@@ -266,7 +266,7 @@ static int brcmf_sdiod_request_data(struct brcmf_sdio_dev *sdiodev, u8 fn,
 	func = sdiodev->func[fn];
 
 	switch (regsz) {
-	case sizeof(u8):
+	case 1:
 		if (write) {
 			if (fn)
 				sdio_writeb(func, *(u8 *)data, addr, &ret);
@@ -280,13 +280,13 @@ static int brcmf_sdiod_request_data(struct brcmf_sdio_dev *sdiodev, u8 fn,
 				*(u8 *)data = sdio_f0_readb(func, addr, &ret);
 		}
 		break;
-	case sizeof(u16):
+	case 2:
 		if (write)
 			sdio_writew(func, *(u16 *)data, addr, &ret);
 		else
 			*(u16 *)data = sdio_readw(func, addr, &ret);
 		break;
-	case sizeof(u32):
+	case 4:
 		if (write)
 			sdio_writel(func, *(u32 *)data, addr, &ret);
 		else
