@@ -53,6 +53,21 @@ static inline int hash__hugepd_ok(hugepd_t hpd)
 }
 #endif
 
+/*
+ * 4k pte format is  different  from  64k  pte  format.  Saving  the
+ * hash_slot is just a matter of returning the pte bits that need to
+ * be modified. On 64k pte, things are a  little  more  involved and
+ * hence  needs   many   more  parameters  to  accomplish  the  same.
+ * However we  want  to abstract this out from the caller by keeping
+ * the prototype consistent across the two formats.
+ */
+static inline unsigned long pte_set_hash_slot(pte_t *ptep, real_pte_t rpte,
+			unsigned int subpg_index, unsigned long slot)
+{
+	return (slot << H_PAGE_F_GIX_SHIFT) &
+		(H_PAGE_F_SECOND | H_PAGE_F_GIX);
+}
+
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 
 static inline char *get_hpte_slot_array(pmd_t *pmdp)
