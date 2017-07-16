@@ -1296,6 +1296,7 @@ thermal_zone_device_register(const char *type, int trips, int mask,
 unregister:
 	ida_simple_remove(&thermal_tz_ida, tz->id);
 	device_unregister(&tz->device);
+	kfree(tz);
 	return ERR_PTR(result);
 }
 EXPORT_SYMBOL_GPL(thermal_zone_device_register);
