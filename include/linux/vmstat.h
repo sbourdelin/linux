@@ -103,6 +103,26 @@ static inline void vm_events_fold_cpu(int cpu)
 #define __count_zid_vm_events(item, zid, delta) \
 	__count_vm_events(item##_NORMAL - ZONE_NORMAL + zid, delta)
 
+#ifdef CONFIG_PER_ORDER_ALLOC_COUNTERS
+static inline void __count_alloc_event(enum zone_type zid, unsigned int order)
+{
+	enum vm_event_item item;
+
+	if (unlikely(order >= MAX_ORDER)) {
+		WARN_ON_ONCE(1);
+		return;
+	}
+
+	item = PGALLOC_FIRST_ZONE + order * MAX_NR_ZONES + zid;
+	__count_vm_events(item, 1);
+}
+#else
+static inline void __count_alloc_event(enum zone_type zid, unsigned int order)
+{
+	__count_zid_vm_events(PGALLOC, zid, 1 << order);
+}
+#endif
+
 /*
  * Zone and node-based page accounting with per cpu differentials.
  */

@@ -66,6 +66,21 @@ struct appldata_mem_data {
 
 } __packed;
 
+#ifdef CONFIG_PER_ORDER_ALLOC_COUNTERS
+static inline sum_pgalloc_events(u64 *pgalloc, unsigned long *ev)
+{
+	int order;
+
+	for (order = 1; order < MAX_ORDER; ++order) {
+		pgalloc += ev[PGALLOC_NORMAL + order * MAX_NR_ZONES] << order;
+		pgalloc += ev[PGALLOC_DMA + order * MAX_NR_ZONES] << order;
+	}
+}
+#else
+static inline sum_pgalloc_events(u64 *pgalloc, unsigned long *ev)
+{
+}
+#endif
 
 /*
  * appldata_get_mem_data()
@@ -92,6 +107,7 @@ static void appldata_get_mem_data(void *data)
 	mem_data->pswpout    = ev[PSWPOUT];
 	mem_data->pgalloc    = ev[PGALLOC_NORMAL];
 	mem_data->pgalloc    += ev[PGALLOC_DMA];
+	sum_pgalloc_events(&mem_data->pgalloc, ev);
 	mem_data->pgfault    = ev[PGFAULT];
 	mem_data->pgmajfault = ev[PGMAJFAULT];
 
