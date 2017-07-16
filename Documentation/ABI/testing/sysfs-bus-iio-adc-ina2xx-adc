@@ -1,0 +1,7 @@
+What:		/sys/bus/iio/devices/iio:deviceX/in_shunt_resistor
+Date:		December 2015
+KernelVersion:	4.5
+Contact:	linux-iio@vger.kernel.org
+Description: 	The value of the shunt resistor connected to the V_IN+ and V_IN-
+		inputs, used to compute the current flowing through the shunt and
+		the corresponding power. In microohms.
