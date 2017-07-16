@@ -1164,7 +1164,7 @@ static void pcpu_balance_workfn(struct work_struct *work)
 	list_for_each_entry_safe(chunk, next, &to_free, list) {
 		int rs, re;
 
-		pcpu_for_each_pop_region(chunk, rs, re, 0, pcpu_unit_pages) {
+		pcpu_for_each_pop_region(chunk, rs, re, 0, chunk->nr_pages) {
 			pcpu_depopulate_chunk(chunk, rs, re);
 			spin_lock_irq(&pcpu_lock);
 			pcpu_chunk_depopulated(chunk, rs, re);
@@ -1221,7 +1221,7 @@ retry_pop:
 
 		spin_lock_irq(&pcpu_lock);
 		list_for_each_entry(chunk, &pcpu_slot[slot], list) {
-			nr_unpop = pcpu_unit_pages - chunk->nr_populated;
+			nr_unpop = chunk->nr_pages - chunk->nr_populated;
 			if (nr_unpop)
 				break;
 		}
@@ -1231,7 +1231,7 @@ retry_pop:
 			continue;
 
 		/* @chunk can't go away while pcpu_alloc_mutex is held */
-		pcpu_for_each_unpop_region(chunk, rs, re, 0, pcpu_unit_pages) {
+		pcpu_for_each_unpop_region(chunk, rs, re, 0, chunk->nr_pages) {
 			int nr = min(re - rs, nr_to_pop);
 
 			ret = pcpu_populate_chunk(chunk, rs, rs + nr);
@@ -1604,6 +1604,7 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 	unsigned int cpu;
 	int *unit_map;
 	int group, unit, i;
+	int chunk_pages;
 	unsigned long tmp_addr, aligned_addr;
 	unsigned long map_size_bytes;
 
@@ -1729,19 +1730,21 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 
 	map_size_bytes = (ai->reserved_size ?: ai->dyn_size) +
 			 pcpu_reserved_offset;
+	chunk_pages = map_size_bytes >> PAGE_SHIFT;
 
 	/* chunk adjacent to static region allocation */
-	chunk = memblock_virt_alloc(pcpu_chunk_struct_size, 0);
+	chunk = memblock_virt_alloc(sizeof(struct pcpu_chunk) +
+				     BITS_TO_LONGS(chunk_pages), 0);
 	INIT_LIST_HEAD(&chunk->list);
 	INIT_LIST_HEAD(&chunk->map_extend_list);
 	chunk->base_addr = (void *)aligned_addr;
 	chunk->map = smap;
 	chunk->map_alloc = ARRAY_SIZE(smap);
 	chunk->immutable = true;
-	bitmap_fill(chunk->populated, pcpu_unit_pages);
-	chunk->nr_populated = pcpu_unit_pages;
+	bitmap_fill(chunk->populated, chunk_pages);
+	chunk->nr_populated = chunk->nr_empty_pop_pages = chunk_pages;
 
-	chunk->nr_pages = map_size_bytes >> PAGE_SHIFT;
+	chunk->nr_pages = chunk_pages;
 
 	if (ai->reserved_size) {
 		chunk->free_size = ai->reserved_size;
@@ -1754,6 +1757,7 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 
 	if (pcpu_reserved_offset) {
 		chunk->has_reserved = true;
+		chunk->nr_empty_pop_pages--;
 		chunk->map[0] = 1;
 		chunk->map[1] = pcpu_reserved_offset;
 		chunk->map_used = 1;
@@ -1764,7 +1768,11 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 
 	/* init dynamic region of first chunk if necessary */
 	if (dyn_size) {
-		chunk = memblock_virt_alloc(pcpu_chunk_struct_size, 0);
+		chunk_pages = dyn_size >> PAGE_SHIFT;
+
+		/* chunk allocation */
+		chunk = memblock_virt_alloc(sizeof(struct pcpu_chunk) +
+					     BITS_TO_LONGS(chunk_pages), 0);
 		INIT_LIST_HEAD(&chunk->list);
 		INIT_LIST_HEAD(&chunk->map_extend_list);
 		chunk->base_addr = base_addr + ai->static_size +
@@ -1772,21 +1780,21 @@ int __init pcpu_setup_first_chunk(const struct pcpu_alloc_info *ai,
 		chunk->map = dmap;
 		chunk->map_alloc = ARRAY_SIZE(dmap);
 		chunk->immutable = true;
-		bitmap_fill(chunk->populated, pcpu_unit_pages);
-		chunk->nr_populated = pcpu_unit_pages;
+		bitmap_fill(chunk->populated, chunk_pages);
+		chunk->nr_populated = chunk_pages;
+		chunk->nr_empty_pop_pages = chunk_pages;
 
 		chunk->contig_hint = chunk->free_size = dyn_size;
 		chunk->map[0] = 0;
 		chunk->map[1] = chunk->free_size | 1;
 		chunk->map_used = 1;
 
-		chunk->nr_pages = dyn_size >> PAGE_SHIFT;
+		chunk->nr_pages = chunk_pages;
 	}
 
 	/* link the first chunk in */
 	pcpu_first_chunk = chunk;
-	pcpu_nr_empty_pop_pages +=
-		pcpu_count_occupied_pages(pcpu_first_chunk, 1);
+	pcpu_nr_empty_pop_pages = pcpu_first_chunk->nr_empty_pop_pages;
 	pcpu_chunk_relocate(pcpu_first_chunk, -1);
 
 	pcpu_stats_chunk_alloc();
