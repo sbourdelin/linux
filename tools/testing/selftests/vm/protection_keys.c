@@ -1068,6 +1068,23 @@ void test_write_of_write_disabled_region(int *ptr, u16 pkey)
 	*ptr = __LINE__;
 	expected_pkey_fault(pkey);
 }
+
+void test_write_of_write_disabled_but_freed_key_region(int *ptr, u16 pkey)
+{
+	dprintf1("disabling write access to PKEY[%02d], doing write\n", pkey);
+	*ptr = __LINE__;
+	do_not_expect_pkey_fault();
+
+	pkey_write_deny(pkey);
+	*ptr = __LINE__;
+	expected_pkey_fault(pkey);
+
+	pkey_write_deny(pkey);
+	sys_pkey_free(pkey);
+	*ptr = __LINE__;
+	do_not_expect_pkey_fault();
+}
+
 void test_write_of_access_disabled_region(int *ptr, u16 pkey)
 {
 	dprintf1("disabling access to PKEY[%02d], doing write\n", pkey);
@@ -1370,6 +1387,7 @@ void (*pkey_tests[])(int *ptr, u16 pkey) = {
 	test_pkey_syscalls_bad_args,
 	test_pkey_alloc_exhaust,
 	test_read_of_access_disabled_but_freed_key_region,
+	test_write_of_write_disabled_but_freed_key_region,
 };
 
 void run_tests_once(void)
