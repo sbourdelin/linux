@@ -37,6 +37,7 @@
 #include <linux/memblock.h>
 #include <linux/memory.h>
 #include <linux/nmi.h>
+#include <linux/pkeys.h>
 
 #include <asm/io.h>
 #include <asm/kdump.h>
@@ -315,6 +316,9 @@ void __init early_setup(unsigned long dt_ptr)
 
 	/* Initialize the hash table or TLB handling */
 	early_init_mmu();
+
+	/* initialize the key subsystem */
+	pkey_initialize();
 
 	/*
 	 * At this point, we can let interrupts switch to virtual mode
