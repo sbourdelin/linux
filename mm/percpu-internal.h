@@ -4,6 +4,21 @@
 #include <linux/types.h>
 #include <linux/percpu.h>
 
+/*
+ * pcpu_bitmap_md is the metadata block struct.
+ * All units are in terms of bits.
+ */
+struct pcpu_bitmap_md {
+	int			contig_hint;	/* contig hint for block */
+	int			contig_hint_start; /* block relative starting
+						      position of the contig hint */
+	int			left_free;	/* size of free space along
+						   the left side of the block */
+	int			right_free;	/* size of free space along
+						   the right side of the block */
+	int			first_free;	/* block position of first free */
+};
+
 struct pcpu_chunk {
 #ifdef CONFIG_PERCPU_STATS
 	int			nr_alloc;	/* # of allocations */
@@ -11,17 +26,20 @@ struct pcpu_chunk {
 #endif
 
 	struct list_head	list;		/* linked to pcpu_slot lists */
-	int			free_size;	/* free bytes in the chunk */
-	int			contig_hint;	/* max contiguous size hint */
+	int			free_bits;	/* free bits in the chunk */
+	int			contig_hint;	/* max contiguous size hint
+						   in bits */
+	int			contig_hint_start; /* contig_hint starting
+						      bit offset */
 	void			*base_addr;	/* base address of this chunk */
 
-	int			map_used;	/* # of map entries used before the sentry */
-	int			map_alloc;	/* # of map entries allocated */
-	int			*map;		/* allocation map */
-	struct list_head	map_extend_list;/* on pcpu_map_extend_chunks */
+	unsigned long		*alloc_map;	/* allocation map */
+	unsigned long		*bound_map;	/* boundary map */
+	struct pcpu_bitmap_md	*md_blocks;	/* metadata blocks */
 
 	void			*data;		/* chunk data */
-	int			first_free;	/* no free below this */
+	int			first_free_block; /* block that contains the first
+						     free bit */
 	bool			immutable;	/* no [de]population allowed */
 	bool			has_reserved;	/* indicates if the region this chunk
 						   is responsible for overlaps with
@@ -43,6 +61,44 @@ extern int pcpu_nr_empty_pop_pages;
 extern struct pcpu_chunk *pcpu_first_chunk;
 extern struct pcpu_chunk *pcpu_reserved_chunk;
 extern unsigned long pcpu_reserved_offset;
+
+/*
+ * pcpu_nr_pages_to_blocks - converts nr_pages to # of md_blocks
+ * @chunk: chunk of interest
+ *
+ * This conversion is from the number of physical pages that the chunk
+ * serves to the number of bitmap blocks required.  It converts to bytes
+ * served to bits required and then blocks used.
+ */
+static inline int pcpu_nr_pages_to_blocks(struct pcpu_chunk *chunk)
+{
+	return chunk->nr_pages * PAGE_SIZE / PCPU_MIN_ALLOC_SIZE /
+	       PCPU_BITMAP_BLOCK_SIZE;
+}
+
+/*
+ * pcpu_pages_to_bits - converts the pages to size of bitmap
+ * @pages: number of physical pages
+ *
+ * This conversion is from physical pages to the number of bits
+ * required in the bitmap.
+ */
+static inline int pcpu_pages_to_bits(int pages)
+{
+	return pages * PAGE_SIZE / PCPU_MIN_ALLOC_SIZE;
+}
+
+/*
+ * pcpu_nr_pages_to_bits - helper to convert nr_pages to size of bitmap
+ * @chunk: chunk of interest
+ *
+ * This conversion is from the number of physical pages that the chunk
+ * serves to the number of bits in the bitmap.
+ */
+static inline int pcpu_nr_pages_to_bits(struct pcpu_chunk *chunk)
+{
+	return pcpu_pages_to_bits(chunk->nr_pages);
+}
 
 #ifdef CONFIG_PERCPU_STATS
 

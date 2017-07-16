@@ -26,6 +26,15 @@
 #define PCPU_MIN_ALLOC_SHIFT		2
 
 /*
+ * This determines the size of each metadata block.  There are several subtle
+ * constraints around this variable.  The reserved_region and dynamic_region
+ * of the first chunk must be multiples of PCPU_BITMAP_BLOCK_SIZE.  This is
+ * not a problem if the BLOCK_SIZE encompasses a page, but if exploring blocks
+ * that are backing multiple pages, this needs to be accounted for.
+ */
+#define PCPU_BITMAP_BLOCK_SIZE		(PAGE_SIZE >> PCPU_MIN_ALLOC_SHIFT)
+
+/*
  * Percpu allocator can serve percpu allocations before slab is
  * initialized which allows slab to depend on the percpu allocator.
  * The following two parameters decide how much resource to
@@ -120,7 +129,6 @@ extern bool is_kernel_percpu_address(unsigned long addr);
 #if !defined(CONFIG_SMP) || !defined(CONFIG_HAVE_SETUP_PER_CPU_AREA)
 extern void __init setup_per_cpu_areas(void);
 #endif
-extern void __init percpu_init_late(void);
 
 extern void __percpu *__alloc_percpu_gfp(size_t size, size_t align, gfp_t gfp);
 extern void __percpu *__alloc_percpu(size_t size, size_t align);
