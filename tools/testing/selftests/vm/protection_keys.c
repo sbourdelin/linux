@@ -1026,6 +1026,30 @@ void test_read_of_access_disabled_region_with_page_already_mapped(int *ptr,
 	expected_pkey_fault(pkey);
 }
 
+void test_read_of_access_disabled_but_freed_key_region(int *ptr, u16 pkey)
+{
+	int ptr_contents;
+
+	dprintf1("disabling access to PKEY[%02d], doing read @ %p\n",
+			 pkey, ptr);
+
+	/* read the content */
+	ptr_contents = read_ptr(ptr);
+	do_not_expect_pkey_fault();
+
+	/* deny key access */
+	pkey_access_deny(pkey);
+	ptr_contents = read_ptr(ptr);
+	dprintf1("*ptr: %d\n", ptr_contents);
+	expected_pkey_fault(pkey);
+
+	/* free the key without restoring access */
+	pkey_access_deny(pkey);
+	sys_pkey_free(pkey);
+	ptr_contents = read_ptr(ptr);
+	do_not_expect_pkey_fault();
+}
+
 void test_write_of_write_disabled_region(int *ptr, u16 pkey)
 {
 	dprintf1("disabling write access to PKEY[%02d], doing write\n", pkey);
@@ -1333,6 +1357,7 @@ void (*pkey_tests[])(int *ptr, u16 pkey) = {
 	test_pkey_syscalls_on_non_allocated_pkey,
 	test_pkey_syscalls_bad_args,
 	test_pkey_alloc_exhaust,
+	test_read_of_access_disabled_but_freed_key_region,
 };
 
 void run_tests_once(void)
