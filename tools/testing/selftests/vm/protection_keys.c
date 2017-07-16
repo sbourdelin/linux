@@ -186,6 +186,7 @@ static char *si_code_str(int si_code)
 
 int pkey_faults;
 int last_si_pkey = -1;
+void pkey_access_allow(int pkey);
 void signal_handler(int signum, siginfo_t *si, void *vucontext)
 {
 	ucontext_t *uctxt = vucontext;
@@ -195,8 +196,6 @@ void signal_handler(int signum, siginfo_t *si, void *vucontext)
 	pkey_reg_t *pkey_reg_ptr;
 	u32 si_pkey;
 	pkey_reg_t *si_pkey_ptr;
-	int pkey_reg_offset;
-	fpregset_t fpregset;
 
 	dprint_in_signal = 1;
 	dprintf1(">>>>===============SIGSEGV============================\n");
@@ -206,8 +205,7 @@ void signal_handler(int signum, siginfo_t *si, void *vucontext)
 
 	trapno = uctxt->uc_mcontext.gregs[REG_TRAPNO];
 	ip = uctxt->uc_mcontext.gregs[REG_IP_IDX];
-	fpregset = uctxt->uc_mcontext.fpregs;
-	fpregs = (void *)fpregset;
+	fpregs = (char *) uctxt->uc_mcontext.fpregs;
 
 	dprintf2("%s() trapno: %d ip: 0x%016lx info->si_code: %s/%d\n",
 			__func__, trapno, ip, si_code_str(si->si_code),
@@ -219,19 +217,20 @@ void signal_handler(int signum, siginfo_t *si, void *vucontext)
 	 * state.  We just assume that it is here.
 	 */
 	fpregs += 0x70;
+	pkey_reg_ptr = (void *)(&fpregs[pkru_xstate_offset()]);
+	/*
+	 * If we got a key fault, we *HAVE* to have at least one bit set in
+	 * here.
+	 */
+	dprintf1("pkru_xstate_offset: %d\n", pkru_xstate_offset());
+	if (DEBUG_LEVEL > 4)
+		dump_mem(pkey_reg_ptr - 128, 256);
+#elif __powerpc64__
+	pkey_reg_ptr = &uctxt->uc_mcontext.gregs[REG_AMR];
 #endif
-	pkey_reg_offset = pkey_reg_xstate_offset();
-	pkey_reg_ptr = (void *)(&fpregs[pkey_reg_offset]);
 
 	dprintf1("siginfo: %p\n", si);
 	dprintf1(" fpregs: %p\n", fpregs);
-	/*
-	 * If we got a PKEY fault, we *HAVE* to have at least one bit set in
-	 * here.
-	 */
-	dprintf1("pkey_reg_xstate_offset: %d\n", pkey_reg_xstate_offset());
-	if (DEBUG_LEVEL > 4)
-		dump_mem(pkey_reg_ptr - 128, 256);
 	pkey_assert(*pkey_reg_ptr);
 
 	si_pkey_ptr = (pkey_reg_t *)(((u8 *)si) + si_pkey_offset);
@@ -254,13 +253,17 @@ void signal_handler(int signum, siginfo_t *si, void *vucontext)
 	 * checking
 	 */
 	dprintf1("signal pkey_reg from  pkey_reg: %016lx\n", __rdpkey_reg());
-	dprintf1("si_pkey from siginfo: %jx\n", si_pkey);
-	*(u64 *)pkey_reg_ptr = 0x00000000;
+	dprintf1("si_pkey from siginfo: %lx\n", si_pkey);
+#ifdef __i386__
+	*(u64 *)pkey_reg_ptr &= reset_bits(si_pkey, PKEY_DISABLE_ACCESS);
+#elif __powerpc64__
+	pkey_access_allow(si_pkey);
+#endif
+	shadow_pkey_reg &= reset_bits(si_pkey, PKEY_DISABLE_ACCESS);
 	dprintf1("WARNING: set PKEY_REG=0 to allow faulting instruction "
 			"to continue\n");
 	pkey_faults++;
 	dprintf1("<<<<==================================================\n");
-	return;
 }
 
 int wait_all_children(void)
