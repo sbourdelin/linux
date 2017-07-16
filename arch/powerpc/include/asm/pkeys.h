@@ -5,6 +5,7 @@ extern bool pkey_inited;
 #define arch_max_pkey()  32
 #define ARCH_VM_PKEY_FLAGS (VM_PKEY_BIT0 | VM_PKEY_BIT1 | VM_PKEY_BIT2 | \
 				VM_PKEY_BIT3 | VM_PKEY_BIT4)
+#define AMR_BITS_PER_PKEY 2
 /*
  * Bits are in BE format.
  * NOTE: key 31, 1, 0 are not used.
