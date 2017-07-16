@@ -3259,10 +3259,12 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 	*did_some_progress = 0;
 
 	/*
-	 * Acquire the oom lock.  If that fails, somebody else is
-	 * making progress for us.
+	 * Acquire the oom lock. If that fails, somebody else should be making
+	 * progress for us. But if many threads are doing the same thing, the
+	 * owner of the oom lock can fail to make progress due to lack of CPU
+	 * time. Therefore, wait unless we get SIGKILL.
 	 */
-	if (!mutex_trylock(&oom_lock)) {
+	if (mutex_lock_killable(&oom_lock)) {
 		*did_some_progress = 1;
 		schedule_timeout_uninterruptible(1);
 		return NULL;
