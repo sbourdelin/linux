@@ -44,7 +44,8 @@
 #define	SI_CC_IDX		0
 
 /* SOC Interconnect types (aka chip types) */
-#define	SOCI_AI			1
+//FIXME - this is multiply defined!
+#define	SOCI_AXI			1
 
 /* A register that is common to all cores to
  * communicate w/PMU regarding clock control.
