@@ -2213,12 +2213,26 @@ int uvc_ctrl_init_device(struct uvc_device *dev)
 {
 	struct uvc_entity *entity;
 	unsigned int i;
+	const struct usb_device_id xu_only[] = {
+		{ USB_DEVICE(0x2833, 0x0201) },
+		{ USB_DEVICE(0x2833, 0x0211) },
+	};
 
 	/* Walk the entities list and instantiate controls */
 	list_for_each_entry(entity, &dev->entities, list) {
 		struct uvc_control *ctrl;
 		unsigned int bControlSize = 0, ncontrols;
 		__u8 *bmControls = NULL;
+
+		/* Oculus Sensors only handle extension unit controls */
+		if (UVC_ENTITY_TYPE(entity) != UVC_VC_EXTENSION_UNIT) {
+			for (i = 0; i < ARRAY_SIZE(xu_only); i++) {
+				if (usb_match_one_id(dev->intf, &xu_only[i]))
+					break;
+			}
+			if (i != ARRAY_SIZE(xu_only))
+				continue;
+		}
 
 		if (UVC_ENTITY_TYPE(entity) == UVC_VC_EXTENSION_UNIT) {
 			bmControls = entity->extension.bmControls;
