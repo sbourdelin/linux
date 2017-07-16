@@ -50,6 +50,18 @@
 #define SBSDIO_NUM_FUNCTION		3
 
 /* function 0 vendor specific CCCR registers */
+
+#define brcm_sdio_func0_rb(sdiodev, addr, r) \
+	sdio_readb((sdiodev)->func[0], (addr), (r))
+
+#define brcm_sdio_func0_wb(sdiodev, addr, v, ret) \
+	sdio_writeb((sdiodev)->func[0], (v), (addr), (ret))
+
+#define brcm_sdio_func1_rb(sdiodev, addr, r) \
+	sdio_readb((sdiodev)->func[1], (addr), (r))
+
+#define brcm_sdio_func1_wb(sdiodev, addr, v, ret) \
+	sdio_writeb((sdiodev)->func[1], (v), (addr), (ret))
 #define SDIO_CCCR_BRCM_CARDCAP			0xf0
 #define SDIO_CCCR_BRCM_CARDCAP_CMD14_SUPPORT	0x02
 #define SDIO_CCCR_BRCM_CARDCAP_CMD14_EXT	0x04
@@ -131,11 +143,6 @@
 /* with b15, maps to 32-bit SB access */
 #define SBSDIO_SB_ACCESS_2_4B_FLAG	0x08000
 
-/* valid bits in SBSDIO_FUNC1_SBADDRxxx regs */
-
-#define SBSDIO_SBADDRLOW_MASK		0x80	/* Valid bits in SBADDRLOW */
-#define SBSDIO_SBADDRMID_MASK		0xff	/* Valid bits in SBADDRMID */
-#define SBSDIO_SBADDRHIGH_MASK		0xffU	/* Valid bits in SBADDRHIGH */
 /* Address bits from SBADDR regs */
 #define SBSDIO_SBWINDOW_MASK		0xffff8000
 
@@ -342,7 +349,7 @@ int brcmf_sdiod_ramrw(struct brcmf_sdio_dev *sdiodev, bool write, u32 address,
 		      u8 *data, uint size);
 
 /* Issue an abort to the specified function */
-int brcmf_sdiod_abort(struct brcmf_sdio_dev *sdiodev, uint fn);
+int brcmf_sdiod_abort(struct brcmf_sdio_dev *sdiodev, u8 fn);
 void brcmf_sdiod_sgtable_alloc(struct brcmf_sdio_dev *sdiodev);
 void brcmf_sdiod_change_state(struct brcmf_sdio_dev *sdiodev,
 			      enum brcmf_sdiod_state state);

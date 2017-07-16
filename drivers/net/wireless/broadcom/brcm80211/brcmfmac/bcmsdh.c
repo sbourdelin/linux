@@ -143,23 +143,22 @@ int brcmf_sdiod_intr_register(struct brcmf_sdio_dev *sdiodev)
 			gpiocontrol |= 0x2;
 			brcmf_sdiod_regwl(sdiodev, addr, gpiocontrol, &ret);
 
-			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_SELECT, 0xf,
+			brcm_sdio_func1_wb(sdiodev, SBSDIO_GPIO_SELECT, 0xf,
 					  &ret);
-			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_OUT, 0, &ret);
-			brcmf_sdiod_regwb(sdiodev, SBSDIO_GPIO_EN, 0x2, &ret);
+			brcm_sdio_func1_wb(sdiodev, SBSDIO_GPIO_OUT, 0, &ret);
+			brcm_sdio_func1_wb(sdiodev, SBSDIO_GPIO_EN, 0x2, &ret);
 		}
 
 		/* must configure SDIO_CCCR_IENx to enable irq */
-		data = brcmf_sdiod_regrb(sdiodev, SDIO_CCCR_IENx, &ret);
+		data = brcm_sdio_func0_rb(sdiodev, SDIO_CCCR_IENx, &ret);
 		data |= 1 << SDIO_FUNC_1 | 1 << SDIO_FUNC_2 | 1;
-		brcmf_sdiod_regwb(sdiodev, SDIO_CCCR_IENx, data, &ret);
+		brcm_sdio_func0_wb(sdiodev, SDIO_CCCR_IENx, data, &ret);
 
 		/* redirect, configure and enable io for interrupt signal */
 		data = SDIO_SEPINT_MASK | SDIO_SEPINT_OE;
 		if (pdata->oob_irq_flags & IRQF_TRIGGER_HIGH)
 			data |= SDIO_SEPINT_ACT_HI;
-		brcmf_sdiod_regwb(sdiodev, SDIO_CCCR_BRCM_SEPINT, data, &ret);
-
+		brcm_sdio_func0_wb(sdiodev, SDIO_CCCR_BRCM_SEPINT, data, &ret);
 		sdio_release_host(sdiodev->func[1]);
 	} else {
 		brcmf_dbg(SDIO, "Entering\n");
@@ -185,8 +184,8 @@ void brcmf_sdiod_intr_unregister(struct brcmf_sdio_dev *sdiodev)
 
 		pdata = &sdiodev->settings->bus.sdio;
 		sdio_claim_host(sdiodev->func[1]);
-		brcmf_sdiod_regwb(sdiodev, SDIO_CCCR_BRCM_SEPINT, 0, NULL);
-		brcmf_sdiod_regwb(sdiodev, SDIO_CCCR_IENx, 0, NULL);
+		brcm_sdio_func0_wb(sdiodev, SDIO_CCCR_BRCM_SEPINT, 0, NULL);
+		brcm_sdio_func0_wb(sdiodev, SDIO_CCCR_IENx, 0, NULL);
 		sdio_release_host(sdiodev->func[1]);
 
 		sdiodev->oob_irq_requested = false;
@@ -240,13 +239,11 @@ brcmf_sdiod_set_sbaddr_window(struct brcmf_sdio_dev *sdiodev, u32 address)
 
 	addr = (address & SBSDIO_SBWINDOW_MASK) >> 8;
 
-	for (i = 0; i < 3; i++) {
-		brcmf_sdiod_regwb(sdiodev, SBSDIO_FUNC1_SBADDRLOW + i, addr & 0xff,
-					&err);
-		if (err)
-			break;
-
+	for (i = 0 ; i < 3 && !err ; i++) {
+		u8 data = addr & 0xff;
 		addr = addr >> 8;
+
+		brcm_sdio_func1_wb(sdiodev, SBSDIO_FUNC1_SBADDRLOW + i, data, &err);
 	}
 
 	return err;
@@ -278,117 +275,6 @@ brcmf_sdiod_addrprep(struct brcmf_sdio_dev *sdiodev, u32 *addr)
 	return 0;
 }
 
-static inline int brcmf_sdiod_f0_writeb(struct sdio_func *func, u8 byte, uint regaddr)
-{
-	int err_ret;
-
-	/*
-	 * Can only directly write to some F0 registers.
-	 * Handle CCCR_IENx and CCCR_ABORT command
-	 * as a special case.
-	 */
-	if ((regaddr == SDIO_CCCR_ABORT) ||
-	    (regaddr == SDIO_CCCR_IENx))
-		sdio_writeb(func, byte, regaddr, &err_ret);
-	else
-		sdio_f0_writeb(func, byte, regaddr, &err_ret);
-
-	return err_ret;
-}
-
-static int brcmf_sdiod_reg_write(struct brcmf_sdio_dev *sdiodev, u32 addr,
-				   u8 regsz, void *data)
-{
-	int ret;
-
-	/*
-	 * figure out how to read the register based on address range
-	 * 0x00 ~ 0x7FF: function 0 CCCR and FBR
-	 * 0x10000 ~ 0x1FFFF: function 1 miscellaneous registers
-	 * The rest: function 1 silicon backplane core registers
-	 * f0 writes must be bytewise
-	 */
-
-	if ((addr & ~REG_F0_REG_MASK) == 0) {
-		if (WARN_ON(regsz > 1))
-			return -EINVAL;
-		ret = brcmf_sdiod_f0_writeb(sdiodev->func[0], *(u8 *)data, addr);
-	}
-	else {
-		switch (regsz) {
-			case 1:
-				sdio_writeb(sdiodev->func[1], *(u8 *)data, addr, &ret);
-				break;
-			case 4:
-				ret = brcmf_sdiod_addrprep(sdiodev, &addr);
-				if (ret)
-					goto done;
-
-				sdio_writel(sdiodev->func[1], *(u32 *)data, addr, &ret);
-				break;
-			default:
-				BUG();
-				ret = -EINVAL;
-				break;
-		}
-	}
-
-#if 0
-	if (ret != 0) {
-		/*
-		 * SleepCSR register access can fail when
-		 * waking up the device so reduce this noise
-		 * in the logs.
-		 */
-		if (addr != SBSDIO_FUNC1_SLEEPCSR)
-			brcmf_err("failed to write data F%d@0x%05x, err: %d\n",
-				  func, addr, ret);
-		else
-			brcmf_dbg(SDIO, "failed to write data F%d@0x%05x, err: %d\n",
-				  func, addr, ret);
-	}
-#endif
-
-done:
-	return ret;
-}
-
-static int brcmf_sdiod_reg_read(struct brcmf_sdio_dev *sdiodev, u32 addr,
-				   u8 regsz, void *data)
-{
-	int ret;
-
-	/*
-	 * figure out how to read the register based on address range
-	 * 0x00 ~ 0x7FF: function 0 CCCR and FBR
-	 * 0x10000 ~ 0x1FFFF: function 1 miscellaneous registers
-	 * The rest: function 1 silicon backplane core registers
-	 * f0 reads must be bytewise
-	 */
-	if ((addr & ~REG_F0_REG_MASK) == 0) {
-		if (WARN_ON(regsz > 1))
-			return -EINVAL;
-		*(u8 *)data = sdio_f0_readb(sdiodev->func[0], addr, &ret);
-	}
-	else {
-		switch (regsz) {
-			case 1:
-				*(u8 *)data = sdio_readb(sdiodev->func[1], addr, &ret);
-				break;
-			case 4:
-				ret = brcmf_sdiod_addrprep(sdiodev, &addr);
-				if (ret)
-					goto done;
-
-				*(u32 *)data = sdio_readl(sdiodev->func[1], addr, &ret);
-				break;
-			default:
-				BUG();
-				ret = -EINVAL;
-				break;
-		}
-	}
-
 #if 0
 	if (ret != 0) {
 		/*
@@ -405,46 +291,20 @@ static int brcmf_sdiod_reg_read(struct brcmf_sdio_dev *sdiodev, u32 addr,
 	}
 #endif
 
-done:
-	return ret;
-}
-
-
-u8 brcmf_sdiod_regrb(struct brcmf_sdio_dev *sdiodev, u32 addr, int *ret)
-{
-	u8 data = 0;
-	int retval;
-
-	retval = brcmf_sdiod_reg_read(sdiodev, addr, 1, &data);
-
-	if (ret)
-		*ret = retval;
-
-	return data;
-}
-
 u32 brcmf_sdiod_regrl(struct brcmf_sdio_dev *sdiodev, u32 addr, int *ret)
 {
 	u32 data = 0;
 	int retval;
 
-	retval = brcmf_sdiod_reg_read(sdiodev, addr, 4, &data);
+	retval = brcmf_sdiod_addrprep(sdiodev, &addr);
+
+	if (!retval)
+		data = sdio_readl(sdiodev->func[1], addr, &retval);
 
 	if (ret)
 		*ret = retval;
 
 	return data;
-}
-
-void brcmf_sdiod_regwb(struct brcmf_sdio_dev *sdiodev, u32 addr,
-		      u8 data, int *ret)
-{
-	int retval;
-
-	retval = brcmf_sdiod_reg_write(sdiodev, addr, 1, &data);
-
-	if (ret)
-		*ret = retval;
 }
 
 void brcmf_sdiod_regwl(struct brcmf_sdio_dev *sdiodev, u32 addr,
@@ -452,7 +312,10 @@ void brcmf_sdiod_regwl(struct brcmf_sdio_dev *sdiodev, u32 addr,
 {
 	int retval;
 
-	retval = brcmf_sdiod_reg_write(sdiodev, addr, 4, &data);
+	retval = brcmf_sdiod_addrprep(sdiodev, &addr);
+
+	if (!retval)
+		sdio_writel(sdiodev->func[1], data, addr, &retval);
 
 	if (ret)
 		*ret = retval;
@@ -890,12 +753,12 @@ brcmf_sdiod_ramrw(struct brcmf_sdio_dev *sdiodev, bool write, u32 address,
 	return err;
 }
 
-int brcmf_sdiod_abort(struct brcmf_sdio_dev *sdiodev, uint fn)
+int brcmf_sdiod_abort(struct brcmf_sdio_dev *sdiodev, u8 fn)
 {
 	brcmf_dbg(SDIO, "Enter\n");
 
 	/* issue abort cmd52 command through F0 */
-	brcmf_sdiod_f0_writeb(sdiodev->func[0], (u8)fn, SDIO_CCCR_ABORT);
+	brcm_sdio_func0_wb(sdiodev, SDIO_CCCR_ABORT, fn, NULL);//FIXME we dont care about errors, right?
 
 
 	brcmf_dbg(SDIO, "Exit\n");
