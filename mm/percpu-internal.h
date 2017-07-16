@@ -23,11 +23,12 @@ struct pcpu_chunk {
 	void			*data;		/* chunk data */
 	int			first_free;	/* no free below this */
 	bool			immutable;	/* no [de]population allowed */
-	bool			has_reserved;	/* Indicates if chunk has reserved space
-						   at the beginning. Reserved chunk will
-						   contain reservation for static chunk.
-						   Dynamic chunk will contain reservation
-						   for static and reserved chunks. */
+	bool			has_reserved;	/* indicates if the region this chunk
+						   is responsible for overlaps with
+						   the prior adjacent region */
+
+	int                     nr_pages;       /* # of PAGE_SIZE pages served
+						   by this chunk */
 	int			nr_populated;	/* # of populated pages */
 	unsigned long		populated[];	/* populated bitmap */
 };
@@ -40,6 +41,7 @@ extern int pcpu_nr_empty_pop_pages;
 
 extern struct pcpu_chunk *pcpu_first_chunk;
 extern struct pcpu_chunk *pcpu_reserved_chunk;
+extern unsigned long pcpu_reserved_offset;
 
 #ifdef CONFIG_PERCPU_STATS
 
