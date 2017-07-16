@@ -872,6 +872,7 @@ address which can extend beyond that limit.
   Additional properties for the root node:
 
     - serial-number : a string representing the device's serial number
+    - board-revision : a string representing the board's revision
 
   b) The /cpus node
 
