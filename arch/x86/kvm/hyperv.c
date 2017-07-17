@@ -732,6 +732,8 @@ static bool kvm_hv_msr_partition_wide(u32 msr)
 	case HV_X64_MSR_HYPERCALL:
 	case HV_X64_MSR_REFERENCE_TSC:
 	case HV_X64_MSR_TIME_REF_COUNT:
+	case HV_X64_MSR_TSC_FREQUENCY:
+	case HV_X64_MSR_APIC_FREQUENCY:
 	case HV_X64_MSR_CRASH_CTL:
 	case HV_X64_MSR_CRASH_P0 ... HV_X64_MSR_CRASH_P4:
 	case HV_X64_MSR_RESET:
@@ -1094,6 +1096,12 @@ static int kvm_hv_get_msr_pw(struct kvm_vcpu *vcpu, u32 msr, u64 *pdata)
 		break;
 	case HV_X64_MSR_REFERENCE_TSC:
 		data = hv->hv_tsc_page;
+		break;
+	case HV_X64_MSR_TSC_FREQUENCY:
+		data = (u64)tsc_khz * 1000;
+		break;
+	case HV_X64_MSR_APIC_FREQUENCY:
+		data = APIC_BUS_FREQUENCY;
 		break;
 	case HV_X64_MSR_CRASH_P0 ... HV_X64_MSR_CRASH_P4:
 		return kvm_hv_msr_get_crash_data(vcpu,
