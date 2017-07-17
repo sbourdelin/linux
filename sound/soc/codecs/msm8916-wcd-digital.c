@@ -568,6 +568,16 @@ static int msm8916_wcd_digital_codec_probe(struct snd_soc_codec *codec)
 	return 0;
 }
 
+static int msm8916_set_dai_sysclk(struct snd_soc_dai *dai,
+				 int clk_id, unsigned int freq, int dir)
+{
+	struct msm8916_wcd_digital_priv *p = dev_get_drvdata(dai->codec->dev);
+
+	clk_set_rate(p->mclk, freq);
+
+	return 0;
+}
+
 static int msm8916_wcd_digital_hw_params(struct snd_pcm_substream *substream,
 					 struct snd_pcm_hw_params *params,
 					 struct snd_soc_dai *dai)
@@ -792,6 +802,7 @@ static struct snd_soc_dai_ops msm8916_wcd_digital_dai_ops = {
 	.startup = msm8916_wcd_digital_startup,
 	.shutdown = msm8916_wcd_digital_shutdown,
 	.hw_params = msm8916_wcd_digital_hw_params,
+	.set_sysclk = msm8916_set_dai_sysclk,
 };
 
 static struct snd_soc_dai_driver msm8916_wcd_digital_dai[] = {
