@@ -47,7 +47,7 @@ static void read_bitstream(char *bitdata, char *buf, int *offset, int rdsize)
 	*offset += rdsize;
 }
 
-static void readinfo_bitstream(char *bitdata, char *buf, int *offset)
+static int readinfo_bitstream(char *bitdata, char *buf, int n, int *offset)
 {
 	char tbuf[64];
 	s32 len;
@@ -59,9 +59,15 @@ static void readinfo_bitstream(char *bitdata, char *buf, int *offset)
 	read_bitstream(bitdata, tbuf, offset, 2);
 
 	len = tbuf[0] << 8 | tbuf[1];
+	if (len + 1 > n) {
+		pr_err("error: readinfo buffer too small\n");
+		return -1;
+	}
 
 	read_bitstream(bitdata, buf, offset, len);
 	buf[len] = '\0';
+
+	return 0;
 }
 
 /*
@@ -113,7 +119,7 @@ static int readmagic_bitstream(char *bitdata, int *offset)
 /*
  * NOTE: supports only bitstream format
  */
-static enum fmt_image get_imageformat(struct fpgaimage *fimage)
+static enum fmt_image get_imageformat(void)
 {
 	return f_bit;
 }
@@ -127,7 +133,7 @@ static void gs_print_header(struct fpgaimage *fimage)
 	pr_info("lendata: %d\n", fimage->lendata);
 }
 
-static void gs_read_bitstream(struct fpgaimage *fimage)
+static int gs_read_bitstream(struct fpgaimage *fimage)
 {
 	char *bitdata;
 	int offset;
@@ -135,26 +141,37 @@ static void gs_read_bitstream(struct fpgaimage *fimage)
 	offset = 0;
 	bitdata = (char *)fimage->fw_entry->data;
 
-	readmagic_bitstream(bitdata, &offset);
-	readinfo_bitstream(bitdata, fimage->filename, &offset);
-	readinfo_bitstream(bitdata, fimage->part, &offset);
-	readinfo_bitstream(bitdata, fimage->date, &offset);
-	readinfo_bitstream(bitdata, fimage->time, &offset);
-	readlength_bitstream(bitdata, &fimage->lendata, &offset);
+	if (readmagic_bitstream(bitdata, &offset))
+		return -1;
+
+	if (readinfo_bitstream(bitdata, fimage->filename, MAX_STR, &offset))
+		return -1;
+	if (readinfo_bitstream(bitdata, fimage->part, MAX_STR, &offset))
+		return -1;
+	if (readinfo_bitstream(bitdata, fimage->date, MAX_STR, &offset))
+		return -1;
+	if (readinfo_bitstream(bitdata, fimage->time, MAX_STR, &offset))
+		return -1;
+
+	if (readlength_bitstream(bitdata, &fimage->lendata, &offset))
+		return -1;
 
 	fimage->fpgadata = bitdata + offset;
+
+	return 0;
 }
 
 static int gs_read_image(struct fpgaimage *fimage)
 {
 	int img_fmt;
 
-	img_fmt = get_imageformat(fimage);
+	img_fmt = get_imageformat();
 
 	switch (img_fmt) {
 	case f_bit:
 		pr_info("image is bitstream format\n");
-		gs_read_bitstream(fimage);
+		if (gs_read_bitstream(fimage))
+			return -1;
 		break;
 	default:
 		pr_err("unsupported fpga image format\n");
