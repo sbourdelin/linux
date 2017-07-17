@@ -187,6 +187,8 @@ struct qmp_phy_init_tbl {
 		.in_layout = 1,		\
 	}
 
+#define QPHY_REG_INVAL		0xffffffffu
+
 /* set of registers with offsets different per-PHY */
 enum qphy_reg_layout {
 	/* Common block control registers */
@@ -676,15 +678,18 @@ static int qcom_qmp_phy_com_init(struct qcom_qmp *qmp)
 		qphy_setbits(serdes, cfg->regs[QPHY_COM_START_CONTROL],
 			     SERDES_START | PCS_START);
 
-		status = serdes + cfg->regs[QPHY_COM_PCS_READY_STATUS];
-		mask = cfg->mask_com_pcs_ready;
+		if (cfg->regs[QPHY_COM_PCS_READY_STATUS] != QPHY_REG_INVAL) {
+			status = serdes + cfg->regs[QPHY_COM_PCS_READY_STATUS];
+			mask = cfg->mask_com_pcs_ready;
 
-		ret = readl_poll_timeout(status, val, (val & mask), 10,
-					 PHY_INIT_COMPLETE_TIMEOUT);
-		if (ret) {
-			dev_err(qmp->dev,
-				"phy common block init timed-out\n");
-			goto err_com_init;
+			ret = readl_poll_timeout(status, val, (val & mask), 10,
+						 PHY_INIT_COMPLETE_TIMEOUT);
+			if (ret) {
+				dev_err(qmp->dev,
+					"%s: phy common block init timed-out\n",
+					__func__);
+				goto err_com_init;
+			}
 		}
 	}
 
