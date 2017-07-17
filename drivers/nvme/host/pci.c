@@ -810,13 +810,12 @@ static void nvme_process_cq(struct nvme_queue *nvmeq)
 
 	while (nvme_read_cqe(nvmeq, &cqe)) {
 		nvme_handle_cqe(nvmeq, &cqe);
+		nvme_ring_cq_doorbell(nvmeq);
 		consumed++;
 	}
 
-	if (consumed) {
-		nvme_ring_cq_doorbell(nvmeq);
+	if (consumed)
 		nvmeq->cqe_seen = 1;
-	}
 }
 
 static irqreturn_t nvme_irq(int irq, void *data)
