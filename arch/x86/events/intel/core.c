@@ -3250,9 +3250,11 @@ static void intel_pmu_cpu_dying(int cpu)
 static void intel_pmu_sched_task(struct perf_event_context *ctx,
 				 bool sched_in)
 {
-	if (x86_pmu.pebs_active)
+	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+
+	if (intel_pmu_pebs_needs_sched_cb(cpuc))
 		intel_pmu_pebs_sched_task(ctx, sched_in);
-	if (x86_pmu.lbr_nr)
+	if (cpuc->lbr_users)
 		intel_pmu_lbr_sched_task(ctx, sched_in);
 }
 

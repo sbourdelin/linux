@@ -811,7 +811,7 @@ struct event_constraint *intel_pebs_constraints(struct perf_event *event)
  * the large interrupt threshold, such that we can provide PID and TID
  * to PEBS samples.
  */
-static inline bool pebs_needs_sched_cb(struct cpu_hw_events *cpuc)
+inline bool intel_pmu_pebs_needs_sched_cb(struct cpu_hw_events *cpuc)
 {
 	return cpuc->n_pebs && (cpuc->n_pebs == cpuc->n_large_pebs);
 }
@@ -841,7 +841,7 @@ pebs_update_state(bool needed_cb, struct cpu_hw_events *cpuc, struct pmu *pmu)
 	 */
 	bool update = cpuc->n_pebs == 1;
 
-	if (needed_cb != pebs_needs_sched_cb(cpuc)) {
+	if (needed_cb != intel_pmu_pebs_needs_sched_cb(cpuc)) {
 		if (!needed_cb)
 			perf_sched_cb_inc(pmu);
 		else
@@ -858,7 +858,7 @@ void intel_pmu_pebs_add(struct perf_event *event)
 {
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
 	struct hw_perf_event *hwc = &event->hw;
-	bool needed_cb = pebs_needs_sched_cb(cpuc);
+	bool needed_cb = intel_pmu_pebs_needs_sched_cb(cpuc);
 
 	cpuc->n_pebs++;
 	if (hwc->flags & PERF_X86_EVENT_FREERUNNING)
@@ -896,7 +896,7 @@ void intel_pmu_pebs_del(struct perf_event *event)
 {
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
 	struct hw_perf_event *hwc = &event->hw;
-	bool needed_cb = pebs_needs_sched_cb(cpuc);
+	bool needed_cb = intel_pmu_pebs_needs_sched_cb(cpuc);
 
 	cpuc->n_pebs--;
 	if (hwc->flags & PERF_X86_EVENT_FREERUNNING)
