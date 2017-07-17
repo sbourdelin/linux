@@ -1047,3 +1047,33 @@ int btrfs_decompress_buf2page(const char *buf, unsigned long buf_start,
 
 	return 1;
 }
+
+/*
+ * Heuristic skeleton
+ * For now just would be a naive and very optimistic 'return true'.
+ * Heuristic proporsed to fast (in compare to direct compression) detect
+ * data type (compressible/uncompressible) for avoid vaste of cpu time
+ * on compression uncompressible data.
+ * In near time that logic will be added:
+ * 0. Get sample of input data
+ * 1. Detect Mostly Zeroed data
+ * 2. Detect Data with low "byte set" size (Text & etc)
+ * 3. Detect Data with low/high core "byte set"
+ */
+int btrfs_compress_heuristic(struct inode *inode, u64 start, u64 end)
+{
+	u64 index = start >> PAGE_SHIFT;
+	u64 end_index = end >> PAGE_SHIFT;
+	struct page *page;
+	int ret = 1;
+
+	while (index <= end_index) {
+		page = find_get_page(inode->i_mapping, index);
+		kmap(page);
+		kunmap(page);
+		put_page(page);
+		index++;
+	}
+
+	return ret;
+}
