@@ -54,6 +54,8 @@ static struct pixel_format bdw_pixel_formats[PRIMARY_FORMAT_NUM] = {
 		"32-bit RGBX (2:10:10:10 MSB-X:B:G:R)"},
 	[0xa] = {DRM_FORMAT_XRGB2101010, 32,
 		"32-bit BGRX (2:10:10:10 MSB-X:R:G:B)"},
+	[0xc] = {DRM_FORMAT_XRGB161616, 64,
+		"64-bit RGBX Floating Point(16:16:16:16 MSB-X:B:G:R)"},
 	[0xe] = {DRM_FORMAT_XBGR8888, 32,
 		"32-bit RGBX (8:8:8:8 MSB-X:B:G:R)"},
 };
@@ -75,6 +77,10 @@ static struct pixel_format skl_pixel_formats[] = {
 	{DRM_FORMAT_XBGR2101010, 32, "32-bit RGBX (2:10:10:10 MSB-X:B:G:R)"},
 	{DRM_FORMAT_XRGB2101010, 32, "32-bit BGRX (2:10:10:10 MSB-X:R:G:B)"},
 
+	{DRM_FORMAT_XRGB161616, 64,
+		"64-bit XRGB (16:16:16:16 MSB-X:R:G:B)"},
+	{DRM_FORMAT_XBGR161616, 64,
+		"64-bit XBGR (16:16:16:16 MSB-X:B:G:R)"},
 
 	/* non-supported format has bpp default to 0 */
 	{0, 0, NULL},
@@ -100,6 +106,9 @@ static int skl_format_to_drm(int format, bool rgb_order, bool alpha,
 		break;
 	case PLANE_CTL_FORMAT_XRGB_2101010:
 		skl_pixel_formats_index = rgb_order ? 10 : 11;
+		break;
+	case PLANE_CTL_FORMAT_XRGB_16161616F:
+		skl_pixel_formats_index = rgb_order ? 12 : 13;
 		break;
 	case PLANE_CTL_FORMAT_YUV422:
 		skl_pixel_formats_index = yuv_order >> 16;
@@ -321,6 +330,8 @@ static struct pixel_format sprite_pixel_formats[SPRITE_FORMAT_NUM] = {
 	[0x0]  = {DRM_FORMAT_YUV422, 16, "YUV 16-bit 4:2:2 packed"},
 	[0x1]  = {DRM_FORMAT_XRGB2101010, 32, "RGB 32-bit 2:10:10:10"},
 	[0x2]  = {DRM_FORMAT_XRGB8888, 32, "RGB 32-bit 8:8:8:8"},
+	[0x3]  = {DRM_FORMAT_XRGB161616, 64,
+		    "RGB 64-bit 16:16:16:16 Floating Point"},
 	[0x4] = {DRM_FORMAT_AYUV, 32,
 		"YUV 32-bit 4:4:4 packed (8:8:8:8 MSB-X:Y:U:V)"},
 };
