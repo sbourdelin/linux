@@ -139,11 +139,13 @@ static long neg_dentry_percpu_limit __read_mostly;
 static long neg_dentry_nfree_init __read_mostly; /* Free pool initial value */
 static struct {
 	raw_spinlock_t nfree_lock;
+	raw_spinlock_t prune_lock;	/* Lock for protecting pruning */
 	long nfree;			/* Negative dentry free pool */
 	struct super_block *prune_sb;	/* Super_block for pruning */
 	int neg_count, prune_count;	/* Pruning counts */
 } ndblk ____cacheline_aligned_in_smp;
 
+static void clear_prune_sb_for_umount(struct super_block *sb);
 static void prune_negative_dentry(struct work_struct *work);
 static DECLARE_DELAYED_WORK(prune_neg_dentry_work, prune_negative_dentry);
 
@@ -1294,6 +1296,7 @@ void shrink_dcache_sb(struct super_block *sb)
 {
 	long freed;
 
+	clear_prune_sb_for_umount(sb);
 	do {
 		LIST_HEAD(dispose);
 
@@ -1324,7 +1327,8 @@ static enum lru_status dentry_negative_lru_isolate(struct list_head *item,
 	 * list.
 	 */
 	if ((ndblk.neg_count >= NEG_DENTRY_BATCH) ||
-	    (ndblk.prune_count >= NEG_DENTRY_BATCH)) {
+	    (ndblk.prune_count >= NEG_DENTRY_BATCH) ||
+	    !READ_ONCE(ndblk.prune_sb)) {
 		ndblk.prune_count = 0;
 		return LRU_STOP;
 	}
@@ -1375,15 +1379,24 @@ out:
 static void prune_negative_dentry(struct work_struct *work)
 {
 	int freed;
-	struct super_block *sb = READ_ONCE(ndblk.prune_sb);
+	struct super_block *sb;
 	LIST_HEAD(dispose);
 
-	if (!sb)
+	/*
+	 * The prune_lock is used to protect negative dentry pruning from
+	 * racing with concurrent umount operation.
+	 */
+	raw_spin_lock(&ndblk.prune_lock);
+	sb = READ_ONCE(ndblk.prune_sb);
+	if (!sb) {
+		raw_spin_unlock(&ndblk.prune_lock);
 		return;
+	}
 
 	ndblk.neg_count = ndblk.prune_count = 0;
 	freed = list_lru_walk(&sb->s_dentry_lru, dentry_negative_lru_isolate,
 			      &dispose, NEG_DENTRY_BATCH);
+	raw_spin_unlock(&ndblk.prune_lock);
 
 	if (freed)
 		shrink_dentry_list(&dispose);
@@ -1398,6 +1411,27 @@ static void prune_negative_dentry(struct work_struct *work)
 				      NEG_PRUNING_DELAY);
 	else
 		WRITE_ONCE(ndblk.prune_sb, NULL);
+}
+
+/*
+ * This is called before an umount to clear ndblk.prune_sb if it
+ * matches the given super_block.
+ */
+static void clear_prune_sb_for_umount(struct super_block *sb)
+{
+	if (likely(READ_ONCE(ndblk.prune_sb) != sb))
+		return;
+	WRITE_ONCE(ndblk.prune_sb, NULL);
+	/*
+	 * Need to wait until an ongoing pruning operation, if present,
+	 * is completed.
+	 *
+	 * Clearing ndblk.prune_sb will hasten the completion of pruning.
+	 * In the unlikely event that ndblk.prune_sb is set to another
+	 * super_block, the waiting will last the complete pruning operation
+	 * which shouldn't be that long either.
+	 */
+	raw_spin_unlock_wait(&ndblk.prune_lock);
 }
 
 /**
@@ -1722,6 +1756,7 @@ void shrink_dcache_for_umount(struct super_block *sb)
 
 	WARN(down_read_trylock(&sb->s_umount), "s_umount should've been locked");
 
+	clear_prune_sb_for_umount(sb);
 	dentry = sb->s_root;
 	sb->s_root = NULL;
 	do_one_tree(dentry);
