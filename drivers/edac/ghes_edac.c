@@ -34,6 +34,9 @@ static LIST_HEAD(ghes_reglist);
 static DEFINE_MUTEX(ghes_edac_lock);
 static int ghes_edac_mc_num;
 
+/* Set 1 to skip the platform check */
+static bool __read_mostly ghes_edac_any_oem;
+module_param_named(any_oem, ghes_edac_any_oem, bool, 0);
 
 /* Memory Device - Type 17 of SMBIOS spec */
 struct memdev_dmi_entry {
@@ -405,6 +408,15 @@ void ghes_edac_report_mem_error(struct ghes *ghes, int sev,
 }
 EXPORT_SYMBOL_GPL(ghes_edac_report_mem_error);
 
+/*
+ * Known systems that are safe to enable this module.
+ * "ghes_edac.any_oem=1" skips this check if necessary.
+ */
+static struct acpi_oemlist oemlist[] = {
+	{"HPE   ", "Server  ", 0, ACPI_SIG_FADT, all_versions},
+	{ } /* End */
+};
+
 int ghes_edac_register(struct ghes *ghes, struct device *dev)
 {
 	bool fake = false;
@@ -413,6 +425,12 @@ int ghes_edac_register(struct ghes *ghes, struct device *dev)
 	struct edac_mc_layer layers[1];
 	struct ghes_edac_pvt *pvt;
 	struct ghes_edac_dimm_fill dimm_fill;
+	int idx;
+
+	/* Check if safe to enable on this system */
+	idx = acpi_match_oemlist(oemlist);
+	if (!ghes_edac_any_oem && idx < 0)
+		return 0;
 
 	/* Get the number of DIMMs */
 	dmi_walk(ghes_edac_count_dimms, &num_dimm);
@@ -456,7 +474,11 @@ int ghes_edac_register(struct ghes *ghes, struct device *dev)
 	mci->dev_name = "ghes";
 
 	if (!ghes_edac_mc_num) {
-		if (!fake) {
+		if (fake) {
+			pr_info("This system has a very crappy BIOS: It doesn't even list the DIMMS.\n");
+			pr_info("Its SMBIOS info is wrong. It is doubtful that the error report would\n");
+			pr_info("work on such system. Use this driver with caution\n");
+		} else if (idx < 0) {
 			pr_info("This EDAC driver relies on BIOS to enumerate memory and get error reports.\n");
 			pr_info("Unfortunately, not all BIOSes reflect the memory layout correctly.\n");
 			pr_info("So, the end result of using this driver varies from vendor to vendor.\n");
@@ -464,10 +486,6 @@ int ghes_edac_register(struct ghes *ghes, struct device *dev)
 			pr_info("to correct its BIOS.\n");
 			pr_info("This system has %d DIMM sockets.\n",
 				num_dimm);
-		} else {
-			pr_info("This system has a very crappy BIOS: It doesn't even list the DIMMS.\n");
-			pr_info("Its SMBIOS info is wrong. It is doubtful that the error report would\n");
-			pr_info("work on such system. Use this driver with caution\n");
 		}
 	}
 
