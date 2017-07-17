@@ -51,17 +51,18 @@
 
 /* function 0 vendor specific CCCR registers */
 
-#define SDIO_CCCR_BRCM_CARDCAP			0xf0
+#define SDIO_CCCR_BRCM_CARDCAP		0xf0
 #define SDIO_CCCR_BRCM_CARDCAP_CMD14_SUPPORT	0x02
 #define SDIO_CCCR_BRCM_CARDCAP_CMD14_EXT	0x04
 #define SDIO_CCCR_BRCM_CARDCAP_CMD_NODEC	0x08
+
 #define SDIO_CCCR_BRCM_CARDCTRL		0xf1
 #define SDIO_CCCR_BRCM_CARDCTRL_WLANRESET	0x02
-#define SDIO_CCCR_BRCM_SEPINT			0xf2
 
-#define  SDIO_SEPINT_MASK		0x01
-#define  SDIO_SEPINT_OE			0x02
-#define  SDIO_SEPINT_ACT_HI		0x04
+#define SDIO_CCCR_BRCM_SEPINT		0xf2
+#define SDIO_SEPINT_MASK			0x01
+#define SDIO_SEPINT_OE				0x02
+#define SDIO_SEPINT_ACT_HI			0x04
 
 /* function 1 miscellaneous registers */
 
