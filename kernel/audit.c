@@ -659,6 +659,7 @@ static int auditd_send_unicast_skb(struct sk_buff *skb)
 err:
 	if (ac && rc == -ECONNREFUSED)
 		auditd_reset(ac);
+	kfree_skb(skb);
 	return rc;
 }
 
