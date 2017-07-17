@@ -206,7 +206,7 @@ void v4l2_async_notifier_unregister(struct v4l2_async_notifier *notifier)
 	unsigned int notif_n_subdev = notifier->num_subdevs;
 	unsigned int n_subdev = min(notif_n_subdev, V4L2_MAX_SUBDEVS);
 	struct device **dev;
-	int i = 0;
+	int i, count = 0;
 
 	if (!notifier->v4l2_dev)
 		return;
@@ -222,37 +222,28 @@ void v4l2_async_notifier_unregister(struct v4l2_async_notifier *notifier)
 	list_del(&notifier->list);
 
 	list_for_each_entry_safe(sd, tmp, &notifier->done, async_list) {
-		struct device *d;
-
-		d = get_device(sd->dev);
+		if (dev)
+			dev[count] = get_device(sd->dev);
+		count++;
 
 		if (notifier->unbind)
 			notifier->unbind(notifier, sd, sd->asd);
 
 		v4l2_async_cleanup(sd);
-
-		/* If we handled USB devices, we'd have to lock the parent too */
-		device_release_driver(d);
-
-		/*
-		 * Store device at the device cache, in order to call
-		 * put_device() on the final step
-		 */
-		if (dev)
-			dev[i++] = d;
-		else
-			put_device(d);
 	}
 
 	mutex_unlock(&list_lock);
 
+	for (i = 0; i < count; i++) {
+		/* If we handled USB devices, we'd have to lock the parent too */
+		if (dev)
+			device_release_driver(dev[i]);
+	}
+
 	/*
 	 * Call device_attach() to reprobe devices
-	 *
-	 * NOTE: If dev allocation fails, i is 0, and the whole loop won't be
-	 * executed.
 	 */
-	while (i--) {
+	for (i = 0; dev && i < count; i++) {
 		struct device *d = dev[i];
 
 		if (d && device_attach(d) < 0) {
