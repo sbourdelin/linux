@@ -124,14 +124,15 @@ static inline void mc_write_command(struct mc_command __iomem *portal,
 {
 	int i;
 
-	/* copy command parameters into the portal */
-	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
-		__raw_writeq(cmd->params[i], &portal->params[i]);
-	/* ensure command params are committed before submitting it */
-	wmb();
-
-	/* submit the command by writing the header */
-	__raw_writeq(cmd->header, &portal->header);
+	/*
+	 * copy command parameters into the portal. Final write
+	 * triggers the submission of the command.
+	 */
+	for (i = sizeof(struct mc_command) / sizeof(u32) - 1; i >= 0; i--) {
+		__raw_writel(((u32 *)cmd)[i], &((u32 *)portal)[i]);
+		/* ensure command params are committed before submitting it */
+		wmb();
+	}
 }
 
 /**
@@ -148,19 +149,11 @@ static inline enum mc_cmd_status mc_read_response(struct mc_command __iomem *
 						  struct mc_command *resp)
 {
 	int i;
-	enum mc_cmd_status status;
 
-	/* Copy command response header from MC portal: */
-	resp->header = __raw_readq(&portal->header);
-	status = mc_cmd_hdr_read_status(resp);
-	if (status != MC_CMD_STATUS_OK)
-		return status;
+	for (i = 0; i < sizeof(struct mc_command) / sizeof(u32); i++)
+		((u32 *)resp)[i] = __raw_readl(&((u32 *)portal)[i]);
 
-	/* Copy command response data from MC portal: */
-	for (i = 0; i < MC_CMD_NUM_OF_PARAMS; i++)
-		resp->params[i] = __raw_readq(&portal->params[i]);
-
-	return status;
+	return mc_cmd_hdr_read_status(resp);
 }
 
 /**
