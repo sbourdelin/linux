@@ -1720,6 +1720,10 @@ pull_pages:
 				skb_shinfo(skb)->frags[k].page_offset += eat;
 				skb_frag_size_sub(&skb_shinfo(skb)->frags[k], eat);
 				eat = 0;
+				if (!i) {
+					k = skb_shinfo(skb)->nr_frags;
+					break;
+				}
 			}
 			k++;
 		}
