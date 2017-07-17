@@ -5,6 +5,7 @@
 #
 
 use strict;
+use List::Util qw(shuffle);
 
 my $outputdir;
 
@@ -153,9 +154,11 @@ sub run_config_bisect {
 	my @diff_arr = diff_config_vals \%good_configs, \%bad_configs;
 	my $len_diff = $#diff_arr + 1;
 
-	my $runtest = 1;
+	my $rand_tries = 10;
+	my $runtest = 0;
 	my %new_configs;
 	my $ret;
+	my $count = 0;
 
 	print "d=$len_diff\n";
 
@@ -164,32 +167,36 @@ sub run_config_bisect {
 		exit 2;
 	}
 
-	my %tmp_config = %bad_configs;
-
-	my $half = int($#diff_arr / 2);
-	my @tophalf = @diff_arr[0 .. $half];
-
-	print "Settings bisect with top half:\n";
-	foreach my $item (@tophalf) {
-		$tmp_config{$item} = $good_configs{$item};
-	}
-
-	$runtest = process_new_config \%tmp_config, \%new_configs,
-		\%good_configs, \%bad_configs, $outfile;
-
-	if (!$runtest) {
+	while ($runtest == 0 && ++$count <= $rand_tries) {
 		my %tmp_config = %bad_configs;
 
-		print "Try bottom half\n";
+		# If we fail to generate a new config (due to the top half
+		# configs being unchangeable without the bottom half configs)
+		# then try a few random permutations, and if those fail try
+		# each option one at a time.
 
-		my @bottomhalf = @diff_arr[$half+1 .. $#diff_arr];
+		if ($count <= $rand_tries) {
+			@diff_arr = shuffle(@diff_arr);
+		}
 
-		foreach my $item (@bottomhalf) {
+		my $half = int($#diff_arr / 2);
+		if ($count > 2) {
+			$half = int(rand($#diff_arr));
+		}
+
+		my @tophalf = @diff_arr[0 .. $half];
+
+		foreach my $item (@tophalf) {
 			$tmp_config{$item} = $good_configs{$item};
 		}
 
 		$runtest = process_new_config \%tmp_config, \%new_configs,
 				\%good_configs, \%bad_configs, $outfile;
+	}
+
+	if ($runtest == 0) {
+		print "$0: No more bisecting possible\n";
+		exit 2;
 	}
 }
 
