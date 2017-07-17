@@ -202,6 +202,7 @@ struct platform_freeze_ops {
  */
 extern void suspend_set_ops(const struct platform_suspend_ops *ops);
 extern int suspend_valid_only_mem(suspend_state_t state);
+extern suspend_state_t suspend_target_state(void);
 
 extern unsigned int pm_suspend_global_flags;
 
@@ -281,6 +282,7 @@ static inline bool pm_resume_via_firmware(void) { return false; }
 
 static inline void suspend_set_ops(const struct platform_suspend_ops *ops) {}
 static inline int pm_suspend(suspend_state_t state) { return -ENOSYS; }
+static inline suspend_state_t suspend_target_state(void) { return -ENOSYS; }
 static inline bool idle_should_freeze(void) { return false; }
 static inline void __init pm_states_init(void) {}
 static inline void freeze_set_ops(const struct platform_freeze_ops *ops) {}

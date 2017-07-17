@@ -47,6 +47,7 @@ const char *mem_sleep_states[PM_SUSPEND_MAX];
 
 suspend_state_t mem_sleep_current = PM_SUSPEND_FREEZE;
 static suspend_state_t mem_sleep_default = PM_SUSPEND_MEM;
+static suspend_state_t pm_suspend_target_state;
 
 unsigned int pm_suspend_global_flags;
 EXPORT_SYMBOL_GPL(pm_suspend_global_flags);
@@ -200,6 +201,18 @@ void suspend_set_ops(const struct platform_suspend_ops *ops)
 	unlock_system_sleep();
 }
 EXPORT_SYMBOL_GPL(suspend_set_ops);
+
+/**
+ * suspend_target_state - Return the system wide suspend state.
+ *
+ * The pm_suspend_target_state becomes valid during
+ * suspend_devices_and_enter().
+ */
+suspend_state_t suspend_target_state(void)
+{
+	return pm_suspend_target_state;
+}
+EXPORT_SYMBOL_GPL(suspend_target_state);
 
 /**
  * suspend_valid_only_mem - Generic memory-only valid callback.
@@ -455,6 +468,8 @@ int suspend_devices_and_enter(suspend_state_t state)
 
 	if (!sleep_state_supported(state))
 		return -ENOSYS;
+
+	pm_suspend_target_state = state;
 
 	error = platform_suspend_begin(state);
 	if (error)
