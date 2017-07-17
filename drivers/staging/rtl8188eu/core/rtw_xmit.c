@@ -53,8 +53,10 @@ s32	_rtw_init_xmit_priv(struct xmit_priv *pxmitpriv, struct adapter *padapter)
 	u32 max_xmit_extbuf_size = MAX_XMIT_EXTBUF_SZ;
 	u32 num_xmit_extbuf = NR_XMIT_EXTBUFF;
 
-
-	/*  We don't need to memset padapter->XXX to zero, because adapter is allocated by vzalloc(). */
+	/*
+	 * We don't need to memset padapter->XXX to zero,
+	 * because adapter is allocated by vzalloc().
+	 */
 
 	spin_lock_init(&pxmitpriv->lock);
 
