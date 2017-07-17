@@ -1884,7 +1884,7 @@ static int search_dh_cookie(struct ubifs_info *c, const union ubifs_key *key,
 			    struct ubifs_dent_node *dent, uint32_t cookie,
 			    struct ubifs_znode **zn, int *n)
 {
-	int err;
+	int err = 0;
 	struct ubifs_znode *znode = *zn;
 	struct ubifs_zbranch *zbr;
 	union ubifs_key *dkey;
