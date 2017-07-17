@@ -59,6 +59,11 @@
 
 #define BRCMF_DEFAULT_RXGLOM_SIZE	32  /* max rx frames in glom chain */
 
+/* This is a huge hack - we should look up this value and refer to that - who knows if it varies from chip to chip...
+ * however this has got to be better than just letting ->sbwad dangle after the last bit of IO during setup
+ */
+#define FIXME_CHIPCOMMON_BASE 0x18000000
+
 struct brcmf_sdiod_freezer {
 	atomic_t freezing;
 	atomic_t thread_count;
@@ -528,7 +533,7 @@ int brcmf_sdiod_recv_buf(struct brcmf_sdio_dev *sdiodev, u8 *buf, uint nbytes)
 
 int brcmf_sdiod_recv_pkt(struct brcmf_sdio_dev *sdiodev, struct sk_buff *pkt)
 {
-	u32 addr = sdiodev->sbwad;
+	u32 addr = FIXME_CHIPCOMMON_BASE;
 	int err = 0;
 
 	brcmf_dbg(SDIO, "addr = 0x%x, size = %d\n", addr, pkt->len);
@@ -551,7 +556,7 @@ int brcmf_sdiod_recv_chain(struct brcmf_sdio_dev *sdiodev,
 {
 	struct sk_buff *glom_skb = NULL;
 	struct sk_buff *skb;
-	u32 addr = sdiodev->sbwad;
+	u32 addr = FIXME_CHIPCOMMON_BASE;
 	int err = 0;
 
 	brcmf_dbg(SDIO, "addr = 0x%x, size = %d\n",
@@ -592,7 +597,7 @@ done:
 int brcmf_sdiod_send_buf(struct brcmf_sdio_dev *sdiodev, u8 *buf, uint nbytes)
 {
 	struct sk_buff *mypkt;
-	u32 addr = sdiodev->sbwad;
+	u32 addr = FIXME_CHIPCOMMON_BASE;
 	int err;
 
 	mypkt = brcmu_pkt_buf_get_skb(nbytes);
@@ -625,7 +630,7 @@ int brcmf_sdiod_send_pkt(struct brcmf_sdio_dev *sdiodev,
 			 struct sk_buff_head *pktq)
 {
 	struct sk_buff *skb;
-	u32 addr = sdiodev->sbwad;
+	u32 addr = FIXME_CHIPCOMMON_BASE;
 	int err;
 
 	brcmf_dbg(SDIO, "addr = 0x%x, size = %d\n", addr, pktq->qlen);
