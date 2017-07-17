@@ -536,15 +536,16 @@ int parport_negotiate (struct parport *port, int mode)
 		port->ieee1284.phase = IEEE1284_PH_FWD_IDLE;
 		DPRINTK (KERN_DEBUG "%s: ECP direction: forward\n",
 			 port->name);
-	} else switch (mode) {
-	case IEEE1284_MODE_NIBBLE:
-	case IEEE1284_MODE_BYTE:
-		port->ieee1284.phase = IEEE1284_PH_REV_IDLE;
-		break;
-	default:
-		port->ieee1284.phase = IEEE1284_PH_FWD_IDLE;
+	} else {
+		switch (mode) {
+		case IEEE1284_MODE_NIBBLE:
+		case IEEE1284_MODE_BYTE:
+			port->ieee1284.phase = IEEE1284_PH_REV_IDLE;
+			break;
+		default:
+			port->ieee1284.phase = IEEE1284_PH_FWD_IDLE;
+		}
 	}
-
 
 	return 0;
 #endif /* IEEE1284 support */

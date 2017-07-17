@@ -191,7 +191,9 @@ void parport_daisy_fini(struct parport *port)
 	/* Gaps in the numbering could be handled better.  How should
            someone enumerate through all IEEE1284.3 devices in the
            topology?. */
-	if (!topology) numdevs = 0;
+	if (!topology)
+		numdevs = 0;
+
 	spin_unlock(&topology_lock);
 	return;
 }
@@ -472,7 +474,8 @@ static int assign_addrs(struct parport *port)
 
 	/* Ask the new devices to introduce themselves. */
 	deviceid = kmalloc(1024, GFP_KERNEL);
-	if (!deviceid) return 0;
+	if (!deviceid)
+		return 0;
 
 	for (daisy = 0; thisdev < numdevs; thisdev++, daisy++)
 		parport_device_id(thisdev, deviceid, 1024);

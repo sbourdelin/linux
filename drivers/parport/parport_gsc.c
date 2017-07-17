@@ -211,10 +211,12 @@ static int parport_PS2_supported(struct parport *pb)
 	parport_gsc_data_reverse (pb);
 	
 	parport_gsc_write_data(pb, 0x55);
-	if (parport_gsc_read_data(pb) != 0x55) ok++;
+	if (parport_gsc_read_data(pb) != 0x55)
+		ok++;
 
 	parport_gsc_write_data(pb, 0xaa);
-	if (parport_gsc_read_data(pb) != 0xaa) ok++;
+	if (parport_gsc_read_data(pb) != 0xaa)
+		ok++;
 
 	/* cancel input mode */
 	parport_gsc_data_forward (pb);

@@ -64,7 +64,9 @@ static void parse_data(struct parport *port, int device, char *str)
 	while (p) {
 		char *sep;
 		q = strchr(p, ';');
-		if (q) *q = 0;
+		if (q)
+			*q = 0;
+
 		sep = strchr(p, ':');
 		if (sep) {
 			char *u;

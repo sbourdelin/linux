@@ -468,7 +468,9 @@ size_t parport_ieee1284_ecp_write_data (struct parport *port,
 		DPRINTK (KERN_DEBUG "%s: Host transfer recovered\n",
 			 port->name);
 
-		if (time_after_eq (jiffies, expire)) break;
+		if (time_after_eq (jiffies, expire))
+			break;
+
 		goto try_again;
 	success:
 		parport_frob_control (port, PARPORT_CONTROL_STROBE, 0);
@@ -704,7 +706,9 @@ size_t parport_ieee1284_ecp_write_addr (struct parport *port,
 		DPRINTK (KERN_DEBUG "%s: Host transfer recovered\n",
 			 port->name);
 
-		if (time_after_eq (jiffies, expire)) break;
+		if (time_after_eq (jiffies, expire))
+			break;
+
 		goto try_again;
 	success:
 		parport_frob_control (port, PARPORT_CONTROL_STROBE, 0);

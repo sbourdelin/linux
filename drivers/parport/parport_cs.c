@@ -88,7 +88,9 @@ static int parport_probe(struct pcmcia_device *link)
 
     /* Create new parport device */
     info = kzalloc(sizeof(*info), GFP_KERNEL);
-    if (!info) return -ENOMEM;
+    if (!info)
+        return -ENOMEM;
+
     link->priv = info;
     info->p_dev = link;
 
