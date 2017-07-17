@@ -60,7 +60,6 @@ sub save_config {
 }
 
 # compare two config hashes, and return configs with different vals.
-# It returns B's config values, but you can use A to see what A was.
 sub diff_config_vals {
 	my ($pa, $pb) = @_;
 
@@ -68,34 +67,15 @@ sub diff_config_vals {
 	my %a = %{$pa};
 	my %b = %{$pb};
 
-	my %ret;
+	my @ret;
 
 	foreach my $item (keys %a) {
 		if (defined($b{$item}) && $b{$item} ne $a{$item}) {
-			$ret{$item} = $b{$item};
+			push @ret, $item;
 		}
 	}
 
-	return %ret;
-}
-
-# compare two config hashes and return the configs in B but not A
-sub diff_configs {
-	my ($pa, $pb) = @_;
-
-	my %ret;
-
-	# crappy Perl way to pass in hashes.
-	my %a = %{$pa};
-	my %b = %{$pb};
-
-	foreach my $item (keys %b) {
-		if (!defined($a{$item})) {
-			$ret{$item} = $b{$item};
-		}
-	}
-
-	return %ret;
+	return @ret;
 }
 
 # return if two configs are equal or not
@@ -170,89 +150,47 @@ sub run_config_bisect {
 	my %good_configs = %{$pgood};
 	my %bad_configs = %{$pbad};
 
-	my %diff_configs = diff_config_vals \%good_configs, \%bad_configs;
-	my %b_configs = diff_configs \%good_configs, \%bad_configs;
-	my %g_configs = diff_configs \%bad_configs, \%good_configs;
-
-	my @diff_arr = keys %diff_configs;
+	my @diff_arr = diff_config_vals \%good_configs, \%bad_configs;
 	my $len_diff = $#diff_arr + 1;
-
-	my @b_arr = keys %b_configs;
-	my $len_b = $#b_arr + 1;
-
-	my @g_arr = keys %g_configs;
-	my $len_g = $#g_arr + 1;
 
 	my $runtest = 1;
 	my %new_configs;
 	my $ret;
 
-	# First, lets get it down to a single subset.
-	# Is the problem with a difference in values?
-	# Is the problem with a missing config?
-	# Is the problem with a config that breaks things?
+	print "d=$len_diff\n";
 
-	# Enable all of one set and see if we get a new bad
-	# or good config.
-
-	# first set the good config to the bad values.
-
-	print "d=$len_diff g=$len_g b=$len_b\n";
-
-	# first lets enable things in bad config that are enabled in good config
-
-	if ($len_diff > 0) {
-		if ($len_b > 0 || $len_g > 0) {
-			my %tmp_config = %bad_configs;
-
-			print "Set tmp config to be bad config with good config values\n";
-			foreach my $item (@diff_arr) {
-				$tmp_config{$item} = $good_configs{$item};
-			}
-
-			$runtest = process_new_config \%tmp_config,
-				\%new_configs, \%good_configs,
-				\%bad_configs, $outfile;
-		}
+	if ($len_diff <= 1) {
+		print "$0: No more bisecting possible\n";
+		exit 2;
 	}
 
-	if (!$runtest && $len_diff > 0) {
+	my %tmp_config = %bad_configs;
 
-		if ($len_diff == 1) {
-			process_failed $diff_arr[0];
-			return 1;
-		}
+	my $half = int($#diff_arr / 2);
+	my @tophalf = @diff_arr[0 .. $half];
+
+	print "Settings bisect with top half:\n";
+	foreach my $item (@tophalf) {
+		$tmp_config{$item} = $good_configs{$item};
+	}
+
+	$runtest = process_new_config \%tmp_config, \%new_configs,
+		\%good_configs, \%bad_configs, $outfile;
+
+	if (!$runtest) {
 		my %tmp_config = %bad_configs;
 
-		my $half = int($#diff_arr / 2);
-		my @tophalf = @diff_arr[0 .. $half];
+		print "Try bottom half\n";
 
-		print "Settings bisect with top half:\n";
-		print "Set tmp config to be bad config with some good config values\n";
-		foreach my $item (@tophalf) {
+		my @bottomhalf = @diff_arr[$half+1 .. $#diff_arr];
+
+		foreach my $item (@bottomhalf) {
 			$tmp_config{$item} = $good_configs{$item};
 		}
 
 		$runtest = process_new_config \%tmp_config, \%new_configs,
-			\%good_configs, \%bad_configs, $outfile;
-
-		if (!$runtest) {
-			my %tmp_config = %bad_configs;
-
-			print "Try bottom half\n";
-
-			my @bottomhalf = @diff_arr[$half+1 .. $#diff_arr];
-
-			foreach my $item (@bottomhalf) {
-				$tmp_config{$item} = $good_configs{$item};
-			}
-
-			$runtest = process_new_config \%tmp_config,
-				\%new_configs, \%good_configs,
-				\%bad_configs, $outfile;
-		}
+				\%good_configs, \%bad_configs, $outfile;
 	}
-
 }
 
 sub cb_by_file {
