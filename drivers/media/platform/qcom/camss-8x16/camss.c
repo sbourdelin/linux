@@ -39,7 +39,10 @@ static const struct resources csiphy_res[] = {
 		.regulator = { NULL },
 		.clock = { "camss_top_ahb", "ispif_ahb",
 			   "camss_ahb", "csiphy0_timer" },
-		.clock_rate = { 0, 0, 0, 200000000 },
+		.clock_rate = { { 0 },
+				{ 0 },
+				{ 0 },
+				{ 100000000, 200000000 } },
 		.reg = { "csiphy0", "csiphy0_clk_mux" },
 		.interrupt = { "csiphy0" }
 	},
@@ -49,7 +52,10 @@ static const struct resources csiphy_res[] = {
 		.regulator = { NULL },
 		.clock = { "camss_top_ahb", "ispif_ahb",
 			   "camss_ahb", "csiphy1_timer" },
-		.clock_rate = { 0, 0, 0, 200000000 },
+		.clock_rate = { { 0 },
+				{ 0 },
+				{ 0 },
+				{ 100000000, 200000000 } },
 		.reg = { "csiphy1", "csiphy1_clk_mux" },
 		.interrupt = { "csiphy1" }
 	}
@@ -62,7 +68,14 @@ static const struct resources csid_res[] = {
 		.clock = { "camss_top_ahb", "ispif_ahb",
 			   "csi0_ahb", "camss_ahb",
 			   "csi0", "csi0_phy", "csi0_pix", "csi0_rdi" },
-		.clock_rate = { 0, 0, 0, 0, 200000000, 0, 0, 0 },
+		.clock_rate = { { 0 },
+				{ 0 },
+				{ 0 },
+				{ 0 },
+				{ 100000000, 200000000 },
+				{ 0 },
+				{ 0 },
+				{ 0 } },
 		.reg = { "csid0" },
 		.interrupt = { "csid0" }
 	},
@@ -73,7 +86,14 @@ static const struct resources csid_res[] = {
 		.clock = { "camss_top_ahb", "ispif_ahb",
 			   "csi1_ahb", "camss_ahb",
 			   "csi1", "csi1_phy", "csi1_pix", "csi1_rdi" },
-		.clock_rate = { 0, 0, 0, 0, 200000000, 0, 0, 0 },
+		.clock_rate = { { 0 },
+				{ 0 },
+				{ 0 },
+				{ 0 },
+				{ 100000000, 200000000 },
+				{ 0 },
+				{ 0 },
+				{ 0 } },
 		.reg = { "csid1" },
 		.interrupt = { "csid1" }
 	},
@@ -95,7 +115,17 @@ static const struct resources vfe_res = {
 	.regulator = { NULL },
 	.clock = { "camss_top_ahb", "camss_vfe_vfe", "camss_csi_vfe",
 		   "iface", "bus", "camss_ahb" },
-	.clock_rate = { 0, 320000000, 0, 0, 0, 0, 0, 0 },
+	.clock_rate = { { 0 },
+			{ 50000000, 80000000, 100000000, 160000000,
+			  177780000, 200000000, 266670000, 320000000,
+			  400000000, 465000000 },
+			{ 0 },
+			{ 0 },
+			{ 0 },
+			{ 0 },
+			{ 0 },
+			{ 0 },
+			{ 0 } },
 	.reg = { "vfe0" },
 	.interrupt = { "vfe0" }
 };
@@ -108,13 +138,14 @@ static const struct resources vfe_res = {
  *
  * Return 0 on success or a negative error code otherwise
  */
-int camss_enable_clocks(int nclocks, struct clk **clock, struct device *dev)
+int camss_enable_clocks(int nclocks, struct camss_clock *clock,
+			struct device *dev)
 {
 	int ret;
 	int i;
 
 	for (i = 0; i < nclocks; i++) {
-		ret = clk_prepare_enable(clock[i]);
+		ret = clk_prepare_enable(clock[i].clk);
 		if (ret) {
 			dev_err(dev, "clock enable failed: %d\n", ret);
 			goto error;
@@ -125,7 +156,7 @@ int camss_enable_clocks(int nclocks, struct clk **clock, struct device *dev)
 
 error:
 	for (i--; i >= 0; i--)
-		clk_disable_unprepare(clock[i]);
+		clk_disable_unprepare(clock[i].clk);
 
 	return ret;
 }
@@ -135,12 +166,12 @@ error:
  * @nclocks: Number of clocks in clock array
  * @clock: Clock array
  */
-void camss_disable_clocks(int nclocks, struct clk **clock)
+void camss_disable_clocks(int nclocks, struct camss_clock *clock)
 {
 	int i;
 
 	for (i = nclocks - 1; i >= 0; i--)
-		clk_disable_unprepare(clock[i]);
+		clk_disable_unprepare(clock[i].clk);
 }
 
 /*
