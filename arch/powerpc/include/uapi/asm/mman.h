@@ -8,6 +8,7 @@
 #define _UAPI_ASM_POWERPC_MMAN_H
 
 #include <asm-generic/mman-common.h>
+#include <asm-generic/hugetlb_encode.h>
 
 
 #define PROT_SAO	0x10		/* Strong Access Ordering */
@@ -30,19 +31,15 @@
 #define MAP_HUGETLB	0x40000		/* create a huge page mapping */
 
 /*
- * When MAP_HUGETLB is set, bits [26:31] of the flags argument to mmap(2),
- * encode the log2 of the huge page size. A value of zero indicates that the
- * default huge page size should be used. To use a non-default huge page size,
- * one of these defines can be used, or the size can be encoded by hand. Note
- * that on most systems only a subset, or possibly none, of these sizes will be
- * available.
+ * Huge page size encoding when MAP_HUGETLB is specified, and a huge page
+ * size other than the default is desired.  See hugetlb_encode.h
  */
-#define MAP_HUGE_512KB	(19 << MAP_HUGE_SHIFT)	/* 512KB HugeTLB Page */
-#define MAP_HUGE_1MB	(20 << MAP_HUGE_SHIFT)	/* 1MB   HugeTLB Page */
-#define MAP_HUGE_2MB	(21 << MAP_HUGE_SHIFT)	/* 2MB   HugeTLB Page */
-#define MAP_HUGE_8MB	(23 << MAP_HUGE_SHIFT)	/* 8MB   HugeTLB Page */
-#define MAP_HUGE_16MB	(24 << MAP_HUGE_SHIFT)	/* 16MB  HugeTLB Page */
-#define MAP_HUGE_1GB	(30 << MAP_HUGE_SHIFT)	/* 1GB   HugeTLB Page */
-#define MAP_HUGE_16GB	(34 << MAP_HUGE_SHIFT)	/* 16GB  HugeTLB Page */
+#define MAP_HUGE_512KB	HUGETLB_FLAG_ENCODE_512KB	/* 512KB HugeTLB Page */
+#define MAP_HUGE_1MB	HUGETLB_FLAG_ENCODE_1MB		/* 1MB   HugeTLB Page */
+#define MAP_HUGE_2MB	HUGETLB_FLAG_ENCODE_2MB		/* 2MB   HugeTLB Page */
+#define MAP_HUGE_8MB	HUGETLB_FLAG_ENCODE_8MB		/* 8MB   HugeTLB Page */
+#define MAP_HUGE_16MB	HUGETLB_FLAG_ENCODE_16MB	/* 16MB  HugeTLB Page */
+#define MAP_HUGE_1GB	HUGETLB_FLAG_ENCODE_1GB		/* 1GB   HugeTLB Page */
+#define MAP_HUGE_16GB	HUGETLB_FLAG_ENCODE__16GB	/* 16GB  HugeTLB Page */
 
 #endif /* _UAPI_ASM_POWERPC_MMAN_H */

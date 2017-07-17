@@ -1,6 +1,8 @@
 #ifndef __PARISC_MMAN_H__
 #define __PARISC_MMAN_H__
 
+#include <asm-generic/hugetlb_encode.h>
+
 #define PROT_READ	0x1		/* page can be read */
 #define PROT_WRITE	0x2		/* page can be written */
 #define PROT_EXEC	0x4		/* page can be executed */
@@ -65,15 +67,11 @@
 #define MAP_VARIABLE	0
 
 /*
- * When MAP_HUGETLB is set bits [26:31] encode the log2 of the huge page size.
- * This gives us 6 bits, which is enough until someone invents 128 bit address
- * spaces.
- *
- * Assume these are all power of twos.
- * When 0 use the default page size.
+ * Huge page size encoding when MAP_HUGETLB is specified, and a huge page
+ * size other than the default is desired.  See hugetlb_encode.h
  */
-#define MAP_HUGE_SHIFT	26
-#define MAP_HUGE_MASK	0x3f
+#define MAP_HUGE_SHIFT	HUGETLB_FLAG_ENCODE_SHIFT
+#define MAP_HUGE_MASK	HUGETLB_FLAG_ENCODE_MASK
 
 #define PKEY_DISABLE_ACCESS	0x1
 #define PKEY_DISABLE_WRITE	0x2

@@ -14,6 +14,8 @@
 #ifndef _XTENSA_MMAN_H
 #define _XTENSA_MMAN_H
 
+#include <asm-generic/hugetlb_encode.h>
+
 /*
  * Protections are chosen from these bits, OR'd together.  The
  * implementation does not necessarily support PROT_EXEC or PROT_WRITE
@@ -107,15 +109,11 @@
 #define MAP_FILE	0
 
 /*
- * When MAP_HUGETLB is set bits [26:31] encode the log2 of the huge page size.
- * This gives us 6 bits, which is enough until someone invents 128 bit address
- * spaces.
- *
- * Assume these are all power of twos.
- * When 0 use the default page size.
+ * Huge page size encoding when MAP_HUGETLB is specified, and a huge page
+ * size other than the default is desired.  See hugetlb_encode.h
  */
-#define MAP_HUGE_SHIFT	26
-#define MAP_HUGE_MASK	0x3f
+#define MAP_HUGE_SHIFT	HUGETLB_FLAG_ENCODE_SHIFT
+#define MAP_HUGE_MASK	HUGETLB_FLAG_ENCODE_MASK
 
 #define PKEY_DISABLE_ACCESS	0x1
 #define PKEY_DISABLE_WRITE	0x2

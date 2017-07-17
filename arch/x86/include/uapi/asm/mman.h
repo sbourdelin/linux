@@ -1,10 +1,16 @@
 #ifndef _ASM_X86_MMAN_H
 #define _ASM_X86_MMAN_H
 
+#include <asm-generic/hugetlb_encode.h>
+
 #define MAP_32BIT	0x40		/* only give out 32bit addresses */
 
-#define MAP_HUGE_2MB    (21 << MAP_HUGE_SHIFT)
-#define MAP_HUGE_1GB    (30 << MAP_HUGE_SHIFT)
+/*
+ * Huge page size encoding when MAP_HUGETLB is specified, and a huge page
+ * size other than the default is desired.  See hugetlb_encode.h
+ */
+#define MAP_HUGE_2MB    HUGETLB_FLAG_ENCODE_2MB
+#define MAP_HUGE_1GB    HUGETLB_FLAG_ENCODE_1GB
 
 #ifdef CONFIG_X86_INTEL_MEMORY_PROTECTION_KEYS
 /*

@@ -1,6 +1,8 @@
 #ifndef __ASM_GENERIC_MMAN_COMMON_H
 #define __ASM_GENERIC_MMAN_COMMON_H
 
+#include <asm-generic/hugetlb_encode.h>
+
 /*
  Author: Michael S. Tsirkin <mst@mellanox.co.il>, Mellanox Technologies Ltd.
  Based on: asm-xxx/mman.h
@@ -69,8 +71,8 @@
  * Assume these are all power of twos.
  * When 0 use the default page size.
  */
-#define MAP_HUGE_SHIFT	26
-#define MAP_HUGE_MASK	0x3f
+#define MAP_HUGE_SHIFT	HUGETLB_FLAG_ENCODE_SHIFT
+#define MAP_HUGE_MASK	HUGETLB_FLAG_ENCODE_MASK
 
 #define PKEY_DISABLE_ACCESS	0x1
 #define PKEY_DISABLE_WRITE	0x2
