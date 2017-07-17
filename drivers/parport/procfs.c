@@ -49,14 +49,12 @@ static int do_active_device(struct ctl_table *table, int write,
 	}
 	
 	for (dev = port->devices; dev ; dev = dev->next) {
-		if(dev == port->cad) {
+		if(dev == port->cad)
 			len += sprintf(buffer, "%s\n", dev->name);
-		}
 	}
 
-	if(!len) {
+	if(!len)
 		len += sprintf(buffer, "%s\n", "none");
-	}
 
 	if (len > *lenp)
 		len = *lenp;

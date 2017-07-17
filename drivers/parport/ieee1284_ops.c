@@ -251,9 +251,8 @@ size_t parport_ieee1284_read_byte(struct parport *port,
 		unsigned char byte;
 
 		/* Data available? */
-		if (parport_read_status(port) & PARPORT_STATUS_ERROR) {
+		if (parport_read_status(port) & PARPORT_STATUS_ERROR)
 			goto end_of_data;
-		}
 
 		/* Event 14: Place data bus in high impedance state. */
 		parport_data_reverse(port);
@@ -796,9 +795,8 @@ size_t parport_ieee1284_epp_read_data(struct parport *port,
 				      PARPORT_CONTROL_AUTOFD,
 				      PARPORT_CONTROL_AUTOFD);
 		/* Event 58: wait for Busy to go high */
-		if (parport_wait_peripheral(port, PARPORT_STATUS_BUSY, 0)) {
+		if (parport_wait_peripheral(port, PARPORT_STATUS_BUSY, 0))
 			break;
-		}
 
 		*bp = parport_read_data(port);
 
@@ -884,9 +882,8 @@ size_t parport_ieee1284_epp_read_addr(struct parport *port,
 				      PARPORT_CONTROL_SELECT);
 
 		/* Event 58: wait for Busy to go high */
-		if (parport_wait_peripheral(port, PARPORT_STATUS_BUSY, 0)) {
+		if (parport_wait_peripheral(port, PARPORT_STATUS_BUSY, 0))
 			break;
-		}
 
 		*bp = parport_read_data(port);
 

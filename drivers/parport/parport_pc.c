@@ -1729,9 +1729,8 @@ static int intel_bug_present_check_epp(struct parport *pb)
 static int intel_bug_present(struct parport *pb)
 {
 /* Check whether the device is legacy, not PCI or PCMCIA. Only legacy is known to be affected. */
-	if (pb->dev != NULL) {
+	if (pb->dev != NULL)
 		return 0;
-	}
 
 	return intel_bug_present_check_epp(pb);
 }

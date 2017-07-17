@@ -290,15 +290,14 @@ struct parport *parport_gsc_probe_port(unsigned long base,
 
 	printk(KERN_INFO "%s: PC-style at 0x%lx", p->name, p->base);
 	p->irq = irq;
-	if (p->irq == PARPORT_IRQ_AUTO) {
+	if (p->irq == PARPORT_IRQ_AUTO)
 		p->irq = PARPORT_IRQ_NONE;
-	}
+
 	if (p->irq != PARPORT_IRQ_NONE) {
 		pr_cont(", irq %d", p->irq);
 
-		if (p->dma == PARPORT_DMA_AUTO) {
+		if (p->dma == PARPORT_DMA_AUTO)
 			p->dma = PARPORT_DMA_NONE;
-		}
 	}
 	if (p->dma == PARPORT_DMA_AUTO) /* To use DMA, giving the irq
                                            is mandatory (see above) */

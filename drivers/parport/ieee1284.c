@@ -631,29 +631,29 @@ ssize_t parport_write(struct parport *port, const void *buffer, size_t len)
 
 	case IEEE1284_MODE_EPP:
 		DPRINTK(KERN_DEBUG "%s: Using EPP mode\n", port->name);
-		if (addr) {
+		if (addr)
 			fn = port->ops->epp_write_addr;
-		} else {
+		else
 			fn = port->ops->epp_write_data;
-		}
+
 		break;
 	case IEEE1284_MODE_EPPSWE:
 		DPRINTK(KERN_DEBUG "%s: Using software-emulated EPP mode\n",
 			port->name);
-		if (addr) {
+		if (addr)
 			fn = parport_ieee1284_epp_write_addr;
-		} else {
+		else
 			fn = parport_ieee1284_epp_write_data;
-		}
+
 		break;
 	case IEEE1284_MODE_ECP:
 	case IEEE1284_MODE_ECPRLE:
 		DPRINTK(KERN_DEBUG "%s: Using ECP mode\n", port->name);
-		if (addr) {
+		if (addr)
 			fn = port->ops->ecp_write_addr;
-		} else {
+		else
 			fn = port->ops->ecp_write_data;
-		}
+
 		break;
 
 	case IEEE1284_MODE_ECPSWE:
@@ -661,11 +661,11 @@ ssize_t parport_write(struct parport *port, const void *buffer, size_t len)
 			 port->name);
 		/* The caller has specified that it must be emulated,
 		 * even if we have ECP hardware! */
-		if (addr) {
+		if (addr)
 			fn = parport_ieee1284_ecp_write_addr;
-		} else {
+		else
 			fn = parport_ieee1284_ecp_write_data;
-		}
+
 		break;
 
 	default:
@@ -726,9 +726,9 @@ ssize_t parport_read(struct parport *port, void *buffer, size_t len)
 			fn = port->ops->byte_read_data;
 			break;
 		}
-		if (parport_negotiate(port, IEEE1284_MODE_NIBBLE)) {
+		if (parport_negotiate(port, IEEE1284_MODE_NIBBLE))
 			return -EIO;
-		}
+
 		/* fall through to NIBBLE */
 	case IEEE1284_MODE_NIBBLE:
 		DPRINTK(KERN_DEBUG "%s: Using nibble mode\n", port->name);
@@ -742,20 +742,20 @@ ssize_t parport_read(struct parport *port, void *buffer, size_t len)
 
 	case IEEE1284_MODE_EPP:
 		DPRINTK(KERN_DEBUG "%s: Using EPP mode\n", port->name);
-		if (addr) {
+		if (addr)
 			fn = port->ops->epp_read_addr;
-		} else {
+		else
 			fn = port->ops->epp_read_data;
-		}
+
 		break;
 	case IEEE1284_MODE_EPPSWE:
 		DPRINTK(KERN_DEBUG "%s: Using software-emulated EPP mode\n",
 			port->name);
-		if (addr) {
+		if (addr)
 			fn = parport_ieee1284_epp_read_addr;
-		} else {
+		else
 			fn = parport_ieee1284_epp_read_data;
-		}
+
 		break;
 	case IEEE1284_MODE_ECP:
 	case IEEE1284_MODE_ECPRLE:

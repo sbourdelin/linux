@@ -142,32 +142,28 @@ static unsigned char parport_sunbpp_frob_control(struct parport *p,
 	dprintk((KERN_DEBUG "frob1: tcr 0x%x or 0x%x\n",
 		 value_tcr, value_or));
 	if (mask & PARPORT_CONTROL_STROBE) {
-		if (val & PARPORT_CONTROL_STROBE) {
+		if (val & PARPORT_CONTROL_STROBE)
 			value_tcr &= ~P_TCR_DS;
-		} else {
+		else
 			value_tcr |= P_TCR_DS;
-		}
 	}
 	if (mask & PARPORT_CONTROL_AUTOFD) {
-		if (val & PARPORT_CONTROL_AUTOFD) {
+		if (val & PARPORT_CONTROL_AUTOFD)
 			value_or &= ~P_OR_AFXN;
-		} else {
+		else
 			value_or |= P_OR_AFXN;
-		}
 	}
 	if (mask & PARPORT_CONTROL_INIT) {
-		if (val & PARPORT_CONTROL_INIT) {
+		if (val & PARPORT_CONTROL_INIT)
 			value_or &= ~P_OR_INIT;
-		} else {
+		else
 			value_or |= P_OR_INIT;
-		}
 	}
 	if (mask & PARPORT_CONTROL_SELECT) {
-		if (val & PARPORT_CONTROL_SELECT) {
+		if (val & PARPORT_CONTROL_SELECT)
 			value_or |= P_OR_SLCT_IN;
-		} else {
+		else
 			value_or &= ~P_OR_SLCT_IN;
-		}
 	}
 
 	sbus_writeb(value_or, &regs->p_or);
