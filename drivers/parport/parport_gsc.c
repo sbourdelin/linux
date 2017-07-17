@@ -95,8 +95,7 @@ void parport_gsc_restore_state(struct parport *p, struct parport_state *s)
 	parport_writeb(s->u.pc.ctr, CONTROL(p));
 }
 
-struct parport_operations parport_gsc_ops = 
-{
+struct parport_operations parport_gsc_ops = {
 	.write_data	= parport_gsc_write_data,
 	.read_data	= parport_gsc_read_data,
 

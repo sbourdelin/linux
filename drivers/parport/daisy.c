@@ -354,8 +354,7 @@ void parport_daisy_deselect_all(struct parport *port)
 
 int parport_daisy_select(struct parport *port, int daisy, int mode)
 {
-	switch (mode)
-	{
+	switch (mode) {
 		// For these modes we should switch to EPP mode:
 		case IEEE1284_MODE_EPP:
 		case IEEE1284_MODE_EPPSL:
