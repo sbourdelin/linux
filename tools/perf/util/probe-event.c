@@ -1155,6 +1155,7 @@ static int try_to_find_probe_trace_events(struct perf_probe_event *pev,
 
 int show_line_range(struct line_range *lr __maybe_unused,
 		    const char *module __maybe_unused,
+		    struct nsinfo *nsi __maybe_unused,
 		    bool user __maybe_unused)
 {
 	pr_warning("Debuginfo-analysis is not supported.\n");
