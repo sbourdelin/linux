@@ -493,7 +493,7 @@ struct mm_struct {
 	 * can move process memory needs to flush the TLB when moving a
 	 * PROT_NONE or PROT_NUMA mapped page.
 	 */
-	bool tlb_flush_pending;
+	atomic_t tlb_flush_pending;
 #endif
 	struct uprobes_state uprobes_state;
 #ifdef CONFIG_HUGETLB_PAGE
@@ -528,11 +528,11 @@ static inline cpumask_t *mm_cpumask(struct mm_struct *mm)
 static inline bool mm_tlb_flush_pending(struct mm_struct *mm)
 {
 	barrier();
-	return mm->tlb_flush_pending;
+	return atomic_read(&mm->tlb_flush_pending) > 0;
 }
 static inline void set_tlb_flush_pending(struct mm_struct *mm)
 {
-	mm->tlb_flush_pending = true;
+	atomic_inc(&mm->tlb_flush_pending);
 
 	/*
 	 * Guarantee that the tlb_flush_pending store does not leak into the
@@ -544,7 +544,7 @@ static inline void set_tlb_flush_pending(struct mm_struct *mm)
 static inline void clear_tlb_flush_pending(struct mm_struct *mm)
 {
 	barrier();
-	mm->tlb_flush_pending = false;
+	atomic_dec(&mm->tlb_flush_pending);
 }
 #else
 static inline bool mm_tlb_flush_pending(struct mm_struct *mm)
