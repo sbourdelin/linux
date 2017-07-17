@@ -261,6 +261,7 @@ static inline void *get_freepointer_safe(struct kmem_cache *s, void *object)
 
 static inline void set_freepointer(struct kmem_cache *s, void *object, void *fp)
 {
+	BUG_ON(object == fp); /* naive detection of double free or corruption */
 	*(void **)(object + s->offset) = fp;
 }
 
