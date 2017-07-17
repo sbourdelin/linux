@@ -851,7 +851,7 @@ demonstrated by two related examples, with the initial values of
 	CPU 0                     CPU 1
 	=======================   =======================
 	r1 = READ_ONCE(x);        r2 = READ_ONCE(y);
-	if (r1 > 0)               if (r2 > 0)
+	if (r1 >= 0)              if (r2 >= 0)
 	  WRITE_ONCE(y, 1);         WRITE_ONCE(x, 1);
 
 	assert(!(r1 == 1 && r2 == 1));
