@@ -328,7 +328,7 @@ static int __init parport_mfc3_init(void)
 		/* XXX: set operating mode */
 
 		p->private_data = (void *)piabase;
-		parport_announce_port (p);
+		parport_announce_port(p);
 
 		if (pias >= MAX_MFC)
 			break;

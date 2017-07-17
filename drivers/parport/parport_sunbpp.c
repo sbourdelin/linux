@@ -184,7 +184,7 @@ static void parport_sunbpp_write_control(struct parport *p, unsigned char d)
 				  PARPORT_CONTROL_INIT |
 				  PARPORT_CONTROL_SELECT);
 
-	parport_sunbpp_frob_control (p, wm, d & wm);
+	parport_sunbpp_frob_control(p, wm, d & wm);
 }
 
 static unsigned char parport_sunbpp_read_status(struct parport *p)
@@ -192,7 +192,7 @@ static unsigned char parport_sunbpp_read_status(struct parport *p)
 	return status_sunbpp_to_pc(p);
 }
 
-static void parport_sunbpp_data_forward (struct parport *p)
+static void parport_sunbpp_data_forward(struct parport *p)
 {
 	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 	unsigned char value_tcr = sbus_readb(&regs->p_tcr);
@@ -202,7 +202,7 @@ static void parport_sunbpp_data_forward (struct parport *p)
 	sbus_writeb(value_tcr, &regs->p_tcr);
 }
 
-static void parport_sunbpp_data_reverse (struct parport *p)
+static void parport_sunbpp_data_reverse(struct parport *p)
 {
 	struct bpp_regs __iomem *regs = (struct bpp_regs __iomem *)p->base;
 	u8 val = sbus_readb(&regs->p_tcr);

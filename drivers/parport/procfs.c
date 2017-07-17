@@ -86,19 +86,19 @@ static int do_autoprobe(struct ctl_table *table, int write,
 	}
 	
 	if ((str = info->class_name) != NULL)
-		len += sprintf (buffer + len, "CLASS:%s;\n", str);
+		len += sprintf(buffer + len, "CLASS:%s;\n", str);
 
 	if ((str = info->model) != NULL)
-		len += sprintf (buffer + len, "MODEL:%s;\n", str);
+		len += sprintf(buffer + len, "MODEL:%s;\n", str);
 
 	if ((str = info->mfr) != NULL)
-		len += sprintf (buffer + len, "MANUFACTURER:%s;\n", str);
+		len += sprintf(buffer + len, "MANUFACTURER:%s;\n", str);
 
 	if ((str = info->description) != NULL)
-		len += sprintf (buffer + len, "DESCRIPTION:%s;\n", str);
+		len += sprintf(buffer + len, "DESCRIPTION:%s;\n", str);
 
 	if ((str = info->cmdset) != NULL)
-		len += sprintf (buffer + len, "COMMAND SET:%s;\n", str);
+		len += sprintf(buffer + len, "COMMAND SET:%s;\n", str);
 
 	if (len > *lenp)
 		len = *lenp;
@@ -107,7 +107,7 @@ static int do_autoprobe(struct ctl_table *table, int write,
 
 	*ppos += len;
 
-	return copy_to_user (result, buffer, len) ? -EFAULT : 0;
+	return copy_to_user(result, buffer, len) ? -EFAULT : 0;
 }
 #endif /* IEEE1284.3 support. */
 
@@ -127,7 +127,7 @@ static int do_hardware_base_addr(struct ctl_table *table, int write,
 	if (write) /* permissions prevent this anyway */
 		return -EACCES;
 
-	len += sprintf (buffer, "%lu\t%lu\n", port->base, port->base_hi);
+	len += sprintf(buffer, "%lu\t%lu\n", port->base, port->base_hi);
 
 	if (len > *lenp)
 		len = *lenp;
@@ -155,7 +155,7 @@ static int do_hardware_irq(struct ctl_table *table, int write,
 	if (write) /* permissions prevent this anyway */
 		return -EACCES;
 
-	len += sprintf (buffer, "%d\n", port->irq);
+	len += sprintf(buffer, "%d\n", port->irq);
 
 	if (len > *lenp)
 		len = *lenp;
@@ -183,7 +183,7 @@ static int do_hardware_dma(struct ctl_table *table, int write,
 	if (write) /* permissions prevent this anyway */
 		return -EACCES;
 
-	len += sprintf (buffer, "%d\n", port->dma);
+	len += sprintf(buffer, "%d\n", port->dma);
 
 	if (len > *lenp)
 		len = *lenp;
@@ -606,12 +606,12 @@ int parport_device_proc_unregister(struct pardevice *device)
 	return 0;
 }
 
-static int __init parport_default_proc_register (void)
+static int __init parport_default_proc_register(void)
 {
 	return parport_bus_init();
 }
 
-static void __exit parport_default_proc_unregister (void)
+static void __exit parport_default_proc_unregister(void)
 {
 	parport_bus_exit();
 }

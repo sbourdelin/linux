@@ -194,13 +194,13 @@ static int __init parport_atari_init(void)
 			return -ENODEV;
 		if (request_irq(IRQ_MFP_BUSY, parport_irq_handler, 0, p->name,
 				p)) {
-			parport_put_port (p);
+			parport_put_port(p);
 			return -ENODEV;
 		}
 
 		this_port = p;
 		printk(KERN_INFO "%s: Atari built-in port using irq\n", p->name);
-		parport_announce_port (p);
+		parport_announce_port(p);
 
 		return 0;
 	}

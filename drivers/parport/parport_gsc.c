@@ -65,8 +65,8 @@ static int clear_epp_timeout(struct parport *pb)
 	/* To clear timeout some chips require double read */
 	parport_gsc_read_status(pb);
 	r = parport_gsc_read_status(pb);
-	parport_writeb (r | 0x01, STATUS (pb)); /* Some reset by writing 1 */
-	parport_writeb (r & 0xfe, STATUS (pb)); /* Others by writing 0 */
+	parport_writeb(r | 0x01, STATUS(pb)); /* Some reset by writing 1 */
+	parport_writeb(r & 0xfe, STATUS(pb)); /* Others by writing 0 */
 	r = parport_gsc_read_status(pb);
 
 	return !(r & 0x01);
@@ -87,12 +87,12 @@ void parport_gsc_init_state(struct pardevice *dev, struct parport_state *s)
 
 void parport_gsc_save_state(struct parport *p, struct parport_state *s)
 {
-	s->u.pc.ctr = parport_readb (CONTROL (p));
+	s->u.pc.ctr = parport_readb(CONTROL(p));
 }
 
 void parport_gsc_restore_state(struct parport *p, struct parport_state *s)
 {
-	parport_writeb (s->u.pc.ctr, CONTROL (p));
+	parport_writeb(s->u.pc.ctr, CONTROL(p));
 }
 
 struct parport_operations parport_gsc_ops = 
@@ -151,19 +151,19 @@ static int parport_SPP_supported(struct parport *pb)
 
 	/* Do a simple read-write test to make sure the port exists. */
 	w = 0xc;
-	parport_writeb (w, CONTROL (pb));
+	parport_writeb(w, CONTROL(pb));
 
 	/* Is there a control register that we can read from?  Some
 	 * ports don't allow reads, so read_control just returns a
 	 * software copy. Some ports _do_ allow reads, so bypass the
 	 * software copy here.  In addition, some bits aren't
 	 * writable. */
-	r = parport_readb (CONTROL (pb));
+	r = parport_readb(CONTROL(pb));
 	if ((r & 0xf) == w) {
 		w = 0xe;
-		parport_writeb (w, CONTROL (pb));
-		r = parport_readb (CONTROL (pb));
-		parport_writeb (0xc, CONTROL (pb));
+		parport_writeb(w, CONTROL(pb));
+		r = parport_readb(CONTROL(pb));
+		parport_writeb(0xc, CONTROL(pb));
 		if ((r & 0xf) == w)
 			return PARPORT_MODE_PCSPP;
 	}
@@ -171,12 +171,12 @@ static int parport_SPP_supported(struct parport *pb)
 	/* Try the data register.  The data lines aren't tri-stated at
 	 * this stage, so we expect back what we wrote. */
 	w = 0xaa;
-	parport_gsc_write_data (pb, w);
-	r = parport_gsc_read_data (pb);
+	parport_gsc_write_data(pb, w);
+	r = parport_gsc_read_data(pb);
 	if (r == w) {
 		w = 0x55;
-		parport_gsc_write_data (pb, w);
-		r = parport_gsc_read_data (pb);
+		parport_gsc_write_data(pb, w);
+		r = parport_gsc_read_data(pb);
 		if (r == w)
 			return PARPORT_MODE_PCSPP;
 	}
@@ -208,7 +208,7 @@ static int parport_PS2_supported(struct parport *pb)
 	clear_epp_timeout(pb);
 
 	/* try to tri-state the buffer */
-	parport_gsc_data_reverse (pb);
+	parport_gsc_data_reverse(pb);
 	
 	parport_gsc_write_data(pb, 0x55);
 	if (parport_gsc_read_data(pb) != 0x55)
@@ -219,7 +219,7 @@ static int parport_PS2_supported(struct parport *pb)
 		ok++;
 
 	/* cancel input mode */
-	parport_gsc_data_forward (pb);
+	parport_gsc_data_forward(pb);
 
 	if (ok) {
 		pb->modes |= PARPORT_MODE_TRISTATE;
@@ -243,17 +243,17 @@ struct parport *parport_gsc_probe_port(unsigned long base,
 	struct parport tmp;
 	struct parport *p = &tmp;
 
-	priv = kzalloc (sizeof (struct parport_gsc_private), GFP_KERNEL);
+	priv = kzalloc(sizeof(struct parport_gsc_private), GFP_KERNEL);
 	if (!priv) {
-		printk (KERN_DEBUG "parport (0x%lx): no memory!\n", base);
+		printk(KERN_DEBUG "parport (0x%lx): no memory!\n", base);
 		return NULL;
 	}
 	ops = kmemdup(&parport_gsc_ops, sizeof(struct parport_operations),
 		      GFP_KERNEL);
 	if (!ops) {
-		printk (KERN_DEBUG "parport (0x%lx): no memory for ops!\n",
+		printk(KERN_DEBUG "parport (0x%lx): no memory for ops!\n",
 			base);
-		kfree (priv);
+		kfree(priv);
 		return NULL;
 	}
 	priv->ctr = 0xc;
@@ -268,18 +268,18 @@ struct parport *parport_gsc_probe_port(unsigned long base,
 	p->ops = ops;
 	p->private_data = priv;
 	p->physport = p;
-	if (!parport_SPP_supported (p)) {
+	if (!parport_SPP_supported(p)) {
 		/* No port. */
-		kfree (priv);
+		kfree(priv);
 		kfree(ops);
 		return NULL;
 	}
-	parport_PS2_supported (p);
+	parport_PS2_supported(p);
 
 	if (!(p = parport_register_port(base, PARPORT_IRQ_NONE,
 					PARPORT_DMA_NONE, ops))) {
-		kfree (priv);
-		kfree (ops);
+		kfree(priv);
+		kfree(ops);
 		return NULL;
 	}
 
@@ -320,9 +320,9 @@ struct parport *parport_gsc_probe_port(unsigned long base,
 	pr_cont("]\n");
 
 	if (p->irq != PARPORT_IRQ_NONE) {
-		if (request_irq (p->irq, parport_irq_handler,
+		if (request_irq(p->irq, parport_irq_handler,
 				 0, p->name, p)) {
-			printk (KERN_WARNING "%s: irq %d in use, "
+			printk(KERN_WARNING "%s: irq %d in use, "
 				"resorting to polled operation\n",
 				p->name, p->irq);
 			p->irq = PARPORT_IRQ_NONE;
@@ -333,12 +333,12 @@ struct parport *parport_gsc_probe_port(unsigned long base,
 	/* Done probing.  Now put the port into a sensible start-up state. */
 
 	parport_gsc_write_data(p, 0);
-	parport_gsc_data_forward (p);
+	parport_gsc_data_forward(p);
 
 	/* Now that we've told the sharing engine about the port, and
 	   found out its characteristics, let the high-level drivers
 	   know about it. */
-	parport_announce_port (p);
+	parport_announce_port(p);
 
 	return p;
 }
@@ -368,7 +368,7 @@ static int parport_init_chip(struct parisc_device *dev)
 
 		/* Initialize bidirectional-mode (0x10) & data-tranfer-mode #1 (0x20) */
 		printk("%s: initialize bidirectional-mode.\n", __func__);
-		parport_writeb ( (0x10 + 0x20), port + 4);
+		parport_writeb((0x10 + 0x20), port + 4);
 
 	} else {
 		printk("%s: enhanced parport-modes not supported.\n", __func__);
@@ -398,9 +398,9 @@ static int parport_remove_chip(struct parisc_device *dev)
 			pci_free_consistent(priv->dev, PAGE_SIZE,
 					    priv->dma_buf,
 					    priv->dma_handle);
-		kfree (p->private_data);
+		kfree(p->private_data);
 		parport_put_port(p);
-		kfree (ops); /* hope no-one cached it */
+		kfree(ops); /* hope no-one cached it */
 	}
 	return 0;
 }

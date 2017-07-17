@@ -522,7 +522,7 @@ struct parport_serial_private {
 /* Register the serial port(s) of a PCI card. */
 static int serial_register(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	struct parport_serial_private *priv = pci_get_drvdata (dev);
+	struct parport_serial_private *priv = pci_get_drvdata(dev);
 	struct pciserial_board *board;
 	struct serial_private *serial;
 
@@ -544,13 +544,13 @@ static int serial_register(struct pci_dev *dev, const struct pci_device_id *id)
 static int parport_register(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	struct parport_pc_pci *card;
-	struct parport_serial_private *priv = pci_get_drvdata (dev);
+	struct parport_serial_private *priv = pci_get_drvdata(dev);
 	int n, success = 0;
 
 	priv->par = cards[id->driver_data];
 	card = &priv->par;
 	if (card->preinit_hook &&
-	    card->preinit_hook (dev, card, PARPORT_IRQ_NONE, PARPORT_DMA_NONE))
+	    card->preinit_hook(dev, card, PARPORT_IRQ_NONE, PARPORT_DMA_NONE))
 		return -ENODEV;
 
 	for (n = 0; n < card->numports; n++) {
@@ -560,18 +560,18 @@ static int parport_register(struct pci_dev *dev, const struct pci_device_id *id)
 		unsigned long io_lo, io_hi;
 		int irq;
 
-		if (priv->num_par == ARRAY_SIZE (priv->port)) {
-			printk (KERN_WARNING
+		if (priv->num_par == ARRAY_SIZE(priv->port)) {
+			printk(KERN_WARNING
 				"parport_serial: %s: only %zu parallel ports "
-				"supported (%d reported)\n", pci_name (dev),
+				"supported (%d reported)\n", pci_name(dev),
 				ARRAY_SIZE(priv->port), card->numports);
 			break;
 		}
 
-		io_lo = pci_resource_start (dev, lo);
+		io_lo = pci_resource_start(dev, lo);
 		io_hi = 0;
 		if ((hi >= 0) && (hi <= 6))
-			io_hi = pci_resource_start (dev, hi);
+			io_hi = pci_resource_start(dev, hi);
 		else if (hi > 6)
 			io_lo += hi; /* Reinterpret the meaning of
                                         "hi" as an offset (see SYBA
@@ -588,7 +588,7 @@ static int parport_register(struct pci_dev *dev, const struct pci_device_id *id)
 		"PCI parallel port detected: I/O at %#lx(%#lx), IRQ %d\n",
 				io_lo, io_hi, irq);
 		}
-		port = parport_pc_probe_port (io_lo, io_hi, irq,
+		port = parport_pc_probe_port(io_lo, io_hi, irq,
 			      PARPORT_DMA_NONE, &dev->dev, IRQF_SHARED);
 		if (port) {
 			priv->port[priv->num_par++] = port;
@@ -597,7 +597,7 @@ static int parport_register(struct pci_dev *dev, const struct pci_device_id *id)
 	}
 
 	if (card->postinit_hook)
-		card->postinit_hook (dev, card, !success);
+		card->postinit_hook(dev, card, !success);
 
 	return 0;
 }
@@ -608,27 +608,27 @@ static int parport_serial_pci_probe(struct pci_dev *dev,
 	struct parport_serial_private *priv;
 	int err;
 
-	priv = kzalloc (sizeof *priv, GFP_KERNEL);
+	priv = kzalloc(sizeof *priv, GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
-	pci_set_drvdata (dev, priv);
+	pci_set_drvdata(dev, priv);
 
-	err = pci_enable_device (dev);
+	err = pci_enable_device(dev);
 	if (err) {
-		kfree (priv);
+		kfree(priv);
 		return err;
 	}
 
-	if (parport_register (dev, id)) {
-		kfree (priv);
+	if (parport_register(dev, id)) {
+		kfree(priv);
 		return -ENODEV;
 	}
 
-	if (serial_register (dev, id)) {
+	if (serial_register(dev, id)) {
 		int i;
 		for (i = 0; i < priv->num_par; i++)
-			parport_pc_unregister_port (priv->port[i]);
-		kfree (priv);
+			parport_pc_unregister_port(priv->port[i]);
+		kfree(priv);
 		return -ENODEV;
 	}
 
@@ -637,7 +637,7 @@ static int parport_serial_pci_probe(struct pci_dev *dev,
 
 static void parport_serial_pci_remove(struct pci_dev *dev)
 {
-	struct parport_serial_private *priv = pci_get_drvdata (dev);
+	struct parport_serial_private *priv = pci_get_drvdata(dev);
 	int i;
 
 	// Serial ports
@@ -646,9 +646,9 @@ static void parport_serial_pci_remove(struct pci_dev *dev)
 
 	// Parallel ports
 	for (i = 0; i < priv->num_par; i++)
-		parport_pc_unregister_port (priv->port[i]);
+		parport_pc_unregister_port(priv->port[i]);
 
-	kfree (priv);
+	kfree(priv);
 	return;
 }
 
@@ -706,14 +706,14 @@ static struct pci_driver parport_serial_pci_driver = {
 };
 
 
-static int __init parport_serial_init (void)
+static int __init parport_serial_init(void)
 {
-	return pci_register_driver (&parport_serial_pci_driver);
+	return pci_register_driver(&parport_serial_pci_driver);
 }
 
-static void __exit parport_serial_exit (void)
+static void __exit parport_serial_exit(void)
 {
-	pci_unregister_driver (&parport_serial_pci_driver);
+	pci_unregister_driver(&parport_serial_pci_driver);
 	return;
 }
 

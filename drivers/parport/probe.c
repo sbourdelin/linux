@@ -40,9 +40,9 @@ static void pretty_print(struct parport *port, int device)
 	printk(KERN_INFO "%s", port->name);
 
 	if (device >= 0)
-		printk (" (addr %d)", device);
+		printk(" (addr %d)", device);
 
-	printk (": %s", classes[info->class].descr);
+	printk(": %s", classes[info->class].descr);
 	if (info->class)
 		printk(", %s %s", info->mfr, info->model);
 
@@ -72,7 +72,7 @@ static void parse_data(struct parport *port, int device, char *str)
 			char *u;
 			*(sep++) = 0;
 			/* Get rid of trailing blanks */
-			u = sep + strlen (sep) - 1;
+			u = sep + strlen(sep) - 1;
 			while (u >= p && *u == ' ')
 				*u-- = '\0';
 			u = p;
@@ -134,7 +134,7 @@ static void parse_data(struct parport *port, int device, char *str)
 /* Read up to count-1 bytes of device id. Terminate buffer with
  * '\0'. Buffer begins with two Device ID length bytes as given by
  * device. */
-static ssize_t parport_read_device_id (struct parport *port, char *buffer,
+static ssize_t parport_read_device_id(struct parport *port, char *buffer,
 				       size_t count)
 {
 	unsigned char length[2];
@@ -146,7 +146,7 @@ static ssize_t parport_read_device_id (struct parport *port, char *buffer,
 	size_t len;
 
 	/* First two bytes are MSB,LSB of inclusive length. */
-	retval = parport_read (port, length, 2);
+	retval = parport_read(port, length, 2);
 
 	if (retval < 0)
 		return retval;
@@ -178,7 +178,7 @@ static ssize_t parport_read_device_id (struct parport *port, char *buffer,
 		 * just return constant nibble forever. This catches
 		 * also those cases. */
 		if (idlens[0] == 0 || idlens[0] > 0xFFF) {
-			printk (KERN_DEBUG "%s: reported broken Device ID"
+			printk(KERN_DEBUG "%s: reported broken Device ID"
 				" length of %#zX bytes\n",
 				port->name, idlens[0]);
 			return -EIO;
@@ -194,7 +194,7 @@ static ssize_t parport_read_device_id (struct parport *port, char *buffer,
 		if (idlen+1 >= count)
 			break;
 
-		retval = parport_read (port, buffer+len, idlen-len);
+		retval = parport_read(port, buffer+len, idlen-len);
 
 		if (retval < 0)
 			return retval;
@@ -202,7 +202,7 @@ static ssize_t parport_read_device_id (struct parport *port, char *buffer,
 
 		if (port->physport->ieee1284.phase != IEEE1284_PH_HBUSY_DAVAIL) {
 			if (belen != len) {
-				printk (KERN_DEBUG "%s: Device ID was %zd bytes"
+				printk(KERN_DEBUG "%s: Device ID was %zd bytes"
 					" while device told it would be %d"
 					" bytes\n",
 					port->name, len, belen);
@@ -215,7 +215,7 @@ static ssize_t parport_read_device_id (struct parport *port, char *buffer,
 		 * the first 256 bytes or so that we must have read so
 		 * far. */
 		if (buffer[len-1] == ';') {
- 			printk (KERN_DEBUG "%s: Device ID reading stopped"
+			printk(KERN_DEBUG "%s: Device ID reading stopped"
 				" before device told data not available. "
 				"Current idlen %u of %u, len bytes %02X %02X\n",
 				port->name, current_idlen, numidlens,
@@ -227,7 +227,7 @@ static ssize_t parport_read_device_id (struct parport *port, char *buffer,
 		/* Buffer not large enough, read to end of buffer. */
 		size_t idlen, len2;
 		if (len+1 < count) {
-			retval = parport_read (port, buffer+len, count-len-1);
+			retval = parport_read(port, buffer+len, count-len-1);
 			if (retval < 0)
 				return retval;
 			len += retval;
@@ -239,7 +239,7 @@ static ssize_t parport_read_device_id (struct parport *port, char *buffer,
 		len2 = len;
 		while(len2 < idlen && retval > 0) {
 			char tmp[4];
-			retval = parport_read (port, tmp,
+			retval = parport_read(port, tmp,
 					       min(sizeof tmp, idlen-len2));
 			if (retval < 0)
 				return retval;
@@ -255,30 +255,30 @@ static ssize_t parport_read_device_id (struct parport *port, char *buffer,
 }
 
 /* Get Std 1284 Device ID. */
-ssize_t parport_device_id (int devnum, char *buffer, size_t count)
+ssize_t parport_device_id(int devnum, char *buffer, size_t count)
 {
 	ssize_t retval = -ENXIO;
-	struct pardevice *dev = parport_open (devnum, "Device ID probe");
+	struct pardevice *dev = parport_open(devnum, "Device ID probe");
 	if (!dev)
 		return -ENXIO;
 
-	parport_claim_or_block (dev);
+	parport_claim_or_block(dev);
 
 	/* Negotiate to compatibility mode, and then to device ID
 	 * mode. (This so that we start form beginning of device ID if
 	 * already in device ID mode.) */
-	parport_negotiate (dev->port, IEEE1284_MODE_COMPAT);
-	retval = parport_negotiate (dev->port,
+	parport_negotiate(dev->port, IEEE1284_MODE_COMPAT);
+	retval = parport_negotiate(dev->port,
 				    IEEE1284_MODE_NIBBLE | IEEE1284_DEVICEID);
 
 	if (!retval) {
-		retval = parport_read_device_id (dev->port, buffer, count);
-		parport_negotiate (dev->port, IEEE1284_MODE_COMPAT);
+		retval = parport_read_device_id(dev->port, buffer, count);
+		parport_negotiate(dev->port, IEEE1284_MODE_COMPAT);
 		if (retval > 2)
-			parse_data (dev->port, dev->daisy, buffer+2);
+			parse_data(dev->port, dev->daisy, buffer+2);
 	}
 
-	parport_release (dev);
-	parport_close (dev);
+	parport_release(dev);
+	parport_close(dev);
 	return retval;
 }
