@@ -556,6 +556,25 @@ extern acpi_status acpi_pci_osc_control_set(acpi_handle handle,
 #define ACPI_OST_SC_DRIVER_LOAD_FAILURE		0x81
 #define ACPI_OST_SC_INSERT_NOT_SUPPORTED	0x82
 
+enum acpi_oemlist_predicates {
+	all_versions,
+	less_than_or_equal,
+	equal,
+	greater_than_or_equal,
+};
+
+/* Table must be terminted by a NULL entry */
+struct acpi_oemlist {
+	char	oem_id[ACPI_OEM_ID_SIZE];
+	char	oem_table_id[ACPI_OEM_TABLE_ID_SIZE];
+	u32	oem_revision;
+	char	*table;
+	enum	acpi_oemlist_predicates oem_revision_predicate;
+	char	*reason;
+	u32	data;
+};
+int acpi_match_oemlist(const struct acpi_oemlist *oem);
+
 extern void acpi_early_init(void);
 extern void acpi_subsystem_init(void);
 

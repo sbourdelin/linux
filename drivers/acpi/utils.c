@@ -816,3 +816,43 @@ static int __init acpi_backlight(char *str)
 	return 1;
 }
 __setup("acpi_backlight=", acpi_backlight);
+
+/**
+ * acpi_match_oemlist - Check if the system matches with an oem list
+ * @oem: pointer to acpi_oemlist table terminated by a NULL entry
+ *
+ * Return the matched index if the system is found in the oem list.
+ * Otherwise, return a negative error code.
+ */
+int acpi_match_oemlist(const struct acpi_oemlist *oem)
+{
+	struct acpi_table_header hdr;
+	int idx = 0;
+
+	if (acpi_disabled)
+		return -ENODEV;
+
+	for (; oem->oem_id[0]; oem++, idx++) {
+		if (ACPI_FAILURE(acpi_get_table_header(oem->table, 0, &hdr)))
+			continue;
+
+		if (strncmp(oem->oem_id, hdr.oem_id, ACPI_OEM_ID_SIZE))
+			continue;
+
+		if (strncmp(oem->oem_table_id, hdr.oem_table_id,
+			    ACPI_OEM_TABLE_ID_SIZE))
+			continue;
+
+		if ((oem->oem_revision_predicate == all_versions) ||
+		    (oem->oem_revision_predicate == less_than_or_equal
+			&& hdr.oem_revision <= oem->oem_revision) ||
+		    (oem->oem_revision_predicate == greater_than_or_equal
+			&& hdr.oem_revision >= oem->oem_revision) ||
+		    (oem->oem_revision_predicate == equal
+			&& hdr.oem_revision == oem->oem_revision))
+			return idx;
+	}
+
+	return -ENODEV;
+}
+EXPORT_SYMBOL(acpi_match_oemlist);
