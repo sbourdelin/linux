@@ -34,10 +34,12 @@ struct apq8016_sbc_data {
 #define MIC_CTRL_QUA_WS_SLAVE_SEL_10	BIT(17)
 #define MIC_CTRL_TLMM_SCLK_EN		BIT(1)
 #define	SPKR_CTL_PRI_WS_SLAVE_SEL_11	(BIT(17) | BIT(16))
+#define DEFAULT_MCLK_RATE		9600000
 
 static int apq8016_sbc_dai_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_card *card = rtd->card;
 	struct apq8016_sbc_data *pdata = snd_soc_card_get_drvdata(card);
 	int rval = 0;
@@ -67,6 +69,10 @@ static int apq8016_sbc_dai_init(struct snd_soc_pcm_runtime *rtd)
 		break;
 
 	}
+
+	/* Set default mclk for internal codec */
+	snd_soc_dai_set_sysclk(codec_dai, 0, DEFAULT_MCLK_RATE,
+			       SND_SOC_CLOCK_IN);
 
 	return rval;
 }
