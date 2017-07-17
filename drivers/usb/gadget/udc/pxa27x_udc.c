@@ -2475,8 +2475,7 @@ static int pxa_udc_probe(struct platform_device *pdev)
 			PTR_ERR(udc->gpiod));
 		return PTR_ERR(udc->gpiod);
 	}
-	if (udc->gpiod)
-		gpiod_direction_output(udc->gpiod, 0);
+	gpiod_direction_output(udc->gpiod, 0);
 
 	udc->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(udc->clk))
