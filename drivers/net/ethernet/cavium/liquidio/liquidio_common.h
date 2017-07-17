@@ -63,6 +63,8 @@ enum octeon_tag_type {
  */
 #define OPCODE_CORE 0           /* used for generic core operations */
 #define OPCODE_NIC  1           /* used for NIC operations */
+#define OPCODE_MGMT 2           /* used for MGMT operations */
+
 /* Subcodes are used by host driver/apps to identify the sub-operation
  * for the core. They only need to by unique for a given subsystem.
  */
@@ -106,6 +108,8 @@ enum octeon_tag_type {
 #define MAX_IOQ_INTERRUPTS_PER_PF   (64 * 2)
 #define MAX_IOQ_INTERRUPTS_PER_VF   (8 * 2)
 
+/* App specific capabilities from firmware to pf driver */
+#define LIQUIDIO_MGMT_INTF_CAP 0x1
 
 static inline u32 incr_index(u32 index, u32 count, u32 max)
 {

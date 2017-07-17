@@ -15,6 +15,7 @@ liquidio-$(CONFIG_LIQUIDIO) += lio_ethtool.o \
 			octeon_mailbox.o   \
 			octeon_mem_ops.o   \
 			octeon_droq.o      \
+			liquidio_mgmt.o      \
 			octeon_nic.o
 
 liquidio-objs := lio_main.o octeon_console.o $(liquidio-y)

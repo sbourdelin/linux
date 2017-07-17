@@ -1776,6 +1776,9 @@ static void liquidio_remove(struct pci_dev *pdev)
 
 	dev_dbg(&oct_dev->pci_dev->dev, "Stopping device\n");
 
+	if (oct_dev->fw_info.app_cap_flags & LIQUIDIO_MGMT_INTF_CAP)
+		lio_mgmt_exit(oct_dev);
+
 	if (oct_dev->watchdog_task)
 		kthread_stop(oct_dev->watchdog_task);
 
@@ -4407,6 +4410,9 @@ static int liquidio_init_nic_module(struct octeon_device *oct)
 		dev_err(&oct->pci_dev->dev, "Setup NIC devices failed\n");
 		goto octnet_init_failure;
 	}
+
+	if (oct->fw_info.app_cap_flags & LIQUIDIO_MGMT_INTF_CAP)
+		lio_mgmt_init(oct);
 
 	liquidio_ptp_init(oct);
 

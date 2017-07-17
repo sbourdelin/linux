@@ -552,6 +552,8 @@ struct octeon_device {
 	} loc;
 
 	atomic_t *adapter_refcount; /* reference count of adapter */
+
+	void *mgmt_ctx; /* pointer to management context */
 };
 
 #define  OCT_DRV_ONLINE 1
