@@ -445,9 +445,9 @@ struct hfa384x_downloadbuffer {
 
 /*-- Information Record: commsquality --*/
 struct hfa384x_commsquality {
-	u16 cq_curr_bss;
-	u16 asl_curr_bss;
-	u16 anl_curr_fc;
+	__le16 cq_curr_bss;
+	__le16 asl_curr_bss;
+	__le16 anl_curr_fc;
 } __packed;
 
 /*-- Information Record: dmbcommsquality --*/
@@ -598,27 +598,27 @@ struct hfa384x_rx_frame {
 
 /*--  Inquiry Frame, Diagnose: Communication Tallies --*/
 struct hfa384x_comm_tallies_16 {
-	u16 txunicastframes;
-	u16 txmulticastframes;
-	u16 txfragments;
-	u16 txunicastoctets;
-	u16 txmulticastoctets;
-	u16 txdeferredtrans;
-	u16 txsingleretryframes;
-	u16 txmultipleretryframes;
-	u16 txretrylimitexceeded;
-	u16 txdiscards;
-	u16 rxunicastframes;
-	u16 rxmulticastframes;
-	u16 rxfragments;
-	u16 rxunicastoctets;
-	u16 rxmulticastoctets;
-	u16 rxfcserrors;
-	u16 rxdiscardsnobuffer;
-	u16 txdiscardswrongsa;
-	u16 rxdiscardswepundecr;
-	u16 rxmsginmsgfrag;
-	u16 rxmsginbadmsgfrag;
+	__le16 txunicastframes;
+	__le16 txmulticastframes;
+	__le16 txfragments;
+	__le16 txunicastoctets;
+	__le16 txmulticastoctets;
+	__le16 txdeferredtrans;
+	__le16 txsingleretryframes;
+	__le16 txmultipleretryframes;
+	__le16 txretrylimitexceeded;
+	__le16 txdiscards;
+	__le16 rxunicastframes;
+	__le16 rxmulticastframes;
+	__le16 rxfragments;
+	__le16 rxunicastoctets;
+	__le16 rxmulticastoctets;
+	__le16 rxfcserrors;
+	__le16 rxdiscardsnobuffer;
+	__le16 txdiscardswrongsa;
+	__le16 rxdiscardswepundecr;
+	__le16 rxmsginmsgfrag;
+	__le16 rxmsginbadmsgfrag;
 } __packed;
 
 struct hfa384x_comm_tallies_32 {
