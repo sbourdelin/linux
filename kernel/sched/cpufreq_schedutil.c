@@ -177,6 +177,8 @@ static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time,
 		if (delta_ns > TICK_NSEC)
 			sg_cpu->iowait_boost = 0;
 	}
+
+	sg_cpu->last_update = time;
 }
 
 static void sugov_iowait_boost(struct sugov_cpu *sg_cpu, unsigned long *util,
@@ -219,7 +221,6 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	bool busy;
 
 	sugov_set_iowait_boost(sg_cpu, time, flags);
-	sg_cpu->last_update = time;
 
 	if (!sugov_should_update_freq(sg_policy, time))
 		return;
@@ -299,7 +300,6 @@ static void sugov_update_shared(struct update_util_data *hook, u64 time,
 	sg_cpu->flags = flags;
 
 	sugov_set_iowait_boost(sg_cpu, time, flags);
-	sg_cpu->last_update = time;
 
 	if (sugov_should_update_freq(sg_policy, time)) {
 		if (flags & SCHED_CPUFREQ_RT_DL)
