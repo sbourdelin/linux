@@ -804,6 +804,31 @@ static inline __be32 ip6_make_flowlabel(struct net *net, struct sk_buff *skb,
 	return flowlabel;
 }
 
+/* Like ip6_make_flowlabel, but already has hash */
+static inline __be32 ip6_make_flowlabel_from_hash(struct net *net,
+						  bool autolabel, u32 hash)
+{
+	__be32 flowlabel;
+
+	if (net->ipv6.sysctl.auto_flowlabels == IP6_AUTO_FLOW_LABEL_OFF ||
+	    (!autolabel &&
+	     net->ipv6.sysctl.auto_flowlabels != IP6_AUTO_FLOW_LABEL_FORCED))
+		return 0;
+
+	/* Since this is being sent on the wire obfuscate hash a bit
+	 * to minimize possbility that any useful information to an
+	 * attacker is leaked. Only lower 20 bits are relevant.
+	 */
+	rol32(hash, 16);
+
+	flowlabel = (__force __be32)hash & IPV6_FLOWLABEL_MASK;
+
+	if (net->ipv6.sysctl.flowlabel_state_ranges)
+		flowlabel |= IPV6_FLOWLABEL_STATELESS_FLAG;
+
+	return flowlabel;
+}
+
 static inline int ip6_default_np_autolabel(struct net *net)
 {
 	switch (net->ipv6.sysctl.auto_flowlabels) {
