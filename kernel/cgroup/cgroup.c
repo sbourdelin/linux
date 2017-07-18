@@ -1867,8 +1867,10 @@ static struct dentry *cgroup_mount(struct file_system_type *fs_type,
 
 		dentry = cgroup_do_mount(&cgroup2_fs_type, flags, &cgrp_dfl_root,
 					 CGROUP2_SUPER_MAGIC, ns);
-		if (!IS_ERR(dentry))
+		if (!IS_ERR(dentry)) {
 			apply_cgroup_root_flags(root_flags);
+			kernfs_activate(cgrp_dfl_root.cgrp.kn);
+		}
 	} else {
 		dentry = cgroup1_mount(&cgroup_fs_type, flags, data,
 				       CGROUP_SUPER_MAGIC, ns);
