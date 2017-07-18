@@ -1190,11 +1190,10 @@ static int cow_file_range_async(struct inode *inode, struct page *locked_page,
 		async_cow->locked_page = locked_page;
 		async_cow->start = start;
 
-		if (BTRFS_I(inode)->flags & BTRFS_INODE_NOCOMPRESS &&
-		    !btrfs_test_opt(fs_info, FORCE_COMPRESS))
-			cur_end = end;
-		else
+		if (inode_need_compress(inode))
 			cur_end = min(end, start + SZ_512K - 1);
+		else
+			cur_end = end;
 
 		async_cow->end = cur_end;
 		INIT_LIST_HEAD(&async_cow->extents);
