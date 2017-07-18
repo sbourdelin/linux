@@ -26,6 +26,7 @@
 #include <linux/suspend.h>
 #include <linux/syscore_ops.h>
 #include <linux/ftrace.h>
+#include <linux/rtc.h>
 #include <trace/events/power.h>
 #include <linux/compiler.h>
 #include <linux/moduleparam.h>
@@ -577,6 +578,7 @@ int pm_suspend(suspend_state_t state)
 	if (state <= PM_SUSPEND_ON || state >= PM_SUSPEND_MAX)
 		return -EINVAL;
 
+	rtc_show_time("PM: suspend entry");
 	error = enter_state(state);
 	if (error) {
 		suspend_stats.fail++;
@@ -584,6 +586,7 @@ int pm_suspend(suspend_state_t state)
 	} else {
 		suspend_stats.success++;
 	}
+	rtc_show_time("PM: suspend exit");
 	return error;
 }
 EXPORT_SYMBOL(pm_suspend);
