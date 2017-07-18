@@ -1698,6 +1698,21 @@ static uint32_t mga_vga_calculate_mode_bandwidth(struct drm_display_mode *mode,
 	return (uint32_t)(bandwidth);
 }
 
+static bool mga_vga_check_mode_bandwidth(struct drm_display_mode *mode,
+					 int bits_per_pixel,
+					 unsigned int max_bw)
+{
+	unsigned int bw;
+
+	bw = mga_vga_calculate_mode_bandwidth(mode, bits_per_pixel);
+	if (bw > max_bw) {
+		DRM_DEBUG_KMS("Mode %d:%s exceeds bandwidth: %d > %d",
+			      mode->base.id, mode->name, bw, max_bw);
+		return false;
+	}
+	return true;
+}
+
 #define MODE_BANDWIDTH	MODE_BAD
 
 static int mga_vga_mode_valid(struct drm_connector *connector,
@@ -1721,20 +1736,20 @@ static int mga_vga_mode_valid(struct drm_connector *connector,
 				return MODE_VIRTUAL_X;
 			if (mode->vdisplay > 1200)
 				return MODE_VIRTUAL_Y;
-			if (mga_vga_calculate_mode_bandwidth(mode, bpp)
-				> (24400 * 1024))
+			if (mga_vga_check_mode_bandwidth(mode, bpp,
+							 24400 * 1024))
 				return MODE_BANDWIDTH;
 		} else if (mdev->unique_rev_id == 0x02) {
 			if (mode->hdisplay > 1920)
 				return MODE_VIRTUAL_X;
 			if (mode->vdisplay > 1200)
 				return MODE_VIRTUAL_Y;
-			if (mga_vga_calculate_mode_bandwidth(mode, bpp)
-				> (30100 * 1024))
+			if (mga_vga_check_mode_bandwidth(mode, bpp,
+							 30100 * 1024))
 				return MODE_BANDWIDTH;
 		} else {
-			if (mga_vga_calculate_mode_bandwidth(mode, bpp)
-				> (55000 * 1024))
+			if (mga_vga_check_mode_bandwidth(mode, bpp,
+							 55000 * 1024))
 				return MODE_BANDWIDTH;
 		}
 	} else if (mdev->type == G200_WB) {
@@ -1742,21 +1757,17 @@ static int mga_vga_mode_valid(struct drm_connector *connector,
 			return MODE_VIRTUAL_X;
 		if (mode->vdisplay > 1024)
 			return MODE_VIRTUAL_Y;
-		if (mga_vga_calculate_mode_bandwidth(mode,
-			bpp > (31877 * 1024)))
+		if (mga_vga_check_mode_bandwidth(mode, bpp, 31877 * 1024))
 			return MODE_BANDWIDTH;
-	} else if (mdev->type == G200_EV &&
-		(mga_vga_calculate_mode_bandwidth(mode, bpp)
-			> (32700 * 1024))) {
-		return MODE_BANDWIDTH;
-	} else if (mdev->type == G200_EH &&
-		(mga_vga_calculate_mode_bandwidth(mode, bpp)
-			> (37500 * 1024))) {
-		return MODE_BANDWIDTH;
-	} else if (mdev->type == G200_ER &&
-		(mga_vga_calculate_mode_bandwidth(mode,
-			bpp) > (55000 * 1024))) {
-		return MODE_BANDWIDTH;
+	} else if (mdev->type == G200_EV) {
+		if (mga_vga_check_mode_bandwidth(mode, bpp, 32700 * 1024))
+			return MODE_BANDWIDTH;
+	} else if (mdev->type == G200_EH) {
+		if (mga_vga_check_mode_bandwidth(mode, bpp, 37500 * 1024))
+			return MODE_BANDWIDTH;
+	} else if (mdev->type == G200_ER) {
+		if (mga_vga_check_mode_bandwidth(mode, bpp, 55000 * 1024))
+			return MODE_BANDWIDTH;
 	}
 
 	if ((mode->hdisplay % 8) != 0 || (mode->hsync_start % 8) != 0 ||
