@@ -2227,6 +2227,12 @@ static int __init uv_bau_init(void)
 	}
 
 	nuvhubs = uv_num_possible_blades();
+	if (nuvhubs < 2) {
+		pr_crit("UV: BAU disabled - insufficient hub count\n");
+		set_bau_off();
+		nobau_perm = 1;
+		return 0;
+	}
 
 	uv_base_pnode = 0x7fffffff;
 	for (uvhub = 0; uvhub < nuvhubs; uvhub++) {
