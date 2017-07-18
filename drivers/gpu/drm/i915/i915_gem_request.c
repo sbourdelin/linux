@@ -871,6 +871,7 @@ static void i915_gem_mark_busy(const struct intel_engine_cs *engine)
 	i915_update_gfx_val(dev_priv);
 	if (INTEL_GEN(dev_priv) >= 6)
 		gen6_rps_busy(dev_priv);
+	i915_pmu_gt_active(dev_priv);
 
 	queue_delayed_work(dev_priv->wq,
 			   &dev_priv->gt.retire_work,

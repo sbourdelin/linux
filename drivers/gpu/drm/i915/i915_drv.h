@@ -2583,7 +2583,9 @@ struct drm_i915_private {
 
 	struct {
 		struct pmu base;
+		spinlock_t lock;
 		struct hrtimer timer;
+		bool timer_enabled;
 		u64 enable;
 		u64 sample[__I915_NUM_PMU_SAMPLERS];
 	} pmu;
@@ -3760,9 +3762,13 @@ extern void i915_perf_unregister(struct drm_i915_private *dev_priv);
 #ifdef CONFIG_PERF_EVENTS
 extern void i915_pmu_register(struct drm_i915_private *i915);
 extern void i915_pmu_unregister(struct drm_i915_private *i915);
+extern void i915_pmu_gt_idle(struct drm_i915_private *i915);
+extern void i915_pmu_gt_active(struct drm_i915_private *i915);
 #else
 static inline void i915_pmu_register(struct drm_i915_private *i915) {}
 static inline void i915_pmu_unregister(struct drm_i915_private *i915) {}
+static inline void i915_pmu_gt_idle(struct drm_i915_private *i915) {}
+static inline void i915_pmu_gt_active(struct drm_i915_private *i915) {}
 #endif
 
 /* i915_suspend.c */

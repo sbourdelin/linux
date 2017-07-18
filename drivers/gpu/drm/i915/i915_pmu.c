@@ -29,6 +29,40 @@ static const unsigned int user_engine_map[I915_NUM_ENGINES] = {
 	[I915_SAMPLE_VECS] = VECS,
 };
 
+static bool pmu_needs_timer(struct drm_i915_private *i915, bool gpu_active)
+{
+	if (gpu_active)
+		return i915->pmu.enable;
+	else
+		return i915->pmu.enable >> 32;
+}
+
+void i915_pmu_gt_idle(struct drm_i915_private *i915)
+{
+	spin_lock_irq(&i915->pmu.lock);
+	/*
+	 * Signal sampling timer to stop if only engine events are enabled and
+	 * GPU went idle.
+	 */
+	i915->pmu.timer_enabled = pmu_needs_timer(i915, false);
+	spin_unlock_irq(&i915->pmu.lock);
+}
+
+void i915_pmu_gt_active(struct drm_i915_private *i915)
+{
+	spin_lock_irq(&i915->pmu.lock);
+	/*
+	 * Re-enable sampling timer when GPU goes active.
+	 */
+	if (!i915->pmu.timer_enabled && pmu_needs_timer(i915, true)) {
+		hrtimer_start_range_ns(&i915->pmu.timer,
+				       ns_to_ktime(PERIOD), 0,
+				       HRTIMER_MODE_REL_PINNED);
+		i915->pmu.timer_enabled = true;
+	}
+	spin_unlock_irq(&i915->pmu.lock);
+}
+
 static bool grab_forcewake(struct drm_i915_private *i915, bool fw)
 {
 	if (!fw)
@@ -133,7 +167,7 @@ static enum hrtimer_restart i915_sample(struct hrtimer *hrtimer)
 	struct drm_i915_private *i915 =
 		container_of(hrtimer, struct drm_i915_private, pmu.timer);
 
-	if (i915->pmu.enable == 0)
+	if (!READ_ONCE(i915->pmu.timer_enabled))
 		return HRTIMER_NORESTART;
 
 	engines_sample(i915);
@@ -307,13 +341,19 @@ static void i915_pmu_enable(struct perf_event *event)
 {
 	struct drm_i915_private *i915 =
 		container_of(event->pmu, typeof(*i915), pmu.base);
+	unsigned long flags;
 
-	if (i915->pmu.enable == 0)
+	spin_lock_irqsave(&i915->pmu.lock, flags);
+
+	i915->pmu.enable |= BIT_ULL(event->attr.config);
+	if (pmu_needs_timer(i915, true) && !i915->pmu.timer_enabled) {
 		hrtimer_start_range_ns(&i915->pmu.timer,
 				       ns_to_ktime(PERIOD), 0,
 				       HRTIMER_MODE_REL_PINNED);
+		i915->pmu.timer_enabled = true;
+	}
 
-	i915->pmu.enable |= BIT_ULL(event->attr.config);
+	spin_unlock_irqrestore(&i915->pmu.lock, flags);
 
 	i915_pmu_timer_start(event);
 }
@@ -322,8 +362,13 @@ static void i915_pmu_disable(struct perf_event *event)
 {
 	struct drm_i915_private *i915 =
 		container_of(event->pmu, typeof(*i915), pmu.base);
+	unsigned long flags;
 
+	spin_lock_irqsave(&i915->pmu.lock, flags);
 	i915->pmu.enable &= ~BIT_ULL(event->attr.config);
+	i915->pmu.timer_enabled &= pmu_needs_timer(i915, true);
+	spin_unlock_irqrestore(&i915->pmu.lock, flags);
+
 	i915_pmu_timer_cancel(event);
 }
 
@@ -577,6 +622,7 @@ void i915_pmu_register(struct drm_i915_private *i915)
 	i915->pmu.base.read		= i915_pmu_event_read;
 	i915->pmu.base.event_idx	= i915_pmu_event_event_idx;
 
+	spin_lock_init(&i915->pmu.lock);
 	hrtimer_init(&i915->pmu.timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	i915->pmu.timer.function = i915_sample;
 	i915->pmu.enable = 0;
