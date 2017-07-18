@@ -32,10 +32,10 @@
 #include <linux/ctype.h>
 #include <linux/genhd.h>
 #include <linux/ktime.h>
+#include <linux/rtc.h>
 #include <trace/events/power.h>
 
 #include "power.h"
-
 
 static int nocompress;
 static int noresume;
@@ -342,6 +342,7 @@ int hibernation_snapshot(int platform_mode)
 	pm_message_t msg;
 	int error;
 
+	rtc_show_time("PM: hibernation entry");
 	pm_suspend_clear_flags();
 	error = platform_begin(platform_mode);
 	if (error)
@@ -409,6 +410,7 @@ int hibernation_snapshot(int platform_mode)
 	thaw_kernel_threads();
  Cleanup:
 	swsusp_free();
+	rtc_show_time("PM: hibernation exit");
 	goto Close;
 }
 
