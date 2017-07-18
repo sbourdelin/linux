@@ -177,6 +177,8 @@ MODULE_DEVICE_TABLE(i2c, at24_ids);
 
 static const struct acpi_device_id at24_acpi_ids[] = {
 	{ "INT3499", AT24_DEVICE_MAGIC(8192 / 8, 0) },
+	/* TODO: Get a proper ACPI ID */
+	{ "CAT24C16", AT24_DEVICE_MAGIC(16384 / 8, AT24_FLAG_READONLY) },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, at24_acpi_ids);
