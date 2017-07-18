@@ -3260,19 +3260,33 @@ static int btusb_suspend(struct usb_interface *intf, pm_message_t message)
 	return 0;
 }
 
+static void btusb_deferred_tx_complete(struct urb *urb)
+{
+	btusb_tx_complete(urb);
+	usb_free_urb(urb);
+}
+
 static void play_deferred(struct btusb_data *data)
 {
 	struct urb *urb;
 	int err;
 
 	while ((urb = usb_get_from_anchor(&data->deferred))) {
+		/* Add a hook to free urb after completed */
+		urb->complete = btusb_deferred_tx_complete;
+
 		err = usb_submit_urb(urb, GFP_ATOMIC);
-		if (err < 0)
-			break;
+		if (err < 0) {
+			if (err != -EPERM && err != -ENODEV)
+				BT_ERR("%s urb %p submission failed (%d)",
+				       data->hdev->name, urb, -err);
+			kfree(urb->setup_packet);
+			usb_free_urb(urb);
+			continue;
+		}
 
 		data->tx_in_flight++;
 	}
-	usb_scuttle_anchored_urbs(&data->deferred);
 }
 
 static int btusb_resume(struct usb_interface *intf)
