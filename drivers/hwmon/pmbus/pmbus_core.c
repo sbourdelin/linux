@@ -140,6 +140,12 @@ static const int pmbus_fan_command_registers[] = {
 	PMBUS_FAN_COMMAND_4,
 };
 
+const struct pmbus_driver_info *pmbus_get_info(struct i2c_client *client)
+{
+	return ((struct pmbus_data *)i2c_get_clientdata(client))->info;
+}
+EXPORT_SYMBOL_GPL(pmbus_get_info);
+
 void pmbus_clear_cache(struct i2c_client *client)
 {
 	struct pmbus_data *data = i2c_get_clientdata(client);

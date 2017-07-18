@@ -420,6 +420,7 @@ extern const struct regulator_ops pmbus_regulator_ops;
 
 /* Function declarations */
 
+const struct pmbus_driver_info *pmbus_get_info(struct i2c_client *client);
 void pmbus_clear_cache(struct i2c_client *client);
 int pmbus_set_page(struct i2c_client *client, u8 page);
 int pmbus_read_word_data(struct i2c_client *client, u8 page, u8 reg);
