@@ -10,6 +10,25 @@
 #define RING_MASK 0xffffffff
 #define RING_MAX 32
 
+#define ENGINE_SAMPLE_MASK (0xf)
+#define ENGINE_SAMPLE_BITS (4)
+
+static const unsigned int engine_map[I915_NUM_ENGINES] = {
+	[RCS] = I915_SAMPLE_RCS,
+	[BCS] = I915_SAMPLE_BCS,
+	[VCS] = I915_SAMPLE_VCS,
+	[VCS2] = I915_SAMPLE_VCS2,
+	[VECS] = I915_SAMPLE_VECS,
+};
+
+static const unsigned int user_engine_map[I915_NUM_ENGINES] = {
+	[I915_SAMPLE_RCS] = RCS,
+	[I915_SAMPLE_BCS] = BCS,
+	[I915_SAMPLE_VCS] = VCS,
+	[I915_SAMPLE_VCS2] = VCS2,
+	[I915_SAMPLE_VECS] = VECS,
+};
+
 static void engines_sample(struct drm_i915_private *dev_priv)
 {
 	struct intel_engine_cs *engine;
@@ -26,9 +45,16 @@ static void engines_sample(struct drm_i915_private *dev_priv)
 		return;
 
 	for_each_engine(engine, dev_priv, id) {
+		unsigned int user_engine = engine_map[id];
 		u32 val;
 
-		if ((dev_priv->pmu.enable & (0x7 << (4*id))) == 0)
+		if (WARN_ON_ONCE(id >= ARRAY_SIZE(engine_map)))
+			continue;
+		else
+			user_engine = engine_map[id];
+
+		if (!(dev_priv->pmu.enable &
+		    (ENGINE_SAMPLE_MASK << (ENGINE_SAMPLE_BITS * user_engine))))
 			continue;
 
 		if (i915_seqno_passed(intel_engine_get_seqno(engine),
@@ -112,6 +138,11 @@ static int engine_event_init(struct perf_event *event)
 	int engine = event->attr.config >> 2;
 	int sample = event->attr.config & 3;
 
+	if (WARN_ON_ONCE(engine >= ARRAY_SIZE(user_engine_map)))
+		return -ENOENT;
+	else
+		engine = user_engine_map[engine];
+
 	switch (sample) {
 	case I915_SAMPLE_QUEUED:
 	case I915_SAMPLE_BUSY:
@@ -124,9 +155,6 @@ static int engine_event_init(struct perf_event *event)
 	default:
 		return -ENOENT;
 	}
-
-	if (engine >= I915_NUM_ENGINES)
-		return -ENOENT;
 
 	if (!i915->engine[engine])
 		return -ENODEV;
@@ -369,7 +397,13 @@ static void i915_pmu_event_read(struct perf_event *event)
 	if (event->attr.config < 32) {
 		int engine = event->attr.config >> 2;
 		int sample = event->attr.config & 3;
-		val = i915->engine[engine]->pmu_sample[sample];
+
+		if (WARN_ON_ONCE(engine >= ARRAY_SIZE(user_engine_map))) {
+			/* Do nothing */
+		} else {
+			engine = user_engine_map[engine];
+			val = i915->engine[engine]->pmu_sample[sample];
+		}
 	} else switch (event->attr.config) {
 	case I915_PMU_ACTUAL_FREQUENCY:
 		val = i915->pmu.sample[__I915_SAMPLE_FREQ_ACT];
