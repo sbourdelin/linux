@@ -1024,6 +1024,7 @@ mt9p031_get_pdata(struct i2c_client *client)
 
 	of_property_read_u32(np, "input-clock-frequency", &pdata->ext_freq);
 	of_property_read_u32(np, "pixel-clock-frequency", &pdata->target_freq);
+	of_property_read_u32(np, "resolution", &pdata->resolution);
 
 done:
 	of_node_put(np);
@@ -1058,6 +1059,7 @@ static int mt9p031_probe(struct i2c_client *client,
 	mt9p031->output_control	= MT9P031_OUTPUT_CONTROL_DEF;
 	mt9p031->mode2 = MT9P031_READ_MODE_2_ROW_BLC;
 	mt9p031->model = did->driver_data;
+	mt9p031->resolution = pdata->resolution;
 
 	mt9p031->regulators[0].supply = "vdd";
 	mt9p031->regulators[1].supply = "vdd_io";
@@ -1123,11 +1125,18 @@ static int mt9p031_probe(struct i2c_client *client,
 	mt9p031->crop.left = MT9P031_COLUMN_START_DEF;
 	mt9p031->crop.top = MT9P031_ROW_START_DEF;
 
-	if (mt9p031->model == MT9P031_MODEL_MONOCHROME)
-		mt9p031->format.code = MEDIA_BUS_FMT_Y12_1X12;
-	else
-		mt9p031->format.code = MEDIA_BUS_FMT_SGRBG12_1X12;
-
+	if (mt9p031->model == MT9P031_MODEL_MONOCHROME) {
+		if (mt9p031->resolution == 8)
+			mt9p031->format.code = MEDIA_BUS_FMT_Y8_1X8;
+		else
+			mt9p031->format.code = MEDIA_BUS_FMT_Y12_1X12;
+	}
+	else {
+		if (mt9p031->resolution == 8)
+			mt9p031->format.code = MEDIA_BUS_FMT_SGRBG8_1X8;
+		else
+			mt9p031->format.code = MEDIA_BUS_FMT_SGRBG12_1X12;
+	}
 	mt9p031->format.width = MT9P031_WINDOW_WIDTH_DEF;
 	mt9p031->format.height = MT9P031_WINDOW_HEIGHT_DEF;
 	mt9p031->format.field = V4L2_FIELD_NONE;

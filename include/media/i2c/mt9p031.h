@@ -11,6 +11,7 @@ struct v4l2_subdev;
 struct mt9p031_platform_data {
 	int ext_freq;
 	int target_freq;
+	int resolution;
 };
 
 #endif
