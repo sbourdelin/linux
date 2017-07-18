@@ -143,7 +143,8 @@ static void pnv_smp_cpu_kill_self(void)
 {
 	unsigned int cpu;
 	unsigned long srr1, wmask;
-
+	uint64_t lpcr_val;
+	uint64_t pir;
 	/* Standard hot unplug procedure */
 	/*
 	 * This hard disables local interurpts, ensuring we have no lazy
@@ -164,13 +165,17 @@ static void pnv_smp_cpu_kill_self(void)
 	if (cpu_has_feature(CPU_FTR_ARCH_207S))
 		wmask = SRR1_WAKEMASK_P8;
 
+	pir = get_hard_smp_processor_id(cpu);
 	/* We don't want to take decrementer interrupts while we are offline,
 	 * so clear LPCR:PECE1. We keep PECE2 (and LPCR_PECE_HVEE on P9)
 	 * enabled as to let IPIs in.
 	 */
-	mtspr(SPRN_LPCR, mfspr(SPRN_LPCR) & ~(u64)LPCR_PECE1);
+	lpcr_val = mfspr(SPRN_LPCR) & ~(u64)LPCR_PECE1;
+	mtspr(SPRN_LPCR, lpcr_val);
 
 	while (!generic_check_cpu_restart(cpu)) {
+
+
 		/*
 		 * Clear IPI flag, since we don't handle IPIs while
 		 * offline, except for those when changing micro-threading
@@ -180,8 +185,15 @@ static void pnv_smp_cpu_kill_self(void)
 		 */
 		kvmppc_set_host_ipi(cpu, 0);
 
+		/*
+		 * If the CPU gets woken up by a special wakeup,
+		 * ensure that the SLW engine sets LPCR with
+		 * decrementer bit cleared, else we will get spurious
+		 * wakeups.
+		 */
+		if (cpu_has_feature(CPU_FTR_ARCH_300))
+			opal_slw_set_reg(pir, SPRN_LPCR, lpcr_val);
 		srr1 = pnv_cpu_offline(cpu);
-
 		WARN_ON(lazy_irq_pending());
 
 		/*
@@ -220,7 +232,15 @@ static void pnv_smp_cpu_kill_self(void)
 	}
 
 	/* Re-enable decrementer interrupts */
-	mtspr(SPRN_LPCR, mfspr(SPRN_LPCR) | LPCR_PECE1);
+	lpcr_val = mfspr(SPRN_LPCR) | LPCR_PECE1;
+	mtspr(SPRN_LPCR, lpcr_val);
+
+	/*
+	 * We want stop states to be woken up by decrementer for
+	 * non-hotplug cases.
+	 */
+	if (cpu_has_feature(CPU_FTR_ARCH_300))
+		opal_slw_set_reg(pir, SPRN_LPCR, lpcr_val);
 	DBG("CPU%d coming online...\n", cpu);
 }
 

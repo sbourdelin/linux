@@ -68,7 +68,7 @@ static int pnv_save_sprs_for_deep_states(void)
 	 * all cpus at boot. Get these reg values of current cpu and use the
 	 * same across all cpus.
 	 */
-	uint64_t lpcr_val = mfspr(SPRN_LPCR) & ~(u64)LPCR_PECE1;
+	uint64_t lpcr_val = mfspr(SPRN_LPCR);
 	uint64_t hid0_val = mfspr(SPRN_HID0);
 	uint64_t hid1_val = mfspr(SPRN_HID1);
 	uint64_t hid4_val = mfspr(SPRN_HID4);
@@ -84,6 +84,16 @@ static int pnv_save_sprs_for_deep_states(void)
 		rc = opal_slw_set_reg(pir, SPRN_HSPRG0, hsprg0_val);
 		if (rc != 0)
 			return rc;
+
+		/*
+		 * On POWER8, the only state that uses SLW engine is
+		 * winkle.  This is only used for CPU-Hotplug. So we
+		 * clear the decrementer bit from LPCR since we
+		 * don't want to be woken up on decrementer when in
+		 * winkle.
+		 */
+		if (!cpu_has_feature(CPU_FTR_ARCH_300))
+			lpcr_val = lpcr_val & ~(u64)LPCR_PECE1;
 
 		rc = opal_slw_set_reg(pir, SPRN_LPCR, lpcr_val);
 		if (rc != 0)
