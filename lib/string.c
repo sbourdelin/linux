@@ -199,6 +199,13 @@ ssize_t strscpy(char *dest, const char *src, size_t count)
 		max = 0;
 #endif
 
+	/*
+	 * KASAN won't be happy about word-at-a-time
+	 * optimistic reads, so let's avoid them.
+	 */
+	if (IS_ENABLED(CONFIG_KASAN))
+		max = 0;
+
 	while (max >= sizeof(unsigned long)) {
 		unsigned long c, data;
 
