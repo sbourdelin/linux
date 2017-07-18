@@ -190,6 +190,20 @@ enum pmbus_regs {
 	PMBUS_VIRT_VMON_UV_FAULT_LIMIT,
 	PMBUS_VIRT_VMON_OV_FAULT_LIMIT,
 	PMBUS_VIRT_STATUS_VMON,
+
+	/* Fan control */
+	PMBUS_VIRT_FAN_TARGET_1,
+	PMBUS_VIRT_FAN_TARGET_2,
+	PMBUS_VIRT_FAN_TARGET_3,
+	PMBUS_VIRT_FAN_TARGET_4,
+	PMBUS_VIRT_PWM_1,
+	PMBUS_VIRT_PWM_2,
+	PMBUS_VIRT_PWM_3,
+	PMBUS_VIRT_PWM_4,
+	PMBUS_VIRT_PWM_ENABLE_1,
+	PMBUS_VIRT_PWM_ENABLE_2,
+	PMBUS_VIRT_PWM_ENABLE_3,
+	PMBUS_VIRT_PWM_ENABLE_4,
 };
 
 /*
@@ -222,6 +236,8 @@ enum pmbus_regs {
 #define PB_FAN_1_PULSE_MASK		(BIT(4) | BIT(5))
 #define PB_FAN_1_RPM			BIT(6)
 #define PB_FAN_1_INSTALLED		BIT(7)
+
+enum pmbus_fan_mode { percent = 0, rpm };
 
 /*
  * STATUS_BYTE, STATUS_WORD (lower)
@@ -313,6 +329,7 @@ enum pmbus_sensor_classes {
 	PSC_POWER,
 	PSC_TEMPERATURE,
 	PSC_FAN,
+	PSC_PWM,
 	PSC_NUM_CLASSES		/* Number of power sensor classes */
 };
 
@@ -413,6 +430,8 @@ int pmbus_write_byte_data(struct i2c_client *client, int page, u8 reg,
 			  u8 value);
 int pmbus_update_byte_data(struct i2c_client *client, int page, u8 reg,
 			   u8 mask, u8 value);
+int pmbus_update_fan(struct i2c_client *client, int page, int id,
+		     int config, int mask, int command);
 void pmbus_clear_faults(struct i2c_client *client);
 bool pmbus_check_byte_register(struct i2c_client *client, int page, int reg);
 bool pmbus_check_word_register(struct i2c_client *client, int page, int reg);
