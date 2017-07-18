@@ -378,75 +378,74 @@ void ll_i2gids(__u32 *suppgids, struct inode *i1, struct inode *i2)
 }
 
 /*
- * try to reuse three types of dentry:
- * 1. unhashed alias, this one is unhashed by d_invalidate (but it may be valid
- *    by concurrent .revalidate).
- * 2. INVALID alias (common case for no valid ldlm lock held, but this flag may
- *    be cleared by others calling d_lustre_revalidate).
- * 3. DISCONNECTED alias.
+ * Try to find an "invalid" alias.  i.e. one that was unhashed by
+ * d_invalidate(), or that was instantiated with no valid ldlm lock.
+ * These can be rehased by d_lustre_revalidate(), which could race
+ * with this code.
  */
-static struct dentry *ll_find_alias(struct inode *inode, struct dentry *dentry)
+static struct dentry *ll_find_invalid_alias(struct inode *inode,
+					    struct dentry *dentry)
 {
-	struct dentry *alias, *discon_alias, *invalid_alias;
+	struct dentry *alias, *invalid_alias = NULL;
 
 	if (hlist_empty(&inode->i_dentry))
 		return NULL;
-
-	discon_alias = NULL;
-	invalid_alias = NULL;
 
 	spin_lock(&inode->i_lock);
 	hlist_for_each_entry(alias, &inode->i_dentry, d_u.d_alias) {
 		LASSERT(alias != dentry);
 
 		spin_lock(&alias->d_lock);
-		if ((alias->d_flags & DCACHE_DISCONNECTED) &&
-		    S_ISDIR(inode->i_mode))
-			/* LASSERT(last_discon == NULL); LU-405, bz 20055 */
-			discon_alias = alias;
-		else if (alias->d_parent == dentry->d_parent	     &&
-			 alias->d_name.hash == dentry->d_name.hash       &&
-			 alias->d_name.len == dentry->d_name.len	 &&
-			 memcmp(alias->d_name.name, dentry->d_name.name,
-				dentry->d_name.len) == 0)
+		if (alias->d_parent == dentry->d_parent       &&
+		    alias->d_name.hash == dentry->d_name.hash &&
+		    alias->d_name.len == dentry->d_name.len   &&
+		    memcmp(alias->d_name.name, dentry->d_name.name,
+			   dentry->d_name.len) == 0) {
+			dget_dlock(alias);
 			invalid_alias = alias;
+		}
 		spin_unlock(&alias->d_lock);
 
 		if (invalid_alias)
 			break;
 	}
-	alias = invalid_alias ?: discon_alias ?: NULL;
-	if (alias) {
-		spin_lock(&alias->d_lock);
-		dget_dlock(alias);
-		spin_unlock(&alias->d_lock);
-	}
 	spin_unlock(&inode->i_lock);
 
-	return alias;
+	return invalid_alias;
 }
 
 /*
- * Similar to d_splice_alias(), but lustre treats invalid alias
- * similar to DCACHE_DISCONNECTED, and tries to use it anyway.
+ * Similar to d_splice_alias(), but also look for an "invalid" alias,
+ * specific to lustre, and use that if found.
  */
 struct dentry *ll_splice_alias(struct inode *inode, struct dentry *de)
 {
-	if (inode) {
-		struct dentry *new = ll_find_alias(inode, de);
+	if (inode && !S_ISDIR(inode->i_mode)) {
+		struct ll_inode_info *lli = ll_i2info(inode);
+		struct dentry *new;
+
+		/* We need lli_lock here as another thread could
+		 * be running this code, and i_lock cannot protect us.
+		 */
+		spin_lock(&lli->lli_lock);
+		new = ll_find_invalid_alias(inode, de);
+		if (!new)
+			d_add(de, inode);
+		spin_lock(&lli->lli_lock);
 
 		if (new) {
-			d_move(new, de);
 			iput(inode);
 			CDEBUG(D_DENTRY,
 			       "Reuse dentry %p inode %p refc %d flags %#x\n",
 			      new, d_inode(new), d_count(new), new->d_flags);
 			return new;
 		}
+		return de;
 	}
-	d_add(de, inode);
-	CDEBUG(D_DENTRY, "Add dentry %p inode %p refc %d flags %#x\n",
-	       de, d_inode(de), d_count(de), de->d_flags);
+	de = d_splice_alias(inode, de);
+	if (!IS_ERR(de))
+		CDEBUG(D_DENTRY, "Add dentry %p inode %p refc %d flags %#x\n",
+		       de, d_inode(de), d_count(de), de->d_flags);
 	return de;
 }
 
