@@ -5,6 +5,17 @@
 config RTC_LIB
 	bool
 
+config RTC_SHOW_TIME
+	bool "rtc_show_time instrumentation"
+	select RTC_LIB
+	help
+	  Activate rtc_show_time(const char *msg) wall clock time
+	  instrumentation.
+
+	  The instrumentation is used to help triage and synchronize
+	  kernel logs using CLOCK_MONOTONIC and user space activity
+	  logs utilizing CLOCK_REALTIME references.
+
 config RTC_MC146818_LIB
 	bool
 	select RTC_LIB
