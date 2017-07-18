@@ -24,6 +24,7 @@
 #include <drm/drm_encoder_slave.h>
 #include <drm/drm_atomic_helper.h>
 
+#include "kirin_drm_drv.h"
 #include "dw_dsi_reg.h"
 
 #define MAX_TX_ESC_CLK		10
@@ -603,6 +604,49 @@ static void dsi_encoder_enable(struct drm_encoder *encoder)
 	dsi->enable = true;
 }
 
+static enum drm_mode_status dsi_encoder_mode_valid(struct drm_encoder *encoder,
+					const struct drm_display_mode *mode)
+{
+	struct dw_dsi *dsi = encoder_to_dsi(encoder);
+	struct drm_crtc *crtc = NULL;
+	struct mipi_phy_params phy;
+	u32 bpp = mipi_dsi_pixel_format_to_bpp(dsi->format);
+	u32 adjusted_clock;
+	u32 req_kHz, act_kHz, lane_byte_clk_kHz;
+
+	/* Figure out what the adjusted modeclock will be */
+	/* XXX There's got to be a better way to go encoder->crtc */
+	drm_for_each_crtc(crtc, encoder->dev)
+		if (crtc)
+			break;
+	if (crtc)
+		adjusted_clock = kirin_ade_adj_mode_clk(crtc, mode->clock);
+	else
+		adjusted_clock = mode->clock;
+
+	/* Calculate the lane byte clk using the adjusted mode clk */
+	memset(&phy, 0, sizeof(phy));
+	req_kHz = adjusted_clock * bpp / dsi->lanes;
+	act_kHz = dsi_calc_phy_rate(req_kHz, &phy);
+	lane_byte_clk_kHz = act_kHz / 8;
+
+	DRM_DEBUG_DRIVER("Checking mode %ix%i-%i@%i clock: %i adj_clock: %i...",
+			mode->hdisplay, mode->vdisplay, bpp,
+			drm_mode_vrefresh(mode), mode->clock, adjusted_clock);
+
+	/*
+	 * Make sure the adjused mode clock and the lane byte clk
+	 * have a common denominator base frequency
+	 */
+	if (adjusted_clock/dsi->lanes == lane_byte_clk_kHz/3) {
+		DRM_DEBUG_DRIVER("OK!\n");
+		return MODE_OK;
+	}
+
+	DRM_DEBUG_DRIVER("BAD!\n");
+	return MODE_BAD;
+}
+
 static void dsi_encoder_mode_set(struct drm_encoder *encoder,
 				 struct drm_display_mode *mode,
 				 struct drm_display_mode *adj_mode)
@@ -622,6 +666,7 @@ static int dsi_encoder_atomic_check(struct drm_encoder *encoder,
 
 static const struct drm_encoder_helper_funcs dw_encoder_helper_funcs = {
 	.atomic_check	= dsi_encoder_atomic_check,
+	.mode_valid	= dsi_encoder_mode_valid,
 	.mode_set	= dsi_encoder_mode_set,
 	.enable		= dsi_encoder_enable,
 	.disable	= dsi_encoder_disable

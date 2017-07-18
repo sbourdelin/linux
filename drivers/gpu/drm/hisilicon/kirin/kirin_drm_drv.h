@@ -27,4 +27,6 @@ struct kirin_drm_private {
 
 extern const struct kirin_dc_ops ade_dc_ops;
 
+u32 kirin_ade_adj_mode_clk(struct drm_crtc *crtc, u32 modeclk);
+
 #endif /* __KIRIN_DRM_DRV_H__ */

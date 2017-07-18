@@ -178,6 +178,14 @@ static void ade_init(struct ade_hw_ctx *ctx)
 			FRM_END_START_MASK, REG_EFFECTIVE_IN_ADEEN_FRMEND);
 }
 
+u32 kirin_ade_adj_mode_clk(struct drm_crtc *crtc, u32 modeclk)
+{
+	struct ade_crtc *acrtc = to_ade_crtc(crtc);
+	struct ade_hw_ctx *ctx = acrtc->ctx;
+
+	return clk_round_rate(ctx->ade_pix_clk, modeclk * 1000) / 1000;
+}
+
 static void ade_set_pix_clk(struct ade_hw_ctx *ctx,
 			    struct drm_display_mode *mode,
 			    struct drm_display_mode *adj_mode)
