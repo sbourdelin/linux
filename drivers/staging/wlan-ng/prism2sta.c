@@ -132,6 +132,13 @@ static void prism2sta_inf_authreq_defer(struct wlandevice *wlandev,
 static void prism2sta_inf_psusercnt(struct wlandevice *wlandev,
 				    struct hfa384x_inf_frame *inf);
 
+/* Convert from __le16 to u16 in situ and return converted value. */
+static inline u16 le16_to_cpus_ret(u16 *var)
+{
+	le16_to_cpus(var);
+	return *var;
+}
+
 /*
  * prism2sta_open
  *
@@ -1136,7 +1143,7 @@ static void prism2sta_inf_chinforesults(struct wlandevice *wlandev,
 	unsigned int i, n;
 
 	hw->channel_info.results.scanchannels =
-	    le16_to_cpu(inf->info.chinforesult.scanchannels);
+	    le16_to_cpus_ret(&inf->info.chinforesult.scanchannels);
 
 	for (i = 0, n = 0; i < HFA384x_CHINFORESULT_MAX; i++) {
 		struct hfa384x_ch_info_result_sub *result;
@@ -1147,16 +1154,16 @@ static void prism2sta_inf_chinforesults(struct wlandevice *wlandev,
 			continue;
 
 		result = &inf->info.chinforesult.result[n];
-		chan = le16_to_cpu(result->chid) - 1;
+		chan = le16_to_cpus_ret(&result->chid) - 1;
 
 		if (chan < 0 || chan >= HFA384x_CHINFORESULT_MAX)
 			continue;
 
 		chinforesult = &hw->channel_info.results.result[chan];
 		chinforesult->chid = chan;
-		chinforesult->anl = le16_to_cpu(result->anl);
-		chinforesult->pnl = le16_to_cpu(result->pnl);
-		chinforesult->active = le16_to_cpu(result->active);
+		chinforesult->anl = le16_to_cpus_ret(&result->anl);
+		chinforesult->pnl = le16_to_cpus_ret(&result->pnl);
+		chinforesult->active = le16_to_cpus_ret(&result->active);
 
 		pr_debug("chinfo: channel %d, %s level (avg/peak)=%d/%d dB, pcf %d\n",
 			 chan + 1,
