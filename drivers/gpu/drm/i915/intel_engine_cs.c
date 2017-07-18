@@ -22,9 +22,13 @@
  *
  */
 
+#include <linux/static_key.h>
+
 #include "i915_drv.h"
 #include "intel_ringbuffer.h"
 #include "intel_lrc.h"
+
+DEFINE_STATIC_KEY_FALSE(i915_engine_stats_key);
 
 /* Haswell does have the CXT_SIZE register however it does not appear to be
  * valid. Now, docs explain in dwords what is in the context object. The full
@@ -221,6 +225,8 @@ intel_engine_setup(struct drm_i915_private *dev_priv,
 
 	/* Nothing to do here, execute in order of dependencies */
 	engine->schedule = NULL;
+
+	spin_lock_init(&engine->stats.lock);
 
 	ATOMIC_INIT_NOTIFIER_HEAD(&engine->context_status_notifier);
 

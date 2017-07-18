@@ -442,6 +442,13 @@ struct intel_engine_cs {
 	 * certain bits to encode the command length in the header).
 	 */
 	u32 (*get_cmd_length_mask)(u32 cmd_header);
+
+       struct {
+               spinlock_t lock;
+               unsigned int ref;
+               u64 start; /* Timestamp of the last idle to active transition. */
+               u64 total; /* Total time engined was busy. */
+       } stats;
 };
 
 static inline unsigned int
@@ -735,5 +742,37 @@ bool intel_engines_are_idle(struct drm_i915_private *dev_priv);
 
 void intel_engines_mark_idle(struct drm_i915_private *i915);
 void intel_engines_reset_default_submission(struct drm_i915_private *i915);
+
+DECLARE_STATIC_KEY_FALSE(i915_engine_stats_key);
+
+static inline void intel_engine_context_in(struct intel_engine_cs *engine)
+{
+	if (static_branch_unlikely(&i915_engine_stats_key)) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&engine->stats.lock, flags);
+		if (engine->stats.ref++ == 0)
+			engine->stats.start = ktime_get_real_ns();
+		GEM_BUG_ON(engine->stats.ref == 0);
+		spin_unlock_irqrestore(&engine->stats.lock, flags);
+	}
+}
+
+static inline void intel_engine_context_out(struct intel_engine_cs *engine)
+{
+	if (static_branch_unlikely(&i915_engine_stats_key)) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&engine->stats.lock, flags);
+		/*
+		 * After turning on the static key context out might be the
+		 * first event which then needs to be ignored (ref == 0).
+		 */
+		if (engine->stats.ref && --engine->stats.ref == 0)
+			engine->stats.total += ktime_get_real_ns() -
+					       engine->stats.start;
+		spin_unlock_irqrestore(&engine->stats.lock, flags);
+	}
+}
 
 #endif /* _INTEL_RINGBUFFER_H_ */
