@@ -775,4 +775,9 @@ static inline void intel_engine_context_out(struct intel_engine_cs *engine)
 	}
 }
 
+int intel_enable_engine_stats(struct drm_i915_private *i915);
+void intel_disable_engine_stats(void);
+
+u64 intel_engine_get_current_busy_ns(struct intel_engine_cs *engine);
+
 #endif /* _INTEL_RINGBUFFER_H_ */

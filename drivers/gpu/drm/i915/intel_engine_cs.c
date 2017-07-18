@@ -29,6 +29,8 @@
 #include "intel_lrc.h"
 
 DEFINE_STATIC_KEY_FALSE(i915_engine_stats_key);
+static DEFINE_MUTEX(i915_engine_stats_mutex);
+static int i915_engine_stats_ref;
 
 /* Haswell does have the CXT_SIZE register however it does not appear to be
  * valid. Now, docs explain in dwords what is in the context object. The full
@@ -1348,6 +1350,57 @@ void intel_engines_mark_idle(struct drm_i915_private *i915)
 		i915_gem_batch_pool_fini(&engine->batch_pool);
 		engine->no_priolist = false;
 	}
+}
+
+int intel_enable_engine_stats(struct drm_i915_private *dev_priv)
+{
+	if (!i915.enable_execlists)
+		return -ENODEV;
+
+	mutex_lock(&i915_engine_stats_mutex);
+	if (i915_engine_stats_ref++ == 0) {
+		struct intel_engine_cs *engine;
+		enum intel_engine_id id;
+
+		for_each_engine(engine, dev_priv, id) {
+			memset(&engine->stats, 0, sizeof(engine->stats));
+			spin_lock_init(&engine->stats.lock);
+		}
+
+		static_branch_enable(&i915_engine_stats_key);
+	}
+	mutex_unlock(&i915_engine_stats_mutex);
+
+	return 0;
+}
+
+void intel_disable_engine_stats(void)
+{
+	mutex_lock(&i915_engine_stats_mutex);
+	if (--i915_engine_stats_ref == 0)
+		static_branch_disable(&i915_engine_stats_key);
+	mutex_unlock(&i915_engine_stats_mutex);
+}
+
+u64 intel_engine_get_current_busy_ns(struct intel_engine_cs *engine)
+{
+	unsigned long flags;
+	u64 total;
+
+	spin_lock_irqsave(&engine->stats.lock, flags);
+
+	total = engine->stats.total;
+
+	/*
+	 * If the engine is executing something at the moment
+	 * add it to the total.
+	 */
+	if (engine->stats.ref)
+		total += ktime_get_real_ns() - engine->stats.start;
+
+	spin_unlock_irqrestore(&engine->stats.lock, flags);
+
+	return total;
 }
 
 #if IS_ENABLED(CONFIG_DRM_I915_SELFTEST)
