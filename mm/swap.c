@@ -400,13 +400,35 @@ void mark_page_accessed(struct page *page)
 }
 EXPORT_SYMBOL(mark_page_accessed);
 
+static void __pagevec_lru_add_drain_fn(struct page *page, struct lruvec *lruvec,
+				       void *arg)
+{
+	/* Check for isolated or already added pages */
+	if (likely(PageLRU(page) && list_empty(&page->lru))) {
+		int file = page_is_file_cache(page);
+		int active = PageActive(page);
+		enum lru_list lru = page_lru(page);
+
+		add_page_to_lru_list(page, lruvec, lru);
+		update_page_reclaim_stat(lruvec, file, active);
+		trace_mm_lru_insertion(page, lru);
+	}
+}
+
 static void __lru_cache_add(struct page *page)
 {
 	struct pagevec *pvec = &get_cpu_var(lru_add_pvec);
 
+	/*
+	 * Set PageLRU right here and initialize list head to
+	 * allow page isolation while it on the way to the LRU list.
+	 */
+	VM_BUG_ON_PAGE(PageLRU(page), page);
+	INIT_LIST_HEAD(&page->lru);
 	get_page(page);
+	SetPageLRU(page);
 	if (!pagevec_add(pvec, page) || PageCompound(page))
-		__pagevec_lru_add(pvec);
+		pagevec_lru_move_fn(pvec, __pagevec_lru_add_drain_fn, NULL);
 	put_cpu_var(lru_add_pvec);
 }
 
@@ -606,7 +628,7 @@ void lru_add_drain_cpu(int cpu)
 	struct pagevec *pvec = &per_cpu(lru_add_pvec, cpu);
 
 	if (pagevec_count(pvec))
-		__pagevec_lru_add(pvec);
+		pagevec_lru_move_fn(pvec, __pagevec_lru_add_drain_fn, NULL);
 
 	pvec = &per_cpu(lru_rotate_pvecs, cpu);
 	if (pagevec_count(pvec)) {
