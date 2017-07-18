@@ -282,6 +282,16 @@ int __compat_only_sysfs_link_entry_to_kobj(struct kobject *kobj,
 				      struct kobject *target_kobj,
 				      const char *target_name);
 
+struct device;
+int __must_check devm_sysfs_create_group(struct device *dev,
+				const struct attribute_group *grp);
+int __must_check devm_sysfs_create_groups(struct device *dev,
+				const struct attribute_group **groups);
+void devm_sysfs_remove_group(struct device *dev,
+			     const struct attribute_group *grp);
+void devm_sysfs_remove_groups(struct device *dev,
+			      const struct attribute_group **groups);
+
 void sysfs_notify(struct kobject *kobj, const char *dir, const char *attr);
 
 int __must_check sysfs_init(void);
