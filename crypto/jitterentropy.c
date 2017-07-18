@@ -54,39 +54,10 @@
  #error "The CPU Jitter random number generator must not be compiled with optimizations. See documentation. Use the compiler switch -O0 for compiling jitterentropy.c."
 #endif
 
-typedef	unsigned long long	__u64;
-typedef	long long		__s64;
+#include <crypto/jitterentropy.h>
+
 typedef	unsigned int		__u32;
 #define NULL    ((void *) 0)
-
-/* The entropy pool */
-struct rand_data {
-	/* all data values that are vital to maintain the security
-	 * of the RNG are marked as SENSITIVE. A user must not
-	 * access that information while the RNG executes its loops to
-	 * calculate the next random value. */
-	__u64 data;		/* SENSITIVE Actual random number */
-	__u64 old_data;		/* SENSITIVE Previous random number */
-	__u64 prev_time;	/* SENSITIVE Previous time stamp */
-#define DATA_SIZE_BITS ((sizeof(__u64)) * 8)
-	__u64 last_delta;	/* SENSITIVE stuck test */
-	__s64 last_delta2;	/* SENSITIVE stuck test */
-	unsigned int stuck:1;	/* Time measurement stuck */
-	unsigned int osr;	/* Oversample rate */
-	unsigned int stir:1;		/* Post-processing stirring */
-	unsigned int disable_unbias:1;	/* Deactivate Von-Neuman unbias */
-#define JENT_MEMORY_BLOCKS 64
-#define JENT_MEMORY_BLOCKSIZE 32
-#define JENT_MEMORY_ACCESSLOOPS 128
-#define JENT_MEMORY_SIZE (JENT_MEMORY_BLOCKS*JENT_MEMORY_BLOCKSIZE)
-	unsigned char *mem;	/* Memory access location with size of
-				 * memblocks * memblocksize */
-	unsigned int memlocation; /* Pointer to byte in *mem */
-	unsigned int memblocks;	/* Number of memory blocks in *mem */
-	unsigned int memblocksize; /* Size of one memory block in bytes */
-	unsigned int memaccessloops; /* Number of memory accesses per random
-				      * bit generation */
-};
 
 /* Flags that can be used to initialize the RNG */
 #define JENT_DISABLE_STIR (1<<0) /* Disable stirring the entropy pool */
