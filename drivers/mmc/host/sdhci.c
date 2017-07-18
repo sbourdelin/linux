@@ -2502,7 +2502,6 @@ static void sdhci_cmd_irq(struct sdhci_host *host, u32 intmask)
 		sdhci_finish_command(host);
 }
 
-#ifdef CONFIG_MMC_DEBUG
 static void sdhci_adma_show_error(struct sdhci_host *host)
 {
 	void *desc = host->adma_table;
@@ -2530,9 +2529,6 @@ static void sdhci_adma_show_error(struct sdhci_host *host)
 			break;
 	}
 }
-#else
-static void sdhci_adma_show_error(struct sdhci_host *host) { }
-#endif
 
 static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
 {
@@ -3746,10 +3742,6 @@ int __sdhci_add_host(struct sdhci_host *host)
 		       mmc_hostname(mmc), host->irq, ret);
 		goto untasklet;
 	}
-
-#ifdef CONFIG_MMC_DEBUG
-	sdhci_dumpregs(host);
-#endif
 
 	ret = sdhci_led_register(host);
 	if (ret) {
