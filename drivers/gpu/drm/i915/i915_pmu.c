@@ -474,11 +474,100 @@ static int i915_pmu_event_event_idx(struct perf_event *event)
 	return 0;
 }
 
+static ssize_t i915_pmu_format_show(struct device *dev,
+				    struct device_attribute *attr, char *buf)
+{
+        struct dev_ext_attribute *eattr;
+
+        eattr = container_of(attr, struct dev_ext_attribute, attr);
+        return sprintf(buf, "%s\n", (char *) eattr->var);
+}
+
+#define I915_PMU_FORMAT_ATTR(_name, _config)           \
+        (&((struct dev_ext_attribute[]) {               \
+                { .attr = __ATTR(_name, S_IRUGO, i915_pmu_format_show, NULL), \
+                  .var = (void *) _config, }            \
+        })[0].attr.attr)
+
+static struct attribute *i915_pmu_format_attrs[] = {
+        I915_PMU_FORMAT_ATTR(i915_eventid, "config:0-42"),
+        NULL,
+};
+
+static const struct attribute_group i915_pmu_format_attr_group = {
+        .name = "format",
+        .attrs = i915_pmu_format_attrs,
+};
+
+static ssize_t i915_pmu_event_show(struct device *dev,
+				   struct device_attribute *attr, char *buf)
+{
+        struct dev_ext_attribute *eattr;
+
+        eattr = container_of(attr, struct dev_ext_attribute, attr);
+        return sprintf(buf, "config=0x%lx\n", (unsigned long) eattr->var);
+}
+
+#define I915_PMU_EVENT_ATTR(_name, _config)            \
+        (&((struct dev_ext_attribute[]) {               \
+                { .attr = __ATTR(_name, S_IRUGO, i915_pmu_event_show, NULL), \
+                  .var = (void *) _config, }            \
+         })[0].attr.attr)
+
+static struct attribute *i915_pmu_events_attrs[] = {
+        I915_PMU_EVENT_ATTR(rcs-queued,	I915_PMU_COUNT_RCS_QUEUED),
+        I915_PMU_EVENT_ATTR(rcs-busy,	I915_PMU_COUNT_RCS_BUSY),
+        I915_PMU_EVENT_ATTR(rcs-wait,	I915_PMU_COUNT_RCS_WAIT),
+        I915_PMU_EVENT_ATTR(rcs-sema,	I915_PMU_COUNT_RCS_SEMA),
+
+        I915_PMU_EVENT_ATTR(bcs-queued,	I915_PMU_COUNT_BCS_QUEUED),
+        I915_PMU_EVENT_ATTR(bcs-busy,	I915_PMU_COUNT_BCS_BUSY),
+        I915_PMU_EVENT_ATTR(bcs-wait,	I915_PMU_COUNT_BCS_WAIT),
+        I915_PMU_EVENT_ATTR(bcs-sema,	I915_PMU_COUNT_BCS_SEMA),
+
+        I915_PMU_EVENT_ATTR(vcs-queued,	I915_PMU_COUNT_VCS_QUEUED),
+        I915_PMU_EVENT_ATTR(vcs-busy,	I915_PMU_COUNT_VCS_BUSY),
+        I915_PMU_EVENT_ATTR(vcs-wait,	I915_PMU_COUNT_VCS_WAIT),
+        I915_PMU_EVENT_ATTR(vcs-sema,	I915_PMU_COUNT_VCS_SEMA),
+
+        I915_PMU_EVENT_ATTR(vcs2-queued, I915_PMU_COUNT_VCS2_QUEUED),
+        I915_PMU_EVENT_ATTR(vcs2-busy,	 I915_PMU_COUNT_VCS2_BUSY),
+        I915_PMU_EVENT_ATTR(vcs2-wait,	 I915_PMU_COUNT_VCS2_WAIT),
+        I915_PMU_EVENT_ATTR(vcs2-sema,	 I915_PMU_COUNT_VCS2_SEMA),
+
+        I915_PMU_EVENT_ATTR(vecs-queued, I915_PMU_COUNT_VECS_QUEUED),
+        I915_PMU_EVENT_ATTR(vecs-busy,	 I915_PMU_COUNT_VECS_BUSY),
+        I915_PMU_EVENT_ATTR(vecs-wait,	 I915_PMU_COUNT_VECS_WAIT),
+        I915_PMU_EVENT_ATTR(vecs-sema,	 I915_PMU_COUNT_VECS_SEMA),
+
+        I915_PMU_EVENT_ATTR(actual-frequency,	 I915_PMU_ACTUAL_FREQUENCY),
+        I915_PMU_EVENT_ATTR(requested-frequency, I915_PMU_REQUESTED_FREQUENCY),
+        I915_PMU_EVENT_ATTR(energy,		 I915_PMU_ENERGY),
+        I915_PMU_EVENT_ATTR(interrupts,		 I915_PMU_INTERRUPTS),
+        I915_PMU_EVENT_ATTR(rc6-residency,	 I915_PMU_RC6_RESIDENCY),
+        I915_PMU_EVENT_ATTR(rc6p-residency,	 I915_PMU_RC6p_RESIDENCY),
+        I915_PMU_EVENT_ATTR(rc6pp-residency,	 I915_PMU_RC6pp_RESIDENCY),
+
+        NULL,
+};
+
+static const struct attribute_group i915_pmu_events_attr_group = {
+        .name = "events",
+        .attrs = i915_pmu_events_attrs,
+};
+
+static const struct attribute_group *i915_pmu_attr_groups[] = {
+        &i915_pmu_format_attr_group,
+        &i915_pmu_events_attr_group,
+        NULL
+};
+
 void i915_pmu_register(struct drm_i915_private *i915)
 {
 	if (INTEL_GEN(i915) <= 2)
 		return;
 
+	i915->pmu.base.attr_groups	= i915_pmu_attr_groups;
 	i915->pmu.base.task_ctx_nr	= perf_sw_context;
 	i915->pmu.base.event_init	= i915_pmu_event_init;
 	i915->pmu.base.add		= i915_pmu_event_add;
