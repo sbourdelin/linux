@@ -495,6 +495,7 @@ struct mm_struct {
 	 */
 	bool tlb_flush_pending;
 #endif
+	bool oom_killer_synchronized;
 	struct uprobes_state uprobes_state;
 #ifdef CONFIG_HUGETLB_PAGE
 	atomic_long_t hugetlb_usage;
