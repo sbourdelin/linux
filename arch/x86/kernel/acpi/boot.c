@@ -489,7 +489,7 @@ acpi_parse_int_src_ovr(struct acpi_subtable_header * header,
 
 	acpi_table_print_madt_entry(header);
 
-	if (intsrc->source_irq == acpi_gbl_FADT.sci_interrupt) {
+	if (intsrc->source_irq == acpi_gbl_FADT.sci_interrupt && !acpi_gbl_reduced_hardware) {
 		acpi_sci_ioapic_setup(intsrc->source_irq,
 				      intsrc->inti_flags & ACPI_MADT_POLARITY_MASK,
 				      (intsrc->inti_flags & ACPI_MADT_TRIGGER_MASK) >> 2,
@@ -1184,7 +1184,7 @@ static int __init acpi_parse_madt_ioapic_entries(void)
 	 * If BIOS did not supply an INT_SRC_OVR for the SCI
 	 * pretend we got one so we can set the SCI flags.
 	 */
-	if (!acpi_sci_override_gsi)
+	if (!acpi_sci_override_gsi && !acpi_gbl_reduced_hardware)
 		acpi_sci_ioapic_setup(acpi_gbl_FADT.sci_interrupt, 0, 0,
 				      acpi_gbl_FADT.sci_interrupt);
 

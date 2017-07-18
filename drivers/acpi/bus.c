@@ -1054,7 +1054,7 @@ void __init acpi_early_init(void)
 	}
 
 #ifdef CONFIG_X86
-	if (!acpi_ioapic) {
+	if (!acpi_ioapic && !acpi_gbl_reduced_hardware) {
 		/* compatible (0) means level (3) */
 		if (!(acpi_sci_flags & ACPI_MADT_TRIGGER_MASK)) {
 			acpi_sci_flags &= ~ACPI_MADT_TRIGGER_MASK;

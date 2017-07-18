@@ -553,7 +553,7 @@ acpi_os_install_interrupt_handler(u32 gsi, acpi_osd_handler handler,
 	 * ACPI interrupts different from the SCI in our copy of the FADT are
 	 * not supported.
 	 */
-	if (gsi != acpi_gbl_FADT.sci_interrupt)
+	if (gsi != acpi_gbl_FADT.sci_interrupt || acpi_gbl_reduced_hardware)
 		return AE_BAD_PARAMETER;
 
 	if (acpi_irq_handler)
