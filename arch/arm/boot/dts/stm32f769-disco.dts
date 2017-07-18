@@ -72,3 +72,9 @@
 	pinctrl-names = "default";
 	status = "okay";
 };
+
+&cec {
+	pinctrl-0 = <&cec_pins_a>;
+	pinctrl-names = "default";
+	status = "okay";
+};
