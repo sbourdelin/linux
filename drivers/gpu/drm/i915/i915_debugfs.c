@@ -4800,6 +4800,89 @@ static const struct file_operations i915_hpd_storm_ctl_fops = {
 	.write = i915_hpd_storm_ctl_write
 };
 
+struct i915_engine_stats_buf {
+	unsigned int len;
+	size_t available;
+	char buf[0];
+};
+
+static int i915_engine_stats_open(struct inode *inode, struct file *file)
+{
+	struct drm_i915_private *i915 = file->f_inode->i_private;
+	const unsigned int engine_name_len =
+		sizeof(((struct intel_engine_cs *)0)->name);
+	struct i915_engine_stats_buf *buf;
+	const unsigned int buf_size =
+		(engine_name_len + 2 + 19 + 1) * I915_NUM_ENGINES + 1 +
+		sizeof(*buf);
+	int ret;
+
+	buf = kzalloc(buf_size, GFP_KERNEL);
+	if (!buf)
+		return -ENOMEM;
+
+	ret = intel_enable_engine_stats(i915);
+	if (ret) {
+		kfree(buf);
+		return ret;
+	}
+
+	buf->len = buf_size;
+	file->private_data = buf;
+
+	return 0;
+}
+
+static int i915_engine_stats_release(struct inode *inode, struct file *file)
+{
+	intel_disable_engine_stats();
+	kfree(file->private_data);
+
+	return 0;
+}
+
+static ssize_t i915_engine_stats_read(struct file *file, char __user *ubuf,
+				      size_t count, loff_t *pos)
+{
+	struct i915_engine_stats_buf *buf =
+		(struct i915_engine_stats_buf *)file->private_data;
+
+	if (*pos == 0) {
+		struct drm_i915_private *dev_priv = file->f_inode->i_private;
+		char *ptr = &buf->buf[0];
+		int left = buf->len;
+		struct intel_engine_cs *engine;
+		enum intel_engine_id id;
+
+		buf->available = 0;
+
+		for_each_engine(engine, dev_priv, id) {
+			u64 total = intel_engine_get_current_busy_ns(engine);
+			int len;
+
+			len = snprintf(ptr, left, "%s: %llu\n",
+				       engine->name, total);
+			buf->available += len;
+			left -= len;
+			ptr += len;
+
+			if (len == 0)
+				return -EFBIG;
+		}
+	}
+
+	return simple_read_from_buffer(ubuf, count, pos, &buf->buf[0],
+				       buf->available);
+}
+
+static const struct file_operations i915_engine_stats_fops = {
+	.owner = THIS_MODULE,
+	.open = i915_engine_stats_open,
+	.release = i915_engine_stats_release,
+	.read = i915_engine_stats_read,
+	.llseek = default_llseek,
+};
+
 static const struct drm_info_list i915_debugfs_list[] = {
 	{"i915_capabilities", i915_capabilities, 0},
 	{"i915_gem_objects", i915_gem_object_info, 0},
@@ -4888,6 +4971,12 @@ int i915_debugfs_register(struct drm_i915_private *dev_priv)
 	struct drm_minor *minor = dev_priv->drm.primary;
 	struct dentry *ent;
 	int ret, i;
+
+	ent = debugfs_create_file("i915_engine_stats", S_IRUGO,
+				  minor->debugfs_root, to_i915(minor->dev),
+				  &i915_engine_stats_fops);
+	if (!ent)
+		return -ENOMEM;
 
 	ent = debugfs_create_file("i915_forcewake_user", S_IRUSR,
 				  minor->debugfs_root, to_i915(minor->dev),
