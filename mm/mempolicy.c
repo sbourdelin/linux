@@ -1208,11 +1208,10 @@ static int get_nodes(nodemask_t *nodes, const unsigned long __user *nmask,
 	unsigned long nlongs;
 	unsigned long endmask;
 
-	--maxnode;
 	nodes_clear(*nodes);
-	if (maxnode == 0 || !nmask)
+	if (maxnode == 1 || !nmask)
 		return 0;
-	if (maxnode > PAGE_SIZE*BITS_PER_BYTE)
+	if (maxnode - 1 > PAGE_SIZE * BITS_PER_BYTE)
 		return -EINVAL;
 
 	nlongs = BITS_TO_LONGS(maxnode);
