@@ -29,12 +29,23 @@ static const unsigned int user_engine_map[I915_NUM_ENGINES] = {
 	[I915_SAMPLE_VECS] = VECS,
 };
 
+#define ENGINE_BUSY_BITS \
+	(BIT_ULL(I915_PMU_COUNT_RCS_BUSY) | \
+	 BIT_ULL(I915_PMU_COUNT_BCS_BUSY) | \
+	 BIT_ULL(I915_PMU_COUNT_VCS_BUSY) | \
+	 BIT_ULL(I915_PMU_COUNT_VCS2_BUSY) | \
+	 BIT_ULL(I915_PMU_COUNT_VECS_BUSY))
+
 static bool pmu_needs_timer(struct drm_i915_private *i915, bool gpu_active)
 {
-	if (gpu_active)
-		return i915->pmu.enable;
-	else
-		return i915->pmu.enable >> 32;
+	u64 mask = i915->pmu.enable;
+
+	if (!gpu_active)
+		mask >>= 32;
+	else if (i915->pmu.busy_stats)
+		mask &= ~ENGINE_BUSY_BITS;
+
+	return mask;
 }
 
 void i915_pmu_gt_idle(struct drm_i915_private *i915)
@@ -110,7 +121,8 @@ static void engines_sample(struct drm_i915_private *dev_priv)
 		if (sample_mask & BIT(I915_SAMPLE_QUEUED))
 			engine->pmu_sample[I915_SAMPLE_QUEUED] += PERIOD;
 
-		if (sample_mask & BIT(I915_SAMPLE_BUSY)) {
+		if ((sample_mask & BIT(I915_SAMPLE_BUSY)) &&
+		    !dev_priv->pmu.busy_stats) {
 			fw = grab_forcewake(dev_priv, fw);
 			val = I915_READ_FW(RING_MI_MODE(engine->mmio_base));
 			if (!(val & MODE_IDLE))
@@ -337,6 +349,11 @@ static void i915_pmu_timer_cancel(struct perf_event *event)
 	hrtimer_cancel(&hwc->hrtimer);
 }
 
+static bool supports_busy_stats(void)
+{
+	return i915.enable_execlists;
+}
+
 static void i915_pmu_enable(struct perf_event *event)
 {
 	struct drm_i915_private *i915 =
@@ -344,6 +361,13 @@ static void i915_pmu_enable(struct perf_event *event)
 	unsigned long flags;
 
 	spin_lock_irqsave(&i915->pmu.lock, flags);
+
+	if (pmu_config_sampler(event->attr.config) == I915_SAMPLE_BUSY &&
+	    supports_busy_stats() && !i915->pmu.busy_stats) {
+		i915->pmu.busy_stats = true;
+		if (!cancel_delayed_work(&i915->pmu.disable_busy_stats))
+			queue_work(i915->wq, &i915->pmu.enable_busy_stats);
+	}
 
 	i915->pmu.enable |= BIT_ULL(event->attr.config);
 	if (pmu_needs_timer(i915, true) && !i915->pmu.timer_enabled) {
@@ -367,6 +391,11 @@ static void i915_pmu_disable(struct perf_event *event)
 	spin_lock_irqsave(&i915->pmu.lock, flags);
 	i915->pmu.enable &= ~BIT_ULL(event->attr.config);
 	i915->pmu.timer_enabled &= pmu_needs_timer(i915, true);
+	if (!(i915->pmu.enable & ENGINE_BUSY_BITS) && i915->pmu.busy_stats) {
+		i915->pmu.busy_stats = false;
+		queue_delayed_work(i915->wq, &i915->pmu.disable_busy_stats,
+				   round_jiffies_up_relative(2 * HZ));
+	}
 	spin_unlock_irqrestore(&i915->pmu.lock, flags);
 
 	i915_pmu_timer_cancel(event);
@@ -471,7 +500,12 @@ static void i915_pmu_event_read(struct perf_event *event)
 			/* Do nothing */
 		} else {
 			enum intel_engine_id id = user_engine_map[user_engine];
-			val = i915->engine[id]->pmu_sample[sample];
+			struct intel_engine_cs *engine = i915->engine[id];
+
+			if (i915->pmu.busy_stats && sample == I915_SAMPLE_BUSY)
+				val = intel_engine_get_current_busy_ns(engine);
+			else
+				val = engine->pmu_sample[sample];
 		}
 	} else switch (event->attr.config) {
 	case I915_PMU_ACTUAL_FREQUENCY:
@@ -607,6 +641,19 @@ static const struct attribute_group *i915_pmu_attr_groups[] = {
         NULL
 };
 
+static void __enable_busy_stats(struct work_struct *work)
+{
+	struct drm_i915_private *i915 =
+		container_of(work, typeof(*i915), pmu.enable_busy_stats);
+
+	WARN_ON_ONCE(intel_enable_engine_stats(i915));
+}
+
+static void __disable_busy_stats(struct work_struct *work)
+{
+	intel_disable_engine_stats();
+}
+
 void i915_pmu_register(struct drm_i915_private *i915)
 {
 	if (INTEL_GEN(i915) <= 2)
@@ -624,6 +671,8 @@ void i915_pmu_register(struct drm_i915_private *i915)
 
 	spin_lock_init(&i915->pmu.lock);
 	hrtimer_init(&i915->pmu.timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	INIT_WORK(&i915->pmu.enable_busy_stats, __enable_busy_stats);
+	INIT_DELAYED_WORK(&i915->pmu.disable_busy_stats, __disable_busy_stats);
 	i915->pmu.timer.function = i915_sample;
 	i915->pmu.enable = 0;
 
@@ -642,4 +691,7 @@ void i915_pmu_unregister(struct drm_i915_private *i915)
 	i915->pmu.base.event_init = NULL;
 
 	hrtimer_cancel(&i915->pmu.timer);
+
+	flush_work(&i915->pmu.enable_busy_stats);
+	flush_delayed_work(&i915->pmu.disable_busy_stats);
 }

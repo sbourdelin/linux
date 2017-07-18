@@ -2586,8 +2586,11 @@ struct drm_i915_private {
 		spinlock_t lock;
 		struct hrtimer timer;
 		bool timer_enabled;
+		bool busy_stats;
 		u64 enable;
 		u64 sample[__I915_NUM_PMU_SAMPLERS];
+		struct work_struct enable_busy_stats;
+		struct delayed_work disable_busy_stats;
 	} pmu;
 
 	/*
