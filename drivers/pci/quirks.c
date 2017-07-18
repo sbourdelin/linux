@@ -4385,6 +4385,8 @@ static const struct pci_dev_acs_enabled {
 	{ 0x10df, 0x720, pci_quirk_mf_endpoint_acs }, /* Emulex Skyhawk-R */
 	/* Cavium ThunderX */
 	{ PCI_VENDOR_ID_CAVIUM, PCI_ANY_ID, pci_quirk_cavium_acs },
+	/* APM XGene */
+	{ PCI_VENDOR_ID_AMCC, 0xE004, pci_quirk_mf_endpoint_acs },
 	{ 0 }
 };
 
