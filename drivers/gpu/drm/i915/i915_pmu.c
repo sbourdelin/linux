@@ -29,6 +29,14 @@ static const unsigned int user_engine_map[I915_NUM_ENGINES] = {
 	[I915_SAMPLE_VECS] = VECS,
 };
 
+static bool grab_forcewake(struct drm_i915_private *i915, bool fw)
+{
+	if (!fw)
+		intel_uncore_forcewake_get(i915, FORCEWAKE_ALL);
+
+	return true;
+}
+
 static void engines_sample(struct drm_i915_private *dev_priv)
 {
 	struct intel_engine_cs *engine;
@@ -46,6 +54,7 @@ static void engines_sample(struct drm_i915_private *dev_priv)
 
 	for_each_engine(engine, dev_priv, id) {
 		unsigned int user_engine = engine_map[id];
+		u8 sample_mask;
 		u32 val;
 
 		if (WARN_ON_ONCE(id >= ARRAY_SIZE(engine_map)))
@@ -53,30 +62,38 @@ static void engines_sample(struct drm_i915_private *dev_priv)
 		else
 			user_engine = engine_map[id];
 
-		if (!(dev_priv->pmu.enable &
-		    (ENGINE_SAMPLE_MASK << (ENGINE_SAMPLE_BITS * user_engine))))
+		sample_mask = (dev_priv->pmu.enable >>
+			      (ENGINE_SAMPLE_BITS * user_engine)) &
+			      ENGINE_SAMPLE_MASK;
+
+		if (!sample_mask)
 			continue;
 
 		if (i915_seqno_passed(intel_engine_get_seqno(engine),
 				      intel_engine_last_submit(engine)))
 			continue;
 
-		if (!fw) {
-			intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
-			fw = true;
+		if (sample_mask & BIT(I915_SAMPLE_QUEUED))
+			engine->pmu_sample[I915_SAMPLE_QUEUED] += PERIOD;
+
+		if (sample_mask & BIT(I915_SAMPLE_BUSY)) {
+			fw = grab_forcewake(dev_priv, fw);
+			val = I915_READ_FW(RING_MI_MODE(engine->mmio_base));
+			if (!(val & MODE_IDLE))
+				engine->pmu_sample[I915_SAMPLE_BUSY] += PERIOD;
 		}
 
-		engine->pmu_sample[I915_SAMPLE_QUEUED] += PERIOD;
-
-		val = I915_READ_FW(RING_MI_MODE(engine->mmio_base));
-		if (!(val & MODE_IDLE))
-			engine->pmu_sample[I915_SAMPLE_BUSY] += PERIOD;
-
-		val = I915_READ_FW(RING_CTL(engine->mmio_base));
-		if (val & RING_WAIT)
-			engine->pmu_sample[I915_SAMPLE_WAIT] += PERIOD;
-		if (val & RING_WAIT_SEMAPHORE)
-			engine->pmu_sample[I915_SAMPLE_SEMA] += PERIOD;
+		if (sample_mask &
+		    (BIT(I915_SAMPLE_WAIT) | BIT(I915_SAMPLE_SEMA))) {
+			fw = grab_forcewake(dev_priv, fw);
+			val = I915_READ_FW(RING_CTL(engine->mmio_base));
+			if ((sample_mask & BIT(I915_SAMPLE_WAIT)) &&
+			    (val & RING_WAIT))
+				engine->pmu_sample[I915_SAMPLE_WAIT] += PERIOD;
+			if ((sample_mask & BIT(I915_SAMPLE_SEMA)) &&
+			    (val & RING_WAIT_SEMAPHORE))
+				engine->pmu_sample[I915_SAMPLE_SEMA] += PERIOD;
+		}
 	}
 
 	if (fw)
