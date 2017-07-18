@@ -244,6 +244,8 @@ struct intel_engine_cs {
 		I915_SELFTEST_DECLARE(bool mock : 1);
 	} breadcrumbs;
 
+	u64 pmu_sample[4];
+
 	/*
 	 * A pool of objects to use as shadow copies of client batch buffers
 	 * when the command parser is enabled. Prevents the client from

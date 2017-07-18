@@ -40,6 +40,7 @@
 #include <linux/hash.h>
 #include <linux/intel-iommu.h>
 #include <linux/kref.h>
+#include <linux/perf_event.h>
 #include <linux/pm_qos.h>
 #include <linux/reservation.h>
 #include <linux/shmem_fs.h>
@@ -2078,6 +2079,12 @@ struct intel_cdclk_state {
 	unsigned int cdclk, vco, ref;
 };
 
+enum {
+	__I915_SAMPLE_FREQ_ACT = 0,
+	__I915_SAMPLE_FREQ_REQ,
+	__I915_NUM_PMU_SAMPLERS
+};
+
 struct drm_i915_private {
 	struct drm_device drm;
 
@@ -2573,6 +2580,13 @@ struct drm_i915_private {
 		struct platform_device *platdev;
 		int	irq;
 	} lpe_audio;
+
+	struct {
+		struct pmu base;
+		struct hrtimer timer;
+		u64 enable;
+		u64 sample[__I915_NUM_PMU_SAMPLERS];
+	} pmu;
 
 	/*
 	 * NOTE: This is the dri1/ums dungeon, don't add stuff here. Your patch
@@ -3741,6 +3755,15 @@ extern void i915_perf_init(struct drm_i915_private *dev_priv);
 extern void i915_perf_fini(struct drm_i915_private *dev_priv);
 extern void i915_perf_register(struct drm_i915_private *dev_priv);
 extern void i915_perf_unregister(struct drm_i915_private *dev_priv);
+
+/* i915_pmu.c */
+#ifdef CONFIG_PERF_EVENTS
+extern void i915_pmu_register(struct drm_i915_private *i915);
+extern void i915_pmu_unregister(struct drm_i915_private *i915);
+#else
+static inline void i915_pmu_register(struct drm_i915_private *i915) {}
+static inline void i915_pmu_unregister(struct drm_i915_private *i915) {}
+#endif
 
 /* i915_suspend.c */
 extern int i915_save_state(struct drm_i915_private *dev_priv);
