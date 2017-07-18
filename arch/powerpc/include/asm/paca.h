@@ -48,6 +48,7 @@ extern unsigned int debug_smp_processor_id(void); /* from linux/smp.h */
 #define get_lppaca()	(get_paca()->lppaca_ptr)
 #define get_slb_shadow()	(get_paca()->slb_shadow_ptr)
 
+#define MAX_STOP_SPRS     7
 struct task_struct;
 
 /*
@@ -183,6 +184,12 @@ struct paca_struct {
 	struct paca_struct **thread_sibling_pacas;
 	/* The PSSCR value that the kernel requested before going to stop */
 	u64 requested_psscr;
+
+	/*
+	 * Save area for additional SPRs that need to be
+	 * saved/restored during cpuidle stop.
+	 */
+	u64 stop_spr_save_area[MAX_STOP_SPRS];
 #endif
 
 #ifdef CONFIG_PPC_STD_MMU_64

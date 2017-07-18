@@ -84,7 +84,50 @@ ALT_FTR_SECTION_END_IFSET(CPU_FTR_ARCH_300)
 	std	r3,_WORT(r1)
 	mfspr	r3,SPRN_WORC
 	std	r3,_WORC(r1)
+BEGIN_FTR_SECTION
+	blr
+END_FTR_SECTION_IFCLR(CPU_FTR_ARCH_300)
+	/* Save additional SPRs for POWER9 */
+power9_save_additional_sprs:
+	mfspr	r3, SPRN_PID
+	mfspr	r4, SPRN_LDBAR
+	std	r3, PACA_PID(r13)
+	std	r4, PACA_LDBAR(r13)
 
+	mfspr	r3, SPRN_FSCR
+	mfspr	r4, SPRN_HFSCR
+	std	r3, PACA_FSCR(r13)
+	std	r4, PACA_HFSCR(r13)
+
+	mfspr	r3, SPRN_MMCRA
+	mfspr	r4, SPRN_MMCR1
+	std	r3, PACA_MMCRA(r13)
+	std	r4, PACA_MMCR1(r13)
+
+	mfspr	r3, SPRN_MMCR2
+	std	r3, PACA_MMCR2(r13)
+	blr
+
+power9_restore_additional_sprs:
+	ld	r3,_LPCR(r1)
+	ld	r4, PACA_PID(r13)
+	mtspr	SPRN_LPCR,r3
+	mtspr	SPRN_PID, r4
+
+	ld	r3, PACA_LDBAR(r13)
+	ld	r4, PACA_FSCR(r13)
+	mtspr	SPRN_LDBAR, r3
+	mtspr	SPRN_FSCR, r4
+
+	ld	r3, PACA_HFSCR(r13)
+	ld	r4, PACA_MMCRA(r13)
+	mtspr	SPRN_HFSCR, r3
+	mtspr	SPRN_MMCRA, r4
+	/* We have already restored PACA_MMCR0 */
+	ld	r3, PACA_MMCR1(r13)
+	ld	r4, PACA_MMCR2(r13)
+	mtspr	SPRN_MMCR1, r3
+	mtspr	SPRN_MMCR2, r4
 	blr
 
 /*
@@ -791,8 +834,7 @@ no_segments:
 	bctrl
 
 BEGIN_FTR_SECTION
-	ld	r4,_LPCR(r1)
-	mtspr	SPRN_LPCR,r4
+	bl 	power9_restore_additional_sprs
 END_FTR_SECTION_IFSET(CPU_FTR_ARCH_300)
 hypervisor_state_restored:
 

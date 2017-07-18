@@ -743,6 +743,18 @@ int main(void)
 	OFFSET(PACA_SUBCORE_SIBLING_MASK, paca_struct, subcore_sibling_mask);
 	OFFSET(PACA_SIBLING_PACA_PTRS, paca_struct, thread_sibling_pacas);
 	OFFSET(PACA_REQ_PSSCR, paca_struct, requested_psscr);
+
+	OFFSET(PACA_PID, paca_struct, stop_spr_save_area[0]);
+	OFFSET(PACA_LDBAR, paca_struct, stop_spr_save_area[1]);
+	OFFSET(PACA_FSCR, paca_struct, stop_spr_save_area[2]);
+	OFFSET(PACA_HFSCR, paca_struct, stop_spr_save_area[3]);
+
+	/* On POWER9, we are already saving MMCR0 for ESL=EC=1 */
+	OFFSET(PACA_MMCRA, paca_struct, stop_spr_save_area[4]);
+	OFFSET(PACA_MMCR1, paca_struct, stop_spr_save_area[5]);
+	OFFSET(PACA_MMCR2, paca_struct, stop_spr_save_area[6]);
+
+
 #endif
 
 	DEFINE(PPC_DBELL_SERVER, PPC_DBELL_SERVER);
