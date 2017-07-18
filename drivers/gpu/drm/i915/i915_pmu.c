@@ -183,8 +183,11 @@ static int engine_event_init(struct perf_event *event)
 	return 0;
 }
 
+static DEFINE_PER_CPU(struct pt_regs, i915_pmu_pt_regs);
+
 static enum hrtimer_restart hrtimer_sample(struct hrtimer *hrtimer)
 {
+	struct pt_regs *regs = this_cpu_ptr(&i915_pmu_pt_regs);
 	struct perf_sample_data data;
 	struct perf_event *event;
 	u64 period;
@@ -196,7 +199,7 @@ static enum hrtimer_restart hrtimer_sample(struct hrtimer *hrtimer)
 	event->pmu->read(event);
 
 	perf_sample_data_init(&data, 0, event->hw.last_period);
-	perf_event_overflow(event, &data, NULL);
+	perf_event_overflow(event, &data, regs);
 
 	period = max_t(u64, 10000, event->hw.sample_period);
 	hrtimer_forward_now(hrtimer, ns_to_ktime(period));
