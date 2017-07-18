@@ -502,6 +502,7 @@ static struct drm_encoder *cirrus_connector_best_encoder(struct drm_connector
 
 static void cirrus_connector_destroy(struct drm_connector *connector)
 {
+	drm_connector_unregister(connector);
 	drm_connector_cleanup(connector);
 	kfree(connector);
 }
