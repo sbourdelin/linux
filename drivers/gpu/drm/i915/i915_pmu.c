@@ -131,17 +131,21 @@ static void i915_pmu_event_destroy(struct perf_event *event)
 	WARN_ON(event->parent);
 }
 
+#define pmu_config_engine(config) ((config) >> 2)
+#define pmu_config_sampler(config) ((config) & 3)
+
 static int engine_event_init(struct perf_event *event)
 {
 	struct drm_i915_private *i915 =
 		container_of(event->pmu, typeof(*i915), pmu.base);
-	int engine = event->attr.config >> 2;
-	int sample = event->attr.config & 3;
+	unsigned int user_engine = pmu_config_engine(event->attr.config);
+	unsigned int sample = pmu_config_sampler(event->attr.config);
+	enum intel_engine_id engine_id;
 
-	if (WARN_ON_ONCE(engine >= ARRAY_SIZE(user_engine_map)))
+	if (WARN_ON_ONCE(user_engine >= ARRAY_SIZE(user_engine_map)))
 		return -ENOENT;
 	else
-		engine = user_engine_map[engine];
+		engine_id = user_engine_map[user_engine];
 
 	switch (sample) {
 	case I915_SAMPLE_QUEUED:
@@ -156,7 +160,7 @@ static int engine_event_init(struct perf_event *event)
 		return -ENOENT;
 	}
 
-	if (!i915->engine[engine])
+	if (!i915->engine[engine_id])
 		return -ENODEV;
 
 	return 0;
@@ -395,14 +399,14 @@ static void i915_pmu_event_read(struct perf_event *event)
 	u64 val = 0;
 
 	if (event->attr.config < 32) {
-		int engine = event->attr.config >> 2;
-		int sample = event->attr.config & 3;
+		unsigned int user_engine = pmu_config_engine(event->attr.config);
+		unsigned int sample = pmu_config_sampler(event->attr.config);
 
-		if (WARN_ON_ONCE(engine >= ARRAY_SIZE(user_engine_map))) {
+		if (WARN_ON_ONCE(user_engine >= ARRAY_SIZE(user_engine_map))) {
 			/* Do nothing */
 		} else {
-			engine = user_engine_map[engine];
-			val = i915->engine[engine]->pmu_sample[sample];
+			enum intel_engine_id id = user_engine_map[user_engine];
+			val = i915->engine[id]->pmu_sample[sample];
 		}
 	} else switch (event->attr.config) {
 	case I915_PMU_ACTUAL_FREQUENCY:
