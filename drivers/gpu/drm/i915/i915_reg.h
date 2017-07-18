@@ -6710,6 +6710,9 @@ enum {
 #define CHICKEN_MISC_2		_MMIO(0x42084)
 #define  COMP_PWR_DOWN		(1 << 23)
 
+#define CHICKEN_MISC_4		_MMIO(0x4208c)
+#define   FBC_STRIDE_OVERRIDE	(1<<13)
+
 #define _CHICKEN_PIPESL_1_A	0x420b0
 #define _CHICKEN_PIPESL_1_B	0x420b4
 #define  HSW_FBCQ_DIS			(1 << 22)

@@ -288,8 +288,27 @@ static bool ilk_fbc_is_active(struct drm_i915_private *dev_priv)
 static void gen7_fbc_activate(struct drm_i915_private *dev_priv)
 {
 	struct intel_fbc_reg_params *params = &dev_priv->fbc.params;
+	struct intel_fbc_state_cache *cache = &dev_priv->fbc.state_cache;
 	u32 dpfc_ctl;
 	int threshold = dev_priv->fbc.threshold;
+
+	/* Display WA #0529: skl, kbl, bxt but not for glk*/
+	if (IS_GEN9(dev_priv) && !IS_GEMINILAKE(dev_priv)) {
+		u32 chicken_misc4 = I915_READ(CHICKEN_MISC_4);
+
+		if (i915_gem_object_get_tiling(cache->vma->obj)
+				!= I915_TILING_X) {
+			int cfb_stride = DIV_ROUND_UP(cache->plane.src_w,
+					 (32 * threshold)) * 8;
+			params->fb.stride = cfb_stride;
+
+			I915_WRITE(CHICKEN_MISC_4, chicken_misc4 |
+					FBC_STRIDE_OVERRIDE | cfb_stride);
+		} else {
+			I915_WRITE(CHICKEN_MISC_4, chicken_misc4 &
+					~FBC_STRIDE_OVERRIDE);
+		}
+	}
 
 	dpfc_ctl = 0;
 	if (IS_IVYBRIDGE(dev_priv))
