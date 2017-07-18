@@ -98,6 +98,7 @@ static int devfreq_simple_ondemand_handler(struct devfreq *devfreq,
 {
 	switch (event) {
 	case DEVFREQ_GOV_START:
+		devfreq_update_stats(devfreq);
 		devfreq_monitor_start(devfreq);
 		break;
 
