@@ -28,7 +28,7 @@
 
 #define DRV_VERSION "2.10"
 #define SYNTH_IO_EXTENT	0x04
-#define SWAIT udelay(70)
+#define SWAIT usleep_range(70, 150)
 #define PROCSPEECH 0x1f
 #define SYNTH_CLEAR 0x03
 
@@ -164,7 +164,7 @@ static const char *synth_immediate(struct spk_synth *synth, const char *buf)
 			if (--timeout <= 0)
 				return oops();
 		outb_p(ch, synth_port);
-		udelay(70);
+		usleep_range(70, 150);
 		buf++;
 	}
 	return NULL;
