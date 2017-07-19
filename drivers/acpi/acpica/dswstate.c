@@ -403,6 +403,7 @@ acpi_ds_obj_stack_pop_and_delete(u32 pop_count,
 				 struct acpi_walk_state *walk_state)
 {
 	s32 i;
+	s32 stack_top;
 	union acpi_operand_object *obj_desc;
 
 	ACPI_FUNCTION_NAME(ds_obj_stack_pop_and_delete);
@@ -411,7 +412,11 @@ acpi_ds_obj_stack_pop_and_delete(u32 pop_count,
 		return;
 	}
 
-	for (i = (s32)pop_count - 1; i >= 0; i--) {
+	/* Calculate curruent top of the stack */
+
+	stack_top = (s32)walk_state->num_operands + walk_state->operand_index - 1;
+
+	for (i = stack_top; i >= 0; i--) {
 		if (walk_state->num_operands == 0) {
 			return;
 		}
