@@ -39,6 +39,7 @@ enum hinic_db_type {
 
 enum hinic_io_path {
 	HINIC_CTRL_PATH,
+	HINIC_DATA_PATH,
 };
 
 struct hinic_free_db_area {
