@@ -1088,10 +1088,10 @@ static int aead_perform(struct aead_request *req, int encrypt,
 	BUG_ON(qmgr_stat_overflow(SEND_QID));
 	return -EINPROGRESS;
 
-free_buf_src:
-	free_buf_chain(dev, req_ctx->src, crypt->src_buf);
 free_buf_dst:
 	free_buf_chain(dev, req_ctx->dst, crypt->dst_buf);
+free_buf_src:
+	free_buf_chain(dev, req_ctx->src, crypt->src_buf);
 	crypt->ctl_flags = CTL_FLAG_UNUSED;
 	return -ENOMEM;
 }
