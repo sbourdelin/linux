@@ -1472,3 +1472,24 @@ static int __init vga_arb_device_init(void)
 	return rc;
 }
 subsys_initcall(vga_arb_device_init);
+
+#if defined(CONFIG_ARCH_WANT_VGA_ARB_FALLBACK)
+static void vga_arb_fallback_fixup(struct pci_dev *pdev)
+{
+	u16 cmd;
+
+	if (vga_default_device())
+		return;
+
+	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
+	if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) {
+		vgaarb_info(&pdev->dev, "[fallback]"
+			    " setting as default device\n");
+		vga_set_default_device(pdev);
+	}
+
+}
+DECLARE_PCI_FIXUP_CLASS_ENABLE(PCI_ANY_ID, PCI_ANY_ID,
+			       PCI_CLASS_DISPLAY_VGA, 8,
+			       vga_arb_fallback_fixup);
+#endif
