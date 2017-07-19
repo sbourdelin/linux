@@ -148,6 +148,9 @@
 #define	FETCH_ID			0xb
 #define	RESET_DEVICE			0xd
 
+/* Value for NAND_DEV_CMD_VLD */
+#define NAND_DEV_CMD_VLD_VAL		0x1d
+
 /*
  * the NAND controller performs reads/writes with ECC in 516 byte chunks.
  * the driver calls the chunks 'step' or 'codeword' interchangeably
@@ -1972,6 +1975,7 @@ static int qcom_nandc_setup(struct qcom_nand_controller *nandc)
 {
 	/* kill onenand */
 	nandc_write(nandc, SFLASHC_BURST_CFG, 0);
+	nandc_write(nandc, NAND_DEV_CMD_VLD, NAND_DEV_CMD_VLD_VAL);
 
 	/* enable ADM DMA */
 	nandc_write(nandc, NAND_FLASH_CHIP_SELECT, DM_EN);
