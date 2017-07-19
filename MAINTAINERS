@@ -6292,7 +6292,7 @@ Hyper-V CORE AND DRIVERS
 M:	"K. Y. Srinivasan" <kys@microsoft.com>
 M:	Haiyang Zhang <haiyangz@microsoft.com>
 M:	Stephen Hemminger <sthemmin@microsoft.com>
-L:	devel@linuxdriverproject.org
+L:	driverdev-devel@linuxdriverproject.org
 S:	Maintained
 F:	arch/x86/include/asm/mshyperv.h
 F:	arch/x86/include/uapi/asm/hyperv.h
