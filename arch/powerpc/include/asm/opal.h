@@ -271,6 +271,7 @@ int opal_get_powercap(u32 handle, int token, u32 *pcap);
 int opal_set_powercap(u32 handle, int token, u32 pcap);
 int opal_get_power_shifting_ratio(u32 handle, int token, u32 *psr);
 int opal_set_power_shifting_ratio(u32 handle, int token, u32 psr);
+int opal_clear_sensor_groups(u32 group_hndl, int token);
 
 /* Internal functions */
 extern int early_init_dt_scan_opal(unsigned long node, const char *uname,

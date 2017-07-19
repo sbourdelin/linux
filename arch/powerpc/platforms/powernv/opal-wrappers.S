@@ -314,3 +314,4 @@ OPAL_CALL(opal_get_powercap,			OPAL_GET_POWERCAP);
 OPAL_CALL(opal_set_powercap,			OPAL_SET_POWERCAP);
 OPAL_CALL(opal_get_power_shifting_ratio,	OPAL_GET_PSR);
 OPAL_CALL(opal_set_power_shifting_ratio,	OPAL_SET_PSR);
+OPAL_CALL(opal_clear_sensor_groups,		OPAL_CLEAR_SENSOR_GROUPS);
