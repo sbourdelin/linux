@@ -1983,6 +1983,8 @@ out:
 static inline void __init of_unittest_overlay(void) { }
 #endif
 
+#ifdef CONFIG_OF_OVERLAY
+
 /*
  * __dtb_ot_begin[] and __dtb_ot_end[] are created by cmd_dt_S_dtb
  * in scripts/Makefile.lib
@@ -2010,14 +2012,14 @@ struct overlay_info {
 OVERLAY_INFO_EXTERN(overlay_base);
 OVERLAY_INFO_EXTERN(overlay);
 OVERLAY_INFO_EXTERN(overlay_bad_phandle);
-
-#ifdef CONFIG_OF_OVERLAY
+OVERLAY_INFO_EXTERN(overlay_bad_symbol);
 
 /* order of entries is hard-coded into users of overlays[] */
 static struct overlay_info overlays[] = {
 	OVERLAY_INFO(overlay_base, -9999),
 	OVERLAY_INFO(overlay, 0),
 	OVERLAY_INFO(overlay_bad_phandle, -EINVAL),
+	OVERLAY_INFO(overlay_bad_symbol, -EINVAL),
 	{}
 };
 
@@ -2289,6 +2291,10 @@ static __init void of_unittest_overlay_high_level(void)
 
 	unittest(overlay_data_add(2),
 		 "Adding overlay 'overlay_bad_phandle' failed\n");
+
+	unittest(overlay_data_add(3),
+		 "Adding overlay 'overlay_bad_symbol' failed\n");
+
 	return;
 
 err_unlock:

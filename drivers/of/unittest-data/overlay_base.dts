@@ -53,6 +53,13 @@
 				spin-controller = < &spin_ctrl_2 5 &spin_ctrl_2 7 >;
 				spin-controller-names = "track_1", "track_2";
 				queues = < 2 >;
+
+				track@3 {
+				};
+
+				track@4 {
+				};
+
 			};
 		};
 
