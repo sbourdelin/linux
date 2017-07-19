@@ -21,6 +21,7 @@
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/of_irq.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 
@@ -139,7 +140,14 @@ static int smbalert_probe(struct i2c_client *ara,
 	if (!alert)
 		return -ENOMEM;
 
-	irq = setup->irq;
+	if (setup) {
+		irq = setup->irq;
+	} else {
+		irq = of_irq_get_byname(adapter->dev.of_node, "smbus_alert");
+		if (irq <= 0)
+			return irq;
+	}
+
 	INIT_WORK(&alert->alert, smbalert_work);
 	alert->ara = ara;
 
@@ -213,6 +221,28 @@ struct i2c_client *i2c_setup_smbus_alert(struct i2c_adapter *adapter,
 	return i2c_new_device(adapter, &ara_board_info);
 }
 EXPORT_SYMBOL_GPL(i2c_setup_smbus_alert);
+
+#if IS_ENABLED(CONFIG_OF)
+int of_i2c_setup_smbus_alert(struct i2c_adapter *adapter)
+{
+	struct i2c_client *client;
+	int irq;
+
+	irq = of_property_match_string(adapter->dev.of_node, "interrupt-names",
+				       "smbus_alert");
+	if (irq == -EINVAL || irq == -ENODATA)
+		return 0;
+	else if (irq < 0)
+		return irq;
+
+	client = i2c_setup_smbus_alert(adapter, NULL);
+	if (!client)
+		return -ENODEV;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(of_i2c_setup_smbus_alert);
+#endif
 
 /**
  * i2c_handle_smbus_alert - Handle an SMBus alert
