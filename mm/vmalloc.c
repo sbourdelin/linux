@@ -46,6 +46,9 @@ static DEFINE_PER_CPU(struct vfree_deferred, vfree_deferred);
 
 static void __vunmap(const void *, int);
 
+static void setup_vmap_ram_vm(struct vm_struct *vm, struct vmap_area *va,
+				unsigned long flags, const void *caller);
+
 static void free_work(struct work_struct *w)
 {
 	struct vfree_deferred *p = container_of(w, struct vfree_deferred, wq);
@@ -326,6 +329,7 @@ EXPORT_SYMBOL(vmalloc_to_pfn);
 /*** Global kva allocator ***/
 
 #define VM_VM_AREA	0x04
+#define VM_VM_RAM	0x08
 
 static DEFINE_SPINLOCK(vmap_area_lock);
 /* Export for kexec only */
@@ -1152,6 +1156,7 @@ void vm_unmap_ram(const void *mem, unsigned int count)
 
 	va = find_vmap_area(addr);
 	BUG_ON(!va);
+	kfree(va->vm);
 	free_unmap_vmap_area(va);
 }
 EXPORT_SYMBOL(vm_unmap_ram);
@@ -1184,6 +1189,12 @@ void *vm_map_ram(struct page **pages, unsigned int count, int node, pgprot_t pro
 		addr = (unsigned long)mem;
 	} else {
 		struct vmap_area *va;
+		struct vm_struct *area;
+
+		area = kzalloc_node(sizeof(*area), GFP_KERNEL, node);
+		if (unlikely(!area))
+			return NULL;
+
 		va = alloc_vmap_area(size, PAGE_SIZE,
 				VMALLOC_START, VMALLOC_END, node, GFP_KERNEL);
 		if (IS_ERR(va))
@@ -1191,6 +1202,7 @@ void *vm_map_ram(struct page **pages, unsigned int count, int node, pgprot_t pro
 
 		addr = va->va_start;
 		mem = (void *)addr;
+		setup_vmap_ram_vm(area, va, 0, __builtin_return_address(0));
 	}
 	if (vmap_page_range(addr, addr + size, prot, pages) < 0) {
 		vm_unmap_ram(mem, count);
@@ -1370,6 +1382,19 @@ static void setup_vmalloc_vm(struct vm_struct *vm, struct vmap_area *va,
 	vm->caller = caller;
 	va->vm = vm;
 	va->flags |= VM_VM_AREA;
+	spin_unlock(&vmap_area_lock);
+}
+
+static void setup_vmap_ram_vm(struct vm_struct *vm, struct vmap_area *va,
+			      unsigned long flags, const void *caller)
+{
+	spin_lock(&vmap_area_lock);
+	vm->flags = flags;
+	vm->addr = (void *)va->va_start;
+	vm->size = va->va_end - va->va_start;
+	vm->caller = caller;
+	va->vm = vm;
+	va->flags |= VM_VM_RAM;
 	spin_unlock(&vmap_area_lock);
 }
 
@@ -2709,7 +2734,7 @@ static int s_show(struct seq_file *m, void *p)
 	 * s_show can encounter race with remove_vm_area, !VM_VM_AREA on
 	 * behalf of vmap area is being tear down or vm_map_ram allocation.
 	 */
-	if (!(va->flags & VM_VM_AREA))
+	if (!(va->flags & (VM_VM_AREA | VM_VM_RAM)))
 		return 0;
 
 	v = va->vm;
