@@ -346,6 +346,7 @@ EXPORT_SYMBOL_GPL(klp_disable_patch);
 static int __klp_enable_patch(struct klp_patch *patch)
 {
 	struct klp_object *obj;
+	struct obj_iter o_iter;
 	int ret;
 
 	if (klp_transition_patch)
@@ -384,7 +385,7 @@ static int __klp_enable_patch(struct klp_patch *patch)
 	 */
 	smp_wmb();
 
-	klp_for_each_object(patch, obj) {
+	klp_for_each_object(patch, obj, &o_iter) {
 		if (!klp_is_object_loaded(obj))
 			continue;
 
@@ -571,10 +572,11 @@ static void klp_free_funcs_limited(struct klp_object *obj,
 static void klp_free_object_loaded(struct klp_object *obj)
 {
 	struct klp_func *func;
+	struct func_iter f_iter;
 
 	obj->mod = NULL;
 
-	klp_for_each_func(obj, func)
+	klp_for_each_func(obj, func, &f_iter)
 		func->old_addr = 0;
 }
 
@@ -630,6 +632,7 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 				  struct klp_object *obj)
 {
 	struct klp_func *func;
+	struct func_iter f_iter;
 	int ret;
 
 	module_disable_ro(patch->mod);
@@ -642,7 +645,7 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 	arch_klp_init_object_loaded(patch, obj);
 	module_enable_ro(patch->mod, true);
 
-	klp_for_each_func(obj, func) {
+	klp_for_each_func(obj, func, &f_iter) {
 		ret = klp_find_object_symbol(obj->name, func->old_name,
 					     func->old_sympos,
 					     &func->old_addr);
@@ -672,6 +675,7 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 static int klp_init_object(struct klp_patch *patch, struct klp_object *obj)
 {
 	struct klp_func *func;
+	struct func_iter f_iter;
 	int ret;
 	const char *name;
 
@@ -689,7 +693,7 @@ static int klp_init_object(struct klp_patch *patch, struct klp_object *obj)
 	if (ret)
 		return ret;
 
-	klp_for_each_func(obj, func) {
+	klp_for_each_func(obj, func, &f_iter) {
 		ret = klp_init_func(obj, func);
 		if (ret)
 			goto free;
@@ -712,6 +716,7 @@ free:
 static int klp_init_patch(struct klp_patch *patch)
 {
 	struct klp_object *obj;
+	struct obj_iter o_iter;
 	int ret;
 
 	if (!patch->objs)
@@ -729,7 +734,11 @@ static int klp_init_patch(struct klp_patch *patch)
 		return ret;
 	}
 
-	klp_for_each_object(patch, obj) {
+	INIT_LIST_HEAD(&patch->obj_list);
+	klp_for_each_object_core(patch, obj)
+		INIT_LIST_HEAD(&obj->func_list);
+
+	klp_for_each_object(patch, obj, &o_iter) {
 		ret = klp_init_object(patch, obj);
 		if (ret)
 			goto free;
@@ -835,6 +844,7 @@ int klp_module_coming(struct module *mod)
 	int ret;
 	struct klp_patch *patch;
 	struct klp_object *obj;
+	struct obj_iter o_iter;
 
 	if (WARN_ON(mod->state != MODULE_STATE_COMING))
 		return -EINVAL;
@@ -848,7 +858,7 @@ int klp_module_coming(struct module *mod)
 	mod->klp_alive = true;
 
 	list_for_each_entry(patch, &klp_patches, list) {
-		klp_for_each_object(patch, obj) {
+		klp_for_each_object(patch, obj, &o_iter) {
 			if (!klp_is_module(obj) || strcmp(obj->name, mod->name))
 				continue;
 
@@ -904,6 +914,7 @@ void klp_module_going(struct module *mod)
 {
 	struct klp_patch *patch;
 	struct klp_object *obj;
+	struct obj_iter o_iter;
 
 	if (WARN_ON(mod->state != MODULE_STATE_GOING &&
 		    mod->state != MODULE_STATE_COMING))
@@ -918,7 +929,7 @@ void klp_module_going(struct module *mod)
 	mod->klp_alive = false;
 
 	list_for_each_entry(patch, &klp_patches, list) {
-		klp_for_each_object(patch, obj) {
+		klp_for_each_object(patch, obj, &o_iter) {
 			if (!klp_is_module(obj) || strcmp(obj->name, mod->name))
 				continue;
 

@@ -81,6 +81,8 @@ static void klp_complete_transition(void)
 	struct task_struct *g, *task;
 	unsigned int cpu;
 	bool immediate_func = false;
+	struct obj_iter o_iter;
+	struct func_iter f_iter;
 
 	if (klp_target_state == KLP_UNPATCHED) {
 		/*
@@ -101,8 +103,8 @@ static void klp_complete_transition(void)
 	if (klp_transition_patch->immediate)
 		goto done;
 
-	klp_for_each_object(klp_transition_patch, obj) {
-		klp_for_each_func(obj, func) {
+	klp_for_each_object(klp_transition_patch, obj, &o_iter) {
+		klp_for_each_func(obj, func, &f_iter) {
 			func->transition = false;
 			if (func->immediate)
 				immediate_func = true;
@@ -244,6 +246,8 @@ static int klp_check_stack(struct task_struct *task, char *err_buf)
 	struct stack_trace trace;
 	struct klp_object *obj;
 	struct klp_func *func;
+	struct obj_iter o_iter;
+	struct func_iter f_iter;
 	int ret;
 
 	trace.skip = 0;
@@ -259,10 +263,10 @@ static int klp_check_stack(struct task_struct *task, char *err_buf)
 		return ret;
 	}
 
-	klp_for_each_object(klp_transition_patch, obj) {
+	klp_for_each_object(klp_transition_patch, obj, &o_iter) {
 		if (!obj->patched)
 			continue;
-		klp_for_each_func(obj, func) {
+		klp_for_each_func(obj, func, &f_iter) {
 			ret = klp_check_stack_func(func, &trace);
 			if (ret) {
 				snprintf(err_buf, STACK_ERR_BUF_SIZE,
@@ -470,6 +474,8 @@ void klp_init_transition(struct klp_patch *patch, int state)
 	unsigned int cpu;
 	struct klp_object *obj;
 	struct klp_func *func;
+	struct obj_iter o_iter;
+	struct func_iter f_iter;
 	int initial_state = !state;
 
 	WARN_ON_ONCE(klp_target_state != KLP_UNDEFINED);
@@ -531,8 +537,8 @@ void klp_init_transition(struct klp_patch *patch, int state)
 	 * When unpatching, the funcs are already in the func_stack and so are
 	 * already visible to the ftrace handler.
 	 */
-	klp_for_each_object(patch, obj)
-		klp_for_each_func(obj, func)
+	klp_for_each_object(patch, obj, &o_iter)
+		klp_for_each_func(obj, func, &f_iter)
 			func->transition = true;
 }
 

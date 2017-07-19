@@ -24,6 +24,7 @@
 #include <linux/module.h>
 #include <linux/ftrace.h>
 #include <linux/completion.h>
+#include <linux/list.h>
 
 #if IS_ENABLED(CONFIG_LIVEPATCH)
 
@@ -88,10 +89,23 @@ struct klp_func {
 };
 
 /**
+ * struct klp_func_no_op - internal object used to link no_op functions, which
+			   avoids the need to bloat struct klp_func
+ * @orig_func:	embeds struct klp_func
+ * @func_entry:	used link struct klp_func_no_op to struct klp_object
+ */
+struct klp_func_no_op {
+	struct klp_func orig_func;
+	struct list_head func_entry;
+};
+
+/**
  * struct klp_object - kernel object structure for live patching
  * @name:	module name (or NULL for vmlinux)
  * @funcs:	function entries for functions to be patched in the object
  * @kobj:	kobject for sysfs resources
+ * @func_list:	head of list for struct klp_func_no_op
+ * @obj_entry:	used to link struct klp_object to struct klp_patch
  * @mod:	kernel module associated with the patched object
  *		(NULL for vmlinux)
  * @patched:	the object's funcs have been added to the klp_ops list
@@ -103,6 +117,8 @@ struct klp_object {
 
 	/* internal */
 	struct kobject kobj;
+	struct list_head func_list;
+	struct list_head obj_entry;
 	struct module *mod;
 	bool patched;
 };
@@ -114,6 +130,7 @@ struct klp_object {
  * @immediate:  patch all funcs immediately, bypassing safety mechanisms
  * @list:	list node for global list of registered patches
  * @kobj:	kobject for sysfs resources
+ * @obj_list:	head of list for dynamically allocated struct klp_object
  * @enabled:	the patch is enabled (but operation may be incomplete)
  * @finish:	for waiting till it is safe to remove the patch module
  */
@@ -126,17 +143,96 @@ struct klp_patch {
 	/* internal */
 	struct list_head list;
 	struct kobject kobj;
+	struct list_head obj_list;
 	bool enabled;
 	struct completion finish;
 };
 
-#define klp_for_each_object(patch, obj) \
+struct obj_iter {
+	struct klp_object *obj;
+	struct list_head *obj_list_head;
+	struct list_head *obj_list_pos;
+};
+
+static inline struct klp_object *obj_iter_next(struct obj_iter *iter)
+{
+	struct klp_object *obj;
+
+	if (iter->obj->funcs || iter->obj->name) {
+		obj = iter->obj;
+		iter->obj++;
+	} else {
+		if (iter->obj_list_pos == iter->obj_list_head) {
+			obj = NULL;
+		} else {
+			obj = list_entry(iter->obj_list_pos, struct klp_object,
+					 obj_entry);
+			iter->obj_list_pos = iter->obj_list_pos->next;
+		}
+	}
+
+	return obj;
+}
+
+static inline struct klp_object *obj_iter_init(struct klp_patch *patch,
+					       struct obj_iter *iter)
+{
+	iter->obj = patch->objs;
+	iter->obj_list_head = &patch->obj_list;
+	iter->obj_list_pos = iter->obj_list_head->next;
+
+	return obj_iter_next(iter);
+}
+
+#define klp_for_each_object(patch, obj, iter) \
+	for (obj = obj_iter_init(patch, iter); obj; obj = obj_iter_next(iter))
+
+#define klp_for_each_object_core(patch, obj) \
 	for (obj = patch->objs; obj->funcs || obj->name; obj++)
 
-#define klp_for_each_func(obj, func) \
-	for (func = obj->funcs; \
-	     func->old_name || func->new_func || func->old_sympos; \
-	     func++)
+struct func_iter {
+	struct klp_func *func;
+	struct list_head *func_list_head;
+	struct list_head *func_list_pos;
+};
+
+static inline struct klp_func *func_iter_next(struct func_iter *iter)
+{
+	struct klp_func *func;
+	struct klp_func_no_op *func_no_op;
+
+	if (iter->func->old_name || iter->func->new_func ||
+					iter->func->old_sympos) {
+		func = iter->func;
+		iter->func++;
+	} else {
+		if (iter->func_list_pos == iter->func_list_head) {
+			func = NULL;
+		} else {
+			func_no_op = list_entry(iter->func_list_pos,
+						struct klp_func_no_op,
+						func_entry);
+			func = &func_no_op->orig_func;
+			iter->func_list_pos = iter->func_list_pos->next;
+		}
+	}
+
+	return func;
+}
+
+static inline struct klp_func *func_iter_init(struct klp_object *obj,
+					      struct func_iter *iter)
+{
+	iter->func = obj->funcs;
+	iter->func_list_head = &obj->func_list;
+	iter->func_list_pos = iter->func_list_head->next;
+
+	return func_iter_next(iter);
+}
+
+#define klp_for_each_func(obj, func, iter) \
+	for (func = func_iter_init(obj, iter); func; \
+	     func = func_iter_next(iter))
 
 int klp_register_patch(struct klp_patch *);
 int klp_unregister_patch(struct klp_patch *);

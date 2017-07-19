@@ -238,8 +238,9 @@ err:
 void klp_unpatch_object(struct klp_object *obj)
 {
 	struct klp_func *func;
+	struct func_iter f_iter;
 
-	klp_for_each_func(obj, func)
+	klp_for_each_func(obj, func, &f_iter)
 		if (func->patched)
 			klp_unpatch_func(func);
 
@@ -249,12 +250,13 @@ void klp_unpatch_object(struct klp_object *obj)
 int klp_patch_object(struct klp_object *obj)
 {
 	struct klp_func *func;
+	struct func_iter f_iter;
 	int ret;
 
 	if (WARN_ON(obj->patched))
 		return -EINVAL;
 
-	klp_for_each_func(obj, func) {
+	klp_for_each_func(obj, func, &f_iter) {
 		ret = klp_patch_func(func);
 		if (ret) {
 			klp_unpatch_object(obj);
@@ -269,8 +271,9 @@ int klp_patch_object(struct klp_object *obj)
 void klp_unpatch_objects(struct klp_patch *patch)
 {
 	struct klp_object *obj;
+	struct obj_iter o_iter;
 
-	klp_for_each_object(patch, obj)
+	klp_for_each_object(patch, obj, &o_iter)
 		if (obj->patched)
 			klp_unpatch_object(obj);
 }
