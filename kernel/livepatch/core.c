@@ -49,6 +49,8 @@ static LIST_HEAD(klp_patches);
 
 static struct kobject *klp_root_kobj;
 
+int sysctl_livepatch_mode;
+
 static bool klp_is_module(struct klp_object *obj)
 {
 	return obj->name;
@@ -641,6 +643,9 @@ static int klp_init_patch_no_ops(struct klp_patch *patch)
 	bool found, mod;
 
 	if (patch->list.prev == &klp_patches)
+		return 0;
+
+	if (sysctl_livepatch_mode != LIVEPATCH_MODE_REPLACE)
 		return 0;
 
 	prev_patch = list_prev_entry(patch, list);
