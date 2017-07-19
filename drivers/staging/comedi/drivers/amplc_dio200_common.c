@@ -28,6 +28,9 @@
 #include "comedi_8254.h"
 #include "8255.h"		/* only for register defines */
 
+#define CREATE_TRACE_POINTS
+#include "comedi-trace.h"
+
 /* 200 series registers */
 #define DIO200_IO_SIZE		0x20
 #define DIO200_PCIE_IO_SIZE	0x4000
@@ -482,8 +485,10 @@ static irqreturn_t dio200_interrupt(int irq, void *d)
 	struct comedi_subdevice *s = dev->read_subdev;
 	int handled;
 
+	trace_comedi_event(0);
 	if (!dev->attached)
 		return IRQ_NONE;
+	trace_comedi_event(1);
 
 	handled = dio200_handle_read_intr(dev, s);
 
