@@ -23,6 +23,10 @@ config CONSTRUCTORS
 config IRQ_WORK
 	bool
 
+config IRQ_SIM
+	bool
+	select IRQ_WORK
+
 config BUILDTIME_EXTABLE_SORT
 	bool
 
