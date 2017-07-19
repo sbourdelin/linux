@@ -4,6 +4,8 @@ Required properties:
 - compatible:		must be one of the following:
 	* "qcom,ebi2-nandc" - EBI2 NAND which uses ADM DMA like IPQ8064.
 	* "qcom,qpic-nandc-v1.4.0" - QPIC NAND v1.4.0 which uses BAM DMA like IPQ4019.
+	* "qcom,qpic-nandc-v1.5.0" - QPIC NAND v1.5.0 which uses BAM DMA like IPQ8074.
+
 - reg:			MMIO address range
 - clocks:		must contain core clock and always on clock
 - clock-names:		must contain "core" for the core clock and "aon" for the
@@ -94,7 +96,7 @@ nand@1ac00000 {
 };
 
 nand@79b0000 {
-	compatible = "qcom,qpic-nandc-v1.4.0";
+	compatible = "qcom,qpic-nandc-v1.4.0", "qcom,qpic-nandc-v1.5.0";
 	reg = <0x79b0000 0x1000>;
 
 	clocks = <&gcc GCC_QPIC_CLK>,
