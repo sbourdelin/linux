@@ -352,6 +352,9 @@ static int __klp_enable_patch(struct klp_patch *patch)
 	if (klp_transition_patch)
 		return -EBUSY;
 
+	if (patch->replaced)
+		return -EINVAL;
+
 	if (WARN_ON(patch->enabled))
 		return -EINVAL;
 
@@ -602,6 +605,118 @@ static void klp_free_patch(struct klp_patch *patch)
 		list_del(&patch->list);
 }
 
+void klp_patch_free_no_ops(struct klp_patch *patch)
+{
+	struct obj_iter o_iter;
+	struct func_iter f_iter;
+	struct klp_object *obj, *tmp_obj;
+	struct klp_func *func;
+	struct klp_func_no_op *func_no_op;
+
+	klp_for_each_object(patch, obj, &o_iter) {
+		klp_for_each_func(obj, func, &f_iter) {
+			if (func->no_op) {
+				func_no_op = container_of(func,
+							  struct klp_func_no_op,
+							  orig_func);
+				list_del_init(&func_no_op->func_entry);
+				kfree(func_no_op);
+			}
+		}
+	}
+	list_for_each_entry_safe(obj, tmp_obj, &patch->obj_list, obj_entry) {
+		list_del_init(&obj->obj_entry);
+		kfree(obj);
+	}
+}
+
+static int klp_init_patch_no_ops(struct klp_patch *patch)
+{
+	struct klp_object *obj, *prev_obj, *new_obj;
+	struct klp_func *prev_func, *func;
+	struct klp_func_no_op *new;
+	struct klp_patch *prev_patch;
+	struct obj_iter o_iter, prev_o_iter;
+	struct func_iter prev_f_iter, f_iter;
+	bool found, mod;
+
+	if (patch->list.prev == &klp_patches)
+		return 0;
+
+	prev_patch = list_prev_entry(patch, list);
+	klp_for_each_object(prev_patch, prev_obj, &prev_o_iter) {
+		if (!klp_is_object_loaded(prev_obj))
+			continue;
+
+		klp_for_each_func(prev_obj, prev_func, &prev_f_iter) {
+			found = false;
+			klp_for_each_object(patch, obj, &o_iter) {
+				klp_for_each_func(obj, func, &f_iter) {
+					if ((strcmp(prev_func->old_name,
+						    func->old_name) == 0) &&
+						(prev_func->old_sympos ==
+							func->old_sympos)) {
+						found = true;
+						break;
+					}
+				}
+				if (found)
+					break;
+			}
+			if (found)
+				continue;
+
+			new = kmalloc(sizeof(*new), GFP_KERNEL);
+			if (!new)
+				return -ENOMEM;
+			new->orig_func = *prev_func;
+			new->orig_func.old_name = prev_func->old_name;
+			new->orig_func.new_func = NULL;
+			new->orig_func.old_sympos = prev_func->old_sympos;
+			new->orig_func.immediate = prev_func->immediate;
+			new->orig_func.old_addr = prev_func->old_addr;
+			INIT_LIST_HEAD(&new->orig_func.stack_node);
+			new->orig_func.old_size = prev_func->old_size;
+			new->orig_func.new_size = 0;
+			new->orig_func.no_op = true;
+			new->orig_func.patched = false;
+			new->orig_func.transition = false;
+			found = false;
+			mod = klp_is_module(prev_obj);
+			klp_for_each_object(patch, obj, &o_iter) {
+				if (mod) {
+					if (klp_is_module(obj) &&
+					    strcmp(prev_obj->name,
+						   obj->name) == 0) {
+						found = true;
+						break;
+					}
+				} else if (!klp_is_module(obj)) {
+					found = true;
+					break;
+				}
+			}
+			if (found) {
+				list_add(&new->func_entry, &obj->func_list);
+			} else {
+				new_obj = kmalloc(sizeof(*new_obj), GFP_KERNEL);
+				if (!new_obj)
+					return -ENOMEM;
+				new_obj->name = prev_obj->name;
+				new_obj->funcs = NULL;
+				new_obj->mod = prev_obj->mod;
+				new_obj->patched = false;
+				INIT_LIST_HEAD(&new_obj->func_list);
+				INIT_LIST_HEAD(&new_obj->obj_entry);
+				list_add(&new->func_entry, &new_obj->func_list);
+				list_add(&new_obj->obj_entry, &patch->obj_list);
+			}
+		}
+	}
+
+	return 0;
+}
+
 static int klp_init_func(struct klp_object *obj, struct klp_func *func)
 {
 	if (!func->old_name || !func->new_func)
@@ -725,6 +840,7 @@ static int klp_init_patch(struct klp_patch *patch)
 	mutex_lock(&klp_mutex);
 
 	patch->enabled = false;
+	patch->replaced = false;
 	init_completion(&patch->finish);
 
 	ret = kobject_init_and_add(&patch->kobj, &klp_ktype_patch,
@@ -746,12 +862,19 @@ static int klp_init_patch(struct klp_patch *patch)
 
 	list_add_tail(&patch->list, &klp_patches);
 
+	ret = klp_init_patch_no_ops(patch);
+	if (ret) {
+		list_del(&patch->list);
+		goto free;
+	}
+
 	mutex_unlock(&klp_mutex);
 
 	return 0;
 
 free:
 	klp_free_objects_limited(patch, obj);
+	klp_patch_free_no_ops(patch);
 
 	mutex_unlock(&klp_mutex);
 
@@ -786,6 +909,7 @@ int klp_unregister_patch(struct klp_patch *patch)
 	}
 
 	klp_free_patch(patch);
+	klp_patch_free_no_ops(patch);
 
 	mutex_unlock(&klp_mutex);
 

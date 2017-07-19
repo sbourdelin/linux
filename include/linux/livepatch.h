@@ -49,6 +49,7 @@
  * @new_size:	size of the new function
  * @patched:	the func has been added to the klp_ops list
  * @transition:	the func is currently being applied or reverted
+ * @no_op:	this is a no_op function used to compelete revert a function
  *
  * The patched and transition variables define the func's patching state.  When
  * patching, a func is always in one of the following states:
@@ -86,6 +87,7 @@ struct klp_func {
 	unsigned long old_size, new_size;
 	bool patched;
 	bool transition;
+	bool no_op;
 };
 
 /**
@@ -132,6 +134,7 @@ struct klp_object {
  * @kobj:	kobject for sysfs resources
  * @obj_list:	head of list for dynamically allocated struct klp_object
  * @enabled:	the patch is enabled (but operation may be incomplete)
+ * @replaced:	the patch has been replaced an can not be re-enabled
  * @finish:	for waiting till it is safe to remove the patch module
  */
 struct klp_patch {
@@ -145,6 +148,7 @@ struct klp_patch {
 	struct kobject kobj;
 	struct list_head obj_list;
 	bool enabled;
+	bool replaced;
 	struct completion finish;
 };
 
@@ -201,8 +205,8 @@ static inline struct klp_func *func_iter_next(struct func_iter *iter)
 	struct klp_func *func;
 	struct klp_func_no_op *func_no_op;
 
-	if (iter->func->old_name || iter->func->new_func ||
-					iter->func->old_sympos) {
+	if (iter->func && (iter->func->old_name || iter->func->new_func ||
+			   iter->func->old_sympos)) {
 		func = iter->func;
 		iter->func++;
 	} else {

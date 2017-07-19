@@ -29,5 +29,6 @@ struct klp_ops *klp_find_ops(unsigned long old_addr);
 int klp_patch_object(struct klp_object *obj);
 void klp_unpatch_object(struct klp_object *obj);
 void klp_unpatch_objects(struct klp_patch *patch);
+void klp_unpatch_func(struct klp_func *func, bool unregistered);
 
 #endif /* _LIVEPATCH_PATCH_H */

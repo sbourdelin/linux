@@ -117,6 +117,8 @@ static void notrace klp_ftrace_handler(unsigned long ip,
 		}
 	}
 
+	if (func->no_op)
+		goto unlock;
 	klp_arch_set_pc(regs, (unsigned long)func->new_func);
 unlock:
 	preempt_enable_notrace();
@@ -135,7 +137,7 @@ static unsigned long klp_get_ftrace_location(unsigned long faddr)
 }
 #endif
 
-static void klp_unpatch_func(struct klp_func *func)
+void klp_unpatch_func(struct klp_func *func, bool unregistered)
 {
 	struct klp_ops *ops;
 
@@ -155,9 +157,11 @@ static void klp_unpatch_func(struct klp_func *func)
 		if (WARN_ON(!ftrace_loc))
 			return;
 
-		WARN_ON(unregister_ftrace_function(&ops->fops));
-		WARN_ON(ftrace_set_filter_ip(&ops->fops, ftrace_loc, 1, 0));
-
+		if (!unregistered) {
+			WARN_ON(unregister_ftrace_function(&ops->fops));
+			WARN_ON(ftrace_set_filter_ip(&ops->fops, ftrace_loc, 1,
+				0));
+		}
 		list_del_rcu(&func->stack_node);
 		list_del(&ops->node);
 		kfree(ops);
@@ -242,7 +246,7 @@ void klp_unpatch_object(struct klp_object *obj)
 
 	klp_for_each_func(obj, func, &f_iter)
 		if (func->patched)
-			klp_unpatch_func(func);
+			klp_unpatch_func(func, false);
 
 	obj->patched = false;
 }

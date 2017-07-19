@@ -21,6 +21,8 @@
 
 #include <linux/cpu.h>
 #include <linux/stacktrace.h>
+#include <linux/ftrace.h>
+#include <linux/delay.h>
 #include "core.h"
 #include "patch.h"
 #include "transition.h"
@@ -70,6 +72,7 @@ static void klp_synchronize_transition(void)
 	schedule_on_each_cpu(klp_sync);
 }
 
+
 /*
  * The transition to the target patch state is complete.  Clean up the data
  * structures.
@@ -81,8 +84,32 @@ static void klp_complete_transition(void)
 	struct task_struct *g, *task;
 	unsigned int cpu;
 	bool immediate_func = false;
+	bool no_op = false;
 	struct obj_iter o_iter;
 	struct func_iter f_iter;
+	unsigned long ftrace_loc;
+	struct klp_ops *ops;
+	struct klp_patch *prev_patch;
+
+	/* remove ftrace hook for all no_op functions. */
+	if (klp_target_state == KLP_PATCHED) {
+		klp_for_each_object(klp_transition_patch, obj, &o_iter) {
+			klp_for_each_func(obj, func, &f_iter) {
+				if (!func->no_op)
+					continue;
+
+				ops = klp_find_ops(func->old_addr);
+				if (WARN_ON(!ops))
+					continue;
+				ftrace_loc = func->old_addr;
+				WARN_ON(unregister_ftrace_function(&ops->fops));
+				WARN_ON(ftrace_set_filter_ip(&ops->fops,
+							     ftrace_loc,
+							     1, 0));
+				no_op = true;
+			}
+		}
+	}
 
 	if (klp_target_state == KLP_UNPATCHED) {
 		/*
@@ -90,7 +117,9 @@ static void klp_complete_transition(void)
 		 * remove the new functions from the func_stack.
 		 */
 		klp_unpatch_objects(klp_transition_patch);
+	}
 
+	if (klp_target_state == KLP_UNPATCHED || no_op) {
 		/*
 		 * Make sure klp_ftrace_handler() can no longer see functions
 		 * from this patch on the ops->func_stack.  Otherwise, after
@@ -132,6 +161,24 @@ static void klp_complete_transition(void)
 	}
 
 done:
+	/* remove and free any no_op functions */
+	if (no_op && klp_target_state == KLP_PATCHED) {
+		prev_patch = list_prev_entry(klp_transition_patch, list);
+		if (prev_patch->enabled) {
+			klp_unpatch_objects(prev_patch);
+			prev_patch->enabled = false;
+			prev_patch->replaced = true;
+			module_put(prev_patch->mod);
+		}
+		klp_for_each_object(klp_transition_patch, obj, &o_iter) {
+			klp_for_each_func(obj, func, &f_iter) {
+				if (func->no_op)
+					klp_unpatch_func(func, true);
+			}
+		}
+		klp_patch_free_no_ops(klp_transition_patch);
+	}
+
 	klp_target_state = KLP_UNDEFINED;
 	klp_transition_patch = NULL;
 }
@@ -204,10 +251,18 @@ static int klp_check_stack_func(struct klp_func *func,
 		if (klp_target_state == KLP_UNPATCHED) {
 			 /*
 			  * Check for the to-be-unpatched function
-			  * (the func itself).
+			  * (the func itself). If we're unpatching
+			  * a no-op, then we're running the original
+			  * function. We never 'patch' a no-op function,
+			  * since we just remove the ftrace hook.
 			  */
-			func_addr = (unsigned long)func->new_func;
-			func_size = func->new_size;
+			if (func->no_op) {
+				func_addr = (unsigned long)func->old_addr;
+				func_size = func->old_size;
+			} else {
+				func_addr = (unsigned long)func->new_func;
+				func_size = func->new_size;
+			}
 		} else {
 			/*
 			 * Check for the to-be-patched function
