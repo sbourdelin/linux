@@ -979,7 +979,7 @@ void w1_search(struct w1_master *dev, u8 search_type, w1_slave_found_callback cb
 			mutex_unlock(&dev->bus_mutex);
 
 			if (rv == 8 && rn)
-				cb(dev, rn);
+				cb(dev, le64_to_cpu(rn));
 
 			break;
 		}
