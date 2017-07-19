@@ -786,6 +786,37 @@ static void hinic_get_stats64(struct net_device *netdev,
 	stats->tx_errors = nic_tx_stats->tx_dropped;
 }
 
+static u16 hinic_select_queue(struct net_device *netdev, struct sk_buff *skb,
+			      void *accel_priv,
+			      select_queue_fallback_t fallback)
+{
+	u16 qid;
+
+	if (skb_rx_queue_recorded(skb))
+		qid = skb_get_rx_queue(skb);
+	else
+		qid = fallback(netdev, skb);
+
+	return qid;
+}
+
+#ifdef CONFIG_NET_POLL_CONTROLLER
+static void hinic_netpoll(struct net_device *netdev)
+{
+	struct hinic_dev *nic_dev = netdev_priv(netdev);
+	struct hinic_hwdev *hwdev = nic_dev->hwdev;
+	int i, num_qps = hinic_hwdev_num_qps(hwdev);
+
+	for (i = 0; i < num_qps; i++) {
+		struct hinic_txq *txq = &nic_dev->txqs[i];
+		struct hinic_rxq *rxq = &nic_dev->rxqs[i];
+
+		napi_schedule(&txq->napi);
+		napi_schedule(&rxq->napi);
+	}
+}
+#endif
+
 static const struct net_device_ops hinic_netdev_ops = {
 	.ndo_open = hinic_open,
 	.ndo_stop = hinic_close,
@@ -798,6 +829,10 @@ static const struct net_device_ops hinic_netdev_ops = {
 	.ndo_start_xmit = hinic_xmit_frame,
 	.ndo_tx_timeout = hinic_tx_timeout,
 	.ndo_get_stats64 = hinic_get_stats64,
+	.ndo_select_queue = hinic_select_queue,
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	.ndo_poll_controller = hinic_netpoll,
+#endif
 };
 
 static void netdev_features_init(struct net_device *netdev)
