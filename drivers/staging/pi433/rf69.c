@@ -101,7 +101,7 @@ enum modulation rf69_get_modulation(struct spi_device *spi)
 
 	currentValue = READ_REG(REG_DATAMODUL);
 
-	switch (currentValue & MASK_DATAMODUL_MODULATION_TYPE >> 3)  // TODO improvement: change 3 to define
+	switch (currentValue & MASK_DATAMODUL_MODULATION_TYPE)
 	{
 	case DATAMODUL_MODULATION_TYPE_OOK: return OOK;
 	case DATAMODUL_MODULATION_TYPE_FSK: return FSK;
@@ -203,7 +203,7 @@ int rf69_set_deviation(struct spi_device *spi, u32 deviation)
 	lsb = (f_reg&0xff);
 
 	// check msb
-	if (msb & !FDEVMASB_MASK)
+	if (msb & ~FDEVMASB_MASK)
 	{
 		dev_dbg(&spi->dev, "set_deviation: err in calc of msb");
 		INVALID_PARAM;
@@ -366,13 +366,13 @@ int rf69_set_lna_gain(struct spi_device *spi, enum lnaGain lnaGain)
 	#endif
 
 	switch(lnaGain) {
-	case automatic:	 return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) & LNA_GAIN_AUTO) );
-	case max:	 return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) & LNA_GAIN_MAX) );
-	case maxMinus6:  return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) & LNA_GAIN_MAX_MINUS_6) );
-	case maxMinus12: return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) & LNA_GAIN_MAX_MINUS_12) );
-	case maxMinus24: return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) & LNA_GAIN_MAX_MINUS_24) );
-	case maxMinus36: return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) & LNA_GAIN_MAX_MINUS_36) );
-	case maxMinus48: return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) & LNA_GAIN_MAX_MINUS_48) );
+	case automatic:	 return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) | LNA_GAIN_AUTO) );
+	case max:	 return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) | LNA_GAIN_MAX) );
+	case maxMinus6:  return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) | LNA_GAIN_MAX_MINUS_6) );
+	case maxMinus12: return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) | LNA_GAIN_MAX_MINUS_12) );
+	case maxMinus24: return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) | LNA_GAIN_MAX_MINUS_24) );
+	case maxMinus36: return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) | LNA_GAIN_MAX_MINUS_36) );
+	case maxMinus48: return WRITE_REG(REG_LNA, ( (READ_REG(REG_LNA) & ~MASK_LNA_GAIN) | LNA_GAIN_MAX_MINUS_48) );
 	default:	 INVALID_PARAM;
 	}
 }
@@ -387,7 +387,7 @@ enum lnaGain rf69_get_lna_gain(struct spi_device *spi)
 
 	currentValue = READ_REG(REG_LNA);
 
-	switch (currentValue & MASK_LNA_CURRENT_GAIN >> 3)  // improvement: change 3 to define
+	switch (currentValue & MASK_LNA_GAIN)
 	{
 	case LNA_GAIN_AUTO:	    return automatic;
 	case LNA_GAIN_MAX:	    return max;
