@@ -2190,7 +2190,7 @@ static int qcom_nandc_remove(struct platform_device *pdev)
  * more controller variants
  */
 static const struct of_device_id qcom_nandc_of_match[] = {
-	{	.compatible = "qcom,ipq806x-nand",
+	{	.compatible = "qcom,ebi2-nandc",
 		.data = (void *)EBI2_NANDC_ECC_MODES,
 	},
 	{}
