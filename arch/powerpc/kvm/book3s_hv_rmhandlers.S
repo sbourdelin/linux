@@ -1530,6 +1530,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_ARCH_207S)
 	std	r6, VCPU_BESCR(r9)
 	stw	r7, VCPU_GUEST_PID(r9)
 	std	r8, VCPU_WORT(r9)
+
 BEGIN_FTR_SECTION
 	mfspr	r5, SPRN_TCSCR
 	mfspr	r6, SPRN_ACOP
@@ -1736,6 +1737,19 @@ BEGIN_FTR_SECTION
 	mtspr	SPRN_PSSCR, r6
 	mtspr	SPRN_PID, r7
 	mtspr	SPRN_IAMR, r8
+
+	/* Handle the case where the guest used an illegal PID */
+	LOAD_REG_ADDR(r4, mmu_base_pid)
+	lwz	r3, VCPU_GUEST_PID(r9)
+	lwz	r5, 0(r4)
+	cmpw	cr0,r3,r5
+	blt	1f
+
+	/* Illegal PID, flush the TLB */
+	isync
+	bl	radix_flush_pid
+1:
+
 END_FTR_SECTION_IFSET(CPU_FTR_ARCH_300)
 BEGIN_FTR_SECTION
 	PPC_INVALIDATE_ERAT

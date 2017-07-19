@@ -1003,11 +1003,11 @@ start_here:
 	RFI
 
 /*
- * void switch_mmu_context(struct mm_struct *prev, struct mm_struct *next);
+ * void __switch_mmu_context(struct mm_struct *prev, struct mm_struct *next);
  *
  * Set up the segment registers for a new context.
  */
-_ENTRY(switch_mmu_context)
+_ENTRY(__switch_mmu_context)
 	lwz	r3,MMCONTEXTID(r4)
 	cmpwi	cr0,r3,0
 	blt-	4f
@@ -1040,7 +1040,7 @@ _ENTRY(switch_mmu_context)
 4:	trap
 	EMIT_BUG_ENTRY 4b,__FILE__,__LINE__,0
 	blr
-EXPORT_SYMBOL(switch_mmu_context)
+EXPORT_SYMBOL(__switch_mmu_context)
 
 /*
  * An undocumented "feature" of 604e requires that the v bit

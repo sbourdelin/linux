@@ -138,6 +138,6 @@
 	lwz	r4, MM(r4)
 	tophys(r4, r4)
 	/* This only clobbers r0, r3, r4 and r5 */
-	bl	switch_mmu_context
+	bl	__switch_mmu_context
 
 .endm

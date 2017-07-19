@@ -21,10 +21,13 @@ extern void radix__flush_tlb_range(struct vm_area_struct *vma, unsigned long sta
 extern void radix__flush_tlb_kernel_range(unsigned long start, unsigned long end);
 
 extern void radix__local_flush_tlb_mm(struct mm_struct *mm);
+extern void radix__local_flush_all_mm(struct mm_struct *mm);
 extern void radix__local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
 extern void radix__local_flush_tlb_page_psize(struct mm_struct *mm, unsigned long vmaddr,
 					      int psize);
 extern void radix__tlb_flush(struct mmu_gather *tlb);
+extern void radix_flush_pid(unsigned long pid);
+
 #ifdef CONFIG_SMP
 extern void radix__flush_tlb_mm(struct mm_struct *mm);
 extern void radix__flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
