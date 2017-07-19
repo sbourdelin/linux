@@ -36,7 +36,7 @@ typedef uint16_t	__u16;
 typedef unsigned char	__u8;
 typedef struct {
 	__u8 b[16];
-} uuid_le;
+} guid_t;
 
 /* Big exception to the "don't include kernel headers into userspace, which
  * even potentially has different endianness and word sizes, since
@@ -134,7 +134,7 @@ static inline void add_wildcard(char *str)
 		strcat(str + len, "*");
 }
 
-static inline void add_uuid(char *str, uuid_le uuid)
+static inline void add_uuid(char *str, guid_t uuid)
 {
 	int len = strlen(str);
 
