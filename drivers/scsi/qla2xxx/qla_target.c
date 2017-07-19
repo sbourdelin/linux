@@ -2399,7 +2399,7 @@ static int qlt_24xx_build_ctio_pkt(struct qla_qpair *qpair,
 		 */
 		return -EAGAIN;
 	} else
-		qpair->req->outstanding_cmds[h] = (srb_t *)prm->cmd;
+		qpair->req->outstanding_cmds[h] = TCMD_TO_U(prm->cmd);
 
 	pkt->handle = MAKE_HANDLE(qpair->req->id, h);
 	pkt->handle |= CTIO_COMPLETION_HANDLE_MARK;
@@ -2928,7 +2928,7 @@ qlt_build_ctio_crc2_pkt(struct qla_qpair *qpair, struct qla_tgt_prm *prm)
 		 */
 		return -EAGAIN;
 	} else
-		qpair->req->outstanding_cmds[h] = (srb_t *)prm->cmd;
+		qpair->req->outstanding_cmds[h] = TCMD_TO_U(prm->cmd);
 
 	pkt->handle  = MAKE_HANDLE(qpair->req->id, h);
 	pkt->handle |= CTIO_COMPLETION_HANDLE_MARK;
@@ -3729,6 +3729,7 @@ static struct qla_tgt_cmd *qlt_ctio_to_cmd(struct scsi_qla_host *vha,
 	struct req_que *req;
 	int qid = GET_QID(handle);
 	uint32_t h = handle & ~QLA_TGT_HANDLE_MASK;
+	struct unify_cmd *u;
 
 	if (unlikely(h == QLA_TGT_SKIP_HANDLE))
 		return NULL;
@@ -3754,13 +3755,14 @@ static struct qla_tgt_cmd *qlt_ctio_to_cmd(struct scsi_qla_host *vha,
 			return NULL;
 		}
 
-		cmd = (struct qla_tgt_cmd *)req->outstanding_cmds[h];
-		if (unlikely(cmd == NULL)) {
+		u = req->outstanding_cmds[h];
+		if (unlikely(u == NULL)) {
 			ql_dbg(ql_dbg_async, vha, 0xe053,
 			    "qla_target(%d): Suspicious: unable to find the command with handle %x req->id %d rsp->id %d\n",
 				vha->vp_idx, handle, req->id, rsp->id);
 			return NULL;
 		}
+		cmd = &u->tcmd;
 		req->outstanding_cmds[h] = NULL;
 	} else if (ctio != NULL) {
 		/* We can't get loop ID from CTIO7 */
@@ -4181,14 +4183,16 @@ static struct qla_tgt_cmd *qlt_get_tag(scsi_qla_host_t *vha,
 	struct se_session *se_sess = sess->se_sess;
 	struct qla_tgt_cmd *cmd;
 	int tag;
+	struct unify_cmd *u;
 
 	tag = percpu_ida_alloc(&se_sess->sess_tag_pool, TASK_RUNNING);
 	if (tag < 0)
 		return NULL;
 
-	cmd = &((struct qla_tgt_cmd *)se_sess->sess_cmd_map)[tag];
-	memset(cmd, 0, sizeof(struct qla_tgt_cmd));
-	cmd->cmd_type = TYPE_TGT_CMD;
+	u = &((struct unify_cmd *)se_sess->sess_cmd_map)[tag];
+	memset(u, 0, sizeof(*u));
+	u->cmd_type = TYPE_TGT_CMD;
+	cmd = &u->tcmd;
 	memcpy(&cmd->atio, atio, sizeof(*atio));
 	cmd->state = QLA_TGT_STATE_NEW;
 	cmd->tgt = vha->vha_tgt.qla_tgt;

@@ -1335,6 +1335,7 @@ qla2x00_eh_wait_for_pending_commands(scsi_qla_host_t *vha, unsigned int t,
 	struct req_que *req;
 	srb_t *sp;
 	struct scsi_cmnd *cmd;
+	struct unify_cmd *u;
 
 	status = QLA_SUCCESS;
 
@@ -1342,9 +1343,11 @@ qla2x00_eh_wait_for_pending_commands(scsi_qla_host_t *vha, unsigned int t,
 	req = vha->req;
 	for (cnt = 1; status == QLA_SUCCESS &&
 		cnt < req->num_outstanding_cmds; cnt++) {
-		sp = req->outstanding_cmds[cnt];
-		if (!sp)
+		u = req->outstanding_cmds[cnt];
+		if (!u)
 			continue;
+
+		sp = &u->srb;
 		if (sp->type != SRB_SCSI_CMD)
 			continue;
 		if (vha->vp_idx != sp->vha->vp_idx)
@@ -1697,6 +1700,7 @@ qla2x00_abort_all_cmds(scsi_qla_host_t *vha, int res)
 	int que, cnt, status;
 	unsigned long flags;
 	srb_t *sp;
+	struct unify_cmd *u;
 	struct qla_hw_data *ha = vha->hw;
 	struct req_que *req;
 	struct qla_tgt *tgt = vha->vha_tgt.qla_tgt;
@@ -1711,10 +1715,11 @@ qla2x00_abort_all_cmds(scsi_qla_host_t *vha, int res)
 		if (!req->outstanding_cmds)
 			continue;
 		for (cnt = 1; cnt < req->num_outstanding_cmds; cnt++) {
-			sp = req->outstanding_cmds[cnt];
-			if (sp) {
+			u = req->outstanding_cmds[cnt];
+			if (u) {
 				req->outstanding_cmds[cnt] = NULL;
-				if (sp->cmd_type == TYPE_SRB) {
+				if (u->cmd_type == TYPE_SRB) {
+					sp = &u->srb;
 					if (sp->type == SRB_NVME_CMD ||
 					    sp->type == SRB_NVME_LS) {
 						sp_get(sp);
@@ -1768,7 +1773,7 @@ qla2x00_abort_all_cmds(scsi_qla_host_t *vha, int res)
 							    vha->dpc_flags);
 						continue;
 					}
-					cmd = (struct qla_tgt_cmd *)sp;
+					cmd = &u->tcmd;
 					qlt_abort_cmd_on_host_reset(cmd->vha,
 					    cmd);
 				}
@@ -5926,6 +5931,7 @@ qla2x00_timer(scsi_qla_host_t *vha)
 	uint16_t        w;
 	struct qla_hw_data *ha = vha->hw;
 	struct req_que *req;
+	struct unify_cmd *u;
 
 	if (ha->flags.eeh_busy) {
 		ql_dbg(ql_dbg_timer, vha, 0x6000,
@@ -5986,11 +5992,12 @@ qla2x00_timer(scsi_qla_host_t *vha)
 				    index++) {
 					fc_port_t *sfcp;
 
-					sp = req->outstanding_cmds[index];
-					if (!sp)
+					u = req->outstanding_cmds[index];
+					if (!u)
 						continue;
-					if (sp->cmd_type != TYPE_SRB)
+					if (u->cmd_type != TYPE_SRB)
 						continue;
+					sp = &u->srb;
 					if (sp->type != SRB_SCSI_CMD)
 						continue;
 					sfcp = sp->fcport;
@@ -6571,8 +6578,8 @@ qla2x00_module_init(void)
 	int ret = 0;
 
 	/* Allocate cache for SRBs. */
-	srb_cachep = kmem_cache_create("qla2xxx_srbs", sizeof(srb_t), 0,
-	    SLAB_HWCACHE_ALIGN, NULL);
+	srb_cachep = kmem_cache_create("qla2xxx_srbs", sizeof(struct unify_cmd),
+	    0, SLAB_HWCACHE_ALIGN, NULL);
 	if (srb_cachep == NULL) {
 		ql_log(ql_log_fatal, NULL, 0x0001,
 		    "Unable to allocate SRB cache...Failing load!.\n");

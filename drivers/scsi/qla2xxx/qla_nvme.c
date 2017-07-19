@@ -377,7 +377,7 @@ static int qla2x00_start_nvme_mq(srb_t *sp)
 
 	/* Build command packet. */
 	req->current_outstanding_cmd = handle;
-	req->outstanding_cmds[handle] = sp;
+	req->outstanding_cmds[handle] = SRB_TO_U(sp);
 	sp->handle = handle;
 	req->cnt -= req_cnt;
 

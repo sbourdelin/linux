@@ -1251,6 +1251,7 @@ qla2x00_process_completed_request(struct scsi_qla_host *vha,
 {
 	srb_t *sp;
 	struct qla_hw_data *ha = vha->hw;
+	struct unify_cmd *u;
 
 	/* Validate handle. */
 	if (index >= req->num_outstanding_cmds) {
@@ -1264,8 +1265,9 @@ qla2x00_process_completed_request(struct scsi_qla_host *vha,
 		return;
 	}
 
-	sp = req->outstanding_cmds[index];
-	if (sp) {
+	u = req->outstanding_cmds[index];
+	if (u) {
+		sp = &u->srb;
 		/* Free outstanding command slot. */
 		req->outstanding_cmds[index] = NULL;
 
@@ -1289,6 +1291,7 @@ qla2x00_get_sp_from_handle(scsi_qla_host_t *vha, const char *func,
 	sts_entry_t *pkt = iocb;
 	srb_t *sp = NULL;
 	uint16_t index;
+	struct unify_cmd *u;
 
 	index = LSW(pkt->handle);
 	if (index >= req->num_outstanding_cmds) {
@@ -1301,12 +1304,14 @@ qla2x00_get_sp_from_handle(scsi_qla_host_t *vha, const char *func,
 			set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
 		goto done;
 	}
-	sp = req->outstanding_cmds[index];
-	if (!sp) {
+	u = req->outstanding_cmds[index];
+	if (!u) {
 		ql_log(ql_log_warn, vha, 0x5032,
 		    "Invalid completion handle (%x) -- timed-out.\n", index);
-		return sp;
+		return NULL;
 	}
+	sp = &u->srb;
+
 	if (sp->handle != index) {
 		ql_log(ql_log_warn, vha, 0x5033,
 		    "SRB handle (%x) mismatch %x.\n", sp->handle, index);
@@ -2165,6 +2170,7 @@ qla25xx_process_bidir_status_iocb(scsi_qla_host_t *vha, void *pkt,
 	struct fc_bsg_reply *bsg_reply;
 	sts_entry_t *sts;
 	struct sts_entry_24xx *sts24;
+	struct unify_cmd *u;
 	sts = (sts_entry_t *) pkt;
 	sts24 = (struct sts_entry_24xx *) pkt;
 
@@ -2176,8 +2182,8 @@ qla25xx_process_bidir_status_iocb(scsi_qla_host_t *vha, void *pkt,
 		return;
 	}
 
-	sp = req->outstanding_cmds[index];
-	if (!sp) {
+	u = req->outstanding_cmds[index];
+	if (!u) {
 		ql_log(ql_log_warn, vha, 0x70b0,
 		    "Req:%d: Invalid ISP SCSI completion handle(0x%x)\n",
 		    req->id, index);
@@ -2188,6 +2194,7 @@ qla25xx_process_bidir_status_iocb(scsi_qla_host_t *vha, void *pkt,
 
 	/* Free outstanding command slot. */
 	req->outstanding_cmds[index] = NULL;
+	sp = &u->srb;
 	bsg_job = sp->u.bsg_job;
 	bsg_request = bsg_job->request;
 	bsg_reply = bsg_job->reply;
@@ -2330,6 +2337,7 @@ qla2x00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 	uint16_t state_flags = 0;
 	uint16_t retry_delay = 0;
 	uint8_t no_logout = 0;
+	struct unify_cmd *u;
 
 	sts = (sts_entry_t *) pkt;
 	sts24 = (struct sts_entry_24xx *) pkt;
@@ -2356,8 +2364,8 @@ qla2x00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 
 	/* Validate handle. */
 	if (handle < req->num_outstanding_cmds) {
-		sp = req->outstanding_cmds[handle];
-		if (!sp) {
+		u = req->outstanding_cmds[handle];
+		if (!u) {
 			ql_dbg(ql_dbg_io, vha, 0x3075,
 			    "%s(%ld): Already returned command for status handle (0x%x).\n",
 			    __func__, vha->host_no, sts->handle);
@@ -2378,14 +2386,15 @@ qla2x00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 		return;
 	}
 
-	if (sp->cmd_type != TYPE_SRB) {
+	if (u->cmd_type != TYPE_SRB) {
 		req->outstanding_cmds[handle] = NULL;
 		ql_dbg(ql_dbg_io, vha, 0x3015,
 		    "Unknown sp->cmd_type %x %p).\n",
-		    sp->cmd_type, sp);
+		    u->cmd_type, u);
 		return;
 	}
 
+	sp = &u->srb;
 	/* NVME completion. */
 	if (sp->type == SRB_NVME_CMD) {
 		qla24xx_nvme_iocb_entry(vha, req, pkt);
