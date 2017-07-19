@@ -156,6 +156,17 @@ static void qla_nvme_sp_ls_done(void *ptr, int res)
 	qla2x00_rel_sp(sp);
 }
 
+static void qla_nvme_io_work(struct work_struct *work)
+{
+	srb_t *sp;
+	struct srb_iocb *nvme = container_of(work, struct srb_iocb, rq_work);
+	struct nvmefc_fcp_req *fd = nvme->u.nvme.desc;
+	sp = container_of(nvme, srb_t, u.iocb_cmd);
+
+	fd->done(fd);
+	qla2xxx_rel_qpair_sp(sp->qpair, sp);
+}
+
 static void qla_nvme_sp_done(void *ptr, int res)
 {
 	srb_t *sp = ptr;
@@ -177,7 +188,13 @@ static void qla_nvme_sp_done(void *ptr, int res)
 		fd->status = 0;
 
 	fd->rcv_rsplen = nvme->u.nvme.rsp_pyld_len;
-	fd->done(fd);
+	if (res == QLA_FUNCTION_FAILED) {
+		INIT_WORK(&nvme->rq_work, qla_nvme_io_work);
+		queue_work(sp->fcport->vha->nvme_io_wq, &nvme->rq_work);
+		return;
+	} else {
+		fd->done(fd);
+	}
 rel:
 	qla2xxx_rel_qpair_sp(sp->qpair, sp);
 }
@@ -514,6 +531,7 @@ static int qla_nvme_post_cmd(struct nvme_fc_local_port *lport,
 	sp->done = qla_nvme_sp_done;
 	sp->qpair = qpair;
 	nvme = &sp->u.iocb_cmd;
+	INIT_WORK(&nvme->rq_work, qla_nvme_io_work);
 	nvme->u.nvme.desc = fd;
 
 	rval = qla2x00_start_nvme_mq(sp);

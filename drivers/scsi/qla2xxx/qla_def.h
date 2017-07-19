@@ -430,6 +430,7 @@ struct srb_iocb {
 		} nvme;
 	} u;
 
+	struct work_struct rq_work;
 	struct timer_list timer;
 	void (*timeout)(void *);
 };
@@ -4132,6 +4133,7 @@ typedef struct scsi_qla_host {
 	atomic_t	nvme_ref_count;
 	wait_queue_head_t nvme_waitq;
 	struct list_head nvme_rport_list;
+	struct workqueue_struct *nvme_io_wq;
 	atomic_t 	nvme_active_aen_cnt;
 	uint16_t	nvme_last_rptd_aen;
 

@@ -2751,7 +2751,6 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	spin_lock_init(&ha->tgt.sess_lock);
 	spin_lock_init(&ha->tgt.atio_lock);
 
-
 	/* Clear our data area */
 	ha->bars = bars;
 	ha->mem_only = mem_only;
@@ -3286,6 +3285,13 @@ skip_dpc:
 	base_vha->flags.init_done = 1;
 	base_vha->flags.online = 1;
 	ha->prev_minidump_failed = 0;
+	atomic_set(&base_vha->nvme_active_aen_cnt, 0);
+	base_vha->nvme_io_wq = alloc_workqueue("qlnvme-io-wq", 0, 0);
+	if (!base_vha->nvme_io_wq) {
+		ql_log(ql_log_fatal, base_vha, 0x000b,
+		    "Unable to allocate workqueue for nvme_io_wq\n");
+		goto disable_device;
+	}
 
 	ql_dbg(ql_dbg_init, base_vha, 0x00f2,
 	    "Init done and hba is online.\n");
@@ -3559,6 +3565,8 @@ qla2x00_remove_one(struct pci_dev *pdev)
 	set_bit(UNLOADING, &base_vha->dpc_flags);
 
 	qla_nvme_delete(base_vha);
+	if (base_vha->nvme_io_wq)
+		destroy_workqueue(base_vha->nvme_io_wq);
 
 	dma_free_coherent(&ha->pdev->dev,
 		base_vha->gnl.size, base_vha->gnl.l, base_vha->gnl.ldma);
