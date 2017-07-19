@@ -67,8 +67,6 @@
 #ifndef _LINUX_MEI_H
 #define _LINUX_MEI_H
 
-#include <linux/uuid.h>
-
 /*
  * This IOCTL is used to associate the current file descriptor with a
  * FW Client (given by UUID). This opens a communication channel
@@ -102,7 +100,7 @@ struct mei_client {
  */
 struct mei_connect_client_data {
 	union {
-		uuid_le in_client_uuid;
+		__u8 in_client_uuid[16];
 		struct mei_client out_client_properties;
 	};
 };

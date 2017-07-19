@@ -288,7 +288,7 @@ struct hbm_host_enum_response {
 } __packed;
 
 struct mei_client_properties {
-	uuid_le protocol_name;
+	guid_t protocol_name;
 	u8 protocol_version;
 	u8 max_number_of_connections;
 	u8 fixed_address;

@@ -342,7 +342,7 @@ static int mei_ioctl_connect_client(struct file *file,
 		return  -EBUSY;
 
 	/* find ME client we're trying to connect to */
-	me_cl = mei_me_cl_by_uuid(dev, &data->in_client_uuid);
+	me_cl = mei_me_cl_by_uuid(dev, (guid_t *)&data->in_client_uuid);
 	if (!me_cl) {
 		dev_dbg(dev->dev, "Cannot connect to FW Client UUID = %pUl\n",
 			&data->in_client_uuid);

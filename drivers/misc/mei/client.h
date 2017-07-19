@@ -34,13 +34,13 @@ void mei_me_cl_add(struct mei_device *dev, struct mei_me_client *me_cl);
 void mei_me_cl_del(struct mei_device *dev, struct mei_me_client *me_cl);
 
 struct mei_me_client *mei_me_cl_by_uuid(struct mei_device *dev,
-					const uuid_le *uuid);
+					const guid_t *uuid);
 struct mei_me_client *mei_me_cl_by_id(struct mei_device *dev, u8 client_id);
 struct mei_me_client *mei_me_cl_by_uuid_id(struct mei_device *dev,
-					   const uuid_le *uuid, u8 client_id);
-void mei_me_cl_rm_by_uuid(struct mei_device *dev, const uuid_le *uuid);
+					   const guid_t *uuid, u8 client_id);
+void mei_me_cl_rm_by_uuid(struct mei_device *dev, const guid_t *uuid);
 void mei_me_cl_rm_by_uuid_id(struct mei_device *dev,
-			     const uuid_le *uuid, u8 id);
+			     const guid_t *uuid, u8 id);
 void mei_me_cl_rm_all(struct mei_device *dev);
 
 /**
@@ -62,7 +62,7 @@ static inline bool mei_me_cl_is_active(const struct mei_me_client *me_cl)
  *
  * Return: me client protocol name
  */
-static inline const uuid_le *mei_me_cl_uuid(const struct mei_me_client *me_cl)
+static inline const guid_t *mei_me_cl_uuid(const struct mei_me_client *me_cl)
 {
 	return &me_cl->props.protocol_name;
 }
@@ -177,7 +177,7 @@ static inline bool mei_cl_is_single_recv_buf(const struct mei_cl *cl)
  *
  * Return: return uuid of connected me client
  */
-static inline const uuid_le *mei_cl_uuid(const struct mei_cl *cl)
+static inline const guid_t *mei_cl_uuid(const struct mei_cl *cl)
 {
 	return mei_me_cl_uuid(cl->me_cl);
 }

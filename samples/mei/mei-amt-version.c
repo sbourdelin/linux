@@ -89,8 +89,20 @@
 	fprintf(stderr, "Error: " fmt, ##ARGS); \
 } while (0)
 
+/* FIXME: Use libuuid instead */
+typedef struct {
+	__u8 b[16];
+} guid_t;
+
+#define GUID_INIT(a, b, c, d0, d1, d2, d3, d4, d5, d6, d7)		\
+((guid_t)								\
+{{ (a) & 0xff, ((a) >> 8) & 0xff, ((a) >> 16) & 0xff, ((a) >> 24) & 0xff, \
+   (b) & 0xff, ((b) >> 8) & 0xff,					\
+   (c) & 0xff, ((c) >> 8) & 0xff,					\
+   (d0), (d1), (d2), (d3), (d4), (d5), (d6), (d7) }})
+
 struct mei {
-	uuid_le guid;
+	guid_t guid;
 	bool initialized;
 	bool verbose;
 	unsigned int buf_size;
@@ -108,7 +120,7 @@ static void mei_deinit(struct mei *cl)
 	cl->initialized = false;
 }
 
-static bool mei_init(struct mei *me, const uuid_le *guid,
+static bool mei_init(struct mei *me, const guid_t *guid,
 		unsigned char req_protocol_version, bool verbose)
 {
 	int result;
@@ -270,8 +282,9 @@ struct amt_host_if_resp_header {
 	unsigned char data[0];
 } __attribute__((packed));
 
-const uuid_le MEI_IAMTHIF = UUID_LE(0x12f80028, 0xb4b7, 0x4b2d,  \
-				0xac, 0xa8, 0x46, 0xe0, 0xff, 0x65, 0x81, 0x4c);
+const guid_t MEI_IAMTHIF =
+	GUID_INIT(0x12f80028, 0xb4b7, 0x4b2d,
+		  0xac, 0xa8, 0x46, 0xe0, 0xff, 0x65, 0x81, 0x4c);
 
 #define AMT_HOST_IF_CODE_VERSIONS_REQUEST  0x0400001A
 #define AMT_HOST_IF_CODE_VERSIONS_RESPONSE 0x0480001A

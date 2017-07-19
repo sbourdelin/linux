@@ -667,8 +667,9 @@ static int mei_wdt_remove(struct mei_cl_device *cldev)
 	return 0;
 }
 
-#define MEI_UUID_WD UUID_LE(0x05B79A6F, 0x4628, 0x4D7F, \
-			    0x89, 0x9D, 0xA9, 0x15, 0x14, 0xCB, 0x32, 0xAB)
+#define MEI_UUID_WD							\
+	GUID_INIT(0x05B79A6F, 0x4628, 0x4D7F,				\
+		  0x89, 0x9D, 0xA9, 0x15, 0x14, 0xCB, 0x32, 0xAB)
 
 static struct mei_cl_device_id mei_wdt_tbl[] = {
 	{ .uuid = MEI_UUID_WD, .version = MEI_CL_VERSION_ANY },

@@ -27,21 +27,27 @@
 #include "mei_dev.h"
 #include "client.h"
 
-#define MEI_UUID_NFC_INFO UUID_LE(0xd2de1625, 0x382d, 0x417d, \
-			0x48, 0xa4, 0xef, 0xab, 0xba, 0x8a, 0x12, 0x06)
+#define MEI_UUID_NFC_INFO						\
+	GUID_INIT(0xd2de1625, 0x382d, 0x417d,				\
+		  0x48, 0xa4, 0xef, 0xab, 0xba, 0x8a, 0x12, 0x06)
 
-static const uuid_le mei_nfc_info_guid = MEI_UUID_NFC_INFO;
+static const guid_t mei_nfc_info_guid = MEI_UUID_NFC_INFO;
 
-#define MEI_UUID_NFC_HCI UUID_LE(0x0bb17a78, 0x2a8e, 0x4c50, \
-			0x94, 0xd4, 0x50, 0x26, 0x67, 0x23, 0x77, 0x5c)
+#define MEI_UUID_NFC_HCI						\
+	GUID_INIT(0x0bb17a78, 0x2a8e, 0x4c50,				\
+		  0x94, 0xd4, 0x50, 0x26, 0x67, 0x23, 0x77, 0x5c)
 
-#define MEI_UUID_WD UUID_LE(0x05B79A6F, 0x4628, 0x4D7F, \
-			    0x89, 0x9D, 0xA9, 0x15, 0x14, 0xCB, 0x32, 0xAB)
+#define MEI_UUID_WD							\
+	GUID_INIT(0x05B79A6F, 0x4628, 0x4D7F,				\
+		  0x89, 0x9D, 0xA9, 0x15, 0x14, 0xCB, 0x32, 0xAB)
 
-#define MEI_UUID_MKHIF_FIX UUID_LE(0x55213584, 0x9a29, 0x4916, \
-			0xba, 0xdf, 0xf, 0xb7, 0xed, 0x68, 0x2a, 0xeb)
+#define MEI_UUID_MKHIF_FIX						\
+	GUID_INIT(0x55213584, 0x9a29, 0x4916,				\
+		  0xba, 0xdf, 0x0f, 0xb7, 0xed, 0x68, 0x2a, 0xeb)
 
-#define MEI_UUID_ANY NULL_UUID_LE
+#define MEI_UUID_ANY							\
+	GUID_INIT(0x00000000, 0x0000, 0x0000,				\
+		  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
 
 /**
  * number_of_connections - determine whether an client be on the bus
@@ -391,7 +397,7 @@ out:
 
 static struct mei_fixup {
 
-	const uuid_le uuid;
+	const guid_t uuid;
 	void (*hook)(struct mei_cl_device *cldev);
 } mei_fixups[] = {
 	MEI_FIXUP(MEI_UUID_ANY, number_of_connections),
@@ -409,15 +415,12 @@ static struct mei_fixup {
 void mei_cl_bus_dev_fixup(struct mei_cl_device *cldev)
 {
 	struct mei_fixup *f;
-	const uuid_le *uuid = mei_me_cl_uuid(cldev->me_cl);
+	const guid_t *uuid = mei_me_cl_uuid(cldev->me_cl);
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(mei_fixups); i++) {
-
 		f = &mei_fixups[i];
-		if (uuid_le_cmp(f->uuid, MEI_UUID_ANY) == 0 ||
-		    uuid_le_cmp(f->uuid, *uuid) == 0)
+		if (guid_is_null(&f->uuid) || guid_equal(&f->uuid, uuid))
 			f->hook(cldev);
 	}
 }
-

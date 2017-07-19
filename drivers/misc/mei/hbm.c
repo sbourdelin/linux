@@ -329,7 +329,7 @@ static int mei_hbm_me_cl_add(struct mei_device *dev,
 			     struct hbm_props_response *res)
 {
 	struct mei_me_client *me_cl;
-	const uuid_le *uuid = &res->client_properties.protocol_name;
+	const guid_t *uuid = &res->client_properties.protocol_name;
 
 	mei_me_cl_rm_by_uuid(dev, uuid);
 

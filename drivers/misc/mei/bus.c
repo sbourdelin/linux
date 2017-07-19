@@ -417,7 +417,7 @@ EXPORT_SYMBOL_GPL(mei_cldev_set_drvdata);
  *
  * Return: me client uuid
  */
-const uuid_le *mei_cldev_uuid(const struct mei_cl_device *cldev)
+const guid_t *mei_cldev_uuid(const struct mei_cl_device *cldev)
 {
 	return mei_me_cl_uuid(cldev->me_cl);
 }
@@ -606,7 +606,7 @@ struct mei_cl_device_id *mei_cl_device_find(struct mei_cl_device *cldev,
 					    struct mei_cl_driver *cldrv)
 {
 	const struct mei_cl_device_id *id;
-	const uuid_le *uuid;
+	const guid_t *uuid;
 	u8 version;
 	bool match;
 
@@ -614,8 +614,8 @@ struct mei_cl_device_id *mei_cl_device_find(struct mei_cl_device *cldev,
 	version = mei_me_cl_ver(cldev->me_cl);
 
 	id = cldrv->id_table;
-	while (uuid_le_cmp(NULL_UUID_LE, id->uuid)) {
-		if (!uuid_le_cmp(*uuid, id->uuid)) {
+	while (!guid_is_null(&id->uuid)) {
+		if (guid_equal(uuid, &id->uuid)) {
 			match = true;
 
 			if (cldev->name[0])
@@ -742,7 +742,7 @@ static ssize_t uuid_show(struct device *dev, struct device_attribute *a,
 			     char *buf)
 {
 	struct mei_cl_device *cldev = to_mei_cl_device(dev);
-	const uuid_le *uuid = mei_me_cl_uuid(cldev->me_cl);
+	const guid_t *uuid = mei_me_cl_uuid(cldev->me_cl);
 
 	return scnprintf(buf, PAGE_SIZE, "%pUl", uuid);
 }
@@ -762,7 +762,7 @@ static ssize_t modalias_show(struct device *dev, struct device_attribute *a,
 			     char *buf)
 {
 	struct mei_cl_device *cldev = to_mei_cl_device(dev);
-	const uuid_le *uuid = mei_me_cl_uuid(cldev->me_cl);
+	const guid_t *uuid = mei_me_cl_uuid(cldev->me_cl);
 	u8 version = mei_me_cl_ver(cldev->me_cl);
 
 	return scnprintf(buf, PAGE_SIZE, "mei:%s:%pUl:%02X:",
@@ -790,7 +790,7 @@ ATTRIBUTE_GROUPS(mei_cldev);
 static int mei_cl_device_uevent(struct device *dev, struct kobj_uevent_env *env)
 {
 	struct mei_cl_device *cldev = to_mei_cl_device(dev);
-	const uuid_le *uuid = mei_me_cl_uuid(cldev->me_cl);
+	const guid_t *uuid = mei_me_cl_uuid(cldev->me_cl);
 	u8 version = mei_me_cl_ver(cldev->me_cl);
 
 	if (add_uevent_var(env, "MEI_CL_VERSION=%d", version))
