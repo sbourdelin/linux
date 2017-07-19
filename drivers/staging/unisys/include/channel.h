@@ -116,13 +116,13 @@ struct channel_header {
 	u32 header_size;	/* sizeof(struct channel_header) */
 	u64 size;		/* Total size of this channel in bytes */
 	u64 features;		/* Flags to modify behavior */
-	uuid_le chtype;		/* Channel type: data, bus, control, etc. */
+	guid_t chtype;		/* Channel type: data, bus, control, etc. */
 	u64 partition_handle;	/* ID of guest partition */
 	u64 handle;		/* Device number of this channel in client */
 	u64 ch_space_offset;	/* Offset in bytes to channel specific area */
 	u32 version_id;		/* struct channel_header Version ID */
 	u32 partition_index;	/* Index of guest partition */
-	uuid_le zone_uuid;	/* Guid of Channel's zone */
+	guid_t zone_guid;	/* Guid of Channel's zone */
 	u32 cli_str_offset;	/* offset from channel header to
 				 * nul-terminated ClientString (0 if
 				 * ClientString not present)
@@ -205,25 +205,25 @@ struct signal_queue_header {
  */
 static inline int
 visor_check_channel(struct channel_header *ch,
-		    uuid_le expected_uuid,
+		    const guid_t *expected_guid,
 		    char *chname,
 		    u64 expected_min_bytes,
 		    u32 expected_version,
 		    u64 expected_signature)
 {
-	if (uuid_le_cmp(expected_uuid, NULL_UUID_LE) != 0) {
+	if (!guid_is_null(expected_guid)) {
 		/* caller wants us to verify type GUID */
-		if (uuid_le_cmp(ch->chtype, expected_uuid) != 0) {
+		if (!guid_equal(&ch->chtype, expected_guid)) {
 			pr_err("Channel mismatch on channel=%s(%pUL) field=type expected=%pUL actual=%pUL\n",
-			       chname, &expected_uuid,
-			       &expected_uuid, &ch->chtype);
+			       chname, expected_guid,
+			       expected_guid, &ch->chtype);
 			return 0;
 		}
 	}
 	if (expected_min_bytes > 0) {	/* verify channel size */
 		if (ch->size < expected_min_bytes) {
 			pr_err("Channel mismatch on channel=%s(%pUL) field=size expected=0x%-8.8Lx actual=0x%-8.8Lx\n",
-			       chname, &expected_uuid,
+			       chname, expected_guid,
 			       (unsigned long long)expected_min_bytes,
 			       ch->size);
 			return 0;
@@ -232,7 +232,7 @@ visor_check_channel(struct channel_header *ch,
 	if (expected_version > 0) {	/* verify channel version */
 		if (ch->version_id != expected_version) {
 			pr_err("Channel mismatch on channel=%s(%pUL) field=version expected=0x%-8.8lx actual=0x%-8.8x\n",
-			       chname, &expected_uuid,
+			       chname, expected_guid,
 			       (unsigned long)expected_version,
 			       ch->version_id);
 			return 0;
@@ -241,7 +241,7 @@ visor_check_channel(struct channel_header *ch,
 	if (expected_signature > 0) {	/* verify channel signature */
 		if (ch->signature != expected_signature) {
 			pr_err("Channel mismatch on channel=%s(%pUL) field=signature expected=0x%-8.8Lx actual=0x%-8.8Lx\n",
-			       chname, &expected_uuid,
+			       chname, expected_guid,
 			       expected_signature, ch->signature);
 			return 0;
 		}
@@ -254,25 +254,22 @@ visor_check_channel(struct channel_header *ch,
  */
 
 /* {414815ed-c58c-11da-95a9-00e08161165f} */
-#define VISOR_VHBA_CHANNEL_UUID \
-	UUID_LE(0x414815ed, 0xc58c, 0x11da, \
-		0x95, 0xa9, 0x0, 0xe0, 0x81, 0x61, 0x16, 0x5f)
-static const uuid_le visor_vhba_channel_uuid = VISOR_VHBA_CHANNEL_UUID;
-#define VISOR_VHBA_CHANNEL_UUID_STR \
+#define VISOR_VHBA_CHANNEL_GUID \
+	GUID_INIT(0x414815ed, 0xc58c, 0x11da, \
+		  0x95, 0xa9, 0x0, 0xe0, 0x81, 0x61, 0x16, 0x5f)
+#define VISOR_VHBA_CHANNEL_GUID_STR \
 	"414815ed-c58c-11da-95a9-00e08161165f"
 
 /* {8cd5994d-c58e-11da-95a9-00e08161165f} */
-#define VISOR_VNIC_CHANNEL_UUID \
-	UUID_LE(0x8cd5994d, 0xc58e, 0x11da, \
-		0x95, 0xa9, 0x0, 0xe0, 0x81, 0x61, 0x16, 0x5f)
-static const uuid_le visor_vnic_channel_uuid = VISOR_VNIC_CHANNEL_UUID;
-#define VISOR_VNIC_CHANNEL_UUID_STR \
+#define VISOR_VNIC_CHANNEL_GUID \
+	GUID_INIT(0x8cd5994d, 0xc58e, 0x11da, \
+		  0x95, 0xa9, 0x0, 0xe0, 0x81, 0x61, 0x16, 0x5f)
+#define VISOR_VNIC_CHANNEL_GUID_STR \
 	"8cd5994d-c58e-11da-95a9-00e08161165f"
 
 /* {72120008-4AAB-11DC-8530-444553544200} */
-#define VISOR_SIOVM_UUID \
-	UUID_LE(0x72120008, 0x4AAB, 0x11DC, \
-		0x85, 0x30, 0x44, 0x45, 0x53, 0x54, 0x42, 0x00)
-static const uuid_le visor_siovm_uuid = VISOR_SIOVM_UUID;
+#define VISOR_SIOVM_GUID \
+	GUID_INIT(0x72120008, 0x4AAB, 0x11DC, \
+		  0x85, 0x30, 0x44, 0x45, 0x53, 0x54, 0x42, 0x00)
 
 #endif

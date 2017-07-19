@@ -58,7 +58,7 @@ struct visorchipset_state {
  *  GUID, name, and sizes.
  */
 struct visor_channeltype_descriptor {
-	const uuid_le guid;
+	const guid_t guid;
 	const char *name;
 };
 
@@ -141,14 +141,14 @@ struct visor_driver {
  *				hypervisor requests.
  * @vbus_hdr_info:		A pointer to header info. Private use by bus
  *				driver.
- * @partition_uuid:		Indicates client partion id. This should be the
+ * @partition_guid:		Indicates client partion id. This should be the
  *				same across all visor_devices in the current
  *				guest. Private use by bus driver only.
  */
 
 struct visor_device {
 	struct visorchannel *visorchannel;
-	uuid_le channel_type_guid;
+	guid_t channel_type_guid;
 	/* These fields are for private use by the bus driver only. */
 	struct device device;
 	struct list_head list_all;
@@ -161,11 +161,11 @@ struct visor_device {
 	u32 chipset_bus_no;
 	u32 chipset_dev_no;
 	struct visorchipset_state state;
-	uuid_le inst;
+	guid_t inst;
 	u8 *name;
 	struct controlvm_message_header *pending_msg_hdr;
 	void *vbus_hdr_info;
-	uuid_le partition_uuid;
+	guid_t partition_guid;
 	struct dentry *debugfs_dir;
 	struct dentry *debugfs_client_bus_info;
 };
@@ -207,7 +207,7 @@ int visorchannel_signalremove(struct visorchannel *channel, u32 queue,
 int visorchannel_signalinsert(struct visorchannel *channel, u32 queue,
 			      void *msg);
 bool visorchannel_signalempty(struct visorchannel *channel, u32 queue);
-uuid_le visorchannel_get_uuid(struct visorchannel *channel);
+const guid_t *visorchannel_get_guid(struct visorchannel *channel);
 
 #define BUS_ROOT_DEVICE UINT_MAX
 struct visor_device *visorbus_get_device_by_id(u32 bus_no, u32 dev_no,

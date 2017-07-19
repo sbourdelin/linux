@@ -29,10 +29,10 @@
 #define MYDRVNAME "visorchannel"
 
 #define VISOR_CONSOLEVIDEO_CHANNEL_GUID \
-	UUID_LE(0x3cd6e705, 0xd6a2, 0x4aa5, \
-		0xad, 0x5c, 0x7b, 0x8, 0x88, 0x9d, 0xff, 0xe2)
+	GUID_INIT(0x3cd6e705, 0xd6a2, 0x4aa5, \
+		  0xad, 0x5c, 0x7b, 0x8, 0x88, 0x9d, 0xff, 0xe2)
 
-static const uuid_le visor_video_guid = VISOR_CONSOLEVIDEO_CHANNEL_GUID;
+static const guid_t visor_video_guid = VISOR_CONSOLEVIDEO_CHANNEL_GUID;
 
 struct visorchannel {
 	u64 physaddr;
@@ -40,14 +40,14 @@ struct visorchannel {
 	void *mapped;
 	bool requested;
 	struct channel_header chan_hdr;
-	uuid_le guid;
+	guid_t guid;
 	bool needs_lock;	/* channel creator knows if more than one */
 				/* thread will be inserting or removing */
 	spinlock_t insert_lock; /* protect head writes in chan_hdr */
 	spinlock_t remove_lock;	/* protect tail writes in chan_hdr */
 
-	uuid_le type;
-	uuid_le inst;
+	guid_t type;
+	guid_t inst;
 };
 
 void
@@ -76,7 +76,7 @@ visorchannel_get_nbytes(struct visorchannel *channel)
 }
 
 char *
-visorchannel_uuid_id(uuid_le *guid, char *s)
+visorchannel_guid_id(const guid_t *guid, char *s)
 {
 	sprintf(s, "%pUL", guid);
 	return s;
@@ -85,13 +85,13 @@ visorchannel_uuid_id(uuid_le *guid, char *s)
 char *
 visorchannel_id(struct visorchannel *channel, char *s)
 {
-	return visorchannel_uuid_id(&channel->guid, s);
+	return visorchannel_guid_id(&channel->guid, s);
 }
 
 char *
 visorchannel_zoneid(struct visorchannel *channel, char *s)
 {
-	return visorchannel_uuid_id(&channel->chan_hdr.zone_uuid, s);
+	return visorchannel_guid_id(&channel->chan_hdr.zone_guid, s);
 }
 
 u64
@@ -109,17 +109,17 @@ visorchannel_set_clientpartition(struct visorchannel *channel,
 }
 
 /**
- * visorchannel_get_uuid() - queries the UUID of the designated channel
+ * visorchannel_get_guid() - queries the GUID of the designated channel
  * @channel: the channel to query
  *
- * Return: the UUID of the provided channel
+ * Return: the GUID of the provided channel
  */
-uuid_le
-visorchannel_get_uuid(struct visorchannel *channel)
+const guid_t *
+visorchannel_get_guid(struct visorchannel *channel)
 {
-	return channel->guid;
+	return &channel->guid;
 }
-EXPORT_SYMBOL_GPL(visorchannel_get_uuid);
+EXPORT_SYMBOL_GPL(visorchannel_get_guid);
 
 int
 visorchannel_read(struct visorchannel *channel, ulong offset,
@@ -376,7 +376,7 @@ signalinsert_inner(struct visorchannel *channel, u32 queue, void *msg)
  *                 back-end), in which case the actual channel size will be
  *                 read from the channel header in memory
  * @gfp:           gfp_t to use when allocating memory for the data struct
- * @guid:          uuid that identifies channel type; this may 0 if the channel
+ * @guid:          GUID that identifies channel type; this may 0 if the channel
  *                 has already been initialized in memory (which is true for all
  *                 channels provided to guest environments by the s-Par
  *                 back-end), in which case the actual channel guid will be
@@ -390,7 +390,7 @@ signalinsert_inner(struct visorchannel *channel, u32 queue, void *msg)
  */
 static struct visorchannel *
 visorchannel_create_guts(u64 physaddr, unsigned long channel_bytes,
-			 gfp_t gfp, uuid_le guid, bool needs_lock)
+			 gfp_t gfp, const guid_t *guid, bool needs_lock)
 {
 	struct visorchannel *channel;
 	int err;
@@ -415,7 +415,7 @@ visorchannel_create_guts(u64 physaddr, unsigned long channel_bytes,
 	 * release later on.
 	 */
 	channel->requested = request_mem_region(physaddr, size, MYDRVNAME);
-	if (!channel->requested && uuid_le_cmp(guid, visor_video_guid))
+	if (!channel->requested && !guid_equal(guid, &visor_video_guid))
 		/* we only care about errors if this is not the video channel */
 		goto err_destroy_channel;
 
@@ -436,8 +436,8 @@ visorchannel_create_guts(u64 physaddr, unsigned long channel_bytes,
 	/* we had better be a CLIENT of this channel */
 	if (channel_bytes == 0)
 		channel_bytes = (ulong)channel->chan_hdr.size;
-	if (uuid_le_cmp(guid, NULL_UUID_LE) == 0)
-		guid = channel->chan_hdr.chtype;
+	if (guid_is_null(guid))
+		guid = &channel->chan_hdr.chtype;
 
 	memunmap(channel->mapped);
 	if (channel->requested)
@@ -445,7 +445,7 @@ visorchannel_create_guts(u64 physaddr, unsigned long channel_bytes,
 	channel->mapped = NULL;
 	channel->requested = request_mem_region(channel->physaddr,
 						channel_bytes, MYDRVNAME);
-	if (!channel->requested && uuid_le_cmp(guid, visor_video_guid))
+	if (!channel->requested && !guid_equal(guid, &visor_video_guid))
 		/* we only care about errors if this is not the video channel */
 		goto err_destroy_channel;
 
@@ -457,7 +457,7 @@ visorchannel_create_guts(u64 physaddr, unsigned long channel_bytes,
 	}
 
 	channel->nbytes = channel_bytes;
-	channel->guid = guid;
+	guid_copy(&channel->guid, guid);
 	return channel;
 
 err_destroy_channel:
@@ -467,7 +467,7 @@ err_destroy_channel:
 
 struct visorchannel *
 visorchannel_create(u64 physaddr, unsigned long channel_bytes,
-		    gfp_t gfp, uuid_le guid)
+		    gfp_t gfp, const guid_t *guid)
 {
 	return visorchannel_create_guts(physaddr, channel_bytes, gfp, guid,
 					false);
@@ -475,7 +475,7 @@ visorchannel_create(u64 physaddr, unsigned long channel_bytes,
 
 struct visorchannel *
 visorchannel_create_with_lock(u64 physaddr, unsigned long channel_bytes,
-			      gfp_t gfp, uuid_le guid)
+			      gfp_t gfp, const guid_t *guid)
 {
 	return visorchannel_create_guts(physaddr, channel_bytes, gfp, guid,
 					true);

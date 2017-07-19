@@ -20,6 +20,8 @@
 #include "visorbus.h"
 #include "visorbus_private.h"
 
+static const guid_t visor_vbus_channel_guid = VISOR_VBUS_CHANNEL_GUID;
+
 #define MYDRVNAME "visorbus"
 
 /* Display string that is guaranteed to be no longer the 99 characters*/
@@ -40,11 +42,11 @@ static ssize_t modalias_show(struct device *dev, struct device_attribute *attr,
 			     char *buf)
 {
 	struct visor_device *vdev;
-	uuid_le guid;
+	const guid_t *guid;
 
 	vdev = to_visor_device(dev);
-	guid = visorchannel_get_uuid(vdev->visorchannel);
-	return sprintf(buf, "visorbus:%pUl\n", &guid);
+	guid = visorchannel_get_guid(vdev->visorchannel);
+	return sprintf(buf, "visorbus:%pUl\n", guid);
 }
 static DEVICE_ATTR_RO(modalias);
 
@@ -77,12 +79,12 @@ static int
 visorbus_uevent(struct device *xdev, struct kobj_uevent_env *env)
 {
 	struct visor_device *dev;
-	uuid_le guid;
+	const guid_t *guid;
 
 	dev = to_visor_device(xdev);
-	guid = visorchannel_get_uuid(dev->visorchannel);
+	guid = visorchannel_get_guid(dev->visorchannel);
 
-	return add_uevent_var(env, "MODALIAS=visorbus:%pUl", &guid);
+	return add_uevent_var(env, "MODALIAS=visorbus:%pUl", guid);
 }
 
 /*
@@ -97,24 +99,22 @@ visorbus_uevent(struct device *xdev, struct kobj_uevent_env *env)
 static int
 visorbus_match(struct device *xdev, struct device_driver *xdrv)
 {
-	uuid_le channel_type;
+	const guid_t *channel_type;
 	int i;
 	struct visor_device *dev;
 	struct visor_driver *drv;
 
 	dev = to_visor_device(xdev);
 	drv = to_visor_driver(xdrv);
-	channel_type = visorchannel_get_uuid(dev->visorchannel);
+	channel_type = visorchannel_get_guid(dev->visorchannel);
 
 	if (!drv->channel_types)
 		return 0;
 
 	for (i = 0;
-	     (uuid_le_cmp(drv->channel_types[i].guid, NULL_UUID_LE) != 0) ||
-	     (drv->channel_types[i].name);
+	     !guid_is_null(&drv->channel_types[i].guid) || drv->channel_types[i].name;
 	     i++)
-		if (uuid_le_cmp(drv->channel_types[i].guid,
-				channel_type) == 0)
+		if (guid_equal(&drv->channel_types[i].guid, channel_type))
 			return i + 1;
 
 	return 0;
@@ -283,7 +283,7 @@ static ssize_t partition_guid_show(struct device *dev,
 				   char *buf) {
 	struct visor_device *vdev = to_visor_device(dev);
 
-	return sprintf(buf, "{%pUb}\n", &vdev->partition_uuid);
+	return sprintf(buf, "{%pUb}\n", &vdev->partition_guid);
 }
 static DEVICE_ATTR_RO(partition_guid);
 
@@ -687,7 +687,7 @@ get_vbus_header_info(struct visorchannel *chan,
 	int err;
 
 	if (!visor_check_channel(visorchannel_get_header(chan),
-				 visor_vbus_channel_uuid,
+				 &visor_vbus_channel_guid,
 				 "vbus",
 				 sizeof(struct visor_vbus_channel),
 				 VISOR_VBUS_CHANNEL_VERSIONID,

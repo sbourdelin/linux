@@ -19,9 +19,9 @@
 #include "channel.h"
 
 /* {2B3C2D10-7EF5-4ad8-B966-3448B7386B3D} */
-#define VISOR_CONTROLVM_CHANNEL_UUID \
-	UUID_LE(0x2b3c2d10, 0x7ef5, 0x4ad8, \
-		0xb9, 0x66, 0x34, 0x48, 0xb7, 0x38, 0x6b, 0x3d)
+#define VISOR_CONTROLVM_CHANNEL_GUID \
+	GUID_INIT(0x2b3c2d10, 0x7ef5, 0x4ad8, \
+		  0xb9, 0x66, 0x34, 0x48, 0xb7, 0x38, 0x6b, 0x3d)
 
 #define VISOR_CONTROLVM_CHANNEL_SIGNATURE VISOR_CHANNEL_SIGNATURE
 #define CONTROLVM_MESSAGE_MAX 64
@@ -33,14 +33,6 @@
  * channel struct withOUT needing to increment this.
  */
 #define VISOR_CONTROLVM_CHANNEL_VERSIONID 1
-
-#define VISOR_CONTROLVM_CHANNEL_OK_CLIENT(ch) \
-	(visor_check_channel(ch, \
-			     VISOR_CONTROLVM_CHANNEL_UUID, \
-			     "controlvm", \
-			     sizeof(struct visor_controlvm_channel), \
-			     VISOR_CONTROLVM_CHANNEL_VERSIONID, \
-			     VISOR_CONTROLVM_CHANNEL_SIGNATURE))
 
 /* Defines for various channel queues */
 #define CONTROLVM_QUEUE_REQUEST	 0
@@ -222,8 +214,8 @@ struct controlvm_packet_device_create  {
 	 */
 	u64 channel_addr;
 	u64 channel_bytes;	/* specifies size of the channel in bytes */
-	uuid_le data_type_uuid;	/* specifies format of data in channel */
-	uuid_le dev_inst_uuid;	/* instance guid for the device */
+	guid_t data_type_guid;	/* specifies format of data in channel */
+	guid_t dev_inst_guid;	/* instance guid for the device */
 	struct irq_info intr;	/* specifies interrupt information */
 } __packed;	/* for CONTROLVM_DEVICE_CREATE */
 
@@ -258,8 +250,8 @@ struct controlvm_message_packet  {
 			u64 channel_addr;
 			u64 channel_bytes;	/* size of the channel */
 	/* indicates format of data in bus channel*/
-			uuid_le bus_data_type_uuid;
-			uuid_le bus_inst_uuid;	/* instance uuid for the bus */
+			guid_t bus_data_type_guid;
+			guid_t bus_inst_guid;	/* instance GUID for the bus */
 		} __packed create_bus;	/* for CONTROLVM_BUS_CREATE */
 		struct  {
 	/* bus # (0..n-1) from the msg receiver's perspective */
@@ -455,7 +447,7 @@ struct visor_controlvm_parameters_header {
 	u32 client_length;
 	u32 name_offset;
 	u32 name_length;
-	uuid_le id;
+	guid_t id;
 	u32 revision;
 	u32 reserved;		/* Natural alignment */
 } __packed;

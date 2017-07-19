@@ -49,18 +49,6 @@
 #define VISOR_VNIC_CHANNEL_VERSIONID 2
 #define VISOR_VSWITCH_CHANNEL_VERSIONID 1
 
-#define VISOR_VHBA_CHANNEL_OK_CLIENT(ch) \
-	(visor_check_channel(ch, visor_vhba_channel_uuid, \
-			     "vhba", MIN_IO_CHANNEL_SIZE, \
-			     VISOR_VHBA_CHANNEL_VERSIONID, \
-			     VISOR_VHBA_CHANNEL_SIGNATURE))
-
-#define VISOR_VNIC_CHANNEL_OK_CLIENT(ch) \
-	(visor_check_channel(ch, visor_vnic_channel_uuid, \
-			     "vnic", MIN_IO_CHANNEL_SIZE, \
-			     VISOR_VNIC_CHANNEL_VERSIONID, \
-			     VISOR_VNIC_CHANNEL_SIGNATURE))
-
 /*
  * Everything necessary to handle SCSI & NIC traffic between Guest Partition and
  * IO Partition is defined below.
@@ -522,7 +510,7 @@ struct iochannel_vnic {
 	u8 macaddr[6];			/* 6 bytes */
 	u32 num_rcv_bufs;		/* 4 bytes */
 	u32 mtu;			/* 4 bytes */
-	uuid_le zone_uuid;		/* 16 bytes */
+	guid_t zone_guid;		/* 16 bytes */
 } __packed;
 /*
  * This is just the header of the IO channel. It is assumed that directly after

@@ -27,10 +27,9 @@
 #include "channel.h"
 
 /* {193b331b-c58f-11da-95a9-00e08161165f} */
-#define VISOR_VBUS_CHANNEL_UUID \
-	UUID_LE(0x193b331b, 0xc58f, 0x11da, \
-		0x95, 0xa9, 0x0, 0xe0, 0x81, 0x61, 0x16, 0x5f)
-static const uuid_le visor_vbus_channel_uuid = VISOR_VBUS_CHANNEL_UUID;
+#define VISOR_VBUS_CHANNEL_GUID \
+	GUID_INIT(0x193b331b, 0xc58f, 0x11da, \
+		  0x95, 0xa9, 0x0, 0xe0, 0x81, 0x61, 0x16, 0x5f)
 
 #define VISOR_VBUS_CHANNEL_SIGNATURE VISOR_CHANNEL_SIGNATURE
 
