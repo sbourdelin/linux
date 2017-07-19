@@ -42,18 +42,12 @@
 #include "rockchip_drm_psr.h"
 #include "rockchip_drm_vop.h"
 
-#define __REG_SET_RELAXED(x, off, mask, shift, v, write_mask) \
-		vop_mask_write(x, off, mask, shift, v, write_mask, true)
-
-#define __REG_SET_NORMAL(x, off, mask, shift, v, write_mask) \
-		vop_mask_write(x, off, mask, shift, v, write_mask, false)
-
 #define REG_SET(x, base, reg, v, mode) \
-		__REG_SET_##mode(x, base + reg.offset, \
-				 reg.mask, reg.shift, v, reg.write_mask)
+		vop_mask_write(x, base + reg.offset, reg.mask, reg.shift, \
+			       v, reg.write_mask, reg.relaxed)
 #define REG_SET_MASK(x, base, reg, mask, v, mode) \
-		__REG_SET_##mode(x, base + reg.offset, \
-				 mask, reg.shift, v, reg.write_mask)
+		vop_mask_write(x, base + reg.offset, \
+			       mask, reg.shift, v, reg.write_mask, reg.relaxed)
 
 #define VOP_WIN_SET(x, win, name, v) \
 		REG_SET(x, win->base, win->phy->name, v, RELAXED)
