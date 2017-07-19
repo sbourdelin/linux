@@ -391,18 +391,18 @@ struct fname {
  * This functoin implements a non-recursive way of freeing all of the
  * nodes in the red-black tree.
  */
-static void free_rb_tree_fname(struct rb_root *root)
+static void free_rb_tree_fname(struct rb_root_cached *root)
 {
 	struct fname *fname, *next;
 
-	rbtree_postorder_for_each_entry_safe(fname, next, root, rb_hash)
+	rbtree_postorder_for_each_entry_safe(fname, next, &root->rb_root, rb_hash)
 		while (fname) {
 			struct fname *old = fname;
 			fname = fname->next;
 			kfree(old);
 		}
 
-	*root = RB_ROOT;
+	*root = RB_ROOT_CACHED;
 }
 
 
@@ -441,9 +441,10 @@ int ext4_htree_store_dirent(struct file *dir_file, __u32 hash,
 	struct fname *fname, *new_fn;
 	struct dir_private_info *info;
 	int len;
+	bool leftmost = true;
 
 	info = dir_file->private_data;
-	p = &info->root.rb_node;
+	p = &info->root.rb_root.rb_node;
 
 	/* Create and allocate the fname structure */
 	len = sizeof(struct fname) + ent_name->len + 1;
@@ -475,16 +476,19 @@ int ext4_htree_store_dirent(struct file *dir_file, __u32 hash,
 
 		if (new_fn->hash < fname->hash)
 			p = &(*p)->rb_left;
-		else if (new_fn->hash > fname->hash)
+		else if (new_fn->hash > fname->hash) {
 			p = &(*p)->rb_right;
-		else if (new_fn->minor_hash < fname->minor_hash)
+			leftmost = false;
+		} else if (new_fn->minor_hash < fname->minor_hash)
 			p = &(*p)->rb_left;
-		else /* if (new_fn->minor_hash > fname->minor_hash) */
+		else { /* if (new_fn->minor_hash > fname->minor_hash) */
 			p = &(*p)->rb_right;
+			leftmost = false;
+		}
 	}
 
 	rb_link_node(&new_fn->rb_hash, parent, p);
-	rb_insert_color(&new_fn->rb_hash, &info->root);
+	rb_insert_color_cached(&new_fn->rb_hash, &info->root, leftmost);
 	return 0;
 }
 
@@ -558,7 +562,7 @@ static int ext4_dx_readdir(struct file *file, struct dir_context *ctx)
 		info->extra_fname = NULL;
 		goto next_node;
 	} else if (!info->curr_node)
-		info->curr_node = rb_first(&info->root);
+		info->curr_node = rb_first_cached(&info->root);
 
 	while (1) {
 		/*
@@ -580,7 +584,7 @@ static int ext4_dx_readdir(struct file *file, struct dir_context *ctx)
 				ctx->pos = ext4_get_htree_eof(file);
 				break;
 			}
-			info->curr_node = rb_first(&info->root);
+			info->curr_node = rb_first_cached(&info->root);
 		}
 
 		fname = rb_entry(info->curr_node, struct fname, rb_hash);

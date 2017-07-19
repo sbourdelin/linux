@@ -2462,7 +2462,7 @@ int ext4_mb_add_groupinfo(struct super_block *sb, ext4_group_t group,
 
 	INIT_LIST_HEAD(&meta_group_info[i]->bb_prealloc_list);
 	init_rwsem(&meta_group_info[i]->alloc_sem);
-	meta_group_info[i]->bb_free_root = RB_ROOT;
+	meta_group_info[i]->bb_free_root = RB_ROOT_CACHED;
 	meta_group_info[i]->bb_largest_free_order = -1;  /* uninit */
 
 #ifdef DOUBLE_CHECK
@@ -2824,7 +2824,7 @@ static void ext4_free_data_in_buddy(struct super_block *sb,
 	count2++;
 	ext4_lock_group(sb, entry->efd_group);
 	/* Take it out of per group rb tree */
-	rb_erase(&entry->efd_node, &(db->bb_free_root));
+	rb_erase_cached(&entry->efd_node, &(db->bb_free_root));
 	mb_free_blocks(NULL, &e4b, entry->efd_start_cluster, entry->efd_count);
 
 	/*
@@ -2836,7 +2836,7 @@ static void ext4_free_data_in_buddy(struct super_block *sb,
 	if (!test_opt(sb, DISCARD))
 		EXT4_MB_GRP_CLEAR_TRIMMED(db);
 
-	if (!db->bb_free_root.rb_node) {
+	if (!db->bb_free_root.rb_root.rb_node) {
 		/* No more items in the per group rb tree
 		 * balance refcounts from ext4_mb_free_metadata()
 		 */
@@ -3519,7 +3519,7 @@ static void ext4_mb_generate_from_freelist(struct super_block *sb, void *bitmap,
 	struct ext4_free_data *entry;
 
 	grp = ext4_get_group_info(sb, group);
-	n = rb_first(&(grp->bb_free_root));
+	n = rb_first_cached(&(grp->bb_free_root));
 
 	while (n) {
 		entry = rb_entry(n, struct ext4_free_data, efd_node);
@@ -4624,7 +4624,7 @@ out:
 static void ext4_try_merge_freed_extent(struct ext4_sb_info *sbi,
 					struct ext4_free_data *entry,
 					struct ext4_free_data *new_entry,
-					struct rb_root *entry_rb_root)
+					struct rb_root_cached *entry_rb_root)
 {
 	if ((entry->efd_tid != new_entry->efd_tid) ||
 	    (entry->efd_group != new_entry->efd_group))
@@ -4641,7 +4641,7 @@ static void ext4_try_merge_freed_extent(struct ext4_sb_info *sbi,
 	spin_lock(&sbi->s_md_lock);
 	list_del(&entry->efd_list);
 	spin_unlock(&sbi->s_md_lock);
-	rb_erase(&entry->efd_node, entry_rb_root);
+	rb_erase_cached(&entry->efd_node, entry_rb_root);
 	kmem_cache_free(ext4_free_data_cachep, entry);
 }
 
@@ -4656,8 +4656,9 @@ ext4_mb_free_metadata(handle_t *handle, struct ext4_buddy *e4b,
 	struct ext4_group_info *db = e4b->bd_info;
 	struct super_block *sb = e4b->bd_sb;
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
-	struct rb_node **n = &db->bb_free_root.rb_node, *node;
+	struct rb_node **n = &db->bb_free_root.rb_root.rb_node, *node;
 	struct rb_node *parent = NULL, *new_node;
+	bool leftmost = true;
 
 	BUG_ON(!ext4_handle_valid(handle));
 	BUG_ON(e4b->bd_bitmap_page == NULL);
@@ -4680,9 +4681,10 @@ ext4_mb_free_metadata(handle_t *handle, struct ext4_buddy *e4b,
 		entry = rb_entry(parent, struct ext4_free_data, efd_node);
 		if (cluster < entry->efd_start_cluster)
 			n = &(*n)->rb_left;
-		else if (cluster >= (entry->efd_start_cluster + entry->efd_count))
+		else if (cluster >= (entry->efd_start_cluster + entry->efd_count)) {
 			n = &(*n)->rb_right;
-		else {
+			leftmost = false;
+		} else {
 			ext4_grp_locked_error(sb, group, 0,
 				ext4_group_first_block_no(sb, group) +
 				EXT4_C2B(sbi, cluster),
@@ -4692,7 +4694,7 @@ ext4_mb_free_metadata(handle_t *handle, struct ext4_buddy *e4b,
 	}
 
 	rb_link_node(new_node, parent, n);
-	rb_insert_color(new_node, &db->bb_free_root);
+	rb_insert_color_cached(new_node, &db->bb_free_root, leftmost);
 
 	/* Now try to see the extent can be merged to left and right */
 	node = rb_prev(new_node);

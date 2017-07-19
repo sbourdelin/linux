@@ -2116,7 +2116,7 @@ static inline bool ext4_is_quota_file(struct inode *inode)
  * readdir operations in hash tree order.
  */
 struct dir_private_info {
-	struct rb_root	root;
+	struct          rb_root_cached	root;
 	struct rb_node	*curr_node;
 	struct fname	*extra_fname;
 	loff_t		last_pos;
@@ -2883,7 +2883,7 @@ int ext4_update_disksize_before_punch(struct inode *inode, loff_t offset,
 
 struct ext4_group_info {
 	unsigned long   bb_state;
-	struct rb_root  bb_free_root;
+	struct          rb_root_cached  bb_free_root;
 	ext4_grpblk_t	bb_first_free;	/* first free block */
 	ext4_grpblk_t	bb_free;	/* total free blocks */
 	ext4_grpblk_t	bb_fragments;	/* nr of freespace fragments */
