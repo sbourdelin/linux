@@ -1746,8 +1746,11 @@ static void fixup_vga(struct pci_dev *pdev)
 {
 	u16 cmd;
 
+	if (vga_default_device())
+		return;
+
 	pci_read_config_word(pdev, PCI_COMMAND, &cmd);
-	if ((cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY)) || !vga_default_device())
+	if (cmd & (PCI_COMMAND_IO | PCI_COMMAND_MEMORY))
 		vga_set_default_device(pdev);
 
 }
