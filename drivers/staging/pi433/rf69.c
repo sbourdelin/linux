@@ -387,7 +387,7 @@ enum lnaGain rf69_get_lna_gain(struct spi_device *spi)
 
 	currentValue = READ_REG(REG_LNA);
 
-	switch (currentValue & MASK_LNA_CURRENT_GAIN >> 3)  // improvement: change 3 to define
+	switch ((currentValue & MASK_LNA_CURRENT_GAIN) >> 3)  // improvement: change 3 to define
 	{
 	case LNA_GAIN_AUTO:	    return automatic;
 	case LNA_GAIN_MAX:	    return max;
