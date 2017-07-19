@@ -25,8 +25,6 @@
 #ifndef _UAPI_HYPERV_H
 #define _UAPI_HYPERV_H
 
-#include <linux/uuid.h>
-
 /*
  * Framework version for util services.
  */
@@ -118,8 +116,8 @@ enum hv_fcopy_op {
 
 struct hv_fcopy_hdr {
 	__u32 operation;
-	uuid_le service_id0; /* currently unused */
-	uuid_le service_id1; /* currently unused */
+	__u8 service_id0[16]; /* currently unused */
+	__u8 service_id1[16]; /* currently unused */
 } __attribute__((packed));
 
 #define OVER_WRITE	0x1
