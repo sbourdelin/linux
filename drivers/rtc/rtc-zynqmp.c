@@ -268,14 +268,6 @@ static int xlnx_rtc_probe(struct platform_device *pdev)
 	return PTR_ERR_OR_ZERO(xrtcdev->rtc);
 }
 
-static int xlnx_rtc_remove(struct platform_device *pdev)
-{
-	xlnx_rtc_alarm_irq_enable(&pdev->dev, 0);
-	device_init_wakeup(&pdev->dev, 0);
-
-	return 0;
-}
-
 static int __maybe_unused xlnx_rtc_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -312,7 +304,6 @@ MODULE_DEVICE_TABLE(of, xlnx_rtc_of_match);
 
 static struct platform_driver xlnx_rtc_driver = {
 	.probe		= xlnx_rtc_probe,
-	.remove		= xlnx_rtc_remove,
 	.driver		= {
 		.name	= KBUILD_MODNAME,
 		.pm	= &xlnx_rtc_pm_ops,
@@ -320,8 +311,4 @@ static struct platform_driver xlnx_rtc_driver = {
 	},
 };
 
-module_platform_driver(xlnx_rtc_driver);
-
-MODULE_DESCRIPTION("Xilinx Zynq MPSoC RTC driver");
-MODULE_AUTHOR("Xilinx Inc.");
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(xlnx_rtc_driver);
