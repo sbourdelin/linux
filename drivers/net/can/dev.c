@@ -27,6 +27,7 @@
 #include <linux/can/skb.h>
 #include <linux/can/netlink.h>
 #include <linux/can/led.h>
+#include <linux/of.h>
 #include <net/rtnetlink.h>
 
 #define MOD_DESC "CAN device driver interface"
@@ -806,6 +807,21 @@ int open_candev(struct net_device *dev)
 		return -EINVAL;
 	}
 
+	if (priv->max_trans_arbitration_speed > 0 &&
+	    priv->bittiming.bitrate > priv->max_trans_arbitration_speed) {
+		netdev_err(dev, "arbitration bitrate surpasses transceiver capabilities of %d bps\n",
+			   priv->max_trans_arbitration_speed);
+		return -EINVAL;
+	}
+
+	if (priv->max_trans_data_speed  >= 0 &&
+	    (priv->ctrlmode & CAN_CTRLMODE_FD) &&
+	    (priv->data_bittiming.bitrate > priv->max_trans_data_speed)) {
+		netdev_err(dev, "canfd data bitrate surpasses transceiver capabilities of %d bps\n",
+			   priv->max_trans_data_speed);
+		return -EINVAL;
+	}
+
 	/* Switch carrier on if device was stopped while in bus-off state */
 	if (!netif_carrier_ok(dev))
 		netif_carrier_on(dev);
@@ -813,6 +829,38 @@ int open_candev(struct net_device *dev)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(open_candev);
+
+#ifdef CONFIG_OF
+void of_transceiver_is_fixed(struct net_device *dev)
+{
+	struct device_node *dn;
+	struct can_priv *priv = netdev_priv(dev);
+	u32 max_frequency;
+	struct device_node *np;
+
+	np = dev->dev.parent->of_node;
+
+	/* New binding */
+	dn = of_get_child_by_name(np, "fixed-transceiver");
+	if (!dn)
+		return;
+
+	of_property_read_u32(dn, "max-arbitration-speed", &max_frequency);
+
+	if (max_frequency > 0)
+		priv->max_trans_arbitration_speed = max_frequency;
+	else
+		priv->max_trans_arbitration_speed = -1;
+
+	of_property_read_u32(dn, "max-data-speed", &max_frequency);
+
+	if (max_frequency >= 0)
+		priv->max_trans_data_speed = max_frequency;
+	else
+		priv->max_trans_data_speed = -1;
+}
+EXPORT_SYMBOL(of_transceiver_is_fixed);
+#endif
 
 /*
  * Common close function for cleanup before the device gets closed.

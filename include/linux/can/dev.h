@@ -69,6 +69,9 @@ struct can_priv {
 	unsigned int echo_skb_max;
 	struct sk_buff **echo_skb;
 
+	unsigned int max_trans_arbitration_speed;
+	unsigned int max_trans_data_speed;
+
 #ifdef CONFIG_CAN_LEDS
 	struct led_trigger *tx_led_trig;
 	char tx_led_trig_name[CAN_LED_NAME_SZ];
@@ -164,6 +167,8 @@ void can_put_echo_skb(struct sk_buff *skb, struct net_device *dev,
 		      unsigned int idx);
 unsigned int can_get_echo_skb(struct net_device *dev, unsigned int idx);
 void can_free_echo_skb(struct net_device *dev, unsigned int idx);
+
+void of_transceiver_is_fixed(struct net_device *dev);
 
 struct sk_buff *alloc_can_skb(struct net_device *dev, struct can_frame **cf);
 struct sk_buff *alloc_canfd_skb(struct net_device *dev,
