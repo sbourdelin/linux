@@ -1789,9 +1789,11 @@ mwifiex_cmd_tdls_oper(struct mwifiex_private *priv,
 		put_unaligned_le16(params->capability, pos);
 		config_len += sizeof(params->capability);
 
-		qos_info = params->uapsd_queues | (params->max_sp << 5);
-		wmm_qos_info = (struct mwifiex_ie_types_qos_info *)(pos +
-								    config_len);
+		if (priv->tdls_uapsd_support)
+			qos_info = params->uapsd_queues | (params->max_sp << 5);
+		else
+			qos_info = 0;
+		wmm_qos_info = (void *)(pos + config_len);
 		wmm_qos_info->header.type = cpu_to_le16(WLAN_EID_QOS_CAPA);
 		wmm_qos_info->header.len = cpu_to_le16(sizeof(qos_info));
 		wmm_qos_info->qos_info = qos_info;

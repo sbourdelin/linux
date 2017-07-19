@@ -660,6 +660,7 @@ struct mwifiex_private {
 	u8 check_tdls_tx;
 	struct timer_list auto_tdls_timer;
 	bool auto_tdls_timer_active;
+	u8 tdls_uapsd_support;
 	struct idr ack_status_frames;
 	/* spin lock for ack status */
 	spinlock_t ack_status_lock;
