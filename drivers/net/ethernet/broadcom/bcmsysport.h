@@ -657,6 +657,9 @@ struct bcm_sysport_stats {
 	enum bcm_sysport_stat_type type;
 	/* reg offset from UMAC base for misc counters */
 	u16 reg_offset;
+	u64     rx_packets;
+	u64     rx_bytes;
+	struct u64_stats_sync   syncp;
 };
 
 /* Software house keeping helper structure */
@@ -693,8 +696,8 @@ struct bcm_sysport_tx_ring {
 	struct bcm_sysport_cb *cbs;	/* Transmit control blocks */
 	struct dma_desc	*desc_cpu;	/* CPU view of the descriptor */
 	struct bcm_sysport_priv *priv;	/* private context backpointer */
-	unsigned long	packets;	/* packets statistics */
-	unsigned long	bytes;		/* bytes statistics */
+	u64	packets;		/* packets statistics */
+	u64	bytes;			/* bytes statistics */
 };
 
 /* Driver private structure */
@@ -743,5 +746,7 @@ struct bcm_sysport_priv {
 
 	/* Ethtool */
 	u32			msg_enable;
+	/* 64bit stats on 32bit/64bit Machine */
+	struct bcm_sysport_stats stats64;
 };
 #endif /* __BCM_SYSPORT_H */
