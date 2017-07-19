@@ -117,10 +117,22 @@ static inline int at803x_enable_rx_delay(struct phy_device *phydev)
 					AT803X_DEBUG_RX_CLK_DLY_EN);
 }
 
+static inline int at803x_disable_rx_delay(struct phy_device *phydev)
+{
+	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_0,
+					AT803X_DEBUG_RX_CLK_DLY_EN, 0);
+}
+
 static inline int at803x_enable_tx_delay(struct phy_device *phydev)
 {
 	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_5, 0,
 					AT803X_DEBUG_TX_CLK_DLY_EN);
+}
+
+static inline int at803x_disable_tx_delay(struct phy_device *phydev)
+{
+	return at803x_debug_reg_mask(phydev, AT803X_DEBUG_REG_5,
+					AT803X_DEBUG_TX_CLK_DLY_EN, 0);
 }
 
 /* save relevant PHY registers to private copy */
@@ -284,18 +296,22 @@ static int at803x_config_init(struct phy_device *phydev)
 		return ret;
 
 	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID ||
-			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID) {
+			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID)
 		ret = at803x_enable_rx_delay(phydev);
-		if (ret < 0)
-			return ret;
-	}
+	else
+		ret = at803x_disable_rx_delay(phydev);
+
+	if (ret < 0)
+		return ret;
 
 	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID ||
-			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID) {
+			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID)
 		ret = at803x_enable_tx_delay(phydev);
-		if (ret < 0)
-			return ret;
-	}
+	else
+		ret = at803x_disable_tx_delay(phydev);
+
+	if (ret < 0)
+		return ret;
 
 	return 0;
 }
