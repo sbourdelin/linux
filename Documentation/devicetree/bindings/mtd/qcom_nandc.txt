@@ -1,7 +1,9 @@
 * Qualcomm NAND controller
 
 Required properties:
-- compatible:		should be "qcom,ipq806x-nand"
+- compatible:		should be "qcom,ebi2-nandc" - EBI2 NAND which uses ADM
+			DMA like IPQ8064.
+
 - reg:			MMIO address range
 - clocks:		must contain core clock and always on clock
 - clock-names:		must contain "core" for the core clock and "aon" for the
