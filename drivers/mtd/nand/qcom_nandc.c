@@ -229,6 +229,7 @@ struct nandc_regs {
  *				by upper layers directly
  * @buf_size/count/start:	markers for chip->read_buf/write_buf functions
  * @reg_read_buf:		local buffer for reading back registers via DMA
+ * @reg_read_buf_phys:		contains dma address for register read buffer
  * @reg_read_pos:		marker for data read in reg_read_buf
  *
  * @regs:			a contiguous chunk of memory for DMA register
@@ -271,6 +272,7 @@ struct qcom_nand_controller {
 	int		buf_start;
 
 	__le32 *reg_read_buf;
+	dma_addr_t reg_read_buf_phys;
 	int reg_read_pos;
 
 	struct nandc_regs *regs;
@@ -361,6 +363,24 @@ static inline void nandc_write(struct qcom_nand_controller *nandc, int offset,
 			       u32 val)
 {
 	iowrite32(val, nandc->base + offset);
+}
+
+static inline void nandc_read_buffer_sync(struct qcom_nand_controller *nandc,
+					  bool is_cpu)
+{
+	if (!nandc->props->is_bam)
+		return;
+
+	if (is_cpu)
+		dma_sync_single_for_cpu(nandc->dev, nandc->reg_read_buf_phys,
+					MAX_REG_RD *
+					sizeof(*nandc->reg_read_buf),
+					DMA_FROM_DEVICE);
+	else
+		dma_sync_single_for_device(nandc->dev, nandc->reg_read_buf_phys,
+					   MAX_REG_RD *
+					   sizeof(*nandc->reg_read_buf),
+					   DMA_FROM_DEVICE);
 }
 
 static __le32 *offset_to_nandc_reg(struct nandc_regs *regs, int offset)
@@ -847,6 +867,7 @@ static void free_descs(struct qcom_nand_controller *nandc)
 static void clear_read_regs(struct qcom_nand_controller *nandc)
 {
 	nandc->reg_read_pos = 0;
+	nandc_read_buffer_sync(nandc, false);
 }
 
 static void pre_command(struct qcom_nand_host *host, int command)
@@ -876,6 +897,7 @@ static void parse_erase_write_errors(struct qcom_nand_host *host, int command)
 	int i;
 
 	num_cw = command == NAND_CMD_PAGEPROG ? ecc->steps : 1;
+	nandc_read_buffer_sync(nandc, true);
 
 	for (i = 0; i < num_cw; i++) {
 		u32 flash_status = le32_to_cpu(nandc->reg_read_buf[i]);
@@ -897,6 +919,7 @@ static void post_command(struct qcom_nand_host *host, int command)
 
 	switch (command) {
 	case NAND_CMD_READID:
+		nandc_read_buffer_sync(nandc, true);
 		memcpy(nandc->data_buffer, nandc->reg_read_buf,
 		       nandc->buf_count);
 		break;
@@ -1060,6 +1083,7 @@ static int parse_read_errors(struct qcom_nand_host *host, u8 *data_buf,
 	int i;
 
 	buf = (struct read_stats *)nandc->reg_read_buf;
+	nandc_read_buffer_sync(nandc, true);
 
 	for (i = 0; i < ecc->steps; i++, buf++) {
 		u32 flash, buffer, erased_cw;
@@ -1996,6 +2020,16 @@ static int qcom_nandc_alloc(struct qcom_nand_controller *nandc)
 		return -ENOMEM;
 
 	if (nandc->props->is_bam) {
+		nandc->reg_read_buf_phys =
+			dma_map_single(nandc->dev, nandc->reg_read_buf,
+				       MAX_REG_RD *
+				       sizeof(*nandc->reg_read_buf),
+				       DMA_FROM_DEVICE);
+		if (dma_mapping_error(nandc->dev, nandc->reg_read_buf_phys)) {
+			dev_err(nandc->dev, "failed to DMA MAP reg buffer\n");
+			return -EIO;
+		}
+
 		nandc->tx_chan = dma_request_slave_channel(nandc->dev, "tx");
 		if (!nandc->tx_chan) {
 			dev_err(nandc->dev, "failed to request tx channel\n");
@@ -2033,6 +2067,12 @@ static int qcom_nandc_alloc(struct qcom_nand_controller *nandc)
 static void qcom_nandc_unalloc(struct qcom_nand_controller *nandc)
 {
 	if (nandc->props->is_bam) {
+		if (!dma_mapping_error(nandc->dev, nandc->reg_read_buf_phys))
+			dma_unmap_single(nandc->dev, nandc->reg_read_buf_phys,
+					 MAX_REG_RD *
+					 sizeof(*nandc->reg_read_buf),
+					 DMA_FROM_DEVICE);
+
 		if (nandc->tx_chan)
 			dma_release_channel(nandc->tx_chan);
 
