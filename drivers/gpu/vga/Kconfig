@@ -17,6 +17,13 @@ config VGA_ARB_MAX_GPUS
 	  Reserves space in the kernel to maintain resource locking for
 	  multiple GPUS.  The overhead for each GPU is very small.
 
+config ARCH_WANT_VGA_ARB_FALLBACK
+	bool
+	help
+	  Some architectures don't have a concept of "legacy" PCI addresses
+	  which the VGA arbiter relies on. Instead, they can fall back to
+	  selecting the first device that decodes memory and I/O.
+
 config VGA_SWITCHEROO
 	bool "Laptop Hybrid Graphics - GPU switching support"
 	depends on X86
