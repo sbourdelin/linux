@@ -30,7 +30,7 @@
 
 /* SOC Interconnect types (aka chip types) */
 #define SOCI_SB		0
-#define SOCI_AI		1
+#define SOCI_AXI	1
 
 /* PL-368 DMP definitions */
 #define DMP_DESC_TYPE_MSK	0x0000000F
@@ -927,7 +927,8 @@ static int brcmf_chip_recognition(struct brcmf_chip_priv *ci)
 		  socitype == SOCI_SB ? "SB" : "AXI", ci->pub.name,
 		  ci->pub.chiprev);
 
-	if (socitype == SOCI_SB) {
+	switch(socitype) {
+		case SOCI_SB:
 		if (ci->pub.chip != BRCM_CC_4329_CHIP_ID) {
 			brcmf_err("SB chip is not supported\n");
 			return -ENODEV;
@@ -951,13 +952,15 @@ static int brcmf_chip_recognition(struct brcmf_chip_priv *ci)
 
 		core = brcmf_chip_add_core(ci, BCMA_CORE_80211, 0x18001000, 0);
 		brcmf_chip_sb_corerev(ci, core);
-	} else if (socitype == SOCI_AI) {
+		break;
+	case SOCI_AXI:
 		ci->iscoreup = brcmf_chip_ai_iscoreup;
 		ci->coredisable = brcmf_chip_ai_coredisable;
 		ci->resetcore = brcmf_chip_ai_resetcore;
 
 		brcmf_chip_dmp_erom_scan(ci);
-	} else {
+		break;
+	default:
 		brcmf_err("chip backplane type %u is not supported\n",
 			  socitype);
 		return -ENODEV;
