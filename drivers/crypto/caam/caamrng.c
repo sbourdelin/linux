@@ -292,10 +292,16 @@ static int caam_init_rng(struct caam_rng_ctx *ctx, struct device *jrdev)
 	return 0;
 }
 
+/*
+ * hwrng register struct
+ * The trng is suppost to have 100% entropy, and thus
+ * we register with a very high quality value.
+ */
 static struct hwrng caam_rng = {
 	.name		= "rng-caam",
 	.cleanup	= caam_cleanup,
 	.read		= caam_read,
+	.quality	= 999,
 };
 
 static void __exit caam_rng_exit(void)
