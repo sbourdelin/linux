@@ -74,4 +74,28 @@ static inline struct ccu_mp *hw_to_ccu_mp(struct clk_hw *hw)
 
 extern const struct clk_ops ccu_mp_ops;
 
+/* Special class of M-P clock that supports MMC timing modes */
+
+#define SUNXI_CCU_MP_MMC_WITH_MUX_GATE(_struct, _name, _parents, _reg,	\
+				       _mshift, _mwidth,		\
+				       _pshift, _pwidth,		\
+				       _muxshift, _muxwidth,		\
+				       _gate, _flags)			\
+	struct ccu_mp _struct = {					\
+		.enable	= _gate,					\
+		.m	= _SUNXI_CCU_DIV(_mshift, _mwidth),		\
+		.p	= _SUNXI_CCU_DIV(_pshift, _pwidth),		\
+		.mux	= _SUNXI_CCU_MUX(_muxshift, _muxwidth),		\
+		.common	= {						\
+			.reg		= _reg,				\
+			.features	= CCU_FEATURE_MMC_TIMING_SWITCH, \
+			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
+							      _parents, \
+							      &ccu_mp_mmc_ops, \
+							      _flags),	\
+		}							\
+	}
+
+extern const struct clk_ops ccu_mp_mmc_ops;
+
 #endif /* _CCU_MP_H_ */
