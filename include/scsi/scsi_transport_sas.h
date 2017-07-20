@@ -179,6 +179,9 @@ struct sas_function_template {
 	int (*smp_handler)(struct Scsi_Host *, struct sas_rphy *, struct request *);
 };
 
+void sas_set_initial_target_id(struct Scsi_Host *shost, u32 target_id);
+void sas_set_initial_expander_id(struct Scsi_Host *shost, u32 expander_id);
+void sas_set_initial_port_id(struct Scsi_Host *shost, u32 port_id);
 
 void sas_remove_children(struct device *);
 extern void sas_remove_host(struct Scsi_Host *);

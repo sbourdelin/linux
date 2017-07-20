@@ -294,6 +294,31 @@ static void sas_bsg_remove(struct Scsi_Host *shost, struct sas_rphy *rphy)
 	bsg_unregister_queue(q);
 }
 
+void sas_set_initial_target_id(struct Scsi_Host *shost, u32 target_id)
+{
+	struct sas_host_attrs *sas_host = to_sas_host_attrs(shost);
+
+	sas_host->next_target_id = target_id;
+}
+EXPORT_SYMBOL(sas_set_initial_target_id);
+
+void sas_set_initial_expander_id(struct Scsi_Host *shost, u32 expander_id)
+{
+	struct sas_host_attrs *sas_host = to_sas_host_attrs(shost);
+
+	sas_host->next_expander_id = expander_id;
+}
+EXPORT_SYMBOL(sas_set_initial_expander_id);
+
+void sas_set_initial_port_id(struct Scsi_Host *shost, u32 port_id)
+{
+	struct sas_host_attrs *sas_host = to_sas_host_attrs(shost);
+
+	sas_host->next_port_id = port_id;
+}
+EXPORT_SYMBOL(sas_set_initial_port_id);
+
+
 /*
  * SAS host attributes
  */
