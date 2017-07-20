@@ -9771,6 +9771,7 @@ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git
 S:	Maintained
 F:	drivers/of/
 F:	include/linux/of*.h
+F:	include/linux/fwnode.h
 F:	scripts/dtc/
 F:	Documentation/ABI/testing/sysfs-firmware-ofw
 
