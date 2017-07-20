@@ -1287,6 +1287,14 @@ config NET_NS
 	help
 	  Allow user space to create what appear to be multiple instances
 	  of the network stack.
+config IMA_NS
+	bool "IMA namespace"
+	depends on IMA
+	default y
+	help
+	  Allow the creation of IMA namespaces for each mount namespace.
+	  Namespaced IMA data enables having IMA features work separately
+	  for each mount namespace.
 
 endif # NAMESPACES
 
