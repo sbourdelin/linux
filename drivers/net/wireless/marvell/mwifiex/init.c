@@ -25,6 +25,10 @@
 #include "wmm.h"
 #include "11n.h"
 
+static bool tdls_uapsd;
+module_param(tdls_uapsd, bool, 0000);
+MODULE_PARM_DESC(tdls_uapsd, "tdls uapsd support enable:1, disable:0");
+
 /*
  * This function adds a BSS priority table to the table list.
  *
@@ -154,6 +158,7 @@ int mwifiex_init_priv(struct mwifiex_private *priv)
 	priv->del_list_idx = 0;
 	priv->hs2_enabled = false;
 	priv->check_tdls_tx = false;
+	priv->tdls_uapsd_support = tdls_uapsd;
 	memcpy(priv->tos_to_tid_inv, tos_to_tid_inv, MAX_NUM_TID);
 
 	mwifiex_init_11h_params(priv);
