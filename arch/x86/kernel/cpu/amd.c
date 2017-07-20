@@ -310,38 +310,67 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
 
 	/* get information required for multi-node processors */
 	if (boot_cpu_has(X86_FEATURE_TOPOEXT)) {
+		u16 l3_nshared = 0;
 		u32 eax, ebx, ecx, edx;
+
+		if (cpuid_edx(0x80000006)) {
+			cpuid_count(0x8000001d, 3, &eax, &ebx, &ecx, &edx);
+			l3_nshared = ((eax >> 14) & 0xfff) + 1;
+		}
 
 		cpuid(0x8000001e, &eax, &ebx, &ecx, &edx);
 
 		node_id  = ecx & 0xff;
 		smp_num_siblings = ((ebx >> 8) & 0xff) + 1;
 
+		/* LLC is default to L3, which generally per-node */
+		if (l3_nshared > 0)
+			per_cpu(cpu_llc_id, cpu) = node_id;
+
 		if (c->x86 == 0x15)
 			c->cu_id = ebx & 0xff;
 
-		if (c->x86 >= 0x17) {
-			c->cpu_core_id = ebx & 0xff;
-
-			if (smp_num_siblings > 1)
-				c->x86_max_cores /= smp_num_siblings;
-		}
-
 		/*
-		 * We may have multiple LLCs if L3 caches exist, so check if we
-		 * have an L3 cache by looking at the L3 cache CPUID leaf.
+		 * In family 17h, the CPUID_Fn8000001E_EBX[7:0] (CoreId)
+		 * is non-contiguous in downcore and non-SMT cases.
+		 * Fixup the cpu_core_id to be contiguous for cores within
+		 * the die.
 		 */
-		if (cpuid_edx(0x80000006)) {
-			if (c->x86 == 0x17) {
+		if (c->x86 >= 0x17) {
+			u32 tmp = c->cpu_core_id = ebx & 0xff;
+			u32 ccx_offset, cpu_offset;
+
+			if (smp_num_siblings == 1) {
 				/*
-				 * LLC is at the core complex level.
-				 * Core complex id is ApicId[3].
+				 * CoreId bit-encoding for SMT-disabled
+				 * [7:4] : die
+				 * [3]   : ccx
+				 * [2:0] : core
 				 */
-				per_cpu(cpu_llc_id, cpu) = c->apicid >> 3;
+				ccx_offset = ((tmp >> 3) & 1) * l3_nshared;
+				cpu_offset = tmp & 7;
 			} else {
-				/* LLC is at the node level. */
-				per_cpu(cpu_llc_id, cpu) = node_id;
+				/*
+				 * CoreId bit-encoding for SMT-enabled
+				 * [7:3] : die
+				 * [2]   : ccx
+				 * [1:0] : core
+				 */
+				c->x86_max_cores /= smp_num_siblings;
+				l3_nshared /= smp_num_siblings;
+				ccx_offset = ((tmp >> 2) & 1) * l3_nshared;
+				cpu_offset = tmp & 3;
 			}
+			c->cpu_core_id = ccx_offset + cpu_offset;
+			pr_debug("Fixup apicid=%#x, CoreId:%#x to cpu_core_id:%#x\n",
+				 c->apicid, tmp, c->cpu_core_id);
+
+			/*
+			 * Family17h L3 cache (LLC) is at Core Complex (CCX).
+			 * There could be multiple CCXs in a node.
+			 * CCX ID is ApicId[3].
+			 */
+			per_cpu(cpu_llc_id, cpu) = c->apicid >> 3;
 		}
 	} else if (cpu_has(c, X86_FEATURE_NODEID_MSR)) {
 		u64 value;
