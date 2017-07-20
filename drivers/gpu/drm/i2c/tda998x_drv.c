@@ -983,9 +983,9 @@ static int tda998x_connector_fill_modes(struct drm_connector *connector,
 	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
 	int ret;
 
-	mutex_lock(&priv->audio_mutex);
 	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
 
+	mutex_lock(&priv->audio_mutex);
 	if (connector->edid_blob_ptr) {
 		struct edid *edid = (void *)connector->edid_blob_ptr->data;
 
