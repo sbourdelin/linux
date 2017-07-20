@@ -30,6 +30,58 @@ config CONSOLE_LOGLEVEL_DEFAULT
 	  usage in the kernel. That is controlled by the MESSAGE_LOGLEVEL_DEFAULT
 	  option.
 
+# set if time is being printed in pr_info_show_time()
+config PR_INFO_SHOW_TIME
+	bool
+
+choice
+	prompt "pr_info_show_time() alternate time message prefix"
+	help
+	  Activate alternate time prefix in pr_info_show_time
+
+	  The primary use of the instrumentation is to aid field
+	  analysis of Battery and Power usage.  The instrumentation
+	  may also help triage and synchronize kernel logs and user
+	  space activity logs at key displacements.
+	config PR_INFO_SHOW_TIME_MONOTONIC
+		bool "monotonic"
+		help
+		  Deactivate alternate time prefix in pr_info_show_time.
+		  Doing so because monotonic time is part of the normal
+		  printk time logging.
+
+		  Print only the supplied message in pr_info_show_time,
+		  indistinguishable from pr_info.
+	config PR_INFO_SHOW_TIME_REALTIME
+		bool "realtime"
+		select PR_INFO_SHOW_TIME
+		help
+		  Activate alternate time prefix in pr_info_show_time
+
+		  The primary use of the instrumentation is to aid field
+		  analysis of Battery and Power usage.  The instrumentation
+		  may also help triage and synchronize kernel logs and user
+		  space activity logs at key displacements.  For instance
+		  CLOCK_MONOTONIC stops while suspended, while CLOCK_REALTIME
+		  continues, and the timestamps help re-orient post-analysis.
+
+		  Prefix realtime [<epoch>.<ns>U] timestamp in pr_info_show_time
+	config PR_INFO_SHOW_TIME_BOOTTIME
+		bool "boottime"
+		select PR_INFO_SHOW_TIME
+		help
+		  Activate alternate time prefix in pr_info_show_time
+
+		  The primary use of the instrumentation is to aid field
+		  analysis of Battery and Power usage.  The instrumentation
+		  may also help triage and synchronize kernel logs and user
+		  space activity logs at key displacements.  For instance
+		  CLOCK_MONOTONIC stops while suspended, while CLOCK_BOOTTIME
+		  continues, and the timestamps help re-orient post-analysis.
+
+		  Prefix boottime [<epoch>.<ns>B] timestamp in pr_info_show_time
+endchoice
+
 config MESSAGE_LOGLEVEL_DEFAULT
 	int "Default message log level (1-7)"
 	range 1 7

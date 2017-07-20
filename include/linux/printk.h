@@ -306,6 +306,36 @@ extern asmlinkage void dump_stack(void) __cold;
 	printk(KERN_NOTICE pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_info(fmt, ...) \
 	printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
+
+/*
+ * pr_info_show_time() prefixes an alternate time prefix as selected by
+ * CONFIG_PR_INFO_SHOW_TIME_<TYPE>.  The time is prefixed on the message
+ * as "[<seconds>.<nseconds><typchar>] ". <TYPE> in the config selection
+ * can be one of the following:
+ *
+ * MONOTONIC - (default) print no alternate time, monotonic is part of dmesg.
+ * BOOTTIME - Adds a message prefix with getboottime64() values.
+ * REALTIME - Adds a message prefix with getnstimeofday64() values.
+ */
+#if defined(CONFIG_PR_INFO_SHOW_TIME_BOOTTIME)
+#define pr_info_show_time(fmt, ...) ({	\
+	struct timespec64 ts;		\
+					\
+	getboottime64(&ts);		\
+	pr_info("[%5lu.%09luB] " fmt, ts.tv_sec, ts.tv_nsec, ##__VA_ARGS__); })
+#include <linux/time64.h>
+#elif defined(CONFIG_PR_INFO_SHOW_TIME_REALTIME)
+#define pr_info_show_time(fmt, ...) ({	\
+	struct timespec64 ts;		\
+					\
+	getnstimeofday64(&ts);		\
+	pr_info("[%lu.%09luU] " fmt, ts.tv_sec, ts.tv_nsec, ##__VA_ARGS__); })
+#include <linux/time64.h>
+#else
+#define pr_info_show_time(fmt, ...) \
+	pr_info(fmt, ##__VA_ARGS__)
+#endif
+
 /*
  * Like KERN_CONT, pr_cont() should only be used when continuing
  * a line with no newline ('\n') enclosed. Otherwise it defaults
