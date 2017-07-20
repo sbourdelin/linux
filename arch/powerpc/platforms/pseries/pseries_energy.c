@@ -229,6 +229,9 @@ static int __init pseries_energy_init(void)
 	int cpu, err;
 	struct device *cpu_dev;
 
+	if (!firmware_has_feature(FW_FEATURE_LPAR))
+		return 0;
+
 	if (!firmware_has_feature(FW_FEATURE_BEST_ENERGY)) {
 		printk(KERN_INFO "Hypercall H_BEST_ENERGY not supported\n");
 		return 0;
