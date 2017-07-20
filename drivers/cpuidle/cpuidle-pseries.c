@@ -233,12 +233,16 @@ static int pseries_cpuidle_driver_init(void)
  */
 static int pseries_idle_probe(void)
 {
+	int retval;
 
 	if (cpuidle_disable != IDLE_NO_OVERRIDE)
 		return -ENODEV;
 
 	if (firmware_has_feature(FW_FEATURE_SPLPAR)) {
-		if (lppaca_shared_proc(get_lppaca())) {
+		preempt_disable();
+		retval = lppaca_shared_proc(get_lppaca());
+		preempt_enable();
+		if (retval) {
 			cpuidle_state_table = shared_states;
 			max_idle_state = ARRAY_SIZE(shared_states);
 		} else {
