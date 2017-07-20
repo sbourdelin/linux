@@ -926,13 +926,26 @@ static int tda998x_audio_get_eld(struct device *dev, void *data,
 				 uint8_t *buf, size_t len)
 {
 	struct tda998x_priv *priv = dev_get_drvdata(dev);
+	struct drm_modeset_acquire_ctx ctx;
+	struct drm_device *drm_dev = priv->connector.dev;
+	int ret;
 
-	mutex_lock(&priv->audio_mutex);
-	memcpy(buf, priv->connector.eld,
-	       min(sizeof(priv->connector.eld), len));
-	mutex_unlock(&priv->audio_mutex);
+	drm_modeset_acquire_init(&ctx, 0);
+retry:
+	ret = drm_modeset_lock(&drm_dev->mode_config.connection_mutex, &ctx);
+	if (!ret)
+		memcpy(buf, priv->connector.eld,
+		       min(sizeof(priv->connector.eld), len));
 
-	return 0;
+	if (ret == -EDEADLK) {
+		drm_modeset_backoff(&ctx);
+		goto retry;
+	}
+
+	drm_modeset_drop_locks(&ctx);
+	drm_modeset_acquire_fini(&ctx);
+
+	return ret;
 }
 
 static const struct hdmi_codec_ops audio_codec_ops = {
@@ -983,7 +996,6 @@ static int tda998x_connector_fill_modes(struct drm_connector *connector,
 	struct tda998x_priv *priv = conn_to_tda998x_priv(connector);
 	int ret;
 
-	mutex_lock(&priv->audio_mutex);
 	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
 
 	if (connector->edid_blob_ptr) {
@@ -993,7 +1005,6 @@ static int tda998x_connector_fill_modes(struct drm_connector *connector,
 	} else {
 		priv->sink_has_audio = false;
 	}
-	mutex_unlock(&priv->audio_mutex);
 
 	return ret;
 }
