@@ -128,6 +128,14 @@ static inline void ima_load_kexec_buffer(void) {}
  */
 extern bool ima_canonical_fmt;
 
+struct ns_status {
+	struct rb_node rb_node;
+	struct inode *inode;
+	ino_t i_ino;
+	u32 i_generation;
+	unsigned long flags;
+};
+
 /* Internal IMA function definitions */
 int ima_init(void);
 int ima_fs_init(void);
@@ -293,10 +301,18 @@ static inline int ima_read_xattr(struct dentry *dentry,
 
 #ifdef CONFIG_IMA_NS
 int ima_ns_init(void);
+struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
+				    struct inode *inode);
 #else
 static inline int ima_ns_init(void)
 {
 	return 0;
+}
+
+static inline struct ns_status *ima_get_ns_status(struct ima_namespace *ns,
+						  struct inode *inode)
+{
+	return NULL;
 }
 #endif /* CONFIG_IMA_NS */
 

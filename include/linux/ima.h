@@ -111,6 +111,9 @@ struct ima_namespace {
 	struct user_namespace *user_ns;
 	struct ns_common ns;
 	struct ima_namespace *parent;
+	struct rb_root ns_status_tree;
+	rwlock_t ns_status_lock;
+	struct kmem_cache *ns_status_cache;
 };
 
 extern struct ima_namespace init_ima_ns;
