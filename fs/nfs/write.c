@@ -110,7 +110,9 @@ static void nfs_writehdr_free(struct nfs_pgio_header *hdr)
 
 static void nfs_context_set_write_error(struct nfs_open_context *ctx, int error)
 {
-	ctx->error = error;
+	struct inode *inode = d_inode(ctx->dentry);
+
+	mapping_set_error(inode->i_mapping, error);
 	smp_wmb();
 	set_bit(NFS_CONTEXT_ERROR_WRITE, &ctx->flags);
 }
@@ -589,6 +591,8 @@ static int nfs_page_async_flush(struct nfs_pageio_descriptor *pgio,
 {
 	struct nfs_page *req;
 	int ret = 0;
+	struct address_space *mapping = page_file_mapping(page);
+	errseq_t since = filemap_sample_wb_err(mapping);
 
 	req = nfs_lock_and_join_requests(page, nonblock);
 	if (!req)
@@ -602,7 +606,7 @@ static int nfs_page_async_flush(struct nfs_pageio_descriptor *pgio,
 
 	ret = 0;
 	/* If there is a fatal error that covers this write, just exit */
-	if (nfs_error_is_fatal_on_server(req->wb_context->error))
+	if (nfs_error_is_fatal_on_server(filemap_check_wb_err(mapping, since)))
 		goto out_launder;
 
 	if (!nfs_pageio_add_request(pgio, req)) {

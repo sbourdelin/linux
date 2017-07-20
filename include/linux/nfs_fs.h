@@ -77,7 +77,6 @@ struct nfs_open_context {
 #define NFS_CONTEXT_RESEND_WRITES	(1)
 #define NFS_CONTEXT_BAD			(2)
 #define NFS_CONTEXT_UNLOCK	(3)
-	int error;
 
 	struct list_head list;
 	struct nfs4_threshold	*mdsthreshold;

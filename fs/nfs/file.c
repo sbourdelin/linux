@@ -212,25 +212,23 @@ nfs_file_fsync_commit(struct file *file, loff_t start, loff_t end, int datasync)
 {
 	struct nfs_open_context *ctx = nfs_file_open_context(file);
 	struct inode *inode = file_inode(file);
-	int have_error, do_resend, status;
-	int ret = 0;
+	int do_resend, status;
+	int ret;
 
 	dprintk("NFS: fsync file(%pD2) datasync %d\n", file, datasync);
 
 	nfs_inc_stats(inode, NFSIOS_VFSFSYNC);
 	do_resend = test_and_clear_bit(NFS_CONTEXT_RESEND_WRITES, &ctx->flags);
-	have_error = test_and_clear_bit(NFS_CONTEXT_ERROR_WRITE, &ctx->flags);
-	status = nfs_commit_inode(inode, FLUSH_SYNC);
-	have_error |= test_bit(NFS_CONTEXT_ERROR_WRITE, &ctx->flags);
-	if (have_error) {
-		ret = xchg(&ctx->error, 0);
-		if (ret)
-			goto out;
-	}
-	if (status < 0) {
+	clear_bit(NFS_CONTEXT_ERROR_WRITE, &ctx->flags);
+	ret = nfs_commit_inode(inode, FLUSH_SYNC);
+
+	/* Recheck and advance after the commit */
+	status = file_check_and_advance_wb_err(file);
+	if (!ret)
 		ret = status;
+	if (ret)
 		goto out;
-	}
+
 	do_resend |= test_bit(NFS_CONTEXT_RESEND_WRITES, &ctx->flags);
 	if (do_resend)
 		ret = -EAGAIN;
@@ -247,7 +245,7 @@ nfs_file_fsync(struct file *file, loff_t start, loff_t end, int datasync)
 	trace_nfs_fsync_enter(inode);
 
 	do {
-		ret = filemap_write_and_wait_range(inode->i_mapping, start, end);
+		ret = file_write_and_wait_range(file, start, end);
 		if (ret != 0)
 			break;
 		ret = nfs_file_fsync_commit(file, start, end, datasync);

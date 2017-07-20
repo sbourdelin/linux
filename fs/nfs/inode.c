@@ -872,7 +872,6 @@ struct nfs_open_context *alloc_nfs_open_context(struct dentry *dentry,
 	ctx->state = NULL;
 	ctx->mode = f_mode;
 	ctx->flags = 0;
-	ctx->error = 0;
 	ctx->flock_owner = (fl_owner_t)filp;
 	nfs_init_lock_context(&ctx->lock_context);
 	ctx->lock_context.open_context = ctx;
@@ -981,7 +980,7 @@ void nfs_file_clear_open_context(struct file *filp)
 		 * We fatal error on write before. Try to writeback
 		 * every page again.
 		 */
-		if (ctx->error < 0)
+		if (filemap_check_wb_err(inode->i_mapping, filp->f_wb_err))
 			invalidate_inode_pages2(inode->i_mapping);
 		filp->private_data = NULL;
 		spin_lock(&inode->i_lock);
