@@ -199,9 +199,9 @@ EXPORT_SYMBOL(drm_scdc_set_scrambling);
  * TMDS character rate = The rate at which TMDS characters are transmitted(Mcsc)
  * TMDS bit rate = 10x TMDS character rate
  * As per the spec:
- * TMDS clock rate for pixel clock < 340 MHz = 1x the character rate
+ * TMDS clock rate for pixel clock < 340 MHz = 1x the character rate \
  *	= 1/10 pixel clock rate
- * TMDS clock rate for pixel clock > 340 MHz = 0.25x the character rate
+ * TMDS clock rate for pixel clock > 340 MHz = 0.25x the character rate \
  *	= 1/40 pixel clock rate
  *
  * Writes to the TMDS config register over SCDC channel, and:
