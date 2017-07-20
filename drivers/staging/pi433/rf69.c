@@ -400,7 +400,9 @@ enum lnaGain rf69_get_lna_gain(struct spi_device *spi)
 	}
 }
 
-int rf69_set_dc_cut_off_frequency_intern(struct spi_device *spi ,u8 reg, enum dccPercent dccPercent)
+static int rf69_set_dc_cut_off_frequency_intern(struct spi_device *spi,
+						u8 reg,
+						enum dccPercent dccPercent)
 {
 	switch (dccPercent) {
 	case dcc16Percent:	return WRITE_REG(reg, ( (READ_REG(reg) & ~MASK_BW_DCC_FREQ) | BW_DCC_16_PERCENT) );
@@ -433,7 +435,8 @@ int rf69_set_dc_cut_off_frequency_during_afc(struct spi_device *spi, enum dccPer
 	return rf69_set_dc_cut_off_frequency_intern(spi, REG_AFCBW, dccPercent);
 }
 
-int rf69_set_bandwidth_intern(struct spi_device *spi, u8 reg, enum mantisse mantisse, u8 exponent)
+static int rf69_set_bandwidth_intern(struct spi_device *spi, u8 reg,
+				     enum mantisse mantisse, u8 exponent)
 {
 	u8 newValue;
 
