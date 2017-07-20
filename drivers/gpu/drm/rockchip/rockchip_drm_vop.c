@@ -982,7 +982,7 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
 	VOP_CTRL_SET(vop, vact_st_end, val);
 	VOP_CTRL_SET(vop, vpost_st_end, val);
 
-	VOP_CTRL_SET(vop, line_flag_num[0], vact_end);
+	VOP_INTR_SET(vop, line_flag_num[0], vact_end);
 
 	clk_set_rate(vop->dclk, adjusted_mode->clock * 1000);
 
