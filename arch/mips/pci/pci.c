@@ -28,7 +28,7 @@ EXPORT_SYMBOL(PCIBIOS_MIN_MEM);
 
 static int __init pcibios_set_cache_line_size(void)
 {
-	struct cpuinfo_mips *c = &current_cpu_data;
+	struct cpuinfo_mips *c = &raw_current_cpu_data;
 	unsigned int lsize;
 
 	/*
