@@ -798,6 +798,21 @@ static int __init hugepage_setup_sz(char *str)
 }
 __setup("hugepagesz=", hugepage_setup_sz);
 
+static int __init hugetlb_default_size_setup(char *str)
+{
+	unsigned long long size;
+
+	size = memparse(str, &str);
+
+	if (add_huge_page_size(size) != 0) {
+		hugetlb_bad_size();
+		pr_err("Invalid powerpc default huge page size specified(%llu)\n", size);
+	}
+
+	return 1;
+}
+__setup("default_hugepagesz=", hugetlb_default_size_setup);
+
 struct kmem_cache *hugepte_cache;
 static int __init hugetlbpage_init(void)
 {
