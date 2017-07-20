@@ -173,6 +173,7 @@ static void nvmet_execute_identify_ctrl(struct nvmet_req *req)
 	struct nvmet_ctrl *ctrl = req->sq->ctrl;
 	struct nvme_id_ctrl *id;
 	u16 status = 0;
+	const char MODEL[] = "Linux";
 
 	id = kzalloc(sizeof(*id), GFP_KERNEL);
 	if (!id) {
@@ -184,14 +185,12 @@ static void nvmet_execute_identify_ctrl(struct nvmet_req *req)
 	id->vid = 0;
 	id->ssvid = 0;
 
-	memset(id->sn, ' ', sizeof(id->sn));
-	snprintf(id->sn, sizeof(id->sn), "%llx", ctrl->serial);
+	bin2hex(id->sn, &ctrl->serial, min(sizeof(ctrl->serial),
+					   sizeof(id->sn) / 2));
 
-	memset(id->mn, ' ', sizeof(id->mn));
-	strncpy((char *)id->mn, "Linux", sizeof(id->mn));
-
-	memset(id->fr, ' ', sizeof(id->fr));
-	strncpy((char *)id->fr, UTS_RELEASE, sizeof(id->fr));
+	memcpy_and_pad(id->mn, sizeof(id->mn), MODEL, sizeof(MODEL) - 1, ' ');
+	memcpy_and_pad(id->fr, sizeof(id->fr),
+		       UTS_RELEASE, strlen(UTS_RELEASE), ' ');
 
 	id->rab = 6;
 
