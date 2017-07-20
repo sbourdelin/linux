@@ -2959,7 +2959,6 @@ static bool i915_gem_reset_request(struct drm_i915_gem_request *request)
 		skip_request(request);
 	} else {
 		i915_gem_context_mark_innocent(request->ctx);
-		dma_fence_set_error(&request->fence, -EAGAIN);
 	}
 
 	return guilty;
