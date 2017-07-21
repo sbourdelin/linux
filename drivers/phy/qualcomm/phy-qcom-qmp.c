@@ -610,27 +610,16 @@ static int qcom_qmp_phy_poweron(struct phy *phy)
 
 	/* turn on regulator supplies */
 	ret = regulator_bulk_enable(num, qmp->vregs);
-	if (ret) {
+	if (ret)
 		dev_err(qmp->dev, "failed to enable regulators, err=%d\n", ret);
-		return ret;
-	}
 
-	ret = clk_prepare_enable(qphy->pipe_clk);
-	if (ret) {
-		dev_err(qmp->dev, "pipe_clk enable failed, err=%d\n", ret);
-		regulator_bulk_disable(num, qmp->vregs);
-		return ret;
-	}
-
-	return 0;
+	return ret;
 }
 
 static int qcom_qmp_phy_poweroff(struct phy *phy)
 {
 	struct qmp_phy *qphy = phy_get_drvdata(phy);
 	struct qcom_qmp *qmp = qphy->qmp;
-
-	clk_disable_unprepare(qphy->pipe_clk);
 
 	regulator_bulk_disable(qmp->cfg->num_vregs, qmp->vregs);
 
@@ -797,7 +786,14 @@ static int qcom_qmp_phy_init(struct phy *phy)
 		goto err_pcs_ready;
 	}
 
-	return ret;
+	/* phy is initialized; we can turn on the pipe clock now */
+	ret = clk_prepare_enable(qphy->pipe_clk);
+	if (ret) {
+		dev_err(qmp->dev, "pipe_clk enable failed, err=%d\n", ret);
+		goto err_pcs_ready;
+	}
+
+	return 0;
 
 err_pcs_ready:
 	if (cfg->has_lane_rst)
@@ -817,6 +813,8 @@ static int qcom_qmp_phy_exit(struct phy *phy)
 	struct qcom_qmp *qmp = qphy->qmp;
 	const struct qmp_phy_cfg *cfg = qmp->cfg;
 	int i = cfg->num_clks;
+
+	clk_disable_unprepare(qphy->pipe_clk);
 
 	/* PHY reset */
 	qphy_setbits(qphy->pcs, cfg->regs[QPHY_SW_RESET], SW_RESET);
