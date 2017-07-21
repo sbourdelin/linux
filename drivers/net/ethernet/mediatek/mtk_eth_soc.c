@@ -917,6 +917,7 @@ static void mtk_update_rx_cpu_idx(struct mtk_eth *eth)
 static int mtk_poll_rx(struct napi_struct *napi, int budget,
 		       struct mtk_eth *eth)
 {
+	struct skb_shared_info *sh;
 	struct mtk_rx_ring *ring;
 	int idx;
 	struct sk_buff *skb;
@@ -987,6 +988,9 @@ static int mtk_poll_rx(struct napi_struct *napi, int budget,
 		else
 			skb_checksum_none_assert(skb);
 		skb->protocol = eth_type_trans(skb, netdev);
+		sh = skb_shinfo(skb);
+
+		sh->dma_desc = trxd.rxd4;
 
 		if (netdev->features & NETIF_F_HW_VLAN_CTAG_RX &&
 		    RX_DMA_VID(trxd.rxd3))
