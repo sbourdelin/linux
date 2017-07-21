@@ -15,6 +15,11 @@ Required properties:
                     to associate with its master device.  See:
                     Documentation/devicetree/bindings/iommu/iommu.txt
 
+Optional properties:
+- rk-iommu,disable-reset-quirk : This ignore the isp mmu reset operation.
+				 It can't get the expected result when isp mmu
+				 reset, but the reset function work normally
+
 Example:
 
 	vopl_mmu: iommu@ff940300 {
