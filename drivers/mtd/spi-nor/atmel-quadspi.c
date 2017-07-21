@@ -208,9 +208,9 @@ static int atmel_qspi_run_transfer(struct atmel_qspi *aq,
 	if (cmd->enable.bits.address)
 		ahb_mem += cmd->address;
 	if (cmd->tx_buf)
-		_memcpy_toio(ahb_mem, cmd->tx_buf, cmd->buf_len);
+		memcpy_toio(ahb_mem, cmd->tx_buf, cmd->buf_len);
 	else
-		_memcpy_fromio(cmd->rx_buf, ahb_mem, cmd->buf_len);
+		memcpy_fromio(cmd->rx_buf, ahb_mem, cmd->buf_len);
 
 	return 0;
 }
