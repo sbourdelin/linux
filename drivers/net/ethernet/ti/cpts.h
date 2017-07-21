@@ -27,6 +27,7 @@
 #include <linux/clocksource.h>
 #include <linux/device.h>
 #include <linux/list.h>
+#include <linux/kthread.h>
 #include <linux/of.h>
 #include <linux/ptp_clock_kernel.h>
 #include <linux/skbuff.h>
@@ -119,13 +120,14 @@ struct cpts {
 	u32 cc_mult; /* for the nominal frequency */
 	struct cyclecounter cc;
 	struct timecounter tc;
-	struct delayed_work overflow_work;
 	int phc_index;
 	struct clk *refclk;
 	struct list_head events;
 	struct list_head pool;
 	struct cpts_event pool_data[CPTS_MAX_EVENTS];
 	unsigned long ov_check_period;
+	struct kthread_worker *kworker;
+	struct kthread_delayed_work overflow_work;
 };
 
 void cpts_rx_timestamp(struct cpts *cpts, struct sk_buff *skb);

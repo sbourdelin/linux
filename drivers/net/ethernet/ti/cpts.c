@@ -20,12 +20,12 @@
 #include <linux/err.h>
 #include <linux/if.h>
 #include <linux/hrtimer.h>
+#include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/net_tstamp.h>
 #include <linux/ptp_classify.h>
 #include <linux/time.h>
 #include <linux/uaccess.h>
-#include <linux/workqueue.h>
 #include <linux/if_ether.h>
 #include <linux/if_vlan.h>
 
@@ -238,14 +238,15 @@ static struct ptp_clock_info cpts_info = {
 	.enable		= cpts_ptp_enable,
 };
 
-static void cpts_overflow_check(struct work_struct *work)
+static void cpts_overflow_check(struct kthread_work *work)
 {
 	struct timespec64 ts;
 	struct cpts *cpts = container_of(work, struct cpts, overflow_work.work);
 
 	cpts_ptp_gettime(&cpts->info, &ts);
 	pr_debug("cpts overflow check at %lld.%09lu\n", ts.tv_sec, ts.tv_nsec);
-	schedule_delayed_work(&cpts->overflow_work, cpts->ov_check_period);
+	kthread_queue_delayed_work(cpts->kworker, &cpts->overflow_work,
+				   cpts->ov_check_period);
 }
 
 static int cpts_match(struct sk_buff *skb, unsigned int ptp_class,
@@ -378,7 +379,8 @@ int cpts_register(struct cpts *cpts)
 	}
 	cpts->phc_index = ptp_clock_index(cpts->clock);
 
-	schedule_delayed_work(&cpts->overflow_work, cpts->ov_check_period);
+	kthread_queue_delayed_work(cpts->kworker, &cpts->overflow_work,
+				   cpts->ov_check_period);
 	return 0;
 
 err_ptp:
@@ -392,7 +394,7 @@ void cpts_unregister(struct cpts *cpts)
 	if (WARN_ON(!cpts->clock))
 		return;
 
-	cancel_delayed_work_sync(&cpts->overflow_work);
+	kthread_cancel_delayed_work_sync(&cpts->overflow_work);
 
 	ptp_clock_unregister(cpts->clock);
 	cpts->clock = NULL;
@@ -476,7 +478,6 @@ struct cpts *cpts_create(struct device *dev, void __iomem *regs,
 	cpts->dev = dev;
 	cpts->reg = (struct cpsw_cpts __iomem *)regs;
 	spin_lock_init(&cpts->lock);
-	INIT_DELAYED_WORK(&cpts->overflow_work, cpts_overflow_check);
 
 	ret = cpts_of_parse(cpts, node);
 	if (ret)
@@ -486,6 +487,14 @@ struct cpts *cpts_create(struct device *dev, void __iomem *regs,
 	if (IS_ERR(cpts->refclk)) {
 		dev_err(dev, "Failed to get cpts refclk\n");
 		return ERR_PTR(PTR_ERR(cpts->refclk));
+	}
+
+	kthread_init_delayed_work(&cpts->overflow_work, cpts_overflow_check);
+	cpts->kworker = kthread_create_worker(0, "cpts");
+	if (IS_ERR(cpts->kworker)) {
+		dev_err(dev, "failed to create cpts overflow_work task %ld\n",
+			PTR_ERR(cpts->kworker));
+		return ERR_CAST(cpts->kworker);
 	}
 
 	clk_prepare(cpts->refclk);
@@ -513,6 +522,8 @@ void cpts_release(struct cpts *cpts)
 		return;
 
 	clk_unprepare(cpts->refclk);
+
+	kthread_destroy_worker(cpts->kworker);
 }
 EXPORT_SYMBOL_GPL(cpts_release);
 
