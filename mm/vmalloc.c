@@ -336,6 +336,7 @@ static struct rb_root vmap_area_root = RB_ROOT;
 
 /* The vmap cache globals are protected by vmap_area_lock */
 static struct rb_node *free_vmap_cache;
+static struct vmap_area *cached_hole_node;
 static unsigned long cached_hole_size;
 static unsigned long cached_vstart;
 static unsigned long cached_align;
@@ -444,6 +445,12 @@ retry:
 			size < cached_hole_size ||
 			vstart < cached_vstart ||
 			align < cached_align) {
+	/*if we have a cached node, just use it*/
+	if ((size < cached_hole_size) && cached_hole_node != NULL) {
+		addr = ALIGN(cached_hole_node->va_end, align);
+		cached_hole_node = NULL;
+		goto found;
+	}
 nocache:
 		cached_hole_size = 0;
 		free_vmap_cache = NULL;
@@ -487,8 +494,13 @@ nocache:
 
 	/* from the starting point, walk areas until a suitable hole is found */
 	while (addr + size > first->va_start && addr + size <= vend) {
-		if (addr + cached_hole_size < first->va_start)
+		if (addr + cached_hole_size < first->va_start) {
 			cached_hole_size = first->va_start - addr;
+			/*record the node corresponding to the hole*/
+			cached_hole_node = (first->list.prev ==
+					    &vmap_area_list) ?
+					    NULL : list_prev_entry(first, list);
+		}
 		addr = ALIGN(first->va_end, align);
 		if (addr + size < addr)
 			goto overflow;
@@ -571,10 +583,17 @@ static void __free_vmap_area(struct vmap_area *va)
 			}
 		}
 	}
+	if (va == cached_hole_node) {
+		/*cached node is freed, the hole get bigger*/
+		if (cached_hole_node->list.prev != &vmap_area_list)
+			cached_hole_node = list_prev_entry(cached_hole_node,
+							   list);
+		else
+			cached_hole_node = NULL;
+	}
 	rb_erase(&va->rb_node, &vmap_area_root);
 	RB_CLEAR_NODE(&va->rb_node);
 	list_del_rcu(&va->list);
-
 	/*
 	 * Track the highest possible candidate for pcpu area
 	 * allocation.  Areas outside of vmalloc area can be returned
