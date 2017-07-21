@@ -1176,6 +1176,7 @@ ARM/BECKHOFF SUPPORT
 M:	Patrick Bruenn <p.bruenn@beckhoff.com>
 S:	Maintained
 F:	Documentation/devicetree/bindings/arm/bhf.txt
+F:	arch/arm/boot/dts/imx53-cx9020.dts
 
 ARM/CALXEDA HIGHBANK ARCHITECTURE
 M:	Rob Herring <robh@kernel.org>
