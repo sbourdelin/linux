@@ -60,6 +60,9 @@ static long clk_fd_round_rate(struct clk_hw *hw, unsigned long rate,
 	if (!rate || rate >= *parent_rate)
 		return *parent_rate;
 
+	if (fd->approx)
+		fd->approx(hw, rate, parent_rate);
+
 	/*
 	 * Get rate closer to *parent_rate to guarantee there is no overflow
 	 * for m and n. In the result it will be the nearest rate left shifted
@@ -145,6 +148,7 @@ struct clk_hw *clk_hw_register_fractional_divider(struct device *dev,
 	fd->nmask = GENMASK(nwidth - 1, 0) << nshift;
 	fd->flags = clk_divider_flags;
 	fd->lock = lock;
+	fd->approx = NULL;
 	fd->hw.init = &init;
 
 	hw = &fd->hw;

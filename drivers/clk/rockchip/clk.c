@@ -164,6 +164,25 @@ static int rockchip_clk_frac_notifier_cb(struct notifier_block *nb,
 	return notifier_from_errno(ret);
 }
 
+/**
+ * fractional divider must set that denominator is 20 times larger than
+ * numerator to generate precise clock frequency.
+ */
+void rockchip_fractional_special_approx(struct clk_hw *hw,
+					unsigned long rate,
+					unsigned long *parent_rate)
+{
+	struct clk_hw *p_parent;
+	unsigned long p_rate, p_parent_rate;
+
+	p_rate = clk_hw_get_rate(clk_hw_get_parent(hw));
+	if ((rate * 20 > p_rate) && (p_rate % rate != 0)) {
+		p_parent = clk_hw_get_parent(clk_hw_get_parent(hw));
+		p_parent_rate = clk_hw_get_rate(p_parent);
+		*parent_rate = p_parent_rate;
+	}
+}
+
 static struct clk *rockchip_clk_register_frac_branch(
 		struct rockchip_clk_provider *ctx, const char *name,
 		const char *const *parent_names, u8 num_parents,
@@ -210,6 +229,7 @@ static struct clk *rockchip_clk_register_frac_branch(
 	div->nwidth = 16;
 	div->nmask = GENMASK(div->nwidth - 1, 0) << div->nshift;
 	div->lock = lock;
+	div->approx = rockchip_fractional_special_approx;
 	div_ops = &clk_fractional_divider_ops;
 
 	clk = clk_register_composite(NULL, name, parent_names, num_parents,
