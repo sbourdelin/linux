@@ -1644,6 +1644,9 @@ int search_binary_handler(struct linux_binprm *bprm)
 		if (printable(bprm->buf[0]) && printable(bprm->buf[1]) &&
 		    printable(bprm->buf[2]) && printable(bprm->buf[3]))
 			return retval;
+		/* Game over if we need to load a module to execute modprobe */
+		if (strcmp(bprm->filename, modprobe_path) == 0)
+			return retval;
 		if (request_module("binfmt-%04x", *(ushort *)(bprm->buf + 2)) < 0)
 			return retval;
 		need_retry = false;
