@@ -226,6 +226,20 @@ config SCSI_LOGGING
 	  there should be no noticeable performance impact as long as you have
 	  logging turned off.
 
+config SCSI_SENSE_UEVENT
+	bool "SCSI sense code logging"
+	depends on SCSI
+	default n
+	---help---
+	  This turns on uevent for SCSI sense code.
+
+	  You can configure which sense keys generate uevent for each device
+	  through sysfs entry sense_event_filter. For example, the following
+	  enables uevent for MEDIUM_ERROR (0x03) and HARDWARE_ERROR (0x04)
+	  on scsi drive sdc:
+
+	  echo 0x000c > /sys/block/sdc/device/sense_event_filter
+
 config SCSI_SCAN_ASYNC
 	bool "Asynchronous SCSI scanning"
 	depends on SCSI
