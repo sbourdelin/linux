@@ -184,6 +184,9 @@ union ieee754sp ieee754sp_fmina(union ieee754sp x, union ieee754sp y)
 	/*
 	 * Infinity and zero handling
 	 */
+	case CLPAIR(IEEE754_CLASS_INF, IEEE754_CLASS_INF):
+		return ieee754sp_inf(xs | ys);
+
 	case CLPAIR(IEEE754_CLASS_INF, IEEE754_CLASS_ZERO):
 	case CLPAIR(IEEE754_CLASS_INF, IEEE754_CLASS_NORM):
 	case CLPAIR(IEEE754_CLASS_INF, IEEE754_CLASS_DNORM):
@@ -191,7 +194,6 @@ union ieee754sp ieee754sp_fmina(union ieee754sp x, union ieee754sp y)
 	case CLPAIR(IEEE754_CLASS_DNORM, IEEE754_CLASS_ZERO):
 		return x;
 
-	case CLPAIR(IEEE754_CLASS_INF, IEEE754_CLASS_INF):
 	case CLPAIR(IEEE754_CLASS_NORM, IEEE754_CLASS_INF):
 	case CLPAIR(IEEE754_CLASS_DNORM, IEEE754_CLASS_INF):
 	case CLPAIR(IEEE754_CLASS_ZERO, IEEE754_CLASS_INF):
