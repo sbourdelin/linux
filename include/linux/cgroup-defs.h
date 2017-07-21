@@ -308,6 +308,13 @@ struct cgroup {
 	u16 old_subtree_ss_mask;
 	u16 old_subtree_bypass;
 
+	/*
+	 * The bitmask of subsystems that are set in its parent's
+	 * ->subtree_bypass and explictly enabled in this cgroup.
+	 */
+	u16 enable_ss_mask;
+	u16 old_enable_ss_mask;
+
 	/* Private pointers for each registered subsystem */
 	struct cgroup_subsys_state __rcu *subsys[CGROUP_SUBSYS_COUNT];
 

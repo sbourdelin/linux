@@ -395,6 +395,18 @@ prefixed controller interface files from C and D.  This means that the
 controller interface files - anything which doesn't start with
 "cgroup." are owned by the parent rather than the cgroup itself.
 
+Once a controller is put into bypass mode in "cgroup.subtree_control",
+the cgroup's children can optionally enable this controller by writing
+the controller name with the '+ prefix into "cgroup.controllers".
+In this case, the controller interface files are considered to be
+owned by the child cgroup itself, not by its parent.  Therefore,
+setting the bypass mode in "cgroup.subtree_control" means delegating
+the authority of enabling or disabling the controller interface files
+to its children.  Writing the controller name with the '#' prefix into
+"cgroup.controllers" resets the state back to bypass mode.  The state
+of a controller cannot be changed if it is enabled or bypassed in its
+"cgroup.subtree_control".
+
 
 Cgroup Hierarchy
 ~~~~~~~~~~~~~~~~
@@ -859,11 +871,18 @@ All cgroup core files are prefixed with "cgroup."
 	should be granted along with the containing directory.
 
   cgroup.controllers
-	A read-only space separated values file which exists on all
+	A read-write space separated values file which exists on all
 	cgroups.
 
 	It shows space separated list of all controllers available to
-	the cgroup.  The controllers are not ordered.
+	the cgroup.  Controller names with '#' prefix are in bypass
+	mode.  The controllers are not ordered.
+
+	When a controller is set into bypass mode in its parent's
+	"cgroup.subtree_control", its name prefixed with '+' or '#'
+	can be written to enable it or reset it back to bypass mode
+	respectively.  Controllers not in bypass mode are not allowed
+	to be written.
 
   cgroup.subtree_control
 	A read-write space separated values file which exists on all
