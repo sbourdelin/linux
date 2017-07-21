@@ -126,6 +126,7 @@ static void byterev(unsigned char *, int);
 static void memex(void);
 static int bsesc(void);
 static void dump(void);
+static void show_pte(unsigned long);
 static void prdump(unsigned long, long);
 static int ppc_inst_dump(unsigned long, long, int);
 static void dump_log_buf(void);
@@ -233,6 +234,7 @@ Commands:\n\
 #endif
   "\
   dr	dump stream of raw bytes\n\
+  ds	dump software PTEs\n\
   dt	dump the tracing buffers (uses printk)\n\
 "
 #ifdef CONFIG_PPC_POWERNV
@@ -2528,6 +2530,9 @@ dump(void)
 	} else if (c == 't') {
 		ftrace_dump(DUMP_ALL);
 		tracing_on();
+	} else if (c == 's') {
+		/* dump software pte */
+		show_pte(adrs);
 	} else if (c == 'r') {
 		scanhex(&ndump);
 		if (ndump == 0)
@@ -2860,7 +2865,99 @@ static void show_task(struct task_struct *tsk)
 		state, task_thread_info(tsk)->cpu,
 		tsk->comm);
 }
+void format_pte(unsigned long pte)
+{
+	unsigned long pa = pte & PTE_RPN_MASK;
 
+	printf("PA: 0x%08lx, PTE: 0x%08lx\n", pa, pte);
+}
+
+static void show_pte(unsigned long tskv)
+{
+	unsigned long addr = 0;
+	struct task_struct *tsk = NULL;
+	struct mm_struct *mm;
+	pgd_t *pgdp;
+	pud_t *pudp;
+	pmd_t *pmdp;
+	pte_t *ptep;
+
+	tsk = (struct task_struct *)tskv;
+	if (tsk == NULL)
+		mm = &init_mm;
+	else
+		mm = tsk->active_mm;
+
+	if (mm == NULL)
+		mm = &init_mm;
+
+	if (!scanhex(&addr))
+		printf("need address to translate\n");
+
+	if (setjmp(bus_error_jmp) != 0) {
+		catch_memory_errors = 0;
+		printf("*** Error dumping pte for task %p\n", tsk);
+		return;
+	}
+
+	catch_memory_errors = 1;
+	sync();
+
+	if (mm == &init_mm)
+		pgdp = pgd_offset_k(addr);
+	else
+		pgdp = pgd_offset(mm, addr);
+
+	if (pgd_none(*pgdp)) {
+		printf("no linux page table for address\n");
+		return;
+	}
+
+	if (pgd_huge(*pgdp)) {
+		format_pte(pgd_val(*pgdp));
+		return;
+	}
+	printf("G: 0x%8lx\t", pgd_val(*pgdp));
+
+	pudp = pud_offset(pgdp, addr);
+
+	if (pud_none(*pudp)) {
+		printf("No valid PUD\n");
+		return;
+	}
+
+	if (pud_huge(*pudp)) {
+		format_pte(pud_val(*pudp));
+		return;
+	}
+	printf("U: 0x%8lx\t", pud_val(*pudp));
+
+	pmdp = pmd_offset(pudp, addr);
+
+	if (pmd_none(*pmdp)) {
+		printf("No valid PMD\n");
+		return;
+	}
+
+	if (pmd_huge(*pmdp)) {
+		format_pte(pmd_val(*pmdp));
+		return;
+	}
+	printf("M: 0x%8lx\t", pmd_val(*pmdp));
+
+	/* pte_offset_map is the same as pte_offset_kernel */
+	ptep = pte_offset_kernel(pmdp, addr);
+	if (pte_none(*ptep)) {
+		printf("no valid PTE\n");
+		return;
+	}
+
+	format_pte(pte_val(*ptep));
+
+	sync();
+	__delay(200);
+	catch_memory_errors = 0;
+}
 static void show_tasks(void)
 {
 	unsigned long tskv;
