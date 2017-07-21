@@ -2372,6 +2372,13 @@
 
 	n2=		[NET] SDL Inc. RISCom/N2 synchronous serial card
 
+	neg_dentry_pc=	[KNL]
+			Range: 1-50
+			Default: 5
+			This parameter specifies the amount of negative
+			dentries allowed in the system as a percentage of
+			total system memory.
+
 	netdev=		[NET] Network devices parameters
 			Format: <irq>,<io>,<mem_start>,<mem_end>,<name>
 			Note that mem_start is often overloaded to mean
