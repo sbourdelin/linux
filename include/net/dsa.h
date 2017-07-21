@@ -106,6 +106,11 @@ struct dsa_device_ops {
 	struct sk_buff *(*rcv)(struct sk_buff *skb, struct net_device *dev,
 			       struct packet_type *pt,
 			       struct net_device *orig_dev);
+	/*
+	 * Network header and 802.3 protocol offsets
+	 */
+	int hash_nh_off;
+	int hash_proto_off;
 };
 
 struct dsa_switch_tree {
