@@ -405,7 +405,7 @@ retry:
 		}
 	}
 
-	if (!shared_count) {
+	if (!fence) {
 		struct dma_fence *fence_excl = rcu_dereference(obj->fence_excl);
 
 		if (fence_excl &&
