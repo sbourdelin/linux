@@ -23,7 +23,7 @@
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
 #include <asm/cputype.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <asm/kvm.h>
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_coproc.h>
@@ -182,7 +182,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
 /**
  * kvm_arm_copy_reg_indices - get indices of all registers.
  *
- * We do core registers right here, then we apppend coproc regs.
+ * We do core registers right here, then we append coproc regs.
  */
 int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
 {
@@ -300,4 +300,55 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
 					struct kvm_guest_debug *dbg)
 {
 	return -EINVAL;
+}
+
+int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+			       struct kvm_device_attr *attr)
+{
+	int ret;
+
+	switch (attr->group) {
+	case KVM_ARM_VCPU_TIMER_CTRL:
+		ret = kvm_arm_timer_set_attr(vcpu, attr);
+		break;
+	default:
+		ret = -ENXIO;
+		break;
+	}
+
+	return ret;
+}
+
+int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+			       struct kvm_device_attr *attr)
+{
+	int ret;
+
+	switch (attr->group) {
+	case KVM_ARM_VCPU_TIMER_CTRL:
+		ret = kvm_arm_timer_get_attr(vcpu, attr);
+		break;
+	default:
+		ret = -ENXIO;
+		break;
+	}
+
+	return ret;
+}
+
+int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+			       struct kvm_device_attr *attr)
+{
+	int ret;
+
+	switch (attr->group) {
+	case KVM_ARM_VCPU_TIMER_CTRL:
+		ret = kvm_arm_timer_has_attr(vcpu, attr);
+		break;
+	default:
+		ret = -ENXIO;
+		break;
+	}
+
+	return ret;
 }

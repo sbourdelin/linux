@@ -1,5 +1,5 @@
 /* Intel(R) Ethernet Switch Host Interface Driver
- * Copyright(c) 2013 - 2016 Intel Corporation.
+ * Copyright(c) 2013 - 2017 Intel Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -19,6 +19,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/interrupt.h>
 #include <linux/aer.h>
 
 #include "fm10k.h"
@@ -62,7 +63,7 @@ u16 fm10k_read_pci_cfg_word(struct fm10k_hw *hw, u32 reg)
 
 u32 fm10k_read_reg(struct fm10k_hw *hw, int reg)
 {
-	u32 __iomem *hw_addr = ACCESS_ONCE(hw->hw_addr);
+	u32 __iomem *hw_addr = READ_ONCE(hw->hw_addr);
 	u32 value = 0;
 
 	if (FM10K_REMOVED(hw_addr))
@@ -92,18 +93,29 @@ static int fm10k_hw_ready(struct fm10k_intfc *interface)
 
 void fm10k_service_event_schedule(struct fm10k_intfc *interface)
 {
-	if (!test_bit(__FM10K_SERVICE_DISABLE, &interface->state) &&
-	    !test_and_set_bit(__FM10K_SERVICE_SCHED, &interface->state))
+	if (!test_bit(__FM10K_SERVICE_DISABLE, interface->state) &&
+	    !test_and_set_bit(__FM10K_SERVICE_SCHED, interface->state)) {
+		clear_bit(__FM10K_SERVICE_REQUEST, interface->state);
 		queue_work(fm10k_workqueue, &interface->service_task);
+	} else {
+		set_bit(__FM10K_SERVICE_REQUEST, interface->state);
+	}
 }
 
 static void fm10k_service_event_complete(struct fm10k_intfc *interface)
 {
-	WARN_ON(!test_bit(__FM10K_SERVICE_SCHED, &interface->state));
+	WARN_ON(!test_bit(__FM10K_SERVICE_SCHED, interface->state));
 
 	/* flush memory to make sure state is correct before next watchog */
 	smp_mb__before_atomic();
-	clear_bit(__FM10K_SERVICE_SCHED, &interface->state);
+	clear_bit(__FM10K_SERVICE_SCHED, interface->state);
+
+	/* If a service event was requested since we started, immediately
+	 * re-schedule now. This ensures we don't drop a request until the
+	 * next timer event.
+	 */
+	if (test_bit(__FM10K_SERVICE_REQUEST, interface->state))
+		fm10k_service_event_schedule(interface);
 }
 
 /**
@@ -123,10 +135,23 @@ static void fm10k_service_timer(unsigned long data)
 static void fm10k_detach_subtask(struct fm10k_intfc *interface)
 {
 	struct net_device *netdev = interface->netdev;
+	u32 __iomem *hw_addr;
+	u32 value;
 
 	/* do nothing if device is still present or hw_addr is set */
 	if (netif_device_present(netdev) || interface->hw.hw_addr)
 		return;
+
+	/* check the real address space to see if we've recovered */
+	hw_addr = READ_ONCE(interface->uc_addr);
+	value = readl(hw_addr);
+	if (~value) {
+		interface->hw.hw_addr = interface->uc_addr;
+		netif_device_attach(netdev);
+		set_bit(FM10K_FLAG_RESET_REQUESTED, interface->flags);
+		netdev_warn(netdev, "PCIe link restored, device now attached\n");
+		return;
+	}
 
 	rtnl_lock();
 
@@ -136,18 +161,16 @@ static void fm10k_detach_subtask(struct fm10k_intfc *interface)
 	rtnl_unlock();
 }
 
-static void fm10k_reinit(struct fm10k_intfc *interface)
+static void fm10k_prepare_for_reset(struct fm10k_intfc *interface)
 {
 	struct net_device *netdev = interface->netdev;
-	struct fm10k_hw *hw = &interface->hw;
-	int err;
 
 	WARN_ON(in_interrupt());
 
 	/* put off any impending NetWatchDogTimeout */
 	netif_trans_update(netdev);
 
-	while (test_and_set_bit(__FM10K_RESETTING, &interface->state))
+	while (test_and_set_bit(__FM10K_RESETTING, interface->state))
 		usleep_range(1000, 2000);
 
 	rtnl_lock();
@@ -164,6 +187,19 @@ static void fm10k_reinit(struct fm10k_intfc *interface)
 
 	/* delay any future reset requests */
 	interface->last_reset = jiffies + (10 * HZ);
+
+	rtnl_unlock();
+}
+
+static int fm10k_handle_reset(struct fm10k_intfc *interface)
+{
+	struct net_device *netdev = interface->netdev;
+	struct fm10k_hw *hw = &interface->hw;
+	int err;
+
+	rtnl_lock();
+
+	pci_set_master(interface->pdev);
 
 	/* reset and initialize the hardware so it is in a known state */
 	err = hw->mac.ops.reset_hw(hw);
@@ -185,7 +221,7 @@ static void fm10k_reinit(struct fm10k_intfc *interface)
 		goto reinit_err;
 	}
 
-	/* reassociate interrupts */
+	/* re-associate interrupts */
 	err = fm10k_mbx_request_irq(interface);
 	if (err)
 		goto err_mbx_irq;
@@ -217,9 +253,9 @@ static void fm10k_reinit(struct fm10k_intfc *interface)
 
 	rtnl_unlock();
 
-	clear_bit(__FM10K_RESETTING, &interface->state);
+	clear_bit(__FM10K_RESETTING, interface->state);
 
-	return;
+	return err;
 err_open:
 	fm10k_mbx_free_irq(interface);
 err_mbx_irq:
@@ -229,15 +265,28 @@ reinit_err:
 
 	rtnl_unlock();
 
-	clear_bit(__FM10K_RESETTING, &interface->state);
+	clear_bit(__FM10K_RESETTING, interface->state);
+
+	return err;
+}
+
+static void fm10k_reinit(struct fm10k_intfc *interface)
+{
+	int err;
+
+	fm10k_prepare_for_reset(interface);
+
+	err = fm10k_handle_reset(interface);
+	if (err)
+		dev_err(&interface->pdev->dev,
+			"fm10k_handle_reset failed: %d\n", err);
 }
 
 static void fm10k_reset_subtask(struct fm10k_intfc *interface)
 {
-	if (!(interface->flags & FM10K_FLAG_RESET_REQUESTED))
+	if (!test_and_clear_bit(FM10K_FLAG_RESET_REQUESTED,
+				interface->flags))
 		return;
-
-	interface->flags &= ~FM10K_FLAG_RESET_REQUESTED;
 
 	netdev_err(interface->netdev, "Reset interface\n");
 
@@ -257,7 +306,7 @@ static void fm10k_configure_swpri_map(struct fm10k_intfc *interface)
 	int i;
 
 	/* clear flag indicating update is needed */
-	interface->flags &= ~FM10K_FLAG_SWPRI_CONFIG;
+	clear_bit(FM10K_FLAG_SWPRI_CONFIG, interface->flags);
 
 	/* these registers are only available on the PF */
 	if (hw->mac.type != fm10k_mac_pf)
@@ -278,14 +327,14 @@ static void fm10k_watchdog_update_host_state(struct fm10k_intfc *interface)
 	struct fm10k_hw *hw = &interface->hw;
 	s32 err;
 
-	if (test_bit(__FM10K_LINK_DOWN, &interface->state)) {
+	if (test_bit(__FM10K_LINK_DOWN, interface->state)) {
 		interface->host_ready = false;
 		if (time_is_after_jiffies(interface->link_down_event))
 			return;
-		clear_bit(__FM10K_LINK_DOWN, &interface->state);
+		clear_bit(__FM10K_LINK_DOWN, interface->state);
 	}
 
-	if (interface->flags & FM10K_FLAG_SWPRI_CONFIG) {
+	if (test_bit(FM10K_FLAG_SWPRI_CONFIG, interface->flags)) {
 		if (rtnl_trylock()) {
 			fm10k_configure_swpri_map(interface);
 			rtnl_unlock();
@@ -297,7 +346,7 @@ static void fm10k_watchdog_update_host_state(struct fm10k_intfc *interface)
 
 	err = hw->mac.ops.get_host_state(hw, &interface->host_ready);
 	if (err && time_is_before_jiffies(interface->last_reset))
-		interface->flags |= FM10K_FLAG_RESET_REQUESTED;
+		set_bit(FM10K_FLAG_RESET_REQUESTED, interface->flags);
 
 	/* free the lock */
 	fm10k_mbx_unlock(interface);
@@ -372,12 +421,19 @@ void fm10k_update_stats(struct fm10k_intfc *interface)
 	u64 bytes, pkts;
 	int i;
 
+	/* ensure only one thread updates stats at a time */
+	if (test_and_set_bit(__FM10K_UPDATING_STATS, interface->state))
+		return;
+
 	/* do not allow stats update via service task for next second */
 	interface->next_stats_update = jiffies + HZ;
 
 	/* gather some stats to the interface struct that are per queue */
 	for (bytes = 0, pkts = 0, i = 0; i < interface->num_tx_queues; i++) {
-		struct fm10k_ring *tx_ring = interface->tx_ring[i];
+		struct fm10k_ring *tx_ring = READ_ONCE(interface->tx_ring[i]);
+
+		if (!tx_ring)
+			continue;
 
 		restart_queue += tx_ring->tx_stats.restart_queue;
 		tx_busy += tx_ring->tx_stats.tx_busy;
@@ -396,7 +452,10 @@ void fm10k_update_stats(struct fm10k_intfc *interface)
 
 	/* gather some stats to the interface struct that are per queue */
 	for (bytes = 0, pkts = 0, i = 0; i < interface->num_rx_queues; i++) {
-		struct fm10k_ring *rx_ring = interface->rx_ring[i];
+		struct fm10k_ring *rx_ring = READ_ONCE(interface->rx_ring[i]);
+
+		if (!rx_ring)
+			continue;
 
 		bytes += rx_ring->stats.bytes;
 		pkts += rx_ring->stats.packets;
@@ -443,6 +502,8 @@ void fm10k_update_stats(struct fm10k_intfc *interface)
 	/* Fill out the OS statistics structure */
 	net_stats->rx_errors = rx_errors;
 	net_stats->rx_dropped = interface->stats.nodesc_drop.count;
+
+	clear_bit(__FM10K_UPDATING_STATS, interface->state);
 }
 
 /**
@@ -472,7 +533,7 @@ static void fm10k_watchdog_flush_tx(struct fm10k_intfc *interface)
 	 * controller to flush Tx.
 	 */
 	if (some_tx_pending)
-		interface->flags |= FM10K_FLAG_RESET_REQUESTED;
+		set_bit(FM10K_FLAG_RESET_REQUESTED, interface->flags);
 }
 
 /**
@@ -482,8 +543,8 @@ static void fm10k_watchdog_flush_tx(struct fm10k_intfc *interface)
 static void fm10k_watchdog_subtask(struct fm10k_intfc *interface)
 {
 	/* if interface is down do nothing */
-	if (test_bit(__FM10K_DOWN, &interface->state) ||
-	    test_bit(__FM10K_RESETTING, &interface->state))
+	if (test_bit(__FM10K_DOWN, interface->state) ||
+	    test_bit(__FM10K_RESETTING, interface->state))
 		return;
 
 	if (interface->host_ready)
@@ -513,8 +574,8 @@ static void fm10k_check_hang_subtask(struct fm10k_intfc *interface)
 	int i;
 
 	/* If we're down or resetting, just bail */
-	if (test_bit(__FM10K_DOWN, &interface->state) ||
-	    test_bit(__FM10K_RESETTING, &interface->state))
+	if (test_bit(__FM10K_DOWN, interface->state) ||
+	    test_bit(__FM10K_RESETTING, interface->state))
 		return;
 
 	/* rate limit tx hang checks to only once every 2 seconds */
@@ -613,7 +674,7 @@ static void fm10k_configure_tx_ring(struct fm10k_intfc *interface,
 			FM10K_PFVTCTL_FTAG_DESC_ENABLE);
 
 	/* Initialize XPS */
-	if (!test_and_set_bit(__FM10K_TX_XPS_INIT_DONE, &ring->state) &&
+	if (!test_and_set_bit(__FM10K_TX_XPS_INIT_DONE, ring->state) &&
 	    ring->q_vector)
 		netif_set_xps_queue(ring->netdev,
 				    &ring->q_vector->affinity_mask,
@@ -684,15 +745,16 @@ static void fm10k_configure_rx_ring(struct fm10k_intfc *interface,
 	u64 rdba = ring->dma;
 	struct fm10k_hw *hw = &interface->hw;
 	u32 size = ring->count * sizeof(union fm10k_rx_desc);
-	u32 rxqctl = FM10K_RXQCTL_ENABLE | FM10K_RXQCTL_PF;
-	u32 rxdctl = FM10K_RXDCTL_WRITE_BACK_MIN_DELAY;
+	u32 rxqctl, rxdctl = FM10K_RXDCTL_WRITE_BACK_MIN_DELAY;
 	u32 srrctl = FM10K_SRRCTL_BUFFER_CHAINING_EN;
 	u32 rxint = FM10K_INT_MAP_DISABLE;
 	u8 rx_pause = interface->rx_pause;
 	u8 reg_idx = ring->reg_idx;
 
 	/* disable queue to avoid issues while updating state */
-	fm10k_write_reg(hw, FM10K_RXQCTL(reg_idx), 0);
+	rxqctl = fm10k_read_reg(hw, FM10K_RXQCTL(reg_idx));
+	rxqctl &= ~FM10K_RXQCTL_ENABLE;
+	fm10k_write_reg(hw, FM10K_RXQCTL(reg_idx), rxqctl);
 	fm10k_write_flush(hw);
 
 	/* possible poll here to verify ring resources have been cleaned */
@@ -747,6 +809,8 @@ static void fm10k_configure_rx_ring(struct fm10k_intfc *interface,
 	fm10k_write_reg(hw, FM10K_RXINT(reg_idx), rxint);
 
 	/* enable queue */
+	rxqctl = fm10k_read_reg(hw, FM10K_RXQCTL(reg_idx));
+	rxqctl |= FM10K_RXQCTL_ENABLE;
 	fm10k_write_reg(hw, FM10K_RXQCTL(reg_idx), rxqctl);
 
 	/* place buffers on ring for receive data */
@@ -811,9 +875,9 @@ static void fm10k_configure_dglort(struct fm10k_intfc *interface)
 	       FM10K_MRQC_IPV6 |
 	       FM10K_MRQC_TCP_IPV6;
 
-	if (interface->flags & FM10K_FLAG_RSS_FIELD_IPV4_UDP)
+	if (test_bit(FM10K_FLAG_RSS_FIELD_IPV4_UDP, interface->flags))
 		mrqc |= FM10K_MRQC_UDP_IPV4;
-	if (interface->flags & FM10K_FLAG_RSS_FIELD_IPV6_UDP)
+	if (test_bit(FM10K_FLAG_RSS_FIELD_IPV6_UDP, interface->flags))
 		mrqc |= FM10K_MRQC_UDP_IPV6;
 
 	fm10k_write_reg(hw, FM10K_MRQC(0), mrqc);
@@ -928,7 +992,7 @@ void fm10k_netpoll(struct net_device *netdev)
 	int i;
 
 	/* if interface is down do nothing */
-	if (test_bit(__FM10K_DOWN, &interface->state))
+	if (test_bit(__FM10K_DOWN, interface->state))
 		return;
 
 	for (i = 0; i < interface->num_q_vectors; i++)
@@ -1092,6 +1156,7 @@ static irqreturn_t fm10k_msix_mbx_pf(int __always_unused irq, void *data)
 	struct fm10k_hw *hw = &interface->hw;
 	struct fm10k_mbx_info *mbx = &hw->mbx;
 	u32 eicr;
+	s32 err = 0;
 
 	/* unmask any set bits related to this interrupt */
 	eicr = fm10k_read_reg(hw, FM10K_EICR);
@@ -1107,17 +1172,20 @@ static irqreturn_t fm10k_msix_mbx_pf(int __always_unused irq, void *data)
 
 	/* service mailboxes */
 	if (fm10k_mbx_trylock(interface)) {
-		mbx->ops.process(hw, mbx);
+		err = mbx->ops.process(hw, mbx);
 		/* handle VFLRE events */
 		fm10k_iov_event(interface);
 		fm10k_mbx_unlock(interface);
 	}
 
+	if (err == FM10K_ERR_RESET_REQUESTED)
+		set_bit(FM10K_FLAG_RESET_REQUESTED, interface->flags);
+
 	/* if switch toggled state we should reset GLORTs */
 	if (eicr & FM10K_EICR_SWITCHNOTREADY) {
 		/* force link down for at least 4 seconds */
 		interface->link_down_event = jiffies + (4 * HZ);
-		set_bit(__FM10K_LINK_DOWN, &interface->state);
+		set_bit(__FM10K_LINK_DOWN, interface->state);
 
 		/* reset dglort_map back to no config */
 		hw->mac.dglort_map = FM10K_DGLORTMAP_NONE;
@@ -1190,12 +1258,12 @@ static s32 fm10k_mbx_mac_addr(struct fm10k_hw *hw, u32 **results,
 	/* MAC was changed so we need reset */
 	if (is_valid_ether_addr(hw->mac.perm_addr) &&
 	    !ether_addr_equal(hw->mac.perm_addr, hw->mac.addr))
-		interface->flags |= FM10K_FLAG_RESET_REQUESTED;
+		set_bit(FM10K_FLAG_RESET_REQUESTED, interface->flags);
 
 	/* VLAN override was changed, or default VLAN changed */
 	if ((vlan_override != hw->mac.vlan_override) ||
 	    (default_vid != hw->mac.default_vid))
-		interface->flags |= FM10K_FLAG_RESET_REQUESTED;
+		set_bit(FM10K_FLAG_RESET_REQUESTED, interface->flags);
 
 	return 0;
 }
@@ -1269,7 +1337,7 @@ static s32 fm10k_lport_map(struct fm10k_hw *hw, u32 **results,
 	if (!err && hw->swapi.status) {
 		/* force link down for a reasonable delay */
 		interface->link_down_event = jiffies + (2 * HZ);
-		set_bit(__FM10K_LINK_DOWN, &interface->state);
+		set_bit(__FM10K_LINK_DOWN, interface->state);
 
 		/* reset dglort_map back to no config */
 		hw->mac.dglort_map = FM10K_DGLORTMAP_NONE;
@@ -1300,7 +1368,7 @@ static s32 fm10k_lport_map(struct fm10k_hw *hw, u32 **results,
 
 	/* we need to reset if port count was just updated */
 	if (dglort_map != hw->mac.dglort_map)
-		interface->flags |= FM10K_FLAG_RESET_REQUESTED;
+		set_bit(FM10K_FLAG_RESET_REQUESTED, interface->flags);
 
 	return 0;
 }
@@ -1339,7 +1407,7 @@ static s32 fm10k_update_pvid(struct fm10k_hw *hw, u32 **results,
 
 	/* we need to reset if default VLAN was just updated */
 	if (pvid != hw->mac.default_vid)
-		interface->flags |= FM10K_FLAG_RESET_REQUESTED;
+		set_bit(FM10K_FLAG_RESET_REQUESTED, interface->flags);
 
 	hw->mac.default_vid = pvid;
 
@@ -1566,8 +1634,11 @@ void fm10k_up(struct fm10k_intfc *interface)
 	/* configure interrupts */
 	hw->mac.ops.update_int_moderator(hw);
 
+	/* enable statistics capture again */
+	clear_bit(__FM10K_UPDATING_STATS, interface->state);
+
 	/* clear down bit to indicate we are ready to go */
-	clear_bit(__FM10K_DOWN, &interface->state);
+	clear_bit(__FM10K_DOWN, interface->state);
 
 	/* enable polling cleanups */
 	fm10k_napi_enable_all(interface);
@@ -1598,10 +1669,11 @@ void fm10k_down(struct fm10k_intfc *interface)
 {
 	struct net_device *netdev = interface->netdev;
 	struct fm10k_hw *hw = &interface->hw;
-	int err;
+	int err, i = 0, count = 0;
 
 	/* signal that we are down to the interrupt handler and service task */
-	set_bit(__FM10K_DOWN, &interface->state);
+	if (test_and_set_bit(__FM10K_DOWN, interface->state))
+		return;
 
 	/* call carrier off first to avoid false dev_watchdog timeouts */
 	netif_carrier_off(netdev);
@@ -1613,18 +1685,57 @@ void fm10k_down(struct fm10k_intfc *interface)
 	/* reset Rx filters */
 	fm10k_reset_rx_state(interface);
 
-	/* allow 10ms for device to quiesce */
-	usleep_range(10000, 20000);
-
 	/* disable polling routines */
 	fm10k_napi_disable_all(interface);
 
 	/* capture stats one last time before stopping interface */
 	fm10k_update_stats(interface);
 
+	/* prevent updating statistics while we're down */
+	while (test_and_set_bit(__FM10K_UPDATING_STATS, interface->state))
+		usleep_range(1000, 2000);
+
+	/* skip waiting for TX DMA if we lost PCIe link */
+	if (FM10K_REMOVED(hw->hw_addr))
+		goto skip_tx_dma_drain;
+
+	/* In some rare circumstances it can take a while for Tx queues to
+	 * quiesce and be fully disabled. Attempt to .stop_hw() first, and
+	 * then if we get ERR_REQUESTS_PENDING, go ahead and wait in a loop
+	 * until the Tx queues have emptied, or until a number of retries. If
+	 * we fail to clear within the retry loop, we will issue a warning
+	 * indicating that Tx DMA is probably hung. Note this means we call
+	 * .stop_hw() twice but this shouldn't cause any problems.
+	 */
+	err = hw->mac.ops.stop_hw(hw);
+	if (err != FM10K_ERR_REQUESTS_PENDING)
+		goto skip_tx_dma_drain;
+
+#define TX_DMA_DRAIN_RETRIES 25
+	for (count = 0; count < TX_DMA_DRAIN_RETRIES; count++) {
+		usleep_range(10000, 20000);
+
+		/* start checking at the last ring to have pending Tx */
+		for (; i < interface->num_tx_queues; i++)
+			if (fm10k_get_tx_pending(interface->tx_ring[i], false))
+				break;
+
+		/* if all the queues are drained, we can break now */
+		if (i == interface->num_tx_queues)
+			break;
+	}
+
+	if (count >= TX_DMA_DRAIN_RETRIES)
+		dev_err(&interface->pdev->dev,
+			"Tx queues failed to drain after %d tries. Tx DMA is probably hung.\n",
+			count);
+skip_tx_dma_drain:
 	/* Disable DMA engine for Tx/Rx */
 	err = hw->mac.ops.stop_hw(hw);
-	if (err)
+	if (err == FM10K_ERR_REQUESTS_PENDING)
+		dev_err(&interface->pdev->dev,
+			"due to pending requests hw was not shut down gracefully\n");
+	else if (err)
 		dev_err(&interface->pdev->dev, "stop_hw failed: %d\n", err);
 
 	/* free any buffers still on the rings */
@@ -1742,14 +1853,16 @@ static int fm10k_sw_init(struct fm10k_intfc *interface,
 	interface->tx_itr = FM10K_TX_ITR_DEFAULT;
 	interface->rx_itr = FM10K_ITR_ADAPTIVE | FM10K_RX_ITR_DEFAULT;
 
-	/* initialize vxlan_port list */
+	/* initialize udp port lists */
 	INIT_LIST_HEAD(&interface->vxlan_port);
+	INIT_LIST_HEAD(&interface->geneve_port);
 
 	netdev_rss_key_fill(rss_key, sizeof(rss_key));
 	memcpy(interface->rssrk, rss_key, sizeof(rss_key));
 
 	/* Start off interface as being down */
-	set_bit(__FM10K_DOWN, &interface->state);
+	set_bit(__FM10K_DOWN, interface->state);
+	set_bit(__FM10K_UPDATING_STATS, interface->state);
 
 	return 0;
 }
@@ -1856,9 +1969,18 @@ static int fm10k_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct fm10k_intfc *interface;
 	int err;
 
+	if (pdev->error_state != pci_channel_io_normal) {
+		dev_err(&pdev->dev,
+			"PCI device still in an error state. Unable to load...\n");
+		return -EIO;
+	}
+
 	err = pci_enable_device_mem(pdev);
-	if (err)
+	if (err) {
+		dev_err(&pdev->dev,
+			"PCI enable device failed: %d\n", err);
 		return err;
+	}
 
 	err = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(48));
 	if (err)
@@ -1869,10 +1991,7 @@ static int fm10k_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto err_dma;
 	}
 
-	err = pci_request_selected_regions(pdev,
-					   pci_select_bars(pdev,
-							   IORESOURCE_MEM),
-					   fm10k_driver_name);
+	err = pci_request_mem_regions(pdev, fm10k_driver_name);
 	if (err) {
 		dev_err(&pdev->dev,
 			"pci_request_selected_regions failed: %d\n", err);
@@ -1920,7 +2039,7 @@ static int fm10k_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	 * must ensure it is disabled since we haven't yet requested the timer
 	 * or work item.
 	 */
-	set_bit(__FM10K_SERVICE_DISABLE, &interface->state);
+	set_bit(__FM10K_SERVICE_DISABLE, interface->state);
 
 	err = fm10k_mbx_request_irq(interface);
 	if (err)
@@ -1961,7 +2080,7 @@ static int fm10k_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	fm10k_iov_configure(pdev, 0);
 
 	/* clear the service task disable bit to allow service task to start */
-	clear_bit(__FM10K_SERVICE_DISABLE, &interface->state);
+	clear_bit(__FM10K_SERVICE_DISABLE, interface->state);
 
 	return 0;
 
@@ -1976,8 +2095,7 @@ err_sw_init:
 err_ioremap:
 	free_netdev(netdev);
 err_alloc_netdev:
-	pci_release_selected_regions(pdev,
-				     pci_select_bars(pdev, IORESOURCE_MEM));
+	pci_release_mem_regions(pdev);
 err_pci_reg:
 err_dma:
 	pci_disable_device(pdev);
@@ -2000,7 +2118,7 @@ static void fm10k_remove(struct pci_dev *pdev)
 
 	del_timer_sync(&interface->service_timer);
 
-	set_bit(__FM10K_SERVICE_DISABLE, &interface->state);
+	set_bit(__FM10K_SERVICE_DISABLE, interface->state);
 	cancel_work_sync(&interface->service_task);
 
 	/* free netdev, this may bounce the interrupts due to setup_tc */
@@ -2025,12 +2143,53 @@ static void fm10k_remove(struct pci_dev *pdev)
 
 	free_netdev(netdev);
 
-	pci_release_selected_regions(pdev,
-				     pci_select_bars(pdev, IORESOURCE_MEM));
+	pci_release_mem_regions(pdev);
 
 	pci_disable_pcie_error_reporting(pdev);
 
 	pci_disable_device(pdev);
+}
+
+static void fm10k_prepare_suspend(struct fm10k_intfc *interface)
+{
+	/* the watchdog task reads from registers, which might appear like
+	 * a surprise remove if the PCIe device is disabled while we're
+	 * stopped. We stop the watchdog task until after we resume software
+	 * activity.
+	 */
+	set_bit(__FM10K_SERVICE_DISABLE, interface->state);
+	cancel_work_sync(&interface->service_task);
+
+	fm10k_prepare_for_reset(interface);
+}
+
+static int fm10k_handle_resume(struct fm10k_intfc *interface)
+{
+	struct fm10k_hw *hw = &interface->hw;
+	int err;
+
+	/* reset statistics starting values */
+	hw->mac.ops.rebind_hw_stats(hw, &interface->stats);
+
+	err = fm10k_handle_reset(interface);
+	if (err)
+		return err;
+
+	/* assume host is not ready, to prevent race with watchdog in case we
+	 * actually don't have connection to the switch
+	 */
+	interface->host_ready = false;
+	fm10k_watchdog_host_not_ready(interface);
+
+	/* force link to stay down for a second to prevent link flutter */
+	interface->link_down_event = jiffies + (HZ);
+	set_bit(__FM10K_LINK_DOWN, interface->state);
+
+	/* clear the service task disable bit to allow service task to start */
+	clear_bit(__FM10K_SERVICE_DISABLE, interface->state);
+	fm10k_service_event_schedule(interface);
+
+	return err;
 }
 
 #ifdef CONFIG_PM
@@ -2069,60 +2228,13 @@ static int fm10k_resume(struct pci_dev *pdev)
 	/* refresh hw_addr in case it was dropped */
 	hw->hw_addr = interface->uc_addr;
 
-	/* reset hardware to known state */
-	err = hw->mac.ops.init_hw(&interface->hw);
-	if (err) {
-		dev_err(&pdev->dev, "init_hw failed: %d\n", err);
+	err = fm10k_handle_resume(interface);
+	if (err)
 		return err;
-	}
-
-	/* reset statistics starting values */
-	hw->mac.ops.rebind_hw_stats(hw, &interface->stats);
-
-	rtnl_lock();
-
-	err = fm10k_init_queueing_scheme(interface);
-	if (err)
-		goto err_queueing_scheme;
-
-	err = fm10k_mbx_request_irq(interface);
-	if (err)
-		goto err_mbx_irq;
-
-	err = fm10k_hw_ready(interface);
-	if (err)
-		goto err_open;
-
-	err = netif_running(netdev) ? fm10k_open(netdev) : 0;
-	if (err)
-		goto err_open;
-
-	rtnl_unlock();
-
-	/* assume host is not ready, to prevent race with watchdog in case we
-	 * actually don't have connection to the switch
-	 */
-	interface->host_ready = false;
-	fm10k_watchdog_host_not_ready(interface);
-
-	/* clear the service task disable bit to allow service task to start */
-	clear_bit(__FM10K_SERVICE_DISABLE, &interface->state);
-	fm10k_service_event_schedule(interface);
-
-	/* restore SR-IOV interface */
-	fm10k_iov_resume(pdev);
 
 	netif_device_attach(netdev);
 
 	return 0;
-err_open:
-	fm10k_mbx_free_irq(interface);
-err_mbx_irq:
-	fm10k_clear_queueing_scheme(interface);
-err_queueing_scheme:
-	rtnl_unlock();
-
-	return err;
 }
 
 /**
@@ -2142,27 +2254,7 @@ static int fm10k_suspend(struct pci_dev *pdev,
 
 	netif_device_detach(netdev);
 
-	fm10k_iov_suspend(pdev);
-
-	/* the watchdog tasks may read registers, which will appear like a
-	 * surprise-remove event once the PCI device is disabled. This will
-	 * cause us to close the netdevice, so we don't retain the open/closed
-	 * state post-resume. Prevent this by disabling the service task while
-	 * suspended, until we actually resume.
-	 */
-	set_bit(__FM10K_SERVICE_DISABLE, &interface->state);
-	cancel_work_sync(&interface->service_task);
-
-	rtnl_lock();
-
-	if (netif_running(netdev))
-		fm10k_close(netdev);
-
-	fm10k_mbx_free_irq(interface);
-
-	fm10k_clear_queueing_scheme(interface);
-
-	rtnl_unlock();
+	fm10k_prepare_suspend(interface);
 
 	err = pci_save_state(pdev);
 	if (err)
@@ -2195,17 +2287,7 @@ static pci_ers_result_t fm10k_io_error_detected(struct pci_dev *pdev,
 	if (state == pci_channel_io_perm_failure)
 		return PCI_ERS_RESULT_DISCONNECT;
 
-	rtnl_lock();
-
-	if (netif_running(netdev))
-		fm10k_close(netdev);
-
-	fm10k_mbx_free_irq(interface);
-
-	/* free interrupts */
-	fm10k_clear_queueing_scheme(interface);
-
-	rtnl_unlock();
+	fm10k_prepare_suspend(interface);
 
 	/* Request a slot reset. */
 	return PCI_ERS_RESULT_NEED_RESET;
@@ -2219,10 +2301,9 @@ static pci_ers_result_t fm10k_io_error_detected(struct pci_dev *pdev,
  */
 static pci_ers_result_t fm10k_io_slot_reset(struct pci_dev *pdev)
 {
-	struct fm10k_intfc *interface = pci_get_drvdata(pdev);
 	pci_ers_result_t result;
 
-	if (pci_enable_device_mem(pdev)) {
+	if (pci_reenable_device(pdev)) {
 		dev_err(&pdev->dev,
 			"Cannot re-enable PCI device after reset.\n");
 		result = PCI_ERS_RESULT_DISCONNECT;
@@ -2236,12 +2317,6 @@ static pci_ers_result_t fm10k_io_slot_reset(struct pci_dev *pdev)
 		pci_save_state(pdev);
 
 		pci_wake_from_d3(pdev, false);
-
-		/* refresh hw_addr in case it was dropped */
-		interface->hw.hw_addr = interface->uc_addr;
-
-		interface->flags |= FM10K_FLAG_RESET_REQUESTED;
-		fm10k_service_event_schedule(interface);
 
 		result = PCI_ERS_RESULT_RECOVERED;
 	}
@@ -2262,50 +2337,44 @@ static void fm10k_io_resume(struct pci_dev *pdev)
 {
 	struct fm10k_intfc *interface = pci_get_drvdata(pdev);
 	struct net_device *netdev = interface->netdev;
-	struct fm10k_hw *hw = &interface->hw;
-	int err = 0;
+	int err;
 
-	/* reset hardware to known state */
-	err = hw->mac.ops.init_hw(&interface->hw);
-	if (err) {
-		dev_err(&pdev->dev, "init_hw failed: %d\n", err);
-		return;
-	}
+	err = fm10k_handle_resume(interface);
 
-	/* reset statistics starting values */
-	hw->mac.ops.rebind_hw_stats(hw, &interface->stats);
-
-	rtnl_lock();
-
-	err = fm10k_init_queueing_scheme(interface);
-	if (err) {
-		dev_err(&interface->pdev->dev,
-			"init_queueing_scheme failed: %d\n", err);
-		goto unlock;
-	}
-
-	/* reassociate interrupts */
-	fm10k_mbx_request_irq(interface);
-
-	rtnl_lock();
-	if (netif_running(netdev))
-		err = fm10k_open(netdev);
-	rtnl_unlock();
-
-	/* final check of hardware state before registering the interface */
-	err = err ? : fm10k_hw_ready(interface);
-
-	if (!err)
+	if (err)
+		dev_warn(&pdev->dev,
+			 "fm10k_io_resume failed: %d\n", err);
+	else
 		netif_device_attach(netdev);
+}
 
-unlock:
-	rtnl_unlock();
+static void fm10k_io_reset_prepare(struct pci_dev *pdev)
+{
+	/* warn incase we have any active VF devices */
+	if (pci_num_vf(pdev))
+		dev_warn(&pdev->dev,
+			 "PCIe FLR may cause issues for any active VF devices\n");
+	fm10k_prepare_suspend(pci_get_drvdata(pdev));
+}
+
+static void fm10k_io_reset_done(struct pci_dev *pdev)
+{
+	struct fm10k_intfc *interface = pci_get_drvdata(pdev);
+	int err = fm10k_handle_resume(interface);
+
+	if (err) {
+		dev_warn(&pdev->dev,
+			 "fm10k_io_reset_notify failed: %d\n", err);
+		netif_device_detach(interface->netdev);
+	}
 }
 
 static const struct pci_error_handlers fm10k_err_handler = {
 	.error_detected = fm10k_io_error_detected,
 	.slot_reset = fm10k_io_slot_reset,
 	.resume = fm10k_io_resume,
+	.reset_prepare = fm10k_io_reset_prepare,
+	.reset_done = fm10k_io_reset_done,
 };
 
 static struct pci_driver fm10k_driver = {

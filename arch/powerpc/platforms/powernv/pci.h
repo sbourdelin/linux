@@ -1,7 +1,14 @@
 #ifndef __POWERNV_PCI_H
 #define __POWERNV_PCI_H
 
+#include <linux/iommu.h>
+#include <asm/iommu.h>
+#include <asm/msi_bitmap.h>
+
 struct pci_dn;
+
+/* Maximum possible number of ATSD MMIO registers per NPU */
+#define NV_NMMU_ATSD_REGS 8
 
 enum pnv_phb_type {
 	PNV_PHB_IODA1	= 0,
@@ -15,6 +22,7 @@ enum pnv_phb_model {
 	PNV_PHB_MODEL_P7IOC,
 	PNV_PHB_MODEL_PHB3,
 	PNV_PHB_MODEL_NPU,
+	PNV_PHB_MODEL_NPU2,
 };
 
 #define PNV_PCI_DIAG_BUF_SIZE	8192
@@ -25,11 +33,15 @@ enum pnv_phb_model {
 #define PNV_IODA_PE_SLAVE	(1 << 4)	/* Slave PE in compound case	*/
 #define PNV_IODA_PE_VF		(1 << 5)	/* PE for one VF 		*/
 
+/* Indicates operations are frozen for a PE: MMIO in PESTA & DMA in PESTB. */
+#define PNV_IODA_STOPPED_STATE	0x8000000000000000
+
 /* Data associated with a PE, including IOMMU tracking etc.. */
 struct pnv_phb;
 struct pnv_ioda_pe {
 	unsigned long		flags;
 	struct pnv_phb		*phb;
+	int			device_count;
 
 	/* A PE can be associated with a single device or an
 	 * entire bus (& children). In the former case, pdev
@@ -71,6 +83,7 @@ struct pnv_ioda_pe {
 };
 
 #define PNV_PHB_FLAG_EEH	(1 << 0)
+#define PNV_PHB_FLAG_CXL	(1 << 1) /* Real PHB supporting the cxl kernel API */
 
 struct pnv_phb {
 	struct pci_controller	*hose;
@@ -80,6 +93,7 @@ struct pnv_phb {
 	u64			opal_id;
 	int			flags;
 	void __iomem		*regs;
+	u64			regs_phys;
 	int			initialized;
 	spinlock_t		lock;
 
@@ -110,6 +124,8 @@ struct pnv_phb {
 		/* Global bridge info */
 		unsigned int		total_pe_num;
 		unsigned int		reserved_pe_idx;
+		unsigned int		root_pe_idx;
+		bool			root_pe_populated;
 
 		/* 32-bit MMIO window */
 		unsigned int		m32_size;
@@ -152,33 +168,33 @@ struct pnv_phb {
 		struct list_head	pe_list;
 		struct mutex            pe_list_mutex;
 
-		/* Reverse map of PEs, will have to extend if
-		 * we are to support more than 256 PEs, indexed
-		 * bus { bus, devfn }
-		 */
-		unsigned char		pe_rmap[0x10000];
-
-		/* TCE cache invalidate registers (physical and
-		 * remapped)
-		 */
-		phys_addr_t		tce_inval_reg_phys;
-		__be64 __iomem		*tce_inval_reg;
+		/* Reverse map of PEs, indexed by {bus, devfn} */
+		unsigned int		pe_rmap[0x10000];
 	} ioda;
 
-	/* PHB and hub status structure */
-	union {
-		unsigned char			blob[PNV_PCI_DIAG_BUF_SIZE];
-		struct OpalIoP7IOCPhbErrorData	p7ioc;
-		struct OpalIoPhb3ErrorData	phb3;
-		struct OpalIoP7IOCErrorData 	hub_diag;
-	} diag;
+	/* PHB and hub diagnostics */
+	unsigned int		diag_data_size;
+	u8			*diag_data;
 
+	/* Nvlink2 data */
+	struct npu {
+		int index;
+		__be64 *mmio_atsd_regs[NV_NMMU_ATSD_REGS];
+		unsigned int mmio_atsd_count;
+
+		/* Bitmask for MMIO register usage */
+		unsigned long mmio_atsd_usage;
+	} npu;
+
+#ifdef CONFIG_CXL_BASE
+	struct cxl_afu *cxl_afu;
+#endif
 };
 
 extern struct pci_ops pnv_pci_ops;
 extern int pnv_tce_build(struct iommu_table *tbl, long index, long npages,
 		unsigned long uaddr, enum dma_data_direction direction,
-		struct dma_attrs *attrs);
+		unsigned long attrs);
 extern void pnv_tce_free(struct iommu_table *tbl, long index, long npages);
 extern int pnv_tce_xchg(struct iommu_table *tbl, long index,
 		unsigned long *hpa, enum dma_data_direction *direction);
@@ -203,8 +219,6 @@ extern void pnv_pci_setup_iommu_table(struct iommu_table *tbl,
 extern void pnv_pci_init_ioda_hub(struct device_node *np);
 extern void pnv_pci_init_ioda2_phb(struct device_node *np);
 extern void pnv_pci_init_npu_phb(struct device_node *np);
-extern void pnv_pci_ioda_tce_invalidate(struct iommu_table *tbl,
-					__be64 *startp, __be64 *endp, bool rm);
 extern void pnv_pci_reset_secondary_bus(struct pci_dev *dev);
 extern int pnv_eeh_phb_reset(struct pci_controller *hose, int option);
 
@@ -212,6 +226,9 @@ extern void pnv_pci_dma_dev_setup(struct pci_dev *pdev);
 extern void pnv_pci_dma_bus_setup(struct pci_bus *bus);
 extern int pnv_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type);
 extern void pnv_teardown_msi_irqs(struct pci_dev *pdev);
+extern struct pnv_ioda_pe *pnv_ioda_get_pe(struct pci_dev *dev);
+extern void pnv_set_msi_irq_chip(struct pnv_phb *phb, unsigned int virq);
+extern bool pnv_pci_enable_device_hook(struct pci_dev *dev);
 
 extern void pe_level_printk(const struct pnv_ioda_pe *pe, const char *level,
 			    const char *fmt, ...);
@@ -231,5 +248,16 @@ extern long pnv_npu_set_window(struct pnv_ioda_pe *npe, int num,
 extern long pnv_npu_unset_window(struct pnv_ioda_pe *npe, int num);
 extern void pnv_npu_take_ownership(struct pnv_ioda_pe *npe);
 extern void pnv_npu_release_ownership(struct pnv_ioda_pe *npe);
+extern int pnv_npu2_init(struct pnv_phb *phb);
+
+/* cxl functions */
+extern bool pnv_cxl_enable_device_hook(struct pci_dev *dev);
+extern void pnv_cxl_disable_device(struct pci_dev *dev);
+extern int pnv_cxl_cx4_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type);
+extern void pnv_cxl_cx4_teardown_msi_irqs(struct pci_dev *pdev);
+
+
+/* phb ops (cxl switches these when enabling the kernel api on the phb) */
+extern const struct pci_controller_ops pnv_cxl_cx4_ioda_controller_ops;
 
 #endif /* __POWERNV_PCI_H */

@@ -16,6 +16,7 @@
 #include <linux/ipv6.h>
 #include <linux/hardirq.h>
 #include <linux/jhash.h>
+#include <linux/refcount.h>
 #include <net/if_inet6.h>
 #include <net/ndisc.h>
 #include <net/flow.h>
@@ -203,7 +204,7 @@ extern rwlock_t ip6_ra_lock;
  */
 
 struct ipv6_txoptions {
-	atomic_t		refcnt;
+	refcount_t		refcnt;
 	/* Length of this structure */
 	int			tot_len;
 
@@ -265,7 +266,7 @@ static inline struct ipv6_txoptions *txopt_get(const struct ipv6_pinfo *np)
 	rcu_read_lock();
 	opt = rcu_dereference(np->opt);
 	if (opt) {
-		if (!atomic_inc_not_zero(&opt->refcnt))
+		if (!refcount_inc_not_zero(&opt->refcnt))
 			opt = NULL;
 		else
 			opt = rcu_pointer_handoff(opt);
@@ -276,7 +277,7 @@ static inline struct ipv6_txoptions *txopt_get(const struct ipv6_pinfo *np)
 
 static inline void txopt_put(struct ipv6_txoptions *opt)
 {
-	if (opt && atomic_dec_and_test(&opt->refcnt))
+	if (opt && refcount_dec_and_test(&opt->refcnt))
 		kfree_rcu(opt, rcu);
 }
 
@@ -313,11 +314,19 @@ struct ipv6_txoptions *ipv6_renew_options(struct sock *sk,
 					  int newtype,
 					  struct ipv6_opt_hdr __user *newopt,
 					  int newoptlen);
+struct ipv6_txoptions *
+ipv6_renew_options_kern(struct sock *sk,
+			struct ipv6_txoptions *opt,
+			int newtype,
+			struct ipv6_opt_hdr *newopt,
+			int newoptlen);
 struct ipv6_txoptions *ipv6_fixup_options(struct ipv6_txoptions *opt_space,
 					  struct ipv6_txoptions *opt);
 
 bool ipv6_opt_accepted(const struct sock *sk, const struct sk_buff *skb,
 		       const struct inet6_skb_parm *opt);
+struct ipv6_txoptions *ipv6_update_options(struct sock *sk,
+					   struct ipv6_txoptions *opt);
 
 static inline bool ipv6_accept_ra(struct inet6_dev *idev)
 {
@@ -768,6 +777,11 @@ static inline __be32 ip6_make_flowlabel(struct net *net, struct sk_buff *skb,
 {
 	u32 hash;
 
+	/* @flowlabel may include more than a flow label, eg, the traffic class.
+	 * Here we want only the flow label value.
+	 */
+	flowlabel &= IPV6_FLOWLABEL_MASK;
+
 	if (flowlabel ||
 	    net->ipv6.sysctl.auto_flowlabels == IP6_AUTO_FLOW_LABEL_OFF ||
 	    (!autolabel &&
@@ -863,7 +877,7 @@ int ip6_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb);
  *	upper-layer output functions
  */
 int ip6_xmit(const struct sock *sk, struct sk_buff *skb, struct flowi6 *fl6,
-	     struct ipv6_txoptions *opt, int tclass);
+	     __u32 mark, struct ipv6_txoptions *opt, int tclass);
 
 int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr);
 
@@ -924,7 +938,8 @@ int ip6_local_out(struct net *net, struct sock *sk, struct sk_buff *skb);
  */
 
 void ipv6_push_nfrag_opts(struct sk_buff *skb, struct ipv6_txoptions *opt,
-			  u8 *proto, struct in6_addr **daddr_p);
+			  u8 *proto, struct in6_addr **daddr_p,
+			  struct in6_addr *saddr);
 void ipv6_push_frag_opts(struct sk_buff *skb, struct ipv6_txoptions *opt,
 			 u8 *proto);
 
@@ -943,7 +958,7 @@ enum {
 int ipv6_find_hdr(const struct sk_buff *skb, unsigned int *offset, int target,
 		  unsigned short *fragoff, int *fragflg);
 
-int ipv6_find_tlv(struct sk_buff *skb, int offset, int type);
+int ipv6_find_tlv(const struct sk_buff *skb, int offset, int type);
 
 struct in6_addr *fl6_update_dst(struct flowi6 *fl6,
 				const struct ipv6_txoptions *opt,
@@ -962,6 +977,8 @@ int compat_ipv6_setsockopt(struct sock *sk, int level, int optname,
 int compat_ipv6_getsockopt(struct sock *sk, int level, int optname,
 			   char __user *optval, int __user *optlen);
 
+int __ip6_datagram_connect(struct sock *sk, struct sockaddr *addr,
+			   int addr_len);
 int ip6_datagram_connect(struct sock *sk, struct sockaddr *addr, int addr_len);
 int ip6_datagram_connect_v6_only(struct sock *sk, struct sockaddr *addr,
 				 int addr_len);
@@ -991,6 +1008,7 @@ int inet6_hash_connect(struct inet_timewait_death_row *death_row,
  */
 extern const struct proto_ops inet6_stream_ops;
 extern const struct proto_ops inet6_dgram_ops;
+extern const struct proto_ops inet6_sockraw_ops;
 
 struct group_source_req;
 struct group_filter;

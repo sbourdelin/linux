@@ -42,29 +42,26 @@
 
 #ifdef DSS_SUBSYS_NAME
 #define DSSERR(format, ...) \
-	printk(KERN_ERR "omapdss " DSS_SUBSYS_NAME " error: " format, \
-	## __VA_ARGS__)
+	pr_err("omapdss " DSS_SUBSYS_NAME " error: " format, ##__VA_ARGS__)
 #else
 #define DSSERR(format, ...) \
-	printk(KERN_ERR "omapdss error: " format, ## __VA_ARGS__)
+	pr_err("omapdss error: " format, ##__VA_ARGS__)
 #endif
 
 #ifdef DSS_SUBSYS_NAME
 #define DSSINFO(format, ...) \
-	printk(KERN_INFO "omapdss " DSS_SUBSYS_NAME ": " format, \
-	## __VA_ARGS__)
+	pr_info("omapdss " DSS_SUBSYS_NAME ": " format, ##__VA_ARGS__)
 #else
 #define DSSINFO(format, ...) \
-	printk(KERN_INFO "omapdss: " format, ## __VA_ARGS__)
+	pr_info("omapdss: " format, ## __VA_ARGS__)
 #endif
 
 #ifdef DSS_SUBSYS_NAME
 #define DSSWARN(format, ...) \
-	printk(KERN_WARNING "omapdss " DSS_SUBSYS_NAME ": " format, \
-	## __VA_ARGS__)
+	pr_warn("omapdss " DSS_SUBSYS_NAME ": " format, ##__VA_ARGS__)
 #else
 #define DSSWARN(format, ...) \
-	printk(KERN_WARNING "omapdss: " format, ## __VA_ARGS__)
+	pr_warn("omapdss: " format, ##__VA_ARGS__)
 #endif
 
 /* OMAP TRM gives bitfields as start:end, where start is the higher bit
@@ -102,6 +99,20 @@ enum dss_writeback_channel {
 	DSS_WB_LCD3_MGR =	7,
 };
 
+enum dss_clk_source {
+	DSS_CLK_SRC_FCK = 0,
+
+	DSS_CLK_SRC_PLL1_1,
+	DSS_CLK_SRC_PLL1_2,
+	DSS_CLK_SRC_PLL1_3,
+
+	DSS_CLK_SRC_PLL2_1,
+	DSS_CLK_SRC_PLL2_2,
+	DSS_CLK_SRC_PLL2_3,
+
+	DSS_CLK_SRC_HDMI_PLL,
+};
+
 enum dss_pll_id {
 	DSS_PLL_DSI1,
 	DSS_PLL_DSI2,
@@ -113,6 +124,11 @@ enum dss_pll_id {
 struct dss_pll;
 
 #define DSS_PLL_MAX_HSDIVS 4
+
+enum dss_pll_type {
+	DSS_PLL_TYPE_A,
+	DSS_PLL_TYPE_B,
+};
 
 /*
  * Type-A PLLs: clkout[]/mX[] refer to hsdiv outputs m4, m5, m6, m7.
@@ -140,6 +156,8 @@ struct dss_pll_ops {
 };
 
 struct dss_pll_hw {
+	enum dss_pll_type type;
+
 	unsigned n_max;
 	unsigned m_min;
 	unsigned m_max;
@@ -201,7 +219,6 @@ struct seq_file;
 struct platform_device;
 
 /* core */
-struct platform_device *dss_get_core_pdev(void);
 int dss_dsi_enable_pads(int dsi_id, unsigned lane_mask);
 void dss_dsi_disable_pads(int dsi_id, unsigned lane_mask);
 int dss_set_min_bus_tput(struct device *dev, unsigned long tput);
@@ -227,7 +244,7 @@ unsigned long dss_get_dispc_clk_rate(void);
 int dss_dpi_select_source(int port, enum omap_channel channel);
 void dss_select_hdmi_venc_clk_source(enum dss_hdmi_venc_clk_source_select);
 enum dss_hdmi_venc_clk_source_select dss_get_hdmi_venc_clk_source(void);
-const char *dss_get_generic_clk_source_name(enum omap_dss_clk_source clk_src);
+const char *dss_get_clk_source_name(enum dss_clk_source clk_src);
 void dss_dump_clocks(struct seq_file *s);
 
 /* DSS VIDEO PLL */
@@ -235,29 +252,23 @@ struct dss_pll *dss_video_pll_init(struct platform_device *pdev, int id,
 	struct regulator *regulator);
 void dss_video_pll_uninit(struct dss_pll *pll);
 
-/* dss-of */
-struct device_node *dss_of_port_get_parent_device(struct device_node *port);
-u32 dss_of_port_get_port_number(struct device_node *port);
-
 #if defined(CONFIG_OMAP2_DSS_DEBUGFS)
 void dss_debug_dump_clocks(struct seq_file *s);
 #endif
 
 void dss_ctrl_pll_enable(enum dss_pll_id pll_id, bool enable);
-void dss_ctrl_pll_set_control_mux(enum dss_pll_id pll_id,
-	enum omap_channel channel);
 
 void dss_sdi_init(int datapairs);
 int dss_sdi_enable(void);
 void dss_sdi_disable(void);
 
 void dss_select_dsi_clk_source(int dsi_module,
-		enum omap_dss_clk_source clk_src);
+		enum dss_clk_source clk_src);
 void dss_select_lcd_clk_source(enum omap_channel channel,
-		enum omap_dss_clk_source clk_src);
-enum omap_dss_clk_source dss_get_dispc_clk_source(void);
-enum omap_dss_clk_source dss_get_dsi_clk_source(int dsi_module);
-enum omap_dss_clk_source dss_get_lcd_clk_source(enum omap_channel channel);
+		enum dss_clk_source clk_src);
+enum dss_clk_source dss_get_dispc_clk_source(void);
+enum dss_clk_source dss_get_dsi_clk_source(int dsi_module);
+enum dss_clk_source dss_get_lcd_clk_source(enum omap_channel channel);
 
 void dss_set_venc_output(enum omap_dss_venc_type type);
 void dss_set_dac_pwrdn_bgz(bool enable);
@@ -269,9 +280,6 @@ bool dss_div_calc(unsigned long pck, unsigned long fck_min,
 		dss_div_calc_func func, void *data);
 
 /* SDI */
-int sdi_init_platform_driver(void) __init;
-void sdi_uninit_platform_driver(void);
-
 #ifdef CONFIG_OMAP2_DSS_SDI
 int sdi_init_port(struct platform_device *pdev, struct device_node *port);
 void sdi_uninit_port(struct device_node *port);
@@ -299,21 +307,10 @@ void dsi_uninit_platform_driver(void);
 void dsi_dump_clocks(struct seq_file *s);
 
 void dsi_irq_handler(void);
-u8 dsi_get_pixel_size(enum omap_dss_dsi_pixel_format fmt);
 
-#else
-static inline u8 dsi_get_pixel_size(enum omap_dss_dsi_pixel_format fmt)
-{
-	WARN(1, "%s: DSI not compiled in, returning pixel_size as 0\n",
-	     __func__);
-	return 0;
-}
 #endif
 
 /* DPI */
-int dpi_init_platform_driver(void) __init;
-void dpi_uninit_platform_driver(void);
-
 #ifdef CONFIG_OMAP2_DSS_DPI
 int dpi_init_port(struct platform_device *pdev, struct device_node *port);
 void dpi_uninit_port(struct device_node *port);
@@ -333,6 +330,9 @@ int dispc_init_platform_driver(void) __init;
 void dispc_uninit_platform_driver(void);
 void dispc_dump_clocks(struct seq_file *s);
 
+int dispc_runtime_get(void);
+void dispc_runtime_put(void);
+
 void dispc_enable_sidle(void);
 void dispc_disable_sidle(void);
 
@@ -347,14 +347,14 @@ bool dispc_div_calc(unsigned long dispc,
 		unsigned long pck_min, unsigned long pck_max,
 		dispc_div_calc_func func, void *data);
 
-bool dispc_mgr_timings_ok(enum omap_channel channel,
-		const struct omap_video_timings *timings);
+bool dispc_mgr_timings_ok(enum omap_channel channel, const struct videomode *vm);
 int dispc_calc_clock_rates(unsigned long dispc_fclk_rate,
 		struct dispc_clock_info *cinfo);
 
 
-void dispc_ovl_set_fifo_threshold(enum omap_plane plane, u32 low, u32 high);
-void dispc_ovl_compute_fifo_thresholds(enum omap_plane plane,
+void dispc_ovl_set_fifo_threshold(enum omap_plane_id plane, u32 low,
+				  u32 high);
+void dispc_ovl_compute_fifo_thresholds(enum omap_plane_id plane,
 		u32 *fifo_low, u32 *fifo_high, bool use_fifomerge,
 		bool manual_update);
 
@@ -367,11 +367,9 @@ void dispc_set_tv_pclk(unsigned long pclk);
 u32 dispc_wb_get_framedone_irq(void);
 bool dispc_wb_go_busy(void);
 void dispc_wb_go(void);
-void dispc_wb_enable(bool enable);
-bool dispc_wb_is_enabled(void);
 void dispc_wb_set_channel_in(enum dss_writeback_channel channel);
 int dispc_wb_setup(const struct omap_dss_writeback_info *wi,
-		bool mem_to_mem, const struct omap_video_timings *timings);
+		bool mem_to_mem, const struct videomode *vm);
 
 /* VENC */
 int venc_init_platform_driver(void) __init;
@@ -383,10 +381,6 @@ void hdmi4_uninit_platform_driver(void);
 
 int hdmi5_init_platform_driver(void) __init;
 void hdmi5_uninit_platform_driver(void);
-
-/* RFBI */
-int rfbi_init_platform_driver(void) __init;
-void rfbi_uninit_platform_driver(void);
 
 
 #ifdef CONFIG_OMAP2_DSS_COLLECT_IRQ_STATS
@@ -409,17 +403,23 @@ typedef bool (*dss_hsdiv_calc_func)(int m_dispc, unsigned long dispc,
 int dss_pll_register(struct dss_pll *pll);
 void dss_pll_unregister(struct dss_pll *pll);
 struct dss_pll *dss_pll_find(const char *name);
+struct dss_pll *dss_pll_find_by_src(enum dss_clk_source src);
+unsigned dss_pll_get_clkout_idx_for_src(enum dss_clk_source src);
 int dss_pll_enable(struct dss_pll *pll);
 void dss_pll_disable(struct dss_pll *pll);
 int dss_pll_set_config(struct dss_pll *pll,
 		const struct dss_pll_clock_info *cinfo);
 
-bool dss_pll_hsdiv_calc(const struct dss_pll *pll, unsigned long clkdco,
+bool dss_pll_hsdiv_calc_a(const struct dss_pll *pll, unsigned long clkdco,
 		unsigned long out_min, unsigned long out_max,
 		dss_hsdiv_calc_func func, void *data);
-bool dss_pll_calc(const struct dss_pll *pll, unsigned long clkin,
+bool dss_pll_calc_a(const struct dss_pll *pll, unsigned long clkin,
 		unsigned long pll_min, unsigned long pll_max,
 		dss_pll_calc_func func, void *data);
+
+bool dss_pll_calc_b(const struct dss_pll *pll, unsigned long clkin,
+	unsigned long target_clkout, struct dss_pll_clock_info *cinfo);
+
 int dss_pll_write_config_type_a(struct dss_pll *pll,
 		const struct dss_pll_clock_info *cinfo);
 int dss_pll_write_config_type_b(struct dss_pll *pll,

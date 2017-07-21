@@ -141,6 +141,16 @@ struct lowpan_dev {
 	u8 priv[0] __aligned(sizeof(void *));
 };
 
+struct lowpan_802154_neigh {
+	__le16 short_addr;
+};
+
+static inline
+struct lowpan_802154_neigh *lowpan_802154_neigh(void *neigh_priv)
+{
+	return neigh_priv;
+}
+
 static inline
 struct lowpan_dev *lowpan_dev(const struct net_device *dev)
 {
@@ -186,6 +196,21 @@ static inline void lowpan_iphc_uncompress_eui64_lladdr(struct in6_addr *ipaddr,
 	 * is done according RFC2464
 	 */
 	ipaddr->s6_addr[8] ^= 0x02;
+}
+
+static inline void lowpan_iphc_uncompress_eui48_lladdr(struct in6_addr *ipaddr,
+						       const void *lladdr)
+{
+	/* fe:80::XXXX:XXff:feXX:XXXX
+	 *        \_________________/
+	 *              hwaddr
+	 */
+	ipaddr->s6_addr[0] = 0xFE;
+	ipaddr->s6_addr[1] = 0x80;
+	memcpy(&ipaddr->s6_addr[8], lladdr, 3);
+	ipaddr->s6_addr[11] = 0xFF;
+	ipaddr->s6_addr[12] = 0xFE;
+	memcpy(&ipaddr->s6_addr[13], lladdr + 3, 3);
 }
 
 #ifdef DEBUG
@@ -242,6 +267,12 @@ static inline bool lowpan_fetch_skb(struct sk_buff *skb, void *data,
 	skb_pull(skb, len);
 
 	return false;
+}
+
+static inline bool lowpan_802154_is_valid_src_short_addr(__le16 addr)
+{
+	/* First bit of addr is multicast, reserved or 802.15.4 specific */
+	return !(addr & cpu_to_le16(0x8000));
 }
 
 static inline void lowpan_push_hc_data(u8 **hc_ptr, const void *data,

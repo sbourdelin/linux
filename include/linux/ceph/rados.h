@@ -50,7 +50,7 @@ struct ceph_timespec {
 #define CEPH_PG_LAYOUT_LINEAR 2
 #define CEPH_PG_LAYOUT_HYBRID 3
 
-#define CEPH_PG_MAX_SIZE      16  /* max # osds in a single pg */
+#define CEPH_PG_MAX_SIZE      32  /* max # osds in a single pg */
 
 /*
  * placement group.
@@ -438,6 +438,12 @@ enum {
 };
 
 const char *ceph_osd_watch_op_name(int o);
+
+enum {
+	CEPH_OSD_BACKOFF_OP_BLOCK = 1,
+	CEPH_OSD_BACKOFF_OP_ACK_BLOCK = 2,
+	CEPH_OSD_BACKOFF_OP_UNBLOCK = 3,
+};
 
 /*
  * an individual object operation.  each may be accompanied by some data

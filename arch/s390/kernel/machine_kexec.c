@@ -24,8 +24,11 @@
 #include <asm/diag.h>
 #include <asm/elf.h>
 #include <asm/asm-offsets.h>
+#include <asm/cacheflush.h>
 #include <asm/os_info.h>
+#include <asm/set_memory.h>
 #include <asm/switch_to.h>
+#include <asm/nmi.h>
 
 typedef void (*relocate_kernel_t)(kimage_entry_t *, unsigned long);
 
@@ -60,8 +63,6 @@ static int machine_kdump_pm_cb(struct notifier_block *nb, unsigned long action,
 static int __init machine_kdump_pm_init(void)
 {
 	pm_notifier(machine_kdump_pm_cb, 0);
-	/* Create initial mapping for crashkernel memory */
-	arch_kexec_unprotect_crashkres();
 	return 0;
 }
 arch_initcall(machine_kdump_pm_init);
@@ -103,6 +104,8 @@ static void __do_machine_kdump(void *image)
  */
 static noinline void __machine_kdump(void *image)
 {
+	struct mcesa *mcesa;
+	unsigned long cr2_old, cr2_new;
 	int this_cpu, cpu;
 
 	lgr_info_log();
@@ -115,8 +118,16 @@ static noinline void __machine_kdump(void *image)
 			continue;
 	}
 	/* Store status of the boot CPU */
+	mcesa = (struct mcesa *)(S390_lowcore.mcesad & MCESA_ORIGIN_MASK);
 	if (MACHINE_HAS_VX)
-		save_vx_regs((void *) &S390_lowcore.vector_save_area);
+		save_vx_regs((__vector128 *) mcesa->vector_save_area);
+	if (MACHINE_HAS_GS) {
+		__ctl_store(cr2_old, 2, 2);
+		cr2_new = cr2_old | (1UL << 4);
+		__ctl_load(cr2_new, 2, 2);
+		save_gs_cb((struct gs_cb *) mcesa->guarded_storage_save_area);
+		__ctl_load(cr2_old, 2, 2);
+	}
 	/*
 	 * To create a good backchain for this CPU in the dump store_status
 	 * is passed the address of a function. The address is saved into
@@ -150,42 +161,40 @@ static int kdump_csum_valid(struct kimage *image)
 
 #ifdef CONFIG_CRASH_DUMP
 
-/*
- * Map or unmap crashkernel memory
- */
-static void crash_map_pages(int enable)
+void crash_free_reserved_phys_range(unsigned long begin, unsigned long end)
 {
-	unsigned long size = resource_size(&crashk_res);
+	unsigned long addr, size;
 
-	BUG_ON(crashk_res.start % KEXEC_CRASH_MEM_ALIGN ||
-	       size % KEXEC_CRASH_MEM_ALIGN);
-	if (enable)
-		vmem_add_mapping(crashk_res.start, size);
-	else {
-		vmem_remove_mapping(crashk_res.start, size);
-		if (size)
-			os_info_crashkernel_add(crashk_res.start, size);
-		else
-			os_info_crashkernel_add(0, 0);
-	}
+	for (addr = begin; addr < end; addr += PAGE_SIZE)
+		free_reserved_page(pfn_to_page(addr >> PAGE_SHIFT));
+	size = begin - crashk_res.start;
+	if (size)
+		os_info_crashkernel_add(crashk_res.start, size);
+	else
+		os_info_crashkernel_add(0, 0);
 }
 
-/*
- * Unmap crashkernel memory
- */
+static void crash_protect_pages(int protect)
+{
+	unsigned long size;
+
+	if (!crashk_res.end)
+		return;
+	size = resource_size(&crashk_res);
+	if (protect)
+		set_memory_ro(crashk_res.start, size >> PAGE_SHIFT);
+	else
+		set_memory_rw(crashk_res.start, size >> PAGE_SHIFT);
+}
+
 void arch_kexec_protect_crashkres(void)
 {
-	if (crashk_res.end)
-		crash_map_pages(0);
+	crash_protect_pages(1);
 }
 
-/*
- * Map crashkernel memory
- */
 void arch_kexec_unprotect_crashkres(void)
 {
-	if (crashk_res.end)
-		crash_map_pages(1);
+	crash_protect_pages(0);
 }
 
 #endif
@@ -237,6 +246,7 @@ void arch_crash_save_vmcoreinfo(void)
 	VMCOREINFO_SYMBOL(lowcore_ptr);
 	VMCOREINFO_SYMBOL(high_memory);
 	VMCOREINFO_LENGTH(lowcore_ptr, NR_CPUS);
+	mem_assign_absolute(S390_lowcore.vmcore_info, paddr_vmcoreinfo_note());
 }
 
 void machine_shutdown(void)

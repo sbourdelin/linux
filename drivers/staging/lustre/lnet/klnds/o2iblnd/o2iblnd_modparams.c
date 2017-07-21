@@ -15,11 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * version 2 along with this program; If not, see
- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
- *
- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- * CA 95054 USA or visit www.sun.com if you need additional information or
- * have any questions.
+ * http://www.gnu.org/licenses/gpl-2.0.html
  *
  * GPL HEADER END
  */
@@ -110,7 +106,8 @@ static int concurrent_sends;
 module_param(concurrent_sends, int, 0444);
 MODULE_PARM_DESC(concurrent_sends, "send work-queue sizing");
 
-static int map_on_demand;
+#define IBLND_DEFAULT_MAP_ON_DEMAND IBLND_MAX_RDMA_FRAGS
+static int map_on_demand = IBLND_DEFAULT_MAP_ON_DEMAND;
 module_param(map_on_demand, int, 0444);
 MODULE_PARM_DESC(map_on_demand, "map on demand");
 
@@ -145,7 +142,7 @@ static int use_privileged_port = 1;
 module_param(use_privileged_port, int, 0644);
 MODULE_PARM_DESC(use_privileged_port, "use privileged port when initiating connection");
 
-kib_tunables_t kiblnd_tunables = {
+struct kib_tunables kiblnd_tunables = {
 	.kib_dev_failover      = &dev_failover,
 	.kib_service           = &service,
 	.kib_cksum             = &cksum,
@@ -164,7 +161,7 @@ kib_tunables_t kiblnd_tunables = {
 static struct lnet_ioctl_config_o2iblnd_tunables default_tunables;
 
 /* # messages/RDMAs in-flight */
-int kiblnd_msg_queue_size(int version, lnet_ni_t *ni)
+int kiblnd_msg_queue_size(int version, struct lnet_ni *ni)
 {
 	if (version == IBLND_MSG_VERSION_1)
 		return IBLND_MSG_QUEUE_SIZE_V1;
@@ -232,10 +229,13 @@ int kiblnd_tunables_setup(struct lnet_ni *ni)
 	if (tunables->lnd_peercredits_hiw >= ni->ni_peertxcredits)
 		tunables->lnd_peercredits_hiw = ni->ni_peertxcredits - 1;
 
-	if (tunables->lnd_map_on_demand < 0 ||
+	if (tunables->lnd_map_on_demand <= 0 ||
 	    tunables->lnd_map_on_demand > IBLND_MAX_RDMA_FRAGS) {
-		/* disable map-on-demand */
-		tunables->lnd_map_on_demand = 0;
+		/* Use the default */
+		CWARN("Invalid map_on_demand (%d), expects 1 - %d. Using default of %d\n",
+		      tunables->lnd_map_on_demand,
+		      IBLND_MAX_RDMA_FRAGS, IBLND_DEFAULT_MAP_ON_DEMAND);
+		tunables->lnd_map_on_demand = IBLND_DEFAULT_MAP_ON_DEMAND;
 	}
 
 	if (tunables->lnd_map_on_demand == 1) {

@@ -15,11 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * version 2 along with this program; If not, see
- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
- *
- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- * CA 95054 USA or visit www.sun.com if you need additional information or
- * have any questions.
+ * http://www.gnu.org/licenses/gpl-2.0.html
  *
  * GPL HEADER END
  */
@@ -250,7 +246,7 @@ void cl_lock_descr_print(const struct lu_env *env, void *cookie,
 	const struct lu_fid  *fid;
 
 	fid = lu_object_fid(&descr->cld_obj->co_lu);
-	(*printer)(env, cookie, DDESCR"@"DFID, PDESCR(descr), PFID(fid));
+	(*printer)(env, cookie, DDESCR "@" DFID, PDESCR(descr), PFID(fid));
 }
 EXPORT_SYMBOL(cl_lock_descr_print);
 

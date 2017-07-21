@@ -629,11 +629,14 @@ int wl12xx_cmd_role_start_ap(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	wl1271_debug(DEBUG_CMD, "cmd role start ap %d", wlvif->role_id);
 
-	/* trying to use hidden SSID with an old hostapd version */
-	if (wlvif->ssid_len == 0 && !bss_conf->hidden_ssid) {
-		wl1271_error("got a null SSID from beacon/bss");
-		ret = -EINVAL;
-		goto out;
+	/* If MESH --> ssid_len is always 0 */
+	if (!ieee80211_vif_is_mesh(vif)) {
+		/* trying to use hidden SSID with an old hostapd version */
+		if (wlvif->ssid_len == 0 && !bss_conf->hidden_ssid) {
+			wl1271_error("got a null SSID from beacon/bss");
+			ret = -EINVAL;
+			goto out;
+		}
 	}
 
 	cmd = kzalloc(sizeof(*cmd), GFP_KERNEL);
@@ -1153,9 +1156,9 @@ int wl12xx_cmd_build_probe_req(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 		goto out;
 	}
 	if (ie0_len)
-		memcpy(skb_put(skb, ie0_len), ie0, ie0_len);
+		skb_put_data(skb, ie0, ie0_len);
 	if (ie1_len)
-		memcpy(skb_put(skb, ie1_len), ie1, ie1_len);
+		skb_put_data(skb, ie1, ie1_len);
 
 	if (sched_scan &&
 	    (wl->quirks & WLCORE_QUIRK_DUAL_PROBE_TMPL)) {
@@ -1230,8 +1233,7 @@ int wl1271_cmd_build_arp_rsp(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 
 	skb_reserve(skb, sizeof(*hdr) + WL1271_EXTRA_SPACE_MAX);
 
-	tmpl = (struct wl12xx_arp_rsp_template *)skb_put(skb, sizeof(*tmpl));
-	memset(tmpl, 0, sizeof(*tmpl));
+	tmpl = skb_put_zero(skb, sizeof(*tmpl));
 
 	/* llc layer */
 	memcpy(tmpl->llc_hdr, rfc1042_header, sizeof(rfc1042_header));
@@ -1280,7 +1282,7 @@ int wl1271_cmd_build_arp_rsp(struct wl1271 *wl, struct wl12xx_vif *wlvif)
 		memset(skb_push(skb, sizeof(__le16)), 0, sizeof(__le16));
 
 	/* mac80211 header */
-	hdr = (struct ieee80211_hdr_3addr *)skb_push(skb, sizeof(*hdr));
+	hdr = skb_push(skb, sizeof(*hdr));
 	memset(hdr, 0, sizeof(*hdr));
 	fc = IEEE80211_FTYPE_DATA | IEEE80211_FCTL_TODS;
 	if (wlvif->sta.qos)
@@ -1565,6 +1567,13 @@ int wl12xx_cmd_add_peer(struct wl1271 *wl, struct wl12xx_vif *wlvif,
 	cmd->supported_rates =
 		cpu_to_le32(wl1271_tx_enabled_rates_get(wl, sta_rates,
 							wlvif->band));
+
+	if (!cmd->supported_rates) {
+		wl1271_debug(DEBUG_CMD,
+			     "peer has no supported rates yet, configuring basic rates: 0x%x",
+			     wlvif->basic_rate_set);
+		cmd->supported_rates = cpu_to_le32(wlvif->basic_rate_set);
+	}
 
 	wl1271_debug(DEBUG_CMD, "new peer rates=0x%x queues=0x%x",
 		     cmd->supported_rates, sta->uapsd_queues);

@@ -66,6 +66,7 @@
 #define NTB_TRANSPORT_VER	"4"
 #define NTB_TRANSPORT_NAME	"ntb_transport"
 #define NTB_TRANSPORT_DESC	"Software Queue-Pair Transport over NTB"
+#define NTB_TRANSPORT_MIN_SPADS (MW0_SZ_HIGH + 2)
 
 MODULE_DESCRIPTION(NTB_TRANSPORT_DESC);
 MODULE_VERSION(NTB_TRANSPORT_VER);
@@ -94,6 +95,9 @@ MODULE_PARM_DESC(use_dma, "Use DMA engine to perform large data copy");
 
 static struct dentry *nt_debugfs_dir;
 
+/* Only two-ports NTB devices are supported */
+#define PIDX		NTB_DEF_PEER_IDX
+
 struct ntb_queue_entry {
 	/* ntb_queue list reference */
 	struct list_head entry;
@@ -102,13 +106,16 @@ struct ntb_queue_entry {
 	void *buf;
 	unsigned int len;
 	unsigned int flags;
+	int retries;
+	int errors;
+	unsigned int tx_index;
+	unsigned int rx_index;
 
 	struct ntb_transport_qp *qp;
 	union {
 		struct ntb_payload_header __iomem *tx_hdr;
 		struct ntb_payload_header *rx_hdr;
 	};
-	unsigned int index;
 };
 
 struct ntb_rx_info {
@@ -153,6 +160,7 @@ struct ntb_transport_qp {
 	unsigned int rx_index;
 	unsigned int rx_max_entry;
 	unsigned int rx_max_frame;
+	unsigned int rx_alloc_entry;
 	dma_cookie_t last_cookie;
 	struct tasklet_struct rxc_db_work;
 
@@ -172,14 +180,12 @@ struct ntb_transport_qp {
 	u64 rx_err_ver;
 	u64 rx_memcpy;
 	u64 rx_async;
-	u64 dma_rx_prep_err;
 	u64 tx_bytes;
 	u64 tx_pkts;
 	u64 tx_ring_full;
 	u64 tx_err_no_buf;
 	u64 tx_memcpy;
 	u64 tx_async;
-	u64 dma_tx_prep_err;
 };
 
 struct ntb_transport_mw {
@@ -238,9 +244,6 @@ enum {
 	NUM_MWS,
 	MW0_SZ_HIGH,
 	MW0_SZ_LOW,
-	MW1_SZ_HIGH,
-	MW1_SZ_LOW,
-	MAX_SPAD,
 };
 
 #define dev_client_dev(__dev) \
@@ -252,12 +255,16 @@ enum {
 #define QP_TO_MW(nt, qp)	((qp) % nt->mw_count)
 #define NTB_QP_DEF_NUM_ENTRIES	100
 #define NTB_LINK_DOWN_TIMEOUT	10
-#define DMA_RETRIES		20
-#define DMA_OUT_RESOURCE_TO	50
 
 static void ntb_transport_rxc_db(unsigned long data);
 static const struct ntb_ctx_ops ntb_transport_ops;
 static struct ntb_client ntb_transport_client;
+static int ntb_async_tx_submit(struct ntb_transport_qp *qp,
+			       struct ntb_queue_entry *entry);
+static void ntb_memcpy_tx(struct ntb_queue_entry *entry, void __iomem *offset);
+static int ntb_async_rx_submit(struct ntb_queue_entry *entry, void *offset);
+static void ntb_memcpy_rx(struct ntb_queue_entry *entry, void *offset);
+
 
 static int ntb_transport_bus_match(struct device *dev,
 				   struct device_driver *drv)
@@ -480,7 +487,9 @@ static ssize_t debugfs_read(struct file *filp, char __user *ubuf, size_t count,
 	out_offset += snprintf(buf + out_offset, out_count - out_offset,
 			       "rx_index - \t%u\n", qp->rx_index);
 	out_offset += snprintf(buf + out_offset, out_count - out_offset,
-			       "rx_max_entry - \t%u\n\n", qp->rx_max_entry);
+			       "rx_max_entry - \t%u\n", qp->rx_max_entry);
+	out_offset += snprintf(buf + out_offset, out_count - out_offset,
+			       "rx_alloc_entry - \t%u\n\n", qp->rx_alloc_entry);
 
 	out_offset += snprintf(buf + out_offset, out_count - out_offset,
 			       "tx_bytes - \t%llu\n", qp->tx_bytes);
@@ -506,12 +515,6 @@ static ssize_t debugfs_read(struct file *filp, char __user *ubuf, size_t count,
 	out_offset += snprintf(buf + out_offset, out_count - out_offset,
 			       "free tx - \t%u\n",
 			       ntb_transport_tx_free_entry(qp));
-	out_offset += snprintf(buf + out_offset, out_count - out_offset,
-			       "DMA tx prep err - \t%llu\n",
-			       qp->dma_tx_prep_err);
-	out_offset += snprintf(buf + out_offset, out_count - out_offset,
-			       "DMA rx prep err - \t%llu\n",
-			       qp->dma_rx_prep_err);
 
 	out_offset += snprintf(buf + out_offset, out_count - out_offset,
 			       "\n");
@@ -597,9 +600,12 @@ static int ntb_transport_setup_qp_mw(struct ntb_transport_ctx *nt,
 {
 	struct ntb_transport_qp *qp = &nt->qp_vec[qp_num];
 	struct ntb_transport_mw *mw;
+	struct ntb_dev *ndev = nt->ndev;
+	struct ntb_queue_entry *entry;
 	unsigned int rx_size, num_qps_mw;
 	unsigned int mw_num, mw_count, qp_count;
 	unsigned int i;
+	int node;
 
 	mw_count = nt->mw_count;
 	qp_count = nt->qp_count;
@@ -610,7 +616,7 @@ static int ntb_transport_setup_qp_mw(struct ntb_transport_ctx *nt,
 	if (!mw->virt_addr)
 		return -ENOMEM;
 
-	if (qp_count % mw_count && mw_num + 1 < qp_count / mw_count)
+	if (mw_num < qp_count % mw_count)
 		num_qps_mw = qp_count / mw_count + 1;
 	else
 		num_qps_mw = qp_count / mw_count;
@@ -625,6 +631,23 @@ static int ntb_transport_setup_qp_mw(struct ntb_transport_ctx *nt,
 	qp->rx_max_frame = min(transport_mtu, rx_size / 2);
 	qp->rx_max_entry = rx_size / qp->rx_max_frame;
 	qp->rx_index = 0;
+
+	/*
+	 * Checking to see if we have more entries than the default.
+	 * We should add additional entries if that is the case so we
+	 * can be in sync with the transport frames.
+	 */
+	node = dev_to_node(&ndev->dev);
+	for (i = qp->rx_alloc_entry; i < qp->rx_max_entry; i++) {
+		entry = kzalloc_node(sizeof(*entry), GFP_ATOMIC, node);
+		if (!entry)
+			return -ENOMEM;
+
+		entry->qp = qp;
+		ntb_list_add(&qp->ntb_rx_q_lock, &entry->entry,
+			     &qp->rx_free_q);
+		qp->rx_alloc_entry++;
+	}
 
 	qp->remote_rx_info->entry = qp->rx_max_entry - 1;
 
@@ -650,7 +673,7 @@ static void ntb_free_mw(struct ntb_transport_ctx *nt, int num_mw)
 	if (!mw->virt_addr)
 		return;
 
-	ntb_mw_clear_trans(nt->ndev, num_mw);
+	ntb_mw_clear_trans(nt->ndev, PIDX, num_mw);
 	dma_free_coherent(&pdev->dev, mw->buff_size,
 			  mw->virt_addr, mw->dma_addr);
 	mw->xlat_size = 0;
@@ -707,7 +730,8 @@ static int ntb_set_mw(struct ntb_transport_ctx *nt, int num_mw,
 	}
 
 	/* Notify HW the memory location of the receive buffer */
-	rc = ntb_mw_set_trans(nt->ndev, num_mw, mw->dma_addr, mw->xlat_size);
+	rc = ntb_mw_set_trans(nt->ndev, PIDX, num_mw, mw->dma_addr,
+			      mw->xlat_size);
 	if (rc) {
 		dev_err(&pdev->dev, "Unable to set mw%d translation", num_mw);
 		ntb_free_mw(nt, num_mw);
@@ -738,8 +762,6 @@ static void ntb_qp_link_down_reset(struct ntb_transport_qp *qp)
 	qp->tx_err_no_buf = 0;
 	qp->tx_memcpy = 0;
 	qp->tx_async = 0;
-	qp->dma_tx_prep_err = 0;
-	qp->dma_rx_prep_err = 0;
 }
 
 static void ntb_qp_link_cleanup(struct ntb_transport_qp *qp)
@@ -779,7 +801,7 @@ static void ntb_transport_link_cleanup(struct ntb_transport_ctx *nt)
 {
 	struct ntb_transport_qp *qp;
 	u64 qp_bitmap_alloc;
-	int i;
+	unsigned int i, count;
 
 	qp_bitmap_alloc = nt->qp_bitmap & ~nt->qp_bitmap_free;
 
@@ -799,7 +821,8 @@ static void ntb_transport_link_cleanup(struct ntb_transport_ctx *nt)
 	 * goes down, blast them now to give them a sane value the next
 	 * time they are accessed
 	 */
-	for (i = 0; i < MAX_SPAD; i++)
+	count = ntb_spad_count(nt->ndev);
+	for (i = 0; i < count; i++)
 		ntb_spad_write(nt->ndev, i, 0);
 }
 
@@ -839,17 +862,17 @@ static void ntb_transport_link_work(struct work_struct *work)
 			size = max_mw_size;
 
 		spad = MW0_SZ_HIGH + (i * 2);
-		ntb_peer_spad_write(ndev, spad, upper_32_bits(size));
+		ntb_peer_spad_write(ndev, PIDX, spad, upper_32_bits(size));
 
 		spad = MW0_SZ_LOW + (i * 2);
-		ntb_peer_spad_write(ndev, spad, lower_32_bits(size));
+		ntb_peer_spad_write(ndev, PIDX, spad, lower_32_bits(size));
 	}
 
-	ntb_peer_spad_write(ndev, NUM_MWS, nt->mw_count);
+	ntb_peer_spad_write(ndev, PIDX, NUM_MWS, nt->mw_count);
 
-	ntb_peer_spad_write(ndev, NUM_QPS, nt->qp_count);
+	ntb_peer_spad_write(ndev, PIDX, NUM_QPS, nt->qp_count);
 
-	ntb_peer_spad_write(ndev, VERSION, NTB_TRANSPORT_VERSION);
+	ntb_peer_spad_write(ndev, PIDX, VERSION, NTB_TRANSPORT_VERSION);
 
 	/* Query the remote side for its info */
 	val = ntb_spad_read(ndev, VERSION);
@@ -925,10 +948,9 @@ static void ntb_qp_link_work(struct work_struct *work)
 
 	val = ntb_spad_read(nt->ndev, QP_LINKS);
 
-	ntb_peer_spad_write(nt->ndev, QP_LINKS, val | BIT(qp->qp_num));
+	ntb_peer_spad_write(nt->ndev, PIDX, QP_LINKS, val | BIT(qp->qp_num));
 
 	/* query remote spad for qp ready bits */
-	ntb_peer_spad_read(nt->ndev, QP_LINKS);
 	dev_dbg_ratelimited(&pdev->dev, "Remote QP link status = %x\n", val);
 
 	/* See if the remote side is up */
@@ -970,7 +992,7 @@ static int ntb_transport_init_queue(struct ntb_transport_ctx *nt,
 	qp->event_handler = NULL;
 	ntb_qp_link_down_reset(qp);
 
-	if (qp_count % mw_count && mw_num + 1 < qp_count / mw_count)
+	if (mw_num < qp_count % mw_count)
 		num_qps_mw = qp_count / mw_count + 1;
 	else
 		num_qps_mw = qp_count / mw_count;
@@ -1032,10 +1054,17 @@ static int ntb_transport_probe(struct ntb_client *self, struct ntb_dev *ndev)
 {
 	struct ntb_transport_ctx *nt;
 	struct ntb_transport_mw *mw;
-	unsigned int mw_count, qp_count;
+	unsigned int mw_count, qp_count, spad_count, max_mw_count_for_spads;
 	u64 qp_bitmap;
 	int node;
 	int rc, i;
+
+	mw_count = ntb_mw_count(ndev, PIDX);
+
+	if (!ndev->ops->mw_set_trans) {
+		dev_err(&ndev->dev, "Inbound MW based NTB API is required\n");
+		return -EINVAL;
+	}
 
 	if (ntb_db_is_unsafe(ndev))
 		dev_dbg(&ndev->dev,
@@ -1044,6 +1073,9 @@ static int ntb_transport_probe(struct ntb_client *self, struct ntb_dev *ndev)
 		dev_dbg(&ndev->dev,
 			"scratchpad is unsafe, proceed anyway...\n");
 
+	if (ntb_peer_port_count(ndev) != NTB_DEF_PEER_CNT)
+		dev_warn(&ndev->dev, "Multi-port NTB devices unsupported\n");
+
 	node = dev_to_node(&ndev->dev);
 
 	nt = kzalloc_node(sizeof(*nt), GFP_KERNEL, node);
@@ -1051,10 +1083,18 @@ static int ntb_transport_probe(struct ntb_client *self, struct ntb_dev *ndev)
 		return -ENOMEM;
 
 	nt->ndev = ndev;
+	spad_count = ntb_spad_count(ndev);
 
-	mw_count = ntb_mw_count(ndev);
+	/* Limit the MW's based on the availability of scratchpads */
 
-	nt->mw_count = mw_count;
+	if (spad_count < NTB_TRANSPORT_MIN_SPADS) {
+		nt->mw_count = 0;
+		rc = -EINVAL;
+		goto err;
+	}
+
+	max_mw_count_for_spads = (spad_count - MW0_SZ_HIGH) / 2;
+	nt->mw_count = min(mw_count, max_mw_count_for_spads);
 
 	nt->mw_vec = kzalloc_node(mw_count * sizeof(*nt->mw_vec),
 				  GFP_KERNEL, node);
@@ -1066,8 +1106,13 @@ static int ntb_transport_probe(struct ntb_client *self, struct ntb_dev *ndev)
 	for (i = 0; i < mw_count; i++) {
 		mw = &nt->mw_vec[i];
 
-		rc = ntb_mw_get_range(ndev, i, &mw->phys_addr, &mw->phys_size,
-				      &mw->xlat_align, &mw->xlat_align_size);
+		rc = ntb_mw_get_align(ndev, PIDX, i, &mw->xlat_align,
+				      &mw->xlat_align_size, NULL);
+		if (rc)
+			goto err1;
+
+		rc = ntb_peer_mw_get_addr(ndev, i, &mw->phys_addr,
+					  &mw->phys_size);
 		if (rc)
 			goto err1;
 
@@ -1088,8 +1133,8 @@ static int ntb_transport_probe(struct ntb_client *self, struct ntb_dev *ndev)
 	qp_count = ilog2(qp_bitmap);
 	if (max_num_clients && max_num_clients < qp_count)
 		qp_count = max_num_clients;
-	else if (mw_count < qp_count)
-		qp_count = mw_count;
+	else if (nt->mw_count < qp_count)
+		qp_count = nt->mw_count;
 
 	qp_bitmap &= BIT_ULL(qp_count) - 1;
 
@@ -1201,7 +1246,7 @@ static void ntb_complete_rxc(struct ntb_transport_qp *qp)
 			break;
 
 		entry->rx_hdr->flags = 0;
-		iowrite32(entry->index, &qp->rx_info->entry);
+		iowrite32(entry->rx_index, &qp->rx_info->entry);
 
 		cb_data = entry->cb_data;
 		len = entry->len;
@@ -1219,9 +1264,35 @@ static void ntb_complete_rxc(struct ntb_transport_qp *qp)
 	spin_unlock_irqrestore(&qp->ntb_rx_q_lock, irqflags);
 }
 
-static void ntb_rx_copy_callback(void *data)
+static void ntb_rx_copy_callback(void *data,
+				 const struct dmaengine_result *res)
 {
 	struct ntb_queue_entry *entry = data;
+
+	/* we need to check DMA results if we are using DMA */
+	if (res) {
+		enum dmaengine_tx_result dma_err = res->result;
+
+		switch (dma_err) {
+		case DMA_TRANS_READ_FAILED:
+		case DMA_TRANS_WRITE_FAILED:
+			entry->errors++;
+		case DMA_TRANS_ABORTED:
+		{
+			struct ntb_transport_qp *qp = entry->qp;
+			void *offset = qp->rx_buff + qp->rx_max_frame *
+					qp->rx_index;
+
+			ntb_memcpy_rx(entry, offset);
+			qp->rx_memcpy++;
+			return;
+		}
+
+		case DMA_TRANS_NOERROR:
+		default:
+			break;
+		}
+	}
 
 	entry->flags |= DESC_DONE_FLAG;
 
@@ -1238,10 +1309,10 @@ static void ntb_memcpy_rx(struct ntb_queue_entry *entry, void *offset)
 	/* Ensure that the data is fully copied out before clearing the flag */
 	wmb();
 
-	ntb_rx_copy_callback(entry);
+	ntb_rx_copy_callback(entry, NULL);
 }
 
-static void ntb_async_rx(struct ntb_queue_entry *entry, void *offset)
+static int ntb_async_rx_submit(struct ntb_queue_entry *entry, void *offset)
 {
 	struct dma_async_tx_descriptor *txd;
 	struct ntb_transport_qp *qp = entry->qp;
@@ -1251,16 +1322,8 @@ static void ntb_async_rx(struct ntb_queue_entry *entry, void *offset)
 	struct dmaengine_unmap_data *unmap;
 	dma_cookie_t cookie;
 	void *buf = entry->buf;
-	int retries = 0;
 
 	len = entry->len;
-
-	if (!chan)
-		goto err;
-
-	if (len < copy_bytes)
-		goto err;
-
 	device = chan->device;
 	pay_off = (size_t)offset & ~PAGE_MASK;
 	buff_off = (size_t)buf & ~PAGE_MASK;
@@ -1287,23 +1350,13 @@ static void ntb_async_rx(struct ntb_queue_entry *entry, void *offset)
 
 	unmap->from_cnt = 1;
 
-	for (retries = 0; retries < DMA_RETRIES; retries++) {
-		txd = device->device_prep_dma_memcpy(chan, unmap->addr[1],
-						     unmap->addr[0], len,
-						     DMA_PREP_INTERRUPT);
-		if (txd)
-			break;
-
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(DMA_OUT_RESOURCE_TO);
-	}
-
-	if (!txd) {
-		qp->dma_rx_prep_err++;
+	txd = device->device_prep_dma_memcpy(chan, unmap->addr[1],
+					     unmap->addr[0], len,
+					     DMA_PREP_INTERRUPT);
+	if (!txd)
 		goto err_get_unmap;
-	}
 
-	txd->callback = ntb_rx_copy_callback;
+	txd->callback_result = ntb_rx_copy_callback;
 	txd->callback_param = entry;
 	dma_set_unmap(txd, unmap);
 
@@ -1317,12 +1370,37 @@ static void ntb_async_rx(struct ntb_queue_entry *entry, void *offset)
 
 	qp->rx_async++;
 
-	return;
+	return 0;
 
 err_set_unmap:
 	dmaengine_unmap_put(unmap);
 err_get_unmap:
 	dmaengine_unmap_put(unmap);
+err:
+	return -ENXIO;
+}
+
+static void ntb_async_rx(struct ntb_queue_entry *entry, void *offset)
+{
+	struct ntb_transport_qp *qp = entry->qp;
+	struct dma_chan *chan = qp->rx_dma_chan;
+	int res;
+
+	if (!chan)
+		goto err;
+
+	if (entry->len < copy_bytes)
+		goto err;
+
+	res = ntb_async_rx_submit(entry, offset);
+	if (res < 0)
+		goto err;
+
+	if (!entry->retries)
+		qp->rx_async++;
+
+	return;
+
 err:
 	ntb_memcpy_rx(entry, offset);
 	qp->rx_memcpy++;
@@ -1369,7 +1447,7 @@ static int ntb_process_rxc(struct ntb_transport_qp *qp)
 	}
 
 	entry->rx_hdr = hdr;
-	entry->index = qp->rx_index;
+	entry->rx_index = qp->rx_index;
 
 	if (hdr->len > entry->len) {
 		dev_dbg(&qp->ndev->pdev->dev,
@@ -1439,11 +1517,38 @@ static void ntb_transport_rxc_db(unsigned long data)
 	}
 }
 
-static void ntb_tx_copy_callback(void *data)
+static void ntb_tx_copy_callback(void *data,
+				 const struct dmaengine_result *res)
 {
 	struct ntb_queue_entry *entry = data;
 	struct ntb_transport_qp *qp = entry->qp;
 	struct ntb_payload_header __iomem *hdr = entry->tx_hdr;
+
+	/* we need to check DMA results if we are using DMA */
+	if (res) {
+		enum dmaengine_tx_result dma_err = res->result;
+
+		switch (dma_err) {
+		case DMA_TRANS_READ_FAILED:
+		case DMA_TRANS_WRITE_FAILED:
+			entry->errors++;
+		case DMA_TRANS_ABORTED:
+		{
+			void __iomem *offset =
+				qp->tx_mw + qp->tx_max_frame *
+				entry->tx_index;
+
+			/* resubmit via CPU */
+			ntb_memcpy_tx(entry, offset);
+			qp->tx_memcpy++;
+			return;
+		}
+
+		case DMA_TRANS_NOERROR:
+		default:
+			break;
+		}
+	}
 
 	iowrite32(entry->flags | DESC_DONE_FLAG, &hdr->flags);
 
@@ -1479,40 +1584,24 @@ static void ntb_memcpy_tx(struct ntb_queue_entry *entry, void __iomem *offset)
 	/* Ensure that the data is fully copied out before setting the flags */
 	wmb();
 
-	ntb_tx_copy_callback(entry);
+	ntb_tx_copy_callback(entry, NULL);
 }
 
-static void ntb_async_tx(struct ntb_transport_qp *qp,
-			 struct ntb_queue_entry *entry)
+static int ntb_async_tx_submit(struct ntb_transport_qp *qp,
+			       struct ntb_queue_entry *entry)
 {
-	struct ntb_payload_header __iomem *hdr;
 	struct dma_async_tx_descriptor *txd;
 	struct dma_chan *chan = qp->tx_dma_chan;
 	struct dma_device *device;
+	size_t len = entry->len;
+	void *buf = entry->buf;
 	size_t dest_off, buff_off;
 	struct dmaengine_unmap_data *unmap;
 	dma_addr_t dest;
 	dma_cookie_t cookie;
-	void __iomem *offset;
-	size_t len = entry->len;
-	void *buf = entry->buf;
-	int retries = 0;
-
-	offset = qp->tx_mw + qp->tx_max_frame * qp->tx_index;
-	hdr = offset + qp->tx_max_frame - sizeof(struct ntb_payload_header);
-	entry->tx_hdr = hdr;
-
-	iowrite32(entry->len, &hdr->len);
-	iowrite32((u32)qp->tx_pkts, &hdr->ver);
-
-	if (!chan)
-		goto err;
-
-	if (len < copy_bytes)
-		goto err;
 
 	device = chan->device;
-	dest = qp->tx_mw_phys + qp->tx_max_frame * qp->tx_index;
+	dest = qp->tx_mw_phys + qp->tx_max_frame * entry->tx_index;
 	buff_off = (size_t)buf & ~PAGE_MASK;
 	dest_off = (size_t)dest & ~PAGE_MASK;
 
@@ -1531,22 +1620,12 @@ static void ntb_async_tx(struct ntb_transport_qp *qp,
 
 	unmap->to_cnt = 1;
 
-	for (retries = 0; retries < DMA_RETRIES; retries++) {
-		txd = device->device_prep_dma_memcpy(chan, dest, unmap->addr[0],
-						     len, DMA_PREP_INTERRUPT);
-		if (txd)
-			break;
-
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(DMA_OUT_RESOURCE_TO);
-	}
-
-	if (!txd) {
-		qp->dma_tx_prep_err++;
+	txd = device->device_prep_dma_memcpy(chan, dest, unmap->addr[0], len,
+					     DMA_PREP_INTERRUPT);
+	if (!txd)
 		goto err_get_unmap;
-	}
 
-	txd->callback = ntb_tx_copy_callback;
+	txd->callback_result = ntb_tx_copy_callback;
 	txd->callback_param = entry;
 	dma_set_unmap(txd, unmap);
 
@@ -1557,13 +1636,47 @@ static void ntb_async_tx(struct ntb_transport_qp *qp,
 	dmaengine_unmap_put(unmap);
 
 	dma_async_issue_pending(chan);
-	qp->tx_async++;
 
-	return;
+	return 0;
 err_set_unmap:
 	dmaengine_unmap_put(unmap);
 err_get_unmap:
 	dmaengine_unmap_put(unmap);
+err:
+	return -ENXIO;
+}
+
+static void ntb_async_tx(struct ntb_transport_qp *qp,
+			 struct ntb_queue_entry *entry)
+{
+	struct ntb_payload_header __iomem *hdr;
+	struct dma_chan *chan = qp->tx_dma_chan;
+	void __iomem *offset;
+	int res;
+
+	entry->tx_index = qp->tx_index;
+	offset = qp->tx_mw + qp->tx_max_frame * entry->tx_index;
+	hdr = offset + qp->tx_max_frame - sizeof(struct ntb_payload_header);
+	entry->tx_hdr = hdr;
+
+	iowrite32(entry->len, &hdr->len);
+	iowrite32((u32)qp->tx_pkts, &hdr->ver);
+
+	if (!chan)
+		goto err;
+
+	if (entry->len < copy_bytes)
+		goto err;
+
+	res = ntb_async_tx_submit(qp, entry);
+	if (res < 0)
+		goto err;
+
+	if (!entry->retries)
+		qp->tx_async++;
+
+	return;
+
 err:
 	ntb_memcpy_tx(entry, offset);
 	qp->tx_memcpy++;
@@ -1670,7 +1783,7 @@ ntb_transport_create_queue(void *data, struct device *client_dev,
 
 	node = dev_to_node(&ndev->dev);
 
-	free_queue = ffs(nt->qp_bitmap);
+	free_queue = ffs(nt->qp_bitmap_free);
 	if (!free_queue)
 		goto err;
 
@@ -1722,8 +1835,9 @@ ntb_transport_create_queue(void *data, struct device *client_dev,
 		ntb_list_add(&qp->ntb_rx_q_lock, &entry->entry,
 			     &qp->rx_free_q);
 	}
+	qp->rx_alloc_entry = NTB_QP_DEF_NUM_ENTRIES;
 
-	for (i = 0; i < NTB_QP_DEF_NUM_ENTRIES; i++) {
+	for (i = 0; i < qp->tx_max_entry; i++) {
 		entry = kzalloc_node(sizeof(*entry), GFP_ATOMIC, node);
 		if (!entry)
 			goto err2;
@@ -1744,6 +1858,7 @@ err2:
 	while ((entry = ntb_list_rm(&qp->ntb_tx_free_q_lock, &qp->tx_free_q)))
 		kfree(entry);
 err1:
+	qp->rx_alloc_entry = 0;
 	while ((entry = ntb_list_rm(&qp->ntb_rx_q_lock, &qp->rx_free_q)))
 		kfree(entry);
 	if (qp->tx_dma_chan)
@@ -1898,6 +2013,9 @@ int ntb_transport_rx_enqueue(struct ntb_transport_qp *qp, void *cb, void *data,
 	entry->buf = data;
 	entry->len = len;
 	entry->flags = 0;
+	entry->retries = 0;
+	entry->errors = 0;
+	entry->rx_index = 0;
 
 	ntb_list_add(&qp->ntb_rx_q_lock, &entry->entry, &qp->rx_pend_q);
 
@@ -1940,6 +2058,9 @@ int ntb_transport_tx_enqueue(struct ntb_transport_qp *qp, void *cb, void *data,
 	entry->buf = data;
 	entry->len = len;
 	entry->flags = 0;
+	entry->errors = 0;
+	entry->retries = 0;
+	entry->tx_index = 0;
 
 	rc = ntb_process_tx(qp, entry);
 	if (rc)
@@ -1987,8 +2108,7 @@ void ntb_transport_link_down(struct ntb_transport_qp *qp)
 
 	val = ntb_spad_read(qp->ndev, QP_LINKS);
 
-	ntb_peer_spad_write(qp->ndev, QP_LINKS,
-			    val & ~BIT(qp->qp_num));
+	ntb_peer_spad_write(qp->ndev, PIDX, QP_LINKS, val & ~BIT(qp->qp_num));
 
 	if (qp->link_is_up)
 		ntb_send_link_down(qp);
@@ -2133,9 +2253,8 @@ module_init(ntb_transport_init);
 
 static void __exit ntb_transport_exit(void)
 {
-	debugfs_remove_recursive(nt_debugfs_dir);
-
 	ntb_unregister_client(&ntb_transport_client);
 	bus_unregister(&ntb_transport_bus);
+	debugfs_remove_recursive(nt_debugfs_dir);
 }
 module_exit(ntb_transport_exit);

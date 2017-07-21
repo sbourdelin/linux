@@ -29,14 +29,26 @@
 #include <linux/module.h>
 #include <linux/printk.h>
 #include <linux/sched.h>
+#include <linux/sched/task_stack.h>
 #include <linux/slab.h>
 #include <linux/stacktrace.h>
 #include <linux/string.h>
 #include <linux/types.h>
 #include <linux/vmalloc.h>
+#include <linux/bug.h>
 
 #include "kasan.h"
 #include "../slab.h"
+
+void kasan_enable_current(void)
+{
+	current->kasan_depth++;
+}
+
+void kasan_disable_current(void)
+{
+	current->kasan_depth--;
+}
 
 /*
  * Poisons the shadow memory for 'size' bytes starting from 'addr'.
@@ -62,7 +74,7 @@ void kasan_unpoison_shadow(const void *address, size_t size)
 	}
 }
 
-static void __kasan_unpoison_stack(struct task_struct *task, void *sp)
+static void __kasan_unpoison_stack(struct task_struct *task, const void *sp)
 {
 	void *base = task_stack_page(task);
 	size_t size = sp - base;
@@ -77,9 +89,31 @@ void kasan_unpoison_task_stack(struct task_struct *task)
 }
 
 /* Unpoison the stack for the current task beyond a watermark sp value. */
-asmlinkage void kasan_unpoison_remaining_stack(void *sp)
+asmlinkage void kasan_unpoison_task_stack_below(const void *watermark)
 {
-	__kasan_unpoison_stack(current, sp);
+	/*
+	 * Calculate the task stack base address.  Avoid using 'current'
+	 * because this function is called by early resume code which hasn't
+	 * yet set up the percpu register (%gs).
+	 */
+	void *base = (void *)((unsigned long)watermark & ~(THREAD_SIZE - 1));
+
+	kasan_unpoison_shadow(base, watermark - base);
+}
+
+/*
+ * Clear all poison for the region between the current SP and a provided
+ * watermark value, as is sometimes required prior to hand-crafted asm function
+ * returns in the middle of functions.
+ */
+void kasan_unpoison_stack_above_sp_to(const void *watermark)
+{
+	const void *sp = __builtin_frame_address(0);
+	size_t size = watermark - sp;
+
+	if (WARN_ON(sp > watermark))
+		return;
+	kasan_unpoison_shadow(sp, size);
 }
 
 /*
@@ -100,97 +134,33 @@ static __always_inline bool memory_is_poisoned_1(unsigned long addr)
 	return false;
 }
 
-static __always_inline bool memory_is_poisoned_2(unsigned long addr)
+static __always_inline bool memory_is_poisoned_2_4_8(unsigned long addr,
+						unsigned long size)
 {
-	u16 *shadow_addr = (u16 *)kasan_mem_to_shadow((void *)addr);
+	u8 *shadow_addr = (u8 *)kasan_mem_to_shadow((void *)addr);
 
-	if (unlikely(*shadow_addr)) {
-		if (memory_is_poisoned_1(addr + 1))
-			return true;
+	/*
+	 * Access crosses 8(shadow size)-byte boundary. Such access maps
+	 * into 2 shadow bytes, so we need to check them both.
+	 */
+	if (unlikely(((addr + size - 1) & KASAN_SHADOW_MASK) < size - 1))
+		return *shadow_addr || memory_is_poisoned_1(addr + size - 1);
 
-		/*
-		 * If single shadow byte covers 2-byte access, we don't
-		 * need to do anything more. Otherwise, test the first
-		 * shadow byte.
-		 */
-		if (likely(((addr + 1) & KASAN_SHADOW_MASK) != 0))
-			return false;
-
-		return unlikely(*(u8 *)shadow_addr);
-	}
-
-	return false;
-}
-
-static __always_inline bool memory_is_poisoned_4(unsigned long addr)
-{
-	u16 *shadow_addr = (u16 *)kasan_mem_to_shadow((void *)addr);
-
-	if (unlikely(*shadow_addr)) {
-		if (memory_is_poisoned_1(addr + 3))
-			return true;
-
-		/*
-		 * If single shadow byte covers 4-byte access, we don't
-		 * need to do anything more. Otherwise, test the first
-		 * shadow byte.
-		 */
-		if (likely(((addr + 3) & KASAN_SHADOW_MASK) >= 3))
-			return false;
-
-		return unlikely(*(u8 *)shadow_addr);
-	}
-
-	return false;
-}
-
-static __always_inline bool memory_is_poisoned_8(unsigned long addr)
-{
-	u16 *shadow_addr = (u16 *)kasan_mem_to_shadow((void *)addr);
-
-	if (unlikely(*shadow_addr)) {
-		if (memory_is_poisoned_1(addr + 7))
-			return true;
-
-		/*
-		 * If single shadow byte covers 8-byte access, we don't
-		 * need to do anything more. Otherwise, test the first
-		 * shadow byte.
-		 */
-		if (likely(IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
-			return false;
-
-		return unlikely(*(u8 *)shadow_addr);
-	}
-
-	return false;
+	return memory_is_poisoned_1(addr + size - 1);
 }
 
 static __always_inline bool memory_is_poisoned_16(unsigned long addr)
 {
-	u32 *shadow_addr = (u32 *)kasan_mem_to_shadow((void *)addr);
+	u16 *shadow_addr = (u16 *)kasan_mem_to_shadow((void *)addr);
 
-	if (unlikely(*shadow_addr)) {
-		u16 shadow_first_bytes = *(u16 *)shadow_addr;
+	/* Unaligned 16-bytes access maps into 3 shadow bytes. */
+	if (unlikely(!IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
+		return *shadow_addr || memory_is_poisoned_1(addr + 15);
 
-		if (unlikely(shadow_first_bytes))
-			return true;
-
-		/*
-		 * If two shadow bytes covers 16-byte access, we don't
-		 * need to do anything more. Otherwise, test the last
-		 * shadow byte.
-		 */
-		if (likely(IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
-			return false;
-
-		return memory_is_poisoned_1(addr + 15);
-	}
-
-	return false;
+	return *shadow_addr;
 }
 
-static __always_inline unsigned long bytes_is_zero(const u8 *start,
+static __always_inline unsigned long bytes_is_nonzero(const u8 *start,
 					size_t size)
 {
 	while (size) {
@@ -203,7 +173,7 @@ static __always_inline unsigned long bytes_is_zero(const u8 *start,
 	return 0;
 }
 
-static __always_inline unsigned long memory_is_zero(const void *start,
+static __always_inline unsigned long memory_is_nonzero(const void *start,
 						const void *end)
 {
 	unsigned int words;
@@ -211,11 +181,11 @@ static __always_inline unsigned long memory_is_zero(const void *start,
 	unsigned int prefix = (unsigned long)start % 8;
 
 	if (end - start <= 16)
-		return bytes_is_zero(start, end - start);
+		return bytes_is_nonzero(start, end - start);
 
 	if (prefix) {
 		prefix = 8 - prefix;
-		ret = bytes_is_zero(start, prefix);
+		ret = bytes_is_nonzero(start, prefix);
 		if (unlikely(ret))
 			return ret;
 		start += prefix;
@@ -224,12 +194,12 @@ static __always_inline unsigned long memory_is_zero(const void *start,
 	words = (end - start) / 8;
 	while (words) {
 		if (unlikely(*(u64 *)start))
-			return bytes_is_zero(start, 8);
+			return bytes_is_nonzero(start, 8);
 		start += 8;
 		words--;
 	}
 
-	return bytes_is_zero(start, (end - start) % 8);
+	return bytes_is_nonzero(start, (end - start) % 8);
 }
 
 static __always_inline bool memory_is_poisoned_n(unsigned long addr,
@@ -237,7 +207,7 @@ static __always_inline bool memory_is_poisoned_n(unsigned long addr,
 {
 	unsigned long ret;
 
-	ret = memory_is_zero(kasan_mem_to_shadow((void *)addr),
+	ret = memory_is_nonzero(kasan_mem_to_shadow((void *)addr),
 			kasan_mem_to_shadow((void *)addr + size - 1) + 1);
 
 	if (unlikely(ret)) {
@@ -258,11 +228,9 @@ static __always_inline bool memory_is_poisoned(unsigned long addr, size_t size)
 		case 1:
 			return memory_is_poisoned_1(addr);
 		case 2:
-			return memory_is_poisoned_2(addr);
 		case 4:
-			return memory_is_poisoned_4(addr);
 		case 8:
-			return memory_is_poisoned_8(addr);
+			return memory_is_poisoned_2_4_8(addr, size);
 		case 16:
 			return memory_is_poisoned_16(addr);
 		default:
@@ -351,7 +319,6 @@ void kasan_free_pages(struct page *page, unsigned int order)
 				KASAN_FREE_PAGE);
 }
 
-#ifdef CONFIG_SLAB
 /*
  * Adaptive redzone policy taken from the userspace AddressSanitizer runtime.
  * For larger allocations larger redzones are used.
@@ -373,45 +340,57 @@ void kasan_cache_create(struct kmem_cache *cache, size_t *size,
 			unsigned long *flags)
 {
 	int redzone_adjust;
-	/* Make sure the adjusted size is still less than
-	 * KMALLOC_MAX_CACHE_SIZE.
-	 * TODO: this check is only useful for SLAB, but not SLUB. We'll need
-	 * to skip it for SLUB when it starts using kasan_cache_create().
-	 */
-	if (*size > KMALLOC_MAX_CACHE_SIZE -
-	    sizeof(struct kasan_alloc_meta) -
-	    sizeof(struct kasan_free_meta))
-		return;
-	*flags |= SLAB_KASAN;
+	int orig_size = *size;
+
 	/* Add alloc meta. */
 	cache->kasan_info.alloc_meta_offset = *size;
 	*size += sizeof(struct kasan_alloc_meta);
 
 	/* Add free meta. */
-	if (cache->flags & SLAB_DESTROY_BY_RCU || cache->ctor ||
+	if (cache->flags & SLAB_TYPESAFE_BY_RCU || cache->ctor ||
 	    cache->object_size < sizeof(struct kasan_free_meta)) {
 		cache->kasan_info.free_meta_offset = *size;
 		*size += sizeof(struct kasan_free_meta);
 	}
 	redzone_adjust = optimal_redzone(cache->object_size) -
 		(*size - cache->object_size);
+
 	if (redzone_adjust > 0)
 		*size += redzone_adjust;
-	*size = min(KMALLOC_MAX_CACHE_SIZE,
-		    max(*size,
-			cache->object_size +
-			optimal_redzone(cache->object_size)));
+
+	*size = min(KMALLOC_MAX_SIZE, max(*size, cache->object_size +
+					optimal_redzone(cache->object_size)));
+
+	/*
+	 * If the metadata doesn't fit, don't enable KASAN at all.
+	 */
+	if (*size <= cache->kasan_info.alloc_meta_offset ||
+			*size <= cache->kasan_info.free_meta_offset) {
+		cache->kasan_info.alloc_meta_offset = 0;
+		cache->kasan_info.free_meta_offset = 0;
+		*size = orig_size;
+		return;
+	}
+
+	*flags |= SLAB_KASAN;
 }
-#endif
 
 void kasan_cache_shrink(struct kmem_cache *cache)
 {
 	quarantine_remove_cache(cache);
 }
 
-void kasan_cache_destroy(struct kmem_cache *cache)
+void kasan_cache_shutdown(struct kmem_cache *cache)
 {
 	quarantine_remove_cache(cache);
+}
+
+size_t kasan_metadata_size(struct kmem_cache *cache)
+{
+	return (cache->kasan_info.alloc_meta_offset ?
+		sizeof(struct kasan_alloc_meta) : 0) +
+		(cache->kasan_info.free_meta_offset ?
+		sizeof(struct kasan_free_meta) : 0);
 }
 
 void kasan_poison_slab(struct page *page)
@@ -431,16 +410,8 @@ void kasan_poison_object_data(struct kmem_cache *cache, void *object)
 	kasan_poison_shadow(object,
 			round_up(cache->object_size, KASAN_SHADOW_SCALE_SIZE),
 			KASAN_KMALLOC_REDZONE);
-#ifdef CONFIG_SLAB
-	if (cache->flags & SLAB_KASAN) {
-		struct kasan_alloc_meta *alloc_info =
-			get_alloc_info(cache, object);
-		alloc_info->state = KASAN_STATE_INIT;
-	}
-#endif
 }
 
-#ifdef CONFIG_SLAB
 static inline int in_irqentry_text(unsigned long ptr)
 {
 	return (ptr >= (unsigned long)&__irqentry_text_start &&
@@ -501,7 +472,17 @@ struct kasan_free_meta *get_free_info(struct kmem_cache *cache,
 	BUILD_BUG_ON(sizeof(struct kasan_free_meta) > 32);
 	return (void *)object + cache->kasan_info.free_meta_offset;
 }
-#endif
+
+void kasan_init_slab_obj(struct kmem_cache *cache, const void *object)
+{
+	struct kasan_alloc_meta *alloc_info;
+
+	if (!(cache->flags & SLAB_KASAN))
+		return;
+
+	alloc_info = get_alloc_info(cache, object);
+	__memset(alloc_info, 0, sizeof(*alloc_info));
+}
 
 void kasan_slab_alloc(struct kmem_cache *cache, void *object, gfp_t flags)
 {
@@ -514,7 +495,7 @@ static void kasan_poison_slab_free(struct kmem_cache *cache, void *object)
 	unsigned long rounded_up_size = round_up(size, KASAN_SHADOW_SCALE_SIZE);
 
 	/* RCU slabs could be legally used after free within the RCU period */
-	if (unlikely(cache->flags & SLAB_DESTROY_BY_RCU))
+	if (unlikely(cache->flags & SLAB_TYPESAFE_BY_RCU))
 		return;
 
 	kasan_poison_shadow(object, rounded_up_size, KASAN_KMALLOC_FREE);
@@ -522,38 +503,27 @@ static void kasan_poison_slab_free(struct kmem_cache *cache, void *object)
 
 bool kasan_slab_free(struct kmem_cache *cache, void *object)
 {
-#ifdef CONFIG_SLAB
+	s8 shadow_byte;
+
 	/* RCU slabs could be legally used after free within the RCU period */
-	if (unlikely(cache->flags & SLAB_DESTROY_BY_RCU))
+	if (unlikely(cache->flags & SLAB_TYPESAFE_BY_RCU))
 		return false;
 
-	if (likely(cache->flags & SLAB_KASAN)) {
-		struct kasan_alloc_meta *alloc_info =
-			get_alloc_info(cache, object);
-		struct kasan_free_meta *free_info =
-			get_free_info(cache, object);
-
-		switch (alloc_info->state) {
-		case KASAN_STATE_ALLOC:
-			alloc_info->state = KASAN_STATE_QUARANTINE;
-			quarantine_put(free_info, cache);
-			set_track(&free_info->track, GFP_NOWAIT);
-			kasan_poison_slab_free(cache, object);
-			return true;
-		case KASAN_STATE_QUARANTINE:
-		case KASAN_STATE_FREE:
-			pr_err("Double free");
-			dump_stack();
-			break;
-		default:
-			break;
-		}
+	shadow_byte = READ_ONCE(*(s8 *)kasan_mem_to_shadow(object));
+	if (shadow_byte < 0 || shadow_byte >= KASAN_SHADOW_SCALE_SIZE) {
+		kasan_report_double_free(cache, object,
+				__builtin_return_address(1));
+		return true;
 	}
-	return false;
-#else
+
 	kasan_poison_slab_free(cache, object);
-	return false;
-#endif
+
+	if (unlikely(!(cache->flags & SLAB_KASAN)))
+		return false;
+
+	set_track(&get_alloc_info(cache, object)->free_track, GFP_NOWAIT);
+	quarantine_put(get_free_info(cache, object), cache);
+	return true;
 }
 
 void kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
@@ -562,7 +532,7 @@ void kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
 	unsigned long redzone_start;
 	unsigned long redzone_end;
 
-	if (flags & __GFP_RECLAIM)
+	if (gfpflags_allow_blocking(flags))
 		quarantine_reduce();
 
 	if (unlikely(object == NULL))
@@ -576,16 +546,9 @@ void kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
 	kasan_unpoison_shadow(object, size);
 	kasan_poison_shadow((void *)redzone_start, redzone_end - redzone_start,
 		KASAN_KMALLOC_REDZONE);
-#ifdef CONFIG_SLAB
-	if (cache->flags & SLAB_KASAN) {
-		struct kasan_alloc_meta *alloc_info =
-			get_alloc_info(cache, object);
 
-		alloc_info->state = KASAN_STATE_ALLOC;
-		alloc_info->alloc_size = size;
-		set_track(&alloc_info->track, flags);
-	}
-#endif
+	if (cache->flags & SLAB_KASAN)
+		set_track(&get_alloc_info(cache, object)->alloc_track, flags);
 }
 EXPORT_SYMBOL(kasan_kmalloc);
 
@@ -595,7 +558,7 @@ void kasan_kmalloc_large(const void *ptr, size_t size, gfp_t flags)
 	unsigned long redzone_start;
 	unsigned long redzone_end;
 
-	if (flags & __GFP_RECLAIM)
+	if (gfpflags_allow_blocking(flags))
 		quarantine_reduce();
 
 	if (unlikely(ptr == NULL))
@@ -662,7 +625,7 @@ int kasan_module_alloc(void *addr, size_t size)
 
 	ret = __vmalloc_node_range(shadow_size, 1, shadow_start,
 			shadow_start + shadow_size,
-			GFP_KERNEL | __GFP_HIGHMEM | __GFP_ZERO,
+			GFP_KERNEL | __GFP_ZERO,
 			PAGE_KERNEL, VM_NO_GUARD, NUMA_NO_NODE,
 			__builtin_return_address(0));
 
@@ -754,18 +717,67 @@ EXPORT_SYMBOL(__asan_storeN_noabort);
 void __asan_handle_no_return(void) {}
 EXPORT_SYMBOL(__asan_handle_no_return);
 
+/* Emitted by compiler to poison large objects when they go out of scope. */
+void __asan_poison_stack_memory(const void *addr, size_t size)
+{
+	/*
+	 * Addr is KASAN_SHADOW_SCALE_SIZE-aligned and the object is surrounded
+	 * by redzones, so we simply round up size to simplify logic.
+	 */
+	kasan_poison_shadow(addr, round_up(size, KASAN_SHADOW_SCALE_SIZE),
+			    KASAN_USE_AFTER_SCOPE);
+}
+EXPORT_SYMBOL(__asan_poison_stack_memory);
+
+/* Emitted by compiler to unpoison large objects when they go into scope. */
+void __asan_unpoison_stack_memory(const void *addr, size_t size)
+{
+	kasan_unpoison_shadow(addr, size);
+}
+EXPORT_SYMBOL(__asan_unpoison_stack_memory);
+
 #ifdef CONFIG_MEMORY_HOTPLUG
-static int kasan_mem_notifier(struct notifier_block *nb,
+static int __meminit kasan_mem_notifier(struct notifier_block *nb,
 			unsigned long action, void *data)
 {
-	return (action == MEM_GOING_ONLINE) ? NOTIFY_BAD : NOTIFY_OK;
+	struct memory_notify *mem_data = data;
+	unsigned long nr_shadow_pages, start_kaddr, shadow_start;
+	unsigned long shadow_end, shadow_size;
+
+	nr_shadow_pages = mem_data->nr_pages >> KASAN_SHADOW_SCALE_SHIFT;
+	start_kaddr = (unsigned long)pfn_to_kaddr(mem_data->start_pfn);
+	shadow_start = (unsigned long)kasan_mem_to_shadow((void *)start_kaddr);
+	shadow_size = nr_shadow_pages << PAGE_SHIFT;
+	shadow_end = shadow_start + shadow_size;
+
+	if (WARN_ON(mem_data->nr_pages % KASAN_SHADOW_SCALE_SIZE) ||
+		WARN_ON(start_kaddr % (KASAN_SHADOW_SCALE_SIZE << PAGE_SHIFT)))
+		return NOTIFY_BAD;
+
+	switch (action) {
+	case MEM_GOING_ONLINE: {
+		void *ret;
+
+		ret = __vmalloc_node_range(shadow_size, PAGE_SIZE, shadow_start,
+					shadow_end, GFP_KERNEL,
+					PAGE_KERNEL, VM_NO_GUARD,
+					pfn_to_nid(mem_data->start_pfn),
+					__builtin_return_address(0));
+		if (!ret)
+			return NOTIFY_BAD;
+
+		kmemleak_ignore(ret);
+		return NOTIFY_OK;
+	}
+	case MEM_OFFLINE:
+		vfree((void *)shadow_start);
+	}
+
+	return NOTIFY_OK;
 }
 
 static int __init kasan_memhotplug_init(void)
 {
-	pr_info("WARNING: KASAN doesn't support memory hot-add\n");
-	pr_info("Memory hot-add will be disabled\n");
-
 	hotplug_memory_notifier(kasan_mem_notifier, 0);
 
 	return 0;

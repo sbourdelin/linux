@@ -43,6 +43,7 @@ typedef enum {
 #define XBF_READ	 (1 << 0) /* buffer intended for reading from device */
 #define XBF_WRITE	 (1 << 1) /* buffer intended for writing to device */
 #define XBF_READ_AHEAD	 (1 << 2) /* asynchronous read-ahead */
+#define XBF_NO_IOACCT	 (1 << 3) /* bypass I/O accounting (non-LRU bufs) */
 #define XBF_ASYNC	 (1 << 4) /* initiator will not wait for completion */
 #define XBF_DONE	 (1 << 5) /* all pages in the buffer uptodate */
 #define XBF_STALE	 (1 << 6) /* buffer has been staled, do not find it */
@@ -69,6 +70,7 @@ typedef unsigned int xfs_buf_flags_t;
 	{ XBF_READ,		"READ" }, \
 	{ XBF_WRITE,		"WRITE" }, \
 	{ XBF_READ_AHEAD,	"READ_AHEAD" }, \
+	{ XBF_NO_IOACCT,	"NO_IOACCT" }, \
 	{ XBF_ASYNC,		"ASYNC" }, \
 	{ XBF_DONE,		"DONE" }, \
 	{ XBF_STALE,		"STALE" }, \
@@ -88,6 +90,7 @@ typedef unsigned int xfs_buf_flags_t;
  * Internal state flags.
  */
 #define XFS_BSTATE_DISPOSE	 (1 << 0)	/* buffer being discarded */
+#define XFS_BSTATE_IN_FLIGHT	 (1 << 1)	/* I/O in flight */
 
 /*
  * The xfs_buftarg contains 2 notions of "sector size" -
@@ -105,7 +108,6 @@ typedef unsigned int xfs_buf_flags_t;
 typedef struct xfs_buftarg {
 	dev_t			bt_dev;
 	struct block_device	*bt_bdev;
-	struct backing_dev_info	*bt_bdi;
 	struct xfs_mount	*bt_mount;
 	unsigned int		bt_meta_sectorsize;
 	size_t			bt_meta_sectormask;
@@ -115,6 +117,8 @@ typedef struct xfs_buftarg {
 	/* LRU control structures */
 	struct shrinker		bt_shrinker;
 	struct list_lru		bt_lru;
+
+	struct percpu_counter	bt_io_count;
 } xfs_buftarg_t;
 
 struct xfs_buf;
@@ -145,7 +149,7 @@ typedef struct xfs_buf {
 	 * which is the only bit that is touched if we hit the semaphore
 	 * fast-path on locking.
 	 */
-	struct rb_node		b_rbnode;	/* rbtree node */
+	struct rhash_head	b_rhash_head;	/* pag buffer hash node */
 	xfs_daddr_t		b_bn;		/* block number of buffer */
 	int			b_length;	/* size of buffer in BBs */
 	atomic_t		b_hold;		/* reference count */
@@ -286,7 +290,6 @@ xfs_buf_readahead(
 	return xfs_buf_readahead_map(target, &map, 1, ops);
 }
 
-struct xfs_buf *xfs_buf_get_empty(struct xfs_buftarg *target, size_t numblks);
 void xfs_buf_set_empty(struct xfs_buf *bp, size_t numblks);
 int xfs_buf_associate_memory(struct xfs_buf *bp, void *mem, size_t length);
 
@@ -325,9 +328,11 @@ extern void *xfs_buf_offset(struct xfs_buf *, size_t);
 extern void xfs_buf_stale(struct xfs_buf *bp);
 
 /* Delayed Write Buffer Routines */
+extern void xfs_buf_delwri_cancel(struct list_head *);
 extern bool xfs_buf_delwri_queue(struct xfs_buf *, struct list_head *);
 extern int xfs_buf_delwri_submit(struct list_head *);
 extern int xfs_buf_delwri_submit_nowait(struct list_head *);
+extern int xfs_buf_delwri_pushbuf(struct xfs_buf *, struct list_head *);
 
 /* Buffer Daemon Setup Routines */
 extern int xfs_buf_init(void);

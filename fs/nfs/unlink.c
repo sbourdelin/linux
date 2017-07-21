@@ -162,7 +162,7 @@ static int nfs_call_unlink(struct dentry *dentry, struct nfs_unlinkdata *data)
  * @dentry: dentry to unlink
  */
 static int
-nfs_async_unlink(struct dentry *dentry, struct qstr *name)
+nfs_async_unlink(struct dentry *dentry, const struct qstr *name)
 {
 	struct nfs_unlinkdata *data;
 	int status = -ENOMEM;
@@ -287,6 +287,19 @@ static void nfs_async_rename_release(void *calldata)
 
 	if (d_really_is_positive(data->old_dentry))
 		nfs_mark_for_revalidate(d_inode(data->old_dentry));
+
+	/* The result of the rename is unknown. Play it safe by
+	 * forcing a new lookup */
+	if (data->cancelled) {
+		spin_lock(&data->old_dir->i_lock);
+		nfs_force_lookup_revalidate(data->old_dir);
+		spin_unlock(&data->old_dir->i_lock);
+		if (data->new_dir != data->old_dir) {
+			spin_lock(&data->new_dir->i_lock);
+			nfs_force_lookup_revalidate(data->new_dir);
+			spin_unlock(&data->new_dir->i_lock);
+		}
+	}
 
 	dput(data->old_dentry);
 	dput(data->new_dentry);

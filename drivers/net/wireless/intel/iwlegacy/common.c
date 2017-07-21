@@ -1305,10 +1305,14 @@ il_send_scan_abort(struct il_priv *il)
 static void
 il_complete_scan(struct il_priv *il, bool aborted)
 {
+	struct cfg80211_scan_info info = {
+		.aborted = aborted,
+	};
+
 	/* check if scan was requested from mac80211 */
 	if (il->scan_request) {
 		D_SCAN("Complete scan in mac80211\n");
-		ieee80211_scan_completed(il->hw, aborted);
+		ieee80211_scan_completed(il->hw, &info);
 	}
 
 	il->scan_vif = NULL;
@@ -5143,6 +5147,8 @@ set_ch_out:
 
 	if (changed & (IEEE80211_CONF_CHANGE_PS | IEEE80211_CONF_CHANGE_IDLE)) {
 		il->power_data.ps_disabled = !(conf->flags & IEEE80211_CONF_PS);
+		if (!il->power_data.ps_disabled)
+			IL_WARN_ONCE("Enabling power save might cause firmware crashes\n");
 		ret = il_power_update_mode(il, false);
 		if (ret)
 			D_MAC80211("Error setting sleep level\n");

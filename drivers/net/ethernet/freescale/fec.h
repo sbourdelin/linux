@@ -442,6 +442,14 @@ struct bufdesc_ex {
 #define FEC_QUIRK_SINGLE_MDIO		(1 << 11)
 /* Controller supports RACC register */
 #define FEC_QUIRK_HAS_RACC		(1 << 12)
+/* Controller supports interrupt coalesc */
+#define FEC_QUIRK_HAS_COALESCE		(1 << 13)
+/* Interrupt doesn't wake CPU from deep idle */
+#define FEC_QUIRK_ERR006687		(1 << 14)
+/* The MIB counters should be cleared and enabled during
+ * initialisation.
+ */
+#define FEC_QUIRK_MIB_CLEAR		(1 << 15)
 
 struct bufdesc_prop {
 	int qid;
@@ -570,6 +578,8 @@ struct fec_enet_private {
 	unsigned int reload_period;
 	int pps_enable;
 	unsigned int next_counter;
+
+	u64 ethtool_stats[0];
 };
 
 void fec_ptp_init(struct platform_device *pdev);

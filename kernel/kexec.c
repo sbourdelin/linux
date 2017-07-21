@@ -48,7 +48,8 @@ static int kimage_alloc_init(struct kimage **rimage, unsigned long entry,
 
 	if (kexec_on_panic) {
 		/* Verify we have a valid entry point */
-		if ((entry < crashk_res.start) || (entry > crashk_res.end))
+		if ((entry < phys_to_boot_phys(crashk_res.start)) ||
+		    (entry > phys_to_boot_phys(crashk_res.end)))
 			return -EADDRNOTAVAIL;
 	}
 
@@ -140,6 +141,14 @@ static int do_kexec_load(unsigned long entry, unsigned long nr_segments,
 		image->preserve_context = 1;
 
 	ret = machine_kexec_prepare(image);
+	if (ret)
+		goto out;
+
+	/*
+	 * Some architecture(like S390) may touch the crash memory before
+	 * machine_kexec_prepare(), we must copy vmcoreinfo data after it.
+	 */
+	ret = kimage_crash_copy_vmcoreinfo(image);
 	if (ret)
 		goto out;
 

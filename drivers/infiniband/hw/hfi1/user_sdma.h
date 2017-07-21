@@ -1,5 +1,7 @@
+#ifndef _HFI1_USER_SDMA_H
+#define _HFI1_USER_SDMA_H
 /*
- * Copyright(c) 2015, 2016 Intel Corporation.
+ * Copyright(c) 2015 - 2017 Intel Corporation.
  *
  * This file is provided under a dual BSD/GPLv2 license.  When using or
  * redistributing this file, you may do so under either license.
@@ -56,21 +58,21 @@ extern uint extended_psn;
 struct hfi1_user_sdma_pkt_q {
 	struct list_head list;
 	unsigned ctxt;
-	unsigned subctxt;
+	u16 subctxt;
 	u16 n_max_reqs;
 	atomic_t n_reqs;
 	u16 reqidx;
 	struct hfi1_devdata *dd;
 	struct kmem_cache *txreq_cache;
 	struct user_sdma_request *reqs;
+	unsigned long *req_in_use;
 	struct iowait busy;
 	unsigned state;
 	wait_queue_head_t wait;
 	unsigned long unpinned;
-	struct rb_root sdma_rb_root;
-	u32 n_locked;
-	struct list_head evict;
-	spinlock_t evict_lock; /* protect evict and n_locked */
+	struct mmu_rb_handler *handler;
+	atomic_t n_locked;
+	struct mm_struct *mm;
 };
 
 struct hfi1_user_sdma_comp_q {
@@ -78,7 +80,11 @@ struct hfi1_user_sdma_comp_q {
 	struct hfi1_sdma_comp_entry *comps;
 };
 
-int hfi1_user_sdma_alloc_queues(struct hfi1_ctxtdata *, struct file *);
-int hfi1_user_sdma_free_queues(struct hfi1_filedata *);
-int hfi1_user_sdma_process_request(struct file *, struct iovec *, unsigned long,
-				   unsigned long *);
+int hfi1_user_sdma_alloc_queues(struct hfi1_ctxtdata *uctxt,
+				struct hfi1_filedata *fd);
+int hfi1_user_sdma_free_queues(struct hfi1_filedata *fd);
+int hfi1_user_sdma_process_request(struct hfi1_filedata *fd,
+				   struct iovec *iovec, unsigned long dim,
+				   unsigned long *count);
+
+#endif /* _HFI1_USER_SDMA_H */

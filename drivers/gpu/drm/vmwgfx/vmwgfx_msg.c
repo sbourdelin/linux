@@ -30,7 +30,7 @@
 #include <linux/kernel.h>
 #include <linux/frame.h>
 #include <asm/hypervisor.h>
-#include "drmP.h"
+#include <drm/drmP.h>
 #include "vmwgfx_msg.h"
 
 
@@ -299,6 +299,9 @@ static int vmw_recv_msg(struct rpc_channel *channel, void **msg,
 
 		break;
 	}
+
+	if (retries == RETRIES)
+		return -EINVAL;
 
 	*msg_len = reply_len;
 	*msg     = reply;

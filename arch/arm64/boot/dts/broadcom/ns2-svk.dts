@@ -40,10 +40,14 @@
 
 	aliases {
 		serial0 = &uart3;
+		serial1 = &uart0;
+		serial2 = &uart1;
+		serial3 = &uart2;
 	};
 
 	chosen {
 		stdout-path = "serial0:115200n8";
+		bootargs = "earlycon=uart8250,mmio32,0x66130000";
 	};
 
 	memory {
@@ -52,28 +56,56 @@
 	};
 };
 
+&enet {
+	status = "okay";
+};
+
+&pci_phy0 {
+	status = "okay";
+};
+
+&pci_phy1 {
+	status = "okay";
+};
+
 &pcie0 {
-	status = "ok";
+	status = "okay";
 };
 
 &pcie4 {
-	status = "ok";
+	status = "okay";
+};
+
+&pcie8 {
+	status = "okay";
 };
 
 &i2c0 {
-	status = "ok";
+	status = "okay";
 };
 
 &i2c1 {
-	status = "ok";
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&uart2 {
+	status = "okay";
 };
 
 &uart3 {
-	status = "ok";
+	status = "okay";
 };
 
 &ssp0 {
-	status = "ok";
+	status = "okay";
 
 	slic@0 {
 		compatible = "silabs,si3226x";
@@ -94,7 +126,7 @@
 };
 
 &ssp1 {
-	status = "ok";
+	status = "okay";
 
 	at25@0 {
 		compatible = "atmel,at25";
@@ -117,8 +149,24 @@
 	};
 };
 
+&sata_phy0 {
+	status = "okay";
+};
+
+&sata_phy1 {
+	status = "okay";
+};
+
+&sata {
+	status = "okay";
+};
+
 &sdio0 {
-	status = "ok";
+	status = "okay";
+};
+
+&sdio1 {
+	status = "okay";
 };
 
 &nand {
@@ -128,7 +176,61 @@
 		nand-ecc-mode = "hw";
 		nand-ecc-strength = <8>;
 		nand-ecc-step-size = <512>;
+		nand-bus-width = <16>;
+		brcm,nand-oob-sector-size = <16>;
 		#address-cells = <1>;
 		#size-cells = <1>;
+	};
+};
+
+&mdio_mux_iproc {
+	mdio@10 {
+		gphy0: eth-phy@10 {
+			enet-phy-lane-swap;
+			reg = <0x10>;
+		};
+	};
+};
+
+&pinctrl {
+	pinctrl-names = "default";
+	pinctrl-0 = <&nand_sel>;
+	nand_sel: nand_sel {
+		function = "nand";
+		groups = "nand_grp";
+	};
+};
+
+&qspi {
+	bspi-sel = <0>;
+	flash: m25p80@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "m25p80";
+		reg = <0x0>;
+		spi-max-frequency = <12500000>;
+		m25p,fast-read;
+		spi-cpol;
+		spi-cpha;
+
+		partition@0 {
+			label = "boot";
+			reg = <0x00000000 0x000a0000>;
+		};
+
+		partition@a0000 {
+			label = "env";
+			reg = <0x000a0000 0x00060000>;
+		};
+
+		partition@100000 {
+			label = "system";
+			reg = <0x00100000 0x00600000>;
+		};
+
+		partition@700000 {
+			label = "rootfs";
+			reg = <0x00700000 0x01900000>;
+		};
 	};
 };

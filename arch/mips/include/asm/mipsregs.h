@@ -34,8 +34,10 @@
  */
 #ifdef __ASSEMBLY__
 #define _ULCAST_
+#define _U64CAST_
 #else
 #define _ULCAST_ (unsigned long)
+#define _U64CAST_ (u64)
 #endif
 
 /*
@@ -53,7 +55,7 @@
 #define CP0_SEGCTL2 $5, 4
 #define CP0_WIRED $6
 #define CP0_INFO $7
-#define CP0_HWRENA $7, 0
+#define CP0_HWRENA $7
 #define CP0_BADVADDR $8
 #define CP0_BADINSTR $8, 1
 #define CP0_COUNT $9
@@ -213,6 +215,14 @@
 #elif defined(CONFIG_MIPS_HUGE_TLB_SUPPORT)
 #error Bad page size configuration for hugetlbfs!
 #endif
+
+/*
+ * Wired register bits
+ */
+#define MIPSR6_WIRED_LIMIT_SHIFT 16
+#define MIPSR6_WIRED_LIMIT	(_ULCAST_(0xffff) << MIPSR6_WIRED_LIMIT_SHIFT)
+#define MIPSR6_WIRED_WIRED_SHIFT 0
+#define MIPSR6_WIRED_WIRED	(_ULCAST_(0xffff) << MIPSR6_WIRED_WIRED_SHIFT)
 
 /*
  * Values used for computation of new tlb entries
@@ -533,6 +543,7 @@
 #define TX49_CONF_CWFON		(_ULCAST_(1) << 27)
 
 /* Bits specific to the MIPS32/64 PRA.	*/
+#define MIPS_CONF_VI		(_ULCAST_(1) <<  3)
 #define MIPS_CONF_MT		(_ULCAST_(7) <<	 7)
 #define MIPS_CONF_MT_TLB	(_ULCAST_(1) <<  7)
 #define MIPS_CONF_MT_FTLB	(_ULCAST_(4) <<  7)
@@ -638,8 +649,10 @@
 #define MIPS_CONF5_LLB		(_ULCAST_(1) << 4)
 #define MIPS_CONF5_MVH		(_ULCAST_(1) << 5)
 #define MIPS_CONF5_VP		(_ULCAST_(1) << 7)
+#define MIPS_CONF5_SBRI		(_ULCAST_(1) << 6)
 #define MIPS_CONF5_FRE		(_ULCAST_(1) << 8)
 #define MIPS_CONF5_UFE		(_ULCAST_(1) << 9)
+#define MIPS_CONF5_CA2		(_ULCAST_(1) << 14)
 #define MIPS_CONF5_MSAEN	(_ULCAST_(1) << 27)
 #define MIPS_CONF5_EVA		(_ULCAST_(1) << 28)
 #define MIPS_CONF5_CV		(_ULCAST_(1) << 29)
@@ -659,8 +672,6 @@
 
 #define MIPS_CONF7_IAR		(_ULCAST_(1) << 10)
 #define MIPS_CONF7_AR		(_ULCAST_(1) << 16)
-/* FTLB probability bits for R6 */
-#define MIPS_CONF7_FTLBP_SHIFT	(18)
 
 /* WatchLo* register definitions */
 #define MIPS_WATCHLO_IRW	(_ULCAST_(0x7) << 0)
@@ -680,11 +691,48 @@
 #define MIPS_WATCHHI_W		(_ULCAST_(1) << 0)
 #define MIPS_WATCHHI_IRW	(_ULCAST_(0x7) << 0)
 
+/* PerfCnt control register definitions */
+#define MIPS_PERFCTRL_EXL	(_ULCAST_(1) << 0)
+#define MIPS_PERFCTRL_K		(_ULCAST_(1) << 1)
+#define MIPS_PERFCTRL_S		(_ULCAST_(1) << 2)
+#define MIPS_PERFCTRL_U		(_ULCAST_(1) << 3)
+#define MIPS_PERFCTRL_IE	(_ULCAST_(1) << 4)
+#define MIPS_PERFCTRL_EVENT_S	5
+#define MIPS_PERFCTRL_EVENT	(_ULCAST_(0x3ff) << MIPS_PERFCTRL_EVENT_S)
+#define MIPS_PERFCTRL_PCTD	(_ULCAST_(1) << 15)
+#define MIPS_PERFCTRL_EC	(_ULCAST_(0x3) << 23)
+#define MIPS_PERFCTRL_EC_R	(_ULCAST_(0) << 23)
+#define MIPS_PERFCTRL_EC_RI	(_ULCAST_(1) << 23)
+#define MIPS_PERFCTRL_EC_G	(_ULCAST_(2) << 23)
+#define MIPS_PERFCTRL_EC_GRI	(_ULCAST_(3) << 23)
+#define MIPS_PERFCTRL_W		(_ULCAST_(1) << 30)
+#define MIPS_PERFCTRL_M		(_ULCAST_(1) << 31)
+
+/* PerfCnt control register MT extensions used by MIPS cores */
+#define MIPS_PERFCTRL_VPEID_S	16
+#define MIPS_PERFCTRL_VPEID	(_ULCAST_(0xf) << MIPS_PERFCTRL_VPEID_S)
+#define MIPS_PERFCTRL_TCID_S	22
+#define MIPS_PERFCTRL_TCID	(_ULCAST_(0xff) << MIPS_PERFCTRL_TCID_S)
+#define MIPS_PERFCTRL_MT_EN	(_ULCAST_(0x3) << 20)
+#define MIPS_PERFCTRL_MT_EN_ALL	(_ULCAST_(0) << 20)
+#define MIPS_PERFCTRL_MT_EN_VPE	(_ULCAST_(1) << 20)
+#define MIPS_PERFCTRL_MT_EN_TC	(_ULCAST_(2) << 20)
+
+/* PerfCnt control register MT extensions used by BMIPS5000 */
+#define BRCM_PERFCTRL_TC	(_ULCAST_(1) << 30)
+
+/* PerfCnt control register MT extensions used by Netlogic XLR */
+#define XLR_PERFCTRL_ALLTHREADS	(_ULCAST_(1) << 13)
+
 /* MAAR bit definitions */
+#define MIPS_MAAR_VH		(_U64CAST_(1) << 63)
 #define MIPS_MAAR_ADDR		((BIT_ULL(BITS_PER_LONG - 12) - 1) << 12)
 #define MIPS_MAAR_ADDR_SHIFT	12
 #define MIPS_MAAR_S		(_ULCAST_(1) << 1)
-#define MIPS_MAAR_V		(_ULCAST_(1) << 0)
+#define MIPS_MAAR_VL		(_ULCAST_(1) << 0)
+
+/* MAARI bit definitions */
+#define MIPS_MAARI_INDEX	(_ULCAST_(0x3f) << 0)
 
 /* EBase bit definitions */
 #define MIPS_EBASE_CPUNUM_SHIFT	0
@@ -697,6 +745,10 @@
 /* CMGCRBase bit definitions */
 #define MIPS_CMGCRB_BASE	11
 #define MIPS_CMGCRF_BASE	(~_ULCAST_((1 << MIPS_CMGCRB_BASE) - 1))
+
+/* LLAddr bit definitions */
+#define MIPS_LLADDR_LLB_SHIFT	0
+#define MIPS_LLADDR_LLB		(_ULCAST_(1) << MIPS_LLADDR_LLB_SHIFT)
 
 /*
  * Bits in the MIPS32 Memory Segmentation registers.
@@ -853,6 +905,24 @@
 #define MIPS_CDMMBASE_ADDR_SHIFT 11
 #define MIPS_CDMMBASE_ADDR_START 15
 
+/* RDHWR register numbers */
+#define MIPS_HWR_CPUNUM		0	/* CPU number */
+#define MIPS_HWR_SYNCISTEP	1	/* SYNCI step size */
+#define MIPS_HWR_CC		2	/* Cycle counter */
+#define MIPS_HWR_CCRES		3	/* Cycle counter resolution */
+#define MIPS_HWR_ULR		29	/* UserLocal */
+#define MIPS_HWR_IMPL1		30	/* Implementation dependent */
+#define MIPS_HWR_IMPL2		31	/* Implementation dependent */
+
+/* Bits in HWREna register */
+#define MIPS_HWRENA_CPUNUM	(_ULCAST_(1) << MIPS_HWR_CPUNUM)
+#define MIPS_HWRENA_SYNCISTEP	(_ULCAST_(1) << MIPS_HWR_SYNCISTEP)
+#define MIPS_HWRENA_CC		(_ULCAST_(1) << MIPS_HWR_CC)
+#define MIPS_HWRENA_CCRES	(_ULCAST_(1) << MIPS_HWR_CCRES)
+#define MIPS_HWRENA_ULR		(_ULCAST_(1) << MIPS_HWR_ULR)
+#define MIPS_HWRENA_IMPL1	(_ULCAST_(1) << MIPS_HWR_IMPL1)
+#define MIPS_HWRENA_IMPL2	(_ULCAST_(1) << MIPS_HWR_IMPL2)
+
 /*
  * Bitfields in the TX39 family CP0 Configuration Register 3
  */
@@ -904,6 +974,22 @@
 #define LOONGSON_DIAG_VTLB	(_ULCAST_(1) << 12)
 /* Flush FTLB */
 #define LOONGSON_DIAG_FTLB	(_ULCAST_(1) << 13)
+
+/* CvmCtl register field definitions */
+#define CVMCTL_IPPCI_SHIFT	7
+#define CVMCTL_IPPCI		(_U64CAST_(0x7) << CVMCTL_IPPCI_SHIFT)
+#define CVMCTL_IPTI_SHIFT	4
+#define CVMCTL_IPTI		(_U64CAST_(0x7) << CVMCTL_IPTI_SHIFT)
+
+/* CvmMemCtl2 register field definitions */
+#define CVMMEMCTL2_INHIBITTS	(_U64CAST_(1) << 17)
+
+/* CvmVMConfig register field definitions */
+#define CVMVMCONF_DGHT		(_U64CAST_(1) << 60)
+#define CVMVMCONF_MMUSIZEM1_S	12
+#define CVMVMCONF_MMUSIZEM1	(_U64CAST_(0xff) << CVMVMCONF_MMUSIZEM1_S)
+#define CVMVMCONF_RMMUSIZEM1_S	0
+#define CVMVMCONF_RMMUSIZEM1	(_U64CAST_(0xff) << CVMVMCONF_RMMUSIZEM1_S)
 
 /*
  * Coprocessor 1 (FPU) register names
@@ -1664,6 +1750,13 @@ do {									\
 
 #define read_c0_cvmmemctl()	__read_64bit_c0_register($11, 7)
 #define write_c0_cvmmemctl(val) __write_64bit_c0_register($11, 7, val)
+
+#define read_c0_cvmmemctl2()	__read_64bit_c0_register($16, 6)
+#define write_c0_cvmmemctl2(val) __write_64bit_c0_register($16, 6, val)
+
+#define read_c0_cvmvmconfig()	__read_64bit_c0_register($16, 7)
+#define write_c0_cvmvmconfig(val) __write_64bit_c0_register($16, 7, val)
+
 /*
  * The cacheerr registers are not standardized.	 On OCTEON, they are
  * 64 bits wide.
@@ -1933,6 +2026,8 @@ do {									\
 #define read_gc0_epc()			__read_ulong_gc0_register(14, 0)
 #define write_gc0_epc(val)		__write_ulong_gc0_register(14, 0, val)
 
+#define read_gc0_prid()			__read_32bit_gc0_register(15, 0)
+
 #define read_gc0_ebase()		__read_32bit_gc0_register(15, 1)
 #define write_gc0_ebase(val)		__write_32bit_gc0_register(15, 1, val)
 
@@ -1955,6 +2050,9 @@ do {									\
 #define write_gc0_config5(val)		__write_32bit_gc0_register(16, 5, val)
 #define write_gc0_config6(val)		__write_32bit_gc0_register(16, 6, val)
 #define write_gc0_config7(val)		__write_32bit_gc0_register(16, 7, val)
+
+#define read_gc0_lladdr()		__read_ulong_gc0_register(17, 0)
+#define write_gc0_lladdr(val)		__write_ulong_gc0_register(17, 0, val)
 
 #define read_gc0_watchlo0()		__read_ulong_gc0_register(18, 0)
 #define read_gc0_watchlo1()		__read_ulong_gc0_register(18, 1)
@@ -2033,6 +2131,19 @@ do {									\
 #define write_gc0_kscratch4(val)	__write_ulong_gc0_register(31, 5, val)
 #define write_gc0_kscratch5(val)	__write_ulong_gc0_register(31, 6, val)
 #define write_gc0_kscratch6(val)	__write_ulong_gc0_register(31, 7, val)
+
+/* Cavium OCTEON (cnMIPS) */
+#define read_gc0_cvmcount()		__read_ulong_gc0_register(9, 6)
+#define write_gc0_cvmcount(val)		__write_ulong_gc0_register(9, 6, val)
+
+#define read_gc0_cvmctl()		__read_64bit_gc0_register(9, 7)
+#define write_gc0_cvmctl(val)		__write_64bit_gc0_register(9, 7, val)
+
+#define read_gc0_cvmmemctl()		__read_64bit_gc0_register(11, 7)
+#define write_gc0_cvmmemctl(val)	__write_64bit_gc0_register(11, 7, val)
+
+#define read_gc0_cvmmemctl2()		__read_64bit_gc0_register(16, 6)
+#define write_gc0_cvmmemctl2(val)	__write_64bit_gc0_register(16, 6, val)
 
 /*
  * Macros to access the floating point coprocessor control registers
@@ -2640,9 +2751,11 @@ __BUILD_SET_C0(brcm_mode)
  */
 #define __BUILD_SET_GC0(name)	__BUILD_SET_COMMON(gc0_##name)
 
+__BUILD_SET_GC0(wired)
 __BUILD_SET_GC0(status)
 __BUILD_SET_GC0(cause)
 __BUILD_SET_GC0(ebase)
+__BUILD_SET_GC0(config1)
 
 /*
  * Return low 10 bits of ebase.

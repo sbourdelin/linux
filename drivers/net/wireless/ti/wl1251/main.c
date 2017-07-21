@@ -448,7 +448,11 @@ static void wl1251_op_stop(struct ieee80211_hw *hw)
 	WARN_ON(wl->state != WL1251_STATE_ON);
 
 	if (wl->scanning) {
-		ieee80211_scan_completed(wl->hw, true);
+		struct cfg80211_scan_info info = {
+			.aborted = true,
+		};
+
+		ieee80211_scan_completed(wl->hw, &info);
 		wl->scanning = false;
 	}
 
@@ -1032,7 +1036,7 @@ static int wl1251_op_hw_scan(struct ieee80211_hw *hw,
 		goto out_idle;
 	}
 	if (req->ie_len)
-		memcpy(skb_put(skb, req->ie_len), req->ie, req->ie_len);
+		skb_put_data(skb, req->ie, req->ie_len);
 
 	ret = wl1251_cmd_template_set(wl, CMD_PROBE_REQ, skb->data,
 				      skb->len);

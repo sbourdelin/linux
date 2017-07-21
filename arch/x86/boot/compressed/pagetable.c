@@ -2,6 +2,9 @@
  * This code is used on x86_64 to create page table identity mappings on
  * demand by building up a new set of page tables (or appending to the
  * existing ones), and then switching over to them when ready.
+ *
+ * Copyright (C) 2015-2016  Yinghai Lu
+ * Copyright (C)      2016  Kees Cook
  */
 
 /*
@@ -17,6 +20,9 @@
 /* These actually do the work of building the kernel identity maps. */
 #include <asm/init.h>
 #include <asm/pgtable.h>
+/* Use the static base for this part of the boot process */
+#undef __PAGE_OFFSET
+#define __PAGE_OFFSET __PAGE_OFFSET_BASE
 #include "../../mm/ident_map.c"
 
 /* Used by pgtable.h asm code to force instruction serialization. */
@@ -57,11 +63,23 @@ static void *alloc_pgt_page(void *context)
 static struct alloc_pgt_data pgt_data;
 
 /* The top level page table entry pointer. */
-static unsigned long level4p;
+static unsigned long top_level_pgt;
+
+/*
+ * Mapping information structure passed to kernel_ident_mapping_init().
+ * Due to relocation, pointers must be assigned at run time not build time.
+ */
+static struct x86_mapping_info mapping_info = {
+	.page_flag       = __PAGE_KERNEL_LARGE_EXEC,
+};
 
 /* Locates and clears a region for a new top level page table. */
-static void prepare_level4(void)
+void initialize_identity_maps(void)
 {
+	/* Init mapping_info with run-time function/buffer pointers. */
+	mapping_info.alloc_pgt_page = alloc_pgt_page;
+	mapping_info.context = &pgt_data;
+
 	/*
 	 * It should be impossible for this not to already be true,
 	 * but since calling this a second time would rewind the other
@@ -73,9 +91,15 @@ static void prepare_level4(void)
 	 * If we came here via startup_32(), cr3 will be _pgtable already
 	 * and we must append to the existing area instead of entirely
 	 * overwriting it.
+	 *
+	 * With 5-level paging, we use '_pgtable' to allocate the p4d page table,
+	 * the top-level page table is allocated separately.
+	 *
+	 * p4d_offset(top_level_pgt, 0) would cover both the 4- and 5-level
+	 * cases. On 4-level paging it's equal to 'top_level_pgt'.
 	 */
-	level4p = read_cr3();
-	if (level4p == (unsigned long)_pgtable) {
+	top_level_pgt = read_cr3_pa();
+	if (p4d_offset((pgd_t *)top_level_pgt, 0) == (p4d_t *)_pgtable) {
 		debug_putstr("booted via startup_32()\n");
 		pgt_data.pgt_buf = _pgtable + BOOT_INIT_PGT_SIZE;
 		pgt_data.pgt_buf_size = BOOT_PGT_SIZE - BOOT_INIT_PGT_SIZE;
@@ -85,7 +109,7 @@ static void prepare_level4(void)
 		pgt_data.pgt_buf = _pgtable;
 		pgt_data.pgt_buf_size = BOOT_PGT_SIZE;
 		memset(pgt_data.pgt_buf, 0, pgt_data.pgt_buf_size);
-		level4p = (unsigned long)alloc_pgt_page(&pgt_data);
+		top_level_pgt = (unsigned long)alloc_pgt_page(&pgt_data);
 	}
 }
 
@@ -96,16 +120,7 @@ static void prepare_level4(void)
  */
 void add_identity_map(unsigned long start, unsigned long size)
 {
-	struct x86_mapping_info mapping_info = {
-		.alloc_pgt_page	= alloc_pgt_page,
-		.context	= &pgt_data,
-		.pmd_flag	= __PAGE_KERNEL_LARGE_EXEC,
-	};
 	unsigned long end = start + size;
-
-	/* Make sure we have a top level page table ready to use. */
-	if (!level4p)
-		prepare_level4();
 
 	/* Align boundary to 2M. */
 	start = round_down(start, PMD_SIZE);
@@ -114,7 +129,7 @@ void add_identity_map(unsigned long start, unsigned long size)
 		return;
 
 	/* Build the mapping. */
-	kernel_ident_mapping_init(&mapping_info, (pgd_t *)level4p,
+	kernel_ident_mapping_init(&mapping_info, (pgd_t *)top_level_pgt,
 				  start, end);
 }
 
@@ -125,5 +140,5 @@ void add_identity_map(unsigned long start, unsigned long size)
  */
 void finalize_identity_maps(void)
 {
-	write_cr3(level4p);
+	write_cr3(top_level_pgt);
 }

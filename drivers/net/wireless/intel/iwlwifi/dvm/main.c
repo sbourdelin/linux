@@ -1317,6 +1317,7 @@ static struct iwl_op_mode *iwl_op_mode_dvm_start(struct iwl_trans *trans,
 	trans_cfg.n_no_reclaim_cmds = ARRAY_SIZE(no_reclaim_cmds);
 
 	switch (iwlwifi_mod_params.amsdu_size) {
+	case IWL_AMSDU_DEF:
 	case IWL_AMSDU_4K:
 		trans_cfg.rx_buf_size = IWL_AMSDU_4K;
 		break;
@@ -1336,6 +1337,8 @@ static struct iwl_op_mode *iwl_op_mode_dvm_start(struct iwl_trans *trans,
 	trans_cfg.command_groups_size = ARRAY_SIZE(iwl_dvm_groups);
 
 	trans_cfg.cmd_fifo = IWLAGN_CMD_FIFO_NUM;
+	trans_cfg.cb_data_offs = offsetof(struct ieee80211_tx_info,
+					  driver_data[2]);
 
 	WARN_ON(sizeof(priv->transport_queue_stop) * BITS_PER_BYTE <
 		priv->cfg->base_params->num_of_queues);
@@ -1368,7 +1371,7 @@ static struct iwl_op_mode *iwl_op_mode_dvm_start(struct iwl_trans *trans,
 
 	/* is antenna coupling more than 35dB ? */
 	priv->bt_ant_couple_ok =
-		(iwlwifi_mod_params.ant_coupling >
+		(iwlwifi_mod_params.antenna_coupling >
 			IWL_BT_ANTENNA_COUPLING_THRESHOLD) ?
 			true : false;
 
@@ -1510,7 +1513,7 @@ out_destroy_workqueue:
 out_free_eeprom_blob:
 	kfree(priv->eeprom_blob);
 out_free_eeprom:
-	iwl_free_nvm_data(priv->nvm_data);
+	kfree(priv->nvm_data);
 out_free_hw:
 	ieee80211_free_hw(priv->hw);
 out:
@@ -1529,7 +1532,7 @@ static void iwl_op_mode_dvm_stop(struct iwl_op_mode *op_mode)
 	iwl_tt_exit(priv);
 
 	kfree(priv->eeprom_blob);
-	iwl_free_nvm_data(priv->nvm_data);
+	kfree(priv->nvm_data);
 
 	/*netif_stop_queue(dev); */
 	flush_workqueue(priv->workqueue);
@@ -1955,7 +1958,7 @@ static void iwlagn_fw_error(struct iwl_priv *priv, bool ondemand)
 	}
 
 	if (!test_bit(STATUS_EXIT_PENDING, &priv->status)) {
-		if (iwlwifi_mod_params.restart_fw) {
+		if (iwlwifi_mod_params.fw_restart) {
 			IWL_DEBUG_FW_ERRORS(priv,
 				  "Restarting adapter due to uCode error.\n");
 			queue_work(priv->workqueue, &priv->restart);

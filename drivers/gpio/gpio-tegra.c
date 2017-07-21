@@ -98,7 +98,6 @@ struct tegra_gpio_info {
 	const struct tegra_gpio_soc_config	*soc;
 	struct gpio_chip			gc;
 	struct irq_chip				ic;
-	struct lock_class_key			lock_class;
 	u32					bank_count;
 };
 
@@ -237,6 +236,18 @@ static int tegra_gpio_set_debounce(struct gpio_chip *chip, unsigned int offset,
 	tegra_gpio_mask_write(tgi, GPIO_MSK_DBC_EN(tgi, offset), offset, 1);
 
 	return 0;
+}
+
+static int tegra_gpio_set_config(struct gpio_chip *chip, unsigned int offset,
+				 unsigned long config)
+{
+	u32 debounce;
+
+	if (pinconf_to_config_param(config) != PIN_CONFIG_INPUT_DEBOUNCE)
+		return -ENOTSUPP;
+
+	debounce = pinconf_to_config_argument(config);
+	return tegra_gpio_set_debounce(chip, offset, debounce);
 }
 
 static int tegra_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
@@ -547,6 +558,12 @@ static const struct dev_pm_ops tegra_gpio_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(tegra_gpio_suspend, tegra_gpio_resume)
 };
 
+/*
+ * This lock class tells lockdep that GPIO irqs are in a different category
+ * than their parents, so it won't report false recursion.
+ */
+static struct lock_class_key gpio_lock_class;
+
 static int tegra_gpio_probe(struct platform_device *pdev)
 {
 	const struct tegra_gpio_soc_config *config;
@@ -610,7 +627,7 @@ static int tegra_gpio_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, tgi);
 
 	if (config->debounce_supported)
-		tgi->gc.set_debounce = tegra_gpio_set_debounce;
+		tgi->gc.set_config = tegra_gpio_set_config;
 
 	tgi->bank_info = devm_kzalloc(&pdev->dev, tgi->bank_count *
 				      sizeof(*tgi->bank_info), GFP_KERNEL);
@@ -660,7 +677,7 @@ static int tegra_gpio_probe(struct platform_device *pdev)
 
 		bank = &tgi->bank_info[GPIO_BANK(gpio)];
 
-		irq_set_lockdep_class(irq, &tgi->lock_class);
+		irq_set_lockdep_class(irq, &gpio_lock_class);
 		irq_set_chip_data(irq, bank);
 		irq_set_chip_and_handler(irq, &tgi->ic, handle_simple_irq);
 	}

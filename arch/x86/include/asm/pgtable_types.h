@@ -70,6 +70,12 @@
 			 _PAGE_PKEY_BIT2 | \
 			 _PAGE_PKEY_BIT3)
 
+#if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
+#define _PAGE_KNL_ERRATUM_MASK (_PAGE_DIRTY | _PAGE_ACCESSED)
+#else
+#define _PAGE_KNL_ERRATUM_MASK 0
+#endif
+
 #ifdef CONFIG_KMEMCHECK
 #define _PAGE_HIDDEN	(_AT(pteval_t, 1) << _PAGE_BIT_HIDDEN)
 #else
@@ -266,6 +272,27 @@ static inline pgdval_t pgd_flags(pgd_t pgd)
 	return native_pgd_val(pgd) & PTE_FLAGS_MASK;
 }
 
+#if CONFIG_PGTABLE_LEVELS > 4
+typedef struct { p4dval_t p4d; } p4d_t;
+
+static inline p4d_t native_make_p4d(pudval_t val)
+{
+	return (p4d_t) { val };
+}
+
+static inline p4dval_t native_p4d_val(p4d_t p4d)
+{
+	return p4d.p4d;
+}
+#else
+#include <asm-generic/pgtable-nop4d.h>
+
+static inline p4dval_t native_p4d_val(p4d_t p4d)
+{
+	return native_pgd_val(p4d.pgd);
+}
+#endif
+
 #if CONFIG_PGTABLE_LEVELS > 3
 typedef struct { pudval_t pud; } pud_t;
 
@@ -283,7 +310,7 @@ static inline pudval_t native_pud_val(pud_t pud)
 
 static inline pudval_t native_pud_val(pud_t pud)
 {
-	return native_pgd_val(pud.pgd);
+	return native_pgd_val(pud.p4d.pgd);
 }
 #endif
 
@@ -304,9 +331,25 @@ static inline pmdval_t native_pmd_val(pmd_t pmd)
 
 static inline pmdval_t native_pmd_val(pmd_t pmd)
 {
-	return native_pgd_val(pmd.pud.pgd);
+	return native_pgd_val(pmd.pud.p4d.pgd);
 }
 #endif
+
+static inline p4dval_t p4d_pfn_mask(p4d_t p4d)
+{
+	/* No 512 GiB huge pages yet */
+	return PTE_PFN_MASK;
+}
+
+static inline p4dval_t p4d_flags_mask(p4d_t p4d)
+{
+	return ~p4d_pfn_mask(p4d);
+}
+
+static inline p4dval_t p4d_flags(p4d_t p4d)
+{
+	return native_p4d_val(p4d) & p4d_flags_mask(p4d);
+}
 
 static inline pudval_t pud_pfn_mask(pud_t pud)
 {
@@ -433,8 +476,6 @@ extern pgprot_t pgprot_writethrough(pgprot_t prot);
 struct file;
 pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
                               unsigned long size, pgprot_t vma_prot);
-int phys_mem_access_prot_allowed(struct file *file, unsigned long pfn,
-                              unsigned long size, pgprot_t *vma_prot);
 
 /* Install a pte for a particular vaddr in kernel space. */
 void set_pte_vaddr(unsigned long vaddr, pte_t pte);
@@ -453,6 +494,7 @@ enum pg_level {
 	PG_LEVEL_4K,
 	PG_LEVEL_2M,
 	PG_LEVEL_1G,
+	PG_LEVEL_512G,
 	PG_LEVEL_NUM
 };
 
@@ -475,8 +517,6 @@ extern pmd_t *lookup_pmd_address(unsigned long address);
 extern phys_addr_t slow_virt_to_phys(void *__address);
 extern int kernel_map_pages_in_pgd(pgd_t *pgd, u64 pfn, unsigned long address,
 				   unsigned numpages, unsigned long page_flags);
-void kernel_unmap_pages_in_pgd(pgd_t *root, unsigned long address,
-			       unsigned numpages);
 #endif	/* !__ASSEMBLY__ */
 
 #endif /* _ASM_X86_PGTABLE_DEFS_H */

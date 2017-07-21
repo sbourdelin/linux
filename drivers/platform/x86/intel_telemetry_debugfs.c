@@ -32,6 +32,7 @@
 #include <linux/suspend.h>
 
 #include <asm/cpu_device_id.h>
+#include <asm/intel-family.h>
 #include <asm/intel_pmc_ipc.h>
 #include <asm/intel_punit_ipc.h>
 #include <asm/intel_telemetry.h>
@@ -78,7 +79,7 @@
 #define TELEM_EVT_LEN(x) (sizeof(x)/sizeof((x)[0]))
 
 #define TELEM_DEBUGFS_CPU(model, data) \
-	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_MWAIT, (unsigned long)&data}
+	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_ANY, (unsigned long)&data}
 
 #define TELEM_CHECK_AND_PARSE_EVTS(EVTID, EVTNUM, BUF, EVTLOG, EVTDAT, MASK) { \
 	if (evtlog[index].telem_evtid == (EVTID)) { \
@@ -96,11 +97,9 @@
 	} \
 }
 
-#ifdef CONFIG_PM_SLEEP
 static u8 suspend_prep_ok;
 static u32 suspend_shlw_ctr_temp, suspend_deep_ctr_temp;
 static u64 suspend_shlw_res_temp, suspend_deep_res_temp;
-#endif
 
 struct telemetry_susp_stats {
 	u32 shlw_swake_ctr;
@@ -331,7 +330,7 @@ static struct telemetry_debugfs_conf telem_apl_debugfs_conf = {
 };
 
 static const struct x86_cpu_id telemetry_debugfs_cpu_ids[] = {
-	TELEM_DEBUGFS_CPU(0x5c, telem_apl_debugfs_conf),
+	TELEM_DEBUGFS_CPU(INTEL_FAM6_ATOM_GOLDMONT, telem_apl_debugfs_conf),
 	{}
 };
 
@@ -711,6 +710,24 @@ static const struct file_operations telem_socstate_ops = {
 	.release	= single_release,
 };
 
+static int telem_s0ix_res_get(void *data, u64 *val)
+{
+	u64 s0ix_total_res;
+	int ret;
+
+	ret = intel_pmc_s0ix_counter_read(&s0ix_total_res);
+	if (ret) {
+		pr_err("Failed to read S0ix residency");
+		return ret;
+	}
+
+	*val = s0ix_total_res;
+
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(telem_s0ix_fops, telem_s0ix_res_get, NULL, "%llu\n");
+
 static int telem_pss_trc_verb_show(struct seq_file *s, void *unused)
 {
 	u32 verbosity;
@@ -806,7 +823,6 @@ static const struct file_operations telem_ioss_trc_verb_ops = {
 	.release	= single_release,
 };
 
-#ifdef CONFIG_PM_SLEEP
 static int pm_suspend_prep_cb(void)
 {
 	struct telemetry_evtlog evtlog[TELEM_MAX_OS_ALLOCATED_EVENTS];
@@ -936,12 +952,11 @@ static int pm_notification(struct notifier_block *this,
 static struct notifier_block pm_notifier = {
 	.notifier_call = pm_notification,
 };
-#endif /* CONFIG_PM_SLEEP */
 
 static int __init telemetry_debugfs_init(void)
 {
 	const struct x86_cpu_id *id;
-	int err = -ENOMEM;
+	int err;
 	struct dentry *f;
 
 	/* Only APL supported for now */
@@ -959,14 +974,12 @@ static int __init telemetry_debugfs_init(void)
 	if (err < 0)
 		return -EINVAL;
 
-
-#ifdef CONFIG_PM_SLEEP
 	register_pm_notifier(&pm_notifier);
-#endif /* CONFIG_PM_SLEEP */
 
+	err = -ENOMEM;
 	debugfs_conf->telemetry_dbg_dir = debugfs_create_dir("telemetry", NULL);
 	if (!debugfs_conf->telemetry_dbg_dir)
-		return -ENOMEM;
+		goto out_pm;
 
 	f = debugfs_create_file("pss_info", S_IFREG | S_IRUGO,
 				debugfs_conf->telemetry_dbg_dir, NULL,
@@ -992,6 +1005,14 @@ static int __init telemetry_debugfs_init(void)
 		goto out;
 	}
 
+	f = debugfs_create_file("s0ix_residency_usec", S_IFREG | S_IRUGO,
+				debugfs_conf->telemetry_dbg_dir,
+				NULL, &telem_s0ix_fops);
+	if (!f) {
+		pr_err("s0ix_residency_usec debugfs register failed\n");
+		goto out;
+	}
+
 	f = debugfs_create_file("pss_trace_verbosity", S_IFREG | S_IRUGO,
 				debugfs_conf->telemetry_dbg_dir, NULL,
 				&telem_pss_trc_verb_ops);
@@ -1013,6 +1034,8 @@ static int __init telemetry_debugfs_init(void)
 out:
 	debugfs_remove_recursive(debugfs_conf->telemetry_dbg_dir);
 	debugfs_conf->telemetry_dbg_dir = NULL;
+out_pm:
+	unregister_pm_notifier(&pm_notifier);
 
 	return err;
 }
@@ -1021,6 +1044,7 @@ static void __exit telemetry_debugfs_exit(void)
 {
 	debugfs_remove_recursive(debugfs_conf->telemetry_dbg_dir);
 	debugfs_conf->telemetry_dbg_dir = NULL;
+	unregister_pm_notifier(&pm_notifier);
 }
 
 late_initcall(telemetry_debugfs_init);

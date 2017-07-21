@@ -26,6 +26,7 @@
 #include <linux/context_tracking.h>
 #include <linux/irqbypass.h>
 #include <linux/swait.h>
+#include <linux/refcount.h>
 #include <asm/signal.h>
 
 #include <linux/kvm.h>
@@ -45,7 +46,6 @@
  * include/linux/kvm_h.
  */
 #define KVM_MEMSLOT_INVALID	(1UL << 16)
-#define KVM_MEMSLOT_INCOHERENT	(1UL << 17)
 
 /* Two fragments for cross MMIO pages. */
 #define KVM_MAX_MMIO_FRAGMENTS	2
@@ -115,14 +115,24 @@ static inline bool is_error_page(struct page *page)
 	return IS_ERR(page);
 }
 
+#define KVM_REQUEST_MASK           GENMASK(7,0)
+#define KVM_REQUEST_NO_WAKEUP      BIT(8)
+#define KVM_REQUEST_WAIT           BIT(9)
 /*
  * Architecture-independent vcpu->requests bit members
  * Bits 4-7 are reserved for more arch-independent bits.
  */
-#define KVM_REQ_TLB_FLUSH          0
-#define KVM_REQ_MMU_RELOAD         1
-#define KVM_REQ_PENDING_TIMER      2
-#define KVM_REQ_UNHALT             3
+#define KVM_REQ_TLB_FLUSH         (0 | KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
+#define KVM_REQ_MMU_RELOAD        (1 | KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
+#define KVM_REQ_PENDING_TIMER     2
+#define KVM_REQ_UNHALT            3
+#define KVM_REQUEST_ARCH_BASE     8
+
+#define KVM_ARCH_REQ_FLAGS(nr, flags) ({ \
+	BUILD_BUG_ON((unsigned)(nr) >= 32 - KVM_REQUEST_ARCH_BASE); \
+	(unsigned)(((nr) + KVM_REQUEST_ARCH_BASE) | (flags)); \
+})
+#define KVM_ARCH_REQ(nr)           KVM_ARCH_REQ_FLAGS(nr, 0)
 
 #define KVM_USERSPACE_IRQ_SOURCE_ID		0
 #define KVM_IRQFD_RESAMPLE_IRQ_SOURCE_ID	1
@@ -162,8 +172,10 @@ int kvm_io_bus_read(struct kvm_vcpu *vcpu, enum kvm_bus bus_idx, gpa_t addr,
 		    int len, void *val);
 int kvm_io_bus_register_dev(struct kvm *kvm, enum kvm_bus bus_idx, gpa_t addr,
 			    int len, struct kvm_io_device *dev);
-int kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
-			      struct kvm_io_device *dev);
+void kvm_io_bus_unregister_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+			       struct kvm_io_device *dev);
+struct kvm_io_device *kvm_io_bus_get_dev(struct kvm *kvm, enum kvm_bus bus_idx,
+					 gpa_t addr);
 
 #ifdef CONFIG_KVM_ASYNC_PF
 struct kvm_async_pf {
@@ -220,11 +232,9 @@ struct kvm_vcpu {
 	struct mutex mutex;
 	struct kvm_run *run;
 
-	int fpu_active;
 	int guest_fpu_loaded, guest_xcr0_loaded;
-	unsigned char fpu_counter;
 	struct swait_queue_head wq;
-	struct pid *pid;
+	struct pid __rcu *pid;
 	int sigset_active;
 	sigset_t sigset;
 	struct kvm_vcpu_stat stat;
@@ -263,10 +273,17 @@ struct kvm_vcpu {
 #endif
 	bool preempted;
 	struct kvm_vcpu_arch arch;
+	struct dentry *debugfs_dentry;
 };
 
 static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
 {
+	/*
+	 * The memory barrier ensures a previous write to vcpu->requests cannot
+	 * be reordered with the read of vcpu->mode.  It pairs with the general
+	 * memory barrier following the write of vcpu->mode in VCPU RUN.
+	 */
+	smp_mb__before_atomic();
 	return cmpxchg(&vcpu->mode, IN_GUEST_MODE, EXITING_GUEST_MODE);
 }
 
@@ -315,7 +332,13 @@ struct kvm_kernel_irq_routing_entry {
 			unsigned irqchip;
 			unsigned pin;
 		} irqchip;
-		struct msi_msg msi;
+		struct {
+			u32 address_lo;
+			u32 address_hi;
+			u32 data;
+			u32 flags;
+			u32 devid;
+		} msi;
 		struct kvm_s390_adapter_int adapter;
 		struct kvm_hv_sint hv_sint;
 	};
@@ -367,15 +390,21 @@ struct kvm {
 	spinlock_t mmu_lock;
 	struct mutex slots_lock;
 	struct mm_struct *mm; /* userspace tied to this vm */
-	struct kvm_memslots *memslots[KVM_ADDRESS_SPACE_NUM];
-	struct srcu_struct srcu;
-	struct srcu_struct irq_srcu;
+	struct kvm_memslots __rcu *memslots[KVM_ADDRESS_SPACE_NUM];
 	struct kvm_vcpu *vcpus[KVM_MAX_VCPUS];
+
+	/*
+	 * created_vcpus is protected by kvm->lock, and is incremented
+	 * at the beginning of KVM_CREATE_VCPU.  online_vcpus is only
+	 * incremented after storing the kvm_vcpu pointer in vcpus,
+	 * and is accessed atomically.
+	 */
 	atomic_t online_vcpus;
+	int created_vcpus;
 	int last_boosted_vcpu;
 	struct list_head vm_list;
 	struct mutex lock;
-	struct kvm_io_bus *buses[KVM_NR_BUSES];
+	struct kvm_io_bus __rcu *buses[KVM_NR_BUSES];
 #ifdef CONFIG_HAVE_KVM_EVENTFD
 	struct {
 		spinlock_t        lock;
@@ -387,8 +416,8 @@ struct kvm {
 #endif
 	struct kvm_vm_stat stat;
 	struct kvm_arch arch;
-	atomic_t users_count;
-#ifdef KVM_COALESCED_MMIO_PAGE_OFFSET
+	refcount_t users_count;
+#ifdef CONFIG_KVM_MMIO
 	struct kvm_coalesced_mmio_ring *coalesced_mmio_ring;
 	spinlock_t ring_lock;
 	struct list_head coalesced_zones;
@@ -414,6 +443,8 @@ struct kvm {
 	struct list_head devices;
 	struct dentry *debugfs_dentry;
 	struct kvm_stat_data **debugfs_stat_data;
+	struct srcu_struct srcu;
+	struct srcu_struct irq_srcu;
 };
 
 #define kvm_err(fmt, ...) \
@@ -422,6 +453,9 @@ struct kvm {
 	pr_info("kvm [%i]: " fmt, task_pid_nr(current), ## __VA_ARGS__)
 #define kvm_debug(fmt, ...) \
 	pr_debug("kvm [%i]: " fmt, task_pid_nr(current), ## __VA_ARGS__)
+#define kvm_debug_ratelimited(fmt, ...) \
+	pr_debug_ratelimited("kvm [%i]: " fmt, task_pid_nr(current), \
+			     ## __VA_ARGS__)
 #define kvm_pr_unimpl(fmt, ...) \
 	pr_err_ratelimited("kvm [%i]: " fmt, \
 			   task_tgid_nr(current), ## __VA_ARGS__)
@@ -433,8 +467,17 @@ struct kvm {
 
 #define vcpu_debug(vcpu, fmt, ...)					\
 	kvm_debug("vcpu%i " fmt, (vcpu)->vcpu_id, ## __VA_ARGS__)
+#define vcpu_debug_ratelimited(vcpu, fmt, ...)				\
+	kvm_debug_ratelimited("vcpu%i " fmt, (vcpu)->vcpu_id,           \
+			      ## __VA_ARGS__)
 #define vcpu_err(vcpu, fmt, ...)					\
 	kvm_err("vcpu%i " fmt, (vcpu)->vcpu_id, ## __VA_ARGS__)
+
+static inline struct kvm_io_bus *kvm_get_bus(struct kvm *kvm, enum kvm_bus idx)
+{
+	return srcu_dereference_check(kvm->buses[idx], &kvm->srcu,
+				      lockdep_is_held(&kvm->slots_lock));
+}
 
 static inline struct kvm_vcpu *kvm_get_vcpu(struct kvm *kvm, int i)
 {
@@ -469,6 +512,17 @@ static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
 	return NULL;
 }
 
+static inline int kvm_vcpu_get_idx(struct kvm_vcpu *vcpu)
+{
+	struct kvm_vcpu *tmp;
+	int idx;
+
+	kvm_for_each_vcpu(idx, tmp, vcpu->kvm)
+		if (tmp == vcpu)
+			return idx;
+	BUG();
+}
+
 #define kvm_for_each_memslot(memslot, slots)	\
 	for (memslot = &slots->memslots[0];	\
 	      memslot < slots->memslots + KVM_MEM_SLOTS_NUM && memslot->npages;\
@@ -481,10 +535,10 @@ int __must_check vcpu_load(struct kvm_vcpu *vcpu);
 void vcpu_put(struct kvm_vcpu *vcpu);
 
 #ifdef __KVM_HAVE_IOAPIC
-void kvm_vcpu_request_scan_ioapic(struct kvm *kvm);
+void kvm_arch_post_irq_ack_notifier_list_update(struct kvm *kvm);
 void kvm_arch_post_irq_routing_update(struct kvm *kvm);
 #else
-static inline void kvm_vcpu_request_scan_ioapic(struct kvm *kvm)
+static inline void kvm_arch_post_irq_ack_notifier_list_update(struct kvm *kvm)
 {
 }
 static inline void kvm_arch_post_irq_routing_update(struct kvm *kvm)
@@ -514,9 +568,8 @@ void kvm_put_kvm(struct kvm *kvm);
 
 static inline struct kvm_memslots *__kvm_memslots(struct kvm *kvm, int as_id)
 {
-	return rcu_dereference_check(kvm->memslots[as_id],
-			srcu_read_lock_held(&kvm->srcu)
-			|| lockdep_is_held(&kvm->slots_lock));
+	return srcu_dereference_check(kvm->memslots[as_id], &kvm->srcu,
+			lockdep_is_held(&kvm->slots_lock));
 }
 
 static inline struct kvm_memslots *kvm_memslots(struct kvm *kvm)
@@ -628,6 +681,8 @@ int kvm_write_guest(struct kvm *kvm, gpa_t gpa, const void *data,
 		    unsigned long len);
 int kvm_write_guest_cached(struct kvm *kvm, struct gfn_to_hva_cache *ghc,
 			   void *data, unsigned long len);
+int kvm_write_guest_offset_cached(struct kvm *kvm, struct gfn_to_hva_cache *ghc,
+			   void *data, int offset, unsigned long len);
 int kvm_gfn_to_hva_cache_init(struct kvm *kvm, struct gfn_to_hva_cache *ghc,
 			      gpa_t gpa, unsigned long len);
 int kvm_clear_guest_page(struct kvm *kvm, gfn_t gfn, int offset, int len);
@@ -659,7 +714,7 @@ void kvm_vcpu_mark_page_dirty(struct kvm_vcpu *vcpu, gfn_t gfn);
 void kvm_vcpu_block(struct kvm_vcpu *vcpu);
 void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu);
 void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu);
-void kvm_vcpu_wake_up(struct kvm_vcpu *vcpu);
+bool kvm_vcpu_wake_up(struct kvm_vcpu *vcpu);
 void kvm_vcpu_kick(struct kvm_vcpu *vcpu);
 int kvm_vcpu_yield_to(struct kvm_vcpu *target);
 void kvm_vcpu_on_spin(struct kvm_vcpu *vcpu);
@@ -733,6 +788,9 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu);
 void kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu);
 void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu);
 
+bool kvm_arch_has_vcpu_debugfs(void);
+int kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu);
+
 int kvm_arch_hardware_enable(void);
 void kvm_arch_hardware_disable(void);
 int kvm_arch_hardware_setup(void);
@@ -740,8 +798,6 @@ void kvm_arch_hardware_unsetup(void);
 void kvm_arch_check_processor_compat(void *rtn);
 int kvm_arch_vcpu_runnable(struct kvm_vcpu *vcpu);
 int kvm_arch_vcpu_should_kick(struct kvm_vcpu *vcpu);
-
-void *kvm_kvzalloc(unsigned long size);
 
 #ifndef __KVM_HAVE_ARCH_VM_ALLOC
 static inline struct kvm *kvm_arch_alloc_vm(void)
@@ -850,61 +906,6 @@ void kvm_unregister_irq_ack_notifier(struct kvm *kvm,
 				   struct kvm_irq_ack_notifier *kian);
 int kvm_request_irq_source_id(struct kvm *kvm);
 void kvm_free_irq_source_id(struct kvm *kvm, int irq_source_id);
-
-#ifdef CONFIG_KVM_DEVICE_ASSIGNMENT
-int kvm_iommu_map_pages(struct kvm *kvm, struct kvm_memory_slot *slot);
-void kvm_iommu_unmap_pages(struct kvm *kvm, struct kvm_memory_slot *slot);
-#else
-static inline int kvm_iommu_map_pages(struct kvm *kvm,
-				      struct kvm_memory_slot *slot)
-{
-	return 0;
-}
-
-static inline void kvm_iommu_unmap_pages(struct kvm *kvm,
-					 struct kvm_memory_slot *slot)
-{
-}
-#endif
-
-/* must be called with irqs disabled */
-static inline void __kvm_guest_enter(void)
-{
-	guest_enter();
-	/* KVM does not hold any references to rcu protected data when it
-	 * switches CPU into a guest mode. In fact switching to a guest mode
-	 * is very similar to exiting to userspace from rcu point of view. In
-	 * addition CPU may stay in a guest mode for quite a long time (up to
-	 * one time slice). Lets treat guest mode as quiescent state, just like
-	 * we do with user-mode execution.
-	 */
-	if (!context_tracking_cpu_is_enabled())
-		rcu_virt_note_context_switch(smp_processor_id());
-}
-
-/* must be called with irqs disabled */
-static inline void __kvm_guest_exit(void)
-{
-	guest_exit();
-}
-
-static inline void kvm_guest_enter(void)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	__kvm_guest_enter();
-	local_irq_restore(flags);
-}
-
-static inline void kvm_guest_exit(void)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	__kvm_guest_exit();
-	local_irq_restore(flags);
-}
 
 /*
  * search_memslots() and __gfn_to_memslot() are here because they are
@@ -1032,17 +1033,19 @@ static inline int mmu_notifier_retry(struct kvm *kvm, unsigned long mmu_seq)
 
 #ifdef CONFIG_S390
 #define KVM_MAX_IRQ_ROUTES 4096 //FIXME: we can have more than that...
+#elif defined(CONFIG_ARM64)
+#define KVM_MAX_IRQ_ROUTES 4096
 #else
 #define KVM_MAX_IRQ_ROUTES 1024
 #endif
 
-int kvm_setup_default_irq_routing(struct kvm *kvm);
-int kvm_setup_empty_irq_routing(struct kvm *kvm);
+bool kvm_arch_can_set_irq_routing(struct kvm *kvm);
 int kvm_set_irq_routing(struct kvm *kvm,
 			const struct kvm_irq_routing_entry *entries,
 			unsigned nr,
 			unsigned flags);
-int kvm_set_routing_entry(struct kvm_kernel_irq_routing_entry *e,
+int kvm_set_routing_entry(struct kvm *kvm,
+			  struct kvm_kernel_irq_routing_entry *e,
 			  const struct kvm_irq_routing_entry *ue);
 void kvm_free_irq_routing(struct kvm *kvm);
 
@@ -1097,12 +1100,6 @@ static inline int kvm_ioeventfd(struct kvm *kvm, struct kvm_ioeventfd *args)
 
 #endif /* CONFIG_HAVE_KVM_EVENTFD */
 
-#ifdef CONFIG_KVM_APIC_ARCHITECTURE
-bool kvm_vcpu_compatible(struct kvm_vcpu *vcpu);
-#else
-static inline bool kvm_vcpu_compatible(struct kvm_vcpu *vcpu) { return true; }
-#endif
-
 static inline void kvm_make_request(int req, struct kvm_vcpu *vcpu)
 {
 	/*
@@ -1110,13 +1107,28 @@ static inline void kvm_make_request(int req, struct kvm_vcpu *vcpu)
 	 * caller.  Paired with the smp_mb__after_atomic in kvm_check_request.
 	 */
 	smp_wmb();
-	set_bit(req, &vcpu->requests);
+	set_bit(req & KVM_REQUEST_MASK, &vcpu->requests);
+}
+
+static inline bool kvm_request_pending(struct kvm_vcpu *vcpu)
+{
+	return READ_ONCE(vcpu->requests);
+}
+
+static inline bool kvm_test_request(int req, struct kvm_vcpu *vcpu)
+{
+	return test_bit(req & KVM_REQUEST_MASK, &vcpu->requests);
+}
+
+static inline void kvm_clear_request(int req, struct kvm_vcpu *vcpu)
+{
+	clear_bit(req & KVM_REQUEST_MASK, &vcpu->requests);
 }
 
 static inline bool kvm_check_request(int req, struct kvm_vcpu *vcpu)
 {
-	if (test_bit(req, &vcpu->requests)) {
-		clear_bit(req, &vcpu->requests);
+	if (kvm_test_request(req, vcpu)) {
+		kvm_clear_request(req, vcpu);
 
 		/*
 		 * Ensure the rest of the request is visible to kvm_check_request's
@@ -1131,6 +1143,10 @@ static inline bool kvm_check_request(int req, struct kvm_vcpu *vcpu)
 
 extern bool kvm_rebooting;
 
+extern unsigned int halt_poll_ns;
+extern unsigned int halt_poll_ns_grow;
+extern unsigned int halt_poll_ns_shrink;
+
 struct kvm_device {
 	struct kvm_device_ops *ops;
 	struct kvm *kvm;
@@ -1141,7 +1157,19 @@ struct kvm_device {
 /* create, destroy, and name are mandatory */
 struct kvm_device_ops {
 	const char *name;
+
+	/*
+	 * create is called holding kvm->lock and any operations not suitable
+	 * to do while holding the lock should be deferred to init (see
+	 * below).
+	 */
 	int (*create)(struct kvm_device *dev, u32 type);
+
+	/*
+	 * init is called after create if create is successful and is called
+	 * outside of holding kvm->lock.
+	 */
+	void (*init)(struct kvm_device *dev);
 
 	/*
 	 * Destroy is responsible for freeing dev.
@@ -1167,7 +1195,6 @@ int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type);
 void kvm_unregister_device_ops(u32 type);
 
 extern struct kvm_device_ops kvm_mpic_ops;
-extern struct kvm_device_ops kvm_xics_ops;
 extern struct kvm_device_ops kvm_arm_vgic_v2_ops;
 extern struct kvm_device_ops kvm_arm_vgic_v3_ops;
 

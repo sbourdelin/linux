@@ -1922,6 +1922,9 @@ static void at76_dwork_hw_scan(struct work_struct *work)
 {
 	struct at76_priv *priv = container_of(work, struct at76_priv,
 					      dwork_hw_scan.work);
+	struct cfg80211_scan_info info = {
+		.aborted = false,
+	};
 	int ret;
 
 	if (priv->device_unplugged)
@@ -1948,7 +1951,7 @@ static void at76_dwork_hw_scan(struct work_struct *work)
 
 	mutex_unlock(&priv->mtx);
 
-	ieee80211_scan_completed(priv->hw, false);
+	ieee80211_scan_completed(priv->hw, &info);
 
 	ieee80211_wake_queues(priv->hw);
 }
@@ -2373,6 +2376,8 @@ static int at76_init_new_device(struct at76_priv *priv,
 		 priv->fw_version.patch, priv->fw_version.build);
 
 	wiphy->hw_version = priv->board_type;
+
+	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_CQM_RSSI_LIST);
 
 	ret = ieee80211_register_hw(priv->hw);
 	if (ret) {

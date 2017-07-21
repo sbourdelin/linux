@@ -6,7 +6,7 @@
  * GPL LICENSE SUMMARY
  *
  * Copyright(c) 2007 - 2014 Intel Corporation. All rights reserved.
- * Copyright (C) 2016 Intel Deutschland GmbH
+ * Copyright (C) 2016 - 2017 Intel Deutschland GmbH
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of version 2 of the GNU General Public License as
@@ -32,7 +32,7 @@
  * BSD LICENSE
  *
  * Copyright(c) 2005 - 2014 Intel Corporation. All rights reserved.
- * Copyright (C) 2016 Intel Deutschland GmbH
+ * Copyright (C) 2016 - 2017 Intel Deutschland GmbH
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -66,8 +66,9 @@
 #define __IWL_CONFIG_H__
 
 #include <linux/types.h>
-#include <net/mac80211.h>
-
+#include <linux/netdevice.h>
+#include <linux/ieee80211.h>
+#include <linux/nl80211.h>
 
 enum iwl_device_family {
 	IWL_DEVICE_FAMILY_UNDEFINED,
@@ -87,17 +88,9 @@ enum iwl_device_family {
 	IWL_DEVICE_FAMILY_6150,
 	IWL_DEVICE_FAMILY_7000,
 	IWL_DEVICE_FAMILY_8000,
+	IWL_DEVICE_FAMILY_9000,
+	IWL_DEVICE_FAMILY_A000,
 };
-
-static inline bool iwl_has_secure_boot(u32 hw_rev,
-				       enum iwl_device_family family)
-{
-	/* return 1 only for family 8000 B0 */
-	if ((family == IWL_DEVICE_FAMILY_8000) && (hw_rev & 0xC))
-		return true;
-
-	return false;
-}
 
 /*
  * LED mode
@@ -138,6 +131,7 @@ enum iwl_led_mode {
 
 /* Antenna presence definitions */
 #define	ANT_NONE	0x0
+#define	ANT_INVALID	0xff
 #define	ANT_A		BIT(0)
 #define	ANT_B		BIT(1)
 #define ANT_C		BIT(2)
@@ -179,7 +173,7 @@ struct iwl_base_params {
 	   apmg_wake_up_wa:1,
 	   scd_chain_ext_wa:1;
 
-	u8 num_of_queues;	/* def: HW dependent */
+	u16 num_of_queues;	/* def: HW dependent */
 
 	u8 max_ll_items;
 	u8 led_compensation;
@@ -192,7 +186,6 @@ struct iwl_base_params {
  * @ht40_bands: bitmap of bands (using %NL80211_BAND_*) that support HT40
  */
 struct iwl_ht_params {
-	enum ieee80211_smps_mode smps_mode;
 	u8 ht_greenfield_support:1,
 	   stbc:1,
 	   ldpc:1,
@@ -261,6 +254,7 @@ struct iwl_tt_params {
 #define OTP_LOW_IMAGE_SIZE_FAMILY_7000	(16 * 512 * sizeof(u16)) /* 16 KB */
 #define OTP_LOW_IMAGE_SIZE_FAMILY_8000	(32 * 512 * sizeof(u16)) /* 32 KB */
 #define OTP_LOW_IMAGE_SIZE_FAMILY_9000	OTP_LOW_IMAGE_SIZE_FAMILY_8000
+#define OTP_LOW_IMAGE_SIZE_FAMILY_A000	OTP_LOW_IMAGE_SIZE_FAMILY_9000
 
 struct iwl_eeprom_params {
 	const u8 regulatory_bands[7];
@@ -282,6 +276,10 @@ struct iwl_pwr_tx_backoff {
  * @fw_name_pre: Firmware filename prefix. The api version and extension
  *	(.ucode) will be added to filename before loading from disk. The
  *	filename is constructed as fw_name_pre<api>.ucode.
+ * @fw_name_pre_next_step: same as @fw_name_pre, only for next step
+ *	(if supported)
+ * @fw_name_pre_rf_next_step: same as @fw_name_pre_next_step, only for rf next
+ *	step. Supported only in integrated solutions.
  * @ucode_api_max: Highest version of uCode API supported by driver.
  * @ucode_api_min: Lowest version of uCode API supported by driver.
  * @max_inst_size: The maximal length of the fw inst section
@@ -319,6 +317,10 @@ struct iwl_pwr_tx_backoff {
  * @mq_rx_supported: multi-queue rx support
  * @vht_mu_mimo_supported: VHT MU-MIMO support
  * @rf_id: need to read rf_id to determine the firmware image
+ * @integrated: discrete or integrated
+ * @gen2: a000 and on transport operation
+ * @cdb: CDB support
+ * @ext_nvm: extended NVM format
  *
  * We enable the driver to be backward compatible wrt. hardware features.
  * API differences in uCode shouldn't be handled here but through TLVs
@@ -328,13 +330,14 @@ struct iwl_cfg {
 	/* params specific to an individual device within a device family */
 	const char *name;
 	const char *fw_name_pre;
+	const char *fw_name_pre_next_step;
+	const char *fw_name_pre_rf_next_step;
 	/* params not likely to change within a device family */
 	const struct iwl_base_params *base_params;
 	/* params likely to change within a device family */
 	const struct iwl_ht_params *ht_params;
 	const struct iwl_eeprom_params *eeprom_params;
 	const struct iwl_pwr_tx_backoff *pwr_tx_backoffs;
-	const char *default_nvm_file_B_step;
 	const char *default_nvm_file_C_step;
 	const struct iwl_tt_params *thermal_params;
 	enum iwl_device_family device_family;
@@ -357,12 +360,17 @@ struct iwl_cfg {
 	    high_temp:1,
 	    mac_addr_from_csr:1,
 	    lp_xtal_workaround:1,
-	    no_power_up_nic_in_init:1,
 	    disable_dummy_notification:1,
 	    apmg_not_supported:1,
 	    mq_rx_supported:1,
 	    vht_mu_mimo_supported:1,
-	    rf_id:1;
+	    rf_id:1,
+	    integrated:1,
+	    use_tfh:1,
+	    gen2:1,
+	    cdb:1,
+	    ext_nvm:1,
+	    dbgc_supported:1;
 	u8 valid_tx_ant;
 	u8 valid_rx_ant;
 	u8 non_shared_ant;
@@ -441,13 +449,20 @@ extern const struct iwl_cfg iwl7265d_n_cfg;
 extern const struct iwl_cfg iwl8260_2n_cfg;
 extern const struct iwl_cfg iwl8260_2ac_cfg;
 extern const struct iwl_cfg iwl8265_2ac_cfg;
+extern const struct iwl_cfg iwl8275_2ac_cfg;
 extern const struct iwl_cfg iwl4165_2ac_cfg;
 extern const struct iwl_cfg iwl8260_2ac_sdio_cfg;
 extern const struct iwl_cfg iwl8265_2ac_sdio_cfg;
 extern const struct iwl_cfg iwl4165_2ac_sdio_cfg;
+extern const struct iwl_cfg iwl9160_2ac_cfg;
 extern const struct iwl_cfg iwl9260_2ac_cfg;
-extern const struct iwl_cfg iwl9260lc_2ac_cfg;
-extern const struct iwl_cfg iwl5165_2ac_cfg;
+extern const struct iwl_cfg iwl9270_2ac_cfg;
+extern const struct iwl_cfg iwl9460_2ac_cfg;
+extern const struct iwl_cfg iwl9560_2ac_cfg;
+extern const struct iwl_cfg iwla000_2ac_cfg_hr;
+extern const struct iwl_cfg iwla000_2ac_cfg_hr_cdb;
+extern const struct iwl_cfg iwla000_2ac_cfg_jf;
+extern const struct iwl_cfg iwla000_2ax_cfg_hr;
 #endif /* CONFIG_IWLMVM */
 
 #endif /* __IWL_CONFIG_H__ */

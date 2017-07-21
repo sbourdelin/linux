@@ -38,8 +38,8 @@ struct backend_info {
 static struct kmem_cache *xen_blkif_cachep;
 static void connect(struct backend_info *);
 static int connect_ring(struct backend_info *);
-static void backend_changed(struct xenbus_watch *, const char **,
-			    unsigned int);
+static void backend_changed(struct xenbus_watch *, const char *,
+			    const char *);
 static void xen_blkif_free(struct xen_blkif *blkif);
 static void xen_vbd_free(struct xen_vbd *vbd);
 
@@ -159,7 +159,7 @@ static int xen_blkif_alloc_rings(struct xen_blkif *blkif)
 		init_waitqueue_head(&ring->shutdown_wq);
 		ring->blkif = blkif;
 		ring->st_print = jiffies;
-		xen_blkif_get(blkif);
+		ring->active = true;
 	}
 
 	return 0;
@@ -249,10 +249,12 @@ static int xen_blkif_disconnect(struct xen_blkif *blkif)
 		struct xen_blkif_ring *ring = &blkif->rings[r];
 		unsigned int i = 0;
 
+		if (!ring->active)
+			continue;
+
 		if (ring->xenblkd) {
 			kthread_stop(ring->xenblkd);
 			wake_up(&ring->shutdown_wq);
-			ring->xenblkd = NULL;
 		}
 
 		/* The above kthread_stop() guarantees that at this point we
@@ -296,7 +298,7 @@ static int xen_blkif_disconnect(struct xen_blkif *blkif)
 		BUG_ON(ring->free_pages_num != 0);
 		BUG_ON(ring->persistent_gnt_c != 0);
 		WARN_ON(i != (XEN_BLKIF_REQS_PER_PAGE * blkif->nr_ring_pages));
-		xen_blkif_put(blkif);
+		ring->active = false;
 	}
 	blkif->nr_ring_pages = 0;
 	/*
@@ -312,9 +314,10 @@ static int xen_blkif_disconnect(struct xen_blkif *blkif)
 
 static void xen_blkif_free(struct xen_blkif *blkif)
 {
-
-	xen_blkif_disconnect(blkif);
+	WARN_ON(xen_blkif_disconnect(blkif));
 	xen_vbd_free(&blkif->vbd);
+	kfree(blkif->be->mode);
+	kfree(blkif->be);
 
 	/* Make sure everything is drained before shutting down */
 	kmem_cache_free(xen_blkif_cachep, blkif);
@@ -379,7 +382,7 @@ static struct attribute *xen_vbdstat_attrs[] = {
 	NULL
 };
 
-static struct attribute_group xen_vbdstat_group = {
+static const struct attribute_group xen_vbdstat_group = {
 	.name = "statistics",
 	.attrs = xen_vbdstat_attrs,
 };
@@ -480,7 +483,7 @@ static int xen_vbd_create(struct xen_blkif *blkif, blkif_vdev_t handle,
 	if (q && test_bit(QUEUE_FLAG_WC, &q->queue_flags))
 		vbd->flush_support = true;
 
-	if (q && blk_queue_secdiscard(q))
+	if (q && blk_queue_secure_erase(q))
 		vbd->discard_secure = true;
 
 	pr_debug("Successful creation of handle=%04x (dom=%u)\n",
@@ -504,13 +507,13 @@ static int xen_blkbk_remove(struct xenbus_device *dev)
 
 	dev_set_drvdata(&dev->dev, NULL);
 
-	if (be->blkif)
+	if (be->blkif) {
 		xen_blkif_disconnect(be->blkif);
 
-	/* Put the reference we set in xen_blkif_alloc(). */
-	xen_blkif_put(be->blkif);
-	kfree(be->mode);
-	kfree(be);
+		/* Put the reference we set in xen_blkif_alloc(). */
+		xen_blkif_put(be->blkif);
+	}
+
 	return 0;
 }
 
@@ -533,13 +536,11 @@ static void xen_blkbk_discard(struct xenbus_transaction xbt, struct backend_info
 	struct xenbus_device *dev = be->dev;
 	struct xen_blkif *blkif = be->blkif;
 	int err;
-	int state = 0, discard_enable;
+	int state = 0;
 	struct block_device *bdev = be->blkif->vbd.bdev;
 	struct request_queue *q = bdev_get_queue(bdev);
 
-	err = xenbus_scanf(XBT_NIL, dev->nodename, "discard-enable", "%d",
-			   &discard_enable);
-	if (err == 1 && !discard_enable)
+	if (!xenbus_read_unsigned(dev->nodename, "discard-enable", 1))
 		return;
 
 	if (blk_queue_discard(q)) {
@@ -663,7 +664,7 @@ fail:
  * ready, connect.
  */
 static void backend_changed(struct xenbus_watch *watch,
-			    const char **vec, unsigned int len)
+			    const char *path, const char *token)
 {
 	int err;
 	unsigned major;
@@ -715,8 +716,11 @@ static void backend_changed(struct xenbus_watch *watch,
 
 	/* Front end dir is a number, which is used as the handle. */
 	err = kstrtoul(strrchr(dev->otherend, '/') + 1, 0, &handle);
-	if (err)
+	if (err) {
+		kfree(be->mode);
+		be->mode = NULL;
 		return;
+	}
 
 	be->major = major;
 	be->minor = minor;
@@ -1022,9 +1026,9 @@ static int connect_ring(struct backend_info *be)
 	pr_debug("%s %s\n", __func__, dev->otherend);
 
 	be->blkif->blk_protocol = BLKIF_PROTOCOL_DEFAULT;
-	err = xenbus_gather(XBT_NIL, dev->otherend, "protocol",
-			    "%63s", protocol, NULL);
-	if (err)
+	err = xenbus_scanf(XBT_NIL, dev->otherend, "protocol",
+			   "%63s", protocol);
+	if (err <= 0)
 		strcpy(protocol, "unspecified, assuming default");
 	else if (0 == strcmp(protocol, XEN_IO_PROTO_ABI_NATIVE))
 		be->blkif->blk_protocol = BLKIF_PROTOCOL_NATIVE;
@@ -1036,31 +1040,24 @@ static int connect_ring(struct backend_info *be)
 		xenbus_dev_fatal(dev, err, "unknown fe protocol %s", protocol);
 		return -ENOSYS;
 	}
-	err = xenbus_gather(XBT_NIL, dev->otherend,
-			    "feature-persistent", "%u",
-			    &pers_grants, NULL);
-	if (err)
-		pers_grants = 0;
-
+	pers_grants = xenbus_read_unsigned(dev->otherend, "feature-persistent",
+					   0);
 	be->blkif->vbd.feature_gnt_persistent = pers_grants;
 	be->blkif->vbd.overflow_max_grants = 0;
 
 	/*
 	 * Read the number of hardware queues from frontend.
 	 */
-	err = xenbus_scanf(XBT_NIL, dev->otherend, "multi-queue-num-queues",
-			   "%u", &requested_num_queues);
-	if (err < 0) {
-		requested_num_queues = 1;
-	} else {
-		if (requested_num_queues > xenblk_max_queues
-		    || requested_num_queues == 0) {
-			/* Buggy or malicious guest. */
-			xenbus_dev_fatal(dev, err,
-					"guest requested %u queues, exceeding the maximum of %u.",
-					requested_num_queues, xenblk_max_queues);
-			return -ENOSYS;
-		}
+	requested_num_queues = xenbus_read_unsigned(dev->otherend,
+						    "multi-queue-num-queues",
+						    1);
+	if (requested_num_queues > xenblk_max_queues
+	    || requested_num_queues == 0) {
+		/* Buggy or malicious guest. */
+		xenbus_dev_fatal(dev, err,
+				"guest requested %u queues, exceeding the maximum of %u.",
+				requested_num_queues, xenblk_max_queues);
+		return -ENOSYS;
 	}
 	be->blkif->nr_rings = requested_num_queues;
 	if (xen_blkif_alloc_rings(be->blkif))

@@ -13,7 +13,7 @@
  * more details.
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/pinctrl/pinctrl.h>
@@ -1310,8 +1310,6 @@ static struct tegra_function tegra210_functions[] = {
 		.lock_bit = 7,						\
 		.ioreset_bit = -1,					\
 		.rcv_sel_bit = PINGROUP_BIT_##e_io_hv(10),		\
-		.parked_reg = PINGROUP_REG(r),				\
-		.parked_bank = 1,					\
 		.parked_bit = 5,					\
 		.hsm_bit = PINGROUP_BIT_##hsm(9),			\
 		.schmitt_bit = 12,					\
@@ -1345,7 +1343,7 @@ static struct tegra_function tegra210_functions[] = {
 		.rcv_sel_bit = -1,					\
 		.drv_reg = DRV_PINGROUP_REG(r),				\
 		.drv_bank = 0,						\
-		.parked_reg = -1,					\
+		.parked_bit = -1,					\
 		.hsm_bit = -1,						\
 		.schmitt_bit = -1,					\
 		.lpmd_bit = -1,						\
@@ -1575,7 +1573,6 @@ static const struct of_device_id tegra210_pinctrl_of_match[] = {
 	{ .compatible = "nvidia,tegra210-pinmux", },
 	{ },
 };
-MODULE_DEVICE_TABLE(of, tegra210_pinctrl_of_match);
 
 static struct platform_driver tegra210_pinctrl_driver = {
 	.driver = {
@@ -1584,8 +1581,4 @@ static struct platform_driver tegra210_pinctrl_driver = {
 	},
 	.probe = tegra210_pinctrl_probe,
 };
-module_platform_driver(tegra210_pinctrl_driver);
-
-MODULE_AUTHOR("NVIDIA");
-MODULE_DESCRIPTION("NVIDIA Tegra210 pinctrl driver");
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(tegra210_pinctrl_driver);

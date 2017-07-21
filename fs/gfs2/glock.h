@@ -247,4 +247,21 @@ extern void gfs2_unregister_debugfs(void);
 
 extern const struct lm_lockops gfs2_dlm_ops;
 
+static inline void gfs2_holder_mark_uninitialized(struct gfs2_holder *gh)
+{
+	gh->gh_gl = NULL;
+}
+
+static inline bool gfs2_holder_initialized(struct gfs2_holder *gh)
+{
+	return gh->gh_gl;
+}
+
+static inline void glock_set_object(struct gfs2_glock *gl, void *object)
+{
+	spin_lock(&gl->gl_lockref.lock);
+	gl->gl_object = object;
+	spin_unlock(&gl->gl_lockref.lock);
+}
+
 #endif /* __GLOCK_DOT_H__ */

@@ -10,8 +10,6 @@
 #include "common.h"
 
 unsigned int __mxc_cpu_type;
-EXPORT_SYMBOL(__mxc_cpu_type);
-
 static unsigned int imx_soc_revision;
 
 void mxc_set_cpu_type(unsigned int type)
@@ -132,6 +130,9 @@ struct device * __init imx_soc_device_init(void)
 		break;
 	case MXC_CPU_IMX6UL:
 		soc_id = "i.MX6UL";
+		break;
+	case MXC_CPU_IMX6ULL:
+		soc_id = "i.MX6ULL";
 		break;
 	case MXC_CPU_IMX7D:
 		soc_id = "i.MX7D";

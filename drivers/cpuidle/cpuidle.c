@@ -12,6 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/mutex.h>
 #include <linux/sched.h>
+#include <linux/sched/clock.h>
 #include <linux/notifier.h>
 #include <linux/pm_qos.h>
 #include <linux/cpu.h>
@@ -97,7 +98,24 @@ static int find_deepest_state(struct cpuidle_driver *drv,
 	return ret;
 }
 
-#ifdef CONFIG_SUSPEND
+/**
+ * cpuidle_use_deepest_state - Set/clear governor override flag.
+ * @enable: New value of the flag.
+ *
+ * Set/unset the current CPU to use the deepest idle state (override governors
+ * going forward if set).
+ */
+void cpuidle_use_deepest_state(bool enable)
+{
+	struct cpuidle_device *dev;
+
+	preempt_disable();
+	dev = cpuidle_get_device();
+	if (dev)
+		dev->use_deepest_state = enable;
+	preempt_enable();
+}
+
 /**
  * cpuidle_find_deepest_state - Find the deepest available idle state.
  * @drv: cpuidle driver for the given CPU.
@@ -109,6 +127,7 @@ int cpuidle_find_deepest_state(struct cpuidle_driver *drv,
 	return find_deepest_state(drv, dev, UINT_MAX, 0, false);
 }
 
+#ifdef CONFIG_SUSPEND
 static void enter_freeze_proper(struct cpuidle_driver *drv,
 				struct cpuidle_device *dev, int index)
 {
@@ -173,7 +192,7 @@ int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
 
 	struct cpuidle_state *target_state = &drv->states[index];
 	bool broadcast = !!(target_state->flags & CPUIDLE_FLAG_TIMER_STOP);
-	u64 time_start, time_end;
+	ktime_t time_start, time_end;
 	s64 diff;
 
 	/*
@@ -195,13 +214,14 @@ int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
 	sched_idle_set_state(target_state);
 
 	trace_cpu_idle_rcuidle(index, dev->cpu);
-	time_start = local_clock();
+	time_start = ns_to_ktime(local_clock());
 
 	stop_critical_timings();
 	entered_state = target_state->enter(dev, drv, index);
 	start_critical_timings();
 
-	time_end = local_clock();
+	sched_clock_idle_wakeup_event();
+	time_end = ns_to_ktime(local_clock());
 	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, dev->cpu);
 
 	/* The cpu is no longer idle or about to enter idle. */
@@ -217,11 +237,7 @@ int cpuidle_enter_state(struct cpuidle_device *dev, struct cpuidle_driver *drv,
 	if (!cpuidle_state_is_coupled(drv, index))
 		local_irq_enable();
 
-	/*
-	 * local_clock() returns the time in nanosecond, let's shift
-	 * by 10 (divide by 1024) to have microsecond based time.
-	 */
-	diff = (time_end - time_start) >> 10;
+	diff = ktime_us_delta(time_end, time_start);
 	if (diff > INT_MAX)
 		diff = INT_MAX;
 

@@ -23,20 +23,16 @@
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
+#include <linux/sched/signal.h>
 #include <linux/fcntl.h>
 #include <linux/delay.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
-#include <linux/kmod.h>
 #include <linux/poll.h>
-#include <linux/init.h>
 #include <linux/device.h>
-#include <linux/vmalloc.h>
 #include <linux/fs.h>
 #include "comedidev.h"
 #include <linux/cdev.h>
-#include <linux/stat.h>
 
 #include <linux/io.h>
 #include <linux/uaccess.h>
@@ -80,21 +76,21 @@ struct comedi_file {
 #define COMEDI_NUM_SUBDEVICE_MINORS	\
 	(COMEDI_NUM_MINORS - COMEDI_NUM_BOARD_MINORS)
 
-static int comedi_num_legacy_minors;
-module_param(comedi_num_legacy_minors, int, S_IRUGO);
+static unsigned short comedi_num_legacy_minors;
+module_param(comedi_num_legacy_minors, ushort, 0444);
 MODULE_PARM_DESC(comedi_num_legacy_minors,
 		 "number of comedi minor devices to reserve for non-auto-configured devices (default 0)"
 		);
 
 unsigned int comedi_default_buf_size_kb = CONFIG_COMEDI_DEFAULT_BUF_SIZE_KB;
-module_param(comedi_default_buf_size_kb, uint, S_IRUGO | S_IWUSR);
+module_param(comedi_default_buf_size_kb, uint, 0644);
 MODULE_PARM_DESC(comedi_default_buf_size_kb,
 		 "default asynchronous buffer size in KiB (default "
 		 __MODULE_STRING(CONFIG_COMEDI_DEFAULT_BUF_SIZE_KB) ")");
 
 unsigned int comedi_default_buf_maxsize_kb
 	= CONFIG_COMEDI_DEFAULT_BUF_MAXSIZE_KB;
-module_param(comedi_default_buf_maxsize_kb, uint, S_IRUGO | S_IWUSR);
+module_param(comedi_default_buf_maxsize_kb, uint, 0644);
 MODULE_PARM_DESC(comedi_default_buf_maxsize_kb,
 		 "default maximum size of asynchronous buffer in KiB (default "
 		 __MODULE_STRING(CONFIG_COMEDI_DEFAULT_BUF_MAXSIZE_KB) ")");
@@ -312,8 +308,8 @@ static void comedi_file_reset(struct file *file)
 	}
 	cfp->last_attached = dev->attached;
 	cfp->last_detach_count = dev->detach_count;
-	ACCESS_ONCE(cfp->read_subdev) = read_s;
-	ACCESS_ONCE(cfp->write_subdev) = write_s;
+	WRITE_ONCE(cfp->read_subdev, read_s);
+	WRITE_ONCE(cfp->write_subdev, write_s);
 }
 
 static void comedi_file_check(struct file *file)
@@ -331,7 +327,7 @@ static struct comedi_subdevice *comedi_file_read_subdevice(struct file *file)
 	struct comedi_file *cfp = file->private_data;
 
 	comedi_file_check(file);
-	return ACCESS_ONCE(cfp->read_subdev);
+	return READ_ONCE(cfp->read_subdev);
 }
 
 static struct comedi_subdevice *comedi_file_write_subdevice(struct file *file)
@@ -339,7 +335,7 @@ static struct comedi_subdevice *comedi_file_write_subdevice(struct file *file)
 	struct comedi_file *cfp = file->private_data;
 
 	comedi_file_check(file);
-	return ACCESS_ONCE(cfp->write_subdev);
+	return READ_ONCE(cfp->write_subdev);
 }
 
 static int resize_async_buffer(struct comedi_device *dev,
@@ -1256,16 +1252,17 @@ static int parse_insn(struct comedi_device *dev, struct comedi_insn *insn,
 		switch (insn->insn) {
 		case INSN_GTOD:
 			{
-				struct timeval tv;
+				struct timespec64 tv;
 
 				if (insn->n != 2) {
 					ret = -EINVAL;
 					break;
 				}
 
-				do_gettimeofday(&tv);
-				data[0] = tv.tv_sec;
-				data[1] = tv.tv_usec;
+				ktime_get_real_ts64(&tv);
+				/* unsigned data safe until 2106 */
+				data[0] = (unsigned int)tv.tv_sec;
+				data[1] = tv.tv_nsec / NSEC_PER_USEC;
 				ret = 2;
 
 				break;
@@ -1992,7 +1989,7 @@ static int do_setrsubd_ioctl(struct comedi_device *dev, unsigned long arg,
 	    !(s_old->async->cmd.flags & CMDF_WRITE))
 		return -EBUSY;
 
-	ACCESS_ONCE(cfp->read_subdev) = s_new;
+	WRITE_ONCE(cfp->read_subdev, s_new);
 	return 0;
 }
 
@@ -2034,7 +2031,7 @@ static int do_setwsubd_ioctl(struct comedi_device *dev, unsigned long arg,
 	    (s_old->async->cmd.flags & CMDF_WRITE))
 		return -EBUSY;
 
-	ACCESS_ONCE(cfp->write_subdev) = s_new;
+	WRITE_ONCE(cfp->write_subdev, s_new);
 	return 0;
 }
 
@@ -2168,9 +2165,24 @@ static void comedi_vm_close(struct vm_area_struct *area)
 	comedi_buf_map_put(bm);
 }
 
+static int comedi_vm_access(struct vm_area_struct *vma, unsigned long addr,
+			    void *buf, int len, int write)
+{
+	struct comedi_buf_map *bm = vma->vm_private_data;
+	unsigned long offset =
+	    addr - vma->vm_start + (vma->vm_pgoff << PAGE_SHIFT);
+
+	if (len < 0)
+		return -EINVAL;
+	if (len > vma->vm_end - addr)
+		len = vma->vm_end - addr;
+	return comedi_buf_map_access(bm, offset, buf, len, write);
+}
+
 static const struct vm_operations_struct comedi_vm_ops = {
 	.open = comedi_vm_open,
 	.close = comedi_vm_close,
+	.access = comedi_vm_access,
 };
 
 static int comedi_mmap(struct file *file, struct vm_area_struct *vma)
@@ -2232,7 +2244,7 @@ static int comedi_mmap(struct file *file, struct vm_area_struct *vma)
 		goto done;
 	}
 
-	n_pages = size >> PAGE_SHIFT;
+	n_pages = vma_pages(vma);
 
 	/* get reference to current buf map (if any) */
 	bm = comedi_buf_map_from_subdev_get(s);
@@ -2860,8 +2872,7 @@ static int __init comedi_init(void)
 
 	pr_info("version " COMEDI_RELEASE " - http://www.comedi.org\n");
 
-	if (comedi_num_legacy_minors < 0 ||
-	    comedi_num_legacy_minors > COMEDI_NUM_BOARD_MINORS) {
+	if (comedi_num_legacy_minors > COMEDI_NUM_BOARD_MINORS) {
 		pr_err("invalid value for module parameter \"comedi_num_legacy_minors\".  Valid values are 0 through %i.\n",
 		       COMEDI_NUM_BOARD_MINORS);
 		return -EINVAL;
@@ -2870,35 +2881,28 @@ static int __init comedi_init(void)
 	retval = register_chrdev_region(MKDEV(COMEDI_MAJOR, 0),
 					COMEDI_NUM_MINORS, "comedi");
 	if (retval)
-		return -EIO;
+		return retval;
+
 	cdev_init(&comedi_cdev, &comedi_fops);
 	comedi_cdev.owner = THIS_MODULE;
 
 	retval = kobject_set_name(&comedi_cdev.kobj, "comedi");
-	if (retval) {
-		unregister_chrdev_region(MKDEV(COMEDI_MAJOR, 0),
-					 COMEDI_NUM_MINORS);
-		return retval;
-	}
+	if (retval)
+		goto out_unregister_chrdev_region;
 
-	if (cdev_add(&comedi_cdev, MKDEV(COMEDI_MAJOR, 0), COMEDI_NUM_MINORS)) {
-		unregister_chrdev_region(MKDEV(COMEDI_MAJOR, 0),
-					 COMEDI_NUM_MINORS);
-		return -EIO;
-	}
+	retval = cdev_add(&comedi_cdev, MKDEV(COMEDI_MAJOR, 0),
+			  COMEDI_NUM_MINORS);
+	if (retval)
+		goto out_unregister_chrdev_region;
+
 	comedi_class = class_create(THIS_MODULE, "comedi");
 	if (IS_ERR(comedi_class)) {
+		retval = PTR_ERR(comedi_class);
 		pr_err("failed to create class\n");
-		cdev_del(&comedi_cdev);
-		unregister_chrdev_region(MKDEV(COMEDI_MAJOR, 0),
-					 COMEDI_NUM_MINORS);
-		return PTR_ERR(comedi_class);
+		goto out_cdev_del;
 	}
 
 	comedi_class->dev_groups = comedi_dev_groups;
-
-	/* XXX requires /proc interface */
-	comedi_proc_init();
 
 	/* create devices files for legacy/manual use */
 	for (i = 0; i < comedi_num_legacy_minors; i++) {
@@ -2906,17 +2910,26 @@ static int __init comedi_init(void)
 
 		dev = comedi_alloc_board_minor(NULL);
 		if (IS_ERR(dev)) {
-			comedi_cleanup_board_minors();
-			cdev_del(&comedi_cdev);
-			unregister_chrdev_region(MKDEV(COMEDI_MAJOR, 0),
-						 COMEDI_NUM_MINORS);
-			return PTR_ERR(dev);
+			retval = PTR_ERR(dev);
+			goto out_cleanup_board_minors;
 		}
 		/* comedi_alloc_board_minor() locked the mutex */
 		mutex_unlock(&dev->mutex);
 	}
 
+	/* XXX requires /proc interface */
+	comedi_proc_init();
+
 	return 0;
+
+out_cleanup_board_minors:
+	comedi_cleanup_board_minors();
+	class_destroy(comedi_class);
+out_cdev_del:
+	cdev_del(&comedi_cdev);
+out_unregister_chrdev_region:
+	unregister_chrdev_region(MKDEV(COMEDI_MAJOR, 0), COMEDI_NUM_MINORS);
+	return retval;
 }
 module_init(comedi_init);
 

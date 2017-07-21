@@ -315,7 +315,7 @@ static void pxav3_set_power(struct sdhci_host *host, unsigned char mode,
 	struct mmc_host *mmc = host->mmc;
 	u8 pwr = host->pwr;
 
-	sdhci_set_power(host, mode, vdd);
+	sdhci_set_power_noreg(host, mode, vdd);
 
 	if (host->pwr == pwr)
 		return;
@@ -323,11 +323,8 @@ static void pxav3_set_power(struct sdhci_host *host, unsigned char mode,
 	if (host->pwr == 0)
 		vdd = 0;
 
-	if (!IS_ERR(mmc->supply.vmmc)) {
-		spin_unlock_irq(&host->lock);
+	if (!IS_ERR(mmc->supply.vmmc))
 		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
-		spin_lock_irq(&host->lock);
-	}
 }
 
 static const struct sdhci_ops pxav3_sdhci_ops = {
@@ -480,8 +477,6 @@ static int sdhci_pxav3_probe(struct platform_device *pdev)
 		goto err_add_host;
 	}
 
-	platform_set_drvdata(pdev, host);
-
 	if (host->mmc->pm_caps & MMC_PM_WAKE_SDIO_IRQ)
 		device_init_wakeup(&pdev->dev, 1);
 
@@ -529,6 +524,8 @@ static int sdhci_pxav3_suspend(struct device *dev)
 	struct sdhci_host *host = dev_get_drvdata(dev);
 
 	pm_runtime_get_sync(dev);
+	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+		mmc_retune_needed(host->mmc);
 	ret = sdhci_suspend_host(host);
 	pm_runtime_mark_last_busy(dev);
 	pm_runtime_put_autosuspend(dev);
@@ -562,6 +559,9 @@ static int sdhci_pxav3_runtime_suspend(struct device *dev)
 	if (ret)
 		return ret;
 
+	if (host->tuning_mode != SDHCI_TUNING_MODE_3)
+		mmc_retune_needed(host->mmc);
+
 	clk_disable_unprepare(pxa->clk_io);
 	if (!IS_ERR(pxa->clk_core))
 		clk_disable_unprepare(pxa->clk_core);
@@ -583,24 +583,17 @@ static int sdhci_pxav3_runtime_resume(struct device *dev)
 }
 #endif
 
-#ifdef CONFIG_PM
 static const struct dev_pm_ops sdhci_pxav3_pmops = {
 	SET_SYSTEM_SLEEP_PM_OPS(sdhci_pxav3_suspend, sdhci_pxav3_resume)
 	SET_RUNTIME_PM_OPS(sdhci_pxav3_runtime_suspend,
 		sdhci_pxav3_runtime_resume, NULL)
 };
 
-#define SDHCI_PXAV3_PMOPS (&sdhci_pxav3_pmops)
-
-#else
-#define SDHCI_PXAV3_PMOPS NULL
-#endif
-
 static struct platform_driver sdhci_pxav3_driver = {
 	.driver		= {
 		.name	= "sdhci-pxav3",
 		.of_match_table = of_match_ptr(sdhci_pxav3_of_match),
-		.pm	= SDHCI_PXAV3_PMOPS,
+		.pm	= &sdhci_pxav3_pmops,
 	},
 	.probe		= sdhci_pxav3_probe,
 	.remove		= sdhci_pxav3_remove,

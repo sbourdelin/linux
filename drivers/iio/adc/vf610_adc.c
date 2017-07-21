@@ -584,7 +584,7 @@ static int vf610_adc_read_data(struct vf610_adc *info)
 
 static irqreturn_t vf610_adc_isr(int irq, void *dev_id)
 {
-	struct iio_dev *indio_dev = (struct iio_dev *)dev_id;
+	struct iio_dev *indio_dev = dev_id;
 	struct vf610_adc *info = iio_priv(indio_dev);
 	int coco;
 
@@ -594,7 +594,8 @@ static irqreturn_t vf610_adc_isr(int irq, void *dev_id)
 		if (iio_buffer_enabled(indio_dev)) {
 			info->buffer[0] = info->value;
 			iio_push_to_buffers_with_timestamp(indio_dev,
-					info->buffer, iio_get_time_ns());
+					info->buffer,
+					iio_get_time_ns(indio_dev));
 			iio_trigger_notify_done(indio_dev->trig);
 		} else
 			complete(&info->completion);

@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <asm/arch_timer.h>
-#include <asm/cachetype.h>
+#include <asm/cache.h>
 #include <asm/cpu.h>
 #include <asm/cputype.h>
 #include <asm/cpufeature.h>
@@ -43,10 +43,10 @@ DEFINE_PER_CPU(struct cpuinfo_arm64, cpu_data);
 static struct cpuinfo_arm64 boot_cpu_data;
 
 static char *icache_policy_str[] = {
-	[ICACHE_POLICY_RESERVED] = "RESERVED/UNKNOWN",
-	[ICACHE_POLICY_AIVIVT] = "AIVIVT",
-	[ICACHE_POLICY_VIPT] = "VIPT",
-	[ICACHE_POLICY_PIPT] = "PIPT",
+	[0 ... ICACHE_POLICY_PIPT]	= "RESERVED/UNKNOWN",
+	[ICACHE_POLICY_VIPT]		= "VIPT",
+	[ICACHE_POLICY_PIPT]		= "PIPT",
+	[ICACHE_POLICY_VPIPT]		= "VPIPT",
 };
 
 unsigned long __icache_flags;
@@ -63,6 +63,11 @@ static const char *const hwcap_str[] = {
 	"atomics",
 	"fphp",
 	"asimdhp",
+	"cpuid",
+	"asimdrdm",
+	"jscvt",
+	"fcma",
+	"lrcpc",
 	NULL
 };
 
@@ -183,25 +188,122 @@ const struct seq_operations cpuinfo_op = {
 	.show	= c_show
 };
 
+
+static struct kobj_type cpuregs_kobj_type = {
+	.sysfs_ops = &kobj_sysfs_ops,
+};
+
+/*
+ * The ARM ARM uses the phrase "32-bit register" to describe a register
+ * whose upper 32 bits are RES0 (per C5.1.1, ARM DDI 0487A.i), however
+ * no statement is made as to whether the upper 32 bits will or will not
+ * be made use of in future, and between ARM DDI 0487A.c and ARM DDI
+ * 0487A.d CLIDR_EL1 was expanded from 32-bit to 64-bit.
+ *
+ * Thus, while both MIDR_EL1 and REVIDR_EL1 are described as 32-bit
+ * registers, we expose them both as 64 bit values to cater for possible
+ * future expansion without an ABI break.
+ */
+#define kobj_to_cpuinfo(kobj)	container_of(kobj, struct cpuinfo_arm64, kobj)
+#define CPUREGS_ATTR_RO(_name, _field)						\
+	static ssize_t _name##_show(struct kobject *kobj,			\
+			struct kobj_attribute *attr, char *buf)			\
+	{									\
+		struct cpuinfo_arm64 *info = kobj_to_cpuinfo(kobj);		\
+										\
+		if (info->reg_midr)						\
+			return sprintf(buf, "0x%016x\n", info->reg_##_field);	\
+		else								\
+			return 0;						\
+	}									\
+	static struct kobj_attribute cpuregs_attr_##_name = __ATTR_RO(_name)
+
+CPUREGS_ATTR_RO(midr_el1, midr);
+CPUREGS_ATTR_RO(revidr_el1, revidr);
+
+static struct attribute *cpuregs_id_attrs[] = {
+	&cpuregs_attr_midr_el1.attr,
+	&cpuregs_attr_revidr_el1.attr,
+	NULL
+};
+
+static const struct attribute_group cpuregs_attr_group = {
+	.attrs = cpuregs_id_attrs,
+	.name = "identification"
+};
+
+static int cpuid_cpu_online(unsigned int cpu)
+{
+	int rc;
+	struct device *dev;
+	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
+
+	dev = get_cpu_device(cpu);
+	if (!dev) {
+		rc = -ENODEV;
+		goto out;
+	}
+	rc = kobject_add(&info->kobj, &dev->kobj, "regs");
+	if (rc)
+		goto out;
+	rc = sysfs_create_group(&info->kobj, &cpuregs_attr_group);
+	if (rc)
+		kobject_del(&info->kobj);
+out:
+	return rc;
+}
+
+static int cpuid_cpu_offline(unsigned int cpu)
+{
+	struct device *dev;
+	struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
+
+	dev = get_cpu_device(cpu);
+	if (!dev)
+		return -ENODEV;
+	if (info->kobj.parent) {
+		sysfs_remove_group(&info->kobj, &cpuregs_attr_group);
+		kobject_del(&info->kobj);
+	}
+
+	return 0;
+}
+
+static int __init cpuinfo_regs_init(void)
+{
+	int cpu, ret;
+
+	for_each_possible_cpu(cpu) {
+		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, cpu);
+
+		kobject_init(&info->kobj, &cpuregs_kobj_type);
+	}
+
+	ret = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm64/cpuinfo:online",
+				cpuid_cpu_online, cpuid_cpu_offline);
+	if (ret < 0) {
+		pr_err("cpuinfo: failed to register hotplug callbacks.\n");
+		return ret;
+	}
+	return 0;
+}
 static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
 {
 	unsigned int cpu = smp_processor_id();
 	u32 l1ip = CTR_L1IP(info->reg_ctr);
 
-	if (l1ip != ICACHE_POLICY_PIPT) {
-		/*
-		 * VIPT caches are non-aliasing if the VA always equals the PA
-		 * in all bit positions that are covered by the index. This is
-		 * the case if the size of a way (# of sets * line size) does
-		 * not exceed PAGE_SIZE.
-		 */
-		u32 waysize = icache_get_numsets() * icache_get_linesize();
-
-		if (l1ip != ICACHE_POLICY_VIPT || waysize > PAGE_SIZE)
-			set_bit(ICACHEF_ALIASING, &__icache_flags);
+	switch (l1ip) {
+	case ICACHE_POLICY_PIPT:
+		break;
+	case ICACHE_POLICY_VPIPT:
+		set_bit(ICACHEF_VPIPT, &__icache_flags);
+		break;
+	default:
+		/* Fallthrough */
+	case ICACHE_POLICY_VIPT:
+		/* Assume aliasing */
+		set_bit(ICACHEF_ALIASING, &__icache_flags);
 	}
-	if (l1ip == ICACHE_POLICY_AIVIVT)
-		set_bit(ICACHEF_AIVIVT, &__icache_flags);
 
 	pr_info("Detected %s I-cache on CPU%d\n", icache_policy_str[l1ip], cpu);
 }
@@ -212,6 +314,7 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
 	info->reg_ctr = read_cpuid_cachetype();
 	info->reg_dczid = read_cpuid(DCZID_EL0);
 	info->reg_midr = read_cpuid_id();
+	info->reg_revidr = read_cpuid(REVIDR_EL1);
 
 	info->reg_id_aa64dfr0 = read_cpuid(ID_AA64DFR0_EL1);
 	info->reg_id_aa64dfr1 = read_cpuid(ID_AA64DFR1_EL1);
@@ -245,8 +348,6 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
 	}
 
 	cpuinfo_detect_icache_policy(info);
-
-	check_local_cpu_errata();
 }
 
 void cpuinfo_store_cpu(void)
@@ -264,3 +365,5 @@ void __init cpuinfo_store_boot_cpu(void)
 	boot_cpu_data = *info;
 	init_cpu_features(&boot_cpu_data);
 }
+
+device_initcall(cpuinfo_regs_init);

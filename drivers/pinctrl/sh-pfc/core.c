@@ -389,6 +389,21 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned mark, int pinmux_type)
 	return 0;
 }
 
+const struct sh_pfc_bias_info *
+sh_pfc_pin_to_bias_info(const struct sh_pfc_bias_info *info,
+			unsigned int num, unsigned int pin)
+{
+	unsigned int i;
+
+	for (i = 0; i < num; i++)
+		if (info[i].pin == pin)
+			return &info[i];
+
+	WARN_ONCE(1, "Pin %u is not in bias info list\n", pin);
+
+	return NULL;
+}
+
 static int sh_pfc_init_ranges(struct sh_pfc *pfc)
 {
 	struct sh_pfc_pin_range *range;
@@ -470,6 +485,18 @@ static const struct of_device_id sh_pfc_of_table[] = {
 		.data = &r8a7740_pinmux_info,
 	},
 #endif
+#ifdef CONFIG_PINCTRL_PFC_R8A7743
+	{
+		.compatible = "renesas,pfc-r8a7743",
+		.data = &r8a7743_pinmux_info,
+	},
+#endif
+#ifdef CONFIG_PINCTRL_PFC_R8A7745
+	{
+		.compatible = "renesas,pfc-r8a7745",
+		.data = &r8a7745_pinmux_info,
+	},
+#endif
 #ifdef CONFIG_PINCTRL_PFC_R8A7778
 	{
 		.compatible = "renesas,pfc-r8a7778",
@@ -494,6 +521,12 @@ static const struct of_device_id sh_pfc_of_table[] = {
 		.data = &r8a7791_pinmux_info,
 	},
 #endif
+#ifdef CONFIG_PINCTRL_PFC_R8A7792
+	{
+		.compatible = "renesas,pfc-r8a7792",
+		.data = &r8a7792_pinmux_info,
+	},
+#endif
 #ifdef CONFIG_PINCTRL_PFC_R8A7793
 	{
 		.compatible = "renesas,pfc-r8a7793",
@@ -510,6 +543,12 @@ static const struct of_device_id sh_pfc_of_table[] = {
 	{
 		.compatible = "renesas,pfc-r8a7795",
 		.data = &r8a7795_pinmux_info,
+	},
+#endif
+#ifdef CONFIG_PINCTRL_PFC_R8A7796
+	{
+		.compatible = "renesas,pfc-r8a7796",
+		.data = &r8a7796_pinmux_info,
 	},
 #endif
 #ifdef CONFIG_PINCTRL_PFC_SH73A0
@@ -559,6 +598,9 @@ static int sh_pfc_probe(struct platform_device *pdev)
 		ret = info->ops->init(pfc);
 		if (ret < 0)
 			return ret;
+
+		/* .init() may have overridden pfc->info */
+		info = pfc->info;
 	}
 
 	/* Enable dummy states for those platforms without pinctrl support */
@@ -594,15 +636,6 @@ static int sh_pfc_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, pfc);
 
 	dev_info(pfc->dev, "%s support registered\n", info->name);
-
-	return 0;
-}
-
-static int sh_pfc_remove(struct platform_device *pdev)
-{
-#ifdef CONFIG_PINCTRL_SH_PFC_GPIO
-	sh_pfc_unregister_gpiochip(platform_get_drvdata(pdev));
-#endif
 
 	return 0;
 }
@@ -650,7 +683,6 @@ static const struct platform_device_id sh_pfc_id_table[] = {
 
 static struct platform_driver sh_pfc_driver = {
 	.probe		= sh_pfc_probe,
-	.remove		= sh_pfc_remove,
 	.id_table	= sh_pfc_id_table,
 	.driver		= {
 		.name	= DRV_NAME,

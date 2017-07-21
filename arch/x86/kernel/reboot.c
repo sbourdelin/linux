@@ -1,6 +1,6 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
 #include <linux/pm.h>
@@ -9,6 +9,7 @@
 #include <linux/sched.h>
 #include <linux/tboot.h>
 #include <linux/delay.h>
+#include <linux/frame.h>
 #include <acpi/reboot.h>
 #include <asm/io.h>
 #include <asm/apic.h>
@@ -53,6 +54,19 @@ bool port_cf9_safe = false;
  * Reboot options and system auto-detection code provided by
  * Dell Inc. so their systems "just work". :-)
  */
+
+/*
+ * Some machines require the "reboot=a" commandline options
+ */
+static int __init set_acpi_reboot(const struct dmi_system_id *d)
+{
+	if (reboot_type != BOOT_ACPI) {
+		reboot_type = BOOT_ACPI;
+		pr_info("%s series board detected. Selecting %s-method for reboots.\n",
+			d->ident, "ACPI");
+	}
+	return 0;
+}
 
 /*
  * Some machines require the "reboot=b" or "reboot=k"  commandline options,
@@ -110,6 +124,7 @@ void __noreturn machine_real_restart(unsigned int type)
 #ifdef CONFIG_APM_MODULE
 EXPORT_SYMBOL(machine_real_restart);
 #endif
+STACK_FRAME_NON_STANDARD(machine_real_restart);
 
 /*
  * Some Apple MacBook and MacBookPro's needs reboot=p to be able to reboot
@@ -208,6 +223,22 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
 		.matches = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
 			DMI_MATCH(DMI_BOARD_NAME, "P4S800"),
+		},
+	},
+	{	/* Handle problems with rebooting on ASUS EeeBook X205TA */
+		.callback = set_acpi_reboot,
+		.ident = "ASUS EeeBook X205TA",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "X205TA"),
+		},
+	},
+	{	/* Handle problems with rebooting on ASUS EeeBook X205TAW */
+		.callback = set_acpi_reboot,
+		.ident = "ASUS EeeBook X205TAW",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "X205TAW"),
 		},
 	},
 
@@ -393,6 +424,14 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
 			DMI_MATCH(DMI_PRODUCT_NAME, "Dell XPS710"),
+		},
+	},
+	{	/* Handle problems with rebooting on Dell Optiplex 7450 AIO */
+		.callback = set_acpi_reboot,
+		.ident = "Dell OptiPlex 7450 AIO",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 7450 AIO"),
 		},
 	},
 
@@ -684,7 +723,7 @@ static void native_machine_power_off(void)
 	tboot_shutdown(TB_SHUTDOWN_HALT);
 }
 
-struct machine_ops machine_ops = {
+struct machine_ops machine_ops __ro_after_init = {
 	.power_off = native_machine_power_off,
 	.shutdown = native_machine_shutdown,
 	.emergency_restart = native_machine_emergency_restart,
@@ -728,10 +767,11 @@ void machine_crash_shutdown(struct pt_regs *regs)
 #endif
 
 
+/* This is the CPU performing the emergency shutdown work. */
+int crashing_cpu = -1;
+
 #if defined(CONFIG_SMP)
 
-/* This keeps a track of which one is crashing cpu. */
-static int crashing_cpu;
 static nmi_shootdown_cb shootdown_callback;
 
 static atomic_t waiting_for_crash_ipi;

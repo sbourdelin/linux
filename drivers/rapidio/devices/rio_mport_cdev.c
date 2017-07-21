@@ -889,16 +889,16 @@ rio_dma_transfer(struct file *filp, u32 transfer_mode,
 			goto err_req;
 		}
 
-		down_read(&current->mm->mmap_sem);
-		pinned = get_user_pages(
+		pinned = get_user_pages_unlocked(
 				(unsigned long)xfer->loc_addr & PAGE_MASK,
-				nr_pages, dir == DMA_FROM_DEVICE, 0,
-				page_list, NULL);
-		up_read(&current->mm->mmap_sem);
+				nr_pages,
+				page_list,
+				dir == DMA_FROM_DEVICE ? FOLL_WRITE : 0);
 
 		if (pinned != nr_pages) {
 			if (pinned < 0) {
-				rmcd_error("get_user_pages err=%ld", pinned);
+				rmcd_error("get_user_pages_unlocked err=%ld",
+					   pinned);
 				nr_pages = 0;
 			} else
 				rmcd_error("pinned %ld out of %ld pages",
@@ -1813,7 +1813,7 @@ static int rio_mport_add_riodev(struct mport_cdev_priv *priv,
 	if (rdev->pef & RIO_PEF_EXT_FEATURES) {
 		rdev->efptr = rval & 0xffff;
 		rdev->phys_efptr = rio_mport_get_physefb(mport, 0, destid,
-							 hopcount);
+						hopcount, &rdev->phys_rmap);
 
 		rdev->em_efptr = rio_mport_get_feature(mport, 0, destid,
 						hopcount, RIO_EFB_ERR_MGMNT);
@@ -2242,7 +2242,7 @@ static void mport_mm_open(struct vm_area_struct *vma)
 {
 	struct rio_mport_mapping *map = vma->vm_private_data;
 
-rmcd_debug(MMAP, "0x%pad", &map->phys_addr);
+	rmcd_debug(MMAP, "%pad", &map->phys_addr);
 	kref_get(&map->ref);
 }
 
@@ -2250,7 +2250,7 @@ static void mport_mm_close(struct vm_area_struct *vma)
 {
 	struct rio_mport_mapping *map = vma->vm_private_data;
 
-rmcd_debug(MMAP, "0x%pad", &map->phys_addr);
+	rmcd_debug(MMAP, "%pad", &map->phys_addr);
 	mutex_lock(&map->md->buf_mutex);
 	kref_put(&map->ref, mport_release_mapping);
 	mutex_unlock(&map->md->buf_mutex);
@@ -2444,30 +2444,24 @@ static struct mport_dev *mport_cdev_add(struct rio_mport *mport)
 	mutex_init(&md->buf_mutex);
 	mutex_init(&md->file_mutex);
 	INIT_LIST_HEAD(&md->file_list);
-	cdev_init(&md->cdev, &mport_fops);
-	md->cdev.owner = THIS_MODULE;
-	ret = cdev_add(&md->cdev, MKDEV(MAJOR(dev_number), mport->id), 1);
-	if (ret < 0) {
-		kfree(md);
-		rmcd_error("Unable to register a device, err=%d", ret);
-		return NULL;
-	}
 
-	md->dev.devt = md->cdev.dev;
+	device_initialize(&md->dev);
+	md->dev.devt = MKDEV(MAJOR(dev_number), mport->id);
 	md->dev.class = dev_class;
 	md->dev.parent = &mport->dev;
 	md->dev.release = mport_device_release;
 	dev_set_name(&md->dev, DEV_NAME "%d", mport->id);
 	atomic_set(&md->active, 1);
 
-	ret = device_register(&md->dev);
+	cdev_init(&md->cdev, &mport_fops);
+	md->cdev.owner = THIS_MODULE;
+
+	ret = cdev_device_add(&md->cdev, &md->dev);
 	if (ret) {
 		rmcd_error("Failed to register mport %d (err=%d)",
 		       mport->id, ret);
 		goto err_cdev;
 	}
-
-	get_device(&md->dev);
 
 	INIT_LIST_HEAD(&md->doorbells);
 	spin_lock_init(&md->db_lock);
@@ -2513,8 +2507,7 @@ static struct mport_dev *mport_cdev_add(struct rio_mport *mport)
 	return md;
 
 err_cdev:
-	cdev_del(&md->cdev);
-	kfree(md);
+	put_device(&md->dev);
 	return NULL;
 }
 
@@ -2578,7 +2571,7 @@ static void mport_cdev_remove(struct mport_dev *md)
 	atomic_set(&md->active, 0);
 	mport_cdev_terminate_dma(md);
 	rio_del_mport_pw_handler(md->mport, md, rio_mport_pw_handler);
-	cdev_del(&(md->cdev));
+	cdev_device_del(&md->cdev, &md->dev);
 	mport_cdev_kill_fasync(md);
 
 	flush_workqueue(dma_wq);
@@ -2603,7 +2596,6 @@ static void mport_cdev_remove(struct mport_dev *md)
 
 	rio_release_inb_dbell(md->mport, 0, 0x0fff);
 
-	device_unregister(&md->dev);
 	put_device(&md->dev);
 }
 

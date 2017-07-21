@@ -44,6 +44,7 @@
 #include <linux/in.h>
 #include <linux/in6.h>
 #include <net/addrconf.h>
+#include <linux/security.h>
 
 #include <rdma/ib_verbs.h>
 #include <rdma/ib_cache.h>
@@ -227,9 +228,11 @@ EXPORT_SYMBOL(rdma_port_get_link_layer);
  * Every PD has a local_dma_lkey which can be used as the lkey value for local
  * memory operations.
  */
-struct ib_pd *ib_alloc_pd(struct ib_device *device)
+struct ib_pd *__ib_alloc_pd(struct ib_device *device, unsigned int flags,
+		const char *caller)
 {
 	struct ib_pd *pd;
+	int mr_access_flags = 0;
 
 	pd = device->alloc_pd(device, NULL, NULL);
 	if (IS_ERR(pd))
@@ -237,26 +240,46 @@ struct ib_pd *ib_alloc_pd(struct ib_device *device)
 
 	pd->device = device;
 	pd->uobject = NULL;
-	pd->local_mr = NULL;
+	pd->__internal_mr = NULL;
 	atomic_set(&pd->usecnt, 0);
+	pd->flags = flags;
 
 	if (device->attrs.device_cap_flags & IB_DEVICE_LOCAL_DMA_LKEY)
 		pd->local_dma_lkey = device->local_dma_lkey;
-	else {
+	else
+		mr_access_flags |= IB_ACCESS_LOCAL_WRITE;
+
+	if (flags & IB_PD_UNSAFE_GLOBAL_RKEY) {
+		pr_warn("%s: enabling unsafe global rkey\n", caller);
+		mr_access_flags |= IB_ACCESS_REMOTE_READ | IB_ACCESS_REMOTE_WRITE;
+	}
+
+	if (mr_access_flags) {
 		struct ib_mr *mr;
 
-		mr = ib_get_dma_mr(pd, IB_ACCESS_LOCAL_WRITE);
+		mr = pd->device->get_dma_mr(pd, mr_access_flags);
 		if (IS_ERR(mr)) {
 			ib_dealloc_pd(pd);
-			return (struct ib_pd *)mr;
+			return ERR_CAST(mr);
 		}
 
-		pd->local_mr = mr;
-		pd->local_dma_lkey = pd->local_mr->lkey;
+		mr->device	= pd->device;
+		mr->pd		= pd;
+		mr->uobject	= NULL;
+		mr->need_inval	= false;
+
+		pd->__internal_mr = mr;
+
+		if (!(device->attrs.device_cap_flags & IB_DEVICE_LOCAL_DMA_LKEY))
+			pd->local_dma_lkey = pd->__internal_mr->lkey;
+
+		if (flags & IB_PD_UNSAFE_GLOBAL_RKEY)
+			pd->unsafe_global_rkey = pd->__internal_mr->rkey;
 	}
+
 	return pd;
 }
-EXPORT_SYMBOL(ib_alloc_pd);
+EXPORT_SYMBOL(__ib_alloc_pd);
 
 /**
  * ib_dealloc_pd - Deallocates a protection domain.
@@ -270,10 +293,10 @@ void ib_dealloc_pd(struct ib_pd *pd)
 {
 	int ret;
 
-	if (pd->local_mr) {
-		ret = ib_dereg_mr(pd->local_mr);
+	if (pd->__internal_mr) {
+		ret = pd->device->dereg_mr(pd->__internal_mr);
 		WARN_ON(ret);
-		pd->local_mr = NULL;
+		pd->__internal_mr = NULL;
 	}
 
 	/* uverbs manipulates usecnt with proper locking, while the kabi
@@ -289,24 +312,25 @@ EXPORT_SYMBOL(ib_dealloc_pd);
 
 /* Address handles */
 
-struct ib_ah *ib_create_ah(struct ib_pd *pd, struct ib_ah_attr *ah_attr)
+struct ib_ah *rdma_create_ah(struct ib_pd *pd, struct rdma_ah_attr *ah_attr)
 {
 	struct ib_ah *ah;
 
-	ah = pd->device->create_ah(pd, ah_attr);
+	ah = pd->device->create_ah(pd, ah_attr, NULL);
 
 	if (!IS_ERR(ah)) {
 		ah->device  = pd->device;
 		ah->pd      = pd;
 		ah->uobject = NULL;
+		ah->type    = ah_attr->type;
 		atomic_inc(&pd->usecnt);
 	}
 
 	return ah;
 }
-EXPORT_SYMBOL(ib_create_ah);
+EXPORT_SYMBOL(rdma_create_ah);
 
-static int ib_get_header_version(const union rdma_network_hdr *hdr)
+int ib_get_rdma_header_version(const union rdma_network_hdr *hdr)
 {
 	const struct iphdr *ip4h = (struct iphdr *)&hdr->roce4grh;
 	struct iphdr ip4h_checked;
@@ -337,6 +361,7 @@ static int ib_get_header_version(const union rdma_network_hdr *hdr)
 		return 4;
 	return 6;
 }
+EXPORT_SYMBOL(ib_get_rdma_header_version);
 
 static enum rdma_network_type ib_get_net_type_by_grh(struct ib_device *device,
 						     u8 port_num,
@@ -347,7 +372,7 @@ static enum rdma_network_type ib_get_net_type_by_grh(struct ib_device *device,
 	if (rdma_protocol_ib(device, port_num))
 		return RDMA_NETWORK_IB;
 
-	grh_version = ib_get_header_version((union rdma_network_hdr *)grh);
+	grh_version = ib_get_rdma_header_version((union rdma_network_hdr *)grh);
 
 	if (grh_version == 4)
 		return RDMA_NETWORK_IPV4;
@@ -393,9 +418,9 @@ static int get_sgid_index_from_eth(struct ib_device *device, u8 port_num,
 				     &context, gid_index);
 }
 
-static int get_gids_from_rdma_hdr(union rdma_network_hdr *hdr,
-				  enum rdma_network_type net_type,
-				  union ib_gid *sgid, union ib_gid *dgid)
+int ib_get_gids_from_rdma_hdr(const union rdma_network_hdr *hdr,
+			      enum rdma_network_type net_type,
+			      union ib_gid *sgid, union ib_gid *dgid)
 {
 	struct sockaddr_in  src_in;
 	struct sockaddr_in  dst_in;
@@ -425,10 +450,24 @@ static int get_gids_from_rdma_hdr(union rdma_network_hdr *hdr,
 		return -EINVAL;
 	}
 }
+EXPORT_SYMBOL(ib_get_gids_from_rdma_hdr);
 
+/*
+ * This function creates ah from the incoming packet.
+ * Incoming packet has dgid of the receiver node on which this code is
+ * getting executed and, sgid contains the GID of the sender.
+ *
+ * When resolving mac address of destination, the arrived dgid is used
+ * as sgid and, sgid is used as dgid because sgid contains destinations
+ * GID whom to respond to.
+ *
+ * This is why when calling rdma_addr_find_l2_eth_by_grh() function, the
+ * position of arguments dgid and sgid do not match the order of the
+ * parameters.
+ */
 int ib_init_ah_from_wc(struct ib_device *device, u8 port_num,
 		       const struct ib_wc *wc, const struct ib_grh *grh,
-		       struct ib_ah_attr *ah_attr)
+		       struct rdma_ah_attr *ah_attr)
 {
 	u32 flow_class;
 	u16 gid_index;
@@ -440,6 +479,7 @@ int ib_init_ah_from_wc(struct ib_device *device, u8 port_num,
 	union ib_gid sgid;
 
 	memset(ah_attr, 0, sizeof *ah_attr);
+	ah_attr->type = rdma_ah_find_type(device, port_num);
 	if (rdma_cap_eth_ah(device, port_num)) {
 		if (wc->wc_flags & IB_WC_WITH_NETWORK_HDR_TYPE)
 			net_type = wc->network_hdr_type;
@@ -447,8 +487,8 @@ int ib_init_ah_from_wc(struct ib_device *device, u8 port_num,
 			net_type = ib_get_net_type_by_grh(device, port_num, grh);
 		gid_type = ib_network_to_gid_type(net_type);
 	}
-	ret = get_gids_from_rdma_hdr((union rdma_network_hdr *)grh, net_type,
-				     &sgid, &dgid);
+	ret = ib_get_gids_from_rdma_hdr((union rdma_network_hdr *)grh, net_type,
+					&sgid, &dgid);
 	if (ret)
 		return ret;
 
@@ -470,7 +510,7 @@ int ib_init_ah_from_wc(struct ib_device *device, u8 port_num,
 			return -ENODEV;
 
 		ret = rdma_addr_find_l2_eth_by_grh(&dgid, &sgid,
-						   ah_attr->dmac,
+						   ah_attr->roce.dmac,
 						   wc->wc_flags & IB_WC_WITH_VLAN ?
 						   NULL : &vlan_id,
 						   &if_index, &hoplimit);
@@ -480,11 +520,6 @@ int ib_init_ah_from_wc(struct ib_device *device, u8 port_num,
 		}
 
 		resolved_dev = dev_get_by_index(&init_net, if_index);
-		if (resolved_dev->flags & IFF_LOOPBACK) {
-			dev_put(resolved_dev);
-			resolved_dev = idev;
-			dev_hold(resolved_dev);
-		}
 		rcu_read_lock();
 		if (resolved_dev != idev && !rdma_is_upper_dev_rcu(idev,
 								   resolved_dev))
@@ -501,15 +536,12 @@ int ib_init_ah_from_wc(struct ib_device *device, u8 port_num,
 			return ret;
 	}
 
-	ah_attr->dlid = wc->slid;
-	ah_attr->sl = wc->sl;
-	ah_attr->src_path_bits = wc->dlid_path_bits;
-	ah_attr->port_num = port_num;
+	rdma_ah_set_dlid(ah_attr, wc->slid);
+	rdma_ah_set_sl(ah_attr, wc->sl);
+	rdma_ah_set_path_bits(ah_attr, wc->dlid_path_bits);
+	rdma_ah_set_port_num(ah_attr, port_num);
 
 	if (wc->wc_flags & IB_WC_GRH) {
-		ah_attr->ah_flags = IB_AH_GRH;
-		ah_attr->grh.dgid = sgid;
-
 		if (!rdma_cap_eth_ah(device, port_num)) {
 			if (dgid.global.interface_id != cpu_to_be64(IB_SA_WELL_KNOWN_GUID)) {
 				ret = ib_find_cached_gid_by_port(device, &dgid,
@@ -523,11 +555,12 @@ int ib_init_ah_from_wc(struct ib_device *device, u8 port_num,
 			}
 		}
 
-		ah_attr->grh.sgid_index = (u8) gid_index;
 		flow_class = be32_to_cpu(grh->version_tclass_flow);
-		ah_attr->grh.flow_label = flow_class & 0xFFFFF;
-		ah_attr->grh.hop_limit = hoplimit;
-		ah_attr->grh.traffic_class = (flow_class >> 20) & 0xFF;
+		rdma_ah_set_grh(ah_attr, &sgid,
+				flow_class & 0xFFFFF,
+				(u8)gid_index, hoplimit,
+				(flow_class >> 20) & 0xFF);
+
 	}
 	return 0;
 }
@@ -536,34 +569,37 @@ EXPORT_SYMBOL(ib_init_ah_from_wc);
 struct ib_ah *ib_create_ah_from_wc(struct ib_pd *pd, const struct ib_wc *wc,
 				   const struct ib_grh *grh, u8 port_num)
 {
-	struct ib_ah_attr ah_attr;
+	struct rdma_ah_attr ah_attr;
 	int ret;
 
 	ret = ib_init_ah_from_wc(pd->device, port_num, wc, grh, &ah_attr);
 	if (ret)
 		return ERR_PTR(ret);
 
-	return ib_create_ah(pd, &ah_attr);
+	return rdma_create_ah(pd, &ah_attr);
 }
 EXPORT_SYMBOL(ib_create_ah_from_wc);
 
-int ib_modify_ah(struct ib_ah *ah, struct ib_ah_attr *ah_attr)
+int rdma_modify_ah(struct ib_ah *ah, struct rdma_ah_attr *ah_attr)
 {
+	if (ah->type != ah_attr->type)
+		return -EINVAL;
+
 	return ah->device->modify_ah ?
 		ah->device->modify_ah(ah, ah_attr) :
 		-ENOSYS;
 }
-EXPORT_SYMBOL(ib_modify_ah);
+EXPORT_SYMBOL(rdma_modify_ah);
 
-int ib_query_ah(struct ib_ah *ah, struct ib_ah_attr *ah_attr)
+int rdma_query_ah(struct ib_ah *ah, struct rdma_ah_attr *ah_attr)
 {
 	return ah->device->query_ah ?
 		ah->device->query_ah(ah, ah_attr) :
 		-ENOSYS;
 }
-EXPORT_SYMBOL(ib_query_ah);
+EXPORT_SYMBOL(rdma_query_ah);
 
-int ib_destroy_ah(struct ib_ah *ah)
+int rdma_destroy_ah(struct ib_ah *ah)
 {
 	struct ib_pd *pd;
 	int ret;
@@ -575,7 +611,7 @@ int ib_destroy_ah(struct ib_ah *ah)
 
 	return ret;
 }
-EXPORT_SYMBOL(ib_destroy_ah);
+EXPORT_SYMBOL(rdma_destroy_ah);
 
 /* Shared receive queues */
 
@@ -686,10 +722,18 @@ static struct ib_qp *__ib_open_qp(struct ib_qp *real_qp,
 {
 	struct ib_qp *qp;
 	unsigned long flags;
+	int err;
 
 	qp = kzalloc(sizeof *qp, GFP_KERNEL);
 	if (!qp)
 		return ERR_PTR(-ENOMEM);
+
+	qp->real_qp = real_qp;
+	err = ib_open_shared_qp_security(qp, real_qp->device);
+	if (err) {
+		kfree(qp);
+		return ERR_PTR(err);
+	}
 
 	qp->real_qp = real_qp;
 	atomic_inc(&real_qp->usecnt);
@@ -758,6 +802,12 @@ struct ib_qp *ib_create_qp(struct ib_pd *pd,
 	struct ib_qp *qp;
 	int ret;
 
+	if (qp_init_attr->rwq_ind_tbl &&
+	    (qp_init_attr->recv_cq ||
+	    qp_init_attr->srq || qp_init_attr->cap.max_recv_wr ||
+	    qp_init_attr->cap.max_recv_sge))
+		return ERR_PTR(-EINVAL);
+
 	/*
 	 * If the callers is using the RDMA API calculate the resources
 	 * needed for the RDMA READ/WRITE operations.
@@ -771,10 +821,17 @@ struct ib_qp *ib_create_qp(struct ib_pd *pd,
 	if (IS_ERR(qp))
 		return qp;
 
+	ret = ib_create_qp_security(qp, device);
+	if (ret) {
+		ib_destroy_qp(qp);
+		return ERR_PTR(ret);
+	}
+
 	qp->device     = device;
 	qp->real_qp    = qp;
 	qp->uobject    = NULL;
 	qp->qp_type    = qp_init_attr->qp_type;
+	qp->rwq_ind_tbl = qp_init_attr->rwq_ind_tbl;
 
 	atomic_set(&qp->usecnt, 0);
 	qp->mrs_used = 0;
@@ -792,7 +849,8 @@ struct ib_qp *ib_create_qp(struct ib_pd *pd,
 		qp->srq = NULL;
 	} else {
 		qp->recv_cq = qp_init_attr->recv_cq;
-		atomic_inc(&qp_init_attr->recv_cq->usecnt);
+		if (qp_init_attr->recv_cq)
+			atomic_inc(&qp_init_attr->recv_cq->usecnt);
 		qp->srq = qp_init_attr->srq;
 		if (qp->srq)
 			atomic_inc(&qp_init_attr->srq->usecnt);
@@ -803,16 +861,28 @@ struct ib_qp *ib_create_qp(struct ib_pd *pd,
 	qp->xrcd    = NULL;
 
 	atomic_inc(&pd->usecnt);
-	atomic_inc(&qp_init_attr->send_cq->usecnt);
+	if (qp_init_attr->send_cq)
+		atomic_inc(&qp_init_attr->send_cq->usecnt);
+	if (qp_init_attr->rwq_ind_tbl)
+		atomic_inc(&qp->rwq_ind_tbl->usecnt);
 
 	if (qp_init_attr->cap.max_rdma_ctxs) {
 		ret = rdma_rw_init_mrs(qp, qp_init_attr);
 		if (ret) {
 			pr_err("failed to init MR pool ret= %d\n", ret);
 			ib_destroy_qp(qp);
-			qp = ERR_PTR(ret);
+			return ERR_PTR(ret);
 		}
 	}
+
+	/*
+	 * Note: all hw drivers guarantee that max_send_sge is lower than
+	 * the device RDMA WRITE SGE limit but not all hw drivers ensure that
+	 * max_send_sge <= max_sge_rd.
+	 */
+	qp->max_write_sge = qp_init_attr->cap.max_send_sge;
+	qp->max_read_sge = min_t(u32, qp_init_attr->cap.max_send_sge,
+				 device->attrs.max_sge_rd);
 
 	return qp;
 }
@@ -825,6 +895,7 @@ static const struct {
 } qp_state_table[IB_QPS_ERR + 1][IB_QPS_ERR + 1] = {
 	[IB_QPS_RESET] = {
 		[IB_QPS_RESET] = { .valid = 1 },
+		[IB_QPS_ERR] =   { .valid = 1 },
 		[IB_QPS_INIT]  = {
 			.valid = 1,
 			.req_param = {
@@ -972,6 +1043,7 @@ static const struct {
 						 IB_QP_QKEY),
 				 [IB_QPT_GSI] = (IB_QP_CUR_STATE		|
 						 IB_QP_QKEY),
+				 [IB_QPT_RAW_PACKET] = IB_QP_RATE_LIMIT,
 			 }
 		}
 	},
@@ -1005,6 +1077,7 @@ static const struct {
 						IB_QP_QKEY),
 				[IB_QPT_GSI] = (IB_QP_CUR_STATE			|
 						IB_QP_QKEY),
+				[IB_QPT_RAW_PACKET] = IB_QP_RATE_LIMIT,
 			}
 		},
 		[IB_QPS_SQD]   = {
@@ -1154,68 +1227,86 @@ int ib_modify_qp_is_ok(enum ib_qp_state cur_state, enum ib_qp_state next_state,
 }
 EXPORT_SYMBOL(ib_modify_qp_is_ok);
 
-int ib_resolve_eth_dmac(struct ib_qp *qp,
-			struct ib_qp_attr *qp_attr, int *qp_attr_mask)
+int ib_resolve_eth_dmac(struct ib_device *device,
+			struct rdma_ah_attr *ah_attr)
 {
 	int           ret = 0;
+	struct ib_global_route *grh;
 
-	if (*qp_attr_mask & IB_QP_AV) {
-		if (qp_attr->ah_attr.port_num < rdma_start_port(qp->device) ||
-		    qp_attr->ah_attr.port_num > rdma_end_port(qp->device))
-			return -EINVAL;
+	if (!rdma_is_port_valid(device, rdma_ah_get_port_num(ah_attr)))
+		return -EINVAL;
 
-		if (!rdma_cap_eth_ah(qp->device, qp_attr->ah_attr.port_num))
-			return 0;
+	if (ah_attr->type != RDMA_AH_ATTR_TYPE_ROCE)
+		return 0;
 
-		if (rdma_link_local_addr((struct in6_addr *)qp_attr->ah_attr.grh.dgid.raw)) {
-			rdma_get_ll_mac((struct in6_addr *)qp_attr->ah_attr.grh.dgid.raw,
-					qp_attr->ah_attr.dmac);
-		} else {
-			union ib_gid		sgid;
-			struct ib_gid_attr	sgid_attr;
-			int			ifindex;
-			int			hop_limit;
+	grh = rdma_ah_retrieve_grh(ah_attr);
 
-			ret = ib_query_gid(qp->device,
-					   qp_attr->ah_attr.port_num,
-					   qp_attr->ah_attr.grh.sgid_index,
-					   &sgid, &sgid_attr);
+	if (rdma_link_local_addr((struct in6_addr *)grh->dgid.raw)) {
+		rdma_get_ll_mac((struct in6_addr *)grh->dgid.raw,
+				ah_attr->roce.dmac);
+	} else {
+		union ib_gid		sgid;
+		struct ib_gid_attr	sgid_attr;
+		int			ifindex;
+		int			hop_limit;
 
-			if (ret || !sgid_attr.ndev) {
-				if (!ret)
-					ret = -ENXIO;
-				goto out;
-			}
+		ret = ib_query_gid(device,
+				   rdma_ah_get_port_num(ah_attr),
+				   grh->sgid_index,
+				   &sgid, &sgid_attr);
 
-			ifindex = sgid_attr.ndev->ifindex;
-
-			ret = rdma_addr_find_l2_eth_by_grh(&sgid,
-							   &qp_attr->ah_attr.grh.dgid,
-							   qp_attr->ah_attr.dmac,
-							   NULL, &ifindex, &hop_limit);
-
-			dev_put(sgid_attr.ndev);
-
-			qp_attr->ah_attr.grh.hop_limit = hop_limit;
+		if (ret || !sgid_attr.ndev) {
+			if (!ret)
+				ret = -ENXIO;
+			goto out;
 		}
+
+		ifindex = sgid_attr.ndev->ifindex;
+
+		ret =
+		rdma_addr_find_l2_eth_by_grh(&sgid, &grh->dgid,
+					     ah_attr->roce.dmac,
+					     NULL, &ifindex, &hop_limit);
+
+		dev_put(sgid_attr.ndev);
+
+		grh->hop_limit = hop_limit;
 	}
 out:
 	return ret;
 }
 EXPORT_SYMBOL(ib_resolve_eth_dmac);
 
+/**
+ * ib_modify_qp_with_udata - Modifies the attributes for the specified QP.
+ * @qp: The QP to modify.
+ * @attr: On input, specifies the QP attributes to modify.  On output,
+ *   the current values of selected QP attributes are returned.
+ * @attr_mask: A bit-mask used to specify which attributes of the QP
+ *   are being modified.
+ * @udata: pointer to user's input output buffer information
+ *   are being modified.
+ * It returns 0 on success and returns appropriate error code on error.
+ */
+int ib_modify_qp_with_udata(struct ib_qp *qp, struct ib_qp_attr *attr,
+			    int attr_mask, struct ib_udata *udata)
+{
+	int ret;
+
+	if (attr_mask & IB_QP_AV) {
+		ret = ib_resolve_eth_dmac(qp->device, &attr->ah_attr);
+		if (ret)
+			return ret;
+	}
+	return ib_security_modify_qp(qp, attr, attr_mask, udata);
+}
+EXPORT_SYMBOL(ib_modify_qp_with_udata);
 
 int ib_modify_qp(struct ib_qp *qp,
 		 struct ib_qp_attr *qp_attr,
 		 int qp_attr_mask)
 {
-	int ret;
-
-	ret = ib_resolve_eth_dmac(qp, qp_attr, &qp_attr_mask);
-	if (ret)
-		return ret;
-
-	return qp->device->modify_qp(qp->real_qp, qp_attr, qp_attr_mask, NULL);
+	return ib_modify_qp_with_udata(qp, qp_attr, qp_attr_mask, NULL);
 }
 EXPORT_SYMBOL(ib_modify_qp);
 
@@ -1244,6 +1335,7 @@ int ib_close_qp(struct ib_qp *qp)
 	spin_unlock_irqrestore(&real_qp->device->event_handler_lock, flags);
 
 	atomic_dec(&real_qp->usecnt);
+	ib_close_shared_qp_security(qp->qp_sec);
 	kfree(qp);
 
 	return 0;
@@ -1283,6 +1375,8 @@ int ib_destroy_qp(struct ib_qp *qp)
 	struct ib_pd *pd;
 	struct ib_cq *scq, *rcq;
 	struct ib_srq *srq;
+	struct ib_rwq_ind_table *ind_tbl;
+	struct ib_qp_security *sec;
 	int ret;
 
 	WARN_ON_ONCE(qp->mrs_used > 0);
@@ -1297,6 +1391,10 @@ int ib_destroy_qp(struct ib_qp *qp)
 	scq  = qp->send_cq;
 	rcq  = qp->recv_cq;
 	srq  = qp->srq;
+	ind_tbl = qp->rwq_ind_tbl;
+	sec  = qp->qp_sec;
+	if (sec)
+		ib_destroy_qp_security_begin(sec);
 
 	if (!qp->uobject)
 		rdma_rw_cleanup_mrs(qp);
@@ -1311,6 +1409,13 @@ int ib_destroy_qp(struct ib_qp *qp)
 			atomic_dec(&rcq->usecnt);
 		if (srq)
 			atomic_dec(&srq->usecnt);
+		if (ind_tbl)
+			atomic_dec(&ind_tbl->usecnt);
+		if (sec)
+			ib_destroy_qp_security_end(sec);
+	} else {
+		if (sec)
+			ib_destroy_qp_security_abort(sec);
 	}
 
 	return ret;
@@ -1366,29 +1471,6 @@ int ib_resize_cq(struct ib_cq *cq, int cqe)
 EXPORT_SYMBOL(ib_resize_cq);
 
 /* Memory regions */
-
-struct ib_mr *ib_get_dma_mr(struct ib_pd *pd, int mr_access_flags)
-{
-	struct ib_mr *mr;
-	int err;
-
-	err = ib_check_mr_access(mr_access_flags);
-	if (err)
-		return ERR_PTR(err);
-
-	mr = pd->device->get_dma_mr(pd, mr_access_flags);
-
-	if (!IS_ERR(mr)) {
-		mr->device  = pd->device;
-		mr->pd      = pd;
-		mr->uobject = NULL;
-		atomic_inc(&pd->usecnt);
-		mr->need_inval = false;
-	}
-
-	return mr;
-}
-EXPORT_SYMBOL(ib_get_dma_mr);
 
 int ib_dereg_mr(struct ib_mr *mr)
 {
@@ -1493,7 +1575,9 @@ int ib_attach_mcast(struct ib_qp *qp, union ib_gid *gid, u16 lid)
 
 	if (!qp->device->attach_mcast)
 		return -ENOSYS;
-	if (gid->raw[0] != 0xff || qp->qp_type != IB_QPT_UD)
+	if (gid->raw[0] != 0xff || qp->qp_type != IB_QPT_UD ||
+	    lid < be16_to_cpu(IB_MULTICAST_LID_BASE) ||
+	    lid == be16_to_cpu(IB_LID_PERMISSIVE))
 		return -EINVAL;
 
 	ret = qp->device->attach_mcast(qp, gid, lid);
@@ -1509,7 +1593,9 @@ int ib_detach_mcast(struct ib_qp *qp, union ib_gid *gid, u16 lid)
 
 	if (!qp->device->detach_mcast)
 		return -ENOSYS;
-	if (gid->raw[0] != 0xff || qp->qp_type != IB_QPT_UD)
+	if (gid->raw[0] != 0xff || qp->qp_type != IB_QPT_UD ||
+	    lid < be16_to_cpu(IB_MULTICAST_LID_BASE) ||
+	    lid == be16_to_cpu(IB_LID_PERMISSIVE))
 		return -EINVAL;
 
 	ret = qp->device->detach_mcast(qp, gid, lid);
@@ -1558,6 +1644,150 @@ int ib_dealloc_xrcd(struct ib_xrcd *xrcd)
 }
 EXPORT_SYMBOL(ib_dealloc_xrcd);
 
+/**
+ * ib_create_wq - Creates a WQ associated with the specified protection
+ * domain.
+ * @pd: The protection domain associated with the WQ.
+ * @wq_init_attr: A list of initial attributes required to create the
+ * WQ. If WQ creation succeeds, then the attributes are updated to
+ * the actual capabilities of the created WQ.
+ *
+ * wq_init_attr->max_wr and wq_init_attr->max_sge determine
+ * the requested size of the WQ, and set to the actual values allocated
+ * on return.
+ * If ib_create_wq() succeeds, then max_wr and max_sge will always be
+ * at least as large as the requested values.
+ */
+struct ib_wq *ib_create_wq(struct ib_pd *pd,
+			   struct ib_wq_init_attr *wq_attr)
+{
+	struct ib_wq *wq;
+
+	if (!pd->device->create_wq)
+		return ERR_PTR(-ENOSYS);
+
+	wq = pd->device->create_wq(pd, wq_attr, NULL);
+	if (!IS_ERR(wq)) {
+		wq->event_handler = wq_attr->event_handler;
+		wq->wq_context = wq_attr->wq_context;
+		wq->wq_type = wq_attr->wq_type;
+		wq->cq = wq_attr->cq;
+		wq->device = pd->device;
+		wq->pd = pd;
+		wq->uobject = NULL;
+		atomic_inc(&pd->usecnt);
+		atomic_inc(&wq_attr->cq->usecnt);
+		atomic_set(&wq->usecnt, 0);
+	}
+	return wq;
+}
+EXPORT_SYMBOL(ib_create_wq);
+
+/**
+ * ib_destroy_wq - Destroys the specified WQ.
+ * @wq: The WQ to destroy.
+ */
+int ib_destroy_wq(struct ib_wq *wq)
+{
+	int err;
+	struct ib_cq *cq = wq->cq;
+	struct ib_pd *pd = wq->pd;
+
+	if (atomic_read(&wq->usecnt))
+		return -EBUSY;
+
+	err = wq->device->destroy_wq(wq);
+	if (!err) {
+		atomic_dec(&pd->usecnt);
+		atomic_dec(&cq->usecnt);
+	}
+	return err;
+}
+EXPORT_SYMBOL(ib_destroy_wq);
+
+/**
+ * ib_modify_wq - Modifies the specified WQ.
+ * @wq: The WQ to modify.
+ * @wq_attr: On input, specifies the WQ attributes to modify.
+ * @wq_attr_mask: A bit-mask used to specify which attributes of the WQ
+ *   are being modified.
+ * On output, the current values of selected WQ attributes are returned.
+ */
+int ib_modify_wq(struct ib_wq *wq, struct ib_wq_attr *wq_attr,
+		 u32 wq_attr_mask)
+{
+	int err;
+
+	if (!wq->device->modify_wq)
+		return -ENOSYS;
+
+	err = wq->device->modify_wq(wq, wq_attr, wq_attr_mask, NULL);
+	return err;
+}
+EXPORT_SYMBOL(ib_modify_wq);
+
+/*
+ * ib_create_rwq_ind_table - Creates a RQ Indirection Table.
+ * @device: The device on which to create the rwq indirection table.
+ * @ib_rwq_ind_table_init_attr: A list of initial attributes required to
+ * create the Indirection Table.
+ *
+ * Note: The life time of ib_rwq_ind_table_init_attr->ind_tbl is not less
+ *	than the created ib_rwq_ind_table object and the caller is responsible
+ *	for its memory allocation/free.
+ */
+struct ib_rwq_ind_table *ib_create_rwq_ind_table(struct ib_device *device,
+						 struct ib_rwq_ind_table_init_attr *init_attr)
+{
+	struct ib_rwq_ind_table *rwq_ind_table;
+	int i;
+	u32 table_size;
+
+	if (!device->create_rwq_ind_table)
+		return ERR_PTR(-ENOSYS);
+
+	table_size = (1 << init_attr->log_ind_tbl_size);
+	rwq_ind_table = device->create_rwq_ind_table(device,
+				init_attr, NULL);
+	if (IS_ERR(rwq_ind_table))
+		return rwq_ind_table;
+
+	rwq_ind_table->ind_tbl = init_attr->ind_tbl;
+	rwq_ind_table->log_ind_tbl_size = init_attr->log_ind_tbl_size;
+	rwq_ind_table->device = device;
+	rwq_ind_table->uobject = NULL;
+	atomic_set(&rwq_ind_table->usecnt, 0);
+
+	for (i = 0; i < table_size; i++)
+		atomic_inc(&rwq_ind_table->ind_tbl[i]->usecnt);
+
+	return rwq_ind_table;
+}
+EXPORT_SYMBOL(ib_create_rwq_ind_table);
+
+/*
+ * ib_destroy_rwq_ind_table - Destroys the specified Indirection Table.
+ * @wq_ind_table: The Indirection Table to destroy.
+*/
+int ib_destroy_rwq_ind_table(struct ib_rwq_ind_table *rwq_ind_table)
+{
+	int err, i;
+	u32 table_size = (1 << rwq_ind_table->log_ind_tbl_size);
+	struct ib_wq **ind_tbl = rwq_ind_table->ind_tbl;
+
+	if (atomic_read(&rwq_ind_table->usecnt))
+		return -EBUSY;
+
+	err = rwq_ind_table->device->destroy_rwq_ind_table(rwq_ind_table);
+	if (!err) {
+		for (i = 0; i < table_size; i++)
+			atomic_dec(&ind_tbl[i]->usecnt);
+	}
+
+	return err;
+}
+EXPORT_SYMBOL(ib_destroy_rwq_ind_table);
+
 struct ib_flow *ib_create_flow(struct ib_qp *qp,
 			       struct ib_flow_attr *flow_attr,
 			       int domain)
@@ -1567,8 +1797,10 @@ struct ib_flow *ib_create_flow(struct ib_qp *qp,
 		return ERR_PTR(-ENOSYS);
 
 	flow_id = qp->device->create_flow(qp, flow_attr, domain);
-	if (!IS_ERR(flow_id))
+	if (!IS_ERR(flow_id)) {
 		atomic_inc(&qp->usecnt);
+		flow_id->qp = qp;
+	}
 	return flow_id;
 }
 EXPORT_SYMBOL(ib_create_flow);
@@ -1644,13 +1876,13 @@ EXPORT_SYMBOL(ib_set_vf_guid);
  *
  * Constraints:
  * - The first sg element is allowed to have an offset.
- * - Each sg element must be aligned to page_size (or physically
- *   contiguous to the previous element). In case an sg element has a
- *   non contiguous offset, the mapping prefix will not include it.
+ * - Each sg element must either be aligned to page_size or virtually
+ *   contiguous to the previous element. In case an sg element has a
+ *   non-contiguous offset, the mapping prefix will not include it.
  * - The last sg element is allowed to have length less than page_size.
  * - If sg_nents total byte length exceeds the mr max_num_sge * page_size
  *   then only max_num_sg entries will be mapped.
- * - If the MR was allocated with type IB_MR_TYPE_SG_GAPS_REG, non of these
+ * - If the MR was allocated with type IB_MR_TYPE_SG_GAPS, none of these
  *   constraints holds and the page_size argument is ignored.
  *
  * Returns the number of sg elements that were mapped to the memory region.
@@ -1776,16 +2008,11 @@ static void ib_drain_qp_done(struct ib_cq *cq, struct ib_wc *wc)
  */
 static void __ib_drain_sq(struct ib_qp *qp)
 {
+	struct ib_cq *cq = qp->send_cq;
 	struct ib_qp_attr attr = { .qp_state = IB_QPS_ERR };
 	struct ib_drain_cqe sdrain;
 	struct ib_send_wr swr = {}, *bad_swr;
 	int ret;
-
-	if (qp->send_cq->poll_ctx == IB_POLL_DIRECT) {
-		WARN_ONCE(qp->send_cq->poll_ctx == IB_POLL_DIRECT,
-			  "IB_POLL_DIRECT poll_ctx not supported for drain\n");
-		return;
-	}
 
 	swr.wr_cqe = &sdrain.cqe;
 	sdrain.cqe.done = ib_drain_qp_done;
@@ -1803,7 +2030,11 @@ static void __ib_drain_sq(struct ib_qp *qp)
 		return;
 	}
 
-	wait_for_completion(&sdrain.done);
+	if (cq->poll_ctx == IB_POLL_DIRECT)
+		while (wait_for_completion_timeout(&sdrain.done, HZ / 10) <= 0)
+			ib_process_cq_direct(cq, -1);
+	else
+		wait_for_completion(&sdrain.done);
 }
 
 /*
@@ -1811,16 +2042,11 @@ static void __ib_drain_sq(struct ib_qp *qp)
  */
 static void __ib_drain_rq(struct ib_qp *qp)
 {
+	struct ib_cq *cq = qp->recv_cq;
 	struct ib_qp_attr attr = { .qp_state = IB_QPS_ERR };
 	struct ib_drain_cqe rdrain;
 	struct ib_recv_wr rwr = {}, *bad_rwr;
 	int ret;
-
-	if (qp->recv_cq->poll_ctx == IB_POLL_DIRECT) {
-		WARN_ONCE(qp->recv_cq->poll_ctx == IB_POLL_DIRECT,
-			  "IB_POLL_DIRECT poll_ctx not supported for drain\n");
-		return;
-	}
 
 	rwr.wr_cqe = &rdrain.cqe;
 	rdrain.cqe.done = ib_drain_qp_done;
@@ -1838,7 +2064,11 @@ static void __ib_drain_rq(struct ib_qp *qp)
 		return;
 	}
 
-	wait_for_completion(&rdrain.done);
+	if (cq->poll_ctx == IB_POLL_DIRECT)
+		while (wait_for_completion_timeout(&rdrain.done, HZ / 10) <= 0)
+			ib_process_cq_direct(cq, -1);
+	else
+		wait_for_completion(&rdrain.done);
 }
 
 /**
@@ -1855,8 +2085,7 @@ static void __ib_drain_rq(struct ib_qp *qp)
  * ensure there is room in the CQ and SQ for the drain work request and
  * completion.
  *
- * allocate the CQ using ib_alloc_cq() and the CQ poll context cannot be
- * IB_POLL_DIRECT.
+ * allocate the CQ using ib_alloc_cq().
  *
  * ensure that there are no other contexts that are posting WRs concurrently.
  * Otherwise the drain is not guaranteed.
@@ -1884,8 +2113,7 @@ EXPORT_SYMBOL(ib_drain_sq);
  * ensure there is room in the CQ and RQ for the drain work request and
  * completion.
  *
- * allocate the CQ using ib_alloc_cq() and the CQ poll context cannot be
- * IB_POLL_DIRECT.
+ * allocate the CQ using ib_alloc_cq().
  *
  * ensure that there are no other contexts that are posting WRs concurrently.
  * Otherwise the drain is not guaranteed.
@@ -1909,8 +2137,7 @@ EXPORT_SYMBOL(ib_drain_rq);
  * ensure there is room in the CQ(s), SQ, and RQ for drain work requests
  * and completions.
  *
- * allocate the CQs using ib_alloc_cq() and the CQ poll context cannot be
- * IB_POLL_DIRECT.
+ * allocate the CQs using ib_alloc_cq().
  *
  * ensure that there are no other contexts that are posting WRs concurrently.
  * Otherwise the drain is not guaranteed.

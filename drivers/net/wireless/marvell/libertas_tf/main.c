@@ -16,7 +16,6 @@
 #include <linux/module.h>
 #include "libertas_tf.h"
 
-#define DRIVER_RELEASE_VERSION "004.p0"
 /* thinfirm version: 5.132.X.pX */
 #define LBTF_FW_VER_MIN		0x05840300
 #define LBTF_FW_VER_MAX		0x0584ffff
@@ -26,12 +25,6 @@
 unsigned int lbtf_debug;
 EXPORT_SYMBOL_GPL(lbtf_debug);
 module_param_named(libertas_tf_debug, lbtf_debug, int, 0644);
-
-static const char lbtf_driver_version[] = "THINFIRM-USB8388-" DRIVER_RELEASE_VERSION
-#ifdef DEBUG
-	"-dbg"
-#endif
-	"";
 
 struct workqueue_struct *lbtf_wq;
 
@@ -267,7 +260,7 @@ static void lbtf_tx_work(struct work_struct *work)
 
 	len = skb->len;
 	info  = IEEE80211_SKB_CB(skb);
-	txpd = (struct txpd *)  skb_push(skb, sizeof(struct txpd));
+	txpd = skb_push(skb, sizeof(struct txpd));
 
 	if (priv->surpriseremoved) {
 		dev_kfree_skb_any(skb);
@@ -648,6 +641,8 @@ struct lbtf_private *lbtf_add_card(void *card, struct device *dmdev)
 		BIT(NL80211_IFTYPE_ADHOC);
 	skb_queue_head_init(&priv->bc_ps_buf);
 
+	wiphy_ext_feature_set(hw->wiphy, NL80211_EXT_FEATURE_CQM_RSSI_LIST);
+
 	SET_IEEE80211_DEV(hw, dmdev);
 
 	INIT_WORK(&priv->cmd_work, lbtf_cmd_work);
@@ -742,7 +737,7 @@ EXPORT_SYMBOL_GPL(lbtf_bcn_sent);
 static int __init lbtf_init_module(void)
 {
 	lbtf_deb_enter(LBTF_DEB_MAIN);
-	lbtf_wq = create_workqueue("libertastf");
+	lbtf_wq = alloc_workqueue("libertastf", WQ_MEM_RECLAIM, 0);
 	if (lbtf_wq == NULL) {
 		printk(KERN_ERR "libertastf: couldn't create workqueue\n");
 		return -ENOMEM;

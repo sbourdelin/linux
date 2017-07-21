@@ -2,6 +2,7 @@
 #include <linux/kernel.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <errno.h>
 #include <unistd.h>
 #include <string.h>
 
@@ -57,7 +58,7 @@ static int open_file_read(struct perf_data_file *file)
 		int err = errno;
 
 		pr_err("failed to open %s: %s", file->path,
-			strerror_r(err, sbuf, sizeof(sbuf)));
+			str_error_r(err, sbuf, sizeof(sbuf)));
 		if (err == ENOENT && !strcmp(file->path, "perf.data"))
 			pr_err("  (try 'perf record' first)");
 		pr_err("\n");
@@ -99,7 +100,7 @@ static int open_file_write(struct perf_data_file *file)
 
 	if (fd < 0)
 		pr_err("failed to open %s : %s\n", file->path,
-			strerror_r(errno, sbuf, sizeof(sbuf)));
+			str_error_r(errno, sbuf, sizeof(sbuf)));
 
 	return fd;
 }

@@ -18,6 +18,7 @@
 #include <linux/spi/spi.h>
 #include <linux/interrupt.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/regmap.h>
 #include <linux/ieee802154.h>
 #include <linux/irq.h>
@@ -773,7 +774,7 @@ static void mrf24j40_handle_rx_read_buf_complete(void *context)
 		return;
 	}
 
-	memcpy(skb_put(skb, len), rx_local_buf, len);
+	skb_put_data(skb, rx_local_buf, len);
 	ieee802154_rx_irqsafe(devrec->hw, skb, 0);
 
 #ifdef DEBUG
@@ -1054,6 +1055,8 @@ static irqreturn_t mrf24j40_isr(int irq, void *data)
 	disable_irq_nosync(irq);
 
 	devrec->irq_buf[0] = MRF24J40_READSHORT(REG_INTSTAT);
+	devrec->irq_buf[1] = 0;
+
 	/* Read the interrupt status */
 	ret = spi_async(devrec->spi, &devrec->irq_msg);
 	if (ret) {

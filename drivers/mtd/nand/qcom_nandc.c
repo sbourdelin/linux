@@ -1957,8 +1957,7 @@ static int qcom_nandc_alloc(struct qcom_nand_controller *nandc)
 	INIT_LIST_HEAD(&nandc->desc_list);
 	INIT_LIST_HEAD(&nandc->host_list);
 
-	spin_lock_init(&nandc->controller.lock);
-	init_waitqueue_head(&nandc->controller.wq);
+	nand_hw_control_init(&nandc->controller);
 
 	return 0;
 }
@@ -2009,6 +2008,8 @@ static int qcom_nand_host_init(struct qcom_nand_controller *nandc,
 	chip->read_byte		= qcom_nandc_read_byte;
 	chip->read_buf		= qcom_nandc_read_buf;
 	chip->write_buf		= qcom_nandc_write_buf;
+	chip->onfi_set_features	= nand_onfi_get_set_features_notsupp;
+	chip->onfi_get_features	= nand_onfi_get_set_features_notsupp;
 
 	/*
 	 * the bad block marker is readable only when we read the last codeword

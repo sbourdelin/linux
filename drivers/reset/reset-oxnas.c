@@ -18,7 +18,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <linux/err.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/reset-controller.h>
@@ -80,9 +80,9 @@ static const struct reset_control_ops oxnas_reset_ops = {
 
 static const struct of_device_id oxnas_reset_dt_ids[] = {
 	 { .compatible = "oxsemi,ox810se-reset", },
+	 { .compatible = "oxsemi,ox820-reset", },
 	 { /* sentinel */ },
 };
-MODULE_DEVICE_TABLE(of, oxnas_reset_dt_ids);
 
 static int oxnas_reset_probe(struct platform_device *pdev)
 {
@@ -112,25 +112,14 @@ static int oxnas_reset_probe(struct platform_device *pdev)
 	data->rcdev.ops = &oxnas_reset_ops;
 	data->rcdev.of_node = pdev->dev.of_node;
 
-	return reset_controller_register(&data->rcdev);
-}
-
-static int oxnas_reset_remove(struct platform_device *pdev)
-{
-	struct oxnas_reset *data = platform_get_drvdata(pdev);
-
-	reset_controller_unregister(&data->rcdev);
-
-	return 0;
+	return devm_reset_controller_register(&pdev->dev, &data->rcdev);
 }
 
 static struct platform_driver oxnas_reset_driver = {
 	.probe	= oxnas_reset_probe,
-	.remove	= oxnas_reset_remove,
 	.driver = {
 		.name		= "oxnas-reset",
 		.of_match_table	= oxnas_reset_dt_ids,
 	},
 };
-
-module_platform_driver(oxnas_reset_driver);
+builtin_platform_driver(oxnas_reset_driver);

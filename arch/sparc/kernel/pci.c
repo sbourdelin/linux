@@ -21,7 +21,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/irq.h>
 #include <asm/prom.h>
@@ -862,9 +862,9 @@ static void __pci_mmap_set_pgprot(struct pci_dev *dev, struct vm_area_struct *vm
  *
  * Returns a negative error code on failure, zero on success.
  */
-int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-			enum pci_mmap_state mmap_state,
-			int write_combine)
+int pci_mmap_page_range(struct pci_dev *dev, int bar,
+			struct vm_area_struct *vma,
+			enum pci_mmap_state mmap_state, int write_combine)
 {
 	int ret;
 
@@ -986,16 +986,18 @@ void pci_resource_to_user(const struct pci_dev *pdev, int bar,
 			  const struct resource *rp, resource_size_t *start,
 			  resource_size_t *end)
 {
-	struct pci_pbm_info *pbm = pdev->dev.archdata.host_controller;
-	unsigned long offset;
+	struct pci_bus_region region;
 
-	if (rp->flags & IORESOURCE_IO)
-		offset = pbm->io_space.start;
-	else
-		offset = pbm->mem_space.start;
-
-	*start = rp->start - offset;
-	*end = rp->end - offset;
+	/*
+	 * "User" addresses are shown in /sys/devices/pci.../.../resource
+	 * and /proc/bus/pci/devices and used as mmap offsets for
+	 * /proc/bus/pci/BB/DD.F files (see proc_bus_pci_mmap()).
+	 *
+	 * On sparc, these are PCI bus addresses, i.e., raw BAR values.
+	 */
+	pcibios_resource_to_bus(pdev->bus, &region, (struct resource *) rp);
+	*start = region.start;
+	*end = region.end;
 }
 
 void pcibios_set_master(struct pci_dev *dev)

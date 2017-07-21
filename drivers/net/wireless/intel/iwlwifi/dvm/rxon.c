@@ -523,11 +523,6 @@ static int iwlagn_rxon_connect(struct iwl_priv *priv,
 		return ret;
 	}
 
-	if (ctx->vif && ctx->vif->type == NL80211_IFTYPE_STATION &&
-	    priv->cfg->ht_params && priv->cfg->ht_params->smps_mode)
-		ieee80211_request_smps(ctx->vif,
-				       priv->cfg->ht_params->smps_mode);
-
 	return 0;
 }
 
@@ -1125,7 +1120,7 @@ int iwlagn_commit_rxon(struct iwl_priv *priv, struct iwl_rxon_context *ctx)
 		return 0;
 	}
 
-	iwl_set_rxon_hwcrypto(priv, ctx, !iwlwifi_mod_params.sw_crypto);
+	iwl_set_rxon_hwcrypto(priv, ctx, !iwlwifi_mod_params.swcrypto);
 
 	IWL_DEBUG_INFO(priv,
 		       "Going to commit RXON\n"

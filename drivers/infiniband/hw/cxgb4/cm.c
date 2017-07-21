@@ -49,6 +49,7 @@
 
 #include <rdma/ib_addr.h>
 
+#include <libcxgb_cm.h>
 #include "iw_cxgb4.h"
 #include "clip_tbl.h"
 
@@ -100,7 +101,7 @@ MODULE_PARM_DESC(enable_tcp_window_scaling,
 
 int c4iw_debug;
 module_param(c4iw_debug, int, 0644);
-MODULE_PARM_DESC(c4iw_debug, "Enable debug logging (default=0)");
+MODULE_PARM_DESC(c4iw_debug, "obsolete");
 
 static int peer2peer = 1;
 module_param(peer2peer, int, 0644);
@@ -179,7 +180,7 @@ static void ref_qp(struct c4iw_ep *ep)
 
 static void start_ep_timer(struct c4iw_ep *ep)
 {
-	PDBG("%s ep %p\n", __func__, ep);
+	pr_debug("%s ep %p\n", __func__, ep);
 	if (timer_pending(&ep->timer)) {
 		pr_err("%s timer already started! ep %p\n",
 		       __func__, ep);
@@ -195,7 +196,7 @@ static void start_ep_timer(struct c4iw_ep *ep)
 
 static int stop_ep_timer(struct c4iw_ep *ep)
 {
-	PDBG("%s ep %p stopping\n", __func__, ep);
+	pr_debug("%s ep %p stopping\n", __func__, ep);
 	del_timer_sync(&ep->timer);
 	if (!test_and_set_bit(TIMEOUT, &ep->com.flags)) {
 		c4iw_put_ep(&ep->com);
@@ -211,7 +212,7 @@ static int c4iw_l2t_send(struct c4iw_rdev *rdev, struct sk_buff *skb,
 
 	if (c4iw_fatal_error(rdev)) {
 		kfree_skb(skb);
-		PDBG("%s - device in error state - dropping\n", __func__);
+		pr_debug("%s - device in error state - dropping\n", __func__);
 		return -EIO;
 	}
 	error = cxgb4_l2t_send(rdev->lldi.ports[0], skb, l2e);
@@ -228,7 +229,7 @@ int c4iw_ofld_send(struct c4iw_rdev *rdev, struct sk_buff *skb)
 
 	if (c4iw_fatal_error(rdev)) {
 		kfree_skb(skb);
-		PDBG("%s - device in error state - dropping\n", __func__);
+		pr_debug("%s - device in error state - dropping\n", __func__);
 		return -EIO;
 	}
 	error = cxgb4_ofld_send(rdev->lldi.ports[0], skb);
@@ -239,15 +240,13 @@ int c4iw_ofld_send(struct c4iw_rdev *rdev, struct sk_buff *skb)
 
 static void release_tid(struct c4iw_rdev *rdev, u32 hwtid, struct sk_buff *skb)
 {
-	struct cpl_tid_release *req;
+	u32 len = roundup(sizeof(struct cpl_tid_release), 16);
 
-	skb = get_skb(skb, sizeof *req, GFP_KERNEL);
+	skb = get_skb(skb, len, GFP_KERNEL);
 	if (!skb)
 		return;
-	req = (struct cpl_tid_release *) skb_put(skb, sizeof(*req));
-	INIT_TP_WR(req, hwtid);
-	OPCODE_TID(req) = cpu_to_be32(MK_OPCODE_TID(CPL_TID_RELEASE, hwtid));
-	set_wr_txq(skb, CPL_PRIORITY_SETUP, 0);
+
+	cxgb_mk_tid_release(skb, len, hwtid, 0);
 	c4iw_ofld_send(rdev, skb);
 	return;
 }
@@ -264,10 +263,10 @@ static void set_emss(struct c4iw_ep *ep, u16 opt)
 	if (ep->emss < 128)
 		ep->emss = 128;
 	if (ep->emss & 7)
-		PDBG("Warning: misaligned mtu idx %u mss %u emss=%u\n",
-		     TCPOPT_MSS_G(opt), ep->mss, ep->emss);
-	PDBG("%s mss_idx %u mss %u emss=%u\n", __func__, TCPOPT_MSS_G(opt),
-	     ep->mss, ep->emss);
+		pr_debug("Warning: misaligned mtu idx %u mss %u emss=%u\n",
+			 TCPOPT_MSS_G(opt), ep->mss, ep->emss);
+	pr_debug("%s mss_idx %u mss %u emss=%u\n", __func__, TCPOPT_MSS_G(opt),
+		 ep->mss, ep->emss);
 }
 
 static enum c4iw_ep_state state_read(struct c4iw_ep_common *epc)
@@ -288,10 +287,29 @@ static void __state_set(struct c4iw_ep_common *epc, enum c4iw_ep_state new)
 static void state_set(struct c4iw_ep_common *epc, enum c4iw_ep_state new)
 {
 	mutex_lock(&epc->mutex);
-	PDBG("%s - %s -> %s\n", __func__, states[epc->state], states[new]);
+	pr_debug("%s - %s -> %s\n", __func__, states[epc->state], states[new]);
 	__state_set(epc, new);
 	mutex_unlock(&epc->mutex);
 	return;
+}
+
+static int alloc_ep_skb_list(struct sk_buff_head *ep_skb_list, int size)
+{
+	struct sk_buff *skb;
+	unsigned int i;
+	size_t len;
+
+	len = roundup(sizeof(union cpl_wr_size), 16);
+	for (i = 0; i < size; i++) {
+		skb = alloc_skb(len, GFP_KERNEL);
+		if (!skb)
+			goto fail;
+		skb_queue_tail(ep_skb_list, skb);
+	}
+	return 0;
+fail:
+	skb_queue_purge(ep_skb_list);
+	return -ENOMEM;
 }
 
 static void *alloc_ep(int size, gfp_t gfp)
@@ -304,7 +322,7 @@ static void *alloc_ep(int size, gfp_t gfp)
 		mutex_init(&epc->mutex);
 		c4iw_init_wr_wait(&epc->wr_wait);
 	}
-	PDBG("%s alloc ep %p\n", __func__, epc);
+	pr_debug("%s alloc ep %p\n", __func__, epc);
 	return epc;
 }
 
@@ -314,6 +332,8 @@ static void remove_ep_tid(struct c4iw_ep *ep)
 
 	spin_lock_irqsave(&ep->com.dev->lock, flags);
 	_remove_handle(ep->com.dev, &ep->com.dev->hwtid_idr, ep->hwtid, 0);
+	if (idr_is_empty(&ep->com.dev->hwtid_idr))
+		wake_up(&ep->com.dev->wait);
 	spin_unlock_irqrestore(&ep->com.dev->lock, flags);
 }
 
@@ -364,7 +384,7 @@ void _c4iw_free_ep(struct kref *kref)
 	struct c4iw_ep *ep;
 
 	ep = container_of(kref, struct c4iw_ep, com.kref);
-	PDBG("%s ep %p state %s\n", __func__, ep, states[ep->com.state]);
+	pr_debug("%s ep %p state %s\n", __func__, ep, states[ep->com.state]);
 	if (test_bit(QP_REFERENCED, &ep->com.flags))
 		deref_qp(ep);
 	if (test_bit(RELEASE_RESOURCES, &ep->com.flags)) {
@@ -378,12 +398,15 @@ void _c4iw_free_ep(struct kref *kref)
 					(const u32 *)&sin6->sin6_addr.s6_addr,
 					1);
 		}
-		cxgb4_remove_tid(ep->com.dev->rdev.lldi.tids, 0, ep->hwtid);
+		cxgb4_remove_tid(ep->com.dev->rdev.lldi.tids, 0, ep->hwtid,
+				 ep->com.local_addr.ss_family);
 		dst_release(ep->dst);
 		cxgb4_l2t_release(ep->l2t);
 		if (ep->mpa_skb)
 			kfree_skb(ep->mpa_skb);
 	}
+	if (!skb_queue_empty(&ep->com.ep_skb_list))
+		skb_queue_purge(&ep->com.ep_skb_list);
 	kfree(ep);
 }
 
@@ -443,75 +466,9 @@ static struct net_device *get_real_dev(struct net_device *egress_dev)
 	return rdma_vlan_dev_real_dev(egress_dev) ? : egress_dev;
 }
 
-static int our_interface(struct c4iw_dev *dev, struct net_device *egress_dev)
-{
-	int i;
-
-	egress_dev = get_real_dev(egress_dev);
-	for (i = 0; i < dev->rdev.lldi.nports; i++)
-		if (dev->rdev.lldi.ports[i] == egress_dev)
-			return 1;
-	return 0;
-}
-
-static struct dst_entry *find_route6(struct c4iw_dev *dev, __u8 *local_ip,
-				     __u8 *peer_ip, __be16 local_port,
-				     __be16 peer_port, u8 tos,
-				     __u32 sin6_scope_id)
-{
-	struct dst_entry *dst = NULL;
-
-	if (IS_ENABLED(CONFIG_IPV6)) {
-		struct flowi6 fl6;
-
-		memset(&fl6, 0, sizeof(fl6));
-		memcpy(&fl6.daddr, peer_ip, 16);
-		memcpy(&fl6.saddr, local_ip, 16);
-		if (ipv6_addr_type(&fl6.daddr) & IPV6_ADDR_LINKLOCAL)
-			fl6.flowi6_oif = sin6_scope_id;
-		dst = ip6_route_output(&init_net, NULL, &fl6);
-		if (!dst)
-			goto out;
-		if (!our_interface(dev, ip6_dst_idev(dst)->dev) &&
-		    !(ip6_dst_idev(dst)->dev->flags & IFF_LOOPBACK)) {
-			dst_release(dst);
-			dst = NULL;
-		}
-	}
-
-out:
-	return dst;
-}
-
-static struct dst_entry *find_route(struct c4iw_dev *dev, __be32 local_ip,
-				 __be32 peer_ip, __be16 local_port,
-				 __be16 peer_port, u8 tos)
-{
-	struct rtable *rt;
-	struct flowi4 fl4;
-	struct neighbour *n;
-
-	rt = ip_route_output_ports(&init_net, &fl4, NULL, peer_ip, local_ip,
-				   peer_port, local_port, IPPROTO_TCP,
-				   tos, 0);
-	if (IS_ERR(rt))
-		return NULL;
-	n = dst_neigh_lookup(&rt->dst, &peer_ip);
-	if (!n)
-		return NULL;
-	if (!our_interface(dev, n->dev) &&
-	    !(n->dev->flags & IFF_LOOPBACK)) {
-		neigh_release(n);
-		dst_release(&rt->dst);
-		return NULL;
-	}
-	neigh_release(n);
-	return &rt->dst;
-}
-
 static void arp_failure_discard(void *handle, struct sk_buff *skb)
 {
-	pr_err(MOD "ARP failure\n");
+	pr_err("ARP failure\n");
 	kfree_skb(skb);
 }
 
@@ -532,6 +489,7 @@ static int _put_ep_safe(struct c4iw_dev *dev, struct sk_buff *skb)
 
 	ep = *((struct c4iw_ep **)(skb->cb + 2 * sizeof(void *)));
 	release_ep_resources(ep);
+	kfree_skb(skb);
 	return 0;
 }
 
@@ -542,6 +500,7 @@ static int _put_pass_ep_safe(struct c4iw_dev *dev, struct sk_buff *skb)
 	ep = *((struct c4iw_ep **)(skb->cb + 2 * sizeof(void *)));
 	c4iw_put_ep(&ep->parent_ep->com);
 	release_ep_resources(ep);
+	kfree_skb(skb);
 	return 0;
 }
 
@@ -572,7 +531,7 @@ static void pass_accept_rpl_arp_failure(void *handle, struct sk_buff *skb)
 {
 	struct c4iw_ep *ep = handle;
 
-	pr_err(MOD "ARP failure during accept - tid %u -dropping connection\n",
+	pr_err("ARP failure during accept - tid %u - dropping connection\n",
 	       ep->hwtid);
 
 	__state_set(&ep->com, DEAD);
@@ -586,7 +545,7 @@ static void act_open_req_arp_failure(void *handle, struct sk_buff *skb)
 {
 	struct c4iw_ep *ep = handle;
 
-	printk(KERN_ERR MOD "ARP failure during connect\n");
+	pr_err("ARP failure during connect\n");
 	connect_reply_upcall(ep, -EHOSTUNREACH);
 	__state_set(&ep->com, DEAD);
 	if (ep->com.remote_addr.ss_family == AF_INET6) {
@@ -611,34 +570,38 @@ static void abort_arp_failure(void *handle, struct sk_buff *skb)
 	struct c4iw_rdev *rdev = &ep->com.dev->rdev;
 	struct cpl_abort_req *req = cplhdr(skb);
 
-	PDBG("%s rdev %p\n", __func__, rdev);
+	pr_debug("%s rdev %p\n", __func__, rdev);
 	req->cmd = CPL_ABORT_NO_RST;
+	skb_get(skb);
 	ret = c4iw_ofld_send(rdev, skb);
 	if (ret) {
 		__state_set(&ep->com, DEAD);
 		queue_arp_failure_cpl(ep, skb, FAKE_CPL_PUT_EP_SAFE);
-	}
+	} else
+		kfree_skb(skb);
 }
 
-static int send_flowc(struct c4iw_ep *ep, struct sk_buff *skb)
+static int send_flowc(struct c4iw_ep *ep)
 {
-	unsigned int flowclen = 80;
 	struct fw_flowc_wr *flowc;
+	struct sk_buff *skb = skb_dequeue(&ep->com.ep_skb_list);
 	int i;
 	u16 vlan = ep->l2t->vlan;
 	int nparams;
+
+	if (WARN_ON(!skb))
+		return -ENOMEM;
 
 	if (vlan == CPL_L2T_VLAN_NONE)
 		nparams = 8;
 	else
 		nparams = 9;
 
-	skb = get_skb(skb, flowclen, GFP_KERNEL);
-	flowc = (struct fw_flowc_wr *)__skb_put(skb, flowclen);
+	flowc = __skb_put(skb, FLOWC_LEN);
 
 	flowc->op_to_nparams = cpu_to_be32(FW_WR_OP_V(FW_FLOWC_WR) |
 					   FW_FLOWC_WR_NPARAMS_V(nparams));
-	flowc->flowid_len16 = cpu_to_be32(FW_WR_LEN16_V(DIV_ROUND_UP(flowclen,
+	flowc->flowid_len16 = cpu_to_be32(FW_WR_LEN16_V(DIV_ROUND_UP(FLOWC_LEN,
 					  16)) | FW_WR_FLOWID_V(ep->hwtid));
 
 	flowc->mnemval[0].mnemonic = FW_FLOWC_MNEM_PFNVFN;
@@ -679,62 +642,34 @@ static int send_flowc(struct c4iw_ep *ep, struct sk_buff *skb)
 	return c4iw_ofld_send(&ep->com.dev->rdev, skb);
 }
 
-static int send_halfclose(struct c4iw_ep *ep, gfp_t gfp)
+static int send_halfclose(struct c4iw_ep *ep)
 {
-	struct cpl_close_con_req *req;
-	struct sk_buff *skb;
-	int wrlen = roundup(sizeof *req, 16);
+	struct sk_buff *skb = skb_dequeue(&ep->com.ep_skb_list);
+	u32 wrlen = roundup(sizeof(struct cpl_close_con_req), 16);
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
-	skb = get_skb(NULL, wrlen, gfp);
-	if (!skb) {
-		printk(KERN_ERR MOD "%s - failed to alloc skb\n", __func__);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	if (WARN_ON(!skb))
 		return -ENOMEM;
-	}
-	set_wr_txq(skb, CPL_PRIORITY_DATA, ep->txq_idx);
-	t4_set_arp_err_handler(skb, NULL, arp_failure_discard);
-	req = (struct cpl_close_con_req *) skb_put(skb, wrlen);
-	memset(req, 0, wrlen);
-	INIT_TP_WR(req, ep->hwtid);
-	OPCODE_TID(req) = cpu_to_be32(MK_OPCODE_TID(CPL_CLOSE_CON_REQ,
-						    ep->hwtid));
+
+	cxgb_mk_close_con_req(skb, wrlen, ep->hwtid, ep->txq_idx,
+			      NULL, arp_failure_discard);
+
 	return c4iw_l2t_send(&ep->com.dev->rdev, skb, ep->l2t);
 }
 
-static int send_abort(struct c4iw_ep *ep, struct sk_buff *skb, gfp_t gfp)
+static int send_abort(struct c4iw_ep *ep)
 {
-	struct cpl_abort_req *req;
-	int wrlen = roundup(sizeof *req, 16);
+	u32 wrlen = roundup(sizeof(struct cpl_abort_req), 16);
+	struct sk_buff *req_skb = skb_dequeue(&ep->com.ep_skb_list);
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
-	skb = get_skb(skb, wrlen, gfp);
-	if (!skb) {
-		printk(KERN_ERR MOD "%s - failed to alloc skb.\n",
-		       __func__);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	if (WARN_ON(!req_skb))
 		return -ENOMEM;
-	}
-	set_wr_txq(skb, CPL_PRIORITY_DATA, ep->txq_idx);
-	t4_set_arp_err_handler(skb, ep, abort_arp_failure);
-	req = (struct cpl_abort_req *) skb_put(skb, wrlen);
-	memset(req, 0, wrlen);
-	INIT_TP_WR(req, ep->hwtid);
-	OPCODE_TID(req) = cpu_to_be32(MK_OPCODE_TID(CPL_ABORT_REQ, ep->hwtid));
-	req->cmd = CPL_ABORT_SEND_RST;
-	return c4iw_l2t_send(&ep->com.dev->rdev, skb, ep->l2t);
-}
 
-static void best_mtu(const unsigned short *mtus, unsigned short mtu,
-		     unsigned int *idx, int use_ts, int ipv6)
-{
-	unsigned short hdr_size = (ipv6 ?
-				   sizeof(struct ipv6hdr) :
-				   sizeof(struct iphdr)) +
-				  sizeof(struct tcphdr) +
-				  (use_ts ?
-				   round_up(TCPOLEN_TIMESTAMP, 4) : 0);
-	unsigned short data_size = mtu - hdr_size;
+	cxgb_mk_abort_req(req_skb, wrlen, ep->hwtid, ep->txq_idx,
+			  ep, abort_arp_failure);
 
-	cxgb4_best_aligned_mtu(mtus, hdr_size, data_size, 8, idx);
+	return c4iw_l2t_send(&ep->com.dev->rdev, req_skb, ep->l2t);
 }
 
 static int send_connect(struct c4iw_ep *ep)
@@ -749,7 +684,7 @@ static int send_connect(struct c4iw_ep *ep)
 	u64 opt0;
 	u32 opt2;
 	unsigned int mtu_idx;
-	int wscale;
+	u32 wscale;
 	int win, sizev4, sizev6, wrlen;
 	struct sockaddr_in *la = (struct sockaddr_in *)
 				 &ep->com.local_addr;
@@ -762,6 +697,10 @@ static int send_connect(struct c4iw_ep *ep)
 	int ret;
 	enum chip_type adapter_type = ep->com.dev->rdev.lldi.adapter_type;
 	u32 isn = (prandom_u32() & ~7UL) - 1;
+	struct net_device *netdev;
+	u64 params;
+
+	netdev = ep->com.dev->rdev.lldi.ports[0];
 
 	switch (CHELSIO_CHIP_VERSION(adapter_type)) {
 	case CHELSIO_T4:
@@ -786,20 +725,19 @@ static int send_connect(struct c4iw_ep *ep)
 			roundup(sizev4, 16) :
 			roundup(sizev6, 16);
 
-	PDBG("%s ep %p atid %u\n", __func__, ep, ep->atid);
+	pr_debug("%s ep %p atid %u\n", __func__, ep, ep->atid);
 
 	skb = get_skb(NULL, wrlen, GFP_KERNEL);
 	if (!skb) {
-		printk(KERN_ERR MOD "%s - failed to alloc skb.\n",
-		       __func__);
+		pr_err("%s - failed to alloc skb\n", __func__);
 		return -ENOMEM;
 	}
 	set_wr_txq(skb, CPL_PRIORITY_SETUP, ep->ctrlq_idx);
 
-	best_mtu(ep->com.dev->rdev.lldi.mtus, ep->mtu, &mtu_idx,
-		 enable_tcp_timestamps,
-		 (AF_INET == ep->com.remote_addr.ss_family) ? 0 : 1);
-	wscale = compute_wscale(rcv_win);
+	cxgb_best_mtu(ep->com.dev->rdev.lldi.mtus, ep->mtu, &mtu_idx,
+		      enable_tcp_timestamps,
+		      (ep->com.remote_addr.ss_family == AF_INET) ? 0 : 1);
+	wscale = cxgb_compute_wscale(rcv_win);
 
 	/*
 	 * Specify the largest window that will fit in opt0. The
@@ -838,6 +776,8 @@ static int send_connect(struct c4iw_ep *ep)
 		opt2 |= T5_ISS_F;
 	}
 
+	params = cxgb4_select_ntuple(netdev, ep->l2t);
+
 	if (ep->com.remote_addr.ss_family == AF_INET6)
 		cxgb4_clip_get(ep->com.dev->rdev.lldi.ports[0],
 			       (const u32 *)&la6->sin6_addr.s6_addr, 1);
@@ -847,18 +787,16 @@ static int send_connect(struct c4iw_ep *ep)
 	if (ep->com.remote_addr.ss_family == AF_INET) {
 		switch (CHELSIO_CHIP_VERSION(adapter_type)) {
 		case CHELSIO_T4:
-			req = (struct cpl_act_open_req *)skb_put(skb, wrlen);
+			req = skb_put(skb, wrlen);
 			INIT_TP_WR(req, 0);
 			break;
 		case CHELSIO_T5:
-			t5req = (struct cpl_t5_act_open_req *)skb_put(skb,
-					wrlen);
+			t5req = skb_put(skb, wrlen);
 			INIT_TP_WR(t5req, 0);
 			req = (struct cpl_act_open_req *)t5req;
 			break;
 		case CHELSIO_T6:
-			t6req = (struct cpl_t6_act_open_req *)skb_put(skb,
-					wrlen);
+			t6req = skb_put(skb, wrlen);
 			INIT_TP_WR(t6req, 0);
 			req = (struct cpl_act_open_req *)t6req;
 			t5req = (struct cpl_t5_act_open_req *)t6req;
@@ -879,34 +817,36 @@ static int send_connect(struct c4iw_ep *ep)
 		req->opt0 = cpu_to_be64(opt0);
 
 		if (is_t4(ep->com.dev->rdev.lldi.adapter_type)) {
-			req->params = cpu_to_be32(cxgb4_select_ntuple(
-						ep->com.dev->rdev.lldi.ports[0],
-						ep->l2t));
+			req->params = cpu_to_be32(params);
 			req->opt2 = cpu_to_be32(opt2);
 		} else {
-			t5req->params = cpu_to_be64(FILTER_TUPLE_V(
-						cxgb4_select_ntuple(
-						ep->com.dev->rdev.lldi.ports[0],
-						ep->l2t)));
-			t5req->rsvd = cpu_to_be32(isn);
-			PDBG("%s snd_isn %u\n", __func__, t5req->rsvd);
-			t5req->opt2 = cpu_to_be32(opt2);
+			if (is_t5(ep->com.dev->rdev.lldi.adapter_type)) {
+				t5req->params =
+					  cpu_to_be64(FILTER_TUPLE_V(params));
+				t5req->rsvd = cpu_to_be32(isn);
+			pr_debug("%s snd_isn %u\n", __func__, t5req->rsvd);
+				t5req->opt2 = cpu_to_be32(opt2);
+			} else {
+				t6req->params =
+					  cpu_to_be64(FILTER_TUPLE_V(params));
+				t6req->rsvd = cpu_to_be32(isn);
+			pr_debug("%s snd_isn %u\n", __func__, t6req->rsvd);
+				t6req->opt2 = cpu_to_be32(opt2);
+			}
 		}
 	} else {
 		switch (CHELSIO_CHIP_VERSION(adapter_type)) {
 		case CHELSIO_T4:
-			req6 = (struct cpl_act_open_req6 *)skb_put(skb, wrlen);
+			req6 = skb_put(skb, wrlen);
 			INIT_TP_WR(req6, 0);
 			break;
 		case CHELSIO_T5:
-			t5req6 = (struct cpl_t5_act_open_req6 *)skb_put(skb,
-					wrlen);
+			t5req6 = skb_put(skb, wrlen);
 			INIT_TP_WR(t5req6, 0);
 			req6 = (struct cpl_act_open_req6 *)t5req6;
 			break;
 		case CHELSIO_T6:
-			t6req6 = (struct cpl_t6_act_open_req6 *)skb_put(skb,
-					wrlen);
+			t6req6 = skb_put(skb, wrlen);
 			INIT_TP_WR(t6req6, 0);
 			req6 = (struct cpl_act_open_req6 *)t6req6;
 			t5req6 = (struct cpl_t5_act_open_req6 *)t6req6;
@@ -929,18 +869,24 @@ static int send_connect(struct c4iw_ep *ep)
 		req6->opt0 = cpu_to_be64(opt0);
 
 		if (is_t4(ep->com.dev->rdev.lldi.adapter_type)) {
-			req6->params = cpu_to_be32(cxgb4_select_ntuple(
-						ep->com.dev->rdev.lldi.ports[0],
-						ep->l2t));
+			req6->params = cpu_to_be32(cxgb4_select_ntuple(netdev,
+								      ep->l2t));
 			req6->opt2 = cpu_to_be32(opt2);
 		} else {
-			t5req6->params = cpu_to_be64(FILTER_TUPLE_V(
-						cxgb4_select_ntuple(
-						ep->com.dev->rdev.lldi.ports[0],
-						ep->l2t)));
-			t5req6->rsvd = cpu_to_be32(isn);
-			PDBG("%s snd_isn %u\n", __func__, t5req6->rsvd);
-			t5req6->opt2 = cpu_to_be32(opt2);
+			if (is_t5(ep->com.dev->rdev.lldi.adapter_type)) {
+				t5req6->params =
+					    cpu_to_be64(FILTER_TUPLE_V(params));
+				t5req6->rsvd = cpu_to_be32(isn);
+			pr_debug("%s snd_isn %u\n", __func__, t5req6->rsvd);
+				t5req6->opt2 = cpu_to_be32(opt2);
+			} else {
+				t6req6->params =
+					    cpu_to_be64(FILTER_TUPLE_V(params));
+				t6req6->rsvd = cpu_to_be32(isn);
+			pr_debug("%s snd_isn %u\n", __func__, t6req6->rsvd);
+				t6req6->opt2 = cpu_to_be32(opt2);
+			}
+
 		}
 	}
 
@@ -961,7 +907,8 @@ static int send_mpa_req(struct c4iw_ep *ep, struct sk_buff *skb,
 	struct mpa_message *mpa;
 	struct mpa_v2_conn_params mpa_v2_params;
 
-	PDBG("%s ep %p tid %u pd_len %d\n", __func__, ep, ep->hwtid, ep->plen);
+	pr_debug("%s ep %p tid %u pd_len %d\n",
+		 __func__, ep, ep->hwtid, ep->plen);
 
 	BUG_ON(skb_cloned(skb));
 
@@ -976,8 +923,7 @@ static int send_mpa_req(struct c4iw_ep *ep, struct sk_buff *skb,
 	}
 	set_wr_txq(skb, CPL_PRIORITY_DATA, ep->txq_idx);
 
-	req = (struct fw_ofld_tx_data_wr *)skb_put(skb, wrlen);
-	memset(req, 0, wrlen);
+	req = skb_put_zero(skb, wrlen);
 	req->op_to_immdlen = cpu_to_be32(
 		FW_WR_OP_V(FW_OFLD_TX_DATA_WR) |
 		FW_WR_COMPL_F |
@@ -992,9 +938,19 @@ static int send_mpa_req(struct c4iw_ep *ep, struct sk_buff *skb,
 
 	mpa = (struct mpa_message *)(req + 1);
 	memcpy(mpa->key, MPA_KEY_REQ, sizeof(mpa->key));
-	mpa->flags = (crc_enabled ? MPA_CRC : 0) |
-		     (markers_enabled ? MPA_MARKERS : 0) |
-		     (mpa_rev_to_use == 2 ? MPA_ENHANCED_RDMA_CONN : 0);
+
+	mpa->flags = 0;
+	if (crc_enabled)
+		mpa->flags |= MPA_CRC;
+	if (markers_enabled) {
+		mpa->flags |= MPA_MARKERS;
+		ep->mpa_attr.recv_marker_enabled = 1;
+	} else {
+		ep->mpa_attr.recv_marker_enabled = 0;
+	}
+	if (mpa_rev_to_use == 2)
+		mpa->flags |= MPA_ENHANCED_RDMA_CONN;
+
 	mpa->private_data_size = htons(ep->plen);
 	mpa->revision = mpa_rev_to_use;
 	if (mpa_rev_to_use == 1) {
@@ -1005,8 +961,8 @@ static int send_mpa_req(struct c4iw_ep *ep, struct sk_buff *skb,
 	if (mpa_rev_to_use == 2) {
 		mpa->private_data_size = htons(ntohs(mpa->private_data_size) +
 					       sizeof (struct mpa_v2_conn_params));
-		PDBG("%s initiator ird %u ord %u\n", __func__, ep->ird,
-		     ep->ord);
+		pr_debug("%s initiator ird %u ord %u\n", __func__, ep->ird,
+			 ep->ord);
 		mpa_v2_params.ird = htons((u16)ep->ird);
 		mpa_v2_params.ord = htons((u16)ep->ord);
 
@@ -1058,7 +1014,8 @@ static int send_mpa_reject(struct c4iw_ep *ep, const void *pdata, u8 plen)
 	struct sk_buff *skb;
 	struct mpa_v2_conn_params mpa_v2_params;
 
-	PDBG("%s ep %p tid %u pd_len %d\n", __func__, ep, ep->hwtid, ep->plen);
+	pr_debug("%s ep %p tid %u pd_len %d\n",
+		 __func__, ep, ep->hwtid, ep->plen);
 
 	mpalen = sizeof(*mpa) + plen;
 	if (ep->mpa_attr.version == 2 && ep->mpa_attr.enhanced_rdma_conn)
@@ -1067,13 +1024,12 @@ static int send_mpa_reject(struct c4iw_ep *ep, const void *pdata, u8 plen)
 
 	skb = get_skb(NULL, wrlen, GFP_KERNEL);
 	if (!skb) {
-		printk(KERN_ERR MOD "%s - cannot alloc skb!\n", __func__);
+		pr_err("%s - cannot alloc skb!\n", __func__);
 		return -ENOMEM;
 	}
 	set_wr_txq(skb, CPL_PRIORITY_DATA, ep->txq_idx);
 
-	req = (struct fw_ofld_tx_data_wr *)skb_put(skb, wrlen);
-	memset(req, 0, wrlen);
+	req = skb_put_zero(skb, wrlen);
 	req->op_to_immdlen = cpu_to_be32(
 		FW_WR_OP_V(FW_OFLD_TX_DATA_WR) |
 		FW_WR_COMPL_F |
@@ -1138,7 +1094,8 @@ static int send_mpa_reply(struct c4iw_ep *ep, const void *pdata, u8 plen)
 	struct sk_buff *skb;
 	struct mpa_v2_conn_params mpa_v2_params;
 
-	PDBG("%s ep %p tid %u pd_len %d\n", __func__, ep, ep->hwtid, ep->plen);
+	pr_debug("%s ep %p tid %u pd_len %d\n",
+		 __func__, ep, ep->hwtid, ep->plen);
 
 	mpalen = sizeof(*mpa) + plen;
 	if (ep->mpa_attr.version == 2 && ep->mpa_attr.enhanced_rdma_conn)
@@ -1147,13 +1104,12 @@ static int send_mpa_reply(struct c4iw_ep *ep, const void *pdata, u8 plen)
 
 	skb = get_skb(NULL, wrlen, GFP_KERNEL);
 	if (!skb) {
-		printk(KERN_ERR MOD "%s - cannot alloc skb!\n", __func__);
+		pr_err("%s - cannot alloc skb!\n", __func__);
 		return -ENOMEM;
 	}
 	set_wr_txq(skb, CPL_PRIORITY_DATA, ep->txq_idx);
 
-	req = (struct fw_ofld_tx_data_wr *) skb_put(skb, wrlen);
-	memset(req, 0, wrlen);
+	req = skb_put_zero(skb, wrlen);
 	req->op_to_immdlen = cpu_to_be32(
 		FW_WR_OP_V(FW_OFLD_TX_DATA_WR) |
 		FW_WR_COMPL_F |
@@ -1169,8 +1125,11 @@ static int send_mpa_reply(struct c4iw_ep *ep, const void *pdata, u8 plen)
 	mpa = (struct mpa_message *)(req + 1);
 	memset(mpa, 0, sizeof(*mpa));
 	memcpy(mpa->key, MPA_KEY_REP, sizeof(mpa->key));
-	mpa->flags = (ep->mpa_attr.crc_enabled ? MPA_CRC : 0) |
-		     (markers_enabled ? MPA_MARKERS : 0);
+	mpa->flags = 0;
+	if (ep->mpa_attr.crc_enabled)
+		mpa->flags |= MPA_CRC;
+	if (ep->mpa_attr.recv_marker_enabled)
+		mpa->flags |= MPA_MARKERS;
 	mpa->revision = ep->mpa_attr.version;
 	mpa->private_data_size = htons(plen);
 
@@ -1226,15 +1185,15 @@ static int act_establish(struct c4iw_dev *dev, struct sk_buff *skb)
 
 	ep = lookup_atid(t, atid);
 
-	PDBG("%s ep %p tid %u snd_isn %u rcv_isn %u\n", __func__, ep, tid,
-	     be32_to_cpu(req->snd_isn), be32_to_cpu(req->rcv_isn));
+	pr_debug("%s ep %p tid %u snd_isn %u rcv_isn %u\n", __func__, ep, tid,
+		 be32_to_cpu(req->snd_isn), be32_to_cpu(req->rcv_isn));
 
 	mutex_lock(&ep->com.mutex);
 	dst_confirm(ep->dst);
 
 	/* setup the hwtid for this connection */
 	ep->hwtid = tid;
-	cxgb4_insert_tid(t, ep, tid);
+	cxgb4_insert_tid(t, ep, tid, ep->com.local_addr.ss_family);
 	insert_ep_tid(ep);
 
 	ep->snd_seq = be32_to_cpu(req->snd_isn);
@@ -1248,7 +1207,7 @@ static int act_establish(struct c4iw_dev *dev, struct sk_buff *skb)
 	set_bit(ACT_ESTAB, &ep->com.history);
 
 	/* start MPA negotiation */
-	ret = send_flowc(ep, NULL);
+	ret = send_flowc(ep);
 	if (ret)
 		goto err;
 	if (ep->retry_with_mpa_v1)
@@ -1270,13 +1229,13 @@ static void close_complete_upcall(struct c4iw_ep *ep, int status)
 {
 	struct iw_cm_event event;
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	memset(&event, 0, sizeof(event));
 	event.event = IW_CM_EVENT_CLOSE;
 	event.status = status;
 	if (ep->com.cm_id) {
-		PDBG("close complete delivered ep %p cm_id %p tid %u\n",
-		     ep, ep->com.cm_id, ep->hwtid);
+		pr_debug("close complete delivered ep %p cm_id %p tid %u\n",
+			 ep, ep->com.cm_id, ep->hwtid);
 		ep->com.cm_id->event_handler(ep->com.cm_id, &event);
 		deref_cm_id(&ep->com);
 		set_bit(CLOSE_UPCALL, &ep->com.history);
@@ -1287,12 +1246,12 @@ static void peer_close_upcall(struct c4iw_ep *ep)
 {
 	struct iw_cm_event event;
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	memset(&event, 0, sizeof(event));
 	event.event = IW_CM_EVENT_DISCONNECT;
 	if (ep->com.cm_id) {
-		PDBG("peer close delivered ep %p cm_id %p tid %u\n",
-		     ep, ep->com.cm_id, ep->hwtid);
+		pr_debug("peer close delivered ep %p cm_id %p tid %u\n",
+			 ep, ep->com.cm_id, ep->hwtid);
 		ep->com.cm_id->event_handler(ep->com.cm_id, &event);
 		set_bit(DISCONN_UPCALL, &ep->com.history);
 	}
@@ -1302,13 +1261,13 @@ static void peer_abort_upcall(struct c4iw_ep *ep)
 {
 	struct iw_cm_event event;
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	memset(&event, 0, sizeof(event));
 	event.event = IW_CM_EVENT_CLOSE;
 	event.status = -ECONNRESET;
 	if (ep->com.cm_id) {
-		PDBG("abort delivered ep %p cm_id %p tid %u\n", ep,
-		     ep->com.cm_id, ep->hwtid);
+		pr_debug("abort delivered ep %p cm_id %p tid %u\n", ep,
+			 ep->com.cm_id, ep->hwtid);
 		ep->com.cm_id->event_handler(ep->com.cm_id, &event);
 		deref_cm_id(&ep->com);
 		set_bit(ABORT_UPCALL, &ep->com.history);
@@ -1319,7 +1278,8 @@ static void connect_reply_upcall(struct c4iw_ep *ep, int status)
 {
 	struct iw_cm_event event;
 
-	PDBG("%s ep %p tid %u status %d\n", __func__, ep, ep->hwtid, status);
+	pr_debug("%s ep %p tid %u status %d\n",
+		 __func__, ep, ep->hwtid, status);
 	memset(&event, 0, sizeof(event));
 	event.event = IW_CM_EVENT_CONNECT_REPLY;
 	event.status = status;
@@ -1348,8 +1308,8 @@ static void connect_reply_upcall(struct c4iw_ep *ep, int status)
 		}
 	}
 
-	PDBG("%s ep %p tid %u status %d\n", __func__, ep,
-	     ep->hwtid, status);
+	pr_debug("%s ep %p tid %u status %d\n", __func__, ep,
+		 ep->hwtid, status);
 	set_bit(CONN_RPL_UPCALL, &ep->com.history);
 	ep->com.cm_id->event_handler(ep->com.cm_id, &event);
 
@@ -1362,7 +1322,7 @@ static int connect_request_upcall(struct c4iw_ep *ep)
 	struct iw_cm_event event;
 	int ret;
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	memset(&event, 0, sizeof(event));
 	event.event = IW_CM_EVENT_CONNECT_REQUEST;
 	memcpy(&event.local_addr, &ep->com.local_addr,
@@ -1399,13 +1359,13 @@ static void established_upcall(struct c4iw_ep *ep)
 {
 	struct iw_cm_event event;
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	memset(&event, 0, sizeof(event));
 	event.event = IW_CM_EVENT_ESTABLISHED;
 	event.ird = ep->ord;
 	event.ord = ep->ird;
 	if (ep->com.cm_id) {
-		PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+		pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 		ep->com.cm_id->event_handler(ep->com.cm_id, &event);
 		set_bit(ESTAB_UPCALL, &ep->com.history);
 	}
@@ -1413,14 +1373,15 @@ static void established_upcall(struct c4iw_ep *ep)
 
 static int update_rx_credits(struct c4iw_ep *ep, u32 credits)
 {
-	struct cpl_rx_data_ack *req;
 	struct sk_buff *skb;
-	int wrlen = roundup(sizeof *req, 16);
+	u32 wrlen = roundup(sizeof(struct cpl_rx_data_ack), 16);
+	u32 credit_dack;
 
-	PDBG("%s ep %p tid %u credits %u\n", __func__, ep, ep->hwtid, credits);
+	pr_debug("%s ep %p tid %u credits %u\n",
+		 __func__, ep, ep->hwtid, credits);
 	skb = get_skb(NULL, wrlen, GFP_KERNEL);
 	if (!skb) {
-		printk(KERN_ERR MOD "update_rx_credits - cannot alloc skb!\n");
+		pr_err("update_rx_credits - cannot alloc skb!\n");
 		return 0;
 	}
 
@@ -1432,15 +1393,12 @@ static int update_rx_credits(struct c4iw_ep *ep, u32 credits)
 	if (ep->rcv_win > RCV_BUFSIZ_M * 1024)
 		credits += ep->rcv_win - RCV_BUFSIZ_M * 1024;
 
-	req = (struct cpl_rx_data_ack *) skb_put(skb, wrlen);
-	memset(req, 0, wrlen);
-	INIT_TP_WR(req, ep->hwtid);
-	OPCODE_TID(req) = cpu_to_be32(MK_OPCODE_TID(CPL_RX_DATA_ACK,
-						    ep->hwtid));
-	req->credit_dack = cpu_to_be32(credits | RX_FORCE_ACK_F |
-				       RX_DACK_CHANGE_F |
-				       RX_DACK_MODE_V(dack_mode));
-	set_wr_txq(skb, CPL_PRIORITY_ACK, ep->ctrlq_idx);
+	credit_dack = credits | RX_FORCE_ACK_F | RX_DACK_CHANGE_F |
+		      RX_DACK_MODE_V(dack_mode);
+
+	cxgb_mk_rx_data_ack(skb, wrlen, ep->hwtid, ep->ctrlq_idx,
+			    credit_dack);
+
 	c4iw_ofld_send(&ep->com.dev->rdev, skb);
 	return credits;
 }
@@ -1471,7 +1429,7 @@ static int process_mpa_reply(struct c4iw_ep *ep, struct sk_buff *skb)
 	int err;
 	int disconnect = 0;
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 
 	/*
 	 * If we get more than the supported amount of private data
@@ -1498,8 +1456,8 @@ static int process_mpa_reply(struct c4iw_ep *ep, struct sk_buff *skb)
 
 	/* Validate MPA header. */
 	if (mpa->revision > mpa_rev) {
-		printk(KERN_ERR MOD "%s MPA version mismatch. Local = %d,"
-		       " Received = %d\n", __func__, mpa_rev, mpa->revision);
+		pr_err("%s MPA version mismatch. Local = %d, Received = %d\n",
+		       __func__, mpa_rev, mpa->revision);
 		err = -EPROTO;
 		goto err_stop_timer;
 	}
@@ -1555,7 +1513,6 @@ static int process_mpa_reply(struct c4iw_ep *ep, struct sk_buff *skb)
 	 */
 	__state_set(&ep->com, FPDU_MODE);
 	ep->mpa_attr.crc_enabled = (mpa->flags & MPA_CRC) | crc_enabled ? 1 : 0;
-	ep->mpa_attr.recv_marker_enabled = markers_enabled;
 	ep->mpa_attr.xmit_marker_enabled = mpa->flags & MPA_MARKERS ? 1 : 0;
 	ep->mpa_attr.version = mpa->revision;
 	ep->mpa_attr.p2p_type = FW_RI_INIT_P2PTYPE_DISABLED;
@@ -1570,8 +1527,9 @@ static int process_mpa_reply(struct c4iw_ep *ep, struct sk_buff *skb)
 				MPA_V2_IRD_ORD_MASK;
 			resp_ord = ntohs(mpa_v2_params->ord) &
 				MPA_V2_IRD_ORD_MASK;
-			PDBG("%s responder ird %u ord %u ep ird %u ord %u\n",
-			     __func__, resp_ird, resp_ord, ep->ird, ep->ord);
+			pr_debug("%s responder ird %u ord %u ep ird %u ord %u\n",
+				 __func__,
+				 resp_ird, resp_ord, ep->ird, ep->ord);
 
 			/*
 			 * This is a double-check. Ideally, below checks are
@@ -1615,12 +1573,11 @@ static int process_mpa_reply(struct c4iw_ep *ep, struct sk_buff *skb)
 		if (peer2peer)
 			ep->mpa_attr.p2p_type = p2p_type;
 
-	PDBG("%s - crc_enabled=%d, recv_marker_enabled=%d, "
-	     "xmit_marker_enabled=%d, version=%d p2p_type=%d local-p2p_type = "
-	     "%d\n", __func__, ep->mpa_attr.crc_enabled,
-	     ep->mpa_attr.recv_marker_enabled,
-	     ep->mpa_attr.xmit_marker_enabled, ep->mpa_attr.version,
-	     ep->mpa_attr.p2p_type, p2p_type);
+	pr_debug("%s - crc_enabled=%d, recv_marker_enabled=%d, xmit_marker_enabled=%d, version=%d p2p_type=%d local-p2p_type = %d\n",
+		 __func__, ep->mpa_attr.crc_enabled,
+		 ep->mpa_attr.recv_marker_enabled,
+		 ep->mpa_attr.xmit_marker_enabled, ep->mpa_attr.version,
+		 ep->mpa_attr.p2p_type, p2p_type);
 
 	/*
 	 * If responder's RTR does not match with that of initiator, assign
@@ -1655,7 +1612,7 @@ static int process_mpa_reply(struct c4iw_ep *ep, struct sk_buff *skb)
 	 * supports, generate TERM message
 	 */
 	if (rtr_mismatch) {
-		printk(KERN_ERR "%s: RTR mismatch, sending TERM\n", __func__);
+		pr_err("%s: RTR mismatch, sending TERM\n", __func__);
 		attrs.layer_etype = LAYER_MPA | DDP_LLP;
 		attrs.ecode = MPA_NOMATCH_RTR;
 		attrs.next_state = C4IW_QP_STATE_TERMINATE;
@@ -1674,8 +1631,7 @@ static int process_mpa_reply(struct c4iw_ep *ep, struct sk_buff *skb)
 	 * initiator ORD.
 	 */
 	if (insuff_ird) {
-		printk(KERN_ERR "%s: Insufficient IRD, sending TERM\n",
-				__func__);
+		pr_err("%s: Insufficient IRD, sending TERM\n", __func__);
 		attrs.layer_etype = LAYER_MPA | DDP_LLP;
 		attrs.ecode = MPA_INSUFF_IRD;
 		attrs.next_state = C4IW_QP_STATE_TERMINATE;
@@ -1714,7 +1670,7 @@ static int process_mpa_request(struct c4iw_ep *ep, struct sk_buff *skb)
 	struct mpa_v2_conn_params *mpa_v2_params;
 	u16 plen;
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 
 	/*
 	 * If we get more than the supported amount of private data
@@ -1723,7 +1679,7 @@ static int process_mpa_request(struct c4iw_ep *ep, struct sk_buff *skb)
 	if (ep->mpa_pkt_len + skb->len > sizeof(ep->mpa_pkt))
 		goto err_stop_timer;
 
-	PDBG("%s enter (%s line %u)\n", __func__, __FILE__, __LINE__);
+	pr_debug("%s enter (%s line %u)\n", __func__, __FILE__, __LINE__);
 
 	/*
 	 * Copy the new data into our accumulation buffer.
@@ -1739,15 +1695,15 @@ static int process_mpa_request(struct c4iw_ep *ep, struct sk_buff *skb)
 	if (ep->mpa_pkt_len < sizeof(*mpa))
 		return 0;
 
-	PDBG("%s enter (%s line %u)\n", __func__, __FILE__, __LINE__);
+	pr_debug("%s enter (%s line %u)\n", __func__, __FILE__, __LINE__);
 	mpa = (struct mpa_message *) ep->mpa_pkt;
 
 	/*
 	 * Validate MPA Header.
 	 */
 	if (mpa->revision > mpa_rev) {
-		printk(KERN_ERR MOD "%s MPA version mismatch. Local = %d,"
-		       " Received = %d\n", __func__, mpa_rev, mpa->revision);
+		pr_err("%s MPA version mismatch. Local = %d, Received = %d\n",
+		       __func__, mpa_rev, mpa->revision);
 		goto err_stop_timer;
 	}
 
@@ -1796,10 +1752,14 @@ static int process_mpa_request(struct c4iw_ep *ep, struct sk_buff *skb)
 				(ep->mpa_pkt + sizeof(*mpa));
 			ep->ird = ntohs(mpa_v2_params->ird) &
 				MPA_V2_IRD_ORD_MASK;
+			ep->ird = min_t(u32, ep->ird,
+					cur_max_read_depth(ep->com.dev));
 			ep->ord = ntohs(mpa_v2_params->ord) &
 				MPA_V2_IRD_ORD_MASK;
-			PDBG("%s initiator ird %u ord %u\n", __func__, ep->ird,
-			     ep->ord);
+			ep->ord = min_t(u32, ep->ord,
+					cur_max_read_depth(ep->com.dev));
+			pr_debug("%s initiator ird %u ord %u\n",
+				 __func__, ep->ird, ep->ord);
 			if (ntohs(mpa_v2_params->ird) & MPA_V2_PEER2PEER_MODEL)
 				if (peer2peer) {
 					if (ntohs(mpa_v2_params->ord) &
@@ -1816,11 +1776,11 @@ static int process_mpa_request(struct c4iw_ep *ep, struct sk_buff *skb)
 		if (peer2peer)
 			ep->mpa_attr.p2p_type = p2p_type;
 
-	PDBG("%s - crc_enabled=%d, recv_marker_enabled=%d, "
-	     "xmit_marker_enabled=%d, version=%d p2p_type=%d\n", __func__,
-	     ep->mpa_attr.crc_enabled, ep->mpa_attr.recv_marker_enabled,
-	     ep->mpa_attr.xmit_marker_enabled, ep->mpa_attr.version,
-	     ep->mpa_attr.p2p_type);
+	pr_debug("%s - crc_enabled=%d, recv_marker_enabled=%d, xmit_marker_enabled=%d, version=%d p2p_type=%d\n",
+		 __func__,
+		 ep->mpa_attr.crc_enabled, ep->mpa_attr.recv_marker_enabled,
+		 ep->mpa_attr.xmit_marker_enabled, ep->mpa_attr.version,
+		 ep->mpa_attr.p2p_type);
 
 	__state_set(&ep->com, MPA_REQ_RCVD);
 
@@ -1856,25 +1816,26 @@ static int rx_data(struct c4iw_dev *dev, struct sk_buff *skb)
 	ep = get_ep_from_tid(dev, tid);
 	if (!ep)
 		return 0;
-	PDBG("%s ep %p tid %u dlen %u\n", __func__, ep, ep->hwtid, dlen);
+	pr_debug("%s ep %p tid %u dlen %u\n", __func__, ep, ep->hwtid, dlen);
 	skb_pull(skb, sizeof(*hdr));
 	skb_trim(skb, dlen);
 	mutex_lock(&ep->com.mutex);
 
-	/* update RX credits */
-	update_rx_credits(ep, dlen);
-
 	switch (ep->com.state) {
 	case MPA_REQ_SENT:
+		update_rx_credits(ep, dlen);
 		ep->rcv_seq += dlen;
 		disconnect = process_mpa_reply(ep, skb);
 		break;
 	case MPA_REQ_WAIT:
+		update_rx_credits(ep, dlen);
 		ep->rcv_seq += dlen;
 		disconnect = process_mpa_request(ep, skb);
 		break;
 	case FPDU_MODE: {
 		struct c4iw_qp_attributes attrs;
+
+		update_rx_credits(ep, dlen);
 		BUG_ON(!ep->com.qp);
 		if (status)
 			pr_err("%s Unexpected streaming data." \
@@ -1906,10 +1867,10 @@ static int abort_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 
 	ep = get_ep_from_tid(dev, tid);
 	if (!ep) {
-		printk(KERN_WARNING MOD "Abort rpl to freed endpoint\n");
+		pr_warn("Abort rpl to freed endpoint\n");
 		return 0;
 	}
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	mutex_lock(&ep->com.mutex);
 	switch (ep->com.state) {
 	case ABORTING:
@@ -1918,8 +1879,7 @@ static int abort_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 		release = 1;
 		break;
 	default:
-		printk(KERN_ERR "%s ep %p state %d\n",
-		     __func__, ep, ep->com.state);
+		pr_err("%s ep %p state %d\n", __func__, ep, ep->com.state);
 		break;
 	}
 	mutex_unlock(&ep->com.mutex);
@@ -1935,13 +1895,12 @@ static int send_fw_act_open_req(struct c4iw_ep *ep, unsigned int atid)
 	struct sk_buff *skb;
 	struct fw_ofld_connection_wr *req;
 	unsigned int mtu_idx;
-	int wscale;
+	u32 wscale;
 	struct sockaddr_in *sin;
 	int win;
 
 	skb = get_skb(NULL, sizeof(*req), GFP_KERNEL);
-	req = (struct fw_ofld_connection_wr *)__skb_put(skb, sizeof(*req));
-	memset(req, 0, sizeof(*req));
+	req = __skb_put_zero(skb, sizeof(*req));
 	req->op_compl = htonl(WR_OP_V(FW_OFLD_CONNECTION_WR));
 	req->len16_pkd = htonl(FW_WR_LEN16_V(DIV_ROUND_UP(sizeof(*req), 16)));
 	req->le.filter = cpu_to_be32(cxgb4_select_ntuple(
@@ -1960,10 +1919,10 @@ static int send_fw_act_open_req(struct c4iw_ep *ep, unsigned int atid)
 			htons(FW_OFLD_CONNECTION_WR_CPLRXDATAACK_F);
 	req->tcb.tx_max = (__force __be32) jiffies;
 	req->tcb.rcv_adv = htons(1);
-	best_mtu(ep->com.dev->rdev.lldi.mtus, ep->mtu, &mtu_idx,
-		 enable_tcp_timestamps,
-		 (AF_INET == ep->com.remote_addr.ss_family) ? 0 : 1);
-	wscale = compute_wscale(rcv_win);
+	cxgb_best_mtu(ep->com.dev->rdev.lldi.mtus, ep->mtu, &mtu_idx,
+		      enable_tcp_timestamps,
+		      (ep->com.remote_addr.ss_family == AF_INET) ? 0 : 1);
+	wscale = cxgb_compute_wscale(rcv_win);
 
 	/*
 	 * Specify the largest window that will fit in opt0. The
@@ -2004,21 +1963,17 @@ static int send_fw_act_open_req(struct c4iw_ep *ep, unsigned int atid)
 }
 
 /*
- * Return whether a failed active open has allocated a TID
+ * Some of the error codes above implicitly indicate that there is no TID
+ * allocated with the result of an ACT_OPEN.  We use this predicate to make
+ * that explicit.
  */
 static inline int act_open_has_tid(int status)
 {
-	return status != CPL_ERR_TCAM_FULL && status != CPL_ERR_CONN_EXIST &&
-	       status != CPL_ERR_ARP_MISS;
-}
-
-/* Returns whether a CPL status conveys negative advice.
- */
-static int is_neg_adv(unsigned int status)
-{
-	return status == CPL_ERR_RTX_NEG_ADVICE ||
-	       status == CPL_ERR_PERSIST_NEG_ADVICE ||
-	       status == CPL_ERR_KEEPALV_NEG_ADVICE;
+	return (status != CPL_ERR_TCAM_PARITY &&
+		status != CPL_ERR_TCAM_MISS &&
+		status != CPL_ERR_TCAM_FULL &&
+		status != CPL_ERR_CONN_EXIST_SYNRECV &&
+		status != CPL_ERR_CONN_EXIST);
 }
 
 static char *neg_adv_str(unsigned int status)
@@ -2039,7 +1994,8 @@ static void set_tcp_window(struct c4iw_ep *ep, struct port_info *pi)
 {
 	ep->snd_win = snd_win;
 	ep->rcv_win = rcv_win;
-	PDBG("%s snd_win %d rcv_win %d\n", __func__, ep->snd_win, ep->rcv_win);
+	pr_debug("%s snd_win %d rcv_win %d\n",
+		 __func__, ep->snd_win, ep->rcv_win);
 }
 
 #define ACT_OPEN_RETRY_COUNT 2
@@ -2077,8 +2033,10 @@ static int import_ep(struct c4iw_ep *ep, int iptype, __u8 *peer_ip,
 		}
 		ep->l2t = cxgb4_l2t_get(cdev->rdev.lldi.l2t,
 					n, pdev, rt_tos2priority(tos));
-		if (!ep->l2t)
+		if (!ep->l2t) {
+			dev_put(pdev);
 			goto out;
+		}
 		ep->mtu = pdev->mtu;
 		ep->tx_chan = cxgb4_port_chan(pdev);
 		ep->smac_idx = cxgb4_tp_smt_idx(adapter_type,
@@ -2130,6 +2088,7 @@ out:
 static int c4iw_reconnect(struct c4iw_ep *ep)
 {
 	int err = 0;
+	int size = 0;
 	struct sockaddr_in *laddr = (struct sockaddr_in *)
 				    &ep->com.cm_id->m_local_addr;
 	struct sockaddr_in *raddr = (struct sockaddr_in *)
@@ -2141,16 +2100,31 @@ static int c4iw_reconnect(struct c4iw_ep *ep)
 	int iptype;
 	__u8 *ra;
 
-	PDBG("%s qp %p cm_id %p\n", __func__, ep->com.qp, ep->com.cm_id);
+	pr_debug("%s qp %p cm_id %p\n", __func__, ep->com.qp, ep->com.cm_id);
 	init_timer(&ep->timer);
 	c4iw_init_wr_wait(&ep->com.wr_wait);
+
+	/* When MPA revision is different on nodes, the node with MPA_rev=2
+	 * tries to reconnect with MPA_rev 1 for the same EP through
+	 * c4iw_reconnect(), where the same EP is assigned with new tid for
+	 * further connection establishment. As we are using the same EP pointer
+	 * for reconnect, few skbs are used during the previous c4iw_connect(),
+	 * which leaves the EP with inadequate skbs for further
+	 * c4iw_reconnect(), Further causing an assert BUG_ON() due to empty
+	 * skb_list() during peer_abort(). Allocate skbs which is already used.
+	 */
+	size = (CN_MAX_CON_BUF - skb_queue_len(&ep->com.ep_skb_list));
+	if (alloc_ep_skb_list(&ep->com.ep_skb_list, size)) {
+		err = -ENOMEM;
+		goto fail1;
+	}
 
 	/*
 	 * Allocate an active TID to initiate a TCP connection.
 	 */
 	ep->atid = cxgb4_alloc_atid(ep->com.dev->rdev.lldi.tids, ep);
 	if (ep->atid == -1) {
-		pr_err("%s - cannot alloc atid.\n", __func__);
+		pr_err("%s - cannot alloc atid\n", __func__);
 		err = -ENOMEM;
 		goto fail2;
 	}
@@ -2158,21 +2132,26 @@ static int c4iw_reconnect(struct c4iw_ep *ep)
 
 	/* find a route */
 	if (ep->com.cm_id->m_local_addr.ss_family == AF_INET) {
-		ep->dst = find_route(ep->com.dev, laddr->sin_addr.s_addr,
-				     raddr->sin_addr.s_addr, laddr->sin_port,
-				     raddr->sin_port, ep->com.cm_id->tos);
+		ep->dst = cxgb_find_route(&ep->com.dev->rdev.lldi, get_real_dev,
+					  laddr->sin_addr.s_addr,
+					  raddr->sin_addr.s_addr,
+					  laddr->sin_port,
+					  raddr->sin_port, ep->com.cm_id->tos);
 		iptype = 4;
 		ra = (__u8 *)&raddr->sin_addr;
 	} else {
-		ep->dst = find_route6(ep->com.dev, laddr6->sin6_addr.s6_addr,
-				      raddr6->sin6_addr.s6_addr,
-				      laddr6->sin6_port, raddr6->sin6_port, 0,
-				      raddr6->sin6_scope_id);
+		ep->dst = cxgb_find_route6(&ep->com.dev->rdev.lldi,
+					   get_real_dev,
+					   laddr6->sin6_addr.s6_addr,
+					   raddr6->sin6_addr.s6_addr,
+					   laddr6->sin6_port,
+					   raddr6->sin6_port, 0,
+					   raddr6->sin6_scope_id);
 		iptype = 6;
 		ra = (__u8 *)&raddr6->sin6_addr;
 	}
 	if (!ep->dst) {
-		pr_err("%s - cannot find route.\n", __func__);
+		pr_err("%s - cannot find route\n", __func__);
 		err = -EHOSTUNREACH;
 		goto fail3;
 	}
@@ -2180,13 +2159,13 @@ static int c4iw_reconnect(struct c4iw_ep *ep)
 			ep->com.dev->rdev.lldi.adapter_type,
 			ep->com.cm_id->tos);
 	if (err) {
-		pr_err("%s - cannot alloc l2e.\n", __func__);
+		pr_err("%s - cannot alloc l2e\n", __func__);
 		goto fail4;
 	}
 
-	PDBG("%s txq_idx %u tx_chan %u smac_idx %u rss_qid %u l2t_idx %u\n",
-	     __func__, ep->txq_idx, ep->tx_chan, ep->smac_idx, ep->rss_qid,
-	     ep->l2t->idx);
+	pr_debug("%s txq_idx %u tx_chan %u smac_idx %u rss_qid %u l2t_idx %u\n",
+		 __func__, ep->txq_idx, ep->tx_chan, ep->smac_idx, ep->rss_qid,
+		 ep->l2t->idx);
 
 	state_set(&ep->com, CONNECTING);
 	ep->tos = ep->com.cm_id->tos;
@@ -2210,6 +2189,7 @@ fail2:
 	 * response of 1st connect request.
 	 */
 	connect_reply_upcall(ep, -ECONNRESET);
+fail1:
 	c4iw_put_ep(&ep->com);
 out:
 	return err;
@@ -2235,12 +2215,12 @@ static int act_open_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 	la6 = (struct sockaddr_in6 *)&ep->com.local_addr;
 	ra6 = (struct sockaddr_in6 *)&ep->com.remote_addr;
 
-	PDBG("%s ep %p atid %u status %u errno %d\n", __func__, ep, atid,
-	     status, status2errno(status));
+	pr_debug("%s ep %p atid %u status %u errno %d\n", __func__, ep, atid,
+		 status, status2errno(status));
 
-	if (is_neg_adv(status)) {
-		PDBG("%s Connection problems for atid %u status %u (%s)\n",
-		     __func__, atid, status, neg_adv_str(status));
+	if (cxgb_is_neg_adv(status)) {
+		pr_debug("%s Connection problems for atid %u status %u (%s)\n",
+			 __func__, atid, status, neg_adv_str(status));
 		ep->stats.connect_neg_adv++;
 		mutex_lock(&dev->rdev.stats.lock);
 		dev->rdev.stats.neg_adv++;
@@ -2317,7 +2297,8 @@ fail:
 				   (const u32 *)&sin6->sin6_addr.s6_addr, 1);
 	}
 	if (status && act_open_has_tid(status))
-		cxgb4_remove_tid(ep->com.dev->rdev.lldi.tids, 0, GET_TID(rpl));
+		cxgb4_remove_tid(ep->com.dev->rdev.lldi.tids, 0, GET_TID(rpl),
+				 ep->com.local_addr.ss_family);
 
 	remove_handle(ep->com.dev, &ep->com.dev->atid_idr, atid);
 	cxgb4_free_atid(t, atid);
@@ -2335,11 +2316,11 @@ static int pass_open_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 	struct c4iw_listen_ep *ep = get_ep_from_stid(dev, stid);
 
 	if (!ep) {
-		PDBG("%s stid %d lookup failure!\n", __func__, stid);
+		pr_debug("%s stid %d lookup failure!\n", __func__, stid);
 		goto out;
 	}
-	PDBG("%s ep %p status %d error %d\n", __func__, ep,
-	     rpl->status, status2errno(rpl->status));
+	pr_debug("%s ep %p status %d error %d\n", __func__, ep,
+		 rpl->status, status2errno(rpl->status));
 	c4iw_wake_up(&ep->com.wr_wait, status2errno(rpl->status));
 	c4iw_put_ep(&ep->com);
 out:
@@ -2352,7 +2333,7 @@ static int close_listsrv_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 	unsigned int stid = GET_TID(rpl);
 	struct c4iw_listen_ep *ep = get_ep_from_stid(dev, stid);
 
-	PDBG("%s ep %p\n", __func__, ep);
+	pr_debug("%s ep %p\n", __func__, ep);
 	c4iw_wake_up(&ep->com.wr_wait, status2errno(rpl->status));
 	c4iw_put_ep(&ep->com);
 	return 0;
@@ -2365,12 +2346,12 @@ static int accept_cr(struct c4iw_ep *ep, struct sk_buff *skb,
 	unsigned int mtu_idx;
 	u64 opt0;
 	u32 opt2;
-	int wscale;
+	u32 wscale;
 	struct cpl_t5_pass_accept_rpl *rpl5 = NULL;
 	int win;
 	enum chip_type adapter_type = ep->com.dev->rdev.lldi.adapter_type;
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	BUG_ON(skb_cloned(skb));
 
 	skb_get(skb);
@@ -2386,10 +2367,10 @@ static int accept_cr(struct c4iw_ep *ep, struct sk_buff *skb,
 	OPCODE_TID(rpl) = cpu_to_be32(MK_OPCODE_TID(CPL_PASS_ACCEPT_RPL,
 						    ep->hwtid));
 
-	best_mtu(ep->com.dev->rdev.lldi.mtus, ep->mtu, &mtu_idx,
-		 enable_tcp_timestamps && req->tcpopt.tstamp,
-		 (AF_INET == ep->com.remote_addr.ss_family) ? 0 : 1);
-	wscale = compute_wscale(rcv_win);
+	cxgb_best_mtu(ep->com.dev->rdev.lldi.mtus, ep->mtu, &mtu_idx,
+		      enable_tcp_timestamps && req->tcpopt.tstamp,
+		      (ep->com.remote_addr.ss_family == AF_INET) ? 0 : 1);
+	wscale = cxgb_compute_wscale(rcv_win);
 
 	/*
 	 * Specify the largest window that will fit in opt0. The
@@ -2441,7 +2422,7 @@ static int accept_cr(struct c4iw_ep *ep, struct sk_buff *skb,
 		if (peer2peer)
 			isn += 4;
 		rpl5->iss = cpu_to_be32(isn);
-		PDBG("%s iss %u\n", __func__, be32_to_cpu(rpl5->iss));
+		pr_debug("%s iss %u\n", __func__, be32_to_cpu(rpl5->iss));
 	}
 
 	rpl->opt0 = cpu_to_be64(opt0);
@@ -2454,46 +2435,10 @@ static int accept_cr(struct c4iw_ep *ep, struct sk_buff *skb,
 
 static void reject_cr(struct c4iw_dev *dev, u32 hwtid, struct sk_buff *skb)
 {
-	PDBG("%s c4iw_dev %p tid %u\n", __func__, dev, hwtid);
+	pr_debug("%s c4iw_dev %p tid %u\n", __func__, dev, hwtid);
 	BUG_ON(skb_cloned(skb));
 	skb_trim(skb, sizeof(struct cpl_tid_release));
 	release_tid(&dev->rdev, hwtid, skb);
-	return;
-}
-
-static void get_4tuple(struct cpl_pass_accept_req *req, enum chip_type type,
-		       int *iptype, __u8 *local_ip, __u8 *peer_ip,
-		       __be16 *local_port, __be16 *peer_port)
-{
-	int eth_len = (CHELSIO_CHIP_VERSION(type) <= CHELSIO_T5) ?
-		      ETH_HDR_LEN_G(be32_to_cpu(req->hdr_len)) :
-		      T6_ETH_HDR_LEN_G(be32_to_cpu(req->hdr_len));
-	int ip_len = (CHELSIO_CHIP_VERSION(type) <= CHELSIO_T5) ?
-		     IP_HDR_LEN_G(be32_to_cpu(req->hdr_len)) :
-		     T6_IP_HDR_LEN_G(be32_to_cpu(req->hdr_len));
-	struct iphdr *ip = (struct iphdr *)((u8 *)(req + 1) + eth_len);
-	struct ipv6hdr *ip6 = (struct ipv6hdr *)((u8 *)(req + 1) + eth_len);
-	struct tcphdr *tcp = (struct tcphdr *)
-			     ((u8 *)(req + 1) + eth_len + ip_len);
-
-	if (ip->version == 4) {
-		PDBG("%s saddr 0x%x daddr 0x%x sport %u dport %u\n", __func__,
-		     ntohl(ip->saddr), ntohl(ip->daddr), ntohs(tcp->source),
-		     ntohs(tcp->dest));
-		*iptype = 4;
-		memcpy(peer_ip, &ip->saddr, 4);
-		memcpy(local_ip, &ip->daddr, 4);
-	} else {
-		PDBG("%s saddr %pI6 daddr %pI6 sport %u dport %u\n", __func__,
-		     ip6->saddr.s6_addr, ip6->daddr.s6_addr, ntohs(tcp->source),
-		     ntohs(tcp->dest));
-		*iptype = 6;
-		memcpy(peer_ip, ip6->saddr.s6_addr, 16);
-		memcpy(local_ip, ip6->daddr.s6_addr, 16);
-	}
-	*peer_port = tcp->source;
-	*local_port = tcp->dest;
-
 	return;
 }
 
@@ -2516,47 +2461,47 @@ static int pass_accept_req(struct c4iw_dev *dev, struct sk_buff *skb)
 
 	parent_ep = (struct c4iw_ep *)get_ep_from_stid(dev, stid);
 	if (!parent_ep) {
-		PDBG("%s connect request on invalid stid %d\n", __func__, stid);
+		pr_debug("%s connect request on invalid stid %d\n",
+			 __func__, stid);
 		goto reject;
 	}
 
 	if (state_read(&parent_ep->com) != LISTEN) {
-		PDBG("%s - listening ep not in LISTEN\n", __func__);
+		pr_debug("%s - listening ep not in LISTEN\n", __func__);
 		goto reject;
 	}
 
-	get_4tuple(req, parent_ep->com.dev->rdev.lldi.adapter_type, &iptype,
-		   local_ip, peer_ip, &local_port, &peer_port);
+	cxgb_get_4tuple(req, parent_ep->com.dev->rdev.lldi.adapter_type,
+			&iptype, local_ip, peer_ip, &local_port, &peer_port);
 
 	/* Find output route */
 	if (iptype == 4)  {
-		PDBG("%s parent ep %p hwtid %u laddr %pI4 raddr %pI4 lport %d rport %d peer_mss %d\n"
-		     , __func__, parent_ep, hwtid,
-		     local_ip, peer_ip, ntohs(local_port),
-		     ntohs(peer_port), peer_mss);
-		dst = find_route(dev, *(__be32 *)local_ip, *(__be32 *)peer_ip,
-				 local_port, peer_port,
-				 tos);
+		pr_debug("%s parent ep %p hwtid %u laddr %pI4 raddr %pI4 lport %d rport %d peer_mss %d\n"
+			 , __func__, parent_ep, hwtid,
+			 local_ip, peer_ip, ntohs(local_port),
+			 ntohs(peer_port), peer_mss);
+		dst = cxgb_find_route(&dev->rdev.lldi, get_real_dev,
+				      *(__be32 *)local_ip, *(__be32 *)peer_ip,
+				      local_port, peer_port, tos);
 	} else {
-		PDBG("%s parent ep %p hwtid %u laddr %pI6 raddr %pI6 lport %d rport %d peer_mss %d\n"
-		     , __func__, parent_ep, hwtid,
-		     local_ip, peer_ip, ntohs(local_port),
-		     ntohs(peer_port), peer_mss);
-		dst = find_route6(dev, local_ip, peer_ip, local_port, peer_port,
-				  PASS_OPEN_TOS_G(ntohl(req->tos_stid)),
-				  ((struct sockaddr_in6 *)
-				  &parent_ep->com.local_addr)->sin6_scope_id);
+		pr_debug("%s parent ep %p hwtid %u laddr %pI6 raddr %pI6 lport %d rport %d peer_mss %d\n"
+			 , __func__, parent_ep, hwtid,
+			 local_ip, peer_ip, ntohs(local_port),
+			 ntohs(peer_port), peer_mss);
+		dst = cxgb_find_route6(&dev->rdev.lldi, get_real_dev,
+				local_ip, peer_ip, local_port, peer_port,
+				PASS_OPEN_TOS_G(ntohl(req->tos_stid)),
+				((struct sockaddr_in6 *)
+				 &parent_ep->com.local_addr)->sin6_scope_id);
 	}
 	if (!dst) {
-		printk(KERN_ERR MOD "%s - failed to find dst entry!\n",
-		       __func__);
+		pr_err("%s - failed to find dst entry!\n", __func__);
 		goto reject;
 	}
 
 	child_ep = alloc_ep(sizeof(*child_ep), GFP_KERNEL);
 	if (!child_ep) {
-		printk(KERN_ERR MOD "%s - failed to allocate ep entry!\n",
-		       __func__);
+		pr_err("%s - failed to allocate ep entry!\n", __func__);
 		dst_release(dst);
 		goto reject;
 	}
@@ -2564,17 +2509,21 @@ static int pass_accept_req(struct c4iw_dev *dev, struct sk_buff *skb)
 	err = import_ep(child_ep, iptype, peer_ip, dst, dev, false,
 			parent_ep->com.dev->rdev.lldi.adapter_type, tos);
 	if (err) {
-		printk(KERN_ERR MOD "%s - failed to allocate l2t entry!\n",
-		       __func__);
+		pr_err("%s - failed to allocate l2t entry!\n", __func__);
 		dst_release(dst);
 		kfree(child_ep);
 		goto reject;
 	}
 
-	hdrs = sizeof(struct iphdr) + sizeof(struct tcphdr) +
+	hdrs = ((iptype == 4) ? sizeof(struct iphdr) : sizeof(struct ipv6hdr)) +
+	       sizeof(struct tcphdr) +
 	       ((enable_tcp_timestamps && req->tcpopt.tstamp) ? 12 : 0);
 	if (peer_mss && child_ep->mtu > (peer_mss + hdrs))
 		child_ep->mtu = peer_mss + hdrs;
+
+	skb_queue_head_init(&child_ep->com.ep_skb_list);
+	if (alloc_ep_skb_list(&child_ep->com.ep_skb_list, CN_MAX_CON_BUF))
+		goto fail;
 
 	state_set(&child_ep->com, CONNECTING);
 	child_ep->com.dev = dev;
@@ -2584,18 +2533,18 @@ static int pass_accept_req(struct c4iw_dev *dev, struct sk_buff *skb)
 		struct sockaddr_in *sin = (struct sockaddr_in *)
 			&child_ep->com.local_addr;
 
-		sin->sin_family = PF_INET;
+		sin->sin_family = AF_INET;
 		sin->sin_port = local_port;
 		sin->sin_addr.s_addr = *(__be32 *)local_ip;
 
 		sin = (struct sockaddr_in *)&child_ep->com.local_addr;
-		sin->sin_family = PF_INET;
+		sin->sin_family = AF_INET;
 		sin->sin_port = ((struct sockaddr_in *)
 				 &parent_ep->com.local_addr)->sin_port;
 		sin->sin_addr.s_addr = *(__be32 *)local_ip;
 
 		sin = (struct sockaddr_in *)&child_ep->com.remote_addr;
-		sin->sin_family = PF_INET;
+		sin->sin_family = AF_INET;
 		sin->sin_port = peer_port;
 		sin->sin_addr.s_addr = *(__be32 *)peer_ip;
 	} else {
@@ -2622,11 +2571,12 @@ static int pass_accept_req(struct c4iw_dev *dev, struct sk_buff *skb)
 	child_ep->dst = dst;
 	child_ep->hwtid = hwtid;
 
-	PDBG("%s tx_chan %u smac_idx %u rss_qid %u\n", __func__,
-	     child_ep->tx_chan, child_ep->smac_idx, child_ep->rss_qid);
+	pr_debug("%s tx_chan %u smac_idx %u rss_qid %u\n", __func__,
+		 child_ep->tx_chan, child_ep->smac_idx, child_ep->rss_qid);
 
 	init_timer(&child_ep->timer);
-	cxgb4_insert_tid(t, child_ep, hwtid);
+	cxgb4_insert_tid(t, child_ep, hwtid,
+			 child_ep->com.local_addr.ss_family);
 	insert_ep_tid(child_ep);
 	if (accept_cr(child_ep, skb, req)) {
 		c4iw_put_ep(&parent_ep->com);
@@ -2640,6 +2590,8 @@ static int pass_accept_req(struct c4iw_dev *dev, struct sk_buff *skb)
 			       (const u32 *)&sin6->sin6_addr.s6_addr, 1);
 	}
 	goto out;
+fail:
+	c4iw_put_ep(&child_ep->com);
 reject:
 	reject_cr(dev, hwtid, skb);
 	if (parent_ep)
@@ -2656,12 +2608,12 @@ static int pass_establish(struct c4iw_dev *dev, struct sk_buff *skb)
 	int ret;
 
 	ep = get_ep_from_tid(dev, tid);
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	ep->snd_seq = be32_to_cpu(req->snd_isn);
 	ep->rcv_seq = be32_to_cpu(req->rcv_isn);
 
-	PDBG("%s ep %p hwtid %u tcp_opt 0x%02x\n", __func__, ep, tid,
-	     ntohs(req->tcp_opt));
+	pr_debug("%s ep %p hwtid %u tcp_opt 0x%02x\n", __func__, ep, tid,
+		 ntohs(req->tcp_opt));
 
 	set_emss(ep, ntohs(req->tcp_opt));
 
@@ -2670,7 +2622,7 @@ static int pass_establish(struct c4iw_dev *dev, struct sk_buff *skb)
 	ep->com.state = MPA_REQ_WAIT;
 	start_ep_timer(ep);
 	set_bit(PASS_ESTAB, &ep->com.history);
-	ret = send_flowc(ep, skb);
+	ret = send_flowc(ep);
 	mutex_unlock(&ep->com.mutex);
 	if (ret)
 		c4iw_ep_disconnect(ep, 1, GFP_KERNEL);
@@ -2693,7 +2645,7 @@ static int peer_close(struct c4iw_dev *dev, struct sk_buff *skb)
 	if (!ep)
 		return 0;
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	dst_confirm(ep->dst);
 
 	set_bit(PEER_CLOSE, &ep->com.history);
@@ -2715,12 +2667,12 @@ static int peer_close(struct c4iw_dev *dev, struct sk_buff *skb)
 		 * in rdma connection migration (see c4iw_accept_cr()).
 		 */
 		__state_set(&ep->com, CLOSING);
-		PDBG("waking up ep %p tid %u\n", ep, ep->hwtid);
+		pr_debug("waking up ep %p tid %u\n", ep, ep->hwtid);
 		c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
 		break;
 	case MPA_REP_SENT:
 		__state_set(&ep->com, CLOSING);
-		PDBG("waking up ep %p tid %u\n", ep, ep->hwtid);
+		pr_debug("waking up ep %p tid %u\n", ep, ep->hwtid);
 		c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
 		break;
 	case FPDU_MODE:
@@ -2772,29 +2724,29 @@ static int peer_abort(struct c4iw_dev *dev, struct sk_buff *skb)
 {
 	struct cpl_abort_req_rss *req = cplhdr(skb);
 	struct c4iw_ep *ep;
-	struct cpl_abort_rpl *rpl;
 	struct sk_buff *rpl_skb;
 	struct c4iw_qp_attributes attrs;
 	int ret;
 	int release = 0;
 	unsigned int tid = GET_TID(req);
+	u32 len = roundup(sizeof(struct cpl_abort_rpl), 16);
 
 	ep = get_ep_from_tid(dev, tid);
 	if (!ep)
 		return 0;
 
-	if (is_neg_adv(req->status)) {
-		PDBG("%s Negative advice on abort- tid %u status %d (%s)\n",
-		     __func__, ep->hwtid, req->status,
-		     neg_adv_str(req->status));
+	if (cxgb_is_neg_adv(req->status)) {
+		pr_debug("%s Negative advice on abort- tid %u status %d (%s)\n",
+			 __func__, ep->hwtid, req->status,
+			 neg_adv_str(req->status));
 		ep->stats.abort_neg_adv++;
 		mutex_lock(&dev->rdev.stats.lock);
 		dev->rdev.stats.neg_adv++;
 		mutex_unlock(&dev->rdev.stats.lock);
 		goto deref_ep;
 	}
-	PDBG("%s ep %p tid %u state %u\n", __func__, ep, ep->hwtid,
-	     ep->com.state);
+	pr_debug("%s ep %p tid %u state %u\n", __func__, ep, ep->hwtid,
+		 ep->com.state);
 	set_bit(PEER_ABORT, &ep->com.history);
 
 	/*
@@ -2826,8 +2778,8 @@ static int peer_abort(struct c4iw_dev *dev, struct sk_buff *skb)
 			 * do some housekeeping so as to re-initiate the
 			 * connection
 			 */
-			PDBG("%s: mpa_rev=%d. Retrying with mpav1\n", __func__,
-			     mpa_rev);
+			pr_debug("%s: mpa_rev=%d. Retrying with mpav1\n",
+				 __func__, mpa_rev);
 			ep->retry_with_mpa_v1 = 1;
 		}
 		break;
@@ -2846,16 +2798,14 @@ static int peer_abort(struct c4iw_dev *dev, struct sk_buff *skb)
 				     ep->com.qp, C4IW_QP_ATTR_NEXT_STATE,
 				     &attrs, 1);
 			if (ret)
-				printk(KERN_ERR MOD
-				       "%s - qp <- error failed!\n",
-				       __func__);
+				pr_err("%s - qp <- error failed!\n", __func__);
 		}
 		peer_abort_upcall(ep);
 		break;
 	case ABORTING:
 		break;
 	case DEAD:
-		PDBG("%s PEER_ABORT IN DEAD STATE!!!!\n", __func__);
+		pr_debug("%s PEER_ABORT IN DEAD STATE!!!!\n", __func__);
 		mutex_unlock(&ep->com.mutex);
 		goto deref_ep;
 	default:
@@ -2871,18 +2821,14 @@ static int peer_abort(struct c4iw_dev *dev, struct sk_buff *skb)
 	}
 	mutex_unlock(&ep->com.mutex);
 
-	rpl_skb = get_skb(skb, sizeof(*rpl), GFP_KERNEL);
-	if (!rpl_skb) {
-		printk(KERN_ERR MOD "%s - cannot allocate skb!\n",
-		       __func__);
+	rpl_skb = skb_dequeue(&ep->com.ep_skb_list);
+	if (WARN_ON(!rpl_skb)) {
 		release = 1;
 		goto out;
 	}
-	set_wr_txq(skb, CPL_PRIORITY_DATA, ep->txq_idx);
-	rpl = (struct cpl_abort_rpl *) skb_put(rpl_skb, sizeof(*rpl));
-	INIT_TP_WR(rpl, ep->hwtid);
-	OPCODE_TID(rpl) = cpu_to_be32(MK_OPCODE_TID(CPL_ABORT_RPL, ep->hwtid));
-	rpl->cmd = CPL_ABORT_NO_RST;
+
+	cxgb_mk_abort_rpl(rpl_skb, len, ep->hwtid, ep->txq_idx);
+
 	c4iw_ofld_send(&ep->com.dev->rdev, rpl_skb);
 out:
 	if (release)
@@ -2898,7 +2844,8 @@ out:
 					1);
 		}
 		remove_handle(ep->com.dev, &ep->com.dev->hwtid_idr, ep->hwtid);
-		cxgb4_remove_tid(ep->com.dev->rdev.lldi.tids, 0, ep->hwtid);
+		cxgb4_remove_tid(ep->com.dev->rdev.lldi.tids, 0, ep->hwtid,
+				 ep->com.local_addr.ss_family);
 		dst_release(ep->dst);
 		cxgb4_l2t_release(ep->l2t);
 		c4iw_reconnect(ep);
@@ -2923,7 +2870,7 @@ static int close_con_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 	if (!ep)
 		return 0;
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 	BUG_ON(!ep);
 
 	/* The cm_id may be null if we failed to connect */
@@ -2971,13 +2918,13 @@ static int terminate(struct c4iw_dev *dev, struct sk_buff *skb)
 	BUG_ON(!ep);
 
 	if (ep && ep->com.qp) {
-		printk(KERN_WARNING MOD "TERM received tid %u qpid %u\n", tid,
-		       ep->com.qp->wq.sq.qid);
+		pr_warn("TERM received tid %u qpid %u\n",
+			tid, ep->com.qp->wq.sq.qid);
 		attrs.next_state = C4IW_QP_STATE_TERMINATE;
 		c4iw_modify_qp(ep->com.qp->rhp, ep->com.qp,
 			       C4IW_QP_ATTR_NEXT_STATE, &attrs, 1);
 	} else
-		printk(KERN_WARNING MOD "TERM received tid %u no ep/qp\n", tid);
+		pr_warn("TERM received tid %u no ep/qp\n", tid);
 	c4iw_put_ep(&ep->com);
 
 	return 0;
@@ -2999,21 +2946,22 @@ static int fw4_ack(struct c4iw_dev *dev, struct sk_buff *skb)
 	ep = get_ep_from_tid(dev, tid);
 	if (!ep)
 		return 0;
-	PDBG("%s ep %p tid %u credits %u\n", __func__, ep, ep->hwtid, credits);
+	pr_debug("%s ep %p tid %u credits %u\n",
+		 __func__, ep, ep->hwtid, credits);
 	if (credits == 0) {
-		PDBG("%s 0 credit ack ep %p tid %u state %u\n",
-		     __func__, ep, ep->hwtid, state_read(&ep->com));
+		pr_debug("%s 0 credit ack ep %p tid %u state %u\n",
+			 __func__, ep, ep->hwtid, state_read(&ep->com));
 		goto out;
 	}
 
 	dst_confirm(ep->dst);
 	if (ep->mpa_skb) {
-		PDBG("%s last streaming msg ack ep %p tid %u state %u "
-		     "initiator %u freeing skb\n", __func__, ep, ep->hwtid,
-		     state_read(&ep->com), ep->mpa_attr.initiator ? 1 : 0);
+		pr_debug("%s last streaming msg ack ep %p tid %u state %u initiator %u freeing skb\n",
+			 __func__, ep, ep->hwtid,
+			 state_read(&ep->com), ep->mpa_attr.initiator ? 1 : 0);
+		mutex_lock(&ep->com.mutex);
 		kfree_skb(ep->mpa_skb);
 		ep->mpa_skb = NULL;
-		mutex_lock(&ep->com.mutex);
 		if (test_bit(STOP_MPA_TIMER, &ep->com.flags))
 			stop_ep_timer(ep);
 		mutex_unlock(&ep->com.mutex);
@@ -3025,10 +2973,10 @@ out:
 
 int c4iw_reject_cr(struct iw_cm_id *cm_id, const void *pdata, u8 pdata_len)
 {
-	int err = 0;
-	int disconnect = 0;
+	int abort;
 	struct c4iw_ep *ep = to_ep(cm_id);
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 
 	mutex_lock(&ep->com.mutex);
 	if (ep->com.state != MPA_REQ_RCVD) {
@@ -3038,16 +2986,13 @@ int c4iw_reject_cr(struct iw_cm_id *cm_id, const void *pdata, u8 pdata_len)
 	}
 	set_bit(ULP_REJECT, &ep->com.history);
 	if (mpa_rev == 0)
-		disconnect = 2;
-	else {
-		err = send_mpa_reject(ep, pdata, pdata_len);
-		disconnect = 1;
-	}
+		abort = 1;
+	else
+		abort = send_mpa_reject(ep, pdata, pdata_len);
 	mutex_unlock(&ep->com.mutex);
-	if (disconnect) {
-		stop_ep_timer(ep);
-		err = c4iw_ep_disconnect(ep, disconnect == 2, GFP_KERNEL);
-	}
+
+	stop_ep_timer(ep);
+	c4iw_ep_disconnect(ep, abort != 0, GFP_KERNEL);
 	c4iw_put_ep(&ep->com);
 	return 0;
 }
@@ -3062,7 +3007,7 @@ int c4iw_accept_cr(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 	struct c4iw_qp *qp = get_qhp(h, conn_param->qpn);
 	int abort = 0;
 
-	PDBG("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
+	pr_debug("%s ep %p tid %u\n", __func__, ep, ep->hwtid);
 
 	mutex_lock(&ep->com.mutex);
 	if (ep->com.state != MPA_REQ_RCVD) {
@@ -3082,7 +3027,7 @@ int c4iw_accept_cr(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 	if (ep->mpa_attr.version == 2 && ep->mpa_attr.enhanced_rdma_conn) {
 		if (conn_param->ord > ep->ird) {
 			if (RELAXED_IRD_NEGOTIATION) {
-				ep->ord = ep->ird;
+				conn_param->ord = ep->ird;
 			} else {
 				ep->ird = conn_param->ird;
 				ep->ord = conn_param->ord;
@@ -3115,7 +3060,7 @@ int c4iw_accept_cr(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 			ep->ird = 1;
 	}
 
-	PDBG("%s %d ird %d ord %d\n", __func__, __LINE__, ep->ird, ep->ord);
+	pr_debug("%s %d ird %d ord %d\n", __func__, __LINE__, ep->ird, ep->ord);
 
 	ep->com.cm_id = cm_id;
 	ref_cm_id(&ep->com);
@@ -3244,10 +3189,17 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 	}
 	ep = alloc_ep(sizeof(*ep), GFP_KERNEL);
 	if (!ep) {
-		printk(KERN_ERR MOD "%s - cannot alloc ep.\n", __func__);
+		pr_err("%s - cannot alloc ep\n", __func__);
 		err = -ENOMEM;
 		goto out;
 	}
+
+	skb_queue_head_init(&ep->com.ep_skb_list);
+	if (alloc_ep_skb_list(&ep->com.ep_skb_list, CN_MAX_CON_BUF)) {
+		err = -ENOMEM;
+		goto fail1;
+	}
+
 	init_timer(&ep->timer);
 	ep->plen = conn_param->private_data_len;
 	if (ep->plen)
@@ -3264,22 +3216,22 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 	ep->com.dev = dev;
 	ep->com.qp = get_qhp(dev, conn_param->qpn);
 	if (!ep->com.qp) {
-		PDBG("%s qpn 0x%x not found!\n", __func__, conn_param->qpn);
+		pr_debug("%s qpn 0x%x not found!\n", __func__, conn_param->qpn);
 		err = -EINVAL;
-		goto fail1;
+		goto fail2;
 	}
 	ref_qp(ep);
-	PDBG("%s qpn 0x%x qp %p cm_id %p\n", __func__, conn_param->qpn,
-	     ep->com.qp, cm_id);
+	pr_debug("%s qpn 0x%x qp %p cm_id %p\n", __func__, conn_param->qpn,
+		 ep->com.qp, cm_id);
 
 	/*
 	 * Allocate an active TID to initiate a TCP connection.
 	 */
 	ep->atid = cxgb4_alloc_atid(dev->rdev.lldi.tids, ep);
 	if (ep->atid == -1) {
-		printk(KERN_ERR MOD "%s - cannot alloc atid.\n", __func__);
+		pr_err("%s - cannot alloc atid\n", __func__);
 		err = -ENOMEM;
-		goto fail1;
+		goto fail2;
 	}
 	insert_handle(dev, &dev->atid_idr, ep, ep->atid);
 
@@ -3303,16 +3255,18 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 		if (raddr->sin_addr.s_addr == htonl(INADDR_ANY)) {
 			err = pick_local_ipaddrs(dev, cm_id);
 			if (err)
-				goto fail1;
+				goto fail2;
 		}
 
 		/* find a route */
-		PDBG("%s saddr %pI4 sport 0x%x raddr %pI4 rport 0x%x\n",
-		     __func__, &laddr->sin_addr, ntohs(laddr->sin_port),
-		     ra, ntohs(raddr->sin_port));
-		ep->dst = find_route(dev, laddr->sin_addr.s_addr,
-				     raddr->sin_addr.s_addr, laddr->sin_port,
-				     raddr->sin_port, cm_id->tos);
+		pr_debug("%s saddr %pI4 sport 0x%x raddr %pI4 rport 0x%x\n",
+			 __func__, &laddr->sin_addr, ntohs(laddr->sin_port),
+			 ra, ntohs(raddr->sin_port));
+		ep->dst = cxgb_find_route(&dev->rdev.lldi, get_real_dev,
+					  laddr->sin_addr.s_addr,
+					  raddr->sin_addr.s_addr,
+					  laddr->sin_port,
+					  raddr->sin_port, cm_id->tos);
 	} else {
 		iptype = 6;
 		ra = (__u8 *)&raddr6->sin6_addr;
@@ -3323,35 +3277,37 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 		if (ipv6_addr_type(&raddr6->sin6_addr) == IPV6_ADDR_ANY) {
 			err = pick_local_ip6addrs(dev, cm_id);
 			if (err)
-				goto fail1;
+				goto fail2;
 		}
 
 		/* find a route */
-		PDBG("%s saddr %pI6 sport 0x%x raddr %pI6 rport 0x%x\n",
-		     __func__, laddr6->sin6_addr.s6_addr,
-		     ntohs(laddr6->sin6_port),
-		     raddr6->sin6_addr.s6_addr, ntohs(raddr6->sin6_port));
-		ep->dst = find_route6(dev, laddr6->sin6_addr.s6_addr,
-				      raddr6->sin6_addr.s6_addr,
-				      laddr6->sin6_port, raddr6->sin6_port, 0,
-				      raddr6->sin6_scope_id);
+		pr_debug("%s saddr %pI6 sport 0x%x raddr %pI6 rport 0x%x\n",
+			 __func__, laddr6->sin6_addr.s6_addr,
+			 ntohs(laddr6->sin6_port),
+			 raddr6->sin6_addr.s6_addr, ntohs(raddr6->sin6_port));
+		ep->dst = cxgb_find_route6(&dev->rdev.lldi, get_real_dev,
+					   laddr6->sin6_addr.s6_addr,
+					   raddr6->sin6_addr.s6_addr,
+					   laddr6->sin6_port,
+					   raddr6->sin6_port, 0,
+					   raddr6->sin6_scope_id);
 	}
 	if (!ep->dst) {
-		printk(KERN_ERR MOD "%s - cannot find route.\n", __func__);
+		pr_err("%s - cannot find route\n", __func__);
 		err = -EHOSTUNREACH;
-		goto fail2;
+		goto fail3;
 	}
 
 	err = import_ep(ep, iptype, ra, ep->dst, ep->com.dev, true,
 			ep->com.dev->rdev.lldi.adapter_type, cm_id->tos);
 	if (err) {
-		printk(KERN_ERR MOD "%s - cannot alloc l2e.\n", __func__);
-		goto fail3;
+		pr_err("%s - cannot alloc l2e\n", __func__);
+		goto fail4;
 	}
 
-	PDBG("%s txq_idx %u tx_chan %u smac_idx %u rss_qid %u l2t_idx %u\n",
-		__func__, ep->txq_idx, ep->tx_chan, ep->smac_idx, ep->rss_qid,
-		ep->l2t->idx);
+	pr_debug("%s txq_idx %u tx_chan %u smac_idx %u rss_qid %u l2t_idx %u\n",
+		 __func__, ep->txq_idx, ep->tx_chan, ep->smac_idx, ep->rss_qid,
+		 ep->l2t->idx);
 
 	state_set(&ep->com, CONNECTING);
 	ep->tos = cm_id->tos;
@@ -3362,13 +3318,15 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 		goto out;
 
 	cxgb4_l2t_release(ep->l2t);
-fail3:
+fail4:
 	dst_release(ep->dst);
-fail2:
+fail3:
 	remove_handle(ep->com.dev, &ep->com.dev->atid_idr, ep->atid);
 	cxgb4_free_atid(ep->com.dev->rdev.lldi.tids, ep->atid);
-fail1:
+fail2:
+	skb_queue_purge(&ep->com.ep_skb_list);
 	deref_cm_id(&ep->com);
+fail1:
 	c4iw_put_ep(&ep->com);
 out:
 	return err;
@@ -3457,11 +3415,12 @@ int c4iw_create_listen(struct iw_cm_id *cm_id, int backlog)
 
 	ep = alloc_ep(sizeof(*ep), GFP_KERNEL);
 	if (!ep) {
-		printk(KERN_ERR MOD "%s - cannot alloc ep.\n", __func__);
+		pr_err("%s - cannot alloc ep\n", __func__);
 		err = -ENOMEM;
 		goto fail1;
 	}
-	PDBG("%s ep %p\n", __func__, ep);
+	skb_queue_head_init(&ep->com.ep_skb_list);
+	pr_debug("%s ep %p\n", __func__, ep);
 	ep->com.cm_id = cm_id;
 	ref_cm_id(&ep->com);
 	ep->com.dev = dev;
@@ -3481,7 +3440,7 @@ int c4iw_create_listen(struct iw_cm_id *cm_id, int backlog)
 					    cm_id->m_local_addr.ss_family, ep);
 
 	if (ep->stid == -1) {
-		printk(KERN_ERR MOD "%s - cannot alloc stid.\n", __func__);
+		pr_err("%s - cannot alloc stid\n", __func__);
 		err = -ENOMEM;
 		goto fail2;
 	}
@@ -3515,7 +3474,7 @@ int c4iw_destroy_listen(struct iw_cm_id *cm_id)
 	int err;
 	struct c4iw_listen_ep *ep = to_listen_ep(cm_id);
 
-	PDBG("%s ep %p\n", __func__, ep);
+	pr_debug("%s ep %p\n", __func__, ep);
 
 	might_sleep();
 	state_set(&ep->com, DEAD);
@@ -3556,8 +3515,8 @@ int c4iw_ep_disconnect(struct c4iw_ep *ep, int abrupt, gfp_t gfp)
 
 	mutex_lock(&ep->com.mutex);
 
-	PDBG("%s ep %p state %s, abrupt %d\n", __func__, ep,
-	     states[ep->com.state], abrupt);
+	pr_debug("%s ep %p state %s, abrupt %d\n", __func__, ep,
+		 states[ep->com.state], abrupt);
 
 	/*
 	 * Ref the ep here in case we have fatal errors causing the
@@ -3577,11 +3536,22 @@ int c4iw_ep_disconnect(struct c4iw_ep *ep, int abrupt, gfp_t gfp)
 	case MPA_REQ_RCVD:
 	case MPA_REP_SENT:
 	case FPDU_MODE:
+	case CONNECTING:
 		close = 1;
 		if (abrupt)
 			ep->com.state = ABORTING;
 		else {
 			ep->com.state = CLOSING;
+
+			/*
+			 * if we close before we see the fw4_ack() then we fix
+			 * up the timer state since we're reusing it.
+			 */
+			if (ep->mpa_skb &&
+			    test_bit(STOP_MPA_TIMER, &ep->com.flags)) {
+				clear_bit(STOP_MPA_TIMER, &ep->com.flags);
+				stop_ep_timer(ep);
+			}
 			start_ep_timer(ep);
 		}
 		set_bit(CLOSE_SENT, &ep->com.flags);
@@ -3599,8 +3569,8 @@ int c4iw_ep_disconnect(struct c4iw_ep *ep, int abrupt, gfp_t gfp)
 	case MORIBUND:
 	case ABORTING:
 	case DEAD:
-		PDBG("%s ignoring disconnect ep %p state %u\n",
-		     __func__, ep, ep->com.state);
+		pr_debug("%s ignoring disconnect ep %p state %u\n",
+			 __func__, ep, ep->com.state);
 		break;
 	default:
 		BUG();
@@ -3611,10 +3581,10 @@ int c4iw_ep_disconnect(struct c4iw_ep *ep, int abrupt, gfp_t gfp)
 		if (abrupt) {
 			set_bit(EP_DISC_ABORT, &ep->com.history);
 			close_complete_upcall(ep, -ECONNRESET);
-			ret = send_abort(ep, NULL, gfp);
+			ret = send_abort(ep);
 		} else {
 			set_bit(EP_DISC_CLOSE, &ep->com.history);
-			ret = send_halfclose(ep, gfp);
+			ret = send_halfclose(ep);
 		}
 		if (ret) {
 			set_bit(EP_DISC_FAIL, &ep->com.history);
@@ -3631,8 +3601,7 @@ int c4iw_ep_disconnect(struct c4iw_ep *ep, int abrupt, gfp_t gfp)
 						     C4IW_QP_ATTR_NEXT_STATE,
 						     &attrs, 1);
 				if (ret)
-					pr_err(MOD
-					       "%s - qp <- error failed!\n",
+					pr_err("%s - qp <- error failed!\n",
 					       __func__);
 			}
 			fatal = 1;
@@ -3705,7 +3674,7 @@ static void passive_ofld_conn_reply(struct c4iw_dev *dev, struct sk_buff *skb,
 	rpl_skb = (struct sk_buff *)(unsigned long)req->cookie;
 	BUG_ON(!rpl_skb);
 	if (req->retval) {
-		PDBG("%s passive open failure %d\n", __func__, req->retval);
+		pr_debug("%s passive open failure %d\n", __func__, req->retval);
 		mutex_lock(&dev->rdev.stats.lock);
 		dev->rdev.stats.pas_ofld_conn_fails++;
 		mutex_unlock(&dev->rdev.stats.lock);
@@ -3779,9 +3748,9 @@ static void build_cpl_pass_accept_req(struct sk_buff *skb, int stid , u8 tos)
 	 */
 	memset(&tmp_opt, 0, sizeof(tmp_opt));
 	tcp_clear_options(&tmp_opt);
-	tcp_parse_options(skb, &tmp_opt, 0, NULL);
+	tcp_parse_options(&init_net, skb, &tmp_opt, 0, NULL);
 
-	req = (struct cpl_pass_accept_req *)__skb_push(skb, sizeof(*req));
+	req = __skb_push(skb, sizeof(*req));
 	memset(req, 0, sizeof(*req));
 	req->l2info = cpu_to_be16(SYN_INTF_V(intf) |
 			 SYN_MAC_IDX_V(RX_MACIDX_G(
@@ -3831,8 +3800,9 @@ static void send_fw_pass_open_req(struct c4iw_dev *dev, struct sk_buff *skb,
 	int ret;
 
 	req_skb = alloc_skb(sizeof(struct fw_ofld_connection_wr), GFP_KERNEL);
-	req = (struct fw_ofld_connection_wr *)__skb_put(req_skb, sizeof(*req));
-	memset(req, 0, sizeof(*req));
+	if (!req_skb)
+		return;
+	req = __skb_put_zero(req_skb, sizeof(*req));
 	req->op_compl = htonl(WR_OP_V(FW_OFLD_CONNECTION_WR) | FW_WR_COMPL_F);
 	req->len16_pkd = htonl(FW_WR_LEN16_V(DIV_ROUND_UP(sizeof(*req), 16)));
 	req->le.version_cpl = htonl(FW_OFLD_CONNECTION_WR_CPL_F);
@@ -3921,7 +3891,8 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
 
 	lep = (struct c4iw_ep *)get_ep_from_stid(dev, stid);
 	if (!lep) {
-		PDBG("%s connect request on invalid stid %d\n", __func__, stid);
+		pr_debug("%s connect request on invalid stid %d\n",
+			 __func__, stid);
 		goto reject;
 	}
 
@@ -3958,12 +3929,13 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
 	skb_set_transport_header(skb, (void *)tcph - (void *)rss);
 	skb_get(skb);
 
-	PDBG("%s lip 0x%x lport %u pip 0x%x pport %u tos %d\n", __func__,
-	     ntohl(iph->daddr), ntohs(tcph->dest), ntohl(iph->saddr),
-	     ntohs(tcph->source), iph->tos);
+	pr_debug("%s lip 0x%x lport %u pip 0x%x pport %u tos %d\n", __func__,
+		 ntohl(iph->daddr), ntohs(tcph->dest), ntohl(iph->saddr),
+		 ntohs(tcph->source), iph->tos);
 
-	dst = find_route(dev, iph->daddr, iph->saddr, tcph->dest, tcph->source,
-			 iph->tos);
+	dst = cxgb_find_route(&dev->rdev.lldi, get_real_dev,
+			      iph->daddr, iph->saddr, tcph->dest,
+			      tcph->source, iph->tos);
 	if (!dst) {
 		pr_err("%s - failed to find dst entry!\n",
 		       __func__);
@@ -4056,8 +4028,8 @@ static void process_timeout(struct c4iw_ep *ep)
 	int abort = 1;
 
 	mutex_lock(&ep->com.mutex);
-	PDBG("%s ep %p tid %u state %d\n", __func__, ep, ep->hwtid,
-	     ep->com.state);
+	pr_debug("%s ep %p tid %u state %d\n", __func__, ep, ep->hwtid,
+		 ep->com.state);
 	set_bit(TIMEDOUT, &ep->com.history);
 	switch (ep->com.state) {
 	case MPA_REQ_SENT:
@@ -4187,8 +4159,8 @@ static int set_tcb_rpl(struct c4iw_dev *dev, struct sk_buff *skb)
 	struct cpl_set_tcb_rpl *rpl = cplhdr(skb);
 
 	if (rpl->status != CPL_ERR_NONE) {
-		printk(KERN_ERR MOD "Unexpected SET_TCB_RPL status %u "
-		       "for tid %u\n", rpl->status, GET_TID(rpl));
+		pr_err("Unexpected SET_TCB_RPL status %u for tid %u\n",
+		       rpl->status, GET_TID(rpl));
 	}
 	kfree_skb(skb);
 	return 0;
@@ -4200,13 +4172,13 @@ static int fw6_msg(struct c4iw_dev *dev, struct sk_buff *skb)
 	struct c4iw_wr_wait *wr_waitp;
 	int ret;
 
-	PDBG("%s type %u\n", __func__, rpl->type);
+	pr_debug("%s type %u\n", __func__, rpl->type);
 
 	switch (rpl->type) {
 	case FW6_TYPE_WR_RPL:
 		ret = (int)((be64_to_cpu(rpl->data[0]) >> 8) & 0xff);
 		wr_waitp = (struct c4iw_wr_wait *)(__force unsigned long) rpl->data[1];
-		PDBG("%s wr_waitp %p ret %u\n", __func__, wr_waitp, ret);
+		pr_debug("%s wr_waitp %p ret %u\n", __func__, wr_waitp, ret);
 		if (wr_waitp)
 			c4iw_wake_up(wr_waitp, ret ? -ret : 0);
 		kfree_skb(skb);
@@ -4216,8 +4188,8 @@ static int fw6_msg(struct c4iw_dev *dev, struct sk_buff *skb)
 		sched(dev, skb);
 		break;
 	default:
-		printk(KERN_ERR MOD "%s unexpected fw6 msg type %u\n", __func__,
-		       rpl->type);
+		pr_err("%s unexpected fw6 msg type %u\n",
+		       __func__, rpl->type);
 		kfree_skb(skb);
 		break;
 	}
@@ -4233,19 +4205,18 @@ static int peer_abort_intr(struct c4iw_dev *dev, struct sk_buff *skb)
 	ep = get_ep_from_tid(dev, tid);
 	/* This EP will be dereferenced in peer_abort() */
 	if (!ep) {
-		printk(KERN_WARNING MOD
-		       "Abort on non-existent endpoint, tid %d\n", tid);
+		pr_warn("Abort on non-existent endpoint, tid %d\n", tid);
 		kfree_skb(skb);
 		return 0;
 	}
-	if (is_neg_adv(req->status)) {
-		PDBG("%s Negative advice on abort- tid %u status %d (%s)\n",
-		     __func__, ep->hwtid, req->status,
-		     neg_adv_str(req->status));
+	if (cxgb_is_neg_adv(req->status)) {
+		pr_debug("%s Negative advice on abort- tid %u status %d (%s)\n",
+			 __func__, ep->hwtid, req->status,
+			 neg_adv_str(req->status));
 		goto out;
 	}
-	PDBG("%s ep %p tid %u state %u\n", __func__, ep, ep->hwtid,
-	     ep->com.state);
+	pr_debug("%s ep %p tid %u state %u\n", __func__, ep, ep->hwtid,
+		 ep->com.state);
 
 	c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
 out:
@@ -4282,7 +4253,7 @@ int __init c4iw_cm_init(void)
 	spin_lock_init(&timeout_lock);
 	skb_queue_head_init(&rxq);
 
-	workq = create_singlethread_workqueue("iw_cxgb4");
+	workq = alloc_ordered_workqueue("iw_cxgb4", WQ_MEM_RECLAIM);
 	if (!workq)
 		return -ENOMEM;
 

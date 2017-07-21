@@ -93,8 +93,6 @@ static void cy_send_xchar(struct tty_struct *tty, char ch);
 #define	SERIAL_XMIT_SIZE	(min(PAGE_SIZE, 4096))
 #endif
 
-#define STD_COM_FLAGS (0)
-
 /* firmware stuff */
 #define ZL_MAX_BLOCKS	16
 #define DRIVER_VERSION	0x02010203
@@ -158,8 +156,8 @@ static unsigned int cy_isa_addresses[] = {
 static long maddr[NR_CARDS];
 static int irq[NR_CARDS];
 
-module_param_array(maddr, long, NULL, 0);
-module_param_array(irq, int, NULL, 0);
+module_param_hw_array(maddr, long, iomem, NULL, 0);
+module_param_hw_array(irq, int, irq, NULL, 0);
 
 #endif				/* CONFIG_ISA */
 
@@ -1977,18 +1975,6 @@ static void cy_set_line_char(struct cyclades_port *info, struct tty_struct *tty)
 	cflag = tty->termios.c_cflag;
 	iflag = tty->termios.c_iflag;
 
-	/*
-	 * Set up the tty->alt_speed kludge
-	 */
-	if ((info->port.flags & ASYNC_SPD_MASK) == ASYNC_SPD_HI)
-		tty->alt_speed = 57600;
-	if ((info->port.flags & ASYNC_SPD_MASK) == ASYNC_SPD_VHI)
-		tty->alt_speed = 115200;
-	if ((info->port.flags & ASYNC_SPD_MASK) == ASYNC_SPD_SHI)
-		tty->alt_speed = 230400;
-	if ((info->port.flags & ASYNC_SPD_MASK) == ASYNC_SPD_WARP)
-		tty->alt_speed = 460800;
-
 	card = info->card;
 	channel = info->line - card->first_line;
 
@@ -2288,7 +2274,6 @@ static int cy_get_serial_info(struct cyclades_port *info,
 		.closing_wait = info->port.closing_wait,
 		.baud_base = info->baud,
 		.custom_divisor = info->custom_divisor,
-		.hub6 = 0,		/*!!! */
 	};
 	return copy_to_user(retinfo, &tmp, sizeof(*retinfo)) ? -EFAULT : 0;
 }
@@ -2298,12 +2283,16 @@ cy_set_serial_info(struct cyclades_port *info, struct tty_struct *tty,
 		struct serial_struct __user *new_info)
 {
 	struct serial_struct new_serial;
+	int old_flags;
 	int ret;
 
 	if (copy_from_user(&new_serial, new_info, sizeof(new_serial)))
 		return -EFAULT;
 
 	mutex_lock(&info->port.mutex);
+
+	old_flags = info->port.flags;
+
 	if (!capable(CAP_SYS_ADMIN)) {
 		if (new_serial.close_delay != info->port.close_delay ||
 				new_serial.baud_base != info->baud ||
@@ -2335,6 +2324,11 @@ cy_set_serial_info(struct cyclades_port *info, struct tty_struct *tty,
 
 check_and_exit:
 	if (tty_port_initialized(&info->port)) {
+		if ((new_serial.flags ^ old_flags) & ASYNC_SPD_MASK) {
+			/* warn about deprecation unless clearing */
+			if (new_serial.flags & ASYNC_SPD_MASK)
+				dev_warn_ratelimited(tty->dev, "use of SPD flags is deprecated\n");
+		}
 		cy_set_line_char(info, tty);
 		ret = 0;
 	} else {
@@ -3084,7 +3078,6 @@ static int cy_init_card(struct cyclades_card *cinfo)
 
 		info->port.closing_wait = CLOSING_WAIT_DELAY;
 		info->port.close_delay = 5 * HZ / 10;
-		info->port.flags = STD_COM_FLAGS;
 		init_completion(&info->shutdown_wait);
 
 		if (cy_is_Z(cinfo)) {

@@ -678,7 +678,7 @@ static int ath9k_init_priv(struct ath9k_htc_priv *priv,
 
 	for (i = 0; i < ATH9K_HTC_MAX_BCN_VIF; i++)
 		priv->beacon.bslot[i] = NULL;
-	priv->beacon.slottime = ATH9K_SLOT_TIME_9;
+	priv->beacon.slottime = 9;
 
 	ath9k_cmn_init_channels_rates(common);
 	ath9k_cmn_init_crypto(ah);
@@ -780,6 +780,8 @@ static void ath9k_set_hw_capab(struct ath9k_htc_priv *priv,
 	}
 
 	SET_IEEE80211_PERM_ADDR(hw, common->macaddr);
+
+	wiphy_ext_feature_set(hw->wiphy, NL80211_EXT_FEATURE_CQM_RSSI_LIST);
 }
 
 static int ath9k_init_firmware_version(struct ath9k_htc_priv *priv)

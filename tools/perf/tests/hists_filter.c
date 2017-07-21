@@ -3,12 +3,14 @@
 #include "util/symbol.h"
 #include "util/sort.h"
 #include "util/evsel.h"
+#include "util/event.h"
 #include "util/evlist.h"
 #include "util/machine.h"
 #include "util/thread.h"
 #include "util/parse-events.h"
 #include "tests/tests.h"
 #include "tests/hists_common.h"
+#include <linux/kernel.h>
 
 struct sample {
 	u32 pid;
@@ -56,7 +58,7 @@ static int add_hist_entries(struct perf_evlist *evlist,
 	 * (perf [perf] main) will be collapsed to an existing entry
 	 * so total 9 entries will be in the tree.
 	 */
-	evlist__for_each(evlist, evsel) {
+	evlist__for_each_entry(evlist, evsel) {
 		for (i = 0; i < ARRAY_SIZE(fake_samples); i++) {
 			struct hist_entry_iter iter = {
 				.evsel = evsel,
@@ -136,7 +138,7 @@ int test__hists_filter(int subtest __maybe_unused)
 	if (err < 0)
 		goto out;
 
-	evlist__for_each(evlist, evsel) {
+	evlist__for_each_entry(evlist, evsel) {
 		struct hists *hists = evsel__hists(evsel);
 
 		hists__collapse_resort(hists, NULL);

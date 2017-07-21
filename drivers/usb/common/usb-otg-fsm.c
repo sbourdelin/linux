@@ -21,6 +21,7 @@
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/mutex.h>
@@ -29,6 +30,13 @@
 #include <linux/usb/gadget.h>
 #include <linux/usb/otg.h>
 #include <linux/usb/otg-fsm.h>
+
+#ifdef VERBOSE
+#define VDBG(fmt, args...) pr_debug("[%s]  " fmt, \
+				 __func__, ## args)
+#else
+#define VDBG(stuff...)	do {} while (0)
+#endif
 
 /* Change USB protocol when there is a protocol change */
 static int otg_set_protocol(struct otg_fsm *fsm, int protocol)
@@ -450,3 +458,4 @@ int otg_statemachine(struct otg_fsm *fsm)
 	return fsm->state_changed;
 }
 EXPORT_SYMBOL_GPL(otg_statemachine);
+MODULE_LICENSE("GPL");

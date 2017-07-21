@@ -26,7 +26,8 @@
 #include <linux/page_counter.h>
 #include <linux/vmpressure.h>
 #include <linux/eventfd.h>
-#include <linux/mmzone.h>
+#include <linux/mm.h>
+#include <linux/vmstat.h>
 #include <linux/writeback.h>
 #include <linux/page-flags.h>
 
@@ -35,48 +36,41 @@ struct page;
 struct mm_struct;
 struct kmem_cache;
 
-/*
- * The corresponding mem_cgroup_stat_names is defined in mm/memcontrol.c,
- * These two lists should keep in accord with each other.
- */
-enum mem_cgroup_stat_index {
-	/*
-	 * For MEM_CONTAINER_TYPE_ALL, usage = pagecache + rss.
-	 */
-	MEM_CGROUP_STAT_CACHE,		/* # of pages charged as cache */
-	MEM_CGROUP_STAT_RSS,		/* # of pages charged as anon rss */
-	MEM_CGROUP_STAT_RSS_HUGE,	/* # of pages charged as anon huge */
-	MEM_CGROUP_STAT_FILE_MAPPED,	/* # of pages charged as file rss */
-	MEM_CGROUP_STAT_DIRTY,          /* # of dirty pages in page cache */
-	MEM_CGROUP_STAT_WRITEBACK,	/* # of pages under writeback */
-	MEM_CGROUP_STAT_SWAP,		/* # of pages, swapped out */
-	MEM_CGROUP_STAT_NSTATS,
-	/* default hierarchy stats */
-	MEMCG_KERNEL_STACK = MEM_CGROUP_STAT_NSTATS,
-	MEMCG_SLAB_RECLAIMABLE,
-	MEMCG_SLAB_UNRECLAIMABLE,
+/* Cgroup-specific page state, on top of universal node page state */
+enum memcg_stat_item {
+	MEMCG_CACHE = NR_VM_NODE_STAT_ITEMS,
+	MEMCG_RSS,
+	MEMCG_RSS_HUGE,
+	MEMCG_SWAP,
 	MEMCG_SOCK,
+	/* XXX: why are these zone and not node counters? */
+	MEMCG_KERNEL_STACK_KB,
 	MEMCG_NR_STAT,
 };
 
-struct mem_cgroup_reclaim_cookie {
-	struct zone *zone;
-	int priority;
-	unsigned int generation;
-};
-
-enum mem_cgroup_events_index {
-	MEM_CGROUP_EVENTS_PGPGIN,	/* # of pages paged in */
-	MEM_CGROUP_EVENTS_PGPGOUT,	/* # of pages paged out */
-	MEM_CGROUP_EVENTS_PGFAULT,	/* # of page-faults */
-	MEM_CGROUP_EVENTS_PGMAJFAULT,	/* # of major page-faults */
-	MEM_CGROUP_EVENTS_NSTATS,
-	/* default hierarchy events */
-	MEMCG_LOW = MEM_CGROUP_EVENTS_NSTATS,
+/* Cgroup-specific events, on top of universal VM events */
+enum memcg_event_item {
+	MEMCG_LOW = NR_VM_EVENT_ITEMS,
 	MEMCG_HIGH,
 	MEMCG_MAX,
 	MEMCG_OOM,
 	MEMCG_NR_EVENTS,
+};
+
+struct mem_cgroup_reclaim_cookie {
+	pg_data_t *pgdat;
+	int priority;
+	unsigned int generation;
+};
+
+#ifdef CONFIG_MEMCG
+
+#define MEM_CGROUP_ID_SHIFT	16
+#define MEM_CGROUP_ID_MAX	USHRT_MAX
+
+struct mem_cgroup_id {
+	int id;
+	atomic_t ref;
 };
 
 /*
@@ -92,11 +86,6 @@ enum mem_cgroup_events_target {
 	MEM_CGROUP_NTARGETS,
 };
 
-#ifdef CONFIG_MEMCG
-
-#define MEM_CGROUP_ID_SHIFT	16
-#define MEM_CGROUP_ID_MAX	USHRT_MAX
-
 struct mem_cgroup_stat_cpu {
 	long count[MEMCG_NR_STAT];
 	unsigned long events[MEMCG_NR_EVENTS];
@@ -110,12 +99,17 @@ struct mem_cgroup_reclaim_iter {
 	unsigned int generation;
 };
 
+struct lruvec_stat {
+	long count[NR_VM_NODE_STAT_ITEMS];
+};
+
 /*
  * per-zone information in memory controller.
  */
-struct mem_cgroup_per_zone {
+struct mem_cgroup_per_node {
 	struct lruvec		lruvec;
-	unsigned long		lru_size[NR_LRU_LISTS];
+	struct lruvec_stat __percpu *lruvec_stat;
+	unsigned long		lru_zone_size[MAX_NR_ZONES][NR_LRU_LISTS];
 
 	struct mem_cgroup_reclaim_iter	iter[DEF_PRIORITY + 1];
 
@@ -125,10 +119,6 @@ struct mem_cgroup_per_zone {
 	bool			on_tree;
 	struct mem_cgroup	*memcg;		/* Back pointer, we cannot */
 						/* use container_of	   */
-};
-
-struct mem_cgroup_per_node {
-	struct mem_cgroup_per_zone zoneinfo[MAX_NR_ZONES];
 };
 
 struct mem_cgroup_threshold {
@@ -171,6 +161,9 @@ enum memcg_kmem_state {
  */
 struct mem_cgroup {
 	struct cgroup_subsys_state css;
+
+	/* Private memcg ID. Used to ID objects that outlive the cgroup */
+	struct mem_cgroup_id id;
 
 	/* Accounted resources */
 	struct page_counter memory;
@@ -249,6 +242,7 @@ struct mem_cgroup {
         /* Index in the kmem_cache->memcg_params.memcg_caches array */
 	int kmemcg_id;
 	enum memcg_kmem_state kmem_state;
+	struct list_head kmem_caches;
 #endif
 
 	int last_scanned_node;
@@ -278,17 +272,10 @@ static inline bool mem_cgroup_disabled(void)
 	return !cgroup_subsys_enabled(memory_cgrp_subsys);
 }
 
-/**
- * mem_cgroup_events - count memory events against a cgroup
- * @memcg: the memory cgroup
- * @idx: the event index
- * @nr: the number of events to account for
- */
-static inline void mem_cgroup_events(struct mem_cgroup *memcg,
-		       enum mem_cgroup_events_index idx,
-		       unsigned int nr)
+static inline void mem_cgroup_event(struct mem_cgroup *memcg,
+				    enum memcg_event_item event)
 {
-	this_cpu_add(memcg->stat->events[idx], nr);
+	this_cpu_inc(memcg->stat->events[event]);
 	cgroup_file_notify(&memcg->events_file);
 }
 
@@ -306,8 +293,46 @@ void mem_cgroup_uncharge_list(struct list_head *page_list);
 
 void mem_cgroup_migrate(struct page *oldpage, struct page *newpage);
 
-struct lruvec *mem_cgroup_zone_lruvec(struct zone *, struct mem_cgroup *);
-struct lruvec *mem_cgroup_page_lruvec(struct page *, struct zone *);
+static struct mem_cgroup_per_node *
+mem_cgroup_nodeinfo(struct mem_cgroup *memcg, int nid)
+{
+	return memcg->nodeinfo[nid];
+}
+
+/**
+ * mem_cgroup_lruvec - get the lru list vector for a node or a memcg zone
+ * @node: node of the wanted lruvec
+ * @memcg: memcg of the wanted lruvec
+ *
+ * Returns the lru list vector holding pages for a given @node or a given
+ * @memcg and @zone. This can be the node lruvec, if the memory controller
+ * is disabled.
+ */
+static inline struct lruvec *mem_cgroup_lruvec(struct pglist_data *pgdat,
+				struct mem_cgroup *memcg)
+{
+	struct mem_cgroup_per_node *mz;
+	struct lruvec *lruvec;
+
+	if (mem_cgroup_disabled()) {
+		lruvec = node_lruvec(pgdat);
+		goto out;
+	}
+
+	mz = mem_cgroup_nodeinfo(memcg, pgdat->node_id);
+	lruvec = &mz->lruvec;
+out:
+	/*
+	 * Since a node can be onlined after the mem_cgroup was created,
+	 * we have to be prepared to initialize lruvec->pgdat here;
+	 * and if offlined then reonlined, we need to reinitialize it.
+	 */
+	if (unlikely(lruvec->pgdat != pgdat))
+		lruvec->pgdat = pgdat;
+	return lruvec;
+}
+
+struct lruvec *mem_cgroup_page_lruvec(struct page *, struct pglist_data *);
 
 bool task_in_mem_cgroup(struct task_struct *task, struct mem_cgroup *memcg);
 struct mem_cgroup *mem_cgroup_from_task(struct task_struct *p);
@@ -324,27 +349,27 @@ struct mem_cgroup *mem_cgroup_iter(struct mem_cgroup *,
 				   struct mem_cgroup *,
 				   struct mem_cgroup_reclaim_cookie *);
 void mem_cgroup_iter_break(struct mem_cgroup *, struct mem_cgroup *);
+int mem_cgroup_scan_tasks(struct mem_cgroup *,
+			  int (*)(struct task_struct *, void *), void *);
 
 static inline unsigned short mem_cgroup_id(struct mem_cgroup *memcg)
 {
 	if (mem_cgroup_disabled())
 		return 0;
 
-	return memcg->css.id;
+	return memcg->id.id;
 }
+struct mem_cgroup *mem_cgroup_from_id(unsigned short id);
 
-/**
- * mem_cgroup_from_id - look up a memcg from an id
- * @id: the id to look up
- *
- * Caller must hold rcu_read_lock() and use css_tryget() as necessary.
- */
-static inline struct mem_cgroup *mem_cgroup_from_id(unsigned short id)
+static inline struct mem_cgroup *lruvec_memcg(struct lruvec *lruvec)
 {
-	struct cgroup_subsys_state *css;
+	struct mem_cgroup_per_node *mz;
 
-	css = css_from_id(id, &memory_cgrp_subsys);
-	return mem_cgroup_from_css(css);
+	if (mem_cgroup_disabled())
+		return NULL;
+
+	mz = container_of(lruvec, struct mem_cgroup_per_node, lruvec);
+	return mz->memcg;
 }
 
 /**
@@ -401,7 +426,7 @@ static inline bool mem_cgroup_online(struct mem_cgroup *memcg)
 int mem_cgroup_select_victim_node(struct mem_cgroup *memcg);
 
 void mem_cgroup_update_lru_size(struct lruvec *lruvec, enum lru_list lru,
-		int nr_pages);
+		int zid, int nr_pages);
 
 unsigned long mem_cgroup_node_nr_lru_pages(struct mem_cgroup *memcg,
 					   int nid, unsigned int lru_mask);
@@ -409,13 +434,29 @@ unsigned long mem_cgroup_node_nr_lru_pages(struct mem_cgroup *memcg,
 static inline
 unsigned long mem_cgroup_get_lru_size(struct lruvec *lruvec, enum lru_list lru)
 {
-	struct mem_cgroup_per_zone *mz;
+	struct mem_cgroup_per_node *mz;
+	unsigned long nr_pages = 0;
+	int zid;
 
-	mz = container_of(lruvec, struct mem_cgroup_per_zone, lruvec);
-	return mz->lru_size[lru];
+	mz = container_of(lruvec, struct mem_cgroup_per_node, lruvec);
+	for (zid = 0; zid < MAX_NR_ZONES; zid++)
+		nr_pages += mz->lru_zone_size[zid][lru];
+	return nr_pages;
+}
+
+static inline
+unsigned long mem_cgroup_get_zone_lru_size(struct lruvec *lruvec,
+		enum lru_list lru, int zone_idx)
+{
+	struct mem_cgroup_per_node *mz;
+
+	mz = container_of(lruvec, struct mem_cgroup_per_node, lruvec);
+	return mz->lru_zone_size[zone_idx][lru];
 }
 
 void mem_cgroup_handle_over_high(void);
+
+unsigned long mem_cgroup_get_limit(struct mem_cgroup *memcg);
 
 void mem_cgroup_print_oom_info(struct mem_cgroup *memcg,
 				struct task_struct *p);
@@ -446,8 +487,37 @@ extern int do_swap_account;
 void lock_page_memcg(struct page *page);
 void unlock_page_memcg(struct page *page);
 
+static inline unsigned long memcg_page_state(struct mem_cgroup *memcg,
+					     enum memcg_stat_item idx)
+{
+	long val = 0;
+	int cpu;
+
+	for_each_possible_cpu(cpu)
+		val += per_cpu(memcg->stat->count[idx], cpu);
+
+	if (val < 0)
+		val = 0;
+
+	return val;
+}
+
+static inline void __mod_memcg_state(struct mem_cgroup *memcg,
+				     enum memcg_stat_item idx, int val)
+{
+	if (!mem_cgroup_disabled())
+		__this_cpu_add(memcg->stat->count[idx], val);
+}
+
+static inline void mod_memcg_state(struct mem_cgroup *memcg,
+				   enum memcg_stat_item idx, int val)
+{
+	if (!mem_cgroup_disabled())
+		this_cpu_add(memcg->stat->count[idx], val);
+}
+
 /**
- * mem_cgroup_update_page_stat - update page state statistics
+ * mod_memcg_page_state - update page state statistics
  * @page: the page
  * @idx: page state item to account
  * @val: number of pages (positive or negative)
@@ -458,36 +528,118 @@ void unlock_page_memcg(struct page *page);
  *
  *   lock_page(page) or lock_page_memcg(page)
  *   if (TestClearPageState(page))
- *     mem_cgroup_update_page_stat(page, state, -1);
+ *     mod_memcg_page_state(page, state, -1);
  *   unlock_page(page) or unlock_page_memcg(page)
+ *
+ * Kernel pages are an exception to this, since they'll never move.
  */
-static inline void mem_cgroup_update_page_stat(struct page *page,
-				 enum mem_cgroup_stat_index idx, int val)
+static inline void __mod_memcg_page_state(struct page *page,
+					  enum memcg_stat_item idx, int val)
 {
-	VM_BUG_ON(!(rcu_read_lock_held() || PageLocked(page)));
-
 	if (page->mem_cgroup)
-		this_cpu_add(page->mem_cgroup->stat->count[idx], val);
+		__mod_memcg_state(page->mem_cgroup, idx, val);
 }
 
-static inline void mem_cgroup_inc_page_stat(struct page *page,
-					    enum mem_cgroup_stat_index idx)
+static inline void mod_memcg_page_state(struct page *page,
+					enum memcg_stat_item idx, int val)
 {
-	mem_cgroup_update_page_stat(page, idx, 1);
+	if (page->mem_cgroup)
+		mod_memcg_state(page->mem_cgroup, idx, val);
 }
 
-static inline void mem_cgroup_dec_page_stat(struct page *page,
-					    enum mem_cgroup_stat_index idx)
+static inline unsigned long lruvec_page_state(struct lruvec *lruvec,
+					      enum node_stat_item idx)
 {
-	mem_cgroup_update_page_stat(page, idx, -1);
+	struct mem_cgroup_per_node *pn;
+	long val = 0;
+	int cpu;
+
+	if (mem_cgroup_disabled())
+		return node_page_state(lruvec_pgdat(lruvec), idx);
+
+	pn = container_of(lruvec, struct mem_cgroup_per_node, lruvec);
+	for_each_possible_cpu(cpu)
+		val += per_cpu(pn->lruvec_stat->count[idx], cpu);
+
+	if (val < 0)
+		val = 0;
+
+	return val;
 }
 
-unsigned long mem_cgroup_soft_limit_reclaim(struct zone *zone, int order,
+static inline void __mod_lruvec_state(struct lruvec *lruvec,
+				      enum node_stat_item idx, int val)
+{
+	struct mem_cgroup_per_node *pn;
+
+	__mod_node_page_state(lruvec_pgdat(lruvec), idx, val);
+	if (mem_cgroup_disabled())
+		return;
+	pn = container_of(lruvec, struct mem_cgroup_per_node, lruvec);
+	__mod_memcg_state(pn->memcg, idx, val);
+	__this_cpu_add(pn->lruvec_stat->count[idx], val);
+}
+
+static inline void mod_lruvec_state(struct lruvec *lruvec,
+				    enum node_stat_item idx, int val)
+{
+	struct mem_cgroup_per_node *pn;
+
+	mod_node_page_state(lruvec_pgdat(lruvec), idx, val);
+	if (mem_cgroup_disabled())
+		return;
+	pn = container_of(lruvec, struct mem_cgroup_per_node, lruvec);
+	mod_memcg_state(pn->memcg, idx, val);
+	this_cpu_add(pn->lruvec_stat->count[idx], val);
+}
+
+static inline void __mod_lruvec_page_state(struct page *page,
+					   enum node_stat_item idx, int val)
+{
+	struct mem_cgroup_per_node *pn;
+
+	__mod_node_page_state(page_pgdat(page), idx, val);
+	if (mem_cgroup_disabled() || !page->mem_cgroup)
+		return;
+	__mod_memcg_state(page->mem_cgroup, idx, val);
+	pn = page->mem_cgroup->nodeinfo[page_to_nid(page)];
+	__this_cpu_add(pn->lruvec_stat->count[idx], val);
+}
+
+static inline void mod_lruvec_page_state(struct page *page,
+					 enum node_stat_item idx, int val)
+{
+	struct mem_cgroup_per_node *pn;
+
+	mod_node_page_state(page_pgdat(page), idx, val);
+	if (mem_cgroup_disabled() || !page->mem_cgroup)
+		return;
+	mod_memcg_state(page->mem_cgroup, idx, val);
+	pn = page->mem_cgroup->nodeinfo[page_to_nid(page)];
+	this_cpu_add(pn->lruvec_stat->count[idx], val);
+}
+
+unsigned long mem_cgroup_soft_limit_reclaim(pg_data_t *pgdat, int order,
 						gfp_t gfp_mask,
 						unsigned long *total_scanned);
 
-static inline void mem_cgroup_count_vm_event(struct mm_struct *mm,
-					     enum vm_event_item idx)
+static inline void count_memcg_events(struct mem_cgroup *memcg,
+				      enum vm_event_item idx,
+				      unsigned long count)
+{
+	if (!mem_cgroup_disabled())
+		this_cpu_add(memcg->stat->events[idx], count);
+}
+
+static inline void count_memcg_page_event(struct page *page,
+					  enum memcg_stat_item idx)
+{
+	if (page->mem_cgroup)
+		count_memcg_events(page->mem_cgroup, idx, 1);
+}
+
+static inline void count_memcg_event_mm(struct mm_struct *mm,
+					enum vm_event_item idx)
 {
 	struct mem_cgroup *memcg;
 
@@ -496,20 +648,11 @@ static inline void mem_cgroup_count_vm_event(struct mm_struct *mm,
 
 	rcu_read_lock();
 	memcg = mem_cgroup_from_task(rcu_dereference(mm->owner));
-	if (unlikely(!memcg))
-		goto out;
-
-	switch (idx) {
-	case PGFAULT:
-		this_cpu_inc(memcg->stat->events[MEM_CGROUP_EVENTS_PGFAULT]);
-		break;
-	case PGMAJFAULT:
-		this_cpu_inc(memcg->stat->events[MEM_CGROUP_EVENTS_PGMAJFAULT]);
-		break;
-	default:
-		BUG();
+	if (likely(memcg)) {
+		this_cpu_inc(memcg->stat->events[idx]);
+		if (idx == OOM_KILL)
+			cgroup_file_notify(&memcg->events_file);
 	}
-out:
 	rcu_read_unlock();
 }
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
@@ -528,9 +671,8 @@ static inline bool mem_cgroup_disabled(void)
 	return true;
 }
 
-static inline void mem_cgroup_events(struct mem_cgroup *memcg,
-				     enum mem_cgroup_events_index idx,
-				     unsigned int nr)
+static inline void mem_cgroup_event(struct mem_cgroup *memcg,
+				    enum memcg_event_item event)
 {
 }
 
@@ -573,16 +715,16 @@ static inline void mem_cgroup_migrate(struct page *old, struct page *new)
 {
 }
 
-static inline struct lruvec *mem_cgroup_zone_lruvec(struct zone *zone,
-						    struct mem_cgroup *memcg)
+static inline struct lruvec *mem_cgroup_lruvec(struct pglist_data *pgdat,
+				struct mem_cgroup *memcg)
 {
-	return &zone->lruvec;
+	return node_lruvec(pgdat);
 }
 
 static inline struct lruvec *mem_cgroup_page_lruvec(struct page *page,
-						    struct zone *zone)
+						    struct pglist_data *pgdat)
 {
-	return &zone->lruvec;
+	return &pgdat->lruvec;
 }
 
 static inline bool mm_match_cgroup(struct mm_struct *mm,
@@ -610,6 +752,12 @@ static inline void mem_cgroup_iter_break(struct mem_cgroup *root,
 {
 }
 
+static inline int mem_cgroup_scan_tasks(struct mem_cgroup *memcg,
+		int (*fn)(struct task_struct *, void *), void *arg)
+{
+	return 0;
+}
+
 static inline unsigned short mem_cgroup_id(struct mem_cgroup *memcg)
 {
 	return 0;
@@ -619,6 +767,11 @@ static inline struct mem_cgroup *mem_cgroup_from_id(unsigned short id)
 {
 	WARN_ON_ONCE(id);
 	/* XXX: This should always return root_mem_cgroup */
+	return NULL;
+}
+
+static inline struct mem_cgroup *lruvec_memcg(struct lruvec *lruvec)
+{
 	return NULL;
 }
 
@@ -632,10 +785,21 @@ mem_cgroup_get_lru_size(struct lruvec *lruvec, enum lru_list lru)
 {
 	return 0;
 }
+static inline
+unsigned long mem_cgroup_get_zone_lru_size(struct lruvec *lruvec,
+		enum lru_list lru, int zone_idx)
+{
+	return 0;
+}
 
 static inline unsigned long
 mem_cgroup_node_nr_lru_pages(struct mem_cgroup *memcg,
 			     int nid, unsigned int lru_mask)
+{
+	return 0;
+}
+
+static inline unsigned long mem_cgroup_get_limit(struct mem_cgroup *memcg)
 {
 	return 0;
 }
@@ -675,18 +839,68 @@ static inline bool mem_cgroup_oom_synchronize(bool wait)
 	return false;
 }
 
-static inline void mem_cgroup_inc_page_stat(struct page *page,
-					    enum mem_cgroup_stat_index idx)
+static inline unsigned long memcg_page_state(struct mem_cgroup *memcg,
+					     enum memcg_stat_item idx)
+{
+	return 0;
+}
+
+static inline void __mod_memcg_state(struct mem_cgroup *memcg,
+				     enum memcg_stat_item idx,
+				     int nr)
 {
 }
 
-static inline void mem_cgroup_dec_page_stat(struct page *page,
-					    enum mem_cgroup_stat_index idx)
+static inline void mod_memcg_state(struct mem_cgroup *memcg,
+				   enum memcg_stat_item idx,
+				   int nr)
 {
+}
+
+static inline void __mod_memcg_page_state(struct page *page,
+					  enum memcg_stat_item idx,
+					  int nr)
+{
+}
+
+static inline void mod_memcg_page_state(struct page *page,
+					enum memcg_stat_item idx,
+					int nr)
+{
+}
+
+static inline unsigned long lruvec_page_state(struct lruvec *lruvec,
+					      enum node_stat_item idx)
+{
+	return node_page_state(lruvec_pgdat(lruvec), idx);
+}
+
+static inline void __mod_lruvec_state(struct lruvec *lruvec,
+				      enum node_stat_item idx, int val)
+{
+	__mod_node_page_state(lruvec_pgdat(lruvec), idx, val);
+}
+
+static inline void mod_lruvec_state(struct lruvec *lruvec,
+				    enum node_stat_item idx, int val)
+{
+	mod_node_page_state(lruvec_pgdat(lruvec), idx, val);
+}
+
+static inline void __mod_lruvec_page_state(struct page *page,
+					   enum node_stat_item idx, int val)
+{
+	__mod_node_page_state(page_pgdat(page), idx, val);
+}
+
+static inline void mod_lruvec_page_state(struct page *page,
+					 enum node_stat_item idx, int val)
+{
+	mod_node_page_state(page_pgdat(page), idx, val);
 }
 
 static inline
-unsigned long mem_cgroup_soft_limit_reclaim(struct zone *zone, int order,
+unsigned long mem_cgroup_soft_limit_reclaim(pg_data_t *pgdat, int order,
 					    gfp_t gfp_mask,
 					    unsigned long *total_scanned)
 {
@@ -697,11 +911,118 @@ static inline void mem_cgroup_split_huge_fixup(struct page *head)
 {
 }
 
+static inline void count_memcg_events(struct mem_cgroup *memcg,
+				      enum vm_event_item idx,
+				      unsigned long count)
+{
+}
+
+static inline void count_memcg_page_event(struct page *page,
+					  enum memcg_stat_item idx)
+{
+}
+
 static inline
-void mem_cgroup_count_vm_event(struct mm_struct *mm, enum vm_event_item idx)
+void count_memcg_event_mm(struct mm_struct *mm, enum vm_event_item idx)
 {
 }
 #endif /* CONFIG_MEMCG */
+
+static inline void __inc_memcg_state(struct mem_cgroup *memcg,
+				     enum memcg_stat_item idx)
+{
+	__mod_memcg_state(memcg, idx, 1);
+}
+
+static inline void __dec_memcg_state(struct mem_cgroup *memcg,
+				     enum memcg_stat_item idx)
+{
+	__mod_memcg_state(memcg, idx, -1);
+}
+
+static inline void __inc_memcg_page_state(struct page *page,
+					  enum memcg_stat_item idx)
+{
+	__mod_memcg_page_state(page, idx, 1);
+}
+
+static inline void __dec_memcg_page_state(struct page *page,
+					  enum memcg_stat_item idx)
+{
+	__mod_memcg_page_state(page, idx, -1);
+}
+
+static inline void __inc_lruvec_state(struct lruvec *lruvec,
+				      enum node_stat_item idx)
+{
+	__mod_lruvec_state(lruvec, idx, 1);
+}
+
+static inline void __dec_lruvec_state(struct lruvec *lruvec,
+				      enum node_stat_item idx)
+{
+	__mod_lruvec_state(lruvec, idx, -1);
+}
+
+static inline void __inc_lruvec_page_state(struct page *page,
+					   enum node_stat_item idx)
+{
+	__mod_lruvec_page_state(page, idx, 1);
+}
+
+static inline void __dec_lruvec_page_state(struct page *page,
+					   enum node_stat_item idx)
+{
+	__mod_lruvec_page_state(page, idx, -1);
+}
+
+static inline void inc_memcg_state(struct mem_cgroup *memcg,
+				   enum memcg_stat_item idx)
+{
+	mod_memcg_state(memcg, idx, 1);
+}
+
+static inline void dec_memcg_state(struct mem_cgroup *memcg,
+				   enum memcg_stat_item idx)
+{
+	mod_memcg_state(memcg, idx, -1);
+}
+
+static inline void inc_memcg_page_state(struct page *page,
+					enum memcg_stat_item idx)
+{
+	mod_memcg_page_state(page, idx, 1);
+}
+
+static inline void dec_memcg_page_state(struct page *page,
+					enum memcg_stat_item idx)
+{
+	mod_memcg_page_state(page, idx, -1);
+}
+
+static inline void inc_lruvec_state(struct lruvec *lruvec,
+				    enum node_stat_item idx)
+{
+	mod_lruvec_state(lruvec, idx, 1);
+}
+
+static inline void dec_lruvec_state(struct lruvec *lruvec,
+				    enum node_stat_item idx)
+{
+	mod_lruvec_state(lruvec, idx, -1);
+}
+
+static inline void inc_lruvec_page_state(struct page *page,
+					 enum node_stat_item idx)
+{
+	mod_lruvec_page_state(page, idx, 1);
+}
+
+static inline void dec_lruvec_page_state(struct page *page,
+					 enum node_stat_item idx)
+{
+	mod_lruvec_page_state(page, idx, -1);
+}
 
 #ifdef CONFIG_CGROUP_WRITEBACK
 
@@ -729,13 +1050,13 @@ static inline void mem_cgroup_wb_stats(struct bdi_writeback *wb,
 #endif	/* CONFIG_CGROUP_WRITEBACK */
 
 struct sock;
-void sock_update_memcg(struct sock *sk);
-void sock_release_memcg(struct sock *sk);
 bool mem_cgroup_charge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages);
 void mem_cgroup_uncharge_skmem(struct mem_cgroup *memcg, unsigned int nr_pages);
 #ifdef CONFIG_MEMCG
 extern struct static_key_false memcg_sockets_enabled_key;
 #define mem_cgroup_sockets_enabled static_branch_unlikely(&memcg_sockets_enabled_key)
+void mem_cgroup_sk_alloc(struct sock *sk);
+void mem_cgroup_sk_free(struct sock *sk);
 static inline bool mem_cgroup_under_socket_pressure(struct mem_cgroup *memcg)
 {
 	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys) && memcg->tcpmem_pressure)
@@ -748,14 +1069,24 @@ static inline bool mem_cgroup_under_socket_pressure(struct mem_cgroup *memcg)
 }
 #else
 #define mem_cgroup_sockets_enabled 0
+static inline void mem_cgroup_sk_alloc(struct sock *sk) { };
+static inline void mem_cgroup_sk_free(struct sock *sk) { };
 static inline bool mem_cgroup_under_socket_pressure(struct mem_cgroup *memcg)
 {
 	return false;
 }
 #endif
 
+struct kmem_cache *memcg_kmem_get_cache(struct kmem_cache *cachep);
+void memcg_kmem_put_cache(struct kmem_cache *cachep);
+int memcg_kmem_charge_memcg(struct page *page, gfp_t gfp, int order,
+			    struct mem_cgroup *memcg);
+int memcg_kmem_charge(struct page *page, gfp_t gfp, int order);
+void memcg_kmem_uncharge(struct page *page, int order);
+
 #if defined(CONFIG_MEMCG) && !defined(CONFIG_SLOB)
 extern struct static_key_false memcg_kmem_enabled_key;
+extern struct workqueue_struct *memcg_kmem_cache_wq;
 
 extern int memcg_nr_cache_ids;
 void memcg_get_cache_ids(void);
@@ -775,22 +1106,6 @@ static inline bool memcg_kmem_enabled(void)
 }
 
 /*
- * In general, we'll do everything in our power to not incur in any overhead
- * for non-memcg users for the kmem functions. Not even a function call, if we
- * can avoid it.
- *
- * Therefore, we'll inline all those functions so that in the best case, we'll
- * see that kmemcg is off for everybody and proceed quickly.  If it is on,
- * we'll still do most of the flag checking inline. We check a lot of
- * conditions, but because they are pretty simple, they are expected to be
- * fast.
- */
-int __memcg_kmem_charge_memcg(struct page *page, gfp_t gfp, int order,
-			      struct mem_cgroup *memcg);
-int __memcg_kmem_charge(struct page *page, gfp_t gfp, int order);
-void __memcg_kmem_uncharge(struct page *page, int order);
-
-/*
  * helper for accessing a memcg's index. It will be used as an index in the
  * child cache array in kmem_cache, and also to derive its name. This function
  * will return -1 when this is not a kmem-limited memcg.
@@ -800,80 +1115,6 @@ static inline int memcg_cache_id(struct mem_cgroup *memcg)
 	return memcg ? memcg->kmemcg_id : -1;
 }
 
-struct kmem_cache *__memcg_kmem_get_cache(struct kmem_cache *cachep, gfp_t gfp);
-void __memcg_kmem_put_cache(struct kmem_cache *cachep);
-
-static inline bool __memcg_kmem_bypass(void)
-{
-	if (!memcg_kmem_enabled())
-		return true;
-	if (in_interrupt() || (!current->mm) || (current->flags & PF_KTHREAD))
-		return true;
-	return false;
-}
-
-/**
- * memcg_kmem_charge: charge a kmem page
- * @page: page to charge
- * @gfp: reclaim mode
- * @order: allocation order
- *
- * Returns 0 on success, an error code on failure.
- */
-static __always_inline int memcg_kmem_charge(struct page *page,
-					     gfp_t gfp, int order)
-{
-	if (__memcg_kmem_bypass())
-		return 0;
-	if (!(gfp & __GFP_ACCOUNT))
-		return 0;
-	return __memcg_kmem_charge(page, gfp, order);
-}
-
-/**
- * memcg_kmem_uncharge: uncharge a kmem page
- * @page: page to uncharge
- * @order: allocation order
- */
-static __always_inline void memcg_kmem_uncharge(struct page *page, int order)
-{
-	if (memcg_kmem_enabled())
-		__memcg_kmem_uncharge(page, order);
-}
-
-/**
- * memcg_kmem_get_cache: selects the correct per-memcg cache for allocation
- * @cachep: the original global kmem cache
- *
- * All memory allocated from a per-memcg cache is charged to the owner memcg.
- */
-static __always_inline struct kmem_cache *
-memcg_kmem_get_cache(struct kmem_cache *cachep, gfp_t gfp)
-{
-	if (__memcg_kmem_bypass())
-		return cachep;
-	return __memcg_kmem_get_cache(cachep, gfp);
-}
-
-static __always_inline void memcg_kmem_put_cache(struct kmem_cache *cachep)
-{
-	if (memcg_kmem_enabled())
-		__memcg_kmem_put_cache(cachep);
-}
-
-/**
- * memcg_kmem_update_page_stat - update kmem page state statistics
- * @page: the page
- * @idx: page state item to account
- * @val: number of pages (positive or negative)
- */
-static inline void memcg_kmem_update_page_stat(struct page *page,
-				enum mem_cgroup_stat_index idx, int val)
-{
-	if (memcg_kmem_enabled() && page->mem_cgroup)
-		this_cpu_add(page->mem_cgroup->stat->count[idx], val);
-}
-
 #else
 #define for_each_memcg_cache_index(_idx)	\
 	for (; NULL; )
@@ -881,15 +1122,6 @@ static inline void memcg_kmem_update_page_stat(struct page *page,
 static inline bool memcg_kmem_enabled(void)
 {
 	return false;
-}
-
-static inline int memcg_kmem_charge(struct page *page, gfp_t gfp, int order)
-{
-	return 0;
-}
-
-static inline void memcg_kmem_uncharge(struct page *page, int order)
-{
 }
 
 static inline int memcg_cache_id(struct mem_cgroup *memcg)
@@ -905,20 +1137,6 @@ static inline void memcg_put_cache_ids(void)
 {
 }
 
-static inline struct kmem_cache *
-memcg_kmem_get_cache(struct kmem_cache *cachep, gfp_t gfp)
-{
-	return cachep;
-}
-
-static inline void memcg_kmem_put_cache(struct kmem_cache *cachep)
-{
-}
-
-static inline void memcg_kmem_update_page_stat(struct page *page,
-				enum mem_cgroup_stat_index idx, int val)
-{
-}
 #endif /* CONFIG_MEMCG && !CONFIG_SLOB */
 
 #endif /* _LINUX_MEMCONTROL_H */

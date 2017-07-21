@@ -15,6 +15,7 @@
 
 #include <linux/rbtree.h>
 #include <linux/list.h>
+#include <errno.h>
 #include "thread.h"
 #include "event.h"
 #include "machine.h"
@@ -615,4 +616,11 @@ int thread_stack__process(struct thread *thread, struct comm *comm,
 	}
 
 	return err;
+}
+
+size_t thread_stack__depth(struct thread *thread)
+{
+	if (!thread->ts)
+		return 0;
+	return thread->ts->cnt;
 }

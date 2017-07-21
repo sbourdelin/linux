@@ -169,12 +169,6 @@ void devm_memunmap(struct device *dev, void *addr)
 }
 EXPORT_SYMBOL(devm_memunmap);
 
-pfn_t phys_to_pfn_t(phys_addr_t addr, u64 flags)
-{
-	return __pfn_to_pfn_t(addr >> PAGE_SHIFT, flags);
-}
-EXPORT_SYMBOL(phys_to_pfn_t);
-
 #ifdef CONFIG_ZONE_DEVICE
 static DEFINE_MUTEX(pgmap_lock);
 static RADIX_TREE(pgmap_radix, GFP_KERNEL);
@@ -187,18 +181,6 @@ struct page_map {
 	struct dev_pagemap pgmap;
 	struct vmem_altmap altmap;
 };
-
-void get_zone_device_page(struct page *page)
-{
-	percpu_ref_get(page->pgmap->ref);
-}
-EXPORT_SYMBOL(get_zone_device_page);
-
-void put_zone_device_page(struct page *page)
-{
-	put_dev_pagemap(page->pgmap);
-}
-EXPORT_SYMBOL(put_zone_device_page);
 
 static void pgmap_radix_release(struct resource *res)
 {
@@ -243,6 +225,10 @@ static void devm_memremap_pages_release(struct device *dev, void *data)
 	struct resource *res = &page_map->res;
 	resource_size_t align_start, align_size;
 	struct dev_pagemap *pgmap = &page_map->pgmap;
+	unsigned long pfn;
+
+	for_each_device_pfn(pfn, page_map)
+		put_page(pfn_to_page(pfn));
 
 	if (percpu_ref_tryget_live(pgmap->ref)) {
 		dev_WARN(dev, "%s: page mapping is still live!\n", __func__);
@@ -252,7 +238,12 @@ static void devm_memremap_pages_release(struct device *dev, void *data)
 	/* pages are dead and unused, undo the arch mapping */
 	align_start = res->start & ~(SECTION_SIZE - 1);
 	align_size = ALIGN(resource_size(res), SECTION_SIZE);
+
+	mem_hotplug_begin();
 	arch_remove_memory(align_start, align_size);
+	mem_hotplug_done();
+
+	untrack_pfn(NULL, PHYS_PFN(align_start), align_size);
 	pgmap_radix_release(res);
 	dev_WARN_ONCE(dev, pgmap->altmap && pgmap->altmap->alloc,
 			"%s: failed to free all reserved pages\n", __func__);
@@ -278,7 +269,10 @@ struct dev_pagemap *find_dev_pagemap(resource_size_t phys)
  *
  * Notes:
  * 1/ @ref must be 'live' on entry and 'dead' before devm_memunmap_pages() time
- *    (or devm release event).
+ *    (or devm release event). The expected order of events is that @ref has
+ *    been through percpu_ref_kill() before devm_memremap_pages_release(). The
+ *    wait for the completion of all references being dropped and
+ *    percpu_ref_exit() must occur after devm_memremap_pages_release().
  *
  * 2/ @res is expected to be a host memory range that could feasibly be
  *    treated as a "System RAM" range, i.e. not a device mmio range, but
@@ -288,6 +282,7 @@ void *devm_memremap_pages(struct device *dev, struct resource *res,
 		struct percpu_ref *ref, struct vmem_altmap *altmap)
 {
 	resource_size_t key, align_start, align_size, align_end;
+	pgprot_t pgprot = PAGE_KERNEL;
 	struct dev_pagemap *pgmap;
 	struct page_map *page_map;
 	int error, nid, is_ram;
@@ -307,12 +302,6 @@ void *devm_memremap_pages(struct device *dev, struct resource *res,
 
 	if (is_ram == REGION_INTERSECTS)
 		return __va(res->start);
-
-	if (altmap && !IS_ENABLED(CONFIG_SPARSEMEM_VMEMMAP)) {
-		dev_err(dev, "%s: altmap requires CONFIG_SPARSEMEM_VMEMMAP=y\n",
-				__func__);
-		return ERR_PTR(-ENXIO);
-	}
 
 	if (!ref)
 		return ERR_PTR(-EINVAL);
@@ -363,7 +352,18 @@ void *devm_memremap_pages(struct device *dev, struct resource *res,
 	if (nid < 0)
 		nid = numa_mem_id();
 
-	error = arch_add_memory(nid, align_start, align_size, true);
+	error = track_pfn_remap(NULL, &pgprot, PHYS_PFN(align_start), 0,
+			align_size);
+	if (error)
+		goto err_pfn_remap;
+
+	mem_hotplug_begin();
+	error = arch_add_memory(nid, align_start, align_size, false);
+	if (!error)
+		move_pfn_range_to_zone(&NODE_DATA(nid)->node_zones[ZONE_DEVICE],
+					align_start >> PAGE_SHIFT,
+					align_size >> PAGE_SHIFT);
+	mem_hotplug_done();
 	if (error)
 		goto err_add_memory;
 
@@ -378,11 +378,14 @@ void *devm_memremap_pages(struct device *dev, struct resource *res,
 		 */
 		list_del(&page->lru);
 		page->pgmap = pgmap;
+		percpu_ref_get(ref);
 	}
 	devres_add(dev, page_map);
 	return __va(res->start);
 
  err_add_memory:
+	untrack_pfn(NULL, PHYS_PFN(align_start), align_size);
+ err_pfn_remap:
  err_radix:
 	pgmap_radix_release(res);
 	devres_free(page_map);
@@ -401,7 +404,6 @@ void vmem_altmap_free(struct vmem_altmap *altmap, unsigned long nr_pfns)
 	altmap->alloc -= nr_pfns;
 }
 
-#ifdef CONFIG_SPARSEMEM_VMEMMAP
 struct vmem_altmap *to_vmem_altmap(unsigned long memmap_start)
 {
 	/*
@@ -427,5 +429,4 @@ struct vmem_altmap *to_vmem_altmap(unsigned long memmap_start)
 
 	return pgmap ? pgmap->altmap : NULL;
 }
-#endif /* CONFIG_SPARSEMEM_VMEMMAP */
 #endif /* CONFIG_ZONE_DEVICE */

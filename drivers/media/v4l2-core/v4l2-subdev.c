@@ -14,13 +14,10 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 #include <linux/ioctl.h>
+#include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <linux/videodev2.h>
@@ -581,13 +578,14 @@ v4l2_subdev_alloc_pad_config(struct v4l2_subdev *sd)
 	if (!sd->entity.num_pads)
 		return NULL;
 
-	cfg = kcalloc(sd->entity.num_pads, sizeof(*cfg), GFP_KERNEL);
+	cfg = kvmalloc_array(sd->entity.num_pads, sizeof(*cfg),
+			     GFP_KERNEL | __GFP_ZERO);
 	if (!cfg)
 		return NULL;
 
 	ret = v4l2_subdev_call(sd, pad, init_cfg, cfg);
 	if (ret < 0 && ret != -ENOIOCTLCMD) {
-		kfree(cfg);
+		kvfree(cfg);
 		return NULL;
 	}
 
@@ -597,7 +595,7 @@ EXPORT_SYMBOL_GPL(v4l2_subdev_alloc_pad_config);
 
 void v4l2_subdev_free_pad_config(struct v4l2_subdev_pad_config *cfg)
 {
-	kfree(cfg);
+	kvfree(cfg);
 }
 EXPORT_SYMBOL_GPL(v4l2_subdev_free_pad_config);
 #endif /* CONFIG_MEDIA_CONTROLLER */
@@ -621,16 +619,6 @@ void v4l2_subdev_init(struct v4l2_subdev *sd, const struct v4l2_subdev_ops *ops)
 }
 EXPORT_SYMBOL(v4l2_subdev_init);
 
-/**
- * v4l2_subdev_notify_event() - Delivers event notification for subdevice
- * @sd: The subdev for which to deliver the event
- * @ev: The event to deliver
- *
- * Will deliver the specified event to all userspace event listeners which are
- * subscribed to the v42l subdev event queue as well as to the bridge driver
- * using the notify callback. The notification type for the notify callback
- * will be V4L2_DEVICE_NOTIFY_EVENT.
- */
 void v4l2_subdev_notify_event(struct v4l2_subdev *sd,
 			      const struct v4l2_event *ev)
 {

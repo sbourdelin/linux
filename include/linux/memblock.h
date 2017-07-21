@@ -42,6 +42,7 @@ struct memblock_type {
 	unsigned long max;	/* size of the allocated array */
 	phys_addr_t total_size;	/* size of all regions */
 	struct memblock_region *regions;
+	char *name;
 };
 
 struct memblock {
@@ -56,10 +57,6 @@ struct memblock {
 
 extern struct memblock memblock;
 extern int memblock_debug;
-#ifdef CONFIG_MOVABLE_NODE
-/* If movable_node boot option specified */
-extern bool movable_node_enabled;
-#endif /* CONFIG_MOVABLE_NODE */
 
 #ifdef CONFIG_ARCH_DISCARD_MEMBLOCK
 #define __init_memblock __meminit
@@ -73,8 +70,8 @@ extern bool movable_node_enabled;
 	if (memblock_debug) printk(KERN_INFO pr_fmt(fmt), ##__VA_ARGS__)
 
 phys_addr_t memblock_find_in_range_node(phys_addr_t size, phys_addr_t align,
-					    phys_addr_t start, phys_addr_t end,
-					    int nid, ulong flags);
+					phys_addr_t start, phys_addr_t end,
+					int nid, ulong flags);
 phys_addr_t memblock_find_in_range(phys_addr_t start, phys_addr_t end,
 				   phys_addr_t size, phys_addr_t align);
 phys_addr_t get_allocated_memblock_reserved_regions_info(phys_addr_t *addr);
@@ -92,6 +89,7 @@ int memblock_mark_hotplug(phys_addr_t base, phys_addr_t size);
 int memblock_clear_hotplug(phys_addr_t base, phys_addr_t size);
 int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
 int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
+int memblock_clear_nomap(phys_addr_t base, phys_addr_t size);
 ulong choose_memblock_flags(void);
 
 /* Low level functions */
@@ -110,7 +108,7 @@ void __next_mem_range_rev(u64 *idx, int nid, ulong flags,
 			  phys_addr_t *out_end, int *out_nid);
 
 void __next_reserved_mem_region(u64 *idx, phys_addr_t *out_start,
-			       phys_addr_t *out_end);
+				phys_addr_t *out_end);
 
 /**
  * for_each_mem_range - iterate through memblock areas from type_a and not
@@ -148,7 +146,7 @@ void __next_reserved_mem_region(u64 *idx, phys_addr_t *out_start,
 			       p_start, p_end, p_nid)			\
 	for (i = (u64)ULLONG_MAX,					\
 		     __next_mem_range_rev(&i, nid, flags, type_a, type_b,\
-					 p_start, p_end, p_nid);	\
+					  p_start, p_end, p_nid);	\
 	     i != (u64)ULLONG_MAX;					\
 	     __next_mem_range_rev(&i, nid, flags, type_a, type_b,	\
 				  p_start, p_end, p_nid))
@@ -163,31 +161,14 @@ void __next_reserved_mem_region(u64 *idx, phys_addr_t *out_start,
  * is initialized.
  */
 #define for_each_reserved_mem_region(i, p_start, p_end)			\
-	for (i = 0UL,							\
-	     __next_reserved_mem_region(&i, p_start, p_end);		\
+	for (i = 0UL, __next_reserved_mem_region(&i, p_start, p_end);	\
 	     i != (u64)ULLONG_MAX;					\
 	     __next_reserved_mem_region(&i, p_start, p_end))
 
-#ifdef CONFIG_MOVABLE_NODE
 static inline bool memblock_is_hotpluggable(struct memblock_region *m)
 {
 	return m->flags & MEMBLOCK_HOTPLUG;
 }
-
-static inline bool __init_memblock movable_node_is_enabled(void)
-{
-	return movable_node_enabled;
-}
-#else
-static inline bool memblock_is_hotpluggable(struct memblock_region *m)
-{
-	return false;
-}
-static inline bool movable_node_is_enabled(void)
-{
-	return false;
-}
-#endif
 
 static inline bool memblock_is_mirror(struct memblock_region *m)
 {
@@ -204,6 +185,7 @@ int memblock_search_pfn_nid(unsigned long pfn, unsigned long *start_pfn,
 			    unsigned long  *end_pfn);
 void __next_mem_pfn_range(int *idx, int nid, unsigned long *out_start_pfn,
 			  unsigned long *out_end_pfn, int *out_nid);
+unsigned long memblock_next_valid_pfn(unsigned long pfn, unsigned long max_pfn);
 
 /**
  * for_each_mem_pfn_range - early memory pfn range iterator
@@ -294,7 +276,6 @@ phys_addr_t memblock_alloc_try_nid(phys_addr_t size, phys_addr_t align, int nid)
 
 phys_addr_t memblock_alloc(phys_addr_t size, phys_addr_t align);
 
-#ifdef CONFIG_MOVABLE_NODE
 /*
  * Set the allocation direction to bottom-up or top-down.
  */
@@ -312,10 +293,6 @@ static inline bool memblock_bottom_up(void)
 {
 	return memblock.bottom_up;
 }
-#else
-static inline void __init memblock_set_bottom_up(bool enable) {}
-static inline bool memblock_bottom_up(void) { return false; }
-#endif
 
 /* Flags for memblock_alloc_base() amd __memblock_alloc_base() */
 #define MEMBLOCK_ALLOC_ANYWHERE	(~(phys_addr_t)0)
@@ -329,10 +306,13 @@ phys_addr_t memblock_alloc_base(phys_addr_t size, phys_addr_t align,
 phys_addr_t __memblock_alloc_base(phys_addr_t size, phys_addr_t align,
 				  phys_addr_t max_addr);
 phys_addr_t memblock_phys_mem_size(void);
+phys_addr_t memblock_reserved_size(void);
 phys_addr_t memblock_mem_size(unsigned long limit_pfn);
 phys_addr_t memblock_start_of_DRAM(void);
 phys_addr_t memblock_end_of_DRAM(void);
 void memblock_enforce_memory_limit(phys_addr_t memory_limit);
+void memblock_cap_memory_range(phys_addr_t base, phys_addr_t size);
+void memblock_mem_limit_remove_map(phys_addr_t limit);
 bool memblock_is_memory(phys_addr_t addr);
 int memblock_is_map_memory(phys_addr_t addr);
 int memblock_is_region_memory(phys_addr_t base, phys_addr_t size);
@@ -403,15 +383,14 @@ static inline unsigned long memblock_region_reserved_end_pfn(const struct memblo
 }
 
 #define for_each_memblock(memblock_type, region)					\
-	for (region = memblock.memblock_type.regions;				\
+	for (region = memblock.memblock_type.regions;					\
 	     region < (memblock.memblock_type.regions + memblock.memblock_type.cnt);	\
 	     region++)
 
 #define for_each_memblock_type(memblock_type, rgn)			\
-	idx = 0;							\
-	rgn = &memblock_type->regions[idx];				\
-	for (idx = 0; idx < memblock_type->cnt;				\
-	     idx++,rgn = &memblock_type->regions[idx])
+	for (idx = 0, rgn = &memblock_type->regions[0];			\
+	     idx < memblock_type->cnt;					\
+	     idx++, rgn = &memblock_type->regions[idx])
 
 #ifdef CONFIG_MEMTEST
 extern void early_memtest(phys_addr_t start, phys_addr_t end);
@@ -421,8 +400,16 @@ static inline void early_memtest(phys_addr_t start, phys_addr_t end)
 }
 #endif
 
+extern unsigned long memblock_reserved_memory_within(phys_addr_t start_addr,
+		phys_addr_t end_addr);
 #else
 static inline phys_addr_t memblock_alloc(phys_addr_t size, phys_addr_t align)
+{
+	return 0;
+}
+
+static inline unsigned long memblock_reserved_memory_within(phys_addr_t start_addr,
+		phys_addr_t end_addr)
 {
 	return 0;
 }

@@ -516,9 +516,9 @@ static void o2hb_bio_end_io(struct bio *bio)
 {
 	struct o2hb_bio_wait_ctxt *wc = bio->bi_private;
 
-	if (bio->bi_error) {
-		mlog(ML_ERROR, "IO Error %d\n", bio->bi_error);
-		wc->wc_error = bio->bi_error;
+	if (bio->bi_status) {
+		mlog(ML_ERROR, "IO Error %d\n", bio->bi_status);
+		wc->wc_error = blk_status_to_errno(bio->bi_status);
 	}
 
 	o2hb_bio_wait_dec(wc, 1);
@@ -530,7 +530,8 @@ static void o2hb_bio_end_io(struct bio *bio)
 static struct bio *o2hb_setup_one_bio(struct o2hb_region *reg,
 				      struct o2hb_bio_wait_ctxt *wc,
 				      unsigned int *current_slot,
-				      unsigned int max_slots)
+				      unsigned int max_slots, int op,
+				      int op_flags)
 {
 	int len, current_page;
 	unsigned int vec_len, vec_start;
@@ -556,6 +557,7 @@ static struct bio *o2hb_setup_one_bio(struct o2hb_region *reg,
 	bio->bi_bdev = reg->hr_bdev;
 	bio->bi_private = wc;
 	bio->bi_end_io = o2hb_bio_end_io;
+	bio_set_op_attrs(bio, op, op_flags);
 
 	vec_start = (cs << bits) % PAGE_SIZE;
 	while(cs < max_slots) {
@@ -591,7 +593,8 @@ static int o2hb_read_slots(struct o2hb_region *reg,
 	o2hb_bio_wait_init(&wc);
 
 	while(current_slot < max_slots) {
-		bio = o2hb_setup_one_bio(reg, &wc, &current_slot, max_slots);
+		bio = o2hb_setup_one_bio(reg, &wc, &current_slot, max_slots,
+					 REQ_OP_READ, 0);
 		if (IS_ERR(bio)) {
 			status = PTR_ERR(bio);
 			mlog_errno(status);
@@ -599,7 +602,7 @@ static int o2hb_read_slots(struct o2hb_region *reg,
 		}
 
 		atomic_inc(&wc.wc_num_reqs);
-		submit_bio(READ, bio);
+		submit_bio(bio);
 	}
 
 	status = 0;
@@ -623,7 +626,8 @@ static int o2hb_issue_node_write(struct o2hb_region *reg,
 
 	slot = o2nm_this_node();
 
-	bio = o2hb_setup_one_bio(reg, write_wc, &slot, slot+1);
+	bio = o2hb_setup_one_bio(reg, write_wc, &slot, slot+1, REQ_OP_WRITE,
+				 REQ_SYNC);
 	if (IS_ERR(bio)) {
 		status = PTR_ERR(bio);
 		mlog_errno(status);
@@ -631,7 +635,7 @@ static int o2hb_issue_node_write(struct o2hb_region *reg,
 	}
 
 	atomic_inc(&write_wc->wc_num_reqs);
-	submit_bio(WRITE_SYNC, bio);
+	submit_bio(bio);
 
 	status = 0;
 bail:
@@ -737,7 +741,7 @@ static inline void o2hb_prepare_block(struct o2hb_region *reg,
 	hb_block = (struct o2hb_disk_heartbeat_block *)slot->ds_raw_block;
 	memset(hb_block, 0, reg->hr_block_bytes);
 	/* TODO: time stuff */
-	cputime = CURRENT_TIME.tv_sec;
+	cputime = ktime_get_real_seconds();
 	if (!cputime)
 		cputime = 1;
 
@@ -1246,7 +1250,7 @@ static int o2hb_thread(void *data)
 
 		mlog(ML_HEARTBEAT,
 		     "start = %lld, end = %lld, msec = %u, ret = %d\n",
-		     before_hb.tv64, after_hb.tv64, elapsed_msec, ret);
+		     before_hb, after_hb, elapsed_msec, ret);
 
 		if (!kthread_should_stop() &&
 		    elapsed_msec < reg->hr_timeout_ms) {
@@ -2238,13 +2242,13 @@ unlock:
 	spin_unlock(&o2hb_live_lock);
 }
 
-static ssize_t o2hb_heartbeat_group_threshold_show(struct config_item *item,
+static ssize_t o2hb_heartbeat_group_dead_threshold_show(struct config_item *item,
 		char *page)
 {
 	return sprintf(page, "%u\n", o2hb_dead_threshold);
 }
 
-static ssize_t o2hb_heartbeat_group_threshold_store(struct config_item *item,
+static ssize_t o2hb_heartbeat_group_dead_threshold_store(struct config_item *item,
 		const char *page, size_t count)
 {
 	unsigned long tmp;
@@ -2293,11 +2297,11 @@ static ssize_t o2hb_heartbeat_group_mode_store(struct config_item *item,
 
 }
 
-CONFIGFS_ATTR(o2hb_heartbeat_group_, threshold);
+CONFIGFS_ATTR(o2hb_heartbeat_group_, dead_threshold);
 CONFIGFS_ATTR(o2hb_heartbeat_group_, mode);
 
 static struct configfs_attribute *o2hb_heartbeat_group_attrs[] = {
-	&o2hb_heartbeat_group_attr_threshold,
+	&o2hb_heartbeat_group_attr_dead_threshold,
 	&o2hb_heartbeat_group_attr_mode,
 	NULL,
 };

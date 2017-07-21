@@ -180,7 +180,7 @@ void iwlagn_dev_txfifo_flush(struct iwl_priv *priv)
 		goto done;
 	}
 	IWL_DEBUG_INFO(priv, "wait transmit/flush all frames\n");
-	iwl_trans_wait_tx_queue_empty(priv->trans, 0xffffffff);
+	iwl_trans_wait_tx_queues_empty(priv->trans, 0xffffffff);
 done:
 	ieee80211_wake_queues(priv->hw);
 	mutex_unlock(&priv->mutex);
@@ -201,23 +201,6 @@ static const __le32 iwlagn_def_3w_lookup[IWLAGN_BT_DECISION_LUT_SIZE] = {
 	cpu_to_le32(0x0000aaaa),
 	cpu_to_le32(0xc0004000),
 	cpu_to_le32(0x00004000),
-	cpu_to_le32(0xf0005000),
-	cpu_to_le32(0xf0005000),
-};
-
-
-/* Loose Coex */
-static const __le32 iwlagn_loose_lookup[IWLAGN_BT_DECISION_LUT_SIZE] = {
-	cpu_to_le32(0xaaaaaaaa),
-	cpu_to_le32(0xaaaaaaaa),
-	cpu_to_le32(0xaeaaaaaa),
-	cpu_to_le32(0xaaaaaaaa),
-	cpu_to_le32(0xcc00ff28),
-	cpu_to_le32(0x0000aaaa),
-	cpu_to_le32(0xcc00aaaa),
-	cpu_to_le32(0x0000aaaa),
-	cpu_to_le32(0x00000000),
-	cpu_to_le32(0x00000000),
 	cpu_to_le32(0xf0005000),
 	cpu_to_le32(0xf0005000),
 };
@@ -1174,7 +1157,7 @@ int iwlagn_suspend(struct iwl_priv *priv, struct cfg80211_wowlan *wowlan)
 	if (ret)
 		goto out;
 
-	if (!iwlwifi_mod_params.sw_crypto) {
+	if (!iwlwifi_mod_params.swcrypto) {
 		/* mark all keys clear */
 		priv->ucode_key_table = 0;
 		ctx->key_mapping_keys = 0;

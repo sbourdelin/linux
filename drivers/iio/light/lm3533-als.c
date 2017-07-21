@@ -267,7 +267,7 @@ static irqreturn_t lm3533_als_isr(int irq, void *dev_id)
 					    0,
 					    IIO_EV_TYPE_THRESH,
 					    IIO_EV_DIR_EITHER),
-		       iio_get_time_ns());
+		       iio_get_time_ns(indio_dev));
 out:
 	return IRQ_HANDLED;
 }
@@ -690,7 +690,7 @@ static struct attribute *lm3533_als_event_attributes[] = {
 	NULL
 };
 
-static struct attribute_group lm3533_als_event_attribute_group = {
+static const struct attribute_group lm3533_als_event_attribute_group = {
 	.attrs = lm3533_als_event_attributes
 };
 
@@ -714,7 +714,7 @@ static struct attribute *lm3533_als_attributes[] = {
 	NULL
 };
 
-static struct attribute_group lm3533_als_attribute_group = {
+static const struct attribute_group lm3533_als_attribute_group = {
 	.attrs = lm3533_als_attributes
 };
 

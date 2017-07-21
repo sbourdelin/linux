@@ -26,6 +26,7 @@
 #include "xfs_mount.h"
 #include "xfs_da_format.h"
 #include "xfs_da_btree.h"
+#include "xfs_defer.h"
 #include "xfs_dir2.h"
 #include "xfs_inode.h"
 #include "xfs_ialloc.h"
@@ -42,8 +43,8 @@
 #include "xfs_log.h"
 
 /* ----- Kernel only functions below ----- */
-STATIC int
-xfs_readlink_bmap(
+int
+xfs_readlink_bmap_ilocked(
 	struct xfs_inode	*ip,
 	char			*link)
 {
@@ -59,6 +60,8 @@ xfs_readlink_bmap(
 	int			error = 0;
 	int			fsblocks = 0;
 	int			offset;
+
+	ASSERT(xfs_isilocked(ip, XFS_ILOCK_SHARED | XFS_ILOCK_EXCL));
 
 	fsblocks = xfs_symlink_blocks(mp, pathlen);
 	error = xfs_bmapi_read(ip, 0, fsblocks, mval, &nmaps, 0);
@@ -142,7 +145,7 @@ xfs_readlink(
 	if (!pathlen)
 		goto out;
 
-	if (pathlen < 0 || pathlen > MAXPATHLEN) {
+	if (pathlen < 0 || pathlen > XFS_SYMLINK_MAXLEN) {
 		xfs_alert(mp, "%s: inode (%llu) bad symlink length (%lld)",
 			 __func__, (unsigned long long) ip->i_ino,
 			 (long long) pathlen);
@@ -152,7 +155,7 @@ xfs_readlink(
 	}
 
 
-	error = xfs_readlink_bmap(ip, link);
+	error = xfs_readlink_bmap_ilocked(ip, link);
 
  out:
 	xfs_iunlock(ip, XFS_ILOCK_SHARED);
@@ -172,7 +175,7 @@ xfs_symlink(
 	struct xfs_inode	*ip = NULL;
 	int			error = 0;
 	int			pathlen;
-	struct xfs_bmap_free	free_list;
+	struct xfs_defer_ops	dfops;
 	xfs_fsblock_t		first_block;
 	bool                    unlock_dp_on_error = false;
 	xfs_fileoff_t		first_fsb;
@@ -201,7 +204,7 @@ xfs_symlink(
 	 * Check component lengths of the target path name.
 	 */
 	pathlen = strlen(target_path);
-	if (pathlen >= MAXPATHLEN)      /* total string too long */
+	if (pathlen >= XFS_SYMLINK_MAXLEN)      /* total string too long */
 		return -ENAMETOOLONG;
 
 	udqp = gdqp = NULL;
@@ -237,8 +240,7 @@ xfs_symlink(
 	if (error)
 		goto out_release_inode;
 
-	xfs_ilock(dp, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL |
-		      XFS_IOLOCK_PARENT | XFS_ILOCK_PARENT);
+	xfs_ilock(dp, XFS_ILOCK_EXCL | XFS_ILOCK_PARENT);
 	unlock_dp_on_error = true;
 
 	/*
@@ -269,7 +271,7 @@ xfs_symlink(
 	 * Initialize the bmap freelist prior to calling either
 	 * bmapi or the directory create code.
 	 */
-	xfs_bmap_init(&free_list, &first_block);
+	xfs_defer_init(&dfops, &first_block);
 
 	/*
 	 * Allocate an inode for the symlink.
@@ -286,7 +288,7 @@ xfs_symlink(
 	 * the transaction cancel unlocking dp so don't do it explicitly in the
 	 * error path.
 	 */
-	xfs_trans_ijoin(tp, dp, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+	xfs_trans_ijoin(tp, dp, XFS_ILOCK_EXCL);
 	unlock_dp_on_error = false;
 
 	/*
@@ -313,7 +315,7 @@ xfs_symlink(
 
 		error = xfs_bmapi_write(tp, ip, first_fsb, fs_blocks,
 				  XFS_BMAPI_METADATA, &first_block, resblks,
-				  mval, &nmaps, &free_list);
+				  mval, &nmaps, &dfops);
 		if (error)
 			goto out_bmap_cancel;
 
@@ -361,7 +363,7 @@ xfs_symlink(
 	 * Create the directory entry for the symlink.
 	 */
 	error = xfs_dir_createname(tp, dp, link_name, ip->i_ino,
-					&first_block, &free_list, resblks);
+					&first_block, &dfops, resblks);
 	if (error)
 		goto out_bmap_cancel;
 	xfs_trans_ichgtime(tp, dp, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
@@ -376,7 +378,7 @@ xfs_symlink(
 		xfs_trans_set_sync(tp);
 	}
 
-	error = xfs_bmap_finish(&tp, &free_list, NULL);
+	error = xfs_defer_finish(&tp, &dfops, NULL);
 	if (error)
 		goto out_bmap_cancel;
 
@@ -392,7 +394,7 @@ xfs_symlink(
 	return 0;
 
 out_bmap_cancel:
-	xfs_bmap_cancel(&free_list);
+	xfs_defer_cancel(&dfops);
 out_trans_cancel:
 	xfs_trans_cancel(tp);
 out_release_inode:
@@ -411,7 +413,7 @@ out_release_inode:
 	xfs_qm_dqrele(pdqp);
 
 	if (unlock_dp_on_error)
-		xfs_iunlock(dp, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
+		xfs_iunlock(dp, XFS_ILOCK_EXCL);
 	return error;
 }
 
@@ -426,7 +428,7 @@ xfs_inactive_symlink_rmt(
 	int		done;
 	int		error;
 	xfs_fsblock_t	first_block;
-	xfs_bmap_free_t	free_list;
+	struct xfs_defer_ops	dfops;
 	int		i;
 	xfs_mount_t	*mp;
 	xfs_bmbt_irec_t	mval[XFS_SYMLINK_MAPS];
@@ -465,7 +467,7 @@ xfs_inactive_symlink_rmt(
 	 * Find the block(s) so we can inval and unmap them.
 	 */
 	done = 0;
-	xfs_bmap_init(&free_list, &first_block);
+	xfs_defer_init(&dfops, &first_block);
 	nmaps = ARRAY_SIZE(mval);
 	error = xfs_bmapi_read(ip, 0, xfs_symlink_blocks(mp, size),
 				mval, &nmaps, 0);
@@ -485,17 +487,17 @@ xfs_inactive_symlink_rmt(
 		xfs_trans_binval(tp, bp);
 	}
 	/*
-	 * Unmap the dead block(s) to the free_list.
+	 * Unmap the dead block(s) to the dfops.
 	 */
 	error = xfs_bunmapi(tp, ip, 0, size, 0, nmaps,
-			    &first_block, &free_list, &done);
+			    &first_block, &dfops, &done);
 	if (error)
 		goto error_bmap_cancel;
 	ASSERT(done);
 	/*
 	 * Commit the first transaction.  This logs the EFI and the inode.
 	 */
-	error = xfs_bmap_finish(&tp, &free_list, ip);
+	error = xfs_defer_finish(&tp, &dfops, ip);
 	if (error)
 		goto error_bmap_cancel;
 	/*
@@ -525,7 +527,7 @@ xfs_inactive_symlink_rmt(
 	return 0;
 
 error_bmap_cancel:
-	xfs_bmap_cancel(&free_list);
+	xfs_defer_cancel(&dfops);
 error_trans_cancel:
 	xfs_trans_cancel(tp);
 error_unlock:
@@ -559,7 +561,7 @@ xfs_inactive_symlink(
 		return 0;
 	}
 
-	if (pathlen < 0 || pathlen > MAXPATHLEN) {
+	if (pathlen < 0 || pathlen > XFS_SYMLINK_MAXLEN) {
 		xfs_alert(mp, "%s: inode (0x%llx) bad symlink length (%d)",
 			 __func__, (unsigned long long)ip->i_ino, pathlen);
 		xfs_iunlock(ip, XFS_ILOCK_EXCL);

@@ -1,3 +1,5 @@
+#include <errno.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <linux/types.h>
@@ -154,10 +156,6 @@ next_event:
 	err = 0;
 
 out_err:
-	if (evlist) {
-		perf_evlist__disable(evlist);
-		perf_evlist__delete(evlist);
-	}
-
+	perf_evlist__delete(evlist);
 	return err;
 }

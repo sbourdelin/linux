@@ -18,10 +18,13 @@
 #include "util/data.h"
 #include "util/auxtrace.h"
 #include "util/jit.h"
+#include "util/thread.h"
 
 #include <subcmd/parse-options.h>
 
 #include <linux/list.h>
+#include <errno.h>
+#include <signal.h>
 
 struct perf_inject {
 	struct perf_tool	tool;
@@ -333,6 +336,18 @@ static int perf_event__repipe_comm(struct perf_tool *tool,
 	return err;
 }
 
+static int perf_event__repipe_namespaces(struct perf_tool *tool,
+					 union perf_event *event,
+					 struct perf_sample *sample,
+					 struct machine *machine)
+{
+	int err = perf_event__process_namespaces(tool, event, sample, machine);
+
+	perf_event__repipe(tool, event, sample, machine);
+
+	return err;
+}
+
 static int perf_event__repipe_exit(struct perf_tool *tool,
 				   union perf_event *event,
 				   struct perf_sample *sample,
@@ -429,7 +444,7 @@ static int perf_event__inject_buildid(struct perf_tool *tool,
 	if (al.map != NULL) {
 		if (!al.map->dso->hit) {
 			al.map->dso->hit = 1;
-			if (map__load(al.map, NULL) >= 0) {
+			if (map__load(al.map) >= 0) {
 				dso__inject_build_id(al.map->dso, tool, machine);
 				/*
 				 * If this fails, too bad, let the other side
@@ -562,7 +577,7 @@ static void strip_init(struct perf_inject *inject)
 
 	inject->tool.context_switch = perf_event__drop;
 
-	evlist__for_each(evlist, evsel)
+	evlist__for_each_entry(evlist, evsel)
 		evsel->handler = drop_sample;
 }
 
@@ -590,7 +605,7 @@ static bool ok_to_remove(struct perf_evlist *evlist,
 	if (!has_tracking(evsel_to_remove))
 		return true;
 
-	evlist__for_each(evlist, evsel) {
+	evlist__for_each_entry(evlist, evsel) {
 		if (evsel->handler != drop_sample) {
 			cnt += 1;
 			if ((evsel->attr.sample_type & COMPAT_MASK) ==
@@ -608,7 +623,7 @@ static void strip_fini(struct perf_inject *inject)
 	struct perf_evsel *evsel, *tmp;
 
 	/* Remove non-synthesized evsels if possible */
-	evlist__for_each_safe(evlist, tmp, evsel) {
+	evlist__for_each_entry_safe(evlist, tmp, evsel) {
 		if (evsel->handler == drop_sample &&
 		    ok_to_remove(evlist, evsel)) {
 			pr_debug("Deleting %s\n", perf_evsel__name(evsel));
@@ -643,7 +658,7 @@ static int __cmd_inject(struct perf_inject *inject)
 	} else if (inject->sched_stat) {
 		struct perf_evsel *evsel;
 
-		evlist__for_each(session->evlist, evsel) {
+		evlist__for_each_entry(session->evlist, evsel) {
 			const char *name = perf_evsel__name(evsel);
 
 			if (!strcmp(name, "sched:sched_switch")) {
@@ -660,6 +675,7 @@ static int __cmd_inject(struct perf_inject *inject)
 		session->itrace_synth_opts = &inject->itrace_synth_opts;
 		inject->itrace_synth_opts.inject = true;
 		inject->tool.comm	    = perf_event__repipe_comm;
+		inject->tool.namespaces	    = perf_event__repipe_namespaces;
 		inject->tool.exit	    = perf_event__repipe_exit;
 		inject->tool.id_index	    = perf_event__repipe_id_index;
 		inject->tool.auxtrace_info  = perf_event__process_auxtrace_info;
@@ -681,6 +697,8 @@ static int __cmd_inject(struct perf_inject *inject)
 		lseek(fd, output_data_offset, SEEK_SET);
 
 	ret = perf_session__process_events(session);
+	if (ret)
+		return ret;
 
 	if (!file_out->is_pipe) {
 		if (inject->build_ids)
@@ -725,7 +743,7 @@ static int __cmd_inject(struct perf_inject *inject)
 	return ret;
 }
 
-int cmd_inject(int argc, const char **argv, const char *prefix __maybe_unused)
+int cmd_inject(int argc, const char **argv)
 {
 	struct perf_inject inject = {
 		.tool = {

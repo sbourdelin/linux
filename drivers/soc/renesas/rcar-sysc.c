@@ -2,7 +2,7 @@
  * R-Car SYSC Power management support
  *
  * Copyright (C) 2014  Magnus Damm
- * Copyright (C) 2015-2016 Glider bvba
+ * Copyright (C) 2015-2017 Glider bvba
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -164,15 +164,6 @@ static bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
 	return false;
 }
 
-void __iomem *rcar_sysc_init(phys_addr_t base)
-{
-	rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
-	if (!rcar_sysc_base)
-		panic("unable to ioremap R-Car SYSC hardware block\n");
-
-	return rcar_sysc_base;
-}
-
 struct rcar_sysc_pd {
 	struct generic_pm_domain genpd;
 	struct rcar_sysc_ch ch;
@@ -190,17 +181,6 @@ static int rcar_sysc_pd_power_off(struct generic_pm_domain *genpd)
 	struct rcar_sysc_pd *pd = to_rcar_pd(genpd);
 
 	pr_debug("%s: %s\n", __func__, genpd->name);
-
-	if (pd->flags & PD_NO_CR) {
-		pr_debug("%s: Cannot control %s\n", __func__, genpd->name);
-		return -EBUSY;
-	}
-
-	if (pd->flags & PD_BUSY) {
-		pr_debug("%s: %s busy\n", __func__, genpd->name);
-		return -EBUSY;
-	}
-
 	return rcar_sysc_power_down(&pd->ch);
 }
 
@@ -209,12 +189,6 @@ static int rcar_sysc_pd_power_on(struct generic_pm_domain *genpd)
 	struct rcar_sysc_pd *pd = to_rcar_pd(genpd);
 
 	pr_debug("%s: %s\n", __func__, genpd->name);
-
-	if (pd->flags & PD_NO_CR) {
-		pr_debug("%s: Cannot control %s\n", __func__, genpd->name);
-		return 0;
-	}
-
 	return rcar_sysc_power_up(&pd->ch);
 }
 
@@ -232,8 +206,7 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
 		 * only be turned off if the CPU is not in use.
 		 */
 		pr_debug("PM domain %s contains %s\n", name, "CPU");
-		pd->flags |= PD_BUSY;
-		gov = &pm_domain_always_on_gov;
+		genpd->flags |= GENPD_FLAG_ALWAYS_ON;
 	} else if (pd->flags & PD_SCU) {
 		/*
 		 * This domain contains an SCU and cache-controller, and
@@ -241,19 +214,17 @@ static void __init rcar_sysc_pd_setup(struct rcar_sysc_pd *pd)
 		 * not in use.
 		 */
 		pr_debug("PM domain %s contains %s\n", name, "SCU");
-		pd->flags |= PD_BUSY;
-		gov = &pm_domain_always_on_gov;
+		genpd->flags |= GENPD_FLAG_ALWAYS_ON;
 	} else if (pd->flags & PD_NO_CR) {
 		/*
 		 * This domain cannot be turned off.
 		 */
-		pd->flags |= PD_BUSY;
-		gov = &pm_domain_always_on_gov;
+		genpd->flags |= GENPD_FLAG_ALWAYS_ON;
 	}
 
 	if (!(pd->flags & (PD_CPU | PD_SCU))) {
 		/* Enable Clock Domain for I/O devices */
-		genpd->flags = GENPD_FLAG_PM_CLK;
+		genpd->flags |= GENPD_FLAG_PM_CLK;
 		if (has_cpg_mstp) {
 			genpd->attach_dev = cpg_mstp_attach_dev;
 			genpd->detach_dev = cpg_mstp_detach_dev;
@@ -284,24 +255,34 @@ finalize:
 }
 
 static const struct of_device_id rcar_sysc_matches[] = {
-#ifdef CONFIG_ARCH_R8A7779
+#ifdef CONFIG_SYSC_R8A7743
+	{ .compatible = "renesas,r8a7743-sysc", .data = &r8a7743_sysc_info },
+#endif
+#ifdef CONFIG_SYSC_R8A7745
+	{ .compatible = "renesas,r8a7745-sysc", .data = &r8a7745_sysc_info },
+#endif
+#ifdef CONFIG_SYSC_R8A7779
 	{ .compatible = "renesas,r8a7779-sysc", .data = &r8a7779_sysc_info },
 #endif
-#ifdef CONFIG_ARCH_R8A7790
+#ifdef CONFIG_SYSC_R8A7790
 	{ .compatible = "renesas,r8a7790-sysc", .data = &r8a7790_sysc_info },
 #endif
-#ifdef CONFIG_ARCH_R8A7791
+#ifdef CONFIG_SYSC_R8A7791
 	{ .compatible = "renesas,r8a7791-sysc", .data = &r8a7791_sysc_info },
-#endif
-#ifdef CONFIG_ARCH_R8A7793
 	/* R-Car M2-N is identical to R-Car M2-W w.r.t. power domains. */
 	{ .compatible = "renesas,r8a7793-sysc", .data = &r8a7791_sysc_info },
 #endif
-#ifdef CONFIG_ARCH_R8A7794
+#ifdef CONFIG_SYSC_R8A7792
+	{ .compatible = "renesas,r8a7792-sysc", .data = &r8a7792_sysc_info },
+#endif
+#ifdef CONFIG_SYSC_R8A7794
 	{ .compatible = "renesas,r8a7794-sysc", .data = &r8a7794_sysc_info },
 #endif
-#ifdef CONFIG_ARCH_R8A7795
+#ifdef CONFIG_SYSC_R8A7795
 	{ .compatible = "renesas,r8a7795-sysc", .data = &r8a7795_sysc_info },
+#endif
+#ifdef CONFIG_SYSC_R8A7796
+	{ .compatible = "renesas,r8a7796-sysc", .data = &r8a7796_sysc_info },
 #endif
 	{ /* sentinel */ }
 };
@@ -322,11 +303,20 @@ static int __init rcar_sysc_pd_init(void)
 	unsigned int i;
 	int error;
 
+	if (rcar_sysc_base)
+		return 0;
+
 	np = of_find_matching_node_and_match(NULL, rcar_sysc_matches, &match);
 	if (!np)
 		return -ENODEV;
 
 	info = match->data;
+
+	if (info->init) {
+		error = info->init();
+		if (error)
+			return error;
+	}
 
 	has_cpg_mstp = of_find_compatible_node(NULL, NULL,
 					       "renesas,cpg-mstp-clocks");
@@ -371,6 +361,11 @@ static int __init rcar_sysc_pd_init(void)
 		const struct rcar_sysc_area *area = &info->areas[i];
 		struct rcar_sysc_pd *pd;
 
+		if (!area->name) {
+			/* Skip NULLified area */
+			continue;
+		}
+
 		pd = kzalloc(sizeof(*pd) + strlen(area->name) + 1, GFP_KERNEL);
 		if (!pd) {
 			error = -ENOMEM;
@@ -392,10 +387,47 @@ static int __init rcar_sysc_pd_init(void)
 		domains->domains[area->isr_bit] = &pd->genpd;
 	}
 
-	of_genpd_add_provider_onecell(np, &domains->onecell_data);
+	error = of_genpd_add_provider_onecell(np, &domains->onecell_data);
 
 out_put:
 	of_node_put(np);
 	return error;
 }
 early_initcall(rcar_sysc_pd_init);
+
+void __init rcar_sysc_nullify(struct rcar_sysc_area *areas,
+			      unsigned int num_areas, u8 id)
+{
+	unsigned int i;
+
+	for (i = 0; i < num_areas; i++)
+		if (areas[i].isr_bit == id) {
+			areas[i].name = NULL;
+			return;
+		}
+}
+
+void __init rcar_sysc_init(phys_addr_t base, u32 syscier)
+{
+	u32 syscimr;
+
+	if (!rcar_sysc_pd_init())
+		return;
+
+	rcar_sysc_base = ioremap_nocache(base, PAGE_SIZE);
+
+	/*
+	 * Mask all interrupt sources to prevent the CPU from receiving them.
+	 * Make sure not to clear reserved bits that were set before.
+	 */
+	syscimr = ioread32(rcar_sysc_base + SYSCIMR);
+	syscimr |= syscier;
+	pr_debug("%s: syscimr = 0x%08x\n", __func__, syscimr);
+	iowrite32(syscimr, rcar_sysc_base + SYSCIMR);
+
+	/*
+	 * SYSC needs all interrupt sources enabled to control power.
+	 */
+	pr_debug("%s: syscier = 0x%08x\n", __func__, syscier);
+	iowrite32(syscier, rcar_sysc_base + SYSCIER);
+}

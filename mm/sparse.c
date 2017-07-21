@@ -59,7 +59,7 @@ static inline void set_section_nid(unsigned long section_nr, int nid)
 #endif
 
 #ifdef CONFIG_SPARSEMEM_EXTREME
-static struct mem_section noinline __init_refok *sparse_index_alloc(int nid)
+static noinline struct mem_section __ref *sparse_index_alloc(int nid)
 {
 	struct mem_section *section = NULL;
 	unsigned long array_size = SECTIONS_PER_ROOT *
@@ -100,11 +100,7 @@ static inline int sparse_index_init(unsigned long section_nr, int nid)
 }
 #endif
 
-/*
- * Although written for the SPARSEMEM_EXTREME case, this happens
- * to also work for the flat array case because
- * NR_SECTION_ROOTS==NR_MEM_SECTIONS.
- */
+#ifdef CONFIG_SPARSEMEM_EXTREME
 int __section_nr(struct mem_section* ms)
 {
 	unsigned long root_nr;
@@ -123,6 +119,12 @@ int __section_nr(struct mem_section* ms)
 
 	return (root_nr * SECTIONS_PER_ROOT) + (ms - root);
 }
+#else
+int __section_nr(struct mem_section* ms)
+{
+	return (int)(ms - mem_section[0]);
+}
+#endif
 
 /*
  * During early boot, before section_mem_map is used for an actual
@@ -166,6 +168,44 @@ void __meminit mminit_validate_memmodel_limits(unsigned long *start_pfn,
 	}
 }
 
+/*
+ * There are a number of times that we loop over NR_MEM_SECTIONS,
+ * looking for section_present() on each.  But, when we have very
+ * large physical address spaces, NR_MEM_SECTIONS can also be
+ * very large which makes the loops quite long.
+ *
+ * Keeping track of this gives us an easy way to break out of
+ * those loops early.
+ */
+int __highest_present_section_nr;
+static void section_mark_present(struct mem_section *ms)
+{
+	int section_nr = __section_nr(ms);
+
+	if (section_nr > __highest_present_section_nr)
+		__highest_present_section_nr = section_nr;
+
+	ms->section_mem_map |= SECTION_MARKED_PRESENT;
+}
+
+static inline int next_present_section_nr(int section_nr)
+{
+	do {
+		section_nr++;
+		if (present_section_nr(section_nr))
+			return section_nr;
+	} while ((section_nr < NR_MEM_SECTIONS) &&
+		 (section_nr <= __highest_present_section_nr));
+
+	return -1;
+}
+#define for_each_present_section_nr(start, section_nr)		\
+	for (section_nr = next_present_section_nr(start-1);	\
+	     ((section_nr >= 0) &&				\
+	      (section_nr < NR_MEM_SECTIONS) &&			\
+	      (section_nr <= __highest_present_section_nr));	\
+	     section_nr = next_present_section_nr(section_nr))
+
 /* Record a memory area against a node. */
 void __init memory_present(int nid, unsigned long start, unsigned long end)
 {
@@ -181,9 +221,11 @@ void __init memory_present(int nid, unsigned long start, unsigned long end)
 		set_section_nid(section, nid);
 
 		ms = __nr_to_section(section);
-		if (!ms->section_mem_map)
+		if (!ms->section_mem_map) {
 			ms->section_mem_map = sparse_encode_early_nid(nid) |
-							SECTION_MARKED_PRESENT;
+							SECTION_IS_ONLINE;
+			section_mark_present(ms);
+		}
 	}
 }
 
@@ -246,10 +288,7 @@ static int __meminit sparse_init_one_section(struct mem_section *ms,
 
 unsigned long usemap_size(void)
 {
-	unsigned long size_bytes;
-	size_bytes = roundup(SECTION_BLOCKFLAGS_BITS, 8) / 8;
-	size_bytes = roundup(size_bytes, sizeof(unsigned long));
-	return size_bytes;
+	return BITS_TO_LONGS(SECTION_BLOCKFLAGS_BITS) * sizeof(unsigned long);
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG
@@ -477,23 +516,19 @@ static void __init alloc_usemap_and_memmap(void (*alloc_func)
 	int nodeid_begin = 0;
 	unsigned long pnum_begin = 0;
 
-	for (pnum = 0; pnum < NR_MEM_SECTIONS; pnum++) {
+	for_each_present_section_nr(0, pnum) {
 		struct mem_section *ms;
 
-		if (!present_section_nr(pnum))
-			continue;
 		ms = __nr_to_section(pnum);
 		nodeid_begin = sparse_early_nid(ms);
 		pnum_begin = pnum;
 		break;
 	}
 	map_count = 1;
-	for (pnum = pnum_begin + 1; pnum < NR_MEM_SECTIONS; pnum++) {
+	for_each_present_section_nr(pnum_begin + 1, pnum) {
 		struct mem_section *ms;
 		int nodeid;
 
-		if (!present_section_nr(pnum))
-			continue;
 		ms = __nr_to_section(pnum);
 		nodeid = sparse_early_nid(ms);
 		if (nodeid == nodeid_begin) {
@@ -562,10 +597,7 @@ void __init sparse_init(void)
 							(void *)map_map);
 #endif
 
-	for (pnum = 0; pnum < NR_MEM_SECTIONS; pnum++) {
-		if (!present_section_nr(pnum))
-			continue;
-
+	for_each_present_section_nr(0, pnum) {
 		usemap = usemap_map[pnum];
 		if (!usemap)
 			continue;
@@ -591,6 +623,48 @@ void __init sparse_init(void)
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG
+
+/* Mark all memory sections within the pfn range as online */
+void online_mem_sections(unsigned long start_pfn, unsigned long end_pfn)
+{
+	unsigned long pfn;
+
+	for (pfn = start_pfn; pfn < end_pfn; pfn += PAGES_PER_SECTION) {
+		unsigned long section_nr = pfn_to_section_nr(start_pfn);
+		struct mem_section *ms;
+
+		/* onlining code should never touch invalid ranges */
+		if (WARN_ON(!valid_section_nr(section_nr)))
+			continue;
+
+		ms = __nr_to_section(section_nr);
+		ms->section_mem_map |= SECTION_IS_ONLINE;
+	}
+}
+
+#ifdef CONFIG_MEMORY_HOTREMOVE
+/* Mark all memory sections within the pfn range as online */
+void offline_mem_sections(unsigned long start_pfn, unsigned long end_pfn)
+{
+	unsigned long pfn;
+
+	for (pfn = start_pfn; pfn < end_pfn; pfn += PAGES_PER_SECTION) {
+		unsigned long section_nr = pfn_to_section_nr(start_pfn);
+		struct mem_section *ms;
+
+		/*
+		 * TODO this needs some double checking. Offlining code makes
+		 * sure to check pfn_valid but those checks might be just bogus
+		 */
+		if (WARN_ON(!valid_section_nr(section_nr)))
+			continue;
+
+		ms = __nr_to_section(section_nr);
+		ms->section_mem_map &= ~SECTION_IS_ONLINE;
+	}
+}
+#endif
+
 #ifdef CONFIG_SPARSEMEM_VMEMMAP
 static inline struct page *kmalloc_section_memmap(unsigned long pnum, int nid)
 {
@@ -660,12 +734,12 @@ static void free_map_bootmem(struct page *memmap)
 		>> PAGE_SHIFT;
 
 	for (i = 0; i < nr_pages; i++, page++) {
-		magic = (unsigned long) page->lru.next;
+		magic = (unsigned long) page->freelist;
 
 		BUG_ON(magic == NODE_INFO);
 
 		maps_section_nr = pfn_to_section_nr(page_to_pfn(page));
-		removing_section_nr = page->private;
+		removing_section_nr = page_private(page);
 
 		/*
 		 * When this function is called, the removing section is
@@ -687,10 +761,9 @@ static void free_map_bootmem(struct page *memmap)
  * set.  If this is <=0, then that means that the passed-in
  * map was not consumed and must be freed.
  */
-int __meminit sparse_add_one_section(struct zone *zone, unsigned long start_pfn)
+int __meminit sparse_add_one_section(struct pglist_data *pgdat, unsigned long start_pfn)
 {
 	unsigned long section_nr = pfn_to_section_nr(start_pfn);
-	struct pglist_data *pgdat = zone->zone_pgdat;
 	struct mem_section *ms;
 	struct page *memmap;
 	unsigned long *usemap;
@@ -723,7 +796,7 @@ int __meminit sparse_add_one_section(struct zone *zone, unsigned long start_pfn)
 
 	memset(memmap, 0, sizeof(struct page) * PAGES_PER_SECTION);
 
-	ms->section_mem_map |= SECTION_MARKED_PRESENT;
+	section_mark_present(ms);
 
 	ret = sparse_init_one_section(ms, section_nr, memmap, usemap);
 

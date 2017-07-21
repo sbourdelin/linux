@@ -26,6 +26,7 @@
 #include <asm/machdep.h>
 #include <asm/msi_bitmap.h>
 #include <asm/ppc-pci.h>
+#include <asm/pnv-pci.h>
 #include <asm/opal.h>
 #include <asm/iommu.h>
 #include <asm/tce.h>
@@ -36,8 +37,124 @@
 #include "powernv.h"
 #include "pci.h"
 
-/* Delay in usec */
-#define PCI_RESET_DELAY_US	3000000
+int pnv_pci_get_slot_id(struct device_node *np, uint64_t *id)
+{
+	struct device_node *parent = np;
+	u32 bdfn;
+	u64 phbid;
+	int ret;
+
+	ret = of_property_read_u32(np, "reg", &bdfn);
+	if (ret)
+		return -ENXIO;
+
+	bdfn = ((bdfn & 0x00ffff00) >> 8);
+	while ((parent = of_get_parent(parent))) {
+		if (!PCI_DN(parent)) {
+			of_node_put(parent);
+			break;
+		}
+
+		if (!of_device_is_compatible(parent, "ibm,ioda2-phb")) {
+			of_node_put(parent);
+			continue;
+		}
+
+		ret = of_property_read_u64(parent, "ibm,opal-phbid", &phbid);
+		if (ret) {
+			of_node_put(parent);
+			return -ENXIO;
+		}
+
+		*id = PCI_SLOT_ID(phbid, bdfn);
+		return 0;
+	}
+
+	return -ENODEV;
+}
+EXPORT_SYMBOL_GPL(pnv_pci_get_slot_id);
+
+int pnv_pci_get_device_tree(uint32_t phandle, void *buf, uint64_t len)
+{
+	int64_t rc;
+
+	if (!opal_check_token(OPAL_GET_DEVICE_TREE))
+		return -ENXIO;
+
+	rc = opal_get_device_tree(phandle, (uint64_t)buf, len);
+	if (rc < OPAL_SUCCESS)
+		return -EIO;
+
+	return rc;
+}
+EXPORT_SYMBOL_GPL(pnv_pci_get_device_tree);
+
+int pnv_pci_get_presence_state(uint64_t id, uint8_t *state)
+{
+	int64_t rc;
+
+	if (!opal_check_token(OPAL_PCI_GET_PRESENCE_STATE))
+		return -ENXIO;
+
+	rc = opal_pci_get_presence_state(id, (uint64_t)state);
+	if (rc != OPAL_SUCCESS)
+		return -EIO;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pnv_pci_get_presence_state);
+
+int pnv_pci_get_power_state(uint64_t id, uint8_t *state)
+{
+	int64_t rc;
+
+	if (!opal_check_token(OPAL_PCI_GET_POWER_STATE))
+		return -ENXIO;
+
+	rc = opal_pci_get_power_state(id, (uint64_t)state);
+	if (rc != OPAL_SUCCESS)
+		return -EIO;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(pnv_pci_get_power_state);
+
+int pnv_pci_set_power_state(uint64_t id, uint8_t state, struct opal_msg *msg)
+{
+	struct opal_msg m;
+	int token, ret;
+	int64_t rc;
+
+	if (!opal_check_token(OPAL_PCI_SET_POWER_STATE))
+		return -ENXIO;
+
+	token = opal_async_get_token_interruptible();
+	if (unlikely(token < 0))
+		return token;
+
+	rc = opal_pci_set_power_state(token, id, (uint64_t)&state);
+	if (rc == OPAL_SUCCESS) {
+		ret = 0;
+		goto exit;
+	} else if (rc != OPAL_ASYNC_COMPLETION) {
+		ret = -EIO;
+		goto exit;
+	}
+
+	ret = opal_async_wait_response(token, &m);
+	if (ret < 0)
+		goto exit;
+
+	if (msg) {
+		ret = 1;
+		memcpy(msg, &m, sizeof(m));
+	}
+
+exit:
+	opal_async_release_token(token);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(pnv_pci_set_power_state);
 
 #ifdef CONFIG_PCI_MSI
 int pnv_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
@@ -69,7 +186,7 @@ int pnv_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
 			return -ENOSPC;
 		}
 		virq = irq_create_mapping(NULL, phb->msi_base + hwirq);
-		if (virq == NO_IRQ) {
+		if (!virq) {
 			pr_warn("%s: Failed to map MSI to linux irq\n",
 				pci_name(pdev));
 			msi_bitmap_free_hwirqs(&phb->msi_bmp, hwirq, 1);
@@ -100,7 +217,7 @@ void pnv_teardown_msi_irqs(struct pci_dev *pdev)
 		return;
 
 	for_each_pci_msi_entry(entry, pdev) {
-		if (entry->irq == NO_IRQ)
+		if (!entry->irq)
 			continue;
 		hwirq = virq_to_hw(entry->irq);
 		irq_set_msi_desc(entry->irq, NULL);
@@ -110,14 +227,42 @@ void pnv_teardown_msi_irqs(struct pci_dev *pdev)
 }
 #endif /* CONFIG_PCI_MSI */
 
+/* Nicely print the contents of the PE State Tables (PEST). */
+static void pnv_pci_dump_pest(__be64 pestA[], __be64 pestB[], int pest_size)
+{
+	__be64 prevA = ULONG_MAX, prevB = ULONG_MAX;
+	bool dup = false;
+	int i;
+
+	for (i = 0; i < pest_size; i++) {
+		__be64 peA = be64_to_cpu(pestA[i]);
+		__be64 peB = be64_to_cpu(pestB[i]);
+
+		if (peA != prevA || peB != prevB) {
+			if (dup) {
+				pr_info("PE[..%03x] A/B: as above\n", i-1);
+				dup = false;
+			}
+			prevA = peA;
+			prevB = peB;
+			if (peA & PNV_IODA_STOPPED_STATE ||
+			    peB & PNV_IODA_STOPPED_STATE)
+				pr_info("PE[%03x] A/B: %016llx %016llx\n",
+					i, peA, peB);
+		} else if (!dup && (peA & PNV_IODA_STOPPED_STATE ||
+				    peB & PNV_IODA_STOPPED_STATE)) {
+			dup = true;
+		}
+	}
+}
+
 static void pnv_pci_dump_p7ioc_diag_data(struct pci_controller *hose,
 					 struct OpalIoPhbErrorCommon *common)
 {
 	struct OpalIoP7IOCPhbErrorData *data;
-	int i;
 
 	data = (struct OpalIoP7IOCPhbErrorData *)common;
-	pr_info("P7IOC PHB#%d Diag-data (Version: %d)\n",
+	pr_info("P7IOC PHB#%x Diag-data (Version: %d)\n",
 		hose->global_number, be32_to_cpu(common->version));
 
 	if (data->brdgCtl)
@@ -191,25 +336,16 @@ static void pnv_pci_dump_p7ioc_diag_data(struct pci_controller *hose,
 			be64_to_cpu(data->dma1ErrorLog0),
 			be64_to_cpu(data->dma1ErrorLog1));
 
-	for (i = 0; i < OPAL_P7IOC_NUM_PEST_REGS; i++) {
-		if ((data->pestA[i] >> 63) == 0 &&
-		    (data->pestB[i] >> 63) == 0)
-			continue;
-
-		pr_info("PE[%3d] A/B: %016llx %016llx\n",
-			i, be64_to_cpu(data->pestA[i]),
-			be64_to_cpu(data->pestB[i]));
-	}
+	pnv_pci_dump_pest(data->pestA, data->pestB, OPAL_P7IOC_NUM_PEST_REGS);
 }
 
 static void pnv_pci_dump_phb3_diag_data(struct pci_controller *hose,
 					struct OpalIoPhbErrorCommon *common)
 {
 	struct OpalIoPhb3ErrorData *data;
-	int i;
 
 	data = (struct OpalIoPhb3ErrorData*)common;
-	pr_info("PHB3 PHB#%d Diag-data (Version: %d)\n",
+	pr_info("PHB3 PHB#%x Diag-data (Version: %d)\n",
 		hose->global_number, be32_to_cpu(common->version));
 	if (data->brdgCtl)
 		pr_info("brdgCtl:     %08x\n",
@@ -287,15 +423,109 @@ static void pnv_pci_dump_phb3_diag_data(struct pci_controller *hose,
 			be64_to_cpu(data->dma1ErrorLog0),
 			be64_to_cpu(data->dma1ErrorLog1));
 
-	for (i = 0; i < OPAL_PHB3_NUM_PEST_REGS; i++) {
-		if ((be64_to_cpu(data->pestA[i]) >> 63) == 0 &&
-		    (be64_to_cpu(data->pestB[i]) >> 63) == 0)
-			continue;
+	pnv_pci_dump_pest(data->pestA, data->pestB, OPAL_PHB3_NUM_PEST_REGS);
+}
 
-		pr_info("PE[%3d] A/B: %016llx %016llx\n",
-				i, be64_to_cpu(data->pestA[i]),
-				be64_to_cpu(data->pestB[i]));
-	}
+static void pnv_pci_dump_phb4_diag_data(struct pci_controller *hose,
+					struct OpalIoPhbErrorCommon *common)
+{
+	struct OpalIoPhb4ErrorData *data;
+
+	data = (struct OpalIoPhb4ErrorData*)common;
+	pr_info("PHB4 PHB#%d Diag-data (Version: %d)\n",
+		hose->global_number, be32_to_cpu(common->version));
+	if (data->brdgCtl)
+		pr_info("brdgCtl:    %08x\n",
+			be32_to_cpu(data->brdgCtl));
+	if (data->deviceStatus || data->slotStatus   ||
+	    data->linkStatus   || data->devCmdStatus ||
+	    data->devSecStatus)
+		pr_info("RootSts:    %08x %08x %08x %08x %08x\n",
+			be32_to_cpu(data->deviceStatus),
+			be32_to_cpu(data->slotStatus),
+			be32_to_cpu(data->linkStatus),
+			be32_to_cpu(data->devCmdStatus),
+			be32_to_cpu(data->devSecStatus));
+	if (data->rootErrorStatus || data->uncorrErrorStatus ||
+	    data->corrErrorStatus)
+		pr_info("RootErrSts: %08x %08x %08x\n",
+			be32_to_cpu(data->rootErrorStatus),
+			be32_to_cpu(data->uncorrErrorStatus),
+			be32_to_cpu(data->corrErrorStatus));
+	if (data->tlpHdr1 || data->tlpHdr2 ||
+	    data->tlpHdr3 || data->tlpHdr4)
+		pr_info("RootErrLog: %08x %08x %08x %08x\n",
+			be32_to_cpu(data->tlpHdr1),
+			be32_to_cpu(data->tlpHdr2),
+			be32_to_cpu(data->tlpHdr3),
+			be32_to_cpu(data->tlpHdr4));
+	if (data->sourceId)
+		pr_info("sourceId:   %08x\n", be32_to_cpu(data->sourceId));
+	if (data->nFir)
+		pr_info("nFir:       %016llx %016llx %016llx\n",
+			be64_to_cpu(data->nFir),
+			be64_to_cpu(data->nFirMask),
+			be64_to_cpu(data->nFirWOF));
+	if (data->phbPlssr || data->phbCsr)
+		pr_info("PhbSts:     %016llx %016llx\n",
+			be64_to_cpu(data->phbPlssr),
+			be64_to_cpu(data->phbCsr));
+	if (data->lemFir)
+		pr_info("Lem:        %016llx %016llx %016llx\n",
+			be64_to_cpu(data->lemFir),
+			be64_to_cpu(data->lemErrorMask),
+			be64_to_cpu(data->lemWOF));
+	if (data->phbErrorStatus)
+		pr_info("PhbErr:     %016llx %016llx %016llx %016llx\n",
+			be64_to_cpu(data->phbErrorStatus),
+			be64_to_cpu(data->phbFirstErrorStatus),
+			be64_to_cpu(data->phbErrorLog0),
+			be64_to_cpu(data->phbErrorLog1));
+	if (data->phbTxeErrorStatus)
+		pr_info("PhbTxeErr:  %016llx %016llx %016llx %016llx\n",
+			be64_to_cpu(data->phbTxeErrorStatus),
+			be64_to_cpu(data->phbTxeFirstErrorStatus),
+			be64_to_cpu(data->phbTxeErrorLog0),
+			be64_to_cpu(data->phbTxeErrorLog1));
+	if (data->phbRxeArbErrorStatus)
+		pr_info("RxeArbErr:  %016llx %016llx %016llx %016llx\n",
+			be64_to_cpu(data->phbRxeArbErrorStatus),
+			be64_to_cpu(data->phbRxeArbFirstErrorStatus),
+			be64_to_cpu(data->phbRxeArbErrorLog0),
+			be64_to_cpu(data->phbRxeArbErrorLog1));
+	if (data->phbRxeMrgErrorStatus)
+		pr_info("RxeMrgErr:  %016llx %016llx %016llx %016llx\n",
+			be64_to_cpu(data->phbRxeMrgErrorStatus),
+			be64_to_cpu(data->phbRxeMrgFirstErrorStatus),
+			be64_to_cpu(data->phbRxeMrgErrorLog0),
+			be64_to_cpu(data->phbRxeMrgErrorLog1));
+	if (data->phbRxeTceErrorStatus)
+		pr_info("RxeTceErr:  %016llx %016llx %016llx %016llx\n",
+			be64_to_cpu(data->phbRxeTceErrorStatus),
+			be64_to_cpu(data->phbRxeTceFirstErrorStatus),
+			be64_to_cpu(data->phbRxeTceErrorLog0),
+			be64_to_cpu(data->phbRxeTceErrorLog1));
+
+	if (data->phbPblErrorStatus)
+		pr_info("PblErr:     %016llx %016llx %016llx %016llx\n",
+			be64_to_cpu(data->phbPblErrorStatus),
+			be64_to_cpu(data->phbPblFirstErrorStatus),
+			be64_to_cpu(data->phbPblErrorLog0),
+			be64_to_cpu(data->phbPblErrorLog1));
+	if (data->phbPcieDlpErrorStatus)
+		pr_info("PcieDlp:    %016llx %016llx %016llx\n",
+			be64_to_cpu(data->phbPcieDlpErrorLog1),
+			be64_to_cpu(data->phbPcieDlpErrorLog2),
+			be64_to_cpu(data->phbPcieDlpErrorStatus));
+	if (data->phbRegbErrorStatus)
+		pr_info("RegbErr:    %016llx %016llx %016llx %016llx\n",
+			be64_to_cpu(data->phbRegbErrorStatus),
+			be64_to_cpu(data->phbRegbFirstErrorStatus),
+			be64_to_cpu(data->phbRegbErrorLog0),
+			be64_to_cpu(data->phbRegbErrorLog1));
+
+
+	pnv_pci_dump_pest(data->pestA, data->pestB, OPAL_PHB4_NUM_PEST_REGS);
 }
 
 void pnv_pci_dump_phb_diag_data(struct pci_controller *hose,
@@ -314,6 +544,9 @@ void pnv_pci_dump_phb_diag_data(struct pci_controller *hose,
 	case OPAL_PHB_ERROR_DATA_TYPE_PHB3:
 		pnv_pci_dump_phb3_diag_data(hose, common);
 		break;
+	case OPAL_PHB_ERROR_DATA_TYPE_PHB4:
+		pnv_pci_dump_phb4_diag_data(hose, common);
+		break;
 	default:
 		pr_warn("%s: Unrecognized ioType %d\n",
 			__func__, be32_to_cpu(common->ioType));
@@ -328,8 +561,8 @@ static void pnv_pci_handle_eeh_config(struct pnv_phb *phb, u32 pe_no)
 	spin_lock_irqsave(&phb->lock, flags);
 
 	/* Fetch PHB diag-data */
-	rc = opal_pci_get_phb_diag_data2(phb->opal_id, phb->diag.blob,
-					 PNV_PCI_DIAG_BUF_SIZE);
+	rc = opal_pci_get_phb_diag_data2(phb->opal_id, phb->diag_data,
+					 phb->diag_data_size);
 	has_diag = (rc == OPAL_SUCCESS);
 
 	/* If PHB supports compound PE, to handle it */
@@ -357,7 +590,7 @@ static void pnv_pci_handle_eeh_config(struct pnv_phb *phb, u32 pe_no)
 	 * with the normal errors generated when probing empty slots
 	 */
 	if (has_diag && ret)
-		pnv_pci_dump_phb_diag_data(phb->hose, phb->diag.blob);
+		pnv_pci_dump_phb_diag_data(phb->hose, phb->diag_data);
 
 	spin_unlock_irqrestore(&phb->lock, flags);
 }
@@ -399,7 +632,7 @@ static void pnv_pci_config_check_eeh(struct pci_dn *pdn)
 		}
 	}
 
-	pr_devel(" -> EEH check, bdfn=%04x PE#%d fstate=%x\n",
+	pr_devel(" -> EEH check, bdfn=%04x PE#%x fstate=%x\n",
 		 (pdn->busno << 8) | (pdn->devfn), pe_no, fstate);
 
 	/* Clear the frozen state if applicable */
@@ -587,7 +820,7 @@ static __be64 *pnv_tce(struct iommu_table *tbl, long idx)
 
 int pnv_tce_build(struct iommu_table *tbl, long index, long npages,
 		unsigned long uaddr, enum dma_data_direction direction,
-		struct dma_attrs *attrs)
+		unsigned long attrs)
 {
 	u64 proto_tce = iommu_direction_to_tce_perm(direction);
 	u64 rpn = __pa(uaddr) >> tbl->it_page_shift;
@@ -620,8 +853,8 @@ int pnv_tce_xchg(struct iommu_table *tbl, long index,
 	if (newtce & TCE_PCI_WRITE)
 		newtce |= TCE_PCI_READ;
 
-	oldtce = xchg(pnv_tce(tbl, idx), cpu_to_be64(newtce));
-	*hpa = be64_to_cpu(oldtce) & ~(TCE_PCI_READ | TCE_PCI_WRITE);
+	oldtce = be64_to_cpu(xchg(pnv_tce(tbl, idx), cpu_to_be64(newtce)));
+	*hpa = oldtce & ~(TCE_PCI_READ | TCE_PCI_WRITE);
 	*direction = iommu_tce_direction(oldtce);
 
 	return 0;
@@ -641,7 +874,7 @@ void pnv_tce_free(struct iommu_table *tbl, long index, long npages)
 
 unsigned long pnv_tce_get(struct iommu_table *tbl, long index)
 {
-	return *(pnv_tce(tbl, index - tbl->it_offset));
+	return be64_to_cpu(*(pnv_tce(tbl, index - tbl->it_offset)));
 }
 
 struct iommu_table *pnv_pci_table_alloc(int nid)
@@ -649,7 +882,11 @@ struct iommu_table *pnv_pci_table_alloc(int nid)
 	struct iommu_table *tbl;
 
 	tbl = kzalloc_node(sizeof(struct iommu_table), GFP_KERNEL, nid);
+	if (!tbl)
+		return NULL;
+
 	INIT_LIST_HEAD_RCU(&tbl->it_group_list);
+	kref_init(&tbl->it_kref);
 
 	return tbl;
 }
@@ -815,12 +1052,20 @@ void __init pnv_pci_init(void)
 	for_each_compatible_node(np, NULL, "ibm,ioda2-phb")
 		pnv_pci_init_ioda2_phb(np);
 
+	/* Look for ioda3 built-in PHB4's, we treat them as IODA2 */
+	for_each_compatible_node(np, NULL, "ibm,ioda3-phb")
+		pnv_pci_init_ioda2_phb(np);
+
 	/* Look for NPU PHBs */
 	for_each_compatible_node(np, NULL, "ibm,ioda2-npu-phb")
 		pnv_pci_init_npu_phb(np);
 
-	/* Setup the linkage between OF nodes and PHBs */
-	pci_devs_phb_init();
+	/*
+	 * Look for NPU2 PHBs which we treat mostly as NPU PHBs with
+	 * the exception of TCE kill which requires an OPAL call.
+	 */
+	for_each_compatible_node(np, NULL, "ibm,ioda2-npu2-phb")
+		pnv_pci_init_npu_phb(np);
 
 	/* Configure IOMMU DMA hooks */
 	set_pci_dma_ops(&dma_iommu_ops);

@@ -10,6 +10,7 @@
 #include <sys/time.h>
 #include <time.h>
 #include <dirent.h>
+#include <errno.h>
 #include <unistd.h>
 #include "builtin.h"
 #include "perf.h"
@@ -21,6 +22,7 @@
 #include "util/build-id.h"
 #include "util/session.h"
 #include "util/symbol.h"
+#include "util/time-utils.h"
 
 static int build_id_cache__kcore_buildid(const char *proc_dir, char *sbuildid)
 {
@@ -47,19 +49,22 @@ static bool same_kallsyms_reloc(const char *from_dir, char *to_dir)
 	char to[PATH_MAX];
 	const char *name;
 	u64 addr1 = 0, addr2 = 0;
-	int i;
+	int i, err = -1;
 
 	scnprintf(from, sizeof(from), "%s/kallsyms", from_dir);
 	scnprintf(to, sizeof(to), "%s/kallsyms", to_dir);
 
 	for (i = 0; (name = ref_reloc_sym_names[i]) != NULL; i++) {
-		addr1 = kallsyms__get_function_start(from, name);
-		if (addr1)
+		err = kallsyms__get_function_start(from, name, &addr1);
+		if (!err)
 			break;
 	}
 
-	if (name)
-		addr2 = kallsyms__get_function_start(to, name);
+	if (err)
+		return false;
+
+	if (kallsyms__get_function_start(to, name, &addr2))
+		return false;
 
 	return addr1 == addr2;
 }
@@ -209,7 +214,7 @@ static int build_id_cache__purge_path(const char *pathname)
 	if (err)
 		goto out;
 
-	strlist__for_each(pos, list) {
+	strlist__for_each_entry(pos, list) {
 		err = build_id_cache__remove_s(pos->s);
 		pr_debug("Removing %s %s: %s\n", pos->s, pathname,
 			 err ? "FAIL" : "Ok");
@@ -276,8 +281,7 @@ static int build_id_cache__update_file(const char *filename)
 	return err;
 }
 
-int cmd_buildid_cache(int argc, const char **argv,
-		      const char *prefix __maybe_unused)
+int cmd_buildid_cache(int argc, const char **argv)
 {
 	struct strlist *list;
 	struct str_node *pos;
@@ -343,7 +347,7 @@ int cmd_buildid_cache(int argc, const char **argv,
 	if (add_name_list_str) {
 		list = strlist__new(add_name_list_str, NULL);
 		if (list) {
-			strlist__for_each(pos, list)
+			strlist__for_each_entry(pos, list)
 				if (build_id_cache__add_file(pos->s)) {
 					if (errno == EEXIST) {
 						pr_debug("%s already in the cache\n",
@@ -351,7 +355,7 @@ int cmd_buildid_cache(int argc, const char **argv,
 						continue;
 					}
 					pr_warning("Couldn't add %s: %s\n",
-						   pos->s, strerror_r(errno, sbuf, sizeof(sbuf)));
+						   pos->s, str_error_r(errno, sbuf, sizeof(sbuf)));
 				}
 
 			strlist__delete(list);
@@ -361,7 +365,7 @@ int cmd_buildid_cache(int argc, const char **argv,
 	if (remove_name_list_str) {
 		list = strlist__new(remove_name_list_str, NULL);
 		if (list) {
-			strlist__for_each(pos, list)
+			strlist__for_each_entry(pos, list)
 				if (build_id_cache__remove_file(pos->s)) {
 					if (errno == ENOENT) {
 						pr_debug("%s wasn't in the cache\n",
@@ -369,7 +373,7 @@ int cmd_buildid_cache(int argc, const char **argv,
 						continue;
 					}
 					pr_warning("Couldn't remove %s: %s\n",
-						   pos->s, strerror_r(errno, sbuf, sizeof(sbuf)));
+						   pos->s, str_error_r(errno, sbuf, sizeof(sbuf)));
 				}
 
 			strlist__delete(list);
@@ -379,7 +383,7 @@ int cmd_buildid_cache(int argc, const char **argv,
 	if (purge_name_list_str) {
 		list = strlist__new(purge_name_list_str, NULL);
 		if (list) {
-			strlist__for_each(pos, list)
+			strlist__for_each_entry(pos, list)
 				if (build_id_cache__purge_path(pos->s)) {
 					if (errno == ENOENT) {
 						pr_debug("%s wasn't in the cache\n",
@@ -387,7 +391,7 @@ int cmd_buildid_cache(int argc, const char **argv,
 						continue;
 					}
 					pr_warning("Couldn't remove %s: %s\n",
-						   pos->s, strerror_r(errno, sbuf, sizeof(sbuf)));
+						   pos->s, str_error_r(errno, sbuf, sizeof(sbuf)));
 				}
 
 			strlist__delete(list);
@@ -400,7 +404,7 @@ int cmd_buildid_cache(int argc, const char **argv,
 	if (update_name_list_str) {
 		list = strlist__new(update_name_list_str, NULL);
 		if (list) {
-			strlist__for_each(pos, list)
+			strlist__for_each_entry(pos, list)
 				if (build_id_cache__update_file(pos->s)) {
 					if (errno == ENOENT) {
 						pr_debug("%s wasn't in the cache\n",
@@ -408,7 +412,7 @@ int cmd_buildid_cache(int argc, const char **argv,
 						continue;
 					}
 					pr_warning("Couldn't update %s: %s\n",
-						   pos->s, strerror_r(errno, sbuf, sizeof(sbuf)));
+						   pos->s, str_error_r(errno, sbuf, sizeof(sbuf)));
 				}
 
 			strlist__delete(list);
@@ -419,8 +423,7 @@ int cmd_buildid_cache(int argc, const char **argv,
 		pr_warning("Couldn't add %s\n", kcore_filename);
 
 out:
-	if (session)
-		perf_session__delete(session);
+	perf_session__delete(session);
 
 	return ret;
 }

@@ -19,7 +19,10 @@
 #include <linux/of_gpio.h>
 #include <linux/of_irq.h>
 #include <linux/of_mdio.h>
+#include <linux/of_net.h>
 #include <linux/module.h>
+
+#define DEFAULT_GPIO_RESET_DELAY	10	/* in microseconds */
 
 MODULE_AUTHOR("Grant Likely <grant.likely@secretlab.ca>");
 MODULE_LICENSE("GPL");
@@ -116,28 +119,6 @@ static void of_mdiobus_register_device(struct mii_bus *mdio,
 		child->name, addr);
 }
 
-int of_mdio_parse_addr(struct device *dev, const struct device_node *np)
-{
-	u32 addr;
-	int ret;
-
-	ret = of_property_read_u32(np, "reg", &addr);
-	if (ret < 0) {
-		dev_err(dev, "%s has invalid PHY address\n", np->full_name);
-		return ret;
-	}
-
-	/* A PHY must have a reg property in the range [0-31] */
-	if (addr >= PHY_MAX_ADDR) {
-		dev_err(dev, "%s PHY address %i is too large\n",
-			np->full_name, addr);
-		return -EINVAL;
-	}
-
-	return addr;
-}
-EXPORT_SYMBOL(of_mdio_parse_addr);
-
 /* The following is a list of PHY compatible strings which appear in
  * some DTBs. The compatible string is never matched against a PHY
  * driver, so is pointless. We only expect devices which are not PHYs
@@ -146,6 +127,7 @@ EXPORT_SYMBOL(of_mdio_parse_addr);
  */
 static const struct of_device_id whitelist_phys[] = {
 	{ .compatible = "brcm,40nm-ephy" },
+	{ .compatible = "broadcom,bcm5241" },
 	{ .compatible = "marvell,88E1111", },
 	{ .compatible = "marvell,88e1116", },
 	{ .compatible = "marvell,88e1118", },
@@ -219,6 +201,10 @@ int of_mdiobus_register(struct mii_bus *mdio, struct device_node *np)
 
 	mdio->dev.of_node = np;
 
+	/* Get bus level PHY reset GPIO details */
+	mdio->reset_delay_us = DEFAULT_GPIO_RESET_DELAY;
+	of_property_read_u32(np, "reset-delay-us", &mdio->reset_delay_us);
+
 	/* Register the MDIO bus */
 	rc = mdiobus_register(mdio);
 	if (rc)
@@ -291,6 +277,7 @@ struct phy_device *of_phy_find_device(struct device_node *phy_np)
 		mdiodev = to_mdio_device(d);
 		if (mdiodev->flags & MDIO_DEVICE_FLAG_PHY)
 			return to_phy_device(d);
+		put_device(d);
 	}
 
 	return NULL;
@@ -332,6 +319,41 @@ struct phy_device *of_phy_connect(struct net_device *dev,
 EXPORT_SYMBOL(of_phy_connect);
 
 /**
+ * of_phy_get_and_connect
+ * - Get phy node and connect to the phy described in the device tree
+ * @dev: pointer to net_device claiming the phy
+ * @np: Pointer to device tree node for the net_device claiming the phy
+ * @hndlr: Link state callback for the network device
+ *
+ * If successful, returns a pointer to the phy_device with the embedded
+ * struct device refcount incremented by one, or NULL on failure. The
+ * refcount must be dropped by calling phy_disconnect() or phy_detach().
+ */
+struct phy_device *of_phy_get_and_connect(struct net_device *dev,
+					  struct device_node *np,
+					  void (*hndlr)(struct net_device *))
+{
+	phy_interface_t iface;
+	struct device_node *phy_np;
+	struct phy_device *phy;
+
+	iface = of_get_phy_mode(np);
+	if (iface < 0)
+		return NULL;
+
+	phy_np = of_parse_phandle(np, "phy-handle", 0);
+	if (!phy_np)
+		return NULL;
+
+	phy = of_phy_connect(dev, phy_np, hndlr, 0, iface);
+
+	of_node_put(phy_np);
+
+	return phy;
+}
+EXPORT_SYMBOL(of_phy_get_and_connect);
+
+/**
  * of_phy_attach - Attach to a PHY without starting the state machine
  * @dev: pointer to net_device claiming the phy
  * @phy_np: Node pointer for the PHY
@@ -361,7 +383,6 @@ struct phy_device *of_phy_attach(struct net_device *dev,
 }
 EXPORT_SYMBOL(of_phy_attach);
 
-#if defined(CONFIG_FIXED_PHY)
 /*
  * of_phy_is_fixed_link() and of_phy_register_fixed_link() must
  * support two DT bindings:
@@ -421,8 +442,11 @@ int of_phy_register_fixed_link(struct device_node *np)
 		status.link = 1;
 		status.duplex = of_property_read_bool(fixed_link_node,
 						      "full-duplex");
-		if (of_property_read_u32(fixed_link_node, "speed", &status.speed))
+		if (of_property_read_u32(fixed_link_node, "speed",
+					 &status.speed)) {
+			of_node_put(fixed_link_node);
 			return -EINVAL;
+		}
 		status.pause = of_property_read_bool(fixed_link_node, "pause");
 		status.asym_pause = of_property_read_bool(fixed_link_node,
 							  "asym-pause");
@@ -451,4 +475,18 @@ int of_phy_register_fixed_link(struct device_node *np)
 	return -ENODEV;
 }
 EXPORT_SYMBOL(of_phy_register_fixed_link);
-#endif
+
+void of_phy_deregister_fixed_link(struct device_node *np)
+{
+	struct phy_device *phydev;
+
+	phydev = of_phy_find_device(np);
+	if (!phydev)
+		return;
+
+	fixed_phy_unregister(phydev);
+
+	put_device(&phydev->mdio.dev);	/* of_phy_find_device() */
+	phy_device_free(phydev);	/* fixed_phy_register() */
+}
+EXPORT_SYMBOL(of_phy_deregister_fixed_link);

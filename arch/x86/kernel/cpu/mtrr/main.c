@@ -38,7 +38,7 @@
 #include <linux/stop_machine.h>
 #include <linux/kvm_para.h>
 #include <linux/uaccess.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/mutex.h>
 #include <linux/init.h>
 #include <linux/sort.h>
@@ -48,7 +48,7 @@
 #include <linux/syscore_ops.h>
 
 #include <asm/cpufeature.h>
-#include <asm/e820.h>
+#include <asm/e820/api.h>
 #include <asm/mtrr.h>
 #include <asm/msr.h>
 #include <asm/pat.h>
@@ -72,14 +72,14 @@ static DEFINE_MUTEX(mtrr_mutex);
 u64 size_or_mask, size_and_mask;
 static bool mtrr_aps_delayed_init;
 
-static const struct mtrr_ops *mtrr_ops[X86_VENDOR_NUM];
+static const struct mtrr_ops *mtrr_ops[X86_VENDOR_NUM] __ro_after_init;
 
 const struct mtrr_ops *mtrr_if;
 
 static void set_mtrr(unsigned int reg, unsigned long base,
 		     unsigned long size, mtrr_type type);
 
-void set_mtrr_ops(const struct mtrr_ops *ops)
+void __init set_mtrr_ops(const struct mtrr_ops *ops)
 {
 	if (ops->vendor && ops->vendor < X86_VENDOR_NUM)
 		mtrr_ops[ops->vendor] = ops;
@@ -807,10 +807,8 @@ void mtrr_save_state(void)
 	if (!mtrr_enabled())
 		return;
 
-	get_online_cpus();
 	first_cpu = cpumask_first(cpu_online_mask);
 	smp_call_function_single(first_cpu, mtrr_save_fixed_ranges, NULL, 1);
-	put_online_cpus();
 }
 
 void set_mtrr_aps_delayed_init(void)

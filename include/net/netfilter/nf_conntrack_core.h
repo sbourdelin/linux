@@ -62,10 +62,10 @@ int __nf_conntrack_confirm(struct sk_buff *skb);
 /* Confirm a connection: returns NF_DROP if packet must be dropped. */
 static inline int nf_conntrack_confirm(struct sk_buff *skb)
 {
-	struct nf_conn *ct = (struct nf_conn *)skb->nfct;
+	struct nf_conn *ct = (struct nf_conn *)skb_nfct(skb);
 	int ret = NF_ACCEPT;
 
-	if (ct && !nf_ct_is_untracked(ct)) {
+	if (ct) {
 		if (!nf_ct_is_confirmed(ct))
 			ret = __nf_conntrack_confirm(skb);
 		if (likely(ret == NF_ACCEPT))
@@ -81,7 +81,6 @@ print_tuple(struct seq_file *s, const struct nf_conntrack_tuple *tuple,
 
 #define CONNTRACK_LOCKS 1024
 
-extern struct hlist_nulls_head *nf_conntrack_hash;
 extern spinlock_t nf_conntrack_locks[CONNTRACK_LOCKS];
 void nf_conntrack_lock(spinlock_t *lock);
 

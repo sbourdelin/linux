@@ -16,6 +16,7 @@
 #include <asm/hwcap.h>
 #include <asm/pgtable-hwdef.h>
 #include <asm/pgtable.h>
+#include <asm/memory.h>
 
 #include "proc-macros.S"
 
@@ -38,13 +39,14 @@ ENTRY(cpu_v7_proc_fin)
 ENDPROC(cpu_v7_proc_fin)
 
 /*
- *	cpu_v7_reset(loc)
+ *	cpu_v7_reset(loc, hyp)
  *
  *	Perform a soft reset of the system.  Put the CPU into the
  *	same state as it would be if it had been reset, and branch
  *	to what would be the reset vector.
  *
  *	- loc   - location to jump to for soft reset
+ *	- hyp   - indicate if restart occurs in HYP mode
  *
  *	This code must be executed using a flat identity mapping with
  *      caches disabled.
@@ -52,11 +54,15 @@ ENDPROC(cpu_v7_proc_fin)
 	.align	5
 	.pushsection	.idmap.text, "ax"
 ENTRY(cpu_v7_reset)
-	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
-	bic	r1, r1, #0x1			@ ...............m
- THUMB(	bic	r1, r1, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
-	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
+	mrc	p15, 0, r2, c1, c0, 0		@ ctrl register
+	bic	r2, r2, #0x1			@ ...............m
+ THUMB(	bic	r2, r2, #1 << 30 )		@ SCTLR.TE (Thumb exceptions)
+	mcr	p15, 0, r2, c1, c0, 0		@ disable MMU
 	isb
+#ifdef CONFIG_ARM_VIRT_EXT
+	teq	r1, #0
+	bne	__hyp_soft_restart
+#endif
 	bx	r0
 ENDPROC(cpu_v7_reset)
 	.popsection
@@ -362,6 +368,39 @@ __ca15_errata:
 #endif
 	b	__errata_finish
 
+__ca12_errata:
+#ifdef CONFIG_ARM_ERRATA_818325_852422
+	mrc	p15, 0, r10, c15, c0, 1		@ read diagnostic register
+	orr	r10, r10, #1 << 12		@ set bit #12
+	mcr	p15, 0, r10, c15, c0, 1		@ write diagnostic register
+#endif
+#ifdef CONFIG_ARM_ERRATA_821420
+	mrc	p15, 0, r10, c15, c0, 2		@ read internal feature reg
+	orr	r10, r10, #1 << 1		@ set bit #1
+	mcr	p15, 0, r10, c15, c0, 2		@ write internal feature reg
+#endif
+#ifdef CONFIG_ARM_ERRATA_825619
+	mrc	p15, 0, r10, c15, c0, 1		@ read diagnostic register
+	orr	r10, r10, #1 << 24		@ set bit #24
+	mcr	p15, 0, r10, c15, c0, 1		@ write diagnostic register
+#endif
+	b	__errata_finish
+
+__ca17_errata:
+#ifdef CONFIG_ARM_ERRATA_852421
+	cmp	r6, #0x12			@ only present up to r1p2
+	mrcle	p15, 0, r10, c15, c0, 1		@ read diagnostic register
+	orrle	r10, r10, #1 << 24		@ set bit #24
+	mcrle	p15, 0, r10, c15, c0, 1		@ write diagnostic register
+#endif
+#ifdef CONFIG_ARM_ERRATA_852423
+	cmp	r6, #0x12			@ only present up to r1p2
+	mrcle	p15, 0, r10, c15, c0, 1		@ read diagnostic register
+	orrle	r10, r10, #1 << 12		@ set bit #12
+	mcrle	p15, 0, r10, c15, c0, 1		@ write diagnostic register
+#endif
+	b	__errata_finish
+
 __v7_pj4b_setup:
 #ifdef CONFIG_CPU_PJ4B
 
@@ -442,6 +481,16 @@ __v7_setup_cont:
 	ldr	r10, =0x00000c09		@ Cortex-A9 primary part number
 	teq	r0, r10
 	beq	__ca9_errata
+
+	/* Cortex-A12 Errata */
+	ldr	r10, =0x00000c0d		@ Cortex-A12 primary part number
+	teq	r0, r10
+	beq	__ca12_errata
+
+	/* Cortex-A17 Errata */
+	ldr	r10, =0x00000c0e		@ Cortex-A17 primary part number
+	teq	r0, r10
+	beq	__ca17_errata
 
 	/* Cortex-A15 Errata */
 	ldr	r10, =0x00000c0f		@ Cortex-A15 primary part number

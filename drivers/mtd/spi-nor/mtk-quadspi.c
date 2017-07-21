@@ -21,7 +21,6 @@
 #include <linux/ioport.h>
 #include <linux/math64.h>
 #include <linux/module.h>
-#include <linux/mtd/mtd.h>
 #include <linux/mutex.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -105,6 +104,8 @@
 #define MTK_NOR_MAX_RX_TX_SHIFT		6
 /* can shift up to 56 bits (7 bytes) transfer by MTK_NOR_PRG_CMD */
 #define MTK_NOR_MAX_SHIFT		7
+/* nor controller 4-byte address mode enable bit */
+#define MTK_NOR_4B_ADDR_EN		BIT(4)
 
 /* Helpers for accessing the program data / shift data registers */
 #define MTK_NOR_PRG_REG(n)		(MTK_NOR_PRGDATA0_REG + 4 * (n))
@@ -122,20 +123,20 @@ static void mt8173_nor_set_read_mode(struct mt8173_nor *mt8173_nor)
 {
 	struct spi_nor *nor = &mt8173_nor->nor;
 
-	switch (nor->flash_read) {
-	case SPI_NOR_FAST:
+	switch (nor->read_proto) {
+	case SNOR_PROTO_1_1_1:
 		writeb(nor->read_opcode, mt8173_nor->base +
 		       MTK_NOR_PRGDATA3_REG);
 		writeb(MTK_NOR_FAST_READ, mt8173_nor->base +
 		       MTK_NOR_CFG1_REG);
 		break;
-	case SPI_NOR_DUAL:
+	case SNOR_PROTO_1_1_2:
 		writeb(nor->read_opcode, mt8173_nor->base +
 		       MTK_NOR_PRGDATA3_REG);
 		writeb(MTK_NOR_DUAL_READ_EN, mt8173_nor->base +
 		       MTK_NOR_DUAL_REG);
 		break;
-	case SPI_NOR_QUAD:
+	case SNOR_PROTO_1_1_4:
 		writeb(nor->read_opcode, mt8173_nor->base +
 		       MTK_NOR_PRGDATA4_REG);
 		writeb(MTK_NOR_QUAD_READ_EN, mt8173_nor->base +
@@ -231,9 +232,34 @@ static int mt8173_nor_write_buffer_disable(struct mt8173_nor *mt8173_nor)
 				  10000);
 }
 
+static void mt8173_nor_set_addr_width(struct mt8173_nor *mt8173_nor)
+{
+	u8 val;
+	struct spi_nor *nor = &mt8173_nor->nor;
+
+	val = readb(mt8173_nor->base + MTK_NOR_DUAL_REG);
+
+	switch (nor->addr_width) {
+	case 3:
+		val &= ~MTK_NOR_4B_ADDR_EN;
+		break;
+	case 4:
+		val |= MTK_NOR_4B_ADDR_EN;
+		break;
+	default:
+		dev_warn(mt8173_nor->dev, "Unexpected address width %u.\n",
+			 nor->addr_width);
+		break;
+	}
+
+	writeb(val, mt8173_nor->base + MTK_NOR_DUAL_REG);
+}
+
 static void mt8173_nor_set_addr(struct mt8173_nor *mt8173_nor, u32 addr)
 {
 	int i;
+
+	mt8173_nor_set_addr_width(mt8173_nor);
 
 	for (i = 0; i < 3; i++) {
 		writeb(addr & 0xff, mt8173_nor->base + MTK_NOR_RADR0_REG + i * 4);
@@ -243,8 +269,8 @@ static void mt8173_nor_set_addr(struct mt8173_nor *mt8173_nor, u32 addr)
 	writeb(addr & 0xff, mt8173_nor->base + MTK_NOR_RADR3_REG);
 }
 
-static int mt8173_nor_read(struct spi_nor *nor, loff_t from, size_t length,
-			   size_t *retlen, u_char *buffer)
+static ssize_t mt8173_nor_read(struct spi_nor *nor, loff_t from, size_t length,
+			       u_char *buffer)
 {
 	int i, ret;
 	int addr = (int)from;
@@ -255,13 +281,13 @@ static int mt8173_nor_read(struct spi_nor *nor, loff_t from, size_t length,
 	mt8173_nor_set_read_mode(mt8173_nor);
 	mt8173_nor_set_addr(mt8173_nor, addr);
 
-	for (i = 0; i < length; i++, (*retlen)++) {
+	for (i = 0; i < length; i++) {
 		ret = mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_PIO_READ_CMD);
 		if (ret < 0)
 			return ret;
 		buf[i] = readb(mt8173_nor->base + MTK_NOR_RDATA_REG);
 	}
-	return 0;
+	return length;
 }
 
 static int mt8173_nor_write_single_byte(struct mt8173_nor *mt8173_nor,
@@ -297,36 +323,44 @@ static int mt8173_nor_write_buffer(struct mt8173_nor *mt8173_nor, int addr,
 	return mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_WR_CMD);
 }
 
-static void mt8173_nor_write(struct spi_nor *nor, loff_t to, size_t len,
-			     size_t *retlen, const u_char *buf)
+static ssize_t mt8173_nor_write(struct spi_nor *nor, loff_t to, size_t len,
+				const u_char *buf)
 {
 	int ret;
 	struct mt8173_nor *mt8173_nor = nor->priv;
+	size_t i;
 
 	ret = mt8173_nor_write_buffer_enable(mt8173_nor);
-	if (ret < 0)
+	if (ret < 0) {
 		dev_warn(mt8173_nor->dev, "write buffer enable failed!\n");
+		return ret;
+	}
 
-	while (len >= SFLASH_WRBUF_SIZE) {
+	for (i = 0; i + SFLASH_WRBUF_SIZE <= len; i += SFLASH_WRBUF_SIZE) {
 		ret = mt8173_nor_write_buffer(mt8173_nor, to, buf);
-		if (ret < 0)
+		if (ret < 0) {
 			dev_err(mt8173_nor->dev, "write buffer failed!\n");
-		len -= SFLASH_WRBUF_SIZE;
+			return ret;
+		}
 		to += SFLASH_WRBUF_SIZE;
 		buf += SFLASH_WRBUF_SIZE;
-		(*retlen) += SFLASH_WRBUF_SIZE;
 	}
 	ret = mt8173_nor_write_buffer_disable(mt8173_nor);
-	if (ret < 0)
+	if (ret < 0) {
 		dev_warn(mt8173_nor->dev, "write buffer disable failed!\n");
-
-	if (len) {
-		ret = mt8173_nor_write_single_byte(mt8173_nor, to, (int)len,
-						   (u8 *)buf);
-		if (ret < 0)
-			dev_err(mt8173_nor->dev, "write single byte failed!\n");
-		(*retlen) += len;
+		return ret;
 	}
+
+	if (i < len) {
+		ret = mt8173_nor_write_single_byte(mt8173_nor, to,
+						   (int)(len - i), (u8 *)buf);
+		if (ret < 0) {
+			dev_err(mt8173_nor->dev, "write single byte failed!\n");
+			return ret;
+		}
+	}
+
+	return len;
 }
 
 static int mt8173_nor_read_reg(struct spi_nor *nor, u8 opcode, u8 *buf, int len)
@@ -374,6 +408,11 @@ static int mt8173_nor_write_reg(struct spi_nor *nor, u8 opcode, u8 *buf,
 static int mtk_nor_init(struct mt8173_nor *mt8173_nor,
 			struct device_node *flash_node)
 {
+	const struct spi_nor_hwcaps hwcaps = {
+		.mask = SNOR_HWCAPS_READ_FAST |
+			SNOR_HWCAPS_READ_1_1_2 |
+			SNOR_HWCAPS_PP,
+	};
 	int ret;
 	struct spi_nor *nor;
 
@@ -392,7 +431,7 @@ static int mtk_nor_init(struct mt8173_nor *mt8173_nor,
 	nor->write_reg = mt8173_nor_write_reg;
 	nor->mtd.name = "mtk_nor";
 	/* initialized with NULL */
-	ret = spi_nor_scan(nor, NULL, SPI_NOR_DUAL);
+	ret = spi_nor_scan(nor, NULL, &hwcaps);
 	if (ret)
 		return ret;
 
