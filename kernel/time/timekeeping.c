@@ -180,7 +180,8 @@ static void timekeeping_check_update(struct timekeeper *tk, u64 offset)
 	}
 }
 
-static inline u64 timekeeping_get_delta(struct tk_read_base *tkr)
+static inline u64 timekeeping_get_delta(struct tk_read_base *tkr,
+					u64 *cycles_stamp)
 {
 	struct timekeeper *tk = &tk_core.timekeeper;
 	u64 now, last, mask, max, delta;
@@ -195,7 +196,7 @@ static inline u64 timekeeping_get_delta(struct tk_read_base *tkr)
 	 */
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
-		now = tk_clock_read(tkr, NULL);
+		now = tk_clock_read(tkr, cycles_stamp);
 		last = tkr->cycle_last;
 		mask = tkr->mask;
 		max = tkr->clock->max_cycles;
@@ -224,12 +225,13 @@ static inline u64 timekeeping_get_delta(struct tk_read_base *tkr)
 static inline void timekeeping_check_update(struct timekeeper *tk, u64 offset)
 {
 }
-static inline u64 timekeeping_get_delta(struct tk_read_base *tkr)
+static inline u64 timekeeping_get_delta(struct tk_read_base *tkr,
+					u64 *cycles_stamp)
 {
 	u64 cycle_now, delta;
 
 	/* read clocksource */
-	cycle_now = tk_clock_read(tkr, NULL);
+	cycle_now = tk_clock_read(tkr, cycles_stamp);
 
 	/* calculate the delta since the last update_wall_time */
 	delta = clocksource_delta(cycle_now, tkr->cycle_last, tkr->mask);
@@ -329,11 +331,12 @@ static inline u64 timekeeping_delta_to_ns(struct tk_read_base *tkr, u64 delta)
 	return nsec + arch_gettimeoffset();
 }
 
-static inline u64 timekeeping_get_ns(struct tk_read_base *tkr)
+static inline u64 timekeeping_get_ns(struct tk_read_base *tkr,
+					u64 *cycles_stamp)
 {
 	u64 delta;
 
-	delta = timekeeping_get_delta(tkr);
+	delta = timekeeping_get_delta(tkr, cycles_stamp);
 	return timekeeping_delta_to_ns(tkr, delta);
 }
 
@@ -707,7 +710,7 @@ int __getnstimeofday64(struct timespec64 *ts)
 		seq = read_seqcount_begin(&tk_core.seq);
 
 		ts->tv_sec = tk->xtime_sec;
-		nsecs = timekeeping_get_ns(&tk->tkr_mono);
+		nsecs = timekeeping_get_ns(&tk->tkr_mono, NULL);
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
@@ -748,7 +751,7 @@ ktime_t ktime_get(void)
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
 		base = tk->tkr_mono.base;
-		nsecs = timekeeping_get_ns(&tk->tkr_mono);
+		nsecs = timekeeping_get_ns(&tk->tkr_mono, NULL);
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
@@ -779,7 +782,7 @@ static ktime_t *offsets[TK_OFFS_MAX] = {
 	[TK_OFFS_TAI]	= &tk_core.timekeeper.offs_tai,
 };
 
-ktime_t ktime_get_with_offset(enum tk_offsets offs)
+ktime_t ktime_get_with_offset(enum tk_offsets offs, u64 *cycles_stamp)
 {
 	struct timekeeper *tk = &tk_core.timekeeper;
 	unsigned int seq;
@@ -791,7 +794,7 @@ ktime_t ktime_get_with_offset(enum tk_offsets offs)
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
 		base = ktime_add(tk->tkr_mono.base, *offset);
-		nsecs = timekeeping_get_ns(&tk->tkr_mono);
+		nsecs = timekeeping_get_ns(&tk->tkr_mono, cycles_stamp);
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
@@ -833,7 +836,7 @@ ktime_t ktime_get_raw(void)
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
 		base = tk->tkr_raw.base;
-		nsecs = timekeeping_get_ns(&tk->tkr_raw);
+		nsecs = timekeeping_get_ns(&tk->tkr_raw, NULL);
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
@@ -861,7 +864,7 @@ void ktime_get_ts64(struct timespec64 *ts)
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
 		ts->tv_sec = tk->xtime_sec;
-		nsec = timekeeping_get_ns(&tk->tkr_mono);
+		nsec = timekeeping_get_ns(&tk->tkr_mono, NULL);
 		tomono = tk->wall_to_monotonic;
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
@@ -1379,7 +1382,7 @@ void getrawmonotonic64(struct timespec64 *ts)
 
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
-		nsecs = timekeeping_get_ns(&tk->tkr_raw);
+		nsecs = timekeeping_get_ns(&tk->tkr_raw, NULL);
 		ts64 = tk->raw_time;
 
 	} while (read_seqcount_retry(&tk_core.seq, seq));
@@ -2224,7 +2227,7 @@ ktime_t ktime_get_update_offsets_now(unsigned int *cwsseq, ktime_t *offs_real,
 		seq = read_seqcount_begin(&tk_core.seq);
 
 		base = tk->tkr_mono.base;
-		nsecs = timekeeping_get_ns(&tk->tkr_mono);
+		nsecs = timekeeping_get_ns(&tk->tkr_mono, NULL);
 		base = ktime_add_ns(base, nsecs);
 
 		if (*cwsseq != tk->clock_was_set_seq) {
