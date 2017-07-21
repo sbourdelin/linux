@@ -82,8 +82,12 @@ u64 pvclock_clocksource_read(struct pvclock_vcpu_time_info *src,
 	u8 flags;
 
 	do {
+		u64 tsc;
 		version = pvclock_read_begin(src);
-		ret = __pvclock_read_cycles(src, rdtsc_ordered());
+		tsc = rdtsc_ordered();
+		ret = __pvclock_read_cycles(src, tsc);
+		if (cycles_stamp)
+			*cycles_stamp = tsc;
 		flags = src->flags;
 	} while (pvclock_read_retry(src, version));
 
