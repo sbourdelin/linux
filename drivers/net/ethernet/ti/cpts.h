@@ -128,6 +128,7 @@ struct cpts {
 	unsigned long ov_check_period;
 	struct kthread_worker *kworker;
 	struct kthread_delayed_work overflow_work;
+	struct sk_buff_head txq;
 };
 
 void cpts_rx_timestamp(struct cpts *cpts, struct sk_buff *skb);
