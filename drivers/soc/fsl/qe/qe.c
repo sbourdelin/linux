@@ -229,7 +229,9 @@ int qe_setbrg(enum qe_clock brg, unsigned int rate, unsigned int multiplier)
 	/* Errata QE_General4, which affects some MPC832x and MPC836x SOCs, says
 	   that the BRG divisor must be even if you're not using divide-by-16
 	   mode. */
+#ifdef CONFIG_PPC
 	if (pvr_version_is(PVR_VER_836x) || pvr_version_is(PVR_VER_832x))
+#endif
 		if (!div16 && (divisor & 1) && (divisor > 3))
 			divisor++;
 
