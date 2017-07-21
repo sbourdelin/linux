@@ -88,6 +88,8 @@ static struct sk_buff *mtk_tag_rcv(struct sk_buff *skb, struct net_device *dev,
 }
 
 const struct dsa_device_ops mtk_netdev_ops = {
-	.xmit	= mtk_tag_xmit,
-	.rcv	= mtk_tag_rcv,
+	.xmit		= mtk_tag_xmit,
+	.rcv		= mtk_tag_rcv,
+	.hash_nh_off	= 4,
+	.hash_proto_off	= 2,
 };
