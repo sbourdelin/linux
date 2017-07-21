@@ -4,6 +4,7 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/if_vlan.h>
+#include <net/dsa.h>
 #include <net/ip.h>
 #include <net/ipv6.h>
 #include <net/gre.h>
@@ -440,6 +441,17 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 			 skb->vlan_proto : skb->protocol;
 		nhoff = skb_network_offset(skb);
 		hlen = skb_headlen(skb);
+
+		if (unlikely(netdev_uses_dsa(skb->dev))) {
+			const struct dsa_device_ops *ops;
+			u8 *p = (u8 *)data;
+
+			ops = skb->dev->dsa_ptr->tag_ops;
+			if (ops->hash_proto_off)
+				proto = (u16)p[ops->hash_proto_off];
+			hlen -= ops->hash_nh_off;
+			nhoff += ops->hash_nh_off;
+		}
 	}
 
 	/* It is ensured by skb_flow_dissector_init() that control key will
