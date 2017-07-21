@@ -2778,6 +2778,12 @@ sub process {
 				next if ($f =~ /^-/);
 				last if (!$file && $f =~ /^\@\@/);
 
+				if ($f !~ /^[+\- ]/) {
+					# End of file
+					$is_end = 1;
+					last;
+				}
+
 				if ($lines[$ln - 1] =~ /^\+\s*(?:bool|tristate)\s*\"/) {
 					$is_start = 1;
 				} elsif ($lines[$ln - 1] =~ /^\+\s*(?:---)?help(?:---)?$/) {
@@ -2788,7 +2794,7 @@ sub process {
 				$f =~ s/#.*//;
 				$f =~ s/^\s+//;
 				next if ($f =~ /^$/);
-				if ($f =~ /^\s*config\s/) {
+				if ($f =~ /^(?:config\s|menuconfig\s|choice\s|endchoice\s*$|comment\s|menu\s|endmenu\s*$|if\s|endif\s*$|source\s)/) {
 					$is_end = 1;
 					last;
 				}
