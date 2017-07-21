@@ -134,12 +134,18 @@ struct dentry_stat_t dentry_stat = {
  * Macros and variables to manage and count negative dentries.
  */
 #define NEG_DENTRY_BATCH	(1 << 8)
+#define NEG_PRUNING_DELAY	(HZ/10)
 static long neg_dentry_percpu_limit __read_mostly;
 static long neg_dentry_nfree_init __read_mostly; /* Free pool initial value */
 static struct {
 	raw_spinlock_t nfree_lock;
 	long nfree;			/* Negative dentry free pool */
+	struct super_block *prune_sb;	/* Super_block for pruning */
+	int neg_count, prune_count;	/* Pruning counts */
 } ndblk ____cacheline_aligned_in_smp;
+
+static void prune_negative_dentry(struct work_struct *work);
+static DECLARE_DELAYED_WORK(prune_neg_dentry_work, prune_negative_dentry);
 
 static DEFINE_PER_CPU(long, nr_dentry);
 static DEFINE_PER_CPU(long, nr_dentry_unused);
@@ -323,6 +329,16 @@ static void __neg_dentry_inc(struct dentry *dentry)
 	 */
 	if (!cnt)
 		dentry->d_flags |= DCACHE_KILL_NEGATIVE;
+
+	/*
+	 * Initiate negative dentry pruning if free pool has less than
+	 * 1/4 of its initial value.
+	 */
+	if (READ_ONCE(ndblk.nfree) < neg_dentry_nfree_init/4) {
+		WRITE_ONCE(ndblk.prune_sb, dentry->d_sb);
+		schedule_delayed_work(&prune_neg_dentry_work,
+				      NEG_PRUNING_DELAY);
+	}
 }
 
 static inline void neg_dentry_inc(struct dentry *dentry)
@@ -1319,6 +1335,103 @@ void shrink_dcache_sb(struct super_block *sb)
 	} while (list_lru_count(&sb->s_dentry_lru) > 0);
 }
 EXPORT_SYMBOL(shrink_dcache_sb);
+
+/*
+ * A modified version that attempts to remove a limited number of negative
+ * dentries as well as some other non-negative dentries at the front.
+ */
+static enum lru_status dentry_negative_lru_isolate(struct list_head *item,
+		struct list_lru_one *lru, spinlock_t *lru_lock, void *arg)
+{
+	struct list_head *freeable = arg;
+	struct dentry	*dentry = container_of(item, struct dentry, d_lru);
+	enum lru_status	status = LRU_SKIP;
+
+	/*
+	 * Stop further list walking for the current node list to limit
+	 * performance impact, but allow further walking in the next node
+	 * list.
+	 */
+	if ((ndblk.neg_count >= NEG_DENTRY_BATCH) ||
+	    (ndblk.prune_count >= NEG_DENTRY_BATCH)) {
+		ndblk.prune_count = 0;
+		return LRU_STOP;
+	}
+
+	/*
+	 * we are inverting the lru lock/dentry->d_lock here,
+	 * so use a trylock. If we fail to get the lock, just skip
+	 * it
+	 */
+	if (!spin_trylock(&dentry->d_lock)) {
+		ndblk.prune_count++;
+		return LRU_SKIP;
+	}
+
+	/*
+	 * Referenced dentries are still in use. If they have active
+	 * counts, just remove them from the LRU. Otherwise give them
+	 * another pass through the LRU.
+	 */
+	if (dentry->d_lockref.count) {
+		d_lru_isolate(lru, dentry);
+		status = LRU_REMOVED;
+		goto out;
+	}
+
+	/*
+	 * Dentries with reference bit on are moved back to the tail
+	 * except for the negative ones.
+	 */
+	if ((dentry->d_flags & DCACHE_REFERENCED) && !d_is_negative(dentry)) {
+		dentry->d_flags &= ~DCACHE_REFERENCED;
+		status = LRU_ROTATE;
+		goto out;
+	}
+
+	status = LRU_REMOVED;
+	d_lru_shrink_move(lru, dentry, freeable);
+	if (d_is_negative(dentry))
+		ndblk.neg_count++;
+out:
+	spin_unlock(&dentry->d_lock);
+	ndblk.prune_count++;
+	return status;
+}
+
+/*
+ * A workqueue function to prune negative dentry.
+ *
+ * The pruning is done gradually over time so as not to have noticeable
+ * performance impact.
+ */
+static void prune_negative_dentry(struct work_struct *work)
+{
+	int freed;
+	struct super_block *sb = READ_ONCE(ndblk.prune_sb);
+	LIST_HEAD(dispose);
+
+	if (!sb)
+		return;
+
+	ndblk.neg_count = ndblk.prune_count = 0;
+	freed = list_lru_walk(&sb->s_dentry_lru, dentry_negative_lru_isolate,
+			      &dispose, NEG_DENTRY_BATCH);
+
+	if (freed)
+		shrink_dentry_list(&dispose);
+	/*
+	 * Continue delayed pruning once every second until negative dentry
+	 * free pool is at least 1/2 of the initial value or the super_block
+	 * has no more negative dentries left at the front.
+	 */
+	if (ndblk.neg_count &&
+	   (READ_ONCE(ndblk.nfree) < neg_dentry_nfree_init/2))
+		schedule_delayed_work(&prune_neg_dentry_work,
+				      NEG_PRUNING_DELAY);
+	else
+		WRITE_ONCE(ndblk.prune_sb, NULL);
+}
 
 /**
  * enum d_walk_ret - action to talke during tree walk
