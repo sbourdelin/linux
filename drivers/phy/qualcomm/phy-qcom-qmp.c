@@ -479,6 +479,8 @@ struct qcom_qmp {
 
 	struct mutex phy_mutex;
 	int init_count;
+	bool power_enabled;
+	bool clk_enabled;
 };
 
 static inline void qphy_setbits(void __iomem *base, u32 offset, u32 val)
@@ -599,29 +601,69 @@ static void qcom_qmp_phy_configure(void __iomem *base,
 	}
 }
 
-static int qcom_qmp_phy_poweron(struct phy *phy)
+static int qcom_qmp_phy_poweron(struct qcom_qmp *qmp)
 {
-	struct qmp_phy *qphy = phy_get_drvdata(phy);
-	struct qcom_qmp *qmp = qphy->qmp;
 	int num = qmp->cfg->num_vregs;
 	int ret;
 
-	dev_vdbg(&phy->dev, "Powering on QMP phy\n");
+	dev_vdbg(qmp->dev, "Powering on QMP phy\n");
+
+	if (qmp->power_enabled)
+		return 0;
 
 	/* turn on regulator supplies */
 	ret = regulator_bulk_enable(num, qmp->vregs);
 	if (ret)
 		dev_err(qmp->dev, "failed to enable regulators, err=%d\n", ret);
+	else
+		qmp->power_enabled = true;
 
 	return ret;
 }
 
-static int qcom_qmp_phy_poweroff(struct phy *phy)
+static int qcom_qmp_phy_poweroff(struct qcom_qmp *qmp)
 {
-	struct qmp_phy *qphy = phy_get_drvdata(phy);
-	struct qcom_qmp *qmp = qphy->qmp;
+	if (!qmp->power_enabled)
+		return 0;
 
 	regulator_bulk_disable(qmp->cfg->num_vregs, qmp->vregs);
+	qmp->power_enabled = false;
+
+	return 0;
+}
+
+static int qcom_qmp_phy_enable_clocks(struct qcom_qmp *qmp)
+{
+	int ret = 0, i;
+
+	if (qmp->clk_enabled)
+		return 0;
+
+	for (i = 0; i < qmp->cfg->num_clks; i++) {
+		ret = clk_prepare_enable(qmp->clks[i]);
+		if (ret) {
+			dev_err(qmp->dev, "failed to enable %s clk, err=%d\n",
+				qmp->cfg->clk_list[i], ret);
+			while (--i >= 0)
+				clk_disable_unprepare(qmp->clks[i]);
+		}
+	}
+	qmp->clk_enabled = true;
+
+	return ret;
+}
+
+static int qcom_qmp_phy_disable_clocks(struct qcom_qmp *qmp)
+{
+	int i = qmp->cfg->num_clks;
+
+	if (!qmp->clk_enabled)
+		return 0;
+
+	while (--i >= 0)
+		clk_disable_unprepare(qmp->clks[i]);
+
+	qmp->clk_enabled = false;
 
 	return 0;
 }
@@ -729,19 +771,17 @@ static int qcom_qmp_phy_init(struct phy *phy)
 	void __iomem *pcs = qphy->pcs;
 	void __iomem *status;
 	unsigned int mask, val;
-	int ret, i;
+	int ret;
 
 	dev_vdbg(qmp->dev, "Initializing QMP phy\n");
 
-	for (i = 0; i < qmp->cfg->num_clks; i++) {
-		ret = clk_prepare_enable(qmp->clks[i]);
-		if (ret) {
-			dev_err(qmp->dev, "failed to enable %s clk, err=%d\n",
-				qmp->cfg->clk_list[i], ret);
-			while (--i >= 0)
-				clk_disable_unprepare(qmp->clks[i]);
-		}
-	}
+	ret = qcom_qmp_phy_poweron(qmp);
+	if (ret)
+		return ret;
+
+	ret = qcom_qmp_phy_enable_clocks(qmp);
+	if (ret)
+		goto err_clk_enable;
 
 	ret = qcom_qmp_phy_com_init(qmp);
 	if (ret)
@@ -801,8 +841,9 @@ err_pcs_ready:
 err_lane_rst:
 	qcom_qmp_phy_com_exit(qmp);
 err_com_init:
-	while (--i >= 0)
-		clk_disable_unprepare(qmp->clks[i]);
+	qcom_qmp_phy_disable_clocks(qmp);
+err_clk_enable:
+	qcom_qmp_phy_poweroff(qmp);
 
 	return ret;
 }
@@ -812,7 +853,6 @@ static int qcom_qmp_phy_exit(struct phy *phy)
 	struct qmp_phy *qphy = phy_get_drvdata(phy);
 	struct qcom_qmp *qmp = qphy->qmp;
 	const struct qmp_phy_cfg *cfg = qmp->cfg;
-	int i = cfg->num_clks;
 
 	clk_disable_unprepare(qphy->pipe_clk);
 
@@ -830,8 +870,9 @@ static int qcom_qmp_phy_exit(struct phy *phy)
 
 	qcom_qmp_phy_com_exit(qmp);
 
-	while (--i >= 0)
-		clk_disable_unprepare(qmp->clks[i]);
+	qcom_qmp_phy_disable_clocks(qmp);
+
+	qcom_qmp_phy_poweroff(qmp);
 
 	return 0;
 }
@@ -958,8 +999,6 @@ static int phy_pipe_clk_register(struct qcom_qmp *qmp, int id)
 static const struct phy_ops qcom_qmp_phy_gen_ops = {
 	.init		= qcom_qmp_phy_init,
 	.exit		= qcom_qmp_phy_exit,
-	.power_on	= qcom_qmp_phy_poweron,
-	.power_off	= qcom_qmp_phy_poweroff,
 	.owner		= THIS_MODULE,
 };
 
