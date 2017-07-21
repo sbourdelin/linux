@@ -289,7 +289,7 @@ int rt5514_spi_burst_read(unsigned int addr, u8 *rxbuf, size_t len)
 {
 	u8 spi_cmd = RT5514_SPI_CMD_BURST_READ;
 	int status;
-	u8 write_buf[8];
+	u8 write_buf[8], read_buf[RT5514_SPI_BUF_LEN];
 	unsigned int i, end, offset = 0;
 
 	struct spi_message message;
@@ -319,13 +319,15 @@ int rt5514_spi_burst_read(unsigned int addr, u8 *rxbuf, size_t len)
 		spi_message_add_tail(&x[1], &message);
 
 		x[2].len = end;
-		x[2].rx_buf = rxbuf + offset;
+		x[2].rx_buf = read_buf;
 		spi_message_add_tail(&x[2], &message);
 
 		status = spi_sync(rt5514_spi, &message);
 
 		if (status)
 			return false;
+
+		memcpy(rxbuf + offset, read_buf, end);
 
 		offset += RT5514_SPI_BUF_LEN;
 	}
@@ -365,13 +367,8 @@ int rt5514_spi_burst_read(unsigned int addr, u8 *rxbuf, size_t len)
 int rt5514_spi_burst_write(u32 addr, const u8 *txbuf, size_t len)
 {
 	u8 spi_cmd = RT5514_SPI_CMD_BURST_WRITE;
-	u8 *write_buf;
+	u8 write_buf[RT5514_SPI_BUF_LEN + 6];
 	unsigned int i, end, offset = 0;
-
-	write_buf = kmalloc(RT5514_SPI_BUF_LEN + 6, GFP_KERNEL);
-
-	if (write_buf == NULL)
-		return -ENOMEM;
 
 	while (offset < len) {
 		if (offset + RT5514_SPI_BUF_LEN <= len)
@@ -402,8 +399,6 @@ int rt5514_spi_burst_write(u32 addr, const u8 *txbuf, size_t len)
 
 		offset += RT5514_SPI_BUF_LEN;
 	}
-
-	kfree(write_buf);
 
 	return 0;
 }
