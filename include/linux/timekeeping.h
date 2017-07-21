@@ -372,3 +372,6 @@ extern int update_persistent_clock64(struct timespec64 now);
 
 
 #endif
+
+extern const seqcount_t *get_tk_seq(void);
+extern int get_tk_mono_clock_mode(void);

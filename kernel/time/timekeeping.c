@@ -2381,3 +2381,18 @@ void xtime_update(unsigned long ticks)
 	write_sequnlock(&jiffies_lock);
 	update_wall_time();
 }
+
+/*
+ * Helpers forthe core timekeeper reading
+ */
+const seqcount_t *get_tk_seq(void)
+{
+	return &tk_core.seq;
+}
+EXPORT_SYMBOL(get_tk_seq);
+
+int get_tk_mono_clock_mode(void)
+{
+	return tk_core.timekeeper.tkr_mono.clock->archdata.vclock_mode;
+}
+EXPORT_SYMBOL(get_tk_mono_clock_mode);
