@@ -901,7 +901,7 @@ get_more_pages:
 					break;
 				}
 
-				num_ops = 1 + do_sync;
+				num_ops = 1;
 				strip_unit_end = page->index +
 					((len - 1) >> PAGE_SHIFT);
 
@@ -1009,7 +1009,7 @@ new_request:
 		for (i = 0; i < locked_pages; i++) {
 			u64 cur_offset = page_offset(pages[i]);
 			if (offset + len != cur_offset) {
-				if (op_idx + do_sync + 1 == req->r_num_ops)
+				if (op_idx + 1 == req->r_num_ops)
 					break;
 				osd_req_op_extent_dup_last(req, op_idx,
 							   cur_offset - offset);
@@ -1046,17 +1046,12 @@ new_request:
 						 0, !!pool, false);
 		osd_req_op_extent_update(req, op_idx, len);
 
-		if (do_sync) {
-			op_idx++;
-			osd_req_op_init(req, op_idx, CEPH_OSD_OP_STARTSYNC, 0);
-		}
 		BUG_ON(op_idx + 1 != req->r_num_ops);
 
 		pool = NULL;
 		if (i < locked_pages) {
 			BUG_ON(num_ops <= req->r_num_ops);
 			num_ops -= req->r_num_ops;
-			num_ops += do_sync;
 			locked_pages -= i;
 
 			/* allocate new pages array for next request */
