@@ -291,6 +291,7 @@ struct name_list_extended {
 
 struct req_que;
 struct qla_tgt_sess;
+struct unify_cmd;
 
 /*
  * SCSI Request Block
@@ -457,18 +458,7 @@ struct srb_iocb {
 #define SRB_NVME_LS	20
 #define SRB_PRLI_CMD	21
 
-enum {
-	TYPE_SRB,
-	TYPE_TGT_CMD,
-};
-
 typedef struct srb {
-	/*
-	 * Do not move cmd_type field, it needs to
-	 * line up with qla_tgt_cmd->cmd_type
-	 */
-	uint8_t cmd_type;
-	uint8_t pad[3];
 	atomic_t ref_count;
 	wait_queue_head_t nvme_ls_waitq;
 	struct fc_port *fcport;
@@ -3284,7 +3274,7 @@ struct req_que {
 	uint16_t  qos;
 	uint16_t  vp_idx;
 	struct rsp_que *rsp;
-	srb_t **outstanding_cmds;
+	struct unify_cmd **outstanding_cmds;
 	uint32_t current_outstanding_cmd;
 	uint16_t num_outstanding_cmds;
 	int max_q_depth;
@@ -4380,6 +4370,23 @@ enum nexus_wait_type {
 	(IS_QLA27XX(_ha) || IS_QLA83XX(_ha)))
 
 #include "qla_target.h"
+
+typedef enum {
+	TYPE_SRB,
+	TYPE_TGT_CMD,
+} cmd_type_t;
+
+struct unify_cmd {
+	cmd_type_t  cmd_type;
+	union {
+		struct srb srb;
+		struct qla_tgt_cmd tcmd;
+	};
+};
+
+#define SRB_TO_U(_p) container_of(_p, struct unify_cmd, srb)
+#define TCMD_TO_U(_p) container_of(_p, struct unify_cmd, tcmd)
+
 #include "qla_gbl.h"
 #include "qla_dbg.h"
 #include "qla_inline.h"

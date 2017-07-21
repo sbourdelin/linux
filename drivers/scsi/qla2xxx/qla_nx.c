@@ -3668,6 +3668,7 @@ qla82xx_chip_reset_cleanup(scsi_qla_host_t *vha)
 		int cnt, que;
 		srb_t *sp;
 		struct req_que *req;
+		struct unify_cmd *u;
 
 		spin_lock_irqsave(&ha->hardware_lock, flags);
 		for (que = 0; que < ha->max_req_queues; que++) {
@@ -3675,8 +3676,9 @@ qla82xx_chip_reset_cleanup(scsi_qla_host_t *vha)
 			if (!req)
 				continue;
 			for (cnt = 1; cnt < req->num_outstanding_cmds; cnt++) {
-				sp = req->outstanding_cmds[cnt];
-				if (sp) {
+				u = req->outstanding_cmds[cnt];
+				if (u) {
+					sp = &u->srb;
 					if ((!sp->u.scmd.ctx ||
 					    (sp->flags &
 						SRB_FCP_CMND_DMA_VALID)) &&

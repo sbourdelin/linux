@@ -206,6 +206,7 @@ qla2x00_reset_active(scsi_qla_host_t *vha)
 static inline srb_t *
 qla2xxx_get_qpair_sp(struct qla_qpair *qpair, fc_port_t *fcport, gfp_t flag)
 {
+	struct unify_cmd *u;
 	srb_t *sp = NULL;
 	uint8_t bail;
 
@@ -213,11 +214,13 @@ qla2xxx_get_qpair_sp(struct qla_qpair *qpair, fc_port_t *fcport, gfp_t flag)
 	if (unlikely(bail))
 		return NULL;
 
-	sp = mempool_alloc(qpair->srb_mempool, flag);
-	if (!sp)
+	u = mempool_alloc(qpair->srb_mempool, flag);
+	if (!u)
 		goto done;
 
-	memset(sp, 0, sizeof(*sp));
+	memset(u, 0, sizeof(*u));
+	u->cmd_type = TYPE_SRB;
+	sp = &u->srb;
 	sp->fcport = fcport;
 	sp->iocbs = 1;
 	sp->vha = qpair->vha;
@@ -230,7 +233,7 @@ done:
 static inline void
 qla2xxx_rel_qpair_sp(struct qla_qpair *qpair, srb_t *sp)
 {
-	mempool_free(sp, qpair->srb_mempool);
+	mempool_free(SRB_TO_U(sp), qpair->srb_mempool);
 	QLA_QPAIR_MARK_NOT_BUSY(qpair);
 }
 
@@ -238,19 +241,21 @@ static inline srb_t *
 qla2x00_get_sp(scsi_qla_host_t *vha, fc_port_t *fcport, gfp_t flag)
 {
 	srb_t *sp = NULL;
+	struct unify_cmd *u;
 	uint8_t bail;
 
 	QLA_VHA_MARK_BUSY(vha, bail);
 	if (unlikely(bail))
 		return NULL;
 
-	sp = mempool_alloc(vha->hw->srb_mempool, flag);
-	if (!sp)
+	u = mempool_alloc(vha->hw->srb_mempool, flag);
+	if (!u)
 		goto done;
 
-	memset(sp, 0, sizeof(*sp));
+	memset(u, 0, sizeof(*u));
+	u->cmd_type = TYPE_SRB;
+	sp = &u->srb;
 	sp->fcport = fcport;
-	sp->cmd_type = TYPE_SRB;
 	sp->iocbs = 1;
 	sp->vha = vha;
 done:
@@ -263,7 +268,7 @@ static inline void
 qla2x00_rel_sp(srb_t *sp)
 {
 	QLA_VHA_MARK_NOT_BUSY(sp->vha);
-	mempool_free(sp, sp->vha->hw->srb_mempool);
+	mempool_free(SRB_TO_U(sp), sp->vha->hw->srb_mempool);
 }
 
 static inline void

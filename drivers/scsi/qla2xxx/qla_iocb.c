@@ -384,7 +384,7 @@ qla2x00_start_scsi(srb_t *sp)
 
 	/* Build command packet */
 	req->current_outstanding_cmd = handle;
-	req->outstanding_cmds[handle] = sp;
+	req->outstanding_cmds[handle] = SRB_TO_U(sp);
 	sp->handle = handle;
 	cmd->host_scribble = (unsigned char *)(unsigned long)handle;
 	req->cnt -= req_cnt;
@@ -1474,7 +1474,7 @@ qla24xx_start_scsi(srb_t *sp)
 
 	/* Build command packet. */
 	req->current_outstanding_cmd = handle;
-	req->outstanding_cmds[handle] = sp;
+	req->outstanding_cmds[handle] = SRB_TO_U(sp);
 	sp->handle = handle;
 	cmd->host_scribble = (unsigned char *)(unsigned long)handle;
 	req->cnt -= req_cnt;
@@ -1677,7 +1677,7 @@ qla24xx_dif_start_scsi(srb_t *sp)
 
 	/* Build header part of command packet (excluding the OPCODE). */
 	req->current_outstanding_cmd = handle;
-	req->outstanding_cmds[handle] = sp;
+	req->outstanding_cmds[handle] = SRB_TO_U(sp);
 	sp->handle = handle;
 	cmd->host_scribble = (unsigned char *)(unsigned long)handle;
 	req->cnt -= req_cnt;
@@ -1827,7 +1827,7 @@ qla2xxx_start_scsi_mq(srb_t *sp)
 
 	/* Build command packet. */
 	req->current_outstanding_cmd = handle;
-	req->outstanding_cmds[handle] = sp;
+	req->outstanding_cmds[handle] = SRB_TO_U(sp);
 	sp->handle = handle;
 	cmd->host_scribble = (unsigned char *)(unsigned long)handle;
 	req->cnt -= req_cnt;
@@ -2044,7 +2044,7 @@ qla2xxx_dif_start_scsi_mq(srb_t *sp)
 
 	/* Build header part of command packet (excluding the OPCODE). */
 	req->current_outstanding_cmd = handle;
-	req->outstanding_cmds[handle] = sp;
+	req->outstanding_cmds[handle] = SRB_TO_U(sp);
 	sp->handle = handle;
 	cmd->host_scribble = (unsigned char *)(unsigned long)handle;
 	req->cnt -= req_cnt;
@@ -2148,7 +2148,7 @@ __qla2x00_alloc_iocbs(struct qla_qpair *qpair, srb_t *sp)
 
 	/* Prep command array. */
 	req->current_outstanding_cmd = handle;
-	req->outstanding_cmds[handle] = sp;
+	req->outstanding_cmds[handle] = SRB_TO_U(sp);
 	sp->handle = handle;
 
 	/* Adjust entry-counts as needed. */
@@ -3033,7 +3033,7 @@ sufficient_dsds:
 	}
 	/* Build command packet. */
 	req->current_outstanding_cmd = handle;
-	req->outstanding_cmds[handle] = sp;
+	req->outstanding_cmds[handle] = SRB_TO_U(sp);
 	sp->handle = handle;
 	cmd->host_scribble = (unsigned char *)(unsigned long)handle;
 	req->cnt -= req_cnt;
@@ -3459,7 +3459,7 @@ qla2x00_start_bidir(srb_t *sp, struct scsi_qla_host *vha, uint32_t tot_dsds)
 	cmd_pkt->entry_status = (uint8_t) rsp->id;
 	/* Build command packet. */
 	req->current_outstanding_cmd = handle;
-	req->outstanding_cmds[handle] = sp;
+	req->outstanding_cmds[handle] = SRB_TO_U(sp);
 	sp->handle = handle;
 	req->cnt -= req_cnt;
 

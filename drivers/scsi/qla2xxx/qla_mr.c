@@ -2292,7 +2292,7 @@ qlafx00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 	struct req_que *req;
 	int logit = 1;
 	int res = 0;
-
+	struct unify_cmd *u;
 	sts = (struct sts_entry_fx00 *) pkt;
 
 	comp_status = sts->comp_status;
@@ -2305,11 +2305,11 @@ qlafx00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 
 	/* Validate handle. */
 	if (handle < req->num_outstanding_cmds)
-		sp = req->outstanding_cmds[handle];
+		u = req->outstanding_cmds[handle];
 	else
-		sp = NULL;
+		u = NULL;
 
-	if (sp == NULL) {
+	if (u == NULL) {
 		ql_dbg(ql_dbg_io, vha, 0x3034,
 		    "Invalid status handle (0x%x).\n", handle);
 
@@ -2317,6 +2317,7 @@ qlafx00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 		qla2xxx_wake_dpc(vha);
 		return;
 	}
+	sp = &u->srb;
 
 	if (sp->type == SRB_TM_CMD) {
 		req->outstanding_cmds[handle] = NULL;
@@ -2626,7 +2627,7 @@ static void
 qlafx00_multistatus_entry(struct scsi_qla_host *vha,
 	struct rsp_que *rsp, void *pkt)
 {
-	srb_t		*sp;
+	struct unify_cmd *u;
 	struct multi_sts_entry_fx00 *stsmfx;
 	struct qla_hw_data *ha = vha->hw;
 	uint32_t handle, hindex, handle_count, i;
@@ -2656,11 +2657,11 @@ qlafx00_multistatus_entry(struct scsi_qla_host *vha,
 
 		/* Validate handle. */
 		if (handle < req->num_outstanding_cmds)
-			sp = req->outstanding_cmds[handle];
+			u = req->outstanding_cmds[handle];
 		else
-			sp = NULL;
+			u = NULL;
 
-		if (sp == NULL) {
+		if (u == NULL) {
 			ql_dbg(ql_dbg_io, vha, 0x3044,
 			    "Invalid status handle (0x%x).\n", handle);
 			set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
@@ -3134,7 +3135,7 @@ qlafx00_start_scsi(srb_t *sp)
 
 	/* Build command packet. */
 	req->current_outstanding_cmd = handle;
-	req->outstanding_cmds[handle] = sp;
+	req->outstanding_cmds[handle] = SRB_TO_U(sp);
 	sp->handle = handle;
 	cmd->host_scribble = (unsigned char *)(unsigned long)handle;
 	req->cnt -= req_cnt;

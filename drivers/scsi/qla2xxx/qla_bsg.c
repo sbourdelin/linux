@@ -1920,7 +1920,7 @@ qla24xx_process_bidir_cmd(struct bsg_job *bsg_job)
 	return rval;
 
 done_free_srb:
-	mempool_free(sp, ha->srb_mempool);
+	mempool_free(SRB_TO_U(sp), ha->srb_mempool);
 done_unmap_sg:
 	dma_unmap_sg(&ha->pdev->dev,
 	    bsg_job->reply_payload.sg_list,
@@ -2043,7 +2043,7 @@ qlafx00_mgmt_cmd(struct bsg_job *bsg_job)
 	if (rval != QLA_SUCCESS) {
 		ql_log(ql_log_warn, vha, 0x70cd,
 		    "qla2x00_start_sp failed=%d.\n", rval);
-		mempool_free(sp, ha->srb_mempool);
+		mempool_free(SRB_TO_U(sp), ha->srb_mempool);
 		rval = -EIO;
 		goto done_free_fcport;
 	}
@@ -2533,6 +2533,7 @@ qla24xx_bsg_timeout(struct bsg_job *bsg_job)
 	int cnt, que;
 	unsigned long flags;
 	struct req_que *req;
+	struct unify_cmd *u;
 
 	/* find the bsg job from the active list of commands */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
@@ -2542,30 +2543,30 @@ qla24xx_bsg_timeout(struct bsg_job *bsg_job)
 			continue;
 
 		for (cnt = 1; cnt < req->num_outstanding_cmds; cnt++) {
-			sp = req->outstanding_cmds[cnt];
-			if (sp) {
-				if (((sp->type == SRB_CT_CMD) ||
-					(sp->type == SRB_ELS_CMD_HST) ||
-					(sp->type == SRB_FXIOCB_BCMD))
-					&& (sp->u.bsg_job == bsg_job)) {
-					req->outstanding_cmds[cnt] = NULL;
-					spin_unlock_irqrestore(&ha->hardware_lock, flags);
-					if (ha->isp_ops->abort_command(sp)) {
-						ql_log(ql_log_warn, vha, 0x7089,
-						    "mbx abort_command "
-						    "failed.\n");
-						scsi_req(bsg_job->req)->result =
-						bsg_reply->result = -EIO;
-					} else {
-						ql_dbg(ql_dbg_user, vha, 0x708a,
-						    "mbx abort_command "
-						    "success.\n");
-						scsi_req(bsg_job->req)->result =
-						bsg_reply->result = 0;
-					}
-					spin_lock_irqsave(&ha->hardware_lock, flags);
-					goto done;
+			u = req->outstanding_cmds[cnt];
+			if (!u || u->cmd_type != TYPE_SRB)
+				continue;
+
+			sp = &u->srb;
+			if (((sp->type == SRB_CT_CMD) ||
+			    (sp->type == SRB_ELS_CMD_HST) ||
+			    (sp->type == SRB_FXIOCB_BCMD))
+				&& (sp->u.bsg_job == bsg_job)) {
+				req->outstanding_cmds[cnt] = NULL;
+				spin_unlock_irqrestore(&ha->hardware_lock, flags);
+				if (ha->isp_ops->abort_command(sp)) {
+					ql_log(ql_log_warn, vha, 0x7089,
+					    "mbx abort_command failed.\n");
+					scsi_req(bsg_job->req)->result =
+					    bsg_reply->result = -EIO;
+				} else {
+					ql_dbg(ql_dbg_user, vha, 0x708a,
+					    "mbx abort_command success.\n");
+					scsi_req(bsg_job->req)->result =
+					    bsg_reply->result = 0;
 				}
+				spin_lock_irqsave(&ha->hardware_lock, flags);
+				goto done;
 			}
 		}
 	}

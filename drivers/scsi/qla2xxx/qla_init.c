@@ -1404,10 +1404,11 @@ qla24xx_async_abort_command(srb_t *sp)
 	struct scsi_qla_host *vha = fcport->vha;
 	struct qla_hw_data *ha = vha->hw;
 	struct req_que *req = vha->req;
+	struct unify_cmd *u = SRB_TO_U(sp);
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
 	for (handle = 1; handle < req->num_outstanding_cmds; handle++) {
-		if (req->outstanding_cmds[handle] == sp)
+		if (req->outstanding_cmds[handle] == u)
 			break;
 	}
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
@@ -2799,7 +2800,7 @@ qla2x00_alloc_outstanding_cmds(struct qla_hw_data *ha, struct req_que *req)
 			req->num_outstanding_cmds = ha->cur_fw_iocb_count;
 	}
 
-	req->outstanding_cmds = kzalloc(sizeof(srb_t *) *
+	req->outstanding_cmds = kzalloc(sizeof(struct unify_cmd *) *
 	    req->num_outstanding_cmds, GFP_KERNEL);
 
 	if (!req->outstanding_cmds) {
@@ -2808,7 +2809,7 @@ qla2x00_alloc_outstanding_cmds(struct qla_hw_data *ha, struct req_que *req)
 		 * initialization.
 		 */
 		req->num_outstanding_cmds = MIN_OUTSTANDING_COMMANDS;
-		req->outstanding_cmds = kzalloc(sizeof(srb_t *) *
+		req->outstanding_cmds = kzalloc(sizeof(struct unify_cmd *) *
 		    req->num_outstanding_cmds, GFP_KERNEL);
 
 		if (!req->outstanding_cmds) {
