@@ -4668,6 +4668,14 @@ int cgroup_mkdir(struct kernfs_node *parent_kn, const char *name, umode_t mode)
 	if (!parent)
 		return -ENODEV;
 
+	/*
+	 * New cgroup creation isn't allowed on an invalid domain parent.
+	 */
+	if (!cgroup_is_threaded(parent) && !cgroup_is_valid_domain(parent)) {
+		ret = -EOPNOTSUPP;
+		goto out_unlock;
+	}
+
 	cgrp = cgroup_create(parent);
 	if (IS_ERR(cgrp)) {
 		ret = PTR_ERR(cgrp);
