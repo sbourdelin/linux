@@ -1112,7 +1112,11 @@ static void tsc_resume(struct clocksource *cs)
  */
 static u64 read_tsc(struct clocksource *cs, u64 *cycles_stamp)
 {
-	return (u64)rdtsc_ordered();
+	u64 tsc = rdtsc_ordered();
+
+	if (cycles_stamp)
+		*cycles_stamp = tsc;
+	return tsc;
 }
 
 static void tsc_cs_mark_unstable(struct clocksource *cs)
