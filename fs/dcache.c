@@ -135,6 +135,7 @@ struct dentry_stat_t dentry_stat = {
  */
 #define NEG_DENTRY_BATCH	(1 << 8)
 static long neg_dentry_percpu_limit __read_mostly;
+static long neg_dentry_nfree_init __read_mostly; /* Free pool initial value */
 static struct {
 	raw_spinlock_t nfree_lock;
 	long nfree;			/* Negative dentry free pool */
@@ -176,11 +177,23 @@ static long get_nr_dentry_unused(void)
 	return sum < 0 ? 0 : sum;
 }
 
+static long get_nr_dentry_neg(void)
+{
+	int i;
+	long sum = 0;
+
+	for_each_possible_cpu(i)
+		sum += per_cpu(nr_dentry_neg, i);
+	sum += neg_dentry_nfree_init - ndblk.nfree;
+	return sum < 0 ? 0 : sum;
+}
+
 int proc_nr_dentry(struct ctl_table *table, int write, void __user *buffer,
 		   size_t *lenp, loff_t *ppos)
 {
 	dentry_stat.nr_dentry = get_nr_dentry();
 	dentry_stat.nr_unused = get_nr_dentry_unused();
+	dentry_stat.nr_negative = get_nr_dentry_neg();
 	return proc_doulongvec_minmax(table, write, buffer, lenp, ppos);
 }
 #endif
@@ -3733,7 +3746,8 @@ static void __init neg_dentry_init(void)
 	raw_spin_lock_init(&ndblk.nfree_lock);
 
 	/* 20% in global pool & 80% in percpu free */
-	ndblk.nfree = totalram_pages * nr_dentry_page * neg_dentry_pc / 500;
+	ndblk.nfree = neg_dentry_nfree_init
+		    = totalram_pages * nr_dentry_page * neg_dentry_pc / 500;
 	cnt = ndblk.nfree * 4 / num_possible_cpus();
 	if (unlikely(cnt < 2 * NEG_DENTRY_BATCH))
 		cnt = 2 * NEG_DENTRY_BATCH;
