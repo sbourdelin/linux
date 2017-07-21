@@ -195,13 +195,13 @@ static void qusb2_phy_set_tune2_param(struct qusb2_phy *qphy)
 	qusb2_setbits(qphy->base, QUSB2PHY_PORT_TUNE2, val[0] << 0x4);
 }
 
-static int qusb2_phy_poweron(struct phy *phy)
+static int qusb2_phy_poweron(struct qusb2_phy *qphy)
 {
-	struct qusb2_phy *qphy = phy_get_drvdata(phy);
+	struct device *dev = &qphy->phy->dev;
 	int num = ARRAY_SIZE(qphy->vregs);
 	int ret;
 
-	dev_vdbg(&phy->dev, "%s(): Powering-on QUSB2 phy\n", __func__);
+	dev_vdbg(dev, "%s(): Powering-on QUSB2 phy\n", __func__);
 
 	/* turn on regulator supplies */
 	ret = regulator_bulk_enable(num, qphy->vregs);
@@ -210,7 +210,7 @@ static int qusb2_phy_poweron(struct phy *phy)
 
 	ret = clk_prepare_enable(qphy->iface_clk);
 	if (ret) {
-		dev_err(&phy->dev, "failed to enable iface_clk, %d\n", ret);
+		dev_err(dev, "failed to enable iface_clk, %d\n", ret);
 		regulator_bulk_disable(num, qphy->vregs);
 		return ret;
 	}
@@ -218,10 +218,8 @@ static int qusb2_phy_poweron(struct phy *phy)
 	return 0;
 }
 
-static int qusb2_phy_poweroff(struct phy *phy)
+static int qusb2_phy_poweroff(struct qusb2_phy *qphy)
 {
-	struct qusb2_phy *qphy = phy_get_drvdata(phy);
-
 	clk_disable_unprepare(qphy->iface_clk);
 
 	regulator_bulk_disable(ARRAY_SIZE(qphy->vregs), qphy->vregs);
@@ -238,11 +236,15 @@ static int qusb2_phy_init(struct phy *phy)
 
 	dev_vdbg(&phy->dev, "%s(): Initializing QUSB2 phy\n", __func__);
 
+	ret = qusb2_phy_poweron(qphy);
+	if (ret)
+		return ret;
+
 	/* enable ahb interface clock to program phy */
 	ret = clk_prepare_enable(qphy->cfg_ahb_clk);
 	if (ret) {
 		dev_err(&phy->dev, "failed to enable cfg ahb clock, %d\n", ret);
-		return ret;
+		goto poweroff_phy;
 	}
 
 	/* Perform phy reset */
@@ -344,6 +346,9 @@ assert_phy_reset:
 	reset_control_assert(qphy->phy_reset);
 disable_ahb_clk:
 	clk_disable_unprepare(qphy->cfg_ahb_clk);
+poweroff_phy:
+	qusb2_phy_poweroff(qphy);
+
 	return ret;
 }
 
@@ -362,14 +367,14 @@ static int qusb2_phy_exit(struct phy *phy)
 
 	clk_disable_unprepare(qphy->cfg_ahb_clk);
 
+	qusb2_phy_poweroff(qphy);
+
 	return 0;
 }
 
 static const struct phy_ops qusb2_phy_gen_ops = {
 	.init		= qusb2_phy_init,
 	.exit		= qusb2_phy_exit,
-	.power_on	= qusb2_phy_poweron,
-	.power_off	= qusb2_phy_poweroff,
 	.owner		= THIS_MODULE,
 };
 
