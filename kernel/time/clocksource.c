@@ -194,8 +194,8 @@ static void clocksource_watchdog(unsigned long data)
 		}
 
 		local_irq_disable();
-		csnow = cs->read(cs);
-		wdnow = watchdog->read(watchdog);
+		csnow = cs->read(cs, NULL);
+		wdnow = watchdog->read(watchdog, NULL);
 		local_irq_enable();
 
 		/* Clocksource initialized ? */

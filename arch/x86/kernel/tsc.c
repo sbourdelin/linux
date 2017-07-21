@@ -1110,7 +1110,7 @@ static void tsc_resume(struct clocksource *cs)
  * checking the result of read_tsc() - cycle_last for being negative.
  * That works because CLOCKSOURCE_MASK(64) does not mask out any bit.
  */
-static u64 read_tsc(struct clocksource *cs)
+static u64 read_tsc(struct clocksource *cs, u64 *cycles_stamp)
 {
 	return (u64)rdtsc_ordered();
 }

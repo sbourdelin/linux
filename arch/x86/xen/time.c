@@ -46,12 +46,12 @@ u64 xen_clocksource_read(void)
 
 	preempt_disable_notrace();
 	src = &__this_cpu_read(xen_vcpu)->time;
-	ret = pvclock_clocksource_read(src);
+	ret = pvclock_clocksource_read(src, NULL);
 	preempt_enable_notrace();
 	return ret;
 }
 
-static u64 xen_clocksource_get_cycles(struct clocksource *cs)
+static u64 xen_clocksource_get_cycles(struct clocksource *cs, u64 *cycles_stamp)
 {
 	return xen_clocksource_read();
 }

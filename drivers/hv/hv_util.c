@@ -218,7 +218,7 @@ static void hv_set_host_time(struct work_struct *work)
 
 	wrk = container_of(work, struct adj_time_work, work);
 
-	reftime = hyperv_cs->read(hyperv_cs);
+	reftime = hyperv_cs->read(hyperv_cs, NULL);
 	newtime = wrk->host_time + (reftime - wrk->ref_time);
 	host_ts = ns_to_timespec64((newtime - WLTIMEDELTA) * 100);
 
@@ -278,7 +278,7 @@ static inline void adj_guesttime(u64 hosttime, u64 reftime, u8 adj_flags)
 		 */
 		spin_lock_irqsave(&host_ts.lock, flags);
 
-		cur_reftime = hyperv_cs->read(hyperv_cs);
+		cur_reftime = hyperv_cs->read(hyperv_cs, NULL);
 		host_ts.host_time = hosttime;
 		host_ts.ref_time = cur_reftime;
 		ktime_get_snapshot(&host_ts.snap);
@@ -530,7 +530,7 @@ static int hv_ptp_gettime(struct ptp_clock_info *info, struct timespec64 *ts)
 	u64 newtime, reftime;
 
 	spin_lock_irqsave(&host_ts.lock, flags);
-	reftime = hyperv_cs->read(hyperv_cs);
+	reftime = hyperv_cs->read(hyperv_cs, NULL);
 	newtime = host_ts.host_time + (reftime - host_ts.ref_time);
 	*ts = ns_to_timespec64((newtime - WLTIMEDELTA) * 100);
 	spin_unlock_irqrestore(&host_ts.lock, flags);

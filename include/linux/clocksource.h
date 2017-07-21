@@ -48,7 +48,10 @@ struct module;
  *			400-499: Perfect
  *				The ideal clocksource. A must-use where
  *				available.
- * @read:		returns a cycle value, passes clocksource as argument
+ * @read:		returns a cycle value, passes as arguments clocksource
+ *			and a pointer where the cycles "stamp" is stored which
+ *			was used in calcualtion of the returning cycle value,
+ *			if any,	otherwise the pointer value is untouched.
  * @enable:		optional function to enable the clocksource
  * @disable:		optional function to disable the clocksource
  * @mask:		bitmask for two's complement
@@ -77,7 +80,7 @@ struct module;
  * structure.
  */
 struct clocksource {
-	u64 (*read)(struct clocksource *cs);
+	u64 (*read)(struct clocksource *cs, u64 *cycles_stamp);
 	u64 mask;
 	u32 mult;
 	u32 shift;
