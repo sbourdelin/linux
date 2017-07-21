@@ -481,6 +481,8 @@ struct qcom_qmp {
 	int init_count;
 	bool power_enabled;
 	bool clk_enabled;
+	bool phy_initialized;
+	enum phy_mode mode;
 };
 
 static inline void qphy_setbits(void __iomem *base, u32 offset, u32 val)
@@ -832,6 +834,7 @@ static int qcom_qmp_phy_init(struct phy *phy)
 		dev_err(qmp->dev, "pipe_clk enable failed, err=%d\n", ret);
 		goto err_pcs_ready;
 	}
+	qmp->phy_initialized = true;
 
 	return 0;
 
@@ -873,6 +876,75 @@ static int qcom_qmp_phy_exit(struct phy *phy)
 	qcom_qmp_phy_disable_clocks(qmp);
 
 	qcom_qmp_phy_poweroff(qmp);
+
+	qmp->phy_initialized = false;
+
+	return 0;
+}
+
+static int qcom_qmp_phy_set_mode(struct phy *phy, enum phy_mode mode)
+{
+	struct qmp_phy *qphy = phy_get_drvdata(phy);
+	struct qcom_qmp *qmp = qphy->qmp;
+
+	qmp->mode = mode;
+
+	return 0;
+}
+
+static int __maybe_unused qcom_qmp_phy_runtime_suspend(struct device *dev)
+{
+	struct qcom_qmp *qmp = dev_get_drvdata(dev);
+	struct qmp_phy *qphy = qmp->phys[0];
+	const struct qmp_phy_cfg *cfg = qmp->cfg;
+	void __iomem *pcs = qphy->pcs;
+
+	dev_vdbg(dev, "Suspending QMP phy, mode:%d\n", qmp->mode);
+
+	if (!qmp->phy_initialized) {
+		dev_vdbg(dev, "PHY not initialized, bailing out\n");
+		return 0;
+	}
+
+	/* Power down PHY if not in session */
+	if (qmp->mode == PHY_MODE_INVALID)
+		qphy_clrbits(pcs, QPHY_POWER_DOWN_CONTROL, cfg->pwrdn_ctrl);
+
+	clk_disable_unprepare(qphy->pipe_clk);
+	qcom_qmp_phy_disable_clocks(qmp);
+
+	if (qmp->mode == PHY_MODE_INVALID)
+		qcom_qmp_phy_poweroff(qmp);
+
+	return 0;
+}
+
+static int __maybe_unused qcom_qmp_phy_runtime_resume(struct device *dev)
+{
+	struct qcom_qmp *qmp = dev_get_drvdata(dev);
+	struct qmp_phy *qphy = qmp->phys[0];
+	const struct qmp_phy_cfg *cfg = qmp->cfg;
+	void __iomem *pcs = qphy->pcs;
+	int ret = 0;
+
+	dev_vdbg(dev, "Resuming QMP phy, mode:%d\n", qmp->mode);
+
+	if (!qmp->phy_initialized) {
+		dev_vdbg(dev, "PHY not initialized, bailing out\n");
+		return 0;
+	}
+
+	qcom_qmp_phy_poweron(qmp);
+
+	qcom_qmp_phy_enable_clocks(qmp);
+
+	ret = clk_prepare_enable(qphy->pipe_clk);
+	if (ret) {
+		dev_err(dev, "pipe_clk enable failed, err=%d\n", ret);
+		return ret;
+	}
+
+	qphy_setbits(pcs, QPHY_POWER_DOWN_CONTROL, cfg->pwrdn_ctrl);
 
 	return 0;
 }
@@ -999,6 +1071,7 @@ static int phy_pipe_clk_register(struct qcom_qmp *qmp, int id)
 static const struct phy_ops qcom_qmp_phy_gen_ops = {
 	.init		= qcom_qmp_phy_init,
 	.exit		= qcom_qmp_phy_exit,
+	.set_mode	= qcom_qmp_phy_set_mode,
 	.owner		= THIS_MODULE,
 };
 
@@ -1091,6 +1164,11 @@ static const struct of_device_id qcom_qmp_phy_of_match_table[] = {
 };
 MODULE_DEVICE_TABLE(of, qcom_qmp_phy_of_match_table);
 
+static const struct dev_pm_ops qcom_qmp_phy_pm_ops = {
+	SET_RUNTIME_PM_OPS(qcom_qmp_phy_runtime_suspend,
+			   qcom_qmp_phy_runtime_resume, NULL)
+};
+
 static int qcom_qmp_phy_probe(struct platform_device *pdev)
 {
 	struct qcom_qmp *qmp;
@@ -1118,6 +1196,7 @@ static int qcom_qmp_phy_probe(struct platform_device *pdev)
 	qmp->serdes = base;
 
 	mutex_init(&qmp->phy_mutex);
+	qmp->mode = PHY_MODE_INVALID;
 
 	/* Get the specific init parameters of QMP phy */
 	qmp->cfg = of_device_get_match_data(dev);
@@ -1146,12 +1225,16 @@ static int qcom_qmp_phy_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	id = 0;
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
+
 	for_each_available_child_of_node(dev->of_node, child) {
 		/* Create per-lane phy */
 		ret = qcom_qmp_phy_create(dev, child, id);
 		if (ret) {
 			dev_err(dev, "failed to create lane%d phy, %d\n",
 				id, ret);
+			pm_runtime_disable(dev);
 			return ret;
 		}
 
@@ -1163,6 +1246,7 @@ static int qcom_qmp_phy_probe(struct platform_device *pdev)
 		if (ret) {
 			dev_err(qmp->dev,
 				"failed to register pipe clock source\n");
+			pm_runtime_disable(dev);
 			return ret;
 		}
 		id++;
@@ -1171,6 +1255,8 @@ static int qcom_qmp_phy_probe(struct platform_device *pdev)
 	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
 	if (!IS_ERR(phy_provider))
 		dev_info(dev, "Registered Qcom-QMP phy\n");
+	else
+		pm_runtime_disable(dev);
 
 	return PTR_ERR_OR_ZERO(phy_provider);
 }
@@ -1179,6 +1265,7 @@ static struct platform_driver qcom_qmp_phy_driver = {
 	.probe		= qcom_qmp_phy_probe,
 	.driver = {
 		.name	= "qcom-qmp-phy",
+		.pm	= &qcom_qmp_phy_pm_ops,
 		.of_match_table = qcom_qmp_phy_of_match_table,
 	},
 };
