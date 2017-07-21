@@ -1005,6 +1005,12 @@ static ssize_t online_store(struct device *dev, struct device_attribute *attr,
 	bool val;
 	int ret;
 
+	/* According to Documentation/ABI/testing/sysfs-devices-online,
+	 * the buf length should be 2, buf[0]: one of 'Yy1Nn0', buf[1]: '\n'.
+	 */
+	if (strlen(buf) != 2)
+		return -EINVAL;
+
 	ret = strtobool(buf, &val);
 	if (ret < 0)
 		return ret;
