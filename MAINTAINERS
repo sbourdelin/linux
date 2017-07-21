@@ -1172,6 +1172,11 @@ M:	Boris Brezillon <boris.brezillon@free-electrons.com>
 S:	Maintained
 F:	drivers/clk/at91
 
+ARM/BECKHOFF SUPPORT
+M:	Patrick Bruenn <p.bruenn@beckhoff.com>
+S:	Maintained
+F:	Documentation/devicetree/bindings/arm/bhf.txt
+
 ARM/CALXEDA HIGHBANK ARCHITECTURE
 M:	Rob Herring <robh@kernel.org>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
