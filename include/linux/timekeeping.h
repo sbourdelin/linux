@@ -178,10 +178,17 @@ extern u32 ktime_get_resolution_ns(void);
 
 /**
  * ktime_get_real - get the real (wall-) time in ktime_t format
+ * ktime_get_real_with_cycles - does the same and stores the cycles value
+ * (if any) used for the ktime_ calculation in the pointer given
  */
 static inline ktime_t ktime_get_real(void)
 {
 	return ktime_get_with_offset(TK_OFFS_REAL, NULL);
+}
+
+static inline ktime_t ktime_get_real_with_cycles(u64 *cycles_stamp)
+{
+	return ktime_get_with_offset(TK_OFFS_REAL, cycles_stamp);
 }
 
 /**
@@ -189,12 +196,19 @@ static inline ktime_t ktime_get_real(void)
  *
  * This is similar to CLOCK_MONTONIC/ktime_get, but also includes the
  * time spent in suspend.
+ *
+ * ktime_get_boottime_with_cycles - the version of the function storing the
+ *	cycles value used for the ktime_ calculationif (any in) the pointer
  */
 static inline ktime_t ktime_get_boottime(void)
 {
 	return ktime_get_with_offset(TK_OFFS_BOOT, NULL);
 }
 
+static inline ktime_t ktime_get_boottime_with_cycles(u64 *cycles_stamp)
+{
+	return ktime_get_with_offset(TK_OFFS_BOOT, cycles_stamp);
+}
 /**
  * ktime_get_clocktai - Returns the TAI time of day in ktime_t format
  */
@@ -221,9 +235,19 @@ static inline u64 ktime_get_real_ns(void)
 	return ktime_to_ns(ktime_get_real());
 }
 
+static inline u64 ktime_get_real_ns_with_cycles(u64 *cycles_stamp)
+{
+	return ktime_to_ns(ktime_get_real_with_cycles(cycles_stamp));
+}
+
 static inline u64 ktime_get_boot_ns(void)
 {
 	return ktime_to_ns(ktime_get_boottime());
+}
+
+static inline u64 ktime_get_boot_ns_with_cycles(u64 *cycles_stamp)
+{
+	return ktime_to_ns(ktime_get_boottime_with_cycles(cycles_stamp));
 }
 
 static inline u64 ktime_get_tai_ns(void)
