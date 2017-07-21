@@ -426,6 +426,7 @@ struct skb_shared_info {
 	unsigned int	gso_type;
 	u32		tskey;
 	__be32          ip6_frag_id;
+	u32		dma_desc;
 
 	/*
 	 * Warning : all fields before dataref are cleared in __alloc_skb()
