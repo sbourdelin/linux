@@ -132,6 +132,9 @@ struct qusb2_phy {
 
 	const struct qusb2_phy_cfg *cfg;
 	bool has_se_clk_scheme;
+	bool phy_initialized;
+	bool powered_on;
+	enum phy_mode mode;
 };
 
 static inline void qusb2_setbits(void __iomem *base, u32 offset, u32 val)
@@ -203,28 +206,109 @@ static int qusb2_phy_poweron(struct qusb2_phy *qphy)
 
 	dev_vdbg(dev, "%s(): Powering-on QUSB2 phy\n", __func__);
 
+	if (qphy->powered_on)
+		return 0;
+
 	/* turn on regulator supplies */
 	ret = regulator_bulk_enable(num, qphy->vregs);
 	if (ret)
 		return ret;
 
-	ret = clk_prepare_enable(qphy->iface_clk);
-	if (ret) {
-		dev_err(dev, "failed to enable iface_clk, %d\n", ret);
-		regulator_bulk_disable(num, qphy->vregs);
-		return ret;
-	}
+	qphy->powered_on = true;
 
 	return 0;
 }
 
 static int qusb2_phy_poweroff(struct qusb2_phy *qphy)
 {
-	clk_disable_unprepare(qphy->iface_clk);
+	if (!qphy->powered_on)
+		return 0;
 
 	regulator_bulk_disable(ARRAY_SIZE(qphy->vregs), qphy->vregs);
 
+	qphy->powered_on = false;
+
 	return 0;
+}
+
+static int qusb2_phy_set_mode(struct phy *phy, enum phy_mode mode)
+{
+	struct qusb2_phy *qphy = phy_get_drvdata(phy);
+
+	qphy->mode = mode;
+
+	return 0;
+}
+
+static int __maybe_unused qusb2_phy_runtime_suspend(struct device *dev)
+{
+	struct qusb2_phy *qphy = dev_get_drvdata(dev);
+
+	dev_vdbg(dev, "Suspending QUSB2 Phy, mode:%d\n", qphy->mode);
+
+	if (!qphy->phy_initialized) {
+		dev_vdbg(dev, "PHY not initialized, bailing out\n");
+		return 0;
+	}
+
+	if (!qphy->has_se_clk_scheme)
+		clk_disable_unprepare(qphy->ref_clk);
+
+	clk_disable_unprepare(qphy->cfg_ahb_clk);
+	clk_disable_unprepare(qphy->iface_clk);
+
+	if (qphy->mode == PHY_MODE_INVALID)
+		qusb2_phy_poweroff(qphy);
+
+	return 0;
+}
+
+static int __maybe_unused qusb2_phy_runtime_resume(struct device *dev)
+{
+	struct qusb2_phy *qphy = dev_get_drvdata(dev);
+	int ret;
+
+	dev_vdbg(dev, "Resuming QUSB2 phy, mode:%d\n", qphy->mode);
+
+	if (!qphy->phy_initialized) {
+		dev_vdbg(dev, "PHY not initialized, bailing out\n");
+		return 0;
+	}
+
+	ret = qusb2_phy_poweron(qphy);
+	if (ret)
+		return ret;
+
+	ret = clk_prepare_enable(qphy->iface_clk);
+	if (ret) {
+		dev_err(dev, "failed to enable iface_clk, %d\n", ret);
+		goto poweroff_phy;
+	}
+
+	ret = clk_prepare_enable(qphy->cfg_ahb_clk);
+	if (ret) {
+		dev_err(dev, "failed to enable cfg ahb clock, %d\n", ret);
+		goto disable_iface_clk;
+	}
+
+	if (!qphy->has_se_clk_scheme) {
+		clk_prepare_enable(qphy->ref_clk);
+		if (ret) {
+			dev_err(dev, "failed to enable ref clk, %d\n", ret);
+			goto disable_ahb_clk;
+		}
+	}
+
+	return 0;
+
+disable_ahb_clk:
+	clk_disable_unprepare(qphy->cfg_ahb_clk);
+disable_iface_clk:
+	clk_disable_unprepare(qphy->iface_clk);
+poweroff_phy:
+	qusb2_phy_poweroff(qphy);
+
+	return ret;
 }
 
 static int qusb2_phy_init(struct phy *phy)
@@ -240,11 +324,17 @@ static int qusb2_phy_init(struct phy *phy)
 	if (ret)
 		return ret;
 
+	ret = clk_prepare_enable(qphy->iface_clk);
+	if (ret) {
+		dev_err(&phy->dev, "failed to enable iface_clk, %d\n", ret);
+		goto poweroff_phy;
+	}
+
 	/* enable ahb interface clock to program phy */
 	ret = clk_prepare_enable(qphy->cfg_ahb_clk);
 	if (ret) {
 		dev_err(&phy->dev, "failed to enable cfg ahb clock, %d\n", ret);
-		goto poweroff_phy;
+		goto disable_iface_clk;
 	}
 
 	/* Perform phy reset */
@@ -336,6 +426,7 @@ static int qusb2_phy_init(struct phy *phy)
 		ret = -EBUSY;
 		goto disable_ref_clk;
 	}
+	qphy->phy_initialized = true;
 
 	return 0;
 
@@ -346,6 +437,8 @@ assert_phy_reset:
 	reset_control_assert(qphy->phy_reset);
 disable_ahb_clk:
 	clk_disable_unprepare(qphy->cfg_ahb_clk);
+disable_iface_clk:
+	clk_disable_unprepare(qphy->iface_clk);
 poweroff_phy:
 	qusb2_phy_poweroff(qphy);
 
@@ -366,8 +459,11 @@ static int qusb2_phy_exit(struct phy *phy)
 	reset_control_assert(qphy->phy_reset);
 
 	clk_disable_unprepare(qphy->cfg_ahb_clk);
+	clk_disable_unprepare(qphy->iface_clk);
 
 	qusb2_phy_poweroff(qphy);
+
+	qphy->phy_initialized = false;
 
 	return 0;
 }
@@ -375,6 +471,7 @@ static int qusb2_phy_exit(struct phy *phy)
 static const struct phy_ops qusb2_phy_gen_ops = {
 	.init		= qusb2_phy_init,
 	.exit		= qusb2_phy_exit,
+	.set_mode	= qusb2_phy_set_mode,
 	.owner		= THIS_MODULE,
 };
 
@@ -386,6 +483,11 @@ static const struct of_device_id qusb2_phy_of_match_table[] = {
 	{ },
 };
 MODULE_DEVICE_TABLE(of, qusb2_phy_of_match_table);
+
+static const struct dev_pm_ops qusb2_phy_pm_ops = {
+	SET_RUNTIME_PM_OPS(qusb2_phy_runtime_suspend,
+			   qusb2_phy_runtime_resume, NULL)
+};
 
 static int qusb2_phy_probe(struct platform_device *pdev)
 {
@@ -464,11 +566,14 @@ static int qusb2_phy_probe(struct platform_device *pdev)
 		qphy->cell = NULL;
 		dev_dbg(dev, "failed to lookup tune2 hstx trim value\n");
 	}
+	pm_runtime_set_active(dev);
+	pm_runtime_enable(dev);
 
 	generic_phy = devm_phy_create(dev, NULL, &qusb2_phy_gen_ops);
 	if (IS_ERR(generic_phy)) {
 		ret = PTR_ERR(generic_phy);
 		dev_err(dev, "failed to create phy, %d\n", ret);
+		pm_runtime_disable(dev);
 		return ret;
 	}
 	qphy->phy = generic_phy;
@@ -479,6 +584,8 @@ static int qusb2_phy_probe(struct platform_device *pdev)
 	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
 	if (!IS_ERR(phy_provider))
 		dev_info(dev, "Registered Qcom-QUSB2 phy\n");
+	else
+		pm_runtime_disable(dev);
 
 	return PTR_ERR_OR_ZERO(phy_provider);
 }
@@ -487,6 +594,7 @@ static struct platform_driver qusb2_phy_driver = {
 	.probe		= qusb2_phy_probe,
 	.driver = {
 		.name	= "qcom-qusb2-phy",
+		.pm	= &qusb2_phy_pm_ops,
 		.of_match_table = qusb2_phy_of_match_table,
 	},
 };
