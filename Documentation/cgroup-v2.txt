@@ -24,8 +24,9 @@ v1 is available under Documentation/cgroup-v1/.
      2-3. [Un]populated Notification
      2-4. Controlling Controllers
        2-4-1. Enabling and Disabling
-       2-4-2. Top-down Constraint
-       2-4-3. No Internal Process Constraint
+       2-4-2. Cgroup Hierarchy
+       2-4-3. Top-down Constraint
+       2-4-4. No Internal Process Constraint
      2-5. Delegation
        2-5-1. Model of Delegation
        2-5-2. Delegation Containment
@@ -362,10 +363,15 @@ disabled by writing to the "cgroup.subtree_control" file::
 
   # echo "+cpu +memory -io" > cgroup.subtree_control
 
+The prefixes '+', '-' and '#' are used to enable, disable or put a
+controller in the bypass mode respectively.  In the bypass mode, a
+controller is disabled in a cgroup, but it can be enabled again in its
+child cgroups as it will still be listed in "cgroup.controllers".
+
 Only controllers which are listed in "cgroup.controllers" can be
-enabled.  When multiple operations are specified as above, either they
-all succeed or fail.  If multiple operations on the same controller
-are specified, the last one is effective.
+enabled or bypassed.  When multiple operations are specified as above,
+either they all succeed or fail.  If multiple operations on the same
+controller are specified, the last one is effective.
 
 Enabling a controller in a cgroup indicates that the distribution of
 the target resource across its immediate children will be controlled.
@@ -390,16 +396,47 @@ controller interface files - anything which doesn't start with
 "cgroup." are owned by the parent rather than the cgroup itself.
 
 
+Cgroup Hierarchy
+~~~~~~~~~~~~~~~~
+
+The hierarchy as seen from each controller's perspective can be different
+from that of another controller depending on which controllers are enabled
+or disabled in various nodes within the full cgroup hierarchy.
+
+In the example below::
+
+  A(+) - B(#) - C(#) - D(#) - E(+) - F(-)
+              \ G(+)
+
+The '+', '-' and '#' markers in parenthesis indicate a controller in
+enabled, disabled or bypass mode respectively.
+
+Disabling a controller in a cgroup effectively collapses it to its
+parent from that controller's point of view.  In this case, the
+effective hierarchy as seen from that particular controller will be::
+
+  A|B|C|D - E|F
+          \ G
+
+There are three effective node clusters. The top cluster contains
+(A, B, C, D) with two leaf clusters (E, F) and (G).
+
+Disabling controllers from the leaves up and using bypass mode in
+the middle layers allow controllers to have their own unique views
+of the cgroup hierarchy that can best fit their own need.
+
+
 Top-down Constraint
 ~~~~~~~~~~~~~~~~~~~
 
 Resources are distributed top-down and a cgroup can further distribute
 a resource only if the resource has been distributed to it from the
 parent.  This means that all non-root "cgroup.subtree_control" files
-can only contain controllers which are enabled in the parent's
-"cgroup.subtree_control" file.  A controller can be enabled only if
-the parent has the controller enabled and a controller can't be
-disabled if one or more children have it enabled.
+can only contain controllers which are enabled or bypassed in the parent's
+"cgroup.subtree_control" file.  A controller can be enabled or bypassed
+only if the parent has the controller enabled or bypassed and the
+state of a controller can't be changed if one or more children have
+it enabled or bypassed.
 
 
 No Internal Process Constraint
@@ -836,12 +873,12 @@ All cgroup core files are prefixed with "cgroup."
 	which are enabled to control resource distribution from the
 	cgroup to its children.
 
-	Space separated list of controllers prefixed with '+' or '-'
-	can be written to enable or disable controllers.  A controller
-	name prefixed with '+' enables the controller and '-'
-	disables.  If a controller appears more than once on the list,
-	the last one is effective.  When multiple enable and disable
-	operations are specified, either all succeed or all fail.
+	Space separated list of controllers prefixed with '+', '-' or
+	'#' can be written to enable, disable or bypass controllers
+	respectively.  If a controller appears more than once on
+	the list, the last one is effective.  When multiple enable,
+	disable or bypass operations are specified, either all succeed
+	or all fail.
 
   cgroup.events
 	A read-only flat-keyed file which exists on non-root cgroups.

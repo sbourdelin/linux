@@ -295,16 +295,18 @@ struct cgroup {
 	struct cgroup_file events_file;	/* handle for "cgroup.events" */
 
 	/*
-	 * The bitmask of subsystems enabled on the child cgroups.
-	 * ->subtree_control is the one configured through
-	 * "cgroup.subtree_control" while ->child_ss_mask is the effective
-	 * one which may have more subsystems enabled.  Controller knobs
-	 * are made available iff it's enabled in ->subtree_control.
+	 * The bitmask of subsystems enabled or bypassed on the child cgroups.
+	 * ->subtree_control and ->subtree_bypass are the one configured
+	 * through "cgroup.subtree_control" while ->subtree_ss_mask is the
+	 * effective one which may have more subsystems enabled.  Controller
+	 * knobs are made available iff it's enabled in ->subtree_ss_mask.
 	 */
 	u16 subtree_control;
 	u16 subtree_ss_mask;
+	u16 subtree_bypass;
 	u16 old_subtree_control;
 	u16 old_subtree_ss_mask;
+	u16 old_subtree_bypass;
 
 	/* Private pointers for each registered subsystem */
 	struct cgroup_subsys_state __rcu *subsys[CGROUP_SUBSYS_COUNT];
