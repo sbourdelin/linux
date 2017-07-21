@@ -114,6 +114,14 @@ static union ieee754sp _sp_maddf(union ieee754sp z, union ieee754sp x,
 	case CLPAIR(IEEE754_CLASS_DNORM, IEEE754_CLASS_ZERO):
 		if (zc == IEEE754_CLASS_INF)
 			return ieee754sp_inf(zs);
+		/* Handle cases +0 + (-0) and similar ones. */
+		if (zc == IEEE754_CLASS_ZERO) {
+			if ((!(flags & maddf_negate_product) && (zs == (xs ^ ys))) ||
+			    ((flags & maddf_negate_product) && (zs != (xs ^ ys))))
+				return z;
+			else
+				return ieee754sp_zero(ieee754_csr.rm == FPU_CSR_RD);
+		}
 		/* Multiplication is 0 so just return z */
 		return z;
 
