@@ -283,6 +283,12 @@ static int at803x_config_init(struct phy_device *phydev)
 	if (ret < 0)
 		return ret;
 
+	/*
+	 * NB: This code assumes that RGMII RX clock delay is disabled
+	 * at reset, but actually, RX clock delay is enabled at reset.
+	 * Disabling the delay if it has not been explicitly requested
+	 * breaks boards that rely on the enabled-by-default behavior.
+	 */
 	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_RXID ||
 			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID) {
 		ret = at803x_enable_rx_delay(phydev);
@@ -290,6 +296,12 @@ static int at803x_config_init(struct phy_device *phydev)
 			return ret;
 	}
 
+	/*
+	 * NB: This code assumes that RGMII TX clock delay is disabled
+	 * at reset, but actually, TX clock delay "survives" across SW
+	 * resets. If the bootloader enables TX clock delay, Linux is
+	 * stuck with that setting.
+	 */
 	if (phydev->interface == PHY_INTERFACE_MODE_RGMII_TXID ||
 			phydev->interface == PHY_INTERFACE_MODE_RGMII_ID) {
 		ret = at803x_enable_tx_delay(phydev);
