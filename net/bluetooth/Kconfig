@@ -45,6 +45,8 @@ config BT_BREDR
 	bool "Bluetooth Classic (BR/EDR) features"
 	depends on BT
 	default y
+	help
+	  Support Bluetooth version 1 and 2 connections.
 
 source "net/bluetooth/rfcomm/Kconfig"
 
@@ -58,11 +60,17 @@ config BT_HS
 	bool "Bluetooth High Speed (HS) features"
 	depends on BT_BREDR
 	default y
+	help
+	  Bluetooth 3 introduces high-speed mode where bluetooth endpoints
+	  negotiate fast connection over WIFI. This controls its support.
 
 config BT_LE
 	bool "Bluetooth Low Energy (LE) features"
 	depends on BT
 	default y
+	help
+	  Bluetooth 4 introduces special low-energy protocol, designed
+	  for simple devices. This controls its support.
 
 config BT_6LOWPAN
 	tristate "Bluetooth 6LoWPAN support"
