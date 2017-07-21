@@ -16,6 +16,7 @@
  */
 
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 
 #include "core.h"
 
@@ -150,4 +151,18 @@ void dwc3_host_exit(struct dwc3 *dwc)
 	phy_remove_lookup(dwc->usb3_generic_phy, "usb3-phy",
 			  dev_name(dwc->dev));
 	platform_device_unregister(dwc->xhci);
+}
+
+int dwc3_host_suspend(struct dwc3 *dwc)
+{
+	struct device *xhci = &dwc->xhci->dev;
+
+	return pm_runtime_suspend(xhci);
+}
+
+int dwc3_host_resume(struct dwc3 *dwc)
+{
+	struct device *xhci = &dwc->xhci->dev;
+
+	return pm_runtime_resume(xhci);
 }
