@@ -1094,7 +1094,7 @@ static void set_backend_state(struct xenbus_device *dev,
 				xenbus_switch_state(dev, XenbusStateClosing);
 				break;
 			default:
-				__WARN();
+				WARN_ON(1);
 			}
 			break;
 		case XenbusStateInitWait:
@@ -1109,7 +1109,7 @@ static void set_backend_state(struct xenbus_device *dev,
 				xenbus_switch_state(dev, XenbusStateClosing);
 				break;
 			default:
-				__WARN();
+				WARN_ON(1);
 			}
 			break;
 		case XenbusStateConnected:
@@ -1123,7 +1123,7 @@ static void set_backend_state(struct xenbus_device *dev,
 				xenbus_switch_state(dev, XenbusStateClosing);
 				break;
 			default:
-				__WARN();
+				WARN_ON(1);
 			}
 			break;
 		case XenbusStateClosing:
@@ -1134,11 +1134,11 @@ static void set_backend_state(struct xenbus_device *dev,
 				xenbus_switch_state(dev, XenbusStateClosed);
 				break;
 			default:
-				__WARN();
+				WARN_ON(1);
 			}
 			break;
 		default:
-			__WARN();
+			WARN_ON(1);
 		}
 	}
 }
