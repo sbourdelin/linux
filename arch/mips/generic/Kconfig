@@ -36,4 +36,15 @@ config FIT_IMAGE_FDT_BOSTON
 	  enable this if you wish to boot on a MIPS Boston board, as it is
 	  expected by the bootloader.
 
+config VIRT_BOARD_RANCHU
+	bool "Ranchu platform for Android emulator"
+	select LEGACY_BOARDS
+	help
+	  This enables support for the platform used by Android emulator.
+
+	  Ranchu platform consists of a set of virtual devices. This platform
+	  enables emulation of variety of virtual configurations while using
+	  Android emulator. Android emulator is based on Qemu, and contains
+	  the support for the same set of virtual devices.
+
 endif
