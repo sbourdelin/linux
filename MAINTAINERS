@@ -5006,8 +5006,7 @@ L:	linux-edac@vger.kernel.org
 S:	Maintained
 F:	drivers/edac/skx_edac.c
 
-EDAC-XGENE
-APPLIED MICRO (APM) X-GENE SOC EDAC
+EDAC-XGENE-APPLIED MICRO (APM) X-GENE SOC EDAC
 M:     Loc Ho <lho@apm.com>
 S:     Supported
 F:     drivers/edac/xgene_edac.c
