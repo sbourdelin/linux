@@ -1311,9 +1311,17 @@ static u64 compute_guest_tsc(struct kvm_vcpu *vcpu, s64 kernel_ns)
 }
 
 #ifdef CONFIG_X86_64
+static bool pvclock_stable(void)
+{
+	return !!(pvclock_read_flags(&pvclock_pvti_cpu0_va()->pvti)
+		& PVCLOCK_TSC_STABLE_BIT);
+}
+
 static bool clocksource_stable(void)
 {
-	return get_tk_mono_clock_mode() == VCLOCK_TSC;
+	return get_tk_mono_clock_mode() == VCLOCK_TSC ||
+		(get_tk_mono_clock_mode() == VCLOCK_PVCLOCK
+		&& pvclock_stable());
 }
 
 static bool clocksource_stability_check(void)

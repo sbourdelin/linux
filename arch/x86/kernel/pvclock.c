@@ -73,6 +73,7 @@ u8 pvclock_read_flags(struct pvclock_vcpu_time_info *src)
 
 	return flags & valid_flags;
 }
+EXPORT_SYMBOL(pvclock_read_flags);
 
 static atomic64_t clocksource_stable = ATOMIC64_INIT(0);
 
