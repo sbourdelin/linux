@@ -297,6 +297,48 @@ static int nearby_node(int apicid)
 #endif
 
 /*
+ * Get topology information via X86_FEATURE_TOPOEXT
+ */
+static void __get_topoext(struct cpuinfo_x86 *c)
+{
+	u32 eax, ebx, ecx, edx;
+	int cpu = smp_processor_id();
+
+	cpuid(0x8000001e, &eax, &ebx, &ecx, &edx);
+
+	smp_num_siblings = ((ebx >> 8) & 0xff) + 1;
+
+	if (c->x86 == 0x15)
+		c->cu_id = ebx & 0xff;
+
+	if (c->x86 >= 0x17) {
+		c->cpu_core_id = ebx & 0xff;
+
+		if (smp_num_siblings > 1)
+			c->x86_max_cores /= smp_num_siblings;
+	}
+
+	/*
+	 * We may have multiple LLCs if L3 caches exist, so check if we
+	 * have an L3 cache by looking at the L3 cache CPUID leaf.
+	 */
+	if (cpuid_edx(0x80000006)) {
+		if (c->x86 == 0x17) {
+			/*
+			 * LLC is at the core complex level.
+			 * Core complex id is ApicId[3].
+			 */
+			per_cpu(cpu_llc_id, cpu) = c->apicid >> 3;
+		} else {
+			/* LLC is at the node level. */
+			u8 node_id = ecx & 0xff;
+
+			per_cpu(cpu_llc_id, cpu) = node_id;
+		}
+	}
+}
+
+/*
  * Fixup core topology information for
  * (1) AMD multi-node processors
  *     Assumption: Number of cores in each internal node is the same.
@@ -305,46 +347,13 @@ static int nearby_node(int apicid)
 #ifdef CONFIG_SMP
 static void amd_get_topology(struct cpuinfo_x86 *c)
 {
-	u8 node_id;
-	int cpu = smp_processor_id();
-
 	/* get information required for multi-node processors */
 	if (boot_cpu_has(X86_FEATURE_TOPOEXT)) {
-		u32 eax, ebx, ecx, edx;
-
-		cpuid(0x8000001e, &eax, &ebx, &ecx, &edx);
-
-		node_id  = ecx & 0xff;
-		smp_num_siblings = ((ebx >> 8) & 0xff) + 1;
-
-		if (c->x86 == 0x15)
-			c->cu_id = ebx & 0xff;
-
-		if (c->x86 >= 0x17) {
-			c->cpu_core_id = ebx & 0xff;
-
-			if (smp_num_siblings > 1)
-				c->x86_max_cores /= smp_num_siblings;
-		}
-
-		/*
-		 * We may have multiple LLCs if L3 caches exist, so check if we
-		 * have an L3 cache by looking at the L3 cache CPUID leaf.
-		 */
-		if (cpuid_edx(0x80000006)) {
-			if (c->x86 == 0x17) {
-				/*
-				 * LLC is at the core complex level.
-				 * Core complex id is ApicId[3].
-				 */
-				per_cpu(cpu_llc_id, cpu) = c->apicid >> 3;
-			} else {
-				/* LLC is at the node level. */
-				per_cpu(cpu_llc_id, cpu) = node_id;
-			}
-		}
+		__get_topoext(c);
 	} else if (cpu_has(c, X86_FEATURE_NODEID_MSR)) {
+		u8 node_id;
 		u64 value;
+		int cpu = smp_processor_id();
 
 		rdmsrl(MSR_FAM10H_NODE_ID, value);
 		node_id = value & 7;
