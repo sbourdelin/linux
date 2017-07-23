@@ -18,6 +18,7 @@ my $V = '0.26';
 
 use Getopt::Long qw(:config no_auto_abbrev);
 use Cwd;
+use File::Find;
 
 my $cur_path = fastgetcwd() . '/';
 my $lk_path = "./";
@@ -307,36 +308,69 @@ if (!top_of_kernel_tree($lk_path)) {
 
 my @typevalue = ();
 my %keyword_hash;
+my @mfiles = ();
 
-open (my $maint, '<', "${lk_path}MAINTAINERS")
-    or die "$P: Can't open MAINTAINERS: $!\n";
-while (<$maint>) {
-    my $line = $_;
+sub read_maintainer_file {
+    my ($file) = @_;
 
-    if ($line =~ m/^([A-Z]):\s*(.*)/) {
-	my $type = $1;
-	my $value = $2;
+    open (my $maint, '<', "$file")
+	or die "$P: Can't open MAINTAINERS file '$file': $!\n";
+    while (<$maint>) {
+	my $line = $_;
 
-	##Filename pattern matching
-	if ($type eq "F" || $type eq "X") {
-	    $value =~ s@\.@\\\.@g;       ##Convert . to \.
-	    $value =~ s/\*/\.\*/g;       ##Convert * to .*
-	    $value =~ s/\?/\./g;         ##Convert ? to .
-	    ##if pattern is a directory and it lacks a trailing slash, add one
-	    if ((-d $value)) {
-		$value =~ s@([^/])$@$1/@;
+	if ($line =~ m/^([A-Z]):\s*(.*)/) {
+	    my $type = $1;
+	    my $value = $2;
+
+	    ##Filename pattern matching
+	    if ($type eq "F" || $type eq "X") {
+		$value =~ s@\.@\\\.@g;       ##Convert . to \.
+		$value =~ s/\*/\.\*/g;       ##Convert * to .*
+		$value =~ s/\?/\./g;         ##Convert ? to .
+		##if pattern is a directory and it lacks a trailing slash, add one
+		if ((-d $value)) {
+		    $value =~ s@([^/])$@$1/@;
+		}
+	    } elsif ($type eq "K") {
+		$keyword_hash{@typevalue} = $value;
 	    }
-	} elsif ($type eq "K") {
-	    $keyword_hash{@typevalue} = $value;
+	    push(@typevalue, "$type:$value");
+	} elsif (!(/^\s*$/ || /^\s*\#/)) {
+	    $line =~ s/\n$//g;
+	    push(@typevalue, $line);
 	}
-	push(@typevalue, "$type:$value");
-    } elsif (!/^(\s)*$/) {
-	$line =~ s/\n$//g;
-	push(@typevalue, $line);
+    }
+    close($maint);
+}
+
+sub find_is_maintainer_file {
+    my $file = $File::Find::name;
+    if (-f $file && $file =~ m@/MAINTAINERS$@) {
+	push(@mfiles, $file);
     }
 }
-close($maint);
 
+sub find_ignore_git {
+    return grep { $_ !~ /^\.git$/; } @_;
+}
+
+if (-d "${lk_path}MAINTAINERS") {
+    opendir(DIR, "${lk_path}MAINTAINERS") or die $!;
+    my @files = readdir(DIR);
+    closedir(DIR);
+    foreach my $file (@files) {
+	push(@mfiles, "${lk_path}MAINTAINERS/$file") if ($file !~ /^\./);
+    }
+}
+
+find( { wanted => \&find_is_maintainer_file,
+	preprocess => \&find_ignore_git,
+	no_chdir => 1,
+      }, "${lk_path}");
+
+foreach my $file (@mfiles) {
+    read_maintainer_file("$file");
+}
 
 #
 # Read mail address map
@@ -873,7 +907,7 @@ sub top_of_kernel_tree {
     if (   (-f "${lk_path}COPYING")
 	&& (-f "${lk_path}CREDITS")
 	&& (-f "${lk_path}Kbuild")
-	&& (-f "${lk_path}MAINTAINERS")
+	&& (-e "${lk_path}MAINTAINERS")
 	&& (-f "${lk_path}Makefile")
 	&& (-f "${lk_path}README")
 	&& (-d "${lk_path}Documentation")
