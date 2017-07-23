@@ -98,6 +98,10 @@
 	status = "okay";
 };
 
+&cpu0 {
+	cpu-supply = <&reg_sy8106a>;
+};
+
 &ehci0 {
 	status = "okay";
 };
@@ -157,6 +161,21 @@
 	leds_opc: led_pins@0 {
 		pins = "PA15";
 		function = "gpio_out";
+	};
+};
+
+&r_i2c {
+	status = "okay";
+
+	reg_sy8106a: regulator@65 {
+		compatible = "silergy,sy8106a";
+		reg = <0x65>;
+		regulator-name = "vdd-cpux";
+		regulator-min-microvolt = <1000000>;
+		regulator-max-microvolt = <1400000>;
+		regulator-ramp-delay = <200>;
+		regulator-boot-on;
+		regulator-always-on;
 	};
 };
 
