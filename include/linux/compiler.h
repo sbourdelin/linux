@@ -305,6 +305,31 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
  * mutilate accesses that either do not require ordering or that interact
  * with an explicit memory barrier or atomic instruction that provides the
  * required ordering.
+ *
+ * The return value of READ_ONCE() should be honored by compilers, IOW,
+ * compilers must treat the return value of READ_ONCE() as an unknown value at
+ * compile time, i.e. no optimization should be done based on the value of a
+ * READ_ONCE(). For example, the following code snippet:
+ *
+ * 	int a = 0;
+ * 	int x = 0;
+ *
+ * 	void some_func() {
+ * 		int t = READ_ONCE(a);
+ * 		if (!t)
+ * 			WRITE_ONCE(x, 1);
+ * 	}
+ *
+ * , should never be optimized as:
+ *
+ * 	void some_func() {
+ * 		WRITE_ONCE(x, 1);
+ * 	}
+ *
+ * because the compiler is 'smart' enough to think the value of 'a' is never
+ * changed.
+ *
+ * We provide this guarantee by making READ_ONCE() a *volatile* load.
  */
 
 #define __READ_ONCE(x, check)						\
