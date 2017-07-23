@@ -34,6 +34,7 @@
 
 #include <linux/types.h>
 #include <linux/cpumask.h>
+#include <linux/interrupt.h>
 
 #include "dpaa2-fd.h"
 #include "dpaa2-global.h"
