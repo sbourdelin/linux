@@ -2418,6 +2418,8 @@ static void skip_emulated_instruction(struct kvm_vcpu *vcpu)
 	vmx_set_interrupt_shadow(vcpu, 0);
 }
 
+static bool nested_vmx_is_page_fault_vmexit(struct vmcs12 *vmcs12, u16 error_code);
+
 /*
  * KVM wants to inject page-faults which it got to the guest. This function
  * checks whether in a nested guest, we need to inject them to L1 or L2.
@@ -2429,6 +2431,10 @@ static int nested_vmx_check_exception(struct kvm_vcpu *vcpu)
 
 	if (!((vmcs12->exception_bitmap & (1u << nr)) ||
 		(nr == PF_VECTOR && vcpu->arch.exception.nested_apf)))
+		return 0;
+
+	if (nr == PF_VECTOR && !vcpu->arch.exception.nested_apf &&
+		!nested_vmx_is_page_fault_vmexit(vmcs12, vcpu->arch.exception.error_code))
 		return 0;
 
 	if (vcpu->arch.exception.nested_apf) {
