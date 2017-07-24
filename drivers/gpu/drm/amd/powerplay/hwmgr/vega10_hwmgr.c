@@ -3044,8 +3044,6 @@ static int vega10_apply_state_adjust_rules(struct pp_hwmgr *hwmgr,
 	cgs_get_active_displays_info(hwmgr->device, &info);
 
 	/* result = PHM_CheckVBlankTime(hwmgr, &vblankTooShort);*/
-	minimum_clocks.engineClock = hwmgr->display_config.min_core_set_clock;
-	minimum_clocks.memoryClock = hwmgr->display_config.min_mem_set_clock;
 
 	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_StablePState)) {
@@ -4000,10 +3998,6 @@ static int vega10_notify_smc_display_config_after_ps_adjustment(
 	else
 		vega10_notify_smc_display_change(hwmgr, true);
 
-	min_clocks.dcefClock = hwmgr->display_config.min_dcef_set_clk;
-	min_clocks.dcefClockInSR = hwmgr->display_config.min_dcef_deep_sleep_set_clk;
-	min_clocks.memoryClock = hwmgr->display_config.min_mem_set_clock;
-
 	for (i = 0; i < dpm_table->count; i++) {
 		if (dpm_table->dpm_levels[i].value == min_clocks.dcefClock)
 			break;
@@ -4634,20 +4628,19 @@ static bool
 vega10_check_smc_update_required_for_display_configuration(struct pp_hwmgr *hwmgr)
 {
 	struct vega10_hwmgr *data = (struct vega10_hwmgr *)(hwmgr->backend);
-	bool is_update_required = false;
 	struct cgs_display_info info = {0, 0, NULL};
 
 	cgs_get_active_displays_info(hwmgr->device, &info);
 
 	if (data->display_timing.num_existing_displays != info.display_count)
-		is_update_required = true;
+		return true;
 
-	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_SclkDeepSleep)) {
-		if (data->display_timing.min_clock_in_sr != hwmgr->display_config.min_core_set_clock_in_sr)
-			is_update_required = true;
-	}
+	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
+			    PHM_PlatformCaps_SclkDeepSleep) &&
+	    data->display_timing.min_clock_in_sr)
+		return true;
 
-	return is_update_required;
+	return false;
 }
 
 static int vega10_disable_dpm_tasks(struct pp_hwmgr *hwmgr)
