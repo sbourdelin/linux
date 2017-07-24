@@ -241,8 +241,6 @@ static int rv_tf_set_clock_limit(struct pp_hwmgr *hwmgr, void *input,
 	struct PP_Clocks clocks = {0};
 	struct pp_display_clock_request clock_req;
 
-	clocks.dcefClock = hwmgr->display_config.min_dcef_set_clk;
-	clocks.dcefClockInSR = hwmgr->display_config.min_dcef_deep_sleep_set_clk;
 	clock_req.clock_type = amd_pp_dcf_clock;
 	clock_req.clock_freq_in_khz = clocks.dcefClock * 10;
 
