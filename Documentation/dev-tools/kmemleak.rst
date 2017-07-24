@@ -60,6 +60,11 @@ Memory scanning parameters can be modified at run-time by writing to the
     or free all kmemleak objects if kmemleak has been disabled.
 - dump=<addr>
     dump information about the object found at <addr>
+- oom=disable
+    disable kmemleak after system out of memory (default)
+- oom=ignore
+    do not disable kmemleak after system out of memory
+    (useful for memory stress test, but will lose some objects)
 
 Kmemleak can also be disabled at boot-time by passing ``kmemleak=off`` on
 the kernel command line.
