@@ -674,7 +674,7 @@ apicinterrupt3 \num trace(\sym) smp_trace(\sym)
 #endif
 
 /* Make sure APIC interrupt handlers end up in the irqentry section: */
-#if defined(CONFIG_FUNCTION_GRAPH_TRACER) || defined(CONFIG_KASAN)
+#if defined(CONFIG_FUNCTION_GRAPH_TRACER) || defined(CONFIG_KASAN) || defined(CONFIG_KPROBES)
 # define PUSH_SECTION_IRQENTRY	.pushsection .irqentry.text, "ax"
 # define POP_SECTION_IRQENTRY	.popsection
 #else

@@ -28,6 +28,7 @@ void __unwind_start(struct unwind_state *state, struct task_struct *task,
 bool unwind_next_frame(struct unwind_state *state);
 
 unsigned long unwind_get_return_address(struct unwind_state *state);
+bool in_entry_code(unsigned long ip);
 
 static inline bool unwind_done(struct unwind_state *state)
 {

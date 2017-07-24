@@ -84,14 +84,14 @@ static size_t regs_size(struct pt_regs *regs)
 	return sizeof(*regs);
 }
 
-static bool in_entry_code(unsigned long ip)
+bool in_entry_code(unsigned long ip)
 {
 	char *addr = (char *)ip;
 
 	if (addr >= __entry_text_start && addr < __entry_text_end)
 		return true;
 
-#if defined(CONFIG_FUNCTION_GRAPH_TRACER) || defined(CONFIG_KASAN)
+#if defined(CONFIG_FUNCTION_GRAPH_TRACER) || defined(CONFIG_KASAN) || defined(CONFIG_KPROBES)
 	if (addr >= __irqentry_text_start && addr < __irqentry_text_end)
 		return true;
 #endif
