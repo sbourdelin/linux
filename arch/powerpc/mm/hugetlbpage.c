@@ -24,6 +24,7 @@
 #include <asm/tlb.h>
 #include <asm/setup.h>
 #include <asm/hugetlb.h>
+#include <asm/machdep.h>
 
 #ifdef CONFIG_HUGETLB_PAGE
 
@@ -749,7 +750,8 @@ static int __init add_huge_page_size(unsigned long long size)
 				return -EINVAL;
 		}
 	} else {
-		if (mmu_psize != MMU_PAGE_16M && mmu_psize != MMU_PAGE_16G)
+		if ((mmu_psize != MMU_PAGE_16M && mmu_psize != MMU_PAGE_16G)
+		    || (mmu_psize == MMU_PAGE_16G && machine_is(powernv)))
 			return -EINVAL;
 	}
 #endif
