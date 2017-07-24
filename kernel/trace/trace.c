@@ -6347,16 +6347,28 @@ static const struct file_operations snapshot_raw_fops = {
 
 #endif /* CONFIG_TRACER_SNAPSHOT */
 
+extern bool rb_per_cpu_allocated(struct ring_buffer *buffer, int cpu);
+
 static int tracing_buffers_open(struct inode *inode, struct file *filp)
 {
 	struct trace_array *tr = inode->i_private;
+	struct trace_buffer *tb = &tr->trace_buffer;
+	struct ring_buffer *buffer = tb->buffer;
 	struct ftrace_buffer_info *info;
 	int ret;
+	int cpu_file;
 
 	if (tracing_disabled)
 		return -ENODEV;
 
 	if (trace_array_get(tr) < 0)
+		return -ENODEV;
+
+	cpu_file = tracing_get_cpu(inode);
+
+	/* Make sure, ring buffer for this cpu is allocated. */
+	if (cpu_file != RING_BUFFER_ALL_CPUS &&
+			!rb_per_cpu_allocated(buffer, cpu_file))
 		return -ENODEV;
 
 	info = kzalloc(sizeof(*info), GFP_KERNEL);
@@ -6368,7 +6380,7 @@ static int tracing_buffers_open(struct inode *inode, struct file *filp)
 	mutex_lock(&trace_types_lock);
 
 	info->iter.tr		= tr;
-	info->iter.cpu_file	= tracing_get_cpu(inode);
+	info->iter.cpu_file	= cpu_file;
 	info->iter.trace	= tr->current_trace;
 	info->iter.trace_buffer = &tr->trace_buffer;
 	info->spare		= NULL;

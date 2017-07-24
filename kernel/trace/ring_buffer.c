@@ -3002,6 +3002,11 @@ int ring_buffer_write(struct ring_buffer *buffer,
 }
 EXPORT_SYMBOL_GPL(ring_buffer_write);
 
+bool rb_per_cpu_allocated(struct ring_buffer *buffer, int cpu)
+{
+	return !!cpumask_test_cpu(cpu, buffer->cpumask);
+}
+
 static bool rb_per_cpu_empty(struct ring_buffer_per_cpu *cpu_buffer)
 {
 	struct buffer_page *reader = cpu_buffer->reader_page;
