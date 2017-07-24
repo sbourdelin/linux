@@ -302,38 +302,73 @@ static int nearby_node(int apicid)
  */
 static void __get_topoext(struct cpuinfo_x86 *c)
 {
-	u8 node_id;
+	u16 l3_nshared = 0;
 	u32 eax, ebx, ecx, edx;
 	int cpu = smp_processor_id();
 
-	cpuid(0x8000001e, &eax, &ebx, &ecx, &edx);
-
-	node_id = ecx & 0xff;
-	smp_num_siblings = ((ebx >> 8) & 0xff) + 1;
-
-	if (c->x86 == 0x15)
-		c->cu_id = ebx & 0xff;
-
-	if (c->x86 >= 0x17) {
-		c->cpu_core_id = ebx & 0xff;
-
-		if (smp_num_siblings > 1)
-			c->x86_max_cores /= smp_num_siblings;
+	if (cpuid_edx(0x80000006)) {
+		cpuid_count(0x8000001d, 3, &eax, &ebx, &ecx, &edx);
+		l3_nshared = ((eax >> 14) & 0xfff) + 1;
 	}
 
-	/*
-	 * We may have multiple LLCs if L3 caches exist, so check if we
-	 * have an L3 cache by looking at the L3 cache CPUID leaf.
-	 */
-	if (cpuid_edx(0x80000006)) {
-		if (c->x86 == 0x17) {
+	cpuid(0x8000001e, &eax, &ebx, &ecx, &edx);
+
+	smp_num_siblings = ((ebx >> 8) & 0xff) + 1;
+
+	switch (c->x86) {
+	case 0x17: {
+		u32 tmp, ccx_offset, cpu_offset;
+
+		/*
+		 * In family 17h, the CPUID_Fn8000001E_EBX[7:0] (CoreId)
+		 * is non-contiguous in downcore and non-SMT cases.
+		 * Fixup the cpu_core_id to be contiguous for cores within
+		 * the die.
+		 */
+		tmp = ebx & 0xff;
+		if (smp_num_siblings == 1) {
 			/*
-			 * LLC is at the core complex level.
-			 * Core complex id is ApicId[3].
+			 * CoreId bit-encoding for SMT-disabled
+			 * [7:4] : die
+			 * [3]   : ccx
+			 * [2:0] : core
 			 */
-			per_cpu(cpu_llc_id, cpu) = c->apicid >> 3;
+			ccx_offset = ((tmp >> 3) & 1) * l3_nshared;
+			cpu_offset = tmp & 7;
 		} else {
-			/* LLC is at the node level. */
+			/*
+			 * CoreId bit-encoding for SMT-enabled
+			 * [7:3] : die
+			 * [2]   : ccx
+			 * [1:0] : core
+			 */
+			ccx_offset = ((tmp >> 2) & 1) * l3_nshared /
+				       smp_num_siblings;
+			cpu_offset = tmp & 3;
+			c->x86_max_cores /= smp_num_siblings;
+
+		}
+		c->cpu_core_id = ccx_offset + cpu_offset;
+
+		/*
+		 * Family17h L3 cache (LLC) is at Core Complex (CCX).
+		 * There could be multiple CCXs in a node.
+		 * CCX ID is ApicId[3].
+		 */
+		per_cpu(cpu_llc_id, cpu) = c->apicid >> 3;
+
+		pr_debug("Fixup coreid:%#x to cpu_core_id:%#x\n",
+			 tmp, c->cpu_core_id);
+		break;
+	}
+	case 0x15:
+		c->cu_id = ebx & 0xff;
+		/* Follow through */
+	default:
+		/* LLC is default to L3, which generally per-node */
+		if (l3_nshared > 0) {
+			u8 node_id = ecx & 0xff;
+
 			per_cpu(cpu_llc_id, cpu) = node_id;
 		}
 	}
