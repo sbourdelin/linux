@@ -1237,27 +1237,6 @@ int amd_powerplay_reset(void *handle)
 	return pem_handle_event(eventmgr, AMD_PP_EVENT_COMPLETE_INIT, &event_data);
 }
 
-/* export this function to DAL */
-
-int amd_powerplay_display_configuration_change(void *handle,
-	const struct amd_pp_display_configuration *display_config)
-{
-	struct pp_hwmgr  *hwmgr;
-	struct pp_instance *pp_handle = (struct pp_instance *)handle;
-	int ret = 0;
-
-	ret = pp_check(pp_handle);
-
-	if (ret != 0)
-		return ret;
-
-	hwmgr = pp_handle->hwmgr;
-	mutex_lock(&pp_handle->pp_lock);
-	phm_store_dal_configuration_data(hwmgr, display_config);
-	mutex_unlock(&pp_handle->pp_lock);
-	return 0;
-}
-
 int amd_powerplay_get_display_power_level(void *handle,
 		struct amd_pp_simple_clock_info *output)
 {

@@ -407,9 +407,6 @@ int amd_powerplay_destroy(void *handle);
 
 int amd_powerplay_reset(void *handle);
 
-int amd_powerplay_display_configuration_change(void *handle,
-		const struct amd_pp_display_configuration *input);
-
 int amd_powerplay_get_display_power_level(void *handle,
 		struct amd_pp_simple_clock_info *output);
 
