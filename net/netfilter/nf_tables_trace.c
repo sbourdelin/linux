@@ -175,12 +175,10 @@ void nft_trace_notify(struct nft_traceinfo *info)
 		return;
 
 	size = nlmsg_total_size(sizeof(struct nfgenmsg)) +
-		nla_total_size(NFT_CHAIN_MAXNAMELEN) +
 		nla_total_size_64bit(sizeof(__be64)) +	/* rule handle */
 		nla_total_size(sizeof(__be32)) +	/* trace type */
 		nla_total_size(0) +			/* VERDICT, nested */
 			nla_total_size(sizeof(u32)) +	/* verdict code */
-			nla_total_size(NFT_CHAIN_MAXNAMELEN) + /* jump target */
 		nla_total_size(sizeof(u32)) +		/* id */
 		nla_total_size(NFT_TRACETYPE_LL_HSIZE) +
 		nla_total_size(NFT_TRACETYPE_NETWORK_HSIZE) +
@@ -194,7 +192,11 @@ void nft_trace_notify(struct nft_traceinfo *info)
 		nla_total_size(sizeof(u32));		/* policy */
 
 	if (info->chain)
-		size += nla_total_size(strlen(info->chain->table->name));
+		size += nla_total_size(strlen(info->chain->table->name)) +
+			nla_total_size(strlen(info->chain->name));
+
+	if (info->verdict->chain)
+		size += nla_total_size(strlen(info->verdict->chain->name)); /* jump target */
 
 	skb = nlmsg_new(size, GFP_ATOMIC);
 	if (!skb)
