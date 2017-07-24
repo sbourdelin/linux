@@ -5036,3 +5036,48 @@ out_drop_ref:
 	}
 	return;
 }
+
+/**
+ * drm_check_edid_changed - Check whether the EDID changed since the last update
+ * @connector: connector we're probing
+ * @adapter: I2C adapter to use for DDC
+ *
+ * Check whether the EDID changed since the last time it was updated in the
+ * drm blob cache.
+ *
+ * Return: A boolean indicating whether a change happened or not.
+ */
+bool drm_check_edid_changed(struct drm_connector *connector,
+			    struct i2c_adapter *adapter)
+{
+	struct drm_property_blob *edid_blob;
+	struct edid *edid_stored;
+	struct edid *edid_read;
+	int ret = 0;
+
+	if (!connector->edid_blob_ptr)
+		return false;
+
+	edid_blob = drm_property_blob_get(connector->edid_blob_ptr);
+	if (!edid_blob)
+		return false;
+
+	if (!edid_blob->data || edid_blob->length != sizeof(struct edid))
+		goto out;
+
+	edid_stored = (struct edid *) edid_blob->data;
+
+	edid_read = drm_get_edid(connector, adapter);
+	if (!edid_read)
+		goto out;
+
+	ret = memcmp(edid_stored, edid_read, sizeof(struct edid));
+
+	kfree(edid_read);
+
+out:
+	drm_property_blob_put(edid_blob);
+
+	return ret != 0;
+}
+EXPORT_SYMBOL_GPL(drm_check_edid_changed);
