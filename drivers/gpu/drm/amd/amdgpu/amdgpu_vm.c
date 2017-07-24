@@ -1301,7 +1301,7 @@ static int amdgpu_vm_update_ptes(struct amdgpu_pte_update_params *params,
 
 		if (params->shadow) {
 			if (WARN_ONCE(use_cpu_update,
-				"CPU VM update doesn't suuport shadow pages"))
+				"CPU VM update doesn't support shadow pages"))
 				return 0;
 
 			if (!pt->shadow)
