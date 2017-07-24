@@ -46,6 +46,7 @@ else
 endif
 
 prefix ?= /usr/local
+headerdir = $(prefix)/include/bpf/
 libdir = $(prefix)/$(libdir_relative)
 man_dir = $(prefix)/share/man
 man_dir_SQ = '$(subst ','\'',$(man_dir))'
@@ -90,11 +91,13 @@ endif
 export prefix libdir src obj
 
 # Shell quotes
+headerdir_SQ = $(subst ','\'',$(headerdir))
 libdir_SQ = $(subst ','\'',$(libdir))
 libdir_relative_SQ = $(subst ','\'',$(libdir_relative))
 plugin_dir_SQ = $(subst ','\'',$(plugin_dir))
 
 LIB_FILE = libbpf.a libbpf.so
+HEADER_FILE = bpf.h
 
 VERSION		= $(BPF_VERSION)
 PATCHLEVEL	= $(BPF_PATCHLEVEL)
@@ -189,7 +192,11 @@ install_lib: all_cmd
 	$(call QUIET_INSTALL, $(LIB_FILE)) \
 		$(call do_install,$(LIB_FILE),$(libdir_SQ))
 
-install: install_lib
+install_hdr: all_cmd
+	$(call QUIET_INSTALL, $(HEADER_FILE)) \
+		$(call do_install,$(HEADER_FILE),$(headerdir_SQ))
+
+install: install_lib install_hdr
 
 ### Cleaning rules
 
