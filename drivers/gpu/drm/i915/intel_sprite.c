@@ -41,13 +41,14 @@
 #include "i915_drv.h"
 
 static bool
-format_is_yuv(uint32_t format)
+intel_format_is_yuv(uint32_t format)
 {
 	switch (format) {
 	case DRM_FORMAT_YUYV:
 	case DRM_FORMAT_UYVY:
 	case DRM_FORMAT_VYUY:
 	case DRM_FORMAT_YVYU:
+	case DRM_FORMAT_NV12:
 		return true;
 	default:
 		return false;
@@ -330,7 +331,7 @@ chv_update_csc(struct intel_plane *plane, uint32_t format)
 	enum plane_id plane_id = plane->id;
 
 	/* Seems RGB data bypasses the CSC always */
-	if (!format_is_yuv(format))
+	if (!intel_format_is_yuv(format))
 		return;
 
 	/*
@@ -894,7 +895,7 @@ intel_check_sprite_plane(struct intel_plane *plane,
 		src_y = src->y1 >> 16;
 		src_h = drm_rect_height(src) >> 16;
 
-		if (format_is_yuv(fb->format->format)) {
+		if (intel_format_is_yuv(fb->format->format)) {
 			src_x &= ~1;
 			src_w &= ~1;
 
