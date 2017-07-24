@@ -54,6 +54,7 @@ static struct hstate * __initdata parsed_hstate;
 static unsigned long __initdata default_hstate_max_huge_pages;
 static unsigned long __initdata default_hstate_size;
 static bool __initdata parsed_valid_hugepagesz = true;
+static bool __initdata parsed_valid_default_hugepagesz = true;
 
 /*
  * Protects updates to hugepage_freelists, hugepage_activelist, nr_huge_pages,
@@ -2804,6 +2805,12 @@ void __init hugetlb_bad_size(void)
 	parsed_valid_hugepagesz = false;
 }
 
+/* Should be called on processing a default_hugepagesz=... option */
+void __init hugetlb_bad_default_size(void)
+{
+	parsed_valid_default_hugepagesz = false;
+}
+
 void __init hugetlb_add_hstate(unsigned int order)
 {
 	struct hstate *h;
@@ -2846,8 +2853,14 @@ static int __init hugetlb_nrpages_setup(char *s)
 	 * !hugetlb_max_hstate means we haven't parsed a hugepagesz= parameter yet,
 	 * so this hugepages= parameter goes to the "default hstate".
 	 */
-	else if (!hugetlb_max_hstate)
-		mhp = &default_hstate_max_huge_pages;
+	else if (!hugetlb_max_hstate) {
+		if (!parsed_valid_default_hugepagesz) {
+			pr_warn("hugepages = %s cannot be allocated for "
+				"unsupported default_hugepagesz, ignoring\n", s);
+			parsed_valid_default_hugepagesz = true;
+		} else
+			mhp = &default_hstate_max_huge_pages;
+	}
 	else
 		mhp = &parsed_hstate->max_huge_pages;
 

@@ -780,6 +780,21 @@ static int __init hugepage_setup_sz(char *str)
 }
 __setup("hugepagesz=", hugepage_setup_sz);
 
+static int __init hugepage_default_setup_sz(char *str)
+{
+	unsigned long long size;
+
+	size = memparse(str, &str);
+
+	if (add_huge_page_size(size) != 0) {
+		hugetlb_bad_default_size();
+		pr_err("Invalid ppc default huge page size specified(%llu)\n", size);
+	}
+
+	return 1;
+}
+__setup("default_hugepagesz=", hugepage_default_setup_sz);
+
 struct kmem_cache *hugepte_cache;
 static int __init hugetlbpage_init(void)
 {
