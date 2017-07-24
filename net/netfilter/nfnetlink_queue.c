@@ -28,11 +28,11 @@
 #include <linux/netfilter_bridge.h>
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nfnetlink_queue.h>
-#include <linux/netfilter/nf_conntrack_common.h>
 #include <linux/list.h>
 #include <net/sock.h>
 #include <net/tcp_states.h>
 #include <net/netfilter/nf_queue.h>
+#include <net/netfilter/nf_conntrack.h>
 #include <net/netns/generic.h>
 
 #include <linux/atomic.h>
@@ -612,6 +612,18 @@ nlmsg_failure:
 	return NULL;
 }
 
+static bool nf_ct_drop_unconfirmed(const struct nf_queue_entry *entry)
+{
+#if IS_ENABLED(CONFIG_NF_CONNTRACK)
+	static const unsigned long flags = IPS_CONFIRMED | IPS_DYING;
+	const struct nf_conn *ct = (void *)skb_nfct(entry->skb);
+
+	if (ct && ((ct->status & flags) == IPS_DYING))
+		return true;
+#endif
+	return false;
+}
+
 static int
 __nfqnl_enqueue_packet(struct net *net, struct nfqnl_instance *queue,
 			struct nf_queue_entry *entry)
@@ -627,6 +639,9 @@ __nfqnl_enqueue_packet(struct net *net, struct nfqnl_instance *queue,
 		goto err_out;
 	}
 	spin_lock_bh(&queue->lock);
+
+	if (nf_ct_drop_unconfirmed(entry))
+		goto err_out_free_nskb;
 
 	if (queue->queue_total >= queue->queue_maxlen) {
 		if (queue->flags & NFQA_CFG_F_FAIL_OPEN) {
