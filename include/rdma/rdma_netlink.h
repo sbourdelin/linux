@@ -10,6 +10,18 @@ struct ibnl_client_cbs {
 	struct module *module;
 };
 
+/* Define this module as providing netlinkg services for NETLINK_RDMA, client
+ * index _index.  Since the client indexes were setup in a uapi header as an
+ * enum and we do no want to change that, the user must supply the expanded
+ * constant as well and the compiler checks they are the same.
+ */
+#define MODULE_ALIAS_RDMA_NETLINK(_index, _val)                                \
+	static inline void __chk_##_index(void)                                \
+	{                                                                      \
+		BUILD_BUG_ON(_index != _val);                                  \
+	}                                                                      \
+	MODULE_ALIAS("rdma_netlink_subsys-" __stringify(_val))
+
 /**
  * Add a a client to the list of IB netlink exporters.
  * @index: Index of the added client

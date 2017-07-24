@@ -51,6 +51,18 @@ static DEFINE_MUTEX(ibnl_mutex);
 static struct sock *nls;
 static LIST_HEAD(client_list);
 
+static struct ibnl_client *ibnl_find_client(int index)
+{
+	struct ibnl_client *client;
+
+	list_for_each_entry_rcu(client, &client_list, list) {
+		if (client->index == index)
+			return client;
+	}
+
+	return NULL;
+}
+
 int ibnl_chk_listeners(unsigned int group)
 {
 	if (netlink_has_listeners(nls, group) == 0)
@@ -61,7 +73,6 @@ int ibnl_chk_listeners(unsigned int group)
 int ibnl_add_client(int index, int nops,
 		    const struct ibnl_client_cbs cb_table[])
 {
-	struct ibnl_client *cur;
 	struct ibnl_client *nl_client;
 
 	nl_client = kmalloc(sizeof *nl_client, GFP_KERNEL);
@@ -73,14 +84,11 @@ int ibnl_add_client(int index, int nops,
 	nl_client->cb_table	= cb_table;
 
 	mutex_lock(&ibnl_mutex);
-
-	list_for_each_entry(cur, &client_list, list) {
-		if (cur->index == index) {
-			pr_warn("Client for %d already exists\n", index);
-			mutex_unlock(&ibnl_mutex);
-			kfree(nl_client);
-			return -EINVAL;
-		}
+	if (ibnl_find_client(index)) {
+		pr_warn("Client for %d already exists\n", index);
+		mutex_unlock(&ibnl_mutex);
+		kfree(nl_client);
+		return -EINVAL;
 	}
 
 	list_add_tail(&nl_client->list, &client_list);
@@ -155,40 +163,46 @@ static int ibnl_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 	int index = RDMA_NL_GET_CLIENT(type);
 	unsigned int op = RDMA_NL_GET_OP(type);
 
-	list_for_each_entry(client, &client_list, list) {
-		if (client->index == index) {
-			if (op >= client->nops || !client->cb_table[op].dump)
-				return -EINVAL;
-
-			/*
-			 * For response or local service set_timeout request,
-			 * there is no need to use netlink_dump_start.
-			 */
-			if (!(nlh->nlmsg_flags & NLM_F_REQUEST) ||
-			    (index == RDMA_NL_LS &&
-			     op == RDMA_NL_LS_OP_SET_TIMEOUT)) {
-				struct netlink_callback cb = {
-					.skb = skb,
-					.nlh = nlh,
-					.dump = client->cb_table[op].dump,
-					.module = client->cb_table[op].module,
-				};
-
-				return cb.dump(skb, &cb);
-			}
-
-			{
-				struct netlink_dump_control c = {
-					.dump = client->cb_table[op].dump,
-					.module = client->cb_table[op].module,
-				};
-				return netlink_dump_start(nls, skb, nlh, &c);
-			}
-		}
+	client = ibnl_find_client(index);
+#ifdef CONFIG_MODULES
+	if (!client) {
+		mutex_unlock(&ibnl_mutex);
+		request_module("rdma_netlink_subsys-%d", index);
+		mutex_lock(&ibnl_mutex);
+		client = ibnl_find_client(index);
+	}
+#endif
+	if (!client) {
+		pr_info("Index %d wasn't found in client list\n", index);
+		return -EINVAL;
 	}
 
-	pr_info("Index %d wasn't found in client list\n", index);
-	return -EINVAL;
+	if (op >= client->nops || !client->cb_table[op].dump)
+		return -EINVAL;
+
+	/*
+	 * For response or local service set_timeout request,
+	 * there is no need to use netlink_dump_start.
+	 */
+	if (!(nlh->nlmsg_flags & NLM_F_REQUEST) ||
+	    (index == RDMA_NL_LS && op == RDMA_NL_LS_OP_SET_TIMEOUT)) {
+		struct netlink_callback cb = {
+		    .skb = skb,
+		    .nlh = nlh,
+		    .dump = client->cb_table[op].dump,
+		    .module = client->cb_table[op].module,
+		};
+
+		return cb.dump(skb, &cb);
+	}
+
+	{
+		struct netlink_dump_control c = {
+		    .dump = client->cb_table[op].dump,
+		    .module = client->cb_table[op].module,
+		};
+		return netlink_dump_start(nls, skb, nlh, &c);
+	}
 }
 
 static void ibnl_rcv_reply_skb(struct sk_buff *skb)
