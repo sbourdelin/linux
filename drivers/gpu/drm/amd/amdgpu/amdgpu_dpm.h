@@ -488,7 +488,6 @@ struct amdgpu_pm {
 	const struct amdgpu_dpm_funcs *funcs;
 	uint32_t                pcie_gen_mask;
 	uint32_t                pcie_mlw_mask;
-	struct amd_pp_display_configuration pm_display_cfg;/* set by DAL */
 };
 
 #define R600_SSTU_DFLT                               0
