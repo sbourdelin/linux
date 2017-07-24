@@ -1207,6 +1207,18 @@ static inline struct in6_addr nla_get_in6_addr(const struct nlattr *nla)
 }
 
 /**
+ * nla_get_bitfield_32 - return payload of 32 bitfield attribute
+ * @nla: nla_bitfield_32 attribute
+ */
+static inline struct nla_bitfield_32 nla_get_bitfield_32(const struct nlattr *nla)
+{
+	struct nla_bitfield_32 tmp;
+
+	nla_memcpy(&tmp, nla, sizeof(tmp));
+	return tmp;
+}
+
+/**
  * nla_memdup - duplicate attribute memory (kmemdup)
  * @src: netlink attribute to duplicate from
  * @gfp: GFP mask
