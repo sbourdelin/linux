@@ -711,11 +711,12 @@ static int polaris10_populate_single_graphic_level(struct pp_hwmgr *hwmgr,
 	level->DownHyst = 0;
 	level->VoltageDownHyst = 0;
 	level->PowerThrottle = 0;
-	data->display_timing.min_clock_in_sr = hwmgr->display_config.min_core_set_clock_in_sr;
+	data->display_timing.min_clock_in_sr = 0;
 
-	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_SclkDeepSleep))
-		level->DeepSleepDivId = smu7_get_sleep_divider_id_from_clock(clock,
-								hwmgr->display_config.min_core_set_clock_in_sr);
+	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
+			    PHM_PlatformCaps_SclkDeepSleep))
+		level->DeepSleepDivId =
+			smu7_get_sleep_divider_id_from_clock(clock, 0);
 
 	/* Default to slow, highest DPM level will be
 	 * set to PPSMC_DISPLAY_WATERMARK_LOW later.
