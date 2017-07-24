@@ -538,6 +538,11 @@ struct drm_mode_config {
 	 */
 	struct drm_property *link_status_property;
 	/**
+	 * @cp_property: Default connector property for CP
+	 * of a connector
+	 */
+	struct drm_property *cp_property;
+	/**
 	 * @plane_type_property: Default plane property to differentiate
 	 * CURSOR, PRIMARY and OVERLAY legacy uses of planes.
 	 */
