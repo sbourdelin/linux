@@ -97,6 +97,7 @@ void omap_gem_describe_objects(struct list_head *list, struct seq_file *m);
 int omap_gem_resume(struct device *dev);
 #endif
 
+int omap_irq_enable_framedone(struct drm_crtc *crtc, bool enable);
 int omap_irq_enable_vblank(struct drm_crtc *crtc);
 void omap_irq_disable_vblank(struct drm_crtc *crtc);
 void omap_drm_irq_uninstall(struct drm_device *dev);
@@ -124,6 +125,7 @@ struct drm_crtc *omap_crtc_init(struct drm_device *dev,
 int omap_crtc_wait_pending(struct drm_crtc *crtc);
 void omap_crtc_error_irq(struct drm_crtc *crtc, uint32_t irqstatus);
 void omap_crtc_vblank_irq(struct drm_crtc *crtc);
+void omap_crtc_framedone_irq(struct drm_crtc *crtc, uint32_t irqstatus);
 
 struct drm_plane *omap_plane_init(struct drm_device *dev,
 		int idx, enum drm_plane_type type,
