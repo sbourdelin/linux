@@ -47,6 +47,9 @@ struct can_priv {
 	unsigned int data_bitrate_const_cnt;
 	struct can_clock clock;
 
+	int max_trans_arbitration_speed;
+	int max_trans_data_speed;
+
 	enum can_state state;
 
 	/* CAN controller features - see include/uapi/linux/can/netlink.h */
@@ -164,6 +167,8 @@ void can_put_echo_skb(struct sk_buff *skb, struct net_device *dev,
 		      unsigned int idx);
 unsigned int can_get_echo_skb(struct net_device *dev, unsigned int idx);
 void can_free_echo_skb(struct net_device *dev, unsigned int idx);
+
+void of_can_transceiver_fixed(struct net_device *dev);
 
 struct sk_buff *alloc_can_skb(struct net_device *dev, struct can_frame **cf);
 struct sk_buff *alloc_canfd_skb(struct net_device *dev,
