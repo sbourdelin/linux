@@ -1560,9 +1560,13 @@ void kvm_lapic_expired_hv_timer(struct kvm_vcpu *vcpu)
 {
 	struct kvm_lapic *apic = vcpu->arch.apic;
 
-	WARN_ON(!apic->lapic_timer.hv_timer_in_use);
-	WARN_ON(swait_active(&vcpu->wq));
-	cancel_hv_timer(apic);
+	preempt_disable();
+	if (!(!apic_lvtt_period(apic) && atomic_read(&apic->lapic_timer.pending))) {
+		WARN_ON(!apic->lapic_timer.hv_timer_in_use);
+		WARN_ON(swait_active(&vcpu->wq));
+		cancel_hv_timer(apic);
+	}
+	preempt_enable();
 	apic_timer_expired(apic);
 
 	if (apic_lvtt_period(apic) && apic->lapic_timer.period) {
