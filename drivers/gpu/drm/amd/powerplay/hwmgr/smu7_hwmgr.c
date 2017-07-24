@@ -2727,9 +2727,6 @@ static int smu7_apply_state_adjust_rules(struct pp_hwmgr *hwmgr,
 
 	cgs_get_active_displays_info(hwmgr->device, &info);
 
-	minimum_clocks.engineClock = hwmgr->display_config.min_core_set_clock;
-	minimum_clocks.memoryClock = hwmgr->display_config.min_mem_set_clock;
-
 	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_StablePState)) {
 		max_limits = &(hwmgr->dyn_state.max_clock_voltage_on_ac);
@@ -3928,7 +3925,7 @@ smu7_notify_smc_display_config_after_ps_adjustment(struct pp_hwmgr *hwmgr)
 
 	num_active_displays = info.display_count;
 
-	if (num_active_displays > 1 && hwmgr->display_config.multi_monitor_in_sync != true)
+	if (num_active_displays > 1)
 		smu7_notify_smc_display_change(hwmgr, false);
 
 	return 0;
@@ -4032,12 +4029,12 @@ smu7_check_smc_update_required_for_display_configuration(struct pp_hwmgr *hwmgr)
 	if (data->display_timing.num_existing_displays != info.display_count)
 		is_update_required = true;
 
-	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps, PHM_PlatformCaps_SclkDeepSleep)) {
-		if (data->display_timing.min_clock_in_sr != hwmgr->display_config.min_core_set_clock_in_sr &&
-			(data->display_timing.min_clock_in_sr >= SMU7_MINIMUM_ENGINE_CLOCK ||
-			hwmgr->display_config.min_core_set_clock_in_sr >= SMU7_MINIMUM_ENGINE_CLOCK))
-			is_update_required = true;
-	}
+	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
+			    PHM_PlatformCaps_SclkDeepSleep) &&
+	    data->display_timing.min_clock_in_sr &&
+	    data->display_timing.min_clock_in_sr >= SMU7_MINIMUM_ENGINE_CLOCK)
+		is_update_required = true;
+
 	return is_update_required;
 }
 
