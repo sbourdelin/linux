@@ -58,6 +58,8 @@ int bpf_prog_get_next_id(__u32 start_id, __u32 *next_id);
 int bpf_map_get_next_id(__u32 start_id, __u32 *next_id);
 int bpf_prog_get_fd_by_id(__u32 id);
 int bpf_map_get_fd_by_id(__u32 id);
+/* Note: bpf_obj_get_info_by_fd() will init info to zeroes */
 int bpf_obj_get_info_by_fd(int prog_fd, void *info, __u32 *info_len);
+int __bpf_obj_get_info_by_fd(int prog_fd, void *info, __u32 *info_len);
 
 #endif

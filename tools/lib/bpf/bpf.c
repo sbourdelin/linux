@@ -308,13 +308,12 @@ int bpf_map_get_fd_by_id(__u32 id)
 	return sys_bpf(BPF_MAP_GET_FD_BY_ID, &attr, sizeof(attr));
 }
 
-int bpf_obj_get_info_by_fd(int prog_fd, void *info, __u32 *info_len)
+int __bpf_obj_get_info_by_fd(int prog_fd, void *info, __u32 *info_len)
 {
 	union bpf_attr attr;
 	int err;
 
 	bzero(&attr, sizeof(attr));
-	bzero(info, *info_len);
 	attr.info.bpf_fd = prog_fd;
 	attr.info.info_len = *info_len;
 	attr.info.info = ptr_to_u64(info);
@@ -324,4 +323,11 @@ int bpf_obj_get_info_by_fd(int prog_fd, void *info, __u32 *info_len)
 		*info_len = attr.info.info_len;
 
 	return err;
+}
+
+int bpf_obj_get_info_by_fd(int prog_fd, void *info, __u32 *info_len)
+{
+	bzero(info, *info_len);
+
+	return __bpf_obj_get_info_by_fd(prog_fd, info, info_len);
 }
