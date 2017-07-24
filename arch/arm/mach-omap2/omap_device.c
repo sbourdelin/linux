@@ -670,12 +670,21 @@ static int _od_suspend_noirq(struct device *dev)
 
 	ret = pm_generic_suspend_noirq(dev);
 
-	if (!ret && !pm_runtime_status_suspended(dev)) {
-		if (pm_generic_runtime_suspend(dev) == 0) {
-			pm_runtime_set_suspended(dev);
-			omap_device_idle(pdev);
-			od->flags |= OMAP_DEVICE_SUSPENDED;
+	if (!ret) {
+		ret = pm_runtime_force_suspend(dev);
+		if (ret == -EBUSY) {
+			/*
+			 * In case of error pm_runtime_force_suspend will
+			 * not call pm_runtime_disable() and it's required to
+			 * make additional call to pm_runtime_disable() here
+			 * to balance it with pm_runtime_enable() call in
+			 * pm_runtime_force_resume()
+			 */
+			pm_runtime_disable(dev);
+			return 0;
 		}
+		if (ret)
+			dev_err(dev, "omap device suspend failure %d", ret);
 	}
 
 	return ret;
@@ -685,21 +694,15 @@ static int _od_resume_noirq(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
 	struct omap_device *od = to_omap_device(pdev);
+	int ret;
 
-	if (od->flags & OMAP_DEVICE_SUSPENDED) {
-		od->flags &= ~OMAP_DEVICE_SUSPENDED;
-		omap_device_enable(pdev);
-		/*
-		 * XXX: we run before core runtime pm has resumed itself. At
-		 * this point in time, we just restore the runtime pm state and
-		 * considering symmetric operations in resume, we donot expect
-		 * to fail. If we failed, something changed in core runtime_pm
-		 * framework OR some device driver messed things up, hence, WARN
-		 */
-		WARN(pm_runtime_set_active(dev),
-		     "Could not set %s runtime state active\n", dev_name(dev));
-		pm_generic_runtime_resume(dev);
-	}
+	/* Don't attempt late suspend on a driver that is not bound */
+	if (od->_driver_status != BUS_NOTIFY_BOUND_DRIVER)
+		return 0;
+
+	ret = pm_runtime_force_resume(dev);
+	if (ret)
+		dev_err(dev, "omap device resume failure %d", ret);
 
 	return pm_generic_resume_noirq(dev);
 }
