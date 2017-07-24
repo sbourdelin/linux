@@ -1,0 +1,42 @@
+Fixed transceiver Device Tree binding
+------------------------------
+
+CAN transceiver typically limits the max speed in standard CAN and CAN FD
+modes. Typically these limitations are static and the transceivers themselves
+provide no way to detect this limitation at runtime. For this situation,
+the "fixed-transceiver" node can be used.
+
+Properties:
+
+Optional:
+ max-arbitration-speed: a positive non 0 value that determines the max
+			speed that CAN can run in non CAN-FD mode or during the
+			arbitration phase in CAN-FD mode.
+
+ max-data-speed:	a positive non 0 value that determines the max data rate
+			that can be used in CAN-FD mode. A value of -1 implies
+			CAN-FD is not supported by the transceiver.
+
+Examples:
+
+Based on Texas Instrument's TCAN1042HGV CAN Transceiver
+
+m_can0 {
+	....
+	fixed-transceiver {
+		max-arbitration-speed = <1000000>;
+		max-data-speed = <5000000>;
+	};
+	...
+};
+
+Based on a CAN Transceiver that doesn't support CAN-FD. Only needed if the
+CAN IP supports CAN-FD but is using a transceiver that doesn't.
+
+m_can0 {
+	....
+	fixed-transceiver {
+		max-data-speed = <(-1)>;
+	};
+	...
+};
