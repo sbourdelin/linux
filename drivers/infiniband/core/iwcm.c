@@ -1181,6 +1181,12 @@ static int __init iw_cm_init(void)
 	if (ret)
 		pr_err("iw_cm: couldn't register netlink callbacks\n");
 
+
+	/* Old iwpmds still use this legacy ID, provide a kernel side for it
+	 * that always returns EINVAL
+	 */
+	ibnl_add_client(RDMA_NL_RSVD, 0, NULL);
+
 	iwcm_wq = alloc_ordered_workqueue("iw_cm_wq", WQ_MEM_RECLAIM);
 	if (!iwcm_wq)
 		return -ENOMEM;
@@ -1200,6 +1206,7 @@ static void __exit iw_cm_cleanup(void)
 {
 	unregister_net_sysctl_table(iwcm_ctl_table_hdr);
 	destroy_workqueue(iwcm_wq);
+	ibnl_remove_client(RDMA_NL_RSVD);
 	ibnl_remove_client(RDMA_NL_IWCM);
 	iwpm_exit(RDMA_NL_IWCM);
 }
