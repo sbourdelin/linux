@@ -428,7 +428,7 @@ nf_tables_chain_type_lookup(const struct nft_af_info *afi,
 
 static const struct nla_policy nft_table_policy[NFTA_TABLE_MAX + 1] = {
 	[NFTA_TABLE_NAME]	= { .type = NLA_STRING,
-				    .len = NFT_TABLE_MAXNAMELEN - 1 },
+				    .len = NFT_NAME_MAXLEN - 1 },
 	[NFTA_TABLE_FLAGS]	= { .type = NLA_U32 },
 };
 
@@ -726,7 +726,10 @@ static int nf_tables_newtable(struct net *net, struct sock *nlsk,
 	if (table == NULL)
 		goto err2;
 
-	nla_strlcpy(table->name, name, NFT_TABLE_MAXNAMELEN);
+	table->name = nla_strdup(name, GFP_KERNEL);
+	if (table->name == NULL)
+		goto err3;
+
 	INIT_LIST_HEAD(&table->chains);
 	INIT_LIST_HEAD(&table->sets);
 	INIT_LIST_HEAD(&table->objects);
@@ -735,10 +738,12 @@ static int nf_tables_newtable(struct net *net, struct sock *nlsk,
 	nft_ctx_init(&ctx, net, skb, nlh, afi, table, NULL, nla);
 	err = nft_trans_table_add(&ctx, NFT_MSG_NEWTABLE);
 	if (err < 0)
-		goto err3;
+		goto err4;
 
 	list_add_tail_rcu(&table->list, &afi->tables);
 	return 0;
+err4:
+	kfree(table->name);
 err3:
 	kfree(table);
 err2:
@@ -865,6 +870,7 @@ static void nf_tables_table_destroy(struct nft_ctx *ctx)
 {
 	BUG_ON(ctx->table->use > 0);
 
+	kfree(ctx->table->name);
 	kfree(ctx->table);
 	module_put(ctx->afi->owner);
 }
@@ -935,7 +941,7 @@ static struct nft_chain *nf_tables_chain_lookup(const struct nft_table *table,
 
 static const struct nla_policy nft_chain_policy[NFTA_CHAIN_MAX + 1] = {
 	[NFTA_CHAIN_TABLE]	= { .type = NLA_STRING,
-				    .len = NFT_TABLE_MAXNAMELEN - 1 },
+				    .len = NFT_NAME_MAXLEN - 1 },
 	[NFTA_CHAIN_HANDLE]	= { .type = NLA_U64 },
 	[NFTA_CHAIN_NAME]	= { .type = NLA_STRING,
 				    .len = NFT_CHAIN_MAXNAMELEN - 1 },
@@ -1873,7 +1879,7 @@ static struct nft_rule *nf_tables_rule_lookup(const struct nft_chain *chain,
 
 static const struct nla_policy nft_rule_policy[NFTA_RULE_MAX + 1] = {
 	[NFTA_RULE_TABLE]	= { .type = NLA_STRING,
-				    .len = NFT_TABLE_MAXNAMELEN - 1 },
+				    .len = NFT_NAME_MAXLEN - 1 },
 	[NFTA_RULE_CHAIN]	= { .type = NLA_STRING,
 				    .len = NFT_CHAIN_MAXNAMELEN - 1 },
 	[NFTA_RULE_HANDLE]	= { .type = NLA_U64 },
@@ -1977,7 +1983,7 @@ err:
 }
 
 struct nft_rule_dump_ctx {
-	char table[NFT_TABLE_MAXNAMELEN];
+	char *table;
 	char chain[NFT_CHAIN_MAXNAMELEN];
 };
 
@@ -2002,7 +2008,7 @@ static int nf_tables_dump_rules(struct sk_buff *skb,
 			continue;
 
 		list_for_each_entry_rcu(table, &afi->tables, list) {
-			if (ctx && ctx->table[0] &&
+			if (ctx && ctx->table &&
 			    strcmp(ctx->table, table->name) != 0)
 				continue;
 
@@ -2042,7 +2048,12 @@ done:
 
 static int nf_tables_dump_rules_done(struct netlink_callback *cb)
 {
-	kfree(cb->data);
+	struct nft_rule_dump_ctx *ctx = cb->data;
+
+	if (ctx) {
+		kfree(ctx->table);
+		kfree(ctx);
+	}
 	return 0;
 }
 
@@ -2074,9 +2085,14 @@ static int nf_tables_getrule(struct net *net, struct sock *nlsk,
 			if (!ctx)
 				return -ENOMEM;
 
-			if (nla[NFTA_RULE_TABLE])
-				nla_strlcpy(ctx->table, nla[NFTA_RULE_TABLE],
-					    sizeof(ctx->table));
+			if (nla[NFTA_RULE_TABLE]) {
+				ctx->table = nla_strdup(nla[NFTA_RULE_TABLE],
+							GFP_KERNEL);
+				if (!ctx->table) {
+					kfree(ctx);
+					return -ENOMEM;
+				}
+			}
 			if (nla[NFTA_RULE_CHAIN])
 				nla_strlcpy(ctx->chain, nla[NFTA_RULE_CHAIN],
 					    sizeof(ctx->chain));
@@ -2508,7 +2524,7 @@ nft_select_set_ops(const struct nft_ctx *ctx,
 
 static const struct nla_policy nft_set_policy[NFTA_SET_MAX + 1] = {
 	[NFTA_SET_TABLE]		= { .type = NLA_STRING,
-					    .len = NFT_TABLE_MAXNAMELEN - 1 },
+					    .len = NFT_NAME_MAXLEN - 1 },
 	[NFTA_SET_NAME]			= { .type = NLA_STRING,
 					    .len = NFT_SET_MAXNAMELEN - 1 },
 	[NFTA_SET_FLAGS]		= { .type = NLA_U32 },
@@ -3275,7 +3291,7 @@ static const struct nla_policy nft_set_elem_policy[NFTA_SET_ELEM_MAX + 1] = {
 
 static const struct nla_policy nft_set_elem_list_policy[NFTA_SET_ELEM_LIST_MAX + 1] = {
 	[NFTA_SET_ELEM_LIST_TABLE]	= { .type = NLA_STRING,
-					    .len = NFT_TABLE_MAXNAMELEN - 1 },
+					    .len = NFT_NAME_MAXLEN - 1 },
 	[NFTA_SET_ELEM_LIST_SET]	= { .type = NLA_STRING,
 					    .len = NFT_SET_MAXNAMELEN - 1 },
 	[NFTA_SET_ELEM_LIST_ELEMENTS]	= { .type = NLA_NESTED },
@@ -4219,7 +4235,7 @@ EXPORT_SYMBOL_GPL(nf_tables_obj_lookup);
 
 static const struct nla_policy nft_obj_policy[NFTA_OBJ_MAX + 1] = {
 	[NFTA_OBJ_TABLE]	= { .type = NLA_STRING,
-				    .len = NFT_TABLE_MAXNAMELEN - 1 },
+				    .len = NFT_NAME_MAXLEN - 1 },
 	[NFTA_OBJ_NAME]		= { .type = NLA_STRING,
 				    .len = NFT_OBJ_MAXNAMELEN - 1 },
 	[NFTA_OBJ_TYPE]		= { .type = NLA_U32 },
@@ -4415,7 +4431,7 @@ nla_put_failure:
 }
 
 struct nft_obj_filter {
-	char		table[NFT_OBJ_MAXNAMELEN];
+	char		*table;
 	u32		type;
 };
 
@@ -4480,7 +4496,10 @@ done:
 
 static int nf_tables_dump_obj_done(struct netlink_callback *cb)
 {
-	kfree(cb->data);
+	struct nft_obj_filter *filter = cb->data;
+
+	kfree(filter->table);
+	kfree(filter);
 
 	return 0;
 }
@@ -4494,9 +4513,13 @@ nft_obj_filter_alloc(const struct nlattr * const nla[])
 	if (!filter)
 		return ERR_PTR(-ENOMEM);
 
-	if (nla[NFTA_OBJ_TABLE])
-		nla_strlcpy(filter->table, nla[NFTA_OBJ_TABLE],
-			    NFT_TABLE_MAXNAMELEN);
+	if (nla[NFTA_OBJ_TABLE]) {
+		filter->table = nla_strdup(nla[NFTA_OBJ_TABLE], GFP_KERNEL);
+		if (!filter->table) {
+			kfree(filter);
+			return ERR_PTR(-ENOMEM);
+		}
+	}
 	if (nla[NFTA_OBJ_TYPE])
 		filter->type = ntohl(nla_get_be32(nla[NFTA_OBJ_TYPE]));
 
