@@ -322,7 +322,7 @@ cpu_initialize_context(unsigned int cpu, struct task_struct *idle)
 	ctxt->gs_base_kernel = per_cpu_offset(cpu);
 #endif
 	ctxt->event_callback_eip    =
-		(unsigned long)xen_hypervisor_callback;
+		(unsigned long)xen_hypervisor_callback - pv_idt_prologue;
 	ctxt->failsafe_callback_eip =
 		(unsigned long)xen_failsafe_callback;
 	ctxt->user_regs.cs = __KERNEL_CS;
