@@ -1967,6 +1967,9 @@ void intel_hdmi_init_connector(struct intel_digital_port *intel_dig_port,
 	else
 		intel_connector->get_hw_state = intel_connector_get_hw_state;
 
+	intel_edid_change_init(intel_connector,
+			       intel_gmbus_get_adapter(dev_priv, intel_hdmi->ddc_bus));
+
 	intel_hdmi_add_properties(intel_hdmi, connector);
 
 	intel_connector_attach_encoder(intel_connector, intel_encoder);

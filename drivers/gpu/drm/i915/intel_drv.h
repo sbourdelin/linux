@@ -319,6 +319,12 @@ struct intel_connector {
 	struct edid *edid;
 	struct edid *detect_edid;
 
+	/* I2C adapter to retrieve the EDID. */
+	struct i2c_adapter *adapter;
+
+	/* Work to detect EDID change. */
+	struct work_struct edid_change_work;
+
 	/* since POLL and HPD connectors may use the same HPD line keep the native
 	   state of connector->polled in case hotplug storm detection changes it */
 	u8 polled;

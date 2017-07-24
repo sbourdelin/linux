@@ -6063,6 +6063,9 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 		goto fail;
 	}
 
+	if (!is_edp(intel_dp))
+		intel_edid_change_init(intel_connector, &intel_dp->aux.ddc);
+
 	intel_dp_add_properties(intel_dp, connector);
 
 	/* For G4X desktop chip, PEG_BAND_GAP_DATA 3:0 must first be written

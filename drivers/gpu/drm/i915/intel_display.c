@@ -15049,3 +15049,53 @@ intel_display_print_error_state(struct drm_i915_error_state_buf *m,
 }
 
 #endif
+
+static void intel_edid_change_work_func(struct work_struct *work)
+{
+	struct intel_connector *connector =
+		container_of(work, struct intel_connector, edid_change_work);
+	bool changed;
+
+	changed = drm_check_edid_changed(&connector->base, connector->adapter);
+	if (changed) {
+		DRM_DEBUG_KMS("[CONNECTOR:%d:%s] EDID change detected\n",
+			      connector->base.base.id, connector->base.name);
+
+		drm_kms_helper_hotplug_event(connector->base.dev);
+	}
+}
+
+/**
+ * intel_edid_change_init - init the EDID change data
+ * @connector: DRM connector device to use
+ * @adapter: i2c adapter
+ *
+ * Store the i2c adapter and initialize the EDID change detection work.
+ */
+void intel_edid_change_init(struct intel_connector *connector,
+			    struct i2c_adapter *adapter)
+{
+	connector->adapter = adapter;
+
+	INIT_WORK(&connector->edid_change_work, intel_edid_change_work_func);
+}
+
+/**
+ * intel_edid_changes_detect - detect EDID changes to connectors
+ * @dev: DRM device to get connectors from
+ *
+ * Schedule the EDID detection change work for all registered connectors.
+ */
+void intel_edid_changes_detect(struct drm_device *dev)
+{
+	struct intel_connector *connector;
+	struct drm_connector_list_iter conn_iter;
+
+	drm_connector_list_iter_begin(dev, &conn_iter);
+	for_each_intel_connector_iter(connector, &conn_iter) {
+		if (!connector->adapter)
+			continue;
+
+		schedule_work(&connector->edid_change_work);
+	}
+}

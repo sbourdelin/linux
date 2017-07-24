@@ -925,6 +925,9 @@ void intel_crt_init(struct drm_i915_private *dev_priv)
 	 */
 	crt->force_hotplug_required = 0;
 
+	intel_edid_change_init(intel_connector,
+			       intel_gmbus_get_adapter(dev_priv, dev_priv->vbt.crt_ddc_pin));
+
 	/*
 	 * TODO: find a proper way to discover whether we need to set the the
 	 * polarity and link reversal bits or not, instead of relying on the

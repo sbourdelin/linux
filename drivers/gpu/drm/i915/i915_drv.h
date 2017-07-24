@@ -3915,6 +3915,11 @@ intel_display_capture_error_state(struct drm_i915_private *dev_priv);
 extern void intel_display_print_error_state(struct drm_i915_error_state_buf *e,
 					    struct intel_display_error_state *error);
 
+/* edid change */
+void intel_edid_change_init(struct intel_connector *connector,
+			    struct i2c_adapter *adapter);
+void intel_edid_changes_detect(struct drm_device *dev);
+
 int sandybridge_pcode_read(struct drm_i915_private *dev_priv, u32 mbox, u32 *val);
 int sandybridge_pcode_write(struct drm_i915_private *dev_priv, u32 mbox, u32 val);
 int skl_pcode_request(struct drm_i915_private *dev_priv, u32 mbox, u32 request,
