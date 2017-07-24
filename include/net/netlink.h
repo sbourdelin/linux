@@ -178,6 +178,7 @@ enum {
 	NLA_S16,
 	NLA_S32,
 	NLA_S64,
+	NLA_BITFIELD_32,
 	__NLA_TYPE_MAX,
 };
 
@@ -206,6 +207,7 @@ enum {
  *    NLA_MSECS            Leaving the length field zero will verify the
  *                         given type fits, using it verifies minimum length
  *                         just like "All other"
+ *    NLA_BITFIELD_32      A 32-bit bitmap/bitselector attribute
  *    All other            Minimum length of attribute payload
  *
  * Example:
@@ -213,11 +215,13 @@ enum {
  * 	[ATTR_FOO] = { .type = NLA_U16 },
  *	[ATTR_BAR] = { .type = NLA_STRING, .len = BARSIZ },
  *	[ATTR_BAZ] = { .len = sizeof(struct mystruct) },
+ *	[ATTR_GOO] = { .type = NLA_BITFIELD_32, .validation_data = &myvalidflags },
  * };
  */
 struct nla_policy {
 	u16		type;
 	u16		len;
+	void            *validation_data;
 };
 
 /**

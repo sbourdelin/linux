@@ -226,5 +226,22 @@ struct nlattr {
 #define NLA_ALIGN(len)		(((len) + NLA_ALIGNTO - 1) & ~(NLA_ALIGNTO - 1))
 #define NLA_HDRLEN		((int) NLA_ALIGN(sizeof(struct nlattr)))
 
+/* Generic 32 bitflags attribute content sent to the kernel.
+ *
+ * The nla_value is a bitmap that defines the values being set
+ * The nla_selector is a bitmask that defines which value is legit
+ *
+ * Examples:
+ *  nla_value = 0x0, and nla_selector = 0x1
+ *  implies we are selecting bit 1 and we want to set its value to 0.
+ *
+ *  nla_value = 0x2, and nla_selector = 0x2
+ *  implies we are selecting bit 2 and we want to set its value to 1.
+ *
+ */
+struct nla_bitfield_32 {
+	__u32 nla_value;
+	__u32 nla_selector;
+};
 
 #endif /* _UAPI__LINUX_NETLINK_H */
