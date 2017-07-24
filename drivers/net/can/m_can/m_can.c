@@ -23,6 +23,7 @@
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 #include <linux/iopoll.h>
 #include <linux/can/dev.h>
 
@@ -633,11 +634,15 @@ static int m_can_clk_start(struct m_can_priv *priv)
 	if (err)
 		clk_disable_unprepare(priv->hclk);
 
+	pm_runtime_get_sync(priv->device);
+
 	return err;
 }
 
 static void m_can_clk_stop(struct m_can_priv *priv)
 {
+	pm_runtime_put_sync(priv->device);
+
 	clk_disable_unprepare(priv->cclk);
 	clk_disable_unprepare(priv->hclk);
 }
@@ -1582,6 +1587,8 @@ static int m_can_plat_probe(struct platform_device *pdev)
 	/* Enable clocks. Necessary to read Core Release in order to determine
 	 * M_CAN version
 	 */
+	pm_runtime_enable(&pdev->dev);
+
 	ret = clk_prepare_enable(hclk);
 	if (ret)
 		goto disable_hclk_ret;
@@ -1625,6 +1632,8 @@ static int m_can_plat_probe(struct platform_device *pdev)
 	 * Defines the total amount of echo buffers for loopback
 	 */
 	tx_fifo_size = mram_config_vals[7];
+
+	pm_runtime_get_sync(&pdev->dev);
 
 	/* allocate the m_can device */
 	dev = alloc_m_can_dev(pdev, addr, tx_fifo_size);
@@ -1670,6 +1679,7 @@ disable_cclk_ret:
 disable_hclk_ret:
 	clk_disable_unprepare(hclk);
 failed_ret:
+	pm_runtime_put_sync(&pdev->dev);
 	return ret;
 }
 
@@ -1726,6 +1736,9 @@ static int m_can_plat_remove(struct platform_device *pdev)
 	struct net_device *dev = platform_get_drvdata(pdev);
 
 	unregister_m_can_dev(dev);
+
+	pm_runtime_disable(&pdev->dev);
+
 	platform_set_drvdata(pdev, NULL);
 
 	free_m_can_dev(dev);
