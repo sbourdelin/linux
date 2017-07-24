@@ -720,12 +720,8 @@ static int cz_tf_update_sclk_limit(struct pp_hwmgr *hwmgr,
 	else
 		cz_hwmgr->sclk_dpm.soft_max_clk  = table->entries[table->count - 1].clk;
 
-	clock = hwmgr->display_config.min_core_set_clock;
-	if (clock == 0)
-		pr_info("min_core_set_clock not set\n");
-
-	if (cz_hwmgr->sclk_dpm.hard_min_clk != clock) {
-		cz_hwmgr->sclk_dpm.hard_min_clk = clock;
+	if (cz_hwmgr->sclk_dpm.hard_min_clk) {
+		cz_hwmgr->sclk_dpm.hard_min_clk = 0;
 
 		smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
 						PPSMC_MSG_SetSclkHardMin,
@@ -780,15 +776,13 @@ static int cz_tf_set_deep_sleep_sclk_threshold(struct pp_hwmgr *hwmgr,
 {
 	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
 				PHM_PlatformCaps_SclkDeepSleep)) {
-		uint32_t clks = hwmgr->display_config.min_core_set_clock_in_sr;
-		if (clks == 0)
-			clks = CZ_MIN_DEEP_SLEEP_SCLK;
 
-		PP_DBG_LOG("Setting Deep Sleep Clock: %d\n", clks);
+		PP_DBG_LOG("Setting Deep Sleep Clock: %d\n",
+			   CZ_MIN_DEEP_SLEEP_SCLK);
 
 		smum_send_msg_to_smc_with_parameter(hwmgr->smumgr,
 				PPSMC_MSG_SetMinDeepSleepSclk,
-				clks);
+				CZ_MIN_DEEP_SLEEP_SCLK);
 	}
 
 	return 0;
@@ -1120,9 +1114,7 @@ static int cz_apply_state_adjust_rules(struct pp_hwmgr *hwmgr,
 
 	cz_hwmgr->battery_state = (PP_StateUILabel_Battery == prequest_ps->classification.ui_label);
 
-	clocks.memoryClock = hwmgr->display_config.min_mem_set_clock != 0 ?
-				hwmgr->display_config.min_mem_set_clock :
-				cz_hwmgr->sys_info.nbp_memory_clock[1];
+	clocks.memoryClock = cz_hwmgr->sys_info.nbp_memory_clock[1];
 
 	cgs_get_active_displays_info(hwmgr->device, &info);
 	num_of_active_displays = info.display_count;
