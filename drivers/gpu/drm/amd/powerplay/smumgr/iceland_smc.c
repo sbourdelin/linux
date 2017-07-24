@@ -780,8 +780,7 @@ static int iceland_populate_single_graphic_level(struct pp_hwmgr *hwmgr,
 	graphic_level->VoltageDownHyst = 0;
 	graphic_level->PowerThrottle = 0;
 
-	data->display_timing.min_clock_in_sr =
-			hwmgr->display_config.min_core_set_clock_in_sr;
+	data->display_timing.min_clock_in_sr = 0;
 
 	if (phm_cap_enabled(hwmgr->platform_descriptor.platformCaps,
 			PHM_PlatformCaps_SclkDeepSleep))
