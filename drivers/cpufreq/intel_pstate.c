@@ -2050,6 +2050,7 @@ static int intel_pstate_set_policy(struct cpufreq_policy *policy)
 		 */
 		intel_pstate_clear_update_util_hook(policy->cpu);
 		intel_pstate_max_within_limits(cpu);
+		cpu->sample.core_avg_perf = 0;
 	} else {
 		intel_pstate_set_update_util_hook(policy->cpu);
 	}
