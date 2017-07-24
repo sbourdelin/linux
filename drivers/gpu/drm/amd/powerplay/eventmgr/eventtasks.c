@@ -193,7 +193,6 @@ int pem_task_store_dal_configuration(struct pp_eventmgr *eventmgr, const struct 
 {
 	/* TODO */
 	return 0;
-	/*phm_store_dal_configuration_data(eventmgr->hwmgr, display_config) */
 }
 
 int pem_task_notify_hw_mgr_display_configuration_change(struct pp_eventmgr *eventmgr, struct pem_event_data *event_data)
