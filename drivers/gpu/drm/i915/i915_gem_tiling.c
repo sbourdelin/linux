@@ -345,6 +345,14 @@ i915_gem_set_tiling_ioctl(struct drm_device *dev, void *data,
 	if (!obj)
 		return -ENOENT;
 
+	/* The tiling mode of proxy objects is handled by its generator, and not
+	 * expected to be changed by user mode.
+	 */
+	if (i915_gem_object_is_proxy(obj)) {
+		err = -EPERM;
+		goto err;
+	}
+
 	if (!i915_tiling_ok(obj, args->tiling_mode, args->stride)) {
 		err = -EINVAL;
 		goto err;

@@ -1624,6 +1624,16 @@ i915_gem_set_domain_ioctl(struct drm_device *dev, void *data,
 	if (err)
 		goto out;
 
+	/* Proxy objects do not control access to the backing storage, ergo
+	 * they cannot be used as a means to manipulate the cache domain
+	 * tracking for that backing storage. The proxy object is always
+	 * considered to be outside of any cache domain.
+	 */
+	if (i915_gem_object_is_proxy(obj)) {
+		err = -EPERM;
+		goto out;
+	}
+
 	/* Flush and acquire obj->pages so that we are coherent through
 	 * direct access in memory with previous cached writes through
 	 * shmemfs and that our cache domain tracking remains valid.
@@ -1680,6 +1690,10 @@ i915_gem_sw_finish_ioctl(struct drm_device *dev, void *data,
 	if (!obj)
 		return -ENOENT;
 
+	/* Proxy objects are barred from CPU access, so there is no
+	 * need to ban sw_finish as it is a nop.
+	 */
+
 	/* Pinned buffers may be scanout, so flush the cache */
 	i915_gem_object_flush_if_display(obj);
 	i915_gem_object_put(obj);
@@ -1730,7 +1744,7 @@ i915_gem_mmap_ioctl(struct drm_device *dev, void *data,
 	 */
 	if (!obj->base.filp) {
 		i915_gem_object_put(obj);
-		return -EINVAL;
+		return -EPERM;
 	}
 
 	addr = vm_mmap(obj->base.filp, 0, args->size,
@@ -3773,6 +3787,14 @@ int i915_gem_set_caching_ioctl(struct drm_device *dev, void *data,
 	obj = i915_gem_object_lookup(file, args->handle);
 	if (!obj)
 		return -ENOENT;
+
+	/* The caching mode of proxy object is handled by its generator, and not
+	 * expected to be changed by user mode.
+	 */
+	if (i915_gem_object_is_proxy(obj)) {
+		ret = -EPERM;
+		goto out;
+	}
 
 	if (obj->cache_level == level)
 		goto out;
