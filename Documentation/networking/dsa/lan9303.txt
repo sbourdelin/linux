@@ -1,0 +1,63 @@
+LAN9303 Ethernet switch driver
+==============================
+
+The LAN9303 is a three port 10/100 ethernet switch with integrated phys
+for the two external ethernet ports. The third port is an RMII/MII
+interface to a host master network interface (e.g. fixed link).
+
+
+Driver details
+==============
+
+The driver is implemented as a DSA driver, see
+Documentation/networking/dsa/dsa.txt.
+
+See Documentation/devicetree/bindings/net/dsa/lan9303.txt for device
+tree binding.
+
+The LAN9303 can be managed both via MDIO and I2C, both supported by this
+driver.
+
+At startup the driver configures the device to provide two separate
+network interfaces (which is the default state of a DSA device).
+
+When both user ports are joined to the same bridge, the normal
+HW MAC learning is enabled. This means that unicast traffic is forwarded
+in HW. STP is also supported in this mode.
+
+If one of the user ports leave the bridge,
+the ports goes back to the initial separated operation.
+
+The driver implements the port_fdb_xxx/port_mdb_xxx methods.
+
+
+Sysfs nodes
+===========
+
+When a user port is enabled, the driver creates sysfs directory
+/sys/class/net/xxx/lan9303 with the following files:
+
+ - swe_bcst_throt (RW): Set/get 6.4.7 Broadcast Storm Control
+      Throttle Level for the port. Accesses the corresponding bits of
+      the SWE_BCST_THROT register (13.4.3.23).
+
+
+Driver limitations
+==================
+
+ - No support for VLAN
+
+
+Bridging notes
+==============
+When the user ports are bridged, broadcasts, multicasts and unknown
+frames with unknown destination are flooded by the chip. Therefore SW
+flooding must be disabled by:
+
+   echo 0 > /sys/class/net/p1/brport/broadcast_flood
+   echo 0 > /sys/class/net/p1/brport/multicast_flood
+   echo 0 > /sys/class/net/p1/brport/unicast_flood
+   echo 0 > /sys/class/net/p2/brport/broadcast_flood
+   echo 0 > /sys/class/net/p2/brport/multicast_flood
+   echo 0 > /sys/class/net/p2/brport/unicast_flood
+
