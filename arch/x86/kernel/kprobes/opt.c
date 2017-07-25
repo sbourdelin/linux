@@ -29,6 +29,7 @@
 #include <linux/kallsyms.h>
 #include <linux/ftrace.h>
 #include <linux/frame.h>
+#include <linux/interrupt.h>
 
 #include <asm/text-patching.h>
 #include <asm/cacheflush.h>
@@ -251,10 +252,12 @@ static int can_optimize(unsigned long paddr)
 
 	/*
 	 * Do not optimize in the entry code due to the unstable
-	 * stack handling.
+	 * stack handling and registers setup.
 	 */
-	if ((paddr >= (unsigned long)__entry_text_start) &&
-	    (paddr <  (unsigned long)__entry_text_end))
+	if (((paddr >= (unsigned long)__entry_text_start) &&
+	     (paddr <  (unsigned long)__entry_text_end)) ||
+	    ((paddr >= (unsigned long)__irqentry_text_start) &&
+	     (paddr <  (unsigned long)__irqentry_text_end)))
 		return 0;
 
 	/* Check there is enough space for a relative jump. */
