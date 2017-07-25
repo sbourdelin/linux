@@ -45,6 +45,7 @@
 #include <linux/random.h>
 
 #include <net/tcp.h>
+#include <net/inet_hashtables.h>
 #include <net/ndisc.h>
 #include <net/inet6_hashtables.h>
 #include <net/inet6_connection_sock.h>
@@ -338,6 +339,13 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 {
 	const struct ipv6hdr *hdr = (const struct ipv6hdr *)skb->data;
 	const struct tcphdr *th = (struct tcphdr *)(skb->data+offset);
+	struct sk_lookup params = {
+		.saddr.ipv6 = &hdr->daddr,
+		.daddr.ipv6 = &hdr->saddr,
+		.sport = th->dest,
+		.hnum = ntohs(th->source),
+		.dif = skb->dev->ifindex,
+	};
 	struct net *net = dev_net(skb->dev);
 	struct request_sock *fastopen;
 	struct ipv6_pinfo *np;
@@ -347,11 +355,7 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	bool fatal;
 	int err;
 
-	sk = __inet6_lookup_established(net, &tcp_hashinfo,
-					&hdr->daddr, th->dest,
-					&hdr->saddr, ntohs(th->source),
-					skb->dev->ifindex);
-
+	sk = __inet6_lookup_established(net, &tcp_hashinfo, &params);
 	if (!sk) {
 		__ICMP6_INC_STATS(net, __in6_dev_get(skb->dev),
 				  ICMP6_MIB_INERRORS);
@@ -907,6 +911,14 @@ static void tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb)
 	if (sk && sk_fullsock(sk)) {
 		key = tcp_v6_md5_do_lookup(sk, &ipv6h->saddr);
 	} else if (hash_location) {
+		struct sk_lookup params = {
+			.saddr.ipv6 = &ipv6h->saddr,
+			.daddr.ipv6 = &ipv6h->daddr,
+			.sport = th->source,
+			.hnum = ntohs(th->source),
+			.dif  = tcp_v6_iif(skb),
+		};
+
 		/*
 		 * active side is lost. Try to find listening socket through
 		 * source port, and then find md5 key through listening socket.
@@ -915,10 +927,7 @@ static void tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb)
 		 * no RST generated if md5 hash doesn't match.
 		 */
 		sk1 = inet6_lookup_listener(dev_net(skb_dst(skb)->dev),
-					   &tcp_hashinfo, NULL, 0,
-					   &ipv6h->saddr,
-					   th->source, &ipv6h->daddr,
-					   ntohs(th->source), tcp_v6_iif(skb));
+					   &tcp_hashinfo, NULL, 0, &params);
 		if (!sk1)
 			goto out;
 
@@ -1403,6 +1412,9 @@ static int tcp_v6_rcv(struct sk_buff *skb)
 	struct sock *sk;
 	int ret;
 	struct net *net = dev_net(skb->dev);
+	struct sk_lookup params = {
+		.dif = inet6_iif(skb),
+	};
 
 	if (skb->pkt_type != PACKET_HOST)
 		goto discard_it;
@@ -1428,10 +1440,11 @@ static int tcp_v6_rcv(struct sk_buff *skb)
 	th = (const struct tcphdr *)skb->data;
 	hdr = ipv6_hdr(skb);
 
+	params.sport = th->source;
+	params.dport = th->dest;
 lookup:
 	sk = __inet6_lookup_skb(&tcp_hashinfo, skb, __tcp_hdrlen(th),
-				th->source, th->dest, inet6_iif(skb),
-				&refcounted);
+				&params, &refcounted);
 	if (!sk)
 		goto no_tcp_socket;
 
@@ -1558,13 +1571,17 @@ do_time_wait:
 	switch (tcp_timewait_state_process(inet_twsk(sk), skb, th)) {
 	case TCP_TW_SYN:
 	{
+		struct sk_lookup params = {
+			.saddr.ipv6 = &ipv6_hdr(skb)->saddr,
+			.daddr.ipv6 = &ipv6_hdr(skb)->daddr,
+			.sport = th->source,
+			.hnum = ntohs(th->dest),
+			.dif  = tcp_v6_iif(skb),
+		};
 		struct sock *sk2;
 
 		sk2 = inet6_lookup_listener(dev_net(skb->dev), &tcp_hashinfo,
-					    skb, __tcp_hdrlen(th),
-					    &ipv6_hdr(skb)->saddr, th->source,
-					    &ipv6_hdr(skb)->daddr,
-					    ntohs(th->dest), tcp_v6_iif(skb));
+					    skb, __tcp_hdrlen(th), &params);
 		if (sk2) {
 			struct inet_timewait_sock *tw = inet_twsk(sk);
 			inet_twsk_deschedule_put(tw);
@@ -1591,6 +1608,10 @@ do_time_wait:
 
 static void tcp_v6_early_demux(struct sk_buff *skb)
 {
+	/* Note : We use inet6_iif() here, not tcp_v6_iif() */
+	struct sk_lookup params = {
+		.dif = inet6_iif(skb),
+	};
 	const struct ipv6hdr *hdr;
 	const struct tcphdr *th;
 	struct sock *sk;
@@ -1607,11 +1628,12 @@ static void tcp_v6_early_demux(struct sk_buff *skb)
 	if (th->doff < sizeof(struct tcphdr) / 4)
 		return;
 
-	/* Note : We use inet6_iif() here, not tcp_v6_iif() */
+	params.saddr.ipv6 = &hdr->saddr,
+	params.daddr.ipv6 = &hdr->daddr,
+	params.sport = th->source,
+	params.hnum = ntohs(th->dest),
 	sk = __inet6_lookup_established(dev_net(skb->dev), &tcp_hashinfo,
-					&hdr->saddr, th->source,
-					&hdr->daddr, ntohs(th->dest),
-					inet6_iif(skb));
+					&params);
 	if (sk) {
 		skb->sk = sk;
 		skb->destructor = sock_edemux;

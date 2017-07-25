@@ -60,6 +60,7 @@ static int udp_dump_one(struct udp_table *tbl, struct sk_buff *in_skb,
 			.daddr.ipv6 = (struct in6_addr *)req->id.idiag_dst,
 			.sport = req->id.idiag_sport,
 			.dport = req->id.idiag_dport,
+			.hnum  = ntohs(req->id.idiag_dport),
 			.dif   =  req->id.idiag_if,
 		};
 
@@ -221,6 +222,7 @@ static int __udp_diag_destroy(struct sk_buff *in_skb,
 				.daddr.ipv6 = (struct in6_addr *)req->id.idiag_src,
 				.sport = req->id.idiag_dport,
 				.dport = req->id.idiag_sport,
+				.hnum  = ntohs(req->id.idiag_sport),
 				.dif   =  req->id.idiag_if,
 			};
 

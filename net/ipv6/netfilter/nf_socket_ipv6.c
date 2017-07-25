@@ -91,14 +91,13 @@ nf_socket_get_sock_v6(struct net *net, struct sk_buff *skb, int doff,
 		.daddr.ipv6 = daddr,
 		.sport = sport,
 		.dport = dport,
+		.hnum  = ntohs(dport),
 		.dif = in->ifindex,
 	};
 
 	switch (protocol) {
 	case IPPROTO_TCP:
-		return inet6_lookup(net, &tcp_hashinfo, skb, doff,
-				    saddr, sport, daddr, dport,
-				    in->ifindex);
+		return inet6_lookup(net, &tcp_hashinfo, skb, doff, &params);
 	case IPPROTO_UDP:
 		return udp6_lib_lookup(net, &params);
 	}

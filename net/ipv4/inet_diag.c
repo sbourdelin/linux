@@ -422,13 +422,18 @@ struct sock *inet_diag_find_one_icsk(struct net *net,
 			};
 
 			sk = inet_lookup(net, hashinfo, NULL, 0, &params);
-		} else
-			sk = inet6_lookup(net, hashinfo, NULL, 0,
-					  (struct in6_addr *)req->id.idiag_dst,
-					  req->id.idiag_dport,
-					  (struct in6_addr *)req->id.idiag_src,
-					  req->id.idiag_sport,
-					  req->id.idiag_if);
+		} else {
+			struct sk_lookup params = {
+				.saddr.ipv6 = (struct in6_addr *)req->id.idiag_dst,
+				.daddr.ipv6 = (struct in6_addr *)req->id.idiag_src,
+				.sport = req->id.idiag_dport,
+				.dport = req->id.idiag_sport,
+				.hnum = ntohs(req->id.idiag_sport),
+				.dif = req->id.idiag_if,
+			};
+
+			sk = inet6_lookup(net, hashinfo, NULL, 0, &params);
+		}
 	}
 #endif
 	else {

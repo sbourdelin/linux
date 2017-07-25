@@ -70,6 +70,11 @@ static void dccp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 			u8 type, u8 code, int offset, __be32 info)
 {
 	const struct ipv6hdr *hdr = (const struct ipv6hdr *)skb->data;
+	struct sk_lookup params = {
+		.saddr.ipv6 = &hdr->daddr,
+		.daddr.ipv6 = &hdr->saddr,
+		.dif = inet6_iif(skb),
+	};
 	const struct dccp_hdr *dh;
 	struct dccp_sock *dp;
 	struct ipv6_pinfo *np;
@@ -86,11 +91,10 @@ static void dccp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	BUILD_BUG_ON(offsetofend(struct dccp_hdr, dccph_dport) > 8);
 	dh = (struct dccp_hdr *)(skb->data + offset);
 
-	sk = __inet6_lookup_established(net, &dccp_hashinfo,
-					&hdr->daddr, dh->dccph_dport,
-					&hdr->saddr, ntohs(dh->dccph_sport),
-					inet6_iif(skb));
-
+	params.sport = dh->dccph_dport;
+	params.dport = dh->dccph_sport;
+	params.hnum = ntohs(dh->dccph_sport);
+	sk = __inet6_lookup_established(net, &dccp_hashinfo, &params);
 	if (!sk) {
 		__ICMP6_INC_STATS(net, __in6_dev_get(skb->dev),
 				  ICMP6_MIB_INERRORS);
@@ -656,6 +660,9 @@ discard:
 
 static int dccp_v6_rcv(struct sk_buff *skb)
 {
+	struct sk_lookup params = {
+		.dif = inet6_iif(skb),
+	};
 	const struct dccp_hdr *dh;
 	bool refcounted;
 	struct sock *sk;
@@ -683,10 +690,11 @@ static int dccp_v6_rcv(struct sk_buff *skb)
 	else
 		DCCP_SKB_CB(skb)->dccpd_ack_seq = dccp_hdr_ack_seq(skb);
 
+	params.sport = dh->dccph_sport;
+	params.dport = dh->dccph_dport;
 lookup:
 	sk = __inet6_lookup_skb(&dccp_hashinfo, skb, __dccp_hdr_len(dh),
-			        dh->dccph_sport, dh->dccph_dport,
-				inet6_iif(skb), &refcounted);
+				&params, &refcounted);
 	if (!sk) {
 		dccp_pr_debug("failed to look up flow ID in table and "
 			      "get corresponding socket\n");

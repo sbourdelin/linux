@@ -52,33 +52,35 @@ u32 inet6_ehashfn(const struct net *net,
  */
 struct sock *__inet6_lookup_established(struct net *net,
 					struct inet_hashinfo *hashinfo,
-					   const struct in6_addr *saddr,
-					   const __be16 sport,
-					   const struct in6_addr *daddr,
-					   const u16 hnum,
-					   const int dif)
+					const struct sk_lookup *params)
 {
+	const __portpair ports = INET_COMBINED_PORTS(params->sport,
+						     params->hnum);
+	const struct in6_addr *saddr = params->saddr.ipv6;
+	const struct in6_addr *daddr = params->daddr.ipv6;
 	struct sock *sk;
 	const struct hlist_nulls_node *node;
-	const __portpair ports = INET_COMBINED_PORTS(sport, hnum);
+
 	/* Optimize here for direct hit, only listening connections can
 	 * have wildcards anyways.
 	 */
-	unsigned int hash = inet6_ehashfn(net, daddr, hnum, saddr, sport);
+	unsigned int hash = inet6_ehashfn(net, daddr, params->hnum,
+					  saddr, params->sport);
 	unsigned int slot = hash & hashinfo->ehash_mask;
 	struct inet_ehash_bucket *head = &hashinfo->ehash[slot];
-
 
 begin:
 	sk_nulls_for_each_rcu(sk, node, &head->chain) {
 		if (sk->sk_hash != hash)
 			continue;
-		if (!INET6_MATCH(sk, net, saddr, daddr, ports, dif))
+		if (!INET6_MATCH(sk, net, saddr, daddr, ports,
+				 params->dif))
 			continue;
 		if (unlikely(!refcount_inc_not_zero(&sk->sk_refcnt)))
 			goto out;
 
-		if (unlikely(!INET6_MATCH(sk, net, saddr, daddr, ports, dif))) {
+		if (unlikely(!INET6_MATCH(sk, net, saddr, daddr, ports,
+				 params->dif))) {
 			sock_gen_put(sk);
 			goto begin;
 		}
@@ -94,26 +96,27 @@ found:
 EXPORT_SYMBOL(__inet6_lookup_established);
 
 static inline int compute_score(struct sock *sk, struct net *net,
-				const unsigned short hnum,
-				const struct in6_addr *daddr,
-				const int dif, bool exact_dif)
+				const struct sk_lookup *params)
 {
 	int score = -1;
 
-	if (net_eq(sock_net(sk), net) && inet_sk(sk)->inet_num == hnum &&
+	if (net_eq(sock_net(sk), net) &&
+	    inet_sk(sk)->inet_num == params->hnum &&
 	    sk->sk_family == PF_INET6) {
+		int rc;
 
 		score = 1;
 		if (!ipv6_addr_any(&sk->sk_v6_rcv_saddr)) {
-			if (!ipv6_addr_equal(&sk->sk_v6_rcv_saddr, daddr))
+			if (!ipv6_addr_equal(&sk->sk_v6_rcv_saddr,
+					     params->daddr.ipv6))
 				return -1;
 			score++;
 		}
-		if (sk->sk_bound_dev_if || exact_dif) {
-			if (sk->sk_bound_dev_if != dif)
-				return -1;
+		rc = sk_lookup_device_cmp(sk, params);
+		if (rc < 0)
+			return -1;
+		if (rc > 0)
 			score++;
-		}
 		if (sk->sk_incoming_cpu == raw_smp_processor_id())
 			score++;
 	}
@@ -122,26 +125,27 @@ static inline int compute_score(struct sock *sk, struct net *net,
 
 /* called with rcu_read_lock() */
 struct sock *inet6_lookup_listener(struct net *net,
-		struct inet_hashinfo *hashinfo,
-		struct sk_buff *skb, int doff,
-		const struct in6_addr *saddr,
-		const __be16 sport, const struct in6_addr *daddr,
-		const unsigned short hnum, const int dif)
+				   struct inet_hashinfo *hashinfo,
+				   struct sk_buff *skb, int doff,
+				   struct sk_lookup *params)
 {
-	unsigned int hash = inet_lhashfn(net, hnum);
+	unsigned int hash = inet_lhashfn(net, params->hnum);
 	struct inet_listen_hashbucket *ilb = &hashinfo->listening_hash[hash];
 	int score, hiscore = 0, matches = 0, reuseport = 0;
-	bool exact_dif = inet6_exact_dif_match(net, skb);
 	struct sock *sk, *result = NULL;
 	u32 phash = 0;
 
+	params->exact_dif = inet6_exact_dif_match(net, skb);
+
 	sk_for_each(sk, &ilb->head) {
-		score = compute_score(sk, net, hnum, daddr, dif, exact_dif);
+		score = compute_score(sk, net, params);
 		if (score > hiscore) {
 			reuseport = sk->sk_reuseport;
 			if (reuseport) {
-				phash = inet6_ehashfn(net, daddr, hnum,
-						      saddr, sport);
+				phash = inet6_ehashfn(net, params->daddr.ipv6,
+						      params->hnum,
+						      params->saddr.ipv6,
+						      params->sport);
 				result = reuseport_select_sock(sk, phash,
 							       skb, doff);
 				if (result)
@@ -163,15 +167,12 @@ EXPORT_SYMBOL_GPL(inet6_lookup_listener);
 
 struct sock *inet6_lookup(struct net *net, struct inet_hashinfo *hashinfo,
 			  struct sk_buff *skb, int doff,
-			  const struct in6_addr *saddr, const __be16 sport,
-			  const struct in6_addr *daddr, const __be16 dport,
-			  const int dif)
+			  struct sk_lookup *params)
 {
 	struct sock *sk;
 	bool refcounted;
 
-	sk = __inet6_lookup(net, hashinfo, skb, doff, saddr, sport, daddr,
-			    ntohs(dport), dif, &refcounted);
+	sk = __inet6_lookup(net, hashinfo, skb, doff, params, &refcounted);
 	if (sk && !refcounted && !refcount_inc_not_zero(&sk->sk_refcnt))
 		sk = NULL;
 	return sk;
@@ -203,7 +204,8 @@ static int __inet6_check_established(struct inet_timewait_death_row *death_row,
 		if (sk2->sk_hash != hash)
 			continue;
 
-		if (likely(INET6_MATCH(sk2, net, saddr, daddr, ports, dif))) {
+		if (likely(INET6_MATCH(sk2, net, saddr, daddr, ports,
+				       dif))) {
 			if (sk2->sk_state == TCP_TIME_WAIT) {
 				tw = inet_twsk(sk2);
 				if (twsk_unique(sk, sk2, twp))
