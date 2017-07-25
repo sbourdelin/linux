@@ -231,7 +231,7 @@ static void init_test(void)
 
 	if (precision > MAX_PRECISION) {
 		printf("[SKIP]\n");
-		ksft_exit_skip();
+		ksft_exit_skip("[SKIP]\n");
 	}
 
 	printf("[OK]\n");
