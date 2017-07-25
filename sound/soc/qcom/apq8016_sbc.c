@@ -19,10 +19,13 @@
 #include <linux/of.h>
 #include <linux/clk.h>
 #include <linux/platform_device.h>
+#include <sound/jack.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
 #include <dt-bindings/sound/apq8016-lpass.h>
+
+#include "../codecs/msm8916-wcd-analog.h"
 
 struct apq8016_sbc_data {
 	void __iomem *mic_iomux;
@@ -35,12 +38,25 @@ struct apq8016_sbc_data {
 #define MIC_CTRL_TLMM_SCLK_EN		BIT(1)
 #define	SPKR_CTL_PRI_WS_SLAVE_SEL_11	(BIT(17) | BIT(16))
 
+static struct snd_soc_jack apq8016_jack;
+
 static int apq8016_sbc_dai_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_card *card = rtd->card;
+	struct snd_soc_codec *codec = rtd->codec;
 	struct apq8016_sbc_data *pdata = snd_soc_card_get_drvdata(card);
 	int rval = 0;
+
+	if (!apq8016_jack.jack) {
+		rval = snd_soc_card_jack_new(card, "headset",
+					     SND_JACK_MECHANICAL,
+					     &apq8016_jack, NULL, 0);
+		if (rval)
+			return rval;
+
+		pm8916_wcd_analog_jack_detect(codec, &apq8016_jack);
+	}
 
 	switch (cpu_dai->id) {
 	case MI2S_PRIMARY:
