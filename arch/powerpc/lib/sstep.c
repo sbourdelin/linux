@@ -655,6 +655,25 @@ static nokprobe_inline void do_bpermd(struct pt_regs *regs, unsigned long v1,
 	regs->gpr[ra] = perm;
 }
 #endif /* __powerpc64__ */
+/*
+ * The size parameter adjusts the equivalent prty instruction.
+ * prtyw = 32, prtyd = 64
+ */
+static nokprobe_inline void do_prty(struct pt_regs *regs, unsigned long v,
+				int size, int ra)
+{
+	unsigned long long res = v;
+
+	res = (0x0001000100010001 & res) + (0x0001000100010001 & (res >> 8));
+	res = (0x0000000700000007 & res) + (0x0000000700000007 & (res >> 16));
+	if (size == 32) {		/* prtyw */
+		regs->gpr[ra] = (0x0000000100000001 & res);
+		return;
+	}
+
+	res = (0x000000000000000f & res) + (0x000000000000000f & (res >> 32));
+	regs->gpr[ra] = res & 1;	/*prtyd */
+}
 
 static nokprobe_inline int trap_compare(long v1, long v2)
 {
@@ -1244,6 +1263,14 @@ int analyse_instr(struct instruction_op *op, struct pt_regs *regs,
 
 		case 124:	/* nor */
 			regs->gpr[ra] = ~(regs->gpr[rd] | regs->gpr[rb]);
+			goto logical_done;
+
+		case 154:	/* prtyw */
+			do_prty(regs, regs->gpr[rd], 32, ra);
+			goto logical_done;
+
+		case 186:	/* prtyd */
+			do_prty(regs, regs->gpr[rd], 64, ra);
 			goto logical_done;
 #ifdef __powerpc64__
 		case 252:	/* bpermd */
