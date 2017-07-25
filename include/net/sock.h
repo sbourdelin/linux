@@ -507,23 +507,27 @@ struct sk_lookup {
 	unsigned short hnum;
 
 	int dif;
+	int sdif;
 	bool exact_dif;
 };
 
-/* Compare sk_bound_dev_if to socket lookup dif
+/* Compare sk_bound_dev_if to socket lookup dif and sdif
  * Returns:
  *   -1   exact dif required and not met
  *    0   sk_bound_dev_if is either not set or does not match
- *    1   sk_bound_dev_if is set and matches dif
+ *    1   sk_bound_dev_if is set and matches dif or sdif
  */
 static inline int sk_lookup_device_cmp(const struct sock *sk,
 				       const struct sk_lookup *params)
 {
+	bool dev_match = (sk->sk_bound_dev_if == params->dif ||
+			  sk->sk_bound_dev_if == params->sdif);
+
 	/* exact_dif true == l3mdev case */
-	if (params->exact_dif && sk->sk_bound_dev_if != params->dif)
+	if (params->exact_dif && !dev_match)
 		return -1;
 
-	if (sk->sk_bound_dev_if && sk->sk_bound_dev_if == params->dif)
+	if (sk->sk_bound_dev_if && dev_match)
 		return 1;
 
 	return 0;
