@@ -1226,7 +1226,8 @@ void phy_state_machine(struct work_struct *work)
 	if (err < 0)
 		phy_error(phydev);
 
-	phydev_dbg(phydev, "PHY state change %s -> %s\n",
+	if (old_state != phydev->state)
+		phydev_dbg(phydev, "PHY state change %s -> %s\n",
 		   phy_state_to_str(old_state),
 		   phy_state_to_str(phydev->state));
 
