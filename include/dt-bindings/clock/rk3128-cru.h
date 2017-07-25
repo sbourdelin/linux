@@ -125,6 +125,9 @@
 #define PCLK_GMAC		367
 #define PCLK_PMU_PRE		368
 #define PCLK_SIM_CARD		369
+#define PCLK_STIMER		370
+#define PCLK_S_EFUSE		371
+#define PCLK_SGRF		372
 
 /* hclk gates */
 #define HCLK_SPDIF		440
