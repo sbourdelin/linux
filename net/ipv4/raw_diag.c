@@ -53,11 +53,16 @@ static struct sock *raw_lookup(struct net *net, struct sock *from,
 		sk = __raw_v4_lookup(net, from, &params);
 	}
 #if IS_ENABLED(CONFIG_IPV6)
-	else
-		sk = __raw_v6_lookup(net, from, r->sdiag_raw_protocol,
-				     (const struct in6_addr *)r->id.idiag_src,
-				     (const struct in6_addr *)r->id.idiag_dst,
-				     r->id.idiag_if);
+	else {
+		struct sk_lookup params = {
+			.saddr.ipv6 = (const struct in6_addr *)r->id.idiag_dst,
+			.daddr.ipv6 = (const struct in6_addr *)r->id.idiag_src,
+			.hnum = r->sdiag_raw_protocol,
+			.dif = r->id.idiag_if,
+		};
+
+		sk = __raw_v6_lookup(net, from, &params);
+	}
 #endif
 	return sk;
 }

@@ -71,14 +71,14 @@ struct raw_hashinfo raw_v6_hashinfo = {
 EXPORT_SYMBOL_GPL(raw_v6_hashinfo);
 
 struct sock *__raw_v6_lookup(struct net *net, struct sock *sk,
-		unsigned short num, const struct in6_addr *loc_addr,
-		const struct in6_addr *rmt_addr, int dif)
+			     const struct sk_lookup *params)
 {
+	const struct in6_addr *loc_addr = params->daddr.ipv6;
+	const struct in6_addr *rmt_addr = params->saddr.ipv6;
 	bool is_multicast = ipv6_addr_is_multicast(loc_addr);
 
 	sk_for_each_from(sk)
-		if (inet_sk(sk)->inet_num == num) {
-
+		if (inet_sk(sk)->inet_num == params->hnum) {
 			if (!net_eq(sock_net(sk), net))
 				continue;
 
@@ -86,7 +86,8 @@ struct sock *__raw_v6_lookup(struct net *net, struct sock *sk,
 			    !ipv6_addr_equal(&sk->sk_v6_daddr, rmt_addr))
 				continue;
 
-			if (sk->sk_bound_dev_if && sk->sk_bound_dev_if != dif)
+			if (sk->sk_bound_dev_if &&
+			    sk->sk_bound_dev_if != params->dif)
 				continue;
 
 			if (!ipv6_addr_any(&sk->sk_v6_rcv_saddr)) {
@@ -159,15 +160,17 @@ EXPORT_SYMBOL(rawv6_mh_filter_unregister);
  */
 static bool ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 {
-	const struct in6_addr *saddr;
-	const struct in6_addr *daddr;
+	struct sk_lookup params = {
+		.saddr.ipv6 = &ipv6_hdr(skb)->saddr,
+		.daddr.ipv6 = &ipv6_hdr(skb)->daddr,
+		.hnum = nexthdr,
+		.dif  = inet6_iif(skb),
+	};
 	struct sock *sk;
 	bool delivered = false;
 	__u8 hash;
 	struct net *net;
 
-	saddr = &ipv6_hdr(skb)->saddr;
-	daddr = saddr + 1;
 
 	hash = nexthdr & (RAW_HTABLE_SIZE - 1);
 
@@ -178,7 +181,7 @@ static bool ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 		goto out;
 
 	net = dev_net(skb->dev);
-	sk = __raw_v6_lookup(net, sk, nexthdr, daddr, saddr, inet6_iif(skb));
+	sk = __raw_v6_lookup(net, sk, &params);
 
 	while (sk) {
 		int filtered;
@@ -221,8 +224,7 @@ static bool ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 				rawv6_rcv(sk, clone);
 			}
 		}
-		sk = __raw_v6_lookup(net, sk_next(sk), nexthdr, daddr, saddr,
-				     inet6_iif(skb));
+		sk = __raw_v6_lookup(net, sk_next(sk), &params);
 	}
 out:
 	read_unlock(&raw_v6_hashinfo.lock);
@@ -362,23 +364,26 @@ void raw6_icmp_error(struct sk_buff *skb, int nexthdr,
 		u8 type, u8 code, int inner_offset, __be32 info)
 {
 	struct sock *sk;
-	int hash;
-	const struct in6_addr *saddr, *daddr;
 	struct net *net;
+	int hash;
 
 	hash = nexthdr & (RAW_HTABLE_SIZE - 1);
 
 	read_lock(&raw_v6_hashinfo.lock);
 	sk = sk_head(&raw_v6_hashinfo.ht[hash]);
 	if (sk) {
+		struct sk_lookup params = {
+			.hnum = nexthdr,
+			.dif  = inet6_iif(skb),
+		};
 		/* Note: ipv6_hdr(skb) != skb->data */
 		const struct ipv6hdr *ip6h = (const struct ipv6hdr *)skb->data;
-		saddr = &ip6h->saddr;
-		daddr = &ip6h->daddr;
+
+		params.daddr.ipv6 = &ip6h->saddr;
+		params.saddr.ipv6 = &ip6h->daddr;
 		net = dev_net(skb->dev);
 
-		while ((sk = __raw_v6_lookup(net, sk, nexthdr, saddr, daddr,
-						inet6_iif(skb)))) {
+		while ((sk = __raw_v6_lookup(net, sk, &params))) {
 			rawv6_err(sk, skb, NULL, type, code,
 					inner_offset, info);
 			sk = sk_next(sk);
