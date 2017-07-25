@@ -220,6 +220,7 @@ struct sock *__udp6_lib_lookup(struct net *net, struct sk_lookup *params,
 	u32 hash = 0;
 
 	params->hnum = hnum;
+	params->sdif = inet6_sdif(skb);
 	params->exact_dif = udp6_lib_exact_dif_match(net, skb);
 
 	if (hslot->count > 10) {
@@ -673,7 +674,8 @@ static bool __udp_v6_is_mcast_sock(struct net *net, struct sock *sk,
 	    (inet->inet_dport && inet->inet_dport != params->sport) ||
 	    (!ipv6_addr_any(&sk->sk_v6_daddr) &&
 		    !ipv6_addr_equal(&sk->sk_v6_daddr, rmt_addr)) ||
-	    (sk->sk_bound_dev_if && sk->sk_bound_dev_if != params->dif) ||
+	    (sk->sk_bound_dev_if && sk->sk_bound_dev_if != params->dif &&
+	     sk->sk_bound_dev_if != params->sdif) ||
 	    (!ipv6_addr_any(&sk->sk_v6_rcv_saddr) &&
 		    !ipv6_addr_equal(&sk->sk_v6_rcv_saddr, loc_addr)))
 		return false;
@@ -715,6 +717,7 @@ static int __udp6_lib_mcast_deliver(struct net *net, struct sk_buff *skb,
 		.dport = uh->dest,
 		.hnum  = hnum,
 		.dif   = inet6_iif(skb),
+		.sdif  = inet6_sdif(skb),
 	};
 
 	if (use_hash2) {
@@ -893,7 +896,7 @@ static struct sock *__udp6_lib_demux_lookup(struct net *net,
 		if (sk->sk_state == TCP_ESTABLISHED &&
 		    INET6_MATCH(sk, net, params->saddr.ipv6,
 				params->daddr.ipv6, ports,
-				params->dif))
+				params->dif, params->sdif))
 			return sk;
 
 		/* Only check first socket in chain */
@@ -910,6 +913,7 @@ static void udp_v6_early_demux(struct sk_buff *skb)
 	struct dst_entry *dst;
 	struct sk_lookup params = {
 		.dif = skb->dev->ifindex,
+		.sdif = inet6_sdif(skb),
 	};
 
 	if (skb->pkt_type != PACKET_HOST)

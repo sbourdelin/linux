@@ -848,6 +848,13 @@ static inline int tcp_v6_iif(const struct sk_buff *skb)
 
 	return l3_slave ? skb->skb_iif : TCP_SKB_CB(skb)->header.h6.iif;
 }
+
+static inline int tcp_v6_sdif(const struct sk_buff *skb)
+{
+	bool l3_slave = ipv6_l3mdev_skb(TCP_SKB_CB(skb)->header.h6.flags);
+
+	return l3_slave ? TCP_SKB_CB(skb)->header.h6.iif : 0;
+}
 #endif
 
 /* TCP_SKB_CB reference means this can not be used from early demux */
