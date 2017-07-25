@@ -557,9 +557,6 @@ static int lan9303_disable_processing(struct lan9303 *chip)
 {
 	int ret;
 
-	ret = lan9303_disable_packet_processing(chip, LAN9303_PORT_0_OFFSET);
-	if (ret)
-		return ret;
 	ret = lan9303_disable_packet_processing(chip, LAN9303_PORT_1_OFFSET);
 	if (ret)
 		return ret;
@@ -632,10 +629,6 @@ static int lan9303_setup(struct dsa_switch *ds)
 	ret = lan9303_separate_ports(chip);
 	if (ret)
 		dev_err(chip->dev, "failed to separate ports %d\n", ret);
-
-	ret = lan9303_enable_packet_processing(chip, LAN9303_PORT_0_OFFSET);
-	if (ret)
-		dev_err(chip->dev, "failed to re-enable switching %d\n", ret);
 
 	return 0;
 }
