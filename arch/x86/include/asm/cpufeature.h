@@ -125,8 +125,12 @@ extern const char * const x86_bug_flags[NBUGINTS*32];
 #define boot_cpu_has(bit)	cpu_has(&boot_cpu_data, bit)
 
 #define set_cpu_cap(c, bit)	set_bit(bit, (unsigned long *)((c)->x86_capability))
-#define clear_cpu_cap(c, bit)	clear_bit(bit, (unsigned long *)((c)->x86_capability))
-#define setup_clear_cpu_cap(bit) do { \
+#define __clear_cpu_cap(c, bit)	clear_bit(bit, (unsigned long *)((c)->x86_capability))
+
+extern void setup_clear_cpu_cap(int bit);
+extern void clear_cpu_cap(struct cpuinfo_x86 *cpu, int bit);
+
+#define __setup_clear_cpu_cap(bit) do { \
 	clear_cpu_cap(&boot_cpu_data, bit);	\
 	set_bit(bit, (unsigned long *)cpu_caps_cleared); \
 } while (0)
