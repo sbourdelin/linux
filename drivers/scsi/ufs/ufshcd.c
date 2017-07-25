@@ -931,6 +931,31 @@ out:
 }
 
 /**
+ * ufshcd_read_auto_hibern8_state - Reads hosts auto-hibern8 feature state
+ * @hba: per adapter instance
+ */
+u32 ufshcd_read_auto_hibern8_state(struct ufs_hba *hba)
+{
+	return ufshcd_readl(hba, REG_AUTO_HIBERN8_IDLE_TIMER);
+}
+
+/**
+ * ufshcd_setup_auto_hibern8 - Sets up hosts auto-hibern8 feature
+ * @hba: per adapter instance
+ * @scale: timer scale (1/10/100us/1/10/100ms)
+ * @timer_val: value to be multipled with scale (idle timeout)
+ */
+void ufshcd_setup_auto_hibern8(struct ufs_hba *hba, u8 scale, u16 timer_val)
+{
+	u32 val = (scale << UFSHCI_AHIBERN8_SCALE_OFFSET)
+			& UFSHCI_AHIBERN8_SCALE_MASK;
+
+	val |= timer_val & UFSHCI_AHIBERN8_TIMER_MASK;
+
+	ufshcd_writel(hba, val, REG_AUTO_HIBERN8_IDLE_TIMER);
+}
+
+/**
  * ufshcd_is_devfreq_scaling_required - check if scaling is required or not
  * @hba: per adapter instance
  * @scale_up: True if scaling up and false if scaling down
@@ -5715,6 +5740,54 @@ out:
 	return err;
 }
 
+#define UFS_AHIBERN8_SCALE_STEP_MAGNITUDE	10
+
+static ssize_t ufshcd_auto_hibern8_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+	u32 val;
+	unsigned long timer;
+	u8 scale;
+	char *unit;
+
+	val = ufshcd_read_auto_hibern8_state(hba);
+	timer = val & UFSHCI_AHIBERN8_TIMER_MASK;
+	scale =	(val & UFSHCI_AHIBERN8_SCALE_MASK)
+			>> UFSHCI_AHIBERN8_SCALE_OFFSET;
+
+	unit = scale >= UFSHCI_AHIBERN8_SCALE_1MS ? "ms" : "us";
+
+	for (scale %= UFSHCI_AHIBERN8_SCALE_1MS; scale > 0; --scale)
+		timer *= UFS_AHIBERN8_SCALE_STEP_MAGNITUDE;
+
+	return snprintf(buf, PAGE_SIZE, "%ld %s\n", timer, unit);
+}
+
+static ssize_t ufshcd_auto_hibern8_store(struct device *dev,
+		struct device_attribute *atr, const char *buf, size_t count)
+{
+	struct ufs_hba *hba = dev_get_drvdata(dev);
+	unsigned long timer;
+	u8 scale = UFSHCI_AHIBERN8_SCALE_1US;
+
+	if (kstrtoul(buf, 0, &timer))
+		return -EINVAL;
+
+	while (timer > UFSHCI_AHIBERN8_TIMER_MASK &&
+	       scale < UFSHCI_AHIBERN8_SCALE_MAX) {
+		timer /= UFS_AHIBERN8_SCALE_STEP_MAGNITUDE;
+		++scale;
+	}
+
+	if (scale >= UFSHCI_AHIBERN8_SCALE_MAX)
+		return -EINVAL;
+
+	ufshcd_setup_auto_hibern8(hba, scale, (u16) timer);
+
+	return count;
+}
+
 /**
  * ufshcd_host_reset_and_restore - reset and restore host controller
  * @hba: per-adapter instance
@@ -7693,16 +7766,34 @@ static void ufshcd_add_spm_lvl_sysfs_nodes(struct ufs_hba *hba)
 		dev_err(hba->dev, "Failed to create sysfs for spm_lvl\n");
 }
 
+static void ufshcd_add_ahibern8_sysfs_node(struct ufs_hba *hba)
+{
+	if (!(hba->capabilities & MASK_AUTO_HIBERN8_SUPPORT))
+		return;
+
+	hba->ahibern8_attr.show = ufshcd_auto_hibern8_show;
+	hba->ahibern8_attr.store = ufshcd_auto_hibern8_store;
+	sysfs_attr_init(&hba->ahibern8_attr.attr);
+	hba->ahibern8_attr.attr.name = "ufs_auto_hibern8";
+	hba->ahibern8_attr.attr.mode = 0600;
+	if (device_create_file(hba->dev, &hba->ahibern8_attr))
+		dev_err(hba->dev, "Failed to create sysfs for ufs_auto_hibern8\n");
+}
+
 static inline void ufshcd_add_sysfs_nodes(struct ufs_hba *hba)
 {
 	ufshcd_add_rpm_lvl_sysfs_nodes(hba);
 	ufshcd_add_spm_lvl_sysfs_nodes(hba);
+	ufshcd_add_ahibern8_sysfs_node(hba);
 }
 
 static inline void ufshcd_remove_sysfs_nodes(struct ufs_hba *hba)
 {
 	device_remove_file(hba->dev, &hba->rpm_lvl_attr);
 	device_remove_file(hba->dev, &hba->spm_lvl_attr);
+
+	if (hba->capabilities & MASK_AUTO_HIBERN8_SUPPORT)
+		device_remove_file(hba->dev, &hba->ahibern8_attr);
 }
 
 /**
