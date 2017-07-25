@@ -58,6 +58,8 @@ struct gpiod_lookup_table {
 
 #ifdef CONFIG_GPIOLIB
 void gpiod_add_lookup_table(struct gpiod_lookup_table *table);
+void gpiod_add_lookup_tables(struct gpiod_lookup_table **tables,
+			     unsigned int n);
 void gpiod_remove_lookup_table(struct gpiod_lookup_table *table);
 #else
 static inline

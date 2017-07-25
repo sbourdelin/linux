@@ -3011,6 +3011,24 @@ void gpiod_add_lookup_table(struct gpiod_lookup_table *table)
 }
 
 /**
+ * gpiod_add_lookup_tables() - register GPIO device consumers
+ * @tables: list of table of consumers to register
+ * @n: number of tables in the list
+ */
+void gpiod_add_lookup_tables(struct gpiod_lookup_table **tables,
+			     unsigned int n)
+{
+	unsigned int i;
+
+	mutex_lock(&gpio_lookup_lock);
+
+	for (i = 0; i < n; i++)
+		list_add_tail(&tables[i]->list, &gpio_lookup_list);
+
+	mutex_unlock(&gpio_lookup_lock);
+}
+
+/**
  * gpiod_remove_lookup_table() - unregister GPIO device consumers
  * @table: table of consumers to unregister
  */
