@@ -1338,7 +1338,7 @@ static int lpc_eth_drv_probe(struct platform_device *pdev)
 	/* Get size of DMA buffers/descriptors region */
 	pldat->dma_buff_size = (ENET_TX_DESC + ENET_RX_DESC) * (ENET_MAXF_SIZE +
 		sizeof(struct txrx_desc_t) + sizeof(struct rx_status_t));
-	pldat->dma_buff_base_v = 0;
+	pldat->dma_buff_base_v = NULL;
 
 	if (use_iram_for_net(&pldat->pdev->dev)) {
 		dma_handle = LPC32XX_IRAM_BASE;
@@ -1350,7 +1350,7 @@ static int lpc_eth_drv_probe(struct platform_device *pdev)
 				"IRAM not big enough for net buffers, using SDRAM instead.\n");
 	}
 
-	if (pldat->dma_buff_base_v == 0) {
+	if (pldat->dma_buff_base_v == NULL) {
 		ret = dma_coerce_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
 		if (ret)
 			goto err_out_free_irq;
