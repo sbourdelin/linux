@@ -39,6 +39,7 @@ static void lan9303_mdio_real_write(struct mdio_device *mdio, int reg, u16 val)
 static int lan9303_mdio_write(void *ctx, uint32_t reg, uint32_t val)
 {
 	struct lan9303_mdio *sw_dev = (struct lan9303_mdio *)ctx;
+	reg <<= 2; /* reg num to offset */
 
 	mutex_lock(&sw_dev->device->bus->mdio_lock);
 	lan9303_mdio_real_write(sw_dev->device, reg, val & 0xffff);
@@ -56,6 +57,7 @@ static u16 lan9303_mdio_real_read(struct mdio_device *mdio, int reg)
 static int lan9303_mdio_read(void *ctx, uint32_t reg, uint32_t *val)
 {
 	struct lan9303_mdio *sw_dev = (struct lan9303_mdio *)ctx;
+	reg <<= 2; /* reg num to offset */
 
 	mutex_lock(&sw_dev->device->bus->mdio_lock);
 	*val = lan9303_mdio_real_read(sw_dev->device, reg);
@@ -64,6 +66,36 @@ static int lan9303_mdio_read(void *ctx, uint32_t reg, uint32_t *val)
 
 	return 0;
 }
+
+int lan9303_mdio_phy_write(struct lan9303 *chip, int phy, int regnum, u16 val)
+{
+	struct lan9303_mdio *sw_dev = dev_get_drvdata(chip->dev);
+	struct mdio_device *mdio = sw_dev->device;
+
+	mutex_lock(&mdio->bus->mdio_lock);
+	mdio->bus->write(mdio->bus, phy, regnum, val);
+	mutex_unlock(&mdio->bus->mdio_lock);
+
+	return 0;
+}
+
+int lan9303_mdio_phy_read(struct lan9303 *chip, int phy,  int reg)
+{
+	struct lan9303_mdio *sw_dev = dev_get_drvdata(chip->dev);
+	struct mdio_device *mdio = sw_dev->device;
+	int val;
+
+	mutex_lock(&mdio->bus->mdio_lock);
+	val  =  mdio->bus->read(mdio->bus, phy, reg);
+	mutex_unlock(&mdio->bus->mdio_lock);
+
+	return val;
+}
+
+static const struct lan9303_phy_ops lan9303_mdio_phy_ops = {
+	.phy_read = lan9303_mdio_phy_read,
+	.phy_write = lan9303_mdio_phy_write,
+};
 
 static const struct regmap_config lan9303_mdio_regmap_config = {
 	.reg_bits = 8,
@@ -105,6 +137,8 @@ static int lan9303_mdio_probe(struct mdio_device *mdiodev)
 	sw_dev->device = mdiodev;
 	dev_set_drvdata(&mdiodev->dev, sw_dev);
 	sw_dev->chip.dev = &mdiodev->dev;
+
+	sw_dev->chip.ops = &lan9303_mdio_phy_ops;
 
 	ret = lan9303_probe(&sw_dev->chip, mdiodev->dev.of_node);
 	if (ret != 0)
