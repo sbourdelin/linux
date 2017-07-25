@@ -960,6 +960,7 @@ static void gen8_ppgtt_insert_huge_entries(struct i915_vma *vma,
 		struct i915_page_table *pt = pd->page_table[idx.pde];
 		dma_addr_t rem = iter->max - iter->dma;
 		unsigned int page_size;
+		bool maybe_64K = false;
 		gen8_pte_t encode = pte_encode;
 		gen8_pte_t *vaddr;
 		u16 index, max;
@@ -985,9 +986,17 @@ static void gen8_ppgtt_insert_huge_entries(struct i915_vma *vma,
 			index = idx.pte;
 			max = GEN8_PTES;
 			page_size = I915_GTT_PAGE_SIZE;
+
+			if (vma->page_sizes.sg & I915_GTT_PAGE_SIZE_64K && !idx.pte)
+				maybe_64K = true;
 		}
 
 		do {
+			if (maybe_64K && (index % 16 == 0) &&
+			    (!IS_ALIGNED(iter->dma, I915_GTT_PAGE_SIZE_64K) ||
+			     rem < I915_GTT_PAGE_SIZE_64K))
+				maybe_64K = false;
+
 			GEM_BUG_ON(iter->sg->length < page_size);
 			vaddr[index++] = encode | iter->dma;
 
@@ -1009,6 +1018,23 @@ static void gen8_ppgtt_insert_huge_entries(struct i915_vma *vma,
 		} while (rem >= page_size && index < max);
 
 		kunmap_atomic(vaddr);
+
+
+		/* Is it safe to mark the 2M block as 64K? -- Either we have
+		 * filled whole page-table with 64K entries, or filled part of
+		 * it and have reached the end of the sg table and we have
+		 * enough padding.
+		 */
+		if (maybe_64K) {
+			if (index == max ||
+			    (!iter->sg && IS_ALIGNED(vma->node.start +
+						     vma->node.size,
+						     I915_GTT_PAGE_SIZE_2M))) {
+				vaddr = kmap_atomic_px(pd);
+				vaddr[idx.pde] |= GEN8_PDE_IPS_64K;
+				kunmap_atomic(vaddr);
+			}
+		}
 
 	} while (iter->sg);
 }
