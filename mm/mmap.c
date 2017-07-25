@@ -2993,6 +2993,11 @@ void exit_mmap(struct mm_struct *mm)
 	/* Use -1 here to ensure all VMAs in the mm are unmapped */
 	unmap_vmas(&tlb, vma, 0, -1);
 
+	if (test_and_set_bit(MMF_OOM_SKIP, &mm->flags)) {
+		/* wait the OOM reaper to stop working on this mm */
+		down_write(&mm->mmap_sem);
+		up_write(&mm->mmap_sem);
+	}
 	free_pgtables(&tlb, vma, FIRST_USER_ADDRESS, USER_PGTABLES_CEILING);
 	tlb_finish_mmu(&tlb, 0, -1);
 

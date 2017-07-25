@@ -471,6 +471,7 @@ static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
 	struct mmu_gather tlb;
 	struct vm_area_struct *vma;
 	bool ret = true;
+	bool mmgot = true;
 
 	/*
 	 * We have to make sure to not race with the victim exit path
@@ -500,9 +501,16 @@ static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
 	 * and delayed __mmput doesn't matter that much
 	 */
 	if (!mmget_not_zero(mm)) {
-		up_read(&mm->mmap_sem);
 		trace_skip_task_reaping(tsk->pid);
-		goto unlock_oom;
+		/*
+		 * MMF_OOM_SKIP is set by exit_mmap when the OOM
+		 * reaper can't work on the mm anymore.
+		 */
+		if (test_and_set_bit(MMF_OOM_SKIP, &mm->flags)) {
+			up_read(&mm->mmap_sem);
+			goto unlock_oom;
+		}
+		mmgot = false;
 	}
 
 	trace_start_task_reaping(tsk->pid);
@@ -547,7 +555,8 @@ static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
 	 * different context because we shouldn't risk we get stuck there and
 	 * put the oom_reaper out of the way.
 	 */
-	mmput_async(mm);
+	if (mmgot)
+		mmput_async(mm);
 	trace_finish_task_reaping(tsk->pid);
 unlock_oom:
 	mutex_unlock(&oom_lock);
