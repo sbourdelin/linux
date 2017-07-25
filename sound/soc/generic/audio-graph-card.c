@@ -223,10 +223,16 @@ static int asoc_graph_card_parse_of(struct graph_card_data *priv)
 	 */
 
 	of_for_each_phandle(&it, rc, node, "dais", NULL, 0) {
+		/*
+		 * asoc_graph_card_dai_link_of() will call
+		 * of_node_put(). So, call of_node_get() here
+		 */
+		of_node_get(it.node);
 		ret = asoc_graph_card_dai_link_of(it.node, priv, idx++);
-		of_node_put(it.node);
-		if (ret < 0)
+		if (ret < 0) {
+			of_node_put(it.node);
 			return ret;
+		}
 	}
 
 	return asoc_simple_card_parse_card_name(card, NULL);
@@ -239,10 +245,8 @@ static int asoc_graph_get_dais_count(struct device *dev)
 	int count = 0;
 	int rc;
 
-	of_for_each_phandle(&it, rc, node, "dais", NULL, 0) {
+	of_for_each_phandle(&it, rc, node, "dais", NULL, 0)
 		count++;
-		of_node_put(it.node);
-	}
 
 	return count;
 }

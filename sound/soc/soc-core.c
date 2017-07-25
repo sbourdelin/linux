@@ -4062,6 +4062,11 @@ int snd_soc_get_dai_id(struct device_node *ep)
 	struct device_node *node;
 	int ret;
 
+	/*
+	 * of_graph_get_port_parent() will call
+	 * of_node_put(). So, call of_node_get() here
+	 */
+	of_node_get(ep);
 	node = of_graph_get_port_parent(ep);
 
 	/*

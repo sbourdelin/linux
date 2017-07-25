@@ -250,6 +250,11 @@ static int asoc_simple_card_get_dai_id(struct device_node *ep)
 	if (ret != -ENOTSUPP)
 		return ret;
 
+	/*
+	 * of_graph_get_port_parent() will call
+	 * of_node_put(). So, call of_node_get() here
+	 */
+	of_node_get(ep);
 	node = of_graph_get_port_parent(ep);
 
 	/*
