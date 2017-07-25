@@ -5088,6 +5088,34 @@ void cmdline(int argc, char **argv)
 	}
 }
 
+int has_hypervisor(void)
+{
+	FILE *cpuinfo;
+	char *flags, *hypervisor;
+	char *buffer;
+
+	/* On VMs /proc/cpuinfo contains a "flags" entry for hypervisor */
+	cpuinfo = fopen_or_die("/proc/cpuinfo", "ro");
+
+	buffer = malloc(4096);
+	if (!buffer)
+		err(-ENOMEM, "buffer malloc fail");
+
+	fread(buffer, 1024, 1, cpuinfo);
+
+	flags = strstr(buffer, "flags");
+	rewind(cpuinfo);
+	fseek(cpuinfo, flags - buffer, SEEK_SET);
+	fgets(buffer, 4096, cpuinfo);
+	fclose(cpuinfo);
+
+	hypervisor = strstr(buffer, "hypervisor");
+
+	free(buffer);
+
+	return !!hypervisor;
+}
+
 int main(int argc, char **argv)
 {
 	outf = stderr;
@@ -5096,6 +5124,12 @@ int main(int argc, char **argv)
 
 	if (!quiet)
 		print_version();
+
+	if (has_hypervisor()) {
+		fprintf(outf,
+			"turbostat is not supported on virtual machines.\n");
+		return -ENXIO;
+	}
 
 	probe_sysfs();
 
