@@ -3,8 +3,7 @@
 
 #include <linux/rculist.h>
 
-enum pid_type
-{
+enum pid_type {
 	PIDTYPE_PID,
 	PIDTYPE_PGID,
 	PIDTYPE_SID,
@@ -54,8 +53,7 @@ struct upid {
 	struct hlist_node pid_chain;
 };
 
-struct pid
-{
+struct pid {
 	atomic_t count;
 	unsigned int level;
 	/* lists of tasks that use this pid */
@@ -66,8 +64,7 @@ struct pid
 
 extern struct pid init_struct_pid;
 
-struct pid_link
-{
+struct pid_link {
 	struct hlist_node node;
 	struct pid *pid;
 };
