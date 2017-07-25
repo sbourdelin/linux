@@ -119,9 +119,17 @@ name for each port using port PHYS name.  The udev rule would be:
 SUBSYSTEM=="net", ACTION=="add", ATTR{phys_switch_id}=="<phys_switch_id>", \
 	ATTR{phys_port_name}!="", NAME="swX$attr{phys_port_name}"
 
-Suggested naming convention is "swXpYsZ", where X is the switch name or ID, Y
-is the port name or ID, and Z is the sub-port name or ID.  For example, sw1p1s0
-would be sub-port 0 on port 1 on switch 1.
+Suggested formats of the port name returned by ndo_get_phys_port_name are:
+ - pA     for external ports;
+ - pAsB   for split external ports;
+ - pfC    for PF ports (so called PF representors);
+ - pfCvfD for VF ports (so called VF representors).
+Where A is the port name or ID; B is the sub-port name or ID; C is PCIe
+Physical Function name or ID and D is PCIe Virtual Function name or ID.
+
+Suggested naming convention for switches is "swX", where X is the switch name
+or ID, plus the port name.  For example, sw1p1s0 would be sub-port 0 on port 1
+on switch 1.
 
 Port Features
 ^^^^^^^^^^^^^
