@@ -84,6 +84,7 @@ struct ceph_fs_client {
 
 	unsigned long mount_state;
 	int min_caps;                  /* min caps i added */
+	bool wb_fault;
 
 	struct ceph_mds_client *mdsc;
 
@@ -100,6 +101,7 @@ struct ceph_fs_client {
 	struct dentry *debugfs_bdi;
 	struct dentry *debugfs_mdsc, *debugfs_mdsmap;
 	struct dentry *debugfs_mds_sessions;
+	struct dentry *debugfs_wb_fault;
 #endif
 
 #ifdef CONFIG_CEPH_FSCACHE

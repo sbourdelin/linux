@@ -584,6 +584,10 @@ static int writepage_nounlock(struct page *page, struct writeback_control *wbc)
 				   page_off, len,
 				   truncate_seq, truncate_size,
 				   &inode->i_mtime, &page, 1);
+
+	if (fsc->wb_fault && err >= 0)
+		err = -EIO;
+
 	if (err < 0) {
 		struct writeback_control tmp_wbc;
 		if (!wbc)
@@ -665,6 +669,9 @@ static void writepages_finish(struct ceph_osd_request *req)
 	struct address_space *mapping = inode->i_mapping;
 	struct ceph_fs_client *fsc = ceph_inode_to_client(inode);
 	bool remove_page;
+
+	if (fsc->wb_fault && rc >= 0)
+		rc = -EIO;
 
 	dout("writepages_finish %p rc %d\n", inode, rc);
 	if (rc < 0) {

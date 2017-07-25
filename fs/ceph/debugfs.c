@@ -197,7 +197,6 @@ CEPH_DEFINE_SHOW_FUNC(caps_show)
 CEPH_DEFINE_SHOW_FUNC(dentry_lru_show)
 CEPH_DEFINE_SHOW_FUNC(mds_sessions_show)
 
-
 /*
  * debugfs
  */
@@ -231,6 +230,7 @@ void ceph_fs_debugfs_cleanup(struct ceph_fs_client *fsc)
 	debugfs_remove(fsc->debugfs_caps);
 	debugfs_remove(fsc->debugfs_mdsc);
 	debugfs_remove(fsc->debugfs_dentry_lru);
+	debugfs_remove(fsc->debugfs_wb_fault);
 }
 
 int ceph_fs_debugfs_init(struct ceph_fs_client *fsc)
@@ -296,6 +296,12 @@ int ceph_fs_debugfs_init(struct ceph_fs_client *fsc)
 					fsc,
 					&dentry_lru_show_fops);
 	if (!fsc->debugfs_dentry_lru)
+		goto out;
+
+	fsc->debugfs_wb_fault = debugfs_create_bool("wb_fault",
+					0600, fsc->client->debugfs_dir,
+					&fsc->wb_fault);
+	if (!fsc->debugfs_wb_fault)
 		goto out;
 
 	return 0;
