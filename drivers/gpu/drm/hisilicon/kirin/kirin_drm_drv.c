@@ -121,6 +121,7 @@ static int kirin_drm_kms_init(struct drm_device *dev)
 	/* init kms poll for handling hpd */
 	drm_kms_helper_poll_init(dev);
 
+#ifdef CONFIG_DRM_FBDEV_EMULATION
 	priv->fbdev = drm_fbdev_cma_init(dev, 32,
 					 dev->mode_config.num_connector);
 	if (IS_ERR(priv->fbdev)) {
@@ -128,11 +129,13 @@ static int kirin_drm_kms_init(struct drm_device *dev)
 		ret = PTR_ERR(priv->fbdev);
 		goto err_cleanup_poll;
 	}
-
+#endif
 	return 0;
 
+#ifdef CONFIG_DRM_FBDEV_EMULATION
 err_cleanup_poll:
 	drm_kms_helper_poll_fini(dev);
+#endif
 err_unbind_all:
 	component_unbind_all(dev->dev, dev);
 err_dc_cleanup:
