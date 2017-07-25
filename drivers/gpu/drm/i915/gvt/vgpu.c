@@ -346,7 +346,7 @@ static struct intel_vgpu *__intel_gvt_create_vgpu(struct intel_gvt *gvt,
 	vgpu->gvt = gvt;
 	vgpu->sched_ctl.weight = param->weight;
 	bitmap_zero(vgpu->tlb_handle_pending, I915_NUM_ENGINES);
-
+	INIT_LIST_HEAD(&vgpu->dmabuf_obj_list_head);
 	intel_vgpu_init_cfg_space(vgpu, param->primary);
 
 	ret = intel_vgpu_init_mmio(vgpu);

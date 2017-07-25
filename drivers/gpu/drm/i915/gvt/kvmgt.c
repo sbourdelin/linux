@@ -492,9 +492,22 @@ static int intel_vgpu_register_reg(struct intel_vgpu *vgpu,
 	vgpu->vdev.region[vgpu->vdev.num_regions].flags = flags;
 	vgpu->vdev.region[vgpu->vdev.num_regions].data = data;
 	vgpu->vdev.num_regions++;
-
 	return 0;
 }
+
+static int kvmgt_get_vfio_device(void *p_vgpu)
+{
+	struct intel_vgpu *vgpu = (struct intel_vgpu *)p_vgpu;
+
+	vgpu->vdev.vfio_device = vfio_device_get_from_dev(
+		mdev_dev(vgpu->vdev.mdev));
+	if (!vgpu->vdev.vfio_device) {
+		gvt_vgpu_err("failed to get vfio device\n");
+		return -ENODEV;
+	}
+	return 0;
+}
+
 
 static int kvmgt_set_opregion(void *p_vgpu)
 {
@@ -525,6 +538,14 @@ static int kvmgt_set_opregion(void *p_vgpu)
 		memunmap(base);
 
 	return ret;
+}
+
+static void kvmgt_put_vfio_device(void *vgpu)
+{
+	if (WARN_ON(!((struct intel_vgpu *)vgpu)->vdev.vfio_device))
+		return;
+
+	vfio_device_put(((struct intel_vgpu *)vgpu)->vdev.vfio_device);
 }
 
 static int intel_vgpu_create(struct kobject *kobj, struct mdev_device *mdev)
@@ -1253,6 +1274,22 @@ static long intel_vgpu_ioctl(struct mdev_device *mdev, unsigned int cmd,
 	} else if (cmd == VFIO_DEVICE_RESET) {
 		intel_gvt_ops->vgpu_reset(vgpu);
 		return 0;
+	} else if (cmd == VFIO_DEVICE_QUERY_GFX_PLANE) {
+		struct vfio_device_gfx_plane_info dmabuf;
+		int ret = 0;
+
+		minsz = offsetofend(struct vfio_device_gfx_plane_info, fd);
+		if (copy_from_user(&dmabuf, (void __user *)arg, minsz))
+			return -EFAULT;
+		if (dmabuf.argsz < minsz || dmabuf.flags != 0)
+			return -EINVAL;
+
+		ret = intel_gvt_ops->vgpu_query_plane(vgpu, &dmabuf);
+		if (ret != 0)
+			return ret;
+
+		return copy_to_user((void __user *)arg, &dmabuf, minsz) ?
+								-EFAULT : 0;
 	}
 
 	return 0;
@@ -1475,6 +1512,9 @@ static int kvmgt_guest_init(struct mdev_device *mdev)
 	kvmgt_protect_table_init(info);
 	gvt_cache_init(vgpu);
 
+	mutex_init(&vgpu->dmabuf_list_lock);
+	init_completion(&vgpu->vblank_done);
+
 	info->track_node.track_write = kvmgt_page_track_write;
 	info->track_node.track_flush_slot = kvmgt_page_track_flush_slot;
 	kvm_page_track_register_notifier(kvm, &info->track_node);
@@ -1616,6 +1656,8 @@ struct intel_gvt_mpt kvmgt_mpt = {
 	.write_gpa = kvmgt_write_gpa,
 	.gfn_to_mfn = kvmgt_gfn_to_pfn,
 	.set_opregion = kvmgt_set_opregion,
+	.get_vfio_device = kvmgt_get_vfio_device,
+	.put_vfio_device = kvmgt_put_vfio_device,
 };
 EXPORT_SYMBOL_GPL(kvmgt_mpt);
 
