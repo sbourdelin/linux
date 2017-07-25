@@ -1113,6 +1113,7 @@ static bool intel_sdvo_compute_config(struct intel_encoder *encoder,
 				      struct intel_crtc_state *pipe_config,
 				      struct drm_connector_state *conn_state)
 {
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
 	struct intel_sdvo *intel_sdvo = to_sdvo(encoder);
 	struct intel_sdvo_connector_state *intel_sdvo_state =
 		to_intel_sdvo_connector_state(conn_state);
@@ -1172,6 +1173,12 @@ static bool intel_sdvo_compute_config(struct intel_encoder *encoder,
 		if (pipe_config->has_hdmi_sink &&
 		    intel_sdvo_state->base.broadcast_rgb == INTEL_BROADCAST_RGB_LIMITED)
 			pipe_config->limited_color_range = true;
+	}
+
+	/* gen3 doesn't do the hdmi bits in the SDVO register */
+	if (INTEL_GEN(dev_priv) < 4) {
+		pipe_config->limited_color_range = false;
+		pipe_config->has_audio = false;
 	}
 
 	/* Clock computation needs to happen after pixel multiplier. */
@@ -1479,6 +1486,9 @@ static void intel_sdvo_get_config(struct intel_encoder *encoder,
 
 	if (sdvox & HDMI_COLOR_RANGE_16_235)
 		pipe_config->limited_color_range = true;
+
+	if (sdvox & SDVO_AUDIO_ENABLE)
+		pipe_config->has_audio = true;
 
 	if (intel_sdvo_get_value(intel_sdvo, SDVO_CMD_GET_ENCODE,
 				 &val, 1)) {
