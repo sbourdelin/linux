@@ -677,6 +677,8 @@ struct ufs_hba {
 
 	struct rw_semaphore clk_scaling_lock;
 	struct ufs_desc_size desc_size;
+
+	struct device_attribute ahibern8_attr;
 };
 
 /* Returns true if clocks can be gated. Otherwise false */
