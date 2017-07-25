@@ -42,6 +42,7 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(extlog_mem_event);
 EXPORT_TRACEPOINT_SYMBOL_GPL(mc_event);
 EXPORT_TRACEPOINT_SYMBOL_GPL(non_standard_event);
 EXPORT_TRACEPOINT_SYMBOL_GPL(arm_event);
+EXPORT_TRACEPOINT_SYMBOL_GPL(mce_decode);
 
 static int __init parse_ras_param(char *str)
 {

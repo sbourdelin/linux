@@ -1,6 +1,8 @@
 #include <linux/seq_buf.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/ras.h>
+#include <ras/ras_event.h>
 
 #include <asm/cpu.h>
 
@@ -1053,7 +1055,10 @@ amd_decode_mce(struct notifier_block *nb, unsigned long val, void *data)
  err_code:
 	amd_decode_err_code(m->status & 0xffff);
 
-	pr_emerg("%.*s\n", (int)sb.len, sb.buffer);
+	if (ras_userspace_consumers())
+		trace_mce_decode(sb.buffer);
+	else
+		pr_emerg("%.*s\n", (int)sb.len, sb.buffer);
 
 	seq_buf_clear_buf(&sb);
 

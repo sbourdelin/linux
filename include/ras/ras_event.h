@@ -407,6 +407,22 @@ TRACE_EVENT(memory_failure_event,
 	)
 );
 #endif /* CONFIG_MEMORY_FAILURE */
+
+TRACE_EVENT(mce_decode,
+	TP_PROTO(const char *param_str),
+
+	TP_ARGS(param_str),
+
+	TP_STRUCT__entry(
+		__string(str, param_str)
+	),
+
+	TP_fast_assign(
+		__assign_str(str, param_str);
+	),
+
+	TP_printk("%s", __get_str(str))
+);
 #endif /* _TRACE_HW_EVENT_MC_H */
 
 /* This part must be outside protection */
