@@ -86,14 +86,21 @@ nf_socket_get_sock_v6(struct net *net, struct sk_buff *skb, int doff,
 		      const __be16 sport, const __be16 dport,
 		      const struct net_device *in)
 {
+	struct sk_lookup params = {
+		.saddr.ipv6 = saddr,
+		.daddr.ipv6 = daddr,
+		.sport = sport,
+		.dport = dport,
+		.dif = in->ifindex,
+	};
+
 	switch (protocol) {
 	case IPPROTO_TCP:
 		return inet6_lookup(net, &tcp_hashinfo, skb, doff,
 				    saddr, sport, daddr, dport,
 				    in->ifindex);
 	case IPPROTO_UDP:
-		return udp6_lib_lookup(net, saddr, sport, daddr, dport,
-				       in->ifindex);
+		return udp6_lib_lookup(net, &params);
 	}
 
 	return NULL;

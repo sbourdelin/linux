@@ -188,6 +188,13 @@ nf_tproxy_get_sock_v6(struct net *net, struct sk_buff *skb, int thoff, void *hp,
 		      const struct net_device *in,
 		      const enum nf_tproxy_lookup_t lookup_type)
 {
+	struct sk_lookup params = {
+		.saddr.ipv6 = saddr,
+		.daddr.ipv6 = daddr,
+		.sport = sport,
+		.dport = dport,
+		.dif = in->ifindex,
+	};
 	struct sock *sk;
 	struct tcphdr *tcph;
 
@@ -220,8 +227,7 @@ nf_tproxy_get_sock_v6(struct net *net, struct sk_buff *skb, int thoff, void *hp,
 		}
 		break;
 	case IPPROTO_UDP:
-		sk = udp6_lib_lookup(net, saddr, sport, daddr, dport,
-				     in->ifindex);
+		sk = udp6_lib_lookup(net, &params);
 		if (sk) {
 			int connected = (sk->sk_state == TCP_ESTABLISHED);
 			int wildcard = ipv6_addr_any(&sk->sk_v6_rcv_saddr);

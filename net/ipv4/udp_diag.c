@@ -54,13 +54,17 @@ static int udp_dump_one(struct udp_table *tbl, struct sk_buff *in_skb,
 		sk = __udp4_lib_lookup(net, &params, tbl, NULL);
 	}
 #if IS_ENABLED(CONFIG_IPV6)
-	else if (req->sdiag_family == AF_INET6)
-		sk = __udp6_lib_lookup(net,
-				(struct in6_addr *)req->id.idiag_src,
-				req->id.idiag_sport,
-				(struct in6_addr *)req->id.idiag_dst,
-				req->id.idiag_dport,
-				req->id.idiag_if, tbl, NULL);
+	else if (req->sdiag_family == AF_INET6) {
+		struct sk_lookup params = {
+			.saddr.ipv6 = (struct in6_addr *)req->id.idiag_src,
+			.daddr.ipv6 = (struct in6_addr *)req->id.idiag_dst,
+			.sport = req->id.idiag_sport,
+			.dport = req->id.idiag_dport,
+			.dif   =  req->id.idiag_if,
+		};
+
+		sk = __udp6_lib_lookup(net, &params, tbl, NULL);
+	}
 #endif
 	if (sk && !refcount_inc_not_zero(&sk->sk_refcnt))
 		sk = NULL;
@@ -212,12 +216,15 @@ static int __udp_diag_destroy(struct sk_buff *in_skb,
 
 			sk = __udp4_lib_lookup(net, &params, tbl, NULL);
 		} else {
-			sk = __udp6_lib_lookup(net,
-					(struct in6_addr *)req->id.idiag_dst,
-					req->id.idiag_dport,
-					(struct in6_addr *)req->id.idiag_src,
-					req->id.idiag_sport,
-					req->id.idiag_if, tbl, NULL);
+			struct sk_lookup params = {
+				.saddr.ipv6 = (struct in6_addr *)req->id.idiag_dst,
+				.daddr.ipv6 = (struct in6_addr *)req->id.idiag_src,
+				.sport = req->id.idiag_dport,
+				.dport = req->id.idiag_sport,
+				.dif   =  req->id.idiag_if,
+			};
+
+			sk = __udp6_lib_lookup(net, &params, tbl, NULL);
 		}
 	}
 #endif
