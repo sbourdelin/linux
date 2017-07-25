@@ -22,12 +22,6 @@ __kernel_datapage_offset:
 
 V_FUNCTION_BEGIN(__get_datapage)
   .cfi_startproc
-	/* We don't want that exposed or overridable as we want other objects
-	 * to be able to bl directly to here
-	 */
-	.protected __get_datapage
-	.hidden __get_datapage
-
 	mflr	r0
   .cfi_register lr,r0
 

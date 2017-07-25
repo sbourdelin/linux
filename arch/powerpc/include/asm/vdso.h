@@ -23,6 +23,7 @@ extern unsigned long vdso32_sigtramp;
 extern unsigned long vdso32_rt_sigtramp;
 
 int vdso_getcpu_init(void);
+struct vdso_data *__get_datapage(void);
 
 #else /* __ASSEMBLY__ */
 

@@ -16,6 +16,8 @@
 #include <asm/asm-offsets.h>
 #include <asm/unistd.h>
 
+.global	kernel_clock_gettime
+
 	.text
 /*
  * Exact prototype of gettimeofday
@@ -60,71 +62,23 @@ V_FUNCTION_END(__kernel_gettimeofday)
  */
 V_FUNCTION_BEGIN(__kernel_clock_gettime)
   .cfi_startproc
-	/* Check for supported clock IDs */
-	cmpwi	cr0,r3,CLOCK_REALTIME
-	cmpwi	cr1,r3,CLOCK_MONOTONIC
-	cror	cr0*4+eq,cr0*4+eq,cr1*4+eq
-	bne	cr0,99f
-
-	mflr	r12			/* r12 saves lr */
-  .cfi_register lr,r12
-	mr	r11,r4			/* r11 saves tp */
-	bl	V_LOCAL_FUNC(__get_datapage)	/* get data page */
-	lis	r7,NSEC_PER_SEC@h	/* want nanoseconds */
-	ori	r7,r7,NSEC_PER_SEC@l
-50:	bl	V_LOCAL_FUNC(__do_get_tspec)	/* get time from tb & kernel */
-	bne	cr1,80f			/* if not monotonic, all done */
-
-	/*
-	 * CLOCK_MONOTONIC
-	 */
-
-	/* now we must fixup using wall to monotonic. We need to snapshot
-	 * that value and do the counter trick again. Fortunately, we still
-	 * have the counter value in r8 that was returned by __do_get_tspec.
-	 * At this point, r4,r5 contain our sec/nsec values.
-	 */
-
-	lwa	r6,WTOM_CLOCK_SEC(r3)
-	lwa	r9,WTOM_CLOCK_NSEC(r3)
-
-	/* We now have our result in r6,r9. We create a fake dependency
-	 * on that result and re-check the counter
-	 */
-	or	r0,r6,r9
-	xor	r0,r0,r0
-	add	r3,r3,r0
-	ld	r0,CFG_TB_UPDATE_COUNT(r3)
-        cmpld   cr0,r0,r8		/* check if updated */
-	bne-	50b
-
-	/* Add wall->monotonic offset and check for overflow or underflow.
-	 */
-	add	r4,r4,r6
-	add	r5,r5,r9
-	cmpd	cr0,r5,r7
-	cmpdi	cr1,r5,0
-	blt	1f
-	subf	r5,r7,r5
-	addi	r4,r4,1
-1:	bge	cr1,80f
-	addi	r4,r4,-1
-	add	r5,r5,r7
-
-80:	std	r4,TSPC64_TV_SEC(r11)
-	std	r5,TSPC64_TV_NSEC(r11)
-
-	mtlr	r12
+	mflr	r6			/* r12 saves lr */
+	stwu	r1,-112(r1)
+  .cfi_register lr,r6
+	std	r6,24(r1)
+	std	r3,32(r1)
+	std	r4,40(r1)
 	crclr	cr0*4+so
-	li	r3,0
-	blr
-
-	/*
-	 * syscall fallback
-	 */
-99:
+	bl	V_LOCAL_FUNC(kernel_clock_gettime)
+	cmpwi	r3,0
+	beq	77f
 	li	r0,__NR_clock_gettime
+	ld	r3,32(r1)
+	ld	r4,40(r1)
 	sc
+77:	ld	r6,24(r1)
+	addi	r1,r1,112
+	mtlr	r6
 	blr
   .cfi_endproc
 V_FUNCTION_END(__kernel_clock_gettime)
