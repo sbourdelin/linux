@@ -297,6 +297,28 @@ static int nearby_node(int apicid)
 #endif
 
 /*
+ * Only fixup cpu_core_id for pre-family17h systems to be in the
+ * [0 .. cores_per_node - 1] range. This is not really needed,
+ * but mainly kept so that we do not break any existing code,
+ * which may make this assumption on older platforms.
+ *
+ * For family17h and later, this logic is not applicable as cpu_core_id
+ * is the CoreId from CPUID_Fn8000001E_EBX, which is non-contiguous for
+ * downcore system configuration. This could break the logic and result
+ * in invalid cpu_core_id.
+ */
+static void __fixup_multi_node(struct cpuinfo_x86 *c)
+{
+	u32 cus_per_node;
+
+	if (c->x86 >= 0x17)
+		return;
+
+	cus_per_node = c->x86_max_cores / nodes_per_socket;
+	c->cpu_core_id %= cus_per_node;
+}
+
+/*
  * Fixup core topology information for
  * (1) AMD multi-node processors
  *     Assumption: Number of cores in each internal node is the same.
@@ -353,15 +375,10 @@ static void amd_get_topology(struct cpuinfo_x86 *c)
 	} else
 		return;
 
-	/* fixup multi-node processor information */
 	if (nodes_per_socket > 1) {
-		u32 cus_per_node;
-
 		set_cpu_cap(c, X86_FEATURE_AMD_DCM);
-		cus_per_node = c->x86_max_cores / nodes_per_socket;
 
-		/* core id has to be in the [0 .. cores_per_node - 1] range */
-		c->cpu_core_id %= cus_per_node;
+		__fixup_multi_node(c);
 	}
 }
 #endif
