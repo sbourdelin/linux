@@ -323,7 +323,8 @@ static int cvm_oct_poll(struct oct_rx_group *rx_group, int budget)
 						segment_size = len;
 					/* Copy the data into the packet */
 					skb_put_data(skb,
-						     cvmx_phys_to_ptr(segment_ptr.s.addr),
+						     cvmx_phys_to_ptr(
+						     segment_ptr.s.addr),
 						     segment_size);
 					len -= segment_size;
 					segment_ptr = next_ptr;
