@@ -155,8 +155,8 @@ static inline bool kvm_check_has_quirk(struct kvm *kvm, u64 quirk)
 	return !(kvm->arch.disabled_quirks & quirk);
 }
 
-void kvm_before_handle_nmi(struct kvm_vcpu *vcpu);
-void kvm_after_handle_nmi(struct kvm_vcpu *vcpu);
+void kvm_before_interrupt(struct kvm_vcpu *vcpu);
+void kvm_after_interrupt(struct kvm_vcpu *vcpu);
 void kvm_set_pending_timer(struct kvm_vcpu *vcpu);
 int kvm_inject_realmode_interrupt(struct kvm_vcpu *vcpu, int irq, int inc_eip);
 

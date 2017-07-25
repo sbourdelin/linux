@@ -5975,17 +5975,17 @@ static struct perf_guest_info_callbacks kvm_guest_cbs = {
 	.get_guest_ip		= kvm_get_guest_ip,
 };
 
-void kvm_before_handle_nmi(struct kvm_vcpu *vcpu)
+void kvm_before_interrupt(struct kvm_vcpu *vcpu)
 {
 	__this_cpu_write(current_vcpu, vcpu);
 }
-EXPORT_SYMBOL_GPL(kvm_before_handle_nmi);
+EXPORT_SYMBOL_GPL(kvm_before_interrupt);
 
-void kvm_after_handle_nmi(struct kvm_vcpu *vcpu)
+void kvm_after_interrupt(struct kvm_vcpu *vcpu)
 {
 	__this_cpu_write(current_vcpu, NULL);
 }
-EXPORT_SYMBOL_GPL(kvm_after_handle_nmi);
+EXPORT_SYMBOL_GPL(kvm_after_interrupt);
 
 static void kvm_set_mmio_spte_mask(void)
 {

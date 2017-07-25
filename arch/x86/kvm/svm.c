@@ -4872,14 +4872,14 @@ static void svm_vcpu_run(struct kvm_vcpu *vcpu)
 	vcpu->arch.regs[VCPU_REGS_RIP] = svm->vmcb->save.rip;
 
 	if (unlikely(svm->vmcb->control.exit_code == SVM_EXIT_NMI))
-		kvm_before_handle_nmi(&svm->vcpu);
+		kvm_before_interrupt(&svm->vcpu);
 
 	stgi();
 
 	/* Any pending NMI will happen here */
 
 	if (unlikely(svm->vmcb->control.exit_code == SVM_EXIT_NMI))
-		kvm_after_handle_nmi(&svm->vcpu);
+		kvm_after_interrupt(&svm->vcpu);
 
 	sync_cr8_to_lapic(vcpu);
 
@@ -5234,6 +5234,7 @@ out:
 
 static void svm_handle_external_intr(struct kvm_vcpu *vcpu)
 {
+	kvm_before_interrupt(vcpu);
 	local_irq_enable();
 	/*
 	 * We must have an instruction with interrupts enabled, so
@@ -5241,6 +5242,7 @@ static void svm_handle_external_intr(struct kvm_vcpu *vcpu)
 	 */
 	asm("nop");
 	local_irq_disable();
+	kvm_after_interrupt(vcpu);
 }
 
 static void svm_sched_in(struct kvm_vcpu *vcpu, int cpu)
