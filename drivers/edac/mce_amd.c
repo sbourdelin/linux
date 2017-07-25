@@ -461,7 +461,7 @@ static void decode_mc0_mce(struct mce *m)
 	u16 ec = EC(m->status);
 	u8 xec = XEC(m->status, xec_mask);
 
-	seq_buf_printf(&sb, HW_ERR "MC0 Error: ");
+	seq_buf_printf(&sb, "MC0 Error: ");
 
 	/* TLB error signatures are the same across families */
 	if (TLB_ERROR(ec)) {
@@ -571,7 +571,7 @@ static void decode_mc1_mce(struct mce *m)
 	u16 ec = EC(m->status);
 	u8 xec = XEC(m->status, xec_mask);
 
-	seq_buf_printf(&sb, HW_ERR "MC1 Error: ");
+	seq_buf_printf(&sb, "MC1 Error: ");
 
 	if (TLB_ERROR(ec))
 		seq_buf_printf(&sb, "%s TLB %s.\n", LL_MSG(ec),
@@ -717,7 +717,7 @@ static void decode_mc2_mce(struct mce *m)
 	u16 ec = EC(m->status);
 	u8 xec = XEC(m->status, xec_mask);
 
-	seq_buf_printf(&sb, HW_ERR "MC2 Error: ");
+	seq_buf_printf(&sb, "MC2 Error: ");
 
 	if (!fam_ops->mc2_mce(ec, xec))
 		pr_emerg(HW_ERR "Corrupted MC2 MCE info?\n");
@@ -734,7 +734,7 @@ static void decode_mc3_mce(struct mce *m)
 		return;
 	}
 
-	seq_buf_printf(&sb, HW_ERR "MC3 Error");
+	seq_buf_printf(&sb, "MC3 Error");
 
 	if (xec == 0x0) {
 		u8 r4 = R4(ec);
@@ -760,7 +760,7 @@ static void decode_mc4_mce(struct mce *m)
 	u8 xec = XEC(m->status, 0x1f);
 	u8 offset = 0;
 
-	seq_buf_printf(&sb, HW_ERR "MC4 Error (node %d): ", node_id);
+	seq_buf_printf(&sb, "MC4 Error (node %d): ", node_id);
 
 	switch (xec) {
 	case 0x0 ... 0xe:
@@ -819,7 +819,7 @@ static void decode_mc5_mce(struct mce *m)
 	if (fam == 0xf || fam == 0x11)
 		goto wrong_mc5_mce;
 
-	seq_buf_printf(&sb, HW_ERR "MC5 Error: ");
+	seq_buf_printf(&sb, "MC5 Error: ");
 
 	if (INT_ERROR(ec)) {
 		if (xec <= 0x1f) {
@@ -846,7 +846,7 @@ static void decode_mc6_mce(struct mce *m)
 {
 	u8 xec = XEC(m->status, xec_mask);
 
-	seq_buf_printf(&sb, HW_ERR "MC6 Error: ");
+	seq_buf_printf(&sb, "MC6 Error: ");
 
 	if (xec > 0x5)
 		goto wrong_mc6_mce;
@@ -879,12 +879,12 @@ static void decode_smca_error(struct mce *m)
 	bank_type = hwid->bank_type;
 	ip_name = smca_get_long_name(bank_type);
 
-	seq_buf_printf(&sb, HW_ERR "%s Extended Error Code: %d\n", ip_name, xec);
+	seq_buf_printf(&sb, "%s Extended Error Code: %d\n", ip_name, xec);
 
 	/* Only print the decode of valid error codes */
 	if (xec < smca_mce_descs[bank_type].num_descs &&
 			(hwid->xec_bitmap & BIT_ULL(xec))) {
-		seq_buf_printf(&sb, HW_ERR "%s Error: ", ip_name);
+		seq_buf_printf(&sb, "%s Error: ", ip_name);
 		seq_buf_printf(&sb, "%s.\n", smca_mce_descs[bank_type].descs[xec]);
 	}
 
@@ -895,11 +895,11 @@ static void decode_smca_error(struct mce *m)
 static inline void amd_decode_err_code(u16 ec)
 {
 	if (INT_ERROR(ec)) {
-		seq_buf_printf(&sb, HW_ERR "internal: %s\n", UU_MSG(ec));
+		seq_buf_printf(&sb, "internal: %s\n", UU_MSG(ec));
 		return;
 	}
 
-	seq_buf_printf(&sb, HW_ERR "cache level: %s", LL_MSG(ec));
+	seq_buf_printf(&sb, "cache level: %s", LL_MSG(ec));
 
 	if (BUS_ERROR(ec))
 		seq_buf_printf(&sb, ", mem/io: %s", II_MSG(ec));
@@ -912,8 +912,6 @@ static inline void amd_decode_err_code(u16 ec)
 		if (BUS_ERROR(ec))
 			seq_buf_printf(&sb, ", part-proc: %s (%s)", PP_MSG(ec), TO_MSG(ec));
 	}
-
-	seq_buf_printf(&sb, "\n");
 }
 
 /*
@@ -946,18 +944,10 @@ static const char *decode_error_status(struct mce *m)
 	return "Corrected error, no action required.";
 }
 
-static int
-amd_decode_mce(struct notifier_block *nb, unsigned long val, void *data)
+static void __decode_mce(struct mce *m)
 {
-	struct mce *m = (struct mce *)data;
 	unsigned int fam = x86_family(m->cpuid);
 	int ecc;
-
-	if (amd_filter_mce(m))
-		return NOTIFY_STOP;
-
-	/* \0 terminated */
-	seq_buf_init(&sb, __err_buf, BUF_LEN);
 
 	pr_emerg(HW_ERR "%s\n", decode_error_status(m));
 
@@ -999,7 +989,12 @@ amd_decode_mce(struct notifier_block *nb, unsigned long val, void *data)
 	pr_cont("]: 0x%016llx\n", m->status);
 
 	if (m->status & MCI_STATUS_ADDRV)
-		pr_emerg(HW_ERR "Error Addr: 0x%016llx\n", m->addr);
+		pr_emerg(HW_ERR "Error Addr: 0x%016llx ", m->addr);
+
+	if (m->tsc)
+		pr_cont(HW_ERR "TSC: %llu", m->tsc);
+
+	pr_cont("\n");
 
 	if (boot_cpu_has(X86_FEATURE_SMCA)) {
 		pr_emerg(HW_ERR "IPID: 0x%016llx", m->ipid);
@@ -1008,16 +1003,14 @@ amd_decode_mce(struct notifier_block *nb, unsigned long val, void *data)
 			pr_cont(", Syndrome: 0x%016llx", m->synd);
 
 		pr_cont("\n");
-
-		decode_smca_error(m);
-		goto err_code;
 	}
 
-	if (m->tsc)
-		pr_emerg(HW_ERR "TSC: %llu\n", m->tsc);
+}
 
+static void decode_legacy_error(struct mce *m)
+{
 	if (!fam_ops)
-		goto err_code;
+		return;
 
 	switch (m->bank) {
 	case 0:
@@ -1051,14 +1044,40 @@ amd_decode_mce(struct notifier_block *nb, unsigned long val, void *data)
 	default:
 		break;
 	}
+}
 
- err_code:
+static int
+amd_decode_mce(struct notifier_block *nb, unsigned long val, void *data)
+{
+	struct mce *m = (struct mce *)data;
+
+	if (amd_filter_mce(m))
+		return NOTIFY_STOP;
+
+	if (!ras_userspace_consumers())
+		__decode_mce(m);
+
+	/* \0 terminated */
+	seq_buf_init(&sb, __err_buf, BUF_LEN);
+
+	if (boot_cpu_has(X86_FEATURE_SMCA))
+		decode_smca_error(m);
+	else
+		decode_legacy_error(m);
+
 	amd_decode_err_code(m->status & 0xffff);
 
-	if (ras_userspace_consumers())
+	if (ras_userspace_consumers()) {
 		trace_mce_decode(sb.buffer);
-	else
-		pr_emerg("%.*s\n", (int)sb.len, sb.buffer);
+	} else {
+		char *l;
+
+		while ((l = strsep(&sb.buffer, "\n")))
+			pr_emerg(HW_ERR "%s\n", l);
+
+		/* Restore original address because strsep() mangles it. */
+		sb.buffer = __err_buf;
+	}
 
 	seq_buf_clear_buf(&sb);
 
