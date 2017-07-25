@@ -20,6 +20,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../kselftest.h"
+
 static char longpath[2 * PATH_MAX] = "";
 static char *envp[] = { "IN_TEST=yes", NULL, NULL };
 static char *argv[] = { "execveat", "99", NULL };
@@ -41,23 +43,26 @@ static int _check_execveat_fail(int fd, const char *path, int flags,
 				int expected_errno, const char *errno_str)
 {
 	int rc;
+	char msg[512];
+	snprintf(msg, 512, "Check failure of execveat(%d, '%s', %d) with %s...\n",
+			fd, path?:"(null)", flags, errno_str);
 
 	errno = 0;
-	printf("Check failure of execveat(%d, '%s', %d) with %s... ",
-		fd, path?:"(null)", flags, errno_str);
 	rc = execveat_(fd, path, argv, envp, flags);
 
 	if (rc > 0) {
-		printf("[FAIL] (unexpected success from execveat(2))\n");
+		ksft_test_result_fail(msg);
+		ksft_print_msg("unexpected success from execveat(2)\n");
 		return 1;
 	}
 	if (errno != expected_errno) {
-		printf("[FAIL] (expected errno %d (%s) not %d (%s)\n",
+		ksft_test_result_fail(msg);
+		ksft_print_msg("expected errno %d (%s) not %d (%s)\n",
 			expected_errno, strerror(expected_errno),
 			errno, strerror(errno));
 		return 1;
 	}
-	printf("[OK]\n");
+	ksft_test_result_pass(msg);
 	return 0;
 }
 
@@ -68,43 +73,48 @@ static int check_execveat_invoked_rc(int fd, const char *path, int flags,
 	int rc;
 	pid_t child;
 	int pathlen = path ? strlen(path) : 0;
+	char msg[512];
 
 	if (pathlen > 40)
-		printf("Check success of execveat(%d, '%.20s...%s', %d)... ",
+		snprintf(msg, 512, "Check success of execveat(%d, '%.20s...%s', %d)...\n",
 			fd, path, (path + pathlen - 20), flags);
 	else
-		printf("Check success of execveat(%d, '%s', %d)... ",
+		snprintf(msg, 512, "Check success of execveat(%d, '%s', %d)...\n",
 			fd, path?:"(null)", flags);
 	child = fork();
 	if (child < 0) {
-		printf("[FAIL] (fork() failed)\n");
+		ksft_test_result_fail(msg);
+		ksft_print_msg("fork() failed\n");
 		return 1;
 	}
 	if (child == 0) {
 		/* Child: do execveat(). */
 		rc = execveat_(fd, path, argv, envp, flags);
-		printf("[FAIL]: execveat() failed, rc=%d errno=%d (%s)\n",
+		ksft_exit_fail_msg("execveat() failed, rc=%d errno=%d (%s)\n",
 			rc, errno, strerror(errno));
 		exit(1);  /* should not reach here */
 	}
 	/* Parent: wait for & check child's exit status. */
 	rc = waitpid(child, &status, 0);
 	if (rc != child) {
-		printf("[FAIL] (waitpid(%d,...) returned %d)\n", child, rc);
+		ksft_test_result_fail(msg);
+		ksft_print_msg("waitpid(%d,...) returned %d\n", child, rc);
 		return 1;
 	}
 	if (!WIFEXITED(status)) {
-		printf("[FAIL] (child %d did not exit cleanly, status=%08x)\n",
+		ksft_test_result_fail(msg);
+		ksft_print_msg("child %d did not exit cleanly, status=%08x\n",
 			child, status);
 		return 1;
 	}
 	if ((WEXITSTATUS(status) != expected_rc) &&
 	    (WEXITSTATUS(status) != expected_rc2)) {
-		printf("[FAIL] (child %d exited with %d not %d nor %d)\n",
+		ksft_test_result_fail(msg);
+		ksft_print_msg("child %d exited with %d not %d nor %d\n",
 			child, WEXITSTATUS(status), expected_rc, expected_rc2);
 		return 1;
 	}
-	printf("[OK]\n");
+	ksft_test_result_pass(msg);
 	return 0;
 }
 
@@ -127,7 +137,7 @@ static int open_or_die(const char *filename, int flags)
 	int fd = open(filename, flags);
 
 	if (fd < 0) {
-		printf("Failed to open '%s'; "
+		ksft_exit_fail_msg("Failed to open '%s'; "
 			"check prerequisites are available\n", filename);
 		exit(1);
 	}
@@ -180,11 +190,11 @@ static int check_execveat_pathmax(int dot_dfd, const char *src, int is_script)
 	 */
 	fd = open(longpath, O_RDONLY);
 	if (fd > 0) {
-		printf("Invoke copy of '%s' via filename of length %zu:\n",
+		ksft_print_msg("Invoke copy of '%s' via filename of length %zu:\n",
 			src, strlen(longpath));
 		fail += check_execveat(fd, "", AT_EMPTY_PATH);
 	} else {
-		printf("Failed to open length %zu filename, errno=%d (%s)\n",
+		ksft_print_msg("Failed to open length %zu filename, errno=%d (%s)\n",
 			strlen(longpath), errno, strerror(errno));
 		fail++;
 	}
@@ -210,6 +220,8 @@ static int check_execveat_pathmax(int dot_dfd, const char *src, int is_script)
 
 static int run_tests(void)
 {
+	ksft_print_header();
+
 	int fail = 0;
 	char *fullname = realpath("execveat", NULL);
 	char *fullname_script = realpath("script", NULL);
@@ -238,7 +250,7 @@ static int run_tests(void)
 	errno = 0;
 	execveat_(-1, NULL, NULL, NULL, 0);
 	if (errno == ENOSYS) {
-		printf("[FAIL] ENOSYS calling execveat - no kernel support?\n");
+		ksft_print_msg("[FAIL] ENOSYS calling execveat - no kernel support?\n");
 		return 1;
 	}
 
@@ -247,115 +259,115 @@ static int run_tests(void)
 
 	/* Normal executable file: */
 	/*   dfd + path */
-	fail += check_execveat(subdir_dfd, "../execveat", 0);
-	fail += check_execveat(dot_dfd, "execveat", 0);
-	fail += check_execveat(dot_dfd_path, "execveat", 0);
+	check_execveat(subdir_dfd, "../execveat", 0);
+	check_execveat(dot_dfd, "execveat", 0);
+	check_execveat(dot_dfd_path, "execveat", 0);
 	/*   absolute path */
-	fail += check_execveat(AT_FDCWD, fullname, 0);
+	check_execveat(AT_FDCWD, fullname, 0);
 	/*   absolute path with nonsense dfd */
-	fail += check_execveat(99, fullname, 0);
+	check_execveat(99, fullname, 0);
 	/*   fd + no path */
-	fail += check_execveat(fd, "", AT_EMPTY_PATH);
+	check_execveat(fd, "", AT_EMPTY_PATH);
 	/*   O_CLOEXEC fd + no path */
-	fail += check_execveat(fd_cloexec, "", AT_EMPTY_PATH);
+	check_execveat(fd_cloexec, "", AT_EMPTY_PATH);
 	/*   O_PATH fd */
-	fail += check_execveat(fd_path, "", AT_EMPTY_PATH);
+	check_execveat(fd_path, "", AT_EMPTY_PATH);
 
 	/* Mess with executable file that's already open: */
 	/*   fd + no path to a file that's been renamed */
 	rename("execveat.ephemeral", "execveat.moved");
-	fail += check_execveat(fd_ephemeral, "", AT_EMPTY_PATH);
+	check_execveat(fd_ephemeral, "", AT_EMPTY_PATH);
 	/*   fd + no path to a file that's been deleted */
 	unlink("execveat.moved"); /* remove the file now fd open */
-	fail += check_execveat(fd_ephemeral, "", AT_EMPTY_PATH);
+	check_execveat(fd_ephemeral, "", AT_EMPTY_PATH);
 
 	/* Mess with executable file that's already open with O_PATH */
 	/*   fd + no path to a file that's been deleted */
 	unlink("execveat.path.ephemeral");
-	fail += check_execveat(fd_ephemeral_path, "", AT_EMPTY_PATH);
+	check_execveat(fd_ephemeral_path, "", AT_EMPTY_PATH);
 
 	/* Invalid argument failures */
-	fail += check_execveat_fail(fd, "", 0, ENOENT);
-	fail += check_execveat_fail(fd, NULL, AT_EMPTY_PATH, EFAULT);
+	check_execveat_fail(fd, "", 0, ENOENT);
+	check_execveat_fail(fd, NULL, AT_EMPTY_PATH, EFAULT);
 
 	/* Symlink to executable file: */
 	/*   dfd + path */
-	fail += check_execveat(dot_dfd, "execveat.symlink", 0);
-	fail += check_execveat(dot_dfd_path, "execveat.symlink", 0);
+	check_execveat(dot_dfd, "execveat.symlink", 0);
+	check_execveat(dot_dfd_path, "execveat.symlink", 0);
 	/*   absolute path */
-	fail += check_execveat(AT_FDCWD, fullname_symlink, 0);
+	check_execveat(AT_FDCWD, fullname_symlink, 0);
 	/*   fd + no path, even with AT_SYMLINK_NOFOLLOW (already followed) */
-	fail += check_execveat(fd_symlink, "", AT_EMPTY_PATH);
-	fail += check_execveat(fd_symlink, "",
+	check_execveat(fd_symlink, "", AT_EMPTY_PATH);
+	check_execveat(fd_symlink, "",
 			       AT_EMPTY_PATH|AT_SYMLINK_NOFOLLOW);
 
 	/* Symlink fails when AT_SYMLINK_NOFOLLOW set: */
 	/*   dfd + path */
-	fail += check_execveat_fail(dot_dfd, "execveat.symlink",
+	check_execveat_fail(dot_dfd, "execveat.symlink",
 				    AT_SYMLINK_NOFOLLOW, ELOOP);
-	fail += check_execveat_fail(dot_dfd_path, "execveat.symlink",
+	check_execveat_fail(dot_dfd_path, "execveat.symlink",
 				    AT_SYMLINK_NOFOLLOW, ELOOP);
 	/*   absolute path */
-	fail += check_execveat_fail(AT_FDCWD, fullname_symlink,
+	check_execveat_fail(AT_FDCWD, fullname_symlink,
 				    AT_SYMLINK_NOFOLLOW, ELOOP);
 
 	/* Shell script wrapping executable file: */
 	/*   dfd + path */
-	fail += check_execveat(subdir_dfd, "../script", 0);
-	fail += check_execveat(dot_dfd, "script", 0);
-	fail += check_execveat(dot_dfd_path, "script", 0);
+	check_execveat(subdir_dfd, "../script", 0);
+	check_execveat(dot_dfd, "script", 0);
+	check_execveat(dot_dfd_path, "script", 0);
 	/*   absolute path */
-	fail += check_execveat(AT_FDCWD, fullname_script, 0);
+	check_execveat(AT_FDCWD, fullname_script, 0);
 	/*   fd + no path */
-	fail += check_execveat(fd_script, "", AT_EMPTY_PATH);
-	fail += check_execveat(fd_script, "",
+	check_execveat(fd_script, "", AT_EMPTY_PATH);
+	check_execveat(fd_script, "",
 			       AT_EMPTY_PATH|AT_SYMLINK_NOFOLLOW);
 	/*   O_CLOEXEC fd fails for a script (as script file inaccessible) */
-	fail += check_execveat_fail(fd_script_cloexec, "", AT_EMPTY_PATH,
+	check_execveat_fail(fd_script_cloexec, "", AT_EMPTY_PATH,
 				    ENOENT);
-	fail += check_execveat_fail(dot_dfd_cloexec, "script", 0, ENOENT);
+	check_execveat_fail(dot_dfd_cloexec, "script", 0, ENOENT);
 
 	/* Mess with script file that's already open: */
 	/*   fd + no path to a file that's been renamed */
 	rename("script.ephemeral", "script.moved");
-	fail += check_execveat(fd_script_ephemeral, "", AT_EMPTY_PATH);
+	check_execveat(fd_script_ephemeral, "", AT_EMPTY_PATH);
 	/*   fd + no path to a file that's been deleted */
 	unlink("script.moved"); /* remove the file while fd open */
-	fail += check_execveat(fd_script_ephemeral, "", AT_EMPTY_PATH);
+	check_execveat(fd_script_ephemeral, "", AT_EMPTY_PATH);
 
 	/* Rename a subdirectory in the path: */
 	rename("subdir.ephemeral", "subdir.moved");
-	fail += check_execveat(subdir_dfd_ephemeral, "../script", 0);
-	fail += check_execveat(subdir_dfd_ephemeral, "script", 0);
+	check_execveat(subdir_dfd_ephemeral, "../script", 0);
+	check_execveat(subdir_dfd_ephemeral, "script", 0);
 	/* Remove the subdir and its contents */
 	unlink("subdir.moved/script");
 	unlink("subdir.moved");
 	/* Shell loads via deleted subdir OK because name starts with .. */
-	fail += check_execveat(subdir_dfd_ephemeral, "../script", 0);
-	fail += check_execveat_fail(subdir_dfd_ephemeral, "script", 0, ENOENT);
+	check_execveat(subdir_dfd_ephemeral, "../script", 0);
+	check_execveat_fail(subdir_dfd_ephemeral, "script", 0, ENOENT);
 
 	/* Flag values other than AT_SYMLINK_NOFOLLOW => EINVAL */
-	fail += check_execveat_fail(dot_dfd, "execveat", 0xFFFF, EINVAL);
+	check_execveat_fail(dot_dfd, "execveat", 0xFFFF, EINVAL);
 	/* Invalid path => ENOENT */
-	fail += check_execveat_fail(dot_dfd, "no-such-file", 0, ENOENT);
-	fail += check_execveat_fail(dot_dfd_path, "no-such-file", 0, ENOENT);
-	fail += check_execveat_fail(AT_FDCWD, "no-such-file", 0, ENOENT);
+	check_execveat_fail(dot_dfd, "no-such-file", 0, ENOENT);
+	check_execveat_fail(dot_dfd_path, "no-such-file", 0, ENOENT);
+	check_execveat_fail(AT_FDCWD, "no-such-file", 0, ENOENT);
 	/* Attempt to execute directory => EACCES */
 	fail += check_execveat_fail(dot_dfd, "", AT_EMPTY_PATH, EACCES);
 	/* Attempt to execute non-executable => EACCES */
-	fail += check_execveat_fail(dot_dfd, "Makefile", 0, EACCES);
-	fail += check_execveat_fail(fd_denatured, "", AT_EMPTY_PATH, EACCES);
-	fail += check_execveat_fail(fd_denatured_path, "", AT_EMPTY_PATH,
+	check_execveat_fail(dot_dfd, "Makefile", 0, EACCES);
+	check_execveat_fail(fd_denatured, "", AT_EMPTY_PATH, EACCES);
+	check_execveat_fail(fd_denatured_path, "", AT_EMPTY_PATH,
 				    EACCES);
 	/* Attempt to execute nonsense FD => EBADF */
-	fail += check_execveat_fail(99, "", AT_EMPTY_PATH, EBADF);
-	fail += check_execveat_fail(99, "execveat", 0, EBADF);
+	check_execveat_fail(99, "", AT_EMPTY_PATH, EBADF);
+	check_execveat_fail(99, "execveat", 0, EBADF);
 	/* Attempt to execute relative to non-directory => ENOTDIR */
-	fail += check_execveat_fail(fd, "execveat", 0, ENOTDIR);
+	check_execveat_fail(fd, "execveat", 0, ENOTDIR);
 
-	fail += check_execveat_pathmax(dot_dfd, "execveat", 0);
-	fail += check_execveat_pathmax(dot_dfd, "script", 1);
-	return fail;
+	check_execveat_pathmax(dot_dfd, "execveat", 0);
+	check_execveat_pathmax(dot_dfd, "script", 1);
+	return ksft_get_fail_cnt();
 }
 
 static void prerequisites(void)
@@ -405,8 +417,10 @@ int main(int argc, char **argv)
 		if (verbose)
 			envp[1] = "VERBOSE=1";
 		rc = run_tests();
-		if (rc > 0)
-			printf("%d tests failed\n", rc);
+		if (rc)
+			ksft_exit_fail();
+		else
+			ksft_exit_pass();
 	}
 	return rc;
 }
