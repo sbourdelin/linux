@@ -333,6 +333,16 @@ static int tb_drom_parse_entry_port(struct tb_switch *sw,
 	int res;
 	enum tb_port_type type;
 
+	/*
+	 * Some DROMs list more ports than the controller actually has
+	 * so we skip those but allow the parser to continue.
+	 */
+	if (header->index > sw->config.max_port_number) {
+		dev_warn_once(&sw->dev, "DROM has too many port entries %u (expected %u)\n",
+			      header->index, sw->config.max_port_number);
+		return 0;
+	}
+
 	port = &sw->ports[header->index];
 	port->disabled = header->port_disabled;
 	if (port->disabled)
