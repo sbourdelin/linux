@@ -450,6 +450,7 @@ void unregister_switch_driver(struct dsa_switch_driver *type);
 struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev);
 
 struct net_device *dsa_dev_to_net_device(struct device *dev);
+struct dsa_port *dsa_net_device_to_dsa_port(struct net_device *dev);
 
 /* Keep inline for faster access in hot path */
 static inline bool netdev_uses_dsa(struct net_device *dev)

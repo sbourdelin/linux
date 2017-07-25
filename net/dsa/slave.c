@@ -209,6 +209,16 @@ static int dsa_slave_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return -EOPNOTSUPP;
 }
 
+struct dsa_port *dsa_net_device_to_dsa_port(struct net_device *dev)
+{
+	struct dsa_slave_priv *p = netdev_priv(dev);
+
+	if (!dsa_slave_dev_check(dev))
+		return NULL;
+	return p->dp;
+}
+EXPORT_SYMBOL_GPL(dsa_net_device_to_dsa_port);
+
 static int dsa_slave_port_attr_set(struct net_device *dev,
 				   const struct switchdev_attr *attr,
 				   struct switchdev_trans *trans)
