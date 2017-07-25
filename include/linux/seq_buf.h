@@ -28,6 +28,13 @@ static inline void seq_buf_clear(struct seq_buf *s)
 	s->readpos = 0;
 }
 
+/* Like seq_buf_clear() but zero out the buffer too. */
+static inline void seq_buf_clear_buf(struct seq_buf *s)
+{
+	seq_buf_clear(s);
+	memset(s->buffer, 0, s->size);
+}
+
 static inline void
 seq_buf_init(struct seq_buf *s, unsigned char *buf, unsigned int size)
 {
