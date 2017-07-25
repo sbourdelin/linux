@@ -17,6 +17,8 @@ TEST_GEN_FILES += transhuge-stress
 TEST_GEN_FILES += userfaultfd
 TEST_GEN_FILES += mlock-random-test
 TEST_GEN_FILES += virtual_address_range
+TEST_GEN_FILES += mremap_mirror_shared_anon
+TEST_GEN_FILES += mremap_mirror_private_anon
 
 TEST_PROGS := run_vmtests
 
