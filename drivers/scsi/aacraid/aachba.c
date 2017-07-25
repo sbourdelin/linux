@@ -549,7 +549,7 @@ static void get_container_name_callback(void *context, struct fib * fibptr)
 	if ((le32_to_cpu(get_name_reply->status) == CT_OK)
 	 && (get_name_reply->data[0] != '\0')) {
 		char *sp = get_name_reply->data;
-		sp[sizeof(((struct aac_get_name_resp *)NULL)->data)] = '\0';
+		sp[sizeof(((struct aac_get_name_resp *)NULL)->data) - 1] = '\0';
 		while (*sp == ' ')
 			++sp;
 		if (*sp) {
