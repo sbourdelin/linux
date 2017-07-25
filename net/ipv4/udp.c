@@ -485,6 +485,7 @@ struct sock *__udp4_lib_lookup(struct net *net, struct sk_lookup *params,
 	u32 hash = 0;
 
 	params->hnum = hnum;
+	params->sdif = ip_sdif(skb);
 	params->exact_dif = udp_lib_exact_dif_match(net, skb);
 
 	if (hslot->count > 10) {
@@ -597,9 +598,10 @@ static inline bool __udp_is_mcast_sock(struct net *net, struct sock *sk,
 	    (inet->inet_dport != params->sport && inet->inet_dport) ||
 	    (inet->inet_rcv_saddr && inet->inet_rcv_saddr != loc_addr) ||
 	    ipv6_only_sock(sk) ||
-	    (sk->sk_bound_dev_if && sk->sk_bound_dev_if != params->dif))
+	    (sk->sk_bound_dev_if && sk->sk_bound_dev_if != params->dif &&
+	     sk->sk_bound_dev_if != params->sdif))
 		return false;
-	if (!ip_mc_sf_allow(sk, loc_addr, rmt_addr, params->dif))
+	if (!ip_mc_sf_allow(sk, loc_addr, rmt_addr, params->dif, params->sdif))
 		return false;
 	return true;
 }
@@ -1970,6 +1972,7 @@ static int __udp4_lib_mcast_deliver(struct net *net, struct sk_buff *skb,
 		.dport = uh->dest,
 		.hnum = hnum,
 		.dif = skb->dev->ifindex,
+		.sdif = ip_sdif(skb),
 	};
 
 	if (use_hash2) {
@@ -2210,7 +2213,8 @@ static struct sock *__udp4_lib_demux_lookup(struct net *net,
 
 	udp_portaddr_for_each_entry_rcu(sk, &hslot2->head) {
 		if (INET_MATCH(sk, net, acookie, params->saddr.ipv4,
-			       params->daddr.ipv4, ports, params->dif))
+			       params->daddr.ipv4, ports, params->dif,
+			       params->sdif))
 			return sk;
 		/* Only check first socket in chain */
 		break;
@@ -2223,6 +2227,7 @@ void udp_v4_early_demux(struct sk_buff *skb)
 	struct net *net = dev_net(skb->dev);
 	struct sk_lookup params = {
 		.dif = skb->dev->ifindex,
+		.sdif = ip_sdif(skb),
 	};
 	const struct iphdr *iph;
 	const struct udphdr *uh;

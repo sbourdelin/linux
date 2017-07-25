@@ -291,12 +291,12 @@ begin:
 		if (sk->sk_hash != hash)
 			continue;
 		if (likely(INET_MATCH(sk, net, acookie, saddr, daddr,
-				      ports, params->dif))) {
+				      ports, params->dif, params->sdif))) {
 			if (unlikely(!refcount_inc_not_zero(&sk->sk_refcnt)))
 				goto out;
 			if (unlikely(!INET_MATCH(sk, net, acookie,
 						 saddr, daddr, ports,
-						 params->dif))) {
+						 params->dif, params->sdif))) {
 				sock_gen_put(sk);
 				goto begin;
 			}
@@ -345,7 +345,7 @@ static int __inet_check_established(struct inet_timewait_death_row *death_row,
 			continue;
 
 		if (likely(INET_MATCH(sk2, net, acookie,
-					 saddr, daddr, ports, dif))) {
+					 saddr, daddr, ports, dif, 0))) {
 			if (sk2->sk_state == TCP_TIME_WAIT) {
 				tw = inet_twsk(sk2);
 				if (twsk_unique(sk, sk2, twp))

@@ -1664,7 +1664,9 @@ EXPORT_SYMBOL(tcp_filter);
 int tcp_v4_rcv(struct sk_buff *skb)
 {
 	struct net *net = dev_net(skb->dev);
-	struct sk_lookup params = { };
+	struct sk_lookup params = {
+		.sdif  = ip_sdif(skb),
+	};
 	const struct iphdr *iph;
 	const struct tcphdr *th;
 	bool refcounted;
@@ -1846,8 +1848,8 @@ do_time_wait:
 			.daddr.ipv4 = iph->daddr,
 			.sport = th->source,
 			.dport = th->dest,
-			.hnum  = ntohs(th->dest),
 			.dif   = inet_iif(skb),
+			.sdif  = tcp_v4_sdif(skb),
 		};
 		struct sock *sk2 = inet_lookup_listener(dev_net(skb->dev),
 							&tcp_hashinfo, skb,
