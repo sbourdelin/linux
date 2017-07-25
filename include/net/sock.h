@@ -491,6 +491,44 @@ enum sk_pacing {
 #define rcu_dereference_sk_user_data(sk)	rcu_dereference(__sk_user_data((sk)))
 #define rcu_assign_sk_user_data(sk, ptr)	rcu_assign_pointer(__sk_user_data((sk)), ptr)
 
+/* used for socket lookups */
+struct sk_lookup {
+	union {
+		const struct in6_addr *ipv6;
+		__be32 ipv4;
+	} saddr;
+	union {
+		const struct in6_addr *ipv6;
+		__be32 ipv4;
+	} daddr;
+
+	__be16 sport;
+	__be16 dport;
+	unsigned short hnum;
+
+	int dif;
+	bool exact_dif;
+};
+
+/* Compare sk_bound_dev_if to socket lookup dif
+ * Returns:
+ *   -1   exact dif required and not met
+ *    0   sk_bound_dev_if is either not set or does not match
+ *    1   sk_bound_dev_if is set and matches dif
+ */
+static inline int sk_lookup_device_cmp(const struct sock *sk,
+				       const struct sk_lookup *params)
+{
+	/* exact_dif true == l3mdev case */
+	if (params->exact_dif && sk->sk_bound_dev_if != params->dif)
+		return -1;
+
+	if (sk->sk_bound_dev_if && sk->sk_bound_dev_if == params->dif)
+		return 1;
+
+	return 0;
+}
+
 /*
  * SK_CAN_REUSE and SK_NO_REUSE on a socket mean that the socket is OK
  * or not whether his port will be reused by someone else. SK_FORCE_REUSE
