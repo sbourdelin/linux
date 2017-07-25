@@ -383,6 +383,10 @@ static struct intel_vgpu *__intel_gvt_create_vgpu(struct intel_gvt *gvt,
 	if (ret)
 		goto out_clean_shadow_ctx;
 
+	ret = intel_gvt_hypervisor_set_opregion(vgpu);
+	if (ret)
+		goto out_clean_shadow_ctx;
+
 	mutex_unlock(&gvt->lock);
 
 	return vgpu;

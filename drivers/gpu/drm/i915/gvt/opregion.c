@@ -113,23 +113,37 @@ void intel_vgpu_clean_opregion(struct intel_vgpu *vgpu)
  */
 int intel_vgpu_init_opregion(struct intel_vgpu *vgpu, u32 gpa)
 {
-	int ret;
+	int ret = 0;
+	unsigned long pfn;
 
 	gvt_dbg_core("vgpu%d: init vgpu opregion\n", vgpu->id);
 
-	if (intel_gvt_host.hypervisor_type == INTEL_GVT_HYPERVISOR_XEN) {
+	switch (intel_gvt_host.hypervisor_type) {
+	case INTEL_GVT_HYPERVISOR_KVM:
+		pfn = intel_gvt_hypervisor_gfn_to_mfn(vgpu, gpa >> PAGE_SHIFT);
+		vgpu_opregion(vgpu)->va = memremap(pfn << PAGE_SHIFT,
+						INTEL_GVT_OPREGION_SIZE,
+						MEMREMAP_WB);
+		if (!vgpu_opregion(vgpu)->va) {
+			gvt_vgpu_err("failed to map guest opregion\n");
+			ret = -EFAULT;
+		}
+		break;
+	case INTEL_GVT_HYPERVISOR_XEN:
 		gvt_dbg_core("emulate opregion from kernel\n");
 
 		ret = init_vgpu_opregion(vgpu, gpa);
 		if (ret)
-			return ret;
+			break;
 
 		ret = map_vgpu_opregion(vgpu, true);
-		if (ret)
-			return ret;
+		break;
+	default:
+		ret = -EINVAL;
+		gvt_vgpu_err("not supported hypervisor\n");
 	}
 
-	return 0;
+	return ret;
 }
 
 /**
