@@ -483,7 +483,7 @@ void parse_cmdline_pkg(char *s)
 			while (pkg <= end_pkg) {
 				if (pkg > max_pkg_num)
 					errx(1, "Requested pkg%d exceeds max pkg%d", pkg, max_pkg_num);
-				pkg_selected_set |= 1 << pkg;
+				pkg_selected_set |= 1ULL << pkg;
 				pkg++;
 			}
 			startp = endp;
@@ -498,7 +498,7 @@ void parse_cmdline_pkg(char *s)
 		pkg = strtol(startp, &endp, 10);
 		if (pkg > max_pkg_num)
 			errx(1, "Requested pkg%d Exceeds max pkg%d", pkg, max_pkg_num);
-		pkg_selected_set |= 1 << pkg;
+		pkg_selected_set |= 1ULL << pkg;
 		startp = endp;
 	}
 }
