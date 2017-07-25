@@ -133,7 +133,7 @@ static inline void i915_ggtt_invalidate(struct drm_i915_private *i915)
 }
 
 int intel_sanitize_enable_ppgtt(struct drm_i915_private *dev_priv,
-			       	int enable_ppgtt)
+				int enable_ppgtt)
 {
 	bool has_aliasing_ppgtt;
 	bool has_full_ppgtt;
@@ -180,10 +180,14 @@ int intel_sanitize_enable_ppgtt(struct drm_i915_private *dev_priv,
 		return 0;
 	}
 
-	if (INTEL_GEN(dev_priv) >= 8 && i915.enable_execlists && has_full_ppgtt)
-		return has_full_48bit_ppgtt ? 3 : 2;
-	else
-		return has_aliasing_ppgtt ? 1 : 0;
+	if (!has_full_ppgtt)
+		return 1;
+
+	/* full-ppgtt doesn't yet work reliably in legacy ringbuffer mode */
+	if (!i915.enable_execlists)
+		return 1;
+
+	return has_full_48bit_ppgtt ? 3 : 2;
 }
 
 static int ppgtt_bind_vma(struct i915_vma *vma,
