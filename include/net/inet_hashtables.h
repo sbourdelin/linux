@@ -218,19 +218,16 @@ void inet_unhash(struct sock *sk);
 struct sock *__inet_lookup_listener(struct net *net,
 				    struct inet_hashinfo *hashinfo,
 				    struct sk_buff *skb, int doff,
-				    const __be32 saddr, const __be16 sport,
-				    const __be32 daddr,
-				    const unsigned short hnum,
-				    const int dif);
+				    struct sk_lookup *params);
 
 static inline struct sock *inet_lookup_listener(struct net *net,
 		struct inet_hashinfo *hashinfo,
 		struct sk_buff *skb, int doff,
-		__be32 saddr, __be16 sport,
-		__be32 daddr, __be16 dport, int dif)
+		struct sk_lookup *params)
 {
-	return __inet_lookup_listener(net, hashinfo, skb, doff, saddr, sport,
-				      daddr, ntohs(dport), dif);
+	params->hnum = ntohs(params->dport);
+
+	return __inet_lookup_listener(net, hashinfo, skb, doff, params);
 }
 
 /* Socket demux engine toys. */
@@ -286,53 +283,44 @@ static inline struct sock *inet_lookup_listener(struct net *net,
  */
 struct sock *__inet_lookup_established(struct net *net,
 				       struct inet_hashinfo *hashinfo,
-				       const __be32 saddr, const __be16 sport,
-				       const __be32 daddr, const u16 hnum,
-				       const int dif);
+				       const struct sk_lookup *params);
 
 static inline struct sock *
 	inet_lookup_established(struct net *net, struct inet_hashinfo *hashinfo,
-				const __be32 saddr, const __be16 sport,
-				const __be32 daddr, const __be16 dport,
-				const int dif)
+				struct sk_lookup *params)
 {
-	return __inet_lookup_established(net, hashinfo, saddr, sport, daddr,
-					 ntohs(dport), dif);
+	params->hnum = ntohs(params->dport);
+
+	return __inet_lookup_established(net, hashinfo, params);
 }
 
 static inline struct sock *__inet_lookup(struct net *net,
 					 struct inet_hashinfo *hashinfo,
 					 struct sk_buff *skb, int doff,
-					 const __be32 saddr, const __be16 sport,
-					 const __be32 daddr, const __be16 dport,
-					 const int dif,
+					 struct sk_lookup *params,
 					 bool *refcounted)
 {
-	u16 hnum = ntohs(dport);
 	struct sock *sk;
 
-	sk = __inet_lookup_established(net, hashinfo, saddr, sport,
-				       daddr, hnum, dif);
+	params->hnum = ntohs(params->dport);
+
+	sk = __inet_lookup_established(net, hashinfo, params);
 	*refcounted = true;
 	if (sk)
 		return sk;
 	*refcounted = false;
-	return __inet_lookup_listener(net, hashinfo, skb, doff, saddr,
-				      sport, daddr, hnum, dif);
+	return __inet_lookup_listener(net, hashinfo, skb, doff, params);
 }
 
 static inline struct sock *inet_lookup(struct net *net,
 				       struct inet_hashinfo *hashinfo,
 				       struct sk_buff *skb, int doff,
-				       const __be32 saddr, const __be16 sport,
-				       const __be32 daddr, const __be16 dport,
-				       const int dif)
+				       struct sk_lookup *params)
 {
 	struct sock *sk;
 	bool refcounted;
 
-	sk = __inet_lookup(net, hashinfo, skb, doff, saddr, sport, daddr,
-			   dport, dif, &refcounted);
+	sk = __inet_lookup(net, hashinfo, skb, doff, params, &refcounted);
 
 	if (sk && !refcounted && !refcount_inc_not_zero(&sk->sk_refcnt))
 		sk = NULL;
@@ -342,21 +330,22 @@ static inline struct sock *inet_lookup(struct net *net,
 static inline struct sock *__inet_lookup_skb(struct inet_hashinfo *hashinfo,
 					     struct sk_buff *skb,
 					     int doff,
-					     const __be16 sport,
-					     const __be16 dport,
+					     struct sk_lookup *params,
 					     bool *refcounted)
 {
 	struct sock *sk = skb_steal_sock(skb);
 	const struct iphdr *iph = ip_hdr(skb);
+
+	params->dif   = inet_iif(skb),
+	params->saddr.ipv4 = iph->saddr,
+	params->daddr.ipv4 = iph->daddr,
 
 	*refcounted = true;
 	if (sk)
 		return sk;
 
 	return __inet_lookup(dev_net(skb_dst(skb)->dev), hashinfo, skb,
-			     doff, iph->saddr, sport,
-			     iph->daddr, dport, inet_iif(skb),
-			     refcounted);
+			     doff, params, refcounted);
 }
 
 u32 inet6_ehashfn(const struct net *net,

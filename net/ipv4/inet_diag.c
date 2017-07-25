@@ -396,18 +396,33 @@ struct sock *inet_diag_find_one_icsk(struct net *net,
 	struct sock *sk;
 
 	rcu_read_lock();
-	if (req->sdiag_family == AF_INET)
-		sk = inet_lookup(net, hashinfo, NULL, 0, req->id.idiag_dst[0],
-				 req->id.idiag_dport, req->id.idiag_src[0],
-				 req->id.idiag_sport, req->id.idiag_if);
+	if (req->sdiag_family == AF_INET) {
+		struct sk_lookup params = {
+			.saddr.ipv4 = req->id.idiag_dst[0],
+			.daddr.ipv4 = req->id.idiag_src[0],
+			.sport = req->id.idiag_dport,
+			.dport = req->id.idiag_sport,
+			.hnum = ntohs(req->id.idiag_sport),
+			.dif = req->id.idiag_if,
+		};
+
+		sk = inet_lookup(net, hashinfo, NULL, 0, &params);
+	}
 #if IS_ENABLED(CONFIG_IPV6)
 	else if (req->sdiag_family == AF_INET6) {
 		if (ipv6_addr_v4mapped((struct in6_addr *)req->id.idiag_dst) &&
-		    ipv6_addr_v4mapped((struct in6_addr *)req->id.idiag_src))
-			sk = inet_lookup(net, hashinfo, NULL, 0, req->id.idiag_dst[3],
-					 req->id.idiag_dport, req->id.idiag_src[3],
-					 req->id.idiag_sport, req->id.idiag_if);
-		else
+		    ipv6_addr_v4mapped((struct in6_addr *)req->id.idiag_src)) {
+			struct sk_lookup params = {
+				.saddr.ipv4 = req->id.idiag_dst[3],
+				.daddr.ipv4 = req->id.idiag_src[3],
+				.sport = req->id.idiag_dport,
+				.dport = req->id.idiag_sport,
+				.hnum = ntohs(req->id.idiag_sport),
+				.dif = req->id.idiag_if,
+			};
+
+			sk = inet_lookup(net, hashinfo, NULL, 0, &params);
+		} else
 			sk = inet6_lookup(net, hashinfo, NULL, 0,
 					  (struct in6_addr *)req->id.idiag_dst,
 					  req->id.idiag_dport,

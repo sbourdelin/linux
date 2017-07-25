@@ -382,10 +382,16 @@ void tcp_v4_err(struct sk_buff *icmp_skb, u32 info)
 	u32 delta_us;
 	int err;
 	struct net *net = dev_net(icmp_skb->dev);
+	struct sk_lookup params = {
+		.daddr.ipv4 = iph->saddr,
+		.saddr.ipv4 = iph->daddr,
+		.sport = th->dest,
+		.dport = th->source,
+		.hnum  = ntohs(th->source),
+		.dif   = inet_iif(icmp_skb),
+	};
 
-	sk = __inet_lookup_established(net, &tcp_hashinfo, iph->daddr,
-				       th->dest, iph->saddr, ntohs(th->source),
-				       inet_iif(icmp_skb));
+	sk = inet_lookup_established(net, &tcp_hashinfo, &params);
 	if (!sk) {
 		__ICMP_INC_STATS(net, ICMP_MIB_INERRORS);
 		return;
@@ -651,6 +657,14 @@ static void tcp_v4_send_reset(const struct sock *sk, struct sk_buff *skb)
 		key = tcp_md5_do_lookup(sk, (union tcp_md5_addr *)
 					&ip_hdr(skb)->saddr, AF_INET);
 	} else if (hash_location) {
+		struct sk_lookup params = {
+			.saddr.ipv4 = ip_hdr(skb)->saddr,
+			.daddr.ipv4 = ip_hdr(skb)->daddr,
+			.hnum  = ntohs(th->source),
+			.sport = th->source,
+			.dif = inet_iif(skb),
+		};
+
 		/*
 		 * active side is lost. Try to find listening socket through
 		 * source port, and then find md5 key through listening socket.
@@ -658,10 +672,8 @@ static void tcp_v4_send_reset(const struct sock *sk, struct sk_buff *skb)
 		 * Incoming packet is checked with md5 hash with finding key,
 		 * no RST generated if md5 hash doesn't match.
 		 */
-		sk1 = __inet_lookup_listener(net, &tcp_hashinfo, NULL, 0,
-					     ip_hdr(skb)->saddr,
-					     th->source, ip_hdr(skb)->daddr,
-					     ntohs(th->source), inet_iif(skb));
+		sk1 = inet_lookup_listener(net, &tcp_hashinfo, NULL, 0,
+					   &params);
 		/* don't send rst if it can't find key */
 		if (!sk1)
 			goto out;
@@ -1509,6 +1521,10 @@ void tcp_v4_early_demux(struct sk_buff *skb)
 	const struct iphdr *iph;
 	const struct tcphdr *th;
 	struct sock *sk;
+	struct sk_lookup params = {
+		.dif   = skb->skb_iif,
+	};
+
 
 	if (skb->pkt_type != PACKET_HOST)
 		return;
@@ -1522,10 +1538,13 @@ void tcp_v4_early_demux(struct sk_buff *skb)
 	if (th->doff < sizeof(struct tcphdr) / 4)
 		return;
 
-	sk = __inet_lookup_established(dev_net(skb->dev), &tcp_hashinfo,
-				       iph->saddr, th->source,
-				       iph->daddr, ntohs(th->dest),
-				       skb->skb_iif);
+	params.saddr.ipv4 = iph->saddr;
+	params.daddr.ipv4 = iph->daddr;
+	params.sport = th->source;
+	params.dport = th->dest;
+	params.hnum  = ntohs(th->dest),
+
+	sk = inet_lookup_established(dev_net(skb->dev), &tcp_hashinfo, &params);
 	if (sk) {
 		skb->sk = sk;
 		skb->destructor = sock_edemux;
@@ -1645,6 +1664,7 @@ EXPORT_SYMBOL(tcp_filter);
 int tcp_v4_rcv(struct sk_buff *skb)
 {
 	struct net *net = dev_net(skb->dev);
+	struct sk_lookup params = { };
 	const struct iphdr *iph;
 	const struct tcphdr *th;
 	bool refcounted;
@@ -1693,9 +1713,11 @@ int tcp_v4_rcv(struct sk_buff *skb)
 	TCP_SKB_CB(skb)->ip_dsfield = ipv4_get_dsfield(iph);
 	TCP_SKB_CB(skb)->sacked	 = 0;
 
+	params.sport = th->source;
+	params.dport = th->dest;
 lookup:
-	sk = __inet_lookup_skb(&tcp_hashinfo, skb, __tcp_hdrlen(th), th->source,
-			       th->dest, &refcounted);
+	sk = __inet_lookup_skb(&tcp_hashinfo, skb, __tcp_hdrlen(th), &params,
+			       &refcounted);
 	if (!sk)
 		goto no_tcp_socket;
 
@@ -1819,12 +1841,18 @@ do_time_wait:
 	}
 	switch (tcp_timewait_state_process(inet_twsk(sk), skb, th)) {
 	case TCP_TW_SYN: {
+		struct sk_lookup params = {
+			.saddr.ipv4 = iph->saddr,
+			.daddr.ipv4 = iph->daddr,
+			.sport = th->source,
+			.dport = th->dest,
+			.hnum  = ntohs(th->dest),
+			.dif   = inet_iif(skb),
+		};
 		struct sock *sk2 = inet_lookup_listener(dev_net(skb->dev),
 							&tcp_hashinfo, skb,
 							__tcp_hdrlen(th),
-							iph->saddr, th->source,
-							iph->daddr, th->dest,
-							inet_iif(skb));
+							&params);
 		if (sk2) {
 			inet_twsk_deschedule_put(inet_twsk(sk));
 			sk = sk2;

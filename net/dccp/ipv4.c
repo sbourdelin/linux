@@ -244,6 +244,11 @@ static void dccp_v4_err(struct sk_buff *skb, u32 info)
 	__u64 seq;
 	int err;
 	struct net *net = dev_net(skb->dev);
+	struct sk_lookup params = {
+		.saddr.ipv4 = iph->daddr,
+		.daddr.ipv4 = iph->saddr,
+		.dif = inet_iif(skb),
+	};
 
 	/* Only need dccph_dport & dccph_sport which are the first
 	 * 4 bytes in dccp header.
@@ -253,10 +258,11 @@ static void dccp_v4_err(struct sk_buff *skb, u32 info)
 	BUILD_BUG_ON(offsetofend(struct dccp_hdr, dccph_dport) > 8);
 	dh = (struct dccp_hdr *)(skb->data + offset);
 
-	sk = __inet_lookup_established(net, &dccp_hashinfo,
-				       iph->daddr, dh->dccph_dport,
-				       iph->saddr, ntohs(dh->dccph_sport),
-				       inet_iif(skb));
+	params.sport = dh->dccph_dport;
+	params.dport = dh->dccph_sport;
+	params.hnum = ntohs(dh->dccph_sport);
+
+	sk = inet_lookup_established(net, &dccp_hashinfo, &params);
 	if (!sk) {
 		__ICMP_INC_STATS(net, ICMP_MIB_INERRORS);
 		return;
@@ -763,6 +769,7 @@ EXPORT_SYMBOL_GPL(dccp_invalid_packet);
 /* this is called when real data arrives */
 static int dccp_v4_rcv(struct sk_buff *skb)
 {
+	struct sk_lookup params = {};
 	const struct dccp_hdr *dh;
 	const struct iphdr *iph;
 	bool refcounted;
@@ -801,9 +808,11 @@ static int dccp_v4_rcv(struct sk_buff *skb)
 				  DCCP_SKB_CB(skb)->dccpd_ack_seq);
 	}
 
+	params.sport = dh->dccph_sport;
+	params.dport = dh->dccph_dport;
 lookup:
 	sk = __inet_lookup_skb(&dccp_hashinfo, skb, __dccp_hdr_len(dh),
-			       dh->dccph_sport, dh->dccph_dport, &refcounted);
+			       &params, &refcounted);
 	if (!sk) {
 		dccp_pr_debug("failed to look up flow ID in table and "
 			      "get corresponding socket\n");

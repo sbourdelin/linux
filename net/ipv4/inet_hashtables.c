@@ -169,26 +169,28 @@ int __inet_inherit_port(const struct sock *sk, struct sock *child)
 EXPORT_SYMBOL_GPL(__inet_inherit_port);
 
 static inline int compute_score(struct sock *sk, struct net *net,
-				const unsigned short hnum, const __be32 daddr,
-				const int dif, bool exact_dif)
+				const struct sk_lookup *params)
 {
 	int score = -1;
 	struct inet_sock *inet = inet_sk(sk);
 
-	if (net_eq(sock_net(sk), net) && inet->inet_num == hnum &&
-			!ipv6_only_sock(sk)) {
+	if (net_eq(sock_net(sk), net) &&
+	    inet->inet_num == params->hnum &&
+	    !ipv6_only_sock(sk)) {
 		__be32 rcv_saddr = inet->inet_rcv_saddr;
+		int rc;
+
 		score = sk->sk_family == PF_INET ? 2 : 1;
 		if (rcv_saddr) {
-			if (rcv_saddr != daddr)
+			if (rcv_saddr != params->daddr.ipv4)
 				return -1;
 			score += 4;
 		}
-		if (sk->sk_bound_dev_if || exact_dif) {
-			if (sk->sk_bound_dev_if != dif)
-				return -1;
+		rc = sk_lookup_device_cmp(sk, params);
+		if (rc < 0)
+			return -1;
+		if (rc > 0)
 			score += 4;
-		}
 		if (sk->sk_incoming_cpu == raw_smp_processor_id())
 			score++;
 	}
@@ -206,24 +208,25 @@ static inline int compute_score(struct sock *sk, struct net *net,
 struct sock *__inet_lookup_listener(struct net *net,
 				    struct inet_hashinfo *hashinfo,
 				    struct sk_buff *skb, int doff,
-				    const __be32 saddr, __be16 sport,
-				    const __be32 daddr, const unsigned short hnum,
-				    const int dif)
+				    struct sk_lookup *params)
 {
-	unsigned int hash = inet_lhashfn(net, hnum);
+	unsigned int hash = inet_lhashfn(net, params->hnum);
 	struct inet_listen_hashbucket *ilb = &hashinfo->listening_hash[hash];
 	int score, hiscore = 0, matches = 0, reuseport = 0;
-	bool exact_dif = inet_exact_dif_match(net, skb);
 	struct sock *sk, *result = NULL;
 	u32 phash = 0;
 
+	params->exact_dif = inet_exact_dif_match(net, skb);
+
 	sk_for_each_rcu(sk, &ilb->head) {
-		score = compute_score(sk, net, hnum, daddr, dif, exact_dif);
+		score = compute_score(sk, net, params);
 		if (score > hiscore) {
 			reuseport = sk->sk_reuseport;
 			if (reuseport) {
-				phash = inet_ehashfn(net, daddr, hnum,
-						     saddr, sport);
+				phash = inet_ehashfn(net, params->daddr.ipv4,
+						     params->hnum,
+						     params->saddr.ipv4,
+						     params->sport);
 				result = reuseport_select_sock(sk, phash,
 							       skb, doff);
 				if (result)
@@ -265,11 +268,13 @@ void sock_edemux(struct sk_buff *skb)
 EXPORT_SYMBOL(sock_edemux);
 
 struct sock *__inet_lookup_established(struct net *net,
-				  struct inet_hashinfo *hashinfo,
-				  const __be32 saddr, const __be16 sport,
-				  const __be32 daddr, const u16 hnum,
-				  const int dif)
+				       struct inet_hashinfo *hashinfo,
+				       const struct sk_lookup *params)
 {
+	const __be32 saddr = params->saddr.ipv4;
+	const __be32 daddr = params->daddr.ipv4;
+	const __be16 sport = params->sport;
+	const u16 hnum = params->hnum;
 	INET_ADDR_COOKIE(acookie, saddr, daddr);
 	const __portpair ports = INET_COMBINED_PORTS(sport, hnum);
 	struct sock *sk;
@@ -285,12 +290,13 @@ begin:
 	sk_nulls_for_each_rcu(sk, node, &head->chain) {
 		if (sk->sk_hash != hash)
 			continue;
-		if (likely(INET_MATCH(sk, net, acookie,
-				      saddr, daddr, ports, dif))) {
+		if (likely(INET_MATCH(sk, net, acookie, saddr, daddr,
+				      ports, params->dif))) {
 			if (unlikely(!refcount_inc_not_zero(&sk->sk_refcnt)))
 				goto out;
 			if (unlikely(!INET_MATCH(sk, net, acookie,
-						 saddr, daddr, ports, dif))) {
+						 saddr, daddr, ports,
+						 params->dif))) {
 				sock_gen_put(sk);
 				goto begin;
 			}

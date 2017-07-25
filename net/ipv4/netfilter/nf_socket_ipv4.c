@@ -86,14 +86,13 @@ nf_socket_get_sock_v4(struct net *net, struct sk_buff *skb, const int doff,
 		.daddr.ipv4 = daddr,
 		.sport = sport,
 		.dport = dport,
+		.hnum = ntohs(dport),
 		.dif = in->ifindex,
 	};
 
 	switch (protocol) {
 	case IPPROTO_TCP:
-		return inet_lookup(net, &tcp_hashinfo, skb, doff,
-				   saddr, sport, daddr, dport,
-				   in->ifindex);
+		return inet_lookup(net, &tcp_hashinfo, skb, doff, &params);
 	case IPPROTO_UDP:
 		return udp4_lib_lookup(net, &params);
 	}
