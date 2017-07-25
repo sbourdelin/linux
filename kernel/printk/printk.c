@@ -576,6 +576,8 @@ static u32 truncate_msg(u16 *text_len, u16 *trunc_msg_len,
 	return msg_used_size(*text_len + *trunc_msg_len, 0, pad_len);
 }
 
+static u64 printk_get_ts(void);
+
 /* insert record into the buffer, discard old ones, update heads */
 static int log_store(int facility, int level,
 		     enum log_flags flags, u64 ts_nsec,
@@ -624,7 +626,7 @@ static int log_store(int facility, int level,
 	if (ts_nsec > 0)
 		msg->ts_nsec = ts_nsec;
 	else
-		msg->ts_nsec = local_clock();
+		msg->ts_nsec = printk_get_ts();
 	memset(log_dict(msg) + dict_len, 0, pad_len);
 	msg->len = size;
 
@@ -1203,26 +1205,60 @@ static inline void boot_delay_msec(int level)
 #endif
 
 static int printk_time = CONFIG_PRINTK_TIME;
+static int printk_time_setting; /* initial setting */
 
+/*
+ * Real clock & 32-bit systems:  Selecting the real clock printk timestamp may
+ * lead to unlikely situations where a timestamp is wrong because the real time
+ * offset is read without the protection of a sequence lock in the call to
+ * ktime_get_log_ts() in printk_get_ts() below.
+ */
 static int printk_time_set(const char *val, const struct kernel_param *kp)
 {
 	char *param = strstrip((char *)val);
+	int _printk_time;
 
 	if (strlen(param) != 1)
 		return -EINVAL;
 
-	if (!strncmp("0", param, 1) || !strncmp("n", param, 1) ||
-	    !strncmp("N", param, 1)) {
-		printk_time = 0;
-	} else if (!strncmp("1", param, 1) || !strncmp("y", param, 1) ||
-		   !strncmp("Y", param, 1)) {
-		printk_time = 1;
-	} else {
-		pr_warn("printk: invalid timestamp value %s.\n", param);
+	switch (param[0]) {
+	case '0':
+	case 'n':
+	case 'N':
+		_printk_time = 0; /* none/disabled */
+		break;
+	case '1':
+	case 'y':
+	case 'Y':
+		_printk_time = 1; /* local unadjusted HW clock */
+		break;
+	case '2':
+		_printk_time = 2; /* boot time */
+		break;
+	case '3':
+		_printk_time = 3; /* real time */
+		break;
+	default:
+		pr_warn("printk: invalid timestamp value\n");
 		return -EINVAL;
 	}
 
-	pr_info("printk: timestamp set to %d.\n", printk_time);
+	/*
+	 * Only allow enabling and disabling of the current printk_time
+	 * setting.  Changing it from one setting to another confuses
+	 * userspace.
+	 */
+	if (printk_time_setting == 0) {
+		printk_time_setting = _printk_time;
+	} else if ((printk_time_setting != _printk_time) &&
+		   (_printk_time != 0)) {
+		pr_warn("printk: timestamp can only be set to 0 or %d ",
+			printk_time_setting);
+		return -EINVAL;
+	}
+
+	printk_time = _printk_time;
+	pr_info("printk: timestamp set to %d.", printk_time);
 	return 0;
 }
 
@@ -1236,6 +1272,21 @@ static struct kernel_param_ops printk_time_ops = {
 	.get = printk_time_get,
 };
 module_param_cb(time, &printk_time_ops, NULL, S_IRUGO | S_IWUSR);
+
+static u64 printk_get_ts(void)
+{
+	u64 mono, offset_real;
+
+	if (printk_time <= 1)
+		return local_clock();
+
+	mono = ktime_get_log_ts(&offset_real);
+
+	if (printk_time == 2)
+		return mono;
+
+	return mono + offset_real;
+}
 
 static size_t print_time(u64 ts, char *buf)
 {
@@ -1675,7 +1726,7 @@ static bool cont_add(int facility, int level, enum log_flags flags, const char *
 		cont.facility = facility;
 		cont.level = level;
 		cont.owner = current;
-		cont.ts_nsec = local_clock();
+		cont.ts_nsec = printk_get_ts();
 		cont.flags = flags;
 	}
 
@@ -2690,6 +2741,10 @@ static int __init printk_late_init(void)
 {
 	struct console *con;
 	int ret;
+
+	/* initialize printk_time settings */
+	if (printk_time_setting == 0)
+		printk_time_setting = printk_time;
 
 	for_each_console(con) {
 		if (!keep_bootcon && con->flags & CON_BOOT) {
