@@ -38,7 +38,7 @@ static void huge_free_pages(struct drm_i915_gem_object *obj,
 }
 
 static struct sg_table *
-huge_get_pages(struct drm_i915_gem_object *obj)
+huge_get_pages(struct drm_i915_gem_object *obj, unsigned int *sg_mask)
 {
 #define GFP (GFP_KERNEL | __GFP_NOWARN | __GFP_NORETRY)
 	const unsigned long nreal = obj->scratch / PAGE_SIZE;
@@ -80,6 +80,8 @@ huge_get_pages(struct drm_i915_gem_object *obj)
 
 	if (i915_gem_gtt_prepare_pages(obj, pages))
 		goto err;
+
+	*sg_mask = PAGE_SIZE;
 
 	return pages;
 

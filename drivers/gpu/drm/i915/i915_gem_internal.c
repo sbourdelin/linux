@@ -45,7 +45,8 @@ static void internal_free_pages(struct sg_table *st)
 }
 
 static struct sg_table *
-i915_gem_object_get_pages_internal(struct drm_i915_gem_object *obj)
+i915_gem_object_get_pages_internal(struct drm_i915_gem_object *obj,
+				   unsigned int *sg_mask)
 {
 	struct drm_i915_private *i915 = to_i915(obj->base.dev);
 	struct sg_table *st;
@@ -76,6 +77,7 @@ i915_gem_object_get_pages_internal(struct drm_i915_gem_object *obj)
 	}
 
 create_st:
+	*sg_mask = 0;
 	st = kmalloc(sizeof(*st), GFP_KERNEL);
 	if (!st)
 		return ERR_PTR(-ENOMEM);
@@ -105,6 +107,7 @@ create_st:
 		} while (1);
 
 		sg_set_page(sg, page, PAGE_SIZE << order, 0);
+		*sg_mask |= PAGE_SIZE << order;
 		st->nents++;
 
 		npages -= 1 << order;

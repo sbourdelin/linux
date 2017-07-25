@@ -540,11 +540,16 @@ i915_pages_create_for_stolen(struct drm_device *dev,
 }
 
 static struct sg_table *
-i915_gem_object_get_pages_stolen(struct drm_i915_gem_object *obj)
+i915_gem_object_get_pages_stolen(struct drm_i915_gem_object *obj,
+				 unsigned int *sg_mask)
 {
-	return i915_pages_create_for_stolen(obj->base.dev,
-					    obj->stolen->start,
-					    obj->stolen->size);
+	struct sg_table *pages =
+		i915_pages_create_for_stolen(obj->base.dev,
+					     obj->stolen->start,
+					     obj->stolen->size);
+	*sg_mask = obj->stolen->size;
+
+	return pages;
 }
 
 static void i915_gem_object_put_pages_stolen(struct drm_i915_gem_object *obj,

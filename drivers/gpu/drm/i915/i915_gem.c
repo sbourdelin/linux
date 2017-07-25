@@ -163,7 +163,8 @@ i915_gem_get_aperture_ioctl(struct drm_device *dev, void *data,
 }
 
 static struct sg_table *
-i915_gem_object_get_pages_phys(struct drm_i915_gem_object *obj)
+i915_gem_object_get_pages_phys(struct drm_i915_gem_object *obj,
+			       unsigned int *sg_mask)
 {
 	struct address_space *mapping = obj->base.filp->f_mapping;
 	drm_dma_handle_t *phys;
@@ -222,6 +223,8 @@ i915_gem_object_get_pages_phys(struct drm_i915_gem_object *obj)
 	sg = st->sgl;
 	sg->offset = 0;
 	sg->length = obj->base.size;
+
+	*sg_mask = sg->length;
 
 	sg_dma_address(sg) = phys->busaddr;
 	sg_dma_len(sg) = obj->base.size;
@@ -2298,6 +2301,8 @@ void __i915_gem_object_put_pages(struct drm_i915_gem_object *obj,
 	if (!IS_ERR(pages))
 		obj->ops->put_pages(obj, pages);
 
+	obj->mm.page_sizes.phys = obj->mm.page_sizes.sg = 0;
+
 unlock:
 	mutex_unlock(&obj->mm.lock);
 }
@@ -2329,7 +2334,8 @@ static bool i915_sg_trim(struct sg_table *orig_st)
 }
 
 static struct sg_table *
-i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj)
+i915_gem_object_get_pages_gtt(struct drm_i915_gem_object *obj,
+			      unsigned int *sg_mask)
 {
 	struct drm_i915_private *dev_priv = to_i915(obj->base.dev);
 	const unsigned long page_count = obj->base.size / PAGE_SIZE;
@@ -2376,6 +2382,7 @@ rebuild_st:
 
 	sg = st->sgl;
 	st->nents = 0;
+	*sg_mask = 0;
 	for (i = 0; i < page_count; i++) {
 		const unsigned int shrink[] = {
 			I915_SHRINK_BOUND | I915_SHRINK_UNBOUND | I915_SHRINK_PURGEABLE,
@@ -2428,8 +2435,10 @@ rebuild_st:
 		if (!i ||
 		    sg->length >= max_segment ||
 		    page_to_pfn(page) != last_pfn + 1) {
-			if (i)
+			if (i) {
+				*sg_mask |= sg->length;
 				sg = sg_next(sg);
+			}
 			st->nents++;
 			sg_set_page(sg, page, PAGE_SIZE, 0);
 		} else {
@@ -2440,8 +2449,10 @@ rebuild_st:
 		/* Check that the i965g/gm workaround works. */
 		WARN_ON((gfp & __GFP_DMA32) && (last_pfn >= 0x00100000UL));
 	}
-	if (sg) /* loop terminated early; short sg table */
+	if (sg) { /* loop terminated early; short sg table */
+		*sg_mask |= sg->length;
 		sg_mark_end(sg);
+	}
 
 	/* Trim unused sg entries to avoid wasting memory. */
 	i915_sg_trim(st);
@@ -2495,8 +2506,13 @@ err_pages:
 }
 
 void __i915_gem_object_set_pages(struct drm_i915_gem_object *obj,
-				 struct sg_table *pages)
+				 struct sg_table *pages,
+				 unsigned int sg_mask)
 {
+	struct drm_i915_private *i915 = to_i915(obj->base.dev);
+	unsigned long supported_page_sizes = INTEL_INFO(i915)->page_size_mask;
+	unsigned int bit;
+
 	lockdep_assert_held(&obj->mm.lock);
 
 	obj->mm.get_page.sg_pos = pages->sgl;
@@ -2510,11 +2526,24 @@ void __i915_gem_object_set_pages(struct drm_i915_gem_object *obj,
 		__i915_gem_object_pin_pages(obj);
 		obj->mm.quirked = true;
 	}
+
+	GEM_BUG_ON(!sg_mask);
+
+	obj->mm.page_sizes.phys = sg_mask;
+
+	obj->mm.page_sizes.sg = 0;
+	for_each_set_bit(bit, &supported_page_sizes, BITS_PER_LONG) {
+		if (obj->mm.page_sizes.phys & ~0u << bit)
+			obj->mm.page_sizes.sg |= BIT(bit);
+	}
+
+	GEM_BUG_ON(!HAS_PAGE_SIZE(i915, obj->mm.page_sizes.sg));
 }
 
 static int ____i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 {
 	struct sg_table *pages;
+	unsigned int sg_mask = 0;
 
 	GEM_BUG_ON(i915_gem_object_has_pinned_pages(obj));
 
@@ -2523,11 +2552,11 @@ static int ____i915_gem_object_get_pages(struct drm_i915_gem_object *obj)
 		return -EFAULT;
 	}
 
-	pages = obj->ops->get_pages(obj);
+	pages = obj->ops->get_pages(obj, &sg_mask);
 	if (unlikely(IS_ERR(pages)))
 		return PTR_ERR(pages);
 
-	__i915_gem_object_set_pages(obj, pages);
+	__i915_gem_object_set_pages(obj, pages, sg_mask);
 	return 0;
 }
 
