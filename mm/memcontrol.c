@@ -2625,6 +2625,181 @@ static inline bool memcg_has_children(struct mem_cgroup *memcg)
 	return ret;
 }
 
+static long memcg_oom_badness(struct mem_cgroup *memcg,
+			      const nodemask_t *nodemask)
+{
+	long points = 0;
+	int nid;
+
+	for_each_node_state(nid, N_MEMORY) {
+		if (nodemask && !node_isset(nid, *nodemask))
+			continue;
+
+		points += mem_cgroup_node_nr_lru_pages(memcg, nid,
+				LRU_ALL_ANON | BIT(LRU_UNEVICTABLE));
+	}
+
+	points += memcg_page_state(memcg, MEMCG_KERNEL_STACK_KB) /
+		(PAGE_SIZE / 1024);
+	points += memcg_page_state(memcg, NR_SLAB_UNRECLAIMABLE);
+	points += memcg_page_state(memcg, MEMCG_SOCK);
+	points += memcg_page_state(memcg, MEMCG_SWAP);
+
+	return points;
+}
+
+static long oom_evaluate_memcg(struct mem_cgroup *memcg,
+			       const nodemask_t *nodemask)
+{
+	struct css_task_iter it;
+	struct task_struct *task;
+	int elegible = 0;
+
+	css_task_iter_start(&memcg->css, 0, &it);
+	while ((task = css_task_iter_next(&it))) {
+		/*
+		 * If there are no tasks, or all tasks have oom_score_adj set
+		 * to OOM_SCORE_ADJ_MIN and oom_kill_all_tasks is not set,
+		 * don't select this memory cgroup.
+		 */
+		if (!elegible &&
+		    (memcg->oom_kill_all_tasks ||
+		     task->signal->oom_score_adj != OOM_SCORE_ADJ_MIN))
+			elegible = 1;
+
+		/*
+		 * If there are previously selected OOM victims,
+		 * abort memcg selection.
+		 */
+		if (tsk_is_oom_victim(task) &&
+		    !test_bit(MMF_OOM_SKIP, &task->signal->oom_mm->flags)) {
+			elegible = -1;
+			break;
+		}
+	}
+	css_task_iter_end(&it);
+
+	return elegible > 0 ? memcg_oom_badness(memcg, nodemask) : elegible;
+}
+
+static void select_victim_memcg(struct mem_cgroup *root, struct oom_control *oc)
+{
+	struct mem_cgroup *iter, *parent;
+
+	for_each_mem_cgroup_tree(iter, root) {
+		if (memcg_has_children(iter)) {
+			iter->oom_score = 0;
+			continue;
+		}
+
+		iter->oom_score = oom_evaluate_memcg(iter, oc->nodemask);
+		if (iter->oom_score == -1) {
+			oc->chosen_memcg = (void *)-1UL;
+			mem_cgroup_iter_break(root, iter);
+			return;
+		}
+
+		if (!iter->oom_score)
+			continue;
+
+		for (parent = parent_mem_cgroup(iter); parent && parent != root;
+		     parent = parent_mem_cgroup(parent))
+			parent->oom_score += iter->oom_score;
+	}
+
+	for (;;) {
+		struct cgroup_subsys_state *css;
+		struct mem_cgroup *memcg = NULL;
+		long score = LONG_MIN;
+
+		css_for_each_child(css, &root->css) {
+			struct mem_cgroup *iter = mem_cgroup_from_css(css);
+
+			if (iter->oom_score > score) {
+				memcg = iter;
+				score = iter->oom_score;
+			}
+		}
+
+		if (!memcg) {
+			if (oc->memcg && root == oc->memcg) {
+				oc->chosen_memcg = oc->memcg;
+				css_get(&oc->chosen_memcg->css);
+				oc->chosen_points = oc->memcg->oom_score;
+			}
+			break;
+		}
+
+		if (memcg->oom_kill_all_tasks || !memcg_has_children(memcg)) {
+			oc->chosen_memcg = memcg;
+			css_get(&oc->chosen_memcg->css);
+			oc->chosen_points = score;
+			break;
+		}
+
+		root = memcg;
+	}
+}
+
+static void select_victim_root_cgroup_task(struct oom_control *oc)
+{
+	struct css_task_iter it;
+	struct task_struct *task;
+	int ret = 0;
+
+	css_task_iter_start(&root_mem_cgroup->css, 0, &it);
+	while (!ret && (task = css_task_iter_next(&it)))
+		ret = oom_evaluate_task(task, oc);
+	css_task_iter_end(&it);
+}
+
+bool mem_cgroup_select_oom_victim(struct oom_control *oc)
+{
+	struct mem_cgroup *root = root_mem_cgroup;
+
+	oc->chosen = NULL;
+	oc->chosen_memcg = NULL;
+
+	if (mem_cgroup_disabled())
+		return false;
+
+	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys))
+		return false;
+
+	if (oc->memcg)
+		root = oc->memcg;
+
+	rcu_read_lock();
+
+	select_victim_memcg(root, oc);
+	if (oc->chosen_memcg == (void *)-1UL) {
+		/* Existing OOM victims are found. */
+		rcu_read_unlock();
+		return true;
+	}
+
+	/*
+	 * For system-wide OOMs we should consider tasks in the root cgroup
+	 * with oom_score larger than oc->chosen_points.
+	 */
+	if (!oc->memcg) {
+		select_victim_root_cgroup_task(oc);
+
+		if (oc->chosen && oc->chosen_memcg) {
+			/*
+			 * If we've decided to kill a task in the root memcg,
+			 * release chosen_memcg.
+			 */
+			css_put(&oc->chosen_memcg->css);
+			oc->chosen_memcg = NULL;
+		}
+	}
+
+	rcu_read_unlock();
+
+	return !!oc->chosen || !!oc->chosen_memcg;
+}
+
 /*
  * Reclaims as many pages from the given memcg as possible.
  *
@@ -5166,6 +5341,33 @@ static ssize_t memory_max_write(struct kernfs_open_file *of,
 	return nbytes;
 }
 
+static int memory_oom_kill_all_tasks_show(struct seq_file *m, void *v)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
+	bool oom_kill_all_tasks = memcg->oom_kill_all_tasks;
+
+	seq_printf(m, "%d\n", oom_kill_all_tasks);
+
+	return 0;
+}
+
+static ssize_t memory_oom_kill_all_tasks_write(struct kernfs_open_file *of,
+					       char *buf, size_t nbytes,
+					       loff_t off)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(of_css(of));
+	int oom_kill_all_tasks;
+	int err;
+
+	err = kstrtoint(strstrip(buf), 0, &oom_kill_all_tasks);
+	if (err)
+		return err;
+
+	memcg->oom_kill_all_tasks = !!oom_kill_all_tasks;
+
+	return nbytes;
+}
+
 static int memory_events_show(struct seq_file *m, void *v)
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
@@ -5284,6 +5486,12 @@ static struct cftype memory_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = memory_max_show,
 		.write = memory_max_write,
+	},
+	{
+		.name = "oom_kill_all_tasks",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = memory_oom_kill_all_tasks_show,
+		.write = memory_oom_kill_all_tasks_write,
 	},
 	{
 		.name = "events",
