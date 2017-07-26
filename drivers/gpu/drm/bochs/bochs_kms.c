@@ -217,6 +217,13 @@ bochs_connector_best_encoder(struct drm_connector *connector)
 	return NULL;
 }
 
+static int bochs_connector_dpms(struct drm_connector *connector, int mode)
+{
+	drm_helper_connector_dpms(connector, mode);
+	/* FIXME: return error to make fbcon generic blank working */
+	return -EINVAL;
+}
+
 static const struct drm_connector_helper_funcs bochs_connector_connector_helper_funcs = {
 	.get_modes = bochs_connector_get_modes,
 	.mode_valid = bochs_connector_mode_valid,
@@ -224,7 +231,7 @@ static const struct drm_connector_helper_funcs bochs_connector_connector_helper_
 };
 
 static const struct drm_connector_funcs bochs_connector_connector_funcs = {
-	.dpms = drm_helper_connector_dpms,
+	.dpms = bochs_connector_dpms,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = drm_connector_cleanup,
 };
