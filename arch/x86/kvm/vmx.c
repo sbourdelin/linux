@@ -8606,9 +8606,9 @@ static void vmx_complete_atomic_exit(struct vcpu_vmx *vmx)
 
 	/* We need to handle NMIs before interrupts are enabled */
 	if (is_nmi(exit_intr_info)) {
-		kvm_before_handle_nmi(&vmx->vcpu);
+		kvm_before_interrupt(&vmx->vcpu);
 		asm("int $2");
-		kvm_after_handle_nmi(&vmx->vcpu);
+		kvm_after_interrupt(&vmx->vcpu);
 	}
 }
 
@@ -8627,6 +8627,7 @@ static void vmx_handle_external_intr(struct kvm_vcpu *vcpu)
 		unsigned long tmp;
 #endif
 
+		kvm_before_interrupt(vcpu);
 		vector =  exit_intr_info & INTR_INFO_VECTOR_MASK;
 		desc = (gate_desc *)vmx->host_idt_base + vector;
 		entry = gate_offset(*desc);
@@ -8650,6 +8651,7 @@ static void vmx_handle_external_intr(struct kvm_vcpu *vcpu)
 			[ss]"i"(__KERNEL_DS),
 			[cs]"i"(__KERNEL_CS)
 			);
+		kvm_after_interrupt(vcpu);
 	}
 }
 

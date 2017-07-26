@@ -155,8 +155,6 @@ static inline bool kvm_check_has_quirk(struct kvm *kvm, u64 quirk)
 	return !(kvm->arch.disabled_quirks & quirk);
 }
 
-void kvm_before_handle_nmi(struct kvm_vcpu *vcpu);
-void kvm_after_handle_nmi(struct kvm_vcpu *vcpu);
 void kvm_set_pending_timer(struct kvm_vcpu *vcpu);
 int kvm_inject_realmode_interrupt(struct kvm_vcpu *vcpu, int irq, int inc_eip);
 
@@ -246,6 +244,18 @@ static inline bool kvm_mwait_in_guest(void)
 		return false;
 
 	return true;
+}
+
+DECLARE_PER_CPU(struct kvm_vcpu *, current_vcpu);
+
+static inline void kvm_before_interrupt(struct kvm_vcpu *vcpu)
+{
+	__this_cpu_write(current_vcpu, vcpu);
+}
+
+static inline void kvm_after_interrupt(struct kvm_vcpu *vcpu)
+{
+	__this_cpu_write(current_vcpu, NULL);
 }
 
 #endif
