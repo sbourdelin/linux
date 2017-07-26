@@ -5635,6 +5635,11 @@ static bool raid5_make_request(struct mddev *mddev, struct bio * bi)
 				    ? logical_sector < conf->reshape_safe
 				    : logical_sector >= conf->reshape_safe) {
 					spin_unlock_irq(&conf->device_lock);
+					if (bi->bi_opf & REQ_NOWAIT) {
+						bio_wouldblock_error(bi);
+						finish_wait(&conf->wait_for_overlap, &w);
+						return true;
+					}
 					schedule();
 					do_prepare = true;
 					goto retry;
@@ -5672,6 +5677,11 @@ static bool raid5_make_request(struct mddev *mddev, struct bio * bi)
 				spin_unlock_irq(&conf->device_lock);
 				if (must_retry) {
 					raid5_release_stripe(sh);
+					if (bi->bi_opf & REQ_NOWAIT) {
+						bio_wouldblock_error(bi);
+						finish_wait(&conf->wait_for_overlap, &w);
+						return true;
+					}
 					schedule();
 					do_prepare = true;
 					goto retry;
@@ -5700,6 +5710,11 @@ static bool raid5_make_request(struct mddev *mddev, struct bio * bi)
 					sigset_t full, old;
 					sigfillset(&full);
 					sigprocmask(SIG_BLOCK, &full, &old);
+					if (bi->bi_opf & REQ_NOWAIT) {
+						bio_wouldblock_error(bi);
+						finish_wait(&conf->wait_for_overlap, &w);
+						return true;
+					}
 					schedule();
 					sigprocmask(SIG_SETMASK, &old, NULL);
 					do_prepare = true;
@@ -5715,6 +5730,11 @@ static bool raid5_make_request(struct mddev *mddev, struct bio * bi)
 				 */
 				md_wakeup_thread(mddev->thread);
 				raid5_release_stripe(sh);
+				if (bi->bi_opf & REQ_NOWAIT) {
+					bio_wouldblock_error(bi);
+					finish_wait(&conf->wait_for_overlap, &w);
+					return true;
+				}
 				schedule();
 				do_prepare = true;
 				goto retry;
