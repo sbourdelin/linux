@@ -91,6 +91,9 @@ extern int s3c_i2sv2_probe(struct snd_soc_dai *dai,
 			   struct s3c_i2sv2_info *i2s,
 			   unsigned long base);
 
+
+extern int s3c_i2sv2_remove(struct snd_soc_dai *dai);
+
 /**
  * s3c_i2sv2_register_component - register component and dai with soc core
  * @dev: DAI device

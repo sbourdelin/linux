@@ -625,20 +625,24 @@ int s3c_i2sv2_probe(struct snd_soc_dai *dai,
 {
 	struct device *dev = dai->dev;
 	unsigned int iismod;
+	int ret;
 
 	i2s->dev = dev;
 
 	/* record our i2s structure for later use in the callbacks */
 	snd_soc_dai_set_drvdata(dai, i2s);
 
-	i2s->iis_pclk = clk_get(dev, "iis");
+	i2s->iis_pclk = devm_clk_get(dev, "iis");
 	if (IS_ERR(i2s->iis_pclk)) {
 		dev_err(dev, "failed to get iis_clock\n");
-		iounmap(i2s->regs);
 		return -ENOENT;
 	}
 
-	clk_enable(i2s->iis_pclk);
+	ret = clk_prepare_enable(i2s->iis_pclk);
+	if (ret) {
+		dev_err(dev, "failed to prepare iis_clock\n");
+		return ret;
+	}
 
 	/* Mark ourselves as in TXRX mode so we can run through our cleanup
 	 * process without warnings. */
@@ -651,6 +655,15 @@ int s3c_i2sv2_probe(struct snd_soc_dai *dai,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(s3c_i2sv2_probe);
+
+int s3c_i2sv2_remove(struct snd_soc_dai *dai)
+{
+	struct s3c_i2sv2_info *i2s = to_info(dai);
+
+	clk_disable_unprepare(i2s->iis_pclk);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(s3c_i2sv2_remove);
 
 #ifdef CONFIG_PM
 static int s3c2412_i2s_suspend(struct snd_soc_dai *dai)
