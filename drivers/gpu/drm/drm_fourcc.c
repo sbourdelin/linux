@@ -222,7 +222,7 @@ drm_get_format_info(struct drm_device *dev,
 	const struct drm_format_info *info = NULL;
 
 	if (dev->mode_config.funcs->get_format_info)
-		info = dev->mode_config.funcs->get_format_info(mode_cmd);
+		info = dev->mode_config.funcs->get_format_info(dev, mode_cmd);
 
 	if (!info)
 		info = drm_format_info(mode_cmd->pixel_format);
