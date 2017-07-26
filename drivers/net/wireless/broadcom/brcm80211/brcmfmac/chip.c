@@ -222,18 +222,18 @@ struct sbsocramregs {
 
 static inline int brcmf_readl(struct brcmf_chip *chip, u32 addr)
 {
-	return chip->ops->read32(chip->ctx, addr);
+	return chip->ops->read32(chip->bus_priv, addr);
 }
 
 static inline void brcmf_writel(struct brcmf_chip *chip, u32 addr, u32 v)
 {
-	chip->ops->write32(chip->ctx, addr, v);
+	chip->ops->write32(chip->bus_priv, addr, v);
 }
 
 static inline void brcmf_writelp(struct brcmf_chip *chip, u32 addr, u32 v)
 {
-	chip->ops->write32(chip->ctx, addr, v);
-	chip->ops->read32(chip->ctx, addr);
+	chip->ops->write32(chip->bus_priv, addr, v);
+	chip->ops->read32(chip->bus_priv, addr);
 }
 
 static void brcmf_clear_bits(struct brcmf_chip *ci, u32 reg, u32 bits)
@@ -1018,7 +1018,7 @@ static int brcmf_chip_probe(struct brcmf_chip *ci)
 	 * specific reset at this point.
 	 */
 	if (ci->ops->reset) {
-		ci->ops->reset(ci->ctx, ci);
+		ci->ops->reset(ci->bus_priv, ci);
 		brcmf_chip_set_passive(ci);
 	}
 
@@ -1089,12 +1089,12 @@ static int brcmf_chip_setup(struct brcmf_chip *chip)
 
 	/* execute bus core specific setup */
 	if (chip->ops->setup)
-		ret = chip->ops->setup(chip->ctx, chip);
+		ret = chip->ops->setup(chip->bus_priv, chip);
 
 	return ret;
 }
 
-struct brcmf_chip *brcmf_chip_attach(void *ctx,
+struct brcmf_chip *brcmf_chip_attach(void *bus_priv,
 				     const struct brcmf_buscore_ops *ops)
 {
 	struct brcmf_chip *chip;
@@ -1118,9 +1118,9 @@ struct brcmf_chip *brcmf_chip_attach(void *ctx,
 	INIT_LIST_HEAD(&chip->cores);
 	chip->num_cores = 0;
 	chip->ops = ops;
-	chip->ctx = ctx;
+	chip->bus_priv = bus_priv;
 
-	err = ops->prepare(ctx);
+	err = ops->prepare(bus_priv);
 	if (err < 0)
 		goto fail;
 
@@ -1241,7 +1241,7 @@ static bool brcmf_chip_cm3_set_active(struct brcmf_chip *chip)
 		return false;
 	}
 
-	chip->ops->activate(chip->ctx, chip, 0);
+	chip->ops->activate(chip->bus_priv, chip, 0);
 
 	core = brcmf_chip_get_core(chip, BCMA_CORE_ARM_CM3);
 	brcmf_chip_resetcore(core, 0, 0, 0);
@@ -1267,7 +1267,7 @@ static bool brcmf_chip_cr4_set_active(struct brcmf_chip *chip, u32 rstvec)
 {
 	struct brcmf_core *core;
 
-	chip->ops->activate(chip->ctx, chip, rstvec);
+	chip->ops->activate(chip->bus_priv, chip, rstvec);
 
 	/* restore ARM */
 	core = brcmf_chip_get_core(chip, BCMA_CORE_ARM_CR4);
@@ -1294,7 +1294,7 @@ static bool brcmf_chip_ca7_set_active(struct brcmf_chip *chip, u32 rstvec)
 {
 	struct brcmf_core *core;
 
-	chip->ops->activate(chip->ctx, chip, rstvec);
+	chip->ops->activate(chip->bus_priv, chip, rstvec);
 
 	/* restore ARM */
 	core = brcmf_chip_get_core(chip, BCMA_CORE_ARM_CA7);
