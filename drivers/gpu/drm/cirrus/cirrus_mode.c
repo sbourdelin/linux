@@ -506,13 +506,20 @@ static void cirrus_connector_destroy(struct drm_connector *connector)
 	kfree(connector);
 }
 
+static int cirrus_connector_dpms(struct drm_connector *connector, int mode)
+{
+	drm_helper_connector_dpms(connector, mode);
+	/* FIXME: return error to make fbcon generic blank working */
+	return -EINVAL;
+}
+
 static const struct drm_connector_helper_funcs cirrus_vga_connector_helper_funcs = {
 	.get_modes = cirrus_vga_get_modes,
 	.best_encoder = cirrus_connector_best_encoder,
 };
 
 static const struct drm_connector_funcs cirrus_vga_connector_funcs = {
-	.dpms = drm_helper_connector_dpms,
+	.dpms = cirrus_connector_dpms,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = cirrus_connector_destroy,
 };
