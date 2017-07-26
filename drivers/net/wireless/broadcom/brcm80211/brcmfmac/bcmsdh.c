@@ -367,7 +367,7 @@ done:
 
 u8 brcmf_sdiod_regrb(struct brcmf_sdio_dev *sdiodev, u32 addr, int *ret)
 {
-	u8 data;
+	u8 data = 0;
 	int retval;
 
 	brcmf_dbg(SDIO, "addr:0x%08x\n", addr);
