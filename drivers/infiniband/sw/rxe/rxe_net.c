@@ -351,6 +351,27 @@ static void prepare_ipv6_hdr(struct dst_entry *dst, struct sk_buff *skb,
 	ip6h->payload_len = htons(skb->len - sizeof(*ip6h));
 }
 
+static inline bool addr4_same_rxe(struct rxe_dev *rxe, struct in_addr *daddr)
+{
+	struct in_device *in_dev;
+	bool same_rxe = false;
+
+	rcu_read_lock();
+	in_dev = __in_dev_get_rcu(rxe->ndev);
+	if (!in_dev)
+		goto out;
+
+	for_ifa(in_dev)
+		if (!memcmp(&ifa->ifa_address, daddr, sizeof(*daddr))) {
+			same_rxe = true;
+			goto out;
+		}
+	endfor_ifa(in_dev);
+out:
+	rcu_read_unlock();
+	return same_rxe;
+}
+
 static int prepare4(struct rxe_dev *rxe, struct rxe_pkt_info *pkt,
 		    struct sk_buff *skb, struct rxe_av *av)
 {
@@ -367,7 +388,7 @@ static int prepare4(struct rxe_dev *rxe, struct rxe_pkt_info *pkt,
 		return -EHOSTUNREACH;
 	}
 
-	if (!memcmp(saddr, daddr, sizeof(*daddr)))
+	if (addr4_same_rxe(rxe, daddr))
 		pkt->mask |= RXE_LOOPBACK_MASK;
 
 	prepare_udp_hdr(skb, htons(RXE_ROCE_V2_SPORT),
@@ -384,6 +405,28 @@ static int prepare4(struct rxe_dev *rxe, struct rxe_pkt_info *pkt,
 	return 0;
 }
 
+static inline bool addr6_same_rxe(struct rxe_dev *rxe, struct in6_addr *daddr)
+{
+	struct inet6_dev *in6_dev;
+	struct inet6_ifaddr *ifp;
+	bool same_rxe = false;
+
+	in6_dev = in6_dev_get(rxe->ndev);
+	if (!in6_dev)
+		return false;
+
+	read_lock_bh(&in6_dev->lock);
+	list_for_each_entry(ifp, &in6_dev->addr_list, if_list)
+		if (!memcmp(&ifp->addr, daddr, sizeof(*daddr))) {
+			same_rxe = true;
+			goto out;
+		}
+out:
+	read_unlock_bh(&in6_dev->lock);
+	in6_dev_put(in6_dev);
+	return same_rxe;
+}
+
 static int prepare6(struct rxe_dev *rxe, struct rxe_pkt_info *pkt,
 		    struct sk_buff *skb, struct rxe_av *av)
 {
@@ -398,7 +441,7 @@ static int prepare6(struct rxe_dev *rxe, struct rxe_pkt_info *pkt,
 		return -EHOSTUNREACH;
 	}
 
-	if (!memcmp(saddr, daddr, sizeof(*daddr)))
+	if (addr6_same_rxe(rxe, daddr))
 		pkt->mask |= RXE_LOOPBACK_MASK;
 
 	prepare_udp_hdr(skb, htons(RXE_ROCE_V2_SPORT),
