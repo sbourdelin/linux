@@ -1,3 +1,5 @@
+menu "IRQ chip support"
+
 config IRQCHIP
 	def_bool y
 	depends on OF_IRQ
@@ -307,3 +309,5 @@ config QCOM_IRQ_COMBINER
 	help
 	  Say yes here to add support for the IRQ combiner devices embedded
 	  in Qualcomm Technologies chips.
+
+endmenu
