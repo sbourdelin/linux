@@ -1,0 +1,8 @@
+What:		/sys/bus/pci/devices/<bus>:<vid>:<pid>.<n>/auto_hibern8
+Date:		July 2017
+Contact:	linux-scsi@vger.kernel.org
+Description:
+		This attribiute provides information on current setting of
+		Auto-Hibern8 UFS Host feature (read <unit: microseconds>)
+		and ability to set the feature on - by writing desired
+		timeout value <unit: microseconds>, or off (by writing '0').
