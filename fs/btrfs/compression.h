@@ -139,6 +139,8 @@ struct heuristic_bucket_item {
 #define BTRFS_HEURISTIC_ITER_OFFSET 256
 #define BTRFS_HEURISTIC_BUCKET_SIZE 256
 #define BTRFS_HEURISTIC_BYTE_SET_THRESHOLD 64
+#define BTRFS_HEURISTIC_BYTE_CORE_SET_LOW  BTRFS_HEURISTIC_BYTE_SET_THRESHOLD
+#define BTRFS_HEURISTIC_BYTE_CORE_SET_HIGH 200 // 80%
 
 int btrfs_compress_heuristic(struct inode *inode, u64 start, u64 end);
 
