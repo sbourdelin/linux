@@ -223,17 +223,6 @@ struct sbsocramregs {
 #define	ARMCR4_BSZ_MASK		0x3f
 #define	ARMCR4_BSZ_MULT		8192
 
-
-static void brcmf_chip_sb_corerev(struct brcmf_chip *ci,
-				  struct brcmf_core *core)
-{
-	u32 regdata;
-
-	regdata = ci->ops->read32(ci->ctx, CORE_SB(core->base, sbidhigh));
-
-	core->rev = SBCOREREV(regdata);
-}
-
 static bool brcmf_chip_sb_iscoreup(struct brcmf_core *core)
 {
 	struct brcmf_chip *ci = core->chip;
@@ -482,15 +471,15 @@ static char *brcmf_chip_name(uint chipid, char *buf, uint len)
 	return buf;
 }
 
-static struct brcmf_core *brcmf_chip_add_core(struct brcmf_chip *ci,
-					      u16 coreid, u32 base,
-					      u32 wrapbase)
+static struct brcmf_core *__brcmf_chip_add_core(struct brcmf_chip *ci,
+						u16 coreid, u32 base,
+						u32 wrapbase)
 {
 	struct brcmf_core *core;
 
 	core = kzalloc(sizeof(*core), GFP_KERNEL);
 	if (!core)
-		return ERR_PTR(-ENOMEM);
+		return NULL;
 
 	core->id = coreid;
 	core->base = base;
@@ -498,6 +487,40 @@ static struct brcmf_core *brcmf_chip_add_core(struct brcmf_chip *ci,
 	core->wrapbase = wrapbase;
 
 	list_add_tail(&core->list, &ci->cores);
+
+	return core;
+}
+
+static struct brcmf_core *brcmf_chip_add_sb_core(struct brcmf_chip *ci,
+						 u16 coreid, u32 base,
+						 u32 wrapbase)
+{
+	struct brcmf_core *core;
+	u32 regdata;
+
+	core = __brcmf_chip_add_core(ci, coreid, base, wrapbase);
+
+	if (!core)
+		goto out;
+
+	regdata = ci->ops->read32(ci->ctx, CORE_SB(core->base, sbidhigh));
+
+	core->rev = SBCOREREV(regdata);
+
+out:
+	return core;
+}
+
+static struct brcmf_core *brcmf_chip_add_axi_core(struct brcmf_chip *ci,
+						  u16 coreid, u32 base,
+						  u32 wrapbase, u8 rev)
+{
+	struct brcmf_core *core;
+
+	core = __brcmf_chip_add_core(ci, coreid, base, wrapbase);
+
+	if (core)
+		core->rev = rev;
 
 	return core;
 }
@@ -900,19 +923,41 @@ int brcmf_chip_dmp_erom_scan(struct brcmf_chip *ci)
 			continue;
 
 		/* finally a core to be added */
-		core = brcmf_chip_add_core(ci, id, base, wrap);
-		if (IS_ERR(core))
-			return PTR_ERR(core);
-
-		core->rev = rev;
+		core = brcmf_chip_add_axi_core(ci, id, base, wrap, rev);
+		if (!core)
+			return -ENOMEM; //FIXME - Cleanup the allocated cores?
 	}
 
 	return 0;
 }
 
-static int brcmf_chip_recognition(struct brcmf_chip *ci)
+struct brcmf_chip_desc {
+	u16 id;
+	u32 base;
+};
+
+static struct brcmf_chip_desc brcmf_4329[] = {
+	{ BCMA_CORE_CHIPCOMMON,   SI_ENUM_BASE },
+	{ BCMA_CORE_SDIO_DEV,     BCM4329_CORE_BUS_BASE },
+	{ BCMA_CORE_INTERNAL_MEM, BCM4329_CORE_SOCRAM_BASE },
+	{ BCMA_CORE_ARM_CM3,      BCM4329_CORE_ARM_BASE },
+	{ BCMA_CORE_80211,        0x18001000 },
+	{ 0, 0},
+};
+
+static int brcmf_chip_add_static(struct brcmf_chip *ci,
+				 struct brcmf_chip_desc *desc)
 {
-	struct brcmf_core *core;
+	for ( ; desc->id ; desc++)
+		brcmf_chip_add_sb_core(ci, desc->id, desc->base, 0);
+
+	//FIXME: cleanup if we fail to add a core?
+
+	return 0;
+}
+
+static int brcmf_chip_probe(struct brcmf_chip *ci)
+{
 	u32 regdata;
 	u32 socitype;
 	int ret;
@@ -920,11 +965,13 @@ static int brcmf_chip_recognition(struct brcmf_chip *ci)
 	/* Get CC core rev
 	 * Chipid is assume to be at offset 0 from SI_ENUM_BASE
 	 * For different chiptypes or old sdio hosts w/o chipcommon,
-	 * other ways of recognition should be added here.
+	 * other ways of to probe should be added here.
 	 */
 	regdata = ci->ops->read32(ci->ctx, CORE_CC_REG(SI_ENUM_BASE, chipid));
+
 	ci->chip = regdata & CID_ID_MASK;
 	ci->chiprev = (regdata & CID_REV_MASK) >> CID_REV_SHIFT;
+
 	socitype = (regdata & CID_TYPE_MASK) >> CID_TYPE_SHIFT;
 
 	brcmf_chip_name(ci->chip, ci->name, sizeof(ci->name));
@@ -932,45 +979,34 @@ static int brcmf_chip_recognition(struct brcmf_chip *ci)
 	printk(KERN_LOG "found %s chip: BCM%s, rev=%d\n",
 	       socitype == SOCI_SB ? "SB" : "AXI", ci->name, ci->chiprev);
 
-	switch(socitype) {
-		case SOCI_SB:
+	switch (socitype) {
+	case SOCI_SB:
 
-		if (ci->chip != BRCM_CC_4329_CHIP_ID) {
+		switch (ci->chip) {
+		case BRCM_CC_4329_CHIP_ID:
+			ret = brcmf_chip_add_static(ci, brcmf_4329);
+			break;
+		default:
 			brcmf_err("SB chip is not supported\n");
 			return -ENODEV;
 		}
+
+		if (!ret)
+			return -ENODEV;
 
 		ci->iscoreup = brcmf_chip_sb_iscoreup;
 		ci->coredisable = brcmf_chip_sb_coredisable;
 		ci->resetcore = brcmf_chip_sb_resetcore;
 
-		core = brcmf_chip_add_core(ci, BCMA_CORE_CHIPCOMMON,
-					   SI_ENUM_BASE, 0);
-		brcmf_chip_sb_corerev(ci, core);
-
-		core = brcmf_chip_add_core(ci, BCMA_CORE_SDIO_DEV,
-					   BCM4329_CORE_BUS_BASE, 0);
-		brcmf_chip_sb_corerev(ci, core);
-
-		core = brcmf_chip_add_core(ci, BCMA_CORE_INTERNAL_MEM,
-					   BCM4329_CORE_SOCRAM_BASE, 0);
-		brcmf_chip_sb_corerev(ci, core);
-
-		core = brcmf_chip_add_core(ci, BCMA_CORE_ARM_CM3,
-					   BCM4329_CORE_ARM_BASE, 0);
-		brcmf_chip_sb_corerev(ci, core);
-
-		core = brcmf_chip_add_core(ci, BCMA_CORE_80211, 0x18001000, 0);
-		brcmf_chip_sb_corerev(ci, core);
-
 		break;
 	case SOCI_AXI:
+
+		if (brcmf_chip_dmp_erom_scan(ci))
+			return -ENODEV;
 
 		ci->iscoreup = brcmf_chip_ai_iscoreup;
 		ci->coredisable = brcmf_chip_ai_coredisable;
 		ci->resetcore = brcmf_chip_ai_resetcore;
-
-		brcmf_chip_dmp_erom_scan(ci);
 
 		break;
 	default:
@@ -1092,7 +1128,7 @@ struct brcmf_chip *brcmf_chip_attach(void *ctx,
 	if (err < 0)
 		goto fail;
 
-	err = brcmf_chip_recognition(chip);
+	err = brcmf_chip_probe(chip);
 	if (err < 0)
 		goto fail;
 
