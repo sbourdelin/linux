@@ -1294,7 +1294,8 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 			}
 
 			count_vm_event(PGLAZYFREED);
-			count_memcg_page_event(page, PGLAZYFREED);
+			count_memcg_page_event(page,
+				(enum memcg_stat_item)PGLAZYFREED);
 		} else if (!mapping || !__remove_mapping(mapping, page, true))
 			goto keep_locked;
 		/*
@@ -1324,7 +1325,8 @@ activate_locked:
 		if (!PageMlocked(page)) {
 			SetPageActive(page);
 			pgactivate++;
-			count_memcg_page_event(page, PGACTIVATE);
+			count_memcg_page_event(page,
+				(enum memcg_stat_item)PGACTIVATE);
 		}
 keep_locked:
 		unlock_page(page);
@@ -2099,7 +2101,8 @@ static bool inactive_list_is_low(struct lruvec *lruvec, bool file,
 	active = lruvec_lru_size(lruvec, active_lru, sc->reclaim_idx);
 
 	if (memcg)
-		refaults = memcg_page_state(memcg, WORKINGSET_ACTIVATE);
+		refaults = memcg_page_state(memcg,
+				(enum memcg_stat_item)WORKINGSET_ACTIVATE);
 	else
 		refaults = node_page_state(pgdat, WORKINGSET_ACTIVATE);
 
@@ -2795,7 +2798,8 @@ static void snapshot_refaults(struct mem_cgroup *root_memcg, pg_data_t *pgdat)
 		struct lruvec *lruvec;
 
 		if (memcg)
-			refaults = memcg_page_state(memcg, WORKINGSET_ACTIVATE);
+			refaults = memcg_page_state(memcg,
+			    (enum memcg_stat_item)WORKINGSET_ACTIVATE);
 		else
 			refaults = node_page_state(pgdat, WORKINGSET_ACTIVATE);
 

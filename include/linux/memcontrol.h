@@ -576,7 +576,7 @@ static inline void __mod_lruvec_state(struct lruvec *lruvec,
 	if (mem_cgroup_disabled())
 		return;
 	pn = container_of(lruvec, struct mem_cgroup_per_node, lruvec);
-	__mod_memcg_state(pn->memcg, idx, val);
+	__mod_memcg_state(pn->memcg, (enum memcg_stat_item)idx, val);
 	__this_cpu_add(pn->lruvec_stat->count[idx], val);
 }
 
@@ -589,7 +589,7 @@ static inline void mod_lruvec_state(struct lruvec *lruvec,
 	if (mem_cgroup_disabled())
 		return;
 	pn = container_of(lruvec, struct mem_cgroup_per_node, lruvec);
-	mod_memcg_state(pn->memcg, idx, val);
+	mod_memcg_state(pn->memcg, (enum memcg_stat_item)idx, val);
 	this_cpu_add(pn->lruvec_stat->count[idx], val);
 }
 
@@ -601,7 +601,7 @@ static inline void __mod_lruvec_page_state(struct page *page,
 	__mod_node_page_state(page_pgdat(page), idx, val);
 	if (mem_cgroup_disabled() || !page->mem_cgroup)
 		return;
-	__mod_memcg_state(page->mem_cgroup, idx, val);
+	__mod_memcg_state(page->mem_cgroup, (enum memcg_stat_item)idx, val);
 	pn = page->mem_cgroup->nodeinfo[page_to_nid(page)];
 	__this_cpu_add(pn->lruvec_stat->count[idx], val);
 }
@@ -614,7 +614,7 @@ static inline void mod_lruvec_page_state(struct page *page,
 	mod_node_page_state(page_pgdat(page), idx, val);
 	if (mem_cgroup_disabled() || !page->mem_cgroup)
 		return;
-	mod_memcg_state(page->mem_cgroup, idx, val);
+	mod_memcg_state(page->mem_cgroup, (enum memcg_stat_item)idx, val);
 	pn = page->mem_cgroup->nodeinfo[page_to_nid(page)];
 	this_cpu_add(pn->lruvec_stat->count[idx], val);
 }
@@ -635,7 +635,8 @@ static inline void count_memcg_page_event(struct page *page,
 					  enum memcg_stat_item idx)
 {
 	if (page->mem_cgroup)
-		count_memcg_events(page->mem_cgroup, idx, 1);
+		count_memcg_events(page->mem_cgroup,
+			(enum vm_event_item)idx, 1);
 }
 
 static inline void count_memcg_event_mm(struct mm_struct *mm,

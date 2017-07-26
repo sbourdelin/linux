@@ -591,7 +591,7 @@ static void lru_lazyfree_fn(struct page *page, struct lruvec *lruvec,
 		add_page_to_lru_list(page, lruvec, LRU_INACTIVE_FILE);
 
 		__count_vm_events(PGLAZYFREE, hpage_nr_pages(page));
-		count_memcg_page_event(page, PGLAZYFREE);
+		count_memcg_page_event(page, (enum memcg_stat_item)PGLAZYFREE);
 		update_page_reclaim_stat(lruvec, 1, 0);
 	}
 }
