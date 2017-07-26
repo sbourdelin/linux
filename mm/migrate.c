@@ -1937,6 +1937,15 @@ int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 		put_page(new_page);
 		goto out_fail;
 	}
+
+	/*
+	 * mm_tlb_flush_pending() is safe if it is executed while the page-table
+	 * lock is taken. But here, it is executed while the page-table lock is
+	 * already released. This requires a full memory barrier on
+	 * architectures with weak memory models.
+	 */
+	smp_mb__after_unlock_lock();
+
 	/*
 	 * We are not sure a pending tlb flush here is for a huge page
 	 * mapping or not. Hence use the tlb range variant
