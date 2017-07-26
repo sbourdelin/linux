@@ -633,6 +633,7 @@ struct request_queue {
 #define QUEUE_FLAG_REGISTERED  29	/* queue has been registered to a disk */
 #define QUEUE_FLAG_SCSI_PASSTHROUGH 30	/* queue supports SCSI commands */
 #define QUEUE_FLAG_QUIESCED    31	/* queue has been quiesced */
+#define QUEUE_FLAG_NOWAIT      32	/* stack device driver supports REQ_NOWAIT */
 
 #define QUEUE_FLAG_DEFAULT	((1 << QUEUE_FLAG_IO_STAT) |		\
 				 (1 << QUEUE_FLAG_STACKABLE)	|	\
@@ -732,6 +733,7 @@ static inline void queue_flag_clear(unsigned int flag, struct request_queue *q)
 #define blk_queue_dax(q)	test_bit(QUEUE_FLAG_DAX, &(q)->queue_flags)
 #define blk_queue_scsi_passthrough(q)	\
 	test_bit(QUEUE_FLAG_SCSI_PASSTHROUGH, &(q)->queue_flags)
+#define blk_queue_supports_nowait(q)	test_bit(QUEUE_FLAG_NOWAIT, &(q)->queue_flags)
 
 #define blk_noretry_request(rq) \
 	((rq)->cmd_flags & (REQ_FAILFAST_DEV|REQ_FAILFAST_TRANSPORT| \

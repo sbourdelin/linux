@@ -2025,7 +2025,8 @@ generic_make_request_checks(struct bio *bio)
 	 * if queue is not a request based queue.
 	 */
 
-	if ((bio->bi_opf & REQ_NOWAIT) && !queue_is_rq_based(q))
+	if ((bio->bi_opf & REQ_NOWAIT) && !queue_is_rq_based(q) &&
+	    !blk_queue_supports_nowait(q))
 		goto not_supported;
 
 	part = bio->bi_bdev->bd_part;
