@@ -2271,6 +2271,8 @@ retry:
 			F2FS_FITS_IN_INODE(src, le16_to_cpu(src->i_extra_isize),
 								i_projid))
 			dst->i_projid = src->i_projid;
+
+		f2fs_inode_chksum_set(sbi, F2FS_NODE(ipage));
 	}
 
 	new_ni = old_ni;
