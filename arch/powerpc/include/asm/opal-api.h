@@ -195,7 +195,8 @@
 #define OPAL_SET_POWERCAP			153
 #define OPAL_GET_PSR				154
 #define OPAL_SET_PSR				155
-#define OPAL_LAST				155
+#define OPAL_SENSOR_GROUPS_CLEAR		156
+#define OPAL_LAST				156
 
 /* Device tree flags */
 
