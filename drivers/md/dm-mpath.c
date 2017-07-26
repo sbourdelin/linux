@@ -543,6 +543,11 @@ static int __multipath_map_bio(struct multipath *m, struct bio *bio, struct dm_m
 
 	if ((pgpath && queue_io) ||
 	    (!pgpath && test_bit(MPATHF_QUEUE_IF_NO_PATH, &m->flags))) {
+		/* Bail if nowait is set */
+		if (bio->bi_opf & REQ_NOWAIT) {
+			bio_wouldblock_error(bio);
+			return DM_MAPIO_SUBMITTED;
+		}
 		/* Queue for the daemon to resubmit */
 		spin_lock_irqsave(&m->lock, flags);
 		bio_list_add(&m->queued_bios, bio);
