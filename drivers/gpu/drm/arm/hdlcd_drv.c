@@ -36,7 +36,7 @@ static int hdlcd_load(struct drm_device *drm, unsigned long flags)
 	struct platform_device *pdev = to_platform_device(drm->dev);
 	struct resource *res;
 	u32 version;
-	int ret;
+	int ret, irq;
 
 	hdlcd->clk = devm_clk_get(drm->dev, "pxlclk");
 	if (IS_ERR(hdlcd->clk))
@@ -82,10 +82,13 @@ static int hdlcd_load(struct drm_device *drm, unsigned long flags)
 		goto setup_fail;
 	}
 
-	ret = drm_irq_install(drm, platform_get_irq(pdev, 0));
-	if (ret < 0) {
-		DRM_ERROR("failed to install IRQ handler\n");
-		goto irq_fail;
+	irq = platform_get_irq(pdev, 0);
+	if (irq > 0) {
+		ret = drm_irq_install(drm, irq);
+		if (ret < 0) {
+			DRM_ERROR("failed to install IRQ handler\n");
+			goto irq_fail;
+		}
 	}
 
 	return 0;
