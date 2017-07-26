@@ -34,6 +34,7 @@
 
 #ifdef CONFIG_ACPI_APEI
 # include <asm/pgtable_types.h>
+# include <linux/mem_encrypt.h>
 #endif
 
 #ifdef CONFIG_ACPI
@@ -166,8 +167,12 @@ static inline pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
 	 * anything other than PAGE_KERNEL (some arm64 platforms
 	 * require the equivalent of PAGE_KERNEL_NOCACHE), return that
 	 * until we know differently.
+	 *
+	 * When SME is active, the ACPI information will not reside in
+	 * in memory in an encrypted state so return a protection attribute
+	 * that does not have the encryption bit set.
 	 */
-	 return PAGE_KERNEL;
+	 return sme_active() ? PAGE_KERNEL_IO : PAGE_KERNEL;
 }
 #endif
 
