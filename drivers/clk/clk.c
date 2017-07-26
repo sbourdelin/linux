@@ -67,6 +67,8 @@ struct clk_core {
 	struct hlist_head	children;
 	struct hlist_node	child_node;
 	struct hlist_head	clks;
+	struct list_head	prepare_list;
+	struct list_head	enable_list;
 	unsigned int		notifier_count;
 #ifdef CONFIG_DEBUG_FS
 	struct dentry		*dentry;
@@ -523,33 +525,43 @@ EXPORT_SYMBOL_GPL(clk_unprepare);
 static int clk_core_prepare(struct clk_core *core)
 {
 	int ret = 0;
+	struct clk_core *tmp, *parent;
+	LIST_HEAD(head);
 
 	lockdep_assert_held(&prepare_lock);
 
-	if (!core)
-		return 0;
-
-	if (core->prepare_count == 0) {
-		ret = clk_core_prepare(core->parent);
-		if (ret)
-			return ret;
-
-		trace_clk_prepare(core);
-
-		if (core->ops->prepare)
-			ret = core->ops->prepare(core->hw);
-
-		trace_clk_prepare_complete(core);
-
-		if (ret) {
-			clk_core_unprepare(core->parent);
-			return ret;
-		}
+	while (core) {
+		list_add(&core->prepare_list, &head);
+		/* Stop once we see a clk that is already prepared */
+		if (core->prepare_count)
+			break;
+		core = core->parent;
 	}
 
-	core->prepare_count++;
+	list_for_each_entry_safe(core, tmp, &head, prepare_list) {
+		list_del_init(&core->prepare_list);
+
+		if (core->prepare_count == 0) {
+			trace_clk_prepare(core);
+
+			if (core->ops->prepare)
+				ret = core->ops->prepare(core->hw);
+
+			trace_clk_prepare_complete(core);
+
+			if (ret)
+				goto err;
+		}
+		core->prepare_count++;
+	}
 
 	return 0;
+err:
+	parent = core->parent;
+	list_for_each_entry_safe_continue(core, tmp, &head, prepare_list)
+		list_del_init(&core->prepare_list);
+	clk_core_unprepare(parent);
+	return ret;
 }
 
 static int clk_core_prepare_lock(struct clk_core *core)
@@ -643,36 +655,49 @@ EXPORT_SYMBOL_GPL(clk_disable);
 static int clk_core_enable(struct clk_core *core)
 {
 	int ret = 0;
+	struct clk_core *tmp, *parent, *prev;
+	LIST_HEAD(head);
 
 	lockdep_assert_held(&enable_lock);
 
-	if (!core)
-		return 0;
-
-	if (WARN_ON(core->prepare_count == 0))
-		return -ESHUTDOWN;
-
-	if (core->enable_count == 0) {
-		ret = clk_core_enable(core->parent);
-
-		if (ret)
-			return ret;
-
-		trace_clk_enable_rcuidle(core);
-
-		if (core->ops->enable)
-			ret = core->ops->enable(core->hw);
-
-		trace_clk_enable_complete_rcuidle(core);
-
-		if (ret) {
-			clk_core_disable(core->parent);
-			return ret;
-		}
+	while (core) {
+		list_add(&core->enable_list, &head);
+		/* Stop once we see a clk that is already enabled */
+		if (core->enable_count)
+			break;
+		core = core->parent;
 	}
 
-	core->enable_count++;
+	list_for_each_entry_safe(core, tmp, &head, enable_list) {
+		list_del_init(&core->enable_list);
+
+		if (WARN_ON(core->prepare_count == 0)) {
+			ret = -ESHUTDOWN;
+			goto err;
+		}
+
+		if (core->enable_count == 0) {
+			trace_clk_enable_rcuidle(core);
+
+			if (core->ops->enable)
+				ret = core->ops->enable(core->hw);
+
+			trace_clk_enable_complete_rcuidle(core);
+
+			if (ret)
+				goto err;
+		}
+
+		core->enable_count++;
+	}
+
 	return 0;
+err:
+	parent = core->parent;
+	list_for_each_entry_safe_continue(core, tmp, &head, enable_list)
+		list_del_init(&core->enable_list);
+	clk_core_disable(parent);
+	return ret;
 }
 
 static int clk_core_enable_lock(struct clk_core *core)
@@ -2590,6 +2615,8 @@ struct clk *clk_register(struct device *dev, struct clk_hw *hw)
 	core->num_parents = hw->init->num_parents;
 	core->min_rate = 0;
 	core->max_rate = ULONG_MAX;
+	INIT_LIST_HEAD(&core->prepare_list);
+	INIT_LIST_HEAD(&core->enable_list);
 	hw->core = core;
 
 	/* allocate local copy in case parent_names is __initdata */
