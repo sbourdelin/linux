@@ -979,9 +979,20 @@ char *strreplace(char *s, char old, char new)
 }
 EXPORT_SYMBOL(strreplace);
 
-void fortify_panic(const char *name)
+void fortify_read_overflow(const char *func)
 {
-	pr_emerg("detected buffer overflow in %s\n", name);
-	BUG();
+	WARN(1, "detected read beyond size of object passed as 1st parameter in %s\n", func);
 }
-EXPORT_SYMBOL(fortify_panic);
+EXPORT_SYMBOL(fortify_read_overflow);
+
+void fortify_read_overflow2(const char *func)
+{
+	WARN(1, "detected read beyond size of object passed as 2nd parameter in %s\n", func);
+}
+EXPORT_SYMBOL(fortify_read_overflow2);
+
+void fortify_write_overflow(const char *func)
+{
+	WARN(1, "detected write beyond size of object passed as 1st parameter in %s\n", func);
+}
+EXPORT_SYMBOL(fortify_write_overflow);
