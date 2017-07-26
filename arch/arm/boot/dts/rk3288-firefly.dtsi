@@ -116,6 +116,19 @@
 		};
 	};
 
+	sound-i2s {
+		compatible = "rockchip,rk3288-hdmi-analog";
+		pinctrl-names = "default";
+		pinctrl-0 = <&phone_ctl>, <&hp_det>;
+		rockchip,audio-codec = <&es8323>;
+		rockchip,hp-det-gpios = <&gpio7 15 GPIO_ACTIVE_HIGH>;
+		rockchip,hp-en-gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>;
+		rockchip,i2s-controller = <&i2s>;
+		rockchip,model = "I2S";
+		rockchip,routing = "Analog", "LOUT2",
+				   "Analog", "ROUT2";
+	};
+
 	vbat_wl: vcc_sys: vsys-regulator {
 		compatible = "regulator-fixed";
 		regulator-name = "vcc_sys";
@@ -388,6 +401,17 @@
 
 &i2c2 {
 	status = "okay";
+
+	es8323: es8323@10 {
+		compatible = "everest,es8323", "everest,es8328";
+		reg = <0x10>;
+		AVDD-supply = <&vcca_33>;
+		DVDD-supply = <&vcca_33>;
+		HPVDD-supply = <&vcca_33>;
+		PVDD-supply = <&vcca_33>;
+		clocks = <&cru SCLK_I2S0_OUT>;
+		clock-names = "i2s_clk_out";
+	};
 };
 
 &i2c4 {
@@ -395,6 +419,10 @@
 };
 
 &i2c5 {
+	status = "okay";
+};
+
+&i2s {
 	status = "okay";
 };
 
@@ -497,6 +525,16 @@
 
 		sdmmc_pwr: sdmmc-pwr {
 			rockchip,pins = <7 11 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	headphone {
+		hp_det: hp-det {
+			rockchip,pins = <7 15 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		phone_ctl: phone-ctl {
+			rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
 
