@@ -631,3 +631,8 @@ struct page *get_signal_page(void)
 
 	return page;
 }
+
+asmlinkage void addr_limit_check_failed(void)
+{
+	panic("Incorrect address limit while returning to user-mode.");
+}
