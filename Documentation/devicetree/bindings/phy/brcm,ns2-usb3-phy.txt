@@ -1,0 +1,48 @@
+Broadcom USB3 dual port phy for Northstar2 SoC
+This is a child bus node of "brcm,mdio-mux-iproc" node.
+
+Required mdio bus properties:
+- reg: MDIO Bus number for the MDIO interface
+- #address-cells: must be 1
+- #size-cells: must be 0
+
+Required PHY properties:
+- compatible: should be "brcm,ns2-usb3-phy"
+- reg: MDIO Phy ID for the MDIO interface
+- #phy-cells: must be 0
+- #address-cells: must be 1
+- #size-cells: must be 0
+
+Sub-nodes:
+  Each port's PHY should be represented as a sub-node.
+
+Sub-nodes required properties:
+ - reg: the PHY number
+ - phy-cells: from the generic PHY bindings, must be 0
+
+Example:
+
+mdio@1 {
+	reg = <0x1>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	usb3_phy: usb3_phy@0 {
+		compatible = "brcm,ns2-usb3-phy";
+		reg = <0x0>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		usb3_phy0: usb3_phy@0 {
+			reg = <0>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+
+		usb3_phy1: usb_phy@1 {
+			reg = <1>;
+			#phy-cells = <0>;
+			status = "disabled";
+		};
+	};
+};
