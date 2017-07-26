@@ -215,7 +215,6 @@ static int asoc_graph_card_parse_of(struct graph_card_data *priv)
 		codec_ep = of_graph_get_remote_endpoint(cpu_ep);
 		rcpu_ep  = of_graph_get_remote_endpoint(codec_ep);
 
-		of_node_put(cpu_port);
 		of_node_put(cpu_ep);
 		of_node_put(codec_ep);
 		of_node_put(rcpu_ep);
@@ -248,11 +247,9 @@ static int asoc_graph_card_parse_of(struct graph_card_data *priv)
 			cpu_port = it.node;
 			cpu_ep   = of_get_next_child(cpu_port, NULL);
 			codec_ep = of_graph_get_remote_endpoint(cpu_ep);
-			codec_port = of_graph_get_port_parent(codec_ep);
+			codec_port = of_graph_get_port_parent(codec_ep); /* call put */
 
-			of_node_put(cpu_port);
 			of_node_put(cpu_ep);
-			of_node_put(codec_ep);
 			of_node_put(codec_port);
 
 			if (codec) {
@@ -304,11 +301,9 @@ static int asoc_graph_get_dais_count(struct device *dev)
 		cpu_port = it.node;
 		cpu_ep   = of_get_next_child(cpu_port, NULL);
 		codec_ep = of_graph_get_remote_endpoint(cpu_ep);
-		codec_port = of_graph_get_port_parent(codec_ep);
+		codec_port = of_graph_get_port_parent(codec_ep); /* call put */
 
-		of_node_put(cpu_port);
 		of_node_put(cpu_ep);
-		of_node_put(codec_ep);
 		of_node_put(codec_port);
 
 		if (cpu_ep)
