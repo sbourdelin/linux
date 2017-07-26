@@ -1187,6 +1187,9 @@ const struct inode_operations ll_dir_inode_operations = {
 	.permission	 = ll_inode_permission,
 	.listxattr	  = ll_listxattr,
 	.get_acl	    = ll_get_acl,
+#ifdef CONFIG_FS_POSIX_ACL
+	.set_acl	= ll_set_acl,
+#endif
 };
 
 const struct inode_operations ll_special_inode_operations = {
@@ -1195,4 +1198,7 @@ const struct inode_operations ll_special_inode_operations = {
 	.permission     = ll_inode_permission,
 	.listxattr      = ll_listxattr,
 	.get_acl	    = ll_get_acl,
+#ifdef CONFIG_FS_POSIX_ACL
+	.set_acl	= ll_set_acl,
+#endif
 };

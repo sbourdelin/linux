@@ -3040,6 +3040,61 @@ struct posix_acl *ll_get_acl(struct inode *inode, int type)
 	return acl;
 }
 
+#ifdef CONFIG_FS_POSIX_ACL
+int ll_set_acl(struct inode *inode, struct posix_acl *acl, int type)
+{
+	const char *name = NULL;
+	char *value = NULL;
+	size_t size = 0;
+	int rc = 0;
+
+	switch (type) {
+	case ACL_TYPE_ACCESS:
+		if (acl) {
+			rc = posix_acl_update_mode(inode, &inode->i_mode, &acl);
+			if (rc)
+				goto out;
+		}
+		name = XATTR_NAME_POSIX_ACL_ACCESS;
+		break;
+	case ACL_TYPE_DEFAULT:
+		if (!S_ISDIR(inode->i_mode)) {
+			rc = acl ? -EACCES : 0;
+			goto out;
+		}
+		name = XATTR_NAME_POSIX_ACL_DEFAULT;
+		break;
+	default:
+		rc = -EINVAL;
+		goto out;
+	}
+
+	if (acl) {
+		size = posix_acl_xattr_size(acl->a_count);
+		value = kmalloc(size, GFP_NOFS);
+		if (!value) {
+			rc = -ENOMEM;
+			goto out;
+		}
+
+		rc = posix_acl_to_xattr(&init_user_ns, acl, value, size);
+		if (rc < 0)
+			goto out_free;
+	}
+
+	/* dentry is only used for *.lov attributes so it's safe to be NULL */
+	rc = __vfs_setxattr(NULL, inode, name, value, size, XATTR_CREATE);
+out_free:
+	kfree(value);
+out:
+	if (!rc)
+		set_cached_acl(inode, type, acl);
+	else
+		forget_cached_acl(inode, type);
+	return rc;
+}
+#endif /* CONFIG_FS_POSIX_ACL */
+
 int ll_inode_permission(struct inode *inode, int mask)
 {
 	struct ll_sb_info *sbi;
@@ -3162,6 +3217,9 @@ const struct inode_operations ll_file_inode_operations = {
 	.listxattr	= ll_listxattr,
 	.fiemap		= ll_fiemap,
 	.get_acl	= ll_get_acl,
+#ifdef CONFIG_FS_POSIX_ACL
+	.set_acl	= ll_set_acl,
+#endif
 };
 
 /* dynamic ioctl number support routines */
