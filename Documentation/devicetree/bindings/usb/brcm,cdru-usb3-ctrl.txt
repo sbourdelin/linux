@@ -1,0 +1,14 @@
+Broadcom Chip Device Resource Unit USB3 register
+
+Required properties:
+- compatible: "brcm,cdru-usb3-ctrl"
+- reg: Base address and length of the USB registers
+
+
+Example:
+
+cdru_usb3_ctrl: cdru_usb3_ctrl@6501d144 {
+        compatible = "brcm,cdru-usb3-ctrl";
+        reg = <0x6501d144 0x4>;
+};
+
