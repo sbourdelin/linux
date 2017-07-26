@@ -1019,8 +1019,15 @@ static void qxl_conn_destroy(struct drm_connector *connector)
 	kfree(qxl_output);
 }
 
+static int qxl_conn_dpms(struct drm_connector *connector, int mode)
+{
+	drm_helper_connector_dpms(connector, mode);
+	/* FIXME: return error to make fbcon generic blank working */
+	return -EINVAL;
+}
+
 static const struct drm_connector_funcs qxl_connector_funcs = {
-	.dpms = drm_helper_connector_dpms,
+	.dpms = qxl_conn_dpms,
 	.detect = qxl_conn_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.set_property = qxl_conn_set_property,
