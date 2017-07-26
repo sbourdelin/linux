@@ -21,6 +21,8 @@
 #define CORE_CC_REG(base, field) \
 		(base + offsetof(struct chipcregs, field))
 
+struct brcmf_core;
+
 /**
  * struct brcmf_chip - chip level information.
  *
@@ -36,6 +38,20 @@
  * @name: string representation of the chip identifier.
  */
 struct brcmf_chip {
+	const struct brcmf_buscore_ops *ops;
+
+	/* assured first core is chipcommon, second core is buscore */
+	//FIXME: Really? does not appear to hold true for 43430
+	struct list_head cores; /* List of cores in this chip */
+	u16 num_cores;
+
+	bool (*iscoreup)(struct brcmf_core *core);
+	void (*coredisable)(struct brcmf_core *core, u32 prereset, u32 reset);
+	void (*resetcore)(struct brcmf_core *core, u32 prereset, u32 reset,
+			  u32 postreset);
+
+	void *ctx;
+
 	u32 chip;
 	u32 chiprev;
 	u32 cc_caps;
@@ -45,6 +61,7 @@ struct brcmf_chip {
 	u32 rambase;
 	u32 ramsize;
 	u32 srsize;
+
 	char name[8];
 };
 
@@ -56,9 +73,14 @@ struct brcmf_chip {
  * @base: base address of core register space.
  */
 struct brcmf_core {
+	struct brcmf_chip *chip; /* Parent chip */
+	struct list_head list;
+
 	u16 id;
 	u16 rev;
 	u32 base;
+	u32 wrapbase;
+
 };
 
 /**
