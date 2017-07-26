@@ -1,0 +1,13 @@
+Broadcom ICFG USB3 registers
+
+Required properties:
+- compatible: "brcm,icfg-usb"
+- reg: Base address and length of the USB registers
+
+
+Example:
+
+icfg_usb3: icfg_usb3@66000900 {
+        compatible = "brcm,icfg-usb";
+        reg = <0x66000900 0x60>;
+};
