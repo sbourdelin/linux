@@ -97,9 +97,11 @@ static inline void r4k_on_each_cpu(unsigned int type,
 				   void (*func)(void *info), void *info)
 {
 	preempt_disable();
+#ifdef CONFIG_SMP
 	if (r4k_op_needs_ipi(type))
 		smp_call_function_many(&cpu_foreign_map[smp_processor_id()],
 				       func, info, 1);
+#endif
 	func(info);
 	preempt_enable();
 }
