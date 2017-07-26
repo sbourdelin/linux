@@ -370,9 +370,7 @@ u8 brcmf_sdiod_regrb(struct brcmf_sdio_dev *sdiodev, u32 addr, int *ret)
 	u8 data = 0;
 	int retval;
 
-	brcmf_dbg(SDIO, "addr:0x%08x\n", addr);
 	retval = brcmf_sdiod_reg_read(sdiodev, addr, 1, &data);
-	brcmf_dbg(SDIO, "data:0x%02x\n", data);
 
 	if (ret)
 		*ret = retval;
@@ -385,8 +383,6 @@ u32 brcmf_sdiod_regrl(struct brcmf_sdio_dev *sdiodev, u32 addr, int *ret)
 	u32 data = 0;
 	int retval;
 
-	brcmf_dbg(SDIO, "addr:0x%08x\n", addr);
-	brcmf_dbg(SDIO, "data:0x%08x\n", data);
 	retval = brcmf_sdiod_reg_read(sdiodev, addr, 4, &data);
 
 	if (ret)
@@ -400,7 +396,6 @@ void brcmf_sdiod_regwb(struct brcmf_sdio_dev *sdiodev, u32 addr,
 {
 	int retval;
 
-	brcmf_dbg(SDIO, "addr:0x%08x, data:0x%02x\n", addr, data);
 	retval = brcmf_sdiod_reg_write(sdiodev, addr, 1, &data);
 
 	if (ret)
@@ -412,7 +407,7 @@ void brcmf_sdiod_regwl(struct brcmf_sdio_dev *sdiodev, u32 addr,
 {
 	int retval;
 
-	brcmf_dbg(SDIO, "addr:0x%08x, data:0x%08x\n", addr, data);
+	retval = brcmf_sdiod_reg_write(sdiodev, addr, 4, &data);
 
 	if (ret)
 		*ret = retval;
