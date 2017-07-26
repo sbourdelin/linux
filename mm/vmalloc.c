@@ -336,6 +336,7 @@ static struct rb_root vmap_area_root = RB_ROOT;
 
 /* The vmap cache globals are protected by vmap_area_lock */
 static struct rb_node *free_vmap_cache;
+static struct vmap_area *cached_hole_node;
 static unsigned long cached_hole_size;
 static unsigned long cached_vstart;
 static unsigned long cached_align;
@@ -444,6 +445,14 @@ retry:
 			size < cached_hole_size ||
 			vstart < cached_vstart ||
 			align < cached_align) {
+		/*if we have a cached node, just use it*/
+		if ((size < cached_hole_size) && cached_hole_node != NULL) {
+			addr = ALIGN(cached_hole_node->va_end, align);
+			if (addr >= vstart) {
+				cached_hole_node = NULL;
+				goto found;
+			}
+		}
 nocache:
 		cached_hole_size = 0;
 		free_vmap_cache = NULL;
@@ -487,8 +496,15 @@ nocache:
 
 	/* from the starting point, walk areas until a suitable hole is found */
 	while (addr + size > first->va_start && addr + size <= vend) {
-		if (addr + cached_hole_size < first->va_start)
+		struct rb_node *rb_node;
+
+		if (addr + cached_hole_size < first->va_start) {
 			cached_hole_size = first->va_start - addr;
+			/*record the node corresponding to the hole*/
+			rb_node = rb_prev(&first->rb_node);
+			cached_hole_node = (rb_node == NULL) ? NULL :
+				rb_entry(rb_node, struct vmap_area, rb_node);
+		}
 		addr = ALIGN(first->va_end, align);
 		if (addr + size < addr)
 			goto overflow;
@@ -554,6 +570,9 @@ EXPORT_SYMBOL_GPL(unregister_vmap_purge_notifier);
 
 static void __free_vmap_area(struct vmap_area *va)
 {
+	struct vmap_area *prev, *next;
+	unsigned long hole_size;
+
 	BUG_ON(RB_EMPTY_NODE(&va->rb_node));
 
 	if (free_vmap_cache) {
@@ -571,10 +590,16 @@ static void __free_vmap_area(struct vmap_area *va)
 			}
 		}
 	}
+	prev = rb_entry(rb_prev(&va->rb_node), struct vmap_area, rb_node);
+	next = rb_entry(rb_next(&va->rb_node), struct vmap_area, rb_node);
+	hole_size = next->va_start - prev->va_end;
+	if (hole_size > cached_hole_size) {
+		cached_hole_node = prev;
+		cached_hole_size = hole_size;
+	}
 	rb_erase(&va->rb_node, &vmap_area_root);
 	RB_CLEAR_NODE(&va->rb_node);
 	list_del_rcu(&va->list);
-
 	/*
 	 * Track the highest possible candidate for pcpu area
 	 * allocation.  Areas outside of vmalloc area can be returned
