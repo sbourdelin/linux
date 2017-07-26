@@ -60,13 +60,6 @@ static int create_encryption_context_from_policy(struct inode *inode,
 {
 	struct fscrypt_context ctx;
 
-	if (!fscrypt_valid_enc_modes(policy->contents_encryption_mode,
-				     policy->filenames_encryption_mode))
-		return -EINVAL;
-
-	if (policy->flags & ~FS_POLICY_FLAGS_VALID)
-		return -EINVAL;
-
 	ctx.version = context_version_for_policy(policy);
 	ctx.contents_encryption_mode = policy->contents_encryption_mode;
 	ctx.filenames_encryption_mode = policy->filenames_encryption_mode;
@@ -98,6 +91,13 @@ int fscrypt_ioctl_set_policy(struct file *filp, const void __user *arg)
 
 	if (policy.version != FS_POLICY_VERSION_ORIGINAL &&
 	    policy.version != FS_POLICY_VERSION_HKDF)
+		return -EINVAL;
+
+	if (!fscrypt_valid_enc_modes(policy.contents_encryption_mode,
+				     policy.filenames_encryption_mode))
+		return -EINVAL;
+
+	if (policy.flags & ~FS_POLICY_FLAGS_VALID)
 		return -EINVAL;
 
 	ret = mnt_want_write_file(filp);
