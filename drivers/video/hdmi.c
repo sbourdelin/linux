@@ -240,6 +240,49 @@ int hdmi_audio_infoframe_init(struct hdmi_audio_infoframe *frame)
 EXPORT_SYMBOL(hdmi_audio_infoframe_init);
 
 /**
+ * hdmi_audio_infoframe_pack_payload() - write HDMI audio infoframe payload to
+ * binary buffer
+ * @frame: HDMI audio infoframe
+ * @buffer: destination buffer
+ * @size: size of buffer
+ *
+ * Packs the information contained in the @frame structure into a binary
+ * representation that can be written into the corresponding controller
+ * registers.
+ *
+ * Returns 0 on success or a negative error code on failure.
+ */
+ssize_t hdmi_audio_infoframe_pack_payload(struct hdmi_audio_infoframe *frame,
+					  void *buffer, size_t size)
+{
+	unsigned char channels;
+	u8 *ptr = buffer;
+
+	if (size < frame->length || size < HDMI_AUDIO_INFOFRAME_SIZE)
+		return -ENOSPC;
+
+	memset(buffer, 0, size);
+
+	if (frame->channels >= 2)
+		channels = frame->channels - 1;
+	else
+		channels = 0;
+
+	ptr[0] = ((frame->coding_type & 0xf) << 4) | (channels & 0x7);
+	ptr[1] = ((frame->sample_frequency & 0x7) << 2) |
+		 (frame->sample_size & 0x3);
+	ptr[2] = frame->coding_type_ext & 0x1f;
+	ptr[3] = frame->channel_allocation;
+	ptr[4] = (frame->level_shift_value & 0xf) << 3;
+
+	if (frame->downmix_inhibit)
+		ptr[4] |= BIT(7);
+
+	return 0;
+}
+EXPORT_SYMBOL(hdmi_audio_infoframe_pack_payload);
+
+/**
  * hdmi_audio_infoframe_pack() - write HDMI audio infoframe to binary buffer
  * @frame: HDMI audio infoframe
  * @buffer: destination buffer
@@ -256,21 +299,14 @@ EXPORT_SYMBOL(hdmi_audio_infoframe_init);
 ssize_t hdmi_audio_infoframe_pack(struct hdmi_audio_infoframe *frame,
 				  void *buffer, size_t size)
 {
-	unsigned char channels;
 	u8 *ptr = buffer;
 	size_t length;
+	int ret;
 
 	length = HDMI_INFOFRAME_HEADER_SIZE + frame->length;
 
 	if (size < length)
 		return -ENOSPC;
-
-	memset(buffer, 0, size);
-
-	if (frame->channels >= 2)
-		channels = frame->channels - 1;
-	else
-		channels = 0;
 
 	ptr[0] = frame->type;
 	ptr[1] = frame->version;
@@ -279,16 +315,10 @@ ssize_t hdmi_audio_infoframe_pack(struct hdmi_audio_infoframe *frame,
 
 	/* start infoframe payload */
 	ptr += HDMI_INFOFRAME_HEADER_SIZE;
-
-	ptr[0] = ((frame->coding_type & 0xf) << 4) | (channels & 0x7);
-	ptr[1] = ((frame->sample_frequency & 0x7) << 2) |
-		 (frame->sample_size & 0x3);
-	ptr[2] = frame->coding_type_ext & 0x1f;
-	ptr[3] = frame->channel_allocation;
-	ptr[4] = (frame->level_shift_value & 0xf) << 3;
-
-	if (frame->downmix_inhibit)
-		ptr[4] |= BIT(7);
+	ret = hdmi_audio_infoframe_pack_payload(frame, ptr,
+					size - HDMI_INFOFRAME_HEADER_SIZE);
+	if (ret)
+		return ret;
 
 	hdmi_infoframe_set_checksum(buffer, length);
 
