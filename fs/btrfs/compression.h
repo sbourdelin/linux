@@ -129,6 +129,16 @@ struct btrfs_compress_op {
 extern const struct btrfs_compress_op btrfs_zlib_compress;
 extern const struct btrfs_compress_op btrfs_lzo_compress;
 
+struct heuristic_bucket_item {
+       u8  padding;
+       u8  symbol;
+       u16 count;
+};
+
+#define BTRFS_HEURISTIC_READ_SIZE 16
+#define BTRFS_HEURISTIC_ITER_OFFSET 256
+#define BTRFS_HEURISTIC_BUCKET_SIZE 256
+
 int btrfs_compress_heuristic(struct inode *inode, u64 start, u64 end);
 
 #endif
