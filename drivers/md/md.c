@@ -285,6 +285,13 @@ static blk_qc_t md_make_request(struct request_queue *q, struct bio *bio)
 		bio_endio(bio);
 		return BLK_QC_T_NONE;
 	}
+
+	if (mddev->suspended && (bio->bi_opf & REQ_NOWAIT)) {
+		bio_wouldblock_error(bio);
+		rcu_read_unlock();
+		return BLK_QC_T_NONE;
+	}
+
 check_suspended:
 	rcu_read_lock();
 	if (mddev->suspended) {
@@ -5274,6 +5281,10 @@ static int md_alloc(dev_t dev, char *name)
 		mddev->queue = NULL;
 		goto abort;
 	}
+
+	/* Set the NOWAIT flags to show support */
+	queue_flag_set_unlocked(QUEUE_FLAG_NOWAIT, mddev->queue);
+
 	disk->major = MAJOR(mddev->unit);
 	disk->first_minor = unit << shift;
 	if (name)
@@ -8010,8 +8021,20 @@ bool md_write_start(struct mddev *mddev, struct bio *bi)
 	rcu_read_unlock();
 	if (did_change)
 		sysfs_notify_dirent_safe(mddev->sysfs_state);
-	wait_event(mddev->sb_wait,
-		   !test_bit(MD_SB_CHANGE_PENDING, &mddev->sb_flags) && !mddev->suspended);
+
+	/* Don't wait for sb writes if marked with REQ_NOWAIT */
+	if (test_bit(MD_SB_CHANGE_PENDING, &mddev->sb_flags) ||
+			mddev->suspended) {
+		if (bi->bi_opf & REQ_NOWAIT) {
+			bio_wouldblock_error(bi);
+			percpu_ref_put(&mddev->writes_pending);
+			return false;
+		}
+
+		wait_event(mddev->sb_wait,
+				!test_bit(MD_SB_CHANGE_PENDING, &mddev->sb_flags) && !mddev->suspended);
+	}
+
 	if (test_bit(MD_SB_CHANGE_PENDING, &mddev->sb_flags)) {
 		percpu_ref_put(&mddev->writes_pending);
 		return false;
