@@ -424,6 +424,11 @@
 /* Reference cycles when using lane clock as reference */
 #define LANE_REF_CYC				0x8000
 
+#define F_HOST_WR		BIT(0)
+#define PIF_PKT_ALLOC_WR_EN	BIT(0)
+#define PIF_PKT_TYPE_VALID	(3 << 16)
+#define F_PACKET_TYPE(x)	(((x) & 0xff) << 8)
+
 enum voltage_swing_level {
 	VOLTAGE_LEVEL_0,
 	VOLTAGE_LEVEL_1,
@@ -478,5 +483,6 @@ int cdn_dp_set_video_status(struct cdn_dp_device *dp, int active);
 int cdn_dp_config_video(struct cdn_dp_device *dp);
 int cdn_dp_audio_stop(struct cdn_dp_device *dp, struct audio_info *audio);
 int cdn_dp_audio_mute(struct cdn_dp_device *dp, bool enable);
+void cdn_dp_sdp_write(struct cdn_dp_device *dp, int entry_id, u8 *buf, u32 len);
 int cdn_dp_audio_config(struct cdn_dp_device *dp, struct audio_info *audio);
 #endif /* _CDN_DP_REG_H */

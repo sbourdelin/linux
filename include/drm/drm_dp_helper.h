@@ -878,6 +878,7 @@ struct edp_sdp_header {
 	u8 HB3; /* 7:5 reserved, 4:0 number of valid data bytes */
 } __packed;
 
+#define EDP_SDP_HEADER_SIZE			4
 #define EDP_SDP_HEADER_REVISION_MASK		0x1F
 #define EDP_SDP_HEADER_VALID_PAYLOAD_BYTES	0x1F
 

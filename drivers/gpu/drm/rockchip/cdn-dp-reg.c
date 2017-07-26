@@ -286,6 +286,33 @@ err_dpcd_write:
 	return ret;
 }
 
+void cdn_dp_sdp_write(struct cdn_dp_device *dp, int entry_id, u8 *buf,
+		      u32 buf_len)
+{
+	int idx;
+	u32 *packet = (u32 *)buf;
+	u32 num_packets = buf_len / 4;
+	u8 type;
+
+	if (buf_len < EDP_SDP_HEADER_SIZE) {
+		DRM_DEV_ERROR(dp->dev, "sdp buffer length: %d\n", buf_len);
+		return;
+	}
+
+	type = buf[1];
+
+	for (idx = 0; idx < num_packets; idx++)
+		writel(cpu_to_le32(*packet++), dp->regs + SOURCE_PIF_DATA_WR);
+
+	writel(entry_id, dp->regs + SOURCE_PIF_WR_ADDR);
+
+	writel(F_HOST_WR, dp->regs + SOURCE_PIF_WR_REQ);
+
+	writel(PIF_PKT_TYPE_VALID | F_PACKET_TYPE(type) | entry_id,
+	       dp->regs + SOURCE_PIF_PKT_ALLOC_REG);
+	writel(PIF_PKT_ALLOC_WR_EN, dp->regs + SOURCE_PIF_PKT_ALLOC_WR_EN);
+}
+
 int cdn_dp_load_firmware(struct cdn_dp_device *dp, const u32 *i_mem,
 			 u32 i_size, const u32 *d_mem, u32 d_size)
 {
