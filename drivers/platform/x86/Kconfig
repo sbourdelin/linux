@@ -17,7 +17,7 @@ if X86_PLATFORM_DEVICES
 
 config ACER_WMI
 	tristate "Acer WMI Laptop Extras"
-	depends on ACPI
+	depends on ACPI_VIDEO
 	select LEDS_CLASS
 	select NEW_LEDS
 	depends on BACKLIGHT_CLASS_DEVICE
@@ -26,8 +26,6 @@ config ACER_WMI
 	depends on RFKILL || RFKILL = n
 	depends on ACPI_WMI
 	select INPUT_SPARSEKMAP
-	# Acer WMI depends on ACPI_VIDEO when ACPI is enabled
-        select ACPI_VIDEO if ACPI
 	---help---
 	  This is a driver for newer Acer (and Wistron) laptops. It adds
 	  wireless radio and bluetooth control, and on some laptops,
@@ -782,7 +780,7 @@ config ACPI_CMPC
 	tristate "CMPC Laptop Extras"
 	depends on ACPI
 	depends on RFKILL || RFKILL=n
-	select INPUT
+	depends on INPUT
 	select BACKLIGHT_CLASS_DEVICE
 	select BACKLIGHT_LCD_SUPPORT
 	default n
