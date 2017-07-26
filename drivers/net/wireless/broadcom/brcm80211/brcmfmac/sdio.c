@@ -2475,14 +2475,12 @@ static inline void brcmf_sdio_clrintr(struct brcmf_sdio *bus)
 
 static int brcmf_sdio_intr_rstatus(struct brcmf_sdio *bus)
 {
-	struct brcmf_core *buscore = bus->sdio_core;
-	u32 addr;
+	struct brcmf_core *core = bus->sdio_core;
 	unsigned long val;
 	int ret;
 
-	addr = buscore->base + __sd_reg(intstatus);
-
-	val = brcmf_sdiod_readl(bus->sdiodev, addr, &ret);
+	val = brcmf_sdiod_readl(bus->sdiodev, core->base + __sd_reg(intstatus),
+				&ret);
 	bus->sdcnt.f1regdata++;
 	if (ret != 0)
 		return ret;
@@ -2492,7 +2490,8 @@ static int brcmf_sdio_intr_rstatus(struct brcmf_sdio *bus)
 
 	/* Clear interrupts */
 	if (val) {
-		brcmf_sdiod_writel(bus->sdiodev, addr, val, &ret);
+		brcmf_sdiod_writel(bus->sdiodev,
+				   core->base + __sd_reg(intstatus), val, &ret);
 		bus->sdcnt.f1regdata++;
 		atomic_or(val, &bus->intstatus);
 	}
