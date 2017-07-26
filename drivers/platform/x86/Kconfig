@@ -784,6 +784,7 @@ config ACPI_CMPC
 	depends on RFKILL || RFKILL=n
 	select INPUT
 	select BACKLIGHT_CLASS_DEVICE
+	select BACKLIGHT_LCD_SUPPORT
 	default n
 	help
 	  Support for Intel Classmate PC ACPI devices, including some
@@ -999,6 +1000,7 @@ config SAMSUNG_Q10
 	tristate "Samsung Q10 Extras"
 	depends on ACPI
 	select BACKLIGHT_CLASS_DEVICE
+	select BACKLIGHT_LCD_SUPPORT
 	---help---
 	  This driver provides support for backlight control on Samsung Q10
 	  and related laptops, including Dell Latitude X200.
