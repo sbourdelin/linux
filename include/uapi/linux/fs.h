@@ -257,6 +257,12 @@ struct fsxattr {
  * File system encryption support
  */
 /* Policy provided via an ioctl on the topmost directory */
+
+/* original policy version, no key verification (potentially insecure) */
+#define FS_POLICY_VERSION_ORIGINAL	0
+/* new version w/ HKDF and key verification (recommended) */
+#define FS_POLICY_VERSION_HKDF		2
+
 #define FS_KEY_DESCRIPTOR_SIZE	8
 
 #define FS_POLICY_FLAGS_PAD_4		0x00
