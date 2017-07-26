@@ -1850,6 +1850,7 @@ static void *get_any_partial(struct kmem_cache *s, gfp_t flags,
 	enum zone_type high_zoneidx = gfp_zone(flags);
 	void *object;
 	unsigned int cpuset_mems_cookie;
+	bool csets_enabled;
 
 	/*
 	 * The defrag ratio allows a configuration of the tradeoffs between
@@ -1874,7 +1875,14 @@ static void *get_any_partial(struct kmem_cache *s, gfp_t flags,
 		return NULL;
 
 	do {
-		cpuset_mems_cookie = read_mems_allowed_begin();
+		if (cpusets_enabled()) {
+			csets_enabled = true;
+			cpuset_mems_cookie = raw_read_mems_allowed_begin();
+		} else {
+			csets_enabled = false;
+			cpuset_mems_cookie = 0;
+		}
+
 		zonelist = node_zonelist(mempolicy_slab_node(), flags);
 		for_each_zone_zonelist(zone, z, zonelist, high_zoneidx) {
 			struct kmem_cache_node *n;
@@ -1896,7 +1904,8 @@ static void *get_any_partial(struct kmem_cache *s, gfp_t flags,
 				}
 			}
 		}
-	} while (read_mems_allowed_retry(cpuset_mems_cookie));
+	} while (csets_enabled &&
+		 raw_read_mems_allowed_retry(cpuset_mems_cookie));
 #endif
 	return NULL;
 }
