@@ -280,7 +280,9 @@ static void i82860_remove_one(struct pci_dev *pdev)
 	if (i82860_pci)
 		edac_pci_release_generic_ctl(i82860_pci);
 
-	if ((mci = edac_mc_del_mc(&pdev->dev)) == NULL)
+	mci = edac_mc_del_mc(&pdev->dev);
+
+	if (mci == NULL)
 		return;
 
 	edac_mc_free(mci);
@@ -310,10 +312,11 @@ static int __init i82860_init(void)
 
 	edac_dbg(3, "\n");
 
-       /* Ensure that the OPSTATE is set correctly for POLL or NMI */
-       opstate_init();
+	/* Ensure that the OPSTATE is set correctly for POLL or NMI */
+	opstate_init();
 
-	if ((pci_rc = pci_register_driver(&i82860_driver)) < 0)
+	pci_rc = pci_register_driver(&i82860_driver);
+	if (pci_rc < 0)
 		goto fail0;
 
 	if (!mci_pdev) {
