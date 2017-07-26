@@ -1,0 +1,14 @@
+Broadcom IDM USB3 registers
+
+Required properties:
+- compatible: "brcm,usb3-idm"
+- reg: Base address and length of the USB registers
+
+
+Example:
+
+usb3_idm: idm@67000000 {
+        compatible = "brcm,usb3-idm";
+        reg = <0x67000000 0x2000>;
+};
+
