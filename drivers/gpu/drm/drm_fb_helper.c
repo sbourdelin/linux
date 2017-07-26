@@ -581,21 +581,22 @@ static struct sysrq_key_op sysrq_drm_fb_helper_restore_op = {
 static struct sysrq_key_op sysrq_drm_fb_helper_restore_op = { };
 #endif
 
-static void drm_fb_helper_dpms(struct fb_info *info, int dpms_mode)
+static int drm_fb_helper_dpms(struct fb_info *info, int dpms_mode)
 {
 	struct drm_fb_helper *fb_helper = info->par;
 	struct drm_device *dev = fb_helper->dev;
 	struct drm_crtc *crtc;
 	struct drm_connector *connector;
 	int i, j;
+	int ret = 0;
 
 	/*
 	 * For each CRTC in this fb, turn the connectors on/off.
 	 */
 	drm_modeset_lock_all(dev);
 	if (!drm_fb_helper_is_bound(fb_helper)) {
-		drm_modeset_unlock_all(dev);
-		return;
+		ret = -ENODEV;
+		goto out;
 	}
 
 	for (i = 0; i < fb_helper->crtc_count; i++) {
@@ -607,12 +608,16 @@ static void drm_fb_helper_dpms(struct fb_info *info, int dpms_mode)
 		/* Walk the connectors & encoders on this fb turning them on/off */
 		drm_fb_helper_for_each_connector(fb_helper, j) {
 			connector = fb_helper->connector_info[j]->connector;
-			connector->funcs->dpms(connector, dpms_mode);
+			ret = connector->funcs->dpms(connector, dpms_mode);
+			if (ret < 0)
+				goto out;
 			drm_object_property_set_value(&connector->base,
 				dev->mode_config.dpms_property, dpms_mode);
 		}
 	}
+ out:
 	drm_modeset_unlock_all(dev);
+	return ret;
 }
 
 /**
@@ -622,32 +627,37 @@ static void drm_fb_helper_dpms(struct fb_info *info, int dpms_mode)
  */
 int drm_fb_helper_blank(int blank, struct fb_info *info)
 {
+	int dpms_mode;
+
 	if (oops_in_progress)
 		return -EBUSY;
 
 	switch (blank) {
 	/* Display: On; HSync: On, VSync: On */
 	case FB_BLANK_UNBLANK:
-		drm_fb_helper_dpms(info, DRM_MODE_DPMS_ON);
+		dpms_mode = DRM_MODE_DPMS_ON;
 		break;
 	/* Display: Off; HSync: On, VSync: On */
 	case FB_BLANK_NORMAL:
-		drm_fb_helper_dpms(info, DRM_MODE_DPMS_STANDBY);
+		dpms_mode = DRM_MODE_DPMS_STANDBY;
 		break;
 	/* Display: Off; HSync: Off, VSync: On */
 	case FB_BLANK_HSYNC_SUSPEND:
-		drm_fb_helper_dpms(info, DRM_MODE_DPMS_STANDBY);
+		dpms_mode = DRM_MODE_DPMS_STANDBY;
 		break;
 	/* Display: Off; HSync: On, VSync: Off */
 	case FB_BLANK_VSYNC_SUSPEND:
-		drm_fb_helper_dpms(info, DRM_MODE_DPMS_SUSPEND);
+		dpms_mode = DRM_MODE_DPMS_SUSPEND;
 		break;
 	/* Display: Off; HSync: Off, VSync: Off */
 	case FB_BLANK_POWERDOWN:
-		drm_fb_helper_dpms(info, DRM_MODE_DPMS_OFF);
+		dpms_mode = DRM_MODE_DPMS_OFF;
 		break;
+	default:
+		return 0; /* ignored */
 	}
-	return 0;
+
+	return drm_fb_helper_dpms(info, dpms_mode);
 }
 EXPORT_SYMBOL(drm_fb_helper_blank);
 
