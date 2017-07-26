@@ -24,9 +24,6 @@
 /* Maximum number of I/O funcs */
 #define NUM_SDIO_FUNCS	3
 
-#define SDIO_FUNC_1		1
-#define SDIO_FUNC_2		2
-
 #define SDIOD_FBR_SIZE		0x100
 
 /* io_en */
@@ -45,10 +42,12 @@
 #define REG_F0_REG_MASK		0x7FF
 #define REG_F1_MISC_MASK	0x1FFFF
 
-/* as of sdiod rev 0, supports 3 functions */
-#define SBSDIO_NUM_FUNCTION		3
-
 /* function 0 vendor specific CCCR registers */
+
+/* Interrupt enable bits for func 1 and 2 */
+#define SDIO_CCCR_IEN_BIT0		BIT(0)
+#define SDIO_CCCR_IEN_FUNC1		BIT(1)
+#define SDIO_CCCR_IEN_FUNC2		BIT(2)
 
 #define SDIO_CCCR_BRCM_CARDCAP		0xf0
 #define SDIO_CCCR_BRCM_CARDCAP_CMD14_SUPPORT	0x02
@@ -350,7 +349,8 @@ int brcmf_sdiod_ramrw(struct brcmf_sdio_dev *sdiodev, bool write, u32 address,
 		      u8 *data, uint size);
 
 /* Issue an abort to the specified function */
-int brcmf_sdiod_abort(struct brcmf_sdio_dev *sdiodev, u8 fn);
+int brcmf_sdiod_abort(struct brcmf_sdio_dev *sdiodev, struct sdio_func *func);
+
 void brcmf_sdiod_sgtable_alloc(struct brcmf_sdio_dev *sdiodev);
 void brcmf_sdiod_change_state(struct brcmf_sdio_dev *sdiodev,
 			      enum brcmf_sdiod_state state);
