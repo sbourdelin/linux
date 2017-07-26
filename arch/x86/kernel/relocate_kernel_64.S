@@ -132,6 +132,13 @@ identity_mapped:
 	/* Flush the TLB (needed?) */
 	movq	%r9, %cr3
 
+	/*
+	 * If SME is/was active, there could be old encrypted cache line
+	 * entries that will conflict with the now unencrypted memory
+	 * used by kexec. Flush the caches before copying the kernel.
+	 */
+	wbinvd
+
 	movq	%rcx, %r11
 	call	swap_pages
 
