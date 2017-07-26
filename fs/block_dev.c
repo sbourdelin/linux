@@ -718,8 +718,6 @@ int bdev_write_page(struct block_device *bdev, sector_t sector,
 	result = ops->rw_page(bdev, sector + get_start_sect(bdev), page, true);
 	if (result)
 		end_page_writeback(page);
-	else
-		unlock_page(page);
 	blk_queue_exit(bdev->bd_queue);
 	return result;
 }

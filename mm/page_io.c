@@ -311,6 +311,7 @@ int __swap_writepage(struct page *page, struct writeback_control *wbc,
 
 	ret = bdev_write_page(sis->bdev, swap_page_sector(page), page, wbc);
 	if (!ret) {
+		unlock_page(page);
 		count_vm_event(PSWPOUT);
 		return 0;
 	}

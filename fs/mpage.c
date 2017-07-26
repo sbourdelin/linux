@@ -607,6 +607,7 @@ alloc_new:
 			if (!bdev_write_page(bdev, blocks[0] << (blkbits - 9),
 								page, wbc)) {
 				clean_buffers(page, first_unmapped);
+				unlock_page(page);
 				goto out;
 			}
 		}
