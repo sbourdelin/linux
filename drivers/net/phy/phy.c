@@ -743,12 +743,17 @@ void phy_trigger_machine(struct phy_device *phydev, bool sync)
  */
 void phy_stop_machine(struct phy_device *phydev)
 {
+	/* Run the state machine to completion */
+	flush_delayed_work(&phydev->state_queue);
 	cancel_delayed_work_sync(&phydev->state_queue);
 
 	mutex_lock(&phydev->lock);
 	if (phydev->state > PHY_UP && phydev->state != PHY_HALTED)
 		phydev->state = PHY_UP;
 	mutex_unlock(&phydev->lock);
+
+	/* Now we can run the state machine synchronously */
+	phy_state_machine(&phydev->state_queue.work);
 }
 
 /**
