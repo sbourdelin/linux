@@ -189,3 +189,11 @@
 &uart3 {
 	status = "okay";
 };
+
+&usb3_phy0 {
+	status = "okay";
+};
+
+&xhci0 {
+	status = "okay";
+};
