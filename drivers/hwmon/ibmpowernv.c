@@ -51,6 +51,7 @@ enum sensors {
 	POWER_SUPPLY,
 	POWER_INPUT,
 	CURRENT,
+	RESET_HISTORY,
 	MAX_SENSOR_TYPE,
 };
 
@@ -78,6 +79,7 @@ static struct sensor_group {
 	{ "in"    },
 	{ "power" },
 	{ "curr"  },
+	{ "reset_history" },
 };
 
 struct sensor_data {
@@ -124,6 +126,25 @@ static ssize_t show_label(struct device *dev, struct device_attribute *devattr,
 						 dev_attr);
 
 	return sprintf(buf, "%s\n", sdata->label);
+}
+
+static ssize_t store_reset_history(struct device *dev,
+				   struct device_attribute *devattr,
+				   const char *buf, size_t count)
+{
+	struct sensor_data *sdata = container_of(devattr, struct sensor_data,
+						 dev_attr);
+	int rc;
+	int reset;
+
+	rc = kstrtoint(buf, 0, &reset);
+	if (rc)
+		return rc;
+
+	if (reset == 1)
+		rc = opal_sensor_groups_clear_history(sdata->id);
+
+	return rc ? rc : count;
 }
 
 static int __init get_logical_cpu(int hwcpu)
@@ -457,6 +478,16 @@ static int create_device_attrs(struct platform_device *pdev)
 			get_sensor_hwmon_index(&sdata[count], sdata, count);
 
 		create_hwmon_attr(&sdata[count], attr_name, show_sensor);
+
+		if (type == RESET_HISTORY) {
+			snprintf(sdata[count].name, MAX_ATTR_LEN, "%s%d",
+				 sensor_groups[type].name,
+				 sdata[count].hwmon_index);
+
+			sdata[count].dev_attr.attr.mode = 0220;
+			sdata[count].dev_attr.store = store_reset_history;
+			sdata[count].dev_attr.show = NULL;
+		}
 
 		pgroups[type]->attrs[sensor_groups[type].attr_count++] =
 				&sdata[count++].dev_attr.attr;
