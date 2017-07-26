@@ -1219,6 +1219,11 @@ static int mirror_map(struct dm_target *ti, struct bio *bio)
 		if (bio->bi_opf & REQ_RAHEAD)
 			return DM_MAPIO_KILL;
 
+		if (bio->bi_opf & REQ_NOWAIT) {
+			bio_wouldblock_error(bio);
+			return DM_MAPIO_SUBMITTED;
+		}
+
 		queue_bio(ms, bio, rw);
 		return DM_MAPIO_SUBMITTED;
 	}
