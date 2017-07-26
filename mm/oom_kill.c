@@ -435,6 +435,8 @@ static DECLARE_WAIT_QUEUE_HEAD(oom_victims_wait);
 
 static bool oom_killer_disabled __read_mostly;
 
+static struct task_struct *tif_memdie_owner;
+
 #define K(x) ((x) << (PAGE_SHIFT-10))
 
 /*
@@ -656,13 +658,24 @@ static void mark_oom_victim(struct task_struct *tsk)
 	struct mm_struct *mm = tsk->mm;
 
 	WARN_ON(oom_killer_disabled);
-	/* OOM killer might race with memcg OOM */
-	if (test_and_set_tsk_thread_flag(tsk, TIF_MEMDIE))
+
+	if (!cmpxchg(&tif_memdie_owner, NULL, current)) {
+		struct task_struct *t;
+
+		rcu_read_lock();
+		for_each_thread(current, t)
+			set_tsk_thread_flag(t, TIF_MEMDIE);
+		rcu_read_unlock();
+	}
+
+	/*
+	 * OOM killer might race with memcg OOM.
+	 * oom_mm is bound to the signal struct life time.
+	 */
+	if (cmpxchg(&tsk->signal->oom_mm, NULL, mm))
 		return;
 
-	/* oom_mm is bound to the signal struct life time. */
-	if (!cmpxchg(&tsk->signal->oom_mm, NULL, mm))
-		mmgrab(tsk->signal->oom_mm);
+	mmgrab(tsk->signal->oom_mm);
 
 	/*
 	 * Make sure that the task is woken up from uninterruptible sleep
@@ -681,6 +694,13 @@ static void mark_oom_victim(struct task_struct *tsk)
 void exit_oom_victim(void)
 {
 	clear_thread_flag(TIF_MEMDIE);
+
+	/*
+	 * If current tasks if a thread, which initially
+	 * received TIF_MEMDIE, clear tif_memdie_owner to
+	 * give a next process a chance to capture it.
+	 */
+	cmpxchg(&tif_memdie_owner, current, NULL);
 
 	if (!atomic_dec_return(&oom_victims))
 		wake_up_all(&oom_victims_wait);
