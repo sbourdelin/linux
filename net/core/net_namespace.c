@@ -23,6 +23,16 @@
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
 
+/* Take into consideration the size of the struct sk_buff overhead in the
+ * determination of these values, since that is non-constant across
+ * platforms.  This makes socket queueing behavior and performance
+ * not depend upon such differences.
+ */
+#define _SK_MEM_PACKETS		256
+#define _SK_MEM_OVERHEAD	SKB_TRUESIZE(256)
+#define SK_WMEM_MAX		(_SK_MEM_OVERHEAD * _SK_MEM_PACKETS)
+#define SK_RMEM_MAX		(_SK_MEM_OVERHEAD * _SK_MEM_PACKETS)
+
 /*
  *	Our network namespace constructor/destructor lists
  */
@@ -318,6 +328,18 @@ out_undo:
 static int __net_init net_defaults_init_net(struct net *net)
 {
 	net->core.sysctl_somaxconn = SOMAXCONN;
+	if (net_eq(net, &init_net)) {
+		init_net.core.sysctl_wmem_max = SK_WMEM_MAX;
+		init_net.core.sysctl_rmem_max = SK_RMEM_MAX;
+		init_net.core.sysctl_wmem_default = SK_WMEM_MAX;
+		init_net.core.sysctl_rmem_default = SK_RMEM_MAX;
+	} else {
+		net->core.sysctl_wmem_max = init_net.core.sysctl_wmem_max;
+		net->core.sysctl_rmem_max = init_net.core.sysctl_rmem_max;
+		net->core.sysctl_wmem_default = init_net.core.sysctl_wmem_default;
+		net->core.sysctl_rmem_default = init_net.core.sysctl_rmem_default;
+	}
+
 	return 0;
 }
 

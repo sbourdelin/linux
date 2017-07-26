@@ -377,7 +377,8 @@ void tcp_openreq_init_rwin(struct request_sock *req,
 		&req->rsk_window_clamp,
 		ireq->wscale_ok,
 		&rcv_wscale,
-		rcv_wnd);
+		rcv_wnd,
+		sock_net(sk_listener)->core.sysctl_rmem_max);
 	ireq->rcv_wscale = rcv_wscale;
 }
 EXPORT_SYMBOL(tcp_openreq_init_rwin);

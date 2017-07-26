@@ -1299,7 +1299,8 @@ static inline void tcp_slow_start_after_idle_check(struct sock *sk)
 /* Determine a window scaling and initial window to offer. */
 void tcp_select_initial_window(int __space, __u32 mss, __u32 *rcv_wnd,
 			       __u32 *window_clamp, int wscale_ok,
-			       __u8 *rcv_wscale, __u32 init_rcv_wnd);
+			       __u8 *rcv_wscale, __u32 init_rcv_wnd,
+			       __u32 rmem_max);
 
 static inline int tcp_win_from_space(int space)
 {

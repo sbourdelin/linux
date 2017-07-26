@@ -206,7 +206,7 @@ u32 tcp_default_init_rwnd(u32 mss)
 void tcp_select_initial_window(int __space, __u32 mss,
 			       __u32 *rcv_wnd, __u32 *window_clamp,
 			       int wscale_ok, __u8 *rcv_wscale,
-			       __u32 init_rcv_wnd)
+			       __u32 init_rcv_wnd, __u32 rmem_max)
 {
 	unsigned int space = (__space < 0 ? 0 : __space);
 
@@ -236,7 +236,7 @@ void tcp_select_initial_window(int __space, __u32 mss,
 	if (wscale_ok) {
 		/* Set window scaling on max possible window */
 		space = max_t(u32, space, sysctl_tcp_rmem[2]);
-		space = max_t(u32, space, sysctl_rmem_max);
+		space = max_t(u32, space, rmem_max);
 		space = min_t(u32, space, *window_clamp);
 		while (space > U16_MAX && (*rcv_wscale) < TCP_MAX_WSCALE) {
 			space >>= 1;
@@ -3271,6 +3271,7 @@ static void tcp_connect_init(struct sock *sk)
 {
 	const struct dst_entry *dst = __sk_dst_get(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
+	struct net *net = sock_net(sk);
 	__u8 rcv_wscale;
 	u32 rcv_wnd;
 
@@ -3278,7 +3279,7 @@ static void tcp_connect_init(struct sock *sk)
 	 * See tcp_input.c:tcp_rcv_state_process case TCP_SYN_SENT.
 	 */
 	tp->tcp_header_len = sizeof(struct tcphdr);
-	if (sock_net(sk)->ipv4.sysctl_tcp_timestamps)
+	if (net->ipv4.sysctl_tcp_timestamps)
 		tp->tcp_header_len += TCPOLEN_TSTAMP_ALIGNED;
 
 #ifdef CONFIG_TCP_MD5SIG
@@ -3314,9 +3315,10 @@ static void tcp_connect_init(struct sock *sk)
 				  tp->advmss - (tp->rx_opt.ts_recent_stamp ? tp->tcp_header_len - sizeof(struct tcphdr) : 0),
 				  &tp->rcv_wnd,
 				  &tp->window_clamp,
-				  sock_net(sk)->ipv4.sysctl_tcp_window_scaling,
+				  net->ipv4.sysctl_tcp_window_scaling,
 				  &rcv_wscale,
-				  rcv_wnd);
+				  rcv_wnd,
+				  net->core.sysctl_rmem_max);
 
 	tp->rx_opt.rcv_wscale = rcv_wscale;
 	tp->rcv_ssthresh = tp->rcv_wnd;

@@ -388,7 +388,8 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb)
 	tcp_select_initial_window(tcp_full_space(sk), req->mss,
 				  &req->rsk_rcv_wnd, &req->rsk_window_clamp,
 				  ireq->wscale_ok, &rcv_wscale,
-				  dst_metric(&rt->dst, RTAX_INITRWND));
+				  dst_metric(&rt->dst, RTAX_INITRWND),
+				  sock_net(sk)->core.sysctl_rmem_max);
 
 	ireq->rcv_wscale  = rcv_wscale;
 	ireq->ecn_ok = cookie_ecn_ok(&tcp_opt, sock_net(sk), &rt->dst);

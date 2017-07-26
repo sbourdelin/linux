@@ -2363,13 +2363,7 @@ bool sk_net_capable(const struct sock *sk, int cap);
 
 void sk_get_meminfo(const struct sock *sk, u32 *meminfo);
 
-extern __u32 sysctl_wmem_max;
-extern __u32 sysctl_rmem_max;
-
 extern int sysctl_tstamp_allow_data;
 extern int sysctl_optmem_max;
-
-extern __u32 sysctl_wmem_default;
-extern __u32 sysctl_rmem_default;
 
 #endif	/* _SOCK_H */
