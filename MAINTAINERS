@@ -1196,6 +1196,11 @@ F:	arch/arm/boot/dts/sama*.dtsi
 F:	arch/arm/include/debug/at91.S
 F:	drivers/memory/atmel*
 
+ARM/BECKHOFF SUPPORT
+M:	Patrick Bruenn <p.bruenn@beckhoff.com>
+S:	Maintained
+F:	Documentation/devicetree/bindings/arm/bhf.txt
+
 ARM/CALXEDA HIGHBANK ARCHITECTURE
 M:	Rob Herring <robh@kernel.org>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
