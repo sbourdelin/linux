@@ -193,7 +193,9 @@
 #define OPAL_NPU_MAP_LPAR			148
 #define OPAL_GET_POWERCAP			152
 #define OPAL_SET_POWERCAP			153
-#define OPAL_LAST				153
+#define OPAL_GET_PSR				154
+#define OPAL_SET_PSR				155
+#define OPAL_LAST				155
 
 /* Device tree flags */
 
