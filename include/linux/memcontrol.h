@@ -206,6 +206,9 @@ struct mem_cgroup {
 	/* cached OOM score */
 	long oom_score;
 
+	/* OOM killer priority */
+	short oom_priority;
+
 	/* handle for "memory.events" */
 	struct cgroup_file events_file;
 

@@ -2710,12 +2710,21 @@ static void select_victim_memcg(struct mem_cgroup *root, struct oom_control *oc)
 	for (;;) {
 		struct cgroup_subsys_state *css;
 		struct mem_cgroup *memcg = NULL;
+		short prio = SHRT_MIN;
 		long score = LONG_MIN;
 
 		css_for_each_child(css, &root->css) {
 			struct mem_cgroup *iter = mem_cgroup_from_css(css);
 
-			if (iter->oom_score > score) {
+			if (iter->oom_score == 0)
+				continue;
+
+			if (iter->oom_priority > prio) {
+				memcg = iter;
+				prio = iter->oom_priority;
+				score = iter->oom_score;
+			} else if (iter->oom_priority == prio &&
+				   iter->oom_score > score) {
 				memcg = iter;
 				score = iter->oom_score;
 			}
@@ -2782,7 +2791,15 @@ bool mem_cgroup_select_oom_victim(struct oom_control *oc)
 	 * For system-wide OOMs we should consider tasks in the root cgroup
 	 * with oom_score larger than oc->chosen_points.
 	 */
-	if (!oc->memcg) {
+	if (!oc->memcg && !(oc->chosen_memcg &&
+			    oc->chosen_memcg->oom_priority > 0)) {
+		/*
+		 * Root memcg has priority 0, so if chosen memcg has lower
+		 * priority, any task in root cgroup is preferable.
+		 */
+		if (oc->chosen_memcg && oc->chosen_memcg->oom_priority < 0)
+			oc->chosen_points = 0;
+
 		select_victim_root_cgroup_task(oc);
 
 		if (oc->chosen && oc->chosen_memcg) {
@@ -5368,6 +5385,34 @@ static ssize_t memory_oom_kill_all_tasks_write(struct kernfs_open_file *of,
 	return nbytes;
 }
 
+static int memory_oom_priority_show(struct seq_file *m, void *v)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
+
+	seq_printf(m, "%d\n", memcg->oom_priority);
+
+	return 0;
+}
+
+static ssize_t memory_oom_priority_write(struct kernfs_open_file *of,
+				char *buf, size_t nbytes, loff_t off)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(of_css(of));
+	int oom_priority;
+	int err;
+
+	err = kstrtoint(strstrip(buf), 0, &oom_priority);
+	if (err)
+		return err;
+
+	if (oom_priority < -10000 || oom_priority > 10000)
+		return -EINVAL;
+
+	memcg->oom_priority = (short)oom_priority;
+
+	return nbytes;
+}
+
 static int memory_events_show(struct seq_file *m, void *v)
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
@@ -5492,6 +5537,12 @@ static struct cftype memory_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = memory_oom_kill_all_tasks_show,
 		.write = memory_oom_kill_all_tasks_write,
+	},
+	{
+		.name = "oom_priority",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = memory_oom_priority_show,
+		.write = memory_oom_priority_write,
 	},
 	{
 		.name = "events",
