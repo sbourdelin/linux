@@ -330,11 +330,6 @@ void adreno_wait_ring(struct msm_gpu *gpu, uint32_t ndwords)
 		DRM_ERROR("%s: timeout waiting for ringbuffer space\n", gpu->name);
 }
 
-static const char *iommu_ports[] = {
-		"gfx3d_user", "gfx3d_priv",
-		"gfx3d1_user", "gfx3d1_priv",
-};
-
 int adreno_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 		struct adreno_gpu *adreno_gpu, const struct adreno_gpu_funcs *funcs)
 {
@@ -366,14 +361,14 @@ int adreno_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 
 	adreno_gpu_config.ringsz = RB_SIZE;
 
+	pm_runtime_set_autosuspend_delay(&pdev->dev, DRM_MSM_INACTIVE_PERIOD);
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
 	ret = msm_gpu_init(drm, pdev, &adreno_gpu->base, &funcs->base,
 			adreno_gpu->info->name, &adreno_gpu_config);
 	if (ret)
 		return ret;
-
-	pm_runtime_set_autosuspend_delay(&pdev->dev, DRM_MSM_INACTIVE_PERIOD);
-	pm_runtime_use_autosuspend(&pdev->dev);
-	pm_runtime_enable(&pdev->dev);
 
 	ret = request_firmware(&adreno_gpu->pm4, adreno_gpu->info->pm4fw, drm->dev);
 	if (ret) {
@@ -387,14 +382,6 @@ int adreno_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 		dev_err(drm->dev, "failed to load %s PFP firmware: %d\n",
 				adreno_gpu->info->pfpfw, ret);
 		return ret;
-	}
-
-	if (gpu->aspace && gpu->aspace->mmu) {
-		struct msm_mmu *mmu = gpu->aspace->mmu;
-		ret = mmu->funcs->attach(mmu, iommu_ports,
-				ARRAY_SIZE(iommu_ports));
-		if (ret)
-			return ret;
 	}
 
 	adreno_gpu->memptrs_bo = msm_gem_new(drm, sizeof(*adreno_gpu->memptrs),
@@ -439,10 +426,4 @@ void adreno_gpu_cleanup(struct adreno_gpu *adreno_gpu)
 	release_firmware(adreno_gpu->pfp);
 
 	msm_gpu_cleanup(gpu);
-
-	if (gpu->aspace) {
-		gpu->aspace->mmu->funcs->detach(gpu->aspace->mmu,
-			iommu_ports, ARRAY_SIZE(iommu_ports));
-		msm_gem_address_space_put(gpu->aspace);
-	}
 }
