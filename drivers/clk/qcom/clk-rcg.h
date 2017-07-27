@@ -17,6 +17,14 @@
 #include <linux/clk-provider.h>
 #include "clk-regmap.h"
 
+enum {
+	CLK_RCG2_CMD,
+	CLK_RCG2_CFG,
+	CLK_RCG2_M,
+	CLK_RCG2_N,
+	CLK_RCG2_D,
+};
+
 struct freq_tbl {
 	unsigned long freq;
 	u8 src;
@@ -154,6 +162,8 @@ extern const struct clk_ops clk_dyn_rcg_ops;
  * @cmd_rcgr: corresponds to *_CMD_RCGR
  * @mnd_width: number of bits in m/n/d values
  * @hid_width: number of bits in half integer divider
+ * @offsets: offsets of RCG2 register from cmd_rcgr.
+ *	     default will be used in case of null
  * @parent_map: map from software's parent index to hardware's src_sel field
  * @freq_tbl: frequency table
  * @current_freq: last cached frequency when using branches with shared RCGs
@@ -164,6 +174,7 @@ struct clk_rcg2 {
 	u32			cmd_rcgr;
 	u8			mnd_width;
 	u8			hid_width;
+	const u8		*offsets;
 	const struct parent_map	*parent_map;
 	const struct freq_tbl	*freq_tbl;
 	unsigned long		current_freq;
