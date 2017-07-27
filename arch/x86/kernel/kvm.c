@@ -141,6 +141,8 @@ void kvm_async_pf_task_wait(u32 token)
 	n.token = token;
 	n.cpu = smp_processor_id();
 	n.halted = is_idle_task(current) || preempt_count() > 1;
+	if (!n.halted)
+		rcu_irq_exit();
 	init_swait_queue_head(&n.wq);
 	hlist_add_head(&n.link, &b->list);
 	raw_spin_unlock(&b->lock);
@@ -167,8 +169,9 @@ void kvm_async_pf_task_wait(u32 token)
 	}
 	if (!n.halted)
 		finish_swait(&n.wq, &wait);
+	else
+		rcu_irq_exit();
 
-	rcu_irq_exit();
 	return;
 }
 EXPORT_SYMBOL_GPL(kvm_async_pf_task_wait);
