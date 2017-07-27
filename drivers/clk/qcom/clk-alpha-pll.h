@@ -61,6 +61,10 @@ struct clk_alpha_pll {
 	struct clk_regmap clkr;
 };
 
+#define CLK_HUAYRA_PLL_FLAGS	(HAVE_NO_VCO_CONF | SUPPORTS_DYNAMIC_UPDATE | \
+				 SUPPORTS_64BIT_CONFIG_CTL |		      \
+				 SUPPORTS_16BIT_ALPHA)
+
 /**
  * struct clk_alpha_pll_postdiv - phase locked loop (PLL) post-divider
  * @base: base address of registers
@@ -97,9 +101,11 @@ struct alpha_pll_config {
 };
 
 extern const u8 alpha_pll_offsets[];
+extern const u8 huayra_pll_offsets[];
 
 extern const struct clk_ops clk_alpha_pll_ops;
 extern const struct clk_ops clk_alpha_pll_hwfsm_ops;
+extern const struct clk_ops clk_alpha_pll_huayra_ops;
 extern const struct clk_ops clk_alpha_pll_postdiv_ops;
 
 void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
