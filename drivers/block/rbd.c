@@ -159,6 +159,13 @@ struct rbd_image_header {
 	u64 *snap_sizes;	/* format 1 only */
 };
 
+
+struct rbd_request_linker {
+	struct work_struct work;
+	void *img_request;
+};
+
+
 /*
  * An rbd image specification.
  *
@@ -4017,6 +4024,7 @@ static void rbd_queue_workfn(struct work_struct *work)
 	struct request *rq = blk_mq_rq_from_pdu(work);
 	struct rbd_device *rbd_dev = rq->q->queuedata;
 	struct rbd_img_request *img_request;
+	struct rbd_request_linker *linker;
 	struct ceph_snap_context *snapc = NULL;
 	u64 offset = (u64)blk_rq_pos(rq) << SECTOR_SHIFT;
 	u64 length = blk_rq_bytes(rq);
@@ -4124,6 +4132,7 @@ static void rbd_queue_workfn(struct work_struct *work)
 		goto err_unlock;
 	}
 	img_request->rq = rq;
+	linker->img_request = img_request;
 	snapc = NULL; /* img_request consumes a ref */
 
 	if (op_type == OBJ_OP_DISCARD)
@@ -4362,9 +4371,32 @@ static int rbd_init_request(struct blk_mq_tag_set *set, struct request *rq,
 	return 0;
 }
 
+static enum blk_eh_timer_return rbd_request_timeout(struct request *rq,
+		bool reserved)
+{
+	struct rbd_obj_request *obj_request;
+	struct rbd_obj_request *next_obj_request;
+	struct rbd_img_request *img_request;
+	struct rbd_request_linker *linker = blk_mq_rq_to_pdu(rq);
+
+	img_request = (struct rbd_img_request *)linker->img_request;
+	for_each_obj_request_safe(img_request, obj_request, next_obj_request) {
+		struct ceph_osd_request *osd_req = obj_request->osd_req;
+
+		if (!osd_req)
+			printk(KERN_INFO "osd_req is null \n");
+		else
+			ceph_osdc_cancel_request(osd_req);
+	}
+	return BLK_EH_HANDLED;
+}
+
+
+
 static const struct blk_mq_ops rbd_mq_ops = {
 	.queue_rq	= rbd_queue_rq,
 	.init_request	= rbd_init_request,
+	.timeout       = rbd_request_timeout,
 };
 
 static int rbd_init_disk(struct rbd_device *rbd_dev)
@@ -4396,7 +4428,7 @@ static int rbd_init_disk(struct rbd_device *rbd_dev)
 	rbd_dev->tag_set.numa_node = NUMA_NO_NODE;
 	rbd_dev->tag_set.flags = BLK_MQ_F_SHOULD_MERGE | BLK_MQ_F_SG_MERGE;
 	rbd_dev->tag_set.nr_hw_queues = 1;
-	rbd_dev->tag_set.cmd_size = sizeof(struct work_struct);
+	rbd_dev->tag_set.cmd_size = sizeof(struct rbd_request_linker);
 
 	err = blk_mq_alloc_tag_set(&rbd_dev->tag_set);
 	if (err)
