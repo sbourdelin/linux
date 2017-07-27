@@ -2930,7 +2930,7 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 {
 	long min = mark;
 	int o;
-	const bool alloc_harder = (alloc_flags & ALLOC_HARDER);
+	const bool alloc_harder = (alloc_flags & (ALLOC_HARDER|ALLOC_OOM));
 
 	/* free_pages may go negative - that's OK */
 	free_pages -= (1 << order) - 1;
@@ -2943,10 +2943,19 @@ bool __zone_watermark_ok(struct zone *z, unsigned int order, unsigned long mark,
 	 * the high-atomic reserves. This will over-estimate the size of the
 	 * atomic reserve but it avoids a search.
 	 */
-	if (likely(!alloc_harder))
+	if (likely(!alloc_harder)) {
 		free_pages -= z->nr_reserved_highatomic;
-	else
-		min -= min / 4;
+	} else {
+		/*
+		 * OOM victims can try even harder than normal ALLOC_HARDER
+		 * users
+		 */
+		if (alloc_flags & ALLOC_OOM)
+			min -= min / 2;
+		else
+			min -= min / 4;
+	}
+
 
 #ifdef CONFIG_CMA
 	/* If allocation can't use CMA areas don't use free CMA pages */
@@ -3184,7 +3193,7 @@ static void warn_alloc_show_mem(gfp_t gfp_mask, nodemask_t *nodemask)
 	 * of allowed nodes.
 	 */
 	if (!(gfp_mask & __GFP_NOMEMALLOC))
-		if (test_thread_flag(TIF_MEMDIE) ||
+		if (tsk_is_oom_victim(current) ||
 		    (current->flags & (PF_MEMALLOC | PF_EXITING)))
 			filter &= ~SHOW_MEM_FILTER_NODES;
 	if (in_interrupt() || !(gfp_mask & __GFP_DIRECT_RECLAIM))
@@ -3603,6 +3612,22 @@ gfp_to_alloc_flags(gfp_t gfp_mask)
 	return alloc_flags;
 }
 
+static bool oom_reserves_allowed(struct task_struct *tsk)
+{
+	if (!tsk_is_oom_victim(tsk))
+		return false;
+
+	/*
+	 * !MMU doesn't have oom reaper so we shouldn't risk the memory reserves
+	 * depletion and shouldn't give access to memory reserves passed the
+	 * exit_mm
+	 */
+	if (!IS_ENABLED(CONFIG_MMU) && !tsk->mm)
+		return false;
+
+	return true;
+}
+
 bool gfp_pfmemalloc_allowed(gfp_t gfp_mask)
 {
 	if (unlikely(gfp_mask & __GFP_NOMEMALLOC))
@@ -3614,7 +3639,7 @@ bool gfp_pfmemalloc_allowed(gfp_t gfp_mask)
 		return true;
 	if (!in_interrupt() &&
 			((current->flags & PF_MEMALLOC) ||
-			 unlikely(test_thread_flag(TIF_MEMDIE))))
+			 oom_reserves_allowed(current)))
 		return true;
 
 	return false;
@@ -3770,6 +3795,7 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	unsigned long alloc_start = jiffies;
 	unsigned int stall_timeout = 10 * HZ;
 	unsigned int cpuset_mems_cookie;
+	bool reserves;
 
 	/*
 	 * In the slowpath, we sanity check order to avoid ever trying to
@@ -3875,15 +3901,24 @@ retry:
 	if (gfp_mask & __GFP_KSWAPD_RECLAIM)
 		wake_all_kswapds(order, ac);
 
-	if (gfp_pfmemalloc_allowed(gfp_mask))
-		alloc_flags = ALLOC_NO_WATERMARKS;
+	/*
+	 * Distinguish requests which really need access to whole memory
+	 * reserves from oom victims which can live with their own reserve
+	 */
+	reserves = gfp_pfmemalloc_allowed(gfp_mask);
+	if (reserves) {
+		if (tsk_is_oom_victim(current))
+			alloc_flags = ALLOC_OOM;
+		else
+			alloc_flags = ALLOC_NO_WATERMARKS;
+	}
 
 	/*
 	 * Reset the zonelist iterators if memory policies can be ignored.
 	 * These allocations are high priority and system rather than user
 	 * orientated.
 	 */
-	if (!(alloc_flags & ALLOC_CPUSET) || (alloc_flags & ALLOC_NO_WATERMARKS)) {
+	if (!(alloc_flags & ALLOC_CPUSET) || reserves) {
 		ac->zonelist = node_zonelist(numa_node_id(), gfp_mask);
 		ac->preferred_zoneref = first_zones_zonelist(ac->zonelist,
 					ac->high_zoneidx, ac->nodemask);
@@ -3960,7 +3995,7 @@ retry:
 		goto got_pg;
 
 	/* Avoid allocations with no watermarks from looping endlessly */
-	if (test_thread_flag(TIF_MEMDIE) &&
+	if (tsk_is_oom_victim(current) &&
 	    (alloc_flags == ALLOC_NO_WATERMARKS ||
 	     (gfp_mask & __GFP_NOMEMALLOC)))
 		goto nopage;
