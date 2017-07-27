@@ -55,7 +55,7 @@ tioca_gart_init(struct tioca_kernel *tioca_kern)
 	 * Validate aperature size
 	 */
 
-	switch (CA_APERATURE_SIZE >> 20) {
+	switch (CA_APERTURE_SIZE >> 20) {
 	case 4:
 		ap_reg |= (0x3ff << CA_GART_AP_SIZE_SHFT);	/* 4MB */
 		break;
@@ -90,8 +90,8 @@ tioca_gart_init(struct tioca_kernel *tioca_kern)
 		ap_reg |= (0x000 << CA_GART_AP_SIZE_SHFT);	/* 4 GB */
 		break;
 	default:
-		printk(KERN_ERR "%s:  Invalid CA_APERATURE_SIZE "
-		       "0x%lx\n", __func__, (ulong) CA_APERATURE_SIZE);
+		printk(KERN_ERR "%s:  Invalid CA_APERTURE_SIZE 0x%lx\n",
+			__func__, (ulong) CA_APERTURE_SIZE);
 		return -1;
 	}
 
@@ -106,8 +106,8 @@ tioca_gart_init(struct tioca_kernel *tioca_kern)
 		tioca_kern->ca_ap_pagesize = 4096;
 	}
 
-	tioca_kern->ca_ap_size = CA_APERATURE_SIZE;
-	tioca_kern->ca_ap_bus_base = CA_APERATURE_BASE;
+	tioca_kern->ca_ap_size = CA_APERTURE_SIZE;
+	tioca_kern->ca_ap_bus_base = CA_APERTURE_BASE;
 	tioca_kern->ca_gart_entries =
 	    tioca_kern->ca_ap_size / tioca_kern->ca_ap_pagesize;
 
@@ -141,7 +141,7 @@ tioca_gart_init(struct tioca_kernel *tioca_kern)
 	 * Compute PCI/AGP convenience fields 
 	 */
 
-	offset = CA_PCI32_MAPPED_BASE - CA_APERATURE_BASE;
+	offset = CA_PCI32_MAPPED_BASE - CA_APERTURE_BASE;
 	tioca_kern->ca_pciap_base = CA_PCI32_MAPPED_BASE;
 	tioca_kern->ca_pciap_size = CA_PCI32_MAPPED_SIZE;
 	tioca_kern->ca_pcigart_start = offset / tioca_kern->ca_ap_pagesize;
@@ -159,7 +159,7 @@ tioca_gart_init(struct tioca_kernel *tioca_kern)
 		return -1;
 	}
 
-	offset = CA_AGP_MAPPED_BASE - CA_APERATURE_BASE;
+	offset = CA_AGP_MAPPED_BASE - CA_APERTURE_BASE;
 	tioca_kern->ca_gfxap_base = CA_AGP_MAPPED_BASE;
 	tioca_kern->ca_gfxap_size = CA_AGP_MAPPED_SIZE;
 	tioca_kern->ca_gfxgart_start = offset / tioca_kern->ca_ap_pagesize;
