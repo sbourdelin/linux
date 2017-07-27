@@ -10,6 +10,7 @@
 #include <linux/delay.h>
 #include <linux/reboot.h>
 
+#include <asm/barrier.h>
 #include <asm/cacheflush.h>
 #include <asm/idmap.h>
 #include <asm/virt.h>
@@ -107,7 +108,11 @@ void machine_halt(void)
 {
 	local_irq_disable();
 	smp_send_stop();
-	while (1);
+	while (1) {
+#ifdef wfi
+		wfi();
+#endif
+	}
 }
 
 /*
@@ -151,5 +156,9 @@ void machine_restart(char *cmd)
 
 	/* Whoops - the platform was unable to reboot. Tell the user! */
 	printk("Reboot failed -- System halted\n");
-	while (1);
+	while (1) {
+#ifdef wfi
+		wfi();
+#endif
+	}
 }
