@@ -3710,8 +3710,8 @@ lpfc_get_wwpn(struct lpfc_hba *phba)
 	if (phba->sli_rev == LPFC_SLI_REV4)
 		return be64_to_cpu(wwn);
 	else
-		return (((wwn & 0xffffffff00000000) >> 32) |
-			((wwn & 0x00000000ffffffff) << 32));
+		return (((wwn & 0xffffffff00000000ULL) >> 32) |
+			((wwn & 0x00000000ffffffffULL) << 32));
 
 }
 
