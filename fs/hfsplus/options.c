@@ -24,7 +24,7 @@ enum {
 	opt_part, opt_session, opt_nls,
 	opt_nodecompose, opt_decompose,
 	opt_barrier, opt_nobarrier,
-	opt_force, opt_err
+	opt_force, opt_acl, opt_err
 };
 
 static const match_table_t tokens = {
@@ -41,6 +41,7 @@ static const match_table_t tokens = {
 	{ opt_barrier, "barrier" },
 	{ opt_nobarrier, "nobarrier" },
 	{ opt_force, "force" },
+	{ opt_acl, "acl" },
 	{ opt_err, NULL }
 };
 
@@ -195,6 +196,14 @@ int hfsplus_parse_options(char *input, struct hfsplus_sb_info *sbi)
 		case opt_force:
 			set_bit(HFSPLUS_SB_FORCE, &sbi->flags);
 			break;
+		case opt_acl:
+#ifdef CONFIG_HFSPLUS_FS_POSIX_ACL
+			sbi->sb->s_flags |= MS_POSIXACL;
+			break;
+#else
+			pr_err("support for ACL not compiled in!");
+			return 0;
+#endif
 		default:
 			return 0;
 		}
@@ -234,5 +243,9 @@ int hfsplus_show_options(struct seq_file *seq, struct dentry *root)
 		seq_puts(seq, ",nodecompose");
 	if (test_bit(HFSPLUS_SB_NOBARRIER, &sbi->flags))
 		seq_puts(seq, ",nobarrier");
+#ifdef CONFIG_HFSPLUS_FS_POSIX_ACL
+	if (sbi->sb->s_flags & MS_POSIXACL)
+		seq_puts(seq, ",acl");
+#endif
 	return 0;
 }

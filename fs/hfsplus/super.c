@@ -389,6 +389,7 @@ static int hfsplus_fill_super(struct super_block *sb, void *data, int silent)
 		goto out;
 
 	sb->s_fs_info = sbi;
+	sbi->sb = sb;
 	mutex_init(&sbi->alloc_mutex);
 	mutex_init(&sbi->vh_mutex);
 	spin_lock_init(&sbi->work_lock);

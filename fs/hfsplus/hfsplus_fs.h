@@ -153,6 +153,7 @@ struct hfsplus_sb_info {
 	struct inode *alloc_file;
 	struct inode *hidden_dir;
 	struct nls_table *nls;
+	struct super_block *sb;
 
 	/* Runtime variables */
 	u32 blockoffset;
