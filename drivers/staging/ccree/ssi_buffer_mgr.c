@@ -371,7 +371,7 @@ static int ssi_buffer_mgr_map_scatterlist(
 		*mapped_nents = 1;
 	} else {  /*sg_is_last*/
 		*nents = ssi_buffer_mgr_get_sgl_nents(sg, nbytes, lbytes,
-						     &is_chained);
+						      &is_chained);
 		if (*nents > max_sg_nents) {
 			*nents = 0;
 			SSI_LOG_ERR("Too many fragments. current %d max %d\n",
@@ -393,7 +393,7 @@ static int ssi_buffer_mgr_map_scatterlist(
 			 * must have the same nents before and after map
 			 */
 			*mapped_nents = ssi_buffer_mgr_dma_map_sg(dev,
-								 sg,
+								  sg,
 								 *nents,
 								 direction);
 			if (unlikely(*mapped_nents != *nents)) {
@@ -784,7 +784,7 @@ static inline int ssi_buffer_mgr_aead_chain_iv(
 	}
 
 	areq_ctx->gen_ctx.iv_dma_addr = dma_map_single(dev, req->iv,
-		hw_iv_size, DMA_BIDIRECTIONAL);
+						       hw_iv_size, DMA_BIDIRECTIONAL);
 	if (unlikely(dma_mapping_error(dev, areq_ctx->gen_ctx.iv_dma_addr))) {
 		SSI_LOG_ERR("Mapping iv %u B at va=%pK for DMA failed\n",
 			    hw_iv_size, req->iv);
@@ -1323,8 +1323,9 @@ int ssi_buffer_mgr_map_aead_request(
 				req->cryptlen :
 				(req->cryptlen - authsize);
 
-	areq_ctx->mac_buf_dma_addr = dma_map_single(dev,
-		areq_ctx->mac_buf, MAX_MAC_SIZE, DMA_BIDIRECTIONAL);
+	areq_ctx->mac_buf_dma_addr = dma_map_single(dev, areq_ctx->mac_buf,
+						    MAX_MAC_SIZE,
+						    DMA_BIDIRECTIONAL);
 	if (unlikely(dma_mapping_error(dev, areq_ctx->mac_buf_dma_addr))) {
 		SSI_LOG_ERR("Mapping mac_buf %u B at va=%pK for DMA failed\n",
 			    MAX_MAC_SIZE, areq_ctx->mac_buf);
@@ -1334,8 +1335,10 @@ int ssi_buffer_mgr_map_aead_request(
 
 	if (areq_ctx->ccm_hdr_size != ccm_header_size_null) {
 		areq_ctx->ccm_iv0_dma_addr = dma_map_single(dev,
-			(areq_ctx->ccm_config + CCM_CTR_COUNT_0_OFFSET),
-			AES_BLOCK_SIZE, DMA_TO_DEVICE);
+							    (areq_ctx->ccm_config +
+							     CCM_CTR_COUNT_0_OFFSET),
+							    AES_BLOCK_SIZE,
+							    DMA_TO_DEVICE);
 
 		if (unlikely(dma_mapping_error(dev, areq_ctx->ccm_iv0_dma_addr))) {
 			SSI_LOG_ERR("Mapping mac_buf %u B at va=%pK "
@@ -1356,7 +1359,9 @@ int ssi_buffer_mgr_map_aead_request(
 #if SSI_CC_HAS_AES_GCM
 	if (areq_ctx->cipher_mode == DRV_CIPHER_GCTR) {
 		areq_ctx->hkey_dma_addr = dma_map_single(dev,
-			areq_ctx->hkey, AES_BLOCK_SIZE, DMA_BIDIRECTIONAL);
+							 areq_ctx->hkey,
+							 AES_BLOCK_SIZE,
+							 DMA_BIDIRECTIONAL);
 		if (unlikely(dma_mapping_error(dev, areq_ctx->hkey_dma_addr))) {
 			SSI_LOG_ERR("Mapping hkey %u B at va=%pK for DMA failed\n",
 				    AES_BLOCK_SIZE, areq_ctx->hkey);
@@ -1365,7 +1370,7 @@ int ssi_buffer_mgr_map_aead_request(
 		}
 
 		areq_ctx->gcm_block_len_dma_addr = dma_map_single(dev,
-			&areq_ctx->gcm_len_block, AES_BLOCK_SIZE, DMA_TO_DEVICE);
+								  &areq_ctx->gcm_len_block, AES_BLOCK_SIZE, DMA_TO_DEVICE);
 		if (unlikely(dma_mapping_error(dev, areq_ctx->gcm_block_len_dma_addr))) {
 			SSI_LOG_ERR("Mapping gcm_len_block %u B at va=%pK for DMA failed\n",
 				    AES_BLOCK_SIZE, &areq_ctx->gcm_len_block);
@@ -1374,7 +1379,7 @@ int ssi_buffer_mgr_map_aead_request(
 		}
 
 		areq_ctx->gcm_iv_inc1_dma_addr = dma_map_single(dev,
-			areq_ctx->gcm_iv_inc1,
+								areq_ctx->gcm_iv_inc1,
 			AES_BLOCK_SIZE, DMA_TO_DEVICE);
 
 		if (unlikely(dma_mapping_error(dev, areq_ctx->gcm_iv_inc1_dma_addr))) {
@@ -1387,8 +1392,9 @@ int ssi_buffer_mgr_map_aead_request(
 		}
 
 		areq_ctx->gcm_iv_inc2_dma_addr = dma_map_single(dev,
-			areq_ctx->gcm_iv_inc2,
-			AES_BLOCK_SIZE, DMA_TO_DEVICE);
+								areq_ctx->gcm_iv_inc2,
+								AES_BLOCK_SIZE,
+								DMA_TO_DEVICE);
 
 		if (unlikely(dma_mapping_error(dev, areq_ctx->gcm_iv_inc2_dma_addr))) {
 			SSI_LOG_ERR("Mapping gcm_iv_inc2 %u B at va=%pK "
