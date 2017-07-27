@@ -144,11 +144,16 @@ static void sync_timeline_signal(struct sync_timeline *obj, unsigned int inc)
 	obj->value += inc;
 
 	list_for_each_entry_safe(pt, next, &obj->pt_list, link) {
-		if (!dma_fence_is_signaled_locked(&pt->base))
+		dma_fence_get(&pt->base);
+		if (!dma_fence_is_signaled_locked(&pt->base)) {
+			dma_fence_put(&pt->base);
 			break;
+		}
 
 		list_del_init(&pt->link);
 		rb_erase(&pt->node, &obj->pt_tree);
+
+		dma_fence_put(&pt->base);
 	}
 
 	spin_unlock_irq(&obj->lock);
