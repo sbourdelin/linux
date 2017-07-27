@@ -118,7 +118,10 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 	regmap_write(regmap, off + PLL_L_VAL, config->l);
 	regmap_write(regmap, off + PLL_ALPHA_VAL, config->alpha);
 	regmap_write(regmap, off + PLL_CONFIG_CTL, config->config_ctl_val);
-	regmap_write(regmap, off + PLL_CONFIG_CTL_U, config->config_ctl_hi_val);
+
+	if (pll->flags & SUPPORTS_64BIT_CONFIG_CTL)
+		regmap_write(regmap, off + PLL_CONFIG_CTL_U,
+			     config->config_ctl_hi_val);
 
 	val = config->main_output_mask;
 	val |= config->aux_output_mask;
