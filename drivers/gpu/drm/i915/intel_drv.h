@@ -1649,7 +1649,9 @@ void intel_hdmi_handle_sink_scrambling(struct intel_encoder *intel_encoder,
 				       bool high_tmds_clock_ratio,
 				       bool scrambling);
 void intel_dp_dual_mode_set_tmds_output(struct intel_hdmi *hdmi, bool enable);
-
+u8 gen8_ddc_pin_mapping(struct drm_i915_private *dev_priv, enum port port);
+u8 gen9_lp_ddc_pin_mapping(struct drm_i915_private *dev_priv, enum port port);
+u8 gen10_ddc_pin_mapping(struct drm_i915_private *dev_priv, enum port port);
 
 /* intel_lvds.c */
 void intel_lvds_init(struct drm_i915_private *dev_priv);

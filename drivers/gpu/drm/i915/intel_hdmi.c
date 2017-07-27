@@ -1850,7 +1850,7 @@ static u8 intel_hdmi_ddc_pin(struct drm_i915_private *dev_priv,
 {
 	const struct ddi_vbt_port_info *info =
 		&dev_priv->vbt.ddi_port_info[port];
-	u8 ddc_pin;
+	u8 ddc_pin = 0;
 
 	if (info->alternate_ddc_pin) {
 		DRM_DEBUG_KMS("Using DDC pin 0x%x for port %c (VBT)\n",
@@ -1858,36 +1858,72 @@ static u8 intel_hdmi_ddc_pin(struct drm_i915_private *dev_priv,
 		return info->alternate_ddc_pin;
 	}
 
+	if (IS_CHERRYVIEW(dev_priv))
+		ddc_pin = gen8_ddc_pin_mapping(dev_priv, port);
+	else if (IS_GEN9_LP(dev_priv))
+		ddc_pin = gen9_lp_ddc_pin_mapping(dev_priv, port);
+	else if (IS_CANNONLAKE(dev_priv))
+		ddc_pin = gen10_ddc_pin_mapping(dev_priv, port);
+
+	DRM_DEBUG_KMS("Using DDC pin 0x%x for port %c (platform default)\n",
+		      ddc_pin, port_name(port));
+	return ddc_pin;
+}
+
+u8 gen8_ddc_pin_mapping(struct drm_i915_private *dev_priv, enum port port)
+{
+	u8 ddc_pin;
+
 	switch (port) {
-	case PORT_B:
-		if (IS_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv))
-			ddc_pin = GMBUS_PIN_1_BXT;
-		else
-			ddc_pin = GMBUS_PIN_DPB;
-		break;
-	case PORT_C:
-		if (IS_GEN9_LP(dev_priv) || HAS_PCH_CNP(dev_priv))
-			ddc_pin = GMBUS_PIN_2_BXT;
-		else
-			ddc_pin = GMBUS_PIN_DPC;
-		break;
 	case PORT_D:
-		if (HAS_PCH_CNP(dev_priv))
-			ddc_pin = GMBUS_PIN_4_CNP;
-		else if (IS_CHERRYVIEW(dev_priv))
-			ddc_pin = GMBUS_PIN_DPD_CHV;
-		else
-			ddc_pin = GMBUS_PIN_DPD;
+		ddc_pin = GMBUS_PIN_DPD_CHV;
 		break;
 	default:
 		MISSING_CASE(port);
 		ddc_pin = GMBUS_PIN_DPB;
 		break;
 	}
+	return ddc_pin;
+}
 
-	DRM_DEBUG_KMS("Using DDC pin 0x%x for port %c (platform default)\n",
-		      ddc_pin, port_name(port));
+u8 gen9_lp_ddc_pin_mapping(struct drm_i915_private *dev_priv, enum port port)
+{
+	u8 ddc_pin;
 
+	switch (port) {
+	case PORT_B:
+		ddc_pin = GMBUS_PIN_1_BXT;
+		break;
+	case PORT_C:
+		ddc_pin = GMBUS_PIN_2_BXT;
+		break;
+	default:
+		MISSING_CASE(port);
+		ddc_pin = GMBUS_PIN_DPB;
+		break;
+	}
+	return ddc_pin;
+}
+
+u8 gen10_ddc_pin_mapping(struct drm_i915_private *dev_priv, enum port port)
+{
+	u8 ddc_pin;
+
+	switch (port) {
+	case PORT_B:
+		ddc_pin = GMBUS_PIN_1_BXT;
+		break;
+	case PORT_C:
+		ddc_pin = GMBUS_PIN_2_BXT;
+		break;
+	case PORT_D:
+		ddc_pin = GMBUS_PIN_4_CNP;
+		break;
+	default:
+		MISSING_CASE(port);
+		ddc_pin = GMBUS_PIN_DPB;
+		break;
+	}
 	return ddc_pin;
 }
 
