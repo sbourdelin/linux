@@ -1971,13 +1971,13 @@ alloc_pages_vma(gfp_t gfp, int order, struct vm_area_struct *vma,
 {
 	struct mempolicy *pol;
 	struct page *page;
-	unsigned int cpuset_mems_cookie;
+	struct cpuset_mems_cookie cpuset_mems_cookie;
 	struct zonelist *zl;
 	nodemask_t *nmask;
 
 retry_cpuset:
 	pol = get_vma_policy(vma, addr);
-	cpuset_mems_cookie = read_mems_allowed_begin();
+	read_mems_allowed_begin(&cpuset_mems_cookie);
 
 	if (pol->mode == MPOL_INTERLEAVE) {
 		unsigned nid;
@@ -2019,7 +2019,7 @@ retry_cpuset:
 	page = __alloc_pages_nodemask(gfp, order, zl, nmask);
 	mpol_cond_put(pol);
 out:
-	if (unlikely(!page && read_mems_allowed_retry(cpuset_mems_cookie)))
+	if (unlikely(!page && read_mems_allowed_retry(&cpuset_mems_cookie)))
 		goto retry_cpuset;
 	return page;
 }
@@ -2047,13 +2047,13 @@ struct page *alloc_pages_current(gfp_t gfp, unsigned order)
 {
 	struct mempolicy *pol = &default_policy;
 	struct page *page;
-	unsigned int cpuset_mems_cookie;
+	struct cpuset_mems_cookie cpuset_mems_cookie;
 
 	if (!in_interrupt() && !(gfp & __GFP_THISNODE))
 		pol = get_task_policy(current);
 
 retry_cpuset:
-	cpuset_mems_cookie = read_mems_allowed_begin();
+	read_mems_allowed_begin(&cpuset_mems_cookie);
 
 	/*
 	 * No reference counting needed for current->mempolicy
@@ -2066,7 +2066,7 @@ retry_cpuset:
 				policy_zonelist(gfp, pol, numa_node_id()),
 				policy_nodemask(gfp, pol));
 
-	if (unlikely(!page && read_mems_allowed_retry(cpuset_mems_cookie)))
+	if (unlikely(!page && read_mems_allowed_retry(&cpuset_mems_cookie)))
 		goto retry_cpuset;
 
 	return page;

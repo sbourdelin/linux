@@ -3688,7 +3688,7 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	int no_progress_loops;
 	unsigned long alloc_start = jiffies;
 	unsigned int stall_timeout = 10 * HZ;
-	unsigned int cpuset_mems_cookie;
+	struct cpuset_mems_cookie cpuset_mems_cookie;
 
 	/*
 	 * In the slowpath, we sanity check order to avoid ever trying to
@@ -3713,7 +3713,7 @@ retry_cpuset:
 	compaction_retries = 0;
 	no_progress_loops = 0;
 	compact_priority = DEF_COMPACT_PRIORITY;
-	cpuset_mems_cookie = read_mems_allowed_begin();
+	read_mems_allowed_begin(&cpuset_mems_cookie);
 
 	/*
 	 * The fast path uses conservative alloc_flags to succeed only until
@@ -3872,7 +3872,7 @@ retry:
 	 * It's possible we raced with cpuset update so the OOM would be
 	 * premature (see below the nopage: label for full explanation).
 	 */
-	if (read_mems_allowed_retry(cpuset_mems_cookie))
+	if (read_mems_allowed_retry(&cpuset_mems_cookie))
 		goto retry_cpuset;
 
 	/* Reclaim has failed us, start killing things */
@@ -3900,7 +3900,7 @@ nopage:
 	 * to fail, check if the cpuset changed during allocation and if so,
 	 * retry.
 	 */
-	if (read_mems_allowed_retry(cpuset_mems_cookie))
+	if (read_mems_allowed_retry(&cpuset_mems_cookie))
 		goto retry_cpuset;
 
 	/*

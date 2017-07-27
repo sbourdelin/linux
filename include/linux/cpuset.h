@@ -16,6 +16,11 @@
 #include <linux/mm.h>
 #include <linux/jump_label.h>
 
+struct cpuset_mems_cookie {
+	unsigned int seq;
+	bool was_enabled;
+};
+
 #ifdef CONFIG_CPUSETS
 
 extern struct static_key_false cpusets_enabled_key;
@@ -113,12 +118,15 @@ extern void cpuset_print_current_mems_allowed(void);
  * causing process failure. A retry loop with read_mems_allowed_begin and
  * read_mems_allowed_retry prevents these artificial failures.
  */
-static inline unsigned int read_mems_allowed_begin(void)
+static inline void read_mems_allowed_begin(struct cpuset_mems_cookie *cookie)
 {
-	if (!cpusets_enabled())
-		return 0;
+	if (!cpusets_enabled()) {
+		cookie->was_enabled = false;
+		return;
+	}
 
-	return read_seqcount_begin(&current->mems_allowed_seq);
+	cookie->was_enabled = true;
+	cookie->seq = read_seqcount_begin(&current->mems_allowed_seq);
 }
 
 /*
@@ -127,12 +135,11 @@ static inline unsigned int read_mems_allowed_begin(void)
  * update of mems_allowed. It is up to the caller to retry the operation if
  * appropriate.
  */
-static inline bool read_mems_allowed_retry(unsigned int seq)
+static inline bool read_mems_allowed_retry(struct cpuset_mems_cookie *cookie)
 {
-	if (!cpusets_enabled())
+	if (!cookie->was_enabled)
 		return false;
-
-	return read_seqcount_retry(&current->mems_allowed_seq, seq);
+	return read_seqcount_retry(&current->mems_allowed_seq, cookie->seq);
 }
 
 static inline void set_mems_allowed(nodemask_t nodemask)
@@ -249,12 +256,12 @@ static inline void set_mems_allowed(nodemask_t nodemask)
 {
 }
 
-static inline unsigned int read_mems_allowed_begin(void)
+static inline void read_mems_allowed_begin(struct cpuset_mems_cookie *cookie)
 {
 	return 0;
 }
 
-static inline bool read_mems_allowed_retry(unsigned int seq)
+static inline bool read_mems_allowed_retry(struct cpuset_mems_cookie *cookie)
 {
 	return false;
 }

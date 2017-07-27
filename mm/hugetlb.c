@@ -907,7 +907,7 @@ static struct page *dequeue_huge_page_vma(struct hstate *h,
 	struct zonelist *zonelist;
 	struct zone *zone;
 	struct zoneref *z;
-	unsigned int cpuset_mems_cookie;
+	struct cpuset_mems_cookie cpuset_mems_cookie;
 
 	/*
 	 * A child process with MAP_PRIVATE mappings created by their parent
@@ -923,7 +923,7 @@ static struct page *dequeue_huge_page_vma(struct hstate *h,
 		goto err;
 
 retry_cpuset:
-	cpuset_mems_cookie = read_mems_allowed_begin();
+	read_mems_allowed_begin(&cpuset_mems_cookie);
 	zonelist = huge_zonelist(vma, address,
 					htlb_alloc_mask(h), &mpol, &nodemask);
 
@@ -945,7 +945,7 @@ retry_cpuset:
 	}
 
 	mpol_cond_put(mpol);
-	if (unlikely(!page && read_mems_allowed_retry(cpuset_mems_cookie)))
+	if (unlikely(!page && read_mems_allowed_retry(&cpuset_mems_cookie)))
 		goto retry_cpuset;
 	return page;
 
@@ -1511,7 +1511,7 @@ static struct page *__hugetlb_alloc_buddy_huge_page(struct hstate *h,
 {
 	int order = huge_page_order(h);
 	gfp_t gfp = htlb_alloc_mask(h)|__GFP_COMP|__GFP_REPEAT|__GFP_NOWARN;
-	unsigned int cpuset_mems_cookie;
+	struct cpuset_mems_cookie cpuset_mems_cookie;
 
 	/*
 	 * We need a VMA to get a memory policy.  If we do not
@@ -1548,13 +1548,13 @@ static struct page *__hugetlb_alloc_buddy_huge_page(struct hstate *h,
 		struct zonelist *zl;
 		nodemask_t *nodemask;
 
-		cpuset_mems_cookie = read_mems_allowed_begin();
+		read_mems_allowed_begin(&cpuset_mems_cookie);
 		zl = huge_zonelist(vma, addr, gfp, &mpol, &nodemask);
 		mpol_cond_put(mpol);
 		page = __alloc_pages_nodemask(gfp, order, zl, nodemask);
 		if (page)
 			return page;
-	} while (read_mems_allowed_retry(cpuset_mems_cookie));
+	} while (read_mems_allowed_retry(&cpuset_mems_cookie));
 
 	return NULL;
 }

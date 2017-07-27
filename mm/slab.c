@@ -3195,13 +3195,13 @@ static void *fallback_alloc(struct kmem_cache *cache, gfp_t flags)
 	void *obj = NULL;
 	struct page *page;
 	int nid;
-	unsigned int cpuset_mems_cookie;
+	struct cpuset_mems_cookie cpuset_mems_cookie;
 
 	if (flags & __GFP_THISNODE)
 		return NULL;
 
 retry_cpuset:
-	cpuset_mems_cookie = read_mems_allowed_begin();
+	read_mems_allowed_begin(&cpuset_mems_cookie);
 	zonelist = node_zonelist(mempolicy_slab_node(), flags);
 
 retry:
@@ -3245,7 +3245,7 @@ retry:
 		}
 	}
 
-	if (unlikely(!obj && read_mems_allowed_retry(cpuset_mems_cookie)))
+	if (unlikely(!obj && read_mems_allowed_retry(&cpuset_mems_cookie)))
 		goto retry_cpuset;
 	return obj;
 }
