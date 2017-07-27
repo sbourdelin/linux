@@ -708,6 +708,15 @@ struct device_node *of_graph_get_port_parent(struct device_node *node)
 {
 	unsigned int depth;
 
+	if (!node)
+		return NULL;
+
+	/*
+	 * Preserve usecount for passed in node as of_get_next_parent()
+	 * will do of_node_put() on it.
+	 */
+	of_node_get(node);
+
 	/* Walk 3 levels up only if there is 'ports' node. */
 	for (depth = 3; depth && node; depth--) {
 		node = of_get_next_parent(node);

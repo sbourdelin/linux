@@ -282,11 +282,6 @@ int asoc_simple_card_parse_graph_dai(struct device_node *ep,
 	if (!dai_name)
 		return 0;
 
-	/*
-	 * of_graph_get_port_parent() will call
-	 * of_node_put(). So, call of_node_get() here
-	 */
-	of_node_get(ep);
 	node = of_graph_get_port_parent(ep);
 
 	/* Get dai->name */
