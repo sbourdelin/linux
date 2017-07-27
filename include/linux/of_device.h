@@ -40,6 +40,8 @@ extern int of_device_request_module(struct device *dev);
 extern void of_device_uevent(struct device *dev, struct kobj_uevent_env *env);
 extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env);
 
+extern int of_device_node_get_cpu(struct device_node *np);
+
 static inline void of_device_node_put(struct device *dev)
 {
 	of_node_put(dev->of_node);
@@ -110,6 +112,11 @@ static inline int of_dma_configure(struct device *dev, struct device_node *np)
 }
 static inline void of_dma_deconfigure(struct device *dev)
 {}
+
+static inline int of_device_node_get_cpu(struct device_node *np)
+{
+	return nr_cpu_ids;
+}
 #endif /* CONFIG_OF */
 
 #endif /* _LINUX_OF_DEVICE_H */

@@ -420,6 +420,32 @@ struct device_node *of_get_cpu_node(int cpu, unsigned int *thread)
 EXPORT_SYMBOL(of_get_cpu_node);
 
 /**
+ * of_device_node_get_cpu: Get the logical CPU number for a given device_node
+ *
+ * @cpu_node: Pointer to the device_node for CPU.
+ *
+ * Returns the logical CPU number of the given CPU device_node.
+ * Returns >= nr_cpu_ids if CPU is not found.
+ */
+int of_device_node_get_cpu(struct device_node *cpu_node)
+{
+	int cpu;
+	bool found = false;
+	struct device_node *np;
+
+	for_each_possible_cpu(cpu) {
+		np = of_get_cpu_node(cpu, NULL);
+		found = (cpu_node == np);
+		of_node_put(np);
+		if (found)
+			break;
+	}
+
+	return cpu;
+}
+EXPORT_SYMBOL(of_device_node_get_cpu);
+
+/**
  * __of_device_is_compatible() - Check if the node matches given constraints
  * @device: pointer to node
  * @compat: required compatible string, NULL or "" for any match
