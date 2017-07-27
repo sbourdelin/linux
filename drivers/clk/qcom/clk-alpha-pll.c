@@ -31,7 +31,10 @@
 # define PLL_VOTE_FSM_ENA	BIT(20)
 # define PLL_FSM_ENA		BIT(20)
 # define PLL_VOTE_FSM_RESET	BIT(21)
+# define PLL_UPDATE		BIT(22)
+# define PLL_UPDATE_BYPASS	BIT(23)
 # define PLL_OFFLINE_ACK	BIT(28)
+# define ALPHA_PLL_ACK_LATCH	BIT(29)
 # define PLL_ACTIVE_FLAG	BIT(30)
 # define PLL_LOCK_DET		BIT(31)
 
@@ -121,6 +124,15 @@ static int wait_for_pll(struct clk_alpha_pll *pll, u32 mask, bool inverse,
 
 #define wait_for_pll_offline(pll) \
 	wait_for_pll(pll, PLL_OFFLINE_ACK, 0, "offline")
+
+#define wait_for_pll_update(pll) \
+	wait_for_pll(pll, PLL_UPDATE, 1, "update")
+
+#define wait_for_pll_update_ack_set(pll) \
+	wait_for_pll(pll, ALPHA_PLL_ACK_LATCH, 0, "update_ack_set")
+
+#define wait_for_pll_update_ack_clear(pll) \
+	wait_for_pll(pll, ALPHA_PLL_ACK_LATCH, 1, "update_ack_clear")
 
 void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 			     const struct alpha_pll_config *config)
@@ -398,7 +410,8 @@ static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 {
 	struct clk_alpha_pll *pll = to_clk_alpha_pll(hw);
 	const struct pll_vco *vco;
-	u32 l, alpha_width = pll_alpha_width(pll);
+	u32 l, mode, alpha_width = pll_alpha_width(pll);
+	int ret;
 	u64 a;
 
 	rate = alpha_pll_round_rate(rate, prate, &l, &a, alpha_width);
@@ -410,22 +423,49 @@ static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 
 	regmap_write(pll->clkr.regmap, pll_l(pll), l);
 
-	if (alpha_width > ALPHA_BITWIDTH) {
-		a <<= (alpha_width - ALPHA_BITWIDTH);
-		regmap_update_bits(pll->clkr.regmap, pll_alpha_u(pll),
-				   GENMASK(0, alpha_width - ALPHA_BITWIDTH - 1),
-				   a >> ALPHA_BITWIDTH);
-	}
+	a <<= ALPHA_REG_BITWIDTH - ALPHA_BITWIDTH;
+
+	regmap_write(pll->clkr.regmap, pll_alpha(pll), a);
+	regmap_write(pll->clkr.regmap, pll_alpha_u(pll), a >> 32);
 
 	regmap_update_bits(pll->clkr.regmap, pll_alpha(pll),
 			   GENMASK(0, alpha_width - 1), a);
 
 	regmap_update_bits(pll->clkr.regmap, pll_user_ctl(pll),
-			   PLL_VCO_MASK << PLL_VCO_SHIFT,
-			   vco->val << PLL_VCO_SHIFT);
+			   PLL_ALPHA_EN, PLL_ALPHA_EN);
 
-	regmap_update_bits(pll->clkr.regmap, pll_user_ctl(pll), PLL_ALPHA_EN,
-			   PLL_ALPHA_EN);
+	if (!clk_hw_is_enabled(hw) || !(pll->flags & SUPPORTS_DYNAMIC_UPDATE))
+		return 0;
+
+	regmap_read(pll->clkr.regmap, pll_mode(pll), &mode);
+	regmap_update_bits(pll->clkr.regmap, pll_mode(pll), PLL_UPDATE,
+			   PLL_UPDATE);
+
+	/* Make sure PLL_UPDATE request goes through*/
+	mb();
+
+	/*
+	 * PLL will latch the new L, Alpha and freq control word.
+	 * PLL will respond by raising PLL_ACK_LATCH output when new programming
+	 * has been latched in and PLL is being updated. When
+	 * UPDATE_LOGIC_BYPASS bit is not set, PLL_UPDATE will be cleared
+	 * automatically by hardware when PLL_ACK_LATCH is asserted by PLL.
+	 */
+	if (!(mode & PLL_UPDATE_BYPASS))
+		return wait_for_pll_update(pll);
+
+	ret = wait_for_pll_update_ack_set(pll);
+	if (ret)
+		return ret;
+
+	regmap_update_bits(pll->clkr.regmap, pll_mode(pll), PLL_UPDATE, 0);
+
+	/* Make sure PLL_UPDATE request goes through*/
+	mb();
+
+	ret = wait_for_pll_update_ack_clear(pll);
+	if (ret)
+		return ret;
 
 	return 0;
 }
