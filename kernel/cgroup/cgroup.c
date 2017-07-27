@@ -3220,6 +3220,33 @@ static int cgroup_events_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
+static int cgroup_stats_show(struct seq_file *seq, void *v)
+{
+	struct cgroup_subsys_state *css;
+	unsigned long total = 0;
+	unsigned long offline = 0;
+	int max_level = 0;
+
+	rcu_read_lock();
+	css_for_each_descendant_pre(css, seq_css(seq)) {
+		if (css == seq_css(seq))
+			continue;
+		++total;
+		if (!(css->flags & CSS_ONLINE))
+			++offline;
+		if (css->cgroup->level > max_level)
+			max_level = css->cgroup->level;
+	}
+	rcu_read_unlock();
+
+	seq_printf(seq, "nr_descendants %lu\n", total);
+	seq_printf(seq, "nr_dying_descendants %lu\n", offline);
+	seq_printf(seq, "max_descendant_depth %d\n",
+		   max_level - seq_css(seq)->cgroup->level);
+
+	return 0;
+}
+
 static int cgroup_file_open(struct kernfs_open_file *of)
 {
 	struct cftype *cft = of->kn->priv;
@@ -4312,6 +4339,10 @@ static struct cftype cgroup_base_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.file_offset = offsetof(struct cgroup, events_file),
 		.seq_show = cgroup_events_show,
+	},
+	{
+		.name = "cgroup.stat",
+		.seq_show = cgroup_stats_show,
 	},
 	{ }	/* terminate */
 };

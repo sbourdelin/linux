@@ -854,6 +854,18 @@ All cgroup core files are prefixed with "cgroup."
 		1 if the cgroup or its descendants contains any live
 		processes; otherwise, 0.
 
+  cgroup.stat
+	A read-only flat-keyed file with the following entries:
+
+	  nr_descendants
+		Total number of descendant cgroups.
+
+	  nr_dying_descendants
+		Total number of dying descendant cgroups.
+
+	  max_descendant_depth
+		Maximum descent depth below the current cgroup.
+
 
 Controllers
 ===========
