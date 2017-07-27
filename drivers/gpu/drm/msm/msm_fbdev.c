@@ -78,6 +78,7 @@ static int msm_fbdev_create(struct drm_fb_helper *helper,
 	struct drm_framebuffer *fb = NULL;
 	struct fb_info *fbi = NULL;
 	struct drm_mode_fb_cmd2 mode_cmd = {0};
+	void *ptr;
 	uint64_t paddr;
 	int ret, size;
 
@@ -97,11 +98,18 @@ static int msm_fbdev_create(struct drm_fb_helper *helper,
 	/* allocate backing bo */
 	size = mode_cmd.pitches[0] * mode_cmd.height;
 	DBG("allocating %d bytes for fb %d", size, dev->primary->index);
-	fbdev->bo = msm_gem_new(dev, size, MSM_BO_SCANOUT |
-			MSM_BO_WC | MSM_BO_STOLEN);
-	if (IS_ERR(fbdev->bo)) {
-		ret = PTR_ERR(fbdev->bo);
-		fbdev->bo = NULL;
+
+	/*
+	 * NOTE: if we can be guaranteed to be able to map buffer
+	 * in panic (ie. lock-safe, etc) we could avoid pinning the
+	 * buffer now:
+	 */
+	ptr = msm_gem_kernel_new(dev, size,
+		MSM_BO_SCANOUT | MSM_BO_WC | MSM_BO_STOLEN,
+		priv->kms->aspace, &fbdev->bo, &paddr);
+
+	if (IS_ERR(ptr)) {
+		ret = PTR_ERR(ptr);
 		dev_err(dev->dev, "failed to allocate buffer object: %d\n", ret);
 		goto fail;
 	}
@@ -118,17 +126,6 @@ static int msm_fbdev_create(struct drm_fb_helper *helper,
 	}
 
 	mutex_lock(&dev->struct_mutex);
-
-	/*
-	 * NOTE: if we can be guaranteed to be able to map buffer
-	 * in panic (ie. lock-safe, etc) we could avoid pinning the
-	 * buffer now:
-	 */
-	ret = msm_gem_get_iova(fbdev->bo, priv->kms->aspace, &paddr);
-	if (ret) {
-		dev_err(dev->dev, "failed to get buffer obj iova: %d\n", ret);
-		goto fail_unlock;
-	}
 
 	fbi = drm_fb_helper_alloc_fbi(helper);
 	if (IS_ERR(fbi)) {
@@ -153,11 +150,7 @@ static int msm_fbdev_create(struct drm_fb_helper *helper,
 
 	dev->mode_config.fb_base = paddr;
 
-	fbi->screen_base = msm_gem_get_vaddr(fbdev->bo);
-	if (IS_ERR(fbi->screen_base)) {
-		ret = PTR_ERR(fbi->screen_base);
-		goto fail_unlock;
-	}
+	fbi->screen_base = ptr;
 	fbi->screen_size = fbdev->bo->size;
 	fbi->fix.smem_start = paddr;
 	fbi->fix.smem_len = fbdev->bo->size;
