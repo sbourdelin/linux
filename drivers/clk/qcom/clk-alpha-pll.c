@@ -123,6 +123,9 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 		regmap_write(regmap, off + PLL_CONFIG_CTL_U,
 			     config->config_ctl_hi_val);
 
+	if (!(pll->flags & SUPPORTS_16BIT_ALPHA))
+		regmap_write(regmap, off + PLL_ALPHA_VAL_U, config->alpha_hi);
+
 	val = config->main_output_mask;
 	val |= config->aux_output_mask;
 	val |= config->aux2_output_mask;
@@ -130,6 +133,8 @@ void clk_alpha_pll_configure(struct clk_alpha_pll *pll, struct regmap *regmap,
 	val |= config->pre_div_val;
 	val |= config->post_div_val;
 	val |= config->vco_val;
+	val |= config->alpha_en_mask;
+	val |= config->alpha_mode_mask;
 
 	mask = config->main_output_mask;
 	mask |= config->aux_output_mask;
