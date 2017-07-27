@@ -2724,6 +2724,26 @@ asmlinkage __visible void schedule_tail(struct task_struct *prev)
 		put_user(task_pid_vnr(current), current->set_child_tid);
 }
 
+#ifdef CONFIG_MEMBARRIER
+static void membarrier_expedited_mb_after_set_current(struct mm_struct *mm,
+		struct mm_struct *oldmm)
+{
+	if (likely(mm == oldmm))
+		return;		/* Thread context switch, same mm. */
+	/*
+	 * When switching between processes, membarrier expedited
+	 * private requires a memory barrier after we set the current
+	 * task.
+	 */
+	smp_mb();
+}
+#else /* #ifdef CONFIG_MEMBARRIER */
+static void membarrier_expedited_mb_after_set_current(struct mm_struct *mm,
+		struct mm_struct *oldmm)
+{
+}
+#endif /* #else #ifdef CONFIG_MEMBARRIER */
+
 /*
  * context_switch - switch to the new MM and the new thread's register state.
  */
@@ -2737,6 +2757,7 @@ context_switch(struct rq *rq, struct task_struct *prev,
 
 	mm = next->mm;
 	oldmm = prev->active_mm;
+	membarrier_expedited_mb_after_set_current(mm, oldmm);
 	/*
 	 * For paravirt, this is coupled with an exit in switch_to to
 	 * combine the page table reload and the switch backend into
