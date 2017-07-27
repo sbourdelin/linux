@@ -967,7 +967,7 @@ double disasm__calc_percent(struct annotation *notes, int evidx, s64 offset,
 			period += h->addr[offset++].period;
 		}
 
-		if (h->nr_samples) {
+		if (h->period) {
 			sample->period	   = period;
 			sample->nr_samples = hits;
 			percent = 100.0 * hits / h->nr_samples;
@@ -1718,7 +1718,7 @@ static int symbol__get_source_line(struct symbol *sym, struct map *map,
 
 			h = annotation__histogram(notes, evidx + k);
 			nr_samples = h->addr[i].nr_samples;
-			if (h->nr_samples)
+			if (h->period)
 				percent = 100.0 * nr_samples / h->nr_samples;
 
 			if (percent > percent_max)
