@@ -17,12 +17,15 @@
 #include <linux/interrupt.h>
 #include <linux/types.h>
 #include <linux/input.h>
+#include <linux/input/mt.h>
 #include <linux/kernel.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/irq.h>
 #include <linux/io.h>
 #include <linux/acpi.h>
+
+#define GOLDFISH_MAX_FINGERS 5
 
 enum {
 	REG_READ        = 0x00,
@@ -52,7 +55,22 @@ static irqreturn_t events_interrupt(int irq, void *dev_id)
 	value = __raw_readl(edev->addr + REG_READ);
 
 	input_event(edev->input, type, code, value);
-	input_sync(edev->input);
+
+	/*
+	 * Send an extra (EV_SYN, SYN_REPORT, 0x0) event only if a key
+	 * was pressed. Some keyboard device drivers may only send the
+	 * EV_KEY event and not the EV_SYN event.
+	 *
+	 * Note that sending an extra SYN_REPORT is not necessary nor
+	 * correct protocol with other devices such as touchscreens,
+	 * which will send their own SYN_REPORTs when sufficient event
+	 * event information has been collected (for example, in case
+	 * touchscreens, when pressure and X/Y coordinates have been
+	 * received). Hence, we will only send this extra SYN_REPORT
+	 * if type == EV_KEY.
+	 */
+	if (type == EV_KEY)
+		input_sync(edev->input);
 	return IRQ_HANDLED;
 }
 
@@ -154,6 +172,21 @@ static int events_probe(struct platform_device *pdev)
 
 	input_dev->name = edev->name;
 	input_dev->id.bustype = BUS_HOST;
+
+	/*
+	 * Set the Goldfish Device to be multitouch.
+	 *
+	 * In the Ranchu kernel, there is multitouch-specific code for
+	 * handling ABS_MT_SLOT events (see file drivers/input/input.c,
+	 * function input_handle_abs_event). If we do not issue
+	 * input_mt_init_slots, the kernel will filter out needed
+	 * ABS_MT_SLOT events when we touch the screen in more than one
+	 * place, preventing multitouch with more than one finger from
+	 * working.
+	 */
+	error = input_mt_init_slots(input_dev, GOLDFISH_MAX_FINGERS, 0);
+	if (error)
+		return error;
 
 	events_import_bits(edev, input_dev->evbit, EV_SYN, EV_MAX);
 	events_import_bits(edev, input_dev->keybit, EV_KEY, KEY_MAX);
