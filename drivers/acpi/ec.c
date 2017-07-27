@@ -164,7 +164,7 @@ module_param(ec_polling_guard, uint, 0644);
 MODULE_PARM_DESC(ec_polling_guard, "Guard time(us) between EC accesses in polling modes");
 
 static unsigned int ec_event_clearing __read_mostly = ACPI_EC_EVT_TIMING_QUERY;
-static unsigned int ec_gpe_polling __read_mostly = ACPI_EC_GPE_POLL_NONE;
+static unsigned int ec_gpe_polling __read_mostly = ACPI_EC_GPE_POLL_RESUME;
 
 /*
  * If the number of false interrupts per one transaction exceeds
