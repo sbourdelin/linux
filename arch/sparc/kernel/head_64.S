@@ -600,7 +600,7 @@ niagara_tlb_fixup:
 	be,pt	%xcc, niagara4_patch
 	 nop
 	cmp	%g1, SUN4V_CHIP_SPARC_M7
-	be,pt	%xcc, niagara4_patch
+	be,pt	%xcc, sparc_m7_patch
 	 nop
 	cmp	%g1, SUN4V_CHIP_SPARC_SN
 	be,pt	%xcc, niagara4_patch
@@ -611,6 +611,16 @@ niagara_tlb_fixup:
 	call	generic_patch_bzero
 	 nop
 	call	generic_patch_pageops
+	 nop
+
+	ba,a,pt	%xcc, 80f
+	 nop
+sparc_m7_patch:
+	call	m7_patch_copyops
+	 nop
+	call	m7_patch_bzero
+	 nop
+	call	m7_patch_pageops
 	 nop
 
 	ba,a,pt	%xcc, 80f
