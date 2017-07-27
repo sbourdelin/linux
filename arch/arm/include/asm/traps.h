@@ -18,7 +18,7 @@ struct undef_hook {
 void register_undef_hook(struct undef_hook *hook);
 void unregister_undef_hook(struct undef_hook *hook);
 
-#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+#ifdef CONFIG_IRQENTRY
 static inline int __in_irqentry_text(unsigned long ptr)
 {
 	extern char __irqentry_text_start[];
