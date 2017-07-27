@@ -102,13 +102,19 @@ end_set_acl:
 int hfsplus_set_posix_acl(struct inode *inode, struct posix_acl *acl, int type)
 {
 	int err;
+	int update_mode = 0;
+	umode_t mode = inode->i_mode;
 
 	if (type == ACL_TYPE_ACCESS && acl) {
-		err = posix_acl_update_mode(inode, &inode->i_mode, &acl);
+		err = posix_acl_update_mode(inode, &mode, &acl);
 		if (err)
 			return err;
+		update_mode = 1;
 	}
-	return __hfsplus_set_posix_acl(inode, acl, type);
+	err = __hfsplus_set_posix_acl(inode, acl, type);
+	if (!err && update_mode)
+		inode->i_mode = mode;
+	return err;
 }
 
 int hfsplus_init_posix_acl(struct inode *inode, struct inode *dir)
