@@ -610,7 +610,7 @@ static inline pte_t pte_mkdevmap(pte_t pte)
 
 static inline int pte_devmap(pte_t pte)
 {
-	return !!(pte_raw(pte) & cpu_to_be64(_PAGE_DEVMAP));
+	return !!(pte_raw(pte) & cpu_to_be64(_PAGE_DEVMAP | _PAGE_PTE));
 }
 
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
