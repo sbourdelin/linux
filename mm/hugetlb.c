@@ -2083,7 +2083,9 @@ struct page *alloc_huge_page_noerr(struct vm_area_struct *vma,
 	return page;
 }
 
-int __weak alloc_bootmem_huge_page(struct hstate *h)
+int alloc_bootmem_huge_page(struct hstate *h)
+	__attribute__ ((weak, alias("__alloc_bootmem_huge_page")));
+int __alloc_bootmem_huge_page(struct hstate *h)
 {
 	struct huge_bootmem_page *m;
 	int nr_nodes, node;
@@ -2104,6 +2106,7 @@ int __weak alloc_bootmem_huge_page(struct hstate *h)
 			goto found;
 		}
 	}
+	pr_info("Failed to allocate hugepage of size %ld\n", huge_page_size(h));
 	return 0;
 
 found:
