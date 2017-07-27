@@ -52,6 +52,7 @@
 #define PLL_HUAYRA_N_MASK		0xff
 #define PLL_HUAYRA_ALPHA_WIDTH		16
 
+#define PLL_BRAMMO_ALPHA_BITWIDTH	40
 /*
  * Even though 40 bits are present, use only 32 for ease of calculation.
  */
@@ -102,6 +103,17 @@ const u8 huayra_pll_offsets[] = {
 	[ALPHA_PLL_CONFIG_CTL_U] = 0x18,
 	[ALPHA_PLL_TEST_CTL] = 0x1c,
 	[ALPHA_PLL_TEST_CTL_U] = 0x20,
+	[ALPHA_PLL_STATUS] = 0x24,
+};
+
+const u8 brammo_pll_offsets[] = {
+	[ALPHA_PLL_MODE] = 0x00,
+	[ALPHA_PLL_L_VAL] = 0x04,
+	[ALPHA_PLL_ALPHA_VAL] = 0x08,
+	[ALPHA_PLL_ALPHA_VAL_U] = 0x0c,
+	[ALPHA_PLL_USER_CTL] = 0x10,
+	[ALPHA_PLL_CONFIG_CTL] = 0x18,
+	[ALPHA_PLL_TEST_CTL] = 0x1c,
 	[ALPHA_PLL_STATUS] = 0x24,
 };
 

@@ -64,6 +64,7 @@ struct clk_alpha_pll {
 #define CLK_HUAYRA_PLL_FLAGS	(HAVE_NO_VCO_CONF | SUPPORTS_DYNAMIC_UPDATE | \
 				 SUPPORTS_64BIT_CONFIG_CTL |		      \
 				 SUPPORTS_16BIT_ALPHA)
+#define CLK_BRAMMO_PLL_FLAGS	(HAVE_NO_VCO_CONF | SUPPORTS_DYNAMIC_UPDATE)
 
 /**
  * struct clk_alpha_pll_postdiv - phase locked loop (PLL) post-divider
@@ -102,6 +103,7 @@ struct alpha_pll_config {
 
 extern const u8 alpha_pll_offsets[];
 extern const u8 huayra_pll_offsets[];
+extern const u8 brammo_pll_offsets[];
 
 extern const struct clk_ops clk_alpha_pll_ops;
 extern const struct clk_ops clk_alpha_pll_hwfsm_ops;
