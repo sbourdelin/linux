@@ -137,10 +137,9 @@ static int ssi_hash_map_result(struct device *dev,
 			    digestsize);
 		return -ENOMEM;
 	}
-	SSI_LOG_DEBUG("Mapped digest result buffer %u B "
-		     "at va=%pK to dma=%pad\n",
-		digestsize, state->digest_result_buff,
-		state->digest_result_dma_addr);
+	SSI_LOG_DEBUG("Mapped digest result buffer %u B at va=%pK to dma=%pad\n",
+		      digestsize, state->digest_result_buff,
+		      state->digest_result_dma_addr);
 
 	return 0;
 }
@@ -357,11 +356,10 @@ static void ssi_hash_unmap_result(struct device *dev,
 				 state->digest_result_dma_addr,
 				 digestsize,
 				  DMA_BIDIRECTIONAL);
-		SSI_LOG_DEBUG("unmpa digest result buffer "
-			     "va (%pK) pa (%pad) len %u\n",
-			     state->digest_result_buff,
-			     state->digest_result_dma_addr,
-			     digestsize);
+		SSI_LOG_DEBUG("unmpa digest result buffer va (%pK) pa (%pad) len %u\n",
+			      state->digest_result_buff,
+			      state->digest_result_dma_addr,
+			      digestsize);
 		memcpy(result,
 		       state->digest_result_buff,
 		       digestsize);
@@ -999,13 +997,13 @@ static int ssi_hash_setkey(void *hash,
 						keylen, DMA_TO_DEVICE);
 		if (unlikely(dma_mapping_error(&ctx->drvdata->plat_dev->dev,
 					       ctx->key_params.key_dma_addr))) {
-			SSI_LOG_ERR("Mapping key va=0x%p len=%u for"
-				   " DMA failed\n", key, keylen);
+			SSI_LOG_ERR("Mapping key va=0x%p len=%u for DMA failed\n",
+				    key, keylen);
 			return -ENOMEM;
 		}
-		SSI_LOG_DEBUG("mapping key-buffer: key_dma_addr=%pad "
-			     "keylen=%u\n", ctx->key_params.key_dma_addr,
-			     ctx->key_params.keylen);
+		SSI_LOG_DEBUG("mapping key-buffer: key_dma_addr=%pad keylen=%u\n",
+			      ctx->key_params.key_dma_addr,
+			      ctx->key_params.keylen);
 
 		if (keylen > blocksize) {
 			/* Load hash initial state */
@@ -1181,14 +1179,13 @@ static int ssi_xcbc_setkey(struct crypto_ahash *ahash,
 					keylen, DMA_TO_DEVICE);
 	if (unlikely(dma_mapping_error(&ctx->drvdata->plat_dev->dev,
 				       ctx->key_params.key_dma_addr))) {
-		SSI_LOG_ERR("Mapping key va=0x%p len=%u for"
-			   " DMA failed\n", key, keylen);
+		SSI_LOG_ERR("Mapping key va=0x%p len=%u for DMA failed\n",
+			    key, keylen);
 		return -ENOMEM;
 	}
-	SSI_LOG_DEBUG("mapping key-buffer: key_dma_addr=%pad "
-		     "keylen=%u\n",
-		     ctx->key_params.key_dma_addr,
-		     ctx->key_params.keylen);
+	SSI_LOG_DEBUG("mapping key-buffer: key_dma_addr=%pad keylen=%u\n",
+		      ctx->key_params.key_dma_addr,
+		      ctx->key_params.keylen);
 
 	ctx->is_hmac = true;
 	/* 1. Load the AES key */
@@ -1289,8 +1286,7 @@ static void ssi_hash_free_ctx(struct ssi_hash_ctx *ctx)
 	if (ctx->digest_buff_dma_addr != 0) {
 		dma_unmap_single(dev, ctx->digest_buff_dma_addr,
 				 sizeof(ctx->digest_buff), DMA_BIDIRECTIONAL);
-		SSI_LOG_DEBUG("Unmapped digest-buffer: "
-			     "digest_buff_dma_addr=%pad\n",
+		SSI_LOG_DEBUG("Unmapped digest-buffer: digest_buff_dma_addr=%pad\n",
 			      ctx->digest_buff_dma_addr);
 		ctx->digest_buff_dma_addr = 0;
 	}
@@ -1298,8 +1294,7 @@ static void ssi_hash_free_ctx(struct ssi_hash_ctx *ctx)
 		dma_unmap_single(dev, ctx->opad_tmp_keys_dma_addr,
 				 sizeof(ctx->opad_tmp_keys_buff),
 				 DMA_BIDIRECTIONAL);
-		SSI_LOG_DEBUG("Unmapped opad-digest: "
-			     "opad_tmp_keys_dma_addr=%pad\n",
+		SSI_LOG_DEBUG("Unmapped opad-digest: opad_tmp_keys_dma_addr=%pad\n",
 			      ctx->opad_tmp_keys_dma_addr);
 		ctx->opad_tmp_keys_dma_addr = 0;
 	}

@@ -240,9 +240,8 @@ static void ssi_aead_complete(struct device *dev, void *ssi_req, void __iomem *c
 	if (areq_ctx->gen_ctx.op_type == DRV_CRYPTO_DIRECTION_DECRYPT) {
 		if (memcmp(areq_ctx->mac_buf, areq_ctx->icv_virt_addr,
 			   ctx->authsize) != 0) {
-			SSI_LOG_DEBUG("Payload authentication failure, "
-				"(auth-size=%d, cipher=%d).\n",
-				ctx->authsize, ctx->cipher_mode);
+			SSI_LOG_DEBUG("Payload authentication failure, (auth-size=%d, cipher=%d).\n",
+				      ctx->authsize, ctx->cipher_mode);
 			/* In case of payload authentication failure, MUST NOT
 			 * revealed the decrypted message --> zero its memory.
 			 */
@@ -455,8 +454,8 @@ ssi_get_plain_hmac_key(struct crypto_aead *tfm, const u8 *key, unsigned int keyl
 	if (likely(keylen != 0)) {
 		key_dma_addr = dma_map_single(dev, (void *)key, keylen, DMA_TO_DEVICE);
 		if (unlikely(dma_mapping_error(dev, key_dma_addr))) {
-			SSI_LOG_ERR("Mapping key va=0x%p len=%u for"
-				   " DMA failed\n", key, keylen);
+			SSI_LOG_ERR("Mapping key va=0x%p len=%u for DMA failed\n",
+				    key, keylen);
 			return -ENOMEM;
 		}
 		if (keylen > blocksize) {

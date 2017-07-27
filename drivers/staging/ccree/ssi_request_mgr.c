@@ -140,8 +140,8 @@ int request_mgr_init(struct ssi_drvdata *drvdata)
 							&req_mgr_h->dummy_comp_buff_dma,
 							GFP_KERNEL);
 	if (!req_mgr_h->dummy_comp_buff) {
-		SSI_LOG_ERR("Not enough memory to allocate DMA (%zu) dropped "
-			   "buffer\n", sizeof(u32));
+		SSI_LOG_ERR("Not enough memory to allocate DMA (%zu) dropped buffer\n",
+			    sizeof(u32));
 		rc = -ENOMEM;
 		goto req_mgr_init_err;
 	}
@@ -238,12 +238,9 @@ static inline int request_mgr_queues_status_check(
 			      req_mgr_h->q_free_slots, total_seq_len);
 	}
 	/* No room in the HW queue try again later */
-	SSI_LOG_DEBUG("HW FIFO full, timeout. req_queue_head=%d "
-		   "sw_fifo_len=%d q_free_slots=%d total_seq_len=%d\n",
-		     req_mgr_h->req_queue_head,
-		   MAX_REQUEST_QUEUE_SIZE,
-		   req_mgr_h->q_free_slots,
-		   total_seq_len);
+	SSI_LOG_DEBUG("HW FIFO full, timeout. req_queue_head=%d sw_fifo_len=%d q_free_slots=%d total_seq_len=%d\n",
+		      req_mgr_h->req_queue_head, MAX_REQUEST_QUEUE_SIZE,
+		      req_mgr_h->q_free_slots, total_seq_len);
 	return -EAGAIN;
 }
 

@@ -82,8 +82,8 @@ static unsigned int ssi_buffer_mgr_get_sgl_nents(
 
 	while (nbytes != 0) {
 		if (sg_is_chain(sg_list)) {
-			SSI_LOG_ERR("Unexpected chained entry "
-				   "in sg (entry =0x%X)\n", nents);
+			SSI_LOG_ERR("Unexpected chained entry in sg (entry =0x%X)\n",
+				    nents);
 			BUG();
 		}
 		if (sg_list->length != 0) {
@@ -259,11 +259,9 @@ static int ssi_buffer_mgr_generate_mlli(
 	/* Set MLLI size for the bypass operation */
 	mlli_params->mlli_len = (total_nents * LLI_ENTRY_BYTE_SIZE);
 
-	SSI_LOG_DEBUG("MLLI params: "
-		     "virt_addr=%pK dma_addr=%pad mlli_len=0x%X\n",
-		   mlli_params->mlli_virt_addr,
-		   mlli_params->mlli_dma_addr,
-		   mlli_params->mlli_len);
+	SSI_LOG_DEBUG("MLLI params: virt_addr=%pK dma_addr=%pad mlli_len=0x%X\n",
+		      mlli_params->mlli_virt_addr, mlli_params->mlli_dma_addr,
+		      mlli_params->mlli_len);
 
 build_mlli_exit:
 	return rc;
@@ -276,9 +274,8 @@ static inline void ssi_buffer_mgr_add_buffer_entry(
 {
 	unsigned int index = sgl_data->num_of_buffers;
 
-	SSI_LOG_DEBUG("index=%u single_buff=%pad "
-		     "buffer_len=0x%08X is_last=%d\n",
-		     index, buffer_dma, buffer_len, is_last_entry);
+	SSI_LOG_DEBUG("index=%u single_buff=%pad buffer_len=0x%08X is_last=%d\n",
+		      index, buffer_dma, buffer_len, is_last_entry);
 	sgl_data->nents[index] = 1;
 	sgl_data->entry[index].buffer_dma = buffer_dma;
 	sgl_data->offset[index] = 0;
@@ -359,8 +356,7 @@ static int ssi_buffer_mgr_map_scatterlist(
 			SSI_LOG_ERR("dma_map_sg() single buffer failed\n");
 			return -ENOMEM;
 		}
-		SSI_LOG_DEBUG("Mapped sg: dma_address=%pad "
-			     "page=%p addr=%pK offset=%u "
+		SSI_LOG_DEBUG("Mapped sg: dma_address=%pad page=%p addr=%pK offset=%u "
 			     "length=%u\n",
 			     sg_dma_address(sg),
 			     sg_page(sg),
@@ -419,12 +415,10 @@ ssi_aead_handle_config_buf(struct device *dev,
 	sg_init_one(&areq_ctx->ccm_adata_sg, config_data, AES_BLOCK_SIZE + areq_ctx->ccm_hdr_size);
 	if (unlikely(dma_map_sg(dev, &areq_ctx->ccm_adata_sg, 1,
 				DMA_TO_DEVICE) != 1)) {
-			SSI_LOG_ERR("dma_map_sg() "
-			   "config buffer failed\n");
+			SSI_LOG_ERR("dma_map_sg() config buffer failed\n");
 			return -ENOMEM;
 	}
-	SSI_LOG_DEBUG("Mapped curr_buff: dma_address=%pad "
-		     "page=%p addr=%pK "
+	SSI_LOG_DEBUG("Mapped curr_buff: dma_address=%pad page=%p addr=%pK "
 		     "offset=%u length=%u\n",
 		     sg_dma_address(&areq_ctx->ccm_adata_sg),
 		     sg_page(&areq_ctx->ccm_adata_sg),
@@ -452,12 +446,10 @@ static inline int ssi_ahash_handle_curr_buf(struct device *dev,
 	sg_init_one(areq_ctx->buff_sg, curr_buff, curr_buff_cnt);
 	if (unlikely(dma_map_sg(dev, areq_ctx->buff_sg, 1,
 				DMA_TO_DEVICE) != 1)) {
-			SSI_LOG_ERR("dma_map_sg() "
-			   "src buffer failed\n");
+			SSI_LOG_ERR("dma_map_sg() src buffer failed\n");
 			return -ENOMEM;
 	}
-	SSI_LOG_DEBUG("Mapped curr_buff: dma_address=%pad "
-		     "page=%p addr=%pK "
+	SSI_LOG_DEBUG("Mapped curr_buff: dma_address=%pad page=%p addr=%pK "
 		     "offset=%u length=%u\n",
 		     sg_dma_address(areq_ctx->buff_sg),
 		     sg_page(areq_ctx->buff_sg),
@@ -539,8 +531,8 @@ int ssi_buffer_mgr_map_blkcipher_request(
 				       DMA_TO_DEVICE);
 		if (unlikely(dma_mapping_error(dev,
 					       req_ctx->gen_ctx.iv_dma_addr))) {
-			SSI_LOG_ERR("Mapping iv %u B at va=%pK "
-				   "for DMA failed\n", ivsize, info);
+			SSI_LOG_ERR("Mapping iv %u B at va=%pK for DMA failed\n",
+				    ivsize, info);
 			return -ENOMEM;
 		}
 		SSI_LOG_DEBUG("Mapped iv %u B at va=%pK to dma=%pad\n",
@@ -1341,9 +1333,9 @@ int ssi_buffer_mgr_map_aead_request(
 							    DMA_TO_DEVICE);
 
 		if (unlikely(dma_mapping_error(dev, areq_ctx->ccm_iv0_dma_addr))) {
-			SSI_LOG_ERR("Mapping mac_buf %u B at va=%pK "
-			"for DMA failed\n", AES_BLOCK_SIZE,
-			(areq_ctx->ccm_config + CCM_CTR_COUNT_0_OFFSET));
+			SSI_LOG_ERR("Mapping mac_buf %u B at va=%pK for DMA failed\n",
+				    AES_BLOCK_SIZE, (areq_ctx->ccm_config +
+						     CCM_CTR_COUNT_0_OFFSET));
 			areq_ctx->ccm_iv0_dma_addr = 0;
 			rc = -ENOMEM;
 			goto aead_map_failure;
@@ -1383,9 +1375,8 @@ int ssi_buffer_mgr_map_aead_request(
 			AES_BLOCK_SIZE, DMA_TO_DEVICE);
 
 		if (unlikely(dma_mapping_error(dev, areq_ctx->gcm_iv_inc1_dma_addr))) {
-			SSI_LOG_ERR("Mapping gcm_iv_inc1 %u B at va=%pK "
-			"for DMA failed\n", AES_BLOCK_SIZE,
-			(areq_ctx->gcm_iv_inc1));
+			SSI_LOG_ERR("Mapping gcm_iv_inc1 %u B at va=%pK for DMA failed\n",
+				    AES_BLOCK_SIZE, (areq_ctx->gcm_iv_inc1));
 			areq_ctx->gcm_iv_inc1_dma_addr = 0;
 			rc = -ENOMEM;
 			goto aead_map_failure;
@@ -1397,9 +1388,8 @@ int ssi_buffer_mgr_map_aead_request(
 								DMA_TO_DEVICE);
 
 		if (unlikely(dma_mapping_error(dev, areq_ctx->gcm_iv_inc2_dma_addr))) {
-			SSI_LOG_ERR("Mapping gcm_iv_inc2 %u B at va=%pK "
-			"for DMA failed\n", AES_BLOCK_SIZE,
-			(areq_ctx->gcm_iv_inc2));
+			SSI_LOG_ERR("Mapping gcm_iv_inc2 %u B at va=%pK for DMA failed\n",
+				    AES_BLOCK_SIZE, (areq_ctx->gcm_iv_inc2));
 			areq_ctx->gcm_iv_inc2_dma_addr = 0;
 			rc = -ENOMEM;
 			goto aead_map_failure;
@@ -1505,8 +1495,7 @@ int ssi_buffer_mgr_map_hash_request_final(
 	u32 dummy = 0;
 	u32 mapped_nents = 0;
 
-	SSI_LOG_DEBUG(" final params : curr_buff=%pK "
-		     "curr_buff_cnt=0x%X nbytes = 0x%X "
+	SSI_LOG_DEBUG(" final params : curr_buff=%pK curr_buff_cnt=0x%X nbytes = 0x%X "
 		     "src=%pK curr_index=%u\n",
 		     curr_buff, *curr_buff_cnt, nbytes,
 		     src, areq_ctx->buff_index);
@@ -1602,8 +1591,7 @@ int ssi_buffer_mgr_map_hash_request_update(
 	u32 dummy = 0;
 	u32 mapped_nents = 0;
 
-	SSI_LOG_DEBUG(" update params : curr_buff=%pK "
-		     "curr_buff_cnt=0x%X nbytes=0x%X "
+	SSI_LOG_DEBUG(" update params : curr_buff=%pK curr_buff_cnt=0x%X nbytes=0x%X "
 		     "src=%pK curr_index=%u\n",
 		     curr_buff, *curr_buff_cnt, nbytes,
 		     src, areq_ctx->buff_index);
@@ -1615,10 +1603,9 @@ int ssi_buffer_mgr_map_hash_request_update(
 	areq_ctx->in_nents = 0;
 
 	if (unlikely(total_in_len < block_size)) {
-		SSI_LOG_DEBUG(" less than one block: curr_buff=%pK "
-			     "*curr_buff_cnt=0x%X copy_to=%pK\n",
-			curr_buff, *curr_buff_cnt,
-			&curr_buff[*curr_buff_cnt]);
+		SSI_LOG_DEBUG(" less than one block: curr_buff=%pK *curr_buff_cnt=0x%X copy_to=%pK\n",
+			      curr_buff, *curr_buff_cnt,
+			      &curr_buff[*curr_buff_cnt]);
 		areq_ctx->in_nents =
 			ssi_buffer_mgr_get_sgl_nents(src,
 						     nbytes,
@@ -1634,16 +1621,14 @@ int ssi_buffer_mgr_map_hash_request_update(
 	/* update data len */
 	update_data_len = total_in_len - *next_buff_cnt;
 
-	SSI_LOG_DEBUG(" temp length : *next_buff_cnt=0x%X "
-		     "update_data_len=0x%X\n",
-		*next_buff_cnt, update_data_len);
+	SSI_LOG_DEBUG(" temp length : *next_buff_cnt=0x%X update_data_len=0x%X\n",
+		      *next_buff_cnt, update_data_len);
 
 	/* Copy the new residue to next buffer */
 	if (*next_buff_cnt != 0) {
-		SSI_LOG_DEBUG(" handle residue: next buff %pK skip data %u"
-			     " residue %u\n", next_buff,
-			     (update_data_len - *curr_buff_cnt),
-			     *next_buff_cnt);
+		SSI_LOG_DEBUG(" handle residue: next buff %pK skip data %u residue %u\n",
+			      next_buff, (update_data_len - *curr_buff_cnt),
+			      *next_buff_cnt);
 		ssi_buffer_mgr_copy_scatterlist_portion(next_buff, src,
 							(update_data_len - *curr_buff_cnt),
 							nbytes, SSI_SG_TO_BUF);
@@ -1741,11 +1726,10 @@ void ssi_buffer_mgr_unmap_hash_request(
 	}
 
 	if (*prev_len != 0) {
-		SSI_LOG_DEBUG("Unmapped buffer: areq_ctx->buff_sg=%pK"
-			     " dma=%pad len 0x%X\n",
-				sg_virt(areq_ctx->buff_sg),
-				sg_dma_address(areq_ctx->buff_sg),
-				sg_dma_len(areq_ctx->buff_sg));
+		SSI_LOG_DEBUG("Unmapped buffer: areq_ctx->buff_sg=%pK dma=%pad len 0x%X\n",
+			      sg_virt(areq_ctx->buff_sg),
+			      sg_dma_address(areq_ctx->buff_sg),
+			      sg_dma_len(areq_ctx->buff_sg));
 		dma_unmap_sg(dev, areq_ctx->buff_sg, 1, DMA_TO_DEVICE);
 		if (!do_revert) {
 			/* clean the previous data length for update operation */
