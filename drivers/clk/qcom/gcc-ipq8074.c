@@ -51,7 +51,8 @@ static const struct parent_map gcc_xo_gpll0_gpll0_out_main_div2_map[] = {
 };
 
 static struct clk_alpha_pll gpll0_main = {
-	.offset = 0x21000,
+	.base = 0x21000,
+	.offsets = alpha_pll_offsets,
 	.clkr = {
 		.enable_reg = 0x0b000,
 		.enable_mask = BIT(0),
@@ -81,7 +82,8 @@ static struct clk_fixed_factor gpll0_out_main_div2 = {
 };
 
 static struct clk_alpha_pll_postdiv gpll0 = {
-	.offset = 0x21000,
+	.base = 0x21000,
+	.offsets = alpha_pll_offsets,
 	.clkr.hw.init = &(struct clk_init_data){
 		.name = "gpll0",
 		.parent_names = (const char *[]){
