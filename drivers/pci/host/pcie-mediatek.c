@@ -16,6 +16,7 @@
 
 #include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/iopoll.h>
 #include <linux/kernel.h>
 #include <linux/of_address.h>
 #include <linux/of_pci.h>
@@ -63,6 +64,18 @@
 #define PCIE_FC_CREDIT_MASK	(GENMASK(31, 31) | GENMASK(28, 16))
 #define PCIE_FC_CREDIT_VAL(x)	((x) << 16)
 
+struct mtk_pcie_port;
+
+/**
+ * struct mtk_pcie_soc - differentiate between host generations
+ * @ops: pointer to configuration access functions
+ * @startup: pointer to controller setting functions
+ */
+struct mtk_pcie_soc {
+	struct pci_ops *ops;
+	int (*startup)(struct mtk_pcie_port *port);
+};
+
 /**
  * struct mtk_pcie_port - PCIe port information
  * @base: IO mapped register base
@@ -96,6 +109,7 @@ struct mtk_pcie_port {
  * @busn: bus range
  * @offset: IO / Memory offset
  * @ports: pointer to PCIe port information
+ * @soc: pointer to SoC-dependent operations
  */
 struct mtk_pcie {
 	struct device *dev;
@@ -111,12 +125,8 @@ struct mtk_pcie {
 		resource_size_t io;
 	} offset;
 	struct list_head ports;
+	const struct mtk_pcie_soc *soc;
 };
-
-static inline bool mtk_pcie_link_up(struct mtk_pcie_port *port)
-{
-	return !!(readl(port->base + PCIE_LINK_STATUS) & PCIE_PORT_LINKUP);
-}
 
 static void mtk_pcie_subsys_powerdown(struct mtk_pcie *pcie)
 {
@@ -171,12 +181,30 @@ static struct pci_ops mtk_pcie_ops = {
 	.write = pci_generic_config_write,
 };
 
-static void mtk_pcie_configure_rc(struct mtk_pcie_port *port)
+static int mtk_pcie_startup_ports(struct mtk_pcie_port *port)
 {
 	struct mtk_pcie *pcie = port->pcie;
 	u32 func = PCI_FUNC(port->index << 3);
 	u32 slot = PCI_SLOT(port->index << 3);
 	u32 val;
+	int err;
+
+	/* assert port PERST_N */
+	val = readl(pcie->base + PCIE_SYS_CFG);
+	val |= PCIE_PORT_PERST(port->index);
+	writel(val, pcie->base + PCIE_SYS_CFG);
+
+	/* de-assert port PERST_N */
+	val = readl(pcie->base + PCIE_SYS_CFG);
+	val &= ~PCIE_PORT_PERST(port->index);
+	writel(val, pcie->base + PCIE_SYS_CFG);
+
+	/* 100ms timeout value should be enough for Gen1/2 training */
+	err = readl_poll_timeout(port->base + PCIE_LINK_STATUS, val,
+				 !!(val & PCIE_PORT_LINKUP), 20,
+				 100 * USEC_PER_MSEC);
+	if (err)
+		return -ETIMEDOUT;
 
 	/* enable interrupt */
 	val = readl(pcie->base + PCIE_INT_ENABLE);
@@ -209,30 +237,14 @@ static void mtk_pcie_configure_rc(struct mtk_pcie_port *port)
 	writel(PCIE_CONF_ADDR(PCIE_FTS_NUM, func, slot, 0),
 	       pcie->base + PCIE_CFG_ADDR);
 	writel(val, pcie->base + PCIE_CFG_DATA);
-}
 
-static void mtk_pcie_assert_ports(struct mtk_pcie_port *port)
-{
-	struct mtk_pcie *pcie = port->pcie;
-	u32 val;
-
-	/* assert port PERST_N */
-	val = readl(pcie->base + PCIE_SYS_CFG);
-	val |= PCIE_PORT_PERST(port->index);
-	writel(val, pcie->base + PCIE_SYS_CFG);
-
-	/* de-assert port PERST_N */
-	val = readl(pcie->base + PCIE_SYS_CFG);
-	val &= ~PCIE_PORT_PERST(port->index);
-	writel(val, pcie->base + PCIE_SYS_CFG);
-
-	/* PCIe v2.0 need at least 100ms delay to train from Gen1 to Gen2 */
-	msleep(100);
+	return 0;
 }
 
 static void mtk_pcie_enable_ports(struct mtk_pcie_port *port)
 {
-	struct device *dev = port->pcie->dev;
+	struct mtk_pcie *pcie = port->pcie;
+	struct device *dev = pcie->dev;
 	int err;
 
 	err = clk_prepare_enable(port->sys_ck);
@@ -250,13 +262,8 @@ static void mtk_pcie_enable_ports(struct mtk_pcie_port *port)
 		goto err_phy_on;
 	}
 
-	mtk_pcie_assert_ports(port);
-
-	/* if link up, then setup root port configuration space */
-	if (mtk_pcie_link_up(port)) {
-		mtk_pcie_configure_rc(port);
+	if (!pcie->soc->startup(port))
 		return;
-	}
 
 	dev_info(dev, "Port%d link down\n", port->index);
 
@@ -480,7 +487,7 @@ static int mtk_pcie_register_host(struct pci_host_bridge *host)
 
 	host->busnr = pcie->busn.start;
 	host->dev.parent = pcie->dev;
-	host->ops = &mtk_pcie_ops;
+	host->ops = pcie->soc->ops;
 	host->map_irq = of_irq_parse_and_map_pci;
 	host->swizzle_irq = pci_common_swizzle;
 
@@ -513,6 +520,7 @@ static int mtk_pcie_probe(struct platform_device *pdev)
 	pcie = pci_host_bridge_priv(host);
 
 	pcie->dev = dev;
+	pcie->soc = of_device_get_match_data(dev);
 	platform_set_drvdata(pdev, pcie);
 	INIT_LIST_HEAD(&pcie->ports);
 
@@ -537,9 +545,14 @@ put_resources:
 	return err;
 }
 
+static struct mtk_pcie_soc mtk_pcie_soc_v1 = {
+	.ops = &mtk_pcie_ops,
+	.startup = mtk_pcie_startup_ports,
+};
+
 static const struct of_device_id mtk_pcie_ids[] = {
-	{ .compatible = "mediatek,mt7623-pcie"},
-	{ .compatible = "mediatek,mt2701-pcie"},
+	{ .compatible = "mediatek,mt2701-pcie", .data = &mtk_pcie_soc_v1 },
+	{ .compatible = "mediatek,mt7623-pcie", .data = &mtk_pcie_soc_v1 },
 	{},
 };
 
