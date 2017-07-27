@@ -580,6 +580,20 @@ static void r5l_log_endio(struct bio *bio)
 
 	spin_lock_irqsave(&log->io_list_lock, flags);
 	__r5l_set_io_unit_state(io, IO_UNIT_IO_END);
+
+	if (io->has_null_flush) {
+		struct bio *bi;
+
+		WARN_ON(bio_list_empty(&io->flush_barriers));
+		while ((bi = bio_list_pop(&io->flush_barriers)) != NULL) {
+			bio_endio(bi);
+			atomic_dec(&io->pending_stripe);
+		}
+	}
+	/* finish flush only io_unit and PAYLOAD_FLUSH only io_unit */
+	if (atomic_read(&io->pending_stripe) == 0)
+		__r5l_set_io_unit_state(io, IO_UNIT_STRIPE_END);
+
 	if (log->need_cache_flush && !list_empty(&io->stripe_list))
 		r5l_move_to_end_ios(log);
 	else
@@ -599,20 +613,6 @@ static void r5l_log_endio(struct bio *bio)
 
 	if (log->need_cache_flush)
 		md_wakeup_thread(log->rdev->mddev->thread);
-
-	if (io->has_null_flush) {
-		struct bio *bi;
-
-		WARN_ON(bio_list_empty(&io->flush_barriers));
-		while ((bi = bio_list_pop(&io->flush_barriers)) != NULL) {
-			bio_endio(bi);
-			atomic_dec(&io->pending_stripe);
-		}
-	}
-
-	/* finish flush only io_unit and PAYLOAD_FLUSH only io_unit */
-	if (atomic_read(&io->pending_stripe) == 0)
-		__r5l_stripe_write_finished(io);
 }
 
 static void r5l_do_submit_io(struct r5l_log *log, struct r5l_io_unit *io)
