@@ -10,6 +10,7 @@
 #include <linux/device.h>
 #include <linux/errno.h>
 #include <linux/module.h>
+#include <linux/occ.h>
 #include <linux/platform_device.h>
 
 #include "common.h"
@@ -23,7 +24,54 @@ struct p9_sbe_occ {
 
 static int p9_sbe_occ_send_cmd(struct occ *occ, u8 *cmd)
 {
-	return -EOPNOTSUPP;
+	int rc;
+	struct occ_client *client;
+	struct occ_response *resp = &occ->resp;
+	struct p9_sbe_occ *p9_sbe_occ = to_p9_sbe_occ(occ);
+
+	client = occ_drv_open(p9_sbe_occ->sbe, 0);
+	if (!client)
+		return -ENODEV;
+
+	/* skip first byte (sequence number), OCC driver handles it */
+	rc = occ_drv_write(client, (const char *)&cmd[1], 7);
+	if (rc < 0)
+		goto err;
+
+	rc = occ_drv_read(client, (char *)resp, sizeof(*resp));
+	if (rc < 0)
+		goto err;
+
+	/* check the OCC response */
+	switch (resp->return_status) {
+	case OCC_RESP_CMD_IN_PRG:
+		rc = -ETIMEDOUT;
+		break;
+	case OCC_RESP_SUCCESS:
+		rc = 0;
+		break;
+	case OCC_RESP_CMD_INVAL:
+	case OCC_RESP_CMD_LEN_INVAL:
+	case OCC_RESP_DATA_INVAL:
+	case OCC_RESP_CHKSUM_ERR:
+		rc = -EINVAL;
+		break;
+	case OCC_RESP_INT_ERR:
+	case OCC_RESP_BAD_STATE:
+	case OCC_RESP_CRIT_EXCEPT:
+	case OCC_RESP_CRIT_INIT:
+	case OCC_RESP_CRIT_WATCHDOG:
+	case OCC_RESP_CRIT_OCB:
+	case OCC_RESP_CRIT_HW:
+		rc = -EREMOTEIO;
+		break;
+	default:
+		rc = -EPROTO;
+	}
+
+err:
+	occ_drv_release(client);
+	return rc;
 }
 
 static int p9_sbe_occ_probe(struct platform_device *pdev)
