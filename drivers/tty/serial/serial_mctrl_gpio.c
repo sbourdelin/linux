@@ -19,6 +19,7 @@
 #include <linux/irq.h>
 #include <linux/gpio/consumer.h>
 #include <linux/termios.h>
+#include <linux/property.h>
 #include <linux/serial_core.h>
 #include <linux/module.h>
 
@@ -117,6 +118,9 @@ struct mctrl_gpios *mctrl_gpio_init_noauto(struct device *dev, unsigned int idx)
 {
 	struct mctrl_gpios *gpios;
 	enum mctrl_gpio_idx i;
+
+	if (device_property_present(dev, "wakeup-source"))
+		return ERR_PTR(-ENOSYS);
 
 	gpios = devm_kzalloc(dev, sizeof(*gpios), GFP_KERNEL);
 	if (!gpios)
