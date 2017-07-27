@@ -415,10 +415,13 @@ static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 	u64 a;
 
 	rate = alpha_pll_round_rate(rate, prate, &l, &a, alpha_width);
-	vco = alpha_pll_find_vco(pll, rate);
-	if (!vco) {
-		pr_err("alpha pll not in a valid vco range\n");
-		return -EINVAL;
+
+	if (!(pll->flags & HAVE_NO_VCO_CONF)) {
+		vco = alpha_pll_find_vco(pll, rate);
+		if (!vco) {
+			pr_err("alpha pll not in a valid vco range\n");
+			return -EINVAL;
+		}
 	}
 
 	regmap_write(pll->clkr.regmap, pll_l(pll), l);
@@ -428,8 +431,10 @@ static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 	regmap_write(pll->clkr.regmap, pll_alpha(pll), a);
 	regmap_write(pll->clkr.regmap, pll_alpha_u(pll), a >> 32);
 
-	regmap_update_bits(pll->clkr.regmap, pll_alpha(pll),
-			   GENMASK(0, alpha_width - 1), a);
+	if (!(pll->flags & HAVE_NO_VCO_CONF))
+		regmap_update_bits(pll->clkr.regmap, pll_user_ctl(pll),
+				   PLL_VCO_MASK << PLL_VCO_SHIFT,
+				   vco->val << PLL_VCO_SHIFT);
 
 	regmap_update_bits(pll->clkr.regmap, pll_user_ctl(pll),
 			   PLL_ALPHA_EN, PLL_ALPHA_EN);
@@ -479,7 +484,7 @@ static long clk_alpha_pll_round_rate(struct clk_hw *hw, unsigned long rate,
 	unsigned long min_freq, max_freq;
 
 	rate = alpha_pll_round_rate(rate, *prate, &l, &a, alpha_width);
-	if (alpha_pll_find_vco(pll, rate))
+	if ((pll->flags & HAVE_NO_VCO_CONF) || alpha_pll_find_vco(pll, rate))
 		return rate;
 
 	min_freq = pll->vco_table[0].min_freq;

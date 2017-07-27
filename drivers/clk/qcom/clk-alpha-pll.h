@@ -55,6 +55,7 @@ struct clk_alpha_pll {
 #define SUPPORTS_FSM_MODE		BIT(2)
 #define SUPPORTS_64BIT_CONFIG_CTL	BIT(3)
 #define SUPPORTS_DYNAMIC_UPDATE		BIT(4)
+#define HAVE_NO_VCO_CONF		BIT(5)
 	u8 flags;
 
 	struct clk_regmap clkr;
