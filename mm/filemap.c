@@ -36,6 +36,7 @@
 #include <linux/memcontrol.h>
 #include <linux/cleancache.h>
 #include <linux/rmap.h>
+#include <linux/memdelay.h>
 #include "internal.h"
 
 #define CREATE_TRACE_POINTS
@@ -830,9 +831,14 @@ static void wake_up_page(struct page *page, int bit)
 static inline int wait_on_page_bit_common(wait_queue_head_t *q,
 		struct page *page, int bit_nr, int state, bool lock)
 {
+	bool refault = bit_nr == PG_locked && PageWorkingset(page);
 	struct wait_page_queue wait_page;
 	wait_queue_t *wait = &wait_page.wait;
+	unsigned long mdflags;
 	int ret = 0;
+
+	if (refault)
+		memdelay_enter(&mdflags);
 
 	init_wait(wait);
 	wait->func = wake_page_function;
@@ -872,6 +878,9 @@ static inline int wait_on_page_bit_common(wait_queue_head_t *q,
 	}
 
 	finish_wait(q, wait);
+
+	if (refault)
+		memdelay_leave(&mdflags);
 
 	/*
 	 * A signal could leave PageWaiters set. Clearing it here if

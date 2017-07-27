@@ -102,6 +102,17 @@ int cgroupstats_build(struct cgroupstats *stats, struct dentry *dentry);
 int proc_cgroup_show(struct seq_file *m, struct pid_namespace *ns,
 		     struct pid *pid, struct task_struct *tsk);
 
+/* caller must have irqs disabled */
+static inline void lock_task_cgroup(struct task_struct *p)
+{
+	spin_lock(&p->cgroups_lock);
+}
+
+static inline void unlock_task_cgroup(struct task_struct *p)
+{
+	spin_unlock(&p->cgroups_lock);
+}
+
 void cgroup_fork(struct task_struct *p);
 extern int cgroup_can_fork(struct task_struct *p);
 extern void cgroup_cancel_fork(struct task_struct *p);
@@ -619,6 +630,9 @@ static inline int cgroup_attach_task_all(struct task_struct *from,
 					 struct task_struct *t) { return 0; }
 static inline int cgroupstats_build(struct cgroupstats *stats,
 				    struct dentry *dentry) { return -EINVAL; }
+
+static inline void lock_task_cgroup(struct task_struct *p) {}
+static inline void unlock_task_cgroup(struct task_struct *p) {}
 
 static inline void cgroup_fork(struct task_struct *p) {}
 static inline int cgroup_can_fork(struct task_struct *p) { return 0; }

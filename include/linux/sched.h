@@ -837,6 +837,12 @@ struct task_struct {
 
 	struct io_context		*io_context;
 
+	unsigned long			memdelay_start;
+	unsigned long			memdelay_total;
+#ifdef CONFIG_DEBUG_VM
+	int				memdelay_state;
+#endif
+
 	/* Ptrace state: */
 	unsigned long			ptrace_message;
 	siginfo_t			*last_siginfo;
@@ -859,7 +865,8 @@ struct task_struct {
 	int				cpuset_slab_spread_rotor;
 #endif
 #ifdef CONFIG_CGROUPS
-	/* Control Group info protected by css_set_lock: */
+	spinlock_t			cgroups_lock;
+	/* Control Group info protected by cgroups_lock: */
 	struct css_set __rcu		*cgroups;
 	/* cg_list protected by css_set_lock and tsk->alloc_lock: */
 	struct list_head		cg_list;
@@ -1231,6 +1238,7 @@ extern struct pid *cad_pid;
 #define PF_KTHREAD		0x00200000	/* I am a kernel thread */
 #define PF_RANDOMIZE		0x00400000	/* Randomize virtual address space */
 #define PF_SWAPWRITE		0x00800000	/* Allowed to write to swap */
+#define PF_MEMDELAY		0x01000000	/* Delayed due to lack of memory */
 #define PF_NO_SETAFFINITY	0x04000000	/* Userland is not allowed to meddle with cpus_allowed */
 #define PF_MCE_EARLY		0x08000000      /* Early kill for mce process policy */
 #define PF_MUTEX_TESTER		0x20000000	/* Thread belongs to the rt mutex tester */
