@@ -243,16 +243,15 @@ static int iTCO_wdt_start(struct watchdog_device *wd_dev)
 	struct iTCO_wdt_private *p = watchdog_get_drvdata(wd_dev);
 	unsigned int val;
 
-	spin_lock(&p->io_lock);
-
-	iTCO_vendor_pre_start(p->smi_res, wd_dev->timeout);
-
 	/* disable chipset's NO_REBOOT bit */
 	if (p->update_no_reboot_bit(p->no_reboot_priv, false)) {
-		spin_unlock(&p->io_lock);
 		pr_err("failed to reset NO_REBOOT flag, reboot disabled by hardware/BIOS\n");
 		return -EIO;
 	}
+
+	spin_lock(&p->io_lock);
+
+	iTCO_vendor_pre_start(p->smi_res, wd_dev->timeout);
 
 	/* Force the timer to its reload value by writing to the TCO_RLD
 	   register */
@@ -288,10 +287,10 @@ static int iTCO_wdt_stop(struct watchdog_device *wd_dev)
 	outw(val, TCO1_CNT(p));
 	val = inw(TCO1_CNT(p));
 
+	spin_unlock(&p->io_lock);
+
 	/* Set the NO_REBOOT bit to prevent later reboots, just for sure */
 	p->update_no_reboot_bit(p->no_reboot_priv, true);
-
-	spin_unlock(&p->io_lock);
 
 	if ((val & 0x0800) == 0)
 		return -1;
