@@ -2377,6 +2377,7 @@ bool tcp_schedule_loss_probe(struct sock *sk)
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
 	u32 timeout, tlp_time_stamp, rto_time_stamp;
+	s32 delta;
 
 	/* No consecutive loss probes. */
 	if (WARN_ON(icsk->icsk_pending == ICSK_TIME_LOSS_PROBE)) {
@@ -2423,7 +2424,12 @@ bool tcp_schedule_loss_probe(struct sock *sk)
 	tlp_time_stamp = tcp_jiffies32 + timeout;
 	rto_time_stamp = (u32)inet_csk(sk)->icsk_timeout;
 	if ((s32)(tlp_time_stamp - rto_time_stamp) > 0) {
-		s32 delta = rto_time_stamp - tcp_jiffies32;
+		/* It is not needed to reschedule PTO when there 
+		 * is one outstanding TLP retransmission. 
+		 */
+		if (tp->tlp_high_seq)
+			return false;
+		delta = rto_time_stamp - tcp_jiffies32;
 		if (delta > 0)
 			timeout = delta;
 	}
