@@ -40,6 +40,7 @@
 #include <linux/ratelimit.h>
 #include <linux/kthread.h>
 #include <linux/init.h>
+#include <linux/hugetlb.h>
 
 #include <asm/tlb.h>
 #include "internal.h"
@@ -1041,6 +1042,13 @@ bool out_of_memory(struct oom_control *oc)
 		get_task_struct(current);
 		oc->chosen = current;
 		oom_kill_process(oc, "Out of memory (oom_kill_allocating_task)");
+		return true;
+	}
+
+	/* Reclaim a free, unreserved hugepage. */
+	freed = decrease_free_hugepages(oc->nodemask);
+	if (freed != 0) {
+		pr_err("Out of memory: Reclaimed %lu from HugeTLB\n", freed);
 		return true;
 	}
 

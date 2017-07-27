@@ -1454,6 +1454,41 @@ static int free_pool_huge_page(struct hstate *h, nodemask_t *nodes_allowed,
 }
 
 /*
+ * Decrement free hugepages.  Used by oom kill to avoid killing a task if
+ * there is free huge pages that can be used instead.
+ * Returns the number of bytes reclaimed from hugepages
+ */
+#define CONFIG_HUGETLB_PAGE_OOM
+unsigned long decrease_free_hugepages(nodemask_t *nodes)
+{
+#ifdef CONFIG_HUGETLB_PAGE_OOM
+	struct hstate *h;
+	unsigned long ret = 0;
+
+	spin_lock(&hugetlb_lock);
+	for_each_hstate(h) {
+		if (h->free_huge_pages > h->resv_huge_pages) {
+			char buf[32];
+
+			memfmt(buf, huge_page_size(h));
+			ret = free_pool_huge_page(h, nodes ?
+						  nodes : &node_online_map, 0);
+			pr_warn("HugeTLB: Reclaiming %lu hugepage(s) of page size %s\n",
+				ret, buf);
+			ret *= huge_page_size(h);
+			goto found;
+		}
+	}
+
+found:
+	spin_unlock(&hugetlb_lock);
+	return ret;
+#else
+	return 0;
+#endif /* CONFIG_HUGETLB_PAGE_OOM */
+}
+
+/*
  * Dissolve a given free hugepage into free buddy pages. This function does
  * nothing for in-use (including surplus) hugepages. Returns -EBUSY if the
  * number of free hugepages would be reduced below the number of reserved

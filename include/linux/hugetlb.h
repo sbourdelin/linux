@@ -473,6 +473,7 @@ static inline pgoff_t basepage_index(struct page *page)
 }
 
 extern int dissolve_free_huge_page(struct page *page);
+extern unsigned long decrease_free_hugepages(nodemask_t *nodes);
 extern int dissolve_free_huge_pages(unsigned long start_pfn,
 				    unsigned long end_pfn);
 static inline bool hugepage_migration_supported(struct hstate *h)
