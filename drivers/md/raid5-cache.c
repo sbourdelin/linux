@@ -2541,9 +2541,8 @@ static ssize_t r5c_journal_mode_show(struct mddev *mddev, char *page)
 int r5c_journal_mode_set(struct mddev *mddev, int mode)
 {
 	struct r5conf *conf = mddev->private;
-	struct r5l_log *log = conf->log;
 
-	if (!log)
+	if (!conf->log)
 		return -ENODEV;
 
 	if (mode < R5C_JOURNAL_MODE_WRITE_THROUGH ||
@@ -2555,6 +2554,10 @@ int r5c_journal_mode_set(struct mddev *mddev, int mode)
 		return -EINVAL;
 
 	mddev_suspend(mddev);
+	if (!conf || !conf->log) {
+		mddev_resume(mddev);
+		return -ENODEV;
+	}
 	conf->log->r5c_journal_mode = mode;
 	mddev_resume(mddev);
 
