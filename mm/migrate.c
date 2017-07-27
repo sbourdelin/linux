@@ -1941,7 +1941,7 @@ int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 	 * We are not sure a pending tlb flush here is for a huge page
 	 * mapping or not. Hence use the tlb range variant
 	 */
-	if (mm_tlb_flush_pending(mm))
+	if (mm_tlb_flush_pending(mm, false))
 		flush_tlb_range(vma, mmun_start, mmun_end);
 
 	/* Prepare a page as a migration target */

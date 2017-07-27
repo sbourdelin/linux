@@ -647,7 +647,7 @@ static inline bool pte_accessible(struct mm_struct *mm, pte_t a)
 		return true;
 
 	if ((pte_flags(a) & _PAGE_PROTNONE) &&
-			mm_tlb_flush_pending(mm))
+			mm_tlb_flush_pending(mm, true))
 		return true;
 
 	return false;
