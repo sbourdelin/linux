@@ -287,8 +287,17 @@
 #define CLKID_32K_CLK		  114
 #define CLKID_32K_CLK_SEL	  115
 #define CLKID_32K_CLK_DIV	  116
+#define CLKID_SD_EMMC_A_CLK0_SEL  117
+#define CLKID_SD_EMMC_A_CLK0_DIV  118
+#define CLKID_SD_EMMC_A_CLK0	  119
+#define CLKID_SD_EMMC_B_CLK0_SEL  120
+#define CLKID_SD_EMMC_B_CLK0_DIV  121
+#define CLKID_SD_EMMC_B_CLK0	  122
+#define CLKID_SD_EMMC_C_CLK0_SEL  123
+#define CLKID_SD_EMMC_C_CLK0_DIV  124
+#define CLKID_SD_EMMC_C_CLK0	  125
 
-#define NR_CLKS			  117
+#define NR_CLKS			  126
 
 /* include the CLKIDs that have been made part of the stable DT binding */
 #include <dt-bindings/clock/gxbb-clkc.h>
