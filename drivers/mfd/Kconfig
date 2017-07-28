@@ -208,6 +208,33 @@ config MFD_CROS_EC_SPI
 	  response time cannot be guaranteed, we support ignoring
 	  'pre-amble' bytes before the response actually starts.
 
+config MFD_MADERA
+	bool
+	select MFD_CORE
+	select REGMAP
+	select REGMAP_IRQ
+	select MADERA_IRQ
+
+config MFD_MADERA_I2C
+	bool "Cirrus Logic Madera codecs with I2C"
+	select MFD_MADERA
+	select REGMAP_I2C
+	depends on I2C
+	depends on PINCTRL
+	help
+	  Support for the Cirrus Logic Madera platform audio SoC
+	  core functionality controlled via I2C.
+
+config MFD_MADERA_SPI
+	bool "Cirrus Logic Madera codecs with SPI"
+	select MFD_MADERA
+	select REGMAP_SPI
+	depends on SPI_MASTER
+	depends on PINCTRL
+	help
+	  Support for the Cirrus Logic Madera platform audio SoC
+	  core functionality controlled via SPI.
+
 config MFD_ASIC3
 	bool "Compaq ASIC3"
 	depends on GPIOLIB && ARM
