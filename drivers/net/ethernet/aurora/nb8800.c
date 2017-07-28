@@ -39,6 +39,7 @@
 
 #include "nb8800.h"
 
+static void nb8800_init(struct net_device *dev);
 static void nb8800_tx_done(struct net_device *dev);
 static int nb8800_dma_stop(struct net_device *dev);
 
@@ -957,6 +958,8 @@ static int nb8800_open(struct net_device *dev)
 	struct phy_device *phydev;
 	int err;
 
+	nb8800_init(dev);
+
 	/* clear any pending interrupts */
 	nb8800_writel(priv, NB8800_RXC_SR, 0xf);
 	nb8800_writel(priv, NB8800_TXC_SR, 0xf);
@@ -1351,6 +1354,20 @@ static const struct of_device_id nb8800_dt_ids[] = {
 };
 MODULE_DEVICE_TABLE(of, nb8800_dt_ids);
 
+static void nb8800_init(struct net_device *dev)
+{
+	struct nb8800_priv *priv = netdev_priv(dev);
+	const struct nb8800_ops *ops = priv->ops;
+
+	if (ops && ops->reset)
+		ops->reset(dev);
+	nb8800_hw_init(dev);
+	if (ops && ops->init)
+		ops->init(dev);
+	nb8800_update_mac_addr(dev);
+	priv->speed = 0;
+}
+
 static int nb8800_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
@@ -1390,6 +1407,7 @@ static int nb8800_probe(struct platform_device *pdev)
 
 	priv = netdev_priv(dev);
 	priv->base = base;
+	priv->ops = ops;
 
 	priv->phy_mode = of_get_phy_mode(pdev->dev.of_node);
 	if (priv->phy_mode < 0)
@@ -1407,12 +1425,6 @@ static int nb8800_probe(struct platform_device *pdev)
 		goto err_free_dev;
 
 	spin_lock_init(&priv->tx_lock);
-
-	if (ops && ops->reset) {
-		ret = ops->reset(dev);
-		if (ret)
-			goto err_disable_clk;
-	}
 
 	bus = devm_mdiobus_alloc(&pdev->dev);
 	if (!bus) {
@@ -1455,16 +1467,6 @@ static int nb8800_probe(struct platform_device *pdev)
 
 	priv->mii_bus = bus;
 
-	ret = nb8800_hw_init(dev);
-	if (ret)
-		goto err_deregister_fixed_link;
-
-	if (ops && ops->init) {
-		ret = ops->init(dev);
-		if (ret)
-			goto err_deregister_fixed_link;
-	}
-
 	dev->netdev_ops = &nb8800_netdev_ops;
 	dev->ethtool_ops = &nb8800_ethtool_ops;
 	dev->flags |= IFF_MULTICAST;
@@ -1477,14 +1479,12 @@ static int nb8800_probe(struct platform_device *pdev)
 	if (!is_valid_ether_addr(dev->dev_addr))
 		eth_hw_addr_random(dev);
 
-	nb8800_update_mac_addr(dev);
-
 	netif_carrier_off(dev);
 
 	ret = register_netdev(dev);
 	if (ret) {
 		netdev_err(dev, "failed to register netdev\n");
-		goto err_free_dma;
+		goto err_deregister_fixed_link;
 	}
 
 	netif_napi_add(dev, &priv->napi, nb8800_poll, NAPI_POLL_WEIGHT);
@@ -1493,8 +1493,6 @@ static int nb8800_probe(struct platform_device *pdev)
 
 	return 0;
 
-err_free_dma:
-	nb8800_dma_free(dev);
 err_deregister_fixed_link:
 	if (of_phy_is_fixed_link(pdev->dev.of_node))
 		of_phy_deregister_fixed_link(pdev->dev.of_node);
