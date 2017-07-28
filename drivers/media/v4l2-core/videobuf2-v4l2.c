@@ -53,7 +53,8 @@ module_param(debug, int, 0644);
  * __verify_planes_array() - verify that the planes array passed in struct
  * v4l2_buffer from userspace can be safely used
  */
-static int __verify_planes_array(struct vb2_buffer *vb, const struct v4l2_buffer *b)
+static int __verify_planes_array(struct vb2_buffer *vb,
+				 const struct v4l2_buffer *b)
 {
 	if (!V4L2_TYPE_IS_MULTIPLANAR(b->type))
 		return 0;
@@ -73,7 +74,8 @@ static int __verify_planes_array(struct vb2_buffer *vb, const struct v4l2_buffer
 	return 0;
 }
 
-static int __verify_planes_array_core(struct vb2_buffer *vb, const void *pb)
+static int __verify_planes_array_core(struct vb2_buffer *vb,
+				      const struct v4l2_buffer *pb)
 {
 	return __verify_planes_array(vb, pb);
 }
@@ -118,9 +120,8 @@ static int __verify_length(struct vb2_buffer *vb, const struct v4l2_buffer *b)
 	return 0;
 }
 
-static void __copy_timestamp(struct vb2_buffer *vb, const void *pb)
+static void __copy_timestamp(struct vb2_buffer *vb, const struct v4l2_buffer *b)
 {
-	const struct v4l2_buffer *b = pb;
 	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	struct vb2_queue *q = vb->vb2_queue;
 
@@ -185,9 +186,8 @@ static int vb2_queue_or_prepare_buf(struct vb2_queue *q, struct v4l2_buffer *b,
  * __fill_v4l2_buffer() - fill in a struct v4l2_buffer with information to be
  * returned to userspace
  */
-static void __fill_v4l2_buffer(struct vb2_buffer *vb, void *pb)
+static void __fill_v4l2_buffer(struct vb2_buffer *vb, struct v4l2_buffer *b)
 {
-	struct v4l2_buffer *b = pb;
 	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	struct vb2_queue *q = vb->vb2_queue;
 	unsigned int plane;
@@ -292,10 +292,9 @@ static void __fill_v4l2_buffer(struct vb2_buffer *vb, void *pb)
  * v4l2_buffer has a valid number of planes.
  */
 static int __fill_vb2_buffer(struct vb2_buffer *vb,
-		const void *pb, struct vb2_plane *planes)
+		const struct v4l2_buffer *b, struct vb2_plane *planes)
 {
 	struct vb2_queue *q = vb->vb2_queue;
-	const struct v4l2_buffer *b = pb;
 	struct vb2_v4l2_buffer *vbuf = to_vb2_v4l2_buffer(vb);
 	unsigned int plane;
 	int ret;

@@ -395,6 +395,8 @@ struct vb2_ops {
 	void (*buf_queue)(struct vb2_buffer *vb);
 };
 
+struct v4l2_buffer;
+
 /**
  * struct vb2_buf_ops - driver-specific callbacks
  *
@@ -410,11 +412,13 @@ struct vb2_ops {
  *			the vb2_buffer struct.
  */
 struct vb2_buf_ops {
-	int (*verify_planes_array)(struct vb2_buffer *vb, const void *pb);
-	void (*fill_user_buffer)(struct vb2_buffer *vb, void *pb);
-	int (*fill_vb2_buffer)(struct vb2_buffer *vb, const void *pb,
+	int (*verify_planes_array)(struct vb2_buffer *vb,
+				const struct v4l2_buffer *pb);
+	void (*fill_user_buffer)(struct vb2_buffer *vb, struct v4l2_buffer *b);
+	int (*fill_vb2_buffer)(struct vb2_buffer *vb, const struct v4l2_buffer *pb,
 				struct vb2_plane *planes);
-	void (*copy_timestamp)(struct vb2_buffer *vb, const void *pb);
+	void (*copy_timestamp)(struct vb2_buffer *vb,
+				const struct v4l2_buffer *b);
 };
 
 /**
@@ -704,7 +708,8 @@ int vb2_core_create_bufs(struct vb2_queue *q, enum vb2_memory memory,
  * The return values from this function are intended to be directly returned
  * from vidioc_prepare_buf handler in driver.
  */
-int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb);
+int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index,
+			 struct v4l2_buffer *pb);
 
 /**
  * vb2_core_qbuf() - Queue a buffer from userspace
@@ -753,8 +758,8 @@ int vb2_core_qbuf(struct vb2_queue *q, unsigned int index, void *pb);
  * The return values from this function are intended to be directly returned
  * from vidioc_dqbuf handler in driver.
  */
-int vb2_core_dqbuf(struct vb2_queue *q, unsigned int *pindex, void *pb,
-		   bool nonblocking);
+int vb2_core_dqbuf(struct vb2_queue *q, unsigned int *pindex,
+		   struct v4l2_buffer *pb, bool nonblocking);
 
 int vb2_core_streamon(struct vb2_queue *q, unsigned int type);
 int vb2_core_streamoff(struct vb2_queue *q, unsigned int type);

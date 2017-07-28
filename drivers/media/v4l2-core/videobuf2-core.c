@@ -958,7 +958,7 @@ EXPORT_SYMBOL_GPL(vb2_discard_done);
 /**
  * __prepare_mmap() - prepare an MMAP buffer
  */
-static int __prepare_mmap(struct vb2_buffer *vb, const void *pb)
+static int __prepare_mmap(struct vb2_buffer *vb, const struct v4l2_buffer *pb)
 {
 	int ret = 0;
 
@@ -971,7 +971,7 @@ static int __prepare_mmap(struct vb2_buffer *vb, const void *pb)
 /**
  * __prepare_userptr() - prepare a USERPTR buffer
  */
-static int __prepare_userptr(struct vb2_buffer *vb, const void *pb)
+static int __prepare_userptr(struct vb2_buffer *vb, const struct v4l2_buffer *pb)
 {
 	struct vb2_plane planes[VB2_MAX_PLANES];
 	struct vb2_queue *q = vb->vb2_queue;
@@ -1089,7 +1089,7 @@ err:
 /**
  * __prepare_dmabuf() - prepare a DMABUF buffer
  */
-static int __prepare_dmabuf(struct vb2_buffer *vb, const void *pb)
+static int __prepare_dmabuf(struct vb2_buffer *vb, const struct v4l2_buffer *pb)
 {
 	struct vb2_plane planes[VB2_MAX_PLANES];
 	struct vb2_queue *q = vb->vb2_queue;
@@ -1236,7 +1236,7 @@ static void __enqueue_in_driver(struct vb2_buffer *vb)
 	call_void_vb_qop(vb, buf_queue, vb);
 }
 
-static int __buf_prepare(struct vb2_buffer *vb, const void *pb)
+static int __buf_prepare(struct vb2_buffer *vb, const struct v4l2_buffer *pb)
 {
 	struct vb2_queue *q = vb->vb2_queue;
 	unsigned int plane;
@@ -1279,7 +1279,8 @@ static int __buf_prepare(struct vb2_buffer *vb, const void *pb)
 	return 0;
 }
 
-int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index, void *pb)
+int vb2_core_prepare_buf(struct vb2_queue *q, unsigned int index,
+			 struct v4l2_buffer *pb)
 {
 	struct vb2_buffer *vb;
 	int ret;
@@ -1514,7 +1515,7 @@ static int __vb2_wait_for_done_vb(struct vb2_queue *q, int nonblocking)
  * Will sleep if required for nonblocking == false.
  */
 static int __vb2_get_done_vb(struct vb2_queue *q, struct vb2_buffer **vb,
-			     void *pb, int nonblocking)
+			     struct v4l2_buffer *pb, int nonblocking)
 {
 	unsigned long flags;
 	int ret = 0;
@@ -1583,8 +1584,8 @@ static void __vb2_dqbuf(struct vb2_buffer *vb)
 		}
 }
 
-int vb2_core_dqbuf(struct vb2_queue *q, unsigned int *pindex, void *pb,
-		   bool nonblocking)
+int vb2_core_dqbuf(struct vb2_queue *q, unsigned int *pindex,
+		   struct v4l2_buffer *pb, bool nonblocking)
 {
 	struct vb2_buffer *vb = NULL;
 	int ret;
