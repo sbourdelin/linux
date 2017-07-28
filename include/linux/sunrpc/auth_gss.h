@@ -18,6 +18,7 @@
 #include <linux/sunrpc/gss_api.h>
 
 #define RPC_GSS_VERSION		1
+#define RPC_GSS3_VERSION	3
 
 #define MAXSEQ 0x80000000 /* maximum legal sequence number, from rfc 2203 */
 
@@ -25,7 +26,10 @@ enum rpc_gss_proc {
 	RPC_GSS_PROC_DATA = 0,
 	RPC_GSS_PROC_INIT = 1,
 	RPC_GSS_PROC_CONTINUE_INIT = 2,
-	RPC_GSS_PROC_DESTROY = 3
+	RPC_GSS_PROC_DESTROY = 3,
+	RPC_GSS_PROC_BIND_CHANNEL = 4,	/* GSS2, not used */
+	RPC_GSS_PROC_CREATE = 5,	/* GSS3 */
+	RPC_GSS_PROC_LIST = 6		/* GSS3 */
 };
 
 enum rpc_gss_svc {
