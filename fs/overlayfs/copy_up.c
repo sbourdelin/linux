@@ -240,7 +240,7 @@ static struct ovl_fh *ovl_encode_fh(struct dentry *lower, uuid_be *uuid)
 	void *buf;
 	int buflen = MAX_HANDLE_SZ;
 
-	buf = kmalloc(buflen, GFP_TEMPORARY);
+	buf = kmalloc(buflen, GFP_KERNEL);
 	if (!buf)
 		return ERR_PTR(-ENOMEM);
 

@@ -38,7 +38,7 @@ static int ovl_check_redirect(struct dentry *dentry, struct ovl_lookup_data *d,
 			return 0;
 		goto fail;
 	}
-	buf = kzalloc(prelen + res + strlen(post) + 1, GFP_TEMPORARY);
+	buf = kzalloc(prelen + res + strlen(post) + 1, GFP_KERNEL);
 	if (!buf)
 		return -ENOMEM;
 
@@ -106,7 +106,7 @@ static struct dentry *ovl_get_origin(struct dentry *dentry,
 	if (res == 0)
 		return NULL;
 
-	fh  = kzalloc(res, GFP_TEMPORARY);
+	fh  = kzalloc(res, GFP_KERNEL);
 	if (!fh)
 		return ERR_PTR(-ENOMEM);
 
@@ -296,7 +296,7 @@ static int ovl_check_origin(struct dentry *dentry, struct dentry *upperdentry,
 		return PTR_ERR(origin);
 
 	BUG_ON(*stackp || *ctrp);
-	*stackp = kmalloc(sizeof(struct path), GFP_TEMPORARY);
+	*stackp = kmalloc(sizeof(struct path), GFP_KERNEL);
 	if (!*stackp) {
 		dput(origin);
 		return -ENOMEM;
@@ -393,7 +393,7 @@ struct dentry *ovl_lookup(struct inode *dir, struct dentry *dentry,
 	if (!d.stop && poe->numlower) {
 		err = -ENOMEM;
 		stack = kcalloc(ofs->numlower, sizeof(struct path),
-				GFP_TEMPORARY);
+				GFP_KERNEL);
 		if (!stack)
 			goto out_put_upper;
 	}

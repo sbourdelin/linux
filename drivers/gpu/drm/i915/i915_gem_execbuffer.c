@@ -81,7 +81,7 @@ eb_create(struct drm_i915_private *i915,
 		unsigned size = args->buffer_count;
 		size *= sizeof(struct i915_vma *);
 		size += sizeof(struct eb_vmas);
-		eb = kmalloc(size, GFP_TEMPORARY | __GFP_NOWARN | __GFP_NORETRY);
+		eb = kmalloc(size, GFP_KERNEL | __GFP_NOWARN | __GFP_NORETRY);
 	}
 
 	if (eb == NULL) {
@@ -92,7 +92,7 @@ eb_create(struct drm_i915_private *i915,
 			count >>= 1;
 		eb = kzalloc(count*sizeof(struct hlist_head) +
 			     sizeof(struct eb_vmas),
-			     GFP_TEMPORARY);
+			     GFP_KERNEL);
 		if (eb == NULL)
 			return eb;
 
@@ -1956,7 +1956,7 @@ i915_gem_execbuffer2(struct drm_device *dev, void *data,
 
 	exec2_list = drm_malloc_gfp(args->buffer_count,
 				    sizeof(*exec2_list),
-				    GFP_TEMPORARY);
+				    GFP_KERNEL);
 	if (exec2_list == NULL) {
 		DRM_DEBUG("Failed to allocate exec list for %d buffers\n",
 			  args->buffer_count);
