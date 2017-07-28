@@ -49,8 +49,8 @@ The device node referenced by "phy" or "phy-handle" should be a child node
 of the mdio node. See phy.txt for the generic PHY bindings.
 
 Required properties of the phy node with the following compatibles:
-  - "allwinner,sun8i-h3-emac",
-  - "allwinner,sun8i-v3s-emac":
+  - "allwinner,sun8i-h3-ephy",
+  - "allwinner,sun8i-v3s-ephy":
 - clocks: a phandle to the reference clock for the EPHY
 - resets: a phandle to the reset control for the EPHY
 
