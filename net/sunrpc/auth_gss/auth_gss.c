@@ -1629,6 +1629,53 @@ gss_refresh_null(struct rpc_task *task)
 	return 0;
 }
 
+/**
+ * gss3_reply_verifier: The new gssv3 verifier uses same data as call
+ * caveat REPLY direction - see rpc_encode_header
+ */
+static  void *
+gss3_reply_verifier(struct rpc_cred *cred, struct gss_cl_ctx *ctx,
+		    struct rpc_task *task, __be32 *seq, struct kvec *iov)
+{
+	struct gss_cred *g_cred = container_of(cred, struct gss_cred, gc_base);
+	void	*gss3_buf = NULL;
+	__be32 *crlen, *ptr = NULL;
+	int len;
+
+	/* freed in gss_validate */
+	len = (13 * 4) + ctx->gc_wire_ctx.len;
+	gss3_buf = kmalloc(len, GFP_NOFS);
+	if (!gss3_buf) {
+		gss3_buf = ERR_PTR(-EIO);
+		goto out;
+	}
+	ptr = (__be32 *)gss3_buf;
+
+	*ptr++ = htonl(task->tk_rqstp->rq_xid);
+	*ptr++ = htonl(RPC_REPLY);
+	*ptr++ = htonl(RPC_VERSION);
+	*ptr++ = htonl(task->tk_client->cl_prog);
+	*ptr++ = htonl(task->tk_client->cl_vers);
+	*ptr++ = htonl(task->tk_msg.rpc_proc->p_proc);
+	*ptr++ = htonl(RPC_AUTH_GSS);
+
+	/* credential */
+	crlen = ptr++;
+	*ptr++ = htonl(ctx->gc_v);
+	*ptr++ = htonl(ctx->gc_proc);
+	*ptr++ = *seq;
+	*ptr++ = htonl(g_cred->gc_service);
+	ptr = xdr_encode_netobj(ptr, &ctx->gc_wire_ctx);
+
+	/* backfill cred length */
+	*crlen = htonl((ptr - (crlen + 1)) << 2);
+
+	iov->iov_base = gss3_buf;
+	iov->iov_len = (ptr - (__be32 *)gss3_buf) << 2;
+out:
+	return gss3_buf;
+}
+
 static __be32 *
 gss_validate(struct rpc_task *task, __be32 *p)
 {
@@ -1638,6 +1685,7 @@ gss_validate(struct rpc_task *task, __be32 *p)
 	struct kvec	iov;
 	struct xdr_buf	verf_buf;
 	struct xdr_netobj mic;
+	void	*g3_buf = NULL;
 	u32		flav,len;
 	u32		maj_stat;
 	__be32		*ret = ERR_PTR(-EIO);
@@ -1653,14 +1701,21 @@ gss_validate(struct rpc_task *task, __be32 *p)
 	if (!seq)
 		goto out_bad;
 	*seq = htonl(task->tk_rqstp->rq_seqno);
-	iov.iov_base = seq;
-	iov.iov_len = 4;
+	if (ctx->gc_v == RPC_GSS_VERSION) {
+		iov.iov_base = seq;
+		iov.iov_len = 4;
+	} else if (ctx->gc_v == RPC_GSS3_VERSION) {
+		g3_buf = gss3_reply_verifier(cred, ctx, task, seq, &iov);
+		if (IS_ERR(g3_buf))
+			goto out_bad;
+	}
 	xdr_buf_from_iov(&iov, &verf_buf);
 	mic.data = (u8 *)p;
 	mic.len = len;
 
 	ret = ERR_PTR(-EACCES);
 	maj_stat = gss_verify_mic(ctx->gc_gss_ctx, &verf_buf, &mic);
+	kfree(g3_buf);
 	if (maj_stat == GSS_S_CONTEXT_EXPIRED)
 		clear_bit(RPCAUTH_CRED_UPTODATE, &cred->cr_flags);
 	if (maj_stat) {
