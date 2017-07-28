@@ -60,6 +60,7 @@ static int gss3_create_label(struct rpc_cred *cred);
 static struct gss3_assert *gss3_use_child_handle(struct rpc_cred *cred,
 						 struct gss_cl_ctx *ctx);
 static struct gss3_assert *gss3_match_label(struct gss3_assert_list *in);
+static void gss3_free_assertions(struct gss3_assert_list *in);
 
 static const struct rpc_authops authgss_ops;
 
@@ -130,8 +131,10 @@ gss_get_ctx(struct gss_cl_ctx *ctx)
 static inline void
 gss_put_ctx(struct gss_cl_ctx *ctx)
 {
-	if (atomic_dec_and_test(&ctx->count))
+	if (atomic_dec_and_test(&ctx->count)) {
+		gss3_free_assertions(&ctx->gc_alist);
 		gss_free_ctx(ctx);
+	}
 }
 
 /* gss3_label_enabled:
@@ -1670,6 +1673,52 @@ gss3_insert_assertion(struct gss3_assert_list *alist, struct gss3_assert *g3a)
 static void gss3_free_label(struct gss3_label *gl)
 {
 	kfree(gl->la_label.data);
+}
+
+static void
+gss3_free_assertion(struct gss3_assert *freeme)
+{
+	/* allocated in gss3_dec_create */
+	kfree(freeme->gss3_handle.data);
+
+	/* gss3_num is always one for now */
+	switch (freeme->gss3_assertion->au_type) {
+	case GSS3_LABEL:
+		gss3_free_label(&freeme->gss3_assertion->u.au_label);
+	break;
+	case GSS3_PRIVS:
+	default:
+		pr_warn("RPC  %s Can't free unsupported au_type %d\n",
+			__func__, freeme->gss3_assertion->au_type);
+		return;
+	}
+	kfree(freeme);
+}
+
+static void
+gss3_free_assert_callback(struct rcu_head *head)
+{
+	struct gss3_assert *g3a = container_of(head, struct gss3_assert,
+					       gss3_rcu);
+	gss3_free_assertion(g3a);
+}
+
+static void
+gss3_free_assert(struct gss3_assert *ap)
+{
+	call_rcu(&ap->gss3_rcu, gss3_free_assert_callback);
+}
+
+static void gss3_free_assertions(struct gss3_assert_list *in)
+{
+	struct gss3_assert *found;
+
+	list_for_each_entry_rcu(found, &in->assert_list, gss3_list) {
+		spin_lock(&in->assert_lock);
+		list_del_rcu(&found->gss3_list);
+		spin_unlock(&in->assert_lock);
+		gss3_free_assert(found);
+	}
 }
 
 static struct gss3_assert *
