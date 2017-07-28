@@ -63,7 +63,7 @@
  *
  */
 
-static int netobj_equal(struct xdr_netobj *a, struct xdr_netobj *b)
+int netobj_equal(struct xdr_netobj *a, struct xdr_netobj *b)
 {
 	return a->len == b->len && 0 == memcmp(a->data, b->data, a->len);
 }
