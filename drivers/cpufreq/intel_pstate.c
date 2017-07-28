@@ -38,6 +38,7 @@
 #include <asm/intel-family.h>
 
 #define INTEL_PSTATE_DEFAULT_SAMPLING_INTERVAL	(10 * NSEC_PER_MSEC)
+#define INTEL_PSTATE_IO_WAIT_SAMPLING_INTERVAL	(NSEC_PER_MSEC)
 #define INTEL_PSTATE_HWP_SAMPLING_INTERVAL	(50 * NSEC_PER_MSEC)
 
 #define INTEL_CPUFREQ_TRANSITION_LATENCY	20000
@@ -345,6 +346,7 @@ static struct pstate_adjust_policy pid_params __read_mostly = {
 
 static int hwp_active __read_mostly;
 static bool per_cpu_limits __read_mostly;
+static int current_sample_interval = INTEL_PSTATE_DEFAULT_SAMPLING_INTERVAL;
 
 static struct cpufreq_driver *intel_pstate_driver __read_mostly;
 
@@ -1766,15 +1768,18 @@ static void intel_pstate_update_util(struct update_util_data *data, u64 time,
 
 	if (flags & SCHED_CPUFREQ_IOWAIT) {
 		cpu->iowait_boost = int_tofp(1);
+		current_sample_interval = INTEL_PSTATE_IO_WAIT_SAMPLING_INTERVAL;
 	} else if (cpu->iowait_boost) {
 		/* Clear iowait_boost if the CPU may have been idle. */
 		delta_ns = time - cpu->last_update;
-		if (delta_ns > TICK_NSEC)
+		if (delta_ns > TICK_NSEC) {
 			cpu->iowait_boost = 0;
+			current_sample_interval = INTEL_PSTATE_DEFAULT_SAMPLING_INTERVAL;
+		}
 	}
 	cpu->last_update = time;
 	delta_ns = time - cpu->sample.time;
-	if ((s64)delta_ns < INTEL_PSTATE_DEFAULT_SAMPLING_INTERVAL)
+	if ((s64)delta_ns < current_sample_interval)
 		return;
 
 	if (intel_pstate_sample(cpu, time)) {
