@@ -2381,7 +2381,7 @@ EXPORT_SYMBOL_GPL(nfs_access_add_cache);
 #define NFS_DIR_MAY_WRITE NFS_MAY_WRITE
 #define NFS_MAY_LOOKUP (NFS4_ACCESS_LOOKUP)
 #define NFS_MAY_EXECUTE (NFS4_ACCESS_EXECUTE)
-static int
+int
 nfs_access_calc_mask(u32 access_result, umode_t umode)
 {
 	int mask = 0;
@@ -2402,6 +2402,7 @@ nfs_access_calc_mask(u32 access_result, umode_t umode)
 			mask |= MAY_WRITE;
 	return mask;
 }
+EXPORT_SYMBOL_GPL(nfs_access_calc_mask);
 
 void nfs_access_set_mask(struct nfs_access_entry *entry, u32 access_result)
 {

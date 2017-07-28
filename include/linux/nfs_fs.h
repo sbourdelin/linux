@@ -340,6 +340,7 @@ extern int nfs_post_op_update_inode_force_wcc_locked(struct inode *inode, struct
 extern int nfs_getattr(const struct path *, struct kstat *, u32, unsigned int);
 extern void nfs_access_add_cache(struct inode *, struct nfs_access_entry *);
 extern void nfs_access_set_mask(struct nfs_access_entry *, u32);
+extern int nfs_access_calc_mask(u32 access_result, umode_t umode);
 extern int nfs_permission(struct inode *, int);
 extern int nfs_open(struct inode *, struct file *);
 extern int nfs_attribute_cache_expired(struct inode *inode);

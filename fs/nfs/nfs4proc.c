@@ -2236,7 +2236,7 @@ static int nfs4_opendata_access(struct rpc_cred *cred,
 				int openflags)
 {
 	struct nfs_access_entry cache;
-	u32 mask;
+	int mask, cache_mask;
 
 	/* access call failed or for some reason the server doesn't
 	 * support any access modes -- defer access call until later */
@@ -2259,7 +2259,8 @@ static int nfs4_opendata_access(struct rpc_cred *cred,
 	nfs_access_set_mask(&cache, opendata->o_res.access_result);
 	nfs_access_add_cache(state->inode, &cache);
 
-	if ((mask & ~cache.mask & (MAY_READ | MAY_EXEC)) == 0)
+	cache_mask = nfs_access_calc_mask(cache.mask, state->inode->i_mode);
+	if ((mask & ~cache_mask & (MAY_READ | MAY_EXEC)) == 0)
 		return 0;
 
 	return -EACCES;
@@ -3870,25 +3871,9 @@ static int _nfs4_proc_access(struct inode *inode, struct nfs_access_entry *entry
 		.rpc_resp = &res,
 		.rpc_cred = entry->cred,
 	};
-	int mode = entry->mask;
 	int status = 0;
 
-	/*
-	 * Determine which access bits we want to ask for...
-	 */
-	if (mode & MAY_READ)
-		args.access |= NFS4_ACCESS_READ;
-	if (S_ISDIR(inode->i_mode)) {
-		if (mode & MAY_WRITE)
-			args.access |= NFS4_ACCESS_MODIFY | NFS4_ACCESS_EXTEND | NFS4_ACCESS_DELETE;
-		if (mode & MAY_EXEC)
-			args.access |= NFS4_ACCESS_LOOKUP;
-	} else {
-		if (mode & MAY_WRITE)
-			args.access |= NFS4_ACCESS_MODIFY | NFS4_ACCESS_EXTEND;
-		if (mode & MAY_EXEC)
-			args.access |= NFS4_ACCESS_EXECUTE;
-	}
+	args.access = entry->mask;
 
 	res.fattr = nfs_alloc_fattr();
 	if (res.fattr == NULL)
