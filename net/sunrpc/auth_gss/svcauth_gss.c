@@ -984,8 +984,8 @@ svcauth_gss_set_client(struct svc_rqst *rqstp)
 }
 
 static inline int
-gss_write_init_verf(struct cache_detail *cd, struct svc_rqst *rqstp,
-		struct xdr_netobj *out_handle, int *major_status)
+gss_write_init_verf(struct cache_detail *cd, struct svc_rqst *rqstp, u32 gssv,
+		    struct xdr_netobj *out_handle, int *major_status)
 {
 	struct rsc *rsci;
 	int        rc;
@@ -997,6 +997,8 @@ gss_write_init_verf(struct cache_detail *cd, struct svc_rqst *rqstp,
 		*major_status = GSS_S_NO_CONTEXT;
 		return gss_write_null_verf(rqstp);
 	}
+	/* set the RPCSEC_GSS version in the context */
+	rsci->mechctx->gss_version = gssv;
 	rc = gss_write_verf(rqstp, rsci->mechctx, GSS_SEQ_WIN);
 	cache_put(&rsci->h, cd);
 	return rc;
@@ -1138,7 +1140,7 @@ static int svcauth_gss_legacy_init(struct svc_rqst *rqstp,
 
 	ret = SVC_CLOSE;
 	/* Got an answer to the upcall; use it: */
-	if (gss_write_init_verf(sn->rsc_cache, rqstp,
+	if (gss_write_init_verf(sn->rsc_cache, rqstp, gc->gc_v,
 				&rsip->out_handle, &rsip->major_status))
 		goto out;
 	if (gss_write_resv(resv, PAGE_SIZE,
@@ -1267,7 +1269,7 @@ static int svcauth_gss_proxy_init(struct svc_rqst *rqstp,
 	}
 
 	/* Got an answer to the upcall; use it: */
-	if (gss_write_init_verf(sn->rsc_cache, rqstp,
+	if (gss_write_init_verf(sn->rsc_cache, rqstp, gc->gc_v,
 				&cli_handle, &ud.major_status))
 		goto out;
 	if (gss_write_resv(resv, PAGE_SIZE,
@@ -1443,14 +1445,15 @@ svcauth_gss_accept(struct svc_rqst *rqstp, __be32 *authp)
 	rpcstart -= 7;
 
 	/* credential is:
-	 *   version(==1), proc(0,1,2,3), seq, service (1,2,3), handle
+	 *   version(==1 or 3), proc(0,1,2,3), seq, service (1,2,3), handle
 	 * at least 5 u32s, and is preceded by length, so that makes 6.
 	 */
 
 	if (argv->iov_len < 5 * 4)
 		goto auth_err;
 	crlen = svc_getnl(argv);
-	if (svc_getnl(argv) != RPC_GSS_VERSION)
+	gc->gc_v = svc_getnl(argv);
+	if ((gc->gc_v != RPC_GSS_VERSION) && (gc->gc_v != RPC_GSS3_VERSION))
 		goto auth_err;
 	gc->gc_proc = svc_getnl(argv);
 	gc->gc_seq = svc_getnl(argv);
@@ -1478,6 +1481,11 @@ svcauth_gss_accept(struct svc_rqst *rqstp, __be32 *authp)
 		rsci = gss_svc_searchbyctx(sn->rsc_cache, &gc->gc_ctx);
 		if (!rsci)
 			goto auth_err;
+		if (rsci->mechctx->gss_version != gc->gc_v) {
+			pr_warn("NFSD:  RPCSEC_GSS version mismatch (%u:%u)\n",
+				rsci->mechctx->gss_version, gc->gc_v);
+			goto auth_err;
+		}
 		switch (gss_verify_header(rqstp, rsci, rpcstart, gc, authp)) {
 		case SVC_OK:
 			break;

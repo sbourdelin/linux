@@ -28,6 +28,7 @@ struct gss3_assert {
 /* The mechanism-independent gss-api context: */
 struct gss_ctx {
 	struct gss_api_mech	*mech_type;
+	u32			 gss_version;
 	void			*internal_ctx_id;
 };
 
