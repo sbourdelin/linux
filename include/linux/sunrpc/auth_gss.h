@@ -136,6 +136,11 @@ struct gss3_assertion_u {
 	} u;
 };
 
+struct gss3_svc_assert {
+	u32			sa_num;
+	struct gss3_assertion_u	sa_assert;
+};
+
 struct gss3_create_args {
 	struct gss3_mp_auth		*ca_mp_auth;
 	struct gss3_chan_binding	*ca_chan_bind;
