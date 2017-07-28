@@ -44,6 +44,7 @@
  *         get/put helpers should be used when accessing an instance
  *         outside of a lifetime-guarded section.  In general, this
  *         is only needed for handling filters shared across tasks.
+ * @log: true if all actions except for SECCOMP_RET_ALLOW should be logged
  * @prev: points to a previously installed, or inherited, filter
  * @prog: the BPF program to evaluate
  *
@@ -59,6 +60,7 @@
  */
 struct seccomp_filter {
 	refcount_t usage;
+	bool log;
 	struct seccomp_filter *prev;
 	struct bpf_prog *prog;
 };
@@ -172,17 +174,22 @@ static int seccomp_check_filter(struct sock_filter *filter, unsigned int flen)
 
 /**
  * seccomp_run_filters - evaluates all seccomp filters against @sd
+ * @filter: upon return, points to the matched filter but may be NULL in some
+ *          unexpected situations
  * @sd: optional seccomp data to be passed to filters
  *
  * Returns valid seccomp BPF response codes.
  */
-static u32 seccomp_run_filters(const struct seccomp_data *sd)
+static u32 seccomp_run_filters(struct seccomp_filter **filter,
+			       const struct seccomp_data *sd)
 {
 	struct seccomp_data sd_local;
 	u32 ret = SECCOMP_RET_ALLOW;
 	/* Make sure cross-thread synced filter points somewhere sane. */
 	struct seccomp_filter *f =
 			lockless_dereference(current->seccomp.filter);
+
+	*filter = f;
 
 	/* Ensure unexpected behavior doesn't result in failing open. */
 	if (unlikely(WARN_ON(f == NULL)))
@@ -200,8 +207,10 @@ static u32 seccomp_run_filters(const struct seccomp_data *sd)
 	for (; f; f = f->prev) {
 		u32 cur_ret = BPF_PROG_RUN(f->prog, sd);
 
-		if ((cur_ret & SECCOMP_RET_ACTION) < (ret & SECCOMP_RET_ACTION))
+		if ((cur_ret & SECCOMP_RET_ACTION) < (ret & SECCOMP_RET_ACTION)) {
 			ret = cur_ret;
+			*filter = f;
+		}
 	}
 	return ret;
 }
@@ -446,6 +455,9 @@ static long seccomp_attach_filter(unsigned int flags,
 			return ret;
 	}
 
+	if (flags & SECCOMP_FILTER_FLAG_LOG)
+		filter->log = true;
+
 	/*
 	 * If there is an existing filter, make it the prev and don't drop its
 	 * task reference.
@@ -526,34 +538,37 @@ static void seccomp_send_sigsys(int syscall, int reason)
 static u32 seccomp_actions_logged = SECCOMP_LOG_KILL  | SECCOMP_LOG_TRAP  |
 				    SECCOMP_LOG_ERRNO | SECCOMP_LOG_TRACE;
 
-static inline void seccomp_log(unsigned long syscall, long signr, u32 action)
+static inline void seccomp_log(unsigned long syscall, long signr, u32 action,
+			       bool requested)
 {
-	bool log;
+	if (requested) {
+		bool log;
 
-	switch (action) {
-	case SECCOMP_RET_TRAP:
-		log = seccomp_actions_logged & SECCOMP_LOG_TRAP;
-		break;
-	case SECCOMP_RET_ERRNO:
-		log = seccomp_actions_logged & SECCOMP_LOG_ERRNO;
-		break;
-	case SECCOMP_RET_TRACE:
-		log = seccomp_actions_logged & SECCOMP_LOG_TRACE;
-		break;
-	case SECCOMP_RET_ALLOW:
-		log = false;
-		break;
-	case SECCOMP_RET_KILL:
-	default:
-		log = seccomp_actions_logged & SECCOMP_LOG_KILL;
+		switch (action) {
+		case SECCOMP_RET_TRAP:
+			log = seccomp_actions_logged & SECCOMP_LOG_TRAP;
+			break;
+		case SECCOMP_RET_ERRNO:
+			log = seccomp_actions_logged & SECCOMP_LOG_ERRNO;
+			break;
+		case SECCOMP_RET_TRACE:
+			log = seccomp_actions_logged & SECCOMP_LOG_TRACE;
+			break;
+		case SECCOMP_RET_ALLOW:
+			log = false;
+			break;
+		case SECCOMP_RET_KILL:
+		default:
+			log = seccomp_actions_logged & SECCOMP_LOG_KILL;
+		}
+
+		/*
+		 * Force an audit message to be emitted when the action is
+		 * allowed to be logged by the admin.
+		 */
+		if (log)
+			return __audit_seccomp(syscall, signr, action);
 	}
-
-	/*
-	 * Force an audit message to be emitted when the action is allowed to
-	 * be logged by the admin.
-	 */
-	if (log)
-		return __audit_seccomp(syscall, signr, action);
 
 	/*
 	 * Let the audit subsystem decide if the action should be audited based
@@ -587,7 +602,7 @@ static void __secure_computing_strict(int this_syscall)
 #ifdef SECCOMP_DEBUG
 	dump_stack();
 #endif
-	seccomp_log(this_syscall, SIGKILL, SECCOMP_RET_KILL);
+	seccomp_log(this_syscall, SIGKILL, SECCOMP_RET_KILL, true);
 	do_exit(SIGKILL);
 }
 
@@ -613,6 +628,7 @@ void secure_computing_strict(int this_syscall)
 static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
 			    const bool recheck_after_trace)
 {
+	struct seccomp_filter *filter;
 	u32 filter_ret, action;
 	int data;
 
@@ -622,7 +638,7 @@ static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
 	 */
 	rmb();
 
-	filter_ret = seccomp_run_filters(sd);
+	filter_ret = seccomp_run_filters(&filter, sd);
 	data = filter_ret & SECCOMP_RET_DATA;
 	action = filter_ret & SECCOMP_RET_ACTION;
 
@@ -690,7 +706,7 @@ static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
 
 	case SECCOMP_RET_KILL:
 	default:
-		seccomp_log(this_syscall, SIGSYS, action);
+		seccomp_log(this_syscall, SIGSYS, action, true);
 		/* Dump core only if this is the last remaining thread. */
 		if (get_nr_threads(current) == 1) {
 			siginfo_t info;
@@ -707,7 +723,7 @@ static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
 	unreachable();
 
 skip:
-	seccomp_log(this_syscall, 0, action);
+	seccomp_log(this_syscall, 0, action, filter ? filter->log : false);
 	return -1;
 }
 #else
