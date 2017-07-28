@@ -181,7 +181,8 @@ static bool __init obsolete_checksetup(char *line)
 				/* Already done in parse_early_param?
 				 * (Needs exact match on param part).
 				 * Keep iterating, as we can have early
-				 * params and __setups of same names 8( */
+				 * params and __setups of same names
+				 */
 				if (line[n] == '\0' || line[n] == '=')
 					had_early_param = true;
 			} else if (!p->setup_func) {
@@ -693,9 +694,9 @@ asmlinkage __visible void __init start_kernel(void)
 	arch_post_acpi_subsys_init();
 	sfi_init_late();
 
-	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
+	if (efi_enabled(EFI_RUNTIME_SERVICES))
 		efi_free_boot_services();
-	}
+
 
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
