@@ -3201,6 +3201,17 @@ no_open:
 						open_flag & O_EXCL);
 		if (error)
 			goto out_dput;
+		/* if fs not support direct io, delete this inode */
+		if (unlikely(open_flag & O_DIRECT) &&
+			!(dentry->d_inode->i_mapping &&
+			dentry->d_inode->i_mapping->a_ops &&
+			dentry->d_inode->i_mapping->a_ops->direct_IO) &&
+			dir_inode->i_op->unlink) {
+			error = dir_inode->i_op->unlink(dir_inode, dentry);
+			if (error == 0)
+				error = -EINVAL;
+			goto out_dput;
+		}
 		fsnotify_create(dir_inode, dentry);
 	}
 	if (unlikely(create_error) && !dentry->d_inode) {
