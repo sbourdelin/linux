@@ -78,8 +78,10 @@ int __init early_init_dt_scan_fw_dump(unsigned long node,
 	 * dump data waiting for us.
 	 */
 	fdm_active = of_get_flat_dt_prop(node, "ibm,kernel-dump", NULL);
-	if (fdm_active)
+	if (fdm_active) {
+		pr_info("Firmware-assisted dump is active.\n");
 		fw_dump.dump_active = 1;
+	}
 
 	/* Get the sizes required to store dump data for the firmware provided
 	 * dump sections.
@@ -332,8 +334,11 @@ int __init fadump_reserve_mem(void)
 {
 	unsigned long base, size, memory_boundary;
 
-	if (!fw_dump.fadump_enabled)
+	if (!fw_dump.fadump_enabled) {
+		if (fw_dump.dump_active)
+			pr_warn("Firmware-assisted dump was active but kernel booted with fadump disabled!\n");
 		return 0;
+	}
 
 	if (!fw_dump.fadump_supported) {
 		printk(KERN_INFO "Firmware-assisted dump is not supported on"
@@ -373,7 +378,6 @@ int __init fadump_reserve_mem(void)
 		memory_boundary = memblock_end_of_DRAM();
 
 	if (fw_dump.dump_active) {
-		printk(KERN_INFO "Firmware-assisted dump is active.\n");
 		/*
 		 * If last boot has crashed then reserve all the memory
 		 * above boot_memory_size so that we don't touch it until
@@ -459,6 +463,121 @@ static int __init early_fadump_reserve_mem(char *p)
 	return 0;
 }
 early_param("fadump_reserve_mem", early_fadump_reserve_mem);
+
+#define FADUMP_EXTRA_ARGS_PARAM		"fadump_extra_args="
+#define INIT_ARGS_START			"-- "
+#define INIT_ARGS_START_LEN		strlen(INIT_ARGS_START)
+
+struct param_info {
+	char		*params;
+	unsigned int	len;
+	unsigned int	index;
+};
+
+static void __init fadump_update_params(struct param_info *param_info,
+					char *val, unsigned int len,
+					bool split_params)
+{
+	bool add_quotes = (split_params ? false :
+			   ((strchr(val, ' ') != NULL) ? true : false));
+
+	if (add_quotes)
+		param_info->params[param_info->index++] = '"';
+
+	strncpy(param_info->params + param_info->index, val, len);
+	param_info->index += len;
+
+	if (add_quotes)
+		param_info->params[param_info->index++] = '"';
+}
+
+/*
+ * Reworks command line parameters and splits 'fadump_extra_args=' param
+ * to enforce the parameters passed through it
+ */
+static int __init fadump_rework_cmdline_params(char *param, char *val,
+					       const char *unused, void *arg)
+{
+	unsigned int len;
+	struct param_info *param_info = (struct param_info *)arg;
+	bool split_params = false;
+
+	if (!strncmp(param, FADUMP_EXTRA_ARGS_PARAM,
+		     (strlen(FADUMP_EXTRA_ARGS_PARAM) - 1)))
+		split_params = true;
+
+	len = strlen(param);
+	fadump_update_params(param_info, param, len, split_params);
+
+	len = (val != NULL) ? strlen(val) : 0;
+	if (len) {
+		param_info->params[param_info->index++] =
+						split_params ? ' ' : '=';
+		fadump_update_params(param_info, val, len, split_params);
+	}
+
+	param_info->params[param_info->index++] = ' ';
+
+	return 0;
+}
+
+/*
+ * Replace every occurrence of 'fadump_extra_args="param1 param2 param3"'
+ * in cmdline with 'fadump_extra_args param1 param2 param3' by stripping
+ * off '=' and quotes, if any. This ensures that the additional parameters
+ * passed with 'fadump_extra_args=' are enforced.
+ */
+void __init enforce_fadump_extra_args(char *cmdline)
+{
+	static char tmp_cmdline[COMMAND_LINE_SIZE] __initdata;
+	static char init_cmdline[COMMAND_LINE_SIZE] __initdata;
+	struct param_info param_info;
+	char *args;
+
+	if (strstr(cmdline, FADUMP_EXTRA_ARGS_PARAM) == NULL)
+		return;
+
+	pr_info("Modifying command line to enforce the additional parameters passed through 'fadump_extra_args='");
+
+	param_info.params = cmdline;
+	param_info.len = strlen(cmdline);
+	param_info.index = 0;
+
+	strlcpy(init_cmdline, cmdline, COMMAND_LINE_SIZE);
+
+	strlcpy(tmp_cmdline, cmdline, COMMAND_LINE_SIZE);
+	while (1) {
+		parse_args("fadump params", tmp_cmdline, NULL, 0, 0, 0,
+			   &param_info, &fadump_rework_cmdline_params);
+
+		/*
+		 * parse_args() stops at '--'. Keep going if there are more
+		 * parameters as we are supposed to look at all parameters
+		 * in this case. Otherwise, break.
+		 */
+		args = strstr(init_cmdline + param_info.index, INIT_ARGS_START);
+		if (args == NULL)
+			break;
+
+		strncpy(param_info.params + param_info.index,
+			INIT_ARGS_START, INIT_ARGS_START_LEN);
+		param_info.index += INIT_ARGS_START_LEN;
+		strlcpy(tmp_cmdline, (args + INIT_ARGS_START_LEN),
+			(COMMAND_LINE_SIZE - param_info.index));
+	}
+
+	/*
+	 * Length of the processed cmdline could come down owing to the
+	 * stripping of quotes. Fill that much length with '\0' to
+	 * compensate for that.
+	 */
+	if (param_info.len > param_info.index) {
+		memset(param_info.params + param_info.index, '\0',
+		       (param_info.len - param_info.index));
+	}
+
+	pr_info("Modified command line: %s\n", cmdline);
+}
 
 static int register_fw_dump(struct fadump_mem_struct *fdm)
 {

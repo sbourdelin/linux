@@ -693,6 +693,13 @@ void __init early_init_devtree(void *params)
 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
 	of_scan_flat_dt(early_init_dt_scan_memory_ppc, NULL);
 
+	/*
+	 * Look for 'fadump_extra_args=' parameter and enfore the additional
+	 * parameters passed to it if fadump is active.
+	 */
+	if (is_fadump_active())
+		enforce_fadump_extra_args(boot_command_line);
+
 	parse_early_param();
 
 	/* make sure we've parsed cmdline for mem= before this */
