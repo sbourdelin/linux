@@ -6517,3 +6517,13 @@ int selinux_disable(void)
 	return 0;
 }
 #endif
+
+int security_current_sid_to_context(char **scontext, u32 *scontext_len)
+{
+	const struct task_security_struct *ts = current_security();
+
+	if (!selinux_enabled)
+		return -EINVAL;
+	return security_sid_to_context(ts->sid, scontext, scontext_len);
+}
+EXPORT_SYMBOL_GPL(security_current_sid_to_context);
