@@ -30,6 +30,7 @@
  * SOFTWARE.
  */
 
+#include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include "hns_roce_common.h"
 #include "hns_roce_device.h"
