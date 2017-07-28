@@ -20,6 +20,7 @@
 #include <linux/videodev2.h>
 #include <linux/vmalloc.h>
 #include <linux/wait.h>
+#include <linux/workqueue.h>
 #include <linux/atomic.h>
 #include <media/v4l2-ctrls.h>
 
@@ -1236,15 +1237,109 @@ static void uvc_ctrl_send_event(struct uvc_fh *handle,
 	}
 }
 
-static void uvc_ctrl_send_slave_event(struct uvc_fh *handle,
-	struct uvc_control *master, u32 slave_id,
-	const struct v4l2_ext_control *xctrls, unsigned int xctrls_count)
+static void __uvc_ctrl_send_slave_event(struct uvc_fh *handle,
+				struct uvc_control *master, u32 slave_id)
 {
 	struct uvc_control_mapping *mapping = NULL;
 	struct uvc_control *ctrl = NULL;
 	u32 changes = V4L2_EVENT_CTRL_CH_FLAGS;
-	unsigned int i;
 	s32 val = 0;
+
+	__uvc_find_control(master->entity, slave_id, &mapping, &ctrl, 0);
+	if (ctrl == NULL)
+		return;
+
+	if (__uvc_ctrl_get(handle->chain, ctrl, mapping, &val) == 0)
+		changes |= V4L2_EVENT_CTRL_CH_VALUE;
+
+	uvc_ctrl_send_event(handle, ctrl, mapping, val, changes);
+}
+
+static void uvc_ctrl_status_event_work(struct work_struct *work)
+{
+	struct uvc_device *dev = container_of(work, struct uvc_device,
+					      async_ctrl.work);
+	struct uvc_ctrl_work *w = &dev->async_ctrl;
+	struct uvc_control_mapping *mapping;
+	struct uvc_control *ctrl;
+	struct uvc_fh *handle;
+	__u8 *data;
+	unsigned int i;
+
+	spin_lock_irq(&w->lock);
+	data = w->data;
+	w->data = NULL;
+	ctrl = w->ctrl;
+	handle = ctrl->handle;
+	ctrl->handle = NULL;
+	spin_unlock_irq(&w->lock);
+
+	if (mutex_lock_interruptible(&handle->chain->ctrl_mutex))
+		goto free;
+
+	list_for_each_entry(mapping, &ctrl->info.mappings, list) {
+		s32 value = mapping->get(mapping, UVC_GET_CUR, data);
+
+		for (i = 0; i < ARRAY_SIZE(mapping->slave_ids); ++i) {
+			if (!mapping->slave_ids[i])
+				break;
+
+			__uvc_ctrl_send_slave_event(handle, ctrl,
+						    mapping->slave_ids[i]);
+		}
+
+		if (mapping->v4l2_type == V4L2_CTRL_TYPE_MENU) {
+			struct uvc_menu_info *menu = mapping->menu_info;
+			unsigned int i;
+
+			for (i = 0; i < mapping->menu_count; ++i, ++menu)
+				if (menu->value == value) {
+					value = i;
+					break;
+				}
+		}
+
+		uvc_ctrl_send_event(handle, ctrl, mapping, value,
+				    V4L2_EVENT_CTRL_CH_VALUE);
+	}
+
+	mutex_unlock(&handle->chain->ctrl_mutex);
+
+free:
+	kfree(data);
+}
+
+void uvc_ctrl_status_event(struct uvc_device *dev, struct uvc_control *ctrl,
+			   __u8 *data, size_t len)
+{
+	struct uvc_ctrl_work *w = &dev->async_ctrl;
+
+	if (list_empty(&ctrl->info.mappings))
+		return;
+
+	if (!ctrl->handle)
+		/* This is an auto-update, they are unsupported */
+		return;
+
+	spin_lock(&w->lock);
+	if (w->data)
+		/* A previous event work hasn't run yet, we lose 1 event */
+		kfree(w->data);
+
+	w->data = kmalloc(len, GFP_ATOMIC);
+	if (w->data) {
+		memcpy(w->data, data, len);
+		w->ctrl = ctrl;
+		schedule_work(&w->work);
+	}
+	spin_unlock(&w->lock);
+}
+
+static void uvc_ctrl_send_slave_event(struct uvc_fh *handle,
+	struct uvc_control *master, u32 slave_id,
+	const struct v4l2_ext_control *xctrls, unsigned int xctrls_count)
+{
+	unsigned int i;
 
 	/*
 	 * We can skip sending an event for the slave if the slave
@@ -1255,14 +1350,7 @@ static void uvc_ctrl_send_slave_event(struct uvc_fh *handle,
 			return;
 	}
 
-	__uvc_find_control(master->entity, slave_id, &mapping, &ctrl, 0);
-	if (ctrl == NULL)
-		return;
-
-	if (__uvc_ctrl_get(handle->chain, ctrl, mapping, &val) == 0)
-		changes |= V4L2_EVENT_CTRL_CH_VALUE;
-
-	uvc_ctrl_send_event(handle, ctrl, mapping, val, changes);
+	__uvc_ctrl_send_slave_event(handle, master, slave_id);
 }
 
 static void uvc_ctrl_send_events(struct uvc_fh *handle,
@@ -1276,6 +1364,10 @@ static void uvc_ctrl_send_events(struct uvc_fh *handle,
 
 	for (i = 0; i < xctrls_count; ++i) {
 		ctrl = uvc_find_control(handle->chain, xctrls[i].id, &mapping);
+
+		if (ctrl->info.flags & UVC_CTRL_FLAG_ASYNCHRONOUS)
+			/* Notification will be sent from an Interrupt event */
+			continue;
 
 		for (j = 0; j < ARRAY_SIZE(mapping->slave_ids); ++j) {
 			if (!mapping->slave_ids[j])
@@ -1472,9 +1564,10 @@ int uvc_ctrl_get(struct uvc_video_chain *chain,
 	return __uvc_ctrl_get(chain, ctrl, mapping, &xctrl->value);
 }
 
-int uvc_ctrl_set(struct uvc_video_chain *chain,
+int uvc_ctrl_set(struct uvc_fh *handle,
 	struct v4l2_ext_control *xctrl)
 {
+	struct uvc_video_chain *chain = handle->chain;
 	struct uvc_control *ctrl;
 	struct uvc_control_mapping *mapping;
 	s32 value;
@@ -1488,6 +1581,18 @@ int uvc_ctrl_set(struct uvc_video_chain *chain,
 		return -EINVAL;
 	if (!(ctrl->info.flags & UVC_CTRL_FLAG_SET_CUR))
 		return -EACCES;
+	if (ctrl->info.flags & UVC_CTRL_FLAG_ASYNCHRONOUS) {
+		if (ctrl->handle)
+			/*
+			 * Actually we could send the control and let the camera
+			 * issue a STALL, but we have to check here anyway.
+			 * Besides we cannot process a new instance of the same
+			 * asynchronous control, while the previous one is still
+			 * active.
+			 */
+			return -EBUSY;
+		ctrl->handle = handle;
+	}
 
 	/* Clamp out of range values. */
 	switch (mapping->v4l2_type) {
@@ -1676,7 +1781,9 @@ static int uvc_ctrl_fill_xu_info(struct uvc_device *dev,
 		    | (data[0] & UVC_CONTROL_CAP_SET ?
 		       UVC_CTRL_FLAG_SET_CUR : 0)
 		    | (data[0] & UVC_CONTROL_CAP_AUTOUPDATE ?
-		       UVC_CTRL_FLAG_AUTO_UPDATE : 0);
+		       UVC_CTRL_FLAG_AUTO_UPDATE : 0)
+		    | (data[0] & UVC_CONTROL_CAP_ASYNCHRONOUS ?
+		       UVC_CTRL_FLAG_ASYNCHRONOUS : 0);
 
 	uvc_ctrl_fixup_xu_info(dev, ctrl, info);
 
@@ -2124,6 +2231,13 @@ static void uvc_ctrl_init_ctrl(struct uvc_device *dev, struct uvc_control *ctrl)
 	if (!ctrl->initialized)
 		return;
 
+	/* Temporarily abuse DATA_CURRENT buffer to avoid 1 byte allocation */
+	if (!uvc_query_ctrl(dev, UVC_GET_INFO, ctrl->entity->id,
+			    dev->intfnum, info->selector,
+			    uvc_ctrl_data(ctrl, UVC_CTRL_DATA_CURRENT), 1) &&
+	    uvc_ctrl_data(ctrl, UVC_CTRL_DATA_CURRENT)[0] & 0x10)
+		ctrl->info.flags |= UVC_CTRL_FLAG_ASYNCHRONOUS;
+
 	for (; mapping < mend; ++mapping) {
 		if (uvc_entity_match_guid(ctrl->entity, mapping->entity) &&
 		    ctrl->info.selector == mapping->selector)
@@ -2138,6 +2252,9 @@ int uvc_ctrl_init_device(struct uvc_device *dev)
 {
 	struct uvc_entity *entity;
 	unsigned int i;
+
+	spin_lock_init(&dev->async_ctrl.lock);
+	INIT_WORK(&dev->async_ctrl.work, uvc_ctrl_status_event_work);
 
 	/* Walk the entities list and instantiate controls */
 	list_for_each_entry(entity, &dev->entities, list) {
@@ -2209,6 +2326,8 @@ void uvc_ctrl_cleanup_device(struct uvc_device *dev)
 {
 	struct uvc_entity *entity;
 	unsigned int i;
+
+	cancel_work_sync(&dev->async_ctrl.work);
 
 	/* Free controls and control mappings for all entities. */
 	list_for_each_entry(entity, &dev->entities, list) {

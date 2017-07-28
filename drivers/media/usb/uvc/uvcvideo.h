@@ -11,6 +11,7 @@
 #include <linux/usb/video.h>
 #include <linux/uvcvideo.h>
 #include <linux/videodev2.h>
+#include <linux/workqueue.h>
 #include <media/media-device.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-event.h>
@@ -251,6 +252,8 @@ struct uvc_control {
 	     initialized:1;
 
 	__u8 *uvc_data;
+
+	struct uvc_fh *handle;	/* Used for asynchronous event delivery */
 };
 
 struct uvc_format_desc {
@@ -595,6 +598,13 @@ struct uvc_device {
 	__u8 *status;
 	struct input_dev *input;
 	char input_phys[64];
+
+	struct uvc_ctrl_work {
+		struct work_struct work;
+		struct uvc_control *ctrl;
+		spinlock_t lock;
+		void *data;
+	} async_ctrl;
 };
 
 enum uvc_handle_state {
@@ -742,6 +752,8 @@ extern int uvc_ctrl_add_mapping(struct uvc_video_chain *chain,
 extern int uvc_ctrl_init_device(struct uvc_device *dev);
 extern void uvc_ctrl_cleanup_device(struct uvc_device *dev);
 extern int uvc_ctrl_restore_values(struct uvc_device *dev);
+extern void uvc_ctrl_status_event(struct uvc_device *dev,
+		struct uvc_control *ctrl, __u8 *data, size_t len);
 
 extern int uvc_ctrl_begin(struct uvc_video_chain *chain);
 extern int __uvc_ctrl_commit(struct uvc_fh *handle, int rollback,
@@ -760,7 +772,7 @@ static inline int uvc_ctrl_rollback(struct uvc_fh *handle)
 
 extern int uvc_ctrl_get(struct uvc_video_chain *chain,
 		struct v4l2_ext_control *xctrl);
-extern int uvc_ctrl_set(struct uvc_video_chain *chain,
+extern int uvc_ctrl_set(struct uvc_fh *handle,
 		struct v4l2_ext_control *xctrl);
 
 extern int uvc_xu_ctrl_query(struct uvc_video_chain *chain,

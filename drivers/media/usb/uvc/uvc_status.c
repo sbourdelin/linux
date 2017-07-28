@@ -78,7 +78,24 @@ static void uvc_input_report_key(struct uvc_device *dev, unsigned int code,
 /* --------------------------------------------------------------------------
  * Status interrupt endpoint
  */
-static void uvc_event_streaming(struct uvc_device *dev, __u8 *data, int len)
+struct uvc_streaming_status {
+	__u8	bStatusType;
+	__u8	bOriginator;
+	__u8	bEvent;
+	__u8	bValue[];
+} __packed;
+
+struct uvc_control_status {
+	__u8	bStatusType;
+	__u8	bOriginator;
+	__u8	bEvent;
+	__u8	bSelector;
+	__u8	bAttribute;
+	__u8	bValue[];
+} __packed;
+
+static void uvc_event_streaming(struct uvc_device *dev,
+				struct uvc_streaming_status *status, int len)
 {
 	if (len < 3) {
 		uvc_trace(UVC_TRACE_STATUS, "Invalid streaming status event "
@@ -86,30 +103,101 @@ static void uvc_event_streaming(struct uvc_device *dev, __u8 *data, int len)
 		return;
 	}
 
-	if (data[2] == 0) {
+	if (status->bEvent == 0) {
 		if (len < 4)
 			return;
 		uvc_trace(UVC_TRACE_STATUS, "Button (intf %u) %s len %d\n",
-			data[1], data[3] ? "pressed" : "released", len);
-		uvc_input_report_key(dev, KEY_CAMERA, data[3]);
+			  status->bOriginator,
+			  status->bValue[0] ? "pressed" : "released", len);
+		uvc_input_report_key(dev, KEY_CAMERA, status->bValue[0]);
 	} else {
 		uvc_trace(UVC_TRACE_STATUS, "Stream %u error event %02x %02x "
-			"len %d.\n", data[1], data[2], data[3], len);
+			  "len %d.\n", status->bOriginator, status->bEvent,
+			  status->bValue[0], len);
 	}
 }
 
-static void uvc_event_control(struct uvc_device *dev, __u8 *data, int len)
-{
-	char *attrs[3] = { "value", "info", "failure" };
+#define UVC_CTRL_VALUE_CHANGE	0
+#define UVC_CTRL_INFO_CHANGE	1
+#define UVC_CTRL_FAILURE_CHANGE	2
+#define UVC_CTRL_MIN_CHANGE	3
+#define UVC_CTRL_MAX_CHANGE	4
 
-	if (len < 6 || data[2] != 0 || data[4] > 2) {
+static struct uvc_control *uvc_event_entity_ctrl(struct uvc_entity *entity,
+					       __u8 selector)
+{
+	struct uvc_control *ctrl;
+	unsigned int i;
+
+	for (i = 0, ctrl = entity->controls; i < entity->ncontrols; i++, ctrl++)
+		if (ctrl->info.selector == selector)
+			return ctrl;
+
+	return NULL;
+}
+
+static struct uvc_control *uvc_event_find_ctrl(struct uvc_device *dev,
+					struct uvc_control_status *status)
+{
+	struct uvc_video_chain *chain;
+
+	list_for_each_entry(chain, &dev->chains, list) {
+		struct uvc_entity *entity;
+		struct uvc_control *ctrl;
+
+		list_for_each_entry(entity, &chain->entities, chain) {
+			if (entity->id == status->bOriginator) {
+				ctrl = uvc_event_entity_ctrl(entity,
+							     status->bSelector);
+				/*
+				 * Some buggy cameras send asynchronous Control
+				 * Change events for control, other than the
+				 * ones, that had been changed, even though the
+				 * AutoUpdate flag isn't set for the control.
+				 */
+				if (ctrl && (!ctrl->handle ||
+					     ctrl->handle->chain == chain))
+					return ctrl;
+			}
+		}
+	}
+
+	return NULL;
+}
+
+static void uvc_event_control(struct uvc_device *dev,
+			      struct uvc_control_status *status, int len)
+{
+	struct uvc_control *ctrl;
+	char *attrs[] = { "value", "info", "failure", "min", "max" };
+
+	if (len < 6 || status->bEvent != 0 ||
+	    status->bAttribute >= ARRAY_SIZE(attrs)) {
 		uvc_trace(UVC_TRACE_STATUS, "Invalid control status event "
 				"received.\n");
 		return;
 	}
 
 	uvc_trace(UVC_TRACE_STATUS, "Control %u/%u %s change len %d.\n",
-		data[1], data[3], attrs[data[4]], len);
+		  status->bOriginator, status->bSelector,
+		  attrs[status->bAttribute], len);
+
+	/* Find the control. */
+	ctrl = uvc_event_find_ctrl(dev, status);
+	if (!ctrl)
+		return;
+
+	switch (status->bAttribute) {
+	case UVC_CTRL_VALUE_CHANGE:
+		uvc_ctrl_status_event(dev, ctrl, status->bValue, len -
+				      offsetof(struct uvc_control_status, bValue));
+		break;
+	case UVC_CTRL_INFO_CHANGE:
+	case UVC_CTRL_FAILURE_CHANGE:
+	case UVC_CTRL_MIN_CHANGE:
+	case UVC_CTRL_MAX_CHANGE:
+		break;
+	}
 }
 
 static void uvc_status_complete(struct urb *urb)
@@ -138,11 +226,13 @@ static void uvc_status_complete(struct urb *urb)
 	if (len > 0) {
 		switch (dev->status[0] & 0x0f) {
 		case UVC_STATUS_TYPE_CONTROL:
-			uvc_event_control(dev, dev->status, len);
+			uvc_event_control(dev,
+				(struct uvc_control_status *)dev->status, len);
 			break;
 
 		case UVC_STATUS_TYPE_STREAMING:
-			uvc_event_streaming(dev, dev->status, len);
+			uvc_event_streaming(dev,
+				(struct uvc_streaming_status *)dev->status, len);
 			break;
 
 		default:
