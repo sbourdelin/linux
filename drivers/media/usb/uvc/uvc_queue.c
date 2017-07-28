@@ -84,7 +84,7 @@ static int uvc_queue_setup(struct vb2_queue *vq,
 
 	/* Make sure the image size is large enough. */
 	if (*nplanes)
-		return sizes[0] < size ? -EINVAL : 0;
+		return sizes[0] < size || *nplanes != 1 ? -EINVAL : 0;
 	*nplanes = 1;
 	sizes[0] = size;
 	return 0;
