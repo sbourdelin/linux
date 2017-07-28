@@ -40,6 +40,7 @@ enum rpc_gss_svc {
 
 /* on-the-wire gss cred: */
 struct rpc_gss_wire_cred {
+	u32			gc_crlen;
 	u32			gc_v;		/* version */
 	u32			gc_proc;	/* control procedure */
 	u32			gc_seq;		/* sequence number */
