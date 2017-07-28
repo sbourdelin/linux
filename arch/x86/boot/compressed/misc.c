@@ -15,6 +15,8 @@
 #include "error.h"
 #include "../string.h"
 #include "../voffset.h"
+#include <linux/efi.h>
+#include <asm/efi.h>
 
 /*
  * WARNING!!
@@ -168,6 +170,55 @@ void __puthex(unsigned long value)
 		__putstr(alpha);
 	}
 }
+
+#ifdef CONFIG_EFI
+bool __init
+efi_kernel_boot_services_overlap(unsigned long start, unsigned long size)
+{
+	int i;
+	u32 nr_desc;
+	struct efi_info *e = &boot_params->efi_info;
+	efi_memory_desc_t *md;
+	char *signature;
+	unsigned long pmap;
+
+	signature = (char *)&boot_params->efi_info.efi_loader_signature;
+	if (strncmp(signature, EFI32_LOADER_SIGNATURE, 4) &&
+	    strncmp(signature, EFI64_LOADER_SIGNATURE, 4))
+		return false;
+
+#ifdef CONFIG_X86	/* Can't handle data above 4GB at this time */
+	if (e->efi_memmap_hi) {
+		warn("Memory map is above 4GB, EFI should be disabled.\n");
+		return false;
+	}
+	pmap =  e->efi_memmap;
+#else
+	pmap = (e->efi_memmap | ((__u64)e->efi_memmap_hi << 32));
+#endif
+
+	add_identity_map(pmap, e->efi_memmap_size);
+
+	nr_desc = e->efi_memmap_size / e->efi_memdesc_size;
+	for (i = 0; i < nr_desc; i++) {
+		md = (efi_memory_desc_t *)(pmap + (i * e->efi_memdesc_size));
+		if (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) <= start)
+			continue;
+		if (md->phys_addr >= start + size)
+			continue;
+		if (md->type == EFI_BOOT_SERVICES_CODE ||
+		    md->type == EFI_BOOT_SERVICES_DATA)
+			return true;
+	}
+	return false;
+}
+#else
+bool __init
+efi_kernel_boot_services_overlap(unsigned long start, unsigned long size)
+{
+	return false;
+}
+#endif
 
 #if CONFIG_X86_NEED_RELOCS
 static void handle_relocations(void *output, unsigned long output_len,
@@ -372,6 +423,9 @@ asmlinkage __visible void *extract_kernel(void *rmode, memptr heap,
 	debug_putaddr(output_len);
 	debug_putaddr(kernel_total_size);
 
+	/* Prepare to add new identity pagetables on demand. */
+	initialize_identity_maps();
+
 	/*
 	 * The memory hole needed for the kernel is the larger of either
 	 * the entire decompressed kernel plus relocation table, or the
@@ -402,6 +456,8 @@ asmlinkage __visible void *extract_kernel(void *rmode, memptr heap,
 	if (virt_addr != LOAD_PHYSICAL_ADDR)
 		error("Destination virtual address changed when not relocatable");
 #endif
+	if (efi_kernel_boot_services_overlap((unsigned long)output, output_len))
+		error("Kernel overlaps EFI_BOOT_SERVICES area");
 
 	debug_putstr("\nDecompressing Linux... ");
 	__decompress(input_data, input_len, NULL, NULL, output, output_len,
