@@ -145,6 +145,7 @@ static struct {
 	long nfree;			/* Negative dentry free pool */
 	struct super_block *prune_sb;	/* Super_block for pruning */
 	int neg_count, prune_count;	/* Pruning counts */
+	atomic_long_t nr_neg_killed;	/* # of negative entries killed */
 } ndblk ____cacheline_aligned_in_smp;
 
 static void clear_prune_sb_for_umount(struct super_block *sb);
@@ -204,6 +205,7 @@ int proc_nr_dentry(struct ctl_table *table, int write, void __user *buffer,
 	dentry_stat.nr_dentry = get_nr_dentry();
 	dentry_stat.nr_unused = get_nr_dentry_unused();
 	dentry_stat.nr_negative = get_nr_dentry_neg();
+	dentry_stat.nr_killed = atomic_long_read(&ndblk.nr_neg_killed);
 	return proc_doulongvec_minmax(table, write, buffer, lenp, ppos);
 }
 #endif
@@ -802,6 +804,7 @@ static struct dentry *dentry_kill(struct dentry *dentry)
 					spin_unlock(&parent->d_lock);
 				goto failed;
 			}
+			atomic_long_inc(&ndblk.nr_neg_killed);
 
 		} else if (unlikely(!spin_trylock(&parent->d_lock))) {
 			if (inode)
@@ -3932,6 +3935,7 @@ static void __init neg_dentry_init(void)
 
 	raw_spin_lock_init(&ndblk.nfree_lock);
 	spin_lock_init(&ndblk.prune_lock);
+	atomic_long_set(&ndblk.nr_neg_killed, 0);
 
 	/* 20% in global pool & 80% in percpu free */
 	ndblk.nfree = neg_dentry_nfree_init
