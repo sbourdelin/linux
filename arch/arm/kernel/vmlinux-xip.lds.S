@@ -238,11 +238,16 @@ SECTIONS
 		DATA_DATA
 		CONSTRUCTORS
 
+#ifdef CONFIG_GENERIC_BUG
+		__bug_table = ALIGN(8);
+		VMLINUX_SYMBOL(__start___bug_table) = .;
+		KEEP(*(__bug_table))
+		VMLINUX_SYMBOL(__stop___bug_table) = .;
+#endif
+
 		_edata = .;
 	}
 	_edata_loc = __data_loc + SIZEOF(.data);
-
-	BUG_TABLE
 
 #ifdef CONFIG_HAVE_TCM
         /*
