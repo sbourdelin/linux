@@ -558,6 +558,12 @@ static u32 msg_used_size(u16 text_len, u16 dict_len, u32 *pad_len)
 #define MAX_LOG_TAKE_PART 4
 static const char trunc_msg[] = "<truncated>";
 
+/*
+ * Define max drop msg length that we put in next msg
+ */
+#define MAX_DROP_MSG_LENGTH 32
+static char drop_msg[MAX_DROP_MSG_LENGTH];
+
 static u32 truncate_msg(u16 *text_len, u16 *trunc_msg_len,
 			u16 *dict_len, u32 *pad_len)
 {
@@ -1264,8 +1270,23 @@ static size_t msg_print_text(const struct printk_log *msg, bool syslog, char *bu
 
 		if (buf) {
 			if (print_prefix(msg, syslog, NULL) +
-			    text_len + 1 >= size - len)
+			    text_len + 1 >= size - len) {
+				/* below stores dropped characters
+				 * related information in next msg
+				 */
+				size_t drop_len;
+
+				drop_len = scnprintf(drop_msg,
+					MAX_DROP_MSG_LENGTH,
+					"<%u characters dropped>",
+					(next) ?
+					(unsigned int)(text_size + next - text) :
+					(unsigned int)text_size);
+				drop_msg[drop_len] = 0;
+				log_store(msg->facility, msg->level, msg->flags,
+					0, NULL, 0, drop_msg, strlen(drop_msg));
 				break;
+			}
 
 			len += print_prefix(msg, syslog, buf + len);
 			memcpy(buf + len, text, text_len);
