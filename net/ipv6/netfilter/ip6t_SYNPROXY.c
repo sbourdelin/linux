@@ -347,7 +347,7 @@ static unsigned int ipv6_synproxy_hook(void *priv,
 	if (synproxy == NULL)
 		return NF_ACCEPT;
 
-	if (nf_is_loopback_packet(skb))
+	if (nf_is_loopback_packet(skb) || ctinfo == IP_CT_RELATED_REPLY)
 		return NF_ACCEPT;
 
 	nexthdr = ipv6_hdr(skb)->nexthdr;

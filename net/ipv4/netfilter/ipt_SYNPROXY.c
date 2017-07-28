@@ -330,7 +330,7 @@ static unsigned int ipv4_synproxy_hook(void *priv,
 	if (synproxy == NULL)
 		return NF_ACCEPT;
 
-	if (nf_is_loopback_packet(skb))
+	if (nf_is_loopback_packet(skb) || ctinfo == IP_CT_RELATED_REPLY)
 		return NF_ACCEPT;
 
 	thoff = ip_hdrlen(skb);
