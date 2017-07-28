@@ -209,10 +209,11 @@ gss_alloc_context(void)
 static const void *
 gss_fill_context(const void *p, const void *end, struct gss_cl_ctx *ctx, struct gss_api_mech *gm)
 {
-	const void *q;
+	const void *q, *save;
 	unsigned int seclen;
 	unsigned int timeout;
 	unsigned long now = jiffies;
+	unsigned int gss_v;
 	u32 window_size;
 	int ret;
 
@@ -274,10 +275,22 @@ gss_fill_context(const void *p, const void *end, struct gss_cl_ctx *ctx, struct 
 	p = simple_get_netobj(q, end, &ctx->gc_acceptor);
 	if (IS_ERR(p))
 		goto err;
+
+	/** Pull in RPCSEC_GSS version if there is one.
+         * Assign RPC_GSS_VERSION (version 1) as the default.
+	 */
+	save = p;
+	p = simple_get_bytes(p, end, &gss_v, sizeof(gss_v));
+	if (IS_ERR(p)) {
+		ctx->gc_v = RPC_GSS_VERSION;
+		p = save;
+	} else {
+		ctx->gc_v = gss_v;
+	}
 done:
-	dprintk("RPC:       %s Success. gc_expiry %lu now %lu timeout %u acceptor %.*s\n",
+	dprintk("RPC:       %s Success. gc_expiry %lu now %lu timeout %u acceptor %.*s gss version %d\n",
 		__func__, ctx->gc_expiry, now, timeout, ctx->gc_acceptor.len,
-		ctx->gc_acceptor.data);
+		ctx->gc_acceptor.data, ctx->gc_v);
 	return p;
 err:
 	dprintk("RPC:       %s returns error %ld\n", __func__, -PTR_ERR(p));
@@ -1511,10 +1524,10 @@ gss_marshal(struct rpc_task *task, __be32 *p)
 	req->rq_seqno = ctx->gc_seq++;
 	spin_unlock(&ctx->gc_seq_lock);
 
-	*p++ = htonl((u32) RPC_GSS_VERSION);
-	*p++ = htonl((u32) ctx->gc_proc);
-	*p++ = htonl((u32) req->rq_seqno);
-	*p++ = htonl((u32) gss_cred->gc_service);
+	*p++ = htonl((u32)ctx->gc_v);
+	*p++ = htonl((u32)ctx->gc_proc);
+	*p++ = htonl((u32)req->rq_seqno);
+	*p++ = htonl((u32)gss_cred->gc_service);
 	p = xdr_encode_netobj(p, &ctx->gc_wire_ctx);
 	*cred_len = htonl((p - (cred_len + 1)) << 2);
 
