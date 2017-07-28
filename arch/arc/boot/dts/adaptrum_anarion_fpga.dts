@@ -1,0 +1,49 @@
+/*
+ * (C) Copyright 2017 Adaptrum, Inc.
+ * Written by Alexandru Gagniuc <alex.g@adaptrum.com> for Adaptrum, Inc.
+ * Licensed under the GPLv2 or (at your option) any later version
+ */
+
+/dts-v1/;
+
+#include "adaptrum_anarion.dtsi"
+
+/ {
+	model = "adaptrum,anarion";
+	compatible = "adaptrum,anarion";
+
+	chosen {
+		bootargs = "earlycon console=ttyS0,115200n8";
+		stdout-path = "serial0:115200n8";
+	};
+
+	aliases {
+		serial0 = &uart0;
+	};
+
+	core_clk: core_clk {
+		#clock-cells = <0>;
+		compatible = "fixed-clock";
+		clock-frequency = <12000000>;
+	};
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&qspi {
+	status = "okay";
+	flash0: w25q128fvn@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "winbond,w25q128", "jedec,spi-nor";
+		spi-max-frequency = <70000000>;
+		m25p,fast-read;
+	};
+};
+
+&gmac1 {
+	phy-mode = "rgmii";
+	status = "okay";
+};

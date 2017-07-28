@@ -1,0 +1,107 @@
+/*
+ * (C) Copyright 2017 Adaptrum, Inc.
+ * Written by Alexandru Gagniuc <alex.g@adaptrum.com> for Adaptrum, Inc.
+ * Licensed under the GPLv2 or (at your option) any later version
+ */
+
+#include "skeleton.dtsi"
+
+/ {
+	compatible = "adaptrum,anarion";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	soc {
+		compatible = "simple-bus";
+		device_type = "soc";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+		interrupt-parent = <&core_intc>;
+
+		core_intc: interrupt-controller {
+			compatible = "snps,arc700-intc";
+			interrupt-controller;
+			#interrupt-cells = <1>;
+		};
+
+		uart0: serial@f2202100 {
+			compatible = "ns16550";
+			reg = <0xf2202100 0x20>;
+			interrupts = <8>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			clock-frequency = <192000000>;
+			status = "disabled";
+		};
+
+		uart1: serial@f2202200 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0xf2202200 0x20>;
+			interrupts = <8>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			clock-frequency = <192000000>;
+			status = "disabled";
+		};
+
+		uart2: serial@f2202300 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0xf2202300 0x20>;
+			interrupts = <8>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			clock-frequency = <192000000>;
+			status = "disabled";
+		};
+
+		uart3: serial@f2202400 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0xf2202400 0x20>;
+			interrupts = <8>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			clock-frequency = <192000000>;
+			status = "disabled";
+		};
+
+		qspi: qspi@f200f000 {
+			compatible = "adaptrum,anarion-qspi";
+			reg = <0xf200f000 0x1000>,
+			      <0x20000000 0x08000000>;
+
+			interrupts = <10>;
+			status = "disabled";
+		};
+
+		gmac0: ethernet@f2010000 {
+			compatible = "snps,dwmac";
+			reg = <0xf2010000 0x4000>;
+
+			interrupt-parent = <&core_intc>;
+			interrupts = <20>;
+			interrupt-names = "macirq";
+
+			clocks = <&core_clk>;
+			clock-names = "stmmaceth";
+
+			snps,pbl = <32>;
+			status = "disabled";
+		};
+
+		gmac1: ethernet@f2014000 {
+			compatible = "adaptrum,anarion-gmac", "snps,dwmac";
+			reg = <0xf2014000 0x4000>, <0xf2018100 8>;
+
+			interrupt-parent = <&core_intc>;
+			interrupts = <21>;
+			interrupt-names = "macirq";
+
+			clocks = <&core_clk>;
+			clock-names = "stmmaceth";
+
+			snps,pbl = <32>;
+			status = "disabled";
+		};
+	};
+};
