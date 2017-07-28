@@ -162,7 +162,18 @@ How to enable firmware-assisted dump (fadump):
 
 1. Set config option CONFIG_FA_DUMP=y and build kernel.
 2. Boot into linux kernel with 'fadump=on' kernel cmdline option.
-3. Optionally, user can also set 'crashkernel=' kernel cmdline
+3. A user can pass additional command line parameters as a space
+   separated quoted list through 'fadump_extra_args=' parameter,
+   to be enforced when fadump is active. For example, parameter
+   'fadump_extra_args="nr_cpus=1 numa=off udev.children-max=2"'
+   will be changed to 'fadump_extra_args nr_cpus=1  numa=off
+   udev.children-max=2' in-place when fadump is active. This
+   parameter has no affect when fadump is not active. Multiple
+   instances of 'fadump_extra_args=' can be passed. This provision
+   can be used to reduce memory consumption during dump capture by
+   disabling unwarranted resources/subsystems like CPUs, NUMA
+   and such.
+4. Optionally, user can also set 'crashkernel=' kernel cmdline
    to specify size of the memory to reserve for boot memory dump
    preservation.
 
@@ -172,6 +183,9 @@ NOTE: 1. 'fadump_reserve_mem=' parameter has been deprecated. Instead
       2. If firmware-assisted dump fails to reserve memory then it
          will fallback to existing kdump mechanism if 'crashkernel='
          option is set at kernel cmdline.
+      3. Special parameters like '--' are also just replaced in-place.
+         So, the user is advised to consider this while specifying
+         such parameters.
 
 Sysfs/debugfs files:
 ------------
