@@ -123,7 +123,7 @@ static void snd_gf1_interrupt_timer2(struct snd_gus_card * gus)
 
  */
 
-static struct snd_timer_hardware snd_gf1_timer1 =
+static const struct snd_timer_hardware snd_gf1_timer1 =
 {
 	.flags =	SNDRV_TIMER_HW_STOP,
 	.resolution =	80000,
@@ -132,7 +132,7 @@ static struct snd_timer_hardware snd_gf1_timer1 =
 	.stop =		snd_gf1_timer1_stop,
 };
 
-static struct snd_timer_hardware snd_gf1_timer2 =
+static const struct snd_timer_hardware snd_gf1_timer2 =
 {
 	.flags =	SNDRV_TIMER_HW_STOP,
 	.resolution =	320000,
