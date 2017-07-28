@@ -62,6 +62,11 @@ struct rpc_gss_init_res {
 	struct xdr_netobj	gr_token;	/* token */
 };
 
+struct gss3_assert_list {
+	struct list_head	assert_list;
+	spinlock_t		assert_lock;
+};
+
 /* The gss_cl_ctx struct holds all the information the rpcsec_gss client
  * code needs to know about a single security context.  In particular,
  * gc_gss_ctx is the context handle that is used to do gss-api calls, while
@@ -79,6 +84,7 @@ struct gss_cl_ctx {
 	struct xdr_netobj	gc_acceptor;
 	u32			gc_win;
 	unsigned long		gc_expiry;
+	struct gss3_assert_list	gc_alist;
 	struct rcu_head		gc_rcu;
 };
 
@@ -90,6 +96,59 @@ struct gss_cred {
 	struct gss_upcall_msg	*gc_upcall;
 	const char		*gc_principal;
 	unsigned long		gc_upcall_timestamp;
+};
+
+/** GSS3 */
+enum gss3_type {
+	GSS3_LABEL = 0,
+	GSS3_PRIVS = 1,
+};
+
+struct gss3_chan_binding {
+	u32	cb_len;
+	void	*cb_binding;
+};
+
+struct gss3_mp_auth {
+	u32	mp_handle_len;
+	void	*mp_handle;
+	u32	*mp_mic_len;
+	void	*mp_mic;	/* header mic */
+};
+
+struct gss3_label {
+	u32			la_lfs;
+	u32			la_pi;
+	struct xdr_netobj	la_label;
+};
+
+struct gss3_privs {
+	struct xdr_netobj	pr_name;
+	struct xdr_netobj	pr_data;
+};
+
+struct gss3_assertion_u {
+	u32	au_type;
+	union {
+		struct gss3_label	au_label;
+		struct gss3_privs	au_privs;
+	} u;
+};
+
+struct gss3_create_args {
+	struct gss3_mp_auth		*ca_mp_auth;
+	struct gss3_chan_binding	*ca_chan_bind;
+	u32			ca_num;
+	struct gss3_assertion_u	*ca_assertions;
+};
+
+struct gss3_create_res {
+	u32		cr_hlen;
+	void		*cr_handle;
+	struct gss3_mp_auth		*cr_mp_auth;
+	struct gss3_chan_binding	*cr_chan_bind;
+	u32			cr_num;
+	struct gss3_assertion_u	*cr_assertions;
 };
 
 #endif /* __KERNEL__ */

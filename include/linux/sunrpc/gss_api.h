@@ -17,6 +17,13 @@
 #include <linux/sunrpc/msg_prot.h>
 #include <linux/uio.h>
 
+struct gss3_assert {
+	struct list_head	gss3_list;  /* per context list of assertions */
+	struct xdr_netobj	gss3_handle; /* child handle */
+	u32			gss3_num;  /* always one for now */
+	struct gss3_assertion_u	*gss3_assertion;
+};
+
 /* The mechanism-independent gss-api context: */
 struct gss_ctx {
 	struct gss_api_mech	*mech_type;
