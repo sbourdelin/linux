@@ -890,6 +890,28 @@ static int dcmi_enum_frameintervals(struct file *file, void *fh,
 	return 0;
 }
 
+static int dcmi_set_default_fmt(struct stm32_dcmi *dcmi)
+{
+	struct v4l2_format f = {
+		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
+		.fmt.pix = {
+			.width		= CIF_WIDTH,
+			.height		= CIF_HEIGHT,
+			.field		= V4L2_FIELD_NONE,
+			.pixelformat	= dcmi->sd_formats[0]->fourcc,
+		},
+	};
+	int ret;
+
+	ret = dcmi_try_fmt(dcmi, &f, NULL);
+	if (ret)
+		return ret;
+	dcmi->sd_format = dcmi->sd_formats[0];
+	dcmi->fmt = f;
+
+	return 0;
+}
+
 static const struct of_device_id stm32_dcmi_of_match[] = {
 	{ .compatible = "st,stm32-dcmi"},
 	{ /* end node */ },
@@ -916,7 +938,13 @@ static int dcmi_open(struct file *file)
 	if (ret < 0 && ret != -ENOIOCTLCMD)
 		goto fh_rel;
 
+	ret = dcmi_set_default_fmt(dcmi);
+	if (ret)
+		goto power_off;
+
 	ret = dcmi_set_fmt(dcmi, &dcmi->fmt);
+
+power_off:
 	if (ret)
 		v4l2_subdev_call(sd, core, s_power, 0);
 fh_rel:
@@ -990,27 +1018,6 @@ static const struct v4l2_file_operations dcmi_fops = {
 #endif
 	.read		= vb2_fop_read,
 };
-
-static int dcmi_set_default_fmt(struct stm32_dcmi *dcmi)
-{
-	struct v4l2_format f = {
-		.type = V4L2_BUF_TYPE_VIDEO_CAPTURE,
-		.fmt.pix = {
-			.width		= CIF_WIDTH,
-			.height		= CIF_HEIGHT,
-			.field		= V4L2_FIELD_NONE,
-			.pixelformat	= dcmi->sd_formats[0]->fourcc,
-		},
-	};
-	int ret;
-
-	ret = dcmi_try_fmt(dcmi, &f, NULL);
-	if (ret)
-		return ret;
-	dcmi->sd_format = dcmi->sd_formats[0];
-	dcmi->fmt = f;
-	return 0;
-}
 
 static const struct dcmi_format dcmi_formats[] = {
 	{
