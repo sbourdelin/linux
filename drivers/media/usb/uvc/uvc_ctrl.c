@@ -2179,6 +2179,9 @@ int uvc_ctrl_init_device(struct uvc_device *dev)
 			ctrl->entity = entity;
 			ctrl->index = i;
 
+			if (UVC_ENTITY_TYPE(entity) == UVC_VC_EXTENSION_UNIT)
+				uvc_trace(UVC_TRACE_CONTROL, "XU %u: ctrl %d\n", entity->id, i);
+
 			uvc_ctrl_init_ctrl(dev, ctrl);
 			ctrl++;
 		}

@@ -1884,6 +1884,7 @@ static void uvc_unregister_video(struct uvc_device *dev)
 			continue;
 
 		video_unregister_device(&stream->vdev);
+		video_unregister_device(&stream->meta.vdev);
 
 		uvc_debugfs_cleanup_stream(stream);
 	}
@@ -1943,6 +1944,11 @@ static int uvc_register_video(struct uvc_device *dev,
 			   ret);
 		return ret;
 	}
+
+	/* Register a metadata node, but ignore a possible failure, complete
+	 * registration of video nodes anyway.
+	 */
+	uvc_meta_register(stream);
 
 	if (stream->type == V4L2_BUF_TYPE_VIDEO_CAPTURE)
 		stream->chain->caps |= V4L2_CAP_VIDEO_CAPTURE;
@@ -2041,6 +2047,12 @@ static int uvc_probe(struct usb_interface *intf,
 	dev->udev = usb_get_dev(udev);
 	dev->intf = usb_get_intf(intf);
 	dev->intfnum = intf->cur_altsetting->desc.bInterfaceNumber;
+	if (uvc_quirks_param != -1 &&
+	    uvc_quirks_param & UVC_DEV_FLAG_METADATA_NODE) {
+		uvc_quirks_param &= ~UVC_DEV_FLAG_METADATA_NODE;
+		if (uvc_quirks_param == 0)
+			uvc_quirks_param = -1;
+	}
 	dev->quirks = (uvc_quirks_param == -1)
 		    ? id->driver_info : uvc_quirks_param;
 
