@@ -4872,7 +4872,7 @@ static void floppy_release_irq_and_dma(void)
 	if (delayed_work_pending(&fd_timer))
 		pr_info("auxiliary floppy timer still active\n");
 	if (work_pending(&floppy_work))
-		pr_info("work still pending\n");
+		pr_info("floppy: work still pending\n");
 	old_fdc = fdc;
 	for (fdc = 0; fdc < N_FDC; fdc++)
 		if (FDCS->address != -1)
