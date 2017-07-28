@@ -1,0 +1,22 @@
+* Adaptrum Anarion Quad SPI controller
+
+Required properties:
+- compatible : Should be "adaptrum,anarion-qspi".
+- reg : Contains two entries, each of which is a tuple consisting of a
+	physical address and length. The first entry is the address and
+	length of the controller register set. The second entry is the
+	address and length of the memory-mapped flash. This second region is
+	the region where the controller responds to XIP requests, and may be
+	larger than the size of the attached flash.
+
+Example:
+
+	qspi: qspi@f200f000 {
+		compatible = "adaptrum,anarion-qspi";
+		reg = 	<0xf200f000 0x1000>,
+			<0x20000000 0x08000000>;
+
+		flash0: w25q128fvn@0 {
+			...
+		}
+	};

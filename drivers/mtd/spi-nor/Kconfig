@@ -48,6 +48,13 @@ config SPI_ATMEL_QUADSPI
 	  This driver does not support generic SPI. The implementation only
 	  supports SPI NOR.
 
+config SPI_ANARION_QUADSPI
+	tristate "Adaptrum Anarion Quad SPI Controller"
+	depends on OF && HAS_IOMEM
+	help
+	  Enable support for the Adaptrum Anarion Quad SPI controller.
+	  This driver does not support generic SPI. It only supports SPI NOR.
+
 config SPI_CADENCE_QUADSPI
 	tristate "Cadence Quad SPI controller"
 	depends on OF && (ARM || COMPILE_TEST)
