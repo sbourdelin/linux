@@ -575,7 +575,7 @@ static int mcs_speed_change(struct mcs_cb *mcs)
 	int rst = 0;
 	int cnt = 0;
 	__u16 nspeed;
-	__u16 rval;
+	__u16 rval = -1;
 
 	nspeed = mcs_speed_set[(mcs->new_speed >> 8) & 0x0f];
 
