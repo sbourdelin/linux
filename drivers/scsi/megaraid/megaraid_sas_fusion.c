@@ -3048,7 +3048,6 @@ complete_cmd_fusion(struct megasas_instance *instance, u32 MSIxIndex)
 			}
 			//Fall thru and complete IO
 		case MEGASAS_MPI2_FUNCTION_LD_IO_REQUEST: /* LD-IO Path */
-			atomic_dec(&instance->fw_outstanding);
 			if (cmd_fusion->r1_alt_dev_handle == MR_DEVHANDLE_INVALID) {
 				map_cmd_status(fusion, scmd_local, status,
 					       extStatus, le32_to_cpu(data_length),
@@ -3062,6 +3061,7 @@ complete_cmd_fusion(struct megasas_instance *instance, u32 MSIxIndex)
 				scmd_local->scsi_done(scmd_local);
 			} else	/* Optimal VD - R1 FP command completion. */
 				megasas_complete_r1_command(instance, cmd_fusion);
+			atomic_dec(&instance->fw_outstanding);
 			break;
 		case MEGASAS_MPI2_FUNCTION_PASSTHRU_IO_REQUEST: /*MFI command */
 			cmd_mfi = instance->cmd_list[cmd_fusion->sync_cmd_idx];
