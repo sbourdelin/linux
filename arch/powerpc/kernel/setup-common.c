@@ -920,8 +920,11 @@ void __init setup_arch(char **cmdline_p)
 	 * Reserve any gigantic pages requested on the command line.
 	 * memblock needs to have been initialized by the time this is
 	 * called since this will reserve memory.
+	 * (PPC32 did this already in MMU_init())
 	 */
+#ifdef CONFIG_PPC64
 	reserve_hugetlb_gpages();
+#endif
 
 	klp_init_thread_info(&init_thread_info);
 
