@@ -1080,6 +1080,37 @@ svcauth_gss_set_client(struct svc_rqst *rqstp)
 	return SVC_OK;
 }
 
+/**
+ * the svcdata->rsci_ch pointer is the child context.
+ * assume one GSS3_LABEL per child context.
+ */
+static int
+svcauth_gss_set_label(struct svc_rqst *rqstp, struct cred *new)
+{
+	struct gss_svc_data *svcdata = rqstp->rq_auth_data;
+	struct rsc *rsci_ch = svcdata->rsci_ch;
+	struct gss3_svc_assert *g3a;
+	struct gss3_label *g3l;
+	int ret = -1;
+
+	if (!rsci_ch || !rsci_ch->assertions)
+		goto out;
+
+	g3a = rsci_ch->assertions;
+	if (g3a->sa_num != 1 || g3a->sa_assert.au_type != GSS3_LABEL)
+		goto out;
+
+	g3l = &g3a->sa_assert.u.au_label;
+	if (g3l->la_label.len == 0)
+		goto out;
+
+	/* Assume SeLinux - need to validate la_lfs and la_pi ? */
+	ret = set_security_override_from_ctx(new, (char *)g3l->la_label.data);
+
+out:
+	return ret;
+}
+
 static inline int
 gss_write_init_verf(struct cache_detail *cd, struct svc_rqst *rqstp,
 		    struct rpc_gss_wire_cred *gc,
@@ -2134,6 +2165,7 @@ static struct auth_ops svcauthops_gss = {
 	.release	= svcauth_gss_release,
 	.domain_release = svcauth_gss_domain_release,
 	.set_client	= svcauth_gss_set_client,
+	.set_label	= svcauth_gss_set_label,
 };
 
 static int rsi_cache_create_net(struct net *net)
