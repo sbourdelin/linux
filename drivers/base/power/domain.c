@@ -2575,6 +2575,12 @@ static int __init pm_genpd_debug_init(void)
 		return -ENOMEM;
 
 	list_for_each_entry(genpd, &gpd_list, gpd_list_node) {
+		if (!genpd->name) {
+			pr_warn("%s: Must populate name of genpd for extended debugfs info.",
+				__func__);
+			continue;
+		}
+
 		d = debugfs_create_dir(genpd->name, pm_genpd_debugfs_dir);
 		if (!d)
 			return -ENOMEM;
