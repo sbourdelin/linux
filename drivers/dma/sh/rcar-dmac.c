@@ -836,7 +836,8 @@ static void rcar_dmac_chan_configure_desc(struct rcar_dmac_chan *chan,
 	}
 
 	desc->xfer_shift = ilog2(xfer_size);
-	desc->chcr = chcr | chcr_ts[desc->xfer_shift];
+	if (desc->xfer_shift < ARRAY_SIZE(chcr_ts))
+		desc->chcr = chcr | chcr_ts[desc->xfer_shift];
 }
 
 /*
