@@ -130,8 +130,19 @@ struct dentry_stat_t dentry_stat = {
 	.age_limit = 45,
 };
 
+/*
+ * Macros and variables to manage and count negative dentries.
+ */
+#define NEG_DENTRY_BATCH	(1 << 8)
+static long neg_dentry_percpu_limit __read_mostly;
+static struct {
+	raw_spinlock_t nfree_lock;
+	long nfree;			/* Negative dentry free pool */
+} ndblk ____cacheline_aligned_in_smp;
+
 static DEFINE_PER_CPU(long, nr_dentry);
 static DEFINE_PER_CPU(long, nr_dentry_unused);
+static DEFINE_PER_CPU(long, nr_dentry_neg);
 
 #if defined(CONFIG_SYSCTL) && defined(CONFIG_PROC_FS)
 
@@ -226,6 +237,92 @@ static inline int dentry_string_cmp(const unsigned char *cs, const unsigned char
 }
 
 #endif
+
+/*
+ * There is a system-wide limit to the amount of negative dentries allowed
+ * in the super blocks' LRU lists. The default limit is 5% of the total
+ * system memory. This limit can be changed by using the kernel command line
+ * option "neg_dentry_pc=" to specify the percentage of the total memory
+ * that can be used for negative dentries. That percentage must be in the
+ * 1-50% range.
+ *
+ * To avoid performance problem with a global counter on an SMP system,
+ * the tracking is done mostly on a per-cpu basis. The total limit is
+ * distributed in a 80/20 ratio to per-cpu counters and a global free pool.
+ *
+ * If a per-cpu counter runs out of negative dentries, it can borrow extra
+ * ones from the global free pool. If it has more than its percpu limit,
+ * the extra ones will be returned back to the global pool.
+ */
+
+/*
+ * Decrement negative dentry count if applicable.
+ */
+static void __neg_dentry_dec(struct dentry *dentry)
+{
+	if (unlikely(this_cpu_dec_return(nr_dentry_neg) < 0)) {
+		long *pcnt = get_cpu_ptr(&nr_dentry_neg);
+
+		if ((*pcnt < 0) && raw_spin_trylock(&ndblk.nfree_lock)) {
+			ACCESS_ONCE(ndblk.nfree) += NEG_DENTRY_BATCH;
+			*pcnt += NEG_DENTRY_BATCH;
+			raw_spin_unlock(&ndblk.nfree_lock);
+		}
+		put_cpu_ptr(&nr_dentry_neg);
+	}
+}
+
+static inline void neg_dentry_dec(struct dentry *dentry)
+{
+	if (unlikely(d_is_negative(dentry)))
+		__neg_dentry_dec(dentry);
+}
+
+/*
+ * Decrement the negative dentry free pool by NEG_DENTRY_BATCH & return
+ * the actual number decremented.
+ */
+static long __neg_dentry_nfree_dec(void)
+{
+	long cnt = NEG_DENTRY_BATCH;
+
+	raw_spin_lock(&ndblk.nfree_lock);
+	if (ndblk.nfree < cnt)
+		cnt = ndblk.nfree;
+	ACCESS_ONCE(ndblk.nfree) -= cnt;
+	raw_spin_unlock(&ndblk.nfree_lock);
+	return cnt;
+}
+
+/*
+ * Increment negative dentry count if applicable.
+ */
+static void __neg_dentry_inc(struct dentry *dentry)
+{
+	long cnt = 0, *pcnt;
+
+	if (this_cpu_inc_return(nr_dentry_neg) <= neg_dentry_percpu_limit)
+		return;
+
+	pcnt = get_cpu_ptr(&nr_dentry_neg);
+	if (READ_ONCE(ndblk.nfree) && (*pcnt > neg_dentry_percpu_limit)) {
+		cnt = __neg_dentry_nfree_dec();
+		*pcnt -= cnt;
+	}
+	put_cpu_ptr(&nr_dentry_neg);
+	/*
+	 * If there are too many negative dentries, set DCACHE_KILL_NEGATIVE
+	 * flag to indicate that the dentry should be killed.
+	 */
+	if (!cnt)
+		dentry->d_flags |= DCACHE_KILL_NEGATIVE;
+}
+
+static inline void neg_dentry_inc(struct dentry *dentry)
+{
+	if (unlikely(d_is_negative(dentry)))
+		__neg_dentry_inc(dentry);
+}
 
 static inline int dentry_cmp(const struct dentry *dentry, const unsigned char *ct, unsigned tcount)
 {
@@ -329,6 +426,8 @@ static inline void __d_clear_type_and_inode(struct dentry *dentry)
 	flags &= ~(DCACHE_ENTRY_TYPE | DCACHE_FALLTHRU);
 	WRITE_ONCE(dentry->d_flags, flags);
 	dentry->d_inode = NULL;
+	if (dentry->d_flags & DCACHE_LRU_LIST)
+		__neg_dentry_inc(dentry);
 }
 
 static void dentry_free(struct dentry *dentry)
@@ -396,6 +495,7 @@ static void d_lru_add(struct dentry *dentry)
 	dentry->d_flags |= DCACHE_LRU_LIST;
 	this_cpu_inc(nr_dentry_unused);
 	WARN_ON_ONCE(!list_lru_add(&dentry->d_sb->s_dentry_lru, &dentry->d_lru));
+	neg_dentry_inc(dentry);
 }
 
 static void d_lru_del(struct dentry *dentry)
@@ -404,6 +504,7 @@ static void d_lru_del(struct dentry *dentry)
 	dentry->d_flags &= ~DCACHE_LRU_LIST;
 	this_cpu_dec(nr_dentry_unused);
 	WARN_ON_ONCE(!list_lru_del(&dentry->d_sb->s_dentry_lru, &dentry->d_lru));
+	neg_dentry_dec(dentry);
 }
 
 static void d_shrink_del(struct dentry *dentry)
@@ -434,6 +535,7 @@ static void d_lru_isolate(struct list_lru_one *lru, struct dentry *dentry)
 	dentry->d_flags &= ~DCACHE_LRU_LIST;
 	this_cpu_dec(nr_dentry_unused);
 	list_lru_isolate(lru, &dentry->d_lru);
+	neg_dentry_dec(dentry);
 }
 
 static void d_lru_shrink_move(struct list_lru_one *lru, struct dentry *dentry,
@@ -442,6 +544,7 @@ static void d_lru_shrink_move(struct list_lru_one *lru, struct dentry *dentry,
 	D_FLAG_VERIFY(dentry, DCACHE_LRU_LIST);
 	dentry->d_flags |= DCACHE_SHRINK_LIST;
 	list_lru_isolate_move(lru, &dentry->d_lru, list);
+	neg_dentry_dec(dentry);
 }
 
 /*
@@ -586,38 +689,6 @@ static void __dentry_kill(struct dentry *dentry)
 		dentry_free(dentry);
 }
 
-/*
- * Finish off a dentry we've decided to kill.
- * dentry->d_lock must be held, returns with it unlocked.
- * If ref is non-zero, then decrement the refcount too.
- * Returns dentry requiring refcount drop, or NULL if we're done.
- */
-static struct dentry *dentry_kill(struct dentry *dentry)
-	__releases(dentry->d_lock)
-{
-	struct inode *inode = dentry->d_inode;
-	struct dentry *parent = NULL;
-
-	if (inode && unlikely(!spin_trylock(&inode->i_lock)))
-		goto failed;
-
-	if (!IS_ROOT(dentry)) {
-		parent = dentry->d_parent;
-		if (unlikely(!spin_trylock(&parent->d_lock))) {
-			if (inode)
-				spin_unlock(&inode->i_lock);
-			goto failed;
-		}
-	}
-
-	__dentry_kill(dentry);
-	return parent;
-
-failed:
-	spin_unlock(&dentry->d_lock);
-	return dentry; /* try again with same dentry */
-}
-
 static inline struct dentry *lock_parent(struct dentry *dentry)
 {
 	struct dentry *parent = dentry->d_parent;
@@ -650,6 +721,71 @@ again:
 	else
 		parent = NULL;
 	return parent;
+}
+
+/*
+ * Finish off a dentry we've decided to kill.
+ * dentry->d_lock must be held, returns with it unlocked.
+ * If ref is non-zero, then decrement the refcount too.
+ * Returns dentry requiring refcount drop, or NULL if we're done.
+ */
+static struct dentry *dentry_kill(struct dentry *dentry)
+	__releases(dentry->d_lock)
+{
+	struct inode *inode = dentry->d_inode;
+	struct dentry *parent = NULL;
+
+	if (inode && unlikely(!spin_trylock(&inode->i_lock)))
+		goto failed;
+
+	if (!IS_ROOT(dentry)) {
+		parent = dentry->d_parent;
+		if (unlikely(dentry->d_flags & DCACHE_KILL_NEGATIVE)) {
+			/*
+			 * Force the killing of this negative dentry when
+			 * DCACHE_KILL_NEGATIVE flag is set. This is to
+			 * protect against the worst case situation where
+			 * the parent d_lock is kept busy most of the time
+			 * while the number of negative dentries has
+			 * exceeded the limit. Leaving the dentry as is
+			 * will cause the number of negative entries to
+			 * continue to increase way past the limit under
+			 * the worst case situation.
+			 *
+			 * As the reference count is kept at 1 before
+			 * calling dentry_kill(), the dentry won't
+			 * disappear under the hood even if the dentry
+			 * lock is temporarily released.
+			 */
+			unsigned int dflags;
+
+			dentry->d_flags &= ~DCACHE_KILL_NEGATIVE;
+			dflags = dentry->d_flags;
+			parent = lock_parent(dentry);
+			/*
+			 * Abort the killing if the reference count or
+			 * d_flags changed.
+			 */
+			if ((dentry->d_flags != dflags) ||
+			    (dentry->d_lockref.count != 1)) {
+				if (parent)
+					spin_unlock(&parent->d_lock);
+				goto failed;
+			}
+
+		} else if (unlikely(!spin_trylock(&parent->d_lock))) {
+			if (inode)
+				spin_unlock(&inode->i_lock);
+			goto failed;
+		}
+	}
+
+	__dentry_kill(dentry);
+	return parent;
+
+failed:
+	spin_unlock(&dentry->d_lock);
+	return dentry; /* try again with same dentry */
 }
 
 /*
@@ -814,6 +950,9 @@ repeat:
 	}
 
 	dentry_lru_add(dentry);
+
+	if (unlikely(dentry->d_flags & DCACHE_KILL_NEGATIVE))
+		goto kill_it;
 
 	dentry->d_lockref.count--;
 	spin_unlock(&dentry->d_lock);
@@ -1820,6 +1959,11 @@ static void __d_instantiate(struct dentry *dentry, struct inode *inode)
 	WARN_ON(d_in_lookup(dentry));
 
 	spin_lock(&dentry->d_lock);
+	/*
+	 * Decrement negative dentry count if it was in the LRU list.
+	 */
+	if (dentry->d_flags & DCACHE_LRU_LIST)
+		__neg_dentry_dec(dentry);
 	hlist_add_head(&dentry->d_u.d_alias, &inode->i_dentry);
 	raw_write_seqcount_begin(&dentry->d_seq);
 	__d_set_inode_and_type(dentry, inode, add_flags);
@@ -3566,6 +3710,47 @@ void d_tmpfile(struct dentry *dentry, struct inode *inode)
 }
 EXPORT_SYMBOL(d_tmpfile);
 
+static long neg_dentry_pc __initdata = 5;
+static bool neg_dentry_warn __initdata;
+static int __init set_neg_dentry_pc(char *str)
+{
+	ssize_t ret;
+	long new_pc = neg_dentry_pc;
+
+	if (!str)
+		return 0;
+	ret = kstrtol(str, 0, &new_pc);
+	if (ret || (new_pc < 1) || (new_pc > 50))
+		ret = 1;
+	else
+		neg_dentry_pc = new_pc;
+	if (ret)
+		neg_dentry_warn = true;
+	return ret ? 0 : 1;
+}
+__setup("neg_dentry_pc=", set_neg_dentry_pc);
+
+static void __init neg_dentry_init(void)
+{
+	/* Rough estimate of # of dentries allocated per page */
+	unsigned int nr_dentry_page = PAGE_SIZE/sizeof(struct dentry) - 1;
+	unsigned long cnt;
+
+	raw_spin_lock_init(&ndblk.nfree_lock);
+
+	/* 20% in global pool & 80% in percpu free */
+	ndblk.nfree = totalram_pages * nr_dentry_page * neg_dentry_pc / 500;
+	cnt = ndblk.nfree * 4 / num_possible_cpus();
+	if (unlikely(cnt < 2 * NEG_DENTRY_BATCH))
+		cnt = 2 * NEG_DENTRY_BATCH;
+	neg_dentry_percpu_limit = cnt;
+
+	if (neg_dentry_warn)
+		pr_warn("Warning: neg_dentry_pc must be within 1-50 range.\n");
+	pr_info("Negative dentry: percpu limit = %ld, free pool = %ld\n",
+		neg_dentry_percpu_limit, ndblk.nfree);
+}
+
 static __initdata unsigned long dhash_entries;
 static int __init set_dhash_entries(char *str)
 {
@@ -3605,6 +3790,8 @@ static void __init dcache_init(void)
 	 */
 	dentry_cache = KMEM_CACHE(dentry,
 		SLAB_RECLAIM_ACCOUNT|SLAB_PANIC|SLAB_MEM_SPREAD|SLAB_ACCOUNT);
+
+	neg_dentry_init();
 
 	/* Hash may have been set up in dcache_init_early */
 	if (!hashdist)
