@@ -333,14 +333,58 @@ int get_msr_fd(int cpu)
 	return fd;
 }
 
+/*
+ * Open a file, and exit on failure
+ */
+FILE *fopen_or_die(const char *path, const char *mode)
+{
+	FILE *filep = fopen(path, mode);
+
+	if (!filep)
+		err(1, "%s: open failed", path);
+	return filep;
+}
+
+void err_on_hypervisor(void)
+{
+	FILE *cpuinfo;
+	char *flags, *hypervisor;
+	char *buffer;
+
+	/* On VMs /proc/cpuinfo contains a "flags" entry for hypervisor */
+	cpuinfo = fopen_or_die("/proc/cpuinfo", "ro");
+
+	buffer = malloc(4096);
+	if (!buffer)
+		err(-ENOMEM, "buffer malloc fail");
+
+	fread(buffer, 1024, 1, cpuinfo);
+
+	flags = strstr(buffer, "flags");
+	rewind(cpuinfo);
+	fseek(cpuinfo, flags - buffer, SEEK_SET);
+	fgets(buffer, 4096, cpuinfo);
+	fclose(cpuinfo);
+
+	hypervisor = strstr(buffer, "hypervisor");
+
+	free(buffer);
+
+	if (hypervisor)
+		err(-1,
+		    "turbostat is not supported on this virtual machine.");
+}
+
 int get_msr(int cpu, off_t offset, unsigned long long *msr)
 {
 	ssize_t retval;
 
 	retval = pread(get_msr_fd(cpu), msr, sizeof(*msr), offset);
 
-	if (retval != sizeof *msr)
+	if (retval != sizeof *msr) {
+		err_on_hypervisor();
 		err(-1, "cpu%d: msr offset 0x%llx read failed", cpu, (unsigned long long)offset);
+	}
 
 	return 0;
 }
@@ -1452,17 +1496,6 @@ static unsigned long long rdtsc(void)
 	return low | ((unsigned long long)high) << 32;
 }
 
-/*
- * Open a file, and exit on failure
- */
-FILE *fopen_or_die(const char *path, const char *mode)
-{
-	FILE *filep = fopen(path, mode);
-
-	if (!filep)
-		err(1, "%s: open failed", path);
-	return filep;
-}
 /*
  * snapshot_sysfs_counter()
  *
