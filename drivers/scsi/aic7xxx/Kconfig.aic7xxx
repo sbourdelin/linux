@@ -6,6 +6,7 @@ config SCSI_AIC7XXX
 	tristate "Adaptec AIC7xxx Fast -> U160 support (New Driver)"
 	depends on (PCI || EISA) && SCSI
 	select SCSI_SPI_ATTRS
+	select SCSI_AICLIB
 	---help---
 	This driver supports all of Adaptec's Fast through Ultra 160 PCI
 	based SCSI controllers as well as the aic7770 based EISA and VLB

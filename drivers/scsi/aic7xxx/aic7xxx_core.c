@@ -7116,60 +7116,12 @@ ahc_download_instr(struct ahc_softc *ahc, u_int instrptr, uint8_t *dconsts)
 	}
 }
 
-int
-ahc_print_register(const ahc_reg_parse_entry_t *table, u_int num_entries,
-		   const char *name, u_int address, u_int value,
-		   u_int *cur_column, u_int wrap_point)
-{
-	int	printed;
-	u_int	printed_mask;
-
-	if (cur_column != NULL && *cur_column >= wrap_point) {
-		printk("\n");
-		*cur_column = 0;
-	}
-	printed  = printk("%s[0x%x]", name, value);
-	if (table == NULL) {
-		printed += printk(" ");
-		*cur_column += printed;
-		return (printed);
-	}
-	printed_mask = 0;
-	while (printed_mask != 0xFF) {
-		int entry;
-
-		for (entry = 0; entry < num_entries; entry++) {
-			if (((value & table[entry].mask)
-			  != table[entry].value)
-			 || ((printed_mask & table[entry].mask)
-			  == table[entry].mask))
-				continue;
-
-			printed += printk("%s%s",
-					  printed_mask == 0 ? ":(" : "|",
-					  table[entry].name);
-			printed_mask |= table[entry].mask;
-			
-			break;
-		}
-		if (entry >= num_entries)
-			break;
-	}
-	if (printed_mask != 0)
-		printed += printk(") ");
-	else
-		printed += printk(" ");
-	if (cur_column != NULL)
-		*cur_column += printed;
-	return (printed);
-}
-
 void
 ahc_dump_card_state(struct ahc_softc *ahc)
 {
+	struct aic_dump_buffer buf;
 	struct	scb *scb;
 	struct	scb_tailq *untagged_q;
-	u_int	cur_col;
 	int	paused;
 	int	target;
 	int	maxtarget;
@@ -7201,37 +7153,39 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 	       ahc_inb(ahc, ARG_2));
 	printk("HCNT = 0x%x SCBPTR = 0x%x\n", ahc_inb(ahc, HCNT),
 	       ahc_inb(ahc, SCBPTR));
-	cur_col = 0;
+
+	aic_printbuf_init(&buf, 60);
 	if ((ahc->features & AHC_DT) != 0)
-		ahc_scsiphase_print(ahc_inb(ahc, SCSIPHASE), &cur_col, 50);
-	ahc_scsisigi_print(ahc_inb(ahc, SCSISIGI), &cur_col, 50);
-	ahc_error_print(ahc_inb(ahc, ERROR), &cur_col, 50);
-	ahc_scsibusl_print(ahc_inb(ahc, SCSIBUSL), &cur_col, 50);
-	ahc_lastphase_print(ahc_inb(ahc, LASTPHASE), &cur_col, 50);
-	ahc_scsiseq_print(ahc_inb(ahc, SCSISEQ), &cur_col, 50);
-	ahc_sblkctl_print(ahc_inb(ahc, SBLKCTL), &cur_col, 50);
-	ahc_scsirate_print(ahc_inb(ahc, SCSIRATE), &cur_col, 50);
-	ahc_seqctl_print(ahc_inb(ahc, SEQCTL), &cur_col, 50);
-	ahc_seq_flags_print(ahc_inb(ahc, SEQ_FLAGS), &cur_col, 50);
-	ahc_sstat0_print(ahc_inb(ahc, SSTAT0), &cur_col, 50);
-	ahc_sstat1_print(ahc_inb(ahc, SSTAT1), &cur_col, 50);
-	ahc_sstat2_print(ahc_inb(ahc, SSTAT2), &cur_col, 50);
-	ahc_sstat3_print(ahc_inb(ahc, SSTAT3), &cur_col, 50);
-	ahc_simode0_print(ahc_inb(ahc, SIMODE0), &cur_col, 50);
-	ahc_simode1_print(ahc_inb(ahc, SIMODE1), &cur_col, 50);
-	ahc_sxfrctl0_print(ahc_inb(ahc, SXFRCTL0), &cur_col, 50);
-	ahc_dfcntrl_print(ahc_inb(ahc, DFCNTRL), &cur_col, 50);
-	ahc_dfstatus_print(ahc_inb(ahc, DFSTATUS), &cur_col, 50);
-	if (cur_col != 0)
-		printk("\n");
-	printk("STACK:");
+		ahc_scsiphase_print(ahc_inb(ahc, SCSIPHASE), &buf);
+	ahc_scsisigi_print(ahc_inb(ahc, SCSISIGI), &buf);
+	ahc_error_print(ahc_inb(ahc, ERROR), &buf);
+	ahc_scsibusl_print(ahc_inb(ahc, SCSIBUSL), &buf);
+	ahc_lastphase_print(ahc_inb(ahc, LASTPHASE), &buf);
+	ahc_scsiseq_print(ahc_inb(ahc, SCSISEQ), &buf);
+	ahc_sblkctl_print(ahc_inb(ahc, SBLKCTL), &buf);
+	ahc_scsirate_print(ahc_inb(ahc, SCSIRATE), &buf);
+	ahc_seqctl_print(ahc_inb(ahc, SEQCTL), &buf);
+	ahc_seq_flags_print(ahc_inb(ahc, SEQ_FLAGS), &buf);
+	ahc_sstat0_print(ahc_inb(ahc, SSTAT0), &buf);
+	ahc_sstat1_print(ahc_inb(ahc, SSTAT1), &buf);
+	ahc_sstat2_print(ahc_inb(ahc, SSTAT2), &buf);
+	ahc_sstat3_print(ahc_inb(ahc, SSTAT3), &buf);
+	ahc_simode0_print(ahc_inb(ahc, SIMODE0), &buf);
+	ahc_simode1_print(ahc_inb(ahc, SIMODE1), &buf);
+	ahc_sxfrctl0_print(ahc_inb(ahc, SXFRCTL0), &buf);
+	ahc_dfcntrl_print(ahc_inb(ahc, DFCNTRL), &buf);
+	ahc_dfstatus_print(ahc_inb(ahc, DFSTATUS), &buf);
+	aic_printbuf_finish(&buf);
+	aic_printbuf_push(&buf, "STACK:");
 	for (i = 0; i < STACK_SIZE; i++)
-		printk(" 0x%x", ahc_inb(ahc, STACK)|(ahc_inb(ahc, STACK) << 8));
+		aic_printbuf_push(&buf, " 0x%x",
+				  ahc_inb(ahc, STACK)|(ahc_inb(ahc, STACK) << 8));
+	aic_printbuf_finish(&buf);
 	printk("\nSCB count = %d\n", ahc->scb_data->numscbs);
 	printk("Kernel NEXTQSCB = %d\n", ahc->next_queued_scb->hscb->tag);
 	printk("Card NEXTQSCB = %d\n", ahc_inb(ahc, NEXT_QUEUED_SCB));
 	/* QINFIFO */
-	printk("QINFIFO entries: ");
+	aic_printbuf_push(&buf, "QINFIFO entries: ");
 	if ((ahc->features & AHC_QUEUE_REGS) != 0) {
 		qinpos = ahc_inb(ahc, SNSCB_QOFF);
 		ahc_outb(ahc, SNSCB_QOFF, qinpos);
@@ -7239,105 +7193,104 @@ ahc_dump_card_state(struct ahc_softc *ahc)
 		qinpos = ahc_inb(ahc, QINPOS);
 	qintail = ahc->qinfifonext;
 	while (qinpos != qintail) {
-		printk("%d ", ahc->qinfifo[qinpos]);
+		aic_printbuf_push(&buf, "%d ", ahc->qinfifo[qinpos]);
 		qinpos++;
 	}
-	printk("\n");
+	aic_printbuf_finish(&buf);
 
-	printk("Waiting Queue entries: ");
+	aic_printbuf_push(&buf, "Waiting Queue entries: ");
 	scb_index = ahc_inb(ahc, WAITING_SCBH);
 	i = 0;
 	while (scb_index != SCB_LIST_NULL && i++ < 256) {
 		ahc_outb(ahc, SCBPTR, scb_index);
-		printk("%d:%d ", scb_index, ahc_inb(ahc, SCB_TAG));
+		aic_printbuf_push(&buf, "%d:%d ", scb_index,
+				  ahc_inb(ahc, SCB_TAG));
 		scb_index = ahc_inb(ahc, SCB_NEXT);
 	}
-	printk("\n");
+	aic_printbuf_finish(&buf);
 
-	printk("Disconnected Queue entries: ");
+	aic_printbuf_push(&buf, "Disconnected Queue entries: ");
 	scb_index = ahc_inb(ahc, DISCONNECTED_SCBH);
 	i = 0;
 	while (scb_index != SCB_LIST_NULL && i++ < 256) {
 		ahc_outb(ahc, SCBPTR, scb_index);
-		printk("%d:%d ", scb_index, ahc_inb(ahc, SCB_TAG));
+		aic_printbuf_push(&buf, "%d:%d ", scb_index, ahc_inb(ahc, SCB_TAG));
 		scb_index = ahc_inb(ahc, SCB_NEXT);
 	}
-	printk("\n");
-		
+	aic_printbuf_finish(&buf);
+
 	ahc_sync_qoutfifo(ahc, BUS_DMASYNC_POSTREAD);
-	printk("QOUTFIFO entries: ");
+	aic_printbuf_push(&buf, "QOUTFIFO entries: ");
 	qoutpos = ahc->qoutfifonext;
 	i = 0;
 	while (ahc->qoutfifo[qoutpos] != SCB_LIST_NULL && i++ < 256) {
-		printk("%d ", ahc->qoutfifo[qoutpos]);
+		aic_printbuf_push(&buf, "%d ", ahc->qoutfifo[qoutpos]);
 		qoutpos++;
 	}
-	printk("\n");
+	aic_printbuf_finish(&buf);
 
-	printk("Sequencer Free SCB List: ");
+	aic_printbuf_push(&buf, "Sequencer Free SCB List: ");
 	scb_index = ahc_inb(ahc, FREE_SCBH);
 	i = 0;
 	while (scb_index != SCB_LIST_NULL && i++ < 256) {
 		ahc_outb(ahc, SCBPTR, scb_index);
-		printk("%d ", scb_index);
+		aic_printbuf_push(&buf, "%d ", scb_index);
 		scb_index = ahc_inb(ahc, SCB_NEXT);
 	}
-	printk("\n");
+	aic_printbuf_finish(&buf);
 
-	printk("Sequencer SCB Info: ");
+	printk("Sequencer SCB Info:\n");
 	for (i = 0; i < ahc->scb_data->maxhscbs; i++) {
 		ahc_outb(ahc, SCBPTR, i);
-		cur_col  = printk("\n%3d ", i);
-
-		ahc_scb_control_print(ahc_inb(ahc, SCB_CONTROL), &cur_col, 60);
-		ahc_scb_scsiid_print(ahc_inb(ahc, SCB_SCSIID), &cur_col, 60);
-		ahc_scb_lun_print(ahc_inb(ahc, SCB_LUN), &cur_col, 60);
-		ahc_scb_tag_print(ahc_inb(ahc, SCB_TAG), &cur_col, 60);
+		aic_printbuf_push(&buf, "%3d ", i);
+		ahc_scb_control_print(ahc_inb(ahc, SCB_CONTROL), &buf);
+		ahc_scb_scsiid_print(ahc_inb(ahc, SCB_SCSIID), &buf);
+		ahc_scb_lun_print(ahc_inb(ahc, SCB_LUN), &buf);
+		ahc_scb_tag_print(ahc_inb(ahc, SCB_TAG), &buf);
+		aic_printbuf_finish(&buf);
 	}
-	printk("\n");
 
-	printk("Pending list: ");
+	printk("Pending list:\n");
 	i = 0;
 	LIST_FOREACH(scb, &ahc->pending_scbs, pending_links) {
 		if (i++ > 256)
 			break;
-		cur_col  = printk("\n%3d ", scb->hscb->tag);
-		ahc_scb_control_print(scb->hscb->control, &cur_col, 60);
-		ahc_scb_scsiid_print(scb->hscb->scsiid, &cur_col, 60);
-		ahc_scb_lun_print(scb->hscb->lun, &cur_col, 60);
+		aic_printbuf_push(&buf, "%3d ", scb->hscb->tag);
+		ahc_scb_control_print(scb->hscb->control, &buf);
+		ahc_scb_scsiid_print(scb->hscb->scsiid, &buf);
+		ahc_scb_lun_print(scb->hscb->lun, &buf);
 		if ((ahc->flags & AHC_PAGESCBS) == 0) {
 			ahc_outb(ahc, SCBPTR, scb->hscb->tag);
-			printk("(");
-			ahc_scb_control_print(ahc_inb(ahc, SCB_CONTROL),
-					      &cur_col, 60);
-			ahc_scb_tag_print(ahc_inb(ahc, SCB_TAG), &cur_col, 60);
-			printk(")");
+			aic_printbuf_push(&buf, "(");
+			ahc_scb_control_print(ahc_inb(ahc, SCB_CONTROL), &buf);
+			ahc_scb_tag_print(ahc_inb(ahc, SCB_TAG), &buf);
+			aic_printbuf_push(&buf, ")");
 		}
+		aic_printbuf_finish(&buf);
 	}
-	printk("\n");
 
-	printk("Kernel Free SCB list: ");
+	aic_printbuf_push(&buf, "Kernel Free SCB list: ");
 	i = 0;
 	SLIST_FOREACH(scb, &ahc->scb_data->free_scbs, links.sle) {
 		if (i++ > 256)
 			break;
-		printk("%d ", scb->hscb->tag);
+		aic_printbuf_push(&buf, "%d ", scb->hscb->tag);
 	}
-	printk("\n");
+	aic_printbuf_finish(&buf);
 
 	maxtarget = (ahc->features & (AHC_WIDE|AHC_TWIN)) ? 15 : 7;
 	for (target = 0; target <= maxtarget; target++) {
 		untagged_q = &ahc->untagged_queues[target];
 		if (TAILQ_FIRST(untagged_q) == NULL)
 			continue;
-		printk("Untagged Q(%d): ", target);
+		aic_printbuf_push(&buf, "Untagged Q(%d): ", target);
 		i = 0;
 		TAILQ_FOREACH(scb, untagged_q, links.tqe) {
 			if (i++ > 256)
 				break;
-			printk("%d ", scb->hscb->tag);
+			aic_printbuf_push(&buf, "%d ", scb->hscb->tag);
 		}
-		printk("\n");
+		aic_printbuf_finish(&buf);
 	}
 
 	printk("\n<<<<<<<<<<<<<<<<< Dump Card State Ends >>>>>>>>>>>>>>>>>>\n");

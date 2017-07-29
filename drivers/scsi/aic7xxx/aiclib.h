@@ -57,6 +57,38 @@
 #ifndef	_AICLIB_H
 #define _AICLIB_H
 
+#include <linux/blkdev.h>
+#include <linux/types.h>
+
+struct aic_dump_buffer
+{
+	unsigned int cur_col;
+	unsigned int wrap;
+	char buf[256];
+};
+
+typedef void (aic_reg_print_t)(uint32_t, struct aic_dump_buffer *);
+
+typedef struct aic_reg_parse_entry {
+	char    *name;
+	uint8_t  value;
+	uint8_t  mask;
+} aic_reg_parse_entry_t;
+
+static inline void
+aic_printbuf_init(struct aic_dump_buffer *buf, unsigned int wrap)
+{
+	buf->cur_col = 0;
+	buf->wrap = wrap;
+}
+
+void __printf(2, 3) aic_printbuf_push(struct aic_dump_buffer *buf,
+				      const char *fmt, ...);
+void aic_printbuf_finish(struct aic_dump_buffer *buf);
+void aic_print_register(const aic_reg_parse_entry_t *table, u_int num_entries,
+			const char *name, u_int address, u_int value,
+			struct aic_dump_buffer *buf);
+
 struct scsi_sense
 {
 	uint8_t opcode;

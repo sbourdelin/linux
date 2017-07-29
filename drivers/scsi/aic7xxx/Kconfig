@@ -1,0 +1,6 @@
+config SCSI_AICLIB
+	tristate
+	default n
+
+source "drivers/scsi/aic7xxx/Kconfig.aic7xxx"
+source "drivers/scsi/aic7xxx/Kconfig.aic79xx"

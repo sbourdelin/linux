@@ -52,6 +52,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <regex.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -353,23 +354,6 @@ aic_print_include(FILE *dfile, char *include_file)
 	fprintf(dfile, "\n#include \"%s\"\n\n", include_file);
 }
 
-void
-aic_print_reg_dump_types(FILE *ofile)
-{
-	if (ofile == NULL)
-		return;
-
-	fprintf(ofile,
-"typedef int (%sreg_print_t)(u_int, u_int *, u_int);\n"
-"typedef struct %sreg_parse_entry {\n"
-"	char	*name;\n"
-"	uint8_t	 value;\n"
-"	uint8_t	 mask;\n"
-"} %sreg_parse_entry_t;\n"
-"\n",
-		prefix, prefix, prefix);
-}
-
 static void
 aic_print_reg_dump_start(FILE *dfile, symbol_node_t *regnode)
 {
@@ -377,8 +361,7 @@ aic_print_reg_dump_start(FILE *dfile, symbol_node_t *regnode)
 		return;
 
 	fprintf(dfile,
-"static const %sreg_parse_entry_t %s_parse_table[] = {\n",
-		prefix,
+"static const aic_reg_parse_entry_t %s_parse_table[] = {\n",
 		regnode->symbol->name);
 }
 
@@ -404,16 +387,15 @@ aic_print_reg_dump_end(FILE *ofile, FILE *dfile,
 "\n");
 
 		fprintf(dfile,
-"int\n"
-"%s%s_print(u_int regvalue, u_int *cur_col, u_int wrap)\n"
+"void\n"
+"%s%s_print(u_int regvalue, struct aic_dump_buffer *buf)\n"
 "{\n"
-"	return (%sprint_register(%s%s, %d, \"%s\",\n"
-"	    0x%02x, regvalue, cur_col, wrap));\n"
+"	aic_print_register(%s%s, %d, \"%s\",\n"
+"			   0x%02x, regvalue, buf);\n"
 "}\n"
 "\n",
 			prefix,
 			lower_name,
-			prefix,
 			num_entries != 0 ? regnode->symbol->name : "NULL",
 			num_entries != 0 ? "_parse_table" : "",
 			num_entries,
@@ -423,18 +405,16 @@ aic_print_reg_dump_end(FILE *ofile, FILE *dfile,
 
 	fprintf(ofile,
 "#if AIC_DEBUG_REGISTERS\n"
-"%sreg_print_t %s%s_print;\n"
+"aic_reg_print_t %s%s_print;\n"
 "#else\n"
-"#define %s%s_print(regvalue, cur_col, wrap) \\\n"
-"    %sprint_register(NULL, 0, \"%s\", 0x%02x, regvalue, cur_col, wrap)\n"
+"#define %s%s_print(regvalue, buf) \\\n"
+"    aic_print_register(NULL, 0, \"%s\", 0x%02x, regvalue, buf)\n"
 "#endif\n"
 "\n",
 		prefix,
-		prefix,
 		lower_name,
 		prefix,
 		lower_name,
-		prefix,
 		regnode->symbol->name,
 		regnode->symbol->info.rinfo->address);
 }
@@ -534,7 +514,6 @@ symtable_dump(FILE *ofile, FILE *dfile)
 
 	/* Register dianostic functions/declarations first. */
 	aic_print_file_prologue(ofile);
-	aic_print_reg_dump_types(ofile);
 	aic_print_file_prologue(dfile);
 	aic_print_include(dfile, stock_include_file);
 	SLIST_FOREACH(curnode, &registers, links) {
