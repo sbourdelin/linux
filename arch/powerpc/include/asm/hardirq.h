@@ -12,6 +12,10 @@ typedef struct {
 	unsigned int mce_exceptions;
 	unsigned int spurious_irqs;
 	unsigned int hmi_exceptions;
+	unsigned int sreset_irqs;
+#if defined(CONFIG_HARDLOCKUP_DETECTOR) && defined(CONFIG_HAVE_HARDLOCKUP_DETECTOR_ARCH)
+	unsigned int soft_nmi_irqs;
+#endif
 #ifdef CONFIG_PPC_DOORBELL
 	unsigned int doorbell_irqs;
 #endif
