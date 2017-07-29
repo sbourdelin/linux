@@ -1730,6 +1730,12 @@ xfs_ioc_swapext(
 		goto out_put_tmp_file;
 	}
 
+	if (IS_IOMAP_IMMUTABLE(file_inode(f.file)) ||
+	    IS_IOMAP_IMMUTABLE(file_inode(tmp.file))) {
+		error = -EINVAL;
+		goto out_put_tmp_file;
+	}
+
 	/*
 	 * We need to ensure that the fds passed in point to XFS inodes
 	 * before we cast and access them as XFS structures as we have no

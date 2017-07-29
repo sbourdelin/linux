@@ -2806,6 +2806,15 @@ inline ssize_t generic_write_checks(struct kiocb *iocb, struct iov_iter *from)
 	if (unlikely(pos >= inode->i_sb->s_maxbytes))
 		return -EFBIG;
 
+	/* Are we about to mutate the block map on an immutable file? */
+	if (IS_IOMAP_IMMUTABLE(inode)
+			&& (pos + iov_iter_count(from) > i_size_read(inode))) {
+		if (pos < i_size_read(inode))
+			iov_iter_truncate(from, i_size_read(inode) - pos);
+		else
+			return -ETXTBSY;
+	}
+
 	iov_iter_truncate(from, inode->i_sb->s_maxbytes - pos);
 	return iov_iter_count(from);
 }

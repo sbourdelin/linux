@@ -292,6 +292,12 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 		return -ETXTBSY;
 
 	/*
+	 * We cannot allow any allocation changes on an iomap immutable file
+	 */
+	if (IS_IOMAP_IMMUTABLE(inode))
+		return -ETXTBSY;
+
+	/*
 	 * Revalidate the write permissions, in case security policy has
 	 * changed since the files were opened.
 	 */

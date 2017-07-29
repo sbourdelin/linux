@@ -112,6 +112,16 @@ EXPORT_SYMBOL(setattr_prepare);
  */
 int inode_newsize_ok(const struct inode *inode, loff_t offset)
 {
+	if (IS_IOMAP_IMMUTABLE(inode)) {
+		/*
+		 * Any size change is disallowed. Size increases may
+		 * dirty metadata that an application is not prepared to
+		 * sync, and a size decrease may expose free blocks to
+		 * in-flight DMA.
+		 */
+		return -ETXTBSY;
+	}
+
 	if (inode->i_size < offset) {
 		unsigned long limit;
 
