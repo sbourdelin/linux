@@ -501,10 +501,8 @@ static void ibmvtpm_crq_process(struct ibmvtpm_crq *crq,
 			ibmvtpm->rtce_size = be16_to_cpu(crq->len);
 			ibmvtpm->rtce_buf = kmalloc(ibmvtpm->rtce_size,
 						    GFP_ATOMIC);
-			if (!ibmvtpm->rtce_buf) {
-				dev_err(ibmvtpm->dev, "Failed to allocate memory for rtce buffer\n");
+			if (!ibmvtpm->rtce_buf)
 				return;
-			}
 
 			ibmvtpm->rtce_dma_handle = dma_map_single(ibmvtpm->dev,
 				ibmvtpm->rtce_buf, ibmvtpm->rtce_size,
@@ -584,10 +582,8 @@ static int tpm_ibmvtpm_probe(struct vio_dev *vio_dev,
 		return PTR_ERR(chip);
 
 	ibmvtpm = kzalloc(sizeof(struct ibmvtpm_dev), GFP_KERNEL);
-	if (!ibmvtpm) {
-		dev_err(dev, "kzalloc for ibmvtpm failed\n");
+	if (!ibmvtpm)
 		goto cleanup;
-	}
 
 	ibmvtpm->dev = dev;
 	ibmvtpm->vdev = vio_dev;
