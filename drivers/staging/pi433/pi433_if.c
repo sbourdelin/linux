@@ -208,7 +208,17 @@ rf69_set_rx_cfg(struct pi433_device *dev, struct pi433_rx_cfg *rx_cfg)
 	{
 		SET_CHECKED(rf69_set_fifo_fill_condition(dev->spi, always));
 	}
-	SET_CHECKED(rf69_set_packet_format  (dev->spi, rx_cfg->enable_length_byte));
+	if (rx_cfg->enable_length_byte == optionOn) {
+		int ret = rf69_set_packet_format(dev->spi, packetLengthVar);
+
+		if (ret < 0)
+			return ret;
+	} else {
+		int ret = rf69_set_packet_format(dev->spi, packetLengthFix);
+
+		if (ret < 0)
+			return ret;
+	}
 	SET_CHECKED(rf69_set_adressFiltering(dev->spi, rx_cfg->enable_address_filtering));
 	SET_CHECKED(rf69_set_crc_enable	    (dev->spi, rx_cfg->enable_crc));
 
@@ -264,8 +274,18 @@ rf69_set_tx_cfg(struct pi433_device *dev, struct pi433_tx_cfg *tx_cfg)
 	{
 		SET_CHECKED(rf69_set_preamble_length(dev->spi, 0));
 	}
+	if (tx_cfg->enable_length_byte == optionOn) {
+		int ret = rf69_set_packet_format(dev->spi, packetLengthVar);
+
+		if (ret < 0)
+			return ret;
+	} else {
+		int ret = rf69_set_packet_format(dev->spi, packetLengthFix);
+
+		if (ret < 0)
+			return ret;
+	}
 	SET_CHECKED(rf69_set_sync_enable  (dev->spi, tx_cfg->enable_sync));
-	SET_CHECKED(rf69_set_packet_format(dev->spi, tx_cfg->enable_length_byte));
 	SET_CHECKED(rf69_set_crc_enable	  (dev->spi, tx_cfg->enable_crc));
 
 	/* configure sync, if enabled */
