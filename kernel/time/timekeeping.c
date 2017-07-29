@@ -596,6 +596,55 @@ int pvclock_gtod_unregister_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL_GPL(pvclock_gtod_unregister_notifier);
 
+/* notification chain when there is some changes in the clocksource */
+static RAW_NOTIFIER_HEAD(clocksource_changes_chain);
+
+/**
+ * notify_clocksource_changing - notify all the listeners about changes
+ * happened in the clocksource: changing a clocksource, changing the sensitive
+ * parameters of the clocksource, e.g. stability flag for kvmclock
+ */
+void clocksource_changes_notify(void)
+{
+	raw_notifier_call_chain(&clocksource_changes_chain, 0L, NULL);
+}
+EXPORT_SYMBOL_GPL(clocksource_changes_notify);
+
+/**
+ * clocksource_changes_register_notifier - register
+ * a clocksource changes listener
+ */
+int clocksource_changes_register_notifier(struct notifier_block *nb)
+{
+	unsigned long flags;
+	int ret;
+
+	raw_spin_lock_irqsave(&timekeeper_lock, flags);
+	ret = raw_notifier_chain_register(&clocksource_changes_chain, nb);
+	clocksource_changes_notify();
+	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(clocksource_changes_register_notifier);
+
+/**
+ * clocksource_changes_unregister_notifier - unregister
+ * a clocksource changes listener
+ */
+int clocksource_changes_unregister_notifier(struct notifier_block *nb)
+{
+	unsigned long flags;
+	int ret;
+
+	raw_spin_lock_irqsave(&timekeeper_lock, flags);
+	ret = raw_notifier_chain_unregister(&clocksource_changes_chain, nb);
+	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(clocksource_changes_unregister_notifier);
+
 /*
  * tk_update_leap_state - helper to update the next_leap_ktime
  */
@@ -1367,6 +1416,7 @@ static int change_clocksource(void *data)
 		}
 	}
 	timekeeping_update(tk, TK_CLEAR_NTP | TK_MIRROR | TK_CLOCK_WAS_SET);
+	clocksource_changes_notify();
 
 	write_seqcount_end(&tk_core.seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
@@ -1544,6 +1594,7 @@ void __init timekeeping_init(void)
 	tk_set_wall_to_mono(tk, tmp);
 
 	timekeeping_update(tk, TK_MIRROR | TK_CLOCK_WAS_SET);
+	clocksource_changes_notify();
 
 	write_seqcount_end(&tk_core.seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
