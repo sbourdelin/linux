@@ -378,7 +378,7 @@ static struct i2c_client *save_client;
 
 static int wdt_margin = WD_TIMO;
 static unsigned long wdt_is_open;
-module_param(wdt_margin, int, 0);
+module_param(wdt_margin, int, 0000);
 MODULE_PARM_DESC(wdt_margin, "Watchdog timeout in seconds (default 32s)");
 
 static const struct watchdog_info ds1374_wdt_info = {
