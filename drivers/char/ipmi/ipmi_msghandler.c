@@ -135,8 +135,8 @@ struct seq_table {
 	unsigned int         inuse : 1;
 	unsigned int         broadcast : 1;
 
-	unsigned long        timeout;
-	unsigned long        orig_timeout;
+	long        timeout;
+	long        orig_timeout;
 	unsigned int         retries_left;
 
 	/*
