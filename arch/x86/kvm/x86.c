@@ -1643,22 +1643,32 @@ static int do_realtime(struct timespec *ts, u64 *cycle_now)
 /* returns true if host is using tsc clocksource */
 static bool kvm_get_time_and_clockread(s64 *kernel_ns, u64 *cycle_now)
 {
-	/* checked again under seqlock below */
-	if (pvclock_gtod_data.clock.vclock_mode != VCLOCK_TSC)
-		return false;
+	struct system_time_snapshot systime_snapshot;
 
-	return do_monotonic_boot(kernel_ns, cycle_now) == VCLOCK_TSC;
+	ktime_get_snapshot(&systime_snapshot);
+
+	if (systime_snapshot.cs_stable) {
+		*kernel_ns = ktime_to_ns(systime_snapshot.boot);
+		*cycle_now = systime_snapshot.cycles;
+	}
+
+	return systime_snapshot.cs_stable;
 }
 
 /* returns true if host is using tsc clocksource */
 static bool kvm_get_walltime_and_clockread(struct timespec *ts,
 					   u64 *cycle_now)
 {
-	/* checked again under seqlock below */
-	if (pvclock_gtod_data.clock.vclock_mode != VCLOCK_TSC)
-		return false;
+	struct system_time_snapshot systime_snapshot;
 
-	return do_realtime(ts, cycle_now) == VCLOCK_TSC;
+	ktime_get_snapshot(&systime_snapshot);
+
+	if (systime_snapshot.cs_stable) {
+		*ts = ktime_to_timespec(systime_snapshot.real);
+		*cycle_now = systime_snapshot.cycles;
+	}
+
+	return systime_snapshot.cs_stable;
 }
 #endif
 

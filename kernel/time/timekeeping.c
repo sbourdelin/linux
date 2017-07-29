@@ -953,27 +953,44 @@ void ktime_get_snapshot(struct system_time_snapshot *systime_snapshot)
 	unsigned long seq;
 	ktime_t base_raw;
 	ktime_t base_real;
+	ktime_t base_boot;
 	u64 nsec_raw;
 	u64 nsec_real;
 	u64 now;
+	struct clocksource *clock;
 
 	WARN_ON_ONCE(timekeeping_suspended);
 
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
-		now = tk_clock_read(&tk->tkr_mono);
+		clock = tk->tkr_mono.clock;
+
+		if (clock->is_stable)
+			systime_snapshot->cs_stable = clock->is_stable();
+		else
+			systime_snapshot->cs_stable = false;
+
+		if (clock->read_with_cycles) {
+			clock->read_with_cycles(
+				&now, &systime_snapshot->cycles);
+		} else {
+			now = tk_clock_read(&tk->tkr_mono);
+			systime_snapshot->cycles = now;
+		}
 		systime_snapshot->cs_was_changed_seq = tk->cs_was_changed_seq;
 		systime_snapshot->clock_was_set_seq = tk->clock_was_set_seq;
 		base_real = ktime_add(tk->tkr_mono.base,
 				      tk_core.timekeeper.offs_real);
 		base_raw = tk->tkr_raw.base;
+		base_boot = ktime_add(tk->tkr_mono.base,
+				      tk_core.timekeeper.offs_boot);
 		nsec_real = timekeeping_cycles_to_ns(&tk->tkr_mono, now);
 		nsec_raw  = timekeeping_cycles_to_ns(&tk->tkr_raw, now);
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
-	systime_snapshot->cycles = now;
 	systime_snapshot->real = ktime_add_ns(base_real, nsec_real);
 	systime_snapshot->raw = ktime_add_ns(base_raw, nsec_raw);
+	systime_snapshot->boot = ktime_add_ns(base_boot, nsec_real);
 }
 EXPORT_SYMBOL_GPL(ktime_get_snapshot);
 
