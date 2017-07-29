@@ -186,10 +186,22 @@ static void kvm_clock_read_with_cycles(u64 *cycles, u64 *cycles_stamp)
 	*cycles = __kvm_clock_read(cycles_stamp);
 }
 
+static bool kvm_clock_stable(void)
+{
+	int cpu = get_cpu();
+	struct pvclock_vcpu_time_info *vcpu_time = &hv_clock[cpu].pvti;
+	u8 flags = pvclock_read_flags(vcpu_time);
+
+	put_cpu();
+
+	return flags & PVCLOCK_TSC_STABLE_BIT;
+}
+
 struct clocksource kvm_clock = {
 	.name = "kvm-clock",
 	.read = kvm_clock_get_cycles,
 	.read_with_cycles = kvm_clock_read_with_cycles,
+	.is_stable = kvm_clock_stable,
 	.rating = 400,
 	.mask = CLOCKSOURCE_MASK(64),
 	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
