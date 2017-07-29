@@ -13,7 +13,21 @@
 #include <asm/ppc_asm.h>
 #include <asm/export.h>
 
-_GLOBAL(memset)
+.weak memset
+.set  memset, __memset
+#ifndef PPC64_ELF_ABI_v2
+.weak DOTSYM(memset)
+.set DOTSYM(memset), DOTSYM(__memset)
+#endif
+
+.weak memmove
+.set  memmove, __memmove
+#ifndef PPC64_ELF_ABI_v2
+.weak DOTSYM(memmove)
+.set DOTSYM(memmove), DOTSYM(__memmove)
+#endif
+
+_GLOBAL_TOC(__memset)
 	neg	r0,r3
 	rlwimi	r4,r4,8,16,23
 	andi.	r0,r0,7			/* # bytes to be 8-byte aligned */
@@ -79,8 +93,9 @@ _GLOBAL(memset)
 	stb	r4,0(r6)
 	blr
 EXPORT_SYMBOL(memset)
+EXPORT_SYMBOL(__memset)
 
-_GLOBAL_TOC(memmove)
+_GLOBAL_TOC(__memmove)
 	cmplw	0,r3,r4
 	bgt	backwards_memcpy
 	b	memcpy
@@ -122,3 +137,4 @@ _GLOBAL(backwards_memcpy)
 	mtctr	r7
 	b	1b
 EXPORT_SYMBOL(memmove)
+EXPORT_SYMBOL(__memmove)

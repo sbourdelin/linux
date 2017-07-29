@@ -20,6 +20,7 @@
 #include <linux/reboot.h>
 #include <linux/delay.h>
 #include <linux/initrd.h>
+#include <linux/kasan.h>
 #include <linux/platform_device.h>
 #include <linux/seq_file.h>
 #include <linux/ioport.h>
@@ -38,6 +39,7 @@
 #include <asm/debugfs.h>
 #include <asm/io.h>
 #include <asm/paca.h>
+#include <asm/kasan.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
 #include <asm/vdso_datapage.h>
@@ -957,6 +959,7 @@ void __init setup_arch(char **cmdline_p)
 		ppc_md.setup_arch();
 
 	paging_init();
+	kasan_init();
 
 	/* Initialize the MMU context management stuff. */
 	mmu_context_init();

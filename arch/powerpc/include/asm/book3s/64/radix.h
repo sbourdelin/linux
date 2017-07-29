@@ -93,8 +93,17 @@
  * +------------------------------+  Kernel linear (0xc.....)
  */
 
+#ifndef CONFIG_KASAN
 #define RADIX_KERN_VIRT_START ASM_CONST(0xc008000000000000)
+#else
+#define RADIX_KERN_VIRT_START ASM_CONST(0xc002000000000000)
+#endif
+
+#ifndef CONFIG_KASAN
 #define RADIX_KERN_VIRT_SIZE  ASM_CONST(0x0008000000000000)
+#else
+#define RADIX_KERN_VIRT_SIZE  ASM_CONST(0x0002000000000000)
+#endif
 
 /*
  * The vmalloc space starts at the beginning of that region, and

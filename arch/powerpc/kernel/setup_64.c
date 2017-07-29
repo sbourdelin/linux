@@ -322,7 +322,6 @@ void __init early_setup(unsigned long dt_ptr)
 	 * have IR and DR set and enable AIL if it exists
 	 */
 	cpu_ready_for_interrupts();
-
 	DBG(" <- early_setup()\n");
 
 #ifdef CONFIG_PPC_EARLY_DEBUG_BOOTX

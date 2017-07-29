@@ -17,9 +17,33 @@ extern __kernel_size_t strlen(const char *);
 extern int strcmp(const char *,const char *);
 extern int strncmp(const char *, const char *, __kernel_size_t);
 extern char * strcat(char *, const char *);
+
+extern void * __memset(void *,int,__kernel_size_t);
+extern void * __memcpy(void *,const void *,__kernel_size_t);
+extern void * __memmove(void *,const void *,__kernel_size_t);
+
 extern void * memset(void *,int,__kernel_size_t);
 extern void * memcpy(void *,const void *,__kernel_size_t);
 extern void * memmove(void *,const void *,__kernel_size_t);
+
+#if defined(CONFIG_KASAN) && !defined(__SANITIZE_ADDRESS__)
+
+/*
+ * For files that are not instrumented (e.g. mm/slub.c) we
+ * should use not instrumented version of mem* functions.
+ */
+
+#define memcpy(dst, src, len) __memcpy(dst, src, len)
+#define memmove(dst, src, len) __memmove(dst, src, len)
+#define memset(s, c, n) __memset(s, c, n)
+
+#ifndef __NO_FORTIFY
+#define __NO_FORTIFY /* FORTIFY_SOURCE uses __builtin_memcpy, etc. */
+#endif
+
+#endif
+
+
 extern int memcmp(const void *,const void *,__kernel_size_t);
 extern void * memchr(const void *,int,__kernel_size_t);
 

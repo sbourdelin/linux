@@ -10,8 +10,15 @@
 #include <asm/ppc_asm.h>
 #include <asm/export.h>
 
+.weak memcpy
+.set  memcpy, __memcpy
+#ifndef PPC64_ELF_ABI_v2
+.weak DOTSYM(memcpy)
+.set DOTSYM(memcpy), DOTSYM(__memcpy)
+#endif
+
 	.align	7
-_GLOBAL_TOC(memcpy)
+_GLOBAL_TOC(__memcpy)
 BEGIN_FTR_SECTION
 #ifdef __LITTLE_ENDIAN__
 	cmpdi	cr7,r5,0
@@ -221,3 +228,4 @@ END_FTR_SECTION_IFCLR(CPU_FTR_UNALIGNED_LD_STD)
 	blr
 #endif
 EXPORT_SYMBOL(memcpy)
+EXPORT_SYMBOL(__memcpy)

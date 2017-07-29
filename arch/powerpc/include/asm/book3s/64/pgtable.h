@@ -299,6 +299,7 @@ extern unsigned long pci_io_base;
  * IOREMAP_BASE = ISA_IO_BASE + 2G to VMALLOC_START + PGTABLE_RANGE
  */
 #define KERN_IO_START	(KERN_VIRT_START + (KERN_VIRT_SIZE >> 1))
+
 #define FULL_IO_SIZE	0x80000000ul
 #define  ISA_IO_BASE	(KERN_IO_START)
 #define  ISA_IO_END	(KERN_IO_START + 0x10000ul)

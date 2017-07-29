@@ -28,6 +28,7 @@
  *   - Latter it reused it as zero shadow to cover large ranges of memory
  *     that allowed to access, but not handled by kasan (vmalloc/vmemmap ...).
  */
+#ifndef ARCH_DEFINES_KASAN_ZERO_PTE
 unsigned char kasan_zero_page[PAGE_SIZE] __page_aligned_bss;
 
 #if CONFIG_PGTABLE_LEVELS > 4
@@ -40,6 +41,7 @@ pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
 pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
 #endif
 pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
+#endif
 
 static __init void *early_alloc(size_t size, int node)
 {

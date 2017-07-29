@@ -2187,7 +2187,7 @@ void __init set_cur_cpu_spec(struct cpu_spec *s)
 	struct cpu_spec *t = &the_cpu_spec;
 
 	t = PTRRELOC(t);
-	*t = *s;
+	memcpy(t, s, sizeof(*s));
 
 	*PTRRELOC(&cur_cpu_spec) = &the_cpu_spec;
 }
@@ -2199,10 +2199,10 @@ static struct cpu_spec * __init setup_cpu_spec(unsigned long offset,
 	struct cpu_spec old;
 
 	t = PTRRELOC(t);
-	old = *t;
+	memcpy(&old, t, sizeof(*t));
 
 	/* Copy everything, then do fixups */
-	*t = *s;
+	memcpy(t, s, sizeof(*s));
 
 	/*
 	 * If we are overriding a previous value derived from the real

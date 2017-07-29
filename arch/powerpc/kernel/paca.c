@@ -62,7 +62,7 @@ static struct lppaca * __init new_lppaca(int cpu)
 		return &lppaca[cpu];
 
 	lp = extra_lppacas + (cpu - NR_LPPACAS);
-	*lp = lppaca[0];
+	memcpy(lp, &lppaca[0], sizeof(struct lppaca));
 
 	return lp;
 }
