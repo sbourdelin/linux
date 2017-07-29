@@ -76,4 +76,23 @@
  */
 #define FALLOC_FL_UNSHARE_RANGE		0x40
 
+/*
+ * FALLOC_FL_SEAL_BLOCK_MAP is used to seal (make immutable) all of the
+ * file logical-to-physical extent offset mappings in the file. The
+ * purpose is to allow an application to assume that there are no holes
+ * or shared extents in the file and that the metadata needed to find
+ * all the physical extents of the file is stable and can never be
+ * dirtied.
+ *
+ * The immutable property is in effect for the entire inode, so the
+ * range for this operation must start at offset 0 and len must be
+ * greater than or equal to the current size of the file. If greater,
+ * this operation allocates, unshares, hole fills, and seals in one
+ * atomic step. If len is zero then the immutable state is cleared for
+ * the inode.
+ *
+ * This flag implies FALLOC_FL_UNSHARE_RANGE and as such cannot be used
+ * with the punch, zero, collapse, or insert range modes.
+ */
+#define FALLOC_FL_SEAL_BLOCK_MAP	0x80
 #endif /* _UAPI_FALLOC_H_ */

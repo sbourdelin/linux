@@ -1387,6 +1387,92 @@ out:
 
 }
 
+int
+xfs_seal_file_space(
+	struct xfs_inode	*ip,
+	xfs_off_t		offset,
+	xfs_off_t		len)
+{
+	struct inode		*inode = VFS_I(ip);
+	struct address_space	*mapping = inode->i_mapping;
+	int			error = 0;
+
+	if (offset)
+		return -EINVAL;
+
+	i_mmap_lock_read(mapping);
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	if (len == 0) {
+		/*
+		 * Clear the immutable flag provided there are no active
+		 * mappings. The active mapping check prevents an
+		 * application that is assuming a static block map, for
+		 * DAX or peer-to-peer DMA, from having this state
+		 * silently change behind its back.
+		 */
+		if (RB_EMPTY_ROOT(&mapping->i_mmap))
+			inode->i_flags &= ~S_IOMAP_IMMUTABLE;
+		else
+			error = -EBUSY;
+	} else if (IS_IOMAP_IMMUTABLE(inode)) {
+		if (len == i_size_read(inode)) {
+			/*
+			 * The file is already in the correct state,
+			 * bail out without error below.
+			 */
+			len = 0;
+		} else {
+			/* too late to allocate more space */
+			error = -ETXTBSY;
+		}
+	} else {
+		if (len < i_size_read(inode)) {
+			/*
+			 * Since S_IOMAP_IMMUTABLE is inode global it
+			 * does not make sense to fallocate(immutable)
+			 * on a sub-range of the file.
+			 */
+			error = -EINVAL;
+		} else if (!RB_EMPTY_ROOT(&mapping->i_mmap)) {
+			/*
+			 * It's not strictly required to prevent setting
+			 * immutable while a file is already mapped, but
+			 * we do it for simplicity and symmetry with the
+			 * S_IOMAP_IMMUTABLE disable case.
+			 */
+			error = -EBUSY;
+		} else
+			inode->i_flags |= S_IOMAP_IMMUTABLE;
+	}
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	i_mmap_unlock_read(mapping);
+
+	if (error || len == 0)
+		return error;
+
+	/*
+	 * From here, the immutable flag is already set, so new
+	 * operations that would change the block map are prevented by
+	 * upper layer code paths. Wwe can proceed to unshare and
+	 * allocate zeroed / written extents.
+	 */
+	error = xfs_reflink_unshare(ip, offset, len);
+	if (error)
+		goto err;
+
+	error = xfs_alloc_file_space(ip, offset, len,
+			XFS_BMAPI_CONVERT | XFS_BMAPI_ZERO);
+	if (error)
+		goto err;
+
+	return 0;
+err:
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	inode->i_flags &= ~S_IOMAP_IMMUTABLE;
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	return error;
+}
+
 /*
  * @next_fsb will keep track of the extent currently undergoing shift.
  * @stop_fsb will keep track of the extent at which we have to stop.

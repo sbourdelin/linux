@@ -241,7 +241,11 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 	struct inode *inode = file_inode(file);
 	long ret;
 
-	if (offset < 0 || len <= 0)
+	if (offset < 0 || len < 0)
+		return -EINVAL;
+
+	/* Allow zero len only for the unseal operation */
+	if (!(mode & FALLOC_FL_SEAL_BLOCK_MAP) && len == 0)
 		return -EINVAL;
 
 	/* Return error if mode is not supported */
@@ -273,6 +277,17 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 	    (mode & ~(FALLOC_FL_UNSHARE_RANGE | FALLOC_FL_KEEP_SIZE)))
 		return -EINVAL;
 
+	/*
+	 * Seal block map should only be used exclusively, and with
+	 * the IMMUTABLE capability.
+	 */
+	if (mode & FALLOC_FL_SEAL_BLOCK_MAP) {
+		if (mode & ~FALLOC_FL_SEAL_BLOCK_MAP)
+			return -EINVAL;
+		if (!capable(CAP_LINUX_IMMUTABLE))
+			return -EPERM;
+	}
+
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EBADF;
 
@@ -292,9 +307,14 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 		return -ETXTBSY;
 
 	/*
-	 * We cannot allow any allocation changes on an iomap immutable file
+	 * We cannot allow any allocation changes on an iomap immutable
+	 * file, however if the operation is FALLOC_FL_SEAL_BLOCK_MAP,
+	 * call down to ->fallocate() to determine if the operations is
+	 * allowed. ->fallocate() may either clear the flag when @len is
+	 * zero, or validate that the requested operation is already the
+	 * current state of the file.
 	 */
-	if (IS_IOMAP_IMMUTABLE(inode))
+	if (IS_IOMAP_IMMUTABLE(inode) && (!(mode & FALLOC_FL_SEAL_BLOCK_MAP)))
 		return -ETXTBSY;
 
 	/*
