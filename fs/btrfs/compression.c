@@ -33,6 +33,7 @@
 #include <linux/bit_spinlock.h>
 #include <linux/slab.h>
 #include <linux/sched/mm.h>
+#include <linux/sort.h>
 #include "ctree.h"
 #include "disk-io.h"
 #include "transaction.h"
@@ -1069,6 +1070,42 @@ static inline int byte_set_size(const struct heuristic_bucket_item *bucket)
 	return byte_set_size;
 }
 
+/* For bucket sorting */
+static inline int heuristic_bucket_compare(const void *lv, const void *rv)
+{
+	struct heuristic_bucket_item *l = (struct heuristic_bucket_item *)(lv);
+	struct heuristic_bucket_item *r = (struct heuristic_bucket_item *)(rv);
+
+	return r->count - l->count;
+}
+
+/*
+ * Byte Core set size
+ * How many bytes use 90% of sample
+ */
+static inline int byte_core_set_size(struct heuristic_bucket_item *bucket,
+				     u32 core_set_threshold)
+{
+	int a = 0;
+	u32 coreset_sum = 0;
+
+	for (; a < BTRFS_HEURISTIC_BYTE_CORE_SET_LOW; a++)
+		coreset_sum += bucket[a].count;
+
+	if (coreset_sum > core_set_threshold)
+		return a;
+
+	for (; a < BTRFS_HEURISTIC_BYTE_CORE_SET_HIGH; a++) {
+		if (bucket[a].count == 0)
+			break;
+		coreset_sum += bucket[a].count;
+		if (coreset_sum > core_set_threshold)
+			break;
+	}
+
+	return a;
+}
+
 /*
  * Compression heuristic.
  *
@@ -1092,6 +1129,8 @@ int btrfs_compress_heuristic(struct inode *inode, u64 start, u64 end)
 	struct heuristic_bucket_item *bucket;
 	int a, b, ret;
 	u8 symbol, *input_data;
+	u32 core_set_threshold;
+	u32 input_size = end - start;
 
 	ret = 1;
 
@@ -1120,6 +1159,25 @@ int btrfs_compress_heuristic(struct inode *inode, u64 start, u64 end)
 	a = byte_set_size(bucket);
 	if (a > BTRFS_HEURISTIC_BYTE_SET_THRESHOLD) {
 		ret = 1;
+		goto out;
+	}
+
+	/* Sort in reverse order */
+	sort(bucket, BTRFS_HEURISTIC_BUCKET_SIZE,
+	     sizeof(struct heuristic_bucket_item), &heuristic_bucket_compare,
+	     NULL);
+
+	core_set_threshold = (input_size*90)/(BTRFS_HEURISTIC_ITER_OFFSET*100);
+	core_set_threshold *= BTRFS_HEURISTIC_READ_SIZE;
+
+	a = byte_core_set_size(bucket, core_set_threshold);
+	if (a <= BTRFS_HEURISTIC_BYTE_CORE_SET_LOW) {
+		ret = 2;
+		goto out;
+	}
+
+	if (a >= BTRFS_HEURISTIC_BYTE_CORE_SET_HIGH) {
+		ret = 0;
 		goto out;
 	}
 
