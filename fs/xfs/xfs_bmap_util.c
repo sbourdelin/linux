@@ -1021,7 +1021,8 @@ xfs_alloc_file_space(
 	struct xfs_inode	*ip,
 	xfs_off_t		offset,
 	xfs_off_t		len,
-	int			alloc_type)
+	int			alloc_type,
+	uint64_t		di_flags2)
 {
 	xfs_mount_t		*mp = ip->i_mount;
 	xfs_off_t		count;
@@ -1119,6 +1120,12 @@ xfs_alloc_file_space(
 			break;
 		}
 		xfs_ilock(ip, XFS_ILOCK_EXCL);
+		if (di_flags2) {
+			/* fold inode attributes for this allocation */
+			ip->i_d.di_flags2 |= di_flags2;
+			di_flags2 = 0;
+		}
+
 		error = xfs_trans_reserve_quota_nblks(tp, ip, qblocks,
 						      0, quota_flag);
 		if (error)
@@ -1381,7 +1388,7 @@ xfs_zero_file_space(
 	error = xfs_alloc_file_space(ip, round_down(offset, blksize),
 				     round_up(offset + len, blksize) -
 				     round_down(offset, blksize),
-				     XFS_BMAPI_PREALLOC);
+				     XFS_BMAPI_PREALLOC, 0);
 out:
 	return error;
 
@@ -1461,7 +1468,8 @@ xfs_seal_file_space(
 		goto err;
 
 	error = xfs_alloc_file_space(ip, offset, len,
-			XFS_BMAPI_CONVERT | XFS_BMAPI_ZERO);
+			XFS_BMAPI_CONVERT | XFS_BMAPI_ZERO,
+			XFS_DIFLAG2_IOMAP_IMMUTABLE);
 	if (error)
 		goto err;
 

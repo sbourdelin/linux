@@ -702,7 +702,7 @@ xfs_ioc_space(
 	case XFS_IOC_RESVSP64:
 		flags |= XFS_PREALLOC_SET;
 		error = xfs_alloc_file_space(ip, bf->l_start, bf->l_len,
-						XFS_BMAPI_PREALLOC);
+						XFS_BMAPI_PREALLOC, 0);
 		break;
 	case XFS_IOC_UNRESVSP:
 	case XFS_IOC_UNRESVSP64:
@@ -715,7 +715,7 @@ xfs_ioc_space(
 		flags |= XFS_PREALLOC_CLEAR;
 		if (bf->l_start > XFS_ISIZE(ip)) {
 			error = xfs_alloc_file_space(ip, XFS_ISIZE(ip),
-					bf->l_start - XFS_ISIZE(ip), 0);
+					bf->l_start - XFS_ISIZE(ip), 0, 0);
 			if (error)
 				goto out_unlock;
 		}

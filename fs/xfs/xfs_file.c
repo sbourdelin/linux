@@ -837,12 +837,12 @@ xfs_file_fallocate(
 					goto out_unlock;
 
 				error = xfs_alloc_file_space(ip, offset, len,
-						XFS_BMAPI_PREALLOC);
+						XFS_BMAPI_PREALLOC, 0);
 			} else if (mode & FALLOC_FL_SEAL_BLOCK_MAP) {
 				error = xfs_seal_file_space(ip, offset, len);
 			} else
 				error = xfs_alloc_file_space(ip, offset, len,
-						XFS_BMAPI_PREALLOC);
+						XFS_BMAPI_PREALLOC, 0);
 		}
 		if (error)
 			goto out_unlock;
