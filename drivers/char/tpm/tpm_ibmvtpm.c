@@ -151,7 +151,7 @@ static int tpm_ibmvtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
 	rc = ibmvtpm_send_crq(ibmvtpm->vdev, be64_to_cpu(word[0]),
 			      be64_to_cpu(word[1]));
 	if (rc != H_SUCCESS) {
-		dev_err(ibmvtpm->dev, "tpm_ibmvtpm_send failed rc=%d\n", rc);
+		dev_err(ibmvtpm->dev, "%s failed rc=%d\n", __func__, rc);
 		rc = 0;
 		ibmvtpm->tpm_processing_cmd = false;
 	} else
@@ -193,7 +193,7 @@ static int ibmvtpm_crq_get_rtce_size(struct ibmvtpm_dev *ibmvtpm)
 			      cpu_to_be64(buf[1]));
 	if (rc != H_SUCCESS)
 		dev_err(ibmvtpm->dev,
-			"ibmvtpm_crq_get_rtce_size failed rc=%d\n", rc);
+			"%s failed rc=%d\n", __func__, rc);
 
 	return rc;
 }
@@ -221,7 +221,7 @@ static int ibmvtpm_crq_get_version(struct ibmvtpm_dev *ibmvtpm)
 			      cpu_to_be64(buf[1]));
 	if (rc != H_SUCCESS)
 		dev_err(ibmvtpm->dev,
-			"ibmvtpm_crq_get_version failed rc=%d\n", rc);
+			"%s failed rc=%d\n", __func__, rc);
 
 	return rc;
 }
@@ -241,7 +241,7 @@ static int ibmvtpm_crq_send_init_complete(struct ibmvtpm_dev *ibmvtpm)
 	rc = ibmvtpm_send_crq(ibmvtpm->vdev, INIT_CRQ_COMP_CMD, 0);
 	if (rc != H_SUCCESS)
 		dev_err(ibmvtpm->dev,
-			"ibmvtpm_crq_send_init_complete failed rc=%d\n", rc);
+			"%s rc=%d\n", __func__, rc);
 
 	return rc;
 }
@@ -261,7 +261,7 @@ static int ibmvtpm_crq_send_init(struct ibmvtpm_dev *ibmvtpm)
 	rc = ibmvtpm_send_crq(ibmvtpm->vdev, INIT_CRQ_CMD, 0);
 	if (rc != H_SUCCESS)
 		dev_err(ibmvtpm->dev,
-			"ibmvtpm_crq_send_init failed rc=%d\n", rc);
+			"%s failed rc=%d\n", __func__, rc);
 
 	return rc;
 }
@@ -351,7 +351,7 @@ static int tpm_ibmvtpm_suspend(struct device *dev)
 			      cpu_to_be64(buf[1]));
 	if (rc != H_SUCCESS)
 		dev_err(ibmvtpm->dev,
-			"tpm_ibmvtpm_suspend failed rc=%d\n", rc);
+			"%s failed rc=%d\n", __func__, rc);
 
 	return rc;
 }
