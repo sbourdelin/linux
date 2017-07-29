@@ -1068,15 +1068,35 @@ int btrfs_compress_heuristic(struct inode *inode, u64 start, u64 end)
 	u64 index = start >> PAGE_SHIFT;
 	u64 end_index = end >> PAGE_SHIFT;
 	struct page *page;
-	int ret = 1;
+	struct heuristic_bucket_item *bucket;
+	int a, b, ret;
+	u8 symbol, *input_data;
+
+	ret = 1;
+
+	bucket = kcalloc(BTRFS_HEURISTIC_BUCKET_SIZE,
+		sizeof(struct heuristic_bucket_item), GFP_NOFS);
+
+	if (!bucket)
+		goto out;
 
 	while (index <= end_index) {
 		page = find_get_page(inode->i_mapping, index);
-		kmap(page);
+		input_data = kmap(page);
+		a = 0;
+		while (a < PAGE_SIZE) {
+			for (b = 0; b < BTRFS_HEURISTIC_READ_SIZE; b++) {
+				symbol = input_data[a+b];
+				bucket[symbol].count++;
+			}
+			a += BTRFS_HEURISTIC_ITER_OFFSET;
+		}
 		kunmap(page);
 		put_page(page);
 		index++;
 	}
 
+out:
+	kfree(bucket);
 	return ret;
 }
