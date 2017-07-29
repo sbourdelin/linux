@@ -1475,7 +1475,7 @@ out:
 }
 
 static int __write_data_page(struct page *page, bool *submitted,
-				struct writeback_control *wbc)
+				struct writeback_control *wbc, bool do_balance)
 {
 	struct inode *inode = page->mapping->host;
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
@@ -1578,7 +1578,7 @@ out:
 	}
 
 	unlock_page(page);
-	if (!S_ISDIR(inode->i_mode))
+	if (do_balance)
 		f2fs_balance_fs(sbi, need_balance_fs);
 
 	if (unlikely(f2fs_cp_error(sbi))) {
@@ -1602,7 +1602,7 @@ redirty_out:
 static int f2fs_write_data_page(struct page *page,
 					struct writeback_control *wbc)
 {
-	return __write_data_page(page, NULL, wbc);
+	return __write_data_page(page, NULL, wbc, true);
 }
 
 /*
@@ -1611,7 +1611,7 @@ static int f2fs_write_data_page(struct page *page,
  * warm/hot data page.
  */
 static int f2fs_write_cache_pages(struct address_space *mapping,
-					struct writeback_control *wbc)
+					struct writeback_control *wbc, bool do_balance)
 {
 	int ret = 0;
 	int done = 0;
@@ -1701,7 +1701,7 @@ continue_unlock:
 			if (!clear_page_dirty_for_io(page))
 				goto continue_unlock;
 
-			ret = __write_data_page(page, &submitted, wbc);
+			ret = __write_data_page(page, &submitted, wbc, do_balance);
 			if (unlikely(ret)) {
 				/*
 				 * keep nr_to_write, since vfs uses this to
@@ -1756,8 +1756,8 @@ continue_unlock:
 	return ret;
 }
 
-static int f2fs_write_data_pages(struct address_space *mapping,
-			    struct writeback_control *wbc)
+static int _f2fs_write_data_pages(struct address_space *mapping,
+			    struct writeback_control *wbc, bool do_balance)
 {
 	struct inode *inode = mapping->host;
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
@@ -1794,7 +1794,7 @@ static int f2fs_write_data_pages(struct address_space *mapping,
 		goto skip_write;
 
 	blk_start_plug(&plug);
-	ret = f2fs_write_cache_pages(mapping, wbc);
+	ret = f2fs_write_cache_pages(mapping, wbc, do_balance);
 	blk_finish_plug(&plug);
 
 	if (wbc->sync_mode == WB_SYNC_ALL)
@@ -1811,6 +1811,57 @@ skip_write:
 	wbc->pages_skipped += get_dirty_pages(inode);
 	trace_f2fs_writepages(mapping->host, wbc, DATA);
 	return 0;
+}
+
+static int f2fs_write_data_pages(struct address_space *mapping,
+			    struct writeback_control *wbc)
+{
+	return	_f2fs_write_data_pages(mapping, wbc, true);
+}
+
+/*
+ * This function was copied from do_writepages from mm/page-writeback.c.
+ * The major change is changing writepages to _f2fs_write_data_pages.
+ */
+static int f2fs_do_writepages(struct address_space *mapping,
+				struct writeback_control *wbc, bool is_dir)
+{
+	int ret;
+
+	if (wbc->nr_to_write <= 0)
+		return 0;
+	while (1) {
+		ret = _f2fs_write_data_pages(mapping, wbc, !is_dir);
+		if ((ret != -ENOMEM) || (wbc->sync_mode != WB_SYNC_ALL))
+			break;
+		cond_resched();
+		congestion_wait(BLK_RW_ASYNC, HZ/50);
+	}
+	return ret;
+}
+
+/*
+ * This function was copied from __filemap_fdatawrite_range from
+ * mm/filemap.c. The major change is changing do_writepages to
+ * f2fs_do_writepages.
+ */
+int f2fs_filemap_fdatawrite(struct address_space *mapping, bool is_dir)
+{
+	int ret;
+	struct writeback_control wbc = {
+		.sync_mode = WB_SYNC_ALL,
+		.nr_to_write = LONG_MAX,
+		.range_start = 0,
+		.range_end = LLONG_MAX,
+	};
+
+	if (!mapping_cap_writeback_dirty(mapping))
+		return 0;
+
+	wbc_attach_fdatawrite_inode(&wbc, mapping->host);
+	ret = f2fs_do_writepages(mapping, &wbc, is_dir);
+	wbc_detach_inode(&wbc);
+	return ret;
 }
 
 static void f2fs_write_failed(struct address_space *mapping, loff_t to)

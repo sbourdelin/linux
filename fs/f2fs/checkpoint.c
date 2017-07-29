@@ -904,7 +904,7 @@ retry:
 	if (inode) {
 		unsigned long cur_ino = inode->i_ino;
 
-		filemap_fdatawrite(inode->i_mapping);
+		f2fs_filemap_fdatawrite(inode->i_mapping, is_dir);
 		iput(inode);
 		/* We need to give cpu to another writers. */
 		if (ino == cur_ino) {

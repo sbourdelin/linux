@@ -2531,6 +2531,7 @@ int f2fs_release_page(struct page *page, gfp_t wait);
 int f2fs_migrate_page(struct address_space *mapping, struct page *newpage,
 			struct page *page, enum migrate_mode mode);
 #endif
+int f2fs_filemap_fdatawrite(struct address_space *mapping, bool is_dir);
 
 /*
  * gc.c
