@@ -46,7 +46,7 @@ u64 xen_clocksource_read(void)
 
 	preempt_disable_notrace();
 	src = &__this_cpu_read(xen_vcpu)->time;
-	ret = pvclock_clocksource_read(src);
+	ret = pvclock_clocksource_read(src, NULL);
 	preempt_enable_notrace();
 	return ret;
 }

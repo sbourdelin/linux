@@ -91,7 +91,7 @@ static u64 kvm_clock_read(void)
 	preempt_disable_notrace();
 	cpu = smp_processor_id();
 	src = &hv_clock[cpu].pvti;
-	ret = pvclock_clocksource_read(src);
+	ret = pvclock_clocksource_read(src, NULL);
 	preempt_enable_notrace();
 	return ret;
 }

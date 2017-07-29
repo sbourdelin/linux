@@ -73,18 +73,23 @@ u8 pvclock_read_flags(struct pvclock_vcpu_time_info *src)
 	return flags & valid_flags;
 }
 
-u64 pvclock_clocksource_read(struct pvclock_vcpu_time_info *src)
+u64 pvclock_clocksource_read(struct pvclock_vcpu_time_info *src, u64 *cycles)
 {
 	unsigned version;
 	u64 ret;
 	u64 last;
 	u8 flags;
+	u64 tsc;
 
 	do {
 		version = pvclock_read_begin(src);
-		ret = __pvclock_read_cycles(src, rdtsc_ordered());
+		tsc = rdtsc_ordered();
+		ret = __pvclock_read_cycles(src, tsc);
 		flags = src->flags;
 	} while (pvclock_read_retry(src, version));
+
+	if (cycles)
+		*cycles = tsc;
 
 	if (unlikely((flags & PVCLOCK_GUEST_STOPPED) != 0)) {
 		src->flags &= ~PVCLOCK_GUEST_STOPPED;
@@ -136,7 +141,8 @@ void pvclock_read_wallclock(struct pvclock_wall_clock *wall_clock,
 		rmb();		/* fetch time before checking version */
 	} while ((wall_clock->version & 1) || (version != wall_clock->version));
 
-	delta = pvclock_clocksource_read(vcpu_time);	/* time since system boot */
+	/* time since system boot */
+	delta = pvclock_clocksource_read(vcpu_time, NULL);
 	delta += now.tv_sec * (u64)NSEC_PER_SEC + now.tv_nsec;
 
 	now.tv_nsec = do_div(delta, NSEC_PER_SEC);
