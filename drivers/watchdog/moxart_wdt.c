@@ -170,7 +170,7 @@ static struct platform_driver moxart_wdt_driver = {
 };
 module_platform_driver(moxart_wdt_driver);
 
-module_param(heartbeat, int, 0);
+module_param(heartbeat, int, 0000);
 MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
 
 MODULE_DESCRIPTION("MOXART watchdog driver");
