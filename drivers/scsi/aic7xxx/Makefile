@@ -47,39 +47,39 @@ clean-files += aic79xx_seq.h aic79xx_reg.h aic79xx_reg_print.c
 $(addprefix $(obj)/,$(aic7xxx-y)): $(obj)/aic7xxx_seq.h $(obj)/aic7xxx_reg.h
 $(addprefix $(obj)/,$(aic79xx-y)): $(obj)/aic79xx_seq.h $(obj)/aic79xx_reg.h
 
-aic7xxx-gen-$(CONFIG_AIC7XXX_BUILD_FIRMWARE)	:= $(obj)/aic7xxx_reg.h
+aicasm-src := $(if $(KBUILD_SRC),$(srctree)/)$(src)
+
+aic7xxx-gen-$(CONFIG_AIC7XXX_BUILD_FIRMWARE)	:= $(obj)/aic7xxx_reg.h \
+						   $(obj)/aic7xxx_seq.h
 aic7xxx-gen-$(CONFIG_AIC7XXX_REG_PRETTY_PRINT)	+= $(obj)/aic7xxx_reg_print.c
 
 aicasm-7xxx-opts-$(CONFIG_AIC7XXX_REG_PRETTY_PRINT) := \
 	-p $(obj)/aic7xxx_reg_print.c -i aic7xxx_osm.h
 
 ifeq ($(CONFIG_AIC7XXX_BUILD_FIRMWARE),y)
-$(obj)/aic7xxx_seq.h: $(src)/aic7xxx.seq $(src)/aic7xxx.reg $(obj)/aicasm/aicasm
-	$(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic7xxx_reg.h \
+$(aic7xxx-gen-y): $(src)/aic7xxx.seq $(src)/aic7xxx.reg $(obj)/aicasm/aicasm
+	$(obj)/aicasm/aicasm -I$(aicasm-src) -r $(obj)/aic7xxx_reg.h \
 			      $(aicasm-7xxx-opts-y) -o $(obj)/aic7xxx_seq.h \
-			      $(src)/aic7xxx.seq
-
-$(aic7xxx-gen-y): $(obj)/aic7xxx_seq.h
-else
-$(obj)/aic7xxx_reg_print.c: $(src)/aic7xxx_reg_print.c_shipped
+			      $(aicasm-src)/aic7xxx.seq
 endif
 
-aic79xx-gen-$(CONFIG_AIC79XX_BUILD_FIRMWARE)	:= $(obj)/aic79xx_reg.h
+aic79xx-gen-$(CONFIG_AIC79XX_BUILD_FIRMWARE)	:= $(obj)/aic79xx_reg.h \
+						   $(obj)/aic79xx_seq.h
 aic79xx-gen-$(CONFIG_AIC79XX_REG_PRETTY_PRINT)	+= $(obj)/aic79xx_reg_print.c
 
 aicasm-79xx-opts-$(CONFIG_AIC79XX_REG_PRETTY_PRINT) := \
 	-p $(obj)/aic79xx_reg_print.c -i aic79xx_osm.h
 
 ifeq ($(CONFIG_AIC79XX_BUILD_FIRMWARE),y)
-$(obj)/aic79xx_seq.h: $(src)/aic79xx.seq $(src)/aic79xx.reg $(obj)/aicasm/aicasm
-	$(obj)/aicasm/aicasm -I$(src) -r $(obj)/aic79xx_reg.h \
+$(aic79xx-gen-y): $(src)/aic79xx.seq $(src)/aic79xx.reg $(obj)/aicasm/aicasm
+	$(obj)/aicasm/aicasm -I$(aicasm-src) -r $(obj)/aic79xx_reg.h \
 			      $(aicasm-79xx-opts-y) -o $(obj)/aic79xx_seq.h \
-			      $(src)/aic79xx.seq
-
-$(aic79xx-gen-y): $(obj)/aic79xx_seq.h
-else
-$(obj)/aic79xx_reg_print.c: $(src)/aic79xx_reg_print.c_shipped
+			      $(aicasm-src)/aic79xx.seq
 endif
 
-$(obj)/aicasm/aicasm: $(src)/aicasm/*.[chyl]
-	$(MAKE) -C $(src)/aicasm
+$(obj)/aicasm/aicasm: $(aicasm-src)/aicasm/Makefile $(aicasm-src)/aicasm/*.[chyl]
+ifneq ($(KBUILD_SRC),)
+	mkdir -p $(obj)/aicasm
+	cp -ax $^ $(obj)/aicasm/
+endif
+	$(MAKE) -C $(obj)/aicasm KSRC=$(if $(KBUILD_SRC),$(aicasm-src)/aicasm,.)

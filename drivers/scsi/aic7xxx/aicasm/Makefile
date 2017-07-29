@@ -13,7 +13,7 @@ SRCS=	${CSRCS} ${GENSRCS}
 LIBS=	-ldb
 clean-files:= ${GENSRCS} ${GENHDRS} $(YSRCS:.y=.output) $(PROG)
 # Override default kernel CFLAGS.  This is a userland app.
-AICASM_CFLAGS:= -I/usr/include -I.
+AICASM_CFLAGS:= -I/usr/include -I. -I$(KSRC)
 LEX= flex
 YACC= bison
 YFLAGS= -d
@@ -50,6 +50,7 @@ aicdb.h:
 		echo "#include <db_185.h>" > aicdb.h;		\
 	 else							\
 		echo "*** Install db development libraries";	\
+		false;						\
 	 fi
 
 clean:
