@@ -1048,6 +1048,27 @@ int btrfs_decompress_buf2page(const char *buf, unsigned long buf_start,
 	return 1;
 }
 
+static inline int byte_set_size(const struct heuristic_bucket_item *bucket)
+{
+	int a = 0;
+	int byte_set_size = 0;
+
+	for (; a < BTRFS_HEURISTIC_BYTE_SET_THRESHOLD; a++) {
+		if (bucket[a].count > 0)
+			byte_set_size++;
+	}
+
+	for (; a < BTRFS_HEURISTIC_BUCKET_SIZE; a++) {
+		if (bucket[a].count > 0) {
+			byte_set_size++;
+			if (byte_set_size > BTRFS_HEURISTIC_BYTE_SET_THRESHOLD)
+				return byte_set_size;
+		}
+	}
+
+	return byte_set_size;
+}
+
 /*
  * Compression heuristic.
  *
@@ -1094,6 +1115,12 @@ int btrfs_compress_heuristic(struct inode *inode, u64 start, u64 end)
 		kunmap(page);
 		put_page(page);
 		index++;
+	}
+
+	a = byte_set_size(bucket);
+	if (a > BTRFS_HEURISTIC_BYTE_SET_THRESHOLD) {
+		ret = 1;
+		goto out;
 	}
 
 out:
