@@ -22,6 +22,7 @@
 #include <linux/gfp.h>
 #include <linux/bootmem.h>
 #include <linux/nmi.h>
+#include <linux/cs_notifier.h>
 
 #include <asm/fixmap.h>
 #include <asm/pvclock.h>
@@ -73,6 +74,8 @@ u8 pvclock_read_flags(struct pvclock_vcpu_time_info *src)
 	return flags & valid_flags;
 }
 
+static atomic64_t clocksource_stable = ATOMIC64_INIT(0);
+
 u64 pvclock_clocksource_read(struct pvclock_vcpu_time_info *src, u64 *cycles)
 {
 	unsigned version;
@@ -96,10 +99,20 @@ u64 pvclock_clocksource_read(struct pvclock_vcpu_time_info *src, u64 *cycles)
 		pvclock_touch_watchdogs();
 	}
 
-	if ((valid_flags & PVCLOCK_TSC_STABLE_BIT) &&
-		(flags & PVCLOCK_TSC_STABLE_BIT))
-		return ret;
+	if (likely(valid_flags & PVCLOCK_TSC_STABLE_BIT)) {
+		bool stable_now = !!(flags & PVCLOCK_TSC_STABLE_BIT);
+		bool stable_last = (bool) atomic64_read(&clocksource_stable);
 
+		if (unlikely(stable_now != stable_last)) {
+			/* send notification once */
+			if (stable_last == atomic64_cmpxchg(
+				&clocksource_stable, stable_last, stable_now))
+				clocksource_changes_notify();
+		}
+
+		if (stable_now)
+			return ret;
+	}
 	/*
 	 * Assumption here is that last_value, a global accumulator, always goes
 	 * forward. If we are less than that, we should not be much smaller.
