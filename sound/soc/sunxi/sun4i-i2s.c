@@ -94,9 +94,13 @@
  * struct sun4i_i2s_quirks - Differences between SoC variants.
  *
  * @has_reset: SoC needs reset deasserted.
+ * @mclk_offset: Value by which mclkdiv needs to be adjusted.
+ * @bclk_offset: Value by which bclkdiv needs to be adjusted.
  */
 struct sun4i_i2s_quirks {
 	bool				has_reset;
+	unsigned int			mclk_offset;
+	unsigned int			bclk_offset;
 };
 
 struct sun4i_i2s {
@@ -149,7 +153,7 @@ static int sun4i_i2s_get_bclk_div(struct sun4i_i2s *i2s,
 		const struct sun4i_i2s_clk_div *bdiv = &sun4i_i2s_bclk_div[i];
 
 		if (bdiv->div == div)
-			return bdiv->val;
+			return bdiv->val + i2s->variant->bclk_offset;
 	}
 
 	return -EINVAL;
@@ -167,7 +171,7 @@ static int sun4i_i2s_get_mclk_div(struct sun4i_i2s *i2s,
 		const struct sun4i_i2s_clk_div *mdiv = &sun4i_i2s_mclk_div[i];
 
 		if (mdiv->div == div)
-			return mdiv->val;
+			return mdiv->val + i2s->variant->mclk_offset;
 	}
 
 	return -EINVAL;
