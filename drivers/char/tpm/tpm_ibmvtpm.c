@@ -531,7 +531,6 @@ static void ibmvtpm_crq_process(struct ibmvtpm_crq *crq,
 			return;
 		}
 	}
-	return;
 }
 
 /**
