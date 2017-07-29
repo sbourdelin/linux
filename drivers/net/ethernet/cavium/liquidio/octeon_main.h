@@ -198,4 +198,12 @@ sleep_timeout_cond(wait_queue_head_t *wait_queue,
 #define ROUNDUP128(val) (((val) + 127) & 0xffffff80)
 #endif
 
+/* Initializes the LiquidIO management interface module
+ * @param octdev - octeon device pointer
+ * @returns 0 if init is success, -1 otherwise
+ */
+int lio_mgmt_init(struct octeon_device *octdev);
+
+/* De-initializes the LiquidIO management interface module */
+void lio_mgmt_exit(struct octeon_device *octdev);
 #endif /* _OCTEON_MAIN_H_ */
