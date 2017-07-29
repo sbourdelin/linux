@@ -127,7 +127,7 @@ static int tpm_ibmvtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
 
 	if (ibmvtpm->tpm_processing_cmd) {
 		dev_info(ibmvtpm->dev,
-		         "Need to wait for TPM to finish\n");
+			"Need to wait for TPM to finish\n");
 		/* wait for previous command to finish */
 		sig = wait_event_interruptible(ibmvtpm->wq, !ibmvtpm->tpm_processing_cmd);
 		if (sig)
