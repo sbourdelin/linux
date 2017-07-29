@@ -895,4 +895,21 @@ union oct_nic_if_cfg {
 	} s;
 };
 
+union oct_nic_vf_info {
+	u64 info;
+	struct {
+#ifdef __BIG_ENDIAN_BITFIELD
+		u64 max_vfs:32;
+		u64 bus_num:8;
+		u64 dev_fn:8;
+		u64 reserved:16;
+#else
+		u64 reserved:16;
+		u64 dev_fn:8;
+		u64 bus_num:8;
+		u64 max_vfs:32;
+#endif
+	} s;
+};
+
 #endif

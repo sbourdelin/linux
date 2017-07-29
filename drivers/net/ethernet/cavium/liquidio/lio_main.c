@@ -3949,6 +3949,8 @@ static int setup_nic_devices(struct octeon_device *octeon_dev)
 	u32 resp_size, ctx_size, data_size;
 	u32 ifidx_or_pfnum;
 	struct lio_version *vdata;
+	union oct_nic_vf_info vf_info;
+
 
 	/* This is to handle link status changes */
 	octeon_register_dispatch_fn(octeon_dev, OPCODE_NIC,
@@ -4017,9 +4019,16 @@ static int setup_nic_devices(struct octeon_device *octeon_dev)
 
 		sc->iq_no = 0;
 
+		/* Populate VF info for firmware */
+		vf_info.info = 0;
+
+		vf_info.s.bus_num = octeon_dev->pci_dev->bus->number;
+		vf_info.s.dev_fn = octeon_dev->pci_dev->devfn;
+		vf_info.s.max_vfs = octeon_dev->sriov_info.max_vfs;
+
 		octeon_prepare_soft_command(octeon_dev, sc, OPCODE_NIC,
 					    OPCODE_NIC_IF_CFG, 0,
-					    if_cfg.u64, 0);
+					    if_cfg.u64, vf_info.info);
 
 		sc->callback = if_cfg_callback;
 		sc->callback_arg = sc;

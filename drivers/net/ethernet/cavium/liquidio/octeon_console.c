@@ -724,15 +724,19 @@ static int octeon_console_read(struct octeon_device *oct, u32 console_num,
 }
 
 #define FBUF_SIZE	(4 * 1024 * 1024)
+#define MAX_DATE_SIZE    30
 
 int octeon_download_firmware(struct octeon_device *oct, const u8 *data,
 			     size_t size)
 {
-	int ret = 0;
+	struct octeon_firmware_file_header *h;
+	char date[MAX_DATE_SIZE];
+	struct timeval time;
 	u32 crc32_result;
+	struct tm tm_val;
 	u64 load_addr;
 	u32 image_len;
-	struct octeon_firmware_file_header *h;
+	int ret = 0;
 	u32 i, rem;
 
 	if (size < sizeof(struct octeon_firmware_file_header)) {
@@ -814,8 +818,24 @@ int octeon_download_firmware(struct octeon_device *oct, const u8 *data,
 	dev_info(&oct->pci_dev->dev, "Writing boot command: %s\n",
 		 h->bootcmd);
 
-	/* Invoke the bootcmd */
-	ret = octeon_console_send_cmd(oct, h->bootcmd, 50);
+	/*Get time of the day*/
+	do_gettimeofday(&time);
+	time_to_tm(time.tv_sec, (-sys_tz.tz_minuteswest) * 60,  &tm_val);
+	ret = snprintf(date, MAX_DATE_SIZE,
+		       " date=%04ld.%02d.%02d-%02d:%02d:%02d",
+		       tm_val.tm_year + 1900, tm_val.tm_mon + 1, tm_val.tm_mday,
+		       tm_val.tm_hour, tm_val.tm_min, tm_val.tm_sec);
+	if ((sizeof(h->bootcmd) - strnlen(h->bootcmd, sizeof(h->bootcmd))) <
+		ret) {
+		dev_err(&oct->pci_dev->dev, "Boot command buffer too small\n");
+		return -EINVAL;
+	}
+	strncat(h->bootcmd, date,
+		sizeof(h->bootcmd) - strnlen(h->bootcmd, sizeof(h->bootcmd)));
 
-	return 0;
+	ret = octeon_console_send_cmd(oct, h->bootcmd, 50);
+	if (ret)
+		dev_info(&oct->pci_dev->dev, "Boot command send failed\n");
+
+	return ret;
 }
