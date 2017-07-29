@@ -288,6 +288,8 @@ void system_reset_exception(struct pt_regs *regs)
 	if (!nested)
 		nmi_enter();
 
+	__this_cpu_inc(irq_stat.sreset_irqs);
+
 	/* See if any machine dependent calls */
 	if (ppc_md.system_reset_exception) {
 		if (ppc_md.system_reset_exception(regs))
@@ -755,7 +757,14 @@ void machine_check_exception(struct pt_regs *regs)
 	enum ctx_state prev_state = exception_enter();
 	int recover = 0;
 
+#ifdef CONFIG_PPC_BOOK3S_64
+	/* 64s accounts the mce in machine_check_early when in HVMODE */
+	if (!cpu_has_feature(CPU_FTR_HVMODE))
+		__this_cpu_inc(irq_stat.mce_exceptions);
+#else
 	__this_cpu_inc(irq_stat.mce_exceptions);
+#endif
+
 
 	add_taint(TAINT_MACHINE_CHECK, LOCKDEP_NOW_UNRELIABLE);
 
