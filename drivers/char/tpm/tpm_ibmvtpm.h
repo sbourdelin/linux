@@ -25,7 +25,7 @@ struct ibmvtpm_crq {
 	__be16 len;
 	__be32 data;
 	__be64 reserved;
-} __attribute__((packed, aligned(8)));
+} __packed __aligned(8);
 
 struct ibmvtpm_crq_queue {
 	struct ibmvtpm_crq *crq_addr;
