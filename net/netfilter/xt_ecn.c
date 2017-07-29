@@ -37,8 +37,10 @@ static bool match_tcp(const struct sk_buff *skb, struct xt_action_param *par)
 	 * be good citizens.
 	 */
 	th = skb_header_pointer(skb, par->thoff, sizeof(_tcph), &_tcph);
-	if (th == NULL)
+	if (!th) {
+		par->hotdrop = true;
 		return false;
+	}
 
 	if (einfo->operation & XT_ECN_OP_MATCH_ECE) {
 		if (einfo->invert & XT_ECN_OP_MATCH_ECE) {
