@@ -2912,8 +2912,10 @@ static int rtm_to_fib6_config(struct sk_buff *skb, struct nlmsghdr *nlh,
 	cfg->fc_dst_len = rtm->rtm_dst_len;
 	cfg->fc_src_len = rtm->rtm_src_len;
 	cfg->fc_flags = RTF_UP;
-	cfg->fc_protocol = rtm->rtm_protocol;
 	cfg->fc_type = rtm->rtm_type;
+
+	if (rtm->rtm_protocol != RTPROT_REDIRECT)
+		cfg->fc_protocol = rtm->rtm_protocol;
 
 	if (rtm->rtm_type == RTN_UNREACHABLE ||
 	    rtm->rtm_type == RTN_BLACKHOLE ||
