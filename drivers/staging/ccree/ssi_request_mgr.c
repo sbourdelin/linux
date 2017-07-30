@@ -324,9 +324,9 @@ int send_request(
 	if (ssi_req->ivgen_dma_addr_len > 0) {
 		SSI_LOG_DEBUG("Acquire IV from pool into %d DMA addresses %pad, %pad, %pad, IV-size=%u\n",
 			      ssi_req->ivgen_dma_addr_len,
-			      ssi_req->ivgen_dma_addr[0],
-			      ssi_req->ivgen_dma_addr[1],
-			      ssi_req->ivgen_dma_addr[2],
+			      &ssi_req->ivgen_dma_addr[0],
+			      &ssi_req->ivgen_dma_addr[1],
+			      &ssi_req->ivgen_dma_addr[2],
 			      ssi_req->ivgen_size);
 
 		/* Acquire IV from pool */

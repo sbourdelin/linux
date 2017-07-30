@@ -141,7 +141,7 @@ static int ssi_hash_map_result(struct device *dev,
 	SSI_LOG_DEBUG("Mapped digest result buffer %u B "
 		     "at va=%pK to dma=%pad\n",
 		digestsize, state->digest_result_buff,
-		state->digest_result_dma_addr);
+		&state->digest_result_dma_addr);
 
 	return 0;
 }
@@ -205,7 +205,7 @@ static int ssi_hash_map_request(struct device *dev,
 	}
 	SSI_LOG_DEBUG("Mapped digest %d B at va=%pK to dma=%pad\n",
 		ctx->inter_digestsize, state->digest_buff,
-		state->digest_buff_dma_addr);
+		&state->digest_buff_dma_addr);
 
 	if (is_hmac) {
 		dma_sync_single_for_cpu(dev, ctx->digest_buff_dma_addr, ctx->inter_digestsize, DMA_BIDIRECTIONAL);
@@ -254,7 +254,7 @@ static int ssi_hash_map_request(struct device *dev,
 		}
 		SSI_LOG_DEBUG("Mapped digest len %u B at va=%pK to dma=%pad\n",
 			HASH_LEN_SIZE, state->digest_bytes_len,
-			state->digest_bytes_len_dma_addr);
+			&state->digest_bytes_len_dma_addr);
 	} else {
 		state->digest_bytes_len_dma_addr = 0;
 	}
@@ -268,7 +268,7 @@ static int ssi_hash_map_request(struct device *dev,
 		}
 		SSI_LOG_DEBUG("Mapped opad digest %d B at va=%pK to dma=%pad\n",
 			ctx->inter_digestsize, state->opad_digest_buff,
-			state->opad_digest_dma_addr);
+			&state->opad_digest_dma_addr);
 	} else {
 		state->opad_digest_dma_addr = 0;
 	}
@@ -322,21 +322,21 @@ static void ssi_hash_unmap_request(struct device *dev,
 		dma_unmap_single(dev, state->digest_buff_dma_addr,
 				 ctx->inter_digestsize, DMA_BIDIRECTIONAL);
 		SSI_LOG_DEBUG("Unmapped digest-buffer: digest_buff_dma_addr=%pad\n",
-			      state->digest_buff_dma_addr);
+			      &state->digest_buff_dma_addr);
 		state->digest_buff_dma_addr = 0;
 	}
 	if (state->digest_bytes_len_dma_addr != 0) {
 		dma_unmap_single(dev, state->digest_bytes_len_dma_addr,
 				 HASH_LEN_SIZE, DMA_BIDIRECTIONAL);
 		SSI_LOG_DEBUG("Unmapped digest-bytes-len buffer: digest_bytes_len_dma_addr=%pad\n",
-			      state->digest_bytes_len_dma_addr);
+			      &state->digest_bytes_len_dma_addr);
 		state->digest_bytes_len_dma_addr = 0;
 	}
 	if (state->opad_digest_dma_addr != 0) {
 		dma_unmap_single(dev, state->opad_digest_dma_addr,
 				 ctx->inter_digestsize, DMA_BIDIRECTIONAL);
 		SSI_LOG_DEBUG("Unmapped opad-digest: opad_digest_dma_addr=%pad\n",
-			      state->opad_digest_dma_addr);
+			      &state->opad_digest_dma_addr);
 		state->opad_digest_dma_addr = 0;
 	}
 
@@ -360,7 +360,7 @@ static void ssi_hash_unmap_result(struct device *dev,
 		SSI_LOG_DEBUG("unmpa digest result buffer "
 			     "va (%pK) pa (%pad) len %u\n",
 			     state->digest_result_buff,
-			     state->digest_result_dma_addr,
+			     &state->digest_result_dma_addr,
 			     digestsize);
 		memcpy(result,
 		       state->digest_result_buff,
@@ -1004,7 +1004,7 @@ static int ssi_hash_setkey(void *hash,
 			return -ENOMEM;
 		}
 		SSI_LOG_DEBUG("mapping key-buffer: key_dma_addr=%pad "
-			     "keylen=%u\n", ctx->key_params.key_dma_addr,
+			     "keylen=%u\n", &ctx->key_params.key_dma_addr,
 			     ctx->key_params.keylen);
 
 		if (keylen > blocksize) {
@@ -1148,7 +1148,7 @@ out:
 				ctx->key_params.key_dma_addr,
 				ctx->key_params.keylen, DMA_TO_DEVICE);
 		SSI_LOG_DEBUG("Unmapped key-buffer: key_dma_addr=%pad keylen=%u\n",
-				ctx->key_params.key_dma_addr,
+				&ctx->key_params.key_dma_addr,
 				ctx->key_params.keylen);
 	}
 	return rc;
@@ -1187,7 +1187,7 @@ static int ssi_xcbc_setkey(struct crypto_ahash *ahash,
 	}
 	SSI_LOG_DEBUG("mapping key-buffer: key_dma_addr=%pad "
 		     "keylen=%u\n",
-		     ctx->key_params.key_dma_addr,
+		     &ctx->key_params.key_dma_addr,
 		     ctx->key_params.keylen);
 
 	ctx->is_hmac = true;
@@ -1235,7 +1235,7 @@ static int ssi_xcbc_setkey(struct crypto_ahash *ahash,
 			ctx->key_params.key_dma_addr,
 			ctx->key_params.keylen, DMA_TO_DEVICE);
 	SSI_LOG_DEBUG("Unmapped key-buffer: key_dma_addr=%pad keylen=%u\n",
-			ctx->key_params.key_dma_addr,
+			&ctx->key_params.key_dma_addr,
 			ctx->key_params.keylen);
 
 	return rc;
@@ -1291,7 +1291,7 @@ static void ssi_hash_free_ctx(struct ssi_hash_ctx *ctx)
 				 sizeof(ctx->digest_buff), DMA_BIDIRECTIONAL);
 		SSI_LOG_DEBUG("Unmapped digest-buffer: "
 			     "digest_buff_dma_addr=%pad\n",
-			      ctx->digest_buff_dma_addr);
+			      &ctx->digest_buff_dma_addr);
 		ctx->digest_buff_dma_addr = 0;
 	}
 	if (ctx->opad_tmp_keys_dma_addr != 0) {
@@ -1300,7 +1300,7 @@ static void ssi_hash_free_ctx(struct ssi_hash_ctx *ctx)
 				 DMA_BIDIRECTIONAL);
 		SSI_LOG_DEBUG("Unmapped opad-digest: "
 			     "opad_tmp_keys_dma_addr=%pad\n",
-			      ctx->opad_tmp_keys_dma_addr);
+			      &ctx->opad_tmp_keys_dma_addr);
 		ctx->opad_tmp_keys_dma_addr = 0;
 	}
 
@@ -1321,7 +1321,7 @@ static int ssi_hash_alloc_ctx(struct ssi_hash_ctx *ctx)
 	}
 	SSI_LOG_DEBUG("Mapped digest %zu B at va=%pK to dma=%pad\n",
 		sizeof(ctx->digest_buff), ctx->digest_buff,
-		      ctx->digest_buff_dma_addr);
+		      &ctx->digest_buff_dma_addr);
 
 	ctx->opad_tmp_keys_dma_addr = dma_map_single(dev, (void *)ctx->opad_tmp_keys_buff, sizeof(ctx->opad_tmp_keys_buff), DMA_BIDIRECTIONAL);
 	if (dma_mapping_error(dev, ctx->opad_tmp_keys_dma_addr)) {
@@ -1332,7 +1332,7 @@ static int ssi_hash_alloc_ctx(struct ssi_hash_ctx *ctx)
 	}
 	SSI_LOG_DEBUG("Mapped opad_tmp_keys %zu B at va=%pK to dma=%pad\n",
 		sizeof(ctx->opad_tmp_keys_buff), ctx->opad_tmp_keys_buff,
-		      ctx->opad_tmp_keys_dma_addr);
+		      &ctx->opad_tmp_keys_dma_addr);
 
 	ctx->is_hmac = false;
 	return 0;
