@@ -3163,12 +3163,8 @@ static int kvm_vcpu_ioctl_x86_set_vcpu_events(struct kvm_vcpu *vcpu,
 			vcpu->arch.hflags |= HF_SMM_INSIDE_NMI_MASK;
 		else
 			vcpu->arch.hflags &= ~HF_SMM_INSIDE_NMI_MASK;
-		if (lapic_in_kernel(vcpu)) {
-			if (events->smi.latched_init)
-				set_bit(KVM_APIC_INIT, &vcpu->arch.apic->pending_events);
-			else
-				clear_bit(KVM_APIC_INIT, &vcpu->arch.apic->pending_events);
-		}
+		if (events->smi.latched_init && lapic_in_kernel(vcpu))
+			set_bit(KVM_APIC_INIT, &vcpu->arch.apic->pending_events);
 	}
 
 	kvm_make_request(KVM_REQ_EVENT, vcpu);
