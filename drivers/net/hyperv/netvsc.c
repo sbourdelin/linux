@@ -743,6 +743,7 @@ static inline int netvsc_send_pkt(
 	struct sk_buff *skb)
 {
 	struct nvsp_message nvmsg;
+	struct nvsp_1_message_send_rndis_packet *rpkt;
 	struct netvsc_channel *nvchan
 		= &net_device->chan_table[packet->q_idx];
 	struct vmbus_channel *out_channel = nvchan->channel;
@@ -754,21 +755,17 @@ static inline int netvsc_send_pkt(
 	u32 ring_avail = hv_ringbuf_avail_percent(&out_channel->outbound);
 
 	nvmsg.hdr.msg_type = NVSP_MSG1_TYPE_SEND_RNDIS_PKT;
-	if (skb != NULL) {
-		/* 0 is RMC_DATA; */
-		nvmsg.msg.v1_msg.send_rndis_pkt.channel_type = 0;
-	} else {
-		/* 1 is RMC_CONTROL; */
-		nvmsg.msg.v1_msg.send_rndis_pkt.channel_type = 1;
-	}
-
-	nvmsg.msg.v1_msg.send_rndis_pkt.send_buf_section_index =
-		packet->send_buf_index;
-	if (packet->send_buf_index == NETVSC_INVALID_INDEX)
-		nvmsg.msg.v1_msg.send_rndis_pkt.send_buf_section_size = 0;
+	rpkt = &nvmsg.msg.v1_msg.send_rndis_pkt;
+	if (skb != NULL)
+		rpkt->channel_type = 0;		/* 0 is RMC_DATA */
 	else
-		nvmsg.msg.v1_msg.send_rndis_pkt.send_buf_section_size =
-			packet->total_data_buflen;
+		rpkt->channel_type = 1;		/* 1 is RMC_CONTROL */
+
+	rpkt->send_buf_section_index = packet->send_buf_index;
+	if (packet->send_buf_index == NETVSC_INVALID_INDEX)
+		rpkt->send_buf_section_size = 0;
+	else
+		rpkt->send_buf_section_size = packet->total_data_buflen;
 
 	req_id = (ulong)skb;
 
@@ -776,8 +773,7 @@ static inline int netvsc_send_pkt(
 		return -ENODEV;
 
 	if (packet->page_buf_cnt) {
-		pgbuf = packet->cp_partial ? (*pb) +
-			packet->rmsg_pgcnt : (*pb);
+		pgbuf = packet->cp_partial ? *pb + packet->rmsg_pgcnt : *pb;
 		ret = vmbus_sendpacket_pagebuffer_ctl(out_channel,
 						      pgbuf,
 						      packet->page_buf_cnt,
