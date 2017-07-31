@@ -89,7 +89,7 @@ static unsigned long nidump = 16;
 static unsigned long ncsum = 4096;
 static int termch;
 static char tmpstr[128];
-static char tracing_enabled = 1;
+static char tracing_enabled = 0;
 
 static long bus_error_jmp[JMP_BUF_LEN];
 static int catch_memory_errors;
@@ -463,6 +463,7 @@ static int xmon_core(struct pt_regs *regs, int fromipi)
 
 	local_irq_save(flags);
 	hard_irq_disable();
+	tracing_off();
 
 	bp = in_breakpoint_table(regs->nip, &offset);
 	if (bp != NULL) {
