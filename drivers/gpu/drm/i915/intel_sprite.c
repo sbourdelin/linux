@@ -1074,6 +1074,19 @@ static uint32_t skl_plane_formats[] = {
 	DRM_FORMAT_VYUY,
 };
 
+static uint32_t nv12_plane_formats[] = {
+	DRM_FORMAT_RGB565,
+	DRM_FORMAT_ABGR8888,
+	DRM_FORMAT_ARGB8888,
+	DRM_FORMAT_XBGR8888,
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_YUYV,
+	DRM_FORMAT_YVYU,
+	DRM_FORMAT_UYVY,
+	DRM_FORMAT_VYUY,
+	DRM_FORMAT_NV12,
+};
+
 struct intel_plane *
 intel_sprite_plane_create(struct drm_i915_private *dev_priv,
 			  enum pipe pipe, int plane)
@@ -1106,8 +1119,14 @@ intel_sprite_plane_create(struct drm_i915_private *dev_priv,
 		intel_plane->update_plane = skl_update_plane;
 		intel_plane->disable_plane = skl_disable_plane;
 
-		plane_formats = skl_plane_formats;
-		num_plane_formats = ARRAY_SIZE(skl_plane_formats);
+		if (IS_BROXTON(dev_priv) &&
+			((pipe == PIPE_A || pipe == PIPE_B) && (plane == 0))) {
+			plane_formats = nv12_plane_formats;
+			num_plane_formats = ARRAY_SIZE(nv12_plane_formats);
+		} else {
+			plane_formats = skl_plane_formats;
+			num_plane_formats = ARRAY_SIZE(skl_plane_formats);
+		}
 	} else if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
 		intel_plane->can_scale = false;
 		intel_plane->max_downscale = 1;
