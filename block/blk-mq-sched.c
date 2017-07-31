@@ -112,8 +112,15 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 	 */
 	if (!list_empty_careful(&hctx->dispatch)) {
 		spin_lock(&hctx->lock);
-		if (!list_empty(&hctx->dispatch))
+		if (!list_empty(&hctx->dispatch)) {
 			list_splice_init(&hctx->dispatch, &rq_list);
+
+			/*
+			 * BUSY won't be cleared until all requests
+			 * in hctx->dispatch are dispatched successfully
+			 */
+			set_bit(BLK_MQ_S_BUSY, &hctx->state);
+		}
 		spin_unlock(&hctx->lock);
 	}
 
@@ -129,14 +136,19 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 	if (!list_empty(&rq_list)) {
 		blk_mq_sched_mark_restart_hctx(hctx);
 		can_go = blk_mq_dispatch_rq_list(q, &rq_list);
-	} else if (!has_sched_dispatch && !q->queue_depth) {
-		blk_mq_flush_busy_ctxs(hctx, &rq_list);
-		blk_mq_dispatch_rq_list(q, &rq_list);
-		can_go = false;
+		if (can_go)
+			clear_bit(BLK_MQ_S_BUSY, &hctx->state);
 	}
 
-	if (!can_go)
+	/* can't go until ->dispatch is flushed */
+	if (!can_go || test_bit(BLK_MQ_S_BUSY, &hctx->state))
 		return;
+
+	if (!has_sched_dispatch && !q->queue_depth) {
+		blk_mq_flush_busy_ctxs(hctx, &rq_list);
+		blk_mq_dispatch_rq_list(q, &rq_list);
+		return;
+	}
 
 	/*
 	 * We want to dispatch from the scheduler if we had no work left
