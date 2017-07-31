@@ -680,6 +680,24 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
 	return ret ? NULL : ops;
 }
 
+static int nc_dma_get_range(struct device *dev, u64 *size)
+{
+	struct acpi_iort_node *node;
+	struct acpi_iort_named_component *ncomp;
+
+	node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+			      iort_match_node_callback, dev);
+	if (!node)
+		return -ENODEV;
+
+	ncomp = (struct acpi_iort_named_component *)node->node_data;
+
+	*size = ncomp->memory_address_limit >= 64 ? ~0ULL :
+			1ULL<<ncomp->memory_address_limit;
+
+	return 0;
+}
+
 /**
  * iort_dma_setup() - Set-up device DMA parameters.
  *
@@ -708,17 +726,19 @@ void iort_dma_setup(struct device *dev, u64 *dma_addr, u64 *dma_size)
 
 	size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
 
-	if (dev_is_pci(dev)) {
+	if (dev_is_pci(dev))
 		ret = acpi_dma_get_range(dev, &dmaaddr, &offset, &size);
-		if (!ret) {
-			mask = __roundup_pow_of_two(dmaaddr + size) - 1;
-			/*
-			 * Limit coherent and dma mask based on size
-			 * retrieved from firmware.
-			 */
-			dev->coherent_dma_mask = mask;
-			*dev->dma_mask = mask;
-		}
+	else
+		ret = nc_dma_get_range(dev, &size);
+
+	if (!ret) {
+		mask = __roundup_pow_of_two(dmaaddr + size) - 1;
+		/*
+		 * Limit coherent and dma mask based on size
+		 * retrieved from firmware.
+		 */
+		dev->coherent_dma_mask = mask;
+		*dev->dma_mask = mask;
 	}
 
 	*dma_addr = dmaaddr;
