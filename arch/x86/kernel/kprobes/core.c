@@ -435,8 +435,10 @@ static int arch_copy_kprobe(struct kprobe *p)
 
 	/* Copy an instruction with recovering if other optprobe modifies it.*/
 	len = __copy_instruction(p->ainsn.insn, p->addr, &insn);
-	if (!len)
+	if (!len) {
+		set_memory_ro((unsigned long)p->ainsn.insn & PAGE_MASK, 1);
 		return -EINVAL;
+	}
 
 	/*
 	 * __copy_instruction can modify the displacement of the instruction,

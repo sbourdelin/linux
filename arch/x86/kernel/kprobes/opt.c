@@ -368,6 +368,7 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
 	ret = copy_optimized_instructions(buf + TMPL_END_IDX, op->kp.addr);
 	if (ret < 0) {
 		__arch_remove_optimized_kprobe(op, 0);
+		set_memory_ro((unsigned long)buf & PAGE_MASK, 1);
 		return ret;
 	}
 	op->optinsn.size = ret;
