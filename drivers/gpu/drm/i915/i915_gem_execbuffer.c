@@ -242,6 +242,7 @@ struct i915_execbuffer {
 	 */
 	int lut_size;
 	struct hlist_head *buckets; /** ht for relocation handles */
+	uint32_t tag;
 };
 
 /*
@@ -1194,7 +1195,7 @@ static int __reloc_gpu_alloc(struct i915_execbuffer *eb,
 	if (err)
 		goto err_request;
 
-	i915_perf_emit_sample_capture(rq, true);
+	i915_perf_emit_sample_capture(rq, true, eb->tag);
 
 	err = eb->engine->emit_bb_start(rq,
 					batch->node.start, PAGE_SIZE,
@@ -1202,7 +1203,7 @@ static int __reloc_gpu_alloc(struct i915_execbuffer *eb,
 	if (err)
 		goto err_request;
 
-	i915_perf_emit_sample_capture(rq, false);
+	i915_perf_emit_sample_capture(rq, false, eb->tag);
 
 	GEM_BUG_ON(!reservation_object_test_signaled_rcu(batch->resv, true));
 	i915_vma_move_to_active(batch, rq, 0);
@@ -2033,7 +2034,7 @@ static int eb_submit(struct i915_execbuffer *eb)
 			return err;
 	}
 
-	i915_perf_emit_sample_capture(eb->request, true);
+	i915_perf_emit_sample_capture(eb->request, true, eb->tag);
 
 	err = eb->engine->emit_bb_start(eb->request,
 					eb->batch->node.start +
@@ -2043,7 +2044,7 @@ static int eb_submit(struct i915_execbuffer *eb)
 	if (err)
 		return err;
 
-	i915_perf_emit_sample_capture(eb->request, false);
+	i915_perf_emit_sample_capture(eb->request, false, eb->tag);
 
 	return 0;
 }
@@ -2167,6 +2168,8 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	eb.engine = eb_select_engine(eb.i915, file, args);
 	if (!eb.engine)
 		return -EINVAL;
+
+	eb.tag	= i915_execbuffer2_get_tag(*args);
 
 	if (args->flags & I915_EXEC_RESOURCE_STREAMER) {
 		if (!HAS_RESOURCE_STREAMER(eb.i915)) {

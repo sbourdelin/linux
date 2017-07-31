@@ -294,6 +294,7 @@ struct i915_perf_sample_data {
 	u64 source;
 	u64 ctx_id;
 	u64 pid;
+	u64 tag;
 	const u8 *report;
 };
 
@@ -350,6 +351,7 @@ static const enum intel_engine_id user_ring_map[I915_USER_RINGS + 1] = {
 #define SAMPLE_OA_SOURCE      (1<<1)
 #define SAMPLE_CTX_ID	      (1<<2)
 #define SAMPLE_PID	      (1<<3)
+#define SAMPLE_TAG	      (1<<4)
 
 /**
  * struct perf_open_properties - for validated properties given to open a stream
@@ -402,12 +404,14 @@ static u32 gen7_oa_hw_tail_read(struct drm_i915_private *dev_priv)
  * the command stream of a GPU engine.
  * @request: request in whose context the metrics are being collected.
  * @preallocate: allocate space in ring for related sample.
+ * @tag: userspace provided tag to be associated with the perf sample
  *
  * The function provides a hook through which the commands to capture perf
  * metrics, are inserted into the command stream of a GPU engine.
  */
 void i915_perf_emit_sample_capture(struct drm_i915_gem_request *request,
-				   bool preallocate)
+				   bool preallocate,
+				   u32 tag)
 {
 	struct intel_engine_cs *engine = request->engine;
 	struct drm_i915_private *dev_priv = engine->i915;
@@ -422,7 +426,8 @@ void i915_perf_emit_sample_capture(struct drm_i915_gem_request *request,
 	if (stream && (stream->state == I915_PERF_STREAM_ENABLED) &&
 				stream->cs_mode)
 		stream->ops->emit_sample_capture(stream, request,
-						 preallocate);
+						 preallocate, tag);
+
 	srcu_read_unlock(&engine->perf_srcu, idx);
 }
 
@@ -591,11 +596,13 @@ static int i915_emit_oa_report_capture(
  * @stream: An i915-perf stream opened for GPU metrics
  * @request: request in whose context the metrics are being collected.
  * @preallocate: allocate space in ring for related sample.
+ * @tag: userspace provided tag to be associated with the perf sample
  */
 static void i915_perf_stream_emit_sample_capture(
 					struct i915_perf_stream *stream,
 					struct drm_i915_gem_request *request,
-					bool preallocate)
+					bool preallocate,
+					u32 tag)
 {
 	struct reservation_object *resv = stream->cs_buffer.vma->resv;
 	struct i915_perf_cs_sample *sample;
@@ -611,6 +618,7 @@ static void i915_perf_stream_emit_sample_capture(
 	sample->request = i915_gem_request_get(request);
 	sample->ctx_id = request->ctx->hw_id;
 	sample->pid = current->pid;
+	sample->tag = tag;
 
 	insert_perf_sample(stream, sample);
 
@@ -933,6 +941,12 @@ static int append_perf_sample(struct i915_perf_stream *stream,
 		buf += 8;
 	}
 
+	if (sample_flags & SAMPLE_TAG) {
+		if (copy_to_user(buf, &data->tag, 8))
+			return -EFAULT;
+		buf += 8;
+	}
+
 	if (sample_flags & SAMPLE_OA_REPORT) {
 		if (copy_to_user(buf, data->report, report_size))
 			return -EFAULT;
@@ -972,6 +986,9 @@ static int append_oa_buffer_sample(struct i915_perf_stream *stream,
 
 	if (sample_flags & SAMPLE_PID)
 		data.pid = stream->last_pid;
+
+	if (sample_flags & SAMPLE_TAG)
+		data.tag = stream->last_tag;
 
 	if (sample_flags & SAMPLE_OA_REPORT)
 		data.report = report;
@@ -1573,6 +1590,11 @@ static int append_cs_buffer_sample(struct i915_perf_stream *stream,
 	if (sample_flags & SAMPLE_PID) {
 		data.pid = node->pid;
 		stream->last_pid = node->pid;
+	}
+
+	if (sample_flags & SAMPLE_TAG) {
+		data.tag = node->tag;
+		stream->last_tag = node->tag;
 	}
 
 	return append_perf_sample(stream, buf, count, offset, &data);
@@ -2736,7 +2758,8 @@ static int i915_perf_stream_init(struct i915_perf_stream *stream,
 	struct drm_i915_private *dev_priv = stream->dev_priv;
 	bool require_oa_unit = props->sample_flags & (SAMPLE_OA_REPORT |
 						      SAMPLE_OA_SOURCE);
-	bool require_cs_mode = props->sample_flags & SAMPLE_PID;
+	bool require_cs_mode = props->sample_flags & (SAMPLE_PID |
+						      SAMPLE_TAG);
 	bool cs_sample_data = props->sample_flags & SAMPLE_OA_REPORT;
 	struct i915_perf_stream *curr_stream;
 	struct intel_engine_cs *engine = NULL;
@@ -2895,7 +2918,7 @@ static int i915_perf_stream_init(struct i915_perf_stream *stream,
 	}
 
 	if (require_cs_mode && !props->cs_mode) {
-		DRM_ERROR("PID sampling requires a ring to be specified");
+		DRM_ERROR("PID/TAG sampling requires a ring to be specified");
 		ret = -EINVAL;
 		goto err_enable;
 	}
@@ -2921,6 +2944,11 @@ static int i915_perf_stream_init(struct i915_perf_stream *stream,
 
 		if (props->sample_flags & SAMPLE_PID) {
 			stream->sample_flags |= SAMPLE_PID;
+			stream->sample_size += 8;
+		}
+
+		if (props->sample_flags & SAMPLE_TAG) {
+			stream->sample_flags |= SAMPLE_TAG;
 			stream->sample_size += 8;
 		}
 
@@ -3640,6 +3668,9 @@ static int read_properties_unlocked(struct drm_i915_private *dev_priv,
 			break;
 		case DRM_I915_PERF_PROP_SAMPLE_PID:
 			props->sample_flags |= SAMPLE_PID;
+			break;
+		case DRM_I915_PERF_PROP_SAMPLE_TAG:
+			props->sample_flags |= SAMPLE_TAG;
 			break;
 		case DRM_I915_PERF_PROP_MAX:
 			MISSING_CASE(id);
