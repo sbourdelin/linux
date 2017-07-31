@@ -2079,6 +2079,7 @@ struct i915_perf_stream {
 	bool pollin;
 
 	u32 last_ctx_id;
+	u32 last_pid;
 };
 
 /**
@@ -2189,6 +2190,12 @@ struct i915_perf_cs_sample {
 	 * @ctx_id: Context ID associated with this perf sample
 	 */
 	u32 ctx_id;
+
+	/**
+	 * @pid: PID of the process in context of which the workload was
+	 * submitted, pertaining to this perf sample
+	 */
+	u32 pid;
 };
 
 struct intel_cdclk_state {
