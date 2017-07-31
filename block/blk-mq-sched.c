@@ -144,7 +144,7 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 	if (!can_go || test_bit(BLK_MQ_S_BUSY, &hctx->state))
 		return;
 
-	if (!has_sched_dispatch && !q->queue_depth) {
+	if (!has_sched_dispatch && !(hctx->flags & BLK_MQ_F_SHARED_DEPTH)) {
 		blk_mq_flush_busy_ctxs(hctx, &rq_list);
 		blk_mq_dispatch_rq_list(q, &rq_list);
 		return;

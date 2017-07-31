@@ -209,6 +209,7 @@ static const char *const hctx_flag_name[] = {
 	HCTX_FLAG_NAME(SG_MERGE),
 	HCTX_FLAG_NAME(BLOCKING),
 	HCTX_FLAG_NAME(NO_SCHED),
+	HCTX_FLAG_NAME(SHARED_DEPTH),
 };
 #undef HCTX_FLAG_NAME
 

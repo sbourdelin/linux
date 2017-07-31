@@ -2647,12 +2647,31 @@ int blk_mq_update_nr_requests(struct request_queue *q, unsigned int nr)
 int blk_mq_update_sched_queue_depth(struct request_queue *q)
 {
 	unsigned nr;
+	struct blk_mq_hw_ctx *hctx;
+	unsigned int i;
+	int ret = 0;
 
-	if (!q->mq_ops || !q->elevator)
-		return 0;
+	if (!q->mq_ops)
+		return ret;
+
+	blk_mq_freeze_queue(q);
+	/*
+	 * if there is q->queue_depth, all hw queues share
+	 * this queue depth limit
+	 */
+	if (q->queue_depth) {
+		queue_for_each_hw_ctx(q, hctx, i)
+			hctx->flags |= BLK_MQ_F_SHARED_DEPTH;
+	}
+
+	if (!q->elevator)
+		goto exit;
 
 	nr = blk_mq_sched_queue_depth(q);
-	return __blk_mq_update_nr_requests(q, true, nr);
+	ret = __blk_mq_update_nr_requests(q, true, nr);
+ exit:
+	blk_mq_unfreeze_queue(q);
+	return ret;
 }
 
 static void __blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set,
