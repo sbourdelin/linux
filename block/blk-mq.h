@@ -135,4 +135,19 @@ static inline bool blk_mq_hw_queue_mapped(struct blk_mq_hw_ctx *hctx)
 	return hctx->nr_ctx && hctx->tags;
 }
 
+static inline bool blk_mq_hctx_is_busy(struct blk_mq_hw_ctx *hctx)
+{
+	return test_bit(BLK_MQ_S_BUSY, &hctx->state);
+}
+
+static inline void blk_mq_hctx_set_busy(struct blk_mq_hw_ctx *hctx)
+{
+	set_bit(BLK_MQ_S_BUSY, &hctx->state);
+}
+
+static inline void blk_mq_hctx_clear_busy(struct blk_mq_hw_ctx *hctx)
+{
+	clear_bit(BLK_MQ_S_BUSY, &hctx->state);
+}
+
 #endif

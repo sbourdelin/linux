@@ -140,7 +140,7 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 			 * BUSY won't be cleared until all requests
 			 * in hctx->dispatch are dispatched successfully
 			 */
-			set_bit(BLK_MQ_S_BUSY, &hctx->state);
+			blk_mq_hctx_set_busy(hctx);
 		}
 		spin_unlock(&hctx->lock);
 	}
@@ -158,11 +158,11 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 		blk_mq_sched_mark_restart_hctx(hctx);
 		can_go = blk_mq_dispatch_rq_list(q, &rq_list);
 		if (can_go)
-			clear_bit(BLK_MQ_S_BUSY, &hctx->state);
+			blk_mq_hctx_clear_busy(hctx);
 	}
 
 	/* can't go until ->dispatch is flushed */
-	if (!can_go || test_bit(BLK_MQ_S_BUSY, &hctx->state))
+	if (!can_go || blk_mq_hctx_is_busy(hctx))
 		return;
 
 	/*
