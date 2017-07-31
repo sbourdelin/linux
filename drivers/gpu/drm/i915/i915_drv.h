@@ -2068,6 +2068,8 @@ struct i915_perf_stream {
 	struct {
 		struct i915_vma *vma;
 		u8 *vaddr;
+#define I915_PERF_CMD_STREAM_BUF_STATUS_OVERFLOW (1<<0)
+		u32 status;
 	} cs_buffer;
 
 	struct list_head cs_samples;
