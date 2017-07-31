@@ -810,7 +810,11 @@ static void blk_mq_timeout_work(struct work_struct *work)
 
 struct ctx_iter_data {
 	struct blk_mq_hw_ctx *hctx;
-	struct list_head *list;
+
+	union {
+		struct list_head *list;
+		struct request *rq;
+	};
 };
 
 static bool flush_busy_ctx(struct sbitmap *sb, unsigned int bitnr, void *data)
@@ -824,6 +828,26 @@ static bool flush_busy_ctx(struct sbitmap *sb, unsigned int bitnr, void *data)
 	list_splice_tail_init(&ctx->rq_list, flush_data->list);
 	spin_unlock(&ctx->lock);
 	return true;
+}
+
+static bool dispatch_rq_from_ctx(struct sbitmap *sb, unsigned int bitnr, void *data)
+{
+	struct ctx_iter_data *dispatch_data = data;
+	struct blk_mq_hw_ctx *hctx = dispatch_data->hctx;
+	struct blk_mq_ctx *ctx = hctx->ctxs[bitnr];
+	bool empty = true;
+
+	spin_lock(&ctx->lock);
+	if (unlikely(!list_empty(&ctx->rq_list))) {
+		dispatch_data->rq = list_entry_rq(ctx->rq_list.next);
+		list_del_init(&dispatch_data->rq->queuelist);
+		empty = list_empty(&ctx->rq_list);
+	}
+	spin_unlock(&ctx->lock);
+	if (empty)
+		sbitmap_clear_bit(sb, bitnr);
+
+	return !dispatch_data->rq;
 }
 
 /*
@@ -840,6 +864,18 @@ void blk_mq_flush_busy_ctxs(struct blk_mq_hw_ctx *hctx, struct list_head *list)
 	sbitmap_for_each_set(&hctx->ctx_map, flush_busy_ctx, &data);
 }
 EXPORT_SYMBOL_GPL(blk_mq_flush_busy_ctxs);
+
+struct request *blk_mq_dispatch_rq_from_ctxs(struct blk_mq_hw_ctx *hctx)
+{
+	struct ctx_iter_data data = {
+		.hctx = hctx,
+		.rq   = NULL,
+	};
+
+	sbitmap_for_each_set(&hctx->ctx_map, dispatch_rq_from_ctx, &data);
+
+	return data.rq;
+}
 
 static inline unsigned int queued_to_index(unsigned int queued)
 {
