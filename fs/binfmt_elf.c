@@ -195,7 +195,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr *exec,
 		size_t len = strlen(k_platform) + 1;
 
 		u_platform = (elf_addr_t __user *)STACK_ALLOC(p, len);
-		if (__copy_to_user(u_platform, k_platform, len))
+		if (copy_to_user(u_platform, k_platform, len))
 			return -EFAULT;
 	}
 
