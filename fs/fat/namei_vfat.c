@@ -17,6 +17,7 @@
 
 #include <linux/module.h>
 #include <linux/ctype.h>
+#include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/namei.h>
 #include "fat.h"
@@ -510,11 +511,10 @@ xlate_to_uni(const unsigned char *name, int len, unsigned char *outname,
 	     struct nls_table *nls)
 {
 	const unsigned char *ip;
-	unsigned char nc;
 	unsigned char *op;
-	unsigned int ec;
-	int i, k, fill;
+	int i, fill;
 	int charlen;
+	u8 hc[2];
 
 	if (utf8) {
 		*outlen = utf8s_to_utf16s(name, len, UTF16_HOST_ENDIAN,
@@ -532,31 +532,16 @@ xlate_to_uni(const unsigned char *name, int len, unsigned char *outname,
 			if (escape && (*ip == ':')) {
 				if (i > len - 5)
 					return -EINVAL;
-				ec = 0;
-				for (k = 1; k < 5; k++) {
-					nc = ip[k];
-					ec <<= 4;
-					if (nc >= '0' && nc <= '9') {
-						ec |= nc - '0';
-						continue;
-					}
-					if (nc >= 'a' && nc <= 'f') {
-						ec |= nc - ('a' - 10);
-						continue;
-					}
-					if (nc >= 'A' && nc <= 'F') {
-						ec |= nc - ('A' - 10);
-						continue;
-					}
-					return -EINVAL;
-				}
-				*op++ = ec & 0xFF;
-				*op++ = ec >> 8;
+
+				fill = hex2bin(hc, ip + 1, 2);
+				if (fill)
+					return fill;
+				*op++ = hc[1];
+				*op++ = hc[0];
 				ip += 5;
 				i += 5;
 			} else {
-				charlen = nls->char2uni(ip, len - i,
-									(wchar_t *)op);
+				charlen = nls->char2uni(ip, len - i, (wchar_t *)op);
 				if (charlen < 0)
 					return -EINVAL;
 				ip += charlen;
