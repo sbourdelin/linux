@@ -5,6 +5,7 @@
 obj-$(CONFIG_IIO) += industrialio.o
 industrialio-y := industrialio-core.o industrialio-event.o inkern.o
 industrialio-$(CONFIG_IIO_BUFFER) += industrialio-buffer.o
+industrialio-$(CONFIG_IIO_COUNTER) += industrialio-counter.o
 industrialio-$(CONFIG_IIO_TRIGGER) += industrialio-trigger.o
 
 obj-$(CONFIG_IIO_CONFIGFS) += industrialio-configfs.o

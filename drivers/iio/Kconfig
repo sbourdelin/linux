@@ -30,6 +30,14 @@ config IIO_CONFIGFS
 	  (e.g. software triggers). For more info see
 	  Documentation/iio/iio_configfs.txt.
 
+config IIO_COUNTER
+	bool "Enable IIO counter support"
+	help
+	  Provides IIO core support for counters. This API provides
+	  a generic interface that serves as the building blocks to
+	  create more complex counter interfaces. Rudimentary support
+	  for counters is enabled.
+
 config IIO_TRIGGER
 	bool "Enable triggered sampling support"
 	help

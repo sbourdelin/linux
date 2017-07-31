@@ -4,6 +4,7 @@
 # When adding new entries keep the list in alphabetical order
 
 menu "Counters"
+	depends on IIO_COUNTER
 
 config 104_QUAD_8
 	tristate "ACCES 104-QUAD-8 driver"
