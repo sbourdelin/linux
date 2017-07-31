@@ -181,7 +181,7 @@ static void cw_clear_margins(struct vc_data *vc, struct fb_info *info,
 	unsigned int rs = info->var.yres - rw;
 	struct fb_fillrect region;
 
-	region.color = 0;
+	region.color = vc->vc_decscnm ? 7 : 0;
 	region.rop = ROP_COPY;
 
 	if (rw && !bottom_only) {

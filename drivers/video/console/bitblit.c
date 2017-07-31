@@ -213,7 +213,7 @@ static void bit_clear_margins(struct vc_data *vc, struct fb_info *info,
 	unsigned int bs = info->var.yres - bh;
 	struct fb_fillrect region;
 
-	region.color = 0;
+	region.color = vc->vc_decscnm ? 7 : 0;
 	region.rop = ROP_COPY;
 
 	if (rw && !bottom_only) {
