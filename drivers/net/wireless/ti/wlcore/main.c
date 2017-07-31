@@ -5961,6 +5961,22 @@ static void wl12xx_derive_mac_addresses(struct wl1271 *wl, u32 oui, u32 nic)
 	if (nic + WLCORE_NUM_MAC_ADDRESSES - wl->num_mac_addr > 0xffffff)
 		wl1271_warning("NIC part of the MAC address wraps around!");
 
+	if (oui == 0xdeadbe && nic == 0xef0000) {
+		wl1271_warning("Detected unconfigured mac address in nvs.\n"
+				"Using a random TI mac address instead.\n"
+				"in case of using a wl12xx device, your "
+				"device performance may not be optimized.\n"
+				"Please use the calibrator tool to configure "
+				"your device.\n"
+				"When using a wl18xx device the nvs file can "
+				"be removed as a default mac address is "
+				"stored internally.\n");
+
+		/* Use TI oui and a random nic */
+		oui = 0x080028;
+		nic = get_random_int();
+	}
+
 	for (i = 0; i < wl->num_mac_addr; i++) {
 		wl->addresses[i].addr[0] = (u8)(oui >> 16);
 		wl->addresses[i].addr[1] = (u8)(oui >> 8);
