@@ -808,14 +808,14 @@ static void blk_mq_timeout_work(struct work_struct *work)
 	blk_queue_exit(q);
 }
 
-struct flush_busy_ctx_data {
+struct ctx_iter_data {
 	struct blk_mq_hw_ctx *hctx;
 	struct list_head *list;
 };
 
 static bool flush_busy_ctx(struct sbitmap *sb, unsigned int bitnr, void *data)
 {
-	struct flush_busy_ctx_data *flush_data = data;
+	struct ctx_iter_data *flush_data = data;
 	struct blk_mq_hw_ctx *hctx = flush_data->hctx;
 	struct blk_mq_ctx *ctx = hctx->ctxs[bitnr];
 
@@ -832,7 +832,7 @@ static bool flush_busy_ctx(struct sbitmap *sb, unsigned int bitnr, void *data)
  */
 void blk_mq_flush_busy_ctxs(struct blk_mq_hw_ctx *hctx, struct list_head *list)
 {
-	struct flush_busy_ctx_data data = {
+	struct ctx_iter_data data = {
 		.hctx = hctx,
 		.list = list,
 	};
