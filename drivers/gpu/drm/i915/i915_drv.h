@@ -2182,11 +2182,30 @@ struct i915_perf_cs_sample {
 	struct drm_i915_gem_request *request;
 
 	/**
-	 * @offset: Offset into ``&stream->cs_buffer``
-	 * where the perf metrics will be collected, when the commands inserted
+	 * @start_offset: Offset into ``&stream->cs_buffer
+	 * where the metrics will be collected, when the commands inserted
 	 * into the command stream are executed by GPU.
 	 */
-	u32 offset;
+	u32 start_offset;
+
+	/**
+	 * @oa_offset: Offset into ``&stream->cs_buffer
+	 * where the OA report will be collected (if the stream is configured
+	 * for collection of OA samples).
+	 */
+	u32 oa_offset;
+
+	/**
+	 * @ts_offset: Offset into ``&stream->cs_buffer
+	 * where the timestamps will be collected (if the stream is configured
+	 * for collection of timestamp data)
+	 */
+	u32 ts_offset;
+
+	/**
+	 * @size: buffer size corresponding to this perf sample
+	 */
+	u32 size;
 
 	/**
 	 * @ctx_id: Context ID associated with this perf sample

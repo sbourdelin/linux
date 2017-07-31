@@ -289,12 +289,17 @@ static u32 i915_perf_stream_paranoid = true;
 #define OAREPORT_REASON_CTX_SWITCH     (1<<3)
 #define OAREPORT_REASON_CLK_RATIO      (1<<5)
 
-/* Data common to periodic and RCS based OA samples */
+#define OA_ADDR_ALIGN 64
+#define TS_ADDR_ALIGN 8
+#define I915_PERF_TS_SAMPLE_SIZE 8
+
+/*Data common to perf samples (periodic OA / CS based OA / Timestamps)*/
 struct i915_perf_sample_data {
 	u64 source;
 	u64 ctx_id;
 	u64 pid;
 	u64 tag;
+	u64 ts;
 	const u8 *report;
 };
 
@@ -352,6 +357,7 @@ static const enum intel_engine_id user_ring_map[I915_USER_RINGS + 1] = {
 #define SAMPLE_CTX_ID	      (1<<2)
 #define SAMPLE_PID	      (1<<3)
 #define SAMPLE_TAG	      (1<<4)
+#define SAMPLE_TS	      (1<<5)
 
 /**
  * struct perf_open_properties - for validated properties given to open a stream
@@ -446,14 +452,12 @@ void i915_perf_emit_sample_capture(struct drm_i915_gem_request *request,
 static void release_perf_samples(struct i915_perf_stream *stream,
 				 u32 target_size)
 {
-	struct drm_i915_private *dev_priv = stream->dev_priv;
 	struct i915_perf_cs_sample *sample, *next;
-	u32 sample_size = dev_priv->perf.oa.oa_buffer.format_size;
 	u32 size = 0;
 
 	list_for_each_entry_safe
 		(sample, next, &stream->cs_samples, link) {
-		size += sample_size;
+		size += sample->size;
 		i915_gem_request_put(sample->request);
 		list_del(&sample->link);
 		kfree(sample);
@@ -478,15 +482,24 @@ static void insert_perf_sample(struct i915_perf_stream *stream,
 	struct drm_i915_private *dev_priv = stream->dev_priv;
 	struct i915_perf_cs_sample *first, *last;
 	int max_offset = stream->cs_buffer.vma->obj->base.size;
-	u32 sample_size = dev_priv->perf.oa.oa_buffer.format_size;
 	unsigned long flags;
+	u32 offset, sample_size = 0;
+
+	if (stream->sample_flags & SAMPLE_OA_REPORT)
+		sample_size += dev_priv->perf.oa.oa_buffer.format_size;
+	else if (stream->sample_flags & SAMPLE_TS) {
+		/*
+		 * XXX: Since TS data can anyways be derived from OA report, so
+		 * no need to capture it for RCS engine, if capture oa data is
+		 * called already.
+		 */
+		sample_size += I915_PERF_TS_SAMPLE_SIZE;
+	}
 
 	spin_lock_irqsave(&stream->cs_samples_lock, flags);
 	if (list_empty(&stream->cs_samples)) {
-		sample->offset = 0;
-		list_add_tail(&sample->link, &stream->cs_samples);
-		spin_unlock_irqrestore(&stream->cs_samples_lock, flags);
-		return;
+		offset = 0;
+		goto out;
 	}
 
 	first = list_first_entry(&stream->cs_samples, typeof(*first),
@@ -494,41 +507,61 @@ static void insert_perf_sample(struct i915_perf_stream *stream,
 	last = list_last_entry(&stream->cs_samples, typeof(*last),
 				link);
 
-	if (last->offset >= first->offset) {
+	if (last->start_offset >= first->start_offset) {
 		/* Sufficient space available at the end of buffer? */
-		if (last->offset + 2*sample_size < max_offset)
-			sample->offset = last->offset + sample_size;
+		if (last->start_offset + last->size + sample_size < max_offset)
+			offset = last->start_offset + last->size;
 		/*
 		 * Wraparound condition. Is sufficient space available at
 		 * beginning of buffer?
 		 */
-		else if (sample_size < first->offset)
-			sample->offset = 0;
+		else if (sample_size < first->start_offset)
+			offset = 0;
 		/* Insufficient space. Overwrite existing old entries */
 		else {
-			u32 target_size = sample_size - first->offset;
+			u32 target_size = sample_size - first->start_offset;
 
 			stream->cs_buffer.status |=
 				I915_PERF_CMD_STREAM_BUF_STATUS_OVERFLOW;
 			release_perf_samples(stream, target_size);
-			sample->offset = 0;
+			offset = 0;
 		}
 	} else {
 		/* Sufficient space available? */
-		if (last->offset + 2*sample_size < first->offset)
-			sample->offset = last->offset + sample_size;
+		if (last->start_offset + last->size + sample_size
+						< first->start_offset)
+			offset = last->start_offset + last->size;
+
 		/* Insufficient space. Overwrite existing old entries */
 		else {
 			u32 target_size = sample_size -
-				(first->offset - last->offset -
-				sample_size);
+				(first->start_offset - last->start_offset -
+				last->size);
 
 			stream->cs_buffer.status |=
 				I915_PERF_CMD_STREAM_BUF_STATUS_OVERFLOW;
 			release_perf_samples(stream, target_size);
-			sample->offset = last->offset + sample_size;
+			offset = last->start_offset + sample_size;
 		}
 	}
+
+out:
+	sample->start_offset = offset;
+	sample->size = sample_size;
+	if (stream->sample_flags & SAMPLE_OA_REPORT) {
+		sample->oa_offset = offset;
+		/* Ensure 64 byte alignment of oa_offset */
+		sample->oa_offset = ALIGN(sample->oa_offset, OA_ADDR_ALIGN);
+		offset = sample->oa_offset +
+			 dev_priv->perf.oa.oa_buffer.format_size;
+	}
+	if (stream->sample_flags & SAMPLE_TS) {
+		sample->ts_offset = offset;
+		/* Ensure 8 byte alignment of ts_offset */
+		sample->ts_offset = ALIGN(sample->ts_offset, TS_ADDR_ALIGN);
+		offset = sample->ts_offset + I915_PERF_TS_SAMPLE_SIZE;
+	}
+
 	list_add_tail(&sample->link, &stream->cs_samples);
 	spin_unlock_irqrestore(&stream->cs_samples_lock, flags);
 }
@@ -591,6 +624,82 @@ static int i915_emit_oa_report_capture(
 }
 
 /**
+ * i915_emit_ts_capture - Insert the commands to capture timestamp
+ * data into the GPU command stream
+ * @request: request in whose context the timestamps are being collected.
+ * @preallocate: allocate space in ring for related sample.
+ * @offset: command stream buffer offset where the timestamp data needs to be
+ * collected
+ */
+static int i915_emit_ts_capture(struct drm_i915_gem_request *request,
+					 bool preallocate,
+					 u32 offset)
+{
+	struct drm_i915_private *dev_priv = request->i915;
+	struct intel_engine_cs *engine = request->engine;
+	struct i915_perf_stream *stream;
+	u32 addr = 0;
+	u32 cmd, len = 6, *cs;
+	int idx;
+
+	if (preallocate)
+		request->reserved_space += len;
+	else
+		request->reserved_space -= len;
+
+	cs = intel_ring_begin(request, 6);
+	if (IS_ERR(cs))
+		return PTR_ERR(cs);
+
+	idx = srcu_read_lock(&engine->perf_srcu);
+	stream = rcu_dereference(engine->exclusive_stream);
+	addr = stream->cs_buffer.vma->node.start + offset;
+	srcu_read_unlock(&engine->perf_srcu, idx);
+
+	if (request->engine->id == RCS) {
+		if (INTEL_GEN(dev_priv) >= 8)
+			cmd = GFX_OP_PIPE_CONTROL(6);
+		else
+			cmd = GFX_OP_PIPE_CONTROL(5);
+
+		*cs++ = cmd;
+		*cs++ = PIPE_CONTROL_GLOBAL_GTT_IVB |
+				PIPE_CONTROL_TIMESTAMP_WRITE;
+		*cs++ = addr | PIPE_CONTROL_GLOBAL_GTT;
+		*cs++ = 0;
+		*cs++ = 0;
+
+		if (INTEL_GEN(dev_priv) >= 8)
+			*cs++ = 0;
+		else
+			*cs++ = MI_NOOP;
+	} else {
+		uint32_t cmd;
+
+		cmd = MI_FLUSH_DW + 1;
+		if (INTEL_GEN(dev_priv) >= 8)
+			cmd += 1;
+
+		cmd |= MI_FLUSH_DW_OP_STAMP;
+
+		*cs++ = cmd;
+		*cs++ = addr | MI_FLUSH_DW_USE_GTT;
+		*cs++ = 0;
+		*cs++ = 0;
+
+		if (INTEL_GEN(dev_priv) >= 8)
+			*cs++ = 0;
+		else
+			*cs++ = MI_NOOP;
+		*cs++ = MI_NOOP;
+	}
+
+	intel_ring_advance(request, cs);
+
+	return 0;
+}
+
+/**
  * i915_perf_stream_emit_sample_capture - Insert the commands to capture perf
  * metrics into the GPU command stream
  * @stream: An i915-perf stream opened for GPU metrics
@@ -625,7 +734,17 @@ static void i915_perf_stream_emit_sample_capture(
 	if (stream->sample_flags & SAMPLE_OA_REPORT) {
 		ret = i915_emit_oa_report_capture(request,
 						  preallocate,
-						  sample->offset);
+						  sample->oa_offset);
+		if (ret)
+			goto err_unref;
+	} else if (stream->sample_flags & SAMPLE_TS) {
+		/*
+		 * XXX: Since TS data can anyways be derived from OA report, so
+		 * no need to capture it for RCS engine, if capture oa data is
+		 * called already.
+		 */
+		ret = i915_emit_ts_capture(request, preallocate,
+						    sample->ts_offset);
 		if (ret)
 			goto err_unref;
 	}
@@ -947,6 +1066,12 @@ static int append_perf_sample(struct i915_perf_stream *stream,
 		buf += 8;
 	}
 
+	if (sample_flags & SAMPLE_TS) {
+		if (copy_to_user(buf, &data->ts, I915_PERF_TS_SAMPLE_SIZE))
+			return -EFAULT;
+		buf += I915_PERF_TS_SAMPLE_SIZE;
+	}
+
 	if (sample_flags & SAMPLE_OA_REPORT) {
 		if (copy_to_user(buf, data->report, report_size))
 			return -EFAULT;
@@ -989,6 +1114,12 @@ static int append_oa_buffer_sample(struct i915_perf_stream *stream,
 
 	if (sample_flags & SAMPLE_TAG)
 		data.tag = stream->last_tag;
+
+	/* TODO: Derive timestamp from OA report,
+	 * after scaling with the ts base
+	 */
+	if (sample_flags & SAMPLE_TS)
+		data.ts = 0;
 
 	if (sample_flags & SAMPLE_OA_REPORT)
 		data.report = report;
@@ -1565,7 +1696,8 @@ static int append_cs_buffer_sample(struct i915_perf_stream *stream,
 	int ret = 0;
 
 	if (sample_flags & SAMPLE_OA_REPORT) {
-		const u8 *report = stream->cs_buffer.vaddr + node->offset;
+		const u8 *report = stream->cs_buffer.vaddr + node->oa_offset;
+
 		u32 sample_ts = *(u32 *)(report + 4);
 
 		data.report = report;
@@ -1595,6 +1727,19 @@ static int append_cs_buffer_sample(struct i915_perf_stream *stream,
 	if (sample_flags & SAMPLE_TAG) {
 		data.tag = node->tag;
 		stream->last_tag = node->tag;
+	}
+
+	if (sample_flags & SAMPLE_TS) {
+		/* For RCS, if OA samples are also being collected, derive the
+		 * timestamp from OA report, after scaling with the TS base.
+		 * Else, forward the timestamp collected via command stream.
+		 */
+		/* TODO: derive the timestamp from OA report */
+		if (sample_flags & SAMPLE_OA_REPORT)
+			data.ts = 0;
+		else
+			data.ts = *(u64 *) (stream->cs_buffer.vaddr +
+					   node->ts_offset);
 	}
 
 	return append_perf_sample(stream, buf, count, offset, &data);
@@ -2760,7 +2905,8 @@ static int i915_perf_stream_init(struct i915_perf_stream *stream,
 						      SAMPLE_OA_SOURCE);
 	bool require_cs_mode = props->sample_flags & (SAMPLE_PID |
 						      SAMPLE_TAG);
-	bool cs_sample_data = props->sample_flags & SAMPLE_OA_REPORT;
+	bool cs_sample_data = props->sample_flags & (SAMPLE_OA_REPORT |
+							SAMPLE_TS);
 	struct i915_perf_stream *curr_stream;
 	struct intel_engine_cs *engine = NULL;
 	int idx;
@@ -2917,8 +3063,21 @@ static int i915_perf_stream_init(struct i915_perf_stream *stream,
 			require_cs_mode = true;
 	}
 
+	if (props->sample_flags & SAMPLE_TS) {
+		stream->sample_flags |= SAMPLE_TS;
+		stream->sample_size += I915_PERF_TS_SAMPLE_SIZE;
+
+		/*
+		 * NB: it's meaningful to request SAMPLE_TS with just CS
+		 * mode or periodic OA mode sampling but we don't allow
+		 * SAMPLE_TS without either mode
+		 */
+		if (!require_oa_unit)
+			require_cs_mode = true;
+	}
+
 	if (require_cs_mode && !props->cs_mode) {
-		DRM_ERROR("PID/TAG sampling requires a ring to be specified");
+		DRM_ERROR("PID/TAG/TS sampling requires engine to be specified");
 		ret = -EINVAL;
 		goto err_enable;
 	}
@@ -2932,11 +3091,11 @@ static int i915_perf_stream_init(struct i915_perf_stream *stream,
 
 		/*
 		 * The only time we should allow enabling CS mode if it's not
-		 * strictly required, is if SAMPLE_CTX_ID has been requested
-		 * as it's usable with periodic OA or CS sampling.
+		 * strictly required, is if SAMPLE_CTX_ID/SAMPLE_TS has been
+		 * requested as they're usable with periodic OA or CS sampling.
 		 */
 		if (!require_cs_mode &&
-		    !(props->sample_flags & SAMPLE_CTX_ID)) {
+		    !(props->sample_flags & (SAMPLE_CTX_ID | SAMPLE_TS))) {
 			DRM_ERROR("Stream engine given without requesting any CS specific property\n");
 			ret = -EINVAL;
 			goto err_enable;
@@ -3646,21 +3805,12 @@ static int read_properties_unlocked(struct drm_i915_private *dev_priv,
 		case DRM_I915_PERF_PROP_ENGINE: {
 				unsigned int user_ring_id =
 					value & I915_EXEC_RING_MASK;
-				enum intel_engine_id engine;
 
 				if (user_ring_id > I915_USER_RINGS)
 					return -EINVAL;
 
-				/* XXX: Currently only RCS is supported.
-				 * Remove this check when support for other
-				 * engines is added
-				 */
-				engine = user_ring_map[user_ring_id];
-				if (engine != RCS)
-					return -EINVAL;
-
 				props->cs_mode = true;
-				props->engine = engine;
+				props->engine = user_ring_map[user_ring_id];
 			}
 			break;
 		case DRM_I915_PERF_PROP_SAMPLE_CTX_ID:
@@ -3671,6 +3821,9 @@ static int read_properties_unlocked(struct drm_i915_private *dev_priv,
 			break;
 		case DRM_I915_PERF_PROP_SAMPLE_TAG:
 			props->sample_flags |= SAMPLE_TAG;
+			break;
+		case DRM_I915_PERF_PROP_SAMPLE_TS:
+			props->sample_flags |= SAMPLE_TS;
 			break;
 		case DRM_I915_PERF_PROP_MAX:
 			MISSING_CASE(id);
