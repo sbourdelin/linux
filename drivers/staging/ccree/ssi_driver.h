@@ -100,7 +100,7 @@
 #ifdef CC_DEBUG
 #define SSI_LOG_DEBUG(format, ...) SSI_LOG(KERN_DEBUG, format, ##__VA_ARGS__)
 #else /* Debug log messages are removed at compile time for non-DEBUG config. */
-#define SSI_LOG_DEBUG(format, ...) do {} while (0)
+#define SSI_LOG_DEBUG(format, ...) no_printk(format, ##__VA_ARGS__)
 #endif
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
