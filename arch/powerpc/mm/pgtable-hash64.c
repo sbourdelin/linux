@@ -434,8 +434,26 @@ static bool hash__change_memory_range(unsigned long start, unsigned long end,
 	shift = mmu_psize_defs[mmu_linear_psize].shift;
 	step = 1 << shift;
 
-	start = ALIGN_DOWN(start, step);
-	end = ALIGN(end, step); // aligns up
+	if (!IS_ALIGNED(PHYSICAL_START, step)) {
+		/*
+		 * For the relocatable case we might have
+		 * a case where _stext shares the page
+		 * with rw memory or __init_begin might
+		 * share the page with executable text.
+		 * This breaks strict RWX, but allows the
+		 * kernel to boot. If PHYSICAL_START is mmu_linear_psize
+		 * aligned, then we can continue to make the same
+		 * assumptions as the non-relocatable case.
+		 *
+		 * TODO: If we really care about the relocatable
+		 * case, we can align __init_begin/end better.
+		 */
+		start = ALIGN(start, step);
+		end = ALIGN_DOWN(end, step);
+	} else {
+		start = ALIGN_DOWN(start, step);
+		end = ALIGN(end, step); /* Aligns up */
+	}
 
 	if (start >= end)
 		return false;
@@ -454,6 +472,12 @@ static bool hash__change_memory_range(unsigned long start, unsigned long end,
 void hash__mark_rodata_ro(void)
 {
 	unsigned long start, end;
+
+	if (PHYSICAL_START > MEMORY_START)
+		pr_warn("Detected relocation and CONFIG_STRICT_KERNEL_RWX "
+			"permissions are best effort, some non-text area "
+			"might still be left as executable");
+
 
 	start = (unsigned long)_stext;
 	end = (unsigned long)__init_begin;
