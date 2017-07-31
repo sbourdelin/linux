@@ -3329,6 +3329,28 @@ done:
 	return ret;
 }
 
+static int vt_notifier_call(struct notifier_block *blk,
+			    unsigned long code, void *_param)
+{
+	struct vt_notifier_param *param = _param;
+	struct vc_data *vc = param->vc;
+
+	switch (code) {
+	case VT_UPDATE:
+		/*
+		 * This event could indicate that the terminal has been
+		 * inverted (or there was some other major change), in which
+		 * case we need to re-draw the margins.
+		 */
+		if (con_is_visible(vc) && vc->vc_mode == KD_TEXT)
+			fbcon_clear_margins(vc, 0);
+		break;
+	default:
+		break;
+	}
+	return NOTIFY_OK;
+}
+
 /*
  *  The console `switch' structure for the frame buffer based console
  */
@@ -3362,6 +3384,10 @@ static const struct consw fb_con = {
 
 static struct notifier_block fbcon_event_notifier = {
 	.notifier_call	= fbcon_event_notify,
+};
+
+static struct notifier_block vt_notifier_block = {
+	.notifier_call = vt_notifier_call,
 };
 
 static ssize_t store_rotate(struct device *device,
@@ -3612,6 +3638,7 @@ static int __init fb_console_init(void)
 
 	console_lock();
 	fb_register_client(&fbcon_event_notifier);
+	register_vt_notifier(&vt_notifier_block);
 	fbcon_device = device_create(fb_class, NULL, MKDEV(0, 0), NULL,
 				     "fbcon");
 
@@ -3650,6 +3677,7 @@ static void __exit fbcon_deinit_device(void)
 static void __exit fb_console_exit(void)
 {
 	console_lock();
+	unregister_vt_notifier(&vt_notifier_block);
 	fb_unregister_client(&fbcon_event_notifier);
 	fbcon_deinit_device();
 	device_destroy(fb_class, MKDEV(0, 0));
