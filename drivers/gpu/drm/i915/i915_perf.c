@@ -3308,12 +3308,10 @@ static ssize_t i915_perf_read(struct file *file,
 	return ret;
 }
 
-static enum hrtimer_restart poll_check_timer_cb(struct hrtimer *hrtimer)
+static void wake_up_perf_streams(void *data, async_cookie_t cookie)
 {
+	struct drm_i915_private *dev_priv = data;
 	struct i915_perf_stream *stream;
-	struct drm_i915_private *dev_priv =
-		container_of(hrtimer, typeof(*dev_priv),
-			     perf.poll_check_timer);
 	int idx;
 	struct intel_engine_cs *engine;
 	enum intel_engine_id id;
@@ -3329,6 +3327,15 @@ static enum hrtimer_restart poll_check_timer_cb(struct hrtimer *hrtimer)
 		}
 		srcu_read_unlock(&engine->perf_srcu, idx);
 	}
+}
+
+static enum hrtimer_restart poll_check_timer_cb(struct hrtimer *hrtimer)
+{
+	struct drm_i915_private *dev_priv =
+		container_of(hrtimer, typeof(*dev_priv),
+			     perf.poll_check_timer);
+
+	async_schedule(wake_up_perf_streams, dev_priv);
 
 	hrtimer_forward_now(hrtimer, ns_to_ktime(POLL_PERIOD));
 
