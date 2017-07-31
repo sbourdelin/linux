@@ -1,0 +1,24 @@
+menu "I3C support"
+
+config I3C
+	tristate "I3C support"
+	---help---
+	  I3C (pronounce: I-cube-C) is a serial protocol standardized by the
+	  MIPI alliance.
+
+	  It's supposed to be backward compatible with I2C while providing
+	  support for high speed transfers and native interrupt support
+	  without the need for extra pins.
+
+	  The I3C protocol also standardizes the slave device types and is
+	  mainly design to communicate with sensors.
+
+	  If you want I3C support, you should say Y here and also to the
+	  specific driver for your bus adapter(s) below.
+
+	  This I3C support can also be built as a module.  If so, the module
+	  will be called i3c.
+
+source "drivers/i3c/master/Kconfig"
+
+endmenu

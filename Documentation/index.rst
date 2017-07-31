@@ -75,6 +75,7 @@ needed).
    sound/index
    crypto/index
    filesystems/index
+   i3c/index
 
 Architecture-specific documentation
 -----------------------------------

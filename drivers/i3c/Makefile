@@ -1,0 +1,3 @@
+i3c-y				:= core.o device.o master.o
+obj-$(CONFIG_I3C)		+= i3c.o
+obj-$(CONFIG_I3C)		+= master/
