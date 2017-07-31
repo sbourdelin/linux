@@ -1,0 +1,90 @@
+Generic device tree bindings for I3C busses
+===========================================
+
+This document describes generic bindings that should be used to describe I3C
+busses in a device tree.
+
+Required properties
+-------------------
+
+- #address-cells  - should be <1>. Read more about addresses below.
+- #size-cells     - should be <0>.
+- compatible      - name of I3C bus controller following generic names
+		    recommended practice.
+
+For other required properties e.g. to describe register sets,
+clocks, etc. check the binding documentation of the specific driver.
+
+Optional properties
+-------------------
+
+These properties may not be supported by all I3C master drivers. Each I3C
+master bindings should specify which of them are supported.
+
+- i3c-scl-frequency: frequency (in Hz) of the SCL signal used for I3C
+		     transfers. When undefined the core set it to 12.5MHz.
+
+- i2c-scl-frequency: frequency (in Hz) of the SCL signal used for I2C
+		     transfers. When undefined, the core looks at LVR values
+		     of I2C devices described in the device tree to determine
+		     the maximum I2C frequency.
+
+I2C devices
+===========
+
+Each I2C device connected to the bus should be described in a subnode with
+the following properties:
+
+All properties described in Documentation/devicetree/bindings/i2c/i2c.txt are
+valid here.
+
+New required properties:
+------------------------
+- i3c-lvr: 32 bits integer property (only the lowest 8 bits are meaningful)
+	   describing device capabilities as described in the I3C
+	   specification.
+
+	   bit[31:8]: unused
+	   bit[7:5]: I2C device index. Possible values
+	    * 0: I2C device has a 50 ns spike filter
+	    * 1: I2C device does not have a 50 ns spike filter but supports high
+		 frequency on SCL
+	    * 2: I2C device does not have a 50 ns spike filter and is not
+		 tolerant to high frequencies
+	    * 3-7: reserved
+
+	   bit[4]: tell whether the device operates in FM or FM+ mode
+	    * 0: FM+ mode
+	    * 1: FM mode
+
+	   bit[3:0]: device type
+	    * 0-15: reserved
+
+I3C devices
+===========
+
+I3C are not described in the device tree yet. We could decide to represent them
+at some point to assign a specific dynamic address to a device or to force an
+I3C device to act as an I2C device if it has a static address.
+
+Example:
+
+	i3c-master@0d040000 {
+		compatible = "cdns,i3c-master";
+		clocks = <&coreclock>, <&i3csysclock>;
+		clock-names = "pclk", "sysclk";
+		interrupts = <3 0>;
+		reg = <0x0d040000 0x1000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		status = "okay";
+		i2c-scl-frequency = <100000>;
+
+		nunchuk: nunchuk@52 {
+			compatible = "nintendo,nunchuk";
+			reg = <0x52>;
+			i3c-lvr = <0x10>;
+		};
+	};
+
