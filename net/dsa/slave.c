@@ -648,8 +648,8 @@ static int dsa_slave_set_eee(struct net_device *dev, struct ethtool_eee *e)
 	struct dsa_switch *ds = p->dp->ds;
 	int err = -ENODEV;
 
-	if (ds->ops->set_eee) {
-		err = ds->ops->set_eee(ds, p->dp->index, e);
+	if (ds->ops->set_mac_eee) {
+		err = ds->ops->set_mac_eee(ds, p->dp->index, e);
 		if (err)
 			return err;
 	}
@@ -675,8 +675,8 @@ static int dsa_slave_get_eee(struct net_device *dev, struct ethtool_eee *e)
 	struct dsa_switch *ds = p->dp->ds;
 	int err = -ENODEV;
 
-	if (ds->ops->get_eee) {
-		err = ds->ops->get_eee(ds, p->dp->index, e);
+	if (ds->ops->get_mac_eee) {
+		err = ds->ops->get_mac_eee(ds, p->dp->index, e);
 		if (err)
 			return err;
 	}
