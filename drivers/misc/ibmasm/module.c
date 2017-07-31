@@ -96,11 +96,13 @@ static int ibmasm_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	if (ibmasm_event_buffer_init(sp)) {
 		dev_err(sp->dev, "Failed to allocate event buffer\n");
+		result = -ENOMEM;
 		goto error_eventbuffer;
 	}
 
 	if (ibmasm_heartbeat_init(sp)) {
 		dev_err(sp->dev, "Failed to allocate heartbeat command\n");
+		result = -ENOMEM;
 		goto error_heartbeat;
 	}
 
