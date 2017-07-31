@@ -2077,6 +2077,8 @@ struct i915_perf_stream {
 
 	wait_queue_head_t poll_wq;
 	bool pollin;
+
+	u32 last_ctx_id;
 };
 
 /**
@@ -2151,6 +2153,12 @@ struct i915_oa_ops {
 	 * generations.
 	 */
 	u32 (*oa_hw_tail_read)(struct drm_i915_private *dev_priv);
+
+	/**
+	 * @get_ctx_id: Retrieve the ctx_id associated with the (periodic) OA
+	 * report.
+	 */
+	u32 (*get_ctx_id)(struct i915_perf_stream *stream, const u8 *report);
 };
 
 /*

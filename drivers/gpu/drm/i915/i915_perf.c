@@ -790,6 +790,45 @@ static u32 oa_buffer_num_reports_unlocked(
 	return aged_tail == INVALID_TAIL_PTR ? 0 : num_reports;
 }
 
+static u32 gen7_oa_buffer_get_ctx_id(struct i915_perf_stream *stream,
+				    const u8 *report)
+{
+	if (!stream->cs_mode)
+		WARN_ONCE(1,
+			"CTX ID can't be retrieved if command stream mode not enabled");
+
+	/*
+	 * OA reports generated in Gen7 don't have the ctx ID information.
+	 * Therefore, just rely on the ctx ID information from the last CS
+	 * sample forwarded
+	 */
+	return stream->last_ctx_id;
+}
+
+static u32 gen8_oa_buffer_get_ctx_id(struct i915_perf_stream *stream,
+				    const u8 *report)
+{
+	u32 ctx_id;
+
+	/* The ctx ID present in the OA reports have intel_context::hw_id
+	 * present, since this is programmed into the ELSP in execlist mode.
+	 * In non-execlist mode, fall back to retrieving the ctx ID from the
+	 * last saved ctx ID from command stream mode.
+	 */
+	if (i915.enable_execlists) {
+		u32 *report32 = (void *)report;
+
+		ctx_id = report32[2] & 0x1fffff;
+	} else {
+		if (!stream->cs_mode)
+			WARN_ONCE(1,
+				"CTX ID can't be retrieved if command stream mode not enabled");
+
+		ctx_id = stream->last_ctx_id;
+	}
+	return ctx_id;
+}
+
 /**
  * append_oa_status - Appends a status record to a userspace read() buffer.
  * @stream: An i915-perf stream opened for OA metrics
@@ -914,22 +953,12 @@ static int append_oa_buffer_sample(struct i915_perf_stream *stream,
 	struct drm_i915_private *dev_priv = stream->dev_priv;
 	u32 sample_flags = stream->sample_flags;
 	struct i915_perf_sample_data data = { 0 };
-	u32 *report32 = (u32 *)report;
 
 	if (sample_flags & SAMPLE_OA_SOURCE)
 		data.source = I915_PERF_SAMPLE_OA_SOURCE_OABUFFER;
 
 	if (sample_flags & SAMPLE_CTX_ID) {
-		if (INTEL_INFO(dev_priv)->gen < 8)
-			data.ctx_id = 0;
-		else {
-			/*
-			 * XXX: Just keep the lower 21 bits for now since I'm
-			 * not entirely sure if the HW touches any of the higher
-			 * bits in this field
-			 */
-			data.ctx_id = report32[2] & 0x1fffff;
-		}
+		data.ctx_id = dev_priv->perf.oa.ops.get_ctx_id(stream, report);
 	}
 
 	if (sample_flags & SAMPLE_OA_REPORT)
@@ -1524,8 +1553,10 @@ static int append_cs_buffer_sample(struct i915_perf_stream *stream,
 	if (sample_flags & SAMPLE_OA_SOURCE)
 		data.source = I915_PERF_SAMPLE_OA_SOURCE_CS;
 
-	if (sample_flags & SAMPLE_CTX_ID)
+	if (sample_flags & SAMPLE_CTX_ID) {
 		data.ctx_id = node->ctx_id;
+		stream->last_ctx_id = data.ctx_id;
+	}
 
 	return append_perf_sample(stream, buf, count, offset, &data);
 }
@@ -3838,6 +3869,7 @@ void i915_perf_init(struct drm_i915_private *dev_priv)
 		dev_priv->perf.oa.ops.read = gen7_oa_read;
 		dev_priv->perf.oa.ops.oa_hw_tail_read =
 			gen7_oa_hw_tail_read;
+		dev_priv->perf.oa.ops.get_ctx_id = gen7_oa_buffer_get_ctx_id;
 
 		dev_priv->perf.oa.timestamp_frequency = 12500000;
 
@@ -3933,6 +3965,8 @@ void i915_perf_init(struct drm_i915_private *dev_priv)
 			dev_priv->perf.oa.ops.read = gen8_oa_read;
 			dev_priv->perf.oa.ops.oa_hw_tail_read =
 				gen8_oa_hw_tail_read;
+			dev_priv->perf.oa.ops.get_ctx_id =
+				gen8_oa_buffer_get_ctx_id;
 
 			dev_priv->perf.oa.oa_formats = gen8_plus_oa_formats;
 		}
