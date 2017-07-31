@@ -36,6 +36,7 @@ bool blk_mq_hctx_has_pending(struct blk_mq_hw_ctx *hctx);
 bool blk_mq_get_driver_tag(struct request *rq, struct blk_mq_hw_ctx **hctx,
 				bool wait);
 struct request *blk_mq_dispatch_rq_from_ctxs(struct blk_mq_hw_ctx *hctx);
+int blk_mq_update_sched_queue_depth(struct request_queue *q);
 
 /*
  * Internal helpers for allocating/freeing the request map
