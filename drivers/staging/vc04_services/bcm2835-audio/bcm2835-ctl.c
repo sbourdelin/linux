@@ -91,7 +91,7 @@ static int snd_bcm2835_ctl_get(struct snd_kcontrol *kcontrol,
 	if (mutex_lock_interruptible(&chip->audio_mutex))
 		return -EINTR;
 
-	BUG_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
+	WARN_ON(!chip && !(chip->avail_substreams & AVAIL_SUBSTREAMS_MASK));
 
 	if (kcontrol->private_value == PCM_PLAYBACK_VOLUME)
 		ucontrol->value.integer.value[0] = chip2alsa(chip->volume);
