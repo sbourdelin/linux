@@ -141,11 +141,11 @@ void optprobe_template_func(void);
 STACK_FRAME_NON_STANDARD(optprobe_template_func);
 
 #define TMPL_MOVE_IDX \
-	((long)&optprobe_template_val - (long)&optprobe_template_entry)
+	((long)optprobe_template_val - (long)optprobe_template_entry)
 #define TMPL_CALL_IDX \
-	((long)&optprobe_template_call - (long)&optprobe_template_entry)
+	((long)optprobe_template_call - (long)optprobe_template_entry)
 #define TMPL_END_IDX \
-	((long)&optprobe_template_end - (long)&optprobe_template_entry)
+	((long)optprobe_template_end - (long)optprobe_template_entry)
 
 #define INT3_SIZE sizeof(kprobe_opcode_t)
 
@@ -374,7 +374,7 @@ int arch_prepare_optimized_kprobe(struct optimized_kprobe *op,
 	op->optinsn.size = ret;
 
 	/* Copy arch-dep-instance from template */
-	memcpy(buf, &optprobe_template_entry, TMPL_END_IDX);
+	memcpy(buf, optprobe_template_entry, TMPL_END_IDX);
 
 	/* Set probe information */
 	synthesize_set_arg1(buf + TMPL_MOVE_IDX, (unsigned long)op);
