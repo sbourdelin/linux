@@ -1622,6 +1622,8 @@ void intel_engine_cleanup(struct intel_engine_cs *engine)
 
 	intel_engine_cleanup_common(engine);
 
+	cleanup_srcu_struct(&engine->perf_srcu);
+
 	dev_priv->engine[engine->id] = NULL;
 	kfree(engine);
 }

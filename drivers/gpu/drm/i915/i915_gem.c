@@ -3220,6 +3220,7 @@ i915_gem_idle_work_handler(struct work_struct *work)
 
 	intel_engines_mark_idle(dev_priv);
 	i915_gem_timelines_mark_idle(dev_priv);
+	i915_perf_streams_mark_idle(dev_priv);
 
 	GEM_BUG_ON(!dev_priv->gt.awake);
 	dev_priv->gt.awake = false;

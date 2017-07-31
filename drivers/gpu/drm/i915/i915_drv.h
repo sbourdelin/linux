@@ -1985,6 +1985,24 @@ struct i915_perf_stream_ops {
 	 * The stream will always be disabled before this is called.
 	 */
 	void (*destroy)(struct i915_perf_stream *stream);
+
+	/*
+	 * @emit_sample_capture: Emit the commands in the command streamer
+	 * for a particular gpu engine.
+	 *
+	 * The commands are inserted to capture the perf sample data at
+	 * specific points during workload execution, such as before and after
+	 * the batch buffer.
+	 */
+	void (*emit_sample_capture)(struct i915_perf_stream *stream,
+				    struct drm_i915_gem_request *request,
+				    bool preallocate);
+};
+
+enum i915_perf_stream_state {
+	I915_PERF_STREAM_DISABLED,
+	I915_PERF_STREAM_ENABLE_IN_PROGRESS,
+	I915_PERF_STREAM_ENABLED,
 };
 
 /**
@@ -1997,9 +2015,9 @@ struct i915_perf_stream {
 	struct drm_i915_private *dev_priv;
 
 	/**
-	 * @link: Links the stream into ``&drm_i915_private->streams``
+	 * @engine: Engine to which this stream corresponds.
 	 */
-	struct list_head link;
+	struct intel_engine_cs *engine;
 
 	/**
 	 * @sample_flags: Flags representing the `DRM_I915_PERF_PROP_SAMPLE_*`
@@ -2022,17 +2040,41 @@ struct i915_perf_stream {
 	struct i915_gem_context *ctx;
 
 	/**
-	 * @enabled: Whether the stream is currently enabled, considering
-	 * whether the stream was opened in a disabled state and based
-	 * on `I915_PERF_IOCTL_ENABLE` and `I915_PERF_IOCTL_DISABLE` calls.
+	 * @state: Current stream state, which can be either disabled, enabled,
+	 * or enable_in_progress, while considering whether the stream was
+	 * opened in a disabled state and based on `I915_PERF_IOCTL_ENABLE` and
+	 * `I915_PERF_IOCTL_DISABLE` calls.
 	 */
-	bool enabled;
+	enum i915_perf_stream_state state;
+
+	/**
+	 * @cs_mode: Whether command stream based perf sample collection is
+	 * enabled for this stream
+	 */
+	bool cs_mode;
+
+	/**
+	 * @using_oa: Whether OA unit is in use for this particular stream
+	 */
+	bool using_oa;
 
 	/**
 	 * @ops: The callbacks providing the implementation of this specific
 	 * type of configured stream.
 	 */
 	const struct i915_perf_stream_ops *ops;
+
+	/* Command stream based perf data buffer */
+	struct {
+		struct i915_vma *vma;
+		u8 *vaddr;
+	} cs_buffer;
+
+	struct list_head cs_samples;
+	spinlock_t cs_samples_lock;
+
+	wait_queue_head_t poll_wq;
+	bool pollin;
 };
 
 /**
@@ -2095,7 +2137,8 @@ struct i915_oa_ops {
 	int (*read)(struct i915_perf_stream *stream,
 		    char __user *buf,
 		    size_t count,
-		    size_t *offset);
+		    size_t *offset,
+		    u32 ts);
 
 	/**
 	 * @oa_hw_tail_read: read the OA tail pointer register
@@ -2105,6 +2148,36 @@ struct i915_oa_ops {
 	 * generations.
 	 */
 	u32 (*oa_hw_tail_read)(struct drm_i915_private *dev_priv);
+};
+
+/*
+ * i915_perf_cs_sample - Sample element to hold info about a single perf
+ * sample data associated with a particular GPU command stream.
+ */
+struct i915_perf_cs_sample {
+	/**
+	 * @link: Links the sample into ``&stream->cs_samples``
+	 */
+	struct list_head link;
+
+	/**
+	 * @request: GEM request associated with the sample. The commands to
+	 * capture the perf metrics are inserted into the command streamer in
+	 * context of this request.
+	 */
+	struct drm_i915_gem_request *request;
+
+	/**
+	 * @offset: Offset into ``&stream->cs_buffer``
+	 * where the perf metrics will be collected, when the commands inserted
+	 * into the command stream are executed by GPU.
+	 */
+	u32 offset;
+
+	/**
+	 * @ctx_id: Context ID associated with this perf sample
+	 */
+	u32 ctx_id;
 };
 
 struct intel_cdclk_state {
@@ -2431,17 +2504,10 @@ struct drm_i915_private {
 		struct ctl_table_header *sysctl_header;
 
 		struct mutex lock;
-		struct list_head streams;
+
+		struct hrtimer poll_check_timer;
 
 		struct {
-			struct i915_perf_stream *exclusive_stream;
-
-			u32 specific_ctx_id;
-
-			struct hrtimer poll_check_timer;
-			wait_queue_head_t poll_wq;
-			bool pollin;
-
 			/**
 			 * For rate limiting any notifications of spurious
 			 * invalid OA reports
@@ -3636,6 +3702,8 @@ int i915_perf_open_ioctl(struct drm_device *dev, void *data,
 void i915_oa_init_reg_state(struct intel_engine_cs *engine,
 			    struct i915_gem_context *ctx,
 			    uint32_t *reg_state);
+void i915_perf_emit_sample_capture(struct drm_i915_gem_request *req,
+				   bool preallocate);
 
 /* i915_gem_evict.c */
 int __must_check i915_gem_evict_something(struct i915_address_space *vm,
@@ -3795,6 +3863,7 @@ int intel_engine_cmd_parser(struct intel_engine_cs *engine,
 /* i915_perf.c */
 extern void i915_perf_init(struct drm_i915_private *dev_priv);
 extern void i915_perf_fini(struct drm_i915_private *dev_priv);
+extern void i915_perf_streams_mark_idle(struct drm_i915_private *dev_priv);
 extern void i915_perf_register(struct drm_i915_private *dev_priv);
 extern void i915_perf_unregister(struct drm_i915_private *dev_priv);
 

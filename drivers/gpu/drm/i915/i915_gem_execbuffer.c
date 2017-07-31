@@ -1194,11 +1194,15 @@ static int __reloc_gpu_alloc(struct i915_execbuffer *eb,
 	if (err)
 		goto err_request;
 
+	i915_perf_emit_sample_capture(rq, true);
+
 	err = eb->engine->emit_bb_start(rq,
 					batch->node.start, PAGE_SIZE,
 					cache->gen > 5 ? 0 : I915_DISPATCH_SECURE);
 	if (err)
 		goto err_request;
+
+	i915_perf_emit_sample_capture(rq, false);
 
 	GEM_BUG_ON(!reservation_object_test_signaled_rcu(batch->resv, true));
 	i915_vma_move_to_active(batch, rq, 0);
@@ -2029,6 +2033,8 @@ static int eb_submit(struct i915_execbuffer *eb)
 			return err;
 	}
 
+	i915_perf_emit_sample_capture(eb->request, true);
+
 	err = eb->engine->emit_bb_start(eb->request,
 					eb->batch->node.start +
 					eb->batch_start_offset,
@@ -2036,6 +2042,8 @@ static int eb_submit(struct i915_execbuffer *eb)
 					eb->batch_flags);
 	if (err)
 		return err;
+
+	i915_perf_emit_sample_capture(eb->request, false);
 
 	return 0;
 }

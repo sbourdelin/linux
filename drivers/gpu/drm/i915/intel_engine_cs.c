@@ -317,6 +317,10 @@ int intel_engines_init(struct drm_i915_private *dev_priv)
 			goto cleanup;
 
 		GEM_BUG_ON(!engine->submit_request);
+
+		/* Perf stream related initialization for Engine */
+		rcu_assign_pointer(engine->exclusive_stream, NULL);
+		init_srcu_struct(&engine->perf_srcu);
 	}
 
 	return 0;

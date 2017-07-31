@@ -441,6 +441,11 @@ struct intel_engine_cs {
 	 * certain bits to encode the command length in the header).
 	 */
 	u32 (*get_cmd_length_mask)(u32 cmd_header);
+
+	/* Global per-engine stream */
+	struct srcu_struct perf_srcu;
+	struct i915_perf_stream __rcu *exclusive_stream;
+	u32 specific_ctx_id;
 };
 
 static inline unsigned int
