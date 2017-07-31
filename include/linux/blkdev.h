@@ -395,6 +395,11 @@ struct request_queue {
 
 	atomic_t		shared_hctx_restart;
 
+	/* blk-mq dispatch list and lock for shared queue depth case */
+	struct list_head	__mq_dispatch_list;
+	spinlock_t		__mq_dispatch_lock;
+	unsigned int		mq_dispatch_busy;
+
 	struct blk_queue_stats	*stats;
 	struct rq_wb		*rq_wb;
 

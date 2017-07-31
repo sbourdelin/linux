@@ -138,19 +138,27 @@ static inline bool blk_mq_hw_queue_mapped(struct blk_mq_hw_ctx *hctx)
 static inline bool blk_mq_hctx_is_busy(struct request_queue *q,
 		struct blk_mq_hw_ctx *hctx)
 {
-	return test_bit(BLK_MQ_S_BUSY, &hctx->state);
+	if (!(hctx->flags & BLK_MQ_F_SHARED_DEPTH))
+		return test_bit(BLK_MQ_S_BUSY, &hctx->state);
+	return q->mq_dispatch_busy;
 }
 
 static inline void blk_mq_hctx_set_busy(struct request_queue *q,
 		struct blk_mq_hw_ctx *hctx)
 {
-	set_bit(BLK_MQ_S_BUSY, &hctx->state);
+	if (!(hctx->flags & BLK_MQ_F_SHARED_DEPTH))
+		set_bit(BLK_MQ_S_BUSY, &hctx->state);
+	else
+		q->mq_dispatch_busy = 1;
 }
 
 static inline void blk_mq_hctx_clear_busy(struct request_queue *q,
 		struct blk_mq_hw_ctx *hctx)
 {
-	clear_bit(BLK_MQ_S_BUSY, &hctx->state);
+	if (!(hctx->flags & BLK_MQ_F_SHARED_DEPTH))
+		clear_bit(BLK_MQ_S_BUSY, &hctx->state);
+	else
+		q->mq_dispatch_busy = 0;
 }
 
 static inline bool blk_mq_has_dispatch_rqs(struct blk_mq_hw_ctx *hctx)

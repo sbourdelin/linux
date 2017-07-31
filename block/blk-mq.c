@@ -2667,8 +2667,14 @@ int blk_mq_update_sched_queue_depth(struct request_queue *q)
 	 * this queue depth limit
 	 */
 	if (q->queue_depth) {
-		queue_for_each_hw_ctx(q, hctx, i)
+		queue_for_each_hw_ctx(q, hctx, i) {
 			hctx->flags |= BLK_MQ_F_SHARED_DEPTH;
+			hctx->dispatch_lock = &q->__mq_dispatch_lock;
+			hctx->dispatch_list = &q->__mq_dispatch_list;
+
+			spin_lock_init(hctx->dispatch_lock);
+			INIT_LIST_HEAD(hctx->dispatch_list);
+		}
 	}
 
 	if (!q->elevator)
