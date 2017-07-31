@@ -194,8 +194,16 @@ static void fib6_link_table(struct net *net, struct fib6_table *tb)
 	 * Initialize table lock at a single place to give lockdep a key,
 	 * tables aren't visible prior to being linked to the list.
 	 */
-	rwlock_init(&tb->tb6_lock);
-
+	for_each_possible_cpu(h) {
+		/*
+		 * make sure the first lock and other locks have different
+		 * lockdep map, so we can treat the first lock as nested lock
+		 */
+		if (h == 0)
+			spin_lock_init(per_cpu_ptr(tb->percpu_tb6_lock, h));
+		else
+			spin_lock_init(per_cpu_ptr(tb->percpu_tb6_lock, h));
+	}
 	h = tb->tb6_id & (FIB6_TABLE_HASHSZ - 1);
 
 	/*
@@ -205,23 +213,34 @@ static void fib6_link_table(struct net *net, struct fib6_table *tb)
 	hlist_add_head_rcu(&tb->tb6_hlist, &net->ipv6.fib_table_hash[h]);
 }
 
-#ifdef CONFIG_IPV6_MULTIPLE_TABLES
-
-static struct fib6_table *fib6_alloc_table(struct net *net, u32 id)
+static struct fib6_table *fib6_alloc_table(struct net *net, u32 id, gfp_t gfp)
 {
 	struct fib6_table *table;
 
-	table = kzalloc(sizeof(*table), GFP_ATOMIC);
-	if (table) {
+	table = kzalloc(sizeof(*table), gfp);
+	if (!table)
+		return NULL;
+	table->percpu_tb6_lock = alloc_percpu_gfp(struct spinlock, gfp);
+	if (table->percpu_tb6_lock) {
 		table->tb6_id = id;
 		table->tb6_root.leaf = net->ipv6.ip6_null_entry;
 		table->tb6_root.fn_flags = RTN_ROOT | RTN_TL_ROOT | RTN_RTINFO;
 		inet_peer_base_init(&table->tb6_peers);
+	} else {
+		kfree(table);
+		return NULL;
 	}
 
 	return table;
 }
 
+static void fib6_free_table(struct fib6_table *table)
+{
+	free_percpu(table->percpu_tb6_lock);
+	kfree(table);
+}
+
+#ifdef CONFIG_IPV6_MULTIPLE_TABLES
 struct fib6_table *fib6_new_table(struct net *net, u32 id)
 {
 	struct fib6_table *tb;
@@ -232,7 +251,7 @@ struct fib6_table *fib6_new_table(struct net *net, u32 id)
 	if (tb)
 		return tb;
 
-	tb = fib6_alloc_table(net, id);
+	tb = fib6_alloc_table(net, id, GFP_ATOMIC);
 	if (tb)
 		fib6_link_table(net, tb);
 
@@ -366,9 +385,9 @@ static int fib6_dump_table(struct fib6_table *table, struct sk_buff *skb,
 		w->count = 0;
 		w->skip = 0;
 
-		read_lock_bh(&table->tb6_lock);
+		fib6_table_read_lock_bh(table);
 		res = fib6_walk(net, w);
-		read_unlock_bh(&table->tb6_lock);
+		fib6_table_read_unlock_bh(table);
 		if (res > 0) {
 			cb->args[4] = 1;
 			cb->args[5] = w->root->fn_sernum;
@@ -383,9 +402,9 @@ static int fib6_dump_table(struct fib6_table *table, struct sk_buff *skb,
 		} else
 			w->skip = 0;
 
-		read_lock_bh(&table->tb6_lock);
+		fib6_table_read_lock_bh(table);
 		res = fib6_walk_continue(w);
-		read_unlock_bh(&table->tb6_lock);
+		fib6_table_read_unlock_bh(table);
 		if (res <= 0) {
 			fib6_walker_unlink(net, w);
 			cb->args[4] = 0;
@@ -1710,10 +1729,10 @@ static void __fib6_clean_all(struct net *net,
 	for (h = 0; h < FIB6_TABLE_HASHSZ; h++) {
 		head = &net->ipv6.fib_table_hash[h];
 		hlist_for_each_entry_rcu(table, head, tb6_hlist) {
-			write_lock_bh(&table->tb6_lock);
+			fib6_table_write_lock_bh(table);
 			fib6_clean_tree(net, &table->tb6_root,
 					func, false, sernum, arg);
-			write_unlock_bh(&table->tb6_lock);
+			fib6_table_write_unlock_bh(table);
 		}
 	}
 	rcu_read_unlock();
@@ -1856,27 +1875,16 @@ static int __net_init fib6_net_init(struct net *net)
 	if (!net->ipv6.fib_table_hash)
 		goto out_rt6_stats;
 
-	net->ipv6.fib6_main_tbl = kzalloc(sizeof(*net->ipv6.fib6_main_tbl),
-					  GFP_KERNEL);
+	net->ipv6.fib6_main_tbl = fib6_alloc_table(net, RT6_TABLE_MAIN,
+		GFP_KERNEL);
 	if (!net->ipv6.fib6_main_tbl)
 		goto out_fib_table_hash;
 
-	net->ipv6.fib6_main_tbl->tb6_id = RT6_TABLE_MAIN;
-	net->ipv6.fib6_main_tbl->tb6_root.leaf = net->ipv6.ip6_null_entry;
-	net->ipv6.fib6_main_tbl->tb6_root.fn_flags =
-		RTN_ROOT | RTN_TL_ROOT | RTN_RTINFO;
-	inet_peer_base_init(&net->ipv6.fib6_main_tbl->tb6_peers);
-
 #ifdef CONFIG_IPV6_MULTIPLE_TABLES
-	net->ipv6.fib6_local_tbl = kzalloc(sizeof(*net->ipv6.fib6_local_tbl),
-					   GFP_KERNEL);
+	net->ipv6.fib6_local_tbl = fib6_alloc_table(net, RT6_TABLE_LOCAL,
+		GFP_KERNEL);
 	if (!net->ipv6.fib6_local_tbl)
 		goto out_fib6_main_tbl;
-	net->ipv6.fib6_local_tbl->tb6_id = RT6_TABLE_LOCAL;
-	net->ipv6.fib6_local_tbl->tb6_root.leaf = net->ipv6.ip6_null_entry;
-	net->ipv6.fib6_local_tbl->tb6_root.fn_flags =
-		RTN_ROOT | RTN_TL_ROOT | RTN_RTINFO;
-	inet_peer_base_init(&net->ipv6.fib6_local_tbl->tb6_peers);
 #endif
 	fib6_tables_init(net);
 
@@ -1884,7 +1892,7 @@ static int __net_init fib6_net_init(struct net *net)
 
 #ifdef CONFIG_IPV6_MULTIPLE_TABLES
 out_fib6_main_tbl:
-	kfree(net->ipv6.fib6_main_tbl);
+	fib6_free_table(net->ipv6.fib6_main_tbl);
 #endif
 out_fib_table_hash:
 	kfree(net->ipv6.fib_table_hash);
@@ -1901,10 +1909,10 @@ static void fib6_net_exit(struct net *net)
 
 #ifdef CONFIG_IPV6_MULTIPLE_TABLES
 	inetpeer_invalidate_tree(&net->ipv6.fib6_local_tbl->tb6_peers);
-	kfree(net->ipv6.fib6_local_tbl);
+	fib6_free_table(net->ipv6.fib6_local_tbl);
 #endif
 	inetpeer_invalidate_tree(&net->ipv6.fib6_main_tbl->tb6_peers);
-	kfree(net->ipv6.fib6_main_tbl);
+	fib6_free_table(net->ipv6.fib6_main_tbl);
 	kfree(net->ipv6.fib_table_hash);
 	kfree(net->ipv6.rt6_stats);
 }
@@ -2067,9 +2075,9 @@ static void *ipv6_route_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 iter_table:
 	ipv6_route_check_sernum(iter);
-	read_lock(&iter->tbl->tb6_lock);
+	fib6_table_read_lock(iter->tbl);
 	r = fib6_walk_continue(&iter->w);
-	read_unlock(&iter->tbl->tb6_lock);
+	fib6_table_read_unlock(iter->tbl);
 	if (r > 0) {
 		if (v)
 			++*pos;

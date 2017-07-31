@@ -877,7 +877,7 @@ static struct rt6_info *ip6_pol_route_lookup(struct net *net,
 	struct fib6_node *fn;
 	struct rt6_info *rt;
 
-	read_lock_bh(&table->tb6_lock);
+	fib6_table_read_lock_bh(table);
 	fn = fib6_lookup(&table->tb6_root, &fl6->daddr, &fl6->saddr);
 restart:
 	rt = fn->leaf;
@@ -890,7 +890,7 @@ restart:
 			goto restart;
 	}
 	dst_use(&rt->dst, jiffies);
-	read_unlock_bh(&table->tb6_lock);
+	fib6_table_read_unlock_bh(table);
 
 	trace_fib6_table_lookup(net, rt, table->tb6_id, fl6);
 
@@ -944,9 +944,9 @@ static int __ip6_ins_rt(struct rt6_info *rt, struct nl_info *info,
 	struct fib6_table *table;
 
 	table = rt->rt6i_table;
-	write_lock_bh(&table->tb6_lock);
+	fib6_table_write_lock_bh(table);
 	err = fib6_add(&table->tb6_root, rt, info, mxc, extack);
-	write_unlock_bh(&table->tb6_lock);
+	fib6_table_write_unlock_bh(table);
 
 	return err;
 }
@@ -1044,7 +1044,7 @@ static struct rt6_info *rt6_make_pcpu_route(struct rt6_info *rt)
 		return net->ipv6.ip6_null_entry;
 	}
 
-	read_lock_bh(&table->tb6_lock);
+	fib6_table_read_lock_bh(table);
 	if (rt->rt6i_pcpu) {
 		p = this_cpu_ptr(rt->rt6i_pcpu);
 		prev = cmpxchg(p, NULL, pcpu_rt);
@@ -1065,7 +1065,7 @@ static struct rt6_info *rt6_make_pcpu_route(struct rt6_info *rt)
 	}
 	dst_hold(&pcpu_rt->dst);
 	rt6_dst_from_metrics_check(pcpu_rt);
-	read_unlock_bh(&table->tb6_lock);
+	fib6_table_read_unlock_bh(table);
 	return pcpu_rt;
 }
 
@@ -1081,7 +1081,7 @@ struct rt6_info *ip6_pol_route(struct net *net, struct fib6_table *table,
 	if (net->ipv6.devconf_all->forwarding == 0)
 		strict |= RT6_LOOKUP_F_REACHABLE;
 
-	read_lock_bh(&table->tb6_lock);
+	fib6_table_read_lock_bh(table);
 
 	fn = fib6_lookup(&table->tb6_root, &fl6->daddr, &fl6->saddr);
 	saved_fn = fn;
@@ -1108,7 +1108,7 @@ redo_rt6_select:
 
 	if (rt == net->ipv6.ip6_null_entry || (rt->rt6i_flags & RTF_CACHE)) {
 		dst_use(&rt->dst, jiffies);
-		read_unlock_bh(&table->tb6_lock);
+		fib6_table_read_unlock_bh(table);
 
 		rt6_dst_from_metrics_check(rt);
 
@@ -1125,7 +1125,7 @@ redo_rt6_select:
 		struct rt6_info *uncached_rt;
 
 		dst_use(&rt->dst, jiffies);
-		read_unlock_bh(&table->tb6_lock);
+		fib6_table_read_unlock_bh(table);
 
 		uncached_rt = ip6_rt_cache_alloc(rt, &fl6->daddr, NULL);
 		dst_release(&rt->dst);
@@ -1153,14 +1153,14 @@ redo_rt6_select:
 		pcpu_rt = rt6_get_pcpu_route(rt);
 
 		if (pcpu_rt) {
-			read_unlock_bh(&table->tb6_lock);
+			fib6_table_read_unlock_bh(table);
 		} else {
 			/* We have to do the read_unlock first
 			 * because rt6_make_pcpu_route() may trigger
 			 * ip6_dst_gc() which will take the write_lock.
 			 */
 			dst_hold(&rt->dst);
-			read_unlock_bh(&table->tb6_lock);
+			fib6_table_read_unlock_bh(table);
 			pcpu_rt = rt6_make_pcpu_route(rt);
 			dst_release(&rt->dst);
 		}
@@ -1503,7 +1503,7 @@ static struct rt6_info *__ip6_route_redirect(struct net *net,
 	 * routes.
 	 */
 
-	read_lock_bh(&table->tb6_lock);
+	fib6_table_read_lock_bh(table);
 	fn = fib6_lookup(&table->tb6_root, &fl6->daddr, &fl6->saddr);
 restart:
 	for (rt = fn->leaf; rt; rt = rt->dst.rt6_next) {
@@ -1536,7 +1536,7 @@ restart:
 out:
 	dst_hold(&rt->dst);
 
-	read_unlock_bh(&table->tb6_lock);
+	fib6_table_read_unlock_bh(table);
 
 	trace_fib6_table_lookup(net, rt, table->tb6_id, fl6);
 	return rt;
@@ -2135,9 +2135,9 @@ static int __ip6_del_rt(struct rt6_info *rt, struct nl_info *info)
 	}
 
 	table = rt->rt6i_table;
-	write_lock_bh(&table->tb6_lock);
+	fib6_table_write_lock_bh(table);
 	err = fib6_del(rt, info);
-	write_unlock_bh(&table->tb6_lock);
+	fib6_table_write_unlock_bh(table);
 
 out:
 	ip6_rt_put(rt);
@@ -2163,7 +2163,7 @@ static int __ip6_del_rt_siblings(struct rt6_info *rt, struct fib6_config *cfg)
 	if (rt == net->ipv6.ip6_null_entry)
 		goto out_put;
 	table = rt->rt6i_table;
-	write_lock_bh(&table->tb6_lock);
+	fib6_table_write_lock_bh(table);
 
 	if (rt->rt6i_nsiblings && cfg->fc_delete_all_nh) {
 		struct rt6_info *sibling, *next_sibling;
@@ -2193,7 +2193,7 @@ static int __ip6_del_rt_siblings(struct rt6_info *rt, struct fib6_config *cfg)
 
 	err = fib6_del(rt, info);
 out_unlock:
-	write_unlock_bh(&table->tb6_lock);
+	fib6_table_write_unlock_bh(table);
 out_put:
 	ip6_rt_put(rt);
 
@@ -2218,7 +2218,7 @@ static int ip6_route_del(struct fib6_config *cfg,
 		return err;
 	}
 
-	read_lock_bh(&table->tb6_lock);
+	fib6_table_read_lock_bh(table);
 
 	fn = fib6_locate(&table->tb6_root,
 			 &cfg->fc_dst, cfg->fc_dst_len,
@@ -2241,7 +2241,7 @@ static int ip6_route_del(struct fib6_config *cfg,
 			if (cfg->fc_protocol && cfg->fc_protocol != rt->rt6i_protocol)
 				continue;
 			dst_hold(&rt->dst);
-			read_unlock_bh(&table->tb6_lock);
+			fib6_table_read_unlock_bh(table);
 
 			/* if gateway was specified only delete the one hop */
 			if (cfg->fc_flags & RTF_GATEWAY)
@@ -2250,7 +2250,7 @@ static int ip6_route_del(struct fib6_config *cfg,
 			return __ip6_del_rt_siblings(rt, cfg);
 		}
 	}
-	read_unlock_bh(&table->tb6_lock);
+	fib6_table_read_unlock_bh(table);
 
 	return err;
 }
@@ -2429,7 +2429,7 @@ static struct rt6_info *rt6_get_route_info(struct net *net,
 	if (!table)
 		return NULL;
 
-	read_lock_bh(&table->tb6_lock);
+	fib6_table_read_lock_bh(table);
 	fn = fib6_locate(&table->tb6_root, prefix, prefixlen, NULL, 0);
 	if (!fn)
 		goto out;
@@ -2445,7 +2445,7 @@ static struct rt6_info *rt6_get_route_info(struct net *net,
 		break;
 	}
 out:
-	read_unlock_bh(&table->tb6_lock);
+	fib6_table_read_unlock_bh(table);
 	return rt;
 }
 
@@ -2490,7 +2490,7 @@ struct rt6_info *rt6_get_dflt_router(const struct in6_addr *addr, struct net_dev
 	if (!table)
 		return NULL;
 
-	read_lock_bh(&table->tb6_lock);
+	fib6_table_read_lock_bh(table);
 	for (rt = table->tb6_root.leaf; rt; rt = rt->dst.rt6_next) {
 		if (dev == rt->dst.dev &&
 		    ((rt->rt6i_flags & (RTF_ADDRCONF | RTF_DEFAULT)) == (RTF_ADDRCONF | RTF_DEFAULT)) &&
@@ -2499,7 +2499,7 @@ struct rt6_info *rt6_get_dflt_router(const struct in6_addr *addr, struct net_dev
 	}
 	if (rt)
 		dst_hold(&rt->dst);
-	read_unlock_bh(&table->tb6_lock);
+	fib6_table_read_unlock_bh(table);
 	return rt;
 }
 
@@ -2536,17 +2536,17 @@ static void __rt6_purge_dflt_routers(struct fib6_table *table)
 	struct rt6_info *rt;
 
 restart:
-	read_lock_bh(&table->tb6_lock);
+	fib6_table_read_unlock_bh(table);
 	for (rt = table->tb6_root.leaf; rt; rt = rt->dst.rt6_next) {
 		if (rt->rt6i_flags & (RTF_DEFAULT | RTF_ADDRCONF) &&
 		    (!rt->rt6i_idev || rt->rt6i_idev->cnf.accept_ra != 2)) {
 			dst_hold(&rt->dst);
-			read_unlock_bh(&table->tb6_lock);
+			fib6_table_read_unlock_bh(table);
 			ip6_del_rt(rt);
 			goto restart;
 		}
 	}
-	read_unlock_bh(&table->tb6_lock);
+	fib6_table_read_unlock_bh(table);
 
 	table->flags &= ~RT6_TABLE_HAS_DFLT_ROUTER;
 }

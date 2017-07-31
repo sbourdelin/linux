@@ -2313,7 +2313,7 @@ static struct rt6_info *addrconf_get_prefix_route(const struct in6_addr *pfx,
 	if (!table)
 		return NULL;
 
-	read_lock_bh(&table->tb6_lock);
+	fib6_table_read_lock_bh(table);
 	fn = fib6_locate(&table->tb6_root, pfx, plen, NULL, 0);
 	if (!fn)
 		goto out;
@@ -2330,7 +2330,7 @@ static struct rt6_info *addrconf_get_prefix_route(const struct in6_addr *pfx,
 		break;
 	}
 out:
-	read_unlock_bh(&table->tb6_lock);
+	fib6_table_read_unlock_bh(table);
 	return rt;
 }
 
@@ -5929,7 +5929,7 @@ void addrconf_disable_policy_idev(struct inet6_dev *idev, int val)
 			struct fib6_table *table = rt->rt6i_table;
 			int cpu;
 
-			read_lock(&table->tb6_lock);
+			fib6_table_read_lock(table);
 			addrconf_set_nopolicy(ifa->rt, val);
 			if (rt->rt6i_pcpu) {
 				for_each_possible_cpu(cpu) {
@@ -5939,7 +5939,7 @@ void addrconf_disable_policy_idev(struct inet6_dev *idev, int val)
 					addrconf_set_nopolicy(*rtp, val);
 				}
 			}
-			read_unlock(&table->tb6_lock);
+			fib6_table_read_unlock(table);
 		}
 		spin_unlock(&ifa->lock);
 	}

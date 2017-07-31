@@ -229,12 +229,61 @@ struct rt6_statistics {
 struct fib6_table {
 	struct hlist_node	tb6_hlist;
 	u32			tb6_id;
-	rwlock_t		tb6_lock;
+	spinlock_t __percpu	*percpu_tb6_lock;
 	struct fib6_node	tb6_root;
 	struct inet_peer_base	tb6_peers;
 	unsigned int		flags;
 #define RT6_TABLE_HAS_DFLT_ROUTER	BIT(0)
 };
+
+static inline void fib6_table_read_lock_bh(struct fib6_table *table)
+{
+	preempt_disable();
+	spin_lock_bh(this_cpu_ptr(table->percpu_tb6_lock));
+}
+
+static inline void fib6_table_read_unlock_bh(struct fib6_table *table)
+{
+	spin_unlock_bh(this_cpu_ptr(table->percpu_tb6_lock));
+	preempt_enable();
+}
+
+static inline void fib6_table_read_lock(struct fib6_table *table)
+{
+	preempt_disable();
+	spin_lock(this_cpu_ptr(table->percpu_tb6_lock));
+}
+
+static inline void fib6_table_read_unlock(struct fib6_table *table)
+{
+	spin_unlock(this_cpu_ptr(table->percpu_tb6_lock));
+	preempt_enable();
+}
+
+static inline void fib6_table_write_lock_bh(struct fib6_table *table)
+{
+	int i;
+
+	spin_lock_bh(per_cpu_ptr(table->percpu_tb6_lock, 0));
+	for_each_possible_cpu(i) {
+		if (i == 0)
+			continue;
+		spin_lock_nest_lock(per_cpu_ptr(table->percpu_tb6_lock, i),
+			per_cpu_ptr(table->percpu_tb6_lock, 0));
+	}
+}
+
+static inline void fib6_table_write_unlock_bh(struct fib6_table *table)
+{
+	int i;
+
+	for_each_possible_cpu(i) {
+		if (i == 0)
+			continue;
+		spin_unlock(per_cpu_ptr(table->percpu_tb6_lock, i));
+	}
+	spin_unlock_bh(per_cpu_ptr(table->percpu_tb6_lock, 0));
+}
 
 #define RT6_TABLE_UNSPEC	RT_TABLE_UNSPEC
 #define RT6_TABLE_MAIN		RT_TABLE_MAIN
