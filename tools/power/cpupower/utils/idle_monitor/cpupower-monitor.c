@@ -21,7 +21,10 @@
 #include "idle_monitor/cpupower-monitor.h"
 #include "idle_monitor/idle_monitors.h"
 #include "helpers/helpers.h"
-
+#define xstr(s) str(s)
+#define str(s) #s
+#define COL_WIDTH_MIN   6
+#define COL_WIDTH_MAX   8
 /* Define pointers to all monitors.  */
 #define DEF(x) & x ## _monitor ,
 struct cpuidle_monitor *all_monitors[] = {
@@ -85,7 +88,7 @@ int fill_string_with_spaces(char *s, int n)
 void print_header(int topology_depth)
 {
 	int unsigned mon;
-	int state, need_len;
+	int state, need_len, name_len;
 	cstate_t s;
 	char buf[128] = "";
 	int percent_width = 4;
@@ -116,17 +119,19 @@ void print_header(int topology_depth)
 	for (mon = 0; mon < avail_monitors; mon++) {
 		if (mon != 0)
 			printf("|| ");
-		else
-			printf(" ");
 		for (state = 0; state < monitors[mon]->hw_states_num; state++) {
 			if (state != 0)
-				printf(" | ");
+				printf("|");
 			s = monitors[mon]->hw_states[state];
-			sprintf(buf, "%s", s.name);
+			name_len = strlen(s.name);
+			if (name_len <= COL_WIDTH_MIN)
+				percent_width = COL_WIDTH_MIN;
+			else
+				percent_width = COL_WIDTH_MAX;
+			sprintf(buf, "%.*s", percent_width, s.name);
 			fill_string_with_spaces(buf, percent_width);
 			printf("%s", buf);
 		}
-		printf(" ");
 	}
 	printf("\n");
 }
@@ -134,11 +139,12 @@ void print_header(int topology_depth)
 
 void print_results(int topology_depth, int cpu)
 {
-	unsigned int mon;
-	int state, ret;
+	unsigned int mon, percent_width, name_len, width;
+	int state, ret, i;
 	double percent;
 	unsigned long long result;
 	cstate_t s;
+	char buf[128] = "";
 
 	/* Be careful CPUs may got resorted for pkg value do not just use cpu */
 	if (!bitmask_isbitset(cpus_chosen, cpu_top.core_info[cpu].cpu))
@@ -163,23 +169,34 @@ void print_results(int topology_depth, int cpu)
 				printf("|");
 
 			s = monitors[mon]->hw_states[state];
-
+			name_len = strlen(s.name);
+			if (name_len > COL_WIDTH_MIN) {
+				percent_width = COL_WIDTH_MAX;
+				width = percent_width - COL_WIDTH_MIN;
+				fill_string_with_spaces(buf, width);
+				printf("%s", buf);
+			}
 			if (s.get_count_percent) {
 				ret = s.get_count_percent(s.id, &percent,
 						  cpu_top.core_info[cpu].cpu);
 				if (ret)
-					printf("******");
+					for (i = 0; i < COL_WIDTH_MIN; i++)
+						printf("*");
 				else if (percent >= 100.0)
-					printf("%6.1f", percent);
+					printf("%"xstr(COL_WIDTH_MIN)".1f",
+						  percent);
 				else
-					printf("%6.2f", percent);
+					printf("%"xstr(COL_WIDTH_MIN)".2f",
+						  percent);
 			} else if (s.get_count) {
 				ret = s.get_count(s.id, &result,
 						  cpu_top.core_info[cpu].cpu);
 				if (ret)
-					printf("******");
+					for (i = 0; i < COL_WIDTH_MIN; i++)
+						printf("*");
 				else
-					printf("%6llu", result);
+					printf("%"xstr(COL_WIDTH_MIN)"llu",
+						  result);
 			} else {
 				printf(_("Monitor %s, Counter %s has no count "
 					 "function. Implementation error\n"),
