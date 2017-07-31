@@ -80,19 +80,6 @@ static inline struct drm_fbdev_cma *to_fbdev_cma(struct drm_fb_helper *helper)
 	return container_of(helper, struct drm_fbdev_cma, fb_helper);
 }
 
-void drm_fb_cma_destroy(struct drm_framebuffer *fb)
-{
-	drm_gem_fb_destroy(fb);
-}
-EXPORT_SYMBOL(drm_fb_cma_destroy);
-
-int drm_fb_cma_create_handle(struct drm_framebuffer *fb,
-	struct drm_file *file_priv, unsigned int *handle)
-{
-	return drm_gem_fb_create_handle(fb, file_priv, handle);
-}
-EXPORT_SYMBOL(drm_fb_cma_create_handle);
-
 /**
  * drm_fb_cma_create_with_funcs() - helper function for the
  *                                  &drm_mode_config_funcs.fb_create
