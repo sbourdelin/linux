@@ -131,19 +131,8 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 	 * If we have previous entries on our dispatch list, grab them first for
 	 * more fair dispatch.
 	 */
-	if (!list_empty_careful(&hctx->dispatch)) {
-		spin_lock(&hctx->lock);
-		if (!list_empty(&hctx->dispatch)) {
-			list_splice_init(&hctx->dispatch, &rq_list);
-
-			/*
-			 * BUSY won't be cleared until all requests
-			 * in hctx->dispatch are dispatched successfully
-			 */
-			blk_mq_hctx_set_busy(hctx);
-		}
-		spin_unlock(&hctx->lock);
-	}
+	if (blk_mq_has_dispatch_rqs(hctx))
+		blk_mq_take_list_from_dispatch(hctx, &rq_list);
 
 	/*
 	 * Only ask the scheduler for requests, if we didn't have residual
@@ -296,9 +285,7 @@ static bool blk_mq_sched_bypass_insert(struct blk_mq_hw_ctx *hctx,
 	 * If we already have a real request tag, send directly to
 	 * the dispatch list.
 	 */
-	spin_lock(&hctx->lock);
-	list_add(&rq->queuelist, &hctx->dispatch);
-	spin_unlock(&hctx->lock);
+	blk_mq_add_rq_to_dispatch(hctx, rq);
 	return true;
 }
 

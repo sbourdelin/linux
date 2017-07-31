@@ -63,7 +63,7 @@ static int blk_mq_poll_stats_bkt(const struct request *rq)
 bool blk_mq_hctx_has_pending(struct blk_mq_hw_ctx *hctx)
 {
 	return sbitmap_any_bit_set(&hctx->ctx_map) ||
-			!list_empty_careful(&hctx->dispatch) ||
+			blk_mq_has_dispatch_rqs(hctx) ||
 			blk_mq_sched_has_work(hctx);
 }
 
@@ -1097,9 +1097,7 @@ bool blk_mq_dispatch_rq_list(struct request_queue *q, struct list_head *list)
 		rq = list_first_entry(list, struct request, queuelist);
 		blk_mq_put_driver_tag(rq);
 
-		spin_lock(&hctx->lock);
-		list_splice_init(list, &hctx->dispatch);
-		spin_unlock(&hctx->lock);
+		blk_mq_add_list_to_dispatch(hctx, list);
 
 		/*
 		 * If SCHED_RESTART was set by the caller of this function and
@@ -1874,9 +1872,7 @@ static int blk_mq_hctx_notify_dead(unsigned int cpu, struct hlist_node *node)
 	if (list_empty(&tmp))
 		return 0;
 
-	spin_lock(&hctx->lock);
-	list_splice_tail_init(&tmp, &hctx->dispatch);
-	spin_unlock(&hctx->lock);
+	blk_mq_add_list_to_dispatch_tail(hctx, &tmp);
 
 	blk_mq_run_hw_queue(hctx, true);
 	return 0;
@@ -1926,6 +1922,13 @@ static void blk_mq_exit_hw_queues(struct request_queue *q,
 	}
 }
 
+static void blk_mq_init_dispatch(struct request_queue *q,
+		struct blk_mq_hw_ctx *hctx)
+{
+	spin_lock_init(&hctx->lock);
+	INIT_LIST_HEAD(&hctx->dispatch);
+}
+
 static int blk_mq_init_hctx(struct request_queue *q,
 		struct blk_mq_tag_set *set,
 		struct blk_mq_hw_ctx *hctx, unsigned hctx_idx)
@@ -1939,6 +1942,7 @@ static int blk_mq_init_hctx(struct request_queue *q,
 	INIT_DELAYED_WORK(&hctx->run_work, blk_mq_run_work_fn);
 	spin_lock_init(&hctx->lock);
 	INIT_LIST_HEAD(&hctx->dispatch);
+	blk_mq_init_dispatch(q, hctx);
 	hctx->queue = q;
 	hctx->flags = set->flags & ~BLK_MQ_F_TAG_SHARED;
 
