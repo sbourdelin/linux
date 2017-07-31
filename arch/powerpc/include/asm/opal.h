@@ -269,6 +269,8 @@ int64_t opal_xive_sync(uint32_t type, uint32_t id);
 int64_t opal_xive_dump(uint32_t type, uint32_t id);
 int opal_get_powercap(u32 handle, int token, u32 *pcap);
 int opal_set_powercap(u32 handle, int token, u32 pcap);
+int opal_get_power_shift_ratio(u32 handle, int token, u32 *psr);
+int opal_set_power_shift_ratio(u32 handle, int token, u32 psr);
 
 /* Internal functions */
 extern int early_init_dt_scan_opal(unsigned long node, const char *uname,
@@ -348,6 +350,7 @@ static inline int opal_get_async_rc(struct opal_msg msg)
 void opal_wake_poller(void);
 
 void opal_powercap_init(void);
+void opal_psr_init(void);
 
 #endif /* __ASSEMBLY__ */
 
