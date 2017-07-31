@@ -842,6 +842,9 @@ static int __init opal_init(void)
 	/* Initialise OPAL Power-Shifting-Ratio interface */
 	opal_psr_init();
 
+	/* Initialize platform device: OCC interface */
+	opal_pdev_init("ibm,opal-occ-sensor-group");
+
 	return 0;
 }
 machine_subsys_initcall(powernv, opal_init);
