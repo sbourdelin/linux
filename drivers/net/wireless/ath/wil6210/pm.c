@@ -24,6 +24,7 @@ int wil_can_suspend(struct wil6210_priv *wil, bool is_runtime)
 {
 	int rc = 0;
 	struct wireless_dev *wdev = wil->wdev;
+	struct net_device *ndev = wil_to_ndev(wil);
 	bool wmi_only = test_bit(WMI_FW_CAPABILITY_WMI_ONLY,
 				 wil->fw_capabilities);
 
@@ -35,7 +36,8 @@ int wil_can_suspend(struct wil6210_priv *wil, bool is_runtime)
 		rc = -EPERM;
 		goto out;
 	}
-	if (!netif_running(wil_to_ndev(wil))) {
+
+	if (!(ndev->flags & IFF_UP)) {
 		/* can always sleep when down */
 		wil_dbg_pm(wil, "Interface is down\n");
 		goto out;
