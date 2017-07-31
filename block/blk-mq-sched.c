@@ -96,6 +96,9 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 	const bool has_sched_dispatch = e && e->type->ops.mq.dispatch_request;
 	bool can_go = true;
 	LIST_HEAD(rq_list);
+	struct request *(*dispatch_fn)(struct blk_mq_hw_ctx *) =
+		has_sched_dispatch ? e->type->ops.mq.dispatch_request :
+			blk_mq_dispatch_rq_from_ctxs;
 
 	/* RCU or SRCU read lock is needed before checking quiesced flag */
 	if (unlikely(blk_mq_hctx_stopped(hctx) || blk_queue_quiesced(q)))
@@ -126,26 +129,28 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 	if (!list_empty(&rq_list)) {
 		blk_mq_sched_mark_restart_hctx(hctx);
 		can_go = blk_mq_dispatch_rq_list(q, &rq_list);
-	} else if (!has_sched_dispatch) {
+	} else if (!has_sched_dispatch && !q->queue_depth) {
 		blk_mq_flush_busy_ctxs(hctx, &rq_list);
 		blk_mq_dispatch_rq_list(q, &rq_list);
+		can_go = false;
 	}
+
+	if (!can_go)
+		return;
 
 	/*
 	 * We want to dispatch from the scheduler if we had no work left
 	 * on the dispatch list, OR if we did have work but weren't able
 	 * to make progress.
 	 */
-	if (can_go && has_sched_dispatch) {
-		do {
-			struct request *rq;
+	do {
+		struct request *rq;
 
-			rq = e->type->ops.mq.dispatch_request(hctx);
-			if (!rq)
-				break;
-			list_add(&rq->queuelist, &rq_list);
-		} while (blk_mq_dispatch_rq_list(q, &rq_list));
-	}
+		rq = dispatch_fn(hctx);
+		if (!rq)
+			break;
+		list_add(&rq->queuelist, &rq_list);
+	} while (blk_mq_dispatch_rq_list(q, &rq_list));
 }
 
 bool blk_mq_sched_try_merge(struct request_queue *q, struct bio *bio,
