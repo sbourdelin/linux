@@ -790,12 +790,6 @@ static inline __be32 ip6_make_flowlabel(struct net *net, struct sk_buff *skb,
 
 	hash = skb_get_hash_flowi6(skb, fl6);
 
-	/* Since this is being sent on the wire obfuscate hash a bit
-	 * to minimize possbility that any useful information to an
-	 * attacker is leaked. Only lower 20 bits are relevant.
-	 */
-	rol32(hash, 16);
-
 	flowlabel = (__force __be32)hash & IPV6_FLOWLABEL_MASK;
 
 	if (net->ipv6.sysctl.flowlabel_state_ranges)
