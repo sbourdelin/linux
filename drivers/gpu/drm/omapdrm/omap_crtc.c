@@ -498,39 +498,34 @@ static void omap_crtc_atomic_flush(struct drm_crtc *crtc,
 	spin_unlock_irq(&crtc->dev->event_lock);
 }
 
-static bool omap_crtc_is_plane_prop(struct drm_crtc *crtc,
-	struct drm_property *property)
-{
-	struct drm_device *dev = crtc->dev;
-	struct omap_drm_private *priv = dev->dev_private;
-
-	return property == priv->zorder_prop ||
-		property == crtc->primary->rotation_property;
-}
-
 static int omap_crtc_atomic_set_property(struct drm_crtc *crtc,
 					 struct drm_crtc_state *state,
 					 struct drm_property *property,
 					 uint64_t val)
 {
-	if (omap_crtc_is_plane_prop(crtc, property)) {
-		struct drm_plane_state *plane_state;
-		struct drm_plane *plane = crtc->primary;
+	struct omap_drm_private *priv = crtc->dev->dev_private;
+	struct omap_crtc_state *omap_state = to_omap_crtc_state(state);
+	struct drm_plane_state *plane_state;
 
-		/*
-		 * Delegate property set to the primary plane. Get the plane
-		 * state and set the property directly.
-		 */
+	/*
+	 * Delegate property set to the primary plane. Get the plane
+	 * state and set the property directly.
+	 */
+	plane_state = drm_atomic_get_plane_state(state->state, crtc->primary);
+	if (IS_ERR(plane_state))
+		return PTR_ERR(plane_state);
 
-		plane_state = drm_atomic_get_plane_state(state->state, plane);
-		if (IS_ERR(plane_state))
-			return PTR_ERR(plane_state);
-
-		return drm_atomic_plane_set_property(plane, plane_state,
-				property, val);
+	if (property == crtc->primary->rotation_property) {
+		plane_state->rotation = val;
+		omap_state->rotation = val;
+	} else if (property == priv->zorder_prop) {
+		plane_state->zpos = val;
+		omap_state->zpos = val;
+	} else {
+		return -EINVAL;
 	}
 
-	return -EINVAL;
+	return 0;
 }
 
 static int omap_crtc_atomic_get_property(struct drm_crtc *crtc,
@@ -538,18 +533,35 @@ static int omap_crtc_atomic_get_property(struct drm_crtc *crtc,
 					 struct drm_property *property,
 					 uint64_t *val)
 {
-	if (omap_crtc_is_plane_prop(crtc, property)) {
-		/*
-		 * Delegate property get to the primary plane. The
-		 * drm_atomic_plane_get_property() function isn't exported, but
-		 * can be called through drm_object_property_get_value() as that
-		 * will call drm_atomic_get_property() for atomic drivers.
-		 */
-		return drm_object_property_get_value(&crtc->primary->base,
-				property, val);
-	}
+	struct omap_drm_private *priv = crtc->dev->dev_private;
+	struct omap_crtc_state *omap_state = to_omap_crtc_state(state);
+
+	/*
+	 * Remap to the plane rotation/zorder property. We can peek at the plane
+	 * state directly since holding the crtc locks gives you a read-lock on
+	 * the plane state.
+	 */
+	if (property == crtc->primary->rotation_property)
+		return omap_state->rotation;
+	else if (property == priv->zorder_prop)
+		return omap_state->zpos;
 
 	return -EINVAL;
+}
+
+static struct drm_crtc_state *
+omap_crtc_duplicate_state(struct drm_crtc *crtc)
+{
+	struct omap_crtc_state *state;
+
+	if (WARN_ON(!crtc->state))
+		return NULL;
+
+	state = kmalloc(sizeof(*state), GFP_KERNEL);
+	if (state)
+		__drm_atomic_helper_crtc_duplicate_state(crtc, &state->base);
+
+	return &state->base;
 }
 
 static const struct drm_crtc_funcs omap_crtc_funcs = {
@@ -559,7 +571,7 @@ static const struct drm_crtc_funcs omap_crtc_funcs = {
 	.page_flip = drm_atomic_helper_page_flip,
 	.gamma_set = drm_atomic_helper_legacy_gamma_set,
 	.set_property = drm_atomic_helper_crtc_set_property,
-	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
+	.atomic_duplicate_state = omap_crtc_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
 	.atomic_set_property = omap_crtc_atomic_set_property,
 	.atomic_get_property = omap_crtc_atomic_get_property,

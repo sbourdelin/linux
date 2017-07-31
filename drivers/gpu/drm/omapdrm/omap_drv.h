@@ -115,6 +115,15 @@ static inline void omap_fbdev_free(struct drm_device *dev)
 }
 #endif
 
+struct omap_crtc_state {
+	/* must be first */
+	struct drm_crtc_state base;
+	/* shadow values for legacy userspace support */
+	unsigned int rotation;
+	unsigned int zpos;
+};
+#define to_omap_crtc_state(x) container_of(x, struct omap_crtc_state, base)
+
 struct videomode *omap_crtc_timings(struct drm_crtc *crtc);
 enum omap_channel omap_crtc_channel(struct drm_crtc *crtc);
 void omap_crtc_pre_init(void);
