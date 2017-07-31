@@ -263,6 +263,7 @@ struct iio_event_spec {
  *			attributes but not for event codes.
  * @output:		Channel is output.
  * @differential:	Channel is differential.
+ * @counter:		Channel is part of a counter.
  */
 struct iio_chan_spec {
 	enum iio_chan_type	type;
@@ -295,6 +296,7 @@ struct iio_chan_spec {
 	unsigned		indexed:1;
 	unsigned		output:1;
 	unsigned		differential:1;
+	unsigned		counter:1;
 };
 
 

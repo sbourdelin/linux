@@ -85,6 +85,7 @@ static const char * const iio_chan_type_name_spec[] = {
 	[IIO_COUNT] = "count",
 	[IIO_INDEX] = "index",
 	[IIO_GRAVITY]  = "gravity",
+	[IIO_SIGNAL] = "signal",
 };
 
 static const char * const iio_modifier_names[] = {
@@ -989,7 +990,18 @@ int __iio_device_attr_init(struct device_attribute *dev_attr,
 			break;
 
 		case IIO_SEPARATE:
-			if (chan->indexed)
+			if (chan->counter) {
+				if (!chan->indexed) {
+					WARN(1, "Counter channels must be indexed\n");
+					ret = -EINVAL;
+					goto error_free_full_postfix;
+				}
+				name = kasprintf(GFP_KERNEL, "%s%d-%d_%s",
+						    iio_chan_type_name_spec[chan->type],
+						    chan->channel,
+						    chan->channel2,
+						    full_postfix);
+			} else if (chan->indexed)
 				name = kasprintf(GFP_KERNEL, "%s_%s%d_%s",
 						    iio_direction[chan->output],
 						    iio_chan_type_name_spec[chan->type],
