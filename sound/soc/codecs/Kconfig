@@ -117,7 +117,7 @@ config SND_SOC_ALL_CODECS
 	select SND_SOC_RT274 if I2C
 	select SND_SOC_RT286 if I2C
 	select SND_SOC_RT298 if I2C
-	select SND_SOC_RT5514 if I2C
+	select SND_SOC_RT5514_I2C if I2C
 	select SND_SOC_RT5616 if I2C
 	select SND_SOC_RT5631 if I2C
 	select SND_SOC_RT5640 if I2C
@@ -738,6 +738,11 @@ config SND_SOC_RT298
 	depends on I2C
 
 config SND_SOC_RT5514
+	tristate
+	default m if SND_SOC_RT5514_SPI=m
+	default SND_SOC_RT5514_I2C || SND_SOC_RT5514_SPI
+
+config SND_SOC_RT5514_I2C
 	tristate
 
 config SND_SOC_RT5514_SPI
