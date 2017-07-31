@@ -89,6 +89,7 @@ static unsigned long nidump = 16;
 static unsigned long ncsum = 4096;
 static int termch;
 static char tmpstr[128];
+static char tracing_enabled = 1;
 
 static long bus_error_jmp[JMP_BUF_LEN];
 static int catch_memory_errors;
@@ -268,6 +269,7 @@ Commands:\n\
   Sr #	read SPR #\n\
   Sw #v write v to SPR #\n\
   t	print backtrace\n\
+  v	trace enable/disable\n\
   x	exit monitor and recover\n\
   X	exit monitor and don't recover\n"
 #if defined(CONFIG_PPC64) && !defined(CONFIG_PPC_BOOK3E)
@@ -983,6 +985,17 @@ cmds(struct pt_regs *excp)
 		case 'x':
 		case 'X':
 			return cmd;
+		case 'v':
+			if (tracing_is_on()) {
+				printk("Disabling tracing\n");
+				tracing_enabled = 0;
+				tracing_off();
+			} else {
+				printk("Enabling tracing\n");
+				tracing_enabled = 1;
+				tracing_on();
+			}
+			break;
 		case EOF:
 			printf(" <no input ...>\n");
 			mdelay(2000);
@@ -2353,7 +2366,8 @@ static void dump_tracing(void)
 	else
 		ftrace_dump(DUMP_ALL);
 
-	tracing_on();
+	if (tracing_enabled)
+		tracing_on();
 }
 
 static void dump_all_pacas(void)
