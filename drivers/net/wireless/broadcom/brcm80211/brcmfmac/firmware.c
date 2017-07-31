@@ -462,8 +462,14 @@ static void brcmf_fw_request_nvram_done(const struct firmware *fw, void *ctx)
 		raw_nvram = false;
 	} else {
 		data = bcm47xx_nvram_get_contents(&data_len);
-		if (!data && !(fwctx->flags & BRCMF_FW_REQ_NV_OPTIONAL))
-			goto fail;
+		if (!data) {
+			brcmf_dbg(TRACE, "Failed to get platform NVRAM\n");
+			if (!(fwctx->flags & BRCMF_FW_REQ_NV_OPTIONAL)) {
+				brcmf_err("Loading NVRAM from %s and using platform one both failed\n",
+					  fwctx->nvram_name);
+				goto fail;
+			}
+		}
 		raw_nvram = true;
 	}
 
@@ -491,6 +497,9 @@ fail:
 static void brcmf_fw_request_code_done(const struct firmware *fw, void *ctx)
 {
 	struct brcmf_fw *fwctx = ctx;
+	struct firmware_opts fw_opts = {
+		.optional = true,
+	};
 	int ret = 0;
 
 	brcmf_dbg(TRACE, "enter: dev=%s\n", dev_name(fwctx->dev));
@@ -503,9 +512,8 @@ static void brcmf_fw_request_code_done(const struct firmware *fw, void *ctx)
 		goto done;
 
 	fwctx->code = fw;
-	ret = request_firmware_nowait(THIS_MODULE, true, fwctx->nvram_name,
-				      fwctx->dev, GFP_KERNEL, fwctx,
-				      brcmf_fw_request_nvram_done);
+	ret = request_firmware_async(fwctx->nvram_name, &fw_opts, fwctx->dev,
+				     fwctx, brcmf_fw_request_nvram_done);
 
 	/* pass NULL to nvram callback for bcm47xx fallback */
 	if (ret)
