@@ -169,7 +169,7 @@ config MEMORY_HOTPLUG_SPARSE
 config MEMORY_HOTPLUG_DEFAULT_ONLINE
         bool "Online the newly added memory blocks by default"
         default n
-        depends on MEMORY_HOTPLUG
+        depends on MEMORY_HOTPLUG && !PPC64
         help
 	  This option sets the default policy setting for memory hotplug
 	  onlining policy (/sys/devices/system/memory/auto_online_blocks) which
