@@ -446,6 +446,9 @@ struct intel_engine_cs {
 	struct srcu_struct perf_srcu;
 	struct i915_perf_stream __rcu *exclusive_stream;
 	u32 specific_ctx_id;
+
+	u32 num_mmio;
+	u32 mmio_list[I915_PERF_MMIO_NUM_MAX];
 };
 
 static inline unsigned int

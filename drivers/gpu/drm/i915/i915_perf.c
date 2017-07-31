@@ -301,6 +301,7 @@ struct i915_perf_sample_data {
 	u64 tag;
 	u64 ts;
 	const u8 *report;
+	const u8 *mmio;
 };
 
 /* For sysctl proc_dointvec_minmax of i915_oa_max_sample_rate
@@ -358,6 +359,7 @@ static const enum intel_engine_id user_ring_map[I915_USER_RINGS + 1] = {
 #define SAMPLE_PID	      (1<<3)
 #define SAMPLE_TAG	      (1<<4)
 #define SAMPLE_TS	      (1<<5)
+#define SAMPLE_MMIO	      (1<<6)
 
 /**
  * struct perf_open_properties - for validated properties given to open a stream
@@ -496,6 +498,9 @@ static void insert_perf_sample(struct i915_perf_stream *stream,
 		sample_size += I915_PERF_TS_SAMPLE_SIZE;
 	}
 
+	if (stream->sample_flags & SAMPLE_MMIO)
+		sample_size += 4 * stream->engine->num_mmio;
+
 	spin_lock_irqsave(&stream->cs_samples_lock, flags);
 	if (list_empty(&stream->cs_samples)) {
 		offset = 0;
@@ -560,6 +565,10 @@ out:
 		/* Ensure 8 byte alignment of ts_offset */
 		sample->ts_offset = ALIGN(sample->ts_offset, TS_ADDR_ALIGN);
 		offset = sample->ts_offset + I915_PERF_TS_SAMPLE_SIZE;
+	}
+	if (stream->sample_flags & SAMPLE_MMIO) {
+		sample->mmio_offset = offset;
+		offset = sample->mmio_offset + 4 * stream->engine->num_mmio;
 	}
 
 	list_add_tail(&sample->link, &stream->cs_samples);
@@ -700,6 +709,61 @@ static int i915_emit_ts_capture(struct drm_i915_gem_request *request,
 }
 
 /**
+ * i915_emit_mmio_capture - Insert the commands to capture mmio
+ * data into the GPU command stream
+ * @request: request in whose context the mmio data being collected.
+ * @preallocate: allocate space in ring for related sample.
+ * @offset: command stream buffer offset where the data needs to be collected
+ */
+static int i915_engine_stream_capture_mmio(struct drm_i915_gem_request *request,
+					   bool preallocate,
+					   u32 offset)
+{
+	struct drm_i915_private *dev_priv = request->i915;
+	struct intel_engine_cs *engine = request->engine;
+	struct i915_perf_stream *stream;
+	int i, num_mmio = engine->num_mmio;
+	u32 mmio_addr;
+	u32 cmd, len, *cs;
+	int idx;
+
+	len = 4 * num_mmio;
+
+	if (preallocate)
+		request->reserved_space += len;
+	else
+		request->reserved_space -= len;
+
+	cs = intel_ring_begin(request, 4 * num_mmio);
+	if (IS_ERR(cs))
+		return PTR_ERR(cs);
+
+	idx = srcu_read_lock(&engine->perf_srcu);
+	stream = rcu_dereference(engine->exclusive_stream);
+	mmio_addr = stream->cs_buffer.vma->node.start + offset;
+	srcu_read_unlock(&engine->perf_srcu, idx);
+
+
+	if (INTEL_GEN(dev_priv) >= 8)
+		cmd = MI_STORE_REGISTER_MEM_GEN8 | MI_SRM_LRM_GLOBAL_GTT;
+	else
+		cmd = MI_STORE_REGISTER_MEM | MI_SRM_LRM_GLOBAL_GTT;
+
+	for (i = 0; i < num_mmio; i++) {
+		*cs++ = cmd;
+		*cs++ = engine->mmio_list[i];
+		*cs++ = mmio_addr + 4*i;
+
+		if (INTEL_GEN(dev_priv) >= 8)
+			*cs++ = 0;
+		else
+			*cs++ = MI_NOOP;
+	}
+	intel_ring_advance(request, cs);
+	return 0;
+}
+
+/**
  * i915_perf_stream_emit_sample_capture - Insert the commands to capture perf
  * metrics into the GPU command stream
  * @stream: An i915-perf stream opened for GPU metrics
@@ -745,6 +809,14 @@ static void i915_perf_stream_emit_sample_capture(
 		 */
 		ret = i915_emit_ts_capture(request, preallocate,
 						    sample->ts_offset);
+		if (ret)
+			goto err_unref;
+	}
+
+	if (stream->sample_flags & SAMPLE_MMIO) {
+		ret = i915_engine_stream_capture_mmio(request,
+				preallocate,
+				sample->mmio_offset);
 		if (ret)
 			goto err_unref;
 	}
@@ -1072,6 +1144,12 @@ static int append_perf_sample(struct i915_perf_stream *stream,
 		buf += I915_PERF_TS_SAMPLE_SIZE;
 	}
 
+	if (sample_flags & SAMPLE_MMIO) {
+		if (copy_to_user(buf, data->mmio, 4 * stream->engine->num_mmio))
+			return -EFAULT;
+		buf += 4 * stream->engine->num_mmio;
+	}
+
 	if (sample_flags & SAMPLE_OA_REPORT) {
 		if (copy_to_user(buf, data->report, report_size))
 			return -EFAULT;
@@ -1121,6 +1199,7 @@ static int append_oa_buffer_sample(struct i915_perf_stream *stream,
 	struct drm_i915_private *dev_priv = stream->dev_priv;
 	u32 sample_flags = stream->sample_flags;
 	struct i915_perf_sample_data data = { 0 };
+	u32 mmio_list_dummy[I915_PERF_MMIO_NUM_MAX] = { 0 };
 
 	if (sample_flags & SAMPLE_OA_SOURCE)
 		data.source = I915_PERF_SAMPLE_OA_SOURCE_OABUFFER;
@@ -1137,6 +1216,10 @@ static int append_oa_buffer_sample(struct i915_perf_stream *stream,
 
 	if (sample_flags & SAMPLE_TS)
 		data.ts = get_gpu_ts_from_oa_report(dev_priv, report);
+
+	/* Periodic OA samples don't have mmio associated with them */
+	if (sample_flags & SAMPLE_MMIO)
+		data.mmio = (u8 *)mmio_list_dummy;
 
 	if (sample_flags & SAMPLE_OA_REPORT)
 		data.report = report;
@@ -1759,6 +1842,9 @@ static int append_cs_buffer_sample(struct i915_perf_stream *stream,
 					   node->ts_offset);
 		data.ts = gpu_ts;
 	}
+
+	if (sample_flags & SAMPLE_MMIO)
+		data.mmio = stream->cs_buffer.vaddr + node->mmio_offset;
 
 	return append_perf_sample(stream, buf, count, offset, &data);
 }
@@ -2928,9 +3014,11 @@ static int i915_perf_stream_init(struct i915_perf_stream *stream,
 	bool require_oa_unit = props->sample_flags & (SAMPLE_OA_REPORT |
 						      SAMPLE_OA_SOURCE);
 	bool require_cs_mode = props->sample_flags & (SAMPLE_PID |
-						      SAMPLE_TAG);
+						      SAMPLE_TAG |
+						      SAMPLE_MMIO);
 	bool cs_sample_data = props->sample_flags & (SAMPLE_OA_REPORT |
-							SAMPLE_TS);
+							SAMPLE_TS |
+							SAMPLE_MMIO);
 	struct i915_perf_stream *curr_stream;
 	struct intel_engine_cs *engine = NULL;
 	int idx;
@@ -3101,7 +3189,8 @@ static int i915_perf_stream_init(struct i915_perf_stream *stream,
 	}
 
 	if (require_cs_mode && !props->cs_mode) {
-		DRM_ERROR("PID/TAG/TS sampling requires engine to be specified");
+		DRM_ERROR(
+			"PID/TAG/TS/MMIO sampling requires engine to be specified");
 		ret = -EINVAL;
 		goto err_enable;
 	}
@@ -3136,6 +3225,16 @@ static int i915_perf_stream_init(struct i915_perf_stream *stream,
 		}
 
 		engine = dev_priv->engine[props->engine];
+
+		if (props->sample_flags & SAMPLE_MMIO) {
+			memset(engine->mmio_list, 0, I915_PERF_MMIO_NUM_MAX);
+			memcpy(engine->mmio_list, dev_priv->perf.mmio_list,
+			       4 * engine->num_mmio);
+			engine->num_mmio = dev_priv->perf.num_mmio;
+
+			stream->sample_flags |= SAMPLE_MMIO;
+			stream->sample_size += 4 * engine->num_mmio;
+		}
 
 		idx = srcu_read_lock(&engine->perf_srcu);
 		curr_stream = srcu_dereference(engine->exclusive_stream,
@@ -3703,6 +3802,69 @@ static u64 oa_exponent_to_ns(struct drm_i915_private *dev_priv, int exponent)
 		       dev_priv->perf.oa.timestamp_frequency);
 }
 
+static int check_mmio_whitelist(struct drm_i915_private *dev_priv, u32 num_mmio)
+{
+#define GEN_RANGE(l, h) GENMASK(h, l)
+	static const struct register_whitelist {
+		i915_reg_t mmio;
+		uint32_t size;
+		/* supported gens, 0x10 for 4, 0x30 for 4 and 5, etc. */
+		uint32_t gen_bitmask;
+	} whitelist[] = {
+		{ GEN6_GT_GFX_RC6, 4, GEN_RANGE(7, 9) },
+		{ GEN6_GT_GFX_RC6p, 4, GEN_RANGE(7, 9) },
+	};
+	int i, count;
+
+	for (count = 0; count < num_mmio; count++) {
+		/* Coarse check on mmio reg addresses being non zero */
+		if (!dev_priv->perf.mmio_list[count])
+			return -EINVAL;
+
+		for (i = 0; i < ARRAY_SIZE(whitelist); i++) {
+			if ((i915_mmio_reg_offset(whitelist[i].mmio) ==
+				dev_priv->perf.mmio_list[count]) &&
+			    (1 << INTEL_INFO(dev_priv)->gen &
+					whitelist[i].gen_bitmask))
+				break;
+		}
+
+		if (i == ARRAY_SIZE(whitelist))
+			return -EINVAL;
+	}
+	return 0;
+}
+
+static int copy_mmio_list(struct drm_i915_private *dev_priv,
+				void __user *mmio)
+{
+	void __user *mmio_list = ((u8 __user *)mmio + 4);
+	u32 num_mmio;
+	int ret;
+
+	if (!mmio)
+		return -EINVAL;
+
+	ret = get_user(num_mmio, (u32 __user *)mmio);
+	if (ret)
+		return ret;
+
+	if (num_mmio > I915_PERF_MMIO_NUM_MAX)
+		return -EINVAL;
+
+	memset(dev_priv->perf.mmio_list, 0, I915_PERF_MMIO_NUM_MAX);
+	if (copy_from_user(dev_priv->perf.mmio_list, mmio_list, 4 * num_mmio))
+		return -EFAULT;
+
+	ret = check_mmio_whitelist(dev_priv, num_mmio);
+	if (ret)
+		return ret;
+
+	dev_priv->perf.num_mmio = num_mmio;
+
+	return 0;
+}
+
 /**
  * read_properties_unlocked - validate + copy userspace stream open properties
  * @dev_priv: i915 device instance
@@ -3855,6 +4017,12 @@ static int read_properties_unlocked(struct drm_i915_private *dev_priv,
 			break;
 		case DRM_I915_PERF_PROP_SAMPLE_TS:
 			props->sample_flags |= SAMPLE_TS;
+			break;
+		case DRM_I915_PERF_PROP_SAMPLE_MMIO:
+			ret = copy_mmio_list(dev_priv, (u64 __user *)value);
+			if (ret)
+				return ret;
+			props->sample_flags |= SAMPLE_MMIO;
 			break;
 		case DRM_I915_PERF_PROP_MAX:
 			MISSING_CASE(id);

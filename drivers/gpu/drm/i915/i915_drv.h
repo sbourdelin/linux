@@ -2203,6 +2203,13 @@ struct i915_perf_cs_sample {
 	u32 ts_offset;
 
 	/**
+	 * @mmio_offset: Offset into ``&stream->cs_buffer`` where the mmio reg
+	 * values for this perf sample will be collected (if the stream is
+	 * configured for collection of mmio data)
+	 */
+	u32 mmio_offset;
+
+	/**
 	 * @size: buffer size corresponding to this perf sample
 	 */
 	u32 size;
@@ -2669,6 +2676,9 @@ struct drm_i915_private {
 			const struct i915_oa_format *oa_formats;
 			int n_builtin_sets;
 		} oa;
+
+		u32 num_mmio;
+		u32 mmio_list[I915_PERF_MMIO_NUM_MAX];
 	} perf;
 
 	/* Abstract the submission mechanism (legacy ringbuffer or execlists) away */
