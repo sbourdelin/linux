@@ -301,14 +301,6 @@ typedef struct {
 	word          Number;
 	word          Flags;
 } _DAT_B3_REQP;
-/* DATA-B3-REQUEST 64 BIT Systems                           */
-typedef struct {
-	dword         Data;
-	word          Data_Length;
-	word          Number;
-	word          Flags;
-	void          *pData;
-} _DAT_B3_REQ64P;
 /* DATA-B3-CONFIRM                                          */
 typedef struct {
 	word          Number;
@@ -321,14 +313,6 @@ typedef struct {
 	word          Number;
 	word          Flags;
 } _DAT_B3_INDP;
-/* DATA-B3-INDICATION  64 BIT Systems                       */
-typedef struct {
-	dword         Data;
-	word          Data_Length;
-	word          Number;
-	word          Flags;
-	void          *pData;
-} _DAT_B3_IND64P;
 /* DATA-B3-RESPONSE                                         */
 typedef struct {
 	word          Number;
@@ -409,10 +393,8 @@ struct _API_MSG {
 		_DIS_B3_INDP        disconnect_b3_ind;
 		_DIS_B3_RESP        disconnect_b3_res;
 		_DAT_B3_REQP        data_b3_req;
-		_DAT_B3_REQ64P      data_b3_req64;
 		_DAT_B3_CONP        data_b3_con;
 		_DAT_B3_INDP        data_b3_ind;
-		_DAT_B3_IND64P      data_b3_ind64;
 		_DAT_B3_RESP        data_b3_res;
 		_RES_B3_REQP        reset_b3_req;
 		_RES_B3_CONP        reset_b3_con;
