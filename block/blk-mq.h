@@ -135,17 +135,20 @@ static inline bool blk_mq_hw_queue_mapped(struct blk_mq_hw_ctx *hctx)
 	return hctx->nr_ctx && hctx->tags;
 }
 
-static inline bool blk_mq_hctx_is_busy(struct blk_mq_hw_ctx *hctx)
+static inline bool blk_mq_hctx_is_busy(struct request_queue *q,
+		struct blk_mq_hw_ctx *hctx)
 {
 	return test_bit(BLK_MQ_S_BUSY, &hctx->state);
 }
 
-static inline void blk_mq_hctx_set_busy(struct blk_mq_hw_ctx *hctx)
+static inline void blk_mq_hctx_set_busy(struct request_queue *q,
+		struct blk_mq_hw_ctx *hctx)
 {
 	set_bit(BLK_MQ_S_BUSY, &hctx->state);
 }
 
-static inline void blk_mq_hctx_clear_busy(struct blk_mq_hw_ctx *hctx)
+static inline void blk_mq_hctx_clear_busy(struct request_queue *q,
+		struct blk_mq_hw_ctx *hctx)
 {
 	clear_bit(BLK_MQ_S_BUSY, &hctx->state);
 }
@@ -179,8 +182,8 @@ static inline void blk_mq_add_list_to_dispatch_tail(struct blk_mq_hw_ctx *hctx,
 	spin_unlock(hctx->dispatch_lock);
 }
 
-static inline void blk_mq_take_list_from_dispatch(struct blk_mq_hw_ctx *hctx,
-		struct list_head *list)
+static inline void blk_mq_take_list_from_dispatch(struct request_queue *q,
+		struct blk_mq_hw_ctx *hctx, struct list_head *list)
 {
 	spin_lock(hctx->dispatch_lock);
 	list_splice_init(hctx->dispatch_list, list);
@@ -190,7 +193,7 @@ static inline void blk_mq_take_list_from_dispatch(struct blk_mq_hw_ctx *hctx,
 	 * in hctx->dispatch are dispatched successfully
 	 */
 	if (!list_empty(list))
-		blk_mq_hctx_set_busy(hctx);
+		blk_mq_hctx_set_busy(q, hctx);
 	spin_unlock(hctx->dispatch_lock);
 }
 

@@ -132,7 +132,7 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 	 * more fair dispatch.
 	 */
 	if (blk_mq_has_dispatch_rqs(hctx))
-		blk_mq_take_list_from_dispatch(hctx, &rq_list);
+		blk_mq_take_list_from_dispatch(q, hctx, &rq_list);
 
 	/*
 	 * Only ask the scheduler for requests, if we didn't have residual
@@ -147,11 +147,11 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 		blk_mq_sched_mark_restart_hctx(hctx);
 		can_go = blk_mq_dispatch_rq_list(q, &rq_list);
 		if (can_go)
-			blk_mq_hctx_clear_busy(hctx);
+			blk_mq_hctx_clear_busy(q, hctx);
 	}
 
 	/* can't go until ->dispatch is flushed */
-	if (!can_go || blk_mq_hctx_is_busy(hctx))
+	if (!can_go || blk_mq_hctx_is_busy(q, hctx))
 		return;
 
 	/*
