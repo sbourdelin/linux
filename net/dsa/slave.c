@@ -649,7 +649,7 @@ static int dsa_slave_set_eee(struct net_device *dev, struct ethtool_eee *e)
 	int err = -ENODEV;
 
 	if (ds->ops->set_eee) {
-		err = ds->ops->set_eee(ds, p->dp->index, p->phy, e);
+		err = ds->ops->set_eee(ds, p->dp->index, e);
 		if (err)
 			return err;
 	}
