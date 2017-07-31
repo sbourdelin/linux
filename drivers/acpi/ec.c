@@ -40,6 +40,7 @@
 #include <linux/slab.h>
 #include <linux/acpi.h>
 #include <linux/dmi.h>
+#include <linux/timer.h>
 #include <asm/io.h>
 
 #include "internal.h"
@@ -87,6 +88,31 @@
 #define ACPI_EC_EVT_TIMING_QUERY	0x01
 #define ACPI_EC_EVT_TIMING_EVENT	0x02
 
+/*
+ * There is a noirq stage during suspend/resume and EC firmware may
+ * require OS to handle EC events (SCI_EVT) during this stage.
+ * If there is no EC transactions during this stage, SCI_EVT cannot be
+ * detected. In order to still detect SCI_EVT, IRQ must be polled by the
+ * EC GPE poller. There are 3 configurable modes implemented for the EC
+ * GPE poller:
+ * NONE:    Do not enable noirq stage GPE poller.
+ * SUSPEND: Enable GPE poller for suspend noirq stage.
+ *          This mode detects SCI_EVT in suspend noirq stage, making sure
+ *          that all pre-suspend firmware events are handled before
+ *          entering a low power state. Some buggy EC firmware may require
+ *          this, otherwise some unknown firmware issues can be seen on
+ *          such platforms:
+ *          Link: https://bugzilla.kernel.org/show_bug.cgi?id=196129
+ * RESUME:  Enable GPE poller for suspend/resume noirq stages.
+ *          This mode detects SCI_EVT in both suspend and resume noirq
+ *          stages, making sure that all post-resume firmware events are
+ *          handled as early as possible. This mode might be able to solve
+ *          some unknown driver timing issues.
+ */
+#define ACPI_EC_GPE_POLL_NONE		0x00
+#define ACPI_EC_GPE_POLL_SUSPEND	0x01
+#define ACPI_EC_GPE_POLL_RESUME		0x02
+
 /* EC commands */
 enum ec_command {
 	ACPI_EC_COMMAND_READ = 0x80,
@@ -102,6 +128,7 @@ enum ec_command {
 #define ACPI_EC_CLEAR_MAX	100	/* Maximum number of events to query
 					 * when trying to clear the EC */
 #define ACPI_EC_MAX_QUERIES	16	/* Maximum number of parallel queries */
+#define ACPI_EC_POLL_INTERVAL	500	/* Polling event every 500ms */
 
 enum {
 	EC_FLAGS_QUERY_ENABLED,		/* Query is enabled */
@@ -113,6 +140,7 @@ enum {
 	EC_FLAGS_STARTED,		/* Driver is started */
 	EC_FLAGS_STOPPED,		/* Driver is stopped */
 	EC_FLAGS_GPE_MASKED,		/* GPE masked */
+	EC_FLAGS_GPE_POLLING,		/* GPE polling is enabled */
 };
 
 #define ACPI_EC_COMMAND_POLL		0x01 /* Available for command byte */
@@ -136,6 +164,7 @@ module_param(ec_polling_guard, uint, 0644);
 MODULE_PARM_DESC(ec_polling_guard, "Guard time(us) between EC accesses in polling modes");
 
 static unsigned int ec_event_clearing __read_mostly = ACPI_EC_EVT_TIMING_QUERY;
+static unsigned int ec_gpe_polling __read_mostly = ACPI_EC_GPE_POLL_NONE;
 
 /*
  * If the number of false interrupts per one transaction exceeds
@@ -149,6 +178,10 @@ MODULE_PARM_DESC(ec_storm_threshold, "Maxim false GPE numbers not considered as 
 static bool ec_freeze_events __read_mostly = false;
 module_param(ec_freeze_events, bool, 0644);
 MODULE_PARM_DESC(ec_freeze_events, "Disabling event handling during suspend/resume");
+
+static unsigned int ec_poll_interval __read_mostly = ACPI_EC_POLL_INTERVAL;
+module_param(ec_poll_interval, uint, 0644);
+MODULE_PARM_DESC(ec_poll_interval, "GPE polling interval(ms)");
 
 struct acpi_ec_query_handler {
 	struct list_head node;
@@ -347,6 +380,44 @@ static inline bool acpi_ec_is_gpe_raised(struct acpi_ec *ec)
 
 	(void)acpi_get_gpe_status(NULL, ec->gpe, &gpe_status);
 	return (gpe_status & ACPI_EVENT_FLAG_STATUS_SET) ? true : false;
+}
+
+static void acpi_ec_gpe_tick(struct acpi_ec *ec)
+{
+	mod_timer(&ec->timer,
+		  jiffies + msecs_to_jiffies(ec_poll_interval));
+}
+
+static void ec_start_gpe_poller(struct acpi_ec *ec)
+{
+	unsigned long flags;
+	bool start_tick = false;
+
+	spin_lock_irqsave(&ec->lock, flags);
+	if (!test_and_set_bit(EC_FLAGS_GPE_POLLING, &ec->flags)) {
+		ec_log_drv("GPE poller started");
+		start_tick = true;
+		/* kick off GPE polling without delay */
+		advance_transaction(ec);
+	}
+	spin_unlock_irqrestore(&ec->lock, flags);
+	if (start_tick)
+		acpi_ec_gpe_tick(ec);
+}
+
+static void ec_stop_gpe_poller(struct acpi_ec *ec)
+{
+	unsigned long flags;
+	bool stop_tick = false;
+
+	spin_lock_irqsave(&ec->lock, flags);
+	if (test_and_clear_bit(EC_FLAGS_GPE_POLLING, &ec->flags))
+		stop_tick = true;
+	spin_unlock_irqrestore(&ec->lock, flags);
+	if (stop_tick) {
+		del_timer_sync(&ec->timer);
+		ec_log_drv("GPE poller stopped");
+	}
 }
 
 static inline void acpi_ec_enable_gpe(struct acpi_ec *ec, bool open)
@@ -937,6 +1008,8 @@ static void acpi_ec_start(struct acpi_ec *ec, bool resuming)
 		ec_log_drv("EC started");
 	}
 	spin_unlock_irqrestore(&ec->lock, flags);
+	if (resuming && ec_gpe_polling == ACPI_EC_GPE_POLL_RESUME)
+		ec_start_gpe_poller(ec);
 }
 
 static bool acpi_ec_stopped(struct acpi_ec *ec)
@@ -972,6 +1045,8 @@ static void acpi_ec_stop(struct acpi_ec *ec, bool suspending)
 		ec_log_drv("EC stopped");
 	}
 	spin_unlock_irqrestore(&ec->lock, flags);
+	if (suspending)
+		ec_stop_gpe_poller(ec);
 }
 
 static void acpi_ec_enter_noirq(struct acpi_ec *ec)
@@ -1257,6 +1332,19 @@ static u32 acpi_ec_gpe_handler(acpi_handle gpe_device,
 	return ACPI_INTERRUPT_HANDLED;
 }
 
+static void acpi_ec_gpe_poller(ulong arg)
+{
+	struct acpi_ec *ec = (struct acpi_ec *)arg;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ec->lock, flags);
+	ec_dbg_drv("GPE polling begin");
+	advance_transaction(ec);
+	ec_dbg_drv("GPE polling end");
+	spin_unlock_irqrestore(&ec->lock, flags);
+	acpi_ec_gpe_tick(ec);
+}
+
 /* --------------------------------------------------------------------------
  *                           Address Space Management
  * -------------------------------------------------------------------------- */
@@ -1326,6 +1414,8 @@ static struct acpi_ec *acpi_ec_alloc(void)
 	INIT_LIST_HEAD(&ec->list);
 	spin_lock_init(&ec->lock);
 	INIT_WORK(&ec->work, acpi_ec_event_handler);
+	init_timer(&ec->timer);
+	setup_timer(&ec->timer, acpi_ec_gpe_poller, (ulong)ec);
 	ec->timestamp = jiffies;
 	ec->busy_polling = true;
 	ec->polling_guard = 0;
@@ -1874,6 +1964,8 @@ static int acpi_ec_suspend(struct device *dev)
 	struct acpi_ec *ec =
 		acpi_driver_data(to_acpi_device(dev));
 
+	if (ec_gpe_polling != ACPI_EC_GPE_POLL_NONE)
+		ec_start_gpe_poller(ec);
 	if (acpi_sleep_no_ec_events() && ec_freeze_events)
 		acpi_ec_disable_event(ec);
 	return 0;
@@ -1885,6 +1977,7 @@ static int acpi_ec_resume(struct device *dev)
 		acpi_driver_data(to_acpi_device(dev));
 
 	acpi_ec_enable_event(ec);
+	ec_stop_gpe_poller(ec);
 	return 0;
 }
 #endif
@@ -1929,6 +2022,43 @@ static int param_get_event_clearing(char *buffer, struct kernel_param *kp)
 module_param_call(ec_event_clearing, param_set_event_clearing, param_get_event_clearing,
 		  NULL, 0644);
 MODULE_PARM_DESC(ec_event_clearing, "Assumed SCI_EVT clearing timing");
+
+static int param_set_gpe_polling(const char *val, struct kernel_param *kp)
+{
+	int result = 0;
+
+	if (!strncmp(val, "none", sizeof("none") - 1)) {
+		ec_gpe_polling = ACPI_EC_GPE_POLL_NONE;
+		pr_info("GPE noirq stage polling disabled\n");
+	} else if (!strncmp(val, "suspend", sizeof("suspend") - 1)) {
+		ec_gpe_polling = ACPI_EC_GPE_POLL_SUSPEND;
+		pr_info("GPE noirq suspend polling enabled\n");
+	} else if (!strncmp(val, "resume", sizeof("resume") - 1)) {
+		ec_gpe_polling = ACPI_EC_GPE_POLL_RESUME;
+		pr_info("GPE noirq suspend/resume polling enabled\n");
+	} else
+		result = -EINVAL;
+	return result;
+}
+
+static int param_get_gpe_polling(char *buffer, struct kernel_param *kp)
+{
+	switch (ec_gpe_polling) {
+	case ACPI_EC_GPE_POLL_NONE:
+		return sprintf(buffer, "none");
+	case ACPI_EC_GPE_POLL_SUSPEND:
+		return sprintf(buffer, "suspend");
+	case ACPI_EC_GPE_POLL_RESUME:
+		return sprintf(buffer, "resume");
+	default:
+		return sprintf(buffer, "invalid");
+	}
+	return 0;
+}
+
+module_param_call(ec_gpe_polling, param_set_gpe_polling, param_get_gpe_polling,
+		  NULL, 0644);
+MODULE_PARM_DESC(ec_gpe_polling, "Enabling GPE polling during noirq stages");
 
 static struct acpi_driver acpi_ec_driver = {
 	.name = "ec",
