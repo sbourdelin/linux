@@ -1,0 +1,4 @@
+config CDNS_I3C_MASTER
+	tristate "Cadence I3C master driver"
+	help
+	  Enable this driver if you want to support Cadence I3C master block.
