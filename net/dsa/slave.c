@@ -646,38 +646,42 @@ static int dsa_slave_set_eee(struct net_device *dev, struct ethtool_eee *e)
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_switch *ds = p->dp->ds;
-	int ret;
+	int err = -ENODEV;
 
-	if (!ds->ops->set_eee)
-		return -EOPNOTSUPP;
+	if (ds->ops->set_eee) {
+		err = ds->ops->set_eee(ds, p->dp->index, p->phy, e);
+		if (err)
+			return err;
+	}
 
-	ret = ds->ops->set_eee(ds, p->dp->index, p->phy, e);
-	if (ret)
-		return ret;
+	if (p->phy) {
+		err = phy_ethtool_set_eee(p->phy, e);
+		if (err)
+			return err;
+	}
 
-	if (p->phy)
-		ret = phy_ethtool_set_eee(p->phy, e);
-
-	return ret;
+	return err;
 }
 
 static int dsa_slave_get_eee(struct net_device *dev, struct ethtool_eee *e)
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_switch *ds = p->dp->ds;
-	int ret;
+	int err = -ENODEV;
 
-	if (!ds->ops->get_eee)
-		return -EOPNOTSUPP;
+	if (ds->ops->get_eee) {
+		err = ds->ops->get_eee(ds, p->dp->index, e);
+		if (err)
+			return err;
+	}
 
-	ret = ds->ops->get_eee(ds, p->dp->index, e);
-	if (ret)
-		return ret;
+	if (p->phy) {
+		err = phy_ethtool_get_eee(p->phy, e);
+		if (err)
+			return err;
+	}
 
-	if (p->phy)
-		ret = phy_ethtool_get_eee(p->phy, e);
-
-	return ret;
+	return err;
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
