@@ -47,18 +47,18 @@
 #include <linux/kthread.h>
 #include <linux/wait.h>
 #include <linux/spi/spi.h>
+#include <linux/bitops.h>
 #ifdef CONFIG_COMPAT
-#include <asm/compat.h>
+#include <linux/compat.h>
 #endif
 
 #include "pi433_if.h"
 #include "rf69.h"
 
-
-#define N_PI433_MINORS			(1U << MINORBITS) /*32*/	/* ... up to 256 */
-#define MAX_MSG_SIZE			900	/* min: FIFO_SIZE! */
-#define MSG_FIFO_SIZE			65536   /* 65536 = 2^16  */
-#define NUM_DIO				2
+#define N_PI433_MINORS		BIT(MINORBITS) /*32*/ /* ... up to 256 */
+#define MAX_MSG_SIZE		900	/* min: FIFO_SIZE! */
+#define MSG_FIFO_SIZE		65536   /* 65536 = 2^16  */
+#define NUM_DIO			2
 
 static dev_t pi433_dev;
 static DEFINE_IDR(pi433_idr);
@@ -66,10 +66,14 @@ static DEFINE_MUTEX(minor_lock); /* Protect idr accesses */
 
 static struct class *pi433_class; /* mainly for udev to create /dev/pi433 */
 
-/* tx config is instance specific
-	so with each open a new tx config struct is needed */
-/* rx config is device specific
-	so we have just one rx config, ebedded in device struct */
+/*
+ * tx config is instance specific
+ * so with each open a new tx config struct is needed
+ */
+/*
+ * rx config is device specific
+ * so we have just one rx config, ebedded in device struct
+ */
 struct pi433_device {
 	/* device handling related values */
 	dev_t			devt;
