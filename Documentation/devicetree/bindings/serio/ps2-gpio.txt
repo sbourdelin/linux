@@ -1,0 +1,20 @@
+Device-Tree bindings for ps2 gpio driver
+
+Required properties:
+	- compatible = "ps2-gpio";
+	- gpios: data and clock gpio
+
+Optional properties:
+	- ps2-gpio,write-enable: Indicates whether write function is provided
+	to serio device. Most probably providing the write fn will not work,
+	because of the tough timing libps2 requires.
+
+Example nodes:
+
+ps2@0 {
+	compatible = "ps2-gpio";
+	gpios = <&gpio 24 0 /* data */
+		 &gpio 23 0 /* clock */
+		>;
+	i2c-gpio,write-enable = <0>;
+};
