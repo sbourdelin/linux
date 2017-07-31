@@ -773,10 +773,8 @@ static inline void iph_to_flow_copy_v6addrs(struct flow_keys *flow,
 
 static inline __be32 ip6_make_flowlabel(struct net *net, struct sk_buff *skb,
 					__be32 flowlabel, bool autolabel,
-					struct flowi6 *fl6)
+					struct flowi6 *fl6, u32 hash)
 {
-	u32 hash;
-
 	/* @flowlabel may include more than a flow label, eg, the traffic class.
 	 * Here we want only the flow label value.
 	 */
@@ -788,7 +786,8 @@ static inline __be32 ip6_make_flowlabel(struct net *net, struct sk_buff *skb,
 	     net->ipv6.sysctl.auto_flowlabels != IP6_AUTO_FLOW_LABEL_FORCED))
 		return flowlabel;
 
-	hash = skb_get_hash_flowi6(skb, fl6);
+	if (skb)
+		hash = skb_get_hash_flowi6(skb, fl6);
 
 	flowlabel = (__force __be32)hash & IPV6_FLOWLABEL_MASK;
 
@@ -814,7 +813,7 @@ static inline int ip6_default_np_autolabel(struct net *net)
 static inline void ip6_set_txhash(struct sock *sk) { }
 static inline __be32 ip6_make_flowlabel(struct net *net, struct sk_buff *skb,
 					__be32 flowlabel, bool autolabel,
-					struct flowi6 *fl6)
+					struct flowi6 *fl6, u32 hash)
 {
 	return flowlabel;
 }

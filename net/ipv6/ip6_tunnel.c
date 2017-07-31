@@ -1201,7 +1201,7 @@ route_lookup:
 	skb_reset_network_header(skb);
 	ipv6h = ipv6_hdr(skb);
 	ip6_flow_hdr(ipv6h, dsfield,
-		     ip6_make_flowlabel(net, skb, fl6->flowlabel, true, fl6));
+		     ip6_make_flowlabel(net, skb, fl6->flowlabel, true, fl6, 0));
 	ipv6h->hop_limit = hop_limit;
 	ipv6h->nexthdr = proto;
 	ipv6h->saddr = fl6->saddr;
