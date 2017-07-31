@@ -22,6 +22,9 @@ struct blk_mq_hw_ctx {
 
 	unsigned long		flags;		/* BLK_MQ_F_* flags */
 
+	spinlock_t		*dispatch_lock;
+	struct list_head	*dispatch_list;
+
 	void			*sched_data;
 	struct request_queue	*queue;
 	struct blk_flush_queue	*fq;

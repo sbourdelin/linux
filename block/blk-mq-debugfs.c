@@ -370,23 +370,23 @@ static void *hctx_dispatch_start(struct seq_file *m, loff_t *pos)
 {
 	struct blk_mq_hw_ctx *hctx = m->private;
 
-	spin_lock(&hctx->lock);
-	return seq_list_start(&hctx->dispatch, *pos);
+	spin_lock(hctx->dispatch_lock);
+	return seq_list_start(hctx->dispatch_list, *pos);
 }
 
 static void *hctx_dispatch_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	struct blk_mq_hw_ctx *hctx = m->private;
 
-	return seq_list_next(v, &hctx->dispatch, pos);
+	return seq_list_next(v, hctx->dispatch_list, pos);
 }
 
 static void hctx_dispatch_stop(struct seq_file *m, void *v)
-	__releases(&hctx->lock)
+	__releases(hctx->dispatch_lock)
 {
 	struct blk_mq_hw_ctx *hctx = m->private;
 
-	spin_unlock(&hctx->lock);
+	spin_unlock(hctx->dispatch_lock);
 }
 
 static const struct seq_operations hctx_dispatch_seq_ops = {

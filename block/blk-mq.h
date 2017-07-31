@@ -152,38 +152,38 @@ static inline void blk_mq_hctx_clear_busy(struct blk_mq_hw_ctx *hctx)
 
 static inline bool blk_mq_has_dispatch_rqs(struct blk_mq_hw_ctx *hctx)
 {
-	return !list_empty_careful(&hctx->dispatch);
+	return !list_empty_careful(hctx->dispatch_list);
 }
 
 static inline void blk_mq_add_rq_to_dispatch(struct blk_mq_hw_ctx *hctx,
 		struct request *rq)
 {
-	spin_lock(&hctx->lock);
-	list_add(&rq->queuelist, &hctx->dispatch);
-	spin_unlock(&hctx->lock);
+	spin_lock(hctx->dispatch_lock);
+	list_add(&rq->queuelist, hctx->dispatch_list);
+	spin_unlock(hctx->dispatch_lock);
 }
 
 static inline void blk_mq_add_list_to_dispatch(struct blk_mq_hw_ctx *hctx,
 		struct list_head *list)
 {
-	spin_lock(&hctx->lock);
-	list_splice_init(list, &hctx->dispatch);
-	spin_unlock(&hctx->lock);
+	spin_lock(hctx->dispatch_lock);
+	list_splice_init(list, hctx->dispatch_list);
+	spin_unlock(hctx->dispatch_lock);
 }
 
 static inline void blk_mq_add_list_to_dispatch_tail(struct blk_mq_hw_ctx *hctx,
 						    struct list_head *list)
 {
-	spin_lock(&hctx->lock);
-	list_splice_tail_init(list, &hctx->dispatch);
-	spin_unlock(&hctx->lock);
+	spin_lock(hctx->dispatch_lock);
+	list_splice_tail_init(list, hctx->dispatch_list);
+	spin_unlock(hctx->dispatch_lock);
 }
 
 static inline void blk_mq_take_list_from_dispatch(struct blk_mq_hw_ctx *hctx,
 		struct list_head *list)
 {
-	spin_lock(&hctx->lock);
-	list_splice_init(&hctx->dispatch, list);
+	spin_lock(hctx->dispatch_lock);
+	list_splice_init(hctx->dispatch_list, list);
 
 	/*
 	 * BUSY won't be cleared until all requests
@@ -191,7 +191,7 @@ static inline void blk_mq_take_list_from_dispatch(struct blk_mq_hw_ctx *hctx,
 	 */
 	if (!list_empty(list))
 		blk_mq_hctx_set_busy(hctx);
-	spin_unlock(&hctx->lock);
+	spin_unlock(hctx->dispatch_lock);
 }
 
 #endif

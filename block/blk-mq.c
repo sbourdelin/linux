@@ -1925,8 +1925,11 @@ static void blk_mq_exit_hw_queues(struct request_queue *q,
 static void blk_mq_init_dispatch(struct request_queue *q,
 		struct blk_mq_hw_ctx *hctx)
 {
-	spin_lock_init(&hctx->lock);
-	INIT_LIST_HEAD(&hctx->dispatch);
+	hctx->dispatch_lock = &hctx->lock;
+	hctx->dispatch_list = &hctx->dispatch;
+
+	spin_lock_init(hctx->dispatch_lock);
+	INIT_LIST_HEAD(hctx->dispatch_list);
 }
 
 static int blk_mq_init_hctx(struct request_queue *q,
