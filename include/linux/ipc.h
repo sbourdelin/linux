@@ -3,6 +3,7 @@
 
 #include <linux/spinlock.h>
 #include <linux/uidgid.h>
+#include <linux/rhashtable.h>
 #include <uapi/linux/ipc.h>
 
 #define IPCMNI 32768  /* <= MAX_INT limit for ipc arrays (including sysctl changes) */
@@ -20,6 +21,8 @@ struct kern_ipc_perm {
 	umode_t		mode;
 	unsigned long	seq;
 	void		*security;
+
+	struct rhash_head khtnode;
 
 	struct rcu_head rcu;
 	atomic_t refcount;
