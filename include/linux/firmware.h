@@ -82,6 +82,19 @@ static inline int request_firmware_into_buf(const struct firmware **firmware_p,
 {
 	return -EINVAL;
 }
-
 #endif
+
+struct firmware_opts {
+	bool optional;
+};
+
+int __request_firmware_async(struct module *module, const char *name,
+			     struct firmware_opts *fw_opts, struct device *dev,
+			     void *context,
+			     void (*cont)(const struct firmware *fw, void *context));
+
+#define request_firmware_async(name, fw_opts, dev, context, cont)	\
+	__request_firmware_async(THIS_MODULE, name, fw_opts, dev,	\
+				 context, cont)
+
 #endif
