@@ -1139,6 +1139,15 @@ config SILEAD_DMI
 	  with the OS-image for the device. This option supplies the missing
 	  information. Enable this for x86 tablets with Silead touchscreens.
 
+config ACPI_CHROMEOS
+	bool "ChromeOS specific ACPI extensions"
+	depends on ACPI && CHROME_PLATFORMS
+	select NVRAM
+	select CHROMEOS
+	---help---
+	  This driver provides the firmware interface for the services exported
+	  through the ChromeOS interfaces when using ChromeOS ACPI firmware.
+
 endif # X86_PLATFORM_DEVICES
 
 config PMC_ATOM
