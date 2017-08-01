@@ -288,15 +288,9 @@ struct sock *__udp4_lib_lookup(struct net *net, struct sk_lookup *params,
 			       struct udp_table *tbl, struct sk_buff *skb);
 struct sock *udp4_lib_lookup_skb(struct sk_buff *skb,
 				 __be16 sport, __be16 dport);
-struct sock *udp6_lib_lookup(struct net *net,
-			     const struct in6_addr *saddr, __be16 sport,
-			     const struct in6_addr *daddr, __be16 dport,
-			     int dif);
-struct sock *__udp6_lib_lookup(struct net *net,
-			       const struct in6_addr *saddr, __be16 sport,
-			       const struct in6_addr *daddr, __be16 dport,
-			       int dif, struct udp_table *tbl,
-			       struct sk_buff *skb);
+struct sock *udp6_lib_lookup(struct net *net, struct sk_lookup *params);
+struct sock *__udp6_lib_lookup(struct net *net, struct sk_lookup *params,
+			       struct udp_table *tbl, struct sk_buff *skb);
 struct sock *udp6_lib_lookup_skb(struct sk_buff *skb,
 				 __be16 sport, __be16 dport);
 
