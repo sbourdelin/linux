@@ -2713,9 +2713,10 @@ void intel_ddi_init(struct drm_i915_private *dev_priv, enum port port)
 	 * configuration so that we use the proper lane count for our
 	 * calculations.
 	 */
-	if (IS_GEN9_LP(dev_priv) && port == PORT_A) {
+	if ((IS_GEN9_LP(dev_priv) || INTEL_GEN(dev_priv) >= 10) &&
+	    port == PORT_A) {
 		if (!(intel_dig_port->saved_port_bits & DDI_A_4_LANES)) {
-			DRM_DEBUG_KMS("BXT BIOS forgot to set DDI_A_4_LANES for port A; fixing\n");
+			DRM_DEBUG_KMS("BIOS forgot to set DDI_A_4_LANES for port A\n");
 			intel_dig_port->saved_port_bits |= DDI_A_4_LANES;
 			max_lanes = 4;
 		}
