@@ -1784,7 +1784,6 @@ static int spi_nor_setup(struct spi_nor *nor, const struct flash_info *info,
 			 const struct spi_nor_hwcaps *hwcaps)
 {
 	u32 ignored_mask, shared_mask;
-	bool enable_quad_io;
 	int err;
 
 	/*
@@ -1829,19 +1828,41 @@ static int spi_nor_setup(struct spi_nor *nor, const struct flash_info *info,
 		return err;
 	}
 
-	/* Enable Quad I/O if needed. */
-	enable_quad_io = (spi_nor_get_protocol_width(nor->read_proto) == 4 ||
-			  spi_nor_get_protocol_width(nor->write_proto) == 4);
-	if (enable_quad_io && params->quad_enable) {
-		err = params->quad_enable(nor);
+	return 0;
+}
+
+static int spi_nor_init(struct spi_nor *nor)
+{
+	int err;
+
+	/*
+	 * Atmel, SST, Intel/Numonyx, and others serial NOR tend to power up
+	 * with the software protection bits set
+	 */
+	if (JEDEC_MFR(nor->info) == SNOR_MFR_ATMEL ||
+	    JEDEC_MFR(nor->info) == SNOR_MFR_INTEL ||
+	    JEDEC_MFR(nor->info) == SNOR_MFR_SST ||
+	    nor->info->flags & SPI_NOR_HAS_LOCK) {
+		write_enable(nor);
+		write_sr(nor, 0);
+		spi_nor_wait_till_ready(nor);
+	}
+
+	if (nor->quad_enable) {
+		err = nor->quad_enable(nor);
 		if (err) {
 			dev_err(nor->dev, "quad mode not supported\n");
 			return err;
 		}
 	}
 
+	if ((JEDEC_MFR(nor->info) != SNOR_MFR_SPANSION) &&
+	    !(nor->info->flags & SPI_NOR_4B_OPCODES))
+		set_4byte(nor, nor->info, 1);
+
 	return 0;
 }
+
 
 int spi_nor_scan(struct spi_nor *nor, const char *name,
 		 const struct spi_nor_hwcaps *hwcaps)
@@ -1853,6 +1874,7 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
 	struct device_node *np = spi_nor_get_flash_node(nor);
 	int ret;
 	int i;
+	bool enable_quad_io;
 
 	ret = spi_nor_check(nor);
 	if (ret)
@@ -1914,15 +1936,6 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
 	 * Atmel, SST, Intel/Numonyx, and others serial NOR tend to power up
 	 * with the software protection bits set
 	 */
-
-	if (JEDEC_MFR(info) == SNOR_MFR_ATMEL ||
-	    JEDEC_MFR(info) == SNOR_MFR_INTEL ||
-	    JEDEC_MFR(info) == SNOR_MFR_SST ||
-	    info->flags & SPI_NOR_HAS_LOCK) {
-		write_enable(nor);
-		write_sr(nor, 0);
-		spi_nor_wait_till_ready(nor);
-	}
 
 	if (!mtd->name)
 		mtd->name = dev_name(dev);
@@ -2002,8 +2015,6 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
 		if (JEDEC_MFR(info) == SNOR_MFR_SPANSION ||
 		    info->flags & SPI_NOR_4B_OPCODES)
 			spi_nor_set_4byte_opcodes(nor, info);
-		else
-			set_4byte(nor, info, 1);
 	} else {
 		nor->addr_width = 3;
 	}
@@ -2020,8 +2031,21 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
 			return ret;
 	}
 
-	dev_info(dev, "%s (%lld Kbytes)\n", info->name,
-			(long long)mtd->size >> 10);
+	/* Send all the required SPI flash commands to initialize device */
+	nor->info = info;
+	/* Enable Quad I/O if needed. */
+	enable_quad_io = (spi_nor_get_protocol_width(nor->read_proto) == 4 ||
+			  spi_nor_get_protocol_width(nor->write_proto) == 4);
+	if (enable_quad_io && params.quad_enable)
+		nor->quad_enable = params.quad_enable;
+
+	ret = spi_nor_init(nor);
+	if (ret)
+		return ret;
+
+	dev_info(dev, "%s (%lld Kbytes), %dByte addr, %s\n", info->name,
+		 (long long)mtd->size >> 10, nor->addr_width,
+		 (nor->quad_enable ? "quad io enabled" : "quad io disabled"));
 
 	dev_dbg(dev,
 		"mtd .name = %s, .size = 0x%llx (%lldMiB), "
