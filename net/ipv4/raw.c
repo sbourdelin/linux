@@ -132,7 +132,8 @@ struct sock *__raw_v4_lookup(struct net *net, struct sock *sk,
 		bool dev_match;
 
 		dev_match = (!sk->sk_bound_dev_if ||
-				sk->sk_bound_dev_if == params->dif);
+				sk->sk_bound_dev_if == params->dif ||
+				sk->sk_bound_dev_if == params->sdif);
 
 		if (net_eq(sock_net(sk), net) &&
 		    inet->inet_num == params->hnum &&
@@ -186,6 +187,7 @@ static int __raw_v4_input(struct sk_buff *skb, const struct iphdr *iph,
 		.daddr.ipv4 = iph->daddr,
 		.hnum = iph->protocol,
 		.dif  = skb->dev->ifindex,
+		.sdif = ip_sdif(skb),
 	};
 	int delivered = 0;
 	struct sock *sk;
@@ -195,7 +197,7 @@ static int __raw_v4_input(struct sk_buff *skb, const struct iphdr *iph,
 		delivered = 1;
 		if ((iph->protocol != IPPROTO_ICMP || !icmp_filter(sk, skb)) &&
 		    ip_mc_sf_allow(sk, iph->daddr, iph->saddr,
-				   skb->dev->ifindex)) {
+				   skb->dev->ifindex, params.sdif)) {
 			struct sk_buff *clone = skb_clone(skb, GFP_ATOMIC);
 
 			/* Not releasing hash table! */
@@ -316,6 +318,7 @@ void raw_icmp_error(struct sk_buff *skb, int protocol, u32 info)
 		struct sk_lookup params = {
 			.hnum = protocol,
 			.dif = skb->dev->ifindex,
+			.sdif = ip_sdif(skb),
 		};
 
 		iph = (const struct iphdr *)skb->data;
