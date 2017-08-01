@@ -4529,9 +4529,7 @@ skl_update_scaler(struct intel_crtc_state *crtc_state, bool force_detach,
 	/* range checks */
 	if (src_w < SKL_MIN_SRC_W || src_h < SKL_MIN_SRC_H ||
 		dst_w < SKL_MIN_DST_W || dst_h < SKL_MIN_DST_H ||
-
-		src_w > SKL_MAX_SRC_W || src_h > SKL_MAX_SRC_H ||
-		dst_w > SKL_MAX_DST_W || dst_h > SKL_MAX_DST_H) {
+		src_w > SKL_MAX_SRC_W || src_h > SKL_MAX_SRC_H) {
 		DRM_DEBUG_KMS("scaler_user index %u.%u: src %ux%u dst %ux%u "
 			"size is out of scaler range\n",
 			intel_crtc->pipe, scaler_user, src_w, src_h, dst_w, dst_h);
