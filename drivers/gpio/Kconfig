@@ -1096,6 +1096,13 @@ config GPIO_WM8994
 	  Say yes here to access the GPIO signals of WM8994 audio hub
 	  CODECs from Wolfson Microelectronics.
 
+config GPIO_LMP92001
+       tristate "LMP92001 GPIOs"
+       depends on MFD_LMP92001
+       help
+         Say yes here to access the GPIO signals of TI LMP92001 Analog System
+         Monitor and Controller.
+
 endmenu
 
 menu "PCI GPIO expanders"
