@@ -738,6 +738,7 @@ struct i40e_vsi {
 	atomic_t next_base_queue;
 
 	struct list_head ch_list;
+	u16 tc_seid_map[I40E_MAX_TRAFFIC_CLASS];
 
 	void *priv;	/* client driver data reference. */
 
