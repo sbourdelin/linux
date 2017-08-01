@@ -492,6 +492,20 @@ static void intel_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 {
 	struct intel_connector *intel_connector = to_intel_connector(connector);
 	struct drm_i915_private *dev_priv = to_i915(connector->dev);
+	enum drm_connector_status old_status;
+
+	mutex_lock(&connector->dev->mode_config.mutex);
+	old_status = connector->status;
+	connector->status = connector->funcs->detect(connector, false);
+
+	if (old_status != connector->status)
+		DRM_DEBUG_KMS("[CONNECTOR:%d:%s] status updated from %s to %s\n",
+			      connector->base.id,
+			      connector->name,
+			      drm_get_connector_status_name(old_status),
+			      drm_get_connector_status_name(connector->status));
+
+	mutex_unlock(&connector->dev->mode_config.mutex);
 
 	drm_connector_unregister(connector);
 
