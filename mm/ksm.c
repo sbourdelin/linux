@@ -42,7 +42,8 @@
 
 #include <asm/tlbflush.h>
 #include "internal.h"
-
+#include <linux/crypto.h>
+#include <crypto/hash.h>
 #ifdef CONFIG_NUMA
 #define NUMA(x)		(x)
 #define DO_NUMA(x)	do { (x); } while (0)
@@ -260,6 +261,9 @@ static unsigned int zero_checksum __read_mostly;
 /* Whether to merge empty (zeroed) pages with actual zero pages */
 static bool ksm_use_zero_pages __read_mostly;
 
+/* Whether to support crc32 hash function */
+static bool crc32_support;
+
 #ifdef CONFIG_NUMA
 /* Zeroed when merging across nodes is not allowed */
 static unsigned int ksm_merge_across_nodes = 1;
@@ -279,10 +283,26 @@ static void wait_while_offlining(void);
 static DECLARE_WAIT_QUEUE_HEAD(ksm_thread_wait);
 static DEFINE_MUTEX(ksm_thread_mutex);
 static DEFINE_SPINLOCK(ksm_mmlist_lock);
-
+static struct shash_desc desc;
+static struct crypto_shash *tfm;
 #define KSM_KMEM_CACHE(__struct, __flags) kmem_cache_create("ksm_"#__struct,\
 		sizeof(struct __struct), __alignof__(struct __struct),\
 		(__flags), NULL)
+
+static void __init ksm_crc32_init(void)
+{
+	tfm = crypto_alloc_shash("crc32", 0, CRYPTO_ALG_ASYNC);
+
+	if (IS_ERR(tfm) || tfm->base.__crt_alg->cra_priority < 200) {
+		pr_warn("not support crc32 instruction, use jhash2 \n");
+		crc32_support = false;
+		crypto_free_shash(tfm);
+		return;
+	}
+	desc.tfm = tfm;
+	desc.flags = 0;
+	crc32_support = true;
+}
 
 static int __init ksm_slab_init(void)
 {
@@ -986,7 +1006,14 @@ static u32 calc_checksum(struct page *page)
 {
 	u32 checksum;
 	void *addr = kmap_atomic(page);
-	checksum = jhash2(addr, PAGE_SIZE / 4, 17);
+	/*
+	* If crc32 is supported, the use crc32 to calculate the checksum
+	* otherwise use jhash2
+	*/
+	if (crc32_support)
+		crypto_shash_digest(&desc, addr, PAGE_SIZE, (u8 *)&checksum);
+	else
+		checksum = jhash2(addr, PAGE_SIZE / 4, 17);
 	kunmap_atomic(addr);
 	return checksum;
 }
@@ -3058,6 +3085,7 @@ static int __init ksm_init(void)
 	/* Default to false for backwards compatibility */
 	ksm_use_zero_pages = false;
 
+	ksm_crc32_init();
 	err = ksm_slab_init();
 	if (err)
 		goto out;
