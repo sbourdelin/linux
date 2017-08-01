@@ -288,7 +288,7 @@ config_log_add(struct obd_device *obd, char *logname,
 	struct config_llog_data *cld;
 	struct config_llog_data *sptlrpc_cld;
 	struct config_llog_data *params_cld;
-	bool locked = false;
+	struct config_llog_data *recover_cld = ERR_PTR(-EINVAL);
 	char			seclogname[32];
 	char			*ptr;
 	int			rc;
@@ -338,8 +338,6 @@ config_log_add(struct obd_device *obd, char *logname,
 
 	LASSERT(lsi->lsi_lmd);
 	if (!(lsi->lsi_lmd->lmd_flags & LMD_FLG_NOIR)) {
-		struct config_llog_data *recover_cld;
-
 		ptr = strrchr(seclogname, '-');
 		if (ptr) {
 			*ptr = 0;
@@ -355,14 +353,11 @@ config_log_add(struct obd_device *obd, char *logname,
 			rc = PTR_ERR(recover_cld);
 			goto out_cld;
 		}
-
-		mutex_lock(&cld->cld_lock);
-		locked = true;
-		cld->cld_recover = recover_cld;
 	}
 
-	if (!locked)
-		mutex_lock(&cld->cld_lock);
+	mutex_lock(&cld->cld_lock);
+	if (!IS_ERR(recover_cld))
+		cld->cld_recover = recover_cld;
 	cld->cld_params = params_cld;
 	cld->cld_sptlrpc = sptlrpc_cld;
 	mutex_unlock(&cld->cld_lock);
