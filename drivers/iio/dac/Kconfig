@@ -309,4 +309,13 @@ config VF610_DAC
 	  This driver can also be built as a module. If so, the module will
 	  be called vf610_dac.
 
+config LMP92001_DAC
+        tristate "TI LMP92001 DAC Driver"
+        depends on MFD_LMP92001
+        help
+          If you say yes here you get support for TI LMP92001 DACs.
+
+          This driver can also be built as a module. If so, the module will
+          be called lmp92001_dac.
+
 endmenu
