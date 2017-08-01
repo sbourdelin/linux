@@ -9,6 +9,10 @@
 #define TCA_EGRESS_MIRROR 2 /* mirror packet to EGRESS */
 #define TCA_INGRESS_REDIR 3  /* packet redirect to INGRESS*/
 #define TCA_INGRESS_MIRROR 4 /* mirror packet to INGRESS */
+
+#define MIRRED_F_TC_MAP		0x1
+#define MIRRED_TC_MAP_MAX	0x10
+#define MIRRED_TC_MAP_MASK	0xF
                                                                                 
 struct tc_mirred {
 	tc_gen;
@@ -21,6 +25,7 @@ enum {
 	TCA_MIRRED_TM,
 	TCA_MIRRED_PARMS,
 	TCA_MIRRED_PAD,
+	TCA_MIRRED_TC_MAP,
 	__TCA_MIRRED_MAX
 };
 #define TCA_MIRRED_MAX (__TCA_MIRRED_MAX - 1)

@@ -67,6 +67,7 @@ static void tcf_mirred_release(struct tc_action *a, int bind)
 
 static const struct nla_policy mirred_policy[TCA_MIRRED_MAX + 1] = {
 	[TCA_MIRRED_PARMS]	= { .len = sizeof(struct tc_mirred) },
+	[TCA_MIRRED_TC_MAP]	= { .type = NLA_U8 },
 };
 
 static unsigned int mirred_net_id;
@@ -83,6 +84,8 @@ static int tcf_mirred_init(struct net *net, struct nlattr *nla,
 	struct tcf_mirred *m;
 	struct net_device *dev;
 	bool exists = false;
+	u8 *tc_map = NULL;
+	u32 flags = 0;
 	int ret;
 
 	if (nla == NULL)
@@ -92,6 +95,14 @@ static int tcf_mirred_init(struct net *net, struct nlattr *nla,
 		return ret;
 	if (tb[TCA_MIRRED_PARMS] == NULL)
 		return -EINVAL;
+
+	if (tb[TCA_MIRRED_TC_MAP]) {
+		tc_map = nla_data(tb[TCA_MIRRED_TC_MAP]);
+		if (*tc_map >= MIRRED_TC_MAP_MAX)
+			return -EINVAL;
+		flags |= MIRRED_F_TC_MAP;
+	}
+
 	parm = nla_data(tb[TCA_MIRRED_PARMS]);
 
 	exists = tcf_hash_check(tn, parm->index, a, bind);
@@ -139,6 +150,7 @@ static int tcf_mirred_init(struct net *net, struct nlattr *nla,
 	ASSERT_RTNL();
 	m->tcf_action = parm->action;
 	m->tcfm_eaction = parm->eaction;
+	m->flags = flags;
 	if (dev != NULL) {
 		m->tcfm_ifindex = parm->ifindex;
 		if (ret != ACT_P_CREATED)
@@ -146,6 +158,8 @@ static int tcf_mirred_init(struct net *net, struct nlattr *nla,
 		dev_hold(dev);
 		rcu_assign_pointer(m->tcfm_dev, dev);
 		m->tcfm_mac_header_xmit = mac_header_xmit;
+		if (flags & MIRRED_F_TC_MAP)
+			m->tcfm_tc = *tc_map & MIRRED_TC_MAP_MASK;
 	}
 
 	if (ret == ACT_P_CREATED) {
@@ -258,6 +272,9 @@ static int tcf_mirred_dump(struct sk_buff *skb, struct tc_action *a, int bind,
 	struct tcf_t t;
 
 	if (nla_put(skb, TCA_MIRRED_PARMS, sizeof(opt), &opt))
+		goto nla_put_failure;
+	if ((m->flags & MIRRED_F_TC_MAP) &&
+	    nla_put_u8(skb, TCA_MIRRED_TC_MAP, m->tcfm_tc))
 		goto nla_put_failure;
 
 	tcf_tm_dump(&t, &m->tcf_tm);
