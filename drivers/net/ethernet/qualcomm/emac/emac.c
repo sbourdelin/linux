@@ -441,8 +441,13 @@ static void emac_init_adapter(struct emac_adapter *adpt)
 	/* others */
 	adpt->preamble = EMAC_PREAMBLE_DEF;
 
-	/* default to automatic flow control */
-	adpt->automatic = true;
+	/* Disable transmission of pause frames by default, to avoid the
+	 * risk of a pause frame flood that can occur if the kernel hangs.
+	 * We still want to be able to respond to them, however.
+	 */
+	adpt->automatic = false;
+	adpt->tx_flow_control = false;
+	adpt->rx_flow_control = true;
 }
 
 /* Get the clock */
