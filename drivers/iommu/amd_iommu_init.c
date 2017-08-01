@@ -214,6 +214,7 @@ u16 *amd_iommu_alias_table;
  * for a specific device. It is also indexed by the PCI device id.
  */
 struct amd_iommu **amd_iommu_rlookup_table;
+EXPORT_SYMBOL(amd_iommu_rlookup_table);
 
 /*
  * This table is used to find the irq remapping table for a given device id
@@ -267,6 +268,7 @@ bool translation_pre_enabled(struct amd_iommu *iommu)
 {
 	return (iommu->flags & AMD_IOMMU_FLAG_TRANS_PRE_ENABLED);
 }
+EXPORT_SYMBOL(translation_pre_enabled);
 
 static void clear_translation_pre_enabled(struct amd_iommu *iommu)
 {
@@ -858,6 +860,7 @@ static int copy_device_table(void)
 	u16 dom_id, dte_v, irq_v;
 	static int copied;
 	gfp_t gfp_flag;
+	u64 tmp;
 
 	for_each_iommu(iommu) {
 		/* All IOMMUs should use the same device table with the same size */
@@ -908,6 +911,14 @@ static int copy_device_table(void)
 				old_dev_tbl_cpy[devid].data[1]
 					= old_devtb[devid].data[1];
 				__set_bit(dom_id, amd_iommu_pd_alloc_bitmap);
+				/* If gcr3 table existed, mask it out */
+				if (old_devtb[devid].data[0] & DTE_FLAG_GV) {
+					tmp = DTE_GCR3_VAL_B(~0ULL) << DTE_GCR3_SHIFT_B;
+					tmp |= DTE_GCR3_VAL_C(~0ULL) << DTE_GCR3_SHIFT_C;
+					old_dev_tbl_cpy[devid].data[1] &= ~tmp;
+					tmp = DTE_GCR3_VAL_A(~0ULL) << DTE_GCR3_SHIFT_A;
+					old_dev_tbl_cpy[devid].data[0] &= ~tmp;
+				}
 			}
 
 			irq_v = old_devtb[devid].data[2] & DTE_IRQ_REMAP_ENABLE;
