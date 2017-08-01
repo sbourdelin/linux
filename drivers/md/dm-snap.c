@@ -21,7 +21,7 @@
 #include <linux/dm-kcopyd.h>
 
 #include "dm.h"
-
+#include "dm-dax.h"
 #include "dm-exception-store.h"
 
 #define DM_MSG_PREFIX "snapshots"
@@ -2301,13 +2301,6 @@ static int origin_map(struct dm_target *ti, struct bio *bio)
 
 	/* Only tell snapshots if this is a write */
 	return do_origin(o->dev, bio);
-}
-
-static long origin_dax_direct_access(struct dm_target *ti, pgoff_t pgoff,
-		long nr_pages, void **kaddr, pfn_t *pfn)
-{
-	DMWARN("device does not support dax.");
-	return -EIO;
 }
 
 /*

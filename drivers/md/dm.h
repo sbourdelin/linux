@@ -174,6 +174,40 @@ int dm_stripe_init(void);
 void dm_stripe_exit(void);
 
 /*
+ * Linear: maps a linear range of a device.
+ */
+struct linear_c {
+	struct dm_dev *dev;
+	sector_t start;
+};
+
+struct stripe {
+	struct dm_dev *dev;
+	sector_t physical_start;
+
+	atomic_t error_count;
+};
+
+struct stripe_c {
+	uint32_t stripes;
+	int stripes_shift;
+
+	/* The size of this target / num. stripes */
+	sector_t stripe_width;
+
+	uint32_t chunk_size;
+	int chunk_size_shift;
+
+	/* Needed for handling events */
+	struct dm_target *ti;
+
+	/* Work struct used for triggering events*/
+	struct work_struct trigger_event;
+
+	struct stripe stripe[0];
+};
+
+/*
  * mapped_device operations
  */
 void dm_destroy(struct mapped_device *md);

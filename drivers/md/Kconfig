@@ -200,7 +200,6 @@ config BLK_DEV_DM_BUILTIN
 config BLK_DEV_DM
 	tristate "Device mapper support"
 	select BLK_DEV_DM_BUILTIN
-	select DAX
 	---help---
 	  Device-mapper is a low level volume manager.  It works by allowing
 	  people to specify mappings for ranges of logical sectors.  Various
@@ -211,6 +210,19 @@ config BLK_DEV_DM
 
 	  To compile this as a module, choose M here: the module will be
 	  called dm-mod.
+
+	  If unsure, say N.
+
+config DM_DAX
+	bool "Direct access (DAX) support"
+	depends on BLK_DEV_DM
+	default BLK_DEV_PMEM
+	select DAX
+	---help---
+	  Enable DAX support for the device-mapper linear and stripe
+	  targets for use with DAX capable block devices like /dev/pmemN.
+	  If you have a DAX capable block device and have enabled
+	  filesystem DAX support (CONFIG_FS_DAX), then say Y.
 
 	  If unsure, say N.
 

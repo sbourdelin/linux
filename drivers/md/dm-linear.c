@@ -5,23 +5,15 @@
  */
 
 #include "dm.h"
+#include "dm-dax.h"
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/blkdev.h>
 #include <linux/bio.h>
-#include <linux/dax.h>
 #include <linux/slab.h>
 #include <linux/device-mapper.h>
 
 #define DM_MSG_PREFIX "linear"
-
-/*
- * Linear: maps a linear range of a device.
- */
-struct linear_c {
-	struct dm_dev *dev;
-	sector_t start;
-};
 
 /*
  * Construct a linear mapping: <dev_path> <offset>
@@ -77,7 +69,7 @@ static void linear_dtr(struct dm_target *ti)
 	kfree(lc);
 }
 
-static sector_t linear_map_sector(struct dm_target *ti, sector_t bi_sector)
+sector_t linear_map_sector(struct dm_target *ti, sector_t bi_sector)
 {
 	struct linear_c *lc = ti->private;
 
@@ -152,50 +144,6 @@ static int linear_iterate_devices(struct dm_target *ti,
 	struct linear_c *lc = ti->private;
 
 	return fn(ti, lc->dev, lc->start, ti->len, data);
-}
-
-static long linear_dax_direct_access(struct dm_target *ti, pgoff_t pgoff,
-		long nr_pages, void **kaddr, pfn_t *pfn)
-{
-	long ret;
-	struct linear_c *lc = ti->private;
-	struct block_device *bdev = lc->dev->bdev;
-	struct dax_device *dax_dev = lc->dev->dax_dev;
-	sector_t dev_sector, sector = pgoff * PAGE_SECTORS;
-
-	dev_sector = linear_map_sector(ti, sector);
-	ret = bdev_dax_pgoff(bdev, dev_sector, nr_pages * PAGE_SIZE, &pgoff);
-	if (ret)
-		return ret;
-	return dax_direct_access(dax_dev, pgoff, nr_pages, kaddr, pfn);
-}
-
-static size_t linear_dax_copy_from_iter(struct dm_target *ti, pgoff_t pgoff,
-		void *addr, size_t bytes, struct iov_iter *i)
-{
-	struct linear_c *lc = ti->private;
-	struct block_device *bdev = lc->dev->bdev;
-	struct dax_device *dax_dev = lc->dev->dax_dev;
-	sector_t dev_sector, sector = pgoff * PAGE_SECTORS;
-
-	dev_sector = linear_map_sector(ti, sector);
-	if (bdev_dax_pgoff(bdev, dev_sector, ALIGN(bytes, PAGE_SIZE), &pgoff))
-		return 0;
-	return dax_copy_from_iter(dax_dev, pgoff, addr, bytes, i);
-}
-
-static void linear_dax_flush(struct dm_target *ti, pgoff_t pgoff, void *addr,
-		size_t size)
-{
-	struct linear_c *lc = ti->private;
-	struct block_device *bdev = lc->dev->bdev;
-	struct dax_device *dax_dev = lc->dev->dax_dev;
-	sector_t dev_sector, sector = pgoff * PAGE_SECTORS;
-
-	dev_sector = linear_map_sector(ti, sector);
-	if (bdev_dax_pgoff(bdev, dev_sector, ALIGN(size, PAGE_SIZE), &pgoff))
-		return;
-	dax_flush(dax_dev, pgoff, addr, size);
 }
 
 static struct target_type linear_target = {

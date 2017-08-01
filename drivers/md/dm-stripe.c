@@ -5,44 +5,18 @@
  */
 
 #include "dm.h"
+#include "dm-dax.h"
 #include <linux/device-mapper.h>
 
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/blkdev.h>
 #include <linux/bio.h>
-#include <linux/dax.h>
 #include <linux/slab.h>
 #include <linux/log2.h>
 
 #define DM_MSG_PREFIX "striped"
 #define DM_IO_ERROR_THRESHOLD 15
-
-struct stripe {
-	struct dm_dev *dev;
-	sector_t physical_start;
-
-	atomic_t error_count;
-};
-
-struct stripe_c {
-	uint32_t stripes;
-	int stripes_shift;
-
-	/* The size of this target / num. stripes */
-	sector_t stripe_width;
-
-	uint32_t chunk_size;
-	int chunk_size_shift;
-
-	/* Needed for handling events */
-	struct dm_target *ti;
-
-	/* Work struct used for triggering events*/
-	struct work_struct trigger_event;
-
-	struct stripe stripe[0];
-};
 
 /*
  * An event is triggered whenever a drive
@@ -212,7 +186,7 @@ static void stripe_dtr(struct dm_target *ti)
 	kfree(sc);
 }
 
-static void stripe_map_sector(struct stripe_c *sc, sector_t sector,
+void stripe_map_sector(struct stripe_c *sc, sector_t sector,
 			      uint32_t *stripe, sector_t *result)
 {
 	sector_t chunk = dm_target_offset(sc->ti, sector);
@@ -309,65 +283,6 @@ static int stripe_map(struct dm_target *ti, struct bio *bio)
 	bio->bi_bdev = sc->stripe[stripe].dev->bdev;
 
 	return DM_MAPIO_REMAPPED;
-}
-
-static long stripe_dax_direct_access(struct dm_target *ti, pgoff_t pgoff,
-		long nr_pages, void **kaddr, pfn_t *pfn)
-{
-	sector_t dev_sector, sector = pgoff * PAGE_SECTORS;
-	struct stripe_c *sc = ti->private;
-	struct dax_device *dax_dev;
-	struct block_device *bdev;
-	uint32_t stripe;
-	long ret;
-
-	stripe_map_sector(sc, sector, &stripe, &dev_sector);
-	dev_sector += sc->stripe[stripe].physical_start;
-	dax_dev = sc->stripe[stripe].dev->dax_dev;
-	bdev = sc->stripe[stripe].dev->bdev;
-
-	ret = bdev_dax_pgoff(bdev, dev_sector, nr_pages * PAGE_SIZE, &pgoff);
-	if (ret)
-		return ret;
-	return dax_direct_access(dax_dev, pgoff, nr_pages, kaddr, pfn);
-}
-
-static size_t stripe_dax_copy_from_iter(struct dm_target *ti, pgoff_t pgoff,
-		void *addr, size_t bytes, struct iov_iter *i)
-{
-	sector_t dev_sector, sector = pgoff * PAGE_SECTORS;
-	struct stripe_c *sc = ti->private;
-	struct dax_device *dax_dev;
-	struct block_device *bdev;
-	uint32_t stripe;
-
-	stripe_map_sector(sc, sector, &stripe, &dev_sector);
-	dev_sector += sc->stripe[stripe].physical_start;
-	dax_dev = sc->stripe[stripe].dev->dax_dev;
-	bdev = sc->stripe[stripe].dev->bdev;
-
-	if (bdev_dax_pgoff(bdev, dev_sector, ALIGN(bytes, PAGE_SIZE), &pgoff))
-		return 0;
-	return dax_copy_from_iter(dax_dev, pgoff, addr, bytes, i);
-}
-
-static void stripe_dax_flush(struct dm_target *ti, pgoff_t pgoff, void *addr,
-		size_t size)
-{
-	sector_t dev_sector, sector = pgoff * PAGE_SECTORS;
-	struct stripe_c *sc = ti->private;
-	struct dax_device *dax_dev;
-	struct block_device *bdev;
-	uint32_t stripe;
-
-	stripe_map_sector(sc, sector, &stripe, &dev_sector);
-	dev_sector += sc->stripe[stripe].physical_start;
-	dax_dev = sc->stripe[stripe].dev->dax_dev;
-	bdev = sc->stripe[stripe].dev->bdev;
-
-	if (bdev_dax_pgoff(bdev, dev_sector, ALIGN(size, PAGE_SIZE), &pgoff))
-		return;
-	dax_flush(dax_dev, pgoff, addr, size);
 }
 
 /*

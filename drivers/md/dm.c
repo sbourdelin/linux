@@ -8,6 +8,7 @@
 #include "dm-core.h"
 #include "dm-rq.h"
 #include "dm-uevent.h"
+#include "dm-dax.h"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -16,7 +17,6 @@
 #include <linux/blkpg.h>
 #include <linux/bio.h>
 #include <linux/mempool.h>
-#include <linux/dax.h>
 #include <linux/slab.h>
 #include <linux/idr.h>
 #include <linux/uio.h>
@@ -634,7 +634,7 @@ static int open_table_device(struct table_device *td, dev_t dev,
 	}
 
 	td->dm_dev.bdev = bdev;
-	td->dm_dev.dax_dev = dax_get_by_host(bdev->bd_disk->disk_name);
+	td->dm_dev.dax_dev = dm_dax_get_by_host(bdev->bd_disk->disk_name);
 	return 0;
 }
 
@@ -648,7 +648,7 @@ static void close_table_device(struct table_device *td, struct mapped_device *md
 
 	bd_unlink_disk_holder(td->dm_dev.bdev, dm_disk(md));
 	blkdev_put(td->dm_dev.bdev, td->dm_dev.mode | FMODE_EXCL);
-	put_dax(td->dm_dev.dax_dev);
+	dm_put_dax(td->dm_dev.dax_dev);
 	td->dm_dev.bdev = NULL;
 	td->dm_dev.dax_dev = NULL;
 }
@@ -890,7 +890,7 @@ static sector_t max_io_len_target_boundary(sector_t sector, struct dm_target *ti
 	return ti->len - target_offset;
 }
 
-static sector_t max_io_len(sector_t sector, struct dm_target *ti)
+sector_t max_io_len(sector_t sector, struct dm_target *ti)
 {
 	sector_t len = max_io_len_target_boundary(sector, ti);
 	sector_t offset, max_len;
@@ -927,93 +927,6 @@ int dm_set_target_max_io_len(struct dm_target *ti, sector_t len)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(dm_set_target_max_io_len);
-
-static struct dm_target *dm_dax_get_live_target(struct mapped_device *md,
-		sector_t sector, int *srcu_idx)
-{
-	struct dm_table *map;
-	struct dm_target *ti;
-
-	map = dm_get_live_table(md, srcu_idx);
-	if (!map)
-		return NULL;
-
-	ti = dm_table_find_target(map, sector);
-	if (!dm_target_is_valid(ti))
-		return NULL;
-
-	return ti;
-}
-
-static long dm_dax_direct_access(struct dax_device *dax_dev, pgoff_t pgoff,
-		long nr_pages, void **kaddr, pfn_t *pfn)
-{
-	struct mapped_device *md = dax_get_private(dax_dev);
-	sector_t sector = pgoff * PAGE_SECTORS;
-	struct dm_target *ti;
-	long len, ret = -EIO;
-	int srcu_idx;
-
-	ti = dm_dax_get_live_target(md, sector, &srcu_idx);
-
-	if (!ti)
-		goto out;
-	if (!ti->type->direct_access)
-		goto out;
-	len = max_io_len(sector, ti) / PAGE_SECTORS;
-	if (len < 1)
-		goto out;
-	nr_pages = min(len, nr_pages);
-	if (ti->type->direct_access)
-		ret = ti->type->direct_access(ti, pgoff, nr_pages, kaddr, pfn);
-
- out:
-	dm_put_live_table(md, srcu_idx);
-
-	return ret;
-}
-
-static size_t dm_dax_copy_from_iter(struct dax_device *dax_dev, pgoff_t pgoff,
-		void *addr, size_t bytes, struct iov_iter *i)
-{
-	struct mapped_device *md = dax_get_private(dax_dev);
-	sector_t sector = pgoff * PAGE_SECTORS;
-	struct dm_target *ti;
-	long ret = 0;
-	int srcu_idx;
-
-	ti = dm_dax_get_live_target(md, sector, &srcu_idx);
-
-	if (!ti)
-		goto out;
-	if (!ti->type->dax_copy_from_iter) {
-		ret = copy_from_iter(addr, bytes, i);
-		goto out;
-	}
-	ret = ti->type->dax_copy_from_iter(ti, pgoff, addr, bytes, i);
- out:
-	dm_put_live_table(md, srcu_idx);
-
-	return ret;
-}
-
-static void dm_dax_flush(struct dax_device *dax_dev, pgoff_t pgoff, void *addr,
-		size_t size)
-{
-	struct mapped_device *md = dax_get_private(dax_dev);
-	sector_t sector = pgoff * PAGE_SECTORS;
-	struct dm_target *ti;
-	int srcu_idx;
-
-	ti = dm_dax_get_live_target(md, sector, &srcu_idx);
-
-	if (!ti)
-		goto out;
-	if (ti->type->dax_flush)
-		ti->type->dax_flush(ti, pgoff, addr, size);
- out:
-	dm_put_live_table(md, srcu_idx);
-}
 
 /*
  * A target may call dm_accept_partial_bio only from the map routine.  It is
@@ -1681,8 +1594,8 @@ static void cleanup_mapped_device(struct mapped_device *md)
 		bioset_free(md->bs);
 
 	if (md->dax_dev) {
-		kill_dax(md->dax_dev);
-		put_dax(md->dax_dev);
+		dm_kill_dax(md->dax_dev);
+		dm_put_dax(md->dax_dev);
 		md->dax_dev = NULL;
 	}
 
@@ -1779,8 +1692,8 @@ static struct mapped_device *alloc_dev(int minor)
 	md->disk->private_data = md;
 	sprintf(md->disk->disk_name, "dm-%d", minor);
 
-	dax_dev = alloc_dax(md, md->disk->disk_name, &dm_dax_ops);
-	if (!dax_dev)
+	dax_dev = dm_alloc_dax(md, md->disk->disk_name, &dm_dax_ops);
+	if (!dax_dev && IS_ENABLED(CONFIG_DM_DAX))
 		goto bad;
 	md->dax_dev = dax_dev;
 
@@ -2999,7 +2912,7 @@ static const struct block_device_operations dm_blk_dops = {
 	.owner = THIS_MODULE
 };
 
-static const struct dax_operations dm_dax_ops = {
+static const __maybe_unused struct dax_operations dm_dax_ops = {
 	.direct_access = dm_dax_direct_access,
 	.copy_from_iter = dm_dax_copy_from_iter,
 	.flush = dm_dax_flush,
