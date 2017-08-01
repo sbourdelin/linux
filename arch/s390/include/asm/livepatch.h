@@ -17,18 +17,11 @@
 #ifndef ASM_LIVEPATCH_H
 #define ASM_LIVEPATCH_H
 
-#include <linux/module.h>
+#include <asm/ptrace.h>
 
 static inline int klp_check_compiler_support(void)
 {
 	return 0;
-}
-
-static inline int klp_write_module_reloc(struct module *mod, unsigned long
-		type, unsigned long loc, unsigned long value)
-{
-	/* not supported yet */
-	return -ENOSYS;
 }
 
 static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)

@@ -117,7 +117,7 @@ extern int valid_mmap_phys_addr_range (unsigned long pfn, size_t count);
  * following the barrier will arrive after all previous writes.  For most
  * ia64 platforms, this is a simple 'mf.a' instruction.
  *
- * See Documentation/DocBook/deviceiobook.tmpl for more information.
+ * See Documentation/driver-api/device-io.rst for more information.
  */
 static inline void ___ia64_mmiowb(void)
 {
@@ -433,6 +433,7 @@ static inline void __iomem * ioremap_cache (unsigned long phys_addr, unsigned lo
 	return ioremap(phys_addr, size);
 }
 #define ioremap_cache ioremap_cache
+#define ioremap_uc ioremap_nocache
 
 
 /*

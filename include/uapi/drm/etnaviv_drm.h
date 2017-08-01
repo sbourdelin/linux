@@ -19,6 +19,10 @@
 
 #include "drm.h"
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* Please note that modifications to all structs defined here are
  * subject to backwards-compatibility constraints:
  *  1) Do not use pointers, use __u64 instead for 32 bit / 64 bit
@@ -150,6 +154,12 @@ struct drm_etnaviv_gem_submit_bo {
  * one or more cmdstream buffers.  This allows for conditional execution
  * (context-restore), and IB buffers needed for per tile/bin draw cmds.
  */
+#define ETNA_SUBMIT_NO_IMPLICIT         0x0001
+#define ETNA_SUBMIT_FENCE_FD_IN         0x0002
+#define ETNA_SUBMIT_FENCE_FD_OUT        0x0004
+#define ETNA_SUBMIT_FLAGS		(ETNA_SUBMIT_NO_IMPLICIT | \
+					 ETNA_SUBMIT_FENCE_FD_IN | \
+					 ETNA_SUBMIT_FENCE_FD_OUT)
 #define ETNA_PIPE_3D      0x00
 #define ETNA_PIPE_2D      0x01
 #define ETNA_PIPE_VG      0x02
@@ -163,6 +173,8 @@ struct drm_etnaviv_gem_submit {
 	__u64 bos;            /* in, ptr to array of submit_bo's */
 	__u64 relocs;         /* in, ptr to array of submit_reloc's */
 	__u64 stream;         /* in, ptr to cmdstream */
+	__u32 flags;          /* in, mask of ETNA_SUBMIT_x */
+	__s32 fence_fd;       /* in/out, fence fd (see ETNA_SUBMIT_FENCE_FD_x) */
 };
 
 /* The normal way to synchronize with the GPU is just to CPU_PREP on
@@ -221,5 +233,9 @@ struct drm_etnaviv_gem_wait {
 #define DRM_IOCTL_ETNAVIV_WAIT_FENCE   DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_WAIT_FENCE, struct drm_etnaviv_wait_fence)
 #define DRM_IOCTL_ETNAVIV_GEM_USERPTR  DRM_IOWR(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_USERPTR, struct drm_etnaviv_gem_userptr)
 #define DRM_IOCTL_ETNAVIV_GEM_WAIT     DRM_IOW(DRM_COMMAND_BASE + DRM_ETNAVIV_GEM_WAIT, struct drm_etnaviv_gem_wait)
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif /* __ETNAVIV_DRM_H__ */

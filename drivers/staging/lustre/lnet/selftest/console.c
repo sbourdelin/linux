@@ -15,11 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * version 2 along with this program; If not, see
- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
- *
- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- * CA 95054 USA or visit www.sun.com if you need additional information or
- * have any questions.
+ * http://www.gnu.org/licenses/gpl-2.0.html
  *
  * GPL HEADER END
  */
@@ -61,7 +57,7 @@ do {							\
 struct lstcon_session console_session;
 
 static void
-lstcon_node_get(lstcon_node_t *nd)
+lstcon_node_get(struct lstcon_node *nd)
 {
 	LASSERT(nd->nd_ref >= 1);
 
@@ -69,9 +65,10 @@ lstcon_node_get(lstcon_node_t *nd)
 }
 
 static int
-lstcon_node_find(lnet_process_id_t id, lstcon_node_t **ndpp, int create)
+lstcon_node_find(struct lnet_process_id id, struct lstcon_node **ndpp,
+		 int create)
 {
-	lstcon_ndlink_t	*ndl;
+	struct lstcon_ndlink	*ndl;
 	unsigned int idx = LNET_NIDADDR(id.nid) % LST_GLOBAL_HASHSIZE;
 
 	LASSERT(id.nid != LNET_NID_ANY);
@@ -90,11 +87,11 @@ lstcon_node_find(lnet_process_id_t id, lstcon_node_t **ndpp, int create)
 	if (!create)
 		return -ENOENT;
 
-	LIBCFS_ALLOC(*ndpp, sizeof(lstcon_node_t) + sizeof(lstcon_ndlink_t));
+	LIBCFS_ALLOC(*ndpp, sizeof(**ndpp) + sizeof(*ndl));
 	if (!*ndpp)
 		return -ENOMEM;
 
-	ndl = (lstcon_ndlink_t *)(*ndpp + 1);
+	ndl = (struct lstcon_ndlink *)(*ndpp + 1);
 
 	ndl->ndl_node = *ndpp;
 
@@ -103,7 +100,7 @@ lstcon_node_find(lnet_process_id_t id, lstcon_node_t **ndpp, int create)
 	ndl->ndl_node->nd_stamp = cfs_time_current();
 	ndl->ndl_node->nd_state = LST_NODE_UNKNOWN;
 	ndl->ndl_node->nd_timeout = 0;
-	memset(&ndl->ndl_node->nd_ping, 0, sizeof(lstcon_rpc_t));
+	memset(&ndl->ndl_node->nd_ping, 0, sizeof(struct lstcon_rpc));
 
 	/*
 	 * queued in global hash & list, no refcount is taken by
@@ -117,16 +114,16 @@ lstcon_node_find(lnet_process_id_t id, lstcon_node_t **ndpp, int create)
 }
 
 static void
-lstcon_node_put(lstcon_node_t *nd)
+lstcon_node_put(struct lstcon_node *nd)
 {
-	lstcon_ndlink_t *ndl;
+	struct lstcon_ndlink *ndl;
 
 	LASSERT(nd->nd_ref > 0);
 
 	if (--nd->nd_ref > 0)
 		return;
 
-	ndl = (lstcon_ndlink_t *)(nd + 1);
+	ndl = (struct lstcon_ndlink *)(nd + 1);
 
 	LASSERT(!list_empty(&ndl->ndl_link));
 	LASSERT(!list_empty(&ndl->ndl_hlink));
@@ -135,16 +132,16 @@ lstcon_node_put(lstcon_node_t *nd)
 	list_del(&ndl->ndl_link);
 	list_del(&ndl->ndl_hlink);
 
-	LIBCFS_FREE(nd, sizeof(lstcon_node_t) + sizeof(lstcon_ndlink_t));
+	LIBCFS_FREE(nd, sizeof(*nd) + sizeof(*ndl));
 }
 
 static int
-lstcon_ndlink_find(struct list_head *hash,
-		   lnet_process_id_t id, lstcon_ndlink_t **ndlpp, int create)
+lstcon_ndlink_find(struct list_head *hash, struct lnet_process_id id,
+		   struct lstcon_ndlink **ndlpp, int create)
 {
 	unsigned int idx = LNET_NIDADDR(id.nid) % LST_NODE_HASHSIZE;
-	lstcon_ndlink_t *ndl;
-	lstcon_node_t *nd;
+	struct lstcon_ndlink *ndl;
+	struct lstcon_node *nd;
 	int rc;
 
 	if (id.nid == LNET_NID_ANY)
@@ -168,7 +165,7 @@ lstcon_ndlink_find(struct list_head *hash,
 	if (rc)
 		return rc;
 
-	LIBCFS_ALLOC(ndl, sizeof(lstcon_ndlink_t));
+	LIBCFS_ALLOC(ndl, sizeof(struct lstcon_ndlink));
 	if (!ndl) {
 		lstcon_node_put(nd);
 		return -ENOMEM;
@@ -184,7 +181,7 @@ lstcon_ndlink_find(struct list_head *hash,
 }
 
 static void
-lstcon_ndlink_release(lstcon_ndlink_t *ndl)
+lstcon_ndlink_release(struct lstcon_ndlink *ndl)
 {
 	LASSERT(list_empty(&ndl->ndl_link));
 	LASSERT(!list_empty(&ndl->ndl_hlink));
@@ -196,12 +193,12 @@ lstcon_ndlink_release(lstcon_ndlink_t *ndl)
 }
 
 static int
-lstcon_group_alloc(char *name, lstcon_group_t **grpp)
+lstcon_group_alloc(char *name, struct lstcon_group **grpp)
 {
-	lstcon_group_t *grp;
+	struct lstcon_group *grp;
 	int i;
 
-	LIBCFS_ALLOC(grp, offsetof(lstcon_group_t,
+	LIBCFS_ALLOC(grp, offsetof(struct lstcon_group,
 				   grp_ndl_hash[LST_NODE_HASHSIZE]));
 	if (!grp)
 		return -ENOMEM;
@@ -209,7 +206,7 @@ lstcon_group_alloc(char *name, lstcon_group_t **grpp)
 	grp->grp_ref = 1;
 	if (name) {
 		if (strlen(name) > sizeof(grp->grp_name) - 1) {
-			LIBCFS_FREE(grp, offsetof(lstcon_group_t,
+			LIBCFS_FREE(grp, offsetof(struct lstcon_group,
 				    grp_ndl_hash[LST_NODE_HASHSIZE]));
 			return -E2BIG;
 		}
@@ -229,18 +226,19 @@ lstcon_group_alloc(char *name, lstcon_group_t **grpp)
 }
 
 static void
-lstcon_group_addref(lstcon_group_t *grp)
+lstcon_group_addref(struct lstcon_group *grp)
 {
 	grp->grp_ref++;
 }
 
-static void lstcon_group_ndlink_release(lstcon_group_t *, lstcon_ndlink_t *);
+static void lstcon_group_ndlink_release(struct lstcon_group *,
+					struct lstcon_ndlink *);
 
 static void
-lstcon_group_drain(lstcon_group_t *grp, int keep)
+lstcon_group_drain(struct lstcon_group *grp, int keep)
 {
-	lstcon_ndlink_t *ndl;
-	lstcon_ndlink_t *tmp;
+	struct lstcon_ndlink *ndl;
+	struct lstcon_ndlink *tmp;
 
 	list_for_each_entry_safe(ndl, tmp, &grp->grp_ndl_list, ndl_link) {
 		if (!(ndl->ndl_node->nd_state & keep))
@@ -249,7 +247,7 @@ lstcon_group_drain(lstcon_group_t *grp, int keep)
 }
 
 static void
-lstcon_group_decref(lstcon_group_t *grp)
+lstcon_group_decref(struct lstcon_group *grp)
 {
 	int i;
 
@@ -264,20 +262,20 @@ lstcon_group_decref(lstcon_group_t *grp)
 	for (i = 0; i < LST_NODE_HASHSIZE; i++)
 		LASSERT(list_empty(&grp->grp_ndl_hash[i]));
 
-	LIBCFS_FREE(grp, offsetof(lstcon_group_t,
+	LIBCFS_FREE(grp, offsetof(struct lstcon_group,
 				  grp_ndl_hash[LST_NODE_HASHSIZE]));
 }
 
 static int
-lstcon_group_find(const char *name, lstcon_group_t **grpp)
+lstcon_group_find(const char *name, struct lstcon_group **grpp)
 {
-	lstcon_group_t *grp;
+	struct lstcon_group *grp;
 
 	list_for_each_entry(grp, &console_session.ses_grp_list, grp_link) {
 		if (strncmp(grp->grp_name, name, LST_NAME_SIZE))
 			continue;
 
-		lstcon_group_addref(grp);  /* +1 ref for caller */
+		lstcon_group_addref(grp); /* +1 ref for caller */
 		*grpp = grp;
 		return 0;
 	}
@@ -286,8 +284,8 @@ lstcon_group_find(const char *name, lstcon_group_t **grpp)
 }
 
 static int
-lstcon_group_ndlink_find(lstcon_group_t *grp, lnet_process_id_t id,
-			 lstcon_ndlink_t **ndlpp, int create)
+lstcon_group_ndlink_find(struct lstcon_group *grp, struct lnet_process_id id,
+			 struct lstcon_ndlink **ndlpp, int create)
 {
 	int rc;
 
@@ -305,7 +303,7 @@ lstcon_group_ndlink_find(lstcon_group_t *grp, lnet_process_id_t id,
 }
 
 static void
-lstcon_group_ndlink_release(lstcon_group_t *grp, lstcon_ndlink_t *ndl)
+lstcon_group_ndlink_release(struct lstcon_group *grp, struct lstcon_ndlink *ndl)
 {
 	list_del_init(&ndl->ndl_link);
 	lstcon_ndlink_release(ndl);
@@ -313,8 +311,8 @@ lstcon_group_ndlink_release(lstcon_group_t *grp, lstcon_ndlink_t *ndl)
 }
 
 static void
-lstcon_group_ndlink_move(lstcon_group_t *old,
-			 lstcon_group_t *new, lstcon_ndlink_t *ndl)
+lstcon_group_ndlink_move(struct lstcon_group *old,
+			 struct lstcon_group *new, struct lstcon_ndlink *ndl)
 {
 	unsigned int idx = LNET_NIDADDR(ndl->ndl_node->nd_id.nid) %
 					LST_NODE_HASHSIZE;
@@ -329,21 +327,21 @@ lstcon_group_ndlink_move(lstcon_group_t *old,
 }
 
 static void
-lstcon_group_move(lstcon_group_t *old, lstcon_group_t *new)
+lstcon_group_move(struct lstcon_group *old, struct lstcon_group *new)
 {
-	lstcon_ndlink_t *ndl;
+	struct lstcon_ndlink *ndl;
 
 	while (!list_empty(&old->grp_ndl_list)) {
 		ndl = list_entry(old->grp_ndl_list.next,
-				 lstcon_ndlink_t, ndl_link);
+				 struct lstcon_ndlink, ndl_link);
 		lstcon_group_ndlink_move(old, new, ndl);
 	}
 }
 
 static int
-lstcon_sesrpc_condition(int transop, lstcon_node_t *nd, void *arg)
+lstcon_sesrpc_condition(int transop, struct lstcon_node *nd, void *arg)
 {
-	lstcon_group_t *grp = (lstcon_group_t *)arg;
+	struct lstcon_group *grp = (struct lstcon_group *)arg;
 
 	switch (transop) {
 	case LST_TRANS_SESNEW:
@@ -370,10 +368,10 @@ lstcon_sesrpc_condition(int transop, lstcon_node_t *nd, void *arg)
 }
 
 static int
-lstcon_sesrpc_readent(int transop, srpc_msg_t *msg,
-		      lstcon_rpc_ent_t __user *ent_up)
+lstcon_sesrpc_readent(int transop, struct srpc_msg *msg,
+		      struct lstcon_rpc_ent __user *ent_up)
 {
-	srpc_debug_reply_t *rep;
+	struct srpc_debug_reply *rep;
 
 	switch (transop) {
 	case LST_TRANS_SESNEW:
@@ -399,14 +397,15 @@ lstcon_sesrpc_readent(int transop, srpc_msg_t *msg,
 }
 
 static int
-lstcon_group_nodes_add(lstcon_group_t *grp,
-		       int count, lnet_process_id_t __user *ids_up,
-		       unsigned *featp, struct list_head __user *result_up)
+lstcon_group_nodes_add(struct lstcon_group *grp,
+		       int count, struct lnet_process_id __user *ids_up,
+		       unsigned int *featp,
+		       struct list_head __user *result_up)
 {
-	lstcon_rpc_trans_t *trans;
-	lstcon_ndlink_t	*ndl;
-	lstcon_group_t *tmp;
-	lnet_process_id_t id;
+	struct lstcon_rpc_trans *trans;
+	struct lstcon_ndlink	*ndl;
+	struct lstcon_group *tmp;
+	struct lnet_process_id id;
 	int i;
 	int rc;
 
@@ -466,14 +465,14 @@ lstcon_group_nodes_add(lstcon_group_t *grp,
 }
 
 static int
-lstcon_group_nodes_remove(lstcon_group_t *grp,
-			  int count, lnet_process_id_t __user *ids_up,
+lstcon_group_nodes_remove(struct lstcon_group *grp,
+			  int count, struct lnet_process_id __user *ids_up,
 			  struct list_head __user *result_up)
 {
-	lstcon_rpc_trans_t *trans;
-	lstcon_ndlink_t *ndl;
-	lstcon_group_t *tmp;
-	lnet_process_id_t id;
+	struct lstcon_rpc_trans *trans;
+	struct lstcon_ndlink *ndl;
+	struct lstcon_group *tmp;
+	struct lnet_process_id id;
 	int rc;
 	int i;
 
@@ -523,7 +522,7 @@ error:
 int
 lstcon_group_add(char *name)
 {
-	lstcon_group_t *grp;
+	struct lstcon_group *grp;
 	int rc;
 
 	rc = lstcon_group_find(name, &grp) ? 0 : -EEXIST;
@@ -545,10 +544,10 @@ lstcon_group_add(char *name)
 }
 
 int
-lstcon_nodes_add(char *name, int count, lnet_process_id_t __user *ids_up,
-		 unsigned *featp, struct list_head __user *result_up)
+lstcon_nodes_add(char *name, int count, struct lnet_process_id __user *ids_up,
+		 unsigned int *featp, struct list_head __user *result_up)
 {
-	lstcon_group_t *grp;
+	struct lstcon_group *grp;
 	int rc;
 
 	LASSERT(count > 0);
@@ -578,8 +577,8 @@ lstcon_nodes_add(char *name, int count, lnet_process_id_t __user *ids_up,
 int
 lstcon_group_del(char *name)
 {
-	lstcon_rpc_trans_t *trans;
-	lstcon_group_t *grp;
+	struct lstcon_rpc_trans *trans;
+	struct lstcon_group *grp;
 	int rc;
 
 	rc = lstcon_group_find(name, &grp);
@@ -621,7 +620,7 @@ lstcon_group_del(char *name)
 int
 lstcon_group_clean(char *name, int args)
 {
-	lstcon_group_t *grp = NULL;
+	struct lstcon_group *grp = NULL;
 	int rc;
 
 	rc = lstcon_group_find(name, &grp);
@@ -651,10 +650,11 @@ lstcon_group_clean(char *name, int args)
 }
 
 int
-lstcon_nodes_remove(char *name, int count, lnet_process_id_t __user *ids_up,
+lstcon_nodes_remove(char *name, int count,
+		    struct lnet_process_id __user *ids_up,
 		    struct list_head __user *result_up)
 {
-	lstcon_group_t *grp = NULL;
+	struct lstcon_group *grp = NULL;
 	int rc;
 
 	rc = lstcon_group_find(name, &grp);
@@ -683,8 +683,8 @@ lstcon_nodes_remove(char *name, int count, lnet_process_id_t __user *ids_up,
 int
 lstcon_group_refresh(char *name, struct list_head __user *result_up)
 {
-	lstcon_rpc_trans_t *trans;
-	lstcon_group_t *grp;
+	struct lstcon_rpc_trans *trans;
+	struct lstcon_group *grp;
 	int rc;
 
 	rc = lstcon_group_find(name, &grp);
@@ -725,7 +725,7 @@ lstcon_group_refresh(char *name, struct list_head __user *result_up)
 int
 lstcon_group_list(int index, int len, char __user *name_up)
 {
-	lstcon_group_t *grp;
+	struct lstcon_group *grp;
 
 	LASSERT(index >= 0);
 	LASSERT(name_up);
@@ -733,7 +733,7 @@ lstcon_group_list(int index, int len, char __user *name_up)
 	list_for_each_entry(grp, &console_session.ses_grp_list, grp_link) {
 		if (!index--) {
 			return copy_to_user(name_up, grp->grp_name, len) ?
-			       -EFAULT : 0;
+					    -EFAULT : 0;
 		}
 	}
 
@@ -742,10 +742,10 @@ lstcon_group_list(int index, int len, char __user *name_up)
 
 static int
 lstcon_nodes_getent(struct list_head *head, int *index_p,
-		    int *count_p, lstcon_node_ent_t __user *dents_up)
+		    int *count_p, struct lstcon_node_ent __user *dents_up)
 {
-	lstcon_ndlink_t *ndl;
-	lstcon_node_t *nd;
+	struct lstcon_ndlink *ndl;
+	struct lstcon_node *nd;
 	int count = 0;
 	int index = 0;
 
@@ -781,13 +781,13 @@ lstcon_nodes_getent(struct list_head *head, int *index_p,
 }
 
 int
-lstcon_group_info(char *name, lstcon_ndlist_ent_t __user *gents_p,
+lstcon_group_info(char *name, struct lstcon_ndlist_ent __user *gents_p,
 		  int *index_p, int *count_p,
-		  lstcon_node_ent_t __user *dents_up)
+		  struct lstcon_node_ent __user *dents_up)
 {
-	lstcon_ndlist_ent_t *gentp;
-	lstcon_group_t *grp;
-	lstcon_ndlink_t *ndl;
+	struct lstcon_ndlist_ent *gentp;
+	struct lstcon_group *grp;
+	struct lstcon_ndlink *ndl;
 	int rc;
 
 	rc = lstcon_group_find(name, &grp);
@@ -806,7 +806,7 @@ lstcon_group_info(char *name, lstcon_ndlist_ent_t __user *gents_p,
 	}
 
 	/* non-verbose query */
-	LIBCFS_ALLOC(gentp, sizeof(lstcon_ndlist_ent_t));
+	LIBCFS_ALLOC(gentp, sizeof(struct lstcon_ndlist_ent));
 	if (!gentp) {
 		CERROR("Can't allocate ndlist_ent\n");
 		lstcon_group_decref(grp);
@@ -818,19 +818,19 @@ lstcon_group_info(char *name, lstcon_ndlist_ent_t __user *gents_p,
 		LST_NODE_STATE_COUNTER(ndl->ndl_node, gentp);
 
 	rc = copy_to_user(gents_p, gentp,
-			  sizeof(lstcon_ndlist_ent_t)) ? -EFAULT : 0;
+			  sizeof(struct lstcon_ndlist_ent)) ? -EFAULT : 0;
 
-	LIBCFS_FREE(gentp, sizeof(lstcon_ndlist_ent_t));
+	LIBCFS_FREE(gentp, sizeof(struct lstcon_ndlist_ent));
 
 	lstcon_group_decref(grp);
 
-	return 0;
+	return rc;
 }
 
 static int
-lstcon_batch_find(const char *name, lstcon_batch_t **batpp)
+lstcon_batch_find(const char *name, struct lstcon_batch **batpp)
 {
-	lstcon_batch_t *bat;
+	struct lstcon_batch *bat;
 
 	list_for_each_entry(bat, &console_session.ses_bat_list, bat_link) {
 		if (!strncmp(bat->bat_name, name, LST_NAME_SIZE)) {
@@ -845,7 +845,7 @@ lstcon_batch_find(const char *name, lstcon_batch_t **batpp)
 int
 lstcon_batch_add(char *name)
 {
-	lstcon_batch_t *bat;
+	struct lstcon_batch *bat;
 	int i;
 	int rc;
 
@@ -855,7 +855,7 @@ lstcon_batch_add(char *name)
 		return rc;
 	}
 
-	LIBCFS_ALLOC(bat, sizeof(lstcon_batch_t));
+	LIBCFS_ALLOC(bat, sizeof(struct lstcon_batch));
 	if (!bat) {
 		CERROR("Can't allocate descriptor for batch %s\n", name);
 		return -ENOMEM;
@@ -865,7 +865,7 @@ lstcon_batch_add(char *name)
 		     sizeof(struct list_head) * LST_NODE_HASHSIZE);
 	if (!bat->bat_cli_hash) {
 		CERROR("Can't allocate hash for batch %s\n", name);
-		LIBCFS_FREE(bat, sizeof(lstcon_batch_t));
+		LIBCFS_FREE(bat, sizeof(struct lstcon_batch));
 
 		return -ENOMEM;
 	}
@@ -875,7 +875,7 @@ lstcon_batch_add(char *name)
 	if (!bat->bat_srv_hash) {
 		CERROR("Can't allocate hash for batch %s\n", name);
 		LIBCFS_FREE(bat->bat_cli_hash, LST_NODE_HASHSIZE);
-		LIBCFS_FREE(bat, sizeof(lstcon_batch_t));
+		LIBCFS_FREE(bat, sizeof(struct lstcon_batch));
 
 		return -ENOMEM;
 	}
@@ -883,7 +883,7 @@ lstcon_batch_add(char *name)
 	if (strlen(name) > sizeof(bat->bat_name) - 1) {
 		LIBCFS_FREE(bat->bat_srv_hash, LST_NODE_HASHSIZE);
 		LIBCFS_FREE(bat->bat_cli_hash, LST_NODE_HASHSIZE);
-		LIBCFS_FREE(bat, sizeof(lstcon_batch_t));
+		LIBCFS_FREE(bat, sizeof(struct lstcon_batch));
 		return -E2BIG;
 	}
 	strncpy(bat->bat_name, name, sizeof(bat->bat_name));
@@ -911,7 +911,7 @@ lstcon_batch_add(char *name)
 int
 lstcon_batch_list(int index, int len, char __user *name_up)
 {
-	lstcon_batch_t *bat;
+	struct lstcon_batch *bat;
 
 	LASSERT(name_up);
 	LASSERT(index >= 0);
@@ -927,16 +927,16 @@ lstcon_batch_list(int index, int len, char __user *name_up)
 }
 
 int
-lstcon_batch_info(char *name, lstcon_test_batch_ent_t __user *ent_up,
+lstcon_batch_info(char *name, struct lstcon_test_batch_ent __user *ent_up,
 		  int server, int testidx, int *index_p, int *ndent_p,
-		  lstcon_node_ent_t __user *dents_up)
+		  struct lstcon_node_ent __user *dents_up)
 {
-	lstcon_test_batch_ent_t *entp;
+	struct lstcon_test_batch_ent *entp;
 	struct list_head *clilst;
 	struct list_head *srvlst;
-	lstcon_test_t *test = NULL;
-	lstcon_batch_t *bat;
-	lstcon_ndlink_t	*ndl;
+	struct lstcon_test *test = NULL;
+	struct lstcon_batch *bat;
+	struct lstcon_ndlink	*ndl;
 	int rc;
 
 	rc = lstcon_batch_find(name, &bat);
@@ -970,14 +970,13 @@ lstcon_batch_info(char *name, lstcon_test_batch_ent_t __user *ent_up,
 	}
 
 	/* non-verbose query */
-	LIBCFS_ALLOC(entp, sizeof(lstcon_test_batch_ent_t));
+	LIBCFS_ALLOC(entp, sizeof(struct lstcon_test_batch_ent));
 	if (!entp)
 		return -ENOMEM;
 
 	if (!test) {
 		entp->u.tbe_batch.bae_ntest = bat->bat_ntest;
 		entp->u.tbe_batch.bae_state = bat->bat_state;
-
 	} else {
 		entp->u.tbe_test.tse_type = test->tes_type;
 		entp->u.tbe_test.tse_loop = test->tes_loop;
@@ -991,15 +990,15 @@ lstcon_batch_info(char *name, lstcon_test_batch_ent_t __user *ent_up,
 		LST_NODE_STATE_COUNTER(ndl->ndl_node, &entp->tbe_srv_nle);
 
 	rc = copy_to_user(ent_up, entp,
-			  sizeof(lstcon_test_batch_ent_t)) ? -EFAULT : 0;
+			  sizeof(struct lstcon_test_batch_ent)) ? -EFAULT : 0;
 
-	LIBCFS_FREE(entp, sizeof(lstcon_test_batch_ent_t));
+	LIBCFS_FREE(entp, sizeof(struct lstcon_test_batch_ent));
 
 	return rc;
 }
 
 static int
-lstcon_batrpc_condition(int transop, lstcon_node_t *nd, void *arg)
+lstcon_batrpc_condition(int transop, struct lstcon_node *nd, void *arg)
 {
 	switch (transop) {
 	case LST_TRANS_TSBRUN:
@@ -1021,10 +1020,10 @@ lstcon_batrpc_condition(int transop, lstcon_node_t *nd, void *arg)
 }
 
 static int
-lstcon_batch_op(lstcon_batch_t *bat, int transop,
+lstcon_batch_op(struct lstcon_batch *bat, int transop,
 		struct list_head __user *result_up)
 {
-	lstcon_rpc_trans_t *trans;
+	struct lstcon_rpc_trans *trans;
 	int rc;
 
 	rc = lstcon_rpc_trans_ndlist(&bat->bat_cli_list,
@@ -1047,7 +1046,7 @@ lstcon_batch_op(lstcon_batch_t *bat, int transop,
 int
 lstcon_batch_run(char *name, int timeout, struct list_head __user *result_up)
 {
-	lstcon_batch_t *bat;
+	struct lstcon_batch *bat;
 	int rc;
 
 	if (lstcon_batch_find(name, &bat)) {
@@ -1069,7 +1068,7 @@ lstcon_batch_run(char *name, int timeout, struct list_head __user *result_up)
 int
 lstcon_batch_stop(char *name, int force, struct list_head __user *result_up)
 {
-	lstcon_batch_t *bat;
+	struct lstcon_batch *bat;
 	int rc;
 
 	if (lstcon_batch_find(name, &bat)) {
@@ -1089,17 +1088,17 @@ lstcon_batch_stop(char *name, int force, struct list_head __user *result_up)
 }
 
 static void
-lstcon_batch_destroy(lstcon_batch_t *bat)
+lstcon_batch_destroy(struct lstcon_batch *bat)
 {
-	lstcon_ndlink_t *ndl;
-	lstcon_test_t *test;
+	struct lstcon_ndlink *ndl;
+	struct lstcon_test *test;
 	int i;
 
 	list_del(&bat->bat_link);
 
 	while (!list_empty(&bat->bat_test_list)) {
 		test = list_entry(bat->bat_test_list.next,
-				  lstcon_test_t, tes_link);
+				  struct lstcon_test, tes_link);
 		LASSERT(list_empty(&test->tes_trans_list));
 
 		list_del(&test->tes_link);
@@ -1107,7 +1106,7 @@ lstcon_batch_destroy(lstcon_batch_t *bat)
 		lstcon_group_decref(test->tes_src_grp);
 		lstcon_group_decref(test->tes_dst_grp);
 
-		LIBCFS_FREE(test, offsetof(lstcon_test_t,
+		LIBCFS_FREE(test, offsetof(struct lstcon_test,
 					   tes_param[test->tes_paramlen]));
 	}
 
@@ -1115,7 +1114,7 @@ lstcon_batch_destroy(lstcon_batch_t *bat)
 
 	while (!list_empty(&bat->bat_cli_list)) {
 		ndl = list_entry(bat->bat_cli_list.next,
-				 lstcon_ndlink_t, ndl_link);
+				 struct lstcon_ndlink, ndl_link);
 		list_del_init(&ndl->ndl_link);
 
 		lstcon_ndlink_release(ndl);
@@ -1123,7 +1122,7 @@ lstcon_batch_destroy(lstcon_batch_t *bat)
 
 	while (!list_empty(&bat->bat_srv_list)) {
 		ndl = list_entry(bat->bat_srv_list.next,
-				 lstcon_ndlink_t, ndl_link);
+				 struct lstcon_ndlink, ndl_link);
 		list_del_init(&ndl->ndl_link);
 
 		lstcon_ndlink_release(ndl);
@@ -1138,19 +1137,19 @@ lstcon_batch_destroy(lstcon_batch_t *bat)
 		    sizeof(struct list_head) * LST_NODE_HASHSIZE);
 	LIBCFS_FREE(bat->bat_srv_hash,
 		    sizeof(struct list_head) * LST_NODE_HASHSIZE);
-	LIBCFS_FREE(bat, sizeof(lstcon_batch_t));
+	LIBCFS_FREE(bat, sizeof(struct lstcon_batch));
 }
 
 static int
-lstcon_testrpc_condition(int transop, lstcon_node_t *nd, void *arg)
+lstcon_testrpc_condition(int transop, struct lstcon_node *nd, void *arg)
 {
-	lstcon_test_t *test;
-	lstcon_batch_t *batch;
-	lstcon_ndlink_t *ndl;
+	struct lstcon_test *test;
+	struct lstcon_batch *batch;
+	struct lstcon_ndlink *ndl;
 	struct list_head *hash;
 	struct list_head *head;
 
-	test = (lstcon_test_t *)arg;
+	test = (struct lstcon_test *)arg;
 	LASSERT(test);
 
 	batch = test->tes_batch;
@@ -1186,10 +1185,11 @@ lstcon_testrpc_condition(int transop, lstcon_node_t *nd, void *arg)
 }
 
 static int
-lstcon_test_nodes_add(lstcon_test_t *test, struct list_head __user *result_up)
+lstcon_test_nodes_add(struct lstcon_test *test,
+		      struct list_head __user *result_up)
 {
-	lstcon_rpc_trans_t *trans;
-	lstcon_group_t *grp;
+	struct lstcon_rpc_trans *trans;
+	struct lstcon_group *grp;
 	int transop;
 	int rc;
 
@@ -1237,7 +1237,7 @@ again:
 }
 
 static int
-lstcon_verify_batch(const char *name, lstcon_batch_t **batch)
+lstcon_verify_batch(const char *name, struct lstcon_batch **batch)
 {
 	int rc;
 
@@ -1256,10 +1256,10 @@ lstcon_verify_batch(const char *name, lstcon_batch_t **batch)
 }
 
 static int
-lstcon_verify_group(const char *name, lstcon_group_t **grp)
+lstcon_verify_group(const char *name, struct lstcon_group **grp)
 {
 	int rc;
-	lstcon_ndlink_t	*ndl;
+	struct lstcon_ndlink	*ndl;
 
 	rc = lstcon_group_find(name, grp);
 	if (rc) {
@@ -1284,11 +1284,11 @@ lstcon_test_add(char *batch_name, int type, int loop,
 		void *param, int paramlen, int *retp,
 		struct list_head __user *result_up)
 {
-	lstcon_test_t *test = NULL;
+	struct lstcon_test *test = NULL;
 	int rc;
-	lstcon_group_t *src_grp = NULL;
-	lstcon_group_t *dst_grp = NULL;
-	lstcon_batch_t *batch = NULL;
+	struct lstcon_group *src_grp = NULL;
+	struct lstcon_group *dst_grp = NULL;
+	struct lstcon_batch *batch = NULL;
 
 	/*
 	 * verify that a batch of the given name exists, and the groups
@@ -1310,7 +1310,7 @@ lstcon_test_add(char *batch_name, int type, int loop,
 	if (dst_grp->grp_userland)
 		*retp = 1;
 
-	LIBCFS_ALLOC(test, offsetof(lstcon_test_t, tes_param[paramlen]));
+	LIBCFS_ALLOC(test, offsetof(struct lstcon_test, tes_param[paramlen]));
 	if (!test) {
 		CERROR("Can't allocate test descriptor\n");
 		rc = -ENOMEM;
@@ -1357,7 +1357,7 @@ lstcon_test_add(char *batch_name, int type, int loop,
 	return rc;
 out:
 	if (test)
-		LIBCFS_FREE(test, offsetof(lstcon_test_t, tes_param[paramlen]));
+		LIBCFS_FREE(test, offsetof(struct lstcon_test, tes_param[paramlen]));
 
 	if (dst_grp)
 		lstcon_group_decref(dst_grp);
@@ -1369,9 +1369,10 @@ out:
 }
 
 static int
-lstcon_test_find(lstcon_batch_t *batch, int idx, lstcon_test_t **testpp)
+lstcon_test_find(struct lstcon_batch *batch, int idx,
+		 struct lstcon_test **testpp)
 {
-	lstcon_test_t *test;
+	struct lstcon_test *test;
 
 	list_for_each_entry(test, &batch->bat_test_list, tes_link) {
 		if (idx == test->tes_hdr.tsb_index) {
@@ -1384,10 +1385,10 @@ lstcon_test_find(lstcon_batch_t *batch, int idx, lstcon_test_t **testpp)
 }
 
 static int
-lstcon_tsbrpc_readent(int transop, srpc_msg_t *msg,
-		      lstcon_rpc_ent_t __user *ent_up)
+lstcon_tsbrpc_readent(int transop, struct srpc_msg *msg,
+		      struct lstcon_rpc_ent __user *ent_up)
 {
-	srpc_batch_reply_t *rep = &msg->msg_body.bat_reply;
+	struct srpc_batch_reply *rep = &msg->msg_body.bat_reply;
 
 	LASSERT(transop == LST_TRANS_TSBCLIQRY ||
 		transop == LST_TRANS_TSBSRVQRY);
@@ -1404,12 +1405,12 @@ int
 lstcon_test_batch_query(char *name, int testidx, int client,
 			int timeout, struct list_head __user *result_up)
 {
-	lstcon_rpc_trans_t *trans;
+	struct lstcon_rpc_trans *trans;
 	struct list_head *translist;
 	struct list_head *ndlist;
-	lstcon_tsb_hdr_t *hdr;
-	lstcon_batch_t *batch;
-	lstcon_test_t *test = NULL;
+	struct lstcon_tsb_hdr *hdr;
+	struct lstcon_batch *batch;
+	struct lstcon_test *test = NULL;
 	int transop;
 	int rc;
 
@@ -1423,7 +1424,6 @@ lstcon_test_batch_query(char *name, int testidx, int client,
 		translist = &batch->bat_trans_list;
 		ndlist = &batch->bat_cli_list;
 		hdr = &batch->bat_hdr;
-
 	} else {
 		/* query specified test only */
 		rc = lstcon_test_find(batch, testidx, &test);
@@ -1448,7 +1448,8 @@ lstcon_test_batch_query(char *name, int testidx, int client,
 
 	lstcon_rpc_trans_postwait(trans, timeout);
 
-	if (!testidx && /* query a batch, not a test */
+	/* query a batch, not a test */
+	if (!testidx &&
 	    !lstcon_rpc_stat_failure(lstcon_trans_stat(), 0) &&
 	    !lstcon_tsbqry_stat_run(lstcon_trans_stat(), 0)) {
 		/* all RPCs finished, and no active test */
@@ -1463,20 +1464,20 @@ lstcon_test_batch_query(char *name, int testidx, int client,
 }
 
 static int
-lstcon_statrpc_readent(int transop, srpc_msg_t *msg,
-		       lstcon_rpc_ent_t __user *ent_up)
+lstcon_statrpc_readent(int transop, struct srpc_msg *msg,
+		       struct lstcon_rpc_ent __user *ent_up)
 {
-	srpc_stat_reply_t *rep = &msg->msg_body.stat_reply;
-	sfw_counters_t __user *sfwk_stat;
-	srpc_counters_t __user *srpc_stat;
-	lnet_counters_t __user *lnet_stat;
+	struct srpc_stat_reply *rep = &msg->msg_body.stat_reply;
+	struct sfw_counters __user *sfwk_stat;
+	struct srpc_counters __user *srpc_stat;
+	struct lnet_counters __user *lnet_stat;
 
 	if (rep->str_status)
 		return 0;
 
-	sfwk_stat = (sfw_counters_t __user *)&ent_up->rpe_payload[0];
-	srpc_stat = (srpc_counters_t __user *)(sfwk_stat + 1);
-	lnet_stat = (lnet_counters_t __user *)(srpc_stat + 1);
+	sfwk_stat = (struct sfw_counters __user *)&ent_up->rpe_payload[0];
+	srpc_stat = (struct srpc_counters __user *)(sfwk_stat + 1);
+	lnet_stat = (struct lnet_counters __user *)(srpc_stat + 1);
 
 	if (copy_to_user(sfwk_stat, &rep->str_fw, sizeof(*sfwk_stat)) ||
 	    copy_to_user(srpc_stat, &rep->str_rpc, sizeof(*srpc_stat)) ||
@@ -1491,7 +1492,7 @@ lstcon_ndlist_stat(struct list_head *ndlist,
 		   int timeout, struct list_head __user *result_up)
 {
 	struct list_head head;
-	lstcon_rpc_trans_t *trans;
+	struct lstcon_rpc_trans *trans;
 	int rc;
 
 	INIT_LIST_HEAD(&head);
@@ -1516,7 +1517,7 @@ int
 lstcon_group_stat(char *grp_name, int timeout,
 		  struct list_head __user *result_up)
 {
-	lstcon_group_t *grp;
+	struct lstcon_group *grp;
 	int rc;
 
 	rc = lstcon_group_find(grp_name, &grp);
@@ -1533,12 +1534,12 @@ lstcon_group_stat(char *grp_name, int timeout,
 }
 
 int
-lstcon_nodes_stat(int count, lnet_process_id_t __user *ids_up,
+lstcon_nodes_stat(int count, struct lnet_process_id __user *ids_up,
 		  int timeout, struct list_head __user *result_up)
 {
-	lstcon_ndlink_t	*ndl;
-	lstcon_group_t *tmp;
-	lnet_process_id_t id;
+	struct lstcon_ndlink	*ndl;
+	struct lstcon_group *tmp;
+	struct lnet_process_id id;
 	int i;
 	int rc;
 
@@ -1581,7 +1582,7 @@ lstcon_debug_ndlist(struct list_head *ndlist,
 		    struct list_head *translist,
 		    int timeout, struct list_head __user *result_up)
 {
-	lstcon_rpc_trans_t *trans;
+	struct lstcon_rpc_trans *trans;
 	int rc;
 
 	rc = lstcon_rpc_trans_ndlist(ndlist, translist, LST_TRANS_SESQRY,
@@ -1611,7 +1612,7 @@ int
 lstcon_batch_debug(int timeout, char *name,
 		   int client, struct list_head __user *result_up)
 {
-	lstcon_batch_t *bat;
+	struct lstcon_batch *bat;
 	int rc;
 
 	rc = lstcon_batch_find(name, &bat);
@@ -1629,7 +1630,7 @@ int
 lstcon_group_debug(int timeout, char *name,
 		   struct list_head __user *result_up)
 {
-	lstcon_group_t *grp;
+	struct lstcon_group *grp;
 	int rc;
 
 	rc = lstcon_group_find(name, &grp);
@@ -1644,13 +1645,13 @@ lstcon_group_debug(int timeout, char *name,
 }
 
 int
-lstcon_nodes_debug(int timeout,
-		   int count, lnet_process_id_t __user *ids_up,
+lstcon_nodes_debug(int timeout, int count,
+		   struct lnet_process_id __user *ids_up,
 		   struct list_head __user *result_up)
 {
-	lnet_process_id_t id;
-	lstcon_ndlink_t *ndl;
-	lstcon_group_t *grp;
+	struct lnet_process_id id;
+	struct lstcon_ndlink *ndl;
+	struct lstcon_group *grp;
 	int i;
 	int rc;
 
@@ -1688,16 +1689,16 @@ lstcon_nodes_debug(int timeout,
 }
 
 int
-lstcon_session_match(lst_sid_t sid)
+lstcon_session_match(struct lst_sid sid)
 {
 	return (console_session.ses_id.ses_nid == sid.ses_nid &&
 		console_session.ses_id.ses_stamp == sid.ses_stamp) ? 1 : 0;
 }
 
 static void
-lstcon_new_session_id(lst_sid_t *sid)
+lstcon_new_session_id(struct lst_sid *sid)
 {
-	lnet_process_id_t id;
+	struct lnet_process_id id;
 
 	LASSERT(console_session.ses_state == LST_SESSION_NONE);
 
@@ -1707,8 +1708,8 @@ lstcon_new_session_id(lst_sid_t *sid)
 }
 
 int
-lstcon_session_new(char *name, int key, unsigned feats,
-		   int timeout, int force, lst_sid_t __user *sid_up)
+lstcon_session_new(char *name, int key, unsigned int feats,
+		   int timeout, int force, struct lst_sid __user *sid_up)
 {
 	int rc = 0;
 	int i;
@@ -1749,7 +1750,7 @@ lstcon_session_new(char *name, int key, unsigned feats,
 
 	if (strlen(name) > sizeof(console_session.ses_name) - 1)
 		return -E2BIG;
-	strncpy(console_session.ses_name, name,
+	strlcpy(console_session.ses_name, name,
 		sizeof(console_session.ses_name));
 
 	rc = lstcon_batch_add(LST_DEFAULT_BATCH);
@@ -1758,7 +1759,7 @@ lstcon_session_new(char *name, int key, unsigned feats,
 
 	rc = lstcon_rpc_pinger_start();
 	if (rc) {
-		lstcon_batch_t *bat = NULL;
+		struct lstcon_batch *bat = NULL;
 
 		lstcon_batch_find(LST_DEFAULT_BATCH, &bat);
 		lstcon_batch_destroy(bat);
@@ -1767,7 +1768,7 @@ lstcon_session_new(char *name, int key, unsigned feats,
 	}
 
 	if (!copy_to_user(sid_up, &console_session.ses_id,
-			  sizeof(lst_sid_t)))
+			  sizeof(struct lst_sid)))
 		return rc;
 
 	lstcon_session_end();
@@ -1776,13 +1777,13 @@ lstcon_session_new(char *name, int key, unsigned feats,
 }
 
 int
-lstcon_session_info(lst_sid_t __user *sid_up, int __user *key_up,
+lstcon_session_info(struct lst_sid __user *sid_up, int __user *key_up,
 		    unsigned __user *featp,
-		    lstcon_ndlist_ent_t __user *ndinfo_up,
+		    struct lstcon_ndlist_ent __user *ndinfo_up,
 		    char __user *name_up, int len)
 {
-	lstcon_ndlist_ent_t *entp;
-	lstcon_ndlink_t *ndl;
+	struct lstcon_ndlist_ent *entp;
+	struct lstcon_ndlink *ndl;
 	int rc = 0;
 
 	if (console_session.ses_state != LST_SESSION_ACTIVE)
@@ -1796,7 +1797,7 @@ lstcon_session_info(lst_sid_t __user *sid_up, int __user *key_up,
 		LST_NODE_STATE_COUNTER(ndl->ndl_node, entp);
 
 	if (copy_to_user(sid_up, &console_session.ses_id,
-			 sizeof(lst_sid_t)) ||
+			 sizeof(*sid_up)) ||
 	    copy_to_user(key_up, &console_session.ses_key,
 			 sizeof(*key_up)) ||
 	    copy_to_user(featp, &console_session.ses_features,
@@ -1813,9 +1814,9 @@ lstcon_session_info(lst_sid_t __user *sid_up, int __user *key_up,
 int
 lstcon_session_end(void)
 {
-	lstcon_rpc_trans_t *trans;
-	lstcon_group_t *grp;
-	lstcon_batch_t *bat;
+	struct lstcon_rpc_trans *trans;
+	struct lstcon_group *grp;
+	struct lstcon_batch *bat;
 	int rc = 0;
 
 	LASSERT(console_session.ses_state == LST_SESSION_ACTIVE);
@@ -1849,7 +1850,7 @@ lstcon_session_end(void)
 	/* destroy all batches */
 	while (!list_empty(&console_session.ses_bat_list)) {
 		bat = list_entry(console_session.ses_bat_list.next,
-				 lstcon_batch_t, bat_link);
+				 struct lstcon_batch, bat_link);
 
 		lstcon_batch_destroy(bat);
 	}
@@ -1857,7 +1858,7 @@ lstcon_session_end(void)
 	/* destroy all groups */
 	while (!list_empty(&console_session.ses_grp_list)) {
 		grp = list_entry(console_session.ses_grp_list.next,
-				 lstcon_group_t, grp_link);
+				 struct lstcon_group, grp_link);
 		LASSERT(grp->grp_ref == 1);
 
 		lstcon_group_decref(grp);
@@ -1873,7 +1874,7 @@ lstcon_session_end(void)
 }
 
 int
-lstcon_session_feats_check(unsigned feats)
+lstcon_session_feats_check(unsigned int feats)
 {
 	int rc = 0;
 
@@ -1906,12 +1907,12 @@ lstcon_session_feats_check(unsigned feats)
 static int
 lstcon_acceptor_handle(struct srpc_server_rpc *rpc)
 {
-	srpc_msg_t *rep	= &rpc->srpc_replymsg;
-	srpc_msg_t *req	= &rpc->srpc_reqstbuf->buf_msg;
-	srpc_join_reqst_t *jreq = &req->msg_body.join_reqst;
-	srpc_join_reply_t *jrep = &rep->msg_body.join_reply;
-	lstcon_group_t *grp = NULL;
-	lstcon_ndlink_t *ndl;
+	struct srpc_msg *rep	= &rpc->srpc_replymsg;
+	struct srpc_msg *req	= &rpc->srpc_reqstbuf->buf_msg;
+	struct srpc_join_reqst *jreq = &req->msg_body.join_reqst;
+	struct srpc_join_reply *jrep = &rep->msg_body.join_reply;
+	struct lstcon_group *grp = NULL;
+	struct lstcon_ndlink *ndl;
 	int rc = 0;
 
 	sfw_unpack_message(req);
@@ -1987,7 +1988,8 @@ out:
 	return rc;
 }
 
-static srpc_service_t lstcon_acceptor_service;
+static struct srpc_service lstcon_acceptor_service;
+
 static void lstcon_init_acceptor_service(void)
 {
 	/* initialize selftest console acceptor service table */
@@ -1996,8 +1998,6 @@ static void lstcon_init_acceptor_service(void)
 	lstcon_acceptor_service.sv_id = SRPC_SERVICE_JOIN;
 	lstcon_acceptor_service.sv_wi_total = SFW_FRWK_WI_MAX;
 }
-
-extern int lstcon_ioctl_entry(unsigned int cmd, struct libcfs_ioctl_hdr *hdr);
 
 static DECLARE_IOCTL_HANDLER(lstcon_ioctl_handler, lstcon_ioctl_entry);
 

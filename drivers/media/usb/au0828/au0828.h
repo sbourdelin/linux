@@ -13,14 +13,11 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *
  *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
+#include <linux/bitops.h>
 #include <linux/usb.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
@@ -54,7 +51,6 @@
 #define NTSC_STD_H      480
 
 #define AU0828_INTERLACED_DEFAULT       1
-#define V4L2_CID_PRIVATE_SHARPNESS  (V4L2_CID_PRIVATE_BASE + 0)
 
 /* Defination for AU0828 USB transfer */
 #define AU0828_MAX_ISO_BUFS    12  /* maybe resize this value in the future */
@@ -121,9 +117,9 @@ enum au0828_stream_state {
 
 /* device state */
 enum au0828_dev_state {
-	DEV_INITIALIZED = 0x01,
-	DEV_DISCONNECTED = 0x02,
-	DEV_MISCONFIGURED = 0x04
+	DEV_INITIALIZED = 0,
+	DEV_DISCONNECTED = 1,
+	DEV_MISCONFIGURED = 2
 };
 
 struct au0828_dev;
@@ -199,6 +195,8 @@ struct au0828_dev {
 	/* Digital */
 	struct au0828_dvb		dvb;
 	struct work_struct              restart_streaming;
+	struct timer_list               bulk_timeout;
+	int                             bulk_timeout_running;
 
 #ifdef CONFIG_VIDEO_AU0828_V4L2
 	/* Analog */
@@ -247,7 +245,7 @@ struct au0828_dev {
 	int input_type;
 	int std_set_in_tuner_core;
 	unsigned int ctrl_input;
-	enum au0828_dev_state dev_state;
+	long unsigned int dev_state; /* defined at enum au0828_dev_state */;
 	enum au0828_stream_state stream_state;
 	wait_queue_head_t open;
 

@@ -9,6 +9,8 @@
 #include <asm/pci-direct.h>
 #include <asm/tsc.h>
 #include <asm/cpufeature.h>
+#include <linux/sched.h>
+#include <linux/sched/clock.h>
 
 #include "cpu.h"
 
@@ -253,6 +255,7 @@ static void init_cyrix(struct cpuinfo_x86 *c)
 		break;
 
 	case 4: /* MediaGX/GXm or Geode GXM/GXLV/GX1 */
+	case 11: /* GX1 with inverted Device ID */
 #ifdef CONFIG_PCI
 	{
 		u32 vendor, device;
@@ -333,7 +336,7 @@ static void init_cyrix(struct cpuinfo_x86 *c)
 		switch (dir0_lsn) {
 		case 0xd:  /* either a 486SLC or DLC w/o DEVID */
 			dir0_msn = 0;
-			p = Cx486_name[(cpu_has_fpu ? 1 : 0)];
+			p = Cx486_name[!!boot_cpu_has(X86_FEATURE_FPU)];
 			break;
 
 		case 0xe:  /* a 486S A step */

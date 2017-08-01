@@ -8,6 +8,15 @@
 
 extern struct timezone sys_tz;
 
+int get_timespec64(struct timespec64 *ts,
+		const struct timespec __user *uts);
+int put_timespec64(const struct timespec64 *ts,
+		struct timespec __user *uts);
+int get_itimerspec64(struct itimerspec64 *it,
+			const struct itimerspec __user *uit);
+int put_itimerspec64(const struct itimerspec64 *it,
+			struct itimerspec __user *uit);
+
 #define TIME_T_MAX	(time_t)((1UL << ((sizeof(time_t) << 3) - 1)) - 1)
 
 static inline int timespec_equal(const struct timespec *a,
@@ -151,9 +160,6 @@ static inline bool timespec_inject_offset_valid(const struct timespec *ts)
 	return true;
 }
 
-#define CURRENT_TIME		(current_kernel_time())
-#define CURRENT_TIME_SEC	((struct timespec) { get_seconds(), 0 })
-
 /* Some architectures do not supply their own clocksource.
  * This is mainly the case in architectures that get their
  * inter-tick times by reading the counter on their interval
@@ -172,12 +178,7 @@ extern int do_setitimer(int which, struct itimerval *value,
 			struct itimerval *ovalue);
 extern int do_getitimer(int which, struct itimerval *value);
 
-extern unsigned int alarm_setitimer(unsigned int seconds);
-
 extern long do_utimes(int dfd, const char __user *filename, struct timespec *times, int flags);
-
-struct tms;
-extern void do_sys_times(struct tms *);
 
 /*
  * Similar to the struct tm in userspace <time.h>, but it needs to be here so
@@ -205,7 +206,20 @@ struct tm {
 	int tm_yday;
 };
 
-void time_to_tm(time_t totalsecs, int offset, struct tm *result);
+void time64_to_tm(time64_t totalsecs, int offset, struct tm *result);
+
+/**
+ * time_to_tm - converts the calendar time to local broken-down time
+ *
+ * @totalsecs	the number of seconds elapsed since 00:00:00 on January 1, 1970,
+ *		Coordinated Universal Time (UTC).
+ * @offset	offset seconds adding to totalsecs.
+ * @result	pointer to struct tm variable to receive broken-down time
+ */
+static inline void time_to_tm(time_t totalsecs, int offset, struct tm *result)
+{
+	time64_to_tm(totalsecs, offset, result);
+}
 
 /**
  * timespec_to_ns - Convert timespec to nanoseconds
@@ -260,6 +274,15 @@ static __always_inline void timespec_add_ns(struct timespec *a, u64 ns)
 {
 	a->tv_sec += __iter_div_u64_rem(a->tv_nsec + ns, NSEC_PER_SEC, &ns);
 	a->tv_nsec = ns;
+}
+
+static inline bool itimerspec64_valid(const struct itimerspec64 *its)
+{
+	if (!timespec64_valid(&(its->it_interval)) ||
+		!timespec64_valid(&(its->it_value)))
+		return false;
+
+	return true;
 }
 
 #endif

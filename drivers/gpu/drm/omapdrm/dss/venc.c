@@ -35,10 +35,10 @@
 #include <linux/regulator/consumer.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
+#include <linux/of_graph.h>
 #include <linux/component.h>
 
-#include <video/omapdss.h>
-
+#include "omapdss.h"
 #include "dss.h"
 #include "dss_features.h"
 
@@ -263,47 +263,41 @@ static const struct venc_config venc_config_pal_bdghi = {
 	.fid_ext_start_y__fid_ext_offset_y	= 0x01380005,
 };
 
-const struct omap_video_timings omap_dss_pal_timings = {
-	.x_res		= 720,
-	.y_res		= 574,
+const struct videomode omap_dss_pal_vm = {
+	.hactive	= 720,
+	.vactive	= 574,
 	.pixelclock	= 13500000,
-	.hsw		= 64,
-	.hfp		= 12,
-	.hbp		= 68,
-	.vsw		= 5,
-	.vfp		= 5,
-	.vbp		= 41,
+	.hsync_len	= 64,
+	.hfront_porch	= 12,
+	.hback_porch	= 68,
+	.vsync_len	= 5,
+	.vfront_porch	= 5,
+	.vback_porch	= 41,
 
-	.interlace	= true,
-
-	.hsync_level = OMAPDSS_SIG_ACTIVE_LOW,
-	.vsync_level = OMAPDSS_SIG_ACTIVE_LOW,
-	.data_pclk_edge = OMAPDSS_DRIVE_SIG_RISING_EDGE,
-	.de_level = OMAPDSS_SIG_ACTIVE_HIGH,
-	.sync_pclk_edge = OMAPDSS_DRIVE_SIG_FALLING_EDGE,
+	.flags		= DISPLAY_FLAGS_INTERLACED | DISPLAY_FLAGS_HSYNC_LOW |
+			  DISPLAY_FLAGS_VSYNC_LOW | DISPLAY_FLAGS_DE_HIGH |
+			  DISPLAY_FLAGS_PIXDATA_POSEDGE |
+			  DISPLAY_FLAGS_SYNC_NEGEDGE,
 };
-EXPORT_SYMBOL(omap_dss_pal_timings);
+EXPORT_SYMBOL(omap_dss_pal_vm);
 
-const struct omap_video_timings omap_dss_ntsc_timings = {
-	.x_res		= 720,
-	.y_res		= 482,
+const struct videomode omap_dss_ntsc_vm = {
+	.hactive	= 720,
+	.vactive	= 482,
 	.pixelclock	= 13500000,
-	.hsw		= 64,
-	.hfp		= 16,
-	.hbp		= 58,
-	.vsw		= 6,
-	.vfp		= 6,
-	.vbp		= 31,
+	.hsync_len	= 64,
+	.hfront_porch	= 16,
+	.hback_porch	= 58,
+	.vsync_len	= 6,
+	.vfront_porch	= 6,
+	.vback_porch	= 31,
 
-	.interlace	= true,
-
-	.hsync_level = OMAPDSS_SIG_ACTIVE_LOW,
-	.vsync_level = OMAPDSS_SIG_ACTIVE_LOW,
-	.data_pclk_edge = OMAPDSS_DRIVE_SIG_RISING_EDGE,
-	.de_level = OMAPDSS_SIG_ACTIVE_HIGH,
-	.sync_pclk_edge = OMAPDSS_DRIVE_SIG_FALLING_EDGE,
+	.flags		= DISPLAY_FLAGS_INTERLACED | DISPLAY_FLAGS_HSYNC_LOW |
+			  DISPLAY_FLAGS_VSYNC_LOW | DISPLAY_FLAGS_DE_HIGH |
+			  DISPLAY_FLAGS_PIXDATA_POSEDGE |
+			  DISPLAY_FLAGS_SYNC_NEGEDGE,
 };
-EXPORT_SYMBOL(omap_dss_ntsc_timings);
+EXPORT_SYMBOL(omap_dss_ntsc_vm);
 
 static struct {
 	struct platform_device *pdev;
@@ -314,7 +308,7 @@ static struct {
 
 	struct clk	*tv_dac_clk;
 
-	struct omap_video_timings timings;
+	struct videomode vm;
 	enum omap_dss_venc_type type;
 	bool invert_polarity;
 
@@ -428,13 +422,12 @@ static void venc_runtime_put(void)
 	WARN_ON(r < 0 && r != -ENOSYS);
 }
 
-static const struct venc_config *venc_timings_to_config(
-		struct omap_video_timings *timings)
+static const struct venc_config *venc_timings_to_config(struct videomode *vm)
 {
-	if (memcmp(&omap_dss_pal_timings, timings, sizeof(*timings)) == 0)
+	if (memcmp(&omap_dss_pal_vm, vm, sizeof(*vm)) == 0)
 		return &venc_config_pal_trm;
 
-	if (memcmp(&omap_dss_ntsc_timings, timings, sizeof(*timings)) == 0)
+	if (memcmp(&omap_dss_ntsc_vm, vm, sizeof(*vm)) == 0)
 		return &venc_config_ntsc_trm;
 
 	BUG();
@@ -443,7 +436,7 @@ static const struct venc_config *venc_timings_to_config(
 
 static int venc_power_on(struct omap_dss_device *dssdev)
 {
-	struct omap_overlay_manager *mgr = venc.output.manager;
+	enum omap_channel channel = dssdev->dispc_channel;
 	u32 l;
 	int r;
 
@@ -452,7 +445,7 @@ static int venc_power_on(struct omap_dss_device *dssdev)
 		goto err0;
 
 	venc_reset();
-	venc_write_config(venc_timings_to_config(&venc.timings));
+	venc_write_config(venc_timings_to_config(&venc.vm));
 
 	dss_set_venc_output(venc.type);
 	dss_set_dac_pwrdn_bgz(1);
@@ -469,13 +462,13 @@ static int venc_power_on(struct omap_dss_device *dssdev)
 
 	venc_write_reg(VENC_OUTPUT_CONTROL, l);
 
-	dss_mgr_set_timings(mgr, &venc.timings);
+	dss_mgr_set_timings(channel, &venc.vm);
 
 	r = regulator_enable(venc.vdda_dac_reg);
 	if (r)
 		goto err1;
 
-	r = dss_mgr_enable(mgr);
+	r = dss_mgr_enable(channel);
 	if (r)
 		goto err2;
 
@@ -494,12 +487,12 @@ err0:
 
 static void venc_power_off(struct omap_dss_device *dssdev)
 {
-	struct omap_overlay_manager *mgr = venc.output.manager;
+	enum omap_channel channel = dssdev->dispc_channel;
 
 	venc_write_reg(VENC_OUTPUT_CONTROL, 0);
 	dss_set_dac_pwrdn_bgz(0);
 
-	dss_mgr_disable(mgr);
+	dss_mgr_disable(channel);
 
 	regulator_disable(venc.vdda_dac_reg);
 
@@ -515,7 +508,7 @@ static int venc_display_enable(struct omap_dss_device *dssdev)
 
 	mutex_lock(&venc.venc_lock);
 
-	if (out->manager == NULL) {
+	if (!out->dispc_channel_connected) {
 		DSSERR("Failed to enable display: no output/manager\n");
 		r = -ENODEV;
 		goto err0;
@@ -547,17 +540,17 @@ static void venc_display_disable(struct omap_dss_device *dssdev)
 }
 
 static void venc_set_timings(struct omap_dss_device *dssdev,
-		struct omap_video_timings *timings)
+			     struct videomode *vm)
 {
 	DSSDBG("venc_set_timings\n");
 
 	mutex_lock(&venc.venc_lock);
 
 	/* Reset WSS data when the TV standard changes. */
-	if (memcmp(&venc.timings, timings, sizeof(*timings)))
+	if (memcmp(&venc.vm, vm, sizeof(*vm)))
 		venc.wss_data = 0;
 
-	venc.timings = *timings;
+	venc.vm = *vm;
 
 	dispc_set_tv_pclk(13500000);
 
@@ -565,25 +558,25 @@ static void venc_set_timings(struct omap_dss_device *dssdev,
 }
 
 static int venc_check_timings(struct omap_dss_device *dssdev,
-		struct omap_video_timings *timings)
+			      struct videomode *vm)
 {
 	DSSDBG("venc_check_timings\n");
 
-	if (memcmp(&omap_dss_pal_timings, timings, sizeof(*timings)) == 0)
+	if (memcmp(&omap_dss_pal_vm, vm, sizeof(*vm)) == 0)
 		return 0;
 
-	if (memcmp(&omap_dss_ntsc_timings, timings, sizeof(*timings)) == 0)
+	if (memcmp(&omap_dss_ntsc_vm, vm, sizeof(*vm)) == 0)
 		return 0;
 
 	return -EINVAL;
 }
 
 static void venc_get_timings(struct omap_dss_device *dssdev,
-		struct omap_video_timings *timings)
+			     struct videomode *vm)
 {
 	mutex_lock(&venc.venc_lock);
 
-	*timings = venc.timings;
+	*vm = venc.vm;
 
 	mutex_unlock(&venc.venc_lock);
 }
@@ -603,7 +596,7 @@ static int venc_set_wss(struct omap_dss_device *dssdev, u32 wss)
 
 	mutex_lock(&venc.venc_lock);
 
-	config = venc_timings_to_config(&venc.timings);
+	config = venc_timings_to_config(&venc.vm);
 
 	/* Invert due to VENC_L21_WC_CTL:INV=1 */
 	venc.wss_data = (wss ^ 0xfffff) << 8;
@@ -623,26 +616,6 @@ err:
 	return r;
 }
 
-static void venc_set_type(struct omap_dss_device *dssdev,
-		enum omap_dss_venc_type type)
-{
-	mutex_lock(&venc.venc_lock);
-
-	venc.type = type;
-
-	mutex_unlock(&venc.venc_lock);
-}
-
-static void venc_invert_vid_out_polarity(struct omap_dss_device *dssdev,
-		bool invert_polarity)
-{
-	mutex_lock(&venc.venc_lock);
-
-	venc.invert_polarity = invert_polarity;
-
-	mutex_unlock(&venc.venc_lock);
-}
-
 static int venc_init_regulator(void)
 {
 	struct regulator *vdda_dac;
@@ -650,11 +623,7 @@ static int venc_init_regulator(void)
 	if (venc.vdda_dac_reg != NULL)
 		return 0;
 
-	if (venc.pdev->dev.of_node)
-		vdda_dac = devm_regulator_get(&venc.pdev->dev, "vdda");
-	else
-		vdda_dac = devm_regulator_get(&venc.pdev->dev, "vdda_dac");
-
+	vdda_dac = devm_regulator_get(&venc.pdev->dev, "vdda");
 	if (IS_ERR(vdda_dac)) {
 		if (PTR_ERR(vdda_dac) != -EPROBE_DEFER)
 			DSSERR("can't get VDDA_DAC regulator\n");
@@ -742,18 +711,14 @@ static int venc_get_clocks(struct platform_device *pdev)
 static int venc_connect(struct omap_dss_device *dssdev,
 		struct omap_dss_device *dst)
 {
-	struct omap_overlay_manager *mgr;
+	enum omap_channel channel = dssdev->dispc_channel;
 	int r;
 
 	r = venc_init_regulator();
 	if (r)
 		return r;
 
-	mgr = omap_dss_get_overlay_manager(dssdev->dispc_channel);
-	if (!mgr)
-		return -ENODEV;
-
-	r = dss_mgr_connect(mgr, dssdev);
+	r = dss_mgr_connect(channel, dssdev);
 	if (r)
 		return r;
 
@@ -761,7 +726,7 @@ static int venc_connect(struct omap_dss_device *dssdev,
 	if (r) {
 		DSSERR("failed to connect output to new device: %s\n",
 				dst->name);
-		dss_mgr_disconnect(mgr, dssdev);
+		dss_mgr_disconnect(channel, dssdev);
 		return r;
 	}
 
@@ -771,6 +736,8 @@ static int venc_connect(struct omap_dss_device *dssdev,
 static void venc_disconnect(struct omap_dss_device *dssdev,
 		struct omap_dss_device *dst)
 {
+	enum omap_channel channel = dssdev->dispc_channel;
+
 	WARN_ON(dst != dssdev->dst);
 
 	if (dst != dssdev->dst)
@@ -778,8 +745,7 @@ static void venc_disconnect(struct omap_dss_device *dssdev,
 
 	omapdss_output_unset_device(dssdev);
 
-	if (dssdev->manager)
-		dss_mgr_disconnect(dssdev->manager, dssdev);
+	dss_mgr_disconnect(channel, dssdev);
 }
 
 static const struct omapdss_atv_ops venc_ops = {
@@ -792,9 +758,6 @@ static const struct omapdss_atv_ops venc_ops = {
 	.check_timings = venc_check_timings,
 	.set_timings = venc_set_timings,
 	.get_timings = venc_get_timings,
-
-	.set_type = venc_set_type,
-	.invert_vid_out_polarity = venc_invert_vid_out_polarity,
 
 	.set_wss = venc_set_wss,
 	.get_wss = venc_get_wss,
@@ -829,7 +792,7 @@ static int venc_probe_of(struct platform_device *pdev)
 	u32 channels;
 	int r;
 
-	ep = omapdss_of_get_first_endpoint(node);
+	ep = of_graph_get_endpoint_by_regs(node, 0, 0);
 	if (!ep)
 		return 0;
 
@@ -879,17 +842,9 @@ static int venc_bind(struct device *dev, struct device *master, void *data)
 	venc.wss_data = 0;
 
 	venc_mem = platform_get_resource(venc.pdev, IORESOURCE_MEM, 0);
-	if (!venc_mem) {
-		DSSERR("can't get IORESOURCE_MEM VENC\n");
-		return -EINVAL;
-	}
-
-	venc.base = devm_ioremap(&pdev->dev, venc_mem->start,
-				 resource_size(venc_mem));
-	if (!venc.base) {
-		DSSERR("can't ioremap VENC\n");
-		return -ENOMEM;
-	}
+	venc.base = devm_ioremap_resource(&pdev->dev, venc_mem);
+	if (IS_ERR(venc.base))
+		return PTR_ERR(venc.base);
 
 	r = venc_get_clocks(pdev);
 	if (r)
@@ -906,12 +861,10 @@ static int venc_bind(struct device *dev, struct device *master, void *data)
 
 	venc_runtime_put();
 
-	if (pdev->dev.of_node) {
-		r = venc_probe_of(pdev);
-		if (r) {
-			DSSERR("Invalid DT data\n");
-			goto err_probe_of;
-		}
+	r = venc_probe_of(pdev);
+	if (r) {
+		DSSERR("Invalid DT data\n");
+		goto err_probe_of;
 	}
 
 	dss_debugfs_create_file("venc", venc_dump_regs);

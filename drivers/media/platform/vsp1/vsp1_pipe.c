@@ -23,6 +23,8 @@
 #include "vsp1_bru.h"
 #include "vsp1_dl.h"
 #include "vsp1_entity.h"
+#include "vsp1_hgo.h"
+#include "vsp1_hgt.h"
 #include "vsp1_pipe.h"
 #include "vsp1_rwpf.h"
 #include "vsp1_uds.h"
@@ -43,7 +45,7 @@ static const struct vsp1_format_info vsp1_video_formats[] = {
 	{ V4L2_PIX_FMT_XRGB444, MEDIA_BUS_FMT_ARGB8888_1X32,
 	  VI6_FMT_XRGB_4444, VI6_RPF_DSWAP_P_LLS | VI6_RPF_DSWAP_P_LWS |
 	  VI6_RPF_DSWAP_P_WDS,
-	  1, { 16, 0, 0 }, false, false, 1, 1, true },
+	  1, { 16, 0, 0 }, false, false, 1, 1, false },
 	{ V4L2_PIX_FMT_ARGB555, MEDIA_BUS_FMT_ARGB8888_1X32,
 	  VI6_FMT_ARGB_1555, VI6_RPF_DSWAP_P_LLS | VI6_RPF_DSWAP_P_LWS |
 	  VI6_RPF_DSWAP_P_WDS,
@@ -75,6 +77,14 @@ static const struct vsp1_format_info vsp1_video_formats[] = {
 	  VI6_RPF_DSWAP_P_WDS | VI6_RPF_DSWAP_P_BTS,
 	  1, { 32, 0, 0 }, false, false, 1, 1, true },
 	{ V4L2_PIX_FMT_XRGB32, MEDIA_BUS_FMT_ARGB8888_1X32,
+	  VI6_FMT_ARGB_8888, VI6_RPF_DSWAP_P_LLS | VI6_RPF_DSWAP_P_LWS |
+	  VI6_RPF_DSWAP_P_WDS | VI6_RPF_DSWAP_P_BTS,
+	  1, { 32, 0, 0 }, false, false, 1, 1, false },
+	{ V4L2_PIX_FMT_HSV24, MEDIA_BUS_FMT_AHSV8888_1X32,
+	  VI6_FMT_RGB_888, VI6_RPF_DSWAP_P_LLS | VI6_RPF_DSWAP_P_LWS |
+	  VI6_RPF_DSWAP_P_WDS | VI6_RPF_DSWAP_P_BTS,
+	  1, { 24, 0, 0 }, false, false, 1, 1, false },
+	{ V4L2_PIX_FMT_HSV32, MEDIA_BUS_FMT_AHSV8888_1X32,
 	  VI6_FMT_ARGB_8888, VI6_RPF_DSWAP_P_LLS | VI6_RPF_DSWAP_P_LWS |
 	  VI6_RPF_DSWAP_P_WDS | VI6_RPF_DSWAP_P_BTS,
 	  1, { 32, 0, 0 }, false, false, 1, 1, false },
@@ -136,16 +146,28 @@ static const struct vsp1_format_info vsp1_video_formats[] = {
 	  3, { 8, 8, 8 }, false, true, 1, 1, false },
 };
 
-/*
+/**
  * vsp1_get_format_info - Retrieve format information for a 4CC
+ * @vsp1: the VSP1 device
  * @fourcc: the format 4CC
  *
  * Return a pointer to the format information structure corresponding to the
  * given V4L2 format 4CC, or NULL if no corresponding format can be found.
  */
-const struct vsp1_format_info *vsp1_get_format_info(u32 fourcc)
+const struct vsp1_format_info *vsp1_get_format_info(struct vsp1_device *vsp1,
+						    u32 fourcc)
 {
 	unsigned int i;
+
+	/* Special case, the VYUY and HSV formats are supported on Gen2 only. */
+	if (vsp1->info->gen != 2) {
+		switch (fourcc) {
+		case V4L2_PIX_FMT_VYUY:
+		case V4L2_PIX_FMT_HSV24:
+		case V4L2_PIX_FMT_HSV32:
+			return NULL;
+		}
+	}
 
 	for (i = 0; i < ARRAY_SIZE(vsp1_video_formats); ++i) {
 		const struct vsp1_format_info *info = &vsp1_video_formats[i];
@@ -172,15 +194,37 @@ void vsp1_pipeline_reset(struct vsp1_pipeline *pipe)
 			bru->inputs[i].rpf = NULL;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(pipe->inputs); ++i)
-		pipe->inputs[i] = NULL;
+	for (i = 0; i < ARRAY_SIZE(pipe->inputs); ++i) {
+		if (pipe->inputs[i]) {
+			pipe->inputs[i]->pipe = NULL;
+			pipe->inputs[i] = NULL;
+		}
+	}
+
+	if (pipe->output) {
+		pipe->output->pipe = NULL;
+		pipe->output = NULL;
+	}
+
+	if (pipe->hgo) {
+		struct vsp1_hgo *hgo = to_hgo(&pipe->hgo->subdev);
+
+		hgo->histo.pipe = NULL;
+	}
+
+	if (pipe->hgt) {
+		struct vsp1_hgt *hgt = to_hgt(&pipe->hgt->subdev);
+
+		hgt->histo.pipe = NULL;
+	}
 
 	INIT_LIST_HEAD(&pipe->entities);
 	pipe->state = VSP1_PIPELINE_STOPPED;
 	pipe->buffers_ready = 0;
 	pipe->num_inputs = 0;
-	pipe->output = NULL;
 	pipe->bru = NULL;
+	pipe->hgo = NULL;
+	pipe->hgt = NULL;
 	pipe->lif = NULL;
 	pipe->uds = NULL;
 }
@@ -190,11 +234,13 @@ void vsp1_pipeline_init(struct vsp1_pipeline *pipe)
 	mutex_init(&pipe->lock);
 	spin_lock_init(&pipe->irqlock);
 	init_waitqueue_head(&pipe->wq);
+	kref_init(&pipe->kref);
 
 	INIT_LIST_HEAD(&pipe->entities);
 	pipe->state = VSP1_PIPELINE_STOPPED;
 }
 
+/* Must be called with the pipe irqlock held. */
 void vsp1_pipeline_run(struct vsp1_pipeline *pipe)
 {
 	struct vsp1_device *vsp1 = pipe->output->entity.vsp1;
@@ -222,16 +268,17 @@ bool vsp1_pipeline_stopped(struct vsp1_pipeline *pipe)
 
 int vsp1_pipeline_stop(struct vsp1_pipeline *pipe)
 {
+	struct vsp1_device *vsp1 = pipe->output->entity.vsp1;
 	struct vsp1_entity *entity;
 	unsigned long flags;
 	int ret;
 
-	if (pipe->dl) {
-		/* When using display lists in continuous frame mode the only
+	if (pipe->lif) {
+		/*
+		 * When using display lists in continuous frame mode the only
 		 * way to stop the pipeline is to reset the hardware.
 		 */
-		ret = vsp1_reset_wpf(pipe->output->entity.vsp1,
-				     pipe->output->entity.index);
+		ret = vsp1_reset_wpf(vsp1, pipe->output->entity.index);
 		if (ret == 0) {
 			spin_lock_irqsave(&pipe->irqlock, flags);
 			pipe->state = VSP1_PIPELINE_STOPPED;
@@ -251,11 +298,21 @@ int vsp1_pipeline_stop(struct vsp1_pipeline *pipe)
 
 	list_for_each_entry(entity, &pipe->entities, list_pipe) {
 		if (entity->route && entity->route->reg)
-			vsp1_write(entity->vsp1, entity->route->reg,
+			vsp1_write(vsp1, entity->route->reg,
 				   VI6_DPR_NODE_UNUSED);
-
-		v4l2_subdev_call(&entity->subdev, video, s_stream, 0);
 	}
+
+	if (pipe->hgo)
+		vsp1_write(vsp1, VI6_DPR_HGO_SMPPT,
+			   (7 << VI6_DPR_SMPPT_TGW_SHIFT) |
+			   (VI6_DPR_NODE_UNUSED << VI6_DPR_SMPPT_PT_SHIFT));
+
+	if (pipe->hgt)
+		vsp1_write(vsp1, VI6_DPR_HGT_SMPPT,
+			   (7 << VI6_DPR_SMPPT_TGW_SHIFT) |
+			   (VI6_DPR_NODE_UNUSED << VI6_DPR_SMPPT_PT_SHIFT));
+
+	v4l2_subdev_call(&pipe->output->entity.subdev, video, s_stream, 0);
 
 	return ret;
 }
@@ -271,50 +328,34 @@ bool vsp1_pipeline_ready(struct vsp1_pipeline *pipe)
 	return pipe->buffers_ready == mask;
 }
 
-void vsp1_pipeline_display_start(struct vsp1_pipeline *pipe)
-{
-	if (pipe->dl)
-		vsp1_dl_irq_display_start(pipe->dl);
-}
-
 void vsp1_pipeline_frame_end(struct vsp1_pipeline *pipe)
 {
-	enum vsp1_pipeline_state state;
-	unsigned long flags;
+	bool completed;
 
 	if (pipe == NULL)
 		return;
 
-	if (pipe->dl)
-		vsp1_dl_irq_frame_end(pipe->dl);
-
-	/* Signal frame end to the pipeline handler. */
-	pipe->frame_end(pipe);
-
-	spin_lock_irqsave(&pipe->irqlock, flags);
-
-	state = pipe->state;
-
-	/* When using display lists in continuous frame mode the pipeline is
-	 * automatically restarted by the hardware.
-	 */
-	if (!pipe->dl)
-		pipe->state = VSP1_PIPELINE_STOPPED;
-
-	/* If a stop has been requested, mark the pipeline as stopped and
-	 * return.
-	 */
-	if (state == VSP1_PIPELINE_STOPPING) {
-		wake_up(&pipe->wq);
-		goto done;
+	completed = vsp1_dlm_irq_frame_end(pipe->output->dlm);
+	if (!completed) {
+		/*
+		 * If the DL commit raced with the frame end interrupt, the
+		 * commit ends up being postponed by one frame. Return
+		 * immediately without calling the pipeline's frame end handler
+		 * or incrementing the sequence number.
+		 */
+		return;
 	}
 
-	/* Restart the pipeline if ready. */
-	if (vsp1_pipeline_ready(pipe))
-		vsp1_pipeline_run(pipe);
+	if (pipe->hgo)
+		vsp1_hgo_frame_end(pipe->hgo);
 
-done:
-	spin_unlock_irqrestore(&pipe->irqlock, flags);
+	if (pipe->hgt)
+		vsp1_hgt_frame_end(pipe->hgt);
+
+	if (pipe->frame_end)
+		pipe->frame_end(pipe);
+
+	pipe->sequence++;
 }
 
 /*
@@ -326,36 +367,19 @@ done:
  * from the input RPF alpha.
  */
 void vsp1_pipeline_propagate_alpha(struct vsp1_pipeline *pipe,
-				   struct vsp1_entity *input,
-				   unsigned int alpha)
+				   struct vsp1_dl_list *dl, unsigned int alpha)
 {
-	struct vsp1_entity *entity;
-	struct media_pad *pad;
+	if (!pipe->uds)
+		return;
 
-	pad = media_entity_remote_pad(&input->pads[RWPF_PAD_SOURCE]);
+	/*
+	 * The BRU background color has a fixed alpha value set to 255, the
+	 * output alpha value is thus always equal to 255.
+	 */
+	if (pipe->uds_input->type == VSP1_ENTITY_BRU)
+		alpha = 255;
 
-	while (pad) {
-		if (!is_media_entity_v4l2_subdev(pad->entity))
-			break;
-
-		entity = to_vsp1_entity(media_entity_to_v4l2_subdev(pad->entity));
-
-		/* The BRU background color has a fixed alpha value set to 255,
-		 * the output alpha value is thus always equal to 255.
-		 */
-		if (entity->type == VSP1_ENTITY_BRU)
-			alpha = 255;
-
-		if (entity->type == VSP1_ENTITY_UDS) {
-			struct vsp1_uds *uds = to_uds(&entity->subdev);
-
-			vsp1_uds_set_alpha(uds, alpha);
-			break;
-		}
-
-		pad = &entity->pads[entity->source_pad];
-		pad = media_entity_remote_pad(pad);
-	}
+	vsp1_uds_set_alpha(pipe->uds, dl, alpha);
 }
 
 void vsp1_pipelines_suspend(struct vsp1_device *vsp1)
@@ -364,7 +388,8 @@ void vsp1_pipelines_suspend(struct vsp1_device *vsp1)
 	unsigned int i;
 	int ret;
 
-	/* To avoid increasing the system suspend time needlessly, loop over the
+	/*
+	 * To avoid increasing the system suspend time needlessly, loop over the
 	 * pipelines twice, first to set them all to the stopping state, and
 	 * then to wait for the stop to complete.
 	 */
@@ -375,7 +400,7 @@ void vsp1_pipelines_suspend(struct vsp1_device *vsp1)
 		if (wpf == NULL)
 			continue;
 
-		pipe = to_vsp1_pipeline(&wpf->entity.subdev.entity);
+		pipe = wpf->pipe;
 		if (pipe == NULL)
 			continue;
 
@@ -392,7 +417,7 @@ void vsp1_pipelines_suspend(struct vsp1_device *vsp1)
 		if (wpf == NULL)
 			continue;
 
-		pipe = to_vsp1_pipeline(&wpf->entity.subdev.entity);
+		pipe = wpf->pipe;
 		if (pipe == NULL)
 			continue;
 
@@ -406,9 +431,10 @@ void vsp1_pipelines_suspend(struct vsp1_device *vsp1)
 
 void vsp1_pipelines_resume(struct vsp1_device *vsp1)
 {
+	unsigned long flags;
 	unsigned int i;
 
-	/* Resume pipeline all running pipelines. */
+	/* Resume all running pipelines. */
 	for (i = 0; i < vsp1->info->wpf_count; ++i) {
 		struct vsp1_rwpf *wpf = vsp1->wpf[i];
 		struct vsp1_pipeline *pipe;
@@ -416,11 +442,13 @@ void vsp1_pipelines_resume(struct vsp1_device *vsp1)
 		if (wpf == NULL)
 			continue;
 
-		pipe = to_vsp1_pipeline(&wpf->entity.subdev.entity);
+		pipe = wpf->pipe;
 		if (pipe == NULL)
 			continue;
 
+		spin_lock_irqsave(&pipe->irqlock, flags);
 		if (vsp1_pipeline_ready(pipe))
 			vsp1_pipeline_run(pipe);
+		spin_unlock_irqrestore(&pipe->irqlock, flags);
 	}
 }

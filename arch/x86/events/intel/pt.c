@@ -28,6 +28,7 @@
 #include <asm/insn.h>
 #include <asm/io.h>
 #include <asm/intel_pt.h>
+#include <asm/intel-family.h>
 
 #include "../perf_event.h"
 #include "pt.h"
@@ -35,13 +36,6 @@
 static DEFINE_PER_CPU(struct pt, pt_ctx);
 
 static struct pt_pmu pt_pmu;
-
-enum cpuid_regs {
-	CR_EAX = 0,
-	CR_ECX,
-	CR_EDX,
-	CR_EBX
-};
 
 /*
  * Capabilities of Intel PT hardware, such as number of address bits or
@@ -64,17 +58,21 @@ static struct pt_cap_desc {
 	u8		reg;
 	u32		mask;
 } pt_caps[] = {
-	PT_CAP(max_subleaf,		0, CR_EAX, 0xffffffff),
-	PT_CAP(cr3_filtering,		0, CR_EBX, BIT(0)),
-	PT_CAP(psb_cyc,			0, CR_EBX, BIT(1)),
-	PT_CAP(mtc,			0, CR_EBX, BIT(3)),
-	PT_CAP(topa_output,		0, CR_ECX, BIT(0)),
-	PT_CAP(topa_multiple_entries,	0, CR_ECX, BIT(1)),
-	PT_CAP(single_range_output,	0, CR_ECX, BIT(2)),
-	PT_CAP(payloads_lip,		0, CR_ECX, BIT(31)),
-	PT_CAP(mtc_periods,		1, CR_EAX, 0xffff0000),
-	PT_CAP(cycle_thresholds,	1, CR_EBX, 0xffff),
-	PT_CAP(psb_periods,		1, CR_EBX, 0xffff0000),
+	PT_CAP(max_subleaf,		0, CPUID_EAX, 0xffffffff),
+	PT_CAP(cr3_filtering,		0, CPUID_EBX, BIT(0)),
+	PT_CAP(psb_cyc,			0, CPUID_EBX, BIT(1)),
+	PT_CAP(ip_filtering,		0, CPUID_EBX, BIT(2)),
+	PT_CAP(mtc,			0, CPUID_EBX, BIT(3)),
+	PT_CAP(ptwrite,			0, CPUID_EBX, BIT(4)),
+	PT_CAP(power_event_trace,	0, CPUID_EBX, BIT(5)),
+	PT_CAP(topa_output,		0, CPUID_ECX, BIT(0)),
+	PT_CAP(topa_multiple_entries,	0, CPUID_ECX, BIT(1)),
+	PT_CAP(single_range_output,	0, CPUID_ECX, BIT(2)),
+	PT_CAP(payloads_lip,		0, CPUID_ECX, BIT(31)),
+	PT_CAP(num_address_ranges,	1, CPUID_EAX, 0x3),
+	PT_CAP(mtc_periods,		1, CPUID_EAX, 0xffff0000),
+	PT_CAP(cycle_thresholds,	1, CPUID_EBX, 0xffff),
+	PT_CAP(psb_periods,		1, CPUID_EBX, 0xffff0000),
 };
 
 static u32 pt_cap_get(enum pt_capabilities cap)
@@ -101,19 +99,29 @@ static struct attribute_group pt_cap_group = {
 	.name	= "caps",
 };
 
+PMU_FORMAT_ATTR(pt,		"config:0"	);
 PMU_FORMAT_ATTR(cyc,		"config:1"	);
+PMU_FORMAT_ATTR(pwr_evt,	"config:4"	);
+PMU_FORMAT_ATTR(fup_on_ptw,	"config:5"	);
 PMU_FORMAT_ATTR(mtc,		"config:9"	);
 PMU_FORMAT_ATTR(tsc,		"config:10"	);
 PMU_FORMAT_ATTR(noretcomp,	"config:11"	);
+PMU_FORMAT_ATTR(ptw,		"config:12"	);
+PMU_FORMAT_ATTR(branch,		"config:13"	);
 PMU_FORMAT_ATTR(mtc_period,	"config:14-17"	);
 PMU_FORMAT_ATTR(cyc_thresh,	"config:19-22"	);
 PMU_FORMAT_ATTR(psb_period,	"config:24-27"	);
 
 static struct attribute *pt_formats_attr[] = {
+	&format_attr_pt.attr,
 	&format_attr_cyc.attr,
+	&format_attr_pwr_evt.attr,
+	&format_attr_fup_on_ptw.attr,
 	&format_attr_mtc.attr,
 	&format_attr_tsc.attr,
 	&format_attr_noretcomp.attr,
+	&format_attr_ptw.attr,
+	&format_attr_branch.attr,
 	&format_attr_mtc_period.attr,
 	&format_attr_cyc_thresh.attr,
 	&format_attr_psb_period.attr,
@@ -125,9 +133,46 @@ static struct attribute_group pt_format_group = {
 	.attrs	= pt_formats_attr,
 };
 
+static ssize_t
+pt_timing_attr_show(struct device *dev, struct device_attribute *attr,
+		    char *page)
+{
+	struct perf_pmu_events_attr *pmu_attr =
+		container_of(attr, struct perf_pmu_events_attr, attr);
+
+	switch (pmu_attr->id) {
+	case 0:
+		return sprintf(page, "%lu\n", pt_pmu.max_nonturbo_ratio);
+	case 1:
+		return sprintf(page, "%u:%u\n",
+			       pt_pmu.tsc_art_num,
+			       pt_pmu.tsc_art_den);
+	default:
+		break;
+	}
+
+	return -EINVAL;
+}
+
+PMU_EVENT_ATTR(max_nonturbo_ratio, timing_attr_max_nonturbo_ratio, 0,
+	       pt_timing_attr_show);
+PMU_EVENT_ATTR(tsc_art_ratio, timing_attr_tsc_art_ratio, 1,
+	       pt_timing_attr_show);
+
+static struct attribute *pt_timing_attr[] = {
+	&timing_attr_max_nonturbo_ratio.attr.attr,
+	&timing_attr_tsc_art_ratio.attr.attr,
+	NULL,
+};
+
+static struct attribute_group pt_timing_group = {
+	.attrs	= pt_timing_attr,
+};
+
 static const struct attribute_group *pt_attr_groups[] = {
 	&pt_cap_group,
 	&pt_format_group,
+	&pt_timing_group,
 	NULL,
 };
 
@@ -136,17 +181,59 @@ static int __init pt_pmu_hw_init(void)
 	struct dev_ext_attribute *de_attrs;
 	struct attribute **attrs;
 	size_t size;
+	u64 reg;
 	int ret;
 	long i;
+
+	rdmsrl(MSR_PLATFORM_INFO, reg);
+	pt_pmu.max_nonturbo_ratio = (reg & 0xff00) >> 8;
+
+	/*
+	 * if available, read in TSC to core crystal clock ratio,
+	 * otherwise, zero for numerator stands for "not enumerated"
+	 * as per SDM
+	 */
+	if (boot_cpu_data.cpuid_level >= CPUID_TSC_LEAF) {
+		u32 eax, ebx, ecx, edx;
+
+		cpuid(CPUID_TSC_LEAF, &eax, &ebx, &ecx, &edx);
+
+		pt_pmu.tsc_art_num = ebx;
+		pt_pmu.tsc_art_den = eax;
+	}
+
+	/* model-specific quirks */
+	switch (boot_cpu_data.x86_model) {
+	case INTEL_FAM6_BROADWELL_CORE:
+	case INTEL_FAM6_BROADWELL_XEON_D:
+	case INTEL_FAM6_BROADWELL_GT3E:
+	case INTEL_FAM6_BROADWELL_X:
+		/* not setting BRANCH_EN will #GP, erratum BDM106 */
+		pt_pmu.branch_en_always_on = true;
+		break;
+	default:
+		break;
+	}
+
+	if (boot_cpu_has(X86_FEATURE_VMX)) {
+		/*
+		 * Intel SDM, 36.5 "Tracing post-VMXON" says that
+		 * "IA32_VMX_MISC[bit 14]" being 1 means PT can trace
+		 * post-VMXON.
+		 */
+		rdmsrl(MSR_IA32_VMX_MISC, reg);
+		if (reg & BIT(14))
+			pt_pmu.vmx = true;
+	}
 
 	attrs = NULL;
 
 	for (i = 0; i < PT_CPUID_LEAVES; i++) {
 		cpuid_count(20, i,
-			    &pt_pmu.caps[CR_EAX + i*PT_CPUID_REGS_NUM],
-			    &pt_pmu.caps[CR_EBX + i*PT_CPUID_REGS_NUM],
-			    &pt_pmu.caps[CR_ECX + i*PT_CPUID_REGS_NUM],
-			    &pt_pmu.caps[CR_EDX + i*PT_CPUID_REGS_NUM]);
+			    &pt_pmu.caps[CPUID_EAX + i*PT_CPUID_REGS_NUM],
+			    &pt_pmu.caps[CPUID_EBX + i*PT_CPUID_REGS_NUM],
+			    &pt_pmu.caps[CPUID_ECX + i*PT_CPUID_REGS_NUM],
+			    &pt_pmu.caps[CPUID_EDX + i*PT_CPUID_REGS_NUM]);
 	}
 
 	ret = -ENOMEM;
@@ -191,10 +278,28 @@ fail:
 #define RTIT_CTL_MTC	(RTIT_CTL_MTC_EN	| \
 			 RTIT_CTL_MTC_RANGE)
 
-#define PT_CONFIG_MASK (RTIT_CTL_TSC_EN		| \
+#define RTIT_CTL_PTW	(RTIT_CTL_PTW_EN	| \
+			 RTIT_CTL_FUP_ON_PTW)
+
+/*
+ * Bit 0 (TraceEn) in the attr.config is meaningless as the
+ * corresponding bit in the RTIT_CTL can only be controlled
+ * by the driver; therefore, repurpose it to mean: pass
+ * through the bit that was previously assumed to be always
+ * on for PT, thereby allowing the user to *not* set it if
+ * they so wish. See also pt_event_valid() and pt_config().
+ */
+#define RTIT_CTL_PASSTHROUGH RTIT_CTL_TRACEEN
+
+#define PT_CONFIG_MASK (RTIT_CTL_TRACEEN	| \
+			RTIT_CTL_TSC_EN		| \
 			RTIT_CTL_DISRETC	| \
+			RTIT_CTL_BRANCH_EN	| \
 			RTIT_CTL_CYC_PSB	| \
-			RTIT_CTL_MTC)
+			RTIT_CTL_MTC		| \
+			RTIT_CTL_PWR_EVT_EN	| \
+			RTIT_CTL_FUP_ON_PTW	| \
+			RTIT_CTL_PTW_EN)
 
 static bool pt_event_valid(struct perf_event *event)
 {
@@ -243,6 +348,47 @@ static bool pt_event_valid(struct perf_event *event)
 			return false;
 	}
 
+	if (config & RTIT_CTL_PWR_EVT_EN &&
+	    !pt_cap_get(PT_CAP_power_event_trace))
+		return false;
+
+	if (config & RTIT_CTL_PTW) {
+		if (!pt_cap_get(PT_CAP_ptwrite))
+			return false;
+
+		/* FUPonPTW without PTW doesn't make sense */
+		if ((config & RTIT_CTL_FUP_ON_PTW) &&
+		    !(config & RTIT_CTL_PTW_EN))
+			return false;
+	}
+
+	/*
+	 * Setting bit 0 (TraceEn in RTIT_CTL MSR) in the attr.config
+	 * clears the assomption that BranchEn must always be enabled,
+	 * as was the case with the first implementation of PT.
+	 * If this bit is not set, the legacy behavior is preserved
+	 * for compatibility with the older userspace.
+	 *
+	 * Re-using bit 0 for this purpose is fine because it is never
+	 * directly set by the user; previous attempts at setting it in
+	 * the attr.config resulted in -EINVAL.
+	 */
+	if (config & RTIT_CTL_PASSTHROUGH) {
+		/*
+		 * Disallow not setting BRANCH_EN where BRANCH_EN is
+		 * always required.
+		 */
+		if (pt_pmu.branch_en_always_on &&
+		    !(config & RTIT_CTL_BRANCH_EN))
+			return false;
+	} else {
+		/*
+		 * Disallow BRANCH_EN without the PASSTHROUGH.
+		 */
+		if (config & RTIT_CTL_BRANCH_EN)
+			return false;
+	}
+
 	return true;
 }
 
@@ -251,8 +397,78 @@ static bool pt_event_valid(struct perf_event *event)
  * These all are cpu affine and operate on a local PT
  */
 
+/* Address ranges and their corresponding msr configuration registers */
+static const struct pt_address_range {
+	unsigned long	msr_a;
+	unsigned long	msr_b;
+	unsigned int	reg_off;
+} pt_address_ranges[] = {
+	{
+		.msr_a	 = MSR_IA32_RTIT_ADDR0_A,
+		.msr_b	 = MSR_IA32_RTIT_ADDR0_B,
+		.reg_off = RTIT_CTL_ADDR0_OFFSET,
+	},
+	{
+		.msr_a	 = MSR_IA32_RTIT_ADDR1_A,
+		.msr_b	 = MSR_IA32_RTIT_ADDR1_B,
+		.reg_off = RTIT_CTL_ADDR1_OFFSET,
+	},
+	{
+		.msr_a	 = MSR_IA32_RTIT_ADDR2_A,
+		.msr_b	 = MSR_IA32_RTIT_ADDR2_B,
+		.reg_off = RTIT_CTL_ADDR2_OFFSET,
+	},
+	{
+		.msr_a	 = MSR_IA32_RTIT_ADDR3_A,
+		.msr_b	 = MSR_IA32_RTIT_ADDR3_B,
+		.reg_off = RTIT_CTL_ADDR3_OFFSET,
+	}
+};
+
+static u64 pt_config_filters(struct perf_event *event)
+{
+	struct pt_filters *filters = event->hw.addr_filters;
+	struct pt *pt = this_cpu_ptr(&pt_ctx);
+	unsigned int range = 0;
+	u64 rtit_ctl = 0;
+
+	if (!filters)
+		return 0;
+
+	perf_event_addr_filters_sync(event);
+
+	for (range = 0; range < filters->nr_filters; range++) {
+		struct pt_filter *filter = &filters->filter[range];
+
+		/*
+		 * Note, if the range has zero start/end addresses due
+		 * to its dynamic object not being loaded yet, we just
+		 * go ahead and program zeroed range, which will simply
+		 * produce no data. Note^2: if executable code at 0x0
+		 * is a concern, we can set up an "invalid" configuration
+		 * such as msr_b < msr_a.
+		 */
+
+		/* avoid redundant msr writes */
+		if (pt->filters.filter[range].msr_a != filter->msr_a) {
+			wrmsrl(pt_address_ranges[range].msr_a, filter->msr_a);
+			pt->filters.filter[range].msr_a = filter->msr_a;
+		}
+
+		if (pt->filters.filter[range].msr_b != filter->msr_b) {
+			wrmsrl(pt_address_ranges[range].msr_b, filter->msr_b);
+			pt->filters.filter[range].msr_b = filter->msr_b;
+		}
+
+		rtit_ctl |= filter->config << pt_address_ranges[range].reg_off;
+	}
+
+	return rtit_ctl;
+}
+
 static void pt_config(struct perf_event *event)
 {
+	struct pt *pt = this_cpu_ptr(&pt_ctx);
 	u64 reg;
 
 	if (!event->hw.itrace_started) {
@@ -260,7 +476,21 @@ static void pt_config(struct perf_event *event)
 		wrmsrl(MSR_IA32_RTIT_STATUS, 0);
 	}
 
-	reg = RTIT_CTL_TOPA | RTIT_CTL_BRANCH_EN | RTIT_CTL_TRACEEN;
+	reg = pt_config_filters(event);
+	reg |= RTIT_CTL_TOPA | RTIT_CTL_TRACEEN;
+
+	/*
+	 * Previously, we had BRANCH_EN on by default, but now that PT has
+	 * grown features outside of branch tracing, it is useful to allow
+	 * the user to disable it. Setting bit 0 in the event's attr.config
+	 * allows BRANCH_EN to pass through instead of being always on. See
+	 * also the comment in pt_event_valid().
+	 */
+	if (event->attr.config & BIT(0)) {
+		reg |= event->attr.config & RTIT_CTL_BRANCH_EN;
+	} else {
+		reg |= RTIT_CTL_BRANCH_EN;
+	}
 
 	if (!event->attr.exclude_kernel)
 		reg |= RTIT_CTL_OS;
@@ -269,19 +499,27 @@ static void pt_config(struct perf_event *event)
 
 	reg |= (event->attr.config & PT_CONFIG_MASK);
 
-	wrmsrl(MSR_IA32_RTIT_CTL, reg);
+	event->hw.config = reg;
+	if (READ_ONCE(pt->vmx_on))
+		perf_aux_output_flag(&pt->handle, PERF_AUX_FLAG_PARTIAL);
+	else
+		wrmsrl(MSR_IA32_RTIT_CTL, reg);
 }
 
-static void pt_config_start(bool start)
+static void pt_config_stop(struct perf_event *event)
 {
-	u64 ctl;
+	struct pt *pt = this_cpu_ptr(&pt_ctx);
+	u64 ctl = READ_ONCE(event->hw.config);
 
-	rdmsrl(MSR_IA32_RTIT_CTL, ctl);
-	if (start)
-		ctl |= RTIT_CTL_TRACEEN;
-	else
-		ctl &= ~RTIT_CTL_TRACEEN;
-	wrmsrl(MSR_IA32_RTIT_CTL, ctl);
+	/* may be already stopped by a PMI */
+	if (!(ctl & RTIT_CTL_TRACEEN))
+		return;
+
+	ctl &= ~RTIT_CTL_TRACEEN;
+	if (!READ_ONCE(pt->vmx_on))
+		wrmsrl(MSR_IA32_RTIT_CTL, ctl);
+
+	WRITE_ONCE(event->hw.config, ctl);
 
 	/*
 	 * A wrmsr that disables trace generation serializes other PT
@@ -291,8 +529,7 @@ static void pt_config_start(bool start)
 	 * The below WMB, separating data store and aux_head store matches
 	 * the consumer's RMB that separates aux_head load and data load.
 	 */
-	if (!start)
-		wmb();
+	wmb();
 }
 
 static void pt_config_buffer(void *buf, unsigned int topa_idx,
@@ -592,7 +829,8 @@ static void pt_handle_status(struct pt *pt)
 		 */
 		if (!pt_cap_get(PT_CAP_topa_multiple_entries) ||
 		    buf->output_off == sizes(TOPA_ENTRY(buf->cur, buf->cur_idx)->size)) {
-			local_inc(&buf->lost);
+			perf_aux_output_flag(&pt->handle,
+			                     PERF_AUX_FLAG_TRUNCATED);
 			advance++;
 		}
 	}
@@ -685,8 +923,10 @@ static int pt_buffer_reset_markers(struct pt_buffer *buf,
 
 	/* can't stop in the middle of an output region */
 	if (buf->output_off + handle->size + 1 <
-	    sizes(TOPA_ENTRY(buf->cur, buf->cur_idx)->size))
+	    sizes(TOPA_ENTRY(buf->cur, buf->cur_idx)->size)) {
+		perf_aux_output_flag(handle, PERF_AUX_FLAG_TRUNCATED);
 		return -EINVAL;
+	}
 
 
 	/* single entry ToPA is handled by marking all regions STOP=1 INT=1 */
@@ -695,6 +935,7 @@ static int pt_buffer_reset_markers(struct pt_buffer *buf,
 
 	/* clear STOP and INT from current entry */
 	buf->topa_index[buf->stop_pos]->stop = 0;
+	buf->topa_index[buf->stop_pos]->intr = 0;
 	buf->topa_index[buf->intr_pos]->intr = 0;
 
 	/* how many pages till the STOP marker */
@@ -719,6 +960,7 @@ static int pt_buffer_reset_markers(struct pt_buffer *buf,
 	buf->intr_pos = idx;
 
 	buf->topa_index[buf->stop_pos]->stop = 1;
+	buf->topa_index[buf->stop_pos]->intr = 1;
 	buf->topa_index[buf->intr_pos]->intr = 1;
 
 	return 0;
@@ -905,24 +1147,90 @@ static void pt_buffer_free_aux(void *data)
 	kfree(buf);
 }
 
-/**
- * pt_buffer_is_full() - check if the buffer is full
- * @buf:	PT buffer.
- * @pt:		Per-cpu pt handle.
- *
- * If the user hasn't read data from the output region that aux_head
- * points to, the buffer is considered full: the user needs to read at
- * least this region and update aux_tail to point past it.
- */
-static bool pt_buffer_is_full(struct pt_buffer *buf, struct pt *pt)
+static int pt_addr_filters_init(struct perf_event *event)
 {
-	if (buf->snapshot)
-		return false;
+	struct pt_filters *filters;
+	int node = event->cpu == -1 ? -1 : cpu_to_node(event->cpu);
 
-	if (local_read(&buf->data_size) >= pt->handle.size)
-		return true;
+	if (!pt_cap_get(PT_CAP_num_address_ranges))
+		return 0;
 
-	return false;
+	filters = kzalloc_node(sizeof(struct pt_filters), GFP_KERNEL, node);
+	if (!filters)
+		return -ENOMEM;
+
+	if (event->parent)
+		memcpy(filters, event->parent->hw.addr_filters,
+		       sizeof(*filters));
+
+	event->hw.addr_filters = filters;
+
+	return 0;
+}
+
+static void pt_addr_filters_fini(struct perf_event *event)
+{
+	kfree(event->hw.addr_filters);
+	event->hw.addr_filters = NULL;
+}
+
+static inline bool valid_kernel_ip(unsigned long ip)
+{
+	return virt_addr_valid(ip) && kernel_ip(ip);
+}
+
+static int pt_event_addr_filters_validate(struct list_head *filters)
+{
+	struct perf_addr_filter *filter;
+	int range = 0;
+
+	list_for_each_entry(filter, filters, entry) {
+		/* PT doesn't support single address triggers */
+		if (!filter->range || !filter->size)
+			return -EOPNOTSUPP;
+
+		if (!filter->inode) {
+			if (!valid_kernel_ip(filter->offset))
+				return -EINVAL;
+
+			if (!valid_kernel_ip(filter->offset + filter->size))
+				return -EINVAL;
+		}
+
+		if (++range > pt_cap_get(PT_CAP_num_address_ranges))
+			return -EOPNOTSUPP;
+	}
+
+	return 0;
+}
+
+static void pt_event_addr_filters_sync(struct perf_event *event)
+{
+	struct perf_addr_filters_head *head = perf_event_addr_filters(event);
+	unsigned long msr_a, msr_b, *offs = event->addr_filters_offs;
+	struct pt_filters *filters = event->hw.addr_filters;
+	struct perf_addr_filter *filter;
+	int range = 0;
+
+	if (!filters)
+		return;
+
+	list_for_each_entry(filter, &head->list, entry) {
+		if (filter->inode && !offs[range]) {
+			msr_a = msr_b = 0;
+		} else {
+			/* apply the offset */
+			msr_a = filter->offset + offs[range];
+			msr_b = filter->size + msr_a - 1;
+		}
+
+		filters->filter[range].msr_a  = msr_a;
+		filters->filter[range].msr_b  = msr_b;
+		filters->filter[range].config = filter->filter ? 1 : 2;
+		range++;
+	}
+
+	filters->nr_filters = range;
 }
 
 /**
@@ -939,13 +1247,13 @@ void intel_pt_interrupt(void)
 	 * after PT has been disabled by pt_event_stop(). Make sure we don't
 	 * do anything (particularly, re-enable) for this event here.
 	 */
-	if (!ACCESS_ONCE(pt->handle_nmi))
+	if (!READ_ONCE(pt->handle_nmi))
 		return;
-
-	pt_config_start(false);
 
 	if (!event)
 		return;
+
+	pt_config_stop(event);
 
 	buf = perf_get_aux(&pt->handle);
 	if (!buf)
@@ -957,8 +1265,7 @@ void intel_pt_interrupt(void)
 
 	pt_update_head(pt);
 
-	perf_aux_output_end(&pt->handle, local_xchg(&buf->data_size, 0),
-			    local_xchg(&buf->lost, 0));
+	perf_aux_output_end(&pt->handle, local_xchg(&buf->data_size, 0));
 
 	if (!event->hw.state) {
 		int ret;
@@ -973,7 +1280,7 @@ void intel_pt_interrupt(void)
 		/* snapshot counters don't use PMI, so it's safe */
 		ret = pt_buffer_reset_markers(buf, &pt->handle);
 		if (ret) {
-			perf_aux_output_end(&pt->handle, 0, true);
+			perf_aux_output_end(&pt->handle, 0);
 			return;
 		}
 
@@ -983,26 +1290,75 @@ void intel_pt_interrupt(void)
 	}
 }
 
+void intel_pt_handle_vmx(int on)
+{
+	struct pt *pt = this_cpu_ptr(&pt_ctx);
+	struct perf_event *event;
+	unsigned long flags;
+
+	/* PT plays nice with VMX, do nothing */
+	if (pt_pmu.vmx)
+		return;
+
+	/*
+	 * VMXON will clear RTIT_CTL.TraceEn; we need to make
+	 * sure to not try to set it while VMX is on. Disable
+	 * interrupts to avoid racing with pmu callbacks;
+	 * concurrent PMI should be handled fine.
+	 */
+	local_irq_save(flags);
+	WRITE_ONCE(pt->vmx_on, on);
+
+	/*
+	 * If an AUX transaction is in progress, it will contain
+	 * gap(s), so flag it PARTIAL to inform the user.
+	 */
+	event = pt->handle.event;
+	if (event)
+		perf_aux_output_flag(&pt->handle,
+		                     PERF_AUX_FLAG_PARTIAL);
+
+	/* Turn PTs back on */
+	if (!on && event)
+		wrmsrl(MSR_IA32_RTIT_CTL, event->hw.config);
+
+	local_irq_restore(flags);
+}
+EXPORT_SYMBOL_GPL(intel_pt_handle_vmx);
+
 /*
  * PMU callbacks
  */
 
 static void pt_event_start(struct perf_event *event, int mode)
 {
+	struct hw_perf_event *hwc = &event->hw;
 	struct pt *pt = this_cpu_ptr(&pt_ctx);
-	struct pt_buffer *buf = perf_get_aux(&pt->handle);
+	struct pt_buffer *buf;
 
-	if (!buf || pt_buffer_is_full(buf, pt)) {
-		event->hw.state = PERF_HES_STOPPED;
-		return;
+	buf = perf_aux_output_begin(&pt->handle, event);
+	if (!buf)
+		goto fail_stop;
+
+	pt_buffer_reset_offsets(buf, pt->handle.head);
+	if (!buf->snapshot) {
+		if (pt_buffer_reset_markers(buf, &pt->handle))
+			goto fail_end_stop;
 	}
 
-	ACCESS_ONCE(pt->handle_nmi) = 1;
-	event->hw.state = 0;
+	WRITE_ONCE(pt->handle_nmi, 1);
+	hwc->state = 0;
 
 	pt_config_buffer(buf->cur->table, buf->cur_idx,
 			 buf->output_off);
 	pt_config(event);
+
+	return;
+
+fail_end_stop:
+	perf_aux_output_end(&pt->handle, 0);
+fail_stop:
+	hwc->state = PERF_HES_STOPPED;
 }
 
 static void pt_event_stop(struct perf_event *event, int mode)
@@ -1013,8 +1369,9 @@ static void pt_event_stop(struct perf_event *event, int mode)
 	 * Protect against the PMI racing with disabling wrmsr,
 	 * see comment in intel_pt_interrupt().
 	 */
-	ACCESS_ONCE(pt->handle_nmi) = 0;
-	pt_config_start(false);
+	WRITE_ONCE(pt->handle_nmi, 0);
+
+	pt_config_stop(event);
 
 	if (event->hw.state == PERF_HES_STOPPED)
 		return;
@@ -1035,31 +1392,22 @@ static void pt_event_stop(struct perf_event *event, int mode)
 		pt_handle_status(pt);
 
 		pt_update_head(pt);
+
+		if (buf->snapshot)
+			pt->handle.head =
+				local_xchg(&buf->data_size,
+					   buf->nr_pages << PAGE_SHIFT);
+		perf_aux_output_end(&pt->handle, local_xchg(&buf->data_size, 0));
 	}
 }
 
 static void pt_event_del(struct perf_event *event, int mode)
 {
-	struct pt *pt = this_cpu_ptr(&pt_ctx);
-	struct pt_buffer *buf;
-
 	pt_event_stop(event, PERF_EF_UPDATE);
-
-	buf = perf_get_aux(&pt->handle);
-
-	if (buf) {
-		if (buf->snapshot)
-			pt->handle.head =
-				local_xchg(&buf->data_size,
-					   buf->nr_pages << PAGE_SHIFT);
-		perf_aux_output_end(&pt->handle, local_xchg(&buf->data_size, 0),
-				    local_xchg(&buf->lost, 0));
-	}
 }
 
 static int pt_event_add(struct perf_event *event, int mode)
 {
-	struct pt_buffer *buf;
 	struct pt *pt = this_cpu_ptr(&pt_ctx);
 	struct hw_perf_event *hwc = &event->hw;
 	int ret = -EBUSY;
@@ -1067,34 +1415,18 @@ static int pt_event_add(struct perf_event *event, int mode)
 	if (pt->handle.event)
 		goto fail;
 
-	buf = perf_aux_output_begin(&pt->handle, event);
-	ret = -EINVAL;
-	if (!buf)
-		goto fail_stop;
-
-	pt_buffer_reset_offsets(buf, pt->handle.head);
-	if (!buf->snapshot) {
-		ret = pt_buffer_reset_markers(buf, &pt->handle);
-		if (ret)
-			goto fail_end_stop;
-	}
-
 	if (mode & PERF_EF_START) {
 		pt_event_start(event, 0);
-		ret = -EBUSY;
+		ret = -EINVAL;
 		if (hwc->state == PERF_HES_STOPPED)
-			goto fail_end_stop;
+			goto fail;
 	} else {
 		hwc->state = PERF_HES_STOPPED;
 	}
 
-	return 0;
-
-fail_end_stop:
-	perf_aux_output_end(&pt->handle, 0, true);
-fail_stop:
-	hwc->state = PERF_HES_STOPPED;
+	ret = 0;
 fail:
+
 	return ret;
 }
 
@@ -1104,6 +1436,7 @@ static void pt_event_read(struct perf_event *event)
 
 static void pt_event_destroy(struct perf_event *event)
 {
+	pt_addr_filters_fini(event);
 	x86_del_exclusive(x86_lbr_exclusive_pt);
 }
 
@@ -1117,6 +1450,11 @@ static int pt_event_init(struct perf_event *event)
 
 	if (x86_add_exclusive(x86_lbr_exclusive_pt))
 		return -EBUSY;
+
+	if (pt_addr_filters_init(event)) {
+		x86_del_exclusive(x86_lbr_exclusive_pt);
+		return -ENOMEM;
+	}
 
 	event->destroy = pt_event_destroy;
 
@@ -1137,7 +1475,7 @@ static __init int pt_init(void)
 
 	BUILD_BUG_ON(sizeof(struct topa) > PAGE_SIZE);
 
-	if (!test_cpu_cap(&boot_cpu_data, X86_FEATURE_INTEL_PT))
+	if (!boot_cpu_has(X86_FEATURE_INTEL_PT))
 		return -ENODEV;
 
 	get_online_cpus();
@@ -1171,16 +1509,21 @@ static __init int pt_init(void)
 			PERF_PMU_CAP_AUX_NO_SG | PERF_PMU_CAP_AUX_SW_DOUBLEBUF;
 
 	pt_pmu.pmu.capabilities	|= PERF_PMU_CAP_EXCLUSIVE | PERF_PMU_CAP_ITRACE;
-	pt_pmu.pmu.attr_groups	= pt_attr_groups;
-	pt_pmu.pmu.task_ctx_nr	= perf_sw_context;
-	pt_pmu.pmu.event_init	= pt_event_init;
-	pt_pmu.pmu.add		= pt_event_add;
-	pt_pmu.pmu.del		= pt_event_del;
-	pt_pmu.pmu.start	= pt_event_start;
-	pt_pmu.pmu.stop		= pt_event_stop;
-	pt_pmu.pmu.read		= pt_event_read;
-	pt_pmu.pmu.setup_aux	= pt_buffer_setup_aux;
-	pt_pmu.pmu.free_aux	= pt_buffer_free_aux;
+	pt_pmu.pmu.attr_groups		 = pt_attr_groups;
+	pt_pmu.pmu.task_ctx_nr		 = perf_sw_context;
+	pt_pmu.pmu.event_init		 = pt_event_init;
+	pt_pmu.pmu.add			 = pt_event_add;
+	pt_pmu.pmu.del			 = pt_event_del;
+	pt_pmu.pmu.start		 = pt_event_start;
+	pt_pmu.pmu.stop			 = pt_event_stop;
+	pt_pmu.pmu.read			 = pt_event_read;
+	pt_pmu.pmu.setup_aux		 = pt_buffer_setup_aux;
+	pt_pmu.pmu.free_aux		 = pt_buffer_free_aux;
+	pt_pmu.pmu.addr_filters_sync     = pt_event_addr_filters_sync;
+	pt_pmu.pmu.addr_filters_validate = pt_event_addr_filters_validate;
+	pt_pmu.pmu.nr_addr_filters       =
+		pt_cap_get(PT_CAP_num_address_ranges);
+
 	ret = perf_pmu_register(&pt_pmu.pmu, "intel_pt", -1);
 
 	return ret;

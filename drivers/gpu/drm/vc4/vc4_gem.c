@@ -26,6 +26,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/device.h>
 #include <linux/io.h>
+#include <linux/sched/signal.h>
 
 #include "uapi/drm/vc4_drm.h"
 #include "vc4_drv.h"
@@ -53,10 +54,8 @@ vc4_free_hang_state(struct drm_device *dev, struct vc4_hang_state *state)
 {
 	unsigned int i;
 
-	mutex_lock(&dev->struct_mutex);
 	for (i = 0; i < state->user_state.bo_count; i++)
-		drm_gem_object_unreference(state->bo[i]);
-	mutex_unlock(&dev->struct_mutex);
+		drm_gem_object_unreference_unlocked(state->bo[i]);
 
 	kfree(state);
 }
@@ -112,8 +111,8 @@ vc4_get_hang_state_ioctl(struct drm_device *dev, void *data,
 					    &handle);
 
 		if (ret) {
-			state->bo_count = i - 1;
-			goto err;
+			state->bo_count = i;
+			goto err_delete_handle;
 		}
 		bo_state[i].handle = handle;
 		bo_state[i].paddr = vc4_bo->base.paddr;
@@ -125,13 +124,16 @@ vc4_get_hang_state_ioctl(struct drm_device *dev, void *data,
 			 state->bo_count * sizeof(*bo_state)))
 		ret = -EFAULT;
 
-	kfree(bo_state);
+err_delete_handle:
+	if (ret) {
+		for (i = 0; i < state->bo_count; i++)
+			drm_gem_handle_delete(file_priv, bo_state[i].handle);
+	}
 
 err_free:
-
 	vc4_free_hang_state(dev, kernel_state);
+	kfree(bo_state);
 
-err:
 	return ret;
 }
 
@@ -141,10 +143,10 @@ vc4_save_hang_state(struct drm_device *dev)
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	struct drm_vc4_get_hang_state *state;
 	struct vc4_hang_state *kernel_state;
-	struct vc4_exec_info *exec;
+	struct vc4_exec_info *exec[2];
 	struct vc4_bo *bo;
 	unsigned long irqflags;
-	unsigned int i, unref_list_count;
+	unsigned int i, j, unref_list_count, prev_idx;
 
 	kernel_state = kcalloc(1, sizeof(*kernel_state), GFP_KERNEL);
 	if (!kernel_state)
@@ -153,37 +155,55 @@ vc4_save_hang_state(struct drm_device *dev)
 	state = &kernel_state->user_state;
 
 	spin_lock_irqsave(&vc4->job_lock, irqflags);
-	exec = vc4_first_job(vc4);
-	if (!exec) {
+	exec[0] = vc4_first_bin_job(vc4);
+	exec[1] = vc4_first_render_job(vc4);
+	if (!exec[0] && !exec[1]) {
 		spin_unlock_irqrestore(&vc4->job_lock, irqflags);
 		return;
 	}
 
-	unref_list_count = 0;
-	list_for_each_entry(bo, &exec->unref_list, unref_head)
-		unref_list_count++;
+	/* Get the bos from both binner and renderer into hang state. */
+	state->bo_count = 0;
+	for (i = 0; i < 2; i++) {
+		if (!exec[i])
+			continue;
 
-	state->bo_count = exec->bo_count + unref_list_count;
-	kernel_state->bo = kcalloc(state->bo_count, sizeof(*kernel_state->bo),
-				   GFP_ATOMIC);
+		unref_list_count = 0;
+		list_for_each_entry(bo, &exec[i]->unref_list, unref_head)
+			unref_list_count++;
+		state->bo_count += exec[i]->bo_count + unref_list_count;
+	}
+
+	kernel_state->bo = kcalloc(state->bo_count,
+				   sizeof(*kernel_state->bo), GFP_ATOMIC);
+
 	if (!kernel_state->bo) {
 		spin_unlock_irqrestore(&vc4->job_lock, irqflags);
 		return;
 	}
 
-	for (i = 0; i < exec->bo_count; i++) {
-		drm_gem_object_reference(&exec->bo[i]->base);
-		kernel_state->bo[i] = &exec->bo[i]->base;
+	prev_idx = 0;
+	for (i = 0; i < 2; i++) {
+		if (!exec[i])
+			continue;
+
+		for (j = 0; j < exec[i]->bo_count; j++) {
+			drm_gem_object_reference(&exec[i]->bo[j]->base);
+			kernel_state->bo[j + prev_idx] = &exec[i]->bo[j]->base;
+		}
+
+		list_for_each_entry(bo, &exec[i]->unref_list, unref_head) {
+			drm_gem_object_reference(&bo->base.base);
+			kernel_state->bo[j + prev_idx] = &bo->base.base;
+			j++;
+		}
+		prev_idx = j + 1;
 	}
 
-	list_for_each_entry(bo, &exec->unref_list, unref_head) {
-		drm_gem_object_reference(&bo->base.base);
-		kernel_state->bo[i] = &bo->base.base;
-		i++;
-	}
-
-	state->start_bin = exec->ct0ca;
-	state->start_render = exec->ct1ca;
+	if (exec[0])
+		state->start_bin = exec[0]->ct0ca;
+	if (exec[1])
+		state->start_render = exec[1]->ct1ca;
 
 	spin_unlock_irqrestore(&vc4->job_lock, irqflags);
 
@@ -267,13 +287,15 @@ vc4_hangcheck_elapsed(unsigned long data)
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	uint32_t ct0ca, ct1ca;
 	unsigned long irqflags;
-	struct vc4_exec_info *exec;
+	struct vc4_exec_info *bin_exec, *render_exec;
 
 	spin_lock_irqsave(&vc4->job_lock, irqflags);
-	exec = vc4_first_job(vc4);
+
+	bin_exec = vc4_first_bin_job(vc4);
+	render_exec = vc4_first_render_job(vc4);
 
 	/* If idle, we can stop watching for hangs. */
-	if (!exec) {
+	if (!bin_exec && !render_exec) {
 		spin_unlock_irqrestore(&vc4->job_lock, irqflags);
 		return;
 	}
@@ -284,9 +306,12 @@ vc4_hangcheck_elapsed(unsigned long data)
 	/* If we've made any progress in execution, rearm the timer
 	 * and wait.
 	 */
-	if (ct0ca != exec->last_ct0ca || ct1ca != exec->last_ct1ca) {
-		exec->last_ct0ca = ct0ca;
-		exec->last_ct1ca = ct1ca;
+	if ((bin_exec && ct0ca != bin_exec->last_ct0ca) ||
+	    (render_exec && ct1ca != render_exec->last_ct1ca)) {
+		if (bin_exec)
+			bin_exec->last_ct0ca = ct0ca;
+		if (render_exec)
+			render_exec->last_ct1ca = ct1ca;
 		spin_unlock_irqrestore(&vc4->job_lock, irqflags);
 		vc4_queue_hangcheck(dev);
 		return;
@@ -386,23 +411,50 @@ vc4_flush_caches(struct drm_device *dev)
  * The job_lock should be held during this.
  */
 void
-vc4_submit_next_job(struct drm_device *dev)
+vc4_submit_next_bin_job(struct drm_device *dev)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
-	struct vc4_exec_info *exec = vc4_first_job(vc4);
+	struct vc4_exec_info *exec;
 
+again:
+	exec = vc4_first_bin_job(vc4);
 	if (!exec)
 		return;
 
 	vc4_flush_caches(dev);
 
-	/* Disable the binner's pre-loaded overflow memory address */
-	V3D_WRITE(V3D_BPOA, 0);
-	V3D_WRITE(V3D_BPOS, 0);
-
-	if (exec->ct0ca != exec->ct0ea)
+	/* Either put the job in the binner if it uses the binner, or
+	 * immediately move it to the to-be-rendered queue.
+	 */
+	if (exec->ct0ca != exec->ct0ea) {
 		submit_cl(dev, 0, exec->ct0ca, exec->ct0ea);
+	} else {
+		vc4_move_job_to_render(dev, exec);
+		goto again;
+	}
+}
+
+void
+vc4_submit_next_render_job(struct drm_device *dev)
+{
+	struct vc4_dev *vc4 = to_vc4_dev(dev);
+	struct vc4_exec_info *exec = vc4_first_render_job(vc4);
+
+	if (!exec)
+		return;
+
 	submit_cl(dev, 1, exec->ct1ca, exec->ct1ea);
+}
+
+void
+vc4_move_job_to_render(struct drm_device *dev, struct vc4_exec_info *exec)
+{
+	struct vc4_dev *vc4 = to_vc4_dev(dev);
+	bool was_empty = list_empty(&vc4->render_job_list);
+
+	list_move_tail(&exec->head, &vc4->render_job_list);
+	if (was_empty)
+		vc4_submit_next_render_job(dev);
 }
 
 static void
@@ -414,11 +466,114 @@ vc4_update_bo_seqnos(struct vc4_exec_info *exec, uint64_t seqno)
 	for (i = 0; i < exec->bo_count; i++) {
 		bo = to_vc4_bo(&exec->bo[i]->base);
 		bo->seqno = seqno;
+
+		reservation_object_add_shared_fence(bo->resv, exec->fence);
 	}
 
 	list_for_each_entry(bo, &exec->unref_list, unref_head) {
 		bo->seqno = seqno;
 	}
+
+	for (i = 0; i < exec->rcl_write_bo_count; i++) {
+		bo = to_vc4_bo(&exec->rcl_write_bo[i]->base);
+		bo->write_seqno = seqno;
+
+		reservation_object_add_excl_fence(bo->resv, exec->fence);
+	}
+}
+
+static void
+vc4_unlock_bo_reservations(struct drm_device *dev,
+			   struct vc4_exec_info *exec,
+			   struct ww_acquire_ctx *acquire_ctx)
+{
+	int i;
+
+	for (i = 0; i < exec->bo_count; i++) {
+		struct vc4_bo *bo = to_vc4_bo(&exec->bo[i]->base);
+
+		ww_mutex_unlock(&bo->resv->lock);
+	}
+
+	ww_acquire_fini(acquire_ctx);
+}
+
+/* Takes the reservation lock on all the BOs being referenced, so that
+ * at queue submit time we can update the reservations.
+ *
+ * We don't lock the RCL the tile alloc/state BOs, or overflow memory
+ * (all of which are on exec->unref_list).  They're entirely private
+ * to vc4, so we don't attach dma-buf fences to them.
+ */
+static int
+vc4_lock_bo_reservations(struct drm_device *dev,
+			 struct vc4_exec_info *exec,
+			 struct ww_acquire_ctx *acquire_ctx)
+{
+	int contended_lock = -1;
+	int i, ret;
+	struct vc4_bo *bo;
+
+	ww_acquire_init(acquire_ctx, &reservation_ww_class);
+
+retry:
+	if (contended_lock != -1) {
+		bo = to_vc4_bo(&exec->bo[contended_lock]->base);
+		ret = ww_mutex_lock_slow_interruptible(&bo->resv->lock,
+						       acquire_ctx);
+		if (ret) {
+			ww_acquire_done(acquire_ctx);
+			return ret;
+		}
+	}
+
+	for (i = 0; i < exec->bo_count; i++) {
+		if (i == contended_lock)
+			continue;
+
+		bo = to_vc4_bo(&exec->bo[i]->base);
+
+		ret = ww_mutex_lock_interruptible(&bo->resv->lock, acquire_ctx);
+		if (ret) {
+			int j;
+
+			for (j = 0; j < i; j++) {
+				bo = to_vc4_bo(&exec->bo[j]->base);
+				ww_mutex_unlock(&bo->resv->lock);
+			}
+
+			if (contended_lock != -1 && contended_lock >= i) {
+				bo = to_vc4_bo(&exec->bo[contended_lock]->base);
+
+				ww_mutex_unlock(&bo->resv->lock);
+			}
+
+			if (ret == -EDEADLK) {
+				contended_lock = i;
+				goto retry;
+			}
+
+			ww_acquire_done(acquire_ctx);
+			return ret;
+		}
+	}
+
+	ww_acquire_done(acquire_ctx);
+
+	/* Reserve space for our shared (read-only) fence references,
+	 * before we commit the CL to the hardware.
+	 */
+	for (i = 0; i < exec->bo_count; i++) {
+		bo = to_vc4_bo(&exec->bo[i]->base);
+
+		ret = reservation_object_reserve_shared(bo->resv);
+		if (ret) {
+			vc4_unlock_bo_reservations(dev, exec, acquire_ctx);
+			return ret;
+		}
+	}
+
+	return 0;
 }
 
 /* Queues a struct vc4_exec_info for execution.  If no job is
@@ -430,37 +585,63 @@ vc4_update_bo_seqnos(struct vc4_exec_info *exec, uint64_t seqno)
  * then bump the end address.  That's a change for a later date,
  * though.
  */
-static void
-vc4_queue_submit(struct drm_device *dev, struct vc4_exec_info *exec)
+static int
+vc4_queue_submit(struct drm_device *dev, struct vc4_exec_info *exec,
+		 struct ww_acquire_ctx *acquire_ctx)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	uint64_t seqno;
 	unsigned long irqflags;
+	struct vc4_fence *fence;
+
+	fence = kzalloc(sizeof(*fence), GFP_KERNEL);
+	if (!fence)
+		return -ENOMEM;
+	fence->dev = dev;
 
 	spin_lock_irqsave(&vc4->job_lock, irqflags);
 
 	seqno = ++vc4->emit_seqno;
 	exec->seqno = seqno;
+
+	dma_fence_init(&fence->base, &vc4_fence_ops, &vc4->job_lock,
+		       vc4->dma_fence_context, exec->seqno);
+	fence->seqno = exec->seqno;
+	exec->fence = &fence->base;
+
 	vc4_update_bo_seqnos(exec, seqno);
 
-	list_add_tail(&exec->head, &vc4->job_list);
+	vc4_unlock_bo_reservations(dev, exec, acquire_ctx);
+
+	list_add_tail(&exec->head, &vc4->bin_job_list);
 
 	/* If no job was executing, kick ours off.  Otherwise, it'll
-	 * get started when the previous job's frame done interrupt
+	 * get started when the previous job's flush done interrupt
 	 * occurs.
 	 */
-	if (vc4_first_job(vc4) == exec) {
-		vc4_submit_next_job(dev);
+	if (vc4_first_bin_job(vc4) == exec) {
+		vc4_submit_next_bin_job(dev);
 		vc4_queue_hangcheck(dev);
 	}
 
 	spin_unlock_irqrestore(&vc4->job_lock, irqflags);
+
+	return 0;
 }
 
 /**
- * Looks up a bunch of GEM handles for BOs and stores the array for
- * use in the command validator that actually writes relocated
- * addresses pointing to them.
+ * vc4_cl_lookup_bos() - Sets up exec->bo[] with the GEM objects
+ * referenced by the job.
+ * @dev: DRM device
+ * @file_priv: DRM file for this fd
+ * @exec: V3D job being set up
+ *
+ * The command validator needs to reference BOs by their index within
+ * the submitted job's BO list.  This does the validation of the job's
+ * BO list and reference counting for the lifetime of the job.
+ *
+ * Note that this function doesn't need to unreference the BOs on
+ * failure, because that will happen at vc4_complete_exec() time.
  */
 static int
 vc4_cl_lookup_bos(struct drm_device *dev,
@@ -482,23 +663,25 @@ vc4_cl_lookup_bos(struct drm_device *dev,
 		return -EINVAL;
 	}
 
-	exec->bo = kcalloc(exec->bo_count, sizeof(struct drm_gem_cma_object *),
-			   GFP_KERNEL);
+	exec->bo = kvmalloc_array(exec->bo_count,
+				    sizeof(struct drm_gem_cma_object *),
+				    GFP_KERNEL | __GFP_ZERO);
 	if (!exec->bo) {
 		DRM_ERROR("Failed to allocate validated BO pointers\n");
 		return -ENOMEM;
 	}
 
-	handles = drm_malloc_ab(exec->bo_count, sizeof(uint32_t));
+	handles = kvmalloc_array(exec->bo_count, sizeof(uint32_t), GFP_KERNEL);
 	if (!handles) {
+		ret = -ENOMEM;
 		DRM_ERROR("Failed to allocate incoming GEM handles\n");
 		goto fail;
 	}
 
-	ret = copy_from_user(handles,
-			     (void __user *)(uintptr_t)args->bo_handles,
-			     exec->bo_count * sizeof(uint32_t));
-	if (ret) {
+	if (copy_from_user(handles,
+			   (void __user *)(uintptr_t)args->bo_handles,
+			   exec->bo_count * sizeof(uint32_t))) {
+		ret = -EFAULT;
 		DRM_ERROR("Failed to copy in GEM handles\n");
 		goto fail;
 	}
@@ -520,8 +703,8 @@ vc4_cl_lookup_bos(struct drm_device *dev,
 	spin_unlock(&file_priv->table_lock);
 
 fail:
-	kfree(handles);
-	return 0;
+	kvfree(handles);
+	return ret;
 }
 
 static int
@@ -540,12 +723,14 @@ vc4_get_bcl(struct drm_device *dev, struct vc4_exec_info *exec)
 					  args->shader_rec_count);
 	struct vc4_bo *bo;
 
-	if (uniforms_offset < shader_rec_offset ||
+	if (shader_rec_offset < args->bin_cl_size ||
+	    uniforms_offset < shader_rec_offset ||
 	    exec_size < uniforms_offset ||
 	    args->shader_rec_count >= (UINT_MAX /
 					  sizeof(struct vc4_shader_state)) ||
 	    temp_size < exec_size) {
 		DRM_ERROR("overflow in exec arguments\n");
+		ret = -EINVAL;
 		goto fail;
 	}
 
@@ -556,7 +741,7 @@ vc4_get_bcl(struct drm_device *dev, struct vc4_exec_info *exec)
 	 * read the contents back for validation, and I think the
 	 * bo->vaddr is uncached access.
 	 */
-	temp = kmalloc(temp_size, GFP_KERNEL);
+	temp = kvmalloc_array(temp_size, 1, GFP_KERNEL);
 	if (!temp) {
 		DRM_ERROR("Failed to allocate storage for copying "
 			  "in bin/render CLs.\n");
@@ -621,9 +806,17 @@ vc4_get_bcl(struct drm_device *dev, struct vc4_exec_info *exec)
 		goto fail;
 
 	ret = vc4_validate_shader_recs(dev, exec);
+	if (ret)
+		goto fail;
+
+	/* Block waiting on any previous rendering into the CS's VBO,
+	 * IB, or textures, so that pixels are actually written by the
+	 * time we try to read them.
+	 */
+	ret = vc4_wait_for_seqno(dev, exec->bin_dep_seqno, ~0ull, true);
 
 fail:
-	kfree(temp);
+	kvfree(temp);
 	return ret;
 }
 
@@ -631,27 +824,38 @@ static void
 vc4_complete_exec(struct drm_device *dev, struct vc4_exec_info *exec)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
+	unsigned long irqflags;
 	unsigned i;
 
-	/* Need the struct lock for drm_gem_object_unreference(). */
-	mutex_lock(&dev->struct_mutex);
+	/* If we got force-completed because of GPU reset rather than
+	 * through our IRQ handler, signal the fence now.
+	 */
+	if (exec->fence)
+		dma_fence_signal(exec->fence);
+
 	if (exec->bo) {
 		for (i = 0; i < exec->bo_count; i++)
-			drm_gem_object_unreference(&exec->bo[i]->base);
-		kfree(exec->bo);
+			drm_gem_object_unreference_unlocked(&exec->bo[i]->base);
+		kvfree(exec->bo);
 	}
 
 	while (!list_empty(&exec->unref_list)) {
 		struct vc4_bo *bo = list_first_entry(&exec->unref_list,
 						     struct vc4_bo, unref_head);
 		list_del(&bo->unref_head);
-		drm_gem_object_unreference(&bo->base.base);
+		drm_gem_object_unreference_unlocked(&bo->base.base);
 	}
-	mutex_unlock(&dev->struct_mutex);
+
+	/* Free up the allocation of any bin slots we used. */
+	spin_lock_irqsave(&vc4->job_lock, irqflags);
+	vc4->bin_alloc_used &= ~exec->bin_slots;
+	spin_unlock_irqrestore(&vc4->job_lock, irqflags);
 
 	mutex_lock(&vc4->power_lock);
-	if (--vc4->power_refcount == 0)
-		pm_runtime_put(&vc4->v3d->pdev->dev);
+	if (--vc4->power_refcount == 0) {
+		pm_runtime_mark_last_busy(&vc4->v3d->pdev->dev);
+		pm_runtime_put_autosuspend(&vc4->v3d->pdev->dev);
+	}
 	mutex_unlock(&vc4->power_lock);
 
 	kfree(exec);
@@ -768,7 +972,7 @@ vc4_wait_bo_ioctl(struct drm_device *dev, void *data,
 	if (args->pad != 0)
 		return -EINVAL;
 
-	gem_obj = drm_gem_object_lookup(dev, file_priv, args->handle);
+	gem_obj = drm_gem_object_lookup(file_priv, args->handle);
 	if (!gem_obj) {
 		DRM_ERROR("Failed to look up GEM BO %d\n", args->handle);
 		return -EINVAL;
@@ -783,9 +987,16 @@ vc4_wait_bo_ioctl(struct drm_device *dev, void *data,
 }
 
 /**
- * Submits a command list to the VC4.
+ * vc4_submit_cl_ioctl() - Submits a job (frame) to the VC4.
+ * @dev: DRM device
+ * @data: ioctl argument
+ * @file_priv: DRM file for this fd
  *
- * This is what is called batchbuffer emitting on other hardware.
+ * This is the main entrypoint for userspace to submit a 3D frame to
+ * the GPU.  Userspace provides the binner command list (if
+ * applicable), and the kernel sets up the render command list to draw
+ * to the framebuffer described in the ioctl, using the command lists
+ * that the 3D engine's binner will produce.
  */
 int
 vc4_submit_cl_ioctl(struct drm_device *dev, void *data,
@@ -794,6 +1005,7 @@ vc4_submit_cl_ioctl(struct drm_device *dev, void *data,
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 	struct drm_vc4_submit_cl *args = data;
 	struct vc4_exec_info *exec;
+	struct ww_acquire_ctx acquire_ctx;
 	int ret = 0;
 
 	if ((args->flags & ~VC4_SUBMIT_CL_USE_CLEAR_COLOR) != 0) {
@@ -808,13 +1020,16 @@ vc4_submit_cl_ioctl(struct drm_device *dev, void *data,
 	}
 
 	mutex_lock(&vc4->power_lock);
-	if (vc4->power_refcount++ == 0)
+	if (vc4->power_refcount++ == 0) {
 		ret = pm_runtime_get_sync(&vc4->v3d->pdev->dev);
-	mutex_unlock(&vc4->power_lock);
-	if (ret < 0) {
-		kfree(exec);
-		return ret;
+		if (ret < 0) {
+			mutex_unlock(&vc4->power_lock);
+			vc4->power_refcount--;
+			kfree(exec);
+			return ret;
+		}
 	}
+	mutex_unlock(&vc4->power_lock);
 
 	exec->args = args;
 	INIT_LIST_HEAD(&exec->unref_list);
@@ -836,12 +1051,18 @@ vc4_submit_cl_ioctl(struct drm_device *dev, void *data,
 	if (ret)
 		goto fail;
 
+	ret = vc4_lock_bo_reservations(dev, exec, &acquire_ctx);
+	if (ret)
+		goto fail;
+
 	/* Clear this out of the struct we'll be putting in the queue,
 	 * since it's part of our stack.
 	 */
 	exec->args = NULL;
 
-	vc4_queue_submit(dev, exec);
+	ret = vc4_queue_submit(dev, exec, &acquire_ctx);
+	if (ret)
+		goto fail;
 
 	/* Return the seqno for our job. */
 	args->seqno = vc4->emit_seqno;
@@ -859,7 +1080,10 @@ vc4_gem_init(struct drm_device *dev)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 
-	INIT_LIST_HEAD(&vc4->job_list);
+	vc4->dma_fence_context = dma_fence_context_alloc(1);
+
+	INIT_LIST_HEAD(&vc4->bin_job_list);
+	INIT_LIST_HEAD(&vc4->render_job_list);
 	INIT_LIST_HEAD(&vc4->job_done_list);
 	INIT_LIST_HEAD(&vc4->seqno_cb_list);
 	spin_lock_init(&vc4->job_lock);
@@ -887,13 +1111,13 @@ vc4_gem_destroy(struct drm_device *dev)
 	/* V3D should already have disabled its interrupt and cleared
 	 * the overflow allocation registers.  Now free the object.
 	 */
-	if (vc4->overflow_mem) {
-		drm_gem_object_unreference_unlocked(&vc4->overflow_mem->base.base);
-		vc4->overflow_mem = NULL;
+	if (vc4->bin_bo) {
+		drm_gem_object_put_unlocked(&vc4->bin_bo->base.base);
+		vc4->bin_bo = NULL;
 	}
-
-	vc4_bo_cache_destroy(dev);
 
 	if (vc4->hang_state)
 		vc4_free_hang_state(dev, vc4->hang_state);
+
+	vc4_bo_cache_destroy(dev);
 }

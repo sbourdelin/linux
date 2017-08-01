@@ -241,38 +241,6 @@ DEFINE_NFS4_CLIENTID_EVENT(nfs4_bind_conn_to_session);
 DEFINE_NFS4_CLIENTID_EVENT(nfs4_sequence);
 DEFINE_NFS4_CLIENTID_EVENT(nfs4_reclaim_complete);
 
-TRACE_EVENT(nfs4_setup_sequence,
-		TP_PROTO(
-			const struct nfs4_session *session,
-			const struct nfs4_sequence_args *args
-		),
-		TP_ARGS(session, args),
-
-		TP_STRUCT__entry(
-			__field(unsigned int, session)
-			__field(unsigned int, slot_nr)
-			__field(unsigned int, seq_nr)
-			__field(unsigned int, highest_used_slotid)
-		),
-
-		TP_fast_assign(
-			const struct nfs4_slot *sa_slot = args->sa_slot;
-			__entry->session = nfs_session_id_hash(&session->sess_id);
-			__entry->slot_nr = sa_slot->slot_nr;
-			__entry->seq_nr = sa_slot->seq_nr;
-			__entry->highest_used_slotid =
-					sa_slot->table->highest_used_slotid;
-		),
-		TP_printk(
-			"session=0x%08x slot_nr=%u seq_nr=%u "
-			"highest_used_slotid=%u",
-			__entry->session,
-			__entry->slot_nr,
-			__entry->seq_nr,
-			__entry->highest_used_slotid
-		)
-);
-
 #define show_nfs4_sequence_status_flags(status) \
 	__print_flags((unsigned long)status, "|", \
 		{ SEQ4_STATUS_CB_PATH_DOWN, "CB_PATH_DOWN" }, \
@@ -381,6 +349,38 @@ TRACE_EVENT(nfs4_cb_sequence,
 		)
 );
 #endif /* CONFIG_NFS_V4_1 */
+
+TRACE_EVENT(nfs4_setup_sequence,
+		TP_PROTO(
+			const struct nfs4_session *session,
+			const struct nfs4_sequence_args *args
+		),
+		TP_ARGS(session, args),
+
+		TP_STRUCT__entry(
+			__field(unsigned int, session)
+			__field(unsigned int, slot_nr)
+			__field(unsigned int, seq_nr)
+			__field(unsigned int, highest_used_slotid)
+		),
+
+		TP_fast_assign(
+			const struct nfs4_slot *sa_slot = args->sa_slot;
+			__entry->session = session ? nfs_session_id_hash(&session->sess_id) : 0;
+			__entry->slot_nr = sa_slot->slot_nr;
+			__entry->seq_nr = sa_slot->seq_nr;
+			__entry->highest_used_slotid =
+					sa_slot->table->highest_used_slotid;
+		),
+		TP_printk(
+			"session=0x%08x slot_nr=%u seq_nr=%u "
+			"highest_used_slotid=%u",
+			__entry->session,
+			__entry->slot_nr,
+			__entry->seq_nr,
+			__entry->highest_used_slotid
+		)
+);
 
 DECLARE_EVENT_CLASS(nfs4_open_event,
 		TP_PROTO(
@@ -891,6 +891,35 @@ DEFINE_NFS4_LOOKUP_EVENT(nfs4_remove);
 DEFINE_NFS4_LOOKUP_EVENT(nfs4_get_fs_locations);
 DEFINE_NFS4_LOOKUP_EVENT(nfs4_secinfo);
 
+TRACE_EVENT(nfs4_lookupp,
+		TP_PROTO(
+			const struct inode *inode,
+			int error
+		),
+
+		TP_ARGS(inode, error),
+
+		TP_STRUCT__entry(
+			__field(dev_t, dev)
+			__field(u64, ino)
+			__field(int, error)
+		),
+
+		TP_fast_assign(
+			__entry->dev = inode->i_sb->s_dev;
+			__entry->ino = NFS_FILEID(inode);
+			__entry->error = error;
+		),
+
+		TP_printk(
+			"error=%d (%s) inode=%02x:%02x:%llu",
+			__entry->error,
+			show_nfsv4_errors(__entry->error),
+			MAJOR(__entry->dev), MINOR(__entry->dev),
+			(unsigned long long)__entry->ino
+		)
+);
+
 TRACE_EVENT(nfs4_rename,
 		TP_PROTO(
 			const struct inode *olddir,
@@ -1235,8 +1264,8 @@ DECLARE_EVENT_CLASS(nfs4_idmap_event,
 				len = 0;
 			__entry->error = error < 0 ? error : 0;
 			__entry->id = id;
-			memcpy(__get_dynamic_array(name), name, len);
-			((char *)__get_dynamic_array(name))[len] = 0;
+			memcpy(__get_str(name), name, len);
+			__get_str(name)[len] = 0;
 		),
 
 		TP_printk(
@@ -1520,6 +1549,8 @@ DEFINE_NFS4_INODE_EVENT(nfs4_layoutreturn_on_close);
 		{ PNFS_UPDATE_LAYOUT_FOUND_CACHED, "found cached" },	\
 		{ PNFS_UPDATE_LAYOUT_RETURN, "layoutreturn" },		\
 		{ PNFS_UPDATE_LAYOUT_BLOCKED, "layouts blocked" },	\
+		{ PNFS_UPDATE_LAYOUT_INVALID_OPEN, "invalid open" },	\
+		{ PNFS_UPDATE_LAYOUT_RETRY, "retrying" },	\
 		{ PNFS_UPDATE_LAYOUT_SEND_LAYOUTGET, "sent layoutget" })
 
 TRACE_EVENT(pnfs_update_layout,
@@ -1528,9 +1559,10 @@ TRACE_EVENT(pnfs_update_layout,
 			u64 count,
 			enum pnfs_iomode iomode,
 			struct pnfs_layout_hdr *lo,
+			struct pnfs_layout_segment *lseg,
 			enum pnfs_update_layout_reason reason
 		),
-		TP_ARGS(inode, pos, count, iomode, lo, reason),
+		TP_ARGS(inode, pos, count, iomode, lo, lseg, reason),
 		TP_STRUCT__entry(
 			__field(dev_t, dev)
 			__field(u64, fileid)
@@ -1540,6 +1572,7 @@ TRACE_EVENT(pnfs_update_layout,
 			__field(enum pnfs_iomode, iomode)
 			__field(int, layoutstateid_seq)
 			__field(u32, layoutstateid_hash)
+			__field(long, lseg)
 			__field(enum pnfs_update_layout_reason, reason)
 		),
 		TP_fast_assign(
@@ -1559,11 +1592,12 @@ TRACE_EVENT(pnfs_update_layout,
 				__entry->layoutstateid_seq = 0;
 				__entry->layoutstateid_hash = 0;
 			}
+			__entry->lseg = (long)lseg;
 		),
 		TP_printk(
 			"fileid=%02x:%02x:%llu fhandle=0x%08x "
 			"iomode=%s pos=%llu count=%llu "
-			"layoutstateid=%d:0x%08x (%s)",
+			"layoutstateid=%d:0x%08x lseg=0x%lx (%s)",
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->fileid,
 			__entry->fhandle,
@@ -1571,6 +1605,7 @@ TRACE_EVENT(pnfs_update_layout,
 			(unsigned long long)__entry->pos,
 			(unsigned long long)__entry->count,
 			__entry->layoutstateid_seq, __entry->layoutstateid_hash,
+			__entry->lseg,
 			show_pnfs_update_layout_reason(__entry->reason)
 		)
 );

@@ -45,12 +45,31 @@ enum fs_node_type {
 };
 
 enum fs_flow_table_type {
-	FS_FT_NIC_RX	 = 0x0,
-	FS_FT_FDB	 = 0X4,
+	FS_FT_NIC_RX          = 0x0,
+	FS_FT_ESW_EGRESS_ACL  = 0x2,
+	FS_FT_ESW_INGRESS_ACL = 0x3,
+	FS_FT_FDB             = 0X4,
+	FS_FT_SNIFFER_RX	= 0X5,
+	FS_FT_SNIFFER_TX	= 0X6,
+};
+
+enum fs_flow_table_op_mod {
+	FS_FT_OP_MOD_NORMAL,
+	FS_FT_OP_MOD_LAG_DEMUX,
 };
 
 enum fs_fte_status {
 	FS_FTE_STATUS_EXISTING = 1UL << 0,
+};
+
+struct mlx5_flow_steering {
+	struct mlx5_core_dev *dev;
+	struct mlx5_flow_root_namespace *root_ns;
+	struct mlx5_flow_root_namespace *fdb_root_ns;
+	struct mlx5_flow_root_namespace *esw_egress_root_ns;
+	struct mlx5_flow_root_namespace *esw_ingress_root_ns;
+	struct mlx5_flow_root_namespace	*sniffer_tx_root_ns;
+	struct mlx5_flow_root_namespace	*sniffer_rx_root_ns;
 };
 
 struct fs_node {
@@ -68,20 +87,60 @@ struct fs_node {
 struct mlx5_flow_rule {
 	struct fs_node				node;
 	struct mlx5_flow_destination		dest_attr;
+	/* next_ft should be accessed under chain_lock and only of
+	 * destination type is FWD_NEXT_fT.
+	 */
+	struct list_head			next_ft;
+	u32					sw_action;
+};
+
+struct mlx5_flow_handle {
+	int num_rules;
+	struct mlx5_flow_rule *rule[];
 };
 
 /* Type of children is mlx5_flow_group */
 struct mlx5_flow_table {
 	struct fs_node			node;
 	u32				id;
+	u16				vport;
 	unsigned int			max_fte;
 	unsigned int			level;
 	enum fs_flow_table_type		type;
+	enum fs_flow_table_op_mod	op_mod;
 	struct {
 		bool			active;
 		unsigned int		required_groups;
 		unsigned int		num_groups;
 	} autogroup;
+	/* Protect fwd_rules */
+	struct mutex			lock;
+	/* FWD rules that point on this flow table */
+	struct list_head		fwd_rules;
+	u32				flags;
+};
+
+struct mlx5_fc_cache {
+	u64 packets;
+	u64 bytes;
+	u64 lastuse;
+};
+
+struct mlx5_fc {
+	struct rb_node node;
+	struct list_head list;
+
+	/* last{packets,bytes} members are used when calculating the delta since
+	 * last reading
+	 */
+	u64 lastpackets;
+	u64 lastbytes;
+
+	u16 id;
+	bool deleted;
+	bool aging;
+
+	struct mlx5_fc_cache cache ____cacheline_aligned_in_smp;
 };
 
 /* Type of children is mlx5_flow_rule */
@@ -92,13 +151,16 @@ struct fs_fte {
 	u32				flow_tag;
 	u32				index;
 	u32				action;
+	u32				encap_id;
+	u32				modify_id;
 	enum fs_fte_status		status;
+	struct mlx5_fc			*counter;
 };
 
 /* Type of children is mlx5_flow_table/namespace */
 struct fs_prio {
 	struct fs_node			node;
-	unsigned int			max_ft;
+	unsigned int			num_levels;
 	unsigned int			start_level;
 	unsigned int			prio;
 	unsigned int			num_ft;
@@ -132,7 +194,16 @@ struct mlx5_flow_root_namespace {
 	struct mlx5_flow_table		*root_ft;
 	/* Should be held when chaining flow tables */
 	struct mutex			chain_lock;
+	u32				underlay_qpn;
 };
+
+int mlx5_init_fc_stats(struct mlx5_core_dev *dev);
+void mlx5_cleanup_fc_stats(struct mlx5_core_dev *dev);
+void mlx5_fc_queue_stats_work(struct mlx5_core_dev *dev,
+			      struct delayed_work *dwork,
+			      unsigned long delay);
+void mlx5_fc_update_sampling_interval(struct mlx5_core_dev *dev,
+				      unsigned long interval);
 
 int mlx5_init_fs(struct mlx5_core_dev *dev);
 void mlx5_cleanup_fs(struct mlx5_core_dev *dev);
@@ -141,6 +212,9 @@ void mlx5_cleanup_fs(struct mlx5_core_dev *dev);
 
 #define fs_list_for_each_entry(pos, root)		\
 	list_for_each_entry(pos, root, node.list)
+
+#define fs_list_for_each_entry_safe(pos, tmp, root)		\
+	list_for_each_entry_safe(pos, tmp, root, node.list)
 
 #define fs_for_each_ns_or_ft_reverse(pos, prio)				\
 	list_for_each_entry_reverse(pos, &(prio)->node.children, list)
@@ -156,6 +230,9 @@ void mlx5_cleanup_fs(struct mlx5_core_dev *dev);
 
 #define fs_for_each_ft(pos, prio)			\
 	fs_list_for_each_entry(pos, &(prio)->node.children)
+
+#define fs_for_each_ft_safe(pos, tmp, prio)			\
+	fs_list_for_each_entry_safe(pos, tmp, &(prio)->node.children)
 
 #define fs_for_each_fg(pos, ft)			\
 	fs_list_for_each_entry(pos, &(ft)->node.children)

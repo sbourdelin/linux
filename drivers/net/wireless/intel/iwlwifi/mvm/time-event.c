@@ -66,7 +66,7 @@
 #include <linux/jiffies.h>
 #include <net/mac80211.h>
 
-#include "iwl-notif-wait.h"
+#include "fw/notif-wait.h"
 #include "iwl-trans.h"
 #include "fw-api.h"
 #include "time-event.h"
@@ -130,7 +130,10 @@ void iwl_mvm_roc_done_wk(struct work_struct *wk)
 	 * issue as it will have to complete before the next command is
 	 * executed, and a new time event means a new command.
 	 */
-	iwl_mvm_flush_tx_path(mvm, queues, CMD_ASYNC);
+	if (iwl_mvm_is_dqa_supported(mvm))
+		iwl_mvm_flush_sta(mvm, &mvm->aux_sta, true, CMD_ASYNC);
+	else
+		iwl_mvm_flush_tx_path(mvm, queues, CMD_ASYNC);
 }
 
 static void iwl_mvm_roc_finished(struct iwl_mvm *mvm)
@@ -371,20 +374,13 @@ static int iwl_mvm_aux_roc_te_handle_notif(struct iwl_mvm *mvm,
 
 	iwl_mvm_te_check_trigger(mvm, notif, te_data);
 
-	if (!le32_to_cpu(notif->status)) {
-		IWL_DEBUG_TE(mvm,
-			     "ERROR: Aux ROC Time Event %s notification failure\n",
-			     (le32_to_cpu(notif->action) &
-			      TE_V2_NOTIF_HOST_EVENT_START) ? "start" : "end");
-		return -EINVAL;
-	}
-
 	IWL_DEBUG_TE(mvm,
-		     "Aux ROC time event notification  - UID = 0x%x action %d\n",
+		     "Aux ROC time event notification  - UID = 0x%x action %d (error = %d)\n",
 		     le32_to_cpu(notif->unique_id),
-		     le32_to_cpu(notif->action));
+		     le32_to_cpu(notif->action), le32_to_cpu(notif->status));
 
-	if (le32_to_cpu(notif->action) == TE_V2_NOTIF_HOST_EVENT_END) {
+	if (!le32_to_cpu(notif->status) ||
+	    le32_to_cpu(notif->action) == TE_V2_NOTIF_HOST_EVENT_END) {
 		/* End TE, notify mac80211 */
 		ieee80211_remain_on_channel_expired(mvm->hw);
 		iwl_mvm_roc_finished(mvm); /* flush aux queue */

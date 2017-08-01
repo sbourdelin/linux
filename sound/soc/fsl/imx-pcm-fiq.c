@@ -220,7 +220,7 @@ static int snd_imx_pcm_mmap(struct snd_pcm_substream *substream,
 	ret = dma_mmap_wc(substream->pcm->card->dev, vma, runtime->dma_area,
 			  runtime->dma_addr, runtime->dma_bytes);
 
-	pr_debug("%s: ret: %d %p %pad 0x%08x\n", __func__, ret,
+	pr_debug("%s: ret: %d %p %pad 0x%08zx\n", __func__, ret,
 			runtime->dma_area,
 			&runtime->dma_addr,
 			runtime->dma_bytes);
@@ -282,7 +282,7 @@ static int imx_pcm_new(struct snd_soc_pcm_runtime *rtd)
 	return 0;
 }
 
-static int ssi_irq = 0;
+static int ssi_irq;
 
 static int imx_pcm_fiq_new(struct snd_soc_pcm_runtime *rtd)
 {

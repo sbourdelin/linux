@@ -12,11 +12,6 @@
  * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
  * more details.
  *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc.,
- * 51 Franklin Street, Fifth Floor, Boston, MA 02110, USA
- *
- *
  ******************************************************************************/
 
 #ifndef __HAL8188EPWRSEQ_H__
@@ -34,7 +29,7 @@
 	4: LPS--Low Power State
 	5: SUS--Suspend
 
-	The transision from different states are defined below
+	The transition from different states are defined below
 	TRANS_CARDEMU_TO_ACT
 	TRANS_ACT_TO_CARDEMU
 	TRANS_CARDEMU_TO_SUS

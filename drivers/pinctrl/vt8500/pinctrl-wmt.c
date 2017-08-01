@@ -18,7 +18,6 @@
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/irq.h>
-#include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
 #include <linux/pinctrl/consumer.h>
@@ -429,7 +428,7 @@ static int wmt_pinconf_set(struct pinctrl_dev *pctldev, unsigned pin,
 {
 	struct wmt_pinctrl_data *data = pinctrl_dev_get_drvdata(pctldev);
 	enum pin_config_param param;
-	u16 arg;
+	u32 arg;
 	u32 bank = WMT_BANK_FROM_PIN(pin);
 	u32 bit = WMT_BIT_FROM_PIN(pin);
 	u32 reg_pull_en = data->banks[bank].reg_pull_en;
@@ -583,7 +582,7 @@ int wmt_pinctrl_probe(struct platform_device *pdev,
 
 	data->dev = &pdev->dev;
 
-	data->pctl_dev = pinctrl_register(&wmt_desc, &pdev->dev, data);
+	data->pctl_dev = devm_pinctrl_register(&pdev->dev, &wmt_desc, data);
 	if (IS_ERR(data->pctl_dev)) {
 		dev_err(&pdev->dev, "Failed to register pinctrl\n");
 		return PTR_ERR(data->pctl_dev);
@@ -592,7 +591,7 @@ int wmt_pinctrl_probe(struct platform_device *pdev,
 	err = gpiochip_add_data(&data->gpio_chip, data);
 	if (err) {
 		dev_err(&pdev->dev, "could not add GPIO chip\n");
-		goto fail_gpio;
+		return err;
 	}
 
 	err = gpiochip_add_pin_range(&data->gpio_chip, dev_name(data->dev),
@@ -606,17 +605,5 @@ int wmt_pinctrl_probe(struct platform_device *pdev,
 
 fail_range:
 	gpiochip_remove(&data->gpio_chip);
-fail_gpio:
-	pinctrl_unregister(data->pctl_dev);
 	return err;
-}
-
-int wmt_pinctrl_remove(struct platform_device *pdev)
-{
-	struct wmt_pinctrl_data *data = platform_get_drvdata(pdev);
-
-	gpiochip_remove(&data->gpio_chip);
-	pinctrl_unregister(data->pctl_dev);
-
-	return 0;
 }

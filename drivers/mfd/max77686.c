@@ -2,7 +2,7 @@
  * max77686.c - mfd core driver for the Maxim 77686/802
  *
  * Copyright (C) 2012 Samsung Electronics
- * Chiwoong Byun <woong.byun@smasung.com>
+ * Chiwoong Byun <woong.byun@samsung.com>
  * Jonghwa Lee <jonghwa3.lee@samsung.com>
  *
  * This program is free software; you can redistribute it and/or modify
@@ -34,6 +34,7 @@
 #include <linux/mfd/max77686-private.h>
 #include <linux/err.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 
 static const struct mfd_cell max77686_devs[] = {
 	{ .name = "max77686-pmic", },
@@ -169,12 +170,11 @@ static const struct of_device_id max77686_pmic_dt_match[] = {
 	},
 	{ },
 };
+MODULE_DEVICE_TABLE(of, max77686_pmic_dt_match);
 
-static int max77686_i2c_probe(struct i2c_client *i2c,
-			      const struct i2c_device_id *id)
+static int max77686_i2c_probe(struct i2c_client *i2c)
 {
 	struct max77686_dev *max77686 = NULL;
-	const struct of_device_id *match;
 	unsigned int data;
 	int ret = 0;
 	const struct regmap_config *config;
@@ -187,16 +187,8 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
 	if (!max77686)
 		return -ENOMEM;
 
-	if (i2c->dev.of_node) {
-		match = of_match_node(max77686_pmic_dt_match, i2c->dev.of_node);
-		if (!match)
-			return -EINVAL;
-
-		max77686->type = (unsigned long)match->data;
-	} else
-		max77686->type = id->driver_data;
-
 	i2c_set_clientdata(i2c, max77686);
+	max77686->type = (unsigned long)of_device_get_match_data(&i2c->dev);
 	max77686->dev = &i2c->dev;
 	max77686->i2c = i2c;
 
@@ -229,45 +221,25 @@ static int max77686_i2c_probe(struct i2c_client *i2c,
 		return -ENODEV;
 	}
 
-	ret = regmap_add_irq_chip(max77686->regmap, max77686->irq,
-				  IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
-				  IRQF_SHARED, 0, irq_chip,
-				  &max77686->irq_data);
+	ret = devm_regmap_add_irq_chip(&i2c->dev, max77686->regmap,
+				       max77686->irq,
+				       IRQF_TRIGGER_FALLING | IRQF_ONESHOT |
+				       IRQF_SHARED, 0, irq_chip,
+				       &max77686->irq_data);
 	if (ret < 0) {
 		dev_err(&i2c->dev, "failed to add PMIC irq chip: %d\n", ret);
 		return ret;
 	}
 
-	ret = mfd_add_devices(max77686->dev, -1, cells, n_devs, NULL, 0, NULL);
+	ret = devm_mfd_add_devices(max77686->dev, -1, cells, n_devs, NULL,
+				   0, NULL);
 	if (ret < 0) {
 		dev_err(&i2c->dev, "failed to add MFD devices: %d\n", ret);
-		goto err_del_irqc;
+		return ret;
 	}
 
 	return 0;
-
-err_del_irqc:
-	regmap_del_irq_chip(max77686->irq, max77686->irq_data);
-
-	return ret;
 }
-
-static int max77686_i2c_remove(struct i2c_client *i2c)
-{
-	struct max77686_dev *max77686 = i2c_get_clientdata(i2c);
-
-	mfd_remove_devices(max77686->dev);
-
-	regmap_del_irq_chip(max77686->irq, max77686->irq_data);
-
-	return 0;
-}
-
-static const struct i2c_device_id max77686_i2c_id[] = {
-	{ "max77686", TYPE_MAX77686 },
-	{ }
-};
-MODULE_DEVICE_TABLE(i2c, max77686_i2c_id);
 
 #ifdef CONFIG_PM_SLEEP
 static int max77686_suspend(struct device *dev)
@@ -314,23 +286,10 @@ static struct i2c_driver max77686_i2c_driver = {
 		   .pm = &max77686_pm,
 		   .of_match_table = of_match_ptr(max77686_pmic_dt_match),
 	},
-	.probe = max77686_i2c_probe,
-	.remove = max77686_i2c_remove,
-	.id_table = max77686_i2c_id,
+	.probe_new = max77686_i2c_probe,
 };
 
-static int __init max77686_i2c_init(void)
-{
-	return i2c_add_driver(&max77686_i2c_driver);
-}
-/* init early so consumer devices can complete system boot */
-subsys_initcall(max77686_i2c_init);
-
-static void __exit max77686_i2c_exit(void)
-{
-	i2c_del_driver(&max77686_i2c_driver);
-}
-module_exit(max77686_i2c_exit);
+module_i2c_driver(max77686_i2c_driver);
 
 MODULE_DESCRIPTION("MAXIM 77686/802 multi-function core driver");
 MODULE_AUTHOR("Chiwoong Byun <woong.byun@samsung.com>");

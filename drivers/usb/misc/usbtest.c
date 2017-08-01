@@ -124,6 +124,20 @@ static struct usb_device *testdev_to_usbdev(struct usbtest_dev *test)
 
 /*-------------------------------------------------------------------------*/
 
+static inline void endpoint_update(int edi,
+				   struct usb_host_endpoint **in,
+				   struct usb_host_endpoint **out,
+				   struct usb_host_endpoint *e)
+{
+	if (edi) {
+		if (!*in)
+			*in = e;
+	} else {
+		if (!*out)
+			*out = e;
+	}
+}
+
 static int
 get_endpoints(struct usbtest_dev *dev, struct usb_interface *intf)
 {
@@ -151,45 +165,25 @@ get_endpoints(struct usbtest_dev *dev, struct usb_interface *intf)
 		 */
 		for (ep = 0; ep < alt->desc.bNumEndpoints; ep++) {
 			struct usb_host_endpoint	*e;
+			int edi;
 
 			e = alt->endpoint + ep;
+			edi = usb_endpoint_dir_in(&e->desc);
+
 			switch (usb_endpoint_type(&e->desc)) {
 			case USB_ENDPOINT_XFER_BULK:
-				break;
+				endpoint_update(edi, &in, &out, e);
+				continue;
 			case USB_ENDPOINT_XFER_INT:
 				if (dev->info->intr)
-					goto try_intr;
+					endpoint_update(edi, &int_in, &int_out, e);
+				continue;
 			case USB_ENDPOINT_XFER_ISOC:
 				if (dev->info->iso)
-					goto try_iso;
+					endpoint_update(edi, &iso_in, &iso_out, e);
 				/* FALLTHROUGH */
 			default:
 				continue;
-			}
-			if (usb_endpoint_dir_in(&e->desc)) {
-				if (!in)
-					in = e;
-			} else {
-				if (!out)
-					out = e;
-			}
-			continue;
-try_intr:
-			if (usb_endpoint_dir_in(&e->desc)) {
-				if (!int_in)
-					int_in = e;
-			} else {
-				if (!int_out)
-					int_out = e;
-			}
-			continue;
-try_iso:
-			if (usb_endpoint_dir_in(&e->desc)) {
-				if (!iso_in)
-					iso_in = e;
-			} else {
-				if (!iso_out)
-					iso_out = e;
 			}
 		}
 		if ((in && out)  ||  iso_in || iso_out || int_in || int_out)
@@ -286,6 +280,9 @@ static struct urb *usbtest_alloc_urb(
 	urb->transfer_flags = transfer_flags;
 	if (usb_pipein(pipe))
 		urb->transfer_flags |= URB_SHORT_NOT_OK;
+
+	if ((bytes + offset) == 0)
+		return urb;
 
 	if (urb->transfer_flags & URB_NO_TRANSFER_DMA_MAP)
 		urb->transfer_buffer = usb_alloc_coherent(udev, bytes + offset,
@@ -529,6 +526,7 @@ static struct scatterlist *
 alloc_sglist(int nents, int max, int vary, struct usbtest_dev *dev, int pipe)
 {
 	struct scatterlist	*sg;
+	unsigned int		n_size = 0;
 	unsigned		i;
 	unsigned		size = max;
 	unsigned		maxpacket =
@@ -561,7 +559,8 @@ alloc_sglist(int nents, int max, int vary, struct usbtest_dev *dev, int pipe)
 			break;
 		case 1:
 			for (j = 0; j < size; j++)
-				*buf++ = (u8) ((j % maxpacket) % 63);
+				*buf++ = (u8) (((j + n_size) % maxpacket) % 63);
+			n_size += size;
 			break;
 		}
 
@@ -580,7 +579,6 @@ static void sg_timeout(unsigned long _req)
 {
 	struct usb_sg_request	*req = (struct usb_sg_request *) _req;
 
-	req->status = -ETIMEDOUT;
 	usb_sg_cancel(req);
 }
 
@@ -611,8 +609,10 @@ static int perform_sglist(
 		mod_timer(&sg_timer, jiffies +
 				msecs_to_jiffies(SIMPLE_IO_TIMEOUT));
 		usb_sg_wait(req);
-		del_timer_sync(&sg_timer);
-		retval = req->status;
+		if (!del_timer_sync(&sg_timer))
+			retval = -ETIMEDOUT;
+		else
+			retval = req->status;
 
 		/* FIXME check resulting data pattern */
 
@@ -986,7 +986,7 @@ static int ch9_postconfig(struct usbtest_dev *dev)
 				dev_err(&iface->dev,
 						"hs dev qualifier --> %d\n",
 						retval);
-				return (retval < 0) ? retval : -EDOM;
+				return retval;
 			}
 			/* usb2.0 but not high-speed capable; fine */
 		} else if (retval != sizeof(struct usb_qualifier_descriptor)) {
@@ -1909,7 +1909,7 @@ static struct urb *iso_alloc_urb(
 	if (bytes < 0 || !desc)
 		return NULL;
 	maxp = 0x7ff & usb_endpoint_maxp(desc);
-	maxp *= 1 + (0x3 & (usb_endpoint_maxp(desc) >> 11));
+	maxp *= usb_endpoint_maxp_mult(desc);
 	packets = DIV_ROUND_UP(bytes, maxp);
 
 	urb = usb_alloc_urb(packets, GFP_KERNEL);
@@ -1995,8 +1995,8 @@ test_queue(struct usbtest_dev *dev, struct usbtest_param_32 *param,
 			"iso period %d %sframes, wMaxPacket %d, transactions: %d\n",
 			1 << (desc->bInterval - 1),
 			(udev->speed == USB_SPEED_HIGH) ? "micro" : "",
-			usb_endpoint_maxp(desc) & 0x7ff,
-			1 + (0x3 & (usb_endpoint_maxp(desc) >> 11)));
+			usb_endpoint_maxp(desc),
+			usb_endpoint_maxp_mult(desc));
 
 		dev_info(&dev->intf->dev,
 			"total %lu msec (%lu packets)\n",
@@ -2597,7 +2597,7 @@ usbtest_ioctl(struct usb_interface *intf, unsigned int code, void *buf)
 	ktime_get_ts64(&start);
 
 	retval = usbtest_do_ioctl(intf, param_32);
-	if (retval)
+	if (retval < 0)
 		goto free_mutex;
 
 	ktime_get_ts64(&end);

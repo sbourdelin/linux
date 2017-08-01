@@ -114,8 +114,8 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent);
 static void e1000_remove(struct pci_dev *pdev);
 static int e1000_alloc_queues(struct e1000_adapter *adapter);
 static int e1000_sw_init(struct e1000_adapter *adapter);
-static int e1000_open(struct net_device *netdev);
-static int e1000_close(struct net_device *netdev);
+int e1000_open(struct net_device *netdev);
+int e1000_close(struct net_device *netdev);
 static void e1000_configure_tx(struct e1000_adapter *adapter);
 static void e1000_configure_rx(struct e1000_adapter *adapter);
 static void e1000_setup_rctl(struct e1000_adapter *adapter);
@@ -131,7 +131,6 @@ static void e1000_watchdog(struct work_struct *work);
 static void e1000_82547_tx_fifo_stall_task(struct work_struct *work);
 static netdev_tx_t e1000_xmit_frame(struct sk_buff *skb,
 				    struct net_device *netdev);
-static struct net_device_stats *e1000_get_stats(struct net_device *netdev);
 static int e1000_change_mtu(struct net_device *netdev, int new_mtu);
 static int e1000_set_mac(struct net_device *netdev, void *p);
 static irqreturn_t e1000_intr(int irq, void *data);
@@ -846,7 +845,6 @@ static const struct net_device_ops e1000_netdev_ops = {
 	.ndo_open		= e1000_open,
 	.ndo_stop		= e1000_close,
 	.ndo_start_xmit		= e1000_xmit_frame,
-	.ndo_get_stats		= e1000_get_stats,
 	.ndo_set_rx_mode	= e1000_set_rx_mode,
 	.ndo_set_mac_address	= e1000_set_mac,
 	.ndo_tx_timeout		= e1000_tx_timeout,
@@ -1084,6 +1082,10 @@ static int e1000_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (hw->device_id != E1000_DEV_ID_82545EM_COPPER ||
 	    hw->subsystem_vendor_id != PCI_VENDOR_ID_VMWARE)
 		netdev->priv_flags |= IFF_UNICAST_FLT;
+
+	/* MTU range: 46 - 16110 */
+	netdev->min_mtu = ETH_ZLEN - ETH_HLEN;
+	netdev->max_mtu = MAX_JUMBO_FRAME_SIZE - (ETH_HLEN + ETH_FCS_LEN);
 
 	adapter->en_mng_pt = e1000_enable_mng_pass_thru(hw);
 
@@ -1360,7 +1362,7 @@ static int e1000_alloc_queues(struct e1000_adapter *adapter)
  * handler is registered with the OS, the watchdog task is started,
  * and the stack is notified that the interface is ready.
  **/
-static int e1000_open(struct net_device *netdev)
+int e1000_open(struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
@@ -1437,7 +1439,7 @@ err_setup_tx:
  * needs to be disabled.  A global MAC reset is issued to stop the
  * hardware, and all transmit and receive resources are freed.
  **/
-static int e1000_close(struct net_device *netdev)
+int e1000_close(struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
@@ -3106,7 +3108,7 @@ static int e1000_maybe_stop_tx(struct net_device *netdev,
 	return __e1000_maybe_stop_tx(netdev, size);
 }
 
-#define TXD_USE_COUNT(S, X) (((S) >> (X)) + 1)
+#define TXD_USE_COUNT(S, X) (((S) + ((1 << (X)) - 1)) >> (X))
 static netdev_tx_t e1000_xmit_frame(struct sk_buff *skb,
 				    struct net_device *netdev)
 {
@@ -3256,12 +3258,29 @@ static netdev_tx_t e1000_xmit_frame(struct sk_buff *skb,
 			     nr_frags, mss);
 
 	if (count) {
+		/* The descriptors needed is higher than other Intel drivers
+		 * due to a number of workarounds.  The breakdown is below:
+		 * Data descriptors: MAX_SKB_FRAGS + 1
+		 * Context Descriptor: 1
+		 * Keep head from touching tail: 2
+		 * Workarounds: 3
+		 */
+		int desc_needed = MAX_SKB_FRAGS + 7;
+
 		netdev_sent_queue(netdev, skb->len);
 		skb_tx_timestamp(skb);
 
 		e1000_tx_queue(adapter, tx_ring, tx_flags, count);
+
+		/* 82544 potentially requires twice as many data descriptors
+		 * in order to guarantee buffers don't end on evenly-aligned
+		 * dwords
+		 */
+		if (adapter->pcix_82544)
+			desc_needed += MAX_SKB_FRAGS + 1;
+
 		/* Make sure there is space in the ring for the next send. */
-		e1000_maybe_stop_tx(netdev, tx_ring, MAX_SKB_FRAGS + 2);
+		e1000_maybe_stop_tx(netdev, tx_ring, desc_needed);
 
 		if (!skb->xmit_more ||
 		    netif_xmit_stopped(netdev_get_tx_queue(netdev, 0))) {
@@ -3509,19 +3528,6 @@ static void e1000_reset_task(struct work_struct *work)
 }
 
 /**
- * e1000_get_stats - Get System Network Statistics
- * @netdev: network interface device structure
- *
- * Returns the address of the device statistics structure.
- * The statistics are actually updated from the watchdog.
- **/
-static struct net_device_stats *e1000_get_stats(struct net_device *netdev)
-{
-	/* only return the current stats */
-	return &netdev->stats;
-}
-
-/**
  * e1000_change_mtu - Change the Maximum Transfer Unit
  * @netdev: network interface device structure
  * @new_mtu: new value for maximum frame size
@@ -3532,13 +3538,7 @@ static int e1000_change_mtu(struct net_device *netdev, int new_mtu)
 {
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 	struct e1000_hw *hw = &adapter->hw;
-	int max_frame = new_mtu + ENET_HEADER_SIZE + ETHERNET_FCS_SIZE;
-
-	if ((max_frame < MINIMUM_ETHERNET_FRAME_SIZE) ||
-	    (max_frame > MAX_JUMBO_FRAME_SIZE)) {
-		e_err(probe, "Invalid MTU setting\n");
-		return -EINVAL;
-	}
+	int max_frame = new_mtu + ETH_HLEN + ETH_FCS_LEN;
 
 	/* Adapter-specific max frame size limits. */
 	switch (hw->mac_type) {
@@ -4345,7 +4345,7 @@ static struct sk_buff *e1000_copybreak(struct e1000_adapter *adapter,
 	dma_sync_single_for_cpu(&adapter->pdev->dev, buffer_info->dma,
 				length, DMA_FROM_DEVICE);
 
-	memcpy(skb_put(skb, length), data, length);
+	skb_put_data(skb, data, length);
 
 	return skb;
 }
@@ -5240,8 +5240,8 @@ static void e1000_netpoll(struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev_priv(netdev);
 
-	disable_irq(adapter->pdev->irq);
-	e1000_intr(adapter->pdev->irq, netdev);
+	if (disable_hardirq(adapter->pdev->irq))
+		e1000_intr(adapter->pdev->irq, netdev);
 	enable_irq(adapter->pdev->irq);
 }
 #endif

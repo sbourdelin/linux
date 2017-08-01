@@ -39,6 +39,11 @@
 #define MODULE_MAX_IN_PINS	8
 #define MODULE_MAX_OUT_PINS	8
 
+#define SKL_MIC_CH_SUPPORT	4
+#define SKL_MIC_MAX_CH_SUPPORT	8
+#define SKL_DEFAULT_MIC_SEL_GAIN	0x3FF
+#define SKL_MIC_SEL_SWITCH	0x3
+
 enum skl_channel_index {
 	SKL_CHANNEL_LEFT = 0,
 	SKL_CHANNEL_RIGHT = 1,
@@ -111,6 +116,12 @@ struct skl_cpr_gtw_cfg {
 	u32 config_length;
 	/* not mandatory; required only for DMIC/I2S */
 	u32 config_data[1];
+} __packed;
+
+struct skl_dma_control {
+	u32 node_id;
+	u32 config_length;
+	u32 config_data[0];
 } __packed;
 
 struct skl_cpr_cfg {
@@ -192,9 +203,20 @@ struct skl_module_fmt {
 
 struct skl_module_cfg;
 
+struct skl_mod_inst_map {
+	u16 mod_id;
+	u16 inst_id;
+};
+
+struct skl_kpb_params {
+	u32 num_modules;
+	struct skl_mod_inst_map map[0];
+};
+
 struct skl_module_inst_id {
-	u32 module_id;
+	int module_id;
 	u32 instance_id;
+	int pvt_id;
 };
 
 enum skl_module_pin_state {
@@ -221,7 +243,8 @@ enum skl_pipe_state {
 	SKL_PIPE_INVALID = 0,
 	SKL_PIPE_CREATED = 1,
 	SKL_PIPE_PAUSED = 2,
-	SKL_PIPE_STARTED = 3
+	SKL_PIPE_STARTED = 3,
+	SKL_PIPE_RESET = 4
 };
 
 struct skl_pipe_module {
@@ -236,7 +259,11 @@ struct skl_pipe_params {
 	u32 s_freq;
 	u32 s_fmt;
 	u8 linktype;
+	snd_pcm_format_t format;
+	int link_index;
 	int stream;
+	unsigned int host_bps;
+	unsigned int link_bps;
 };
 
 struct skl_pipe {
@@ -244,21 +271,29 @@ struct skl_pipe {
 	u8 pipe_priority;
 	u16 conn_type;
 	u32 memory_pages;
+	u8 lp_mode;
 	struct skl_pipe_params *p_params;
 	enum skl_pipe_state state;
 	struct list_head w_list;
+	bool passthru;
 };
 
 enum skl_module_state {
 	SKL_MODULE_UNINIT = 0,
-	SKL_MODULE_INIT_DONE = 1,
-	SKL_MODULE_LOADED = 2,
-	SKL_MODULE_UNLOADED = 3,
-	SKL_MODULE_BIND_DONE = 4
+	SKL_MODULE_LOADED = 1,
+	SKL_MODULE_INIT_DONE = 2,
+	SKL_MODULE_BIND_DONE = 3,
+	SKL_MODULE_UNLOADED = 4,
+};
+
+enum d0i3_capability {
+	SKL_D0I3_NONE = 0,
+	SKL_D0I3_STREAMING = 1,
+	SKL_D0I3_NON_STREAMING = 2,
 };
 
 struct skl_module_cfg {
-	char guid[SKL_UUID_STR_SZ];
+	u8 guid[16];
 	struct skl_module_inst_id id;
 	u8 domain;
 	bool homogenous_inputs;
@@ -279,10 +314,14 @@ struct skl_module_cfg {
 	u8 dev_type;
 	u8 dma_id;
 	u8 time_slot;
+	u8 dmic_ch_combo_index;
+	u32 dmic_ch_type;
 	u32 params_fixup;
 	u32 converter;
 	u32 vbus_id;
 	u32 mem_pages;
+	enum d0i3_capability d0i3_caps;
+	u32 dma_buffer_size; /* in milli seconds */
 	struct skl_module_pin *m_in_pin;
 	struct skl_module_pin *m_out_pin;
 	enum skl_module_type m_type;
@@ -296,12 +335,32 @@ struct skl_algo_data {
 	u32 param_id;
 	u32 set_params;
 	u32 max;
+	u32 size;
 	char *params;
 };
 
 struct skl_pipeline {
 	struct skl_pipe *pipe;
 	struct list_head node;
+};
+
+struct skl_module_deferred_bind {
+	struct skl_module_cfg *src;
+	struct skl_module_cfg *dst;
+	struct list_head node;
+};
+
+struct skl_mic_sel_config {
+	u16 mic_switch;
+	u16 flags;
+	u16 blob[SKL_MIC_MAX_CH_SUPPORT][SKL_MIC_MAX_CH_SUPPORT];
+} __packed;
+
+enum skl_channel {
+	SKL_CH_MONO = 1,
+	SKL_CH_STEREO = 2,
+	SKL_CH_TRIO = 3,
+	SKL_CH_QUATRO = 4,
 };
 
 static inline struct skl *get_skl_ctx(struct device *dev)
@@ -313,6 +372,8 @@ static inline struct skl *get_skl_ctx(struct device *dev)
 
 int skl_tplg_be_update_params(struct snd_soc_dai *dai,
 	struct skl_pipe_params *params);
+int skl_dsp_set_dma_control(struct skl_sst *ctx,
+		struct skl_module_cfg *mconfig);
 void skl_tplg_set_be_dmic_config(struct snd_soc_dai *dai,
 	struct skl_pipe_params *params, int stream);
 int skl_tplg_init(struct snd_soc_platform *platform,
@@ -321,6 +382,9 @@ struct skl_module_cfg *skl_tplg_fe_get_cpr_module(
 		struct snd_soc_dai *dai, int stream);
 int skl_tplg_update_pipe_params(struct device *dev,
 		struct skl_module_cfg *mconfig, struct skl_pipe_params *params);
+
+void skl_tplg_d0i3_get(struct skl *skl, enum d0i3_capability caps);
+void skl_tplg_d0i3_put(struct skl *skl, enum d0i3_capability caps);
 
 int skl_create_pipeline(struct skl_sst *ctx, struct skl_pipe *pipe);
 
@@ -331,6 +395,8 @@ int skl_pause_pipe(struct skl_sst *ctx, struct skl_pipe *pipe);
 int skl_delete_pipe(struct skl_sst *ctx, struct skl_pipe *pipe);
 
 int skl_stop_pipe(struct skl_sst *ctx, struct skl_pipe *pipe);
+
+int skl_reset_pipe(struct skl_sst *ctx, struct skl_pipe *pipe);
 
 int skl_init_module(struct skl_sst *ctx, struct skl_module_cfg *module_config);
 
@@ -345,5 +411,11 @@ int skl_set_module_params(struct skl_sst *ctx, u32 *params, int size,
 int skl_get_module_params(struct skl_sst *ctx, u32 *params, int size,
 			  u32 param_id, struct skl_module_cfg *mcfg);
 
+struct skl_module_cfg *skl_tplg_be_get_cpr_module(struct snd_soc_dai *dai,
+								int stream);
 enum skl_bitdepth skl_get_bit_depth(int params);
+int skl_pcm_host_dma_prepare(struct device *dev,
+			struct skl_pipe_params *params);
+int skl_pcm_link_dma_prepare(struct device *dev,
+			struct skl_pipe_params *params);
 #endif

@@ -11,7 +11,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * version 2 along with this program; If not, see
- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
+ * http://www.gnu.org/licenses/gpl-2.0.html
  *
  */
 /*
@@ -45,15 +45,6 @@ EXPORT_SYMBOL(libcfs_kvzalloc);
 void *libcfs_kvzalloc_cpt(struct cfs_cpt_table *cptab, int cpt, size_t size,
 			  gfp_t flags)
 {
-	void *ret;
-
-	ret = kzalloc_node(size, flags | __GFP_NOWARN,
-			   cfs_cpt_spread_node(cptab, cpt));
-	if (!ret) {
-		WARN_ON(!(flags & (__GFP_FS | __GFP_HIGH)));
-		ret = vmalloc_node(size, cfs_cpt_spread_node(cptab, cpt));
-	}
-
-	return ret;
+	return kvzalloc_node(size, flags, cfs_cpt_spread_node(cptab, cpt));
 }
 EXPORT_SYMBOL(libcfs_kvzalloc_cpt);

@@ -274,6 +274,8 @@ static int bpa10x_setup(struct hci_dev *hdev)
 
 	BT_INFO("%s: %s", hdev->name, (char *)(skb->data + 1));
 
+	hci_set_fw_info(hdev, "%s", skb->data + 1);
+
 	kfree_skb(skb);
 	return 0;
 }
@@ -295,7 +297,7 @@ static int bpa10x_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 		return -ENOMEM;
 
 	/* Prepend skb with frame type */
-	*skb_push(skb, 1) = hci_skb_pkt_type(skb);
+	*(u8 *)skb_push(skb, 1) = hci_skb_pkt_type(skb);
 
 	switch (hci_skb_pkt_type(skb)) {
 	case HCI_COMMAND_PKT:

@@ -46,10 +46,10 @@
 #include <net/ip6_route.h>
 #include <rdma/ib_addr.h>
 #include <rdma/ib.h>
+#include <rdma/rdma_netlink.h>
+#include <net/netlink.h>
 
-MODULE_AUTHOR("Sean Hefty");
-MODULE_DESCRIPTION("IB Address Translation");
-MODULE_LICENSE("Dual BSD/GPL");
+#include "core_priv.h"
 
 struct addr_req {
 	struct list_head list;
@@ -62,7 +62,10 @@ struct addr_req {
 			 struct rdma_dev_addr *addr, void *context);
 	unsigned long timeout;
 	int status;
+	u32 seq;
 };
+
+static atomic_t ib_nl_addr_request_seq = ATOMIC_INIT(0);
 
 static void process_req(struct work_struct *work);
 
@@ -70,6 +73,125 @@ static DEFINE_MUTEX(lock);
 static LIST_HEAD(req_list);
 static DECLARE_DELAYED_WORK(work, process_req);
 static struct workqueue_struct *addr_wq;
+
+static const struct nla_policy ib_nl_addr_policy[LS_NLA_TYPE_MAX] = {
+	[LS_NLA_TYPE_DGID] = {.type = NLA_BINARY,
+		.len = sizeof(struct rdma_nla_ls_gid)},
+};
+
+static inline bool ib_nl_is_good_ip_resp(const struct nlmsghdr *nlh)
+{
+	struct nlattr *tb[LS_NLA_TYPE_MAX] = {};
+	int ret;
+
+	if (nlh->nlmsg_flags & RDMA_NL_LS_F_ERR)
+		return false;
+
+	ret = nla_parse(tb, LS_NLA_TYPE_MAX - 1, nlmsg_data(nlh),
+			nlmsg_len(nlh), ib_nl_addr_policy, NULL);
+	if (ret)
+		return false;
+
+	return true;
+}
+
+static void ib_nl_process_good_ip_rsep(const struct nlmsghdr *nlh)
+{
+	const struct nlattr *head, *curr;
+	union ib_gid gid;
+	struct addr_req *req;
+	int len, rem;
+	int found = 0;
+
+	head = (const struct nlattr *)nlmsg_data(nlh);
+	len = nlmsg_len(nlh);
+
+	nla_for_each_attr(curr, head, len, rem) {
+		if (curr->nla_type == LS_NLA_TYPE_DGID)
+			memcpy(&gid, nla_data(curr), nla_len(curr));
+	}
+
+	mutex_lock(&lock);
+	list_for_each_entry(req, &req_list, list) {
+		if (nlh->nlmsg_seq != req->seq)
+			continue;
+		/* We set the DGID part, the rest was set earlier */
+		rdma_addr_set_dgid(req->addr, &gid);
+		req->status = 0;
+		found = 1;
+		break;
+	}
+	mutex_unlock(&lock);
+
+	if (!found)
+		pr_info("Couldn't find request waiting for DGID: %pI6\n",
+			&gid);
+}
+
+int ib_nl_handle_ip_res_resp(struct sk_buff *skb,
+			     struct netlink_callback *cb)
+{
+	const struct nlmsghdr *nlh = (struct nlmsghdr *)cb->nlh;
+
+	if ((nlh->nlmsg_flags & NLM_F_REQUEST) ||
+	    !(NETLINK_CB(skb).sk) ||
+	    !netlink_capable(skb, CAP_NET_ADMIN))
+		return -EPERM;
+
+	if (ib_nl_is_good_ip_resp(nlh))
+		ib_nl_process_good_ip_rsep(nlh);
+
+	return skb->len;
+}
+
+static int ib_nl_ip_send_msg(struct rdma_dev_addr *dev_addr,
+			     const void *daddr,
+			     u32 seq, u16 family)
+{
+	struct sk_buff *skb = NULL;
+	struct nlmsghdr *nlh;
+	struct rdma_ls_ip_resolve_header *header;
+	void *data;
+	size_t size;
+	int attrtype;
+	int len;
+
+	if (family == AF_INET) {
+		size = sizeof(struct in_addr);
+		attrtype = RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_IPV4;
+	} else {
+		size = sizeof(struct in6_addr);
+		attrtype = RDMA_NLA_F_MANDATORY | LS_NLA_TYPE_IPV6;
+	}
+
+	len = nla_total_size(sizeof(size));
+	len += NLMSG_ALIGN(sizeof(*header));
+
+	skb = nlmsg_new(len, GFP_KERNEL);
+	if (!skb)
+		return -ENOMEM;
+
+	data = ibnl_put_msg(skb, &nlh, seq, 0, RDMA_NL_LS,
+			    RDMA_NL_LS_OP_IP_RESOLVE, NLM_F_REQUEST);
+	if (!data) {
+		nlmsg_free(skb);
+		return -ENODATA;
+	}
+
+	/* Construct the family header first */
+	header = skb_put(skb, NLMSG_ALIGN(sizeof(*header)));
+	header->ifindex = dev_addr->bound_dev_if;
+	nla_put(skb, attrtype, size, daddr);
+
+	/* Repair the nlmsg header length */
+	nlmsg_end(skb, nlh);
+	ibnl_multicast(skb, nlh, RDMA_NL_GROUP_LS, GFP_KERNEL);
+
+	/* Make the request retry, so when we get the response from userspace
+	 * we will have something.
+	 */
+	return -ENODATA;
+}
 
 int rdma_addr_size(struct sockaddr *addr)
 {
@@ -146,6 +268,7 @@ int rdma_translate_ip(const struct sockaddr *addr,
 			return ret;
 
 		ret = rdma_copy_addr(dev_addr, dev, NULL);
+		dev_addr->bound_dev_if = dev->ifindex;
 		if (vlan_id)
 			*vlan_id = rdma_vlan_dev_vlan_id(dev);
 		dev_put(dev);
@@ -158,6 +281,7 @@ int rdma_translate_ip(const struct sockaddr *addr,
 					  &((const struct sockaddr_in6 *)addr)->sin6_addr,
 					  dev, 1)) {
 				ret = rdma_copy_addr(dev_addr, dev, NULL);
+				dev_addr->bound_dev_if = dev->ifindex;
 				if (vlan_id)
 					*vlan_id = rdma_vlan_dev_vlan_id(dev);
 				break;
@@ -199,6 +323,17 @@ static void queue_req(struct addr_req *req)
 	mutex_unlock(&lock);
 }
 
+static int ib_nl_fetch_ha(struct dst_entry *dst, struct rdma_dev_addr *dev_addr,
+			  const void *daddr, u32 seq, u16 family)
+{
+	if (ibnl_chk_listeners(RDMA_NL_GROUP_LS))
+		return -EADDRNOTAVAIL;
+
+	/* We fill in what we can, the response will fill the rest */
+	rdma_copy_addr(dev_addr, dst->dev, NULL);
+	return ib_nl_ip_send_msg(dev_addr, daddr, seq, family);
+}
+
 static int dst_fetch_ha(struct dst_entry *dst, struct rdma_dev_addr *dev_addr,
 			const void *daddr)
 {
@@ -223,6 +358,39 @@ static int dst_fetch_ha(struct dst_entry *dst, struct rdma_dev_addr *dev_addr,
 	return ret;
 }
 
+static bool has_gateway(struct dst_entry *dst, sa_family_t family)
+{
+	struct rtable *rt;
+	struct rt6_info *rt6;
+
+	if (family == AF_INET) {
+		rt = container_of(dst, struct rtable, dst);
+		return rt->rt_uses_gateway;
+	}
+
+	rt6 = container_of(dst, struct rt6_info, dst);
+	return rt6->rt6i_flags & RTF_GATEWAY;
+}
+
+static int fetch_ha(struct dst_entry *dst, struct rdma_dev_addr *dev_addr,
+		    const struct sockaddr *dst_in, u32 seq)
+{
+	const struct sockaddr_in *dst_in4 =
+		(const struct sockaddr_in *)dst_in;
+	const struct sockaddr_in6 *dst_in6 =
+		(const struct sockaddr_in6 *)dst_in;
+	const void *daddr = (dst_in->sa_family == AF_INET) ?
+		(const void *)&dst_in4->sin_addr.s_addr :
+		(const void *)&dst_in6->sin6_addr;
+	sa_family_t family = dst_in->sa_family;
+
+	/* Gateway + ARPHRD_INFINIBAND -> IB router */
+	if (has_gateway(dst, family) && dst->dev->type == ARPHRD_INFINIBAND)
+		return ib_nl_fetch_ha(dst, dev_addr, daddr, seq, family);
+	else
+		return dst_fetch_ha(dst, dev_addr, daddr);
+}
+
 static int addr4_resolve(struct sockaddr_in *src_in,
 			 const struct sockaddr_in *dst_in,
 			 struct rdma_dev_addr *addr,
@@ -239,25 +407,24 @@ static int addr4_resolve(struct sockaddr_in *src_in,
 	fl4.saddr = src_ip;
 	fl4.flowi4_oif = addr->bound_dev_if;
 	rt = ip_route_output_key(addr->net, &fl4);
-	if (IS_ERR(rt)) {
-		ret = PTR_ERR(rt);
-		goto out;
-	}
+	ret = PTR_ERR_OR_ZERO(rt);
+	if (ret)
+		return ret;
+
 	src_in->sin_family = AF_INET;
 	src_in->sin_addr.s_addr = fl4.saddr;
 
-	/* If there's a gateway, we're definitely in RoCE v2 (as RoCE v1 isn't
-	 * routable) and we could set the network type accordingly.
+	/* If there's a gateway and type of device not ARPHRD_INFINIBAND, we're
+	 * definitely in RoCE v2 (as RoCE v1 isn't routable) set the network
+	 * type accordingly.
 	 */
-	if (rt->rt_uses_gateway)
+	if (rt->rt_uses_gateway && rt->dst.dev->type != ARPHRD_INFINIBAND)
 		addr->network = RDMA_NETWORK_IPV4;
 
 	addr->hoplimit = ip4_dst_hoplimit(&rt->dst);
 
 	*prt = rt;
 	return 0;
-out:
-	return ret;
 }
 
 #if IS_ENABLED(CONFIG_IPV6)
@@ -276,34 +443,28 @@ static int addr6_resolve(struct sockaddr_in6 *src_in,
 	fl6.saddr = src_in->sin6_addr;
 	fl6.flowi6_oif = addr->bound_dev_if;
 
-	dst = ip6_route_output(addr->net, NULL, &fl6);
-	if ((ret = dst->error))
-		goto put;
+	ret = ipv6_stub->ipv6_dst_lookup(addr->net, NULL, &dst, &fl6);
+	if (ret < 0)
+		return ret;
 
 	rt = (struct rt6_info *)dst;
-	if (ipv6_addr_any(&fl6.saddr)) {
-		ret = ipv6_dev_get_saddr(addr->net, ip6_dst_idev(dst)->dev,
-					 &fl6.daddr, 0, &fl6.saddr);
-		if (ret)
-			goto put;
-
+	if (ipv6_addr_any(&src_in->sin6_addr)) {
 		src_in->sin6_family = AF_INET6;
 		src_in->sin6_addr = fl6.saddr;
 	}
 
-	/* If there's a gateway, we're definitely in RoCE v2 (as RoCE v1 isn't
-	 * routable) and we could set the network type accordingly.
+	/* If there's a gateway and type of device not ARPHRD_INFINIBAND, we're
+	 * definitely in RoCE v2 (as RoCE v1 isn't routable) set the network
+	 * type accordingly.
 	 */
-	if (rt->rt6i_flags & RTF_GATEWAY)
+	if (rt->rt6i_flags & RTF_GATEWAY &&
+	    ip6_dst_idev(dst)->dev->type != ARPHRD_INFINIBAND)
 		addr->network = RDMA_NETWORK_IPV6;
 
 	addr->hoplimit = ip6_dst_hoplimit(dst);
 
 	*pdst = dst;
 	return 0;
-put:
-	dst_release(dst);
-	return ret;
 }
 #else
 static int addr6_resolve(struct sockaddr_in6 *src_in,
@@ -317,7 +478,8 @@ static int addr6_resolve(struct sockaddr_in6 *src_in,
 
 static int addr_resolve_neigh(struct dst_entry *dst,
 			      const struct sockaddr *dst_in,
-			      struct rdma_dev_addr *addr)
+			      struct rdma_dev_addr *addr,
+			      u32 seq)
 {
 	if (dst->dev->flags & IFF_LOOPBACK) {
 		int ret;
@@ -331,17 +493,8 @@ static int addr_resolve_neigh(struct dst_entry *dst,
 	}
 
 	/* If the device doesn't do ARP internally */
-	if (!(dst->dev->flags & IFF_NOARP)) {
-		const struct sockaddr_in *dst_in4 =
-			(const struct sockaddr_in *)dst_in;
-		const struct sockaddr_in6 *dst_in6 =
-			(const struct sockaddr_in6 *)dst_in;
-
-		return dst_fetch_ha(dst, addr,
-				    dst_in->sa_family == AF_INET ?
-				    (const void *)&dst_in4->sin_addr.s_addr :
-				    (const void *)&dst_in6->sin6_addr);
-	}
+	if (!(dst->dev->flags & IFF_NOARP))
+		return fetch_ha(dst, addr, dst_in, seq);
 
 	return rdma_copy_addr(addr, dst->dev, NULL);
 }
@@ -349,11 +502,17 @@ static int addr_resolve_neigh(struct dst_entry *dst,
 static int addr_resolve(struct sockaddr *src_in,
 			const struct sockaddr *dst_in,
 			struct rdma_dev_addr *addr,
-			bool resolve_neigh)
+			bool resolve_neigh,
+			u32 seq)
 {
 	struct net_device *ndev;
 	struct dst_entry *dst;
 	int ret;
+
+	if (!addr->net) {
+		pr_warn_ratelimited("%s: missing namespace\n", __func__);
+		return -EINVAL;
+	}
 
 	if (src_in->sa_family == AF_INET) {
 		struct rtable *rt = NULL;
@@ -366,10 +525,14 @@ static int addr_resolve(struct sockaddr *src_in,
 			return ret;
 
 		if (resolve_neigh)
-			ret = addr_resolve_neigh(&rt->dst, dst_in, addr);
+			ret = addr_resolve_neigh(&rt->dst, dst_in, addr, seq);
 
-		ndev = rt->dst.dev;
-		dev_hold(ndev);
+		if (addr->bound_dev_if) {
+			ndev = dev_get_by_index(addr->net, addr->bound_dev_if);
+		} else {
+			ndev = rt->dst.dev;
+			dev_hold(ndev);
+		}
 
 		ip_rt_put(rt);
 	} else {
@@ -383,16 +546,29 @@ static int addr_resolve(struct sockaddr *src_in,
 			return ret;
 
 		if (resolve_neigh)
-			ret = addr_resolve_neigh(dst, dst_in, addr);
+			ret = addr_resolve_neigh(dst, dst_in, addr, seq);
 
-		ndev = dst->dev;
-		dev_hold(ndev);
+		if (addr->bound_dev_if) {
+			ndev = dev_get_by_index(addr->net, addr->bound_dev_if);
+		} else {
+			ndev = dst->dev;
+			dev_hold(ndev);
+		}
 
 		dst_release(dst);
 	}
 
-	addr->bound_dev_if = ndev->ifindex;
-	addr->net = dev_net(ndev);
+	if (ndev->flags & IFF_LOOPBACK) {
+		ret = rdma_translate_ip(dst_in, addr, NULL);
+		/*
+		 * Put the loopback device and get the translated
+		 * device instead.
+		 */
+		dev_put(ndev);
+		ndev = dev_get_by_index(addr->net, addr->bound_dev_if);
+	} else {
+		addr->bound_dev_if = ndev->ifindex;
+	}
 	dev_put(ndev);
 
 	return ret;
@@ -412,7 +588,7 @@ static void process_req(struct work_struct *work)
 			src_in = (struct sockaddr *) &req->src_addr;
 			dst_in = (struct sockaddr *) &req->dst_addr;
 			req->status = addr_resolve(src_in, dst_in, req->addr,
-						   true);
+						   true, req->seq);
 			if (req->status && time_after_eq(jiffies, req->timeout))
 				req->status = -ETIMEDOUT;
 			else if (req->status == -ENODATA)
@@ -471,8 +647,9 @@ int rdma_resolve_ip(struct rdma_addr_client *client,
 	req->context = context;
 	req->client = client;
 	atomic_inc(&client->refcount);
+	req->seq = (u32)atomic_inc_return(&ib_nl_addr_request_seq);
 
-	req->status = addr_resolve(src_in, dst_in, addr, true);
+	req->status = addr_resolve(src_in, dst_in, addr, true, req->seq);
 	switch (req->status) {
 	case 0:
 		req->timeout = jiffies;
@@ -510,7 +687,7 @@ int rdma_resolve_ip_route(struct sockaddr *src_addr,
 		src_in->sa_family = dst_addr->sa_family;
 	}
 
-	return addr_resolve(src_in, dst_addr, addr, false);
+	return addr_resolve(src_in, dst_addr, addr, false, 0);
 }
 EXPORT_SYMBOL(rdma_resolve_ip_route);
 
@@ -535,13 +712,16 @@ EXPORT_SYMBOL(rdma_addr_cancel);
 struct resolve_cb_context {
 	struct rdma_dev_addr *addr;
 	struct completion comp;
+	int status;
 };
 
 static void resolve_cb(int status, struct sockaddr *src_addr,
 	     struct rdma_dev_addr *addr, void *context)
 {
-	memcpy(((struct resolve_cb_context *)context)->addr, addr, sizeof(struct
-				rdma_dev_addr));
+	if (!status)
+		memcpy(((struct resolve_cb_context *)context)->addr,
+		       addr, sizeof(struct rdma_dev_addr));
+	((struct resolve_cb_context *)context)->status = status;
 	complete(&((struct resolve_cb_context *)context)->comp);
 }
 
@@ -578,6 +758,10 @@ int rdma_addr_find_l2_eth_by_grh(const union ib_gid *sgid,
 		return ret;
 
 	wait_for_completion(&ctx.comp);
+
+	ret = ctx.status;
+	if (ret)
+		return ret;
 
 	memcpy(dmac, dev_addr.dst_dev_addr, ETH_ALEN);
 	dev = dev_get_by_index(&init_net, dev_addr.bound_dev_if);
@@ -634,23 +818,21 @@ static struct notifier_block nb = {
 	.notifier_call = netevent_callback
 };
 
-static int __init addr_init(void)
+int addr_init(void)
 {
-	addr_wq = create_singlethread_workqueue("ib_addr");
+	addr_wq = alloc_workqueue("ib_addr", WQ_MEM_RECLAIM, 0);
 	if (!addr_wq)
 		return -ENOMEM;
 
 	register_netevent_notifier(&nb);
 	rdma_addr_register_client(&self);
+
 	return 0;
 }
 
-static void __exit addr_cleanup(void)
+void addr_cleanup(void)
 {
 	rdma_addr_unregister_client(&self);
 	unregister_netevent_notifier(&nb);
 	destroy_workqueue(addr_wq);
 }
-
-module_init(addr_init);
-module_exit(addr_cleanup);

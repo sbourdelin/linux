@@ -15,11 +15,7 @@
  *
  * You should have received a copy of the GNU General Public License
  * version 2 along with this program; If not, see
- * http://www.sun.com/software/products/lustre/docs/GPLv2.pdf
- *
- * Please contact Sun Microsystems, Inc., 4150 Network Circle, Santa Clara,
- * CA 95054 USA or visit www.sun.com if you need additional information or
- * have any questions.
+ * http://www.gnu.org/licenses/gpl-2.0.html
  *
  * GPL HEADER END
  */
@@ -49,7 +45,7 @@
 static const char * const obd_connect_names[] = {
 	"read_only",
 	"lov_index",
-	"unused",
+	"connect_from_mds",
 	"write_grant",
 	"server_lock",
 	"version",
@@ -100,7 +96,17 @@ static const char * const obd_connect_names[] = {
 	"pingless",
 	"flock_deadlock",
 	"disp_stripe",
+	"open_by_fid",
+	"lfsck",
 	"unknown",
+	"unlink_close",
+	"multi_mod_rpcs",
+	"dir_stripe",
+	"subtree",
+	"lock_ahead",
+	"bulk_mbits",
+	"compact_obdo",
+	"second_flags",
 	NULL
 };
 
@@ -121,6 +127,59 @@ int obd_connect_flags2str(char *page, int count, __u64 flags, char *sep)
 	return ret;
 }
 EXPORT_SYMBOL(obd_connect_flags2str);
+
+static void obd_connect_data_seqprint(struct seq_file *m,
+				      struct obd_connect_data *ocd)
+{
+	u64 flags;
+
+	LASSERT(ocd);
+	flags = ocd->ocd_connect_flags;
+
+	seq_printf(m, "    connect_data:\n"
+		   "       flags: %llx\n"
+		   "       instance: %u\n",
+		   ocd->ocd_connect_flags,
+		   ocd->ocd_instance);
+	if (flags & OBD_CONNECT_VERSION)
+		seq_printf(m, "       target_version: %u.%u.%u.%u\n",
+			   OBD_OCD_VERSION_MAJOR(ocd->ocd_version),
+			   OBD_OCD_VERSION_MINOR(ocd->ocd_version),
+			   OBD_OCD_VERSION_PATCH(ocd->ocd_version),
+			   OBD_OCD_VERSION_FIX(ocd->ocd_version));
+	if (flags & OBD_CONNECT_MDS)
+		seq_printf(m, "       mdt_index: %d\n", ocd->ocd_group);
+	if (flags & OBD_CONNECT_GRANT)
+		seq_printf(m, "       initial_grant: %d\n", ocd->ocd_grant);
+	if (flags & OBD_CONNECT_INDEX)
+		seq_printf(m, "       target_index: %u\n", ocd->ocd_index);
+	if (flags & OBD_CONNECT_BRW_SIZE)
+		seq_printf(m, "       max_brw_size: %d\n", ocd->ocd_brw_size);
+	if (flags & OBD_CONNECT_IBITS)
+		seq_printf(m, "       ibits_known: %llx\n",
+			   ocd->ocd_ibits_known);
+	if (flags & OBD_CONNECT_GRANT_PARAM)
+		seq_printf(m, "       grant_block_size: %d\n"
+			   "       grant_inode_size: %d\n"
+			   "       grant_extent_overhead: %d\n",
+			   ocd->ocd_blocksize,
+			   ocd->ocd_inodespace,
+			   ocd->ocd_grant_extent);
+	if (flags & OBD_CONNECT_TRANSNO)
+		seq_printf(m, "       first_transno: %llx\n",
+			   ocd->ocd_transno);
+	if (flags & OBD_CONNECT_CKSUM)
+		seq_printf(m, "       cksum_types: %#x\n",
+			   ocd->ocd_cksum_types);
+	if (flags & OBD_CONNECT_MAX_EASIZE)
+		seq_printf(m, "       max_easize: %d\n", ocd->ocd_max_easize);
+	if (flags & OBD_CONNECT_MAXBYTES)
+		seq_printf(m, "       max_object_bytes: %llx\n",
+			   ocd->ocd_maxbytes);
+	if (flags & OBD_CONNECT_MULTIMODRPCS)
+		seq_printf(m, "       max_mod_rpcs: %hu\n",
+			   ocd->ocd_maxmodrpcs);
+}
 
 int lprocfs_read_frac_helper(char *buffer, unsigned long count, long val,
 			     int mult)
@@ -242,7 +301,7 @@ EXPORT_SYMBOL(lprocfs_seq_release);
 
 struct dentry *ldebugfs_add_simple(struct dentry *root,
 				   char *name, void *data,
-				   struct file_operations *fops)
+				   const struct file_operations *fops)
 {
 	struct dentry *entry;
 	umode_t mode = 0;
@@ -263,7 +322,7 @@ struct dentry *ldebugfs_add_simple(struct dentry *root,
 }
 EXPORT_SYMBOL_GPL(ldebugfs_add_simple);
 
-static struct file_operations lprocfs_generic_fops = { };
+static const struct file_operations lprocfs_generic_fops = { };
 
 int ldebugfs_add_vars(struct dentry *parent,
 		      struct lprocfs_vars *list,
@@ -330,33 +389,6 @@ out:
 EXPORT_SYMBOL_GPL(ldebugfs_register);
 
 /* Generic callbacks */
-int lprocfs_rd_uint(struct seq_file *m, void *data)
-{
-	seq_printf(m, "%u\n", *(unsigned int *)data);
-	return 0;
-}
-EXPORT_SYMBOL(lprocfs_rd_uint);
-
-int lprocfs_wr_uint(struct file *file, const char __user *buffer,
-		    unsigned long count, void *data)
-{
-	unsigned *p = data;
-	char dummy[MAX_STRING_SIZE + 1], *end;
-	unsigned long tmp;
-
-	dummy[MAX_STRING_SIZE] = '\0';
-	if (copy_from_user(dummy, buffer, MAX_STRING_SIZE))
-		return -EFAULT;
-
-	tmp = simple_strtoul(dummy, &end, 0);
-	if (dummy == end)
-		return -EINVAL;
-
-	*p = (unsigned int)tmp;
-	return count;
-}
-EXPORT_SYMBOL(lprocfs_wr_uint);
-
 static ssize_t uuid_show(struct kobject *kobj, struct attribute *attr,
 			 char *buf)
 {
@@ -532,6 +564,93 @@ int lprocfs_rd_conn_uuid(struct seq_file *m, void *data)
 }
 EXPORT_SYMBOL(lprocfs_rd_conn_uuid);
 
+/**
+ * Lock statistics structure for access, possibly only on this CPU.
+ *
+ * The statistics struct may be allocated with per-CPU structures for
+ * efficient concurrent update (usually only on server-wide stats), or
+ * as a single global struct (e.g. for per-client or per-job statistics),
+ * so the required locking depends on the type of structure allocated.
+ *
+ * For per-CPU statistics, pin the thread to the current cpuid so that
+ * will only access the statistics for that CPU.  If the stats structure
+ * for the current CPU has not been allocated (or previously freed),
+ * allocate it now.  The per-CPU statistics do not need locking since
+ * the thread is pinned to the CPU during update.
+ *
+ * For global statistics, lock the stats structure to prevent concurrent update.
+ *
+ * \param[in] stats    statistics structure to lock
+ * \param[in] opc      type of operation:
+ *                     LPROCFS_GET_SMP_ID: "lock" and return current CPU index
+ *                             for incrementing statistics for that CPU
+ *                     LPROCFS_GET_NUM_CPU: "lock" and return number of used
+ *                             CPU indices to iterate over all indices
+ * \param[out] flags   CPU interrupt saved state for IRQ-safe locking
+ *
+ * \retval cpuid of current thread or number of allocated structs
+ * \retval negative on error (only for opc LPROCFS_GET_SMP_ID + per-CPU stats)
+ */
+int lprocfs_stats_lock(struct lprocfs_stats *stats,
+		       enum lprocfs_stats_lock_ops opc,
+		       unsigned long *flags)
+{
+	if (stats->ls_flags & LPROCFS_STATS_FLAG_NOPERCPU) {
+		if (stats->ls_flags & LPROCFS_STATS_FLAG_IRQ_SAFE)
+			spin_lock_irqsave(&stats->ls_lock, *flags);
+		else
+			spin_lock(&stats->ls_lock);
+		return opc == LPROCFS_GET_NUM_CPU ? 1 : 0;
+	}
+
+	switch (opc) {
+	case LPROCFS_GET_SMP_ID: {
+		unsigned int cpuid = get_cpu();
+
+		if (unlikely(!stats->ls_percpu[cpuid])) {
+			int rc = lprocfs_stats_alloc_one(stats, cpuid);
+
+			if (rc < 0) {
+				put_cpu();
+				return rc;
+			}
+		}
+		return cpuid;
+	}
+	case LPROCFS_GET_NUM_CPU:
+		return stats->ls_biggest_alloc_num;
+	default:
+		LBUG();
+	}
+}
+
+/**
+ * Unlock statistics structure after access.
+ *
+ * Unlock the lock acquired via lprocfs_stats_lock() for global statistics,
+ * or unpin this thread from the current cpuid for per-CPU statistics.
+ *
+ * This function must be called using the same arguments as used when calling
+ * lprocfs_stats_lock() so that the correct operation can be performed.
+ *
+ * \param[in] stats    statistics structure to unlock
+ * \param[in] opc      type of operation (current cpuid or number of structs)
+ * \param[in] flags    CPU interrupt saved state for IRQ-safe locking
+ */
+void lprocfs_stats_unlock(struct lprocfs_stats *stats,
+			  enum lprocfs_stats_lock_ops opc,
+			  unsigned long *flags)
+{
+	if (stats->ls_flags & LPROCFS_STATS_FLAG_NOPERCPU) {
+		if (stats->ls_flags & LPROCFS_STATS_FLAG_IRQ_SAFE)
+			spin_unlock_irqrestore(&stats->ls_lock, *flags);
+		else
+			spin_unlock(&stats->ls_lock);
+	} else if (opc == LPROCFS_GET_SMP_ID) {
+		put_cpu();
+	}
+}
+
 /** add up per-cpu counters */
 void lprocfs_stats_collect(struct lprocfs_stats *stats, int idx,
 			   struct lprocfs_counter *cnt)
@@ -569,7 +688,6 @@ void lprocfs_stats_collect(struct lprocfs_stats *stats, int idx,
 
 	lprocfs_stats_unlock(stats, LPROCFS_GET_NUM_CPU, &flags);
 }
-EXPORT_SYMBOL(lprocfs_stats_collect);
 
 /**
  * Append a space separated list of current set flags to str.
@@ -584,7 +702,7 @@ static int obd_import_flags2str(struct obd_import *imp, struct seq_file *m)
 	bool first = true;
 
 	if (imp->imp_obd->obd_no_recov) {
-		seq_printf(m, "no_recov");
+		seq_puts(m, "no_recov");
 		first = false;
 	}
 
@@ -624,6 +742,7 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
 	struct obd_device		*obd	= data;
 	struct obd_import		*imp;
 	struct obd_import_conn		*conn;
+	struct obd_connect_data *ocd;
 	int				j;
 	int				k;
 	int				rw	= 0;
@@ -635,9 +754,9 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
 		return rc;
 
 	imp = obd->u.cli.cl_import;
+	ocd = &imp->imp_connect_data;
 
-	seq_printf(m,
-		   "import:\n"
+	seq_printf(m, "import:\n"
 		   "    name: %s\n"
 		   "    target: %s\n"
 		   "    state: %s\n"
@@ -649,15 +768,15 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
 		   imp->imp_connect_data.ocd_instance);
 	obd_connect_seq_flags2str(m, imp->imp_connect_data.ocd_connect_flags,
 				  ", ");
-	seq_printf(m,
-		   " ]\n"
-		   "    import_flags: [ ");
+	seq_puts(m, " ]\n");
+	obd_connect_data_seqprint(m, ocd);
+	seq_puts(m, "    import_flags: [ ");
 	obd_import_flags2str(imp, m);
 
-	seq_printf(m,
-		   " ]\n"
-		   "    connection:\n"
-		   "       failover_nids: [ ");
+	seq_puts(m,
+		 " ]\n"
+		 "    connection:\n"
+		 "       failover_nids: [ ");
 	spin_lock(&imp->imp_lock);
 	j = 0;
 	list_for_each_entry(conn, &imp->imp_conn_list, oic_item) {
@@ -694,8 +813,9 @@ int lprocfs_rd_import(struct seq_file *m, void *data)
 
 		do_div(sum, ret.lc_count);
 		ret.lc_sum = sum;
-	} else
+	} else {
 		ret.lc_sum = 0;
+	}
 	seq_printf(m,
 		   "    rpcs:\n"
 		   "       inflight: %u\n"
@@ -789,7 +909,7 @@ int lprocfs_rd_state(struct seq_file *m, void *data)
 
 	seq_printf(m, "current_state: %s\n",
 		   ptlrpc_import_state_name(imp->imp_state));
-	seq_printf(m, "state_history:\n");
+	seq_puts(m, "state_history:\n");
 	k = imp->imp_state_hist_idx;
 	for (j = 0; j < IMP_STATE_HIST_LEN; j++) {
 		struct import_state_hist *ish =
@@ -811,7 +931,7 @@ int lprocfs_at_hist_helper(struct seq_file *m, struct adaptive_timeout *at)
 
 	for (i = 0; i < AT_BINS; i++)
 		seq_printf(m, "%3u ", at->at_hist[i]);
-	seq_printf(m, "\n");
+	seq_puts(m, "\n");
 	return 0;
 }
 EXPORT_SYMBOL(lprocfs_at_hist_helper);
@@ -879,7 +999,7 @@ int lprocfs_rd_connect_flags(struct seq_file *m, void *data)
 	flags = obd->u.cli.cl_import->imp_connect_data.ocd_connect_flags;
 	seq_printf(m, "flags=%#llx\n", flags);
 	obd_connect_seq_flags2str(m, flags, "\n");
-	seq_printf(m, "\n");
+	seq_puts(m, "\n");
 	up_read(&obd->u.cli.cl_sem);
 	return 0;
 }
@@ -995,7 +1115,6 @@ int lprocfs_stats_alloc_one(struct lprocfs_stats *stats, unsigned int cpuid)
 	}
 	return rc;
 }
-EXPORT_SYMBOL(lprocfs_stats_alloc_one);
 
 struct lprocfs_stats *lprocfs_alloc_stats(unsigned int num,
 					  enum lprocfs_stats_flags flags)
@@ -1079,6 +1198,30 @@ void lprocfs_free_stats(struct lprocfs_stats **statsh)
 	LIBCFS_FREE(stats, offsetof(typeof(*stats), ls_percpu[num_entry]));
 }
 EXPORT_SYMBOL(lprocfs_free_stats);
+
+__u64 lprocfs_stats_collector(struct lprocfs_stats *stats, int idx,
+			      enum lprocfs_fields_flags field)
+{
+	unsigned int i;
+	unsigned int  num_cpu;
+	unsigned long flags     = 0;
+	__u64         ret       = 0;
+
+	LASSERT(stats);
+
+	num_cpu = lprocfs_stats_lock(stats, LPROCFS_GET_NUM_CPU, &flags);
+	for (i = 0; i < num_cpu; i++) {
+		if (!stats->ls_percpu[i])
+			continue;
+		ret += lprocfs_read_helper(
+				lprocfs_stats_counter_get(stats, i, idx),
+				&stats->ls_cnt_header[idx], stats->ls_flags,
+				field);
+	}
+	lprocfs_stats_unlock(stats, LPROCFS_GET_NUM_CPU, &flags);
+	return ret;
+}
+EXPORT_SYMBOL(lprocfs_stats_collector);
 
 void lprocfs_clear_stats(struct lprocfs_stats *stats)
 {
@@ -1223,7 +1366,8 @@ int ldebugfs_register_stats(struct dentry *parent, const char *name,
 EXPORT_SYMBOL_GPL(ldebugfs_register_stats);
 
 void lprocfs_counter_init(struct lprocfs_stats *stats, int index,
-			  unsigned conf, const char *name, const char *units)
+			  unsigned int conf, const char *name,
+			  const char *units)
 {
 	struct lprocfs_counter_header	*header;
 	struct lprocfs_counter		*percpu_cntr;
@@ -1471,10 +1615,10 @@ EXPORT_SYMBOL(lprocfs_oh_tally);
 
 void lprocfs_oh_tally_log2(struct obd_histogram *oh, unsigned int value)
 {
-	unsigned int val;
+	unsigned int val = 0;
 
-	for (val = 0; ((1 << val) < value) && (val <= OBD_HIST_MAX); val++)
-		;
+	if (likely(value != 0))
+		val = min(fls(value - 1), OBD_HIST_MAX);
 
 	lprocfs_oh_tally(oh, val);
 }
@@ -1498,6 +1642,146 @@ void lprocfs_oh_clear(struct obd_histogram *oh)
 	spin_unlock(&oh->oh_lock);
 }
 EXPORT_SYMBOL(lprocfs_oh_clear);
+
+int lprocfs_wr_root_squash(const char __user *buffer, unsigned long count,
+			   struct root_squash_info *squash, char *name)
+{
+	char kernbuf[64], *tmp, *errmsg;
+	unsigned long uid, gid;
+	int rc;
+
+	if (count >= sizeof(kernbuf)) {
+		errmsg = "string too long";
+		rc = -EINVAL;
+		goto failed_noprint;
+	}
+	if (copy_from_user(kernbuf, buffer, count)) {
+		errmsg = "bad address";
+		rc = -EFAULT;
+		goto failed_noprint;
+	}
+	kernbuf[count] = '\0';
+
+	/* look for uid gid separator */
+	tmp = strchr(kernbuf, ':');
+	if (!tmp) {
+		errmsg = "needs uid:gid format";
+		rc = -EINVAL;
+		goto failed;
+	}
+	*tmp = '\0';
+	tmp++;
+
+	/* parse uid */
+	if (kstrtoul(kernbuf, 0, &uid) != 0) {
+		errmsg = "bad uid";
+		rc = -EINVAL;
+		goto failed;
+	}
+	/* parse gid */
+	if (kstrtoul(tmp, 0, &gid) != 0) {
+		errmsg = "bad gid";
+		rc = -EINVAL;
+		goto failed;
+	}
+
+	squash->rsi_uid = uid;
+	squash->rsi_gid = gid;
+
+	LCONSOLE_INFO("%s: root_squash is set to %u:%u\n",
+		      name, squash->rsi_uid, squash->rsi_gid);
+	return count;
+
+failed:
+	if (tmp) {
+		tmp--;
+		*tmp = ':';
+	}
+	CWARN("%s: failed to set root_squash to \"%s\", %s, rc = %d\n",
+	      name, kernbuf, errmsg, rc);
+	return rc;
+failed_noprint:
+	CWARN("%s: failed to set root_squash due to %s, rc = %d\n",
+	      name, errmsg, rc);
+	return rc;
+}
+EXPORT_SYMBOL(lprocfs_wr_root_squash);
+
+int lprocfs_wr_nosquash_nids(const char __user *buffer, unsigned long count,
+			     struct root_squash_info *squash, char *name)
+{
+	char *kernbuf = NULL, *errmsg;
+	struct list_head tmp;
+	int len = count;
+	int rc;
+
+	if (count > 4096) {
+		errmsg = "string too long";
+		rc = -EINVAL;
+		goto failed;
+	}
+
+	kernbuf = kzalloc(count + 1, GFP_NOFS);
+	if (!kernbuf) {
+		errmsg = "no memory";
+		rc = -ENOMEM;
+		goto failed;
+	}
+
+	if (copy_from_user(kernbuf, buffer, count)) {
+		errmsg = "bad address";
+		rc = -EFAULT;
+		goto failed;
+	}
+	kernbuf[count] = '\0';
+
+	if (count > 0 && kernbuf[count - 1] == '\n')
+		len = count - 1;
+
+	if ((len == 4 && !strncmp(kernbuf, "NONE", len)) ||
+	    (len == 5 && !strncmp(kernbuf, "clear", len))) {
+		/* empty string is special case */
+		down_write(&squash->rsi_sem);
+		if (!list_empty(&squash->rsi_nosquash_nids))
+			cfs_free_nidlist(&squash->rsi_nosquash_nids);
+		up_write(&squash->rsi_sem);
+		LCONSOLE_INFO("%s: nosquash_nids is cleared\n", name);
+		kfree(kernbuf);
+		return count;
+	}
+
+	INIT_LIST_HEAD(&tmp);
+	if (cfs_parse_nidlist(kernbuf, count, &tmp) <= 0) {
+		errmsg = "can't parse";
+		rc = -EINVAL;
+		goto failed;
+	}
+	LCONSOLE_INFO("%s: nosquash_nids set to %s\n",
+		      name, kernbuf);
+	kfree(kernbuf);
+	kernbuf = NULL;
+
+	down_write(&squash->rsi_sem);
+	if (!list_empty(&squash->rsi_nosquash_nids))
+		cfs_free_nidlist(&squash->rsi_nosquash_nids);
+	list_splice(&tmp, &squash->rsi_nosquash_nids);
+	up_write(&squash->rsi_sem);
+
+	return count;
+
+failed:
+	if (kernbuf) {
+		CWARN("%s: failed to set nosquash_nids to \"%s\", %s rc = %d\n",
+		      name, kernbuf, errmsg, rc);
+		kfree(kernbuf);
+		kernbuf = NULL;
+	} else {
+		CWARN("%s: failed to set nosquash_nids due to %s rc = %d\n",
+		      name, errmsg, rc);
+	}
+	return rc;
+}
+EXPORT_SYMBOL(lprocfs_wr_nosquash_nids);
 
 static ssize_t lustre_attr_show(struct kobject *kobj,
 				struct attribute *attr, char *buf)

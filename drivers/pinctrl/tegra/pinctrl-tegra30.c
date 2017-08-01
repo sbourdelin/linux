@@ -1,6 +1,8 @@
 /*
  * Pinctrl data for the NVIDIA Tegra30 pinmux
  *
+ * Author: Stephen Warren <swarren@nvidia.com>
+ *
  * Copyright (c) 2011-2012, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
@@ -13,7 +15,7 @@
  * more details.
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/pinctrl/pinctrl.h>
@@ -2139,6 +2141,7 @@ static struct tegra_function tegra30_functions[] = {
 		.lock_bit = 7,						\
 		.ioreset_bit = PINGROUP_BIT_##ior(8),			\
 		.rcv_sel_bit = -1,					\
+		.parked_bit = -1,					\
 		.drv_reg = -1,						\
 	}
 
@@ -2159,6 +2162,7 @@ static struct tegra_function tegra30_functions[] = {
 		.rcv_sel_bit = -1,					\
 		.drv_reg = DRV_PINGROUP_REG(r),				\
 		.drv_bank = 0,						\
+		.parked_bit = -1,					\
 		.hsm_bit = hsm_b,					\
 		.schmitt_bit = schmitt_b,				\
 		.lpmd_bit = lpmd_b,					\
@@ -2490,7 +2494,6 @@ static const struct of_device_id tegra30_pinctrl_of_match[] = {
 	{ .compatible = "nvidia,tegra30-pinmux", },
 	{ },
 };
-MODULE_DEVICE_TABLE(of, tegra30_pinctrl_of_match);
 
 static struct platform_driver tegra30_pinctrl_driver = {
 	.driver = {
@@ -2498,10 +2501,5 @@ static struct platform_driver tegra30_pinctrl_driver = {
 		.of_match_table = tegra30_pinctrl_of_match,
 	},
 	.probe = tegra30_pinctrl_probe,
-	.remove = tegra_pinctrl_remove,
 };
-module_platform_driver(tegra30_pinctrl_driver);
-
-MODULE_AUTHOR("Stephen Warren <swarren@nvidia.com>");
-MODULE_DESCRIPTION("NVIDIA Tegra30 pinctrl driver");
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(tegra30_pinctrl_driver);

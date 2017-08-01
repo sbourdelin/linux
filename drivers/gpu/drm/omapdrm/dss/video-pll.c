@@ -17,8 +17,7 @@
 #include <linux/platform_device.h>
 #include <linux/sched.h>
 
-#include <video/omapdss.h>
-
+#include "omapdss.h"
 #include "dss.h"
 #include "dss_features.h"
 
@@ -108,6 +107,8 @@ static const struct dss_pll_ops dss_pll_ops = {
 };
 
 static const struct dss_pll_hw dss_dra7_video_pll_hw = {
+	.type = DSS_PLL_TYPE_A,
+
 	.n_max = (1 << 8) - 1,
 	.m_max = (1 << 12) - 1,
 	.mX_max = (1 << 5) - 1,
@@ -124,6 +125,10 @@ static const struct dss_pll_hw dss_dra7_video_pll_hw = {
 	.mX_lsb[0] = 21,
 	.mX_msb[1] = 30,
 	.mX_lsb[1] = 26,
+	.mX_msb[2] = 4,
+	.mX_lsb[2] = 0,
+	.mX_msb[3] = 9,
+	.mX_lsb[3] = 5,
 
 	.has_refsel = true,
 };
@@ -145,33 +150,17 @@ struct dss_pll *dss_video_pll_init(struct platform_device *pdev, int id,
 	/* PLL CONTROL */
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, reg_name[id]);
-	if (!res) {
-		dev_err(&pdev->dev,
-			"missing platform resource data for pll%d\n", id);
-		return ERR_PTR(-ENODEV);
-	}
-
 	pll_base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(pll_base)) {
-		dev_err(&pdev->dev, "failed to ioremap pll%d reg_name\n", id);
+	if (IS_ERR(pll_base))
 		return ERR_CAST(pll_base);
-	}
 
 	/* CLOCK CONTROL */
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
 		clkctrl_name[id]);
-	if (!res) {
-		dev_err(&pdev->dev,
-			"missing platform resource data for pll%d\n", id);
-		return ERR_PTR(-ENODEV);
-	}
-
 	clkctrl_base = devm_ioremap_resource(&pdev->dev, res);
-	if (IS_ERR(clkctrl_base)) {
-		dev_err(&pdev->dev, "failed to ioremap pll%d clkctrl\n", id);
+	if (IS_ERR(clkctrl_base))
 		return ERR_CAST(clkctrl_base);
-	}
 
 	/* CLKIN */
 

@@ -148,7 +148,7 @@ that only one external action is invoked at a time.
 #include <linux/dma-mapping.h>
 #include <linux/proc_fs.h>
 #include <linux/skbuff.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <asm/io.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
@@ -1238,7 +1238,7 @@ static int ipw2100_get_hw_features(struct ipw2100_priv *priv)
 }
 
 /*
- * Start firmware execution after power on and intialization
+ * Start firmware execution after power on and initialization
  * The sequence is:
  *  1. Release ARC
  *  2. Wait for f/w initialization completes;
@@ -1277,7 +1277,7 @@ static int ipw2100_start_adapter(struct ipw2100_priv *priv)
 	/* Release ARC - clear reset bit */
 	write_register(priv->net_dev, IPW_REG_RESET_REG, 0);
 
-	/* wait for f/w intialization complete */
+	/* wait for f/w initialization complete */
 	IPW_DEBUG_FW("Waiting for f/w initialization to complete...\n");
 	i = 5000;
 	do {
@@ -1913,7 +1913,7 @@ static int ipw2100_wdev_init(struct net_device *dev)
 	if (geo->bg_channels) {
 		struct ieee80211_supported_band *bg_band = &priv->ieee->bg_band;
 
-		bg_band->band = IEEE80211_BAND_2GHZ;
+		bg_band->band = NL80211_BAND_2GHZ;
 		bg_band->n_channels = geo->bg_channels;
 		bg_band->channels = kcalloc(geo->bg_channels,
 					    sizeof(struct ieee80211_channel),
@@ -1924,7 +1924,7 @@ static int ipw2100_wdev_init(struct net_device *dev)
 		}
 		/* translate geo->bg to bg_band.channels */
 		for (i = 0; i < geo->bg_channels; i++) {
-			bg_band->channels[i].band = IEEE80211_BAND_2GHZ;
+			bg_band->channels[i].band = NL80211_BAND_2GHZ;
 			bg_band->channels[i].center_freq = geo->bg[i].freq;
 			bg_band->channels[i].hw_value = geo->bg[i].channel;
 			bg_band->channels[i].max_power = geo->bg[i].max_power;
@@ -1945,7 +1945,7 @@ static int ipw2100_wdev_init(struct net_device *dev)
 		bg_band->bitrates = ipw2100_bg_rates;
 		bg_band->n_bitrates = RATE_COUNT;
 
-		wdev->wiphy->bands[IEEE80211_BAND_2GHZ] = bg_band;
+		wdev->wiphy->bands[NL80211_BAND_2GHZ] = bg_band;
 	}
 
 	wdev->wiphy->cipher_suites = ipw_cipher_suites;
@@ -2954,7 +2954,7 @@ static int __ipw2100_tx_process(struct ipw2100_priv *priv)
 
 		/* A packet was processed by the hardware, so update the
 		 * watchdog */
-		priv->net_dev->trans_start = jiffies;
+		netif_trans_update(priv->net_dev);
 
 		break;
 
@@ -3521,7 +3521,7 @@ static void ipw2100_msg_free(struct ipw2100_priv *priv)
 static ssize_t show_pci(struct device *d, struct device_attribute *attr,
 			char *buf)
 {
-	struct pci_dev *pci_dev = container_of(d, struct pci_dev, dev);
+	struct pci_dev *pci_dev = to_pci_dev(d);
 	char *out = buf;
 	int i, j;
 	u32 val;
@@ -4160,12 +4160,12 @@ static ssize_t show_bssinfo(struct device *d, struct device_attribute *attr,
 static DEVICE_ATTR(bssinfo, S_IRUGO, show_bssinfo, NULL);
 
 #ifdef CONFIG_IPW2100_DEBUG
-static ssize_t show_debug_level(struct device_driver *d, char *buf)
+static ssize_t debug_level_show(struct device_driver *d, char *buf)
 {
 	return sprintf(buf, "0x%08X\n", ipw2100_debug_level);
 }
 
-static ssize_t store_debug_level(struct device_driver *d,
+static ssize_t debug_level_store(struct device_driver *d,
 				 const char *buf, size_t count)
 {
 	u32 val;
@@ -4179,9 +4179,7 @@ static ssize_t store_debug_level(struct device_driver *d,
 
 	return strnlen(buf, count);
 }
-
-static DRIVER_ATTR(debug_level, S_IWUSR | S_IRUGO, show_debug_level,
-		   store_debug_level);
+static DRIVER_ATTR_RW(debug_level);
 #endif				/* CONFIG_IPW2100_DEBUG */
 
 static ssize_t show_fatal_error(struct device *d,
@@ -5652,7 +5650,7 @@ static void shim__set_security(struct net_device *dev,
 
 /* As a temporary work around to enable WPA until we figure out why
  * wpa_supplicant toggles the security capability of the driver, which
- * forces a disassocation with force_update...
+ * forces a disassociation with force_update...
  *
  *	if (force_update || !(priv->status & STATUS_ASSOCIATED))*/
 	if (!(priv->status & (STATUS_ASSOCIATED | STATUS_ASSOCIATING)))
@@ -6035,7 +6033,6 @@ static const struct net_device_ops ipw2100_netdev_ops = {
 	.ndo_open		= ipw2100_open,
 	.ndo_stop		= ipw2100_close,
 	.ndo_start_xmit		= libipw_xmit,
-	.ndo_change_mtu		= libipw_change_mtu,
 	.ndo_tx_timeout		= ipw2100_tx_timeout,
 	.ndo_set_mac_address	= ipw2100_set_address,
 	.ndo_validate_addr	= eth_validate_addr,
@@ -6071,6 +6068,8 @@ static struct net_device *ipw2100_alloc_device(struct pci_dev *pci_dev,
 	dev->wireless_data = &priv->wireless_data;
 	dev->watchdog_timeo = 3 * HZ;
 	dev->irq = 0;
+	dev->min_mtu = 68;
+	dev->max_mtu = LIBIPW_DATA_LEN;
 
 	/* NOTE: We don't use the wireless_handlers hook
 	 * in dev as the system will start throwing WX requests

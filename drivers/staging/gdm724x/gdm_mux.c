@@ -62,7 +62,7 @@ static int packet_type_to_index(u16 packetType)
 
 static struct mux_tx *alloc_mux_tx(int len)
 {
-	struct mux_tx *t = NULL;
+	struct mux_tx *t;
 
 	t = kzalloc(sizeof(*t), GFP_ATOMIC);
 	if (!t)
@@ -91,7 +91,7 @@ static void free_mux_tx(struct mux_tx *t)
 
 static struct mux_rx *alloc_mux_rx(void)
 {
-	struct mux_rx *r = NULL;
+	struct mux_rx *r;
 
 	r = kzalloc(sizeof(*r), GFP_KERNEL);
 	if (!r)
@@ -278,8 +278,9 @@ static void gdm_mux_rcv_complete(struct urb *urb)
 	}
 }
 
-static int gdm_mux_recv(void *priv_dev, int (*cb)(void *data, int len,
-			int tty_index, struct tty_dev *tty_dev, int complete))
+static int gdm_mux_recv(void *priv_dev,
+			int (*cb)(void *data, int len, int tty_index,
+				  struct tty_dev *tty_dev, int complete))
 {
 	struct mux_dev *mux_dev = priv_dev;
 	struct usb_device *usbdev = mux_dev->usbdev;
@@ -663,9 +664,8 @@ static int __init gdm_usb_mux_init(void)
 
 static void __exit gdm_usb_mux_exit(void)
 {
-	unregister_lte_tty_driver();
-
 	usb_deregister(&gdm_mux_driver);
+	unregister_lte_tty_driver();
 }
 
 module_init(gdm_usb_mux_init);

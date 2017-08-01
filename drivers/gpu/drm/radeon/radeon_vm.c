@@ -132,8 +132,8 @@ struct radeon_bo_list *radeon_vm_get_bos(struct radeon_device *rdev,
 	struct radeon_bo_list *list;
 	unsigned i, idx;
 
-	list = drm_malloc_ab(vm->max_pde_used + 2,
-			     sizeof(struct radeon_bo_list));
+	list = kvmalloc_array(vm->max_pde_used + 2,
+			     sizeof(struct radeon_bo_list), GFP_KERNEL);
 	if (!list)
 		return NULL;
 
@@ -611,15 +611,16 @@ uint64_t radeon_vm_map_gart(struct radeon_device *rdev, uint64_t addr)
  */
 static uint32_t radeon_vm_page_flags(uint32_t flags)
 {
-        uint32_t hw_flags = 0;
-        hw_flags |= (flags & RADEON_VM_PAGE_VALID) ? R600_PTE_VALID : 0;
-        hw_flags |= (flags & RADEON_VM_PAGE_READABLE) ? R600_PTE_READABLE : 0;
-        hw_flags |= (flags & RADEON_VM_PAGE_WRITEABLE) ? R600_PTE_WRITEABLE : 0;
-        if (flags & RADEON_VM_PAGE_SYSTEM) {
-                hw_flags |= R600_PTE_SYSTEM;
-                hw_flags |= (flags & RADEON_VM_PAGE_SNOOPED) ? R600_PTE_SNOOPED : 0;
-        }
-        return hw_flags;
+	uint32_t hw_flags = 0;
+
+	hw_flags |= (flags & RADEON_VM_PAGE_VALID) ? R600_PTE_VALID : 0;
+	hw_flags |= (flags & RADEON_VM_PAGE_READABLE) ? R600_PTE_READABLE : 0;
+	hw_flags |= (flags & RADEON_VM_PAGE_WRITEABLE) ? R600_PTE_WRITEABLE : 0;
+	if (flags & RADEON_VM_PAGE_SYSTEM) {
+		hw_flags |= R600_PTE_SYSTEM;
+		hw_flags |= (flags & RADEON_VM_PAGE_SNOOPED) ? R600_PTE_SNOOPED : 0;
+	}
+	return hw_flags;
 }
 
 /**

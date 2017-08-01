@@ -145,7 +145,7 @@ static int __init cmx270_init(void)
 
 	ret = gpio_request(GPIO_NAND_CS, "NAND CS");
 	if (ret) {
-		pr_warning("CM-X270: failed to request NAND CS gpio\n");
+		pr_warn("CM-X270: failed to request NAND CS gpio\n");
 		return ret;
 	}
 
@@ -153,7 +153,7 @@ static int __init cmx270_init(void)
 
 	ret = gpio_request(GPIO_NAND_RB, "NAND R/B");
 	if (ret) {
-		pr_warning("CM-X270: failed to request NAND R/B gpio\n");
+		pr_warn("CM-X270: failed to request NAND R/B gpio\n");
 		goto err_gpio_request;
 	}
 
@@ -187,6 +187,7 @@ static int __init cmx270_init(void)
 	/* 15 us command delay time */
 	this->chip_delay = 20;
 	this->ecc.mode = NAND_ECC_SOFT;
+	this->ecc.algo = NAND_ECC_HAMMING;
 
 	/* read/write functions */
 	this->read_byte = cmx270_read_byte;
@@ -194,9 +195,9 @@ static int __init cmx270_init(void)
 	this->write_buf = cmx270_write_buf;
 
 	/* Scan to find existence of the device */
-	if (nand_scan (cmx270_nand_mtd, 1)) {
+	ret = nand_scan(cmx270_nand_mtd, 1);
+	if (ret) {
 		pr_notice("No NAND device\n");
-		ret = -ENXIO;
 		goto err_scan;
 	}
 

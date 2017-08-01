@@ -191,9 +191,6 @@ static void pxamci_setup_data(struct pxamci_host *host, struct mmc_data *data)
 
 	host->data = data;
 
-	if (data->flags & MMC_DATA_STREAM)
-		nob = 0xffff;
-
 	writel(nob, host->base + MMC_NOB);
 	writel(data->blksz, host->base + MMC_BLKLEN);
 
@@ -443,9 +440,6 @@ static void pxamci_request(struct mmc_host *mmc, struct mmc_request *mrq)
 		cmdat |= CMDAT_DATAEN | CMDAT_DMAEN;
 		if (mrq->data->flags & MMC_DATA_WRITE)
 			cmdat |= CMDAT_WRITE;
-
-		if (mrq->data->flags & MMC_DATA_STREAM)
-			cmdat |= CMDAT_STREAM;
 	}
 
 	pxamci_start_cmd(host, mrq->cmd, cmdat);
@@ -708,7 +702,11 @@ static int pxamci_probe(struct platform_device *pdev)
 
 	pxamci_init_ocr(host);
 
-	mmc->caps = 0;
+	/*
+	 * This architecture used to disable bounce buffers through its
+	 * defconfig, now it is done at runtime as a host property.
+	 */
+	mmc->caps = MMC_CAP_NO_BOUNCE_BUFF;
 	host->cmdat = 0;
 	if (!cpu_is_pxa25x()) {
 		mmc->caps |= MMC_CAP_4_BIT_DATA | MMC_CAP_SDIO_IRQ;
@@ -795,14 +793,16 @@ static int pxamci_probe(struct platform_device *pdev)
 		gpio_direction_output(gpio_power,
 				      host->pdata->gpio_power_invert);
 	}
-	if (gpio_is_valid(gpio_ro))
+	if (gpio_is_valid(gpio_ro)) {
 		ret = mmc_gpio_request_ro(mmc, gpio_ro);
-	if (ret) {
-		dev_err(&pdev->dev, "Failed requesting gpio_ro %d\n", gpio_ro);
-		goto out;
-	} else {
-		mmc->caps2 |= host->pdata->gpio_card_ro_invert ?
-			0 : MMC_CAP2_RO_ACTIVE_HIGH;
+		if (ret) {
+			dev_err(&pdev->dev, "Failed requesting gpio_ro %d\n",
+				gpio_ro);
+			goto out;
+		} else {
+			mmc->caps2 |= host->pdata->gpio_card_ro_invert ?
+				0 : MMC_CAP2_RO_ACTIVE_HIGH;
+		}
 	}
 
 	if (gpio_is_valid(gpio_cd))

@@ -59,11 +59,8 @@ static LIST_HEAD(dvfs_info_list);
 static struct mtk_cpu_dvfs_info *mtk_cpu_dvfs_info_lookup(int cpu)
 {
 	struct mtk_cpu_dvfs_info *info;
-	struct list_head *list;
 
-	list_for_each(list, &dvfs_info_list) {
-		info = list_entry(list, struct mtk_cpu_dvfs_info, list_head);
-
+	list_for_each_entry(info, &dvfs_info_list, list_head) {
 		if (cpumask_test_cpu(cpu, &info->cpus))
 			return info;
 	}
@@ -235,16 +232,14 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 
 	freq_hz = freq_table[index].frequency * 1000;
 
-	rcu_read_lock();
 	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_hz);
 	if (IS_ERR(opp)) {
-		rcu_read_unlock();
 		pr_err("cpu%d: failed to find OPP for %ld\n",
 		       policy->cpu, freq_hz);
 		return PTR_ERR(opp);
 	}
 	vproc = dev_pm_opp_get_voltage(opp);
-	rcu_read_unlock();
+	dev_pm_opp_put(opp);
 
 	/*
 	 * If the new voltage or the intermediate voltage is higher than the
@@ -310,17 +305,22 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
 	return 0;
 }
 
+#define DYNAMIC_POWER "dynamic-power-coefficient"
+
 static void mtk_cpufreq_ready(struct cpufreq_policy *policy)
 {
 	struct mtk_cpu_dvfs_info *info = policy->driver_data;
 	struct device_node *np = of_node_get(info->cpu_dev->of_node);
+	u32 capacitance = 0;
 
 	if (WARN_ON(!np))
 		return;
 
 	if (of_find_property(np, "#cooling-cells", NULL)) {
-		info->cdev = of_cpufreq_cooling_register(np,
-							 policy->related_cpus);
+		of_property_read_u32(np, DYNAMIC_POWER, &capacitance);
+
+		info->cdev = of_cpufreq_power_cooling_register(np,
+						policy, capacitance, NULL);
 
 		if (IS_ERR(info->cdev)) {
 			dev_err(info->cpu_dev,
@@ -407,16 +407,14 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
 
 	/* Search a safe voltage for intermediate frequency. */
 	rate = clk_get_rate(inter_clk);
-	rcu_read_lock();
 	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &rate);
 	if (IS_ERR(opp)) {
-		rcu_read_unlock();
 		pr_err("failed to get intermediate opp for cpu%d\n", cpu);
 		ret = PTR_ERR(opp);
 		goto out_free_opp_table;
 	}
 	info->intermediate_voltage = dev_pm_opp_get_voltage(opp);
-	rcu_read_unlock();
+	dev_pm_opp_put(opp);
 
 	info->cpu_dev = cpu_dev;
 	info->proc_reg = proc_reg;
@@ -524,8 +522,7 @@ static struct cpufreq_driver mt8173_cpufreq_driver = {
 
 static int mt8173_cpufreq_probe(struct platform_device *pdev)
 {
-	struct mtk_cpu_dvfs_info *info;
-	struct list_head *list, *tmp;
+	struct mtk_cpu_dvfs_info *info, *tmp;
 	int cpu, ret;
 
 	for_each_possible_cpu(cpu) {
@@ -559,11 +556,9 @@ static int mt8173_cpufreq_probe(struct platform_device *pdev)
 	return 0;
 
 release_dvfs_info_list:
-	list_for_each_safe(list, tmp, &dvfs_info_list) {
-		info = list_entry(list, struct mtk_cpu_dvfs_info, list_head);
-
+	list_for_each_entry_safe(info, tmp, &dvfs_info_list, list_head) {
 		mtk_cpu_dvfs_info_release(info);
-		list_del(list);
+		list_del(&info->list_head);
 	}
 
 	return ret;
@@ -576,13 +571,32 @@ static struct platform_driver mt8173_cpufreq_platdrv = {
 	.probe		= mt8173_cpufreq_probe,
 };
 
-static int mt8173_cpufreq_driver_init(void)
+/* List of machines supported by this driver */
+static const struct of_device_id mt8173_cpufreq_machines[] __initconst = {
+	{ .compatible = "mediatek,mt817x", },
+	{ .compatible = "mediatek,mt8173", },
+	{ .compatible = "mediatek,mt8176", },
+
+	{ }
+};
+
+static int __init mt8173_cpufreq_driver_init(void)
 {
+	struct device_node *np;
+	const struct of_device_id *match;
 	struct platform_device *pdev;
 	int err;
 
-	if (!of_machine_is_compatible("mediatek,mt8173"))
+	np = of_find_node_by_path("/");
+	if (!np)
 		return -ENODEV;
+
+	match = of_match_node(mt8173_cpufreq_machines, np);
+	of_node_put(np);
+	if (!match) {
+		pr_warn("Machine is not compatible with mt8173-cpufreq\n");
+		return -ENODEV;
+	}
 
 	err = platform_driver_register(&mt8173_cpufreq_platdrv);
 	if (err)

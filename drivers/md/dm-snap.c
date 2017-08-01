@@ -1590,7 +1590,7 @@ static void full_bio_end_io(struct bio *bio)
 {
 	void *callback_data = bio->bi_private;
 
-	dm_kcopyd_do_callback(callback_data, 0, bio->bi_error ? 1 : 0);
+	dm_kcopyd_do_callback(callback_data, 0, bio->bi_status ? 1 : 0);
 }
 
 static void start_full_bio(struct dm_snap_pending_exception *pe,
@@ -1680,7 +1680,7 @@ static int snapshot_map(struct dm_target *ti, struct bio *bio)
 
 	init_tracked_chunk(bio);
 
-	if (bio->bi_rw & REQ_FLUSH) {
+	if (bio->bi_opf & REQ_PREFLUSH) {
 		bio->bi_bdev = s->cow->bdev;
 		return DM_MAPIO_REMAPPED;
 	}
@@ -1690,14 +1690,15 @@ static int snapshot_map(struct dm_target *ti, struct bio *bio)
 	/* Full snapshots are not usable */
 	/* To get here the table must be live so s->active is always set. */
 	if (!s->valid)
-		return -EIO;
+		return DM_MAPIO_KILL;
 
 	/* FIXME: should only take write lock if we need
 	 * to copy an exception */
 	down_write(&s->lock);
 
-	if (!s->valid || (unlikely(s->snapshot_overflowed) && bio_rw(bio) == WRITE)) {
-		r = -EIO;
+	if (!s->valid || (unlikely(s->snapshot_overflowed) &&
+	    bio_data_dir(bio) == WRITE)) {
+		r = DM_MAPIO_KILL;
 		goto out_unlock;
 	}
 
@@ -1713,7 +1714,7 @@ static int snapshot_map(struct dm_target *ti, struct bio *bio)
 	 * flags so we should only get this if we are
 	 * writeable.
 	 */
-	if (bio_rw(bio) == WRITE) {
+	if (bio_data_dir(bio) == WRITE) {
 		pe = __lookup_pending_exception(s, chunk);
 		if (!pe) {
 			up_write(&s->lock);
@@ -1722,7 +1723,7 @@ static int snapshot_map(struct dm_target *ti, struct bio *bio)
 
 			if (!s->valid || s->snapshot_overflowed) {
 				free_pending_exception(pe);
-				r = -EIO;
+				r = DM_MAPIO_KILL;
 				goto out_unlock;
 			}
 
@@ -1740,7 +1741,7 @@ static int snapshot_map(struct dm_target *ti, struct bio *bio)
 					DMERR("Snapshot overflowed: Unable to allocate exception.");
 				} else
 					__invalidate_snapshot(s, -ENOMEM);
-				r = -EIO;
+				r = DM_MAPIO_KILL;
 				goto out_unlock;
 			}
 		}
@@ -1799,7 +1800,7 @@ static int snapshot_merge_map(struct dm_target *ti, struct bio *bio)
 
 	init_tracked_chunk(bio);
 
-	if (bio->bi_rw & REQ_FLUSH) {
+	if (bio->bi_opf & REQ_PREFLUSH) {
 		if (!dm_bio_get_target_bio_nr(bio))
 			bio->bi_bdev = s->origin->bdev;
 		else
@@ -1819,7 +1820,7 @@ static int snapshot_merge_map(struct dm_target *ti, struct bio *bio)
 	e = dm_lookup_exception(&s->complete, chunk);
 	if (e) {
 		/* Queue writes overlapping with chunks being merged */
-		if (bio_rw(bio) == WRITE &&
+		if (bio_data_dir(bio) == WRITE &&
 		    chunk >= s->first_merging_chunk &&
 		    chunk < (s->first_merging_chunk +
 			     s->num_merging_chunks)) {
@@ -1831,7 +1832,7 @@ static int snapshot_merge_map(struct dm_target *ti, struct bio *bio)
 
 		remap_exception(s, e, bio, chunk);
 
-		if (bio_rw(bio) == WRITE)
+		if (bio_data_dir(bio) == WRITE)
 			track_chunk(s, bio, chunk);
 		goto out_unlock;
 	}
@@ -1839,7 +1840,7 @@ static int snapshot_merge_map(struct dm_target *ti, struct bio *bio)
 redirect_to_origin:
 	bio->bi_bdev = s->origin->bdev;
 
-	if (bio_rw(bio) == WRITE) {
+	if (bio_data_dir(bio) == WRITE) {
 		up_write(&s->lock);
 		return do_origin(s->origin, bio);
 	}
@@ -1850,14 +1851,15 @@ out_unlock:
 	return r;
 }
 
-static int snapshot_end_io(struct dm_target *ti, struct bio *bio, int error)
+static int snapshot_end_io(struct dm_target *ti, struct bio *bio,
+		blk_status_t *error)
 {
 	struct dm_snapshot *s = ti->private;
 
 	if (is_bio_tracked(bio))
 		stop_tracking_chunk(s, bio);
 
-	return 0;
+	return DM_ENDIO_DONE;
 }
 
 static void snapshot_merge_presuspend(struct dm_target *ti)
@@ -2285,10 +2287,10 @@ static int origin_map(struct dm_target *ti, struct bio *bio)
 
 	bio->bi_bdev = o->dev->bdev;
 
-	if (unlikely(bio->bi_rw & REQ_FLUSH))
+	if (unlikely(bio->bi_opf & REQ_PREFLUSH))
 		return DM_MAPIO_REMAPPED;
 
-	if (bio_rw(bio) != WRITE)
+	if (bio_data_dir(bio) != WRITE)
 		return DM_MAPIO_REMAPPED;
 
 	available_sectors = o->split_boundary -
@@ -2299,6 +2301,13 @@ static int origin_map(struct dm_target *ti, struct bio *bio)
 
 	/* Only tell snapshots if this is a write */
 	return do_origin(o->dev, bio);
+}
+
+static long origin_dax_direct_access(struct dm_target *ti, pgoff_t pgoff,
+		long nr_pages, void **kaddr, pfn_t *pfn)
+{
+	DMWARN("device does not support dax.");
+	return -EIO;
 }
 
 /*
@@ -2360,6 +2369,7 @@ static struct target_type origin_target = {
 	.postsuspend = origin_postsuspend,
 	.status  = origin_status,
 	.iterate_devices = origin_iterate_devices,
+	.direct_access = origin_dax_direct_access,
 };
 
 static struct target_type snapshot_target = {

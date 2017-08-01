@@ -1,6 +1,8 @@
 /*
  * Pinctrl data for the NVIDIA Tegra20 pinmux
  *
+ * Author: Stephen Warren <swarren@nvidia.com>
+ *
  * Copyright (c) 2011-2012, NVIDIA CORPORATION.  All rights reserved.
  *
  * Derived from code:
@@ -17,7 +19,7 @@
  * more details.
  */
 
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/pinctrl/pinctrl.h>
@@ -1994,6 +1996,7 @@ static struct tegra_function tegra20_functions[] = {
 		.tri_reg = ((tri_r) - TRISTATE_REG_A),		\
 		.tri_bank = 0,					\
 		.tri_bit = tri_b,				\
+		.parked_bit = -1,				\
 		.einput_bit = -1,				\
 		.odrain_bit = -1,				\
 		.lock_bit = -1,					\
@@ -2013,6 +2016,7 @@ static struct tegra_function tegra20_functions[] = {
 		.pupd_bank = 2,					\
 		.pupd_bit = pupd_b,				\
 		.drv_reg = -1,					\
+		.parked_bit = -1,				\
 	}
 
 /* Pin groups for drive strength registers (configurable version) */
@@ -2028,6 +2032,7 @@ static struct tegra_function tegra20_functions[] = {
 		.tri_reg = -1,					\
 		.drv_reg = ((r) - PINGROUP_REG_A),		\
 		.drv_bank = 3,					\
+		.parked_bit = -1,				\
 		.hsm_bit = hsm_b,				\
 		.schmitt_bit = schmitt_b,			\
 		.lpmd_bit = lpmd_b,				\
@@ -2242,11 +2247,5 @@ static struct platform_driver tegra20_pinctrl_driver = {
 		.of_match_table = tegra20_pinctrl_of_match,
 	},
 	.probe = tegra20_pinctrl_probe,
-	.remove = tegra_pinctrl_remove,
 };
-module_platform_driver(tegra20_pinctrl_driver);
-
-MODULE_AUTHOR("Stephen Warren <swarren@nvidia.com>");
-MODULE_DESCRIPTION("NVIDIA Tegra20 pinctrl driver");
-MODULE_LICENSE("GPL v2");
-MODULE_DEVICE_TABLE(of, tegra20_pinctrl_of_match);
+builtin_platform_driver(tegra20_pinctrl_driver);

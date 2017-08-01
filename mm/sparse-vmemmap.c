@@ -36,7 +36,7 @@
  * Uses the main allocators if they are available, else bootmem.
  */
 
-static void * __init_refok __earlyonly_bootmem_alloc(int node,
+static void * __ref __earlyonly_bootmem_alloc(int node,
 				unsigned long size,
 				unsigned long align,
 				unsigned long goal)
@@ -56,11 +56,11 @@ void * __meminit vmemmap_alloc_block(unsigned long size, int node)
 
 		if (node_state(node, N_HIGH_MEMORY))
 			page = alloc_pages_node(
-				node, GFP_KERNEL | __GFP_ZERO | __GFP_REPEAT,
+				node, GFP_KERNEL | __GFP_ZERO | __GFP_RETRY_MAYFAIL,
 				get_order(size));
 		else
 			page = alloc_pages(
-				GFP_KERNEL | __GFP_ZERO | __GFP_REPEAT,
+				GFP_KERNEL | __GFP_ZERO | __GFP_RETRY_MAYFAIL,
 				get_order(size));
 		if (page)
 			return page_address(page);
@@ -166,8 +166,8 @@ void __meminit vmemmap_verify(pte_t *pte, int node,
 	int actual_node = early_pfn_to_nid(pfn);
 
 	if (node_distance(actual_node, node) > LOCAL_DISTANCE)
-		printk(KERN_WARNING "[%lx-%lx] potential offnode "
-			"page_structs\n", start, end - 1);
+		pr_warn("[%lx-%lx] potential offnode page_structs\n",
+			start, end - 1);
 }
 
 pte_t * __meminit vmemmap_pte_populate(pmd_t *pmd, unsigned long addr, int node)
@@ -196,9 +196,9 @@ pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node)
 	return pmd;
 }
 
-pud_t * __meminit vmemmap_pud_populate(pgd_t *pgd, unsigned long addr, int node)
+pud_t * __meminit vmemmap_pud_populate(p4d_t *p4d, unsigned long addr, int node)
 {
-	pud_t *pud = pud_offset(pgd, addr);
+	pud_t *pud = pud_offset(p4d, addr);
 	if (pud_none(*pud)) {
 		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
 		if (!p)
@@ -206,6 +206,18 @@ pud_t * __meminit vmemmap_pud_populate(pgd_t *pgd, unsigned long addr, int node)
 		pud_populate(&init_mm, pud, p);
 	}
 	return pud;
+}
+
+p4d_t * __meminit vmemmap_p4d_populate(pgd_t *pgd, unsigned long addr, int node)
+{
+	p4d_t *p4d = p4d_offset(pgd, addr);
+	if (p4d_none(*p4d)) {
+		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
+		if (!p)
+			return NULL;
+		p4d_populate(&init_mm, p4d, p);
+	}
+	return p4d;
 }
 
 pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
@@ -225,6 +237,7 @@ int __meminit vmemmap_populate_basepages(unsigned long start,
 {
 	unsigned long addr = start;
 	pgd_t *pgd;
+	p4d_t *p4d;
 	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
@@ -233,7 +246,10 @@ int __meminit vmemmap_populate_basepages(unsigned long start,
 		pgd = vmemmap_pgd_populate(addr, node);
 		if (!pgd)
 			return -ENOMEM;
-		pud = vmemmap_pud_populate(pgd, addr, node);
+		p4d = vmemmap_p4d_populate(pgd, addr, node);
+		if (!p4d)
+			return -ENOMEM;
+		pud = vmemmap_pud_populate(p4d, addr, node);
 		if (!pud)
 			return -ENOMEM;
 		pmd = vmemmap_pmd_populate(pud, addr, node);
@@ -292,8 +308,8 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
 		if (map_map[pnum])
 			continue;
 		ms = __nr_to_section(pnum);
-		printk(KERN_ERR "%s: sparsemem memory map backing failed "
-			"some memory will not be available.\n", __func__);
+		pr_err("%s: sparsemem memory map backing failed some memory will not be available\n",
+		       __func__);
 		ms->section_mem_map = 0;
 	}
 

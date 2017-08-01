@@ -73,6 +73,15 @@ static void for_each_companion(struct pci_dev *pdev, struct usb_hcd *hcd,
 		if (companion->bus != pdev->bus ||
 				PCI_SLOT(companion->devfn) != slot)
 			continue;
+
+		/*
+		 * Companion device should be either UHCI,OHCI or EHCI host
+		 * controller, otherwise skip.
+		 */
+		if (companion->class != CL_UHCI && companion->class != CL_OHCI &&
+				companion->class != CL_EHCI)
+			continue;
+
 		companion_hcd = pci_get_drvdata(companion);
 		if (!companion_hcd || !companion_hcd->self.root_hub)
 			continue;
@@ -575,12 +584,7 @@ static int hcd_pci_suspend_noirq(struct device *dev)
 
 static int hcd_pci_resume_noirq(struct device *dev)
 {
-	struct pci_dev		*pci_dev = to_pci_dev(dev);
-
-	powermac_set_asic(pci_dev, 1);
-
-	/* Go back to D0 and disable remote wakeup */
-	pci_back_from_sleep(pci_dev);
+	powermac_set_asic(to_pci_dev(dev), 1);
 	return 0;
 }
 

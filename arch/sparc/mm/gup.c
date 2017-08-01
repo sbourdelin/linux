@@ -78,8 +78,8 @@ static int gup_huge_pmd(pmd_t *pmdp, pmd_t pmd, unsigned long addr,
 		return 0;
 
 	refs = 0;
-	head = pmd_page(pmd);
-	page = head + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
+	page = pmd_page(pmd) + ((addr & ~PMD_MASK) >> PAGE_SHIFT);
+	head = compound_head(page);
 	do {
 		VM_BUG_ON(compound_head(page) != head);
 		pages[*nr] = page;
@@ -237,8 +237,9 @@ slow:
 		start += nr << PAGE_SHIFT;
 		pages += nr;
 
-		ret = get_user_pages_unlocked(current, mm, start,
-			(end - start) >> PAGE_SHIFT, write, 0, pages);
+		ret = get_user_pages_unlocked(start,
+			(end - start) >> PAGE_SHIFT, pages,
+			write ? FOLL_WRITE : 0);
 
 		/* Have to be a bit careful with return values */
 		if (nr > 0) {

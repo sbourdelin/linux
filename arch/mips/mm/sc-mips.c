@@ -141,6 +141,7 @@ static inline int mips_sc_is_activated(struct cpuinfo_mips *c)
 	case CPU_P5600:
 	case CPU_BMIPS5000:
 	case CPU_QEMU_GENERIC:
+	case CPU_P6600:
 		if (config2 & (1 << 12))
 			return 0;
 	}
@@ -180,6 +181,7 @@ static int __init mips_sc_probe_cm3(void)
 
 	if (c->scache.linesz) {
 		c->scache.flags &= ~MIPS_CACHE_NOT_PRESENT;
+		c->options |= MIPS_CPU_INCLUSIVE_CACHES;
 		return 1;
 	}
 

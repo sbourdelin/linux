@@ -45,12 +45,17 @@ void *module_alloc(unsigned long size)
 	if (PAGE_ALIGN(size) > MODULES_LEN)
 		return NULL;
 	return __vmalloc_node_range(size, 1, MODULES_VADDR, MODULES_END,
-				    GFP_KERNEL, PAGE_KERNEL, 0, NUMA_NO_NODE,
+				    GFP_KERNEL, PAGE_KERNEL_EXEC,
+				    0, NUMA_NO_NODE,
 				    __builtin_return_address(0));
 }
 
 void module_arch_freeing_init(struct module *mod)
 {
+	if (is_livepatch_module(mod) &&
+	    mod->state == MODULE_STATE_LIVE)
+		return;
+
 	vfree(mod->arch.syminfo);
 	mod->arch.syminfo = NULL;
 }
@@ -425,7 +430,5 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    struct module *me)
 {
 	jump_label_apply_nops(me);
-	vfree(me->arch.syminfo);
-	me->arch.syminfo = NULL;
 	return 0;
 }

@@ -186,6 +186,29 @@ static int vx855gpio_direction_output(struct gpio_chip *gpio,
 	return 0;
 }
 
+static int vx855gpio_set_config(struct gpio_chip *gpio, unsigned int nr,
+				unsigned long config)
+{
+	enum pin_config_param param = pinconf_to_config_param(config);
+
+	/* The GPI cannot be single-ended */
+	if (nr < NR_VX855_GPI)
+		return -EINVAL;
+
+	/* The GPO's are push-pull */
+	if (nr < NR_VX855_GPInO) {
+		if (param != PIN_CONFIG_DRIVE_PUSH_PULL)
+			return -ENOTSUPP;
+		return 0;
+	}
+
+	/* The GPIO's are open drain */
+	if (param != PIN_CONFIG_DRIVE_OPEN_DRAIN)
+		return -ENOTSUPP;
+
+	return 0;
+}
+
 static const char *vx855gpio_names[NR_VX855_GP] = {
 	"VX855_GPI0", "VX855_GPI1", "VX855_GPI2", "VX855_GPI3", "VX855_GPI4",
 	"VX855_GPI5", "VX855_GPI6", "VX855_GPI7", "VX855_GPI8", "VX855_GPI9",
@@ -209,6 +232,7 @@ static void vx855gpio_gpio_setup(struct vx855_gpio *vg)
 	c->direction_output = vx855gpio_direction_output;
 	c->get = vx855gpio_get;
 	c->set = vx855gpio_set;
+	c->set_config = vx855gpio_set_config,
 	c->dbg_show = NULL;
 	c->base = 0;
 	c->ngpio = NR_VX855_GP;

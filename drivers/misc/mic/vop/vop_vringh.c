@@ -292,7 +292,6 @@ static int vop_virtio_add_device(struct vop_vdev *vdev,
 	if (ret) {
 		dev_err(vop_dev(vdev), "%s %d err %d\n",
 			__func__, __LINE__, ret);
-		kfree(vdev);
 		return ret;
 	}
 
@@ -943,6 +942,11 @@ static long vop_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
 			return -ENOMEM;
 		if (copy_from_user(dd_config, argp, mic_desc_size(&dd))) {
 			ret = -EFAULT;
+			goto free_ret;
+		}
+		/* Ensure desc has not changed between the two reads */
+		if (memcmp(&dd, dd_config, sizeof(dd))) {
+			ret = -EINVAL;
 			goto free_ret;
 		}
 		mutex_lock(&vdev->vdev_mutex);

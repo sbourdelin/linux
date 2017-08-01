@@ -15,7 +15,6 @@
 #include "udfend.h"
 #include "udf_i.h"
 
-#define UDF_PREALLOCATE
 #define UDF_DEFAULT_PREALLOC_BLOCKS	8
 
 extern __printf(3, 4) void _udf_err(struct super_block *sb,
@@ -49,8 +48,8 @@ extern __printf(3, 4) void _udf_warn(struct super_block *sb,
 #define UDF_EXTENT_FLAG_MASK	0xC0000000
 
 #define UDF_NAME_PAD		4
-#define UDF_NAME_LEN		256
-#define UDF_PATH_LEN		1023
+#define UDF_NAME_LEN		254
+#define UDF_NAME_LEN_CS0	255
 
 static inline size_t udf_file_entry_alloc_offset(struct inode *inode)
 {
@@ -85,6 +84,7 @@ extern const struct inode_operations udf_dir_inode_operations;
 extern const struct file_operations udf_dir_operations;
 extern const struct inode_operations udf_file_inode_operations;
 extern const struct file_operations udf_file_operations;
+extern const struct inode_operations udf_symlink_inode_operations;
 extern const struct address_space_operations udf_aops;
 extern const struct address_space_operations udf_adinicb_aops;
 extern const struct address_space_operations udf_symlink_aops;
@@ -104,12 +104,6 @@ struct udf_vds_record {
 struct generic_desc {
 	struct tag	descTag;
 	__le32		volDescSeqNum;
-};
-
-struct ustr {
-	uint8_t u_cmpID;
-	uint8_t u_name[UDF_NAME_LEN - 2];
-	uint8_t u_len;
 };
 
 
@@ -214,12 +208,11 @@ udf_get_lb_pblock(struct super_block *sb, struct kernel_lb_addr *loc,
 }
 
 /* unicode.c */
-extern int udf_get_filename(struct super_block *, uint8_t *, int, uint8_t *,
-			    int);
-extern int udf_put_filename(struct super_block *, const uint8_t *, uint8_t *,
-			    int);
-extern int udf_build_ustr(struct ustr *, dstring *, int);
-extern int udf_CS0toUTF8(struct ustr *, const struct ustr *);
+extern int udf_get_filename(struct super_block *, const uint8_t *, int,
+			    uint8_t *, int);
+extern int udf_put_filename(struct super_block *, const uint8_t *, int,
+			    uint8_t *, int);
+extern int udf_dstrCS0toUTF8(uint8_t *, int, const uint8_t *, int);
 
 /* ialloc.c */
 extern void udf_free_inode(struct inode *);

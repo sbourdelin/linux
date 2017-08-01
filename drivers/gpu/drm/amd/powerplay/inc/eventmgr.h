@@ -37,7 +37,7 @@ typedef int (*pem_event_action)(struct pp_eventmgr *eventmgr,
 
 struct action_chain {
 	const char *description;  /* action chain description for debugging purpose */
-	const pem_event_action **action_chain; /* pointer to chain of event actions */
+	const pem_event_action * const *action_chain; /* pointer to chain of event actions */
 };
 
 struct pem_power_source_ui_state_info {
@@ -119,7 +119,6 @@ struct pp_eventmgr {
 	void (*pp_eventmgr_fini)(struct pp_eventmgr *eventmgr);
 };
 
-int eventmgr_init(struct pp_instance *handle);
-int eventmgr_fini(struct pp_eventmgr *eventmgr);
+int eventmgr_early_init(struct pp_instance *handle);
 
 #endif /* _EVENTMGR_H_ */

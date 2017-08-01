@@ -13,9 +13,11 @@
 #include <linux/wait.h>
 #include <linux/mutex.h>
 #include <linux/rcupdate.h>
+#include <linux/refcount.h>
 #include <linux/percpu-refcount.h>
 #include <linux/percpu-rwsem.h>
 #include <linux/workqueue.h>
+#include <linux/bpf-cgroup.h>
 
 #ifdef CONFIG_CGROUPS
 
@@ -45,6 +47,8 @@ enum {
 	CSS_NO_REF	= (1 << 0), /* no reference counting for this css */
 	CSS_ONLINE	= (1 << 1), /* between ->css_online() and ->css_offline() */
 	CSS_RELEASED	= (1 << 2), /* refcnt reached zero, released */
+	CSS_VISIBLE	= (1 << 3), /* css is visible to userland */
+	CSS_DYING	= (1 << 4), /* css is dying */
 };
 
 /* bits in struct cgroup flags field */
@@ -63,12 +67,21 @@ enum {
 enum {
 	CGRP_ROOT_NOPREFIX	= (1 << 1), /* mounted subsystems have no named prefix */
 	CGRP_ROOT_XATTR		= (1 << 2), /* supports extended attributes */
+
+	/*
+	 * Consider namespaces as delegation boundaries.  If this flag is
+	 * set, controller specific interface files in a namespace root
+	 * aren't writeable from inside the namespace.
+	 */
+	CGRP_ROOT_NS_DELEGATE	= (1 << 3),
 };
 
 /* cftype->flags */
 enum {
 	CFTYPE_ONLY_ON_ROOT	= (1 << 0),	/* only create on root cgrp */
 	CFTYPE_NOT_ON_ROOT	= (1 << 1),	/* don't create on root cgrp */
+	CFTYPE_NS_DELEGATABLE	= (1 << 2),	/* writeable beyond delegation boundaries */
+
 	CFTYPE_NO_PREFIX	= (1 << 3),	/* (DON'T USE FOR NEW FILES) no subsys prefix */
 	CFTYPE_WORLD_WRITABLE	= (1 << 4),	/* (DON'T USE FOR NEW FILES) S_IWUGO */
 
@@ -104,9 +117,6 @@ struct cgroup_subsys_state {
 	/* reference count - access via css_[try]get() and css_put() */
 	struct percpu_ref refcnt;
 
-	/* PI: the parent css */
-	struct cgroup_subsys_state *parent;
-
 	/* siblings list anchored at the parent's ->children */
 	struct list_head sibling;
 	struct list_head children;
@@ -136,6 +146,12 @@ struct cgroup_subsys_state {
 	/* percpu_ref killing and RCU release */
 	struct rcu_head rcu_head;
 	struct work_struct destroy_work;
+
+	/*
+	 * PI: the parent css.	Placed here for cache proximity to following
+	 * fields of the containing structure.
+	 */
+	struct cgroup_subsys_state *parent;
 };
 
 /*
@@ -146,14 +162,21 @@ struct cgroup_subsys_state {
  * set for a task.
  */
 struct css_set {
-	/* Reference count */
-	atomic_t refcount;
-
 	/*
-	 * List running through all cgroup groups in the same hash
-	 * slot. Protected by css_set_lock
+	 * Set of subsystem states, one for each subsystem. This array is
+	 * immutable after creation apart from the init_css_set during
+	 * subsystem registration (at boot time).
 	 */
-	struct hlist_node hlist;
+	struct cgroup_subsys_state *subsys[CGROUP_SUBSYS_COUNT];
+
+	/* reference count */
+	refcount_t refcount;
+
+	/* the default cgroup associated with this css_set */
+	struct cgroup *dfl_cgrp;
+
+	/* internal task count, protected by css_set_lock */
+	int nr_tasks;
 
 	/*
 	 * Lists running through all tasks using this cgroup group.
@@ -165,38 +188,8 @@ struct css_set {
 	struct list_head tasks;
 	struct list_head mg_tasks;
 
-	/*
-	 * List of cgrp_cset_links pointing at cgroups referenced from this
-	 * css_set.  Protected by css_set_lock.
-	 */
-	struct list_head cgrp_links;
-
-	/* the default cgroup associated with this css_set */
-	struct cgroup *dfl_cgrp;
-
-	/*
-	 * Set of subsystem states, one for each subsystem. This array is
-	 * immutable after creation apart from the init_css_set during
-	 * subsystem registration (at boot time).
-	 */
-	struct cgroup_subsys_state *subsys[CGROUP_SUBSYS_COUNT];
-
-	/*
-	 * List of csets participating in the on-going migration either as
-	 * source or destination.  Protected by cgroup_mutex.
-	 */
-	struct list_head mg_preload_node;
-	struct list_head mg_node;
-
-	/*
-	 * If this cset is acting as the source of migration the following
-	 * two fields are set.  mg_src_cgrp is the source cgroup of the
-	 * on-going migration and mg_dst_cset is the destination cset the
-	 * target tasks on this cset should be migrated to.  Protected by
-	 * cgroup_mutex.
-	 */
-	struct cgroup *mg_src_cgrp;
-	struct css_set *mg_dst_cset;
+	/* all css_task_iters currently walking this cset */
+	struct list_head task_iters;
 
 	/*
 	 * On the default hierarhcy, ->subsys[ssid] may point to a css
@@ -207,8 +200,38 @@ struct css_set {
 	 */
 	struct list_head e_cset_node[CGROUP_SUBSYS_COUNT];
 
-	/* all css_task_iters currently walking this cset */
-	struct list_head task_iters;
+	/*
+	 * List running through all cgroup groups in the same hash
+	 * slot. Protected by css_set_lock
+	 */
+	struct hlist_node hlist;
+
+	/*
+	 * List of cgrp_cset_links pointing at cgroups referenced from this
+	 * css_set.  Protected by css_set_lock.
+	 */
+	struct list_head cgrp_links;
+
+	/*
+	 * List of csets participating in the on-going migration either as
+	 * source or destination.  Protected by cgroup_mutex.
+	 */
+	struct list_head mg_preload_node;
+	struct list_head mg_node;
+
+	/*
+	 * If this cset is acting as the source of migration the following
+	 * two fields are set.  mg_src_cgrp and mg_dst_cgrp are
+	 * respectively the source and destination cgroups of the on-going
+	 * migration.  mg_dst_cset is the destination cset the target tasks
+	 * on this cset should be migrated to.  Protected by cgroup_mutex.
+	 */
+	struct cgroup *mg_src_cgrp;
+	struct cgroup *mg_dst_cgrp;
+	struct css_set *mg_dst_cset;
+
+	/* dead and being drained, ignore for migration */
+	bool dead;
 
 	/* For RCU-protected deletion */
 	struct rcu_head rcu_head;
@@ -253,13 +276,14 @@ struct cgroup {
 	/*
 	 * The bitmask of subsystems enabled on the child cgroups.
 	 * ->subtree_control is the one configured through
-	 * "cgroup.subtree_control" while ->child_subsys_mask is the
-	 * effective one which may have more subsystems enabled.
-	 * Controller knobs are made available iff it's enabled in
-	 * ->subtree_control.
+	 * "cgroup.subtree_control" while ->child_ss_mask is the effective
+	 * one which may have more subsystems enabled.  Controller knobs
+	 * are made available iff it's enabled in ->subtree_control.
 	 */
-	unsigned int subtree_control;
-	unsigned int child_subsys_mask;
+	u16 subtree_control;
+	u16 subtree_ss_mask;
+	u16 old_subtree_control;
+	u16 old_subtree_ss_mask;
 
 	/* Private pointers for each registered subsystem */
 	struct cgroup_subsys_state __rcu *subsys[CGROUP_SUBSYS_COUNT];
@@ -293,6 +317,9 @@ struct cgroup {
 
 	/* used to schedule release agent */
 	struct work_struct release_agent_work;
+
+	/* used to store eBPF programs */
+	struct cgroup_bpf bpf;
 
 	/* ids of the ancestors at each level including self */
 	int ancestor_ids[];
@@ -378,6 +405,9 @@ struct cftype {
 	struct list_head node;		/* anchored at ss->cfts */
 	struct kernfs_ops *kf_ops;
 
+	int (*open)(struct kernfs_open_file *of);
+	void (*release)(struct kernfs_open_file *of);
+
 	/*
 	 * read_u64() is a shortcut for the common case of returning a
 	 * single integer. Use it in place of read()
@@ -434,11 +464,11 @@ struct cgroup_subsys {
 	void (*css_released)(struct cgroup_subsys_state *css);
 	void (*css_free)(struct cgroup_subsys_state *css);
 	void (*css_reset)(struct cgroup_subsys_state *css);
-	void (*css_e_css_changed)(struct cgroup_subsys_state *css);
 
 	int (*can_attach)(struct cgroup_taskset *tset);
 	void (*cancel_attach)(struct cgroup_taskset *tset);
 	void (*attach)(struct cgroup_taskset *tset);
+	void (*post_attach)(void);
 	int (*can_fork)(struct task_struct *task);
 	void (*cancel_fork)(struct task_struct *task);
 	void (*fork)(struct task_struct *task);
@@ -446,7 +476,20 @@ struct cgroup_subsys {
 	void (*free)(struct task_struct *task);
 	void (*bind)(struct cgroup_subsys_state *root_css);
 
-	int early_init;
+	bool early_init:1;
+
+	/*
+	 * If %true, the controller, on the default hierarchy, doesn't show
+	 * up in "cgroup.controllers" or "cgroup.subtree_control", is
+	 * implicitly enabled on all cgroups on the default hierarchy, and
+	 * bypasses the "no internal process" constraint.  This is for
+	 * utility type controllers which is transparent to userland.
+	 *
+	 * An implicit controller can be stolen from the default hierarchy
+	 * anytime and thus must be okay with offline csses from previous
+	 * hierarchies coexisting with csses for the current one.
+	 */
+	bool implicit_on_dfl:1;
 
 	/*
 	 * If %false, this subsystem is properly hierarchical -
@@ -460,8 +503,8 @@ struct cgroup_subsys {
 	 * cases.  Eventually, all subsystems will be made properly
 	 * hierarchical and this will go away.
 	 */
-	bool broken_hierarchy;
-	bool warned_broken_hierarchy;
+	bool broken_hierarchy:1;
+	bool warned_broken_hierarchy:1;
 
 	/* the following two fields are initialized automtically during boot */
 	int id;
@@ -505,8 +548,8 @@ extern struct percpu_rw_semaphore cgroup_threadgroup_rwsem;
  * cgroup_threadgroup_change_begin - threadgroup exclusion for cgroups
  * @tsk: target task
  *
- * Called from threadgroup_change_begin() and allows cgroup operations to
- * synchronize against threadgroup changes using a percpu_rw_semaphore.
+ * Allows cgroup operations to synchronize against threadgroup changes
+ * using a percpu_rw_semaphore.
  */
 static inline void cgroup_threadgroup_change_begin(struct task_struct *tsk)
 {
@@ -517,8 +560,7 @@ static inline void cgroup_threadgroup_change_begin(struct task_struct *tsk)
  * cgroup_threadgroup_change_end - threadgroup exclusion for cgroups
  * @tsk: target task
  *
- * Called from threadgroup_change_end().  Counterpart of
- * cgroup_threadcgroup_change_begin().
+ * Counterpart of cgroup_threadcgroup_change_begin().
  */
 static inline void cgroup_threadgroup_change_end(struct task_struct *tsk)
 {
@@ -529,7 +571,11 @@ static inline void cgroup_threadgroup_change_end(struct task_struct *tsk)
 
 #define CGROUP_SUBSYS_COUNT 0
 
-static inline void cgroup_threadgroup_change_begin(struct task_struct *tsk) {}
+static inline void cgroup_threadgroup_change_begin(struct task_struct *tsk)
+{
+	might_sleep();
+}
+
 static inline void cgroup_threadgroup_change_end(struct task_struct *tsk) {}
 
 #endif	/* CONFIG_CGROUPS */

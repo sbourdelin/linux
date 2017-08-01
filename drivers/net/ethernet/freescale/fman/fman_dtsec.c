@@ -337,7 +337,7 @@ struct fman_mac {
 	u8 mac_id;
 	u32 exceptions;
 	bool ptp_tsu_enabled;
-	bool en_tsu_err_exeption;
+	bool en_tsu_err_exception;
 	struct dtsec_cfg *dtsec_drv_param;
 	void *fm;
 	struct fman_rev_info fm_rev_info;
@@ -381,6 +381,9 @@ static int init(struct dtsec_regs __iomem *regs, struct dtsec_cfg *cfg,
 
 	/* check RGMII support */
 	if (iface == PHY_INTERFACE_MODE_RGMII ||
+	    iface == PHY_INTERFACE_MODE_RGMII_ID ||
+	    iface == PHY_INTERFACE_MODE_RGMII_RXID ||
+	    iface == PHY_INTERFACE_MODE_RGMII_TXID ||
 	    iface == PHY_INTERFACE_MODE_RMII)
 		if (tmp & DTSEC_ID2_INT_REDUCED_OFF)
 			return -EINVAL;
@@ -390,7 +393,10 @@ static int init(struct dtsec_regs __iomem *regs, struct dtsec_cfg *cfg,
 		if (tmp & DTSEC_ID2_INT_REDUCED_OFF)
 			return -EINVAL;
 
-	is_rgmii = iface == PHY_INTERFACE_MODE_RGMII;
+	is_rgmii = iface == PHY_INTERFACE_MODE_RGMII ||
+		   iface == PHY_INTERFACE_MODE_RGMII_ID ||
+		   iface == PHY_INTERFACE_MODE_RGMII_RXID ||
+		   iface == PHY_INTERFACE_MODE_RGMII_TXID;
 	is_sgmii = iface == PHY_INTERFACE_MODE_SGMII;
 	is_qsgmii = iface == PHY_INTERFACE_MODE_QSGMII;
 
@@ -932,15 +938,14 @@ int dtsec_set_tx_pause_frames(struct fman_mac *dtsec,
 	if (!is_init_done(dtsec->dtsec_drv_param))
 		return -EINVAL;
 
-	/* FM_BAD_TX_TS_IN_B_2_B_ERRATA_DTSEC_A003 Errata workaround */
-	if (dtsec->fm_rev_info.major == 2)
-		if (pause_time <= 320) {
+	if (pause_time) {
+		/* FM_BAD_TX_TS_IN_B_2_B_ERRATA_DTSEC_A003 Errata workaround */
+		if (dtsec->fm_rev_info.major == 2 && pause_time <= 320) {
 			pr_warn("pause-time: %d illegal.Should be > 320\n",
 				pause_time);
 			return -EINVAL;
 		}
 
-	if (pause_time) {
 		ptv = ioread32be(&regs->ptv);
 		ptv &= PTV_PTE_MASK;
 		ptv |= pause_time & PTV_PT_MASK;
@@ -1248,12 +1253,12 @@ int dtsec_set_exception(struct fman_mac *dtsec,
 		switch (exception) {
 		case FM_MAC_EX_1G_1588_TS_RX_ERR:
 			if (enable) {
-				dtsec->en_tsu_err_exeption = true;
+				dtsec->en_tsu_err_exception = true;
 				iowrite32be(ioread32be(&regs->tmr_pemask) |
 					    TMR_PEMASK_TSREEN,
 					    &regs->tmr_pemask);
 			} else {
-				dtsec->en_tsu_err_exeption = false;
+				dtsec->en_tsu_err_exception = false;
 				iowrite32be(ioread32be(&regs->tmr_pemask) &
 					    ~TMR_PEMASK_TSREEN,
 					    &regs->tmr_pemask);
@@ -1421,7 +1426,7 @@ struct fman_mac *dtsec_config(struct fman_mac_params *params)
 	dtsec->event_cb = params->event_cb;
 	dtsec->dev_id = params->dev_id;
 	dtsec->ptp_tsu_enabled = dtsec->dtsec_drv_param->ptp_tsu_en;
-	dtsec->en_tsu_err_exeption = dtsec->dtsec_drv_param->ptp_exception_en;
+	dtsec->en_tsu_err_exception = dtsec->dtsec_drv_param->ptp_exception_en;
 
 	dtsec->fm = params->fm;
 	dtsec->basex_if = params->basex_if;

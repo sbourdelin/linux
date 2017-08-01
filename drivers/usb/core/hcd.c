@@ -26,6 +26,7 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
+#include <linux/sched/task_stack.h>
 #include <linux/slab.h>
 #include <linux/completion.h>
 #include <linux/utsname.h>
@@ -46,6 +47,7 @@
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
 #include <linux/usb/phy.h>
+#include <linux/usb/otg.h>
 
 #include "usb.h"
 
@@ -519,8 +521,10 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 	 */
 	tbuf_size =  max_t(u16, sizeof(struct usb_hub_descriptor), wLength);
 	tbuf = kzalloc(tbuf_size, GFP_KERNEL);
-	if (!tbuf)
-		return -ENOMEM;
+	if (!tbuf) {
+		status = -ENOMEM;
+		goto err_alloc;
+	}
 
 	bufp = tbuf;
 
@@ -733,6 +737,7 @@ error:
 	}
 
 	kfree(tbuf);
+ err_alloc:
 
 	/* any errors get returned through the urb completion */
 	spin_lock_irq(&hcd_root_hub_lock);
@@ -994,7 +999,7 @@ static void usb_bus_init (struct usb_bus *bus)
 	bus->bandwidth_allocated = 0;
 	bus->bandwidth_int_reqs  = 0;
 	bus->bandwidth_isoc_reqs = 0;
-	mutex_init(&bus->usb_address0_mutex);
+	mutex_init(&bus->devnum_next_mutex);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -1430,7 +1435,7 @@ void usb_hcd_unmap_urb_setup_for_dma(struct usb_hcd *hcd, struct urb *urb)
 {
 	if (IS_ENABLED(CONFIG_HAS_DMA) &&
 	    (urb->transfer_flags & URB_SETUP_MAP_SINGLE))
-		dma_unmap_single(hcd->self.controller,
+		dma_unmap_single(hcd->self.sysdev,
 				urb->setup_dma,
 				sizeof(struct usb_ctrlrequest),
 				DMA_TO_DEVICE);
@@ -1463,19 +1468,19 @@ void usb_hcd_unmap_urb_for_dma(struct usb_hcd *hcd, struct urb *urb)
 	dir = usb_urb_dir_in(urb) ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
 	if (IS_ENABLED(CONFIG_HAS_DMA) &&
 	    (urb->transfer_flags & URB_DMA_MAP_SG))
-		dma_unmap_sg(hcd->self.controller,
+		dma_unmap_sg(hcd->self.sysdev,
 				urb->sg,
 				urb->num_sgs,
 				dir);
 	else if (IS_ENABLED(CONFIG_HAS_DMA) &&
 		 (urb->transfer_flags & URB_DMA_MAP_PAGE))
-		dma_unmap_page(hcd->self.controller,
+		dma_unmap_page(hcd->self.sysdev,
 				urb->transfer_dma,
 				urb->transfer_buffer_length,
 				dir);
 	else if (IS_ENABLED(CONFIG_HAS_DMA) &&
 		 (urb->transfer_flags & URB_DMA_MAP_SINGLE))
-		dma_unmap_single(hcd->self.controller,
+		dma_unmap_single(hcd->self.sysdev,
 				urb->transfer_dma,
 				urb->transfer_buffer_length,
 				dir);
@@ -1517,12 +1522,20 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 		if (hcd->self.uses_pio_for_control)
 			return ret;
 		if (IS_ENABLED(CONFIG_HAS_DMA) && hcd->self.uses_dma) {
+			if (is_vmalloc_addr(urb->setup_packet)) {
+				WARN_ONCE(1, "setup packet is not dma capable\n");
+				return -EAGAIN;
+			} else if (object_is_on_stack(urb->setup_packet)) {
+				WARN_ONCE(1, "setup packet is on stack\n");
+				return -EAGAIN;
+			}
+
 			urb->setup_dma = dma_map_single(
-					hcd->self.controller,
+					hcd->self.sysdev,
 					urb->setup_packet,
 					sizeof(struct usb_ctrlrequest),
 					DMA_TO_DEVICE);
-			if (dma_mapping_error(hcd->self.controller,
+			if (dma_mapping_error(hcd->self.sysdev,
 						urb->setup_dma))
 				return -EAGAIN;
 			urb->transfer_flags |= URB_SETUP_MAP_SINGLE;
@@ -1553,7 +1566,7 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 				}
 
 				n = dma_map_sg(
-						hcd->self.controller,
+						hcd->self.sysdev,
 						urb->sg,
 						urb->num_sgs,
 						dir);
@@ -1568,12 +1581,12 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 			} else if (urb->sg) {
 				struct scatterlist *sg = urb->sg;
 				urb->transfer_dma = dma_map_page(
-						hcd->self.controller,
+						hcd->self.sysdev,
 						sg_page(sg),
 						sg->offset,
 						urb->transfer_buffer_length,
 						dir);
-				if (dma_mapping_error(hcd->self.controller,
+				if (dma_mapping_error(hcd->self.sysdev,
 						urb->transfer_dma))
 					ret = -EAGAIN;
 				else
@@ -1581,13 +1594,16 @@ int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
 			} else if (is_vmalloc_addr(urb->transfer_buffer)) {
 				WARN_ONCE(1, "transfer buffer not dma capable\n");
 				ret = -EAGAIN;
+			} else if (object_is_on_stack(urb->transfer_buffer)) {
+				WARN_ONCE(1, "transfer buffer is on stack\n");
+				ret = -EAGAIN;
 			} else {
 				urb->transfer_dma = dma_map_single(
-						hcd->self.controller,
+						hcd->self.sysdev,
 						urb->transfer_buffer,
 						urb->transfer_buffer_length,
 						dir);
-				if (dma_mapping_error(hcd->self.controller,
+				if (dma_mapping_error(hcd->self.sysdev,
 						urb->transfer_dma))
 					ret = -EAGAIN;
 				else
@@ -1717,7 +1733,7 @@ int usb_hcd_unlink_urb (struct urb *urb, int status)
 		if (retval == 0)
 			retval = -EINPROGRESS;
 		else if (retval != -EIDRM && retval != -EBUSY)
-			dev_dbg(&udev->dev, "hcd_unlink_urb %p fail %d\n",
+			dev_dbg(&udev->dev, "hcd_unlink_urb %pK fail %d\n",
 					urb, retval);
 		usb_put_dev(udev);
 	}
@@ -1884,7 +1900,7 @@ rescan:
 		/* kick hcd */
 		unlink1(hcd, urb, -ESHUTDOWN);
 		dev_dbg (hcd->self.controller,
-			"shutdown urb %p ep%d%s%s\n",
+			"shutdown urb %pK ep%d%s%s\n",
 			urb, usb_endpoint_num(&ep->desc),
 			is_in ? "in" : "out",
 			({	char *s;
@@ -2493,6 +2509,68 @@ static void init_giveback_urb_bh(struct giveback_urb_bh *bh)
 	tasklet_init(&bh->bh, usb_giveback_urb_bh, (unsigned long)bh);
 }
 
+struct usb_hcd *__usb_create_hcd(const struct hc_driver *driver,
+		struct device *sysdev, struct device *dev, const char *bus_name,
+		struct usb_hcd *primary_hcd)
+{
+	struct usb_hcd *hcd;
+
+	hcd = kzalloc(sizeof(*hcd) + driver->hcd_priv_size, GFP_KERNEL);
+	if (!hcd)
+		return NULL;
+	if (primary_hcd == NULL) {
+		hcd->address0_mutex = kmalloc(sizeof(*hcd->address0_mutex),
+				GFP_KERNEL);
+		if (!hcd->address0_mutex) {
+			kfree(hcd);
+			dev_dbg(dev, "hcd address0 mutex alloc failed\n");
+			return NULL;
+		}
+		mutex_init(hcd->address0_mutex);
+		hcd->bandwidth_mutex = kmalloc(sizeof(*hcd->bandwidth_mutex),
+				GFP_KERNEL);
+		if (!hcd->bandwidth_mutex) {
+			kfree(hcd->address0_mutex);
+			kfree(hcd);
+			dev_dbg(dev, "hcd bandwidth mutex alloc failed\n");
+			return NULL;
+		}
+		mutex_init(hcd->bandwidth_mutex);
+		dev_set_drvdata(dev, hcd);
+	} else {
+		mutex_lock(&usb_port_peer_mutex);
+		hcd->address0_mutex = primary_hcd->address0_mutex;
+		hcd->bandwidth_mutex = primary_hcd->bandwidth_mutex;
+		hcd->primary_hcd = primary_hcd;
+		primary_hcd->primary_hcd = primary_hcd;
+		hcd->shared_hcd = primary_hcd;
+		primary_hcd->shared_hcd = hcd;
+		mutex_unlock(&usb_port_peer_mutex);
+	}
+
+	kref_init(&hcd->kref);
+
+	usb_bus_init(&hcd->self);
+	hcd->self.controller = dev;
+	hcd->self.sysdev = sysdev;
+	hcd->self.bus_name = bus_name;
+	hcd->self.uses_dma = (sysdev->dma_mask != NULL);
+
+	init_timer(&hcd->rh_timer);
+	hcd->rh_timer.function = rh_timer_func;
+	hcd->rh_timer.data = (unsigned long) hcd;
+#ifdef CONFIG_PM
+	INIT_WORK(&hcd->wakeup_work, hcd_resume_work);
+#endif
+
+	hcd->driver = driver;
+	hcd->speed = driver->flags & HCD_MASK;
+	hcd->product_desc = (driver->product_desc) ? driver->product_desc :
+			"USB Host Controller";
+	return hcd;
+}
+EXPORT_SYMBOL_GPL(__usb_create_hcd);
+
 /**
  * usb_create_shared_hcd - create and initialize an HCD structure
  * @driver: HC driver that will use this hcd
@@ -2513,52 +2591,7 @@ struct usb_hcd *usb_create_shared_hcd(const struct hc_driver *driver,
 		struct device *dev, const char *bus_name,
 		struct usb_hcd *primary_hcd)
 {
-	struct usb_hcd *hcd;
-
-	hcd = kzalloc(sizeof(*hcd) + driver->hcd_priv_size, GFP_KERNEL);
-	if (!hcd) {
-		dev_dbg (dev, "hcd alloc failed\n");
-		return NULL;
-	}
-	if (primary_hcd == NULL) {
-		hcd->bandwidth_mutex = kmalloc(sizeof(*hcd->bandwidth_mutex),
-				GFP_KERNEL);
-		if (!hcd->bandwidth_mutex) {
-			kfree(hcd);
-			dev_dbg(dev, "hcd bandwidth mutex alloc failed\n");
-			return NULL;
-		}
-		mutex_init(hcd->bandwidth_mutex);
-		dev_set_drvdata(dev, hcd);
-	} else {
-		mutex_lock(&usb_port_peer_mutex);
-		hcd->bandwidth_mutex = primary_hcd->bandwidth_mutex;
-		hcd->primary_hcd = primary_hcd;
-		primary_hcd->primary_hcd = primary_hcd;
-		hcd->shared_hcd = primary_hcd;
-		primary_hcd->shared_hcd = hcd;
-		mutex_unlock(&usb_port_peer_mutex);
-	}
-
-	kref_init(&hcd->kref);
-
-	usb_bus_init(&hcd->self);
-	hcd->self.controller = dev;
-	hcd->self.bus_name = bus_name;
-	hcd->self.uses_dma = (dev->dma_mask != NULL);
-
-	init_timer(&hcd->rh_timer);
-	hcd->rh_timer.function = rh_timer_func;
-	hcd->rh_timer.data = (unsigned long) hcd;
-#ifdef CONFIG_PM
-	INIT_WORK(&hcd->wakeup_work, hcd_resume_work);
-#endif
-
-	hcd->driver = driver;
-	hcd->speed = driver->flags & HCD_MASK;
-	hcd->product_desc = (driver->product_desc) ? driver->product_desc :
-			"USB Host Controller";
-	return hcd;
+	return __usb_create_hcd(driver, dev, dev, bus_name, primary_hcd);
 }
 EXPORT_SYMBOL_GPL(usb_create_shared_hcd);
 
@@ -2579,7 +2612,7 @@ EXPORT_SYMBOL_GPL(usb_create_shared_hcd);
 struct usb_hcd *usb_create_hcd(const struct hc_driver *driver,
 		struct device *dev, const char *bus_name)
 {
-	return usb_create_shared_hcd(driver, dev, bus_name, NULL);
+	return __usb_create_hcd(driver, dev, dev, bus_name, NULL);
 }
 EXPORT_SYMBOL_GPL(usb_create_hcd);
 
@@ -2588,24 +2621,23 @@ EXPORT_SYMBOL_GPL(usb_create_hcd);
  * Don't deallocate the bandwidth_mutex until the last shared usb_hcd is
  * deallocated.
  *
- * Make sure to only deallocate the bandwidth_mutex when the primary HCD is
- * freed.  When hcd_release() is called for either hcd in a peer set
- * invalidate the peer's ->shared_hcd and ->primary_hcd pointers to
- * block new peering attempts
+ * Make sure to deallocate the bandwidth_mutex only when the last HCD is
+ * freed.  When hcd_release() is called for either hcd in a peer set,
+ * invalidate the peer's ->shared_hcd and ->primary_hcd pointers.
  */
 static void hcd_release(struct kref *kref)
 {
 	struct usb_hcd *hcd = container_of (kref, struct usb_hcd, kref);
 
 	mutex_lock(&usb_port_peer_mutex);
-	if (usb_hcd_is_primary_hcd(hcd))
-		kfree(hcd->bandwidth_mutex);
 	if (hcd->shared_hcd) {
 		struct usb_hcd *peer = hcd->shared_hcd;
 
 		peer->shared_hcd = NULL;
-		if (peer->primary_hcd == hcd)
-			peer->primary_hcd = NULL;
+		peer->primary_hcd = NULL;
+	} else {
+		kfree(hcd->address0_mutex);
+		kfree(hcd->bandwidth_mutex);
 	}
 	mutex_unlock(&usb_port_peer_mutex);
 	kfree(hcd);
@@ -2707,7 +2739,7 @@ int usb_add_hcd(struct usb_hcd *hcd,
 	struct usb_device *rhdev;
 
 	if (IS_ENABLED(CONFIG_USB_PHY) && !hcd->usb_phy) {
-		struct usb_phy *phy = usb_get_phy_dev(hcd->self.controller, 0);
+		struct usb_phy *phy = usb_get_phy_dev(hcd->self.sysdev, 0);
 
 		if (IS_ERR(phy)) {
 			retval = PTR_ERR(phy);
@@ -2725,7 +2757,7 @@ int usb_add_hcd(struct usb_hcd *hcd,
 	}
 
 	if (IS_ENABLED(CONFIG_GENERIC_PHY) && !hcd->phy) {
-		struct phy *phy = phy_get(hcd->self.controller, "usb");
+		struct phy *phy = phy_get(hcd->self.sysdev, "usb");
 
 		if (IS_ERR(phy)) {
 			retval = PTR_ERR(phy);
@@ -2773,7 +2805,7 @@ int usb_add_hcd(struct usb_hcd *hcd,
 	 */
 	retval = hcd_buffer_create(hcd);
 	if (retval != 0) {
-		dev_dbg(hcd->self.controller, "pool alloc failed\n");
+		dev_dbg(hcd->self.sysdev, "pool alloc failed\n");
 		goto err_create_buf;
 	}
 
@@ -2783,7 +2815,7 @@ int usb_add_hcd(struct usb_hcd *hcd,
 
 	rhdev = usb_alloc_dev(NULL, &hcd->self, 0);
 	if (rhdev == NULL) {
-		dev_err(hcd->self.controller, "unable to allocate root hub\n");
+		dev_err(hcd->self.sysdev, "unable to allocate root hub\n");
 		retval = -ENOMEM;
 		goto err_allocate_root_hub;
 	}
@@ -3009,6 +3041,7 @@ void usb_remove_hcd(struct usb_hcd *hcd)
 	}
 
 	usb_put_invalidate_rhdev(hcd);
+	hcd->flags = 0;
 }
 EXPORT_SYMBOL_GPL(usb_remove_hcd);
 
@@ -3024,7 +3057,7 @@ EXPORT_SYMBOL_GPL(usb_hcd_platform_shutdown);
 
 /*-------------------------------------------------------------------------*/
 
-#if defined(CONFIG_USB_MON) || defined(CONFIG_USB_MON_MODULE)
+#if IS_ENABLED(CONFIG_USB_MON)
 
 const struct usb_mon_operations *mon_ops;
 

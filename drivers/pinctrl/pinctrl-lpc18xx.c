@@ -11,7 +11,7 @@
 #include <linux/bitops.h>
 #include <linux/clk.h>
 #include <linux/io.h>
-#include <linux/module.h>
+#include <linux/init.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/pinctrl/pinctrl.h>
@@ -904,7 +904,7 @@ static int lpc18xx_pconf_get(struct pinctrl_dev *pctldev, unsigned pin,
 
 static int lpc18xx_pconf_set_usb1(struct pinctrl_dev *pctldev,
 				  enum pin_config_param param,
-				  u16 param_val, u32 *reg)
+				  u32 param_val, u32 *reg)
 {
 	switch (param) {
 	case PIN_CONFIG_LOW_POWER_MODE:
@@ -932,7 +932,7 @@ static int lpc18xx_pconf_set_usb1(struct pinctrl_dev *pctldev,
 
 static int lpc18xx_pconf_set_i2c0(struct pinctrl_dev *pctldev,
 				  enum pin_config_param param,
-				  u16 param_val, u32 *reg,
+				  u32 param_val, u32 *reg,
 				  unsigned pin)
 {
 	u8 shift;
@@ -982,7 +982,7 @@ static int lpc18xx_pconf_set_i2c0(struct pinctrl_dev *pctldev,
 }
 
 static int lpc18xx_pconf_set_gpio_pin_int(struct pinctrl_dev *pctldev,
-					  u16 param_val, unsigned pin)
+					  u32 param_val, unsigned pin)
 {
 	struct lpc18xx_scu_data *scu = pinctrl_dev_get_drvdata(pctldev);
 	u32 val, reg_val, reg_offset = LPC18XX_SCU_PINTSEL0;
@@ -1008,7 +1008,7 @@ static int lpc18xx_pconf_set_gpio_pin_int(struct pinctrl_dev *pctldev,
 }
 
 static int lpc18xx_pconf_set_pin(struct pinctrl_dev *pctldev, unsigned param,
-				 u16 param_val, u32 *reg, unsigned pin,
+				 u32 param_val, u32 *reg, unsigned pin,
 				 struct lpc18xx_pin_caps *pin_cap)
 {
 	switch (param) {
@@ -1088,7 +1088,7 @@ static int lpc18xx_pconf_set(struct pinctrl_dev *pctldev, unsigned pin,
 	struct lpc18xx_scu_data *scu = pinctrl_dev_get_drvdata(pctldev);
 	struct lpc18xx_pin_caps *pin_cap;
 	enum pin_config_param param;
-	u16 param_val;
+	u32 param_val;
 	u32 reg;
 	int ret;
 	int i;
@@ -1252,7 +1252,7 @@ static const struct pinctrl_ops lpc18xx_pctl_ops = {
 	.get_group_name		= lpc18xx_pctl_get_group_name,
 	.get_group_pins		= lpc18xx_pctl_get_group_pins,
 	.dt_node_to_map		= pinconf_generic_dt_node_to_map_pin,
-	.dt_free_map		= pinctrl_utils_dt_free_map,
+	.dt_free_map		= pinctrl_utils_free_map,
 };
 
 static struct pinctrl_desc lpc18xx_scu_desc = {
@@ -1355,7 +1355,7 @@ static int lpc18xx_scu_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, scu);
 
-	scu->pctl = pinctrl_register(&lpc18xx_scu_desc, &pdev->dev, scu);
+	scu->pctl = devm_pinctrl_register(&pdev->dev, &lpc18xx_scu_desc, scu);
 	if (IS_ERR(scu->pctl)) {
 		dev_err(&pdev->dev, "Could not register pinctrl driver\n");
 		clk_disable_unprepare(scu->clk);
@@ -1365,32 +1365,17 @@ static int lpc18xx_scu_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int lpc18xx_scu_remove(struct platform_device *pdev)
-{
-	struct lpc18xx_scu_data *scu = platform_get_drvdata(pdev);
-
-	pinctrl_unregister(scu->pctl);
-	clk_disable_unprepare(scu->clk);
-
-	return 0;
-}
-
 static const struct of_device_id lpc18xx_scu_match[] = {
 	{ .compatible = "nxp,lpc1850-scu" },
 	{},
 };
-MODULE_DEVICE_TABLE(of, lpc18xx_scu_match);
 
 static struct platform_driver lpc18xx_scu_driver = {
 	.probe		= lpc18xx_scu_probe,
-	.remove		= lpc18xx_scu_remove,
 	.driver = {
 		.name		= "lpc18xx-scu",
 		.of_match_table	= lpc18xx_scu_match,
+		.suppress_bind_attrs = true,
 	},
 };
-module_platform_driver(lpc18xx_scu_driver);
-
-MODULE_AUTHOR("Joachim Eastwood <manabian@gmail.com>");
-MODULE_DESCRIPTION("Pinctrl driver for NXP LPC18xx/43xx SCU");
-MODULE_LICENSE("GPL v2");
+builtin_platform_driver(lpc18xx_scu_driver);

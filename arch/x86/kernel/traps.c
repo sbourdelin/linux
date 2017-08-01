@@ -21,7 +21,7 @@
 #include <linux/kdebug.h>
 #include <linux/kgdb.h>
 #include <linux/kernel.h>
-#include <linux/module.h>
+#include <linux/export.h>
 #include <linux/ptrace.h>
 #include <linux/uprobes.h>
 #include <linux/string.h>
@@ -29,6 +29,7 @@
 #include <linux/errno.h>
 #include <linux/kexec.h>
 #include <linux/sched.h>
+#include <linux/sched/task_stack.h>
 #include <linux/timer.h>
 #include <linux/init.h>
 #include <linux/bug.h>
@@ -51,6 +52,7 @@
 #include <asm/processor.h>
 #include <asm/debugreg.h>
 #include <linux/atomic.h>
+#include <asm/text-patching.h>
 #include <asm/ftrace.h>
 #include <asm/traps.h>
 #include <asm/desc.h>
@@ -95,6 +97,12 @@ static inline void cond_local_irq_disable(struct pt_regs *regs)
 		local_irq_disable();
 }
 
+/*
+ * In IST context, we explicitly disable preemption.  This serves two
+ * purposes: it makes it much less likely that we would accidentally
+ * schedule in IST context and it will force a warning if we somehow
+ * manage to schedule by accident.
+ */
 void ist_enter(struct pt_regs *regs)
 {
 	if (user_mode(regs)) {
@@ -109,13 +117,7 @@ void ist_enter(struct pt_regs *regs)
 		rcu_nmi_enter();
 	}
 
-	/*
-	 * We are atomic because we're on the IST stack; or we're on
-	 * x86_32, in which case we still shouldn't schedule; or we're
-	 * on x86_64 and entered from user mode, in which case we're
-	 * still atomic unless ist_begin_non_atomic is called.
-	 */
-	preempt_count_add(HARDIRQ_OFFSET);
+	preempt_disable();
 
 	/* This code is a bit fragile.  Test it. */
 	RCU_LOCKDEP_WARN(!rcu_is_watching(), "ist_enter didn't work");
@@ -123,7 +125,7 @@ void ist_enter(struct pt_regs *regs)
 
 void ist_exit(struct pt_regs *regs)
 {
-	preempt_count_sub(HARDIRQ_OFFSET);
+	preempt_enable_no_resched();
 
 	if (!user_mode(regs))
 		rcu_nmi_exit();
@@ -154,7 +156,7 @@ void ist_begin_non_atomic(struct pt_regs *regs)
 	BUG_ON((unsigned long)(current_top_of_stack() -
 			       current_stack_pointer()) >= THREAD_SIZE);
 
-	preempt_count_sub(HARDIRQ_OFFSET);
+	preempt_enable_no_resched();
 }
 
 /**
@@ -164,7 +166,38 @@ void ist_begin_non_atomic(struct pt_regs *regs)
  */
 void ist_end_non_atomic(void)
 {
-	preempt_count_add(HARDIRQ_OFFSET);
+	preempt_disable();
+}
+
+int is_valid_bugaddr(unsigned long addr)
+{
+	unsigned short ud;
+
+	if (addr < TASK_SIZE_MAX)
+		return 0;
+
+	if (probe_kernel_address((unsigned short *)addr, ud))
+		return 0;
+
+	return ud == INSN_UD0 || ud == INSN_UD2;
+}
+
+int fixup_bug(struct pt_regs *regs, int trapnr)
+{
+	if (trapnr != X86_TRAP_UD)
+		return 0;
+
+	switch (report_bug(regs->ip, regs)) {
+	case BUG_TRAP_TYPE_NONE:
+	case BUG_TRAP_TYPE_BUG:
+		break;
+
+	case BUG_TRAP_TYPE_WARN:
+		regs->ip += LEN_UD0;
+		return 1;
+	}
+
+	return 0;
 }
 
 static nokprobe_inline int
@@ -185,12 +218,15 @@ do_trap_no_signal(struct task_struct *tsk, int trapnr, char *str,
 	}
 
 	if (!user_mode(regs)) {
-		if (!fixup_exception(regs, trapnr)) {
-			tsk->thread.error_code = error_code;
-			tsk->thread.trap_nr = trapnr;
-			die(str, regs, error_code);
-		}
-		return 0;
+		if (fixup_exception(regs, trapnr))
+			return 0;
+
+		if (fixup_bug(regs, trapnr))
+			return 0;
+
+		tsk->thread.error_code = error_code;
+		tsk->thread.trap_nr = trapnr;
+		die(str, regs, error_code);
 	}
 
 	return -1;
@@ -253,7 +289,7 @@ do_trap(int trapnr, int signr, char *str, struct pt_regs *regs,
 		pr_info("%s[%d] trap %s ip:%lx sp:%lx error:%lx",
 			tsk->comm, tsk->pid, str,
 			regs->ip, regs->sp, error_code);
-		print_vma_addr(" in ", regs->ip);
+		print_vma_addr(KERN_CONT " in ", regs->ip);
 		pr_cont("\n");
 	}
 
@@ -291,12 +327,30 @@ DO_ERROR(X86_TRAP_NP,     SIGBUS,  "segment not present",	segment_not_present)
 DO_ERROR(X86_TRAP_SS,     SIGBUS,  "stack segment",		stack_segment)
 DO_ERROR(X86_TRAP_AC,     SIGBUS,  "alignment check",		alignment_check)
 
+#ifdef CONFIG_VMAP_STACK
+__visible void __noreturn handle_stack_overflow(const char *message,
+						struct pt_regs *regs,
+						unsigned long fault_address)
+{
+	printk(KERN_EMERG "BUG: stack guard page was hit at %p (stack is %p..%p)\n",
+		 (void *)fault_address, current->stack,
+		 (char *)current->stack + THREAD_SIZE - 1);
+	die(message, regs, 0);
+
+	/* Be absolutely certain we don't return. */
+	panic(message);
+}
+#endif
+
 #ifdef CONFIG_X86_64
 /* Runs on IST stack */
 dotraplinkage void do_double_fault(struct pt_regs *regs, long error_code)
 {
 	static const char str[] = "double fault";
 	struct task_struct *tsk = current;
+#ifdef CONFIG_VMAP_STACK
+	unsigned long cr2;
+#endif
 
 #ifdef CONFIG_X86_ESPFIX64
 	extern unsigned char native_irq_return_iret[];
@@ -330,6 +384,49 @@ dotraplinkage void do_double_fault(struct pt_regs *regs, long error_code)
 
 	tsk->thread.error_code = error_code;
 	tsk->thread.trap_nr = X86_TRAP_DF;
+
+#ifdef CONFIG_VMAP_STACK
+	/*
+	 * If we overflow the stack into a guard page, the CPU will fail
+	 * to deliver #PF and will send #DF instead.  Similarly, if we
+	 * take any non-IST exception while too close to the bottom of
+	 * the stack, the processor will get a page fault while
+	 * delivering the exception and will generate a double fault.
+	 *
+	 * According to the SDM (footnote in 6.15 under "Interrupt 14 -
+	 * Page-Fault Exception (#PF):
+	 *
+	 *   Processors update CR2 whenever a page fault is detected. If a
+	 *   second page fault occurs while an earlier page fault is being
+	 *   deliv- ered, the faulting linear address of the second fault will
+	 *   overwrite the contents of CR2 (replacing the previous
+	 *   address). These updates to CR2 occur even if the page fault
+	 *   results in a double fault or occurs during the delivery of a
+	 *   double fault.
+	 *
+	 * The logic below has a small possibility of incorrectly diagnosing
+	 * some errors as stack overflows.  For example, if the IDT or GDT
+	 * gets corrupted such that #GP delivery fails due to a bad descriptor
+	 * causing #GP and we hit this condition while CR2 coincidentally
+	 * points to the stack guard page, we'll think we overflowed the
+	 * stack.  Given that we're going to panic one way or another
+	 * if this happens, this isn't necessarily worth fixing.
+	 *
+	 * If necessary, we could improve the test by only diagnosing
+	 * a stack overflow if the saved RSP points within 47 bytes of
+	 * the bottom of the stack: if RSP == tsk_stack + 48 and we
+	 * take an exception, the stack is already aligned and there
+	 * will be enough room SS, RSP, RFLAGS, CS, RIP, and a
+	 * possible error code, so a stack overflow would *not* double
+	 * fault.  With any less space left, exception delivery could
+	 * fail, and, as a practical matter, we've overflowed the
+	 * stack even if the actual trigger for the double fault was
+	 * something else.
+	 */
+	cr2 = read_cr2();
+	if ((unsigned long)task_stack_page(tsk) - 1 - cr2 < PAGE_SIZE)
+		handle_stack_overflow("kernel stack overflow (double-fault)", regs, cr2);
+#endif
 
 #ifdef CONFIG_DOUBLEFAULT
 	df_debug(regs, error_code);
@@ -456,7 +553,7 @@ do_general_protection(struct pt_regs *regs, long error_code)
 		pr_info("%s[%d] general protection ip:%lx sp:%lx error:%lx",
 			tsk->comm, task_pid_nr(tsk),
 			regs->ip, regs->sp, error_code);
-		print_vma_addr(" in ", regs->ip);
+		print_vma_addr(KERN_CONT " in ", regs->ip);
 		pr_cont("\n");
 	}
 
@@ -501,11 +598,9 @@ dotraplinkage void notrace do_int3(struct pt_regs *regs, long error_code)
 	 * as we may switch to the interrupt stack.
 	 */
 	debug_stack_usage_inc();
-	preempt_disable();
 	cond_local_irq_enable(regs);
 	do_trap(X86_TRAP_BP, SIGTRAP, "int3", regs, error_code, NULL);
 	cond_local_irq_disable(regs);
-	preempt_enable_no_resched();
 	debug_stack_usage_dec();
 exit:
 	ist_exit(regs);
@@ -680,14 +775,12 @@ dotraplinkage void do_debug(struct pt_regs *regs, long error_code)
 	debug_stack_usage_inc();
 
 	/* It's safe to allow irq's after DR6 has been saved */
-	preempt_disable();
 	cond_local_irq_enable(regs);
 
 	if (v8086_mode(regs)) {
 		handle_vm86_trap((struct kernel_vm86_regs *) regs, error_code,
 					X86_TRAP_DB);
 		cond_local_irq_disable(regs);
-		preempt_enable_no_resched();
 		debug_stack_usage_dec();
 		goto exit;
 	}
@@ -707,7 +800,6 @@ dotraplinkage void do_debug(struct pt_regs *regs, long error_code)
 	if (tsk->thread.debugreg6 & (DR_STEP | DR_TRAP_BITS) || user_icebp)
 		send_sigtrap(tsk, regs, error_code, si_code);
 	cond_local_irq_disable(regs);
-	preempt_enable_no_resched();
 	debug_stack_usage_dec();
 
 exit:
@@ -791,6 +883,8 @@ do_spurious_interrupt_bug(struct pt_regs *regs, long error_code)
 dotraplinkage void
 do_device_not_available(struct pt_regs *regs, long error_code)
 {
+	unsigned long cr0;
+
 	RCU_LOCKDEP_WARN(!rcu_is_watching(), "entry code didn't wake RCU");
 
 #ifdef CONFIG_MATH_EMULATION
@@ -804,10 +898,20 @@ do_device_not_available(struct pt_regs *regs, long error_code)
 		return;
 	}
 #endif
-	fpu__restore(&current->thread.fpu); /* interrupts still off */
-#ifdef CONFIG_X86_32
-	cond_local_irq_enable(regs);
-#endif
+
+	/* This should not happen. */
+	cr0 = read_cr0();
+	if (WARN(cr0 & X86_CR0_TS, "CR0.TS was set")) {
+		/* Try to fix it up and carry on. */
+		write_cr0(cr0 & ~X86_CR0_TS);
+	} else {
+		/*
+		 * Something terrible happened, and we're better off trying
+		 * to kill the task than getting stuck in a never-ending
+		 * loop of #NM faults.
+		 */
+		die("unexpected #NM exception", regs, error_code);
+	}
 }
 NOKPROBE_SYMBOL(do_device_not_available);
 

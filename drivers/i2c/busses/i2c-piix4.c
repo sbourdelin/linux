@@ -58,7 +58,7 @@
 #define SMBSLVDAT	(0xC + piix4_smba)
 
 /* count for request_region */
-#define SMBIOSIZE	8
+#define SMBIOSIZE	9
 
 /* PCI Address Constants */
 #define SMBBA		0x090
@@ -85,8 +85,14 @@
 /* SB800 constants */
 #define SB800_PIIX4_SMB_IDX		0xcd6
 
-/* SB800 port is selected by bits 2:1 of the smb_en register (0x2c) */
+/*
+ * SB800 port is selected by bits 2:1 of the smb_en register (0x2c)
+ * or the smb_sel register (0x2e), depending on bit 0 of register 0x2f.
+ * Hudson-2/Bolton port is always selected by bits 2:1 of register 0x2f.
+ */
 #define SB800_PIIX4_PORT_IDX		0x2c
+#define SB800_PIIX4_PORT_IDX_ALT	0x2e
+#define SB800_PIIX4_PORT_IDX_SEL	0x2f
 #define SB800_PIIX4_PORT_IDX_MASK	0x06
 
 /* insmod parameters */
@@ -100,7 +106,7 @@ MODULE_PARM_DESC(force, "Forcibly enable the PIIX4. DANGEROUS!");
 /* If force_addr is set to anything different from 0, we forcibly enable
    the PIIX4 at the given address. VERY DANGEROUS! */
 static int force_addr;
-module_param (force_addr, int, 0);
+module_param_hw(force_addr, int, ioport, 0);
 MODULE_PARM_DESC(force_addr,
 		 "Forcibly enable the PIIX4 at the given address. "
 		 "EXTREMELY DANGEROUS!");
@@ -136,8 +142,13 @@ static const struct dmi_system_id piix4_dmi_ibm[] = {
 	{ },
 };
 
-/* SB800 globals */
+/*
+ * SB800 globals
+ * piix4_mutex_sb800 protects piix4_port_sel_sb800 and the pair
+ * of I/O ports at SB800_PIIX4_SMB_IDX.
+ */
 static DEFINE_MUTEX(piix4_mutex_sb800);
+static u8 piix4_port_sel_sb800;
 static const char *piix4_main_port_names_sb800[PIIX4_MAX_ADAPTERS] = {
 	" port 0", " port 2", " port 3", " port 4"
 };
@@ -148,7 +159,7 @@ struct i2c_piix4_adapdata {
 
 	/* SB800 */
 	bool sb800_main;
-	unsigned short port;
+	u8 port;		/* Port number, shifted */
 };
 
 static int piix4_setup(struct pci_dev *PIIX4_dev,
@@ -254,7 +265,7 @@ static int piix4_setup_sb800(struct pci_dev *PIIX4_dev,
 			     const struct pci_device_id *id, u8 aux)
 {
 	unsigned short piix4_smba;
-	u8 smba_en_lo, smba_en_hi, smb_en, smb_en_status;
+	u8 smba_en_lo, smba_en_hi, smb_en, smb_en_status, port_sel;
 	u8 i2ccfg, i2ccfg_offset = 0x10;
 
 	/* SB800 and later SMBus does not support forcing address */
@@ -333,6 +344,23 @@ static int piix4_setup_sb800(struct pci_dev *PIIX4_dev,
 	dev_info(&PIIX4_dev->dev,
 		 "SMBus Host Controller at 0x%x, revision %d\n",
 		 piix4_smba, i2ccfg >> 4);
+
+	/* Find which register is used for port selection */
+	if (PIIX4_dev->vendor == PCI_VENDOR_ID_AMD) {
+		piix4_port_sel_sb800 = SB800_PIIX4_PORT_IDX_ALT;
+	} else {
+		mutex_lock(&piix4_mutex_sb800);
+		outb_p(SB800_PIIX4_PORT_IDX_SEL, SB800_PIIX4_SMB_IDX);
+		port_sel = inb_p(SB800_PIIX4_SMB_IDX + 1);
+		piix4_port_sel_sb800 = (port_sel & 0x01) ?
+				       SB800_PIIX4_PORT_IDX_ALT :
+				       SB800_PIIX4_PORT_IDX;
+		mutex_unlock(&piix4_mutex_sb800);
+	}
+
+	dev_info(&PIIX4_dev->dev,
+		 "Using register 0x%02x for SMBus port selection\n",
+		 (unsigned int)piix4_port_sel_sb800);
 
 	return piix4_smba;
 }
@@ -557,24 +585,48 @@ static s32 piix4_access_sb800(struct i2c_adapter *adap, u16 addr,
 		 u8 command, int size, union i2c_smbus_data *data)
 {
 	struct i2c_piix4_adapdata *adapdata = i2c_get_adapdata(adap);
+	unsigned short piix4_smba = adapdata->smba;
+	int retries = MAX_TIMEOUT;
+	int smbslvcnt;
 	u8 smba_en_lo;
 	u8 port;
 	int retval;
 
 	mutex_lock(&piix4_mutex_sb800);
 
-	outb_p(SB800_PIIX4_PORT_IDX, SB800_PIIX4_SMB_IDX);
+	/* Request the SMBUS semaphore, avoid conflicts with the IMC */
+	smbslvcnt  = inb_p(SMBSLVCNT);
+	do {
+		outb_p(smbslvcnt | 0x10, SMBSLVCNT);
+
+		/* Check the semaphore status */
+		smbslvcnt  = inb_p(SMBSLVCNT);
+		if (smbslvcnt & 0x10)
+			break;
+
+		usleep_range(1000, 2000);
+	} while (--retries);
+	/* SMBus is still owned by the IMC, we give up */
+	if (!retries) {
+		mutex_unlock(&piix4_mutex_sb800);
+		return -EBUSY;
+	}
+
+	outb_p(piix4_port_sel_sb800, SB800_PIIX4_SMB_IDX);
 	smba_en_lo = inb_p(SB800_PIIX4_SMB_IDX + 1);
 
 	port = adapdata->port;
-	if ((smba_en_lo & SB800_PIIX4_PORT_IDX_MASK) != (port << 1))
-		outb_p((smba_en_lo & ~SB800_PIIX4_PORT_IDX_MASK) | (port << 1),
+	if ((smba_en_lo & SB800_PIIX4_PORT_IDX_MASK) != port)
+		outb_p((smba_en_lo & ~SB800_PIIX4_PORT_IDX_MASK) | port,
 		       SB800_PIIX4_SMB_IDX + 1);
 
 	retval = piix4_access(adap, addr, flags, read_write,
 			      command, size, data);
 
 	outb_p(smba_en_lo, SB800_PIIX4_SMB_IDX + 1);
+
+	/* Release the semaphore */
+	outb_p(smbslvcnt | 0x20, SMBSLVCNT);
 
 	mutex_unlock(&piix4_mutex_sb800);
 
@@ -627,7 +679,7 @@ static struct i2c_adapter *piix4_main_adapters[PIIX4_MAX_ADAPTERS];
 static struct i2c_adapter *piix4_aux_adapter;
 
 static int piix4_add_adapter(struct pci_dev *dev, unsigned short smba,
-			     bool sb800_main, unsigned short port,
+			     bool sb800_main, u8 port,
 			     const char *name, struct i2c_adapter **padap)
 {
 	struct i2c_adapter *adap;
@@ -654,7 +706,7 @@ static int piix4_add_adapter(struct pci_dev *dev, unsigned short smba,
 
 	adapdata->smba = smba;
 	adapdata->sb800_main = sb800_main;
-	adapdata->port = port;
+	adapdata->port = port << 1;
 
 	/* set up the sysfs linkage to our parent device */
 	adap->dev.parent = &dev->dev;
@@ -666,7 +718,6 @@ static int piix4_add_adapter(struct pci_dev *dev, unsigned short smba,
 
 	retval = i2c_add_adapter(adap);
 	if (retval) {
-		dev_err(&dev->dev, "Couldn't register adapter!\n");
 		kfree(adapdata);
 		kfree(adap);
 		release_region(smba, SMBIOSIZE);
@@ -790,7 +841,7 @@ static void piix4_adap_remove(struct i2c_adapter *adap)
 
 	if (adapdata->smba) {
 		i2c_del_adapter(adap);
-		if (adapdata->port == 0) {
+		if (adapdata->port == (0 << 1)) {
 			release_region(adapdata->smba, SMBIOSIZE);
 			if (adapdata->sb800_main)
 				release_region(SB800_PIIX4_SMB_IDX, 2);

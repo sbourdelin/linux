@@ -81,6 +81,7 @@ const char *scsi_host_state_name(enum scsi_host_state state)
 	return name;
 }
 
+#ifdef CONFIG_SCSI_DH
 static const struct {
 	unsigned char	value;
 	char		*name;
@@ -94,7 +95,7 @@ static const struct {
 	{ SCSI_ACCESS_STATE_TRANSITIONING, "transitioning" },
 };
 
-const char *scsi_access_state_name(unsigned char state)
+static const char *scsi_access_state_name(unsigned char state)
 {
 	int i;
 	char *name = NULL;
@@ -107,6 +108,7 @@ const char *scsi_access_state_name(unsigned char state)
 	}
 	return name;
 }
+#endif
 
 static int check_set(unsigned long long *val, char *src)
 {
@@ -143,7 +145,8 @@ static int scsi_scan(struct Scsi_Host *shost, const char *str)
 	if (shost->transportt->user_scan)
 		res = shost->transportt->user_scan(shost, channel, id, lun);
 	else
-		res = scsi_scan_host_selected(shost, channel, id, lun, 1);
+		res = scsi_scan_host_selected(shost, channel, id, lun,
+					      SCSI_SCAN_MANUAL);
 	return res;
 }
 
@@ -226,7 +229,7 @@ show_shost_state(struct device *dev, struct device_attribute *attr, char *buf)
 }
 
 /* DEVICE_ATTR(state) clashes with dev_attr_state for sdev */
-struct device_attribute dev_attr_hstate =
+static struct device_attribute dev_attr_hstate =
 	__ATTR(state, S_IRUGO | S_IWUSR, show_shost_state, store_shost_state);
 
 static ssize_t
@@ -401,7 +404,7 @@ static struct attribute *scsi_sysfs_shost_attrs[] = {
 	NULL
 };
 
-struct attribute_group scsi_shost_attr_group = {
+static struct attribute_group scsi_shost_attr_group = {
 	.attrs =	scsi_sysfs_shost_attrs,
 };
 
@@ -716,7 +719,7 @@ static ssize_t
 store_state_field(struct device *dev, struct device_attribute *attr,
 		  const char *buf, size_t count)
 {
-	int i;
+	int i, ret;
 	struct scsi_device *sdev = to_scsi_device(dev);
 	enum scsi_device_state state = 0;
 
@@ -731,9 +734,11 @@ store_state_field(struct device *dev, struct device_attribute *attr,
 	if (!state)
 		return -EINVAL;
 
-	if (scsi_device_set_state(sdev, state))
-		return -EINVAL;
-	return count;
+	mutex_lock(&sdev->state_mutex);
+	ret = scsi_device_set_state(sdev, state);
+	mutex_unlock(&sdev->state_mutex);
+
+	return ret == 0 ? count : -EINVAL;
 }
 
 static ssize_t
@@ -1105,7 +1110,7 @@ static umode_t scsi_sdev_bin_attr_is_visible(struct kobject *kobj,
 	if (attr == &dev_attr_vpd_pg80 && !sdev->vpd_pg80)
 		return 0;
 
-	if (attr == &dev_attr_vpd_pg83 && sdev->vpd_pg83)
+	if (attr == &dev_attr_vpd_pg83 && !sdev->vpd_pg83)
 		return 0;
 
 	return S_IRUGO;
@@ -1201,10 +1206,6 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 	struct request_queue *rq = sdev->request_queue;
 	struct scsi_target *starget = sdev->sdev_target;
 
-	error = scsi_device_set_state(sdev, SDEV_RUNNING);
-	if (error)
-		return error;
-
 	error = scsi_target_add(starget);
 	if (error)
 		return error;
@@ -1273,6 +1274,7 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 void __scsi_remove_device(struct scsi_device *sdev)
 {
 	struct device *dev = &sdev->sdev_gendev;
+	int res;
 
 	/*
 	 * This cleanup path is not reentrant and while it is impossible
@@ -1283,7 +1285,25 @@ void __scsi_remove_device(struct scsi_device *sdev)
 		return;
 
 	if (sdev->is_visible) {
-		if (scsi_device_set_state(sdev, SDEV_CANCEL) != 0)
+		/*
+		 * If scsi_internal_target_block() is running concurrently,
+		 * wait until it has finished before changing the device state.
+		 */
+		mutex_lock(&sdev->state_mutex);
+		/*
+		 * If blocked, we go straight to DEL and restart the queue so
+		 * any commands issued during driver shutdown (like sync
+		 * cache) are errored immediately.
+		 */
+		res = scsi_device_set_state(sdev, SDEV_CANCEL);
+		if (res != 0) {
+			res = scsi_device_set_state(sdev, SDEV_DEL);
+			if (res == 0)
+				scsi_start_queue(sdev);
+		}
+		mutex_unlock(&sdev->state_mutex);
+
+		if (res != 0)
 			return;
 
 		bsg_unregister_queue(sdev->request_queue);
@@ -1299,7 +1319,10 @@ void __scsi_remove_device(struct scsi_device *sdev)
 	 * scsi_run_queue() invocations have finished before tearing down the
 	 * device.
 	 */
+	mutex_lock(&sdev->state_mutex);
 	scsi_device_set_state(sdev, SDEV_DEL);
+	mutex_unlock(&sdev->state_mutex);
+
 	blk_cleanup_queue(sdev->request_queue);
 	cancel_work_sync(&sdev->requeue_work);
 
@@ -1364,18 +1387,22 @@ static void __scsi_remove_target(struct scsi_target *starget)
 void scsi_remove_target(struct device *dev)
 {
 	struct Scsi_Host *shost = dev_to_shost(dev->parent);
-	struct scsi_target *starget, *last_target = NULL;
+	struct scsi_target *starget;
 	unsigned long flags;
 
 restart:
 	spin_lock_irqsave(shost->host_lock, flags);
 	list_for_each_entry(starget, &shost->__targets, siblings) {
 		if (starget->state == STARGET_DEL ||
-		    starget == last_target)
+		    starget->state == STARGET_REMOVE ||
+		    starget->state == STARGET_CREATED_REMOVE)
 			continue;
 		if (starget->dev.parent == dev || &starget->dev == dev) {
 			kref_get(&starget->reap_ref);
-			last_target = starget;
+			if (starget->state == STARGET_CREATED)
+				starget->state = STARGET_CREATED_REMOVE;
+			else
+				starget->state = STARGET_REMOVE;
 			spin_unlock_irqrestore(shost->host_lock, flags);
 			__scsi_remove_target(starget);
 			scsi_target_reap(starget);

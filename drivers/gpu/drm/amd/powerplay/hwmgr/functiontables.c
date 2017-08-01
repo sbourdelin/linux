@@ -34,6 +34,11 @@ static int phm_run_table(struct pp_hwmgr *hwmgr,
 	int result = 0;
 	phm_table_function *function;
 
+	if (rt_table->function_list == NULL) {
+		pr_debug("this function not implement!\n");
+		return 0;
+	}
+
 	for (function = rt_table->function_list; NULL != *function; function++) {
 		int tmp = (*function)(hwmgr, input, output, temp_storage, result);
 
@@ -54,32 +59,33 @@ int phm_dispatch_table(struct pp_hwmgr *hwmgr,
 		       struct phm_runtime_table_header *rt_table,
 		       void *input, void *output)
 {
-	int result = 0;
-	void *temp_storage = NULL;
+	int result;
+	void *temp_storage;
 
-	if (hwmgr == NULL || rt_table == NULL || rt_table->function_list == NULL) {
-		printk(KERN_ERR "[ powerplay ] Invalid Parameter!\n");
-		return 0; /*temp return ture because some function not implement on some asic */
+	if (hwmgr == NULL || rt_table == NULL) {
+		pr_err("Invalid Parameter!\n");
+		return -EINVAL;
 	}
 
 	if (0 != rt_table->storage_size) {
 		temp_storage = kzalloc(rt_table->storage_size, GFP_KERNEL);
 		if (temp_storage == NULL) {
-			printk(KERN_ERR "[ powerplay ] Could not allocate table temporary storage\n");
+			pr_err("Could not allocate table temporary storage\n");
 			return -ENOMEM;
 		}
+	} else {
+		temp_storage = NULL;
 	}
 
 	result = phm_run_table(hwmgr, rt_table, input, output, temp_storage);
 
-	if (NULL != temp_storage)
-		kfree(temp_storage);
+	kfree(temp_storage);
 
 	return result;
 }
 
 int phm_construct_table(struct pp_hwmgr *hwmgr,
-			struct phm_master_table_header *master_table,
+			const struct phm_master_table_header *master_table,
 			struct phm_runtime_table_header *rt_table)
 {
 	uint32_t function_count = 0;
@@ -89,7 +95,7 @@ int phm_construct_table(struct pp_hwmgr *hwmgr,
 	phm_table_function *rtf;
 
 	if (hwmgr == NULL || master_table == NULL || rt_table == NULL) {
-		printk(KERN_ERR "[ powerplay ] Invalid Parameter!\n");
+		pr_err("Invalid Parameter!\n");
 		return -EINVAL;
 	}
 
@@ -110,7 +116,7 @@ int phm_construct_table(struct pp_hwmgr *hwmgr,
 	for (table_item = master_table->master_list;
 		NULL != table_item->tableFunction; table_item++) {
 		if ((rtf - run_time_list) > function_count) {
-			printk(KERN_ERR "[ powerplay ] Check function results have changed\n");
+			pr_err("Check function results have changed\n");
 			kfree(run_time_list);
 			return -EINVAL;
 		}
@@ -122,7 +128,7 @@ int phm_construct_table(struct pp_hwmgr *hwmgr,
 	}
 
 	if ((rtf - run_time_list) > function_count) {
-		printk(KERN_ERR "[ powerplay ] Check function results have changed\n");
+		pr_err("Check function results have changed\n");
 		kfree(run_time_list);
 		return -EINVAL;
 	}
@@ -138,7 +144,7 @@ int phm_destroy_table(struct pp_hwmgr *hwmgr,
 		      struct phm_runtime_table_header *rt_table)
 {
 	if (hwmgr == NULL || rt_table == NULL) {
-		printk(KERN_ERR "[ powerplay ] Invalid Parameter\n");
+		pr_err("Invalid Parameter\n");
 		return -EINVAL;
 	}
 

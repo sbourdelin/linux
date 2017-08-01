@@ -3,7 +3,6 @@ menu "EEPROM support"
 config EEPROM_AT24
 	tristate "I2C EEPROMs / RAMs / ROMs from most vendors"
 	depends on I2C && SYSFS
-	select REGMAP
 	select NVMEM
 	help
 	  Enable this driver to get read/write support to most I2C EEPROMs
@@ -32,7 +31,6 @@ config EEPROM_AT24
 config EEPROM_AT25
 	tristate "SPI EEPROMs from most vendors"
 	depends on SPI && SYSFS
-	select REGMAP
 	select NVMEM
 	help
 	  Enable this driver to get read/write support to most SPI EEPROMs,
@@ -101,5 +99,15 @@ config EEPROM_DIGSY_MTC_CFG
 	  erase the whole EEPROM.
 
 	  If unsure, say N.
+
+config EEPROM_IDT_89HPESX
+	tristate "IDT 89HPESx PCIe-swtiches EEPROM / CSR support"
+	depends on I2C && SYSFS
+	help
+	  Enable this driver to get read/write access to EEPROM / CSRs
+	  over IDT PCIe-swtich i2c-slave interface.
+
+	  This driver can also be built as a module. If so, the module
+	  will be called idt_89hpesx.
 
 endmenu

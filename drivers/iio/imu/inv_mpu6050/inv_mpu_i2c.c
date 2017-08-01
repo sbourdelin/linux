@@ -15,9 +15,9 @@
 #include <linux/delay.h>
 #include <linux/err.h>
 #include <linux/i2c.h>
-#include <linux/i2c-mux.h>
 #include <linux/iio/iio.h>
 #include <linux/module.h>
+#include <linux/of_device.h>
 #include "inv_mpu_iio.h"
 
 static const struct regmap_config inv_mpu_regmap_config = {
@@ -25,46 +25,16 @@ static const struct regmap_config inv_mpu_regmap_config = {
 	.val_bits = 8,
 };
 
-/*
- * The i2c read/write needs to happen in unlocked mode. As the parent
- * adapter is common. If we use locked versions, it will fail as
- * the mux adapter will lock the parent i2c adapter, while calling
- * select/deselect functions.
- */
-static int inv_mpu6050_write_reg_unlocked(struct i2c_client *client,
-					  u8 reg, u8 d)
+static int inv_mpu6050_select_bypass(struct i2c_mux_core *muxc, u32 chan_id)
 {
-	int ret;
-	u8 buf[2] = {reg, d};
-	struct i2c_msg msg[1] = {
-		{
-			.addr = client->addr,
-			.flags = 0,
-			.len = sizeof(buf),
-			.buf = buf,
-		}
-	};
-
-	ret = __i2c_transfer(client->adapter, msg, 1);
-	if (ret != 1)
-		return ret;
-
-	return 0;
-}
-
-static int inv_mpu6050_select_bypass(struct i2c_adapter *adap, void *mux_priv,
-				     u32 chan_id)
-{
-	struct i2c_client *client = mux_priv;
-	struct iio_dev *indio_dev = dev_get_drvdata(&client->dev);
+	struct iio_dev *indio_dev = i2c_mux_priv(muxc);
 	struct inv_mpu6050_state *st = iio_priv(indio_dev);
 	int ret = 0;
 
 	/* Use the same mutex which was used everywhere to protect power-op */
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&st->lock);
 	if (!st->powerup_count) {
-		ret = inv_mpu6050_write_reg_unlocked(client,
-						     st->reg->pwr_mgmt_1, 0);
+		ret = regmap_write(st->map, st->reg->pwr_mgmt_1, 0);
 		if (ret)
 			goto write_error;
 
@@ -73,35 +43,45 @@ static int inv_mpu6050_select_bypass(struct i2c_adapter *adap, void *mux_priv,
 	}
 	if (!ret) {
 		st->powerup_count++;
-		ret = inv_mpu6050_write_reg_unlocked(client,
-						     st->reg->int_pin_cfg,
-						     INV_MPU6050_INT_PIN_CFG |
-						     INV_MPU6050_BIT_BYPASS_EN);
+		ret = regmap_write(st->map, st->reg->int_pin_cfg,
+				   INV_MPU6050_INT_PIN_CFG |
+				   INV_MPU6050_BIT_BYPASS_EN);
 	}
 write_error:
-	mutex_unlock(&indio_dev->mlock);
+	mutex_unlock(&st->lock);
 
 	return ret;
 }
 
-static int inv_mpu6050_deselect_bypass(struct i2c_adapter *adap,
-				       void *mux_priv, u32 chan_id)
+static int inv_mpu6050_deselect_bypass(struct i2c_mux_core *muxc, u32 chan_id)
 {
-	struct i2c_client *client = mux_priv;
-	struct iio_dev *indio_dev = dev_get_drvdata(&client->dev);
+	struct iio_dev *indio_dev = i2c_mux_priv(muxc);
 	struct inv_mpu6050_state *st = iio_priv(indio_dev);
 
-	mutex_lock(&indio_dev->mlock);
+	mutex_lock(&st->lock);
 	/* It doesn't really mattter, if any of the calls fails */
-	inv_mpu6050_write_reg_unlocked(client, st->reg->int_pin_cfg,
-				       INV_MPU6050_INT_PIN_CFG);
+	regmap_write(st->map, st->reg->int_pin_cfg, INV_MPU6050_INT_PIN_CFG);
 	st->powerup_count--;
 	if (!st->powerup_count)
-		inv_mpu6050_write_reg_unlocked(client, st->reg->pwr_mgmt_1,
-					       INV_MPU6050_BIT_SLEEP);
-	mutex_unlock(&indio_dev->mlock);
+		regmap_write(st->map, st->reg->pwr_mgmt_1,
+			     INV_MPU6050_BIT_SLEEP);
+	mutex_unlock(&st->lock);
 
 	return 0;
+}
+
+static const char *inv_mpu_match_acpi_device(struct device *dev,
+					     enum inv_devices *chip_id)
+{
+	const struct acpi_device_id *id;
+
+	id = acpi_match_device(dev->driver->acpi_match_table, dev);
+	if (!id)
+		return NULL;
+
+	*chip_id = (int)id->driver_data;
+
+	return dev_name(dev);
 }
 
 /**
@@ -116,12 +96,29 @@ static int inv_mpu_probe(struct i2c_client *client,
 {
 	struct inv_mpu6050_state *st;
 	int result;
-	const char *name = id ? id->name : NULL;
+	enum inv_devices chip_type;
 	struct regmap *regmap;
+	const char *name;
 
 	if (!i2c_check_functionality(client->adapter,
 				     I2C_FUNC_SMBUS_I2C_BLOCK))
 		return -EOPNOTSUPP;
+
+	if (client->dev.of_node) {
+		chip_type = (enum inv_devices)
+			of_device_get_match_data(&client->dev);
+		name = client->name;
+	} else if (id) {
+		chip_type = (enum inv_devices)
+			id->driver_data;
+		name = id->name;
+	} else if (ACPI_HANDLE(&client->dev)) {
+		name = inv_mpu_match_acpi_device(&client->dev, &chip_type);
+		if (!name)
+			return -ENODEV;
+	} else {
+		return -ENOSYS;
+	}
 
 	regmap = devm_regmap_init_i2c(client, &inv_mpu_regmap_config);
 	if (IS_ERR(regmap)) {
@@ -131,21 +128,23 @@ static int inv_mpu_probe(struct i2c_client *client,
 	}
 
 	result = inv_mpu_core_probe(regmap, client->irq, name,
-				    NULL, id->driver_data);
+				    NULL, chip_type);
 	if (result < 0)
 		return result;
 
 	st = iio_priv(dev_get_drvdata(&client->dev));
-	st->mux_adapter = i2c_add_mux_adapter(client->adapter,
-					      &client->dev,
-					      client,
-					      0, 0, 0,
-					      inv_mpu6050_select_bypass,
-					      inv_mpu6050_deselect_bypass);
-	if (!st->mux_adapter) {
-		result = -ENODEV;
+	st->muxc = i2c_mux_alloc(client->adapter, &client->dev,
+				 1, 0, I2C_MUX_LOCKED | I2C_MUX_GATE,
+				 inv_mpu6050_select_bypass,
+				 inv_mpu6050_deselect_bypass);
+	if (!st->muxc) {
+		result = -ENOMEM;
 		goto out_unreg_device;
 	}
+	st->muxc->priv = dev_get_drvdata(&client->dev);
+	result = i2c_mux_add_adapter(st->muxc, 0, 0, 0);
+	if (result)
+		goto out_unreg_device;
 
 	result = inv_mpu_acpi_create_mux_client(client);
 	if (result)
@@ -154,7 +153,7 @@ static int inv_mpu_probe(struct i2c_client *client,
 	return 0;
 
 out_del_mux:
-	i2c_del_mux_adapter(st->mux_adapter);
+	i2c_mux_del_adapters(st->muxc);
 out_unreg_device:
 	inv_mpu_core_remove(&client->dev);
 	return result;
@@ -166,7 +165,7 @@ static int inv_mpu_remove(struct i2c_client *client)
 	struct inv_mpu6050_state *st = iio_priv(indio_dev);
 
 	inv_mpu_acpi_delete_mux_client(client);
-	i2c_del_mux_adapter(st->mux_adapter);
+	i2c_mux_del_adapters(st->muxc);
 
 	return inv_mpu_core_remove(&client->dev);
 }
@@ -178,13 +177,41 @@ static int inv_mpu_remove(struct i2c_client *client)
 static const struct i2c_device_id inv_mpu_id[] = {
 	{"mpu6050", INV_MPU6050},
 	{"mpu6500", INV_MPU6500},
+	{"mpu9150", INV_MPU9150},
+	{"mpu9250", INV_MPU9250},
+	{"icm20608", INV_ICM20608},
 	{}
 };
 
 MODULE_DEVICE_TABLE(i2c, inv_mpu_id);
 
+static const struct of_device_id inv_of_match[] = {
+	{
+		.compatible = "invensense,mpu6050",
+		.data = (void *)INV_MPU6050
+	},
+	{
+		.compatible = "invensense,mpu6500",
+		.data = (void *)INV_MPU6500
+	},
+	{
+		.compatible = "invensense,mpu9150",
+		.data = (void *)INV_MPU9150
+	},
+	{
+		.compatible = "invensense,mpu9250",
+		.data = (void *)INV_MPU9250
+	},
+	{
+		.compatible = "invensense,icm20608",
+		.data = (void *)INV_ICM20608
+	},
+	{ }
+};
+MODULE_DEVICE_TABLE(of, inv_of_match);
+
 static const struct acpi_device_id inv_acpi_match[] = {
-	{"INVN6500", 0},
+	{"INVN6500", INV_MPU6500},
 	{ },
 };
 
@@ -195,6 +222,7 @@ static struct i2c_driver inv_mpu_driver = {
 	.remove		=	inv_mpu_remove,
 	.id_table	=	inv_mpu_id,
 	.driver = {
+		.of_match_table = inv_of_match,
 		.acpi_match_table = ACPI_PTR(inv_acpi_match),
 		.name	=	"inv-mpu6050-i2c",
 		.pm     =       &inv_mpu_pmops,

@@ -263,13 +263,21 @@ static int uinput_create_device(struct uinput_device *udev)
 		return -EINVAL;
 	}
 
-	if (test_bit(ABS_MT_SLOT, dev->absbit)) {
-		nslot = input_abs_get_max(dev, ABS_MT_SLOT) + 1;
-		error = input_mt_init_slots(dev, nslot, 0);
-		if (error)
+	if (test_bit(EV_ABS, dev->evbit)) {
+		input_alloc_absinfo(dev);
+		if (!dev->absinfo) {
+			error = -EINVAL;
 			goto fail1;
-	} else if (test_bit(ABS_MT_POSITION_X, dev->absbit)) {
-		input_set_events_per_packet(dev, 60);
+		}
+
+		if (test_bit(ABS_MT_SLOT, dev->absbit)) {
+			nslot = input_abs_get_max(dev, ABS_MT_SLOT) + 1;
+			error = input_mt_init_slots(dev, nslot, 0);
+			if (error)
+				goto fail1;
+		} else if (test_bit(ABS_MT_POSITION_X, dev->absbit)) {
+			input_set_events_per_packet(dev, 60);
+		}
 	}
 
 	if (test_bit(EV_FF, dev->evbit) && !udev->ff_effects_max) {
@@ -664,7 +672,7 @@ struct uinput_ff_upload_compat {
 static int uinput_ff_upload_to_user(char __user *buffer,
 				    const struct uinput_ff_upload *ff_up)
 {
-	if (INPUT_COMPAT_TEST) {
+	if (in_compat_syscall()) {
 		struct uinput_ff_upload_compat ff_up_compat;
 
 		ff_up_compat.request_id = ff_up->request_id;
@@ -695,7 +703,7 @@ static int uinput_ff_upload_to_user(char __user *buffer,
 static int uinput_ff_upload_from_user(const char __user *buffer,
 				      struct uinput_ff_upload *ff_up)
 {
-	if (INPUT_COMPAT_TEST) {
+	if (in_compat_syscall()) {
 		struct uinput_ff_upload_compat ff_up_compat;
 
 		if (copy_from_user(&ff_up_compat, buffer,
@@ -981,9 +989,15 @@ static long uinput_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 }
 
 #ifdef CONFIG_COMPAT
+
+#define UI_SET_PHYS_COMPAT	_IOW(UINPUT_IOCTL_BASE, 108, compat_uptr_t)
+
 static long uinput_compat_ioctl(struct file *file,
 				unsigned int cmd, unsigned long arg)
 {
+	if (cmd == UI_SET_PHYS_COMPAT)
+		cmd = UI_SET_PHYS;
+
 	return uinput_ioctl_handler(file, cmd, arg, compat_ptr(arg));
 }
 #endif
@@ -1007,23 +1021,12 @@ static struct miscdevice uinput_misc = {
 	.minor		= UINPUT_MINOR,
 	.name		= UINPUT_NAME,
 };
+module_misc_device(uinput_misc);
+
 MODULE_ALIAS_MISCDEV(UINPUT_MINOR);
 MODULE_ALIAS("devname:" UINPUT_NAME);
-
-static int __init uinput_init(void)
-{
-	return misc_register(&uinput_misc);
-}
-
-static void __exit uinput_exit(void)
-{
-	misc_deregister(&uinput_misc);
-}
 
 MODULE_AUTHOR("Aristeu Sergio Rozanski Filho");
 MODULE_DESCRIPTION("User level driver support for input subsystem");
 MODULE_LICENSE("GPL");
 MODULE_VERSION("0.3");
-
-module_init(uinput_init);
-module_exit(uinput_exit);
