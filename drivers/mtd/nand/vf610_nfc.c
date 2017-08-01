@@ -816,10 +816,13 @@ static int vf610_nfc_resume(struct device *dev)
 {
 	struct mtd_info *mtd = dev_get_drvdata(dev);
 	struct vf610_nfc *nfc = mtd_to_nfc(mtd);
+	int ret;
 
 	pinctrl_pm_select_default_state(dev);
 
-	clk_prepare_enable(nfc->clk);
+	ret = clk_prepare_enable(nfc->clk);
+	if (ret)
+		return ret;
 
 	vf610_nfc_preinit_controller(nfc);
 	vf610_nfc_init_controller(nfc);
