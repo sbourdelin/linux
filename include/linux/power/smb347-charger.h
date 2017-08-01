@@ -47,7 +47,7 @@ enum smb347_chg_enable {
  * @pre_charge_current: current (in uA) to use in pre-charging phase
  * @termination_current: current (in uA) used to determine when the
  *			 charging cycle terminates
- * @pre_to_fast_voltage: voltage (in uV) treshold used for transitioning to
+ * @pre_to_fast_voltage: voltage (in uV) threshold used for transitioning to
  *			 pre-charge to fast charge mode
  * @mains_current_limit: maximum input current drawn from AC/DC input (in uA)
  * @usb_hc_current_limit: maximum input high current (in uA) drawn from USB
@@ -71,6 +71,7 @@ enum smb347_chg_enable {
  * @use_usb: USB input can be used
  * @use_usb_otg: USB OTG output can be used (not implemented yet)
  * @irq_gpio: GPIO number used for interrupts (%-1 if not used)
+ * @en_gpio: GPIO used for Enable input
  * @enable_control: how charging enable/disable is controlled
  *		    (driver/pin controls)
  *
@@ -111,6 +112,7 @@ struct smb347_charger_platform_data {
 	bool		use_usb;
 	bool		use_usb_otg;
 	int		irq_gpio;
+	struct gpio_desc *en_gpio;
 	enum smb347_chg_enable enable_control;
 };
 
