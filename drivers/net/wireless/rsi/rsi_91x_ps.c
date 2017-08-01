@@ -124,6 +124,23 @@ void rsi_disable_ps(struct rsi_hw *adapter)
 	rsi_modify_ps_state(adapter, PS_DISABLE_REQ_SENT);
 }
 
+/* This function configures UAPSD powersave */
+void rsi_conf_uapsd(struct rsi_hw *adapter)
+{
+	int ret;
+
+	if (adapter->ps_state != PS_ENABLED)
+		return;
+
+	ret = rsi_send_ps_request(adapter, false);
+	if (!ret)
+		ret = rsi_send_ps_request(adapter, true);
+	if (ret)
+		rsi_dbg(ERR_ZONE,
+			"%s: Failed to send PS request to device\n",
+			__func__);
+}
+
 /* This function Processes powersave confirmation */
 int rsi_handle_ps_confirm(struct rsi_hw *adapter, u8 *msg)
 {
@@ -147,3 +164,4 @@ int rsi_handle_ps_confirm(struct rsi_hw *adapter, u8 *msg)
 
 	return 0;
 }
+
