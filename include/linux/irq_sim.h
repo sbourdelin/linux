@@ -9,6 +9,7 @@
 #define _LINUX_IRQ_SIM_H
 
 #include <linux/irq_work.h>
+#include <linux/device.h>
 
 struct irq_sim_work_ctx {
 	struct irq_work work;
@@ -29,6 +30,9 @@ struct irq_sim {
 
 int irq_sim_init(struct irq_sim *sim, unsigned int num_irqs);
 void irq_sim_fini(struct irq_sim *sim);
+
+int devm_irq_sim_init(struct device *dev,
+		      struct irq_sim *sim, unsigned int num_irqs);
 
 void irq_sim_fire(struct irq_sim *sim, unsigned int offset);
 
