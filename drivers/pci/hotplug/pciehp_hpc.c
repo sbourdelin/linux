@@ -583,7 +583,9 @@ static irqreturn_t pciehp_isr(int irq, void *dev_id)
 	 * Slot Status contains plain status bits as well as event
 	 * notification bits; right now we only want the event bits.
 	 */
-	events = status & (PCI_EXP_SLTSTA_ABP | PCI_EXP_SLTSTA_PFD |
+	events = status & (PCI_EXP_SLTSTA_ABP |
+			  (ctrl->power_fault_detected ?
+				0 : PCI_EXP_SLTSTA_PFD) |
 			   PCI_EXP_SLTSTA_PDC | PCI_EXP_SLTSTA_CC |
 			   PCI_EXP_SLTSTA_DLLSC);
 	if (!events)
