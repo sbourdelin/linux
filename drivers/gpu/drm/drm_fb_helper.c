@@ -1884,6 +1884,7 @@ void drm_fb_helper_fill_var(struct fb_info *info, struct drm_fb_helper *fb_helpe
 			    uint32_t fb_width, uint32_t fb_height)
 {
 	struct drm_framebuffer *fb = fb_helper->fb;
+	int i;
 
 	info->pseudo_palette = fb_helper->pseudo_palette;
 	info->var.xres_virtual = fb->width;
@@ -1895,6 +1896,18 @@ void drm_fb_helper_fill_var(struct fb_info *info, struct drm_fb_helper *fb_helpe
 	info->var.activate = FB_ACTIVATE_NOW;
 	info->var.height = -1;
 	info->var.width = -1;
+
+	drm_fb_helper_for_each_connector(fb_helper, i) {
+		struct drm_connector *connector =
+			fb_helper->connector_info[i]->connector;
+
+		/* use the first connected connector for the physical dimensions */
+		if (connector->status == connector_status_connected) {
+			info->var.height = connector->display_info.width_mm;
+			info->var.width = connector->display_info.height_mm;
+			break;
+		}
+	}
 
 	switch (fb->format->depth) {
 	case 8:
