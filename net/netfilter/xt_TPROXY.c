@@ -117,6 +117,7 @@ nf_tproxy_get_sock_v4(struct net *net, struct sk_buff *skb, void *hp,
 		.daddr.ipv4 = daddr,
 		.sport = sport,
 		.dport = dport,
+		.hnum  = ntohs(dport),
 		.dif   = in->ifindex,
 	};
 
@@ -129,11 +130,9 @@ nf_tproxy_get_sock_v4(struct net *net, struct sk_buff *skb, void *hp,
 		case NFT_LOOKUP_LISTENER:
 			tcph = hp;
 			sk = inet_lookup_listener(net, &tcp_hashinfo, skb,
-						    ip_hdrlen(skb) +
+						  ip_hdrlen(skb) +
 						      __tcp_hdrlen(tcph),
-						    saddr, sport,
-						    daddr, dport,
-						    in->ifindex);
+						  &params);
 
 			if (sk && !refcount_inc_not_zero(&sk->sk_refcnt))
 				sk = NULL;
@@ -145,8 +144,7 @@ nf_tproxy_get_sock_v4(struct net *net, struct sk_buff *skb, void *hp,
 			break;
 		case NFT_LOOKUP_ESTABLISHED:
 			sk = inet_lookup_established(net, &tcp_hashinfo,
-						    saddr, sport, daddr, dport,
-						    in->ifindex);
+						     &params);
 			break;
 		default:
 			BUG();
