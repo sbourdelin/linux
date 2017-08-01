@@ -22,6 +22,8 @@ Optional properties:
 		 register files".
  - rockchip,companion_grf_quirk : when set driver will request
 		 "rockchip,usbgrf" phandle as one companion-grf.
+ - rockchip,otg_mux_irq_quirk: set if otg-id/otg-bvalid/linestate irqs
+		 are multiplexed to one irq in otg-port on some SoCs.
 
 Required nodes : a sub-node is required for each port the phy provides.
 		 The sub-node name is used to identify host or otg port,
@@ -36,6 +38,9 @@ Required properties (port (child) node):
 	* "otg-id" : for the otg id interrupt.
 	* "otg-bvalid" : for the otg vbus interrupt.
 	* "linestate" : for the host/otg linestate interrupt.
+	* "otg-mux" : otg-port interrupt, which multiplex otg-id/otg-bvalid/
+		linestate irqs to one irq. Should specify if
+		rockchip,otg_mux_irq_quirk property is set.
 
 Optional properties:
  - phy-supply : phandle to a regulator that provides power to VBUS.
