@@ -55,6 +55,8 @@
 #include <linux/net_tstamp.h>
 #include <linux/ptp_clock_kernel.h>
 #include <net/pkt_cls.h>
+#include <net/tc_act/tc_gact.h>
+#include <net/tc_act/tc_mirred.h>
 #include "i40e_type.h"
 #include "i40e_prototype.h"
 #include "i40e_client.h"
@@ -252,10 +254,51 @@ struct i40e_fdir_filter {
 	u32 fd_id;
 };
 
+#define I40E_CLOUD_FIELD_OMAC	0x01
+#define I40E_CLOUD_FIELD_IMAC	0x02
+#define I40E_CLOUD_FIELD_IVLAN	0x04
+#define I40E_CLOUD_FIELD_TEN_ID	0x08
+#define I40E_CLOUD_FIELD_IIP	0x10
+
+#define I40E_CLOUD_FILTER_FLAGS_OMAC	I40E_CLOUD_FIELD_OMAC
+#define I40E_CLOUD_FILTER_FLAGS_IMAC	I40E_CLOUD_FIELD_IMAC
+#define I40E_CLOUD_FILTER_FLAGS_IMAC_IVLAN	(I40E_CLOUD_FIELD_IMAC | \
+						 I40E_CLOUD_FIELD_IVLAN)
+#define I40E_CLOUD_FILTER_FLAGS_IMAC_TEN_ID	(I40E_CLOUD_FIELD_IMAC | \
+						 I40E_CLOUD_FIELD_TEN_ID)
+#define I40E_CLOUD_FILTER_FLAGS_OMAC_TEN_ID_IMAC (I40E_CLOUD_FIELD_OMAC | \
+						  I40E_CLOUD_FIELD_IMAC | \
+						  I40E_CLOUD_FIELD_TEN_ID)
+#define I40E_CLOUD_FILTER_FLAGS_IMAC_IVLAN_TEN_ID (I40E_CLOUD_FIELD_IMAC | \
+						   I40E_CLOUD_FIELD_IVLAN | \
+						   I40E_CLOUD_FIELD_TEN_ID)
+#define I40E_CLOUD_FILTER_FLAGS_IIP	I40E_CLOUD_FIELD_IIP
+
 struct i40e_cloud_filter {
 	struct hlist_node cloud_node;
 	/* cloud filter input set follows */
 	unsigned long cookie;
+	u8 dst_mac[ETH_ALEN];
+	u8 src_mac[ETH_ALEN];
+	__be16 vlan_id;
+	__be32 dst_ip[4];
+	__be32 src_ip[4];
+	u8 dst_ipv6[16];
+	u8 src_ipv6[16];
+	__be16 dst_port;
+	__be16 src_port;
+	/* matter only when IP based filtering is set */
+	bool is_ipv6;
+	/* IPPROTO value */
+	u8 ip_proto;
+	/* L4 port type: src or destination port */
+#define I40E_CLOUD_FILTER_PORT_SRC	0x01
+#define I40E_CLOUD_FILTER_PORT_DEST	0x02
+	u8 port_type;
+	u32 tenant_id;
+	u8 flags;
+#define I40E_CLOUD_TNL_TYPE_NONE	0xff
+	u8 tunnel_type;
 	/* filter control */
 	u16 seid;
 };
@@ -574,6 +617,9 @@ struct i40e_pf {
 	u16 phy_led_val;
 
 	u16 override_q_count;
+	u16 last_sw_conf_flags;
+	u16 last_sw_conf_valid_flags;
+
 };
 
 /**

@@ -69,6 +69,12 @@ static int i40e_reset(struct i40e_pf *pf);
 static void i40e_rebuild(struct i40e_pf *pf, bool reinit, bool lock_acquired);
 static void i40e_fdir_sb_setup(struct i40e_pf *pf);
 static int i40e_veb_get_bw_info(struct i40e_veb *veb);
+static int i40e_add_del_cloud_filter(struct i40e_vsi *vsi,
+				     struct i40e_cloud_filter *filter,
+				     bool add);
+static int i40e_add_del_cloud_filter_big_buf(struct i40e_vsi *vsi,
+					     struct i40e_cloud_filter *filter,
+					     bool add);
 
 /* i40e_pci_tbl - PCI Device ID Table
  *
@@ -5482,7 +5488,11 @@ int i40e_set_bw_limit(struct i40e_vsi *vsi, u16 seid, u64 max_tx_rate)
  **/
 static void i40e_remove_queue_channels(struct i40e_vsi *vsi)
 {
+	enum i40e_admin_queue_err last_aq_status;
+	struct i40e_cloud_filter *cfilter;
 	struct i40e_channel *ch, *ch_tmp;
+	struct i40e_pf *pf = vsi->back;
+	struct hlist_node *node;
 	int ret, i;
 
 	/* Reset rss size that was stored when reconfiguring rss for
@@ -5522,6 +5532,29 @@ static void i40e_remove_queue_channels(struct i40e_vsi *vsi)
 			dev_info(&vsi->back->pdev->dev,
 				 "Failed to reset tx rate for ch->seid %u\n",
 				 ch->seid);
+
+		/* delete cloud filters associated with this channel */
+		hlist_for_each_entry_safe(cfilter, node,
+					  &pf->cloud_filter_list, cloud_node) {
+			if (cfilter->seid != ch->seid)
+				continue;
+
+			hash_del(&cfilter->cloud_node);
+			if (cfilter->dst_port)
+				ret = i40e_add_del_cloud_filter_big_buf(vsi,
+									cfilter,
+									false);
+			else
+				ret = i40e_add_del_cloud_filter(vsi, cfilter,
+								false);
+			last_aq_status = pf->hw.aq.asq_last_status;
+			if (ret)
+				dev_info(&pf->pdev->dev,
+					 "fail to delete cloud filter, err %s aq_err %s\n",
+					 i40e_stat_str(&pf->hw, ret),
+					 i40e_aq_str(&pf->hw, last_aq_status));
+			kfree(cfilter);
+		}
 
 		/* delete VSI from FW */
 		ret = i40e_aq_delete_element(&vsi->back->hw, ch->seid,
@@ -6001,6 +6034,131 @@ static bool i40e_setup_channel(struct i40e_pf *pf, struct i40e_vsi *vsi,
 	}
 
 	return ch->initialized ? true : false;
+}
+
+/**
+ * i40e_get_device_capabilities - get device level info about the HW
+ * @pf: the PF struct
+ **/
+static int i40e_get_device_capabilities(struct i40e_pf *pf)
+{
+	struct i40e_aqc_list_capabilities_element_resp *cap_buf;
+	u16 data_size;
+	int buf_len;
+	int err;
+
+	buf_len = 40 * sizeof(struct i40e_aqc_list_capabilities_element_resp);
+
+	/* proceed with query device level capabilities */
+	do {
+		cap_buf = kzalloc(buf_len, GFP_KERNEL);
+		if (!cap_buf)
+			return -ENOMEM;
+
+		/* this loads the data into the hw struct for us */
+		err = i40e_aq_discover_capabilities(&pf->hw, cap_buf, buf_len,
+					     &data_size,
+					     i40e_aqc_opc_list_dev_capabilities,
+					     NULL);
+		/* data loaded, buffer no longer needed */
+		kfree(cap_buf);
+
+		if (pf->hw.aq.asq_last_status == I40E_AQ_RC_ENOMEM) {
+			/* retry with a larger buffer */
+			buf_len = data_size;
+		} else if (pf->hw.aq.asq_last_status != I40E_AQ_RC_OK) {
+			dev_dbg(&pf->pdev->dev,
+				"device capability discovery failed, err %s aq_err %s\n",
+				i40e_stat_str(&pf->hw, err),
+				i40e_aq_str(&pf->hw,
+					    pf->hw.aq.asq_last_status));
+			return -ENODEV;
+		}
+	} while (err);
+
+	if (pf->hw.debug_mask & I40E_DEBUG_USER) {
+		dev_info(&pf->pdev->dev,
+			 "switch_mode=0x%04x, function_valid=0x%08x\n",
+			 pf->hw.dev_caps.switch_mode,
+			 pf->hw.dev_caps.valid_functions);
+		dev_info(&pf->pdev->dev,
+			 "SR-IOV=%d, num_vfs for all function=%u\n",
+			 pf->hw.dev_caps.sr_iov_1_1, pf->hw.dev_caps.num_vfs);
+		dev_info(&pf->pdev->dev,
+			 "num_vsis=%u, num_rx:%u, num_tx=%u\n",
+			 pf->hw.dev_caps.num_vsis, pf->hw.dev_caps.num_rx_qp,
+			 pf->hw.dev_caps.num_tx_qp);
+	}
+	return 0;
+}
+
+/**
+ * i40e_validate_and_set_switch_mode - sets up switch mode correctly
+ * @vsi: ptr to VSI which has PF backing
+ * @l4type: true for TCP ond false for UDP
+ * @port_type: true if port is destination and false if port is source
+ *
+ * Sets up switch mode correctly if it needs to be changed and perform
+ * what are allowed modes.
+ **/
+static int i40e_validate_and_set_switch_mode(struct i40e_vsi *vsi, bool l4type,
+					     bool port_type)
+{
+	u8 mode;
+	struct i40e_pf *pf = vsi->back;
+	struct i40e_hw *hw = &pf->hw;
+	int ret;
+
+	ret = i40e_get_device_capabilities(pf);
+	if (ret)
+		return -EINVAL;
+
+	if (hw->dev_caps.switch_mode) {
+		/* if switch mode is set, support mode2 (non-tunneled for
+		 * cloud filter) for now
+		 */
+#define I40E_SWITCH_MODE_MASK	0xF /* largest cloud filter mode is 0x8 */
+		u32 switch_mode = hw->dev_caps.switch_mode &
+							I40E_SWITCH_MODE_MASK;
+		if (switch_mode >= I40E_NVM_IMAGE_TYPE_MODE1) {
+			if (switch_mode == I40E_NVM_IMAGE_TYPE_MODE2)
+				return 0;
+			dev_err(&pf->pdev->dev,
+				"Invalid switch_mode (%d), only non-tunneled mode for cloud filter is supported\n",
+				hw->dev_caps.switch_mode);
+			return -EINVAL;
+		}
+	}
+
+	/* port_type: true for destination port and false for source port
+	 * For now, supports only destination port type
+	 */
+	if (!port_type) {
+		dev_err(&pf->pdev->dev, "src port type not supported\n");
+		return -EINVAL;
+	}
+
+	/* Set Bit 7 to be valid */
+	mode = I40E_AQ_SET_SWITCH_BIT7_VALID;
+
+	/* Set L4type to both TCP and UDP support */
+	mode |= I40E_AQ_SET_SWITCH_L4_TYPE_BOTH;
+
+	/* Set cloud filter mode */
+	mode |= I40E_AQ_SET_SWITCH_MODE_NON_TUNNEL;
+
+	/* Prep mode field for set_switch_config */
+	ret = i40e_aq_set_switch_config(hw, pf->last_sw_conf_flags,
+					pf->last_sw_conf_valid_flags,
+					mode, NULL);
+	if (ret && hw->aq.asq_last_status != I40E_AQ_RC_ESRCH)
+		dev_err(&pf->pdev->dev,
+			"couldn't set switch config bits, err %s aq_err %s\n",
+			i40e_stat_str(hw, ret),
+			i40e_aq_str(hw,
+				    hw->aq.asq_last_status));
+
+	return ret;
 }
 
 /**
@@ -6632,6 +6790,10 @@ static int i40e_setup_tc(struct net_device *netdev, struct tc_to_netdev *tc)
 	}
 	if (!hw) {
 		pf->flags &= ~I40E_FLAG_TC_MQPRIO;
+		if ((pf->hw.func_caps.fd_filters_guaranteed > 0) ||
+		    (pf->hw.func_caps.fd_filters_best_effort > 0))
+			pf->flags |= I40E_FLAG_FD_ATR_ENABLED;
+
 		if (tc->type == TC_SETUP_MQPRIO_EXT)
 			memcpy(&vsi->mqprio_qopt, tc->mqprio_qopt,
 			       sizeof(*tc->mqprio_qopt));
@@ -6682,6 +6844,11 @@ static int i40e_setup_tc(struct net_device *netdev, struct tc_to_netdev *tc)
 		       sizeof(*tc->mqprio_qopt));
 		pf->flags |= I40E_FLAG_TC_MQPRIO;
 		pf->flags &= ~I40E_FLAG_DCB_ENABLED;
+		if (pf->flags & I40E_FLAG_FD_ATR_ENABLED) {
+			pf->flags &= ~I40E_FLAG_FD_ATR_ENABLED;
+			dev_info(&pf->pdev->dev,
+				 "Disabling ATR in MQPRIO mode\n");
+		}
 		break;
 	default:
 		return -EINVAL;
@@ -6743,10 +6910,724 @@ out:
 	return ret;
 }
 
+/**
+ * i40e_set_cld_element - sets cloud filter element data
+ * @filter: cloud filter rule
+ * @cld: ptr to cloud filter element data
+ *
+ * This is helper function to copy data into cloud filter element
+ **/
+static inline void
+i40e_set_cld_element(struct i40e_cloud_filter *filter,
+		     struct i40e_aqc_add_remove_cloud_filters_element_data *cld)
+{
+	u8 *dest_ipaddr;
+	u32 ipaddr;
+	int i;
+
+	memset(cld, 0, sizeof(*cld));
+
+	ether_addr_copy(cld->outer_mac, filter->dst_mac);
+	ether_addr_copy(cld->inner_mac, filter->src_mac);
+
+	if (filter->is_ipv6) {
+		dest_ipaddr = (u8 *)&cld->ipaddr.v6.data;
+		for (i = ARRAY_SIZE(filter->dst_ipv6) - 1; i >= 0; i--) {
+			memcpy(dest_ipaddr, &filter->dst_ipv6[i], 1);
+			dest_ipaddr++;
+		}
+	} else {
+		ipaddr = be32_to_cpu(filter->dst_ip[0]);
+		memcpy(&cld->ipaddr.v4.data, &ipaddr, 4);
+	}
+
+	cld->inner_vlan = cpu_to_le16(ntohs(filter->vlan_id));
+	cld->tenant_id = cpu_to_le32(filter->tenant_id);
+}
+
+/**
+ * i40e_add_del_cloud_filter - Add/del cloud filter
+ * @vsi: pointer to VSI
+ * @filter: cloud filter rule
+ * @add: if true, add, if false, delete
+ *
+ * Add or delete a cloud filter for a specific flow spec.
+ * Returns 0 if the filter were successfully added.
+ **/
+static int i40e_add_del_cloud_filter(struct i40e_vsi *vsi,
+				     struct i40e_cloud_filter *filter, bool add)
+{
+	struct i40e_aqc_add_remove_cloud_filters_element_data cld_filter;
+	struct i40e_pf *pf = vsi->back;
+	int ret;
+	static const u16 flag_table[128] = {
+		[I40E_CLOUD_FILTER_FLAGS_OMAC]  =
+			I40E_AQC_ADD_CLOUD_FILTER_OMAC,
+		[I40E_CLOUD_FILTER_FLAGS_IMAC]  =
+			I40E_AQC_ADD_CLOUD_FILTER_IMAC,
+		[I40E_CLOUD_FILTER_FLAGS_IMAC_IVLAN]  =
+			I40E_AQC_ADD_CLOUD_FILTER_IMAC_IVLAN,
+		[I40E_CLOUD_FILTER_FLAGS_IMAC_TEN_ID] =
+			I40E_AQC_ADD_CLOUD_FILTER_IMAC_TEN_ID,
+		[I40E_CLOUD_FILTER_FLAGS_OMAC_TEN_ID_IMAC] =
+			I40E_AQC_ADD_CLOUD_FILTER_OMAC_TEN_ID_IMAC,
+		[I40E_CLOUD_FILTER_FLAGS_IMAC_IVLAN_TEN_ID] =
+			I40E_AQC_ADD_CLOUD_FILTER_IMAC_IVLAN_TEN_ID,
+		[I40E_CLOUD_FILTER_FLAGS_IIP] =
+			I40E_AQC_ADD_CLOUD_FILTER_IIP,
+	};
+
+	if (filter->flags >= ARRAY_SIZE(flag_table))
+		return I40E_ERR_CONFIG;
+
+	/* copy element needed to add cloud filter from filter */
+	i40e_set_cld_element(filter, &cld_filter);
+
+	if (filter->tunnel_type != I40E_CLOUD_TNL_TYPE_NONE)
+		cld_filter.flags = cpu_to_le16(filter->tunnel_type <<
+					     I40E_AQC_ADD_CLOUD_TNL_TYPE_SHIFT);
+
+	if (filter->is_ipv6)
+		cld_filter.flags |= cpu_to_le16(flag_table[filter->flags] |
+						I40E_AQC_ADD_CLOUD_FLAGS_IPV6);
+	else
+		cld_filter.flags |= cpu_to_le16(flag_table[filter->flags] |
+						I40E_AQC_ADD_CLOUD_FLAGS_IPV4);
+
+	if (add)
+		ret = i40e_aq_add_cloud_filters(&pf->hw, filter->seid,
+						&cld_filter, 1);
+	else
+		ret = i40e_aq_remove_cloud_filters(&pf->hw, filter->seid,
+						   &cld_filter, 1);
+	if (ret)
+		dev_dbg(&pf->pdev->dev,
+			"Failed to %s cloud filter using l4 port %u, err %d aq_err %d\n",
+			add ? "add" : "delete", filter->dst_port, ret,
+			pf->hw.aq.asq_last_status);
+
+	dev_info(&pf->pdev->dev,
+		 "%s cloud filter for VSI: %d\n", add ? "Added" : "Deleted",
+		 filter->seid);
+	return ret;
+}
+
+/**
+ * i40e_add_del_cloud_filter_big_buf - Add/del cloud filter using big_buf
+ * @vsi: pointer to VSI
+ * @filter: cloud filter rule
+ * @add: if true, add, if false, delete
+ *
+ * Add or delete a cloud filter for a specific flow spec using big buffer.
+ * Returns 0 if the filter were successfully added.
+ **/
+static int i40e_add_del_cloud_filter_big_buf(struct i40e_vsi *vsi,
+					     struct i40e_cloud_filter *filter,
+					     bool add)
+{
+	struct i40e_aqc_add_remove_cloud_filters_element_big_data cld_filter;
+	struct i40e_pf *pf = vsi->back;
+	int ret;
+
+	/* Both (Outer/Inner) valid mac_addr are not supported */
+	if (is_valid_ether_addr(filter->dst_mac) &&
+	    is_valid_ether_addr(filter->src_mac))
+		return -EINVAL;
+
+	/* Make sure port is specified, otherwise bail out, for channel
+	 * specific cloud filter needs 'L4 port' to be non-zero
+	 */
+	if (!filter->dst_port)
+		return -EINVAL;
+
+	/* adding filter using src_port/src_ip is not supported at this stage */
+	if (filter->src_port || filter->src_ip[0])
+		return -EINVAL;
+
+	/* copy element needed to add cloud filter from filter */
+	i40e_set_cld_element(filter, &cld_filter.element);
+
+	if (is_valid_ether_addr(filter->dst_mac) ||
+	    is_valid_ether_addr(filter->src_mac) ||
+	    is_multicast_ether_addr(filter->dst_mac) ||
+	    is_multicast_ether_addr(filter->src_mac)) {
+		/* MAC + IP : unsupported mode */
+		if (filter->dst_ip[0])
+			return -EINVAL;
+
+		/* since we validated that L4 port must be valid before
+		 * we get here, start with respective "flags" value
+		 * and update if vlan is present or not
+		 */
+		cld_filter.element.flags =
+			cpu_to_le16(I40E_AQC_ADD_CLOUD_FILTER_MAC_PORT);
+
+		if (filter->vlan_id) {
+			cld_filter.element.flags =
+			cpu_to_le16(I40E_AQC_ADD_CLOUD_FILTER_MAC_VLAN_PORT);
+		}
+
+	} else if (filter->dst_ip[0] || filter->is_ipv6) {
+		cld_filter.element.flags =
+				cpu_to_le16(I40E_AQC_ADD_CLOUD_FILTER_IP_PORT);
+		if (filter->is_ipv6)
+			cld_filter.element.flags |=
+				cpu_to_le16(I40E_AQC_ADD_CLOUD_FLAGS_IPV6);
+		else
+			cld_filter.element.flags |=
+				cpu_to_le16(I40E_AQC_ADD_CLOUD_FLAGS_IPV4);
+	} else {
+		dev_err(&pf->pdev->dev,
+			"either mac or ip has to be valid for cloud filter\n");
+		return -EINVAL;
+	}
+
+	/* Now copy L4 port in Byte 6..7 in general fields */
+	cld_filter.general_fields[I40E_AQC_ADD_CLOUD_FV_FLU_0X16_WORD0] =
+						be16_to_cpu(filter->dst_port);
+
+	if (add) {
+		bool proto_type, port_type;
+
+		proto_type = (filter->ip_proto == IPPROTO_TCP) ? true : false;
+		port_type = (filter->port_type & I40E_CLOUD_FILTER_PORT_DEST) ?
+			     true : false;
+
+		/* For now, src port based cloud filter for channel is not
+		 * supported
+		 */
+		if (!port_type) {
+			dev_err(&pf->pdev->dev,
+				"unsupported port type (src port)\n");
+			return -EOPNOTSUPP;
+		}
+
+		/* Validate current device switch mode, change if necessary */
+		ret = i40e_validate_and_set_switch_mode(vsi, proto_type,
+							port_type);
+		if (ret) {
+			dev_err(&pf->pdev->dev,
+				"fail to and set switch mode, ret %d\n",
+				ret);
+			return ret;
+		}
+
+		ret = i40e_aq_add_cloud_filters_big_buffer(&pf->hw,
+							   filter->seid,
+							   &cld_filter, 1);
+	} else {
+		ret = i40e_aq_remove_cloud_filters_big_buffer(&pf->hw,
+							      filter->seid,
+							      &cld_filter, 1);
+	}
+
+	if (ret)
+		dev_dbg(&pf->pdev->dev,
+			"Failed to %s cloud filter(big buffer) err %d aq_err %d\n",
+			add ? "add" : "delete", ret, pf->hw.aq.asq_last_status);
+
+	dev_info(&pf->pdev->dev,
+		 "%s cloud filter for VSI: %d, L4 port: %d\n",
+		 add ? "add" : "delete", filter->seid, ntohs(filter->dst_port));
+
+	return ret;
+}
+
+/**
+ * i40e_parse_cls_flower - Parse tc flower filters provided by kernel
+ * @vsi: Pointer to VSI
+ * @cls_flower: Pointer to struct tc_cls_flower_offload
+ * @filter: Pointer to cloud filter structure
+ *
+ **/
+static int i40e_parse_cls_flower(struct i40e_vsi *vsi,
+				 struct tc_cls_flower_offload *f,
+				 struct i40e_cloud_filter *filter)
+{
+	struct i40e_pf *pf = vsi->back;
+	u16 addr_type = 0;
+	u8 field_flags = 0;
+
+	if (f->dissector->used_keys &
+	    ~(BIT(FLOW_DISSECTOR_KEY_CONTROL) |
+	      BIT(FLOW_DISSECTOR_KEY_BASIC) |
+	      BIT(FLOW_DISSECTOR_KEY_ETH_ADDRS) |
+	      BIT(FLOW_DISSECTOR_KEY_VLAN) |
+	      BIT(FLOW_DISSECTOR_KEY_IPV4_ADDRS) |
+	      BIT(FLOW_DISSECTOR_KEY_IPV6_ADDRS) |
+	      BIT(FLOW_DISSECTOR_KEY_PORTS) |
+	      BIT(FLOW_DISSECTOR_KEY_ENC_KEYID) |
+	      BIT(FLOW_DISSECTOR_KEY_ENC_IPV4_ADDRS) |
+	      BIT(FLOW_DISSECTOR_KEY_ENC_IPV6_ADDRS) |
+	      BIT(FLOW_DISSECTOR_KEY_ENC_PORTS)	|
+	      BIT(FLOW_DISSECTOR_KEY_ENC_CONTROL))) {
+		dev_err(&pf->pdev->dev, "Unsupported key used: 0x%x\n",
+			f->dissector->used_keys);
+		return -EOPNOTSUPP;
+	}
+
+	if (dissector_uses_key(f->dissector, FLOW_DISSECTOR_KEY_ENC_KEYID)) {
+		struct flow_dissector_key_keyid *key =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_ENC_KEYID,
+						  f->key);
+
+		struct flow_dissector_key_keyid *mask =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_ENC_KEYID,
+						  f->mask);
+
+		if (mask->keyid != 0)
+			field_flags |= I40E_CLOUD_FIELD_TEN_ID;
+
+		filter->tenant_id = be32_to_cpu(key->keyid);
+	}
+
+	if (dissector_uses_key(f->dissector, FLOW_DISSECTOR_KEY_BASIC)) {
+		struct flow_dissector_key_basic *key =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_BASIC,
+						  f->key);
+
+		filter->ip_proto = key->ip_proto;
+	}
+
+	if (dissector_uses_key(f->dissector, FLOW_DISSECTOR_KEY_ETH_ADDRS)) {
+		struct flow_dissector_key_eth_addrs *key =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_ETH_ADDRS,
+						  f->key);
+
+		struct flow_dissector_key_eth_addrs *mask =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_ETH_ADDRS,
+						  f->mask);
+
+		/* use is_broadcast and is_zero to check for all 0xf or 0 */
+		if (!is_zero_ether_addr(mask->dst)) {
+			if (is_broadcast_ether_addr(mask->dst)) {
+				field_flags |= I40E_CLOUD_FIELD_OMAC;
+			} else {
+				dev_err(&pf->pdev->dev, "Bad ether dest mask %pM\n",
+					mask->dst);
+				return I40E_ERR_CONFIG;
+			}
+		}
+
+		if (!is_zero_ether_addr(mask->src)) {
+			if (is_broadcast_ether_addr(mask->src)) {
+				field_flags |= I40E_CLOUD_FIELD_IMAC;
+			} else {
+				dev_err(&pf->pdev->dev, "Bad ether src mask %pM\n",
+					mask->src);
+				return I40E_ERR_CONFIG;
+			}
+		}
+		ether_addr_copy(filter->dst_mac, key->dst);
+		ether_addr_copy(filter->src_mac, key->src);
+	}
+
+	if (dissector_uses_key(f->dissector, FLOW_DISSECTOR_KEY_VLAN)) {
+		struct flow_dissector_key_vlan *key =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_VLAN,
+						  f->key);
+		struct flow_dissector_key_vlan *mask =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_VLAN,
+						  f->mask);
+
+		if (mask->vlan_id) {
+			if (mask->vlan_id == VLAN_VID_MASK) {
+				field_flags |= I40E_CLOUD_FIELD_IVLAN;
+			} else {
+				dev_err(&pf->pdev->dev, "Bad vlan mask %u\n",
+					mask->vlan_id);
+				return I40E_ERR_CONFIG;
+			}
+		}
+
+		filter->vlan_id = cpu_to_be16(key->vlan_id);
+	}
+
+	if (dissector_uses_key(f->dissector, FLOW_DISSECTOR_KEY_CONTROL)) {
+		struct flow_dissector_key_control *key =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_CONTROL,
+						  f->key);
+
+		addr_type = key->addr_type;
+	}
+
+	if (addr_type == FLOW_DISSECTOR_KEY_IPV4_ADDRS) {
+		struct flow_dissector_key_ipv4_addrs *key =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_IPV4_ADDRS,
+						  f->key);
+		struct flow_dissector_key_ipv4_addrs *mask =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_IPV4_ADDRS,
+						  f->mask);
+
+		if (mask->dst) {
+			if (mask->dst == cpu_to_be32(0xffffffff)) {
+				field_flags |= I40E_CLOUD_FIELD_IIP;
+			} else {
+				dev_err(&pf->pdev->dev, "Bad ip dst mask 0x%08x\n",
+					be32_to_cpu(mask->dst));
+				return I40E_ERR_CONFIG;
+			}
+		}
+
+		if (mask->src) {
+			if (mask->src == cpu_to_be32(0xffffffff)) {
+				field_flags |= I40E_CLOUD_FIELD_IIP;
+			} else {
+				dev_err(&pf->pdev->dev, "Bad ip src mask 0x%08x\n",
+					be32_to_cpu(mask->dst));
+				return I40E_ERR_CONFIG;
+			}
+		}
+
+		if (field_flags & I40E_CLOUD_FIELD_TEN_ID) {
+			dev_err(&pf->pdev->dev, "Tenant id not allowed for ip filter\n");
+			return I40E_ERR_CONFIG;
+		}
+		filter->dst_ip[0] = key->dst;
+		filter->src_ip[0] = key->src;
+	}
+
+	if (addr_type == FLOW_DISSECTOR_KEY_IPV6_ADDRS) {
+		struct flow_dissector_key_ipv6_addrs *key =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_IPV6_ADDRS,
+						  f->key);
+		struct flow_dissector_key_ipv6_addrs *mask =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_IPV6_ADDRS,
+						  f->mask);
+
+		/* validate mask, make sure it is not IPV6_ADDR_ANY */
+		if (ipv6_addr_any(&mask->dst)) {
+			dev_err(&pf->pdev->dev, "Bad ipv6 dst mask 0x%02x\n",
+				IPV6_ADDR_ANY);
+			return I40E_ERR_CONFIG;
+		}
+
+		/* validate src and dest IPV6 address, make sure they are not
+		 * ANY (0:0:0:0:0:0:0:0) or LOOPBACK (0:0:0:0:0:0:0:1), which
+		 * can be represented as ::1
+		 */
+		if (ipv6_addr_any(&key->dst) || ipv6_addr_loopback(&key->dst)) {
+			dev_err(&pf->pdev->dev,
+				"Bad ipv6 dst addr is ANY or LOOPBACK\n");
+			return I40E_ERR_CONFIG;
+		}
+		if (ipv6_addr_loopback(&key->src)) {
+			dev_err(&pf->pdev->dev,
+				"Bad ipv6 src addr is ANY or LOOPBACK\n");
+			return I40E_ERR_CONFIG;
+		}
+		memcpy(&filter->src_ipv6, &key->src.s6_addr,
+		       ARRAY_SIZE(filter->src_ipv6));
+		memcpy(&filter->dst_ipv6, &key->dst.s6_addr,
+		       ARRAY_SIZE(filter->dst_ipv6));
+
+		/* mark it as IPv6 filter, to be used later */
+		filter->is_ipv6 = true;
+
+		/* and it is IP[4|6] filter type */
+		field_flags |= I40E_CLOUD_FIELD_IIP;
+	}
+
+	if (dissector_uses_key(f->dissector, FLOW_DISSECTOR_KEY_PORTS)) {
+		struct flow_dissector_key_ports *key =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_PORTS,
+						  f->key);
+		struct flow_dissector_key_ports *mask =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_PORTS,
+						  f->mask);
+
+		if (mask->src) {
+			if (mask->src == cpu_to_be16(0xffff)) {
+				field_flags |= I40E_CLOUD_FIELD_IIP;
+			} else {
+				dev_err(&pf->pdev->dev, "Bad src port mask %u\n",
+					be16_to_cpu(mask->src));
+				return I40E_ERR_CONFIG;
+			}
+		}
+
+		if (mask->dst) {
+			if (mask->dst == cpu_to_be16(0xffff)) {
+				field_flags |= I40E_CLOUD_FIELD_IIP;
+			} else {
+				dev_err(&pf->pdev->dev, "Bad dst port mask %u\n",
+					be16_to_cpu(mask->dst));
+				return I40E_ERR_CONFIG;
+			}
+		}
+
+		filter->dst_port = key->dst;
+		filter->src_port = key->src;
+
+		/* For now, only supports destination port*/
+		filter->port_type |= I40E_CLOUD_FILTER_PORT_DEST;
+
+		switch (filter->ip_proto) {
+		case IPPROTO_TCP:
+		case IPPROTO_UDP:
+			break;
+		default:
+			dev_err(&pf->pdev->dev,
+				"Only UDP and TCP transport are supported\n");
+			return -EINVAL;
+		}
+	}
+	filter->flags = field_flags;
+	return 0;
+}
+
+/**
+ * i40e_handle_redirect_action: Forward to a traffic class on the device
+ * @vsi: Pointer to VSI
+ * @ifindex: ifindex of the device to forwared to
+ * @tc: traffic class index on the device
+ * @filter: Pointer to cloud filter structure
+ *
+ **/
+static int i40e_handle_redirect_action(struct i40e_vsi *vsi, int ifindex, u8 tc,
+				       struct i40e_cloud_filter *filter)
+{
+	struct i40e_channel *ch, *ch_tmp;
+
+	/* redirect to a traffic class on the same device */
+	if (vsi->netdev->ifindex == ifindex) {
+		if (tc == 0) {
+			filter->seid = vsi->seid;
+			return 0;
+		} else if (vsi->tc_config.enabled_tc & BIT(tc)) {
+			if (!filter->dst_port) {
+				dev_err(&vsi->back->pdev->dev,
+					"Specify destination port to redirect to traffic class that is not default\n");
+				return -EINVAL;
+			}
+			if (list_empty(&vsi->ch_list))
+				return -EINVAL;
+			list_for_each_entry_safe(ch, ch_tmp, &vsi->ch_list,
+						 list) {
+				if (ch->seid == vsi->tc_seid_map[tc])
+					filter->seid = ch->seid;
+			}
+			return 0;
+		}
+	}
+	return -EINVAL;
+}
+
+/**
+ * i40e_parse_tc_actions - Parse tc actions
+ * @vsi: Pointer to VSI
+ * @cls_flower: Pointer to struct tc_cls_flower_offload
+ * @filter: Pointer to cloud filter structure
+ *
+ **/
+static int i40e_parse_tc_actions(struct i40e_vsi *vsi, struct tcf_exts *exts,
+				 struct i40e_cloud_filter *filter)
+{
+	const struct tc_action *a;
+	LIST_HEAD(actions);
+	int err;
+
+	if (tc_no_actions(exts))
+		return -EINVAL;
+
+	tcf_exts_to_list(exts, &actions);
+	list_for_each_entry(a, &actions, list) {
+		/* Drop action */
+		if (is_tcf_gact_shot(a)) {
+			dev_err(&vsi->back->pdev->dev,
+				"Cloud filters do not support the drop action.\n");
+			return -EOPNOTSUPP;
+		}
+
+		/* Redirect to a traffic class on the same device */
+		if (!is_tcf_mirred_egress_redirect(a)) {
+			int ifindex = tcf_mirred_ifindex(a);
+			int tc = tcf_mirred_tc(a);
+
+			err = i40e_handle_redirect_action(vsi, ifindex, tc,
+							  filter);
+			if (err == 0)
+				return err;
+		}
+	}
+	return -EINVAL;
+}
+
+/**
+ * i40e_configure_clsflower - Configure tc flower filters
+ * @vsi: Pointer to VSI
+ * @cls_flower: Pointer to struct tc_cls_flower_offload
+ *
+ **/
+static int i40e_configure_clsflower(struct i40e_vsi *vsi,
+				    struct tc_cls_flower_offload *cls_flower)
+{
+	struct i40e_cloud_filter *filter = NULL;
+	struct i40e_pf *pf = vsi->back;
+	int err = 0;
+
+	if (test_bit(__I40E_RESET_RECOVERY_PENDING, pf->state) ||
+	    test_bit(__I40E_RESET_INTR_RECEIVED, pf->state))
+		return -EBUSY;
+
+	if (pf->fdir_pf_active_filters ||
+	    (!hlist_empty(&pf->fdir_filter_list))) {
+		dev_err(&vsi->back->pdev->dev,
+			"Flow Director Sideband filters exists, turn ntuple off to configure cloud filters\n");
+		return -EINVAL;
+	}
+
+	if (vsi->back->flags & I40E_FLAG_FD_SB_ENABLED) {
+		dev_err(&vsi->back->pdev->dev,
+			"Disable Flow Director Sideband while configuring Cloud filters via tc-flower\n");
+		vsi->back->flags &= ~I40E_FLAG_FD_SB_ENABLED;
+	}
+
+	filter = kzalloc(sizeof(*filter), GFP_KERNEL);
+	if (!filter)
+		return -ENOMEM;
+
+	filter->cookie = cls_flower->cookie;
+
+	err = i40e_parse_cls_flower(vsi, cls_flower, filter);
+	if (err < 0)
+		goto err;
+
+	err = i40e_parse_tc_actions(vsi, cls_flower->exts, filter);
+	if (err < 0)
+		goto err;
+
+	/* Add cloud filter */
+	if (filter->dst_port)
+		err = i40e_add_del_cloud_filter_big_buf(vsi, filter, true);
+	else
+		err = i40e_add_del_cloud_filter(vsi, filter, true);
+
+	if (err) {
+		dev_err(&pf->pdev->dev,
+			"Failed to add cloud filter, err %s\n",
+			i40e_stat_str(&pf->hw, err));
+		err = i40e_aq_rc_to_posix(err, pf->hw.aq.asq_last_status);
+		goto err;
+	}
+
+	/* add filter to the ordered list */
+	INIT_HLIST_NODE(&filter->cloud_node);
+
+	hlist_add_head(&filter->cloud_node, &pf->cloud_filter_list);
+
+	pf->num_cloud_filters++;
+
+	return err;
+err:
+	kfree(filter);
+	return err;
+}
+
+/**
+ * i40e_find_cloud_filter - Find the could filter in the list
+ * @vsi: Pointer to VSI
+ * @cookie: filter specific cookie
+ *
+ **/
+static struct i40e_cloud_filter *i40e_find_cloud_filter(struct i40e_vsi *vsi,
+							unsigned long *cookie)
+{
+	struct i40e_cloud_filter *filter = NULL;
+	struct hlist_node *node2;
+
+	hlist_for_each_entry_safe(filter, node2,
+				  &vsi->back->cloud_filter_list, cloud_node)
+		if (!memcmp(cookie, &filter->cookie, sizeof(filter->cookie)))
+			return filter;
+	return NULL;
+}
+
+/**
+ * i40e_delete_clsflower - Remove tc flower filters
+ * @vsi: Pointer to VSI
+ * @cls_flower: Pointer to struct tc_cls_flower_offload
+ *
+ **/
+static int i40e_delete_clsflower(struct i40e_vsi *vsi,
+				 struct tc_cls_flower_offload *cls_flower)
+{
+	struct i40e_cloud_filter *filter = NULL;
+	struct i40e_pf *pf = vsi->back;
+	int err = 0;
+
+	filter = i40e_find_cloud_filter(vsi, &cls_flower->cookie);
+
+	if (!filter)
+		return -EINVAL;
+
+	hash_del(&filter->cloud_node);
+
+	if (filter->dst_port)
+		err = i40e_add_del_cloud_filter_big_buf(vsi, filter, false);
+	else
+		err = i40e_add_del_cloud_filter(vsi, filter, false);
+	if (err) {
+		kfree(filter);
+		dev_err(&pf->pdev->dev,
+			"Failed to delete cloud filter, err %s\n",
+			i40e_stat_str(&pf->hw, err));
+		return i40e_aq_rc_to_posix(err, pf->hw.aq.asq_last_status);
+	}
+
+	kfree(filter);
+	pf->num_cloud_filters--;
+
+	if (!pf->num_cloud_filters) {
+		/* Re-enable FD-SB that was disabled while configuring cloud
+		 * filters
+		 */
+		if ((pf->hw.func_caps.fd_filters_guaranteed > 0) ||
+		    (pf->hw.func_caps.fd_filters_best_effort > 0)) {
+			if (!(pf->flags & I40E_FLAG_MFP_ENABLED &&
+			      pf->hw.num_partitions > 1))
+				pf->flags |= I40E_FLAG_FD_SB_ENABLED;
+		}
+	}
+
+	return 0;
+}
+
 static int __i40e_setup_tc(struct net_device *netdev, u32 handle,
 			   u32 chain_index, __be16 proto,
 			   struct tc_to_netdev *tc)
 {
+	struct i40e_netdev_priv *np = netdev_priv(netdev);
+	struct i40e_vsi *vsi = np->vsi;
+
+	if (TC_H_MAJ(handle) == TC_H_MAJ(TC_H_INGRESS) &&
+	    tc->type == TC_SETUP_CLSFLOWER) {
+		switch (tc->cls_flower->command) {
+		case TC_CLSFLOWER_REPLACE:
+			return i40e_configure_clsflower(vsi, tc->cls_flower);
+		case TC_CLSFLOWER_DESTROY:
+			return i40e_delete_clsflower(vsi, tc->cls_flower);
+		case TC_CLSFLOWER_STATS:
+			return -EOPNOTSUPP;
+		default:
+			return -EINVAL;
+		}
+	}
+
 	return i40e_setup_tc(netdev, tc);
 }
 
@@ -6948,6 +7829,16 @@ static void i40e_cloud_filter_exit(struct i40e_pf *pf)
 		kfree(cfilter);
 	}
 	pf->num_cloud_filters = 0;
+
+	/* Re-enable FD-SB that was disabled while configuring cloud
+	 * filters
+	 */
+	if ((pf->hw.func_caps.fd_filters_guaranteed > 0) ||
+	    (pf->hw.func_caps.fd_filters_best_effort > 0)) {
+		if (!(pf->flags & I40E_FLAG_MFP_ENABLED &&
+		      pf->hw.num_partitions > 1))
+			pf->flags |= I40E_FLAG_FD_SB_ENABLED;
+	}
 }
 
 /**
@@ -8157,6 +9048,48 @@ static void i40e_fdir_teardown(struct i40e_pf *pf)
 }
 
 /**
+ * i40e_rebuild_cloud_filters - Rebuilds cloud filters for VSIs
+ * @vsi: PF main vsi
+ * @seid: seid of main or channel VSIs
+ *
+ * Rebuilds cloud filters associated with main VSI and channel VSIs if they
+ * existed before reset
+ **/
+static int i40e_rebuild_cloud_filters(struct i40e_vsi *vsi, u16 seid)
+{
+	struct i40e_cloud_filter *cfilter;
+	struct i40e_pf *pf = vsi->back;
+	struct hlist_node *node;
+	i40e_status ret;
+
+	/* Add cloud filters back if they exist */
+	if (hlist_empty(&pf->cloud_filter_list))
+		return 0;
+
+	hlist_for_each_entry_safe(cfilter, node, &pf->cloud_filter_list,
+				  cloud_node) {
+		if (cfilter->seid != seid)
+			continue;
+
+		if (cfilter->dst_port)
+			ret = i40e_add_del_cloud_filter_big_buf(vsi, cfilter,
+								true);
+		else
+			ret = i40e_add_del_cloud_filter(vsi, cfilter, true);
+
+		if (ret) {
+			dev_dbg(&pf->pdev->dev,
+				"Failed to rebuild cloud filter, err %s aq_err %s\n",
+				i40e_stat_str(&pf->hw, ret),
+				i40e_aq_str(&pf->hw,
+					    pf->hw.aq.asq_last_status));
+			return ret;
+		}
+	}
+	return 0;
+}
+
+/**
  * i40e_rebuild_channels - Rebuilds channel VSIs if they existed before reset
  * @vsi: PF main vsi
  *
@@ -8192,6 +9125,13 @@ static int i40e_rebuild_channels(struct i40e_vsi *vsi)
 				ch->max_tx_rate /
 						I40E_BW_CREDIT_DIVISOR,
 				ch->seid);
+		}
+		ret = i40e_rebuild_cloud_filters(vsi, ch->seid);
+		if (ret) {
+			dev_dbg(&vsi->back->pdev->dev,
+				"Failed to rebuild cloud filters for channel VSI %u\n",
+				ch->seid);
+			return ret;
 		}
 	}
 	return 0;
@@ -8475,6 +9415,10 @@ static void i40e_rebuild(struct i40e_pf *pf, bool reinit, bool lock_acquired)
 		else
 			goto end_unlock;
 	}
+
+	ret = i40e_rebuild_cloud_filters(vsi, vsi->seid);
+	if (ret)
+		goto end_unlock;
 
 	/* PF Main VSI is rebuild by now, go ahead and rebuild channel VSIs
 	 * for this main VSI if they exist
@@ -10846,7 +11790,8 @@ static int i40e_config_netdev(struct i40e_vsi *vsi)
 		netdev->hw_features |= NETIF_F_NTUPLE;
 	hw_features = hw_enc_features		|
 		      NETIF_F_HW_VLAN_CTAG_TX	|
-		      NETIF_F_HW_VLAN_CTAG_RX;
+		      NETIF_F_HW_VLAN_CTAG_RX	|
+		      NETIF_F_HW_TC;
 
 	netdev->hw_features |= hw_features;
 
@@ -12123,8 +13068,10 @@ static int i40e_setup_pf_switch(struct i40e_pf *pf, bool reinit)
 	*/
 
 	if ((pf->hw.pf_id == 0) &&
-	    !(pf->flags & I40E_FLAG_TRUE_PROMISC_SUPPORT))
+	    !(pf->flags & I40E_FLAG_TRUE_PROMISC_SUPPORT)) {
 		flags = I40E_AQ_SET_SWITCH_CFG_PROMISC;
+		pf->last_sw_conf_flags = flags;
+	}
 
 	if (pf->hw.pf_id == 0) {
 		u16 valid_flags;
@@ -12140,6 +13087,7 @@ static int i40e_setup_pf_switch(struct i40e_pf *pf, bool reinit)
 					     pf->hw.aq.asq_last_status));
 			/* not a fatal problem, just keep going */
 		}
+		pf->last_sw_conf_valid_flags = valid_flags;
 	}
 
 	/* first time setup */
