@@ -183,7 +183,8 @@ static int mipi_dbi_buf_copy(void *dst, struct drm_framebuffer *fb,
 		dev_err_once(fb->dev->dev, "Format is not supported: %s\n",
 			     drm_get_format_name(fb->format->format,
 						 &format_name));
-		return -EINVAL;
+		ret = -EINVAL;
+		break;
 	}
 
 	if (import_attach)
