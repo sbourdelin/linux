@@ -371,7 +371,14 @@ inline void __blk_run_queue_uncond(struct request_queue *q)
 	 * running such a request function concurrently. Keep track of the
 	 * number of active request_fn invocations such that blk_drain_queue()
 	 * can wait until all these request_fn calls have finished.
+	 *
+	 * For zoned block devices, do not allow multiple threads to
+	 * dequeue requests as this can lead to write request reordering
+	 * during the time the queue is unlocked.
 	 */
+	if (blk_queue_is_zoned(q) && q->request_fn_active)
+		return;
+
 	q->request_fn_active++;
 	q->request_fn(q);
 	q->request_fn_active--;
