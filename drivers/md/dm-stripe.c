@@ -311,6 +311,7 @@ static int stripe_map(struct dm_target *ti, struct bio *bio)
 	return DM_MAPIO_REMAPPED;
 }
 
+#if IS_ENABLED(CONFIG_DAX)
 static long stripe_dax_direct_access(struct dm_target *ti, pgoff_t pgoff,
 		long nr_pages, void **kaddr, pfn_t *pfn)
 {
@@ -369,6 +370,11 @@ static void stripe_dax_flush(struct dm_target *ti, pgoff_t pgoff, void *addr,
 		return;
 	dax_flush(dax_dev, pgoff, addr, size);
 }
+#else
+#define stripe_dax_direct_access NULL
+#define stripe_dax_copy_from_iter NULL
+#define stripe_dax_flush NULL
+#endif
 
 /*
  * Stripe status:

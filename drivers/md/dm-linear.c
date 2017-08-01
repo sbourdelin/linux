@@ -154,6 +154,7 @@ static int linear_iterate_devices(struct dm_target *ti,
 	return fn(ti, lc->dev, lc->start, ti->len, data);
 }
 
+#if IS_ENABLED(CONFIG_DAX)
 static long linear_dax_direct_access(struct dm_target *ti, pgoff_t pgoff,
 		long nr_pages, void **kaddr, pfn_t *pfn)
 {
@@ -197,6 +198,11 @@ static void linear_dax_flush(struct dm_target *ti, pgoff_t pgoff, void *addr,
 		return;
 	dax_flush(dax_dev, pgoff, addr, size);
 }
+#else
+#define linear_dax_direct_access NULL
+#define linear_dax_copy_from_iter NULL
+#define linear_dax_flush NULL
+#endif
 
 static struct target_type linear_target = {
 	.name   = "linear",
