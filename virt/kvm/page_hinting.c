@@ -55,6 +55,7 @@ static void make_hypercall(void)
 	 * Dummy function: Tobe filled later.
 	 */
 	empty_hyperlist();
+	trace_guest_str_dump("Hypercall to host...:");
 }
 
 static int sort_pfn(const void *a1, const void *b1)
@@ -77,6 +78,9 @@ static int pack_hyperlist(void)
 
 	while (i < MAX_FGPT_ENTRIES  - 1) {
 		if (hypervisor_pagelist[i].pfn != 0) {
+			trace_guest_pfn_dump("Packing Hyperlist",
+					     hypervisor_pagelist[i].pfn,
+					     hypervisor_pagelist[i].pages);
 			hypervisor_pagelist[j].pfn =
 					hypervisor_pagelist[i].pfn;
 			hypervisor_pagelist[j].pages =
@@ -164,6 +168,9 @@ void copy_hyperlist(int hyper_idx)
 
 	free_page_obj = &get_cpu_var(kvm_pt)[0];
 	while (i < hyper_idx) {
+		trace_guest_pfn_dump("HyperList entry copied",
+				     hypervisor_pagelist[i].pfn,
+				     hypervisor_pagelist[i].pages);
 		free_page_obj[*idx].pfn = hypervisor_pagelist[i].pfn;
 		free_page_obj[*idx].pages = hypervisor_pagelist[i].pages;
 		*idx += 1;
@@ -204,11 +211,14 @@ void arch_free_page_slowpath(void)
 
 				pfn = head_pfn + alloc_pages;
 				prev_free = false;
+				trace_guest_pfn_dump("Compound",
+						     head_pfn, alloc_pages);
 				continue;
 			}
 			if (page_ref_count(p)) {
 				pfn++;
 				prev_free = false;
+				trace_guest_pfn_dump("Single", pfn, 1);
 				continue;
 			}
 			/*
@@ -216,6 +226,11 @@ void arch_free_page_slowpath(void)
 			 * hypervisor_pagelist if required.
 			 */
 			if (!prev_free) {
+				if (hyper_idx != -1) {
+					trace_guest_free_page_slowpath(
+					hypervisor_pagelist[hyper_idx].pfn,
+					hypervisor_pagelist[hyper_idx].pages);
+				}
 				hyper_idx++;
 				if (hyper_idx == MAX_FGPT_ENTRIES - 1) {
 					hyper_idx =  compress_hyperlist();
@@ -262,6 +277,7 @@ void arch_alloc_page(struct page *page, int order)
 	do {
 		seq = read_seqbegin(&guest_page_lock);
 	} while (read_seqretry(&guest_page_lock, seq));
+	trace_guest_alloc_page(page, order);
 }
 
 void arch_free_page(struct page *page, int order)
@@ -277,6 +293,7 @@ void arch_free_page(struct page *page, int order)
 	 */
 	local_irq_save(flags);
 	free_page_obj = &get_cpu_var(kvm_pt)[0];
+	trace_guest_free_page(page, order);
 	free_page_obj[*free_page_idx].pfn = page_to_pfn(page);
 	free_page_obj[*free_page_idx].pages = 1 << order;
 	*free_page_idx += 1;
