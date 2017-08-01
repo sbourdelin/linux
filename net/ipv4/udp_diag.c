@@ -41,11 +41,17 @@ static int udp_dump_one(struct udp_table *tbl, struct sk_buff *in_skb,
 	struct net *net = sock_net(in_skb->sk);
 
 	rcu_read_lock();
-	if (req->sdiag_family == AF_INET)
-		sk = __udp4_lib_lookup(net,
-				req->id.idiag_src[0], req->id.idiag_sport,
-				req->id.idiag_dst[0], req->id.idiag_dport,
-				req->id.idiag_if, tbl, NULL);
+	if (req->sdiag_family == AF_INET) {
+		struct sk_lookup params = {
+			.saddr.ipv4 = req->id.idiag_src[0],
+			.daddr.ipv4 = req->id.idiag_dst[0],
+			.sport = req->id.idiag_sport,
+			.dport = req->id.idiag_dport,
+			.dif   =  req->id.idiag_if,
+		};
+
+		sk = __udp4_lib_lookup(net, &params, tbl, NULL);
+	}
 #if IS_ENABLED(CONFIG_IPV6)
 	else if (req->sdiag_family == AF_INET6)
 		sk = __udp6_lib_lookup(net,
@@ -178,27 +184,38 @@ static int __udp_diag_destroy(struct sk_buff *in_skb,
 
 	rcu_read_lock();
 
-	if (req->sdiag_family == AF_INET)
-		sk = __udp4_lib_lookup(net,
-				req->id.idiag_dst[0], req->id.idiag_dport,
-				req->id.idiag_src[0], req->id.idiag_sport,
-				req->id.idiag_if, tbl, NULL);
+	if (req->sdiag_family == AF_INET) {
+		struct sk_lookup params = {
+			.saddr.ipv4 = req->id.idiag_dst[0],
+			.daddr.ipv4 = req->id.idiag_src[0],
+			.sport = req->id.idiag_dport,
+			.dport = req->id.idiag_sport,
+			.dif   = req->id.idiag_if,
+		};
+
+		sk = __udp4_lib_lookup(net, &params, tbl, NULL);
+	}
 #if IS_ENABLED(CONFIG_IPV6)
 	else if (req->sdiag_family == AF_INET6) {
 		if (ipv6_addr_v4mapped((struct in6_addr *)req->id.idiag_dst) &&
-		    ipv6_addr_v4mapped((struct in6_addr *)req->id.idiag_src))
-			sk = __udp4_lib_lookup(net,
-					req->id.idiag_dst[3], req->id.idiag_dport,
-					req->id.idiag_src[3], req->id.idiag_sport,
-					req->id.idiag_if, tbl, NULL);
+		    ipv6_addr_v4mapped((struct in6_addr *)req->id.idiag_src)) {
+			struct sk_lookup params = {
+				.saddr.ipv4 = req->id.idiag_dst[3],
+				.daddr.ipv4 = req->id.idiag_src[3],
+				.sport = req->id.idiag_dport,
+				.dport = req->id.idiag_sport,
+				.dif   = req->id.idiag_if,
+			};
 
-		else
+			sk = __udp4_lib_lookup(net, &params, tbl, NULL);
+		} else {
 			sk = __udp6_lib_lookup(net,
 					(struct in6_addr *)req->id.idiag_dst,
 					req->id.idiag_dport,
 					(struct in6_addr *)req->id.idiag_src,
 					req->id.idiag_sport,
 					req->id.idiag_if, tbl, NULL);
+		}
 	}
 #endif
 	else {

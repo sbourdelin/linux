@@ -112,6 +112,14 @@ nf_tproxy_get_sock_v4(struct net *net, struct sk_buff *skb, void *hp,
 		      const struct net_device *in,
 		      const enum nf_tproxy_lookup_t lookup_type)
 {
+	struct sk_lookup params = {
+		.saddr.ipv4 = saddr,
+		.daddr.ipv4 = daddr,
+		.sport = sport,
+		.dport = dport,
+		.dif   = in->ifindex,
+	};
+
 	struct sock *sk;
 	struct tcphdr *tcph;
 
@@ -145,8 +153,7 @@ nf_tproxy_get_sock_v4(struct net *net, struct sk_buff *skb, void *hp,
 		}
 		break;
 	case IPPROTO_UDP:
-		sk = udp4_lib_lookup(net, saddr, sport, daddr, dport,
-				     in->ifindex);
+		sk = udp4_lib_lookup(net, &params);
 		if (sk) {
 			int connected = (sk->sk_state == TCP_ESTABLISHED);
 			int wildcard = (inet_sk(sk)->inet_rcv_saddr == 0);
