@@ -46,63 +46,50 @@ static inline unsigned int __inet6_ehashfn(const u32 lhash,
  */
 struct sock *__inet6_lookup_established(struct net *net,
 					struct inet_hashinfo *hashinfo,
-					const struct in6_addr *saddr,
-					const __be16 sport,
-					const struct in6_addr *daddr,
-					const u16 hnum, const int dif);
+					const struct sk_lookup *params);
 
 struct sock *inet6_lookup_listener(struct net *net,
 				   struct inet_hashinfo *hashinfo,
 				   struct sk_buff *skb, int doff,
-				   const struct in6_addr *saddr,
-				   const __be16 sport,
-				   const struct in6_addr *daddr,
-				   const unsigned short hnum, const int dif);
+				   struct sk_lookup *params);
 
 static inline struct sock *__inet6_lookup(struct net *net,
 					  struct inet_hashinfo *hashinfo,
 					  struct sk_buff *skb, int doff,
-					  const struct in6_addr *saddr,
-					  const __be16 sport,
-					  const struct in6_addr *daddr,
-					  const u16 hnum,
-					  const int dif,
+					  struct sk_lookup *params,
 					  bool *refcounted)
 {
-	struct sock *sk = __inet6_lookup_established(net, hashinfo, saddr,
-						sport, daddr, hnum, dif);
+	struct sock *sk = __inet6_lookup_established(net, hashinfo, params);
+
 	*refcounted = true;
 	if (sk)
 		return sk;
 	*refcounted = false;
-	return inet6_lookup_listener(net, hashinfo, skb, doff, saddr, sport,
-				     daddr, hnum, dif);
+	return inet6_lookup_listener(net, hashinfo, skb, doff, params);
 }
 
 static inline struct sock *__inet6_lookup_skb(struct inet_hashinfo *hashinfo,
 					      struct sk_buff *skb, int doff,
-					      const __be16 sport,
-					      const __be16 dport,
-					      int iif,
+					      struct sk_lookup *params,
 					      bool *refcounted)
 {
 	struct sock *sk = skb_steal_sock(skb);
+
+	params->saddr.ipv6 = &ipv6_hdr(skb)->saddr,
+	params->daddr.ipv6 = &ipv6_hdr(skb)->daddr,
+	params->hnum = ntohs(params->dport),
 
 	*refcounted = true;
 	if (sk)
 		return sk;
 
 	return __inet6_lookup(dev_net(skb_dst(skb)->dev), hashinfo, skb,
-			      doff, &ipv6_hdr(skb)->saddr, sport,
-			      &ipv6_hdr(skb)->daddr, ntohs(dport),
-			      iif, refcounted);
+			      doff, params, refcounted);
 }
 
 struct sock *inet6_lookup(struct net *net, struct inet_hashinfo *hashinfo,
 			  struct sk_buff *skb, int doff,
-			  const struct in6_addr *saddr, const __be16 sport,
-			  const struct in6_addr *daddr, const __be16 dport,
-			  const int dif);
+			  struct sk_lookup *params);
 
 int inet6_hash(struct sock *sk);
 #endif /* IS_ENABLED(CONFIG_IPV6) */
