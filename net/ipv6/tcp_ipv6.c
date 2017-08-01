@@ -917,6 +917,7 @@ static void tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb)
 			.sport = th->source,
 			.hnum = ntohs(th->source),
 			.dif  = tcp_v6_iif(skb),
+			.sdif = tcp_v6_sdif(skb),
 		};
 
 		/*
@@ -1414,6 +1415,7 @@ static int tcp_v6_rcv(struct sk_buff *skb)
 	struct net *net = dev_net(skb->dev);
 	struct sk_lookup params = {
 		.dif = inet6_iif(skb),
+		.sdif = inet6_sdif(skb),
 	};
 
 	if (skb->pkt_type != PACKET_HOST)
@@ -1577,6 +1579,7 @@ do_time_wait:
 			.sport = th->source,
 			.hnum = ntohs(th->dest),
 			.dif  = tcp_v6_iif(skb),
+			.sdif = tcp_v6_sdif(skb),
 		};
 		struct sock *sk2;
 

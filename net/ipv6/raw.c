@@ -87,7 +87,8 @@ struct sock *__raw_v6_lookup(struct net *net, struct sock *sk,
 				continue;
 
 			if (sk->sk_bound_dev_if &&
-			    sk->sk_bound_dev_if != params->dif)
+			    sk->sk_bound_dev_if != params->dif &&
+			    sk->sk_bound_dev_if != params->sdif)
 				continue;
 
 			if (!ipv6_addr_any(&sk->sk_v6_rcv_saddr)) {
@@ -165,6 +166,7 @@ static bool ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 		.daddr.ipv6 = &ipv6_hdr(skb)->daddr,
 		.hnum = nexthdr,
 		.dif  = inet6_iif(skb),
+		.sdif = inet6_sdif(skb),
 	};
 	struct sock *sk;
 	bool delivered = false;
@@ -375,6 +377,7 @@ void raw6_icmp_error(struct sk_buff *skb, int nexthdr,
 		struct sk_lookup params = {
 			.hnum = nexthdr,
 			.dif  = inet6_iif(skb),
+			.sdif = inet6_sdif(skb),
 		};
 		/* Note: ipv6_hdr(skb) != skb->data */
 		const struct ipv6hdr *ip6h = (const struct ipv6hdr *)skb->data;

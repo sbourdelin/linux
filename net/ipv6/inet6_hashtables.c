@@ -74,13 +74,13 @@ begin:
 		if (sk->sk_hash != hash)
 			continue;
 		if (!INET6_MATCH(sk, net, saddr, daddr, ports,
-				 params->dif))
+				 params->dif, params->sdif))
 			continue;
 		if (unlikely(!refcount_inc_not_zero(&sk->sk_refcnt)))
 			goto out;
 
 		if (unlikely(!INET6_MATCH(sk, net, saddr, daddr, ports,
-				 params->dif))) {
+				 params->dif, params->sdif))) {
 			sock_gen_put(sk);
 			goto begin;
 		}
@@ -188,8 +188,9 @@ static int __inet6_check_established(struct inet_timewait_death_row *death_row,
 	const struct in6_addr *daddr = &sk->sk_v6_rcv_saddr;
 	const struct in6_addr *saddr = &sk->sk_v6_daddr;
 	const int dif = sk->sk_bound_dev_if;
-	const __portpair ports = INET_COMBINED_PORTS(inet->inet_dport, lport);
 	struct net *net = sock_net(sk);
+	const int sdif = l3mdev_master_ifindex_by_index(net, dif);
+	const __portpair ports = INET_COMBINED_PORTS(inet->inet_dport, lport);
 	const unsigned int hash = inet6_ehashfn(net, daddr, lport, saddr,
 						inet->inet_dport);
 	struct inet_ehash_bucket *head = inet_ehash_bucket(hinfo, hash);
@@ -205,7 +206,7 @@ static int __inet6_check_established(struct inet_timewait_death_row *death_row,
 			continue;
 
 		if (likely(INET6_MATCH(sk2, net, saddr, daddr, ports,
-				       dif))) {
+				       dif, sdif))) {
 			if (sk2->sk_state == TCP_TIME_WAIT) {
 				tw = inet_twsk(sk2);
 				if (twsk_unique(sk, sk2, twp))
