@@ -116,6 +116,21 @@ ring_buffer_has_space(unsigned long head, unsigned long tail,
 		return CIRC_SPACE(tail, head, data_size) >= size;
 }
 
+void __always_inline
+rb_handle_wakeup_events(struct perf_event *event, struct ring_buffer *rb)
+{
+	int wakeup_events = event->attr.wakeup_events;
+
+	if (!event->attr.watermark && wakeup_events) {
+		int events = local_inc_return(&rb->events);
+
+		if (events >= wakeup_events) {
+			local_sub(wakeup_events, &rb->events);
+			local_inc(&rb->wakeup);
+		}
+	}
+}
+
 static int __always_inline
 __perf_output_begin(struct perf_output_handle *handle,
 		    struct perf_event *event, unsigned int size,
@@ -196,6 +211,9 @@ __perf_output_begin(struct perf_output_handle *handle,
 	 * We rely on the implied barrier() by local_cmpxchg() to ensure
 	 * none of the data stores below can be lifted up by the compiler.
 	 */
+
+	if (unlikely(event->attr.count_sb_events))
+		rb_handle_wakeup_events(event, rb);
 
 	if (unlikely(head - local_read(&rb->wakeup) > rb->watermark))
 		local_add(rb->watermark, &rb->wakeup);

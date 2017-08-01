@@ -2680,11 +2680,13 @@ EXPORT_SYMBOL_GPL(perf_event_addr_filters_sync);
 static int _perf_event_refresh(struct perf_event *event, int refresh)
 {
 	/*
-	 * not supported on inherited events or if user has requested for
-	 * signals on ring buffer wakeup.
+	 * not supported on:
+	 * - inherited events
+	 * - if user has requested for signals on ring buffer wakeup, or
+	 * - if counting sideband events
 	 */
 	if (event->attr.inherit || event->attr.signal_on_wakeup ||
-			!is_sampling_event(event))
+			event->attr.count_sb_events || !is_sampling_event(event))
 		return -EINVAL;
 
 	atomic_add(refresh, &event->event_limit);
@@ -5974,19 +5976,8 @@ void perf_output_sample(struct perf_output_handle *handle,
 		}
 	}
 
-	if (!event->attr.watermark) {
-		int wakeup_events = event->attr.wakeup_events;
-
-		if (wakeup_events) {
-			struct ring_buffer *rb = handle->rb;
-			int events = local_inc_return(&rb->events);
-
-			if (events >= wakeup_events) {
-				local_sub(wakeup_events, &rb->events);
-				local_inc(&rb->wakeup);
-			}
-		}
-	}
+	if (!event->attr.count_sb_events)
+		rb_handle_wakeup_events(event, handle->rb);
 }
 
 void perf_prepare_sample(struct perf_event_header *header,

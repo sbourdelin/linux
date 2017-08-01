@@ -81,6 +81,7 @@ extern int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
 extern void rb_free_aux(struct ring_buffer *rb);
 extern struct ring_buffer *ring_buffer_get(struct perf_event *event);
 extern void ring_buffer_put(struct ring_buffer *rb);
+extern void rb_handle_wakeup_events(struct perf_event *event, struct ring_buffer *rb);
 
 static inline bool rb_has_aux(struct ring_buffer *rb)
 {
