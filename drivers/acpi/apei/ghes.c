@@ -1088,12 +1088,53 @@ static inline void ghes_nmi_init_cxt(void)
 }
 #endif /* CONFIG_HAVE_ACPI_APEI_NMI */
 
+static int ghes_common_init(void)
+{
+	int rc;
+	static bool initialised;
+
+	if (initialised)
+		return 0;
+
+	ghes_nmi_init_cxt();
+
+	rc = ghes_ioremap_init();
+	if (rc)
+		goto err;
+
+	rc = ghes_estatus_pool_init();
+	if (rc)
+		goto err_ioremap_exit;
+
+	rc = apei_osc_setup();
+	if (rc == 0 && osc_sb_apei_support_acked)
+		pr_info(GHES_PFX "APEI firmware first mode is enabled by APEI bit and WHEA _OSC.\n");
+	else if (rc == 0 && !osc_sb_apei_support_acked)
+		pr_info(GHES_PFX "APEI firmware first mode is enabled by WHEA _OSC.\n");
+	else if (rc && osc_sb_apei_support_acked)
+		pr_info(GHES_PFX "APEI firmware first mode is enabled by APEI bit.\n");
+	else
+		pr_info(GHES_PFX "Failed to enable APEI firmware first mode.\n");
+
+	initialised = true;
+	return 0;
+
+err_ioremap_exit:
+	ghes_ioremap_exit();
+err:
+	return rc;
+}
+
 static int ghes_probe(struct platform_device *ghes_dev)
 {
 	struct acpi_hest_generic *generic;
 	struct ghes *ghes = NULL;
 
-	int rc = -EINVAL;
+	int rc;
+
+	rc = ghes_common_init();
+	if (rc)
+		return rc;
 
 	generic = *(struct acpi_hest_generic **)ghes_dev->dev.platform_data;
 	if (!generic->enabled)
@@ -1268,8 +1309,6 @@ static struct platform_driver ghes_platform_driver = {
 
 static int __init ghes_init(void)
 {
-	int rc;
-
 	if (acpi_disabled)
 		return -ENODEV;
 
@@ -1283,36 +1322,6 @@ static int __init ghes_init(void)
 		return -EINVAL;
 	}
 
-	ghes_nmi_init_cxt();
-
-	rc = ghes_ioremap_init();
-	if (rc)
-		goto err;
-
-	rc = ghes_estatus_pool_init();
-	if (rc)
-		goto err_ioremap_exit;
-
-	rc = platform_driver_register(&ghes_platform_driver);
-	if (rc)
-		goto err_pool_exit;
-
-	rc = apei_osc_setup();
-	if (rc == 0 && osc_sb_apei_support_acked)
-		pr_info(GHES_PFX "APEI firmware first mode is enabled by APEI bit and WHEA _OSC.\n");
-	else if (rc == 0 && !osc_sb_apei_support_acked)
-		pr_info(GHES_PFX "APEI firmware first mode is enabled by WHEA _OSC.\n");
-	else if (rc && osc_sb_apei_support_acked)
-		pr_info(GHES_PFX "APEI firmware first mode is enabled by APEI bit.\n");
-	else
-		pr_info(GHES_PFX "Failed to enable APEI firmware first mode.\n");
-
-	return 0;
-err_pool_exit:
-	ghes_estatus_pool_exit();
-err_ioremap_exit:
-	ghes_ioremap_exit();
-err:
-	return rc;
+	return platform_driver_register(&ghes_platform_driver);
 }
 device_initcall(ghes_init);
