@@ -1,0 +1,29 @@
+* Texas Instruments' LMP92001 GPIOs
+
+Required properties:
+ - compatible: Must be set to "ti,lmp92001-gpio".
+ - reg: i2c chip address for the device.
+ - gpio-controller: Marks the device node as a gpio controller.
+ - #gpio-cells : Should be two.  The first cell is the pin number and the
+  second cell is used to specify the gpio polarity:
+        0 = Active high
+        1 = Active low
+- ti,lmp92001-gpio-dir: bit mask for direction and drive logic default. Since
+  the direction and the internal pull-down are shared register and similar to
+  open-collector drive:
+        0 = [O]utput and also meaning drive it to low
+        1 = [I]nput and also meaning open, to drive it to high is required to
+        have an external resistor
+
+Example:
+lmp92001@20 {
+        compatible = "ti,lmp92001";
+        reg = <0x20>;
+
+        lmp92001_gpio: lmp92001-gpio {
+                compatible = "ti,lmp92001-gpio";
+                gpio-controller;
+                #gpio-cells = <2>;
+                ti,lmp92001-gpio-dir = /bits/ 8 <0xff>;
+        };
+};

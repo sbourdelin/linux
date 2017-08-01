@@ -1,0 +1,21 @@
+* Texas Instruments' LMP92001 ADCs
+
+Required properties:
+ - compatible: Must be set to "ti,lmp92001-adc".
+ - reg: i2c chip address for the device.
+ - ti,lmp92001-adc-mode: adc operation, either continuous or single-shot.
+ - ti,lmp92001-adc-mask: bit mask for which channel is enable.
+        0 = Off
+        1 = On
+
+Example:
+lmp92001@20 {
+        compatible = "ti,lmp92001";
+        reg = <0x20>;
+
+        lmp92001-adc {
+                compatible = "ti,lmp92001-adc";
+                ti,lmp92001-adc-mode = "continuous";
+                ti,lmp92001-adc-mask = <0x00000079>;
+        };
+};
