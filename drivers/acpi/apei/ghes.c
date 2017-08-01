@@ -207,28 +207,6 @@ static void ghes_iounmap_irq(void __iomem *vaddr_ptr)
 	arch_apei_flush_tlb_one(vaddr);
 }
 
-static int ghes_estatus_pool_init(void)
-{
-	ghes_estatus_pool = gen_pool_create(GHES_ESTATUS_POOL_MIN_ALLOC_ORDER, -1);
-	if (!ghes_estatus_pool)
-		return -ENOMEM;
-	return 0;
-}
-
-static void ghes_estatus_pool_free_chunk_page(struct gen_pool *pool,
-					      struct gen_pool_chunk *chunk,
-					      void *data)
-{
-	free_page(chunk->start_addr);
-}
-
-static void ghes_estatus_pool_exit(void)
-{
-	gen_pool_for_each_chunk(ghes_estatus_pool,
-				ghes_estatus_pool_free_chunk_page, NULL);
-	gen_pool_destroy(ghes_estatus_pool);
-}
-
 static int ghes_estatus_pool_expand(unsigned long len)
 {
 	unsigned long i, pages, size, addr;
@@ -249,6 +227,36 @@ static int ghes_estatus_pool_expand(unsigned long len)
 	}
 
 	return 0;
+}
+
+static void ghes_estatus_pool_free_chunk_page(struct gen_pool *pool,
+					      struct gen_pool_chunk *chunk,
+					      void *data)
+{
+	free_page(chunk->start_addr);
+}
+
+static void ghes_estatus_pool_exit(void)
+{
+	gen_pool_for_each_chunk(ghes_estatus_pool,
+				ghes_estatus_pool_free_chunk_page, NULL);
+	gen_pool_destroy(ghes_estatus_pool);
+}
+
+static int ghes_estatus_pool_init(void)
+{
+	int rc;
+
+	ghes_estatus_pool = gen_pool_create(GHES_ESTATUS_POOL_MIN_ALLOC_ORDER, -1);
+	if (!ghes_estatus_pool)
+		return -ENOMEM;
+
+	rc = ghes_estatus_pool_expand(GHES_ESTATUS_CACHE_AVG_SIZE *
+				      GHES_ESTATUS_CACHE_ALLOCED_MAX);
+	if (rc)
+		ghes_estatus_pool_exit();
+
+	return rc;
 }
 
 static int map_gen_v2(struct ghes *ghes)
@@ -1284,11 +1292,6 @@ static int __init ghes_init(void)
 	rc = ghes_estatus_pool_init();
 	if (rc)
 		goto err_ioremap_exit;
-
-	rc = ghes_estatus_pool_expand(GHES_ESTATUS_CACHE_AVG_SIZE *
-				      GHES_ESTATUS_CACHE_ALLOCED_MAX);
-	if (rc)
-		goto err_pool_exit;
 
 	rc = platform_driver_register(&ghes_platform_driver);
 	if (rc)
