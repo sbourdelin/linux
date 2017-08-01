@@ -25,6 +25,7 @@
 #include <linux/stop_machine.h>
 #include <linux/pvclock_gtod.h>
 #include <linux/compiler.h>
+#include <linux/sched/clock.h>
 
 #include "tick-internal.h"
 #include "ntp_internal.h"
@@ -45,6 +46,7 @@ static struct {
 
 static DEFINE_RAW_SPINLOCK(timekeeper_lock);
 static struct timekeeper shadow_timekeeper;
+static int timekeeping_active;
 
 /**
  * struct tk_fast - NMI safe timekeeper
@@ -476,6 +478,16 @@ u64 notrace ktime_get_boot_fast_ns(void)
 	return (ktime_get_mono_fast_ns() + ktime_to_ns(tk->offs_boot));
 }
 EXPORT_SYMBOL_GPL(ktime_get_boot_fast_ns);
+
+u64 ktime_get_log_ts(u64 *offset_real)
+{
+	*offset_real = ktime_to_ns(tk_core.timekeeper.offs_real);
+
+	if (timekeeping_active)
+		return ktime_get_mono_fast_ns();
+	else
+		return local_clock();
+}
 
 /* Suspend-time cycles value for halted fast timekeeper. */
 static u64 cycles_at_suspend;
@@ -1530,6 +1542,8 @@ void __init timekeeping_init(void)
 
 	write_seqcount_end(&tk_core.seq);
 	raw_spin_unlock_irqrestore(&timekeeper_lock, flags);
+
+	timekeeping_active = 1;
 }
 
 /* time in seconds when suspend began for persistent clock */
