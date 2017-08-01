@@ -9,6 +9,8 @@
 #include <linux/smp.h>
 #include <linux/percpu.h>
 
+#include <xen/xen.h>
+
 static inline void fill_ldt(struct desc_struct *desc, const struct user_desc *info)
 {
 	desc->limit0		= info->limit & 0x0ffff;
@@ -82,6 +84,12 @@ static inline phys_addr_t get_cpu_gdt_paddr(unsigned int cpu)
 {
 	return per_cpu_ptr_to_phys(get_cpu_gdt_rw(cpu));
 }
+
+#if defined(CONFIG_X86_64) && defined(CONFIG_XEN_PV)
+#define pv_trap_entry(name) (void *)(xen_pv_domain() ? xen_ ## name : name)
+#else
+#define pv_trap_entry(name) (void *)(name)
+#endif
 
 #ifdef CONFIG_X86_64
 
@@ -479,6 +487,14 @@ static inline void _set_gate(int gate, unsigned type, void *addr,
 	do {								\
 		set_intr_gate_notrace(n, addr);				\
 		_trace_set_gate(n, GATE_INTERRUPT, (void *)trace_##addr,\
+				0, 0, __KERNEL_CS);			\
+	} while (0)
+
+#define set_intr_gate_pv(n, addr)					\
+	do {								\
+		set_intr_gate_notrace(n, pv_trap_entry(addr));		\
+		_trace_set_gate(n, GATE_INTERRUPT,			\
+				pv_trap_entry(trace_##addr),		\
 				0, 0, __KERNEL_CS);			\
 	} while (0)
 

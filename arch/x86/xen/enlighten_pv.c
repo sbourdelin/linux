@@ -598,24 +598,22 @@ static int cvt_gate_to_trap(int vector, const gate_desc *val,
 	 * so we should never see them.  Warn if
 	 * there's an unexpected IST-using fault handler.
 	 */
-	if (addr == (unsigned long)debug)
-		addr = (unsigned long)xen_debug;
-	else if (addr == (unsigned long)int3)
-		addr = (unsigned long)xen_int3;
-	else if (addr == (unsigned long)stack_segment)
-		addr = (unsigned long)xen_stack_segment;
-	else if (addr == (unsigned long)double_fault) {
+	if (addr == (unsigned long)xen_debug)
+		addr = (unsigned long)xen_xendebug;
+	else if (addr == (unsigned long)xen_int3)
+		addr = (unsigned long)xen_xenint3;
+	else if (addr == (unsigned long)xen_double_fault) {
 		/* Don't need to handle these */
 		return 0;
 #ifdef CONFIG_X86_MCE
-	} else if (addr == (unsigned long)machine_check) {
+	} else if (addr == (unsigned long)xen_machine_check) {
 		/*
 		 * when xen hypervisor inject vMCE to guest,
 		 * use native mce handler to handle it
 		 */
 		;
 #endif
-	} else if (addr == (unsigned long)nmi)
+	} else if (addr == (unsigned long)xen_nmi)
 		/*
 		 * Use the native version as well.
 		 */

@@ -946,15 +946,15 @@ void __init early_trap_init(void)
 	 * early stage. DEBUG_STACK will be equipped after cpu_init() in
 	 * trap_init().
 	 *
-	 * We don't need to set trace_idt_table like set_intr_gate(),
+	 * We don't need to set trace_idt_table like set_intr_gate_pv(),
 	 * since we don't have trace_debug and it will be reset to
 	 * 'debug' in trap_init() by set_intr_gate_ist().
 	 */
 	set_intr_gate_notrace(X86_TRAP_DB, debug);
 	/* int3 can be called from all */
-	set_system_intr_gate(X86_TRAP_BP, &int3);
+	set_system_intr_gate(X86_TRAP_BP, pv_trap_entry(int3));
 #ifdef CONFIG_X86_32
-	set_intr_gate(X86_TRAP_PF, page_fault);
+	set_intr_gate_pv(X86_TRAP_PF, page_fault);
 #endif
 	load_idt(&idt_descr);
 }
@@ -962,7 +962,7 @@ void __init early_trap_init(void)
 void __init early_trap_pf_init(void)
 {
 #ifdef CONFIG_X86_64
-	set_intr_gate(X86_TRAP_PF, page_fault);
+	set_intr_gate_pv(X86_TRAP_PF, page_fault);
 #endif
 }
 
@@ -978,42 +978,45 @@ void __init trap_init(void)
 	early_iounmap(p, 4);
 #endif
 
-	set_intr_gate(X86_TRAP_DE, divide_error);
-	set_intr_gate_ist(X86_TRAP_NMI, &nmi, NMI_STACK);
+	set_intr_gate_pv(X86_TRAP_DE, divide_error);
+	set_intr_gate_ist(X86_TRAP_NMI, pv_trap_entry(nmi), NMI_STACK);
 	/* int4 can be called from all */
-	set_system_intr_gate(X86_TRAP_OF, &overflow);
-	set_intr_gate(X86_TRAP_BR, bounds);
-	set_intr_gate(X86_TRAP_UD, invalid_op);
-	set_intr_gate(X86_TRAP_NM, device_not_available);
+	set_system_intr_gate(X86_TRAP_OF, pv_trap_entry(overflow));
+	set_intr_gate_pv(X86_TRAP_BR, bounds);
+	set_intr_gate_pv(X86_TRAP_UD, invalid_op);
+	set_intr_gate_pv(X86_TRAP_NM, device_not_available);
 #ifdef CONFIG_X86_32
 	set_task_gate(X86_TRAP_DF, GDT_ENTRY_DOUBLEFAULT_TSS);
 #else
-	set_intr_gate_ist(X86_TRAP_DF, &double_fault, DOUBLEFAULT_STACK);
+	set_intr_gate_ist(X86_TRAP_DF, pv_trap_entry(double_fault),
+			  DOUBLEFAULT_STACK);
 #endif
-	set_intr_gate(X86_TRAP_OLD_MF, coprocessor_segment_overrun);
-	set_intr_gate(X86_TRAP_TS, invalid_TSS);
-	set_intr_gate(X86_TRAP_NP, segment_not_present);
-	set_intr_gate(X86_TRAP_SS, stack_segment);
-	set_intr_gate(X86_TRAP_GP, general_protection);
-	set_intr_gate(X86_TRAP_SPURIOUS, spurious_interrupt_bug);
-	set_intr_gate(X86_TRAP_MF, coprocessor_error);
-	set_intr_gate(X86_TRAP_AC, alignment_check);
+	set_intr_gate_pv(X86_TRAP_OLD_MF, coprocessor_segment_overrun);
+	set_intr_gate_pv(X86_TRAP_TS, invalid_TSS);
+	set_intr_gate_pv(X86_TRAP_NP, segment_not_present);
+	set_intr_gate_pv(X86_TRAP_SS, stack_segment);
+	set_intr_gate_pv(X86_TRAP_GP, general_protection);
+	set_intr_gate_pv(X86_TRAP_SPURIOUS, spurious_interrupt_bug);
+	set_intr_gate_pv(X86_TRAP_MF, coprocessor_error);
+	set_intr_gate_pv(X86_TRAP_AC, alignment_check);
 #ifdef CONFIG_X86_MCE
-	set_intr_gate_ist(X86_TRAP_MC, &machine_check, MCE_STACK);
+	set_intr_gate_ist(X86_TRAP_MC, pv_trap_entry(machine_check), MCE_STACK);
 #endif
-	set_intr_gate(X86_TRAP_XF, simd_coprocessor_error);
+	set_intr_gate_pv(X86_TRAP_XF, simd_coprocessor_error);
 
 	/* Reserve all the builtin and the syscall vector: */
 	for (i = 0; i < FIRST_EXTERNAL_VECTOR; i++)
 		set_bit(i, used_vectors);
 
 #ifdef CONFIG_IA32_EMULATION
-	set_system_intr_gate(IA32_SYSCALL_VECTOR, entry_INT80_compat);
+	set_system_intr_gate(IA32_SYSCALL_VECTOR,
+			     pv_trap_entry(entry_INT80_compat));
 	set_bit(IA32_SYSCALL_VECTOR, used_vectors);
 #endif
 
 #ifdef CONFIG_X86_32
-	set_system_intr_gate(IA32_SYSCALL_VECTOR, entry_INT80_32);
+	set_system_intr_gate(IA32_SYSCALL_VECTOR,
+			     pv_trap_entry(entry_INT80_32));
 	set_bit(IA32_SYSCALL_VECTOR, used_vectors);
 #endif
 
@@ -1035,15 +1038,15 @@ void __init trap_init(void)
 	 * in early_trap_init(). However, ITS works only after
 	 * cpu_init() loads TSS. See comments in early_trap_init().
 	 */
-	set_intr_gate_ist(X86_TRAP_DB, &debug, DEBUG_STACK);
+	set_intr_gate_ist(X86_TRAP_DB, pv_trap_entry(debug), DEBUG_STACK);
 	/* int3 can be called from all */
-	set_system_intr_gate_ist(X86_TRAP_BP, &int3, DEBUG_STACK);
+	set_system_intr_gate_ist(X86_TRAP_BP, pv_trap_entry(int3), DEBUG_STACK);
 
 	x86_init.irqs.trap_init();
 
 #ifdef CONFIG_X86_64
 	memcpy(&debug_idt_table, &idt_table, IDT_ENTRIES * 16);
-	set_nmi_gate(X86_TRAP_DB, &debug);
-	set_nmi_gate(X86_TRAP_BP, &int3);
+	set_nmi_gate(X86_TRAP_DB, pv_trap_entry(debug));
+	set_nmi_gate(X86_TRAP_BP, pv_trap_entry(int3));
 #endif
 }
