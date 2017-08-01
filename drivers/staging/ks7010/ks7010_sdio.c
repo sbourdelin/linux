@@ -9,7 +9,6 @@
  *   it under the terms of the GNU General Public License version 2 as
  *   published by the Free Software Foundation.
  */
-
 #include <linux/firmware.h>
 #include <linux/mmc/card.h>
 #include <linux/mmc/sdio_func.h>
@@ -32,19 +31,39 @@ static const struct sdio_device_id ks7010_sdio_ids[] = {
 };
 MODULE_DEVICE_TABLE(sdio, ks7010_sdio_ids);
 
-#define inc_txqhead(priv) \
-	(priv->tx_dev.qhead = (priv->tx_dev.qhead + 1) % TX_DEVICE_BUFF_SIZE)
-#define inc_txqtail(priv) \
-	(priv->tx_dev.qtail = (priv->tx_dev.qtail + 1) % TX_DEVICE_BUFF_SIZE)
-#define cnt_txqbody(priv) \
-	(((priv->tx_dev.qtail + TX_DEVICE_BUFF_SIZE) - (priv->tx_dev.qhead)) % TX_DEVICE_BUFF_SIZE)
+static int inc_txqhead(struct ks_wlan_private *priv)
+{
+	priv->tx_dev.qhead = (priv->tx_dev.qhead + 1) % TX_DEVICE_BUFF_SIZE;
+	return 0;
+}
 
-#define inc_rxqhead(priv) \
-	(priv->rx_dev.qhead = (priv->rx_dev.qhead + 1) % RX_DEVICE_BUFF_SIZE)
-#define inc_rxqtail(priv) \
-	(priv->rx_dev.qtail = (priv->rx_dev.qtail + 1) % RX_DEVICE_BUFF_SIZE)
-#define cnt_rxqbody(priv) \
-	(((priv->rx_dev.qtail + RX_DEVICE_BUFF_SIZE) - (priv->rx_dev.qhead)) % RX_DEVICE_BUFF_SIZE)
+static int inc_txqtail(struct ks_wlan_private *priv)
+{
+	priv->tx_dev.qtail = (priv->tx_dev.qtail + 1) % TX_DEVICE_BUFF_SIZE;
+	return 0;
+}
+
+static int inc_rxqtail(struct ks_wlan_private *priv)
+{
+	priv->rx_dev.qtail = (priv->rx_dev.qtail + 1) % RX_DEVICE_BUFF_SIZE;
+	return 0;
+}
+
+static int inc_rxqhead(struct ks_wlan_private *priv)
+{
+	priv->rx_dev.qhead = (priv->rx_dev.qhead + 1) % RX_DEVICE_BUFF_SIZE;
+	return 0;
+}
+
+static int cnt_rxqbody(struct ks_wlan_private *priv)
+{
+	return  (((priv->rx_dev.qtail + RX_DEVICE_BUFF_SIZE) - (priv->rx_dev.qhead)) % RX_DEVICE_BUFF_SIZE);
+}
+
+static int cnt_txqbody(struct ks_wlan_private *priv)
+{
+	return (((priv->tx_dev.qtail + TX_DEVICE_BUFF_SIZE) - (priv->tx_dev.qhead)) % TX_DEVICE_BUFF_SIZE);
+}
 
 /* Read single byte from device address into byte (CMD52) */
 static int ks7010_sdio_readb(struct ks_wlan_private *priv, unsigned int address,
