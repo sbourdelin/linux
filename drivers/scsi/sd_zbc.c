@@ -528,14 +528,19 @@ out:
 
 static int sd_zbc_setup(struct scsi_disk *sdkp)
 {
+	struct request_queue *q = sdkp->disk->queue;
 
 	/* chunk_sectors indicates the zone size */
-	blk_queue_chunk_sectors(sdkp->disk->queue,
+	blk_queue_chunk_sectors(q,
 			logical_to_sectors(sdkp->device, sdkp->zone_blocks));
 	sdkp->zone_shift = ilog2(sdkp->zone_blocks);
 	sdkp->nr_zones = sdkp->capacity >> sdkp->zone_shift;
 	if (sdkp->capacity & (sdkp->zone_blocks - 1))
 		sdkp->nr_zones++;
+
+	/* Do not use zone locking in mq case */
+	if (q->mq_ops)
+		return 0;
 
 	if (!sdkp->zones_wlock) {
 		sdkp->zones_wlock = kcalloc(BITS_TO_LONGS(sdkp->nr_zones),
