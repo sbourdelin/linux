@@ -1530,6 +1530,10 @@ static void update_sit_entry(struct f2fs_sb_info *sbi, block_t blkaddr, int del)
 			f2fs_bug_on(sbi, 1);
 #endif
 		}
+#ifdef CONFIG_F2FS_CHECK_FS
+		else
+			f2fs_set_bit(offset, se->cur_valid_map_mir);
+#endif
 		if (f2fs_discard_en(sbi) &&
 			!f2fs_test_and_set_bit(offset, se->discard_map))
 			sbi->discard_blks--;
@@ -1551,6 +1555,10 @@ static void update_sit_entry(struct f2fs_sb_info *sbi, block_t blkaddr, int del)
 			f2fs_bug_on(sbi, 1);
 #endif
 		}
+#ifdef CONFIG_F2FS_CHECK_FS
+		else
+			f2fs_clear_bit(offset, se->cur_valid_map_mir);
+#endif
 		if (f2fs_discard_en(sbi) &&
 			f2fs_test_and_clear_bit(offset, se->discard_map))
 			sbi->discard_blks++;
