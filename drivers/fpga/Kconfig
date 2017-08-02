@@ -12,6 +12,12 @@ config FPGA
 	  manager drivers.
 
 if FPGA
+config FPGA_DEVICE
+	tristate "FPGA Bus Device Framework"
+	help
+	  Say Y here if you want support for FPGA Bus devices from the
+	  kernel. The FPGA Bus Device Framework adds a FPGA Bus type and
+	  provide interfaces to create FPGA devices on the bus.
 
 config FPGA_REGION
 	tristate "FPGA Region"

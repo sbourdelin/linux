@@ -1,0 +1,5 @@
+What:		/sys/bus/fpga/devices/<fpga.x>/name
+Date:		August 2017
+KernelVersion:	4.13
+Contact:	Wu Hao <hao.wu@intel.com>
+Description:	Name of FPGA bus device

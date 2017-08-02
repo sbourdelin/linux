@@ -5,6 +5,9 @@
 # Core FPGA Manager Framework
 obj-$(CONFIG_FPGA)			+= fpga-mgr.o
 
+# FPGA Bus Device Framework
+obj-$(CONFIG_FPGA_DEVICE)		+= fpga-dev.o
+
 # FPGA Manager Drivers
 obj-$(CONFIG_FPGA_MGR_ICE40_SPI)	+= ice40-spi.o
 obj-$(CONFIG_FPGA_MGR_SOCFPGA)		+= socfpga.o
