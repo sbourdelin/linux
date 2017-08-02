@@ -84,6 +84,28 @@ static struct notifier_block kasan_die_notifier = {
 };
 #endif
 
+/*
+ * Memory that was allocated by vmemmap_populate is not zeroed, so we must
+ * zero it here explicitly.
+ */
+static void
+zero_vemmap_populated_memory(void)
+{
+	u64 i, start, end;
+
+	for (i = 0; i < E820_MAX_ENTRIES && pfn_mapped[i].end; i++) {
+		void *kaddr_start = pfn_to_kaddr(pfn_mapped[i].start);
+		void *kaddr_end = pfn_to_kaddr(pfn_mapped[i].end);
+
+		start = (u64)kasan_mem_to_shadow(kaddr_start);
+		end = (u64)kasan_mem_to_shadow(kaddr_end);
+		memset((void *)start, 0, end - start);
+	}
+	start = (u64)kasan_mem_to_shadow(_stext);
+	end = (u64)kasan_mem_to_shadow(_end);
+	memset((void *)start, 0, end - start);
+}
+
 void __init kasan_early_init(void)
 {
 	int i;
@@ -156,6 +178,13 @@ void __init kasan_init(void)
 		pte_t pte = __pte(__pa(kasan_zero_page) | __PAGE_KERNEL_RO);
 		set_pte(&kasan_zero_pte[i], pte);
 	}
+
+	/*
+	 * vmemmap_populate does not zero the memory, so we need to zero it
+	 * explicitly
+	 */
+	zero_vemmap_populated_memory();
+
 	/* Flush TLBs again to be sure that write protection applied. */
 	__flush_tlb_all();
 
