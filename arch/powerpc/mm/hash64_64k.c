@@ -15,45 +15,15 @@
 #include <linux/mm.h>
 #include <asm/machdep.h>
 #include <asm/mmu.h>
-/*
- * index from 0 - 15
- */
-bool __rpte_sub_valid(real_pte_t rpte, unsigned long index)
-{
-	unsigned long g_idx;
-	unsigned long ptev = pte_val(rpte.pte);
-
-	g_idx = (ptev & H_PAGE_COMBO_VALID) >> H_PAGE_F_GIX_SHIFT;
-	index = index >> 2;
-	if (g_idx & (0x1 << index))
-		return true;
-	else
-		return false;
-}
-/*
- * index from 0 - 15
- */
-static unsigned long mark_subptegroup_valid(unsigned long ptev, unsigned long index)
-{
-	unsigned long g_idx;
-
-	if (!(ptev & H_PAGE_COMBO))
-		return ptev;
-	index = index >> 2;
-	g_idx = 0x1 << index;
-
-	return ptev | (g_idx << H_PAGE_F_GIX_SHIFT);
-}
 
 int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
 		   pte_t *ptep, unsigned long trap, unsigned long flags,
 		   int ssize, int subpg_prot)
 {
-	real_pte_t rpte;
-	unsigned long *hidxp;
+	int ret;
 	unsigned long hpte_group;
 	unsigned int subpg_index;
-	unsigned long rflags, pa, hidx;
+	unsigned long rflags, pa;
 	unsigned long old_pte, new_pte, subpg_pte;
 	unsigned long vpn, hash, slot;
 	unsigned long shift = mmu_psize_defs[MMU_PAGE_4K].shift;
@@ -99,7 +69,6 @@ int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
 
 	subpg_index = (ea & (PAGE_SIZE - 1)) >> shift;
 	vpn  = hpt_vpn(ea, vsid, ssize);
-	rpte = __real_pte(__pte(old_pte), ptep);
 	/*
 	 *None of the sub 4k page is hashed
 	 */
@@ -110,37 +79,31 @@ int __hash_page_4K(unsigned long ea, unsigned long access, unsigned long vsid,
 	 * as a 64k HW page, and invalidate the 64k HPTE if so.
 	 */
 	if (!(old_pte & H_PAGE_COMBO)) {
-		flush_hash_page(vpn, rpte, MMU_PAGE_64K, ssize, flags);
-		/*
-		 * clear the old slot details from the old and new pte.
-		 * On hash insert failure we use old pte value and we don't
-		 * want slot information there if we have a insert failure.
-		 */
-		old_pte &= ~(H_PAGE_HASHPTE | H_PAGE_F_GIX | H_PAGE_F_SECOND);
-		new_pte &= ~(H_PAGE_HASHPTE | H_PAGE_F_GIX | H_PAGE_F_SECOND);
+		flush_hash_page(vpn, MMU_PAGE_64K, ssize, flags);
+		old_pte &= ~H_PAGE_HASHPTE;
+		new_pte &= ~H_PAGE_HASHPTE;
 		goto htab_insert_hpte;
 	}
 	/*
-	 * Check for sub page valid and update
+	 * We are not tracking the validty of 4k entries seperately. Hence
+	 * If H_PAGE_HASHPTE is set, we always try an update.
 	 */
-	if (__rpte_sub_valid(rpte, subpg_index)) {
-		int ret;
-
-		hash = hpt_hash(vpn, shift, ssize);
-		ret = mmu_hash_ops.hash_updatepp(hash, rflags, vpn,
-						 MMU_PAGE_4K, MMU_PAGE_4K,
-						 ssize, flags);
-		/*
-		 * if we failed because typically the HPTE wasn't really here
-		 * we try an insertion.
-		 */
-		if (ret == -1)
-			goto htab_insert_hpte;
-
+	hash = hpt_hash(vpn, shift, ssize);
+	ret = mmu_hash_ops.hash_updatepp(hash, rflags, vpn,
+					 MMU_PAGE_4K, MMU_PAGE_4K,
+					 ssize, flags);
+	/*
+	 * if we failed because typically the HPTE wasn't really here
+	 * we try an insertion.
+	 */
+	if (ret != -1) {
 		*ptep = __pte(new_pte & ~H_PAGE_BUSY);
 		return 0;
 	}
-
+	/*
+	 * updatepp failed, hash table doesn't have an entry for this,
+	 * insert a new entry
+	 */
 htab_insert_hpte:
 	/*
 	 * handle H_PAGE_4K_PFN case
@@ -192,21 +155,7 @@ repeat:
 				   MMU_PAGE_4K, MMU_PAGE_4K, old_pte);
 		return -1;
 	}
-	/*
-	 * Insert slot number & secondary bit in PTE second half,
-	 * clear H_PAGE_BUSY and set appropriate HPTE slot bit
-	 * Since we have H_PAGE_BUSY set on ptep, we can be sure
-	 * nobody is undating hidx.
-	 */
-	hidxp = (unsigned long *)(ptep + PTRS_PER_PTE);
-	rpte.hidx &= ~(0xfUL << (subpg_index << 2));
-	*hidxp = rpte.hidx  | (slot << (subpg_index << 2));
-	new_pte = mark_subptegroup_valid(new_pte, subpg_index);
 	new_pte |=  H_PAGE_HASHPTE;
-	/*
-	 * check __real_pte for details on matching smp_rmb()
-	 */
-	smp_wmb();
 	*ptep = __pte(new_pte & ~H_PAGE_BUSY);
 	return 0;
 }
@@ -311,9 +260,7 @@ repeat:
 					   MMU_PAGE_64K, MMU_PAGE_64K, old_pte);
 			return -1;
 		}
-		new_pte = (new_pte & ~_PAGE_HPTEFLAGS) | H_PAGE_HASHPTE;
-		new_pte |= (slot << H_PAGE_F_GIX_SHIFT) &
-			(H_PAGE_F_SECOND | H_PAGE_F_GIX);
+		new_pte = new_pte |  H_PAGE_HASHPTE;
 	}
 	*ptep = __pte(new_pte & ~H_PAGE_BUSY);
 	return 0;

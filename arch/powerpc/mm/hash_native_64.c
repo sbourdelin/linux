@@ -741,7 +741,6 @@ static void native_flush_hash_range(unsigned long number, int local)
 	unsigned long hash, index, shift;
 	struct hash_pte *hptep;
 	unsigned long flags;
-	real_pte_t pte;
 	struct ppc64_tlb_batch *batch = this_cpu_ptr(&ppc64_tlb_batch);
 	unsigned long psize = batch->psize;
 	int ssize = batch->ssize;
@@ -755,9 +754,8 @@ static void native_flush_hash_range(unsigned long number, int local)
 
 	for (i = 0; i < number; i++) {
 		vpn = batch->vpn[i];
-		pte = batch->pte[i];
 
-		pte_iterate_hashed_subpages(pte, psize, vpn, index, shift) {
+		pte_iterate_hashed_subpages(vpn, psize, index, shift) {
 			hash = hpt_hash(vpn, shift, ssize);
 			hptep = native_hpte_find(hash, vpn, psize, ssize);
 			if (!hptep)
@@ -773,10 +771,8 @@ static void native_flush_hash_range(unsigned long number, int local)
 		asm volatile("ptesync":::"memory");
 		for (i = 0; i < number; i++) {
 			vpn = batch->vpn[i];
-			pte = batch->pte[i];
 
-			pte_iterate_hashed_subpages(pte, psize,
-						    vpn, index, shift) {
+			pte_iterate_hashed_subpages(vpn, psize, index, shift) {
 				__tlbiel(vpn, psize, psize, ssize);
 			} pte_iterate_hashed_end();
 		}
@@ -790,10 +786,8 @@ static void native_flush_hash_range(unsigned long number, int local)
 		asm volatile("ptesync":::"memory");
 		for (i = 0; i < number; i++) {
 			vpn = batch->vpn[i];
-			pte = batch->pte[i];
 
-			pte_iterate_hashed_subpages(pte, psize,
-						    vpn, index, shift) {
+			pte_iterate_hashed_subpages(vpn, psize, index, shift) {
 				__tlbie(vpn, psize, psize, ssize);
 			} pte_iterate_hashed_end();
 		}

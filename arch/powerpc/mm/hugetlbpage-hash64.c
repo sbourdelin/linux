@@ -100,11 +100,7 @@ int __hash_page_huge(unsigned long ea, unsigned long access, unsigned long vsid,
 					   mmu_psize, mmu_psize, old_pte);
 			return -1;
 		}
-
-		new_pte |= (slot << H_PAGE_F_GIX_SHIFT) &
-			(H_PAGE_F_SECOND | H_PAGE_F_GIX);
 	}
-
 	/*
 	 * No need to use ldarx/stdcx here
 	 */

@@ -25,8 +25,7 @@
 #define H_PAGE_COMBO_VALID	(H_PAGE_F_GIX | H_PAGE_F_SECOND)
 
 /* PTE flags to conserve for HPTE identification */
-#define _PAGE_HPTEFLAGS (H_PAGE_BUSY | H_PAGE_F_SECOND | \
-			 H_PAGE_F_GIX | H_PAGE_HASHPTE | H_PAGE_COMBO)
+#define _PAGE_HPTEFLAGS (H_PAGE_BUSY | H_PAGE_HASHPTE | H_PAGE_COMBO)
 /*
  * we support 16 fragments per PTE page of 64K size.
  */
@@ -40,55 +39,16 @@
 
 #ifndef __ASSEMBLY__
 #include <asm/errno.h>
-
-/*
- * With 64K pages on hash table, we have a special PTE format that
- * uses a second "half" of the page table to encode sub-page information
- * in order to deal with 64K made of 4K HW pages. Thus we override the
- * generic accessors and iterators here
- */
-#define __real_pte __real_pte
-static inline real_pte_t __real_pte(pte_t pte, pte_t *ptep)
-{
-	real_pte_t rpte;
-	unsigned long *hidxp;
-
-	rpte.pte = pte;
-	rpte.hidx = 0;
-	if (pte_val(pte) & H_PAGE_COMBO) {
-		/*
-		 * Make sure we order the hidx load against the H_PAGE_COMBO
-		 * check. The store side ordering is done in __hash_page_4K
-		 */
-		smp_rmb();
-		hidxp = (unsigned long *)(ptep + PTRS_PER_PTE);
-		rpte.hidx = *hidxp;
-	}
-	return rpte;
-}
-
-static inline unsigned long __rpte_to_hidx(real_pte_t rpte, unsigned long index)
-{
-	if ((pte_val(rpte.pte) & H_PAGE_COMBO))
-		return (rpte.hidx >> (index<<2)) & 0xf;
-	return (pte_val(rpte.pte) >> H_PAGE_F_GIX_SHIFT) & 0xf;
-}
-
-#define __rpte_to_pte(r)	((r).pte)
-extern bool __rpte_sub_valid(real_pte_t rpte, unsigned long index);
 /*
  * Trick: we set __end to va + 64k, which happens works for
  * a 16M page as well as we want only one iteration
  */
-#define pte_iterate_hashed_subpages(rpte, psize, vpn, index, shift)	\
+#define pte_iterate_hashed_subpages(vpn, psize, index, shift)		\
 	do {								\
 		unsigned long __end = vpn + (1UL << (PAGE_SHIFT - VPN_SHIFT));	\
-		unsigned __split = (psize == MMU_PAGE_4K ||		\
-				    psize == MMU_PAGE_64K_AP);		\
 		shift = mmu_psize_defs[psize].shift;			\
 		for (index = 0; vpn < __end; index++,			\
 			     vpn += (1L << (shift - VPN_SHIFT))) {	\
-			if (!__split || __rpte_sub_valid(rpte, index))	\
 				do {
 
 #define pte_iterate_hashed_end() } while(0); } } while(0)

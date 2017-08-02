@@ -616,7 +616,6 @@ static void pSeries_lpar_flush_hash_range(unsigned long number, int local)
 	int lock_tlbie = !mmu_has_feature(MMU_FTR_LOCKLESS_TLBIE);
 	unsigned long param[PLPAR_HCALL9_BUFSIZE];
 	unsigned long index, shift, slot;
-	real_pte_t pte;
 	int psize, ssize, pix;
 
 	if (lock_tlbie)
@@ -627,8 +626,7 @@ static void pSeries_lpar_flush_hash_range(unsigned long number, int local)
 	pix = 0;
 	for (i = 0; i < number; i++) {
 		vpn = batch->vpn[i];
-		pte = batch->pte[i];
-		pte_iterate_hashed_subpages(pte, psize, vpn, index, shift) {
+		pte_iterate_hashed_subpages(vpn, psize, index, shift) {
 			slot = pSeries_lpar_hpte_find(vpn, psize, ssize);
 			if (!firmware_has_feature(FW_FEATURE_BULK_REMOVE)) {
 				/*

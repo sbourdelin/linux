@@ -48,7 +48,6 @@ void hpte_need_flush(struct mm_struct *mm, unsigned long addr,
 	unsigned long vsid;
 	unsigned int psize;
 	int ssize;
-	real_pte_t rpte;
 	int i;
 
 	i = batch->index;
@@ -89,14 +88,13 @@ void hpte_need_flush(struct mm_struct *mm, unsigned long addr,
 	}
 	WARN_ON(vsid == 0);
 	vpn = hpt_vpn(addr, vsid, ssize);
-	rpte = __real_pte(__pte(pte), ptep);
 
 	/*
 	 * Check if we have an active batch on this CPU. If not, just
 	 * flush now and return.
 	 */
 	if (!batch->active) {
-		flush_hash_page(vpn, rpte, psize, ssize, mm_is_thread_local(mm));
+		flush_hash_page(vpn, psize, ssize, mm_is_thread_local(mm));
 		put_cpu_var(ppc64_tlb_batch);
 		return;
 	}
@@ -121,7 +119,6 @@ void hpte_need_flush(struct mm_struct *mm, unsigned long addr,
 		batch->psize = psize;
 		batch->ssize = ssize;
 	}
-	batch->pte[i] = rpte;
 	batch->vpn[i] = vpn;
 	batch->index = ++i;
 	if (i >= PPC64_TLB_BATCH_NR)
@@ -146,8 +143,8 @@ void __flush_tlb_pending(struct ppc64_tlb_batch *batch)
 	if (cpumask_equal(mm_cpumask(batch->mm), tmp))
 		local = 1;
 	if (i == 1)
-		flush_hash_page(batch->vpn[0], batch->pte[0],
-				batch->psize, batch->ssize, local);
+		flush_hash_page(batch->vpn[0], batch->psize,
+				batch->ssize, local);
 	else
 		flush_hash_range(i, local);
 	batch->index = 0;

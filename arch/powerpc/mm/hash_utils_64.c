@@ -972,21 +972,8 @@ void __init hash__early_init_devtree(void)
 
 void __init hash__early_init_mmu(void)
 {
-	/*
-	 * We have code in __hash_page_64K() and elsewhere, which assumes it can
-	 * do the following:
-	 *   new_pte |= (slot << H_PAGE_F_GIX_SHIFT) & (H_PAGE_F_SECOND | H_PAGE_F_GIX);
-	 *
-	 * Where the slot number is between 0-15, and values of 8-15 indicate
-	 * the secondary bucket. For that code to work H_PAGE_F_SECOND and
-	 * H_PAGE_F_GIX must occupy four contiguous bits in the PTE, and
-	 * H_PAGE_F_SECOND must be placed above H_PAGE_F_GIX. Assert that here
-	 * with a BUILD_BUG_ON().
-	 */
-	BUILD_BUG_ON(H_PAGE_F_SECOND != (1ul  << (H_PAGE_F_GIX_SHIFT + 3)));
 
 	htab_init_page_sizes();
-
 	/*
 	 * initialize page table size
 	 */
@@ -1589,14 +1576,13 @@ static inline void tm_flush_hash_page(int local)
 /* WARNING: This is called from hash_low_64.S, if you change this prototype,
  *          do not forget to update the assembly call site !
  */
-void flush_hash_page(unsigned long vpn, real_pte_t pte, int psize, int ssize,
-		     unsigned long flags)
+void flush_hash_page(unsigned long vpn, int psize, int ssize, unsigned long flags)
 {
 	unsigned long hash, index, shift;
 	int local = flags & HPTE_LOCAL_UPDATE;
 
 	DBG_LOW("flush_hash_page(vpn=%016lx)\n", vpn);
-	pte_iterate_hashed_subpages(pte, psize, vpn, index, shift) {
+	pte_iterate_hashed_subpages(vpn, psize, index, shift) {
 		hash = hpt_hash(vpn, shift, ssize);
 		DBG_LOW(" sub %ld: hash=%lx\n", index, hash);
 		/*
@@ -1678,8 +1664,8 @@ void flush_hash_range(unsigned long number, int local)
 			this_cpu_ptr(&ppc64_tlb_batch);
 
 		for (i = 0; i < number; i++)
-			flush_hash_page(batch->vpn[i], batch->pte[i],
-					batch->psize, batch->ssize, local);
+			flush_hash_page(batch->vpn[i], batch->psize,
+					batch->ssize, local);
 	}
 }
 

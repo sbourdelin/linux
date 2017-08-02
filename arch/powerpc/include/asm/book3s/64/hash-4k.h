@@ -17,8 +17,7 @@
 #define H_PGD_TABLE_SIZE	(sizeof(pgd_t) << H_PGD_INDEX_SIZE)
 
 /* PTE flags to conserve for HPTE identification */
-#define _PAGE_HPTEFLAGS (H_PAGE_BUSY | H_PAGE_HASHPTE | \
-			 H_PAGE_F_SECOND | H_PAGE_F_GIX)
+#define _PAGE_HPTEFLAGS (H_PAGE_BUSY | H_PAGE_HASHPTE)
 /*
  * Not supported by 4k linux page size
  */
@@ -27,6 +26,19 @@
 #define H_PAGE_COMBO	0x0
 #define H_PTE_FRAG_NR	0
 #define H_PTE_FRAG_SIZE_SHIFT  0
+
+#define pte_iterate_hashed_subpages(vpn, psize, index, shift)	\
+	do {							\
+	index = 0;						\
+	shift = mmu_psize_defs[psize].shift;			\
+
+#define pte_iterate_hashed_end() } while(0)
+/*
+ * We expect this to be called only for user addresses or kernel virtual
+ * addresses other than the linear mapping.
+ */
+#define pte_pagesize_index(mm, addr, pte)	MMU_PAGE_4K
+
 /*
  * On all 4K setups, remap_4k_pfn() equates to remap_pfn_range()
  */

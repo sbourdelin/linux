@@ -113,8 +113,6 @@ repeat:
 			return -1;
 		}
 		new_pte = (new_pte & ~_PAGE_HPTEFLAGS) | H_PAGE_HASHPTE;
-		new_pte |= (slot << H_PAGE_F_GIX_SHIFT) &
-			(H_PAGE_F_SECOND | H_PAGE_F_GIX);
 	}
 	*ptep = __pte(new_pte & ~H_PAGE_BUSY);
 	return 0;
