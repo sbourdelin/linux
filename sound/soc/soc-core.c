@@ -3323,26 +3323,30 @@ EXPORT_SYMBOL_GPL(snd_soc_register_component);
  *
  * @dev: The device to unregister
  */
-void snd_soc_unregister_component(struct device *dev)
+void snd_soc_unregister_component_exp(struct device *dev,
+				      const char *driver_name)
 {
 	struct snd_soc_component *component;
 
-	mutex_lock(&client_mutex);
-	list_for_each_entry(component, &component_list, list) {
-		if (dev == component->dev && component->registered_as_component)
-			goto found;
-	}
-	mutex_unlock(&client_mutex);
-	return;
+	component = snd_soc_lookup_component(dev, driver_name);
+	if (!component || !component->registered_as_component)
+		return;
 
-found:
+	snd_soc_remove_component(component);
+}
+EXPORT_SYMBOL_GPL(snd_soc_unregister_component_exp);
+
+void snd_soc_remove_component(struct snd_soc_component *component)
+{
+	mutex_lock(&client_mutex);
 	snd_soc_tplg_component_remove(component, SND_SOC_TPLG_INDEX_ALL);
 	snd_soc_component_del_unlocked(component);
 	mutex_unlock(&client_mutex);
+
 	snd_soc_component_cleanup(component);
 	kfree(component);
 }
-EXPORT_SYMBOL_GPL(snd_soc_unregister_component);
+EXPORT_SYMBOL_GPL(snd_soc_remove_component);
 
 struct snd_soc_component *snd_soc_lookup_component(struct device *dev,
 						   const char *driver_name)
