@@ -558,7 +558,7 @@ ds1305_nvram_write(struct file *filp, struct kobject *kobj,
 	return (status < 0) ? status : count;
 }
 
-static struct bin_attribute nvram = {
+static const struct bin_attribute nvram = {
 	.attr.name	= "nvram",
 	.attr.mode	= S_IRUGO | S_IWUSR,
 	.read		= ds1305_nvram_read,

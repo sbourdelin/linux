@@ -191,7 +191,7 @@ static ssize_t ds1343_nvram_read(struct file *filp, struct kobject *kobj,
 }
 
 
-static struct bin_attribute nvram_attr = {
+static const struct bin_attribute nvram_attr = {
 	.attr.name	= "nvram",
 	.attr.mode	= S_IRUGO | S_IWUSR,
 	.read		= ds1343_nvram_read,
