@@ -328,15 +328,21 @@ static long pSeries_lpar_hpte_updatepp(unsigned long slot,
 	return 0;
 }
 
-static long __pSeries_lpar_hpte_find(unsigned long want_v, unsigned long hpte_group)
+static long __pSeries_lpar_hpte_find(unsigned long hash, unsigned long want_v)
 {
 	long lpar_rc;
 	unsigned long i, j;
+	unsigned long hpte_group;
+	bool secondary_search = false;
 	struct {
 		unsigned long pteh;
 		unsigned long ptel;
 	} ptes[4];
 
+	/* first check primary */
+	hpte_group = (hash & htab_hash_mask) * HPTES_PER_GROUP;
+
+search_again:
 	for (i = 0; i < HPTES_PER_GROUP; i += 4, hpte_group += 4) {
 
 		lpar_rc = plpar_pte_read_4(0, hpte_group, (void *)ptes);
@@ -346,30 +352,30 @@ static long __pSeries_lpar_hpte_find(unsigned long want_v, unsigned long hpte_gr
 		for (j = 0; j < 4; j++) {
 			if (HPTE_V_COMPARE(ptes[j].pteh, want_v) &&
 			    (ptes[j].pteh & HPTE_V_VALID))
-				return i + j;
+				return hpte_group + j;
 		}
 	}
-
+	if (!secondary_search) {
+		hpte_group = (~hash & htab_hash_mask) * HPTES_PER_GROUP;
+		secondary_search = true;
+		goto search_again;
+	}
 	return -1;
 }
 
 static long pSeries_lpar_hpte_find(unsigned long vpn, int psize, int ssize)
 {
 	long slot;
-	unsigned long hash;
-	unsigned long want_v;
-	unsigned long hpte_group;
+	unsigned long hash, want_v;
 
 	hash = hpt_hash(vpn, mmu_psize_defs[psize].shift, ssize);
 	want_v = hpte_encode_avpn(vpn, psize, ssize);
-
-	/* Bolted entries are always in the primary group */
-	hpte_group = (hash & htab_hash_mask) * HPTES_PER_GROUP;
-	slot = __pSeries_lpar_hpte_find(want_v, hpte_group);
+	slot = __pSeries_lpar_hpte_find(hash, want_v);
 	if (slot < 0)
 		return -1;
-	return hpte_group + slot;
+	return slot;
 }
+
 
 static void pSeries_lpar_hpte_updateboltedpp(unsigned long newpp,
 					     unsigned long ea,
