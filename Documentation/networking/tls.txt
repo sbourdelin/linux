@@ -12,8 +12,12 @@ Creating a TLS connection
 
 First create a new TCP socket and set the TLS ULP.
 
+    struct ulp_config ulpc = {
+	.ulp_name = "tls",
+    };
+
   sock = socket(AF_INET, SOCK_STREAM, 0);
-  setsockopt(sock, SOL_TCP, TCP_ULP, "tls", sizeof("tls"));
+  setsockopt(sock, SOL_SOCKET, SO_ULP, &ulpc, sizeof(ulpc))
 
 Setting the TLS ULP allows us to set/get TLS socket options. Currently
 only the symmetric encryption is handled in the kernel.  After the TLS

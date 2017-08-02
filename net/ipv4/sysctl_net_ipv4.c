@@ -21,6 +21,7 @@
 #include <net/route.h>
 #include <net/tcp.h>
 #include <net/udp.h>
+#include <net/ulp_sock.h>
 #include <net/cipso_ipv4.h>
 #include <net/inet_frag.h>
 #include <net/ping.h>
@@ -369,13 +370,15 @@ static int proc_tcp_available_ulp(struct ctl_table *ctl,
 				  void __user *buffer, size_t *lenp,
 				  loff_t *ppos)
 {
-	struct ctl_table tbl = { .maxlen = TCP_ULP_BUF_MAX, };
+	struct ctl_table tbl = { .maxlen = ULP_BUF_MAX, };
 	int ret;
 
 	tbl.data = kmalloc(tbl.maxlen, GFP_USER);
 	if (!tbl.data)
 		return -ENOMEM;
-	tcp_get_available_ulp(tbl.data, TCP_ULP_BUF_MAX);
+
+	/* Just return all ULPs for compatibility */
+	ulp_get_available(tbl.data, ULP_BUF_MAX);
 	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
 	kfree(tbl.data);
 
@@ -706,7 +709,7 @@ static struct ctl_table ipv4_table[] = {
 	},
 	{
 		.procname	= "tcp_available_ulp",
-		.maxlen		= TCP_ULP_BUF_MAX,
+		.maxlen		= ULP_BUF_MAX,
 		.mode		= 0444,
 		.proc_handler   = proc_tcp_available_ulp,
 	},
