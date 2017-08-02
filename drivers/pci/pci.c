@@ -3812,7 +3812,7 @@ int pci_wait_for_pending_transaction(struct pci_dev *dev)
 EXPORT_SYMBOL(pci_wait_for_pending_transaction);
 
 /*
- * We should only need to wait 100ms after FLR, but some devices take longer.
+ * We should only need to wait 100ms after FLR for virtual functions.
  * Wait for up to 1000ms for config space to return something other than -1.
  * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
  * dword because VFs don't implement the 1st dword.
@@ -3821,6 +3821,11 @@ static void pci_flr_wait(struct pci_dev *dev)
 {
 	int i = 0;
 	u32 id;
+
+	if (dev->is_virtfn) {
+		msleep(100);
+		return;
+	}
 
 	do {
 		msleep(100);
