@@ -304,7 +304,7 @@ size_t tcp_vegas_get_info(struct sock *sk, u32 ext, int *attr,
 }
 EXPORT_SYMBOL_GPL(tcp_vegas_get_info);
 
-static struct tcp_congestion_ops tcp_vegas __read_mostly = {
+static const struct tcp_congestion_ops tcp_vegas = {
 	.init		= tcp_vegas_init,
 	.ssthresh	= tcp_reno_ssthresh,
 	.undo_cwnd	= tcp_reno_undo_cwnd,

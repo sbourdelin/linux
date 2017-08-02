@@ -232,7 +232,7 @@ static u32 tcp_yeah_cwnd_undo(struct sock *sk)
 	return max(tcp_sk(sk)->snd_cwnd, yeah->loss_cwnd);
 }
 
-static struct tcp_congestion_ops tcp_yeah __read_mostly = {
+static const struct tcp_congestion_ops tcp_yeah = {
 	.init		= tcp_yeah_init,
 	.ssthresh	= tcp_yeah_ssthresh,
 	.undo_cwnd      = tcp_yeah_cwnd_undo,

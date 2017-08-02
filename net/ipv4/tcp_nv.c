@@ -441,7 +441,7 @@ static size_t tcpnv_get_info(struct sock *sk, u32 ext, int *attr,
 	return 0;
 }
 
-static struct tcp_congestion_ops tcpnv __read_mostly = {
+static const struct tcp_congestion_ops tcpnv = {
 	.init		= tcpnv_init,
 	.ssthresh	= tcpnv_recalc_ssthresh,
 	.cong_avoid	= tcpnv_cong_avoid,

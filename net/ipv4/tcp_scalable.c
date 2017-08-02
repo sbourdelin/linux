@@ -50,7 +50,7 @@ static u32 tcp_scalable_cwnd_undo(struct sock *sk)
 	return max(tcp_sk(sk)->snd_cwnd, ca->loss_cwnd);
 }
 
-static struct tcp_congestion_ops tcp_scalable __read_mostly = {
+static const struct tcp_congestion_ops tcp_scalable = {
 	.ssthresh	= tcp_scalable_ssthresh,
 	.undo_cwnd	= tcp_scalable_cwnd_undo,
 	.cong_avoid	= tcp_scalable_cong_avoid,

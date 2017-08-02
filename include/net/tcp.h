@@ -954,8 +954,6 @@ struct rate_sample {
 };
 
 struct tcp_congestion_ops {
-	struct list_head	list;
-	u32 key;
 	u32 flags;
 
 	/* initialize private data (optional) */
@@ -993,8 +991,8 @@ struct tcp_congestion_ops {
 	struct module 	*owner;
 };
 
-int tcp_register_congestion_control(struct tcp_congestion_ops *type);
-void tcp_unregister_congestion_control(struct tcp_congestion_ops *type);
+int tcp_register_congestion_control(const struct tcp_congestion_ops *type);
+void tcp_unregister_congestion_control(const struct tcp_congestion_ops *type);
 
 void tcp_assign_congestion_control(struct sock *sk);
 void tcp_init_congestion_control(struct sock *sk);
@@ -1013,9 +1011,9 @@ void tcp_cong_avoid_ai(struct tcp_sock *tp, u32 w, u32 acked);
 u32 tcp_reno_ssthresh(struct sock *sk);
 u32 tcp_reno_undo_cwnd(struct sock *sk);
 void tcp_reno_cong_avoid(struct sock *sk, u32 ack, u32 acked);
-extern struct tcp_congestion_ops tcp_reno;
+extern const struct tcp_congestion_ops tcp_reno;
 
-struct tcp_congestion_ops *tcp_ca_find_key(u32 key);
+const struct tcp_congestion_ops *tcp_ca_find_key(u32 key);
 u32 tcp_ca_get_key_by_name(const char *name, bool *ecn_ca);
 #ifdef CONFIG_INET
 char *tcp_ca_get_name_by_key(u32 key, char *buffer);

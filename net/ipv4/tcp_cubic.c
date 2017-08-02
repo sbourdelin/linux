@@ -465,7 +465,7 @@ static void bictcp_acked(struct sock *sk, const struct ack_sample *sample)
 		hystart_update(sk, delay);
 }
 
-static struct tcp_congestion_ops cubictcp __read_mostly = {
+static const struct tcp_congestion_ops cubictcp = {
 	.init		= bictcp_init,
 	.ssthresh	= bictcp_recalc_ssthresh,
 	.cong_avoid	= bictcp_cong_avoid,

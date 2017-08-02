@@ -316,7 +316,7 @@ static void tcp_lp_pkts_acked(struct sock *sk, const struct ack_sample *sample)
 	lp->last_drop = now;
 }
 
-static struct tcp_congestion_ops tcp_lp __read_mostly = {
+static const struct tcp_congestion_ops tcp_lp = {
 	.init = tcp_lp_init,
 	.ssthresh = tcp_reno_ssthresh,
 	.undo_cwnd = tcp_reno_undo_cwnd,

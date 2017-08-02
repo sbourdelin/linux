@@ -210,7 +210,7 @@ static u32 tcp_veno_cwnd_undo(struct sock *sk)
 	return max(tcp_sk(sk)->snd_cwnd, veno->loss_cwnd);
 }
 
-static struct tcp_congestion_ops tcp_veno __read_mostly = {
+static const struct tcp_congestion_ops tcp_veno = {
 	.init		= tcp_veno_init,
 	.ssthresh	= tcp_veno_ssthresh,
 	.undo_cwnd	= tcp_veno_cwnd_undo,

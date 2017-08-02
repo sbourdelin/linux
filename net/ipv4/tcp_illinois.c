@@ -333,7 +333,7 @@ static size_t tcp_illinois_info(struct sock *sk, u32 ext, int *attr,
 	return 0;
 }
 
-static struct tcp_congestion_ops tcp_illinois __read_mostly = {
+static const struct tcp_congestion_ops tcp_illinois = {
 	.init		= tcp_illinois_init,
 	.ssthresh	= tcp_illinois_ssthresh,
 	.undo_cwnd	= tcp_illinois_cwnd_undo,

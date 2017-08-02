@@ -917,7 +917,7 @@ static void bbr_set_state(struct sock *sk, u8 new_state)
 	}
 }
 
-static struct tcp_congestion_ops tcp_bbr_cong_ops __read_mostly = {
+static const struct tcp_congestion_ops tcp_bbr_cong_ops = {
 	.flags		= TCP_CONG_NON_RESTRICTED,
 	.name		= "bbr",
 	.owner		= THIS_MODULE,

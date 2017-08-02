@@ -165,7 +165,7 @@ static u32 hstcp_cwnd_undo(struct sock *sk)
 	return max(tcp_sk(sk)->snd_cwnd, ca->loss_cwnd);
 }
 
-static struct tcp_congestion_ops tcp_highspeed __read_mostly = {
+static const struct tcp_congestion_ops tcp_highspeed = {
 	.init		= hstcp_init,
 	.ssthresh	= hstcp_ssthresh,
 	.undo_cwnd	= hstcp_cwnd_undo,

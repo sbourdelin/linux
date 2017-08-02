@@ -19,13 +19,21 @@
 static DEFINE_SPINLOCK(tcp_cong_list_lock);
 static LIST_HEAD(tcp_cong_list);
 
+struct tcp_congestion_entry {
+	struct list_head	list;
+	u32 key;
+	u32 flags;
+	const struct tcp_congestion_ops *ops;
+	struct rcu_head rcu;
+};
+
 /* Simple linear search, don't expect many entries! */
-static struct tcp_congestion_ops *tcp_ca_find(const char *name)
+static struct tcp_congestion_entry *tcp_ca_find(const char *name)
 {
-	struct tcp_congestion_ops *e;
+	struct tcp_congestion_entry *e;
 
 	list_for_each_entry_rcu(e, &tcp_cong_list, list) {
-		if (strcmp(e->name, name) == 0)
+		if (strcmp(e->ops->name, name) == 0)
 			return e;
 	}
 
@@ -33,28 +41,30 @@ static struct tcp_congestion_ops *tcp_ca_find(const char *name)
 }
 
 /* Must be called with rcu lock held */
-static const struct tcp_congestion_ops *__tcp_ca_find_autoload(const char *name)
+static const struct tcp_congestion_entry *tcp_ca_find_autoload(const char *name)
 {
-	const struct tcp_congestion_ops *ca = tcp_ca_find(name);
+	const struct tcp_congestion_entry *e;
+
+	e = tcp_ca_find(name);
 #ifdef CONFIG_MODULES
-	if (!ca && capable(CAP_NET_ADMIN)) {
+	if (!e && capable(CAP_NET_ADMIN)) {
 		rcu_read_unlock();
 		request_module("tcp_%s", name);
 		rcu_read_lock();
-		ca = tcp_ca_find(name);
+		e = tcp_ca_find(name);
 	}
 #endif
-	return ca;
+	return e;
 }
 
 /* Simple linear search, not much in here. */
-struct tcp_congestion_ops *tcp_ca_find_key(u32 key)
+const struct tcp_congestion_ops *tcp_ca_find_key(u32 key)
 {
-	struct tcp_congestion_ops *e;
+	struct tcp_congestion_entry *e;
 
 	list_for_each_entry_rcu(e, &tcp_cong_list, list) {
 		if (e->key == key)
-			return e;
+			return e->ops;
 	}
 
 	return NULL;
@@ -64,8 +74,9 @@ struct tcp_congestion_ops *tcp_ca_find_key(u32 key)
  * Attach new congestion control algorithm to the list
  * of available options.
  */
-int tcp_register_congestion_control(struct tcp_congestion_ops *ca)
+int tcp_register_congestion_control(const struct tcp_congestion_ops *ca)
 {
+	struct tcp_congestion_entry *e;
 	int ret = 0;
 
 	/* all algorithms must implement these */
@@ -75,15 +86,21 @@ int tcp_register_congestion_control(struct tcp_congestion_ops *ca)
 		return -EINVAL;
 	}
 
-	ca->key = jhash(ca->name, sizeof(ca->name), strlen(ca->name));
+	e = kmalloc(sizeof(*e), GFP_KERNEL);
+	if (!e)
+		return -ENOMEM;
+
+	e->key = jhash(ca->name, sizeof(ca->name), strlen(ca->name));
+	e->ops = ca;
+	e->flags = ca->flags;
 
 	spin_lock(&tcp_cong_list_lock);
-	if (ca->key == TCP_CA_UNSPEC || tcp_ca_find_key(ca->key)) {
+	if (e->key == TCP_CA_UNSPEC || tcp_ca_find_key(e->key)) {
 		pr_notice("%s already registered or non-unique key\n",
 			  ca->name);
 		ret = -EEXIST;
 	} else {
-		list_add_tail_rcu(&ca->list, &tcp_cong_list);
+		list_add_tail_rcu(&e->list, &tcp_cong_list);
 		pr_debug("%s registered\n", ca->name);
 	}
 	spin_unlock(&tcp_cong_list_lock);
@@ -98,10 +115,18 @@ EXPORT_SYMBOL_GPL(tcp_register_congestion_control);
  * to ensure that this can't be done till all sockets using
  * that method are closed.
  */
-void tcp_unregister_congestion_control(struct tcp_congestion_ops *ca)
+void tcp_unregister_congestion_control(const struct tcp_congestion_ops *ca)
 {
+	struct tcp_congestion_entry *e;
+
 	spin_lock(&tcp_cong_list_lock);
-	list_del_rcu(&ca->list);
+	list_for_each_entry_rcu(e, &tcp_cong_list, list) {
+		if (e->ops == ca) {
+			list_del_rcu(&e->list);
+			kfree_rcu(e, rcu);
+			break;
+		}
+	}
 	spin_unlock(&tcp_cong_list_lock);
 
 	/* Wait for outstanding readers to complete before the
@@ -117,17 +142,19 @@ EXPORT_SYMBOL_GPL(tcp_unregister_congestion_control);
 
 u32 tcp_ca_get_key_by_name(const char *name, bool *ecn_ca)
 {
-	const struct tcp_congestion_ops *ca;
+	const struct tcp_congestion_entry *e;
 	u32 key = TCP_CA_UNSPEC;
 
 	might_sleep();
 
 	rcu_read_lock();
-	ca = __tcp_ca_find_autoload(name);
-	if (ca) {
-		key = ca->key;
-		*ecn_ca = ca->flags & TCP_CONG_NEEDS_ECN;
+
+	e = tcp_ca_find_autoload(name);
+	if (e) {
+		key = e->key;
+		*ecn_ca = e->flags & TCP_CONG_NEEDS_ECN;
 	}
+
 	rcu_read_unlock();
 
 	return key;
@@ -154,10 +181,12 @@ EXPORT_SYMBOL_GPL(tcp_ca_get_name_by_key);
 void tcp_assign_congestion_control(struct sock *sk)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
-	struct tcp_congestion_ops *ca;
+	struct tcp_congestion_entry *e;
 
 	rcu_read_lock();
-	list_for_each_entry_rcu(ca, &tcp_cong_list, list) {
+	list_for_each_entry_rcu(e, &tcp_cong_list, list) {
+		const struct tcp_congestion_ops *ca = e->ops;
+
 		if (likely(try_module_get(ca->owner))) {
 			icsk->icsk_ca_ops = ca;
 			goto out;
@@ -166,14 +195,15 @@ void tcp_assign_congestion_control(struct sock *sk)
 		 * guaranteed fallback is Reno from this list.
 		 */
 	}
-out:
-	rcu_read_unlock();
-	memset(icsk->icsk_ca_priv, 0, sizeof(icsk->icsk_ca_priv));
 
-	if (ca->flags & TCP_CONG_NEEDS_ECN)
+out:
+	if (e->flags & TCP_CONG_NEEDS_ECN)
 		INET_ECN_xmit(sk);
 	else
 		INET_ECN_dontxmit(sk);
+
+	rcu_read_unlock();
+	memset(icsk->icsk_ca_priv, 0, sizeof(icsk->icsk_ca_priv));
 }
 
 void tcp_init_congestion_control(struct sock *sk)
@@ -216,24 +246,24 @@ void tcp_cleanup_congestion_control(struct sock *sk)
 /* Used by sysctl to change default congestion control */
 int tcp_set_default_congestion_control(const char *name)
 {
-	struct tcp_congestion_ops *ca;
+	struct tcp_congestion_entry *e;
 	int ret = -ENOENT;
 
 	spin_lock(&tcp_cong_list_lock);
-	ca = tcp_ca_find(name);
+	e = tcp_ca_find(name);
 #ifdef CONFIG_MODULES
-	if (!ca && capable(CAP_NET_ADMIN)) {
+	if (!e && capable(CAP_NET_ADMIN)) {
 		spin_unlock(&tcp_cong_list_lock);
 
 		request_module("tcp_%s", name);
 		spin_lock(&tcp_cong_list_lock);
-		ca = tcp_ca_find(name);
+		e = tcp_ca_find(name);
 	}
 #endif
 
-	if (ca) {
-		ca->flags |= TCP_CONG_NON_RESTRICTED;	/* default is always allowed */
-		list_move(&ca->list, &tcp_cong_list);
+	if (e) {
+		e->flags |= TCP_CONG_NON_RESTRICTED;	/* default is always allowed */
+		list_move(&e->list, &tcp_cong_list);
 		ret = 0;
 	}
 	spin_unlock(&tcp_cong_list_lock);
@@ -251,14 +281,16 @@ late_initcall(tcp_congestion_default);
 /* Build string with list of available congestion control values */
 void tcp_get_available_congestion_control(char *buf, size_t maxlen)
 {
-	struct tcp_congestion_ops *ca;
+	struct tcp_congestion_entry *e;
 	size_t offs = 0;
 
 	rcu_read_lock();
-	list_for_each_entry_rcu(ca, &tcp_cong_list, list) {
+	list_for_each_entry_rcu(e, &tcp_cong_list, list) {
+		const char *name = e->ops->name;
+
 		offs += snprintf(buf + offs, maxlen - offs,
 				 "%s%s",
-				 offs == 0 ? "" : " ", ca->name);
+				 offs == 0 ? "" : " ", name);
 	}
 	rcu_read_unlock();
 }
@@ -266,30 +298,33 @@ void tcp_get_available_congestion_control(char *buf, size_t maxlen)
 /* Get current default congestion control */
 void tcp_get_default_congestion_control(char *name)
 {
-	struct tcp_congestion_ops *ca;
+	struct tcp_congestion_entry *e;
 	/* We will always have reno... */
 	BUG_ON(list_empty(&tcp_cong_list));
 
 	rcu_read_lock();
-	ca = list_entry(tcp_cong_list.next, struct tcp_congestion_ops, list);
-	strncpy(name, ca->name, TCP_CA_NAME_MAX);
+	e = list_first_entry(&tcp_cong_list, struct tcp_congestion_entry, list);
+	strncpy(name, e->ops->name, TCP_CA_NAME_MAX);
 	rcu_read_unlock();
 }
 
 /* Built list of non-restricted congestion control values */
 void tcp_get_allowed_congestion_control(char *buf, size_t maxlen)
 {
-	struct tcp_congestion_ops *ca;
+	struct tcp_congestion_entry *e;
 	size_t offs = 0;
 
 	*buf = '\0';
 	rcu_read_lock();
-	list_for_each_entry_rcu(ca, &tcp_cong_list, list) {
-		if (!(ca->flags & TCP_CONG_NON_RESTRICTED))
+	list_for_each_entry_rcu(e, &tcp_cong_list, list) {
+		const char *name = e->ops->name;
+
+		if (!(e->flags & TCP_CONG_NON_RESTRICTED))
 			continue;
+
 		offs += snprintf(buf + offs, maxlen - offs,
 				 "%s%s",
-				 offs == 0 ? "" : " ", ca->name);
+				 offs == 0 ? "" : " ", name);
 	}
 	rcu_read_unlock();
 }
@@ -297,7 +332,7 @@ void tcp_get_allowed_congestion_control(char *buf, size_t maxlen)
 /* Change list of non-restricted congestion control */
 int tcp_set_allowed_congestion_control(char *val)
 {
-	struct tcp_congestion_ops *ca;
+	struct tcp_congestion_entry *e;
 	char *saved_clone, *clone, *name;
 	int ret = 0;
 
@@ -308,23 +343,23 @@ int tcp_set_allowed_congestion_control(char *val)
 	spin_lock(&tcp_cong_list_lock);
 	/* pass 1 check for bad entries */
 	while ((name = strsep(&clone, " ")) && *name) {
-		ca = tcp_ca_find(name);
-		if (!ca) {
+		e = tcp_ca_find(name);
+		if (!e) {
 			ret = -ENOENT;
 			goto out;
 		}
 	}
 
 	/* pass 2 clear old values */
-	list_for_each_entry_rcu(ca, &tcp_cong_list, list)
-		ca->flags &= ~TCP_CONG_NON_RESTRICTED;
+	list_for_each_entry_rcu(e, &tcp_cong_list, list)
+		e->flags &= ~TCP_CONG_NON_RESTRICTED;
 
 	/* pass 3 mark as allowed */
 	while ((name = strsep(&val, " ")) && *name) {
-		ca = tcp_ca_find(name);
-		WARN_ON(!ca);
-		if (ca)
-			ca->flags |= TCP_CONG_NON_RESTRICTED;
+		e = tcp_ca_find(name);
+		WARN_ON(!e);
+		if (e)
+			e->flags |= TCP_CONG_NON_RESTRICTED;
 	}
 out:
 	spin_unlock(&tcp_cong_list_lock);
@@ -341,6 +376,7 @@ out:
 int tcp_set_congestion_control(struct sock *sk, const char *name, bool load)
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
+	const struct tcp_congestion_entry *e;
 	const struct tcp_congestion_ops *ca;
 	int err = 0;
 
@@ -349,17 +385,23 @@ int tcp_set_congestion_control(struct sock *sk, const char *name, bool load)
 
 	rcu_read_lock();
 	if (!load)
-		ca = tcp_ca_find(name);
+		e = tcp_ca_find(name);
 	else
-		ca = __tcp_ca_find_autoload(name);
+		e = tcp_ca_find_autoload(name);
+
+	if (!e) {
+		err = -ENOENT;
+		goto out;
+	}
+
 	/* No change asking for existing value */
+	ca = e->ops;
 	if (ca == icsk->icsk_ca_ops) {
 		icsk->icsk_ca_setsockopt = 1;
 		goto out;
 	}
-	if (!ca) {
-		err = -ENOENT;
-	} else if (!load) {
+
+	if (!load) {
 		icsk->icsk_ca_ops = ca;
 		if (!try_module_get(ca->owner))
 			err = -EBUSY;
@@ -460,7 +502,7 @@ u32 tcp_reno_undo_cwnd(struct sock *sk)
 }
 EXPORT_SYMBOL_GPL(tcp_reno_undo_cwnd);
 
-struct tcp_congestion_ops tcp_reno = {
+const struct tcp_congestion_ops tcp_reno = {
 	.flags		= TCP_CONG_NON_RESTRICTED,
 	.name		= "reno",
 	.owner		= THIS_MODULE,
