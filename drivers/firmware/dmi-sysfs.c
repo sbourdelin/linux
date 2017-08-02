@@ -439,7 +439,7 @@ static ssize_t dmi_sel_raw_read(struct file *filp, struct kobject *kobj,
 	return find_dmi_entry(entry, dmi_sel_raw_read_helper, &state);
 }
 
-static struct bin_attribute dmi_sel_raw_attr = {
+static const struct bin_attribute dmi_sel_raw_attr = {
 	.attr = {.name = "raw_event_log", .mode = 0400},
 	.read = dmi_sel_raw_read,
 };

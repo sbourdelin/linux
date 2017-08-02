@@ -675,18 +675,18 @@ static ssize_t write_rbu_packet_size(struct file *filp, struct kobject *kobj,
 	return count;
 }
 
-static struct bin_attribute rbu_data_attr = {
+static const struct bin_attribute rbu_data_attr = {
 	.attr = {.name = "data", .mode = 0444},
 	.read = read_rbu_data,
 };
 
-static struct bin_attribute rbu_image_type_attr = {
+static const struct bin_attribute rbu_image_type_attr = {
 	.attr = {.name = "image_type", .mode = 0644},
 	.read = read_rbu_image_type,
 	.write = write_rbu_image_type,
 };
 
-static struct bin_attribute rbu_packet_size_attr = {
+static const struct bin_attribute rbu_packet_size_attr = {
 	.attr = {.name = "packet_size", .mode = 0644},
 	.read = read_rbu_packet_size,
 	.write = write_rbu_packet_size,

@@ -33,7 +33,7 @@ static ssize_t memconsole_read(struct file *filp, struct kobject *kobp,
 	return memconsole_read_func(buf, pos, count);
 }
 
-static struct bin_attribute memconsole_bin_attr = {
+static const struct bin_attribute memconsole_bin_attr = {
 	.attr = {.name = "log", .mode = 0444},
 	.read = memconsole_read,
 };

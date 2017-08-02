@@ -343,7 +343,7 @@ static ssize_t fw_cfg_sysfs_read_raw(struct file *filp, struct kobject *kobj,
 	return count;
 }
 
-static struct bin_attribute fw_cfg_sysfs_attr_raw = {
+static const struct bin_attribute fw_cfg_sysfs_attr_raw = {
 	.attr = { .name = "raw", .mode = S_IRUSR },
 	.read = fw_cfg_sysfs_read_raw,
 };
