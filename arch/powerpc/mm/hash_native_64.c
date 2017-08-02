@@ -702,10 +702,8 @@ static void native_hpte_clear(void)
 static void native_flush_hash_range(unsigned long number, int local)
 {
 	unsigned long vpn;
-	unsigned long hash, index, hidx, shift, slot;
+	unsigned long hash, index, shift;
 	struct hash_pte *hptep;
-	unsigned long hpte_v;
-	unsigned long want_v;
 	unsigned long flags;
 	real_pte_t pte;
 	struct ppc64_tlb_batch *batch = this_cpu_ptr(&ppc64_tlb_batch);
@@ -725,23 +723,13 @@ static void native_flush_hash_range(unsigned long number, int local)
 
 		pte_iterate_hashed_subpages(pte, psize, vpn, index, shift) {
 			hash = hpt_hash(vpn, shift, ssize);
-			hidx = __rpte_to_hidx(pte, index);
-			if (hidx & _PTEIDX_SECONDARY)
-				hash = ~hash;
-			slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
-			slot += hidx & _PTEIDX_GROUP_IX;
-			hptep = htab_address + slot;
-			want_v = hpte_encode_avpn(vpn, psize, ssize);
-			native_lock_hpte(hptep);
-			hpte_v = be64_to_cpu(hptep->v);
-			if (cpu_has_feature(CPU_FTR_ARCH_300))
-				hpte_v = hpte_new_to_old_v(hpte_v,
-						be64_to_cpu(hptep->r));
-			if (!HPTE_V_COMPARE(hpte_v, want_v) ||
-			    !(hpte_v & HPTE_V_VALID))
-				native_unlock_hpte(hptep);
-			else
-				hptep->v = 0;
+			hptep = native_hpte_find(hash, vpn, psize, ssize);
+			if (!hptep)
+				continue;
+			/*
+			 * Invalidate the hpte. NOTE: this also unlocks it
+			 */
+			hptep->v = 0;
 		} pte_iterate_hashed_end();
 	}
 
