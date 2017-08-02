@@ -351,32 +351,44 @@ static long native_hpte_updatepp(unsigned long slot, unsigned long newpp,
 	return ret;
 }
 
-static long native_hpte_find(unsigned long vpn, int psize, int ssize)
+/* returns a locked hash pte */
+struct hash_pte *native_hpte_find(unsigned long hash, unsigned long vpn,
+				  unsigned long bpsize, unsigned long ssize)
 {
+	int i;
+	unsigned long hpte_v;
 	struct hash_pte *hptep;
-	unsigned long hash;
-	unsigned long i;
-	long slot;
-	unsigned long want_v, hpte_v;
+	unsigned long want_v, slot;
+	bool secondary_search = false;
 
-	hash = hpt_hash(vpn, mmu_psize_defs[psize].shift, ssize);
-	want_v = hpte_encode_avpn(vpn, psize, ssize);
-
-	/* Bolted mappings are only ever in the primary group */
+	want_v = hpte_encode_avpn(vpn, bpsize, ssize);
 	slot = (hash & htab_hash_mask) * HPTES_PER_GROUP;
-	for (i = 0; i < HPTES_PER_GROUP; i++) {
-		hptep = htab_address + slot;
+
+	/*
+	 * search for hpte in the primary group
+	 */
+search_again:
+	hptep = htab_address + slot;
+	for (i = 0; i < HPTES_PER_GROUP; i++, hptep++) {
+		/*
+		 * FIXME!! Should we check locklessly check first ?
+		 */
+		native_lock_hpte(hptep);
 		hpte_v = be64_to_cpu(hptep->v);
 		if (cpu_has_feature(CPU_FTR_ARCH_300))
 			hpte_v = hpte_new_to_old_v(hpte_v, be64_to_cpu(hptep->r));
-
-		if (HPTE_V_COMPARE(hpte_v, want_v) && (hpte_v & HPTE_V_VALID))
-			/* HPTE matches */
-			return slot;
-		++slot;
+		if (!HPTE_V_COMPARE(hpte_v, want_v) || !(hpte_v & HPTE_V_VALID))
+			native_unlock_hpte(hptep);
+		else
+			return hptep;
 	}
-
-	return -1;
+	if (!secondary_search) {
+		/* Search for hpte in the secondary group */
+		slot = (~hash & htab_hash_mask) * HPTES_PER_GROUP;
+		secondary_search = true;
+		goto search_again;
+	}
+	return NULL;
 }
 
 /*
@@ -389,23 +401,22 @@ static long native_hpte_find(unsigned long vpn, int psize, int ssize)
 static void native_hpte_updateboltedpp(unsigned long newpp, unsigned long ea,
 				       int psize, int ssize)
 {
-	unsigned long vpn;
-	unsigned long vsid;
-	long slot;
+	unsigned long hash;
+	unsigned long vpn, vsid;
 	struct hash_pte *hptep;
 
 	vsid = get_kernel_vsid(ea, ssize);
 	vpn = hpt_vpn(ea, vsid, ssize);
-
-	slot = native_hpte_find(vpn, psize, ssize);
-	if (slot == -1)
+	hash = hpt_hash(vpn, mmu_psize_defs[psize].shift, ssize);
+	hptep = native_hpte_find(hash, vpn, psize, ssize);
+	if (!hptep)
 		panic("could not find page to bolt\n");
-	hptep = htab_address + slot;
 
 	/* Update the HPTE */
 	hptep->r = cpu_to_be64((be64_to_cpu(hptep->r) &
 				~(HPTE_R_PPP | HPTE_R_N)) |
 			       (newpp & (HPTE_R_PPP | HPTE_R_N)));
+	native_unlock_hpte(hptep);
 	/*
 	 * Ensure it is out of the tlb too. Bolted entries base and
 	 * actual page size will be same.
@@ -422,17 +433,16 @@ static int native_hpte_removebolted(unsigned long ea, int psize, int ssize)
 {
 	unsigned long vpn;
 	unsigned long vsid;
-	long slot;
+	unsigned long hash;
 	struct hash_pte *hptep;
 
 	vsid = get_kernel_vsid(ea, ssize);
 	vpn = hpt_vpn(ea, vsid, ssize);
+	hash = hpt_hash(vpn, mmu_psize_defs[psize].shift, ssize);
 
-	slot = native_hpte_find(vpn, psize, ssize);
-	if (slot == -1)
+	hptep = native_hpte_find(hash, vpn, psize, ssize);
+	if (!hptep)
 		return -ENOENT;
-
-	hptep = htab_address + slot;
 
 	VM_WARN_ON(!(be64_to_cpu(hptep->v) & HPTE_V_BOLTED));
 
