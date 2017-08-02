@@ -3974,7 +3974,7 @@ sysfs_drvr_stat_data_read(struct file *filp, struct kobject *kobj,
 	return index;
 }
 
-static struct bin_attribute sysfs_drvr_stat_data_attr = {
+static const struct bin_attribute sysfs_drvr_stat_data_attr = {
 	.attr = {
 		.name = "lpfc_drvr_stat_data",
 		.mode = S_IRUSR,
@@ -5368,7 +5368,7 @@ sysfs_ctlreg_read(struct file *filp, struct kobject *kobj,
 	return count;
 }
 
-static struct bin_attribute sysfs_ctlreg_attr = {
+static const struct bin_attribute sysfs_ctlreg_attr = {
 	.attr = {
 		.name = "ctlreg",
 		.mode = S_IRUSR | S_IWUSR,
@@ -5426,7 +5426,7 @@ sysfs_mbox_read(struct file *filp, struct kobject *kobj,
 	return -EPERM;
 }
 
-static struct bin_attribute sysfs_mbox_attr = {
+static const struct bin_attribute sysfs_mbox_attr = {
 	.attr = {
 		.name = "mbox",
 		.mode = S_IRUSR | S_IWUSR,

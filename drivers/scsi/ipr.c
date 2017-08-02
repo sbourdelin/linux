@@ -4206,7 +4206,7 @@ static ssize_t ipr_next_async_err_log(struct file *filep, struct kobject *kobj,
 	return count;
 }
 
-static struct bin_attribute ipr_ioa_async_err_log = {
+static const struct bin_attribute ipr_ioa_async_err_log = {
 	.attr = {
 		.name =		"async_err_log",
 		.mode =		S_IRUGO | S_IWUSR,
