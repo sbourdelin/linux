@@ -807,45 +807,39 @@ TRACE_EVENT(kvm_write_tsc_offset,
 
 #ifdef CONFIG_X86_64
 
-#define host_clocks					\
-	{VCLOCK_NONE, "none"},				\
-	{VCLOCK_TSC,  "tsc"}				\
-
 TRACE_EVENT(kvm_update_master_clock,
-	TP_PROTO(bool use_master_clock, unsigned int host_clock, bool offset_matched),
-	TP_ARGS(use_master_clock, host_clock, offset_matched),
+	TP_PROTO(bool use_master_clock, bool host_clock_stable,
+		bool offset_matched),
+	TP_ARGS(use_master_clock, host_clock_stable, offset_matched),
 
 	TP_STRUCT__entry(
 		__field(		bool,	use_master_clock	)
-		__field(	unsigned int,	host_clock		)
+		__field(		bool,	host_clock_stable	)
 		__field(		bool,	offset_matched		)
 	),
 
 	TP_fast_assign(
 		__entry->use_master_clock	= use_master_clock;
-		__entry->host_clock		= host_clock;
+		__entry->host_clock_stable	= host_clock_stable;
 		__entry->offset_matched		= offset_matched;
 	),
 
-	TP_printk("masterclock %d hostclock %s offsetmatched %u",
+	TP_printk("masterclock %d hostclock stable %u offsetmatched %u",
 		  __entry->use_master_clock,
-		  __print_symbolic(__entry->host_clock, host_clocks),
+		  __entry->host_clock_stable,
 		  __entry->offset_matched)
 );
 
 TRACE_EVENT(kvm_track_tsc,
 	TP_PROTO(unsigned int vcpu_id, unsigned int nr_matched,
-		 unsigned int online_vcpus, bool use_master_clock,
-		 unsigned int host_clock),
-	TP_ARGS(vcpu_id, nr_matched, online_vcpus, use_master_clock,
-		host_clock),
+		 unsigned int online_vcpus, bool use_master_clock),
+	TP_ARGS(vcpu_id, nr_matched, online_vcpus, use_master_clock),
 
 	TP_STRUCT__entry(
 		__field(	unsigned int,	vcpu_id			)
 		__field(	unsigned int,	nr_vcpus_matched_tsc	)
 		__field(	unsigned int,	online_vcpus		)
 		__field(	bool,		use_master_clock	)
-		__field(	unsigned int,	host_clock		)
 	),
 
 	TP_fast_assign(
@@ -853,14 +847,11 @@ TRACE_EVENT(kvm_track_tsc,
 		__entry->nr_vcpus_matched_tsc	= nr_matched;
 		__entry->online_vcpus		= online_vcpus;
 		__entry->use_master_clock	= use_master_clock;
-		__entry->host_clock		= host_clock;
 	),
 
-	TP_printk("vcpu_id %u masterclock %u offsetmatched %u nr_online %u"
-		  " hostclock %s",
+	TP_printk("vcpu_id %u masterclock %u offsetmatched %u nr_online %u",
 		  __entry->vcpu_id, __entry->use_master_clock,
-		  __entry->nr_vcpus_matched_tsc, __entry->online_vcpus,
-		  __print_symbolic(__entry->host_clock, host_clocks))
+		  __entry->nr_vcpus_matched_tsc, __entry->online_vcpus)
 );
 
 #endif /* CONFIG_X86_64 */
