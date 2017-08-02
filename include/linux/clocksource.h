@@ -48,7 +48,14 @@ struct module;
  *			400-499: Perfect
  *				The ideal clocksource. A must-use where
  *				available.
- * @read:		returns a cycle value, passes clocksource as argument
+ * @read:		returns a cycle value (might be not quite cycles:
+ *			see pvclock) passes clocksource as argument
+ * @read_with_stamp:	saves cycles value (got from timekeeper) and cycles
+ *			stamp (got from hardware counter value and used by
+ *			timekeeper to calculate the cycles value) to
+ *			corresponding input pointers return true if cycles
+ *			stamp holds real cycles and false if it holds some
+ *			time derivative value
  * @enable:		optional function to enable the clocksource
  * @disable:		optional function to disable the clocksource
  * @mask:		bitmask for two's complement
@@ -78,6 +85,8 @@ struct module;
  */
 struct clocksource {
 	u64 (*read)(struct clocksource *cs);
+	bool (*read_with_stamp)(struct clocksource *cs,
+				u64 *cycles, u64 *cycles_stamp);
 	u64 mask;
 	u32 mult;
 	u32 shift;
