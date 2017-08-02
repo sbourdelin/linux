@@ -151,7 +151,7 @@ DIO0_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs)
 		wake_up_interruptible(&device->fifo_wait_queue);
 	}
 
-	return (irq_handler_t) IRQ_HANDLED;
+	return IRQ_HANDLED;
 }
 
 static irq_handler_t
@@ -171,7 +171,7 @@ DIO1_irq_handler(unsigned int irq, void *dev_id, struct pt_regs *regs)
 	printk("DIO1 irq: %d bytes free in fifo\n", device->free_in_fifo); // TODO: printk() should include KERN_ facility level
 	wake_up_interruptible(&device->fifo_wait_queue);
 
-	return (irq_handler_t) IRQ_HANDLED;
+	return IRQ_HANDLED;
 }
 
 static void *DIO_irq_handler[NUM_DIO] = {
