@@ -454,6 +454,27 @@ static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long vpn,
 	BUG_ON(lpar_rc != H_SUCCESS);
 }
 
+static void __pseries_lpar_hash_invalidate(unsigned long hash, unsigned long vpn,
+					   int psize, int apsize,
+					   int ssize, int local)
+{
+	unsigned long want_v;
+	unsigned long lpar_rc;
+	unsigned long dummy1, dummy2;
+
+	pr_devel("    inval : hash=%lx, vpn=%016lx, psize: %d, local: %d\n",
+		 hash, vpn, psize, local);
+
+	want_v = hpte_encode_avpn(vpn, psize, ssize);
+	lpar_rc = plpar_pte_hash_remove(H_AVPN, hash, want_v, &dummy1, &dummy2);
+	if (lpar_rc == H_NOT_FOUND)
+		return;
+
+	BUG_ON(lpar_rc != H_SUCCESS);
+
+}
+
+
 static void pSeries_lpar_hash_invalidate(unsigned long hash, unsigned long vpn,
 					 int psize, int apsize,
 					 int ssize, int local)
@@ -466,6 +487,9 @@ static void pSeries_lpar_hash_invalidate(unsigned long hash, unsigned long vpn,
 	pr_devel("    inval : hash=%lx, vpn=%016lx, psize: %d, local: %d\n",
 		 hash, vpn, psize, local);
 
+	if (firmware_has_feature(FW_FEATURE_HASH_API))
+		return __pseries_lpar_hash_invalidate(hash, vpn, psize,
+						      apsize, ssize, local);
 	want_v = hpte_encode_avpn(vpn, psize, ssize);
 	slot = __pSeries_lpar_hpte_find(hash, want_v);
 	if (slot < 0)
