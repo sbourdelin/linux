@@ -111,4 +111,6 @@
 
 #define SO_PEERGROUPS		59
 
+#define SO_ULP			60
+
 #endif /* _ASM_IA64_SOCKET_H */
