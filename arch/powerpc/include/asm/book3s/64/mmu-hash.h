@@ -135,6 +135,10 @@ struct mmu_hash_ops {
 					   unsigned long vpn,
 					   int bpsize, int apsize,
 					   int ssize, int local);
+	void            (*hash_invalidate)(unsigned long hash,
+					   unsigned long vpn,
+					   int bpsize, int apsize,
+					   int ssize, int local);
 	long		(*hpte_updatepp)(unsigned long slot,
 					 unsigned long newpp,
 					 unsigned long vpn,

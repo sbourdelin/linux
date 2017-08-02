@@ -492,6 +492,32 @@ static void native_hpte_invalidate(unsigned long slot, unsigned long vpn,
 	local_irq_restore(flags);
 }
 
+static void native_hash_invalidate(unsigned long hash, unsigned long vpn,
+				   int bpsize, int apsize, int ssize, int local)
+{
+	unsigned long flags;
+	struct hash_pte *hptep;
+
+	DBG_LOW("    invalidate(vpn=%016lx, hash: %lx)\n", vpn, hash);
+	local_irq_save(flags);
+	hptep = native_hpte_find(hash, vpn, bpsize, ssize);
+	if (hptep) {
+		/*
+		 * Invalidate the hpte. NOTE: this also unlocks it
+		 */
+		hptep->v = 0;
+	}
+	/*
+	 * We need to invalidate the TLB always because hpte_remove doesn't do
+	 * a tlb invalidate. If a hash bucket gets full, we "evict" a more/less
+	 * random entry from it. When we do that we don't invalidate the TLB
+	 * (hpte_remove) because we assume the old translation is still
+	 * technically "valid".
+	 */
+	tlbie(vpn, bpsize, apsize, ssize, local);
+	local_irq_restore(flags);
+}
+
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 static void native_hugepage_invalidate(unsigned long vsid,
 				       unsigned long addr,
@@ -771,6 +797,7 @@ static int native_register_proc_table(unsigned long base, unsigned long page_siz
 void __init hpte_init_native(void)
 {
 	mmu_hash_ops.hpte_invalidate	= native_hpte_invalidate;
+	mmu_hash_ops.hash_invalidate	= native_hash_invalidate;
 	mmu_hash_ops.hpte_updatepp	= native_hpte_updatepp;
 	mmu_hash_ops.hpte_updateboltedpp = native_hpte_updateboltedpp;
 	mmu_hash_ops.hpte_removebolted = native_hpte_removebolted;

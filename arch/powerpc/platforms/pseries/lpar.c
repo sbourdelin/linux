@@ -419,6 +419,31 @@ static void pSeries_lpar_hpte_invalidate(unsigned long slot, unsigned long vpn,
 	BUG_ON(lpar_rc != H_SUCCESS);
 }
 
+static void pSeries_lpar_hash_invalidate(unsigned long hash, unsigned long vpn,
+					 int psize, int apsize,
+					 int ssize, int local)
+{
+	long slot;
+	unsigned long want_v;
+	unsigned long lpar_rc;
+	unsigned long dummy1, dummy2;
+
+	pr_devel("    inval : hash=%lx, vpn=%016lx, psize: %d, local: %d\n",
+		 hash, vpn, psize, local);
+
+	want_v = hpte_encode_avpn(vpn, psize, ssize);
+	slot = __pSeries_lpar_hpte_find(hash, want_v);
+	if (slot < 0)
+		/* HPTE not found */
+		return;
+	lpar_rc = plpar_pte_remove(H_AVPN, slot, want_v, &dummy1, &dummy2);
+	if (lpar_rc == H_NOT_FOUND)
+		return;
+
+	BUG_ON(lpar_rc != H_SUCCESS);
+}
+
+
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 /*
  * Limit iterations holding pSeries_lpar_tlbie_lock to 3. We also need
@@ -758,6 +783,7 @@ static int pseries_lpar_register_process_table(unsigned long base,
 void __init hpte_init_pseries(void)
 {
 	mmu_hash_ops.hpte_invalidate	 = pSeries_lpar_hpte_invalidate;
+	mmu_hash_ops.hash_invalidate	 = pSeries_lpar_hash_invalidate;
 	mmu_hash_ops.hpte_updatepp	 = pSeries_lpar_hpte_updatepp;
 	mmu_hash_ops.hpte_updateboltedpp = pSeries_lpar_hpte_updateboltedpp;
 	mmu_hash_ops.hpte_insert	 = pSeries_lpar_hpte_insert;
