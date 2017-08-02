@@ -1299,7 +1299,7 @@ static inline void d_lustre_invalidate(struct dentry *dentry, int nested)
 	 * If we unhashed such a dentry, unmount would not be able to find
 	 * it and busy inodes would be reported.
 	 */
-	if (d_count(dentry) == 0 && !(dentry->d_flags & DCACHE_DISCONNECTED))
+	if (d_count(dentry) == 0 && !IS_ROOT(dentry))
 		__d_drop(dentry);
 	spin_unlock(&dentry->d_lock);
 }
