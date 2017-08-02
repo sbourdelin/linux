@@ -37,6 +37,16 @@ config SENSORS_ADM1275
 	  This driver can also be built as a module. If so, the module will
 	  be called adm1275.
 
+config SENSORS_IBMPS
+	tristate "IBM Power Supply"
+	default n
+	help
+	  If you say yes here you get hardware monitoring support for IBM
+	  power supply.
+
+	  This driver can also be built as a module. If so, the module will
+	  be called ibmps.
+
 config SENSORS_IR35221
 	tristate "Infineon IR35221"
 	default n
