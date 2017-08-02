@@ -41,6 +41,7 @@
 #include <linux/rwsem.h>
 #include <linux/ptrace.h>
 #include <linux/async.h>
+#include <linux/delay.h>
 #include <linux/uaccess.h>
 
 #include <trace/events/module.h>
@@ -106,7 +107,8 @@ static int call_modprobe(char *module_name, int wait)
 	argv[4] = NULL;
 
 	info = call_usermodehelper_setup(modprobe_path, argv, envp, GFP_KERNEL,
-					 NULL, free_modprobe_argv, NULL);
+			                 NULL, NULL, NULL, free_modprobe_argv,
+					 NULL);
 	if (!info)
 		goto free_module_name;
 
@@ -201,8 +203,15 @@ static void umh_complete(struct subprocess_info *sub_info)
 	 */
 	if (comp)
 		complete(comp);
-	else
+	else {
+		for(;;) {
+			if (sub_info->cleaned == false)
+				udelay(20);
+			else
+				break;
+		}
 		call_usermodehelper_freeinfo(sub_info);
+	}
 }
 
 /*
@@ -296,7 +305,10 @@ static void call_usermodehelper_exec_sync(struct subprocess_info *sub_info)
 
 	/* Restore default kernel sig handler */
 	kernel_sigaction(SIGCHLD, SIG_IGN);
-
+	if(sub_info->cleanup_intermediate) {
+		sub_info->cleanup_intermediate(sub_info);
+	}
+	sub_info->cleaned = true;
 	umh_complete(sub_info);
 }
 
@@ -318,6 +330,9 @@ static void call_usermodehelper_exec_work(struct work_struct *work)
 {
 	struct subprocess_info *sub_info =
 		container_of(work, struct subprocess_info, work);
+	if(sub_info->init_intermediate) {
+		sub_info->init_intermediate(sub_info);
+	}
 
 	if (sub_info->wait & UMH_WAIT_PROC) {
 		call_usermodehelper_exec_sync(sub_info);
@@ -330,6 +345,11 @@ static void call_usermodehelper_exec_work(struct work_struct *work)
 		 */
 		pid = kernel_thread(call_usermodehelper_exec_async, sub_info,
 				    CLONE_PARENT | SIGCHLD);
+
+		if(sub_info->cleanup_intermediate) {
+			sub_info->cleanup_intermediate(sub_info);
+		}
+		sub_info->cleaned = true;
 		if (pid < 0) {
 			sub_info->retval = pid;
 			umh_complete(sub_info);
@@ -495,25 +515,38 @@ static void helper_unlock(void)
  * @argv: arg vector for process
  * @envp: environment for process
  * @gfp_mask: gfp mask for memory allocation
- * @cleanup: a cleanup function
+ * @init_intermediate: init function which is called in parent task
+ * @cleanup_intermediate: clean function which is called in parent task
  * @init: an init function
+ * @cleanup: a cleanup function
  * @data: arbitrary context sensitive data
  *
  * Returns either %NULL on allocation failure, or a subprocess_info
  * structure.  This should be passed to call_usermodehelper_exec to
  * exec the process and free the structure.
  *
- * The init function is used to customize the helper process prior to
- * exec.  A non-zero return code causes the process to error out, exit,
- * and return the failure to the calling process
+ * The init_intermediate is called in the parent task of user mode
+ * helper. It's designed for init works which must be done in
+ * parent task, like switching the pid_ns_for_children.
  *
- * The cleanup function is just before ethe subprocess_info is about to
+ * The cleanup_intermediate is used when we want to cleanup what
+ * we have done in init_intermediate, it is also called in parent
+ * task.
+ *
+ * The init function is called after fork. It is used to customize the
+ * helper process prior to exec.  A non-zero return code causes the
+ * process to error out, exit, and return the failure to the
+ * calling process.
+ *
+ * The cleanup function is just before the subprocess_info is about to
  * be freed.  This can be used for freeing the argv and envp.  The
  * Function must be runnable in either a process context or the
  * context in which call_usermodehelper_exec is called.
  */
 struct subprocess_info *call_usermodehelper_setup(const char *path, char **argv,
 		char **envp, gfp_t gfp_mask,
+		void (*init_intermediate)(struct subprocess_info *info),
+		void (*cleanup_intermediate)(struct subprocess_info *info),
 		int (*init)(struct subprocess_info *info, struct cred *new),
 		void (*cleanup)(struct subprocess_info *info),
 		void *data)
@@ -533,8 +566,11 @@ struct subprocess_info *call_usermodehelper_setup(const char *path, char **argv,
 	sub_info->argv = argv;
 	sub_info->envp = envp;
 
-	sub_info->cleanup = cleanup;
+	sub_info->init_intermediate = init_intermediate;
+	sub_info->cleaned = false;
+	sub_info->cleanup_intermediate = cleanup_intermediate;
 	sub_info->init = init;
+	sub_info->cleanup = cleanup;
 	sub_info->data = data;
   out:
 	return sub_info;
@@ -629,7 +665,7 @@ int call_usermodehelper(const char *path, char **argv, char **envp, int wait)
 	gfp_t gfp_mask = (wait == UMH_NO_WAIT) ? GFP_ATOMIC : GFP_KERNEL;
 
 	info = call_usermodehelper_setup(path, argv, envp, gfp_mask,
-					 NULL, NULL, NULL);
+					 NULL, NULL, NULL, NULL, NULL);
 	if (info == NULL)
 		return -ENOMEM;
 

@@ -61,6 +61,9 @@ struct subprocess_info {
 	char **envp;
 	int wait;
 	int retval;
+	bool cleaned;
+	void (*init_intermediate)(struct subprocess_info *info);
+	void (*cleanup_intermediate)(struct subprocess_info *info);
 	int (*init)(struct subprocess_info *info, struct cred *new);
 	void (*cleanup)(struct subprocess_info *info);
 	void *data;
@@ -72,6 +75,8 @@ call_usermodehelper(const char *path, char **argv, char **envp, int wait);
 extern struct subprocess_info *
 call_usermodehelper_setup(const char *path, char **argv, char **envp,
 			  gfp_t gfp_mask,
+			  void (*init_intermediate)(struct subprocess_info *info),
+			  void (*cleanup_intermediate)(struct subprocess_info *info),
 			  int (*init)(struct subprocess_info *info, struct cred *new),
 			  void (*cleanup)(struct subprocess_info *), void *data);
 
