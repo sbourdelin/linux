@@ -104,4 +104,6 @@
 
 #define SO_PEERGROUPS		59
 
+#define SO_ULP			60
+
 #endif /* __ASM_GENERIC_SOCKET_H */

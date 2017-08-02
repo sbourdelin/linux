@@ -1055,6 +1055,11 @@ set_rcvbuf:
 		if (val == 1)
 			dst_negative_advice(sk);
 		break;
+
+	case SO_ULP:
+		ret = ulp_set(sk, optval, optlen);
+		break;
+
 	default:
 		ret = -ENOPROTOOPT;
 		break;
@@ -1382,6 +1387,9 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 			return -EINVAL;
 		v.val64 = sock_gen_cookie(sk);
 		break;
+
+	case SO_ULP:
+		return ulp_get_config(sk, optval, optlen);
 
 	default:
 		/* We implement the SO_SNDLOWAT etc to not be settable
@@ -2921,6 +2929,12 @@ EXPORT_SYMBOL(compat_sock_common_setsockopt);
 
 void sk_common_release(struct sock *sk)
 {
+	/* Clean up ULP before destroying protocol socket since ULP might
+	 * be dependent on transport (and not the other way around).
+	 */
+
+	ulp_cleanup(sk);
+
 	if (sk->sk_prot->destroy)
 		sk->sk_prot->destroy(sk);
 
