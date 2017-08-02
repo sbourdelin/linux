@@ -3813,14 +3813,16 @@ EXPORT_SYMBOL(pci_wait_for_pending_transaction);
 
 /*
  * We should only need to wait 100ms after FLR for virtual functions.
- * Wait for up to 1000ms for config space to return something other than -1.
- * Intel IGD requires this when an LCD panel is attached.  We read the 2nd
- * dword because VFs don't implement the 1st dword.
+ * Wait for up to 60s for config space to return something other than -1.
+ * Intel IGD requires 1s when an LCD panel is attached.  We use
+ * pci_bus_read_dev_vendor_id() for reading the vendor ID as it handles
+ * CRS gracefully.
  */
 static void pci_flr_wait(struct pci_dev *dev)
 {
 	int i = 0;
 	u32 id;
+	bool ret;
 
 	if (dev->is_virtfn) {
 		msleep(100);
@@ -3828,15 +3830,15 @@ static void pci_flr_wait(struct pci_dev *dev)
 	}
 
 	do {
-		msleep(100);
-		pci_read_config_dword(dev, PCI_COMMAND, &id);
-	} while (i++ < 10 && id == ~0);
+		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+						 1000);
+	} while (i++ < 60 && !ret);
 
-	if (id == ~0)
+	if (!ret)
 		dev_warn(&dev->dev, "Failed to return from FLR\n");
 	else if (i > 1)
-		dev_info(&dev->dev, "Required additional %dms to return from FLR\n",
-			 (i - 1) * 100);
+		dev_info(&dev->dev, "Required additional %ds to return from FLR\n",
+			 (i - 1));
 }
 
 /**
