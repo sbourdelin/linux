@@ -283,6 +283,7 @@ extern void ktime_get_raw_and_real_ts64(struct timespec64 *ts_raw,
  * @cycles:	Clocksource counter value to produce the system times
  * @real:	Realtime system time
  * @raw:	Monotonic raw system time
+ * @boot:	Monotonic time since boot
  * @clock_was_set_seq:	The sequence number of clock was set events
  * @cs_was_changed_seq:	The sequence number of clocksource change events
  */
@@ -290,6 +291,7 @@ struct system_time_snapshot {
 	u64		cycles;
 	ktime_t		real;
 	ktime_t		raw;
+	ktime_t		boot;
 	unsigned int	clock_was_set_seq;
 	u8		cs_was_changed_seq;
 };

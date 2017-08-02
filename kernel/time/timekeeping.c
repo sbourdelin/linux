@@ -953,6 +953,7 @@ void ktime_get_snapshot(struct system_time_snapshot *systime_snapshot)
 	unsigned long seq;
 	ktime_t base_raw;
 	ktime_t base_real;
+	ktime_t base_boot;
 	u64 nsec_raw;
 	u64 nsec_real;
 	u64 now;
@@ -967,6 +968,8 @@ void ktime_get_snapshot(struct system_time_snapshot *systime_snapshot)
 		base_real = ktime_add(tk->tkr_mono.base,
 				      tk_core.timekeeper.offs_real);
 		base_raw = tk->tkr_raw.base;
+		base_boot = ktime_add(tk->tkr_mono.base,
+					tk_core.timekeeper.offs_boot);
 		nsec_real = timekeeping_cycles_to_ns(&tk->tkr_mono, now);
 		nsec_raw  = timekeeping_cycles_to_ns(&tk->tkr_raw, now);
 	} while (read_seqcount_retry(&tk_core.seq, seq));
@@ -974,6 +977,7 @@ void ktime_get_snapshot(struct system_time_snapshot *systime_snapshot)
 	systime_snapshot->cycles = now;
 	systime_snapshot->real = ktime_add_ns(base_real, nsec_real);
 	systime_snapshot->raw = ktime_add_ns(base_raw, nsec_raw);
+	systime_snapshot->boot = ktime_add_ns(base_boot, nsec_real);
 }
 EXPORT_SYMBOL_GPL(ktime_get_snapshot);
 
