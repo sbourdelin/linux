@@ -226,6 +226,13 @@ static inline long plpar_pte_protect(unsigned long flags, unsigned long ptex,
 	return plpar_hcall_norets(H_PROTECT, flags, ptex, avpn);
 }
 
+static inline long plpar_pte_hash_protect(unsigned long flags,
+					  unsigned long hash,
+					  unsigned long avpn)
+{
+	return plpar_hcall_norets(H_HASH_PROTECT, flags, hash, avpn);
+}
+
 static inline long plpar_resize_hpt_prepare(unsigned long flags,
 					    unsigned long shift)
 {

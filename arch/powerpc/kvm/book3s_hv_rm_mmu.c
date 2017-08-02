@@ -752,33 +752,14 @@ long kvmppc_h_bulk_remove(struct kvm_vcpu *vcpu)
 	return ret;
 }
 
-long kvmppc_h_protect(struct kvm_vcpu *vcpu, unsigned long flags,
-		      unsigned long pte_index, unsigned long avpn,
-		      unsigned long va)
+long __kvmppc_do_hash_protect(struct kvm *kvm, __be64 *hpte,
+			      unsigned long flags, unsigned long pte_index)
 {
-	struct kvm *kvm = vcpu->kvm;
-	__be64 *hpte;
+	u64 pte_v, pte_r;
 	struct revmap_entry *rev;
 	unsigned long v, r, rb, mask, bits;
-	u64 pte_v, pte_r;
 
-	if (kvm_is_radix(kvm))
-		return H_FUNCTION;
-	if (pte_index >= kvmppc_hpt_npte(&kvm->arch.hpt))
-		return H_PARAMETER;
-
-	hpte = (__be64 *)(kvm->arch.hpt.virt + (pte_index << 4));
-	while (!try_lock_hpte(hpte, HPTE_V_HVLOCK))
-		cpu_relax();
 	v = pte_v = be64_to_cpu(hpte[0]);
-	if (cpu_has_feature(CPU_FTR_ARCH_300))
-		v = hpte_new_to_old_v(v, be64_to_cpu(hpte[1]));
-	if ((v & (HPTE_V_ABSENT | HPTE_V_VALID)) == 0 ||
-	    ((flags & H_AVPN) && (v & ~0x7fUL) != avpn)) {
-		__unlock_hpte(hpte, pte_v);
-		return H_NOT_FOUND;
-	}
-
 	pte_r = be64_to_cpu(hpte[1]);
 	bits = (flags << 55) & HPTE_R_PP0;
 	bits |= (flags << 48) & HPTE_R_KEY_HI;
@@ -821,6 +802,55 @@ long kvmppc_h_protect(struct kvm_vcpu *vcpu, unsigned long flags,
 		atomic64_inc(&kvm->arch.mmio_update);
 
 	return H_SUCCESS;
+}
+
+long kvmppc_h_protect(struct kvm_vcpu *vcpu, unsigned long flags,
+		      unsigned long pte_index, unsigned long avpn,
+		      unsigned long va)
+{
+	__be64 *hpte;
+	u64 v, pte_v;
+	struct kvm *kvm = vcpu->kvm;
+
+	if (kvm_is_radix(kvm))
+		return H_FUNCTION;
+	if (pte_index >= kvmppc_hpt_npte(&kvm->arch.hpt))
+		return H_PARAMETER;
+
+	hpte = (__be64 *)(kvm->arch.hpt.virt + (pte_index << 4));
+	while (!try_lock_hpte(hpte, HPTE_V_HVLOCK))
+		cpu_relax();
+	v = pte_v = be64_to_cpu(hpte[0]);
+	if (cpu_has_feature(CPU_FTR_ARCH_300))
+		v = hpte_new_to_old_v(v, be64_to_cpu(hpte[1]));
+	if ((v & (HPTE_V_ABSENT | HPTE_V_VALID)) == 0 ||
+	    ((flags & H_AVPN) && (v & ~0x7fUL) != avpn)) {
+		__unlock_hpte(hpte, pte_v);
+		return H_NOT_FOUND;
+	}
+	return __kvmppc_do_hash_protect(kvm, hpte, flags, pte_index);
+}
+
+/*  H_AVPN flag is must */
+long kvmppc_h_hash_protect(struct kvm_vcpu *vcpu, unsigned long flags,
+			   unsigned long hash, unsigned long avpn,
+			   unsigned long va)
+{
+	__be64 *hpte;
+	unsigned long pte_index;
+	struct kvm *kvm = vcpu->kvm;
+
+	if (kvm_is_radix(kvm))
+		return H_FUNCTION;
+
+	if (!(flags & H_AVPN))
+		return H_PARAMETER;
+
+	hpte = kvmppc_find_hpte_slot(kvm, hash, avpn, &pte_index);
+	if (!hpte)
+		return H_NOT_FOUND;
+
+	return __kvmppc_do_hash_protect(kvm, hpte, flags, pte_index);
 }
 
 long kvmppc_h_read(struct kvm_vcpu *vcpu, unsigned long flags,
