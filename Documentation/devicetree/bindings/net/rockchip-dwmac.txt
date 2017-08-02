@@ -25,7 +25,8 @@ Required properties:
  - clock-names: One name for each entry in the clocks property.
  - phy-mode: See ethernet.txt file in the same directory.
  - pinctrl-names: Names corresponding to the numbered pinctrl states.
- - pinctrl-0: pin-control mode. can be <&rgmii_pins> or <&rmii_pins>.
+ - pinctrl-0: pin-control mode. can be <&rgmii_pins>, <&rmii_pins> or led pins
+   for internal phy mode.
  - clock_in_out: For RGMII, it must be "input", means main clock(125MHz)
    is not sourced from SoC's PLL, but input from PHY; For RMII, "input" means
    PHY provides the reference clock(50MHz), "output" means GMAC provides the
@@ -40,6 +41,9 @@ Optional properties:
  - tx_delay: Delay value for TXD timing. Range value is 0~0x7F, 0x30 as default.
  - rx_delay: Delay value for RXD timing. Range value is 0~0x7F, 0x10 as default.
  - phy-supply: phandle to a regulator if the PHY needs one
+ - clocks: <&cru MAC_PHY>: Clock selector for internal macphy
+ - phy-is-internal: A boolean property allows us to know that MAC will connect to
+   internal phy.
 
 Example:
 
