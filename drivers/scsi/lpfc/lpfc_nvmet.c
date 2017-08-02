@@ -2179,7 +2179,7 @@ lpfc_nvmet_prep_fcp_wqe(struct lpfc_hba *phba,
 
 		/* Word 10 */
 		bf_set(wqe_nvme, &wqe->fcp_trsp.wqe_com, 1);
-		bf_set(wqe_dbde, &wqe->fcp_trsp.wqe_com, 0);
+		bf_set(wqe_dbde, &wqe->fcp_trsp.wqe_com, 1);
 		bf_set(wqe_iod, &wqe->fcp_trsp.wqe_com, LPFC_WQE_IOD_WRITE);
 		bf_set(wqe_lenloc, &wqe->fcp_trsp.wqe_com,
 		       LPFC_WQE_LENLOC_WORD3);
@@ -2516,7 +2516,7 @@ lpfc_nvmet_unsol_issue_abort(struct lpfc_hba *phba,
 	bf_set(wqe_rcvoxid, &wqe_abts->xmit_sequence.wqe_com, xri);
 
 	/* Word 10 */
-	bf_set(wqe_dbde, &wqe_abts->xmit_sequence.wqe_com, 1);
+	bf_set(wqe_dbde, &wqe_abts->xmit_sequence.wqe_com, 0);
 	bf_set(wqe_iod, &wqe_abts->xmit_sequence.wqe_com, LPFC_WQE_IOD_WRITE);
 	bf_set(wqe_lenloc, &wqe_abts->xmit_sequence.wqe_com,
 	       LPFC_WQE_LENLOC_WORD12);
@@ -2652,6 +2652,7 @@ lpfc_nvmet_sol_fcp_issue_abort(struct lpfc_hba *phba,
 	       abts_wqeq->iotag);
 
 	/* word 10 */
+	bf_set(wqe_dbde, &abts_wqe->abort_cmd.wqe_com, 0);
 	bf_set(wqe_qosd, &abts_wqe->abort_cmd.wqe_com, 1);
 	bf_set(wqe_lenloc, &abts_wqe->abort_cmd.wqe_com, LPFC_WQE_LENLOC_NONE);
 

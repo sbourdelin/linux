@@ -619,7 +619,7 @@ lpfc_nvme_adj_fcp_sgls(struct lpfc_vport *vport,
 
 	/* Word 0-2 - NVME CMND IU (embedded payload) */
 	wqe->generic.bde.tus.f.bdeFlags = BUFF_TYPE_BDE_IMMED;
-	wqe->generic.bde.tus.f.bdeSize = 60;
+	wqe->generic.bde.tus.f.bdeSize = 56;
 	wqe->generic.bde.addrHigh = 0;
 	wqe->generic.bde.addrLow =  64;  /* Word 16 */
 
@@ -628,6 +628,7 @@ lpfc_nvme_adj_fcp_sgls(struct lpfc_vport *vport,
 	       (nCmd->rsplen + nCmd->cmdlen));
 
 	/* Word 10 */
+	bf_set(wqe_dbde, &wqe->generic.wqe_com, 0);
 	bf_set(wqe_nvme, &wqe->fcp_icmd.wqe_com, 1);
 	bf_set(wqe_wqes, &wqe->fcp_icmd.wqe_com, 1);
 
@@ -1999,7 +2000,6 @@ lpfc_new_nvme_buf(struct lpfc_vport *vport, int num_to_alloc)
 
 		/* Word 10 */
 		bf_set(wqe_ebde_cnt, &wqe->generic.wqe_com, 0);
-		bf_set(wqe_dbde, &wqe->generic.wqe_com, 1);
 
 		/* add the nvme buffer to a post list */
 		list_add_tail(&lpfc_ncmd->list, &post_nblist);

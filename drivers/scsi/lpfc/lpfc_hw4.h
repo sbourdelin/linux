@@ -84,6 +84,7 @@ struct lpfc_sli_intf {
 #define LPFC_SLI_INTF_IF_TYPE_0		0
 #define LPFC_SLI_INTF_IF_TYPE_1		1
 #define LPFC_SLI_INTF_IF_TYPE_2		2
+#define LPFC_SLI_INTF_IF_TYPE_6		6
 #define lpfc_sli_intf_sli_family_SHIFT		8
 #define lpfc_sli_intf_sli_family_MASK		0x0000000F
 #define lpfc_sli_intf_sli_family_WORD		word0
@@ -731,11 +732,13 @@ struct lpfc_register {
  * register sets depending on the UCNA Port's reported if_type
  * value.  For UCNA ports running SLI4 and if_type 0, they reside in
  * BAR4.  For UCNA ports running SLI4 and if_type 2, they reside in
- * BAR0.  The offsets are the same so the driver must account for
- * any base address difference.
+ * BAR0.  For FC ports running SLI4 and if_type 6, they reside in
+ * BAR2. The offsets and base address are different,  so the driver
+ * has to compute the register addresses accordingly
  */
 #define LPFC_ULP0_RQ_DOORBELL		0x00A0
 #define LPFC_ULP1_RQ_DOORBELL		0x00C0
+#define LPFC_IF6_RQ_DOORBELL		0x0080
 #define lpfc_rq_db_list_fm_num_posted_SHIFT	24
 #define lpfc_rq_db_list_fm_num_posted_MASK	0x00FF
 #define lpfc_rq_db_list_fm_num_posted_WORD	word0
@@ -769,6 +772,20 @@ struct lpfc_register {
 #define lpfc_wq_db_ring_fm_id_SHIFT             0
 #define lpfc_wq_db_ring_fm_id_MASK              0xFFFF
 #define lpfc_wq_db_ring_fm_id_WORD              word0
+
+#define LPFC_IF6_WQ_DOORBELL		0x0040
+#define lpfc_if6_wq_db_list_fm_num_posted_SHIFT	24
+#define lpfc_if6_wq_db_list_fm_num_posted_MASK	0x00FF
+#define lpfc_if6_wq_db_list_fm_num_posted_WORD	word0
+#define lpfc_if6_wq_db_list_fm_dpp_SHIFT	23
+#define lpfc_if6_wq_db_list_fm_dpp_MASK		0x0001
+#define lpfc_if6_wq_db_list_fm_dpp_WORD		word0
+#define lpfc_if6_wq_db_list_fm_dpp_id_SHIFT	16
+#define lpfc_if6_wq_db_list_fm_dpp_id_MASK	0x001F
+#define lpfc_if6_wq_db_list_fm_dpp_id_WORD	word0
+#define lpfc_if6_wq_db_list_fm_id_SHIFT		0
+#define lpfc_if6_wq_db_list_fm_id_MASK		0xFFFF
+#define lpfc_if6_wq_db_list_fm_id_WORD		word0
 
 #define LPFC_EQCQ_DOORBELL		0x0120
 #define lpfc_eqcq_doorbell_se_SHIFT		31
@@ -805,6 +822,38 @@ struct lpfc_register {
 #define LPFC_CQID_HI_FIELD_SHIFT		10
 #define LPFC_EQID_HI_FIELD_SHIFT		9
 
+#define LPFC_IF6_CQ_DOORBELL			0x00C0
+#define lpfc_if6_cq_doorbell_se_SHIFT		31
+#define lpfc_if6_cq_doorbell_se_MASK		0x0001
+#define lpfc_if6_cq_doorbell_se_WORD		word0
+#define LPFC_IF6_CQ_SOLICIT_ENABLE_OFF		0
+#define LPFC_IF6_CQ_SOLICIT_ENABLE_ON		1
+#define lpfc_if6_cq_doorbell_arm_SHIFT		29
+#define lpfc_if6_cq_doorbell_arm_MASK		0x0001
+#define lpfc_if6_cq_doorbell_arm_WORD		word0
+#define lpfc_if6_cq_doorbell_num_released_SHIFT	16
+#define lpfc_if6_cq_doorbell_num_released_MASK	0x1FFF
+#define lpfc_if6_cq_doorbell_num_released_WORD	word0
+#define lpfc_if6_cq_doorbell_cqid_SHIFT		0
+#define lpfc_if6_cq_doorbell_cqid_MASK		0xFFFF
+#define lpfc_if6_cq_doorbell_cqid_WORD		word0
+
+#define LPFC_IF6_EQ_DOORBELL			0x0120
+#define lpfc_if6_eq_doorbell_io_SHIFT		31
+#define lpfc_if6_eq_doorbell_io_MASK		0x0001
+#define lpfc_if6_eq_doorbell_io_WORD		word0
+#define LPFC_IF6_EQ_INTR_OVERRIDE_OFF		0
+#define LPFC_IF6_EQ_INTR_OVERRIDE_ON		1
+#define lpfc_if6_eq_doorbell_arm_SHIFT		29
+#define lpfc_if6_eq_doorbell_arm_MASK		0x0001
+#define lpfc_if6_eq_doorbell_arm_WORD		word0
+#define lpfc_if6_eq_doorbell_num_released_SHIFT	16
+#define lpfc_if6_eq_doorbell_num_released_MASK	0x1FFF
+#define lpfc_if6_eq_doorbell_num_released_WORD	word0
+#define lpfc_if6_eq_doorbell_eqid_SHIFT		0
+#define lpfc_if6_eq_doorbell_eqid_MASK		0x0FFF
+#define lpfc_if6_eq_doorbell_eqid_WORD		word0
+
 #define LPFC_BMBX			0x0160
 #define lpfc_bmbx_addr_SHIFT		2
 #define lpfc_bmbx_addr_MASK		0x3FFFFFFF
@@ -817,6 +866,7 @@ struct lpfc_register {
 #define lpfc_bmbx_rdy_WORD		word0
 
 #define LPFC_MQ_DOORBELL			0x0140
+#define LPFC_IF6_MQ_DOORBELL			0x0160
 #define lpfc_mq_doorbell_num_posted_SHIFT	16
 #define lpfc_mq_doorbell_num_posted_MASK	0x3FFF
 #define lpfc_mq_doorbell_num_posted_WORD	word0
@@ -1318,6 +1368,15 @@ struct lpfc_mbx_wq_create {
 #define lpfc_mbx_wq_create_page_size_MASK	0x000000FF
 #define lpfc_mbx_wq_create_page_size_WORD	word1
 #define LPFC_WQ_PAGE_SIZE_4096	0x1
+#define lpfc_mbx_wq_create_dpp_req_SHIFT	15
+#define lpfc_mbx_wq_create_dpp_req_MASK		0x00000001
+#define lpfc_mbx_wq_create_dpp_req_WORD		word1
+#define lpfc_mbx_wq_create_doe_SHIFT		14
+#define lpfc_mbx_wq_create_doe_MASK		0x00000001
+#define lpfc_mbx_wq_create_doe_WORD		word1
+#define lpfc_mbx_wq_create_toe_SHIFT		13
+#define lpfc_mbx_wq_create_toe_MASK		0x00000001
+#define lpfc_mbx_wq_create_toe_WORD		word1
 #define lpfc_mbx_wq_create_wqe_size_SHIFT	8
 #define lpfc_mbx_wq_create_wqe_size_MASK	0x0000000F
 #define lpfc_mbx_wq_create_wqe_size_WORD	word1
@@ -1346,6 +1405,28 @@ struct lpfc_mbx_wq_create {
 #define lpfc_mbx_wq_create_db_format_MASK	0x0000FFFF
 #define lpfc_mbx_wq_create_db_format_WORD	word2
 		} response;
+		struct {
+			uint32_t word0;
+#define lpfc_mbx_wq_create_dpp_rsp_SHIFT	31
+#define lpfc_mbx_wq_create_dpp_rsp_MASK		0x00000001
+#define lpfc_mbx_wq_create_dpp_rsp_WORD		word0
+#define lpfc_mbx_wq_create_v1_q_id_SHIFT	0
+#define lpfc_mbx_wq_create_v1_q_id_MASK		0x0000FFFF
+#define lpfc_mbx_wq_create_v1_q_id_WORD		word0
+			uint32_t word1;
+#define lpfc_mbx_wq_create_v1_bar_set_SHIFT	0
+#define lpfc_mbx_wq_create_v1_bar_set_MASK	0x0000000F
+#define lpfc_mbx_wq_create_v1_bar_set_WORD	word1
+			uint32_t doorbell_offset;
+			uint32_t word3;
+#define lpfc_mbx_wq_create_dpp_id_SHIFT		16
+#define lpfc_mbx_wq_create_dpp_id_MASK		0x0000001F
+#define lpfc_mbx_wq_create_dpp_id_WORD		word3
+#define lpfc_mbx_wq_create_dpp_bar_SHIFT	0
+#define lpfc_mbx_wq_create_dpp_bar_MASK		0x0000000F
+#define lpfc_mbx_wq_create_dpp_bar_WORD		word3
+			uint32_t dpp_offset;
+		} response_1;
 	} u;
 };
 
