@@ -34,6 +34,12 @@ static uint scan_timeout = WIL6210_SCAN_TO_SEC;
 module_param(scan_timeout, uint, 0644);
 MODULE_PARM_DESC(scan_timeout, " Scan timeout (seconds)");
 
+#ifdef CONFIG_PM
+static struct wiphy_wowlan_support wil_wowlan_support = {
+	.flags = WIPHY_WOWLAN_ANY | WIPHY_WOWLAN_DISCONNECT,
+};
+#endif
+
 #define CHAN60G(_channel, _flags) {				\
 	.band			= NL80211_BAND_60GHZ,		\
 	.center_freq		= 56160 + (2160 * (_channel)),	\
@@ -1819,6 +1825,10 @@ static void wil_wiphy_init(struct wiphy *wiphy)
 
 	wiphy->n_vendor_commands = ARRAY_SIZE(wil_nl80211_vendor_commands);
 	wiphy->vendor_commands = wil_nl80211_vendor_commands;
+
+#ifdef CONFIG_PM
+	wiphy->wowlan = &wil_wowlan_support;
+#endif
 }
 
 struct wireless_dev *wil_cfg80211_init(struct device *dev)
