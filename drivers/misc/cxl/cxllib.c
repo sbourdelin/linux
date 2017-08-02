@@ -198,6 +198,13 @@ int cxllib_get_PE_attributes(struct task_struct *task,
 		 * as XSL uses the memory context
 		 */
 		attr->pid = mm->context.id;
+#ifdef CONFIG_PPC_BOOK3S_64
+		mm_context_set_global_tlbi(&mm->context);
+		/*
+		 * barrier guarantees that XSL receives all invalidations
+		 */
+		wmb();
+#endif
 		mmput(mm);
 	} else {
 		attr->pid = 0;

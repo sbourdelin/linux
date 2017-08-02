@@ -222,8 +222,17 @@ static long afu_ioctl_start_work(struct cxl_context *ctx,
 	cxl_context_mm_count_get(ctx);
 
 	/* decrement the use count */
-	if (ctx->mm)
+	if (ctx->mm) {
 		mmput(ctx->mm);
+#ifdef CONFIG_PPC_BOOK3S_64
+		mm_context_set_global_tlbi(&ctx->mm->context);
+		/*
+		 * Barrier guarantees that the device will receive all
+		 * TLBIs from that point on
+		 */
+		wmb();
+#endif
+	}
 
 	trace_cxl_attach(ctx, work.work_element_descriptor, work.num_interrupts, amr);
 
@@ -236,7 +245,6 @@ static long afu_ioctl_start_work(struct cxl_context *ctx,
 		cxl_context_mm_count_put(ctx);
 		goto out;
 	}
-
 	ctx->status = STARTED;
 	rc = 0;
 out:
