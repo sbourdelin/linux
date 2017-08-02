@@ -69,10 +69,29 @@ static inline int mm_is_core_local(struct mm_struct *mm)
 			      topology_sibling_cpumask(smp_processor_id()));
 }
 
-static inline int mm_is_thread_local(struct mm_struct *mm)
+static inline int mm_is_invalidation_local(struct mm_struct *mm)
 {
-	return cpumask_equal(mm_cpumask(mm),
-			      cpumask_of(smp_processor_id()));
+	int rc;
+
+	rc = cpumask_equal(mm_cpumask(mm),
+			cpumask_of(smp_processor_id()));
+#ifdef CONFIG_PPC_BOOK3S_64
+	if (rc) {
+		/*
+		 * Check if context requires global TLBI.
+		 *
+		 * We need to make sure the PTE update is happening
+		 * before reading the context global flag. Otherwise,
+		 * reading the flag may be re-ordered and happen
+		 * first, and we could end up in a situation where the
+		 * old PTE was seen by the NPU/PSL/device, but the
+		 * TLBI is local.
+		 */
+		mb();
+		rc = !mm_context_get_global_tlbi(&mm->context);
+	}
+#endif
+	return rc;
 }
 
 #else
@@ -81,7 +100,7 @@ static inline int mm_is_core_local(struct mm_struct *mm)
 	return 1;
 }
 
-static inline int mm_is_thread_local(struct mm_struct *mm)
+static inline int mm_is_invalidation_local(struct mm_struct *mm)
 {
 	return 1;
 }

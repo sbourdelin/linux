@@ -96,7 +96,8 @@ void hpte_need_flush(struct mm_struct *mm, unsigned long addr,
 	 * flush now and return.
 	 */
 	if (!batch->active) {
-		flush_hash_page(vpn, rpte, psize, ssize, mm_is_thread_local(mm));
+		flush_hash_page(vpn, rpte, psize, ssize,
+				mm_is_invalidation_local(mm));
 		put_cpu_var(ppc64_tlb_batch);
 		return;
 	}
