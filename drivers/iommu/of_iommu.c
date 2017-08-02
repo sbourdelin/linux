@@ -200,7 +200,8 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
 					     of_pci_iommu_init, &info);
 		if (err) /* err > 0 means the walk stopped, but non-fatally */
 			ops = ERR_PTR(min(err, 0));
-		else /* success implies both fwspec and ops are now valid */
+		/* success may not imply fwspec is valid */
+		else if (dev->iommu_fwspec)
 			ops = dev->iommu_fwspec->ops;
 	} else {
 		struct of_phandle_args iommu_spec;
