@@ -2018,7 +2018,7 @@ int bitmap_resize(struct bitmap *bitmap, sector_t blocks,
 	if (store.sb_page && bitmap->storage.sb_page)
 		memcpy(page_address(store.sb_page),
 		       page_address(bitmap->storage.sb_page),
-		       sizeof(bitmap_super_t));
+		       init ? PAGE_SIZE : sizeof(bitmap_super_t));
 	bitmap_file_unmap(&bitmap->storage);
 	bitmap->storage = store;
 
