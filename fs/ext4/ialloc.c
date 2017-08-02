@@ -761,6 +761,7 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
 	ext4_group_t flex_group;
 	struct ext4_group_info *grp;
 	int encrypt = 0;
+	unsigned attemp;
 
 	/* Cannot create files in a deleted directory */
 	if (!dir || !dir->i_nlink)
@@ -917,6 +918,7 @@ got_group:
 			continue;
 		}
 
+		attemp = 0;
 repeat_in_this_group:
 		ino = ext4_find_next_zero_bit((unsigned long *)
 					      inode_bitmap_bh->b_data,
@@ -933,6 +935,9 @@ repeat_in_this_group:
 			ino++;
 			goto next_inode;
 		}
+
+		attemp++;
+
 		if (!handle) {
 			BUG_ON(nblocks <= 0);
 			handle = __ext4_journal_start_sb(dir->i_sb, line_no,
@@ -957,8 +962,14 @@ repeat_in_this_group:
 		if (!ret2)
 			goto got; /* we grabbed the inode! */
 next_inode:
-		if (ino < EXT4_INODES_PER_GROUP(sb))
+		if (ino < EXT4_INODES_PER_GROUP(sb)) {
+			/* Lock contention, relax a bit */
+			if (attemp >= 2) {
+				schedule_timeout_uninterruptible(msecs_to_jiffies(1));
+				attemp = 0;
+			}
 			goto repeat_in_this_group;
+		}
 next_group:
 		if (++group == ngroups)
 			group = 0;
