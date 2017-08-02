@@ -1581,7 +1581,7 @@ static struct btrfs_root *btrfs_read_tree_root(struct btrfs_root *tree_root,
 
 	__setup_root(root, fs_info, key->objectid);
 
-	ret = btrfs_find_root(tree_root, key, path,
+	ret = btrfs_find_root(fs_info, key, path,
 			      &root->root_item, &root->root_key);
 	if (ret) {
 		if (ret > 0)

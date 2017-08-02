@@ -62,7 +62,7 @@ static void btrfs_read_root_item(struct extent_buffer *eb, int slot,
 
 /*
  * btrfs_find_root - lookup the root by the key.
- * root: the root of the root tree
+ * fs_info: the fs_info for the file system to search
  * search_key: the key to search
  * path: the path we search
  * root_item: the root item of the tree we look for
@@ -74,7 +74,8 @@ static void btrfs_read_root_item(struct extent_buffer *eb, int slot,
  *
  * If we find something return 0, otherwise > 0, < 0 on error.
  */
-int btrfs_find_root(struct btrfs_root *root, const struct btrfs_key *search_key,
+int btrfs_find_root(struct btrfs_fs_info *fs_info,
+		    const struct btrfs_key *search_key,
 		    struct btrfs_path *path, struct btrfs_root_item *root_item,
 		    struct btrfs_key *root_key)
 {
@@ -83,7 +84,8 @@ int btrfs_find_root(struct btrfs_root *root, const struct btrfs_key *search_key,
 	int ret;
 	int slot;
 
-	ret = btrfs_search_slot(NULL, root, search_key, path, 0, 0);
+	ret = btrfs_search_slot(NULL, fs_info->tree_root, search_key,
+				path, 0, 0);
 	if (ret < 0)
 		return ret;
 
@@ -335,10 +337,11 @@ int btrfs_find_orphan_roots(struct btrfs_fs_info *fs_info)
 	return err;
 }
 
-/* drop the root item for 'key' from 'root' */
-int btrfs_del_root(struct btrfs_trans_handle *trans, struct btrfs_root *root,
-		   const struct btrfs_key *key)
+/* drop the root item for 'key' from the tree root */
+int btrfs_del_root(struct btrfs_trans_handle *trans,
+		   struct btrfs_fs_info *fs_info, const struct btrfs_key *key)
 {
+	struct btrfs_root *root = fs_info->tree_root;
 	struct btrfs_path *path;
 	int ret;
 
