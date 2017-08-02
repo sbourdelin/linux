@@ -2229,12 +2229,13 @@ raid56_parity_alloc_scrub_rbio(struct btrfs_fs_info *fs_info, struct bio *bio,
 	ASSERT(!bio->bi_iter.bi_size);
 	rbio->operation = BTRFS_RBIO_PARITY_SCRUB;
 
-	for (i = 0; i < rbio->real_stripes; i++) {
+	for (i = rbio->data_stripes; i < rbio->real_stripes; i++) {
 		if (bbio->stripes[i].dev == scrub_dev) {
 			rbio->scrubp = i;
 			break;
 		}
 	}
+	ASSERT(i < rbio->real_stripes);
 
 	/* Now we just support the sectorsize equals to page size */
 	ASSERT(fs_info->sectorsize == PAGE_SIZE);
