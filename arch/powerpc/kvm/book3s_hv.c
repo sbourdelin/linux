@@ -4144,6 +4144,7 @@ static unsigned int default_hcall_list[] = {
 	H_XIRR,
 	H_XIRR_X,
 #endif
+	H_HASH_REMOVE,
 	0
 };
 

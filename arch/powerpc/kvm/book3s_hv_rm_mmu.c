@@ -465,33 +465,20 @@ static void do_tlbies(struct kvm *kvm, unsigned long *rbvalues,
 	}
 }
 
-long kvmppc_do_h_remove(struct kvm *kvm, unsigned long flags,
-			unsigned long pte_index, unsigned long avpn,
-			unsigned long *hpret)
+static long __kvmppc_do_hash_remove(struct kvm *kvm, __be64 *hpte,
+				    unsigned long pte_index,
+				    unsigned long *hpret)
 {
-	__be64 *hpte;
+
 	unsigned long v, r, rb;
 	struct revmap_entry *rev;
 	u64 pte, orig_pte, pte_r;
 
-	if (kvm_is_radix(kvm))
-		return H_FUNCTION;
-	if (pte_index >= kvmppc_hpt_npte(&kvm->arch.hpt))
-		return H_PARAMETER;
-	hpte = (__be64 *)(kvm->arch.hpt.virt + (pte_index << 4));
-	while (!try_lock_hpte(hpte, HPTE_V_HVLOCK))
-		cpu_relax();
 	pte = orig_pte = be64_to_cpu(hpte[0]);
 	pte_r = be64_to_cpu(hpte[1]);
 	if (cpu_has_feature(CPU_FTR_ARCH_300)) {
 		pte = hpte_new_to_old_v(pte, pte_r);
 		pte_r = hpte_new_to_old_r(pte_r);
-	}
-	if ((pte & (HPTE_V_ABSENT | HPTE_V_VALID)) == 0 ||
-	    ((flags & H_AVPN) && (pte & ~0x7fUL) != avpn) ||
-	    ((flags & H_ANDCOND) && (pte & avpn) != 0)) {
-		__unlock_hpte(hpte, orig_pte);
-		return H_NOT_FOUND;
 	}
 
 	rev = real_vmalloc_addr(&kvm->arch.hpt.rev[pte_index]);
@@ -525,12 +512,125 @@ long kvmppc_do_h_remove(struct kvm *kvm, unsigned long flags,
 	hpret[1] = r;
 	return H_SUCCESS;
 }
+
+long kvmppc_do_h_remove(struct kvm *kvm, unsigned long flags,
+			unsigned long pte_index, unsigned long avpn,
+			unsigned long *hpret)
+{
+	__be64 *hpte;
+	u64 pte, orig_pte, pte_r;
+
+	if (kvm_is_radix(kvm))
+		return H_FUNCTION;
+	if (pte_index >= kvmppc_hpt_npte(&kvm->arch.hpt))
+		return H_PARAMETER;
+	hpte = (__be64 *)(kvm->arch.hpt.virt + (pte_index << 4));
+	while (!try_lock_hpte(hpte, HPTE_V_HVLOCK))
+		cpu_relax();
+	pte = orig_pte = be64_to_cpu(hpte[0]);
+	pte_r = be64_to_cpu(hpte[1]);
+	if (cpu_has_feature(CPU_FTR_ARCH_300)) {
+		pte = hpte_new_to_old_v(pte, pte_r);
+		pte_r = hpte_new_to_old_r(pte_r);
+	}
+	if ((pte & (HPTE_V_ABSENT | HPTE_V_VALID)) == 0 ||
+	    ((flags & H_AVPN) && (pte & ~0x7fUL) != avpn) ||
+	    ((flags & H_ANDCOND) && (pte & avpn) != 0)) {
+		__unlock_hpte(hpte, orig_pte);
+		return H_NOT_FOUND;
+	}
+	return __kvmppc_do_hash_remove(kvm, hpte, pte_index, hpret);
+}
 EXPORT_SYMBOL_GPL(kvmppc_do_h_remove);
 
 long kvmppc_h_remove(struct kvm_vcpu *vcpu, unsigned long flags,
 		     unsigned long pte_index, unsigned long avpn)
 {
 	return kvmppc_do_h_remove(vcpu->kvm, flags, pte_index, avpn,
+				  &vcpu->arch.gpr[4]);
+}
+
+/* return locked hpte */
+static __be64 *kvmppc_find_hpte_slot(struct kvm *kvm, unsigned long hash,
+				     unsigned long avpn, unsigned long *pte_index)
+{
+	int i;
+	__be64 *hpte;
+	unsigned long slot;
+	u64 pte_v, orig_pte, pte_r;
+	bool secondary_search = false;
+
+	/*
+	 * search for the hpte in primary group
+	 */
+	slot = ((hash & kvmppc_hpt_mask(&kvm->arch.hpt)) * HPTES_PER_GROUP) & ~0x7UL;
+
+search_again:
+	hpte = (__be64 *)(kvm->arch.hpt.virt + (slot << 4));
+	for (i = 0; i < HPTES_PER_GROUP; i++ , hpte += 2) {
+		/* lockless search */
+		pte_v = orig_pte = be64_to_cpu(hpte[0]);
+		pte_r = be64_to_cpu(hpte[1]);
+		if (cpu_has_feature(CPU_FTR_ARCH_300)) {
+			pte_v = hpte_new_to_old_v(pte_v, pte_r);
+			pte_r = hpte_new_to_old_r(pte_r);
+		}
+		if ((pte_v & (HPTE_V_ABSENT | HPTE_V_VALID)) == 0)
+			continue;
+
+		if ((pte_v & ~0x7FUL) == avpn) {
+			while (!try_lock_hpte(hpte, HPTE_V_HVLOCK))
+				cpu_relax();
+			pte_v = orig_pte = be64_to_cpu(hpte[0]);
+			pte_r = be64_to_cpu(hpte[1]);
+			if (cpu_has_feature(CPU_FTR_ARCH_300)) {
+				pte_v = hpte_new_to_old_v(pte_v, pte_r);
+				pte_r = hpte_new_to_old_r(pte_r);
+			}
+			if ((pte_v & ~0x7FUL) != avpn) {
+				/* unlock and continue */
+				__unlock_hpte(hpte, orig_pte);
+				continue;
+			}
+			*pte_index = slot + i;
+			return hpte;
+		}
+	}
+	if (!secondary_search) {
+		secondary_search = true;
+		slot = ((~hash & kvmppc_hpt_mask(&kvm->arch.hpt)) * HPTES_PER_GROUP) & ~0x7UL;
+		goto search_again;
+	}
+	return NULL;
+}
+
+/* Only support H_AVPN flag, which is must */
+long kvmppc_do_h_hash_remove(struct kvm *kvm, unsigned long flags,
+			     unsigned long hash, unsigned long avpn,
+			     unsigned long *hpret)
+{
+	__be64 *hpte;
+	unsigned long pte_index;
+
+
+	if (kvm_is_radix(kvm))
+		return H_FUNCTION;
+
+	if ((flags & H_AVPN) != H_AVPN)
+		return H_PARAMETER;
+
+	hpte = kvmppc_find_hpte_slot(kvm, hash, avpn, &pte_index);
+	if (!hpte)
+		return H_NOT_FOUND;
+
+	return __kvmppc_do_hash_remove(kvm, hpte, pte_index, hpret);
+}
+EXPORT_SYMBOL_GPL(kvmppc_do_h_hash_remove);
+
+long kvmppc_h_hash_remove(struct kvm_vcpu *vcpu, unsigned long flags,
+			  unsigned long hash, unsigned long avpn)
+{
+	return kvmppc_do_h_hash_remove(vcpu->kvm, flags, hash, avpn,
 				  &vcpu->arch.gpr[4]);
 }
 
