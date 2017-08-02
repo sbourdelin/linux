@@ -9377,7 +9377,6 @@ static void nested_vmx_cr_fixed1_bits_update(struct kvm_vcpu *vcpu)
 
 static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 {
-	struct kvm_cpuid_entry2 *best;
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	u32 secondary_exec_ctl = vmx_secondary_exec_control(vmx);
 
@@ -9397,14 +9396,12 @@ static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 	}
 
 	/* Exposing INVPCID only when PCID is exposed */
-	best = kvm_find_cpuid_entry(vcpu, 0x7, 0);
 	if (vmx_invpcid_supported() &&
-	    (!best || !(best->ebx & bit(X86_FEATURE_INVPCID)) ||
-	    !guest_cpuid_has(vcpu, X86_FEATURE_PCID))) {
+	    (!guest_cpuid_has(vcpu, X86_FEATURE_INVPCID) ||
+	     !guest_cpuid_has(vcpu, X86_FEATURE_PCID))) {
 		secondary_exec_ctl &= ~SECONDARY_EXEC_ENABLE_INVPCID;
 
-		if (best)
-			best->ebx &= ~bit(X86_FEATURE_INVPCID);
+		guest_cpuid_clear(vcpu, X86_FEATURE_INVPCID);
 	}
 
 	if (cpu_has_secondary_exec_ctrls())

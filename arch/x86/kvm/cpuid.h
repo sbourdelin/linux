@@ -104,6 +104,15 @@ static inline bool guest_cpuid_has(struct kvm_vcpu *vcpu, unsigned x86_feature)
 	return *reg & bit(x86_feature);
 }
 
+static inline void guest_cpuid_clear(struct kvm_vcpu *vcpu, unsigned x86_feature)
+{
+	int *reg;
+
+	reg = guest_cpuid_get_register(vcpu, x86_feature);
+	if (reg)
+		*reg &= ~bit(x86_feature);
+}
+
 static inline bool guest_cpuid_is_amd(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpuid_entry2 *best;
