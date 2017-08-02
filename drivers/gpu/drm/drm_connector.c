@@ -617,6 +617,14 @@ static const struct drm_prop_enum_list drm_link_status_enum_list[] = {
 };
 DRM_ENUM_NAME_FN(drm_get_link_status_name, drm_link_status_enum_list)
 
+static const struct drm_prop_enum_list drm_cp_enum_list[] = {
+	{ DRM_MODE_CONTENT_PROTECTION_UNSUPPORTED,	"Unsupported" },
+	{ DRM_MODE_CONTENT_PROTECTION_UNDESIRED,	"Undesired" },
+	{ DRM_MODE_CONTENT_PROTECTION_DESIRED,		"Desired" },
+	{ DRM_MODE_CONTENT_PROTECTION_ENABLED,		"Enabled" },
+};
+DRM_ENUM_NAME_FN(drm_get_cp_status_name, drm_cp_enum_list)
+
 /**
  * drm_display_info_set_bus_formats - set the supported bus formats
  * @info: display info to store bus formats in
@@ -741,6 +749,15 @@ DRM_ENUM_NAME_FN(drm_get_tv_subconnector_name,
  *      value of link-status is "GOOD". If something fails during or after modeset,
  *      the kernel driver may set this to "BAD" and issue a hotplug uevent. Drivers
  *      should update this value using drm_mode_connector_set_link_status_property().
+ * Content Protection:
+ *      Connector Content Protection property to indicate the content protection
+ *      status of a connector. Default value is "UNDESIRED". Kernel will set
+ *      to "UNSUPPORTED" if there is no common HDCP ver supported between Src
+ *      and Sink. User space could set this to "DESIRED" to enabled the content
+ *      protection on the connector. If content protection setup process is
+ *      success, kernel will set this property to "ENABLED". To Disable the
+ *      content protection on the connector userspace could set this property to
+ *      "UNDESIRED".
  *
  * Connectors also have one standardized atomic property:
  *
@@ -788,6 +805,13 @@ int drm_connector_create_standard_properties(struct drm_device *dev)
 	if (!prop)
 		return -ENOMEM;
 	dev->mode_config.link_status_property = prop;
+
+	prop = drm_property_create_enum(dev, 0, "Content Protection",
+					drm_cp_enum_list,
+					ARRAY_SIZE(drm_cp_enum_list));
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.cp_property = prop;
 
 	return 0;
 }

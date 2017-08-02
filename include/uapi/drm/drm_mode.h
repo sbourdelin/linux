@@ -173,6 +173,13 @@ extern "C" {
 		DRM_MODE_REFLECT_X | \
 		DRM_MODE_REFLECT_Y)
 
+/* Content Protection options */
+enum cp_state {
+	DRM_MODE_CONTENT_PROTECTION_UNSUPPORTED = -1,
+	DRM_MODE_CONTENT_PROTECTION_UNDESIRED,
+	DRM_MODE_CONTENT_PROTECTION_DESIRED,
+	DRM_MODE_CONTENT_PROTECTION_ENABLED,
+};
 
 struct drm_mode_modeinfo {
 	__u32 clock;
