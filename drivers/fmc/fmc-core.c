@@ -111,7 +111,7 @@ static ssize_t fmc_write_eeprom(struct file *file, struct kobject *kobj,
 	return fmc->op->write_ee(fmc, off, buf, count);
 }
 
-static struct bin_attribute fmc_eeprom_attr = {
+static const struct bin_attribute fmc_eeprom_attr = {
 	.attr = { .name = "eeprom", .mode = S_IRUGO | S_IWUSR, },
 	.size = 8192, /* more or less standard */
 	.read = fmc_read_eeprom,
