@@ -672,7 +672,7 @@ static void pSeries_lpar_flush_hash_range(unsigned long number, int local)
 	struct ppc64_tlb_batch *batch = this_cpu_ptr(&ppc64_tlb_batch);
 	int lock_tlbie = !mmu_has_feature(MMU_FTR_LOCKLESS_TLBIE);
 	unsigned long param[PLPAR_HCALL9_BUFSIZE];
-	unsigned long index, shift, slot;
+	unsigned long index, shift;
 	int psize, ssize, pix;
 
 	if (lock_tlbie)
@@ -684,15 +684,40 @@ static void pSeries_lpar_flush_hash_range(unsigned long number, int local)
 	for (i = 0; i < number; i++) {
 		vpn = batch->vpn[i];
 		pte_iterate_hashed_subpages(vpn, psize, index, shift) {
-			slot = pSeries_lpar_hpte_find(vpn, psize, ssize);
-			pix = plpar_bluk_remove(param, pix, slot, vpn,
-						psize, ssize, local);
+			if (!firmware_has_feature(FW_FEATURE_HASH_API)) {
+				unsigned long slot;
+				slot = pSeries_lpar_hpte_find(vpn, psize, ssize);
+				pix = plpar_bluk_remove(param, pix, slot, vpn,
+							  psize, ssize, local);
+			} else {
+				unsigned long hash;
+				hash = hpt_hash(vpn, mmu_psize_defs[psize].shift, ssize);
+				/* trim the top bits, we overload them below */
+				hash &= MAX_HTAB_MASK;
+				param[pix] = HBR_REQUEST | HBR_AVPN | hash;
+				param[pix+1] = hpte_encode_avpn(vpn, psize, ssize);
+				pix += 2;
+				if (pix == 8) {
+					rc = plpar_hcall9(H_HASH_BULK_REMOVE, param,
+							  param[0], param[1], param[2],
+							  param[3], param[4], param[5],
+							  param[6], param[7]);
+					BUG_ON(rc != H_SUCCESS);
+					pix = 0;
+				}
+			}
 		} pte_iterate_hashed_end();
 	}
 	if (pix) {
+		unsigned long hcall;
+
 		/* We have a flush pending */
 		param[pix] = HBR_END;
-		rc = plpar_hcall9(H_BULK_REMOVE, param, param[0], param[1],
+		if (!firmware_has_feature(FW_FEATURE_HASH_API))
+			hcall = H_BULK_REMOVE;
+		else
+			hcall = H_HASH_BULK_REMOVE;
+		rc = plpar_hcall9(hcall, param, param[0], param[1],
 				  param[2], param[3], param[4], param[5],
 				  param[6], param[7]);
 		BUG_ON(rc != H_SUCCESS);
