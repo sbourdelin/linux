@@ -286,6 +286,8 @@ extern void ktime_get_raw_and_real_ts64(struct timespec64 *ts_raw,
  * @boot:	Monotonic time since boot
  * @clock_was_set_seq:	The sequence number of clock was set events
  * @cs_was_changed_seq:	The sequence number of clocksource change events
+ * @cycles_valid:	The flag is true when @cycles contain actual
+ *			number of cycles instead some cycle derivative
  */
 struct system_time_snapshot {
 	u64		cycles;
@@ -294,6 +296,7 @@ struct system_time_snapshot {
 	ktime_t		boot;
 	unsigned int	clock_was_set_seq;
 	u8		cs_was_changed_seq;
+	bool		cycles_valid;
 };
 
 /*

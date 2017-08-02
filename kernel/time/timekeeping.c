@@ -957,12 +957,22 @@ void ktime_get_snapshot(struct system_time_snapshot *systime_snapshot)
 	u64 nsec_raw;
 	u64 nsec_real;
 	u64 now;
+	struct clocksource *clock;
 
 	WARN_ON_ONCE(timekeeping_suspended);
 
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
-		now = tk_clock_read(&tk->tkr_mono);
+		clock = READ_ONCE(tk->tkr_mono.clock);
+		if (clock->read_with_stamp)
+			systime_snapshot->cycles_valid =
+				clock->read_with_stamp(
+					clock, &now, &systime_snapshot->cycles);
+		else {
+			systime_snapshot->cycles_valid = false;
+			now = clock->read(clock);
+			systime_snapshot->cycles = now;
+		}
 		systime_snapshot->cs_was_changed_seq = tk->cs_was_changed_seq;
 		systime_snapshot->clock_was_set_seq = tk->clock_was_set_seq;
 		base_real = ktime_add(tk->tkr_mono.base,
@@ -974,7 +984,6 @@ void ktime_get_snapshot(struct system_time_snapshot *systime_snapshot)
 		nsec_raw  = timekeeping_cycles_to_ns(&tk->tkr_raw, now);
 	} while (read_seqcount_retry(&tk_core.seq, seq));
 
-	systime_snapshot->cycles = now;
 	systime_snapshot->real = ktime_add_ns(base_real, nsec_real);
 	systime_snapshot->raw = ktime_add_ns(base_raw, nsec_raw);
 	systime_snapshot->boot = ktime_add_ns(base_boot, nsec_real);
