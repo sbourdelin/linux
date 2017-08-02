@@ -5,10 +5,13 @@
 menu "Misc devices"
 
 config SENSORS_LIS3LV02D
-	tristate
+	tristate "support STMicroelectronics Sensor LIS3LV02D"
 	depends on INPUT
 	select INPUT_POLLDEV
 	default n
+	help
+	  If you say yes here, you get support for the STM
+	  LIS3LV02D sensor.
 
 config AD525X_DPOT
 	tristate "Analog Devices Digital Potentiometers"
