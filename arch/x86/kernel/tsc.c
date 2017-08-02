@@ -1036,6 +1036,15 @@ static void tsc_cs_tick_stable(struct clocksource *cs)
 		sched_clock_tick_stable();
 }
 
+static bool tsc_read_with_stamp(struct clocksource *cs,
+				u64 *cycles, u64 *cycles_stamp)
+{
+	u64 tsc = read_tsc(cs);
+	*cycles = tsc;
+	*cycles_stamp = tsc;
+	return true;
+}
+
 /*
  * .mask MUST be CLOCKSOURCE_MASK(64). See comment above read_tsc()
  */
@@ -1043,6 +1052,7 @@ static struct clocksource clocksource_tsc = {
 	.name                   = "tsc",
 	.rating                 = 300,
 	.read                   = read_tsc,
+	.read_with_stamp	= tsc_read_with_stamp,
 	.mask                   = CLOCKSOURCE_MASK(64),
 	.flags                  = CLOCK_SOURCE_IS_CONTINUOUS |
 				  CLOCK_SOURCE_MUST_VERIFY,
