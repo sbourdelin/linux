@@ -516,7 +516,8 @@ static int xive_pick_irq_target(struct irq_data *d,
 		free_cpumask_var(mask);
 		if (cpu >= 0)
 			return cpu;
-		fuzz--;
+		if (fuzz)
+			fuzz--;
 	}
 
 	/* No chip IDs, fallback to using the affinity mask */
