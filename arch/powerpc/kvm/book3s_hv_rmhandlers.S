@@ -2304,6 +2304,7 @@ hcall_real_table:
 	.space	((H_HASH_REMOVE - 4) - H_RANDOM), 0
 	.long	DOTSYM(kvmppc_h_hash_remove) - hcall_real_table
 	.long	DOTSYM(kvmppc_h_hash_protect) - hcall_real_table
+	.long	DOTSYM(kvmppc_h_hash_bulk_remove) - hcall_real_table
 	.globl	hcall_real_table_end
 hcall_real_table_end:
 

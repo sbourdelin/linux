@@ -752,6 +752,101 @@ long kvmppc_h_bulk_remove(struct kvm_vcpu *vcpu)
 	return ret;
 }
 
+long kvmppc_h_hash_bulk_remove(struct kvm_vcpu *vcpu)
+{
+	struct kvm *kvm = vcpu->kvm;
+	unsigned long *args = &vcpu->arch.gpr[4];
+	__be64 *hp, *hptes[4];
+	unsigned long tlbrb[4];
+	long int i, j, k, n, pte_index[4];
+	unsigned long flags, req, hash, rcbits;
+	int global;
+	long int ret = H_SUCCESS;
+	struct revmap_entry *rev, *revs[4];
+	u64 hp0, hp1;
+
+	if (kvm_is_radix(kvm))
+		return H_FUNCTION;
+
+	global = global_invalidates(kvm);
+	for (i = 0; i < 4 && ret == H_SUCCESS; ) {
+		n = 0;
+		for (; i < 4; ++i) {
+			j = i * 2;
+			hash = args[j];
+			flags = hash >> 56;
+			hash &= ((1ul << 56) - 1);
+			req = flags >> 6;
+			flags &= 3;
+			if (req == 3) {		/* no more requests */
+				i = 4;
+				break;
+			}
+			/* only support avpn flag */
+			if (req != 1 || flags != 2) {
+				/* parameter error */
+				args[j] = ((0xa0 | flags) << 56) + hash;
+				ret = H_PARAMETER;
+				break;
+			}
+			/*
+			 * We wait here to take lock for all hash values
+			 * FIXME!! will that deadlock ?
+			 */
+			hp = kvmppc_find_hpte_slot(kvm, hash,
+						   args[j + 1], &pte_index[n]);
+			if (!hp) {
+				args[j] = ((0x90 | flags) << 56) + hash;
+				continue;
+			}
+			hp0 = be64_to_cpu(hp[0]);
+			hp1 = be64_to_cpu(hp[1]);
+			if (cpu_has_feature(CPU_FTR_ARCH_300)) {
+				hp0 = hpte_new_to_old_v(hp0, hp1);
+				hp1 = hpte_new_to_old_r(hp1);
+			}
+			args[j] = ((0x80 | flags) << 56) + hash;
+			rev = real_vmalloc_addr(&kvm->arch.hpt.rev[pte_index[n]]);
+			note_hpte_modification(kvm, rev);
+
+			if (!(hp0 & HPTE_V_VALID)) {
+				/* insert R and C bits from PTE */
+				rcbits = rev->guest_rpte & (HPTE_R_R|HPTE_R_C);
+				args[j] |= rcbits << (56 - 5);
+				hp[0] = 0;
+				if (is_mmio_hpte(hp0, hp1))
+					atomic64_inc(&kvm->arch.mmio_update);
+				continue;
+			}
+			/* leave it locked */
+			hp[0] &= ~cpu_to_be64(HPTE_V_VALID);
+			tlbrb[n] = compute_tlbie_rb(hp0, hp1, pte_index[n]);
+			hptes[n] = hp;
+			revs[n] = rev;
+			++n;
+		}
+
+		if (!n)
+			break;
+
+		/* Now that we've collected a batch, do the tlbies */
+		do_tlbies(kvm, tlbrb, n, global, true);
+
+		/* Read PTE low words after tlbie to get final R/C values */
+		for (k = 0; k < n; ++k) {
+			hp = hptes[k];
+			rev = revs[k];
+			remove_revmap_chain(kvm, pte_index[k], rev,
+				be64_to_cpu(hp[0]), be64_to_cpu(hp[1]));
+			rcbits = rev->guest_rpte & (HPTE_R_R|HPTE_R_C);
+			args[j] |= rcbits << (56 - 5);
+			__unlock_hpte(hp, 0);
+		}
+	}
+
+	return ret;
+}
+
 long __kvmppc_do_hash_protect(struct kvm *kvm, __be64 *hpte,
 			      unsigned long flags, unsigned long pte_index)
 {

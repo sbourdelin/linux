@@ -4146,6 +4146,7 @@ static unsigned int default_hcall_list[] = {
 #endif
 	H_HASH_PROTECT,
 	H_HASH_REMOVE,
+	H_HASH_BULK_REMOVE,
 	0
 };
 

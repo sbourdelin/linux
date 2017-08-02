@@ -68,6 +68,8 @@
  */
 
 #define HPTES_PER_GROUP 8
+/* ISA defines max HTAB SIZE bits 46 */
+#define MAX_HTAB_MASK ((1UL << 46) - 1)
 
 #define HPTE_V_SSIZE_SHIFT	62
 #define HPTE_V_AVPN_SHIFT	7
