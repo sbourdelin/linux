@@ -632,6 +632,34 @@ static int pSeries_lpar_hpte_removebolted(unsigned long ea,
 	return 0;
 }
 
+static int plpar_bluk_remove(unsigned long *param, int index, unsigned long slot,
+			     unsigned long vpn, unsigned long psize,
+			     unsigned long ssize, int local)
+{
+	unsigned long rc;
+	if (!firmware_has_feature(FW_FEATURE_BULK_REMOVE)) {
+		/*
+		 * lpar doesn't use the passed actual page size
+		 */
+		pSeries_lpar_hpte_invalidate(slot, vpn, psize,
+					     0, ssize, local);
+	} else {
+		param[index] = HBR_REQUEST | HBR_AVPN | slot;
+		param[index+1] = hpte_encode_avpn(vpn, psize,
+						ssize);
+		index += 2;
+		if (index == 8) {
+			rc = plpar_hcall9(H_BULK_REMOVE, param,
+					  param[0], param[1], param[2],
+					  param[3], param[4], param[5],
+					  param[6], param[7]);
+			BUG_ON(rc != H_SUCCESS);
+			index = 0;
+		}
+	}
+	return index;
+}
+
 /*
  * Take a spinlock around flushes to avoid bouncing the hypervisor tlbie
  * lock.
@@ -657,29 +685,12 @@ static void pSeries_lpar_flush_hash_range(unsigned long number, int local)
 		vpn = batch->vpn[i];
 		pte_iterate_hashed_subpages(vpn, psize, index, shift) {
 			slot = pSeries_lpar_hpte_find(vpn, psize, ssize);
-			if (!firmware_has_feature(FW_FEATURE_BULK_REMOVE)) {
-				/*
-				 * lpar doesn't use the passed actual page size
-				 */
-				pSeries_lpar_hpte_invalidate(slot, vpn, psize,
-							     0, ssize, local);
-			} else {
-				param[pix] = HBR_REQUEST | HBR_AVPN | slot;
-				param[pix+1] = hpte_encode_avpn(vpn, psize,
-								ssize);
-				pix += 2;
-				if (pix == 8) {
-					rc = plpar_hcall9(H_BULK_REMOVE, param,
-						param[0], param[1], param[2],
-						param[3], param[4], param[5],
-						param[6], param[7]);
-					BUG_ON(rc != H_SUCCESS);
-					pix = 0;
-				}
-			}
+			pix = plpar_bluk_remove(param, pix, slot, vpn,
+						psize, ssize, local);
 		} pte_iterate_hashed_end();
 	}
 	if (pix) {
+		/* We have a flush pending */
 		param[pix] = HBR_END;
 		rc = plpar_hcall9(H_BULK_REMOVE, param, param[0], param[1],
 				  param[2], param[3], param[4], param[5],
