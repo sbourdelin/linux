@@ -334,6 +334,11 @@ config REALTEK_PHY
 	---help---
 	  Supports the Realtek 821x PHY.
 
+config ROCKCHIP_PHY
+        tristate "Driver for Rockchip Ethernet PHYs"
+        ---help---
+          Currently supports the internal Ethernet PHY.
+
 config SMSC_PHY
 	tristate "SMSC PHYs"
 	---help---
