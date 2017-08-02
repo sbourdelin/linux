@@ -1190,14 +1190,15 @@ static int rcar_pcie_probe(struct platform_device *pdev)
 
 	return 0;
 
-err_free_bridge:
-	pci_free_host_bridge(bridge);
-
 err_pm_put:
 	pm_runtime_put(dev);
 
 err_pm_disable:
 	pm_runtime_disable(dev);
+
+err_free_bridge:
+	pci_free_host_bridge(bridge);
+	pci_free_resource_list(&pcie->resources);
 	return err;
 }
 
