@@ -388,15 +388,20 @@ static long pSeries_lpar_hash_updatepp(unsigned long hash,
 	unsigned long want_v;
 
 	want_v = hpte_encode_avpn(vpn, psize, ssize);
-
 	pr_devel("    update: avpnv=%016lx, hash=%016lx, f=%lx, psize: %d ...",
 		 want_v, hash, flags, psize);
 
+	if (firmware_has_feature(FW_FEATURE_HASH_API)) {
+		lpar_rc = plpar_pte_hash_protect(flags, hash, want_v);
+		goto err_out;
+	}
 	slot = __pSeries_lpar_hpte_find(hash, want_v);
 	if (slot < 0)
 		return -1;
 
 	lpar_rc = plpar_pte_protect(flags, slot, want_v);
+
+err_out:
 	if (lpar_rc == H_NOT_FOUND) {
 		pr_devel("not found !\n");
 		return -1;
