@@ -193,6 +193,43 @@ static void ps3_hpte_clear(void)
 	ps3_mm_vas_destroy();
 }
 
+static long ps3_hpte_find(unsigned long hash, unsigned long want_v)
+{
+	unsigned long i, j, result;
+	unsigned long hpte_group;
+	bool secondary_search = false;
+	u64 hpte_v_array[4], hpte_rs;
+
+
+	/* first check primary */
+	hpte_group = (hash & htab_hash_mask) * HPTES_PER_GROUP;
+
+search_again:
+	for (i = 0; i < HPTES_PER_GROUP; i += 4, hpte_group += 4) {
+
+		result = lv1_read_htab_entries(PS3_LPAR_VAS_ID_CURRENT,
+					       hpte_group & ~0x3UL, &hpte_v_array[0],
+					       &hpte_v_array[1], &hpte_v_array[2],
+					       &hpte_v_array[3], &hpte_rs);
+		/* ignore failures ? */
+		if (result)
+			continue;
+
+		for (j = 0; j < 4; j++) {
+			if (HPTE_V_COMPARE(hpte_v_array[j], want_v) &&
+			    (hpte_v_array[j] & HPTE_V_VALID)) {
+				return hpte_group + j;
+			}
+		}
+	}
+	if (!secondary_search) {
+		hpte_group = (~hash & htab_hash_mask) * HPTES_PER_GROUP;
+		secondary_search = true;
+		goto search_again;
+	}
+	return -1;
+}
+
 void __init ps3_hpte_init(unsigned long htab_size)
 {
 	mmu_hash_ops.hpte_invalidate = ps3_hpte_invalidate;
