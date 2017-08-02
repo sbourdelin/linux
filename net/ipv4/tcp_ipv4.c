@@ -1916,8 +1916,6 @@ void tcp_v4_destroy_sock(struct sock *sk)
 
 	tcp_cleanup_congestion_control(sk);
 
-	tcp_cleanup_ulp(sk);
-
 	/* Cleanup up the write buffer. */
 	tcp_write_queue_purge(sk);
 

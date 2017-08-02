@@ -2485,24 +2485,24 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 		release_sock(sk);
 		return err;
 	}
+
 	case TCP_ULP: {
-		char name[TCP_ULP_NAME_MAX];
+		struct ulp_config ulpc;
 
 		if (optlen < 1)
 			return -EINVAL;
 
-		val = strncpy_from_user(name, optval,
-					min_t(long, TCP_ULP_NAME_MAX - 1,
+		val = strncpy_from_user(ulpc.ulp_name, optval,
+					min_t(long, ULP_NAME_MAX - 1,
 					      optlen));
 		if (val < 0)
 			return -EFAULT;
-		name[val] = 0;
+		ulpc.ulp_name[val] = 0;
 
-		lock_sock(sk);
-		err = tcp_set_ulp(sk, name);
-		release_sock(sk);
-		return err;
+		return kernel_setsockopt(sk->sk_socket, SOL_SOCKET, SO_ULP,
+					 (char *)&ulpc, sizeof(ulpc));
 	}
+
 	default:
 		/* fallthru */
 		break;
@@ -3060,20 +3060,28 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 			return -EFAULT;
 		return 0;
 
-	case TCP_ULP:
+	case TCP_ULP: {
+		struct ulp_config ulpc;
+		int ulen, ret;
+
 		if (get_user(len, optlen))
 			return -EFAULT;
-		len = min_t(unsigned int, len, TCP_ULP_NAME_MAX);
-		if (!icsk->icsk_ulp_ops) {
-			if (put_user(0, optlen))
-				return -EFAULT;
-			return 0;
-		}
+		len = min_t(unsigned int, len, ULP_NAME_MAX);
+
+		ulen = sizeof(ulpc);
+
+		/* Backwards compatbility */
+		ret = kernel_getsockopt(sk->sk_socket, SOL_SOCKET, SO_ULP,
+					(char *)&ulpc, &ulen);
+		if (ret)
+			return ret;
+
 		if (put_user(len, optlen))
 			return -EFAULT;
-		if (copy_to_user(optval, icsk->icsk_ulp_ops->name, len))
+		if (copy_to_user(optval, ulpc.ulp_name, len))
 			return -EFAULT;
 		return 0;
+	}
 
 	case TCP_THIN_LINEAR_TIMEOUTS:
 		val = tp->thin_lto;
