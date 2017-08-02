@@ -360,6 +360,8 @@ EXPORT_SYMBOL_GPL(clk_round_rate);
 static struct clk_lookup bcm3368_clks[] = {
 	/* fixed rate clocks */
 	CLKDEV_INIT(NULL, "periph", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.1", "refclk", &clk_periph),
 	/* gated clocks */
 	CLKDEV_INIT(NULL, "enet0", &clk_enet0),
 	CLKDEV_INIT(NULL, "enet1", &clk_enet1),
@@ -373,6 +375,8 @@ static struct clk_lookup bcm3368_clks[] = {
 static struct clk_lookup bcm6328_clks[] = {
 	/* fixed rate clocks */
 	CLKDEV_INIT(NULL, "periph", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.1", "refclk", &clk_periph),
 	/* gated clocks */
 	CLKDEV_INIT(NULL, "enetsw", &clk_enetsw),
 	CLKDEV_INIT(NULL, "usbh", &clk_usbh),
@@ -384,6 +388,7 @@ static struct clk_lookup bcm6328_clks[] = {
 static struct clk_lookup bcm6338_clks[] = {
 	/* fixed rate clocks */
 	CLKDEV_INIT(NULL, "periph", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
 	/* gated clocks */
 	CLKDEV_INIT(NULL, "enet0", &clk_enet0),
 	CLKDEV_INIT(NULL, "enet1", &clk_enet1),
@@ -396,6 +401,7 @@ static struct clk_lookup bcm6338_clks[] = {
 static struct clk_lookup bcm6345_clks[] = {
 	/* fixed rate clocks */
 	CLKDEV_INIT(NULL, "periph", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
 	/* gated clocks */
 	CLKDEV_INIT(NULL, "enet0", &clk_enet0),
 	CLKDEV_INIT(NULL, "enet1", &clk_enet1),
@@ -408,6 +414,7 @@ static struct clk_lookup bcm6345_clks[] = {
 static struct clk_lookup bcm6348_clks[] = {
 	/* fixed rate clocks */
 	CLKDEV_INIT(NULL, "periph", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
 	/* gated clocks */
 	CLKDEV_INIT(NULL, "enet0", &clk_enet0),
 	CLKDEV_INIT(NULL, "enet1", &clk_enet1),
@@ -420,6 +427,8 @@ static struct clk_lookup bcm6348_clks[] = {
 static struct clk_lookup bcm6358_clks[] = {
 	/* fixed rate clocks */
 	CLKDEV_INIT(NULL, "periph", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.1", "refclk", &clk_periph),
 	/* gated clocks */
 	CLKDEV_INIT(NULL, "enet0", &clk_enet0),
 	CLKDEV_INIT(NULL, "enet1", &clk_enet1),
@@ -433,6 +442,8 @@ static struct clk_lookup bcm6358_clks[] = {
 static struct clk_lookup bcm6362_clks[] = {
 	/* fixed rate clocks */
 	CLKDEV_INIT(NULL, "periph", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.1", "refclk", &clk_periph),
 	/* gated clocks */
 	CLKDEV_INIT(NULL, "enetsw", &clk_enetsw),
 	CLKDEV_INIT(NULL, "usbh", &clk_usbh),
@@ -446,6 +457,8 @@ static struct clk_lookup bcm6362_clks[] = {
 static struct clk_lookup bcm6368_clks[] = {
 	/* fixed rate clocks */
 	CLKDEV_INIT(NULL, "periph", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.0", "refclk", &clk_periph),
+	CLKDEV_INIT("bcm63xx_uart.1", "refclk", &clk_periph),
 	/* gated clocks */
 	CLKDEV_INIT(NULL, "enetsw", &clk_enetsw),
 	CLKDEV_INIT(NULL, "usbh", &clk_usbh),
