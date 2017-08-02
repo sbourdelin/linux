@@ -82,7 +82,7 @@ static int kvm_set_wallclock(const struct timespec *now)
 	return -1;
 }
 
-static u64 kvm_clock_read(void)
+static inline u64 __kvm_clock_read(u64 *cycles, u8 *flags)
 {
 	struct pvclock_vcpu_time_info *src;
 	u64 ret;
@@ -91,9 +91,13 @@ static u64 kvm_clock_read(void)
 	preempt_disable_notrace();
 	cpu = smp_processor_id();
 	src = &hv_clock[cpu].pvti;
-	ret = pvclock_clocksource_read(src, NULL, NULL);
+	ret = pvclock_clocksource_read(src, cycles, flags);
 	preempt_enable_notrace();
 	return ret;
+}
+static u64 kvm_clock_read(void)
+{
+	return __kvm_clock_read(NULL, NULL);
 }
 
 static u64 kvm_clock_get_cycles(struct clocksource *cs)
@@ -177,9 +181,20 @@ bool kvm_check_and_clear_guest_paused(void)
 	return ret;
 }
 
+static bool kvm_clock_read_with_stamp(struct clocksource *cs,
+					u64 *cycles, u64 *cycles_stamp)
+{
+	u8 flags;
+
+	*cycles = __kvm_clock_read(cycles_stamp, &flags);
+
+	return (bool) flags & PVCLOCK_TSC_STABLE_BIT;
+}
+
 struct clocksource kvm_clock = {
 	.name = "kvm-clock",
 	.read = kvm_clock_get_cycles,
+	.read_with_stamp = kvm_clock_read_with_stamp,
 	.rating = 400,
 	.mask = CLOCKSOURCE_MASK(64),
 	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
