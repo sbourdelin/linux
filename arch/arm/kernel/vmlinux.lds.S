@@ -89,6 +89,7 @@ SECTIONS
 #endif
 		*(.discard)
 		*(.discard.*)
+		*(.ARM.exidx.discard)
 	}
 
 	. = PAGE_OFFSET + TEXT_OFFSET;

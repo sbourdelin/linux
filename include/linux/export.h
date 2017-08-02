@@ -24,12 +24,6 @@
 #define VMLINUX_SYMBOL_STR(x) __VMLINUX_SYMBOL_STR(x)
 
 #ifndef __ASSEMBLY__
-struct kernel_symbol
-{
-	unsigned long value;
-	const char *name;
-};
-
 #ifdef MODULE
 extern struct module __this_module;
 #define THIS_MODULE (&__this_module)
@@ -60,17 +54,26 @@ extern struct module __this_module;
 #define __CRC_SYMBOL(sym, sec)
 #endif
 
-/* For every exported symbol, place a struct in the __ksymtab section */
+/*
+ * For every exported symbol, place a struct in the __ksymtab section.
+ * Note that we have to visibly take the address of sym, so the compiler
+ * is forced to emit it, rather than inlining it or removing it
+ * altogether. Do so in a way that avoids taking the address statically,
+ * and emit that code into a section that is discarded by the linker.
+ */
 #define ___EXPORT_SYMBOL(sym, sec)					\
 	extern typeof(sym) sym;						\
 	__CRC_SYMBOL(sym, sec)						\
 	static const char __kstrtab_##sym[]				\
-	__attribute__((section("__ksymtab_strings"), aligned(1)))	\
+	__attribute__((section("__ksymtab_strings"), used, aligned(1)))	\
 	= VMLINUX_SYMBOL_STR(sym);					\
-	static const struct kernel_symbol __ksymtab_##sym		\
-	__used								\
-	__attribute__((section("___ksymtab" sec "+" #sym), used))	\
-	= { (unsigned long)&sym, __kstrtab_##sym }
+	static void * __attribute__((section(".discard"), used))	\
+			__discard_##sym(void) { return (void *)&sym; }	\
+	asm("	.section \"___ksymtab" sec "+" #sym "\", \"a\"	\n"	\
+	    "	.balign	8					\n"	\
+	    "	.long "	VMLINUX_SYMBOL_STR(sym) "- .		\n"	\
+	    "	.long "	VMLINUX_SYMBOL_STR(__kstrtab_##sym) "- .\n"	\
+	    "	.previous					\n")
 
 #if defined(__KSYM_DEPS__)
 
