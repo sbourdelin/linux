@@ -1,0 +1,49 @@
+What:		/sys/bus/i2c/devices/<dev>/clear_faults
+KernelVersion:	4.13
+Contact:	eajames@us.ibm.com
+Description:	Clears pmbus faults for this power supply.
+
+What:		/sys/bus/i2c/devices/<dev>/status_word
+KernelVersion:	4.13
+Contact:	eajames@us.ibm.com
+Description:	Displays the STATUS_WORD register.
+
+What:		/sys/bus/i2c/devices/<dev>/status_vout
+KernelVersion:	4.13
+Contact:	eajames@us.ibm.com
+Description:	Displays the STATUS_VOUT register.
+
+What:		/sys/bus/i2c/devices/<dev>/status_iout
+KernelVersion:	4.13
+Contact:	eajames@us.ibm.com
+Description:	Displays the STATUS_IOUT register.
+
+What:		/sys/bus/i2c/devices/<dev>/status_input
+KernelVersion:	4.13
+Contact:	eajames@us.ibm.com
+Description:	Displays the STATUS_INPUT register.
+
+What:		/sys/bus/i2c/devices/<dev>/status_temp
+KernelVersion:	4.13
+Contact:	eajames@us.ibm.com
+Description:	Displays the STATUS_TEMPERATURE register.
+
+What:		/sys/bus/i2c/devices/<dev>/status_cml
+KernelVersion:	4.13
+Contact:	eajames@us.ibm.com
+Description:	Displays the STATUS_CML register.
+
+What:		/sys/bus/i2c/devices/<dev>/status_other
+KernelVersion:	4.13
+Contact:	eajames@us.ibm.com
+Description:	Displays the STATUS_OTHER register.
+
+What:		/sys/bus/i2c/devices/<dev>/status_mfr
+KernelVersion:	4.13
+Contact:	eajames@us.ibm.com
+Description:	Displays the STATUS_MFR_SPECIFIC register.
+
+What:		/sys/bus/i2c/devices/<dev>/status_fan
+KernelVersion:	4.13
+Contact:	eajames@us.ibm.com
+Description:	Displays the STATUS_FAN register.
