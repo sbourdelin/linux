@@ -55,7 +55,12 @@ struct i915_dependency {
 #define I915_DEPENDENCY_ALLOC BIT(0)
 };
 
-/* Requests exist in a complex web of interdependencies. Each request
+/*
+ * "People assume that time is a strict progression of cause to effect, but
+ * actually, from a nonlinear, non-subjective viewpoint, it's more like a big
+ * ball of wibbly-wobbly, timey-wimey ... stuff." -The Doctor, 2015
+ *
+ * Requests exist in a complex web of interdependencies. Each request
  * has to wait for some other request to complete before it is ready to be run
  * (e.g. we have to wait until the pixels have been rendering into a texture
  * before we can copy from it). We track the readiness of a request in terms
