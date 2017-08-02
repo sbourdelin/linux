@@ -632,6 +632,10 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 		/* Disable this on POWER9 until code handles new HPTE format */
 		r = !!hv_enabled && !cpu_has_feature(CPU_FTR_ARCH_300);
 		break;
+	case KVM_CAP_SPAPR_HASH_API:
+		/* Only enable for HV kvm */
+		r = is_kvmppc_hv_enabled(kvm);
+		break;
 #endif
 #ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
 	case KVM_CAP_PPC_FWNMI:
