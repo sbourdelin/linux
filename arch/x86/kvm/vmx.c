@@ -10687,7 +10687,8 @@ static int vmx_check_nested_events(struct kvm_vcpu *vcpu, bool external_intr)
 		return 0;
 	}
 
-	if ((kvm_cpu_has_interrupt(vcpu) || external_intr) &&
+	if ((kvm_cpu_has_interrupt(vcpu) ||
+	    (external_intr && !nested_exit_intr_ack_set(vcpu))) &&
 	    nested_exit_on_intr(vcpu)) {
 		if (vmx->nested.nested_run_pending)
 			return -EBUSY;
