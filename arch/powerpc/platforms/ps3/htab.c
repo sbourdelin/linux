@@ -251,11 +251,40 @@ err_out:
 	return;
 }
 
+static long ps3_hash_updatepp(unsigned long hash,
+			      unsigned long newpp, unsigned long vpn,
+			      int psize, int apsize, int ssize,
+			      unsigned long inv_flags)
+{
+	long slot;
+	unsigned long flags;
+	unsigned long want_v;
+
+	want_v = hpte_encode_avpn(vpn, psize, ssize);
+	spin_lock_irqsave(&ps3_htab_lock, flags);
+
+	slot = ps3_hpte_find(hash, want_v);
+	if (slot < 0)
+		goto err_out;
+	/*
+	 * entry found, just invalidate it
+	 */
+	lv1_write_htab_entry(PS3_LPAR_VAS_ID_CURRENT, slot, 0, 0);
+	/*
+	 * We just invalidate instead of updating pp. Hence
+	 * return -1;
+	 */
+err_out:
+	spin_unlock_irqrestore(&ps3_htab_lock, flags);
+	return -1;
+}
+
 void __init ps3_hpte_init(unsigned long htab_size)
 {
 	mmu_hash_ops.hpte_invalidate = ps3_hpte_invalidate;
 	mmu_hash_ops.hash_invalidate = ps3_hash_invalidate;
 	mmu_hash_ops.hpte_updatepp = ps3_hpte_updatepp;
+	mmu_hash_ops.hash_updatepp = ps3_hash_updatepp;
 	mmu_hash_ops.hpte_updateboltedpp = ps3_hpte_updateboltedpp;
 	mmu_hash_ops.hpte_insert = ps3_hpte_insert;
 	mmu_hash_ops.hpte_remove = ps3_hpte_remove;

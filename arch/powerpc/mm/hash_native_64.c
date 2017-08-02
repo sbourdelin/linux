@@ -391,6 +391,42 @@ search_again:
 	return NULL;
 }
 
+static long native_hash_updatepp(unsigned long hash, unsigned long newpp,
+				 unsigned long vpn, int bpsize,
+				 int apsize, int ssize, unsigned long flags)
+{
+	int ret = 0;
+	struct hash_pte *hptep;
+	int local = 0;
+
+
+	DBG_LOW("    update(vpn=%016lx, newpp=%lx)", vpn, newpp);
+
+	hptep = native_hpte_find(hash, vpn, bpsize, ssize);
+	if (hptep) {
+		DBG_LOW(" -> hit\n");
+		/* Update the HPTE */
+		hptep->r = cpu_to_be64((be64_to_cpu(hptep->r) &
+					~(HPTE_R_PPP | HPTE_R_N)) |
+				       (newpp & (HPTE_R_PPP | HPTE_R_N |
+						 HPTE_R_C)));
+		native_unlock_hpte(hptep);
+	} else {
+		DBG_LOW(" -> miss\n");
+		ret = -1;
+	}
+	/*
+	 * Ensure it is out of the tlb too if it is not a nohpte fault
+	 */
+	if (!(flags & HPTE_NOHPTE_UPDATE)) {
+		if (flags & HPTE_LOCAL_UPDATE)
+			local = 1;
+		tlbie(vpn, bpsize, apsize, ssize, local);
+	}
+	return ret;
+}
+
+
 /*
  * Update the page protection bits. Intended to be used to create
  * guard pages for kernel data structures on pages which are bolted
@@ -787,6 +823,7 @@ void __init hpte_init_native(void)
 	mmu_hash_ops.hpte_invalidate	= native_hpte_invalidate;
 	mmu_hash_ops.hash_invalidate	= native_hash_invalidate;
 	mmu_hash_ops.hpte_updatepp	= native_hpte_updatepp;
+	mmu_hash_ops.hash_updatepp	= native_hash_updatepp;
 	mmu_hash_ops.hpte_updateboltedpp = native_hpte_updateboltedpp;
 	mmu_hash_ops.hpte_removebolted = native_hpte_removebolted;
 	mmu_hash_ops.hpte_insert	= native_hpte_insert;

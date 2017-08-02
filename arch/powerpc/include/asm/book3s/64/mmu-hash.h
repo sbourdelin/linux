@@ -144,6 +144,12 @@ struct mmu_hash_ops {
 					 unsigned long vpn,
 					 int bpsize, int apsize,
 					 int ssize, unsigned long flags);
+	long		(*hash_updatepp)(unsigned long hash,
+					 unsigned long newpp,
+					 unsigned long vpn,
+					 int bpsize, int apsize,
+					 int ssize, unsigned long flags);
+
 	void            (*hpte_updateboltedpp)(unsigned long newpp,
 					       unsigned long ea,
 					       int psize, int ssize);

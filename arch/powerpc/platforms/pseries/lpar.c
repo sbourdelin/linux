@@ -376,6 +376,36 @@ static long pSeries_lpar_hpte_find(unsigned long vpn, int psize, int ssize)
 	return slot;
 }
 
+static long pSeries_lpar_hash_updatepp(unsigned long hash,
+				       unsigned long newpp,
+				       unsigned long vpn,
+				       int psize, int apsize,
+				       int ssize, unsigned long inv_flags)
+{
+	long slot;
+	unsigned long lpar_rc;
+	unsigned long flags = (newpp & 7) | H_AVPN;
+	unsigned long want_v;
+
+	want_v = hpte_encode_avpn(vpn, psize, ssize);
+
+	pr_devel("    update: avpnv=%016lx, hash=%016lx, f=%lx, psize: %d ...",
+		 want_v, hash, flags, psize);
+
+	slot = __pSeries_lpar_hpte_find(hash, want_v);
+	if (slot < 0)
+		return -1;
+
+	lpar_rc = plpar_pte_protect(flags, slot, want_v);
+	if (lpar_rc == H_NOT_FOUND) {
+		pr_devel("not found !\n");
+		return -1;
+	}
+	pr_devel("ok\n");
+	BUG_ON(lpar_rc != H_SUCCESS);
+
+	return 0;
+}
 
 static void pSeries_lpar_hpte_updateboltedpp(unsigned long newpp,
 					     unsigned long ea,
@@ -780,6 +810,7 @@ void __init hpte_init_pseries(void)
 	mmu_hash_ops.hpte_invalidate	 = pSeries_lpar_hpte_invalidate;
 	mmu_hash_ops.hash_invalidate	 = pSeries_lpar_hash_invalidate;
 	mmu_hash_ops.hpte_updatepp	 = pSeries_lpar_hpte_updatepp;
+	mmu_hash_ops.hash_updatepp	 = pSeries_lpar_hash_updatepp;
 	mmu_hash_ops.hpte_updateboltedpp = pSeries_lpar_hpte_updateboltedpp;
 	mmu_hash_ops.hpte_insert	 = pSeries_lpar_hpte_insert;
 	mmu_hash_ops.hpte_remove	 = pSeries_lpar_hpte_remove;
