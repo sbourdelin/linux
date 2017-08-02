@@ -1921,24 +1921,7 @@ void intel_hdmi_init_connector(struct intel_digital_port *intel_dig_port,
 		connector->ycbcr_420_allowed = true;
 
 	intel_hdmi->ddc_bus = intel_hdmi_ddc_pin(dev_priv, port);
-
-	switch (port) {
-	case PORT_B:
-		intel_encoder->hpd_pin = HPD_PORT_B;
-		break;
-	case PORT_C:
-		intel_encoder->hpd_pin = HPD_PORT_C;
-		break;
-	case PORT_D:
-		intel_encoder->hpd_pin = HPD_PORT_D;
-		break;
-	case PORT_E:
-		intel_encoder->hpd_pin = HPD_PORT_E;
-		break;
-	default:
-		MISSING_CASE(port);
-		return;
-	}
+	intel_encoder->hpd_pin = intel_hpd_pin(port);
 
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
 		intel_hdmi->write_infoframe = vlv_write_infoframe;
