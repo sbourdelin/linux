@@ -701,6 +701,19 @@ unlock:
 }
 EXPORT_SYMBOL(edac_mc_find);
 
+/*
+ * Returns:
+ *	1 when EDAC MC is free or owned by the module name
+ *	0 when EDAC MC is owned by other module
+ */
+int edac_check_mc_owner(const char *mod_name)
+{
+	if (edac_mc_owner && strcmp(edac_mc_owner, mod_name))
+		return 0;
+
+	return 1;
+}
+EXPORT_SYMBOL(edac_check_mc_owner);
 
 /* FIXME - should a warning be printed if no error detection? correction? */
 int edac_mc_add_mc_with_groups(struct mem_ctl_info *mci,
@@ -742,7 +755,7 @@ int edac_mc_add_mc_with_groups(struct mem_ctl_info *mci,
 #endif
 	mutex_lock(&mem_ctls_mutex);
 
-	if (edac_mc_owner && edac_mc_owner != mci->mod_name) {
+	if (!edac_check_mc_owner(mci->mod_name)) {
 		ret = -EPERM;
 		goto fail0;
 	}

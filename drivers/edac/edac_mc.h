@@ -128,6 +128,18 @@ struct mem_ctl_info *edac_mc_alloc(unsigned mc_num,
 				   unsigned sz_pvt);
 
 /**
+ *
+ * edac_check_mc_owner - Check the owner of EDAC MC
+ *
+ * @mod_name: pointer to the module name
+ *
+ * Returns:
+ *	1 when EDAC MC is free or owned by the module name
+ *	0 when EDAC MC is owned by other module
+ */
+extern int edac_check_mc_owner(const char *mod_name);
+
+/*
  * edac_mc_add_mc_with_groups() - Insert the @mci structure into the mci
  *	global list and create sysfs entries associated with @mci structure.
  *
