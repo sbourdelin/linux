@@ -2316,7 +2316,8 @@
 	mousedev.yres=	[MOUSE] Vertical screen resolution, used for devices
 			reporting absolute coordinates, such as tablets
 
-	movablecore=nn[KMG]	[KNL,X86,IA-64,PPC] This parameter
+	movablecore=nn[KMG]
+			[KNL,X86,IA-64,PPC] This parameter
 			is similar to kernelcore except it specifies the
 			amount of memory used for migratable allocations.
 			If both kernelcore and movablecore is specified,
@@ -2326,11 +2327,17 @@
 			that the amount of memory usable for all allocations
 			is not too small.
 
-	movable_node	[KNL] Boot-time switch to make hotplugable memory
+	movable_node	[KNL] Boot-time switch to make hot-pluggable memory
 			NUMA nodes to be movable. This means that the memory
 			of such nodes will be usable only for movable
 			allocations which rules out almost all kernel
 			allocations. Use with caution!
+
+	movable_node=nn[KMG]
+			[KNL] Extend movable_node to work well with KASLR. This
+			parameter is the boundaries between the movable nodes
+			and immovable nodes, the memory which exceeds it will
+			be regarded as hot-pluggable.
 
 	MTD_Partition=	[MTD]
 			Format: <name>,<region-number>,<size>,<offset>

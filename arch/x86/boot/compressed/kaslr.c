@@ -89,7 +89,10 @@ struct mem_vector {
 static bool memmap_too_large;
 
 
-/* Store memory limit specified by "mem=nn[KMG]" or "memmap=nn[KMG]" */
+/*
+ * Store memory limit specified by the following situations:
+ * "mem=nn[KMG]" or "memmap=nn[KMG]" or "movable_node=nn[KMG]"
+ */
 unsigned long long mem_limit = ULLONG_MAX;
 
 
@@ -212,7 +215,8 @@ static int handle_mem_memmap(void)
 	char *param, *val;
 	u64 mem_size;
 
-	if (!strstr(args, "memmap=") && !strstr(args, "mem="))
+	if (!strstr(args, "memmap=") && !strstr(args, "mem=") &&
+		!strstr(args, "movable_node="))
 		return 0;
 
 	tmp_cmdline = malloc(len + 1);
@@ -247,7 +251,16 @@ static int handle_mem_memmap(void)
 				free(tmp_cmdline);
 				return -EINVAL;
 			}
-			mem_limit = mem_size;
+			mem_limit = mem_limit > mem_size ? mem_size : mem_limit;
+		} else if (!strcmp(param, "movable_node")) {
+			char *p = val;
+
+			mem_size = memparse(p, &p);
+			if (mem_size == 0) {
+				free(tmp_cmdline);
+				return -EINVAL;
+			}
+			mem_limit = mem_limit > mem_size ? mem_size : mem_limit;
 		}
 	}
 
