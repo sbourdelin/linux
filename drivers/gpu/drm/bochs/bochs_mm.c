@@ -417,7 +417,7 @@ int bochs_dumb_create(struct drm_file *file, struct drm_device *dev,
 		return ret;
 
 	ret = drm_gem_handle_create(file, gobj, &handle);
-	drm_gem_object_unreference_unlocked(gobj);
+	drm_gem_object_put_unlocked(gobj);
 	if (ret)
 		return ret;
 
@@ -457,7 +457,7 @@ int bochs_dumb_mmap_offset(struct drm_file *file, struct drm_device *dev,
 	bo = gem_to_bochs_bo(obj);
 	*offset = bochs_bo_mmap_offset(bo);
 
-	drm_gem_object_unreference_unlocked(obj);
+	drm_gem_object_put_unlocked(obj);
 	return 0;
 }
 
@@ -467,7 +467,7 @@ static void bochs_user_framebuffer_destroy(struct drm_framebuffer *fb)
 {
 	struct bochs_framebuffer *bochs_fb = to_bochs_framebuffer(fb);
 
-	drm_gem_object_unreference_unlocked(bochs_fb->obj);
+	drm_gem_object_put_unlocked(bochs_fb->obj);
 	drm_framebuffer_cleanup(fb);
 	kfree(fb);
 }
@@ -518,13 +518,13 @@ bochs_user_framebuffer_create(struct drm_device *dev,
 
 	bochs_fb = kzalloc(sizeof(*bochs_fb), GFP_KERNEL);
 	if (!bochs_fb) {
-		drm_gem_object_unreference_unlocked(obj);
+		drm_gem_object_put_unlocked(obj);
 		return ERR_PTR(-ENOMEM);
 	}
 
 	ret = bochs_framebuffer_init(dev, bochs_fb, mode_cmd, obj);
 	if (ret) {
-		drm_gem_object_unreference_unlocked(obj);
+		drm_gem_object_put_unlocked(obj);
 		kfree(bochs_fb);
 		return ERR_PTR(ret);
 	}

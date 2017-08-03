@@ -145,7 +145,7 @@ static int bochs_fbdev_destroy(struct bochs_device *bochs)
 	drm_fb_helper_unregister_fbi(&bochs->fb.helper);
 
 	if (gfb->obj) {
-		drm_gem_object_unreference_unlocked(gfb->obj);
+		drm_gem_object_put_unlocked(gfb->obj);
 		gfb->obj = NULL;
 	}
 
