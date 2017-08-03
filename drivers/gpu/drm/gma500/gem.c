@@ -73,7 +73,7 @@ int psb_gem_dumb_map_gtt(struct drm_file *file, struct drm_device *dev,
 		goto out;
 	*offset = drm_vma_node_offset_addr(&obj->vma_node);
 out:
-	drm_gem_object_unreference_unlocked(obj);
+	drm_gem_object_put_unlocked(obj);
 	return ret;
 }
 
@@ -123,7 +123,7 @@ int psb_gem_create(struct drm_file *file, struct drm_device *dev, u64 size,
 		return ret;
 	}
 	/* We have the initial and handle reference but need only one now */
-	drm_gem_object_unreference_unlocked(&r->gem);
+	drm_gem_object_put_unlocked(&r->gem);
 	*handlep = handle;
 	return 0;
 }

@@ -541,7 +541,7 @@ static int psb_fbdev_destroy(struct drm_device *dev, struct psb_fbdev *fbdev)
 	drm_framebuffer_cleanup(&psbfb->base);
 
 	if (psbfb->gtt)
-		drm_gem_object_unreference_unlocked(&psbfb->gtt->gem);
+		drm_gem_object_put_unlocked(&psbfb->gtt->gem);
 	return 0;
 }
 
@@ -639,7 +639,7 @@ static void psb_user_framebuffer_destroy(struct drm_framebuffer *fb)
 	/* Let DRM do its clean up */
 	drm_framebuffer_cleanup(fb);
 	/*  We are no longer using the resource in GEM */
-	drm_gem_object_unreference_unlocked(&r->gem);
+	drm_gem_object_put_unlocked(&r->gem);
 	kfree(fb);
 }
 
