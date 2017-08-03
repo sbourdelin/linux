@@ -223,6 +223,20 @@ void rpc_destroy_generic_auth(void)
  * on the acred ac_flags and return 0.
  */
 static int
+generic_key_destroy(struct rpc_auth *auth, struct rpc_cred *cred)
+{
+	struct auth_cred *acred = &container_of(cred, struct generic_cred,
+						gc_base)->acred;
+	struct rpc_cred *tcred;
+
+	tcred = auth->au_ops->lookup_cred(auth, acred, 0);
+	if (IS_ERR(tcred))
+		return -EACCES;
+	set_bit(RPCAUTH_CRED_DESTROYED, &tcred->cr_flags);
+	return 1;
+}
+
+static int
 generic_key_timeout(struct rpc_auth *auth, struct rpc_cred *cred)
 {
 	struct auth_cred *acred = &container_of(cred, struct generic_cred,
@@ -270,6 +284,7 @@ static const struct rpc_authops generic_auth_ops = {
 	.lookup_cred = generic_lookup_cred,
 	.crcreate = generic_create_cred,
 	.key_timeout = generic_key_timeout,
+	.key_destroy = generic_key_destroy,
 };
 
 static struct rpc_auth generic_auth = {
