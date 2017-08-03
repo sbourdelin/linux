@@ -1088,7 +1088,8 @@ static int mac_ioctl(struct net_device *ndev, struct ifreq *req, int cmd)
 
 				snprintf(buff, size, "rssi %d", rssi);
 
-				if (copy_to_user(wrq->u.data.pointer, buff, size)) {
+				if (copy_to_user(wrq->u.data.pointer, buff,
+							size)) {
 					netdev_err(ndev, "failed to copy\n");
 					ret = -EFAULT;
 					goto done;
