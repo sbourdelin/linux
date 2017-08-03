@@ -1222,6 +1222,11 @@ struct usb_device_driver {
 
 extern struct bus_type usb_bus_type;
 
+static inline bool dev_is_usb(struct device *dev)
+{
+	return dev->bus == &usb_bus_type;
+}
+
 /**
  * struct usb_class_driver - identifies a USB driver that wants to use the USB major number
  * @name: the usb class device name for this driver.  Will show up in sysfs.
