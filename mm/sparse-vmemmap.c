@@ -191,6 +191,7 @@ pmd_t * __meminit vmemmap_pmd_populate(pud_t *pud, unsigned long addr, int node)
 		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
 		if (!p)
 			return NULL;
+		memset(p, 0, PAGE_SIZE);
 		pmd_populate_kernel(&init_mm, pmd, p);
 	}
 	return pmd;
@@ -203,6 +204,7 @@ pud_t * __meminit vmemmap_pud_populate(p4d_t *p4d, unsigned long addr, int node)
 		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
 		if (!p)
 			return NULL;
+		memset(p, 0, PAGE_SIZE);
 		pud_populate(&init_mm, pud, p);
 	}
 	return pud;
@@ -215,6 +217,7 @@ p4d_t * __meminit vmemmap_p4d_populate(pgd_t *pgd, unsigned long addr, int node)
 		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
 		if (!p)
 			return NULL;
+		memset(p, 0, PAGE_SIZE);
 		p4d_populate(&init_mm, p4d, p);
 	}
 	return p4d;
@@ -227,6 +230,7 @@ pgd_t * __meminit vmemmap_pgd_populate(unsigned long addr, int node)
 		void *p = vmemmap_alloc_block(PAGE_SIZE, node);
 		if (!p)
 			return NULL;
+		memset(p, 0, PAGE_SIZE);
 		pgd_populate(&init_mm, pgd, p);
 	}
 	return pgd;
