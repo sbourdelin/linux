@@ -35,6 +35,11 @@
 #include "pfn.h"
 #include "nd.h"
 
+int readonly;
+
+module_param(readonly, int, S_IRUGO);
+MODULE_PARM_DESC(readonly, "Mount readonly");
+
 static struct device *to_dev(struct pmem_device *pmem)
 {
 	/*
@@ -350,9 +355,14 @@ static int pmem_attach_disk(struct device *dev,
 		addr = devm_memremap_pages(dev, &nsio->res,
 				&q->q_usage_counter, NULL);
 		pmem->pfn_flags |= PFN_MAP;
-	} else
-		addr = devm_memremap(dev, pmem->phys_addr,
+	} else {
+		if (readonly == 0)
+			addr = devm_memremap(dev, pmem->phys_addr,
 				pmem->size, ARCH_MEMREMAP_PMEM);
+		else
+			addr = devm_memremap_ro(dev, pmem->phys_addr,
+				pmem->size, ARCH_MEMREMAP_PMEM);
+	}
 
 	/*
 	 * At release time the queue must be frozen before
