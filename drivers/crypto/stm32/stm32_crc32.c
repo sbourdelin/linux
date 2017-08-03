@@ -1,12 +1,14 @@
 /*
  * Copyright (C) STMicroelectronics SA 2017
  * Author: Fabien Dessenne <fabien.dessenne@st.com>
+ * Author: Cosar Dindar <cosardindar@gmail.com>
  * License terms:  GNU General Public License (GPL), version 2
  */
 
 #include <linux/bitrev.h>
 #include <linux/clk.h>
 #include <linux/module.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 
 #include <crypto/internal/hash.h>
@@ -37,8 +39,12 @@ struct stm32_crc {
 	struct device    *dev;
 	void __iomem     *regs;
 	struct clk       *clk;
+	struct shash_alg *algs;
 	u8               pending_data[sizeof(u32)];
 	size_t           nb_pending_bytes;
+	bool             key_support;
+	bool             poly_support;
+	bool             reverse_support;
 };
 
 struct stm32_crc_list {
@@ -106,13 +112,31 @@ static int stm32_crc_init(struct shash_desc *desc)
 	}
 	spin_unlock_bh(&crc_list.lock);
 
-	/* Reset, set key, poly and configure in bit reverse mode */
-	writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
-	writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
-	writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
+	/* set key */
+	if (ctx->crc->key_support) {
+		writel(bitrev32(mctx->key), ctx->crc->regs + CRC_INIT);
+	} else if (mctx->key != CRC_INIT_DEFAULT) {
+		dev_err(ctx->crc->dev, "Unsupported key value! Should be: 0x%x\n",
+			CRC_INIT_DEFAULT);
+		return -EINVAL;
+	}
 
-	/* Store partial result */
-	ctx->partial = readl(ctx->crc->regs + CRC_DR);
+	/* set poly */
+	if (ctx->crc->poly_support)
+		writel(bitrev32(mctx->poly), ctx->crc->regs + CRC_POL);
+
+	/* reset and configure in bit reverse mode if supported */
+	if (ctx->crc->reverse_support)
+		writel(CRC_CR_RESET | CRC_CR_REVERSE, ctx->crc->regs + CRC_CR);
+	else
+		writel(CRC_CR_RESET, ctx->crc->regs + CRC_CR);
+
+	/* store partial result */
+	if (!ctx->crc->reverse_support)
+		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
+	else
+		ctx->partial = readl(ctx->crc->regs + CRC_DR);
+
 	ctx->crc->nb_pending_bytes = 0;
 
 	return 0;
@@ -135,7 +159,12 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
 
 		if (crc->nb_pending_bytes == sizeof(u32)) {
 			/* Process completed pending data */
-			writel(*(u32 *)crc->pending_data, crc->regs + CRC_DR);
+			if (!ctx->crc->reverse_support)
+				writel(bitrev32(*(u32 *)crc->pending_data),
+				       crc->regs + CRC_DR);
+			else
+				writel(*(u32 *)crc->pending_data,
+				       crc->regs + CRC_DR);
 			crc->nb_pending_bytes = 0;
 		}
 	}
@@ -143,10 +172,16 @@ static int stm32_crc_update(struct shash_desc *desc, const u8 *d8,
 	d32 = (u32 *)d8;
 	for (i = 0; i < length >> 2; i++)
 		/* Process 32 bits data */
-		writel(*(d32++), crc->regs + CRC_DR);
+		if (!ctx->crc->reverse_support)
+			writel(bitrev32(*(d32++)), crc->regs + CRC_DR);
+		else
+			writel(*(d32++), crc->regs + CRC_DR);
 
 	/* Store partial result */
-	ctx->partial = readl(crc->regs + CRC_DR);
+	if (!ctx->crc->reverse_support)
+		ctx->partial = bitrev32(readl(crc->regs + CRC_DR));
+	else
+		ctx->partial = readl(crc->regs + CRC_DR);
 
 	/* Check for pending data (non 32 bits) */
 	length &= 3;
@@ -192,7 +227,7 @@ static int stm32_crc_digest(struct shash_desc *desc, const u8 *data,
 	return stm32_crc_init(desc) ?: stm32_crc_finup(desc, data, length, out);
 }
 
-static struct shash_alg algs[] = {
+static struct shash_alg algs_for_f7[] = {
 	/* CRC-32 */
 	{
 		.setkey         = stm32_crc_setkey,
@@ -237,12 +272,37 @@ static struct shash_alg algs[] = {
 	}
 };
 
+static struct shash_alg algs_for_f4[] = {
+	/* CRC-32 */
+	{
+		.setkey         = stm32_crc_setkey,
+		.init           = stm32_crc_init,
+		.update         = stm32_crc_update,
+		.final          = stm32_crc_final,
+		.finup          = stm32_crc_finup,
+		.digest         = stm32_crc_digest,
+		.descsize       = sizeof(struct stm32_crc_desc_ctx),
+		.digestsize     = CHKSUM_DIGEST_SIZE,
+		.base           = {
+			.cra_name               = "crc32",
+			.cra_driver_name        = DRIVER_NAME,
+			.cra_priority           = 200,
+			.cra_blocksize          = CHKSUM_BLOCK_SIZE,
+			.cra_alignmask          = 3,
+			.cra_ctxsize            = sizeof(struct stm32_crc_ctx),
+			.cra_module             = THIS_MODULE,
+			.cra_init               = stm32_crc32_cra_init,
+		}
+	}
+};
+
 static int stm32_crc_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct stm32_crc *crc;
 	struct resource *res;
 	int ret;
+	int algs_size;
 
 	crc = devm_kzalloc(dev, sizeof(*crc), GFP_KERNEL);
 	if (!crc)
@@ -269,13 +329,29 @@ static int stm32_crc_probe(struct platform_device *pdev)
 		return ret;
 	}
 
+	/* set key, poly and reverse support if device is of F7 series */
+	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f7-crc")) {
+		crc->key_support = true;
+		crc->poly_support = true;
+		crc->reverse_support = true;
+	}
+
 	platform_set_drvdata(pdev, crc);
 
 	spin_lock(&crc_list.lock);
 	list_add(&crc->list, &crc_list.dev_list);
 	spin_unlock(&crc_list.lock);
 
-	ret = crypto_register_shashes(algs, ARRAY_SIZE(algs));
+	/* For F4 series only CRC32 algorithm will be used */
+	if (of_device_is_compatible(crc->dev->of_node, "st,stm32f4-crc")) {
+		crc->algs = algs_for_f4;
+		algs_size = ARRAY_SIZE(algs_for_f4);
+	} else {
+		crc->algs = algs_for_f7;
+		algs_size = ARRAY_SIZE(algs_for_f7);
+	}
+
+	ret = crypto_register_shashes(crc->algs, algs_size);
 	if (ret) {
 		dev_err(dev, "Failed to register\n");
 		clk_disable_unprepare(crc->clk);
@@ -295,7 +371,7 @@ static int stm32_crc_remove(struct platform_device *pdev)
 	list_del(&crc->list);
 	spin_unlock(&crc_list.lock);
 
-	crypto_unregister_shash(algs);
+	crypto_unregister_shash(crc->algs);
 
 	clk_disable_unprepare(crc->clk);
 
@@ -304,6 +380,7 @@ static int stm32_crc_remove(struct platform_device *pdev)
 
 static const struct of_device_id stm32_dt_ids[] = {
 	{ .compatible = "st,stm32f7-crc", },
+	{ .compatible = "st,stm32f4-crc", },
 	{},
 };
 MODULE_DEVICE_TABLE(of, stm32_dt_ids);
