@@ -83,6 +83,11 @@ static inline bool is_migrate_movable(int mt)
 	for (order = 0; order < MAX_ORDER; order++) \
 		for (type = 0; type < MIGRATE_TYPES; type++)
 
+#define for_each_migratetype_order_decend(min_order, order, type) \
+	for (order = MAX_ORDER - 1; order < MAX_ORDER && order >= min_order; \
+	     order--) \
+		for (type = 0; type < MIGRATE_TYPES; type++)
+
 extern int page_group_by_mobility_disabled;
 
 #define NR_MIGRATETYPE_BITS (PB_migrate_end - PB_migrate + 1)

@@ -4761,6 +4761,115 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 	show_swap_cache_info();
 }
 
+#if IS_ENABLED(CONFIG_VIRTIO_BALLOON)
+
+/*
+ * Heuristically get a free page block in the system.
+ *
+ * It is possible that pages from the page block are used immediately after
+ * report_free_page_block() returns. It is the caller's responsibility to
+ * either detect or prevent the use of such pages.
+ *
+ * The input parameters specify the free list to check for a free page block:
+ * zone->free_area[order].free_list[migratetype]
+ *
+ * If the caller supplied page block (i.e. **page) is on the free list, offer
+ * the next page block on the list to the caller. Otherwise, offer the first
+ * page block on the list.
+ *
+ * Return 0 when a page block is found on the caller specified free list.
+ * Otherwise, no page block is found.
+ */
+static int report_free_page_block(struct zone *zone, unsigned int order,
+				  unsigned int migratetype, struct page **page)
+{
+	struct list_head *free_list;
+	int ret = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&zone->lock, flags);
+
+	free_list = &zone->free_area[order].free_list[migratetype];
+	if (list_empty(free_list)) {
+		*page = NULL;
+		ret = -EAGAIN;
+		goto out;
+	}
+
+	/* The caller is asking for the first free page block on the list */
+	if (!(*page)) {
+		*page = list_first_entry(free_list, struct page, lru);
+		ret = 0;
+		goto out;
+	}
+
+	/*
+	 * The page block passed from the caller is not on this free list
+	 * anymore (e.g. a 1MB free page block has been split). In this case,
+	 * offer the first page block on the free list that the caller is
+	 * asking for.
+	 */
+	if (PageBuddy(*page) && order != page_order(*page)) {
+		*page = list_first_entry(free_list, struct page, lru);
+		ret = 0;
+		goto out;
+	}
+
+	/*
+	 * The page block passed from the caller has been the last page block
+	 * on the list.
+	 */
+	if ((*page)->lru.next == free_list) {
+		*page = NULL;
+		ret = -EAGAIN;
+		goto out;
+	}
+
+	/*
+	 * Finally, fall into the regular case: the page block passed from the
+	 * caller is still on the free list. Offer the next one.
+	 */
+	*page = list_next_entry((*page), lru);
+out:
+	spin_unlock_irqrestore(&zone->lock, flags);
+	return ret;
+}
+
+/*
+ * Walk through the free page blocks in the system. The @visit callback is
+ * invoked to handle each free page block.
+ *
+ * Note: some page blocks may be used after the report function returns, so it
+ * is not safe for the callback to use any pages or discard data on such page
+ * blocks.
+ */
+void walk_free_mem_block(void *opaque1,
+			 unsigned int min_order,
+			 void (*visit)(void *opaque2,
+				       unsigned long pfn,
+				       unsigned long nr_pages))
+{
+	struct zone *zone = NULL;
+	struct page *page = NULL;
+	unsigned int order;
+	unsigned long pfn, nr_pages;
+	int type;
+
+	for_each_populated_zone(zone) {
+		for_each_migratetype_order_decend(min_order, order, type) {
+			while (!report_free_page_block(zone, order, type,
+						       &page)) {
+				pfn = page_to_pfn(page);
+				nr_pages = 1 << order;
+				visit(opaque1, pfn, nr_pages);
+			}
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(walk_free_mem_block);
+
+#endif
+
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
 {
 	zoneref->zone = zone;
