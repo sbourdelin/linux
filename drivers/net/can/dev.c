@@ -27,6 +27,7 @@
 #include <linux/can/skb.h>
 #include <linux/can/netlink.h>
 #include <linux/can/led.h>
+#include <linux/of.h>
 #include <net/rtnetlink.h>
 
 #define MOD_DESC "CAN device driver interface"
@@ -814,6 +815,39 @@ int open_candev(struct net_device *dev)
 }
 EXPORT_SYMBOL_GPL(open_candev);
 
+#ifdef CONFIG_OF
+/*
+ * Common function that can be used to understand the limitation of
+ * a transceiver when it provides no means to determine these limitations
+ * at runtime.
+ */
+void of_can_transceiver_fixed(struct net_device *dev)
+{
+	struct device_node *dn;
+	struct can_priv *priv = netdev_priv(dev);
+	struct device_node *np;
+	unsigned int max_bitrate;
+	int ret;
+
+	np = dev->dev.parent->of_node;
+
+	dn = of_get_child_by_name(np, "fixed-transceiver");
+	if (!dn)
+		return;
+
+	max_bitrate = 0;
+	ret = of_property_read_u32(dn, "max-bitrate", &max_bitrate);
+
+	if (max_bitrate > 0) {
+		priv->max_bitrate = max_bitrate;
+		priv->is_bitrate_limited = true;
+	} else if (ret != -EINVAL) {
+		netdev_warn(dev, "Invalid value for transceiver max bitrate\n");
+	}
+}
+EXPORT_SYMBOL(of_can_transceiver_fixed);
+#endif
+
 /*
  * Common close function for cleanup before the device gets closed.
  *
@@ -913,6 +947,14 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 					priv->bitrate_const_cnt);
 		if (err)
 			return err;
+
+		if (priv->is_bitrate_limited &&
+		    bt.bitrate > priv->max_bitrate) {
+			netdev_err(dev, "arbitration bitrate surpasses transceiver capabilities of %d bps\n",
+				   priv->max_bitrate);
+			return -EINVAL;
+		}
+
 		memcpy(&priv->bittiming, &bt, sizeof(bt));
 
 		if (priv->do_set_bittiming) {
@@ -997,6 +1039,14 @@ static int can_changelink(struct net_device *dev, struct nlattr *tb[],
 					priv->data_bitrate_const_cnt);
 		if (err)
 			return err;
+
+		if (priv->is_bitrate_limited &&
+		    dbt.bitrate > priv->max_bitrate) {
+			netdev_err(dev, "canfd data bitrate surpasses transceiver capabilities of %d bps\n",
+				   priv->max_bitrate);
+			return -EINVAL;
+		}
+
 		memcpy(&priv->data_bittiming, &dbt, sizeof(dbt));
 
 		if (priv->do_set_data_bittiming) {
