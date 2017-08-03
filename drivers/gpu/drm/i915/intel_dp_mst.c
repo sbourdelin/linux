@@ -524,7 +524,7 @@ static void intel_dp_destroy_mst_connector(struct drm_dp_mst_topology_mgr *mgr,
 	intel_connector->mst_port = NULL;
 	drm_modeset_unlock_all(dev);
 
-	drm_connector_unreference(&intel_connector->base);
+	drm_connector_put(&intel_connector->base);
 	DRM_DEBUG_KMS("\n");
 }
 

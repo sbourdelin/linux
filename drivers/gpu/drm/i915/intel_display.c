@@ -2672,10 +2672,10 @@ update_state_fb(struct drm_plane *plane)
 		return;
 
 	if (plane->state->fb)
-		drm_framebuffer_unreference(plane->state->fb);
+		drm_framebuffer_put(plane->state->fb);
 	plane->state->fb = plane->fb;
 	if (plane->state->fb)
-		drm_framebuffer_reference(plane->state->fb);
+		drm_framebuffer_get(plane->state->fb);
 }
 
 static void
@@ -2746,7 +2746,7 @@ intel_find_initial_plane_obj(struct intel_crtc *intel_crtc,
 
 		if (intel_plane_ggtt_offset(state) == plane_config->base) {
 			fb = c->primary->fb;
-			drm_framebuffer_reference(fb);
+			drm_framebuffer_get(fb);
 			goto valid_fb;
 		}
 	}
@@ -2777,7 +2777,7 @@ valid_fb:
 			  intel_crtc->pipe, PTR_ERR(intel_state->vma));
 
 		intel_state->vma = NULL;
-		drm_framebuffer_unreference(fb);
+		drm_framebuffer_put(fb);
 		return;
 	}
 
@@ -2798,7 +2798,7 @@ valid_fb:
 	if (i915_gem_object_is_tiled(obj))
 		dev_priv->preserve_bios_swizzle = true;
 
-	drm_framebuffer_reference(fb);
+	drm_framebuffer_get(fb);
 	primary->fb = primary->state->fb = fb;
 	primary->crtc = primary->state->crtc = &intel_crtc->base;
 
@@ -9654,7 +9654,7 @@ mode_fits_in_fbdev(struct drm_device *dev,
 	if (obj->base.size < mode->vdisplay * fb->pitches[0])
 		return NULL;
 
-	drm_framebuffer_reference(fb);
+	drm_framebuffer_get(fb);
 	return fb;
 #else
 	return NULL;
@@ -9835,7 +9835,7 @@ found:
 	if (ret)
 		goto fail;
 
-	drm_framebuffer_unreference(fb);
+	drm_framebuffer_put(fb);
 
 	ret = drm_atomic_set_mode_for_crtc(&crtc_state->base, mode);
 	if (ret)
@@ -10145,7 +10145,7 @@ static void intel_unpin_work_fn(struct work_struct *__work)
 	intel_frontbuffer_flip_complete(to_i915(dev),
 					to_intel_plane(primary)->frontbuffer_bit);
 	intel_fbc_post_update(crtc);
-	drm_framebuffer_unreference(work->old_fb);
+	drm_framebuffer_put(work->old_fb);
 
 	BUG_ON(atomic_read(&crtc->unpin_work_count) == 0);
 	atomic_dec(&crtc->unpin_work_count);
@@ -10785,7 +10785,7 @@ static int intel_crtc_page_flip(struct drm_crtc *crtc,
 		flush_workqueue(dev_priv->wq);
 
 	/* Reference the objects for the scheduled work. */
-	drm_framebuffer_reference(work->old_fb);
+	drm_framebuffer_get(work->old_fb);
 
 	crtc->primary->fb = fb;
 	update_state_fb(crtc->primary);
@@ -10899,7 +10899,7 @@ cleanup:
 	update_state_fb(crtc->primary);
 
 	i915_gem_object_put(obj);
-	drm_framebuffer_unreference(work->old_fb);
+	drm_framebuffer_put(work->old_fb);
 
 	spin_lock_irq(&dev->event_lock);
 	intel_crtc->flip_work = NULL;
@@ -11223,7 +11223,7 @@ static void intel_modeset_update_connector_atomic_state(struct drm_device *dev)
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	for_each_intel_connector_iter(connector, &conn_iter) {
 		if (connector->base.state->crtc)
-			drm_connector_unreference(&connector->base);
+			drm_connector_put(&connector->base);
 
 		if (connector->base.encoder) {
 			connector->base.state->best_encoder =
@@ -11231,7 +11231,7 @@ static void intel_modeset_update_connector_atomic_state(struct drm_device *dev)
 			connector->base.state->crtc =
 				connector->base.encoder->crtc;
 
-			drm_connector_reference(&connector->base);
+			drm_connector_get(&connector->base);
 		} else {
 			connector->base.state->best_encoder = NULL;
 			connector->base.state->crtc = NULL;
