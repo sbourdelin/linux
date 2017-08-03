@@ -31,6 +31,7 @@
 
 #include "edac_module.h"
 
+#define SKX_MOD_NAME    "skx_edac.c"
 #define SKX_REVISION    " Ver: 1.0 "
 
 /*
@@ -471,7 +472,7 @@ static int skx_register_mci(struct skx_imc *imc)
 	mci->mtype_cap = MEM_FLAG_DDR4;
 	mci->edac_ctl_cap = EDAC_FLAG_NONE;
 	mci->edac_cap = EDAC_FLAG_NONE;
-	mci->mod_name = "skx_edac.c";
+	mci->mod_name = SKX_MOD_NAME;
 	mci->dev_name = pci_name(imc->chan[0].cdev);
 	mci->mod_ver = SKX_REVISION;
 	mci->ctl_page_to_phys = NULL;
@@ -1051,6 +1052,9 @@ static int __init skx_init(void)
 	id = x86_match_cpu(skx_cpuids);
 	if (!id)
 		return -ENODEV;
+
+	if (!edac_check_mc_owner(SKX_MOD_NAME))
+		return -EBUSY;
 
 	rc = skx_get_hi_lo();
 	if (rc)

@@ -3444,6 +3444,9 @@ static int __init amd64_edac_init(void)
 	if (amd_cache_northbridges() < 0)
 		return -ENODEV;
 
+	if (!edac_check_mc_owner(EDAC_MOD_STR))
+		return -EBUSY;
+
 	opstate_init();
 
 	err = -ENOMEM;

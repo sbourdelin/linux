@@ -45,6 +45,8 @@
 #include "edac_module.h"
 #include "pnd2_edac.h"
 
+#define PND2_MOD_NAME		"pnd2_edac.c"
+
 #define APL_NUM_CHANNELS	4
 #define DNV_NUM_CHANNELS	2
 #define DNV_MAX_DIMMS		2 /* Max DIMMs per channel */
@@ -1313,7 +1315,7 @@ static int pnd2_register_mci(struct mem_ctl_info **ppmci)
 	pvt = mci->pvt_info;
 	memset(pvt, 0, sizeof(*pvt));
 
-	mci->mod_name = "pnd2_edac.c";
+	mci->mod_name = PND2_MOD_NAME;
 	mci->dev_name = ops->name;
 	mci->ctl_name = "Pondicherry2";
 
@@ -1512,6 +1514,9 @@ static int __init pnd2_init(void)
 	id = x86_match_cpu(pnd2_cpuids);
 	if (!id)
 		return -ENODEV;
+
+	if (!edac_check_mc_owner(PND2_MOD_NAME))
+		return -EBUSY;
 
 	ops = (struct dunit_ops *)id->driver_data;
 

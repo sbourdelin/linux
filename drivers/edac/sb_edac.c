@@ -36,7 +36,7 @@ static LIST_HEAD(sbridge_edac_list);
  * Alter this version for the module when modifications are made
  */
 #define SBRIDGE_REVISION    " Ver: 1.1.2 "
-#define EDAC_MOD_STR      "sbridge_edac"
+#define SBRIDGE_MOD_NAME    "sb_edac.c"
 
 /*
  * Debug macros
@@ -3124,7 +3124,7 @@ static int sbridge_register_mci(struct sbridge_dev *sbridge_dev, enum type type)
 		MEM_FLAG_DDR4 : MEM_FLAG_DDR3;
 	mci->edac_ctl_cap = EDAC_FLAG_NONE;
 	mci->edac_cap = EDAC_FLAG_NONE;
-	mci->mod_name = "sb_edac.c";
+	mci->mod_name = SBRIDGE_MOD_NAME;
 	mci->mod_ver = SBRIDGE_REVISION;
 	mci->dev_name = pci_name(pdev);
 	mci->ctl_page_to_phys = NULL;
@@ -3379,6 +3379,9 @@ static int __init sbridge_init(void)
 	id = x86_match_cpu(sbridge_cpuids);
 	if (!id)
 		return -ENODEV;
+
+	if (!edac_check_mc_owner(SBRIDGE_MOD_NAME))
+		return -EBUSY;
 
 	/* Ensure that the OPSTATE is set correctly for POLL or NMI */
 	opstate_init();
