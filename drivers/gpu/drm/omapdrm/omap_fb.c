@@ -91,7 +91,7 @@ static void omap_framebuffer_destroy(struct drm_framebuffer *fb)
 	for (i = 0; i < n; i++) {
 		struct plane *plane = &omap_fb->planes[i];
 
-		drm_gem_object_unreference_unlocked(plane->bo);
+		drm_gem_object_put_unlocked(plane->bo);
 	}
 
 	kfree(omap_fb);
@@ -380,7 +380,7 @@ struct drm_framebuffer *omap_framebuffer_create(struct drm_device *dev,
 
 error:
 	while (--i > 0)
-		drm_gem_object_unreference_unlocked(bos[i]);
+		drm_gem_object_put_unlocked(bos[i]);
 
 	return fb;
 }
