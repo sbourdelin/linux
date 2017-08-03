@@ -34,6 +34,8 @@
 /* PEX Internal Configuration Registers */
 #define PCIE_STRFMR1		0x71c /* Symbol Timer & Filter Mask Register1 */
 
+#define PCIE_IATU_NUM		6
+
 struct ls_pcie_drvdata {
 	u32 lut_offset;
 	u32 ltssm_shift;
@@ -90,6 +92,14 @@ static void ls_pcie_drop_msg_tlp(struct ls_pcie *pcie)
 	iowrite32(val, pci->dbi_base + PCIE_STRFMR1);
 }
 
+static void ls_pcie_disable_outbound_atus(struct ls_pcie *pcie)
+{
+	int i;
+
+	for (i = 0; i < PCIE_IATU_NUM; i++)
+		dw_pcie_disable_atu(pcie->pci, DW_PCIE_REGION_OUTBOUND, i);
+}
+
 static int ls1021_pcie_link_up(struct dw_pcie *pci)
 {
 	u32 state;
@@ -126,6 +136,13 @@ static void ls_pcie_host_init(struct pcie_port *pp)
 {
 	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
 	struct ls_pcie *pcie = to_ls_pcie(pci);
+
+	/*
+	 * Disable the outbound windows configured by bootloader to avoid
+	 * one transaction hitting multiple outbound windows and the function
+	 * dw_pcie_setup_rc will re-configure the outbound windows.
+	 */
+	ls_pcie_disable_outbound_atus(pcie);
 
 	dw_pcie_dbi_ro_wr_en(pci);
 	ls_pcie_fix_class(pcie);
