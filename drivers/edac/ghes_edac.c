@@ -407,15 +407,18 @@ EXPORT_SYMBOL_GPL(ghes_edac_report_mem_error);
 
 int ghes_edac_register(struct ghes *ghes, struct device *dev)
 {
-	bool fake = false;
-	int rc, num_dimm = 0;
 	struct mem_ctl_info *mci;
 	struct edac_mc_layer layers[1];
 	struct ghes_edac_pvt *pvt;
 	struct ghes_edac_dimm_fill dimm_fill;
+	int rc;
+
+	static int num_dimm;
+	static bool fake;
 
 	/* Get the number of DIMMs */
-	dmi_walk(ghes_edac_count_dimms, &num_dimm);
+	if (num_dimm == 0)
+		dmi_walk(ghes_edac_count_dimms, &num_dimm);
 
 	/* Check if we've got a bogus BIOS */
 	if (num_dimm == 0) {
