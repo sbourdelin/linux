@@ -649,7 +649,7 @@ static void __init early_cmdline_parse(void)
 	}
 #endif
 	opt = strstr(prom_cmd_line, "mem=");
-	if (opt) {
+	if (opt && is_substring_param(prom_cmd_line, opt)) {
 		opt += 4;
 		prom_memory_limit = prom_memparse(opt, (const char **)&opt);
 #ifdef CONFIG_PPC64
