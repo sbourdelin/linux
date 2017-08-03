@@ -660,8 +660,16 @@ static void __init early_cmdline_parse(void)
 
 	opt = strstr(prom_cmd_line, "disable_radix");
 	if (opt) {
-		prom_debug("Radix disabled from cmdline\n");
-		prom_radix_disable = true;
+		/*
+		 * Check if this is prefix or suffix of some other parameter
+		 * before proceeding.
+		 */
+		p = (char *)(opt + 13);
+		if ((*p == ' ' || *p == '"' || *p == '\0') &&
+		    is_substring_param(prom_cmd_line, opt)) {
+			prom_debug("Radix disabled from cmdline\n");
+			prom_radix_disable = true;
+		}
 	}
 }
 
