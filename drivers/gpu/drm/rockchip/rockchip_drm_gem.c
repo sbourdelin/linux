@@ -383,7 +383,7 @@ rockchip_gem_create_with_handle(struct drm_file *file_priv,
 		goto err_handle_create;
 
 	/* drop reference from allocate - handle holds it now. */
-	drm_gem_object_unreference_unlocked(obj);
+	drm_gem_object_put_unlocked(obj);
 
 	return rk_obj;
 
@@ -414,7 +414,7 @@ int rockchip_gem_dumb_map_offset(struct drm_file *file_priv,
 	DRM_DEBUG_KMS("offset = 0x%llx\n", *offset);
 
 out:
-	drm_gem_object_unreference_unlocked(obj);
+	drm_gem_object_put_unlocked(obj);
 
 	return 0;
 }
