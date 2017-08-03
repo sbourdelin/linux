@@ -10645,11 +10645,11 @@ F:	kernel/printk/
 F:	include/linux/printk.h
 
 PRISM54 WIRELESS DRIVER
-M:	"Luis R. Rodriguez" <mcgrof@gmail.com>
+M:	"Luis R. Rodriguez" <mcgrof@kernel.org>
 L:	linux-wireless@vger.kernel.org
 W:	http://wireless.kernel.org/en/users/Drivers/p54
 S:	Obsolete
-F:	drivers/net/wireless/intersil/prism54/
+F:	drivers/staging/prism54/
 
 PROC SYSCTL
 M:	"Luis R. Rodriguez" <mcgrof@kernel.org>
