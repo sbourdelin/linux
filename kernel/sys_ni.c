@@ -178,6 +178,7 @@ cond_syscall(sys_setfsgid);
 cond_syscall(sys_capget);
 cond_syscall(sys_capset);
 cond_syscall(sys_copy_file_range);
+cond_syscall(sys_destroy_creds);
 
 /* arch-specific weak syscall entries */
 cond_syscall(sys_pciconfig_read);

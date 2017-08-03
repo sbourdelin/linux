@@ -2041,3 +2041,23 @@ out:
 	return ret;
 }
 EXPORT_SYMBOL(vfs_dedupe_file_range);
+
+long vfs_destroy_creds(struct file *fd)
+{
+	if (!IS_DIR(fd))
+		return -EINVAL;
+	if (fd->f_op->destroy_creds)
+		return fd->f_op->destroy_creds(fd);
+	return 0;
+}
+EXPORT_SYMBOL(vfs_destroy_creds);
+
+SYSCALL_DEFINE1(destroy_creds, int, fd_in)
+{
+	struct fd f_in;
+
+	f_in = fdget(fd_in);
+	if (!f_in.file)
+		return 0;
+	return vfs_destroy_creds(f_in.file);
+}

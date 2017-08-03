@@ -1698,6 +1698,7 @@ struct file_operations {
 			u64);
 	ssize_t (*dedupe_file_range)(struct file *, u64, u64, struct file *,
 			u64);
+	int (*destroy_creds)(struct file *);
 };
 
 struct inode_operations {
@@ -1772,6 +1773,7 @@ extern int vfs_dedupe_file_range_compare(struct inode *src, loff_t srcoff,
 					 loff_t len, bool *is_same);
 extern int vfs_dedupe_file_range(struct file *file,
 				 struct file_dedupe_range *same);
+extern long vfs_destroy_creds(struct file *fd);
 
 struct super_operations {
    	struct inode *(*alloc_inode)(struct super_block *sb);
