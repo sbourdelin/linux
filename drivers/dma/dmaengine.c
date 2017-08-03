@@ -939,6 +939,8 @@ int dma_async_device_register(struct dma_device *device)
 		!device->device_prep_dma_interrupt);
 	BUG_ON(dma_has_cap(DMA_SG_SG, device->cap_mask) &&
 		!device->device_prep_dma_sg);
+	BUG_ON(dma_has_cap(DMA_MEMCPY_SG, device->cap_mask) &&
+		!device->device_prep_dma_memcpy_sg);
 	BUG_ON(dma_has_cap(DMA_CYCLIC, device->cap_mask) &&
 		!device->device_prep_dma_cyclic);
 	BUG_ON(dma_has_cap(DMA_INTERLEAVE, device->cap_mask) &&

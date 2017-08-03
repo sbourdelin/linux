@@ -67,6 +67,7 @@ enum dma_transaction_type {
 	DMA_PQ_VAL,
 	DMA_MEMSET,
 	DMA_MEMSET_SG,
+	DMA_MEMCPY_SG,
 	DMA_INTERRUPT,
 	DMA_SG_SG,
 	DMA_PRIVATE,
@@ -693,6 +694,7 @@ struct dma_filter {
  * @device_prep_dma_pq_val: prepares a pqzero_sum operation
  * @device_prep_dma_memset: prepares a memset operation
  * @device_prep_dma_memset_sg: prepares a memset operation over a scatter list
+ * @device_prep_dma_memcpy_sg: prepares memcpy between scatterlist and buffer
  * @device_prep_dma_interrupt: prepares an end of chain interrupt operation
  * @device_prep_slave_sg: prepares a slave dma operation
  * @device_prep_dma_cyclic: prepare a cyclic dma operation suitable for audio.
@@ -769,6 +771,10 @@ struct dma_device {
 	struct dma_async_tx_descriptor *(*device_prep_dma_memset_sg)(
 		struct dma_chan *chan, struct scatterlist *sg,
 		unsigned int nents, int value, unsigned long flags);
+	struct dma_async_tx_descriptor *(*device_prep_dma_memcpy_sg)(
+		struct dma_chan *chan,
+		struct scatterlist *dst_sg, unsigned int dst_nents,
+		dma_addr_t src, bool to_sg, unsigned long flags);
 	struct dma_async_tx_descriptor *(*device_prep_dma_interrupt)(
 		struct dma_chan *chan, unsigned long flags);
 	struct dma_async_tx_descriptor *(*device_prep_dma_sg)(

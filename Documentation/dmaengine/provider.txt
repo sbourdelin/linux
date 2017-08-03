@@ -188,6 +188,9 @@ Currently, the types available are:
       scatter-gather transfer, with a single chunk to transfer, it's a
       distinct transaction type in the mem2mem transfers case
 
+  * DMA_MEMCPY_SG
+    - The device supports scatterlist to/from memory.
+
   * DMA_PRIVATE
     - The devices only supports slave transfers, and as such isn't
       available for async transfers.
