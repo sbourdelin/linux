@@ -3237,7 +3237,7 @@ nv50_mstm_destroy_connector(struct drm_dp_mst_topology_mgr *mgr,
 	mstc->port = NULL;
 	drm_modeset_unlock_all(drm->dev);
 
-	drm_connector_unreference(&mstc->connector);
+	drm_connector_put(&mstc->connector);
 }
 
 static void
