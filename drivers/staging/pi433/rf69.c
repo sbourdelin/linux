@@ -109,7 +109,7 @@ enum modulation rf69_get_modulation(struct spi_device *spi)
 	}
 }
 
-int rf69_set_modulation_shaping(struct spi_device *spi, enum modShaping modShaping)
+int rf69_set_modulation_shaping(struct spi_device *spi, enum mod_shaping modShaping)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: mod shaping");
@@ -264,7 +264,7 @@ int rf69_set_frequency(struct spi_device *spi, u32 frequency)
 	return 0;
 }
 
-int rf69_set_amplifier_0(struct spi_device *spi, enum optionOnOff optionOnOff)
+int rf69_set_amplifier_0(struct spi_device *spi, enum option_on_off optionOnOff)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: amp #0");
@@ -277,7 +277,7 @@ int rf69_set_amplifier_0(struct spi_device *spi, enum optionOnOff optionOnOff)
 	}
 }
 
-int rf69_set_amplifier_1(struct spi_device *spi, enum optionOnOff optionOnOff)
+int rf69_set_amplifier_1(struct spi_device *spi, enum option_on_off optionOnOff)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: amp #1");
@@ -290,7 +290,7 @@ int rf69_set_amplifier_1(struct spi_device *spi, enum optionOnOff optionOnOff)
 	}
 }
 
-int rf69_set_amplifier_2(struct spi_device *spi, enum optionOnOff optionOnOff)
+int rf69_set_amplifier_2(struct spi_device *spi, enum option_on_off optionOnOff)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: amp #2");
@@ -319,7 +319,7 @@ int rf69_set_output_power_level(struct spi_device *spi, u8 powerLevel)
 	return WRITE_REG(REG_PALEVEL, (READ_REG(REG_PALEVEL) & ~MASK_PALEVEL_OUTPUT_POWER) | powerLevel);
 }
 
-int rf69_set_pa_ramp(struct spi_device *spi, enum paRamp paRamp)
+int rf69_set_pa_ramp(struct spi_device *spi, enum pa_ramp paRamp)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: pa ramp");
@@ -346,7 +346,7 @@ int rf69_set_pa_ramp(struct spi_device *spi, enum paRamp paRamp)
 	}
 }
 
-int rf69_set_antenna_impedance(struct spi_device *spi, enum antennaImpedance antennaImpedance)
+int rf69_set_antenna_impedance(struct spi_device *spi, enum antenna_impedance antennaImpedance)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: antenna impedance");
@@ -359,7 +359,7 @@ int rf69_set_antenna_impedance(struct spi_device *spi, enum antennaImpedance ant
 	}
 }
 
-int rf69_set_lna_gain(struct spi_device *spi, enum lnaGain lnaGain)
+int rf69_set_lna_gain(struct spi_device *spi, enum lna_gain lnaGain)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: lna gain");
@@ -377,7 +377,7 @@ int rf69_set_lna_gain(struct spi_device *spi, enum lnaGain lnaGain)
 	}
 }
 
-enum lnaGain rf69_get_lna_gain(struct spi_device *spi)
+enum lna_gain rf69_get_lna_gain(struct spi_device *spi)
 {
 	u8 currentValue;
 
@@ -516,7 +516,7 @@ int rf69_set_ook_threshold_step(struct spi_device *spi, enum thresholdStep thres
 	}
 }
 
-int rf69_set_ook_threshold_dec(struct spi_device *spi, enum thresholdDecrement thresholdDecrement)
+int rf69_set_ook_threshold_dec(struct spi_device *spi, enum threshold_decrement thresholdDecrement)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: threshold decrement");
@@ -666,7 +666,7 @@ int rf69_set_preamble_length(struct spi_device *spi, u16 preambleLength)
 	return retval;
 }
 
-int rf69_set_sync_enable(struct spi_device *spi, enum optionOnOff optionOnOff)
+int rf69_set_sync_enable(struct spi_device *spi, enum option_on_off optionOnOff)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: sync enable");
@@ -753,7 +753,7 @@ int rf69_set_packet_format(struct spi_device * spi, enum packetFormat packetForm
 	}
 }
 
-int rf69_set_crc_enable(struct spi_device *spi, enum optionOnOff optionOnOff)
+int rf69_set_crc_enable(struct spi_device *spi, enum option_on_off optionOnOff)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: crc enable");
@@ -766,7 +766,7 @@ int rf69_set_crc_enable(struct spi_device *spi, enum optionOnOff optionOnOff)
 	}
 }
 
-int rf69_set_adressFiltering(struct spi_device *spi, enum addressFiltering addressFiltering)
+int rf69_set_adressFiltering(struct spi_device *spi, enum address_filtering addressFiltering)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: address filtering");
@@ -816,7 +816,7 @@ int rf69_set_broadcast_address(struct spi_device *spi, u8 broadcastAddress)
 	return WRITE_REG(REG_BROADCASTADRS, broadcastAddress);
 }
 
-int rf69_set_tx_start_condition(struct spi_device *spi, enum txStartCondition txStartCondition)
+int rf69_set_tx_start_condition(struct spi_device *spi, enum tx_start_condition txStartCondition)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: start condition");

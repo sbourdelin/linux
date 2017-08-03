@@ -18,7 +18,7 @@
 #ifndef RF69_ENUM_H
 #define RF69_ENUM_H
 
-enum optionOnOff
+enum option_on_off
 {
     optionOff,
     optionOn
@@ -46,7 +46,7 @@ enum modulation
     FSK
 };
 
-enum modShaping
+enum mod_shaping
 {
     shapingOff,
     shaping1_0,
@@ -56,7 +56,7 @@ enum modShaping
     shaping2BR
 };
 
-enum paRamp
+enum pa_ramp
 {
     ramp3400,
     ramp2000,
@@ -76,13 +76,13 @@ enum paRamp
     ramp10
 };
 
-enum antennaImpedance
+enum antenna_impedance
 {
     fiftyOhm,
     twohundretOhm
 };
 
-enum lnaGain
+enum lna_gain
 {
     automatic,
     max,
@@ -132,7 +132,7 @@ enum thresholdStep
     step_6_0db
 };
 
-enum thresholdDecrement
+enum threshold_decrement
 {
     dec_every8th,
     dec_every4th,
@@ -177,13 +177,13 @@ enum packetFormat
     packetLengthVar
 };
 
-enum txStartCondition
+enum tx_start_condition
 {
     fifoLevel,
     fifoNotEmpty
 };
 
-enum addressFiltering
+enum address_filtering
 {
     filteringOff,
     nodeAddress,
