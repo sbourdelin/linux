@@ -3180,9 +3180,8 @@ unsigned long __init prom_init(unsigned long r3, unsigned long r4,
 	 * Fill in some infos for use by the kernel later on
 	 */
 	if (prom_memory_limit) {
-		__be64 val = cpu_to_be64(prom_memory_limit);
 		prom_setprop(prom.chosen, "/chosen", "linux,memory-limit",
-			     &val, sizeof(val));
+			     &prom_memory_limit, sizeof(prom_memory_limit));
 	}
 #ifdef CONFIG_PPC64
 	if (prom_iommu_off)
