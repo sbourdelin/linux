@@ -80,7 +80,7 @@ static void exynos_drm_fb_destroy(struct drm_framebuffer *fb)
 			continue;
 
 		obj = &exynos_fb->exynos_gem[i]->base;
-		drm_gem_object_unreference_unlocked(obj);
+		drm_gem_object_put_unlocked(obj);
 	}
 
 	kfree(exynos_fb);
@@ -172,7 +172,7 @@ exynos_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
 
 err:
 	while (i--)
-		drm_gem_object_unreference_unlocked(&exynos_gem[i]->base);
+		drm_gem_object_put_unlocked(&exynos_gem[i]->base);
 
 	return ERR_PTR(ret);
 }
