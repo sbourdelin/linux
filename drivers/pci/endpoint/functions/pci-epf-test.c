@@ -455,9 +455,6 @@ static int pci_epf_test_probe(struct pci_epf *epf)
 
 static int pci_epf_test_remove(struct pci_epf *epf)
 {
-	struct pci_epf_test *epf_test = epf_get_drvdata(epf);
-
-	kfree(epf_test);
 	return 0;
 }
 
