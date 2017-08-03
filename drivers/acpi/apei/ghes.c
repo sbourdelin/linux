@@ -1139,9 +1139,11 @@ static int ghes_probe(struct platform_device *ghes_dev)
 		goto err;
 	}
 
-	rc = ghes_edac_register(ghes, &ghes_dev->dev);
-	if (rc < 0)
-		goto err;
+	if (osc_sb_apei_support_acked) {
+		rc = ghes_edac_register(ghes, &ghes_dev->dev);
+		if (rc < 0)
+			goto err;
+	}
 
 	switch (generic->notify.type) {
 	case ACPI_HEST_NOTIFY_POLLED:
