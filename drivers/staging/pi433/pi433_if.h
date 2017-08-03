@@ -33,14 +33,13 @@
 #include "rf69_enum.h"
 
 /*---------------------------------------------------------------------------*/
-
-
 /*---------------------------------------------------------------------------*/
 
 /* IOCTL structs and commands */
 
 /**
- * struct pi433_tx_config - describes the configuration of the radio module for sending
+ * struct pi433_tx_config - describes the configuration of the radio module for
+ * sending
  * @frequency:
  * @bit_rate:
  * @modulation:
@@ -57,9 +56,8 @@
  *
  * NOTE: struct layout is the same in 64bit and 32bit userspace.
  */
-#define PI433_TX_CFG_IOCTL_NR 	0
-struct pi433_tx_cfg
-{
+#define PI433_TX_CFG_IOCTL_NR	0
+struct pi433_tx_cfg {
 	__u32			frequency;
 	__u16			bit_rate;
 	__u32			dev_frequency;
@@ -90,7 +88,8 @@ struct pi433_tx_cfg
 
 
 /**
- * struct pi433_rx_config - describes the configuration of the radio module for sending
+ * struct pi433_rx_config - describes the configuration of the radio module for
+ * sending
  * @frequency:
  * @bit_rate:
  * @modulation:
@@ -107,7 +106,7 @@ struct pi433_tx_cfg
  *
  * NOTE: struct layout is the same in 64bit and 32bit userspace.
  */
-#define PI433_RX_CFG_IOCTL_NR 	1
+#define PI433_RX_CFG_IOCTL_NR	1
 struct pi433_rx_cfg {
 	__u32			frequency;
 	__u16			bit_rate;
@@ -143,10 +142,13 @@ struct pi433_rx_cfg {
 
 #define PI433_IOC_MAGIC			'r'
 
-#define PI433_IOC_RD_TX_CFG	_IOR(PI433_IOC_MAGIC, PI433_TX_CFG_IOCTL_NR, char[sizeof(struct pi433_tx_cfg)])
-#define PI433_IOC_WR_TX_CFG	_IOW(PI433_IOC_MAGIC, PI433_TX_CFG_IOCTL_NR, char[sizeof(struct pi433_tx_cfg)])
-
-#define PI433_IOC_RD_RX_CFG	_IOR(PI433_IOC_MAGIC, PI433_RX_CFG_IOCTL_NR, char[sizeof(struct pi433_rx_cfg)])
-#define PI433_IOC_WR_RX_CFG	_IOW(PI433_IOC_MAGIC, PI433_RX_CFG_IOCTL_NR, char[sizeof(struct pi433_rx_cfg)])
+#define PI433_IOC_RD_TX_CFG	_IOR(PI433_IOC_MAGIC, PI433_TX_CFG_IOCTL_NR,\
+				     char[sizeof(struct pi433_tx_cfg)])
+#define PI433_IOC_WR_TX_CFG	_IOW(PI433_IOC_MAGIC, PI433_TX_CFG_IOCTL_NR,\
+				     char[sizeof(struct pi433_tx_cfg)])
+#define PI433_IOC_RD_RX_CFG	_IOR(PI433_IOC_MAGIC, PI433_RX_CFG_IOCTL_NR,\
+				     char[sizeof(struct pi433_rx_cfg)])
+#define PI433_IOC_WR_RX_CFG	_IOW(PI433_IOC_MAGIC, PI433_RX_CFG_IOCTL_NR,\
+				     char[sizeof(struct pi433_rx_cfg)])
 
 #endif /* PI433_H */
