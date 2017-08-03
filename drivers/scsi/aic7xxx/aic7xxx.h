@@ -1270,13 +1270,6 @@ extern uint32_t ahc_debug;
 void			ahc_print_devinfo(struct ahc_softc *ahc,
 					  struct ahc_devinfo *dev);
 void			ahc_dump_card_state(struct ahc_softc *ahc);
-int			ahc_print_register(const ahc_reg_parse_entry_t *table,
-					   u_int num_entries,
-					   const char *name,
-					   u_int address,
-					   u_int value,
-					   u_int *cur_column,
-					   u_int wrap_point);
 /******************************* SEEPROM *************************************/
 int		ahc_acquire_seeprom(struct ahc_softc *ahc,
 				    struct seeprom_descriptor *sd);

@@ -7,6 +7,7 @@
 # Let kbuild descend into aicasm when cleaning
 subdir-				+= aicasm
 
+obj-$(CONFIG_SCSI_AICLIB)	+= aiclib.o
 obj-$(CONFIG_SCSI_AIC7XXX)	+= aic7xxx.o
 obj-$(CONFIG_SCSI_AIC79XX)	+= aic79xx.o
 

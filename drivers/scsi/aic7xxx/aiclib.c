@@ -1,34 +1,83 @@
 /*
- * Implementation of Utility functions for all SCSI device types.
+ * Utility functions for AIC driver
  *
- * Copyright (c) 1997, 1998, 1999 Justin T. Gibbs.
- * Copyright (c) 1997, 1998 Kenneth D. Merry.
- * All rights reserved.
+ * Copyright (c) 2017 Michał Mirosław
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions, and the following disclaimer,
- *    without modification, immediately at the beginning of the file.
- * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
- * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.38 2002/09/23 04:56:35 mjacob Exp $
- * $Id$
+ * License: GPLv2
  */
 
 #include "aiclib.h"
 
+void aic_printbuf_push(struct aic_dump_buffer *buf, const char *fmt, ...)
+{
+	va_list args;
+	char *ptr;
+	int len;
+
+	ptr = buf->buf + buf->cur_col;
+
+	va_start(args, fmt);
+	len = vscnprintf(ptr, sizeof(buf->buf) - buf->cur_col, fmt, args);
+	buf->cur_col += len;
+	va_end(args);
+}
+EXPORT_SYMBOL_GPL(aic_printbuf_push);
+
+void aic_printbuf_finish(struct aic_dump_buffer *buf)
+{
+	if (!buf->cur_col)
+		return;
+
+	printk("%s\n", buf->buf);
+	buf->cur_col = 0;
+}
+EXPORT_SYMBOL_GPL(aic_printbuf_finish);
+
+static void aic_printbuf_maybe_break(struct aic_dump_buffer *buf)
+{
+	if (buf->cur_col >= buf->wrap)
+		aic_printbuf_finish(buf);
+}
+
+void aic_print_register(const aic_reg_parse_entry_t *table, u_int num_entries,
+			const char *name, u_int address, u_int value,
+			struct aic_dump_buffer *buf)
+{
+	u_int	printed_mask;
+
+	aic_printbuf_push(buf, "%s[0x%x]", name, value);
+	if (table == NULL) {
+		aic_printbuf_push(buf, " ");
+		aic_printbuf_maybe_break(buf);
+		return;
+	}
+
+	printed_mask = 0;
+	while (printed_mask != 0xFF) {
+		int entry;
+
+		for (entry = 0; entry < num_entries; entry++) {
+			const aic_reg_parse_entry_t *e = &table[entry];
+			if (((value & e->mask) != e->value) ||
+			    ((printed_mask & e->mask) == e->mask))
+				continue;
+
+			aic_printbuf_push(buf, "%s%s",
+					  printed_mask == 0 ? ":(" : "|",
+					  e->name);
+			printed_mask |= e->mask;
+
+			break;
+		}
+
+		if (entry >= num_entries)
+			break;
+	}
+	if (printed_mask != 0)
+		aic_printbuf_push(buf, ") ");
+	else
+		aic_printbuf_push(buf, " ");
+
+	aic_printbuf_maybe_break(buf);
+}
+EXPORT_SYMBOL_GPL(aic_print_register);
