@@ -54,6 +54,13 @@ static int nfs_fsync_dir(struct file *, loff_t, loff_t, int);
 static loff_t nfs_llseek_dir(struct file *, loff_t, int);
 static void nfs_readdir_clear_array(struct page*);
 
+static int nfs_destroy_creds(struct file *file)
+{
+	struct rpc_auth *auth = NFS_SERVER(file_inode(file))->client->cl_auth;
+
+	return rpcauth_key_set_destroy(auth, rpc_lookup_cred());
+}
+
 const struct file_operations nfs_dir_operations = {
 	.llseek		= nfs_llseek_dir,
 	.read		= generic_read_dir,
@@ -61,6 +68,7 @@ const struct file_operations nfs_dir_operations = {
 	.open		= nfs_opendir,
 	.release	= nfs_closedir,
 	.fsync		= nfs_fsync_dir,
+	.destroy_creds	= nfs_destroy_creds,
 };
 
 const struct address_space_operations nfs_dir_aops = {
