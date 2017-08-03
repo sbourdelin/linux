@@ -703,16 +703,25 @@ static void ghes_estatus_cache_add(
 static int ghes_ack_error(struct acpi_hest_generic_v2 *gv2)
 {
 	int rc;
-	u64 val = 0;
+	u64 ack_paddr;
+	u64 ack_val = 0;
 
-	rc = apei_read(&val, &gv2->read_ack_register);
+	rc = apei_read(&ack_paddr, &gv2->read_ack_register);
 	if (rc)
 		return rc;
 
-	val &= gv2->read_ack_preserve << gv2->read_ack_register.bit_offset;
-	val |= gv2->read_ack_write    << gv2->read_ack_register.bit_offset;
+	if (!ack_paddr)
+		return -ENOENT;
 
-	return apei_write(val, &gv2->read_ack_register);
+	ghes_copy_tofrom_phys(&ack_val, ack_paddr,
+			      sizeof(u64), 1);
+
+	ack_val &= gv2->read_ack_preserve << gv2->read_ack_register.bit_offset;
+	ack_val |= gv2->read_ack_write    << gv2->read_ack_register.bit_offset;
+
+	ghes_copy_tofrom_phys(&ack_val, ack_paddr,
+				sizeof(u64), 0);
+	return 0;
 }
 
 static void __ghes_panic(struct ghes *ghes)
