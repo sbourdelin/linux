@@ -25,6 +25,10 @@
 static char *reg_alpha2;
 module_param(reg_alpha2, charp, 0);
 
+static bool disable_2g4_40m;
+module_param(disable_2g4_40m, bool, 0000);
+MODULE_PARM_DESC(disable_2g4_40m, "2.4G 40M support disable:1, enable:0");
+
 static const struct ieee80211_iface_limit mwifiex_ap_sta_limits[] = {
 	{
 		.max = 3, .types = BIT(NL80211_IFTYPE_STATION) |
@@ -2755,7 +2759,7 @@ static void mwifiex_setup_vht_caps(struct ieee80211_sta_vht_cap *vht_info,
  */
 static void
 mwifiex_setup_ht_caps(struct ieee80211_sta_ht_cap *ht_info,
-		      struct mwifiex_private *priv)
+		      struct mwifiex_private *priv, int disable_40m)
 {
 	int rx_mcs_supp;
 	struct ieee80211_mcs_info mcs_set;
@@ -2769,7 +2773,7 @@ mwifiex_setup_ht_caps(struct ieee80211_sta_ht_cap *ht_info,
 	memset(&ht_info->mcs, 0, sizeof(ht_info->mcs));
 
 	/* Fill HT capability information */
-	if (ISSUPP_CHANWIDTH40(adapter->hw_dot_11n_dev_cap))
+	if (ISSUPP_CHANWIDTH40(adapter->hw_dot_11n_dev_cap) && !disable_40m)
 		ht_info->cap |= IEEE80211_HT_CAP_SUP_WIDTH_20_40;
 	else
 		ht_info->cap &= ~IEEE80211_HT_CAP_SUP_WIDTH_20_40;
@@ -2779,7 +2783,7 @@ mwifiex_setup_ht_caps(struct ieee80211_sta_ht_cap *ht_info,
 	else
 		ht_info->cap &= ~IEEE80211_HT_CAP_SGI_20;
 
-	if (ISSUPP_SHORTGI40(adapter->hw_dot_11n_dev_cap))
+	if (ISSUPP_SHORTGI40(adapter->hw_dot_11n_dev_cap) && !disable_40m)
 		ht_info->cap |= IEEE80211_HT_CAP_SGI_40;
 	else
 		ht_info->cap &= ~IEEE80211_HT_CAP_SGI_40;
@@ -2799,7 +2803,8 @@ mwifiex_setup_ht_caps(struct ieee80211_sta_ht_cap *ht_info,
 	else
 		ht_info->cap &= ~IEEE80211_HT_CAP_GRN_FLD;
 
-	if (ISENABLED_40MHZ_INTOLERANT(adapter->hw_dot_11n_dev_cap))
+	if (ISENABLED_40MHZ_INTOLERANT(adapter->hw_dot_11n_dev_cap) &&
+	    !disable_40m)
 		ht_info->cap |= IEEE80211_HT_CAP_40MHZ_INTOLERANT;
 	else
 		ht_info->cap &= ~IEEE80211_HT_CAP_40MHZ_INTOLERANT;
@@ -2819,7 +2824,7 @@ mwifiex_setup_ht_caps(struct ieee80211_sta_ht_cap *ht_info,
 	memset(&mcs[rx_mcs_supp], 0,
 	       sizeof(struct ieee80211_mcs_info) - rx_mcs_supp);
 	if (priv->bss_mode == NL80211_IFTYPE_STATION ||
-	    ISSUPP_CHANWIDTH40(adapter->hw_dot_11n_dev_cap))
+	    (ISSUPP_CHANWIDTH40(adapter->hw_dot_11n_dev_cap) && !disable_40m))
 		/* Set MCS32 for infra mode or ad-hoc mode with 40MHz support */
 		SETHT_MCS32(mcs_set.rx_mask);
 
@@ -2974,14 +2979,15 @@ struct wireless_dev *mwifiex_add_virtual_intf(struct wiphy *wiphy,
 	if (ret)
 		goto err_sta_init;
 
-	mwifiex_setup_ht_caps(&wiphy->bands[NL80211_BAND_2GHZ]->ht_cap, priv);
-	if (adapter->is_hw_11ac_capable)
+	mwifiex_setup_ht_caps(&wiphy->bands[NL80211_BAND_2GHZ]->ht_cap, priv,
+			      disable_2g4_40m);
+	if (adapter->is_hw_11ac_capable && !disable_2g4_40m)
 		mwifiex_setup_vht_caps(
 			&wiphy->bands[NL80211_BAND_2GHZ]->vht_cap, priv);
 
 	if (adapter->config_bands & BAND_A)
 		mwifiex_setup_ht_caps(
-			&wiphy->bands[NL80211_BAND_5GHZ]->ht_cap, priv);
+			&wiphy->bands[NL80211_BAND_5GHZ]->ht_cap, priv, 0);
 
 	if ((adapter->config_bands & BAND_A) && adapter->is_hw_11ac_capable)
 		mwifiex_setup_vht_caps(
