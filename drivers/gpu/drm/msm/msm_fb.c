@@ -50,7 +50,7 @@ static void msm_framebuffer_destroy(struct drm_framebuffer *fb)
 	for (i = 0; i < n; i++) {
 		struct drm_gem_object *bo = msm_fb->planes[i];
 
-		drm_gem_object_unreference_unlocked(bo);
+		drm_gem_object_put_unlocked(bo);
 	}
 
 	kfree(msm_fb);
@@ -157,7 +157,7 @@ struct drm_framebuffer *msm_framebuffer_create(struct drm_device *dev,
 
 out_unref:
 	for (i = 0; i < n; i++)
-		drm_gem_object_unreference_unlocked(bos[i]);
+		drm_gem_object_put_unlocked(bos[i]);
 	return ERR_PTR(ret);
 }
 

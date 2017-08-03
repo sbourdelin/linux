@@ -303,7 +303,7 @@ static struct drm_gem_object *a5xx_ucode_load_bo(struct msm_gpu *gpu,
 
 	ptr = msm_gem_get_vaddr(bo);
 	if (!ptr) {
-		drm_gem_object_unreference(bo);
+		drm_gem_object_put(bo);
 		return ERR_PTR(-ENOMEM);
 	}
 
@@ -311,7 +311,7 @@ static struct drm_gem_object *a5xx_ucode_load_bo(struct msm_gpu *gpu,
 		int ret = msm_gem_get_iova(bo, gpu->aspace, iova);
 
 		if (ret) {
-			drm_gem_object_unreference(bo);
+			drm_gem_object_put(bo);
 			return ERR_PTR(ret);
 		}
 	}
@@ -697,19 +697,19 @@ static void a5xx_destroy(struct msm_gpu *gpu)
 	if (a5xx_gpu->pm4_bo) {
 		if (a5xx_gpu->pm4_iova)
 			msm_gem_put_iova(a5xx_gpu->pm4_bo, gpu->aspace);
-		drm_gem_object_unreference_unlocked(a5xx_gpu->pm4_bo);
+		drm_gem_object_put_unlocked(a5xx_gpu->pm4_bo);
 	}
 
 	if (a5xx_gpu->pfp_bo) {
 		if (a5xx_gpu->pfp_iova)
 			msm_gem_put_iova(a5xx_gpu->pfp_bo, gpu->aspace);
-		drm_gem_object_unreference_unlocked(a5xx_gpu->pfp_bo);
+		drm_gem_object_put_unlocked(a5xx_gpu->pfp_bo);
 	}
 
 	if (a5xx_gpu->gpmu_bo) {
 		if (a5xx_gpu->gpmu_iova)
 			msm_gem_put_iova(a5xx_gpu->gpmu_bo, gpu->aspace);
-		drm_gem_object_unreference_unlocked(a5xx_gpu->gpmu_bo);
+		drm_gem_object_put_unlocked(a5xx_gpu->gpmu_bo);
 	}
 
 	adreno_gpu_cleanup(adreno_gpu);

@@ -417,7 +417,7 @@ static void retire_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit)
 		/* move to inactive: */
 		msm_gem_move_to_inactive(&msm_obj->base);
 		msm_gem_put_iova(&msm_obj->base, gpu->aspace);
-		drm_gem_object_unreference(&msm_obj->base);
+		drm_gem_object_put(&msm_obj->base);
 	}
 
 	pm_runtime_mark_last_busy(&gpu->pdev->dev);
@@ -496,7 +496,7 @@ void msm_gpu_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
 		WARN_ON(is_active(msm_obj) && (msm_obj->gpu != gpu));
 
 		/* submit takes a reference to the bo and iova until retired: */
-		drm_gem_object_reference(&msm_obj->base);
+		drm_gem_object_get(&msm_obj->base);
 		msm_gem_get_iova(&msm_obj->base,
 				submit->gpu->aspace, &iova);
 

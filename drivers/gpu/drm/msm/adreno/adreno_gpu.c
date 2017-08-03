@@ -433,7 +433,7 @@ void adreno_gpu_cleanup(struct adreno_gpu *adreno_gpu)
 		if (adreno_gpu->memptrs_iova)
 			msm_gem_put_iova(adreno_gpu->memptrs_bo, gpu->aspace);
 
-		drm_gem_object_unreference_unlocked(adreno_gpu->memptrs_bo);
+		drm_gem_object_put_unlocked(adreno_gpu->memptrs_bo);
 	}
 	release_firmware(adreno_gpu->pm4);
 	release_firmware(adreno_gpu->pfp);
