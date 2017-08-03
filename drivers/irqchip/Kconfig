@@ -307,3 +307,8 @@ config QCOM_IRQ_COMBINER
 	help
 	  Say yes here to add support for the IRQ combiner devices embedded
 	  in Qualcomm Technologies chips.
+
+config IRQ_UNIPHIER_AIDET
+	def_bool y
+	depends on ARCH_UNIPHIER || COMPILE_TEST
+	select IRQ_DOMAIN_HIERARCHY
