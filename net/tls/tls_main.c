@@ -31,15 +31,15 @@
  * SOFTWARE.
  */
 
-#include <linux/module.h>
-
-#include <net/tcp.h>
-#include <net/inet_common.h>
 #include <linux/highmem.h>
+#include <linux/module.h>
 #include <linux/netdevice.h>
 #include <linux/sched/signal.h>
-
+#include <net/inet_common.h>
+#include <net/sock.h>
+#include <net/tcp.h>
 #include <net/tls.h>
+#include <net/ulp_sock.h>
 
 MODULE_AUTHOR("Mellanox Technologies");
 MODULE_DESCRIPTION("Transport Layer Security Support");
@@ -438,11 +438,13 @@ static int tls_setsockopt(struct sock *sk, int level, int optname,
 	return do_tls_setsockopt(sk, optname, optval, optlen);
 }
 
-static int tls_init(struct sock *sk)
+static int tls_init(struct sock *sk, char __user *optval, int len)
 {
-	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tls_context *ctx;
 	int rc = 0;
+
+	if (sk->sk_protocol != IPPROTO_TCP)
+		return -EAFNOSUPPORT;
 
 	/* allocate tls context */
 	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
@@ -450,7 +452,7 @@ static int tls_init(struct sock *sk)
 		rc = -ENOMEM;
 		goto out;
 	}
-	icsk->icsk_ulp_data = ctx;
+	sk->sk_ulp_data = ctx;
 	ctx->setsockopt = sk->sk_prot->setsockopt;
 	ctx->getsockopt = sk->sk_prot->getsockopt;
 	sk->sk_prot = &tls_base_prot;
@@ -458,7 +460,7 @@ out:
 	return rc;
 }
 
-static struct tcp_ulp_ops tcp_tls_ulp_ops __read_mostly = {
+static struct ulp_ops ulp_tls_ops __read_mostly = {
 	.name			= "tls",
 	.owner			= THIS_MODULE,
 	.init			= tls_init,
@@ -475,14 +477,14 @@ static int __init tls_register(void)
 	tls_sw_prot.sendpage            = tls_sw_sendpage;
 	tls_sw_prot.close               = tls_sk_proto_close;
 
-	tcp_register_ulp(&tcp_tls_ulp_ops);
+	ulp_register(&ulp_tls_ops);
 
 	return 0;
 }
 
 static void __exit tls_unregister(void)
 {
-	tcp_unregister_ulp(&tcp_tls_ulp_ops);
+	ulp_unregister(&ulp_tls_ops);
 }
 
 module_init(tls_register);
