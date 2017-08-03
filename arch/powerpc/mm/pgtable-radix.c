@@ -30,7 +30,8 @@ static int native_register_process_table(unsigned long base, unsigned long pg_sz
 {
 	unsigned long patb1 = base | table_size | PATB_GR;
 
-	partition_tb->patb1 = cpu_to_be64(patb1);
+	mmu_partition_table_set_entry(0, be64_to_cpu(partition_tb->patb0),
+				      patb1);
 	return 0;
 }
 
