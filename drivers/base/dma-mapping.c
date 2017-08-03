@@ -13,6 +13,7 @@
 #include <linux/gfp.h>
 #include <linux/of_device.h>
 #include <linux/slab.h>
+#include <linux/usb.h>
 #include <linux/vmalloc.h>
 
 /*
@@ -345,6 +346,10 @@ int dma_configure(struct device *dev)
 	enum dev_dma_attr attr;
 	int ret = 0;
 
+	/* USB devices share the controller's mask. */
+	if (dev->bus == &usb_bus_type)
+		return 0;
+
 	if (dev_is_pci(dev)) {
 		bridge = pci_get_host_bridge_device(to_pci_dev(dev));
 		dma_dev = bridge;
@@ -369,6 +374,9 @@ int dma_configure(struct device *dev)
 
 void dma_deconfigure(struct device *dev)
 {
+	if (dev->bus == &usb_bus_type)
+		return;
+
 	of_dma_deconfigure(dev);
 	acpi_dma_deconfigure(dev);
 }
