@@ -466,9 +466,13 @@ static void ghes_do_proc(struct ghes *ghes,
 	guid_t *sec_type;
 	guid_t *fru_id = &NULL_UUID_LE;
 	char *fru_text = "";
+	unsigned int data_len;
 
 	sev = ghes_severity(estatus->error_severity);
-	apei_estatus_for_each_section(estatus, gdata) {
+	data_len = estatus->data_length;
+	gdata = (struct acpi_hest_generic_data *)(estatus + 1);
+
+	while (data_len >= acpi_hest_get_size(gdata)) {
 		sec_type = (guid_t *)gdata->section_type;
 		sec_sev = ghes_severity(gdata->error_severity);
 		if (gdata->validation_bits & CPER_SEC_VALID_FRU_ID)
@@ -528,6 +532,8 @@ static void ghes_do_proc(struct ghes *ghes,
 					       sec_sev, err,
 					       gdata->error_data_length);
 		}
+		data_len -= acpi_hest_get_record_size(gdata);
+		gdata = acpi_hest_get_next(gdata);
 	}
 }
 
