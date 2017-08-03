@@ -1933,14 +1933,14 @@ static int __init at_dma_probe(struct platform_device *pdev)
 
 	/* setup platform data for each SoC */
 	dma_cap_set(DMA_MEMCPY, at91sam9rl_config.cap_mask);
-	dma_cap_set(DMA_SG, at91sam9rl_config.cap_mask);
+	dma_cap_set(DMA_SG_SG, at91sam9rl_config.cap_mask);
 	dma_cap_set(DMA_INTERLEAVE, at91sam9g45_config.cap_mask);
 	dma_cap_set(DMA_MEMCPY, at91sam9g45_config.cap_mask);
 	dma_cap_set(DMA_MEMSET, at91sam9g45_config.cap_mask);
 	dma_cap_set(DMA_MEMSET_SG, at91sam9g45_config.cap_mask);
 	dma_cap_set(DMA_PRIVATE, at91sam9g45_config.cap_mask);
 	dma_cap_set(DMA_SLAVE, at91sam9g45_config.cap_mask);
-	dma_cap_set(DMA_SG, at91sam9g45_config.cap_mask);
+	dma_cap_set(DMA_SG_SG, at91sam9g45_config.cap_mask);
 
 	/* get DMA parameters from controller type */
 	plat_dat = at_dma_get_driver_data(pdev);
@@ -2078,7 +2078,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
 		atdma->dma_common.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 	}
 
-	if (dma_has_cap(DMA_SG, atdma->dma_common.cap_mask))
+	if (dma_has_cap(DMA_SG_SG, atdma->dma_common.cap_mask))
 		atdma->dma_common.device_prep_dma_sg = atc_prep_dma_sg;
 
 	dma_writel(atdma, EN, AT_DMA_ENABLE);
@@ -2087,7 +2087,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
 	  dma_has_cap(DMA_MEMCPY, atdma->dma_common.cap_mask) ? "cpy " : "",
 	  dma_has_cap(DMA_MEMSET, atdma->dma_common.cap_mask) ? "set " : "",
 	  dma_has_cap(DMA_SLAVE, atdma->dma_common.cap_mask)  ? "slave " : "",
-	  dma_has_cap(DMA_SG, atdma->dma_common.cap_mask)  ? "sg-cpy " : "",
+	  dma_has_cap(DMA_SG_SG, atdma->dma_common.cap_mask)  ? "sg-cpy " : "",
 	  plat_dat->nr_channels);
 
 	dma_async_device_register(&atdma->dma_common);

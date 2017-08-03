@@ -1254,7 +1254,7 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 		dma_dev->device_prep_dma_interrupt = mv_xor_prep_dma_interrupt;
 	if (dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask))
 		dma_dev->device_prep_dma_memcpy = mv_xor_prep_dma_memcpy;
-	if (dma_has_cap(DMA_SG, dma_dev->cap_mask))
+	if (dma_has_cap(DMA_SG_SG, dma_dev->cap_mask))
 		dma_dev->device_prep_dma_sg = mv_xor_prep_dma_sg;
 	if (dma_has_cap(DMA_XOR, dma_dev->cap_mask)) {
 		dma_dev->max_xor = 8;
@@ -1309,7 +1309,7 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
 		 mv_chan->op_in_desc ? "Descriptor Mode" : "Registers Mode",
 		 dma_has_cap(DMA_XOR, dma_dev->cap_mask) ? "xor " : "",
 		 dma_has_cap(DMA_MEMCPY, dma_dev->cap_mask) ? "cpy " : "",
-		 dma_has_cap(DMA_SG, dma_dev->cap_mask) ? "sg " : "",
+		 dma_has_cap(DMA_SG_SG, dma_dev->cap_mask) ? "sg " : "",
 		 dma_has_cap(DMA_INTERRUPT, dma_dev->cap_mask) ? "intr " : "");
 
 	dma_async_device_register(dma_dev);
@@ -1552,7 +1552,7 @@ static int mv_xor_probe(struct platform_device *pdev)
 
 			dma_cap_zero(cap_mask);
 			dma_cap_set(DMA_MEMCPY, cap_mask);
-			dma_cap_set(DMA_SG, cap_mask);
+			dma_cap_set(DMA_SG_SG, cap_mask);
 			dma_cap_set(DMA_XOR, cap_mask);
 			dma_cap_set(DMA_INTERRUPT, cap_mask);
 

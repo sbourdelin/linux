@@ -704,7 +704,7 @@ int ccp_dmaengine_register(struct ccp_device *ccp)
 	dma_dev->directions = DMA_MEM_TO_MEM;
 	dma_dev->residue_granularity = DMA_RESIDUE_GRANULARITY_DESCRIPTOR;
 	dma_cap_set(DMA_MEMCPY, dma_dev->cap_mask);
-	dma_cap_set(DMA_SG, dma_dev->cap_mask);
+	dma_cap_set(DMA_SG_SG, dma_dev->cap_mask);
 	dma_cap_set(DMA_INTERRUPT, dma_dev->cap_mask);
 
 	/* The DMA channels for this device can be set to public or private,

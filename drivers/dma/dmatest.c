@@ -448,7 +448,7 @@ static int dmatest_func(void *data)
 	if (thread->type == DMA_MEMCPY) {
 		align = dev->copy_align;
 		src_cnt = dst_cnt = 1;
-	} else if (thread->type == DMA_SG) {
+	} else if (thread->type == DMA_SG_SG) {
 		align = dev->copy_align;
 		src_cnt = dst_cnt = sg_buffers;
 	} else if (thread->type == DMA_XOR) {
@@ -640,7 +640,7 @@ static int dmatest_func(void *data)
 			tx = dev->device_prep_dma_memcpy(chan,
 							 dsts[0] + dst_off,
 							 srcs[0], len, flags);
-		else if (thread->type == DMA_SG)
+		else if (thread->type == DMA_SG_SG)
 			tx = dev->device_prep_dma_sg(chan, tx_sg, src_cnt,
 						     rx_sg, src_cnt, flags);
 		else if (thread->type == DMA_XOR)
@@ -821,7 +821,7 @@ static int dmatest_add_threads(struct dmatest_info *info,
 
 	if (type == DMA_MEMCPY)
 		op = "copy";
-	else if (type == DMA_SG)
+	else if (type == DMA_SG_SG)
 		op = "sg";
 	else if (type == DMA_XOR)
 		op = "xor";
@@ -883,9 +883,9 @@ static int dmatest_add_channel(struct dmatest_info *info,
 		}
 	}
 
-	if (dma_has_cap(DMA_SG, dma_dev->cap_mask)) {
+	if (dma_has_cap(DMA_SG_SG, dma_dev->cap_mask)) {
 		if (dmatest == 1) {
-			cnt = dmatest_add_threads(info, dtc, DMA_SG);
+			cnt = dmatest_add_threads(info, dtc, DMA_SG_SG);
 			thread_count += cnt > 0 ? cnt : 0;
 		}
 	}
@@ -962,7 +962,7 @@ static void run_threaded_test(struct dmatest_info *info)
 
 	request_channels(info, DMA_MEMCPY);
 	request_channels(info, DMA_XOR);
-	request_channels(info, DMA_SG);
+	request_channels(info, DMA_SG_SG);
 	request_channels(info, DMA_PQ);
 }
 

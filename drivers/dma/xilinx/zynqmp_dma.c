@@ -1064,7 +1064,7 @@ static int zynqmp_dma_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&zdev->common.channels);
 
 	dma_set_mask(&pdev->dev, DMA_BIT_MASK(44));
-	dma_cap_set(DMA_SG, zdev->common.cap_mask);
+	dma_cap_set(DMA_SG_SG, zdev->common.cap_mask);
 	dma_cap_set(DMA_MEMCPY, zdev->common.cap_mask);
 
 	p = &zdev->common;

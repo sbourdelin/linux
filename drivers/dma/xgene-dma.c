@@ -1653,7 +1653,7 @@ static void xgene_dma_set_caps(struct xgene_dma_chan *chan,
 	dma_cap_zero(dma_dev->cap_mask);
 
 	/* Set DMA device capability */
-	dma_cap_set(DMA_SG, dma_dev->cap_mask);
+	dma_cap_set(DMA_SG_SG, dma_dev->cap_mask);
 
 	/* Basically here, the X-Gene SoC DMA engine channel 0 supports XOR
 	 * and channel 1 supports XOR, PQ both. First thing here is we have
@@ -1732,7 +1732,7 @@ static int xgene_dma_async_register(struct xgene_dma *pdma, int id)
 	/* DMA capability info */
 	dev_info(pdma->dev,
 		 "%s: CAPABILITY ( %s%s%s)\n", dma_chan_name(&chan->dma_chan),
-		 dma_has_cap(DMA_SG, dma_dev->cap_mask) ? "SGCPY " : "",
+		 dma_has_cap(DMA_SG_SG, dma_dev->cap_mask) ? "SGCPY " : "",
 		 dma_has_cap(DMA_XOR, dma_dev->cap_mask) ? "XOR " : "",
 		 dma_has_cap(DMA_PQ, dma_dev->cap_mask) ? "PQ " : "");
 
