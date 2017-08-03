@@ -43,8 +43,10 @@
 /* second interrupt byte */
 #define CH341_MULT_STAT 0x04 /* multiple status since last interrupt event */
 
-/* status returned in third interrupt answer byte, inverted in data
-   from irq */
+/*
+ * status returned in third interrupt answer byte, inverted in data
+ * from irq
+ */
 #define CH341_BIT_CTS 0x01
 #define CH341_BIT_DSR 0x02
 #define CH341_BIT_RI  0x04
@@ -92,7 +94,7 @@ MODULE_DEVICE_TABLE(usb, id_table);
 
 struct ch341_private {
 	spinlock_t lock; /* access lock */
-	unsigned baud_rate; /* set baud rate */
+	unsigned int baud_rate; /* set baud rate */
 	u8 mcr;
 	u8 msr;
 	u8 lcr;
@@ -121,7 +123,7 @@ static int ch341_control_out(struct usb_device *dev, u8 request,
 
 static int ch341_control_in(struct usb_device *dev,
 			    u8 request, u16 value, u16 index,
-			    char *buf, unsigned bufsize)
+			    char *buf, unsigned int bufsize)
 {
 	int r;
 
@@ -289,6 +291,7 @@ static int ch341_port_remove(struct usb_serial_port *port)
 static int ch341_carrier_raised(struct usb_serial_port *port)
 {
 	struct ch341_private *priv = usb_get_serial_port_data(port);
+
 	if (priv->msr & CH341_BIT_DCD)
 		return 1;
 	return 0;
@@ -358,7 +361,7 @@ static void ch341_set_termios(struct tty_struct *tty,
 		struct usb_serial_port *port, struct ktermios *old_termios)
 {
 	struct ch341_private *priv = usb_get_serial_port_data(port);
-	unsigned baud_rate;
+	unsigned int baud_rate;
 	unsigned long flags;
 	u8 lcr;
 	int r;
@@ -442,11 +445,13 @@ static void ch341_break_ctl(struct tty_struct *tty, int break_state)
 	dev_dbg(&port->dev, "%s - initial ch341 break register contents - reg1: %x, reg2: %x\n",
 		__func__, break_reg[0], break_reg[1]);
 	if (break_state != 0) {
-		dev_dbg(&port->dev, "%s - Enter break state requested\n", __func__);
+		dev_dbg(&port->dev, "%s - Enter break state requested\n",
+			__func__);
 		break_reg[0] &= ~CH341_NBREAK_BITS;
 		break_reg[1] &= ~CH341_LCR_ENABLE_TX;
 	} else {
-		dev_dbg(&port->dev, "%s - Leave break state requested\n", __func__);
+		dev_dbg(&port->dev, "%s - Leave break state requested\n",
+			__func__);
 		break_reg[0] |= CH341_NBREAK_BITS;
 		break_reg[1] |= CH341_LCR_ENABLE_TX;
 	}
