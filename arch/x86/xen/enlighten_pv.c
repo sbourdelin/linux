@@ -579,6 +579,71 @@ static void xen_write_ldt_entry(struct desc_struct *dt, int entrynum,
 	preempt_enable();
 }
 
+#ifdef CONFIG_X86_64
+static struct {
+	void (*orig)(void);
+	void (*xen)(void);
+	bool ist_okay;
+	bool handle;
+} trap_array[] = {
+	{ debug, xen_xendebug, true, true },
+	{ int3, xen_xenint3, true, true },
+	{ double_fault, xen_double_fault, true, false },
+#ifdef CONFIG_X86_MCE
+	{ machine_check, xen_machine_check, true, true },
+#endif
+	{ nmi, xen_nmi, true, true },
+	{ overflow, xen_overflow, false, true },
+#ifdef CONFIG_IA32_EMULATION
+	{ entry_INT80_compat, xen_entry_INT80_compat, false, true },
+#endif
+	{ page_fault, xen_page_fault, false, true },
+	{ divide_error, xen_divide_error, false, true },
+	{ bounds, xen_bounds, false, true },
+	{ invalid_op, xen_invalid_op, false, true },
+	{ device_not_available, xen_device_not_available, false, true },
+	{ coprocessor_segment_overrun, xen_coprocessor_segment_overrun,
+	  false, true },
+	{ invalid_TSS, xen_invalid_TSS, false, true },
+	{ segment_not_present, xen_segment_not_present, false, true },
+	{ stack_segment, xen_stack_segment, false, true },
+	{ general_protection, xen_general_protection, false, true },
+	{ spurious_interrupt_bug, xen_spurious_interrupt_bug, false, true },
+	{ coprocessor_error, xen_coprocessor_error, false, true },
+	{ alignment_check, xen_alignment_check, false, true },
+	{ simd_coprocessor_error, xen_simd_coprocessor_error, false, true },
+#ifdef CONFIG_TRACING
+	{ trace_page_fault, xen_trace_page_fault, false, true },
+#endif
+};
+
+static bool get_trap_addr(unsigned long *addr, unsigned int ist)
+{
+	unsigned int nr;
+	bool handle = true, ist_okay = false;
+
+	/*
+	 * Replace trap handler addresses by Xen specific ones.
+	 * Check for known traps using IST and whitelist them.
+	 * The debugger ones are the only ones we care about.
+	 * Xen will handle faults like double_fault, * so we should never see
+	 * them.  Warn if there's an unexpected IST-using fault handler.
+	 */
+	for (nr = 0; nr < ARRAY_SIZE(trap_array); nr++)
+		if (*addr == (unsigned long)trap_array[nr].orig) {
+			*addr = (unsigned long)trap_array[nr].xen;
+			ist_okay = trap_array[nr].ist_okay;
+			handle = trap_array[nr].handle;
+			break;
+		}
+
+	if (WARN_ON(ist != 0 && !ist_okay))
+		handle = false;
+
+	return handle;
+}
+#endif
+
 static int cvt_gate_to_trap(int vector, const gate_desc *val,
 			    struct trap_info *info)
 {
@@ -591,40 +656,8 @@ static int cvt_gate_to_trap(int vector, const gate_desc *val,
 
 	addr = gate_offset(*val);
 #ifdef CONFIG_X86_64
-	/*
-	 * Look for known traps using IST, and substitute them
-	 * appropriately.  The debugger ones are the only ones we care
-	 * about.  Xen will handle faults like double_fault,
-	 * so we should never see them.  Warn if
-	 * there's an unexpected IST-using fault handler.
-	 */
-	if (addr == (unsigned long)debug)
-		addr = (unsigned long)xen_debug;
-	else if (addr == (unsigned long)int3)
-		addr = (unsigned long)xen_int3;
-	else if (addr == (unsigned long)stack_segment)
-		addr = (unsigned long)xen_stack_segment;
-	else if (addr == (unsigned long)double_fault) {
-		/* Don't need to handle these */
+	if (!get_trap_addr(&addr, val->ist))
 		return 0;
-#ifdef CONFIG_X86_MCE
-	} else if (addr == (unsigned long)machine_check) {
-		/*
-		 * when xen hypervisor inject vMCE to guest,
-		 * use native mce handler to handle it
-		 */
-		;
-#endif
-	} else if (addr == (unsigned long)nmi)
-		/*
-		 * Use the native version as well.
-		 */
-		;
-	else {
-		/* Some other trap using IST? */
-		if (WARN_ON(val->ist != 0))
-			return 0;
-	}
 #endif	/* CONFIG_X86_64 */
 	info->address = addr;
 
