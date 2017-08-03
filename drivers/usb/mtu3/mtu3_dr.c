@@ -322,23 +322,82 @@ static const struct file_operations ssusb_mode_fops = {
 	.release = single_release,
 };
 
-static void ssusb_debugfs_init(struct ssusb_mtk *ssusb)
+static int ssusb_vbus_show(struct seq_file *sf, void *unused)
+{
+	struct ssusb_mtk *ssusb = sf->private;
+	struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
+
+	seq_printf(sf, "vbus state: %s\n(echo on/off)\n",
+		regulator_is_enabled(otg_sx->vbus) ? "on" : "off");
+
+	return 0;
+}
+
+static int ssusb_vbus_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ssusb_vbus_show, inode->i_private);
+}
+
+static ssize_t ssusb_vbus_write(struct file *file,
+	const char __user *ubuf, size_t count, loff_t *ppos)
+{
+	struct seq_file *sf = file->private_data;
+	struct ssusb_mtk *ssusb = sf->private;
+	struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
+	char buf[16];
+
+	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
+		return -EFAULT;
+
+	if (!strncmp(buf, "on", 2)) {
+		ssusb_set_vbus(otg_sx, 1);
+	} else if (!strncmp(buf, "off", 3)) {
+		ssusb_set_vbus(otg_sx, 0);
+	} else {
+		dev_err(ssusb->dev, "wrong setting\n");
+		return -EINVAL;
+	}
+
+	return count;
+}
+
+static const struct file_operations ssusb_vbus_fops = {
+	.open = ssusb_vbus_open,
+	.write = ssusb_vbus_write,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+static int ssusb_debugfs_init(struct ssusb_mtk *ssusb)
 {
 	struct dentry *root;
 	struct dentry *file;
 
 	root = debugfs_create_dir(dev_name(ssusb->dev), usb_debug_root);
 	if (IS_ERR_OR_NULL(root)) {
-		if (!root)
-			dev_err(ssusb->dev, "create debugfs root failed\n");
-		return;
+		dev_err(ssusb->dev, "create debugfs root failed\n");
+		goto err_dbgfs;
 	}
 	ssusb->dbgfs_root = root;
 
-	file = debugfs_create_file("mode", S_IRUGO | S_IWUSR, root,
-			ssusb, &ssusb_mode_fops);
-	if (!file)
-		dev_dbg(ssusb->dev, "create debugfs mode failed\n");
+	file = debugfs_create_file("mode", 0644, root, ssusb, &ssusb_mode_fops);
+	if (!file) {
+		dev_err(ssusb->dev, "create debugfs mode failed\n");
+		goto err_dbgfs;
+	}
+
+	file = debugfs_create_file("vbus", 0644, root, ssusb, &ssusb_vbus_fops);
+	if (!file) {
+		dev_err(ssusb->dev, "create debugfs vbus failed\n");
+		goto err_dbgfs;
+	}
+
+	return 0;
+
+err_dbgfs:
+	debugfs_remove_recursive(ssusb->dbgfs_root);
+	return -ENOMEM;
 }
 
 static void ssusb_debugfs_exit(struct ssusb_mtk *ssusb)
