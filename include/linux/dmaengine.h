@@ -476,6 +476,10 @@ struct dmaengine_unmap_data {
 	dma_addr_t addr[0];
 };
 
+#define DMA_UNMAP_SG_ENTS	2
+#define dma_unmap_data_sg_to_nents(x, n) x->addr[n]
+#define dma_unmap_data_sg_from_nents(x, n) x->addr[n+1]
+
 /**
  * struct dma_async_tx_descriptor - async transaction descriptor
  * ---dma generic offload fields---

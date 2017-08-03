@@ -1130,16 +1130,35 @@ static void dmaengine_unmap(struct kref *kref)
 {
 	struct dmaengine_unmap_data *unmap = container_of(kref, typeof(*unmap), kref);
 	struct device *dev = unmap->dev;
-	int cnt, i;
+	int cnt, i, sg_nents;
+	struct scatterlist *sg;
 
-	cnt = unmap->to_cnt;
-	for (i = 0; i < cnt; i++)
-		dma_unmap_page(dev, unmap->addr[i], unmap->len,
-			       DMA_TO_DEVICE);
-	cnt += unmap->from_cnt;
-	for (; i < cnt; i++)
-		dma_unmap_page(dev, unmap->addr[i], unmap->len,
-			       DMA_FROM_DEVICE);
+	sg_nents = dma_unmap_data_sg_to_nents(unmap, unmap->map_cnt);
+	if (sg_nents) {
+		i = 0;
+		cnt = 1;
+		sg = (struct scatterlist *)unmap->addr[i];
+		dma_unmap_sg(dev, sg, sg_nents, DMA_TO_DEVICE);
+	} else {
+		cnt = unmap->to_cnt;
+		for (i = 0; i < cnt; i++)
+			dma_unmap_page(dev, unmap->addr[i], unmap->len,
+					DMA_TO_DEVICE);
+	}
+
+	sg_nents = dma_unmap_data_sg_from_nents(unmap, unmap->map_cnt);
+	if (sg_nents) {
+		sg = (struct scatterlist *)unmap->addr[i];
+		dma_unmap_sg(dev, sg, sg_nents, DMA_FROM_DEVICE);
+		cnt++;
+		i++;
+	} else {
+		cnt += unmap->from_cnt;
+		for (; i < cnt; i++)
+			dma_unmap_page(dev, unmap->addr[i], unmap->len,
+					DMA_FROM_DEVICE);
+	}
+
 	cnt += unmap->bidi_cnt;
 	for (; i < cnt; i++) {
 		if (unmap->addr[i] == 0)
@@ -1183,6 +1202,10 @@ static int __init dmaengine_init_unmap_pool(void)
 		size = sizeof(struct dmaengine_unmap_data) +
 		       sizeof(dma_addr_t) * p->size;
 
+		/* add 2 more entries for SG nents overload */
+		if (i == 0)
+			size += sizeof(dma_addr_t) * 2;
+
 		p->cache = kmem_cache_create(p->name, size, 0,
 					     SLAB_HWCACHE_ALIGN, NULL);
 		if (!p->cache)
@@ -1209,6 +1232,10 @@ dmaengine_get_unmap_data(struct device *dev, int nr, gfp_t flags)
 		return NULL;
 
 	memset(unmap, 0, sizeof(*unmap));
+	/* clear the overloaded sg nents entries */
+	if (nr < 3)
+		memset(&unmap->addr[nr], 0,
+				DMA_UNMAP_SG_ENTS * sizeof(dma_addr_t));
 	kref_init(&unmap->kref);
 	unmap->dev = dev;
 	unmap->map_cnt = nr;
