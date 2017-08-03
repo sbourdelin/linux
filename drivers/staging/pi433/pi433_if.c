@@ -192,7 +192,7 @@ rf69_set_rx_cfg(struct pi433_device *dev, struct pi433_rx_cfg *rx_cfg)
 	SET_CHECKED(rf69_set_modulation	(dev->spi, rx_cfg->modulation));
 	SET_CHECKED(rf69_set_antenna_impedance	 (dev->spi, rx_cfg->antenna_impedance));
 	SET_CHECKED(rf69_set_rssi_threshold	 (dev->spi, rx_cfg->rssi_threshold));
-	SET_CHECKED(rf69_set_ook_threshold_dec	 (dev->spi, rx_cfg->thresholdDecrement));
+	SET_CHECKED(rf69_set_ook_threshold_dec	 (dev->spi, rx_cfg->threshold_decrement));
 	SET_CHECKED(rf69_set_bandwidth 		 (dev->spi, rx_cfg->bw_mantisse, rx_cfg->bw_exponent));
 	SET_CHECKED(rf69_set_bandwidth_during_afc(dev->spi, rx_cfg->bw_mantisse, rx_cfg->bw_exponent));
 	SET_CHECKED(rf69_set_dagc 		 (dev->spi, rx_cfg->dagc));
@@ -254,7 +254,7 @@ rf69_set_tx_cfg(struct pi433_device *dev, struct pi433_tx_cfg *tx_cfg)
 	SET_CHECKED(rf69_set_modulation	(dev->spi, tx_cfg->modulation));
 	SET_CHECKED(rf69_set_deviation	(dev->spi, tx_cfg->dev_frequency));
 	SET_CHECKED(rf69_set_pa_ramp	(dev->spi, tx_cfg->pa_ramp));
-	SET_CHECKED(rf69_set_modulation_shaping(dev->spi, tx_cfg->modShaping));
+	SET_CHECKED(rf69_set_modulation_shaping(dev->spi, tx_cfg->mod_shaping));
 	SET_CHECKED(rf69_set_tx_start_condition(dev->spi, tx_cfg->tx_start_condition));
 
 	/* packet format enable */

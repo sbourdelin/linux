@@ -62,7 +62,7 @@ struct pi433_tx_cfg {
 	__u16			bit_rate;
 	__u32			dev_frequency;
 	enum modulation		modulation;
-	enum mod_shaping		modShaping;
+	enum mod_shaping	mod_shaping;
 
 	enum pa_ramp		pa_ramp;
 
@@ -114,8 +114,8 @@ struct pi433_rx_cfg {
 
 	__u8			rssi_threshold;
 
-	enum threshold_decrement	thresholdDecrement;
-	enum antenna_impedance	antenna_impedance;
+	enum threshold_decrement	threshold_decrement;
+  	enum antenna_impedance	antenna_impedance;
 	enum lna_gain		lna_gain;
 	enum mantisse		bw_mantisse;	/* normal: 0x50 */
 	__u8			bw_exponent;	/* during AFC: 0x8b */
