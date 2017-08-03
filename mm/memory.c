@@ -3874,13 +3874,9 @@ int handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 	/*
 	 * This mm has been already reaped by the oom reaper and so the
 	 * refault cannot be trusted in general. Anonymous refaults would
-	 * lose data and give a zero page instead e.g. This is especially
-	 * problem for use_mm() because regular tasks will just die and
-	 * the corrupted data will not be visible anywhere while kthread
-	 * will outlive the oom victim and potentially propagate the date
-	 * further.
+	 * lose data and give a zero page instead e.g.
 	 */
-	if (unlikely((current->flags & PF_KTHREAD) && !(ret & VM_FAULT_ERROR)
+	if (unlikely(!(ret & VM_FAULT_ERROR)
 				&& test_bit(MMF_UNSTABLE, &vma->vm_mm->flags)))
 		ret = VM_FAULT_SIGBUS;
 
