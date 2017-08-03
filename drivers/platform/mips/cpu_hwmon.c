@@ -50,7 +50,7 @@ static struct attribute *cpu_hwmon_attributes[] = {
 };
 
 /* Hwmon device attribute group */
-static struct attribute_group cpu_hwmon_attribute_group = {
+static const struct attribute_group cpu_hwmon_attribute_group = {
 	.attrs = cpu_hwmon_attributes,
 };
 
