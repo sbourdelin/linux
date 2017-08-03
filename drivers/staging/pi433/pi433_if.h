@@ -126,9 +126,18 @@ struct pi433_rx_cfg {
 
 	/* packet format */
 	enum optionOnOff	enable_sync;
-	enum optionOnOff	enable_length_byte;	  /* should be used in combination with sync, only */
-	enum addressFiltering	enable_address_filtering; /* operational with sync, only */
-	enum optionOnOff	enable_crc;		  /* only operational, if sync on and fixed length or length byte is used */
+	enum optionOnOff	enable_length_byte;	  /* should be used in
+							   * combination with
+							   * sync, only
+							   */
+	enum addressFiltering	enable_address_filtering; /* operational
+							   * with sync, only
+							   */
+	enum optionOnOff	enable_crc;		  /* only operational,
+							   *if sync on and fixed
+							   * length or length
+							   * byte is used
+							   */
 
 	__u8			sync_length;
 	__u8			fixed_message_length;
