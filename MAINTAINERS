@@ -4365,6 +4365,12 @@ S:	Maintained
 F:	drivers/gpu/drm/tinydrm/repaper.c
 F:	Documentation/devicetree/bindings/display/repaper.txt
 
+DRM DRIVER FOR SITRONIX ST7586 PANELS
+M:	David Lechner <david@lechnology.com>
+S:	Maintained
+F:	drivers/gpu/drm/tinydrm/st7586.c
+F:	Documentation/devicetree/bindings/display/st7586.txt
+
 DRM DRIVER FOR RAGE 128 VIDEO CARDS
 S:	Orphan / Obsolete
 F:	drivers/gpu/drm/r128/
