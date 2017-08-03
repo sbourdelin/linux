@@ -1,0 +1,20 @@
+SiI9234 Mobile HD Link Transmitter
+
+Required properties:
+- compatible : "sil,sii9234".
+- reg : I2C address for TPI interface, use 0x39
+- vcc-supply : regulator that supplies the chip
+- interrupts, interrupt-parent: interrupt specifier of INT pin
+- reset-gpios: gpio specifier of RESET pin
+
+Additional compatible properties are also allowed.
+
+Example:
+	sii9234@39 {
+		compatible = "sil,sii9234";
+		reg = <0x39>;
+		vcc-supply = <&vsil>;
+		reset-gpios = <&gpf3 4 GPIO_ACTIVE_HIGH>;
+		interrupt-parent = <&gpf3>;
+		interrupts = <5 IRQ_TYPE_LEVEL_HIGH>;
+	};
