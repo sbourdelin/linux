@@ -1,0 +1,26 @@
+Sitronix ST7586 display panel
+
+Required properties:
+- compatible:	"lego,ev3-lcd".
+
+The node for this driver must be a child node of a SPI controller, hence
+all mandatory properties described in ../spi/spi-bus.txt must be specified.
+
+Optional properties:
+- dc-gpios:	D/C pin. The presence/absence of this GPIO determines
+		the panel interface operation mode (IF[3:1] pins):
+		- present: IF=011 4-wire 8-bit data serial interface
+		- absent:  IF=010 3-wire 9-bit data serial interface
+- reset-gpios:	Reset pin
+- power-supply:	A regulator node for the supply voltage.
+- backlight:	phandle of the backlight device attached to the panel
+- rotation:	panel rotation in degrees counter clockwise (0,90,180,270)
+
+Example:
+	display@0{
+		compatible = "lego,ev3-lcd";
+		reg = <0>;
+		spi-max-frequency = <10000000>;
+		dc-gpios = <&gpio 43 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio 80 GPIO_ACTIVE_HIGH>;
+	};
