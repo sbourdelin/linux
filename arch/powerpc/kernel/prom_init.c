@@ -594,6 +594,26 @@ static unsigned long prom_memparse(const char *ptr, const char **retptr)
 }
 
 /*
+ * Check if str is a suffix of another param as "mem=" could
+ * be "iomem=" as well.
+ */
+static bool is_substring_param(const char *cmdline, const char *str)
+{
+	char *p;
+	bool ret = false;
+
+	if (cmdline == str)
+		ret = true;
+	else {
+		p = (char *)(str - 1);
+		if (*p == ' ' || *p == '"')
+			ret = true;
+	}
+
+	return ret;
+}
+
+/*
  * Early parsing of the command line passed to the kernel, used for
  * "mem=x" and the options that affect the iommu
  */
@@ -617,7 +637,7 @@ static void __init early_cmdline_parse(void)
 
 #ifdef CONFIG_PPC64
 	opt = strstr(prom_cmd_line, "iommu=");
-	if (opt) {
+	if (opt && is_substring_param(prom_cmd_line, opt)) {
 		prom_printf("iommu opt is: %s\n", opt);
 		opt += 6;
 		while (*opt && *opt == ' ')
