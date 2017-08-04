@@ -1186,9 +1186,10 @@ xfs_diflags_to_iflags(
 	struct xfs_inode	*ip)
 {
 	uint16_t		flags = ip->i_d.di_flags;
+	uint64_t		flags2 = ip->i_d.di_flags2;
 
 	inode->i_flags &= ~(S_IMMUTABLE | S_APPEND | S_SYNC |
-			    S_NOATIME | S_DAX);
+			    S_NOATIME | S_DAX | S_IOMAP_IMMUTABLE);
 
 	if (flags & XFS_DIFLAG_IMMUTABLE)
 		inode->i_flags |= S_IMMUTABLE;
@@ -1201,9 +1202,10 @@ xfs_diflags_to_iflags(
 	if (S_ISREG(inode->i_mode) &&
 	    ip->i_mount->m_sb.sb_blocksize == PAGE_SIZE &&
 	    !xfs_is_reflink_inode(ip) &&
-	    (ip->i_mount->m_flags & XFS_MOUNT_DAX ||
-	     ip->i_d.di_flags2 & XFS_DIFLAG2_DAX))
+	    (ip->i_mount->m_flags & XFS_MOUNT_DAX || flags2 & XFS_DIFLAG2_DAX))
 		inode->i_flags |= S_DAX;
+	if (flags2 & XFS_DIFLAG2_IOMAP_IMMUTABLE)
+		inode->i_flags |= S_IOMAP_IMMUTABLE;
 }
 
 /*

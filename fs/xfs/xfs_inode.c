@@ -674,6 +674,8 @@ _xfs_dic2xflags(
 			flags |= FS_XFLAG_DAX;
 		if (di_flags2 & XFS_DIFLAG2_COWEXTSIZE)
 			flags |= FS_XFLAG_COWEXTSIZE;
+		if (di_flags2 & XFS_DIFLAG2_IOMAP_IMMUTABLE)
+			flags |= FS_XFLAG_IOMAP_IMMUTABLE;
 	}
 
 	if (has_attr)

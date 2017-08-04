@@ -977,6 +977,7 @@ xfs_set_diflags(
 		return;
 
 	di_flags2 = (ip->i_d.di_flags2 & XFS_DIFLAG2_REFLINK);
+	di_flags2 |= (ip->i_d.di_flags2 & XFS_DIFLAG2_IOMAP_IMMUTABLE);
 	if (xflags & FS_XFLAG_DAX)
 		di_flags2 |= XFS_DIFLAG2_DAX;
 	if (xflags & FS_XFLAG_COWEXTSIZE)
