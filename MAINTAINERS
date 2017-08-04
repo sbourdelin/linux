@@ -5655,7 +5655,7 @@ GENERIC GPIO I2C MULTIPLEXER DRIVER
 M:	Peter Korsgaard <peter.korsgaard@barco.com>
 L:	linux-i2c@vger.kernel.org
 S:	Supported
-F:	drivers/i2c/muxes/i2c-mux-gpio.c
+F:	drivers/i2c/muxes/gpio.c
 F:	include/linux/i2c-mux-gpio.h
 F:	Documentation/i2c/muxes/i2c-mux-gpio
 
@@ -7983,7 +7983,7 @@ M:	Michael Hennerich <michael.hennerich@analog.com>
 W:	http://ez.analog.com/community/linux-device-drivers
 L:	linux-i2c@vger.kernel.org
 S:	Supported
-F:	drivers/i2c/muxes/i2c-mux-ltc4306.c
+F:	drivers/i2c/muxes/ltc4306.c
 F:	Documentation/devicetree/bindings/i2c/i2c-mux-ltc4306.txt
 
 LTP (Linux Test Project)
@@ -8600,7 +8600,7 @@ M:	Michael Shych <michaelsh@mellanox.com>
 L:	linux-i2c@vger.kernel.org
 S:	Supported
 F:	drivers/i2c/busses/i2c-mlxcpld.c
-F:	drivers/i2c/muxes/i2c-mux-mlxcpld.c
+F:	drivers/i2c/muxes/mlxcpld.c
 F:	Documentation/i2c/busses/i2c-mlxcpld
 
 MELLANOX MLXCPLD LED DRIVER
@@ -10013,7 +10013,7 @@ PCA9541 I2C BUS MASTER SELECTOR DRIVER
 M:	Guenter Roeck <linux@roeck-us.net>
 L:	linux-i2c@vger.kernel.org
 S:	Maintained
-F:	drivers/i2c/muxes/i2c-mux-pca9541.c
+F:	drivers/i2c/muxes/pca9541.c
 
 PCDP - PRIMARY CONSOLE AND DEBUG PORT
 M:	Khalid Aziz <khalid@gonehiking.org>

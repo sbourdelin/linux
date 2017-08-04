@@ -1,6 +1,19 @@
 #
 # Makefile for multiplexer I2C chip drivers.
 
+i2c-arb-gpio-challenge-objs	:= arb-gpio-challenge.o
+
+i2c-demux-pinctrl-objs		:= demux-pinctrl.o
+
+i2c-mux-gpio-objs		:= gpio.o
+i2c-mux-gpmux-objs		:= gpmux.o
+i2c-mux-ltc4306-objs		:= ltc4306.o
+i2c-mux-mlxcpld-objs		:= mlxcpld.o
+i2c-mux-pca9541-objs		:= pca9541.o
+i2c-mux-pca954x-objs		:= pca954x.o
+i2c-mux-pinctrl-objs		:= pinctrl.o
+i2c-mux-reg-objs		:= reg.o
+
 obj-$(CONFIG_I2C_ARB_GPIO_CHALLENGE)	+= i2c-arb-gpio-challenge.o
 
 obj-$(CONFIG_I2C_DEMUX_PINCTRL)		+= i2c-demux-pinctrl.o
