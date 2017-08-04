@@ -1393,6 +1393,107 @@ out:
 
 }
 
+/* Return 1 if hole detected, 0 if not, and < 0 if fail to determine */
+STATIC int
+xfs_file_has_holes(
+	struct xfs_inode	*ip)
+{
+	struct xfs_mount	*mp = ip->i_mount;
+	struct xfs_bmbt_irec	*map;
+	const int		map_size = 10;	/* constrain memory overhead */
+	int			i, nmaps;
+	int			error = 0;
+	xfs_fileoff_t		lblkno = 0;
+	xfs_filblks_t		maxlblkcnt;
+
+	map = kmem_alloc(map_size * sizeof(*map), KM_SLEEP);
+
+	maxlblkcnt = XFS_B_TO_FSB(mp, i_size_read(VFS_I(ip)));
+	do {
+		nmaps = map_size;
+		error = xfs_bmapi_read(ip, lblkno, maxlblkcnt - lblkno,
+				       map, &nmaps, 0);
+		if (error)
+			break;
+
+		ASSERT(nmaps <= map_size);
+		for (i = 0; i < nmaps; i++) {
+			lblkno += map[i].br_blockcount;
+			if (map[i].br_startblock == HOLESTARTBLOCK) {
+				error = 1;
+				break;
+			}
+		}
+	} while (nmaps > 0 && error == 0);
+
+	kmem_free(map);
+	return error;
+}
+
+int
+xfs_seal_file_space(
+	struct xfs_inode	*ip,
+	xfs_off_t		offset,
+	xfs_off_t		len)
+{
+	struct inode		*inode = VFS_I(ip);
+	struct address_space	*mapping = inode->i_mapping;
+	int			error;
+
+	ASSERT(xfs_isilocked(ip, XFS_MMAPLOCK_EXCL));
+
+	if (offset)
+		return -EINVAL;
+
+	error = xfs_reflink_unshare(ip, offset, len);
+	if (error)
+		return error;
+
+	error = xfs_alloc_file_space(ip, offset, len,
+			XFS_BMAPI_CONVERT | XFS_BMAPI_ZERO);
+	if (error)
+		return error;
+
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	/*
+	 * Either the size changed after we performed allocation /
+	 * unsharing, or the request was too small to begin with.
+	 */
+	error = -EINVAL;
+	if (len < i_size_read(inode))
+		goto out_unlock;
+
+	/*
+	 * Allow DAX path to assume that the state of S_IOMAP_IMMUTABLE
+	 * will never change while any mapping is established.
+	 */
+	error = -EBUSY;
+	if (mapping_mapped(mapping))
+		goto out_unlock;
+
+	/* Did we race someone attempting to share extents? */
+	if (xfs_is_reflink_inode(ip))
+		goto out_unlock;
+
+	/* Did we race a hole punch? */
+	error = xfs_file_has_holes(ip);
+	if (error == 1) {
+		error = -EBUSY;
+		goto out_unlock;
+	}
+
+	/* Abort on an error reading the block map */
+	if (error < 0)
+		goto out_unlock;
+
+	inode->i_flags |= S_IOMAP_IMMUTABLE;
+
+out_unlock:
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
+	return error;
+}
+
 /*
  * @next_fsb will keep track of the extent currently undergoing shift.
  * @stop_fsb will keep track of the extent at which we have to stop.

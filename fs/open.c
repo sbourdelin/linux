@@ -273,6 +273,17 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 	    (mode & ~(FALLOC_FL_UNSHARE_RANGE | FALLOC_FL_KEEP_SIZE)))
 		return -EINVAL;
 
+	/*
+	 * Seal block map operation should only be used exclusively, and
+	 * with the IMMUTABLE capability.
+	 */
+	if (mode & FALLOC_FL_SEAL_BLOCK_MAP) {
+		if (!capable(CAP_LINUX_IMMUTABLE))
+			return -EPERM;
+		if (mode & ~FALLOC_FL_SEAL_BLOCK_MAP)
+			return -EINVAL;
+	}
+
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EBADF;
 
