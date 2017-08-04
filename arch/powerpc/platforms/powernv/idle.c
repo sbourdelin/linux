@@ -184,9 +184,6 @@ static void pnv_alloc_idle_core_states(void)
 	}
 
 	update_subcore_sibling_mask();
-
-	if (supported_cpuidle_states & OPAL_PM_LOSE_FULL_CONTEXT)
-		pnv_save_sprs_for_deep_states();
 }
 
 u32 pnv_get_supported_cpuidle_states(void)
@@ -467,8 +464,39 @@ int validate_psscr_val_mask(u64 *psscr_val, u64 *psscr_mask, u32 flags)
 	return err;
 }
 
+static void __init pnv_power8_idle_init(struct device_node *np, u32 *flags,
+					int dt_idle_states)
+{
+	bool disable_full_context_loss = false;
+	bool sprs_for_lose_full_context_saved = false;
+
+	int rc = 0, i;
+
+	for (i = 0; i < dt_idle_states; i++) {
+		if (flags[i] & OPAL_PM_LOSE_FULL_CONTEXT) {
+			if (sprs_for_lose_full_context_saved)
+				goto add_flags;
+
+			if (disable_full_context_loss)
+				continue;
+
+			rc = pnv_save_sprs_for_deep_states();
+
+			if (unlikely(rc)) {
+				pr_warn("cpuidle-powernv: Disabling full context loss idle states.\n");
+				pr_warn("cpuidle-powernv: Offlined CPUs will be put to shallow idle state.\n");
+				disable_full_context_loss = true;
+				continue;
+			}
+
+			sprs_for_lose_full_context_saved = true;
+		}
+add_flags:
+		supported_cpuidle_states |= flags[i];
+	}
+}
 /*
- * pnv_arch300_idle_init: Initializes the default idle state, first
+ * pnv_power9_idle_init: Initializes the default idle state, first
  *                        deep idle state and deepest idle state on
  *                        ISA 3.0 CPUs.
  *
@@ -485,6 +513,9 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 	u32 *residency_ns = NULL;
 	u64 max_residency_ns = 0;
 	int rc = 0, i;
+	bool save_sprs_for_full_context_loss = false;
+	bool disable_full_context_loss = false;
+	unsigned long invalid_states_mask = 0;
 
 	psscr_val = kcalloc(dt_idle_states, sizeof(*psscr_val), GFP_KERNEL);
 	psscr_mask = kcalloc(dt_idle_states, sizeof(*psscr_mask), GFP_KERNEL);
@@ -521,35 +552,83 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 	}
 
 	/*
+	 * States that have OPAL_PM_LOSE_FULL_CONTEXT flag set require
+	 * the assistance of the slw engine to restore certain SPRs on
+	 * wakeup from these states. The function to program the slw
+	 * engine via stop-api expects pnv_deep_stop_psscr_val to be
+	 * set before it is called.
+	 *
+	 * Hence, we first set the pnv_deepest_stop_psscr_{val,mask}
+	 * to the value corresponding to deepest state.
+	 */
+	for (i = 0; i < dt_idle_states; i++) {
+		int err;
+
+		err = validate_psscr_val_mask(&psscr_val[i], &psscr_mask[i],
+					      flags[i]);
+		if (err) {
+			report_invalid_psscr_val(psscr_val[i], err);
+			set_bit(i, &invalid_states_mask);
+			continue;
+		}
+
+		if (flags[i] & OPAL_PM_LOSE_FULL_CONTEXT)
+			save_sprs_for_full_context_loss = true;
+
+		if (max_residency_ns < residency_ns[i]) {
+			max_residency_ns = residency_ns[i];
+			pnv_deepest_stop_psscr_val = psscr_val[i];
+			pnv_deepest_stop_psscr_mask = psscr_mask[i];
+			deepest_stop_found = true;
+		}
+	}
+
+	/*
+	 * Program the SLW via stop-api to restore some of the SPRs
+	 * after wakeup from a LOSE_FULL_CONTEXT idle state.
+	 */
+	if (save_sprs_for_full_context_loss) {
+		int rc;
+
+		rc = pnv_save_sprs_for_deep_states();
+		if (unlikely(rc)) {
+			pr_warn("cpuidle-powernv: Disabling full context loss idle states.\n");
+			pr_warn("cpuidle-powernv: Idle powersavings impacted.\n");
+			disable_full_context_loss = true;
+			max_residency_ns = 0;
+			deepest_stop_found = false;
+		}
+	}
+
+	/*
 	 * Set pnv_first_deep_stop_state, pnv_deepest_stop_psscr_{val,mask},
 	 * and the pnv_default_stop_{val,mask}.
 	 *
 	 * pnv_first_deep_stop_state should be set to the first stop
 	 * level to cause hypervisor state loss.
 	 *
-	 * pnv_deepest_stop_{val,mask} should be set to values corresponding to
-	 * the deepest stop state.
+	 * If the stop-api failed above, then pnv_deepest_stop_{val,mask}
+	 * should be set to values corresponding to the deepest stop
+	 * state that doesn't have OPAL_PM_LOSE_FULL_CONTEXT set.
 	 *
 	 * pnv_default_stop_{val,mask} should be set to values corresponding to
 	 * the shallowest (OPAL_PM_STOP_INST_FAST) loss-less stop state.
 	 */
 	pnv_first_deep_stop_state = MAX_STOP_STATE;
 	for (i = 0; i < dt_idle_states; i++) {
-		int err;
 		u64 psscr_rl = psscr_val[i] & PSSCR_RL_MASK;
 
-		if ((flags[i] & OPAL_PM_LOSE_FULL_CONTEXT) &&
-		     (pnv_first_deep_stop_state > psscr_rl))
-			pnv_first_deep_stop_state = psscr_rl;
-
-		err = validate_psscr_val_mask(&psscr_val[i], &psscr_mask[i],
-					      flags[i]);
-		if (err) {
-			report_invalid_psscr_val(psscr_val[i], err);
+		if (test_bit(i, &invalid_states_mask))
 			continue;
+
+		if (flags[i] & OPAL_PM_LOSE_FULL_CONTEXT) {
+			if (disable_full_context_loss)
+				continue;
+			else if (pnv_first_deep_stop_state > psscr_rl)
+				pnv_first_deep_stop_state = psscr_rl;
 		}
 
-		if (max_residency_ns < residency_ns[i]) {
+		if (unlikely(max_residency_ns < residency_ns[i])) {
 			max_residency_ns = residency_ns[i];
 			pnv_deepest_stop_psscr_val = psscr_val[i];
 			pnv_deepest_stop_psscr_mask = psscr_mask[i];
@@ -562,6 +641,8 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 			pnv_default_stop_mask = psscr_mask[i];
 			default_stop_found = true;
 		}
+
+		supported_cpuidle_states |= flags[i];
 	}
 
 	if (unlikely(!default_stop_found)) {
@@ -597,7 +678,6 @@ static void __init pnv_probe_idle_states(void)
 	struct device_node *np;
 	int dt_idle_states;
 	u32 *flags = NULL;
-	int i;
 
 	np = of_find_node_by_path("/ibm,opal/power-mgt");
 	if (!np) {
@@ -619,14 +699,10 @@ static void __init pnv_probe_idle_states(void)
 		goto out;
 	}
 
-	if (cpu_has_feature(CPU_FTR_ARCH_300)) {
-		if (pnv_power9_idle_init(np, flags, dt_idle_states))
-			goto out;
-	}
-
-	for (i = 0; i < dt_idle_states; i++)
-		supported_cpuidle_states |= flags[i];
-
+	if (cpu_has_feature(CPU_FTR_ARCH_300))
+		pnv_power9_idle_init(np, flags, dt_idle_states);
+	else
+		pnv_power8_idle_init(np, flags, dt_idle_states);
 out:
 	kfree(flags);
 }

@@ -235,6 +235,7 @@ static inline int validate_dt_prop_sizes(const char *prop1, int prop1_len,
 	return -1;
 }
 
+extern u32 pnv_get_supported_cpuidle_states(void);
 static int powernv_add_idle_states(void)
 {
 	struct device_node *power_mgt;
@@ -362,6 +363,14 @@ static int powernv_add_idle_states(void)
 	for (i = 0; i < dt_idle_states; i++) {
 		unsigned int exit_latency, target_residency;
 		bool stops_timebase = false;
+		u32 supported_flags = pnv_get_supported_cpuidle_states();
+
+		/*
+		 * If a certain deep state isn't marked in
+		 * supported_cpuidle_states, we skip it here.
+		 */
+		if ((flags[i] & supported_flags) != flags[i])
+			continue;
 		/*
 		 * If an idle state has exit latency beyond
 		 * POWERNV_THRESHOLD_LATENCY_NS then don't use it
