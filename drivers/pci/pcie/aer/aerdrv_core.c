@@ -390,7 +390,18 @@ static pci_ers_result_t broadcast_error_message(struct pci_dev *dev,
 		 * If the error is reported by an end point, we think this
 		 * error is related to the upstream link of the end point.
 		 */
-		pci_walk_bus(dev->bus, cb, &result_data);
+		if ((state == pci_channel_io_normal) &&
+				(!pci_ari_enabled(dev->bus)))
+			/*
+			 * the error is non fatal so the bus is ok, just walk
+			 * through all the functions in a multifunction device.
+			 * if ARI is enabled on the bus then there can be only
+			 * one device under that bus (so walk all the functions
+			 * under the bus).
+			 */
+			pci_walk_mf_dev(dev, cb, &result_data);
+		else
+			pci_walk_bus(dev->bus, cb, &result_data);
 	}
 
 	return result_data.result;

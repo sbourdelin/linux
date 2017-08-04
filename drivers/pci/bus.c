@@ -364,6 +364,44 @@ void pci_bus_add_devices(const struct pci_bus *bus)
 }
 EXPORT_SYMBOL(pci_bus_add_devices);
 
+/** pci_walk_mf_dev - walk all functions of a multi-function
+ *  device calling callback.
+ *  @dev      a function in a multi-function device
+ *  @cb       callback to be called for each device found
+ *  @userdata arbitrary pointer to be passed to callback.
+ *
+ *  Walk, on a given bus, only the adjacent functions of a
+ *  multi-function device. Call the provided callback on each
+ *  device found.
+ *
+ *  We check the return of @cb each time. If it returns anything
+ *  other than 0, we break out.
+ *
+ */
+void pci_walk_mf_dev(struct pci_dev *dev, int (*cb)(struct pci_dev *, void *),
+		  void *userdata)
+{
+	int retval;
+	struct pci_bus *bus;
+	struct pci_dev *pdev;
+	int ndev;
+
+	bus = dev->bus;
+	ndev = PCI_SLOT(dev->devfn);
+
+	down_read(&pci_bus_sem);
+	/* call cb for all the functions of the mf device */
+	list_for_each_entry(pdev, &bus->devices, bus_list) {
+		if (PCI_SLOT(pdev->devfn) == ndev) {
+			retval = cb(pdev, userdata);
+			if (retval)
+				break;
+		}
+	}
+	up_read(&pci_bus_sem);
+}
+EXPORT_SYMBOL_GPL(pci_walk_mf_dev);
+
 /** pci_walk_bus - walk devices on/under bus, calling callback.
  *  @top      bus whose devices should be walked
  *  @cb       callback to be called for each device found
