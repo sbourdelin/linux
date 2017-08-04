@@ -628,7 +628,7 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 
 	prev = NULL;
 	for (mpnt = oldmm->mmap; mpnt; mpnt = mpnt->vm_next) {
-		struct file *file;
+		struct file *file = NULL;
 
 		if (mpnt->vm_flags & VM_DONTCOPY) {
 			vm_stat_account(mm, mpnt->vm_flags, -vma_pages(mpnt));
@@ -658,7 +658,11 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 			goto fail_nomem_anon_vma_fork;
 		tmp->vm_flags &= ~(VM_LOCKED | VM_LOCKONFAULT);
 		tmp->vm_next = tmp->vm_prev = NULL;
-		file = tmp->vm_file;
+
+		/* With VM_WIPEONFORK, the child gets an empty VMA. */
+		if (!(tmp->vm_flags & VM_WIPEONFORK))
+			file = tmp->vm_file;
+
 		if (file) {
 			struct inode *inode = file_inode(file);
 			struct address_space *mapping = file->f_mapping;
