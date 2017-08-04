@@ -133,8 +133,9 @@ static int scsi_dh_handler_attach(struct scsi_device *sdev,
 
 	error = scsi_dh->attach(sdev);
 	if (error) {
-		sdev_printk(KERN_ERR, sdev, "%s: Attach failed (%d)\n",
-			    scsi_dh->name, error);
+		if (error != -ENODEV)
+			sdev_printk(KERN_ERR, sdev, "%s: Attach failed (%d)\n",
+				    scsi_dh->name, error);
 		module_put(scsi_dh->module);
 	} else
 		sdev->handler = scsi_dh;
