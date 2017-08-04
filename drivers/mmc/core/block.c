@@ -1987,8 +1987,24 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 	int devidx, ret;
 
 	devidx = ida_simple_get(&mmc_blk_ida, 0, max_devices, GFP_KERNEL);
-	if (devidx < 0)
+	if (devidx < 0) {
+		/*
+		 * The reason for why we could get -ENOSPC here for
+		 * removable devices is that probably userspace mount
+		 * the partition but forget to umount it which makes
+		 * it fail to release md->usage via mmc_blk_release,
+		 * so as a result it leaks the device ID and finally
+		 * breaks the reference counting for mmc block layer.
+		 * It's uerspace's responsibility to guarantee it but
+		 * we could cast an explcit error log  here to clarify
+		 * the situation.
+		 */
+		if (mmc_card_is_removable(card->host) && devidx == -ENOSPC)
+			dev_err(mmc_dev(card->host),
+				"possible unblanced mount/umount detected\n");
+
 		return ERR_PTR(devidx);
+	}
 
 	md = kzalloc(sizeof(struct mmc_blk_data), GFP_KERNEL);
 	if (!md) {
