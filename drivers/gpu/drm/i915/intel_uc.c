@@ -459,7 +459,8 @@ void intel_uc_fini_hw(struct drm_i915_private *dev_priv)
 	i915_ggtt_disable_guc(dev_priv);
 }
 
-int intel_guc_send_nop(struct intel_guc *guc, const u32 *action, u32 len)
+int intel_guc_send_nop(struct intel_guc *guc, const u32 *action, u32 len,
+		       u32 *response)
 {
 	WARN(1, "Unexpected send: action=%#x\n", *action);
 	return -ENODEV;
@@ -468,7 +469,8 @@ int intel_guc_send_nop(struct intel_guc *guc, const u32 *action, u32 len)
 /*
  * This function implements the MMIO based host to GuC interface.
  */
-int intel_guc_send_mmio(struct intel_guc *guc, const u32 *action, u32 len)
+int intel_guc_send_mmio(struct intel_guc *guc, const u32 *action, u32 len,
+			u32 *response)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
 	u32 status;
