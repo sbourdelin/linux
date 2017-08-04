@@ -95,4 +95,5 @@
  * with the punch, zero, collapse, or insert range modes.
  */
 #define FALLOC_FL_SEAL_BLOCK_MAP	0x080
+#define FALLOC_FL_UNSEAL_BLOCK_MAP	0x100
 #endif /* _UAPI_FALLOC_H_ */

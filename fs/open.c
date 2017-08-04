@@ -274,13 +274,17 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 		return -EINVAL;
 
 	/*
-	 * Seal block map operation should only be used exclusively, and
-	 * with the IMMUTABLE capability.
+	 * Seal/unseal block map operations should only be used
+	 * exclusively, and with the IMMUTABLE capability.
 	 */
-	if (mode & FALLOC_FL_SEAL_BLOCK_MAP) {
+	if (mode & (FALLOC_FL_SEAL_BLOCK_MAP | FALLOC_FL_UNSEAL_BLOCK_MAP)) {
 		if (!capable(CAP_LINUX_IMMUTABLE))
 			return -EPERM;
-		if (mode & ~FALLOC_FL_SEAL_BLOCK_MAP)
+		if (mode == (FALLOC_FL_SEAL_BLOCK_MAP
+					| FALLOC_FL_UNSEAL_BLOCK_MAP))
+			return -EINVAL;
+		if (mode & ~(FALLOC_FL_SEAL_BLOCK_MAP
+					| FALLOC_FL_UNSEAL_BLOCK_MAP))
 			return -EINVAL;
 	}
 
@@ -303,9 +307,10 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 		return -ETXTBSY;
 
 	/*
-	 * We cannot allow any allocation changes on an iomap immutable file
+	 * We cannot allow any allocation changes on an iomap immutable
+	 * file, but we can allow clearing the immutable state.
 	 */
-	if (IS_IOMAP_IMMUTABLE(inode))
+	if (IS_IOMAP_IMMUTABLE(inode) && !(mode & FALLOC_FL_UNSEAL_BLOCK_MAP))
 		return -ETXTBSY;
 
 	/*

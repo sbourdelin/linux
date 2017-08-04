@@ -1494,6 +1494,48 @@ out_unlock:
 	return error;
 }
 
+int
+xfs_unseal_file_space(
+	struct xfs_inode	*ip,
+	xfs_off_t		offset,
+	xfs_off_t		len)
+{
+	struct inode		*inode = VFS_I(ip);
+	struct address_space	*mapping = inode->i_mapping;
+	int			error;
+
+	ASSERT(xfs_isilocked(ip, XFS_MMAPLOCK_EXCL));
+
+	if (offset)
+		return -EINVAL;
+
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	/*
+	 * It does not make sense to unseal less than the full range of
+	 * the file.
+	 */
+	error = -EINVAL;
+	if (len < i_size_read(inode))
+		goto out_unlock;
+
+	/*
+	 * Provide safety against one thread changing the policy of not
+	 * requiring fsync/msync (for block allocations) behind another
+	 * thread's back.
+	 */
+	error = -EBUSY;
+	if (mapping_mapped(mapping))
+		goto out_unlock;
+
+	inode->i_flags &= ~S_IOMAP_IMMUTABLE;
+	error = 0;
+
+out_unlock:
+	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+
+	return error;
+}
+
 /*
  * @next_fsb will keep track of the extent currently undergoing shift.
  * @stop_fsb will keep track of the extent at which we have to stop.

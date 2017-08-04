@@ -740,7 +740,7 @@ buffered:
 		(FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE |		\
 		 FALLOC_FL_COLLAPSE_RANGE | FALLOC_FL_ZERO_RANGE |	\
 		 FALLOC_FL_INSERT_RANGE | FALLOC_FL_UNSHARE_RANGE |	\
-		 FALLOC_FL_SEAL_BLOCK_MAP)
+		 FALLOC_FL_SEAL_BLOCK_MAP | FALLOC_FL_UNSEAL_BLOCK_MAP)
 
 STATIC long
 xfs_file_fallocate(
@@ -840,6 +840,8 @@ xfs_file_fallocate(
 						XFS_BMAPI_PREALLOC);
 			} else if (mode & FALLOC_FL_SEAL_BLOCK_MAP) {
 				error = xfs_seal_file_space(ip, offset, len);
+			} else if (mode & FALLOC_FL_UNSEAL_BLOCK_MAP) {
+				error = xfs_unseal_file_space(ip, offset, len);
 			} else
 				error = xfs_alloc_file_space(ip, offset, len,
 						XFS_BMAPI_PREALLOC);
