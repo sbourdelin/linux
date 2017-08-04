@@ -1141,6 +1141,25 @@ static int emulate_instruction(struct pt_regs *regs)
 		mtspr(SPRN_DSCR, current->thread.dscr);
 		return 0;
 	}
+	/* Emulate the mfspr rD, TIDR. */
+	if (((instword & PPC_INST_MFSPR_TIDR_MASK) ==
+		PPC_INST_MFSPR_TIDR) &&
+			cpu_has_feature(CPU_FTR_TIDR)) {
+		PPC_WARN_EMULATED(mftidr, regs);
+		rd = (instword >> 21) & 0x1f;
+		regs->gpr[rd] = mfspr(SPRN_TIDR);
+		return 0;
+	}
+	/* Emulate the mtspr TIDR, rD. */
+	if (((instword & PPC_INST_MTSPR_TIDR_MASK) ==
+		PPC_INST_MTSPR_TIDR) &&
+			cpu_has_feature(CPU_FTR_TIDR)) {
+		PPC_WARN_EMULATED(mttidr, regs);
+		rd = (instword >> 21) & 0x1f;
+		current->thread.tidr = regs->gpr[rd];
+		mtspr(SPRN_TIDR, regs->gpr[rd]);
+		return 0;
+	}
 #endif
 
 	return -EINVAL;
@@ -2036,6 +2055,8 @@ struct ppc_emulated ppc_emulated = {
 #ifdef CONFIG_PPC64
 	WARN_EMULATED_SETUP(mfdscr),
 	WARN_EMULATED_SETUP(mtdscr),
+	WARN_EMULATED_SETUP(mftidr),
+	WARN_EMULATED_SETUP(mttidr),
 	WARN_EMULATED_SETUP(lq_stq),
 #endif
 };

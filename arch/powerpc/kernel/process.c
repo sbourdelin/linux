@@ -1084,6 +1084,9 @@ static inline void save_sprs(struct thread_struct *t)
 	if (cpu_has_feature(CPU_FTR_DSCR))
 		t->dscr = mfspr(SPRN_DSCR);
 
+	if (cpu_has_feature(CPU_FTR_TIDR))
+		t->tidr = mfspr(SPRN_TIDR);
+
 	if (cpu_has_feature(CPU_FTR_ARCH_207S)) {
 		t->bescr = mfspr(SPRN_BESCR);
 		t->ebbhr = mfspr(SPRN_EBBHR);
@@ -1118,6 +1121,11 @@ static inline void restore_sprs(struct thread_struct *old_thread,
 
 		if (old_thread->dscr != dscr)
 			mtspr(SPRN_DSCR, dscr);
+	}
+
+	if (cpu_has_feature(CPU_FTR_TIDR)) {
+		if (old_thread->tidr != new_thread->tidr)
+			mtspr(SPRN_TIDR, new_thread->tidr);
 	}
 
 	if (cpu_has_feature(CPU_FTR_ARCH_207S)) {
