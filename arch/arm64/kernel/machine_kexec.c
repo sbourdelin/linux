@@ -213,6 +213,23 @@ void machine_kexec(struct kimage *kimage)
 	BUG(); /* Should never get here. */
 }
 
+void crash_smp_send_stop(void)
+{
+	static int cpus_stopped;
+
+	/*
+	 * This function can be called twice in panic path, but obviously
+	 * we execute this only once.
+	 */
+	if (cpus_stopped)
+		return;
+
+	/* shutdown non-crashing cpus */
+	smp_send_crash_stop();
+
+	cpus_stopped = 1;
+}
+
 static void machine_kexec_mask_interrupts(void)
 {
 	unsigned int i;
@@ -252,7 +269,7 @@ void machine_crash_shutdown(struct pt_regs *regs)
 	local_irq_disable();
 
 	/* shutdown non-crashing cpus */
-	smp_send_crash_stop();
+	crash_smp_send_stop();
 
 	/* for crashing cpu */
 	crash_save_cpu(regs, smp_processor_id());
