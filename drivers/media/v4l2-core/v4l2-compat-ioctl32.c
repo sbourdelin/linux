@@ -673,9 +673,14 @@ struct v4l2_ext_control32 {
    type STRING is a pointer type. */
 static inline int ctrl_is_pointer(u32 id)
 {
-	switch (id) {
+	switch (id & V4L2_CTRL_ID_MASK) {
 	case V4L2_CID_RDS_TX_PS_NAME:
 	case V4L2_CID_RDS_TX_RADIO_TEXT:
+	case V4L2_CID_RDS_RX_PS_NAME:
+	case V4L2_CID_RDS_RX_RADIO_TEXT:
+	case V4L2_CID_DETECT_MD_REGION_GRID:
+	case V4L2_CID_DETECT_MD_THRESHOLD_GRID:
+	case V4L2_CID_RDS_TX_ALT_FREQS:
 		return 1;
 	default:
 		return 0;
