@@ -132,10 +132,9 @@ int eeh_send_failure_event(struct eeh_pe *pe)
 	struct eeh_event *event;
 
 	event = kzalloc(sizeof(*event), GFP_ATOMIC);
-	if (!event) {
-		pr_err("EEH: out of memory, event not handled\n");
+	if (!event)
 		return -ENOMEM;
-	}
+
 	event->pe = pe;
 
 	/* We may or may not be called in an interrupt context */
