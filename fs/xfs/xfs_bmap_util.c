@@ -1436,9 +1436,11 @@ xfs_seal_file_space(
 	xfs_off_t		offset,
 	xfs_off_t		len)
 {
+	struct xfs_mount	*mp = ip->i_mount;
 	struct inode		*inode = VFS_I(ip);
 	struct address_space	*mapping = inode->i_mapping;
 	int			error;
+	struct xfs_trans	*tp;
 
 	ASSERT(xfs_isilocked(ip, XFS_MMAPLOCK_EXCL));
 
@@ -1451,6 +1453,10 @@ xfs_seal_file_space(
 
 	error = xfs_alloc_file_space(ip, offset, len,
 			XFS_BMAPI_CONVERT | XFS_BMAPI_ZERO);
+	if (error)
+		return error;
+
+	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_ichange, 0, 0, 0, &tp);
 	if (error)
 		return error;
 
@@ -1486,10 +1492,20 @@ xfs_seal_file_space(
 	if (error < 0)
 		goto out_unlock;
 
+	xfs_trans_ijoin(tp, ip, 0);
+	ip->i_d.di_flags2 |= XFS_DIFLAG2_IOMAP_IMMUTABLE;
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	error = xfs_trans_commit(tp);
+	tp = NULL; /* nothing to cancel */
+	if (error)
+		goto out_unlock;
+
 	inode->i_flags |= S_IOMAP_IMMUTABLE;
 
 out_unlock:
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	if (tp)
+		xfs_trans_cancel(tp);
 
 	return error;
 }
@@ -1500,14 +1516,20 @@ xfs_unseal_file_space(
 	xfs_off_t		offset,
 	xfs_off_t		len)
 {
+	struct xfs_mount	*mp = ip->i_mount;
 	struct inode		*inode = VFS_I(ip);
 	struct address_space	*mapping = inode->i_mapping;
 	int			error;
+	struct xfs_trans	*tp;
 
 	ASSERT(xfs_isilocked(ip, XFS_MMAPLOCK_EXCL));
 
 	if (offset)
 		return -EINVAL;
+
+	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_ichange, 0, 0, 0, &tp);
+	if (error)
+		return error;
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
 	/*
@@ -1527,11 +1549,21 @@ xfs_unseal_file_space(
 	if (mapping_mapped(mapping))
 		goto out_unlock;
 
+	xfs_trans_ijoin(tp, ip, 0);
+	ip->i_d.di_flags2 &= ~XFS_DIFLAG2_IOMAP_IMMUTABLE;
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	error = xfs_trans_commit(tp);
+	tp = NULL; /* nothing to cancel */
+	if (error)
+		goto out_unlock;
+
 	inode->i_flags &= ~S_IOMAP_IMMUTABLE;
 	error = 0;
 
 out_unlock:
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
+	if (tp)
+		xfs_trans_cancel(tp);
 
 	return error;
 }
