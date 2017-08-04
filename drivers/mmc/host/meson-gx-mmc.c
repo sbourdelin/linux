@@ -727,6 +727,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
 	struct mmc_command *cmd;
 	struct mmc_data *data;
 	u32 irq_en, status, raw_status;
+	unsigned long flag;
 	irqreturn_t ret = IRQ_HANDLED;
 
 	if (WARN_ON(!host))
@@ -739,7 +740,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *dev_id)
 
 	data = cmd->data;
 
-	spin_lock(&host->lock);
+	spin_lock_irqsave(&host->lock, flag);
 	irq_en = readl(host->regs + SD_EMMC_IRQ_EN);
 	raw_status = readl(host->regs + SD_EMMC_STATUS);
 	status = raw_status & irq_en;
@@ -806,7 +807,7 @@ out:
 	if (ret == IRQ_HANDLED)
 		meson_mmc_request_done(host->mmc, cmd->mrq);
 
-	spin_unlock(&host->lock);
+	spin_unlock_irqrestore(&host->lock, flag);
 	return ret;
 }
 
