@@ -456,11 +456,13 @@ static struct scsi_dev_info_list *scsi_dev_info_list_find(const char *vendor,
 			/*
 			 * Behave like the older version of get_device_flags.
 			 */
-			if (memcmp(devinfo->vendor, vskip, vmax) ||
+			if (memcmp(devinfo->vendor, vskip,
+				   min(vmax, strlen(devinfo->vendor))) ||
 					(vmax < sizeof(devinfo->vendor) &&
 						devinfo->vendor[vmax]))
 				continue;
-			if (memcmp(devinfo->model, mskip, mmax) ||
+			if (memcmp(devinfo->model, mskip,
+				   min(mmax, strlen(devinfo->model))) ||
 					(mmax < sizeof(devinfo->model) &&
 						devinfo->model[mmax]))
 				continue;
