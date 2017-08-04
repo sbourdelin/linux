@@ -658,6 +658,9 @@ static bool guc_process_incoming_requests(struct intel_guc *guc)
 	len = ct_header_get_len(header) + 1; /* also count header dw */
 
 	switch (action) {
+	case INTEL_GUC_ACTION_DEFAULT:
+		intel_guc_process_default_action(guc, request->data[1]);
+		break;
 	default:
 		DRM_ERROR("CT: unexpected request %*phn\n",
 			  4*len, request->data);

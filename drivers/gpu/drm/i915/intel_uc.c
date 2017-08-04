@@ -596,3 +596,10 @@ int intel_guc_sample_forcewake(struct intel_guc *guc)
 
 	return intel_guc_send(guc, action, ARRAY_SIZE(action));
 }
+
+void intel_guc_process_default_action(struct intel_guc *guc, u32 msg)
+{
+	if (msg & (INTEL_GUC_RECV_MSG_CRASH_DUMP_POSTED |
+		   INTEL_GUC_RECV_MSG_FLUSH_LOG_BUFFER))
+		intel_guc_log_flush(guc);
+}
