@@ -445,8 +445,8 @@ static void meson_mmc_set_tuning_params(struct mmc_host *mmc)
 static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 {
 	struct meson_host *host = mmc_priv(mmc);
-	u32 bus_width;
-	u32 val, orig;
+	u32 bus_width, val;
+	int err;
 
 	/*
 	 * GPIO regulator, only controls switching between 1v8 and
@@ -474,7 +474,7 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 			int ret = regulator_enable(mmc->supply.vqmmc);
 
 			if (ret < 0)
-				dev_err(mmc_dev(mmc),
+				dev_err(host->dev,
 					"failed to enable vqmmc regulator\n");
 			else
 				host->vqmmc_enabled = true;
@@ -482,9 +482,6 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 
 		break;
 	}
-
-
-	meson_mmc_clk_set(host, ios->clock);
 
 	/* Bus width */
 	switch (ios->bus_width) {
@@ -504,8 +501,6 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	}
 
 	val = readl(host->regs + SD_EMMC_CFG);
-	orig = val;
-
 	val &= ~CFG_BUS_WIDTH_MASK;
 	val |= FIELD_PREP(CFG_BUS_WIDTH_MASK, bus_width);
 
@@ -519,11 +514,12 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	if (ios->timing == MMC_TIMING_MMC_HS400)
 		val |= CFG_CHK_DS;
 
-	if (val != orig) {
-		writel(val, host->regs + SD_EMMC_CFG);
-		dev_dbg(host->dev, "%s: SD_EMMC_CFG: 0x%08x -> 0x%08x\n",
-			__func__, orig, val);
-	}
+	err = meson_mmc_clk_set(host, ios->clock);
+	if (err)
+		dev_err(host->dev, "Failed to set clock: %d\n,", err);
+
+	writel(val, host->regs + SD_EMMC_CFG);
+	dev_dbg(host->dev, "SD_EMMC_CFG:  0x%08x\n", val);
 }
 
 static void meson_mmc_request_done(struct mmc_host *mmc,
