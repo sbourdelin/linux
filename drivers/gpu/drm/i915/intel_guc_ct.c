@@ -24,6 +24,12 @@
 #include "i915_drv.h"
 #include "intel_guc_ct.h"
 
+#ifdef CONFIG_DRM_I915_DEBUG
+#define CT_DEBUG_DRIVER(...)	DRM_DEBUG_DRIVER(__VA_ARGS__)
+#else
+#define CT_DEBUG_DRIVER(...)
+#endif
+
 struct ct_request {
 	struct list_head link;
 	u32 fence;
@@ -325,6 +331,10 @@ static int ctb_write(struct intel_guc_ct_buffer *ctb,
 		 (send_response ? GUC_CT_MSG_SEND_STATUS : 0) |
 		 (action[0] << GUC_CT_MSG_ACTION_SHIFT);
 
+	CT_DEBUG_DRIVER("CT: writing %*phn %*phn %*phn\n",
+			4, &header, 4, &fence,
+			4*(len - 1), &action[1]);
+
 	cmds[tail] = header;
 	tail = (tail + 1) % size;
 
@@ -496,6 +506,9 @@ static int intel_guc_send_ct(struct intel_guc *guc, const u32 *action, u32 len,
 	if (unlikely(ret < 0)) {
 		DRM_ERROR("CT: send action %#X failed; err=%d status=%#X\n",
 			  action[0], ret, status);
+	} else if (unlikely(ret)) {
+		CT_DEBUG_DRIVER("CT: send action %#x returned %d (%#x)\n",
+				action[0], ret, ret);
 	}
 
 	mutex_unlock(&guc->send_mutex);
@@ -542,10 +555,12 @@ static int ctb_read(struct intel_guc_ct_buffer *ctb, u32 *data)
 	/* beware of buffer wrap case */
 	if (available < 0)
 		available += size;
+	CT_DEBUG_DRIVER("CT: available %d (%u:%u)\n", available, head, tail);
 	GEM_BUG_ON(available < 0);
 
 	data[0] = cmds[head];
 	head = (head + 1) % size;
+	CT_DEBUG_DRIVER("CT: header %#x\n", data[0]);
 
 	/* message len with header */
 	len = ct_header_get_len(data[0]) + 1;
@@ -563,6 +578,7 @@ static int ctb_read(struct intel_guc_ct_buffer *ctb, u32 *data)
 		data[i] = cmds[head];
 		head = (head + 1) % size;
 	}
+	CT_DEBUG_DRIVER("CT: received %*phn\n", 4*len, data);
 
 	desc->head = head * 4;
 	return 0;
@@ -584,6 +600,7 @@ static int guc_handle_response(struct intel_guc *guc, const u32 *data)
 		DRM_ERROR("CT: corrupted response %*phn\n", 4*len, data);
 		return -EPROTO;
 	}
+	CT_DEBUG_DRIVER("CT: response fence %u status %#x\n", fence, status);
 
 	spin_lock_irqsave(&guc->ct.lock, flags);
 	list_for_each_entry(req, &guc->ct.pending_requests, link) {
@@ -615,6 +632,7 @@ static int guc_handle_request(struct intel_guc *guc, const u32 *data)
 
 	GEM_BUG_ON(ct_header_is_response(header));
 	/* data layout beyond header is request specific */
+	CT_DEBUG_DRIVER("CT: request %#x\n", ct_header_get_action(header));
 
 	request = kmalloc(sizeof(*request), GFP_ATOMIC);
 	if (unlikely(!request)) {
@@ -656,6 +674,7 @@ static bool guc_process_incoming_requests(struct intel_guc *guc)
 	header = request->data[0];
 	action = ct_header_get_action(header);
 	len = ct_header_get_len(header) + 1; /* also count header dw */
+	CT_DEBUG_DRIVER("CT: processing request %*phn\n", 4*len, request->data);
 
 	switch (action) {
 	case INTEL_GUC_ACTION_DEFAULT:
