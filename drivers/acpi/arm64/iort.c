@@ -970,6 +970,40 @@ static bool __init arm_smmu_is_coherent(struct acpi_iort_node *node)
 	return smmu->flags & ACPI_IORT_SMMU_COHERENT_WALK;
 }
 
+static int __init arm_smmu_pmu_count_resources(struct acpi_iort_node *node)
+{
+	struct acpi_iort_pmcg *pmcg;
+
+	/* Retrieve PMCG specific data */
+	pmcg = (struct acpi_iort_pmcg *)node->node_data;
+
+	/*
+	 * There are always 2 memory resources.
+	 * If the overflow_gsiv is present then add that for a total of 3.
+	 */
+	return pmcg->overflow_gsiv > 0 ? 3 : 2;
+}
+
+static void __init arm_smmu_pmu_init_resources(struct resource *res,
+					       struct acpi_iort_node *node)
+{
+	struct acpi_iort_pmcg *pmcg;
+
+	/* Retrieve PMCG specific data */
+	pmcg = (struct acpi_iort_pmcg *)node->node_data;
+
+	res[0].start = pmcg->base_address;
+	res[0].end = pmcg->base_address + SZ_4K - 1;
+	res[0].flags = IORESOURCE_MEM;
+	res[1].start = pmcg->base_address + SZ_64K;
+	res[1].end = pmcg->base_address + SZ_64K + SZ_4K - 1;
+	res[1].flags = IORESOURCE_MEM;
+
+	if (pmcg->overflow_gsiv)
+		acpi_iort_register_irq(pmcg->overflow_gsiv, "overflow",
+				       ACPI_EDGE_SENSITIVE, &res[2]);
+}
+
 struct iort_iommu_config {
 	const char *name;
 	int (*iommu_init)(struct acpi_iort_node *node);
@@ -993,6 +1027,12 @@ static const struct iort_iommu_config iort_arm_smmu_cfg __initconst = {
 	.iommu_init_resources = arm_smmu_init_resources
 };
 
+static const struct iort_iommu_config iort_arm_smmu_pmcg_cfg __initconst = {
+	.name = "arm-smmu-pmu",
+	.iommu_count_resources = arm_smmu_pmu_count_resources,
+	.iommu_init_resources = arm_smmu_pmu_init_resources
+};
+
 static __init
 const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
 {
@@ -1001,6 +1041,8 @@ const struct iort_iommu_config *iort_get_iommu_cfg(struct acpi_iort_node *node)
 		return &iort_arm_smmu_v3_cfg;
 	case ACPI_IORT_NODE_SMMU:
 		return &iort_arm_smmu_cfg;
+	case ACPI_IORT_NODE_PMCG:
+		return &iort_arm_smmu_pmcg_cfg;
 	default:
 		return NULL;
 	}
@@ -1055,6 +1097,15 @@ static int __init iort_add_smmu_platform_device(struct acpi_iort_node *node)
 	ret = platform_device_add_data(pdev, &node, sizeof(node));
 	if (ret)
 		goto dev_put;
+
+	/* End of init for PMCG */
+	if (node->type == ACPI_IORT_NODE_PMCG) {
+		ret = platform_device_add(pdev);
+		if (ret)
+			goto dev_put;
+
+		return 0;
+	}
 
 	/*
 	 * We expect the dma masks to be equivalent for
@@ -1131,6 +1182,9 @@ static void __init iort_init_platform_devices(void)
 				acpi_free_fwnode_static(fwnode);
 				return;
 			}
+		} else if (iort_node->type == ACPI_IORT_NODE_PMCG) {
+			if (iort_add_smmu_platform_device(iort_node))
+				return;
 		}
 
 		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
