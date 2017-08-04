@@ -2946,6 +2946,7 @@ ___update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 		  unsigned long weight, int running, struct cfs_rq *cfs_rq)
 {
 	u64 delta;
+	int periods;
 
 	delta = now - sa->last_update_time;
 	/*
@@ -2972,9 +2973,12 @@ ___update_load_avg(u64 now, int cpu, struct sched_avg *sa,
 	 * accrues by two steps:
 	 *
 	 * Step 1: accumulate *_sum since last_update_time. If we haven't
-	 * crossed period boundaries, finish.
+	 * crossed period boundaries and the time since last update is small
+	 * enough, we're done.
 	 */
-	if (!accumulate_sum(delta, cpu, sa, weight, running, cfs_rq))
+	periods = accumulate_sum(delta, cpu, sa, weight, running, cfs_rq);
+
+	if (!periods && delta < 128)
 		return 0;
 
 	/*
