@@ -1070,7 +1070,8 @@ dequeue_rx(struct idt77252_dev *card, struct rsq_entry *rsqe)
 
 		cell = skb->data;
 		for (i = (stat & SAR_RSQE_CELLCNT); i; i--) {
-			if ((sb = dev_alloc_skb(64)) == NULL) {
+			sb = dev_alloc_skb(64);
+			if (!sb) {
 				printk("%s: Can't allocate buffers for aal0.\n",
 				       card->name);
 				atomic_add(i, &vcc->stats->rx_drop);
@@ -1304,7 +1305,8 @@ idt77252_rx_raw(struct idt77252_dev *card)
 			goto drop;
 		}
 	
-		if ((sb = dev_alloc_skb(64)) == NULL) {
+		sb = dev_alloc_skb(64);
+		if (!sb) {
 			printk("%s: Can't allocate buffers for AAL0.\n",
 			       card->name);
 			atomic_inc(&vcc->stats->rx_err);
@@ -3600,13 +3602,14 @@ static int idt77252_init_one(struct pci_dev *pcidev,
 	struct atm_dev *dev;
 	int i, err;
 
-
-	if ((err = pci_enable_device(pcidev))) {
+	err = pci_enable_device(pcidev);
+	if (err) {
 		printk("idt77252: can't enable PCI device at %s\n", pci_name(pcidev));
 		return err;
 	}
 
-	if ((err = dma_set_mask_and_coherent(&pcidev->dev, DMA_BIT_MASK(32)))) {
+	err = dma_set_mask_and_coherent(&pcidev->dev, DMA_BIT_MASK(32));
+	if (err) {
 		printk("idt77252: can't enable DMA for PCI device at %s\n", pci_name(pcidev));
 		return err;
 	}
