@@ -235,6 +235,13 @@ static inline int intel_guc_send(struct intel_guc *guc, const u32 *action, u32 l
 	return guc->send(guc, action, len, NULL);
 }
 
+static inline int intel_guc_send_and_receive(struct intel_guc *guc,
+					     const u32 *action, u32 len,
+					     u32 *response)
+{
+	return guc->send(guc, action, len, response);
+}
+
 static inline void intel_guc_notify(struct intel_guc *guc)
 {
 	guc->notify(guc);
