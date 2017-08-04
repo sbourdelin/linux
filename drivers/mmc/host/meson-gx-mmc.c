@@ -337,7 +337,7 @@ static int meson_mmc_clk_init(struct meson_host *host)
 	int i, ret = 0;
 	const char *mux_parent_names[MUX_CLK_NUM_PARENTS];
 	const char *clk_div_parents[1];
-	u32 clk_reg, cfg;
+	u32 clk_reg;
 
 	/* get the mux parents */
 	for (i = 0; i < MUX_CLK_NUM_PARENTS; i++) {
@@ -402,12 +402,6 @@ static int meson_mmc_clk_init(struct meson_host *host)
 	clk_reg |= FIELD_PREP(CLK_DIV_MASK, CLK_DIV_MAX);
 	clk_reg &= ~CLK_ALWAYS_ON;
 	writel(clk_reg, host->regs + SD_EMMC_CLOCK);
-
-	/* Ensure clock starts in "auto" mode, not "always on" */
-	cfg = readl(host->regs + SD_EMMC_CFG);
-	cfg &= ~CFG_CLK_ALWAYS_ON;
-	cfg |= CFG_AUTO_CLK;
-	writel(cfg, host->regs + SD_EMMC_CFG);
 
 	ret = clk_prepare_enable(host->cfg_div_clk);
 	if (ret)
@@ -958,6 +952,9 @@ static int meson_mmc_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_core_clk;
 
+	/* set config to sane default */
+	meson_mmc_cfg_init(host);
+
 	/* Stop execution */
 	writel(0, host->regs + SD_EMMC_START);
 
@@ -965,9 +962,6 @@ static int meson_mmc_probe(struct platform_device *pdev)
 	writel(0, host->regs + SD_EMMC_IRQ_EN);
 	writel(IRQ_EN_MASK, host->regs + SD_EMMC_STATUS);
 	writel(IRQ_EN_MASK, host->regs + SD_EMMC_IRQ_EN);
-
-	/* set config to sane default */
-	meson_mmc_cfg_init(host);
 
 	ret = devm_request_threaded_irq(&pdev->dev, irq, meson_mmc_irq,
 					meson_mmc_irq_thread, IRQF_SHARED,
