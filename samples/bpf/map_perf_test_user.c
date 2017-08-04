@@ -8,7 +8,9 @@
 #include <sched.h>
 #include <stdio.h>
 #include <sys/types.h>
+#define __ARCH_WANT_SYSCALL_DEPRECATED
 #include <asm/unistd.h>
+#undef __ARCH_WANT_SYSCALL_DEPRECATED
 #include <unistd.h>
 #include <assert.h>
 #include <sys/wait.h>
