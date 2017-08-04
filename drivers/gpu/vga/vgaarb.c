@@ -51,6 +51,7 @@
 
 #include <linux/uaccess.h>
 
+#include <linux/vga_default.h>
 #include <linux/vgaarb.h>
 
 static void vga_arbiter_notify_clients(void);
@@ -119,9 +120,6 @@ both:
 	return 1;
 }
 
-/* this is only used a cookie - it should not be dereferenced */
-static struct pci_dev *vga_default;
-
 static void vga_arb_device_card_gone(struct pci_dev *pdev);
 
 /* Find somebody in our list */
@@ -133,39 +131,6 @@ static struct vga_device *vgadev_find(struct pci_dev *pdev)
 		if (pdev == vgadev->pdev)
 			return vgadev;
 	return NULL;
-}
-
-/**
- * vga_default_device - return the default VGA device, for vgacon
- *
- * This can be defined by the platform. The default implementation
- * is rather dumb and will probably only work properly on single
- * vga card setups and/or x86 platforms.
- *
- * If your VGA default device is not PCI, you'll have to return
- * NULL here. In this case, I assume it will not conflict with
- * any PCI card. If this is not true, I'll have to define two archs
- * hooks for enabling/disabling the VGA default device if that is
- * possible. This may be a problem with real _ISA_ VGA cards, in
- * addition to a PCI one. I don't know at this point how to deal
- * with that card. Can theirs IOs be disabled at all ? If not, then
- * I suppose it's a matter of having the proper arch hook telling
- * us about it, so we basically never allow anybody to succeed a
- * vga_get()...
- */
-struct pci_dev *vga_default_device(void)
-{
-	return vga_default;
-}
-EXPORT_SYMBOL_GPL(vga_default_device);
-
-void vga_set_default_device(struct pci_dev *pdev)
-{
-	if (vga_default == pdev)
-		return;
-
-	pci_dev_put(vga_default);
-	vga_default = pci_dev_get(pdev);
 }
 
 static inline void vga_irq_set_state(struct vga_device *vgadev, bool state)
@@ -667,7 +632,7 @@ static bool vga_arbiter_add_pci_device(struct pci_dev *pdev)
 	/* Deal with VGA default device. Use first enabled one
 	 * by default if arch doesn't have it's own hook
 	 */
-	if (vga_default == NULL &&
+	if (vga_default_device() == NULL &&
 	    ((vgadev->owns & VGA_RSRC_LEGACY_MASK) == VGA_RSRC_LEGACY_MASK)) {
 		vgaarb_info(&pdev->dev, "setting as boot VGA device\n");
 		vga_set_default_device(pdev);
@@ -704,7 +669,7 @@ static bool vga_arbiter_del_pci_device(struct pci_dev *pdev)
 		goto bail;
 	}
 
-	if (vga_default == pdev)
+	if (vga_default_device() == pdev)
 		vga_set_default_device(NULL);
 
 	if (vgadev->decodes & (VGA_RSRC_LEGACY_IO | VGA_RSRC_LEGACY_MEM))

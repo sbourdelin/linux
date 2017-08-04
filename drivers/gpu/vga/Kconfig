@@ -1,3 +1,14 @@
+config VGA_DEFAULT
+	bool "VGA Default Device Support" if EXPERT
+	default y
+	depends on PCI
+	help
+	  Some programs find it helpful to know what VGA device is the default.
+	  On platforms like x86 this means the device used by the BIOS to show
+	  early boot messages. On other platforms this may be an arbitrary PCI
+	  graphics card. Select this to have a default device recorded within
+	  the kernel and exposed to userspace through sysfs.
+
 config VGA_ARB
 	bool "VGA Arbitration" if EXPERT
 	default y
@@ -22,6 +33,7 @@ config VGA_SWITCHEROO
 	depends on X86
 	depends on ACPI
 	select VGA_ARB
+	select VGA_DEFAULT
 	help
 	  Many laptops released in 2008/9/10 have two GPUs with a multiplexer
 	  to switch between them. This adds support for dynamic switching when

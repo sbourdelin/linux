@@ -31,7 +31,7 @@
 #include <linux/irq.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
-#include <linux/vgaarb.h>
+#include <linux/vga_default.h>
 
 #include <asm/processor.h>
 #include <asm/io.h>

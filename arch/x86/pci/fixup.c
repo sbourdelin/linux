@@ -5,7 +5,7 @@
 #include <linux/delay.h>
 #include <linux/dmi.h>
 #include <linux/pci.h>
-#include <linux/vgaarb.h>
+#include <linux/vga_default.h>
 #include <asm/hpet.h>
 #include <asm/pci_x86.h>
 

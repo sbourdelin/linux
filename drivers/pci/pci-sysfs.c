@@ -27,7 +27,7 @@
 #include <linux/security.h>
 #include <linux/pci-aspm.h>
 #include <linux/slab.h>
-#include <linux/vgaarb.h>
+#include <linux/vga_default.h>
 #include <linux/pm_runtime.h>
 #include <linux/of.h>
 #include "pci.h"

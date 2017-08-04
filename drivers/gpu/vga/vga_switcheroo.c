@@ -41,7 +41,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/seq_file.h>
 #include <linux/uaccess.h>
-#include <linux/vgaarb.h>
+#include <linux/vga_default.h>
 #include <linux/vga_switcheroo.h>
 
 /**
