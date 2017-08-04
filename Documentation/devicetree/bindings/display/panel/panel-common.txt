@@ -89,3 +89,9 @@ backlight controller.
 
 - backlight: For panels whose backlight is controlled by an external backlight
   controller, this property contains a phandle that references the controller.
+
+
+Rotation
+--------
+
+- rotation: Display rotation in degrees counter clockwise (0,90,180,270)
