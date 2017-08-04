@@ -1749,12 +1749,23 @@ config MODULE_SIG
 	  debuginfo strip done by some packagers (such as rpmbuild) and
 	  inclusion into an initramfs that wants the module size reduced.
 
+config MODULE_UNSIGNED_TAINT
+	bool "Taint the kernel if unsigned modules are loaded"
+	default y
+	depends on MODULE_SIG
+	help
+	  Taint the kernel if an unsigned kernel module is loaded. If this
+	  option is enabled, the kernel will be tainted on an attempt to load
+	  an unsigned module or signed modules for which we don't have a key
+	  even if signature enforcement is disabled.
+
 config MODULE_SIG_FORCE
 	bool "Require modules to be validly signed"
 	depends on MODULE_SIG
 	help
 	  Reject unsigned modules or signed modules for which we don't have a
-	  key.  Without this, such modules will simply taint the kernel.
+	  key. Without this, such modules will be loaded successfully but will
+	  (if MODULE_UNSIGNED_TAINT is set) taint the kernel.
 
 config MODULE_SIG_ALL
 	bool "Automatically sign all modules"

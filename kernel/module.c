@@ -3660,12 +3660,14 @@ static int load_module(struct load_info *info, const char __user *uargs,
 
 #ifdef CONFIG_MODULE_SIG
 	mod->sig_ok = info->sig_ok;
+#ifdef CONFIG_MODULE_UNSIGNED_TAINT
 	if (!mod->sig_ok) {
 		pr_notice_once("%s: module verification failed: signature "
 			       "and/or required key missing - tainting "
 			       "kernel\n", mod->name);
 		add_taint_module(mod, TAINT_UNSIGNED_MODULE, LOCKDEP_STILL_OK);
 	}
+#endif
 #endif
 
 	/* To avoid stressing percpu allocator, do this once we're unique. */
