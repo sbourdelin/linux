@@ -63,6 +63,13 @@
 		method = "smc";
 	};
 
+	pmufw: firmware {
+		compatible = "xlnx,zynqmp-pm";
+		method = "smc";
+		interrupt-parent = <&gic>;
+		interrupts = <0 35 4>;
+	};
+
 	timer {
 		compatible = "arm,armv8-timer";
 		interrupt-parent = <&gic>;
