@@ -764,15 +764,11 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 			limit_us = 100000;
 
 		/*
-		 * SDHC cards always use these fixed values.
+		 * Assign limit value if invalid. Note that for the SDHC case,
+		 * we set taac and nasc to zero when parsing CSD, so it's safe
+		 * to fall through here.
 		 */
-		if (timeout_us > limit_us || mmc_card_blockaddr(card)) {
-			data->timeout_ns = limit_us * 1000;
-			data->timeout_clks = 0;
-		}
-
-		/* assign limit value if invalid */
-		if (timeout_us == 0)
+		if (timeout_us == 0 || timeout_us > limit_us)
 			data->timeout_ns = limit_us * 1000;
 	}
 
