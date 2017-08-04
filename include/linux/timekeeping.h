@@ -239,6 +239,8 @@ static inline u64 ktime_get_raw_ns(void)
 extern u64 ktime_get_mono_fast_ns(void);
 extern u64 ktime_get_raw_fast_ns(void);
 extern u64 ktime_get_boot_fast_ns(void);
+extern u64 ktime_get_real_log_ts(u64 *offset_real);
+extern u64 ktime_get_boot_log_ts(void);
 
 /*
  * Timespec interfaces utilizing the ktime based ones
