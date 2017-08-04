@@ -852,10 +852,10 @@ static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 		.flags = PVMW_SYNC,
 	};
 	int *cleaned = arg;
+	bool invalidation_needed = false;
 
 	while (page_vma_mapped_walk(&pvmw)) {
 		int ret = 0;
-		address = pvmw.address;
 		if (pvmw.pte) {
 			pte_t entry;
 			pte_t *pte = pvmw.pte;
@@ -863,11 +863,11 @@ static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 			if (!pte_dirty(*pte) && !pte_write(*pte))
 				continue;
 
-			flush_cache_page(vma, address, pte_pfn(*pte));
-			entry = ptep_clear_flush(vma, address, pte);
+			flush_cache_page(vma, pvmw.address, pte_pfn(*pte));
+			entry = ptep_clear_flush(vma, pvmw.address, pte);
 			entry = pte_wrprotect(entry);
 			entry = pte_mkclean(entry);
-			set_pte_at(vma->vm_mm, address, pte, entry);
+			set_pte_at(vma->vm_mm, pvmw.address, pte, entry);
 			ret = 1;
 		} else {
 #ifdef CONFIG_TRANSPARENT_HUGE_PAGECACHE
@@ -877,11 +877,11 @@ static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 			if (!pmd_dirty(*pmd) && !pmd_write(*pmd))
 				continue;
 
-			flush_cache_page(vma, address, page_to_pfn(page));
-			entry = pmdp_huge_clear_flush(vma, address, pmd);
+			flush_cache_page(vma, pvmw.address, page_to_pfn(page));
+			entry = pmdp_huge_clear_flush(vma, pvmw.address, pmd);
 			entry = pmd_wrprotect(entry);
 			entry = pmd_mkclean(entry);
-			set_pmd_at(vma->vm_mm, address, pmd, entry);
+			set_pmd_at(vma->vm_mm, pvmw.address, pmd, entry);
 			ret = 1;
 #else
 			/* unexpected pmd-mapped page? */
@@ -890,9 +890,14 @@ static bool page_mkclean_one(struct page *page, struct vm_area_struct *vma,
 		}
 
 		if (ret) {
-			mmu_notifier_invalidate_page(vma->vm_mm, address);
 			(*cleaned)++;
+			invalidation_needed = true;
 		}
+	}
+
+	if (invalidation_needed) {
+		mmu_notifier_invalidate_range(vma->vm_mm, address,
+				address + (1UL << compound_order(page)));
 	}
 
 	return true;
