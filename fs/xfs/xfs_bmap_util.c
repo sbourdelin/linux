@@ -1044,6 +1044,9 @@ xfs_alloc_file_space(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return -EIO;
 
+	if (IS_IOMAP_IMMUTABLE(VFS_I(ip)))
+		return -ETXTBSY;
+
 	error = xfs_qm_dqattach(ip, 0);
 	if (error)
 		return error;
@@ -1293,6 +1296,9 @@ xfs_free_file_space(
 	int			done = 0, error;
 
 	trace_xfs_free_file_space(ip);
+
+	if (IS_IOMAP_IMMUTABLE(VFS_I(ip)))
+		return -ETXTBSY;
 
 	error = xfs_qm_dqattach(ip, 0);
 	if (error)
