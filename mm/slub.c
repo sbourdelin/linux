@@ -124,6 +124,18 @@ static inline int kmem_cache_debug(struct kmem_cache *s)
 #endif
 }
 
+#define SLAB_SLOW_FLAGS (SLAB_CONSISTENCY_CHECKS | SLAB_STORE_USER | \
+				SLAB_TRACE)
+
+static inline int kmem_cache_slow_debug(struct kmem_cache *s)
+{
+#if defined(CONFIG_SLUB_FAST_POISON)
+	return s->flags & SLAB_SLOW_FLAGS;
+#else
+	return kmem_cache_debug(s);
+#endif
+}
+
 void *fixup_red_left(struct kmem_cache *s, void *p)
 {
 	if (kmem_cache_debug(s) && s->flags & SLAB_RED_ZONE)
@@ -134,7 +146,9 @@ void *fixup_red_left(struct kmem_cache *s, void *p)
 
 static inline bool kmem_cache_has_cpu_partial(struct kmem_cache *s)
 {
-#ifdef CONFIG_SLUB_CPU_PARTIAL
+#if defined(CONFIG_SLUB_FAST_POISON)
+	return !kmem_cache_slow_debug(s);
+#elif defined(CONFIG_SLUB_CPU_PARTIAL)
 	return !kmem_cache_debug(s);
 #else
 	return false;
@@ -2083,7 +2097,7 @@ redo:
 		}
 	} else {
 		m = M_FULL;
-		if (kmem_cache_debug(s) && !lock) {
+		if (kmem_cache_slow_debug(s) && !lock) {
 			lock = 1;
 			/*
 			 * This also ensures that the scanning of full
@@ -2580,11 +2594,11 @@ new_slab:
 	}
 
 	page = c->page;
-	if (likely(!kmem_cache_debug(s) && pfmemalloc_match(page, gfpflags)))
+	if (likely(!kmem_cache_slow_debug(s) && pfmemalloc_match(page, gfpflags)))
 		goto load_freelist;
 
 	/* Only entered in the debug case */
-	if (kmem_cache_debug(s) &&
+	if (kmem_cache_slow_debug(s) &&
 			!alloc_debug_processing(s, page, freelist, addr))
 		goto new_slab;	/* Slab failed checks. Next slab needed */
 
@@ -2617,6 +2631,12 @@ static void *__slab_alloc(struct kmem_cache *s, gfp_t gfpflags, int node,
 	return p;
 }
 
+static inline void alloc_sanitize(struct kmem_cache *s, void *object)
+{
+#ifdef CONFIG_SLUB_FAST_POISON
+	init_object(s, object, SLUB_RED_ACTIVE);
+#endif
+}
 /*
  * Inlined fastpath so that allocation functions (kmalloc, kmem_cache_alloc)
  * have the fastpath folded into their functions. So no function call
@@ -2706,6 +2726,8 @@ redo:
 		stat(s, ALLOC_FASTPATH);
 	}
 
+	if (kmem_cache_debug(s))
+		alloc_sanitize(s, object);
 	if (unlikely(gfpflags & __GFP_ZERO) && object)
 		memset(object, 0, s->object_size);
 
@@ -2793,7 +2815,7 @@ static void __slab_free(struct kmem_cache *s, struct page *page,
 
 	stat(s, FREE_SLOWPATH);
 
-	if (kmem_cache_debug(s) &&
+	if (kmem_cache_slow_debug(s) &&
 	    !free_debug_processing(s, page, head, tail, cnt, addr))
 		return;
 
@@ -2908,6 +2930,21 @@ slab_empty:
  * same page) possible by specifying head and tail ptr, plus objects
  * count (cnt). Bulk free indicated by tail pointer being set.
  */
+
+static inline void free_sanitize(struct kmem_cache *s, struct page *page, void *head, void *tail)
+{
+#ifdef CONFIG_SLUB_FAST_POISON
+	void *object = head;
+
+next_object:
+	init_object(s, object, SLUB_RED_INACTIVE);
+	if (object != tail) {
+		object = get_freepointer(s, object);
+		goto next_object;
+	}
+#endif
+}
+
 static __always_inline void do_slab_free(struct kmem_cache *s,
 				struct page *page, void *head, void *tail,
 				int cnt, unsigned long addr)
@@ -2930,6 +2967,9 @@ redo:
 
 	/* Same with comment on barrier() in slab_alloc_node() */
 	barrier();
+
+	if (kmem_cache_debug(s))
+		free_sanitize(s, page, head, tail_obj);
 
 	if (likely(page == c->page)) {
 		set_freepointer(s, tail_obj, c->freelist);

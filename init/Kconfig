@@ -1582,6 +1582,16 @@ config SLUB_CPU_PARTIAL
 	  which requires the taking of locks that may cause latency spikes.
 	  Typically one would choose no for a realtime system.
 
+config SLUB_FAST_POISON
+	bool "Allow poisoning debug options to use the fast path"
+	depends on SLUB_CPU_PARTIAL
+	help
+	   Some SLUB debugging options are safe to use without taking extra
+	   locks and can use the per-cpu lists. Enable this option to let
+	   poisoning and red zoning use the per-cpu lists. The trade-off is
+	   a few extra checks in the fast path. You should select this option
+	   if you intend to use poisoning for non-debugging uses.
+
 config MMAP_ALLOW_UNINITIALIZED
 	bool "Allow mmapped anonymous memory to be uninitialized"
 	depends on EXPERT && !MMU
