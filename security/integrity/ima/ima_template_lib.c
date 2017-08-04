@@ -383,8 +383,20 @@ int ima_eventsig_init(struct ima_event_data *event_data,
 	int xattr_len = event_data->xattr_len;
 	int rc = 0;
 
-	if ((!xattr_value) || (xattr_value->type != EVM_IMA_XATTR_DIGSIG))
+	if (!xattr_value || (xattr_value->type != EVM_IMA_XATTR_DIGSIG &&
+			     xattr_value->type != IMA_MODSIG))
 		goto out;
+
+	/*
+	 * The xattr_value for IMA_MODSIG is a runtime structure containing
+	 * pointers. Get its raw data instead.
+	 */
+	if (xattr_value->type == IMA_MODSIG) {
+		rc = ima_modsig_serialize_data(xattr_value, &xattr_value,
+					       &xattr_len);
+		if (rc)
+			goto out;
+	}
 
 	rc = ima_write_template_field_data(xattr_value, xattr_len, fmt,
 					   field_data);

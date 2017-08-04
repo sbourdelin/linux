@@ -190,6 +190,64 @@ int ima_read_xattr(struct dentry *dentry,
 	return ret;
 }
 
+static void process_xattr_error(int rc, struct integrity_iint_cache *iint,
+				int opened, char const **cause,
+				enum integrity_status *status)
+{
+	if (rc && rc != -ENODATA)
+		return;
+
+	*cause = iint->flags & IMA_DIGSIG_REQUIRED ?
+		"IMA-signature-required" : "missing-hash";
+	*status = INTEGRITY_NOLABEL;
+
+	if (opened & FILE_CREATED)
+		iint->flags |= IMA_NEW_FILE;
+
+	if ((iint->flags & IMA_NEW_FILE) &&
+	    !(iint->flags & IMA_DIGSIG_REQUIRED))
+		*status = INTEGRITY_PASS;
+}
+
+static int appraise_modsig(struct integrity_iint_cache *iint,
+			   struct evm_ima_xattr_data *xattr_value,
+			   int xattr_len)
+{
+	enum hash_algo algo;
+	const void *digest;
+	void *buf;
+	int rc, len;
+	u8 dig_len;
+
+	rc = ima_modsig_verify(INTEGRITY_KEYRING_IMA, xattr_value);
+	if (rc)
+		return rc;
+
+	/*
+	 * The signature is good. Now let's put the sig hash
+	 * into the iint cache so that it gets stored in the
+	 * measurement list.
+	 */
+
+	rc = ima_get_modsig_hash(xattr_value, &algo, &digest, &dig_len);
+	if (rc)
+		return rc;
+
+	len = sizeof(iint->ima_hash) + dig_len;
+	buf = krealloc(iint->ima_hash, len, GFP_NOFS);
+	if (!buf)
+		return -ENOMEM;
+
+	iint->ima_hash = buf;
+	iint->flags |= IMA_DIGSIG;
+	iint->ima_hash->algo = algo;
+	iint->ima_hash->length = dig_len;
+
+	memcpy(iint->ima_hash->digest, digest, dig_len);
+
+	return 0;
+}
+
 /*
  * ima_appraise_measurement - appraise file measurement
  *
@@ -200,44 +258,55 @@ int ima_read_xattr(struct dentry *dentry,
  */
 int ima_appraise_measurement(enum ima_hooks func,
 			     struct integrity_iint_cache *iint,
-			     struct file *file, const unsigned char *filename,
-			     struct evm_ima_xattr_data *xattr_value,
-			     int xattr_len, int opened)
+			     struct file *file, const void *buf, loff_t size,
+			     const unsigned char *filename,
+			     struct evm_ima_xattr_data **xattr_value_,
+			     int *xattr_len_, int opened)
 {
 	static const char op[] = "appraise_data";
-	char *cause = "unknown";
+	const char *cause = "unknown";
 	struct dentry *dentry = file_dentry(file);
 	struct inode *inode = d_backing_inode(dentry);
 	enum integrity_status status = INTEGRITY_UNKNOWN;
-	int rc = xattr_len, hash_start = 0;
+	struct evm_ima_xattr_data *xattr_value = *xattr_value_;
+	int xattr_len = *xattr_len_, rc = xattr_len, hash_start = 0;
+	bool appraising_modsig = false;
 
-	if (!(inode->i_opflags & IOP_XATTR))
+	if (iint->flags & IMA_MODSIG_ALLOWED &&
+	    !ima_read_modsig(func, buf, size, &xattr_value, &xattr_len)) {
+		appraising_modsig = true;
+		rc = xattr_len;
+	}
+
+	/* If not appraising a modsig, we need an xattr. */
+	if (!appraising_modsig && !(inode->i_opflags & IOP_XATTR))
 		return INTEGRITY_UNKNOWN;
 
 	if (rc <= 0) {
-		if (rc && rc != -ENODATA)
-			goto out;
-
-		cause = iint->flags & IMA_DIGSIG_REQUIRED ?
-				"IMA-signature-required" : "missing-hash";
-		status = INTEGRITY_NOLABEL;
-		if (opened & FILE_CREATED)
-			iint->flags |= IMA_NEW_FILE;
-		if ((iint->flags & IMA_NEW_FILE) &&
-		    !(iint->flags & IMA_DIGSIG_REQUIRED))
-			status = INTEGRITY_PASS;
+		process_xattr_error(rc, iint, opened, &cause, &status);
 		goto out;
 	}
 
-	status = evm_verifyxattr(dentry, XATTR_NAME_IMA, xattr_value, rc, iint);
-	if ((status != INTEGRITY_PASS) && (status != INTEGRITY_UNKNOWN)) {
-		if ((status == INTEGRITY_NOLABEL)
-		    || (status == INTEGRITY_NOXATTRS))
-			cause = "missing-HMAC";
-		else if (status == INTEGRITY_FAIL)
-			cause = "invalid-HMAC";
+	status = evm_verifyxattr(dentry, XATTR_NAME_IMA, NULL, 0, iint);
+	switch (status) {
+	case INTEGRITY_PASS:
+	case INTEGRITY_UNKNOWN:
+		break;
+	case INTEGRITY_NOXATTRS:
+		/* No EVM protected xattrs. */
+		if (appraising_modsig)
+			break;
+	case INTEGRITY_NOLABEL:
+		/* No security.evm xattr. */
+		cause = "missing-HMAC";
+		goto out;
+	case INTEGRITY_FAIL:
+		/* Invalid HMAC/signature. */
+		cause = "invalid-HMAC";
 		goto out;
 	}
+
+ retry:
 	switch (xattr_value->type) {
 	case IMA_XATTR_DIGEST_NG:
 		/* first byte contains algorithm id */
@@ -281,6 +350,54 @@ int ima_appraise_measurement(enum ima_hooks func,
 			status = INTEGRITY_PASS;
 		}
 		break;
+	case IMA_MODSIG:
+		/*
+		 * To avoid being tricked into an infinite loop, we don't allow
+		 * a modsig stored in the xattr.
+		 */
+		if (!appraising_modsig) {
+			status = INTEGRITY_UNKNOWN;
+			cause = "unknown-ima-data";
+			break;
+		}
+
+		rc = appraise_modsig(iint, xattr_value, xattr_len);
+		if (!rc) {
+			kfree(*xattr_value_);
+			*xattr_value_ = xattr_value;
+			*xattr_len_ = xattr_len;
+
+			status = INTEGRITY_PASS;
+			break;
+		}
+
+		ima_free_xattr_data(xattr_value);
+
+		/*
+		 * The appended signature failed verification. Let's see if
+		 * there's an extended attribute to fall back to.
+		 */
+		if (inode->i_opflags & IOP_XATTR && *xattr_len_ != 0) {
+			xattr_value = *xattr_value_;
+			xattr_len = rc = *xattr_len_;
+			appraising_modsig = false;
+
+			if (rc <= 0) {
+				process_xattr_error(rc, iint, opened, &cause,
+						    &status);
+				goto out;
+			}
+
+			goto retry;
+		}
+
+		if (rc == -EOPNOTSUPP)
+			status = INTEGRITY_UNKNOWN;
+		else if (rc) {
+			cause = "invalid-signature";
+			status = INTEGRITY_FAIL;
+		}
+		break;
 	default:
 		status = INTEGRITY_UNKNOWN;
 		cause = "unknown-ima-data";
@@ -291,13 +408,15 @@ out:
 	if (status != INTEGRITY_PASS) {
 		if ((ima_appraise & IMA_APPRAISE_FIX) &&
 		    (!xattr_value ||
-		     xattr_value->type != EVM_IMA_XATTR_DIGSIG)) {
+		     (xattr_value->type != EVM_IMA_XATTR_DIGSIG &&
+		      xattr_value->type != IMA_MODSIG))) {
 			if (!ima_fix_xattr(dentry, iint))
 				status = INTEGRITY_PASS;
 		} else if ((inode->i_size == 0) &&
 			   (iint->flags & IMA_NEW_FILE) &&
 			   (xattr_value &&
-			    xattr_value->type == EVM_IMA_XATTR_DIGSIG)) {
+			    (xattr_value->type == EVM_IMA_XATTR_DIGSIG ||
+			     xattr_value->type == IMA_MODSIG))) {
 			status = INTEGRITY_PASS;
 		}
 		integrity_audit_msg(AUDIT_INTEGRITY_DATA, inode, filename,
@@ -398,6 +517,7 @@ int ima_inode_setxattr(struct dentry *dentry, const char *xattr_name,
 		       const void *xattr_value, size_t xattr_value_len)
 {
 	const struct evm_ima_xattr_data *xvalue = xattr_value;
+	bool digsig;
 	int result;
 
 	result = ima_protect_xattr(dentry, xattr_name, xattr_value,
@@ -405,8 +525,10 @@ int ima_inode_setxattr(struct dentry *dentry, const char *xattr_name,
 	if (result == 1) {
 		if (!xattr_value_len || (xvalue->type >= IMA_XATTR_LAST))
 			return -EINVAL;
-		ima_reset_appraise_flags(d_backing_inode(dentry),
-			 (xvalue->type == EVM_IMA_XATTR_DIGSIG) ? 1 : 0);
+
+		digsig = xvalue->type == EVM_IMA_XATTR_DIGSIG ||
+				xvalue->type == IMA_MODSIG;
+		ima_reset_appraise_flags(d_backing_inode(dentry), digsig);
 		result = 0;
 	}
 	return result;
