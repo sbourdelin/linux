@@ -1035,6 +1035,20 @@ static const struct dmi_system_id intel_use_opregion_panel_type[] = {
 			    DMI_MATCH(DMI_PRODUCT_NAME, "IX45GM2"),
 		},
 	},
+	{
+		.callback = intel_use_opregion_panel_type_callback,
+		.ident = "HP Spectre x360 Convertible",
+		.matches = {DMI_MATCH(DMI_SYS_VENDOR, "HP"),
+			    DMI_MATCH(DMI_PRODUCT_NAME, "HP Spectre x360 Convertible"),
+		},
+	},
+	{
+		.callback = intel_use_opregion_panel_type_callback,
+		.ident = "HP Spectre x360 Convertible",
+		.matches = {DMI_MATCH(DMI_SYS_VENDOR, "Hewlett-Packard"),
+			    DMI_MATCH(DMI_PRODUCT_NAME, "HP Spectre x360 Convertible 13"),
+		},
+	},
 	{ }
 };
 
