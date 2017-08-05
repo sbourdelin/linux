@@ -101,7 +101,7 @@ static void ia_init_rtn_q (IARTN_Q *que)
 static void ia_enque_head_rtn_q (IARTN_Q *que, IARTN_Q * data) 
 {
    data->next = NULL;
-   if (que->next == NULL) 
+	if (!que->next)
       que->next = que->tail = data;
    else {
       data->next = que->next;
@@ -116,7 +116,7 @@ static int ia_enque_rtn_q (IARTN_Q *que, struct desc_tbl_t data) {
       return -ENOMEM;
    entry->data = data;
    entry->next = NULL;
-   if (que->next == NULL) 
+	if (!que->next)
       que->next = que->tail = entry;
    else {
       que->tail->next = entry;
@@ -127,7 +127,7 @@ static int ia_enque_rtn_q (IARTN_Q *que, struct desc_tbl_t data) {
 
 static IARTN_Q * ia_deque_rtn_q (IARTN_Q *que) {
    IARTN_Q *tmpdata;
-   if (que->next == NULL)
+	if (!que->next)
       return NULL;
    tmpdata = que->next;
    if ( que->next == que->tail)  
@@ -1321,7 +1321,7 @@ static void rx_dle_intr(struct atm_dev *dev)
               goto INCR_DLE;
           }
           ia_vcc = INPH_IA_VCC(vcc);
-          if (ia_vcc == NULL)
+		if (!ia_vcc)
           {
              atomic_inc(&vcc->stats->rx_err);
              atm_return(vcc, skb->truesize);
