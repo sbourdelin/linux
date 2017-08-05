@@ -40,7 +40,7 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
 	probe_opcode_t insn;
 
 	/* TODO: Currently we do not support AARCH32 instruction probing */
-	if (test_bit(TIF_32BIT, &mm->context.flags))
+	if (test_bit(MMCF_AARCH32, &mm->context.flags))
 		return -ENOTSUPP;
 	else if (!IS_ALIGNED(addr, AARCH64_INSN_SIZE))
 		return -EINVAL;
