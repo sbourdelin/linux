@@ -210,7 +210,7 @@ static __init int sctpprobe_init(void)
 
 	init_waitqueue_head(&sctpw.wait);
 	spin_lock_init(&sctpw.lock);
-	if (kfifo_alloc(&sctpw.fifo, bufsize, GFP_KERNEL))
+	if (kfifo_alloc(&sctpw.fifo, bufsize, GFP_KERNEL | __GFP_NOWARN))
 		return ret;
 
 	if (!proc_create(procname, S_IRUSR, init_net.proc_net,
