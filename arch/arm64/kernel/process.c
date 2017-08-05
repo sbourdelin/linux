@@ -417,3 +417,20 @@ unsigned long arch_randomize_brk(struct mm_struct *mm)
 	else
 		return randomize_page(mm->brk, SZ_1G);
 }
+
+/*
+ * Called immediately after a successful exec.
+ */
+void arch_setup_new_exec(void)
+{
+	current->mm->context.flags = 0;
+
+	/*
+	 * Unlike the native one, the compat version of exec() inherits
+	 * READ_IMPLIES_EXEC since this is the behaviour on arch/arm/.
+	 */
+	if (is_compat_task())
+		__set_bit(MMCF_AARCH32, &current->mm->context.flags);
+	else
+		current->personality &= ~READ_IMPLIES_EXEC;
+}

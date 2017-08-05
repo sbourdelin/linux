@@ -138,11 +138,14 @@ typedef struct user_fpsimd_state elf_fpregset_t;
  */
 #define ELF_PLAT_INIT(_r, load_addr)	(_r)->regs[0] = 0
 
+/*
+ * Don't modify this macro unless you add new personality.
+ * All personality-related setup should be done at proper place.
+ * If not sure, consider the arch_setup_new_exec() function.
+ */
 #define SET_PERSONALITY(ex)						\
 ({									\
-	clear_bit(MMCF_AARCH32, &current->mm->context.flags);		\
 	clear_thread_flag(TIF_32BIT);					\
-	current->personality &= ~READ_IMPLIES_EXEC;			\
 })
 
 /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
@@ -188,14 +191,14 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
 					 ((x)->e_flags & EF_ARM_EABI_MASK))
 
 #define compat_start_thread		compat_start_thread
+
 /*
- * Unlike the native SET_PERSONALITY macro, the compat version inherits
- * READ_IMPLIES_EXEC across a fork() since this is the behaviour on
- * arch/arm/.
+ * Don't modify this macro unless you add new personality.
+ * All personality-related setup should be done at proper place.
+ * If not sure, consider the arch_setup_new_exec() function.
  */
 #define COMPAT_SET_PERSONALITY(ex)					\
 ({									\
-	set_bit(MMCF_AARCH32, &current->mm->context.flags);		\
 	set_thread_flag(TIF_32BIT);					\
  })
 #define COMPAT_ARCH_DLINFO
