@@ -638,7 +638,7 @@ alloc_scq(struct idt77252_dev *card, int class)
 {
 	struct scq_info *scq;
 
-	scq = kzalloc(sizeof(struct scq_info), GFP_KERNEL);
+	scq = kzalloc(sizeof(*scq), GFP_KERNEL);
 	if (!scq)
 		return NULL;
 	scq->base = dma_zalloc_coherent(&card->pcidev->dev, SCQ_SIZE,
@@ -2119,7 +2119,7 @@ idt77252_init_est(struct vc_map *vc, int pcr)
 {
 	struct rate_estimator *est;
 
-	est = kzalloc(sizeof(struct rate_estimator), GFP_KERNEL);
+	est = kzalloc(sizeof(*est), GFP_KERNEL);
 	if (!est)
 		return NULL;
 	est->maxcps = pcr < 0 ? -pcr : pcr;
@@ -2422,7 +2422,8 @@ idt77252_open(struct atm_vcc *vcc)
 
 	index = VPCI2VC(card, vpi, vci);
 	if (!card->vcs[index]) {
-		card->vcs[index] = kzalloc(sizeof(struct vc_map), GFP_KERNEL);
+		card->vcs[index] = kzalloc(sizeof(*card->vcs[index]),
+					   GFP_KERNEL);
 		if (!card->vcs[index]) {
 			mutex_unlock(&card->mutex);
 			return -ENOMEM;
@@ -2612,8 +2613,7 @@ idt77252_change_qos(struct atm_vcc *vcc, struct atm_qos *qos, int flags)
 			goto out;
 	}
 
-	memcpy(&vcc->qos, qos, sizeof(struct atm_qos));
-
+	memcpy(&vcc->qos, qos, sizeof(*qos));
 	set_bit(ATM_VF_HASQOS, &vcc->flags);
 
 out:
@@ -2851,8 +2851,7 @@ open_card_oam(struct idt77252_dev *card)
 	for (vpi = 0; vpi < (1 << card->vpibits); vpi++) {
 		for (vci = 3; vci < 5; vci++) {
 			index = VPCI2VC(card, vpi, vci);
-
-			vc = kzalloc(sizeof(struct vc_map), GFP_KERNEL);
+			vc = kzalloc(sizeof(*vc), GFP_KERNEL);
 			if (!vc)
 				return -ENOMEM;
 
@@ -2918,7 +2917,7 @@ open_card_ubr0(struct idt77252_dev *card)
 {
 	struct vc_map *vc;
 
-	vc = kzalloc(sizeof(struct vc_map), GFP_KERNEL);
+	vc = kzalloc(sizeof(*vc), GFP_KERNEL);
 	if (!vc)
 		return -ENOMEM;
 
@@ -3605,7 +3604,7 @@ static int idt77252_init_one(struct pci_dev *pcidev,
 		return err;
 	}
 
-	card = kzalloc(sizeof(struct idt77252_dev), GFP_KERNEL);
+	card = kzalloc(sizeof(*card), GFP_KERNEL);
 	if (!card) {
 		err = -ENOMEM;
 		goto err_out_disable_pdev;
