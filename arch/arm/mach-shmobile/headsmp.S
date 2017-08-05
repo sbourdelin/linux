@@ -46,11 +46,10 @@ ENTRY(shmobile_smp_boot)
 	and	r0, r1, #0xffffff		@ MPIDR_HWID_BITMASK
 						@ r0 = cpu_logical_map() value
 	mov	r1, #0				@ r1 = CPU index
-	adr	r2, 1f
-	ldmia	r2, {r5, r6, r7}
-	add	r5, r5, r2			@ array of per-cpu mpidr values
-	add	r6, r6, r2			@ array of per-cpu functions
-	add	r7, r7, r2			@ array of per-cpu arguments
+
+	adr_l	r5, shmobile_smp_mpidr		@ array of per-cpu mpidr values
+	adr_l	r6, shmobile_smp_fn		@ array of per-cpu functions
+	adr_l	r7, shmobile_smp_arg		@ array of per-cpu arguments
 
 shmobile_smp_boot_find_mpidr:
 	ldr	r8, [r5, r1, lsl #2]
@@ -77,11 +76,6 @@ ENTRY(shmobile_smp_sleep)
 	wfi
 	b	shmobile_smp_boot
 ENDPROC(shmobile_smp_sleep)
-
-	.align	2
-1:	.long	shmobile_smp_mpidr - .
-	.long	shmobile_smp_fn - 1b
-	.long	shmobile_smp_arg - 1b
 
 	.bss
 	.globl	shmobile_smp_mpidr
