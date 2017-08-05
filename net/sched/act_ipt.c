@@ -55,6 +55,7 @@ static int ipt_init_target(struct xt_entry_target *t, char *table,
 	par.targinfo  = t->data;
 	par.hook_mask = hook;
 	par.family    = NFPROTO_IPV4;
+	par.nft_compat = false;
 
 	ret = xt_check_target(&par, t->u.target_size - sizeof(*t), 0, false);
 	if (ret < 0) {
