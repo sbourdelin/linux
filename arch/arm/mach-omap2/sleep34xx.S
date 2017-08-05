@@ -86,9 +86,7 @@ ENTRY(enable_omap3630_toggle_l2_on_restore)
 	stmfd	sp!, {lr}	@ save registers on stack
 	/* Setup so that we will disable and enable l2 */
 	mov	r1, #0x1
-	adrl	r3, l2dis_3630_offset	@ may be too distant for plain adr
-	ldr	r2, [r3]		@ value for offset
-	str	r1, [r2, r3]		@ write to l2dis_3630
+	str_l	r1, l2dis_3630, r2	@ write to l2dis_3630
 	ldmfd	sp!, {pc}	@ restore regs and return
 ENDPROC(enable_omap3630_toggle_l2_on_restore)
 
@@ -422,9 +420,7 @@ ENTRY(omap3_restore)
 	cmp	r2, #0x0	@ Check if target power state was OFF or RET
 	bne	logic_l1_restore
 
-	adr	r1, l2dis_3630_offset	@ address for offset
-	ldr	r0, [r1]		@ value for offset
-	ldr	r0, [r1, r0]		@ value at l2dis_3630
+	ldr_l	r0, l2dis_3630	@ value at l2dis_3630
 	cmp	r0, #0x1	@ should we disable L2 on 3630?
 	bne	skipl2dis
 	mrc	p15, 0, r0, c1, c0, 1
@@ -436,9 +432,7 @@ skipl2dis:
 	and	r1, #0x700
 	cmp	r1, #0x300
 	beq	l2_inv_gp
-	adr	r0, l2_inv_api_params_offset
-	ldr	r3, [r0]
-	add	r3, r3, r0		@ r3 points to dummy parameters
+	adr_l	r3, l2_inv_api_params	@ r3 points to dummy parameters
 	mov	r0, #40			@ set service ID for PPA
 	mov	r12, r0			@ copy secure Service ID in r12
 	mov	r1, #0			@ set task id for ROM code in r1
@@ -476,9 +470,6 @@ skipl2dis:
 #endif
 	b	logic_l1_restore
 
-	.align
-l2_inv_api_params_offset:
-	.long	l2_inv_api_params - .
 l2_inv_gp:
 	/* Execute smi to invalidate L2 cache */
 	mov r12, #0x1			@ set up to invalidate L2
@@ -495,9 +486,7 @@ l2_inv_gp:
 	mov	r12, #0x2
 	smc	#0			@ Call SMI monitor (smieq)
 logic_l1_restore:
-	adr	r0, l2dis_3630_offset	@ adress for offset
-	ldr	r1, [r0]		@ value for offset
-	ldr	r1, [r0, r1]		@ value at l2dis_3630
+	ldr_l	r1, l2dis_3630		@ value at l2dis_3630
 	cmp	r1, #0x1		@ Test if L2 re-enable needed on 3630
 	bne	skipl2reen
 	mrc	p15, 0, r1, c1, c0, 1
@@ -526,8 +515,6 @@ control_stat:
 	.word	CONTROL_STAT
 control_mem_rta:
 	.word	CONTROL_MEM_RTA_CTRL
-l2dis_3630_offset:
-	.long	l2dis_3630 - .
 
 	.data
 l2dis_3630:
