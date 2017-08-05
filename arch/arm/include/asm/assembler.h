@@ -518,4 +518,74 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
 #endif
 	.endm
 
+#ifdef CONFIG_THUMB2_KERNEL
+#define	ARM_PC_BIAS		4
+#else
+#define	ARM_PC_BIAS		8
+#endif
+
+	.macro		__adldst_l, op, reg, sym, tmp
+	.if		__LINUX_ARM_ARCH__ < 7
+	ldr		\tmp, 111f
+	.subsection	1
+	.align		2
+111:	.long		\sym - (222f + ARM_PC_BIAS)
+	.previous
+	.else
+	movw		\tmp, #:lower16:\sym - (222f + ARM_PC_BIAS)
+	movt		\tmp, #:upper16:\sym - (222f + ARM_PC_BIAS)
+	.endif
+222:;	.ifc		\op, add
+	add		\reg, \tmp, pc
+	.elseif		CONFIG_THUMB2_KERNEL == 1
+	add		\tmp, \tmp, pc
+	\op		\reg, [\tmp]
+	.else
+	\op		\reg, [pc, \tmp]
+	.endif
+	.endm
+
+	/*
+	 * mov_l - move a constant value or [relocated] address into a register
+	 */
+	.macro		mov_l, dst:req, imm:req
+	.if		__LINUX_ARM_ARCH__ < 7
+	ldr		\dst, =\imm
+	.else
+	movw		\dst, #:lower16:\imm
+	movt		\dst, #:upper16:\imm
+	.endif
+	.endm
+
+	/*
+	 * adr_l - adr pseudo-op with unlimited range
+	 *
+	 * @dst: destination register
+	 * @sym: name of the symbol
+	 */
+	.macro		adr_l, dst:req, sym:req
+	__adldst_l	add, \dst, \sym, \dst
+	.endm
+
+	/*
+	 * ldr_l - ldr <literal> pseudo-op with unlimited range
+	 *
+	 * @dst: destination register
+	 * @sym: name of the symbol
+	 */
+	.macro		ldr_l, dst:req, sym:req
+	__adldst_l	ldr, \dst, \sym, \dst
+	.endm
+
+	/*
+	 * str_l - str <literal> pseudo-op with unlimited range
+	 *
+	 * @src: source register
+	 * @sym: name of the symbol
+	 * @tmp: mandatory scratch register
+	 */
+	.macro		str_l, src:req, sym:req, tmp:req
+	__adldst_l	str, \src, \sym, \tmp
+	.endm
+
 #endif /* __ASM_ASSEMBLER_H__ */
