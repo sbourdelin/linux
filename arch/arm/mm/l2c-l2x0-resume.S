@@ -12,9 +12,7 @@
 	.text
 
 ENTRY(l2c310_early_resume)
-	adr	r0, 1f
-	ldr	r2, [r0]
-	add	r0, r2, r0
+	adr_l	r0, l2x0_saved_regs
 
 	ldmia	r0, {r1, r2, r3, r4, r5, r6, r7, r8}
 	@ r1 = phys address of L2C-310 controller
@@ -54,6 +52,3 @@ ENTRY(l2c310_early_resume)
 	str	r9, [r1, #L2X0_CTRL]
 	ret	lr
 ENDPROC(l2c310_early_resume)
-
-	.align
-1:	.long	l2x0_saved_regs - .
