@@ -94,7 +94,7 @@ of_get_fixed_voltage_config(struct device *dev,
 	return config;
 }
 
-static struct regulator_ops fixed_voltage_ops = {
+static const struct regulator_ops fixed_voltage_ops = {
 };
 
 static int reg_fixed_voltage_probe(struct platform_device *pdev)

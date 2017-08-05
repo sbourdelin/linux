@@ -747,7 +747,7 @@ static int max8997_reg_disable_suspend(struct regulator_dev *rdev)
 	return max8997_update_reg(i2c, reg, ~pattern, mask);
 }
 
-static struct regulator_ops max8997_ldo_ops = {
+static const struct regulator_ops max8997_ldo_ops = {
 	.list_voltage		= max8997_list_voltage,
 	.is_enabled		= max8997_reg_is_enabled,
 	.enable			= max8997_reg_enable,
@@ -757,7 +757,7 @@ static struct regulator_ops max8997_ldo_ops = {
 	.set_suspend_disable	= max8997_reg_disable_suspend,
 };
 
-static struct regulator_ops max8997_buck_ops = {
+static const struct regulator_ops max8997_buck_ops = {
 	.list_voltage		= max8997_list_voltage,
 	.is_enabled		= max8997_reg_is_enabled,
 	.enable			= max8997_reg_enable,
@@ -768,7 +768,7 @@ static struct regulator_ops max8997_buck_ops = {
 	.set_suspend_disable	= max8997_reg_disable_suspend,
 };
 
-static struct regulator_ops max8997_fixedvolt_ops = {
+static const struct regulator_ops max8997_fixedvolt_ops = {
 	.list_voltage		= max8997_list_voltage,
 	.is_enabled		= max8997_reg_is_enabled,
 	.enable			= max8997_reg_enable,
@@ -776,7 +776,7 @@ static struct regulator_ops max8997_fixedvolt_ops = {
 	.set_suspend_disable	= max8997_reg_disable_suspend,
 };
 
-static struct regulator_ops max8997_safeout_ops = {
+static const struct regulator_ops max8997_safeout_ops = {
 	.list_voltage		= regulator_list_voltage_table,
 	.is_enabled		= max8997_reg_is_enabled,
 	.enable			= max8997_reg_enable,
@@ -786,7 +786,7 @@ static struct regulator_ops max8997_safeout_ops = {
 	.set_suspend_disable	= max8997_reg_disable_suspend,
 };
 
-static struct regulator_ops max8997_fixedstate_ops = {
+static const struct regulator_ops max8997_fixedstate_ops = {
 	.list_voltage		= max8997_list_voltage_charger_cv,
 	.get_voltage_sel	= max8997_get_voltage_sel,
 	.set_voltage		= max8997_set_voltage_charger_cv,
@@ -820,7 +820,7 @@ static int max8997_get_current_limit(struct regulator_dev *rdev)
 	return max8997_list_voltage(rdev, sel);
 }
 
-static struct regulator_ops max8997_charger_ops = {
+static const struct regulator_ops max8997_charger_ops = {
 	.is_enabled		= max8997_reg_is_enabled,
 	.enable			= max8997_reg_enable,
 	.disable		= max8997_reg_disable,
@@ -828,7 +828,7 @@ static struct regulator_ops max8997_charger_ops = {
 	.set_current_limit	= max8997_set_current_limit,
 };
 
-static struct regulator_ops max8997_charger_fixedstate_ops = {
+static const struct regulator_ops max8997_charger_fixedstate_ops = {
 	.get_current_limit	= max8997_get_current_limit,
 	.set_current_limit	= max8997_set_current_limit,
 };
