@@ -957,8 +957,13 @@ repeat_in_this_group:
 		if (!ret2)
 			goto got; /* we grabbed the inode! */
 next_inode:
-		if (ino < EXT4_INODES_PER_GROUP(sb))
+		if (ino < EXT4_INODES_PER_GROUP(sb)) {
+			/* Lock contention, relax a bit */
+			if (ext4_fs_is_busy(sbi))
+				schedule_timeout_uninterruptible(
+						msecs_to_jiffies(1));
 			goto repeat_in_this_group;
+		}
 next_group:
 		if (++group == ngroups)
 			group = 0;
