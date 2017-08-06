@@ -761,6 +761,7 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
 	ext4_group_t flex_group;
 	struct ext4_group_info *grp;
 	int encrypt = 0;
+	bool hold_lock;
 
 	/* Cannot create files in a deleted directory */
 	if (!dir || !dir->i_nlink)
@@ -917,21 +918,48 @@ got_group:
 			continue;
 		}
 
+		hold_lock = false;
 repeat_in_this_group:
+		/* if @hold_lock is ture, that means, journal
+		 * is properly setup and inode bitmap buffer is
+		 * journaled too, we can directly hold lock and
+		 * set bit if found, this will avoid lock contention
+		 * which make us retry again and again.
+		 */
+		if (hold_lock)
+			ext4_lock_group(sb, group);
+
 		ino = ext4_find_next_zero_bit((unsigned long *)
 					      inode_bitmap_bh->b_data,
 					      EXT4_INODES_PER_GROUP(sb), ino);
-		if (ino >= EXT4_INODES_PER_GROUP(sb))
+		if (ino >= EXT4_INODES_PER_GROUP(sb)) {
+			if (hold_lock)
+				ext4_unlock_group(sb, group);
 			goto next_group;
+		}
 		if (group == 0 && (ino+1) < EXT4_FIRST_INO(sb)) {
 			ext4_error(sb, "reserved inode found cleared - "
 				   "inode=%lu", ino + 1);
+			if (hold_lock)
+				ext4_unlock_group(sb, group);
 			continue;
 		}
+
+		if (hold_lock) {
+			ret2 = ext4_test_and_set_bit(ino, inode_bitmap_bh->b_data);
+			ext4_unlock_group(sb, group);
+			ino++;
+			if (!ret2)
+				goto got;
+			BUG_ON(1);
+		}
+
 		if ((EXT4_SB(sb)->s_journal == NULL) &&
 		    recently_deleted(sb, group, ino)) {
-			ino++;
-			goto next_inode;
+			if (++ino < EXT4_INODES_PER_GROUP(sb))
+				goto repeat_in_this_group;
+			else
+				goto next_group;
 		}
 		if (!handle) {
 			BUG_ON(nblocks <= 0);
@@ -950,15 +978,23 @@ repeat_in_this_group:
 			ext4_std_error(sb, err);
 			goto out;
 		}
+
+		if (EXT4_SB(sb)->s_journal)
+			hold_lock = true;
+
 		ext4_lock_group(sb, group);
 		ret2 = ext4_test_and_set_bit(ino, inode_bitmap_bh->b_data);
 		ext4_unlock_group(sb, group);
 		ino++;		/* the inode bitmap is zero-based */
 		if (!ret2)
 			goto got; /* we grabbed the inode! */
-next_inode:
-		if (ino < EXT4_INODES_PER_GROUP(sb))
+		if (ino < EXT4_INODES_PER_GROUP(sb)) {
+			/* make no journal mode happy too */
+			if (!EXT4_SB(sb)->s_journal && ext4_fs_is_busy(sbi))
+				schedule_timeout_uninterruptible(
+					msecs_to_jiffies(1));
 			goto repeat_in_this_group;
+		}
 next_group:
 		if (++group == ngroups)
 			group = 0;
