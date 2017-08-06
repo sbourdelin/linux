@@ -116,10 +116,10 @@ struct cca_pvt_ext_CRT_sec {
  */
 static inline int zcrypt_type6_mex_key_en(struct ica_rsa_modexpo *mex, void *p)
 {
-	static struct cca_token_hdr static_pub_hdr = {
+	static const struct cca_token_hdr static_pub_hdr = {
 		.token_identifier	=  0x1E,
 	};
-	static struct cca_public_sec static_pub_sec = {
+	static const struct cca_public_sec static_pub_sec = {
 		.section_identifier	=  0x04,
 	};
 	struct {
@@ -176,7 +176,7 @@ static inline int zcrypt_type6_mex_key_en(struct ica_rsa_modexpo *mex, void *p)
  */
 static inline int zcrypt_type6_crt_key(struct ica_rsa_modexpo_crt *crt, void *p)
 {
-	static struct cca_public_sec static_cca_pub_sec = {
+	static const struct cca_public_sec static_cca_pub_sec = {
 		.section_identifier = 4,
 		.section_length = 0x000f,
 		.exponent_len = 0x0003,
