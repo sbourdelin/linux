@@ -1,0 +1,22 @@
+* Altera ASMI Parallel II IP Core
+
+Required properties:
+- compatible : Should be "altr,asmi_parallel2".
+- reg : A tuple consisting of a physical address and length.
+
+Optional subnodes:
+Subnodes of the Altera ASMI Paralllel II IP Core are spi slave nodes.
+- reg : chip select value
+- label : optional user friendly label
+
+Example:
+
+qspi: spi@a0001000 {
+	compatible = "altr,asmi_parallel2";
+	reg = <0xa0001000 0x10>;
+
+	flash@0 {
+		reg = <0>;
+		label = "FPGA Image";
+	};
+};
