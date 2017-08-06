@@ -1,6 +1,7 @@
 #ifndef __HDLC_IOCTL_H__
 #define __HDLC_IOCTL_H__
 
+#include <linux/if.h>
 
 #define GENERIC_HDLC_VERSION 4	/* For synchronization with sethdlc utility */
 
@@ -36,25 +37,25 @@
 
 #ifndef __ASSEMBLY__
 
-typedef struct {
+typedef struct sync_serial_settings {
 	unsigned int clock_rate; /* bits per second */
 	unsigned int clock_type; /* internal, external, TX-internal etc. */
 	unsigned short loopback;
 } sync_serial_settings;          /* V.35, V.24, X.21 */
 
-typedef struct {
+typedef struct te1_settings {
 	unsigned int clock_rate; /* bits per second */
 	unsigned int clock_type; /* internal, external, TX-internal etc. */
 	unsigned short loopback;
 	unsigned int slot_map;
 } te1_settings;                  /* T1, E1 */
 
-typedef struct {
+typedef struct raw_hdlc_proto {
 	unsigned short encoding;
 	unsigned short parity;
 } raw_hdlc_proto;
 
-typedef struct {
+typedef struct fr_proto {
 	unsigned int t391;
 	unsigned int t392;
 	unsigned int n391;
@@ -64,16 +65,16 @@ typedef struct {
 	unsigned short dce; /* 1 for DCE (network side) operation */
 } fr_proto;
 
-typedef struct {
+typedef struct fr_proto_pvc {
 	unsigned int dlci;
 } fr_proto_pvc;          /* for creating/deleting FR PVCs */
 
-typedef struct {
+typedef struct fr_proto_pvc_info {
 	unsigned int dlci;
 	char master[IFNAMSIZ];	/* Name of master FRAD device */
-}fr_proto_pvc_info;		/* for returning PVC information only */
+} fr_proto_pvc_info;		/* for returning PVC information only */
 
-typedef struct {
+typedef struct cisco_proto {
     unsigned int interval;
     unsigned int timeout;
 } cisco_proto;

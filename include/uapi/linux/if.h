@@ -34,6 +34,15 @@
 #define	IFALIASZ	256
 #include <linux/hdlc/ioctl.h>
 
+/* Forward declarations to break dependency loop with <linux/hdlc/ioctl.h> */
+struct sync_serial_settings;
+struct ae1_settings;
+struct raw_hdlc_proto;
+struct fr_proto;
+struct fr_proto_pvc;
+struct fr_proto_pvc_info;
+struct cisco_proto;
+
 /* For glibc compatibility. An empty enum does not compile. */
 #if __UAPI_DEF_IF_NET_DEVICE_FLAGS_LOWER_UP_DORMANT_ECHO != 0 || \
     __UAPI_DEF_IF_NET_DEVICE_FLAGS != 0
@@ -206,15 +215,15 @@ struct if_settings {
 	unsigned int size;	/* Size of the data allocated by the caller */
 	union {
 		/* {atm/eth/dsl}_settings anyone ? */
-		raw_hdlc_proto		__user *raw_hdlc;
-		cisco_proto		__user *cisco;
-		fr_proto		__user *fr;
-		fr_proto_pvc		__user *fr_pvc;
-		fr_proto_pvc_info	__user *fr_pvc_info;
+		struct raw_hdlc_proto		__user *raw_hdlc;
+		struct cisco_proto		__user *cisco;
+		struct fr_proto		__user *fr;
+		struct fr_proto_pvc		__user *fr_pvc;
+		struct fr_proto_pvc_info	__user *fr_pvc_info;
 
 		/* interface settings */
-		sync_serial_settings	__user *sync;
-		te1_settings		__user *te1;
+		struct sync_serial_settings	__user *sync;
+		struct te1_settings		__user *te1;
 	} ifs_ifsu;
 };
 
