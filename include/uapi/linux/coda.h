@@ -100,7 +100,14 @@ typedef unsigned long long u_quad_t;
 #if defined(__linux__)
 #include <linux/time.h>
 #define cdev_t u_quad_t
+
 #ifndef __KERNEL__
+typedef unsigned long u_long;
+typedef unsigned int u_int;
+typedef unsigned short u_short;
+typedef u_long ino_t;
+typedef u_long dev_t;
+typedef void *caddr_t;
 #if !defined(_UQUAD_T_) && (!defined(__GLIBC__) || __GLIBC__ < 2)
 #define _UQUAD_T_ 1
 typedef unsigned long long u_quad_t;
@@ -295,8 +302,8 @@ struct coda_statfs {
 struct coda_in_hdr {
     u_int32_t opcode;
     u_int32_t unique;	    /* Keep multiple outstanding msgs distinct */
-    pid_t pid;
-    pid_t pgid;
+    __kernel_pid_t pid;
+    __kernel_pid_t pgid;
     vuid_t uid;
 };
 
