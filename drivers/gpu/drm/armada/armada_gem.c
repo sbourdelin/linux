@@ -300,12 +300,6 @@ int armada_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
 	return ret;
 }
 
-int armada_gem_dumb_destroy(struct drm_file *file, struct drm_device *dev,
-	uint32_t handle)
-{
-	return drm_gem_handle_delete(file, handle);
-}
-
 /* Private driver gem ioctls */
 int armada_gem_create_ioctl(struct drm_device *dev, void *data,
 	struct drm_file *file)
