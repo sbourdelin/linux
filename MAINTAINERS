@@ -3527,6 +3527,11 @@ S:	Maintained
 F:	mm/memcontrol.c
 F:	mm/swap_cgroup.c
 
+COMPILE TEST FOR HEADER FILES EXPORTED TO USERSPACE
+M:	Mikko Rapeli <mikko.rapeli@iki.fi>
+S:	Maintained
+F:	scripts/headers_compile_test.sh
+
 CORETEMP HARDWARE MONITORING DRIVER
 M:	Fenghua Yu <fenghua.yu@intel.com>
 L:	linux-hwmon@vger.kernel.org
