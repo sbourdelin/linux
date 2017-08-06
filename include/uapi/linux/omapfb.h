@@ -181,7 +181,7 @@ struct omapfb_memory_read {
 	__u16 y;
 	__u16 w;
 	__u16 h;
-	size_t buffer_size;
+	__kernel_size_t buffer_size;
 	void __user *buffer;
 };
 
