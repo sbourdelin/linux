@@ -2302,7 +2302,7 @@ static const struct ddb_info ddb_octopusv3 = {
 
 /*** MaxA8 adapters ***********************************************************/
 
-static struct ddb_info ddb_ct2_8 = {
+static const struct ddb_info ddb_ct2_8 = {
 	.type     = DDB_OCTOPUS_MAX_CT,
 	.name     = "Digital Devices MAX A8 CT2",
 	.port_num = 4,
@@ -2311,7 +2311,7 @@ static struct ddb_info ddb_ct2_8 = {
 	.ts_quirks = TS_QUIRK_SERIAL,
 };
 
-static struct ddb_info ddb_c2t2_8 = {
+static const struct ddb_info ddb_c2t2_8 = {
 	.type     = DDB_OCTOPUS_MAX_CT,
 	.name     = "Digital Devices MAX A8 C2T2",
 	.port_num = 4,
@@ -2320,7 +2320,7 @@ static struct ddb_info ddb_c2t2_8 = {
 	.ts_quirks = TS_QUIRK_SERIAL,
 };
 
-static struct ddb_info ddb_isdbt_8 = {
+static const struct ddb_info ddb_isdbt_8 = {
 	.type     = DDB_OCTOPUS_MAX_CT,
 	.name     = "Digital Devices MAX A8 ISDBT",
 	.port_num = 4,
@@ -2329,7 +2329,7 @@ static struct ddb_info ddb_isdbt_8 = {
 	.ts_quirks = TS_QUIRK_SERIAL,
 };
 
-static struct ddb_info ddb_c2t2i_v0_8 = {
+static const struct ddb_info ddb_c2t2i_v0_8 = {
 	.type     = DDB_OCTOPUS_MAX_CT,
 	.name     = "Digital Devices MAX A8 C2T2I V0",
 	.port_num = 4,
@@ -2338,7 +2338,7 @@ static struct ddb_info ddb_c2t2i_v0_8 = {
 	.ts_quirks = TS_QUIRK_SERIAL | TS_QUIRK_ALT_OSC,
 };
 
-static struct ddb_info ddb_c2t2i_8 = {
+static const struct ddb_info ddb_c2t2i_8 = {
 	.type     = DDB_OCTOPUS_MAX_CT,
 	.name     = "Digital Devices MAX A8 C2T2I",
 	.port_num = 4,
