@@ -9,6 +9,7 @@
 #include "compress.h"
 #include "path.h"
 #include "symbol.h"
+#include "srcline.h"
 #include "dso.h"
 #include "machine.h"
 #include "auxtrace.h"
@@ -1233,6 +1234,7 @@ void dso__delete(struct dso *dso)
 		       dso->long_name);
 	for (i = 0; i < MAP__NR_TYPES; ++i)
 		symbols__delete(&dso->symbols[i]);
+	inlines__tree_delete(&dso->inlined_nodes);
 
 	if (dso->short_name_allocated) {
 		zfree((char **)&dso->short_name);

@@ -2,6 +2,7 @@
 #define PERF_SRCLINE_H
 
 #include <linux/list.h>
+#include <linux/rbtree.h>
 #include <linux/types.h>
 
 struct dso;
@@ -17,18 +18,28 @@ void free_srcline(char *srcline);
 #define SRCLINE_UNKNOWN  ((char *) "??:0")
 
 struct inline_list {
-	char			*filename;
-	char			*funcname;
-	unsigned int		line_nr;
+	struct symbol		*symbol;
+	char			*srcline;
 	struct list_head	list;
 };
 
 struct inline_node {
 	u64			addr;
 	struct list_head	val;
+	struct rb_node		rb_node;
 };
 
-struct inline_node *dso__parse_addr_inlines(struct dso *dso, u64 addr);
+// parse inlined frames for the given address
+struct inline_node *dso__parse_addr_inlines(struct dso *dso, u64 addr,
+					    struct symbol *sym);
+// free resources associated to the inline node list
 void inline_node__delete(struct inline_node *node);
+
+// insert the inline node list into the DSO, which will take ownership
+void inlines__tree_insert(struct rb_root *tree, struct inline_node *inlines);
+// find previously inserted inline node list
+struct inline_node *inlines__tree_find(struct rb_root *tree, u64 addr);
+// delete all nodes within the tree of inline_node s
+void inlines__tree_delete(struct rb_root *tree);
 
 #endif /* PERF_SRCLINE_H */
