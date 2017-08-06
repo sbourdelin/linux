@@ -644,6 +644,13 @@ ALPS PS/2 TOUCHPAD DRIVER
 R:	Pali Rohár <pali.rohar@gmail.com>
 F:	drivers/input/mouse/alps.*
 
+ALTERA ASMI Parallel II Driver
+M:      Matthew Gerlach <matthew.gerlach@linux.intel.com>
+L:      linux-mtd@lists.infradead.org
+S:      Maintained
+F:      drivers/mtd/spi-nor/altera-asmip2.c
+F:      inclulde/linux/mtd/altera-asmip2.h
+
 ALTERA MAILBOX DRIVER
 M:	Ley Foon Tan <lftan@altera.com>
 L:	nios2-dev@lists.rocketboards.org (moderated for non-subscribers)
