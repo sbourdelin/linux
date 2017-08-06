@@ -11,7 +11,7 @@
  */
 
 #ifndef _LINUX_PATCHKEY_H_INDIRECT
-#error "patchkey.h included directly"
+#warning "patchkey.h included directly"
 #endif
 
 #ifndef _UAPI_LINUX_PATCHKEY_H
