@@ -4585,16 +4585,12 @@ err:
 
 }
 
-static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
+static void __tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	bool fragstolen = false;
 	int eaten = -1;
 
-	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq) {
-		__kfree_skb(skb);
-		return;
-	}
 	skb_dst_drop(skb);
 	__skb_pull(skb, tcp_hdr(skb)->doff * 4);
 
@@ -4701,6 +4697,14 @@ drop:
 	}
 
 	tcp_data_queue_ofo(sk, skb);
+}
+
+static inline void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
+{
+	if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq)
+		__kfree_skb(skb);
+	else
+		__tcp_data_queue(sk, skb);
 }
 
 static struct sk_buff *tcp_skb_next(struct sk_buff *skb, struct sk_buff_head *list)
