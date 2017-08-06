@@ -4,16 +4,8 @@
 #ifndef KSYM_FUNC
 #define KSYM_FUNC(x) x
 #endif
-#ifdef CONFIG_64BIT
-#define __put .quad
 #ifndef KSYM_ALIGN
 #define KSYM_ALIGN 8
-#endif
-#else
-#define __put .long
-#ifndef KSYM_ALIGN
-#define KSYM_ALIGN 4
-#endif
 #endif
 #ifndef KCRC_ALIGN
 #define KCRC_ALIGN 4
@@ -35,7 +27,7 @@
 	.section ___ksymtab\sec+\name,"a"
 	.balign KSYM_ALIGN
 KSYM(__ksymtab_\name):
-	__put \val, KSYM(__kstrtab_\name)
+	.long \val - ., KSYM(__kstrtab_\name) - .
 	.previous
 	.section __ksymtab_strings,"a"
 KSYM(__kstrtab_\name):
