@@ -29,6 +29,7 @@
 #define __XEN_PUBLIC_GRANT_TABLE_H__
 
 #include <xen/interface/xen.h>
+#include <uapi/xen/gntdev.h> /* for grant_ref_t */
 
 /***********************************
  * GRANT TABLE REPRESENTATION
@@ -83,11 +84,6 @@
  * Changing a GTF_permit_access from read-only to writable:
  *  Use SMP-safe bit-setting instruction.
  */
-
-/*
- * Reference to a grant entry in a specified domain's grant table.
- */
-typedef uint32_t grant_ref_t;
 
 /*
  * A grant table comprises a packed array of grant entries in one or more
