@@ -3,6 +3,12 @@
 
 #include <linux/types.h>
 
+#ifdef __KERNEL__
+#include <linux/time.h>
+#else
+#include <time.h>
+#endif /* __KERNEL__ */
+
 struct sock_extended_err {
 	__u32	ee_errno;	
 	__u8	ee_origin;
