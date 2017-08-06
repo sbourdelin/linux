@@ -1235,6 +1235,7 @@ void dso__delete(struct dso *dso)
 	for (i = 0; i < MAP__NR_TYPES; ++i)
 		symbols__delete(&dso->symbols[i]);
 	inlines__tree_delete(&dso->inlined_nodes);
+	srcline__tree_delete(&dso->srclines);
 
 	if (dso->short_name_allocated) {
 		zfree((char **)&dso->short_name);
