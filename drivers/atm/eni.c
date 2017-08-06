@@ -1849,8 +1849,6 @@ static int eni_start(struct atm_dev *dev)
 					   sizeof(*eni_dev->free_list),
 					   GFP_KERNEL);
 	if (!eni_dev->free_list) {
-		printk(KERN_ERR DEV_LABEL "(itf %d): couldn't get free page\n",
-		    dev->number);
 		error = -ENOMEM;
 		goto free_irq;
 	}
