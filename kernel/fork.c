@@ -659,6 +659,13 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 		tmp->vm_flags &= ~(VM_LOCKED | VM_LOCKONFAULT);
 		tmp->vm_next = tmp->vm_prev = NULL;
 		file = tmp->vm_file;
+
+		/* With VM_WIPEONFORK, the child gets an empty VMA. */
+		if (tmp->vm_flags & VM_WIPEONFORK) {
+			tmp->vm_file = file = NULL;
+			tmp->vm_ops = NULL;
+		}
+
 		if (file) {
 			struct inode *inode = file_inode(file);
 			struct address_space *mapping = file->f_mapping;

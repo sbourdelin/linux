@@ -1134,6 +1134,16 @@ int copy_page_range(struct mm_struct *dst_mm, struct mm_struct *src_mm,
 			!vma->anon_vma)
 		return 0;
 
+	/*
+	 * With VM_WIPEONFORK, the child inherits the VMA from the
+	 * parent, but not its contents.
+	 *
+	 * A child accessing VM_WIPEONFORK memory will see all zeroes;
+	 * a child accessing VM_DONTCOPY memory receives a segfault.
+	 */
+	if (vma->vm_flags & VM_WIPEONFORK)
+		return 0;
+
 	if (is_vm_hugetlb_page(vma))
 		return copy_hugetlb_page_range(dst_mm, src_mm, vma);
 
