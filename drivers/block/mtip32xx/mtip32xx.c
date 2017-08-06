@@ -4193,7 +4193,7 @@ static int mtip_pci_probe(struct pci_dev *pdev,
 			const struct pci_device_id *ent)
 {
 	int rv = 0;
-	struct driver_data *dd = NULL;
+	struct driver_data *dd;
 	char cpu_list[256];
 	const struct cpumask *node_mask;
 	int cpu, i = 0, j = 0;
