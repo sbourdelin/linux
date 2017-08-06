@@ -3019,9 +3019,7 @@ static int mtip_hw_init(struct driver_data *dd)
 	num_command_slots = dd->slot_groups * 32;
 
 	hba_setup(dd);
-
-	dd->port = kzalloc_node(sizeof(struct mtip_port), GFP_KERNEL,
-				dd->numa_node);
+	dd->port = kzalloc_node(sizeof(*dd->port), GFP_KERNEL, dd->numa_node);
 	if (!dd->port)
 		return -ENOMEM;
 
@@ -4215,7 +4213,7 @@ static int mtip_pci_probe(struct pci_dev *pdev,
 		my_node, pcibus_to_node(pdev->bus), dev_to_node(&pdev->dev),
 		cpu_to_node(raw_smp_processor_id()), raw_smp_processor_id());
 
-	dd = kzalloc_node(sizeof(struct driver_data), GFP_KERNEL, my_node);
+	dd = kzalloc_node(sizeof(*dd), GFP_KERNEL, my_node);
 	if (!dd)
 		return -ENOMEM;
 
