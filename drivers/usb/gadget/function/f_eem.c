@@ -215,6 +215,11 @@ static int eem_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 		 */
 		eem->port.is_zlp_ok = 1;
 		eem->port.cdc_filter = DEFAULT_FILTER;
+
+		/* setup DMA alignment workaround for UDC's that*need it */
+		eem->port.no_skb_reserve =
+				gadget_avoids_skb_reserve(cdev->gadget);
+
 		DBG(cdev, "activate eem\n");
 		net = gether_connect(&eem->port);
 		if (IS_ERR(net))
