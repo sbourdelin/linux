@@ -37,7 +37,9 @@
 #include <asm/byteorder.h>
 #include <linux/socket.h>
 #include <linux/tcp.h>
+#ifdef __KERNEL__
 #include <net/tcp.h>
+#endif
 
 /* TLS socket options */
 #define TLS_TX			1	/* Set transmit parameters */
