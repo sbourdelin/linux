@@ -12,6 +12,8 @@ struct siginfo;
 #define NSIG		32
 typedef unsigned long sigset_t;
 
+#include <stddef.h>
+
 #endif /* __KERNEL__ */
 
 #define SIGHUP		 1
