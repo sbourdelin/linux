@@ -28,6 +28,8 @@
 struct amdgpu_vram_mgr {
 	struct drm_mm mm;
 	spinlock_t lock;
+	uint64_t usage;
+	uint64_t vis_usage;
 };
 
 /**
@@ -79,6 +81,27 @@ static int amdgpu_vram_mgr_fini(struct ttm_mem_type_manager *man)
 }
 
 /**
+ * amdgpu_vram_mgr_vis_size - Calculate visible node size
+ *
+ * @adev: amdgpu device structure
+ * @node: MM node structure
+ *
+ * Calculate how many bytes of the MM node are inside visible VRAM
+ */
+static u64 amdgpu_vram_mgr_vis_size(struct amdgpu_device *adev,
+				    struct drm_mm_node *node)
+{
+	uint64_t start = node->start << PAGE_SHIFT;
+	uint64_t end = (node->size + node->start) << PAGE_SHIFT;
+
+	if (start >= adev->mc.visible_vram_size)
+		return 0;
+
+	return (end > adev->mc.visible_vram_size ?
+		adev->mc.visible_vram_size : end) - start;
+}
+
+/**
  * amdgpu_vram_mgr_new - allocate new ranges
  *
  * @man: TTM memory type manager
@@ -93,6 +116,7 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 			       const struct ttm_place *place,
 			       struct ttm_mem_reg *mem)
 {
+	struct amdgpu_device *adev = amdgpu_ttm_adev(man->bdev);
 	struct amdgpu_vram_mgr *mgr = man->priv;
 	struct drm_mm *mm = &mgr->mm;
 	struct drm_mm_node *nodes;
@@ -142,6 +166,9 @@ static int amdgpu_vram_mgr_new(struct ttm_mem_type_manager *man,
 		if (unlikely(r))
 			goto error;
 
+		mgr->usage += nodes[i].size << PAGE_SHIFT;
+		mgr->vis_usage += amdgpu_vram_mgr_vis_size(adev, &nodes[i]);
+
 		/* Calculate a virtual BO start address to easily check if
 		 * everything is CPU accessible.
 		 */
@@ -181,6 +208,7 @@ error:
 static void amdgpu_vram_mgr_del(struct ttm_mem_type_manager *man,
 				struct ttm_mem_reg *mem)
 {
+	struct amdgpu_device *adev = amdgpu_ttm_adev(man->bdev);
 	struct amdgpu_vram_mgr *mgr = man->priv;
 	struct drm_mm_node *nodes = mem->mm_node;
 	unsigned pages = mem->num_pages;
@@ -192,12 +220,42 @@ static void amdgpu_vram_mgr_del(struct ttm_mem_type_manager *man,
 	while (pages) {
 		pages -= nodes->size;
 		drm_mm_remove_node(nodes);
+		mgr->usage -= nodes->size << PAGE_SHIFT;
+		mgr->vis_usage -= amdgpu_vram_mgr_vis_size(adev, nodes);
 		++nodes;
 	}
 	spin_unlock(&mgr->lock);
 
 	kfree(mem->mm_node);
 	mem->mm_node = NULL;
+}
+
+/**
+ * amdgpu_vram_mgr_usage - how many bytes are used in this domain
+ *
+ * @man: TTM memory type manager
+ *
+ * Returns how many bytes are used in this domain.
+ */
+uint64_t amdgpu_vram_mgr_usage(struct ttm_mem_type_manager *man)
+{
+	struct amdgpu_vram_mgr *mgr = man->priv;
+
+	return READ_ONCE(mgr->usage);
+}
+
+/**
+ * amdgpu_vram_mgr_vis_usage - how many bytes are used in the visible part
+ *
+ * @man: TTM memory type manager
+ *
+ * Returns how many bytes are used in the visible part of VRAM
+ */
+uint64_t amdgpu_vram_mgr_vis_usage(struct ttm_mem_type_manager *man)
+{
+	struct amdgpu_vram_mgr *mgr = man->priv;
+
+	return READ_ONCE(mgr->vis_usage);
 }
 
 /**
@@ -211,7 +269,6 @@ static void amdgpu_vram_mgr_del(struct ttm_mem_type_manager *man,
 static void amdgpu_vram_mgr_debug(struct ttm_mem_type_manager *man,
 				  struct drm_printer *printer)
 {
-	struct amdgpu_device *adev = amdgpu_ttm_adev(man->bdev);
 	struct amdgpu_vram_mgr *mgr = man->priv;
 
 	spin_lock(&mgr->lock);
@@ -219,9 +276,8 @@ static void amdgpu_vram_mgr_debug(struct ttm_mem_type_manager *man,
 	spin_unlock(&mgr->lock);
 
 	drm_printf(printer, "man size:%llu pages, ram usage:%lluMB, vis usage:%lluMB\n",
-		   adev->mman.bdev.man[TTM_PL_VRAM].size,
-		   (u64)atomic64_read(&adev->vram_usage) >> 20,
-		   (u64)atomic64_read(&adev->vram_vis_usage) >> 20);
+		   man->size, amdgpu_vram_mgr_usage(man) >> 20,
+		   amdgpu_vram_mgr_vis_usage(man) >> 20);
 }
 
 const struct ttm_mem_type_manager_func amdgpu_vram_mgr_func = {
