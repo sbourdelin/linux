@@ -32,6 +32,7 @@
 #include <linux/pci.h>
 #include <linux/bitops.h>
 #include <linux/property.h>
+#include <linux/irqdomain.h>
 #include <trace/events/iommu.h>
 
 static struct kset *iommu_group_kset;
@@ -1028,6 +1029,7 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
 	const struct iommu_ops *ops = dev->bus->iommu_ops;
 	struct iommu_group *group;
 	int ret;
+	struct irq_domain *d = dev_get_msi_domain(dev);
 
 	group = iommu_group_get(dev);
 	if (group)
@@ -1069,6 +1071,11 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
 		iommu_group_put(group);
 		return ERR_PTR(ret);
 	}
+
+	if (d && irq_domain_is_msi(d) &&
+			irq_domain_hierarchical_is_msi_remap(d))
+		iommu_group_set_caps(group, 0,
+				IOMMU_GROUP_CAP_ISOLATE_MSIX);
 
 	return group;
 }
