@@ -169,6 +169,21 @@ void vfio_iommu_group_put(struct iommu_group *group, struct device *dev)
 }
 EXPORT_SYMBOL_GPL(vfio_iommu_group_put);
 
+bool vfio_iommu_group_is_capable(struct device *dev, unsigned long cap)
+{
+	bool ret = false;
+	struct iommu_group *group = vfio_iommu_group_get(dev);
+
+	if (group) {
+		ret = iommu_group_is_capable(group, cap);
+
+		vfio_iommu_group_put(group, dev);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(vfio_iommu_group_is_capable);
+
 #ifdef CONFIG_VFIO_NOIOMMU
 static void *vfio_noiommu_open(unsigned long arg)
 {

@@ -561,11 +561,17 @@ static int msix_sparse_mmap_cap(struct vfio_pci_device *vdev,
 	struct vfio_region_info_cap_sparse_mmap *sparse;
 	size_t end, size;
 	int nr_areas = 2, i = 0, ret;
+	bool is_msix_isolated = vfio_iommu_group_is_capable(&vdev->pdev->dev,
+			IOMMU_GROUP_CAP_ISOLATE_MSIX);
 
 	end = pci_resource_len(vdev->pdev, vdev->msix_bar);
 
-	/* If MSI-X table is aligned to the start or end, only one area */
-	if (((vdev->msix_offset & PAGE_MASK) == 0) ||
+	/*
+	 * If MSI-X table is allowed to mmap because of the capability
+	 * of IRQ remapping or aligned to the start or end, only one area
+	 */
+	if (is_msix_isolated ||
+	    ((vdev->msix_offset & PAGE_MASK) == 0) ||
 	    (PAGE_ALIGN(vdev->msix_offset + vdev->msix_size) >= end))
 		nr_areas = 1;
 
@@ -576,6 +582,12 @@ static int msix_sparse_mmap_cap(struct vfio_pci_device *vdev,
 		return -ENOMEM;
 
 	sparse->nr_areas = nr_areas;
+
+	if (is_msix_isolated) {
+		sparse->areas[i].offset = 0;
+		sparse->areas[i].size = end;
+		return 0;
+	}
 
 	if (vdev->msix_offset & PAGE_MASK) {
 		sparse->areas[i].offset = 0;
@@ -1094,6 +1106,8 @@ static int vfio_pci_mmap(void *device_data, struct vm_area_struct *vma)
 	unsigned int index;
 	u64 phys_len, req_len, pgoff, req_start;
 	int ret;
+	bool is_msix_isolated = vfio_iommu_group_is_capable(&vdev->pdev->dev,
+			IOMMU_GROUP_CAP_ISOLATE_MSIX);
 
 	index = vma->vm_pgoff >> (VFIO_PCI_OFFSET_SHIFT - PAGE_SHIFT);
 
@@ -1115,7 +1129,7 @@ static int vfio_pci_mmap(void *device_data, struct vm_area_struct *vma)
 	if (req_start + req_len > phys_len)
 		return -EINVAL;
 
-	if (index == vdev->msix_bar) {
+	if (index == vdev->msix_bar && !is_msix_isolated) {
 		/*
 		 * Disallow mmaps overlapping the MSI-X table; users don't
 		 * get to touch this directly.  We could find somewhere

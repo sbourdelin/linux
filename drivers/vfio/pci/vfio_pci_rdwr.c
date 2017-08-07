@@ -18,6 +18,7 @@
 #include <linux/uaccess.h>
 #include <linux/io.h>
 #include <linux/vgaarb.h>
+#include <linux/vfio.h>
 
 #include "vfio_pci_private.h"
 
@@ -123,6 +124,8 @@ ssize_t vfio_pci_bar_rw(struct vfio_pci_device *vdev, char __user *buf,
 	resource_size_t end;
 	void __iomem *io;
 	ssize_t done;
+	bool is_msix_isolated = vfio_iommu_group_is_capable(&vdev->pdev->dev,
+			IOMMU_GROUP_CAP_ISOLATE_MSIX);
 
 	if (pci_resource_start(pdev, bar))
 		end = pci_resource_len(pdev, bar);
@@ -164,7 +167,7 @@ ssize_t vfio_pci_bar_rw(struct vfio_pci_device *vdev, char __user *buf,
 	} else
 		io = vdev->barmap[bar];
 
-	if (bar == vdev->msix_bar) {
+	if (bar == vdev->msix_bar && !is_msix_isolated) {
 		x_start = vdev->msix_offset;
 		x_end = vdev->msix_offset + vdev->msix_size;
 	}
