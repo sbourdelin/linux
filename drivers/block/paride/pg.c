@@ -550,7 +550,6 @@ static int pg_open(struct inode *inode, struct file *file)
 	dev->bufptr = kmalloc(PG_MAX_DATA, GFP_KERNEL);
 	if (dev->bufptr == NULL) {
 		clear_bit(0, &dev->access);
-		printk("%s: buffer allocation failed\n", dev->name);
 		ret = -ENOMEM;
 		goto out;
 	}

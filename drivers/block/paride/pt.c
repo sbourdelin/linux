@@ -687,10 +687,8 @@ static int pt_open(struct inode *inode, struct file *file)
 
 	err = -ENOMEM;
 	tape->bufptr = kmalloc(PT_BUFSIZE, GFP_KERNEL);
-	if (tape->bufptr == NULL) {
-		printk("%s: buffer allocation failed\n", tape->name);
+	if (!tape->bufptr)
 		goto out;
-	}
 
 	file->private_data = tape;
 	mutex_unlock(&pt_mutex);
