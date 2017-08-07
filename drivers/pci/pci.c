@@ -3819,8 +3819,26 @@ EXPORT_SYMBOL(pci_wait_for_pending_transaction);
  */
 static void pci_flr_wait(struct pci_dev *dev)
 {
+	u16 root_cap = 0;
 	int i = 0;
 	u32 id;
+	bool ret;
+
+	pcie_capability_read_word(dev, PCI_EXP_RTCAP, &root_cap);
+	if (root_cap & PCI_EXP_RTCAP_CRSVIS) {
+		/* don't touch the HW before waiting 100ms */
+		msleep(100);
+
+		/*
+		 * Physical functions return from here if found,
+		 * virtual functions fall through as they return ~0 on vendor
+		 * id read once CRS is completed.
+		 */
+		ret = pci_bus_read_dev_vendor_id(dev->bus, dev->devfn, &id,
+						 60000);
+		if (ret)
+			return;
+	}
 
 	do {
 		msleep(100);
