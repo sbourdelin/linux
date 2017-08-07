@@ -60,16 +60,14 @@ static inline void *_pci_root_bus_fwnode(struct pci_bus *bus)
 #define pci_root_bus_fwnode	_pci_root_bus_fwnode
 #endif
 
-static inline bool is_vmd(struct pci_bus *bus)
-{
 #if IS_ENABLED(CONFIG_VMD)
+static inline bool pci_bus_is_vmd(struct pci_bus *bus)
+{
 	struct pci_sysdata *sd = bus->sysdata;
 
 	return sd->vmd_domain;
-#else
-	return false;
-#endif
 }
+#endif
 
 /* Can be used to override the logic in pci_scan_bus for skipping
    already-configured bus numbers - to be used for buggy BIOSes

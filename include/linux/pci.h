@@ -1471,6 +1471,10 @@ static inline int pci_proc_domain(struct pci_bus *bus) { return 0; }
 static inline int pci_get_new_domain_nr(void) { return -ENOSYS; }
 #endif /* CONFIG_PCI_DOMAINS */
 
+#if !IS_ENABLED(CONFIG_VMD)
+static inline bool pci_bus_is_vmd(struct pci_bus *bus) { return false; }
+#endif
+
 /*
  * Generic implementation for PCI domain support. If your
  * architecture does not need custom management of PCI

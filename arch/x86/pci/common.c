@@ -662,7 +662,7 @@ static void set_dma_domain_ops(struct pci_dev *pdev) {}
 
 static void set_dev_domain_options(struct pci_dev *pdev)
 {
-	if (is_vmd(pdev->bus))
+	if (pci_bus_is_vmd(pdev->bus))
 		pdev->hotplug_user_indicators = 1;
 }
 
