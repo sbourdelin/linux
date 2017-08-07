@@ -23,6 +23,7 @@ struct gen_74x164_chip {
 	struct gpio_chip	gpio_chip;
 	struct mutex		lock;
 	u32			registers;
+	struct gpio_desc	*enable_gpio;
 	/*
 	 * Since the registers are chained, every byte sent will make
 	 * the previous byte shift to the next register in the
@@ -142,6 +143,12 @@ static int gen_74x164_probe(struct spi_device *spi)
 	chip->gpio_chip.parent = &spi->dev;
 	chip->gpio_chip.owner = THIS_MODULE;
 
+	chip->enable_gpio = devm_gpiod_get(&spi->dev, "enable", GPIOD_OUT_LOW);
+	if (IS_ERR(chip->enable_gpio)) {
+		dev_dbg(&spi->dev, "No enable-gpios property\n");
+		chip->enable_gpio = NULL;
+	}
+
 	mutex_init(&chip->lock);
 
 	ret = __gen_74x164_write_config(chip);
@@ -164,6 +171,8 @@ static int gen_74x164_remove(struct spi_device *spi)
 {
 	struct gen_74x164_chip *chip = spi_get_drvdata(spi);
 
+	if (chip->enable_gpio)
+		gpiod_set_value(chip->enable_gpio, 0);
 	gpiochip_remove(&chip->gpio_chip);
 	mutex_destroy(&chip->lock);
 
