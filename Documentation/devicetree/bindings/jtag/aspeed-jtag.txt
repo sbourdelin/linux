@@ -1,0 +1,27 @@
+Aspeed JTAG driver for ast2400 and ast2500 SoC
+
+Required properties:
+- compatible:		Should be one of
+      - "aspeed,aspeed2400-jtag"
+      - "aspeed,aspeed2500-jtag"
+- reg			contains the offset and length of the JTAG memory
+			region
+- clocks		root clock of bus, should reference the APB clock
+- reg-shift		device register offsets are shifted by this value
+- interrupts		should contain JTAG controller interrupt
+
+Optional properties:
+- status 		 defines the operation status of the JTAG. Valid
+values are:
+      - "disabled"	 the JTAG is disabled
+      - "okay"		 the JTAG is enabled
+
+Example:
+jtag: jtag@1e6e4000 {
+	compatible = "aspeed,aspeed2500-jtag";
+	reg = <0x1e6e4000 0x1c>;
+	reg-shift = <2>;
+	clocks = <&clk_apb>;
+	interrupts = <43>;
+	status = "disabled";
+};
