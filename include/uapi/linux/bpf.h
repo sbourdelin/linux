@@ -708,6 +708,7 @@ enum bpf_ret_code {
 	BPF_DROP = 2,
 	/* 3-6 reserved */
 	BPF_REDIRECT = 7,
+	BPF_DISCONNECT = 8,
 	/* >127 are reserved for prog type specific return codes */
 };
 
