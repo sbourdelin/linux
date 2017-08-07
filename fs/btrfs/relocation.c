@@ -3774,7 +3774,10 @@ int add_data_references(struct reloc_control *rc,
 			ret = find_data_references(rc, extent_key,
 						   eb, dref, blocks);
 		} else {
-			BUG();
+			ret = -EINVAL;
+			WARN(1,
+		     "extent %llu slot %d has an invalid inline ref type\n",
+			     eb->start, path->slots[0]);
 		}
 		if (ret) {
 			err = ret;
