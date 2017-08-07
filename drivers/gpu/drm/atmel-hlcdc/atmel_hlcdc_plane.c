@@ -883,24 +883,21 @@ static int atmel_hlcdc_plane_init_properties(struct atmel_hlcdc_plane *plane,
 				struct atmel_hlcdc_plane_properties *props)
 {
 	const struct atmel_hlcdc_layer_desc *desc = plane->layer.desc;
+	int ret;
 
 	if (desc->type == ATMEL_HLCDC_OVERLAY_LAYER ||
 	    desc->type == ATMEL_HLCDC_CURSOR_LAYER)
 		drm_object_attach_property(&plane->base.base,
 					   props->alpha, 255);
 
-	if (desc->layout.xstride && desc->layout.pstride) {
-		int ret;
-
-		ret = drm_plane_create_rotation_property(&plane->base,
-							 DRM_MODE_ROTATE_0,
-							 DRM_MODE_ROTATE_0 |
-							 DRM_MODE_ROTATE_90 |
-							 DRM_MODE_ROTATE_180 |
-							 DRM_MODE_ROTATE_270);
-		if (ret)
-			return ret;
-	}
+	ret = drm_plane_create_rotation_property(&plane->base,
+						 DRM_MODE_ROTATE_0,
+						 DRM_MODE_ROTATE_0 |
+						 DRM_MODE_ROTATE_90 |
+						 DRM_MODE_ROTATE_180 |
+						 DRM_MODE_ROTATE_270);
+	if (ret)
+		return ret;
 
 	if (desc->layout.csc) {
 		/*
