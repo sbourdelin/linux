@@ -3918,6 +3918,9 @@ retry:
 		goto exit3;
 	error = vfs_rmdir(path.dentry->d_inode, dentry);
 exit3:
+	/* after remove the dir set dentry remove flag */
+	if (!error)
+		dentry->d_flags |= DCACHE_FILE_REMOVED;
 	dput(dentry);
 exit2:
 	inode_unlock(path.dentry->d_inode);
@@ -4042,6 +4045,9 @@ retry_deleg:
 			goto exit2;
 		error = vfs_unlink(path.dentry->d_inode, dentry, &delegated_inode);
 exit2:
+		/* after unlink file set dentry remove flag */
+		if (!error)
+			dentry->d_flags |= DCACHE_FILE_REMOVED;
 		dput(dentry);
 	}
 	inode_unlock(path.dentry->d_inode);

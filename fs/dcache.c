@@ -722,7 +722,8 @@ static inline bool fast_dput(struct dentry *dentry)
 	 */
 	smp_rmb();
 	d_flags = ACCESS_ONCE(dentry->d_flags);
-	d_flags &= DCACHE_REFERENCED | DCACHE_LRU_LIST | DCACHE_DISCONNECTED;
+	d_flags &= DCACHE_REFERENCED | DCACHE_LRU_LIST | DCACHE_DISCONNECTED
+		| DCACHE_FILE_REMOVED;
 
 	/* Nothing to do? Dropping the reference was all we needed? */
 	if (d_flags == (DCACHE_REFERENCED | DCACHE_LRU_LIST) && !d_unhashed(dentry))
@@ -816,6 +817,15 @@ repeat:
 	dentry_lru_add(dentry);
 
 	dentry->d_lockref.count--;
+
+	/*
+	 * if file has been declare as removed and reference count is zero
+	 * then we can free the dentry rather than leave it stay in dcache
+	 */
+	if (unlikely(dentry->d_flags & DCACHE_FILE_REMOVED)) {
+		if (dentry->d_lockref.count == 0) 
+			goto kill_it;
+	}
 	spin_unlock(&dentry->d_lock);
 	return;
 
