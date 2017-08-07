@@ -4831,8 +4831,6 @@ static void skd_pci_remove(struct pci_dev *pdev)
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
-
-	return;
 }
 
 static int skd_pci_suspend(struct pci_dev *pdev, pm_message_t state)
