@@ -416,6 +416,16 @@ int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
 		&& !v->arch.power_off && !v->arch.pause);
 }
 
+bool kvm_arch_vcpu_spin_in_kernel(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+
+bool kvm_arch_vcpu_preempt_in_kernel(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+
 /* Just ensure a guest exit from a particular CPU */
 static void exit_vm_noop(void *info)
 {

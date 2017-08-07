@@ -2324,12 +2324,14 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me)
 {
 	struct kvm *kvm = me->kvm;
 	struct kvm_vcpu *vcpu;
+	bool in_kern;
 	int last_boosted_vcpu = me->kvm->last_boosted_vcpu;
 	int yielded = 0;
 	int try = 3;
 	int pass;
 	int i;
 
+	in_kern = kvm_arch_vcpu_spin_in_kernel(me);
 	kvm_vcpu_set_in_spin_loop(me, true);
 	/*
 	 * We boost the priority of a VCPU that is runnable but not
@@ -2350,6 +2352,8 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me)
 			if (vcpu == me)
 				continue;
 			if (swait_active(&vcpu->wq) && !kvm_arch_vcpu_runnable(vcpu))
+				continue;
+			if (in_kern && !kvm_arch_vcpu_preempt_in_kernel(vcpu))
 				continue;
 			if (!kvm_vcpu_eligible_for_directed_yield(vcpu))
 				continue;
