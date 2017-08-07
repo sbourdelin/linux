@@ -1392,12 +1392,9 @@ static int skd_sg_io_get_and_check_args(struct skd_device *skdev,
 		size_t iov_data_len;
 
 		iov = kmalloc(nbytes, GFP_KERNEL);
-		if (iov == NULL) {
-			pr_debug("%s:%s:%d alloc iovec failed %d\n",
-				 skdev->name, __func__, __LINE__,
-				 sgp->iovec_count);
+		if (!iov)
 			return -ENOMEM;
-		}
+
 		sksgio->iov = iov;
 		sksgio->iovcnt = sgp->iovec_count;
 
@@ -3859,8 +3856,6 @@ static int skd_acquire_msix(struct skd_device *skdev)
 			sizeof(struct skd_msix_entry), GFP_KERNEL);
 	if (!skdev->msix_entries) {
 		rc = -ENOMEM;
-		pr_err("(%s): msix table allocation error\n",
-		       skd_name(skdev));
 		goto out;
 	}
 
@@ -4309,12 +4304,8 @@ static struct skd_device *skd_construct(struct pci_dev *pdev)
 	int rc;
 
 	skdev = kzalloc(sizeof(*skdev), GFP_KERNEL);
-
-	if (!skdev) {
-		pr_err(PFX "(%s): memory alloc failure\n",
-		       pci_name(pdev));
+	if (!skdev)
 		return NULL;
-	}
 
 	skdev->state = SKD_DRVR_STATE_LOAD;
 	skdev->pdev = pdev;
