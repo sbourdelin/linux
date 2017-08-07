@@ -42,13 +42,15 @@ static int handle_hvc(struct kvm_vcpu *vcpu, struct kvm_run *run)
 			    kvm_vcpu_hvc_get_imm(vcpu));
 	vcpu->stat.hvc_exit_stat++;
 
-	ret = kvm_psci_call(vcpu);
-	if (ret < 0) {
-		kvm_inject_undefined(vcpu);
-		return 1;
+	/* HVC immediate value must be zero for all compliant calls */
+	if (!ESR_HVC_IMMEDIATE(kvm_vcpu_get_hsr(vcpu))) {
+		ret = kvm_psci_call(vcpu);
+		if (ret >= 0)
+			return ret;
 	}
 
-	return ret;
+	kvm_inject_undefined(vcpu);
+	return 1;
 }
 
 static int handle_smc(struct kvm_vcpu *vcpu, struct kvm_run *run)
