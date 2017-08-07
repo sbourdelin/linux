@@ -1580,7 +1580,13 @@ void __init memblock_mem_limit_remove_map(phys_addr_t limit)
 	memblock_cap_memory_range(0, max_addr);
 }
 
-static int __init_memblock memblock_search(struct memblock_type *type, phys_addr_t addr)
+/**
+ * Return index in regions array if addr is within the region. Otherwise
+ * return -1. If -1 is returned and *next_idx is not %NULL, sets it to the
+ * next region index or -1 if there is none.
+ */
+static int __init_memblock memblock_search(struct memblock_type *type,
+					   phys_addr_t addr, int *next_idx)
 {
 	unsigned int left = 0, right = type->cnt;
 
@@ -1595,22 +1601,26 @@ static int __init_memblock memblock_search(struct memblock_type *type, phys_addr
 		else
 			return mid;
 	} while (left < right);
+
+	if (next_idx)
+		*next_idx = (right == type->cnt) ? -1 : right;
+
 	return -1;
 }
 
 bool __init memblock_is_reserved(phys_addr_t addr)
 {
-	return memblock_search(&memblock.reserved, addr) != -1;
+	return memblock_search(&memblock.reserved, addr, NULL) != -1;
 }
 
 bool __init_memblock memblock_is_memory(phys_addr_t addr)
 {
-	return memblock_search(&memblock.memory, addr) != -1;
+	return memblock_search(&memblock.memory, addr, NULL) != -1;
 }
 
 int __init_memblock memblock_is_map_memory(phys_addr_t addr)
 {
-	int i = memblock_search(&memblock.memory, addr);
+	int i = memblock_search(&memblock.memory, addr, NULL);
 
 	if (i == -1)
 		return false;
@@ -1622,7 +1632,7 @@ int __init_memblock memblock_search_pfn_nid(unsigned long pfn,
 			 unsigned long *start_pfn, unsigned long *end_pfn)
 {
 	struct memblock_type *type = &memblock.memory;
-	int mid = memblock_search(type, PFN_PHYS(pfn));
+	int mid = memblock_search(type, PFN_PHYS(pfn), NULL);
 
 	if (mid == -1)
 		return -1;
@@ -1646,13 +1656,45 @@ int __init_memblock memblock_search_pfn_nid(unsigned long pfn,
  */
 int __init_memblock memblock_is_region_memory(phys_addr_t base, phys_addr_t size)
 {
-	int idx = memblock_search(&memblock.memory, base);
+	int idx = memblock_search(&memblock.memory, base, NULL);
 	phys_addr_t end = base + memblock_cap_size(base, &size);
 
 	if (idx == -1)
 		return 0;
 	return (memblock.memory.regions[idx].base +
 		 memblock.memory.regions[idx].size) >= end;
+}
+
+/**
+ * memblock_get_reserved_pfn_range - search for the next reserved region
+ *
+ * @pfn: start searching from this pfn.
+ *
+ * RETURNS:
+ * [start_pfn, end_pfn), where start_pfn >= pfn. If none is found
+ * start_pfn, and end_pfn are both set to ULONG_MAX.
+ */
+void __init_memblock memblock_get_reserved_pfn_range(unsigned long pfn,
+						     unsigned long *start_pfn,
+						     unsigned long *end_pfn)
+{
+	struct memblock_type *type = &memblock.reserved;
+	int next_idx, idx;
+
+	idx = memblock_search(type, PFN_PHYS(pfn), &next_idx);
+	if (idx == -1 && next_idx == -1) {
+		*start_pfn = ULONG_MAX;
+		*end_pfn = ULONG_MAX;
+		return;
+	}
+
+	if (idx == -1) {
+		idx = next_idx;
+		*start_pfn = PFN_DOWN(type->regions[idx].base);
+	} else {
+		*start_pfn = pfn;
+	}
+	*end_pfn = PFN_DOWN(type->regions[idx].base + type->regions[idx].size);
 }
 
 /**

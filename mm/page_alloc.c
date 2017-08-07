@@ -1447,6 +1447,7 @@ static int __init deferred_init_memmap(void *data)
 	pg_data_t *pgdat = data;
 	int nid = pgdat->node_id;
 	struct mminit_pfnnid_cache nid_init_state = { };
+	unsigned long resv_start_pfn = 0, resv_end_pfn = 0;
 	unsigned long start = jiffies;
 	unsigned long nr_pages = 0;
 	unsigned long walk_start, walk_end;
@@ -1491,6 +1492,10 @@ static int __init deferred_init_memmap(void *data)
 			pfn = zone->zone_start_pfn;
 
 		for (; pfn < end_pfn; pfn++) {
+			if (pfn >= resv_end_pfn)
+				memblock_get_reserved_pfn_range(pfn,
+								&resv_start_pfn,
+								&resv_end_pfn);
 			if (!pfn_valid_within(pfn))
 				goto free_range;
 
@@ -1524,7 +1529,11 @@ static int __init deferred_init_memmap(void *data)
 				cond_resched();
 			}
 
-			if (page->flags) {
+			/*
+			 * Check if this page has already been initialized due
+			 * to being reserved during boot in memblock.
+			 */
+			if (pfn >= resv_start_pfn) {
 				VM_BUG_ON(page_zone(page) != zone);
 				goto free_range;
 			}
