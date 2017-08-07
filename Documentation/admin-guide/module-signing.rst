@@ -52,10 +52,11 @@ This has a number of options available:
      This specifies how the kernel should deal with a module that has a
      signature for which the key is not known or a module that is unsigned.
 
-     If this is off (ie. "permissive"), then modules for which the key is not
-     available and modules that are unsigned are permitted, but the kernel will
-     be marked as being tainted, and the concerned modules will be marked as
-     tainted, shown with the character 'E'.
+     If this is off (ie. "permissive"), then modules for which the key
+     is not available and modules that are unsigned are permitted. If
+     ``CONFIG_MODULE_SIG_TAINT`` is enabled or the sig_taint parameter is
+     set the kernel will be marked as being tainted, and the concerned
+     modules will be marked as tainted, shown with the character 'E'.
 
      If this is on (ie. "restrictive"), only modules that have a valid
      signature that can be verified by a public key in the kernel's possession
@@ -265,6 +266,10 @@ the kernel command line, the kernel will only load validly signed modules
 for which it has a public key.   Otherwise, it will also load modules that are
 unsigned.   Any module for which the kernel has a key, but which proves to have
 a signature mismatch will not be permitted to load.
+
+If ``CONFIG_MODULE_SIG_TAINT`` is enabled or module.sig_taint=1 is
+supplied on the kernel command line, the kernel will be tainted if an
+invalidly signed or unsigned module is loaded.
 
 Any module that has an unparseable signature will be rejected.
 
