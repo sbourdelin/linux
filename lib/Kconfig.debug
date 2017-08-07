@@ -1093,6 +1093,14 @@ config LOCKDEP_COMPLETE
 	 A deadlock caused by wait_for_completion() and complete() can be
 	 detected by lockdep using crossrelease feature.
 
+config LOCKDEP_PAGELOCK
+	bool "Lock debugging: allow PG_locked lock to use deadlock detector"
+	select LOCKDEP_CROSSRELEASE
+	default n
+	help
+	 PG_locked lock is a kind of crosslock. Using crossrelease feature,
+	 PG_locked lock can work with runtime deadlock detector.
+
 config PROVE_LOCKING
 	bool "Lock debugging: prove locking correctness"
 	depends on DEBUG_KERNEL && TRACE_IRQFLAGS_SUPPORT && STACKTRACE_SUPPORT && LOCKDEP_SUPPORT
