@@ -936,6 +936,7 @@ void iommu_register_group(struct iommu_table_group *table_group,
 	if (!name)
 		return;
 	iommu_group_set_name(grp, name);
+	iommu_group_set_caps(grp, 0, IOMMU_GROUP_CAP_ISOLATE_MSIX);
 	kfree(name);
 }
 
