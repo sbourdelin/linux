@@ -111,4 +111,6 @@
 
 #define SO_ZEROCOPY		60
 
+#define SO_ULP			61
+
 #endif /* _UAPI_ASM_SOCKET_H */

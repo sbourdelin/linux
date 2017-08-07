@@ -830,6 +830,11 @@ void inet_csk_destroy_sock(struct sock *sk)
 	/* If it has not 0 inet_sk(sk)->inet_num, it must be bound */
 	WARN_ON(inet_sk(sk)->inet_num && !inet_csk(sk)->icsk_bind_hash);
 
+	/* Clean up ULP before destroying protocol socket since ULP might
+	 * be dependent on transport (and not the other way around).
+	 */
+	ulp_cleanup(sk);
+
 	sk->sk_prot->destroy(sk);
 
 	sk_stream_kill_queues(sk);

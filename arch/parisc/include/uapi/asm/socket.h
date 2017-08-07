@@ -103,4 +103,6 @@
 
 #define SO_ZEROCOPY		0x4035
 
+#define SO_ULP			0x4036
+
 #endif /* _UAPI_ASM_SOCKET_H */

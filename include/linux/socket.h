@@ -156,6 +156,15 @@ struct ucred {
 	__u32	gid;
 };
 
+/* ULP configuration for socket */
+
+#define ULP_NAME_MAX	16
+
+struct ulp_config {
+	char ulp_name[ULP_NAME_MAX];
+	__u8 ulp_params[0];
+};
+
 /* Supported address families. */
 #define AF_UNSPEC	0
 #define AF_UNIX		1	/* Unix domain sockets 		*/

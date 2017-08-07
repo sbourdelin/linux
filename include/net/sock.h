@@ -72,6 +72,7 @@
 #include <net/tcp_states.h>
 #include <linux/net_tstamp.h>
 #include <net/smc.h>
+#include <net/ulp_sock.h>
 
 /*
  * This structure really needs to be cleaned up.
@@ -313,6 +314,8 @@ struct sock_common {
   *	@sk_destruct: called at sock freeing time, i.e. when all refcnt == 0
   *	@sk_reuseport_cb: reuseport group container
   *	@sk_rcu: used during RCU grace period
+  *	@sk_ulp_ops: pluggable ULP control hook
+  *	@sk_ulp_data: ULP private data
   */
 struct sock {
 	/*
@@ -480,6 +483,9 @@ struct sock {
 	void                    (*sk_destruct)(struct sock *sk);
 	struct sock_reuseport __rcu	*sk_reuseport_cb;
 	struct rcu_head		sk_rcu;
+
+	const struct ulp_ops	*sk_ulp_ops;
+	void			*sk_ulp_data;
 };
 
 enum sk_pacing {

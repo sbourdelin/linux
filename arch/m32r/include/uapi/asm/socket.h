@@ -104,4 +104,6 @@
 
 #define SO_ZEROCOPY		60
 
+#define SO_ULP			61
+
 #endif /* _ASM_M32R_SOCKET_H */

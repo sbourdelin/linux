@@ -21,6 +21,7 @@
 #include <net/net_ratelimit.h>
 #include <net/busy_poll.h>
 #include <net/pkt_sched.h>
+#include <net/ulp_sock.h>
 
 static int zero = 0;
 static int one = 1;
@@ -249,6 +250,24 @@ static int proc_do_rss_key(struct ctl_table *table, int write,
 	return proc_dostring(&fake_table, write, buffer, lenp, ppos);
 }
 
+static int proc_ulp_available(struct ctl_table *ctl,
+			      int write,
+			      void __user *buffer, size_t *lenp,
+			      loff_t *ppos)
+{
+	struct ctl_table tbl = { .maxlen = ULP_BUF_MAX, };
+	int ret;
+
+	tbl.data = kmalloc(tbl.maxlen, GFP_USER);
+	if (!tbl.data)
+		return -ENOMEM;
+	ulp_get_available(tbl.data, ULP_BUF_MAX);
+	ret = proc_dostring(&tbl, write, buffer, lenp, ppos);
+	kfree(tbl.data);
+
+	return ret;
+}
+
 static struct ctl_table net_core_table[] = {
 #ifdef CONFIG_NET
 	{
@@ -459,6 +478,12 @@ static struct ctl_table net_core_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
+	},
+	{
+		.procname	= "ulp_available",
+		.maxlen		= ULP_BUF_MAX,
+		.mode		= 0444,
+		.proc_handler	= proc_ulp_available,
 	},
 	{ }
 };
