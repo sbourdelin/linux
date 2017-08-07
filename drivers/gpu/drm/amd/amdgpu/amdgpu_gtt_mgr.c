@@ -241,6 +241,20 @@ static void amdgpu_gtt_mgr_del(struct ttm_mem_type_manager *man,
 }
 
 /**
+ * amdgpu_gtt_mgr_usage - return usage of GTT domain
+ *
+ * @man: TTM memory type manager
+ *
+ * Return how many bytes are used in the GTT domain
+ */
+uint64_t amdgpu_gtt_mgr_usage(struct ttm_mem_type_manager *man)
+{
+	struct amdgpu_gtt_mgr *mgr = man->priv;
+
+	return (u64)(man->size - READ_ONCE(mgr->available)) * PAGE_SIZE;
+}
+
+/**
  * amdgpu_gtt_mgr_debug - dump VRAM table
  *
  * @man: TTM memory type manager
@@ -251,7 +265,6 @@ static void amdgpu_gtt_mgr_del(struct ttm_mem_type_manager *man,
 static void amdgpu_gtt_mgr_debug(struct ttm_mem_type_manager *man,
 				 struct drm_printer *printer)
 {
-	struct amdgpu_device *adev = amdgpu_ttm_adev(man->bdev);
 	struct amdgpu_gtt_mgr *mgr = man->priv;
 
 	spin_lock(&mgr->lock);
@@ -259,8 +272,7 @@ static void amdgpu_gtt_mgr_debug(struct ttm_mem_type_manager *man,
 	spin_unlock(&mgr->lock);
 
 	drm_printf(printer, "man size:%llu pages, gtt available:%llu pages, usage:%lluMB\n",
-		   man->size, mgr->available,
-		   (u64)atomic64_read(&adev->gtt_usage) >> 20);
+		   man->size, mgr->available, amdgpu_gtt_mgr_usage(man) >> 20);
 }
 
 const struct ttm_mem_type_manager_func amdgpu_gtt_mgr_func = {
