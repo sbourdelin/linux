@@ -33,7 +33,7 @@ config SND_PXA2XX_SOC_I2S
 
 config SND_PXA_SOC_SSP
 	tristate
-	select PXA_SSP
+	select PXA_SSP if ARCH_PXA
 
 config SND_MMP_SOC_SSPA
 	tristate
@@ -141,7 +141,6 @@ config SND_PXA910_SOC
 config SND_SOC_TTC_DKB
 	tristate "SoC Audio support for TTC DKB"
 	depends on SND_PXA910_SOC && MACH_TTC_DKB && I2C=y
-	select PXA_SSP
 	select SND_PXA_SOC_SSP
 	select SND_MMP_SOC
 	select MFD_88PM860X
