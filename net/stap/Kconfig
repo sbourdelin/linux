@@ -1,0 +1,8 @@
+config STAP
+	tristate "Socket tap"
+	depends on INET
+	select BPF_SYSCALL
+	select STREAM_PARSER
+	---help---
+	  Socket tap.
+
