@@ -204,10 +204,28 @@ BPF_CALL_5(bpf_trace_printk, char *, fmt, u32, fmt_size, u64, arg1,
 		fmt_cnt++;
 	}
 
-	return __trace_printk(1/* fake ip will not be printed */, fmt,
-			      mod[0] == 2 ? arg1 : mod[0] == 1 ? (long) arg1 : (u32) arg1,
-			      mod[1] == 2 ? arg2 : mod[1] == 1 ? (long) arg2 : (u32) arg2,
-			      mod[2] == 2 ? arg3 : mod[2] == 1 ? (long) arg3 : (u32) arg3);
+	/*
+	 * This is a horribly ugly hack to allow different combinations of
+	 * argument types to be used, particularly on 32-bit architectures where
+	 * u32 & long pass the same as one another, but differently to u64.
+	 *
+	 * On 64-bit architectures it is assumed u32, long & u64 pass in the
+	 * same way.
+	 */
+
+#define __BPFTP_P(...)	__trace_printk(1/* fake ip will not be printed */, \
+				       fmt, ##__VA_ARGS__)
+#define __BPFTP_1(...)	((mod[0] == 2 || __BITS_PER_LONG == 64)		\
+			 ? __BPFTP_P(arg1, ##__VA_ARGS__)		\
+			 : __BPFTP_P((long)arg1, ##__VA_ARGS__))
+#define __BPFTP_2(...)	((mod[1] == 2 || __BITS_PER_LONG == 64)		\
+			 ? __BPFTP_1(arg2, ##__VA_ARGS__)		\
+			 : __BPFTP_1((long)arg2, ##__VA_ARGS__))
+#define __BPFTP_3(...)	((mod[2] == 2 || __BITS_PER_LONG == 64)		\
+			 ? __BPFTP_2(arg3, ##__VA_ARGS__)		\
+			 : __BPFTP_2((long)arg3, ##__VA_ARGS__))
+
+	return __BPFTP_3();
 }
 
 static const struct bpf_func_proto bpf_trace_printk_proto = {
