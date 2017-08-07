@@ -549,7 +549,7 @@ static struct ata_port_operations sis_133_for_sata_ops = {
 	.cable_detect		= sis_133_cable_detect,
 };
 
-static struct ata_port_operations sis_base_ops = {
+static const struct ata_port_operations sis_base_ops = {
 	.inherits		= &ata_bmdma_port_ops,
 	.prereset		= sis_pre_reset,
 };

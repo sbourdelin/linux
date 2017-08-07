@@ -129,7 +129,7 @@ static struct scsi_host_template svia_sht = {
 	ATA_BMDMA_SHT(DRV_NAME),
 };
 
-static struct ata_port_operations svia_base_ops = {
+static const  struct ata_port_operations svia_base_ops = {
 	.inherits		= &ata_bmdma_port_ops,
 	.sff_tf_load		= svia_tf_load,
 };
