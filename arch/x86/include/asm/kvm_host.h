@@ -688,6 +688,9 @@ struct kvm_vcpu_arch {
 
 	/* GPA available (AMD only) */
 	bool gpa_available;
+
+	/* be preempted when it's in kernel-mode(cpl=0) */
+	bool preempted_in_kernel;
 };
 
 struct kvm_lpage_info {
@@ -1057,6 +1060,8 @@ struct kvm_x86_ops {
 	void (*cancel_hv_timer)(struct kvm_vcpu *vcpu);
 
 	void (*setup_mce)(struct kvm_vcpu *vcpu);
+
+	bool (*spin_in_kernel)(struct kvm_vcpu *vcpu);
 };
 
 struct kvm_arch_async_pf {

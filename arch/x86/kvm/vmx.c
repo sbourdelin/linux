@@ -11547,6 +11547,25 @@ static void vmx_setup_mce(struct kvm_vcpu *vcpu)
 			~FEATURE_CONTROL_LMCE;
 }
 
+static bool vmx_spin_in_kernel(struct kvm_vcpu *vcpu)
+{
+	u32 secondary_exec_ctrl = 0;
+
+	/*
+	 * Intel sdm vol3 ch-25.1.3 says: The “PAUSE-loop exiting”
+	 * VM-execution control is ignored if CPL > 0. So the vcpu
+	 * is always exiting with CPL=0 if it uses PLE.
+	 *
+	 * The following block needs less cycles than vmx_get_cpl().
+	 */
+	if (cpu_has_secondary_exec_ctrls())
+		secondary_exec_ctrl = vmcs_read32(SECONDARY_VM_EXEC_CONTROL);
+	if (secondary_exec_ctrl & SECONDARY_EXEC_PAUSE_LOOP_EXITING)
+		return true;
+
+	return vmx_get_cpl(vcpu) == 0;
+}
+
 static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.cpu_has_kvm_support = cpu_has_kvm_support,
 	.disabled_by_bios = vmx_disabled_by_bios,
@@ -11674,6 +11693,7 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 #endif
 
 	.setup_mce = vmx_setup_mce,
+	.spin_in_kernel = vmx_spin_in_kernel,
 };
 
 static int __init vmx_init(void)
