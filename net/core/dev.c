@@ -1362,8 +1362,6 @@ static int __dev_open(struct net_device *dev)
 	if (ret)
 		return ret;
 
-	set_bit(__LINK_STATE_START, &dev->state);
-
 	if (ops->ndo_validate_addr)
 		ret = ops->ndo_validate_addr(dev);
 
@@ -1372,9 +1370,8 @@ static int __dev_open(struct net_device *dev)
 
 	netpoll_poll_enable(dev);
 
-	if (ret)
-		clear_bit(__LINK_STATE_START, &dev->state);
-	else {
+	if (!ret)
+		set_bit(__LINK_STATE_START, &dev->state);
 		dev->flags |= IFF_UP;
 		dev_set_rx_mode(dev);
 		dev_activate(dev);
