@@ -1371,10 +1371,19 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
 	 R1_CC_ERROR |		/* Card controller error */		\
 	 R1_ERROR)		/* General/unknown error */
 
-static bool mmc_blk_has_cmd_err(struct mmc_command *cmd)
+static bool mmc_blk_has_cmd_err(struct mmc_card *card, struct mmc_command *cmd)
 {
-	if (!cmd->error && cmd->resp[0] & CMD_ERRORS)
-		cmd->error = -EIO;
+	struct mmc_blk_data *md = dev_get_drvdata(&card->dev);
+
+	if (!cmd->error && cmd->resp[0] & CMD_ERRORS) {
+		/*
+		 * Prevent the OUT_OF_RANGE error for open-ending
+		 * multiple block operations as it's normal behaviour.
+		 */
+		if (!(!(md->flags & MMC_BLK_CMD23) &&
+		     cmd->resp[0] & R1_OUT_OF_RANGE))
+			cmd->error = -EIO;
+	}
 
 	return cmd->error;
 }
@@ -1400,8 +1409,8 @@ static enum mmc_blk_status mmc_blk_err_check(struct mmc_card *card,
 	 * stop.error indicates a problem with the stop command.  Data
 	 * may have been transferred, or may still be transferring.
 	 */
-	if (brq->sbc.error || brq->cmd.error || mmc_blk_has_cmd_err(&brq->stop) ||
-	    brq->data.error) {
+	if (brq->sbc.error || brq->cmd.error ||
+	    mmc_blk_has_cmd_err(card, &brq->stop) || brq->data.error) {
 		switch (mmc_blk_cmd_recovery(card, req, brq, &ecc_err, &gen_err)) {
 		case ERR_RETRY:
 			return MMC_BLK_RETRY;
