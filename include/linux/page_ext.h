@@ -44,6 +44,10 @@ enum page_ext_flags {
  */
 struct page_ext {
 	unsigned long flags;
+
+#ifdef CONFIG_LOCKDEP_PAGELOCK
+	struct lockdep_map_cross map;
+#endif
 };
 
 extern void pgdat_page_ext_init(struct pglist_data *pgdat);

@@ -1096,6 +1096,7 @@ config LOCKDEP_COMPLETE
 config LOCKDEP_PAGELOCK
 	bool "Lock debugging: allow PG_locked lock to use deadlock detector"
 	select LOCKDEP_CROSSRELEASE
+	select PAGE_EXTENSION
 	default n
 	help
 	 PG_locked lock is a kind of crosslock. Using crossrelease feature,

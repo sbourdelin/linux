@@ -374,28 +374,41 @@ PAGEFLAG(Idle, idle, PF_ANY)
 
 #ifdef CONFIG_LOCKDEP_PAGELOCK
 #include <linux/lockdep.h>
+#include <linux/page_ext.h>
 
 TESTPAGEFLAG(Locked, locked, PF_NO_TAIL)
 
 static __always_inline void __SetPageLocked(struct page *page)
 {
+	struct page_ext *e;
+
 	__set_bit(PG_locked, &PF_NO_TAIL(page, 1)->flags);
 
 	page = compound_head(page);
-	lock_acquire_exclusive((struct lockdep_map *)&page->map, 0, 1, NULL, _RET_IP_);
+	e = lookup_page_ext(page);
+	if (unlikely(!e))
+		return;
+
+	lock_acquire_exclusive((struct lockdep_map *)&e->map, 0, 1, NULL, _RET_IP_);
 }
 
 static __always_inline void __ClearPageLocked(struct page *page)
 {
+	struct page_ext *e;
+
 	__clear_bit(PG_locked, &PF_NO_TAIL(page, 1)->flags);
 
 	page = compound_head(page);
+	e = lookup_page_ext(page);
+	if (unlikely(!e))
+		return;
+
 	/*
 	 * lock_commit_crosslock() is necessary for crosslock
 	 * when the lock is released, before lock_release().
 	 */
-	lock_commit_crosslock((struct lockdep_map *)&page->map);
-	lock_release((struct lockdep_map *)&page->map, 0, _RET_IP_);
+	lock_commit_crosslock((struct lockdep_map *)&e->map);
+	lock_release((struct lockdep_map *)&e->map, 0, _RET_IP_);
 }
 #else
 __PAGEFLAG(Locked, locked, PF_NO_TAIL)

@@ -16,6 +16,7 @@
 #include <linux/hugetlb_inline.h>
 #ifdef CONFIG_LOCKDEP_PAGELOCK
 #include <linux/lockdep.h>
+#include <linux/page_ext.h>
 #endif
 
 /*
@@ -452,28 +453,47 @@ static inline pgoff_t linear_page_index(struct vm_area_struct *vma,
 }
 
 #ifdef CONFIG_LOCKDEP_PAGELOCK
+extern struct page_ext_operations lockdep_pagelock_ops;
+
 #define lock_page_init(p)						\
 do {									\
 	static struct lock_class_key __key;				\
-	lockdep_init_map_crosslock((struct lockdep_map *)&(p)->map,	\
+	struct page_ext *e = lookup_page_ext(p);		\
+								\
+	if (unlikely(!e))					\
+		break;						\
+								\
+	lockdep_init_map_crosslock((struct lockdep_map *)&(e)->map,	\
 			"(PG_locked)" #p, &__key, 0);			\
 } while (0)
 
 static inline void lock_page_acquire(struct page *page, int try)
 {
+	struct page_ext *e;
+
 	page = compound_head(page);
-	lock_acquire_exclusive((struct lockdep_map *)&page->map, 0,
+	e = lookup_page_ext(page);
+	if (unlikely(!e))
+		return;
+
+	lock_acquire_exclusive((struct lockdep_map *)&e->map, 0,
 			       try, NULL, _RET_IP_);
 }
 
 static inline void lock_page_release(struct page *page)
 {
+	struct page_ext *e;
+
 	page = compound_head(page);
+	e = lookup_page_ext(page);
+	if (unlikely(!e))
+		return;
+
 	/*
 	 * lock_commit_crosslock() is necessary for crosslocks.
 	 */
-	lock_commit_crosslock((struct lockdep_map *)&page->map);
-	lock_release((struct lockdep_map *)&page->map, 0, _RET_IP_);
+	lock_commit_crosslock((struct lockdep_map *)&e->map);
+	lock_release((struct lockdep_map *)&e->map, 0, _RET_IP_);
 }
 #else
 static inline void lock_page_init(struct page *page) {}
