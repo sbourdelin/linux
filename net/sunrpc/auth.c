@@ -357,6 +357,15 @@ rpcauth_key_timeout_notify(struct rpc_auth *auth, struct rpc_cred *cred)
 }
 EXPORT_SYMBOL_GPL(rpcauth_key_timeout_notify);
 
+int
+rpcauth_key_set_destroy(struct rpc_auth *auth, struct rpc_cred *cred)
+{
+	if (!cred->cr_auth->au_ops->key_destroy)
+		return 0;
+	return cred->cr_auth->au_ops->key_destroy(auth, cred);
+}
+EXPORT_SYMBOL_GPL(rpcauth_key_set_destroy);
+
 bool
 rpcauth_cred_key_to_expire(struct rpc_auth *auth, struct rpc_cred *cred)
 {

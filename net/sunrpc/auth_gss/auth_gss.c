@@ -1473,6 +1473,9 @@ check_expire:
 	if (ret == 0)
 		return ret;
 
+	if (test_bit(RPCAUTH_CRED_DESTROYED, &rc->cr_flags))
+		return 0;
+
 	/* Notify acred users of GSS context expiration timeout */
 	if (test_bit(RPC_CRED_NOTIFY_TIMEOUT, &acred->ac_flags) &&
 	    (gss_key_timeout(rc) != 0)) {

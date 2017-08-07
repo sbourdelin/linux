@@ -76,6 +76,7 @@ struct rpc_cred {
 #define RPCAUTH_CRED_UPTODATE	1
 #define RPCAUTH_CRED_HASHED	2
 #define RPCAUTH_CRED_NEGATIVE	3
+#define RPCAUTH_CRED_DESTROYED	4
 
 /* rpc_auth au_flags */
 #define RPCAUTH_AUTH_NO_CRKEY_TIMEOUT	0x0001 /* underlying cred has no key timeout */
@@ -135,6 +136,8 @@ struct rpc_authops {
 	int			(*flavor2info)(rpc_authflavor_t,
 						struct rpcsec_gss_info *);
 	int			(*key_timeout)(struct rpc_auth *,
+						struct rpc_cred *);
+	int			(*key_destroy)(struct rpc_auth *,
 						struct rpc_cred *);
 };
 
@@ -197,6 +200,8 @@ int			rpcauth_init_credcache(struct rpc_auth *);
 void			rpcauth_destroy_credcache(struct rpc_auth *);
 void			rpcauth_clear_credcache(struct rpc_cred_cache *);
 int			rpcauth_key_timeout_notify(struct rpc_auth *,
+						struct rpc_cred *);
+int			rpcauth_key_set_destroy(struct rpc_auth *,
 						struct rpc_cred *);
 bool			rpcauth_cred_key_to_expire(struct rpc_auth *, struct rpc_cred *);
 char *			rpcauth_stringify_acceptor(struct rpc_cred *);
