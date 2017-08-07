@@ -751,3 +751,24 @@ unsigned long memory_block_size_bytes(void)
 struct ppc_pci_io ppc_pci_io;
 EXPORT_SYMBOL(ppc_pci_io);
 #endif
+
+#ifdef CONFIG_HARDLOCKUP_DETECTOR_PERF
+u64 hw_nmi_get_sample_period(int watchdog_thresh)
+{
+	return ppc_proc_freq * watchdog_thresh;
+}
+
+/*
+ * The perf based hardlockup detector breaks PMU event based branches and is
+ * likely to get false positives in KVM guests, so disable it by default.
+ * Book3S has a soft-nmi version based on the decrementer interrupt so it does
+ * not suffer from these problems.
+ */
+static int __init disable_hardlockup_detector(void)
+{
+	hardlockup_detector_disable();
+
+	return 0;
+}
+early_initcall(disable_hardlockup_detector);
+#endif
