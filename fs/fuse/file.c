@@ -1227,6 +1227,8 @@ static ssize_t fuse_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 out:
 	current->backing_dev_info = NULL;
 	inode_unlock(inode);
+	if (written > 0)
+		written = generic_write_sync(iocb, written);
 
 	return written ? written : err;
 }
