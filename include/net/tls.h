@@ -214,9 +214,7 @@ static inline void tls_fill_prepend(struct tls_context *ctx,
 
 static inline struct tls_context *tls_get_ctx(const struct sock *sk)
 {
-	struct inet_connection_sock *icsk = inet_csk(sk);
-
-	return icsk->icsk_ulp_data;
+	return sk->sk_ulp_data;
 }
 
 static inline struct tls_sw_context *tls_sw_ctx(
