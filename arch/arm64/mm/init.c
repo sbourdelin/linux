@@ -52,6 +52,7 @@
 #include <asm/sizes.h>
 #include <asm/tlb.h>
 #include <asm/alternative.h>
+#include <asm/module.h>
 
 /*
  * We need to be able to catch inadvertent references to memstart_addr
@@ -609,8 +610,8 @@ void __init mem_init(void)
 	pr_notice("    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n",
 		MLG(KASAN_SHADOW_START, KASAN_SHADOW_END));
 #endif
-	pr_notice("    modules : 0x%16lx - 0x%16lx   (%6ld MB)\n",
-		MLM(MODULES_VADDR, MODULES_END));
+	pr_notice("    modules : 0x%16llx - 0x%16llx   (%6lld MB)\n",
+		MLM(module_alloc_base, module_alloc_base + MODULES_VSIZE));
 	pr_notice("    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n",
 		MLG(VMALLOC_START, VMALLOC_END));
 	pr_notice("      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n",
