@@ -470,6 +470,9 @@ static void init_iommu_group(struct device *dev)
 	if (IS_ERR(group))
 		return;
 
+	if (irq_remapping_enabled)
+		iommu_group_set_caps(group, 0, IOMMU_GROUP_CAP_ISOLATE_MSIX);
+
 	iommu_group_put(group);
 }
 

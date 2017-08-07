@@ -5247,6 +5247,9 @@ static int intel_iommu_add_device(struct device *dev)
 	if (IS_ERR(group))
 		return PTR_ERR(group);
 
+	if (irq_remapping_enabled && !disable_sourceid_checking)
+		iommu_group_set_caps(group, 0, IOMMU_GROUP_CAP_ISOLATE_MSIX);
+
 	iommu_group_put(group);
 	return 0;
 }
