@@ -855,6 +855,9 @@ struct task_struct {
 	unsigned int xhlock_idx;
 	/* For restoring at history boundaries */
 	unsigned int xhlock_idx_hist[CONTEXT_NR];
+	unsigned int hist_id;
+	/* For overwrite check at each context exit */
+	unsigned int hist_id_save[CONTEXT_NR];
 #endif
 
 #ifdef CONFIG_UBSAN
