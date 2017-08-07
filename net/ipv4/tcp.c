@@ -2628,7 +2628,9 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 		break;
 
 	case TCP_KEEPIDLE:
-		if (val < 1 || val > MAX_TCP_KEEPIDLE)
+		/* Per RFC5482 keepalive_time must be > user_timeout */
+		if (val < 1 || val > MAX_TCP_KEEPIDLE ||
+		    ((val * HZ) <= icsk->icsk_user_timeout))
 			err = -EINVAL;
 		else {
 			tp->keepalive_time = val * HZ;
@@ -2724,8 +2726,12 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 	case TCP_USER_TIMEOUT:
 		/* Cap the max time in ms TCP will retry or probe the window
 		 * before giving up and aborting (ETIMEDOUT) a connection.
+		 * Per RFC5482 TCP user timeout must be < keepalive_time.
+		 * If the default value changes later -- all bets are off.
 		 */
-		if (val < 0)
+		if (val < 0 || (tp->keepalive_time &&
+				tp->keepalive_time <= msecs_to_jiffies(val)) ||
+		   net->ipv4.sysctl_tcp_keepalive_time <= msecs_to_jiffies(val))
 			err = -EINVAL;
 		else
 			icsk->icsk_user_timeout = msecs_to_jiffies(val);
