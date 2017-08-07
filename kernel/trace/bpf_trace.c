@@ -129,7 +129,7 @@ BPF_CALL_5(bpf_trace_printk, char *, fmt, u32, fmt_size, u64, arg1,
 	   u64, arg2, u64, arg3)
 {
 	bool str_seen = false;
-	int mod[3] = {};
+	int mod[3] = { 0, 0, 0 };
 	int fmt_cnt = 0;
 	u64 unsafe_addr;
 	char buf[64];
