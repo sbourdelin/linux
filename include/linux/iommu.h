@@ -155,6 +155,9 @@ struct iommu_resv_region {
 	enum iommu_resv_type	type;
 };
 
+/* IOMMU group capabilities */
+#define IOMMU_GROUP_CAP_ISOLATE_MSIX		(1U)
+
 #ifdef CONFIG_IOMMU_API
 
 /**
@@ -312,6 +315,11 @@ extern void *iommu_group_get_iommudata(struct iommu_group *group);
 extern void iommu_group_set_iommudata(struct iommu_group *group,
 				      void *iommu_data,
 				      void (*release)(void *iommu_data));
+extern void iommu_group_set_caps(struct iommu_group *group,
+				 unsigned long clearcaps,
+				 unsigned long setcaps);
+extern bool iommu_group_is_capable(struct iommu_group *group,
+				   unsigned long cap);
 extern int iommu_group_set_name(struct iommu_group *group, const char *name);
 extern int iommu_group_add_device(struct iommu_group *group,
 				  struct device *dev);
@@ -511,6 +519,18 @@ static inline void iommu_group_set_iommudata(struct iommu_group *group,
 					     void *iommu_data,
 					     void (*release)(void *iommu_data))
 {
+}
+
+static inline void iommu_group_set_caps(struct iommu_group *group,
+					unsigned long clearcaps,
+					unsigned long setcaps)
+{
+}
+
+static inline bool iommu_group_is_capable(struct iommu_group *group,
+					  unsigned long cap)
+{
+	return false;
 }
 
 static inline int iommu_group_set_name(struct iommu_group *group,

@@ -52,6 +52,7 @@ struct iommu_group {
 	void (*iommu_data_release)(void *iommu_data);
 	char *name;
 	int id;
+	unsigned long caps;
 	struct iommu_domain *default_domain;
 	struct iommu_domain *domain;
 };
@@ -445,6 +446,33 @@ void iommu_group_set_iommudata(struct iommu_group *group, void *iommu_data,
 	group->iommu_data_release = release;
 }
 EXPORT_SYMBOL_GPL(iommu_group_set_iommudata);
+
+/**
+ * iommu_group_set_caps - Change the group capabilities
+ * @group: the group
+ * @clearcaps: capabilities mask to remove
+ * @setcaps: capabilities mask to add
+ *
+ * IOMMU groups can be capable of various features which device drivers
+ * may read and adjust the behavior.
+ */
+void iommu_group_set_caps(struct iommu_group *group,
+		unsigned long clearcaps, unsigned long setcaps)
+{
+	group->caps &= ~clearcaps;
+	group->caps |= setcaps;
+}
+EXPORT_SYMBOL_GPL(iommu_group_set_caps);
+
+/**
+ * iommu_group_is_capable - Returns if a group capability is present
+ * @group: the group
+ */
+bool iommu_group_is_capable(struct iommu_group *group, unsigned long cap)
+{
+	return !!(group->caps & cap);
+}
+EXPORT_SYMBOL_GPL(iommu_group_is_capable);
 
 /**
  * iommu_group_set_name - set name for a group
