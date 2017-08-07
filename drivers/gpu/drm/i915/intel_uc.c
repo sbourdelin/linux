@@ -395,7 +395,7 @@ int intel_uc_init_hw(struct drm_i915_private *dev_priv)
 
 	intel_guc_auth_huc(dev_priv);
 	if (i915.enable_guc_submission) {
-		if (i915.guc_log_level >= 0)
+		if (HAS_GUC_CT(dev_priv) || i915.guc_log_level >= 0)
 			gen9_enable_guc_interrupts(dev_priv);
 
 		ret = i915_guc_submission_enable(dev_priv);
