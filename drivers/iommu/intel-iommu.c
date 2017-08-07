@@ -905,6 +905,11 @@ static struct intel_iommu *device_to_iommu(struct device *dev, u8 *bus, u8 *devf
 		 * the PF instead to find the IOMMU. */
 		pf_pdev = pci_physfn(pdev);
 		dev = &pf_pdev->dev;
+
+		/* VMD child devices currently cannot be handled individually */
+		if (pci_bus_is_vmd(pdev->bus))
+			return NULL;
+
 		segment = pci_domain_nr(pdev->bus);
 	} else if (has_acpi_companion(dev))
 		dev = &ACPI_COMPANION(dev)->dev;
