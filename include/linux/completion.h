@@ -9,6 +9,9 @@
  */
 
 #include <linux/wait.h>
+#ifdef CONFIG_LOCKDEP_COMPLETE
+#include <linux/lockdep.h>
+#endif
 
 /*
  * struct completion - structure used to maintain state for a "completion"
@@ -25,10 +28,50 @@
 struct completion {
 	unsigned int done;
 	wait_queue_head_t wait;
+#ifdef CONFIG_LOCKDEP_COMPLETE
+	struct lockdep_map_cross map;
+#endif
 };
 
+#ifdef CONFIG_LOCKDEP_COMPLETE
+static inline void complete_acquire(struct completion *x)
+{
+	lock_acquire_exclusive((struct lockdep_map *)&x->map, 0, 0, NULL, _RET_IP_);
+}
+
+static inline void complete_release(struct completion *x)
+{
+	lock_release((struct lockdep_map *)&x->map, 0, _RET_IP_);
+}
+
+static inline void complete_release_commit(struct completion *x)
+{
+	lock_commit_crosslock((struct lockdep_map *)&x->map);
+}
+
+#define init_completion(x)						\
+do {									\
+	static struct lock_class_key __key;				\
+	lockdep_init_map_crosslock((struct lockdep_map *)&(x)->map,	\
+			"(complete)" #x,				\
+			&__key, 0);					\
+	__init_completion(x);						\
+} while (0)
+#else
+#define init_completion(x) __init_completion(x)
+static inline void complete_acquire(struct completion *x) {}
+static inline void complete_release(struct completion *x) {}
+static inline void complete_release_commit(struct completion *x) {}
+#endif
+
+#ifdef CONFIG_LOCKDEP_COMPLETE
+#define COMPLETION_INITIALIZER(work) \
+	{ 0, __WAIT_QUEUE_HEAD_INITIALIZER((work).wait), \
+	STATIC_CROSS_LOCKDEP_MAP_INIT("(complete)" #work, &(work)) }
+#else
 #define COMPLETION_INITIALIZER(work) \
 	{ 0, __WAIT_QUEUE_HEAD_INITIALIZER((work).wait) }
+#endif
 
 #define COMPLETION_INITIALIZER_ONSTACK(work) \
 	({ init_completion(&work); work; })
@@ -70,7 +113,7 @@ struct completion {
  * This inline function will initialize a dynamically created completion
  * structure.
  */
-static inline void init_completion(struct completion *x)
+static inline void __init_completion(struct completion *x)
 {
 	x->done = 0;
 	init_waitqueue_head(&x->wait);
@@ -88,18 +131,75 @@ static inline void reinit_completion(struct completion *x)
 	x->done = 0;
 }
 
-extern void wait_for_completion(struct completion *);
-extern void wait_for_completion_io(struct completion *);
-extern int wait_for_completion_interruptible(struct completion *x);
-extern int wait_for_completion_killable(struct completion *x);
-extern unsigned long wait_for_completion_timeout(struct completion *x,
+extern void __wait_for_completion(struct completion *);
+extern void __wait_for_completion_io(struct completion *);
+extern int __wait_for_completion_interruptible(struct completion *x);
+extern int __wait_for_completion_killable(struct completion *x);
+extern unsigned long __wait_for_completion_timeout(struct completion *x,
 						   unsigned long timeout);
-extern unsigned long wait_for_completion_io_timeout(struct completion *x,
+extern unsigned long __wait_for_completion_io_timeout(struct completion *x,
 						    unsigned long timeout);
-extern long wait_for_completion_interruptible_timeout(
+extern long __wait_for_completion_interruptible_timeout(
 	struct completion *x, unsigned long timeout);
-extern long wait_for_completion_killable_timeout(
+extern long __wait_for_completion_killable_timeout(
 	struct completion *x, unsigned long timeout);
+
+static inline void wait_for_completion(struct completion *x)
+{
+	complete_acquire(x);
+	__wait_for_completion(x);
+	complete_release(x);
+}
+
+static inline void wait_for_completion_io(struct completion *x)
+{
+	complete_acquire(x);
+	__wait_for_completion_io(x);
+	complete_release(x);
+}
+
+static inline int wait_for_completion_interruptible(struct completion *x)
+{
+	int ret;
+	complete_acquire(x);
+	ret = __wait_for_completion_interruptible(x);
+	complete_release(x);
+	return ret;
+}
+
+static inline int wait_for_completion_killable(struct completion *x)
+{
+	int ret;
+	complete_acquire(x);
+	ret = __wait_for_completion_killable(x);
+	complete_release(x);
+	return ret;
+}
+
+static inline unsigned long wait_for_completion_timeout(struct completion *x,
+		unsigned long timeout)
+{
+	return __wait_for_completion_timeout(x, timeout);
+}
+
+static inline unsigned long wait_for_completion_io_timeout(struct completion *x,
+		unsigned long timeout)
+{
+	return __wait_for_completion_io_timeout(x, timeout);
+}
+
+static inline long wait_for_completion_interruptible_timeout(
+	struct completion *x, unsigned long timeout)
+{
+	return __wait_for_completion_interruptible_timeout(x, timeout);
+}
+
+static inline long wait_for_completion_killable_timeout(
+	struct completion *x, unsigned long timeout)
+{
+	return __wait_for_completion_killable_timeout(x, timeout);
+}
+
 extern bool try_wait_for_completion(struct completion *x);
 extern bool completion_done(struct completion *x);
 
