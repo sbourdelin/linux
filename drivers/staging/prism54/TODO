@@ -1,0 +1,5 @@
+prism54 TODO
+
+This driver has been deprecated in favor of p54pci, in a couple of kernel
+releases this driver will be removed, as such no further love should be given
+to this driver other than to ensure it compiles.

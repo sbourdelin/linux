@@ -114,4 +114,6 @@ source "drivers/staging/vboxvideo/Kconfig"
 
 source "drivers/staging/pi433/Kconfig"
 
+source "drivers/staging/prism54/Kconfig"
+
 endif # STAGING
