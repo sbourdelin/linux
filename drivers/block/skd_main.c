@@ -2556,7 +2556,7 @@ static void skd_do_inq_page_da(struct skd_device *skdev,
 	pci_read_config_word(pdev, PCI_SUBSYSTEM_ID, &val);
 	inq.pcie_subsystem_device_id = cpu_to_be16(val);
 
-	/* Driver version, fixed lenth, padded with spaces on the right */
+	/* Driver version, fixed length, padded with spaces on the right */
 	inq.driver_version_length = sizeof(inq.driver_version);
 	memset(&inq.driver_version, ' ', sizeof(inq.driver_version));
 	memcpy(inq.driver_version, DRV_VER_COMPL,
