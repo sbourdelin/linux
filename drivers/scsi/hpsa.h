@@ -246,7 +246,6 @@ struct ctlr_info {
 	struct delayed_work monitor_ctlr_work;
 	struct delayed_work rescan_ctlr_work;
 	struct delayed_work event_monitor_work;
-	int remove_in_progress;
 	/* Address of h->q[x] is passed to intr handler to know which queue */
 	u8 q[MAX_REPLY_QUEUES];
 	char intrname[MAX_REPLY_QUEUES][16];	/* "hpsa0-msix00" names */
@@ -289,18 +288,19 @@ struct ctlr_info {
 		CTLR_STATE_CHANGE_EVENT_AIO_CONFIG_CHANGE)
 	spinlock_t offline_device_lock;
 	struct list_head offline_device_list;
-	int	acciopath_status;
-	int	drv_req_rescan;
+	unsigned int acciopath_status:1;
+	unsigned int drv_req_rescan:1;
+	unsigned int discovery_polling:1;
+	unsigned int reset_in_progress:1;
+	unsigned int needs_abort_tags_swizzled:1;
+	unsigned int remove_in_progress:1;
 	int	raid_offload_debug;
-	int     discovery_polling;
 	struct  ReportLUNdata *lastlogicals;
-	int	needs_abort_tags_swizzled;
 	struct workqueue_struct *resubmit_wq;
 	struct workqueue_struct *rescan_ctlr_wq;
 	atomic_t abort_cmds_available;
 	wait_queue_head_t event_sync_wait_queue;
 	struct mutex reset_mutex;
-	u8 reset_in_progress;
 	struct hpsa_sas_node *sas_host;
 	spinlock_t reset_lock;
 };
