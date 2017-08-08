@@ -6761,7 +6761,7 @@ static int handle_pause(struct kvm_vcpu *vcpu)
 	if (ple_gap)
 		grow_ple_window(vcpu);
 
-	kvm_vcpu_on_spin(vcpu);
+	kvm_vcpu_on_spin(vcpu, kvm_arch_vcpu_in_kernel(vcpu));
 	return kvm_skip_emulated_instruction(vcpu);
 }
 

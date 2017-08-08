@@ -3749,7 +3749,9 @@ static int interrupt_window_interception(struct vcpu_svm *svm)
 
 static int pause_interception(struct vcpu_svm *svm)
 {
-	kvm_vcpu_on_spin(&(svm->vcpu));
+	struct kvm_vcpu *vcpu = &(svm->vcpu);
+
+	kvm_vcpu_on_spin(vcpu, kvm_arch_vcpu_in_kernel(vcpu));
 	return 1;
 }
 
