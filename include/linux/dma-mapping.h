@@ -761,6 +761,15 @@ extern void dmam_free_coherent(struct device *dev, size_t size, void *vaddr,
 extern void *dmam_alloc_attrs(struct device *dev, size_t size,
 			      dma_addr_t *dma_handle, gfp_t gfp,
 			      unsigned long attrs);
+
+static inline void *dma_zalloc_coherent(struct device *dev, size_t size,
+					dma_addr_t *dma_handle, gfp_t flag)
+{
+	void *ret = dmam_alloc_coherent(dev, size, dma_handle,
+					flag | __GFP_ZERO);
+	return ret;
+}
+
 #ifdef CONFIG_HAVE_GENERIC_DMA_COHERENT
 extern int dmam_declare_coherent_memory(struct device *dev,
 					phys_addr_t phys_addr,
