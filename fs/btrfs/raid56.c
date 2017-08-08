@@ -1365,6 +1365,7 @@ static int find_logical_bio_stripe(struct btrfs_raid_bio *rbio,
 	u64 logical = bio->bi_iter.bi_sector;
 	u64 stripe_start;
 	int i;
+	struct bvec_iter_all bia;
 
 	logical <<= 9;
 
