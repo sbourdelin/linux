@@ -946,6 +946,7 @@ static int f2fs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	u64 id = huge_encode_dev(sb->s_bdev->bd_dev);
 	block_t total_count, user_block_count, start_count, ovp_count;
 	u64 avail_node_count;
+	block_t avail_user_block_count;
 
 	total_count = le64_to_cpu(sbi->raw_super->block_count);
 	user_block_count = sbi->user_block_count;
@@ -953,16 +954,16 @@ static int f2fs_statfs(struct dentry *dentry, struct kstatfs *buf)
 	ovp_count = SM_I(sbi)->ovp_segments << sbi->log_blocks_per_seg;
 	buf->f_type = F2FS_SUPER_MAGIC;
 	buf->f_bsize = sbi->blocksize;
+	avail_user_block_count = user_block_count - sbi->reserved_blocks;
 
 	buf->f_blocks = total_count - start_count;
 	buf->f_bfree = user_block_count - valid_user_blocks(sbi) + ovp_count;
-	buf->f_bavail = user_block_count - valid_user_blocks(sbi) -
-						sbi->reserved_blocks;
+	buf->f_bavail = avail_user_block_count - valid_user_blocks(sbi);
 
 	avail_node_count = sbi->total_node_count - F2FS_RESERVED_NODE_NUM;
 
-	if (avail_node_count > user_block_count) {
-		buf->f_files = user_block_count;
+	if (avail_node_count > avail_user_block_count) {
+		buf->f_files = avail_user_block_count;
 		buf->f_ffree = buf->f_bavail;
 	} else {
 		buf->f_files = avail_node_count;
