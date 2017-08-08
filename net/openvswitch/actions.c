@@ -38,6 +38,7 @@
 #include <net/dsfield.h>
 #include <net/mpls.h>
 #include <net/sctp/checksum.h>
+#include <net/nsh.h>
 
 #include "datapath.h"
 #include "flow.h"
@@ -380,6 +381,114 @@ static int push_eth(struct sk_buff *skb, struct sw_flow_key *key,
 	return 0;
 }
 
+static int encap_nsh(struct sk_buff *skb, struct sw_flow_key *key,
+		     const struct ovs_action_encap_nsh *encap)
+{
+	struct nsh_hdr *nsh;
+	size_t length = NSH_BASE_HDR_LEN + encap->mdlen;
+	u8 next_proto;
+
+	if (key->mac_proto == MAC_PROTO_ETHERNET) {
+		next_proto = NSH_P_ETHERNET;
+	} else {
+		switch (ntohs(skb->protocol)) {
+		case ETH_P_IP:
+			next_proto = NSH_P_IPV4;
+			break;
+		case ETH_P_IPV6:
+			next_proto = NSH_P_IPV6;
+			break;
+		case ETH_P_NSH:
+			next_proto = NSH_P_NSH;
+			break;
+		default:
+			return -ENOTSUPP;
+		}
+	}
+
+	/* Add the NSH header */
+	if (skb_cow_head(skb, length) < 0)
+		return -ENOMEM;
+
+	skb_push(skb, length);
+	nsh = (struct nsh_hdr *)(skb->data);
+	nsh->ver_flags_len = htons((encap->flags << NSH_FLAGS_SHIFT) |
+				 (length >> 2));
+	nsh->next_proto = next_proto;
+	nsh->path_hdr = encap->path_hdr;
+	nsh->md_type = encap->mdtype;
+	switch (nsh->md_type) {
+	case NSH_M_TYPE1:
+		nsh->md1 = *(struct nsh_md1_ctx *)encap->metadata;
+		break;
+	case NSH_M_TYPE2: {
+		/* The MD2 metadata in encap is already padded to 4 bytes. */
+		size_t len = DIV_ROUND_UP(encap->mdlen, 4) * 4;
+
+		memcpy(nsh->md2, encap->metadata, len);
+		break;
+	}
+	default:
+		return -ENOTSUPP;
+	}
+
+	if (!skb->inner_protocol)
+		skb_set_inner_protocol(skb, skb->protocol);
+
+	skb->protocol = htons(ETH_P_NSH);
+	key->eth.type = htons(ETH_P_NSH);
+	skb_reset_mac_header(skb);
+	skb_reset_mac_len(skb);
+
+	/* safe right before invalidate_flow_key */
+	key->mac_proto = MAC_PROTO_NONE;
+	invalidate_flow_key(key);
+	return 0;
+}
+
+static int decap_nsh(struct sk_buff *skb, struct sw_flow_key *key)
+{
+	struct nsh_hdr *nsh = (struct nsh_hdr *)(skb->data);
+	size_t length;
+	u16 inner_proto;
+
+	if (ovs_key_mac_proto(key) != MAC_PROTO_NONE ||
+	    skb->protocol != htons(ETH_P_NSH)) {
+		return -EINVAL;
+	}
+
+	switch (nsh->next_proto) {
+	case NSH_P_ETHERNET:
+		inner_proto = htons(ETH_P_TEB);
+		break;
+	case NSH_P_IPV4:
+		inner_proto = htons(ETH_P_IP);
+		break;
+	case NSH_P_IPV6:
+		inner_proto = htons(ETH_P_IPV6);
+		break;
+	case NSH_P_NSH:
+		inner_proto = htons(ETH_P_NSH);
+		break;
+	default:
+		return -ENOTSUPP;
+	}
+
+	length = nsh_hdr_len(nsh);
+	skb_pull(skb, length);
+	skb_reset_mac_header(skb);
+	skb_reset_mac_len(skb);
+	skb->protocol = inner_proto;
+
+	/* safe right before invalidate_flow_key */
+	if (inner_proto == htons(ETH_P_TEB))
+		key->mac_proto = MAC_PROTO_ETHERNET;
+	else
+		key->mac_proto = MAC_PROTO_NONE;
+	invalidate_flow_key(key);
+	return 0;
+}
+
 static void update_ip_l4_checksum(struct sk_buff *skb, struct iphdr *nh,
 				  __be32 addr, __be32 new_addr)
 {
@@ -598,6 +707,49 @@ static int set_ipv6(struct sk_buff *skb, struct sw_flow_key *flow_key,
 		OVS_SET_MASKED(nh->hop_limit, key->ipv6_hlimit,
 			       mask->ipv6_hlimit);
 		flow_key->ip.ttl = nh->hop_limit;
+	}
+	return 0;
+}
+
+static int set_nsh(struct sk_buff *skb, struct sw_flow_key *flow_key,
+		   const struct ovs_key_nsh *key,
+		   const struct ovs_key_nsh *mask)
+{
+	struct nsh_hdr *nsh;
+	int err;
+	u8 flags;
+	int i;
+
+	err = skb_ensure_writable(skb, skb_network_offset(skb) +
+				  sizeof(struct nsh_hdr));
+	if (unlikely(err))
+		return err;
+
+	nsh = (struct nsh_hdr *)skb_network_header(skb);
+
+	flags = (ntohs(nsh->ver_flags_len) & NSH_FLAGS_MASK) >>
+		NSH_FLAGS_SHIFT;
+	flags = OVS_MASKED(flags, key->flags, mask->flags);
+	flow_key->nsh.flags = flags;
+	nsh->ver_flags_len = htons(flags << NSH_FLAGS_SHIFT) |
+			     (nsh->ver_flags_len & ~htons(NSH_FLAGS_MASK));
+	nsh->path_hdr = OVS_MASKED(nsh->path_hdr, key->path_hdr,
+				   mask->path_hdr);
+	flow_key->nsh.path_hdr = nsh->path_hdr;
+	switch (nsh->md_type) {
+	case NSH_M_TYPE1:
+		for (i = 0; i < 4; i++) {
+			nsh->md1.c[i] =
+			    OVS_MASKED(nsh->md1.c[i], key->c[i], mask->c[i]);
+			flow_key->nsh.c[i] = nsh->md1.c[i];
+		}
+		break;
+	case NSH_M_TYPE2:
+		for (i = 0; i < 4; i++)
+			flow_key->nsh.c[i] = 0;
+		break;
+	default:
+		return -EINVAL;
 	}
 	return 0;
 }
@@ -1024,6 +1176,11 @@ static int execute_masked_set_action(struct sk_buff *skb,
 				   get_mask(a, struct ovs_key_ethernet *));
 		break;
 
+	case OVS_KEY_ATTR_NSH:
+		err = set_nsh(skb, flow_key, nla_data(a),
+			      get_mask(a, struct ovs_key_nsh *));
+		break;
+
 	case OVS_KEY_ATTR_IPV4:
 		err = set_ipv4(skb, flow_key, nla_data(a),
 			       get_mask(a, struct ovs_key_ipv4 *));
@@ -1209,6 +1366,14 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 
 		case OVS_ACTION_ATTR_POP_ETH:
 			err = pop_eth(skb, key);
+			break;
+
+		case OVS_ACTION_ATTR_ENCAP_NSH:
+			err = encap_nsh(skb, key, nla_data(a));
+			break;
+
+		case OVS_ACTION_ATTR_DECAP_NSH:
+			err = decap_nsh(skb, key);
 			break;
 		}
 

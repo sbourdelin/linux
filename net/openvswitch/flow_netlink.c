@@ -48,6 +48,7 @@
 #include <net/ndisc.h>
 #include <net/mpls.h>
 #include <net/vxlan.h>
+#include <net/nsh.h>
 
 #include "flow_netlink.h"
 
@@ -76,9 +77,11 @@ static bool actions_may_change_flow(const struct nlattr *actions)
 
 		case OVS_ACTION_ATTR_CT:
 		case OVS_ACTION_ATTR_HASH:
+		case OVS_ACTION_ATTR_DECAP_NSH:
 		case OVS_ACTION_ATTR_POP_ETH:
 		case OVS_ACTION_ATTR_POP_MPLS:
 		case OVS_ACTION_ATTR_POP_VLAN:
+		case OVS_ACTION_ATTR_ENCAP_NSH:
 		case OVS_ACTION_ATTR_PUSH_ETH:
 		case OVS_ACTION_ATTR_PUSH_MPLS:
 		case OVS_ACTION_ATTR_PUSH_VLAN:
@@ -327,7 +330,7 @@ size_t ovs_key_attr_size(void)
 	/* Whenever adding new OVS_KEY_ FIELDS, we should consider
 	 * updating this function.
 	 */
-	BUILD_BUG_ON(OVS_KEY_ATTR_TUNNEL_INFO != 28);
+	BUILD_BUG_ON(OVS_KEY_ATTR_TUNNEL_INFO != 29);
 
 	return    nla_total_size(4)   /* OVS_KEY_ATTR_PRIORITY */
 		+ nla_total_size(0)   /* OVS_KEY_ATTR_TUNNEL */
@@ -341,6 +344,7 @@ size_t ovs_key_attr_size(void)
 		+ nla_total_size(4)   /* OVS_KEY_ATTR_CT_MARK */
 		+ nla_total_size(16)  /* OVS_KEY_ATTR_CT_LABELS */
 		+ nla_total_size(40)  /* OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6 */
+		+ nla_total_size(24)  /* OVS_KEY_ATTR_NSH */
 		+ nla_total_size(12)  /* OVS_KEY_ATTR_ETHERNET */
 		+ nla_total_size(2)   /* OVS_KEY_ATTR_ETHERTYPE */
 		+ nla_total_size(4)   /* OVS_KEY_ATTR_VLAN */
@@ -405,6 +409,7 @@ static const struct ovs_len_tbl ovs_key_lens[OVS_KEY_ATTR_MAX + 1] = {
 		.len = sizeof(struct ovs_key_ct_tuple_ipv4) },
 	[OVS_KEY_ATTR_CT_ORIG_TUPLE_IPV6] = {
 		.len = sizeof(struct ovs_key_ct_tuple_ipv6) },
+	[OVS_KEY_ATTR_NSH]       = { .len = sizeof(struct ovs_key_nsh) },
 };
 
 static bool check_attr_len(unsigned int attr_len, unsigned int expected_len)
@@ -1306,6 +1311,22 @@ static int ovs_key_from_nlattrs(struct net *net, struct sw_flow_match *match,
 		attrs &= ~(1 << OVS_KEY_ATTR_ARP);
 	}
 
+	if (attrs & (1 << OVS_KEY_ATTR_NSH)) {
+		int i;
+		const struct ovs_key_nsh *nsh_key;
+
+		nsh_key = nla_data(a[OVS_KEY_ATTR_NSH]);
+		SW_FLOW_KEY_PUT(match, nsh.flags, nsh_key->flags, is_mask);
+		SW_FLOW_KEY_PUT(match, nsh.mdtype, nsh_key->mdtype, is_mask);
+		SW_FLOW_KEY_PUT(match, nsh.np, nsh_key->np, is_mask);
+		SW_FLOW_KEY_PUT(match, nsh.path_hdr, nsh_key->path_hdr,
+				is_mask);
+		for (i = 0; i < 4; i++)
+			SW_FLOW_KEY_PUT(match, nsh.c[i], nsh_key->c[i],
+					is_mask);
+		attrs &= ~(1 << OVS_KEY_ATTR_NSH);
+	}
+
 	if (attrs & (1 << OVS_KEY_ATTR_MPLS)) {
 		const struct ovs_key_mpls *mpls_key;
 
@@ -1750,6 +1771,21 @@ static int __ovs_nla_put_key(const struct sw_flow_key *swkey,
 		ipv6_key->ipv6_tclass = output->ip.tos;
 		ipv6_key->ipv6_hlimit = output->ip.ttl;
 		ipv6_key->ipv6_frag = output->ip.frag;
+	} else if (swkey->eth.type == htons(ETH_P_NSH)) {
+		int i;
+		struct ovs_key_nsh *nsh_key;
+
+		nla = nla_reserve(skb, OVS_KEY_ATTR_NSH, sizeof(*nsh_key));
+		if (!nla)
+			goto nla_put_failure;
+		nsh_key = nla_data(nla);
+		memset(nsh_key, 0, sizeof(struct ovs_key_nsh));
+		nsh_key->flags = output->nsh.flags;
+		nsh_key->mdtype = output->nsh.mdtype;
+		nsh_key->np = output->nsh.np;
+		nsh_key->path_hdr = output->nsh.path_hdr;
+		for (i = 0; i < 4; i++)
+			nsh_key->c[0] = output->nsh.c[i];
 	} else if (swkey->eth.type == htons(ETH_P_ARP) ||
 		   swkey->eth.type == htons(ETH_P_RARP)) {
 		struct ovs_key_arp *arp_key;
@@ -2384,6 +2420,9 @@ static int validate_set(const struct nlattr *a,
 
 		break;
 
+	case OVS_KEY_ATTR_NSH:
+		break;
+
 	default:
 		return -EINVAL;
 	}
@@ -2482,6 +2521,8 @@ static int __ovs_nla_copy_actions(struct net *net, const struct nlattr *attr,
 			[OVS_ACTION_ATTR_TRUNC] = sizeof(struct ovs_action_trunc),
 			[OVS_ACTION_ATTR_PUSH_ETH] = sizeof(struct ovs_action_push_eth),
 			[OVS_ACTION_ATTR_POP_ETH] = 0,
+			[OVS_ACTION_ATTR_ENCAP_NSH] = sizeof(struct ovs_action_encap_nsh),
+			[OVS_ACTION_ATTR_DECAP_NSH] = 0,
 		};
 		const struct ovs_action_push_vlan *vlan;
 		int type = nla_type(a);
@@ -2634,6 +2675,17 @@ static int __ovs_nla_copy_actions(struct net *net, const struct nlattr *attr,
 			if (vlan_tci & htons(VLAN_TAG_PRESENT))
 				return -EINVAL;
 			mac_proto = MAC_PROTO_ETHERNET;
+			break;
+
+		case OVS_ACTION_ATTR_ENCAP_NSH:
+			mac_proto = MAC_PROTO_NONE;
+			break;
+
+		case OVS_ACTION_ATTR_DECAP_NSH:
+			if (key->nsh.np == NSH_P_ETHERNET)
+				mac_proto = MAC_PROTO_ETHERNET;
+			else
+				mac_proto = MAC_PROTO_NONE;
 			break;
 
 		default:
