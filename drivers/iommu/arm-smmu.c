@@ -1519,6 +1519,7 @@ static int arm_smmu_add_device(struct device *dev)
 
 	if (using_legacy_binding) {
 		ret = arm_smmu_register_legacy_master(dev, &smmu);
+		fwspec = dev->iommu_fwspec;
 		if (ret)
 			goto out_free;
 	} else if (fwspec && fwspec->ops == &arm_smmu_ops) {
