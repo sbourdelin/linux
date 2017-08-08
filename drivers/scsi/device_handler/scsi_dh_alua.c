@@ -1100,6 +1100,8 @@ static int alua_bus_attach(struct scsi_device *sdev)
 	err = alua_initialize(sdev, h);
 	if (err == SCSI_DH_NOMEM)
 		ret = -ENOMEM;
+	if (err == SCSI_DH_DEV_UNSUPP)
+		ret = -ENODEV;
 	if (err != SCSI_DH_OK && err != SCSI_DH_DEV_OFFLINED)
 		goto failed;
 
