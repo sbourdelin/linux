@@ -6761,7 +6761,8 @@ static int handle_pause(struct kvm_vcpu *vcpu)
 	if (ple_gap)
 		grow_ple_window(vcpu);
 
-	kvm_vcpu_on_spin(vcpu, kvm_arch_vcpu_in_kernel(vcpu));
+	/* See comments in vmx_spin_in_kernel() */
+	kvm_vcpu_on_spin(vcpu, true);
 	return kvm_skip_emulated_instruction(vcpu);
 }
 
@@ -11636,6 +11637,17 @@ static void vmx_setup_mce(struct kvm_vcpu *vcpu)
 			~FEATURE_CONTROL_LMCE;
 }
 
+static bool vmx_spin_in_kernel(struct kvm_vcpu *vcpu)
+{
+	/*
+	 * Intel sdm vol3 ch-25.1.3 says: The “PAUSE-loop exiting”
+	 * VM-execution control is ignored if CPL > 0. OTOH, KVM
+	 * never set PAUSE_EXITING and just set PLE if supported,
+	 * so the vcpu must be CPL=0 if it gets a PAUSE exit.
+	 */
+	return true;
+}
+
 static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.cpu_has_kvm_support = cpu_has_kvm_support,
 	.disabled_by_bios = vmx_disabled_by_bios,
@@ -11763,6 +11775,8 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 #endif
 
 	.setup_mce = vmx_setup_mce,
+
+	.spin_in_kernel = vmx_spin_in_kernel,
 };
 
 static int __init vmx_init(void)
