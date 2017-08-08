@@ -415,7 +415,7 @@ static struct scsi_dev_info_list *scsi_dev_info_list_find(const char *vendor,
 	struct scsi_dev_info_list *devinfo;
 	struct scsi_dev_info_list_table *devinfo_table =
 		scsi_devinfo_lookup_by_key(key);
-	size_t vmax, mmax;
+	size_t vmax, mmax, vlen, mlen;
 	const char *vskip, *mskip;
 
 	if (IS_ERR(devinfo_table))
@@ -440,6 +440,8 @@ static struct scsi_dev_info_list *scsi_dev_info_list_find(const char *vendor,
 	/* Also skip trailing spaces */
 	while (vmax > 0 && vskip[vmax - 1] == ' ')
 		--vmax;
+	if (!vmax)
+		vskip = NULL;
 
 	mmax = sizeof(devinfo->model);
 	mskip = model;
@@ -449,6 +451,8 @@ static struct scsi_dev_info_list *scsi_dev_info_list_find(const char *vendor,
 	}
 	while (mmax > 0 && mskip[mmax - 1] == ' ')
 		--mmax;
+	if (!mmax)
+		mskip = NULL;
 
 	list_for_each_entry(devinfo, &devinfo_table->scsi_dev_info_list,
 			    dev_info_list) {
@@ -456,20 +460,24 @@ static struct scsi_dev_info_list *scsi_dev_info_list_find(const char *vendor,
 			/*
 			 * Behave like the older version of get_device_flags.
 			 */
-			if (memcmp(devinfo->vendor, vskip, vmax) ||
-					(vmax < sizeof(devinfo->vendor) &&
-						devinfo->vendor[vmax]))
+			vlen = min(vmax, strlen(devinfo->vendor));
+			if (vskip && vlen &&
+			    memcmp(devinfo->vendor, vskip, vlen))
 				continue;
-			if (memcmp(devinfo->model, mskip, mmax) ||
-					(mmax < sizeof(devinfo->model) &&
-						devinfo->model[mmax]))
+			/* Empty strings never match */
+			mlen = min(mmax, strlen(devinfo->model));
+			if (!vlen && !mlen)
 				continue;
-			return devinfo;
+			if (mskip &&
+			    memcmp(devinfo->model, mskip, mlen))
+				continue;
+			if (vskip || mskip)
+				return devinfo;
 		} else {
 			if (!memcmp(devinfo->vendor, vendor,
-				     sizeof(devinfo->vendor)) &&
-			     !memcmp(devinfo->model, model,
-				      sizeof(devinfo->model)))
+				    sizeof(devinfo->vendor)) &&
+			    !memcmp(devinfo->model, model,
+				    sizeof(devinfo->model)))
 				return devinfo;
 		}
 	}
