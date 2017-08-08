@@ -82,6 +82,7 @@ struct task_group;
 #define TASK_NOLOAD			1024
 #define TASK_NEW			2048
 #define TASK_STATE_MAX			4096
+#define TASK_ALL_BITS			(TASK_STATE_MAX - 1)
 
 #define TASK_STATE_TO_CHAR_STR		"RSDTtXZxKWPNn"
 
