@@ -761,6 +761,7 @@ struct inode *__ext4_new_inode(handle_t *handle, struct inode *dir,
 	ext4_group_t flex_group;
 	struct ext4_group_info *grp;
 	int encrypt = 0;
+	bool hold_lock;
 
 	/* Cannot create files in a deleted directory */
 	if (!dir || !dir->i_nlink)
@@ -917,17 +918,40 @@ got_group:
 			continue;
 		}
 
+		hold_lock = false;
 repeat_in_this_group:
+		/* if @hold_lock is ture, that means, journal
+		 * is properly setup and inode bitmap buffer has
+		 * been journaled already, we can directly hold
+		 * lock and set bit if found, this will mostly
+		 * gurantee forward progress for each thread.
+		 */
+		if (hold_lock)
+			ext4_lock_group(sb, group);
+
 		ino = ext4_find_next_zero_bit((unsigned long *)
 					      inode_bitmap_bh->b_data,
 					      EXT4_INODES_PER_GROUP(sb), ino);
-		if (ino >= EXT4_INODES_PER_GROUP(sb))
+		if (ino >= EXT4_INODES_PER_GROUP(sb)) {
+			if (hold_lock)
+				ext4_unlock_group(sb, group);
 			goto next_group;
+		}
 		if (group == 0 && (ino+1) < EXT4_FIRST_INO(sb)) {
+			if (hold_lock)
+				ext4_unlock_group(sb, group);
 			ext4_error(sb, "reserved inode found cleared - "
 				   "inode=%lu", ino + 1);
 			continue;
 		}
+
+		if (hold_lock) {
+			ext4_set_bit(ino, inode_bitmap_bh->b_data);
+			ext4_unlock_group(sb, group);
+			ino++;
+			goto got;
+		}
+
 		if ((EXT4_SB(sb)->s_journal == NULL) &&
 		    recently_deleted(sb, group, ino)) {
 			ino++;
@@ -950,6 +974,10 @@ repeat_in_this_group:
 			ext4_std_error(sb, err);
 			goto out;
 		}
+
+		if (EXT4_SB(sb)->s_journal)
+			hold_lock = true;
+
 		ext4_lock_group(sb, group);
 		ret2 = ext4_test_and_set_bit(ino, inode_bitmap_bh->b_data);
 		ext4_unlock_group(sb, group);
