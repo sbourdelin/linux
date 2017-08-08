@@ -5161,19 +5161,20 @@ void show_state_filter(unsigned long state_filter)
 		 */
 		touch_nmi_watchdog();
 		touch_all_softlockup_watchdogs();
-		if (!state_filter || (p->state & state_filter))
+		/* in case we want to set TASK_RUNNING specifically */
+		if ((p->state != TASK_RUNNING ? p->state << 1 : 1) & state_filter)
 			sched_show_task(p);
 	}
 
 #ifdef CONFIG_SCHED_DEBUG
-	if (!state_filter)
+	if (state_filter == TASK_ALL_BITS)
 		sysrq_sched_debug_show();
 #endif
 	rcu_read_unlock();
 	/*
 	 * Only show locks if all tasks are dumped:
 	 */
-	if (!state_filter)
+	if (state_filter == TASK_ALL_BITS)
 		debug_show_all_locks();
 }
 

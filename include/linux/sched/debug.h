@@ -1,6 +1,8 @@
 #ifndef _LINUX_SCHED_DEBUG_H
 #define _LINUX_SCHED_DEBUG_H
 
+#include <linux/sched.h>
+
 /*
  * Various scheduler/task debugging interfaces:
  */
@@ -10,13 +12,13 @@ struct task_struct;
 extern void dump_cpu_task(int cpu);
 
 /*
- * Only dump TASK_* tasks. (0 for all tasks)
+ * Only dump TASK_* tasks. (TASK_ALL_BITS for all tasks)
  */
 extern void show_state_filter(unsigned long state_filter);
 
 static inline void show_state(void)
 {
-	show_state_filter(0);
+	show_state_filter(TASK_ALL_BITS);
 }
 
 struct pt_regs;
