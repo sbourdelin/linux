@@ -2157,6 +2157,8 @@ intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb, unsigned int rotation)
 	 */
 	intel_runtime_pm_get(dev_priv);
 
+	atomic_inc(&dev_priv->gpu_error.pending_fb_pin);
+
 	vma = i915_gem_object_pin_to_display_plane(obj, alignment, &view);
 	if (IS_ERR(vma))
 		goto err;
@@ -2184,6 +2186,8 @@ intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb, unsigned int rotation)
 
 	i915_vma_get(vma);
 err:
+	atomic_dec(&dev_priv->gpu_error.pending_fb_pin);
+
 	intel_runtime_pm_put(dev_priv);
 	return vma;
 }
@@ -3458,12 +3462,14 @@ void intel_prepare_reset(struct drm_i915_private *dev_priv)
 	    !gpu_reset_clobbers_display(dev_priv))
 		return;
 
-	/* We have a modeset vs reset deadlock, defensively unbreak it.
-	 *
-	 * FIXME: We can do a _lot_ better, this is just a first iteration.
-	 */
-	i915_gem_set_wedged(dev_priv);
-	DRM_DEBUG_DRIVER("Wedging GPU to avoid deadlocks with pending modeset updates\n");
+	/* We have a modeset vs reset deadlock, defensively unbreak it. */
+	set_bit(I915_RESET_MODESET, &dev_priv->gpu_error.flags);
+	wake_up_all(&dev_priv->gpu_error.wait_queue);
+
+	if (atomic_read(&dev_priv->gpu_error.pending_fb_pin)) {
+		DRM_DEBUG_KMS("Modeset potentially stuck, unbreaking through wedging\n");
+		i915_gem_set_wedged(dev_priv);
+	}
 
 	/*
 	 * Need mode_config.mutex so that we don't
@@ -3551,6 +3557,8 @@ unlock:
 	drm_modeset_drop_locks(ctx);
 	drm_modeset_acquire_fini(ctx);
 	mutex_unlock(&dev->mode_config.mutex);
+
+	clear_bit(I915_RESET_MODESET, &dev_priv->gpu_error.flags);
 }
 
 static void intel_update_pipe_config(struct intel_crtc *crtc,
@@ -12069,6 +12077,30 @@ static void intel_atomic_helper_free_state_worker(struct work_struct *work)
 	intel_atomic_helper_free_state(dev_priv);
 }
 
+static void intel_atomic_commit_fence_wait(struct intel_atomic_state *intel_state)
+{
+	struct wait_queue_entry wait_fence, wait_reset;
+	struct drm_i915_private *dev_priv = to_i915(intel_state->base.dev);
+
+	init_wait_entry(&wait_fence, 0);
+	init_wait_entry(&wait_reset, 0);
+	for (;;) {
+		prepare_to_wait(&intel_state->commit_ready.wait,
+				&wait_fence, TASK_UNINTERRUPTIBLE);
+		prepare_to_wait(&dev_priv->gpu_error.wait_queue,
+				&wait_reset, TASK_UNINTERRUPTIBLE);
+
+
+		if (i915_sw_fence_done(&intel_state->commit_ready)
+		    || test_bit(I915_RESET_MODESET, &dev_priv->gpu_error.flags))
+			break;
+
+		schedule();
+	}
+	finish_wait(&intel_state->commit_ready.wait, &wait_fence);
+	finish_wait(&dev_priv->gpu_error.wait_queue, &wait_reset);
+}
+
 static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 {
 	struct drm_device *dev = state->dev;
@@ -12082,7 +12114,7 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 	unsigned crtc_vblank_mask = 0;
 	int i;
 
-	i915_sw_fence_wait(&intel_state->commit_ready);
+	intel_atomic_commit_fence_wait(intel_state);
 
 	drm_atomic_helper_wait_for_dependencies(state);
 
