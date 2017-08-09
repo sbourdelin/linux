@@ -376,7 +376,7 @@ static int esw_add_uc_addr(struct mlx5_eswitch *esw, struct vport_addr *vaddr)
 {
 	u8 *mac = vaddr->node.addr;
 	u32 vport = vaddr->vport;
-	int err;
+	int err = 0;
 
 	/* Skip mlx5_mpfs_add_mac for PFs,
 	 * it is already done by the PF netdev in mlx5e_execute_l2_action
