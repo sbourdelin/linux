@@ -131,6 +131,7 @@ static void del_chan(struct pppox_sock *sock)
 	clear_bit(sock->proto.pptp.src_addr.call_id, callid_bitmap);
 	RCU_INIT_POINTER(callid_sock[sock->proto.pptp.src_addr.call_id], NULL);
 	spin_unlock(&chan_lock);
+	synchronize_rcu();
 }
 
 static int pptp_xmit(struct ppp_channel *chan, struct sk_buff *skb)
@@ -519,7 +520,6 @@ static int pptp_release(struct socket *sock)
 
 	po = pppox_sk(sk);
 	del_chan(po);
-	synchronize_rcu();
 
 	pppox_unbind_sock(sk);
 	sk->sk_state = PPPOX_DEAD;
@@ -535,10 +535,6 @@ static int pptp_release(struct socket *sock)
 
 static void pptp_sock_destruct(struct sock *sk)
 {
-	if (!(sk->sk_state & PPPOX_DEAD)) {
-		del_chan(pppox_sk(sk));
-		pppox_unbind_sock(sk);
-	}
 	skb_queue_purge(&sk->sk_receive_queue);
 }
 
