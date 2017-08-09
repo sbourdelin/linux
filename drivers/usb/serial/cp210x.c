@@ -1487,13 +1487,17 @@ static int cp210x_attach(struct usb_serial *serial)
 	if (!priv)
 		return -ENOMEM;
 
+	usb_set_serial_data(serial, priv);
+
 	result = cp210x_read_vendor_block(serial, REQTYPE_DEVICE_TO_HOST,
 					  CP210X_GET_PARTNUM, &priv->partnum,
 					  sizeof(priv->partnum));
-	if (result < 0)
-		goto err_free_priv;
 
-	usb_set_serial_data(serial, priv);
+	if (result < 0) {
+		dev_err(&serial->interface->dev,
+			"querying part number failed, continuing without GPIO support\n");
+		return 0;
+	}
 
 	if (priv->partnum == CP210X_PARTNUM_CP2105) {
 		result = cp2105_shared_gpio_init(serial);
@@ -1504,10 +1508,6 @@ static int cp210x_attach(struct usb_serial *serial)
 	}
 
 	return 0;
-err_free_priv:
-	kfree(priv);
-
-	return result;
 }
 
 static void cp210x_disconnect(struct usb_serial *serial)
