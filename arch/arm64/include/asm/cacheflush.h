@@ -95,6 +95,17 @@ extern void __dma_map_area(const void *, size_t, int);
 extern void __dma_unmap_area(const void *, size_t, int);
 extern void __dma_flush_area(const void *, size_t);
 
+#ifdef CONFIG_XPFO
+#include <linux/xpfo.h>
+#define _dma_map_area(addr, size, dir) \
+	xpfo_dma_map_unmap_area(true, addr, size, dir)
+#define _dma_unmap_area(addr, size, dir) \
+	xpfo_dma_map_unmap_area(false, addr, size, dir)
+#else
+#define _dma_map_area(addr, size, dir) __dma_map_area(addr, size, dir)
+#define _dma_unmap_area(addr, size, dir) __dma_unmap_area(addr, size, dir)
+#endif
+
 /*
  * Copy user data from/to a page which is mapped into a different
  * processes address space.  Really, we want to allow our "user
