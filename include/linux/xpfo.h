@@ -16,6 +16,8 @@
 
 #ifdef CONFIG_XPFO
 
+#include <linux/types.h>
+
 extern struct page_ext_operations page_xpfo_ops;
 
 void set_kpte(void *kaddr, struct page *page, pgprot_t prot);
@@ -28,6 +30,8 @@ void xpfo_alloc_pages(struct page *page, int order, gfp_t gfp);
 void xpfo_free_pages(struct page *page, int order);
 
 bool xpfo_page_is_unmapped(struct page *page);
+
+extern phys_addr_t user_virt_to_phys(unsigned long addr);
 
 #else /* !CONFIG_XPFO */
 
