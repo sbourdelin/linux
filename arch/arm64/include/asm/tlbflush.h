@@ -184,6 +184,14 @@ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end
 	isb();
 }
 
+static inline void __flush_tlb_one(unsigned long addr)
+{
+	dsb(ishst);
+	__tlbi(vaae1is, addr >> 12);
+	dsb(ish);
+	isb();
+}
+
 /*
  * Used to invalidate the TLB (walk caches) corresponding to intermediate page
  * table levels (pgd/pud/pmd).
