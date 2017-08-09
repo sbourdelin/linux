@@ -206,3 +206,12 @@ void xpfo_kunmap(void *kaddr, struct page *page)
 	spin_unlock_irqrestore(&xpfo->maplock, flags);
 }
 EXPORT_SYMBOL(xpfo_kunmap);
+
+inline bool xpfo_page_is_unmapped(struct page *page)
+{
+	if (!static_branch_unlikely(&xpfo_inited))
+		return false;
+
+	return test_bit(XPFO_PAGE_UNMAPPED, &lookup_xpfo(page)->flags);
+}
+EXPORT_SYMBOL(xpfo_page_is_unmapped);
