@@ -1186,8 +1186,6 @@ int dev_change_name(struct net_device *dev, const char *newname)
 	BUG_ON(!dev_net(dev));
 
 	net = dev_net(dev);
-	if (dev->flags & IFF_UP)
-		return -EBUSY;
 
 	write_seqcount_begin(&devnet_rename_seq);
 
