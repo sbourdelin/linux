@@ -20,6 +20,7 @@
 #include <linux/export.h>
 #include <linux/mm.h>
 #include <linux/pagemap.h>
+#include <linux/xpfo.h>
 
 #include <asm/cacheflush.h>
 #include <asm/cache.h>
@@ -30,7 +31,9 @@ void sync_icache_aliases(void *kaddr, unsigned long len)
 	unsigned long addr = (unsigned long)kaddr;
 
 	if (icache_is_aliasing()) {
-		__clean_dcache_area_pou(kaddr, len);
+		/* Don't flush if the page is unmapped by XPFO */
+		if (!xpfo_page_is_unmapped(virt_to_page(kaddr)))
+			__clean_dcache_area_pou(kaddr, len);
 		__flush_icache_all();
 	} else {
 		flush_icache_range(addr, addr + len);
