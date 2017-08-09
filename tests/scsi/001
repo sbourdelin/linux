@@ -1,0 +1,69 @@
+#!/bin/bash
+#
+# Regression test for scsi device blacklisting
+#
+# Copyright (C) 2017 Hannes Reinecke, SUSE Linux GmbH
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+DESCRIPTION="SCSI device blacklisting"
+
+QUICK=1
+
+CHECK_DMESG=0
+
+requires() {
+    if modinfo scsi_debug | grep -q inq_vendor ; then
+	return 0
+    fi
+    return 1
+}
+
+test() {
+    local inq vendor model host dev blacklist
+
+    echo "Running ${TEST_NAME}"
+
+    for inq in \
+	"                        " \
+	"AAAAAAAABBBBBBBBBBBBBBBB" \
+	"HITACHI OPEN-V          " \
+	"        Scanner         " \
+	"Inateck                 " \
+	"Promise STEX            " \
+	"HITA    OPEN-V          " \
+	"ABCD    Scanner         " ; do
+	vendor=${inq:0:8}
+	model=${inq:8:16}
+	modprobe scsi_debug inq_vendor="$vendor" inq_product="$model"
+	host=$(lsscsi -H | sed -n 's/.\([0-9]*\).*scsi_debug/\1/p')
+	if [ -z "$host" ] ; then
+	    echo "Test failed, scsi_debug could not be loaded"
+	    return 1
+	fi
+	dev=$(lsscsi | grep $host | sed -n 's/.*\/dev\/\(sd[a-z]*\).*/\1/p')
+	if [ -z "$dev" ] ; then
+	    echo "Test failed, SCSI device not found"
+	    rmmod scsi_debug
+	    return 1
+	fi
+	vendor=$(cat /sys/block/$dev/device/vendor)
+	model=$(cat /sys/block/$dev/device/model)
+	blacklist=$(cat /sys/block/$dev/device/blacklist)
+	echo "$vendor $model $blacklist"
+	rmmod scsi_debug
+    done
+    echo "Test complete"
+    return 0
+}
