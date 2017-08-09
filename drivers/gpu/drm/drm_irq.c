@@ -127,8 +127,10 @@ int drm_irq_install(struct drm_device *dev, int irq)
 	if (drm_core_check_feature(dev, DRIVER_IRQ_SHARED))
 		sh_flags = IRQF_SHARED;
 
-	ret = request_irq(irq, dev->driver->irq_handler,
-			  sh_flags, dev->driver->name, dev);
+	ret = request_threaded_irq(irq,
+				   dev->driver->irq_handler,
+				   dev->driver->irq_thread_fn,
+				   sh_flags, dev->driver->name, dev);
 
 	if (ret < 0) {
 		dev->irq_enabled = false;

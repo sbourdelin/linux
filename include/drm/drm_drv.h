@@ -333,6 +333,7 @@ struct drm_driver {
 	 * drivers which implement their own interrupt handling.
 	 */
 	irqreturn_t(*irq_handler) (int irq, void *arg);
+	irqreturn_t (*irq_thread_fn)(int irq, void *arg);
 
 	/**
 	 * @irq_preinstall:
