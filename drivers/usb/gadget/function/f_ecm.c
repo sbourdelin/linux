@@ -584,6 +584,13 @@ static int ecm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 			 */
 			ecm->port.is_zlp_ok =
 				gadget_is_zlp_supported(cdev->gadget);
+
+			/* Setup DMA alignment workaround for UDC's that
+			 * need it.
+			 */
+			ecm->port.no_skb_reserve =
+				gadget_avoids_skb_reserve(cdev->gadget);
+
 			ecm->port.cdc_filter = DEFAULT_FILTER;
 			DBG(cdev, "activate ecm\n");
 			net = gether_connect(&ecm->port);
