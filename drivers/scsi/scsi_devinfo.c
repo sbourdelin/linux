@@ -399,8 +399,8 @@ EXPORT_SYMBOL(scsi_dev_info_list_add_keyed);
 
 /**
  * scsi_dev_info_list_find - find a matching dev_info list entry.
- * @vendor:	vendor string
- * @model:	model (product) string
+ * @vendor:	full vendor string
+ * @model:	full model (product) string
  * @key:	specify list to use
  *
  * Description:
@@ -440,6 +440,8 @@ static struct scsi_dev_info_list *scsi_dev_info_list_find(const char *vendor,
 	/* Also skip trailing spaces */
 	while (vmax > 0 && vskip[vmax - 1] == ' ')
 		--vmax;
+	if (!vmax)
+		vskip = NULL;
 
 	mmax = sizeof(devinfo->model);
 	mskip = model;
@@ -449,27 +451,45 @@ static struct scsi_dev_info_list *scsi_dev_info_list_find(const char *vendor,
 	}
 	while (mmax > 0 && mskip[mmax - 1] == ' ')
 		--mmax;
+	if (!mmax)
+		mskip = NULL;
 
 	list_for_each_entry(devinfo, &devinfo_table->scsi_dev_info_list,
 			    dev_info_list) {
 		if (devinfo->compatible) {
 			/*
-			 * Behave like the older version of get_device_flags.
+			 * vendor strings must be an exact match
 			 */
-			if (memcmp(devinfo->vendor, vskip, vmax) ||
-					(vmax < sizeof(devinfo->vendor) &&
-						devinfo->vendor[vmax]))
+			if (vmax != strlen(devinfo->vendor))
 				continue;
-			if (memcmp(devinfo->model, mskip, mmax) ||
-					(mmax < sizeof(devinfo->model) &&
-						devinfo->model[mmax]))
+			if (vskip && vmax &&
+			    memcmp(devinfo->vendor, vskip, vmax))
 				continue;
-			return devinfo;
+			/*
+			 * Empty model strings only match if both strings
+			 * are empty.
+			 */
+			if (!mmax && !strlen(devinfo->model))
+				return devinfo;
+
+			/*
+			 * Empty @model never matches
+			 */
+			if (!mskip)
+				continue;
+
+			/*
+			 * @model specifies the full string, and
+			 * must be larger or equal to devinfo->model
+			 */
+			if (!memcmp(devinfo->model, mskip,
+				    strlen(devinfo->model)))
+				return devinfo;
 		} else {
 			if (!memcmp(devinfo->vendor, vendor,
-				     sizeof(devinfo->vendor)) &&
-			     !memcmp(devinfo->model, model,
-				      sizeof(devinfo->model)))
+				    sizeof(devinfo->vendor)) &&
+			    !memcmp(devinfo->model, model,
+				    sizeof(devinfo->model)))
 				return devinfo;
 		}
 	}
