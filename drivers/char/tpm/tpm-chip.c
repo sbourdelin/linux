@@ -164,14 +164,7 @@ static int tpm_class_shutdown(struct device *dev)
 		chip->ops = NULL;
 		up_write(&chip->ops_sem);
 	}
-	/* Allow bus- and device-specific code to run. Note: since chip->ops
-	 * is NULL, more-specific shutdown code will not be able to issue TPM
-	 * commands.
-	 */
-	if (dev->bus && dev->bus->shutdown)
-		dev->bus->shutdown(dev);
-	else if (dev->driver && dev->driver->shutdown)
-		dev->driver->shutdown(dev);
+
 	return 0;
 }
 
