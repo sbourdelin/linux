@@ -313,10 +313,10 @@ int kvm_set_apic_base(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 	u64 reserved_bits = ((~0ULL) << cpuid_maxphyaddr(vcpu)) |
 		0x2ff | (guest_cpuid_has_x2apic(vcpu) ? 0 : X2APIC_ENABLE);
 
+	if ((msr_info->data & reserved_bits) || new_state == X2APIC_ENABLE)
+		return 1;
 	if (!msr_info->host_initiated &&
-	    ((msr_info->data & reserved_bits) != 0 ||
-	     new_state == X2APIC_ENABLE ||
-	     (new_state == MSR_IA32_APICBASE_ENABLE &&
+	    ((new_state == MSR_IA32_APICBASE_ENABLE &&
 	      old_state == (MSR_IA32_APICBASE_ENABLE | X2APIC_ENABLE)) ||
 	     (new_state == (MSR_IA32_APICBASE_ENABLE | X2APIC_ENABLE) &&
 	      old_state == 0)))
@@ -7444,7 +7444,8 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
 	kvm_x86_ops->set_efer(vcpu, sregs->efer);
 	apic_base_msr.data = sregs->apic_base;
 	apic_base_msr.host_initiated = true;
-	kvm_set_apic_base(vcpu, &apic_base_msr);
+	if (kvm_set_apic_base(vcpu, &apic_base_msr))
+		return -EINVAL;
 
 	mmu_reset_needed |= kvm_read_cr0(vcpu) != sregs->cr0;
 	kvm_x86_ops->set_cr0(vcpu, sregs->cr0);
