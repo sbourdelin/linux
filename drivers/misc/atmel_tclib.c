@@ -112,8 +112,10 @@ static int __init tc_probe(struct platform_device *pdev)
 	unsigned int	i;
 
 	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
-		return -EINVAL;
+	if (irq < 0) {
+		dev_err(&pdev->dev, "Failed to get IRQ: %d\n", irq);
+		return irq;
+	}
 
 	tc = devm_kzalloc(&pdev->dev, sizeof(struct atmel_tc), GFP_KERNEL);
 	if (!tc)
