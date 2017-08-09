@@ -3904,6 +3904,8 @@ void __init skb_init(void)
 						0,
 						SLAB_HWCACHE_ALIGN|SLAB_PANIC,
 						NULL);
+	BUG_ON(skbuff_head_cache == NULL);
+	BUG_ON(skbuff_fclone_cache == NULL);
 }
 
 static int
