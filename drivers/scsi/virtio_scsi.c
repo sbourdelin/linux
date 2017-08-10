@@ -973,7 +973,7 @@ static int virtscsi_probe(struct virtio_device *vdev)
 		goto virtscsi_init_failed;
 
 	cmd_per_lun = virtscsi_config_get(vdev, cmd_per_lun) ?: 1;
-	shost->cmd_per_lun = min_t(u32, cmd_per_lun, shost->can_queue);
+	shost->cmd_per_lun = shost->can_queue = cmd_per_lun;
 	shost->max_sectors = virtscsi_config_get(vdev, max_sectors) ?: 0xFFFF;
 
 	/* LUNs > 256 are reported with format 1, so they go in the range
