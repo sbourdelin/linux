@@ -2655,6 +2655,7 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 
 	}
 	sdev->sdev_state = state;
+	sysfs_notify(&sdev->sdev_gendev.kobj, NULL, "state");
 	return 0;
 
  illegal:
@@ -3078,6 +3079,7 @@ int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 	case SDEV_BLOCK:
 	case SDEV_TRANSPORT_OFFLINE:
 		sdev->sdev_state = new_state;
+		sysfs_notify(&sdev->sdev_gendev.kobj, NULL, "state");
 		break;
 	case SDEV_CREATED_BLOCK:
 		if (new_state == SDEV_TRANSPORT_OFFLINE ||
@@ -3085,6 +3087,7 @@ int scsi_internal_device_unblock_nowait(struct scsi_device *sdev,
 			sdev->sdev_state = new_state;
 		else
 			sdev->sdev_state = SDEV_CREATED;
+		sysfs_notify(&sdev->sdev_gendev.kobj, NULL, "state");
 		break;
 	case SDEV_TRANSPORT_OFFLINE:
 	case SDEV_CANCEL:
