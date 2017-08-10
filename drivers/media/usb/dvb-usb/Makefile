@@ -40,7 +40,7 @@ obj-$(CONFIG_DVB_USB_M920X) += dvb-usb-m920x.o
 dvb-usb-digitv-objs := digitv.o
 obj-$(CONFIG_DVB_USB_DIGITV) += dvb-usb-digitv.o
 
-dvb-usb-cxusb-objs := cxusb.o
+dvb-usb-cxusb-objs := cxusb.o cxusb-analog.o
 obj-$(CONFIG_DVB_USB_CXUSB) += dvb-usb-cxusb.o
 
 dvb-usb-ttusb2-objs := ttusb2.o

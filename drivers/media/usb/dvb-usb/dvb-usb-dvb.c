@@ -14,6 +14,7 @@ static int dvb_usb_ctrl_feed(struct dvb_demux_feed *dvbdmxfeed, int onoff)
 {
 	struct dvb_usb_adapter *adap = dvbdmxfeed->demux->priv;
 	int newfeedcount, ret;
+	bool streaming_ctrl_no_urb;
 
 	if (adap == NULL)
 		return -ENODEV;
@@ -23,12 +24,16 @@ static int dvb_usb_ctrl_feed(struct dvb_demux_feed *dvbdmxfeed, int onoff)
 		return -EINVAL;
 	}
 
+	streaming_ctrl_no_urb = adap->props.fe[adap->active_fe].caps &
+		DVB_USB_ADAP_STREAMING_CTRL_NO_URB;
 	newfeedcount = adap->feedcount + (onoff ? 1 : -1);
 
 	/* stop feed before setting a new pid if there will be no pid anymore */
 	if (newfeedcount == 0) {
 		deb_ts("stop feeding\n");
-		usb_urb_kill(&adap->fe_adap[adap->active_fe].stream);
+
+		if (streaming_ctrl_no_urb)
+			usb_urb_kill(&adap->fe_adap[adap->active_fe].stream);
 
 		if (adap->props.fe[adap->active_fe].streaming_ctrl != NULL) {
 			ret = adap->props.fe[adap->active_fe].streaming_ctrl(adap, 0);
@@ -37,6 +42,9 @@ static int dvb_usb_ctrl_feed(struct dvb_demux_feed *dvbdmxfeed, int onoff)
 				return ret;
 			}
 		}
+
+		if (!streaming_ctrl_no_urb)
+			usb_urb_kill(&adap->fe_adap[adap->active_fe].stream);
 	}
 
 	adap->feedcount = newfeedcount;
@@ -55,8 +63,10 @@ static int dvb_usb_ctrl_feed(struct dvb_demux_feed *dvbdmxfeed, int onoff)
 	 * for reception.
 	 */
 	if (adap->feedcount == onoff && adap->feedcount > 0) {
-		deb_ts("submitting all URBs\n");
-		usb_urb_submit(&adap->fe_adap[adap->active_fe].stream);
+		if (!streaming_ctrl_no_urb) {
+			deb_ts("submitting all URBs early\n");
+			usb_urb_submit(&adap->fe_adap[adap->active_fe].stream);
+		}
 
 		deb_ts("controlling pid parser\n");
 		if (adap->props.fe[adap->active_fe].caps & DVB_USB_ADAP_HAS_PID_FILTER &&
@@ -79,6 +89,10 @@ static int dvb_usb_ctrl_feed(struct dvb_demux_feed *dvbdmxfeed, int onoff)
 			}
 		}
 
+		if (streaming_ctrl_no_urb) {
+			deb_ts("submitting all URBs late\n");
+			usb_urb_submit(&adap->fe_adap[adap->active_fe].stream);
+		}
 	}
 	return 0;
 }
