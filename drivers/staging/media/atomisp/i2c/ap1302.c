@@ -213,6 +213,7 @@ static int ap1302_i2c_write_reg(struct v4l2_subdev *sd,
 	struct ap1302_device *dev = to_ap1302_device(sd);
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	int ret;
+
 	if (len == AP1302_REG16)
 		ret = regmap_write(dev->regmap16, reg, val);
 	else if (len == AP1302_REG32)
