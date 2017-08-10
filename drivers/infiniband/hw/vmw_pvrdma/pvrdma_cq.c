@@ -65,11 +65,26 @@ int pvrdma_req_notify_cq(struct ib_cq *ibcq,
 	struct pvrdma_dev *dev = to_vdev(ibcq->device);
 	struct pvrdma_cq *cq = to_vcq(ibcq);
 	u32 val = cq->cq_handle;
+	unsigned long flags;
 
 	val |= (notify_flags & IB_CQ_SOLICITED_MASK) == IB_CQ_SOLICITED ?
 		PVRDMA_UAR_CQ_ARM_SOL : PVRDMA_UAR_CQ_ARM;
 
+	spin_lock_irqsave(&cq->cq_lock, flags);
+
 	pvrdma_write_uar_cq(dev, val);
+
+	if (notify_flags & IB_CQ_REPORT_MISSED_EVENTS) {
+		unsigned int head;
+
+		if (pvrdma_idx_ring_has_data(&cq->ring_state->rx,
+					     cq->ibcq.cqe, &head)) {
+			spin_unlock_irqrestore(&cq->cq_lock, flags);
+			return 1;
+		}
+	}
+
+	spin_unlock_irqrestore(&cq->cq_lock, flags);
 
 	return 0;
 }
