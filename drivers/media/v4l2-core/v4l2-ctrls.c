@@ -1254,6 +1254,24 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 }
 EXPORT_SYMBOL(v4l2_ctrl_fill);
 
+bool ctrl_is_pointer(u32 id)
+{
+	enum v4l2_ctrl_type type;
+
+	v4l2_ctrl_fill(id, NULL, &type, NULL, NULL, NULL, NULL, NULL);
+
+	switch (type) {
+	case V4L2_CTRL_TYPE_STRING:
+	case V4L2_CTRL_TYPE_U8:
+	case V4L2_CTRL_TYPE_U16:
+	case V4L2_CTRL_TYPE_U32:
+		return true;
+	default:
+		return false;
+	}
+}
+EXPORT_SYMBOL(ctrl_is_pointer);
+
 static void fill_event(struct v4l2_event *ev, struct v4l2_ctrl *ctrl, u32 changes)
 {
 	memset(ev->reserved, 0, sizeof(ev->reserved));
