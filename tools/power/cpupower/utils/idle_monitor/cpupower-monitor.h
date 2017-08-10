@@ -15,7 +15,11 @@
 
 #define MONITORS_MAX 20
 #define MONITOR_NAME_LEN 20
-#define CSTATE_NAME_LEN 5
+/*
+ *  CSTATE_NAME_LEN is limited by the CPUIDLE_NAME_LEN defined
+ *  in include/linux/cpuidle.h.
+ */
+#define CSTATE_NAME_LEN 16
 #define CSTATE_DESC_LEN 60
 
 int cpu_count;
