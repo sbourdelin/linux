@@ -88,6 +88,70 @@ enum cx25840_video_input {
 	CX25840_DIF_ON = 0x80000400,
 };
 
+/* arguments to video s_routing config param */
+#define CX25840_VCONFIG_FMT_SHIFT 0
+#define CX25840_VCONFIG_FMT_MASK 7
+#define CX25840_VCONFIG_FMT_BT601 1
+#define CX25840_VCONFIG_FMT_BT656 2
+#define CX25840_VCONFIG_FMT_VIP11 3
+#define CX25840_VCONFIG_FMT_VIP2 4
+
+#define CX25840_VCONFIG_RES_SHIFT 3
+#define CX25840_VCONFIG_RES_MASK (3 << 3)
+#define CX25840_VCONFIG_RES_8BIT (1 << 3)
+#define CX25840_VCONFIG_RES_10BIT (2 << 3)
+
+#define CX25840_VCONFIG_VBIRAW_SHIFT 5
+#define CX25840_VCONFIG_VBIRAW_MASK (3 << 5)
+#define CX25840_VCONFIG_VBIRAW_DISABLED (1 << 5)
+#define CX25840_VCONFIG_VBIRAW_ENABLED (2 << 5)
+
+#define CX25840_VCONFIG_ANCDATA_SHIFT 7
+#define CX25840_VCONFIG_ANCDATA_MASK (3 << 7)
+#define CX25840_VCONFIG_ANCDATA_DISABLED (1 << 7)
+#define CX25840_VCONFIG_ANCDATA_ENABLED (2 << 7)
+
+#define CX25840_VCONFIG_TASKBIT_SHIFT 9
+#define CX25840_VCONFIG_TASKBIT_MASK (3 << 9)
+#define CX25840_VCONFIG_TASKBIT_ZERO (1 << 9)
+#define CX25840_VCONFIG_TASKBIT_ONE (2 << 9)
+
+#define CX25840_VCONFIG_ACTIVE_SHIFT 11
+#define CX25840_VCONFIG_ACTIVE_MASK (3 << 11)
+#define CX25840_VCONFIG_ACTIVE_COMPOSITE (1 << 11)
+#define CX25840_VCONFIG_ACTIVE_HORIZONTAL (2 << 11)
+
+#define CX25840_VCONFIG_VALID_SHIFT 13
+#define CX25840_VCONFIG_VALID_MASK (3 << 13)
+#define CX25840_VCONFIG_VALID_NORMAL (1 << 13)
+#define CX25840_VCONFIG_VALID_ANDACTIVE (2 << 13)
+
+#define CX25840_VCONFIG_HRESETW_SHIFT 15
+#define CX25840_VCONFIG_HRESETW_MASK (3 << 15)
+#define CX25840_VCONFIG_HRESETW_NORMAL (1 << 15)
+#define CX25840_VCONFIG_HRESETW_PIXCLK (2 << 15)
+
+#define CX25840_VCONFIG_CLKGATE_SHIFT 17
+#define CX25840_VCONFIG_CLKGATE_MASK (3 << 17)
+#define CX25840_VCONFIG_CLKGATE_NONE (1 << 17)
+#define CX25840_VCONFIG_CLKGATE_VALID (2 << 17)
+#define CX25840_VCONFIG_CLKGATE_VALIDACTIVE (3 << 17)
+
+#define CX25840_VCONFIG_DCMODE_SHIFT 19
+#define CX25840_VCONFIG_DCMODE_MASK (3 << 19)
+#define CX25840_VCONFIG_DCMODE_DWORDS (1 << 19)
+#define CX25840_VCONFIG_DCMODE_BYTES (2 << 19)
+
+#define CX25840_VCONFIG_IDID0S_SHIFT 21
+#define CX25840_VCONFIG_IDID0S_MASK (3 << 21)
+#define CX25840_VCONFIG_IDID0S_NORMAL (1 << 21)
+#define CX25840_VCONFIG_IDID0S_LINECNT (2 << 21)
+
+#define CX25840_VCONFIG_VIPCLAMP_SHIFT 23
+#define CX25840_VCONFIG_VIPCLAMP_MASK (3 << 23)
+#define CX25840_VCONFIG_VIPCLAMP_ENABLED (1 << 23)
+#define CX25840_VCONFIG_VIPCLAMP_DISABLED (2 << 23)
+
 enum cx25840_audio_input {
 	/* Audio inputs: serial or In4-In8 */
 	CX25840_AUDIO_SERIAL,
@@ -180,9 +244,17 @@ enum cx23885_io_pad {
    audio autodetect fails on some channels for these models and the workaround
    is to select the audio standard explicitly. Many thanks to Hauppauge for
    providing this information.
-   This platform data only needs to be supplied by the ivtv driver. */
+   This platform data only needs to be supplied by the ivtv driver.
+
+   generic_mode disables some of the ivtv-related hacks in this driver,
+   enables setting video output config and sets it according to datasheet
+   defaults on initialization.
+   This flag is to be used for example with USB video capture devices
+   using this chip.
+*/
 struct cx25840_platform_data {
 	int pvr150_workaround;
+	int generic_mode;
 };
 
 #endif

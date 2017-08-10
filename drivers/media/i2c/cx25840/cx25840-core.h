@@ -55,9 +55,11 @@ struct cx25840_state {
 		struct v4l2_ctrl *mute;
 	};
 	int pvr150_workaround;
+	int generic_mode;
 	int radio;
 	v4l2_std_id std;
 	enum cx25840_video_input vid_input;
+	u32 vid_config;
 	enum cx25840_audio_input aud_input;
 	u32 audclk_freq;
 	int audmode;
@@ -88,6 +90,14 @@ static inline bool is_cx2583x(struct cx25840_state *state)
 {
 	return state->id == CX25836 ||
 	       state->id == CX25837;
+}
+
+static inline bool is_cx2584x(struct cx25840_state *state)
+{
+	return state->id == CX25840 ||
+	       state->id == CX25841 ||
+	       state->id == CX25842 ||
+	       state->id == CX25843;
 }
 
 static inline bool is_cx231xx(struct cx25840_state *state)
@@ -127,6 +137,7 @@ int cx25840_and_or(struct i2c_client *client, u16 addr, unsigned mask, u8 value)
 int cx25840_and_or4(struct i2c_client *client, u16 addr, u32 and_mask,
 		    u32 or_value);
 void cx25840_std_setup(struct i2c_client *client);
+int cx25840_vconfig(struct i2c_client *client, u32 config_in);
 
 /* ----------------------------------------------------------------------- */
 /* cx25850-firmware.c                                                      */
