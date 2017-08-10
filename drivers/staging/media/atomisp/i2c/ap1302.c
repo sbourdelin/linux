@@ -261,6 +261,7 @@ static int ap1302_read_context_reg(struct v4l2_subdev *sd,
 {
 	struct ap1302_device *dev = to_ap1302_device(sd);
 	u16 reg_addr = ap1302_calculate_context_reg_addr(context, offset);
+
 	if (reg_addr == 0)
 		return -EINVAL;
 	return ap1302_i2c_read_reg(sd, reg_addr, len,
