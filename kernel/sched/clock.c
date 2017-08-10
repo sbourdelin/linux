@@ -80,9 +80,24 @@ EXPORT_SYMBOL_GPL(sched_clock);
 
 __read_mostly int sched_clock_running;
 
+/*
+ * We start with sched clock early static branch enabled, and global status
+ * disabled.  Early in boot it is decided whether to enable the global
+ * status as well (set sched_clock_early_running to true), and later, when
+ * early clock is no longer needed, the static branch is disabled.
+ */
+static DEFINE_STATIC_KEY_TRUE(__use_sched_clock_early);
+static bool __read_mostly sched_clock_early_running;
+
 void sched_clock_init(void)
 {
-	sched_clock_running = 1;
+	/*
+	 * We start clock only once early clock is finished, or if early clock
+	 * was not running.
+	 */
+	if (!sched_clock_early_running)
+		sched_clock_running = 1;
+
 }
 
 #ifdef CONFIG_HAVE_UNSTABLE_SCHED_CLOCK
@@ -362,6 +377,11 @@ u64 sched_clock_cpu(int cpu)
 	if (sched_clock_stable())
 		return sched_clock() + __sched_clock_offset;
 
+	if (static_branch_unlikely(&__use_sched_clock_early)) {
+		if (sched_clock_early_running)
+			return sched_clock_early();
+	}
+
 	if (unlikely(!sched_clock_running))
 		return 0ull;
 
@@ -443,6 +463,45 @@ void sched_clock_idle_wakeup_event(void)
 	local_irq_restore(flags);
 }
 EXPORT_SYMBOL_GPL(sched_clock_idle_wakeup_event);
+
+u64 __weak sched_clock_early(void)
+{
+	return 0;
+}
+
+/*
+ * Is called when sched_clock_early() is about to be finished, notifies sched
+ * clock that after this call sched_clock_early() can't be used.
+ */
+void __init sched_clock_early_fini(void)
+{
+	struct sched_clock_data *scd = this_scd();
+	u64 now_early, now_sched;
+
+	now_early = sched_clock_early();
+	now_sched = sched_clock();
+
+	__gtod_offset = now_early - scd->tick_gtod;
+	__sched_clock_offset = now_early - now_sched;
+
+	sched_clock_early_running = false;
+	static_branch_disable(&__use_sched_clock_early);
+
+	/* Now that early clock is finished, start regular sched clock */
+	sched_clock_init();
+}
+
+/*
+ * Notifies sched clock that early boot clocksource is available, it means that
+ * the current platform has implemented sched_clock_early().
+ *
+ * The early clock is running until we switch to a stable clock, or when we
+ * learn that the stable clock is not available.
+ */
+void __init sched_clock_early_init(void)
+{
+	sched_clock_early_running = true;
+}
 
 #else /* CONFIG_HAVE_UNSTABLE_SCHED_CLOCK */
 

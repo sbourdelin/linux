@@ -63,6 +63,10 @@ extern void sched_clock_tick_stable(void);
 extern void sched_clock_idle_sleep_event(void);
 extern void sched_clock_idle_wakeup_event(void);
 
+void sched_clock_early_init(void);
+void sched_clock_early_fini(void);
+u64 sched_clock_early(void);
+
 /*
  * As outlined in clock.c, provides a fast, high resolution, nanosecond
  * time source that is monotonic per cpu argument and has bounded drift

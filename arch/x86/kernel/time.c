@@ -14,6 +14,7 @@
 #include <linux/i8253.h>
 #include <linux/time.h>
 #include <linux/export.h>
+#include <linux/sched/clock.h>
 
 #include <asm/vsyscall.h>
 #include <asm/x86_init.h>
@@ -85,6 +86,7 @@ static __init void x86_late_time_init(void)
 {
 	x86_init.timers.timer_init();
 	tsc_init();
+	tsc_early_fini();
 }
 
 /*
@@ -94,4 +96,24 @@ static __init void x86_late_time_init(void)
 void __init time_init(void)
 {
 	late_time_init = x86_late_time_init;
+}
+
+/*
+ * Called once during to boot to initialize boot time.
+ */
+void read_boot_clock64(struct timespec64 *ts)
+{
+	u64 ns_boot = sched_clock_early(); /* nsec from boot */
+	struct timespec64 ts_now;
+	bool valid_clock;
+
+	/* Time from epoch */
+	read_persistent_clock64(&ts_now);
+	valid_clock = ns_boot && timespec64_valid_strict(&ts_now) &&
+			(ts_now.tv_sec || ts_now.tv_nsec);
+
+	if (!valid_clock)
+		*ts = (struct timespec64){0, 0};
+	else
+		*ts = ns_to_timespec64(timespec64_to_ns(&ts_now) - ns_boot);
 }
