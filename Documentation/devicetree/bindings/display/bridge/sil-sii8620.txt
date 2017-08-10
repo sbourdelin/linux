@@ -10,6 +10,9 @@ Required properties:
 	- clocks, clock-names: specification and name of "xtal" clock
 	- video interfaces: Device node can contain video interface port
 			    node for HDMI encoder according to [1].
+Optional properties:
+	- extcon: phandle to external connector for MHL cable changes
+		  detection
 
 [1]: Documentation/devicetree/bindings/media/video-interfaces.txt
 
@@ -24,6 +27,7 @@ Example:
 		reset-gpio = <&gpv7 0 0>;
 		clocks = <&pmu_system_controller 0>;
 		clock-names = "xtal";
+		extcon = <&muic>;
 
 		port {
 			mhl_to_hdmi: endpoint {

@@ -17,6 +17,7 @@
 
 #include <linux/clk.h>
 #include <linux/delay.h>
+#include <linux/extcon.h>
 #include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
 #include <linux/interrupt.h>
@@ -78,6 +79,10 @@ struct sii8620 {
 	struct edid *edid;
 	unsigned int gen2_write_burst:1;
 	enum sii8620_mt_state mt_state;
+	struct extcon_dev *extcon;
+	struct notifier_block extcon_nb;
+	struct work_struct extcon_wq;
+	bool extcon_attached;
 	struct list_head mt_queue;
 	struct {
 		int r_size;
@@ -2102,6 +2107,72 @@ static void sii8620_cable_in(struct sii8620 *ctx)
 	enable_irq(to_i2c_client(ctx->dev)->irq);
 }
 
+static void sii8620_cable_out(struct sii8620 *ctx)
+{
+	disable_irq(to_i2c_client(ctx->dev)->irq);
+	sii8620_hw_off(ctx);
+}
+
+static void sii8620_extcon_work(struct work_struct *work)
+{
+	struct sii8620 *ctx =
+		container_of(work, struct sii8620, extcon_wq);
+
+	if (ctx->extcon_attached)
+		sii8620_cable_in(ctx);
+	else
+		sii8620_cable_out(ctx);
+}
+
+static int sii8620_extcon_notifier(struct notifier_block *self,
+			unsigned long event, void *ptr)
+{
+	struct sii8620 *ctx =
+		container_of(self, struct sii8620, extcon_nb);
+
+	ctx->extcon_attached = event;
+	schedule_work(&ctx->extcon_wq);
+
+	return NOTIFY_DONE;
+}
+
+static int sii8620_extcon_init(struct sii8620 *ctx)
+{
+	struct extcon_dev *edev;
+	int ret;
+
+	INIT_WORK(&ctx->extcon_wq, sii8620_extcon_work);
+
+	if (!of_property_read_bool(ctx->dev->of_node, "extcon")) {
+		dev_info(ctx->dev, "no extcon found, switching to 'always on' mode\n");
+		ctx->extcon_attached = true;
+		return 0;
+	}
+
+	edev = extcon_get_edev_by_phandle(ctx->dev, 0);
+	if (IS_ERR(edev)) {
+		if (PTR_ERR(edev) == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
+		dev_err(ctx->dev, "Invalid or missing extcon\n");
+		return PTR_ERR(edev);
+	}
+
+	ctx->extcon_attached = extcon_get_cable_state_(edev, EXTCON_DISP_MHL);
+	dev_info(ctx->dev, "extcon(MHL) = %d\n", ctx->extcon_attached);
+
+	ctx->extcon = edev;
+	ctx->extcon_nb.notifier_call = sii8620_extcon_notifier;
+	ret = devm_extcon_register_notifier(ctx->dev, edev,
+					EXTCON_DISP_MHL, &ctx->extcon_nb);
+
+	if (ret) {
+		dev_err(ctx->dev, "failed to register notifier for MHL\n");
+		return ret;
+	}
+
+	return 0;
+}
+
 static inline struct sii8620 *bridge_to_sii8620(struct drm_bridge *bridge)
 {
 	return container_of(bridge, struct sii8620, bridge);
@@ -2201,13 +2272,20 @@ static int sii8620_probe(struct i2c_client *client,
 	if (ret)
 		return ret;
 
+	ret = sii8620_extcon_init(ctx);
+	if (ret < 0) {
+		dev_err(ctx->dev, "failed to initialize EXTCON\n");
+		return ret;
+	}
+
 	i2c_set_clientdata(client, ctx);
 
 	ctx->bridge.funcs = &sii8620_bridge_funcs;
 	ctx->bridge.of_node = dev->of_node;
 	drm_bridge_add(&ctx->bridge);
 
-	sii8620_cable_in(ctx);
+	if (ctx->extcon_attached)
+		sii8620_cable_in(ctx);
 
 	return 0;
 }
@@ -2216,7 +2294,8 @@ static int sii8620_remove(struct i2c_client *client)
 {
 	struct sii8620 *ctx = i2c_get_clientdata(client);
 
-	disable_irq(to_i2c_client(ctx->dev)->irq);
+	if (!ctx->extcon_attached)
+		sii8620_cable_out(ctx);
 	drm_bridge_remove(&ctx->bridge);
 	sii8620_hw_off(ctx);
 
