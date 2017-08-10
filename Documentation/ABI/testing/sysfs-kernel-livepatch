@@ -16,9 +16,11 @@ Description:
 		The attribute allows administrator to affect the course of an
 		existing transition.
 
-		Reading from the file returns all available operations.
+		Reading from the file returns all available operations, which
+		may be "signal" (signalling remaining tasks).
 
 		Writing one of the strings to the file executes the operation.
+		"signal" sends a signal to all remaining blocking tasks.
 
 What:		/sys/kernel/livepatch/<patch>
 Date:		Nov 2014

@@ -180,7 +180,10 @@ patched state.
 
 Administrator can also affect a transition through /sys/kernel/livepatch/force
 attribute. Reading from the file returns all available operations. Writing one
-of the strings to the file executes the operation.
+of the strings to the file executes the operation. "signal" is available for
+signalling all remaining blocking tasks. This is an alternative for
+SIGSTOP/SIGCONT approach mentioned in the previous paragraph. It should also be
+less harmful to the system.
 
 
 3.1 Adding consistency model support to new architectures
