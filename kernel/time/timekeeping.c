@@ -25,6 +25,7 @@
 #include <linux/stop_machine.h>
 #include <linux/pvclock_gtod.h>
 #include <linux/compiler.h>
+#include <linux/sched/clock.h>
 
 #include "tick-internal.h"
 #include "ntp_internal.h"
@@ -60,8 +61,39 @@ struct tk_fast {
 	struct tk_read_base	base[2];
 };
 
-static struct tk_fast tk_fast_mono ____cacheline_aligned;
-static struct tk_fast tk_fast_raw  ____cacheline_aligned;
+/* Suspend-time cycles value for halted fast timekeeper. */
+static u64 cycles_at_suspend;
+
+static u64 dummy_clock_read(struct clocksource *cs)
+{
+	return cycles_at_suspend;
+}
+
+static struct clocksource dummy_clock = {
+	.read = dummy_clock_read,
+};
+
+static struct tk_fast tk_fast_mono ____cacheline_aligned = {
+	.base = {
+		(struct tk_read_base){
+			.clock = &dummy_clock,
+		},
+		(struct tk_read_base){
+			.clock = &dummy_clock,
+		},
+	},
+};
+
+static struct tk_fast tk_fast_raw  ____cacheline_aligned = {
+	.base = {
+		(struct tk_read_base){
+			.clock = &dummy_clock,
+		},
+		(struct tk_read_base){
+			.clock = &dummy_clock,
+		},
+	},
+};
 
 /* flag for if timekeeping is suspended */
 int __read_mostly timekeeping_suspended;
@@ -477,17 +509,10 @@ u64 notrace ktime_get_boot_fast_ns(void)
 }
 EXPORT_SYMBOL_GPL(ktime_get_boot_fast_ns);
 
-/* Suspend-time cycles value for halted fast timekeeper. */
-static u64 cycles_at_suspend;
-
-static u64 dummy_clock_read(struct clocksource *cs)
+u64 ktime_get_real_offset(void)
 {
-	return cycles_at_suspend;
+	return ktime_to_ns(tk_core.timekeeper.offs_real);
 }
-
-static struct clocksource dummy_clock = {
-	.read = dummy_clock_read,
-};
 
 /**
  * halt_fast_timekeeper - Prevent fast timekeeper from accessing clocksource.
