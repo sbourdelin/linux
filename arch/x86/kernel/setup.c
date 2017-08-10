@@ -822,7 +822,11 @@ dump_kernel_offset(struct notifier_block *self, unsigned long v, void *p)
 	return 0;
 }
 
-static void __init simple_udelay_calibration(void)
+/*
+ * Initialize early tsc to show early boot timestamps, and also loops_per_jiffy
+ * for udelay
+ */
+static void __init early_clock_calibration(void)
 {
 	unsigned int tsc_khz, cpu_khz;
 	unsigned long lpj;
@@ -836,6 +840,8 @@ static void __init simple_udelay_calibration(void)
 	tsc_khz = tsc_khz ? : cpu_khz;
 	if (!tsc_khz)
 		return;
+
+	tsc_early_init(tsc_khz);
 
 	lpj = tsc_khz * 1000;
 	do_div(lpj, HZ);
@@ -1049,7 +1055,7 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	init_hypervisor_platform();
 
-	simple_udelay_calibration();
+	early_clock_calibration();
 
 	x86_init.resources.probe_roms();
 

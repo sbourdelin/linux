@@ -1263,6 +1263,53 @@ static int __init init_tsc_clocksource(void)
  */
 device_initcall(init_tsc_clocksource);
 
+#ifdef CONFIG_X86_TSC
+
+static struct cyc2ns_data  cyc2ns_early;
+static bool sched_clock_early_enabled;
+
+u64 sched_clock_early(void)
+{
+	u64 ns;
+
+	if (!sched_clock_early_enabled)
+		return 0;
+	ns = mul_u64_u32_shr(rdtsc(), cyc2ns_early.cyc2ns_mul,
+			     cyc2ns_early.cyc2ns_shift);
+	return ns + cyc2ns_early.cyc2ns_offset;
+}
+
+/*
+ * Initialize clock for early time stamps
+ */
+void __init tsc_early_init(unsigned int khz)
+{
+	sched_clock_early_enabled = true;
+	clocks_calc_mult_shift(&cyc2ns_early.cyc2ns_mul,
+			       &cyc2ns_early.cyc2ns_shift,
+			       khz, NSEC_PER_MSEC, 0);
+	cyc2ns_early.cyc2ns_offset = -sched_clock_early();
+	sched_clock_early_init();
+}
+
+void __init tsc_early_fini(void)
+{
+	unsigned long long t;
+	unsigned long r;
+
+	/* We did not have early sched clock if multiplier is 0 */
+	if (cyc2ns_early.cyc2ns_mul == 0)
+		return;
+
+	t = -cyc2ns_early.cyc2ns_offset;
+	r = do_div(t, NSEC_PER_SEC);
+
+	sched_clock_early_fini();
+	pr_info("sched clock early is finished, offset [%lld.%09lds]\n", t, r);
+	sched_clock_early_enabled = false;
+}
+#endif /* CONFIG_X86_TSC */
+
 void __init tsc_init(void)
 {
 	u64 lpj, cyc;
