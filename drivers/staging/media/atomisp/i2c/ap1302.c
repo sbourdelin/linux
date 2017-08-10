@@ -315,12 +315,15 @@ static int ap1302_request_firmware(struct v4l2_subdev *sd)
 	return ret;
 }
 
-/* When loading firmware, host writes firmware data from address 0x8000.
-   When the address reaches 0x9FFF, the next address should return to 0x8000.
-   This function handles this address window and load firmware data to AP1302.
-   win_pos indicates the offset within this window. Firmware loading procedure
-   may call this function several times. win_pos records the current position
-   that has been written to.*/
+/*
+ * When loading firmware, host writes firmware data from address 0x8000.
+ * When the address reaches 0x9FFF, the next address should return to 0x8000.
+ * This function handles this address window and load firmware data to AP1302.
+ * win_pos indicates the offset within this window. Firmware loading procedure
+ * may call this function several times. win_pos records the current position
+ * that has been written to.
+ *
+ */
 static int ap1302_write_fw_window(struct v4l2_subdev *sd,
 				  u16 *win_pos, const u8 *buf, u32 len)
 {
@@ -365,9 +368,12 @@ static int ap1302_load_firmware(struct v4l2_subdev *sd)
 		dev_err(&client->dev, "firmware size does not match.\n");
 		return -EINVAL;
 	}
-	/* The fw binary contains a header of struct ap1302_firmware.
-	   Following the header is the bootdata of AP1302.
-	   The bootdata pointer can be referenced as &fw[1]. */
+	/*
+	 * The fw binary contains a header of struct ap1302_firmware.
+	 * Following the header is the bootdata of AP1302.
+	 * The bootdata pointer can be referenced as &fw[1].
+	 *
+	 */
 	fw_data = (u8 *)&fw[1];
 
 	/* Clear crc register. */
@@ -380,8 +386,11 @@ static int ap1302_load_firmware(struct v4l2_subdev *sd)
 	if (ret)
 		return ret;
 
-	/* Write 2 to bootdata_stage register to apply basic_init_hp
-	   settings and enable PLL. */
+	/*
+	 * Write 2 to bootdata_stage register to apply basic_init_hp
+	 * settings and enable PLL.
+	 *
+	 */
 	ret = ap1302_i2c_write_reg(sd, REG_BOOTDATA_STAGE,
 				   AP1302_REG16, 0x0002);
 	if (ret)
@@ -407,8 +416,11 @@ static int ap1302_load_firmware(struct v4l2_subdev *sd)
 		return -EAGAIN;
 	}
 
-	/* Write 0xFFFF to bootdata_stage register to indicate AP1302 that
-	   the whole bootdata content has been loaded. */
+	/*
+	 * Write 0xFFFF to bootdata_stage register to indicate AP1302 that
+	 * the whole bootdata content has been loaded.
+	 *
+	 */
 	ret = ap1302_i2c_write_reg(sd, REG_BOOTDATA_STAGE,
 				   AP1302_REG16, 0xFFFF);
 	if (ret)
