@@ -73,6 +73,12 @@ actually function descriptors which must first be resolved. The ``F`` and
 ``f`` specifiers perform this resolution and then provide the same
 functionality as the ``S`` and ``s`` specifiers.
 
+Examples::
+
+	printk("Called from %pS.\n", __builtin_return_address(0));
+	printk("Called from %pS.\n", (void *)regs->ip);
+	printk("Called from %pF.\n", &gettimeofday);
+
 Kernel Pointers
 ===============
 
