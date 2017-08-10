@@ -452,7 +452,7 @@ static void fq_codel_destroy(struct Qdisc *sch)
 {
 	struct fq_codel_sched_data *q = qdisc_priv(sch);
 
-	tcf_block_put(q->block);
+	tcf_block_put(&q->block);
 	kvfree(q->backlogs);
 	kvfree(q->flows);
 }

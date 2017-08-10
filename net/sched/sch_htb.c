@@ -1237,7 +1237,7 @@ static void htb_destroy_class(struct Qdisc *sch, struct htb_class *cl)
 		qdisc_destroy(cl->un.leaf.q);
 	}
 	gen_kill_estimator(&cl->rate_est);
-	tcf_block_put(cl->block);
+	tcf_block_put(&cl->block);
 	kfree(cl);
 }
 
@@ -1255,11 +1255,11 @@ static void htb_destroy(struct Qdisc *sch)
 	 * because filter need its target class alive to be able to call
 	 * unbind_filter on it (without Oops).
 	 */
-	tcf_block_put(q->block);
+	tcf_block_put(&q->block);
 
 	for (i = 0; i < q->clhash.hashsize; i++) {
 		hlist_for_each_entry(cl, &q->clhash.hash[i], common.hnode)
-			tcf_block_put(cl->block);
+			tcf_block_put(&cl->block);
 	}
 	for (i = 0; i < q->clhash.hashsize; i++) {
 		hlist_for_each_entry_safe(cl, next, &q->clhash.hash[i],
@@ -1415,7 +1415,7 @@ static int htb_change_class(struct Qdisc *sch, u32 classid,
 						qdisc_root_sleeping_running(sch),
 						tca[TCA_RATE] ? : &est.nla);
 			if (err) {
-				tcf_block_put(cl->block);
+				tcf_block_put(&cl->block);
 				kfree(cl);
 				goto failure;
 			}

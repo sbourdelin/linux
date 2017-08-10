@@ -1053,7 +1053,7 @@ hfsc_change_class(struct Qdisc *sch, u32 classid, u32 parentid,
 					qdisc_root_sleeping_running(sch),
 					tca[TCA_RATE]);
 		if (err) {
-			tcf_block_put(cl->block);
+			tcf_block_put(&cl->block);
 			kfree(cl);
 			return err;
 		}
@@ -1099,7 +1099,7 @@ hfsc_destroy_class(struct Qdisc *sch, struct hfsc_class *cl)
 {
 	struct hfsc_sched *q = qdisc_priv(sch);
 
-	tcf_block_put(cl->block);
+	tcf_block_put(&cl->block);
 	qdisc_destroy(cl->qdisc);
 	gen_kill_estimator(&cl->rate_est);
 	if (cl != &q->root)
@@ -1523,7 +1523,7 @@ hfsc_destroy_qdisc(struct Qdisc *sch)
 
 	for (i = 0; i < q->clhash.hashsize; i++) {
 		hlist_for_each_entry(cl, &q->clhash.hash[i], cl_common.hnode)
-			tcf_block_put(cl->block);
+			tcf_block_put(&cl->block);
 	}
 	for (i = 0; i < q->clhash.hashsize; i++) {
 		hlist_for_each_entry_safe(cl, next, &q->clhash.hash[i],

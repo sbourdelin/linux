@@ -266,8 +266,9 @@ err_chain_create:
 }
 EXPORT_SYMBOL(tcf_block_get);
 
-void tcf_block_put(struct tcf_block *block)
+void tcf_block_put(struct tcf_block **p_block)
 {
+	struct tcf_block *block = *p_block;
 	struct tcf_chain *chain, *tmp;
 
 	if (!block)
@@ -276,6 +277,7 @@ void tcf_block_put(struct tcf_block *block)
 	list_for_each_entry_safe(chain, tmp, &block->chain_list, list)
 		tcf_chain_destroy(chain);
 	kfree(block);
+	*p_block = NULL;
 }
 EXPORT_SYMBOL(tcf_block_put);
 

@@ -406,7 +406,7 @@ static void dsmark_destroy(struct Qdisc *sch)
 
 	pr_debug("%s(sch %p,[qdisc %p])\n", __func__, sch, p);
 
-	tcf_block_put(p->block);
+	tcf_block_put(&p->block);
 	qdisc_destroy(p->q);
 	if (p->mv != p->embedded)
 		kfree(p->mv);

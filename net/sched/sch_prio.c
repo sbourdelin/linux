@@ -147,7 +147,7 @@ prio_destroy(struct Qdisc *sch)
 	int prio;
 	struct prio_sched_data *q = qdisc_priv(sch);
 
-	tcf_block_put(q->block);
+	tcf_block_put(&q->block);
 	for (prio = 0; prio < q->bands; prio++)
 		qdisc_destroy(q->queues[prio]);
 }

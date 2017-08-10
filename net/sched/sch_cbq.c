@@ -1407,7 +1407,7 @@ static void cbq_destroy_class(struct Qdisc *sch, struct cbq_class *cl)
 
 	WARN_ON(cl->filters);
 
-	tcf_block_put(cl->block);
+	tcf_block_put(&cl->block);
 	qdisc_destroy(cl->q);
 	qdisc_put_rtab(cl->R_tab);
 	gen_kill_estimator(&cl->rate_est);
@@ -1432,7 +1432,7 @@ static void cbq_destroy(struct Qdisc *sch)
 	 */
 	for (h = 0; h < q->clhash.hashsize; h++) {
 		hlist_for_each_entry(cl, &q->clhash.hash[h], common.hnode)
-			tcf_block_put(cl->block);
+			tcf_block_put(&cl->block);
 	}
 	for (h = 0; h < q->clhash.hashsize; h++) {
 		hlist_for_each_entry_safe(cl, next, &q->clhash.hash[h],
@@ -1599,7 +1599,7 @@ cbq_change_class(struct Qdisc *sch, u32 classid, u32 parentid, struct nlattr **t
 					qdisc_root_sleeping_running(sch),
 					tca[TCA_RATE]);
 		if (err) {
-			tcf_block_put(cl->block);
+			tcf_block_put(&cl->block);
 			kfree(cl);
 			goto failure;
 		}

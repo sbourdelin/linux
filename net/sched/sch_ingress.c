@@ -78,7 +78,7 @@ static void ingress_destroy(struct Qdisc *sch)
 {
 	struct ingress_sched_data *q = qdisc_priv(sch);
 
-	tcf_block_put(q->block);
+	tcf_block_put(&q->block);
 	net_dec_ingress_queue();
 }
 
@@ -185,8 +185,8 @@ static void clsact_destroy(struct Qdisc *sch)
 {
 	struct clsact_sched_data *q = qdisc_priv(sch);
 
-	tcf_block_put(q->egress_block);
-	tcf_block_put(q->ingress_block);
+	tcf_block_put(&q->egress_block);
+	tcf_block_put(&q->ingress_block);
 
 	net_dec_ingress_queue();
 	net_dec_egress_queue();

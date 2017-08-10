@@ -467,7 +467,7 @@ static void sfb_destroy(struct Qdisc *sch)
 {
 	struct sfb_sched_data *q = qdisc_priv(sch);
 
-	tcf_block_put(q->block);
+	tcf_block_put(&q->block);
 	qdisc_destroy(q->qdisc);
 }
 

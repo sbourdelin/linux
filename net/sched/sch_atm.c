@@ -144,7 +144,7 @@ static void atm_tc_put(struct Qdisc *sch, unsigned long cl)
 	list_del_init(&flow->list);
 	pr_debug("atm_tc_put: qdisc %p\n", flow->q);
 	qdisc_destroy(flow->q);
-	tcf_block_put(flow->block);
+	tcf_block_put(&flow->block);
 	if (flow->sock) {
 		pr_debug("atm_tc_put: f_count %ld\n",
 			file_count(flow->sock->file));
@@ -573,7 +573,7 @@ static void atm_tc_destroy(struct Qdisc *sch)
 
 	pr_debug("atm_tc_destroy(sch %p,[qdisc %p])\n", sch, p);
 	list_for_each_entry(flow, &p->flows, list)
-		tcf_block_put(flow->block);
+		tcf_block_put(&flow->block);
 
 	list_for_each_entry_safe(flow, tmp, &p->flows, list) {
 		if (flow->ref > 1)

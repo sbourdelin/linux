@@ -172,7 +172,7 @@ multiq_destroy(struct Qdisc *sch)
 	int band;
 	struct multiq_sched_data *q = qdisc_priv(sch);
 
-	tcf_block_put(q->block);
+	tcf_block_put(&q->block);
 	for (band = 0; band < q->bands; band++)
 		qdisc_destroy(q->queues[band]);
 
