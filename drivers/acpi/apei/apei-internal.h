@@ -122,8 +122,8 @@ struct dentry *apei_get_debugfs_dir(void);
 
 #define apei_estatus_for_each_section(estatus, section)			\
 	for (section = (struct acpi_hest_generic_data *)(estatus + 1);	\
-	     (void *)section - (void *)estatus < estatus->data_length;	\
-	     section = (void *)(section+1) + section->error_data_length)
+	     (void *)section - (void *)(estatus + 1) < estatus->data_length; \
+	     section = acpi_hest_get_next(section))
 
 static inline u32 cper_estatus_len(struct acpi_hest_generic_status *estatus)
 {
