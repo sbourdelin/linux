@@ -215,6 +215,41 @@ static const char * const numa_usage[] = {
 	NULL
 };
 
+static int nr_numa_nodes(void)
+{
+	int node = 0, i;
+
+        for (i = 0; i < g->p.nr_nodes; i++) {
+		if (numa_bitmask_isbitset(numa_nodes_ptr, i))
+			node++;
+	}
+	return node;
+}
+
+static bool is_node_present(int node)
+{
+	if (numa_bitmask_isbitset(numa_nodes_ptr, node))
+		return true;
+	else
+		return false;
+}
+
+static bool is_node_hascpu(int node)
+{
+	struct bitmask *cpu;
+	unsigned int i;
+
+	cpu = numa_allocate_cpumask();
+	if (numa_node_to_cpus(node, cpu) == 0) {
+		for (i = 0; i < cpu->size; i++) {
+			if (numa_bitmask_isbitset(cpu, i))
+				return true;
+			}
+	} else
+		return false; // lets fall back to nocpus safely
+	return false;
+}
+
 static cpu_set_t bind_to_cpu(int target_cpu)
 {
 	cpu_set_t orig_mask, mask;
