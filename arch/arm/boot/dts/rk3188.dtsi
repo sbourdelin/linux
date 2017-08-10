@@ -160,6 +160,17 @@
 
 		#clock-cells = <1>;
 		#reset-cells = <1>;
+		assigned-clocks = <&cru PLL_GPLL>, <&cru PLL_DPLL>,
+				  <&cru PLL_CPLL>, <&cru PLL_APLL>,
+				  <&cru ACLK_CPU>, <&cru HCLK_CPU>,
+				  <&cru PCLK_CPU>, <&cru ACLK_PERI>,
+				  <&cru HCLK_PERI>, <&cru PCLK_PERI>;
+
+		assigned-clock-rates = <891000000>, <300000000>,
+				       <132000000>, <312000000>,
+				       <148500000>, <148500000>,
+				       <74250000>, <127285715>,
+				       <127285715>, <63642858>;
 	};
 
 	efuse: efuse@20010000 {
