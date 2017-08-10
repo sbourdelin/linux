@@ -65,6 +65,10 @@
 	UNIPHIER_CLK_FACTOR("evea-io100m", -1, "spll", 1, 20),		\
 	UNIPHIER_CLK_GATE("evea", (idx), "evea-io100m", 0x2108, 1)
 
+#define UNIPHIER_LD11_SYS_CLK_EXIV(idx)					\
+	UNIPHIER_CLK_FACTOR("exiv-io200m", -1, "spll", 1, 10),		\
+	UNIPHIER_CLK_GATE("exiv", (idx), "exiv-io200m", 0x2110, 2)
+
 const struct uniphier_clk_data uniphier_sld3_sys_clk_data[] = {
 	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 65, 1),		/* 1597.44 MHz */
 	UNIPHIER_CLK_FACTOR("upll", -1, "ref", 6000, 512),	/* 288 MHz */
@@ -168,6 +172,7 @@ const struct uniphier_clk_data uniphier_ld11_sys_clk_data[] = {
 	UNIPHIER_CLK_FACTOR("usb2", -1, "ref", 24, 25),
 	UNIPHIER_LD11_SYS_CLK_AIO(40),
 	UNIPHIER_LD11_SYS_CLK_EVEA(41),
+	UNIPHIER_LD11_SYS_CLK_EXIV(42),
 	/* CPU gears */
 	UNIPHIER_CLK_DIV4("cpll", 2, 3, 4, 8),
 	UNIPHIER_CLK_DIV4("mpll", 2, 3, 4, 8),
@@ -206,6 +211,7 @@ const struct uniphier_clk_data uniphier_ld20_sys_clk_data[] = {
 	UNIPHIER_CLK_GATE("usb30-phy1", 17, NULL, 0x210c, 13),
 	UNIPHIER_LD11_SYS_CLK_AIO(40),
 	UNIPHIER_LD11_SYS_CLK_EVEA(41),
+	UNIPHIER_LD11_SYS_CLK_EXIV(42),
 	/* CPU gears */
 	UNIPHIER_CLK_DIV4("cpll", 2, 3, 4, 8),
 	UNIPHIER_CLK_DIV4("spll", 2, 3, 4, 8),
