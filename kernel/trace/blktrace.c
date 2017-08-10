@@ -1710,6 +1710,18 @@ static struct request_queue *blk_trace_get_queue(struct block_device *bdev)
 	return bdev_get_queue(bdev);
 }
 
+/*
+ * Read/write to the tracing sysfs file requires taking references to the
+ * sysfs file and then acquiring the bd_mutex. Deleting a block device
+ * requires acquiring the bd_mutex and then waiting for all the sysfs
+ * references to be gone. This can lead to deadlock if both operations
+ * happen simultaneously. To avoid this problem, read/write to the
+ * the tracing sysfs files can now fail if the bd_mutex cannot be
+ * acquired while a deletion operation is in progress.
+ *
+ * A mutex trylock loop is used assuming that tracing sysfs operations
+ * aren't frequently enough to cause any contention problem.
+ */
 static ssize_t sysfs_blk_trace_attr_show(struct device *dev,
 					 struct device_attribute *attr,
 					 char *buf)
@@ -1727,7 +1739,11 @@ static ssize_t sysfs_blk_trace_attr_show(struct device *dev,
 	if (q == NULL)
 		goto out_bdput;
 
-	mutex_lock(&bdev->bd_mutex);
+	while (!mutex_trylock(&bdev->bd_mutex)) {
+		if (bdev->bd_deleting)
+			goto out_bdput;
+		schedule();
+	}
 
 	if (attr == &dev_attr_enable) {
 		ret = sprintf(buf, "%u\n", !!q->blk_trace);
@@ -1788,7 +1804,11 @@ static ssize_t sysfs_blk_trace_attr_store(struct device *dev,
 	if (q == NULL)
 		goto out_bdput;
 
-	mutex_lock(&bdev->bd_mutex);
+	while (!mutex_trylock(&bdev->bd_mutex)) {
+		if (bdev->bd_deleting)
+			goto out_bdput;
+		schedule();
+	}
 
 	if (attr == &dev_attr_enable) {
 		if (value)

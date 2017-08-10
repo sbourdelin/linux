@@ -86,12 +86,15 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg __user 
 				return -EBUSY;
 			}
 			/* all seems OK */
+			bdev->bd_deleting = 1;
 			fsync_bdev(bdevp);
 			invalidate_bdev(bdevp);
 
 			mutex_lock_nested(&bdev->bd_mutex, 1);
 			delete_partition(disk, partno);
 			mutex_unlock(&bdev->bd_mutex);
+			bdev->bd_deleting = 0;
+
 			mutex_unlock(&bdevp->bd_mutex);
 			bdput(bdevp);
 
