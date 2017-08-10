@@ -163,8 +163,9 @@ static struct ap1302_context_info context_info[] = {
 };
 
 /* This array stores the description list for metadata.
-   The metadata contains exposure settings and face
-   detection results. */
+ * The metadata contains exposure settings and face
+ * detection results.
+ */
 static u16 ap1302_ss_list[] = {
 	0xb01c, /* From 0x0186 with size 0x1C are exposure settings. */
 	0x0186,
