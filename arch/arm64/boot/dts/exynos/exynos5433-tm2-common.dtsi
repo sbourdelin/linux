@@ -784,6 +784,7 @@
 		reset-gpios = <&gpv7 0 GPIO_ACTIVE_LOW>;
 		clocks = <&pmu_system_controller 0>;
 		clock-names = "xtal";
+		extcon = <&muic>;
 
 		port {
 			mhl_to_hdmi: endpoint {
