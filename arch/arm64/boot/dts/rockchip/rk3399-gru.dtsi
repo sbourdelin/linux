@@ -515,6 +515,7 @@
 		compatible = "rockchip,rk3399-gru-sound";
 		rockchip,cpu = <&i2s0 &i2s2>;
 		rockchip,codec = <&max98357a &headsetcodec &codec>;
+		rockchip,codec-names = "MAX98357A", "RT5514", "DA7219";
 	};
 };
 
