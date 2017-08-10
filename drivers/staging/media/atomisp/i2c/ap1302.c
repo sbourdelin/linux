@@ -236,11 +236,14 @@ static u16
 ap1302_calculate_context_reg_addr(enum ap1302_contexts context, u16 offset)
 {
 	u16 reg_addr;
-	/* The register offset is defined according to preview/video registers.
-	   Preview and video context have the same register definition.
-	   But snapshot context does not have register S1_SENSOR_MODE.
-	   When setting snapshot registers, if the offset exceeds
-	   S1_SENSOR_MODE, the actual offset needs to minus 2. */
+	/*
+	 * The register offset is defined according to preview/video registers.
+	 * Preview and video context have the same register definition.
+	 * But snapshot context does not have register S1_SENSOR_MODE.
+	 * When setting snapshot registers, if the offset exceeds
+	 * S1_SENSOR_MODE, the actual offset needs to minus 2.
+	 *
+	 */
 	if (context == CONTEXT_SNAPSHOT) {
 		if (offset == CNTX_S1_SENSOR_MODE)
 			return 0;
