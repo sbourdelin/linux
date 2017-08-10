@@ -33,4 +33,14 @@ static inline struct mpls_shim_hdr *mpls_hdr(const struct sk_buff *skb)
 {
 	return (struct mpls_shim_hdr *)skb_network_header(skb);
 }
+
+typedef int (*mpls_handler)(void *arg, struct sk_buff *skb,
+			    struct net_device *dev, u32 index, u8 bos);
+
+extern int mpls_handler_add(struct net *net, u32 index, u8 via_table, u8 via[],
+			    mpls_handler handler, void *handler_arg,
+			    struct netlink_ext_ack *extack);
+extern int mpls_handler_del(struct net *net, u32 index,
+			    struct netlink_ext_ack *extack);
+
 #endif

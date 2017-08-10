@@ -10,6 +10,7 @@
 #include <linux/netconf.h>
 #include <linux/vmalloc.h>
 #include <linux/percpu.h>
+#include <net/mpls.h>
 #include <net/ip.h>
 #include <net/dst.h>
 #include <net/sock.h>
@@ -299,6 +300,7 @@ static bool mpls_egress(struct net *net, struct mpls_route *rt,
 		success = true;
 		break;
 	}
+	case MPT_HANDLER:
 	case MPT_UNSPEC:
 		/* Should have decided which protocol it is by now */
 		break;
@@ -355,6 +357,10 @@ static int mpls_forward(struct sk_buff *skb, struct net_device *dev,
 		MPLS_INC_STATS(mdev, rx_noroute);
 		goto drop;
 	}
+
+	if (rt->rt_payload_type == MPT_HANDLER)
+		return rt->rt_handler(rt->rt_harg, skb, dev,
+				      dec.label, dec.bos);
 
 	nh = mpls_select_multipath(rt, skb);
 	if (!nh)
@@ -457,6 +463,8 @@ static const struct nla_policy rtm_mpls_policy[RTA_MAX+1] = {
 struct mpls_route_config {
 	u32			rc_protocol;
 	u32			rc_ifindex;
+	mpls_handler		rc_handler;
+	void			*rc_harg;
 	u8			rc_via_table;
 	u8			rc_via_alen;
 	u8			rc_via[MAX_VIA_ALEN];
@@ -995,6 +1003,11 @@ static int mpls_route_add(struct mpls_route_config *cfg,
 	rt->rt_payload_type = cfg->rc_payload_type;
 	rt->rt_ttl_propagate = cfg->rc_ttl_propagate;
 
+	if (cfg->rc_handler) {
+		rt->rt_handler = cfg->rc_handler;
+		rt->rt_harg = cfg->rc_harg;
+	}
+
 	if (cfg->rc_mp)
 		err = mpls_nh_build_multi(cfg, rt, max_labels, extack);
 	else
@@ -1270,6 +1283,68 @@ done:
 
 	return skb->len;
 }
+
+int mpls_handler_add(struct net *net, u32 label, u8 via_table, u8 via[],
+		     mpls_handler handler, void *handler_arg,
+		     struct netlink_ext_ack *extack)
+{
+	struct net_device *dev = handler_arg;
+	struct mpls_route_config *cfg;
+	u8 alen = 0;
+	int err;
+
+	cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
+	if (!cfg)
+		return -ENOMEM;
+
+	memset(cfg, 0, sizeof(*cfg));
+	if (via_table == NEIGH_ARP_TABLE)
+		alen = sizeof(struct in_addr);
+	else if (via_table == NEIGH_ND_TABLE)
+		alen = sizeof(struct in6_addr);
+
+	cfg->rc_ttl_propagate	= MPLS_TTL_PROP_DEFAULT;
+	cfg->rc_protocol	= RTPROT_KERNEL;
+	cfg->rc_nlflags		|= NLM_F_CREATE;
+	cfg->rc_payload_type	= MPT_HANDLER;
+	cfg->rc_via_table	= via_table;
+	cfg->rc_label		= label;
+	cfg->rc_via_alen	= alen;
+	memcpy(&cfg->rc_via, via, alen);
+	cfg->rc_ifindex		= dev->ifindex;
+	cfg->rc_nlinfo.nl_net	= net;
+	cfg->rc_harg		= handler_arg;
+	cfg->rc_handler		= handler;
+	cfg->rc_output_labels	= 0;
+
+	err = mpls_route_add(cfg, extack);
+	kfree(cfg);
+
+	return err;
+}
+EXPORT_SYMBOL(mpls_handler_add);
+
+int mpls_handler_del(struct net *net, u32 index,
+		     struct netlink_ext_ack *extack)
+{
+	struct mpls_route_config *cfg;
+	int err = 0;
+
+	cfg = kzalloc(sizeof(*cfg), GFP_KERNEL);
+	if (!cfg)
+		return -ENOMEM;
+
+	memset(cfg, 0, sizeof(*cfg));
+	cfg->rc_protocol	= RTPROT_KERNEL;
+	cfg->rc_label		= index;
+	cfg->rc_nlinfo.nl_net	= net;
+
+	err = mpls_route_del(cfg, extack);
+	kfree(cfg);
+
+	return err;
+}
+EXPORT_SYMBOL(mpls_handler_del);
 
 #define MPLS_PERDEV_SYSCTL_OFFSET(field)	\
 	(&((struct mpls_dev *)0)->field)
