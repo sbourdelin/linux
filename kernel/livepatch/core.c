@@ -437,12 +437,48 @@ EXPORT_SYMBOL_GPL(klp_enable_patch);
  * Sysfs Interface
  *
  * /sys/kernel/livepatch
+ * /sys/kernel/livepatch/force
  * /sys/kernel/livepatch/<patch>
  * /sys/kernel/livepatch/<patch>/enabled
  * /sys/kernel/livepatch/<patch>/transition
  * /sys/kernel/livepatch/<patch>/<object>
  * /sys/kernel/livepatch/<patch>/<object>/<function,sympos>
  */
+
+/*
+ * NOTE: The following function are currently empty. The intention is to keep
+ * sysfs glue separate and thus make the review easier.
+ */
+static ssize_t force_show(struct kobject *kobj,
+			  struct kobj_attribute *attr, char *buf)
+{
+	return sprintf(buf, "No operation is currently permitted.\n");
+}
+
+static ssize_t force_store(struct kobject *kobj, struct kobj_attribute *attr,
+			   const char *buf, size_t count)
+{
+	/*
+	 * klp_mutex lock is not grabbed here intentionally. It is not really
+	 * needed. The race window is harmless and grabbing the lock would only
+	 * hold the action back.
+	 */
+	if (!klp_transition_patch) {
+		pr_info("no patching in progress, forced action ineffective\n");
+		return -EINVAL;
+	}
+
+	return -EINVAL;
+}
+
+static struct kobj_attribute force_kobj_attr = __ATTR_RW(force);
+static struct attribute *klp_attrs[] = {
+	&force_kobj_attr.attr,
+	NULL
+};
+static struct attribute_group klp_sysfs_group = {
+	.attrs = klp_attrs,
+};
 
 static ssize_t enabled_store(struct kobject *kobj, struct kobj_attribute *attr,
 			     const char *buf, size_t count)
@@ -953,6 +989,13 @@ static int __init klp_init(void)
 	klp_root_kobj = kobject_create_and_add("livepatch", kernel_kobj);
 	if (!klp_root_kobj)
 		return -ENOMEM;
+
+	ret = sysfs_create_group(klp_root_kobj, &klp_sysfs_group);
+	if (ret) {
+		pr_err("cannot create livepatch attributes in sysfs\n");
+		kobject_put(klp_root_kobj);
+		return ret;
+	}
 
 	return 0;
 }
