@@ -410,8 +410,7 @@ static int build_sg_fd(struct dpaa2_eth_priv *priv,
 	dpaa2_fd_set_format(fd, dpaa2_fd_sg);
 	dpaa2_fd_set_addr(fd, addr);
 	dpaa2_fd_set_len(fd, skb->len);
-	dpaa2_fd_set_ctrl(fd, DPAA2_FD_CTRL_ASAL | DPAA2_FD_CTRL_PTA |
-			  DPAA2_FD_CTRL_PTV1);
+	dpaa2_fd_set_ctrl(fd, DPAA2_FD_CTRL_ASAL | FD_CTRL_PTA | FD_CTRL_PTV1);
 
 	return 0;
 
@@ -464,8 +463,7 @@ static int build_single_fd(struct dpaa2_eth_priv *priv,
 	dpaa2_fd_set_offset(fd, (u16)(skb->data - buffer_start));
 	dpaa2_fd_set_len(fd, skb->len);
 	dpaa2_fd_set_format(fd, dpaa2_fd_single);
-	dpaa2_fd_set_ctrl(fd, DPAA2_FD_CTRL_ASAL | DPAA2_FD_CTRL_PTA |
-			  DPAA2_FD_CTRL_PTV1);
+	dpaa2_fd_set_ctrl(fd, DPAA2_FD_CTRL_ASAL | FD_CTRL_PTA | FD_CTRL_PTV1);
 
 	return 0;
 }
@@ -653,7 +651,7 @@ static void dpaa2_eth_tx_conf(struct dpaa2_eth_priv *priv,
 		/* We only check error bits in the FAS field if corresponding
 		 * FAERR bit is set in FD and the FAS field is marked as valid
 		 */
-		has_fas_errors = (fd_errors & DPAA2_FD_CTRL_FAERR) &&
+		has_fas_errors = (fd_errors & FD_CTRL_FAERR) &&
 				 !!(dpaa2_fd_get_frc(fd) & DPAA2_FD_FRC_FASV);
 		if (net_ratelimit())
 			netdev_dbg(priv->net_dev, "TX frame FD error: %x08\n",
