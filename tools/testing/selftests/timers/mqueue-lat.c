@@ -32,14 +32,7 @@
 #ifdef KTEST
 #include "../kselftest.h"
 #else
-static inline int ksft_exit_pass(void)
-{
-	exit(0);
-}
-static inline int ksft_exit_fail(void)
-{
-	exit(1);
-}
+#include "kselftest_stubs.h"
 #endif
 
 #define NSEC_PER_SEC 1000000000ULL
