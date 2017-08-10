@@ -23,7 +23,11 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifdef KTEST
 #include "../kselftest.h"
+#else
+#include "kselftest_stubs.h"
+#endif
 
 #define SAMPLES 100
 #define SAMPLE_READINGS 10

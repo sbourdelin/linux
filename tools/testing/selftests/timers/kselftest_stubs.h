@@ -18,5 +18,6 @@
 
 static inline int ksft_exit_pass(void) { exit(0); }
 static inline int ksft_exit_fail(void) { exit(1); }
+static inline int ksft_exit_skip(const char *msg, ...) { exit(4); }
 
 #endif /* __KSELFTEST__STUBS_H */
