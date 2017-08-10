@@ -16,6 +16,8 @@
 
 #include <linux/if_ether.h>
 #include <linux/netdevice.h>
+#include <linux/kernel.h>
+#include <linux/mpls.h>
 
 #define MPLS_HLEN 4
 
@@ -34,6 +36,19 @@ static inline struct mpls_shim_hdr *mpls_hdr(const struct sk_buff *skb)
 	return (struct mpls_shim_hdr *)skb_network_header(skb);
 }
 
+static inline struct mpls_shim_hdr mpls_entry_encode(u32 label, u32 ttl,
+						     u32 tc, bool bos)
+{
+	struct mpls_shim_hdr result;
+	result.label_stack_entry =
+		cpu_to_be32((label << MPLS_LS_LABEL_SHIFT) |
+			    (tc << MPLS_LS_TC_SHIFT) |
+			    (bos ? (1 << MPLS_LS_S_SHIFT) : 0) |
+			    (ttl << MPLS_LS_TTL_SHIFT));
+	return result;
+}
+
+bool mpls_output_possible(const struct net_device *dev);
 typedef int (*mpls_handler)(void *arg, struct sk_buff *skb,
 			    struct net_device *dev, u32 index, u8 bos);
 

@@ -174,17 +174,6 @@ struct mpls_route { /* next hop label forwarding entry */
 
 #define endfor_nexthops(rt) }
 
-static inline struct mpls_shim_hdr mpls_entry_encode(u32 label, unsigned ttl, unsigned tc, bool bos)
-{
-	struct mpls_shim_hdr result;
-	result.label_stack_entry =
-		cpu_to_be32((label << MPLS_LS_LABEL_SHIFT) |
-			    (tc << MPLS_LS_TC_SHIFT) |
-			    (bos ? (1 << MPLS_LS_S_SHIFT) : 0) |
-			    (ttl << MPLS_LS_TTL_SHIFT));
-	return result;
-}
-
 static inline struct mpls_entry_decoded mpls_entry_decode(struct mpls_shim_hdr *hdr)
 {
 	struct mpls_entry_decoded result;
@@ -207,7 +196,6 @@ int nla_put_labels(struct sk_buff *skb, int attrtype,  u8 labels,
 		   const u32 label[]);
 int nla_get_labels(const struct nlattr *nla, u8 max_labels, u8 *labels,
 		   u32 label[], struct netlink_ext_ack *extack);
-bool mpls_output_possible(const struct net_device *dev);
 unsigned int mpls_dev_mtu(const struct net_device *dev);
 bool mpls_pkt_too_big(const struct sk_buff *skb, unsigned int mtu);
 void mpls_stats_inc_outucastpkts(struct net_device *dev,

@@ -363,6 +363,14 @@ config VSOCKMON
      mostly intended for developers or support to debug vsock issues. If
      unsure, say N.
 
+config VPLS
+       tristate "Virtual Private LAN Service (VPLS)"
+       depends on MPLS_ROUTING
+       ---help---
+	  This allows one to create VPLS virtual interfaces that provide
+	  Layer 2 Networks multipoint to multipoint communication over MPLS
+	  PSN.
+
 endif # NET_CORE
 
 config SUNGEM_PHY
