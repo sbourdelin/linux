@@ -183,7 +183,11 @@ attribute. Reading from the file returns all available operations. Writing one
 of the strings to the file executes the operation. "signal" is available for
 signalling all remaining blocking tasks. This is an alternative for
 SIGSTOP/SIGCONT approach mentioned in the previous paragraph. It should also be
-less harmful to the system.
+less harmful to the system. "force" clears TIF_PATCH_PENDING flag of all tasks
+and thus forces the tasks to the patched state. Important note! Use "force"
+wisely. Administrator must be sure that it is safe to execute such action. This
+means that it must be checked that by doing so the consistency model guarantees
+are not violated.
 
 
 3.1 Adding consistency model support to new architectures

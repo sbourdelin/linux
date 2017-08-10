@@ -452,7 +452,7 @@ EXPORT_SYMBOL_GPL(klp_enable_patch);
 static ssize_t force_show(struct kobject *kobj,
 			  struct kobj_attribute *attr, char *buf)
 {
-	return sprintf(buf, "signal\n");
+	return sprintf(buf, "signal force\n");
 }
 
 static ssize_t force_store(struct kobject *kobj, struct kobj_attribute *attr,
@@ -470,6 +470,8 @@ static ssize_t force_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	if (!memcmp("signal", buf, min(sizeof("signal")-1, count)))
 		klp_force_signals();
+	else if (!memcmp("force", buf, min(sizeof("force")-1, count)))
+		klp_force_transitions();
 	else
 		return -EINVAL;
 

@@ -17,10 +17,14 @@ Description:
 		existing transition.
 
 		Reading from the file returns all available operations, which
-		may be "signal" (signalling remaining tasks).
+		may be "signal" (signalling remaining tasks) and "force" (force
+		transition process to finish).
 
 		Writing one of the strings to the file executes the operation.
 		"signal" sends a signal to all remaining blocking tasks.
+
+		"force" clears TIF_PATCH_PENDING flag of all tasks and thus
+		forces the tasks to the patched state.
 
 What:		/sys/kernel/livepatch/<patch>
 Date:		Nov 2014
