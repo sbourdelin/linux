@@ -2608,9 +2608,7 @@ static bool prepare_zap_oldest_mmu_page(struct kvm *kvm,
 
 	sp = list_last_entry(&kvm->arch.active_mmu_pages,
 			     struct kvm_mmu_page, link);
-	kvm_mmu_prepare_zap_page(kvm, sp, invalid_list);
-
-	return true;
+	return kvm_mmu_prepare_zap_page(kvm, sp, invalid_list);
 }
 
 /*
@@ -3379,6 +3377,10 @@ static int mmu_alloc_direct_roots(struct kvm_vcpu *vcpu)
 	if (vcpu->arch.mmu.shadow_root_level == PT64_ROOT_LEVEL) {
 		spin_lock(&vcpu->kvm->mmu_lock);
 		make_mmu_pages_available(vcpu);
+		if (!kvm_mmu_available_pages(vcpu->kvm)) {
+			spin_unlock(&vcpu->kvm->mmu_lock);
+			return 1;
+		}
 		sp = kvm_mmu_get_page(vcpu, 0, 0, PT64_ROOT_LEVEL, 1, ACC_ALL);
 		++sp->root_count;
 		spin_unlock(&vcpu->kvm->mmu_lock);
@@ -3390,6 +3392,10 @@ static int mmu_alloc_direct_roots(struct kvm_vcpu *vcpu)
 			MMU_WARN_ON(VALID_PAGE(root));
 			spin_lock(&vcpu->kvm->mmu_lock);
 			make_mmu_pages_available(vcpu);
+			if (!kvm_mmu_available_pages(vcpu->kvm)) {
+				spin_unlock(&vcpu->kvm->mmu_lock);
+				return 1;
+			}
 			sp = kvm_mmu_get_page(vcpu, i << (30 - PAGE_SHIFT),
 					i << 30, PT32_ROOT_LEVEL, 1, ACC_ALL);
 			root = __pa(sp->spt);
@@ -3427,6 +3433,10 @@ static int mmu_alloc_shadow_roots(struct kvm_vcpu *vcpu)
 
 		spin_lock(&vcpu->kvm->mmu_lock);
 		make_mmu_pages_available(vcpu);
+		if (!kvm_mmu_available_pages(vcpu->kvm)) {
+			spin_unlock(&vcpu->kvm->mmu_lock);
+			return 1;
+		}
 		sp = kvm_mmu_get_page(vcpu, root_gfn, 0, PT64_ROOT_LEVEL,
 				      0, ACC_ALL);
 		root = __pa(sp->spt);
