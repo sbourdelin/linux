@@ -954,10 +954,8 @@ __irq_do_set_handler(struct irq_desc *desc, irq_flow_handler_t handle,
 		 * chained interrupt. Reset it immediately because we
 		 * do know better.
 		 */
-		if (type != IRQ_TYPE_NONE) {
+		if (type != IRQ_TYPE_NONE)
 			__irq_set_trigger(desc, type);
-			desc->handle_irq = handle;
-		}
 
 		irq_settings_set_noprobe(desc);
 		irq_settings_set_norequest(desc);
