@@ -27,6 +27,7 @@
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
 #include <net/vxlan.h>
+#include <net/nsh.h>
 
 #if IS_ENABLED(CONFIG_IPV6)
 #include <net/ip6_tunnel.h>
@@ -1268,6 +1269,9 @@ static bool vxlan_parse_gpe_hdr(struct vxlanhdr *unparsed,
 	case VXLAN_GPE_NP_IPV6:
 		*protocol = htons(ETH_P_IPV6);
 		break;
+	case VXLAN_GPE_NP_NSH:
+		*protocol = htons(ETH_P_NSH);
+		break;
 	case VXLAN_GPE_NP_ETHERNET:
 		*protocol = htons(ETH_P_TEB);
 		break;
@@ -1806,6 +1810,9 @@ static int vxlan_build_gpe_hdr(struct vxlanhdr *vxh, u32 vxflags,
 		return 0;
 	case htons(ETH_P_IPV6):
 		gpe->next_protocol = VXLAN_GPE_NP_IPV6;
+		return 0;
+	case htons(ETH_P_NSH):
+		gpe->next_protocol = VXLAN_GPE_NP_NSH;
 		return 0;
 	case htons(ETH_P_TEB):
 		gpe->next_protocol = VXLAN_GPE_NP_ETHERNET;
