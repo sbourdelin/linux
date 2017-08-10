@@ -35,7 +35,7 @@
 #include <asm/asm.h>
 #include <asm/kvm_page_track.h>
 
-#define KVM_MAX_VCPUS 288
+#define KVM_MAX_VCPUS 352
 #define KVM_SOFT_MAX_VCPUS 240
 #define KVM_MAX_VCPU_ID 1023
 #define KVM_USER_MEM_SLOTS 509
