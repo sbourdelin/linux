@@ -1468,11 +1468,4 @@ extern uint32_t ahd_debug;
 void			ahd_print_devinfo(struct ahd_softc *ahd,
 					  struct ahd_devinfo *devinfo);
 void			ahd_dump_card_state(struct ahd_softc *ahd);
-int			ahd_print_register(const ahd_reg_parse_entry_t *table,
-					   u_int num_entries,
-					   const char *name,
-					   u_int address,
-					   u_int value,
-					   u_int *cur_column,
-					   u_int wrap_point);
 #endif /* _AIC79XX_H_ */

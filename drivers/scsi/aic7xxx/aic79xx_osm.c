@@ -220,14 +220,27 @@ static const struct ahd_linux_iocell_opts aic79xx_iocell_info[] =
  */
 #define DID_UNDERFLOW   DID_ERROR
 
-void
-ahd_print_path(struct ahd_softc *ahd, struct scb *scb)
+static void
+ahd_printbuf_path(struct aic_dump_buffer *buf, struct ahd_softc *ahd,
+	       struct scb *scb)
 {
-	printk("(scsi%d:%c:%d:%d): ",
+	aic_printbuf_init(buf, "(scsi%d:%c:%d:%d): ",
 	       ahd->platform_data->host->host_no,
 	       scb != NULL ? SCB_GET_CHANNEL(ahd, scb) : 'X',
 	       scb != NULL ? SCB_GET_TARGET(ahd, scb) : -1,
 	       scb != NULL ? SCB_GET_LUN(scb) : -1);
+}
+
+/*
+ * FIXME: convert callers to printbuf
+ */
+void
+ahd_print_path(struct ahd_softc *ahd, struct scb *scb)
+{
+	struct aic_dump_buffer buf;
+
+	ahd_printbuf_path(&buf, ahd, scb);
+	aic_printbuf_line(&buf, " ");
 }
 
 /*
@@ -780,6 +793,7 @@ ahd_linux_abort(struct scsi_cmnd *cmd)
 static int
 ahd_linux_dev_reset(struct scsi_cmnd *cmd)
 {
+	struct aic_dump_buffer printbuf;
 	struct ahd_softc *ahd;
 	struct ahd_linux_device *dev;
 	struct scb *reset_scb;
@@ -800,10 +814,11 @@ ahd_linux_dev_reset(struct scsi_cmnd *cmd)
 	scmd_printk(KERN_INFO, cmd,
 		    "Attempting to queue a TARGET RESET message:");
 
-	printk("CDB:");
+	aic_printbuf_init(&printbuf, "%s: ", ahd_name(ahd));
+	aic_printbuf_push(&printbuf, "CDB:");
 	for (cdb_byte = 0; cdb_byte < cmd->cmd_len; cdb_byte++)
-		printk(" 0x%x", cmd->cmnd[cdb_byte]);
-	printk("\n");
+		aic_printbuf_push(&printbuf, " 0x%x", cmd->cmnd[cdb_byte]);
+	aic_printbuf_finish(&printbuf);
 
 	/*
 	 * Determine if we currently own this command.
@@ -1776,9 +1791,11 @@ ahd_done(struct ahd_softc *ahd, struct scb *scb)
 {
 	struct scsi_cmnd *cmd;
 	struct	  ahd_linux_device *dev;
+	struct aic_dump_buffer printbuf;
 
 	if ((scb->flags & SCB_ACTIVE) == 0) {
-		printk("SCB %d done'd twice\n", SCB_GET_TAG(scb));
+		printk("%s: SCB %d done'd twice\n",
+		       ahd_name(ahd), SCB_GET_TAG(scb));
 		ahd_dump_card_state(ahd);
 		panic("Stopping for safety");
 	}
@@ -1808,8 +1825,9 @@ ahd_done(struct ahd_softc *ahd, struct scb *scb)
 		if ((scb->flags & SCB_TRANSMISSION_ERROR) != 0) {
 #ifdef AHD_DEBUG
 			if ((ahd_debug & AHD_SHOW_MISC) != 0) {
-				ahd_print_path(ahd, scb);
-				printk("Set CAM_UNCOR_PARITY\n");
+				ahd_printbuf_path(&printbuf, ahd, scb);
+				aic_printbuf_line(&printbuf,
+						  "Set CAM_UNCOR_PARITY");
 			}
 #endif
 			ahd_set_transaction_status(scb, CAM_UNCOR_PARITY);
@@ -1826,16 +1844,15 @@ ahd_done(struct ahd_softc *ahd, struct scb *scb)
 		} else if (amount_xferred < scb->io_ctx->underflow) {
 			u_int i;
 
-			ahd_print_path(ahd, scb);
-			printk("CDB:");
+			ahd_printbuf_path(&printbuf, ahd, scb);
+			aic_printbuf_push(&printbuf, "CDB:");
 			for (i = 0; i < scb->io_ctx->cmd_len; i++)
-				printk(" 0x%x", scb->io_ctx->cmnd[i]);
-			printk("\n");
-			ahd_print_path(ahd, scb);
-			printk("Saw underflow (%ld of %ld bytes). "
-			       "Treated as error\n",
-				ahd_get_residual(scb),
-				ahd_get_transfer_length(scb));
+				aic_printbuf_push(&printbuf, " 0x%x",
+						  scb->io_ctx->cmnd[i]);
+			aic_printbuf_line(&printbuf,
+					  "Saw underflow (%ld of %ld bytes). Treated as error",
+					  ahd_get_residual(scb),
+					  ahd_get_transfer_length(scb));
 			ahd_set_transaction_status(scb, CAM_DATA_RUN_ERR);
 #endif
 		} else {
@@ -1865,7 +1882,8 @@ ahd_done(struct ahd_softc *ahd, struct scb *scb)
 		dev->commands_since_idle_or_otag = 0;
 
 	if ((scb->flags & SCB_RECOVERY_SCB) != 0) {
-		printk("Recovery SCB completes\n");
+		ahd_printbuf_path(&printbuf, ahd, scb);
+		aic_printbuf_line(&printbuf, "Recovery SCB completes");
 		if (ahd_get_transaction_status(scb) == CAM_BDR_SENT
 		 || ahd_get_transaction_status(scb) == CAM_REQ_ABORTED)
 			ahd_set_transaction_status(scb, CAM_CMD_TIMEOUT);
@@ -1884,6 +1902,7 @@ ahd_linux_handle_scsi_status(struct ahd_softc *ahd,
 {
 	struct	ahd_devinfo devinfo;
 	struct ahd_linux_device *dev = scsi_transport_device_data(sdev);
+	struct aic_dump_buffer printbuf;
 
 	ahd_compile_devinfo(&devinfo,
 			    ahd->our_id,
@@ -1978,9 +1997,10 @@ ahd_linux_handle_scsi_status(struct ahd_softc *ahd,
 			dev->openings = 0;
 #ifdef AHD_DEBUG
 			if ((ahd_debug & AHD_SHOW_QFULL) != 0) {
-				ahd_print_path(ahd, scb);
-				printk("Dropping tag count to %d\n",
-				       dev->active);
+				ahd_printbuf_path(&printbuf, ahd, scb);
+				aic_printbuf_line(&printbuf,
+						  "Dropping tag count to %d",
+						  dev->active);
 			}
 #endif
 			if (dev->active == dev->tags_on_last_queuefull) {
@@ -1997,9 +2017,10 @@ ahd_linux_handle_scsi_status(struct ahd_softc *ahd,
 				if (dev->last_queuefull_same_count
 				 == AHD_LOCK_TAGS_COUNT) {
 					dev->maxtags = dev->active;
-					ahd_print_path(ahd, scb);
-					printk("Locking max tag count at %d\n",
-					       dev->active);
+					ahd_printbuf_path(&printbuf, ahd, scb);
+					aic_printbuf_line(&printbuf,
+							 "Locking max tag count at %d",
+							 dev->active);
 				}
 			} else {
 				dev->tags_on_last_queuefull = dev->active;
@@ -2162,6 +2183,7 @@ ahd_linux_queue_abort_cmd(struct scsi_cmnd *cmd)
 	int    disconnected;
 	ahd_mode_state saved_modes;
 	unsigned long flags;
+	struct aic_dump_buffer printbuf;
 
 	pending_scb = NULL;
 	paused = FALSE;
@@ -2338,8 +2360,9 @@ ahd_linux_queue_abort_cmd(struct scsi_cmnd *cmd)
 				   CAM_REQUEUE_REQ, SEARCH_COMPLETE);
 		ahd_qinfifo_requeue_tail(ahd, pending_scb);
 		ahd_set_scbptr(ahd, saved_scbptr);
-		ahd_print_path(ahd, pending_scb);
-		printk("Device is disconnected, re-queuing SCB\n");
+		ahd_printbuf_path(&printbuf, ahd, pending_scb);
+		aic_printbuf_line(&printbuf,
+				  "Device is disconnected, re-queuing SCB");
 		wait = TRUE;
 	} else {
 		scmd_printk(KERN_INFO, cmd, "Unable to deliver message\n");

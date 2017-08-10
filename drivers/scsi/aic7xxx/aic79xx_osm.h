@@ -677,7 +677,7 @@ irqreturn_t
 void	ahd_done(struct ahd_softc*, struct scb*);
 void	ahd_send_async(struct ahd_softc *, char channel,
 		       u_int target, u_int lun, ac_code);
-void	ahd_print_path(struct ahd_softc *, struct scb *);
+void	ahd_print_path(struct ahd_softc *ahd, struct scb *scb);
 
 #ifdef CONFIG_PCI
 #define AHD_PCI_CONFIG 1
