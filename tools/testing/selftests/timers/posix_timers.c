@@ -15,7 +15,11 @@
 #include <time.h>
 #include <pthread.h>
 
+#ifdef KTEST
 #include "../kselftest.h"
+#else
+#include "kselftest_stubs.h"
+#endif
 
 #define DELAY 2
 #define USECS_PER_SEC 1000000
