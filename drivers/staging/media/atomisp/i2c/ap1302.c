@@ -272,6 +272,7 @@ static int ap1302_write_context_reg(struct v4l2_subdev *sd,
 {
 	struct ap1302_device *dev = to_ap1302_device(sd);
 	u16 reg_addr = ap1302_calculate_context_reg_addr(context, offset);
+
 	if (reg_addr == 0)
 		return -EINVAL;
 	return ap1302_i2c_write_reg(sd, reg_addr, len,
@@ -284,6 +285,7 @@ static int ap1302_dump_context_reg(struct v4l2_subdev *sd,
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	struct ap1302_device *dev = to_ap1302_device(sd);
 	int i;
+
 	dev_dbg(&client->dev, "Dump registers for context[%d]:\n", context);
 	for (i = 0; i < ARRAY_SIZE(context_info); i++) {
 		struct ap1302_context_info *info = &context_info[i];
@@ -308,6 +310,7 @@ static int ap1302_request_firmware(struct v4l2_subdev *sd)
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
 	struct ap1302_device *dev = to_ap1302_device(sd);
 	int ret;
+
 	ret = request_firmware(&dev->fw, "ap1302_fw.bin", &client->dev);
 	if (ret)
 		dev_err(&client->dev,
@@ -536,6 +539,7 @@ fail_power:
 static enum ap1302_contexts ap1302_get_context(struct v4l2_subdev *sd)
 {
 	struct ap1302_device *dev = to_ap1302_device(sd);
+
 	return dev->cur_context;
 }
 
@@ -638,6 +642,7 @@ static int ap1302_set_fmt(struct v4l2_subdev *sd,
 	struct atomisp_input_stream_info *stream_info =
 		(struct atomisp_input_stream_info *)fmt->reserved;
 	enum ap1302_contexts context, main_context;
+
 	if (format->pad)
 		return -EINVAL;
 	if (!fmt)
@@ -1000,6 +1005,7 @@ static int ap1302_s_register(struct v4l2_subdev *sd,
 static long ap1302_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 {
 	long ret = 0;
+
 	switch (cmd) {
 	case VIDIOC_DBG_G_REGISTER:
 		ret = ap1302_g_register(sd, arg);
