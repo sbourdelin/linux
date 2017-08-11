@@ -437,8 +437,7 @@ dma_fence_test_signaled_any(struct dma_fence **fences, uint32_t count,
 	int i;
 
 	for (i = 0; i < count; ++i) {
-		struct dma_fence *fence = fences[i];
-		if (test_bit(DMA_FENCE_FLAG_SIGNALED_BIT, &fence->flags)) {
+		if (dma_fence_is_signaled(fences[i])) {
 			if (idx)
 				*idx = i;
 			return true;
@@ -484,7 +483,13 @@ dma_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 				return 1;
 			}
 
-		return 0;
+		/* There's a very annoying laxness in the dma_fence API
+		 * here, in that backends are not required to automatically
+		 * report when a fence is signaled prior to
+		 * fence->ops->enable_signaling() being called.  So here if
+		 * we fail to match signaled_count, we need to fallthough
+		 * and try a 0 timeout wait!
+		 */
 	}
 
 	cb = kcalloc(count, sizeof(struct default_wait_cb), GFP_KERNEL);
@@ -496,11 +501,6 @@ dma_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 	for (i = 0; i < count; ++i) {
 		struct dma_fence *fence = fences[i];
 
-		if (fence->ops->wait != dma_fence_default_wait) {
-			ret = -EINVAL;
-			goto fence_rm_cb;
-		}
-
 		cb[i].task = current;
 		if (dma_fence_add_callback(fence, &cb[i].base,
 					   dma_fence_default_wait_cb)) {
@@ -511,7 +511,7 @@ dma_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 		}
 	}
 
-	while (ret > 0) {
+	do {
 		if (intr)
 			set_current_state(TASK_INTERRUPTIBLE);
 		else
@@ -524,7 +524,7 @@ dma_fence_wait_any_timeout(struct dma_fence **fences, uint32_t count,
 
 		if (ret > 0 && intr && signal_pending(current))
 			ret = -ERESTARTSYS;
-	}
+	} while (ret > 0);
 
 	__set_current_state(TASK_RUNNING);
 
