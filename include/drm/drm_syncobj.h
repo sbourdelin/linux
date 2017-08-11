@@ -43,8 +43,11 @@ struct drm_syncobj {
 	/**
 	 * @fence:
 	 * NULL or a pointer to the fence bound to this object.
+	 *
+	 * This pointer should not be accessed directly.  Instead, use
+	 * drm_syncobj_fence_get or drm_syncobj_replace_fence.
 	 */
-	struct dma_fence *fence;
+	struct dma_fence *_fence;
 	/**
 	 * @file:
 	 * a file backing for this syncobj.
@@ -79,6 +82,7 @@ drm_syncobj_put(struct drm_syncobj *obj)
 
 struct drm_syncobj *drm_syncobj_find(struct drm_file *file_private,
 				     u32 handle);
+struct dma_fence *drm_syncobj_fence_get(struct drm_syncobj *syncobj);
 void drm_syncobj_replace_fence(struct drm_syncobj *syncobj,
 			       struct dma_fence *fence);
 int drm_syncobj_find_fence(struct drm_file *file_private,

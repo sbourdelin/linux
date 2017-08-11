@@ -75,6 +75,12 @@ struct drm_syncobj *drm_syncobj_find(struct drm_file *file_private,
 }
 EXPORT_SYMBOL(drm_syncobj_find);
 
+struct dma_fence *drm_syncobj_fence_get(struct drm_syncobj *syncobj)
+{
+	return dma_fence_get_rcu_safe(&syncobj->_fence);
+}
+EXPORT_SYMBOL(drm_syncobj_fence_get);
+
 /**
  * drm_syncobj_replace_fence - replace fence in a sync object.
  * @syncobj: Sync object to replace fence in
@@ -89,7 +95,7 @@ void drm_syncobj_replace_fence(struct drm_syncobj *syncobj,
 
 	if (fence)
 		dma_fence_get(fence);
-	old_fence = xchg(&syncobj->fence, fence);
+	old_fence = xchg(&syncobj->_fence, fence);
 
 	dma_fence_put(old_fence);
 }
@@ -105,7 +111,7 @@ int drm_syncobj_find_fence(struct drm_file *file_private,
 	if (!syncobj)
 		return -ENOENT;
 
-	*fence = dma_fence_get(syncobj->fence);
+	*fence = drm_syncobj_fence_get(syncobj);
 	if (!*fence) {
 		ret = -EINVAL;
 	}
@@ -125,7 +131,7 @@ void drm_syncobj_free(struct kref *kref)
 	struct drm_syncobj *syncobj = container_of(kref,
 						   struct drm_syncobj,
 						   refcount);
-	dma_fence_put(syncobj->fence);
+	dma_fence_put(syncobj->_fence);
 	kfree(syncobj);
 }
 EXPORT_SYMBOL(drm_syncobj_free);
