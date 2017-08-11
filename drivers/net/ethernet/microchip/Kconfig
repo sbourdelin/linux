@@ -5,7 +5,6 @@
 config NET_VENDOR_MICROCHIP
 	bool "Microchip devices"
 	default y
-	depends on SPI
 	---help---
 	  If you have a network (Ethernet) card belonging to this class, say Y.
 
@@ -41,5 +40,14 @@ config ENCX24J600
 
       To compile this driver as a module, choose M here. The module will be
       called encx24j600.
+
+config LAN743X
+	tristate "LAN7430 support"
+	depends on PCI
+	---help---
+	  Support for the Microchip LAN7430 PCI Express Gigabit Ethernet chip
+
+	  To compile this driver as a module, choose M here. The module will be
+	  called lan743x.
 
 endif # NET_VENDOR_MICROCHIP
