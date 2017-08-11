@@ -367,6 +367,14 @@ struct v4l2_ctrl_config {
 void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 		    s64 *min, s64 *max, u64 *step, s64 *def, u32 *flags);
 
+/**
+ * ctrl_is_pointer - Returns non-zero if this control is a pointer type.
+ *
+ * @id: ID of the control
+ *
+ * Currently only STRING and compound types are pointers.
+ */
+bool ctrl_is_pointer(u32 id);
 
 /**
  * v4l2_ctrl_handler_init_class() - Initialize the control handler.
