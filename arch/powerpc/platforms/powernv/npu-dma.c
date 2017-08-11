@@ -544,12 +544,7 @@ static void mmio_invalidate(struct npu_context *npu_context, int va,
 	struct pci_dev *npdev;
 	struct mmio_atsd_reg mmio_atsd_reg[NV_MAX_NPUS];
 	unsigned long pid = npu_context->mm->context.id;
-
-	/*
-	 * Unfortunately the nest mmu does not support flushing specific
-	 * addresses so we have to flush the whole mm.
-	 */
-	flush_tlb_mm(npu_context->mm);
+	bool nmmu_flushed = false;
 
 	/*
 	 * Loop over all the NPUs this process is active on and launch
@@ -565,6 +560,17 @@ static void mmio_invalidate(struct npu_context *npu_context, int va,
 			nphb = pci_bus_to_host(npdev->bus)->private_data;
 			npu = &nphb->npu;
 			mmio_atsd_reg[i].npu = npu;
+
+			if (nphb->npu.nmmu_flush && !nmmu_flushed) {
+				/*
+				 * Unfortunately the nest mmu does not support
+				 * flushing specific addresses so we have to
+				 * flush the whole mm once before shooting down
+				 * the GPU translation.
+				 */
+				flush_tlb_mm(npu_context->mm);
+				nmmu_flushed = true;
+			}
 
 			if (va)
 				mmio_atsd_reg[i].reg =
@@ -732,6 +738,13 @@ struct npu_context *pnv_npu2_init_context(struct pci_dev *gpdev,
 		return ERR_PTR(-ENODEV);
 	npu_context->npdev[npu->index][nvlink_index] = npdev;
 
+	if (!nphb->npu.nmmu_flush)
+		/*
+		 * If we're not explicitly flushing ourselves we need to mark
+		 * the thread for global flushes
+		 */
+		mm_context_set_global_tlbi(&mm->context);
+
 	return npu_context;
 }
 EXPORT_SYMBOL(pnv_npu2_init_context);
@@ -829,6 +842,8 @@ int pnv_npu2_init(struct pnv_phb *phb)
 	static int npu_index;
 	uint64_t rc = 0;
 
+	phb->npu.nmmu_flush =
+		of_property_read_bool(phb->hose->dn, "ibm,nmmu-flush");
 	for_each_child_of_node(phb->hose->dn, dn) {
 		gpdev = pnv_pci_get_gpu_dev(get_pci_dev(dn));
 		if (gpdev) {
