@@ -42,7 +42,8 @@ struct drm_syncobj {
 	struct kref refcount;
 	/**
 	 * @fence:
-	 * NULL or a pointer to the fence bound to this object.
+	 * NULL or a pointer to the fence bound to this object or a pointer
+	 * to a proxy fence which will be assigned to the next bound fence.
 	 *
 	 * This pointer should not be accessed directly.  Instead, use
 	 * drm_syncobj_fence_get or drm_syncobj_replace_fence.

@@ -51,6 +51,7 @@
 #include <linux/fs.h>
 #include <linux/anon_inodes.h>
 #include <linux/sync_file.h>
+#include <linux/dma-fence-proxy.h>
 
 #include "drm_internal.h"
 #include <drm/drm_syncobj.h>
@@ -82,9 +83,44 @@ EXPORT_SYMBOL(drm_syncobj_find);
 
 struct dma_fence *drm_syncobj_fence_get(struct drm_syncobj *syncobj)
 {
-	return dma_fence_get_rcu_safe(&syncobj->_fence);
+	struct dma_fence *fence = dma_fence_get_rcu_safe(&syncobj->_fence);
+
+	/* Don't hand out our internal proxy fence.  Proxy fences are only used
+	 * for implementing WAIT_FLAGS_WAIT_FOR_SUBMIT behavior and should not
+	 * be handed out to random drivers unless they are prepared to deal
+	 * with the possibility that the fence will never get signaled.
+	 */
+	if (fence && dma_fence_is_proxy_tagged(fence, drm_syncobj_free)) {
+		dma_fence_put(fence);
+		return NULL;
+	}
+
+	return fence;
 }
 EXPORT_SYMBOL(drm_syncobj_fence_get);
+
+static struct dma_fence *drm_syncobj_fence_proxy_get(struct drm_syncobj *syncobj)
+{
+	struct dma_fence *fence, *proxy;
+
+	do {
+		fence = dma_fence_get_rcu_safe(&syncobj->_fence);
+		if (fence)
+			return fence;
+
+		proxy = dma_fence_create_proxy("drm_syncobj", drm_syncobj_free);
+		if (!proxy)
+			return NULL;
+
+		fence = cmpxchg(&syncobj->_fence, NULL, proxy);
+		if (!fence)
+			return dma_fence_get(proxy);
+
+		dma_fence_put(proxy);
+	} while(1);
+
+	return proxy;
+}
 
 /**
  * drm_syncobj_replace_fence - replace fence in a sync object.
@@ -97,10 +133,40 @@ void drm_syncobj_replace_fence(struct drm_syncobj *syncobj,
 			       struct dma_fence *fence)
 {
 	struct dma_fence *old_fence;
+	bool old_fence_is_proxy;
 
-	if (fence)
-		dma_fence_get(fence);
-	old_fence = xchg(&syncobj->_fence, fence);
+	dma_fence_get(fence);
+
+	do {
+		old_fence = dma_fence_get_rcu_safe(&syncobj->_fence);
+		old_fence_is_proxy = old_fence &&
+			dma_fence_is_proxy_tagged(old_fence, drm_syncobj_free);
+		dma_fence_put(old_fence);
+
+		if (!fence && old_fence_is_proxy) {
+			/* If we're replacing a proxy with NULL, just leave
+			 * the proxy.
+			 */
+			return;
+		}
+
+		if (cmpxchg(&syncobj->_fence, old_fence, fence) != old_fence)
+			continue;
+	} while(0);
+
+	if (fence && old_fence_is_proxy) {
+		/* If we just replaced a proxy fence with a real fence,
+		 * assign the real fence to the proxy so that it gets
+		 * triggered when the real fence triggers.  If we are
+		 * replacing a proxy with NULL (such as through
+		 * DRM_IOCTL_SYNCOBJ_RESET), we drop the fence on the floor
+		 * and it will never get signaled.  This is ok because the
+		 * only code which waits on our proxy fences is
+		 * SYNCOBJ_WAIT with WAIT_FLAGS_WAIT_FOR_SUBMIT set and the
+		 * wait ioctl has a timeout which will eventually trigger.
+		 */
+		dma_fence_proxy_assign(old_fence, fence);
+	}
 
 	dma_fence_put(old_fence);
 }
@@ -544,13 +610,15 @@ drm_syncobj_wait_ioctl(struct drm_device *dev, void *data,
 	struct drm_syncobj_wait *args = data;
 	uint32_t *handles;
 	struct dma_fence **fences;
+	struct drm_syncobj *syncobj;
 	int ret = 0;
 	uint32_t i;
 
 	if (!drm_core_check_feature(dev, DRIVER_SYNCOBJ))
 		return -ENODEV;
 
-	if (args->flags != 0 && args->flags != DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL)
+	if (args->flags & ~(DRM_SYNCOBJ_WAIT_FLAGS_WAIT_ALL |
+			    DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT))
 		return -EINVAL;
 
 	if (args->count_handles == 0)
@@ -577,8 +645,21 @@ drm_syncobj_wait_ioctl(struct drm_device *dev, void *data,
 	}
 
 	for (i = 0; i < args->count_handles; i++) {
-		ret = drm_syncobj_find_fence(file_private, handles[i],
-					     &fences[i]);
+		syncobj = drm_syncobj_find(file_private, handles[i]);
+		if (!syncobj) {
+			ret = -ENOENT;
+			goto err_free_fence_array;
+		}
+
+		if (args->flags & DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT) {
+			fences[i] = drm_syncobj_fence_proxy_get(syncobj);
+			if (!fences[i])
+				ret = -ENOMEM;
+		} else {
+			fences[i] = drm_syncobj_fence_get(syncobj);
+			if (!fences[i])
+				ret = -EINVAL;
+		}
 		if (ret)
 			goto err_free_fence_array;
 	}
