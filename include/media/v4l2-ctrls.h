@@ -352,6 +352,8 @@ struct v4l2_ctrl_config {
  * For non-standard controls it will only fill in the given arguments
  * and @name content will be filled with %NULL.
  *
+ * if @name is NULL, only the @type will be filled.
+ *
  * This function will overwrite the contents of @name, @type and @flags.
  * The contents of @min, @max, @step and @def may be modified depending on
  * the type.

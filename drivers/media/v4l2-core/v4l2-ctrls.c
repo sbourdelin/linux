@@ -939,8 +939,10 @@ EXPORT_SYMBOL(v4l2_ctrl_get_name);
 void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 		    s64 *min, s64 *max, u64 *step, s64 *def, u32 *flags)
 {
-	*name = v4l2_ctrl_get_name(id);
-	*flags = 0;
+	if (name) {
+		*name = v4l2_ctrl_get_name(id);
+		*flags = 0;
+	}
 
 	switch (id) {
 	case V4L2_CID_AUDIO_MUTE:
@@ -996,11 +998,15 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_RDS_RX_TRAFFIC_PROGRAM:
 	case V4L2_CID_RDS_RX_MUSIC_SPEECH:
 		*type = V4L2_CTRL_TYPE_BOOLEAN;
+		if (!name)
+			break;
 		*min = 0;
 		*max = *step = 1;
 		break;
 	case V4L2_CID_ROTATE:
 		*type = V4L2_CTRL_TYPE_INTEGER;
+		if (!name)
+			break;
 		*flags |= V4L2_CTRL_FLAG_MODIFY_LAYOUT;
 		break;
 	case V4L2_CID_MPEG_VIDEO_MV_H_SEARCH_RANGE:
@@ -1015,6 +1021,8 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_AUTO_FOCUS_START:
 	case V4L2_CID_AUTO_FOCUS_STOP:
 		*type = V4L2_CTRL_TYPE_BUTTON;
+		if (!name)
+			break;
 		*flags |= V4L2_CTRL_FLAG_WRITE_ONLY |
 			  V4L2_CTRL_FLAG_EXECUTE_ON_WRITE;
 		*min = *max = *step = *def = 0;
@@ -1099,12 +1107,16 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_RF_TUNER_CLASS:
 	case V4L2_CID_DETECT_CLASS:
 		*type = V4L2_CTRL_TYPE_CTRL_CLASS;
+		if (!name)
+			break;
 		/* You can neither read not write these */
 		*flags |= V4L2_CTRL_FLAG_READ_ONLY | V4L2_CTRL_FLAG_WRITE_ONLY;
 		*min = *max = *step = *def = 0;
 		break;
 	case V4L2_CID_BG_COLOR:
 		*type = V4L2_CTRL_TYPE_INTEGER;
+		if (!name)
+			break;
 		*step = 1;
 		*min = 0;
 		/* Max is calculated as RGB888 that is 2^24 */
@@ -1123,10 +1135,14 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 	case V4L2_CID_MIN_BUFFERS_FOR_CAPTURE:
 	case V4L2_CID_MIN_BUFFERS_FOR_OUTPUT:
 		*type = V4L2_CTRL_TYPE_INTEGER;
+		if (!name)
+			break;
 		*flags |= V4L2_CTRL_FLAG_READ_ONLY;
 		break;
 	case V4L2_CID_MPEG_VIDEO_DEC_PTS:
 		*type = V4L2_CTRL_TYPE_INTEGER64;
+		if (!name)
+			break;
 		*flags |= V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_READ_ONLY;
 		*min = *def = 0;
 		*max = 0x1ffffffffLL;
@@ -1134,6 +1150,9 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 		break;
 	case V4L2_CID_MPEG_VIDEO_DEC_FRAME:
 		*type = V4L2_CTRL_TYPE_INTEGER64;
+		if (!name)
+			break;
+
 		*flags |= V4L2_CTRL_FLAG_VOLATILE | V4L2_CTRL_FLAG_READ_ONLY;
 		*min = *def = 0;
 		*max = 0x7fffffffffffffffLL;
@@ -1141,6 +1160,8 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 		break;
 	case V4L2_CID_PIXEL_RATE:
 		*type = V4L2_CTRL_TYPE_INTEGER64;
+		if (!name)
+			break;
 		*flags |= V4L2_CTRL_FLAG_READ_ONLY;
 		break;
 	case V4L2_CID_DETECT_MD_REGION_GRID:
@@ -1156,6 +1177,12 @@ void v4l2_ctrl_fill(u32 id, const char **name, enum v4l2_ctrl_type *type,
 		*type = V4L2_CTRL_TYPE_INTEGER;
 		break;
 	}
+
+	if (!name)
+		return;
+
+	/* Update flags for some controls */
+
 	switch (id) {
 	case V4L2_CID_MPEG_AUDIO_ENCODING:
 	case V4L2_CID_MPEG_AUDIO_MODE:
