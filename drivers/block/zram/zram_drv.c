@@ -446,7 +446,7 @@ void zram_page_end_io(struct bio *bio)
 }
 
 /*
- * Returns 0 if the submission is successful.
+ * Returns 1 if the submission is successful.
  */
 static int read_from_bdev_async(struct zram *zram, struct bio_vec *bvec,
 			unsigned long entry, struct bio *parent)
@@ -1064,6 +1064,7 @@ out:
 	}  else {
 		zram_set_handle(zram, index, handle);
 		zram_set_obj_size(zram, index, comp_len);
+		atomic64_add(comp_len, &zram->stats.compr_data_size);
 	}
 	zram_slot_unlock(zram, index);
 
