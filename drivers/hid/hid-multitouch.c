@@ -545,7 +545,8 @@ static int mt_touch_input_mapping(struct hid_device *hdev, struct hid_input *hi,
 		case HID_DG_CONFIDENCE:
 			if ((cls->name == MT_CLS_WIN_8 ||
 				cls->name == MT_CLS_WIN_8_DUAL) &&
-			    field->application == HID_DG_TOUCHPAD) {
+			    (field->application == HID_DG_TOUCHPAD ||
+				field->application == HID_DG_TOUCHSCREEN)) {
 				cls->quirks |= MT_QUIRK_CONFIDENCE;
 				input_set_abs_params(hi->input,
 					ABS_MT_TOOL_TYPE,
