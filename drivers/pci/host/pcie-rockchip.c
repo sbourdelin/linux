@@ -929,6 +929,51 @@ static int rockchip_pcie_get_phys(struct rockchip_pcie *rockchip)
 	return 0;
 }
 
+static int rockchip_pcie_setup_irq(struct rockchip_pcie *rockchip)
+{
+	int irq, err;
+	struct device *dev = rockchip->dev;
+	struct platform_device *pdev = to_platform_device(dev);
+
+	irq = platform_get_irq_byname(pdev, "sys");
+	if (irq < 0) {
+		dev_err(dev, "missing sys IRQ resource\n");
+		return -EINVAL;
+	}
+
+	err = devm_request_irq(dev, irq, rockchip_pcie_subsys_irq_handler,
+			       IRQF_SHARED, "pcie-sys", rockchip);
+	if (err) {
+		dev_err(dev, "failed to request PCIe subsystem IRQ\n");
+		return err;
+	}
+
+	irq = platform_get_irq_byname(pdev, "legacy");
+	if (irq < 0) {
+		dev_err(dev, "missing legacy IRQ resource\n");
+		return -EINVAL;
+	}
+
+	irq_set_chained_handler_and_data(irq,
+					 rockchip_pcie_legacy_int_handler,
+					 rockchip);
+
+	irq = platform_get_irq_byname(pdev, "client");
+	if (irq < 0) {
+		dev_err(dev, "missing client IRQ resource\n");
+		return -EINVAL;
+	}
+
+	err = devm_request_irq(dev, irq, rockchip_pcie_client_irq_handler,
+			       IRQF_SHARED, "pcie-client", rockchip);
+	if (err) {
+		dev_err(dev, "failed to request PCIe client IRQ\n");
+		return err;
+	}
+
+	return 0;
+}
+
 /**
  * rockchip_pcie_parse_dt - Parse Device Tree
  * @rockchip: PCIe port information
@@ -941,7 +986,6 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
 	struct platform_device *pdev = to_platform_device(dev);
 	struct device_node *node = dev->of_node;
 	struct resource *regs;
-	int irq;
 	int err;
 
 	regs = platform_get_resource_byname(pdev,
@@ -1053,42 +1097,6 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
 	if (IS_ERR(rockchip->clk_pcie_pm)) {
 		dev_err(dev, "pm clock not found\n");
 		return PTR_ERR(rockchip->clk_pcie_pm);
-	}
-
-	irq = platform_get_irq_byname(pdev, "sys");
-	if (irq < 0) {
-		dev_err(dev, "missing sys IRQ resource\n");
-		return -EINVAL;
-	}
-
-	err = devm_request_irq(dev, irq, rockchip_pcie_subsys_irq_handler,
-			       IRQF_SHARED, "pcie-sys", rockchip);
-	if (err) {
-		dev_err(dev, "failed to request PCIe subsystem IRQ\n");
-		return err;
-	}
-
-	irq = platform_get_irq_byname(pdev, "legacy");
-	if (irq < 0) {
-		dev_err(dev, "missing legacy IRQ resource\n");
-		return -EINVAL;
-	}
-
-	irq_set_chained_handler_and_data(irq,
-					 rockchip_pcie_legacy_int_handler,
-					 rockchip);
-
-	irq = platform_get_irq_byname(pdev, "client");
-	if (irq < 0) {
-		dev_err(dev, "missing client IRQ resource\n");
-		return -EINVAL;
-	}
-
-	err = devm_request_irq(dev, irq, rockchip_pcie_client_irq_handler,
-			       IRQF_SHARED, "pcie-client", rockchip);
-	if (err) {
-		dev_err(dev, "failed to request PCIe client IRQ\n");
-		return err;
 	}
 
 	rockchip->vpcie12v = devm_regulator_get_optional(dev, "vpcie12v");
@@ -1450,6 +1458,16 @@ err_pcie_pm:
 	return err;
 }
 
+static void rockchip_pcie_disable_clocks(void *data)
+{
+	struct rockchip_pcie *rockchip = data;
+
+	clk_disable_unprepare(rockchip->clk_pcie_pm);
+	clk_disable_unprepare(rockchip->hclk_pcie);
+	clk_disable_unprepare(rockchip->aclk_perf_pcie);
+	clk_disable_unprepare(rockchip->aclk_pcie);
+}
+
 static int rockchip_pcie_probe(struct platform_device *pdev)
 {
 	struct rockchip_pcie *rockchip;
@@ -1483,31 +1501,49 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
 	err = clk_prepare_enable(rockchip->aclk_pcie);
 	if (err) {
 		dev_err(dev, "unable to enable aclk_pcie clock\n");
-		goto err_aclk_pcie;
+		return err;
 	}
 
 	err = clk_prepare_enable(rockchip->aclk_perf_pcie);
 	if (err) {
 		dev_err(dev, "unable to enable aclk_perf_pcie clock\n");
-		goto err_aclk_perf_pcie;
+		clk_disable_unprepare(rockchip->aclk_pcie);
+		return err;
 	}
 
 	err = clk_prepare_enable(rockchip->hclk_pcie);
 	if (err) {
 		dev_err(dev, "unable to enable hclk_pcie clock\n");
-		goto err_hclk_pcie;
+		clk_disable_unprepare(rockchip->aclk_pcie);
+		clk_disable_unprepare(rockchip->aclk_perf_pcie);
+		return err;
 	}
 
 	err = clk_prepare_enable(rockchip->clk_pcie_pm);
 	if (err) {
-		dev_err(dev, "unable to enable hclk_pcie clock\n");
-		goto err_pcie_pm;
+		dev_err(dev, "unable to enable clk_pcie_pm clock\n");
+		clk_disable_unprepare(rockchip->aclk_pcie);
+		clk_disable_unprepare(rockchip->aclk_perf_pcie);
+		clk_disable_unprepare(rockchip->hclk_pcie);
+		return err;
 	}
+
+	err = devm_add_action_or_reset(dev,
+				       rockchip_pcie_disable_clocks,
+				       rockchip);
+	if (err) {
+		dev_err(dev, "unable to add action or reset\n");
+		return err;
+	}
+
+	err = rockchip_pcie_setup_irq(rockchip);
+	if (err)
+		return err;
 
 	err = rockchip_pcie_set_vpcie(rockchip);
 	if (err) {
 		dev_err(dev, "failed to set vpcie regulator\n");
-		goto err_set_vpcie;
+		return err;
 	}
 
 	err = rockchip_pcie_init_port(rockchip);
@@ -1604,15 +1640,6 @@ err_vpcie:
 		regulator_disable(rockchip->vpcie1v8);
 	if (!IS_ERR(rockchip->vpcie0v9))
 		regulator_disable(rockchip->vpcie0v9);
-err_set_vpcie:
-	clk_disable_unprepare(rockchip->clk_pcie_pm);
-err_pcie_pm:
-	clk_disable_unprepare(rockchip->hclk_pcie);
-err_hclk_pcie:
-	clk_disable_unprepare(rockchip->aclk_perf_pcie);
-err_aclk_perf_pcie:
-	clk_disable_unprepare(rockchip->aclk_pcie);
-err_aclk_pcie:
 	return err;
 }
 
@@ -1633,11 +1660,6 @@ static int rockchip_pcie_remove(struct platform_device *pdev)
 			phy_power_off(rockchip->phys[i]);
 		phy_exit(rockchip->phys[i]);
 	}
-
-	clk_disable_unprepare(rockchip->clk_pcie_pm);
-	clk_disable_unprepare(rockchip->hclk_pcie);
-	clk_disable_unprepare(rockchip->aclk_perf_pcie);
-	clk_disable_unprepare(rockchip->aclk_pcie);
 
 	if (!IS_ERR(rockchip->vpcie12v))
 		regulator_disable(rockchip->vpcie12v);
