@@ -162,6 +162,9 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	int fully_mapped = 1;
 	unsigned nblocks;
 	unsigned relative_block;
+	/* on-stack bio for synchronous devices */
+	struct bio sbio;
+	struct bio_vec sbvec;
 
 	if (page_has_buffers(page))
 		goto confused;
@@ -282,10 +285,22 @@ alloc_new:
 								page))
 				goto out;
 		}
-		bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
+
+		if (bdi_cap_synchronous_io(inode_to_bdi(inode))) {
+			bio = &sbio;
+			/* mpage_end_io calls bio_put unconditionally */
+			bio_get(&sbio);
+
+			bio_init(&sbio, &sbvec, 1);
+			sbio.bi_bdev = bdev;
+			sbio.bi_iter.bi_sector = blocks[0] << (blkbits - 9);
+		} else {
+
+			bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
 				min_t(int, nr_pages, BIO_MAX_PAGES), gfp);
-		if (bio == NULL)
-			goto confused;
+			if (bio == NULL)
+				goto confused;
+		}
 	}
 
 	length = first_hole << blkbits;
@@ -302,6 +317,8 @@ alloc_new:
 	else
 		*last_block_in_bio = blocks[blocks_per_page - 1];
 out:
+	if (bio == &sbio)
+		bio = mpage_bio_submit(REQ_OP_READ, 0, bio);
 	return bio;
 
 confused:
@@ -492,6 +509,9 @@ static int __mpage_writepage(struct page *page, struct writeback_control *wbc,
 	loff_t i_size = i_size_read(inode);
 	int ret = 0;
 	int op_flags = wbc_to_write_flags(wbc);
+	/* on-stack-bio */
+	struct bio sbio;
+	struct bio_vec sbvec;
 
 	if (page_has_buffers(page)) {
 		struct buffer_head *head = page_buffers(page);
@@ -610,10 +630,21 @@ alloc_new:
 				goto out;
 			}
 		}
-		bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
-				BIO_MAX_PAGES, GFP_NOFS|__GFP_HIGH);
-		if (bio == NULL)
-			goto confused;
+
+		if (bdi_cap_synchronous_io(inode_to_bdi(inode))) {
+			bio = &sbio;
+			/* mpage_end_io calls bio_put unconditionally */
+			bio_get(&sbio);
+
+			bio_init(&sbio, &sbvec, 1);
+			sbio.bi_bdev = bdev;
+			sbio.bi_iter.bi_sector = blocks[0] << (blkbits - 9);
+		} else {
+			bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
+					BIO_MAX_PAGES, GFP_NOFS|__GFP_HIGH);
+			if (bio == NULL)
+				goto confused;
+		}
 
 		wbc_init_bio(wbc, bio);
 		bio->bi_write_hint = inode->i_write_hint;
@@ -662,6 +693,8 @@ confused:
 	 */
 	mapping_set_error(mapping, ret);
 out:
+	if (bio == &sbio)
+		bio = mpage_bio_submit(REQ_OP_WRITE, op_flags, bio);
 	mpd->bio = bio;
 	return ret;
 }
