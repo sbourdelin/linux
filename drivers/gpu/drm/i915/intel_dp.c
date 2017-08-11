@@ -2497,7 +2497,11 @@ void intel_dp_sink_dpms(struct intel_dp *intel_dp, int mode)
 		return;
 
 	if (mode != DRM_MODE_DPMS_ON) {
-		ret = drm_dp_dpcd_writeb(&intel_dp->aux, DP_SET_POWER,
+		if (intel_dp->is_mst)
+			ret = drm_dp_dpcd_writeb(&intel_dp->aux, DP_SET_POWER,
+					 DP_SET_POWER_D3_AUX_ON);
+		else
+			ret = drm_dp_dpcd_writeb(&intel_dp->aux, DP_SET_POWER,
 					 DP_SET_POWER_D3);
 	} else {
 		struct intel_lspcon *lspcon = dp_to_lspcon(intel_dp);
