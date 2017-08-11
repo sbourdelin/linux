@@ -324,12 +324,6 @@ int __swap_writepage(struct page *page, struct writeback_control *wbc)
 		return ret;
 	}
 
-	ret = bdev_write_page(sis->bdev, swap_page_sector(page), page, wbc);
-	if (!ret) {
-		count_swpout_vm_event(page);
-		return 0;
-	}
-
 	ret = 0;
 	if (!(sis->flags & SWP_SYNC_IO)) {
 
@@ -388,17 +382,6 @@ int swap_readpage(struct page *page, bool do_poll)
 		if (!ret)
 			count_vm_event(PSWPIN);
 		return ret;
-	}
-
-	ret = bdev_read_page(sis->bdev, swap_page_sector(page), page);
-	if (!ret) {
-		if (trylock_page(page)) {
-			swap_slot_free_notify(page);
-			unlock_page(page);
-		}
-
-		count_vm_event(PSWPIN);
-		return 0;
 	}
 
 	ret = 0;

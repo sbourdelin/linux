@@ -280,12 +280,6 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 
 alloc_new:
 	if (bio == NULL) {
-		if (first_hole == blocks_per_page) {
-			if (!bdev_read_page(bdev, blocks[0] << (blkbits - 9),
-								page))
-				goto out;
-		}
-
 		if (bdi_cap_synchronous_io(inode_to_bdi(inode))) {
 			bio = &sbio;
 			/* mpage_end_io calls bio_put unconditionally */
@@ -623,14 +617,6 @@ page_is_mapped:
 
 alloc_new:
 	if (bio == NULL) {
-		if (first_unmapped == blocks_per_page) {
-			if (!bdev_write_page(bdev, blocks[0] << (blkbits - 9),
-								page, wbc)) {
-				clean_buffers(page, first_unmapped);
-				goto out;
-			}
-		}
-
 		if (bdi_cap_synchronous_io(inode_to_bdi(inode))) {
 			bio = &sbio;
 			/* mpage_end_io calls bio_put unconditionally */
@@ -645,7 +631,6 @@ alloc_new:
 			if (bio == NULL)
 				goto confused;
 		}
-
 		wbc_init_bio(wbc, bio);
 		bio->bi_write_hint = inode->i_write_hint;
 	}
