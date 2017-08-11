@@ -595,3 +595,27 @@ err_free_handles:
 
 	return ret;
 }
+
+int
+drm_syncobj_reset_ioctl(struct drm_device *dev, void *data,
+			struct drm_file *file_private)
+{
+	struct drm_syncobj_reset *args = data;
+	struct drm_syncobj *syncobj;
+
+	if (!drm_core_check_feature(dev, DRIVER_SYNCOBJ))
+		return -ENODEV;
+
+	if (args->flags != 0)
+		return -EINVAL;
+
+	syncobj = drm_syncobj_find(file_private, args->handle);
+	if (!syncobj)
+		return -ENOENT;
+
+	drm_syncobj_replace_fence(syncobj, NULL);
+
+	drm_syncobj_put(syncobj);
+
+	return 0;
+}
