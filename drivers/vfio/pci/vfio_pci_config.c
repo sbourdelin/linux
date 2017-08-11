@@ -1244,15 +1244,15 @@ static int vfio_cap_len(struct vfio_pci_device *vdev, u8 cap, u8 pos)
 		}
 
 		/* length based on version and type */
-		if ((pcie_caps_reg(pdev) & PCI_EXP_FLAGS_VERS) == 1) {
-			if (pci_pcie_type(pdev) == PCI_EXP_TYPE_RC_END)
-				return 0xc; /* "All Devices" only, no link */
-			return PCI_CAP_EXP_ENDPOINT_SIZEOF_V1;
-		} else {
-			if (pci_pcie_type(pdev) == PCI_EXP_TYPE_RC_END)
-				return 0x2c; /* No link */
-			return PCI_CAP_EXP_ENDPOINT_SIZEOF_V2;
-		}
+		if ((pcie_caps_reg(pdev) & PCI_EXP_FLAGS_VERS) == 1)
+			ret = PCI_CAP_EXP_ENDPOINT_SIZEOF_V1;
+		else
+			ret = PCI_CAP_EXP_ENDPOINT_SIZEOF_V2;
+
+		if (pci_pcie_type(pdev) == PCI_EXP_TYPE_RC_END)
+			ret -= 8; /* "All Devices" only, no link */
+
+		return ret;
 	case PCI_CAP_ID_HT:
 		ret = pci_read_config_byte(pdev, pos + 3, &byte);
 		if (ret)
