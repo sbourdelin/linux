@@ -694,7 +694,7 @@ static __always_inline int __linearize(struct x86_emulate_ctxt *ctxt,
 	switch (mode) {
 	case X86EMUL_MODE_PROT64:
 		*linear = la;
-		if (is_noncanonical_address(la))
+		if (emul_is_noncanonical_address(la, ctxt))
 			goto bad;
 
 		*max_size = min_t(u64, ~0u, (1ull << 48) - la);
@@ -1748,8 +1748,8 @@ static int __load_segment_descriptor(struct x86_emulate_ctxt *ctxt,
 				sizeof(base3), &ctxt->exception);
 		if (ret != X86EMUL_CONTINUE)
 			return ret;
-		if (is_noncanonical_address(get_desc_base(&seg_desc) |
-					     ((u64)base3 << 32)))
+		if (emul_is_noncanonical_address(get_desc_base(&seg_desc) |
+				((u64)base3 << 32), ctxt))
 			return emulate_gp(ctxt, 0);
 	}
 load:
@@ -2840,8 +2840,8 @@ static int em_sysexit(struct x86_emulate_ctxt *ctxt)
 		ss_sel = cs_sel + 8;
 		cs.d = 0;
 		cs.l = 1;
-		if (is_noncanonical_address(rcx) ||
-		    is_noncanonical_address(rdx))
+		if (emul_is_noncanonical_address(rcx, ctxt) ||
+		    emul_is_noncanonical_address(rdx, ctxt))
 			return emulate_gp(ctxt, 0);
 		break;
 	}
@@ -3756,7 +3756,7 @@ static int em_lgdt_lidt(struct x86_emulate_ctxt *ctxt, bool lgdt)
 	if (rc != X86EMUL_CONTINUE)
 		return rc;
 	if (ctxt->mode == X86EMUL_MODE_PROT64 &&
-	    is_noncanonical_address(desc_ptr.address))
+	    emul_is_noncanonical_address(desc_ptr.address, ctxt))
 		return emulate_gp(ctxt, 0);
 	if (lgdt)
 		ctxt->ops->set_gdt(ctxt, &desc_ptr);
