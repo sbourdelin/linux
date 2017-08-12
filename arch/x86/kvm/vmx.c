@@ -1200,6 +1200,11 @@ static inline bool cpu_has_vmx_ept_4levels(void)
 	return vmx_capability.ept & VMX_EPT_PAGE_WALK_4_BIT;
 }
 
+static inline bool cpu_has_vmx_ept_5levels(void)
+{
+	return vmx_capability.ept & VMX_EPT_PAGE_WALK_5_BIT;
+}
+
 static inline bool cpu_has_vmx_ept_ad_bits(void)
 {
 	return vmx_capability.ept & VMX_EPT_AD_BIT;
@@ -4296,13 +4301,20 @@ static void vmx_set_cr0(struct kvm_vcpu *vcpu, unsigned long cr0)
 	vmx->emulation_required = emulation_required(vcpu);
 }
 
+static int get_ept_level(struct kvm_vcpu *vcpu)
+{
+	if (cpu_has_vmx_ept_5levels() && (cpuid_maxphyaddr(vcpu) > 48))
+		return VMX_EPT_MAX_GAW + 1;
+	return VMX_EPT_DEFAULT_GAW + 1;
+}
+
 static u64 construct_eptp(struct kvm_vcpu *vcpu, unsigned long root_hpa)
 {
 	u64 eptp;
 
 	/* TODO write the value reading from MSR */
 	eptp = VMX_EPT_DEFAULT_MT |
-		VMX_EPT_DEFAULT_GAW << VMX_EPT_GAW_EPTP_SHIFT;
+		(get_ept_level(vcpu) - 1) << VMX_EPT_GAW_EPTP_SHIFT;
 	if (enable_ept_ad_bits &&
 	    (!is_guest_mode(vcpu) || nested_ept_ad_enabled(vcpu)))
 		eptp |= VMX_EPT_AD_ENABLE_BIT;
@@ -9503,11 +9515,6 @@ static void __init vmx_check_processor_compat(void *rtn)
 				smp_processor_id());
 		*(int *)rtn = -EIO;
 	}
-}
-
-static int get_ept_level(void)
-{
-	return VMX_EPT_DEFAULT_GAW + 1;
 }
 
 static u64 vmx_get_mt_mask(struct kvm_vcpu *vcpu, gfn_t gfn, bool is_mmio)

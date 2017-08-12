@@ -37,11 +37,12 @@
 #define PT32_DIR_PSE36_MASK \
 	(((1ULL << PT32_DIR_PSE36_SIZE) - 1) << PT32_DIR_PSE36_SHIFT)
 
+#define PT64_ROOT_5LEVEL 5
 #define PT64_ROOT_4LEVEL 4
 #define PT32_ROOT_LEVEL 2
 #define PT32E_ROOT_LEVEL 3
 
-#define PT64_ROOT_MAX_LEVEL PT64_ROOT_4LEVEL
+#define PT64_ROOT_MAX_LEVEL PT64_ROOT_5LEVEL
 
 #define PT_PDPE_LEVEL 3
 #define PT_DIRECTORY_LEVEL 2
@@ -50,6 +51,9 @@
 
 static inline u64 rsvd_bits(int s, int e)
 {
+	if (e < s)
+		return 0;
+
 	return ((1ULL << (e - s + 1)) - 1) << s;
 }
 
