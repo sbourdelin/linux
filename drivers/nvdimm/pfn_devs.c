@@ -111,6 +111,26 @@ static ssize_t align_show(struct device *dev,
 	return sprintf(buf, "%ld\n", nd_pfn->align);
 }
 
+static const unsigned long *nd_pfn_supported_alignments(void)
+{
+	/*
+	 * This needs to be a local variable because the *_SIZE macros
+	 * aren't always constants.
+	 */
+	static const unsigned long supported_alignments[] = {
+		PAGE_SIZE,
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+		HPAGE_PMD_SIZE,
+#ifdef CONFIG_HAVE_ARCH_TRANSPARENT_HUGEPAGE_PUD
+		HPAGE_PUD_SIZE,
+#endif
+#endif
+		0,
+	};
+
+	return supported_alignments;
+}
+
 static ssize_t __align_store(struct nd_pfn *nd_pfn, const char *buf)
 {
 	unsigned long val;
@@ -260,6 +280,13 @@ static ssize_t size_show(struct device *dev,
 }
 static DEVICE_ATTR_RO(size);
 
+static ssize_t supported_alignments_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return nd_size_select_show(0, nd_pfn_supported_alignments(), buf);
+}
+static DEVICE_ATTR_RO(supported_alignments);
+
 static struct attribute *nd_pfn_attributes[] = {
 	&dev_attr_mode.attr,
 	&dev_attr_namespace.attr,
@@ -267,6 +294,7 @@ static struct attribute *nd_pfn_attributes[] = {
 	&dev_attr_align.attr,
 	&dev_attr_resource.attr,
 	&dev_attr_size.attr,
+	&dev_attr_supported_alignments.attr,
 	NULL,
 };
 
