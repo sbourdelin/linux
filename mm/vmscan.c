@@ -398,6 +398,7 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 			break;
 		freed += ret;
 
+		nr_to_scan = max(nr_to_scan, ret);
 		count_vm_events(SLABS_SCANNED, nr_to_scan);
 		total_scan -= nr_to_scan;
 		scanned += nr_to_scan;
