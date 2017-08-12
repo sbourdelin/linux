@@ -85,6 +85,7 @@ struct spidev_data {
 	u8			*tx_buffer;
 	u8			*rx_buffer;
 	u32			speed_hz;
+	bool			bus_locked;
 };
 
 static LIST_HEAD(device_list);
@@ -109,7 +110,8 @@ spidev_sync(struct spidev_data *spidev, struct spi_message *message)
 	if (spi == NULL)
 		status = -ESHUTDOWN;
 	else
-		status = spi_sync(spi, message);
+		status = spidev->bus_locked ? spi_sync_locked(spi, message) :
+				spi_sync(spi, message);
 
 	if (status == 0)
 		status = message->actual_length;
@@ -460,6 +462,16 @@ spidev_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 				dev_dbg(&spi->dev, "%d Hz (max)\n", tmp);
 			spi->max_speed_hz = save;
 		}
+		break;
+
+	case SPI_IOC_BUS_LOCK:
+		spi_bus_lock(spi->master);
+		spidev->bus_locked = true;
+		break;
+
+	case SPI_IOC_BUS_UNLOCK:
+		spi_bus_unlock(spi->master);
+		spidev->bus_locked = false;
 		break;
 
 	default:

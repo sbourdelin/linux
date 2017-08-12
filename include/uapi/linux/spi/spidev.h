@@ -136,6 +136,8 @@ struct spi_ioc_transfer {
 #define SPI_IOC_RD_MODE32		_IOR(SPI_IOC_MAGIC, 5, __u32)
 #define SPI_IOC_WR_MODE32		_IOW(SPI_IOC_MAGIC, 5, __u32)
 
-
+/* Exclusive bus access lock */
+#define SPI_IOC_BUS_LOCK		_IO(SPI_IOC_MAGIC, 6)
+#define SPI_IOC_BUS_UNLOCK		_IO(SPI_IOC_MAGIC, 7)
 
 #endif /* SPIDEV_H */
