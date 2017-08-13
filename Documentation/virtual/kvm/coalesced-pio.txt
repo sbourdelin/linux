@@ -1,0 +1,36 @@
+Linux KVM Coalesced PIO:
+========================
+Coalesced pio is base on coalesced mmio. When the write access to a port
+of a device does a simple work or can delay, then follows a access to the
+same device, it can use coalesced pio optimizing method.
+
+using coalesced pio, the write access to port A of a device do not exit
+to userspace, and just record the value in shared coalesced ring in kernel.
+Then following access to the port B of the same device or read access to
+the port A will get the previous write value of port A firstly in usersapce
+according to the shared coalesced ring.
+
+Now just use coalesced pio for rtc 0x70 port and we can find other ports
+in the future.
+
+for example: rtc port 0x70
+without coalesced pio:
+  guest write port 0x70
+    vm_exit to userspace
+      userspace set register index: regindex
+    vm_entry
+  guest read or write 0x71
+    vm_exit to userspace
+      usersapce get/set rtc regisers[regindex]
+    vm_entry
+
+with coalesced pio:
+  guest write port 0x70
+    vm_exit to kernel
+    vm_entry
+  guest read or write 0x71
+    vm_exit to userspace
+      usersapce set register index: regindex
+      usersapce get/set rtc regisers[regindex]
+    vm_entry
+
