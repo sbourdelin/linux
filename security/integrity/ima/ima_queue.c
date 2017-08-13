@@ -100,10 +100,9 @@ static int ima_add_digest_entry(struct ima_template_entry *entry,
 	unsigned int key;
 
 	qe = kmalloc(sizeof(*qe), GFP_KERNEL);
-	if (qe == NULL) {
-		pr_err("OUT OF MEMORY ERROR creating queue entry\n");
+	if (!qe)
 		return -ENOMEM;
-	}
+
 	qe->entry = entry;
 
 	INIT_LIST_HEAD(&qe->later);
