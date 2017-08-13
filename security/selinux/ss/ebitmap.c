@@ -96,12 +96,12 @@ int ebitmap_netlbl_export(struct ebitmap *ebmap,
 	unsigned int iter;
 	int rc;
 
-	if (e_iter == NULL) {
+	if (!e_iter) {
 		*catmap = NULL;
 		return 0;
 	}
 
-	if (*catmap != NULL)
+	if (*catmap)
 		netlbl_catmap_free(*catmap);
 	*catmap = NULL;
 
@@ -161,14 +161,14 @@ int ebitmap_netlbl_import(struct ebitmap *ebmap,
 			continue;
 		}
 
-		if (e_iter == NULL ||
+		if (!e_iter ||
 		    offset >= e_iter->startbit + EBITMAP_SIZE) {
 			e_prev = e_iter;
 			e_iter = kmem_cache_zalloc(ebitmap_node_cachep, GFP_ATOMIC);
-			if (e_iter == NULL)
+			if (!e_iter)
 				goto netlbl_import_failure;
 			e_iter->startbit = offset - (offset % EBITMAP_SIZE);
-			if (e_prev == NULL)
+			if (!e_prev)
 				ebmap->node = e_iter;
 			else
 				e_prev->next = e_iter;
