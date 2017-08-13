@@ -895,6 +895,10 @@ int btrfs_compress_pages(int type, struct address_space *mapping,
 						      start, pages,
 						      out_pages,
 						      total_in, total_out);
+
+	trace_btrfs_compress(1, 1, mapping->host, type, *total_in,
+						*total_out, start, ret);
+
 	free_workspace(type, workspace);
 	return ret;
 }
@@ -921,6 +925,10 @@ static int btrfs_decompress_bio(struct compressed_bio *cb)
 
 	workspace = find_workspace(type);
 	ret = btrfs_compress_op[type - 1]->decompress_bio(workspace, cb);
+
+	trace_btrfs_compress(0, 0, cb->inode, type,
+				cb->compressed_len, cb->len, cb->start, ret);
+
 	free_workspace(type, workspace);
 
 	return ret;
@@ -942,6 +950,9 @@ int btrfs_decompress(int type, unsigned char *data_in, struct page *dest_page,
 	ret = btrfs_compress_op[type-1]->decompress(workspace, data_in,
 						  dest_page, start_byte,
 						  srclen, destlen);
+
+	trace_btrfs_compress(0, 1, dest_page->mapping->host,
+				type, srclen, destlen, start_byte, ret);
 
 	free_workspace(type, workspace);
 	return ret;

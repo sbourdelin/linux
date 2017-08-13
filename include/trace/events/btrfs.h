@@ -1629,6 +1629,45 @@ TRACE_EVENT(qgroup_meta_reserve,
 		show_root_type(__entry->refroot), __entry->diff)
 );
 
+TRACE_EVENT(btrfs_compress,
+
+	TP_PROTO(int compress, int page, struct inode *inode,
+			unsigned int type,
+			unsigned long len_before, unsigned long len_after,
+			unsigned long start, int ret),
+
+	TP_ARGS(compress, page, inode, type, len_before,
+					len_after, start, ret),
+
+	TP_STRUCT__entry_btrfs(
+		__field(int,				compress)
+		__field(int,				page)
+		__field(ino_t,				i_ino)
+		__field(unsigned int,			type)
+		__field(unsigned long,			len_before)
+		__field(unsigned long,			len_after)
+		__field(unsigned long,			start)
+		__field(int,				ret)
+	),
+
+	TP_fast_assign_btrfs(btrfs_sb(inode->i_sb),
+		__entry->compress	= compress;
+		__entry->page		= page;
+		__entry->i_ino		= inode->i_ino;
+		__entry->type		= type;
+		__entry->len_before	= len_before;
+		__entry->len_after	= len_after;
+		__entry->start		= start;
+		__entry->ret		= ret;
+	),
+
+	TP_printk_btrfs("%s %s ino=%lu type=%s len_before=%lu len_after=%lu start=%lu ret=%d",
+		__entry->compress ? "compress":"uncompress",
+		__entry->page ? "page":"bio", __entry->i_ino,
+		show_compress_type(__entry->type),
+		__entry->len_before, __entry->len_after, __entry->start,
+		__entry->ret)
+);
 #endif /* _TRACE_BTRFS_H */
 
 /* This part must be outside protection */
