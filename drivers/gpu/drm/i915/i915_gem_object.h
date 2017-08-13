@@ -257,7 +257,7 @@ __attribute__((nonnull))
 static inline struct drm_i915_gem_object *
 i915_gem_object_get(struct drm_i915_gem_object *obj)
 {
-	drm_gem_object_reference(&obj->base);
+	drm_gem_object_get(&obj->base);
 	return obj;
 }
 
@@ -268,7 +268,7 @@ __attribute__((nonnull))
 static inline void
 i915_gem_object_put(struct drm_i915_gem_object *obj)
 {
-	__drm_gem_object_unreference(&obj->base);
+	__drm_gem_object_put(&obj->base);
 }
 
 __deprecated
