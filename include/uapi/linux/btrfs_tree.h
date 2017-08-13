@@ -733,6 +733,11 @@ struct btrfs_balance_item {
 #define BTRFS_FILE_EXTENT_REG 1
 #define BTRFS_FILE_EXTENT_PREALLOC 2
 
+#define BTRFS_COMPRESS_NONE	0
+#define BTRFS_COMPRESS_TYPES	2
+#define BTRFS_COMPRESS_ZLIB	1
+#define BTRFS_COMPRESS_LZO	2
+
 struct btrfs_file_extent_item {
 	/*
 	 * transaction id that created this extent

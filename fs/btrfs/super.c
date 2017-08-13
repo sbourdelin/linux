@@ -404,7 +404,7 @@ int btrfs_parse_options(struct btrfs_fs_info *info, char *options,
 	int ret = 0;
 	char *compress_type;
 	bool compress_force = false;
-	enum btrfs_compression_type saved_compress_type;
+	unsigned int saved_compress_type;
 	bool saved_compress_force;
 	int no_compress = 0;
 
