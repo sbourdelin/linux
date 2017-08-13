@@ -728,6 +728,13 @@ void __init early_init_devtree(void *params)
 	 * FIXME .. and the initrd too? */
 	move_device_tree();
 
+	/*
+	 * Now try to figure out if we are running on LPAR and so on
+	 * This must run before allocate_pacas() in order to allocate
+	 * lppacas or not.
+	 */
+	pseries_probe_fw_features();
+
 	allocate_pacas();
 
 	DBG("Scanning CPUs ...\n");
@@ -757,9 +764,6 @@ void __init early_init_devtree(void *params)
 	of_scan_flat_dt(early_init_dt_scan_recoverable_ranges, NULL);
 #endif
 	epapr_paravirt_early_init();
-
-	/* Now try to figure out if we are running on LPAR and so on */
-	pseries_probe_fw_features();
 
 #ifdef CONFIG_PPC_PS3
 	/* Identify PS3 firmware */

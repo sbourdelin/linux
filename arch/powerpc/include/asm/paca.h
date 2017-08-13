@@ -57,7 +57,7 @@ struct task_struct;
  * processor.
  */
 struct paca_struct {
-#ifdef CONFIG_PPC_BOOK3S
+#ifdef CONFIG_PPC_PSERIES
 	/*
 	 * Because hw_cpu_id, unlike other paca fields, is accessed
 	 * routinely from other CPUs (from the IRQ code), we stick to
@@ -66,7 +66,8 @@ struct paca_struct {
 	 */
 
 	struct lppaca *lppaca_ptr;	/* Pointer to LpPaca for PLIC */
-#endif /* CONFIG_PPC_BOOK3S */
+#endif /* CONFIG_PPC_PSERIES */
+
 	/*
 	 * MAGIC: the spinlock functions in arch/powerpc/lib/locks.c 
 	 * load lock_token and paca_index with a single lwz
@@ -158,6 +159,9 @@ struct paca_struct {
 	u64 saved_r1;			/* r1 save for RTAS calls or PM */
 	u64 saved_msr;			/* MSR saved here by enter_rtas */
 	u16 trap_save;			/* Used when bad stack is encountered */
+#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+	u8 pmcregs_in_use;		/* pseries puts this in lppaca */
+#endif
 	u8 soft_enabled;		/* irq soft-enable flag */
 	u8 irq_happened;		/* irq happened while soft-disabled */
 	u8 io_sync;			/* writel() needs spin_unlock sync */
