@@ -485,13 +485,8 @@ static unsigned long do_h_register_vpa(struct kvm_vcpu *vcpu,
 
 	switch (subfunc) {
 	case H_VPA_REG_VPA:		/* register VPA */
-		/*
-		 * The size of our lppaca is 1kB because of the way we align
-		 * it for the guest to avoid crossing a 4kB boundary. We only
-		 * use 640 bytes of the structure though, so we should accept
-		 * clients that set a size of 640.
-		 */
-		if (len < 640)
+		BUILD_BUG_ON(sizeof(struct lppaca) != 640);
+		if (len < sizeof(struct lppaca))
 			break;
 		vpap = &tvcpu->arch.vpa;
 		err = 0;

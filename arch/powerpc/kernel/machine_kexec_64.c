@@ -329,11 +329,15 @@ void default_machine_kexec(struct kimage *image)
 	memcpy(&kexec_paca, get_paca(), sizeof(struct paca_struct));
 	kexec_paca.data_offset = 0xedeaddeadeeeeeeeUL;
 	paca_ptrs[kexec_paca.paca_index] = &kexec_paca;
+
 	setup_paca(&kexec_paca);
 
-	/* XXX: If anyone does 'dynamic lppacas' this will also need to be
-	 * switched to a static version!
+	/*
+	 * The lppaca should be unregistered at this point. In the case
+	 * of a crash, none of the lppacas are unregistered so there is
+	 * not much we can do about it here.
 	 */
+
 	/*
 	 * On Book3S, the copy must happen with the MMU off if we are either
 	 * using Radix page tables or we are not in an LPAR since we can

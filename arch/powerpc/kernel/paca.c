@@ -19,44 +19,53 @@
 #include <asm/kexec.h>
 
 #include "setup.h"
+static int __initdata paca_nr_cpu_ids;
 
 #ifdef CONFIG_PPC_PSERIES
 
 /*
- * The structure which the hypervisor knows about - this structure
- * should not cross a page boundary.  The vpa_init/register_vpa call
- * is now known to fail if the lppaca structure crosses a page
- * boundary.  The lppaca is also used on POWER5 pSeries boxes.
- * The lppaca is 640 bytes long, and cannot readily
- * change since the hypervisor knows its layout, so a 1kB alignment
- * will suffice to ensure that it doesn't cross a page boundary.
+ * See asm/lppaca.h for more detail.
+ *
+ * lppaca structures must must be 1kB in size, L1 cache line aligned,
+ * and not cross 4kB boundary. A 1kB size and 1kB alignment will satisfy
+ * these requirements.
  */
-struct lppaca lppaca[] = {
-	[0 ... (NR_LPPACAS-1)] = {
+static inline void init_lppaca(struct lppaca *lppaca)
+{
+	BUILD_BUG_ON(sizeof(struct lppaca) != 640);
+
+	*lppaca = (struct lppaca) {
 		.desc = cpu_to_be32(0xd397d781),	/* "LpPa" */
-		.size = cpu_to_be16(sizeof(struct lppaca)),
+		.size = cpu_to_be16(0x400),
 		.fpregs_in_use = 1,
 		.slb_count = cpu_to_be16(64),
 		.vmxregs_in_use = 0,
-		.page_ins = 0,
-	},
+		.page_ins = 0, };
 };
 
-static struct lppaca *extra_lppacas;
-static long __initdata lppaca_size;
+static struct lppaca ** __initdata lppaca_ptrs;
+
+static long __initdata lppaca_ptrs_size;
 
 static void __init allocate_lppacas(int nr_cpus, unsigned long limit)
 {
+	size_t size = 0x400;
+	int cpu;
+
+	BUILD_BUG_ON(size < sizeof(struct lppaca));
+
 	if (!firmware_has_feature(FW_FEATURE_LPAR))
 		return;
 
-	if (nr_cpus <= NR_LPPACAS)
-		return;
+	lppaca_ptrs_size = sizeof(struct lppaca *) * nr_cpu_ids;
+	lppaca_ptrs = __va(memblock_alloc_base(lppaca_ptrs_size, 0, limit));
 
-	lppaca_size = PAGE_ALIGN(sizeof(struct lppaca) *
-				 (nr_cpus - NR_LPPACAS));
-	extra_lppacas = __va(memblock_alloc_base(lppaca_size,
-						 PAGE_SIZE, limit));
+	for (cpu = 0; cpu < nr_cpu_ids; cpu++) {
+		unsigned long pa;
+
+		pa = memblock_alloc_base(size, 0x400, limit);
+		lppaca_ptrs[cpu] = __va(pa);
+	}
 }
 
 static struct lppaca * __init new_lppaca(int cpu)
@@ -66,32 +75,28 @@ static struct lppaca * __init new_lppaca(int cpu)
 	if (!firmware_has_feature(FW_FEATURE_LPAR))
 		return NULL;
 
-	if (cpu < NR_LPPACAS)
-		return &lppaca[cpu];
-
-	lp = extra_lppacas + (cpu - NR_LPPACAS);
-	*lp = lppaca[0];
+	lp = lppaca_ptrs[cpu];
+	init_lppaca(lp);
 
 	return lp;
 }
 
 static void __init free_lppacas(void)
 {
-	long new_size = 0, nr;
+	int cpu;
 
 	if (!firmware_has_feature(FW_FEATURE_LPAR))
 		return;
 
-	if (!lppaca_size)
-		return;
-	nr = num_possible_cpus() - NR_LPPACAS;
-	if (nr > 0)
-		new_size = PAGE_ALIGN(nr * sizeof(struct lppaca));
-	if (new_size >= lppaca_size)
-		return;
+	for (cpu = 0; cpu < paca_nr_cpu_ids; cpu++) {
+		if (!cpu_possible(cpu)) {
+			unsigned long pa = __pa(lppaca_ptrs[cpu]);
+			memblock_free(pa, sizeof(struct lppaca));
+			lppaca_ptrs[cpu] = NULL;
+		}
+	}
 
-	memblock_free(__pa(extra_lppacas) + new_size, lppaca_size - new_size);
-	lppaca_size = new_size;
+	memblock_free(__pa(lppaca_ptrs), lppaca_ptrs_size);
 }
 
 #else
@@ -213,7 +218,6 @@ void setup_paca(struct paca_struct *new_paca)
 
 }
 
-static int __initdata paca_nr_cpu_ids;
 static int __initdata paca_ptrs_size;
 
 void __init allocate_pacas(void)
