@@ -124,6 +124,7 @@ struct dp_upcall_info {
 	const struct nlattr *userdata;
 	const struct nlattr *actions;
 	int actions_len;
+	int actions_attrlen;
 	u32 portid;
 	u8 cmd;
 	u16 mru;

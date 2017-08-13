@@ -48,6 +48,7 @@ struct deferred_action {
 	struct sk_buff *skb;
 	const struct nlattr *actions;
 	int actions_len;
+	int actions_attrlen;
 
 	/* Store pkt_key clone when creating deferred action. */
 	struct sw_flow_key pkt_key;
@@ -135,7 +136,8 @@ static struct deferred_action *action_fifo_put(struct action_fifo *fifo)
 static struct deferred_action *add_deferred_actions(struct sk_buff *skb,
 				    const struct sw_flow_key *key,
 				    const struct nlattr *actions,
-				    const int actions_len)
+				    const int actions_len,
+				    const int actions_attrlen)
 {
 	struct action_fifo *fifo;
 	struct deferred_action *da;
@@ -146,6 +148,7 @@ static struct deferred_action *add_deferred_actions(struct sk_buff *skb,
 		da->skb = skb;
 		da->actions = actions;
 		da->actions_len = actions_len;
+		da->actions_attrlen = actions_attrlen;
 		da->pkt_key = *key;
 	}
 
@@ -166,6 +169,7 @@ static int clone_execute(struct datapath *dp, struct sk_buff *skb,
 			 struct sw_flow_key *key,
 			 u32 recirc_id,
 			 const struct nlattr *actions, int len,
+			 int actions_attrlen,
 			 bool last, bool clone_flow_key);
 
 static void update_ethertype(struct sk_buff *skb, struct ethhdr *hdr,
@@ -880,7 +884,7 @@ static void do_output(struct datapath *dp, struct sk_buff *skb, int out_port,
 static int output_userspace(struct datapath *dp, struct sk_buff *skb,
 			    struct sw_flow_key *key, const struct nlattr *attr,
 			    const struct nlattr *actions, int actions_len,
-			    uint32_t cutlen)
+			    int actions_attrlen, uint32_t cutlen)
 {
 	struct dp_upcall_info upcall;
 	const struct nlattr *a;
@@ -921,6 +925,7 @@ static int output_userspace(struct datapath *dp, struct sk_buff *skb,
 			/* Include actions. */
 			upcall.actions = actions;
 			upcall.actions_len = actions_len;
+			upcall.actions_attrlen = actions_attrlen;
 			break;
 		}
 
@@ -936,7 +941,7 @@ static int output_userspace(struct datapath *dp, struct sk_buff *skb,
  */
 static int sample(struct datapath *dp, struct sk_buff *skb,
 		  struct sw_flow_key *key, const struct nlattr *attr,
-		  bool last)
+		  int actions_attrlen, bool last)
 {
 	struct nlattr *actions;
 	struct nlattr *sample_arg;
@@ -957,8 +962,8 @@ static int sample(struct datapath *dp, struct sk_buff *skb,
 	}
 
 	clone_flow_key = !arg->exec;
-	return clone_execute(dp, skb, key, 0, actions, rem, last,
-			     clone_flow_key);
+	return clone_execute(dp, skb, key, 0, actions, rem, actions_attrlen,
+			     last, clone_flow_key);
 }
 
 static void execute_hash(struct sk_buff *skb, struct sw_flow_key *key,
@@ -1083,13 +1088,14 @@ static int execute_recirc(struct datapath *dp, struct sk_buff *skb,
 	BUG_ON(!is_flow_key_valid(key));
 
 	recirc_id = nla_get_u32(a);
-	return clone_execute(dp, skb, key, recirc_id, NULL, 0, last, true);
+	return clone_execute(dp, skb, key, recirc_id, NULL, 0, 0, last, true);
 }
 
 /* Execute a list of actions against 'skb'. */
 static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 			      struct sw_flow_key *key,
-			      const struct nlattr *attr, int len)
+			      const struct nlattr *attr, int len,
+			      int actions_attrlen)
 {
 	const struct nlattr *a;
 	int rem;
@@ -1130,8 +1136,8 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		}
 
 		case OVS_ACTION_ATTR_USERSPACE:
-			output_userspace(dp, skb, key, a, attr,
-						     len, OVS_CB(skb)->cutlen);
+			output_userspace(dp, skb, key, a, attr, len,
+					 actions_attrlen, OVS_CB(skb)->cutlen);
 			OVS_CB(skb)->cutlen = 0;
 			break;
 
@@ -1181,7 +1187,7 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		case OVS_ACTION_ATTR_SAMPLE: {
 			bool last = nla_is_last(a, rem);
 
-			err = sample(dp, skb, key, a, last);
+			err = sample(dp, skb, key, a, actions_attrlen, last);
 			if (last)
 				return err;
 
@@ -1231,6 +1237,7 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 static int clone_execute(struct datapath *dp, struct sk_buff *skb,
 			 struct sw_flow_key *key, u32 recirc_id,
 			 const struct nlattr *actions, int len,
+			 int actions_attrlen,
 			 bool last, bool clone_flow_key)
 {
 	struct deferred_action *da;
@@ -1258,7 +1265,8 @@ static int clone_execute(struct datapath *dp, struct sk_buff *skb,
 				__this_cpu_inc(exec_actions_level);
 
 			err = do_execute_actions(dp, skb, clone,
-						 actions, len);
+						 actions, len,
+						 actions_attrlen);
 
 			if (clone_flow_key)
 				__this_cpu_dec(exec_actions_level);
@@ -1270,7 +1278,7 @@ static int clone_execute(struct datapath *dp, struct sk_buff *skb,
 	}
 
 	/* Out of 'flow_keys' space. Defer actions */
-	da = add_deferred_actions(skb, key, actions, len);
+	da = add_deferred_actions(skb, key, actions, len, actions_attrlen);
 	if (da) {
 		if (!actions) { /* Recirc action */
 			key = &da->pkt_key;
@@ -1309,10 +1317,12 @@ static void process_deferred_actions(struct datapath *dp)
 		struct sk_buff *skb = da->skb;
 		struct sw_flow_key *key = &da->pkt_key;
 		const struct nlattr *actions = da->actions;
+		int actions_attrlen = da->actions_attrlen;
 		int actions_len = da->actions_len;
 
 		if (actions)
-			do_execute_actions(dp, skb, key, actions, actions_len);
+			do_execute_actions(dp, skb, key, actions, actions_len,
+					   actions_attrlen);
 		else
 			ovs_dp_process_packet(skb, key);
 	} while (!action_fifo_is_empty(fifo));
@@ -1338,7 +1348,8 @@ int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb,
 	}
 
 	err = do_execute_actions(dp, skb, key,
-				 acts->actions, acts->actions_len);
+				 acts->actions, acts->actions_len,
+				 acts->orig_len);
 
 	if (level == 1)
 		process_deferred_actions(dp);

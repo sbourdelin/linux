@@ -398,7 +398,7 @@ static size_t upcall_msg_size(const struct dp_upcall_info *upcall_info,
 
 	/* OVS_PACKET_ATTR_ACTIONS */
 	if (upcall_info->actions_len)
-		size += nla_total_size(upcall_info->actions_len);
+		size += nla_total_size(upcall_info->actions_attrlen);
 
 	/* OVS_PACKET_ATTR_MRU */
 	if (upcall_info->mru)
