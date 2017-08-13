@@ -373,7 +373,7 @@ int ebitmap_read(struct ebitmap *e, void *fp)
 
 	if (!e->highbit) {
 		e->node = NULL;
-		goto ok;
+		goto out;
 	}
 
 	if (e->highbit && !count)
@@ -436,8 +436,6 @@ int ebitmap_read(struct ebitmap *e, void *fp)
 			map = EBITMAP_SHIFT_UNIT_SIZE(map);
 		}
 	}
-ok:
-	rc = 0;
 out:
 	return rc;
 bad:

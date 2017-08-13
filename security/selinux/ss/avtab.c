@@ -587,8 +587,6 @@ int avtab_read(struct avtab *a, void *fp, struct policydb *pol)
 			goto bad;
 		}
 	}
-
-	rc = 0;
 out:
 	return rc;
 

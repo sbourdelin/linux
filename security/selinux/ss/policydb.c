@@ -599,7 +599,6 @@ static int policydb_index(struct policydb *p)
 		if (rc)
 			goto out;
 	}
-	rc = 0;
 out:
 	return rc;
 }
@@ -903,10 +902,10 @@ int policydb_load_isids(struct policydb *p, struct sidtab *s)
 
 	head = p->ocontexts[OCON_ISID];
 	for (c = head; c; c = c->next) {
-		rc = -EINVAL;
 		if (!c->context[0].user) {
 			printk(KERN_ERR "SELinux:  SID %s was never defined.\n",
 				c->u.name);
+			rc = -EINVAL;
 			goto out;
 		}
 
@@ -917,7 +916,6 @@ int policydb_load_isids(struct policydb *p, struct sidtab *s)
 			goto out;
 		}
 	}
-	rc = 0;
 out:
 	return rc;
 }
@@ -1074,13 +1072,12 @@ static int context_read_and_validate(struct context *c,
 		}
 	}
 
-	rc = -EINVAL;
 	if (!policydb_context_isvalid(p, c)) {
 		printk(KERN_ERR "SELinux:  invalid security context\n");
 		context_destroy(c);
+		rc = -EINVAL;
 		goto out;
 	}
-	rc = 0;
 out:
 	return rc;
 }
@@ -1900,7 +1897,6 @@ static int range_read(struct policydb *p, void *fp)
 		r = NULL;
 	}
 	hash_eval(p->range_tr, "rangetr");
-	rc = 0;
 out:
 	kfree(rt);
 	kfree(r);
@@ -2550,8 +2546,6 @@ int policydb_read(struct policydb *p, void *fp)
 	rc = policydb_bounds_sanity_check(p);
 	if (rc)
 		goto bad;
-
-	rc = 0;
 out:
 	return rc;
 bad:

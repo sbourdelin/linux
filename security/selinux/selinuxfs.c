@@ -1724,7 +1724,6 @@ static int sel_make_classes(void)
 		if (rc)
 			goto out;
 	}
-	rc = 0;
 out:
 	for (i = 0; i < nclasses; i++)
 		kfree(classes[i]);
