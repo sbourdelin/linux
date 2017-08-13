@@ -819,7 +819,7 @@ static int rtsx_usb_ms_drv_remove(struct platform_device *pdev)
 static SIMPLE_DEV_PM_OPS(rtsx_usb_ms_pm_ops,
 		rtsx_usb_ms_suspend, rtsx_usb_ms_resume);
 
-static struct platform_device_id rtsx_usb_ms_ids[] = {
+static const struct platform_device_id rtsx_usb_ms_ids[] = {
 	{
 		.name = "rtsx_usb_ms",
 	}, {
