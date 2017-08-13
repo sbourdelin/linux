@@ -228,10 +228,10 @@ struct paca_struct {
 	struct sibling_subcore_state *sibling_subcore_state;
 #endif
 #endif
-};
+} ____cacheline_aligned;
 
 extern void copy_mm_to_paca(struct mm_struct *mm);
-extern struct paca_struct *paca;
+extern struct paca_struct **paca_ptrs;
 extern void initialise_paca(struct paca_struct *new_paca, int cpu);
 extern void setup_paca(struct paca_struct *new_paca);
 extern void allocate_pacas(void);
