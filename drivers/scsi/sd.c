@@ -2883,9 +2883,6 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 
 		sdkp->max_ws_blocks = (u32)get_unaligned_be64(&buffer[36]);
 
-		if (!sdkp->lbpme)
-			goto out;
-
 		lba_count = get_unaligned_be32(&buffer[20]);
 		desc_count = get_unaligned_be32(&buffer[24]);
 
@@ -2897,6 +2894,9 @@ static void sd_read_block_limits(struct scsi_disk *sdkp)
 		if (buffer[32] & 0x80)
 			sdkp->unmap_alignment =
 				get_unaligned_be32(&buffer[32]) & ~(1 << 31);
+
+		if (!sdkp->lbpme)
+			goto out;
 
 		if (!sdkp->lbpvpd) { /* LBP VPD page not provided */
 
