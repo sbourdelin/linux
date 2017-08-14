@@ -2035,8 +2035,17 @@ int zs_page_migrate(struct address_space *mapping, struct page *newpage,
 	 * Page migration is done so let's putback isolated zspage to
 	 * the list if @page is final isolated subpage in the zspage.
 	 */
-	if (!is_zspage_isolated(zspage))
-		putback_zspage(class, zspage);
+	if (!is_zspage_isolated(zspage)) {
+		/*
+		 * Page will be freed in following part. But newpage and
+		 * zspage will stay in system if zspage is in ZS_EMPTY
+		 * list.  So call free_work to free it.
+		 * The page and class is locked, we cannot free zspage
+		 * immediately so let's defer.
+		 */
+		if (putback_zspage(class, zspage) == ZS_EMPTY)
+			schedule_work(&pool->free_work);
+	}
 
 	reset_page(page);
 	put_page(page);
