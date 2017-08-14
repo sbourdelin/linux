@@ -269,4 +269,6 @@ int main(int argc, char **argv)
 		ksft_exit_fail();
 
 	ksft_exit_pass();
+
+	return 0;
 }
