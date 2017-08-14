@@ -85,7 +85,7 @@ MODULE_LICENSE("GPL");
 static int hpsa_allow_any;
 module_param(hpsa_allow_any, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(hpsa_allow_any,
-		"Allow hpsa driver to access unknown HP Smart Array hardware");
+		"Allow hpsa driver to access unsupported HP Smart Array hardware");
 static int hpsa_simple_mode;
 module_param(hpsa_simple_mode, int, S_IRUGO|S_IWUSR);
 MODULE_PARM_DESC(hpsa_simple_mode,
@@ -7314,6 +7314,7 @@ static int hpsa_lookup_board_id(struct pci_dev *pdev, u32 *board_id,
 		!hpsa_allow_any) {
 		dev_warn(&pdev->dev, "unrecognized board ID: "
 			"0x%08x, ignoring.\n", *board_id);
+		dev_warn(&pdev->dev, "This device may be enabled by loading the hpsa module with the hpsa_allow_any=1 option or by writing \"%s\" to /sys/bus/pci/drivers/hpsa/bind while the module is loaded. Please note that the driver is untested with this device and will result in an unsupported environment.\n", dev_name(&pdev->dev));
 			return -ENODEV;
 	}
 	if (legacy_board)
