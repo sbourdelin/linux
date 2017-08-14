@@ -130,6 +130,9 @@ static int __init elevator_setup(char *str)
 	 * Be backwards-compatible with previous kernels, so users
 	 * won't get the wrong elevator.
 	 */
+	printk(KERN_WARNING
+		"Setting I/O scheduler via kernel command line " \
+		"is deprecated. Use udev rule instead.");
 	strncpy(chosen_elevator, str, sizeof(chosen_elevator) - 1);
 	return 1;
 }
