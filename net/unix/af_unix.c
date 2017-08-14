@@ -2127,6 +2127,8 @@ static int unix_dgram_recvmsg(struct socket *sock, struct msghdr *msg,
 		skip = sk_peek_offset(sk, flags);
 		skb = __skb_try_recv_datagram(sk, flags, NULL, &peeked, &skip,
 					      &err, &last);
+		if (skip < 0)
+			skip = 0;
 		if (skb)
 			break;
 
@@ -2304,10 +2306,10 @@ static int unix_stream_read_generic(struct unix_stream_read_state *state,
 	 */
 	mutex_lock(&u->iolock);
 
-	if (flags & MSG_PEEK)
-		skip = sk_peek_offset(sk, flags);
-	else
+	skip = sk_peek_offset(sk, flags);
+	if (skip < 0) {
 		skip = 0;
+	}
 
 	do {
 		int chunk;

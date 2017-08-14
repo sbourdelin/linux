@@ -364,6 +364,10 @@ int udpv6_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 try_again:
 	peeking = off = sk_peek_offset(sk, flags);
 	skb = __skb_recv_udp(sk, flags, noblock, &peeked, &off, &err);
+	if (peeking < 0) {
+		off = 0;
+		peeking = 0;
+	}
 	if (!skb)
 		return err;
 

@@ -175,8 +175,8 @@ struct sk_buff *__skb_try_recv_from_queue(struct sock *sk,
 	*last = queue->prev;
 	skb_queue_walk(queue, skb) {
 		if (flags & MSG_PEEK) {
-			if (_off >= skb->len && (skb->len || _off ||
-						 skb->peeked)) {
+			if (_off >= 0 && _off >= skb->len &&
+			    (_off || skb->peeked)) {
 				_off -= skb->len;
 				continue;
 			}
