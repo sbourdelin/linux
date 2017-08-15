@@ -276,11 +276,17 @@ void tcp_time_wait(struct sock *sk, int state, int timeo)
 #if IS_ENABLED(CONFIG_IPV6)
 		if (tw->tw_family == PF_INET6) {
 			struct ipv6_pinfo *np = inet6_sk(sk);
+			__be32 flowlabel;
 
 			tw->tw_v6_daddr = sk->sk_v6_daddr;
 			tw->tw_v6_rcv_saddr = sk->sk_v6_rcv_saddr;
 			tw->tw_tclass = np->tclass;
-			tw->tw_flowlabel = be32_to_cpu(np->flow_label & IPV6_FLOWLABEL_MASK);
+			flowlabel = np->flow_label & IPV6_FLOWLABEL_MASK;
+			if (flowlabel == 0)
+				flowlabel = ip6_make_flowlabel_from_hash(
+					sock_net(sk), np->autoflowlabel,
+					sk->sk_txhash);
+			tw->tw_flowlabel = be32_to_cpu(flowlabel);
 			tw->tw_ipv6only = sk->sk_ipv6only;
 		}
 #endif

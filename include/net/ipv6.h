@@ -771,6 +771,30 @@ static inline void iph_to_flow_copy_v6addrs(struct flow_keys *flow,
 
 #define IP6_DEFAULT_AUTO_FLOW_LABELS	IP6_AUTO_FLOW_LABEL_OPTOUT
 
+static inline bool ip6_need_make_flowlabel(struct net *net, __be32 flowlabel,
+	bool autolabel)
+{
+	if (flowlabel ||
+	    net->ipv6.sysctl.auto_flowlabels == IP6_AUTO_FLOW_LABEL_OFF ||
+	    (!autolabel &&
+	     net->ipv6.sysctl.auto_flowlabels != IP6_AUTO_FLOW_LABEL_FORCED))
+		return false;
+
+	return true;
+}
+
+static inline __be32 __ip6_make_flowlabel(struct net *net, u32 hash)
+{
+	__be32 flowlabel;
+
+	flowlabel = (__force __be32)hash & IPV6_FLOWLABEL_MASK;
+
+	if (net->ipv6.sysctl.flowlabel_state_ranges)
+		flowlabel |= IPV6_FLOWLABEL_STATELESS_FLAG;
+
+	return flowlabel;
+}
+
 static inline __be32 ip6_make_flowlabel(struct net *net, struct sk_buff *skb,
 					__be32 flowlabel, bool autolabel,
 					struct flowi6 *fl6)
@@ -782,20 +806,20 @@ static inline __be32 ip6_make_flowlabel(struct net *net, struct sk_buff *skb,
 	 */
 	flowlabel &= IPV6_FLOWLABEL_MASK;
 
-	if (flowlabel ||
-	    net->ipv6.sysctl.auto_flowlabels == IP6_AUTO_FLOW_LABEL_OFF ||
-	    (!autolabel &&
-	     net->ipv6.sysctl.auto_flowlabels != IP6_AUTO_FLOW_LABEL_FORCED))
+	if (!ip6_need_make_flowlabel(net, flowlabel, autolabel))
 		return flowlabel;
 
 	hash = skb_get_hash_flowi6(skb, fl6);
 
-	flowlabel = (__force __be32)hash & IPV6_FLOWLABEL_MASK;
+	return __ip6_make_flowlabel(net, hash);
+}
 
-	if (net->ipv6.sysctl.flowlabel_state_ranges)
-		flowlabel |= IPV6_FLOWLABEL_STATELESS_FLAG;
-
-	return flowlabel;
+static inline __be32 ip6_make_flowlabel_from_hash(struct net *net,
+	bool autolabel, u32 hash)
+{
+	if (!ip6_need_make_flowlabel(net, 0, autolabel))
+		return 0;
+	return __ip6_make_flowlabel(net, hash);
 }
 
 static inline int ip6_default_np_autolabel(struct net *net)
