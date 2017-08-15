@@ -1237,12 +1237,11 @@ struct p9_fid *p9_client_walk(struct p9_fid *oldfid, uint16_t nwname,
 clunk_fid:
 	kfree(wqids);
 	p9_client_clunk(fid);
-	fid = NULL;
-
+	goto exit;
 error:
 	if (fid && (fid != oldfid))
 		p9_fid_destroy(fid);
-
+exit:
 	return ERR_PTR(err);
 }
 EXPORT_SYMBOL(p9_client_walk);
