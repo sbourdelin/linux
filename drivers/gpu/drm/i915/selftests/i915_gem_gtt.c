@@ -40,7 +40,7 @@ static void fake_free_pages(struct drm_i915_gem_object *obj,
 }
 
 static struct sg_table *
-fake_get_pages(struct drm_i915_gem_object *obj)
+fake_get_pages(struct drm_i915_gem_object *obj, unsigned int *sg_mask)
 {
 #define GFP (GFP_KERNEL | __GFP_NOWARN | __GFP_NORETRY)
 #define PFN_BIAS 0x1000
@@ -66,6 +66,7 @@ fake_get_pages(struct drm_i915_gem_object *obj)
 		sg_set_page(sg, pfn_to_page(PFN_BIAS), len, 0);
 		sg_dma_address(sg) = page_to_phys(sg_page(sg));
 		sg_dma_len(sg) = len;
+		*sg_mask |= len;
 
 		rem -= len;
 	}

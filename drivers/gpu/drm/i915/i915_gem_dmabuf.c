@@ -257,10 +257,21 @@ struct dma_buf *i915_gem_prime_export(struct drm_device *dev,
 }
 
 static struct sg_table *
-i915_gem_object_get_pages_dmabuf(struct drm_i915_gem_object *obj)
+i915_gem_object_get_pages_dmabuf(struct drm_i915_gem_object *obj,
+				 unsigned int *sg_mask)
 {
-	return dma_buf_map_attachment(obj->base.import_attach,
-				      DMA_BIDIRECTIONAL);
+	struct sg_table *pages;
+	struct scatterlist *sg;
+	int n;
+
+	pages = dma_buf_map_attachment(obj->base.import_attach,
+				       DMA_BIDIRECTIONAL);
+	if (!IS_ERR(pages)) {
+		for_each_sg(pages->sgl, sg, pages->nents, n)
+			*sg_mask |= sg->length;
+	}
+
+	return pages;
 }
 
 static void i915_gem_object_put_pages_dmabuf(struct drm_i915_gem_object *obj,

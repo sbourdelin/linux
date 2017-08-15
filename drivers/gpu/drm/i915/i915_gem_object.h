@@ -53,7 +53,8 @@ struct drm_i915_gem_object_ops {
 	 * being released or under memory pressure (where we attempt to
 	 * reap pages for the shrinker).
 	 */
-	struct sg_table *(*get_pages)(struct drm_i915_gem_object *);
+	struct sg_table *(*get_pages)(struct drm_i915_gem_object *,
+				      unsigned int *sg_mask);
 	void (*put_pages)(struct drm_i915_gem_object *, struct sg_table *);
 
 	int (*pwrite)(struct drm_i915_gem_object *,
@@ -142,6 +143,23 @@ struct drm_i915_gem_object {
 
 		struct sg_table *pages;
 		void *mapping;
+
+		struct i915_page_sizes {
+			/**
+			 * The sg mask of the pages sg_table. i.e the mask of
+			 * of the lengths for each sg entry.
+			 */
+			unsigned int phys;
+
+			/**
+			 * The gtt page sizes we are allowed to use given the
+			 * sg mask and the supported page sizes. This will
+			 * express the smallest unit we can use for the whole
+			 * object, as well as the larger sizes we may be able
+			 * to use opportunistically.
+			 */
+			unsigned int sg;
+		} page_sizes;
 
 		struct i915_gem_object_page_iter {
 			struct scatterlist *sg_pos;

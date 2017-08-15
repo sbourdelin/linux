@@ -406,7 +406,8 @@ struct get_pages_work {
 #endif
 
 static int
-st_set_pages(struct sg_table **st, struct page **pvec, int num_pages)
+st_set_pages(struct sg_table **st, struct page **pvec, int num_pages,
+	     unsigned int *sg_mask)
 {
 	struct scatterlist *sg;
 	int ret, n;
@@ -422,12 +423,17 @@ st_set_pages(struct sg_table **st, struct page **pvec, int num_pages)
 
 		for_each_sg((*st)->sgl, sg, num_pages, n)
 			sg_set_page(sg, pvec[n], PAGE_SIZE, 0);
+
+		*sg_mask = PAGE_SIZE;
 	} else {
 		ret = sg_alloc_table_from_pages(*st, pvec, num_pages,
 						0, num_pages << PAGE_SHIFT,
 						GFP_KERNEL);
 		if (ret)
 			goto err;
+
+		for_each_sg((*st)->sgl, sg, num_pages, n)
+			*sg_mask |= sg->length;
 	}
 
 	return 0;
@@ -440,12 +446,13 @@ err:
 
 static struct sg_table *
 __i915_gem_userptr_set_pages(struct drm_i915_gem_object *obj,
-			     struct page **pvec, int num_pages)
+			     struct page **pvec, int num_pages,
+			     unsigned int *sg_mask)
 {
 	struct sg_table *pages;
 	int ret;
 
-	ret = st_set_pages(&pages, pvec, num_pages);
+	ret = st_set_pages(&pages, pvec, num_pages, sg_mask);
 	if (ret)
 		return ERR_PTR(ret);
 
@@ -540,9 +547,12 @@ __i915_gem_userptr_get_pages_worker(struct work_struct *_work)
 		struct sg_table *pages = ERR_PTR(ret);
 
 		if (pinned == npages) {
-			pages = __i915_gem_userptr_set_pages(obj, pvec, npages);
+			unsigned int sg_mask = 0;
+
+			pages = __i915_gem_userptr_set_pages(obj, pvec, npages,
+							     &sg_mask);
 			if (!IS_ERR(pages)) {
-				__i915_gem_object_set_pages(obj, pages);
+				__i915_gem_object_set_pages(obj, pages, sg_mask);
 				pinned = 0;
 				pages = NULL;
 			}
@@ -604,7 +614,8 @@ __i915_gem_userptr_get_pages_schedule(struct drm_i915_gem_object *obj)
 }
 
 static struct sg_table *
-i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj)
+i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj,
+			   unsigned int *sg_mask)
 {
 	const int num_pages = obj->base.size >> PAGE_SHIFT;
 	struct mm_struct *mm = obj->userptr.mm->mm;
@@ -661,7 +672,8 @@ i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj)
 		pages = __i915_gem_userptr_get_pages_schedule(obj);
 		active = pages == ERR_PTR(-EAGAIN);
 	} else {
-		pages = __i915_gem_userptr_set_pages(obj, pvec, num_pages);
+		pages = __i915_gem_userptr_set_pages(obj, pvec, num_pages,
+						     sg_mask);
 		active = !IS_ERR(pages);
 	}
 	if (active)
