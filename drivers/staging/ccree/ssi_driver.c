@@ -244,6 +244,7 @@ static int init_cc_resources(struct platform_device *plat_dev)
 	/* Get device resources */
 	/* First CC registers space */
 	req_mem_cc_regs = platform_get_resource(plat_dev, IORESOURCE_MEM, 0);
+
 	/* Map registers space */
 	new_drvdata->cc_base = devm_ioremap_resource(&plat_dev->dev,
 						     req_mem_cc_regs);
@@ -253,12 +254,9 @@ static int init_cc_resources(struct platform_device *plat_dev)
 		goto post_drvdata_err;
 	}
 
-	SSI_LOG_DEBUG("Got MEM resource (%s): start=%pad end=%pad\n",
-		      req_mem_cc_regs->name,
-		      req_mem_cc_regs->start,
-		      req_mem_cc_regs->end);
-	SSI_LOG_DEBUG("CC registers mapped from %pa to 0x%p\n",
-		      &req_mem_cc_regs->start, new_drvdata->cc_base);
+	SSI_LOG_DEBUG("Got MEM resource (%s): %pR\n", req_mem_cc_regs->name,
+		      req_mem_cc_regs);
+	SSI_LOG_DEBUG("CC registers mapped to 0x%p\n", new_drvdata->cc_base);
 
 	cc_base = new_drvdata->cc_base;
 
