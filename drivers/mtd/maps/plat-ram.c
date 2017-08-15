@@ -100,8 +100,8 @@ static int platram_remove(struct platform_device *pdev)
 	/* release resources */
 
 	if (info->area) {
-		release_resource(info->area);
-		kfree(info->area);
+		release_mem_region(info->area->start,
+				resource_size(info->area));
 	}
 
 	if (info->map.virt != NULL)
