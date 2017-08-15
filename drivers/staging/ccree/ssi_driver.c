@@ -257,8 +257,8 @@ static int init_cc_resources(struct platform_device *plat_dev)
 	/* Map registers space */
 	req_mem_cc_regs = request_mem_region(new_drvdata->res_mem->start, resource_size(new_drvdata->res_mem), "arm_cc7x_regs");
 	if (unlikely(!req_mem_cc_regs)) {
-		SSI_LOG_ERR("Couldn't allocate registers memory region at "
-			     "0x%08X\n", (unsigned int)new_drvdata->res_mem->start);
+		SSI_LOG_ERR("Couldn't allocate registers memory region at 0x%08X\n",
+			    (unsigned int)new_drvdata->res_mem->start);
 		rc = -EBUSY;
 		goto init_cc_res_err;
 	}
