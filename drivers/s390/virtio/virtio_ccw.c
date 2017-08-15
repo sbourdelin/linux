@@ -1307,7 +1307,7 @@ static int virtio_ccw_cio_notify(struct ccw_device *cdev, int event)
 	return rc;
 }
 
-static struct ccw_device_id virtio_ids[] = {
+static const struct ccw_device_id virtio_ids[] = {
 	{ CCW_DEVICE(0x3832, 0) },
 	{},
 };
