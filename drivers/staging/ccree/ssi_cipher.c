@@ -310,10 +310,12 @@ static int ssi_blkcipher_setkey(struct crypto_tfm *tfm,
 	/* STAT_PHASE_0: Init and sanity checks */
 
 #if SSI_CC_HAS_MULTI2
-	/*last byte of key buffer is round number and should not be a part of key size*/
+	/* Last byte of key buffer is round number and should not be a part
+	 * of key size
+	 */
 	if (ctx_p->flow_mode == S_DIN_to_MULTI2)
 		keylen -= 1;
-#endif /*SSI_CC_HAS_MULTI2*/
+#endif /* SSI_CC_HAS_MULTI2 */
 
 	if (unlikely(validate_keys_sizes(ctx_p, keylen) != 0)) {
 		SSI_LOG_ERR("Unsupported key size %d.\n", keylen);
@@ -797,7 +799,9 @@ static int ssi_blkcipher_process(
 	rc = send_request(ctx_p->drvdata, &ssi_req, desc, seq_len, (!areq) ? 0 : 1);
 	if (areq) {
 		if (unlikely(rc != -EINPROGRESS)) {
-			/* Failed to send the request or request completed synchronously */
+			/* Failed to send the request or request completed
+			 * synchronously
+			 */
 			ssi_buffer_mgr_unmap_blkcipher_request(dev, req_ctx, ivsize, src, dst);
 		}
 

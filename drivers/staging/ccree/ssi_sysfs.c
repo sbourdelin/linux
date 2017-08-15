@@ -185,7 +185,7 @@ static ssize_t ssi_sys_stat_host_db_show(struct kobject *kobj,
 
 	buf_len = scnprintf(buf, PAGE_SIZE,
 			    "phase\t\t\t\t\t\t\tmin[cy]\tavg[cy]\tmax[cy]\t#samples\n");
-	if (buf_len < 0)/* scnprintf shouldn't return negative value according to its implementation*/
+	if (buf_len < 0)
 		return buf_len;
 	for (i = STAT_OP_TYPE_ENCODE; i < MAX_STAT_OP_TYPES; i++) {
 		for (j = 0; j < MAX_STAT_PHASES - 1; j++) {
@@ -203,7 +203,8 @@ static ssize_t ssi_sys_stat_host_db_show(struct kobject *kobj,
 					    stat_name_db[i].stat_phase_name[j],
 					    min_cyc, (unsigned int)avg, max_cyc,
 					    stat_host_db[i][j].count);
-			if (tmp_len < 0)/* scnprintf shouldn't return negative value according to its implementation*/
+
+			if (tmp_len < 0)
 				return buf_len;
 			if (buf_len + tmp_len >= PAGE_SIZE)
 				return buf_len;
@@ -225,7 +226,7 @@ static ssize_t ssi_sys_stat_cc_db_show(struct kobject *kobj,
 
 	buf_len = scnprintf(buf, PAGE_SIZE,
 			    "phase\tmin[cy]\tavg[cy]\tmax[cy]\t#samples\n");
-	if (buf_len < 0)/* scnprintf shouldn't return negative value according to its implementation*/
+	if (buf_len < 0)
 		return buf_len;
 	for (i = STAT_OP_TYPE_ENCODE; i < MAX_STAT_OP_TYPES; i++) {
 		if (stat_cc_db[i][STAT_PHASE_6].count > 0) {
@@ -241,7 +242,7 @@ static ssize_t ssi_sys_stat_cc_db_show(struct kobject *kobj,
 				    (unsigned int)avg, max_cyc,
 				    stat_cc_db[i][STAT_PHASE_6].count);
 
-		if (tmp_len < 0)/* scnprintf shouldn't return negative value according to its implementation*/
+		if (tmp_len < 0)
 			return buf_len;
 
 		if (buf_len + tmp_len >= PAGE_SIZE)

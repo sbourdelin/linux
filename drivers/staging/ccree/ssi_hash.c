@@ -502,7 +502,9 @@ static int ssi_hash_digest(struct ahash_req_ctx *state,
 		ssi_req.user_arg = (void *)async_req;
 	}
 
-	/* If HMAC then load hash IPAD xor key, if HASH then load initial digest */
+	/* If HMAC then load hash IPAD xor key, if HASH then load
+	 * initial digest.
+	 */
 	hw_desc_init(&desc[idx]);
 	set_cipher_mode(&desc[idx], ctx->hw_mode);
 	if (is_hmac) {
@@ -1193,7 +1195,9 @@ static int ssi_hash_setkey(void *hash,
 		set_flow_mode(&desc[idx], DIN_HASH);
 		idx++;
 
-		/* Get the IPAD/OPAD xor key (Note, IPAD is the initial digest of the first HASH "update" state) */
+		/* Get the IPAD/OPAD xor key (Note, IPAD is the initial
+		 * digest of the first HASH "update" state)
+		 */
 		hw_desc_init(&desc[idx]);
 		set_cipher_mode(&desc[idx], ctx->hw_mode);
 		if (i > 0) /* Not first iteration */
@@ -1562,7 +1566,9 @@ static int ssi_mac_final(struct ahash_request *req)
 		set_setup_mode(&desc[idx], SETUP_LOAD_KEY0);
 		idx++;
 
-		/* Initiate decryption of block state to previous block_state-XOR-M[n] */
+		/* Initiate decryption of block state to previous
+		 * block_state-XOR-M[n]
+		 */
 		hw_desc_init(&desc[idx]);
 		set_din_type(&desc[idx], DMA_DLLI, state->digest_buff_dma_addr,
 			     CC_AES_BLOCK_SIZE, NS_BIT);
@@ -2269,7 +2275,9 @@ int ssi_hash_init_sram_digest_consts(struct ssi_drvdata *drvdata)
 	larval_seq_len = 0;
 
 #if (DX_DEV_SHA_MAX > 256)
-	/* We are forced to swap each double-word larval before copying to sram */
+	/* We are forced to swap each double-word larval before
+	 * copying to sram
+	 */
 	for (i = 0; i < ARRAY_SIZE(sha384_init); i++) {
 		const u32 const0 = ((u32 *)((u64 *)&sha384_init[i]))[1];
 		const u32 const1 = ((u32 *)((u64 *)&sha384_init[i]))[0];

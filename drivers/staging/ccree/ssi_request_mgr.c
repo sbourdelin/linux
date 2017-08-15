@@ -405,7 +405,9 @@ int send_request_init(
 	unsigned int total_seq_len = len; /*initial sequence length*/
 	int rc = 0;
 
-	/* Wait for space in HW and SW FIFO. Poll for as much as FIFO_TIMEOUT. */
+	/* Wait for space in HW and SW FIFO. Poll for as much as
+	 * FIFO_TIMEOUT.
+	 */
 	rc = request_mgr_queues_status_check(req_mgr_h, cc_base, total_seq_len);
 	if (unlikely(rc != 0))
 		return rc;
@@ -514,10 +516,14 @@ static void comp_handler(unsigned long devarg)
 	irq = (drvdata->irq & SSI_COMP_IRQ_MASK);
 
 	if (irq & SSI_COMP_IRQ_MASK) {
-		/* To avoid the interrupt from firing as we unmask it, we clear it now */
+		/* To avoid the interrupt from firing as we unmask it,
+		 * we clear it now
+		 */
 		CC_HAL_WRITE_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_ICR), SSI_COMP_IRQ_MASK);
 
-		/* Avoid race with above clear: Test completion counter once more */
+		/* Avoid race with above clear: Test completion counter
+		 * once more
+		 */
 		request_mgr_handle->axi_completed +=
 				cc_axi_comp_count(cc_base);
 
@@ -531,22 +537,27 @@ static void comp_handler(unsigned long devarg)
 						cc_axi_comp_count(cc_base);
 			} while (request_mgr_handle->axi_completed > 0);
 
-			/* To avoid the interrupt from firing as we unmask it, we clear it now */
+			/* To avoid the interrupt from firing as we unmask it,
+			 * we clear it now
+			 */
 			CC_HAL_WRITE_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_ICR), SSI_COMP_IRQ_MASK);
 
-			/* Avoid race with above clear: Test completion counter once more */
+			/* Avoid race with above clear: Test completion counter
+			 * once more
+			 */
 			request_mgr_handle->axi_completed +=
 					cc_axi_comp_count(cc_base);
 		}
 	}
-	/* after verifing that there is nothing to do, Unmask AXI completion interrupt */
+	/* After verifing that there is nothing to do, Unmask AXI completion
+	 * interrupt
+	 */
 	CC_HAL_WRITE_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_IMR),
 			      CC_HAL_READ_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_IMR)) & ~irq);
 }
 
-/*
- * resume the queue configuration - no need to take the lock as this happens inside
- * the spin lock protection
+/* Resume the queue configuration - no need to take the lock as this happens
+ * inside the spin lock protection
  */
 #if defined(CONFIG_PM_RUNTIME) || defined(CONFIG_PM_SLEEP)
 int ssi_request_mgr_runtime_resume_queue(struct ssi_drvdata *drvdata)

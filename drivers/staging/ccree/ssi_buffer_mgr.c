@@ -706,7 +706,8 @@ void ssi_buffer_mgr_unmap_aead_request(
 			size_to_skip += crypto_aead_ivsize(tfm);
 
 		/* copy mac to a temporary location to deal with possible
-		 * data memory overriding that caused by cache coherence problem.
+		 * data memory overriding that caused by cache coherence
+		 * problem.
 		 */
 		ssi_buffer_mgr_copy_scatterlist_portion(
 			areq_ctx->backup_mac, req->src,
@@ -742,10 +743,12 @@ static inline int ssi_buffer_mgr_get_aead_icv_nents(
 		icv_max_size = sgl->length;
 
 	if (last_entry_data_size > authsize) {
-		nents = 0; /* ICV attached to data in last entry (not fragmented!) */
+		/* ICV attached to data in last entry (not fragmented!) */
+		nents = 0;
 		*is_icv_fragmented = false;
 	} else if (last_entry_data_size == authsize) {
-		nents = 1; /* ICV placed in whole last entry (not fragmented!) */
+		/* ICV placed in whole last entry (not fragmented!) */
+		nents = 1;
 		*is_icv_fragmented = false;
 	} else if (icv_max_size > icv_required_size) {
 		nents = 1;
@@ -792,7 +795,8 @@ static inline int ssi_buffer_mgr_aead_chain_iv(
 	SSI_LOG_DEBUG("Mapped iv %u B at va=%pK to dma=%pad\n",
 		      hw_iv_size, req->iv,
 		      &areq_ctx->gen_ctx.iv_dma_addr);
-	if (do_chain && areq_ctx->plaintext_authenticate_only) {  // TODO: what about CTR?? ask Ron
+	if (do_chain && areq_ctx->plaintext_authenticate_only) {
+		/* TODO: what about CTR?? */
 		struct crypto_aead *tfm = crypto_aead_reqtfm(req);
 		unsigned int iv_size_to_authenc = crypto_aead_ivsize(tfm);
 		unsigned int iv_ofs = GCM_BLOCK_RFC4_IV_OFFSET;
@@ -840,16 +844,22 @@ static inline int ssi_buffer_mgr_aead_chain_assoc(
 		goto chain_assoc_exit;
 	}
 
-	//iterate over the sgl to see how many entries are for associated data
-	//it is assumed that if we reach here , the sgl is already mapped
+	/* Iterate over the sgl to see how many entries are for associated
+	 * data it is assumed that if we reach here , the sgl is already
+	 * mapped
+	 */
 	sg_index = current_sg->length;
-	if (sg_index > size_of_assoc) { //the first entry in the scatter list contains all the associated data
+	if (sg_index > size_of_assoc) {
+		/* The first entry in the scatter list contains all the
+		 * associated data
+		 */
 		mapped_nents++;
 	} else {
 		while (sg_index <= size_of_assoc) {
 			current_sg = sg_next(current_sg);
-			//if have reached the end of the sgl, then this is unexpected
-			if (!current_sg) {
+			/* If have reached the end of the sgl, then this is
+			 * unexpected
+			 */			if (!current_sg) {
 				SSI_LOG_ERR("reached end of sg list. unexpected\n");
 				BUG();
 			}
@@ -971,8 +981,8 @@ static inline int ssi_buffer_mgr_prepare_aead_data_mlli(
 
 		if (unlikely(areq_ctx->is_icv_fragmented)) {
 			/* Backup happens only when ICV is fragmented, ICV
-			 * verification is made by CPU compare in order to simplify
-			 * MAC verification upon request completion
+			 * verification is made by CPU compare in order to
+			 * simplify MAC verification upon request completion
 			 */
 			if (direct == DRV_CRYPTO_DIRECTION_DECRYPT) {
 				if (!drvdata->coherent) {
@@ -1037,8 +1047,8 @@ static inline int ssi_buffer_mgr_prepare_aead_data_mlli(
 
 		if (unlikely(areq_ctx->is_icv_fragmented)) {
 			/* Backup happens only when ICV is fragmented, ICV
-			 * verification is made by CPU compare in order to simplify
-			 * MAC verification upon request completion
+			 * verification is made by CPU compare in order to
+			 * simplify MAC verification upon request completion
 			 */
 			  u32 size_to_skip = req->assoclen;
 
@@ -1119,7 +1129,8 @@ static inline int ssi_buffer_mgr_aead_chain_data(
 	int rc = 0;
 	u32 src_mapped_nents = 0, dst_mapped_nents = 0;
 	u32 offset = 0;
-	unsigned int size_for_map = req->assoclen + req->cryptlen; /*non-inplace mode*/
+	/* Non-inplace mode */
+	unsigned int size_for_map = req->assoclen + req->cryptlen;
 	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
 	u32 sg_index = 0;
 	bool chained = false;
@@ -1305,8 +1316,9 @@ int ssi_buffer_mgr_map_aead_request(
 		if (is_gcm4543)
 			size_to_skip += crypto_aead_ivsize(tfm);
 
-		/* copy mac to a temporary location to deal with possible
-		 * data memory overriding that caused by cache coherence problem.
+		/* Copy mac to a temporary location to deal with possible
+		 * data memory overriding that caused by cache coherence
+		 * problem.
 		 */
 		ssi_buffer_mgr_copy_scatterlist_portion(
 			areq_ctx->backup_mac, req->src,
@@ -1466,7 +1478,9 @@ int ssi_buffer_mgr_map_aead_request(
 			goto aead_map_failure;
 	}
 
-	/* Mlli support -start building the MLLI according to the above results */
+	/* Mlli support - start building the MLLI according to the above
+	 * results
+	 */
 	if (unlikely(
 		(areq_ctx->assoc_buff_type == SSI_DMA_BUF_MLLI) ||
 		(areq_ctx->data_buff_type == SSI_DMA_BUF_MLLI))) {
@@ -1739,7 +1753,9 @@ void ssi_buffer_mgr_unmap_hash_request(
 			      sg_dma_len(areq_ctx->buff_sg));
 		dma_unmap_sg(dev, areq_ctx->buff_sg, 1, DMA_TO_DEVICE);
 		if (!do_revert) {
-			/* clean the previous data length for update operation */
+			/* Clean the previous data length for update
+			 * operation
+			 */
 			*prev_len = 0;
 		} else {
 			areq_ctx->buff_index ^= 1;

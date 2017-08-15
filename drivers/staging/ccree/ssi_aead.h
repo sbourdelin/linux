@@ -58,13 +58,13 @@ enum aead_ccm_header_size {
 
 struct aead_req_ctx {
 	/* Allocate cache line although only 4 bytes are needed to
-	 *  assure next field falls @ cache line
-	 *  Used for both: digest HW compare and CCM/GCM MAC value
+	 * assure next field falls @ cache line
+	 * Used for both: digest HW compare and CCM/GCM MAC value
 	 */
 	u8 mac_buf[MAX_MAC_SIZE] ____cacheline_aligned;
 	u8 ctr_iv[AES_BLOCK_SIZE] ____cacheline_aligned;
 
-	//used in gcm
+	/* used in gcm */
 	u8 gcm_iv_inc1[AES_BLOCK_SIZE] ____cacheline_aligned;
 	u8 gcm_iv_inc2[AES_BLOCK_SIZE] ____cacheline_aligned;
 	u8 hkey[AES_BLOCK_SIZE] ____cacheline_aligned;
@@ -74,22 +74,34 @@ struct aead_req_ctx {
 	} gcm_len_block;
 
 	u8 ccm_config[CCM_CONFIG_BUF_SIZE] ____cacheline_aligned;
-	unsigned int hw_iv_size ____cacheline_aligned; /*HW actual size input*/
-	u8 backup_mac[MAX_MAC_SIZE]; /*used to prevent cache coherence problem*/
-	u8 *backup_iv; /*store iv for generated IV flow*/
-	u8 *backup_giv; /*store iv for rfc3686(ctr) flow*/
-	dma_addr_t mac_buf_dma_addr; /* internal ICV DMA buffer */
-	dma_addr_t ccm_iv0_dma_addr; /* buffer for internal ccm configurations */
-	dma_addr_t icv_dma_addr; /* Phys. address of ICV */
+	/* HW actual size input */
+	unsigned int hw_iv_size ____cacheline_aligned;
+	/* used to prevent cache coherence problem */
+	u8 backup_mac[MAX_MAC_SIZE];
+	/* store iv for generated IV flow */
+	u8 *backup_iv;
+	/* store iv for rfc3686(ctr) flow */
+	u8 *backup_giv;
+	/* internal ICV DMA buffer */
+	dma_addr_t mac_buf_dma_addr;
+	/* buf for internal ccm configurations */
+	dma_addr_t ccm_iv0_dma_addr;
+	/* Phys. address of ICV */
+	dma_addr_t icv_dma_addr;
 
-	//used in gcm
-	dma_addr_t gcm_iv_inc1_dma_addr; /* buffer for internal gcm configurations */
-	dma_addr_t gcm_iv_inc2_dma_addr; /* buffer for internal gcm configurations */
-	dma_addr_t hkey_dma_addr; /* Phys. address of hkey */
-	dma_addr_t gcm_block_len_dma_addr; /* Phys. address of gcm block len */
+	/* used in gcm */
+	/* buf for internal gcm configurations */
+	dma_addr_t gcm_iv_inc1_dma_addr;
+	/* buffer for internal gcm configurations */
+	dma_addr_t gcm_iv_inc2_dma_addr;
+	/* Phys. address of hkey */
+	dma_addr_t hkey_dma_addr;
+	/* Phys. address of gcm block len */
+	dma_addr_t gcm_block_len_dma_addr;
 	bool is_gcm4543;
 
-	u8 *icv_virt_addr; /* Virt. address of ICV */
+	/* Virt. address of ICV */
+	u8 *icv_virt_addr;
 	struct async_gen_req_ctx gen_ctx;
 	struct ssi_mlli assoc;
 	struct ssi_mlli src;
@@ -108,7 +120,8 @@ struct aead_req_ctx {
 	enum drv_cipher_mode cipher_mode;
 	bool is_icv_fragmented;
 	bool is_single_pass;
-	bool plaintext_authenticate_only; //for gcm_rfc4543
+	/* for gcm_rfc4543 */
+	bool plaintext_authenticate_only;
 };
 
 int ssi_aead_alloc(struct ssi_drvdata *drvdata);

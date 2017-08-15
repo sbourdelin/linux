@@ -267,7 +267,10 @@ static void ssi_aead_complete(struct device *dev, void *ssi_req,
 								ctx->authsize,
 								SSI_SG_FROM_BUF);
 
-		/* If an IV was generated, copy it back to the user provided buffer. */
+		/*
+		 * If an IV was generated, copy it back to the user provided
+		 * buffer.
+		 */
 		if (areq_ctx->backup_giv) {
 			if (ctx->cipher_mode == DRV_CIPHER_CTR)
 				memcpy(areq_ctx->backup_giv,
@@ -288,8 +291,9 @@ static int xcbc_setkey(struct cc_hw_desc *desc, struct ssi_aead_ctx *ctx)
 {
 	/* Load the AES key */
 	hw_desc_init(&desc[0]);
-	/* We are using for the source/user key the same buffer as for the output keys,
-	 * because after this key loading it is not needed anymore
+	/* We are using for the source/user key the same buffer as for the
+	 * output keys, because after this key loading it is not needed
+	 * anymore.
 	 */
 	set_din_type(&desc[0], DMA_DLLI,
 		     ctx->auth_state.xcbc.xcbc_keys_dma_addr, ctx->auth_keylen,
@@ -1570,7 +1574,9 @@ static int config_ccm_adata(struct aead_request *req)
 	struct aead_req_ctx *req_ctx = aead_request_ctx(req);
 	//unsigned int size_of_a = 0, rem_a_size = 0;
 	unsigned int lp = req->iv[0];
-	/* Note: The code assume that req->iv[0] already contains the value of L' of RFC3610 */
+	/* Note: The code assumes that req->iv[0] already contains the value
+	 * of L' of RFC3610
+	 */
 	unsigned int l = lp + 1;  /* This is L' of RFC 3610. */
 	unsigned int m = ctx->authsize;  /* This is M' of RFC 3610. */
 	u8 *b0 = req_ctx->ccm_config + CCM_B0_OFFSET;
@@ -1624,9 +1630,14 @@ static void ssi_rfc4309_ccm_process(struct aead_request *req)
 
 	/* L' */
 	memset(areq_ctx->ctr_iv, 0, AES_BLOCK_SIZE);
-	areq_ctx->ctr_iv[0] = 3;  /* For RFC 4309, always use 4 bytes for message length (at most 2^32-1 bytes). */
+	/* For RFC 4309, always use 4 bytes for message length
+	 * (at most 2^32-1 bytes).
+	 */
+	areq_ctx->ctr_iv[0] = 3;
 
-	/* In RFC 4309 there is an 11-bytes nonce+IV part, that we build here. */
+	/* In RFC 4309 there is an 11-bytes nonce+IV part, that we build
+	 * here.
+	 */
 	memcpy(areq_ctx->ctr_iv + CCM_BLOCK_NONCE_OFFSET, ctx->ctr_nonce,
 	       CCM_BLOCK_NONCE_SIZE);
 	memcpy(areq_ctx->ctr_iv + CCM_BLOCK_IV_OFFSET, req->iv,
@@ -1701,7 +1712,9 @@ static inline void ssi_aead_gcm_setup_ghash_desc(struct aead_request *req,
 	set_setup_mode(&desc[idx], SETUP_LOAD_KEY0);
 	idx++;
 
-	/* Load GHASH initial STATE (which is 0). (for any hash there is an initial state) */
+	/* Load GHASH initial STATE (which is 0). (for any hash there is an
+	 * initial state).
+	 */
 	hw_desc_init(&desc[idx]);
 	set_din_const(&desc[idx], 0x0, AES_BLOCK_SIZE);
 	set_dout_no_dma(&desc[idx], 0, 0, 1);
@@ -1938,7 +1951,10 @@ static int config_gcm_context(struct aead_request *req)
 		memcpy(&req_ctx->gcm_len_block.len_a, &temp64, sizeof(temp64));
 		temp64 = cpu_to_be64(cryptlen * 8);
 		memcpy(&req_ctx->gcm_len_block.len_c, &temp64, 8);
-	} else { //rfc4543=>  all data(AAD,IV,Plain) are considered additional data that is nothing is encrypted.
+	} else {
+		/* rfc4543=> all data(AAD,IV,Plain) are considered additional
+		 * data that is nothing is encrypted.
+		 */
 		__be64 temp64;
 
 		temp64 =
@@ -2078,10 +2094,10 @@ static int ssi_aead_process(struct aead_request *req,
 			    CTR_RFC3686_NONCE_SIZE;
 			ssi_req.ivgen_dma_addr_len = 1;
 		} else if (ctx->cipher_mode == DRV_CIPHER_CCM) {
-			/* In ccm, the IV needs to exist both inside B0 and inside the counter.
-			 * It is also copied to iv_dma_addr for other reasons (like returning
-			 * it to the user).
-			 * So, using 3 (identical) IV outputs.
+			/* In ccm, the IV needs to exist both inside B0 and
+			 * inside the counter. It is also copied to
+			 * iv_dma_addr for other reasons (like returning it
+			 * to the user). So, using 3 (identical) IV outputs.
 			 */
 			ssi_req.ivgen_dma_addr[0] =
 			    areq_ctx->gen_ctx.iv_dma_addr + CCM_BLOCK_IV_OFFSET;

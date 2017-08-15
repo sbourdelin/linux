@@ -140,7 +140,9 @@ static irqreturn_t cc_isr(int irq, void *dev_id)
 	drvdata->irq = irr;
 	/* Completion interrupt - most probable */
 	if (likely((irr & SSI_COMP_IRQ_MASK) != 0)) {
-		/* Mask AXI completion interrupt - will be unmasked in Deferred service handler */
+		/* Mask AXI completion interrupt - will be unmasked in deferred
+		 * service handler
+		 */
 		CC_HAL_WRITE_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_IMR),
 				      imr | SSI_COMP_IRQ_MASK);
 		irr &= ~SSI_COMP_IRQ_MASK;
@@ -149,7 +151,9 @@ static irqreturn_t cc_isr(int irq, void *dev_id)
 #ifdef CC_SUPPORT_FIPS
 	/* TEE FIPS interrupt */
 	if (likely((irr & SSI_GPR0_IRQ_MASK) != 0)) {
-		/* Mask interrupt - will be unmasked in Deferred service handler */
+		/* Mask interrupt - will be unmasked in deferred
+		 * service handler
+		 */
 		CC_HAL_WRITE_REGISTER(CC_REG_OFFSET(HOST_RGF, HOST_IMR),
 				      imr | SSI_GPR0_IRQ_MASK);
 		irr &= ~SSI_GPR0_IRQ_MASK;
