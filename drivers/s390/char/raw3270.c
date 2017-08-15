@@ -1267,7 +1267,7 @@ void raw3270_pm_unfreeze(struct raw3270_view *view)
 #endif
 }
 
-static struct ccw_device_id raw3270_id[] = {
+static const struct ccw_device_id raw3270_id[] = {
 	{ CCW_DEVICE(0x3270, 0) },
 	{ CCW_DEVICE(0x3271, 0) },
 	{ CCW_DEVICE(0x3272, 0) },
