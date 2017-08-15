@@ -2229,6 +2229,7 @@ int ssi_hash_alloc(struct ssi_drvdata *drvdata)
 		goto fail;
 	}
 
+	INIT_LIST_HEAD(&hash_handle->hash_list);
 	drvdata->hash_handle = hash_handle;
 
 	sram_size_to_alloc = sizeof(digest_len_init) +
@@ -2258,8 +2259,6 @@ int ssi_hash_alloc(struct ssi_drvdata *drvdata)
 		SSI_LOG_ERR("Init digest CONST failed (rc=%d)\n", rc);
 		goto fail;
 	}
-
-	INIT_LIST_HEAD(&hash_handle->hash_list);
 
 	/* ahash registration */
 	for (alg = 0; alg < ARRAY_SIZE(driver_hash); alg++) {
