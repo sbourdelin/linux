@@ -921,6 +921,7 @@ static int output_userspace(struct datapath *dp, struct sk_buff *skb,
 			/* Include actions. */
 			upcall.actions = actions;
 			upcall.actions_len = actions_len;
+			upcall.actions_attrlen = OVS_CB(skb)->acts_origlen;
 			break;
 		}
 
@@ -1337,6 +1338,7 @@ int ovs_execute_actions(struct datapath *dp, struct sk_buff *skb,
 		goto out;
 	}
 
+	OVS_CB(skb)->acts_origlen = acts->orig_len;
 	err = do_execute_actions(dp, skb, key,
 				 acts->actions, acts->actions_len);
 
