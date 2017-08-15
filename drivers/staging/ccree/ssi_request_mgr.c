@@ -205,7 +205,7 @@ static inline int request_mgr_queues_status_check(
 	unsigned long poll_queue;
 
 	/* SW queue is checked only once as it will not
-	 * be chaned during the poll becasue the spinlock_bh
+	 * be chaned during the poll because the spinlock_bh
 	 * is held by the thread
 	 */
 	if (unlikely(((req_mgr_h->req_queue_head + 1) &
