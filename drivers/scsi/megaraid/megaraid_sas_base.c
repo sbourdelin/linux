@@ -1897,14 +1897,19 @@ static void megasas_set_static_target_properties(struct scsi_device *sdev,
 
 static int megasas_slave_configure(struct scsi_device *sdev)
 {
-	u16 pd_index = 0;
+	u16 pd_index = 0, ld_index;
 	struct megasas_instance *instance;
 	int ret_target_prop = DCMD_FAILED;
 	bool is_target_prop = false;
 
 	instance = megasas_lookup_instance(sdev->host->host_no);
 	if (instance->pd_list_not_supported) {
-		if (!MEGASAS_IS_LOGICAL(sdev) && sdev->type == TYPE_DISK) {
+		if (MEGASAS_IS_LOGICAL(sdev)) {
+			ld_index = ((sdev->channel - MEGASAS_MAX_PD_CHANNELS) *
+				    MEGASAS_MAX_DEV_PER_CHANNEL) + sdev->id;
+			if (instance->ld_ids[ld_index] == 0xff)
+				return -ENXIO;
+		} else if (sdev->type == TYPE_DISK) {
 			pd_index = (sdev->channel * MEGASAS_MAX_DEV_PER_CHANNEL) +
 				sdev->id;
 			if (instance->pd_list[pd_index].driveState !=
