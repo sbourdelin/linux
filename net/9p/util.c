@@ -54,7 +54,7 @@ struct p9_idpool *p9_idpool_create(void)
 {
 	struct p9_idpool *p;
 
-	p = kmalloc(sizeof(struct p9_idpool), GFP_KERNEL);
+	p = kmalloc(sizeof(*p), GFP_KERNEL);
 	if (!p)
 		return ERR_PTR(-ENOMEM);
 

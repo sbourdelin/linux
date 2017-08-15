@@ -805,8 +805,8 @@ static int parse_opts(char *params, struct p9_fd_opts *opts)
 
 static int p9_fd_open(struct p9_client *client, int rfd, int wfd)
 {
-	struct p9_trans_fd *ts = kzalloc(sizeof(struct p9_trans_fd),
-					   GFP_KERNEL);
+	struct p9_trans_fd *ts = kzalloc(sizeof(*ts), GFP_KERNEL);
+
 	if (!ts)
 		return -ENOMEM;
 
@@ -832,7 +832,7 @@ static int p9_socket_open(struct p9_client *client, struct socket *csocket)
 	struct p9_trans_fd *p;
 	struct file *file;
 
-	p = kzalloc(sizeof(struct p9_trans_fd), GFP_KERNEL);
+	p = kzalloc(sizeof(*p), GFP_KERNEL);
 	if (!p)
 		return -ENOMEM;
 
@@ -983,7 +983,7 @@ p9_fd_create_tcp(struct p9_client *client, const char *addr, char *args)
 
 	err = csocket->ops->connect(csocket,
 				    (struct sockaddr *)&sin_server,
-				    sizeof(struct sockaddr_in), 0);
+				    sizeof(sin_server), 0);
 	if (err < 0) {
 		pr_err("%s (%d): problem connecting socket to %s\n",
 		       __func__, task_pid_nr(current), addr);
@@ -1020,7 +1020,7 @@ p9_fd_create_unix(struct p9_client *client, const char *addr, char *args)
 		return err;
 	}
 	err = csocket->ops->connect(csocket, (struct sockaddr *)&sun_server,
-			sizeof(struct sockaddr_un) - 1, 0);
+				    sizeof(sun_server) - 1, 0);
 	if (err < 0) {
 		pr_err("%s (%d): problem connecting socket: %s: %d\n",
 		       __func__, task_pid_nr(current), addr, err);

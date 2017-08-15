@@ -200,7 +200,7 @@ p9pdu_vreadf(struct p9_fcall *pdu, int proto_version, const char *fmt,
 				struct p9_wstat *stbuf =
 				    va_arg(ap, struct p9_wstat *);
 
-				memset(stbuf, 0, sizeof(struct p9_wstat));
+				memset(stbuf, 0, sizeof(*stbuf));
 				stbuf->n_uid = stbuf->n_muid = INVALID_UID;
 				stbuf->n_gid = INVALID_GID;
 
@@ -286,7 +286,7 @@ p9pdu_vreadf(struct p9_fcall *pdu, int proto_version, const char *fmt,
 				if (!errcode) {
 					*wqids =
 					    kmalloc(*nwqid *
-						    sizeof(struct p9_qid),
+						    sizeof(**wqids),
 						    GFP_NOFS);
 					if (*wqids == NULL)
 						errcode = -ENOMEM;
@@ -316,7 +316,7 @@ p9pdu_vreadf(struct p9_fcall *pdu, int proto_version, const char *fmt,
 				struct p9_stat_dotl *stbuf =
 				    va_arg(ap, struct p9_stat_dotl *);
 
-				memset(stbuf, 0, sizeof(struct p9_stat_dotl));
+				memset(stbuf, 0, sizeof(*stbuf));
 				errcode =
 				    p9pdu_readf(pdu, proto_version,
 					"qQdugqqqqqqqqqqqqqqq",

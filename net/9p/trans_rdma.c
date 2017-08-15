@@ -576,7 +576,7 @@ static struct p9_trans_rdma *alloc_rdma(struct p9_rdma_opts *opts)
 {
 	struct p9_trans_rdma *rdma;
 
-	rdma = kzalloc(sizeof(struct p9_trans_rdma), GFP_KERNEL);
+	rdma = kzalloc(sizeof(*rdma), GFP_KERNEL);
 	if (!rdma)
 		return NULL;
 

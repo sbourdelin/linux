@@ -272,8 +272,8 @@ p9_tag_alloc(struct p9_client *c, u16 tag, unsigned int max_size)
 		while (tag >= c->max_tag) {
 			row = (tag / P9_ROW_MAXTAG);
 			c->reqs[row] = kcalloc(P9_ROW_MAXTAG,
-					sizeof(struct p9_req_t), GFP_ATOMIC);
-
+					       sizeof(*c->reqs[row]),
+					       GFP_ATOMIC);
 			if (!c->reqs[row]) {
 				spin_unlock_irqrestore(&c->lock, flags);
 				return ERR_PTR(-ENOMEM);
@@ -907,7 +907,7 @@ static struct p9_fid *p9_fid_create(struct p9_client *clnt)
 	unsigned long flags;
 
 	p9_debug(P9_DEBUG_FID, "clnt %p\n", clnt);
-	fid = kmalloc(sizeof(struct p9_fid), GFP_KERNEL);
+	fid = kmalloc(sizeof(*fid), GFP_KERNEL);
 	if (!fid)
 		return ERR_PTR(-ENOMEM);
 
@@ -918,7 +918,7 @@ static struct p9_fid *p9_fid_create(struct p9_client *clnt)
 	}
 	fid->fid = ret;
 
-	memset(&fid->qid, 0, sizeof(struct p9_qid));
+	memset(&fid->qid, 0, sizeof(fid->qid));
 	fid->mode = -1;
 	fid->uid = current_fsuid();
 	fid->clnt = clnt;
@@ -1015,7 +1015,7 @@ struct p9_client *p9_client_create(const char *dev_name, char *options)
 	char *client_id;
 
 	err = 0;
-	clnt = kmalloc(sizeof(struct p9_client), GFP_KERNEL);
+	clnt = kmalloc(sizeof(*clnt), GFP_KERNEL);
 	if (!clnt)
 		return ERR_PTR(-ENOMEM);
 
@@ -1157,7 +1157,7 @@ struct p9_fid *p9_client_attach(struct p9_client *clnt, struct p9_fid *afid,
 	p9_debug(P9_DEBUG_9P, "<<< RATTACH qid %x.%llx.%x\n",
 		 qid.type, (unsigned long long)qid.path, qid.version);
 
-	memmove(&fid->qid, &qid, sizeof(struct p9_qid));
+	memmove(&fid->qid, &qid, sizeof(qid));
 
 	p9_free_req(clnt, req);
 	return fid;
@@ -1227,7 +1227,7 @@ struct p9_fid *p9_client_walk(struct p9_fid *oldfid, uint16_t nwname,
 			wqids[count].version);
 
 	if (nwname)
-		memmove(&fid->qid, &wqids[nwqids - 1], sizeof(struct p9_qid));
+		memmove(&fid->qid, &wqids[nwqids - 1], sizeof(fid->qid));
 	else
 		fid->qid = oldfid->qid;
 
@@ -1697,7 +1697,7 @@ struct p9_wstat *p9_client_stat(struct p9_fid *fid)
 {
 	int err;
 	struct p9_client *clnt;
-	struct p9_wstat *ret = kmalloc(sizeof(struct p9_wstat), GFP_KERNEL);
+	struct p9_wstat *ret = kmalloc(sizeof(*ret), GFP_KERNEL);
 	struct p9_req_t *req;
 	u16 ignored;
 
@@ -1749,8 +1749,7 @@ struct p9_stat_dotl *p9_client_getattr_dotl(struct p9_fid *fid,
 {
 	int err;
 	struct p9_client *clnt;
-	struct p9_stat_dotl *ret = kmalloc(sizeof(struct p9_stat_dotl),
-								GFP_KERNEL);
+	struct p9_stat_dotl *ret = kmalloc(sizeof(*ret), GFP_KERNEL);
 	struct p9_req_t *req;
 
 	p9_debug(P9_DEBUG_9P, ">>> TGETATTR fid %d, request_mask %lld\n",
