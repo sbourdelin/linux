@@ -4481,6 +4481,11 @@ xfs_bmapi_write(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return -EIO;
 
+	/* fail any attempts to mutate data extents */
+	if (IS_IOMAP_SEALED(VFS_I(ip))
+			&& !(flags & (XFS_BMAPI_METADATA | XFS_BMAPI_ATTRFORK)))
+		return -ETXTBSY;
+
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 
 	XFS_STATS_INC(mp, xs_blk_mapw);

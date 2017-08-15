@@ -1294,6 +1294,9 @@ xfs_free_file_space(
 
 	trace_xfs_free_file_space(ip);
 
+	if (IS_IOMAP_SEALED(VFS_I(ip)))
+		return -ETXTBSY;
+
 	error = xfs_qm_dqattach(ip, 0);
 	if (error)
 		return error;
