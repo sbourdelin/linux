@@ -791,7 +791,7 @@ static int raw3215_pm_start(struct ccw_device *cdev)
 	return 0;
 }
 
-static struct ccw_device_id raw3215_id[] = {
+static const struct ccw_device_id raw3215_id[] = {
 	{ CCW_DEVICE(0x3215, 0) },
 	{ /* end of list */ },
 };
