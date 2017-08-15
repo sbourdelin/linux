@@ -78,7 +78,7 @@ static int zfcp_ccw_activate(struct ccw_device *cdev, int clear, char *tag)
 	return 0;
 }
 
-static struct ccw_device_id zfcp_ccw_device_id[] = {
+static const struct ccw_device_id zfcp_ccw_device_id[] = {
 	{ CCW_DEVICE_DEVTYPE(0x1731, 0x3, 0x1732, 0x3) },
 	{ CCW_DEVICE_DEVTYPE(0x1731, 0x3, 0x1732, ZFCP_MODEL_PRIV) },
 	{},
