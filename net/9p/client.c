@@ -1133,25 +1133,23 @@ struct p9_fid *p9_client_attach(struct p9_client *clnt, struct p9_fid *afid,
 	p9_debug(P9_DEBUG_9P, ">>> TATTACH afid %d uname %s aname %s\n",
 		 afid ? afid->fid : -1, uname, aname);
 	fid = p9_fid_create(clnt);
-	if (IS_ERR(fid)) {
-		err = PTR_ERR(fid);
-		fid = NULL;
-		goto error;
-	}
+	if (IS_ERR(fid))
+		return fid;
+
 	fid->uid = n_uname;
 
 	req = p9_client_rpc(clnt, P9_TATTACH, "ddss?u", fid->fid,
 			afid ? afid->fid : P9_NOFID, uname, aname, n_uname);
 	if (IS_ERR(req)) {
 		err = PTR_ERR(req);
-		goto error;
+		goto destroy_fid;
 	}
 
 	err = p9pdu_readf(req->rc, clnt->proto_version, "Q", &qid);
 	if (err) {
 		trace_9p_protocol_dump(clnt, req->rc);
 		p9_free_req(clnt, req);
-		goto error;
+		goto destroy_fid;
 	}
 
 	p9_debug(P9_DEBUG_9P, "<<< RATTACH qid %x.%llx.%x\n",
@@ -1161,10 +1159,8 @@ struct p9_fid *p9_client_attach(struct p9_client *clnt, struct p9_fid *afid,
 
 	p9_free_req(clnt, req);
 	return fid;
-
-error:
-	if (fid)
-		p9_fid_destroy(fid);
+destroy_fid:
+	p9_fid_destroy(fid);
 	return ERR_PTR(err);
 }
 EXPORT_SYMBOL(p9_client_attach);
