@@ -321,7 +321,8 @@ static void udf_sb_free_partitions(struct super_block *sb)
 {
 	struct udf_sb_info *sbi = UDF_SB(sb);
 	int i;
-	if (sbi->s_partmaps == NULL)
+
+	if (!sbi->s_partmaps)
 		return;
 	for (i = 0; i < sbi->s_partitions; i++)
 		udf_free_partition(&sbi->s_partmaps[i]);
@@ -1068,7 +1069,7 @@ static struct udf_bitmap *udf_sb_alloc_bitmap(struct super_block *sb, u32 index)
 	else
 		bitmap = vzalloc(size); /* TODO: get rid of vzalloc */
 
-	if (bitmap == NULL)
+	if (!bitmap)
 		return NULL;
 
 	bitmap->s_nr_groups = nr_groups;
