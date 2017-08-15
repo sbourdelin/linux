@@ -132,7 +132,7 @@ enum uc_todo {
  * @int_class: interruption class to use for accounting interrupts
  */
 struct ccw_driver {
-	struct ccw_device_id *ids;
+	const struct ccw_device_id *ids;
 	int (*probe) (struct ccw_device *);
 	void (*remove) (struct ccw_device *);
 	int (*set_online) (struct ccw_device *);
