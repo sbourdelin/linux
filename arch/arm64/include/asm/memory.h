@@ -68,9 +68,11 @@
 	(UL(1) << VA_BITS) + 1)
 #define PAGE_OFFSET		(UL(0xffffffffffffffff) - \
 	(UL(1) << (VA_BITS - 1)) + 1)
-#define KIMAGE_VADDR		(MODULES_END)
+#define KIMAGE_VADDR		(STATIC_MODULES_END)
+#define STATIC_MODULES_END	(STATIC_MODULES_VADDR + MODULES_VSIZE)
+#define STATIC_MODULES_VADDR	(VA_START + KASAN_SHADOW_SIZE)
 #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
-#define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
+#define MODULES_VADDR		((unsigned long)module_alloc_base)
 #define MODULES_VSIZE		(SZ_128M)
 #define VMEMMAP_START		(PAGE_OFFSET - VMEMMAP_SIZE)
 #define PCI_IO_END		(VMEMMAP_START - SZ_2M)
@@ -137,6 +139,12 @@
 
 #include <linux/bitops.h>
 #include <linux/mmdebug.h>
+
+#ifdef CONFIG_RANDOMIZE_BASE
+extern u64 module_alloc_base;
+#else
+#define module_alloc_base	((u64)_etext - MODULES_VSIZE)
+#endif
 
 extern s64			memstart_addr;
 /* PHYS_OFFSET - the physical address of the start of memory. */

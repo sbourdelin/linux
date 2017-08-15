@@ -29,15 +29,36 @@
 #include <asm/pgtable-hwdef.h>
 #include <asm/ptdump.h>
 
-static const struct addr_marker address_markers[] = {
+enum marker {
+#ifdef CONFIG_KASAN
+	E_KASAN_SHADOW_START,
+	E_KASAN_SHADOW_END,
+#endif
+	E_MODULES_VADDR,
+	E_MODULES_END,
+	E_VMALLOC_START,
+	E_VMALLOC_END,
+	E_FIXADDR_START,
+	E_FIXADDR_TOP,
+	E_PCI_IO_START,
+	E_PCI_IO_END,
+#ifdef CONFIG_SPARSEMEM_VMEMMAP
+	E_VMEMMAP_START,
+	E_VMEMMAP_END,
+#endif
+	E_PAGE_OFFSET,
+	E_NR_MARKER,
+};
+
+static struct addr_marker address_markers[] = {
 #ifdef CONFIG_KASAN
 	{ KASAN_SHADOW_START,		"Kasan shadow start" },
 	{ KASAN_SHADOW_END,		"Kasan shadow end" },
 #endif
-	{ MODULES_VADDR,		"Modules start" },
-	{ MODULES_END,			"Modules end" },
-	{ VMALLOC_START,		"vmalloc() Area" },
-	{ VMALLOC_END,			"vmalloc() End" },
+	{ -1,				"Modules start" },
+	{ -1,				"Modules end" },
+	{ -1,				"vmalloc() Area" },
+	{ -1,				"vmalloc() End" },
 	{ FIXADDR_START,		"Fixmap start" },
 	{ FIXADDR_TOP,			"Fixmap end" },
 	{ PCI_IO_START,			"PCI I/O start" },
@@ -362,9 +383,31 @@ void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
 	note_page(&st, 0, 0, 0);
 }
 
+static void fixup_markers(void)
+{
+	int i;
+
+	address_markers[E_MODULES_VADDR].start_address = MODULES_VADDR;
+	address_markers[E_MODULES_END].start_address = MODULES_END;
+	address_markers[E_VMALLOC_START].start_address = VMALLOC_START;
+	address_markers[E_VMALLOC_END].start_address = VMALLOC_END;
+
+	if (MODULES_VADDR < VMALLOC_START) {
+		address_markers[E_MODULES_END].start_address =
+			(MODULES_END < VMALLOC_START) ?
+			MODULES_END : VMALLOC_START;
+	} else {
+		/* modules is contained in vamlloc area, don't show them */
+		for (i = E_MODULES_VADDR; i <= E_NR_MARKER - 2; i++)
+			address_markers[i] = address_markers[i + 2];
+	}
+}
+
 static void ptdump_initialize(void)
 {
 	unsigned i, j;
+
+	fixup_markers();
 
 	for (i = 0; i < ARRAY_SIZE(pg_level); i++)
 		if (pg_level[i].bits)

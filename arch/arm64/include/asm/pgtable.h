@@ -30,7 +30,11 @@
  * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space
  *	and fixed mappings
  */
+#ifdef CONFIG_KASAN
 #define VMALLOC_START		(MODULES_END)
+#else
+#define VMALLOC_START		(STATIC_MODULES_END)
+#endif
 #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
 
 #define vmemmap			((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
