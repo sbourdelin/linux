@@ -49,7 +49,7 @@ static struct class *vmur_class;
 static struct debug_info *vmur_dbf;
 
 /* We put the device's record length (for writes) in the driver_info field */
-static struct ccw_device_id ur_ids[] = {
+static const struct ccw_device_id ur_ids[] = {
 	{ CCWDEV_CU_DI(READER_PUNCH_DEVTYPE, 80) },
 	{ CCWDEV_CU_DI(PRINTER_DEVTYPE, 132) },
 	{ /* end of list */ }
