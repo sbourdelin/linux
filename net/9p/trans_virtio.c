@@ -552,7 +552,6 @@ static int p9_virtio_probe(struct virtio_device *vdev)
 
 	chan = kmalloc(sizeof(struct virtio_chan), GFP_KERNEL);
 	if (!chan) {
-		pr_err("Failed to allocate virtio 9P channel\n");
 		err = -ENOMEM;
 		goto fail;
 	}

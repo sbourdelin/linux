@@ -160,11 +160,9 @@ static int parse_opts(char *opts, struct p9_client *clnt)
 		return 0;
 
 	tmp_options = kstrdup(opts, GFP_KERNEL);
-	if (!tmp_options) {
-		p9_debug(P9_DEBUG_ERROR,
-			 "failed to allocate copy of option string\n");
+	if (!tmp_options)
 		return -ENOMEM;
-	}
+
 	options = tmp_options;
 
 	while ((p = strsep(&options, ",")) != NULL) {
@@ -277,7 +275,6 @@ p9_tag_alloc(struct p9_client *c, u16 tag, unsigned int max_size)
 					sizeof(struct p9_req_t), GFP_ATOMIC);
 
 			if (!c->reqs[row]) {
-				pr_err("Couldn't grow tag array\n");
 				spin_unlock_irqrestore(&c->lock, flags);
 				return ERR_PTR(-ENOMEM);
 			}

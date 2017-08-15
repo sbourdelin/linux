@@ -205,11 +205,9 @@ static int parse_opts(char *params, struct p9_rdma_opts *opts)
 		return 0;
 
 	tmp_options = kstrdup(params, GFP_KERNEL);
-	if (!tmp_options) {
-		p9_debug(P9_DEBUG_ERROR,
-			 "failed to allocate copy of option string\n");
+	if (!tmp_options)
 		return -ENOMEM;
-	}
+
 	options = tmp_options;
 
 	while ((p = strsep(&options, ",")) != NULL) {
