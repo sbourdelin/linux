@@ -1627,7 +1627,7 @@ static struct tape_discipline tape_discipline_3590 = {
 	.mtop_array = tape_3590_mtop
 };
 
-static struct ccw_device_id tape_3590_ids[] = {
+static const struct ccw_device_id tape_3590_ids[] = {
 	{CCW_DEVICE_DEVTYPE(0x3590, 0, 0x3590, 0), .driver_info = tape_3590},
 	{CCW_DEVICE_DEVTYPE(0x3592, 0, 0x3592, 0), .driver_info = tape_3592},
 	{ /* end of list */ }
