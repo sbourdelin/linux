@@ -1737,7 +1737,7 @@ err_out:
 	return rc;
 }
 
-static struct ccw_device_id ctcm_ids[] = {
+static const struct ccw_device_id ctcm_ids[] = {
 	{CCW_DEVICE(0x3088, 0x08), .driver_info = ctcm_channel_type_parallel},
 	{CCW_DEVICE(0x3088, 0x1e), .driver_info = ctcm_channel_type_ficon},
 	{CCW_DEVICE(0x3088, 0x1f), .driver_info = ctcm_channel_type_escon},
