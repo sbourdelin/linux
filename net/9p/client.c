@@ -1124,7 +1124,7 @@ EXPORT_SYMBOL(p9_client_begin_disconnect);
 struct p9_fid *p9_client_attach(struct p9_client *clnt, struct p9_fid *afid,
 	const char *uname, kuid_t n_uname, const char *aname)
 {
-	int err = 0;
+	int err;
 	struct p9_req_t *req;
 	struct p9_fid *fid;
 	struct p9_qid qid;
