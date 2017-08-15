@@ -1393,6 +1393,8 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 				return -EINVAL;
 			if (!file->f_op->fmmap)
 				return -EOPNOTSUPP;
+			if ((flags & MAP_DIRECT) && !(prot & PROT_WRITE))
+				return -EACCES;
 			/* fall through */
 		case MAP_SHARED:
 			if ((prot&PROT_WRITE) && !(file->f_mode&FMODE_WRITE))

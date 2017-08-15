@@ -8,7 +8,7 @@
 #include <uapi/linux/mman.h>
 
 /* the MAP_VALIDATE set of supported flags */
-#define	MAP_SUPPORTED_MASK (0)
+#define	MAP_SUPPORTED_MASK (MAP_DIRECT)
 
 extern int sysctl_overcommit_memory;
 extern int sysctl_overcommit_ratio;

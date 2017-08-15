@@ -1121,6 +1121,8 @@ static int dax_fault_return(int error)
 		return VM_FAULT_NOPAGE;
 	if (error == -ENOMEM)
 		return VM_FAULT_OOM;
+	if (error == -ETXTBSY)
+		return VM_FAULT_SIGSEGV;
 	return VM_FAULT_SIGBUS;
 }
 

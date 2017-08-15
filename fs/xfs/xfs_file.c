@@ -40,6 +40,7 @@
 #include "xfs_iomap.h"
 #include "xfs_reflink.h"
 
+#include <linux/mman.h>
 #include <linux/dcache.h>
 #include <linux/falloc.h>
 #include <linux/pagevec.h>
@@ -1001,6 +1002,23 @@ xfs_file_llseek(
 	return vfs_setpos(file, offset, inode->i_sb->s_maxbytes);
 }
 
+STATIC int
+xfs_vma_checks(
+	struct vm_area_struct	*vma,
+	struct inode		*inode)
+{
+	if ((vma->fs_flags & MAP_DIRECT) != MAP_DIRECT)
+		return 0;
+
+	if (xfs_is_reflink_inode(XFS_I(inode)))
+		return VM_FAULT_SIGSEGV;
+
+	if (!IS_DAX(inode))
+		return VM_FAULT_SIGSEGV;
+
+	return 0;
+}
+
 /*
  * Locking for serialisation of IO during page faults. This results in a lock
  * ordering of:
@@ -1031,6 +1049,10 @@ xfs_filemap_page_mkwrite(
 	file_update_time(vmf->vma->vm_file);
 	xfs_ilock(XFS_I(inode), XFS_MMAPLOCK_SHARED);
 
+	ret = xfs_vma_checks(vmf->vma, inode);
+	if (ret)
+		goto out_unlock;
+
 	if (IS_DAX(inode)) {
 		ret = dax_iomap_fault(vmf, PE_SIZE_PTE, &xfs_iomap_ops);
 	} else {
@@ -1038,6 +1060,7 @@ xfs_filemap_page_mkwrite(
 		ret = block_page_mkwrite_return(ret);
 	}
 
+out_unlock:
 	xfs_iunlock(XFS_I(inode), XFS_MMAPLOCK_SHARED);
 	sb_end_pagefault(inode->i_sb);
 
@@ -1058,10 +1081,15 @@ xfs_filemap_fault(
 		return xfs_filemap_page_mkwrite(vmf);
 
 	xfs_ilock(XFS_I(inode), XFS_MMAPLOCK_SHARED);
+	ret = xfs_vma_checks(vmf->vma, inode);
+	if (ret)
+		goto out_unlock;
+
 	if (IS_DAX(inode))
 		ret = dax_iomap_fault(vmf, PE_SIZE_PTE, &xfs_iomap_ops);
 	else
 		ret = filemap_fault(vmf);
+out_unlock:
 	xfs_iunlock(XFS_I(inode), XFS_MMAPLOCK_SHARED);
 
 	return ret;
@@ -1094,7 +1122,9 @@ xfs_filemap_huge_fault(
 	}
 
 	xfs_ilock(XFS_I(inode), XFS_MMAPLOCK_SHARED);
-	ret = dax_iomap_fault(vmf, pe_size, &xfs_iomap_ops);
+	ret = xfs_vma_checks(vmf->vma, inode);
+	if (ret == 0)
+		ret = dax_iomap_fault(vmf, pe_size, &xfs_iomap_ops);
 	xfs_iunlock(XFS_I(inode), XFS_MMAPLOCK_SHARED);
 
 	if (vmf->flags & FAULT_FLAG_WRITE)
@@ -1137,12 +1167,63 @@ xfs_filemap_pfn_mkwrite(
 
 }
 
+STATIC void
+xfs_filemap_open(
+	struct vm_area_struct	*vma)
+{
+	struct file		*filp = vma->vm_file;
+	struct inode		*inode = file_inode(filp);
+	struct xfs_inode	*ip = XFS_I(inode);
+
+	if ((vma->fs_flags & MAP_DIRECT) != MAP_DIRECT)
+		return;
+	atomic_inc(&ip->i_mapdcount);
+}
+
+STATIC int
+atomic_dec_and_xfs_ilock(
+	atomic_t		*atomic,
+	struct xfs_inode	*ip,
+	uint			lock_flags)
+{
+	/* Subtract 1 from counter unless that drops it to 0 (ie. it was 1) */
+	if (atomic_add_unless(atomic, -1, 1))
+		return 0;
+
+	/* Otherwise do it the slow way */
+	xfs_ilock(ip, lock_flags);
+	if (atomic_dec_and_test(atomic))
+		return 1;
+	xfs_iunlock(ip, lock_flags);
+	return 0;
+}
+
+STATIC void
+xfs_filemap_close(
+	struct vm_area_struct	*vma)
+{
+	struct file		*filp = vma->vm_file;
+	struct inode		*inode = file_inode(filp);
+	struct xfs_inode	*ip = XFS_I(inode);
+
+	if ((vma->fs_flags & MAP_DIRECT) != MAP_DIRECT)
+		return;
+
+	if (!atomic_dec_and_xfs_ilock(&ip->i_mapdcount, ip,
+				XFS_MMAPLOCK_EXCL | XFS_IOLOCK_EXCL))
+		return;
+	inode->i_flags &= ~S_IOMAP_SEALED;
+	xfs_iunlock(ip, XFS_MMAPLOCK_EXCL | XFS_IOLOCK_EXCL);
+}
+
 static const struct vm_operations_struct xfs_file_vm_ops = {
 	.fault		= xfs_filemap_fault,
 	.huge_fault	= xfs_filemap_huge_fault,
 	.map_pages	= filemap_map_pages,
 	.page_mkwrite	= xfs_filemap_page_mkwrite,
 	.pfn_mkwrite	= xfs_filemap_pfn_mkwrite,
+	.open		= xfs_filemap_open,
+	.close		= xfs_filemap_close,
 };
 
 STATIC int
@@ -1157,6 +1238,31 @@ xfs_file_mmap(
 	return 0;
 }
 
+#define	XFS_MAP_SUPPORTED (MAP_DIRECT)
+
+STATIC int
+xfs_file_fmmap(
+	struct file		*filp,
+	struct vm_area_struct	*vma,
+	unsigned long		flags)
+{
+	struct inode		*inode = file_inode(filp);
+	struct xfs_inode	*ip = XFS_I(inode);
+
+	if (flags & ~(XFS_MAP_SUPPORTED))
+		return -EOPNOTSUPP;
+
+	xfs_ilock(ip, XFS_MMAPLOCK_EXCL|XFS_IOLOCK_EXCL);
+	if ((flags & MAP_DIRECT) == MAP_DIRECT) {
+		vma->fs_flags |= MAP_DIRECT;
+		inode->i_flags |= S_IOMAP_SEALED;
+		atomic_inc(&ip->i_mapdcount);
+	}
+	xfs_iunlock(ip, XFS_MMAPLOCK_EXCL|XFS_IOLOCK_EXCL);
+
+	return xfs_file_mmap(filp, vma);
+}
+
 const struct file_operations xfs_file_operations = {
 	.llseek		= xfs_file_llseek,
 	.read_iter	= xfs_file_read_iter,
@@ -1168,6 +1274,7 @@ const struct file_operations xfs_file_operations = {
 	.compat_ioctl	= xfs_file_compat_ioctl,
 #endif
 	.mmap		= xfs_file_mmap,
+	.fmmap		= xfs_file_fmmap,
 	.open		= xfs_file_open,
 	.release	= xfs_file_release,
 	.fsync		= xfs_file_fsync,
