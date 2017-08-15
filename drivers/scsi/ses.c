@@ -99,8 +99,8 @@ static int ses_recv_diag(struct scsi_device *sdev, int page_code,
 
 	ret =  scsi_execute_req(sdev, cmd, DMA_FROM_DEVICE, buf, bufflen,
 				NULL, SES_TIMEOUT, SES_RETRIES, NULL);
-	if (unlikely(!ret))
-		return ret;
+	if (unlikely(ret))
+		return -EIO;
 
 	recv_page_code = ((unsigned char *)buf)[0];
 
