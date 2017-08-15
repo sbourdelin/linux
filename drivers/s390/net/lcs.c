@@ -2373,7 +2373,7 @@ static int lcs_restore(struct ccwgroup_device *gdev)
 	return lcs_pm_resume(card);
 }
 
-static struct ccw_device_id lcs_ids[] = {
+static const struct ccw_device_id lcs_ids[] = {
 	{CCW_DEVICE(0x3088, 0x08), .driver_info = lcs_channel_type_parallel},
 	{CCW_DEVICE(0x3088, 0x1f), .driver_info = lcs_channel_type_2216},
 	{CCW_DEVICE(0x3088, 0x60), .driver_info = lcs_channel_type_osa2},
