@@ -5053,7 +5053,7 @@ void qeth_trace_features(struct qeth_card *card)
 }
 EXPORT_SYMBOL_GPL(qeth_trace_features);
 
-static struct ccw_device_id qeth_ids[] = {
+static const struct ccw_device_id qeth_ids[] = {
 	{CCW_DEVICE_DEVTYPE(0x1731, 0x01, 0x1732, 0x01),
 					.driver_info = QETH_CARD_TYPE_OSD},
 	{CCW_DEVICE_DEVTYPE(0x1731, 0x05, 0x1732, 0x05),
