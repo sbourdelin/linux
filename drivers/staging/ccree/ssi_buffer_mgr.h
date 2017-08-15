@@ -28,8 +28,10 @@
 
 enum ssi_req_dma_buf_type {
 	SSI_DMA_BUF_NULL = 0,
-	SSI_DMA_BUF_DLLI,
-	SSI_DMA_BUF_MLLI
+	SSI_DMA_BUF_DLLI = 1,
+	SSI_DMA_BUF_MLLI = 2,
+	SSI_DMA_BUF_INVL = 3,
+	SSI_DMA_BUF_TYPE_MAX = 4
 };
 
 enum ssi_sg_cpy_direct {

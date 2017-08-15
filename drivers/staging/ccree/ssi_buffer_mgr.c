@@ -34,11 +34,6 @@
 #include "ssi_hash.h"
 #include "ssi_aead.h"
 
-#define GET_DMA_BUFFER_TYPE(buff_type) ( \
-	((buff_type) == SSI_DMA_BUF_NULL) ? "BUF_NULL" : \
-	((buff_type) == SSI_DMA_BUF_DLLI) ? "BUF_DLLI" : \
-	((buff_type) == SSI_DMA_BUF_MLLI) ? "BUF_MLLI" : "BUF_INVALID")
-
 enum dma_buffer_type {
 	DMA_NULL_TYPE = -1,
 	DMA_SGL_TYPE = 1,
@@ -64,6 +59,19 @@ struct buffer_array {
 	bool is_last[MAX_NUM_OF_BUFFERS_IN_MLLI];
 	u32 *mlli_nents[MAX_NUM_OF_BUFFERS_IN_MLLI];
 };
+
+static const char *dma_buf_types[SSI_DMA_BUF_TYPE_MAX] = {
+	"BUF_NULL",
+	"BUF_DLLI",
+	"BUF_MLLI"
+	"BUF_INVALID"
+};
+
+static inline const char *dma_buf_type_str(enum ssi_req_dma_buf_type type)
+{
+	type = (type < SSI_DMA_BUF_INVL) ? type : SSI_DMA_BUF_INVL;
+	return dma_buf_types[type];
+}
 
 /**
  * ssi_buffer_mgr_get_sgl_nents() - Get scatterlist number of entries.
@@ -597,7 +605,7 @@ int ssi_buffer_mgr_map_blkcipher_request(
 	}
 
 	SSI_LOG_DEBUG("areq_ctx->dma_buf_type = %s\n",
-		      GET_DMA_BUFFER_TYPE(req_ctx->dma_buf_type));
+		      dma_buf_type_str(req_ctx->dma_buf_type));
 
 	return 0;
 
@@ -827,7 +835,7 @@ static inline int ssi_buffer_mgr_aead_chain_assoc(
 		areq_ctx->assoc.nents = 0;
 		areq_ctx->assoc.mlli_nents = 0;
 		SSI_LOG_DEBUG("Chain assoc of length 0: buff_type=%s nents=%u\n",
-			      GET_DMA_BUFFER_TYPE(areq_ctx->assoc_buff_type),
+			      dma_buf_type_str(areq_ctx->assoc_buff_type),
 			      areq_ctx->assoc.nents);
 		goto chain_assoc_exit;
 	}
@@ -879,7 +887,7 @@ static inline int ssi_buffer_mgr_aead_chain_assoc(
 	if (unlikely((do_chain) ||
 		     (areq_ctx->assoc_buff_type == SSI_DMA_BUF_MLLI))) {
 		SSI_LOG_DEBUG("Chain assoc: buff_type=%s nents=%u\n",
-			      GET_DMA_BUFFER_TYPE(areq_ctx->assoc_buff_type),
+			      dma_buf_type_str(areq_ctx->assoc_buff_type),
 			      areq_ctx->assoc.nents);
 		ssi_buffer_mgr_add_scatterlist_entry(
 			sg_data, areq_ctx->assoc.nents,
@@ -1555,7 +1563,7 @@ int ssi_buffer_mgr_map_hash_request_final(
 	/* change the buffer index for the unmap function */
 	areq_ctx->buff_index = (areq_ctx->buff_index ^ 1);
 	SSI_LOG_DEBUG("areq_ctx->data_dma_buf_type = %s\n",
-		      GET_DMA_BUFFER_TYPE(areq_ctx->data_dma_buf_type));
+		      dma_buf_type_str(areq_ctx->data_dma_buf_type));
 	return 0;
 
 fail_unmap_din:
