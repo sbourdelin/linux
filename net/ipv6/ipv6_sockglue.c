@@ -174,6 +174,7 @@ static int do_ipv6_setsockopt(struct sock *sk, int level, int optname,
 		if (val == PF_INET) {
 			struct ipv6_txoptions *opt;
 			struct sk_buff *pktopt;
+			struct proto *expected_prot;
 
 			if (sk->sk_type == SOCK_RAW)
 				break;
@@ -198,6 +199,17 @@ static int do_ipv6_setsockopt(struct sock *sk, int level, int optname,
 				retv = -EADDRNOTAVAIL;
 				break;
 			}
+
+			if (sk->sk_protocol == IPPROTO_TCP &&
+			    sk->sk_prot != &tcpv6_prot)
+				break;
+
+			expected_prot = &udpv6_prot;
+			if (sk->sk_protocol == IPPROTO_UDPLITE)
+				expected_prot = &udplitev6_prot;
+
+			if (sk->sk_prot != expected_prot)
+				break;
 
 			fl6_free_socklist(sk);
 			__ipv6_sock_mc_close(sk);
