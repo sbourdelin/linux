@@ -49,11 +49,23 @@ struct gc_inode_list {
  */
 static inline block_t free_user_blocks(struct f2fs_sb_info *sbi)
 {
-	if (free_segments(sbi) < overprovision_segments(sbi))
+	block_t avail_user_block_count, free_blocks, avail_free_blocks;
+	block_t reserved_blocks;
+
+	avail_user_block_count = sbi->user_block_count - sbi->reserved_blocks;
+
+	if (unlikely(sbi->total_valid_block_count > avail_user_block_count))
+		return 0;
+
+	free_blocks = free_segments(sbi) << sbi->log_blocks_per_seg;
+	avail_free_blocks = min(free_blocks, avail_user_block_count -
+								sbi->total_valid_block_count);
+	reserved_blocks = reserved_segments(sbi) << sbi->log_blocks_per_seg;
+
+	if (avail_free_blocks < reserved_blocks)
 		return 0;
 	else
-		return (free_segments(sbi) - overprovision_segments(sbi))
-			<< sbi->log_blocks_per_seg;
+		return avail_free_blocks - reserved_blocks;
 }
 
 static inline block_t limit_invalid_user_blocks(struct f2fs_sb_info *sbi)
