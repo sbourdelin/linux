@@ -959,11 +959,35 @@ static int create_kernel_qp(struct mlx5_ib_dev *dev,
 		goto err_free;
 	}
 
-	qp->sq.wrid = kmalloc(qp->sq.wqe_cnt * sizeof(*qp->sq.wrid), GFP_KERNEL);
-	qp->sq.wr_data = kmalloc(qp->sq.wqe_cnt * sizeof(*qp->sq.wr_data), GFP_KERNEL);
-	qp->rq.wrid = kmalloc(qp->rq.wqe_cnt * sizeof(*qp->rq.wrid), GFP_KERNEL);
-	qp->sq.w_list = kmalloc(qp->sq.wqe_cnt * sizeof(*qp->sq.w_list), GFP_KERNEL);
-	qp->sq.wqe_head = kmalloc(qp->sq.wqe_cnt * sizeof(*qp->sq.wqe_head), GFP_KERNEL);
+	qp->sq.wrid = kmalloc_array(qp->sq.wqe_cnt, sizeof(*qp->sq.wrid),
+				    GFP_KERNEL | __GFP_NOWARN);
+	if (!qp->sq.wrid)
+		qp->sq.wrid = __vmalloc(qp->sq.wqe_cnt * sizeof(*qp->sq.wrid),
+					GFP_KERNEL, PAGE_KERNEL);
+	qp->sq.wr_data = kmalloc_array(qp->sq.wqe_cnt, sizeof(*qp->sq.wr_data),
+				       GFP_KERNEL | __GFP_NOWARN);
+	if (!qp->sq.wr_data)
+		qp->sq.wr_data = __vmalloc(qp->sq.wqe_cnt *
+					   sizeof(*qp->sq.wr_data),
+					   GFP_KERNEL, PAGE_KERNEL);
+	qp->rq.wrid = kmalloc_array(qp->rq.wqe_cnt, sizeof(*qp->rq.wrid),
+				    GFP_KERNEL | __GFP_NOWARN);
+	if (!qp->rq.wrid)
+		qp->rq.wrid = __vmalloc(qp->rq.wqe_cnt * sizeof(*qp->rq.wrid),
+					GFP_KERNEL, PAGE_KERNEL);
+	qp->sq.w_list = kmalloc_array(qp->sq.wqe_cnt, sizeof(*qp->sq.w_list),
+				      GFP_KERNEL | __GFP_NOWARN);
+	if (!qp->sq.w_list)
+		qp->sq.w_list = __vmalloc(qp->sq.wqe_cnt *
+					  sizeof(*qp->sq.w_list),
+					  GFP_KERNEL, PAGE_KERNEL);
+	qp->sq.wqe_head = kmalloc_array(qp->sq.wqe_cnt,
+					sizeof(*qp->sq.wqe_head),
+					GFP_KERNEL | __GFP_NOWARN);
+	if (!qp->sq.wqe_head)
+		qp->sq.wqe_head = __vmalloc(qp->sq.wqe_cnt *
+					    sizeof(*qp->sq.wqe_head),
+					    GFP_KERNEL, PAGE_KERNEL);
 
 	if (!qp->sq.wrid || !qp->sq.wr_data || !qp->rq.wrid ||
 	    !qp->sq.w_list || !qp->sq.wqe_head) {
@@ -975,11 +999,11 @@ static int create_kernel_qp(struct mlx5_ib_dev *dev,
 	return 0;
 
 err_wrid:
-	kfree(qp->sq.wqe_head);
-	kfree(qp->sq.w_list);
-	kfree(qp->sq.wrid);
-	kfree(qp->sq.wr_data);
-	kfree(qp->rq.wrid);
+	kvfree(qp->sq.wqe_head);
+	kvfree(qp->sq.w_list);
+	kvfree(qp->sq.wrid);
+	kvfree(qp->sq.wr_data);
+	kvfree(qp->rq.wrid);
 	mlx5_db_free(dev->mdev, &qp->db);
 
 err_free:
@@ -992,11 +1016,11 @@ err_buf:
 
 static void destroy_qp_kernel(struct mlx5_ib_dev *dev, struct mlx5_ib_qp *qp)
 {
-	kfree(qp->sq.wqe_head);
-	kfree(qp->sq.w_list);
-	kfree(qp->sq.wrid);
-	kfree(qp->sq.wr_data);
-	kfree(qp->rq.wrid);
+	kvfree(qp->sq.wqe_head);
+	kvfree(qp->sq.w_list);
+	kvfree(qp->sq.wrid);
+	kvfree(qp->sq.wr_data);
+	kvfree(qp->rq.wrid);
 	mlx5_db_free(dev->mdev, &qp->db);
 	mlx5_buf_free(dev->mdev, &qp->buf);
 }
