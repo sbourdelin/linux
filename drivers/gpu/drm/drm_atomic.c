@@ -1447,14 +1447,35 @@ int drm_atomic_nonblocking_commit(struct drm_atomic_state *state)
 {
 	struct drm_mode_config *config = &state->dev->mode_config;
 	int ret;
+	int i;
+	struct drm_crtc *crtc;
+	struct drm_crtc_state *crtc_state;
 
 	ret = drm_atomic_check_only(state);
-	if (ret)
+	if (ret) {
+		if (ret == -ERESTARTSYS)
+			goto fail;
+
 		return ret;
+	}
 
 	DRM_DEBUG_ATOMIC("commiting %p nonblocking\n", state);
 
-	return config->funcs->atomic_commit(state->dev, state, true);
+	ret = config->funcs->atomic_commit(state->dev, state, true);
+	if (ret == -ERESTARTSYS)
+		goto fail;
+
+	return ret;
+
+	/* cleanup commit object if commit fails with ERESTARTSYS */
+fail:
+	for_each_crtc_in_state(state, crtc, crtc_state, i) {
+		if (state->crtcs[i].commit) {
+			drm_crtc_commit_put(state->crtcs[i].commit);
+		}
+	}
+
+	return ret;
 }
 EXPORT_SYMBOL(drm_atomic_nonblocking_commit);
 
