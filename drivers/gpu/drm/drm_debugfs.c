@@ -241,6 +241,7 @@ static ssize_t connector_write(struct file *file, const char __user *ubuf,
 	struct seq_file *m = file->private_data;
 	struct drm_connector *connector = m->private;
 	char buf[12];
+	int i;
 
 	if (len > sizeof(buf) - 1)
 		return -EINVAL;
@@ -249,6 +250,10 @@ static ssize_t connector_write(struct file *file, const char __user *ubuf,
 		return -EFAULT;
 
 	buf[len] = '\0';
+
+	/* strip trailing whitespace */
+	for (i = len - 1; i > 0 && isspace(buf[i]); i--)
+		buf[i] = '\0';
 
 	if (!strcmp(buf, "on"))
 		connector->force = DRM_FORCE_ON;
