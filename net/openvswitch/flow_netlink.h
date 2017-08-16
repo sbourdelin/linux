@@ -79,4 +79,8 @@ int ovs_nla_put_actions(const struct nlattr *attr,
 void ovs_nla_free_flow_actions(struct sw_flow_actions *);
 void ovs_nla_free_flow_actions_rcu(struct sw_flow_actions *);
 
+int nsh_key_from_nlattr(const struct nlattr *attr, struct ovs_key_nsh *nsh);
+int push_nsh_para_from_nlattr(const struct nlattr *attr,
+			      struct push_nsh_para *pnp);
+
 #endif /* flow_netlink.h */

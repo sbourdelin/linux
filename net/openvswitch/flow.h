@@ -35,6 +35,7 @@
 #include <net/inet_ecn.h>
 #include <net/ip_tunnels.h>
 #include <net/dst_metadata.h>
+#include <net/nsh.h>
 
 struct sk_buff;
 
@@ -65,6 +66,15 @@ struct vlan_head {
 #define OVS_SW_FLOW_KEY_METADATA_SIZE			\
 	(offsetof(struct sw_flow_key, recirc_id) +	\
 	FIELD_SIZEOF(struct sw_flow_key, recirc_id))
+
+struct ovs_key_nsh {
+	__u8 flags;
+	__u8 mdtype;
+	__u8 np;
+	__u8 pad;
+	__be32 path_hdr;
+	__be32 context[NSH_MD1_CONTEXT_SIZE];
+};
 
 struct sw_flow_key {
 	u8 tun_opts[IP_TUNNEL_OPTS_MAX];
@@ -144,6 +154,7 @@ struct sw_flow_key {
 			};
 		} ipv6;
 	};
+	struct ovs_key_nsh nsh;         /* network service header */
 	struct {
 		/* Connection tracking fields not packed above. */
 		struct {
