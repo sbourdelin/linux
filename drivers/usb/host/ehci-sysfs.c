@@ -59,7 +59,7 @@ static ssize_t store_companion(struct device *dev,
 	if (sscanf(buf, "%d", &portnum) != 1)
 		return -EINVAL;
 	if (portnum < 0) {
-		portnum = - portnum;
+		portnum = -portnum;
 		new_owner = 0;		/* Owned by EHCI */
 	}
 	if (portnum <= 0 || portnum > HCS_N_PORTS(ehci->hcs_params))

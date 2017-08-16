@@ -38,15 +38,15 @@
 static inline void ehci_qtd_init(struct ehci_hcd *ehci, struct ehci_qtd *qtd,
 				  dma_addr_t dma)
 {
-	memset (qtd, 0, sizeof *qtd);
+	memset(qtd, 0, sizeof(*qtd));
 	qtd->qtd_dma = dma;
 	qtd->hw_token = cpu_to_hc32(ehci, QTD_STS_HALT);
 	qtd->hw_next = EHCI_LIST_END(ehci);
 	qtd->hw_alt_next = EHCI_LIST_END(ehci);
-	INIT_LIST_HEAD (&qtd->qtd_list);
+	INIT_LIST_HEAD(&qtd->qtd_list);
 }
 
-static struct ehci_qtd *ehci_qtd_alloc (struct ehci_hcd *ehci, gfp_t flags)
+static struct ehci_qtd *ehci_qtd_alloc(struct ehci_hcd *ehci, gfp_t flags)
 {
 	struct ehci_qtd		*qtd;
 	dma_addr_t		dma;
@@ -58,45 +58,45 @@ static struct ehci_qtd *ehci_qtd_alloc (struct ehci_hcd *ehci, gfp_t flags)
 	return qtd;
 }
 
-static inline void ehci_qtd_free (struct ehci_hcd *ehci, struct ehci_qtd *qtd)
+static inline void ehci_qtd_free(struct ehci_hcd *ehci, struct ehci_qtd *qtd)
 {
-	dma_pool_free (ehci->qtd_pool, qtd, qtd->qtd_dma);
+	dma_pool_free(ehci->qtd_pool, qtd, qtd->qtd_dma);
 }
 
 
 static void qh_destroy(struct ehci_hcd *ehci, struct ehci_qh *qh)
 {
 	/* clean qtds first, and know this is not linked */
-	if (!list_empty (&qh->qtd_list) || qh->qh_next.ptr) {
-		ehci_dbg (ehci, "unused qh not empty!\n");
+	if (!list_empty(&qh->qtd_list) || qh->qh_next.ptr) {
+		ehci_dbg(ehci, "unused qh not empty!\n");
 		BUG ();
 	}
 	if (qh->dummy)
-		ehci_qtd_free (ehci, qh->dummy);
+		ehci_qtd_free(ehci, qh->dummy);
 	dma_pool_free(ehci->qh_pool, qh->hw, qh->qh_dma);
 	kfree(qh);
 }
 
-static struct ehci_qh *ehci_qh_alloc (struct ehci_hcd *ehci, gfp_t flags)
+static struct ehci_qh *ehci_qh_alloc(struct ehci_hcd *ehci, gfp_t flags)
 {
 	struct ehci_qh		*qh;
 	dma_addr_t		dma;
 
-	qh = kzalloc(sizeof *qh, GFP_ATOMIC);
+	qh = kzalloc(sizeof(*qh), GFP_ATOMIC);
 	if (!qh)
 		goto done;
 	qh->hw = (struct ehci_qh_hw *)
 		dma_pool_alloc(ehci->qh_pool, flags, &dma);
 	if (!qh->hw)
 		goto fail;
-	memset(qh->hw, 0, sizeof *qh->hw);
+	memset(qh->hw, 0, sizeof(*qh->hw));
 	qh->qh_dma = dma;
-	// INIT_LIST_HEAD (&qh->qh_list);
-	INIT_LIST_HEAD (&qh->qtd_list);
+	// INIT_LIST_HEAD(&qh->qh_list);
+	INIT_LIST_HEAD(&qh->qtd_list);
 	INIT_LIST_HEAD(&qh->unlink_node);
 
 	/* dummy td enables safe urb queuing */
-	qh->dummy = ehci_qtd_alloc (ehci, flags);
+	qh->dummy = ehci_qtd_alloc(ehci, flags);
 	if (qh->dummy == NULL) {
 		ehci_dbg (ehci, "no dummy td\n");
 		goto fail1;
@@ -117,7 +117,7 @@ fail:
  * This is the initialisation and cleanup code.
  */
 
-static void ehci_mem_cleanup (struct ehci_hcd *ehci)
+static void ehci_mem_cleanup(struct ehci_hcd *ehci)
 {
 	if (ehci->async)
 		qh_destroy(ehci, ehci->async);
@@ -139,7 +139,7 @@ static void ehci_mem_cleanup (struct ehci_hcd *ehci)
 
 	if (ehci->periodic)
 		dma_free_coherent(ehci_to_hcd(ehci)->self.sysdev,
-			ehci->periodic_size * sizeof (u32),
+			ehci->periodic_size * sizeof(u32),
 			ehci->periodic, ehci->periodic_dma);
 	ehci->periodic = NULL;
 
@@ -149,14 +149,14 @@ static void ehci_mem_cleanup (struct ehci_hcd *ehci)
 }
 
 /* remember to add cleanup code (above) if you add anything here */
-static int ehci_mem_init (struct ehci_hcd *ehci, gfp_t flags)
+static int ehci_mem_init(struct ehci_hcd *ehci, gfp_t flags)
 {
 	int i;
 
 	/* QTDs for control/bulk/intr transfers */
-	ehci->qtd_pool = dma_pool_create ("ehci_qtd",
+	ehci->qtd_pool = dma_pool_create("ehci_qtd",
 			ehci_to_hcd(ehci)->self.sysdev,
-			sizeof (struct ehci_qtd),
+			sizeof(struct ehci_qtd),
 			32 /* byte alignment (for hw parts) */,
 			4096 /* can't cross 4K */);
 	if (!ehci->qtd_pool) {
@@ -164,7 +164,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, gfp_t flags)
 	}
 
 	/* QHs for control/bulk/intr transfers */
-	ehci->qh_pool = dma_pool_create ("ehci_qh",
+	ehci->qh_pool = dma_pool_create("ehci_qh",
 			ehci_to_hcd(ehci)->self.sysdev,
 			sizeof(struct ehci_qh_hw),
 			32 /* byte alignment (for hw parts) */,
@@ -172,15 +172,15 @@ static int ehci_mem_init (struct ehci_hcd *ehci, gfp_t flags)
 	if (!ehci->qh_pool) {
 		goto fail;
 	}
-	ehci->async = ehci_qh_alloc (ehci, flags);
+	ehci->async = ehci_qh_alloc(ehci, flags);
 	if (!ehci->async) {
 		goto fail;
 	}
 
 	/* ITD for high speed ISO transfers */
-	ehci->itd_pool = dma_pool_create ("ehci_itd",
+	ehci->itd_pool = dma_pool_create("ehci_itd",
 			ehci_to_hcd(ehci)->self.sysdev,
-			sizeof (struct ehci_itd),
+			sizeof(struct ehci_itd),
 			32 /* byte alignment (for hw parts) */,
 			4096 /* can't cross 4K */);
 	if (!ehci->itd_pool) {
@@ -188,9 +188,9 @@ static int ehci_mem_init (struct ehci_hcd *ehci, gfp_t flags)
 	}
 
 	/* SITD for full/low speed split ISO transfers */
-	ehci->sitd_pool = dma_pool_create ("ehci_sitd",
+	ehci->sitd_pool = dma_pool_create("ehci_sitd",
 			ehci_to_hcd(ehci)->self.sysdev,
-			sizeof (struct ehci_sitd),
+			sizeof(struct ehci_sitd),
 			32 /* byte alignment (for hw parts) */,
 			4096 /* can't cross 4K */);
 	if (!ehci->sitd_pool) {
@@ -208,6 +208,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, gfp_t flags)
 
 	if (ehci->use_dummy_qh) {
 		struct ehci_qh_hw	*hw;
+
 		ehci->dummy = ehci_qh_alloc(ehci, flags);
 		if (!ehci->dummy)
 			goto fail;
@@ -232,7 +233,7 @@ static int ehci_mem_init (struct ehci_hcd *ehci, gfp_t flags)
 		return 0;
 
 fail:
-	ehci_dbg (ehci, "couldn't init memory\n");
-	ehci_mem_cleanup (ehci);
+	ehci_dbg(ehci, "couldn't init memory\n");
+	ehci_mem_cleanup(ehci);
 	return -ENOMEM;
 }

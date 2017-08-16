@@ -268,7 +268,7 @@ static int ehci_bus_suspend (struct usb_hcd *hcd)
 	fs_idle_delay = false;
 	port = HCS_N_PORTS(ehci->hcs_params);
 	while (port--) {
-		u32 __iomem	*reg = &ehci->regs->port_status [port];
+		u32 __iomem	*reg = &ehci->regs->port_status[port];
 		u32		t1 = ehci_readl(ehci, reg) & ~PORT_RWC_BITS;
 		u32		t2 = t1 & ~PORT_WAKE_BITS;
 
@@ -474,14 +474,14 @@ static int ehci_bus_resume (struct usb_hcd *hcd)
 	/* manually resume the ports we suspended during bus_suspend() */
 	i = HCS_N_PORTS (ehci->hcs_params);
 	while (i--) {
-		temp = ehci_readl(ehci, &ehci->regs->port_status [i]);
+		temp = ehci_readl(ehci, &ehci->regs->port_status[i]);
 		temp &= ~(PORT_RWC_BITS | PORT_WAKE_BITS);
 		if (test_bit(i, &ehci->bus_suspended) &&
 				(temp & PORT_SUSPEND)) {
 			temp |= PORT_RESUME;
 			set_bit(i, &resume_needed);
 		}
-		ehci_writel(ehci, temp, &ehci->regs->port_status [i]);
+		ehci_writel(ehci, temp, &ehci->regs->port_status[i]);
 	}
 
 	/*
@@ -498,10 +498,10 @@ static int ehci_bus_resume (struct usb_hcd *hcd)
 
 	i = HCS_N_PORTS (ehci->hcs_params);
 	while (i--) {
-		temp = ehci_readl(ehci, &ehci->regs->port_status [i]);
+		temp = ehci_readl(ehci, &ehci->regs->port_status[i]);
 		if (test_bit(i, &resume_needed)) {
 			temp &= ~(PORT_RWC_BITS | PORT_SUSPEND | PORT_RESUME);
-			ehci_writel(ehci, temp, &ehci->regs->port_status [i]);
+			ehci_writel(ehci, temp, &ehci->regs->port_status[i]);
 		}
 	}
 
@@ -628,7 +628,7 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 	u32		ppcd = ~0;
 
 	/* init status to no-changes */
-	buf [0] = 0;
+	buf[0] = 0;
 	ports = HCS_N_PORTS (ehci->hcs_params);
 	if (ports > 7) {
 		buf [1] = 0;
@@ -679,9 +679,9 @@ ehci_hub_status_data (struct usb_hcd *hcd, char *buf)
 				|| (ehci->reset_done[i] && time_after_eq(
 					jiffies, ehci->reset_done[i]))) {
 			if (i < 7)
-			    buf [0] |= 1 << (i + 1);
+				buf[0] |= 1 << (i + 1);
 			else
-			    buf [1] |= 1 << (i - 7);
+				buf[1] |= 1 << (i - 7);
 			status = STS_PCD;
 		}
 	}
@@ -1016,7 +1016,7 @@ int ehci_hub_control(
 		if (temp & PORT_PEC)
 			status |= USB_PORT_STAT_C_ENABLE << 16;
 
-		if ((temp & PORT_OCC) && !ignore_oc){
+		if ((temp & PORT_OCC) && !ignore_oc) {
 			status |= USB_PORT_STAT_C_OVERCURRENT << 16;
 
 			/*
@@ -1077,7 +1077,7 @@ int ehci_hub_control(
 		/* whoever resets must GetPortStatus to complete it!! */
 		} else {
 			status |= USB_PORT_STAT_C_RESET << 16;
-			ehci->reset_done [wIndex] = 0;
+			ehci->reset_done[wIndex] = 0;
 
 			/* force reset to complete */
 			ehci_writel(ehci, temp & ~(PORT_RWC_BITS | PORT_RESET),
@@ -1245,7 +1245,7 @@ int ehci_hub_control(
 				 * caller must wait, then call GetPortStatus
 				 * usb 2.0 spec says 50 ms resets on root
 				 */
-				ehci->reset_done [wIndex] = jiffies
+				ehci->reset_done[wIndex] = jiffies
 						+ msecs_to_jiffies (50);
 
 				/*
