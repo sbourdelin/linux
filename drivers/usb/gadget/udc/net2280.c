@@ -3546,15 +3546,6 @@ static irqreturn_t net2280_irq(int irq, void *_dev)
 	return IRQ_HANDLED;
 }
 
-/*-------------------------------------------------------------------------*/
-
-static void gadget_release(struct device *_dev)
-{
-	struct net2280	*dev = dev_get_drvdata(_dev);
-
-	kfree(dev);
-}
-
 /* tear down the binding between this driver and the pci device */
 
 static void net2280_remove(struct pci_dev *pdev)
@@ -3592,6 +3583,8 @@ static void net2280_remove(struct pci_dev *pdev)
 	device_remove_file(&pdev->dev, &dev_attr_registers);
 
 	ep_info(dev, "unbind\n");
+
+	kfree(dev);
 }
 
 /* wrap this driver around the specified device, but
@@ -3769,8 +3762,7 @@ static int net2280_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (retval)
 		goto done;
 
-	retval = usb_add_gadget_udc_release(&pdev->dev, &dev->gadget,
-			gadget_release);
+	retval = usb_add_gadget_udc(&pdev->dev, &dev->gadget);
 	if (retval)
 		goto done;
 	return 0;
