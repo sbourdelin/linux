@@ -463,7 +463,7 @@ radix_tree_node_free(struct radix_tree_node *node)
  * To make use of this facility, the radix tree must be initialised without
  * __GFP_DIRECT_RECLAIM being passed to INIT_RADIX_TREE().
  */
-static int __radix_tree_preload(gfp_t gfp_mask, unsigned nr)
+int __radix_tree_preload(gfp_t gfp_mask, unsigned int nr)
 {
 	struct radix_tree_preload *rtp;
 	struct radix_tree_node *node;
@@ -496,6 +496,7 @@ static int __radix_tree_preload(gfp_t gfp_mask, unsigned nr)
 out:
 	return ret;
 }
+EXPORT_SYMBOL(__radix_tree_preload);
 
 /*
  * Load up this CPU's radix_tree_node buffer with sufficient objects to
@@ -840,6 +841,8 @@ int __radix_tree_create(struct radix_tree_root *root, unsigned long index,
 							offset, 0, 0);
 			if (!child)
 				return -ENOMEM;
+			if (is_idr(root))
+				all_tag_set(child, IDR_FREE);
 			rcu_assign_pointer(*slot, node_to_entry(child));
 			if (node)
 				node->count++;
@@ -1986,8 +1989,20 @@ void __radix_tree_delete_node(struct radix_tree_root *root,
 	delete_node(root, node, update_node, private);
 }
 
-static bool __radix_tree_delete(struct radix_tree_root *root,
-				struct radix_tree_node *node, void __rcu **slot)
+/**
+ * __radix_tree_delete - delete a slot from a radix tree
+ * @root: radix tree root
+ * @node: node containing the slot
+ * @slot: pointer to the slot to delete
+ *
+ * Clear @slot from @node of the radix tree. This may cause the current node to
+ * be freed. This function may be called without any locking if there are no
+ * other threads which can access this tree.
+ *
+ * Return: the node or NULL if the node is freed.
+ */
+bool __radix_tree_delete(struct radix_tree_root *root,
+			 struct radix_tree_node *node, void __rcu **slot)
 {
 	void *old = rcu_dereference_raw(*slot);
 	int exceptional = radix_tree_exceptional_entry(old) ? -1 : 0;
@@ -2003,6 +2018,7 @@ static bool __radix_tree_delete(struct radix_tree_root *root,
 	replace_slot(slot, NULL, node, -1, exceptional);
 	return node && delete_node(root, node, NULL, NULL);
 }
+EXPORT_SYMBOL(__radix_tree_delete);
 
 /**
  * radix_tree_iter_delete - delete the entry at this iterator position

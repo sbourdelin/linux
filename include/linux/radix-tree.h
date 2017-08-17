@@ -309,6 +309,8 @@ void radix_tree_iter_replace(struct radix_tree_root *,
 		const struct radix_tree_iter *, void __rcu **slot, void *entry);
 void radix_tree_replace_slot(struct radix_tree_root *,
 			     void __rcu **slot, void *entry);
+bool __radix_tree_delete(struct radix_tree_root *root,
+			 struct radix_tree_node *node, void __rcu **slot);
 void __radix_tree_delete_node(struct radix_tree_root *,
 			      struct radix_tree_node *,
 			      radix_tree_update_node_t update_node,
@@ -325,6 +327,7 @@ unsigned int radix_tree_gang_lookup(const struct radix_tree_root *,
 unsigned int radix_tree_gang_lookup_slot(const struct radix_tree_root *,
 			void __rcu ***results, unsigned long *indices,
 			unsigned long first_index, unsigned int max_items);
+int __radix_tree_preload(gfp_t gfp_mask, unsigned int nr);
 int radix_tree_preload(gfp_t gfp_mask);
 int radix_tree_maybe_preload(gfp_t gfp_mask);
 int radix_tree_maybe_preload_order(gfp_t gfp_mask, int order);
