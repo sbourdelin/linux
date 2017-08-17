@@ -103,8 +103,70 @@ static void rtsx_base_force_power_down(struct rtsx_pcr *pcr, u8 pm_state)
 	rtsx_pci_write_register(pcr, FPDCTL, 0x03, 0x03);
 }
 
+static int rts5249_init_from_cfg(struct rtsx_pcr *pcr)
+{
+	struct cr_option *option = &(pcr->option);
+	u32 lval;
+
+	if (CHK_PCI_PID(pcr, 0x524A))
+		rtsx_pci_read_config_dword(pcr, 0x160, &lval);
+	else
+		rtsx_pci_read_config_dword(pcr, 0x168, &lval);
+
+	if (lval & (1 << 3))
+		set_dev_flag(pcr, ASPM_L1_1_EN);
+	else
+		clear_dev_flag(pcr, ASPM_L1_1_EN);
+	if (lval & (1 << 2))
+		set_dev_flag(pcr, ASPM_L1_2_EN);
+	else
+		clear_dev_flag(pcr, ASPM_L1_2_EN);
+
+	if (lval & (1 << 1))
+		set_dev_flag(pcr, PM_L1_1_EN);
+	else
+		clear_dev_flag(pcr, PM_L1_1_EN);
+	if (lval & (1 << 0))
+		set_dev_flag(pcr, PM_L1_2_EN);
+	else
+		clear_dev_flag(pcr, PM_L1_2_EN);
+
+	if (option->ltr_en) {
+		u16 val;
+
+		pcie_capability_read_word(pcr->pci, PCI_EXP_DEVCTL2, &val);
+		if (val & PCI_EXP_DEVCTL2_LTR_EN) {
+			option->ltr_enabled = 1;
+			option->ltr_active = 1;
+			rtsx_set_ltr_latency(pcr, option->ltr_active_latency);
+		} else {
+			option->ltr_enabled = 0;
+		}
+	}
+
+	return 0;
+}
+
+static int rts5249_init_from_hw(struct rtsx_pcr *pcr)
+{
+	struct cr_option *option = &(pcr->option);
+
+	if (check_dev_flag(pcr, ASPM_L1_1_EN | ASPM_L1_2_EN
+				| PM_L1_1_EN | PM_L1_2_EN))
+		option->force_clkreq_0 = 0;
+	else
+		option->force_clkreq_0 = 1;
+
+	return 0;
+}
+
 static int rts5249_extra_init_hw(struct rtsx_pcr *pcr)
 {
+	struct cr_option *option = &(pcr->option);
+
+	rts5249_init_from_cfg(pcr);
+	rts5249_init_from_hw(pcr);
+
 	rtsx_pci_init_cmd(pcr);
 
 	/* Rest L1SUB Config */
@@ -124,6 +186,14 @@ static int rts5249_extra_init_hw(struct rtsx_pcr *pcr)
 		rtsx_pci_add_cmd(pcr, WRITE_REG_CMD, PETXCFG, 0xB0, 0xB0);
 	else
 		rtsx_pci_add_cmd(pcr, WRITE_REG_CMD, PETXCFG, 0xB0, 0x80);
+
+	/* u_force_clkreq_0
+	 * If 1, CLKREQ# PIN will be forced to drive 0 to request clock
+	 */
+	if (option->force_clkreq_0)
+		rtsx_pci_add_cmd(pcr, WRITE_REG_CMD, PETXCFG, 0x80, 0x80);
+	else
+		rtsx_pci_add_cmd(pcr, WRITE_REG_CMD, PETXCFG, 0x80, 0x00);
 
 	return rtsx_pci_send_cmd(pcr, 100);
 }
@@ -353,6 +423,8 @@ static const u32 rts5249_ms_pull_ctl_disable_tbl[] = {
 
 void rts5249_init_params(struct rtsx_pcr *pcr)
 {
+	struct cr_option *option = &(pcr->option);
+
 	pcr->extra_caps = EXTRA_CAPS_SD_SDR50 | EXTRA_CAPS_SD_SDR104;
 	pcr->num_slots = 2;
 	pcr->ops = &rts5249_pcr_ops;
@@ -372,6 +444,19 @@ void rts5249_init_params(struct rtsx_pcr *pcr)
 	pcr->ms_pull_ctl_disable_tbl = rts5249_ms_pull_ctl_disable_tbl;
 
 	pcr->reg_pm_ctrl3 = PM_CTRL3;
+
+	option->dev_flags |= LTR_L1SS_PWR_GATE_CHECK_CARD_EN;
+	option->dev_flags |= LTR_L1SS_PWR_GATE_EN;
+	option->ltr_en = 1;
+	/* init latency of active, idle, L1OFF to 60us, 300us, 3ms */
+	/* 60us:0x883C, 300us:0x892C, 3ms:0x9003 */
+	option->ltr_active_latency = 0x883C;
+	option->ltr_idle_latency = 0x892C;
+	option->ltr_l1off_latency = 0x9003;
+	option->dev_aspm_mode = DEV_ASPM_DYNAMIC;
+	option->l1_snooze_delay = 1;
+	option->ltr_l1off_sspwrgate = 0xAF;
+	option->ltr_l1off_snooze_sspwrgate = 0xAC;
 }
 
 static int rts524a_write_phy(struct rtsx_pcr *pcr, u8 addr, u16 val)
@@ -459,6 +544,54 @@ static int rts524a_extra_init_hw(struct rtsx_pcr *pcr)
 	return 0;
 }
 
+static void rts5250_set_l1off_cfg_sub_D0(struct rtsx_pcr *pcr, int active)
+{
+	struct cr_option *option = &(pcr->option);
+
+	u32 interrupt = rtsx_pci_readl(pcr, RTSX_BIPR);
+	int card_exist = (interrupt & SD_EXIST) | (interrupt & MS_EXIST);
+	int aspm_L1_1, aspm_L1_2;
+
+	aspm_L1_1 = check_dev_flag(pcr, ASPM_L1_1_EN);
+	aspm_L1_2 = check_dev_flag(pcr, ASPM_L1_2_EN);
+
+	if (active) {
+		/* run, latency: 60us */
+		if (aspm_L1_1) {
+			u8 val = option->ltr_l1off_snooze_sspwrgate;
+
+			if (check_dev_flag(pcr,
+					LTR_L1SS_PWR_GATE_CHECK_CARD_EN)) {
+				if (card_exist)
+					val &= ~(1 << 7);
+				else
+					val |= (1 << 7);
+			}
+
+			rtsx_set_l1off_sub(pcr, val);
+		} else {
+			rtsx_set_l1off_sub(pcr, 0);
+		}
+	} else {
+		/* l1off, latency: 300us */
+		if (aspm_L1_2) {
+			u8 val = option->ltr_l1off_sspwrgate;
+
+			if (check_dev_flag(pcr,
+					LTR_L1SS_PWR_GATE_CHECK_CARD_EN)) {
+				if (card_exist)
+					val &= ~(1 << 7);
+				else
+					val |= (1 << 7);
+			}
+
+			rtsx_set_l1off_sub(pcr, val);
+		} else {
+			rtsx_set_l1off_sub(pcr, 0);
+		}
+	}
+}
+
 static const struct pcr_ops rts524a_pcr_ops = {
 	.write_phy = rts524a_write_phy,
 	.read_phy = rts524a_read_phy,
@@ -473,11 +606,14 @@ static const struct pcr_ops rts524a_pcr_ops = {
 	.card_power_off = rtsx_base_card_power_off,
 	.switch_output_voltage = rtsx_base_switch_output_voltage,
 	.force_power_down = rtsx_base_force_power_down,
+	.set_l1off_cfg_sub_D0 = rts5250_set_l1off_cfg_sub_D0,
 };
 
 void rts524a_init_params(struct rtsx_pcr *pcr)
 {
 	rts5249_init_params(pcr);
+	pcr->option.ltr_l1off_sspwrgate = 0xFF;
+	pcr->option.ltr_l1off_snooze_sspwrgate = 0xF8;
 
 	pcr->reg_pm_ctrl3 = RTS524A_PM_CTRL3;
 	pcr->ops = &rts524a_pcr_ops;
@@ -576,11 +712,14 @@ static const struct pcr_ops rts525a_pcr_ops = {
 	.card_power_off = rtsx_base_card_power_off,
 	.switch_output_voltage = rts525a_switch_output_voltage,
 	.force_power_down = rtsx_base_force_power_down,
+	.set_l1off_cfg_sub_D0 = rts5250_set_l1off_cfg_sub_D0,
 };
 
 void rts525a_init_params(struct rtsx_pcr *pcr)
 {
 	rts5249_init_params(pcr);
+	pcr->option.ltr_l1off_sspwrgate = 0xFF;
+	pcr->option.ltr_l1off_snooze_sspwrgate = 0xF8;
 
 	pcr->reg_pm_ctrl3 = RTS524A_PM_CTRL3;
 	pcr->ops = &rts525a_pcr_ops;
