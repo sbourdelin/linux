@@ -342,6 +342,7 @@ s32 ixgbe_start_hw_generic(struct ixgbe_hw *hw)
 s32 ixgbe_start_hw_gen2(struct ixgbe_hw *hw)
 {
 	u32 i;
+	struct ixgbe_adapter *adapter = hw->back;
 
 	/* Clear the rate limiters */
 	for (i = 0; i < hw->mac.max_tx_queues; i++) {
@@ -350,25 +351,26 @@ s32 ixgbe_start_hw_gen2(struct ixgbe_hw *hw)
 	}
 	IXGBE_WRITE_FLUSH(hw);
 
-#ifndef CONFIG_SPARC
-	/* Disable relaxed ordering */
-	for (i = 0; i < hw->mac.max_tx_queues; i++) {
-		u32 regval;
+	if (!pcie_relaxed_ordering_enabled(adapter->pdev)) {
+		/* Disable relaxed ordering */
+		for (i = 0; i < hw->mac.max_tx_queues; i++) {
+			u32 regval;
 
-		regval = IXGBE_READ_REG(hw, IXGBE_DCA_TXCTRL_82599(i));
-		regval &= ~IXGBE_DCA_TXCTRL_DESC_WRO_EN;
-		IXGBE_WRITE_REG(hw, IXGBE_DCA_TXCTRL_82599(i), regval);
+			regval = IXGBE_READ_REG(hw, IXGBE_DCA_TXCTRL_82599(i));
+			regval &= ~IXGBE_DCA_TXCTRL_DESC_WRO_EN;
+			IXGBE_WRITE_REG(hw, IXGBE_DCA_TXCTRL_82599(i), regval);
+		}
+
+		for (i = 0; i < hw->mac.max_rx_queues; i++) {
+			u32 regval;
+
+			regval = IXGBE_READ_REG(hw, IXGBE_DCA_RXCTRL(i));
+			regval &= ~(IXGBE_DCA_RXCTRL_DATA_WRO_EN |
+				    IXGBE_DCA_RXCTRL_HEAD_WRO_EN);
+			IXGBE_WRITE_REG(hw, IXGBE_DCA_RXCTRL(i), regval);
+		}
 	}
 
-	for (i = 0; i < hw->mac.max_rx_queues; i++) {
-		u32 regval;
-
-		regval = IXGBE_READ_REG(hw, IXGBE_DCA_RXCTRL(i));
-		regval &= ~(IXGBE_DCA_RXCTRL_DATA_WRO_EN |
-			    IXGBE_DCA_RXCTRL_HEAD_WRO_EN);
-		IXGBE_WRITE_REG(hw, IXGBE_DCA_RXCTRL(i), regval);
-	}
-#endif
 	return 0;
 }
 
