@@ -1118,7 +1118,7 @@ void drm_crtc_vblank_off(struct drm_crtc *crtc)
 	if (drm_core_check_feature(dev, DRIVER_ATOMIC) || !vblank->inmodeset)
 		drm_vblank_disable_and_save(dev, pipe);
 
-	wake_up(&vblank->queue);
+	wake_up_all(&vblank->queue);
 
 	/*
 	 * Prevent subsequent drm_vblank_get() from re-enabling
@@ -1572,7 +1572,7 @@ bool drm_handle_vblank(struct drm_device *dev, unsigned int pipe)
 
 	spin_unlock(&dev->vblank_time_lock);
 
-	wake_up(&vblank->queue);
+	wake_up_all(&vblank->queue);
 
 	/* With instant-off, we defer disabling the interrupt until after
 	 * we finish processing the following vblank after all events have
