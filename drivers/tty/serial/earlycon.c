@@ -240,6 +240,7 @@ int __init of_setup_earlycon(const struct earlycon_id *match,
 {
 	int err;
 	struct uart_port *port = &early_console_dev.port;
+	unsigned long baud;
 	const __be32 *val;
 	bool big_endian;
 	u64 addr;
@@ -282,7 +283,15 @@ int __init of_setup_earlycon(const struct earlycon_id *match,
 		}
 	}
 
+	val = of_get_flat_dt_prop(node, "current-speed", NULL);
+	if (val)
+		early_console_dev.baud = be32_to_cpu(*val);
+
 	if (options) {
+		err = kstrtoul(options, 10, &baud);
+		if (!err)
+			early_console_dev.baud = baud;
+
 		strlcpy(early_console_dev.options, options,
 			sizeof(early_console_dev.options));
 	}
