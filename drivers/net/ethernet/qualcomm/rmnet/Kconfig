@@ -1,0 +1,12 @@
+#
+# RMNET MAP driver
+#
+
+menuconfig RMNET
+	depends on NETDEVICES
+	bool "RmNet MAP driver"
+	default n
+	---help---
+	  If you say Y here, then the rmnet module will be statically
+	  compiled into the kernel. The rmnet module provides MAP
+	  functionality for embedded and bridged traffic.
