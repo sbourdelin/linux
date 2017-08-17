@@ -66,6 +66,7 @@
 #include <linux/kthread.h>
 #include <linux/memcontrol.h>
 #include <linux/ftrace.h>
+#include <linux/nmi.h>
 
 #include <asm/sections.h>
 #include <asm/tlbflush.h>
@@ -2531,11 +2532,14 @@ void drain_all_pages(struct zone *zone)
 
 #ifdef CONFIG_HIBERNATION
 
+/* Touch watchdog for every WD_INTERVAL_PAGE pages. */
+#define WD_INTERVAL_PAGE	1000
+
 void mark_free_pages(struct zone *zone)
 {
 	unsigned long pfn, max_zone_pfn;
 	unsigned long flags;
-	unsigned int order, t;
+	unsigned int order, t, page_num = 0;
 	struct page *page;
 
 	if (zone_is_empty(zone))
@@ -2548,6 +2552,9 @@ void mark_free_pages(struct zone *zone)
 		if (pfn_valid(pfn)) {
 			page = pfn_to_page(pfn);
 
+			if (!((page_num++) % WD_INTERVAL_PAGE))
+				touch_nmi_watchdog();
+
 			if (page_zone(page) != zone)
 				continue;
 
@@ -2555,14 +2562,19 @@ void mark_free_pages(struct zone *zone)
 				swsusp_unset_page_free(page);
 		}
 
+	page_num = 0;
+
 	for_each_migratetype_order(order, t) {
 		list_for_each_entry(page,
 				&zone->free_area[order].free_list[t], lru) {
 			unsigned long i;
 
 			pfn = page_to_pfn(page);
-			for (i = 0; i < (1UL << order); i++)
+			for (i = 0; i < (1UL << order); i++) {
+				if (!((page_num++) % WD_INTERVAL_PAGE))
+					touch_nmi_watchdog();
 				swsusp_set_page_free(pfn_to_page(pfn + i));
+			}
 		}
 	}
 	spin_unlock_irqrestore(&zone->lock, flags);
