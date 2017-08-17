@@ -4762,6 +4762,50 @@ void show_free_areas(unsigned int filter, nodemask_t *nodemask)
 	show_swap_cache_info();
 }
 
+/**
+ * walk_free_mem_block - Walk through the free page blocks in the system
+ * @opaque1: the context passed from the caller
+ * @min_order: the minimum order of free lists to check
+ * @visit: the callback function given by the caller
+ *
+ * The function is used to walk through the free page blocks in the system,
+ * and each free page block is reported to the caller via the @visit callback.
+ * Please note:
+ * 1) The function is used to report hints of free pages, so the caller should
+ * not use those reported pages after the callback returns.
+ * 2) The callback is invoked with the zone->lock being held, so it should not
+ * block and should finish as soon as possible.
+ */
+void walk_free_mem_block(void *opaque1,
+			 unsigned int min_order,
+			 void (*visit)(void *opaque2,
+				       unsigned long pfn,
+				       unsigned long nr_pages))
+{
+	struct zone *zone;
+	struct page *page;
+	struct list_head *list;
+	unsigned int order;
+	enum migratetype mt;
+	unsigned long pfn, flags;
+
+	for_each_populated_zone(zone) {
+		for (order = MAX_ORDER - 1;
+		     order < MAX_ORDER && order >= min_order; order--) {
+			for (mt = 0; mt < MIGRATE_TYPES; mt++) {
+				spin_lock_irqsave(&zone->lock, flags);
+				list = &zone->free_area[order].free_list[mt];
+				list_for_each_entry(page, list, lru) {
+					pfn = page_to_pfn(page);
+					visit(opaque1, pfn, 1 << order);
+				}
+				spin_unlock_irqrestore(&zone->lock, flags);
+			}
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(walk_free_mem_block);
+
 static void zoneref_set_zone(struct zone *zone, struct zoneref *zoneref)
 {
 	zoneref->zone = zone;
