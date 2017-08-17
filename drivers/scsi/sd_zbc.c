@@ -560,6 +560,19 @@ int sd_zbc_read_zones(struct scsi_disk *sdkp,
 		 */
 		return 0;
 
+	/*
+	 * In the scsi-mq case, write ordering is not guaranteed so
+	 * host managed drives will not reliably work. Worse, zone write
+	 * locking can cause dispatch deadlocks. So for now, do not support
+	 * zoned block devices with scsi-mq by showing a 0 capacity disk.
+	 */
+	if (sdkp->disk->queue->mq_ops) {
+		if (sdkp->first_scan)
+			sd_printk(KERN_WARNING, sdkp,
+			  "Zoned block devices are not supported with scsi-mq\n");
+		ret = -ENODEV;
+		goto err;
+	}
 
 	/* Get zoned block device characteristics */
 	ret = sd_zbc_read_zoned_characteristics(sdkp, buf);
