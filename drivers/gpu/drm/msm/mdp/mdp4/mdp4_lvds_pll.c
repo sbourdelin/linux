@@ -137,7 +137,7 @@ static const char *mpd4_lvds_pll_parents[] = {
 	"pxo",
 };
 
-static struct clk_init_data pll_init = {
+static const struct clk_init_data pll_init = {
 	.name = "mpd4_lvds_pll",
 	.ops = &mpd4_lvds_pll_ops,
 	.parent_names = mpd4_lvds_pll_parents,

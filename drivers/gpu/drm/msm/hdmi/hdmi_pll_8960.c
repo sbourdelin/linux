@@ -419,7 +419,7 @@ static const char * const hdmi_pll_parents[] = {
 	"pxo",
 };
 
-static struct clk_init_data pll_init = {
+static const struct clk_init_data pll_init = {
 	.name = "hdmi_pll",
 	.ops = &hdmi_pll_ops,
 	.parent_names = hdmi_pll_parents,
