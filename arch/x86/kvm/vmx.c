@@ -2500,7 +2500,7 @@ static int nested_vmx_check_exception(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
-static void vmx_queue_exception(struct kvm_vcpu *vcpu)
+static int vmx_queue_exception(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	unsigned nr = vcpu->arch.exception.nr;
@@ -2509,9 +2509,12 @@ static void vmx_queue_exception(struct kvm_vcpu *vcpu)
 	u32 error_code = vcpu->arch.exception.error_code;
 	u32 intr_info = nr | INTR_INFO_VALID_MASK;
 
-	if (!reinject && is_guest_mode(vcpu) &&
-	    nested_vmx_check_exception(vcpu))
-		return;
+	if (!reinject && is_guest_mode(vcpu)) {
+		if (vmx->nested.nested_run_pending)
+			return -EBUSY;
+		if (nested_vmx_check_exception(vcpu))
+			return 0;
+	}
 
 	if (has_error_code) {
 		vmcs_write32(VM_ENTRY_EXCEPTION_ERROR_CODE, error_code);
@@ -2524,7 +2527,7 @@ static void vmx_queue_exception(struct kvm_vcpu *vcpu)
 			inc_eip = vcpu->arch.event_exit_inst_len;
 		if (kvm_inject_realmode_interrupt(vcpu, nr, inc_eip) != EMULATE_DONE)
 			kvm_make_request(KVM_REQ_TRIPLE_FAULT, vcpu);
-		return;
+		return 0;
 	}
 
 	if (kvm_exception_is_soft(nr)) {
@@ -2535,6 +2538,8 @@ static void vmx_queue_exception(struct kvm_vcpu *vcpu)
 		intr_info |= INTR_TYPE_HARD_EXCEPTION;
 
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, intr_info);
+
+	return 0;
 }
 
 static bool vmx_rdtscp_supported(void)

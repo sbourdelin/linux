@@ -6363,8 +6363,8 @@ static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 			kvm_update_dr7(vcpu);
 		}
 
-		kvm_x86_ops->queue_exception(vcpu);
-		return 0;
+		r = kvm_x86_ops->queue_exception(vcpu);
+		return r;
 	}
 
 	if (vcpu->arch.nmi_injected) {

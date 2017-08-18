@@ -636,7 +636,7 @@ static void skip_emulated_instruction(struct kvm_vcpu *vcpu)
 	svm_set_interrupt_shadow(vcpu, 0);
 }
 
-static void svm_queue_exception(struct kvm_vcpu *vcpu)
+static int svm_queue_exception(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_svm *svm = to_svm(vcpu);
 	unsigned nr = vcpu->arch.exception.nr;
@@ -650,7 +650,7 @@ static void svm_queue_exception(struct kvm_vcpu *vcpu)
 	 */
 	if (!reinject &&
 	    nested_svm_check_exception(svm, nr, has_error_code, error_code))
-		return;
+		return 0;
 
 	if (nr == BP_VECTOR && !static_cpu_has(X86_FEATURE_NRIPS)) {
 		unsigned long rip, old_rip = kvm_rip_read(&svm->vcpu);
@@ -673,6 +673,8 @@ static void svm_queue_exception(struct kvm_vcpu *vcpu)
 		| (has_error_code ? SVM_EVTINJ_VALID_ERR : 0)
 		| SVM_EVTINJ_TYPE_EXEPT;
 	svm->vmcb->control.event_inj_err = error_code;
+
+	return 0;
 }
 
 static void svm_init_erratum_383(void)
