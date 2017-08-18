@@ -514,6 +514,46 @@ MODULE_DEVICE_TABLE(usb, ti_id_table_combined);
 
 module_usb_serial_driver(serial_drivers, ti_id_table_combined);
 
+/* Sysfs Attributes */
+
+static ssize_t uart_mode_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct usb_serial_port *port = to_usb_serial_port(dev);
+	struct ti_port *tport = usb_get_serial_port_data(port);
+
+	return sprintf(buf, "%d\n", tport->tp_uart_mode);
+}
+
+static ssize_t uart_mode_store(struct device *dev,
+	struct device_attribute *attr, const char *valbuf, size_t count)
+{
+	struct usb_serial_port *port = to_usb_serial_port(dev);
+	struct ti_port *tport = usb_get_serial_port_data(port);
+	unsigned int v = simple_strtoul(valbuf, NULL, 0);
+
+	dev_dbg(dev, "%s: setting uart_mode = %d\n", __func__, v);
+
+	if (v < 256)
+		tport->tp_uart_mode = v;
+	else
+		dev_err(dev, "%s - uart_mode %d is invalid\n", __func__, v);
+
+	return count;
+}
+static DEVICE_ATTR_RW(uart_mode);
+
+static int ti_create_sysfs_attrs(struct usb_serial_port *port)
+{
+	return device_create_file(&port->dev, &dev_attr_uart_mode);
+}
+
+static int ti_remove_sysfs_attrs(struct usb_serial_port *port)
+{
+	device_remove_file(&port->dev, &dev_attr_uart_mode);
+	return 0;
+}
+
 static int ti_startup(struct usb_serial *serial)
 {
 	struct ti_device *tdev;
@@ -607,6 +647,7 @@ static void ti_release(struct usb_serial *serial)
 static int ti_port_probe(struct usb_serial_port *port)
 {
 	struct ti_port *tport;
+	int status;
 
 	tport = kzalloc(sizeof(*tport), GFP_KERNEL);
 	if (!tport)
@@ -628,6 +669,12 @@ static int ti_port_probe(struct usb_serial_port *port)
 
 	usb_set_serial_port_data(port, tport);
 
+	status = ti_create_sysfs_attrs(port);
+	if (status) {
+		kfree(tport);
+		return status;
+	}
+
 	port->port.drain_delay = 3;
 
 	return 0;
@@ -638,6 +685,7 @@ static int ti_port_remove(struct usb_serial_port *port)
 	struct ti_port *tport;
 
 	tport = usb_get_serial_port_data(port);
+	ti_remove_sysfs_attrs(port);
 	kfree(tport);
 
 	return 0;
