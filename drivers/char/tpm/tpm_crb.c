@@ -128,18 +128,16 @@ struct tpm2_crb_smc {
  * Anyhow, we do not wait here as a consequent CMD_READY request
  * will be handled correctly even if idle was not completed.
  *
- * The function does nothing for devices with ACPI-start method.
+ * The function does nothing for devices with ACPI-start method
+ * or SMC-start method.
  *
  * Return: 0 always
  */
 static int __maybe_unused crb_go_idle(struct device *dev, struct crb_priv *priv)
 {
-	if ((priv->flags & CRB_FL_ACPI_START) ||
-	    (priv->flags & CRB_FL_CRB_SMC_START))
-		return 0;
-
-	iowrite32(CRB_CTRL_REQ_GO_IDLE, &priv->regs_t->ctrl_req);
-	/* we don't really care when this settles */
+	if ((priv->flags & (CRB_FL_ACPI_START | CRB_FL_CRB_SMC_START)) == 0)
+		iowrite32(CRB_CTRL_REQ_GO_IDLE, &priv->regs_t->ctrl_req);
+		/* we don't really care when this settles */
 
 	return 0;
 }
@@ -174,23 +172,22 @@ static bool crb_wait_for_reg_32(u32 __iomem *reg, u32 mask, u32 value,
  * The device should respond within TIMEOUT_C.
  *
  * The function does nothing for devices with ACPI-start method
+ * or SMC-start method.
  *
  * Return: 0 on success -ETIME on timeout;
  */
 static int __maybe_unused crb_cmd_ready(struct device *dev,
 					struct crb_priv *priv)
 {
-	if ((priv->flags & CRB_FL_ACPI_START) ||
-	    (priv->flags & CRB_FL_CRB_SMC_START))
-		return 0;
-
-	iowrite32(CRB_CTRL_REQ_CMD_READY, &priv->regs_t->ctrl_req);
-	if (!crb_wait_for_reg_32(&priv->regs_t->ctrl_req,
-				 CRB_CTRL_REQ_CMD_READY /* mask */,
-				 0, /* value */
-				 TPM2_TIMEOUT_C)) {
-		dev_warn(dev, "cmdReady timed out\n");
-		return -ETIME;
+	if ((priv->flags & (CRB_FL_ACPI_START | CRB_FL_CRB_SMC_START)) == 0) {
+		iowrite32(CRB_CTRL_REQ_CMD_READY, &priv->regs_t->ctrl_req);
+		if (!crb_wait_for_reg_32(&priv->regs_t->ctrl_req,
+					 CRB_CTRL_REQ_CMD_READY /* mask */,
+					 0, /* value */
+					 TPM2_TIMEOUT_C)) {
+			dev_warn(dev, "cmdReady timed out\n");
+			return -ETIME;
+		}
 	}
 
 	return 0;
@@ -458,7 +455,7 @@ static int crb_map_io(struct acpi_device *device, struct crb_priv *priv,
 	 * the control area, as one nice sane region except for some older
 	 * stuff that puts the control area outside the ACPI IO region.
 	 */
-	if (!(priv->flags & CRB_FL_ACPI_START)) {
+	if ((priv->flags & (CRB_FL_ACPI_START | CRB_FL_CRB_SMC_START)) == 0) {
 		if (buf->control_address == io_res.start +
 		    sizeof(*priv->regs_h))
 			priv->regs_h = priv->iobase;
