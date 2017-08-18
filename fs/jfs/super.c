@@ -574,7 +574,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	 * Initialize direct-mapping inode/address-space
 	 */
 	inode = new_inode(sb);
-	if (inode == NULL) {
+	if (!inode) {
 		ret = -ENOMEM;
 		goto out_unload;
 	}
@@ -975,7 +975,7 @@ static int __init init_jfs_fs(void)
 	    kmem_cache_create("jfs_ip", sizeof(struct jfs_inode_info), 0,
 			    SLAB_RECLAIM_ACCOUNT|SLAB_MEM_SPREAD|SLAB_ACCOUNT,
 			    init_once);
-	if (jfs_inode_cachep == NULL)
+	if (!jfs_inode_cachep)
 		return -ENOMEM;
 
 	/*

@@ -494,7 +494,7 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 		 * contiguous buffer to work with
 		 */
 		ea_buf->xattr = kmalloc(size, GFP_KERNEL);
-		if (ea_buf->xattr == NULL)
+		if (!ea_buf->xattr)
 			return -ENOMEM;
 
 		ea_buf->flag = EA_MALLOC;
@@ -537,7 +537,7 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 		ea_buf->mp = get_metapage(inode, blkno,
 					  blocks_needed << sb->s_blocksize_bits,
 					  1);
-		if (ea_buf->mp == NULL) {
+		if (!ea_buf->mp) {
 			dbFree(inode, blkno, (s64) blocks_needed);
 			rc = -EIO;
 			goto clean_up;
@@ -558,7 +558,7 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 	ea_buf->mp = read_metapage(inode, addressDXD(&ji->ea),
 				   lengthDXD(&ji->ea) << sb->s_blocksize_bits,
 				   1);
-	if (ea_buf->mp == NULL) {
+	if (!ea_buf->mp) {
 		rc = -EIO;
 		goto clean_up;
 	}
@@ -712,7 +712,7 @@ int __jfs_setxattr(tid_t tid, struct inode *inode, const char *name,
 			rc = -ENODATA;
 			goto release;
 		}
-		if (value == NULL) {
+		if (!value) {
 			rc = 0;
 			goto release;
 		}
@@ -1016,7 +1016,7 @@ static int jfs_initxattrs(struct inode *inode, const struct xattr *xattr_array,
 	char *name;
 	int err = 0;
 
-	for (xattr = xattr_array; xattr->name != NULL; xattr++) {
+	for (xattr = xattr_array; xattr->name; xattr++) {
 		name = kmalloc(XATTR_SECURITY_PREFIX_LEN +
 			       strlen(xattr->name) + 1, GFP_NOFS);
 		if (!name) {

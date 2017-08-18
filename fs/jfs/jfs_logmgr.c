@@ -249,11 +249,11 @@ int lmLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	LOG_LOCK(log);
 
 	/* log by (out-of-transaction) JFS ? */
-	if (tblk == NULL)
+	if (!tblk)
 		goto writeRecord;
 
 	/* log from page ? */
-	if (tlck == NULL ||
+	if (!tlck ||
 	    tlck->type & tlckBTROOT || (mp = tlck->mp) == NULL)
 		goto writeRecord;
 
@@ -382,7 +382,7 @@ lmWriteRecord(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 	dstoffset = log->eor;
 
 	/* any log data to write ? */
-	if (tlck == NULL)
+	if (!tlck)
 		goto moveLrd;
 
 	/*
@@ -617,7 +617,7 @@ static int lmNextPage(struct jfs_log * log)
 			 * of the pages since log pages will be added
 			 * continuously
 			 */
-			if (bp->l_wqnext == NULL)
+			if (!bp->l_wqnext)
 				lbmWrite(log, bp, 0, 0);
 		} else {
 			/*
@@ -902,7 +902,7 @@ static void lmPostGC(struct lbuf * bp)
 	 * wake her up to lead her group.
 	 */
 	if ((!list_empty(&log->cqueue)) &&
-	    ((log->gcrtc > 0) || (tblk->bp->l_wqnext != NULL) ||
+	    ((log->gcrtc > 0) || tblk->bp->l_wqnext ||
 	     test_bit(log_FLUSH, &log->flag) || jfs_tlocks_low))
 		/*
 		 * Call lmGCwrite with new group leader
@@ -1842,7 +1842,7 @@ static int lbmLogInit(struct jfs_log * log)
 		buffer = page_address(page);
 		for (offset = 0; offset < PAGE_SIZE; offset += LOGPSIZE) {
 			lbuf = kmalloc(sizeof(*lbuf), GFP_KERNEL);
-			if (lbuf == NULL) {
+			if (!lbuf) {
 				if (offset == 0)
 					__free_page(page);
 				goto error;
@@ -1941,7 +1941,7 @@ static void lbmfree(struct lbuf * bp)
 {
 	struct jfs_log *log = bp->l_log;
 
-	assert(bp->l_wqnext == NULL);
+	assert(!bp->l_wqnext);
 
 	/*
 	 * return the buffer to head of freelist
@@ -2062,9 +2062,9 @@ static void lbmWrite(struct jfs_log * log, struct lbuf * bp, int flag,
 	tail = log->wqueue;
 
 	/* is buffer not already on write queue ? */
-	if (bp->l_wqnext == NULL) {
+	if (!bp->l_wqnext) {
 		/* insert at tail of wqueue */
-		if (tail == NULL) {
+		if (!tail) {
 			log->wqueue = bp;
 			bp->l_wqnext = bp;
 		} else {

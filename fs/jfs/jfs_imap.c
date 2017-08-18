@@ -124,7 +124,7 @@ int diMount(struct inode *ipimap)
 	mp = read_metapage(ipimap,
 			   IMAPBLKNO << JFS_SBI(ipimap->i_sb)->l2nbperpage,
 			   PSIZE, 0);
-	if (mp == NULL) {
+	if (!mp) {
 		kfree(imap);
 		return -EIO;
 	}
@@ -228,7 +228,7 @@ int diSync(struct inode *ipimap)
 	mp = get_metapage(ipimap,
 			  IMAPBLKNO << JFS_SBI(ipimap->i_sb)->l2nbperpage,
 			  PSIZE, 0);
-	if (mp == NULL) {
+	if (!mp) {
 		jfs_err("diSync: get_metapage failed!");
 		return -EIO;
 	}
@@ -433,7 +433,7 @@ struct inode *diReadSpecial(struct super_block *sb, ino_t inum, int secondary)
 	struct metapage *mp;
 
 	ip = new_inode(sb);
-	if (ip == NULL) {
+	if (!ip) {
 		jfs_err("diReadSpecial: new_inode returned NULL!");
 		return ip;
 	}
@@ -454,7 +454,7 @@ struct inode *diReadSpecial(struct super_block *sb, ino_t inum, int secondary)
 
 	/* read the page of fixed disk inode (AIT) in raw mode */
 	mp = read_metapage(ip, address << sbi->l2nbperpage, PSIZE, 1);
-	if (mp == NULL) {
+	if (!mp) {
 		set_nlink(ip, 1);	/* Don't want iput() deleting it */
 		iput(ip);
 		return (NULL);
@@ -531,7 +531,7 @@ void diWriteSpecial(struct inode *ip, int secondary)
 
 	/* read the page of fixed disk inode (AIT) in raw mode */
 	mp = read_metapage(ip, address << sbi->l2nbperpage, PSIZE, 1);
-	if (mp == NULL) {
+	if (!mp) {
 		jfs_err("diWriteSpecial: failed to read aggregate inode extent!");
 		return;
 	}
@@ -558,7 +558,7 @@ void diWriteSpecial(struct inode *ip, int secondary)
  */
 void diFreeSpecial(struct inode *ip)
 {
-	if (ip == NULL) {
+	if (!ip) {
 		jfs_err("diFreeSpecial called with NULL ip!");
 		return;
 	}
@@ -1109,7 +1109,7 @@ int diFree(struct inode *ip)
 					goto error_out;
 				ciagp = (struct iag *) cmp->data;
 			}
-			assert(ciagp != NULL);
+			assert(ciagp);
 		}
 
 		if (inofreeback >= 0) {
@@ -1123,7 +1123,7 @@ int diFree(struct inode *ip)
 					goto error_out;
 				diagp = (struct iag *) dmp->data;
 			}
-			assert(diagp != NULL);
+			assert(diagp);
 		}
 	}
 
@@ -2250,7 +2250,7 @@ static int diNewExt(struct inomap * imap, struct iag * iagp, int extno)
 					goto error_out;
 				ciagp = (struct iag *) cmp->data;
 			}
-			if (ciagp == NULL) {
+			if (!ciagp) {
 				jfs_error(imap->im_ipimap->i_sb,
 					  "ciagp == NULL\n");
 				rc = -EIO;
@@ -2282,7 +2282,7 @@ static int diNewExt(struct inomap * imap, struct iag * iagp, int extno)
 		/* get a buffer for this page of disk inodes.
 		 */
 		dmp = get_metapage(ipimap, blkno + i, PSIZE, 1);
-		if (dmp == NULL) {
+		if (!dmp) {
 			rc = -EIO;
 			goto error_out;
 		}
@@ -2679,9 +2679,8 @@ static int diIAGRead(struct inomap * imap, int iagno, struct metapage ** mpp)
 
 	/* read the iag. */
 	*mpp = read_metapage(ipimap, blkno, PSIZE, 0);
-	if (*mpp == NULL) {
+	if (!*mpp)
 		return -EIO;
-	}
 
 	return (0);
 }
@@ -3000,7 +2999,7 @@ static void duplicateIXtree(struct super_block *sb, s64 blkno,
 	if (JFS_SBI(sb)->mntflag & JFS_BAD_SAIT)	/* s_flag */
 		return;
 	ip = diReadSpecial(sb, FILESYSTEM_I, 1);
-	if (ip == NULL) {
+	if (!ip) {
 		JFS_SBI(sb)->mntflag |= JFS_BAD_SAIT;
 		if (readSuper(sb, &bh))
 			return;

@@ -759,7 +759,7 @@ xtSplitUp(tid_t tid,
 	 *
 	 * allocation hint: ?
 	 */
-	if (split->pxdlist == NULL) {
+	if (!split->pxdlist) {
 		nsplit = btstack->nsplit;
 		split->pxdlist = &pxdlist;
 		pxdlist.maxnpxd = pxdlist.npxd = 0;
@@ -996,7 +996,7 @@ xtSplitPage(tid_t tid, struct inode *ip,
 	 * allocate the new right page for the split
 	 */
 	rmp = get_metapage(ip, rbn, PSIZE, 1);
-	if (rmp == NULL) {
+	if (!rmp) {
 		rc = -EIO;
 		goto clean_up;
 	}
@@ -1249,7 +1249,7 @@ xtSplitRoot(tid_t tid,
 	pxdlist->npxd++;
 	rbn = addressPXD(pxd);
 	rmp = get_metapage(ip, rbn, PSIZE, 1);
-	if (rmp == NULL)
+	if (!rmp)
 		return -EIO;
 
 	/* Allocate blocks to quota. */

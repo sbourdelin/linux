@@ -1365,7 +1365,7 @@ static int dtSplitPage(tid_t tid, struct inode *ip, struct dtsplit * split,
 	pxdlist->npxd++;
 	rbn = addressPXD(pxd);
 	rmp = get_metapage(ip, rbn, PSIZE, 1);
-	if (rmp == NULL)
+	if (!rmp)
 		return -EIO;
 
 	/* Allocate blocks to quota. */
@@ -3781,12 +3781,12 @@ static int ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
 
 	lkey.name = kmalloc((JFS_NAME_MAX + 1) * sizeof(wchar_t),
 					GFP_KERNEL);
-	if (lkey.name == NULL)
+	if (!lkey.name)
 		return -ENOMEM;
 
 	rkey.name = kmalloc((JFS_NAME_MAX + 1) * sizeof(wchar_t),
 					GFP_KERNEL);
-	if (rkey.name == NULL) {
+	if (!rkey.name) {
 		kfree(lkey.name);
 		return -ENOMEM;
 	}

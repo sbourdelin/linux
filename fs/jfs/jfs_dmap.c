@@ -174,14 +174,14 @@ int dbMount(struct inode *ipbmap)
 	 */
 	/* allocate memory for the in-memory bmap descriptor */
 	bmp = kmalloc(sizeof(struct bmap), GFP_KERNEL);
-	if (bmp == NULL)
+	if (!bmp)
 		return -ENOMEM;
 
 	/* read the on-disk bmap descriptor. */
 	mp = read_metapage(ipbmap,
 			   BMAPBLKNO << JFS_SBI(ipbmap->i_sb)->l2nbperpage,
 			   PSIZE, 0);
-	if (mp == NULL) {
+	if (!mp) {
 		kfree(bmp);
 		return -EIO;
 	}
@@ -274,7 +274,7 @@ int dbSync(struct inode *ipbmap)
 	mp = read_metapage(ipbmap,
 			   BMAPBLKNO << JFS_SBI(ipbmap->i_sb)->l2nbperpage,
 			   PSIZE, 0);
-	if (mp == NULL) {
+	if (!mp) {
 		jfs_err("dbSync: read_metapage failed!");
 		return -EIO;
 	}
@@ -370,7 +370,7 @@ int dbFree(struct inode *ip, s64 blkno, s64 nblocks)
 		/* get the buffer for the current dmap. */
 		lblkno = BLKTODMAP(blkno, bmp->db_l2nbperpage);
 		mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
-		if (mp == NULL) {
+		if (!mp) {
 			IREAD_UNLOCK(ipbmap);
 			return -EIO;
 		}
@@ -464,7 +464,7 @@ dbUpdatePMap(struct inode *ipbmap,
 
 			mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE,
 					   0);
-			if (mp == NULL)
+			if (!mp)
 				return -EIO;
 			metapage_wait_for_io(mp);
 		}
@@ -780,7 +780,7 @@ int dbAlloc(struct inode *ip, s64 hint, s64 nblocks, s64 * results)
 		rc = -EIO;
 		lblkno = BLKTODMAP(blkno, bmp->db_l2nbperpage);
 		mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
-		if (mp == NULL)
+		if (!mp)
 			goto read_unlock;
 
 		dp = (struct dmap *) mp->data;
@@ -922,7 +922,7 @@ int dbAllocExact(struct inode *ip, s64 blkno, int nblocks)
 	/* read in the dmap covering the extent */
 	lblkno = BLKTODMAP(blkno, bmp->db_l2nbperpage);
 	mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
-	if (mp == NULL) {
+	if (!mp) {
 		IREAD_UNLOCK(ipbmap);
 		return -EIO;
 	}
@@ -1078,7 +1078,7 @@ static int dbExtend(struct inode *ip, s64 blkno, s64 nblocks, s64 addnblocks)
 	 */
 	lblkno = BLKTODMAP(extblkno, bmp->db_l2nbperpage);
 	mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
-	if (mp == NULL) {
+	if (!mp) {
 		IREAD_UNLOCK(ipbmap);
 		return -EIO;
 	}
@@ -1421,7 +1421,7 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 	 */
 	lblkno = BLKTOCTL(blkno, bmp->db_l2nbperpage, bmp->db_aglevel);
 	mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE, 0);
-	if (mp == NULL)
+	if (!mp)
 		return -EIO;
 	dcp = (struct dmapctl *) mp->data;
 	budmin = dcp->budmin;
@@ -1642,7 +1642,7 @@ s64 dbDiscardAG(struct inode *ip, int agno, s64 minlen)
 	do_div(max_ranges, minlen);
 	range_cnt = min_t(u64, max_ranges + 1, 32 * 1024);
 	totrim = kmalloc(sizeof(struct range2trim) * range_cnt, GFP_NOFS);
-	if (totrim == NULL) {
+	if (!totrim) {
 		jfs_error(bmp->db_ipbmap->i_sb, "no memory for trim array\n");
 		IWRITE_UNLOCK(ipbmap);
 		return 0;
@@ -1743,7 +1743,7 @@ static int dbFindCtl(struct bmap * bmp, int l2nb, int level, s64 * blkno)
 		 */
 		lblkno = BLKTOCTL(b, bmp->db_l2nbperpage, lev);
 		mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE, 0);
-		if (mp == NULL)
+		if (!mp)
 			return -EIO;
 		dcp = (struct dmapctl *) mp->data;
 		budmin = dcp->budmin;
@@ -1857,7 +1857,7 @@ dbAllocCtl(struct bmap * bmp, s64 nblocks, int l2nb, s64 blkno, s64 * results)
 		 */
 		lblkno = BLKTODMAP(blkno, bmp->db_l2nbperpage);
 		mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE, 0);
-		if (mp == NULL)
+		if (!mp)
 			return -EIO;
 		dp = (struct dmap *) mp->data;
 
@@ -1884,7 +1884,7 @@ dbAllocCtl(struct bmap * bmp, s64 nblocks, int l2nb, s64 blkno, s64 * results)
 		 */
 		lblkno = BLKTODMAP(b, bmp->db_l2nbperpage);
 		mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE, 0);
-		if (mp == NULL) {
+		if (!mp) {
 			rc = -EIO;
 			goto backout;
 		}
@@ -1937,7 +1937,7 @@ dbAllocCtl(struct bmap * bmp, s64 nblocks, int l2nb, s64 blkno, s64 * results)
 		 */
 		lblkno = BLKTODMAP(b, bmp->db_l2nbperpage);
 		mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE, 0);
-		if (mp == NULL) {
+		if (!mp) {
 			/* could not back out.  mark the file system
 			 * to indicate that we have leaked blocks.
 			 */
@@ -2519,7 +2519,7 @@ dbAdjCtl(struct bmap * bmp, s64 blkno, int newval, int alloc, int level)
 	 */
 	lblkno = BLKTOCTL(blkno, bmp->db_l2nbperpage, level);
 	mp = read_metapage(bmp->db_ipbmap, lblkno, PSIZE, 0);
-	if (mp == NULL)
+	if (!mp)
 		return -EIO;
 	dcp = (struct dmapctl *) mp->data;
 
@@ -3232,7 +3232,7 @@ int dbAllocBottomUp(struct inode *ip, s64 blkno, s64 nblocks)
 		/* get the buffer for the current dmap. */
 		lblkno = BLKTODMAP(blkno, bmp->db_l2nbperpage);
 		mp = read_metapage(ipbmap, lblkno, PSIZE, 0);
-		if (mp == NULL) {
+		if (!mp) {
 			IREAD_UNLOCK(ipbmap);
 			return -EIO;
 		}
@@ -3485,7 +3485,7 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 		if (j0) {
 			/* read in L1 page: (blkno & (MAXL1SIZE - 1)) */
 			l1mp = read_metapage(ipbmap, p, PSIZE, 0);
-			if (l1mp == NULL)
+			if (!l1mp)
 				goto errout;
 			l1dcp = (struct dmapctl *) l1mp->data;
 
@@ -3497,7 +3497,7 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 		} else {
 			/* assign/init L1 page */
 			l1mp = get_metapage(ipbmap, p, PSIZE, 0);
-			if (l1mp == NULL)
+			if (!l1mp)
 				goto errout;
 
 			l1dcp = (struct dmapctl *) l1mp->data;
@@ -3517,7 +3517,7 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 				/* read in L0 page: (blkno & (MAXL0SIZE - 1)) */
 
 				l0mp = read_metapage(ipbmap, p, PSIZE, 0);
-				if (l0mp == NULL)
+				if (!l0mp)
 					goto errout;
 				l0dcp = (struct dmapctl *) l0mp->data;
 
@@ -3531,7 +3531,7 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 			} else {
 				/* assign/init L0 page */
 				l0mp = get_metapage(ipbmap, p, PSIZE, 0);
-				if (l0mp == NULL)
+				if (!l0mp)
 					goto errout;
 
 				l0dcp = (struct dmapctl *) l0mp->data;
@@ -3554,14 +3554,14 @@ int dbExtendFS(struct inode *ipbmap, s64 blkno,	s64 nblocks)
 					/* read in dmap page: */
 					mp = read_metapage(ipbmap, p,
 							   PSIZE, 0);
-					if (mp == NULL)
+					if (!mp)
 						goto errout;
 					n = min(nblocks, (s64)BPERDMAP - n);
 				} else {
 					/* assign/init dmap page */
 					mp = read_metapage(ipbmap, p,
 							   PSIZE, 0);
-					if (mp == NULL)
+					if (!mp)
 						goto errout;
 
 					n = min_t(s64, nblocks, BPERDMAP);

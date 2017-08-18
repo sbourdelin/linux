@@ -1006,8 +1006,7 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 			int copy_size = min(ssize, PSIZE);
 
 			mp = get_metapage(ip, xaddr, PSIZE, 1);
-
-			if (mp == NULL) {
+			if (!mp) {
 				xtTruncate(tid, ip, 0, COMMIT_PWMAP);
 				rc = -EIO;
 				txAbort(tid, 0);

@@ -96,7 +96,7 @@ int jfs_mount(struct super_block *sb)
 	}
 
 	ipaimap = diReadSpecial(sb, AGGREGATE_I, 0);
-	if (ipaimap == NULL) {
+	if (!ipaimap) {
 		jfs_err("jfs_mount: Failed to read AGGREGATE_I");
 		rc = -EIO;
 		goto errout20;
@@ -117,7 +117,7 @@ int jfs_mount(struct super_block *sb)
 	 * open aggregate block allocation map
 	 */
 	ipbmap = diReadSpecial(sb, BMAP_I, 0);
-	if (ipbmap == NULL) {
+	if (!ipbmap) {
 		rc = -EIO;
 		goto errout22;
 	}
@@ -175,7 +175,7 @@ int jfs_mount(struct super_block *sb)
 	 * open fileset inode allocation map (aka fileset inode)
 	 */
 	ipimap = diReadSpecial(sb, FILESYSTEM_I, 0);
-	if (ipimap == NULL) {
+	if (!ipimap) {
 		jfs_err("jfs_mount: Failed to read FILESYSTEM_I");
 		/* open fileset secondary inode allocation map */
 		rc = -EIO;

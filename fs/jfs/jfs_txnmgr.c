@@ -282,7 +282,7 @@ int txInit(void)
 
 	size = sizeof(struct tblock) * nTxBlock;
 	TxBlock = vmalloc(size);
-	if (TxBlock == NULL)
+	if (!TxBlock)
 		return -ENOMEM;
 
 	for (k = 1; k < nTxBlock - 1; k++) {
@@ -307,7 +307,7 @@ int txInit(void)
 	 */
 	size = sizeof(struct tlock) * nTxLock;
 	TxLock = vmalloc(size);
-	if (TxLock == NULL) {
+	if (!TxLock) {
 		vfree(TxBlock);
 		return -ENOMEM;
 	}
@@ -2201,7 +2201,7 @@ void txEA(tid_t tid, struct inode *ip, dxd_t * oldea, dxd_t * newea)
 	 * format maplock for free of old EA extent
 	 */
 	if (!test_cflag(COMMIT_Nolink, ip) && oldea->flag & DXD_EXTENT) {
-		if (tlck == NULL) {
+		if (!tlck) {
 			tlck = txMaplock(tid, ip, tlckMAP);
 			maplock = (struct pxd_lock *) & tlck->lock;
 			pxdlock = (struct pxd_lock *) maplock;

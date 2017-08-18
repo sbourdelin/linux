@@ -210,13 +210,12 @@ int __init metapage_init(void)
 	 */
 	metapage_cache = kmem_cache_create("jfs_mp", sizeof(struct metapage),
 					   0, 0, NULL);
-	if (metapage_cache == NULL)
+	if (!metapage_cache)
 		return -ENOMEM;
 
 	metapage_mempool = mempool_create_slab_pool(METAPOOL_MIN_PAGES,
 						    metapage_cache);
-
-	if (metapage_mempool == NULL) {
+	if (!metapage_mempool) {
 		kmem_cache_destroy(metapage_cache);
 		return -ENOMEM;
 	}

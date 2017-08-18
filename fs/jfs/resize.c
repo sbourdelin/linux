@@ -478,7 +478,7 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 	 */
 
 	ipbmap2 = diReadSpecial(sb, BMAP_I, 1);
-	if (ipbmap2 == NULL) {
+	if (!ipbmap2) {
 		printk(KERN_ERR "jfs_extendfs: diReadSpecial(bmap) failed\n");
 		goto error_out;
 	}
