@@ -776,6 +776,7 @@ struct xgbe_hw_if {
  * implementation of a PHY. All routines are required unless noted below.
  *   Optional routines:
  *     kr_training_pre, kr_training_post
+ *     eeprom_data, phydev_read, phydev_write
  */
 struct xgbe_phy_impl_if {
 	/* Perform Setup/teardown actions */
@@ -819,6 +820,14 @@ struct xgbe_phy_impl_if {
 	/* Pre/Post KR training enablement support */
 	void (*kr_training_pre)(struct xgbe_prv_data *);
 	void (*kr_training_post)(struct xgbe_prv_data *);
+
+	/* Return the eeprom data for an SFP */
+	unsigned char *(*sfp_eeprom)(struct xgbe_prv_data *);
+
+	/* Read the register of an attached PHY device */
+	int (*phydev_read)(struct xgbe_prv_data *, unsigned int, unsigned int);
+	int (*phydev_write)(struct xgbe_prv_data *, unsigned int, unsigned int,
+			    unsigned int);
 };
 
 struct xgbe_phy_if {
@@ -1183,6 +1192,9 @@ struct xgbe_prv_data {
 	unsigned int debugfs_xprop_reg;
 
 	unsigned int debugfs_xi2c_reg;
+
+	unsigned int debugfs_phydev_mmd;
+	unsigned int debugfs_phydev_reg;
 #endif
 };
 

@@ -436,6 +436,126 @@ static const struct file_operations xi2c_reg_value_fops = {
 	.write = xi2c_reg_value_write,
 };
 
+static ssize_t sfp_eeprom_read(struct file *filp, char __user *buffer,
+			       size_t count, loff_t *ppos)
+{
+	struct xgbe_prv_data *pdata = filp->private_data;
+	struct xgbe_phy_impl_if *phy_impl;
+	unsigned char *eeprom;
+	ssize_t len;
+
+	phy_impl = &pdata->phy_if.phy_impl;
+	eeprom = phy_impl->sfp_eeprom(pdata);
+	if (!eeprom)
+		return 0;
+
+	len = simple_read_from_buffer(buffer, count, ppos,
+				      eeprom, strlen(eeprom));
+
+	kfree(eeprom);
+
+	return len;
+}
+
+static const struct file_operations sfp_eeprom_fops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = sfp_eeprom_read,
+};
+
+static ssize_t phydev_mmd_read(struct file *filp, char __user *buffer,
+			       size_t count, loff_t *ppos)
+{
+	struct xgbe_prv_data *pdata = filp->private_data;
+
+	return xgbe_common_read(buffer, count, ppos, pdata->debugfs_phydev_mmd);
+}
+
+static ssize_t phydev_mmd_write(struct file *filp, const char __user *buffer,
+				size_t count, loff_t *ppos)
+{
+	struct xgbe_prv_data *pdata = filp->private_data;
+
+	return xgbe_common_write(buffer, count, ppos,
+				 &pdata->debugfs_phydev_mmd);
+}
+
+static ssize_t phydev_reg_addr_read(struct file *filp, char __user *buffer,
+				    size_t count, loff_t *ppos)
+{
+	struct xgbe_prv_data *pdata = filp->private_data;
+
+	return xgbe_common_read(buffer, count, ppos, pdata->debugfs_phydev_reg);
+}
+
+static ssize_t phydev_reg_addr_write(struct file *filp,
+				     const char __user *buffer,
+				     size_t count, loff_t *ppos)
+{
+	struct xgbe_prv_data *pdata = filp->private_data;
+
+	return xgbe_common_write(buffer, count, ppos,
+				 &pdata->debugfs_phydev_reg);
+}
+
+static ssize_t phydev_reg_value_read(struct file *filp, char __user *buffer,
+				     size_t count, loff_t *ppos)
+{
+	struct xgbe_prv_data *pdata = filp->private_data;
+	struct xgbe_phy_impl_if *phy_impl;
+	unsigned int value;
+
+	phy_impl = &pdata->phy_if.phy_impl;
+	value = phy_impl->phydev_read(pdata,
+				      pdata->debugfs_phydev_mmd,
+				      pdata->debugfs_phydev_reg);
+
+	return xgbe_common_read(buffer, count, ppos, value);
+}
+
+static ssize_t phydev_reg_value_write(struct file *filp,
+				      const char __user *buffer,
+				      size_t count, loff_t *ppos)
+{
+	struct xgbe_prv_data *pdata = filp->private_data;
+	struct xgbe_phy_impl_if *phy_impl;
+	unsigned int value;
+	ssize_t len;
+
+	len = xgbe_common_write(buffer, count, ppos, &value);
+	if (len < 0)
+		return len;
+
+	phy_impl = &pdata->phy_if.phy_impl;
+	phy_impl->phydev_write(pdata,
+			       pdata->debugfs_phydev_mmd,
+			       pdata->debugfs_phydev_reg,
+			       value);
+
+	return len;
+}
+
+static const struct file_operations phydev_mmd_fops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = phydev_mmd_read,
+	.write = phydev_mmd_write,
+};
+
+static const struct file_operations phydev_reg_addr_fops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = phydev_reg_addr_read,
+	.write = phydev_reg_addr_write,
+};
+
+static const struct file_operations phydev_reg_value_fops = {
+	.owner = THIS_MODULE,
+	.open = simple_open,
+	.read = phydev_reg_value_read,
+	.write = phydev_reg_value_write,
+};
+
 void xgbe_debugfs_init(struct xgbe_prv_data *pdata)
 {
 	struct dentry *pfile;
@@ -445,6 +565,8 @@ void xgbe_debugfs_init(struct xgbe_prv_data *pdata)
 	pdata->debugfs_xgmac_reg = 0;
 	pdata->debugfs_xpcs_mmd = 1;
 	pdata->debugfs_xpcs_reg = 0;
+	pdata->debugfs_phydev_mmd = 1;
+	pdata->debugfs_phydev_reg = 0;
 
 	buf = kasprintf(GFP_KERNEL, "amd-xgbe-%s", pdata->netdev->name);
 	if (!buf)
@@ -517,6 +639,35 @@ void xgbe_debugfs_init(struct xgbe_prv_data *pdata)
 		if (!pfile)
 			netdev_err(pdata->netdev,
 				   "debugfs_create_file failed\n");
+	}
+
+	if (pdata->phy_if.phy_impl.sfp_eeprom) {
+		pfile = debugfs_create_file("sfp_eeprom", 0400,
+					    pdata->xgbe_debugfs, pdata,
+					    &sfp_eeprom_fops);
+		if (!pfile)
+			netdev_err(pdata->netdev, "debugfs_create_file failed\n");
+	}
+
+	if (pdata->phy_if.phy_impl.phydev_read &&
+	    pdata->phy_if.phy_impl.phydev_write) {
+		pfile = debugfs_create_file("phydev_mmd", 0600,
+					    pdata->xgbe_debugfs, pdata,
+					    &phydev_mmd_fops);
+		if (!pfile)
+			netdev_err(pdata->netdev, "debugfs_create_file failed\n");
+
+		pfile = debugfs_create_file("phydev_register", 0600,
+					    pdata->xgbe_debugfs, pdata,
+					    &phydev_reg_addr_fops);
+		if (!pfile)
+			netdev_err(pdata->netdev, "debugfs_create_file failed\n");
+
+		pfile = debugfs_create_file("phydev_register_value", 0600,
+					    pdata->xgbe_debugfs, pdata,
+					    &phydev_reg_value_fops);
+		if (!pfile)
+			netdev_err(pdata->netdev, "debugfs_create_file failed\n");
 	}
 
 	kfree(buf);

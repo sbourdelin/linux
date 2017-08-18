@@ -258,6 +258,8 @@ struct xgbe_sfp_eeprom {
 	u8 vendor[32];
 };
 
+#define XGBE_SFP_EEPROM_LINE			16
+
 #define XGBE_BEL_FUSE_VENDOR	"BEL-FUSE        "
 #define XGBE_BEL_FUSE_PARTNO	"1GBT-SFP06      "
 
@@ -1273,6 +1275,79 @@ put:
 	xgbe_phy_sfp_phy_settings(pdata);
 
 	xgbe_phy_put_comm_ownership(pdata);
+}
+
+static int xgbe_phy_phydev_write(struct xgbe_prv_data *pdata, unsigned int mmd,
+				 unsigned int reg, unsigned int val)
+{
+	struct xgbe_phy_data *phy_data = pdata->phy_data;
+	unsigned int ret;
+
+	if (!phy_data->phydev)
+		return -ENOTSUPP;
+
+	if (phy_data->phydev_mode == XGBE_MDIO_MODE_CL45)
+		reg = MII_ADDR_C45 | (mmd << 16) | (reg & 0xffff);
+
+	ret = xgbe_phy_mii_write(phy_data->mii, phy_data->mdio_addr, reg, val);
+
+	return ret;
+}
+
+static int xgbe_phy_phydev_read(struct xgbe_prv_data *pdata, unsigned int mmd,
+				unsigned int reg)
+{
+	struct xgbe_phy_data *phy_data = pdata->phy_data;
+	unsigned int ret;
+
+	if (!phy_data->phydev)
+		return -ENOTSUPP;
+
+	if (phy_data->phydev_mode == XGBE_MDIO_MODE_CL45)
+		reg = MII_ADDR_C45 | (mmd << 16) | (reg & 0xffff);
+
+	ret = xgbe_phy_mii_read(phy_data->mii, phy_data->mdio_addr, reg);
+
+	return ret;
+}
+
+static unsigned char *xgbe_phy_sfp_eeprom(struct xgbe_prv_data *pdata)
+{
+	struct xgbe_phy_data *phy_data = pdata->phy_data;
+	unsigned char *eeprom, *eeprom_end;
+	char *buffer, *cur;
+	size_t size;
+
+	/* Calculate the buffer needed for hex_dump_to_buffer()
+	 * assuming XGBE_SFP_EEPROM_LINE bytes per line and ASCII data:
+	 *   sizeof(struct xgbe_sfp_eeprom) * 3  for the hex output
+	 *   sizeof(struct xgbe_sfp_eeprom)      for the ASCII output
+	 *   sizeof(struct xgbe_sfp_eeprom)
+	 *       / XGBE_SFP_EEPROM_LINE * 4      for extra spaces and newlines
+	 */
+	size = (sizeof(struct xgbe_sfp_eeprom) * 4) +
+	       (sizeof(struct xgbe_sfp_eeprom) / XGBE_SFP_EEPROM_LINE * 4);
+	buffer = kzalloc(size, GFP_ATOMIC);
+	if (!buffer)
+		return NULL;
+
+	cur = buffer;
+	eeprom = (unsigned char *)&phy_data->sfp_eeprom;
+	eeprom_end = eeprom + sizeof(struct xgbe_sfp_eeprom);
+	for (; eeprom < eeprom_end; eeprom += XGBE_SFP_EEPROM_LINE) {
+		hex_dump_to_buffer(eeprom, XGBE_SFP_EEPROM_LINE,
+				   XGBE_SFP_EEPROM_LINE, 1, cur, size, true);
+
+		/* Reduce size by new string length (including newline) */
+		size -= strlen(cur);
+		size--;
+
+		/* Adjust buffer and add a new line */
+		cur += strlen(cur);
+		*cur++ = '\n';
+	}
+
+	return buffer;
 }
 
 static void xgbe_phy_phydev_flowctrl(struct xgbe_prv_data *pdata)
@@ -2744,6 +2819,7 @@ static void xgbe_phy_exit(struct xgbe_prv_data *pdata)
 
 static int xgbe_phy_init(struct xgbe_prv_data *pdata)
 {
+	struct xgbe_phy_impl_if *phy_impl = &pdata->phy_if.phy_impl;
 	struct xgbe_phy_data *phy_data;
 	struct mii_bus *mii;
 	unsigned int reg;
@@ -2869,6 +2945,8 @@ static int xgbe_phy_init(struct xgbe_prv_data *pdata)
 		}
 
 		phy_data->phydev_mode = XGBE_MDIO_MODE_CL22;
+		phy_impl->phydev_read = xgbe_phy_phydev_read;
+		phy_impl->phydev_write = xgbe_phy_phydev_write;
 		break;
 
 	/* MDIO Base-X support */
@@ -2880,6 +2958,8 @@ static int xgbe_phy_init(struct xgbe_prv_data *pdata)
 		phy_data->start_mode = XGBE_MODE_X;
 
 		phy_data->phydev_mode = XGBE_MDIO_MODE_CL22;
+		phy_impl->phydev_read = xgbe_phy_phydev_read;
+		phy_impl->phydev_write = xgbe_phy_phydev_write;
 		break;
 
 	/* MDIO NBase-T support */
@@ -2901,6 +2981,8 @@ static int xgbe_phy_init(struct xgbe_prv_data *pdata)
 		}
 
 		phy_data->phydev_mode = XGBE_MDIO_MODE_CL45;
+		phy_impl->phydev_read = xgbe_phy_phydev_read;
+		phy_impl->phydev_write = xgbe_phy_phydev_write;
 		break;
 
 	/* 10GBase-T support */
@@ -2922,6 +3004,8 @@ static int xgbe_phy_init(struct xgbe_prv_data *pdata)
 		}
 
 		phy_data->phydev_mode = XGBE_MDIO_MODE_CL45;
+		phy_impl->phydev_read = xgbe_phy_phydev_read;
+		phy_impl->phydev_write = xgbe_phy_phydev_write;
 		break;
 
 	/* 10GBase-R support */
@@ -2957,8 +3041,11 @@ static int xgbe_phy_init(struct xgbe_prv_data *pdata)
 		}
 
 		phy_data->phydev_mode = XGBE_MDIO_MODE_CL22;
+		phy_impl->phydev_read = xgbe_phy_phydev_read;
+		phy_impl->phydev_write = xgbe_phy_phydev_write;
 
 		xgbe_phy_sfp_setup(pdata);
+		phy_impl->sfp_eeprom = xgbe_phy_sfp_eeprom;
 		break;
 	default:
 		return -EINVAL;
