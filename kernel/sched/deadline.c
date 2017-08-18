@@ -1793,12 +1793,35 @@ next_node:
 
 static DEFINE_PER_CPU(cpumask_var_t, local_cpu_mask_dl);
 
+/*
+ * Find the first cpu in: mask & sd & ~prefer
+ */
+static int find_cpu(const struct cpumask *mask,
+		    const struct sched_domain *sd,
+		    const struct sched_domain *prefer)
+{
+	const struct cpumask *sds = sched_domain_span(sd);
+	const struct cpumask *ps  = prefer ? sched_domain_span(prefer) : NULL;
+	int cpu = -1;
+
+	while ((cpu = cpumask_next(cpu, mask)) < nr_cpu_ids) {
+		if (!cpumask_test_cpu(cpu, sds))
+			continue;
+		if (ps && cpumask_test_cpu(cpu, ps))
+			continue;
+		break;
+	}
+
+	return cpu;
+}
+
 static int find_later_rq(struct task_struct *task)
 {
-	struct sched_domain *sd;
+	struct sched_domain *sd, *prefer = NULL;
 	struct cpumask *later_mask = this_cpu_cpumask_var_ptr(local_cpu_mask_dl);
 	int this_cpu = smp_processor_id();
 	int cpu = task_cpu(task);
+	int fallback_cpu = -1;
 
 	/* Make sure the mask is initialized first */
 	if (unlikely(!later_mask))
@@ -1850,8 +1873,7 @@ static int find_later_rq(struct task_struct *task)
 				return this_cpu;
 			}
 
-			best_cpu = cpumask_first_and(later_mask,
-							sched_domain_span(sd));
+			best_cpu = find_cpu(later_mask, sd, prefer);
 			/*
 			 * Last chance: if a cpu being in both later_mask
 			 * and current sd span is valid, that becomes our
@@ -1859,12 +1881,39 @@ static int find_later_rq(struct task_struct *task)
 			 * already under consideration through later_mask.
 			 */
 			if (best_cpu < nr_cpu_ids) {
+				/*
+				 * If current domain is SD_PREFER_SIBLING
+				 * flaged, we have to try to check other
+				 * siblings first.
+				 */
+				if (sd->flags & SD_PREFER_SIBLING) {
+					prefer = sd;
+
+					/*
+					 * fallback_cpu should be one
+					 * in the closest domain among
+					 * SD_PREFER_SIBLING domains,
+					 * in case that more than one
+					 * SD_PREFER_SIBLING domains
+					 * exist in the hierachy.
+					 */
+					if (fallback_cpu == -1)
+						fallback_cpu = best_cpu;
+					continue;
+				}
 				rcu_read_unlock();
 				return best_cpu;
 			}
 		}
 	}
 	rcu_read_unlock();
+
+	/*
+	 * If fallback_cpu is valid, all our guesses failed *except* for
+	 * SD_PREFER_SIBLING domain. Now, we can return the fallback cpu.
+	 */
+	if (fallback_cpu != -1)
+		return fallback_cpu;
 
 	/*
 	 * At this point, all our guesses failed, we just return
