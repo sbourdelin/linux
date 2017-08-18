@@ -130,6 +130,7 @@
 #include <linux/completion.h>
 #include <linux/cpumask.h>
 #include <linux/interrupt.h>
+#include <linux/dcache.h>
 
 #define XGBE_DRV_NAME		"amd-xgbe"
 #define XGBE_DRV_VERSION	"1.0.3"
@@ -1181,7 +1182,6 @@ struct xgbe_prv_data {
 	struct tasklet_struct tasklet_i2c;
 	struct tasklet_struct tasklet_an;
 
-#ifdef CONFIG_DEBUG_FS
 	struct dentry *xgbe_debugfs;
 
 	unsigned int debugfs_xgmac_reg;
@@ -1195,7 +1195,6 @@ struct xgbe_prv_data {
 
 	unsigned int debugfs_phydev_mmd;
 	unsigned int debugfs_phydev_reg;
-#endif
 };
 
 /* Function prototypes*/
@@ -1244,9 +1243,11 @@ void xgbe_init_tx_coalesce(struct xgbe_prv_data *);
 #ifdef CONFIG_DEBUG_FS
 void xgbe_debugfs_init(struct xgbe_prv_data *);
 void xgbe_debugfs_exit(struct xgbe_prv_data *);
+void xgbe_debugfs_rename(struct xgbe_prv_data *pdata);
 #else
 static inline void xgbe_debugfs_init(struct xgbe_prv_data *pdata) {}
 static inline void xgbe_debugfs_exit(struct xgbe_prv_data *pdata) {}
+static inline void xgbe_debugfs_rename(struct xgbe_prv_data *pdata) {}
 #endif /* CONFIG_DEBUG_FS */
 
 /* NOTE: Uncomment for function trace log messages in KERNEL LOG */
