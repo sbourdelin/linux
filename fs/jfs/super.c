@@ -526,7 +526,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	jfs_info("In jfs_read_super: s_flags=0x%lx", sb->s_flags);
 
-	sbi = kzalloc(sizeof(struct jfs_sb_info), GFP_KERNEL);
+	sbi = kzalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
 

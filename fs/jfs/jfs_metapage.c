@@ -107,7 +107,7 @@ static inline int insert_metapage(struct page *page, struct metapage *mp)
 	if (PagePrivate(page))
 		a = mp_anchor(page);
 	else {
-		a = kzalloc(sizeof(struct meta_anchor), GFP_NOFS);
+		a = kzalloc(sizeof(*a), GFP_NOFS);
 		if (!a)
 			return -ENOMEM;
 		set_page_private(page, (unsigned long)a);

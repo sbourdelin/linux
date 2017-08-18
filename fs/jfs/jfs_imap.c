@@ -115,7 +115,7 @@ int diMount(struct inode *ipimap)
 	 * allocate/initialize the in-memory inode map control structure
 	 */
 	/* allocate the in-memory inode map control structure. */
-	imap = kmalloc(sizeof(struct inomap), GFP_KERNEL);
+	imap = kmalloc(sizeof(*imap), GFP_KERNEL);
 	if (!imap)
 		return -ENOMEM;
 
