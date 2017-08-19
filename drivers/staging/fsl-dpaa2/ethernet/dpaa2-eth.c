@@ -1636,7 +1636,8 @@ static void set_fq_affinity(struct dpaa2_eth_priv *priv)
 	 * This may well change at runtime, either through irqbalance or
 	 * through direct user intervention.
 	 */
-	rx_cpu = txc_cpu = cpumask_first(&priv->dpio_cpumask);
+	rx_cpu = cpumask_first(&priv->dpio_cpumask);
+	txc_cpu = cpumask_first(&priv->dpio_cpumask);
 
 	for (i = 0; i < priv->num_fqs; i++) {
 		fq = &priv->fq[i];
