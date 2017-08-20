@@ -1,0 +1,24 @@
+Small Form Factor (SFF) Committee Small Form-factor Pluggable (SFP)
+Transceiver
+
+Required properties:
+
+- compatible : must be "sff,sfp"
+
+Optional Properties:
+
+- i2c-bus : phandle of an I2C bus controller for the SFP two wire serial
+  interface
+
+- moddef0-gpio : phandle of the MOD-DEF0 (AKA Mod_ABS) module presence input
+  gpio signal
+
+- los-gpio : phandle of the Receiver Loss of Signal Indication input gpio
+  signal
+
+- tx-fault-gpio : phandle of the Module Transmitter Fault input gpio signal
+
+- tx-disable-gpio : phandle of the Transmitter Disable output gpio signal
+
+- rate-select-gpio : phandle of the Rx Signaling Rate Select (AKA RS0) output
+  gpio
