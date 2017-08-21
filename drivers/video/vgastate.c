@@ -31,8 +31,9 @@ struct regstate {
 	__u8 misc;
 };
 
-static inline unsigned char vga_rcrtcs(void __iomem *regbase, unsigned short iobase,
-				       unsigned char reg)
+static inline unsigned char vga_rcrtcs(void __iomem *regbase,
+						unsigned short iobase,
+							unsigned char reg)
 {
 	vga_w(regbase, iobase + 0x4, reg);
 	return vga_r(regbase, iobase + 0x5);
@@ -454,8 +455,9 @@ int save_vga(struct vgastate *state)
 	}
 	return 0;
 }
+EXPORT_SYMBOL(save_vga);
 
-int restore_vga (struct vgastate *state)
+int restore_vga(struct vgastate *state)
 {
 	if (state->vidstate == NULL)
 		return 1;
@@ -480,8 +482,6 @@ int restore_vga (struct vgastate *state)
 	vga_cleanup(state);
 	return 0;
 }
-
-EXPORT_SYMBOL(save_vga);
 EXPORT_SYMBOL(restore_vga);
 
 MODULE_AUTHOR("James Simmons <jsimmons@users.sf.net>");
