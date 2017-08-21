@@ -823,6 +823,9 @@ extern void return_to_handler(void);
 extern int
 ftrace_push_return_trace(unsigned long ret, unsigned long func, int *depth,
 			 unsigned long frame_pointer, unsigned long *retp);
+extern void
+ftrace_pop_return_trace(struct ftrace_graph_ret *trace, unsigned long *ret,
+			unsigned long frame_pointer);
 
 unsigned long ftrace_graph_ret_addr(struct task_struct *task, int *idx,
 				    unsigned long ret, unsigned long *retp);

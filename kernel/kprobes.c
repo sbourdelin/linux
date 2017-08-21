@@ -1839,6 +1839,13 @@ void unregister_jprobes(struct jprobe **jps, int num)
 EXPORT_SYMBOL_GPL(unregister_jprobes);
 
 #ifdef CONFIG_KRETPROBES
+int __weak arch_prepare_kretprobe_fast(struct kretprobe *rp,
+				       struct pt_regs *regs)
+{
+	return -ENOTSUPP;
+}
+NOKPROBE_SYMBOL(arch_prepare_kretprobe_fast);
+
 /*
  * This kprobe pre_handler is registered with every kretprobe. When probe
  * hits it will set up the return probe.
@@ -1859,6 +1866,10 @@ static int pre_handler_kretprobe(struct kprobe *p, struct pt_regs *regs)
 		rp->nmissed++;
 		return 0;
 	}
+
+	/* Try to use fastpath (lockless) */
+	if (!rp->entry_handler && !arch_prepare_kretprobe_fast(rp, regs))
+		return 0;
 
 	/* TODO: consider to only swap the RA after the last pre_handler fired */
 	hash = hash_ptr(current, KPROBE_HASH_BITS);

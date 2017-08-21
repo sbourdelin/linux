@@ -545,6 +545,101 @@ static nokprobe_inline void restore_btf(void)
 	}
 }
 
+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+
+__visible __used void *trampoline_fast_handler(struct pt_regs *regs)
+{
+	struct kretprobe_instance ri;	/* fake instance */
+	struct ftrace_graph_ret trace;
+	unsigned long ret_addr;
+
+	ftrace_pop_return_trace(&trace, &ret_addr, 0);
+	barrier();
+	current->curr_ret_stack--;
+	if (current->curr_ret_stack < -1)
+		current->curr_ret_stack += FTRACE_NOTRACE_DEPTH;
+
+	if (unlikely(!ret_addr || ret_addr == (unsigned long)panic)) {
+		ret_addr = (unsigned long)panic;
+		goto out;
+	}
+
+	ri.rp = (struct kretprobe *)trace.func;
+	if (ri.rp->handler) {
+		ri.ret_addr = (void *)ret_addr;
+		ri.task = current;
+
+		preempt_disable();
+		__this_cpu_write(current_kprobe, &(ri.rp->kp));
+		get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
+		ri.rp->handler(&ri, regs);
+		__this_cpu_write(current_kprobe, NULL);
+		preempt_enable_no_resched();
+	}
+out:
+	return (void *)ret_addr;
+}
+
+asmlinkage void kretprobe_trampoline_fast(void);
+/*
+ * When a retprobed function returns, this code saves registers and
+ * calls trampoline_handler() runs, which calls the kretprobe's handler.
+ */
+asm(
+	".global kretprobe_trampoline_fast\n"
+	".type kretprobe_trampoline_fast, @function\n"
+	"kretprobe_trampoline_fast:\n"
+#ifdef CONFIG_X86_64
+	/* We don't bother saving the ss register */
+	"	pushq %rsp\n"
+	"	pushfq\n"
+	SAVE_REGS_STRING
+	"	movq %rsp, %rdi\n"
+	"	call trampoline_fast_handler\n"
+	/* Replace saved sp with true return address. */
+	"	movq %rax, 152(%rsp)\n"
+	RESTORE_REGS_STRING
+	"	popfq\n"
+#else
+	"	pushf\n"
+	SAVE_REGS_STRING
+	"	movl %esp, %eax\n"
+	"	call trampoline_fast_handler\n"
+	/* Move flags to cs */
+	"	movl 56(%esp), %edx\n"
+	"	movl %edx, 52(%esp)\n"
+	/* Replace saved flags with true return address. */
+	"	movl %eax, 56(%esp)\n"
+	RESTORE_REGS_STRING
+	"	popf\n"
+#endif
+	"	ret\n"
+	".size kretprobe_trampoline_fast, .-kretprobe_trampoline_fast\n"
+);
+NOKPROBE_SYMBOL(kretprobe_trampoline_fast);
+STACK_FRAME_NON_STANDARD(kretprobe_trampoline_fast);
+
+int arch_prepare_kretprobe_fast(struct kretprobe *rp, struct pt_regs *regs)
+{
+	unsigned long *parent = stack_addr(regs);
+	unsigned long old = *parent;
+	int depth = 0;
+	int ret;
+
+	/* Replace the return addr with trampoline addr */
+	*parent = (unsigned long) &kretprobe_trampoline_fast;
+
+	/* Push on the per-thread return stack */
+	ret = ftrace_push_return_trace(old, (unsigned long)rp, &depth, 0,
+				       parent);
+	if (ret)
+		*parent = old;
+
+	return ret;
+}
+NOKPROBE_SYMBOL(arch_prepare_kretprobe_fast);
+#endif
+
 void arch_prepare_kretprobe(struct kretprobe_instance *ri, struct pt_regs *regs)
 {
 	unsigned long *sara = stack_addr(regs);

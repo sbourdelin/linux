@@ -182,9 +182,8 @@ ftrace_push_return_trace(unsigned long ret, unsigned long func, int *depth,
 }
 
 /* Retrieve a function return address to the trace stack on thread info.*/
-static void
-ftrace_pop_return_trace(struct ftrace_graph_ret *trace, unsigned long *ret,
-			unsigned long frame_pointer)
+void ftrace_pop_return_trace(struct ftrace_graph_ret *trace,
+			     unsigned long *ret, unsigned long frame_pointer)
 {
 	int index;
 
