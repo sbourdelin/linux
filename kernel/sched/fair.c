@@ -5499,18 +5499,21 @@ static unsigned long capacity_spare_wake(int cpu, struct task_struct *p)
  * domain.
  */
 static struct sched_group *
-find_idlest_group(struct sched_domain *sd, struct task_struct *p,
-		  int this_cpu, int sd_flag)
+find_idlest_group(struct sched_domain *sd, struct task_struct *p, int sd_flag)
 {
 	struct sched_group *idlest = NULL, *group = sd->groups;
+	struct sched_group *local_group = sd->groups;
 	struct sched_group *most_spare_sg = NULL;
-	unsigned long min_runnable_load = ULONG_MAX, this_runnable_load = 0;
-	unsigned long min_avg_load = ULONG_MAX, this_avg_load = 0;
+	unsigned long min_runnable_load = ULONG_MAX, this_runnable_load = ULONG_MAX;
+	unsigned long min_avg_load = ULONG_MAX, this_avg_load = ULONG_MAX;
 	unsigned long most_spare = 0, this_spare = 0;
 	int load_idx = sd->forkexec_idx;
 	int imbalance_scale = 100 + (sd->imbalance_pct-100)/2;
 	unsigned long imbalance = scale_load_down(NICE_0_LOAD) *
 				(sd->imbalance_pct-100) / 100;
+
+	if (!cpumask_intersects(sched_domain_span(sd), &p->cpus_allowed))
+		return NULL;
 
 	if (sd_flag & SD_BALANCE_WAKE)
 		load_idx = sd->wake_idx;
@@ -5518,16 +5521,13 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p,
 	do {
 		unsigned long load, avg_load, runnable_load;
 		unsigned long spare_cap, max_spare_cap;
-		int local_group;
+		bool group_is_local = group == local_group;
 		int i;
 
 		/* Skip over this group if it has no CPUs allowed */
 		if (!cpumask_intersects(sched_group_span(group),
 					&p->cpus_allowed))
 			continue;
-
-		local_group = cpumask_test_cpu(this_cpu,
-					       sched_group_span(group));
 
 		/*
 		 * Tally up the load of all CPUs in the group and find
@@ -5539,7 +5539,7 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p,
 
 		for_each_cpu(i, sched_group_span(group)) {
 			/* Bias balancing toward cpus of our domain */
-			if (local_group)
+			if (group_is_local)
 				load = source_load(i, load_idx);
 			else
 				load = target_load(i, load_idx);
@@ -5560,7 +5560,7 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p,
 		runnable_load = (runnable_load * SCHED_CAPACITY_SCALE) /
 					group->sgc->capacity;
 
-		if (local_group) {
+		if (group_is_local) {
 			this_runnable_load = runnable_load;
 			this_avg_load = avg_load;
 			this_spare = max_spare_cap;
@@ -5606,21 +5606,21 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p,
 
 	if (this_spare > task_util(p) / 2 &&
 	    imbalance_scale*this_spare > 100*most_spare)
-		return NULL;
+		return local_group;
 
 	if (most_spare > task_util(p) / 2)
 		return most_spare_sg;
 
 skip_spare:
 	if (!idlest)
-		return NULL;
+		return local_group;
 
 	if (min_runnable_load > (this_runnable_load + imbalance))
-		return NULL;
+		return local_group;
 
 	if ((this_runnable_load < (min_runnable_load + imbalance)) &&
 	     (100*this_avg_load < imbalance_scale*min_avg_load))
-		return NULL;
+		return local_group;
 
 	return idlest;
 }
@@ -6044,8 +6044,12 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 			continue;
 		}
 
-		group = find_idlest_group(sd, p, cpu, sd_flag);
+		group = find_idlest_group(sd, p, sd_flag);
 		if (!group) {
+			break;
+		} else if (group == sd->groups) {
+			new_cpu = cpu;
+			/* Now try balancing at a lower domain level of cpu */
 			sd = sd->child;
 			continue;
 		}
