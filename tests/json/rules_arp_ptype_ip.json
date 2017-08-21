@@ -1,0 +1,1 @@
+{"nftables":[{"add":[{"table":{"name":"x","family":"arp","flags":0,"use":1}},{"chain":{"name":"y","handle":1,"table":"x","family":"arp","use":1}},{"rule":{"family":"arp","table":"x","chain":"y","handle":4,"expr":[{"type":"payload","dreg":1,"offset":2,"len":2,"base":"network"},{"type":"cmp","sreg":1,"op":"eq","data":{"reg":{"type":"value","len":2,"data0":"0x00000008"}}}]}}]}]}

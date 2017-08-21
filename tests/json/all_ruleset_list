@@ -1,0 +1,50 @@
+table ip mangle {
+	set set1 {
+		type ipv4_addr
+		elements = { 192.168.1.4, 192.168.1.5 }
+
+	}
+	chain prerouting {
+		type filter hook prerouting priority 0; policy accept;
+		ip saddr @set1 drop
+		ip saddr 192.168.1.100 ip daddr 192.168.1.1 counter packets 0 bytes 0
+		tcp flags != syn counter packets 619772 bytes 389570486
+		icmp type echo-request counter packets 0 bytes 0 drop
+		ct state established,related accept
+		iifname "lo" accept
+		icmp type echo-request accept
+		tcp dport { http, ssh} accept
+	}
+
+}
+table ip6 x {
+	chain y {
+		type nat hook postrouting priority 0; policy accept;
+		ip6 daddr fe00::1-fe00::200 udp dport domain counter packets 0 bytes 0 masquerade
+		meta l4proto tcp masquerade to :1024
+		iifname "wlan0" ct state established,new tcp dport vmap { 222 : drop, ssh : drop} masquerade
+		ip6 daddr fe00::1-fe00::200 udp dport domain counter packets 0 bytes 0 masquerade
+		iifname "eth0" ct state established,new tcp dport vmap { 222 : drop, ssh : drop} masquerade
+		tcp dport ssh ip6 daddr 1::2 ether saddr 00:0f:54:0c:11:04 accept
+	        icmpv6 id 33-45
+	}
+}
+table arp x {
+	chain y {
+		arp operation { request, reply, inreply, inrequest, nak, rrequest, rreply}
+		arp operation != rrequest
+		arp ptype ip
+		arp hlen 33-45
+		arp htype 22
+	}
+}
+table bridge x {
+	chain y {
+		type filter hook input priority 0; policy accept;
+		ether daddr 00:01:02:03:04:05 ether saddr set ff:fe:dc:ba:98:76 drop
+		vlan id 4094 vlan cfi 0
+		vlan id 4094
+		vlan id 1 ip saddr 10.0.0.0/23 udp dport domain
+		ether type ip reject with icmp type host-unreachable
+	}
+}
