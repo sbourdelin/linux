@@ -640,10 +640,20 @@ static int kvm_create_vm_debugfs(struct kvm *kvm, int fd)
 	return 0;
 }
 
+static inline struct kvm *kvm_alloc_vm(void)
+{
+	return kzalloc(sizeof(struct kvm), GFP_KERNEL);
+}
+
+static inline void kvm_free_vm(struct kvm *kvm)
+{
+	kfree(kvm);
+}
+
 static struct kvm *kvm_create_vm(unsigned long type)
 {
 	int r, i;
-	struct kvm *kvm = kvm_arch_alloc_vm();
+	struct kvm *kvm = kvm_alloc_vm();
 
 	if (!kvm)
 		return ERR_PTR(-ENOMEM);
@@ -720,7 +730,7 @@ out_err_no_disable:
 		kfree(kvm_get_bus(kvm, i));
 	for (i = 0; i < KVM_ADDRESS_SPACE_NUM; i++)
 		kvm_free_memslots(kvm, __kvm_memslots(kvm, i));
-	kvm_arch_free_vm(kvm);
+	kvm_free_vm(kvm);
 	mmdrop(current->mm);
 	return ERR_PTR(r);
 }
@@ -771,7 +781,7 @@ static void kvm_destroy_vm(struct kvm *kvm)
 		kvm_free_memslots(kvm, __kvm_memslots(kvm, i));
 	cleanup_srcu_struct(&kvm->irq_srcu);
 	cleanup_srcu_struct(&kvm->srcu);
-	kvm_arch_free_vm(kvm);
+	kvm_free_vm(kvm);
 	preempt_notifier_dec();
 	hardware_disable_all();
 	mmdrop(mm);
