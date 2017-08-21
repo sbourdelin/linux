@@ -1,5 +1,6 @@
 obj-$(CONFIG_PCIE_DW) += pcie-designware.o
-obj-$(CONFIG_PCIE_DW_HOST) += pcie-designware-host.o
+msi-obj-$(CONFIG_PCI_MSI) += pcie-designware-msi.o
+obj-$(CONFIG_PCIE_DW_HOST) += pcie-designware-host.o $(msi-obj-y)
 obj-$(CONFIG_PCIE_DW_HOST_ECAM) += pcie-designware-ecam.o
 obj-$(CONFIG_PCIE_DW_EP) += pcie-designware-ep.o
 obj-$(CONFIG_PCIE_DW_PLAT) += pcie-designware-plat.o
