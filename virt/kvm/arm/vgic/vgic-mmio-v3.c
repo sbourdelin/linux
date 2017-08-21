@@ -797,7 +797,6 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
 	u16 target_cpus;
 	u64 mpidr;
 	int sgi, c;
-	int vcpu_id = vcpu->vcpu_id;
 	bool broadcast;
 
 	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
@@ -821,7 +820,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
 			break;
 
 		/* Don't signal the calling VCPU */
-		if (broadcast && c == vcpu_id)
+		if (broadcast && c_vcpu == vcpu)
 			continue;
 
 		if (!broadcast) {
