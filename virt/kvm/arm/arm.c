@@ -166,6 +166,14 @@ int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
 	return VM_FAULT_SIGBUS;
 }
 
+void kvm_arch_free_vcpus(struct kvm *kvm)
+{
+	int i;
+	struct kvm_vcpu *vcpu;
+
+	for_each_online_vcpu(i, vcpu, kvm)
+		kvm_arch_vcpu_free(vcpu);
+}
 
 /**
  * kvm_arch_destroy_vm - destroy the VM data structure
@@ -173,17 +181,10 @@ int kvm_arch_vcpu_fault(struct kvm_vcpu *vcpu, struct vm_fault *vmf)
  */
 void kvm_arch_destroy_vm(struct kvm *kvm)
 {
-	int i;
-
 	free_percpu(kvm->arch.last_vcpu_ran);
 	kvm->arch.last_vcpu_ran = NULL;
 
-	for (i = 0; i < KVM_MAX_VCPUS; ++i) {
-		if (kvm->vcpus[i]) {
-			kvm_arch_vcpu_free(kvm->vcpus[i]);
-			kvm->vcpus[i] = NULL;
-		}
-	}
+	kvm_free_vcpus(kvm);
 
 	kvm_vgic_destroy(kvm);
 }

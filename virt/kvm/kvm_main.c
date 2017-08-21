@@ -750,6 +750,23 @@ static void kvm_destroy_devices(struct kvm *kvm)
 	}
 }
 
+void kvm_free_vcpus(struct kvm *kvm)
+{
+	int i;
+
+	kvm_arch_free_vcpus(kvm);
+
+	mutex_lock(&kvm->lock);
+
+	i = atomic_read(&kvm->online_vcpus);
+	atomic_set(&kvm->online_vcpus, 0);
+
+	while (i--)
+		kvm->vcpus[i] = NULL;
+
+	mutex_unlock(&kvm->lock);
+}
+
 static void kvm_destroy_vm(struct kvm *kvm)
 {
 	int i;
