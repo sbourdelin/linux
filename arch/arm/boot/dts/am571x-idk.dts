@@ -91,6 +91,22 @@
 	};
 };
 
+&mmu0_dsp1 {
+	status = "okay";
+};
+
+&mmu1_dsp1 {
+	status = "okay";
+};
+
+&mmu_ipu1 {
+	status = "okay";
+};
+
+&mmu_ipu2 {
+	status = "okay";
+};
+
 &pcie1_rc {
 	status = "okay";
 	gpios = <&gpio3 23 GPIO_ACTIVE_HIGH>;
