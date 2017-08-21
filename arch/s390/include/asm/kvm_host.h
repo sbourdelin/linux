@@ -735,6 +735,7 @@ struct kvm_arch{
 	struct mutex ipte_mutex;
 	struct ratelimit_state sthyi_limit;
 	spinlock_t start_stop_lock;
+	unsigned started_vcpus;
 	struct sie_page2 *sie_page2;
 	struct kvm_s390_cpu_model model;
 	struct kvm_s390_crypto crypto;

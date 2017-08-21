@@ -3414,25 +3414,17 @@ static void __enable_ibs_on_vcpu(struct kvm_vcpu *vcpu)
 
 void kvm_s390_vcpu_start(struct kvm_vcpu *vcpu)
 {
-	int i, online_vcpus, started_vcpus = 0;
-
 	if (!is_vcpu_stopped(vcpu))
 		return;
 
 	trace_kvm_s390_vcpu_start_stop(vcpu->vcpu_id, 1);
 	/* Only one cpu at a time may enter/leave the STOPPED state. */
 	spin_lock(&vcpu->kvm->arch.start_stop_lock);
-	online_vcpus = atomic_read(&vcpu->kvm->online_vcpus);
 
-	for (i = 0; i < online_vcpus; i++) {
-		if (!is_vcpu_stopped(vcpu->kvm->vcpus[i]))
-			started_vcpus++;
-	}
-
-	if (started_vcpus == 0) {
+	if (vcpu->kvm->arch.started_vcpus == 0) {
 		/* we're the only active VCPU -> speed it up */
 		__enable_ibs_on_vcpu(vcpu);
-	} else if (started_vcpus == 1) {
+	} else if (vcpu->kvm->arch.started_vcpus == 1) {
 		/*
 		 * As we are starting a second VCPU, we have to disable
 		 * the IBS facility on all VCPUs to remove potentially
@@ -3440,6 +3432,8 @@ void kvm_s390_vcpu_start(struct kvm_vcpu *vcpu)
 		 */
 		__disable_ibs_on_all_vcpus(vcpu->kvm);
 	}
+
+	vcpu->kvm->arch.started_vcpus++;
 
 	atomic_andnot(CPUSTAT_STOPPED, &vcpu->arch.sie_block->cpuflags);
 	/*
@@ -3453,16 +3447,12 @@ void kvm_s390_vcpu_start(struct kvm_vcpu *vcpu)
 
 void kvm_s390_vcpu_stop(struct kvm_vcpu *vcpu)
 {
-	int i, online_vcpus, started_vcpus = 0;
-	struct kvm_vcpu *started_vcpu = NULL;
-
 	if (is_vcpu_stopped(vcpu))
 		return;
 
 	trace_kvm_s390_vcpu_start_stop(vcpu->vcpu_id, 0);
 	/* Only one cpu at a time may enter/leave the STOPPED state. */
 	spin_lock(&vcpu->kvm->arch.start_stop_lock);
-	online_vcpus = atomic_read(&vcpu->kvm->online_vcpus);
 
 	/* SIGP STOP and SIGP STOP AND STORE STATUS has been fully processed */
 	kvm_s390_clear_stop_irq(vcpu);
@@ -3470,19 +3460,20 @@ void kvm_s390_vcpu_stop(struct kvm_vcpu *vcpu)
 	atomic_or(CPUSTAT_STOPPED, &vcpu->arch.sie_block->cpuflags);
 	__disable_ibs_on_vcpu(vcpu);
 
-	for (i = 0; i < online_vcpus; i++) {
-		if (!is_vcpu_stopped(vcpu->kvm->vcpus[i])) {
-			started_vcpus++;
-			started_vcpu = vcpu->kvm->vcpus[i];
-		}
-	}
+	vcpu->kvm->arch.started_vcpus--;
 
-	if (started_vcpus == 1) {
+	if (vcpu->kvm->arch.started_vcpus == 1) {
+		struct kvm_vcpu *started_vcpu;
+
 		/*
-		 * As we only have one VCPU left, we want to enable the
-		 * IBS facility for that VCPU to speed it up.
+		 * As we only have one VCPU left, we want to enable the IBS
+		 * facility for that VCPU to speed it up.
 		 */
-		__enable_ibs_on_vcpu(started_vcpu);
+		kvm_for_each_vcpu(i, started_vcpu, vcpu->kvm)
+			if (!is_vcpu_stopped(started_vcpu)) {
+				__enable_ibs_on_vcpu(started_vcpu);
+				break;
+			}
 	}
 
 	spin_unlock(&vcpu->kvm->arch.start_stop_lock);
