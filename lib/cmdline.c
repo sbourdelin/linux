@@ -73,14 +73,15 @@ EXPORT_SYMBOL(get_option);
 /**
  *	get_options - Parse a string into a list of integers
  *	@str: String to be parsed
- *	@nints: size of integer array
+ *	@nints: size of integer array (including the extra int at the start)
  *	@ints: integer array
  *
  *	This function parses a string containing a comma-separated
  *	list of integers, a hyphen-separated range of _positive_ integers,
  *	or a combination of both.  The parse halts when the array is
  *	full, or when no more numbers can be retrieved from the
- *	string.
+ *	string.  It stores the number of numbers as the first element in the
+ *	array.
  *
  *	Return value is the character in the string which caused
  *	the parse to end (typically a null terminator, if @str is
