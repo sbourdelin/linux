@@ -61,7 +61,7 @@ static unsigned int teton_bga_matrix_key_map[] = {
 	KEY(1, 7, KEY_RIGHT),
 };
 
-static struct matrix_keymap_data teton_bga_matrix_keymap_data = {
+static const struct matrix_keymap_data teton_bga_matrix_keymap_data = {
 	.keymap			= teton_bga_matrix_key_map,
 	.keymap_size		= ARRAY_SIZE(teton_bga_matrix_key_map),
 };

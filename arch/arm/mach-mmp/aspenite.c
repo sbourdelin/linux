@@ -219,7 +219,7 @@ static const unsigned int aspenite_matrix_key_map[] = {
 	KEY(4, 7, KEY_ESC),	/* SW 9 */
 };
 
-static struct matrix_keymap_data aspenite_matrix_keymap_data = {
+static const struct matrix_keymap_data aspenite_matrix_keymap_data = {
 	.keymap			= aspenite_matrix_key_map,
 	.keymap_size		= ARRAY_SIZE(aspenite_matrix_key_map),
 };
