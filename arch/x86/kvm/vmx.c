@@ -2488,6 +2488,10 @@ static int nested_vmx_check_exception(struct kvm_vcpu *vcpu)
 		}
 	} else {
 		unsigned long exit_qual = 0;
+
+		if (to_vmx(vcpu)->nested.nested_run_pending)
+			return 0;
+
 		if (nr == DB_VECTOR)
 			exit_qual = vcpu->arch.dr6;
 
