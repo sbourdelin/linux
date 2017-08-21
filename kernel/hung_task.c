@@ -16,10 +16,26 @@
 #include <linux/export.h>
 #include <linux/sysctl.h>
 #include <linux/utsname.h>
+#include <linux/uaccess.h>
+#include <linux/slab.h>
+#include <linux/proc_fs.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/debug.h>
 
 #include <trace/events/sched.h>
+
+/*
+ * Hung task that needs monitoring
+ */
+struct hung_task {
+	struct list_head list;
+	char comm[TASK_COMM_LEN];
+};
+
+static struct hung_task	*monitor_list;
+int sysctl_hung_task_check_selected;
+
+
 
 /*
  * The number of tasks checked:
@@ -75,6 +91,92 @@ hung_task_panic(struct notifier_block *this, unsigned long event, void *ptr)
 static struct notifier_block panic_block = {
 	.notifier_call = hung_task_panic,
 };
+
+static void hung_task_monitor_setup(void)
+{
+	monitor_list = kmalloc(sizeof(*monitor_list), GFP_KERNEL);
+	if (monitor_list) {
+		INIT_LIST_HEAD(&monitor_list->list);
+		memset(monitor_list->comm, 0, TASK_COMM_LEN);
+	}
+}
+
+
+static  int hung_task_info_show(struct seq_file *m, void *v)
+{
+	struct hung_task *ht;
+
+	ht = list_entry(v, struct hung_task, list);
+	seq_puts(m, ht->comm);
+
+	return 0;
+}
+
+static void *hung_task_info_start(struct seq_file *m, loff_t *pos)
+{
+	return seq_list_start_head(&monitor_list->list, *pos);
+}
+
+static void *hung_task_info_next(struct seq_file *m, void *v, loff_t *pos)
+{
+	return seq_list_next(v, &monitor_list->list, pos);
+}
+
+static void hung_task_info_stop(struct seq_file *m, void *v)
+{
+}
+
+const struct seq_operations hung_task_info_op = {
+	.start	= hung_task_info_start,
+	.next	= hung_task_info_next,
+	.stop	= hung_task_info_stop,
+	.show	= hung_task_info_show
+};
+
+static int hung_task_info_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &hung_task_info_op);
+}
+
+static ssize_t
+hung_task_info_write(struct file *file, const char __user *buf, size_t count,
+	     loff_t *offs)
+{
+	struct task_struct *g, *t;
+	struct hung_task *ht = kmalloc(sizeof(*ht), GFP_KERNEL);
+
+	if (!ht)
+		return -ENOMEM;
+
+	if (copy_from_user(ht->comm, buf, count))
+		return -EFAULT;
+	ht->comm[count] = '\0';
+
+	for_each_process_thread(g, t) {
+		if (!strncmp(t->comm, ht->comm, strlen(t->comm))) {
+			list_add_tail(&ht->list, &monitor_list->list);
+			return count;
+		}
+	}
+
+	pr_err("Non-existing task: %s can't be monitored\n", ht->comm);
+	return count;
+}
+
+static const struct file_operations hung_task_info_operations = {
+	.open		= hung_task_info_open,
+	.read		= seq_read,
+	.write		= hung_task_info_write,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
+static int __init proc_hung_task_info_init(void)
+{
+	proc_create("hung_task_monitor_list", 0644, NULL,
+		    &hung_task_info_operations);
+	return 0;
+}
 
 static void check_hung_task(struct task_struct *t, unsigned long timeout)
 {
@@ -167,6 +269,7 @@ static void check_hung_uninterruptible_tasks(unsigned long timeout)
 	int max_count = sysctl_hung_task_check_count;
 	int batch_count = HUNG_TASK_BATCHING;
 	struct task_struct *g, *t;
+	struct hung_task *ht, *tmp;
 
 	/*
 	 * If the system crashed already then all bets are off,
@@ -186,9 +289,21 @@ static void check_hung_uninterruptible_tasks(unsigned long timeout)
 				goto unlock;
 		}
 		/* use "==" to skip the TASK_KILLABLE tasks waiting on NFS */
-		if (t->state == TASK_UNINTERRUPTIBLE)
-			check_hung_task(t, timeout);
+		if (t->state == TASK_UNINTERRUPTIBLE) {
+			if (sysctl_hung_task_check_selected) {
+				list_for_each_entry_safe(ht, tmp,
+							 &monitor_list->list,
+							 list)
+					if (!strncmp(ht->comm, t->comm,
+					    strlen(t->comm)))
+					/* Task belongs to the selected group */
+						check_hung_task(t, timeout);
+			} else {
+				check_hung_task(t, timeout);
+			}
+		}
 	}
+
  unlock:
 	rcu_read_unlock();
 	if (hung_task_show_lock)
@@ -259,6 +374,8 @@ static int watchdog(void *dummy)
 static int __init hung_task_init(void)
 {
 	atomic_notifier_chain_register(&panic_notifier_list, &panic_block);
+	hung_task_monitor_setup();
+	proc_hung_task_info_init();
 	watchdog_task = kthread_run(watchdog, NULL, "khungtaskd");
 
 	return 0;
