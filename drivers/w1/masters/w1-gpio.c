@@ -130,10 +130,8 @@ static int w1_gpio_probe(struct platform_device *pdev)
 
 	master = devm_kzalloc(&pdev->dev, sizeof(struct w1_bus_master),
 			GFP_KERNEL);
-	if (!master) {
-		dev_err(&pdev->dev, "Out of memory\n");
+	if (!master)
 		return -ENOMEM;
-	}
 
 	err = devm_gpio_request(&pdev->dev, pdata->pin, "w1");
 	if (err) {

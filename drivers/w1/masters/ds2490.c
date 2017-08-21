@@ -995,10 +995,9 @@ static int ds_probe(struct usb_interface *intf,
 	int i, err, alt;
 
 	dev = kzalloc(sizeof(struct ds_device), GFP_KERNEL);
-	if (!dev) {
-		pr_info("Failed to allocate new DS9490R structure.\n");
+	if (!dev)
 		return -ENOMEM;
-	}
+
 	dev->udev = usb_get_dev(udev);
 	if (!dev->udev) {
 		err = -ENOMEM;
