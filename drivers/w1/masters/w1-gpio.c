@@ -128,8 +128,7 @@ static int w1_gpio_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
-	master = devm_kzalloc(&pdev->dev, sizeof(struct w1_bus_master),
-			GFP_KERNEL);
+	master = devm_kzalloc(&pdev->dev, sizeof(*master), GFP_KERNEL);
 	if (!master)
 		return -ENOMEM;
 

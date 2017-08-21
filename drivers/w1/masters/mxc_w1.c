@@ -103,8 +103,7 @@ static int mxc_w1_probe(struct platform_device *pdev)
 	unsigned int clkdiv;
 	int err;
 
-	mdev = devm_kzalloc(&pdev->dev, sizeof(struct mxc_w1_device),
-			    GFP_KERNEL);
+	mdev = devm_kzalloc(&pdev->dev, sizeof(*mdev), GFP_KERNEL);
 	if (!mdev)
 		return -ENOMEM;
 
