@@ -57,7 +57,7 @@ static struct resource musb_resources[] = {
 	},
 };
 
-static struct musb_hdrc_config musb_config = {
+static const struct musb_hdrc_config musb_config = {
 	.multipoint	= 0,
 	.dyn_fifo	= 0,
 	.soft_con	= 1,
