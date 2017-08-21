@@ -34,6 +34,12 @@
 
 #include "drm_crtc_internal.h"
 
+#if 0
+#define DBG(...) DRM_DEBUG_ATOMIC(__VA_ARGS__)
+#else
+#define DBG(...)
+#endif
+
 void __drm_crtc_commit_free(struct kref *kref)
 {
 	struct drm_crtc_commit *commit =
@@ -89,7 +95,7 @@ drm_atomic_state_init(struct drm_device *dev, struct drm_atomic_state *state)
 
 	state->dev = dev;
 
-	DRM_DEBUG_ATOMIC("Allocated atomic state %p\n", state);
+	DBG("Allocated atomic state %p\n", state);
 
 	return 0;
 fail:
@@ -139,7 +145,7 @@ void drm_atomic_state_default_clear(struct drm_atomic_state *state)
 	struct drm_mode_config *config = &dev->mode_config;
 	int i;
 
-	DRM_DEBUG_ATOMIC("Clearing atomic state %p\n", state);
+	DBG("Clearing atomic state %p\n", state);
 
 	for (i = 0; i < state->num_connector; i++) {
 		struct drm_connector *connector = state->connectors[i].ptr;
@@ -242,7 +248,7 @@ void __drm_atomic_state_free(struct kref *ref)
 
 	drm_atomic_state_clear(state);
 
-	DRM_DEBUG_ATOMIC("Freeing atomic state %p\n", state);
+	DBG("Freeing atomic state %p\n", state);
 
 	if (config->funcs->atomic_state_free) {
 		config->funcs->atomic_state_free(state);
@@ -295,8 +301,8 @@ drm_atomic_get_crtc_state(struct drm_atomic_state *state,
 	state->crtcs[index].ptr = crtc;
 	crtc_state->state = state;
 
-	DRM_DEBUG_ATOMIC("Added [CRTC:%d:%s] %p state to %p\n",
-			 crtc->base.id, crtc->name, crtc_state, state);
+	DBG("Added [CRTC:%d:%s] %p state to %p\n",
+	    crtc->base.id, crtc->name, crtc_state, state);
 
 	return crtc_state;
 }
@@ -353,13 +359,11 @@ int drm_atomic_set_mode_for_crtc(struct drm_crtc_state *state,
 
 		drm_mode_copy(&state->mode, mode);
 		state->enable = true;
-		DRM_DEBUG_ATOMIC("Set [MODE:%s] for CRTC state %p\n",
-				 mode->name, state);
+		DBG("Set [MODE:%s] for CRTC state %p\n", mode->name, state);
 	} else {
 		memset(&state->mode, 0, sizeof(state->mode));
 		state->enable = false;
-		DRM_DEBUG_ATOMIC("Set [NOMODE] for CRTC state %p\n",
-				 state);
+		DBG("Set [NOMODE] for CRTC state %p\n", state);
 	}
 
 	return 0;
@@ -399,12 +403,11 @@ int drm_atomic_set_mode_prop_for_crtc(struct drm_crtc_state *state,
 
 		state->mode_blob = drm_property_blob_get(blob);
 		state->enable = true;
-		DRM_DEBUG_ATOMIC("Set [MODE:%s] for CRTC state %p\n",
-				 state->mode.name, state);
+		DBG("Set [MODE:%s] for CRTC state %p\n",
+		    state->mode.name, state);
 	} else {
 		state->enable = false;
-		DRM_DEBUG_ATOMIC("Set [NOMODE] for CRTC state %p\n",
-				 state);
+		DBG("Set [NOMODE] for CRTC state %p\n", state);
 	}
 
 	return 0;
@@ -682,8 +685,8 @@ drm_atomic_get_plane_state(struct drm_atomic_state *state,
 	state->planes[index].new_state = plane_state;
 	plane_state->state = state;
 
-	DRM_DEBUG_ATOMIC("Added [PLANE:%d:%s] %p state to %p\n",
-			 plane->base.id, plane->name, plane_state, state);
+	DBG("Added [PLANE:%d:%s] %p state to %p\n",
+	    plane->base.id, plane->name, plane_state, state);
 
 	if (plane_state->crtc) {
 		struct drm_crtc_state *crtc_state;
@@ -1045,8 +1048,8 @@ drm_atomic_get_private_obj_state(struct drm_atomic_state *state,
 
 	state->num_private_objs = num_objs;
 
-	DRM_DEBUG_ATOMIC("Added new private object %p state %p to %p\n",
-			 obj, obj_state, state);
+	DBG("Added new private object %p state %p to %p\n",
+	    obj, obj_state, state);
 
 	return obj_state;
 }
@@ -1112,9 +1115,9 @@ drm_atomic_get_connector_state(struct drm_atomic_state *state,
 	state->connectors[index].ptr = connector;
 	connector_state->state = state;
 
-	DRM_DEBUG_ATOMIC("Added [CONNECTOR:%d:%s] %p state to %p\n",
-			 connector->base.id, connector->name,
-			 connector_state, state);
+	DBG("Added [CONNECTOR:%d:%s] %p state to %p\n",
+	    connector->base.id, connector->name,
+	    connector_state, state);
 
 	if (connector_state->crtc) {
 		struct drm_crtc_state *crtc_state;
@@ -1368,11 +1371,10 @@ drm_atomic_set_crtc_for_plane(struct drm_plane_state *plane_state,
 	}
 
 	if (crtc)
-		DRM_DEBUG_ATOMIC("Link plane state %p to [CRTC:%d:%s]\n",
-				 plane_state, crtc->base.id, crtc->name);
+		DBG("Link plane state %p to [CRTC:%d:%s]\n",
+		    plane_state, crtc->base.id, crtc->name);
 	else
-		DRM_DEBUG_ATOMIC("Link plane state %p to [NOCRTC]\n",
-				 plane_state);
+		DBG("Link plane state %p to [NOCRTC]\n", plane_state);
 
 	return 0;
 }
@@ -1393,11 +1395,10 @@ drm_atomic_set_fb_for_plane(struct drm_plane_state *plane_state,
 			    struct drm_framebuffer *fb)
 {
 	if (fb)
-		DRM_DEBUG_ATOMIC("Set [FB:%d] for plane state %p\n",
-				 fb->base.id, plane_state);
+		DBG("Set [FB:%d] for plane state %p\n",
+		    fb->base.id, plane_state);
 	else
-		DRM_DEBUG_ATOMIC("Set [NOFB] for plane state %p\n",
-				 plane_state);
+		DBG("Set [NOFB] for plane state %p\n", plane_state);
 
 	drm_framebuffer_assign(&plane_state->fb, fb);
 }
@@ -1477,11 +1478,10 @@ drm_atomic_set_crtc_for_connector(struct drm_connector_state *conn_state,
 		drm_connector_get(conn_state->connector);
 		conn_state->crtc = crtc;
 
-		DRM_DEBUG_ATOMIC("Link connector state %p to [CRTC:%d:%s]\n",
-				 conn_state, crtc->base.id, crtc->name);
+		DBG("Link connector state %p to [CRTC:%d:%s]\n",
+		    conn_state, crtc->base.id, crtc->name);
 	} else {
-		DRM_DEBUG_ATOMIC("Link connector state %p to [NOCRTC]\n",
-				 conn_state);
+		DBG("Link connector state %p to [NOCRTC]\n", conn_state);
 	}
 
 	return 0;
@@ -1524,8 +1524,8 @@ drm_atomic_add_affected_connectors(struct drm_atomic_state *state,
 	if (ret)
 		return ret;
 
-	DRM_DEBUG_ATOMIC("Adding all current connectors for [CRTC:%d:%s] to %p\n",
-			 crtc->base.id, crtc->name, state);
+	DBG("Adding all current connectors for [CRTC:%d:%s] to %p\n",
+	    crtc->base.id, crtc->name, state);
 
 	/*
 	 * Changed connectors are already in @state, so only need to look
@@ -1608,7 +1608,7 @@ int drm_atomic_check_only(struct drm_atomic_state *state)
 	struct drm_crtc_state *crtc_state;
 	int i, ret = 0;
 
-	DRM_DEBUG_ATOMIC("checking %p\n", state);
+	DBG("checking %p\n", state);
 
 	for_each_new_plane_in_state(state, plane, plane_state, i) {
 		ret = drm_atomic_plane_check(plane, plane_state);
@@ -1668,7 +1668,7 @@ int drm_atomic_commit(struct drm_atomic_state *state)
 	if (ret)
 		return ret;
 
-	DRM_DEBUG_ATOMIC("committing %p\n", state);
+	DBG("committing %p\n", state);
 
 	return config->funcs->atomic_commit(state->dev, state, false);
 }
@@ -1697,7 +1697,7 @@ int drm_atomic_nonblocking_commit(struct drm_atomic_state *state)
 	if (ret)
 		return ret;
 
-	DRM_DEBUG_ATOMIC("committing %p nonblocking\n", state);
+	DBG("committing %p nonblocking\n", state);
 
 	return config->funcs->atomic_commit(state->dev, state, true);
 }
@@ -1714,7 +1714,7 @@ static void drm_atomic_print_state(const struct drm_atomic_state *state)
 	struct drm_connector_state *connector_state;
 	int i;
 
-	DRM_DEBUG_ATOMIC("checking %p\n", state);
+	DBG("checking %p\n", state);
 
 	for_each_new_plane_in_state(state, plane, plane_state, i)
 		drm_atomic_plane_print_state(&p, plane_state);
