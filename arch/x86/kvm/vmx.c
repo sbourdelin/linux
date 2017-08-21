@@ -3662,6 +3662,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf)
 			SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 			SECONDARY_EXEC_SHADOW_VMCS |
 			SECONDARY_EXEC_XSAVES |
+			SECONDARY_EXEC_RDSEED |
 			SECONDARY_EXEC_ENABLE_PML |
 			SECONDARY_EXEC_TSC_SCALING |
 			SECONDARY_EXEC_ENABLE_VMFUNC;
@@ -5298,6 +5299,9 @@ static u32 vmx_secondary_exec_control(struct vcpu_vmx *vmx)
 	if (!enable_pml)
 		exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
 
+	if (guest_cpuid_has(&vmx->vcpu, X86_FEATURE_RDSEED))
+		exec_control &= ~SECONDARY_EXEC_RDSEED;
+
 	return exec_control;
 }
 
@@ -6799,6 +6803,12 @@ static int handle_mwait(struct kvm_vcpu *vcpu)
 	return handle_nop(vcpu);
 }
 
+static int handle_invalid_op(struct kvm_vcpu *vcpu)
+{
+	kvm_queue_exception(vcpu, UD_VECTOR);
+	return 1;
+}
+
 static int handle_monitor_trap(struct kvm_vcpu *vcpu)
 {
 	return 1;
@@ -8043,6 +8053,7 @@ static int (*const kvm_vmx_exit_handlers[])(struct kvm_vcpu *vcpu) = {
 	[EXIT_REASON_MONITOR_INSTRUCTION]     = handle_monitor,
 	[EXIT_REASON_INVEPT]                  = handle_invept,
 	[EXIT_REASON_INVVPID]                 = handle_invvpid,
+	[EXIT_REASON_RDSEED]                  = handle_invalid_op,
 	[EXIT_REASON_XSAVES]                  = handle_xsaves,
 	[EXIT_REASON_XRSTORS]                 = handle_xrstors,
 	[EXIT_REASON_PML_FULL]		      = handle_pml_full,
@@ -8972,6 +8983,12 @@ static bool vmx_mpx_supported(void)
 		(vmcs_config.vmentry_ctrl & VM_ENTRY_LOAD_BNDCFGS);
 }
 
+static bool vmx_rdseed_supported(void)
+{
+	return vmcs_config.cpu_based_2nd_exec_ctrl &
+		SECONDARY_EXEC_RDSEED;
+}
+
 static bool vmx_xsaves_supported(void)
 {
 	return vmcs_config.cpu_based_2nd_exec_ctrl &
@@ -9655,6 +9672,24 @@ static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 			else
 				vmx->nested.nested_vmx_secondary_ctls_high &=
 					~SECONDARY_EXEC_ENABLE_INVPCID;
+		}
+	}
+
+	if (vmx_rdseed_supported()) {
+		bool rdseed_enabled = guest_cpuid_has(vcpu, X86_FEATURE_RDSEED);
+
+		if (rdseed_enabled)
+			secondary_exec_ctl &= ~SECONDARY_EXEC_RDSEED;
+		else
+			secondary_exec_ctl |= SECONDARY_EXEC_RDSEED;
+
+		if (nested) {
+			if (rdseed_enabled)
+				vmx->nested.nested_vmx_secondary_ctls_high |=
+					SECONDARY_EXEC_RDSEED;
+			else
+				vmx->nested.nested_vmx_secondary_ctls_high &=
+					~SECONDARY_EXEC_RDSEED;
 		}
 	}
 
