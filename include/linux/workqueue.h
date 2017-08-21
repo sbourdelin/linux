@@ -644,6 +644,7 @@ int workqueue_online_cpu(unsigned int cpu);
 int workqueue_offline_cpu(unsigned int cpu);
 #endif
 
+void wq_numa_add_possible_cpu(unsigned int cpu);
 int __init workqueue_init_early(void);
 int __init workqueue_init(void);
 

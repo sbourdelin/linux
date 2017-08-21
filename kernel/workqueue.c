@@ -5486,6 +5486,27 @@ static inline void wq_watchdog_init(void) { }
 
 #endif	/* CONFIG_WQ_WATCHDOG */
 
+void wq_numa_add_possible_cpu(unsigned int cpu)
+{
+	int node;
+
+	if (num_possible_nodes() <= 1)
+		return;
+
+	if (wq_disable_numa)
+		return;
+
+	if (!wq_numa_enabled)
+		return;
+
+	node = cpu_to_node(cpu);
+	if (node == NUMA_NO_NODE)
+		return;
+
+	cpumask_set_cpu(cpu, wq_numa_possible_cpumask[node]);
+}
+EXPORT_SYMBOL_GPL(wq_numa_add_possible_cpu);
+
 static void __init wq_numa_init(void)
 {
 	cpumask_var_t *tbl;

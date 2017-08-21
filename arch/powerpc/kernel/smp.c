@@ -964,6 +964,7 @@ void start_secondary(void *unused)
 
 	set_numa_node(numa_cpu_lookup_table[cpu]);
 	set_numa_mem(local_memory_node(numa_cpu_lookup_table[cpu]));
+	wq_numa_add_possible_cpu(cpu);
 
 	smp_wmb();
 	notify_cpu_starting(cpu);
