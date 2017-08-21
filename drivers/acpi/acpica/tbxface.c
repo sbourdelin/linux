@@ -251,6 +251,9 @@ acpi_get_table_header(char *signature,
 	u32 j;
 	struct acpi_table_header *header;
 
+	if (acpi_disabled)
+		return (AE_ERROR);
+
 	/* Parameter validation */
 
 	if (!signature || !out_table_header) {
