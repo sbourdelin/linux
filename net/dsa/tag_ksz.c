@@ -60,10 +60,8 @@ static struct sk_buff *ksz_xmit(struct sk_buff *skb, struct net_device *dev)
 					 skb_transport_header(skb) - skb->head);
 		skb_copy_and_csum_dev(skb, skb_put(nskb, skb->len));
 
-		if (skb_put_padto(nskb, nskb->len + padlen)) {
-			kfree_skb(nskb);
+		if (skb_put_padto(nskb, nskb->len + padlen))
 			return NULL;
-		}
 
 		kfree_skb(skb);
 	}
