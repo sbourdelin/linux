@@ -1122,9 +1122,6 @@ static void __blk_mq_run_hw_queue(struct blk_mq_hw_ctx *hctx)
  */
 static int blk_mq_hctx_next_cpu(struct blk_mq_hw_ctx *hctx)
 {
-	if (hctx->queue->nr_hw_queues == 1)
-		return WORK_CPU_UNBOUND;
-
 	if (--hctx->next_cpu_batch <= 0) {
 		int next_cpu;
 
