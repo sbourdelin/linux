@@ -162,12 +162,10 @@ int kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu)
 
 void kvm_arch_free_vcpus(struct kvm *kvm)
 {
-	unsigned int i;
 	struct kvm_vcpu *vcpu;
 
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm)
 		kvm_arch_vcpu_free(vcpu);
-	}
 }
 
 static void kvm_mips_free_gpa_pt(struct kvm *kvm)

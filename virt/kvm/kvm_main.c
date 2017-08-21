@@ -207,7 +207,7 @@ static inline bool kvm_kick_many_cpus(const struct cpumask *cpus, bool wait)
 
 bool kvm_make_all_cpus_request(struct kvm *kvm, unsigned int req)
 {
-	int i, cpu, me;
+	int cpu, me;
 	cpumask_var_t cpus;
 	bool called;
 	struct kvm_vcpu *vcpu;
@@ -215,7 +215,7 @@ bool kvm_make_all_cpus_request(struct kvm *kvm, unsigned int req)
 	zalloc_cpumask_var(&cpus, GFP_ATOMIC);
 
 	me = get_cpu();
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		kvm_make_request(req, vcpu);
 		cpu = vcpu->cpu;
 
@@ -667,6 +667,7 @@ static struct kvm *kvm_create_vm(unsigned long type)
 	mutex_init(&kvm->slots_lock);
 	refcount_set(&kvm->users_count, 1);
 	INIT_LIST_HEAD(&kvm->devices);
+	INIT_LIST_HEAD(&kvm->vcpu_list);
 
 	r = kvm_arch_init_vm(kvm, type);
 	if (r)
@@ -2349,10 +2350,9 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
 {
 	struct kvm *kvm = me->kvm;
 	struct kvm_vcpu *vcpu;
-	int last_boosted_vcpu = me->kvm->last_boosted_vcpu;
-	int yielded = 0;
+	struct kvm_vcpu *last_boosted_vcpu = READ_ONCE(kvm->last_boosted_vcpu);
+	int yielded;
 	int try = 2;
-	int i;
 
 	kvm_vcpu_set_in_spin_loop(me, true);
 	/*
@@ -2362,7 +2362,7 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
 	 * VCPU is holding the lock that we need and will release it.
 	 * We approximate round-robin by starting at the last boosted VCPU.
 	 */
-	kvm_for_each_vcpu_from(i, vcpu, last_boosted_vcpu, kvm) {
+	kvm_for_each_vcpu_from(vcpu, last_boosted_vcpu, kvm) {
 		if (!ACCESS_ONCE(vcpu->preempted))
 			continue;
 		if (vcpu == me)
@@ -2376,11 +2376,12 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
 
 		yielded = kvm_vcpu_yield_to(vcpu);
 		if (yielded > 0) {
-			kvm->last_boosted_vcpu = i;
+			WRITE_ONCE(kvm->last_boosted_vcpu, vcpu);
 			break;
 		} else if (yielded < 0 && !try--)
 			break;
 	}
+
 	kvm_vcpu_set_in_spin_loop(me, false);
 
 	/* Ensure vcpu is not eligible during next spinloop */
@@ -2529,6 +2530,7 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 	}
 
 	kvm->vcpus[atomic_read(&kvm->online_vcpus)] = vcpu;
+	list_add_tail_rcu(&vcpu->vcpu_list, &kvm->vcpu_list);
 
 	/*
 	 * Pairs with smp_rmb() in kvm_get_vcpu.  Write kvm->vcpus
@@ -3767,13 +3769,12 @@ static const struct file_operations vm_stat_get_per_vm_fops = {
 
 static int vcpu_stat_get_per_vm(void *data, u64 *val)
 {
-	int i;
 	struct kvm_stat_data *stat_data = (struct kvm_stat_data *)data;
 	struct kvm_vcpu *vcpu;
 
 	*val = 0;
 
-	kvm_for_each_vcpu(i, vcpu, stat_data->kvm)
+	kvm_for_each_vcpu(vcpu, stat_data->kvm)
 		*val += *(u64 *)((void *)vcpu + stat_data->offset);
 
 	return 0;
@@ -3781,14 +3782,13 @@ static int vcpu_stat_get_per_vm(void *data, u64 *val)
 
 static int vcpu_stat_clear_per_vm(void *data, u64 val)
 {
-	int i;
 	struct kvm_stat_data *stat_data = (struct kvm_stat_data *)data;
 	struct kvm_vcpu *vcpu;
 
 	if (val)
 		return -EINVAL;
 
-	kvm_for_each_vcpu(i, vcpu, stat_data->kvm)
+	kvm_for_each_vcpu(vcpu, stat_data->kvm)
 		*(u64 *)((void *)vcpu + stat_data->offset) = 0;
 
 	return 0;

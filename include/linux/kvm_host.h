@@ -216,6 +216,7 @@ struct kvm_mmio_fragment {
 
 struct kvm_vcpu {
 	struct kvm *kvm;
+	struct list_head vcpu_list;
 #ifdef CONFIG_PREEMPT_NOTIFIERS
 	struct preempt_notifier preempt_notifier;
 #endif
@@ -393,6 +394,7 @@ struct kvm {
 	struct mm_struct *mm; /* userspace tied to this vm */
 	struct kvm_memslots __rcu *memslots[KVM_ADDRESS_SPACE_NUM];
 	struct kvm_vcpu *vcpus[KVM_MAX_VCPUS];
+	struct list_head vcpu_list;
 
 	/*
 	 * created_vcpus is protected by kvm->lock, and is incremented
@@ -402,7 +404,7 @@ struct kvm {
 	 */
 	atomic_t online_vcpus;
 	int created_vcpus;
-	int last_boosted_vcpu;
+	struct kvm_vcpu *last_boosted_vcpu;
 	struct list_head vm_list;
 	struct mutex lock;
 	struct kvm_io_bus __rcu *buses[KVM_NR_BUSES];
@@ -492,29 +494,23 @@ static inline struct kvm_vcpu *kvm_get_vcpu(struct kvm *kvm, int i)
 	return kvm->vcpus[i];
 }
 
-#define kvm_for_each_vcpu(idx, vcpup, kvm) \
-	for (idx = 0; \
-	     idx < atomic_read(&kvm->online_vcpus) && \
-	     (vcpup = kvm_get_vcpu(kvm, idx)) != NULL; \
-	     idx++)
+#define kvm_for_each_vcpu(vcpup, kvm) \
+	list_for_each_entry_rcu(vcpup, &kvm->vcpu_list, vcpu_list)
 
-#define kvm_for_each_vcpu_from(idx, vcpup, from, kvm) \
-	for (idx = from, vcpup = kvm_get_vcpu(kvm, idx); \
+#define kvm_for_each_vcpu_from(vcpup, from, kvm) \
+	for (vcpup = from; \
 	     vcpup; \
 	     ({ \
-		idx++; \
-		if (idx >= atomic_read(&kvm->online_vcpus)) \
-			idx = 0; \
-		if (idx == from) \
+		vcpup = list_entry_rcu(vcpup->vcpu_list.next, typeof(*vcpup), vcpu_list); \
+		if (&vcpup->vcpu_list == &kvm->vcpu_list) \
+			vcpup = list_entry_rcu(kvm->vcpu_list.next, typeof(*vcpup), vcpu_list); \
+		if (vcpup == from) \
 			vcpup = NULL; \
-		else \
-			vcpup = kvm_get_vcpu(kvm, idx); \
-	      }))
+	     }))
 
 static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
 {
 	struct kvm_vcpu *vcpu = NULL;
-	int i;
 
 	if (id < 0)
 		return NULL;
@@ -522,7 +518,7 @@ static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
 		vcpu = kvm_get_vcpu(kvm, id);
 	if (vcpu && vcpu->vcpu_id == id)
 		return vcpu;
-	kvm_for_each_vcpu(i, vcpu, kvm)
+	kvm_for_each_vcpu(vcpu, kvm)
 		if (vcpu->vcpu_id == id)
 			return vcpu;
 	return NULL;

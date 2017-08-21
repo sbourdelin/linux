@@ -68,13 +68,12 @@ static int kvmppc_e500_emul_msgsnd(struct kvm_vcpu *vcpu, int rb)
 	ulong param = vcpu->arch.gpr[rb];
 	int prio = dbell2prio(rb);
 	int pir = param & PPC_DBELL_PIR_MASK;
-	int i;
 	struct kvm_vcpu *cvcpu;
 
 	if (prio < 0)
 		return EMULATE_FAIL;
 
-	kvm_for_each_vcpu(i, cvcpu, vcpu->kvm) {
+	kvm_for_each_vcpu(cvcpu, vcpu->kvm) {
 		int cpir = cvcpu->arch.shared->pir;
 		if ((param & PPC_DBELL_MSG_BRDCAST) || (cpir == pir)) {
 			set_bit(prio, &cvcpu->arch.pending_exceptions);

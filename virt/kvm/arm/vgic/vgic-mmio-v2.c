@@ -72,7 +72,6 @@ static void vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
 	int intid = val & 0xf;
 	int targets = (val >> 16) & 0xff;
 	int mode = (val >> 24) & 0x03;
-	int c;
 	struct kvm_vcpu *vcpu;
 
 	switch (mode) {
@@ -89,10 +88,10 @@ static void vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
 		return;
 	}
 
-	kvm_for_each_vcpu(c, vcpu, source_vcpu->kvm) {
+	kvm_for_each_vcpu(vcpu, source_vcpu->kvm) {
 		struct vgic_irq *irq;
 
-		if (!(targets & (1U << c)))
+		if (!(targets & (1U << vcpu->vcpus_idx)))
 			continue;
 
 		irq = vgic_get_irq(source_vcpu->kvm, vcpu, intid);

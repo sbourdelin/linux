@@ -966,7 +966,7 @@ static int xics_debug_show(struct seq_file *m, void *private)
 
 	seq_printf(m, "=========\nICP state\n=========\n");
 
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		struct kvmppc_icp *icp = vcpu->arch.icp;
 		union kvmppc_icp_state state;
 

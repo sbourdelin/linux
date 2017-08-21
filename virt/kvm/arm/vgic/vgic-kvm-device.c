@@ -257,31 +257,33 @@ int vgic_v2_parse_attr(struct kvm_device *dev, struct kvm_device_attr *attr,
 	return 0;
 }
 
-/* unlocks vcpus from @vcpu_lock_idx and smaller */
-static void unlock_vcpus(struct kvm *kvm, int vcpu_lock_idx)
+/* unlocks vcpus from up to @last_locked */
+static void unlock_vcpus(struct kvm *kvm, struct kvm_vcpu *last_locked)
 {
-	struct kvm_vcpu *tmp_vcpu;
+	if (last_locked) {
+		struct kvm_vcpu *tmp_vcpu;
 
-	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
-		tmp_vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
-		mutex_unlock(&tmp_vcpu->mutex);
+		kvm_for_each_vcpu(tmp_vcpu, kvm) {
+			mutex_unlock(&tmp_vcpu->mutex);
+
+			if (tmp_vcpu == last_locked)
+				return;
+		}
 	}
 }
 
 void unlock_all_vcpus(struct kvm *kvm)
 {
-	int i;
 	struct kvm_vcpu *tmp_vcpu;
 
-	kvm_for_each_vcpu(i, tmp_vcpu, kvm)
+	kvm_for_each_vcpu(tmp_vcpu, kvm)
 		mutex_unlock(&tmp_vcpu->mutex);
 }
 
 /* Returns true if all vcpus were locked, false otherwise */
 bool lock_all_vcpus(struct kvm *kvm)
 {
-	struct kvm_vcpu *tmp_vcpu;
-	int c;
+	struct kvm_vcpu *tmp_vcpu, *last_locked = NULL;
 
 	/*
 	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
@@ -289,11 +291,13 @@ bool lock_all_vcpus(struct kvm *kvm)
 	 * that no other VCPUs are run and fiddle with the vgic state while we
 	 * access it.
 	 */
-	kvm_for_each_vcpu(c, tmp_vcpu, kvm) {
+	kvm_for_each_vcpu(tmp_vcpu, kvm) {
 		if (!mutex_trylock(&tmp_vcpu->mutex)) {
-			unlock_vcpus(kvm, c - 1);
+			unlock_vcpus(kvm, last_locked);
 			return false;
 		}
+
+		last_locked = tmp_vcpu;
 	}
 
 	return true;

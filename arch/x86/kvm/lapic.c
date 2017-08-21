@@ -166,12 +166,11 @@ static void recalculate_apic_map(struct kvm *kvm)
 {
 	struct kvm_apic_map *new, *old = NULL;
 	struct kvm_vcpu *vcpu;
-	int i;
 	u32 max_id = 255; /* enough space for any xAPIC ID */
 
 	mutex_lock(&kvm->arch.apic_map_lock);
 
-	kvm_for_each_vcpu(i, vcpu, kvm)
+	kvm_for_each_vcpu(vcpu, kvm)
 		if (kvm_apic_present(vcpu))
 			max_id = max(max_id, kvm_x2apic_id(vcpu->arch.apic));
 
@@ -183,7 +182,7 @@ static void recalculate_apic_map(struct kvm *kvm)
 
 	new->max_apic_id = max_id;
 
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		struct kvm_lapic *apic = vcpu->arch.apic;
 		struct kvm_lapic **cluster;
 		u16 mask;

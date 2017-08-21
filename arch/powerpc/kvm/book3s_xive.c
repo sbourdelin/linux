@@ -182,7 +182,7 @@ static int xive_check_provisioning(struct kvm *kvm, u8 prio)
 {
 	struct kvmppc_xive *xive = kvm->arch.xive;
 	struct kvm_vcpu *vcpu;
-	int i, rc;
+	int rc;
 
 	lockdep_assert_held(&kvm->lock);
 
@@ -193,7 +193,7 @@ static int xive_check_provisioning(struct kvm *kvm, u8 prio)
 	pr_devel("Provisioning prio... %d\n", prio);
 
 	/* Provision each VCPU and enable escalations */
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		if (!vcpu->arch.xive_vcpu)
 			continue;
 		rc = xive_provision_queue(vcpu, prio);
@@ -252,7 +252,7 @@ static int xive_try_pick_queue(struct kvm_vcpu *vcpu, u8 prio)
 static int xive_select_target(struct kvm *kvm, u32 *server, u8 prio)
 {
 	struct kvm_vcpu *vcpu;
-	int i, rc;
+	int rc;
 
 	/* Locate target server */
 	vcpu = kvmppc_xive_find_server(kvm, *server);
@@ -271,7 +271,7 @@ static int xive_select_target(struct kvm *kvm, u32 *server, u8 prio)
 	pr_devel(" .. failed, looking up candidate...\n");
 
 	/* Failed, pick another VCPU */
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		if (!vcpu->arch.xive_vcpu)
 			continue;
 		rc = xive_try_pick_queue(vcpu, prio);
@@ -1237,7 +1237,7 @@ static void xive_pre_save_queue(struct kvmppc_xive *xive, struct xive_q *q)
 static void xive_pre_save_scan(struct kvmppc_xive *xive)
 {
 	struct kvm_vcpu *vcpu = NULL;
-	int i, j;
+	int j;
 
 	/*
 	 * See comment in xive_get_source() about how this
@@ -1252,7 +1252,7 @@ static void xive_pre_save_scan(struct kvmppc_xive *xive)
 	}
 
 	/* Then scan the queues and update the "in_queue" flag */
-	kvm_for_each_vcpu(i, vcpu, xive->kvm) {
+	kvm_for_each_vcpu(vcpu, xive->kvm) {
 		struct kvmppc_xive_vcpu *xc = vcpu->arch.xive_vcpu;
 		if (!xc)
 			continue;
@@ -1418,9 +1418,8 @@ static bool xive_check_delayed_irq(struct kvmppc_xive *xive, u32 irq)
 {
 	struct kvm *kvm = xive->kvm;
 	struct kvm_vcpu *vcpu = NULL;
-	int i;
 
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		struct kvmppc_xive_vcpu *xc = vcpu->arch.xive_vcpu;
 
 		if (!xc)
@@ -1787,14 +1786,13 @@ static int xive_debug_show(struct seq_file *m, void *private)
 	u64 t_vm_h_cppr = 0;
 	u64 t_vm_h_eoi = 0;
 	u64 t_vm_h_ipi = 0;
-	unsigned int i;
 
 	if (!kvm)
 		return 0;
 
 	seq_printf(m, "=========\nVCPU state\n=========\n");
 
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		struct kvmppc_xive_vcpu *xc = vcpu->arch.xive_vcpu;
 
 		if (!xc)

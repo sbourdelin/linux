@@ -478,12 +478,11 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
 /* Make the updates of cntvoff for all vtimer contexts atomic */
 static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
 {
-	int i;
 	struct kvm *kvm = vcpu->kvm;
 	struct kvm_vcpu *tmp;
 
 	mutex_lock(&kvm->lock);
-	kvm_for_each_vcpu(i, tmp, kvm)
+	kvm_for_each_vcpu(tmp, kvm)
 		vcpu_vtimer(tmp)->cntvoff = cntvoff;
 
 	/*
@@ -622,7 +621,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
 static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
 {
 	int vtimer_irq, ptimer_irq;
-	int i, ret;
+	int ret;
 
 	vtimer_irq = vcpu_vtimer(vcpu)->irq.irq;
 	ret = kvm_vgic_set_owner(vcpu, vtimer_irq, vcpu_vtimer(vcpu));
@@ -634,7 +633,7 @@ static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
 	if (ret)
 		return false;
 
-	kvm_for_each_vcpu(i, vcpu, vcpu->kvm) {
+	kvm_for_each_vcpu(vcpu, vcpu->kvm) {
 		if (vcpu_vtimer(vcpu)->irq.irq != vtimer_irq ||
 		    vcpu_ptimer(vcpu)->irq.irq != ptimer_irq)
 			return false;
@@ -720,9 +719,8 @@ void kvm_timer_init_vhe(void)
 static void set_timer_irqs(struct kvm *kvm, int vtimer_irq, int ptimer_irq)
 {
 	struct kvm_vcpu *vcpu;
-	int i;
 
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		vcpu_vtimer(vcpu)->irq.irq = vtimer_irq;
 		vcpu_ptimer(vcpu)->irq.irq = ptimer_irq;
 	}

@@ -119,7 +119,7 @@ void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
  */
 int kvm_vgic_create(struct kvm *kvm, u32 type)
 {
-	int i, ret;
+	int ret;
 	struct kvm_vcpu *vcpu;
 
 	if (irqchip_in_kernel(kvm))
@@ -143,7 +143,7 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
 	if (!lock_all_vcpus(kvm))
 		return -EBUSY;
 
-	kvm_for_each_vcpu(i, vcpu, kvm)
+	kvm_for_each_vcpu(vcpu, kvm)
 		if (vcpu->arch.has_run_once) {
 			ret = -EBUSY;
 			goto out_unlock;
@@ -266,7 +266,7 @@ int vgic_init(struct kvm *kvm)
 {
 	struct vgic_dist *dist = &kvm->arch.vgic;
 	struct kvm_vcpu *vcpu;
-	int ret = 0, i;
+	int ret = 0;
 
 	if (vgic_initialized(kvm))
 		return 0;
@@ -279,7 +279,7 @@ int vgic_init(struct kvm *kvm)
 	if (ret)
 		goto out;
 
-	kvm_for_each_vcpu(i, vcpu, kvm)
+	kvm_for_each_vcpu(vcpu, kvm)
 		kvm_vgic_vcpu_enable(vcpu);
 
 	ret = kvm_vgic_setup_default_irq_routing(kvm);
@@ -327,13 +327,12 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
 static void __kvm_vgic_destroy(struct kvm *kvm)
 {
 	struct kvm_vcpu *vcpu;
-	int i;
 
 	vgic_debug_destroy(kvm);
 
 	kvm_vgic_dist_destroy(kvm);
 
-	kvm_for_each_vcpu(i, vcpu, kvm)
+	kvm_for_each_vcpu(vcpu, kvm)
 		kvm_vgic_vcpu_destroy(vcpu);
 }
 

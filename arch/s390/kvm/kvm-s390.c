@@ -174,12 +174,11 @@ static int kvm_clock_sync(struct notifier_block *notifier, unsigned long val,
 {
 	struct kvm *kvm;
 	struct kvm_vcpu *vcpu;
-	int i;
 	unsigned long long *delta = v;
 
 	list_for_each_entry(kvm, &vm_list, vm_list) {
 		kvm->arch.epoch -= *delta;
-		kvm_for_each_vcpu(i, vcpu, kvm) {
+		kvm_for_each_vcpu(vcpu, kvm) {
 			vcpu->arch.sie_block->epoch -= *delta;
 			if (vcpu->arch.cputm_enabled)
 				vcpu->arch.cputm_start += *delta;
@@ -491,12 +490,10 @@ out:
 
 static void icpt_operexc_on_all_vcpus(struct kvm *kvm)
 {
-	unsigned int i;
 	struct kvm_vcpu *vcpu;
 
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm)
 		kvm_s390_sync_request(KVM_REQ_ICPT_OPEREXC, vcpu);
-	}
 }
 
 static int kvm_vm_ioctl_enable_cap(struct kvm *kvm, struct kvm_enable_cap *cap)
@@ -705,7 +702,6 @@ static void kvm_s390_vcpu_crypto_setup(struct kvm_vcpu *vcpu);
 static int kvm_s390_vm_set_crypto(struct kvm *kvm, struct kvm_device_attr *attr)
 {
 	struct kvm_vcpu *vcpu;
-	int i;
 
 	if (!test_kvm_facility(kvm, 76))
 		return -EINVAL;
@@ -743,7 +739,7 @@ static int kvm_s390_vm_set_crypto(struct kvm *kvm, struct kvm_device_attr *attr)
 		return -ENXIO;
 	}
 
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		kvm_s390_vcpu_crypto_setup(vcpu);
 		exit_sie(vcpu);
 	}
@@ -753,10 +749,9 @@ static int kvm_s390_vm_set_crypto(struct kvm *kvm, struct kvm_device_attr *attr)
 
 static void kvm_s390_sync_request_broadcast(struct kvm *kvm, int req)
 {
-	int cx;
 	struct kvm_vcpu *vcpu;
 
-	kvm_for_each_vcpu(cx, vcpu, kvm)
+	kvm_for_each_vcpu(vcpu, kvm)
 		kvm_s390_sync_request(req, vcpu);
 }
 
@@ -1943,10 +1938,9 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
 
 void kvm_arch_free_vcpus(struct kvm *kvm)
 {
-	unsigned int i;
 	struct kvm_vcpu *vcpu;
 
-	kvm_for_each_vcpu(i, vcpu, kvm)
+	kvm_for_each_vcpu(vcpu, kvm)
 		kvm_arch_vcpu_destroy(vcpu);
 }
 
@@ -2050,7 +2044,6 @@ static int sca_switch_to_extended(struct kvm *kvm)
 	struct bsca_block *old_sca = kvm->arch.sca;
 	struct esca_block *new_sca;
 	struct kvm_vcpu *vcpu;
-	unsigned int vcpu_idx;
 	u32 scaol, scaoh;
 
 	new_sca = alloc_pages_exact(sizeof(*new_sca), GFP_KERNEL|__GFP_ZERO);
@@ -2065,7 +2058,7 @@ static int sca_switch_to_extended(struct kvm *kvm)
 
 	sca_copy_b_to_e(new_sca, old_sca);
 
-	kvm_for_each_vcpu(vcpu_idx, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		vcpu->arch.sie_block->scaoh = scaoh;
 		vcpu->arch.sie_block->scaol = scaol;
 		vcpu->arch.sie_block->ecb2 |= ECB2_ESCA;
@@ -2491,14 +2484,13 @@ static void kvm_gmap_notifier(struct gmap *gmap, unsigned long start,
 	struct kvm *kvm = gmap->private;
 	struct kvm_vcpu *vcpu;
 	unsigned long prefix;
-	int i;
 
 	if (gmap_is_shadow(gmap))
 		return;
 	if (start >= 1UL << 31)
 		/* We are only interested in prefix pages */
 		return;
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		/* match against both prefix pages */
 		prefix = kvm_s390_get_prefix(vcpu);
 		if (prefix <= end && start <= prefix + 2*PAGE_SIZE - 1) {
@@ -2856,13 +2848,12 @@ retry:
 void kvm_s390_set_tod_clock(struct kvm *kvm, u64 tod)
 {
 	struct kvm_vcpu *vcpu;
-	int i;
 
 	mutex_lock(&kvm->lock);
 	preempt_disable();
 	kvm->arch.epoch = tod - get_tod_clock();
 	kvm_s390_vcpu_block_all(kvm);
-	kvm_for_each_vcpu(i, vcpu, kvm)
+	kvm_for_each_vcpu(vcpu, kvm)
 		vcpu->arch.sie_block->epoch = kvm->arch.epoch;
 	kvm_s390_vcpu_unblock_all(kvm);
 	preempt_enable();
@@ -3389,12 +3380,10 @@ static void __disable_ibs_on_vcpu(struct kvm_vcpu *vcpu)
 
 static void __disable_ibs_on_all_vcpus(struct kvm *kvm)
 {
-	unsigned int i;
 	struct kvm_vcpu *vcpu;
 
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm)
 		__disable_ibs_on_vcpu(vcpu);
-	}
 }
 
 static void __enable_ibs_on_vcpu(struct kvm_vcpu *vcpu)
@@ -3462,7 +3451,7 @@ void kvm_s390_vcpu_stop(struct kvm_vcpu *vcpu)
 		 * As we only have one VCPU left, we want to enable the IBS
 		 * facility for that VCPU to speed it up.
 		 */
-		kvm_for_each_vcpu(i, started_vcpu, vcpu->kvm)
+		kvm_for_each_vcpu(started_vcpu, vcpu->kvm)
 			if (!is_vcpu_stopped(started_vcpu)) {
 				__enable_ibs_on_vcpu(started_vcpu);
 				break;

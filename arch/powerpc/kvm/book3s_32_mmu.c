@@ -353,11 +353,10 @@ static void kvmppc_mmu_book3s_32_mtsrin(struct kvm_vcpu *vcpu, u32 srnum,
 
 static void kvmppc_mmu_book3s_32_tlbie(struct kvm_vcpu *vcpu, ulong ea, bool large)
 {
-	int i;
 	struct kvm_vcpu *v;
 
 	/* flush this VA on all cpus */
-	kvm_for_each_vcpu(i, v, vcpu->kvm)
+	kvm_for_each_vcpu(v, vcpu->kvm)
 		kvmppc_mmu_pte_flush(v, ea, 0x0FFFF000);
 }
 

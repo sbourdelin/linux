@@ -534,7 +534,6 @@ static void kvmppc_mmu_book3s_64_tlbie(struct kvm_vcpu *vcpu, ulong va,
 				       bool large)
 {
 	u64 mask = 0xFFFFFFFFFULL;
-	long i;
 	struct kvm_vcpu *v;
 
 	dprintk("KVM MMU: tlbie(0x%lx)\n", va);
@@ -559,7 +558,7 @@ static void kvmppc_mmu_book3s_64_tlbie(struct kvm_vcpu *vcpu, ulong va,
 			mask = 0xFFFFFF000ULL;
 	}
 	/* flush this VA on all vcpus */
-	kvm_for_each_vcpu(i, v, vcpu->kvm)
+	kvm_for_each_vcpu(v, vcpu->kvm)
 		kvmppc_mmu_pte_vflush(v, va >> 12, mask);
 }
 

@@ -3788,7 +3788,6 @@ static int avic_incomplete_ipi_interception(struct vcpu_svm *svm)
 		kvm_lapic_reg_write(apic, APIC_ICR, icrl);
 		break;
 	case AVIC_IPI_FAILURE_TARGET_NOT_RUNNING: {
-		int i;
 		struct kvm_vcpu *vcpu;
 		struct kvm *kvm = svm->vcpu.kvm;
 		struct kvm_lapic *apic = svm->vcpu.arch.apic;
@@ -3798,7 +3797,7 @@ static int avic_incomplete_ipi_interception(struct vcpu_svm *svm)
 		 * set the appropriate IRR bits on the valid target
 		 * vcpus. So, we just need to kick the appropriate vcpu.
 		 */
-		kvm_for_each_vcpu(i, vcpu, kvm) {
+		kvm_for_each_vcpu(vcpu, kvm) {
 			bool m = kvm_apic_match_dest(vcpu, apic,
 						     icrl & KVM_APIC_SHORT_MASK,
 						     GET_APIC_DEST_FIELD(icrh),

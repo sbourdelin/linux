@@ -641,21 +641,24 @@ static void vgic_unregister_redist_iodev(struct kvm_vcpu *vcpu)
 
 static int vgic_register_all_redist_iodevs(struct kvm *kvm)
 {
-	struct kvm_vcpu *vcpu;
-	int c, ret = 0;
+	struct kvm_vcpu *vcpu, *last_registered = NULL;
+	int ret = 0;
 
-	kvm_for_each_vcpu(c, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		ret = vgic_register_redist_iodev(vcpu);
 		if (ret)
 			break;
+
+		last_registered = vcpu;
 	}
 
-	if (ret) {
+	if (ret && last_registered) {
 		/* The current c failed, so we start with the previous one. */
 		mutex_lock(&kvm->slots_lock);
-		for (c--; c >= 0; c--) {
-			vcpu = kvm_get_vcpu(kvm, c);
+		kvm_for_each_vcpu(vcpu, kvm) {
 			vgic_unregister_redist_iodev(vcpu);
+			if (vcpu == last_registered)
+				break;
 		}
 		mutex_unlock(&kvm->slots_lock);
 	}
@@ -796,7 +799,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
 	struct kvm_vcpu *c_vcpu;
 	u16 target_cpus;
 	u64 mpidr;
-	int sgi, c;
+	int sgi;
 	bool broadcast;
 
 	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
@@ -812,7 +815,7 @@ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
 	 * if we are already finished. This avoids iterating through all
 	 * VCPUs when most of the times we just signal a single VCPU.
 	 */
-	kvm_for_each_vcpu(c, c_vcpu, kvm) {
+	kvm_for_each_vcpu(c_vcpu, kvm) {
 		struct vgic_irq *irq;
 
 		/* Exit early if we have dealt with all requested CPUs */

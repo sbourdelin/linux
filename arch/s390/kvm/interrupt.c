@@ -2287,7 +2287,6 @@ static int flic_ais_mode_set_all(struct kvm *kvm, struct kvm_device_attr *attr)
 static int flic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
 {
 	int r = 0;
-	unsigned int i;
 	struct kvm_vcpu *vcpu;
 
 	switch (attr->group) {
@@ -2308,7 +2307,7 @@ static int flic_set_attr(struct kvm_device *dev, struct kvm_device_attr *attr)
 		 * about late coming workers.
 		 */
 		synchronize_srcu(&dev->kvm->srcu);
-		kvm_for_each_vcpu(i, vcpu, dev->kvm)
+		kvm_for_each_vcpu(vcpu, dev->kvm)
 			kvm_clear_async_pf_completion_queue(vcpu);
 		break;
 	case KVM_DEV_FLIC_ADAPTER_REGISTER:

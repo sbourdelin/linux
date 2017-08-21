@@ -241,7 +241,6 @@ static void pit_do_work(struct kthread_work *work)
 	struct kvm_pit *pit = container_of(work, struct kvm_pit, expired);
 	struct kvm *kvm = pit->kvm;
 	struct kvm_vcpu *vcpu;
-	int i;
 	struct kvm_kpit_state *ps = &pit->pit_state;
 
 	if (atomic_read(&ps->reinject) && !atomic_xchg(&ps->irq_ack, 0))
@@ -260,7 +259,7 @@ static void pit_do_work(struct kthread_work *work)
 	 * also be simultaneously delivered through PIC and IOAPIC.
 	 */
 	if (atomic_read(&kvm->arch.vapics_in_nmi_mode) > 0)
-		kvm_for_each_vcpu(i, vcpu, kvm)
+		kvm_for_each_vcpu(vcpu, kvm)
 			kvm_apic_nmi_wd_deliver(vcpu);
 }
 

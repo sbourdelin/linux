@@ -251,7 +251,6 @@ static int kvmppc_core_check_requests_pr(struct kvm_vcpu *vcpu)
 static void do_kvm_unmap_hva(struct kvm *kvm, unsigned long start,
 			     unsigned long end)
 {
-	long i;
 	struct kvm_vcpu *vcpu;
 	struct kvm_memslots *slots;
 	struct kvm_memory_slot *memslot;
@@ -272,7 +271,7 @@ static void do_kvm_unmap_hva(struct kvm *kvm, unsigned long start,
 		 */
 		gfn = hva_to_gfn_memslot(hva_start, memslot);
 		gfn_end = hva_to_gfn_memslot(hva_end + PAGE_SIZE - 1, memslot);
-		kvm_for_each_vcpu(i, vcpu, kvm)
+		kvm_for_each_vcpu(vcpu, kvm)
 			kvmppc_mmu_pte_pflush(vcpu, gfn << PAGE_SHIFT,
 					      gfn_end << PAGE_SHIFT);
 	}
@@ -1593,7 +1592,7 @@ static int kvm_vm_ioctl_get_dirty_log_pr(struct kvm *kvm,
 		ga = memslot->base_gfn << PAGE_SHIFT;
 		ga_end = ga + (memslot->npages << PAGE_SHIFT);
 
-		kvm_for_each_vcpu(n, vcpu, kvm)
+		kvm_for_each_vcpu(vcpu, kvm)
 			kvmppc_mmu_pte_pflush(vcpu, ga, ga_end);
 
 		n = kvm_dirty_bitmap_bytes(memslot);

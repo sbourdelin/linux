@@ -1253,9 +1253,8 @@ static void kvmppc_set_lpcr(struct kvm_vcpu *vcpu, u64 new_lpcr,
 	 */
 	if ((new_lpcr & LPCR_ILE) != (vc->lpcr & LPCR_ILE)) {
 		struct kvm_vcpu *vcpu;
-		int i;
 
-		kvm_for_each_vcpu(i, vcpu, kvm) {
+		kvm_for_each_vcpu(vcpu, kvm) {
 			if (vcpu->arch.vcore != vc)
 				continue;
 			if (new_lpcr & LPCR_ILE)
@@ -3347,7 +3346,7 @@ static int kvm_vm_ioctl_get_dirty_log_hv(struct kvm *kvm,
 {
 	struct kvm_memslots *slots;
 	struct kvm_memory_slot *memslot;
-	int i, r;
+	int r;
 	unsigned long n;
 	unsigned long *buf;
 	struct kvm_vcpu *vcpu;
@@ -3381,7 +3380,7 @@ static int kvm_vm_ioctl_get_dirty_log_hv(struct kvm *kvm,
 
 	/* Harvest dirty bits from VPA and DTL updates */
 	/* Note: we never modify the SLB shadow buffer areas */
-	kvm_for_each_vcpu(i, vcpu, kvm) {
+	kvm_for_each_vcpu(vcpu, kvm) {
 		spin_lock(&vcpu->arch.vpa_update_lock);
 		kvmppc_harvest_vpa_dirty(&vcpu->arch.vpa, memslot, buf);
 		kvmppc_harvest_vpa_dirty(&vcpu->arch.dtl, memslot, buf);

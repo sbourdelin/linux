@@ -50,14 +50,13 @@ static void pic_unlock(struct kvm_pic *s)
 {
 	bool wakeup = s->wakeup_needed;
 	struct kvm_vcpu *vcpu;
-	int i;
 
 	s->wakeup_needed = false;
 
 	spin_unlock(&s->lock);
 
 	if (wakeup) {
-		kvm_for_each_vcpu(i, vcpu, s->kvm) {
+		kvm_for_each_vcpu(vcpu, s->kvm) {
 			if (kvm_apic_accept_pic_intr(vcpu)) {
 				kvm_make_request(KVM_REQ_EVENT, vcpu);
 				kvm_vcpu_kick(vcpu);
@@ -270,7 +269,7 @@ int kvm_pic_read_irq(struct kvm *kvm)
 
 static void kvm_pic_reset(struct kvm_kpic_state *s)
 {
-	int irq, i;
+	int irq;
 	struct kvm_vcpu *vcpu;
 	u8 edge_irr = s->irr & ~s->elcr;
 	bool found = false;
@@ -287,7 +286,7 @@ static void kvm_pic_reset(struct kvm_kpic_state *s)
 	}
 	s->init_state = 1;
 
-	kvm_for_each_vcpu(i, vcpu, s->pics_state->kvm)
+	kvm_for_each_vcpu(vcpu, s->pics_state->kvm)
 		if (kvm_apic_accept_pic_intr(vcpu)) {
 			found = true;
 			break;
