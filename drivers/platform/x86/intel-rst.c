@@ -65,7 +65,7 @@ static ssize_t irst_store_wakeup_events(struct device *dev,
 	return count;
 }
 
-static struct device_attribute irst_wakeup_attr = {
+static const struct device_attribute irst_wakeup_attr = {
 	.attr = { .name = "wakeup_events", .mode = 0600 },
 	.show = irst_show_wakeup_events,
 	.store = irst_store_wakeup_events
@@ -111,7 +111,7 @@ static ssize_t irst_store_wakeup_time(struct device *dev,
 	return count;
 }
 
-static struct device_attribute irst_timeout_attr = {
+static const struct device_attribute irst_timeout_attr = {
 	.attr = { .name = "wakeup_time", .mode = 0600 },
 	.show = irst_show_wakeup_time,
 	.store = irst_store_wakeup_time

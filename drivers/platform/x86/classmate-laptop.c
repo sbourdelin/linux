@@ -254,7 +254,7 @@ static ssize_t cmpc_accel_sensitivity_store_v4(struct device *dev,
 	return strnlen(buf, count);
 }
 
-static struct device_attribute cmpc_accel_sensitivity_attr_v4 = {
+static const struct device_attribute cmpc_accel_sensitivity_attr_v4 = {
 	.attr = { .name = "sensitivity", .mode = 0660 },
 	.show = cmpc_accel_sensitivity_show_v4,
 	.store = cmpc_accel_sensitivity_store_v4
@@ -303,7 +303,7 @@ static ssize_t cmpc_accel_g_select_store_v4(struct device *dev,
 	return strnlen(buf, count);
 }
 
-static struct device_attribute cmpc_accel_g_select_attr_v4 = {
+static const struct device_attribute cmpc_accel_g_select_attr_v4 = {
 	.attr = { .name = "g_select", .mode = 0660 },
 	.show = cmpc_accel_g_select_show_v4,
 	.store = cmpc_accel_g_select_store_v4
@@ -599,7 +599,7 @@ static ssize_t cmpc_accel_sensitivity_store(struct device *dev,
 	return strnlen(buf, count);
 }
 
-static struct device_attribute cmpc_accel_sensitivity_attr = {
+static const struct device_attribute cmpc_accel_sensitivity_attr = {
 	.attr = { .name = "sensitivity", .mode = 0660 },
 	.show = cmpc_accel_sensitivity_show,
 	.store = cmpc_accel_sensitivity_store
