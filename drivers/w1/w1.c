@@ -712,13 +712,8 @@ int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 	struct w1_netlink_msg msg;
 
 	sl = kzalloc(sizeof(struct w1_slave), GFP_KERNEL);
-	if (!sl) {
-		dev_err(&dev->dev,
-			 "%s: failed to allocate new slave device.\n",
-			 __func__);
+	if (!sl)
 		return -ENOMEM;
-	}
-
 
 	sl->owner = THIS_MODULE;
 	sl->master = dev;
