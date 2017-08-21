@@ -852,6 +852,9 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
 	attr->sample_id_all = perf_missing_features.sample_id_all ? 0 : 1;
 	attr->inherit	    = !opts->no_inherit;
 	attr->write_backward = opts->overwrite ? 1 : 0;
+	attr->read_format   = PERF_FORMAT_TOTAL_TIME_ENABLED |
+			      PERF_FORMAT_TOTAL_TIME_RUNNING |
+			      PERF_FORMAT_ID;
 
 	perf_evsel__set_sample_bit(evsel, IP);
 	perf_evsel__set_sample_bit(evsel, TID);
@@ -945,6 +948,8 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
 		perf_evsel__set_sample_bit(evsel, TIME);
 		perf_evsel__set_sample_bit(evsel, RAW);
 		perf_evsel__set_sample_bit(evsel, CPU);
+		perf_evsel__set_sample_bit(evsel, ID);
+		perf_evsel__set_sample_bit(evsel, READ);
 	}
 
 	if (opts->sample_address)

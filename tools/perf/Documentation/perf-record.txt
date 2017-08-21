@@ -270,6 +270,8 @@ OPTIONS
 -R::
 --raw-samples::
 Collect raw sample records from all opened counters (default for tracepoint counters).
+With this option, each sample includes at least: CPU, timestamp, time running/enabled
+(multiplexing scaling factor).
 
 -C::
 --cpu::
