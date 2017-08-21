@@ -330,7 +330,7 @@ static void vbox_fb_gamma_get(struct drm_crtc *crtc, u16 *red, u16 *green,
 	*blue = regno;
 }
 
-static struct drm_fb_helper_funcs vbox_fb_helper_funcs = {
+static const struct drm_fb_helper_funcs vbox_fb_helper_funcs = {
 	.gamma_set = vbox_fb_gamma_set,
 	.gamma_get = vbox_fb_gamma_get,
 	.fb_probe = vboxfb_create,
