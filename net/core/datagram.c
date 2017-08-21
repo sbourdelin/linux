@@ -360,9 +360,17 @@ int __sk_queue_drop_skb(struct sock *sk, struct sk_buff_head *sk_queue,
 	int err = 0;
 
 	if (flags & MSG_PEEK) {
+		struct sk_buff *lskb;
+		int off = sk_peek_offset(sk, flags);
+
 		err = -ENOENT;
 		spin_lock_bh(&sk_queue->lock);
-		if (skb == skb_peek(sk_queue)) {
+		lskb = skb_peek(sk_queue);
+		while (lskb != skb && lskb && off >= lskb->len) {
+			off -= lskb->len;
+			lskb = skb_peek_next(lskb, sk_queue);
+		}
+		if (lskb == skb) {
 			__skb_unlink(skb, sk_queue);
 			refcount_dec(&skb->users);
 			if (destructor)
