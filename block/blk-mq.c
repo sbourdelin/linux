@@ -2739,6 +2739,16 @@ static unsigned long blk_mq_poll_nsecs(struct request_queue *q,
 	if (q->poll_stat[bucket].nr_samples)
 		ret = (q->poll_stat[bucket].mean + 1) / 2;
 
+	if (q->poll_hyb_use_min)
+		ret = max(ret, (unsigned long)q->poll_stat[bucket].min);
+
+	if (q->poll_hyb_adjust) {
+		if (ret >= q->poll_hyb_adjust)
+			ret -= q->poll_hyb_adjust;
+		else
+			return 0;
+	}
+
 	return ret;
 }
 

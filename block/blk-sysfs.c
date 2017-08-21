@@ -395,6 +395,50 @@ static ssize_t queue_poll_delay_store(struct request_queue *q, const char *page,
 	return count;
 }
 
+static ssize_t queue_poll_hyb_use_min_show(struct request_queue *q, char *page)
+{
+	return sprintf(page, "%d\n", q->poll_hyb_use_min);
+}
+
+static ssize_t queue_poll_hyb_use_min_store(struct request_queue *q,
+					    const char *page, size_t count)
+{
+	int err, val;
+
+	if (!q->mq_ops || !q->mq_ops->poll)
+		return -EINVAL;
+
+	err = kstrtoint(page, 10, &val);
+	if (err < 0)
+		return err;
+
+	q->poll_hyb_use_min = val;
+
+	return count;
+}
+
+static ssize_t queue_poll_hyb_adjust_show(struct request_queue *q, char *page)
+{
+	return sprintf(page, "%d\n", q->poll_hyb_adjust);
+}
+
+static ssize_t queue_poll_hyb_adjust_store(struct request_queue *q,
+					   const char *page, size_t count)
+{
+	int err, val;
+
+	if (!q->mq_ops || !q->mq_ops->poll)
+		return -EINVAL;
+
+	err = kstrtoint(page, 10, &val);
+	if (err < 0)
+		return err;
+
+	q->poll_hyb_adjust = val;
+
+	return count;
+}
+
 static ssize_t queue_poll_show(struct request_queue *q, char *page)
 {
 	return queue_var_show(test_bit(QUEUE_FLAG_POLL, &q->queue_flags), page);
@@ -661,6 +705,18 @@ static struct queue_sysfs_entry queue_poll_delay_entry = {
 	.store = queue_poll_delay_store,
 };
 
+static struct queue_sysfs_entry queue_poll_hyb_use_min_entry = {
+	.attr = {.name = "io_poll_hyb_use_min", .mode = S_IRUGO | S_IWUSR },
+	.show = queue_poll_hyb_use_min_show,
+	.store = queue_poll_hyb_use_min_store,
+};
+
+static struct queue_sysfs_entry queue_poll_hyb_adjust_entry = {
+	.attr = {.name = "io_poll_hyb_adjust", .mode = S_IRUGO | S_IWUSR },
+	.show = queue_poll_hyb_adjust_show,
+	.store = queue_poll_hyb_adjust_store,
+};
+
 static struct queue_sysfs_entry queue_wc_entry = {
 	.attr = {.name = "write_cache", .mode = S_IRUGO | S_IWUSR },
 	.show = queue_wc_show,
@@ -719,6 +775,8 @@ static struct attribute *default_attrs[] = {
 	&queue_dax_entry.attr,
 	&queue_wb_lat_entry.attr,
 	&queue_poll_delay_entry.attr,
+	&queue_poll_hyb_use_min_entry.attr,
+	&queue_poll_hyb_adjust_entry.attr,
 #ifdef CONFIG_BLK_DEV_THROTTLING_LOW
 	&throtl_sample_time_entry.attr,
 #endif
