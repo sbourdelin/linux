@@ -79,6 +79,143 @@ static inline void rtsx_pci_disable_aspm(struct rtsx_pcr *pcr)
 		0xFC, 0);
 }
 
+int rtsx_comm_set_ltr_latency(struct rtsx_pcr *pcr, u32 latency)
+{
+	rtsx_pci_write_register(pcr, MSGTXDATA0, 0xFF, (u8) (latency & 0xFF));
+	rtsx_pci_write_register(pcr, MSGTXDATA1,
+				0xFF, (u8)((latency >> 8) & 0xFF));
+	rtsx_pci_write_register(pcr, MSGTXDATA2,
+				0xFF, (u8)((latency >> 16) & 0xFF));
+	rtsx_pci_write_register(pcr, MSGTXDATA3,
+				0xFF, (u8)((latency >> 24) & 0xFF));
+	rtsx_pci_write_register(pcr, LTR_CTL, 0xC0, 0xC0);
+
+	return 0;
+}
+
+int rtsx_set_ltr_latency(struct rtsx_pcr *pcr, u32 latency)
+{
+	if (pcr->ops->set_ltr_latency)
+		return pcr->ops->set_ltr_latency(pcr, latency);
+	else
+		return rtsx_comm_set_ltr_latency(pcr, latency);
+
+	return 0;
+}
+
+static void rtsx_comm_disable_aspm(struct rtsx_pcr *pcr)
+{
+	struct cr_option *option = &pcr->option;
+
+	if (pcr->aspm_enabled) {
+		if (option->dev_aspm_mode != DEV_ASPM_DISABLE) {
+			if (option->dev_aspm_mode == DEV_ASPM_DYNAMIC) {
+				rtsx_pci_disable_aspm(pcr);
+			} else if (option->dev_aspm_mode == DEV_ASPM_BACKDOOR) {
+				u8 mask = FORCE_ASPM_VAL_MASK;
+
+				rtsx_pci_write_register(pcr, ASPM_FORCE_CTL,
+							mask, 0);
+			}
+			msleep(20);
+		}
+		pcr->aspm_enabled = 0;
+	}
+}
+
+static void rtsx_disable_aspm(struct rtsx_pcr *pcr)
+{
+	if (pcr->ops->disable_aspm)
+		pcr->ops->disable_aspm(pcr);
+	else
+		rtsx_comm_disable_aspm(pcr);
+}
+
+int rtsx_set_l1off_sub(struct rtsx_pcr *pcr, u8 val)
+{
+	rtsx_pci_write_register(pcr, L1SUB_CONFIG3, 0xFF, val);
+	return 0;
+}
+
+static void rtsx_comm_set_l1off_cfg_sub_D0(struct rtsx_pcr *pcr, int active)
+{
+	struct cr_option *option = &(pcr->option);
+	u32 interrupt = rtsx_pci_readl(pcr, RTSX_BIPR);
+	int card_exist = (interrupt & SD_EXIST) | (interrupt & MS_EXIST);
+	int aspm_L1_1, aspm_L1_2;
+
+	aspm_L1_1 = check_dev_flag(pcr, ASPM_L1_1_EN);
+	aspm_L1_2 = check_dev_flag(pcr, ASPM_L1_2_EN);
+
+	if (active) {
+		/* run, latency: 60us */
+		if (aspm_L1_1) {
+			u8 val = option->ltr_l1off_snooze_sspwrgate;
+
+			if (check_dev_flag(pcr,
+					LTR_L1SS_PWR_GATE_CHECK_CARD_EN)) {
+				if (card_exist)
+					val &= ~(1 << 4);
+				else
+					val |= (1 << 4);
+			}
+
+			rtsx_set_l1off_sub(pcr, val);
+		} else {
+			rtsx_set_l1off_sub(pcr, 0);
+		}
+	} else {
+		/* l1off, latency: 300us */
+		if (aspm_L1_2) {
+			u8 val = option->ltr_l1off_sspwrgate;
+
+			if (check_dev_flag(pcr,
+					LTR_L1SS_PWR_GATE_CHECK_CARD_EN)) {
+				if (card_exist)
+					val &= ~(1 << 4);
+				else
+					val |= (1 << 4);
+			}
+
+			rtsx_set_l1off_sub(pcr, val);
+		} else {
+			rtsx_set_l1off_sub(pcr, 0);
+		}
+	}
+}
+
+void rtsx_set_l1off_sub_cfg_D0(struct rtsx_pcr *pcr, int active)
+{
+	if (pcr->ops->set_l1off_cfg_sub_D0)
+		pcr->ops->set_l1off_cfg_sub_D0(pcr, active);
+	else
+		rtsx_comm_set_l1off_cfg_sub_D0(pcr, active);
+}
+
+static void rtsx_comm_pm_full_on(struct rtsx_pcr *pcr)
+{
+	struct cr_option *option = &pcr->option;
+
+	rtsx_disable_aspm(pcr);
+
+	if (option->ltr_enabled) {
+		u32 latency = option->ltr_active_latency;
+
+		rtsx_set_ltr_latency(pcr, latency);
+	}
+
+	if (check_dev_flag(pcr, LTR_L1SS_PWR_GATE_EN))
+		rtsx_set_l1off_sub_cfg_D0(pcr, 1);
+}
+
+void rtsx_pm_full_on(struct rtsx_pcr *pcr)
+{
+	if (pcr->ops->full_on)
+		pcr->ops->full_on(pcr);
+	else
+		rtsx_comm_pm_full_on(pcr);
+}
+
 void rtsx_pci_start_run(struct rtsx_pcr *pcr)
 {
 	/* If pci device removed, don't queue idle work any more */
@@ -89,9 +226,7 @@ void rtsx_pci_start_run(struct rtsx_pcr *pcr)
 		pcr->state = PDEV_STAT_RUN;
 		if (pcr->ops->enable_auto_blink)
 			pcr->ops->enable_auto_blink(pcr);
-
-		if (pcr->aspm_en)
-			rtsx_pci_disable_aspm(pcr);
+		rtsx_pm_full_on(pcr);
 	}
 
 	mod_delayed_work(system_wq, &pcr->idle_work, msecs_to_jiffies(200));
@@ -958,6 +1093,63 @@ static int rtsx_pci_acquire_irq(struct rtsx_pcr *pcr)
 	return 0;
 }
 
+static void rtsx_comm_enable_aspm(struct rtsx_pcr *pcr)
+{
+	struct cr_option *option = &pcr->option;
+
+	if (!pcr->aspm_enabled) {
+		if (option->dev_aspm_mode != DEV_ASPM_DISABLE) {
+			u8 val = 0;
+
+			if (option->dev_aspm_mode == DEV_ASPM_DYNAMIC) {
+				rtsx_pci_enable_aspm(pcr);
+			} else if (option->dev_aspm_mode == DEV_ASPM_BACKDOOR) {
+				u8 mask = FORCE_ASPM_VAL_MASK;
+
+				val = pcr->aspm_en;
+				rtsx_pci_write_register(pcr, ASPM_FORCE_CTL,
+							mask, val);
+			}
+		}
+		pcr->aspm_enabled = 1;
+	}
+}
+
+static void rtsx_enable_aspm(struct rtsx_pcr *pcr)
+{
+	if (pcr->ops->enable_aspm)
+		pcr->ops->enable_aspm(pcr);
+	else
+		rtsx_comm_enable_aspm(pcr);
+}
+
+static void rtsx_comm_pm_power_saving(struct rtsx_pcr *pcr)
+{
+	struct cr_option *option = &pcr->option;
+
+	if (option->ltr_enabled) {
+		u32 latency = option->ltr_l1off_latency;
+
+		if (check_dev_flag(pcr, L1_SNOOZE_TEST_EN))
+			mdelay(option->l1_snooze_delay);
+
+		rtsx_set_ltr_latency(pcr, latency);
+	}
+
+	if (check_dev_flag(pcr, LTR_L1SS_PWR_GATE_EN))
+		rtsx_set_l1off_sub_cfg_D0(pcr, 0);
+
+	rtsx_enable_aspm(pcr);
+}
+
+void rtsx_pm_power_saving(struct rtsx_pcr *pcr)
+{
+	if (pcr->ops->power_saving)
+		pcr->ops->power_saving(pcr);
+	else
+		rtsx_comm_pm_power_saving(pcr);
+}
+
 static void rtsx_pci_idle_work(struct work_struct *work)
 {
 	struct delayed_work *dwork = to_delayed_work(work);
@@ -974,8 +1166,7 @@ static void rtsx_pci_idle_work(struct work_struct *work)
 	if (pcr->ops->turn_off_led)
 		pcr->ops->turn_off_led(pcr);
 
-	if (pcr->aspm_en)
-		rtsx_pci_enable_aspm(pcr);
+	rtsx_pm_power_saving(pcr);
 
 	mutex_unlock(&pcr->pcr_mutex);
 }
@@ -1062,6 +1253,11 @@ static int rtsx_pci_init_hw(struct rtsx_pcr *pcr)
 	err = rtsx_pci_send_cmd(pcr, 100);
 	if (err < 0)
 		return err;
+
+	if (CHK_PCI_PID(pcr, 0x5250) ||
+		CHK_PCI_PID(pcr, 0x524A) ||
+		CHK_PCI_PID(pcr, 0x525A))
+		rtsx_pci_write_register(pcr, PM_CLK_FORCE_CTL, 1, 1);
 
 	/* Enable clk_request_n to enable clock power management */
 	rtsx_pci_write_config_byte(pcr, pcr->pcie_cap + PCI_EXP_LNKCTL + 1, 1);

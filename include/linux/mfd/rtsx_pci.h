@@ -876,14 +876,60 @@ struct pcr_ops {
 	int		(*conv_clk_and_div_n)(int clk, int dir);
 	void		(*fetch_vendor_settings)(struct rtsx_pcr *pcr);
 	void		(*force_power_down)(struct rtsx_pcr *pcr, u8 pm_state);
+
+	void (*enable_aspm)(struct rtsx_pcr *pcr);
+	void (*disable_aspm)(struct rtsx_pcr *pcr);
+	int (*set_ltr_latency)(struct rtsx_pcr *pcr, u32 latency);
+	int (*set_l1off_sub)(struct rtsx_pcr *pcr, u8 val);
+	void (*set_l1off_cfg_sub_D0)(struct rtsx_pcr *pcr, int active);
+	void (*full_on)(struct rtsx_pcr *pcr);
+	void (*power_saving)(struct rtsx_pcr *pcr);
 };
 
 enum PDEV_STAT  {PDEV_STAT_IDLE, PDEV_STAT_RUN};
+
+#define ASPM_L1_1_EN			(1 << 0)
+#define ASPM_L1_2_EN			(1 << 1)
+#define PM_L1_1_EN			(1 << 2)
+#define PM_L1_2_EN			(1 << 3)
+#define LTR_L1SS_PWR_GATE_EN            (1 << 4)
+#define L1_SNOOZE_TEST_EN		(1 << 5)
+#define LTR_L1SS_PWR_GATE_CHECK_CARD_EN	(1 << 6)
+
+enum dev_aspm_mode {
+	DEV_ASPM_DISABLE = 0,
+	DEV_ASPM_DYNAMIC = 1,
+	DEV_ASPM_BACKDOOR = 2,
+	DEV_ASPM_STATIC	= 3,
+};
+
+struct cr_option {
+	u32 dev_flags;
+	int force_clkreq_0;
+	int ltr_en;
+	int ltr_enabled;
+	int ltr_active;
+	u32 ltr_active_latency;
+	u32 ltr_idle_latency;
+	u32 ltr_l1off_latency;
+	enum dev_aspm_mode dev_aspm_mode;
+	u32 l1_snooze_delay;
+	u8 ltr_l1off_sspwrgate;
+	u8 ltr_l1off_snooze_sspwrgate;
+};
+
+#define set_dev_flag(cr, flag) \
+	((cr)->option.dev_flags |= (flag))
+#define clear_dev_flag(cr, flag) \
+	((cr)->option.dev_flags &= ~(flag))
+#define check_dev_flag(cr, flag) \
+	((cr)->option.dev_flags & (flag))
 
 struct rtsx_pcr {
 	struct pci_dev			*pci;
 	unsigned int			id;
 	int				pcie_cap;
+	struct cr_option option;
 
 	/* pci resources */
 	unsigned long			addr;
@@ -940,6 +986,7 @@ struct rtsx_pcr {
 	u8				card_drive_sel;
 #define ASPM_L1_EN			0x02
 	u8				aspm_en;
+	int				aspm_enabled;
 
 #define PCR_MS_PMOS			(1 << 0)
 #define PCR_REVERSE_SOCKET		(1 << 1)

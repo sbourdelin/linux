@@ -85,5 +85,7 @@ do {									\
 
 /* generic operations */
 int rtsx_gops_pm_reset(struct rtsx_pcr *pcr);
+int rtsx_set_ltr_latency(struct rtsx_pcr *pcr, u32 latency);
+int rtsx_set_l1off_sub(struct rtsx_pcr *pcr, u8 val);
 
 #endif
