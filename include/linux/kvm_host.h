@@ -498,6 +498,19 @@ static inline struct kvm_vcpu *kvm_get_vcpu(struct kvm *kvm, int i)
 	     (vcpup = kvm_get_vcpu(kvm, idx)) != NULL; \
 	     idx++)
 
+#define kvm_for_each_vcpu_from(idx, vcpup, from, kvm) \
+	for (idx = from, vcpup = kvm_get_vcpu(kvm, idx); \
+	     vcpup; \
+	     ({ \
+		idx++; \
+		if (idx >= atomic_read(&kvm->online_vcpus)) \
+			idx = 0; \
+		if (idx == from) \
+			vcpup = NULL; \
+		else \
+			vcpup = kvm_get_vcpu(kvm, idx); \
+	      }))
+
 static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
 {
 	struct kvm_vcpu *vcpu = NULL;

@@ -2334,8 +2334,7 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
 	struct kvm_vcpu *vcpu;
 	int last_boosted_vcpu = me->kvm->last_boosted_vcpu;
 	int yielded = 0;
-	int try = 3;
-	int pass;
+	int try = 2;
 	int i;
 
 	kvm_vcpu_set_in_spin_loop(me, true);
@@ -2346,34 +2345,24 @@ void kvm_vcpu_on_spin(struct kvm_vcpu *me, bool yield_to_kernel_mode)
 	 * VCPU is holding the lock that we need and will release it.
 	 * We approximate round-robin by starting at the last boosted VCPU.
 	 */
-	for (pass = 0; pass < 2 && !yielded && try; pass++) {
-		kvm_for_each_vcpu(i, vcpu, kvm) {
-			if (!pass && i <= last_boosted_vcpu) {
-				i = last_boosted_vcpu;
-				continue;
-			} else if (pass && i > last_boosted_vcpu)
-				break;
-			if (!ACCESS_ONCE(vcpu->preempted))
-				continue;
-			if (vcpu == me)
-				continue;
-			if (swait_active(&vcpu->wq) && !kvm_arch_vcpu_runnable(vcpu))
-				continue;
-			if (yield_to_kernel_mode && !kvm_arch_vcpu_in_kernel(vcpu))
-				continue;
-			if (!kvm_vcpu_eligible_for_directed_yield(vcpu))
-				continue;
+	kvm_for_each_vcpu_from(i, vcpu, last_boosted_vcpu, kvm) {
+		if (!ACCESS_ONCE(vcpu->preempted))
+			continue;
+		if (vcpu == me)
+			continue;
+		if (swait_active(&vcpu->wq) && !kvm_arch_vcpu_runnable(vcpu))
+			continue;
+		if (yield_to_kernel_mode && !kvm_arch_vcpu_in_kernel(vcpu))
+			continue;
+		if (!kvm_vcpu_eligible_for_directed_yield(vcpu))
+			continue;
 
-			yielded = kvm_vcpu_yield_to(vcpu);
-			if (yielded > 0) {
-				kvm->last_boosted_vcpu = i;
-				break;
-			} else if (yielded < 0) {
-				try--;
-				if (!try)
-					break;
-			}
-		}
+		yielded = kvm_vcpu_yield_to(vcpu);
+		if (yielded > 0) {
+			kvm->last_boosted_vcpu = i;
+			break;
+		} else if (yielded < 0 && !try--)
+			break;
 	}
 	kvm_vcpu_set_in_spin_loop(me, false);
 
