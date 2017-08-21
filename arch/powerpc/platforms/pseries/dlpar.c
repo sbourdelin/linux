@@ -592,6 +592,8 @@ static CLASS_ATTR_RW(dlpar);
 
 static int __init pseries_dlpar_init(void)
 {
+	shared_topology_update();
+
 	pseries_hp_wq = alloc_workqueue("pseries hotplug workqueue",
 					WQ_UNBOUND, 1);
 	return sysfs_create_file(kernel_kobj, &class_attr_dlpar.attr);
