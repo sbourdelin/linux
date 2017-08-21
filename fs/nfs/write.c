@@ -1372,6 +1372,8 @@ static void nfs_initiate_write(struct nfs_pgio_header *hdr,
 
 	task_setup_data->priority = priority;
 	rpc_ops->write_setup(hdr, msg);
+	trace_nfs_initiate_write(hdr->inode, hdr->io_start, hdr->good_bytes,
+				 hdr->args.stable);
 
 	nfs4_state_protect_write(NFS_SERVER(hdr->inode)->nfs_client,
 				 &task_setup_data->rpc_client, msg, hdr);
@@ -1529,7 +1531,10 @@ static int nfs_writeback_done(struct rpc_task *task,
 	status = NFS_PROTO(inode)->write_done(task, hdr);
 	if (status != 0)
 		return status;
+
 	nfs_add_stats(inode, NFSIOS_SERVERWRITTENBYTES, hdr->res.count);
+	trace_nfs_writeback_done(inode, task->tk_status,
+				 hdr->args.offset, hdr->res.verf);
 
 	if (hdr->res.verf->committed < hdr->args.stable &&
 	    task->tk_status >= 0) {
@@ -1658,6 +1663,7 @@ int nfs_initiate_commit(struct rpc_clnt *clnt, struct nfs_commit_data *data,
 	};
 	/* Set up the initial task struct.  */
 	nfs_ops->commit_setup(data, &msg);
+	trace_nfs_initiate_commit(data);
 
 	dprintk("NFS: initiated commit call\n");
 
@@ -1782,6 +1788,7 @@ static void nfs_commit_done(struct rpc_task *task, void *calldata)
 
 	/* Call the NFS version-specific code */
 	NFS_PROTO(data->inode)->commit_done(task, data);
+	trace_nfs_commit_done(data);
 }
 
 static void nfs_commit_release_pages(struct nfs_commit_data *data)
