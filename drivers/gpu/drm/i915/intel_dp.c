@@ -4750,6 +4750,7 @@ intel_dp_long_pulse(struct intel_connector *intel_connector)
 		intel_dp->max_link_rate = intel_dp_max_common_rate(intel_dp);
 
 		intel_dp->reset_link_params = false;
+		intel_dp->train_set_valid = false;
 	}
 
 	intel_dp_print_rates(intel_dp);
@@ -6019,6 +6020,7 @@ intel_dp_init_connector(struct intel_digital_port *intel_dig_port,
 	intel_dp_set_source_rates(intel_dp);
 
 	intel_dp->reset_link_params = true;
+	intel_dp->train_set_valid = false;
 	intel_dp->pps_pipe = INVALID_PIPE;
 	intel_dp->active_pipe = INVALID_PIPE;
 
