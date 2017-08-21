@@ -119,7 +119,7 @@ void kvm_vgic_vcpu_early_init(struct kvm_vcpu *vcpu)
  */
 int kvm_vgic_create(struct kvm *kvm, u32 type)
 {
-	int i, vcpu_lock_idx = -1, ret;
+	int i, ret;
 	struct kvm_vcpu *vcpu;
 
 	if (irqchip_in_kernel(kvm))
@@ -140,18 +140,14 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
 	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
 	 * that no other VCPUs are run while we create the vgic.
 	 */
-	ret = -EBUSY;
-	kvm_for_each_vcpu(i, vcpu, kvm) {
-		if (!mutex_trylock(&vcpu->mutex))
-			goto out_unlock;
-		vcpu_lock_idx = i;
-	}
+	if (!lock_all_vcpus(kvm))
+		return -EBUSY;
 
-	kvm_for_each_vcpu(i, vcpu, kvm) {
-		if (vcpu->arch.has_run_once)
+	kvm_for_each_vcpu(i, vcpu, kvm)
+		if (vcpu->arch.has_run_once) {
+			ret = -EBUSY;
 			goto out_unlock;
-	}
-	ret = 0;
+		}
 
 	if (type == KVM_DEV_TYPE_ARM_VGIC_V2)
 		kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
@@ -176,11 +172,9 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
 	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
 
+	ret = 0;
 out_unlock:
-	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
-		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
-		mutex_unlock(&vcpu->mutex);
-	}
+	unlock_all_vcpus(kvm);
 	return ret;
 }
 

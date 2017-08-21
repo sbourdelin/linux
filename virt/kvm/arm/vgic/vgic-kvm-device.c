@@ -270,7 +270,11 @@ static void unlock_vcpus(struct kvm *kvm, int vcpu_lock_idx)
 
 void unlock_all_vcpus(struct kvm *kvm)
 {
-	unlock_vcpus(kvm, atomic_read(&kvm->online_vcpus) - 1);
+	int i;
+	struct kvm_vcpu *tmp_vcpu;
+
+	kvm_for_each_vcpu(i, tmp_vcpu, kvm)
+		mutex_unlock(&tmp_vcpu->mutex);
 }
 
 /* Returns true if all vcpus were locked, false otherwise */
