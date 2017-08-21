@@ -388,12 +388,16 @@ struct kvm_memslots {
 	int used_slots;
 };
 
+#define KVM_VCPUS_CHUNK_SIZE 128
+#define KVM_VCPUS_CHUNKS_NUM \
+	(round_up(KVM_MAX_VCPUS, KVM_VCPUS_CHUNK_SIZE) / KVM_VCPUS_CHUNK_SIZE)
+
 struct kvm {
 	spinlock_t mmu_lock;
 	struct mutex slots_lock;
 	struct mm_struct *mm; /* userspace tied to this vm */
 	struct kvm_memslots __rcu *memslots[KVM_ADDRESS_SPACE_NUM];
-	struct kvm_vcpu *vcpus[KVM_MAX_VCPUS];
+	struct kvm_vcpu **vcpus[KVM_VCPUS_CHUNKS_NUM];
 	struct list_head vcpu_list;
 
 	/*
@@ -484,14 +488,23 @@ static inline struct kvm_io_bus *kvm_get_bus(struct kvm *kvm, enum kvm_bus idx)
 				      !refcount_read(&kvm->users_count));
 }
 
-static inline struct kvm_vcpu *kvm_get_vcpu(struct kvm *kvm, int i)
+static inline struct kvm_vcpu *__kvm_get_vcpu(struct kvm *kvm, int id)
 {
-	/* Pairs with smp_wmb() in kvm_vm_ioctl_create_vcpu, in case
-	 * the caller has read kvm->online_vcpus before (as is the case
-	 * for kvm_for_each_vcpu, for example).
+	return kvm->vcpus[id / KVM_VCPUS_CHUNK_SIZE][id % KVM_VCPUS_CHUNK_SIZE];
+}
+
+static inline struct kvm_vcpu *kvm_get_vcpu(struct kvm *kvm, int id)
+{
+	if (id >= atomic_read(&kvm->online_vcpus))
+		return NULL;
+
+	/*
+	 * Pairs with smp_wmb() in kvm_vm_ioctl_create_vcpu.  Ensures that the
+	 * pointers leading to an online vcpu are valid.
 	 */
 	smp_rmb();
-	return kvm->vcpus[i];
+
+	return __kvm_get_vcpu(kvm, id);
 }
 
 #define kvm_for_each_vcpu(vcpup, kvm) \
@@ -514,7 +527,7 @@ static inline struct kvm_vcpu *kvm_get_vcpu_by_id(struct kvm *kvm, int id)
 
 	if (id < 0)
 		return NULL;
-	if (id < KVM_MAX_VCPUS)
+	if (id < atomic_read(&kvm->online_vcpus))
 		vcpu = kvm_get_vcpu(kvm, id);
 	if (vcpu && vcpu->vcpu_id == id)
 		return vcpu;

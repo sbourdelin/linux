@@ -759,11 +759,14 @@ void kvm_free_vcpus(struct kvm *kvm)
 
 	mutex_lock(&kvm->lock);
 
-	i = atomic_read(&kvm->online_vcpus);
+	i = round_up(atomic_read(&kvm->online_vcpus), KVM_VCPUS_CHUNK_SIZE) /
+		KVM_VCPUS_CHUNK_SIZE;
 	atomic_set(&kvm->online_vcpus, 0);
 
-	while (i--)
+	while (i--) {
+		kfree(kvm->vcpus[i]);
 		kvm->vcpus[i] = NULL;
+	}
 
 	mutex_unlock(&kvm->lock);
 }
@@ -2481,6 +2484,8 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 {
 	int r;
 	struct kvm_vcpu *vcpu;
+	struct kvm_vcpu **vcpusp;
+	unsigned chunk, offset;
 
 	if (id >= KVM_MAX_VCPU_ID)
 		return -EINVAL;
@@ -2518,8 +2523,22 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 
 	vcpu->vcpus_idx = atomic_read(&kvm->online_vcpus);
 
-	BUG_ON(kvm->vcpus[vcpu->vcpus_idx]);
+	chunk  = vcpu->vcpus_idx / KVM_VCPUS_CHUNK_SIZE;
+	offset = vcpu->vcpus_idx % KVM_VCPUS_CHUNK_SIZE;
 
+	if (!kvm->vcpus[chunk]) {
+		kvm->vcpus[chunk] = kzalloc(KVM_VCPUS_CHUNK_SIZE * sizeof(**kvm->vcpus),
+		                            GFP_KERNEL);
+		if (!kvm->vcpus[chunk]) {
+			r = -ENOMEM;
+			goto unlock_vcpu_destroy;
+		}
+
+		BUG_ON(offset != 0);
+	}
+
+	vcpusp = &kvm->vcpus[chunk][offset];
+	BUG_ON(*vcpusp);
 
 	/* Now it's all set up, let userspace reach it */
 	kvm_get_kvm(kvm);
@@ -2529,7 +2548,7 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 		goto unlock_vcpu_destroy;
 	}
 
-	kvm->vcpus[atomic_read(&kvm->online_vcpus)] = vcpu;
+	*vcpusp = vcpu;
 	list_add_tail_rcu(&vcpu->vcpu_list, &kvm->vcpu_list);
 
 	/*

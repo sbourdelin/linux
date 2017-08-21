@@ -11737,7 +11737,7 @@ static int vmx_update_pi_irte(struct kvm *kvm, unsigned int host_irq,
 
 	if (!kvm_arch_has_assigned_device(kvm) ||
 		!irq_remapping_cap(IRQ_POSTING_CAP) ||
-		!kvm_vcpu_apicv_active(kvm->vcpus[0]))
+		!kvm_vcpu_apicv_active(kvm_get_vcpu(kvm, 0)))
 		return 0;
 
 	idx = srcu_read_lock(&kvm->irq_srcu);
