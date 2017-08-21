@@ -2499,7 +2499,10 @@ static int kvm_vm_ioctl_create_vcpu(struct kvm *kvm, u32 id)
 		goto unlock_vcpu_destroy;
 	}
 
-	BUG_ON(kvm->vcpus[atomic_read(&kvm->online_vcpus)]);
+	vcpu->vcpus_idx = atomic_read(&kvm->online_vcpus);
+
+	BUG_ON(kvm->vcpus[vcpu->vcpus_idx]);
+
 
 	/* Now it's all set up, let userspace reach it */
 	kvm_get_kvm(kvm);
