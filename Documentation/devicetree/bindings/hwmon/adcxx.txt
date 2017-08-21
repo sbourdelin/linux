@@ -1,0 +1,24 @@
+adcxx properties
+
+Required properties:
+- compatible: Must be one of the following:
+	- "national,adcxx1s" for adcxx1s
+	- "national,adcxx2s" for adcxx2s
+	- "national,adcxx4s" for adcxx4s
+	- "national,adcxx8s" for adcxx8s
+- reg: SPI address for chip
+
+Optional properties:
+
+- vref-supply
+  The external reference in microvolt for this device is set to this value.
+  If it does not exists the reference will be set to 3300000uV (3.3V).
+
+Example:
+
+adc@6 {
+	compatible = "national,adcxx2s";
+	reg = <6 0>;
+	spi-max-frequency = <1000000>;
+	vref-supply = <&vref>;
+};
