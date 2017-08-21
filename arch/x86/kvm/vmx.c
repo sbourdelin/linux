@@ -2810,7 +2810,6 @@ static void nested_vmx_setup_ctls_msrs(struct vcpu_vmx *vmx)
 	vmx->nested.nested_vmx_secondary_ctls_high &=
 		SECONDARY_EXEC_RDRAND | SECONDARY_EXEC_RDSEED |
 		SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
-		SECONDARY_EXEC_RDTSCP |
 		SECONDARY_EXEC_DESC |
 		SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
 		SECONDARY_EXEC_APIC_REGISTER_VIRT |
@@ -9617,25 +9616,28 @@ static void nested_vmx_cr_fixed1_bits_update(struct kvm_vcpu *vcpu)
 #undef cr4_fixed1_update
 }
 
+/*
+ * Update MSR_IA32_VMX_PROCBASED_CTLS2 according to CPUID.  Selected features
+ * are enabled iff they are enabled in CPUID and supported by the host.
+ */
+static void nested_vmx_secondary_ctls_high_update(struct kvm_vcpu *vcpu,
+		u32 host_secondary_exec_ctl)
+{
+	u32 mask = SECONDARY_EXEC_RDTSCP | SECONDARY_EXEC_ENABLE_INVPCID;
+
+	vcpu->vmx.nested.nested_vmx_secondary_ctls_high &= ~mask
+	vcpu->vmx.nested.nested_vmx_secondary_ctls_high |=
+			host_secondary_exec_ctl & mask;
+}
+
 static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 	u32 secondary_exec_ctl = vmx_secondary_exec_control(vmx);
 
-	if (vmx_rdtscp_supported()) {
-		bool rdtscp_enabled = guest_cpuid_has(vcpu, X86_FEATURE_RDTSCP);
-		if (!rdtscp_enabled)
-			secondary_exec_ctl &= ~SECONDARY_EXEC_RDTSCP;
-
-		if (nested) {
-			if (rdtscp_enabled)
-				vmx->nested.nested_vmx_secondary_ctls_high |=
-					SECONDARY_EXEC_RDTSCP;
-			else
-				vmx->nested.nested_vmx_secondary_ctls_high &=
-					~SECONDARY_EXEC_RDTSCP;
-		}
-	}
+	if (vmx_rdtscp_supported() &&
+	    !guest_cpuid_has(vcpu, X86_FEATURE_RDTSCP))
+		secondary_exec_ctl &= ~SECONDARY_EXEC_RDTSCP;
 
 	if (vmx_invpcid_supported()) {
 		/* Exposing INVPCID only when PCID is exposed */
@@ -9646,15 +9648,6 @@ static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 		if (!invpcid_enabled) {
 			secondary_exec_ctl &= ~SECONDARY_EXEC_ENABLE_INVPCID;
 			guest_cpuid_clear(vcpu, X86_FEATURE_INVPCID);
-		}
-
-		if (nested) {
-			if (invpcid_enabled)
-				vmx->nested.nested_vmx_secondary_ctls_high |=
-					SECONDARY_EXEC_ENABLE_INVPCID;
-			else
-				vmx->nested.nested_vmx_secondary_ctls_high &=
-					~SECONDARY_EXEC_ENABLE_INVPCID;
 		}
 	}
 
@@ -9668,8 +9661,11 @@ static void vmx_cpuid_update(struct kvm_vcpu *vcpu)
 		to_vmx(vcpu)->msr_ia32_feature_control_valid_bits &=
 			~FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX;
 
-	if (nested_vmx_allowed(vcpu))
+	if (nested_vmx_allowed(vcpu)) {
 		nested_vmx_cr_fixed1_bits_update(vcpu);
+		nested_vmx_secondary_ctls_high_update(vcpu, secondary_exec_ctl);
+	}
+
 }
 
 static void vmx_set_supported_cpuid(u32 func, struct kvm_cpuid_entry2 *entry)
