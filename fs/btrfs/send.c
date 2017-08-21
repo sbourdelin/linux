@@ -3697,20 +3697,20 @@ static int update_ref_path(struct send_ctx *sctx, struct recorded_ref *ref)
 		return -ENOMEM;
 
 	ret = get_cur_path(sctx, ref->dir, ref->dir_gen, new_path);
-	if (ret < 0) {
-		fs_path_free(new_path);
-		return ret;
-	}
+	if (ret < 0)
+		goto free_path;
+
 	ret = fs_path_add(new_path, ref->name, ref->name_len);
-	if (ret < 0) {
-		fs_path_free(new_path);
-		return ret;
-	}
+	if (ret < 0)
+		goto free_path;
 
 	fs_path_free(ref->full_path);
 	set_ref_path(ref, new_path);
 
 	return 0;
+free_path:
+	fs_path_free(new_path);
+	return ret;
 }
 
 /*
