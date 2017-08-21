@@ -248,7 +248,7 @@ static void rs_start(struct tty_struct *tty)
 
 static void receive_chars(struct serial_state *info)
 {
-        int status;
+	int status;
 	int serdatr;
 	unsigned char ch, flag;
 	struct	async_icount *icount;
@@ -339,7 +339,7 @@ static void transmit_chars(struct serial_state *info)
 	custom.intreq = IF_TBE;
 	mb();
 	if (info->x_char) {
-	        custom.serdat = info->x_char | 0x100;
+		custom.serdat = info->x_char | 0x100;
 		mb();
 		info->icount.tx++;
 		info->x_char = 0;
@@ -349,7 +349,7 @@ static void transmit_chars(struct serial_state *info)
 	    || info->tport.tty->stopped
 	    || info->tport.tty->hw_stopped) {
 		info->IER &= ~UART_IER_THRI;
-	        custom.intena = IF_TBE;
+		custom.intena = IF_TBE;
 		mb();
 		return;
 	}
@@ -368,7 +368,7 @@ static void transmit_chars(struct serial_state *info)
 	printk("THRE...");
 #endif
 	if (info->xmit.head == info->xmit.tail) {
-	        custom.intena = IF_TBE;
+		custom.intena = IF_TBE;
 		mb();
 		info->IER &= ~UART_IER_THRI;
 	}
@@ -448,7 +448,7 @@ static void check_modem_status(struct serial_state *info)
 
 static irqreturn_t ser_vbl_int( int irq, void *data)
 {
-        /* vbl is just a periodic interrupt we tie into to update modem status */
+	/* vbl is just a periodic interrupt we tie into to update modem status */
 	struct serial_state *info = data;
 	/*
 	 * TBD - is it better to unregister from this interrupt or to
@@ -911,7 +911,7 @@ static void rs_flush_buffer(struct tty_struct *tty)
 static void rs_send_xchar(struct tty_struct *tty, char ch)
 {
 	struct serial_state *info = tty->driver_data;
-        unsigned long flags;
+	unsigned long flags;
 
 	if (serial_paranoia_check(info, tty->name, "rs_send_xchar"))
 		return;
@@ -920,8 +920,8 @@ static void rs_send_xchar(struct tty_struct *tty, char ch)
 	if (ch) {
 		/* Make sure transmit interrupts are on */
 
-	        /* Check this ! */
-	        local_irq_save(flags);
+		/* Check this ! */
+		local_irq_save(flags);
 		if(!(custom.intenar & IF_TBE)) {
 		    custom.intena = IF_SETCLR | IF_TBE;
 		    mb();
@@ -1231,70 +1231,66 @@ static int rs_ioctl(struct tty_struct *tty,
 	}
 
 	switch (cmd) {
-		case TIOCGSERIAL:
+	case TIOCGSERIAL:
 			return get_serial_info(tty, info, argp);
-		case TIOCSSERIAL:
+	case TIOCSSERIAL:
 			return set_serial_info(tty, info, argp);
-		case TIOCSERCONFIG:
+	case TIOCSERCONFIG:
 			return 0;
-
-		case TIOCSERGETLSR: /* Get line status register */
+	case TIOCSERGETLSR: /* Get line status register */
 			return get_lsr_info(info, argp);
-
-		case TIOCSERGSTRUCT:
+	case TIOCSERGSTRUCT:
 			if (copy_to_user(argp,
 					 info, sizeof(struct serial_state)))
 				return -EFAULT;
-			return 0;
-
+		return 0;
 		/*
 		 * Wait for any of the 4 modem inputs (DCD,RI,DSR,CTS) to change
 		 * - mask passed in arg for lines of interest
- 		 *   (use |'ed TIOCM_RNG/DSR/CD/CTS for masking)
+		 *   (use |'ed TIOCM_RNG/DSR/CD/CTS for masking)
 		 * Caller should use TIOCGICOUNT to see which one it was
 		 */
-		case TIOCMIWAIT:
+	case TIOCMIWAIT:
+		local_irq_save(flags);
+		/* note the counters on entry */
+		cprev = info->icount;
+		local_irq_restore(flags);
+		while (1) {
+			prepare_to_wait(&info->tport.delta_msr_wait,&wait,
+							TASK_INTERRUPTIBLE);
 			local_irq_save(flags);
-			/* note the counters on entry */
-			cprev = info->icount;
+			cnow = info->icount; /* atomic copy */
 			local_irq_restore(flags);
-			while (1) {
-				prepare_to_wait(&info->tport.delta_msr_wait,
-						&wait, TASK_INTERRUPTIBLE);
-				local_irq_save(flags);
-				cnow = info->icount; /* atomic copy */
-				local_irq_restore(flags);
-				if (cnow.rng == cprev.rng && cnow.dsr == cprev.dsr && 
-				    cnow.dcd == cprev.dcd && cnow.cts == cprev.cts) {
+			if (cnow.rng == cprev.rng && cnow.dsr == cprev.dsr && 
+					cnow.dcd == cprev.dcd && cnow.cts == cprev.cts) {
 					ret = -EIO; /* no change => error */
 					break;
 				}
-				if ( ((arg & TIOCM_RNG) && (cnow.rng != cprev.rng)) ||
+			if ( ((arg & TIOCM_RNG) && (cnow.rng != cprev.rng)) ||
 				     ((arg & TIOCM_DSR) && (cnow.dsr != cprev.dsr)) ||
 				     ((arg & TIOCM_CD)  && (cnow.dcd != cprev.dcd)) ||
 				     ((arg & TIOCM_CTS) && (cnow.cts != cprev.cts)) ) {
 					ret = 0;
 					break;
 				}
-				schedule();
-				/* see if a signal did it */
-				if (signal_pending(current)) {
-					ret = -ERESTARTSYS;
-					break;
+			schedule();
+			/* see if a signal did it */
+			if (signal_pending(current)) {
+				ret = -ERESTARTSYS;
+				break;
 				}
-				cprev = cnow;
+			cprev = cnow;
 			}
-			finish_wait(&info->tport.delta_msr_wait, &wait);
-			return ret;
+		finish_wait(&info->tport.delta_msr_wait, &wait);
+		return ret;
 
-		case TIOCSERGWILD:
-		case TIOCSERSWILD:
-			/* "setserial -W" is called in Debian boot */
-			printk ("TIOCSER?WILD ioctl obsolete, ignored.\n");
-			return 0;
-
-		default:
-			return -ENOIOCTLCMD;
+	case TIOCSERGWILD:
+	case TIOCSERSWILD:
+		/* "setserial -W" is called in Debian boot */
+		printk ("TIOCSER?WILD ioctl obsolete, ignored.\n");
+		return 0;
+	default:
+		return -ENOIOCTLCMD;
 		}
 	return 0;
 }
@@ -1372,8 +1368,8 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	 */
 	state->read_status_mask &= ~UART_LSR_DR;
 	if (tty_port_initialized(port)) {
-	        /* disable receive interrupts */
-	        custom.intena = IF_RBF;
+		/* disable receive interrupts */
+		custom.intena = IF_RBF;
 		mb();
 		/* clear any pending receive interrupt */
 		custom.intreq = IF_RBF;
