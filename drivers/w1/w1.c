@@ -711,7 +711,7 @@ int w1_attach_slave_device(struct w1_master *dev, struct w1_reg_num *rn)
 	int err;
 	struct w1_netlink_msg msg;
 
-	sl = kzalloc(sizeof(struct w1_slave), GFP_KERNEL);
+	sl = kzalloc(sizeof(*sl), GFP_KERNEL);
 	if (!sl)
 		return -ENOMEM;
 
