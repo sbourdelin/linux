@@ -286,12 +286,12 @@ static const unsigned int centro_matrix_keys[] = {
 	KEY(7, 5, KEY_I),
 };
 
-static struct matrix_keymap_data treo680_matrix_keymap_data = {
+static const struct matrix_keymap_data treo680_matrix_keymap_data = {
 	.keymap			= treo680_matrix_keys,
 	.keymap_size		= ARRAY_SIZE(treo680_matrix_keys),
 };
 
-static struct matrix_keymap_data centro_matrix_keymap_data = {
+static const struct matrix_keymap_data centro_matrix_keymap_data = {
 	.keymap			= centro_matrix_keys,
 	.keymap_size		= ARRAY_SIZE(centro_matrix_keys),
 };

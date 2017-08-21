@@ -124,7 +124,7 @@ static const unsigned int palmt5_matrix_keys[] = {
 	KEY(3, 2, KEY_LEFT),
 };
 
-static struct matrix_keymap_data palmt5_matrix_keymap_data = {
+static const struct matrix_keymap_data palmt5_matrix_keymap_data = {
 	.keymap			= palmt5_matrix_keys,
 	.keymap_size		= ARRAY_SIZE(palmt5_matrix_keys),
 };

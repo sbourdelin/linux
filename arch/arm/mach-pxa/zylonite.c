@@ -313,7 +313,7 @@ static const unsigned int zylonite_matrix_key_map[] = {
 	KEY(0, 3, KEY_AUX),	/* contact */
 };
 
-static struct matrix_keymap_data zylonite_matrix_keymap_data = {
+static const struct matrix_keymap_data zylonite_matrix_keymap_data = {
 	.keymap			= zylonite_matrix_key_map,
 	.keymap_size		= ARRAY_SIZE(zylonite_matrix_key_map),
 };

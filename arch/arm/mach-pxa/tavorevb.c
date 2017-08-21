@@ -148,7 +148,7 @@ static const unsigned int tavorevb_matrix_key_map[] = {
 	KEY(3, 3, KEY_F23),	/* soft2 */
 };
 
-static struct matrix_keymap_data tavorevb_matrix_keymap_data = {
+static const struct matrix_keymap_data tavorevb_matrix_keymap_data = {
 	.keymap		= tavorevb_matrix_key_map,
 	.keymap_size	= ARRAY_SIZE(tavorevb_matrix_key_map),
 };

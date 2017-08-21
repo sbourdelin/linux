@@ -429,7 +429,7 @@ static const unsigned int a780_key_map[] = {
 	KEY(4, 4, KEY_DOWN),
 };
 
-static struct matrix_keymap_data a780_matrix_keymap_data = {
+static const struct matrix_keymap_data a780_matrix_keymap_data = {
 	.keymap			= a780_key_map,
 	.keymap_size		= ARRAY_SIZE(a780_key_map),
 };
@@ -464,7 +464,7 @@ static const unsigned int e680_key_map[] = {
 	KEY(2, 3, KEY_KPENTER),
 };
 
-static struct matrix_keymap_data e680_matrix_keymap_data = {
+static const struct matrix_keymap_data e680_matrix_keymap_data = {
 	.keymap			= e680_key_map,
 	.keymap_size		= ARRAY_SIZE(e680_key_map),
 };
@@ -526,7 +526,7 @@ static const unsigned int a1200_key_map[] = {
 	KEY(4, 5, KEY_RESERVED),
 };
 
-static struct matrix_keymap_data a1200_matrix_keymap_data = {
+static const struct matrix_keymap_data a1200_matrix_keymap_data = {
 	.keymap			= a1200_key_map,
 	.keymap_size		= ARRAY_SIZE(a1200_key_map),
 };
@@ -578,7 +578,7 @@ static const unsigned int e6_key_map[] = {
 	KEY(4, 5, KEY_PREVIOUSSONG),
 };
 
-static struct matrix_keymap_data e6_keymap_data = {
+static const struct matrix_keymap_data e6_keymap_data = {
 	.keymap			= e6_key_map,
 	.keymap_size		= ARRAY_SIZE(e6_key_map),
 };
@@ -630,7 +630,7 @@ static const unsigned int a910_key_map[] = {
 	KEY(4, 5, KEY_RESERVED),
 };
 
-static struct matrix_keymap_data a910_matrix_keymap_data = {
+static const struct matrix_keymap_data a910_matrix_keymap_data = {
 	.keymap			= a910_key_map,
 	.keymap_size		= ARRAY_SIZE(a910_key_map),
 };
@@ -682,7 +682,7 @@ static const unsigned int e2_key_map[] = {
 	KEY(4, 5, KEY_RESERVED),
 };
 
-static struct matrix_keymap_data e2_matrix_keymap_data = {
+static const struct matrix_keymap_data e2_matrix_keymap_data = {
 	.keymap			= e2_key_map,
 	.keymap_size		= ARRAY_SIZE(e2_key_map),
 };

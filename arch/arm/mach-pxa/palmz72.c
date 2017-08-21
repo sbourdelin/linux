@@ -156,7 +156,7 @@ static const unsigned int palmz72_matrix_keys[] = {
 	KEY(3, 2, KEY_LEFT),
 };
 
-static struct matrix_keymap_data almz72_matrix_keymap_data = {
+static const struct matrix_keymap_data almz72_matrix_keymap_data = {
 	.keymap			= palmz72_matrix_keys,
 	.keymap_size		= ARRAY_SIZE(palmz72_matrix_keys),
 };

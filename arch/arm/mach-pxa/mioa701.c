@@ -240,7 +240,7 @@ static const unsigned int mioa701_matrix_keys[] = {
 	KEY(2, 2, KEY_CAMERA)	/* Camera key */
 };
 
-static struct matrix_keymap_data mioa701_matrix_keymap_data = {
+static const struct matrix_keymap_data mioa701_matrix_keymap_data = {
 	.keymap			= mioa701_matrix_keys,
 	.keymap_size		= ARRAY_SIZE(mioa701_matrix_keys),
 };

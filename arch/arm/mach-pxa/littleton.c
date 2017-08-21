@@ -249,7 +249,7 @@ static const unsigned int littleton_matrix_key_map[] = {
 	KEY(3, 1, KEY_F23),	/* soft2 */
 };
 
-static struct matrix_keymap_data littleton_matrix_keymap_data = {
+static const struct matrix_keymap_data littleton_matrix_keymap_data = {
 	.keymap			= littleton_matrix_key_map,
 	.keymap_size		= ARRAY_SIZE(littleton_matrix_key_map),
 };

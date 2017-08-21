@@ -412,7 +412,7 @@ static const unsigned int z2_matrix_keys[] = {
 	KEY(5, 7, KEY_DOT),
 };
 
-static struct matrix_keymap_data z2_matrix_keymap_data = {
+static const struct matrix_keymap_data z2_matrix_keymap_data = {
 	.keymap			= z2_matrix_keys,
 	.keymap_size		= ARRAY_SIZE(z2_matrix_keys),
 };

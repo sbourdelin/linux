@@ -846,7 +846,7 @@ static const unsigned int em_x270_module_matrix_keys[] = {
 	KEY(0, 1, KEY_C), KEY(1, 2, KEY_DOWN), KEY(2, 2, KEY_D),
 };
 
-static struct matrix_keymap_data em_x270_matrix_keymap_data = {
+static const struct matrix_keymap_data em_x270_matrix_keymap_data = {
 	.keymap			= em_x270_module_matrix_keys,
 	.keymap_size		= ARRAY_SIZE(em_x270_module_matrix_keys),
 };
@@ -900,7 +900,7 @@ static const unsigned int em_x270_exeda_matrix_keys[] = {
 	KEY(7, 6, 0), KEY(7, 7, 0),
 };
 
-static struct matrix_keymap_data em_x270_exeda_matrix_keymap_data = {
+static const struct matrix_keymap_data em_x270_exeda_matrix_keymap_data = {
 	.keymap			= em_x270_exeda_matrix_keys,
 	.keymap_size		= ARRAY_SIZE(em_x270_exeda_matrix_keys),
 };

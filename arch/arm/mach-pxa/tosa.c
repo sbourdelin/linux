@@ -452,7 +452,7 @@ static const uint32_t tosakbd_keymap[] = {
 	KEY(6, 7, KEY_RIGHT),
 };
 
-static struct matrix_keymap_data tosakbd_keymap_data = {
+static const struct matrix_keymap_data tosakbd_keymap_data = {
 	.keymap		= tosakbd_keymap,
 	.keymap_size	= ARRAY_SIZE(tosakbd_keymap),
 };

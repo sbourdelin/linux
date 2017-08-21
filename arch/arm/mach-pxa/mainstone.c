@@ -482,7 +482,7 @@ static const unsigned int mainstone_matrix_keys[] = {
 	KEY(4, 6, KEY_SELECT),
 };
 
-static struct matrix_keymap_data mainstone_matrix_keymap_data = {
+static const struct matrix_keymap_data mainstone_matrix_keymap_data = {
 	.keymap			= mainstone_matrix_keys,
 	.keymap_size		= ARRAY_SIZE(mainstone_matrix_keys),
 };

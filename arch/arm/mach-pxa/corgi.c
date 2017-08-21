@@ -380,7 +380,7 @@ static const uint32_t corgikbd_keymap[] = {
 	KEY(7, 4, CORGI_KEY_EXJOGUP),
 };
 
-static struct matrix_keymap_data corgikbd_keymap_data = {
+static const struct matrix_keymap_data corgikbd_keymap_data = {
 	.keymap		= corgikbd_keymap,
 	.keymap_size	= ARRAY_SIZE(corgikbd_keymap),
 };
