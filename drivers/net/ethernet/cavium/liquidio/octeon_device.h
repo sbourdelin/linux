@@ -550,6 +550,11 @@ struct octeon_device {
 
 	bool cores_crashed;
 
+#define OCTEON_UBOOT_BUFFER_SIZE 512
+	char uboot_version[OCTEON_UBOOT_BUFFER_SIZE];
+	int  uboot_len;
+	int  uboot_sidx, uboot_eidx;
+
 	struct {
 		int bus;
 		int dev;
