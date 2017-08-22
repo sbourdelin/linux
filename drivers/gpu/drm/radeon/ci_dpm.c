@@ -4342,10 +4342,10 @@ static int ci_set_mc_special_registers(struct radeon_device *rdev,
 					table->mc_reg_table_entry[k].mc_data[j] |= 0x100;
 			}
 			j++;
-			if (j > SMU7_DISCRETE_MC_REGISTER_ARRAY_SIZE)
-				return -EINVAL;
 
 			if (!pi->mem_gddr5) {
+				if (j >= SMU7_DISCRETE_MC_REGISTER_ARRAY_SIZE)
+					return -EINVAL;
 				table->mc_reg_address[j].s1 = MC_PMG_AUTO_CMD >> 2;
 				table->mc_reg_address[j].s0 = MC_PMG_AUTO_CMD >> 2;
 				for (k = 0; k < table->num_entries; k++) {
@@ -4521,8 +4521,6 @@ static int ci_register_patching_mc_seq(struct radeon_device *rdev,
 	    ((rdev->pdev->device == 0x67B0) ||
 	     (rdev->pdev->device == 0x67B1))) {
 		for (i = 0; i < table->last; i++) {
-			if (table->last >= SMU7_DISCRETE_MC_REGISTER_ARRAY_SIZE)
-				return -EINVAL;
 			switch(table->mc_reg_address[i].s1 >> 2) {
 			case MC_SEQ_MISC1:
 				for (k = 0; k < table->num_entries; k++) {
