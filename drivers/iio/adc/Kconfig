@@ -331,6 +331,16 @@ config IMX7D_ADC
 	  This driver can also be built as a module. If so, the module will be
 	  called imx7d_adc.
 
+config LMP92001_ADC
+       tristate "TI LMP92001 ADC Driver"
+       depends on MFD_LMP92001
+       help
+         If you say yes here you get support for TI LMP92001 ADCs
+         conversion.
+
+         This driver can also be built as a module. If so, the module will
+         be called lmp92001_adc.
+
 config LP8788_ADC
 	tristate "LP8788 ADC driver"
 	depends on MFD_LP8788

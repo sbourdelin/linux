@@ -947,6 +947,13 @@ config GPIO_KEMPLD
 	  This driver can also be built as a module. If so, the module will be
 	  called gpio-kempld.
 
+config GPIO_LMP92001
+       tristate "LMP92001 GPIOs"
+       depends on MFD_LMP92001
+       help
+         Say yes here to access the GPIO signals of TI LMP92001 Analog System
+         Monitor and Controller.
+
 config GPIO_LP3943
 	tristate "TI/National Semiconductor LP3943 GPIO expander"
 	depends on MFD_LP3943

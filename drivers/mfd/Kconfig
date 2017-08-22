@@ -1561,6 +1561,18 @@ config MFD_LM3533
 	  additional drivers must be enabled in order to use the LED,
 	  backlight or ambient-light-sensor functionality of the device.
 
+config MFD_LMP92001
+       tristate "TI LMP92001 Analog System Monitor and Controller"
+       depends on I2C
+       select MFD_CORE
+       select REGMAP_I2C
+       help
+         Say yes here to enable support for TI LMP92001 Analog System
+         Monitor and Controller
+
+         This driver provide support for 16 ADC, 12 DAC, Voltage Reference,
+         Analog Temperature Sensor and 8-bit GPIO Port.
+
 config MFD_TIMBERDALE
 	tristate "Timberdale FPGA"
 	select MFD_CORE
