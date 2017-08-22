@@ -4546,10 +4546,10 @@ static int ci_set_mc_special_registers(struct amdgpu_device *adev,
 					table->mc_reg_table_entry[k].mc_data[j] |= 0x100;
 			}
 			j++;
-			if (j > SMU7_DISCRETE_MC_REGISTER_ARRAY_SIZE)
-				return -EINVAL;
 
 			if (adev->mc.vram_type != AMDGPU_VRAM_TYPE_GDDR5) {
+				if (j >= SMU7_DISCRETE_MC_REGISTER_ARRAY_SIZE)
+					return -EINVAL;
 				table->mc_reg_address[j].s1 = mmMC_PMG_AUTO_CMD;
 				table->mc_reg_address[j].s0 = mmMC_PMG_AUTO_CMD;
 				for (k = 0; k < table->num_entries; k++) {
@@ -4725,8 +4725,6 @@ static int ci_register_patching_mc_seq(struct amdgpu_device *adev,
 	    ((adev->pdev->device == 0x67B0) ||
 	     (adev->pdev->device == 0x67B1))) {
 		for (i = 0; i < table->last; i++) {
-			if (table->last >= SMU7_DISCRETE_MC_REGISTER_ARRAY_SIZE)
-				return -EINVAL;
 			switch (table->mc_reg_address[i].s1) {
 			case mmMC_SEQ_MISC1:
 				for (k = 0; k < table->num_entries; k++) {
