@@ -546,6 +546,7 @@ static int decon_bind(struct device *dev, struct device *master, void *data)
 		ctx->configs[win].num_pixel_formats = ARRAY_SIZE(decon_formats);
 		ctx->configs[win].zpos = win;
 		ctx->configs[win].type = decon_win_types[tmp];
+		ctx->configs[win].capabilities = EXYNOS_DRM_PLANE_CAP_BYTE_PITCH;
 
 		ret = exynos_plane_init(drm_dev, &ctx->planes[win], win,
 					&ctx->configs[win]);
