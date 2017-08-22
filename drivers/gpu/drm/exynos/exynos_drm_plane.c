@@ -185,6 +185,16 @@ exynos_drm_plane_check_format(const struct exynos_drm_plane_config *config,
 {
 	struct drm_framebuffer *fb = state->base.fb;
 
+	/*
+	 * Some blocks only allow to specify a buffer pitch in terms
+	 * of pixels. In these cases, we need to ensure that the pitch
+	 * provided by userspace is divisible by the cpp.
+	 */
+	if (!(config->capabilities & EXYNOS_DRM_PLANE_CAP_BYTE_PITCH)) {
+		if (fb->pitches[0] % fb->format->cpp[0])
+			return -ENOTSUPP;
+	}
+
 	switch (fb->modifier) {
 	case DRM_FORMAT_MOD_SAMSUNG_64_32_TILE:
 		if (!(config->capabilities & EXYNOS_DRM_PLANE_CAP_TILE))
