@@ -37,6 +37,7 @@
 #include <linux/pci_ids.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
+#include <linux/pm_wakeirq.h>
 #include <linux/reset.h>
 #include <linux/regmap.h>
 
@@ -1111,6 +1112,15 @@ static int rockchip_pcie_parse_dt(struct rockchip_pcie *rockchip)
 		return err;
 	}
 
+	/* Must init wakeup before setting dedicated wake irq. */
+	device_init_wakeup(dev, true);
+	irq = platform_get_irq_byname(pdev, "wake");
+	if (irq >= 0) {
+		err = dev_pm_set_dedicated_wake_irq(dev, irq);
+		if (err)
+			dev_err(dev, "failed to setup PCIe wake IRQ\n");
+	}
+
 	rockchip->vpcie12v = devm_regulator_get_optional(dev, "vpcie12v");
 	if (IS_ERR(rockchip->vpcie12v)) {
 		if (PTR_ERR(rockchip->vpcie12v) == -EPROBE_DEFER)
@@ -1493,12 +1503,13 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
 
 	err = rockchip_pcie_parse_dt(rockchip);
 	if (err)
-		return err;
+		/* It's safe to disable wake even not enabled */
+		goto err_disable_wake;
 
 	err = clk_prepare_enable(rockchip->aclk_pcie);
 	if (err) {
 		dev_err(dev, "unable to enable aclk_pcie clock\n");
-		return err;
+		goto err_disable_wake;
 	}
 
 	err = clk_prepare_enable(rockchip->aclk_perf_pcie);
@@ -1633,6 +1644,9 @@ err_disable_aclk_perf_pcie:
 	clk_disable_unprepare(rockchip->aclk_perf_pcie);
 err_disable_aclk_pcie:
 	clk_disable_unprepare(rockchip->aclk_pcie);
+err_disable_wake:
+	dev_pm_clear_wake_irq(dev);
+	device_init_wakeup(dev, false);
 	return err;
 }
 
@@ -1661,6 +1675,9 @@ static int rockchip_pcie_remove(struct platform_device *pdev)
 		regulator_disable(rockchip->vpcie3v3);
 	if (!IS_ERR(rockchip->vpcie12v))
 		regulator_disable(rockchip->vpcie12v);
+
+	dev_pm_clear_wake_irq(dev);
+	device_init_wakeup(dev, false);
 
 	return 0;
 }
