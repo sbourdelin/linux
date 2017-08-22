@@ -2277,7 +2277,7 @@ void intel_add_fb_offsets(int *x, int *y,
 
 {
 	const struct intel_framebuffer *intel_fb = to_intel_framebuffer(state->base.fb);
-	unsigned int rotation = state->base.rotation;
+	unsigned int rotation = intel_plane_get_rotation(&state->base);
 
 	if (drm_rotation_90_or_270(rotation)) {
 		*x += intel_fb->rotated[plane].x;
@@ -2330,7 +2330,7 @@ static u32 intel_adjust_tile_offset(int *x, int *y,
 	const struct drm_i915_private *dev_priv = to_i915(state->base.plane->dev);
 	const struct drm_framebuffer *fb = state->base.fb;
 	unsigned int cpp = fb->format->cpp[plane];
-	unsigned int rotation = state->base.rotation;
+	unsigned int rotation = intel_plane_get_rotation(&state->base);
 	unsigned int pitch = intel_fb_pitch(fb, plane, rotation);
 
 	WARN_ON(new_offset > old_offset);
@@ -2434,7 +2434,7 @@ u32 intel_compute_tile_offset(int *x, int *y,
 	struct intel_plane *intel_plane = to_intel_plane(state->base.plane);
 	struct drm_i915_private *dev_priv = to_i915(intel_plane->base.dev);
 	const struct drm_framebuffer *fb = state->base.fb;
-	unsigned int rotation = state->base.rotation;
+	unsigned int rotation = intel_plane_get_rotation(&state->base);
 	int pitch = intel_fb_pitch(fb, plane, rotation);
 	u32 alignment;
 
@@ -2792,6 +2792,44 @@ intel_set_plane_visible(struct intel_crtc_state *crtc_state,
 }
 
 static void
+intel_fixup_initial_subpixel_order(struct drm_connector *connector,
+				   u8 initial_rotation)
+{
+	enum subpixel_order new_order;
+
+	/* We only support an initial rotation of DRM_MODE_ROTATE_180 for now */
+	if (initial_rotation != DRM_MODE_ROTATE_180)
+		return;
+
+	switch (connector->display_info.subpixel_order) {
+	case SubPixelHorizontalRGB: new_order = SubPixelHorizontalBGR; break;
+	case SubPixelHorizontalBGR: new_order = SubPixelHorizontalRGB; break;
+	case SubPixelVerticalRGB:   new_order = SubPixelVerticalBGR;   break;
+	case SubPixelVerticalBGR:   new_order = SubPixelVerticalRGB;   break;
+	}
+
+	connector->display_info.subpixel_order = new_order;
+}
+
+static void
+intel_set_initial_rotation(struct intel_crtc *intel_crtc, u8 rotation)
+{
+	struct drm_crtc_state *state = intel_crtc->base.state;
+	struct drm_device *dev = intel_crtc->base.dev;
+	struct drm_connector_list_iter conn_iter;
+	struct drm_connector *conn;
+
+	intel_crtc->initial_rotation = rotation;
+
+	drm_connector_list_iter_begin(dev, &conn_iter);
+	drm_for_each_connector_iter(conn, &conn_iter) {
+		if (state->connector_mask & (1 << drm_connector_index(conn)))
+			intel_fixup_initial_subpixel_order(conn, rotation);
+	}
+	drm_connector_list_iter_end(&conn_iter);
+}
+
+static void
 intel_find_initial_plane_obj(struct intel_crtc *intel_crtc,
 			     struct intel_initial_plane_config *plane_config)
 {
@@ -2858,9 +2896,11 @@ intel_find_initial_plane_obj(struct intel_crtc *intel_crtc,
 	return;
 
 valid_fb:
+	intel_set_initial_rotation(intel_crtc, plane_config->rotation);
+
 	mutex_lock(&dev->struct_mutex);
 	intel_state->vma =
-		intel_pin_and_fence_fb_obj(fb, primary->state->rotation);
+		intel_pin_and_fence_fb_obj(fb, intel_crtc->initial_rotation);
 	mutex_unlock(&dev->struct_mutex);
 	if (IS_ERR(intel_state->vma)) {
 		DRM_ERROR("failed to pin boot fb on pipe %d: %li\n",
@@ -2986,7 +3026,7 @@ static bool skl_check_main_ccs_coordinates(struct intel_plane_state *plane_state
 static int skl_check_main_surface(struct intel_plane_state *plane_state)
 {
 	const struct drm_framebuffer *fb = plane_state->base.fb;
-	unsigned int rotation = plane_state->base.rotation;
+	unsigned int rotation = intel_plane_get_rotation(&plane_state->base);
 	int x = plane_state->base.src.x1 >> 16;
 	int y = plane_state->base.src.y1 >> 16;
 	int w = drm_rect_width(&plane_state->base.src) >> 16;
@@ -3064,7 +3104,7 @@ static int skl_check_main_surface(struct intel_plane_state *plane_state)
 static int skl_check_nv12_aux_surface(struct intel_plane_state *plane_state)
 {
 	const struct drm_framebuffer *fb = plane_state->base.fb;
-	unsigned int rotation = plane_state->base.rotation;
+	unsigned int rotation = intel_plane_get_rotation(&plane_state->base);
 	int max_width = skl_max_plane_width(fb, 1, rotation);
 	int max_height = 4096;
 	int x = plane_state->base.src.x1 >> 17;
@@ -3095,6 +3135,7 @@ static int skl_check_ccs_aux_surface(struct intel_plane_state *plane_state)
 	struct intel_plane *plane = to_intel_plane(plane_state->base.plane);
 	struct intel_crtc *crtc = to_intel_crtc(plane_state->base.crtc);
 	const struct drm_framebuffer *fb = plane_state->base.fb;
+	unsigned int rotation = intel_plane_get_rotation(&plane_state->base);
 	int src_x = plane_state->base.src.x1 >> 16;
 	int src_y = plane_state->base.src.y1 >> 16;
 	int hsub = fb->format->hsub;
@@ -3117,7 +3158,7 @@ static int skl_check_ccs_aux_surface(struct intel_plane_state *plane_state)
 		return -EINVAL;
 	}
 
-	if (plane_state->base.rotation & ~(DRM_MODE_ROTATE_0 | DRM_MODE_ROTATE_180)) {
+	if (rotation & ~(DRM_MODE_ROTATE_0 | DRM_MODE_ROTATE_180)) {
 		DRM_DEBUG_KMS("RC support only with 0/180 degree rotation %x\n",
 			      plane_state->base.rotation);
 		return -EINVAL;
@@ -3136,7 +3177,7 @@ static int skl_check_ccs_aux_surface(struct intel_plane_state *plane_state)
 int skl_check_plane_surface(struct intel_plane_state *plane_state)
 {
 	const struct drm_framebuffer *fb = plane_state->base.fb;
-	unsigned int rotation = plane_state->base.rotation;
+	unsigned int rotation = intel_plane_get_rotation(&plane_state->base);
 	int ret;
 
 	if (!plane_state->base.visible)
@@ -3181,7 +3222,7 @@ static u32 i9xx_plane_ctl(const struct intel_crtc_state *crtc_state,
 		to_i915(plane_state->base.plane->dev);
 	struct intel_crtc *crtc = to_intel_crtc(crtc_state->base.crtc);
 	const struct drm_framebuffer *fb = plane_state->base.fb;
-	unsigned int rotation = plane_state->base.rotation;
+	unsigned int rotation = intel_plane_get_rotation(&plane_state->base);
 	u32 dspcntr;
 
 	dspcntr = DISPLAY_PLANE_ENABLE | DISPPLANE_GAMMA_ENABLE;
@@ -3254,7 +3295,8 @@ int i9xx_check_plane_surface(struct intel_plane_state *plane_state)
 
 	/* HSW/BDW do this automagically in hardware */
 	if (!IS_HASWELL(dev_priv) && !IS_BROADWELL(dev_priv)) {
-		unsigned int rotation = plane_state->base.rotation;
+		unsigned int rotation =
+			intel_plane_get_rotation(&plane_state->base);
 		int src_w = drm_rect_width(&plane_state->base.src) >> 16;
 		int src_h = drm_rect_height(&plane_state->base.src) >> 16;
 
@@ -3508,7 +3550,7 @@ u32 skl_plane_ctl(const struct intel_crtc_state *crtc_state,
 	struct drm_i915_private *dev_priv =
 		to_i915(plane_state->base.plane->dev);
 	const struct drm_framebuffer *fb = plane_state->base.fb;
-	unsigned int rotation = plane_state->base.rotation;
+	unsigned int rotation = intel_plane_get_rotation(&plane_state->base);
 	const struct drm_intel_sprite_colorkey *key = &plane_state->ckey;
 	u32 plane_ctl;
 
@@ -3543,7 +3585,7 @@ static void skylake_update_primary_plane(struct intel_plane *plane,
 	enum plane_id plane_id = plane->id;
 	enum pipe pipe = plane->pipe;
 	u32 plane_ctl = plane_state->ctl;
-	unsigned int rotation = plane_state->base.rotation;
+	unsigned int rotation = intel_plane_get_rotation(&plane_state->base);
 	u32 stride = skl_plane_stride(fb, 0, rotation);
 	u32 aux_stride = skl_plane_stride(fb, 1, rotation);
 	u32 surf_addr = plane_state->main.offset;
@@ -7503,6 +7545,9 @@ i9xx_get_initial_plane_config(struct intel_crtc *crtc,
 			plane_config->tiling = I915_TILING_X;
 			fb->modifier = I915_FORMAT_MOD_X_TILED;
 		}
+
+		if (val & DISPPLANE_ROTATE_180)
+			plane_config->rotation = DRM_MODE_ROTATE_180;
 	}
 
 	pixel_format = val & DISPPLANE_PIXFORMAT_MASK;
@@ -8556,6 +8601,9 @@ skylake_get_initial_plane_config(struct intel_crtc *crtc,
 		goto error;
 	}
 
+	if ((val & PLANE_CTL_ROTATE_MASK) == PLANE_CTL_ROTATE_180)
+		plane_config->rotation = DRM_MODE_ROTATE_180;
+
 	base = I915_READ(PLANE_SURF(pipe, 0)) & 0xfffff000;
 	plane_config->base = base;
 
@@ -8641,6 +8689,9 @@ ironlake_get_initial_plane_config(struct intel_crtc *crtc,
 			plane_config->tiling = I915_TILING_X;
 			fb->modifier = I915_FORMAT_MOD_X_TILED;
 		}
+
+		if (val & DISPPLANE_ROTATE_180)
+			plane_config->rotation = DRM_MODE_ROTATE_180;
 	}
 
 	pixel_format = val & DISPPLANE_PIXFORMAT_MASK;
@@ -9346,7 +9397,7 @@ static u32 intel_cursor_base(const struct intel_plane_state *plane_state)
 
 	/* ILK+ do this automagically */
 	if (HAS_GMCH_DISPLAY(dev_priv) &&
-	    plane_state->base.rotation & DRM_MODE_ROTATE_180)
+	    intel_plane_get_rotation(&plane_state->base) & DRM_MODE_ROTATE_180)
 		base += (plane_state->base.crtc_h *
 			 plane_state->base.crtc_w - 1) * fb->format->cpp[0];
 
@@ -9568,7 +9619,7 @@ static u32 i9xx_cursor_ctl(const struct intel_crtc_state *crtc_state,
 		return 0;
 	}
 
-	if (plane_state->base.rotation & DRM_MODE_ROTATE_180)
+	if (intel_plane_get_rotation(&plane_state->base) & DRM_MODE_ROTATE_180)
 		cntl |= CURSOR_ROTATE_180;
 
 	return cntl;
@@ -9601,7 +9652,7 @@ static bool i9xx_cursor_size_ok(const struct intel_plane_state *plane_state)
 	 * cursors.
 	 */
 	if (HAS_CUR_FBC(dev_priv) &&
-	    plane_state->base.rotation & DRM_MODE_ROTATE_0) {
+	    intel_plane_get_rotation(&plane_state->base) & DRM_MODE_ROTATE_0) {
 		if (height < 8 || height > width)
 			return false;
 	} else {
@@ -12770,7 +12821,8 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 	} else {
 		struct i915_vma *vma;
 
-		vma = intel_pin_and_fence_fb_obj(fb, new_state->rotation);
+		vma = intel_pin_and_fence_fb_obj(fb,
+				intel_plane_get_rotation(new_state));
 		if (!IS_ERR(vma))
 			to_intel_plane_state(new_state)->vma = vma;
 		else
@@ -13150,7 +13202,8 @@ intel_legacy_cursor_update(struct drm_plane *plane,
 			goto out_unlock;
 		}
 	} else {
-		vma = intel_pin_and_fence_fb_obj(fb, new_plane_state->rotation);
+		vma = intel_pin_and_fence_fb_obj(fb,
+				intel_plane_get_rotation(new_plane_state));
 		if (IS_ERR(vma)) {
 			DRM_DEBUG_KMS("failed to pin object\n");
 
@@ -14620,7 +14673,9 @@ int intel_modeset_init(struct drm_device *dev)
 	drm_modeset_unlock_all(dev);
 
 	for_each_intel_crtc(dev, crtc) {
-		struct intel_initial_plane_config plane_config = {};
+		struct intel_initial_plane_config plane_config = {
+			.rotation = DRM_MODE_ROTATE_0
+		};
 
 		if (!crtc->active)
 			continue;
