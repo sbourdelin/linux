@@ -57,6 +57,13 @@ static ssize_t cm_write(struct file *file, const char __user * user_buf,
 		return -EFAULT;
 	}
 
+	if (!(*ppos)) {
+		struct acpi_table_header *hdr =
+			ACPI_CAST_PTR(struct acpi_table_header, buf);
+
+		hdr->length = max_size;
+	}
+
 	uncopied_bytes -= count;
 	*ppos += count;
 
