@@ -173,7 +173,7 @@ static void sas_smp_request(struct request_queue *q, struct Scsi_Host *shost,
 			    struct sas_rphy *rphy)
 {
 	struct request *req;
-	blk_status_t ret;
+	int ret;
 	int (*handler)(struct Scsi_Host *, struct sas_rphy *, struct request *);
 
 	while ((req = blk_fetch_request(q)) != NULL) {
@@ -185,7 +185,9 @@ static void sas_smp_request(struct request_queue *q, struct Scsi_Host *shost,
 				blk_rq_bytes(req->next_rq);
 		handler = to_sas_internal(shost->transportt)->f->smp_handler;
 		ret = handler(shost, rphy, req);
-		scsi_req(req)->result = ret;
+		WARN_ONCE(ret != 0 && !IS_ERR_VALUE(ret + 0UL),
+			  "%s: ret = %d\n", __func__, ret);
+		scsi_req(req)->result = ret ? DID_ERROR << 16 : 0;
 
 		blk_end_request_all(req, 0);
 
