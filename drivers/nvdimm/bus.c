@@ -1024,6 +1024,12 @@ static int __nd_ioctl(struct nvdimm_bus *nvdimm_bus, struct nvdimm *nvdimm,
 		goto out;
 	}
 
+	if (cmd == ND_CMD_CALL) {
+		struct nd_cmd_pkg *hdr = (struct nd_cmd_pkg *)buf;
+		memcpy(hdr->nd_reserved2, pkg.nd_reserved2,
+				sizeof(pkg.nd_reserved2));
+	}
+
 	nvdimm_bus_lock(&nvdimm_bus->dev);
 	rc = nd_cmd_clear_to_send(nvdimm_bus, nvdimm, func, buf);
 	if (rc)
