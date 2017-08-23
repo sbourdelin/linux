@@ -450,7 +450,7 @@ lpfc_debug_dump_cq(struct lpfc_hba *phba, int qtype, int wqidx)
 {
 	struct lpfc_queue *wq, *cq, *eq;
 	char *qtypestr;
-	int eqidx;
+	unsigned int eqidx;
 
 	/* fcp/nvme wq and cq are 1:1, thus same indexes */
 
