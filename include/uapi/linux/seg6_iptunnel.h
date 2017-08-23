@@ -33,16 +33,27 @@ struct seg6_iptunnel_encap {
 enum {
 	SEG6_IPTUN_MODE_INLINE,
 	SEG6_IPTUN_MODE_ENCAP,
+	SEG6_IPTUN_MODE_L2ENCAP,
 };
 
 #ifdef __KERNEL__
 
 static inline size_t seg6_lwt_headroom(struct seg6_iptunnel_encap *tuninfo)
 {
-	int encap = (tuninfo->mode == SEG6_IPTUN_MODE_ENCAP);
+	int head = 0;
 
-	return ((tuninfo->srh->hdrlen + 1) << 3) +
-	       (encap * sizeof(struct ipv6hdr));
+	switch (tuninfo->mode) {
+	case SEG6_IPTUN_MODE_INLINE:
+		break;
+	case SEG6_IPTUN_MODE_ENCAP:
+		head = sizeof(struct ipv6hdr);
+		break;
+	case SEG6_IPTUN_MODE_L2ENCAP:
+		head = sizeof(struct ipv6hdr) + 14;
+		break;
+	}
+
+	return ((tuninfo->srh->hdrlen + 1) << 3) + head;
 }
 
 #endif
