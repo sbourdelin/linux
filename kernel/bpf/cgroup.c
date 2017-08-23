@@ -217,13 +217,11 @@ EXPORT_SYMBOL(__cgroup_bpf_run_filter_skb);
  * This function will return %-EPERM if any if an attached program was found
  * and if it returned != 1 during execution. In all other cases, 0 is returned.
  */
-int __cgroup_bpf_run_filter_sk(struct sock *sk,
+int __cgroup_bpf_run_filter_sk(struct cgroup *cgrp, struct sock *sk,
 			       enum bpf_attach_type type)
 {
-	struct cgroup *cgrp = sock_cgroup_ptr(&sk->sk_cgrp_data);
 	struct bpf_prog *prog;
 	int ret = 0;
-
 
 	rcu_read_lock();
 

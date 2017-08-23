@@ -5186,4 +5186,22 @@ int cgroup_bpf_update(struct cgroup *cgrp, struct bpf_prog *prog,
 	mutex_unlock(&cgroup_mutex);
 	return ret;
 }
+
+int cgroup_bpf_run_filter_sk(struct sock *sk,
+			     enum bpf_attach_type type)
+{
+	struct cgroup *cgrp = sock_cgroup_ptr(&sk->sk_cgrp_data);
+	int ret = 0;
+
+	while (cgrp) {
+		ret = __cgroup_bpf_run_filter_sk(cgrp, sk, type);
+		if (ret < 0)
+			break;
+
+		cgrp = cgroup_parent(cgrp);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(cgroup_bpf_run_filter_sk);
 #endif /* CONFIG_CGROUP_BPF */

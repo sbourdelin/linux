@@ -40,8 +40,9 @@ int __cgroup_bpf_run_filter_skb(struct sock *sk,
 				struct sk_buff *skb,
 				enum bpf_attach_type type);
 
-int __cgroup_bpf_run_filter_sk(struct sock *sk,
+int __cgroup_bpf_run_filter_sk(struct cgroup *cgrp, struct sock *sk,
 			       enum bpf_attach_type type);
+int cgroup_bpf_run_filter_sk(struct sock *sk, enum bpf_attach_type type);
 
 int __cgroup_bpf_run_filter_sock_ops(struct sock *sk,
 				     struct bpf_sock_ops_kern *sock_ops,
@@ -74,7 +75,7 @@ int __cgroup_bpf_run_filter_sock_ops(struct sock *sk,
 ({									       \
 	int __ret = 0;							       \
 	if (cgroup_bpf_enabled && sk) {					       \
-		__ret = __cgroup_bpf_run_filter_sk(sk,			       \
+		__ret = cgroup_bpf_run_filter_sk(sk,			       \
 						 BPF_CGROUP_INET_SOCK_CREATE); \
 	}								       \
 	__ret;								       \
