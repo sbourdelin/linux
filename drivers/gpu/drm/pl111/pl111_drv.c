@@ -242,7 +242,7 @@ static int pl111_amba_remove(struct amba_device *amba_dev)
 	return 0;
 }
 
-static struct amba_id pl111_id_table[] = {
+static const struct amba_id pl111_id_table[] = {
 	{
 		.id = 0x00041111,
 		.mask = 0x000fffff,
