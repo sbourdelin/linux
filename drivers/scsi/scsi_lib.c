@@ -2001,6 +2001,7 @@ static enum blk_eh_timer_return scsi_timeout(struct request *req,
 	return scsi_times_out(req);
 }
 
+/* scsi-mq */
 static int scsi_init_request(struct blk_mq_tag_set *set, struct request *rq,
 		unsigned int hctx_idx, unsigned int numa_node)
 {
@@ -2026,6 +2027,7 @@ static int scsi_init_request(struct blk_mq_tag_set *set, struct request *rq,
 	return 0;
 }
 
+/* scsi-mq */
 static void scsi_exit_request(struct blk_mq_tag_set *set, struct request *rq,
 		unsigned int hctx_idx)
 {
@@ -2065,6 +2067,7 @@ static u64 scsi_calculate_bounce_limit(struct Scsi_Host *shost)
 	return bounce_limit;
 }
 
+/* scsi-sq and scsi-mq */
 void __scsi_init_queue(struct Scsi_Host *shost, struct request_queue *q)
 {
 	struct device *dev = shost->dma_dev;
@@ -2104,6 +2107,7 @@ void __scsi_init_queue(struct Scsi_Host *shost, struct request_queue *q)
 }
 EXPORT_SYMBOL_GPL(__scsi_init_queue);
 
+/* scsi-sq */
 static int scsi_init_rq(struct request_queue *q, struct request *rq, gfp_t gfp)
 {
 	struct Scsi_Host *shost = q->rq_alloc_data;
@@ -2134,6 +2138,7 @@ fail:
 	return -ENOMEM;
 }
 
+/* scsi-sq */
 static void scsi_exit_rq(struct request_queue *q, struct request *rq)
 {
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(rq);
@@ -2144,6 +2149,7 @@ static void scsi_exit_rq(struct request_queue *q, struct request *rq)
 			       cmd->sense_buffer);
 }
 
+/* scsi-sq */
 struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 {
 	struct Scsi_Host *shost = sdev->host;
