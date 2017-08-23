@@ -159,6 +159,8 @@ static int do_lcfg(char *cfgname, lnet_nid_t nid, int cmd,
 		lustre_cfg_bufs_set_string(&bufs, 4, s4);
 
 	lcfg = lustre_cfg_new(cmd, &bufs);
+	if (IS_ERR(lcfg))
+		return PTR_ERR(lcfg);
 	lcfg->lcfg_nid = nid;
 	rc = class_process_config(lcfg);
 	lustre_cfg_free(lcfg);
