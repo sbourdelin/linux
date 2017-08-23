@@ -295,8 +295,7 @@ long kvm_vm_ioctl_create_spapr_tce(struct kvm *kvm,
 {
 	struct kvmppc_spapr_tce_table *stt = NULL;
 	unsigned long npages, size;
-	int ret = -ENOMEM;
-	int i;
+	int i, ret;
 
 	if (!args->size)
 		return -EINVAL;
@@ -310,16 +309,13 @@ long kvm_vm_ioctl_create_spapr_tce(struct kvm *kvm,
 	size = _ALIGN_UP(args->size, PAGE_SIZE >> 3);
 	npages = kvmppc_tce_pages(size);
 	ret = kvmppc_account_memlimit(kvmppc_stt_pages(npages), true);
-	if (ret) {
-		stt = NULL;
-		goto fail;
-	}
+	if (ret)
+		return ret;
 
-	ret = -ENOMEM;
 	stt = kzalloc(sizeof(*stt) + npages * sizeof(struct page *),
 		      GFP_KERNEL);
 	if (!stt)
-		goto fail;
+		return -ENOMEM;
 
 	stt->liobn = args->liobn;
 	stt->page_shift = args->page_shift;
@@ -331,7 +327,7 @@ long kvm_vm_ioctl_create_spapr_tce(struct kvm *kvm,
 	for (i = 0; i < npages; i++) {
 		stt->pages[i] = alloc_page(GFP_KERNEL | __GFP_ZERO);
 		if (!stt->pages[i])
-			goto fail;
+			goto fail_free;
 	}
 
 	kvm_get_kvm(kvm);
@@ -344,15 +340,12 @@ long kvm_vm_ioctl_create_spapr_tce(struct kvm *kvm,
 	return anon_inode_getfd("kvm-spapr-tce", &kvm_spapr_tce_fops,
 				stt, O_RDWR | O_CLOEXEC);
 
-fail:
-	if (stt) {
-		for (i = 0; i < npages; i++)
-			if (stt->pages[i])
-				__free_page(stt->pages[i]);
-
-		kfree(stt);
-	}
-	return ret;
+fail_free:
+	for (i = 0; i < npages; i++)
+		if (stt->pages[i])
+			__free_page(stt->pages[i]);
+	kfree(stt);
+	return -ENOMEM;
 }
 
 static void kvmppc_clear_tce(struct iommu_table *tbl, unsigned long entry)
