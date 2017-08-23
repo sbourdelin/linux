@@ -456,8 +456,11 @@ static void scsi_device_dev_release_usercontext(struct work_struct *work)
 	/* NULL queue means the device can't be used */
 	sdev->request_queue = NULL;
 
-	kfree(sdev->vpd_pg83);
-	kfree(sdev->vpd_pg80);
+	mutex_lock(&sdev->inquiry_mutex);
+	kfree(rcu_dereference(sdev->vpd_pg83));
+	kfree(rcu_dereference(sdev->vpd_pg80));
+	mutex_unlock(&sdev->inquiry_mutex);
+
 	kfree(sdev->inquiry);
 	kfree(sdev);
 

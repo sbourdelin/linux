@@ -3277,7 +3277,7 @@ int scsi_vpd_lun_id(struct scsi_device *sdev, char *id, size_t id_len)
 	u8 cur_id_type = 0xff;
 	u8 cur_id_size = 0;
 	unsigned char *d, *cur_id_str;
-	unsigned char __rcu *vpd_pg83;
+	unsigned char *vpd_pg83;
 	int id_size = -EINVAL;
 
 	rcu_read_lock();
@@ -3426,7 +3426,7 @@ EXPORT_SYMBOL(scsi_vpd_lun_id);
 int scsi_vpd_tpg_id(struct scsi_device *sdev, int *rel_id)
 {
 	unsigned char *d;
-	unsigned char __rcu *vpd_pg83;
+	unsigned char *vpd_pg83;
 	int group_id = -EAGAIN, rel_port = -1;
 
 	rcu_read_lock();
@@ -3436,8 +3436,8 @@ int scsi_vpd_tpg_id(struct scsi_device *sdev, int *rel_id)
 		return -ENXIO;
 	}
 
-	d = sdev->vpd_pg83 + 4;
-	while (d < sdev->vpd_pg83 + sdev->vpd_pg83_len) {
+	d = vpd_pg83 + 4;
+	while (d < vpd_pg83 + sdev->vpd_pg83_len) {
 		switch (d[1] & 0xf) {
 		case 0x4:
 			/* Relative target port */

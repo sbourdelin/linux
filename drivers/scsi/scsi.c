@@ -426,7 +426,7 @@ void scsi_attach_vpd(struct scsi_device *sdev)
 	int vpd_len = SCSI_VPD_PG_LEN;
 	int pg80_supported = 0;
 	int pg83_supported = 0;
-	unsigned char __rcu *vpd_buf, *orig_vpd_buf = NULL;
+	unsigned char *vpd_buf, *orig_vpd_buf = NULL;
 
 	if (!scsi_device_supports_vpd(sdev))
 		return;
@@ -474,7 +474,7 @@ retry_pg80:
 			goto retry_pg80;
 		}
 		mutex_lock(&sdev->inquiry_mutex);
-		orig_vpd_buf = sdev->vpd_pg80;
+		orig_vpd_buf = rcu_dereference(sdev->vpd_pg80);
 		sdev->vpd_pg80_len = result;
 		rcu_assign_pointer(sdev->vpd_pg80, vpd_buf);
 		mutex_unlock(&sdev->inquiry_mutex);
@@ -503,7 +503,7 @@ retry_pg83:
 			goto retry_pg83;
 		}
 		mutex_lock(&sdev->inquiry_mutex);
-		orig_vpd_buf = sdev->vpd_pg83;
+		orig_vpd_buf = rcu_dereference(sdev->vpd_pg83);
 		sdev->vpd_pg83_len = result;
 		rcu_assign_pointer(sdev->vpd_pg83, vpd_buf);
 		mutex_unlock(&sdev->inquiry_mutex);
