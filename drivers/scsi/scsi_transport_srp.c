@@ -89,7 +89,7 @@ int srp_tmo_valid(int reconnect_delay, int fast_io_fail_tmo, int dev_loss_tmo)
 	if (fast_io_fail_tmo < 0 &&
 	    dev_loss_tmo > SCSI_DEVICE_BLOCK_MAX_TIMEOUT)
 		return -EINVAL;
-	if (dev_loss_tmo >= LONG_MAX / HZ)
+	if (dev_loss_tmo + 0UL >= LONG_MAX / HZ)
 		return -EINVAL;
 	if (fast_io_fail_tmo >= 0 && dev_loss_tmo >= 0 &&
 	    fast_io_fail_tmo >= dev_loss_tmo)
