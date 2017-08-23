@@ -160,6 +160,19 @@ enum hal_atl_utils_fw_state_e {
 	MPI_POWER = 4,
 };
 
+union hal_atl_utils_hw_mpi_state_reg {
+	u32 val;
+	struct {
+		u8 e_state;
+		u8 reserved1;
+		u8 u_speed;
+		u8 reserved2:1;
+		u8 disable_dirty_wake:1;
+		u8 reserved3:2;
+		u8 u_downshift:4;
+	};
+};
+
 #define HAL_ATLANTIC_RATE_10G        BIT(0)
 #define HAL_ATLANTIC_RATE_5G         BIT(1)
 #define HAL_ATLANTIC_RATE_5GSR       BIT(2)

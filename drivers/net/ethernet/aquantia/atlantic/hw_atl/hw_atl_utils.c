@@ -280,10 +280,11 @@ err_exit:;
 int hw_atl_utils_mpi_set_speed(struct aq_hw_s *self, u32 speed,
 			       enum hal_atl_utils_fw_state_e state)
 {
-	u32 ucp_0x368 = 0;
+	union hal_atl_utils_hw_mpi_state_reg ucp_0x368 = { 0 };
 
-	ucp_0x368 = (speed << HW_ATL_MPI_SPEED_SHIFT) | state;
-	aq_hw_write_reg(self, HW_ATL_MPI_CONTROL_ADR, ucp_0x368);
+	ucp_0x368.u_speed = speed;
+	ucp_0x368.e_state = state;
+	aq_hw_write_reg(self, HW_ATL_MPI_CONTROL_ADR, ucp_0x368.val);
 
 	return 0;
 }
