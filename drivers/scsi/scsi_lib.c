@@ -1210,8 +1210,8 @@ static int scsi_setup_fs_cmnd(struct scsi_device *sdev, struct request *req)
 			return ret;
 	}
 
-	cmd->cmnd = scsi_req(req)->cmd = scsi_req(req)->__cmd;
-	memset(cmd->cmnd, 0, BLK_MAX_CDB);
+	scsi_req_init(&cmd->req);
+	cmd->cmnd = cmd->req.cmd;
 	return scsi_cmd_to_driver(cmd)->init_command(cmd);
 }
 
