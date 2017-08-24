@@ -751,6 +751,48 @@ static void set_load_weight(struct task_struct *p)
 	load->inv_weight = sched_prio_to_wmult[prio];
 }
 
+#ifdef CONFIG_UTIL_CLAMP
+/**
+ * uclamp_mutex: serialize updates of TG's utilization clamp values
+ */
+static DEFINE_MUTEX(uclamp_mutex);
+
+/**
+ * alloc_uclamp_sched_group: initialize a new TG's for utilization clamping
+ * @tg: the newly created task group
+ * @parent: its parent task group
+ *
+ * A newly created task group inherits its utilization clamp values, for all
+ * clamp indexes, from its parent task group.
+ */
+static inline void alloc_uclamp_sched_group(struct task_group *tg,
+					    struct task_group *parent)
+{
+	int clamp_id;
+
+	for (clamp_id = 0; clamp_id < UCLAMP_CNT; ++clamp_id)
+		tg->uclamp[clamp_id] = parent->uclamp[clamp_id];
+}
+
+/**
+ * init_uclamp: initialize data structures required for utilization clamping
+ */
+static inline void init_uclamp(void)
+{
+	int clamp_id;
+
+	mutex_init(&uclamp_mutex);
+
+	/* Initialize root TG's to default (none) clamp values */
+	for (clamp_id = 0; clamp_id < UCLAMP_CNT; ++clamp_id)
+		root_task_group.uclamp[clamp_id] = uclamp_none(clamp_id);
+}
+#else
+static inline void alloc_uclamp_sched_group(struct task_group *tg,
+					    struct task_group *parent) { }
+static inline void init_uclamp(void) { }
+#endif /* CONFIG_UTIL_CLAMP */
+
 static inline void enqueue_task(struct rq *rq, struct task_struct *p, int flags)
 {
 	if (!(flags & ENQUEUE_NOCLOCK))
@@ -5907,6 +5949,8 @@ void __init sched_init(void)
 
 	init_schedstats();
 
+	init_uclamp();
+
 	scheduler_running = 1;
 }
 
@@ -6098,6 +6142,8 @@ struct task_group *sched_create_group(struct task_group *parent)
 
 	if (!alloc_rt_sched_group(tg, parent))
 		goto err;
+
+	alloc_uclamp_sched_group(tg, parent);
 
 	return tg;
 
@@ -6318,6 +6364,128 @@ static void cpu_cgroup_attach(struct cgroup_taskset *tset)
 	cgroup_taskset_for_each(task, css, tset)
 		sched_move_task(task);
 }
+
+#ifdef CONFIG_UTIL_CLAMP
+static int cpu_util_min_write_u64(struct cgroup_subsys_state *css,
+				  struct cftype *cftype, u64 min_value)
+{
+	struct cgroup_subsys_state *pos;
+	struct task_group *tg;
+	int ret = -EINVAL;
+
+	if (min_value > SCHED_CAPACITY_SCALE)
+		return ret;
+
+	mutex_lock(&uclamp_mutex);
+	rcu_read_lock();
+
+	tg = css_tg(css);
+
+	/* Already at the required value */
+	if (tg->uclamp[UCLAMP_MIN] == min_value) {
+		ret = 0;
+		goto out;
+	}
+
+	/* Ensure to not exceed the maximum clamp value */
+	if (tg->uclamp[UCLAMP_MAX] < min_value)
+		goto out;
+
+	/* Ensure min clamp fits within parent's clamp value */
+	if (tg->parent &&
+	    tg->parent->uclamp[UCLAMP_MIN] > min_value)
+		goto out;
+
+	/* Ensure each child is a restriction of this TG */
+	css_for_each_child(pos, css) {
+		if (css_tg(pos)->uclamp[UCLAMP_MIN] < min_value)
+			goto out;
+	}
+
+	/* Update TG's utilization clamp */
+	tg->uclamp[UCLAMP_MIN] = min_value;
+	ret = 0;
+
+out:
+	rcu_read_unlock();
+	mutex_unlock(&uclamp_mutex);
+
+	return ret;
+}
+
+static int cpu_util_max_write_u64(struct cgroup_subsys_state *css,
+				  struct cftype *cftype, u64 max_value)
+{
+	struct cgroup_subsys_state *pos;
+	struct task_group *tg;
+	int ret = -EINVAL;
+
+	if (max_value > SCHED_CAPACITY_SCALE)
+		return ret;
+
+	mutex_lock(&uclamp_mutex);
+	rcu_read_lock();
+
+	tg = css_tg(css);
+
+	/* Already at the required value */
+	if (tg->uclamp[UCLAMP_MAX] == max_value) {
+		ret = 0;
+		goto out;
+	}
+
+	/* Ensure to not go below the minimum clamp value */
+	if (tg->uclamp[UCLAMP_MIN] > max_value)
+		goto out;
+
+	/* Ensure max clamp fits within parent's clamp value */
+	if (tg->parent &&
+	    tg->parent->uclamp[UCLAMP_MAX] < max_value)
+		goto out;
+
+	/* Ensure each child is a restriction of this TG */
+	css_for_each_child(pos, css) {
+		if (css_tg(pos)->uclamp[UCLAMP_MAX] > max_value)
+			goto out;
+	}
+
+	/* Update TG's utilization clamp */
+	tg->uclamp[UCLAMP_MAX] = max_value;
+	ret = 0;
+
+out:
+	rcu_read_unlock();
+	mutex_unlock(&uclamp_mutex);
+
+	return ret;
+}
+
+static inline u64 cpu_uclamp_read(struct cgroup_subsys_state *css,
+				  enum uclamp_id clamp_id)
+{
+	struct task_group *tg;
+	u64 util_clamp;
+
+	rcu_read_lock();
+	tg = css_tg(css);
+	util_clamp = tg->uclamp[clamp_id];
+	rcu_read_unlock();
+
+	return util_clamp;
+}
+
+static u64 cpu_util_min_read_u64(struct cgroup_subsys_state *css,
+				 struct cftype *cft)
+{
+	return cpu_uclamp_read(css, UCLAMP_MIN);
+}
+
+static u64 cpu_util_max_read_u64(struct cgroup_subsys_state *css,
+				 struct cftype *cft)
+{
+	return cpu_uclamp_read(css, UCLAMP_MAX);
+}
+#endif /* CONFIG_UTIL_CLAMP */
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 static int cpu_shares_write_u64(struct cgroup_subsys_state *css,
@@ -6640,6 +6808,18 @@ static struct cftype cpu_files[] = {
 		.name = "rt_period_us",
 		.read_u64 = cpu_rt_period_read_uint,
 		.write_u64 = cpu_rt_period_write_uint,
+	},
+#endif
+#ifdef CONFIG_UTIL_CLAMP
+	{
+		.name = "util_min",
+		.read_u64 = cpu_util_min_read_u64,
+		.write_u64 = cpu_util_min_write_u64,
+	},
+	{
+		.name = "util_max",
+		.read_u64 = cpu_util_max_read_u64,
+		.write_u64 = cpu_util_max_write_u64,
 	},
 #endif
 	{ }	/* Terminate */

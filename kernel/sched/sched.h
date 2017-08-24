@@ -330,6 +330,10 @@ struct task_group {
 #endif
 
 	struct cfs_bandwidth cfs_bandwidth;
+
+#ifdef CONFIG_UTIL_CLAMP
+	unsigned int uclamp[UCLAMP_CNT];
+#endif
 };
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
@@ -364,6 +368,24 @@ static inline int walk_tg_tree(tg_visitor down, tg_visitor up, void *data)
 }
 
 extern int tg_nop(struct task_group *tg, void *data);
+
+#ifdef CONFIG_UTIL_CLAMP
+/**
+ * uclamp_none: default value for a clamp
+ *
+ * This returns the default value for each clamp
+ * - 0 for a min utilization clamp
+ * - SCHED_CAPACITY_SCALE for a max utilization clamp
+ *
+ * Return: the default value for a given utilization clamp
+ */
+static inline unsigned int uclamp_none(int clamp_id)
+{
+	if (clamp_id == UCLAMP_MIN)
+		return 0;
+	return SCHED_CAPACITY_SCALE;
+}
+#endif /* CONFIG_UTIL_CLAMP */
 
 extern void free_fair_sched_group(struct task_group *tg);
 extern int alloc_fair_sched_group(struct task_group *tg, struct task_group *parent);
