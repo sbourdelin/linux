@@ -2895,7 +2895,7 @@ xfs_btree_split_worker(
 	 * in any way.
 	 */
 	if (args->kswapd)
-		new_pflags |= PF_MEMALLOC | PF_SWAPWRITE | PF_KSWAPD;
+		new_pflags |= PF_MEMALLOC | PF_SWAPWRITE;
 
 	current_set_flags_nested(&pflags, new_pflags);
 
