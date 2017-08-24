@@ -798,7 +798,7 @@ int rdma_addr_find_l2_eth_by_grh(const union ib_gid *sgid,
 	if (ret)
 		return ret;
 
-	memcpy(dmac, dev_addr.dst_dev_addr, ETH_ALEN);
+	ether_addr_copy(dmac, dev_addr.dst_dev_addr);
 	dev = dev_get_by_index(&init_net, dev_addr.bound_dev_if);
 	if (!dev)
 		return -ENODEV;
@@ -831,7 +831,7 @@ int rdma_addr_find_smac_by_sgid(union ib_gid *sgid, u8 *smac, u16 *vlan_id)
 	if (ret)
 		return ret;
 
-	memcpy(smac, dev_addr.src_dev_addr, ETH_ALEN);
+	ether_addr_copy(smac, dev_addr.src_dev_addr);
 	return ret;
 }
 EXPORT_SYMBOL(rdma_addr_find_smac_by_sgid);
