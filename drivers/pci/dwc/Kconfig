@@ -169,4 +169,15 @@ config PCIE_KIRIN
 	  Say Y here if you want PCIe controller support
 	  on HiSilicon Kirin series SoCs.
 
+config PCIE_DW_HOST_ECAM
+	bool "Synopsys DesignWare PCIe controller in ECAM mode"
+	depends on OF && PCI
+	select PCI_HOST_COMMON
+	select IRQ_DOMAIN
+	help
+	  Add support for Synopsys DesignWare PCIe controllers configured
+	  by the firmware into ECAM shift mode. In some cases, these are
+	  fully ECAM compliant, in which case the pci-host-generic driver
+	  may be used instead.
+
 endmenu
