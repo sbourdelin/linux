@@ -1302,7 +1302,7 @@ int intel_guc_suspend(struct drm_i915_private *dev_priv)
 	if (guc->fw.load_status != INTEL_UC_FIRMWARE_SUCCESS)
 		return 0;
 
-	gen9_disable_guc_interrupts(dev_priv);
+	guc->interrupts.disable(dev_priv);
 
 	ctx = dev_priv->kernel_context;
 
@@ -1329,7 +1329,7 @@ int intel_guc_resume(struct drm_i915_private *dev_priv)
 		return 0;
 
 	if (i915.guc_log_level >= 0)
-		gen9_enable_guc_interrupts(dev_priv);
+		guc->interrupts.enable(dev_priv);
 
 	ctx = dev_priv->kernel_context;
 
