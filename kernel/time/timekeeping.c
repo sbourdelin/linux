@@ -508,6 +508,11 @@ u64 notrace ktime_get_boot_fast_ns(void)
 }
 EXPORT_SYMBOL_GPL(ktime_get_boot_fast_ns);
 
+u64 ktime_get_real_offset(void)
+{
+	return ktime_to_ns(tk_core.timekeeper.offs_real);
+}
+
 /**
  * halt_fast_timekeeper - Prevent fast timekeeper from accessing clocksource.
  * @tk: Timekeeper to snapshot.

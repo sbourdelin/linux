@@ -8,12 +8,58 @@ config PRINTK_TIME
 	  messages to be added to the output of the syslog() system
 	  call and at the console.
 
+choice
+	prompt "printk default clock timestamp" if PRINTK_TIME
+	default PRINTK_TIME_LOCAL if PRINTK_TIME
+	help
+	  This option is selected by setting one of
+	  PRINTK_TIME_[DISABLE|LOCAL|BOOT|MONO|REAL] and causes time stamps of
+	  the printk() messages to be added to the output of the syslog()
+	  system call and at the console.
+
 	  The timestamp is always recorded internally, and exported
 	  to /dev/kmsg. This flag just specifies if the timestamp should
 	  be included, not that the timestamp is recorded.
 
 	  The behavior is also controlled by the kernel command line
-	  parameter printk.time=1. See Documentation/admin-guide/kernel-parameters.rst
+	  parameter printk.time. See
+	  Documentation/admin-guide/kernel-parameters.rst
+
+config PRINTK_TIME_LOCAL
+	bool "Local Clock"
+	help
+	  Selecting this option causes the time stamps of printk() to be
+	  stamped with the unadjusted hardware clock.
+
+config PRINTK_TIME_BOOT
+	bool "CLOCK_BOOTTIME"
+	help
+	  Selecting this option causes the time stamps of printk() to be
+	  stamped with the adjusted boottime clock.
+
+config PRINTK_TIME_MONO
+	bool "CLOCK_MONOTONIC"
+	help
+	  Selecting this option causes the time stamps of printk() to be
+	  stamped with the adjusted monotonic clock.
+
+config PRINTK_TIME_REAL
+	bool "CLOCK_REALTIME"
+	help
+	  Selecting this option causes the time stamps of printk() to be
+	  stamped with the adjusted realtime clock (UTC).
+endchoice
+
+config PRINTK_TIME_TYPE
+	int
+	depends on PRINTK
+	range 0 4
+	default 0 if !PRINTK_TIME
+	default 1 if PRINTK_TIME_LOCAL
+	default 2 if PRINTK_TIME_BOOT
+	default 3 if PRINTK_TIME_MONO
+	default 4 if PRINTK_TIME_REAL
+
 
 config CONSOLE_LOGLEVEL_DEFAULT
 	int "Default console loglevel (1-15)"
@@ -29,6 +75,23 @@ config CONSOLE_LOGLEVEL_DEFAULT
 	  Note: This does not affect the log level of un-prefixed printk()
 	  usage in the kernel. That is controlled by the MESSAGE_LOGLEVEL_DEFAULT
 	  option.
+
+config PRINTK_TIME_DEBUG
+	bool "Allow runtime reselection of any timebase on printks"
+	depends on PRINTK
+	default N
+	help
+	  Selecting this option causes time stamps of the printk()
+	  messages to be changed freely at runtime on the output of
+	  the syslog() system call and at the console. Without this
+	  option, one can only enable or disable the configuration
+	  selected timebase.
+
+	  Runtime adjustment can be set via
+	  /sys/module/printk/paramters/time as follows with a string:
+	  0/N/n/disable, 1/Y/y/local, b/boot, m/monotonic, r/realtime.
+	  eg: echo local >/sys/module/printk/parameters/time
+	      echo realtime >/sys/module/printk/parameters/time
 
 config MESSAGE_LOGLEVEL_DEFAULT
 	int "Default message log level (1-7)"
