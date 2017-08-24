@@ -2260,7 +2260,7 @@ static struct protection_domain *get_domain(struct device *dev)
 		domain = to_pdomain(io_domain);
 		attach_device(dev, domain);
 	}
-	if (!dma_ops_domain(domain))
+	if (domain && !dma_ops_domain(domain))
 		return ERR_PTR(-EBUSY);
 
 	return domain;
