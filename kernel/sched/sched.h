@@ -290,6 +290,24 @@ struct cfs_bandwidth {
 #endif
 };
 
+/**
+ * Utilization's clamp group
+ *
+ * A utilization clamp group maps a "clamp value" (value), i.e.
+ * util_{min,max}, to a "clamp group index" (group_id).
+ *
+ * Thus, the same "group_id" is used by all the TG's which enforce the same
+ * clamp "value" for a given clamp index.
+ */
+struct uclamp_tg {
+	/* Utilization constraint for tasks in this group */
+	unsigned int value;
+	/* Utilization clamp group for this constraint */
+	unsigned int group_id;
+	/* No utilization clamp group assigned */
+#define UCLAMP_NONE	-1
+};
+
 /* task group related information */
 struct task_group {
 	struct cgroup_subsys_state css;
@@ -332,8 +350,9 @@ struct task_group {
 	struct cfs_bandwidth cfs_bandwidth;
 
 #ifdef CONFIG_UTIL_CLAMP
-	unsigned int uclamp[UCLAMP_CNT];
+	struct uclamp_tg uclamp[UCLAMP_CNT];
 #endif
+
 };
 
 #ifdef CONFIG_FAIR_GROUP_SCHED

@@ -771,6 +771,25 @@ config UTIL_CLAMP
 
 	  If in doubt, say N.
 
+config UCLAMP_GROUPS_COUNT
+	int "Number of utilization clamp values supported"
+	range 1 127
+	depends on UTIL_CLAMP
+	default 3
+	help
+	  This defines the maximum number of different utilization clamp
+	  values which can be concurrently enforced for each utilization
+	  clamp index (i.e. minimum and maximum).
+
+	  Only a limited number of clamp values are supported because:
+	    1. there are usually only few classes of workloads for which is
+	       makese sense to boost/cap for different frequencies
+	       e.g. background vs foreground, interactive vs low-priority
+	    2. it allows a simpler and more memory/time efficient tracking of
+	       the per-CPU clamp values.
+
+	  If in doubt, use the default value.
+
 config CGROUP_PIDS
 	bool "PIDs controller"
 	help
