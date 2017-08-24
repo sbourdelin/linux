@@ -231,6 +231,7 @@ static void sugov_update_single(struct update_util_data *hook, u64 time,
 	} else {
 		sugov_get_util(&util, &max);
 		sugov_iowait_boost(sg_cpu, &util, &max);
+		util = uclamp_util(smp_processor_id(), util);
 		next_f = get_next_freq(sg_policy, util, max);
 		/*
 		 * Do not reduce the frequency if the CPU has not been idle
@@ -246,8 +247,17 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 {
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
 	struct cpufreq_policy *policy = sg_policy->policy;
+	unsigned long max_util, min_util;
 	unsigned long util = 0, max = 1;
 	unsigned int j;
+
+	/* Initialize clamp values based on caller CPU constraints */
+	if (uclamp_enabled) {
+		int cpu = smp_processor_id();
+
+		max_util = uclamp_value(cpu, UCLAMP_MAX);
+		min_util = uclamp_value(cpu, UCLAMP_MIN);
+	}
 
 	for_each_cpu(j, policy->cpus) {
 		struct sugov_cpu *j_sg_cpu = &per_cpu(sugov_cpu, j);
@@ -277,7 +287,30 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 		}
 
 		sugov_iowait_boost(j_sg_cpu, &util, &max);
+
+		/*
+		 * Update clamping range based on j-CPUs constraints, but only
+		 * if active. Idle CPUs do not enforce constraints in a shared
+		 * frequency domain.
+		 */
+		if (uclamp_enabled && !idle_cpu(j)) {
+			unsigned long j_max_util, j_min_util;
+
+			j_max_util = uclamp_value(j, UCLAMP_MAX);
+			j_min_util = uclamp_value(j, UCLAMP_MIN);
+
+			/*
+			 * Clamp values are MAX aggregated among all the
+			 * different CPUs in the shared frequency domain.
+			 */
+			max_util = max(max_util, j_max_util);
+			min_util = max(min_util, j_min_util);
+		}
 	}
+
+	/* Clamp utilization based on aggregated uclamp constraints */
+	if (uclamp_enabled)
+		util = clamp(util, min_util, max_util);
 
 	return get_next_freq(sg_policy, util, max);
 }

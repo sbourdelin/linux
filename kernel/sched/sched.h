@@ -2224,6 +2224,66 @@ static inline void cpufreq_update_util(struct rq *rq, unsigned int flags) {}
 static inline void cpufreq_update_this_cpu(struct rq *rq, unsigned int flags) {}
 #endif /* CONFIG_CPU_FREQ */
 
+#ifdef CONFIG_UTIL_CLAMP
+/* Enable clamping code at compile time by constant propagation */
+#define uclamp_enabled true
+
+/**
+ * uclamp_value: get the current CPU's utilization clamp value
+ * @cpu: the CPU to consider
+ * @clamp_id: the utilization clamp index (i.e. min or max utilization)
+ *
+ * The utilization clamp value for a CPU depends on its set of currently
+ * active tasks and their specific util_{min,max} constraints.
+ * A max aggregated value is tracked for each CPU and returned by this
+ * function. An IDLE CPU never enforces a clamp value.
+ *
+ * Return: the current value for the specified CPU and clamp index
+ */
+static inline unsigned int uclamp_value(unsigned int cpu, int clamp_id)
+{
+	struct uclamp_cpu *uc_cpu = &cpu_rq(cpu)->uclamp[clamp_id];
+	int clamp_value = uclamp_none(clamp_id);
+
+	/* Update min utilization clamp */
+	if (uc_cpu->value != UCLAMP_NONE)
+		clamp_value = uc_cpu->value;
+
+	return clamp_value;
+}
+
+/**
+ * clamp_util: clamp a utilization value for a specified CPU
+ * @cpu: the CPU to get the clamp values from
+ * @util: the utilization signal to clamp
+ *
+ * Each CPU tracks util_{min,max} clamp values depending on the set of its
+ * currently active tasks. Given a utilization signal, i.e a signal in the
+ * [0..SCHED_CAPACITY_SCALE] range, this function returns a clamped
+ * utilization signal considering the current clamp values for the
+ * specified CPU.
+ *
+ * Return: a clamped utilization signal for a given CPU.
+ */
+static inline int uclamp_util(unsigned int cpu, unsigned int util)
+{
+	unsigned int min_util = uclamp_value(cpu, UCLAMP_MIN);
+	unsigned int max_util = uclamp_value(cpu, UCLAMP_MAX);
+
+	return clamp(util, min_util, max_util);
+}
+#else
+/* Disable clamping code at compile time by constant propagation */
+#define uclamp_enabled false
+#define uclamp_util(cpu, util) util
+static inline unsigned int uclamp_value(unsigned int cpu, int clamp_id)
+{
+	if (clamp_id == UCLAMP_MIN)
+		return 0;
+	return SCHED_CAPACITY_SCALE;
+}
+#endif /* CONFIG_UTIL_CLAMP */
+
 #ifdef arch_scale_freq_capacity
 #ifndef arch_scale_freq_invariant
 #define arch_scale_freq_invariant()	(true)
