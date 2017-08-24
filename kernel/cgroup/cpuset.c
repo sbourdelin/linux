@@ -1597,6 +1597,7 @@ typedef enum {
 	FILE_MEMORY_PRESSURE,
 	FILE_SPREAD_PAGE,
 	FILE_SPREAD_SLAB,
+	FILE_FEATURES,
 } cpuset_filetype_t;
 
 static int cpuset_write_u64(struct cgroup_subsys_state *css, struct cftype *cft,
@@ -1819,12 +1820,89 @@ static s64 cpuset_read_s64(struct cgroup_subsys_state *css, struct cftype *cft)
 	return 0;
 }
 
+static const struct {
+	char *name;
+	int  flag;
+} cpuset_features[] = {
+	{ "mem_hardwall",	  CS_MEM_HARDWALL,	 },
+	{ "mem_migrate",	  CS_MEMORY_MIGRATE,	 },
+	{ "mem_spread_page",	  CS_SPREAD_PAGE,	 },
+	{ "mem_spread_slab",	  CS_SPREAD_SLAB,	 },
+	{ "sched_load_balance",	  CS_SCHED_LOAD_BALANCE, },
+};
+
+static int cpuset_read_features(struct seq_file *sf, void *v)
+{
+	struct cpuset *cs = css_cs(seq_css(sf));
+	unsigned long enabled = READ_ONCE(cs->flags);
+	unsigned long disabled = ~enabled;
+	int i, cnt;
+
+	seq_puts(sf, "Enabled:  ");
+	for (i = cnt = 0; i < ARRAY_SIZE(cpuset_features); i++) {
+		if (test_bit(cpuset_features[i].flag, &enabled)) {
+			if (cnt++)
+				seq_putc(sf, ' ');
+			seq_puts(sf, cpuset_features[i].name);
+		}
+	}
+
+	seq_puts(sf, "\nDisabled: ");
+	for (i = cnt = 0; i < ARRAY_SIZE(cpuset_features); i++) {
+		if (test_bit(cpuset_features[i].flag, &disabled)) {
+			if (cnt++)
+				seq_puts(sf, " ");
+			seq_puts(sf, cpuset_features[i].name);
+		}
+	}
+
+	seq_putc(sf, '\n');
+	return 0;
+}
+
+static ssize_t cpuset_write_features(struct kernfs_open_file *of,
+				     char *buf, size_t nbytes, loff_t off)
+{
+	struct cpuset *cs = css_cs(of_css(of));
+	unsigned long enable = 0, disable = 0;
+	char *tok;
+	int i;
+
+	/*
+	 * Parse input - space seperated list of feature names prefixed
+	 * with either + or -.
+	 */
+	buf = strstrip(buf);
+	while ((tok = strsep(&buf, " "))) {
+		if (tok[0] == '\0')
+			continue;
+		for (i = 0; i < ARRAY_SIZE(cpuset_features); i++)
+			if (!strcmp(tok + 1, cpuset_features[i].name))
+				break;
+		if (i == ARRAY_SIZE(cpuset_features))
+			return -EINVAL;
+		if (*tok == '+') {
+			enable  |= 1UL << cpuset_features[i].flag;
+			disable &= 1UL << cpuset_features[i].flag;
+		} else if (*tok == '-') {
+			disable |= 1UL << cpuset_features[i].flag;
+			enable  &= 1UL << cpuset_features[i].flag;
+		} else {
+			return -EINVAL;
+		}
+	}
+
+	enable |= READ_ONCE(cs->flags);
+	enable &= ~disable;
+	WRITE_ONCE(cs->flags, enable);
+	return nbytes;
+}
 
 /*
  * for the common functions, 'private' gives the type of file
  */
 
-static struct cftype files[] = {
+static struct cftype legacy_files[] = {
 	{
 		.name = "cpus",
 		.seq_show = cpuset_common_seq_show,
@@ -1924,6 +2002,68 @@ static struct cftype files[] = {
 
 	{ }	/* terminate */
 };
+
+static struct cftype dfl_files[] = {
+	{
+		.name = "cpus",
+		.seq_show = cpuset_common_seq_show,
+		.write = cpuset_write_resmask,
+		.max_write_len = (100U + 6 * NR_CPUS),
+		.private = FILE_CPULIST,
+	},
+
+	{
+		.name = "mems",
+		.seq_show = cpuset_common_seq_show,
+		.write = cpuset_write_resmask,
+		.max_write_len = (100U + 6 * MAX_NUMNODES),
+		.private = FILE_MEMLIST,
+	},
+
+	{
+		.name = "effective_cpus",
+		.seq_show = cpuset_common_seq_show,
+		.private = FILE_EFFECTIVE_CPULIST,
+	},
+
+	{
+		.name = "effective_mems",
+		.seq_show = cpuset_common_seq_show,
+		.private = FILE_EFFECTIVE_MEMLIST,
+	},
+
+	{
+		.name = "features",
+		.seq_show = cpuset_read_features,
+		.write = cpuset_write_features,
+		.private = FILE_FEATURES,
+	},
+
+	{
+		.name = "sched_relax_domain_level",
+		.read_s64 = cpuset_read_s64,
+		.write_s64 = cpuset_write_s64,
+		.private = FILE_SCHED_RELAX_DOMAIN_LEVEL,
+	},
+
+	{
+		.name = "mem_pressure",
+		.read_u64 = cpuset_read_u64,
+		.private = FILE_MEMORY_PRESSURE,
+	},
+
+	{
+		.name = "mem_pressure_enabled",
+		.flags = CFTYPE_ONLY_ON_ROOT,
+		.read_u64 = cpuset_read_u64,
+		.write_u64 = cpuset_write_u64,
+		.private = FILE_MEMORY_PRESSURE_ENABLED,
+	},
+
+
+	{ }	/* terminate */
+};
+
 
 /*
  *	cpuset_css_alloc - allocate a cpuset css
@@ -2099,8 +2239,10 @@ struct cgroup_subsys cpuset_cgrp_subsys = {
 	.post_attach	= cpuset_post_attach,
 	.bind		= cpuset_bind,
 	.fork		= cpuset_fork,
-	.legacy_cftypes	= files,
+	.legacy_cftypes	= legacy_files,
+	.dfl_cftypes	= dfl_files,
 	.early_init	= true,
+	.threaded	= true,
 };
 
 /**
