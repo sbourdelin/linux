@@ -517,6 +517,11 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
 # define __compiletime_error_fallback(condition) do { } while (0)
 #endif
 
+/*
+ * __compiletime_assert() relies on compiler optimizations to remove the check
+ * against '__cond' if 'condition' is false. As a result, compiling with -O0
+ * will cause compilation errors here regardless of the value of 'condition'.
+ */
 #define __compiletime_assert(condition, msg, prefix, suffix)		\
 	do {								\
 		bool __cond = !(condition);				\
