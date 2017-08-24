@@ -391,7 +391,7 @@ out:
 	return ret;
 }
 
-static struct amba_id tmc_ids[] = {
+static const struct amba_id tmc_ids[] = {
 	{
 		.id     = 0x0003b961,
 		.mask   = 0x0003ffff,
