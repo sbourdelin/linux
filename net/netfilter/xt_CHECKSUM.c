@@ -25,8 +25,12 @@ MODULE_ALIAS("ip6t_CHECKSUM");
 static unsigned int
 checksum_tg(struct sk_buff *skb, const struct xt_action_param *par)
 {
-	if (skb->ip_summed == CHECKSUM_PARTIAL)
-		skb_checksum_help(skb);
+	if (skb->ip_summed == CHECKSUM_PARTIAL) {
+		if (unlikely(skb_is_gso(skb)))
+			pr_warn_once("cannot mangle checksum of a GSO packet\n");
+		else
+			skb_checksum_help(skb);
+	}
 
 	return XT_CONTINUE;
 }
