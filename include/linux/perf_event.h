@@ -572,7 +572,20 @@ struct perf_event {
 	 */
 	struct list_head		group_entry;
 	struct list_head		sibling_list;
-
+	/*
+	 * Node on the pinned or flexible tree located at the event context;
+	 * the node may be empty in case its event is not directly attached
+	 * to the tree but to group_list list of the event directly
+	 * attached to the tree;
+	 */
+	struct rb_node			group_node;
+	/*
+	 * List keeps groups allocated for the same cpu;
+	 * the list may be empty in case its event is not directly
+	 * attached to the tree but to group_list list of the event directly
+	 * attached to the tree;
+	 */
+	struct list_head		group_list;
 	/*
 	 * We need storage to track the entries in perf_pmu_migrate_context; we
 	 * cannot use the event_entry because of RCU and we want to keep the
@@ -741,8 +754,8 @@ struct perf_event_context {
 	struct mutex			mutex;
 
 	struct list_head		active_ctx_list;
-	struct list_head		pinned_groups;
-	struct list_head		flexible_groups;
+	struct rb_root			pinned_groups;
+	struct rb_root			flexible_groups;
 	struct list_head		event_list;
 	int				nr_events;
 	int				nr_active;
