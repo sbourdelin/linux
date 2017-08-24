@@ -109,6 +109,22 @@ const struct mtd_ooblayout_ops nand_ooblayout_sp_ops = {
 };
 EXPORT_SYMBOL_GPL(nand_ooblayout_sp_ops);
 
+static int nand_ooblayout_free_lp_no_ecc(struct mtd_info *mtd, int section,
+					   struct mtd_oob_region *oobregion)
+{
+	if (section)
+		return -ERANGE;
+
+	oobregion->offset = 2;
+	oobregion->length = mtd->oobsize - oobregion->offset;
+
+	return 0;
+}
+
+const struct mtd_ooblayout_ops nand_ooblayout_lp_no_ecc_ops = {
+	.free = nand_ooblayout_free_lp_no_ecc,
+};
+
 static int nand_ooblayout_ecc_lp(struct mtd_info *mtd, int section,
 				 struct mtd_oob_region *oobregion)
 {
@@ -4893,6 +4909,19 @@ int nand_scan_tail(struct mtd_info *mtd)
 			mtd_set_ooblayout(mtd, &nand_ooblayout_lp_hamming_ops);
 			break;
 		default:
+			/*
+			 * Expose the whole OOB area to users if ECC_NONE
+			 * is passed. We could do that for all kind of
+			 * ->oobsize, but we must keep the old large/small
+			 * page with ECC layout when ->oobsize <= 128 for
+			 * compatibility reasons.
+			 */
+			if (ecc->mode == NAND_ECC_NONE) {
+				mtd_set_ooblayout(mtd,
+						&nand_ooblayout_lp_no_ecc_ops);
+				break;
+			}
+
 			WARN(1, "No oob scheme defined for oobsize %d\n",
 				mtd->oobsize);
 			ret = -EINVAL;
