@@ -430,6 +430,9 @@ static void update_perf_cpu_limits(void)
 	WRITE_ONCE(perf_sample_allowed_ns, tmp);
 }
 
+#define ROTATION_DISABLED 0
+#define ROTATION_ENABLED  1
+
 static int perf_rotate_context(struct perf_cpu_context *cpuctx);
 
 int perf_proc_update_handler(struct ctl_table *table, int write,
@@ -556,11 +559,11 @@ void perf_sample_event_took(u64 sample_len_ns)
 static atomic64_t perf_event_id;
 
 static void cpu_ctx_sched_out(struct perf_cpu_context *cpuctx,
-			      enum event_type_t event_type);
+			      enum event_type_t event_type, int rotation);
 
 static void cpu_ctx_sched_in(struct perf_cpu_context *cpuctx,
 			     enum event_type_t event_type,
-			     struct task_struct *task);
+			     struct task_struct *task, int rotation);
 
 static void update_context_time(struct perf_event_context *ctx);
 static u64 perf_event_time(struct perf_event *event);
@@ -717,7 +720,8 @@ static void perf_cgroup_switch(struct task_struct *task, int mode)
 		perf_pmu_disable(cpuctx->ctx.pmu);
 
 		if (mode & PERF_CGROUP_SWOUT) {
-			cpu_ctx_sched_out(cpuctx, EVENT_ALL);
+			cpu_ctx_sched_out(cpuctx, EVENT_ALL,
+					ROTATION_DISABLED);
 			/*
 			 * must not be done before ctxswout due
 			 * to event_filter_match() in event_sched_out()
@@ -736,7 +740,8 @@ static void perf_cgroup_switch(struct task_struct *task, int mode)
 			 */
 			cpuctx->cgrp = perf_cgroup_from_task(task,
 							     &cpuctx->ctx);
-			cpu_ctx_sched_in(cpuctx, EVENT_ALL, task);
+			cpu_ctx_sched_in(cpuctx, EVENT_ALL, task,
+					ROTATION_DISABLED);
 		}
 		perf_pmu_enable(cpuctx->ctx.pmu);
 		perf_ctx_unlock(cpuctx, cpuctx->task_ctx);
@@ -1617,6 +1622,14 @@ perf_event_groups_rotate(struct rb_root *groups, int cpu)
 			typeof(*event), node)->list), link)
 
 /*
+ * Iterate event groups related to specific cpu.
+ */
+#define perf_event_groups_for_each_cpu(event, cpu, tree, list, link)	\
+	list = perf_event_groups_get_list(tree, cpu);			\
+	if (list)							\
+		list_for_each_entry(event, list, link)
+
+/*
  * Add a event from the lists for its context.
  * Must be called with ctx->mutex and ctx->lock held.
  */
@@ -2397,12 +2410,12 @@ static void add_event_to_ctx(struct perf_event *event,
 
 static void ctx_sched_out(struct perf_event_context *ctx,
 			  struct perf_cpu_context *cpuctx,
-			  enum event_type_t event_type);
+			  enum event_type_t event_type, int rotation);
 static void
 ctx_sched_in(struct perf_event_context *ctx,
 	     struct perf_cpu_context *cpuctx,
 	     enum event_type_t event_type,
-	     struct task_struct *task);
+	     struct task_struct *task, int rotation);
 
 static void task_ctx_sched_out(struct perf_cpu_context *cpuctx,
 			       struct perf_event_context *ctx,
@@ -2414,19 +2427,19 @@ static void task_ctx_sched_out(struct perf_cpu_context *cpuctx,
 	if (WARN_ON_ONCE(ctx != cpuctx->task_ctx))
 		return;
 
-	ctx_sched_out(ctx, cpuctx, event_type);
+	ctx_sched_out(ctx, cpuctx, event_type, ROTATION_DISABLED);
 }
 
 static void perf_event_sched_in(struct perf_cpu_context *cpuctx,
 				struct perf_event_context *ctx,
-				struct task_struct *task)
+				struct task_struct *task, int rotation)
 {
-	cpu_ctx_sched_in(cpuctx, EVENT_PINNED, task);
+	cpu_ctx_sched_in(cpuctx, EVENT_PINNED, task, rotation);
 	if (ctx)
-		ctx_sched_in(ctx, cpuctx, EVENT_PINNED, task);
-	cpu_ctx_sched_in(cpuctx, EVENT_FLEXIBLE, task);
+		ctx_sched_in(ctx, cpuctx, EVENT_PINNED, task, rotation);
+	cpu_ctx_sched_in(cpuctx, EVENT_FLEXIBLE, task, rotation);
 	if (ctx)
-		ctx_sched_in(ctx, cpuctx, EVENT_FLEXIBLE, task);
+		ctx_sched_in(ctx, cpuctx, EVENT_FLEXIBLE, task, rotation);
 }
 
 /*
@@ -2470,11 +2483,11 @@ static void ctx_resched(struct perf_cpu_context *cpuctx,
 	 *  - otherwise, do nothing more.
 	 */
 	if (cpu_event)
-		cpu_ctx_sched_out(cpuctx, ctx_event_type);
+		cpu_ctx_sched_out(cpuctx, ctx_event_type, ROTATION_DISABLED);
 	else if (ctx_event_type & EVENT_PINNED)
-		cpu_ctx_sched_out(cpuctx, EVENT_FLEXIBLE);
+		cpu_ctx_sched_out(cpuctx, EVENT_FLEXIBLE, ROTATION_DISABLED);
 
-	perf_event_sched_in(cpuctx, task_ctx, current);
+	perf_event_sched_in(cpuctx, task_ctx, current, ROTATION_DISABLED);
 	perf_pmu_enable(cpuctx->ctx.pmu);
 }
 
@@ -2518,7 +2531,7 @@ static int  __perf_install_in_context(void *info)
 	}
 
 	if (reprogram) {
-		ctx_sched_out(ctx, cpuctx, EVENT_TIME);
+		ctx_sched_out(ctx, cpuctx, EVENT_TIME, ROTATION_DISABLED);
 		add_event_to_ctx(event, ctx);
 		ctx_resched(cpuctx, task_ctx, get_event_type(event));
 	} else {
@@ -2661,7 +2674,7 @@ static void __perf_event_enable(struct perf_event *event,
 		return;
 
 	if (ctx->is_active)
-		ctx_sched_out(ctx, cpuctx, EVENT_TIME);
+		ctx_sched_out(ctx, cpuctx, EVENT_TIME, ROTATION_DISABLED);
 
 	__perf_event_mark_enabled(event);
 
@@ -2671,7 +2684,8 @@ static void __perf_event_enable(struct perf_event *event,
 	if (!event_filter_match(event)) {
 		if (is_cgroup_event(event))
 			perf_cgroup_defer_enabled(event);
-		ctx_sched_in(ctx, cpuctx, EVENT_TIME, current);
+		ctx_sched_in(ctx, cpuctx, EVENT_TIME, current,
+				ROTATION_DISABLED);
 		return;
 	}
 
@@ -2680,7 +2694,8 @@ static void __perf_event_enable(struct perf_event *event,
 	 * then don't put it on unless the group is on.
 	 */
 	if (leader != event && leader->state != PERF_EVENT_STATE_ACTIVE) {
-		ctx_sched_in(ctx, cpuctx, EVENT_TIME, current);
+		ctx_sched_in(ctx, cpuctx, EVENT_TIME, current,
+				ROTATION_DISABLED);
 		return;
 	}
 
@@ -2876,11 +2891,14 @@ EXPORT_SYMBOL_GPL(perf_event_refresh);
 
 static void ctx_sched_out(struct perf_event_context *ctx,
 			  struct perf_cpu_context *cpuctx,
-			  enum event_type_t event_type)
+			  enum event_type_t event_type,
+			  int rotation)
 {
 	int is_active = ctx->is_active;
+	struct list_head *group_list;
 	struct perf_event *event;
 	struct rb_node *node;
+	int sw = -1, cpu = smp_processor_id();
 	lockdep_assert_held(&ctx->lock);
 
 	if (likely(!ctx->nr_events)) {
@@ -2926,17 +2944,41 @@ static void ctx_sched_out(struct perf_event_context *ctx,
 
 	perf_pmu_disable(ctx->pmu);
 
-	if (is_active & EVENT_PINNED)
-		perf_event_groups_for_each(event, node,
-				&ctx->pinned_groups, group_node,
-				group_list, group_entry)
-			group_sched_out(event, cpuctx, ctx);
+	if (is_active & EVENT_PINNED) {
+		if (rotation == ROTATION_ENABLED) {
+			perf_event_groups_for_each_cpu(event, cpu,
+					&ctx->pinned_groups,
+					group_list, group_entry)
+				group_sched_out(event, cpuctx, ctx);
+			perf_event_groups_for_each_cpu(event, sw,
+					&ctx->pinned_groups,
+					group_list, group_entry)
+				group_sched_out(event, cpuctx, ctx);
+		} else {
+			perf_event_groups_for_each(event, node,
+					&ctx->pinned_groups, group_node,
+					group_list, group_entry)
+				group_sched_out(event, cpuctx, ctx);
+		}
+	}
 
-	if (is_active & EVENT_FLEXIBLE)
-		perf_event_groups_for_each(event, node,
-				&ctx->flexible_groups, group_node,
-				group_list, group_entry)
-			group_sched_out(event, cpuctx, ctx);
+	if (is_active & EVENT_FLEXIBLE) {
+		if (rotation == ROTATION_ENABLED) {
+			perf_event_groups_for_each_cpu(event, cpu,
+					&ctx->flexible_groups,
+					group_list, group_entry)
+				group_sched_out(event, cpuctx, ctx);
+			perf_event_groups_for_each_cpu(event, sw,
+					&ctx->flexible_groups,
+					group_list, group_entry)
+				group_sched_out(event, cpuctx, ctx);
+		} else {
+			perf_event_groups_for_each(event, node,
+					&ctx->flexible_groups, group_node,
+					group_list, group_entry)
+				group_sched_out(event, cpuctx, ctx);
+		}
+	}
 
 	perf_pmu_enable(ctx->pmu);
 }
@@ -3225,72 +3267,110 @@ void __perf_event_task_sched_out(struct task_struct *task,
  * Called with IRQs disabled
  */
 static void cpu_ctx_sched_out(struct perf_cpu_context *cpuctx,
-			      enum event_type_t event_type)
+			      enum event_type_t event_type, int rotation)
 {
-	ctx_sched_out(&cpuctx->ctx, cpuctx, event_type);
+	ctx_sched_out(&cpuctx->ctx, cpuctx, event_type, rotation);
+}
+
+static void
+pinned_group_sched_in(struct perf_event *event,
+		      struct perf_event_context *ctx,
+		      struct perf_cpu_context *cpuctx)
+{
+	if (event->state <= PERF_EVENT_STATE_OFF)
+		return;
+	if (!event_filter_match(event))
+		return;
+
+	/* may need to reset tstamp_enabled */
+	if (is_cgroup_event(event))
+		perf_cgroup_mark_enabled(event, ctx);
+
+	if (group_can_go_on(event, cpuctx, 1))
+		group_sched_in(event, cpuctx, ctx);
+
+	/*
+	 * If this pinned group hasn't been scheduled,
+	 * put it in error state.
+	 */
+	if (event->state == PERF_EVENT_STATE_INACTIVE) {
+		update_group_times(event);
+		event->state = PERF_EVENT_STATE_ERROR;
+	}
 }
 
 static void
 ctx_pinned_sched_in(struct perf_event_context *ctx,
-		    struct perf_cpu_context *cpuctx)
+		    struct perf_cpu_context *cpuctx, int rotation)
 {
+	struct list_head *group_list;
 	struct perf_event *event;
 	struct rb_node *node;
+	int sw = -1, cpu = smp_processor_id();
 
-	perf_event_groups_for_each(event, node, &ctx->pinned_groups,
-			group_node, group_list, group_entry) {
-		if (event->state <= PERF_EVENT_STATE_OFF)
-			continue;
-		if (!event_filter_match(event))
-			continue;
+	if (rotation == ROTATION_ENABLED) {
+		perf_event_groups_for_each_cpu(event, sw,
+			&ctx->pinned_groups, group_list, group_entry)
+			pinned_group_sched_in(event, ctx, cpuctx);
 
-		/* may need to reset tstamp_enabled */
-		if (is_cgroup_event(event))
-			perf_cgroup_mark_enabled(event, ctx);
+		perf_event_groups_for_each_cpu(event, cpu,
+			&ctx->pinned_groups, group_list, group_entry)
+			pinned_group_sched_in(event, ctx, cpuctx);
+	} else {
+		perf_event_groups_for_each(event, node, &ctx->pinned_groups,
+			group_node, group_list, group_entry)
+			pinned_group_sched_in(event, ctx, cpuctx);
+	}
+}
 
-		if (group_can_go_on(event, cpuctx, 1))
-			group_sched_in(event, cpuctx, ctx);
+static void
+flexible_group_sched_in(struct perf_event *event,
+			struct perf_event_context *ctx,
+			struct perf_cpu_context *cpuctx,
+			int *can_add_hw)
+{
+	/* Ignore events in OFF or ERROR state */
+	if (event->state <= PERF_EVENT_STATE_OFF)
+		return;
+	/*
+	 * Listen to the 'cpu' scheduling filter constraint
+	 * of events:
+	 */
+	if (!event_filter_match(event))
+		return;
 
-		/*
-		 * If this pinned group hasn't been scheduled,
-		 * put it in error state.
-		 */
-		if (event->state == PERF_EVENT_STATE_INACTIVE) {
-			update_group_times(event);
-			event->state = PERF_EVENT_STATE_ERROR;
-		}
+	/* may need to reset tstamp_enabled */
+	if (is_cgroup_event(event))
+		perf_cgroup_mark_enabled(event, ctx);
+
+	if (group_can_go_on(event, cpuctx, *can_add_hw)) {
+		if (group_sched_in(event, cpuctx, ctx))
+			*can_add_hw = 0;
 	}
 }
 
 static void
 ctx_flexible_sched_in(struct perf_event_context *ctx,
-		      struct perf_cpu_context *cpuctx)
+		      struct perf_cpu_context *cpuctx, int rotation)
 {
+	struct list_head *group_list;
 	struct perf_event *event;
 	struct rb_node *node;
 	int can_add_hw = 1;
+	int sw = -1, cpu = smp_processor_id();
 
-	perf_event_groups_for_each(event, node, &ctx->flexible_groups,
-			group_node, group_list, group_entry) {
-
-		/* Ignore events in OFF or ERROR state */
-		if (event->state <= PERF_EVENT_STATE_OFF)
-			continue;
-		/*
-		 * Listen to the 'cpu' scheduling filter constraint
-		 * of events:
-		 */
-		if (!event_filter_match(event))
-			continue;
-
-		/* may need to reset tstamp_enabled */
-		if (is_cgroup_event(event))
-			perf_cgroup_mark_enabled(event, ctx);
-
-		if (group_can_go_on(event, cpuctx, can_add_hw)) {
-			if (group_sched_in(event, cpuctx, ctx))
-				can_add_hw = 0;
-		}
+	if (rotation == ROTATION_ENABLED) {
+		perf_event_groups_for_each_cpu(event, sw,
+			&ctx->flexible_groups, group_list, group_entry)
+			flexible_group_sched_in(event, ctx, cpuctx, &can_add_hw);
+		can_add_hw = 1;
+		perf_event_groups_for_each_cpu(event, cpu,
+			&ctx->flexible_groups, group_list, group_entry)
+			flexible_group_sched_in(event, ctx, cpuctx, &can_add_hw);
+	} else {
+		perf_event_groups_for_each(event, node, &ctx->flexible_groups,
+			group_node, group_list, group_entry)
+			flexible_group_sched_in(event, ctx, cpuctx, &can_add_hw);
 	}
 }
 
@@ -3298,7 +3378,7 @@ static void
 ctx_sched_in(struct perf_event_context *ctx,
 	     struct perf_cpu_context *cpuctx,
 	     enum event_type_t event_type,
-	     struct task_struct *task)
+	     struct task_struct *task, int rotation)
 {
 	int is_active = ctx->is_active;
 
@@ -3328,20 +3408,20 @@ ctx_sched_in(struct perf_event_context *ctx,
 	 * in order to give them the best chance of going on.
 	 */
 	if (is_active & EVENT_PINNED)
-		ctx_pinned_sched_in(ctx, cpuctx);
+		ctx_pinned_sched_in(ctx, cpuctx, rotation);
 
 	/* Then walk through the lower prio flexible groups */
 	if (is_active & EVENT_FLEXIBLE)
-		ctx_flexible_sched_in(ctx, cpuctx);
+		ctx_flexible_sched_in(ctx, cpuctx, rotation);
 }
 
 static void cpu_ctx_sched_in(struct perf_cpu_context *cpuctx,
 			     enum event_type_t event_type,
-			     struct task_struct *task)
+			     struct task_struct *task, int rotation)
 {
 	struct perf_event_context *ctx = &cpuctx->ctx;
 
-	ctx_sched_in(ctx, cpuctx, event_type, task);
+	ctx_sched_in(ctx, cpuctx, event_type, task, rotation);
 }
 
 static void perf_event_context_sched_in(struct perf_event_context *ctx,
@@ -3371,8 +3451,8 @@ static void perf_event_context_sched_in(struct perf_event_context *ctx,
 	 * events, no need to flip the cpuctx's events around.
 	 */
 	if (!RB_EMPTY_ROOT(&ctx->pinned_groups))
-		cpu_ctx_sched_out(cpuctx, EVENT_FLEXIBLE);
-	perf_event_sched_in(cpuctx, ctx, task);
+		cpu_ctx_sched_out(cpuctx, EVENT_FLEXIBLE, ROTATION_DISABLED);
+	perf_event_sched_in(cpuctx, ctx, task, ROTATION_DISABLED);
 	perf_pmu_enable(ctx->pmu);
 
 unlock:
@@ -3607,7 +3687,7 @@ static void rotate_ctx(struct perf_event_context *ctx)
 	 * Rotate the first entry last of non-pinned groups. Rotation might be
 	 * disabled by the inheritance code.
 	 */
-	if (!ctx->rotate_disable) {
+	if (ctx->rotation == ROTATION_ENABLED) {
 		int sw = -1, cpu = smp_processor_id();
 
 		perf_event_groups_rotate(&ctx->flexible_groups, sw);
@@ -3618,40 +3698,40 @@ static void rotate_ctx(struct perf_event_context *ctx)
 static int perf_rotate_context(struct perf_cpu_context *cpuctx)
 {
 	struct perf_event_context *ctx = NULL;
-	int rotate = 0;
+	int rotation = ROTATION_DISABLED;
 
 	if (cpuctx->ctx.nr_events) {
 		if (cpuctx->ctx.nr_events != cpuctx->ctx.nr_active)
-			rotate = 1;
+			rotation = ROTATION_ENABLED;
 	}
 
 	ctx = cpuctx->task_ctx;
 	if (ctx && ctx->nr_events) {
 		if (ctx->nr_events != ctx->nr_active)
-			rotate = 1;
+			rotation = ROTATION_ENABLED;
 	}
 
-	if (!rotate)
+	if (rotation == ROTATION_DISABLED)
 		goto done;
 
 	perf_ctx_lock(cpuctx, cpuctx->task_ctx);
 	perf_pmu_disable(cpuctx->ctx.pmu);
 
-	cpu_ctx_sched_out(cpuctx, EVENT_FLEXIBLE);
+	cpu_ctx_sched_out(cpuctx, EVENT_FLEXIBLE, rotation);
 	if (ctx)
-		ctx_sched_out(ctx, cpuctx, EVENT_FLEXIBLE);
+		ctx_sched_out(ctx, cpuctx, EVENT_FLEXIBLE, rotation);
 
 	rotate_ctx(&cpuctx->ctx);
 	if (ctx)
 		rotate_ctx(ctx);
 
-	perf_event_sched_in(cpuctx, ctx, current);
+	perf_event_sched_in(cpuctx, ctx, current, rotation);
 
 	perf_pmu_enable(cpuctx->ctx.pmu);
 	perf_ctx_unlock(cpuctx, cpuctx->task_ctx);
 done:
 
-	return rotate;
+	return rotation;
 }
 
 void perf_event_task_tick(void)
@@ -3705,7 +3785,7 @@ static void perf_event_enable_on_exec(int ctxn)
 
 	cpuctx = __get_cpu_context(ctx);
 	perf_ctx_lock(cpuctx, ctx);
-	ctx_sched_out(ctx, cpuctx, EVENT_TIME);
+	ctx_sched_out(ctx, cpuctx, EVENT_TIME, ROTATION_DISABLED);
 	list_for_each_entry(event, &ctx->event_list, event_entry) {
 		enabled |= event_enable_on_exec(event, ctx);
 		event_type |= get_event_type(event);
@@ -3718,7 +3798,8 @@ static void perf_event_enable_on_exec(int ctxn)
 		clone_ctx = unclone_ctx(ctx);
 		ctx_resched(cpuctx, ctx, event_type);
 	} else {
-		ctx_sched_in(ctx, cpuctx, EVENT_TIME, current);
+		ctx_sched_in(ctx, cpuctx, EVENT_TIME, current,
+				ROTATION_DISABLED);
 	}
 	perf_ctx_unlock(cpuctx, ctx);
 
@@ -3955,6 +4036,7 @@ static void __perf_event_init_context(struct perf_event_context *ctx)
 	ctx->flexible_groups = RB_ROOT;
 	INIT_LIST_HEAD(&ctx->event_list);
 	atomic_set(&ctx->refcount, 1);
+	ctx->rotation = ROTATION_ENABLED;
 }
 
 static struct perf_event_context *
@@ -11080,7 +11162,7 @@ static int perf_event_init_context(struct task_struct *child, int ctxn)
 	 * rotate_ctx() will change the list from interrupt context.
 	 */
 	raw_spin_lock_irqsave(&parent_ctx->lock, flags);
-	parent_ctx->rotate_disable = 1;
+	parent_ctx->rotation = ROTATION_DISABLED;
 	raw_spin_unlock_irqrestore(&parent_ctx->lock, flags);
 
 	perf_event_groups_for_each(event, node,	&parent_ctx->flexible_groups,
@@ -11092,7 +11174,7 @@ static int perf_event_init_context(struct task_struct *child, int ctxn)
 	}
 
 	raw_spin_lock_irqsave(&parent_ctx->lock, flags);
-	parent_ctx->rotate_disable = 0;
+	parent_ctx->rotation = ROTATION_ENABLED;
 
 	child_ctx = child->perf_event_ctxp[ctxn];
 
