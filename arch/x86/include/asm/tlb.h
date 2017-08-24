@@ -15,4 +15,9 @@
 
 #include <asm-generic/tlb.h>
 
+static inline void __tlb_remove_table(void *table)
+{
+	free_page_and_swap_cache(table);
+}
+
 #endif /* _ASM_X86_TLB_H */
