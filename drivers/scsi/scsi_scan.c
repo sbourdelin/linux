@@ -427,10 +427,9 @@ static struct scsi_target *scsi_alloc_target(struct device *parent,
 	int error, ref_got;
 
 	starget = kzalloc(size, GFP_KERNEL);
-	if (!starget) {
-		printk(KERN_ERR "%s: allocation failure\n", __func__);
+	if (!starget)
 		return NULL;
-	}
+
 	dev = &starget->dev;
 	device_initialize(dev);
 	kref_init(&starget->reap_ref);
@@ -1340,10 +1339,8 @@ static int scsi_report_lun_scan(struct scsi_target *starget, int bflags,
 retry:
 	lun_data = kmalloc(length, GFP_KERNEL |
 			   (sdev->host->unchecked_isa_dma ? __GFP_DMA : 0));
-	if (!lun_data) {
-		printk(ALLOC_FAILURE_MSG, __func__);
+	if (!lun_data)
 		goto out;
-	}
 
 	scsi_cmd[0] = REPORT_LUNS;
 
