@@ -151,6 +151,15 @@ enum bpf_attach_type {
  */
 #define BPF_F_ALLOW_OVERRIDE	(1U << 0)
 
+/* If BPF_F_RECURSIVE flag is used in BPF_PROG_ATTACH command
+ * cgroups are walked recursively back to the root cgroup or the
+ * first cgroup without the flag set running any program attached.
+ * Once the flag is set, it MUST be set for all descendant cgroups.
+ */
+#define BPF_F_RECURSIVE		(1U << 1)
+
+#define BPF_F_ALL_ATTACH_FLAGS  (BPF_F_ALLOW_OVERRIDE | BPF_F_RECURSIVE)
+
 /* If BPF_F_STRICT_ALIGNMENT is used in BPF_PROG_LOAD command, the
  * verifier will perform strict alignment checking as if the kernel
  * has been built with CONFIG_EFFICIENT_UNALIGNED_ACCESS not set,

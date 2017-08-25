@@ -5176,14 +5176,35 @@ void cgroup_sk_free(struct sock_cgroup_data *skcd)
 
 #ifdef CONFIG_CGROUP_BPF
 int cgroup_bpf_update(struct cgroup *cgrp, struct bpf_prog *prog,
-		      enum bpf_attach_type type, bool overridable)
+		      enum bpf_attach_type type, u32 flags)
 {
 	struct cgroup *parent = cgroup_parent(cgrp);
 	int ret;
 
 	mutex_lock(&cgroup_mutex);
-	ret = __cgroup_bpf_update(cgrp, parent, prog, type, overridable);
+	ret = __cgroup_bpf_update(cgrp, parent, prog, type, flags);
 	mutex_unlock(&cgroup_mutex);
 	return ret;
 }
+
+int cgroup_bpf_run_filter_sk(struct sock *sk,
+			     enum bpf_attach_type type)
+{
+	struct cgroup *cgrp = sock_cgroup_ptr(&sk->sk_cgrp_data);
+	int ret = 0;
+
+	while (cgrp) {
+		ret = __cgroup_bpf_run_filter_sk(cgrp, sk, type);
+		if (ret)
+			break;
+
+		if (!cgrp->bpf.is_recursive[type])
+			break;
+
+		cgrp = cgroup_parent(cgrp);
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(cgroup_bpf_run_filter_sk);
 #endif /* CONFIG_CGROUP_BPF */

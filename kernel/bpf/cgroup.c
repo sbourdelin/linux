@@ -47,10 +47,16 @@ void cgroup_bpf_inherit(struct cgroup *cgrp, struct cgroup *parent)
 	unsigned int type;
 
 	for (type = 0; type < ARRAY_SIZE(cgrp->bpf.effective); type++) {
-		struct bpf_prog *e;
+		struct bpf_prog *e = NULL;
 
-		e = rcu_dereference_protected(parent->bpf.effective[type],
-					      lockdep_is_held(&cgroup_mutex));
+		/* do not need to set effective program if cgroups are
+		 * walked recursively
+		 */
+		cgrp->bpf.is_recursive[type] = parent->bpf.is_recursive[type];
+		if (!cgrp->bpf.is_recursive[type])
+			e = rcu_dereference_protected(parent->bpf.effective[type],
+						      lockdep_is_held(&cgroup_mutex));
+
 		rcu_assign_pointer(cgrp->bpf.effective[type], e);
 		cgrp->bpf.disallow_override[type] = parent->bpf.disallow_override[type];
 	}
@@ -85,8 +91,12 @@ void cgroup_bpf_inherit(struct cgroup *cgrp, struct cgroup *parent)
  */
 int __cgroup_bpf_update(struct cgroup *cgrp, struct cgroup *parent,
 			struct bpf_prog *prog, enum bpf_attach_type type,
-			bool new_overridable)
+			u32 flags)
 {
+	bool new_overridable = flags & BPF_F_ALLOW_OVERRIDE;
+	/* initial state inherited from parent */
+	bool curr_recursive = cgrp->bpf.is_recursive[type];
+	bool new_recursive = flags & BPF_F_RECURSIVE;
 	struct bpf_prog *old_prog, *effective = NULL;
 	struct cgroup_subsys_state *pos;
 	bool overridable = true;
@@ -108,6 +118,12 @@ int __cgroup_bpf_update(struct cgroup *cgrp, struct cgroup *parent,
 		 * allow overridable programs in descendent cgroup
 		 */
 		return -EPERM;
+
+	if (prog && curr_recursive && !new_recursive)
+		/* if a parent has recursive prog attached, only
+		 * allow recursive programs in descendent cgroup
+		 */
+		return -EINVAL;
 
 	old_prog = cgrp->bpf.prog[type];
 
@@ -139,6 +155,7 @@ int __cgroup_bpf_update(struct cgroup *cgrp, struct cgroup *parent,
 			rcu_assign_pointer(desc->bpf.effective[type],
 					   effective);
 			desc->bpf.disallow_override[type] = !overridable;
+			desc->bpf.is_recursive[type] = new_recursive;
 		}
 	}
 
@@ -217,13 +234,11 @@ EXPORT_SYMBOL(__cgroup_bpf_run_filter_skb);
  * This function will return %-EPERM if any if an attached program was found
  * and if it returned != 1 during execution. In all other cases, 0 is returned.
  */
-int __cgroup_bpf_run_filter_sk(struct sock *sk,
+int __cgroup_bpf_run_filter_sk(struct cgroup *cgrp, struct sock *sk,
 			       enum bpf_attach_type type)
 {
-	struct cgroup *cgrp = sock_cgroup_ptr(&sk->sk_cgrp_data);
 	struct bpf_prog *prog;
 	int ret = 0;
-
 
 	rcu_read_lock();
 

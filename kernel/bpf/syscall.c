@@ -1151,7 +1151,7 @@ static int bpf_prog_attach(const union bpf_attr *attr)
 	if (CHECK_ATTR(BPF_PROG_ATTACH))
 		return -EINVAL;
 
-	if (attr->attach_flags & ~BPF_F_ALLOW_OVERRIDE)
+	if (attr->attach_flags & ~BPF_F_ALL_ATTACH_FLAGS)
 		return -EINVAL;
 
 	switch (attr->attach_type) {
@@ -1186,7 +1186,7 @@ static int bpf_prog_attach(const union bpf_attr *attr)
 	}
 
 	ret = cgroup_bpf_update(cgrp, prog, attr->attach_type,
-				attr->attach_flags & BPF_F_ALLOW_OVERRIDE);
+				attr->attach_flags);
 	if (ret)
 		bpf_prog_put(prog);
 	cgroup_put(cgrp);
@@ -1216,7 +1216,7 @@ static int bpf_prog_detach(const union bpf_attr *attr)
 		if (IS_ERR(cgrp))
 			return PTR_ERR(cgrp);
 
-		ret = cgroup_bpf_update(cgrp, NULL, attr->attach_type, false);
+		ret = cgroup_bpf_update(cgrp, NULL, attr->attach_type, 0);
 		cgroup_put(cgrp);
 		break;
 
