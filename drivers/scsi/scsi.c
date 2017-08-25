@@ -415,22 +415,20 @@ EXPORT_SYMBOL_GPL(scsi_get_vpd_page);
  * scsi_get_vpd_buf - Get Vital Product Data from a SCSI device
  * @sdev: The device to ask
  * @page: Which Vital Product Data to return
- * @len: Upon success, the VPD length will be stored in *@len.
  *
  * Returns %NULL upon failure.
  */
-static unsigned char *scsi_get_vpd_buf(struct scsi_device *sdev, u8 page,
-				       int *len)
+static struct scsi_vpd *scsi_get_vpd_buf(struct scsi_device *sdev, u8 page)
 {
-	unsigned char *vpd_buf;
+	struct scsi_vpd *vpd_buf;
 	int vpd_len = SCSI_VPD_PG_LEN, result;
 
 retry_pg:
-	vpd_buf = kmalloc(vpd_len, GFP_KERNEL);
+	vpd_buf = kmalloc(sizeof(*vpd_buf) + vpd_len, GFP_KERNEL);
 	if (!vpd_buf)
 		return NULL;
 
-	result = scsi_vpd_inquiry(sdev, vpd_buf, page, vpd_len);
+	result = scsi_vpd_inquiry(sdev, vpd_buf->data, page, vpd_len);
 	if (result < 0) {
 		kfree(vpd_buf);
 		return NULL;
@@ -441,7 +439,7 @@ retry_pg:
 		goto retry_pg;
 	}
 
-	*len = result;
+	vpd_buf->len = result;
 
 	return vpd_buf;
 }
@@ -458,52 +456,50 @@ retry_pg:
 void scsi_attach_vpd(struct scsi_device *sdev)
 {
 	int i;
-	int vpd_len;
 	int pg80_supported = 0;
 	int pg83_supported = 0;
-	unsigned char __rcu *vpd_buf, *orig_vpd_buf = NULL;
+	struct scsi_vpd *vpd_buf, *orig_vpd_buf;
 
 	if (!scsi_device_supports_vpd(sdev))
 		return;
 
 	/* Ask for all the pages supported by this device */
-	vpd_buf = scsi_get_vpd_buf(sdev, 0, &vpd_len);
+	vpd_buf = scsi_get_vpd_buf(sdev, 0);
 	if (!vpd_buf)
 		return;
 
-	for (i = 4; i < vpd_len; i++) {
-		if (vpd_buf[i] == 0x80)
+	for (i = 4; i < vpd_buf->len; i++) {
+		if (vpd_buf->data[i] == 0x80)
 			pg80_supported = 1;
-		if (vpd_buf[i] == 0x83)
+		if (vpd_buf->data[i] == 0x83)
 			pg83_supported = 1;
 	}
 	kfree(vpd_buf);
 
 	if (pg80_supported) {
-		vpd_buf = scsi_get_vpd_buf(sdev, 0x80, &vpd_len);
+		vpd_buf = scsi_get_vpd_buf(sdev, 0x80);
 
 		mutex_lock(&sdev->inquiry_mutex);
-		orig_vpd_buf = sdev->vpd_pg80;
-		sdev->vpd_pg80_len = vpd_len;
+		orig_vpd_buf = rcu_dereference_protected(sdev->vpd_pg80,
+					lockdep_is_held(&sdev->inquiry_mutex));
 		rcu_assign_pointer(sdev->vpd_pg80, vpd_buf);
 		mutex_unlock(&sdev->inquiry_mutex);
-		synchronize_rcu();
-		if (orig_vpd_buf) {
-			kfree(orig_vpd_buf);
-			orig_vpd_buf = NULL;
-		}
+
+		if (orig_vpd_buf)
+			kfree_rcu(orig_vpd_buf, rcu);
 	}
 
 	if (pg83_supported) {
-		vpd_buf = scsi_get_vpd_buf(sdev, 0x83, &vpd_len);
+		vpd_buf = scsi_get_vpd_buf(sdev, 0x83);
+
 		mutex_lock(&sdev->inquiry_mutex);
-		orig_vpd_buf = sdev->vpd_pg83;
-		sdev->vpd_pg83_len = vpd_len;
+		orig_vpd_buf = rcu_dereference_protected(sdev->vpd_pg83,
+					lockdep_is_held(&sdev->inquiry_mutex));
 		rcu_assign_pointer(sdev->vpd_pg83, vpd_buf);
 		mutex_unlock(&sdev->inquiry_mutex);
-		synchronize_rcu();
+
 		if (orig_vpd_buf)
-			kfree(orig_vpd_buf);
+			kfree_rcu(orig_vpd_buf, rcu);
 	}
 }
 
