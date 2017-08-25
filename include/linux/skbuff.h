@@ -766,7 +766,7 @@ struct sk_buff {
 	__u8			ndisc_nodetype:2;
 #endif
 	__u8			ipvs_property:1;
-	__u8			inner_protocol_type:1;
+	__u8			inner_protocol_type:2;
 	__u8			remcsum_offload:1;
 #ifdef CONFIG_NET_SWITCHDEV
 	__u8			offload_fwd_mark:1;
@@ -2174,12 +2174,16 @@ static inline void skb_tailroom_reserve(struct sk_buff *skb, unsigned int mtu,
 
 #define ENCAP_TYPE_ETHER	0
 #define ENCAP_TYPE_IPPROTO	1
+#define ENCAP_TYPE_NSH		2
 
 static inline void skb_set_inner_protocol(struct sk_buff *skb,
 					  __be16 protocol)
 {
 	skb->inner_protocol = protocol;
-	skb->inner_protocol_type = ENCAP_TYPE_ETHER;
+	if (skb->inner_protocol == htons(ETH_P_NSH))
+		skb->inner_protocol_type = ENCAP_TYPE_NSH;
+	else
+		skb->inner_protocol_type = ENCAP_TYPE_ETHER;
 }
 
 static inline void skb_set_inner_ipproto(struct sk_buff *skb,

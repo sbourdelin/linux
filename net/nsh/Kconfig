@@ -1,0 +1,11 @@
+#
+# NSH GSO support
+#
+
+config NET_NSH_GSO
+	bool "NSH GSO support"
+	depends on INET
+	default y
+	---help---
+	  This allows segmentation of GSO packet that have had NSH header
+	  pushed onto them and thus become NSH GSO packets.

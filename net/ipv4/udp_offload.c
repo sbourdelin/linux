@@ -155,6 +155,7 @@ struct sk_buff *skb_udp_tunnel_segment(struct sk_buff *skb,
 	__be16 protocol = skb->protocol;
 	const struct net_offload **offloads;
 	const struct net_offload *ops;
+	const struct packet_offload *po;
 	struct sk_buff *segs = ERR_PTR(-EINVAL);
 	struct sk_buff *(*gso_inner_segment)(struct sk_buff *skb,
 					     netdev_features_t features);
@@ -173,6 +174,12 @@ struct sk_buff *skb_udp_tunnel_segment(struct sk_buff *skb,
 			goto out_unlock;
 		gso_inner_segment = ops->callbacks.gso_segment;
 		break;
+	case ENCAP_TYPE_NSH:
+		protocol = skb->inner_protocol;
+		po = find_gso_segment_by_type(protocol);
+		if (!po || !po->callbacks.gso_segment)
+			goto out_unlock;
+		gso_inner_segment = po->callbacks.gso_segment;
 	default:
 		goto out_unlock;
 	}
