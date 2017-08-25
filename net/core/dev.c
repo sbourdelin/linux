@@ -2983,12 +2983,19 @@ struct sk_buff *dev_hard_start_xmit(struct sk_buff *first, struct net_device *de
 {
 	struct sk_buff *skb = first;
 	int rc = NETDEV_TX_OK;
+	int xmit_count = 0;
+	bool more = true;
 
 	while (skb) {
 		struct sk_buff *next = skb->next;
 
+		if (sysctl_xmit_more_max)
+			more = xmit_count++ < sysctl_xmit_more_max;
+		if (!more)
+			xmit_count = 0;
+
 		skb->next = NULL;
-		rc = xmit_one(skb, dev, txq, next != NULL);
+		rc = xmit_one(skb, dev, txq, more && next != NULL);
 		if (unlikely(!dev_xmit_complete(rc))) {
 			skb->next = next;
 			goto out;
@@ -3523,6 +3530,7 @@ EXPORT_SYMBOL(netdev_max_backlog);
 int netdev_tstamp_prequeue __read_mostly = 1;
 int netdev_budget __read_mostly = 300;
 unsigned int __read_mostly netdev_budget_usecs = 2000;
+unsigned int __read_mostly sysctl_xmit_more_max = 32;
 int weight_p __read_mostly = 64;           /* old backlog weight */
 int dev_weight_rx_bias __read_mostly = 1;  /* bias for backlog weight */
 int dev_weight_tx_bias __read_mostly = 1;  /* bias for output_queue quota */

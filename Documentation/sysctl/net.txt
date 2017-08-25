@@ -230,6 +230,12 @@ netdev_max_backlog
 Maximum number  of  packets,  queued  on  the  INPUT  side, when the interface
 receives packets faster than kernel can process them.
 
+xmit_more_max
+-------------
+
+Maximum number of packets in a row to mark with skb->xmit_more. A value of zero
+indicates no limit.
+
 netdev_rss_key
 --------------
 

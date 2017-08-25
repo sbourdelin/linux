@@ -460,6 +460,13 @@ static struct ctl_table net_core_table[] = {
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
 	},
+	{
+		.procname	= "xmit_more_max",
+		.data		= &sysctl_xmit_more_max,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.prox_handler	= proc_dointvec
+	},
 	{ }
 };
 
