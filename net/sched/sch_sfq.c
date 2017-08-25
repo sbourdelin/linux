@@ -292,7 +292,7 @@ static inline void slot_queue_add(struct sfq_slot *slot, struct sk_buff *skb)
 	slot->skblist_prev = skb;
 }
 
-static unsigned int sfq_drop(struct Qdisc *sch)
+static unsigned int sfq_drop(struct Qdisc *sch, struct sk_buff **to_free)
 {
 	struct sfq_sched_data *q = qdisc_priv(sch);
 	sfq_index x, d = q->cur_depth;
@@ -310,9 +310,13 @@ drop:
 		slot->backlog -= len;
 		sfq_dec(q, x);
 		sch->q.qlen--;
-		qdisc_qstats_drop(sch);
 		qdisc_qstats_backlog_dec(sch, skb);
-		kfree_skb(skb);
+		if (likely(to_free)) {
+			qdisc_drop(skb, sch, to_free);
+		} else {
+			qdisc_qstats_drop(sch);
+			kfree_skb(skb);
+		}
 		return len;
 	}
 
@@ -360,7 +364,7 @@ sfq_enqueue(struct sk_buff *skb, struct Qdisc *sch, struct sk_buff **to_free)
 	if (hash == 0) {
 		if (ret & __NET_XMIT_BYPASS)
 			qdisc_qstats_drop(sch);
-		kfree_skb(skb);
+		__qdisc_drop(skb, to_free);
 		return ret;
 	}
 	hash--;
@@ -465,7 +469,7 @@ enqueue:
 		return NET_XMIT_SUCCESS;
 
 	qlen = slot->qlen;
-	dropped = sfq_drop(sch);
+	dropped = sfq_drop(sch, to_free);
 	/* Return Congestion Notification only if we dropped a packet
 	 * from this flow.
 	 */
@@ -675,7 +679,7 @@ static int sfq_change(struct Qdisc *sch, struct nlattr *opt)
 
 	qlen = sch->q.qlen;
 	while (sch->q.qlen > q->limit)
-		dropped += sfq_drop(sch);
+		dropped += sfq_drop(sch, NULL);
 	qdisc_tree_reduce_backlog(sch, qlen - sch->q.qlen, dropped);
 
 	del_timer(&q->perturb_timer);
