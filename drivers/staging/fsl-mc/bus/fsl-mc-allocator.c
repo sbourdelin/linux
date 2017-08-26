@@ -66,8 +66,6 @@ static int __must_check fsl_mc_resource_pool_add_device(struct fsl_mc_bus
 				GFP_KERNEL);
 	if (!resource) {
 		error = -ENOMEM;
-		dev_err(&mc_bus_dev->dev,
-			"Failed to allocate memory for fsl_mc_resource\n");
 		goto out_unlock;
 	}
 
