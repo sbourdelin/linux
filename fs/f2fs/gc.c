@@ -1053,6 +1053,13 @@ gc_more:
 	if (!sync) {
 		if (has_not_enough_free_secs(sbi, sec_freed, 0)) {
 			segno = NULL_SEGNO;
+			if (prefree_segments(sbi) &&
+				has_not_enough_free_secs(sbi,
+					reserved_sections(sbi), 0)) {
+				ret = write_checkpoint(sbi, &cpc);
+				if (ret)
+					goto stop;
+			}
 			goto gc_more;
 		}
 
