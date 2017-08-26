@@ -352,10 +352,8 @@ static int uctrl_probe(struct platform_device *op)
 	int err = -ENOMEM;
 
 	p = kzalloc(sizeof(*p), GFP_KERNEL);
-	if (!p) {
-		printk(KERN_ERR "uctrl: Unable to allocate device struct.\n");
+	if (!p)
 		goto out;
-	}
 
 	p->regs = of_ioremap(&op->resource[0], 0,
 			     resource_size(&op->resource[0]),
