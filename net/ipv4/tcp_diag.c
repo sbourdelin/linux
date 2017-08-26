@@ -16,6 +16,7 @@
 
 #include <linux/tcp.h>
 
+#include <net/netlink.h>
 #include <net/tcp.h>
 
 static void tcp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
@@ -34,6 +35,103 @@ static void tcp_diag_get_info(struct sock *sk, struct inet_diag_msg *r,
 	}
 	if (info)
 		tcp_get_info(sk, info);
+}
+
+#ifdef CONFIG_TCP_MD5SIG
+static void inet_diag_md5sig_fill(struct tcp_md5sig *info,
+				  const struct tcp_md5sig_key *key)
+{
+	#if IS_ENABLED(CONFIG_IPV6)
+	if (key->family == AF_INET6) {
+		struct sockaddr_in6 *sin6 =
+			(struct sockaddr_in6 *)&info->tcpm_addr;
+
+		memcpy(&sin6->sin6_addr, &key->addr.a6,
+		       sizeof(struct in6_addr));
+	} else
+	#endif
+	{
+		struct sockaddr_in *sin =
+			(struct sockaddr_in *)&info->tcpm_addr;
+
+		memcpy(&sin->sin_addr, &key->addr.a4, sizeof(struct in_addr));
+	}
+
+	info->tcpm_addr.ss_family = key->family;
+	info->tcpm_prefixlen = key->prefixlen;
+	info->tcpm_keylen = key->keylen;
+	memcpy(info->tcpm_key, key->key, key->keylen);
+}
+
+static int inet_diag_put_md5sig(struct sk_buff *skb,
+				const struct tcp_md5sig_info *md5sig)
+{
+	const struct tcp_md5sig_key *key;
+	struct nlattr *attr;
+	struct tcp_md5sig *info;
+	int md5sig_count = 0;
+
+	hlist_for_each_entry_rcu(key, &md5sig->head, node)
+		md5sig_count++;
+
+	attr = nla_reserve(skb, INET_DIAG_MD5SIG,
+			   md5sig_count * sizeof(struct tcp_md5sig));
+	if (!attr)
+		return -EMSGSIZE;
+
+	info = nla_data(attr);
+	hlist_for_each_entry_rcu(key, &md5sig->head, node) {
+		inet_diag_md5sig_fill(info, key);
+		info++;
+	}
+
+	return 0;
+}
+#endif
+
+static int tcp_diag_get_aux(struct sock *sk, bool net_admin,
+			    struct sk_buff *skb)
+{
+#ifdef CONFIG_TCP_MD5SIG
+	if (net_admin) {
+		struct tcp_md5sig_info *md5sig;
+		int err = 0;
+
+		lock_sock(sk);
+		rcu_read_lock();
+		md5sig = rcu_dereference(tcp_sk(sk)->md5sig_info);
+		if (md5sig)
+			err = inet_diag_put_md5sig(skb, md5sig);
+		rcu_read_unlock();
+		release_sock(sk);
+		if (err < 0)
+			return err;
+	}
+#endif
+
+	return 0;
+}
+
+static size_t tcp_diag_get_aux_size(struct sock *sk, bool net_admin)
+{
+	size_t size = 0;
+
+#ifdef CONFIG_TCP_MD5SIG
+	if (sk_fullsock(sk)) {
+		const struct tcp_md5sig_info *md5sig;
+		const struct tcp_md5sig_key *key;
+
+		rcu_read_lock();
+		md5sig = rcu_dereference(tcp_sk(sk)->md5sig_info);
+		if (md5sig) {
+			hlist_for_each_entry_rcu(key, &md5sig->head, node)
+				size += sizeof(struct tcp_md5sig);
+		}
+		rcu_read_unlock();
+	}
+#endif
+
+	return size;
 }
 
 static void tcp_diag_dump(struct sk_buff *skb, struct netlink_callback *cb,
@@ -68,13 +166,15 @@ static int tcp_diag_destroy(struct sk_buff *in_skb,
 #endif
 
 static const struct inet_diag_handler tcp_diag_handler = {
-	.dump		 = tcp_diag_dump,
-	.dump_one	 = tcp_diag_dump_one,
-	.idiag_get_info	 = tcp_diag_get_info,
-	.idiag_type	 = IPPROTO_TCP,
-	.idiag_info_size = sizeof(struct tcp_info),
+	.dump			= tcp_diag_dump,
+	.dump_one		= tcp_diag_dump_one,
+	.idiag_get_info		= tcp_diag_get_info,
+	.idiag_get_aux		= tcp_diag_get_aux,
+	.idiag_get_aux_size	= tcp_diag_get_aux_size,
+	.idiag_type		= IPPROTO_TCP,
+	.idiag_info_size	= sizeof(struct tcp_info),
 #ifdef CONFIG_INET_DIAG_DESTROY
-	.destroy	 = tcp_diag_destroy,
+	.destroy		= tcp_diag_destroy,
 #endif
 };
 
