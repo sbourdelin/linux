@@ -66,7 +66,7 @@ static int microread_mei_remove(struct mei_cl_device *cldev)
 	return 0;
 }
 
-static struct mei_cl_device_id microread_mei_tbl[] = {
+static const struct mei_cl_device_id microread_mei_tbl[] = {
 	{ MICROREAD_DRIVER_NAME, MEI_NFC_UUID, MEI_CL_VERSION_ANY},
 
 	/* required last entry */
