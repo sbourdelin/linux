@@ -255,7 +255,7 @@ struct be_tx_stats {
 /* Structure to hold some data of interest obtained from a TX CQE */
 struct be_tx_compl_info {
 	u8 status;		/* Completion status */
-	u16 end_index;		/* Completed TXQ Index */
+	u32 end_index;		/* Completed TXQ Index */
 };
 
 struct be_tx_obj {

@@ -2606,7 +2606,7 @@ static struct be_tx_compl_info *be_tx_compl_get(struct be_tx_obj *txo)
 }
 
 static u16 be_tx_compl_process(struct be_adapter *adapter,
-			       struct be_tx_obj *txo, u16 last_index)
+			       struct be_tx_obj *txo, u32 last_index)
 {
 	struct sk_buff **sent_skbs = txo->sent_skb_list;
 	struct be_queue_info *txq = &txo->q;
