@@ -5994,10 +5994,19 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 	int want_affine = 0;
 	int sync = wake_flags & WF_SYNC;
 
-	if (sd_flag & SD_BALANCE_WAKE) {
+	if (sd_flag & SD_BALANCE_WAKE)
 		record_wakee(p);
-		want_affine = !wake_wide(p) && !wake_cap(p, cpu, prev_cpu)
-			      && cpumask_test_cpu(cpu, &p->cpus_allowed);
+
+	if ((sd_flag & SD_BALANCE_WAKE) && !wake_cap(p, cpu, prev_cpu)
+	    && cpumask_test_cpu(cpu, &p->cpus_allowed)) {
+		/*
+		 * WF_SYNC indicates waker will goto sleep, incase waker is
+		 * the only one running, select the waker's CPU to run wakee
+		 */
+		if (sync && cpu_rq(cpu)->nr_running < 2)
+			return cpu;
+
+		want_affine = !wake_wide(p);
 	}
 
 	rcu_read_lock();
