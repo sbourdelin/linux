@@ -167,7 +167,7 @@ static unsigned char *nubus_dirptr(const struct nubus_dirent *nd)
 void nubus_get_rsrc_mem(void *dest, const struct nubus_dirent *dirent,
 			int len)
 {
-	unsigned char *t = (unsigned char *)dest;
+	unsigned char *t = dest;
 	unsigned char *p = nubus_dirptr(dirent);
 
 	while (len) {
@@ -180,7 +180,7 @@ EXPORT_SYMBOL(nubus_get_rsrc_mem);
 void nubus_get_rsrc_str(void *dest, const struct nubus_dirent *dirent,
 			int len)
 {
-	unsigned char *t = (unsigned char *)dest;
+	unsigned char *t = dest;
 	unsigned char *p = nubus_dirptr(dirent);
 
 	while (len) {
