@@ -61,6 +61,9 @@
 #define PCA955X_LS_BLINK0	0x2	/* Blink at PWM0 rate */
 #define PCA955X_LS_BLINK1	0x3	/* Blink at PWM1 rate */
 
+#define PCA955X_GPIO_HIGH	LED_OFF
+#define PCA955X_GPIO_LOW	LED_FULL
+
 enum pca955x_type {
 	pca9550,
 	pca9551,
@@ -292,9 +295,9 @@ static void pca955x_gpio_set_value(struct gpio_chip *gc, unsigned int offset,
 	struct pca955x_led *led = &pca955x->leds[offset];
 
 	if (val)
-		pca955x_led_set(&led->led_cdev, LED_FULL);
+		pca955x_led_set(&led->led_cdev, PCA955X_GPIO_HIGH);
 	else
-		pca955x_led_set(&led->led_cdev, LED_OFF);
+		pca955x_led_set(&led->led_cdev, PCA955X_GPIO_LOW);
 }
 
 static int pca955x_gpio_get_value(struct gpio_chip *gc, unsigned int offset)
