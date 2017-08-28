@@ -32,6 +32,29 @@
  * The driver allocates &tinydrm_device, initializes it using
  * devm_tinydrm_init(), sets up the pipeline using tinydrm_display_pipe_init()
  * and registers the DRM device using devm_tinydrm_register().
+ *
+ * Device unplug
+ * -------------
+ *
+ * tinydrm supports device unplugging when there's still open DRM or fbdev file
+ * handles.
+ *
+ * There are 2 ways for driver-device unbinding to happen:
+ *
+ * - The driver module is unloaded causing the driver to be unregistered.
+ *   This can't happen as long as there's open file handles because a reference
+ *   is taken on the module.
+ *
+ * - The device is removed (USB, Device Tree overlay).
+ *   This can happen at any time.
+ *
+ * The driver needs to protect device resources from access after the device is
+ * gone. This is done checking drm_dev_is_unplugged(), typically in
+ * &drm_framebuffer_funcs.dirty, &drm_simple_display_pipe_funcs.enable and
+ * \.disable. Resources that doesn't face userspace and is only used with the
+ * device can be setup using devm\_ functions, but &tinydrm_device must be
+ * allocated using plain kzalloc() since it's lifetime can exceed that of the
+ * device. tinydrm_release() will free the structure.
  */
 
 /**
@@ -138,6 +161,29 @@ static const struct drm_mode_config_funcs tinydrm_mode_config_funcs = {
 	.atomic_commit = drm_atomic_helper_commit,
 };
 
+/**
+ * tinydrm_release - DRM driver release helper
+ * @drm: DRM device
+ *
+ * This function cleans up and finalizes &drm_device and frees &tinydrm_device.
+ *
+ * Drivers must use this as their &drm_driver->release callback.
+ */
+void tinydrm_release(struct drm_device *drm)
+{
+	struct tinydrm_device *tdev = drm_to_tinydrm(drm);
+
+	DRM_DEBUG_DRIVER("\n");
+
+	drm_mode_config_cleanup(drm);
+	drm_dev_fini(drm);
+
+	mutex_destroy(&tdev->dirty_lock);
+	kfree(tdev->fbdev_cma);
+	kfree(tdev);
+}
+EXPORT_SYMBOL(tinydrm_release);
+
 static int tinydrm_init(struct device *parent, struct tinydrm_device *tdev,
 			const struct drm_framebuffer_funcs *fb_funcs,
 			struct drm_driver *driver)
@@ -160,8 +206,6 @@ static int tinydrm_init(struct device *parent, struct tinydrm_device *tdev,
 
 static void tinydrm_fini(struct tinydrm_device *tdev)
 {
-	drm_mode_config_cleanup(&tdev->drm);
-	mutex_destroy(&tdev->dirty_lock);
 	drm_dev_unref(&tdev->drm);
 }
 
@@ -178,8 +222,8 @@ static void devm_tinydrm_release(void *data)
  * @driver: DRM driver
  *
  * This function initializes @tdev, the underlying DRM device and it's
- * mode_config. Resources will be automatically freed on driver detach (devres)
- * using drm_mode_config_cleanup() and drm_dev_unref().
+ * mode_config. drm_dev_unref() is called on driver detach (devres) and when
+ * all refs are dropped, tinydrm_release() is called.
  *
  * Returns:
  * Zero on success, negative error code on failure.
@@ -226,14 +270,17 @@ static int tinydrm_register(struct tinydrm_device *tdev)
 
 static void tinydrm_unregister(struct tinydrm_device *tdev)
 {
-	struct drm_fbdev_cma *fbdev_cma = tdev->fbdev_cma;
-
 	drm_atomic_helper_shutdown(&tdev->drm);
-	/* don't restore fbdev in lastclose, keep pipeline disabled */
-	tdev->fbdev_cma = NULL;
-	drm_dev_unregister(&tdev->drm);
-	if (fbdev_cma)
-		drm_fbdev_cma_fini(fbdev_cma);
+
+	/* Get a ref that will be put in tinydrm_fini() */
+	drm_dev_ref(&tdev->drm);
+
+	drm_fbdev_cma_dev_unplug(tdev->fbdev_cma);
+	drm_dev_unplug(&tdev->drm);
+
+	/* Make sure framebuffer flushing is done */
+	mutex_lock(&tdev->dirty_lock);
+	mutex_unlock(&tdev->dirty_lock);
 }
 
 static void devm_tinydrm_register_release(void *data)

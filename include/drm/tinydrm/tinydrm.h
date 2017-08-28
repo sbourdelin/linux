@@ -23,6 +23,10 @@
  * @fbdev_cma: CMA fbdev structure
  * @suspend_state: Atomic state when suspended
  * @fb_funcs: Framebuffer functions used when creating framebuffers
+ *
+ * Drivers that embed &tinydrm_device must set it as the first member because
+ * it is freed in tinydrm_release(). This means that the structure must be
+ * allocated with kzalloc() and not the devm\_ version.
  */
 struct tinydrm_device {
 	struct drm_device drm;
@@ -94,6 +98,7 @@ struct drm_gem_object *
 tinydrm_gem_cma_prime_import_sg_table(struct drm_device *drm,
 				      struct dma_buf_attachment *attach,
 				      struct sg_table *sgt);
+void tinydrm_release(struct drm_device *drm);
 int devm_tinydrm_init(struct device *parent, struct tinydrm_device *tdev,
 		      const struct drm_framebuffer_funcs *fb_funcs,
 		      struct drm_driver *driver);

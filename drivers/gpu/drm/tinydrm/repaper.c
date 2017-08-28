@@ -542,7 +542,7 @@ static int repaper_fb_dirty(struct drm_framebuffer *fb,
 
 	mutex_lock(&tdev->dirty_lock);
 
-	if (!epd->enabled)
+	if (!epd->enabled || drm_dev_is_unplugged(fb->dev))
 		goto out_unlock;
 
 	/* fbdev can flush even when we're not interested */
@@ -669,6 +669,9 @@ static void repaper_pipe_enable(struct drm_simple_display_pipe *pipe,
 	int i, ret;
 
 	DRM_DEBUG_DRIVER("\n");
+
+	if (drm_dev_is_unplugged(&tdev->drm))
+		return;
 
 	/* Power up sequence */
 	gpiod_set_value_cansleep(epd->reset, 0);
@@ -803,6 +806,9 @@ static void repaper_pipe_disable(struct drm_simple_display_pipe *pipe)
 
 	DRM_DEBUG_DRIVER("\n");
 
+	if (drm_dev_is_unplugged(&tdev->drm))
+		return;
+
 	mutex_lock(&tdev->dirty_lock);
 	epd->enabled = false;
 	mutex_unlock(&tdev->dirty_lock);
@@ -894,6 +900,7 @@ static struct drm_driver repaper_driver = {
 				  DRIVER_ATOMIC,
 	.fops			= &repaper_fops,
 	TINYDRM_GEM_DRIVER_OPS,
+	.release		= tinydrm_release,
 	.name			= "repaper",
 	.desc			= "Pervasive Displays RePaper e-ink panels",
 	.date			= "20170405",

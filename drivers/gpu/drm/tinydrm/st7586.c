@@ -120,7 +120,7 @@ static int st7586_fb_dirty(struct drm_framebuffer *fb,
 
 	mutex_lock(&tdev->dirty_lock);
 
-	if (!mipi->enabled)
+	if (!mipi->enabled || drm_dev_is_unplugged(fb->dev))
 		goto out_unlock;
 
 	/* fbdev can flush even when we're not interested */
@@ -183,6 +183,9 @@ static void st7586_pipe_enable(struct drm_simple_display_pipe *pipe,
 	u8 addr_mode;
 
 	DRM_DEBUG_KMS("\n");
+
+	if (drm_dev_is_unplugged(&tdev->drm))
+		return;
 
 	mipi_dbi_hw_reset(mipi);
 	ret = mipi_dbi_command(mipi, ST7586_AUTO_READ_CTRL, 0x9f);
@@ -252,6 +255,9 @@ static void st7586_pipe_disable(struct drm_simple_display_pipe *pipe)
 
 	DRM_DEBUG_KMS("\n");
 
+	if (drm_dev_is_unplugged(&tdev->drm))
+		return;
+
 	if (!mipi->enabled)
 		return;
 
@@ -319,6 +325,7 @@ static struct drm_driver st7586_driver = {
 				  DRIVER_ATOMIC,
 	.fops			= &st7586_fops,
 	TINYDRM_GEM_DRIVER_OPS,
+	.release		= tinydrm_release,
 	.lastclose		= tinydrm_lastclose,
 	.debugfs_init		= mipi_dbi_debugfs_init,
 	.name			= "st7586",

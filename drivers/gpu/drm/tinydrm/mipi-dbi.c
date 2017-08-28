@@ -209,7 +209,7 @@ static int mipi_dbi_fb_dirty(struct drm_framebuffer *fb,
 
 	mutex_lock(&tdev->dirty_lock);
 
-	if (!mipi->enabled)
+	if (!mipi->enabled || drm_dev_is_unplugged(fb->dev))
 		goto out_unlock;
 
 	/* fbdev can flush even when we're not interested */
@@ -313,6 +313,9 @@ void mipi_dbi_pipe_disable(struct drm_simple_display_pipe *pipe)
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 
 	DRM_DEBUG_KMS("\n");
+
+	if (drm_dev_is_unplugged(&tdev->drm))
+		return;
 
 	mipi->enabled = false;
 

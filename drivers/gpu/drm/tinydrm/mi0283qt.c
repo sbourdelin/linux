@@ -31,6 +31,9 @@ static void mi0283qt_enable(struct drm_simple_display_pipe *pipe,
 
 	DRM_DEBUG_KMS("\n");
 
+	if (drm_dev_is_unplugged(&tdev->drm))
+		return;
+
 	ret = regulator_enable(mipi->regulator);
 	if (ret) {
 		dev_err(dev, "Failed to enable regulator (%d)\n", ret);
@@ -133,6 +136,7 @@ static struct drm_driver mi0283qt_driver = {
 				  DRIVER_ATOMIC,
 	.fops			= &mi0283qt_fops,
 	TINYDRM_GEM_DRIVER_OPS,
+	.release		= tinydrm_release,
 	.lastclose		= tinydrm_lastclose,
 	.debugfs_init		= mipi_dbi_debugfs_init,
 	.name			= "mi0283qt",
