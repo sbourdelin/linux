@@ -73,7 +73,6 @@ MODULE_DEVICE_TABLE(usb, device_table);
 /* Structure to hold all of our device specific stuff */
 struct adu_device {
 	struct mutex		mtx;
-	struct usb_device *udev; /* save off the usb device pointer */
 	struct usb_interface *interface;
 	unsigned int		minor; /* the starting minor number for this device */
 	char			serial_number[8];
@@ -99,6 +98,7 @@ struct adu_device {
 	struct usb_endpoint_descriptor *interrupt_out_endpoint;
 	struct urb	*interrupt_out_urb;
 	int			out_urb_finished;
+	bool deathrow; /* device has been disconnected */
 };
 
 static DEFINE_MUTEX(adutux_mutex);
@@ -120,7 +120,7 @@ static void adu_abort_transfers(struct adu_device *dev)
 {
 	unsigned long flags;
 
-	if (dev->udev == NULL)
+	if (dev->deathrow)
 		return;
 
 	/* shutdown transfer */
@@ -225,6 +225,7 @@ static int adu_open(struct inode *inode, struct file *file)
 {
 	struct adu_device *dev = NULL;
 	struct usb_interface *interface;
+    struct usb_device *udev;
 	int subminor;
 	int retval;
 
@@ -242,8 +243,9 @@ static int adu_open(struct inode *inode, struct file *file)
 		goto exit_no_device;
 	}
 
+	udev = interface_to_usbdev(interface);
 	dev = usb_get_intfdata(interface);
-	if (!dev || !dev->udev) {
+	if (!dev || dev->deathrow) {
 		retval = -ENODEV;
 		goto exit_no_device;
 	}
@@ -265,8 +267,8 @@ static int adu_open(struct inode *inode, struct file *file)
 	dev->read_buffer_length = 0;
 
 	/* fixup first read by having urb waiting for it */
-	usb_fill_int_urb(dev->interrupt_in_urb, dev->udev,
-			 usb_rcvintpipe(dev->udev,
+	usb_fill_int_urb(dev->interrupt_in_urb, udev,
+			 usb_rcvintpipe(udev,
 					dev->interrupt_in_endpoint->bEndpointAddress),
 			 dev->interrupt_in_buffer,
 			 usb_endpoint_maxp(dev->interrupt_in_endpoint),
@@ -326,7 +328,7 @@ static int adu_release(struct inode *inode, struct file *file)
 	}
 
 	adu_release_internal(dev);
-	if (dev->udev == NULL) {
+	if (dev->deathrow) {
 		/* the device was unplugged before the file was released */
 		if (!dev->open_count)	/* ... and we're the last user */
 			adu_delete(dev);
@@ -341,6 +343,7 @@ static ssize_t adu_read(struct file *file, __user char *buffer, size_t count,
 			loff_t *ppos)
 {
 	struct adu_device *dev;
+	struct usb_device *udev;
 	size_t bytes_read = 0;
 	size_t bytes_to_read = count;
 	int i;
@@ -351,11 +354,12 @@ static ssize_t adu_read(struct file *file, __user char *buffer, size_t count,
 	DECLARE_WAITQUEUE(wait, current);
 
 	dev = file->private_data;
+	udev = interface_to_usbdev(dev->interface);
 	if (mutex_lock_interruptible(&dev->mtx))
 		return -ERESTARTSYS;
 
 	/* verify that the device wasn't unplugged */
-	if (dev->udev == NULL) {
+	if (dev->deathrow) {
 		retval = -ENODEV;
 		pr_err("No device or device unplugged %d\n", retval);
 		goto exit;
@@ -422,8 +426,8 @@ static ssize_t adu_read(struct file *file, __user char *buffer, size_t count,
 					dev->read_urb_finished = 0;
 					spin_unlock_irqrestore(&dev->buflock, flags);
 
-					usb_fill_int_urb(dev->interrupt_in_urb, dev->udev,
-							usb_rcvintpipe(dev->udev,
+					usb_fill_int_urb(dev->interrupt_in_urb, udev,
+							usb_rcvintpipe(udev,
 								dev->interrupt_in_endpoint->bEndpointAddress),
 							 dev->interrupt_in_buffer,
 							 usb_endpoint_maxp(dev->interrupt_in_endpoint),
@@ -480,8 +484,8 @@ static ssize_t adu_read(struct file *file, __user char *buffer, size_t count,
 	if (should_submit && dev->read_urb_finished) {
 		dev->read_urb_finished = 0;
 		spin_unlock_irqrestore(&dev->buflock, flags);
-		usb_fill_int_urb(dev->interrupt_in_urb, dev->udev,
-				 usb_rcvintpipe(dev->udev,
+		usb_fill_int_urb(dev->interrupt_in_urb, udev,
+				 usb_rcvintpipe(udev,
 					dev->interrupt_in_endpoint->bEndpointAddress),
 				dev->interrupt_in_buffer,
 				usb_endpoint_maxp(dev->interrupt_in_endpoint),
@@ -507,6 +511,7 @@ static ssize_t adu_write(struct file *file, const __user char *buffer,
 {
 	DECLARE_WAITQUEUE(waita, current);
 	struct adu_device *dev;
+	struct usb_device *udev;
 	size_t bytes_written = 0;
 	size_t bytes_to_write;
 	size_t buffer_size;
@@ -514,13 +519,14 @@ static ssize_t adu_write(struct file *file, const __user char *buffer,
 	int retval;
 
 	dev = file->private_data;
+	udev = interface_to_usbdev(dev->interface);
 
 	retval = mutex_lock_interruptible(&dev->mtx);
 	if (retval)
 		goto exit_nolock;
 
 	/* verify that the device wasn't unplugged */
-	if (dev->udev == NULL) {
+	if (dev->deathrow) {
 		retval = -ENODEV;
 		pr_err("No device or device unplugged %d\n", retval);
 		goto exit;
@@ -586,8 +592,8 @@ static ssize_t adu_write(struct file *file, const __user char *buffer,
 			/* send off the urb */
 			usb_fill_int_urb(
 				dev->interrupt_out_urb,
-				dev->udev,
-				usb_sndintpipe(dev->udev, dev->interrupt_out_endpoint->bEndpointAddress),
+				udev,
+				usb_sndintpipe(udev, dev->interrupt_out_endpoint->bEndpointAddress),
 				dev->interrupt_out_buffer,
 				bytes_to_write,
 				adu_interrupt_out_callback,
@@ -665,7 +671,6 @@ static int adu_probe(struct usb_interface *interface,
 
 	mutex_init(&dev->mtx);
 	spin_lock_init(&dev->buflock);
-	dev->udev = udev;
 	init_waitqueue_head(&dev->read_wait);
 	init_waitqueue_head(&dev->write_wait);
 
@@ -767,7 +772,7 @@ static void adu_disconnect(struct usb_interface *interface)
 
 	mutex_lock(&adutux_mutex);
 	mutex_lock(&dev->mtx);	/* not interruptible */
-	dev->udev = NULL;	/* poison */
+	dev->deathrow = true;	/* poison */
 	minor = dev->minor;
 	usb_deregister_dev(interface, &adu_class);
 	mutex_unlock(&dev->mtx);
