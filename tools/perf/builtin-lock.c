@@ -3,6 +3,7 @@
 #include "builtin.h"
 #include "perf.h"
 
+#include "asm/bug.h"
 #include "util/evlist.h"
 #include "util/evsel.h"
 #include "util/util.h"
@@ -147,12 +148,11 @@ static void thread_stat_insert(struct thread_stat *new)
 		p = container_of(*rb, struct thread_stat, rb);
 		parent = *rb;
 
+		WARN(new->tid == p->tid, "inserting invalid thread_stat\n");
 		if (new->tid < p->tid)
 			rb = &(*rb)->rb_left;
-		else if (new->tid > p->tid)
-			rb = &(*rb)->rb_right;
 		else
-			BUG_ON("inserting invalid thread_stat\n");
+			rb = &(*rb)->rb_right;
 	}
 
 	rb_link_node(&new->rb, parent, rb);
@@ -457,8 +457,8 @@ broken:
 		free(seq);
 		goto end;
 	default:
-		BUG_ON("Unknown state of lock sequence found!\n");
-		break;
+		pr_err("Unknown state of lock sequence found!\n");
+		return -1;
 	}
 
 	ls->nr_acquire++;
@@ -518,8 +518,8 @@ static int report_lock_acquired_event(struct perf_evsel *evsel,
 		free(seq);
 		goto end;
 	default:
-		BUG_ON("Unknown state of lock sequence found!\n");
-		break;
+		pr_err("Unknown state of lock sequence found!\n");
+		return -1;
 	}
 
 	seq->state = SEQ_STATE_ACQUIRED;
@@ -573,8 +573,8 @@ static int report_lock_contended_event(struct perf_evsel *evsel,
 		free(seq);
 		goto end;
 	default:
-		BUG_ON("Unknown state of lock sequence found!\n");
-		break;
+		pr_err("Unknown state of lock sequence found!\n");
+		return -1;
 	}
 
 	seq->state = SEQ_STATE_CONTENDED;
@@ -632,8 +632,8 @@ static int report_lock_release_event(struct perf_evsel *evsel,
 		bad_hist[BROKEN_RELEASE]++;
 		goto free_seq;
 	default:
-		BUG_ON("Unknown state of lock sequence found!\n");
-		break;
+		pr_err("Unknown state of lock sequence found!\n");
+		return -1;
 	}
 
 	ls->nr_release++;
