@@ -105,6 +105,158 @@ static DEFINE_MUTEX(kernel_fb_helper_lock);
  * mmap page writes.
  */
 
+/**
+ * drm_fb_helper_simple_init - Simple fbdev emulation initialization
+ * @dev: drm device
+ * @fb_helper: driver-allocated fbdev helper structure to initialize
+ * @bpp_sel: bpp value to use for the framebuffer configuration
+ * @max_conn_count: max connector count
+ * @funcs: pointer to structure of functions associate with this helper
+ *
+ * Simple fbdev emulation initialization which calls the following functions:
+ * drm_fb_helper_prepare(), drm_fb_helper_init(),
+ * drm_fb_helper_single_add_all_connectors() and
+ * drm_fb_helper_initial_config().
+ *
+ * This function takes a ref on &drm_device and must be used together with
+ * drm_fb_helper_simple_fini() or drm_fb_helper_dev_unplug().
+ *
+ * fbdev deferred I/O users must use drm_fb_helper_defio_init().
+ *
+ * Returns:
+ * 0 on success or a negative error code on failure.
+ */
+int drm_fb_helper_simple_init(struct drm_device *dev,
+			      struct drm_fb_helper *fb_helper, int bpp_sel,
+			      int max_conn_count,
+			      const struct drm_fb_helper_funcs *funcs)
+{
+	int ret;
+
+	drm_fb_helper_prepare(dev, fb_helper, funcs);
+
+	ret = drm_fb_helper_init(dev, fb_helper, max_conn_count);
+	if (ret < 0) {
+		DRM_DEV_ERROR(dev->dev, "Failed to initialize fb helper.\n");
+		return ret;
+	}
+
+	drm_dev_ref(dev);
+
+	ret = drm_fb_helper_single_add_all_connectors(fb_helper);
+	if (ret < 0) {
+		DRM_DEV_ERROR(dev->dev, "Failed to add connectors.\n");
+		goto err_drm_fb_helper_fini;
+
+	}
+
+	ret = drm_fb_helper_initial_config(fb_helper, bpp_sel);
+	if (ret < 0) {
+		DRM_DEV_ERROR(dev->dev, "Failed to set initial hw config.\n");
+		goto err_drm_fb_helper_fini;
+	}
+
+	return 0;
+
+err_drm_fb_helper_fini:
+	drm_fb_helper_fini(fb_helper);
+	drm_dev_unref(dev);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(drm_fb_helper_simple_init);
+
+static void drm_fb_helper_simple_fini_cleanup(struct drm_fb_helper *fb_helper)
+{
+	struct fb_info *info = fb_helper->fbdev;
+	struct fb_ops *fbops = NULL;
+
+	if (info && info->fbdefio) {
+		fb_deferred_io_cleanup(info);
+		kfree(info->fbdefio);
+		info->fbdefio = NULL;
+		fbops = info->fbops;
+	}
+
+	drm_fb_helper_fini(fb_helper);
+	kfree(fbops);
+	if (fb_helper->fb)
+		drm_framebuffer_remove(fb_helper->fb);
+	drm_dev_unref(fb_helper->dev);
+}
+
+/**
+ * drm_fb_helper_simple_fini - Simple fbdev cleanup
+ * @fb_helper: fbdev emulation structure, can be NULL
+ *
+ * Simple fbdev emulation cleanup. This function unregisters fbdev, cleans up
+ * deferred I/O if necessary, finalises @fb_helper and removes the framebuffer.
+ * The driver if responsible for freeing the @fb_helper structure.
+ *
+ * Don't use this function if you use drm_fb_helper_dev_unplug().
+ */
+void drm_fb_helper_simple_fini(struct drm_fb_helper *fb_helper)
+{
+	struct fb_info *info;
+
+	if (!fb_helper)
+		return;
+
+	info = fb_helper->fbdev;
+
+	/* Has drm_fb_helper_dev_unplug() been used? */
+	if (info && info->dev)
+		drm_fb_helper_unregister_fbi(fb_helper);
+
+	if (!(info && info->fbops && info->fbops->fb_destroy))
+		drm_fb_helper_simple_fini_cleanup(fb_helper);
+}
+EXPORT_SYMBOL_GPL(drm_fb_helper_simple_fini);
+
+/**
+ * drm_fb_helper_dev_unplug - unplug an fbdev device
+ * @fb_helper: driver-allocated fbdev helper, can be NULL
+ *
+ * This unplugs the fbdev emulation for a hotpluggable DRM device, which makes
+ * fbdev inaccessible to userspace operations. This essentially unregisters
+ * fbdev and can be called while there are still open users of @fb_helper.
+ * Entry-points from fbdev into drm core/helpers are protected by the fbdev
+ * &fb_info ref count and drm_dev_is_unplugged(). This means that the driver
+ * also has to call drm_dev_unplug() to complete the unplugging.
+ *
+ * Drivers must use drm_fb_helper_fb_destroy() as their &fb_ops.fb_destroy
+ * callback and call drm_mode_config_cleanup() and free @fb_helper in their
+ * &drm_driver->release callback.
+ *
+ * @fb_helper is finalized by this function unless there are open fbdev fd's
+ * in case this is postponed to the closing of the last fd. Finalizing includes
+ * dropping the ref taken on &drm_device in drm_fb_helper_simple_init().
+ */
+void drm_fb_helper_dev_unplug(struct drm_fb_helper *fb_helper)
+{
+	drm_fb_helper_unregister_fbi(fb_helper);
+}
+EXPORT_SYMBOL(drm_fb_helper_dev_unplug);
+
+/**
+ * drm_fb_helper_fb_destroy - implementation for &fb_ops.fb_destroy
+ * @info: fbdev registered by the helper
+ *
+ * This function does the same as drm_fb_helper_simple_fini() except
+ * unregistering fbdev which is already done.
+ *
+ * &fb_ops.fb_destroy is called during unregister_framebuffer() or the last
+ * fb_release() which ever comes last.
+ */
+void drm_fb_helper_fb_destroy(struct fb_info *info)
+{
+	struct drm_fb_helper *helper = info->par;
+
+	DRM_DEBUG("\n");
+	drm_fb_helper_simple_fini_cleanup(helper);
+}
+EXPORT_SYMBOL(drm_fb_helper_fb_destroy);
+
 #define drm_fb_helper_for_each_connector(fbh, i__) \
 	for (({ lockdep_assert_held(&(fbh)->lock); }), \
 	     i__ = 0; i__ < (fbh)->connector_count; i__++)
@@ -498,7 +650,7 @@ int drm_fb_helper_restore_fbdev_mode_unlocked(struct drm_fb_helper *fb_helper)
 	bool do_delayed;
 	int ret;
 
-	if (!drm_fbdev_emulation)
+	if (!drm_fbdev_emulation || drm_dev_is_unplugged(fb_helper->dev))
 		return -ENODEV;
 
 	if (READ_ONCE(fb_helper->deferred_setup))
@@ -562,6 +714,9 @@ static bool drm_fb_helper_force_kernel_mode(void)
 
 	list_for_each_entry(helper, &kernel_fb_helper_list, kernel_fb_list) {
 		struct drm_device *dev = helper->dev;
+
+		if (drm_dev_is_unplugged(dev))
+			continue;
 
 		if (dev->switch_power_state == DRM_SWITCH_POWER_OFF)
 			continue;
@@ -734,6 +889,9 @@ static void drm_fb_helper_dirty_work(struct work_struct *work)
 	struct drm_clip_rect *clip = &helper->dirty_clip;
 	struct drm_clip_rect clip_copy;
 	unsigned long flags;
+
+	if (drm_dev_is_unplugged(helper->dev))
+		return;
 
 	spin_lock_irqsave(&helper->dirty_lock, flags);
 	clip_copy = *clip;
@@ -948,6 +1106,48 @@ void drm_fb_helper_unlink_fbi(struct drm_fb_helper *fb_helper)
 		unlink_framebuffer(fb_helper->fbdev);
 }
 EXPORT_SYMBOL(drm_fb_helper_unlink_fbi);
+
+/**
+ * drm_fb_helper_defio_init - fbdev deferred I/O initialization
+ * @fb_helper: driver-allocated fbdev helper
+ *
+ * This function allocates &fb_deferred_io, sets callback to
+ * drm_fb_helper_deferred_io(), delay to 50ms and calls fb_deferred_io_init().
+ *
+ * NOTE: A copy of &fb_ops is made and assigned to &info->fbops. This is done
+ * because fb_deferred_io_cleanup() clears &fbops->fb_mmap and would thereby
+ * affect other instances of that &fb_ops. This copy is freed by the helper
+ * during cleanup.
+ *
+ * Returns:
+ * 0 on success or a negative error code on failure.
+ */
+int drm_fb_helper_defio_init(struct drm_fb_helper *fb_helper)
+{
+	struct fb_info *info = fb_helper->fbdev;
+	struct fb_deferred_io *fbdefio;
+	struct fb_ops *fbops;
+
+	fbdefio = kzalloc(sizeof(*fbdefio), GFP_KERNEL);
+	fbops = kzalloc(sizeof(*fbops), GFP_KERNEL);
+	if (!fbdefio || !fbops) {
+		kfree(fbdefio);
+		kfree(fbops);
+		return -ENOMEM;
+	}
+
+	info->fbdefio = fbdefio;
+	fbdefio->delay = msecs_to_jiffies(50);
+	fbdefio->deferred_io = drm_fb_helper_deferred_io;
+
+	*fbops = *info->fbops;
+	info->fbops = fbops;
+
+	fb_deferred_io_init(info);
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_fb_helper_defio_init);
 
 static void drm_fb_helper_dirty(struct fb_info *info, u32 x, u32 y,
 				u32 width, u32 height)
@@ -2591,7 +2791,7 @@ int drm_fb_helper_hotplug_event(struct drm_fb_helper *fb_helper)
 {
 	int err = 0;
 
-	if (!drm_fbdev_emulation)
+	if (!drm_fbdev_emulation || drm_dev_is_unplugged(fb_helper->dev))
 		return 0;
 
 	mutex_lock(&fb_helper->lock);

@@ -242,6 +242,14 @@ struct drm_fb_helper {
 	.fb_ioctl	= drm_fb_helper_ioctl
 
 #ifdef CONFIG_DRM_FBDEV_EMULATION
+int drm_fb_helper_simple_init(struct drm_device *dev,
+			      struct drm_fb_helper *fb_helper, int bpp_sel,
+			      int max_conn_count,
+			      const struct drm_fb_helper_funcs *funcs);
+void drm_fb_helper_simple_fini(struct drm_fb_helper *fb_helper);
+void drm_fb_helper_dev_unplug(struct drm_fb_helper *fb_helper);
+void drm_fb_helper_fb_destroy(struct fb_info *info);
+
 void drm_fb_helper_prepare(struct drm_device *dev, struct drm_fb_helper *helper,
 			   const struct drm_fb_helper_funcs *funcs);
 int drm_fb_helper_init(struct drm_device *dev,
@@ -265,6 +273,7 @@ void drm_fb_helper_fill_fix(struct fb_info *info, uint32_t pitch,
 
 void drm_fb_helper_unlink_fbi(struct drm_fb_helper *fb_helper);
 
+int drm_fb_helper_defio_init(struct drm_fb_helper *fb_helper);
 void drm_fb_helper_deferred_io(struct fb_info *info,
 			       struct list_head *pagelist);
 
@@ -311,6 +320,27 @@ int drm_fb_helper_add_one_connector(struct drm_fb_helper *fb_helper, struct drm_
 int drm_fb_helper_remove_one_connector(struct drm_fb_helper *fb_helper,
 				       struct drm_connector *connector);
 #else
+static inline int
+drm_fb_helper_simple_init(struct drm_device *dev,
+			  struct drm_fb_helper *fb_helper, int bpp_sel,
+			  int max_conn_count,
+			  const struct drm_fb_helper_funcs *funcs)
+{
+	return 0;
+}
+
+static inline void drm_fb_helper_simple_fini(struct drm_fb_helper *fb_helper)
+{
+}
+
+static inline void drm_fb_helper_dev_unplug(struct drm_fb_helper *fb_helper)
+{
+}
+
+static inline void drm_fb_helper_fb_destroy(struct fb_info *info)
+{
+}
+
 static inline void drm_fb_helper_prepare(struct drm_device *dev,
 					struct drm_fb_helper *helper,
 					const struct drm_fb_helper_funcs *funcs)
@@ -391,6 +421,11 @@ static inline int drm_fb_helper_ioctl(struct fb_info *info, unsigned int cmd,
 
 static inline void drm_fb_helper_unlink_fbi(struct drm_fb_helper *fb_helper)
 {
+}
+
+static inline int drm_fb_helper_defio_init(struct drm_fb_helper *fb_helper)
+{
+	return 0;
 }
 
 static inline void drm_fb_helper_deferred_io(struct fb_info *info,
