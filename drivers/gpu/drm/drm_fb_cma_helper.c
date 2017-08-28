@@ -25,8 +25,6 @@
 #include <drm/drm_fb_cma_helper.h>
 #include <linux/module.h>
 
-#define DEFAULT_FBDEFIO_DELAY_MS 50
-
 struct drm_fbdev_cma {
 	struct drm_fb_helper	fb_helper;
 	const struct drm_framebuffer_funcs *fb_funcs;
@@ -238,6 +236,34 @@ int drm_fb_cma_debugfs_show(struct seq_file *m, void *arg)
 EXPORT_SYMBOL_GPL(drm_fb_cma_debugfs_show);
 #endif
 
+static int drm_fbdev_cma_fb_open(struct fb_info *info, int user)
+{
+	struct drm_fb_helper *fb_helper = info->par;
+	struct drm_device *dev = fb_helper->dev;
+
+	/*
+	 * The fb_ops definition resides in this library, meaning fb_open()
+	 * will take a ref on the library instead of the driver. Make sure the
+	 * driver module is pinned. Skip fbcon (user==0) since it can detach
+	 * itself on unregister_framebuffer().
+	 */
+	if (user && !try_module_get(dev->driver->fops->owner))
+		return -ENODEV;
+
+	return 0;
+}
+
+static int drm_fbdev_cma_fb_release(struct fb_info *info, int user)
+{
+	struct drm_fb_helper *fb_helper = info->par;
+	struct drm_device *dev = fb_helper->dev;
+
+	if (user)
+		module_put(dev->driver->fops->owner);
+
+	return 0;
+}
+
 static int drm_fb_cma_mmap(struct fb_info *info, struct vm_area_struct *vma)
 {
 	return dma_mmap_writecombine(info->device, vma, info->screen_base,
@@ -247,10 +273,13 @@ static int drm_fb_cma_mmap(struct fb_info *info, struct vm_area_struct *vma)
 static struct fb_ops drm_fbdev_cma_ops = {
 	.owner		= THIS_MODULE,
 	DRM_FB_HELPER_DEFAULT_OPS,
+	.fb_open	= drm_fbdev_cma_fb_open,
+	.fb_release	= drm_fbdev_cma_fb_release,
 	.fb_fillrect	= drm_fb_helper_sys_fillrect,
 	.fb_copyarea	= drm_fb_helper_sys_copyarea,
 	.fb_imageblit	= drm_fb_helper_sys_imageblit,
 	.fb_mmap	= drm_fb_cma_mmap,
+	.fb_destroy	= drm_fb_helper_fb_destroy,
 };
 
 static int drm_fbdev_cma_deferred_io_mmap(struct fb_info *info,
@@ -262,50 +291,24 @@ static int drm_fbdev_cma_deferred_io_mmap(struct fb_info *info,
 	return 0;
 }
 
-static int drm_fbdev_cma_defio_init(struct fb_info *fbi,
+static int drm_fbdev_cma_defio_init(struct drm_fb_helper *helper,
 				    struct drm_gem_cma_object *cma_obj)
 {
-	struct fb_deferred_io *fbdefio;
-	struct fb_ops *fbops;
+	struct fb_info *fbi = helper->fbdev;
+	int ret;
 
-	/*
-	 * Per device structures are needed because:
-	 * fbops: fb_deferred_io_cleanup() clears fbops.fb_mmap
-	 * fbdefio: individual delays
-	 */
-	fbdefio = kzalloc(sizeof(*fbdefio), GFP_KERNEL);
-	fbops = kzalloc(sizeof(*fbops), GFP_KERNEL);
-	if (!fbdefio || !fbops) {
-		kfree(fbdefio);
-		kfree(fbops);
-		return -ENOMEM;
-	}
+	ret = drm_fb_helper_defio_init(helper);
+	if (ret)
+		return ret;
 
 	/* can't be offset from vaddr since dirty() uses cma_obj */
 	fbi->screen_buffer = cma_obj->vaddr;
 	/* fb_deferred_io_fault() needs a physical address */
 	fbi->fix.smem_start = page_to_phys(virt_to_page(fbi->screen_buffer));
 
-	*fbops = *fbi->fbops;
-	fbi->fbops = fbops;
-
-	fbdefio->delay = msecs_to_jiffies(DEFAULT_FBDEFIO_DELAY_MS);
-	fbdefio->deferred_io = drm_fb_helper_deferred_io;
-	fbi->fbdefio = fbdefio;
-	fb_deferred_io_init(fbi);
 	fbi->fbops->fb_mmap = drm_fbdev_cma_deferred_io_mmap;
 
 	return 0;
-}
-
-static void drm_fbdev_cma_defio_fini(struct fb_info *fbi)
-{
-	if (!fbi->fbdefio)
-		return;
-
-	fb_deferred_io_cleanup(fbi);
-	kfree(fbi->fbdefio);
-	kfree(fbi->fbops);
 }
 
 static int
@@ -365,7 +368,7 @@ drm_fbdev_cma_create(struct drm_fb_helper *helper,
 	fbi->fix.smem_len = size;
 
 	if (fbdev_cma->fb_funcs->dirty) {
-		ret = drm_fbdev_cma_defio_init(fbi, obj);
+		ret = drm_fbdev_cma_defio_init(helper, obj);
 		if (ret)
 			goto err_cma_destroy;
 	}
@@ -399,7 +402,6 @@ struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs(struct drm_device *dev,
 	const struct drm_framebuffer_funcs *funcs)
 {
 	struct drm_fbdev_cma *fbdev_cma;
-	struct drm_fb_helper *helper;
 	int ret;
 
 	fbdev_cma = kzalloc(sizeof(*fbdev_cma), GFP_KERNEL);
@@ -409,37 +411,15 @@ struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs(struct drm_device *dev,
 	}
 	fbdev_cma->fb_funcs = funcs;
 
-	helper = &fbdev_cma->fb_helper;
-
-	drm_fb_helper_prepare(dev, helper, &drm_fb_cma_helper_funcs);
-
-	ret = drm_fb_helper_init(dev, helper, max_conn_count);
-	if (ret < 0) {
-		dev_err(dev->dev, "Failed to initialize drm fb helper.\n");
-		goto err_free;
-	}
-
-	ret = drm_fb_helper_single_add_all_connectors(helper);
-	if (ret < 0) {
-		dev_err(dev->dev, "Failed to add connectors.\n");
-		goto err_drm_fb_helper_fini;
-
-	}
-
-	ret = drm_fb_helper_initial_config(helper, preferred_bpp);
-	if (ret < 0) {
-		dev_err(dev->dev, "Failed to set initial hw configuration.\n");
-		goto err_drm_fb_helper_fini;
+	ret = drm_fb_helper_simple_init(dev, &fbdev_cma->fb_helper,
+					preferred_bpp, max_conn_count,
+					&drm_fb_cma_helper_funcs);
+	if (ret) {
+		kfree(fbdev_cma);
+		return ERR_PTR(ret);
 	}
 
 	return fbdev_cma;
-
-err_drm_fb_helper_fini:
-	drm_fb_helper_fini(helper);
-err_free:
-	kfree(fbdev_cma);
-
-	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL_GPL(drm_fbdev_cma_init_with_funcs);
 
@@ -468,17 +448,15 @@ EXPORT_SYMBOL_GPL(drm_fbdev_cma_init);
 /**
  * drm_fbdev_cma_fini() - Free drm_fbdev_cma struct
  * @fbdev_cma: The drm_fbdev_cma struct
+ *
+ * This function calls drm_fb_helper_simple_fini() and frees @fbdev_cma.
+ *
+ * Don't use this function together with drm_fbdev_cma_dev_unplug().
  */
 void drm_fbdev_cma_fini(struct drm_fbdev_cma *fbdev_cma)
 {
-	drm_fb_helper_unregister_fbi(&fbdev_cma->fb_helper);
-	if (fbdev_cma->fb_helper.fbdev)
-		drm_fbdev_cma_defio_fini(fbdev_cma->fb_helper.fbdev);
-
-	if (fbdev_cma->fb_helper.fb)
-		drm_framebuffer_remove(fbdev_cma->fb_helper.fb);
-
-	drm_fb_helper_fini(&fbdev_cma->fb_helper);
+	if (fbdev_cma)
+		drm_fb_helper_simple_fini(&fbdev_cma->fb_helper);
 	kfree(fbdev_cma);
 }
 EXPORT_SYMBOL_GPL(drm_fbdev_cma_fini);
@@ -542,3 +520,20 @@ void drm_fbdev_cma_set_suspend_unlocked(struct drm_fbdev_cma *fbdev_cma,
 						   state);
 }
 EXPORT_SYMBOL(drm_fbdev_cma_set_suspend_unlocked);
+
+/**
+ * drm_fbdev_cma_dev_unplug - wrapper around drm_fb_helper_dev_unplug
+ * @fbdev_cma: The drm_fbdev_cma struct, may be NULL
+ *
+ * This unplugs the fbdev emulation for a hotpluggable DRM device. See
+ * drm_fb_helper_dev_unplug() for details.
+ *
+ * Drivers must call drm_mode_config_cleanup() and free @fbdev_cma in their
+ * &drm_driver->release callback.
+ */
+void drm_fbdev_cma_dev_unplug(struct drm_fbdev_cma *fbdev_cma)
+{
+	if (fbdev_cma)
+		drm_fb_helper_dev_unplug(&fbdev_cma->fb_helper);
+}
+EXPORT_SYMBOL(drm_fbdev_cma_dev_unplug);
