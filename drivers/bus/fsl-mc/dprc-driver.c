@@ -13,7 +13,6 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/msi.h>
-#include "../include/mc.h"
 
 #include "dprc-cmd.h"
 #include "fsl-mc-private.h"

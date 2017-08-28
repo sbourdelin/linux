@@ -31,7 +31,6 @@
  */
 
 #include <linux/io.h>
-#include "../include/mc.h"
 
 #include "fsl-mc-private.h"
 #include "dpmcp.h"

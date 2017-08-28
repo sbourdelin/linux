@@ -10,7 +10,6 @@
 
 #include <linux/module.h>
 #include <linux/msi.h>
-#include "../include/mc.h"
 
 #include "fsl-mc-private.h"
 
