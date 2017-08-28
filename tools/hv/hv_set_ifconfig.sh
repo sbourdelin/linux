@@ -46,19 +46,47 @@
 # is expected to return the configuration that is set via the SET
 # call.
 #
-
-
-
-echo "IPV6INIT=yes" >> $1
-echo "NM_CONTROLLED=no" >> $1
-echo "PEERDNS=yes" >> $1
-echo "ONBOOT=yes" >> $1
-
-
-cp $1 /etc/sysconfig/network-scripts/
-
-
 interface=$(echo $1 | awk -F - '{ print $2 }')
 
-/sbin/ifdown $interface 2>/dev/null
-/sbin/ifup $interface 2>/dev/null
+current_ip=$(ip addr show $interface|grep "inet ");
+config_file_ip=$(grep IPADDR $1|cut -d"=" -f2);
+
+current_ipv6=$(ip addr show $interface|grep "inet6 ");
+config_file_ipv6=$(grep IPV6ADDR $1|cut -d"=" -f2);
+config_file_ipv6_netmask=$(grep IPV6NETMASK $1|cut -d"=" -f2);
+config_file_ipv6=${config_file_ipv6}/${config_file_ipv6_netmask};
+
+network_service_state=$(/bin/systemctl is-active network);
+
+while [[ ${network_service_state} == "activating" \
+   || ${network_service_state} == "deactivating" ]]; do
+    # Network script is still working. let's wait a bit.
+    # The default timeout for systemd is 90s.
+    sleep 30s;
+    ((i++));
+    network_service_state=$(/bin/systemctl is-active network);
+
+    # If network service doens't come up or down in 90s we log the
+    # error and give up.
+    if [[ $i == 3 ]]; then
+        logger "Couldn't set IP address for fail-over interface"\
+            " because network daemon might be busy. Try to"\
+            " if-down $interface && if-up $interface"\
+            " manually later.";
+        exit 1;
+    fi
+done
+
+# Only set the IP if it's not configured yet.
+if [[ $(test "${current_ip#*$config_file_ip}") == "$config_file_ip" \
+    || $(test "${current_ipv6#*$config_file_ipv6}") == "$current_ipv6" ]]; then
+    echo "IPV6INIT=yes" >> $1
+    echo "NM_CONTROLLED=no" >> $1
+    echo "PEERDNS=yes" >> $1
+    echo "ONBOOT=yes" >> $1
+
+    cp $1 /etc/sysconfig/network-scripts/
+
+    /sbin/ifdown $interface 2>/dev/null
+    /sbin/ifup $interface 2>/dev/null
+fi
