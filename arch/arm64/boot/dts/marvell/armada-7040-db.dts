@@ -116,6 +116,7 @@
 		compatible = "jedec,spi-nor";
 		reg = <0x0>;
 		spi-max-frequency = <20000000>;
+		spi-3byte-addressing;
 
 		partitions {
 			compatible = "fixed-partitions";
