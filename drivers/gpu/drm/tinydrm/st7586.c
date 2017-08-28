@@ -112,7 +112,7 @@ static int st7586_fb_dirty(struct drm_framebuffer *fb,
 			   unsigned int color, struct drm_clip_rect *clips,
 			   unsigned int num_clips)
 {
-	struct tinydrm_device *tdev = fb->dev->dev_private;
+	struct tinydrm_device *tdev = drm_to_tinydrm(fb->dev);
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	struct drm_clip_rect clip;
 	int start, end;
@@ -178,7 +178,7 @@ static void st7586_pipe_enable(struct drm_simple_display_pipe *pipe,
 	struct tinydrm_device *tdev = pipe_to_tinydrm(pipe);
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	struct drm_framebuffer *fb = pipe->plane.fb;
-	struct device *dev = tdev->drm->dev;
+	struct device *dev = tdev->drm.dev;
 	int ret;
 	u8 addr_mode;
 
@@ -290,13 +290,13 @@ static int st7586_init(struct device *dev, struct mipi_dbi *mipi,
 	if (ret)
 		return ret;
 
-	tdev->drm->mode_config.preferred_depth = 32;
+	tdev->drm.mode_config.preferred_depth = 32;
 	mipi->rotation = rotation;
 
-	drm_mode_config_reset(tdev->drm);
+	drm_mode_config_reset(&tdev->drm);
 
 	DRM_DEBUG_KMS("preferred_depth=%u, rotation = %u\n",
-		      tdev->drm->mode_config.preferred_depth, rotation);
+		      tdev->drm.mode_config.preferred_depth, rotation);
 
 	return 0;
 }
@@ -349,7 +349,7 @@ static int st7586_probe(struct spi_device *spi)
 	u32 rotation = 0;
 	int ret;
 
-	mipi = devm_kzalloc(dev, sizeof(*mipi), GFP_KERNEL);
+	mipi = kzalloc(sizeof(*mipi), GFP_KERNEL);
 	if (!mipi)
 		return -ENOMEM;
 
@@ -397,9 +397,9 @@ static int st7586_probe(struct spi_device *spi)
 	spi_set_drvdata(spi, mipi);
 
 	DRM_DEBUG_DRIVER("Initialized %s:%s @%uMHz on minor %d\n",
-			 tdev->drm->driver->name, dev_name(dev),
+			 tdev->drm.driver->name, dev_name(dev),
 			 spi->max_speed_hz / 1000000,
-			 tdev->drm->primary->index);
+			 tdev->drm.primary->index);
 
 	return 0;
 }

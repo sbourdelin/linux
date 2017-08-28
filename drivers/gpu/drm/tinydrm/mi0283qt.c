@@ -23,7 +23,7 @@
 static int mi0283qt_init(struct mipi_dbi *mipi)
 {
 	struct tinydrm_device *tdev = &mipi->tinydrm;
-	struct device *dev = tdev->drm->dev;
+	struct device *dev = tdev->drm.dev;
 	u8 addr_mode;
 	int ret;
 
@@ -169,7 +169,7 @@ static int mi0283qt_probe(struct spi_device *spi)
 	u32 rotation = 0;
 	int ret;
 
-	mipi = devm_kzalloc(dev, sizeof(*mipi), GFP_KERNEL);
+	mipi = kzalloc(sizeof(*mipi), GFP_KERNEL);
 	if (!mipi)
 		return -ENOMEM;
 
@@ -224,9 +224,9 @@ static int mi0283qt_probe(struct spi_device *spi)
 	spi_set_drvdata(spi, mipi);
 
 	DRM_DEBUG_DRIVER("Initialized %s:%s @%uMHz on minor %d\n",
-			 tdev->drm->driver->name, dev_name(dev),
+			 tdev->drm.driver->name, dev_name(dev),
 			 spi->max_speed_hz / 1000000,
-			 tdev->drm->primary->index);
+			 tdev->drm.primary->index);
 
 	return 0;
 }

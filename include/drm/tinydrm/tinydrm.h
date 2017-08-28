@@ -10,6 +10,7 @@
 #ifndef __LINUX_TINYDRM_H
 #define __LINUX_TINYDRM_H
 
+#include <drm/drmP.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_simple_kms_helper.h>
@@ -24,13 +25,19 @@
  * @fb_funcs: Framebuffer functions used when creating framebuffers
  */
 struct tinydrm_device {
-	struct drm_device *drm;
+	struct drm_device drm;
 	struct drm_simple_display_pipe pipe;
 	struct mutex dirty_lock;
 	struct drm_fbdev_cma *fbdev_cma;
 	struct drm_atomic_state *suspend_state;
 	const struct drm_framebuffer_funcs *fb_funcs;
 };
+
+static inline struct tinydrm_device *
+drm_to_tinydrm(struct drm_device *drm)
+{
+	return container_of(drm, struct tinydrm_device, drm);
+}
 
 static inline struct tinydrm_device *
 pipe_to_tinydrm(struct drm_simple_display_pipe *pipe)

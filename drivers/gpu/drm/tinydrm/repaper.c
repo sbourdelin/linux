@@ -528,7 +528,7 @@ static int repaper_fb_dirty(struct drm_framebuffer *fb,
 {
 	struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
 	struct dma_buf_attachment *import_attach = cma_obj->base.import_attach;
-	struct tinydrm_device *tdev = fb->dev->dev_private;
+	struct tinydrm_device *tdev = drm_to_tinydrm(fb->dev);
 	struct repaper_epd *epd = epd_from_tinydrm(tdev);
 	struct drm_clip_rect clip;
 	u8 *buf = NULL;
@@ -949,7 +949,7 @@ static int repaper_probe(struct spi_device *spi)
 		}
 	}
 
-	epd = devm_kzalloc(dev, sizeof(*epd), GFP_KERNEL);
+	epd = kzalloc(sizeof(*epd), GFP_KERNEL);
 	if (!epd)
 		return -ENOMEM;
 
@@ -1077,7 +1077,7 @@ static int repaper_probe(struct spi_device *spi)
 	if (ret)
 		return ret;
 
-	drm_mode_config_reset(tdev->drm);
+	drm_mode_config_reset(&tdev->drm);
 
 	ret = devm_tinydrm_register(tdev);
 	if (ret)
@@ -1086,9 +1086,9 @@ static int repaper_probe(struct spi_device *spi)
 	spi_set_drvdata(spi, tdev);
 
 	DRM_DEBUG_DRIVER("Initialized %s:%s @%uMHz on minor %d\n",
-			 tdev->drm->driver->name, dev_name(dev),
+			 tdev->drm.driver->name, dev_name(dev),
 			 spi->max_speed_hz / 1000000,
-			 tdev->drm->primary->index);
+			 tdev->drm.primary->index);
 
 	return 0;
 }
