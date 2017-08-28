@@ -263,8 +263,9 @@ static const struct drm_framebuffer_funcs mipi_dbi_fb_funcs = {
  * @pipe: Display pipe
  * @crtc_state: CRTC state
  *
- * This function enables backlight. Drivers can use this as their
- * &drm_simple_display_pipe_funcs->enable callback.
+ * This function flushes the whole framebuffer and enables the backlight.
+ * Drivers can use this in their &drm_simple_display_pipe_funcs->enable
+ * callback.
  */
 void mipi_dbi_pipe_enable(struct drm_simple_display_pipe *pipe,
 			  struct drm_crtc_state *crtc_state)
@@ -272,8 +273,6 @@ void mipi_dbi_pipe_enable(struct drm_simple_display_pipe *pipe,
 	struct tinydrm_device *tdev = pipe_to_tinydrm(pipe);
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	struct drm_framebuffer *fb = pipe->plane.fb;
-
-	DRM_DEBUG_KMS("\n");
 
 	mipi->enabled = true;
 	if (fb)
@@ -321,6 +320,9 @@ void mipi_dbi_pipe_disable(struct drm_simple_display_pipe *pipe)
 		tinydrm_disable_backlight(mipi->backlight);
 	else
 		mipi_dbi_blank(mipi);
+
+	if (mipi->regulator)
+		regulator_disable(mipi->regulator);
 }
 EXPORT_SYMBOL(mipi_dbi_pipe_disable);
 
