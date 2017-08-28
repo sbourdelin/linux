@@ -29,7 +29,7 @@ with SR-IOV or soft switches, such as OVS, are possible.
                       sw1p1  +  sw1p3  +  sw1p5  +          eth1
                         +    |    +    |    +    |            +
                         |    |    |    |    |    |            |
-                     +--+----+----+----+-+--+----+---+  +-----+-----+
+                     +--+----+----+----+----+----+---+  +-----+-----+
                      |         Switch driver         |  |    mgmt   |
                      |        (this document)        |  |   driver  |
                      |                               |  |           |
