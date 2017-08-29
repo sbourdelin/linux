@@ -193,7 +193,7 @@ struct wlan_bssid_ex {
 	unsigned char SupportedRates[NDIS_802_11_LENGTH_RATES_EX];
 	struct wlan_phy_info	PhyInfo;
 	u32  ie_length;
-	u8  ies[MAX_IE_SZ];	/* timestamp, beacon interval, and
+	u8  ie[MAX_IE_SZ];	/* timestamp, beacon interval, and
 				 * capability information) */
 } __packed;
 

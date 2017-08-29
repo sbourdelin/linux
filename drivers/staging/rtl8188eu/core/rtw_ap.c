@@ -69,15 +69,12 @@ static void update_BCNTIM(struct adapter *padapter)
 	struct mlme_ext_priv *pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info *pmlmeinfo = &pmlmeext->mlmext_info;
 	struct wlan_bssid_ex *pnetwork_mlmeext = &pmlmeinfo->network;
-	//unsigned char *pie = pnetwork_mlmeext->ies;
-	unsigned char *pie = pnetwork_mlmeext->ies;
+	unsigned char *pie = pnetwork_mlmeext->ie;
 	u8 *p, *dst_ie, *premainder_ie = NULL;
 	u8 *pbackup_remainder_ie = NULL;
 	uint offset, tmp_len, tim_ielen, tim_ie_offset, remainder_ielen;
 
 	/* update TIM IE */
-	//p = rtw_get_ie(pie + _FIXED_IE_LENGTH_, _TIM_IE_, &tim_ielen,
-			//pnetwork_mlmeext->ie_length - _FIXED_IE_LENGTH_);
 	p = rtw_get_ie(pie + _FIXED_IE_LENGTH_, _TIM_IE_, &tim_ielen,
 			pnetwork_mlmeext->ie_length - _FIXED_IE_LENGTH_);
 	if (p && tim_ielen > 0) {
@@ -161,13 +158,13 @@ void rtw_add_bcn_ie(struct adapter *padapter, struct wlan_bssid_ex *pnetwork,
 {
 	struct ndis_802_11_var_ie *pIE;
 	u8 bmatch = false;
-	u8 *pie = pnetwork->ies;
+	u8 *pie = pnetwork->ie;
 	u8 *p = NULL, *dst_ie = NULL, *premainder_ie = NULL;
 	u8 *pbackup_remainder_ie = NULL;
 	u32 i, offset, ielen = 0, ie_offset, remainder_ielen = 0;
 
 	for (i = sizeof(struct ndis_802_11_fixed_ie); i < pnetwork->ie_length;) {
-		pIE = (struct ndis_802_11_var_ie *)(pnetwork->ies + i);
+		pIE = (struct ndis_802_11_var_ie *)(pnetwork->ie + i);
 
 		if (pIE->ElementID > index) {
 			break;
@@ -228,7 +225,7 @@ void rtw_remove_bcn_ie(struct adapter *padapter, struct wlan_bssid_ex *pnetwork,
 	u8 *p, *dst_ie = NULL, *premainder_ie = NULL;
 	u8 *pbackup_remainder_ie = NULL;
 	uint offset, ielen, ie_offset, remainder_ielen = 0;
-	u8	*pie = pnetwork->ies;
+	u8	*pie = pnetwork->ie;
 
 	p = rtw_get_ie(pie + _FIXED_IE_LENGTH_, index, &ielen,
 		       pnetwork->ie_length - _FIXED_IE_LENGTH_);
@@ -743,7 +740,7 @@ static void start_bss_network(struct adapter *padapter, u8 *pbuf)
 	 * beacon twice when stating hostapd, and at first time the
 	 * security ie (RSN/WPA IE) will not include in beacon.
 	 */
-	if (!rtw_get_wps_ie(pnetwork->ies + _FIXED_IE_LENGTH_, pnetwork->ie_length - _FIXED_IE_LENGTH_, NULL, NULL))
+	if (!rtw_get_wps_ie(pnetwork->ie + _FIXED_IE_LENGTH_, pnetwork->ie_length - _FIXED_IE_LENGTH_, NULL, NULL))
 		pmlmeext->bstart_bss = true;
 
 	/* todo: update wmm, ht cap */
@@ -797,7 +794,7 @@ static void start_bss_network(struct adapter *padapter, u8 *pbuf)
 		Switch_DM_Func(padapter, DYNAMIC_ALL_FUNC_ENABLE, true);
 	}
 	/* set channel, bwmode */
-	p = rtw_get_ie((pnetwork->ies + sizeof(struct ndis_802_11_fixed_ie)), _HT_ADD_INFO_IE_, &ie_len, (pnetwork->ie_length - sizeof(struct ndis_802_11_fixed_ie)));
+	p = rtw_get_ie((pnetwork->ie + sizeof(struct ndis_802_11_fixed_ie)), _HT_ADD_INFO_IE_, &ie_len, (pnetwork->ie_length - sizeof(struct ndis_802_11_fixed_ie)));
 	if (p && ie_len) {
 		pht_info = (struct HT_info_element *)(p + 2);
 
@@ -869,7 +866,7 @@ int rtw_check_beacon_data(struct adapter *padapter, u8 *pbuf,  int len)
 	struct security_priv *psecuritypriv = &padapter->securitypriv;
 	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
 	struct wlan_bssid_ex *pbss_network = (struct wlan_bssid_ex *)&pmlmepriv->cur_network.network;
-	u8 *ie = pbss_network->ies;
+	u8 *ie = pbss_network->ie;
 
 	/* SSID */
 	/* Supported rates */
@@ -1238,7 +1235,7 @@ static void update_bcn_erpinfo_ie(struct adapter *padapter)
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &pmlmeext->mlmext_info;
 	struct wlan_bssid_ex *pnetwork = &pmlmeinfo->network;
-	unsigned char *p, *ie = pnetwork->ies;
+	unsigned char *p, *ie = pnetwork->ie;
 	u32 len = 0;
 
 	DBG_88E("%s, ERP_enable =%d\n", __func__, pmlmeinfo->ERP_enable);
@@ -1275,7 +1272,7 @@ static void update_bcn_wps_ie(struct adapter *padapter)
 	struct mlme_ext_priv	*pmlmeext = &padapter->mlmeextpriv;
 	struct mlme_ext_info	*pmlmeinfo = &pmlmeext->mlmext_info;
 	struct wlan_bssid_ex *pnetwork = &pmlmeinfo->network;
-	unsigned char *ie = pnetwork->ies;
+	unsigned char *ie = pnetwork->ie;
 	u32 ielen = pnetwork->ie_length;
 
 	DBG_88E("%s\n", __func__);
