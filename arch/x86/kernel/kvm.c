@@ -373,12 +373,53 @@ static void kvm_idle_poll(void)
 	} while (ktime_before(cur, stop));
 }
 
+static unsigned int grow_poll_ns(unsigned int old, unsigned int grow,
+				 unsigned int max)
+{
+	unsigned int val;
+
+	/* set base poll time to 10000ns */
+	if (old == 0 && grow)
+		return 10000;
+
+	val = old * grow;
+	if (val > max)
+		val = max;
+
+	return val;
+}
+
+static unsigned int shrink_poll_ns(unsigned int old, unsigned int shrink)
+{
+	if (shrink == 0)
+		return 0;
+
+	return old / shrink;
+}
+
+static int kvm_idle_update_poll_duration(unsigned long idle_duration)
+{
+	unsigned long poll_duration = this_cpu_read(poll_duration_ns);
+
+	if (poll_duration && idle_duration > poll_threshold_ns)
+		poll_duration = shrink_poll_ns(poll_duration, poll_shrink);
+	else if (poll_duration < poll_threshold_ns &&
+		 idle_duration < poll_threshold_ns)
+		poll_duration = grow_poll_ns(poll_duration, poll_grow,
+					     poll_threshold_ns);
+
+	this_cpu_write(poll_duration_ns, poll_duration);
+
+	return 0;
+}
+
 static void kvm_guest_idle_init(void)
 {
 	if (!kvm_para_available())
 		return;
 
 	pv_idle_ops.poll = kvm_idle_poll;
+	pv_idle_ops.update = kvm_idle_update_poll_duration;
 }
 
 static void kvm_pv_disable_apf(void)
