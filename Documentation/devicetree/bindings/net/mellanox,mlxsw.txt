@@ -1,0 +1,46 @@
+Mellanox Technologies Switch ASICs
+
+This file provides information, what the device node
+for the Switch ASIC interface contains.
+
+Required properties:
+- compatible		: "mellanox,mlxsw_minimal"
+- reg			: The I2C address of the device.
+
+Optional properties:
+- cooling-phandle	: phandle of the cooling device, which is to be used
+			  for the zone thermal control.
+			  If absent, cooling device controlled internally by
+			  the ASIC may be used.
+
+- trips			: the nodes to describe a point in the temperature
+			  domain with key temperatures at which cooling is
+			  recommended. Each node must contain the next values:
+			  - type: the trip type. Expected values are:
+			    0 - a trip point to enable active cooling;
+			    1 - a trip point to enable passive cooling;
+			    2 - a trip point to notify emergency;
+			  - temperature: unsigned integer indicating the trip
+			    temperature level in millicelsius;
+			  - minimum cooling state allowed within the trip node;
+			  - maximum cooling state allowed within the trip node;
+
+Example:
+	asic_thermal: mlxsw_minimal@48 {
+		compatible = "mlxsw_minimal";
+		reg = <0x48>;
+		status = "disabled";
+		cooling-phandle = <&cooling>;
+
+		trips {
+			trip@0 {
+				trip = <0 75000 0 0>;
+			};
+			trip@1 {
+				trip = <2 85000 1 5>;
+			};
+			trip@3 {
+				trip = <2 105000 5 5>;
+			};
+		};
+	};
