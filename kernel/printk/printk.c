@@ -1670,12 +1670,17 @@ static size_t log_output(int facility, int level, enum log_flags lflags, const c
 	 * write from the same process, try to add it to the buffer.
 	 */
 	if (cont.len) {
-		if (cont.owner == current && (lflags & LOG_CONT)) {
+		/*
+		 * Flush the conflicting buffer. An earlier newline was missing,
+		 * or another task also prints continuation lines.
+		 */
+		if (lflags & LOG_PREFIX || cont.owner != current)
+			cont_flush();
+
+		if (!(lflags & LOG_PREFIX) || lflags & LOG_CONT) {
 			if (cont_add(facility, level, lflags, text, text_len))
 				return text_len;
 		}
-		/* Otherwise, make sure it's flushed */
-		cont_flush();
 	}
 
 	/* Skip empty continuation lines that couldn't be added - they just flush */
