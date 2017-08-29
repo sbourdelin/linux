@@ -73,11 +73,24 @@ static int udp6_gro_complete(struct sk_buff *skb, int nhoff)
 	return udp_gro_complete(skb, nhoff, udp6_lib_lookup_skb);
 }
 
+static enum flow_dissect_ret udp6_flow_dissect(const struct sk_buff *skb,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags)
+{
+	return udp_flow_dissect(skb, udp6_lib_lookup_skb, key_control,
+				flow_dissector, target_container, data,
+				p_proto, p_ip_proto, p_nhoff, p_hlen, flags);
+}
+
 static const struct net_offload udpv6_offload = {
 	.callbacks = {
 		.gso_segment	=	udp6_tunnel_segment,
 		.gro_receive	=	udp6_gro_receive,
 		.gro_complete	=	udp6_gro_complete,
+		.flow_dissect	=	udp6_flow_dissect,
 	},
 };
 

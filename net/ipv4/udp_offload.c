@@ -328,11 +328,56 @@ static int udp4_gro_complete(struct sk_buff *skb, int nhoff)
 	return udp_gro_complete(skb, nhoff, udp4_lib_lookup_skb);
 }
 
+enum flow_dissect_ret udp_flow_dissect(const struct sk_buff *skb,
+			udp_lookup_t lookup,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags)
+{
+	enum flow_dissect_ret ret = FLOW_DISSECT_RET_CONTINUE;
+	struct udphdr *uh, _uh;
+	struct sock *sk;
+
+	uh = __skb_header_pointer(skb, *p_nhoff, sizeof(_uh), data,
+				  *p_hlen, &_uh);
+	if (!uh)
+		return FLOW_DISSECT_RET_OUT_BAD;
+
+	rcu_read_lock();
+
+	sk = (*lookup)(skb, uh->source, uh->dest);
+
+	if (sk && udp_sk(sk)->flow_dissect)
+		ret = udp_sk(sk)->flow_dissect(sk, skb, key_control,
+					       flow_dissector, target_container,
+					       data, p_proto, p_ip_proto,
+					       p_nhoff, p_hlen, flags);
+	rcu_read_unlock();
+
+	return ret;
+}
+EXPORT_SYMBOL(udp_flow_dissect);
+
+static enum flow_dissect_ret udp4_flow_dissect(const struct sk_buff *skb,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags)
+{
+	return udp_flow_dissect(skb, udp4_lib_lookup_skb, key_control,
+				flow_dissector, target_container, data,
+				p_proto, p_ip_proto, p_nhoff, p_hlen, flags);
+}
+
 static const struct net_offload udpv4_offload = {
 	.callbacks = {
 		.gso_segment = udp4_tunnel_segment,
 		.gro_receive  =	udp4_gro_receive,
 		.gro_complete =	udp4_gro_complete,
+		.flow_dissect = udp4_flow_dissect,
 	},
 };
 
