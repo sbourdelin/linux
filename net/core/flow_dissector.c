@@ -9,6 +9,7 @@
 #include <net/ipv6.h>
 #include <net/gre.h>
 #include <net/pptp.h>
+#include <net/protocol.h>
 #include <linux/igmp.h>
 #include <linux/icmp.h>
 #include <linux/sctp.h>
@@ -114,12 +115,6 @@ __be32 __skb_flow_get_ports(const struct sk_buff *skb, int thoff, u8 ip_proto,
 	return 0;
 }
 EXPORT_SYMBOL(__skb_flow_get_ports);
-
-enum flow_dissect_ret {
-	FLOW_DISSECT_RET_OUT_GOOD,
-	FLOW_DISSECT_RET_OUT_BAD,
-	FLOW_DISSECT_RET_OUT_PROTO_AGAIN,
-};
 
 static enum flow_dissect_ret
 __skb_flow_dissect_mpls(const struct sk_buff *skb,
@@ -322,7 +317,7 @@ __skb_flow_dissect_gre(const struct sk_buff *skb,
 	if (flags & FLOW_DISSECTOR_F_STOP_AT_ENCAP)
 		return FLOW_DISSECT_RET_OUT_GOOD;
 
-	return FLOW_DISSECT_RET_OUT_PROTO_AGAIN;
+	return FLOW_DISSECT_RET_PROTO_AGAIN;
 }
 
 static void
@@ -382,6 +377,27 @@ __skb_flow_dissect_ipv6(const struct sk_buff *skb,
 	key_ip->tos = ipv6_get_dsfield(iph);
 	key_ip->ttl = iph->hop_limit;
 }
+
+#define GOTO_BY_RESULT(ret) do {				\
+	switch (ret) {						\
+	case FLOW_DISSECT_RET_OUT_GOOD:				\
+		goto out_good;					\
+	case FLOW_DISSECT_RET_PROTO_AGAIN:			\
+		goto proto_again;				\
+	case FLOW_DISSECT_RET_IPPROTO_AGAIN:			\
+		goto ip_proto_again;				\
+	case FLOW_DISSECT_RET_OUT_BAD:				\
+	default:						\
+		goto out_bad;					\
+	}							\
+} while (0)
+
+#define GOTO_OR_CONT_BY_RESULT(ret) do {			\
+	enum flow_dissect_ret __ret = (ret);			\
+								\
+	if (__ret != FLOW_DISSECT_RET_CONTINUE)			\
+		GOTO_BY_RESULT(__ret);				\
+} while (0)
 
 /**
  * __skb_flow_dissect - extract the flow_keys struct and return it
@@ -659,15 +675,10 @@ ipv6:
 	case htons(ETH_P_MPLS_UC):
 	case htons(ETH_P_MPLS_MC):
 mpls:
-		switch (__skb_flow_dissect_mpls(skb, flow_dissector,
-						target_container, data,
-						nhoff, hlen)) {
-		case FLOW_DISSECT_RET_OUT_GOOD:
-			goto out_good;
-		case FLOW_DISSECT_RET_OUT_BAD:
-		default:
-			goto out_bad;
-		}
+		GOTO_BY_RESULT(__skb_flow_dissect_mpls(skb, flow_dissector,
+						       target_container, data,
+						       nhoff, hlen));
+
 	case htons(ETH_P_FCOE):
 		if ((hlen - nhoff) < FCOE_HEADER_LEN)
 			goto out_bad;
@@ -677,32 +688,44 @@ mpls:
 
 	case htons(ETH_P_ARP):
 	case htons(ETH_P_RARP):
-		switch (__skb_flow_dissect_arp(skb, flow_dissector,
-					       target_container, data,
-					       nhoff, hlen)) {
-		case FLOW_DISSECT_RET_OUT_GOOD:
-			goto out_good;
-		case FLOW_DISSECT_RET_OUT_BAD:
-		default:
-			goto out_bad;
+		GOTO_BY_RESULT(__skb_flow_dissect_arp(skb, flow_dissector,
+						      target_container, data,
+						      nhoff, hlen));
+
+	default: {
+		struct packet_offload *ptype;
+		enum flow_dissect_ret ret;
+
+		rcu_read_lock();
+
+		ptype = flow_dissect_find_by_type(proto);
+
+		if (ptype) {
+			ret = ptype->callbacks.flow_dissect(skb, key_control,
+						flow_dissector,
+						target_container,
+						data, &proto, &ip_proto, &nhoff,
+						&hlen, flags);
+			rcu_read_unlock();
+
+			GOTO_BY_RESULT(ret);
+		} else {
+			rcu_read_unlock();
 		}
-	default:
+
 		goto out_bad;
+	}
 	}
 
 ip_proto_again:
 	switch (ip_proto) {
 	case IPPROTO_GRE:
-		switch (__skb_flow_dissect_gre(skb, key_control, flow_dissector,
-					       target_container, data,
-					       &proto, &nhoff, &hlen, flags)) {
-		case FLOW_DISSECT_RET_OUT_GOOD:
-			goto out_good;
-		case FLOW_DISSECT_RET_OUT_BAD:
-			goto out_bad;
-		case FLOW_DISSECT_RET_OUT_PROTO_AGAIN:
-			goto proto_again;
-		}
+		GOTO_BY_RESULT(__skb_flow_dissect_gre(skb, key_control,
+						      flow_dissector,
+						      target_container, data,
+						      &proto, &nhoff, &hlen,
+						      flags));
+
 	case NEXTHDR_HOP:
 	case NEXTHDR_ROUTING:
 	case NEXTHDR_DEST: {
@@ -768,8 +791,42 @@ ip_proto_again:
 		__skb_flow_dissect_tcp(skb, flow_dissector, target_container,
 				       data, nhoff, hlen);
 		break;
-	default:
+	default: {
+		const struct net_offload *ops = NULL;
+
+		if (flags & FLOW_DISSECTOR_F_STOP_AT_L4)
+			break;
+
+		rcu_read_lock();
+
+		switch (proto) {
+		case htons(ETH_P_IP):
+			ops = rcu_dereference(inet_offloads[ip_proto]);
+			break;
+		case htons(ETH_P_IPV6):
+			ops = rcu_dereference(inet6_offloads[ip_proto]);
+			break;
+		default:
+			break;
+		}
+
+		if (ops && ops->callbacks.flow_dissect) {
+			enum flow_dissect_ret ret;
+
+			ret = ops->callbacks.flow_dissect(skb, key_control,
+						flow_dissector,
+						target_container,
+						data, &proto, &ip_proto, &nhoff,
+						&hlen, flags);
+			rcu_read_unlock();
+
+			GOTO_OR_CONT_BY_RESULT(ret);
+		} else {
+			rcu_read_unlock();
+		}
+
 		break;
+	}
 	}
 
 	if (dissector_uses_key(flow_dissector,
@@ -935,7 +992,8 @@ static inline u32 ___skb_get_hash(const struct sk_buff *skb,
 				  struct flow_keys *keys, u32 keyval)
 {
 	skb_flow_dissect_flow_keys(skb, keys,
-				   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL);
+				   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL |
+				   FLOW_DISSECTOR_F_STOP_AT_L4);
 
 	return __flow_hash_from_keys(keys, keyval);
 }
