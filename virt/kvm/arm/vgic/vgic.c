@@ -140,6 +140,29 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
 	kfree(irq);
 }
 
+/* Get the input level of a mapped IRQ directly from the physical GIC */
+bool vgic_irq_line_level(struct vgic_irq *irq)
+{
+	bool line_level;
+
+	BUG_ON(!irq->hw);
+
+	WARN_ON(irq_get_irqchip_state(irq->host_irq,
+				      IRQCHIP_STATE_PENDING,
+				      &line_level));
+	return line_level;
+}
+
+/* Clear the physical active state */
+void vgic_irq_clear_phys_active(struct vgic_irq *irq)
+{
+
+	BUG_ON(!irq->hw);
+	WARN_ON(irq_set_irqchip_state(irq->host_irq,
+				      IRQCHIP_STATE_ACTIVE,
+				      false));
+}
+
 /**
  * kvm_vgic_target_oracle - compute the target vcpu for an irq
  *
