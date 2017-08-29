@@ -950,6 +950,9 @@ void perf_evsel__config(struct perf_evsel *evsel, struct record_opts *opts,
 	if (opts->sample_address)
 		perf_evsel__set_sample_bit(evsel, DATA_SRC);
 
+	if (opts->sample_phys_addr)
+		perf_evsel__set_sample_bit(evsel, PHYS_ADDR);
+
 	if (opts->no_buffering) {
 		attr->watermark = 0;
 		attr->wakeup_events = 1;
@@ -2214,6 +2217,12 @@ int perf_evsel__parse_sample(struct perf_evsel *evsel, union perf_event *event,
 		}
 	}
 
+	data->phys_addr = 0;
+	if (type & PERF_SAMPLE_PHYS_ADDR) {
+		data->phys_addr = *array;
+		array++;
+	}
+
 	return 0;
 }
 
@@ -2318,6 +2327,9 @@ size_t perf_event__sample_event_size(const struct perf_sample *sample, u64 type,
 			result += sizeof(u64);
 		}
 	}
+
+	if (type & PERF_SAMPLE_PHYS_ADDR)
+		result += sizeof(u64);
 
 	return result;
 }
@@ -2506,6 +2518,11 @@ int perf_event__synthesize_sample(union perf_event *event, u64 type,
 		} else {
 			*array++ = 0;
 		}
+	}
+
+	if (type & PERF_SAMPLE_PHYS_ADDR) {
+		*array = sample->phys_addr;
+		array++;
 	}
 
 	return 0;
