@@ -17,6 +17,8 @@
 static int cvm_lmc_probe(struct pci_dev *pdev,
 			 const struct pci_device_id *ent)
 {
+	if (IS_ENABLED(CONFIG_CAVIUM_PMU_LMC))
+		cvm_lmc_pmu_probe(pdev, ent);
 	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
 		thunderx_edac_lmc_probe(pdev, ent);
 	return 0;
@@ -24,6 +26,8 @@ static int cvm_lmc_probe(struct pci_dev *pdev,
 
 static void cvm_lmc_remove(struct pci_dev *pdev)
 {
+	if (IS_ENABLED(CONFIG_CAVIUM_PMU_LMC))
+		cvm_lmc_pmu_remove(pdev);
 	if (IS_ENABLED(CONFIG_EDAC_THUNDERX))
 		thunderx_edac_lmc_remove(pdev);
 }

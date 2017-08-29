@@ -43,4 +43,12 @@ config XGENE_PMU
         help
           Say y if you want to use APM X-Gene SoC performance monitors.
 
+config CAVIUM_PMU_LMC
+	tristate "Cavium SOC memory controller PMU"
+	depends on ARCH_THUNDER && m
+	select CAVIUM_LMC
+	help
+	  Provides PMU counters for the memory controller on
+	  Cavium ThunderX or OcteonTX SOCs.
+
 endmenu
