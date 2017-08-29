@@ -51,4 +51,11 @@ config CAVIUM_PMU_LMC
 	  Provides PMU counters for the memory controller on
 	  Cavium ThunderX or OcteonTX SOCs.
 
+config CAVIUM_PMU_OCX_TLK
+	tristate "Cavium ThunderX interconnect PMU"
+	depends on ARCH_THUNDER && m
+	select CAVIUM_OCX
+	help
+	  Provides PMU counters for the processor interconnect on
+	  Cavium ThunderX processors.
 endmenu

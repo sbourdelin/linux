@@ -8,3 +8,7 @@ config CAVIUM_LMC
 config CAVIUM_OCX
 	depends on ARCH_THUNDER
 	def_tristate m
+
+config CAVIUM_OCX
+        depends on ARCH_THUNDER
+	def_tristate m
