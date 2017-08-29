@@ -318,6 +318,10 @@ struct pv_idle_ops pv_idle_ops = {
 	.update = paravirt_nop,
 };
 
+unsigned long poll_threshold_ns;
+unsigned int poll_shrink = 2;
+unsigned int poll_grow = 2;
+
 __visible struct pv_irq_ops pv_irq_ops = {
 	.save_fl = __PV_IS_CALLEE_SAVE(native_save_fl),
 	.restore_fl = __PV_IS_CALLEE_SAVE(native_restore_fl),

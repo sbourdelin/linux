@@ -462,6 +462,12 @@ extern int sysctl_panic_on_stackoverflow;
 
 extern bool crash_kexec_post_notifiers;
 
+#ifdef CONFIG_PARAVIRT
+extern unsigned long poll_threshold_ns;
+extern unsigned int poll_shrink;
+extern unsigned int poll_grow;
+#endif
+
 /*
  * panic_cpu is used for synchronizing panic() and crash_kexec() execution. It
  * holds a CPU number which is executing panic() currently. A value of

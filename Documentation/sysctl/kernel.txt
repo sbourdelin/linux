@@ -63,6 +63,9 @@ show up in /proc/sys/kernel:
 - perf_event_max_stack
 - perf_event_max_contexts_per_stack
 - pid_max
+- poll_grow                   [ X86 only ]
+- poll_shrink                 [ X86 only ]
+- poll_threshold_ns           [ X86 only ]
 - powersave-nap               [ PPC only ]
 - printk
 - printk_delay
@@ -699,6 +702,28 @@ ns_last_pid:
 The last pid allocated in the current (the one task using this sysctl
 lives in) pid namespace. When selecting a pid for a next task on fork
 kernel tries to allocate a number starting from this one.
+
+==============================================================
+
+poll_grow: (X86 only)
+
+This parameter is multiplied in the grow_poll_ns() to increase the poll time.
+By default, the values is 2.
+
+==============================================================
+poll_shrink: (X86 only)
+
+This parameter is divided in the shrink_poll_ns() to reduce the poll time.
+By default, the values is 2.
+
+==============================================================
+poll_threshold_ns: (X86 only)
+
+This parameter controls the max poll time before entering real idle path.
+This parameter is expected to take effect only when running inside a VM.
+It would make no sense to turn on it in bare mental.
+By default, the values is 0 means don't poll. It is recommended to change
+the value to non-zero if running latency-bound workloads inside VM.
 
 ==============================================================
 
