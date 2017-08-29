@@ -20,7 +20,7 @@ extern int reuseport_add_sock(struct sock *sk, struct sock *sk2);
 extern void reuseport_detach_sock(struct sock *sk);
 extern struct sock *reuseport_select_sock(struct sock *sk,
 					  u32 hash,
-					  struct sk_buff *skb,
+					  const struct sk_buff *skb,
 					  int hdr_len);
 extern struct bpf_prog *reuseport_attach_prog(struct sock *sk,
 					      struct bpf_prog *prog);

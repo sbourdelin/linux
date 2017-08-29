@@ -164,9 +164,10 @@ void reuseport_detach_sock(struct sock *sk)
 EXPORT_SYMBOL(reuseport_detach_sock);
 
 static struct sock *run_bpf(struct sock_reuseport *reuse, u16 socks,
-			    struct bpf_prog *prog, struct sk_buff *skb,
+			    struct bpf_prog *prog, const struct sk_buff *_skb,
 			    int hdr_len)
 {
+	struct sk_buff *skb = (struct sk_buff *)_skb; /* Override const */
 	struct sk_buff *nskb = NULL;
 	u32 index;
 
@@ -205,7 +206,7 @@ static struct sock *run_bpf(struct sock_reuseport *reuse, u16 socks,
  */
 struct sock *reuseport_select_sock(struct sock *sk,
 				   u32 hash,
-				   struct sk_buff *skb,
+				   const struct sk_buff *skb,
 				   int hdr_len)
 {
 	struct sock_reuseport *reuse;

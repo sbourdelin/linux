@@ -56,7 +56,7 @@
 #include <trace/events/skb.h>
 #include "udp_impl.h"
 
-static bool udp6_lib_exact_dif_match(struct net *net, struct sk_buff *skb)
+static bool udp6_lib_exact_dif_match(struct net *net, const struct sk_buff *skb)
 {
 #if defined(CONFIG_NET_L3_MASTER_DEV)
 	if (!net->ipv4.sysctl_udp_l3mdev_accept &&
@@ -181,7 +181,7 @@ static struct sock *udp6_lib_lookup2(struct net *net,
 		const struct in6_addr *saddr, __be16 sport,
 		const struct in6_addr *daddr, unsigned int hnum,
 		int dif, int sdif, bool exact_dif,
-		struct udp_hslot *hslot2, struct sk_buff *skb)
+		struct udp_hslot *hslot2, const struct sk_buff *skb)
 {
 	struct sock *sk, *result;
 	int score, badness, matches = 0, reuseport = 0;
@@ -221,7 +221,7 @@ struct sock *__udp6_lib_lookup(struct net *net,
 			       const struct in6_addr *saddr, __be16 sport,
 			       const struct in6_addr *daddr, __be16 dport,
 			       int dif, int sdif, struct udp_table *udptable,
-			       struct sk_buff *skb)
+			       const struct sk_buff *skb)
 {
 	struct sock *sk, *result;
 	unsigned short hnum = ntohs(dport);
@@ -290,7 +290,7 @@ begin:
 }
 EXPORT_SYMBOL_GPL(__udp6_lib_lookup);
 
-static struct sock *__udp6_lib_lookup_skb(struct sk_buff *skb,
+static struct sock *__udp6_lib_lookup_skb(const struct sk_buff *skb,
 					  __be16 sport, __be16 dport,
 					  struct udp_table *udptable)
 {
@@ -301,7 +301,7 @@ static struct sock *__udp6_lib_lookup_skb(struct sk_buff *skb,
 				 inet6_sdif(skb), udptable, skb);
 }
 
-struct sock *udp6_lib_lookup_skb(struct sk_buff *skb,
+struct sock *udp6_lib_lookup_skb(const struct sk_buff *skb,
 				 __be16 sport, __be16 dport)
 {
 	const struct ipv6hdr *iph = ipv6_hdr(skb);

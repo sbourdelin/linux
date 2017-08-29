@@ -135,7 +135,8 @@ EXPORT_SYMBOL(udp_memory_allocated);
 #define PORTS_PER_CHAIN (MAX_UDP_PORTS / UDP_HTABLE_SIZE_MIN)
 
 /* IPCB reference means this can not be used from early demux */
-static bool udp_lib_exact_dif_match(struct net *net, struct sk_buff *skb)
+static bool udp_lib_exact_dif_match(struct net *net,
+				    const struct sk_buff *skb)
 {
 #if IS_ENABLED(CONFIG_NET_L3_MASTER_DEV)
 	if (!net->ipv4.sysctl_udp_l3mdev_accept &&
@@ -445,7 +446,7 @@ static struct sock *udp4_lib_lookup2(struct net *net,
 				     __be32 daddr, unsigned int hnum,
 				     int dif, int sdif, bool exact_dif,
 				     struct udp_hslot *hslot2,
-				     struct sk_buff *skb)
+				     const struct sk_buff *skb)
 {
 	struct sock *sk, *result;
 	int score, badness, matches = 0, reuseport = 0;
@@ -484,7 +485,7 @@ static struct sock *udp4_lib_lookup2(struct net *net,
  */
 struct sock *__udp4_lib_lookup(struct net *net, __be32 saddr,
 		__be16 sport, __be32 daddr, __be16 dport, int dif,
-		int sdif, struct udp_table *udptable, struct sk_buff *skb)
+		int sdif, struct udp_table *udptable, const struct sk_buff *skb)
 {
 	struct sock *sk, *result;
 	unsigned short hnum = ntohs(dport);
@@ -552,7 +553,7 @@ begin:
 }
 EXPORT_SYMBOL_GPL(__udp4_lib_lookup);
 
-static inline struct sock *__udp4_lib_lookup_skb(struct sk_buff *skb,
+static inline struct sock *__udp4_lib_lookup_skb(const struct sk_buff *skb,
 						 __be16 sport, __be16 dport,
 						 struct udp_table *udptable)
 {
@@ -563,7 +564,7 @@ static inline struct sock *__udp4_lib_lookup_skb(struct sk_buff *skb,
 				 inet_sdif(skb), udptable, skb);
 }
 
-struct sock *udp4_lib_lookup_skb(struct sk_buff *skb,
+struct sock *udp4_lib_lookup_skb(const struct sk_buff *skb,
 				 __be16 sport, __be16 dport)
 {
 	return __udp4_lib_lookup_skb(skb, sport, dport, &udp_table);
