@@ -75,6 +75,7 @@ static int parse_no_kvmclock_vsyscall(char *arg)
 
 early_param("no-kvmclock-vsyscall", parse_no_kvmclock_vsyscall);
 
+static DEFINE_PER_CPU(unsigned long, poll_duration_ns);
 static DEFINE_PER_CPU(struct kvm_vcpu_pv_apf_data, apf_reason) __aligned(64);
 static DEFINE_PER_CPU(struct kvm_steal_time, steal_time) __aligned(64);
 static int has_steal_clock = 0;
@@ -357,6 +358,29 @@ static void kvm_guest_cpu_init(void)
 		kvm_register_steal_time();
 }
 
+static void kvm_idle_poll(void)
+{
+	unsigned long poll_duration = this_cpu_read(poll_duration_ns);
+	ktime_t start, cur, stop;
+
+	start = cur = ktime_get();
+	stop = ktime_add_ns(ktime_get(), poll_duration);
+
+	do {
+		if (need_resched())
+			break;
+		cur = ktime_get();
+	} while (ktime_before(cur, stop));
+}
+
+static void kvm_guest_idle_init(void)
+{
+	if (!kvm_para_available())
+		return;
+
+	pv_idle_ops.poll = kvm_idle_poll;
+}
+
 static void kvm_pv_disable_apf(void)
 {
 	if (!__this_cpu_read(apf_reason.enabled))
@@ -491,6 +515,8 @@ void __init kvm_guest_init(void)
 #else
 	kvm_guest_cpu_init();
 #endif
+
+	kvm_guest_idle_init();
 
 	/*
 	 * Hard lockup detection is enabled by default. Disable it, as guests
