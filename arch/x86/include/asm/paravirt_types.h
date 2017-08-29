@@ -326,6 +326,7 @@ struct pv_lock_ops {
 
 struct pv_idle_ops {
 	void (*poll)(void);
+	void (*update)(unsigned long);
 } __no_randomize_layout;
 
 /* This contains all the paravirt structures: we get a convenient

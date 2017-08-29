@@ -315,6 +315,7 @@ struct pv_time_ops pv_time_ops = {
 
 struct pv_idle_ops pv_idle_ops = {
 	.poll = paravirt_nop,
+	.update = paravirt_nop,
 };
 
 __visible struct pv_irq_ops pv_irq_ops = {

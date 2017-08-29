@@ -207,6 +207,11 @@ static inline void paravirt_idle_poll(void)
 	PVOP_VCALL0(pv_idle_ops.poll);
 }
 
+static inline void paravirt_idle_update_poll_duration(unsigned long duration)
+{
+	PVOP_VCALL1(pv_idle_ops.update, duration);
+}
+
 static inline void paravirt_alloc_ldt(struct desc_struct *ldt, unsigned entries)
 {
 	PVOP_VCALL2(pv_cpu_ops.alloc_ldt, ldt, entries);
