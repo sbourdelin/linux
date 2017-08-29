@@ -20,6 +20,7 @@
 #include <scsi/scsi_dh.h>
 #include <scsi/scsi_transport.h>
 #include <scsi/scsi_driver.h>
+#include <scsi/scsi_devinfo.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -109,6 +110,27 @@ static const char *scsi_access_state_name(unsigned char state)
 	return name;
 }
 #endif
+
+static const struct {
+	unsigned int	value;
+	char		*name;
+} sdev_bflags[] = {
+#include "scsi_devinfo_tbl.c"
+};
+
+static const char *sdev_bflags_name(unsigned int bflags)
+{
+	int i;
+	const char *name = NULL;
+
+	for (i = 0; i < ARRAY_SIZE(sdev_bflags); i++) {
+		if (sdev_bflags[i].value == bflags) {
+			name = sdev_bflags[i].name;
+			break;
+		}
+	}
+	return name;
+}
 
 static int check_set(unsigned long long *val, char *src)
 {
@@ -955,6 +977,43 @@ sdev_show_wwid(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR(wwid, S_IRUGO, sdev_show_wwid, NULL);
 
+static ssize_t
+sdev_show_blacklist(struct device *dev, struct device_attribute *attr,
+		    char *buf)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	int i;
+	char *ptr = buf;
+	ssize_t len = 0;
+
+	for (i = 0; i < sizeof(unsigned int) * 8; i++) {
+		unsigned int bflags = (unsigned int)1 << i;
+		ssize_t blen;
+		const char *name = NULL;
+
+		if (!(bflags & sdev->sdev_bflags))
+			continue;
+
+		if (ptr != buf) {
+			blen = snprintf(ptr, 2, " ");
+			ptr += blen;
+			len += blen;
+		}
+		name = sdev_bflags_name(bflags);
+		if (name)
+			blen = snprintf(ptr, strlen(name) + 1,
+					"%s", name);
+		else
+			blen = snprintf(ptr, 67, "INVALID_BIT(%d)", i);
+		ptr += blen;
+		len += blen;
+	}
+	if (len)
+		len += snprintf(ptr, 2, "\n");
+	return len;
+}
+static DEVICE_ATTR(blacklist, S_IRUGO, sdev_show_blacklist, NULL);
+
 #ifdef CONFIG_SCSI_DH
 static ssize_t
 sdev_show_dh_state(struct device *dev, struct device_attribute *attr,
@@ -1140,6 +1199,7 @@ static struct attribute *scsi_sdev_attrs[] = {
 	&dev_attr_queue_depth.attr,
 	&dev_attr_queue_type.attr,
 	&dev_attr_wwid.attr,
+	&dev_attr_blacklist.attr,
 #ifdef CONFIG_SCSI_DH
 	&dev_attr_dh_state.attr,
 	&dev_attr_access_state.attr,
