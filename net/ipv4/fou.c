@@ -282,6 +282,20 @@ out_unlock:
 	return err;
 }
 
+static enum flow_dissect_ret fou_flow_dissect(struct sock *sk,
+			const struct sk_buff *skb,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags)
+{
+	*p_ip_proto = fou_from_sock(sk)->protocol;
+	*p_nhoff += sizeof(struct udphdr);
+
+	return FLOW_DISSECT_RET_IPPROTO_AGAIN;
+}
+
 static struct guehdr *gue_gro_remcsum(struct sk_buff *skb, unsigned int off,
 				      struct guehdr *guehdr, void *data,
 				      size_t hdrlen, struct gro_remcsum *grc,
@@ -500,6 +514,53 @@ out_unlock:
 	return err;
 }
 
+static enum flow_dissect_ret gue_flow_dissect(struct sock *sk,
+			const struct sk_buff *skb,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags)
+{
+	struct guehdr *guehdr, _guehdr;
+
+	guehdr = __skb_header_pointer(skb, *p_nhoff + sizeof(struct udphdr),
+				      sizeof(_guehdr), data, *p_hlen, &_guehdr);
+	if (!guehdr)
+		return FLOW_DISSECT_RET_OUT_BAD;
+
+	switch (guehdr->version) {
+	case 0:
+		if (unlikely(guehdr->control))
+			return FLOW_DISSECT_RET_CONTINUE;
+
+		*p_ip_proto = guehdr->proto_ctype;
+		*p_nhoff += sizeof(struct udphdr) +
+		    sizeof(*guehdr) + (guehdr->hlen << 2);
+
+		break;
+	case 1:
+		switch (((struct iphdr *)guehdr)->version) {
+		case 4:
+			*p_ip_proto = IPPROTO_IPIP;
+			break;
+		case 6:
+			*p_ip_proto = IPPROTO_IPV6;
+			break;
+		default:
+			return FLOW_DISSECT_RET_CONTINUE;
+		}
+
+		*p_nhoff += sizeof(struct udphdr);
+
+		break;
+	default:
+		return FLOW_DISSECT_RET_CONTINUE;
+	}
+
+	return FLOW_DISSECT_RET_IPPROTO_AGAIN;
+}
+
 static int fou_add_to_port_list(struct net *net, struct fou *fou)
 {
 	struct fou_net *fn = net_generic(net, fou_net_id);
@@ -570,12 +631,14 @@ static int fou_create(struct net *net, struct fou_cfg *cfg,
 		tunnel_cfg.encap_rcv = fou_udp_recv;
 		tunnel_cfg.gro_receive = fou_gro_receive;
 		tunnel_cfg.gro_complete = fou_gro_complete;
+		tunnel_cfg.flow_dissect = fou_flow_dissect;
 		fou->protocol = cfg->protocol;
 		break;
 	case FOU_ENCAP_GUE:
 		tunnel_cfg.encap_rcv = gue_udp_recv;
 		tunnel_cfg.gro_receive = gue_gro_receive;
 		tunnel_cfg.gro_complete = gue_gro_complete;
+		tunnel_cfg.flow_dissect = gue_flow_dissect;
 		break;
 	default:
 		err = -EINVAL;
