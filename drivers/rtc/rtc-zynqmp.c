@@ -193,7 +193,7 @@ static const struct rtc_class_ops xlnx_rtc_ops = {
 
 static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
 {
-	struct xlnx_rtc_dev *xrtcdev = (struct xlnx_rtc_dev *)id;
+	struct xlnx_rtc_dev *xrtcdev = id;
 	unsigned int status;
 
 	status = readl(xrtcdev->reg_base + RTC_INT_STS);

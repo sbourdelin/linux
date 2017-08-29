@@ -528,7 +528,7 @@ void rtc_handle_legacy_irq(struct rtc_device *rtc, int num, int mode)
  */
 void rtc_aie_update_irq(void *private)
 {
-	struct rtc_device *rtc = (struct rtc_device *)private;
+	struct rtc_device *rtc = private;
 	rtc_handle_legacy_irq(rtc, 1, RTC_AF);
 }
 
@@ -541,7 +541,7 @@ void rtc_aie_update_irq(void *private)
  */
 void rtc_uie_update_irq(void *private)
 {
-	struct rtc_device *rtc = (struct rtc_device *)private;
+	struct rtc_device *rtc = private;
 	rtc_handle_legacy_irq(rtc, 1,  RTC_UF);
 }
 

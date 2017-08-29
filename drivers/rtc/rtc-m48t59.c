@@ -302,7 +302,7 @@ static int m48t59_rtc_proc(struct device *dev, struct seq_file *seq)
  */
 static irqreturn_t m48t59_rtc_interrupt(int irq, void *dev_id)
 {
-	struct device *dev = (struct device *)dev_id;
+	struct device *dev = dev_id;
 	struct platform_device *pdev = to_platform_device(dev);
 	struct m48t59_plat_data *pdata = dev_get_platdata(&pdev->dev);
 	struct m48t59_private *m48t59 = platform_get_drvdata(pdev);

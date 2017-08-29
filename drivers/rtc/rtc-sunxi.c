@@ -158,7 +158,7 @@ struct sunxi_rtc_dev {
 
 static irqreturn_t sunxi_rtc_alarmirq(int irq, void *id)
 {
-	struct sunxi_rtc_dev *chip = (struct sunxi_rtc_dev *) id;
+	struct sunxi_rtc_dev *chip = id;
 	u32 val;
 
 	val = readl(chip->base + SUNXI_ALRM_IRQ_STA);

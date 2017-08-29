@@ -113,7 +113,7 @@ static void s3c_rtc_disable_clk(struct s3c_rtc *info)
 /* IRQ Handlers */
 static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
 {
-	struct s3c_rtc *info = (struct s3c_rtc *)id;
+	struct s3c_rtc *info = id;
 
 	if (info->data->irq_handler)
 		info->data->irq_handler(info, S3C2410_INTP_TIC);
@@ -123,7 +123,7 @@ static irqreturn_t s3c_rtc_tickirq(int irq, void *id)
 
 static irqreturn_t s3c_rtc_alarmirq(int irq, void *id)
 {
-	struct s3c_rtc *info = (struct s3c_rtc *)id;
+	struct s3c_rtc *info = id;
 
 	if (info->data->irq_handler)
 		info->data->irq_handler(info, S3C2410_INTP_ALM);

@@ -228,7 +228,7 @@ static int vr41xx_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
 
 static irqreturn_t elapsedtime_interrupt(int irq, void *dev_id)
 {
-	struct platform_device *pdev = (struct platform_device *)dev_id;
+	struct platform_device *pdev = dev_id;
 	struct rtc_device *rtc = platform_get_drvdata(pdev);
 
 	rtc2_write(RTCINTREG, ELAPSEDTIME_INT);
@@ -240,7 +240,7 @@ static irqreturn_t elapsedtime_interrupt(int irq, void *dev_id)
 
 static irqreturn_t rtclong1_interrupt(int irq, void *dev_id)
 {
-	struct platform_device *pdev = (struct platform_device *)dev_id;
+	struct platform_device *pdev = dev_id;
 	struct rtc_device *rtc = platform_get_drvdata(pdev);
 	unsigned long count = periodic_count;
 

@@ -74,7 +74,7 @@ struct max8925_rtc_info {
 
 static irqreturn_t rtc_update_handler(int irq, void *data)
 {
-	struct max8925_rtc_info *info = (struct max8925_rtc_info *)data;
+	struct max8925_rtc_info *info = data;
 
 	/* disable ALARM0 except for 1SEC alarm */
 	max8925_set_bits(info->rtc, MAX8925_ALARM0_CNTL, 0x7f, 0);

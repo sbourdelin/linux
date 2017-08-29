@@ -256,7 +256,7 @@ CLK_OF_DECLARE_DRIVER(sun6i_rtc_clk, "allwinner,sun6i-a31-rtc",
 
 static irqreturn_t sun6i_rtc_alarmirq(int irq, void *id)
 {
-	struct sun6i_rtc_dev *chip = (struct sun6i_rtc_dev *) id;
+	struct sun6i_rtc_dev *chip = id;
 	irqreturn_t ret = IRQ_NONE;
 	u32 val;
 

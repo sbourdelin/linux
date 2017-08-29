@@ -59,7 +59,7 @@ struct pm860x_rtc_info {
 
 static irqreturn_t rtc_update_handler(int irq, void *data)
 {
-	struct pm860x_rtc_info *info = (struct pm860x_rtc_info *)data;
+	struct pm860x_rtc_info *info = data;
 	int mask;
 
 	mask = ALARM | ALARM_WAKEUP;

@@ -60,7 +60,7 @@ struct pm80x_rtc_info {
 
 static irqreturn_t rtc_update_handler(int irq, void *data)
 {
-	struct pm80x_rtc_info *info = (struct pm80x_rtc_info *)data;
+	struct pm80x_rtc_info *info = data;
 	int mask;
 
 	mask = PM800_ALARM | PM800_ALARM_WAKEUP;

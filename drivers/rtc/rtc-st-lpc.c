@@ -74,7 +74,7 @@ static void st_rtc_set_hw_alarm(struct st_rtc *rtc,
 
 static irqreturn_t st_rtc_handler(int this_irq, void *data)
 {
-	struct st_rtc *rtc = (struct st_rtc *)data;
+	struct st_rtc *rtc = data;
 
 	rtc_update_irq(rtc->rtc_dev, 1, RTC_AF);
 

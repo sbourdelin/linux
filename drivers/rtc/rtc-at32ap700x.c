@@ -164,7 +164,7 @@ out:
 
 static irqreturn_t at32_rtc_interrupt(int irq, void *dev_id)
 {
-	struct rtc_at32ap700x *rtc = (struct rtc_at32ap700x *)dev_id;
+	struct rtc_at32ap700x *rtc = dev_id;
 	unsigned long isr = rtc_readl(rtc, ISR);
 	unsigned long events = 0;
 	int ret = IRQ_NONE;

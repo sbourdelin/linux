@@ -169,7 +169,7 @@ static int stm32_rtc_wait_sync(struct stm32_rtc *rtc)
 
 static irqreturn_t stm32_rtc_alarm_irq(int irq, void *dev_id)
 {
-	struct stm32_rtc *rtc = (struct stm32_rtc *)dev_id;
+	struct stm32_rtc *rtc = dev_id;
 	unsigned int isr, cr;
 
 	mutex_lock(&rtc->rtc_dev->ops_lock);

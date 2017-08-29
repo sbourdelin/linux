@@ -92,7 +92,7 @@ static void pic32_rtc_alarm_clk_enable(struct pic32_rtc_dev *pdata,
 
 static irqreturn_t pic32_rtc_alarmirq(int irq, void *id)
 {
-	struct pic32_rtc_dev *pdata = (struct pic32_rtc_dev *)id;
+	struct pic32_rtc_dev *pdata = id;
 
 	clk_enable(pdata->clk);
 	rtc_update_irq(pdata->rtc, 1, RTC_AF | RTC_IRQF);

@@ -131,7 +131,7 @@ static const struct rtc_class_ops xgene_rtc_ops = {
 
 static irqreturn_t xgene_rtc_interrupt(int irq, void *id)
 {
-	struct xgene_rtc_dev *pdata = (struct xgene_rtc_dev *) id;
+	struct xgene_rtc_dev *pdata = id;
 
 	/* Check if interrupt asserted */
 	if (!(readl(pdata->csr_base + RTC_STAT) & RTC_STAT_BIT))
