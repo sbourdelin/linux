@@ -120,8 +120,5 @@ int sun4i_ddc_create(struct sun4i_hdmi *hdmi, struct clk *parent)
 	ddc->hw.init = &init;
 
 	hdmi->ddc_clk = devm_clk_register(hdmi->dev, &ddc->hw);
-	if (IS_ERR(hdmi->ddc_clk))
-		return PTR_ERR(hdmi->ddc_clk);
-
-	return 0;
+	return PTR_ERR_OR_ZERO(hdmi->ddc_clk);
 }
