@@ -299,10 +299,24 @@ static const struct intel_device_info intel_valleyview_info = {
 	.has_rc6p = 0 /* RC6p removed-by HSW */, \
 	.has_runtime_pm = 1
 
-static const struct intel_device_info intel_haswell_info = {
-	HSW_FEATURES,
-	.platform = INTEL_HASWELL,
-	.has_l3_dpf = 1,
+#define HSW_PLATFORM \
+	HSW_FEATURES, \
+	.platform = INTEL_HASWELL, \
+	.has_l3_dpf = 1
+
+static const struct intel_device_info intel_haswell_gt1_info = {
+	HSW_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info intel_haswell_gt2_info = {
+	HSW_PLATFORM,
+	.gt = 2,
+};
+
+static const struct intel_device_info intel_haswell_gt3_info = {
+	HSW_PLATFORM,
+	.gt = 3,
 };
 
 #define BDW_FEATURES \
@@ -318,12 +332,27 @@ static const struct intel_device_info intel_haswell_info = {
 	.gen = 8, \
 	.platform = INTEL_BROADWELL
 
-static const struct intel_device_info intel_broadwell_info = {
+static const struct intel_device_info intel_broadwell_gt1_info = {
 	BDW_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info intel_broadwell_gt2_info = {
+	BDW_PLATFORM,
+	.gt = 2,
+};
+
+static const struct intel_device_info intel_broadwell_rsvd_info = {
+	BDW_PLATFORM,
+	.gt = 3,
+	/* According to the device ID those devices are GT3, they were
+	 * previously treated as not GT3, keep it like that.
+	 */
 };
 
 static const struct intel_device_info intel_broadwell_gt3_info = {
 	BDW_PLATFORM,
+	.gt = 3,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
 };
 
@@ -358,13 +387,29 @@ static const struct intel_device_info intel_cherryview_info = {
 	.has_guc = 1, \
 	.ddb_size = 896
 
-static const struct intel_device_info intel_skylake_info = {
+static const struct intel_device_info intel_skylake_gt1_info = {
 	SKL_PLATFORM,
+	.gt = 1,
 };
 
-static const struct intel_device_info intel_skylake_gt3_info = {
+static const struct intel_device_info intel_skylake_gt2_info = {
 	SKL_PLATFORM,
-	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
+	.gt = 2,
+};
+
+#define SKL_GT3_PLUS_PLATFORM \
+	SKL_PLATFORM, \
+	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING
+
+
+static const struct intel_device_info intel_skylake_gt3_info = {
+	SKL_GT3_PLUS_PLATFORM,
+	.gt = 3,
+};
+
+static const struct intel_device_info intel_skylake_gt4_info = {
+	SKL_GT3_PLUS_PLATFORM,
+	.gt = 4,
 };
 
 #define GEN9_LP_FEATURES \
@@ -415,12 +460,19 @@ static const struct intel_device_info intel_geminilake_info = {
 	.has_guc = 1, \
 	.ddb_size = 896
 
-static const struct intel_device_info intel_kabylake_info = {
+static const struct intel_device_info intel_kabylake_gt1_info = {
 	KBL_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info intel_kabylake_gt2_info = {
+	KBL_PLATFORM,
+	.gt = 2,
 };
 
 static const struct intel_device_info intel_kabylake_gt3_info = {
 	KBL_PLATFORM,
+	.gt = 3,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
 };
 
@@ -433,20 +485,28 @@ static const struct intel_device_info intel_kabylake_gt3_info = {
 	.has_guc = 1, \
 	.ddb_size = 896
 
-static const struct intel_device_info intel_coffeelake_info = {
+static const struct intel_device_info intel_coffeelake_gt1_info = {
 	CFL_PLATFORM,
+	.gt = 1,
+};
+
+static const struct intel_device_info intel_coffeelake_gt2_info = {
+	CFL_PLATFORM,
+	.gt = 2,
 };
 
 static const struct intel_device_info intel_coffeelake_gt3_info = {
 	CFL_PLATFORM,
+	.gt = 3,
 	.ring_mask = RENDER_RING | BSD_RING | BLT_RING | VEBOX_RING | BSD2_RING,
 };
 
-static const struct intel_device_info intel_cannonlake_info = {
+static const struct intel_device_info intel_cannonlake_gt2_info = {
 	BDW_FEATURES,
 	.is_alpha_support = 1,
 	.platform = INTEL_CANNONLAKE,
 	.gen = 10,
+	.gt = 2,
 	.ddb_size = 1024,
 	.has_csr = 1,
 	.color = { .degamma_lut_size = 0, .gamma_lut_size = 1024 }
@@ -480,26 +540,31 @@ static const struct pci_device_id pciidlist[] = {
 	INTEL_IVB_Q_IDS(&intel_ivybridge_q_info), /* must be first IVB */
 	INTEL_IVB_M_IDS(&intel_ivybridge_m_info),
 	INTEL_IVB_D_IDS(&intel_ivybridge_d_info),
-	INTEL_HSW_IDS(&intel_haswell_info),
+	INTEL_HSW_GT1_IDS(&intel_haswell_gt1_info),
+	INTEL_HSW_GT2_IDS(&intel_haswell_gt2_info),
+	INTEL_HSW_GT3_IDS(&intel_haswell_gt3_info),
 	INTEL_VLV_IDS(&intel_valleyview_info),
-	INTEL_BDW_GT12_IDS(&intel_broadwell_info),
+	INTEL_BDW_GT1_IDS(&intel_broadwell_gt1_info),
+	INTEL_BDW_GT2_IDS(&intel_broadwell_gt2_info),
 	INTEL_BDW_GT3_IDS(&intel_broadwell_gt3_info),
-	INTEL_BDW_RSVD_IDS(&intel_broadwell_info),
+	INTEL_BDW_RSVD_IDS(&intel_broadwell_rsvd_info),
 	INTEL_CHV_IDS(&intel_cherryview_info),
-	INTEL_SKL_GT1_IDS(&intel_skylake_info),
-	INTEL_SKL_GT2_IDS(&intel_skylake_info),
+	INTEL_SKL_GT1_IDS(&intel_skylake_gt1_info),
+	INTEL_SKL_GT2_IDS(&intel_skylake_gt2_info),
 	INTEL_SKL_GT3_IDS(&intel_skylake_gt3_info),
-	INTEL_SKL_GT4_IDS(&intel_skylake_gt3_info),
+	INTEL_SKL_GT4_IDS(&intel_skylake_gt4_info),
 	INTEL_BXT_IDS(&intel_broxton_info),
 	INTEL_GLK_IDS(&intel_geminilake_info),
-	INTEL_KBL_GT1_IDS(&intel_kabylake_info),
-	INTEL_KBL_GT2_IDS(&intel_kabylake_info),
+	INTEL_KBL_GT1_IDS(&intel_kabylake_gt1_info),
+	INTEL_KBL_GT2_IDS(&intel_kabylake_gt2_info),
 	INTEL_KBL_GT3_IDS(&intel_kabylake_gt3_info),
 	INTEL_KBL_GT4_IDS(&intel_kabylake_gt3_info),
-	INTEL_CFL_S_IDS(&intel_coffeelake_info),
-	INTEL_CFL_H_IDS(&intel_coffeelake_info),
-	INTEL_CFL_U_IDS(&intel_coffeelake_gt3_info),
-	INTEL_CNL_IDS(&intel_cannonlake_info),
+	INTEL_CFL_S_GT1_IDS(&intel_coffeelake_gt1_info),
+	INTEL_CFL_S_GT2_IDS(&intel_coffeelake_gt2_info),
+	INTEL_CFL_H_GT2_IDS(&intel_coffeelake_gt2_info),
+	INTEL_CFL_U_GT3_IDS(&intel_coffeelake_gt3_info),
+	INTEL_CNL_U_GT2_IDS(&intel_cannonlake_gt2_info),
+	INTEL_CNL_Y_GT2_IDS(&intel_cannonlake_gt2_info),
 	{0, 0, 0}
 };
 MODULE_DEVICE_TABLE(pci, pciidlist);
