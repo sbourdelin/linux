@@ -2023,6 +2023,7 @@ out:
 void i915_gem_runtime_suspend(struct drm_i915_private *dev_priv)
 {
 	struct drm_i915_gem_object *obj, *on;
+	unsigned long flags;
 	int i;
 
 	/*
@@ -2062,6 +2063,17 @@ void i915_gem_runtime_suspend(struct drm_i915_private *dev_priv)
 
 		GEM_BUG_ON(!list_empty(&reg->vma->obj->userfault_link));
 		reg->dirty = true;
+	}
+
+	spin_lock_irqsave(&dev_priv->uncore.lock, flags);
+	POSTING_READ_FW(RING_ACTHD(dev_priv->engine[RCS]->mmio_base));
+	spin_unlock_irqrestore(&dev_priv->uncore.lock, flags);
+
+	list_for_each_entry(obj, &dev_priv->mm.bound_list, global_link) {
+		if (obj->base.read_domains & I915_GEM_DOMAIN_GTT) {
+			obj->base.read_domains &= ~I915_GEM_DOMAIN_GTT;
+			obj->base.write_domain &= ~I915_GEM_DOMAIN_GTT;
+		}
 	}
 }
 
