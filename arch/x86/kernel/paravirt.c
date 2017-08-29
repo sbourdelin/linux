@@ -128,6 +128,7 @@ static void *get_call_destination(u8 type)
 #ifdef CONFIG_PARAVIRT_SPINLOCKS
 		.pv_lock_ops = pv_lock_ops,
 #endif
+		.pv_idle_ops = pv_idle_ops,
 	};
 	return *((void **)&tmpl + type);
 }
@@ -312,6 +313,10 @@ struct pv_time_ops pv_time_ops = {
 	.steal_clock = native_steal_clock,
 };
 
+struct pv_idle_ops pv_idle_ops = {
+	.poll = paravirt_nop,
+};
+
 __visible struct pv_irq_ops pv_irq_ops = {
 	.save_fl = __PV_IS_CALLEE_SAVE(native_save_fl),
 	.restore_fl = __PV_IS_CALLEE_SAVE(native_restore_fl),
@@ -471,3 +476,4 @@ EXPORT_SYMBOL    (pv_cpu_ops);
 EXPORT_SYMBOL    (pv_mmu_ops);
 EXPORT_SYMBOL_GPL(pv_info);
 EXPORT_SYMBOL    (pv_irq_ops);
+EXPORT_SYMBOL    (pv_idle_ops);

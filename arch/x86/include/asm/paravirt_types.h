@@ -324,6 +324,10 @@ struct pv_lock_ops {
 	struct paravirt_callee_save vcpu_is_preempted;
 } __no_randomize_layout;
 
+struct pv_idle_ops {
+	void (*poll)(void);
+} __no_randomize_layout;
+
 /* This contains all the paravirt structures: we get a convenient
  * number for each function using the offset which we use to indicate
  * what to patch. */
@@ -334,6 +338,7 @@ struct paravirt_patch_template {
 	struct pv_irq_ops pv_irq_ops;
 	struct pv_mmu_ops pv_mmu_ops;
 	struct pv_lock_ops pv_lock_ops;
+	struct pv_idle_ops pv_idle_ops;
 } __no_randomize_layout;
 
 extern struct pv_info pv_info;
@@ -343,6 +348,7 @@ extern struct pv_cpu_ops pv_cpu_ops;
 extern struct pv_irq_ops pv_irq_ops;
 extern struct pv_mmu_ops pv_mmu_ops;
 extern struct pv_lock_ops pv_lock_ops;
+extern struct pv_idle_ops pv_idle_ops;
 
 #define PARAVIRT_PATCH(x)					\
 	(offsetof(struct paravirt_patch_template, x) / sizeof(void *))
