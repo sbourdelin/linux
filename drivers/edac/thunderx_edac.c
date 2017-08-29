@@ -22,6 +22,7 @@
 #include <linux/bitfield.h>
 #include <linux/circ_buf.h>
 #include <linux/soc/cavium/lmc.h>
+#include <linux/soc/cavium/ocx.h>
 
 #include <asm/page.h>
 
@@ -814,8 +815,6 @@ EXPORT_SYMBOL_GPL(thunderx_edac_lmc_remove);
 
 /*---------------------- OCX driver ---------------------------------*/
 
-#define PCI_DEVICE_ID_THUNDER_OCX 0xa013
-
 #define OCX_LINK_INTS		3
 #define OCX_INTS		(OCX_LINK_INTS + 1)
 #define OCX_RX_LANES		24
@@ -1311,11 +1310,6 @@ struct debugfs_entry *ocx_dfs_ents[] = {
 	&debugfs_com_int,
 };
 
-static const struct pci_device_id thunderx_ocx_pci_tbl[] = {
-	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_THUNDER_OCX) },
-	{ 0, },
-};
-
 static void thunderx_ocx_clearstats(struct thunderx_ocx *ocx)
 {
 	int lane, stat, cfg;
@@ -1331,8 +1325,8 @@ static void thunderx_ocx_clearstats(struct thunderx_ocx *ocx)
 	}
 }
 
-static int thunderx_ocx_probe(struct pci_dev *pdev,
-			      const struct pci_device_id *id)
+int thunderx_edac_ocx_probe(struct pci_dev *pdev,
+			    const struct pci_device_id *id)
 {
 	struct thunderx_ocx *ocx;
 	struct edac_device_ctl_info *edac_dev;
@@ -1461,8 +1455,9 @@ err_free:
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(thunderx_edac_ocx_probe);
 
-static void thunderx_ocx_remove(struct pci_dev *pdev)
+void thunderx_edac_ocx_remove(struct pci_dev *pdev)
 {
 	struct edac_device_ctl_info *edac_dev = pci_get_drvdata(pdev);
 	struct thunderx_ocx *ocx = edac_dev->pvt_info;
@@ -1480,15 +1475,7 @@ static void thunderx_ocx_remove(struct pci_dev *pdev)
 	edac_device_del_device(&pdev->dev);
 	edac_device_free_ctl_info(edac_dev);
 }
-
-MODULE_DEVICE_TABLE(pci, thunderx_ocx_pci_tbl);
-
-static struct pci_driver thunderx_ocx_driver = {
-	.name     = "thunderx_ocx_edac",
-	.probe    = thunderx_ocx_probe,
-	.remove   = thunderx_ocx_remove,
-	.id_table = thunderx_ocx_pci_tbl,
-};
+EXPORT_SYMBOL_GPL(thunderx_edac_ocx_remove);
 
 /*---------------------- L2C driver ---------------------------------*/
 
@@ -2104,27 +2091,12 @@ static struct pci_driver thunderx_l2c_driver = {
 
 static int __init thunderx_edac_init(void)
 {
-	int rc = 0;
-
-	rc = pci_register_driver(&thunderx_ocx_driver);
-	if (rc)
-		return rc;
-
-	rc = pci_register_driver(&thunderx_l2c_driver);
-	if (rc)
-		goto err_ocx;
-
-	return rc;
-err_ocx:
-	pci_unregister_driver(&thunderx_ocx_driver);
-
-	return rc;
+	return pci_register_driver(&thunderx_l2c_driver);
 }
 
 static void __exit thunderx_edac_exit(void)
 {
 	pci_unregister_driver(&thunderx_l2c_driver);
-	pci_unregister_driver(&thunderx_ocx_driver);
 
 }
 

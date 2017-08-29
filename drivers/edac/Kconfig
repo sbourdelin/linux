@@ -373,6 +373,7 @@ config EDAC_THUNDERX
 	depends on PCI
 	depends on m
 	select CAVIUM_LMC
+	select CAVIUM_OCX
 	help
 	  Support for error detection and correction on the
 	  Cavium ThunderX memory controllers (LMC), Cache
