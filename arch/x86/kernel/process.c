@@ -332,6 +332,13 @@ void arch_cpu_idle(void)
 	x86_idle();
 }
 
+#if defined(CONFIG_SMP) && defined(CONFIG_PARAVIRT)
+void arch_cpu_idle_poll(void)
+{
+	paravirt_idle_poll();
+}
+#endif
+
 /*
  * We use this if we don't have any better idle routine..
  */
