@@ -12,6 +12,10 @@ enum cpu_idle_type {
 
 extern void wake_up_if_idle(int cpu);
 
+#if defined(CONFIG_SMP) && defined(CONFIG_PARAVIRT)
+extern void update_poll_duration(unsigned long idle_duration);
+#endif
+
 /*
  * Idle thread specific functions to determine the need_resched
  * polling state.

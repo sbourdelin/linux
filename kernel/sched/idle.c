@@ -101,6 +101,13 @@ void __cpuidle default_idle_call(void)
 	}
 }
 
+#if defined(CONFIG_SMP) && defined(CONFIG_PARAVIRT)
+void update_poll_duration(unsigned long idle_duration)
+{
+	paravirt_idle_update_poll_duration(idle_duration);
+}
+#endif
+
 static int call_cpuidle(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 		      int next_state)
 {
