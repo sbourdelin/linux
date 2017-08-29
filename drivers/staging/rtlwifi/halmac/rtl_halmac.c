@@ -386,7 +386,7 @@ static void deinit_priv(struct rtl_halmac *halmac)
 		u32 count, size;
 
 		count = HALMAC_FEATURE_ALL + 1;
-#ifdef CONFIG_RTL_DEBUG
+#ifdef CONFIG_RTLWIFI_DEBUG
 		{
 			struct submit_ctx *sctx;
 			u32 i;
@@ -405,7 +405,7 @@ static void deinit_priv(struct rtl_halmac *halmac)
 				rtl_mfree((u8 *)sctx, sizeof(*sctx));
 			}
 		}
-#endif /* !CONFIG_RTL_DEBUG */
+#endif /* !CONFIG_RTLWIFI_DEBUG */
 		size = sizeof(*indicator) * count;
 		kfree((u8 *)indicator);
 	}
