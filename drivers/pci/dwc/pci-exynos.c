@@ -152,10 +152,7 @@ static int exynos5440_pcie_get_mem_resources(struct platform_device *pdev,
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
 	ep->mem_res->block_base = devm_ioremap_resource(dev, res);
-	if (IS_ERR(ep->mem_res->block_base))
-		return PTR_ERR(ep->mem_res->block_base);
-
-	return 0;
+	return PTR_ERR_OR_ZERO(ep->mem_res->block_base);
 }
 
 static int exynos5440_pcie_get_clk_resources(struct exynos_pcie *ep)

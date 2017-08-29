@@ -679,10 +679,7 @@ static int qcom_pcie_get_resources_v3(struct qcom_pcie *pcie)
 		return PTR_ERR(res->ahb_reset);
 
 	res->phy_ahb_reset = devm_reset_control_get_exclusive(dev, "phy_ahb");
-	if (IS_ERR(res->phy_ahb_reset))
-		return PTR_ERR(res->phy_ahb_reset);
-
-	return 0;
+	return PTR_ERR_OR_ZERO(res->phy_ahb_reset);
 }
 
 static void qcom_pcie_deinit_v3(struct qcom_pcie *pcie)
