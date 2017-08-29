@@ -253,6 +253,15 @@ struct drm_crtc_state {
 	 */
 	struct drm_pending_vblank_event *event;
 
+	/**
+	 * @commit:
+	 *
+	 * This tracks how the commit for this update proceeds through the
+	 * various phases. This is never cleared, except when we destroy the
+	 * state, so that subsequent commits can synchronize with previous ones.
+	 */
+	struct drm_crtc_commit *commit;
+
 	struct drm_atomic_state *state;
 };
 
