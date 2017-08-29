@@ -1,0 +1,6 @@
+#
+# Cavium ThunderX Soc drivers
+#
+config CAVIUM_LMC
+        depends on ARCH_THUNDER
+	def_tristate m

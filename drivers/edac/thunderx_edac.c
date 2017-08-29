@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/edac.h>
+#include <linux/export.h>
 #include <linux/interrupt.h>
 #include <linux/string.h>
 #include <linux/stop_machine.h>
@@ -20,6 +21,7 @@
 #include <linux/atomic.h>
 #include <linux/bitfield.h>
 #include <linux/circ_buf.h>
+#include <linux/soc/cavium/lmc.h>
 
 #include <asm/page.h>
 
@@ -654,8 +656,7 @@ static inline int pci_dev_to_mc_idx(struct pci_dev *pdev)
 	return ret;
 }
 
-static int thunderx_lmc_probe(struct pci_dev *pdev,
-				const struct pci_device_id *id)
+int thunderx_edac_lmc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct thunderx_lmc *lmc;
 	struct edac_mc_layer layer;
@@ -797,8 +798,9 @@ err_free:
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(thunderx_edac_lmc_probe);
 
-static void thunderx_lmc_remove(struct pci_dev *pdev)
+void thunderx_edac_lmc_remove(struct pci_dev *pdev)
 {
 	struct mem_ctl_info *mci = pci_get_drvdata(pdev);
 	struct thunderx_lmc *lmc = mci->pvt_info;
@@ -808,19 +810,7 @@ static void thunderx_lmc_remove(struct pci_dev *pdev)
 	edac_mc_del_mc(&pdev->dev);
 	edac_mc_free(mci);
 }
-
-MODULE_DEVICE_TABLE(pci, thunderx_lmc_pci_tbl);
-
-static struct pci_driver thunderx_lmc_driver = {
-	.name     = "thunderx_lmc_edac",
-	.probe    = thunderx_lmc_probe,
-	.remove   = thunderx_lmc_remove,
-#ifdef CONFIG_PM
-	.suspend  = thunderx_lmc_suspend,
-	.resume   = thunderx_lmc_resume,
-#endif
-	.id_table = thunderx_lmc_pci_tbl,
-};
+EXPORT_SYMBOL_GPL(thunderx_edac_lmc_remove);
 
 /*---------------------- OCX driver ---------------------------------*/
 
@@ -2116,13 +2106,9 @@ static int __init thunderx_edac_init(void)
 {
 	int rc = 0;
 
-	rc = pci_register_driver(&thunderx_lmc_driver);
-	if (rc)
-		return rc;
-
 	rc = pci_register_driver(&thunderx_ocx_driver);
 	if (rc)
-		goto err_lmc;
+		return rc;
 
 	rc = pci_register_driver(&thunderx_l2c_driver);
 	if (rc)
@@ -2131,8 +2117,6 @@ static int __init thunderx_edac_init(void)
 	return rc;
 err_ocx:
 	pci_unregister_driver(&thunderx_ocx_driver);
-err_lmc:
-	pci_unregister_driver(&thunderx_lmc_driver);
 
 	return rc;
 }
@@ -2141,7 +2125,6 @@ static void __exit thunderx_edac_exit(void)
 {
 	pci_unregister_driver(&thunderx_l2c_driver);
 	pci_unregister_driver(&thunderx_ocx_driver);
-	pci_unregister_driver(&thunderx_lmc_driver);
 
 }
 
