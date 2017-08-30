@@ -208,6 +208,9 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
 	 * We expect these calls to enable and stabilize the contrast
 	 * voltage Vee as stipulated by the manual
 	 */
+	if (priv->variant_display_enable)
+		priv->variant_display_enable(drm, fb->format->format);
+
 	drm_panel_enable(priv->panel);
 
 	/* Power Up */
@@ -238,6 +241,10 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
 	 * stipulated by the manual
 	 */
 	drm_panel_disable(priv->panel);
+
+	if (priv->variant_display_disable)
+		priv->variant_display_disable(drm);
+
 	drm_panel_unprepare(priv->panel);
 
 	/* Disable */
