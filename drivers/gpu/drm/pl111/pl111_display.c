@@ -201,7 +201,7 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
 		break;
 	}
 
-	writel(cntl, priv->regs + CLCD_PL111_CNTL);
+	writel(cntl, priv->regs + priv->ctrl);
 
 	drm_panel_enable(priv->panel);
 
@@ -219,7 +219,7 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
 	drm_panel_disable(priv->panel);
 
 	/* Disable and Power Down */
-	writel(0, priv->regs + CLCD_PL111_CNTL);
+	writel(0, priv->regs + priv->ctrl);
 
 	drm_panel_unprepare(priv->panel);
 
@@ -259,7 +259,7 @@ int pl111_enable_vblank(struct drm_device *drm, unsigned int crtc)
 {
 	struct pl111_drm_dev_private *priv = drm->dev_private;
 
-	writel(CLCD_IRQ_NEXTBASE_UPDATE, priv->regs + CLCD_PL111_IENB);
+	writel(CLCD_IRQ_NEXTBASE_UPDATE, priv->regs + priv->ienb);
 
 	return 0;
 }
@@ -268,7 +268,7 @@ void pl111_disable_vblank(struct drm_device *drm, unsigned int crtc)
 {
 	struct pl111_drm_dev_private *priv = drm->dev_private;
 
-	writel(0, priv->regs + CLCD_PL111_IENB);
+	writel(0, priv->regs + priv->ienb);
 }
 
 static int pl111_display_prepare_fb(struct drm_simple_display_pipe *pipe,
@@ -412,22 +412,6 @@ int pl111_display_init(struct drm_device *drm)
 	struct device_node *endpoint;
 	u32 tft_r0b0g0[3];
 	int ret;
-	static const u32 formats[] = {
-		DRM_FORMAT_ABGR8888,
-		DRM_FORMAT_XBGR8888,
-		DRM_FORMAT_ARGB8888,
-		DRM_FORMAT_XRGB8888,
-		DRM_FORMAT_BGR565,
-		DRM_FORMAT_RGB565,
-		DRM_FORMAT_ABGR1555,
-		DRM_FORMAT_XBGR1555,
-		DRM_FORMAT_ARGB1555,
-		DRM_FORMAT_XRGB1555,
-		DRM_FORMAT_ABGR4444,
-		DRM_FORMAT_XBGR4444,
-		DRM_FORMAT_ARGB4444,
-		DRM_FORMAT_XRGB4444,
-	};
 
 	endpoint = of_graph_get_next_endpoint(dev->of_node, NULL);
 	if (!endpoint)
@@ -456,7 +440,8 @@ int pl111_display_init(struct drm_device *drm)
 
 	ret = drm_simple_display_pipe_init(drm, &priv->pipe,
 					   &pl111_display_funcs,
-					   formats, ARRAY_SIZE(formats),
+					   priv->variant->formats,
+					   priv->variant->nformats,
 					   priv->connector);
 	if (ret)
 		return ret;
