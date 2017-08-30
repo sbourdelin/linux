@@ -157,8 +157,8 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
 
 	drm_panel_prepare(priv->panel);
 
-	/* Enable and Power Up */
-	cntl = CNTL_LCDEN | CNTL_LCDTFT | CNTL_LCDPWR | CNTL_LCDVCOMP(1);
+	/* Hard-code TFT panel */
+	cntl = CNTL_LCDEN | CNTL_LCDTFT | CNTL_LCDVCOMP(1);
 
 	/* Note that the the hardware's format reader takes 'r' from
 	 * the low bit, while DRM formats list channels from high bit
@@ -201,9 +201,18 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
 		break;
 	}
 
+	/* Power sequence: first enable and chill */
 	writel(cntl, priv->regs + priv->ctrl);
 
+	/*
+	 * We expect these calls to enable and stabilize the contrast
+	 * voltage Vee as stipulated by the manual
+	 */
 	drm_panel_enable(priv->panel);
+
+	/* Power Up */
+	cntl |= CNTL_LCDPWR;
+	writel(cntl, priv->regs + priv->ctrl);
 
 	drm_crtc_vblank_on(crtc);
 }
@@ -213,15 +222,26 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
 	struct drm_crtc *crtc = &pipe->crtc;
 	struct drm_device *drm = crtc->dev;
 	struct pl111_drm_dev_private *priv = drm->dev_private;
+	u32 cntl;
 
 	drm_crtc_vblank_off(crtc);
 
+	/* Power Down */
+	cntl = readl(priv->regs + priv->ctrl);
+	if (cntl & CNTL_LCDPWR) {
+		cntl &= ~CNTL_LCDPWR;
+		writel(cntl, priv->regs + priv->ctrl);
+	}
+
+	/*
+	 * We expect these calls to disable the contrast voltage Vee as
+	 * stipulated by the manual
+	 */
 	drm_panel_disable(priv->panel);
-
-	/* Disable and Power Down */
-	writel(0, priv->regs + priv->ctrl);
-
 	drm_panel_unprepare(priv->panel);
+
+	/* Disable */
+	writel(0, priv->regs + priv->ctrl);
 
 	clk_disable_unprepare(priv->clk);
 }
