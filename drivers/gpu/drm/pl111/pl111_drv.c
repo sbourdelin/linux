@@ -72,6 +72,7 @@
 #include <drm/drm_panel.h>
 
 #include "pl111_drm.h"
+#include "pl111_versatile.h"
 
 #define DRIVER_DESC      "DRM module for PL111"
 
@@ -263,6 +264,10 @@ static int pl111_amba_probe(struct amba_device *amba_dev,
 		dev_err(dev, "%s failed irq %d\n", __func__, ret);
 		return ret;
 	}
+
+	ret = pl111_versatile_init(dev, priv);
+	if (ret)
+		goto dev_unref;
 
 	ret = pl111_modeset_init(drm);
 	if (ret != 0)
