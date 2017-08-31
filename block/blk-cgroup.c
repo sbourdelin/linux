@@ -1296,7 +1296,7 @@ int blkcg_activate_policy(struct request_queue *q,
 		return 0;
 
 	if (q->mq_ops)
-		blk_mq_freeze_queue(q);
+		blk_freeze_queue(q);
 	else
 		blk_queue_bypass_start(q);
 pd_prealloc:
@@ -1363,7 +1363,7 @@ void blkcg_deactivate_policy(struct request_queue *q,
 		return;
 
 	if (q->mq_ops)
-		blk_mq_freeze_queue(q);
+		blk_freeze_queue(q);
 	else
 		blk_queue_bypass_start(q);
 

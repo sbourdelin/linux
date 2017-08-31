@@ -1203,7 +1203,7 @@ static void __nvme_revalidate_disk(struct gendisk *disk, struct nvme_id_ns *id)
 	bs = 1 << ns->lba_shift;
 	ns->noiob = le16_to_cpu(id->noiob);
 
-	blk_mq_freeze_queue(disk->queue);
+	blk_freeze_queue(disk->queue);
 
 	if (ctrl->ops->flags & NVME_F_METADATA_SUPPORTED)
 		nvme_prep_integrity(disk, id, bs);

@@ -950,7 +950,7 @@ static int elevator_switch_mq(struct request_queue *q,
 {
 	int ret;
 
-	blk_mq_freeze_queue(q);
+	blk_freeze_queue(q);
 
 	if (q->elevator) {
 		if (q->elevator->registered)

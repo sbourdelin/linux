@@ -211,7 +211,7 @@ static void __loop_update_dio(struct loop_device *lo, bool dio)
 	 * LO_FLAGS_READ_ONLY, both are set from kernel, and losetup
 	 * will get updated by ioctl(LOOP_GET_STATUS)
 	 */
-	blk_mq_freeze_queue(lo->lo_queue);
+	blk_freeze_queue(lo->lo_queue);
 	lo->use_dio = use_dio;
 	if (use_dio)
 		lo->lo_flags |= LO_FLAGS_DIRECT_IO;
@@ -599,7 +599,7 @@ static int loop_switch(struct loop_device *lo, struct file *file)
 	w.file = file;
 
 	/* freeze queue and wait for completion of scheduled requests */
-	blk_mq_freeze_queue(lo->lo_queue);
+	blk_freeze_queue(lo->lo_queue);
 
 	/* do the switch action */
 	do_loop_switch(lo, &w);
@@ -1046,7 +1046,7 @@ static int loop_clr_fd(struct loop_device *lo)
 		return -EINVAL;
 
 	/* freeze request queue during the transition */
-	blk_mq_freeze_queue(lo->lo_queue);
+	blk_freeze_queue(lo->lo_queue);
 
 	spin_lock_irq(&lo->lo_lock);
 	lo->lo_state = Lo_rundown;
@@ -1116,7 +1116,7 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 		return -EINVAL;
 
 	/* I/O need to be drained during transfer transition */
-	blk_mq_freeze_queue(lo->lo_queue);
+	blk_freeze_queue(lo->lo_queue);
 
 	err = loop_release_xfer(lo);
 	if (err)
