@@ -830,7 +830,7 @@ nouveau_drm_open(struct drm_device *dev, struct drm_file *fpriv)
 {
 	struct nouveau_drm *drm = nouveau_drm(dev);
 	struct nouveau_cli *cli;
-	char name[32], tmpname[TASK_COMM_LEN];
+	char name[TASK_COMM_LEN + 16], tmpname[TASK_COMM_LEN];
 	int ret;
 
 	/* need to bring up power immediately if opening device */
