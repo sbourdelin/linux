@@ -1147,6 +1147,9 @@ static int bcm_sf2_sw_probe(struct platform_device *pdev)
 	ds = dev->ds;
 	ds->ops = &bcm_sf2_ops;
 
+	/* Advertise the 8 egress queues */
+	ds->num_tx_queues = 8;
+
 	dev_set_drvdata(&pdev->dev, priv);
 
 	spin_lock_init(&priv->indir_lock);
