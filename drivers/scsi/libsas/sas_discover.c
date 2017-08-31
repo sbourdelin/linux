@@ -368,6 +368,10 @@ static void sas_destruct_devices(struct work_struct *work)
 		sas_rphy_delete(dev->rphy);
 		sas_unregister_common_dev(port, dev);
 	}
+	if (!port->port->rphy) {
+		sas_port_delete(port->port);
+		port->port = NULL;
+	}
 }
 
 void sas_unregister_dev(struct asd_sas_port *port, struct domain_device *dev)
@@ -401,8 +405,12 @@ void sas_unregister_domain_devices(struct asd_sas_port *port, int gone)
 	list_for_each_entry_safe(dev, n, &port->disco_list, disco_list_node)
 		sas_unregister_dev(port, dev);
 
+	/*
+	 * Add another destruct event (or overload the existing one)
+	 * to trigger port deletion.
+	 */
 	port->port->rphy = NULL;
-
+	sas_discover_event(port, DISCE_DESTRUCT);
 }
 
 void sas_device_set_phy(struct domain_device *dev, struct sas_port *port)
