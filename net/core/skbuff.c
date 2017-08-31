@@ -963,7 +963,7 @@ struct ubuf_info *sock_zerocopy_alloc(struct sock *sk, size_t size)
 	uarg->len = 1;
 	uarg->bytelen = size;
 	uarg->zerocopy = 1;
-	atomic_set(&uarg->refcnt, 0);
+	atomic_set(&uarg->refcnt, 1);
 	sock_hold(sk);
 
 	return uarg;
@@ -1005,6 +1005,7 @@ struct ubuf_info *sock_zerocopy_realloc(struct sock *sk, size_t size,
 			uarg->len++;
 			uarg->bytelen = bytelen;
 			atomic_set(&sk->sk_zckey, ++next);
+			sock_zerocopy_get(uarg);
 			return uarg;
 		}
 	}
