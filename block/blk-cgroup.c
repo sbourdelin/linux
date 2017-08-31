@@ -1337,7 +1337,7 @@ pd_prealloc:
 	spin_unlock_irq(q->queue_lock);
 out_bypass_end:
 	if (q->mq_ops)
-		blk_mq_unfreeze_queue(q);
+		blk_unfreeze_queue(q);
 	else
 		blk_queue_bypass_end(q);
 	if (pd_prealloc)
@@ -1388,7 +1388,7 @@ void blkcg_deactivate_policy(struct request_queue *q,
 	spin_unlock_irq(q->queue_lock);
 
 	if (q->mq_ops)
-		blk_mq_unfreeze_queue(q);
+		blk_unfreeze_queue(q);
 	else
 		blk_queue_bypass_end(q);
 }

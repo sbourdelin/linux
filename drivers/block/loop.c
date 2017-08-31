@@ -217,7 +217,7 @@ static void __loop_update_dio(struct loop_device *lo, bool dio)
 		lo->lo_flags |= LO_FLAGS_DIRECT_IO;
 	else
 		lo->lo_flags &= ~LO_FLAGS_DIRECT_IO;
-	blk_mq_unfreeze_queue(lo->lo_queue);
+	blk_unfreeze_queue(lo->lo_queue);
 }
 
 static int
@@ -605,7 +605,7 @@ static int loop_switch(struct loop_device *lo, struct file *file)
 	do_loop_switch(lo, &w);
 
 	/* unfreeze */
-	blk_mq_unfreeze_queue(lo->lo_queue);
+	blk_unfreeze_queue(lo->lo_queue);
 
 	return 0;
 }
@@ -1079,7 +1079,7 @@ static int loop_clr_fd(struct loop_device *lo)
 	lo->lo_state = Lo_unbound;
 	/* This is safe: open() is still holding a reference. */
 	module_put(THIS_MODULE);
-	blk_mq_unfreeze_queue(lo->lo_queue);
+	blk_unfreeze_queue(lo->lo_queue);
 
 	if (lo->lo_flags & LO_FLAGS_PARTSCAN && bdev)
 		loop_reread_partitions(lo, bdev);
@@ -1191,7 +1191,7 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 	__loop_update_dio(lo, lo->use_dio);
 
  exit:
-	blk_mq_unfreeze_queue(lo->lo_queue);
+	blk_unfreeze_queue(lo->lo_queue);
 
 	if (!err && (info->lo_flags & LO_FLAGS_PARTSCAN) &&
 	     !(lo->lo_flags & LO_FLAGS_PARTSCAN)) {

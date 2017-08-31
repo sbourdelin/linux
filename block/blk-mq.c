@@ -172,7 +172,7 @@ void blk_mq_freeze_queue(struct request_queue *q)
 }
 EXPORT_SYMBOL_GPL(blk_mq_freeze_queue);
 
-void blk_mq_unfreeze_queue(struct request_queue *q)
+void blk_unfreeze_queue(struct request_queue *q)
 {
 	int freeze_depth;
 
@@ -183,7 +183,7 @@ void blk_mq_unfreeze_queue(struct request_queue *q)
 		wake_up_all(&q->mq_freeze_wq);
 	}
 }
-EXPORT_SYMBOL_GPL(blk_mq_unfreeze_queue);
+EXPORT_SYMBOL_GPL(blk_unfreeze_queue);
 
 /*
  * FIXME: replace the scsi_internal_device_*block_nowait() calls in the
@@ -2184,7 +2184,7 @@ static void blk_mq_update_tag_set_depth(struct blk_mq_tag_set *set,
 	list_for_each_entry(q, &set->tag_list, tag_set_list) {
 		blk_mq_freeze_queue(q);
 		queue_set_hctx_shared(q, shared);
-		blk_mq_unfreeze_queue(q);
+		blk_unfreeze_queue(q);
 	}
 }
 
@@ -2640,7 +2640,7 @@ int blk_mq_update_nr_requests(struct request_queue *q, unsigned int nr)
 	if (!ret)
 		q->nr_requests = nr;
 
-	blk_mq_unfreeze_queue(q);
+	blk_unfreeze_queue(q);
 
 	return ret;
 }
@@ -2668,7 +2668,7 @@ static void __blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set,
 	}
 
 	list_for_each_entry(q, &set->tag_list, tag_set_list)
-		blk_mq_unfreeze_queue(q);
+		blk_unfreeze_queue(q);
 }
 
 void blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set, int nr_hw_queues)

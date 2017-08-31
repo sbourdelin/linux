@@ -977,7 +977,7 @@ static int elevator_switch_mq(struct request_queue *q,
 		blk_add_trace_msg(q, "elv switch: none");
 
 out:
-	blk_mq_unfreeze_queue(q);
+	blk_unfreeze_queue(q);
 	return ret;
 }
 
