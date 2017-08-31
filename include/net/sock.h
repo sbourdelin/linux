@@ -138,11 +138,14 @@ typedef __u64 __bitwise __addrpair;
  *	@skc_node: main hash linkage for various protocol lookup tables
  *	@skc_nulls_node: main hash linkage for TCP/UDP/UDP-Lite protocol
  *	@skc_tx_queue_mapping: tx queue number for this connection
+ *	@skc_rx_queue_mapping: rx queue number for this connection
+ *	@skc_rx_ifindex: rx ifindex for this connection
  *	@skc_flags: place holder for sk_flags
  *		%SO_LINGER (l_onoff), %SO_BROADCAST, %SO_KEEPALIVE,
  *		%SO_OOBINLINE settings, %SO_TIMESTAMPING settings
  *	@skc_incoming_cpu: record/match cpu processing incoming packets
  *	@skc_refcnt: reference count
+ *	@skc_symmetric_queues: symmetric tx/rx queues
  *
  *	This is the minimal network layer representation of sockets, the header
  *	for struct sock and struct inet_timewait_sock.
@@ -177,6 +180,7 @@ struct sock_common {
 	unsigned char		skc_reuseport:1;
 	unsigned char		skc_ipv6only:1;
 	unsigned char		skc_net_refcnt:1;
+	unsigned char		skc_symmetric_queues:1;
 	int			skc_bound_dev_if;
 	union {
 		struct hlist_node	skc_bind_node;
@@ -214,6 +218,8 @@ struct sock_common {
 		struct hlist_nulls_node skc_nulls_node;
 	};
 	int			skc_tx_queue_mapping;
+	int			skc_rx_queue_mapping;
+	int			skc_rx_ifindex;
 	union {
 		int		skc_incoming_cpu;
 		u32		skc_rcv_wnd;
@@ -324,6 +330,8 @@ struct sock {
 #define sk_nulls_node		__sk_common.skc_nulls_node
 #define sk_refcnt		__sk_common.skc_refcnt
 #define sk_tx_queue_mapping	__sk_common.skc_tx_queue_mapping
+#define sk_rx_queue_mapping	__sk_common.skc_rx_queue_mapping
+#define sk_rx_ifindex		__sk_common.skc_rx_ifindex
 
 #define sk_dontcopy_begin	__sk_common.skc_dontcopy_begin
 #define sk_dontcopy_end		__sk_common.skc_dontcopy_end
@@ -340,6 +348,7 @@ struct sock {
 #define sk_reuseport		__sk_common.skc_reuseport
 #define sk_ipv6only		__sk_common.skc_ipv6only
 #define sk_net_refcnt		__sk_common.skc_net_refcnt
+#define sk_symmetric_queues	__sk_common.skc_symmetric_queues
 #define sk_bound_dev_if		__sk_common.skc_bound_dev_if
 #define sk_bind_node		__sk_common.skc_bind_node
 #define sk_prot			__sk_common.skc_prot
@@ -1674,6 +1683,14 @@ static inline void sk_tx_queue_clear(struct sock *sk)
 static inline int sk_tx_queue_get(const struct sock *sk)
 {
 	return sk ? sk->sk_tx_queue_mapping : -1;
+}
+
+static inline void sk_mark_rx_queue(struct sock *sk, struct sk_buff *skb)
+{
+	if (sk->sk_symmetric_queues) {
+		sk->sk_rx_ifindex = skb->skb_iif;
+		sk->sk_rx_queue_mapping = skb_get_rx_queue(skb);
+	}
 }
 
 static inline void sk_set_socket(struct sock *sk, struct socket *sock)

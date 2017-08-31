@@ -1069,6 +1069,10 @@ set_rcvbuf:
 			sock_valbool_flag(sk, SOCK_ZEROCOPY, valbool);
 		break;
 
+	case SO_SYMMETRIC_QUEUES:
+		sk->sk_symmetric_queues = valbool;
+		break;
+
 	default:
 		ret = -ENOPROTOOPT;
 		break;
@@ -1399,6 +1403,10 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 
 	case SO_ZEROCOPY:
 		v.val = sock_flag(sk, SOCK_ZEROCOPY);
+		break;
+
+	case SO_SYMMETRIC_QUEUES:
+		v.val = sk->sk_symmetric_queues;
 		break;
 
 	default:
@@ -2751,6 +2759,8 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 	sk->sk_max_pacing_rate = ~0U;
 	sk->sk_pacing_rate = ~0U;
 	sk->sk_incoming_cpu = -1;
+	sk->sk_rx_ifindex = -1;
+	sk->sk_rx_queue_mapping = -1;
 	/*
 	 * Before updating sk_refcnt, we must commit prior changes to memory
 	 * (Documentation/RCU/rculist_nulls.txt for details)

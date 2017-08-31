@@ -3322,7 +3322,13 @@ static u16 __netdev_pick_tx(struct net_device *dev, struct sk_buff *skb)
 
 	if (queue_index < 0 || skb->ooo_okay ||
 	    queue_index >= dev->real_num_tx_queues) {
-		int new_index = get_xps_queue(dev, skb);
+		int new_index = -1;
+
+		if (sk && sk->sk_symmetric_queues && dev->ifindex == sk->sk_rx_ifindex)
+			new_index = sk->sk_rx_queue_mapping;
+
+		if (new_index < 0 || new_index >= dev->real_num_tx_queues)
+			new_index = get_xps_queue(dev, skb);
 
 		if (new_index < 0)
 			new_index = skb_tx_hash(dev, skb);

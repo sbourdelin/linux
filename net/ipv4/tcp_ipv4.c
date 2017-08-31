@@ -1450,6 +1450,7 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 
 		sock_rps_save_rxhash(sk, skb);
 		sk_mark_napi_id(sk, skb);
+		sk_mark_rx_queue(sk, skb);
 		if (dst) {
 			if (inet_sk(sk)->rx_dst_ifindex != skb->skb_iif ||
 			    !dst->ops->check(dst, 0)) {

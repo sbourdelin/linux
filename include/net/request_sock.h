@@ -100,6 +100,7 @@ reqsk_alloc(const struct request_sock_ops *ops, struct sock *sk_listener,
 	req_to_sk(req)->sk_prot = sk_listener->sk_prot;
 	sk_node_init(&req_to_sk(req)->sk_node);
 	sk_tx_queue_clear(req_to_sk(req));
+	req_to_sk(req)->sk_symmetric_queues = sk_listener->sk_symmetric_queues;
 	req->saved_syn = NULL;
 	refcount_set(&req->rsk_refcnt, 0);
 

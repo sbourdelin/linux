@@ -807,6 +807,7 @@ int tcp_child_process(struct sock *parent, struct sock *child,
 
 	/* record NAPI ID of child */
 	sk_mark_napi_id(child, skb);
+	sk_mark_rx_queue(child, skb);
 
 	tcp_segs_in(tcp_sk(child), skb);
 	if (!sock_owned_by_user(child)) {

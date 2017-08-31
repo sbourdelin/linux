@@ -106,4 +106,6 @@
 
 #define SO_ZEROCOPY		60
 
+#define SO_SYMMETRIC_QUEUES	61
+
 #endif /* __ASM_GENERIC_SOCKET_H */
