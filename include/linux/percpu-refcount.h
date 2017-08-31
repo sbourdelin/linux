@@ -324,4 +324,21 @@ static inline bool percpu_ref_is_zero(struct percpu_ref *ref)
 	return !atomic_long_read(&ref->count);
 }
 
+/**
+ * percpu_ref_is_dead - test whether a percpu refcount is killed
+ * @ref: percpu_ref to test
+ *
+ * Returns %true if @ref is dead
+ *
+ * This function is safe to call as long as @ref is between init and exit.
+ */
+static inline bool percpu_ref_is_dead(struct percpu_ref *ref)
+{
+	unsigned long __percpu *percpu_count;
+
+	if (__ref_is_percpu(ref, &percpu_count))
+		return false;
+	return ref->percpu_count_ptr & __PERCPU_REF_DEAD;
+}
+
 #endif
