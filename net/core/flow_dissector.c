@@ -396,6 +396,35 @@ __skb_flow_dissect_ipv6(const struct sk_buff *skb,
 	key_ip->ttl = iph->hop_limit;
 }
 
+/* Maximum number of nested encapsulations that can be processed in
+ * __skb_flow_dissect
+ */
+#define MAX_FLOW_DISSECT_ENCAPS	5
+
+static bool skb_flow_dissect_encap_allowed(int *num_encaps, unsigned int *flags)
+{
+	++*num_encaps;
+
+	if (*num_encaps >= MAX_FLOW_DISSECT_ENCAPS) {
+		if (*num_encaps == MAX_FLOW_DISSECT_ENCAPS) {
+			/* Allow one more pass but ignore disregard
+			 * further encapsulations
+			 */
+			*flags |= FLOW_DISSECTOR_F_STOP_AT_ENCAP;
+		} else {
+			/* Max encaps reached */
+			return  false;
+		}
+	}
+
+	return true;
+}
+
+/* Maximum number of extension headers can be processed in __skb_flow_dissect
+ * per IPv6 packet
+ */
+#define MAX_FLOW_DISSECT_EH	5
+
 /**
  * __skb_flow_dissect - extract the flow_keys struct and return it
  * @skb: sk_buff to extract the flow from, can be NULL if the rest are specified
@@ -426,6 +455,7 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 	struct flow_dissector_key_tags *key_tags;
 	struct flow_dissector_key_vlan *key_vlan;
 	enum flow_dissect_ret fdret;
+	int num_eh, num_encaps = 0;
 	bool skip_vlan = false;
 	u8 ip_proto = 0;
 	bool ret;
@@ -714,7 +744,9 @@ proto_again:
 	case FLOW_DISSECT_RET_OUT_GOOD:
 		goto out_good;
 	case FLOW_DISSECT_RET_PROTO_AGAIN:
-		goto proto_again;
+		if (skb_flow_dissect_encap_allowed(&num_encaps, &flags))
+			goto proto_again;
+		goto out_good;
 	case FLOW_DISSECT_RET_CONTINUE:
 	case FLOW_DISSECT_RET_IPPROTO_AGAIN:
 	case FLOW_DISSECT_RET_IPPROTO_AGAIN_EH:
@@ -723,6 +755,8 @@ proto_again:
 	default:
 		goto out_bad;
 	}
+
+	num_eh = 0;
 
 ip_proto_again:
 	fdret = FLOW_DISSECT_RET_CONTINUE;
@@ -844,10 +878,18 @@ ip_proto_again:
 	/* Process result of IP proto processing */
 	switch (fdret) {
 	case FLOW_DISSECT_RET_PROTO_AGAIN:
-		goto proto_again;
+		if (skb_flow_dissect_encap_allowed(&num_encaps, &flags))
+			goto proto_again;
+		break;
 	case FLOW_DISSECT_RET_IPPROTO_AGAIN:
+		if (skb_flow_dissect_encap_allowed(&num_encaps, &flags))
+			goto ip_proto_again;
+		break;
 	case FLOW_DISSECT_RET_IPPROTO_AGAIN_EH:
-		goto ip_proto_again;
+		++num_eh;
+		if (num_eh <= MAX_FLOW_DISSECT_EH)
+			goto ip_proto_again;
+		break;
 	case FLOW_DISSECT_RET_OUT_GOOD:
 	case FLOW_DISSECT_RET_CONTINUE:
 		break;
