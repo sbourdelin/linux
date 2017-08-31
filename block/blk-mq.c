@@ -382,9 +382,16 @@ struct request *blk_mq_alloc_request(struct request_queue *q, unsigned int op,
 {
 	struct blk_mq_alloc_data alloc_data = { .flags = flags };
 	struct request *rq;
-	int ret;
+	int ret = 0;
 
-	ret = blk_queue_enter(q, flags & BLK_MQ_REQ_NOWAIT);
+	/*
+	 * When queue is frozen, we still need to allocate req for
+	 * REQF_PREEMPT.
+	 */
+	if ((flags & BLK_MQ_REQ_PREEMPT) && blk_queue_is_frozen(q))
+		blk_queue_enter_live(q);
+	else
+		ret = blk_queue_enter(q, flags & BLK_MQ_REQ_NOWAIT);
 	if (ret)
 		return ERR_PTR(ret);
 

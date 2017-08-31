@@ -79,6 +79,11 @@ static inline void blk_queue_enter_live(struct request_queue *q)
 	percpu_ref_get(&q->q_usage_counter);
 }
 
+static inline bool blk_queue_is_frozen(struct request_queue *q)
+{
+	return percpu_ref_is_dead(&q->q_usage_counter);
+}
+
 #ifdef CONFIG_BLK_DEV_INTEGRITY
 void blk_flush_integrity(void);
 bool __bio_integrity_endio(struct bio *);
