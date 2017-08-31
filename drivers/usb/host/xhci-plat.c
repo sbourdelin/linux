@@ -155,6 +155,7 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	const struct of_device_id *match;
 	const struct hc_driver	*driver;
 	struct device		*sysdev;
+	struct device		*parent;
 	struct xhci_hcd		*xhci;
 	struct resource         *res;
 	struct usb_hcd		*hcd;
@@ -179,12 +180,17 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	 * 3. xhci_plat is grandchild of a pci device (dwc3-pci)
 	 */
 	sysdev = &pdev->dev;
-	if (sysdev->parent && !sysdev->of_node && sysdev->parent->of_node)
-		sysdev = sysdev->parent;
+	parent = sysdev->parent;
+	if (parent && !sysdev->of_node && parent->of_node)
+		sysdev = parent;
+	else if (parent && is_acpi_device_node(parent->fwnode) &&
+		 (!sysdev->fwnode ||
+		 (sysdev->fwnode && !is_acpi_device_node(sysdev->fwnode))))
+		sysdev = parent;
 #ifdef CONFIG_PCI
-	else if (sysdev->parent && sysdev->parent->parent &&
-		 sysdev->parent->parent->bus == &pci_bus_type)
-		sysdev = sysdev->parent->parent;
+	else if (parent && parent->parent &&
+		 parent->parent->bus == &pci_bus_type)
+		sysdev = parent->parent;
 #endif
 
 	/* Try to set 64-bit DMA first */
