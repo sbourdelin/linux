@@ -459,6 +459,21 @@ static inline bool netdev_uses_dsa(struct net_device *dev)
 	return false;
 }
 
+#if IS_ENABLED(CONFIG_NET_DSA)
+bool dsa_slave_dev_check(struct net_device *dev);
+unsigned int dsa_slave_dev_port_num(struct net_device *dev);
+#else
+static inline bool dsa_slave_dev_check(struct net_device *dev)
+{
+	return false;
+}
+
+static inline dsa_slave_dev_port_num(struct net_device *dev)
+{
+	return DSA_MAX_PORTS;
+}
+#endif
+
 struct dsa_switch *dsa_switch_alloc(struct device *dev, size_t n);
 void dsa_unregister_switch(struct dsa_switch *ds);
 int dsa_register_switch(struct dsa_switch *ds);
