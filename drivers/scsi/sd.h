@@ -75,7 +75,8 @@ struct scsi_disk {
 #ifdef CONFIG_BLK_DEV_ZONED
 	unsigned int	nr_zones;
 	unsigned int	zone_blocks;
-	unsigned int	zone_shift;
+	unsigned int	zone_sectors;
+	unsigned int	zone_sectors_shift;
 	unsigned long	*zones_wlock;
 	unsigned long	*seq_zones;
 	unsigned int	zones_optimal_open;

@@ -13,15 +13,10 @@ static inline int sd_is_zoned(struct scsi_disk *sdkp)
 
 #ifdef CONFIG_BLK_DEV_ZONED
 
-static inline sector_t sd_zbc_zone_sectors(struct scsi_disk *sdkp)
+static inline unsigned int sd_zbc_rq_zone_no(struct scsi_disk *sdkp,
+					     struct request *rq)
 {
-	return logical_to_sectors(sdkp->device, sdkp->zone_blocks);
-}
-
-static inline unsigned int sd_zbc_zone_no(struct scsi_disk *sdkp,
-					  sector_t sector)
-{
-	return sectors_to_logical(sdkp->device, sector) >> sdkp->zone_shift;
+	return blk_rq_pos(rq) >> sdkp->zone_sectors_shift;
 }
 
 static inline unsigned long *sd_zbc_alloc_zone_bitmap(struct scsi_disk *sdkp)
