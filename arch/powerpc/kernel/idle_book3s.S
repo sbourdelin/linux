@@ -85,7 +85,61 @@ ALT_FTR_SECTION_END_IFSET(CPU_FTR_ARCH_300)
 	std	r3,_WORT(r1)
 	mfspr	r3,SPRN_WORC
 	std	r3,_WORC(r1)
+/*
+ * On POWER9, there are idle states such as stop4, invoked via cpuidle,
+ * that lose hypervisor resources. In such cases, we need to save
+ * additional SPRs before entering those idle states so that they can
+ * be restored to their older values on wakeup from the idle state.
+ *
+ * On POWER8, the only such deep idle state is winkle which is used
+ * only in the context of CPU-Hotplug, where these additional SPRs are
+ * reinitiazed to a sane value. Hence there is no need to save/restore
+ * these SPRs.
+ */
+BEGIN_FTR_SECTION
+	blr
+END_FTR_SECTION_IFCLR(CPU_FTR_ARCH_300)
 
+power9_save_additional_sprs:
+	mfspr	r3, SPRN_PID
+	mfspr	r4, SPRN_LDBAR
+	std	r3, STOP_PID(r13)
+	std	r4, STOP_LDBAR(r13)
+
+	mfspr	r3, SPRN_FSCR
+	mfspr	r4, SPRN_HFSCR
+	std	r3, STOP_FSCR(r13)
+	std	r4, STOP_HFSCR(r13)
+
+	mfspr	r3, SPRN_MMCRA
+	mfspr	r4, SPRN_MMCR1
+	std	r3, STOP_MMCRA(r13)
+	std	r4, STOP_MMCR1(r13)
+
+	mfspr	r3, SPRN_MMCR2
+	std	r3, STOP_MMCR2(r13)
+	blr
+
+power9_restore_additional_sprs:
+	ld	r3,_LPCR(r1)
+	ld	r4, STOP_PID(r13)
+	mtspr	SPRN_LPCR,r3
+	mtspr	SPRN_PID, r4
+
+	ld	r3, STOP_LDBAR(r13)
+	ld	r4, STOP_FSCR(r13)
+	mtspr	SPRN_LDBAR, r3
+	mtspr	SPRN_FSCR, r4
+
+	ld	r3, STOP_HFSCR(r13)
+	ld	r4, STOP_MMCRA(r13)
+	mtspr	SPRN_HFSCR, r3
+	mtspr	SPRN_MMCRA, r4
+	/* We have already restored PACA_MMCR0 */
+	ld	r3, STOP_MMCR1(r13)
+	ld	r4, STOP_MMCR2(r13)
+	mtspr	SPRN_MMCR1, r3
+	mtspr	SPRN_MMCR2, r4
 	blr
 
 /*
@@ -242,13 +296,20 @@ enter_winkle:
 /*
  * r3 - PSSCR value corresponding to the requested stop state.
  */
-power_enter_stop:
 #ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
-	/* Tell KVM we're entering idle */
+power_enter_stop_kvm_rm:
+	/*
+	 * This is currently unused because POWER9 KVM does not have to
+	 * gather secondary threads into sibling mode, but the code is
+	 * here in case that function is required.
+	 *
+	 * Tell KVM we're entering idle.
+	 */
 	li	r4,KVM_HWTHREAD_IN_IDLE
 	/* DO THIS IN REAL MODE!  See comment above. */
 	stb	r4,HSTATE_HWTHREAD_STATE(r13)
 #endif
+power_enter_stop:
 /*
  * Check if we are executing the lite variant with ESL=EC=0
  */
@@ -411,6 +472,18 @@ pnv_powersave_wakeup_mce:
 
 	b	pnv_powersave_wakeup
 
+#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+kvm_start_guest_check:
+	li	r0,KVM_HWTHREAD_IN_KERNEL
+	stb	r0,HSTATE_HWTHREAD_STATE(r13)
+	/* Order setting hwthread_state vs. testing hwthread_req */
+	sync
+	lbz	r0,HSTATE_HWTHREAD_REQ(r13)
+	cmpwi	r0,0
+	beqlr
+	b	kvm_start_guest
+#endif
+
 /*
  * Called from reset vector for powersave wakeups.
  * cr3 - set to gt if waking up with partial/complete hypervisor state loss
@@ -435,15 +508,9 @@ ALT_FTR_SECTION_END_IFSET(CPU_FTR_ARCH_300)
 	mr	r3,r12
 
 #ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
-	li	r0,KVM_HWTHREAD_IN_KERNEL
-	stb	r0,HSTATE_HWTHREAD_STATE(r13)
-	/* Order setting hwthread_state vs. testing hwthread_req */
-	sync
-	lbz	r0,HSTATE_HWTHREAD_REQ(r13)
-	cmpwi	r0,0
-	beq	1f
-	b	kvm_start_guest
-1:
+BEGIN_FTR_SECTION
+	bl	kvm_start_guest_check
+END_FTR_SECTION_IFCLR(CPU_FTR_ARCH_300)
 #endif
 
 	/* Return SRR1 from power7_nap() */
@@ -809,9 +876,16 @@ no_segments:
 	mtctr	r12
 	bctrl
 
+/*
+ * On POWER9, we can come here on wakeup from a cpuidle stop state.
+ * Hence restore the additional SPRs to the saved value.
+ *
+ * On POWER8, we come here only on winkle. Since winkle is used
+ * only in the case of CPU-Hotplug, we don't need to restore
+ * the additional SPRs.
+ */
 BEGIN_FTR_SECTION
-	ld	r4,_LPCR(r1)
-	mtspr	SPRN_LPCR,r4
+	bl 	power9_restore_additional_sprs
 END_FTR_SECTION_IFSET(CPU_FTR_ARCH_300)
 hypervisor_state_restored:
 
