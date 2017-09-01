@@ -21,7 +21,6 @@
 #include <linux/of_graph.h>
 
 #include <drm/drmP.h>
-#include <drm/drm_panel.h>
 #include <drm/drm_gem_cma_helper.h>
 #include <drm/drm_fb_cma_helper.h>
 
@@ -93,7 +92,7 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
 	struct pl111_drm_dev_private *priv = drm->dev_private;
 	const struct drm_display_mode *mode = &cstate->mode;
 	struct drm_framebuffer *fb = plane->state->fb;
-	struct drm_connector *connector = &priv->connector.connector;
+	struct drm_connector *connector = priv->connector;
 	u32 cntl;
 	u32 ppl, hsw, hfp, hbp;
 	u32 lpp, vsw, vfp, vbp;
@@ -155,8 +154,6 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
 
 	writel(0, priv->regs + CLCD_TIM3);
 
-	drm_panel_prepare(priv->connector.panel);
-
 	/* Enable and Power Up */
 	cntl = CNTL_LCDEN | CNTL_LCDTFT | CNTL_LCDPWR | CNTL_LCDVCOMP(1);
 
@@ -203,8 +200,6 @@ static void pl111_display_enable(struct drm_simple_display_pipe *pipe,
 
 	writel(cntl, priv->regs + CLCD_PL111_CNTL);
 
-	drm_panel_enable(priv->connector.panel);
-
 	drm_crtc_vblank_on(crtc);
 }
 
@@ -216,12 +211,8 @@ void pl111_display_disable(struct drm_simple_display_pipe *pipe)
 
 	drm_crtc_vblank_off(crtc);
 
-	drm_panel_disable(priv->connector.panel);
-
 	/* Disable and Power Down */
 	writel(0, priv->regs + CLCD_PL111_CNTL);
-
-	drm_panel_unprepare(priv->connector.panel);
 
 	clk_disable_unprepare(priv->clk);
 }
@@ -457,9 +448,12 @@ int pl111_display_init(struct drm_device *drm)
 	ret = drm_simple_display_pipe_init(drm, &priv->pipe,
 					   &pl111_display_funcs,
 					   formats, ARRAY_SIZE(formats),
-					   &priv->connector.connector);
+					   priv->connector);
 	if (ret)
 		return ret;
+
+	/* We need the encoder to attach the bridge */
+	priv->encoder = &priv->pipe.encoder;
 
 	return 0;
 }
