@@ -5,6 +5,21 @@
 #include <linux/sbitmap.h>
 #include <linux/srcu.h>
 
+#ifdef CONFIG_BLK_DEBUG_FS
+
+#include <linux/seq_file.h>
+
+struct blk_mq_debugfs_attr {
+	const char *name;
+	umode_t mode;
+	int (*show)(void *, struct seq_file *);
+	ssize_t (*write)(void *, const char __user *, size_t, loff_t *);
+	/* Set either .show or .seq_ops. */
+	const struct seq_operations *seq_ops;
+};
+
+#endif
+
 struct blk_mq_tags;
 struct blk_flush_queue;
 
@@ -288,5 +303,10 @@ static inline void *blk_mq_rq_to_pdu(struct request *rq)
 #define hctx_for_each_ctx(hctx, ctx, i)					\
 	for ((i) = 0; (i) < (hctx)->nr_ctx &&				\
 	     ({ ctx = (hctx)->ctxs[(i)]; 1; }); (i)++)
+
+#ifdef CONFIG_BLK_DEBUG_FS
+int __blk_mq_debugfs_rq_show(struct seq_file *m, struct request *rq);
+int blk_mq_debugfs_rq_show(struct seq_file *m, void *v);
+#endif
 
 #endif
