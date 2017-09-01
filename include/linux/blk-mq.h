@@ -284,6 +284,16 @@ void blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set, int nr_hw_queues);
 void blk_mq_quiesce_queue_nowait(struct request_queue *q);
 
 /*
+ * Scheduler helper functions.
+ */
+void blk_mq_sched_free_hctx_data(struct request_queue *q,
+				 void (*exit)(struct blk_mq_hw_ctx *));
+bool blk_mq_sched_try_merge(struct request_queue *q, struct bio *bio,
+			    struct request **merged_request);
+bool blk_mq_sched_try_insert_merge(struct request_queue *q, struct request *rq);
+void blk_mq_sched_request_inserted(struct request *rq);
+
+/*
  * Driver command data is immediately after the request. So subtract request
  * size to get back to the original request, add request size to get the PDU.
  */
