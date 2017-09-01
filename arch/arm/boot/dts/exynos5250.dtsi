@@ -643,6 +643,8 @@
 			power-domains = <&pd_gsc>;
 			clocks = <&clock CLK_GSCL0>;
 			clock-names = "gscl";
+			rot-max-hsize = <2048>;
+			rot-max-vsize = <2048>;
 			iommu = <&sysmmu_gsc0>;
 		};
 
@@ -653,6 +655,8 @@
 			power-domains = <&pd_gsc>;
 			clocks = <&clock CLK_GSCL1>;
 			clock-names = "gscl";
+			rot-max-hsize = <2048>;
+			rot-max-vsize = <2048>;
 			iommu = <&sysmmu_gsc1>;
 		};
 
@@ -663,6 +667,8 @@
 			power-domains = <&pd_gsc>;
 			clocks = <&clock CLK_GSCL2>;
 			clock-names = "gscl";
+			rot-max-hsize = <2048>;
+			rot-max-vsize = <2048>;
 			iommu = <&sysmmu_gsc2>;
 		};
 
@@ -673,6 +679,8 @@
 			power-domains = <&pd_gsc>;
 			clocks = <&clock CLK_GSCL3>;
 			clock-names = "gscl";
+			rot-max-hsize = <2048>;
+			rot-max-vsize = <2048>;
 			iommu = <&sysmmu_gsc3>;
 		};
 
