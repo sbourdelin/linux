@@ -12,6 +12,7 @@
 
 #include <linux/module.h>
 #include <linux/of_graph.h>
+#include <linux/of_device.h>
 #include <linux/regulator/consumer.h>
 
 #include <drm/drmP.h>
@@ -19,9 +20,20 @@
 #include <drm/drm_crtc.h>
 #include <drm/drm_crtc_helper.h>
 
+/**
+ * struct vga_dac_variant - characteristics of the DAC
+ * @posedge_clk: this DAC latches data into the DAC on the positive
+ *	edge of the clock pulse, which means that display controllers
+ *	need to clock it out on the negative edge
+ */
+struct vga_dac_variant {
+	bool posedge_clk;
+};
+
 struct dumb_vga {
 	struct drm_bridge	bridge;
 	struct drm_connector	connector;
+	struct vga_dac_variant const *variant;
 
 	struct i2c_adapter	*ddc;
 	struct regulator	*vdd;
@@ -66,6 +78,18 @@ fallback:
 
 	/* And prefer a mode pretty much anyone can handle */
 	drm_set_preferred_mode(connector, 1024, 768);
+
+	if (vga->variant->posedge_clk)
+		/*
+		 * If the DAC latches the data into its registers on the
+		 * positive edge of the clock, the display driver needs to
+		 * drive the data out on the negative edge so it is
+		 * stable at the positive edge, so as to avoid flicker.
+		 *
+		 * Tell the driver that we want data on the negative edge
+		 */
+		connector->display_info.bus_flags |=
+			DRM_BUS_FLAG_PIXDATA_NEGEDGE;
 
 	return ret;
 }
@@ -183,6 +207,7 @@ static int dumb_vga_probe(struct platform_device *pdev)
 	if (!vga)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, vga);
+	vga->variant = of_device_get_match_data(&pdev->dev);
 
 	vga->vdd = devm_regulator_get_optional(&pdev->dev, "vdd");
 	if (IS_ERR(vga->vdd)) {
@@ -226,10 +251,41 @@ static int dumb_vga_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static const struct vga_dac_variant default_dac_variant = {
+	/*
+	 * These DACs read data on the negative edge. For example in the
+	 * ADV7123 datasheet (revision D, page 8) there is a timing diagram
+	 * making this clear.
+	 */
+	.posedge_clk = false,
+};
+
+static const struct vga_dac_variant ti_ths_dac_variant = {
+	/* The TI DACs read the data on the positive edge of the CLK */
+	.posedge_clk = true,
+};
+
 static const struct of_device_id dumb_vga_match[] = {
-	{ .compatible = "dumb-vga-dac" },
-	{ .compatible = "adi,adv7123" },
-	{ .compatible = "ti,ths8135" },
+	{
+		.compatible = "dumb-vga-dac",
+		.data = &default_dac_variant,
+	},
+	{
+		.compatible = "adi,adv7123",
+		.data = &default_dac_variant,
+	},
+	{
+		.compatible = "ti,ths8134a",
+		.data = &ti_ths_dac_variant,
+	},
+	{
+		.compatible = "ti,ths8134b",
+		.data = &ti_ths_dac_variant,
+	},
+	{
+		.compatible = "ti,ths8135",
+		.data = &ti_ths_dac_variant,
+	},
 	{},
 };
 MODULE_DEVICE_TABLE(of, dumb_vga_match);
