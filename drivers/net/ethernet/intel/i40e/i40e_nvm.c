@@ -322,6 +322,26 @@ i40e_status i40e_read_nvm_word(struct i40e_hw *hw, u16 offset,
 }
 
 /**
+ * __i40e_read_nvm_word - Reads nvm word, assumes caller does the locking
+ * @hw: pointer to the HW structure
+ * @offset: offset of the Shadow RAM word to read (0x000000 - 0x001FFF)
+ * @data: word read from the Shadow RAM
+ *
+ * Reads one 16 bit word from the Shadow RAM using the GLNVM_SRCTL register.
+ **/
+static i40e_status __i40e_read_nvm_word(struct i40e_hw *hw,
+					u16 offset, u16 *data)
+{
+	enum i40e_status_code ret_code = 0;
+
+	if (hw->flags & I40E_HW_FLAG_AQ_SRCTL_ACCESS_ENABLE)
+		ret_code = i40e_read_nvm_word_aq(hw, offset, data);
+	else
+		ret_code = i40e_read_nvm_word_srctl(hw, offset, data);
+	return ret_code;
+}
+
+/**
  * i40e_read_nvm_buffer_srctl - Reads Shadow RAM buffer via SRCTL register
  * @hw: pointer to the HW structure
  * @offset: offset of the Shadow RAM word to read (0x000000 - 0x001FFF).
@@ -516,14 +536,14 @@ static i40e_status i40e_calc_nvm_checksum(struct i40e_hw *hw,
 	data = (u16 *)vmem.va;
 
 	/* read pointer to VPD area */
-	ret_code = i40e_read_nvm_word(hw, I40E_SR_VPD_PTR, &vpd_module);
+	ret_code = __i40e_read_nvm_word(hw, I40E_SR_VPD_PTR, &vpd_module);
 	if (ret_code) {
 		ret_code = I40E_ERR_NVM_CHECKSUM;
 		goto i40e_calc_nvm_checksum_exit;
 	}
 
 	/* read pointer to PCIe Alt Auto-load module */
-	ret_code = i40e_read_nvm_word(hw, I40E_SR_PCIE_ALT_AUTO_LOAD_PTR,
+	ret_code = __i40e_read_nvm_word(hw, I40E_SR_PCIE_ALT_AUTO_LOAD_PTR,
 				      &pcie_alt_module);
 	if (ret_code) {
 		ret_code = I40E_ERR_NVM_CHECKSUM;
