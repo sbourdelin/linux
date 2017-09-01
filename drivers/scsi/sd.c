@@ -68,6 +68,7 @@
 #include <scsi/scsicam.h>
 
 #include "sd.h"
+#include "sd_zbc.h"
 #include "scsi_priv.h"
 #include "scsi_logging.h"
 
