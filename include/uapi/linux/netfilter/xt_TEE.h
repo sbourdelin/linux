@@ -2,10 +2,11 @@
 #define _XT_TEE_TARGET_H
 
 #include <linux/netfilter.h>
+#include <linux/if.h>
 
 struct xt_tee_tginfo {
 	union nf_inet_addr gw;
-	char oif[16];
+	char oif[IFNAMSIZ];
 
 	/* used internally by the kernel */
 	struct xt_tee_priv *priv __attribute__((aligned(8)));
