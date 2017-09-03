@@ -25,6 +25,8 @@
 #include <media/v4l2-mediabus.h>
 
 struct fwnode_handle;
+struct v4l2_async_notifier;
+struct v4l2_async_subdev;
 
 #define V4L2_FWNODE_CSI2_MAX_DATA_LANES	4
 
@@ -200,5 +202,56 @@ int v4l2_fwnode_parse_link(struct fwnode_handle *fwnode,
  * must be called on every link parsed with v4l2_fwnode_parse_link().
  */
 void v4l2_fwnode_put_link(struct v4l2_fwnode_link *link);
+
+/**
+ * v4l2_async_notifier_parse_fwnode_endpoints - Parse V4L2 fwnode endpoints in a
+ *						device node
+ * @dev: the device the endpoints of which are to be parsed
+ * @notifier: notifier for @dev
+ * @asd_struct_size: size of the driver's async sub-device struct, including
+ *		     sizeof(struct v4l2_async_subdev). The &struct
+ *		     v4l2_async_subdev shall be the first member of
+ *		     the driver's async sub-device struct, i.e. both
+ *		     begin at the same memory address.
+ * @parse_endpoint: Driver's callback function called on each V4L2 fwnode
+ *		    endpoint. Optional.
+ *		    Return: %0 on success
+ *			    %-ENOTCONN if the endpoint is to be skipped but this
+ *				       should not be considered as an error
+ *			    %-EINVAL if the endpoint configuration is invalid
+ *
+ * Parse the fwnode endpoints of the @dev device and populate the async sub-
+ * devices array of the notifier. The @parse_endpoint callback function is
+ * called for each endpoint with the corresponding async sub-device pointer to
+ * let the caller initialize the driver-specific part of the async sub-device
+ * structure.
+ *
+ * The notifier memory shall be zeroed before this function is called on the
+ * notifier.
+ *
+ * This function may not be called on a registered notifier and may be called on
+ * a notifier only once. When using this function, the user may not access the
+ * notifier's subdevs array nor change notifier's num_subdevs field, these are
+ * reserved for the framework's internal use only.
+ *
+ * The @struct v4l2_fwnode_endpoint passed to the callback function
+ * @parse_endpoint is released once the function is finished. If there is a need
+ * to retain that configuration, the user needs to allocate memory for it.
+ *
+ * Any notifier populated using this function must be released with a call to
+ * v4l2_async_notifier_release() after it has been unregistered and the async
+ * sub-devices are no longer in use.
+ *
+ * Return: %0 on success, including when no async sub-devices are found
+ *	   %-ENOMEM if memory allocation failed
+ *	   %-EINVAL if graph or endpoint parsing failed
+ *	   Other error codes as returned by @parse_endpoint
+ */
+int v4l2_async_notifier_parse_fwnode_endpoints(
+	struct device *dev, struct v4l2_async_notifier *notifier,
+	size_t asd_struct_size,
+	int (*parse_endpoint)(struct device *dev,
+			      struct v4l2_fwnode_endpoint *vep,
+			      struct v4l2_async_subdev *asd));
 
 #endif /* _V4L2_FWNODE_H */
