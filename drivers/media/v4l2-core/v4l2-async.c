@@ -107,13 +107,13 @@ static int v4l2_async_test_notify(struct v4l2_async_notifier *notifier,
 {
 	int ret;
 
-	ret = v4l2_async_notifier_call_int_op(notifier, bound, sd, asd);
+	ret = v4l2_device_register_subdev(notifier->v4l2_dev, sd);
 	if (ret < 0)
 		return ret;
 
-	ret = v4l2_device_register_subdev(notifier->v4l2_dev, sd);
+	ret = v4l2_async_notifier_call_int_op(notifier, bound, sd, asd);
 	if (ret < 0) {
-		v4l2_async_notifier_call_void_op(notifier, unbind, sd, asd);
+		v4l2_device_unregister_subdev(sd);
 		return ret;
 	}
 
