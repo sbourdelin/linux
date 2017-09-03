@@ -123,6 +123,8 @@ static int hda_codec_driver_probe(struct device *dev)
 	module_put(owner);
 
  error:
+	if (codec->patch_ops.free)
+		codec->patch_ops.free(codec);
 	snd_hda_codec_cleanup_for_unbind(codec);
 	return err;
 }
