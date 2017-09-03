@@ -33,13 +33,6 @@ of a small V4L2_PIX_FMT_SBGGR10P image:
 **Byte Order.**
 Each cell is one byte.
 
-
-.. raw:: latex
-
-    \small
-
-.. tabularcolumns:: |p{2.0cm}|p{1.0cm}|p{1.0cm}|p{1.0cm}|p{1.0cm}|p{10.0cm}|
-
 .. flat-table::
     :header-rows:  0
     :stub-columns: 0
@@ -73,7 +66,3 @@ Each cell is one byte.
       - R\ :sub:`33high`
       - R\ :sub:`33low`\ (bits 7--6) G\ :sub:`32low`\ (bits 5--4)
 	R\ :sub:`31low`\ (bits 3--2) G\ :sub:`30low`\ (bits 1--0)
-
-.. raw:: latex
-
-    \normalsize
