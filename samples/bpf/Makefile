@@ -161,6 +161,11 @@ HOSTLOADLIBES_test_map_in_map += -lelf
 LLC ?= llc
 CLANG ?= clang
 
+# Detect that we're cross compiling and use the cross compiler
+ifdef CROSS_COMPILE
+HOSTCC = $(CROSS_COMPILE)gcc
+endif
+
 # Trick to allow make to be run from this directory
 all:
 	$(MAKE) -C ../../ $(CURDIR)/
