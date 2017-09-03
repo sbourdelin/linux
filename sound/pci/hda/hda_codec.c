@@ -2973,8 +2973,11 @@ int snd_hda_codec_build_controls(struct hda_codec *codec)
 		err = codec->patch_ops.init(codec);
 	if (!err && codec->patch_ops.build_controls)
 		err = codec->patch_ops.build_controls(codec);
-	if (err < 0)
+	if (err < 0) {
+		if (codec->patch_ops.free)
+			codec->patch_ops.free(codec);
 		return err;
+	}
 
 	/* we create chmaps here instead of build_pcms */
 	err = add_std_chmaps(codec);
@@ -3170,6 +3173,8 @@ int snd_hda_codec_parse_pcms(struct hda_codec *codec)
 	if (err < 0) {
 		codec_err(codec, "cannot build PCMs for #%d (error %d)\n",
 			  codec->core.addr, err);
+		if (codec->patch_ops.free)
+			codec->patch_ops.free(codec);
 		return err;
 	}
 
