@@ -1,10 +1,15 @@
 #ifndef _ASM_X86_INTEL_PMC_IPC_H_
 #define  _ASM_X86_INTEL_PMC_IPC_H_
 
+#include <linux/platform_data/x86/intel_ipc_dev.h>
+
+#define INTEL_PMC_IPC_DEV		"intel_pmc_ipc"
+#define PMC_PARAM_LEN			2
+
 /* Commands */
 #define PMC_IPC_PMIC_ACCESS		0xFF
-#define		PMC_IPC_PMIC_ACCESS_READ	0x0
-#define		PMC_IPC_PMIC_ACCESS_WRITE	0x1
+#define	PMC_IPC_PMIC_ACCESS_READ	0x0
+#define	PMC_IPC_PMIC_ACCESS_WRITE	0x1
 #define PMC_IPC_USB_PWR_CTRL		0xF0
 #define PMC_IPC_PMIC_BLACKLIST_SEL	0xEF
 #define PMC_IPC_PHY_CONFIG		0xEE
@@ -28,36 +33,20 @@
 #define PMC_GCR_TELEM_DEEP_S0IX_REG	0x78
 #define PMC_GCR_TELEM_SHLW_S0IX_REG	0x80
 
+static inline void pmc_cmd_init(u32 *cmd, u32 param1, u32 param2)
+{
+	cmd[0] = param1;
+	cmd[1] = param2;
+}
+
 #if IS_ENABLED(CONFIG_INTEL_PMC_IPC)
 
-int intel_pmc_ipc_simple_command(int cmd, int sub);
-int intel_pmc_ipc_raw_cmd(u32 cmd, u32 sub, u8 *in, u32 inlen,
-		u32 *out, u32 outlen, u32 dptr, u32 sptr);
-int intel_pmc_ipc_command(u32 cmd, u32 sub, u8 *in, u32 inlen,
-		u32 *out, u32 outlen);
 int intel_pmc_s0ix_counter_read(u64 *data);
 int intel_pmc_gcr_read(u32 offset, u32 *data);
 int intel_pmc_gcr_write(u32 offset, u32 data);
 int intel_pmc_gcr_update(u32 offset, u32 mask, u32 val);
 
 #else
-
-static inline int intel_pmc_ipc_simple_command(int cmd, int sub)
-{
-	return -EINVAL;
-}
-
-static inline int intel_pmc_ipc_raw_cmd(u32 cmd, u32 sub, u8 *in, u32 inlen,
-		u32 *out, u32 outlen, u32 dptr, u32 sptr)
-{
-	return -EINVAL;
-}
-
-static inline int intel_pmc_ipc_command(u32 cmd, u32 sub, u8 *in, u32 inlen,
-		u32 *out, u32 outlen)
-{
-	return -EINVAL;
-}
 
 static inline int intel_pmc_s0ix_counter_read(u64 *data)
 {
