@@ -95,6 +95,14 @@ struct v4l2_async_notifier_operations {
 		       struct v4l2_async_subdev *asd);
 };
 
+#define v4l2_async_notifier_call_int_op(n, op, ...)			\
+	(((n)->ops && (n)->ops->op) ? (n)->ops->op(n, ## __VA_ARGS__) : 0)
+#define v4l2_async_notifier_call_void_op(n, op, ...)	 \
+	do {						 \
+		if ((n)->ops && (n)->ops->op)		 \
+			(n)->ops->op(n, ## __VA_ARGS__); \
+	} while (false)
+
 /**
  * struct v4l2_async_notifier - v4l2_device notifier data
  *
