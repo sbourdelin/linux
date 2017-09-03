@@ -21,6 +21,7 @@
  *
  * Authors: Ben Skeggs
  */
+#include <linux/kernel.h>
 #include <subdev/bios.h>
 #include <subdev/bios/bit.h>
 #include <subdev/bios/bmp.h>
@@ -2271,7 +2272,7 @@ static struct nvbios_init_opcode {
 	[0xaa] = { init_reserved },
 };
 
-#define init_opcode_nr (sizeof(init_opcode) / sizeof(init_opcode[0]))
+#define init_opcode_nr (ARRAY_SIZE(init_opcode))
 
 int
 nvbios_exec(struct nvbios_init *init)
