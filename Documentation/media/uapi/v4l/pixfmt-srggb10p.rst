@@ -36,7 +36,7 @@ Each cell is one byte.
 
 .. raw:: latex
 
-    \small
+    \newline\small
 
 .. tabularcolumns:: |p{2.0cm}|p{1.0cm}|p{1.0cm}|p{1.0cm}|p{1.0cm}|p{10.0cm}|
 
