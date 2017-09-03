@@ -278,8 +278,6 @@ static int brcmstb_set_trips(void *data, int low, int high)
 	dev_dbg(priv->dev, "set trips %d <--> %d\n", low, high);
 
 	if (low) {
-		if (low > INT_MAX)
-			low = INT_MAX;
 		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_LOW, low);
 		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_LOW, 1);
 	} else {
@@ -287,8 +285,6 @@ static int brcmstb_set_trips(void *data, int low, int high)
 	}
 
 	if (high < ULONG_MAX) {
-		if (high > INT_MAX)
-			high = INT_MAX;
 		avs_tmon_set_trip_temp(priv, TMON_TRIP_TYPE_HIGH, high);
 		avs_tmon_trip_enable(priv, TMON_TRIP_TYPE_HIGH, 1);
 	} else {
