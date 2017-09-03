@@ -254,4 +254,32 @@ int v4l2_async_notifier_parse_fwnode_endpoints(
 			      struct v4l2_fwnode_endpoint *vep,
 			      struct v4l2_async_subdev *asd));
 
+/**
+ * v4l2_fwnode_reference_parse - parse references for async sub-devices
+ * @dev: the device node the properties of which are parsed for references
+ * @notifier: the async notifier where the async subdevs will be added
+ * @prop: the name of the property
+ * @nargs_prop: the name of the property in the remote node that specifies the
+ *		number of integer arguments (may be NULL, in that case nargs
+ *		will be used).
+ * @nargs: the number of integer arguments after the reference
+ * @asd_struct_size: the size of the driver's async sub-device struct, including
+ *		     @struct v4l2_async_subdev
+ * @parse_single: Driver's callback function for parsing a reference. Optional.
+ *		  Return: 0 on success
+ *			  %-ENOTCONN if the reference is to be skipped but this
+ *				     should not be considered as an error
+ *
+ * Return: 0 on success
+ *	   -ENOMEM if memory allocation failed
+ *	   -EINVAL if property parsing failed
+ */
+int v4l2_fwnode_reference_parse(
+	struct device *dev, struct v4l2_async_notifier *notifier,
+	const char *prop, const char *nargs_prop, unsigned int nargs,
+	size_t asd_struct_size,
+	int (*parse_single)(struct device *dev,
+			    struct fwnode_reference_args *args,
+			    struct v4l2_async_subdev *asd));
+
 #endif /* _V4L2_FWNODE_H */

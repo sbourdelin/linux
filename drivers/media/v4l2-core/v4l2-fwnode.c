@@ -449,6 +449,87 @@ int v4l2_async_notifier_parse_fwnode_endpoints(
 }
 EXPORT_SYMBOL_GPL(v4l2_async_notifier_parse_fwnode_endpoints);
 
+static void v4l2_fwnode_print_args(struct fwnode_reference_args *args)
+{
+	unsigned int i;
+
+	for (i = 0; i < args->nargs; i++) {
+		pr_cont(" %u", args->args[i]);
+		if (i + 1 < args->nargs)
+			pr_cont(",");
+	}
+}
+
+int v4l2_fwnode_reference_parse(
+	struct device *dev, struct v4l2_async_notifier *notifier,
+	const char *prop, const char *nargs_prop, unsigned int nargs,
+	size_t asd_struct_size,
+	int (*parse_single)(struct device *dev,
+			    struct fwnode_reference_args *args,
+			    struct v4l2_async_subdev *asd))
+{
+	struct fwnode_reference_args args;
+	unsigned int index = 0;
+	int ret = -ENOENT;
+
+	if (asd_struct_size < sizeof(struct v4l2_async_subdev))
+		return -EINVAL;
+
+	for (; !fwnode_property_get_reference_args(
+		     dev_fwnode(dev), prop, nargs_prop, nargs,
+		     index, &args); index++)
+		fwnode_handle_put(args.fwnode);
+
+	ret = v4l2_async_notifier_realloc(notifier,
+					  notifier->num_subdevs + index);
+	if (ret)
+		return -ENOMEM;
+
+	for (ret = -ENOENT, index = 0; !fwnode_property_get_reference_args(
+		     dev_fwnode(dev), prop, nargs_prop, nargs,
+		     index, &args); index++) {
+		struct v4l2_async_subdev *asd;
+
+		if (WARN_ON(notifier->num_subdevs >= notifier->max_subdevs))
+			break;
+
+		asd = kzalloc(asd_struct_size, GFP_KERNEL);
+		if (!asd) {
+			ret = -ENOMEM;
+			goto error;
+		}
+
+		ret = parse_single ? parse_single(dev, &args, asd) : 0;
+		if (ret == -ENOTCONN) {
+			dev_dbg(dev,
+				"ignoring reference prop \"%s\", nargs_prop \"%s\", nargs %u, index %u",
+				prop, nargs_prop, nargs, index);
+			v4l2_fwnode_print_args(&args);
+			pr_cont("\n");
+			continue;
+		} else if (ret < 0) {
+			dev_warn(dev,
+				 "driver could not parse reference prop \"%s\", nargs_prop \"%s\", nargs %u, index %u",
+				 prop, nargs_prop, nargs, index);
+			v4l2_fwnode_print_args(&args);
+			pr_cont("\n");
+			goto error;
+		}
+
+		notifier->subdevs[notifier->num_subdevs] = asd;
+		asd->match.fwnode.fwnode = args.fwnode;
+		asd->match_type = V4L2_ASYNC_MATCH_FWNODE;
+		notifier->num_subdevs++;
+	}
+
+	return 0;
+
+error:
+	fwnode_handle_put(args.fwnode);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(v4l2_fwnode_reference_parse);
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Sakari Ailus <sakari.ailus@linux.intel.com>");
 MODULE_AUTHOR("Sylwester Nawrocki <s.nawrocki@samsung.com>");
