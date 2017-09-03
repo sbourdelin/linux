@@ -62,7 +62,7 @@ static const char *gpio_of_names[] = {
 	"los",
 	"tx-fault",
 	"tx-disable",
-	"rate-select",
+	"rate-select0",
 };
 
 static const enum gpiod_flags gpio_flags[] = {
