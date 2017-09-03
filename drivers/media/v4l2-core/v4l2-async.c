@@ -107,16 +107,16 @@ static int v4l2_async_test_notify(struct v4l2_async_notifier *notifier,
 {
 	int ret;
 
-	if (notifier->bound) {
-		ret = notifier->bound(notifier, sd, asd);
+	if (notifier->ops->bound) {
+		ret = notifier->ops->bound(notifier, sd, asd);
 		if (ret < 0)
 			return ret;
 	}
 
 	ret = v4l2_device_register_subdev(notifier->v4l2_dev, sd);
 	if (ret < 0) {
-		if (notifier->unbind)
-			notifier->unbind(notifier, sd, asd);
+		if (notifier->ops->unbind)
+			notifier->ops->unbind(notifier, sd, asd);
 		return ret;
 	}
 
@@ -128,8 +128,8 @@ static int v4l2_async_test_notify(struct v4l2_async_notifier *notifier,
 	/* Move from the global subdevice list to notifier's done */
 	list_move(&sd->async_list, &notifier->done);
 
-	if (list_empty(&notifier->waiting) && notifier->complete)
-		return notifier->complete(notifier);
+	if (list_empty(&notifier->waiting) && notifier->ops->complete)
+		return notifier->ops->complete(notifier);
 
 	return 0;
 }
@@ -232,8 +232,8 @@ void v4l2_async_notifier_unregister(struct v4l2_async_notifier *notifier)
 		/* If we handled USB devices, we'd have to lock the parent too */
 		device_release_driver(d);
 
-		if (notifier->unbind)
-			notifier->unbind(notifier, sd, sd->asd);
+		if (notifier->ops->unbind)
+			notifier->ops->unbind(notifier, sd, sd->asd);
 
 		/*
 		 * Store device at the device cache, in order to call
@@ -344,8 +344,8 @@ void v4l2_async_unregister_subdev(struct v4l2_subdev *sd)
 
 	v4l2_async_cleanup(sd);
 
-	if (notifier->unbind)
-		notifier->unbind(notifier, sd, sd->asd);
+	if (notifier->ops->unbind)
+		notifier->ops->unbind(notifier, sd, sd->asd);
 
 	mutex_unlock(&list_lock);
 }
