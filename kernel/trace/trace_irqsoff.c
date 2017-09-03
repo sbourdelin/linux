@@ -13,8 +13,68 @@
 #include <linux/uaccess.h>
 #include <linux/module.h>
 #include <linux/ftrace.h>
+#define CREATE_TRACE_POINTS
+#include <trace/events/critical.h>
 
 #include "trace.h"
+
+#ifdef CONFIG_CRITICAL_SECTION_EVENTS
+static DEFINE_PER_CPU(int, tracing_events_cpu);
+
+/*
+ * Called when either preempt or irq are turned off
+ */
+static inline void
+start_critical_event(unsigned long ip, unsigned long parent_ip)
+{
+	if (this_cpu_read(tracing_events_cpu))
+		return;
+
+	this_cpu_write(tracing_events_cpu, 1);
+	trace_critical_start(ip, parent_ip);
+}
+
+/*
+ * Called when both preempt and irq are turned back on
+ */
+static inline void
+stop_critical_event(unsigned long ip, unsigned long parent_ip)
+{
+	if (!this_cpu_read(tracing_events_cpu))
+		return;
+
+	trace_critical_stop(ip, parent_ip);
+	this_cpu_write(tracing_events_cpu, 0);
+}
+
+static inline int
+__trace_critical_start_enabled(void)
+{
+	if (irqs_disabled() || preempt_count())
+		return 1;
+
+	return 0;
+}
+
+static inline int
+__trace_critical_stop_enabled(void)
+{
+	if ((irqs_disabled() && !preempt_count()) ||
+	    (!irqs_disabled() && preempt_count()))
+		return 1;
+
+	return 0;
+}
+#else
+
+static inline void start_critical_event(unsigned long ip,
+					unsigned long pip) { }
+static inline void stop_critical_event(unsigned long ip,
+					unsigned long pip) { }
+
+static inline int __trace_critical_start_enabled(void) { return 0; }
+static inline int __trace_critical_stop_enabled(void) { return 0; }
+#endif
 
 #if defined(CONFIG_IRQSOFF_TRACER) || defined(CONFIG_PREEMPT_TRACER)
 static struct trace_array		*irqsoff_trace __read_mostly;
@@ -710,7 +770,7 @@ void time_hardirqs_off(unsigned long a0, unsigned long a1)
 }
 #endif
 #else /* !CONFIG_PROVE_LOCKING */
-# ifdef CONFIG_IRQSOFF_TRACER
+# if defined(CONFIG_IRQSOFF_TRACER) || defined(CONFIG_CRITICAL_SECTION_EVENTS)
 
 /*
  * Stubs:
@@ -733,6 +793,9 @@ inline void print_irqtrace_events(struct task_struct *curr)
  */
 void trace_hardirqs_on(void)
 {
+	if (__trace_critical_stop_enabled())
+		stop_critical_event(CALLER_ADDR0, CALLER_ADDR1);
+
 	if (!preempt_trace() && irq_trace())
 		stop_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
 }
@@ -740,6 +803,9 @@ EXPORT_SYMBOL(trace_hardirqs_on);
 
 void trace_hardirqs_off(void)
 {
+	if (__trace_critical_start_enabled())
+		start_critical_event(CALLER_ADDR0, CALLER_ADDR1);
+
 	if (!preempt_trace() && irq_trace())
 		start_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
 }
@@ -747,6 +813,9 @@ EXPORT_SYMBOL(trace_hardirqs_off);
 
 __visible void trace_hardirqs_on_caller(unsigned long caller_addr)
 {
+	if (__trace_critical_stop_enabled())
+		stop_critical_event(CALLER_ADDR0, caller_addr);
+
 	if (!preempt_trace() && irq_trace())
 		stop_critical_timing(CALLER_ADDR0, caller_addr);
 }
@@ -754,32 +823,44 @@ EXPORT_SYMBOL(trace_hardirqs_on_caller);
 
 __visible void trace_hardirqs_off_caller(unsigned long caller_addr)
 {
+	if (__trace_critical_start_enabled())
+		start_critical_event(CALLER_ADDR0, caller_addr);
+
 	if (!preempt_trace() && irq_trace())
 		start_critical_timing(CALLER_ADDR0, caller_addr);
 }
 EXPORT_SYMBOL(trace_hardirqs_off_caller);
 
-#endif /*  CONFIG_IRQSOFF_TRACER */
+#endif /*  CONFIG_IRQSOFF_TRACER || CONFIG_CRITICAL_SECTION_EVENTS */
 #endif /* CONFIG_PROVE_LOCKING */
 
-#ifdef CONFIG_PREEMPT_TRACER
+#if defined(CONFIG_PREEMPT_TRACER) || defined(CONFIG_CRITICAL_SECTION_EVENTS)
 void trace_preempt_on(unsigned long a0, unsigned long a1)
 {
+	if (__trace_critical_stop_enabled())
+		stop_critical_event(a0, a1);
+
 	if (preempt_trace() && !irq_trace())
 		stop_critical_timing(a0, a1);
 }
 
 void trace_preempt_off(unsigned long a0, unsigned long a1)
 {
+	if (__trace_critical_start_enabled())
+		start_critical_event(a0, a1);
+
 	if (preempt_trace() && !irq_trace())
 		start_critical_timing(a0, a1);
 }
-#endif /* CONFIG_PREEMPT_TRACER */
+#endif /* CONFIG_PREEMPT_TRACER || CONFIG_CRITICAL_SECTION_EVENTS */
 
 
 /* start and stop critical timings used to for stoppage (in idle) */
 void start_critical_timings(void)
 {
+	if (__trace_critical_start_enabled())
+		start_critical_event(CALLER_ADDR0, CALLER_ADDR1);
+
 	if (preempt_trace() || irq_trace())
 		start_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
 }
@@ -787,6 +868,14 @@ EXPORT_SYMBOL_GPL(start_critical_timings);
 
 void stop_critical_timings(void)
 {
+	/*
+	 * we have to use *_start_enabled instead of *_stop_enabled
+	 * because the condition for stopping critical timings is
+	 * whether a critical section was entered before entering idle
+	 */
+	if (__trace_critical_start_enabled())
+		stop_critical_event(CALLER_ADDR0, CALLER_ADDR1);
+
 	if (preempt_trace() || irq_trace())
 		stop_critical_timing(CALLER_ADDR0, CALLER_ADDR1);
 }
