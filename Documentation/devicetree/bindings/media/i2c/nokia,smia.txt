@@ -27,6 +27,8 @@ Optional properties
 - nokia,nvm-size: The size of the NVM, in bytes. If the size is not given,
   the NVM contents will not be read.
 - reset-gpios: XSHUTDOWN GPIO
+- flash: One or more phandles to refer to flash LEDs
+- lens-focus: Phandle for lens focus
 
 
 Endpoint node mandatory properties
