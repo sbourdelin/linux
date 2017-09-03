@@ -809,6 +809,8 @@ static int fsl_ssi_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
 		int clk_id, unsigned int freq, int dir)
 {
 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
+	if (clk_get_rate(ssi_private->clk) == freq)
+		return 0;
 
 	ssi_private->bitclk_freq = freq;
 
