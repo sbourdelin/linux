@@ -59,7 +59,6 @@ struct clusterip_config {
 	struct rcu_head rcu;
 
 	char ifname[IFNAMSIZ];			/* device ifname */
-	struct notifier_block notifier;		/* refresh c->ifindex in it */
 };
 
 #ifdef CONFIG_PROC_FS
@@ -73,6 +72,7 @@ struct clusterip_net {
 	/* lock protects the configs list */
 	spinlock_t lock;
 
+	struct notifier_block notifier;
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *procdir;
 #endif
@@ -110,8 +110,6 @@ clusterip_config_entry_put(struct net *net, struct clusterip_config *c)
 		list_del_rcu(&c->list);
 		spin_unlock(&cn->lock);
 		local_bh_enable();
-
-		unregister_netdevice_notifier(&c->notifier);
 
 		/* In case anyone still accesses the file, the open/close
 		 * functions are also incrementing the refcount on their own,
@@ -176,32 +174,37 @@ clusterip_netdev_event(struct notifier_block *this, unsigned long event,
 		       void *ptr)
 {
 	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
+	struct net *net = dev_net(dev);
+	struct clusterip_net *cn = net_generic(net, clusterip_net_id);
 	struct clusterip_config *c;
 
-	c = container_of(this, struct clusterip_config, notifier);
-	switch (event) {
-	case NETDEV_REGISTER:
-		if (!strcmp(dev->name, c->ifname)) {
-			c->ifindex = dev->ifindex;
-			dev_mc_add(dev, c->clustermac);
+	rcu_read_lock();
+	list_for_each_entry_rcu(c, &cn->configs, list) {
+		switch (event) {
+		case NETDEV_REGISTER:
+			if (!strcmp(dev->name, c->ifname)) {
+				c->ifindex = dev->ifindex;
+				dev_mc_add(dev, c->clustermac);
+			}
+			break;
+		case NETDEV_UNREGISTER:
+			if (dev->ifindex == c->ifindex) {
+				dev_mc_del(dev, c->clustermac);
+				c->ifindex = -1;
+			}
+			break;
+		case NETDEV_CHANGENAME:
+			if (!strcmp(dev->name, c->ifname)) {
+				c->ifindex = dev->ifindex;
+				dev_mc_add(dev, c->clustermac);
+			} else if (dev->ifindex == c->ifindex) {
+				dev_mc_del(dev, c->clustermac);
+				c->ifindex = -1;
+			}
+			break;
 		}
-		break;
-	case NETDEV_UNREGISTER:
-		if (dev->ifindex == c->ifindex) {
-			dev_mc_del(dev, c->clustermac);
-			c->ifindex = -1;
-		}
-		break;
-	case NETDEV_CHANGENAME:
-		if (!strcmp(dev->name, c->ifname)) {
-			c->ifindex = dev->ifindex;
-			dev_mc_add(dev, c->clustermac);
-		} else if (dev->ifindex == c->ifindex) {
-			dev_mc_del(dev, c->clustermac);
-			c->ifindex = -1;
-		}
-		break;
 	}
+	rcu_read_unlock();
 
 	return NOTIFY_DONE;
 }
@@ -256,11 +259,7 @@ clusterip_config_init(struct net *net, const struct ipt_clusterip_tgt_info *i,
 	}
 #endif
 
-	c->notifier.notifier_call = clusterip_netdev_event;
-	err = register_netdevice_notifier(&c->notifier);
-	if (!err)
-		return c;
-
+	return c;
 #ifdef CONFIG_PROC_FS
 	proc_remove(c->pde);
 err:
@@ -798,9 +797,17 @@ static int clusterip_net_init(struct net *net)
 	if (ret < 0)
 		return ret;
 
+	cn->notifier.notifier_call = clusterip_netdev_event;
+	ret = register_netdevice_notifier(&cn->notifier);
+	if (ret) {
+		nf_unregister_net_hook(net, &cip_arp_ops);
+		return ret;
+	}
+
 #ifdef CONFIG_PROC_FS
 	cn->procdir = proc_mkdir("ipt_CLUSTERIP", net->proc_net);
 	if (!cn->procdir) {
+		unregister_netdevice_notifier(&cn->notifier);
 		nf_unregister_net_hook(net, &cip_arp_ops);
 		pr_err("Unable to proc dir entry\n");
 		return -ENOMEM;
@@ -812,10 +819,11 @@ static int clusterip_net_init(struct net *net)
 
 static void clusterip_net_exit(struct net *net)
 {
-#ifdef CONFIG_PROC_FS
 	struct clusterip_net *cn = net_generic(net, clusterip_net_id);
+#ifdef CONFIG_PROC_FS
 	proc_remove(cn->procdir);
 #endif
+	unregister_netdevice_notifier(&cn->notifier);
 	nf_unregister_net_hook(net, &cip_arp_ops);
 }
 
