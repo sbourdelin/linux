@@ -3118,7 +3118,7 @@ static int get_empty_pcm_device(struct hda_bus *bus, unsigned int type)
 	static int audio_idx[HDA_PCM_NTYPES][5] = {
 		[HDA_PCM_TYPE_AUDIO] = { 0, 2, 4, 5, -1 },
 		[HDA_PCM_TYPE_SPDIF] = { 1, -1 },
-		[HDA_PCM_TYPE_HDMI]  = { 3, 7, 8, 9, -1 },
+		[HDA_PCM_TYPE_HDMI]  = { 3, 7, -1 },
 		[HDA_PCM_TYPE_MODEM] = { 6, -1 },
 	};
 	int i;
@@ -3139,7 +3139,7 @@ static int get_empty_pcm_device(struct hda_bus *bus, unsigned int type)
 
 #ifdef CONFIG_SND_DYNAMIC_MINORS
 	/* non-fixed slots starting from 10 */
-	for (i = 10; i < 32; i++) {
+	for (i = 8; i < 32; i++) {
 		if (!test_and_set_bit(i, bus->pcm_dev_bits))
 			return i;
 	}
