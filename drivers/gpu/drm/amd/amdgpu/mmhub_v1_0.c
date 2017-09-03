@@ -20,6 +20,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  *
  */
+#include <linux/kernel.h>
+
 #include "amdgpu.h"
 #include "mmhub_v1_0.h"
 
@@ -268,7 +270,7 @@ const struct pctl_data pctl0_data[] = {
     {0x135, 0x12a810},
     {0x149, 0x7a82c}
 };
-#define PCTL0_DATA_LEN (sizeof(pctl0_data)/sizeof(pctl0_data[0]))
+#define PCTL0_DATA_LEN (ARRAY_SIZE(pctl0_data))
 
 #define PCTL0_RENG_EXEC_END_PTR 0x151
 #define PCTL0_STCTRL_REG_SAVE_RANGE0_BASE  0xa640
@@ -297,7 +299,7 @@ const struct pctl_data pctl1_data[] = {
     {0x1be, 0x17a7dd},
     {0x1d7, 0x12a810}
 };
-#define PCTL1_DATA_LEN (sizeof(pctl1_data)/sizeof(pctl1_data[0]))
+#define PCTL1_DATA_LEN (ARRAY_SIZE(pctl1_data))
 
 #define PCTL1_RENG_EXEC_END_PTR 0x1ea
 #define PCTL1_STCTRL_REG_SAVE_RANGE0_BASE  0xa000
