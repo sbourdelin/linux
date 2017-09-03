@@ -109,3 +109,45 @@ static inline void console_init(void)
 #endif
 
 #endif
+
+#ifdef ACPI_BIG_ENDIAN
+#define ACPI_MOVE_64_TO_64(d, s) \
+{((u8 *)(void *)(d))[0] = ((u8 *)(void *)(s))[7]; \
+((u8 *)(void *)(d))[1] = ((u8 *)(void *)(s))[6]; \
+((u8 *)(void *)(d))[2] = ((u8 *)(void *)(s))[5]; \
+((u8 *)(void *)(d))[3] = ((u8 *)(void *)(s))[4]; \
+((u8 *)(void *)(d))[4] = ((u8 *)(void *)(s))[3]; \
+((u8 *)(void *)(d))[5] = ((u8 *)(void *)(s))[2]; \
+((u8 *)(void *)(d))[6] = ((u8 *)(void *)(s))[1]; \
+((u8 *)(void *)(d))[7] = ((u8 *)(void *)(s))[0]; }
+#else
+#ifndef ACPI_MISALIGNMENT_NOT_SUPPORTED
+#define ACPI_MOVE_64_TO_64(d, s) \
+{*(u64 *)(void *)(d) = *(u64 *)(void *)(s); }
+#else
+#define ACPI_MOVE_64_TO_64(d, s) \
+{((u8 *)(void *)(d))[0] = ((u8 *)(void *)(s))[0]; \
+((u8 *)(void *)(d))[1] = ((u8 *)(void *)(s))[1]; \
+((u8 *)(void *)(d))[2] = ((u8 *)(void *)(s))[2]; \
+((u8 *)(void *)(d))[3] = ((u8 *)(void *)(s))[3]; \
+((u8 *)(void *)(d))[4] = ((u8 *)(void *)(s))[4]; \
+((u8 *)(void *)(d))[5] = ((u8 *)(void *)(s))[5]; \
+((u8 *)(void *)(d))[6] = ((u8 *)(void *)(s))[6]; \
+((u8 *)(void *)(d))[7] = ((u8 *)(void *)(s))[7]; }
+#endif
+#endif
+#ifdef ACPI_BIG_ENDIAN
+#define ACPI_MOVE_16_TO_32(d, s) \
+{(*(u32 *)(void *)(d)) = 0; \
+((u8 *)(void *)(d))[2] = ((u8 *)(void *)(s))[1]; \
+((u8 *)(void *)(d))[3] = ((u8 *)(void *)(s))[0]; }
+#else
+#ifndef ACPI_MISALIGNMENT_NOT_SUPPORTED
+#define ACPI_MOVE_16_TO_32(d, s) \
+{*(u32 *)(void *)(d) = *(u16 *)(void *)(s); }
+#else
+#define ACPI_MOVE_16_TO_32(d, s) \
+{(*(u32 *)(void *)(d)) = 0; ACPI_MOVE_16_TO_16(d, s); }
+#endif
+#endif
+
