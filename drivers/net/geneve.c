@@ -834,11 +834,10 @@ static int geneve_xmit_skb(struct sk_buff *skb, struct net_device *dev,
 	sport = udp_flow_src_port(geneve->net, skb, 1, USHRT_MAX, true);
 	if (geneve->collect_md) {
 		tos = ip_tunnel_ecn_encap(key->tos, ip_hdr(skb), skb);
-		ttl = key->ttl;
 	} else {
 		tos = ip_tunnel_ecn_encap(fl4.flowi4_tos, ip_hdr(skb), skb);
-		ttl = key->ttl ? : ip4_dst_hoplimit(&rt->dst);
 	}
+	ttl = key->ttl ? : ip4_dst_hoplimit(&rt->dst);
 	df = key->tun_flags & TUNNEL_DONT_FRAGMENT ? htons(IP_DF) : 0;
 
 	err = geneve_build_skb(&rt->dst, skb, info, xnet, sizeof(struct iphdr));
@@ -873,12 +872,11 @@ static int geneve6_xmit_skb(struct sk_buff *skb, struct net_device *dev,
 	sport = udp_flow_src_port(geneve->net, skb, 1, USHRT_MAX, true);
 	if (geneve->collect_md) {
 		prio = ip_tunnel_ecn_encap(key->tos, ip_hdr(skb), skb);
-		ttl = key->ttl;
 	} else {
 		prio = ip_tunnel_ecn_encap(ip6_tclass(fl6.flowlabel),
 					   ip_hdr(skb), skb);
-		ttl = key->ttl ? : ip6_dst_hoplimit(dst);
 	}
+	ttl = key->ttl ? : ip6_dst_hoplimit(dst);
 	err = geneve_build_skb(dst, skb, info, xnet, sizeof(struct ipv6hdr));
 	if (unlikely(err))
 		return err;
