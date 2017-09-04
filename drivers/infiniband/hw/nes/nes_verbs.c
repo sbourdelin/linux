@@ -1442,7 +1442,7 @@ static struct ib_cq *nes_create_cq(struct ib_device *ibdev,
 	struct nes_hw_cqp_wqe *cqp_wqe;
 	struct nes_pbl *nespbl = NULL;
 	struct nes_create_cq_req req;
-	struct nes_create_cq_resp resp;
+	struct nes_create_cq_resp resp = { 0 };
 	u32 cq_num = 0;
 	u32 opcode = 0;
 	u32 pbl_entries = 1;
