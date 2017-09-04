@@ -511,6 +511,16 @@ config THINKPAD_ACPI_HOTKEY_POLL
 	  If you are not sure, say Y here.  The driver enables polling only if
 	  it is strictly necessary to do so.
 
+config THINKPAD_WMI
+	tristate "THINKPAD WMI Driver (EXPERIMENTAL)"
+	depends on ACPI_WMI
+	---help---
+	  This driver allow you to modify BIOS passwords, settings, and boot order
+	  using Windows Management Instrumentation (WMI) through the Lenovo
+	  client-management interface.
+
+	  Say Y here if you have a WMI aware Thinkpad.
+
 config SENSORS_HDAPS
 	tristate "Thinkpad Hard Drive Active Protection System (hdaps)"
 	depends on INPUT
