@@ -777,10 +777,18 @@ long drm_ioctl(struct file *filp,
 	is_driver_ioctl = nr >= DRM_COMMAND_BASE && nr < DRM_COMMAND_END;
 
 	if (is_driver_ioctl) {
-		/* driver ioctl */
-		if (nr - DRM_COMMAND_BASE >= dev->driver->num_ioctls)
-			goto err_i1;
-		ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
+		/* check first if the driver has registered dynamically ioctls */
+		if (dev->driver->ioctl_register && dev->driver->ioctl_deregister) {
+			struct drm_ioctl_desc *pos = drm_ioctl_get_ioctl(dev, nr);
+			if (!pos)
+				goto err_i1;
+			ioctl = pos;
+		} else {
+			/* driver ioctl */
+			if (nr - DRM_COMMAND_BASE >= dev->driver->num_ioctls)
+				goto err_i1;
+			ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
+		}
 	} else {
 		/* core ioctl */
 		if (nr >= DRM_CORE_IOCTL_COUNT)
@@ -871,3 +879,86 @@ bool drm_ioctl_flags(unsigned int nr, unsigned int *flags)
 	return true;
 }
 EXPORT_SYMBOL(drm_ioctl_flags);
+
+/**
+ * drm_ioctl_register - registers a driver-specific ioctl
+ * @drm: the drm device
+ * @ioctl: the ioctl to register
+ *
+ * This method can be used to dynamically register a driver-specific
+ * ioctl, without the need to have an array of drm_ioctl_desc declared
+ * in DRM core driver.
+ */
+void drm_ioctl_register(struct drm_device *drm, struct drm_ioctl_desc *ioctl)
+{
+	mutex_lock(&drm_global_mutex);
+	list_add_tail(&ioctl->next, &drm->driver->registered_ioctls);
+	mutex_unlock(&drm_global_mutex);
+}
+EXPORT_SYMBOL_GPL(drm_ioctl_register);
+
+/**
+ * drm_ioctl_deregister - removes the ioctl previously registered
+ * @drm: the drm device
+ * @ioctl: the ioctl to be removed
+ *
+ * Use this method to remove previously registered ioctls.
+ */
+void drm_ioctl_deregister(struct drm_device *drm, struct drm_ioctl_desc *ioctl)
+{
+	struct drm_ioctl_desc *pos, *ppos;
+	struct list_head *head = &drm->driver->registered_ioctls;
+
+	mutex_lock(&drm_global_mutex);
+	list_for_each_entry_safe(pos, ppos, head, next) {
+		if (DRM_IOCTL_NR(pos->cmd) == DRM_IOCTL_NR(ioctl->cmd)) {
+			list_del(&pos->next);
+			break;
+		}
+	}
+	mutex_unlock(&drm_global_mutex);
+}
+EXPORT_SYMBOL_GPL(drm_ioctl_deregister);
+
+/**
+ * drm_ioctl_get_ioctl - retrieve a ioctl based on its IOCTL nr
+ * @drm: the drm device
+ * @nr: ioctl number
+ *
+ * Returns: a pointer to struct drm_ioctl_desc or NULL otherwise
+ */
+struct drm_ioctl_desc *drm_ioctl_get_ioctl(struct drm_device *drm, unsigned int nr)
+{
+	struct drm_ioctl_desc *pos, *found;
+	struct list_head *head = &drm->driver->registered_ioctls;
+
+	found = NULL;
+
+	mutex_lock(&drm_global_mutex);
+	list_for_each_entry(pos, head, next) {
+		if (DRM_IOCTL_NR(pos->cmd) == nr) {
+			found = pos;
+			break;
+		}
+	}
+	mutex_unlock(&drm_global_mutex);
+	return found;
+}
+
+/**
+ * drm_ioctl_get_registered - retrieve the number of ioctls registered so far
+ * @drm: the drm device
+ */
+size_t drm_ioctl_get_registered(struct drm_device *drm)
+{
+	size_t cnt = 0;
+	struct list_head *pos;
+
+	mutex_lock(&drm_global_mutex);
+	list_for_each(pos, &drm->driver->registered_ioctls)
+		cnt++;
+	mutex_unlock(&drm_global_mutex);
+
+	return cnt;
+}
+EXPORT_SYMBOL_GPL(drm_ioctl_get_registered);

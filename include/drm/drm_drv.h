@@ -31,6 +31,7 @@
 #include <linux/irqreturn.h>
 
 #include <drm/drm_device.h>
+#include <drm/drm_ioctl.h>
 
 struct drm_file;
 struct drm_gem_object;
@@ -537,6 +538,28 @@ struct drm_driver {
 			    struct drm_device *dev,
 			    uint32_t handle);
 
+
+	/**
+	 * @ioctl_register:
+	 *
+	 * Registers an ioctl.
+	 */
+	void (*ioctl_register)(struct drm_device *drm, struct drm_ioctl_desc *ioctl);
+
+	/**
+	 * @ioctl_deregister:
+	 *
+	 * Removes a previously registered ioctl.
+	 */
+	void (*ioctl_deregister)(struct drm_device *drm, struct drm_ioctl_desc *ioctl);
+
+	/**
+	 * @ioctl_get_registered:
+	 *
+	 * Return the number of ioctls currently registered.
+	 */
+	size_t (*ioctl_get_registered)(struct drm_device *drm);
+
 	/**
 	 * @gem_vm_ops: Driver private ops for this object
 	 */
@@ -569,6 +592,17 @@ struct drm_driver {
 	const struct drm_ioctl_desc *ioctls;
 	/** @num_ioctls: Number of entries in @ioctls. */
 	int num_ioctls;
+
+	/**
+	 * @registered_ioctls:
+	 *
+	 * A list holding dynamically registered ioctls, as an alternative way of
+	 * having a static array of drm_ioctl_desc.
+	 *
+	 * Drivers must initialize ioctl_register and ioctl_deregister (or use
+	 * the already provided drm_ioctl_register/drm_ioctl_deregister).
+	 */
+	struct list_head registered_ioctls;
 
 	/**
 	 * @fops:

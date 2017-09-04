@@ -150,6 +150,7 @@ struct drm_ioctl_desc {
 	enum drm_ioctl_flags flags;
 	drm_ioctl_t *func;
 	const char *name;
+	struct list_head next;
 };
 
 /**
@@ -180,6 +181,11 @@ long drm_compat_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 #define drm_compat_ioctl NULL
 #endif
 bool drm_ioctl_flags(unsigned int nr, unsigned int *flags);
+
+void drm_ioctl_register(struct drm_device *drm, struct drm_ioctl_desc *ioctl);
+void drm_ioctl_deregister(struct drm_device *drm, struct drm_ioctl_desc *ioctl);
+struct drm_ioctl_desc *drm_ioctl_get_ioctl(struct drm_device *drm, unsigned int nr);
+size_t drm_ioctl_get_registered(struct drm_device *drm);
 
 int drm_noop(struct drm_device *dev, void *data,
 	     struct drm_file *file_priv);

@@ -513,6 +513,7 @@ int drm_dev_init(struct drm_device *dev,
 	INIT_LIST_HEAD(&dev->vmalist);
 	INIT_LIST_HEAD(&dev->maplist);
 	INIT_LIST_HEAD(&dev->vblank_event_list);
+	INIT_LIST_HEAD(&dev->driver->registered_ioctls);
 
 	spin_lock_init(&dev->buf_lock);
 	spin_lock_init(&dev->event_lock);
