@@ -52,10 +52,17 @@ extern __must_check bool refcount_sub_and_test(unsigned int i, refcount_t *r);
 
 extern __must_check bool refcount_dec_and_test(refcount_t *r);
 extern void refcount_dec(refcount_t *r);
+
+extern __must_check bool refcount_dec_if_one(refcount_t *r);
+extern __must_check bool refcount_dec_not_one(refcount_t *r);
+extern __must_check bool refcount_dec_and_mutex_lock(refcount_t *r, struct mutex *lock);
+extern __must_check bool refcount_dec_and_lock(refcount_t *r, spinlock_t *lock);
+
 #else
 # ifdef CONFIG_ARCH_HAS_REFCOUNT
 #  include <asm/refcount.h>
 # else
+
 static inline __must_check bool refcount_add_not_zero(unsigned int i, refcount_t *r)
 {
 	return atomic_add_unless(&r->refs, i, 0);
@@ -90,12 +97,30 @@ static inline void refcount_dec(refcount_t *r)
 {
 	atomic_dec(&r->refs);
 }
+
+static inline __must_check bool refcount_dec_if_one(refcount_t *r)
+{
+	int val = 1;
+
+	return atomic_try_cmpxchg_release(&r->refs, &val, 0);
+}
+
+static inline __must_check bool refcount_dec_not_one(refcount_t *r)
+{
+	return atomic_add_unless(&r->refs, -1, 1);
+}
+
+static inline __must_check bool refcount_dec_and_mutex_lock(refcount_t *r, struct mutex *lock)
+{
+	return atomic_dec_and_mutex_lock(&r->refs, lock);
+}
+
+static inline __must_check bool refcount_dec_and_lock(refcount_t *r, spinlock_t *lock)
+{
+	return atomic_dec_and_lock(&r->refs, lock);
+}
+
 # endif /* !CONFIG_ARCH_HAS_REFCOUNT */
 #endif /* CONFIG_REFCOUNT_FULL */
-
-extern __must_check bool refcount_dec_if_one(refcount_t *r);
-extern __must_check bool refcount_dec_not_one(refcount_t *r);
-extern __must_check bool refcount_dec_and_mutex_lock(refcount_t *r, struct mutex *lock);
-extern __must_check bool refcount_dec_and_lock(refcount_t *r, spinlock_t *lock);
 
 #endif /* _LINUX_REFCOUNT_H */
