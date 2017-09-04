@@ -1373,6 +1373,7 @@ xfs_vm_set_page_dirty(
 	offset = page_offset(page);
 
 	spin_lock(&mapping->private_lock);
+	WARN_ON_ONCE(!page_has_buffers(page));
 	if (page_has_buffers(page)) {
 		struct buffer_head *head = page_buffers(page);
 		struct buffer_head *bh = head;
