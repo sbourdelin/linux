@@ -1899,6 +1899,10 @@
 			feature (tagged TLBs) on capable Intel chips.
 			Default is 1 (enabled)
 
+	kvm_nopvspin	[X86,KVM]
+			Disables the paravirtualized spinlock slowpath
+			optimizations for KVM.
+
 	l2cr=		[PPC]
 
 	l3cr=		[PPC]
@@ -4557,7 +4561,7 @@
 			never -- do not unplug even if version check succeeds
 
 	xen_nopvspin	[X86,XEN]
-			Disables the ticketlock slowpath using Xen PV
+			Disables the spinlock slowpath using Xen PV
 			optimizations.
 
 	xen_nopv	[X86]

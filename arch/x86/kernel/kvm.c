@@ -568,6 +568,18 @@ static void kvm_kick_cpu(int cpu)
 	kvm_hypercall2(KVM_HC_KICK_CPU, flags, apicid);
 }
 
+static bool kvm_pvspin = true;
+
+/*
+ * Allow disabling of PV spinlock in kernel command line
+ */
+static __init int kvm_parse_nopvspin(char *arg)
+{
+	kvm_pvspin = false;
+	return 0;
+}
+early_param("kvm_nopvspin", kvm_parse_nopvspin);
+
 #include <asm/qspinlock.h>
 
 static void kvm_wait(u8 *ptr, u8 val)
@@ -633,7 +645,7 @@ asm(
  */
 void __init kvm_spinlock_init(void)
 {
-	if (!kvm_para_available())
+	if (!kvm_para_available() || !kvm_pvspin)
 		return;
 	/* Does host kernel support KVM_FEATURE_PV_UNHALT? */
 	if (!kvm_para_has_feature(KVM_FEATURE_PV_UNHALT))
