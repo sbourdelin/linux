@@ -3374,6 +3374,12 @@ static struct ctl_table dev_root[] = {
 	{}
 };
 
+static struct drm_ioctl_desc i915_perf_ioctls[] = {
+	DRM_IOCTL_DEF_DRV(I915_PERF_OPEN, i915_perf_open_ioctl, DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(I915_PERF_ADD_CONFIG, i915_perf_add_config_ioctl, DRM_UNLOCKED|DRM_RENDER_ALLOW),
+	DRM_IOCTL_DEF_DRV(I915_PERF_REMOVE_CONFIG, i915_perf_remove_config_ioctl, DRM_UNLOCKED|DRM_RENDER_ALLOW),
+};
+
 /**
  * i915_perf_init - initialize i915-perf state on module load
  * @dev_priv: i915 device instance
@@ -3385,6 +3391,8 @@ static struct ctl_table dev_root[] = {
  */
 void i915_perf_init(struct drm_i915_private *dev_priv)
 {
+	unsigned int i;
+	struct drm_device *dev = &dev_priv->drm;
 	dev_priv->perf.oa.timestamp_frequency = 0;
 
 	if (IS_HASWELL(dev_priv)) {
@@ -3483,6 +3491,11 @@ void i915_perf_init(struct drm_i915_private *dev_priv)
 
 		dev_priv->perf.initialized = true;
 	}
+
+	/* register ioctls */
+	for (i = 0; i < ARRAY_SIZE(i915_perf_ioctls); i++)
+		dev->driver->ioctl_register(dev, &i915_perf_ioctls[i]);
+
 }
 
 static int destroy_config(int id, void *p, void *data)
@@ -3501,8 +3514,13 @@ static int destroy_config(int id, void *p, void *data)
  */
 void i915_perf_fini(struct drm_i915_private *dev_priv)
 {
+	unsigned int i;
+	struct drm_device *dev = NULL;
+
 	if (!dev_priv->perf.initialized)
 		return;
+
+	dev = &dev_priv->drm;
 
 	idr_for_each(&dev_priv->perf.metrics_idr, destroy_config, dev_priv);
 	idr_destroy(&dev_priv->perf.metrics_idr);
@@ -3510,6 +3528,9 @@ void i915_perf_fini(struct drm_i915_private *dev_priv)
 	unregister_sysctl_table(dev_priv->perf.sysctl_header);
 
 	memset(&dev_priv->perf.oa.ops, 0, sizeof(dev_priv->perf.oa.ops));
+
+	for (i = 0; i < ARRAY_SIZE(i915_perf_ioctls); i++)
+		dev->driver->ioctl_deregister(dev, &i915_perf_ioctls[i]);
 
 	dev_priv->perf.initialized = false;
 }
