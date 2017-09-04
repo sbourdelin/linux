@@ -99,7 +99,8 @@ ssize_t tpm_common_write(struct file *file, const char __user *buf,
 	if (atomic_read(&priv->data_pending) != 0)
 		return -EBUSY;
 
-	if (in_size > TPM_BUFSIZE)
+	if (in_size > sizeof(priv->data_buffer) || in_size < 6 ||
+	    in_size < be32_to_cpu(*((__be32 *) (buf + 2))))
 		return -E2BIG;
 
 	mutex_lock(&priv->buffer_mutex);
