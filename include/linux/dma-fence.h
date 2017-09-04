@@ -248,27 +248,8 @@ dma_fence_get_rcu_safe(struct dma_fence * __rcu *fencep)
 		struct dma_fence *fence;
 
 		fence = rcu_dereference(*fencep);
-		if (!fence || !dma_fence_get_rcu(fence))
-			return NULL;
-
-		/* The atomic_inc_not_zero() inside dma_fence_get_rcu()
-		 * provides a full memory barrier upon success (such as now).
-		 * This is paired with the write barrier from assigning
-		 * to the __rcu protected fence pointer so that if that
-		 * pointer still matches the current fence, we know we
-		 * have successfully acquire a reference to it. If it no
-		 * longer matches, we are holding a reference to some other
-		 * reallocated pointer. This is possible if the allocator
-		 * is using a freelist like SLAB_TYPESAFE_BY_RCU where the
-		 * fence remains valid for the RCU grace period, but it
-		 * may be reallocated. When using such allocators, we are
-		 * responsible for ensuring the reference we get is to
-		 * the right fence, as below.
-		 */
-		if (fence == rcu_access_pointer(*fencep))
-			return rcu_pointer_handoff(fence);
-
-		dma_fence_put(fence);
+		if (!fence || dma_fence_get_rcu(fence))
+			return fence;
 	} while (1);
 }
 
