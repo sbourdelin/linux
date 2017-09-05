@@ -189,4 +189,15 @@ struct pt {
 	int			vmx_on;
 };
 
+struct intel_pt_pmu_info {
+	struct pmu_info		pi;
+	u8			x86_family;
+	u8			x86_model;
+	u8			x86_step;
+	u8			x86_tsc_max_nonturbo_ratio;
+	u32			x86_tsc_to_art_numerator;
+	u32			x86_tsc_to_art_denominator;
+	u32			__reserved_0;
+};
+
 #endif /* __INTEL_PT_H__ */
