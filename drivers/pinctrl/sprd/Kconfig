@@ -4,6 +4,7 @@
 
 config PINCTRL_SPRD
 	bool "Spreadtrum pinctrl driver"
+	depends on OF
 	select PINMUX
 	select PINCONF
 	select GENERIC_PINCONF
