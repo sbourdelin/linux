@@ -99,6 +99,8 @@ struct fanotify_response {
 /* Legit userspace responses to a _PERM event */
 #define FAN_ALLOW	0x01
 #define FAN_DENY	0x02
+#define FAN_AUDIT	0x80	/* Bit mask to create audit record for result */
+
 /* No fd set in event */
 #define FAN_NOFD	-1
 
