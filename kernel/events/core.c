@@ -50,10 +50,13 @@
 #include <linux/sched/mm.h>
 #include <linux/proc_ns.h>
 #include <linux/mount.h>
+#include <linux/tracefs.h>
 
 #include "internal.h"
 
 #include <asm/irq_regs.h>
+
+static struct dentry *perf_tracefs_dir;
 
 typedef int (*remote_function_f)(void *);
 
@@ -346,7 +349,8 @@ unlock:
 #define PERF_FLAG_ALL (PERF_FLAG_FD_NO_GROUP |\
 		       PERF_FLAG_FD_OUTPUT  |\
 		       PERF_FLAG_PID_CGROUP |\
-		       PERF_FLAG_FD_CLOEXEC)
+		       PERF_FLAG_FD_CLOEXEC |\
+		       PERF_FLAG_DETACHED)
 
 /*
  * branch priv levels that need permission checks
@@ -4177,6 +4181,12 @@ static void _free_event(struct perf_event *event)
 
 	unaccount_event(event);
 
+	if (event->dent) {
+		tracefs_remove(event->dent);
+
+		event->attach_state &= ~PERF_ATTACH_DETACHED;
+	}
+
 	if (event->rb) {
 		/*
 		 * Can happen when we close an event with re-directed output.
@@ -5427,8 +5437,27 @@ static int perf_fasync(int fd, struct file *filp, int on)
 	return 0;
 }
 
+static int perf_open(struct inode *inode, struct file *file)
+{
+	struct perf_event *event = inode->i_private;
+	int ret;
+
+	if (WARN_ON_ONCE(!event))
+		return -EINVAL;
+
+	if (!atomic_long_inc_not_zero(&event->refcount))
+		return -ENOENT;
+
+	ret = simple_open(inode, file);
+	if (ret)
+		put_event(event);
+
+	return ret;
+}
+
 static const struct file_operations perf_fops = {
 	.llseek			= no_llseek,
+	.open			= perf_open,
 	.release		= perf_release,
 	.read			= perf_read,
 	.poll			= perf_poll,
@@ -9377,6 +9406,27 @@ enabled:
 	account_pmu_sb_event(event);
 }
 
+static int perf_event_detach(struct perf_event *event, struct task_struct *task,
+			     struct mm_struct *mm)
+{
+	char *filename;
+
+	filename = kasprintf(GFP_KERNEL, "%s:%x.event",
+			     task ? "task" : "cpu",
+			     hash_64((u64)event, PERF_TRACEFS_HASH_BITS));
+	if (!filename)
+		return -ENOMEM;
+
+	event->dent = tracefs_create_file(filename, 0600,
+					  perf_tracefs_dir,
+					  event, &perf_fops);
+	kfree(filename);
+
+	if (!event->dent)
+		return -ENOMEM;
+
+	return 0;
+}
 /*
  * Allocate and initialize a event structure
  */
@@ -9706,6 +9756,10 @@ perf_event_set_output(struct perf_event *event, struct perf_event *output_event)
 	struct ring_buffer *rb = NULL;
 	int ret = -EINVAL;
 
+	if ((event->attach_state | output_event->attach_state) &
+	    PERF_ATTACH_DETACHED)
+		goto out;
+
 	if (!output_event)
 		goto set;
 
@@ -9866,7 +9920,7 @@ SYSCALL_DEFINE5(perf_event_open,
 	struct task_struct *task = NULL;
 	struct pmu *pmu;
 	int event_fd;
-	int move_group = 0;
+	int move_group = 0, detached = 0;
 	int err;
 	int f_flags = O_RDWR;
 	int cgroup_fd = -1;
@@ -9944,6 +9998,16 @@ SYSCALL_DEFINE5(perf_event_open,
 	    group_leader->attr.inherit != attr.inherit) {
 		err = -EINVAL;
 		goto err_task;
+	}
+
+	if (flags & PERF_FLAG_DETACHED) {
+		err = -EINVAL;
+
+		/* output redirection and grouping are not allowed */
+		if (output_event || (group_fd != -1))
+			goto err_task;
+
+		detached = 1;
 	}
 
 	if (task) {
@@ -10094,6 +10158,16 @@ SYSCALL_DEFINE5(perf_event_open,
 		goto err_context;
 	}
 
+	if (detached) {
+		err = perf_event_detach(event, task, NULL);
+		if (err)
+			goto err_context;
+
+		atomic_long_inc(&event->refcount);
+
+		event_file->private_data = event;
+	}
+
 	if (move_group) {
 		gctx = __perf_event_ctx_lock_double(group_leader, ctx);
 
@@ -10226,7 +10300,7 @@ SYSCALL_DEFINE5(perf_event_open,
 	perf_event__header_size(event);
 	perf_event__id_header_size(event);
 
-	event->owner = current;
+	event->owner = detached ? TASK_TOMBSTONE : current;
 
 	perf_install_in_context(ctx, event, event->cpu);
 	perf_unpin_context(ctx);
@@ -10240,9 +10314,11 @@ SYSCALL_DEFINE5(perf_event_open,
 		put_task_struct(task);
 	}
 
-	mutex_lock(&current->perf_event_mutex);
-	list_add_tail(&event->owner_entry, &current->perf_event_list);
-	mutex_unlock(&current->perf_event_mutex);
+	if (!detached) {
+		mutex_lock(&current->perf_event_mutex);
+		list_add_tail(&event->owner_entry, &current->perf_event_list);
+		mutex_unlock(&current->perf_event_mutex);
+	}
 
 	/*
 	 * Drop the reference on the group_event after placing the
@@ -10482,7 +10558,16 @@ perf_event_exit_event(struct perf_event *child_event,
 	 * Parent events are governed by their filedesc, retain them.
 	 */
 	if (!parent_event) {
-		perf_event_wakeup(child_event);
+		/*
+		 * unless they are DETACHED, in which case we still have
+		 * to dispose of them; they have an extra reference with
+		 * the DETACHED state and a tracefs file
+		 */
+		if (is_detached_event(child_event))
+			put_event(child_event); /* can be last */
+		else
+			perf_event_wakeup(child_event);
+
 		return;
 	}
 	/*
@@ -11194,6 +11279,45 @@ unlock:
 	return ret;
 }
 device_initcall(perf_event_sysfs_init);
+
+static int perf_instance_nop(const char *name)
+{
+	return -EACCES;
+}
+
+static int perf_instance_unlink(const char *name)
+{
+	struct perf_event *event;
+	struct dentry *dent;
+
+	dent = lookup_one_len_unlocked(name, perf_tracefs_dir, strlen(name));
+	if (!dent)
+		return -ENOENT;
+
+	event = dent->d_inode->i_private;
+	if (!event)
+		return -EINVAL;
+
+	if (!(event->attach_state & PERF_ATTACH_CONTEXT))
+		return -EBUSY;
+
+	perf_event_release_kernel(event);
+
+	return 0;
+}
+
+static int __init perf_event_tracefs_init(void)
+{
+	perf_tracefs_dir = tracefs_create_instance_dir("perf", NULL,
+						       perf_instance_nop,
+						       perf_instance_nop,
+						       perf_instance_unlink);
+	if (!perf_tracefs_dir)
+		return -ENOMEM;
+
+	return 0;
+}
+device_initcall(perf_event_tracefs_init);
 
 #ifdef CONFIG_CGROUP_PERF
 static struct cgroup_subsys_state *
