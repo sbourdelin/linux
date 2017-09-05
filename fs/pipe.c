@@ -35,6 +35,11 @@
 unsigned int pipe_max_size = 1048576;
 
 /*
+ * Provide mutual exclusion around access to pipe_max_size
+ */
+static DEFINE_MUTEX(pipe_max_mutex);
+
+/*
  * Minimum pipe size, as required by POSIX
  */
 unsigned int pipe_min_size = PAGE_SIZE;
@@ -623,13 +628,18 @@ struct pipe_inode_info *alloc_pipe_info(void)
 	unsigned long pipe_bufs = PIPE_DEF_BUFFERS;
 	struct user_struct *user = get_current_user();
 	unsigned long user_bufs;
+	unsigned int max_size;
 
 	pipe = kzalloc(sizeof(struct pipe_inode_info), GFP_KERNEL_ACCOUNT);
 	if (pipe == NULL)
 		goto out_free_uid;
 
-	if (pipe_bufs * PAGE_SIZE > pipe_max_size && !capable(CAP_SYS_RESOURCE))
-		pipe_bufs = pipe_max_size >> PAGE_SHIFT;
+	mutex_lock(&pipe_max_mutex);
+	max_size = pipe_max_size;
+	mutex_unlock(&pipe_max_mutex);
+
+	if (pipe_bufs * PAGE_SIZE > max_size && !capable(CAP_SYS_RESOURCE))
+		pipe_bufs = max_size >> PAGE_SHIFT;
 
 	user_bufs = account_pipe_buffers(user, 0, pipe_bufs);
 
@@ -1039,6 +1049,7 @@ static long pipe_set_size(struct pipe_inode_info *pipe, unsigned long arg)
 	struct pipe_buffer *bufs;
 	unsigned int size, nr_pages;
 	unsigned long user_bufs;
+	unsigned int max_size;
 	long ret = 0;
 
 	size = round_pipe_size(arg);
@@ -1056,8 +1067,11 @@ static long pipe_set_size(struct pipe_inode_info *pipe, unsigned long arg)
 	 * Decreasing the pipe capacity is always permitted, even
 	 * if the user is currently over a limit.
 	 */
+	mutex_lock(&pipe_max_mutex);
+	max_size = pipe_max_size;
+	mutex_unlock(&pipe_max_mutex);
 	if (nr_pages > pipe->buffers &&
-			size > pipe_max_size && !capable(CAP_SYS_RESOURCE))
+			size > max_size && !capable(CAP_SYS_RESOURCE))
 		return -EPERM;
 
 	user_bufs = account_pipe_buffers(pipe->user, pipe->buffers, nr_pages);
@@ -1131,18 +1145,24 @@ int pipe_proc_fn(struct ctl_table *table, int write, void __user *buf,
 	unsigned int rounded_pipe_max_size;
 	int ret;
 
+	mutex_lock(&pipe_max_mutex);
 	orig_pipe_max_size = pipe_max_size;
 	ret = proc_dointvec_minmax(table, write, buf, lenp, ppos);
-	if (ret < 0 || !write)
+	if (ret < 0 || !write) {
+		mutex_unlock(&pipe_max_mutex);
 		return ret;
+	}
 
 	rounded_pipe_max_size = round_pipe_size(pipe_max_size);
 	if (rounded_pipe_max_size == 0) {
 		pipe_max_size = orig_pipe_max_size;
+		mutex_unlock(&pipe_max_mutex);
 		return -EINVAL;
 	}
 
 	pipe_max_size = rounded_pipe_max_size;
+	mutex_unlock(&pipe_max_mutex);
+
 	return ret;
 }
 
