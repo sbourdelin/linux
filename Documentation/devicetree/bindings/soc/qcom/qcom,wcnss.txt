@@ -37,6 +37,12 @@ The following properties are defined to the bluetooth node:
 	Definition: must be:
 		    "qcom,wcnss-bt"
 
+- local-bd-address:
+	Usage: optional
+	Value type: <u8 array>
+	Definition: should specify the unique 6-byte BD address assigned to the
+		    BT controller. Usually added at runtime by the boot loader.
+
 == WiFi
 The following properties are defined to the WiFi node:
 
