@@ -15,6 +15,8 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/rpmsg.h>
+#include <linux/of.h>
+
 #include <linux/soc/qcom/wcnss_ctrl.h>
 #include <linux/platform_device.h>
 
@@ -126,6 +128,7 @@ static int btqcomsmd_setup(struct hci_dev *hdev)
 
 static int btqcomsmd_probe(struct platform_device *pdev)
 {
+	const bdaddr_t *local_bd_addr;
 	struct btqcomsmd *btq;
 	struct hci_dev *hdev;
 	void *wcnss;
@@ -146,6 +149,18 @@ static int btqcomsmd_probe(struct platform_device *pdev)
 						   btqcomsmd_cmd_callback, btq);
 	if (IS_ERR(btq->cmd_channel))
 		return PTR_ERR(btq->cmd_channel);
+
+	/* The local-bd-address DT property is usually injected by the
+	 * bootloader which has access to the allocated BD address.
+	 */
+	local_bd_addr = of_get_property(pdev->dev.of_node, "local-mac-address",
+					&ret);
+	if (local_bd_addr && ret == sizeof(bdaddr_t)) {
+		/* local-bd-address stored with most significant byte first */
+		baswap(&btq->bdaddr, local_bd_addr);
+		BT_INFO("BD address %pMR retrieved from device-tree",
+			&btq->bdaddr);
+	}
 
 	hdev = hci_alloc_dev();
 	if (!hdev)
