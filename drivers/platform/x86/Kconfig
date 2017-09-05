@@ -1140,6 +1140,14 @@ config SILEAD_DMI
 	  with the OS-image for the device. This option supplies the missing
 	  information. Enable this for x86 tablets with Silead touchscreens.
 
+config INTEL_IPC_DEV
+	bool "Intel IPC Device Driver"
+	depends on X86_64
+	---help---
+	  This driver implements core features of Intel IPC device. Devices
+	  like PMC, SCU, PUNIT, etc can use interfaces provided by this
+	  driver to implement IPC protocol of their respective device.
+
 endif # X86_PLATFORM_DEVICES
 
 config PMC_ATOM
