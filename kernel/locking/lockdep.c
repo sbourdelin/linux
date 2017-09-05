@@ -80,9 +80,25 @@ module_param(lock_stat, int, 0644);
 #define LT_READ_N 1 /* 1: read non-recursion type */
 #define LT_READ_R 2 /* 2: read recursion type */
 
+/*
+ * This is used to detect deadlocks at the real time for
+ * crosslocks. For example, workqueue code uses acquisitions
+ * manually for that purpose taking a risk creating false
+ * dependencies. It would be better for lockdep to be aware
+ * what users such as workqueue code want in that case and
+ * get chances to enhance lockdep internal code to avoid
+ * false dependencies as far as possible.
+ *
+ * TODO: For now, this flag is only used to skip this kind
+ * of acquisitions on commit. But, adding these false ones
+ * into graph itself should be avoided if possible.
+ */
+#define LT_MIGHT  3 /* 3: might acquire */
+
 #define is_write(a)  ((a) == LT_WRITE)
 #define is_read(a)   ((a) == LT_READ_N || (a) == LT_READ_R)
 #define is_read_r(a) ((a) == LT_READ_R)
+#define is_might(a)  ((a) == LT_MIGHT)
 
 /*
  * lockdep_lock: protects the lockdep graph, the hashes and the
@@ -4827,7 +4843,7 @@ static inline struct lock_class *xlock_class(struct cross_lock *xlock)
  */
 static inline int depend_before(struct held_lock *hlock)
 {
-	return !is_read_r(hlock->read) && hlock->check && !hlock->trylock;
+	return !is_read_r(hlock->read) && !is_might(hlock->read) && hlock->check && !hlock->trylock;
 }
 
 /*
@@ -4835,7 +4851,7 @@ static inline int depend_before(struct held_lock *hlock)
  */
 static inline int depend_after(struct held_lock *hlock)
 {
-	return !is_read_r(hlock->read) && hlock->check;
+	return !is_read_r(hlock->read) && !is_might(hlock->read) && hlock->check;
 }
 
 /*
