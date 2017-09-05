@@ -725,6 +725,11 @@ static __always_inline bool pv_vcpu_is_preempted(long cpu)
 	return PVOP_CALLEE1(bool, pv_lock_ops.vcpu_is_preempted, cpu);
 }
 
+static __always_inline bool pv_virt_spin_lock(struct qspinlock *lock)
+{
+	return PVOP_CALLEE1(bool, pv_lock_ops.virt_spin_lock, lock);
+}
+
 #endif /* SMP && PARAVIRT_SPINLOCKS */
 
 #ifdef CONFIG_X86_32

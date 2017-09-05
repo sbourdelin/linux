@@ -319,6 +319,7 @@ struct pv_lock_ops {
 	void (*kick)(int cpu);
 
 	struct paravirt_callee_save vcpu_is_preempted;
+	struct paravirt_callee_save virt_spin_lock;
 } __no_randomize_layout;
 
 /* This contains all the paravirt structures: we get a convenient
