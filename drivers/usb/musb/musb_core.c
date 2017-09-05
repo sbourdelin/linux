@@ -2674,8 +2674,18 @@ static int musb_suspend(struct device *dev)
 
 	musb_platform_disable(musb);
 	musb_disable_interrupts(musb);
-	if (!(musb->io.quirks & MUSB_PRESERVE_SESSION))
+
+	cancel_delayed_work_sync(&musb->irq_work);
+
+	if (!(musb->io.quirks & MUSB_PRESERVE_SESSION)) {
 		musb_writeb(musb->mregs, MUSB_DEVCTL, 0);
+
+		if (musb->session) {
+			musb->session = false;
+			pm_runtime_put_noidle(musb->controller);
+		}
+	}
+
 	WARN_ON(!list_empty(&musb->pending_list));
 
 	spin_lock_irqsave(&musb->lock, flags);
