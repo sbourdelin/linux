@@ -27,6 +27,25 @@
 #include <asm/mmu.h>
 #include <asm/mce.h>
 #include <asm/machdep.h>
+#include <asm/pgtable.h>
+#include <asm/pte-walk.h>
+#include <asm/sstep.h>
+
+static unsigned long addr_to_pfn(struct mm_struct *mm, unsigned long addr)
+{
+	pte_t *ptep;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	if (mm == current->mm)
+		ptep = find_current_mm_pte(mm->pgd, addr, NULL, NULL);
+	else
+		ptep = find_init_mm_pte(addr, NULL);
+	local_irq_restore(flags);
+	if (!ptep)
+		return ULONG_MAX;
+	return pte_pfn(*ptep);
+}
 
 static void flush_tlb_206(unsigned int num_sets, unsigned int action)
 {
@@ -489,7 +508,8 @@ static int mce_handle_ierror(struct pt_regs *regs,
 
 static int mce_handle_derror(struct pt_regs *regs,
 		const struct mce_derror_table table[],
-		struct mce_error_info *mce_err, uint64_t *addr)
+		struct mce_error_info *mce_err, uint64_t *addr,
+		uint64_t *phys_addr)
 {
 	uint64_t dsisr = regs->dsisr;
 	int handled = 0;
@@ -555,7 +575,37 @@ static int mce_handle_derror(struct pt_regs *regs,
 		mce_err->initiator = table[i].initiator;
 		if (table[i].dar_valid)
 			*addr = regs->dar;
+		else if (mce_err->severity == MCE_SEV_ERROR_SYNC &&
+				table[i].error_type == MCE_ERROR_TYPE_UE) {
+			/*
+			 * Carefully look at the NIP to determine
+			 * the instruction to analyse. Reading the NIP
+			 * in real-mode is tricky and can lead to recursive
+			 * faults
+			 */
+			int instr;
+			struct mm_struct *mm;
+			unsigned long nip = regs->nip;
+			unsigned long pfn = 0, instr_addr;
+			struct instruction_op op;
+			struct pt_regs tmp = *regs;
 
+			if (user_mode(regs))
+				mm = current->mm;
+			else
+				mm = &init_mm;
+
+			pfn = addr_to_pfn(mm, nip);
+			if (pfn != ULONG_MAX) {
+				instr_addr = (pfn << PAGE_SHIFT) + (nip & ~PAGE_MASK);
+				instr = *(unsigned int *)(instr_addr);
+				if (!analyse_instr(&op, &tmp, instr)) {
+					pfn = addr_to_pfn(mm, op.ea);
+					*addr = op.ea;
+					*phys_addr = pfn;
+				}
+			}
+		}
 		found = 1;
 	}
 
@@ -592,19 +642,19 @@ static long mce_handle_error(struct pt_regs *regs,
 		const struct mce_ierror_table itable[])
 {
 	struct mce_error_info mce_err = { 0 };
-	uint64_t addr;
+	uint64_t addr, phys_addr;
 	uint64_t srr1 = regs->msr;
 	long handled;
 
 	if (SRR1_MC_LOADSTORE(srr1))
-		handled = mce_handle_derror(regs, dtable, &mce_err, &addr);
+		handled = mce_handle_derror(regs, dtable, &mce_err, &addr, &phys_addr);
 	else
 		handled = mce_handle_ierror(regs, itable, &mce_err, &addr);
 
 	if (!handled && mce_err.error_type == MCE_ERROR_TYPE_UE)
 		handled = mce_handle_ue_error(regs);
 
-	save_mce_event(regs, handled, &mce_err, regs->nip, addr);
+	save_mce_event(regs, handled, &mce_err, regs->nip, addr, phys_addr);
 
 	return handled;
 }
