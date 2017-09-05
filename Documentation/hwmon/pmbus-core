@@ -218,17 +218,17 @@ Specifically, it provides the following information.
   This function calls the device specific write_byte function if defined.
   Therefore, it must _not_ be called from that function.
 
-  bool pmbus_check_byte_register(struct i2c_client *client, int page, int reg);
+  int pmbus_check_byte_register(struct i2c_client *client, int page, int reg);
 
-  Check if byte register exists. Return true if the register exists, false
-  otherwise.
+  Check if byte register exists. Returns 1 if the register exists, 0 if it does
+  not, and less than zero on an unexpected error.
   This function calls the device specific write_byte function if defined to
   obtain the chip status. Therefore, it must _not_ be called from that function.
 
-  bool pmbus_check_word_register(struct i2c_client *client, int page, int reg);
+  int pmbus_check_word_register(struct i2c_client *client, int page, int reg);
 
-  Check if word register exists. Return true if the register exists, false
-  otherwise.
+  Check if word register exists. Returns 1 if the register exists, 0 if it does
+  not, and less than zero on an unexpected error.
   This function calls the device specific write_byte function if defined to
   obtain the chip status. Therefore, it must _not_ be called from that function.
 

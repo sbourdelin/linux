@@ -304,18 +304,24 @@ static int _pmbus_read_byte_data(struct i2c_client *client, int page, int reg)
 	return pmbus_read_byte_data(client, page, reg);
 }
 
-static void pmbus_clear_fault_page(struct i2c_client *client, int page)
+static int pmbus_clear_fault_page(struct i2c_client *client, int page)
 {
-	_pmbus_write_byte(client, page, PMBUS_CLEAR_FAULTS);
+	return _pmbus_write_byte(client, page, PMBUS_CLEAR_FAULTS);
 }
 
-void pmbus_clear_faults(struct i2c_client *client)
+int pmbus_clear_faults(struct i2c_client *client)
 {
 	struct pmbus_data *data = i2c_get_clientdata(client);
+	int rv;
 	int i;
 
-	for (i = 0; i < data->info->pages; i++)
-		pmbus_clear_fault_page(client, i);
+	for (i = 0; i < data->info->pages; i++) {
+		rv = pmbus_clear_fault_page(client, i);
+		if (rv)
+			return rv;
+	}
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(pmbus_clear_faults);
 
@@ -333,28 +339,45 @@ static int pmbus_check_status_cml(struct i2c_client *client)
 	return 0;
 }
 
-static bool pmbus_check_register(struct i2c_client *client,
+static int pmbus_check_register(struct i2c_client *client,
 				 int (*func)(struct i2c_client *client,
 					     int page, int reg),
 				 int page, int reg)
 {
+	struct pmbus_data *data;
+	int check;
 	int rv;
-	struct pmbus_data *data = i2c_get_clientdata(client);
 
-	rv = func(client, page, reg);
-	if (rv >= 0 && !(data->flags & PMBUS_SKIP_STATUS_CHECK))
-		rv = pmbus_check_status_cml(client);
-	pmbus_clear_fault_page(client, -1);
-	return rv >= 0;
+	data = i2c_get_clientdata(client);
+
+	/*
+	 * pmbus_set_page() guards transactions on the requested page matching
+	 * the current page. This may be done in the execution of func(), but
+	 * at that point a set-page error is conflated with accessing a
+	 * non-existent register.
+	 */
+	rv = pmbus_set_page(client, page);
+	if (rv < 0)
+		return rv;
+
+	check = func(client, page, reg);
+	if (check >= 0 && !(data->flags & PMBUS_SKIP_STATUS_CHECK))
+		check = pmbus_check_status_cml(client);
+
+	rv = pmbus_clear_fault_page(client, -1);
+	if (rv < 0)
+		return rv;
+
+	return check >= 0;
 }
 
-bool pmbus_check_byte_register(struct i2c_client *client, int page, int reg)
+int pmbus_check_byte_register(struct i2c_client *client, int page, int reg)
 {
 	return pmbus_check_register(client, _pmbus_read_byte_data, page, reg);
 }
 EXPORT_SYMBOL_GPL(pmbus_check_byte_register);
 
-bool pmbus_check_word_register(struct i2c_client *client, int page, int reg)
+int pmbus_check_word_register(struct i2c_client *client, int page, int reg)
 {
 	return pmbus_check_register(client, _pmbus_read_word_data, page, reg);
 }
@@ -390,7 +413,7 @@ static struct pmbus_data *pmbus_update_device(struct device *dev)
 
 	mutex_lock(&data->update_lock);
 	if (time_after(jiffies, data->last_updated + HZ) || !data->valid) {
-		int i, j;
+		int i, j, ret;
 
 		for (i = 0; i < info->pages; i++) {
 			data->status[PB_STATUS_BASE + i]
@@ -424,7 +447,13 @@ static struct pmbus_data *pmbus_update_device(struct device *dev)
 							    sensor->page,
 							    sensor->reg);
 		}
-		pmbus_clear_faults(client);
+
+		ret = pmbus_clear_faults(client);
+		if (ret < 0) {
+			mutex_unlock(&data->update_lock);
+			return ERR_PTR(ret);
+		}
+
 		data->last_updated = jiffies;
 		data->valid = 1;
 	}
@@ -754,6 +783,9 @@ static ssize_t pmbus_show_boolean(struct device *dev,
 	struct pmbus_data *data = pmbus_update_device(dev);
 	int val;
 
+	if (IS_ERR(data))
+		return PTR_ERR(data);
+
 	val = pmbus_get_boolean(data, boolean, attr->index);
 	if (val < 0)
 		return val;
@@ -765,6 +797,9 @@ static ssize_t pmbus_show_sensor(struct device *dev,
 {
 	struct pmbus_data *data = pmbus_update_device(dev);
 	struct pmbus_sensor *sensor = to_pmbus_sensor(devattr);
+
+	if (IS_ERR(data))
+		return PTR_ERR(data);
 
 	if (sensor->data < 0)
 		return sensor->data;
@@ -995,7 +1030,11 @@ static int pmbus_add_limit_attrs(struct i2c_client *client,
 	struct pmbus_sensor *curr;
 
 	for (i = 0; i < nlimit; i++) {
-		if (pmbus_check_word_register(client, page, l->reg)) {
+		ret = pmbus_check_word_register(client, page, l->reg);
+		if (ret < 0)
+			return ret;
+
+		if (ret) {
 			curr = pmbus_add_sensor(data, name, l->attr, index,
 						page, l->reg, attr->class,
 						attr->update || l->update,
@@ -1041,6 +1080,8 @@ static int pmbus_add_sensor_attrs_one(struct i2c_client *client,
 	if (!base)
 		return -ENOMEM;
 	if (attr->sfunc) {
+		int check;
+
 		ret = pmbus_add_limit_attrs(client, data, info, name,
 					    index, page, base, attr);
 		if (ret < 0)
@@ -1050,9 +1091,13 @@ static int pmbus_add_sensor_attrs_one(struct i2c_client *client,
 		 * alarm attributes, if there is a global alarm bit, and if
 		 * the generic status register for this page is accessible.
 		 */
-		if (!ret && attr->gbit &&
-		    pmbus_check_byte_register(client, page,
-					      data->status_register)) {
+
+		check = pmbus_check_byte_register(client, page,
+						  data->status_register);
+		if (check < 0)
+			return check;
+
+		if (!ret && attr->gbit && check) {
 			ret = pmbus_add_boolean(data, name, "alarm", index,
 						NULL, NULL,
 						PB_STATUS_BASE + page,
@@ -1604,8 +1649,12 @@ static int pmbus_add_fan_attributes(struct i2c_client *client,
 			if (!(info->func[page] & pmbus_fan_flags[f]))
 				break;
 
-			if (!pmbus_check_word_register(client, page,
-						       pmbus_fan_registers[f]))
+			ret = pmbus_check_word_register(client, page,
+						       pmbus_fan_registers[f]);
+			if (ret < 0)
+				return ret;
+
+			if (!ret)
 				break;
 
 			/*
@@ -1628,9 +1677,13 @@ static int pmbus_add_fan_attributes(struct i2c_client *client,
 			 * Each fan status register covers multiple fans,
 			 * so we have to do some magic.
 			 */
-			if ((info->func[page] & pmbus_fan_status_flags[f]) &&
-			    pmbus_check_byte_register(client,
-					page, pmbus_fan_status_registers[f])) {
+			ret =  pmbus_check_byte_register(client, page,
+						pmbus_fan_status_registers[f]);
+			if (ret < 0)
+				return ret;
+
+			if ((info->func[page] & pmbus_fan_status_flags[f])
+					&& ret) {
 				int base;
 
 				if (f > 1)	/* fan 3, 4 */
@@ -1696,10 +1749,13 @@ static int pmbus_identify_common(struct i2c_client *client,
 				 struct pmbus_data *data, int page)
 {
 	int vout_mode = -1;
+	int rv;
 
-	if (pmbus_check_byte_register(client, page, PMBUS_VOUT_MODE))
+	rv = pmbus_check_byte_register(client, page, PMBUS_VOUT_MODE);
+	if (rv == 1)
 		vout_mode = _pmbus_read_byte_data(client, page,
 						  PMBUS_VOUT_MODE);
+
 	if (vout_mode >= 0 && vout_mode != 0xff) {
 		/*
 		 * Not all chips support the VOUT_MODE command,
@@ -1725,8 +1781,7 @@ static int pmbus_identify_common(struct i2c_client *client,
 		}
 	}
 
-	pmbus_clear_fault_page(client, page);
-	return 0;
+	return pmbus_clear_fault_page(client, page);
 }
 
 static int pmbus_init_common(struct i2c_client *client, struct pmbus_data *data,
@@ -1756,7 +1811,9 @@ static int pmbus_init_common(struct i2c_client *client, struct pmbus_data *data,
 	if (ret >= 0 && (ret & PB_CAPABILITY_ERROR_CHECK))
 		client->flags |= I2C_CLIENT_PEC;
 
-	pmbus_clear_faults(client);
+	ret = pmbus_clear_faults(client);
+	if (ret < 0)
+		return ret;
 
 	if (info->identify) {
 		ret = (*info->identify)(client, info);
