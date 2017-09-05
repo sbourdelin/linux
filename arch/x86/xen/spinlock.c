@@ -129,6 +129,8 @@ void __init xen_init_spinlocks(void)
 
 	if (!xen_pvspin) {
 		printk(KERN_DEBUG "xen: PV spinlocks disabled\n");
+		pv_lock_ops.virt_spin_lock =
+			__PV_IS_CALLEE_SAVE(_paravirt_false);
 		return;
 	}
 	printk(KERN_DEBUG "xen: PV spinlocks enabled\n");
