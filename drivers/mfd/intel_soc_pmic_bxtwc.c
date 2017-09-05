@@ -271,6 +271,8 @@ static int regmap_ipc_byte_reg_read(void *context, unsigned int reg,
 	u8 ipc_in[2];
 	u8 ipc_out[4];
 	struct intel_soc_pmic *pmic = context;
+	u32 cmd[PMC_PARAM_LEN] = {PMC_IPC_PMIC_ACCESS,
+		PMC_IPC_PMIC_ACCESS_READ};
 
 	if (!pmic)
 		return -EINVAL;
@@ -284,9 +286,8 @@ static int regmap_ipc_byte_reg_read(void *context, unsigned int reg,
 
 	ipc_in[0] = reg;
 	ipc_in[1] = i2c_addr;
-	ret = intel_pmc_ipc_command(PMC_IPC_PMIC_ACCESS,
-			PMC_IPC_PMIC_ACCESS_READ,
-			ipc_in, sizeof(ipc_in), (u32 *)ipc_out, 1);
+	ret = ipc_dev_raw_cmd(pmic->ipc_dev, cmd, PMC_PARAM_LEN, ipc_in,
+			sizeof(ipc_in), (u32 *)ipc_out, 1, 0, 0);
 	if (ret) {
 		dev_err(pmic->dev, "Failed to read from PMIC\n");
 		return ret;
@@ -303,6 +304,8 @@ static int regmap_ipc_byte_reg_write(void *context, unsigned int reg,
 	int i2c_addr;
 	u8 ipc_in[3];
 	struct intel_soc_pmic *pmic = context;
+	u32 cmd[PMC_PARAM_LEN] = {PMC_IPC_PMIC_ACCESS,
+		PMC_IPC_PMIC_ACCESS_WRITE};
 
 	if (!pmic)
 		return -EINVAL;
@@ -317,9 +320,8 @@ static int regmap_ipc_byte_reg_write(void *context, unsigned int reg,
 	ipc_in[0] = reg;
 	ipc_in[1] = i2c_addr;
 	ipc_in[2] = val;
-	ret = intel_pmc_ipc_command(PMC_IPC_PMIC_ACCESS,
-			PMC_IPC_PMIC_ACCESS_WRITE,
-			ipc_in, sizeof(ipc_in), NULL, 0);
+	ret = ipc_dev_raw_cmd(pmic->ipc_dev, cmd, PMC_PARAM_LEN, ipc_in,
+			sizeof(ipc_in), NULL, 0, 0, 0);
 	if (ret) {
 		dev_err(pmic->dev, "Failed to write to PMIC\n");
 		return ret;
@@ -444,6 +446,10 @@ static int bxtwc_probe(struct platform_device *pdev)
 	pmic = devm_kzalloc(&pdev->dev, sizeof(*pmic), GFP_KERNEL);
 	if (!pmic)
 		return -ENOMEM;
+
+	pmic->ipc_dev = intel_ipc_dev_get(INTEL_PMC_IPC_DEV);
+	if (IS_ERR_OR_NULL(pmic->ipc_dev))
+		return PTR_ERR(pmic->ipc_dev);
 
 	ret = platform_get_irq(pdev, 0);
 	if (ret < 0) {

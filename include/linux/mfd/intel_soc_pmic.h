@@ -20,6 +20,7 @@
 #define __INTEL_SOC_PMIC_H__
 
 #include <linux/regmap.h>
+#include <linux/platform_data/x86/intel_ipc_dev.h>
 
 struct intel_soc_pmic {
 	int irq;
@@ -31,6 +32,7 @@ struct intel_soc_pmic {
 	struct regmap_irq_chip_data *irq_chip_data_chgr;
 	struct regmap_irq_chip_data *irq_chip_data_crit;
 	struct device *dev;
+	struct intel_ipc_dev *ipc_dev;
 };
 
 #endif	/* __INTEL_SOC_PMIC_H__ */
