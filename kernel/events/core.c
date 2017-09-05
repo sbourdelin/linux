@@ -5579,7 +5579,7 @@ static int perf_fasync(int fd, struct file *filp, int on)
 static int perf_open(struct inode *inode, struct file *file)
 {
 	struct perf_event *event = inode->i_private;
-	int ret;
+	int ret = 0;
 
 	if (WARN_ON_ONCE(!event))
 		return -EINVAL;
@@ -5587,7 +5587,13 @@ static int perf_open(struct inode *inode, struct file *file)
 	if (!atomic_long_inc_not_zero(&event->refcount))
 		return -ENOENT;
 
-	ret = simple_open(inode, file);
+	/* event's user is stable while we're holding the reference */
+	if (event->rb->mmap_user != current_user() &&
+	    !capable(CAP_SYS_ADMIN))
+		ret = -EACCES;
+
+	if (!ret)
+		ret = simple_open(inode, file);
 	if (ret)
 		put_event(event);
 
@@ -9583,7 +9589,7 @@ perf_event_detach(struct perf_event *event, struct perf_event *parent_event,
 	if (!filename)
 		return -ENOMEM;
 
-	event->dent = tracefs_create_file(filename, 0600,
+	event->dent = tracefs_create_file(filename, 0666,
 					  perf_tracefs_dir,
 					  event, &perf_fops);
 	kfree(filename);
@@ -11511,6 +11517,7 @@ static int perf_instance_unlink(const char *name)
 {
 	struct perf_event *event;
 	struct dentry *dent;
+	int ret = 0;
 
 	dent = lookup_one_len_unlocked(name, perf_tracefs_dir, strlen(name));
 	if (!dent)
@@ -11519,6 +11526,18 @@ static int perf_instance_unlink(const char *name)
 	event = dent->d_inode->i_private;
 	if (!event)
 		return -EINVAL;
+
+	if (!atomic_long_inc_not_zero(&event->refcount))
+		return 0;
+
+	/* event's user is stable while we're holding the reference */
+	if (event->rb->mmap_user != current_user() &&
+	    !capable(CAP_SYS_ADMIN))
+		ret = -EACCES;
+	put_event(event);
+
+	if (ret)
+		return ret;
 
 	if (!(event->attach_state & PERF_ATTACH_CONTEXT))
 		return -EBUSY;
