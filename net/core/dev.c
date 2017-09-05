@@ -1718,6 +1718,31 @@ void net_dec_egress_queue(void)
 	static_key_slow_dec(&egress_needed);
 }
 EXPORT_SYMBOL_GPL(net_dec_egress_queue);
+
+int net_set_global_egress_cls_dev(struct net *net, struct net_device *dev)
+{
+	struct net_device *cur_dev;
+
+	ASSERT_RTNL();
+
+	cur_dev = rtnl_dereference(net->global_egress_dev);
+	if (dev) {
+		/* replace not allowed */
+		if (cur_dev)
+			return -EBUSY;
+		/* global cls devices should not change netns */
+		if (!(dev->features & NETIF_F_NETNS_LOCAL))
+			return -EINVAL;
+	}
+
+	/* set or clear based on dev */
+	rcu_assign_pointer(net->global_egress_dev, dev);
+	if (!dev)
+		synchronize_rcu_bh();
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(net_set_global_egress_cls_dev);
 #endif
 
 static struct static_key netstamp_needed __read_mostly;
@@ -3244,8 +3269,15 @@ sch_handle_egress(struct sk_buff *skb, int *ret, struct net_device *dev)
 	struct tcf_proto *cl = rcu_dereference_bh(dev->egress_cl_list);
 	struct tcf_result cl_res;
 
-	if (!cl)
-		return skb;
+	if (!cl) {
+		struct net_device *gdev;
+
+		gdev = rcu_dereference_bh(dev_net(dev)->global_egress_dev);
+		if (gdev)
+			cl = rcu_dereference_bh(gdev->egress_cl_list);
+		if (!cl)
+			return skb;
+	}
 
 	/* qdisc_skb_cb(skb)->pkt_len was already set by the caller. */
 	qdisc_bstats_cpu_update(cl->q, skb);

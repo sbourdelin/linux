@@ -149,6 +149,9 @@ struct net {
 #endif
 	struct sock		*diag_nlsk;
 	atomic_t		fnhe_genid;
+#ifdef CONFIG_NET_EGRESS
+	struct net_device __rcu *global_egress_dev;
+#endif
 } __randomize_layout;
 
 #include <linux/seq_file_net.h>

@@ -88,6 +88,7 @@ void net_dec_ingress_queue(void);
 #ifdef CONFIG_NET_EGRESS
 void net_inc_egress_queue(void);
 void net_dec_egress_queue(void);
+int net_set_global_egress_cls_dev(struct net *net, struct net_device *dev);
 #endif
 
 void rtnetlink_init(void);

@@ -153,6 +153,9 @@ static int clsact_init(struct Qdisc *sch, struct nlattr *opt)
 	struct net_device *dev = qdisc_dev(sch);
 	int err;
 
+	net_inc_ingress_queue();
+	net_inc_egress_queue();
+
 	err = tcf_block_get(&q->ingress_block, &dev->ingress_cl_list);
 	if (err)
 		return err;
@@ -161,8 +164,12 @@ static int clsact_init(struct Qdisc *sch, struct nlattr *opt)
 	if (err)
 		return err;
 
-	net_inc_ingress_queue();
-	net_inc_egress_queue();
+	if (opt) {
+		err = net_set_global_egress_cls_dev(dev_net(dev), dev);
+		if (err)
+			return err;
+		sch->flags |= TCQ_F_GLOBAL;
+	}
 
 	sch->flags |= TCQ_F_CPUSTATS;
 
@@ -172,6 +179,10 @@ static int clsact_init(struct Qdisc *sch, struct nlattr *opt)
 static void clsact_destroy(struct Qdisc *sch)
 {
 	struct clsact_sched_data *q = qdisc_priv(sch);
+	struct net_device *dev = qdisc_dev(sch);
+
+	if (sch->flags & TCQ_F_GLOBAL)
+		WARN_ON_ONCE(net_set_global_egress_cls_dev(dev_net(dev), NULL));
 
 	tcf_block_put(q->egress_block);
 	tcf_block_put(q->ingress_block);
