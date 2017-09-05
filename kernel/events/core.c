@@ -384,7 +384,6 @@ static atomic_t perf_sched_count;
 static DEFINE_PER_CPU(atomic_t, perf_cgroup_events);
 static DEFINE_PER_CPU(int, perf_sched_cb_usages);
 static DEFINE_PER_CPU(struct pmu_event_list, pmu_sb_events);
-static DEFINE_PER_CPU(struct perf_event *, shmem_events);
 
 static atomic_t nr_mmap_events __read_mostly;
 static atomic_t nr_comm_events __read_mostly;
@@ -2086,7 +2085,8 @@ enum pin_event_t {
 
 static enum pin_event_t pin_event_pages(struct perf_event *event)
 {
-	struct perf_event **pinned_event = this_cpu_ptr(&shmem_events);
+	struct user_struct *user = event->rb->mmap_user;
+	struct perf_event **pinned_event = this_cpu_ptr(user->pinned_events);
 	struct perf_event *old_event = *pinned_event;
 
 	if (old_event == event)
@@ -4281,13 +4281,14 @@ static void _free_event(struct perf_event *event)
 	unaccount_event(event);
 
 	if (event->attach_state & PERF_ATTACH_SHMEM) {
+		struct user_struct *user = event->rb->mmap_user;
 		struct perf_event_context *ctx = event->ctx;
 		int cpu;
 
 		atomic_set(&event->xpinned, 0);
 		for_each_possible_cpu(cpu) {
 			struct perf_event **pinned_event =
-				per_cpu_ptr(&shmem_events, cpu);
+				per_cpu_ptr(user->pinned_events, cpu);
 
 			cmpxchg(pinned_event, event, NULL);
 		}
@@ -9520,7 +9521,7 @@ perf_event_detach(struct perf_event *event, struct perf_event *parent_event,
 {
 	struct ring_buffer *parent_rb = parent_event ? parent_event->rb : NULL;
 	char *filename;
-	int err;
+	int err = -ENOMEM;
 
 	filename = kasprintf(GFP_KERNEL, "%s:%x.event",
 			     task ? "task" : "cpu",
@@ -9540,10 +9541,9 @@ perf_event_detach(struct perf_event *event, struct perf_event *parent_event,
 	if (err) {
 		tracefs_remove(event->dent);
 		event->dent = NULL;
-		return err;
 	}
 
-	return 0;
+	return err;
 }
 /*
  * Allocate and initialize a event structure
@@ -10280,7 +10280,7 @@ SYSCALL_DEFINE5(perf_event_open,
 	}
 
 	if (detached) {
-		err = perf_event_detach(event, task, NULL);
+		err = perf_event_detach(event, NULL, task, NULL);
 		if (err)
 			goto err_context;
 
