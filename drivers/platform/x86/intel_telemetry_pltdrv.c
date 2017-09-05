@@ -98,6 +98,7 @@ struct telem_ssram_region {
 };
 
 static struct telemetry_plt_config *telm_conf;
+static struct intel_ipc_dev *punit_bios_ipc_dev;
 
 /*
  * The following counters are programmed by default during setup.
@@ -126,7 +127,6 @@ static struct telemetry_evtmap
 	{"PMC_S0IX_BLOCK_IPS_VNN_REQ",          0x6009},
 	{"PMC_S0IX_BLOCK_IPS_CLOCKS",           0x600B},
 };
-
 
 static struct telemetry_evtmap
 	telemetry_apl_pss_default_events[TELEM_MAX_OS_ALLOCATED_EVENTS] = {
@@ -283,13 +283,12 @@ static inline int telemetry_plt_config_ioss_event(u32 evt_id, int index)
 static inline int telemetry_plt_config_pss_event(u32 evt_id, int index)
 {
 	u32 write_buf;
-	int ret;
+	u32 cmd[PUNIT_PARAM_LEN] = {0};
 
 	write_buf = evt_id | TELEM_EVENT_ENABLE;
-	ret = intel_punit_ipc_command(IPC_PUNIT_BIOS_WRITE_TELE_EVENT,
-				      index, 0, &write_buf, NULL);
-
-	return ret;
+	punit_cmd_init(cmd, IPC_PUNIT_BIOS_WRITE_TELE_EVENT, index, 0);
+	return ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+			(u8 *)&write_buf, sizeof(write_buf), NULL, 0, 0, 0);
 }
 
 static int telemetry_setup_iossevtconfig(struct telemetry_evtconfig evtconfig,
@@ -435,6 +434,7 @@ static int telemetry_setup_pssevtconfig(struct telemetry_evtconfig evtconfig,
 	int ret, index, idx;
 	u32 *pss_evtmap;
 	u32 telem_ctrl;
+	u32 cmd[PUNIT_PARAM_LEN] = {0};
 
 	num_pss_evts = evtconfig.num_evts;
 	pss_period = evtconfig.period;
@@ -442,8 +442,9 @@ static int telemetry_setup_pssevtconfig(struct telemetry_evtconfig evtconfig,
 
 	/* PSS Config */
 	/* Get telemetry EVENT CTL */
-	ret = intel_punit_ipc_command(IPC_PUNIT_BIOS_READ_TELE_EVENT_CTRL,
-				      0, 0, NULL, &telem_ctrl);
+	punit_cmd_init(cmd, IPC_PUNIT_BIOS_READ_TELE_EVENT_CTRL, 0, 0);
+	ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN, NULL,
+			0, &telem_ctrl, 1, 0, 0);
 	if (ret) {
 		pr_err("PSS TELEM_CTRL Read Failed\n");
 		return ret;
@@ -451,8 +452,9 @@ static int telemetry_setup_pssevtconfig(struct telemetry_evtconfig evtconfig,
 
 	/* Disable Telemetry */
 	TELEM_DISABLE(telem_ctrl);
-	ret = intel_punit_ipc_command(IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL,
-				      0, 0, &telem_ctrl, NULL);
+	punit_cmd_init(cmd, IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL, 0, 0);
+	ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+			(u8 *)&telem_ctrl, sizeof(telem_ctrl), NULL, 0, 0, 0);
 	if (ret) {
 		pr_err("PSS TELEM_CTRL Event Disable Write Failed\n");
 		return ret;
@@ -463,9 +465,10 @@ static int telemetry_setup_pssevtconfig(struct telemetry_evtconfig evtconfig,
 		/* Clear All Events */
 		TELEM_CLEAR_EVENTS(telem_ctrl);
 
-		ret = intel_punit_ipc_command(
-				IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL,
-				0, 0, &telem_ctrl, NULL);
+		punit_cmd_init(cmd, IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL, 0, 0);
+		ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+				(u8 *)&telem_ctrl, sizeof(telem_ctrl), NULL,
+				0, 0, 0);
 		if (ret) {
 			pr_err("PSS TELEM_CTRL Event Disable Write Failed\n");
 			return ret;
@@ -489,9 +492,10 @@ static int telemetry_setup_pssevtconfig(struct telemetry_evtconfig evtconfig,
 		/* Clear All Events */
 		TELEM_CLEAR_EVENTS(telem_ctrl);
 
-		ret = intel_punit_ipc_command(
-				IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL,
-				0, 0, &telem_ctrl, NULL);
+		punit_cmd_init(cmd, IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL, 0, 0);
+		ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+				(u8 *)&telem_ctrl, sizeof(telem_ctrl), NULL,
+				0, 0, 0);
 		if (ret) {
 			pr_err("PSS TELEM_CTRL Event Disable Write Failed\n");
 			return ret;
@@ -540,8 +544,9 @@ static int telemetry_setup_pssevtconfig(struct telemetry_evtconfig evtconfig,
 	TELEM_ENABLE_PERIODIC(telem_ctrl);
 	telem_ctrl |= pss_period;
 
-	ret = intel_punit_ipc_command(IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL,
-				      0, 0, &telem_ctrl, NULL);
+	punit_cmd_init(cmd, IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL, 0, 0);
+	ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+			(u8 *)&telem_ctrl, sizeof(telem_ctrl), NULL, 0, 0, 0);
 	if (ret) {
 		pr_err("PSS TELEM_CTRL Event Enable Write Failed\n");
 		return ret;
@@ -601,6 +606,7 @@ static int telemetry_setup(struct platform_device *pdev)
 {
 	struct telemetry_evtconfig pss_evtconfig, ioss_evtconfig;
 	u32 read_buf, events, event_regs;
+	u32 cmd[PUNIT_PARAM_LEN] = {0};
 	int ret;
 
 	ret = intel_pmc_ipc_command(PMC_IPC_PMC_TELEMTRY, IOSS_TELEM_INFO_READ,
@@ -626,8 +632,9 @@ static int telemetry_setup(struct platform_device *pdev)
 	telm_conf->ioss_config.max_period = TELEM_MAX_PERIOD(read_buf);
 
 	/* PUNIT Mailbox Setup */
-	ret = intel_punit_ipc_command(IPC_PUNIT_BIOS_READ_TELE_INFO, 0, 0,
-				      NULL, &read_buf);
+	punit_cmd_init(cmd, IPC_PUNIT_BIOS_READ_TELE_INFO, 0, 0);
+	ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+			NULL, 0, &read_buf, 1, 0, 0);
 	if (ret) {
 		dev_err(&pdev->dev, "PSS TELEM_INFO Read Failed\n");
 		return ret;
@@ -695,6 +702,7 @@ static int telemetry_plt_set_sampling_period(u8 pss_period, u8 ioss_period)
 {
 	u32 telem_ctrl = 0;
 	int ret = 0;
+	u32 cmd[PUNIT_PARAM_LEN] = {0};
 
 	mutex_lock(&(telm_conf->telem_lock));
 	if (ioss_period) {
@@ -752,9 +760,9 @@ static int telemetry_plt_set_sampling_period(u8 pss_period, u8 ioss_period)
 		}
 
 		/* Get telemetry EVENT CTL */
-		ret = intel_punit_ipc_command(
-				IPC_PUNIT_BIOS_READ_TELE_EVENT_CTRL,
-				0, 0, NULL, &telem_ctrl);
+		punit_cmd_init(cmd, IPC_PUNIT_BIOS_READ_TELE_EVENT_CTRL, 0, 0);
+		ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+				NULL, 0, &telem_ctrl, 1, 0, 0);
 		if (ret) {
 			pr_err("PSS TELEM_CTRL Read Failed\n");
 			goto out;
@@ -762,9 +770,11 @@ static int telemetry_plt_set_sampling_period(u8 pss_period, u8 ioss_period)
 
 		/* Disable Telemetry */
 		TELEM_DISABLE(telem_ctrl);
-		ret = intel_punit_ipc_command(
-				IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL,
-				0, 0, &telem_ctrl, NULL);
+		punit_cmd_init(cmd, IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL, 0,
+				0);
+		ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+				(u8 *)&telem_ctrl, sizeof(telem_ctrl), NULL,
+				0, 0, 0);
 		if (ret) {
 			pr_err("PSS TELEM_CTRL Event Disable Write Failed\n");
 			goto out;
@@ -776,9 +786,11 @@ static int telemetry_plt_set_sampling_period(u8 pss_period, u8 ioss_period)
 		TELEM_ENABLE_PERIODIC(telem_ctrl);
 		telem_ctrl |= pss_period;
 
-		ret = intel_punit_ipc_command(
-				IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL,
-				0, 0, &telem_ctrl, NULL);
+		punit_cmd_init(cmd, IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL, 0,
+				0);
+		ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+				(u8 *)&telem_ctrl, sizeof(telem_ctrl), NULL,
+				0, 0, 0);
 		if (ret) {
 			pr_err("PSS TELEM_CTRL Event Enable Write Failed\n");
 			goto out;
@@ -1013,6 +1025,7 @@ static int telemetry_plt_get_trace_verbosity(enum telemetry_unit telem_unit,
 {
 	u32 temp = 0;
 	int ret;
+	u32 cmd[PUNIT_PARAM_LEN] = {0};
 
 	if (verbosity == NULL)
 		return -EINVAL;
@@ -1020,9 +1033,9 @@ static int telemetry_plt_get_trace_verbosity(enum telemetry_unit telem_unit,
 	mutex_lock(&(telm_conf->telem_trace_lock));
 	switch (telem_unit) {
 	case TELEM_PSS:
-		ret = intel_punit_ipc_command(
-				IPC_PUNIT_BIOS_READ_TELE_TRACE_CTRL,
-				0, 0, NULL, &temp);
+		punit_cmd_init(cmd, IPC_PUNIT_BIOS_READ_TELE_TRACE_CTRL, 0, 0);
+		ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+				NULL, 0, &temp, 1, 0, 0);
 		if (ret) {
 			pr_err("PSS TRACE_CTRL Read Failed\n");
 			goto out;
@@ -1058,15 +1071,16 @@ static int telemetry_plt_set_trace_verbosity(enum telemetry_unit telem_unit,
 {
 	u32 temp = 0;
 	int ret;
+	u32 cmd[PUNIT_PARAM_LEN] = {0};
 
 	verbosity &= TELEM_TRC_VERBOSITY_MASK;
 
 	mutex_lock(&(telm_conf->telem_trace_lock));
 	switch (telem_unit) {
 	case TELEM_PSS:
-		ret = intel_punit_ipc_command(
-				IPC_PUNIT_BIOS_READ_TELE_TRACE_CTRL,
-				0, 0, NULL, &temp);
+		punit_cmd_init(cmd, IPC_PUNIT_BIOS_READ_TELE_TRACE_CTRL, 0, 0);
+		ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+				NULL, 0, &temp, 1, 0, 0);
 		if (ret) {
 			pr_err("PSS TRACE_CTRL Read Failed\n");
 			goto out;
@@ -1074,10 +1088,10 @@ static int telemetry_plt_set_trace_verbosity(enum telemetry_unit telem_unit,
 
 		TELEM_CLEAR_VERBOSITY_BITS(temp);
 		TELEM_SET_VERBOSITY_BITS(temp, verbosity);
-
-		ret = intel_punit_ipc_command(
-				IPC_PUNIT_BIOS_WRITE_TELE_TRACE_CTRL,
-				0, 0, &temp, NULL);
+		punit_cmd_init(cmd, IPC_PUNIT_BIOS_WRITE_TELE_EVENT_CTRL,
+				0, 0);
+		ret = ipc_dev_raw_cmd(punit_bios_ipc_dev, cmd, PUNIT_PARAM_LEN,
+				(u8 *)&temp, sizeof(temp), NULL, 0, 0, 0);
 		if (ret) {
 			pr_err("PSS TRACE_CTRL Verbosity Set Failed\n");
 			goto out;
@@ -1138,6 +1152,10 @@ static int telemetry_pltdrv_probe(struct platform_device *pdev)
 	id = x86_match_cpu(telemetry_cpu_ids);
 	if (!id)
 		return -ENODEV;
+
+	punit_bios_ipc_dev = intel_ipc_dev_get(PUNIT_BIOS_IPC_DEV);
+	if (IS_ERR_OR_NULL(punit_bios_ipc_dev))
+		return PTR_ERR(punit_bios_ipc_dev);
 
 	telm_conf = (struct telemetry_plt_config *)id->driver_data;
 
