@@ -76,6 +76,14 @@ module_param(lock_stat, int, 0644);
 #define lock_stat 0
 #endif
 
+#define LT_WRITE  0 /* 0: write type */
+#define LT_READ_N 1 /* 1: read non-recursion type */
+#define LT_READ_R 2 /* 2: read recursion type */
+
+#define is_write(a)  ((a) == LT_WRITE)
+#define is_read(a)   ((a) == LT_READ_N || (a) == LT_READ_R)
+#define is_read_r(a) ((a) == LT_READ_R)
+
 /*
  * lockdep_lock: protects the lockdep graph, the hashes and the
  *               class/list/hash allocators.
@@ -271,9 +279,9 @@ static void lock_release_holdtime(struct held_lock *hlock)
 	holdtime = lockstat_clock() - hlock->holdtime_stamp;
 
 	stats = get_lock_stats(hlock_class(hlock));
-	if (hlock->read)
+	if (is_read(hlock->read))
 		lock_time_inc(&stats->read_holdtime, holdtime);
-	else
+	else if (is_write(hlock->read))
 		lock_time_inc(&stats->write_holdtime, holdtime);
 	put_lock_stats(stats);
 }
@@ -1828,7 +1836,7 @@ check_deadlock(struct task_struct *curr, struct held_lock *next,
 		 * Allow read-after-read recursion of the same
 		 * lock class (i.e. read_lock(lock)+read_lock(lock)):
 		 */
-		if ((read == 2) && prev->read)
+		if (is_read_r(read) && is_read(prev->read))
 			return 2;
 
 		/*
@@ -1906,7 +1914,7 @@ check_prev_add(struct task_struct *curr, struct held_lock *prev,
 	 * write-lock never takes any other locks, then the reads are
 	 * equivalent to a NOP.
 	 */
-	if (next->read == 2 || prev->read == 2)
+	if (is_read_r(next->read) || is_read_r(prev->read))
 		return 1;
 	/*
 	 * Is the <prev> -> <next> dependency already present?
@@ -2016,7 +2024,7 @@ check_prevs_add(struct task_struct *curr, struct held_lock *next)
 			 * Only non-recursive-read entries get new dependencies
 			 * added:
 			 */
-			if (hlock->read != 2 && hlock->check) {
+			if (!is_read_r(hlock->read) && hlock->check) {
 				int ret = check_prev_add(curr, hlock, next,
 							 distance, &trace, save);
 				if (!ret)
@@ -2460,7 +2468,7 @@ static int validate_chain(struct task_struct *curr, struct lockdep_map *lock,
 		 * trylock entries):
 		 */
 		if (ret == 2)
-			hlock->read = 2;
+			hlock->read = LT_READ_R;
 		/*
 		 * Add dependency only if this lock is not the head
 		 * of the chain, and if it's not a secondary read-lock:
@@ -2848,7 +2856,7 @@ mark_held_locks(struct task_struct *curr, enum mark_type mark)
 		hlock = curr->held_locks + i;
 
 		usage_bit = 2 + (mark << 2); /* ENABLED */
-		if (hlock->read)
+		if (is_read(hlock->read))
 			usage_bit += 1; /* READ */
 
 		BUG_ON(usage_bit >= LOCK_USAGE_STATES);
@@ -3060,7 +3068,7 @@ static int mark_irqflags(struct task_struct *curr, struct held_lock *hlock)
 	 * mark the lock as used in these contexts:
 	 */
 	if (!hlock->trylock) {
-		if (hlock->read) {
+		if (is_read(hlock->read)) {
 			if (curr->hardirq_context)
 				if (!mark_lock(curr, hlock,
 						LOCK_USED_IN_HARDIRQ_READ))
@@ -3079,7 +3087,7 @@ static int mark_irqflags(struct task_struct *curr, struct held_lock *hlock)
 		}
 	}
 	if (!hlock->hardirqs_off) {
-		if (hlock->read) {
+		if (is_read(hlock->read)) {
 			if (!mark_lock(curr, hlock,
 					LOCK_ENABLED_HARDIRQ_READ))
 				return 0;
@@ -3715,7 +3723,7 @@ static int __lock_downgrade(struct lockdep_map *lock, unsigned long ip)
 	curr->curr_chain_key = hlock->prev_chain_key;
 
 	WARN(hlock->read, "downgrading a read lock");
-	hlock->read = 1;
+	hlock->read = LT_READ_N;
 	hlock->acquire_ip = ip;
 
 	if (reacquire_held_locks(curr, depth, i))
@@ -4167,7 +4175,7 @@ __lock_contended(struct lockdep_map *lock, unsigned long ip)
 	if (contending_point < LOCKSTAT_POINTS)
 		stats->contending_point[contending_point]++;
 	if (lock->cpu != smp_processor_id())
-		stats->bounces[bounce_contended + !!hlock->read]++;
+		stats->bounces[bounce_contended + is_read(hlock->read)]++;
 	put_lock_stats(stats);
 }
 
@@ -4209,13 +4217,13 @@ __lock_acquired(struct lockdep_map *lock, unsigned long ip)
 
 	stats = get_lock_stats(hlock_class(hlock));
 	if (waittime) {
-		if (hlock->read)
+		if (is_read(hlock->read))
 			lock_time_inc(&stats->read_waittime, waittime);
-		else
+		else if (is_write(hlock->read))
 			lock_time_inc(&stats->write_waittime, waittime);
 	}
 	if (lock->cpu != cpu)
-		stats->bounces[bounce_acquired + !!hlock->read]++;
+		stats->bounces[bounce_acquired + is_read(hlock->read)]++;
 	put_lock_stats(stats);
 
 	lock->cpu = cpu;
@@ -4819,7 +4827,7 @@ static inline struct lock_class *xlock_class(struct cross_lock *xlock)
  */
 static inline int depend_before(struct held_lock *hlock)
 {
-	return hlock->read != 2 && hlock->check && !hlock->trylock;
+	return !is_read_r(hlock->read) && hlock->check && !hlock->trylock;
 }
 
 /*
@@ -4827,7 +4835,7 @@ static inline int depend_before(struct held_lock *hlock)
  */
 static inline int depend_after(struct held_lock *hlock)
 {
-	return hlock->read != 2 && hlock->check;
+	return !is_read_r(hlock->read) && hlock->check;
 }
 
 /*
