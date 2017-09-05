@@ -24,6 +24,8 @@
 #include <linux/pci.h>
 #include <linux/interrupt.h>
 #include <linux/sfi.h>
+#include <linux/regmap.h>
+#include <linux/platform_data/x86/intel_ipc_dev.h>
 #include <asm/intel-mid.h>
 #include <asm/intel_scu_ipc.h>
 
@@ -38,6 +40,25 @@
 #define IPC_CMD_PCNTRL_W      0 /* Register write */
 #define IPC_CMD_PCNTRL_R      1 /* Register read */
 #define IPC_CMD_PCNTRL_M      2 /* Register read-modify-write */
+
+/* IPC dev register offsets */
+/*
+ * IPC Read Buffer (Read Only):
+ * 16 byte buffer for receiving data from SCU, if IPC command
+ * processing results in response data
+ */
+#define IPC_DEV_SCU_RBUF_OFFSET			0x90
+#define IPC_DEV_SCU_WRBUF_OFFSET		0x80
+#define IPC_DEV_SCU_SPTR_OFFSET			0x08
+#define IPC_DEV_SCU_DPTR_OFFSET			0x0C
+#define IPC_DEV_SCU_STATUS_OFFSET		0x04
+
+/* IPC dev commands */
+/* IPC command register IOC bit */
+#define	IPC_DEV_SCU_CMD_MSI			BIT(8)
+#define	IPC_DEV_SCU_CMD_STATUS_ERR		BIT(1)
+#define	IPC_DEV_SCU_CMD_STATUS_ERR_MASK		GENMASK(7, 0)
+#define	IPC_DEV_SCU_CMD_STATUS_BUSY		BIT(0)
 
 /*
  * IPC register summary
@@ -59,6 +80,11 @@
 #define IPC_WWBUF_SIZE    20		/* IPC Write buffer Size */
 #define IPC_RWBUF_SIZE    20		/* IPC Read buffer Size */
 #define IPC_IOC	          0x100		/* IPC command register IOC bit */
+#define	IPC_CMD_SIZE            16
+#define	IPC_CMD_SUBCMD          12
+#define	IPC_RWBUF_SIZE_DWORD    5
+#define	IPC_WWBUF_SIZE_DWORD    5
+
 
 #define PCI_DEVICE_ID_LINCROFT		0x082a
 #define PCI_DEVICE_ID_PENWELL		0x080e
@@ -93,121 +119,31 @@ static const struct intel_scu_ipc_pdata_t intel_scu_ipc_tangier_pdata = {
 
 struct intel_scu_ipc_dev {
 	struct device *dev;
+	struct intel_ipc_dev *ipc_dev;
 	void __iomem *ipc_base;
 	void __iomem *i2c_base;
-	struct completion cmd_complete;
+	struct regmap *ipc_regs;
+	struct regmap *i2c_regs;
 	u8 irq_mode;
+};
+
+static struct regmap_config ipc_regmap_config = {
+        .reg_bits = 32,
+        .reg_stride = 4,
+        .val_bits = 32,
+};
+
+static struct regmap_config i2c_regmap_config = {
+        .reg_bits = 32,
+        .reg_stride = 4,
+        .val_bits = 32,
+	.fast_io = true,
 };
 
 static struct intel_scu_ipc_dev  ipcdev; /* Only one for now */
 
-/*
- * IPC Read Buffer (Read Only):
- * 16 byte buffer for receiving data from SCU, if IPC command
- * processing results in response data
- */
-#define IPC_READ_BUFFER		0x90
-
 #define IPC_I2C_CNTRL_ADDR	0
 #define I2C_DATA_ADDR		0x04
-
-static DEFINE_MUTEX(ipclock); /* lock used to prevent multiple call to SCU */
-
-/*
- * Send ipc command
- * Command Register (Write Only):
- * A write to this register results in an interrupt to the SCU core processor
- * Format:
- * |rfu2(8) | size(8) | command id(4) | rfu1(3) | ioc(1) | command(8)|
- */
-static inline void ipc_command(struct intel_scu_ipc_dev *scu, u32 cmd)
-{
-	if (scu->irq_mode) {
-		reinit_completion(&scu->cmd_complete);
-		writel(cmd | IPC_IOC, scu->ipc_base);
-	}
-	writel(cmd, scu->ipc_base);
-}
-
-/*
- * Write ipc data
- * IPC Write Buffer (Write Only):
- * 16-byte buffer for sending data associated with IPC command to
- * SCU. Size of the data is specified in the IPC_COMMAND_REG register
- */
-static inline void ipc_data_writel(struct intel_scu_ipc_dev *scu, u32 data, u32 offset)
-{
-	writel(data, scu->ipc_base + 0x80 + offset);
-}
-
-/*
- * Status Register (Read Only):
- * Driver will read this register to get the ready/busy status of the IPC
- * block and error status of the IPC command that was just processed by SCU
- * Format:
- * |rfu3(8)|error code(8)|initiator id(8)|cmd id(4)|rfu1(2)|error(1)|busy(1)|
- */
-static inline u8 ipc_read_status(struct intel_scu_ipc_dev *scu)
-{
-	return __raw_readl(scu->ipc_base + 0x04);
-}
-
-/* Read ipc byte data */
-static inline u8 ipc_data_readb(struct intel_scu_ipc_dev *scu, u32 offset)
-{
-	return readb(scu->ipc_base + IPC_READ_BUFFER + offset);
-}
-
-/* Read ipc u32 data */
-static inline u32 ipc_data_readl(struct intel_scu_ipc_dev *scu, u32 offset)
-{
-	return readl(scu->ipc_base + IPC_READ_BUFFER + offset);
-}
-
-/* Wait till scu status is busy */
-static inline int busy_loop(struct intel_scu_ipc_dev *scu)
-{
-	u32 status = ipc_read_status(scu);
-	u32 loop_count = 100000;
-
-	/* break if scu doesn't reset busy bit after huge retry */
-	while ((status & BIT(0)) && --loop_count) {
-		udelay(1); /* scu processing time is in few u secods */
-		status = ipc_read_status(scu);
-	}
-
-	if (status & BIT(0)) {
-		dev_err(scu->dev, "IPC timed out");
-		return -ETIMEDOUT;
-	}
-
-	if (status & BIT(1))
-		return -EIO;
-
-	return 0;
-}
-
-/* Wait till ipc ioc interrupt is received or timeout in 3 HZ */
-static inline int ipc_wait_for_interrupt(struct intel_scu_ipc_dev *scu)
-{
-	int status;
-
-	if (!wait_for_completion_timeout(&scu->cmd_complete, 3 * HZ)) {
-		dev_err(scu->dev, "IPC timed out\n");
-		return -ETIMEDOUT;
-	}
-
-	status = ipc_read_status(scu);
-	if (status & BIT(1))
-		return -EIO;
-
-	return 0;
-}
-
-static int intel_scu_ipc_check_status(struct intel_scu_ipc_dev *scu)
-{
-	return scu->irq_mode ? ipc_wait_for_interrupt(scu) : busy_loop(scu);
-}
 
 /* Read/Write power control(PMIC in Langwell, MSIC in PenWell) registers */
 static int pwr_reg_rdwr(u16 *addr, u8 *data, u32 count, u32 op, u32 id)
@@ -215,18 +151,17 @@ static int pwr_reg_rdwr(u16 *addr, u8 *data, u32 count, u32 op, u32 id)
 	struct intel_scu_ipc_dev *scu = &ipcdev;
 	int nc;
 	u32 offset = 0;
-	int err;
+	int err = -EIO;
 	u8 cbuf[IPC_WWBUF_SIZE];
 	u32 *wbuf = (u32 *)&cbuf;
+	u32 cmd[SCU_PARAM_LEN] = {0};
+	/* max rbuf size is 20 bytes */
+	u8 rbuf[IPC_RWBUF_SIZE] = {0};
+	u32 rbuflen = DIV_ROUND_UP(count, 4);
 
 	memset(cbuf, 0, sizeof(cbuf));
 
-	mutex_lock(&ipclock);
-
-	if (scu->dev == NULL) {
-		mutex_unlock(&ipclock);
-		return -ENODEV;
-	}
+	scu_cmd_init(cmd, op, id);
 
 	for (nc = 0; nc < count; nc++, offset += 2) {
 		cbuf[offset] = addr[nc];
@@ -234,30 +169,30 @@ static int pwr_reg_rdwr(u16 *addr, u8 *data, u32 count, u32 op, u32 id)
 	}
 
 	if (id == IPC_CMD_PCNTRL_R) {
-		for (nc = 0, offset = 0; nc < count; nc++, offset += 4)
-			ipc_data_writel(scu, wbuf[nc], offset);
-		ipc_command(scu, (count * 2) << 16 | id << 12 | 0 << 8 | op);
+		err = ipc_dev_raw_cmd(scu->ipc_dev, cmd, SCU_PARAM_LEN,
+				(u8 *)wbuf, count * 2, (u32 *)rbuf,
+				IPC_RWBUF_SIZE_DWORD, 0, 0);
 	} else if (id == IPC_CMD_PCNTRL_W) {
 		for (nc = 0; nc < count; nc++, offset += 1)
 			cbuf[offset] = data[nc];
-		for (nc = 0, offset = 0; nc < count; nc++, offset += 4)
-			ipc_data_writel(scu, wbuf[nc], offset);
-		ipc_command(scu, (count * 3) << 16 | id << 12 | 0 << 8 | op);
+		err = ipc_dev_raw_cmd(scu->ipc_dev, cmd, SCU_PARAM_LEN,
+				(u8 *)wbuf, count * 3, NULL, 0, 0, 0);
+
 	} else if (id == IPC_CMD_PCNTRL_M) {
 		cbuf[offset] = data[0];
 		cbuf[offset + 1] = data[1];
-		ipc_data_writel(scu, wbuf[0], 0); /* Write wbuff */
-		ipc_command(scu, 4 << 16 | id << 12 | 0 << 8 | op);
+		err = ipc_dev_raw_cmd(scu->ipc_dev, cmd, SCU_PARAM_LEN,
+				(u8 *)wbuf, 4, NULL, 0, 0, 0);
 	}
 
-	err = intel_scu_ipc_check_status(scu);
 	if (!err && id == IPC_CMD_PCNTRL_R) { /* Read rbuf */
 		/* Workaround: values are read as 0 without memcpy_fromio */
 		memcpy_fromio(cbuf, scu->ipc_base + 0x90, 16);
-		for (nc = 0; nc < count; nc++)
-			data[nc] = ipc_data_readb(scu, nc);
+		regmap_bulk_read(scu->ipc_regs, IPC_DEV_SCU_RBUF_OFFSET,
+					rbuf, rbuflen);
+		memcpy(data, rbuf, count);
 	}
-	mutex_unlock(&ipclock);
+
 	return err;
 }
 
@@ -422,138 +357,6 @@ int intel_scu_ipc_update_register(u16 addr, u8 bits, u8 mask)
 }
 EXPORT_SYMBOL(intel_scu_ipc_update_register);
 
-/**
- *	intel_scu_ipc_simple_command	-	send a simple command
- *	@cmd: command
- *	@sub: sub type
- *
- *	Issue a simple command to the SCU. Do not use this interface if
- *	you must then access data as any data values may be overwritten
- *	by another SCU access by the time this function returns.
- *
- *	This function may sleep. Locking for SCU accesses is handled for
- *	the caller.
- */
-int intel_scu_ipc_simple_command(int cmd, int sub)
-{
-	struct intel_scu_ipc_dev *scu = &ipcdev;
-	int err;
-
-	mutex_lock(&ipclock);
-	if (scu->dev == NULL) {
-		mutex_unlock(&ipclock);
-		return -ENODEV;
-	}
-	ipc_command(scu, sub << 12 | cmd);
-	err = intel_scu_ipc_check_status(scu);
-	mutex_unlock(&ipclock);
-	return err;
-}
-EXPORT_SYMBOL(intel_scu_ipc_simple_command);
-
-/**
- *	intel_scu_ipc_command	-	command with data
- *	@cmd: command
- *	@sub: sub type
- *	@in: input data
- *	@inlen: input length in dwords
- *	@out: output data
- *	@outlein: output length in dwords
- *
- *	Issue a command to the SCU which involves data transfers. Do the
- *	data copies under the lock but leave it for the caller to interpret
- */
-int intel_scu_ipc_command(int cmd, int sub, u32 *in, int inlen,
-			  u32 *out, int outlen)
-{
-	struct intel_scu_ipc_dev *scu = &ipcdev;
-	int i, err;
-
-	mutex_lock(&ipclock);
-	if (scu->dev == NULL) {
-		mutex_unlock(&ipclock);
-		return -ENODEV;
-	}
-
-	for (i = 0; i < inlen; i++)
-		ipc_data_writel(scu, *in++, 4 * i);
-
-	ipc_command(scu, (inlen << 16) | (sub << 12) | cmd);
-	err = intel_scu_ipc_check_status(scu);
-
-	if (!err) {
-		for (i = 0; i < outlen; i++)
-			*out++ = ipc_data_readl(scu, 4 * i);
-	}
-
-	mutex_unlock(&ipclock);
-	return err;
-}
-EXPORT_SYMBOL(intel_scu_ipc_command);
-
-#define IPC_SPTR		0x08
-#define IPC_DPTR		0x0C
-
-/**
- * intel_scu_ipc_raw_command() - IPC command with data and pointers
- * @cmd:	IPC command code.
- * @sub:	IPC command sub type.
- * @in:		input data of this IPC command.
- * @inlen:	input data length in dwords.
- * @out:	output data of this IPC command.
- * @outlen:	output data length in dwords.
- * @sptr:	data writing to SPTR register.
- * @dptr:	data writing to DPTR register.
- *
- * Send an IPC command to SCU with input/output data and source/dest pointers.
- *
- * Return:	an IPC error code or 0 on success.
- */
-int intel_scu_ipc_raw_command(int cmd, int sub, u8 *in, int inlen,
-			      u32 *out, int outlen, u32 dptr, u32 sptr)
-{
-	struct intel_scu_ipc_dev *scu = &ipcdev;
-	int inbuflen = DIV_ROUND_UP(inlen, 4);
-	u32 inbuf[4];
-	int i, err;
-
-	/* Up to 16 bytes */
-	if (inbuflen > 4)
-		return -EINVAL;
-
-	mutex_lock(&ipclock);
-	if (scu->dev == NULL) {
-		mutex_unlock(&ipclock);
-		return -ENODEV;
-	}
-
-	writel(dptr, scu->ipc_base + IPC_DPTR);
-	writel(sptr, scu->ipc_base + IPC_SPTR);
-
-	/*
-	 * SRAM controller doesn't support 8-bit writes, it only
-	 * supports 32-bit writes, so we have to copy input data into
-	 * the temporary buffer, and SCU FW will use the inlen to
-	 * determine the actual input data length in the temporary
-	 * buffer.
-	 */
-	memcpy(inbuf, in, inlen);
-
-	for (i = 0; i < inbuflen; i++)
-		ipc_data_writel(scu, inbuf[i], 4 * i);
-
-	ipc_command(scu, (inlen << 16) | (sub << 12) | cmd);
-	err = intel_scu_ipc_check_status(scu);
-	if (!err) {
-		for (i = 0; i < outlen; i++)
-			*out++ = ipc_data_readl(scu, 4 * i);
-	}
-
-	mutex_unlock(&ipclock);
-	return err;
-}
-EXPORT_SYMBOL_GPL(intel_scu_ipc_raw_command);
-
 /* I2C commands */
 #define IPC_I2C_WRITE 1 /* I2C Write command */
 #define IPC_I2C_READ  2 /* I2C Read command */
@@ -575,48 +378,143 @@ int intel_scu_ipc_i2c_cntrl(u32 addr, u32 *data)
 	struct intel_scu_ipc_dev *scu = &ipcdev;
 	u32 cmd = 0;
 
-	mutex_lock(&ipclock);
-	if (scu->dev == NULL) {
-		mutex_unlock(&ipclock);
-		return -ENODEV;
-	}
 	cmd = (addr >> 24) & 0xFF;
 	if (cmd == IPC_I2C_READ) {
-		writel(addr, scu->i2c_base + IPC_I2C_CNTRL_ADDR);
+		regmap_write(scu->i2c_regs, IPC_I2C_CNTRL_ADDR, addr);
 		/* Write not getting updated without delay */
 		mdelay(1);
-		*data = readl(scu->i2c_base + I2C_DATA_ADDR);
+		regmap_read(scu->i2c_regs, I2C_DATA_ADDR, data);
 	} else if (cmd == IPC_I2C_WRITE) {
-		writel(*data, scu->i2c_base + I2C_DATA_ADDR);
+		regmap_write(scu->i2c_regs, I2C_DATA_ADDR, *data);
 		mdelay(1);
-		writel(addr, scu->i2c_base + IPC_I2C_CNTRL_ADDR);
+		regmap_write(scu->i2c_regs, IPC_I2C_CNTRL_ADDR, addr);
 	} else {
 		dev_err(scu->dev,
 			"intel_scu_ipc: I2C INVALID_CMD = 0x%x\n", cmd);
 
-		mutex_unlock(&ipclock);
 		return -EIO;
 	}
-	mutex_unlock(&ipclock);
 	return 0;
 }
 EXPORT_SYMBOL(intel_scu_ipc_i2c_cntrl);
 
-/*
- * Interrupt handler gets called when ioc bit of IPC_COMMAND_REG set to 1
- * When ioc bit is set to 1, caller api must wait for interrupt handler called
- * which in turn unlocks the caller api. Currently this is not used
- *
- * This is edge triggered so we need take no action to clear anything
- */
-static irqreturn_t ioc(int irq, void *dev_id)
+static int pre_simple_cmd_fn(u32 *cmd_list, u32 cmdlen)
 {
-	struct intel_scu_ipc_dev *scu = dev_id;
+	if (!cmd_list || cmdlen != SCU_PARAM_LEN)
+		return -EINVAL;
 
+	cmd_list[0] |= (cmd_list[1] << IPC_CMD_SUBCMD);
+
+	return 0;
+}
+
+static int pre_cmd_fn(u32 *cmd_list, u32 cmdlen, u32 *in, u32 inlen,
+		u32 *out, u32 outlen)
+{
+	int ret;
+
+	if (inlen > IPC_WWBUF_SIZE_DWORD || outlen > IPC_RWBUF_SIZE_DWORD)
+		return -EINVAL;
+
+	ret = pre_simple_cmd_fn(cmd_list, cmdlen);
+	if (ret < 0)
+		return ret;
+
+	cmd_list[0] |= (inlen << IPC_CMD_SIZE);
+
+	return 0;
+}
+
+static int pre_raw_cmd_fn(u32 *cmd_list, u32 cmdlen, u8 *in, u32 inlen,
+		u32 *out, u32 outlen, u32 dptr, u32 sptr)
+{
+	int ret;
+
+	if (inlen > IPC_WWBUF_SIZE || outlen > IPC_RWBUF_SIZE_DWORD)
+		return -EINVAL;
+
+	ret = pre_simple_cmd_fn(cmd_list, cmdlen);
+	if (ret < 0)
+		return ret;
+
+	cmd_list[0] |= (inlen << IPC_CMD_SIZE);
+
+	return 0;
+}
+
+static int scu_ipc_err_code(int status)
+{
+	if (status & IPC_DEV_SCU_CMD_STATUS_ERR)
+		return (status & IPC_DEV_SCU_CMD_STATUS_ERR_MASK);
+	else
+		return 0;
+}
+
+static int scu_ipc_busy_check(int status)
+{
+	return status | IPC_DEV_SCU_CMD_STATUS_BUSY;
+}
+
+static u32 scu_ipc_enable_msi(u32 cmd)
+{
+	return cmd | IPC_DEV_SCU_CMD_MSI;
+}
+
+static struct intel_ipc_dev *intel_scu_ipc_dev_create(
+		struct device *dev,
+		void __iomem *base,
+		int irq)
+{
+	struct intel_ipc_dev_ops *ops;
+	struct intel_ipc_dev_cfg *cfg;
+	struct regmap *ipc_regs;
+	struct intel_scu_ipc_dev *scu = dev_get_drvdata(dev);
+
+	cfg = devm_kzalloc(dev, sizeof(*cfg), GFP_KERNEL);
+	if (!cfg)
+		return ERR_PTR(-ENOMEM);
+
+	ops = devm_kzalloc(dev, sizeof(*ops), GFP_KERNEL);
+	if (!ops)
+		return ERR_PTR(-ENOMEM);
+
+        ipc_regs = devm_regmap_init_mmio_clk(dev, NULL, base,
+			&ipc_regmap_config);
+        if (IS_ERR(ipc_regs)) {
+                dev_err(dev, "ipc_regs regmap init failed\n");
+                return ERR_CAST(ipc_regs);;
+        }
+
+	scu->ipc_regs = ipc_regs;
+
+	/* set IPC dev ops */
+	ops->to_err_code = scu_ipc_err_code;
+	ops->busy_check = scu_ipc_busy_check;
+	ops->enable_msi = scu_ipc_enable_msi;
+	ops->pre_cmd_fn = pre_cmd_fn;
+	ops->pre_raw_cmd_fn = pre_raw_cmd_fn;
+	ops->pre_simple_cmd_fn = pre_simple_cmd_fn;
+
+	/* set cfg options */
 	if (scu->irq_mode)
-		complete(&scu->cmd_complete);
+		cfg->mode = IPC_DEV_MODE_IRQ;
+	else
+		cfg->mode = IPC_DEV_MODE_POLLING;
 
-	return IRQ_HANDLED;
+	cfg->chan_type = IPC_CHANNEL_IA_SCU;
+	cfg->irq = irq;
+	cfg->use_msi = true;
+	cfg->support_sptr = true;
+	cfg->support_dptr = true;
+	cfg->cmd_regs = ipc_regs;
+	cfg->data_regs = ipc_regs;
+	cfg->wrbuf_reg = IPC_DEV_SCU_WRBUF_OFFSET;
+	cfg->rbuf_reg = IPC_DEV_SCU_RBUF_OFFSET;
+	cfg->sptr_reg = IPC_DEV_SCU_SPTR_OFFSET;
+	cfg->dptr_reg = IPC_DEV_SCU_DPTR_OFFSET;
+	cfg->status_reg = IPC_DEV_SCU_STATUS_OFFSET;
+
+	return devm_intel_ipc_dev_create(dev, INTEL_SCU_IPC_DEV, cfg, ops);
 }
 
 /**
@@ -650,25 +548,34 @@ static int ipc_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	if (err)
 		return err;
 
-	init_completion(&scu->cmd_complete);
-
 	scu->ipc_base = pcim_iomap_table(pdev)[0];
 
-	scu->i2c_base = ioremap_nocache(pdata->i2c_base, pdata->i2c_len);
+	scu->i2c_base = devm_ioremap_nocache(&pdev->dev, pdata->i2c_base,
+			pdata->i2c_len);
 	if (!scu->i2c_base)
 		return -ENOMEM;
 
-	err = devm_request_irq(&pdev->dev, pdev->irq, ioc, 0, "intel_scu_ipc",
-			       scu);
-	if (err)
-		return err;
+	pci_set_drvdata(pdev, scu);
+
+        scu->i2c_regs = devm_regmap_init_mmio_clk(&pdev->dev, NULL,
+			scu->i2c_base, &i2c_regmap_config);
+        if (IS_ERR(scu->i2c_regs)) {
+                dev_err(&pdev->dev, "i2c_regs regmap init failed\n");
+                return PTR_ERR(scu->i2c_regs);;
+        }
+
+	scu->ipc_dev = intel_scu_ipc_dev_create(&pdev->dev, scu->ipc_base,
+			pdev->irq);
+	if (IS_ERR(scu->ipc_dev)) {
+		dev_err(&pdev->dev, "Failed to create SCU IPC device\n");
+		return PTR_ERR(scu->ipc_dev);
+	}
 
 	/* Assign device at last */
 	scu->dev = &pdev->dev;
 
 	intel_scu_devices_create();
 
-	pci_set_drvdata(pdev, scu);
 	return 0;
 }
 

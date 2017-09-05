@@ -14,9 +14,19 @@
 #define IPCMSG_COLD_BOOT	0xF3
 
 #define IPCMSG_VRTC		0xFA	 /* Set vRTC device */
-	/* Command id associated with message IPCMSG_VRTC */
-	#define IPC_CMD_VRTC_SETTIME      1 /* Set time */
-	#define IPC_CMD_VRTC_SETALARM     2 /* Set alarm */
+
+/* Command id associated with message IPCMSG_VRTC */
+#define IPC_CMD_VRTC_SETTIME      1 /* Set time */
+#define IPC_CMD_VRTC_SETALARM     2 /* Set alarm */
+
+#define INTEL_SCU_IPC_DEV	"intel_scu_ipc"
+#define SCU_PARAM_LEN		2
+
+static inline void scu_cmd_init(u32 *cmd, u32 param1, u32 param2)
+{
+	cmd[0] = param1;
+	cmd[1] = param2;
+}
 
 /* Read single register */
 int intel_scu_ipc_ioread8(u16 addr, u8 *data);
@@ -44,13 +54,6 @@ int intel_scu_ipc_writev(u16 *addr, u8 *data, int len);
 
 /* Update single register based on the mask */
 int intel_scu_ipc_update_register(u16 addr, u8 data, u8 mask);
-
-/* Issue commands to the SCU with or without data */
-int intel_scu_ipc_simple_command(int cmd, int sub);
-int intel_scu_ipc_command(int cmd, int sub, u32 *in, int inlen,
-			  u32 *out, int outlen);
-int intel_scu_ipc_raw_command(int cmd, int sub, u8 *in, int inlen,
-			      u32 *out, int outlen, u32 dptr, u32 sptr);
 
 /* I2C control api */
 int intel_scu_ipc_i2c_cntrl(u32 addr, u32 *data);

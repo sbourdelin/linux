@@ -18,6 +18,7 @@
 #include <linux/platform_device.h>
 #include <linux/watchdog.h>
 #include <linux/platform_data/intel-mid_wdt.h>
+#include <linux/platform_data/x86/intel_ipc_dev.h>
 
 #include <asm/intel_scu_ipc.h>
 #include <asm/intel-mid.h>
@@ -29,6 +30,8 @@
 #define MID_WDT_TIMEOUT_MAX		170
 #define MID_WDT_DEFAULT_TIMEOUT		90
 
+static struct intel_ipc_dev *scu_ipc_dev;
+
 /* SCU watchdog messages */
 enum {
 	SCU_WATCHDOG_START = 0,
@@ -38,7 +41,10 @@ enum {
 
 static inline int wdt_command(int sub, u32 *in, int inlen)
 {
-	return intel_scu_ipc_command(IPC_WATCHDOG, sub, in, inlen, NULL, 0);
+	u32 cmds[SCU_PARAM_LEN] = {IPC_WATCHDOG, sub};
+
+	return ipc_dev_cmd(scu_ipc_dev, cmds, SCU_PARAM_LEN, in,
+			inlen, NULL, 0);
 }
 
 static int wdt_start(struct watchdog_device *wd)
@@ -128,6 +134,10 @@ static int mid_wdt_probe(struct platform_device *pdev)
 	wdt_dev = devm_kzalloc(&pdev->dev, sizeof(*wdt_dev), GFP_KERNEL);
 	if (!wdt_dev)
 		return -ENOMEM;
+
+	scu_ipc_dev = intel_ipc_dev_get(INTEL_SCU_IPC_DEV);
+	if (IS_ERR_OR_NULL(scu_ipc_dev))
+		return PTR_ERR(scu_ipc_dev);
 
 	wdt_dev->info = &mid_wdt_info;
 	wdt_dev->ops = &mid_wdt_ops;

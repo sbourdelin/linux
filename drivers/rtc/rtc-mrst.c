@@ -36,6 +36,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/sfi.h>
+#include <linux/platform_data/x86/intel_ipc_dev.h>
 
 #include <asm/intel_scu_ipc.h>
 #include <asm/intel-mid.h>
@@ -46,6 +47,7 @@ struct mrst_rtc {
 	struct device		*dev;
 	int			irq;
 	struct resource		*iomem;
+	struct intel_ipc_dev	*ipc_dev;
 
 	u8			enabled_wake;
 	u8			suspend_ctrl;
@@ -110,10 +112,11 @@ static int mrst_read_time(struct device *dev, struct rtc_time *time)
 
 static int mrst_set_time(struct device *dev, struct rtc_time *time)
 {
-	int ret;
 	unsigned long flags;
 	unsigned char mon, day, hrs, min, sec;
 	unsigned int yrs;
+	struct mrst_rtc	*mrst = dev_get_drvdata(dev);
+	u32 cmds[SCU_PARAM_LEN] = {IPCMSG_VRTC, IPC_CMD_VRTC_SETTIME};
 
 	yrs = time->tm_year;
 	mon = time->tm_mon + 1;   /* tm_mon starts at zero */
@@ -137,8 +140,7 @@ static int mrst_set_time(struct device *dev, struct rtc_time *time)
 
 	spin_unlock_irqrestore(&rtc_lock, flags);
 
-	ret = intel_scu_ipc_simple_command(IPCMSG_VRTC, IPC_CMD_VRTC_SETTIME);
-	return ret;
+	return ipc_dev_simple_cmd(mrst->ipc_dev, cmds, SCU_PARAM_LEN);
 }
 
 static int mrst_read_alarm(struct device *dev, struct rtc_wkalrm *t)
@@ -210,6 +212,7 @@ static int mrst_set_alarm(struct device *dev, struct rtc_wkalrm *t)
 	struct mrst_rtc	*mrst = dev_get_drvdata(dev);
 	unsigned char hrs, min, sec;
 	int ret = 0;
+	u32 cmds[SCU_PARAM_LEN] = {IPCMSG_VRTC, IPC_CMD_VRTC_SETALARM};
 
 	if (!mrst->irq)
 		return -EIO;
@@ -229,7 +232,7 @@ static int mrst_set_alarm(struct device *dev, struct rtc_wkalrm *t)
 
 	spin_unlock_irq(&rtc_lock);
 
-	ret = intel_scu_ipc_simple_command(IPCMSG_VRTC, IPC_CMD_VRTC_SETALARM);
+	ret = ipc_dev_simple_cmd(mrst->ipc_dev, cmds, SCU_PARAM_LEN);
 	if (ret)
 		return ret;
 
@@ -328,6 +331,10 @@ static int vrtc_mrst_do_probe(struct device *dev, struct resource *iomem,
 
 	if (!iomem)
 		return -ENODEV;
+
+	mrst_rtc.ipc_dev = intel_ipc_dev_get(INTEL_SCU_IPC_DEV);
+	if (IS_ERR_OR_NULL(mrst_rtc.ipc_dev))
+		return PTR_ERR(mrst_rtc.ipc_dev);
 
 	iomem = request_mem_region(iomem->start, resource_size(iomem),
 				   driver_name);

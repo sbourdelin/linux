@@ -22,6 +22,7 @@
 #include <linux/irq.h>
 #include <linux/export.h>
 #include <linux/notifier.h>
+#include <linux/platform_data/x86/intel_ipc_dev.h>
 
 #include <asm/setup.h>
 #include <asm/mpspec_def.h>
@@ -68,18 +69,23 @@ static void *(*get_intel_mid_ops[])(void) = INTEL_MID_OPS_INIT;
 enum intel_mid_cpu_type __intel_mid_cpu_chip;
 EXPORT_SYMBOL_GPL(__intel_mid_cpu_chip);
 
+static struct intel_ipc_dev *ipc_dev;
+
 static void intel_mid_power_off(void)
 {
+	u32 cmds[SCU_PARAM_LEN] = {IPCMSG_COLD_OFF, 1};
 	/* Shut down South Complex via PWRMU */
 	intel_mid_pwr_power_off();
 
 	/* Only for Tangier, the rest will ignore this command */
-	intel_scu_ipc_simple_command(IPCMSG_COLD_OFF, 1);
+	ipc_dev_simple_cmd(ipc_dev, cmds, SCU_PARAM_LEN);
 };
 
 static void intel_mid_reboot(void)
 {
-	intel_scu_ipc_simple_command(IPCMSG_COLD_BOOT, 0);
+	u32 cmds[SCU_PARAM_LEN] = {IPCMSG_COLD_BOOT, 0};
+
+	ipc_dev_simple_cmd(ipc_dev, cmds, SCU_PARAM_LEN);
 }
 
 static unsigned long __init intel_mid_calibrate_tsc(void)
@@ -206,6 +212,8 @@ void __init x86_intel_mid_early_setup(void)
 	x86_init.mpparse.find_smp_config = x86_init_noop;
 	x86_init.mpparse.get_smp_config = x86_init_uint_noop;
 	set_bit(MP_BUS_ISA, mp_bus_not_pci);
+
+	ipc_dev = intel_ipc_dev_get(INTEL_SCU_IPC_DEV);
 }
 
 /*

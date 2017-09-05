@@ -49,6 +49,7 @@
 #include <asm/intel_scu_ipc.h>
 #include <asm/apb_timer.h>
 #include <asm/intel-mid.h>
+#include <linux/platform_data/x86/intel_ipc_dev.h>
 
 #include "intel_scu_watchdog.h"
 
@@ -94,6 +95,8 @@ MODULE_PARM_DESC(force_boot,
 
 static struct intel_scu_watchdog_dev watchdog_device;
 
+static struct intel_ipc_dev *scu_ipc_dev;
+
 /* Forces restart, if force_reboot is set */
 static void watchdog_fire(void)
 {
@@ -128,18 +131,14 @@ static int watchdog_set_ipc(int soft_threshold, int threshold)
 	u32	*ipc_wbuf;
 	u8	 cbuf[16] = { '\0' };
 	int	 ipc_ret = 0;
+	u32 cmds[SCU_PARAM_LEN] = {IPC_SET_WATCHDOG_TIMER, 0};
 
 	ipc_wbuf = (u32 *)&cbuf;
 	ipc_wbuf[0] = soft_threshold;
 	ipc_wbuf[1] = threshold;
 
-	ipc_ret = intel_scu_ipc_command(
-			IPC_SET_WATCHDOG_TIMER,
-			0,
-			ipc_wbuf,
-			2,
-			NULL,
-			0);
+	ipc_ret = ipc_dev_cmd(scu_ipc_dev, cmds, SCU_PARAM_LEN, ipc_wbuf,
+			2, NULL, 0);
 
 	if (ipc_ret != 0)
 		pr_err("Error setting SCU watchdog timer: %x\n", ipc_ret);
@@ -459,6 +458,10 @@ static int __init intel_scu_watchdog_init(void)
 	/* Check value of timer_margin boot parameter */
 	if (check_timer_margin(timer_margin))
 		return -EINVAL;
+
+	scu_ipc_dev = intel_ipc_dev_get(INTEL_SCU_IPC_DEV);
+	if (IS_ERR_OR_NULL(scu_ipc_dev))
+		return PTR_ERR(scu_ipc_dev);
 
 	watchdog_device.timer_tbl_ptr = sfi_get_mtmr(sfi_mtimer_num-1);
 
