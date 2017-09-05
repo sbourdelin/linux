@@ -1324,6 +1324,12 @@ static void apic_timer_expired(struct kvm_lapic *apic)
 	atomic_inc(&apic->lapic_timer.pending);
 	kvm_set_pending_timer(vcpu);
 
+	/*
+	 * The above kvm_set_pending_timer implies a wmb
+	 * which pairs with the swaiter side. Either way,
+	 * the atomic_inc() is also serialized so using
+	 * swait_active() is safe.
+	 */
 	if (swait_active(q))
 		swake_up(q);
 
