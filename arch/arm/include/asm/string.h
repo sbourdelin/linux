@@ -29,7 +29,7 @@ extern void __memzero(void *ptr, __kernel_size_t n);
 #define memset(p,v,n)							\
 	({								\
 	 	void *__p = (p); size_t __n = n;			\
-		if ((__n) != 0) {					\
+		if (!__builtin_constant_p(__n) || (__n) != 0) {		\
 			if (__builtin_constant_p((v)) && (v) == 0)	\
 				__memzero((__p),(__n));			\
 			else						\
