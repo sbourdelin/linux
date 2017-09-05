@@ -4185,6 +4185,9 @@ static void _free_event(struct perf_event *event)
 		tracefs_remove(event->dent);
 
 		event->attach_state &= ~PERF_ATTACH_DETACHED;
+
+		ring_buffer_unaccount(event->rb, false);
+		rb_free_detached(event->rb, event);
 	}
 
 	if (event->rb) {
@@ -5012,6 +5015,10 @@ static int perf_mmap_fault(struct vm_fault *vmf)
 	int ret = VM_FAULT_SIGBUS;
 
 	if (vmf->flags & FAULT_FLAG_MKWRITE) {
+		/* detached events R/O only */
+		if (event->dent)
+			return ret;
+
 		if (vmf->pgoff == 0)
 			ret = 0;
 		return ret;
@@ -9410,6 +9417,7 @@ static int perf_event_detach(struct perf_event *event, struct task_struct *task,
 			     struct mm_struct *mm)
 {
 	char *filename;
+	int err;
 
 	filename = kasprintf(GFP_KERNEL, "%s:%x.event",
 			     task ? "task" : "cpu",
@@ -9424,6 +9432,13 @@ static int perf_event_detach(struct perf_event *event, struct task_struct *task,
 
 	if (!event->dent)
 		return -ENOMEM;
+
+	err = rb_alloc_detached(event);
+	if (err) {
+		tracefs_remove(event->dent);
+		event->dent = NULL;
+		return err;
+	}
 
 	return 0;
 }
@@ -10007,6 +10022,9 @@ SYSCALL_DEFINE5(perf_event_open,
 		if (output_event || (group_fd != -1))
 			goto err_task;
 
+		if (!attr.detached_nr_pages)
+			goto err_task;
+
 		detached = 1;
 	}
 
@@ -10164,6 +10182,7 @@ SYSCALL_DEFINE5(perf_event_open,
 			goto err_context;
 
 		atomic_long_inc(&event->refcount);
+		atomic_inc(&event->mmap_count);
 
 		event_file->private_data = event;
 	}
