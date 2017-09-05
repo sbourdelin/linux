@@ -50,10 +50,10 @@ static const struct file_operations tracefs_file_operations = {
 	.llseek =	noop_llseek,
 };
 
-static struct tracefs_dir_ops {
+struct tracefs_dir_ops {
 	int (*mkdir)(const char *name);
 	int (*rmdir)(const char *name);
-} tracefs_ops;
+};
 
 static char *get_dname(struct dentry *dentry)
 {
@@ -72,6 +72,7 @@ static char *get_dname(struct dentry *dentry)
 
 static int tracefs_syscall_mkdir(struct inode *inode, struct dentry *dentry, umode_t mode)
 {
+	struct tracefs_dir_ops *tracefs_ops = dentry->d_parent->d_fsdata;
 	char *name;
 	int ret;
 
@@ -85,7 +86,7 @@ static int tracefs_syscall_mkdir(struct inode *inode, struct dentry *dentry, umo
 	 * mkdir routine to handle races.
 	 */
 	inode_unlock(inode);
-	ret = tracefs_ops.mkdir(name);
+	ret = tracefs_ops->mkdir(name);
 	inode_lock(inode);
 
 	kfree(name);
@@ -95,6 +96,7 @@ static int tracefs_syscall_mkdir(struct inode *inode, struct dentry *dentry, umo
 
 static int tracefs_syscall_rmdir(struct inode *inode, struct dentry *dentry)
 {
+	struct tracefs_dir_ops *tracefs_ops = dentry->d_fsdata;
 	char *name;
 	int ret;
 
@@ -112,7 +114,7 @@ static int tracefs_syscall_rmdir(struct inode *inode, struct dentry *dentry)
 	inode_unlock(inode);
 	inode_unlock(dentry->d_inode);
 
-	ret = tracefs_ops.rmdir(name);
+	ret = tracefs_ops->rmdir(name);
 
 	inode_lock_nested(inode, I_MUTEX_PARENT);
 	inode_lock(dentry->d_inode);
@@ -342,6 +344,9 @@ static struct dentry *start_creating(const char *name, struct dentry *parent)
 	if (IS_ERR(dentry)) {
 		inode_unlock(parent->d_inode);
 		simple_release_fs(&tracefs_mount, &tracefs_mount_count);
+	} else {
+		/* propagate dir ops */
+		dentry->d_fsdata = parent->d_fsdata;
 	}
 
 	return dentry;
@@ -482,18 +487,25 @@ struct dentry *tracefs_create_instance_dir(const char *name, struct dentry *pare
 					  int (*mkdir)(const char *name),
 					  int (*rmdir)(const char *name))
 {
+	struct tracefs_dir_ops *tracefs_ops = parent ? parent->d_fsdata : NULL;
 	struct dentry *dentry;
 
-	/* Only allow one instance of the instances directory. */
-	if (WARN_ON(tracefs_ops.mkdir || tracefs_ops.rmdir))
+	if (WARN_ON(tracefs_ops))
+		return NULL;
+
+	tracefs_ops = kzalloc(sizeof(*tracefs_ops), GFP_KERNEL);
+	if (!tracefs_ops)
 		return NULL;
 
 	dentry = __create_dir(name, parent, &tracefs_dir_inode_operations);
-	if (!dentry)
+	if (!dentry) {
+		kfree(tracefs_ops);
 		return NULL;
+	}
 
-	tracefs_ops.mkdir = mkdir;
-	tracefs_ops.rmdir = rmdir;
+	tracefs_ops->mkdir = mkdir;
+	tracefs_ops->rmdir = rmdir;
+	dentry->d_fsdata = tracefs_ops;
 
 	return dentry;
 }
@@ -513,8 +525,11 @@ static int __tracefs_remove(struct dentry *dentry, struct dentry *parent)
 				simple_unlink(parent->d_inode, dentry);
 				break;
 			}
-			if (!ret)
+			if (!ret) {
 				d_delete(dentry);
+				if (dentry->d_fsdata != parent->d_fsdata)
+					kfree(dentry->d_fsdata);
+			}
 			dput(dentry);
 		}
 	}
