@@ -769,6 +769,7 @@ struct perf_event_context {
 	int				nr_stat;
 	int				nr_freq;
 	int				rotate_disable;
+	int				clone_disable;
 	atomic_t			refcount;
 	struct task_struct		*task;
 
