@@ -1,5 +1,6 @@
 config INFINIBAND_CXGB3
 	tristate "Chelsio RDMA Driver"
+	depends on PCI
 	depends on CHELSIO_T3 && INET
 	select GENERIC_ALLOCATOR
 	---help---

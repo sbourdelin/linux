@@ -1,6 +1,7 @@
 config INFINIBAND_HFI1
 	tristate "Intel OPA Gen1 support"
 	depends on X86_64 && INFINIBAND_RDMAVT && I2C
+	depends on PCI
 	select MMU_NOTIFIER
 	select CRC32
 	select I2C_ALGOBIT
