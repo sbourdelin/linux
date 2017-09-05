@@ -3196,7 +3196,7 @@ static bool fast_page_fault(struct kvm_vcpu *vcpu, gva_t gva, int level,
 
 		new_spte = spte;
 
-		if (is_access_track_spte(spte))
+		if (!is_mmio_spte(spte) && is_access_track_spte(spte))
 			new_spte = restore_acc_track_spte(new_spte);
 
 		/*
