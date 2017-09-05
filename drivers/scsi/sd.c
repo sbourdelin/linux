@@ -738,8 +738,8 @@ static int sd_setup_unmap_cmnd(struct scsi_cmnd *cmd)
 {
 	struct scsi_device *sdp = cmd->device;
 	struct request *rq = cmd->request;
-	u64 sector = blk_rq_pos(rq) >> (ilog2(sdp->sector_size) - 9);
-	u32 nr_sectors = blk_rq_sectors(rq) >> (ilog2(sdp->sector_size) - 9);
+	u64 sector = sectors_to_logical(sdp, blk_rq_pos(rq));
+	u32 nr_sectors = sectors_to_logical(sdp, blk_rq_sectors(rq));
 	unsigned int data_len = 24;
 	char *buf;
 
@@ -772,8 +772,8 @@ static int sd_setup_write_same16_cmnd(struct scsi_cmnd *cmd, bool unmap)
 {
 	struct scsi_device *sdp = cmd->device;
 	struct request *rq = cmd->request;
-	u64 sector = blk_rq_pos(rq) >> (ilog2(sdp->sector_size) - 9);
-	u32 nr_sectors = blk_rq_sectors(rq) >> (ilog2(sdp->sector_size) - 9);
+	u64 sector = sectors_to_logical(sdp, blk_rq_pos(rq));
+	u32 nr_sectors = sectors_to_logical(sdp, blk_rq_sectors(rq));
 	u32 data_len = sdp->sector_size;
 
 	rq->special_vec.bv_page = alloc_page(GFP_ATOMIC | __GFP_ZERO);
@@ -802,8 +802,8 @@ static int sd_setup_write_same10_cmnd(struct scsi_cmnd *cmd, bool unmap)
 {
 	struct scsi_device *sdp = cmd->device;
 	struct request *rq = cmd->request;
-	u64 sector = blk_rq_pos(rq) >> (ilog2(sdp->sector_size) - 9);
-	u32 nr_sectors = blk_rq_sectors(rq) >> (ilog2(sdp->sector_size) - 9);
+	u64 sector = sectors_to_logical(sdp, blk_rq_pos(rq));
+	u32 nr_sectors = sectors_to_logical(sdp, blk_rq_sectors(rq));
 	u32 data_len = sdp->sector_size;
 
 	rq->special_vec.bv_page = alloc_page(GFP_ATOMIC | __GFP_ZERO);
@@ -833,8 +833,8 @@ static int sd_setup_write_zeroes_cmnd(struct scsi_cmnd *cmd)
 	struct request *rq = cmd->request;
 	struct scsi_device *sdp = cmd->device;
 	struct scsi_disk *sdkp = scsi_disk(rq->rq_disk);
-	u64 sector = blk_rq_pos(rq) >> (ilog2(sdp->sector_size) - 9);
-	u32 nr_sectors = blk_rq_sectors(rq) >> (ilog2(sdp->sector_size) - 9);
+	u64 sector = sectors_to_logical(sdp, blk_rq_pos(rq));
+	u32 nr_sectors = sectors_to_logical(sdp, blk_rq_sectors(rq));
 	int ret;
 
 	if (!(rq->cmd_flags & REQ_NOUNMAP)) {
