@@ -7792,11 +7792,17 @@ static int instance_rmdir(const char *name)
 	return ret;
 }
 
+static int instance_unlink(const char *name)
+{
+	return -EACCES;
+}
+
 static __init void create_trace_instances(struct dentry *d_tracer)
 {
 	trace_instance_dir = tracefs_create_instance_dir("instances", d_tracer,
 							 instance_mkdir,
-							 instance_rmdir);
+							 instance_rmdir,
+							 instance_unlink);
 	if (WARN_ON(!trace_instance_dir))
 		return;
 }

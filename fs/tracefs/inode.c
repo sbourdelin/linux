@@ -53,6 +53,7 @@ static const struct file_operations tracefs_file_operations = {
 struct tracefs_dir_ops {
 	int (*mkdir)(const char *name);
 	int (*rmdir)(const char *name);
+	int (*unlink)(const char *name);
 };
 
 static char *get_dname(struct dentry *dentry)
@@ -124,10 +125,41 @@ static int tracefs_syscall_rmdir(struct inode *inode, struct dentry *dentry)
 	return ret;
 }
 
+static int tracefs_syscall_unlink(struct inode *inode, struct dentry *dentry)
+{
+	struct tracefs_dir_ops *tracefs_ops = dentry->d_fsdata;
+	char *name;
+	int ret;
+
+	name = get_dname(dentry);
+	if (!name)
+		return -ENOMEM;
+
+	/*
+	 * The unlink call can call the generic functions that create
+	 * the files within the tracefs system. It is up to the individual
+	 * unlink routine to handle races.
+	 * This time we need to unlock not only the parent (inode) but
+	 * also the file that is being deleted.
+	 */
+	inode_unlock(inode);
+	inode_unlock(dentry->d_inode);
+
+	ret = tracefs_ops->unlink(name);
+
+	inode_lock_nested(inode, I_MUTEX_PARENT);
+	inode_lock(dentry->d_inode);
+
+	kfree(name);
+
+	return ret;
+}
+
 static const struct inode_operations tracefs_dir_inode_operations = {
 	.lookup		= simple_lookup,
 	.mkdir		= tracefs_syscall_mkdir,
 	.rmdir		= tracefs_syscall_rmdir,
+	.unlink		= tracefs_syscall_unlink,
 };
 
 static struct inode *tracefs_get_inode(struct super_block *sb)
@@ -485,7 +517,8 @@ struct dentry *tracefs_create_dir(const char *name, struct dentry *parent)
  */
 struct dentry *tracefs_create_instance_dir(const char *name, struct dentry *parent,
 					  int (*mkdir)(const char *name),
-					  int (*rmdir)(const char *name))
+					  int (*rmdir)(const char *name),
+					  int (*unlink)(const char *name))
 {
 	struct tracefs_dir_ops *tracefs_ops = parent ? parent->d_fsdata : NULL;
 	struct dentry *dentry;
@@ -505,6 +538,7 @@ struct dentry *tracefs_create_instance_dir(const char *name, struct dentry *pare
 
 	tracefs_ops->mkdir = mkdir;
 	tracefs_ops->rmdir = rmdir;
+	tracefs_ops->unlink = unlink;
 	dentry->d_fsdata = tracefs_ops;
 
 	return dentry;
