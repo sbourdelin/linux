@@ -39,6 +39,20 @@ struct algif_hash_tfm {
 	bool has_key;
 };
 
+/* Previous versions of crypto_* ops used to return -EBUSY
+ * rather than -EAGAIN to indicate being tied up. The in
+ * kernel API changed but we don't want to break the user
+ * space API. As only the hash user interface exposed this
+ * error ever to the user, do the translation here.
+ */
+static inline int crypto_user_err(int err)
+{
+	if (err == -EAGAIN)
+		return -EBUSY;
+
+	return err;
+}
+
 static int hash_alloc_result(struct sock *sk, struct hash_ctx *ctx)
 {
 	unsigned ds;
@@ -136,7 +150,7 @@ static int hash_sendmsg(struct socket *sock, struct msghdr *msg,
 unlock:
 	release_sock(sk);
 
-	return err ?: copied;
+	return err ? crypto_user_err(err) : copied;
 }
 
 static ssize_t hash_sendpage(struct socket *sock, struct page *page,
@@ -188,7 +202,7 @@ static ssize_t hash_sendpage(struct socket *sock, struct page *page,
 unlock:
 	release_sock(sk);
 
-	return err ?: size;
+	return err ? crypto_user_err(err) : size;
 }
 
 static int hash_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
@@ -236,7 +250,7 @@ unlock:
 	hash_free_result(sk, ctx);
 	release_sock(sk);
 
-	return err ?: len;
+	return err ? crypto_user_err(err) : len;
 }
 
 static int hash_accept(struct socket *sock, struct socket *newsock, int flags,
