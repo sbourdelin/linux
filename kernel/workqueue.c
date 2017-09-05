@@ -2091,8 +2091,8 @@ __acquires(&pool->lock)
 
 	spin_unlock_irq(&pool->lock);
 
-	lock_map_acquire(&pwq->wq->lockdep_map);
-	lock_map_acquire(&lockdep_map);
+	lock_map_acquire_might(&pwq->wq->lockdep_map);
+	lock_map_acquire_might(&lockdep_map);
 	/*
 	 * Strictly speaking we should mark the invariant state without holding
 	 * any locks, that is, before these two lock_map_acquire()'s.
@@ -2504,7 +2504,7 @@ static void insert_wq_barrier(struct pool_workqueue *pwq,
 	 */
 	lockdep_init_map_crosslock((struct lockdep_map *)&barr->done.map,
 				   "(complete)wq_barr::done",
-				   target->lockdep_map.key, 1);
+				   target->lockdep_map.key, 0);
 	__init_completion(&barr->done);
 	barr->task = current;
 
@@ -2611,15 +2611,16 @@ void flush_workqueue(struct workqueue_struct *wq)
 	struct wq_flusher this_flusher = {
 		.list = LIST_HEAD_INIT(this_flusher.list),
 		.flush_color = -1,
-		.done = COMPLETION_INITIALIZER_ONSTACK(this_flusher.done),
 	};
 	int next_color;
 
+	lockdep_init_map_crosslock((struct lockdep_map *)&this_flusher.done.map,
+				   "(complete)wq_flusher::done",
+				   wq->lockdep_map.key, 0);
+	__init_completion(&this_flusher.done);
+
 	if (WARN_ON(!wq_online))
 		return;
-
-	lock_map_acquire(&wq->lockdep_map);
-	lock_map_release(&wq->lockdep_map);
 
 	mutex_lock(&wq->mutex);
 
@@ -2882,9 +2883,6 @@ bool flush_work(struct work_struct *work)
 
 	if (WARN_ON(!wq_online))
 		return false;
-
-	lock_map_acquire(&work->lockdep_map);
-	lock_map_release(&work->lockdep_map);
 
 	if (start_flush_work(work, &barr)) {
 		wait_for_completion(&barr.done);
