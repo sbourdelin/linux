@@ -377,6 +377,7 @@ extern struct pv_lock_ops pv_lock_ops;
 
 unsigned paravirt_patch_ident_32(void *insnbuf, unsigned len);
 unsigned paravirt_patch_ident_64(void *insnbuf, unsigned len);
+unsigned paravirt_patch_false(void *insnbuf, unsigned len);
 unsigned paravirt_patch_call(void *insnbuf,
 			     const void *target, u16 tgt_clobbers,
 			     unsigned long addr, u16 site_clobbers,
@@ -682,6 +683,7 @@ void paravirt_flush_lazy_mmu(void);
 void _paravirt_nop(void);
 u32 _paravirt_ident_32(u32);
 u64 _paravirt_ident_64(u64);
+bool _paravirt_false(void);
 
 #define paravirt_nop	((void *)_paravirt_nop)
 

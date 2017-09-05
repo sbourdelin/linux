@@ -17,6 +17,7 @@ DEF_NATIVE(pv_cpu_ops, swapgs, "swapgs");
 
 DEF_NATIVE(, mov32, "mov %edi, %eax");
 DEF_NATIVE(, mov64, "mov %rdi, %rax");
+DEF_NATIVE(, xor, "xor %rax, %rax");
 
 #if defined(CONFIG_PARAVIRT_SPINLOCKS)
 DEF_NATIVE(pv_lock_ops, queued_spin_unlock, "movb $0, (%rdi)");
@@ -33,6 +34,12 @@ unsigned paravirt_patch_ident_64(void *insnbuf, unsigned len)
 {
 	return paravirt_patch_insns(insnbuf, len,
 				    start__mov64, end__mov64);
+}
+
+unsigned paravirt_patch_false(void *insnbuf, unsigned len)
+{
+	return paravirt_patch_insns(insnbuf, len,
+				    start__xor, end__xor);
 }
 
 extern bool pv_is_native_spin_unlock(void);

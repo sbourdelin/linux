@@ -66,6 +66,11 @@ u64 notrace _paravirt_ident_64(u64 x)
 	return x;
 }
 
+bool notrace _paravirt_false(void)
+{
+	return false;
+}
+
 void __init default_banner(void)
 {
 	printk(KERN_INFO "Booting paravirtualized kernel on %s\n",
@@ -149,6 +154,8 @@ unsigned paravirt_patch_default(u8 type, u16 clobbers, void *insnbuf,
 		ret = paravirt_patch_ident_32(insnbuf, len);
 	else if (opfunc == _paravirt_ident_64)
 		ret = paravirt_patch_ident_64(insnbuf, len);
+	else if (opfunc == _paravirt_false)
+		ret = paravirt_patch_false(insnbuf, len);
 
 	else if (type == PARAVIRT_PATCH(pv_cpu_ops.iret) ||
 		 type == PARAVIRT_PATCH(pv_cpu_ops.usergs_sysret64))

@@ -9,6 +9,8 @@ DEF_NATIVE(pv_mmu_ops, read_cr2, "mov %cr2, %eax");
 DEF_NATIVE(pv_mmu_ops, write_cr3, "mov %eax, %cr3");
 DEF_NATIVE(pv_mmu_ops, read_cr3, "mov %cr3, %eax");
 
+DEF_NATIVE(, xor, "xor %eax, %eax");
+
 #if defined(CONFIG_PARAVIRT_SPINLOCKS)
 DEF_NATIVE(pv_lock_ops, queued_spin_unlock, "movb $0, (%eax)");
 DEF_NATIVE(pv_lock_ops, vcpu_is_preempted, "xor %eax, %eax");
@@ -24,6 +26,12 @@ unsigned paravirt_patch_ident_64(void *insnbuf, unsigned len)
 {
 	/* arg in %edx:%eax, return in %edx:%eax */
 	return 0;
+}
+
+unsigned paravirt_patch_false(void *insnbuf, unsigned len)
+{
+	return paravirt_patch_insns(insnbuf, len,
+				    start__xor, end__xor);
 }
 
 extern bool pv_is_native_spin_unlock(void);
