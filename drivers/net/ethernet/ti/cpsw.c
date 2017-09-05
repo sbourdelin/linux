@@ -291,6 +291,10 @@ struct cpsw_ss_regs {
 #define CPSW_MAX_BLKS_TX_SHIFT		4
 #define CPSW_MAX_BLKS_RX		5
 
+#define HAS_PHY_TXTSTAMP(p) ((p) && (p)->drv && (p)->drv->txtstamp)
+#define HAS_PHY_TSTAMP(p) ((p) && (p)->drv && \
+	((p)->drv->rxtstamp || (p)->drv->rxtstamp))
+
 struct cpsw_host_regs {
 	u32	max_blks;
 	u32	blk_cnt;
@@ -1598,6 +1602,8 @@ static netdev_tx_t cpsw_ndo_start_xmit(struct sk_buff *skb,
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
 	struct cpsw_common *cpsw = priv->cpsw;
+	int slave_no = cpsw_slave_index(cpsw, priv);
+	struct phy_device *phy = cpsw->slaves[slave_no].phy;
 	struct cpts *cpts = cpsw->cpts;
 	struct netdev_queue *txq;
 	struct cpdma_chan *txch;
@@ -1609,8 +1615,9 @@ static netdev_tx_t cpsw_ndo_start_xmit(struct sk_buff *skb,
 		return NET_XMIT_DROP;
 	}
 
-	if (skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP &&
-	    cpts_is_tx_enabled(cpts) && cpts_can_timestamp(cpts, skb))
+	if ((skb_shinfo(skb)->tx_flags & SKBTX_HW_TSTAMP) &&
+	    cpts_can_timestamp(cpts, skb) &&
+	    (cpts_is_tx_enabled(cpts) || HAS_PHY_TXTSTAMP(phy)))
 		skb_shinfo(skb)->tx_flags |= SKBTX_IN_PROGRESS;
 
 	q_idx = skb_get_queue_mapping(skb);
@@ -1808,20 +1815,26 @@ static int cpsw_ndo_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
 	struct cpsw_priv *priv = netdev_priv(dev);
 	struct cpsw_common *cpsw = priv->cpsw;
 	int slave_no = cpsw_slave_index(cpsw, priv);
+	struct phy_device *phy = cpsw->slaves[slave_no].phy;
+
 
 	if (!netif_running(dev))
 		return -EINVAL;
 
 	switch (cmd) {
 	case SIOCSHWTSTAMP:
+		if (HAS_PHY_TSTAMP(phy))
+			break;
 		return cpsw_hwtstamp_set(dev, req);
 	case SIOCGHWTSTAMP:
+		if (HAS_PHY_TSTAMP(phy))
+			break;
 		return cpsw_hwtstamp_get(dev, req);
 	}
 
-	if (!cpsw->slaves[slave_no].phy)
+	if (!phy)
 		return -EOPNOTSUPP;
-	return phy_mii_ioctl(cpsw->slaves[slave_no].phy, req, cmd);
+	return phy_mii_ioctl(phy, req, cmd);
 }
 
 static void cpsw_ndo_tx_timeout(struct net_device *ndev)

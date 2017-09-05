@@ -421,6 +421,8 @@ void cpts_tx_timestamp(struct cpts *cpts, struct sk_buff *skb)
 	u64 ns;
 	struct skb_shared_hwtstamps ssh;
 
+	if (!cpts->rx_enable)
+		return;
 	if (!(skb_shinfo(skb)->tx_flags & SKBTX_IN_PROGRESS))
 		return;
 	ns = cpts_find_ts(cpts, skb, CPTS_EV_TX);
