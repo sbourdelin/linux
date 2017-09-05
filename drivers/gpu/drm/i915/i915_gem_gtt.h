@@ -131,6 +131,13 @@ typedef u64 gen8_ppgtt_pml4e_t;
 #define PPAT_CACHED_INDEX		_PAGE_PAT /* WB LLCeLLC */
 #define PPAT_DISPLAY_ELLC_INDEX		_PAGE_PCD /* WT eLLC */
 
+/* PPAT index = 4 * PAT + 2 * PCD + PWT */
+static inline unsigned int ppat_bits_to_index(unsigned int bits)
+{
+	return (4 * !!(bits & _PAGE_PAT) + 2 * !!(bits & _PAGE_PCD)
+		+ !!(bits & _PAGE_PWT));
+}
+
 #define CHV_PPAT_SNOOP			(1<<6)
 #define GEN8_PPAT_AGE(x)		(x<<4)
 #define GEN8_PPAT_LLCeLLC		(3<<2)

@@ -2914,18 +2914,15 @@ static void cnl_setup_private_ppat(struct intel_ppat *ppat)
 
 	/* XXX: spec is unclear if this is still needed for CNL+ */
 	if (!USES_PPGTT(ppat->i915)) {
-		__alloc_ppat_entry(ppat, 0, GEN8_PPAT_UC);
+		__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_CACHED_PDE_INDEX), GEN8_PPAT_UC);
 		return;
 	}
 
-	__alloc_ppat_entry(ppat, 0, GEN8_PPAT_WB | GEN8_PPAT_LLC);
-	__alloc_ppat_entry(ppat, 1, GEN8_PPAT_WC | GEN8_PPAT_LLCELLC);
-	__alloc_ppat_entry(ppat, 2, GEN8_PPAT_WT | GEN8_PPAT_LLCELLC);
-	__alloc_ppat_entry(ppat, 3, GEN8_PPAT_UC);
-	__alloc_ppat_entry(ppat, 4, GEN8_PPAT_WB | GEN8_PPAT_LLCELLC | GEN8_PPAT_AGE(0));
-	__alloc_ppat_entry(ppat, 5, GEN8_PPAT_WB | GEN8_PPAT_LLCELLC | GEN8_PPAT_AGE(1));
-	__alloc_ppat_entry(ppat, 6, GEN8_PPAT_WB | GEN8_PPAT_LLCELLC | GEN8_PPAT_AGE(2));
-	__alloc_ppat_entry(ppat, 7, GEN8_PPAT_WB | GEN8_PPAT_LLCELLC | GEN8_PPAT_AGE(3));
+	/* See gen8_pte_encode() for the mapping from cache-level to PPAT */
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_CACHED_PDE_INDEX), GEN8_PPAT_WB | GEN8_PPAT_LLC);
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_DISPLAY_ELLC_INDEX), GEN8_PPAT_WT | GEN8_PPAT_LLCELLC);
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_UNCACHED_INDEX), GEN8_PPAT_UC);
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_CACHED_INDEX), GEN8_PPAT_WB | GEN8_PPAT_LLCELLC | GEN8_PPAT_AGE(0));
 }
 
 /* The GGTT and PPGTT need a private PPAT setup in order to handle cacheability
@@ -2952,18 +2949,18 @@ static void bdw_setup_private_ppat(struct intel_ppat *ppat)
 		 * So we can still hold onto all our assumptions wrt cpu
 		 * clflushing on LLC machines.
 		 */
-		__alloc_ppat_entry(ppat, 0, GEN8_PPAT_UC);
+		__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_CACHED_PDE_INDEX), GEN8_PPAT_UC);
 		return;
 	}
 
-	__alloc_ppat_entry(ppat, 0, GEN8_PPAT_WB | GEN8_PPAT_LLC);      /* for normal objects, no eLLC */
-	__alloc_ppat_entry(ppat, 1, GEN8_PPAT_WC | GEN8_PPAT_LLCELLC);  /* for something pointing to ptes? */
-	__alloc_ppat_entry(ppat, 2, GEN8_PPAT_WT | GEN8_PPAT_LLCELLC);  /* for scanout with eLLC */
-	__alloc_ppat_entry(ppat, 3, GEN8_PPAT_UC);                      /* Uncached objects, mostly for scanout */
-	__alloc_ppat_entry(ppat, 4, GEN8_PPAT_WB | GEN8_PPAT_LLCELLC | GEN8_PPAT_AGE(0));
-	__alloc_ppat_entry(ppat, 5, GEN8_PPAT_WB | GEN8_PPAT_LLCELLC | GEN8_PPAT_AGE(1));
-	__alloc_ppat_entry(ppat, 6, GEN8_PPAT_WB | GEN8_PPAT_LLCELLC | GEN8_PPAT_AGE(2));
-	__alloc_ppat_entry(ppat, 7, GEN8_PPAT_WB | GEN8_PPAT_LLCELLC | GEN8_PPAT_AGE(3));
+	/* See gen8_pte_encode() for the mapping from cache-level to PPAT */
+	/* for normal objects, no eLLC */
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_CACHED_PDE_INDEX), GEN8_PPAT_WB | GEN8_PPAT_LLC);
+	/* for scanout with eLLC */
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_DISPLAY_ELLC_INDEX), GEN8_PPAT_WT | GEN8_PPAT_LLCELLC);
+	/* Uncached objects, mostly for scanout */
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_UNCACHED_INDEX), GEN8_PPAT_UC);
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_CACHED_INDEX), GEN8_PPAT_WB | GEN8_PPAT_LLCELLC | GEN8_PPAT_AGE(0));
 }
 
 static void chv_setup_private_ppat(struct intel_ppat *ppat)
@@ -2992,14 +2989,11 @@ static void chv_setup_private_ppat(struct intel_ppat *ppat)
 	 * in order to keep the global status page working.
 	 */
 
-	__alloc_ppat_entry(ppat, 0, CHV_PPAT_SNOOP);
-	__alloc_ppat_entry(ppat, 1, 0);
-	__alloc_ppat_entry(ppat, 2, 0);
-	__alloc_ppat_entry(ppat, 3, 0);
-	__alloc_ppat_entry(ppat, 4, CHV_PPAT_SNOOP);
-	__alloc_ppat_entry(ppat, 5, CHV_PPAT_SNOOP);
-	__alloc_ppat_entry(ppat, 6, CHV_PPAT_SNOOP);
-	__alloc_ppat_entry(ppat, 7, CHV_PPAT_SNOOP);
+	/* See gen8_pte_encode() for the mapping from cache-level to PPAT */
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_CACHED_PDE_INDEX), CHV_PPAT_SNOOP);
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_DISPLAY_ELLC_INDEX), 0);
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_UNCACHED_INDEX), 0);
+	__alloc_ppat_entry(ppat, ppat_bits_to_index(PPAT_CACHED_INDEX), CHV_PPAT_SNOOP);
 }
 
 static void gen6_gmch_remove(struct i915_address_space *vm)
