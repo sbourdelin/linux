@@ -87,6 +87,7 @@ enum perf_output_field {
 	PERF_OUTPUT_BRSTACKINSN	    = 1U << 23,
 	PERF_OUTPUT_BRSTACKOFF	    = 1U << 24,
 	PERF_OUTPUT_SYNTH           = 1U << 25,
+	PERF_OUTPUT_UREGS	    = 1U << 26,
 };
 
 struct output_option {
@@ -108,6 +109,7 @@ struct output_option {
 	{.str = "srcline", .field = PERF_OUTPUT_SRCLINE},
 	{.str = "period", .field = PERF_OUTPUT_PERIOD},
 	{.str = "iregs", .field = PERF_OUTPUT_IREGS},
+	{.str = "uregs", .field = PERF_OUTPUT_UREGS},
 	{.str = "brstack", .field = PERF_OUTPUT_BRSTACK},
 	{.str = "brstacksym", .field = PERF_OUTPUT_BRSTACKSYM},
 	{.str = "data_src", .field = PERF_OUTPUT_DATA_SRC},
@@ -382,6 +384,11 @@ static int perf_evsel__check_attr(struct perf_evsel *evsel,
 					PERF_OUTPUT_IREGS))
 		return -EINVAL;
 
+	if (PRINT_FIELD(UREGS) &&
+		perf_evsel__check_stype(evsel, PERF_SAMPLE_REGS_USER, "UREGS",
+					PERF_OUTPUT_UREGS))
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -494,6 +501,24 @@ static void print_sample_iregs(struct perf_sample *sample,
 
 	if (!regs)
 		return;
+
+	for_each_set_bit(r, (unsigned long *) &mask, sizeof(mask) * 8) {
+		u64 val = regs->regs[i++];
+		printf("%5s:0x%"PRIx64" ", perf_reg_name(r), val);
+	}
+}
+
+static void print_sample_uregs(struct perf_sample *sample,
+			  struct perf_event_attr *attr)
+{
+	struct regs_dump *regs = &sample->user_regs;
+	uint64_t mask = attr->sample_regs_user;
+	unsigned i = 0, r;
+
+	if (!regs || !regs->regs)
+		return;
+
+	printf(" ABI:%lu ", regs->abi);
 
 	for_each_set_bit(r, (unsigned long *) &mask, sizeof(mask) * 8) {
 		u64 val = regs->regs[i++];
@@ -1435,6 +1460,9 @@ static void process_event(struct perf_script *script,
 
 	if (PRINT_FIELD(IREGS))
 		print_sample_iregs(sample, attr);
+
+	if (PRINT_FIELD(UREGS))
+		print_sample_uregs(sample, attr);
 
 	if (PRINT_FIELD(BRSTACK))
 		print_sample_brstack(sample, thread, attr);
@@ -2728,7 +2756,7 @@ int cmd_script(int argc, const char **argv)
 		     "+field to add and -field to remove."
 		     "Valid types: hw,sw,trace,raw,synth. "
 		     "Fields: comm,tid,pid,time,cpu,event,trace,ip,sym,dso,"
-		     "addr,symoff,period,iregs,brstack,brstacksym,flags,"
+		     "addr,symoff,period,iregs,uregs,brstack,brstacksym,flags,"
 		     "bpf-output,callindent,insn,insnlen,brstackinsn,synth",
 		     parse_output_fields),
 	OPT_BOOLEAN('a', "all-cpus", &system_wide,
