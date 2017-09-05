@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/circ_buf.h>
 #include <linux/poll.h>
+#include <linux/shmem_fs.h>
 
 #include "internal.h"
 
@@ -342,10 +343,11 @@ ring_buffer_init(struct ring_buffer *rb, struct perf_event *event, int flags)
 	 * perf_output_begin() only checks rb->paused, therefore
 	 * rb->paused must be true if we have no pages for output.
 	 */
-	if (!rb->nr_pages)
+	if (!rb->nr_pages || (flags & RING_BUFFER_SHMEM))
 		rb->paused = 1;
 
-	perf_event_init_userpage(event, rb);
+	if (!(flags & RING_BUFFER_SHMEM))
+		perf_event_init_userpage(event, rb);
 }
 
 void perf_aux_output_flag(struct perf_output_handle *handle, u64 flags)
@@ -631,6 +633,9 @@ void ring_buffer_unaccount(struct ring_buffer *rb, bool aux)
 	unsigned long nr_pages = aux ? rb->aux_nr_pages : rb->nr_pages + 1;
 	unsigned long pinned = aux ? rb->aux_mmap_locked : rb->mmap_locked;
 
+	if (!rb->nr_pages && !rb->aux_nr_pages)
+		return;
+
 	atomic_long_sub(nr_pages, &rb->mmap_user->locked_vm);
 	if (rb->mmap_mapping)
 		rb->mmap_mapping->pinned_vm -= pinned;
@@ -640,9 +645,14 @@ void ring_buffer_unaccount(struct ring_buffer *rb, bool aux)
 
 #define PERF_AUX_GFP	(GFP_KERNEL | __GFP_ZERO | __GFP_NOWARN | __GFP_NORETRY)
 
-static struct page *rb_alloc_aux_page(int node, int order)
+static struct page *
+rb_alloc_aux_page(struct ring_buffer *rb, int node, int order, int pgoff)
 {
+	struct file *file = rb->shmem_file;
 	struct page *page;
+
+	if (order && file)
+		return NULL;
 
 	if (order > MAX_ORDER)
 		order = MAX_ORDER;
@@ -670,8 +680,13 @@ static void rb_free_aux_page(struct ring_buffer *rb, int idx)
 {
 	struct page *page = virt_to_page(rb->aux_pages[idx]);
 
-	ClearPagePrivate(page);
+	/* SHMEM pages are freed elsewhere */
+	if (rb->shmem_file)
+		return;
+
 	page->mapping = NULL;
+
+	ClearPagePrivate(page);
 	__free_page(page);
 }
 
@@ -706,17 +721,20 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
 		 pgoff_t pgoff, int nr_pages, long watermark, int flags)
 {
 	bool overwrite = !(flags & RING_BUFFER_WRITABLE);
+	bool shmem = !!(flags & RING_BUFFER_SHMEM);
 	int node = (event->cpu == -1) ? -1 : cpu_to_node(event->cpu);
 	int ret, max_order = 0;
 
 	if (!has_aux(event))
 		return -EOPNOTSUPP;
 
-	ret = ring_buffer_account(rb, NULL, nr_pages, true);
-	if (ret)
-		return ret;
+	if (!shmem) {
+		ret = ring_buffer_account(rb, NULL, nr_pages, true);
+		if (ret)
+			return ret;
+	}
 
-	ret = -ENOMEM;
+	ret = -EINVAL;
 	if (event->pmu->capabilities & PERF_PMU_CAP_AUX_NO_SG) {
 		/*
 		 * We need to start with the max_order that fits in nr_pages,
@@ -737,21 +755,41 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
 		}
 	}
 
+	ret = -ENOMEM;
 	rb->aux_pages = kzalloc_node(nr_pages * sizeof(void *), GFP_KERNEL, node);
 	if (!rb->aux_pages)
-		return -ENOMEM;
+		goto out;
 
 	rb->free_aux = event->pmu->free_aux;
+
+	if (shmem) {
+		/*
+		 * Can't guarantee contuguous high order allocations.
+		 */
+		if (max_order)
+			goto out;
+
+		/*
+		 * Skip page allocation; it's done in rb_get_kernel_pages().
+		 */
+		rb->aux_nr_pages = nr_pages;
+
+		goto post_setup;
+	}
+
 	for (rb->aux_nr_pages = 0; rb->aux_nr_pages < nr_pages;) {
 		struct page *page;
 		int last, order;
 
 		order = min(max_order, ilog2(nr_pages - rb->aux_nr_pages));
-		page = rb_alloc_aux_page(node, order);
+		page = rb_alloc_aux_page(rb, node, order, pgoff + rb->aux_nr_pages);
 		if (!page)
 			goto out;
 
-		for (last = rb->aux_nr_pages + (1 << page_private(page));
+		if (order)
+			order = page_private(page);
+
+		for (last = rb->aux_nr_pages + (1 << order);
 		     last > rb->aux_nr_pages; rb->aux_nr_pages++)
 			rb->aux_pages[rb->aux_nr_pages] = page_address(page++);
 	}
@@ -775,6 +813,7 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
 	if (!rb->aux_priv)
 		goto out;
 
+post_setup:
 	ret = 0;
 
 	/*
@@ -795,7 +834,8 @@ out:
 	if (!ret) {
 		rb->aux_pgoff = pgoff;
 	} else {
-		ring_buffer_unaccount(rb, true);
+		if (!shmem)
+			ring_buffer_unaccount(rb, true);
 		__rb_free_aux(rb);
 	}
 
@@ -811,35 +851,95 @@ void rb_free_aux(struct ring_buffer *rb)
 	}
 }
 
+static int rb_shmem_setup(struct perf_event *event,
+			  struct task_struct *task,
+			  struct ring_buffer *rb)
+{
+	int nr_pages, err;
+	char *name;
+
+	if (WARN_ON_ONCE(!task))
+		return -EINVAL;
+
+	name = event->dent && event->dent->d_name.name ?
+		kasprintf(GFP_KERNEL, "perf/%s/%s/%d",
+			  event->dent->d_name.name, event->pmu->name,
+			  task_pid_nr_ns(task, event->ns)) :
+		kasprintf(GFP_KERNEL, "perf/%s/%d", event->pmu->name,
+			  task_pid_nr_ns(task, event->ns));
+	if (!name)
+		return -ENOMEM;
+
+	WARN_ON_ONCE(rb->user_page);
+
+	nr_pages = rb->nr_pages + rb->aux_nr_pages + 1;
+	rb->shmem_file = shmem_file_setup(name, nr_pages << PAGE_SHIFT,
+					  VM_NORESERVE);
+	kfree(name);
+
+	if (IS_ERR(rb->shmem_file)) {
+		err = PTR_ERR(rb->shmem_file);
+		rb->shmem_file = NULL;
+		return err;
+	}
+
+	mapping_set_gfp_mask(rb->shmem_file->f_mapping,
+			     GFP_HIGHUSER | __GFP_RECLAIMABLE);
+
+	event->dent->d_inode->i_mapping = rb->shmem_file->f_mapping;
+	event->attach_state |= PERF_ATTACH_SHMEM;
+
+	return 0;
+}
+
 /*
  * Allocate a ring_buffer for a detached event and attach it to this event.
  * There's one ring_buffer per detached event and vice versa, so
  * ring_buffer_attach() does not apply.
  */
-int rb_alloc_detached(struct perf_event *event)
+int rb_alloc_detached(struct perf_event *event, struct task_struct *task,
+		      struct mm_struct *mm)
 {
 	int aux_nr_pages = event->attr.detached_aux_nr_pages;
 	int nr_pages = event->attr.detached_nr_pages;
-	struct ring_buffer *rb;
 	int ret, pgoff = nr_pages + 1;
+	struct ring_buffer *rb;
+	int flags = 0;
 
 	/*
-	 * Use overwrite mode (!RING_BUFFER_WRITABLE) for both data and aux
-	 * areas as we don't want wakeups or interrupts.
+	 * These are basically coredump conditions. If these are
+	 * not met, we proceed as we would, but with pinned pages
+	 * and therefore *no inheritance*.
 	 */
-	rb = rb_alloc(event, NULL, nr_pages, 0);
+	if (event->attr.inherit && event->attr.exclude_kernel &&
+	    event->cpu == -1)
+		flags = RING_BUFFER_SHMEM;
+	else if (event->attr.inherit)
+		return -EINVAL;
+
+	rb = rb_alloc(event, mm, nr_pages, flags);
 	if (IS_ERR(rb))
 		return PTR_ERR(rb);
 
-	ret = rb_alloc_aux(rb, event, pgoff, aux_nr_pages, 0, 0);
-	if (ret) {
-		rb_free(rb);
-		return ret;
+	if (aux_nr_pages) {
+		ret = rb_alloc_aux(rb, event, pgoff, aux_nr_pages, 0, flags);
+		if (ret)
+			goto err_free;
 	}
 
-	atomic_set(&rb->mmap_count, 1);
-	if (aux_nr_pages)
-		atomic_set(&rb->aux_mmap_count, 1);
+	if (flags & RING_BUFFER_SHMEM) {
+		ret = rb_shmem_setup(event, task, rb);
+		if (ret) {
+			rb_free_aux(rb);
+			goto err_free;
+		}
+
+		rb_toggle_paused(rb, true);
+	} else {
+		atomic_inc(&rb->mmap_count);
+		if (aux_nr_pages)
+			atomic_inc(&rb->aux_mmap_count);
+	}
 
 	/*
 	 * Detached events don't need ring buffer wakeups, therefore we don't
@@ -847,13 +947,23 @@ int rb_alloc_detached(struct perf_event *event)
 	 */
 	rcu_assign_pointer(event->rb, rb);
 
+	event->attach_state |= PERF_ATTACH_DETACHED;
+
 	return 0;
+
+err_free:
+	rb_free(rb);
+
+	return ret;
 }
 
 void rb_free_detached(struct ring_buffer *rb, struct perf_event *event)
 {
 	/* Must be the last one */
 	WARN_ON_ONCE(atomic_read(&rb->refcount) != 1);
+
+	if (rb->shmem_file)
+		shmem_truncate_range(rb->shmem_file->f_inode, 0, (loff_t)-1);
 
 	atomic_set(&rb->aux_mmap_count, 0);
 	rcu_assign_pointer(event->rb, NULL);
@@ -896,12 +1006,16 @@ struct ring_buffer *rb_alloc(struct perf_event *event, struct mm_struct *mm,
 			     int nr_pages, int flags)
 {
 	unsigned long size = offsetof(struct ring_buffer, data_pages[nr_pages]);
+	bool shmem = !!(flags & RING_BUFFER_SHMEM);
 	struct ring_buffer *rb;
 	int i, ret = -ENOMEM;
 
 	rb = kzalloc(size, GFP_KERNEL);
 	if (!rb)
 		return ERR_PTR(-ENOMEM);
+
+	if (shmem)
+		goto post_alloc;
 
 	ret = ring_buffer_account(rb, mm, nr_pages, false);
 	if (ret)
@@ -919,6 +1033,7 @@ struct ring_buffer *rb_alloc(struct perf_event *event, struct mm_struct *mm,
 			goto fail_data_pages;
 	}
 
+post_alloc:
 	rb->nr_pages = nr_pages;
 
 	ring_buffer_init(rb, event, flags);
@@ -927,9 +1042,9 @@ struct ring_buffer *rb_alloc(struct perf_event *event, struct mm_struct *mm,
 
 fail_data_pages:
 	for (i--; i >= 0; i--)
-		free_page((unsigned long)rb->data_pages[i]);
+		put_page(virt_to_page(rb->data_pages[i]));
 
-	free_page((unsigned long)rb->user_page);
+	put_page(virt_to_page(rb->user_page));
 
 fail_unaccount:
 	ring_buffer_unaccount(rb, false);
@@ -952,9 +1067,16 @@ void rb_free(struct ring_buffer *rb)
 {
 	int i;
 
+	if (rb->shmem_file) {
+		/* the pages should have been freed before */
+		fput(rb->shmem_file);
+		goto out_free;
+	}
+
 	perf_mmap_free_page((unsigned long)rb->user_page);
 	for (i = 0; i < rb->nr_pages; i++)
 		perf_mmap_free_page((unsigned long)rb->data_pages[i]);
+out_free:
 	kfree(rb);
 }
 
@@ -1011,6 +1133,9 @@ struct ring_buffer *rb_alloc(struct perf_event *event, struct mm_struct *mm,
 	struct ring_buffer *rb;
 	void *all_buf;
 	int ret = -ENOMEM;
+
+	if (flags & RING_BUFFER_SHMEM)
+		return -EOPNOTSUPP;
 
 	rb = kzalloc(size, GFP_KERNEL);
 	if (!rb)

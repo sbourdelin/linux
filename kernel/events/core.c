@@ -9409,7 +9409,7 @@ static int perf_event_detach(struct perf_event *event, struct task_struct *task,
 	if (!event->dent)
 		return -ENOMEM;
 
-	err = rb_alloc_detached(event);
+	err = rb_alloc_detached(event, task, mm);
 	if (err) {
 		tracefs_remove(event->dent);
 		event->dent = NULL;
