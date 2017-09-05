@@ -206,23 +206,25 @@ void intel_pipe_update_end(struct intel_crtc *crtc)
 	if (intel_vgpu_active(dev_priv))
 		return;
 
-	if (crtc->debug.start_vbl_count &&
-	    crtc->debug.start_vbl_count != end_vbl_count) {
-		DRM_ERROR("Atomic update failure on pipe %c (start=%u end=%u) time %lld us, min %d, max %d, scanline start %d, end %d\n",
-			  pipe_name(pipe), crtc->debug.start_vbl_count,
-			  end_vbl_count,
-			  ktime_us_delta(end_vbl_time, crtc->debug.start_vbl_time),
-			  crtc->debug.min_vbl, crtc->debug.max_vbl,
-			  crtc->debug.scanline_start, scanline_end);
-	}
+	if (!intel_crtc_has_type(new_crtc_state, INTEL_OUTPUT_DSI)) {
+		if (crtc->debug.start_vbl_count &&
+		    crtc->debug.start_vbl_count != end_vbl_count) {
+			DRM_ERROR("Atomic update failure on pipe %c (start=%u end=%u) time %lld us, min %d, max %d, scanline start %d, end %d\n",
+				  pipe_name(pipe), crtc->debug.start_vbl_count,
+				  end_vbl_count,
+				  ktime_us_delta(end_vbl_time, crtc->debug.start_vbl_time),
+				  crtc->debug.min_vbl, crtc->debug.max_vbl,
+				  crtc->debug.scanline_start, scanline_end);
+		}
 #ifdef CONFIG_DRM_I915_DEBUG_VBLANK_EVADE
-	else if (ktime_us_delta(end_vbl_time, crtc->debug.start_vbl_time) >
-		 VBLANK_EVASION_TIME_US)
-		DRM_WARN("Atomic update on pipe (%c) took %lld us, max time under evasion is %u us\n",
-			 pipe_name(pipe),
-			 ktime_us_delta(end_vbl_time, crtc->debug.start_vbl_time),
-			 VBLANK_EVASION_TIME_US);
+		else if (ktime_us_delta(end_vbl_time, crtc->debug.start_vbl_time) >
+			 VBLANK_EVASION_TIME_US)
+			DRM_WARN("Atomic update on pipe (%c) took %lld us, max time under evasion is %u us\n",
+				 pipe_name(pipe),
+				 ktime_us_delta(end_vbl_time, crtc->debug.start_vbl_time),
+				 VBLANK_EVASION_TIME_US);
 #endif
+	}
 }
 
 static void
