@@ -376,10 +376,10 @@ static void set_link_state_by_speed(struct dummy_hcd *dum_hcd)
 				dum_hcd->port_status |=
 					(USB_PORT_STAT_C_CONNECTION << 16);
 			if ((dum_hcd->port_status &
-			     USB_PORT_STAT_ENABLE) == 1 &&
-				(dum_hcd->port_status &
-				 USB_SS_PORT_LS_U0) == 1 &&
-				dum_hcd->rh_state != DUMMY_RH_SUSPENDED)
+			     USB_PORT_STAT_ENABLE) == USB_PORT_STAT_ENABLE &&
+			    (dum_hcd->port_status &
+			     USB_PORT_STAT_LINK_STATE) == USB_SS_PORT_LS_U0 &&
+			    dum_hcd->rh_state != DUMMY_RH_SUSPENDED)
 				dum_hcd->active = 1;
 		}
 	} else {
