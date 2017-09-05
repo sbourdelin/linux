@@ -599,6 +599,16 @@ struct perf_event_mmap_page {
 	__u64	aux_tail;
 	__u64	aux_offset;
 	__u64	aux_size;
+
+	/*
+	 * PMU data: static info that (AUX) decoder wants to know in order to
+	 * decode correctly:
+	 *
+	 *   pmu_offset >= sizeof(struct perf_event_mmap_page)
+	 *   pmu_offset + pmu_size <= PAGE_SIZE
+	 */
+	__u64	pmu_offset;
+	__u64	pmu_size;
 };
 
 #define PERF_RECORD_MISC_CPUMODE_MASK		(7 << 0)

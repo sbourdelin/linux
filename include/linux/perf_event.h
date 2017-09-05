@@ -235,6 +235,8 @@ struct hw_perf_event {
 
 struct perf_event;
 
+struct pmu_info;
+
 /*
  * Common implementation detail of pmu::{start,commit,cancel}_txn
  */
@@ -277,6 +279,9 @@ struct pmu {
 
 	/* number of address filters this PMU can do */
 	unsigned int			nr_addr_filters;
+
+	/* PMU-specific data to append to the user page */
+	const struct pmu_info		*pmu_info;
 
 	/*
 	 * Fully disable/enable this PMU, can be used to protect from the PMI
@@ -495,6 +500,18 @@ struct perf_addr_filters_head {
 	struct list_head	list;
 	raw_spinlock_t		lock;
 	unsigned int		nr_file_filters;
+};
+
+struct pmu_info {
+	/*
+	 * Size of this structure, for versioning.
+	 */
+	u32	note_size;
+
+	/*
+	 * Size of the container structure, not including this one
+	 */
+	u32	pmu_descsz;
 };
 
 /**

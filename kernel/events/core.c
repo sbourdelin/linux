@@ -4926,28 +4926,6 @@ static void calc_timer_values(struct perf_event *event,
 	*running = ctx_time - event->tstamp_running;
 }
 
-static void perf_event_init_userpage(struct perf_event *event)
-{
-	struct perf_event_mmap_page *userpg;
-	struct ring_buffer *rb;
-
-	rcu_read_lock();
-	rb = rcu_dereference(event->rb);
-	if (!rb)
-		goto unlock;
-
-	userpg = rb->user_page;
-
-	/* Allow new userspace to detect that bit 0 is deprecated */
-	userpg->cap_bit0_is_deprecated = 1;
-	userpg->size = offsetof(struct perf_event_mmap_page, __reserved);
-	userpg->data_offset = PAGE_SIZE;
-	userpg->data_size = perf_data_size(rb);
-
-unlock:
-	rcu_read_unlock();
-}
-
 void __weak arch_perf_update_userpage(
 	struct perf_event *event, struct perf_event_mmap_page *userpg, u64 now)
 {
@@ -5385,9 +5363,7 @@ accounting:
 		flags |= RING_BUFFER_WRITABLE;
 
 	if (!rb) {
-		rb = rb_alloc(vma->vm_mm, nr_pages,
-			      event->attr.watermark ? event->attr.wakeup_watermark : 0,
-			      event->cpu, flags);
+		rb = rb_alloc(event, vma->vm_mm, nr_pages, flags);
 
 		if (IS_ERR_OR_NULL(rb)) {
 			ret = PTR_ERR(rb);
@@ -5399,7 +5375,6 @@ accounting:
 
 		ring_buffer_attach(event, rb);
 
-		perf_event_init_userpage(event);
 		perf_event_update_userpage(event);
 	} else {
 		ret = rb_alloc_aux(rb, event, vma->vm_pgoff, nr_pages,
