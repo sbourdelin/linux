@@ -436,7 +436,7 @@ s32 LPS_RF_ON_check(struct adapter *padapter, u32 delay_ms)
 			DBG_88E("%s: Wait for FW LPS leave more than %u ms!!!\n", __func__, delay_ms);
 			break;
 		}
-		msleep(1);
+		usleep_range(0, 1000);
 	}
 
 	return err;
