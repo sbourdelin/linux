@@ -395,7 +395,7 @@ int esp6_output_tail(struct xfrm_state *x, struct sk_buff *skb, struct esp_info 
 	case -EINPROGRESS:
 		goto error;
 
-	case -EBUSY:
+	case -EAGAIN:
 		err = NET_XMIT_DROP;
 		break;
 
