@@ -21,12 +21,21 @@
 #include <linux/slab.h>
 #include <linux/debugfs.h>
 #include <linux/device.h>
-#include <linux/coredump.h>
 
 #include <asm-generic/sizes.h>
 #include <asm/perf_event.h>
 
 #include "../perf_event.h"
+
+#define PMU_NAME "intel_bts"
+
+static struct intel_bts_pmu_info {
+	struct pmu_info		pi;
+	u8			x86_family;
+	u8			x86_model;
+	u8			x86_step;
+	u8			__reserved_0[5];
+} bts_pmu_info;
 
 struct bts_ctx {
 	struct perf_output_handle	handle;
@@ -582,6 +591,12 @@ static __init int bts_init(void)
 	if (!boot_cpu_has(X86_FEATURE_DTES64) || !x86_pmu.bts)
 		return -ENODEV;
 
+	bts_pmu_info.pi.note_size  = sizeof(bts_pmu_info.pi);
+	bts_pmu_info.pi.pmu_descsz = sizeof(bts_pmu_info) - bts_pmu_info.pi.note_size;
+	bts_pmu_info.x86_family    = boot_cpu_data.x86;
+	bts_pmu_info.x86_model	    = boot_cpu_data.x86_model;
+	bts_pmu_info.x86_step	    = boot_cpu_data.x86_mask;
+
 	bts_pmu.capabilities	= PERF_PMU_CAP_AUX_NO_SG | PERF_PMU_CAP_ITRACE |
 				  PERF_PMU_CAP_EXCLUSIVE;
 	bts_pmu.task_ctx_nr	= perf_sw_context;
@@ -593,7 +608,8 @@ static __init int bts_init(void)
 	bts_pmu.read		= bts_event_read;
 	bts_pmu.setup_aux	= bts_buffer_setup_aux;
 	bts_pmu.free_aux	= bts_buffer_free_aux;
+	bts_pmu.pmu_info	= &bts_pmu_info.pi;
 
-	return perf_pmu_register(&bts_pmu, "intel_bts", -1);
+	return perf_pmu_register(&bts_pmu, PMU_NAME, -1);
 }
 arch_initcall(bts_init);
