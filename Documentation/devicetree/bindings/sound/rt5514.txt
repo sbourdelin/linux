@@ -28,6 +28,6 @@ Pins on the device (for linking into audio routes) for RT5514:
 Example:
 
 codec: rt5514@57 {
-	compatible = "realtek,rt5514";
+	compatible = "realtek,rt5514", "realtek,rt5514-i2c";
 	reg = <0x57>;
 };
