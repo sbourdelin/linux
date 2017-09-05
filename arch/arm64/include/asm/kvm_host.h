@@ -193,6 +193,12 @@ struct kvm_cpu_context {
 	};
 };
 
+struct kvm_cpu_host_pstate {
+	u64 daif;
+	u64 uao;
+	u64 pan;
+};
+
 typedef struct kvm_cpu_context kvm_cpu_context_t;
 
 struct kvm_vcpu_arch {
@@ -227,6 +233,8 @@ struct kvm_vcpu_arch {
 
 	/* Pointer to host CPU context */
 	kvm_cpu_context_t *host_cpu_context;
+	/* Host PSTATE value */
+	struct kvm_cpu_host_pstate host_pstate;
 	struct {
 		/* {Break,watch}point registers */
 		struct kvm_guest_debug_arch regs;

@@ -278,6 +278,26 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
 	write_sysreg_el2(*vcpu_pc(vcpu), elr);
 }
 
+static void __hyp_text __save_host_state(struct kvm_vcpu *vcpu)
+{
+	struct kvm_cpu_context *host_ctxt;
+
+	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+
+	__sysreg_save_host_state(host_ctxt);
+	__sysreg_save_host_pstate(vcpu);
+}
+
+static void __hyp_text __restore_host_state(struct kvm_vcpu *vcpu)
+{
+	struct kvm_cpu_context *host_ctxt;
+
+	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+
+	__sysreg_restore_host_state(host_ctxt);
+	__sysreg_restore_host_pstate(vcpu);
+}
+
 int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpu_context *host_ctxt;
@@ -291,7 +311,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
 	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
 	guest_ctxt = &vcpu->arch.ctxt;
 
-	__sysreg_save_host_state(host_ctxt);
+	__save_host_state(vcpu);
 	__debug_cond_save_host_state(vcpu);
 
 	__activate_traps(vcpu);
@@ -374,7 +394,7 @@ again:
 	__deactivate_traps(vcpu);
 	__deactivate_vm(vcpu);
 
-	__sysreg_restore_host_state(host_ctxt);
+	__restore_host_state(vcpu);
 
 	if (fp_enabled) {
 		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);

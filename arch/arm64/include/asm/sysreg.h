@@ -295,6 +295,29 @@
 #define SYS_ICH_LR14_EL2		__SYS__LR8_EL2(6)
 #define SYS_ICH_LR15_EL2		__SYS__LR8_EL2(7)
 
+#define REG_PSTATE_PAN			sys_reg(3, 0, 4, 2, 3)
+#define REG_PSTATE_UAO			sys_reg(3, 0, 4, 2, 4)
+
+#define GET_PSTATE_PAN					\
+	({						\
+		u64 reg;				\
+		asm volatile(ALTERNATIVE("mov %0, #0",	\
+				"mrs_s %0, " __stringify(REG_PSTATE_PAN),\
+				ARM64_HAS_PAN)\
+				: "=r" (reg));\
+		reg;				\
+	})
+
+#define GET_PSTATE_UAO					\
+	({						\
+		u64 reg;					\
+		asm volatile(ALTERNATIVE("mov %0, #0",\
+				"mrs_s %0, " __stringify(REG_PSTATE_UAO),\
+				ARM64_HAS_UAO)\
+				: "=r" (reg));\
+		reg;			\
+	})
+
 /* Common SCTLR_ELx flags. */
 #define SCTLR_ELx_EE    (1 << 25)
 #define SCTLR_ELx_I	(1 << 12)

@@ -22,7 +22,11 @@
 #include <asm/kvm_hyp.h>
 
 /* Yes, this does nothing, on purpose */
-static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
+static void __hyp_text __sysreg_do_nothing_state(struct kvm_cpu_context *ctxt)
+{ }
+static void __hyp_text __sysreg_do_nothing_pstate(struct kvm_vcpu *vcpu)
+{ }
+
 
 /*
  * Non-VHE: Both host and guest must save everything.
@@ -69,7 +73,7 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
 }
 
 static hyp_alternate_select(__sysreg_call_save_host_state,
-			    __sysreg_save_state, __sysreg_do_nothing,
+			    __sysreg_save_state, __sysreg_do_nothing_state,
 			    ARM64_HAS_VIRT_HOST_EXTN);
 
 void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
@@ -122,7 +126,7 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
 }
 
 static hyp_alternate_select(__sysreg_call_restore_host_state,
-			    __sysreg_restore_state, __sysreg_do_nothing,
+			    __sysreg_restore_state, __sysreg_do_nothing_state,
 			    ARM64_HAS_VIRT_HOST_EXTN);
 
 void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
@@ -135,6 +139,44 @@ void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
 {
 	__sysreg_restore_state(ctxt);
 	__sysreg_restore_common_state(ctxt);
+}
+
+static void __hyp_text __sysreg_save_pstate(struct kvm_vcpu *vcpu)
+{
+	vcpu->arch.host_pstate.daif = read_sysreg(daif);
+	vcpu->arch.host_pstate.pan = GET_PSTATE_PAN;
+	vcpu->arch.host_pstate.uao = GET_PSTATE_UAO;
+}
+
+static hyp_alternate_select(__sysreg_call_save_host_pstate,
+			    __sysreg_save_pstate, __sysreg_do_nothing_pstate,
+			    ARM64_HAS_VIRT_HOST_EXTN);
+
+void __hyp_text __sysreg_save_host_pstate(struct kvm_vcpu *vcpu)
+{
+	__sysreg_call_save_host_pstate()(vcpu);
+}
+
+static void __hyp_text __sysreg_restore_pstate(struct kvm_vcpu *vcpu)
+{
+	u8 value = !!(vcpu->arch.host_pstate.pan);
+
+	write_sysreg(vcpu->arch.host_pstate.daif, daif);
+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(value), ARM64_HAS_PAN,
+			CONFIG_ARM64_PAN));
+
+	value = !!(vcpu->arch.host_pstate.uao);
+	asm(ALTERNATIVE("nop", SET_PSTATE_UAO(value), ARM64_HAS_UAO,
+			CONFIG_ARM64_UAO));
+}
+
+static hyp_alternate_select(__sysreg_call_restore_host_pstate,
+			    __sysreg_restore_pstate, __sysreg_do_nothing_pstate,
+			    ARM64_HAS_VIRT_HOST_EXTN);
+
+void __hyp_text __sysreg_restore_host_pstate(struct kvm_vcpu *vcpu)
+{
+	__sysreg_call_restore_host_pstate()(vcpu);
 }
 
 void __hyp_text __sysreg32_save_state(struct kvm_vcpu *vcpu)
