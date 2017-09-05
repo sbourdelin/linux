@@ -531,7 +531,7 @@ static u64 user2rate_bytes(u64 user)
 {
 	u64 r;
 
-	r = user ? 0xFFFFFFFFULL / user : 0xFFFFFFFFULL;
+	r = user ? div64_u64(0xFFFFFFFFULL, user) : 0xFFFFFFFFULL;
 	r = (r - 1) << 4;
 	return r;
 }
