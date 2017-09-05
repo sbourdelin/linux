@@ -1147,7 +1147,7 @@ int pipe_proc_fn(struct ctl_table *table, int write, void __user *buf,
 
 	mutex_lock(&pipe_max_mutex);
 	orig_pipe_max_size = pipe_max_size;
-	ret = proc_dointvec_minmax(table, write, buf, lenp, ppos);
+	ret = proc_douintvec_minmax(table, write, buf, lenp, ppos);
 	if (ret < 0 || !write) {
 		mutex_unlock(&pipe_max_mutex);
 		return ret;
