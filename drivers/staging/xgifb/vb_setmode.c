@@ -780,7 +780,7 @@ static void XGI_SetCRT1Offset(unsigned short ModeNo,
 		break;
 	}
 
-	if ((ModeNo >= 0x26) && (ModeNo <= 0x28))
+	if (ModeNo >= 0x26 && ModeNo <= 0x28)
 		temp = temp * temp2 + temp2 / 2;
 	else
 		temp *= temp2;
