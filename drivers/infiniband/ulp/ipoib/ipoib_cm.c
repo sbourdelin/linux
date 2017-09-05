@@ -594,9 +594,9 @@ void ipoib_cm_handle_rx_wc(struct net_device *dev, struct ib_wc *wc)
 	skb = rx_ring[wr_id].skb;
 
 	if (unlikely(wc->status != IB_WC_SUCCESS)) {
-		ipoib_dbg(priv, "cm recv error "
-			   "(status=%d, wrid=%d vend_err %x)\n",
-			   wc->status, wr_id, wc->vendor_err);
+		ipoib_dbg(priv,
+			  "cm recv error (status=%d, wrid=%d vend_err 0x%x)\n",
+			  wc->status, wr_id, wc->vendor_err);
 		++dev->stats.rx_dropped;
 		if (has_srq)
 			goto repost;
@@ -824,10 +824,10 @@ void ipoib_cm_handle_tx_wc(struct net_device *dev, struct ib_wc *wc)
 		struct ipoib_neigh *neigh;
 
 		if (wc->status != IB_WC_RNR_RETRY_EXC_ERR)
-			ipoib_warn(priv, "failed cm send event (status=%d, wrid=%d vend_err %x)\n",
+			ipoib_warn(priv, "failed cm send event (status=%d, wrid=%d vend_err 0x%x)\n",
 				   wc->status, wr_id, wc->vendor_err);
 		else
-			ipoib_dbg(priv, "failed cm send event (status=%d, wrid=%d vend_err %x)\n",
+			ipoib_dbg(priv, "failed cm send event (status=%d, wrid=%d vend_err 0x%x)\n",
 				  wc->status, wr_id, wc->vendor_err);
 
 		spin_lock_irqsave(&priv->lock, flags);
