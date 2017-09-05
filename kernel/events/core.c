@@ -4309,7 +4309,6 @@ static void _free_event(struct perf_event *event)
 
 		event->attach_state &= ~PERF_ATTACH_DETACHED;
 
-		ring_buffer_unaccount(event->rb, false);
 		rb_free_detached(event->rb, event);
 	}
 
@@ -9515,9 +9514,11 @@ enabled:
 	account_pmu_sb_event(event);
 }
 
-static int perf_event_detach(struct perf_event *event, struct task_struct *task,
-			     struct mm_struct *mm)
+static int
+perf_event_detach(struct perf_event *event, struct perf_event *parent_event,
+		  struct task_struct *task, struct mm_struct *mm)
 {
+	struct ring_buffer *parent_rb = parent_event ? parent_event->rb : NULL;
 	char *filename;
 	int err;
 
@@ -9535,7 +9536,7 @@ static int perf_event_detach(struct perf_event *event, struct task_struct *task,
 	if (!event->dent)
 		return -ENOMEM;
 
-	err = rb_alloc_detached(event, task, mm);
+	err = rb_alloc_detached(event, task, mm, parent_rb);
 	if (err) {
 		tracefs_remove(event->dent);
 		event->dent = NULL;
@@ -11005,7 +11006,8 @@ inherit_event(struct perf_event *parent_event,
 	if (detached) {
 		int err;
 
-		err = perf_event_detach(child_event, child, NULL);
+		err = perf_event_detach(child_event, parent_event, child,
+					NULL);
 		if (err) {
 			perf_free_event(child_event, child_ctx);
 			mutex_unlock(&parent_event->child_mutex);
