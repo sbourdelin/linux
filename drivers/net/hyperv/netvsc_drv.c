@@ -740,24 +740,13 @@ static int netvsc_set_queues(struct net_device *net, struct hv_device *dev,
 			     u32 num_chn)
 {
 	struct netvsc_device_info device_info;
-	int ret;
 
 	memset(&device_info, 0, sizeof(device_info));
 	device_info.num_chn = num_chn;
 	device_info.ring_size = ring_size;
 	device_info.max_num_vrss_chns = num_chn;
 
-	ret = rndis_filter_device_add(dev, &device_info);
-	if (ret)
-		return ret;
-
-	ret = netif_set_real_num_tx_queues(net, num_chn);
-	if (ret)
-		return ret;
-
-	ret = netif_set_real_num_rx_queues(net, num_chn);
-
-	return ret;
+	return rndis_filter_device_add(dev, &device_info);
 }
 
 static int netvsc_set_channels(struct net_device *net,
@@ -1573,8 +1562,6 @@ static int netvsc_probe(struct hv_device *dev,
 
 	/* RCU not necessary here, device not registered */
 	nvdev = net_device_ctx->nvdev;
-	netif_set_real_num_tx_queues(net, nvdev->num_chn);
-	netif_set_real_num_rx_queues(net, nvdev->num_chn);
 
 	/* MTU range: 68 - 1500 or 65521 */
 	net->min_mtu = NETVSC_MTU_MIN;
@@ -1616,10 +1603,9 @@ static int netvsc_remove(struct hv_device *dev)
 	 * removed. Also blocks mtu and channel changes.
 	 */
 	rtnl_lock();
+	unregister_netdevice(net);
 	rndis_filter_device_remove(dev, ndev_ctx->nvdev);
 	rtnl_unlock();
-
-	unregister_netdev(net);
 
 	hv_set_drvdata(dev, NULL);
 
