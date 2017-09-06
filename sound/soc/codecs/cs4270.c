@@ -362,10 +362,8 @@ static int cs4270_hw_params(struct snd_pcm_substream *substream,
 		reg |= cs4270_mode_ratios[i].speed_mode;
 
 	ret = snd_soc_write(codec, CS4270_MODE, reg);
-	if (ret < 0) {
-		dev_err(codec->dev, "i2c write failed\n");
-		return ret;
-	}
+	if (ret < 0)
+		goto report_failure;
 
 	/* Set the DAI format */
 
@@ -385,11 +383,13 @@ static int cs4270_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	ret = snd_soc_write(codec, CS4270_FORMAT, reg);
-	if (ret < 0) {
-		dev_err(codec->dev, "i2c write failed\n");
-		return ret;
-	}
+	if (ret < 0)
+		goto report_failure;
 
+	return ret;
+
+report_failure:
+	dev_err(codec->dev, "i2c write failed\n");
 	return ret;
 }
 
@@ -512,10 +512,8 @@ static int cs4270_probe(struct snd_soc_codec *codec)
 	 * re-enabled it by using the controls.
 	 */
 	ret = snd_soc_update_bits(codec, CS4270_MUTE, CS4270_MUTE_AUTO, 0);
-	if (ret < 0) {
-		dev_err(codec->dev, "i2c write failed\n");
-		return ret;
-	}
+	if (ret < 0)
+		goto report_failure;
 
 	/* Disable automatic volume control.  The hardware enables, and it
 	 * causes volume change commands to be delayed, sometimes until after
@@ -524,14 +522,16 @@ static int cs4270_probe(struct snd_soc_codec *codec)
 	 */
 	ret = snd_soc_update_bits(codec, CS4270_TRANS,
 		CS4270_TRANS_SOFT | CS4270_TRANS_ZERO, 0);
-	if (ret < 0) {
-		dev_err(codec->dev, "i2c write failed\n");
-		return ret;
-	}
+	if (ret < 0)
+		goto report_failure;
 
 	ret = regulator_bulk_enable(ARRAY_SIZE(cs4270->supplies),
 				    cs4270->supplies);
 
+	return ret;
+
+report_failure:
+	dev_err(codec->dev, "i2c write failed\n");
 	return ret;
 }
 
