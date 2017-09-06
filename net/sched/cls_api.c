@@ -213,17 +213,17 @@ static void tcf_chain_flush(struct tcf_chain *chain)
 	}
 }
 
-static void tcf_chain_destroy(struct tcf_chain *chain)
+static void tcf_chain_detach(struct tcf_chain *chain)
 {
 	/* May be already removed from the list by the previous call. */
 	if (!list_empty(&chain->list))
 		list_del_init(&chain->list);
+}
 
-	/* There might still be a reference held when we got here from
-	 * tcf_block_put. Wait for the user to drop reference before free.
-	 */
-	if (!chain->refcnt)
-		kfree(chain);
+static void tcf_chain_destroy(struct tcf_chain *chain)
+{
+	tcf_chain_detach(chain);
+	kfree(chain);
 }
 
 struct tcf_chain *tcf_chain_get(struct tcf_block *block, u32 chain_index,
@@ -246,10 +246,7 @@ EXPORT_SYMBOL(tcf_chain_get);
 
 void tcf_chain_put(struct tcf_chain *chain)
 {
-	/* Destroy unused chain, with exception of chain 0, which is the
-	 * default one and has to be always present.
-	 */
-	if (--chain->refcnt == 0 && !chain->filter_chain && chain->index != 0)
+	if (--chain->refcnt == 0)
 		tcf_chain_destroy(chain);
 }
 EXPORT_SYMBOL(tcf_chain_put);
@@ -296,8 +293,11 @@ void tcf_block_put(struct tcf_block *block)
 
 	list_for_each_entry_safe(chain, tmp, &block->chain_list, list) {
 		tcf_chain_flush(chain);
-		tcf_chain_destroy(chain);
+		tcf_chain_put(chain);
 	}
+	/* If tc actions still hold the chain, just detach it. */
+	list_for_each_entry_safe(chain, tmp, &block->chain_list, list)
+		tcf_chain_detach(chain);
 	kfree(block);
 }
 EXPORT_SYMBOL(tcf_block_put);
