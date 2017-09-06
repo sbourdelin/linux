@@ -130,10 +130,10 @@ read_pll(struct gt215_clk *clk, int idx, u32 pll)
 		sclk = read_clk(clk, 0x10 + idx, false);
 	}
 
-	if (M * P)
-		return sclk * N / (M * P);
+	if (M * P == 0)
+		return 0;
 
-	return 0;
+	return sclk * N / (M * P);
 }
 
 static int
