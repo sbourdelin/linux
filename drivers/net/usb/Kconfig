@@ -123,6 +123,16 @@ config USB_LAN78XX
 	  To compile this driver as a module, choose M here: the
 	  module will be called lan78xx.
 
+	if USB_LAN78XX
+	  	config LAN7801_NO_MDIO_DEVICE
+	  	bool "NO MDIO Device Support"
+	  	select FIXED_PHY
+	  	---help---
+	  	If LAN7801 connected to a PHY device which does not
+	  	have MDIO/MDC access this option adds support to LAN7801
+	  	with fixed_phy support
+	endif
+
 config USB_USBNET
 	tristate "Multi-purpose USB Networking Framework"
 	select MII
