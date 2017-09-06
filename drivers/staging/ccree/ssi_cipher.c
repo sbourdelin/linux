@@ -702,7 +702,7 @@ static int ssi_blkcipher_complete(struct device *dev,
 
 	ssi_buffer_mgr_unmap_blkcipher_request(dev, req_ctx, ivsize, src, dst);
 
-	/*Set the inflight couter value to local variable*/
+	/*Set the inflight counter value to local variable*/
 	inflight_counter =  ctx_p->drvdata->inflight_counter;
 	/*Decrease the inflight counter*/
 	if (ctx_p->flow_mode == BYPASS && ctx_p->drvdata->inflight_counter > 0)
