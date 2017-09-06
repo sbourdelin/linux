@@ -2140,7 +2140,7 @@ static int vgic_its_restore_device_tables(struct vgic_its *its)
 				     vgic_its_restore_dte, NULL);
 	}
 
-	if (ret > 0)
+	if (ret <= 0)
 		ret = -EINVAL;
 
 	return ret;
