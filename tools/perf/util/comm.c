@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <linux/refcount.h>
+#include <pthread.h>
 
 struct comm_str {
 	char *str;
@@ -14,6 +15,7 @@ struct comm_str {
 
 /* Should perhaps be moved to struct machine */
 static struct rb_root comm_str_root;
+static pthread_mutex_t comm_str_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static struct comm_str *comm_str__get(struct comm_str *cs)
 {
@@ -24,11 +26,13 @@ static struct comm_str *comm_str__get(struct comm_str *cs)
 
 static void comm_str__put(struct comm_str *cs)
 {
+	pthread_mutex_lock(&comm_str_lock);
 	if (cs && refcount_dec_and_test(&cs->refcnt)) {
 		rb_erase(&cs->rb_node, &comm_str_root);
 		zfree(&cs->str);
 		free(cs);
 	}
+	pthread_mutex_unlock(&comm_str_lock);
 }
 
 static struct comm_str *comm_str__alloc(const char *str)
@@ -52,18 +56,22 @@ static struct comm_str *comm_str__alloc(const char *str)
 
 static struct comm_str *comm_str__findnew(const char *str, struct rb_root *root)
 {
-	struct rb_node **p = &root->rb_node;
 	struct rb_node *parent = NULL;
 	struct comm_str *iter, *new;
+	struct rb_node **p;
 	int cmp;
 
+	pthread_mutex_lock(&comm_str_lock);
+	p = &root->rb_node;
 	while (*p != NULL) {
 		parent = *p;
 		iter = rb_entry(parent, struct comm_str, rb_node);
 
 		cmp = strcmp(str, iter->str);
-		if (!cmp)
-			return comm_str__get(iter);
+		if (!cmp) {
+			new = comm_str__get(iter);
+			goto unlock;
+		}
 
 		if (cmp < 0)
 			p = &(*p)->rb_left;
@@ -73,11 +81,13 @@ static struct comm_str *comm_str__findnew(const char *str, struct rb_root *root)
 
 	new = comm_str__alloc(str);
 	if (!new)
-		return NULL;
+		goto unlock;
 
 	rb_link_node(&new->rb_node, parent, p);
 	rb_insert_color(&new->rb_node, root);
 
+unlock:
+	pthread_mutex_unlock(&comm_str_lock);
 	return new;
 }
 
