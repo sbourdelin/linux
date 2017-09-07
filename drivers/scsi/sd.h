@@ -126,6 +126,8 @@ static inline struct scsi_disk *scsi_disk(struct gendisk *disk)
 	return container_of(disk->private_data, struct scsi_disk, driver);
 }
 
+struct scsi_disk *scsi_disk_from_queue(struct request_queue *q);
+
 #define sd_printk(prefix, sdsk, fmt, a...)				\
         (sdsk)->disk ?							\
 	      sdev_prefix_printk(prefix, (sdsk)->device,		\
