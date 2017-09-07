@@ -23,6 +23,17 @@ extern const char *ref_reloc_sym_names[];
 
 struct vdso_info;
 
+#define MACHINE_TH_TABLE_BITS	8
+#define MACHINE_TH_TABLE_SIZE	(1 << MACHINE_TH_TABLE_BITS)
+
+struct machine_th {
+	struct rb_root	  threads;
+	pthread_rwlock_t  threads_lock;
+	unsigned int	  nr_threads;
+	struct list_head  dead_threads;
+	struct thread	  *last_match;
+};
+
 struct machine {
 	struct rb_node	  rb_node;
 	pid_t		  pid;
@@ -30,11 +41,7 @@ struct machine {
 	bool		  comm_exec;
 	bool		  kptr_restrict_warned;
 	char		  *root_dir;
-	struct rb_root	  threads;
-	pthread_rwlock_t  threads_lock;
-	unsigned int	  nr_threads;
-	struct list_head  dead_threads;
-	struct thread	  *last_match;
+	struct machine_th threads[MACHINE_TH_TABLE_SIZE];
 	struct vdso_info  *vdso_info;
 	struct perf_env   *env;
 	struct dsos	  dsos;
@@ -47,6 +54,12 @@ struct machine {
 		u64	  db_id;
 	};
 };
+
+static inline
+struct machine_th *machine_thread(struct machine *machine, pid_t tid)
+{
+	return &machine->threads[tid % MACHINE_TH_TABLE_SIZE];
+}
 
 static inline
 struct map *__machine__kernel_map(struct machine *machine, enum map_type type)

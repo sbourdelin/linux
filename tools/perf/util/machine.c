@@ -33,6 +33,21 @@ static void dsos__init(struct dsos *dsos)
 	pthread_rwlock_init(&dsos->lock, NULL);
 }
 
+static void machine__thread_init(struct machine *machine)
+{
+	struct machine_th *machine_th;
+	int i;
+
+	for (i = 0; i < MACHINE_TH_TABLE_SIZE; i++) {
+		machine_th = &machine->threads[i];
+		machine_th->threads = RB_ROOT;
+		pthread_rwlock_init(&machine_th->threads_lock, NULL);
+		machine_th->nr_threads = 0;
+		INIT_LIST_HEAD(&machine_th->dead_threads);
+		machine_th->last_match = NULL;
+	}
+}
+
 int machine__init(struct machine *machine, const char *root_dir, pid_t pid)
 {
 	memset(machine, 0, sizeof(*machine));
@@ -40,11 +55,7 @@ int machine__init(struct machine *machine, const char *root_dir, pid_t pid)
 	RB_CLEAR_NODE(&machine->rb_node);
 	dsos__init(&machine->dsos);
 
-	machine->threads = RB_ROOT;
-	pthread_rwlock_init(&machine->threads_lock, NULL);
-	machine->nr_threads = 0;
-	INIT_LIST_HEAD(&machine->dead_threads);
-	machine->last_match = NULL;
+	machine__thread_init(machine);
 
 	machine->vdso_info = NULL;
 	machine->env = NULL;
@@ -140,28 +151,39 @@ static void dsos__exit(struct dsos *dsos)
 
 void machine__delete_threads(struct machine *machine)
 {
+	struct machine_th *machine_th;
 	struct rb_node *nd;
+	int i;
 
-	pthread_rwlock_wrlock(&machine->threads_lock);
-	nd = rb_first(&machine->threads);
-	while (nd) {
-		struct thread *t = rb_entry(nd, struct thread, rb_node);
+	for (i = 0; i < MACHINE_TH_TABLE_SIZE; i++) {
+		machine_th = &machine->threads[i];
+		pthread_rwlock_wrlock(&machine_th->threads_lock);
+		nd = rb_first(&machine_th->threads);
+		while (nd) {
+			struct thread *t = rb_entry(nd, struct thread, rb_node);
 
-		nd = rb_next(nd);
-		__machine__remove_thread(machine, t, false);
+			nd = rb_next(nd);
+			__machine__remove_thread(machine, t, false);
+		}
+		pthread_rwlock_unlock(&machine_th->threads_lock);
 	}
-	pthread_rwlock_unlock(&machine->threads_lock);
 }
 
 void machine__exit(struct machine *machine)
 {
+	struct machine_th *machine_th;
+	int i;
+
 	machine__destroy_kernel_maps(machine);
 	map_groups__exit(&machine->kmaps);
 	dsos__exit(&machine->dsos);
 	machine__exit_vdso(machine);
 	zfree(&machine->root_dir);
 	zfree(&machine->current_tid);
-	pthread_rwlock_destroy(&machine->threads_lock);
+	for (i = 0; i < MACHINE_TH_TABLE_SIZE; i++) {
+		machine_th = &machine->threads[i];
+		pthread_rwlock_destroy(&machine_th->threads_lock);
+	}
 }
 
 void machine__delete(struct machine *machine)
@@ -382,7 +404,8 @@ static struct thread *____machine__findnew_thread(struct machine *machine,
 						  pid_t pid, pid_t tid,
 						  bool create)
 {
-	struct rb_node **p = &machine->threads.rb_node;
+	struct machine_th *machine_th = machine_thread(machine, tid);
+	struct rb_node **p = &machine_th->threads.rb_node;
 	struct rb_node *parent = NULL;
 	struct thread *th;
 
@@ -391,14 +414,14 @@ static struct thread *____machine__findnew_thread(struct machine *machine,
 	 * so most of the time we dont have to look up
 	 * the full rbtree:
 	 */
-	th = machine->last_match;
+	th = machine_th->last_match;
 	if (th != NULL) {
 		if (th->tid == tid) {
 			machine__update_thread_pid(machine, th, pid);
 			return thread__get(th);
 		}
 
-		machine->last_match = NULL;
+		machine_th->last_match = NULL;
 	}
 
 	while (*p != NULL) {
@@ -406,7 +429,7 @@ static struct thread *____machine__findnew_thread(struct machine *machine,
 		th = rb_entry(parent, struct thread, rb_node);
 
 		if (th->tid == tid) {
-			machine->last_match = th;
+			machine_th->last_match = th;
 			machine__update_thread_pid(machine, th, pid);
 			return thread__get(th);
 		}
@@ -423,7 +446,7 @@ static struct thread *____machine__findnew_thread(struct machine *machine,
 	th = thread__new(pid, tid);
 	if (th != NULL) {
 		rb_link_node(&th->rb_node, parent, p);
-		rb_insert_color(&th->rb_node, &machine->threads);
+		rb_insert_color(&th->rb_node, &machine_th->threads);
 
 		/*
 		 * We have to initialize map_groups separately
@@ -434,7 +457,7 @@ static struct thread *____machine__findnew_thread(struct machine *machine,
 		 * leader and that would screwed the rb tree.
 		 */
 		if (thread__init_map_groups(th, machine)) {
-			rb_erase_init(&th->rb_node, &machine->threads);
+			rb_erase_init(&th->rb_node, &machine_th->threads);
 			RB_CLEAR_NODE(&th->rb_node);
 			thread__put(th);
 			return NULL;
@@ -443,8 +466,8 @@ static struct thread *____machine__findnew_thread(struct machine *machine,
 		 * It is now in the rbtree, get a ref
 		 */
 		thread__get(th);
-		machine->last_match = th;
-		++machine->nr_threads;
+		machine_th->last_match = th;
+		++machine_th->nr_threads;
 	}
 
 	return th;
@@ -458,21 +481,24 @@ struct thread *__machine__findnew_thread(struct machine *machine, pid_t pid, pid
 struct thread *machine__findnew_thread(struct machine *machine, pid_t pid,
 				       pid_t tid)
 {
+	struct machine_th *machine_th = machine_thread(machine, tid);
 	struct thread *th;
 
-	pthread_rwlock_wrlock(&machine->threads_lock);
+	pthread_rwlock_wrlock(&machine_th->threads_lock);
 	th = __machine__findnew_thread(machine, pid, tid);
-	pthread_rwlock_unlock(&machine->threads_lock);
+	pthread_rwlock_unlock(&machine_th->threads_lock);
 	return th;
 }
 
 struct thread *machine__find_thread(struct machine *machine, pid_t pid,
 				    pid_t tid)
 {
+	struct machine_th *machine_th = machine_thread(machine, tid);
 	struct thread *th;
-	pthread_rwlock_rdlock(&machine->threads_lock);
+
+	pthread_rwlock_rdlock(&machine_th->threads_lock);
 	th =  ____machine__findnew_thread(machine, pid, tid, false);
-	pthread_rwlock_unlock(&machine->threads_lock);
+	pthread_rwlock_unlock(&machine_th->threads_lock);
 	return th;
 }
 
@@ -719,21 +745,25 @@ size_t machine__fprintf_vmlinux_path(struct machine *machine, FILE *fp)
 
 size_t machine__fprintf(struct machine *machine, FILE *fp)
 {
-	size_t ret;
+	struct machine_th *machine_th;
 	struct rb_node *nd;
+	size_t ret;
+	int i;
 
-	pthread_rwlock_rdlock(&machine->threads_lock);
+	for (i = 0; i < MACHINE_TH_TABLE_SIZE; i++) {
+		machine_th = &machine->threads[i];
+		pthread_rwlock_rdlock(&machine_th->threads_lock);
 
-	ret = fprintf(fp, "Threads: %u\n", machine->nr_threads);
+		ret = fprintf(fp, "Threads: %u\n", machine_th->nr_threads);
 
-	for (nd = rb_first(&machine->threads); nd; nd = rb_next(nd)) {
-		struct thread *pos = rb_entry(nd, struct thread, rb_node);
+		for (nd = rb_first(&machine_th->threads); nd; nd = rb_next(nd)) {
+			struct thread *pos = rb_entry(nd, struct thread, rb_node);
 
-		ret += thread__fprintf(pos, fp);
+			ret += thread__fprintf(pos, fp);
+		}
+
+		pthread_rwlock_unlock(&machine_th->threads_lock);
 	}
-
-	pthread_rwlock_unlock(&machine->threads_lock);
-
 	return ret;
 }
 
@@ -1479,23 +1509,25 @@ out_problem:
 
 static void __machine__remove_thread(struct machine *machine, struct thread *th, bool lock)
 {
-	if (machine->last_match == th)
-		machine->last_match = NULL;
+	struct machine_th *machine_th = machine_thread(machine, th->tid);
+
+	if (machine_th->last_match == th)
+		machine_th->last_match = NULL;
 
 	BUG_ON(refcount_read(&th->refcnt) == 0);
 	if (lock)
-		pthread_rwlock_wrlock(&machine->threads_lock);
-	rb_erase_init(&th->rb_node, &machine->threads);
+		pthread_rwlock_wrlock(&machine_th->threads_lock);
+	rb_erase_init(&th->rb_node, &machine_th->threads);
 	RB_CLEAR_NODE(&th->rb_node);
-	--machine->nr_threads;
+	--machine_th->nr_threads;
 	/*
 	 * Move it first to the dead_threads list, then drop the reference,
 	 * if this is the last reference, then the thread__delete destructor
 	 * will be called and we will remove it from the dead_threads list.
 	 */
-	list_add_tail(&th->node, &machine->dead_threads);
+	list_add_tail(&th->node, &machine_th->dead_threads);
 	if (lock)
-		pthread_rwlock_unlock(&machine->threads_lock);
+		pthread_rwlock_unlock(&machine_th->threads_lock);
 	thread__put(th);
 }
 
@@ -2118,21 +2150,26 @@ int machine__for_each_thread(struct machine *machine,
 			     int (*fn)(struct thread *thread, void *p),
 			     void *priv)
 {
+	struct machine_th *machine_th;
 	struct rb_node *nd;
 	struct thread *thread;
 	int rc = 0;
+	int i;
 
-	for (nd = rb_first(&machine->threads); nd; nd = rb_next(nd)) {
-		thread = rb_entry(nd, struct thread, rb_node);
-		rc = fn(thread, priv);
-		if (rc != 0)
-			return rc;
-	}
+	for (i = 0; i < MACHINE_TH_TABLE_SIZE; i++) {
+		machine_th = &machine->threads[i];
+		for (nd = rb_first(&machine_th->threads); nd; nd = rb_next(nd)) {
+			thread = rb_entry(nd, struct thread, rb_node);
+			rc = fn(thread, priv);
+			if (rc != 0)
+				return rc;
+		}
 
-	list_for_each_entry(thread, &machine->dead_threads, node) {
-		rc = fn(thread, priv);
-		if (rc != 0)
-			return rc;
+		list_for_each_entry(thread, &machine_th->dead_threads, node) {
+			rc = fn(thread, priv);
+			if (rc != 0)
+				return rc;
+		}
 	}
 	return rc;
 }

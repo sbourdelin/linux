@@ -143,7 +143,8 @@ struct __name##_sorted *__name = __name##_sorted__new
 				  __ilist->rblist.nr_entries)
 
 /* For 'struct machine->threads' */
-#define DECLARE_RESORT_RB_MACHINE_THREADS(__name, __machine)			\
-	DECLARE_RESORT_RB(__name)(&__machine->threads, __machine->nr_threads)
+#define DECLARE_RESORT_RB_MACHINE_THREADS(__name, __machine, tid)		\
+	DECLARE_RESORT_RB(__name)(&__machine->threads[tid].threads,		\
+				  __machine->threads[tid].nr_threads)
 
 #endif /* _PERF_RESORT_RB_H_ */
