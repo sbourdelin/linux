@@ -723,7 +723,10 @@ perf_mmap__read(struct perf_mmap *md, bool check_messup, u64 start,
 		 * In either case, truncate and restart at 'end'.
 		 */
 		if (diff > md->mask / 2 || diff < 0) {
-			fprintf(stderr, "WARNING: failed to keep up with mmap data.\n");
+			WARN_ONCE(1, "WARNING: failed to keep up with mmap data.\n"
+				     "Please try increasing the period (-c) or\n"
+				     "decreasing the freq (-F) or\n"
+				     "limiting the number of CPUs");
 
 			/*
 			 * 'end' points to a known good entry, start there.
