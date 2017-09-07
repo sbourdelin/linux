@@ -18,6 +18,7 @@
 #include <net/dst.h>
 #include <net/xfrm.h>
 #include <linux/veth.h>
+#include <linux/if_veth.h>
 #include <linux/module.h>
 
 #define DRV_NAME	"veth"
@@ -27,12 +28,6 @@ struct pcpu_vstats {
 	u64			packets;
 	u64			bytes;
 	struct u64_stats_sync	syncp;
-};
-
-struct veth_priv {
-	struct net_device __rcu	*peer;
-	atomic64_t		dropped;
-	unsigned		requested_headroom;
 };
 
 /*
@@ -298,13 +293,12 @@ static const struct net_device_ops veth_netdev_ops = {
 		       NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX | \
 		       NETIF_F_HW_VLAN_STAG_TX | NETIF_F_HW_VLAN_STAG_RX )
 
-static void veth_setup(struct net_device *dev)
+void veth_common_setup(struct net_device *dev)
 {
 	ether_setup(dev);
 
 	dev->priv_flags &= ~IFF_TX_SKB_SHARING;
 	dev->priv_flags |= IFF_LIVE_ADDR_CHANGE;
-	dev->priv_flags |= IFF_NO_QUEUE;
 	dev->priv_flags |= IFF_PHONY_HEADROOM;
 
 	dev->netdev_ops = &veth_netdev_ops;
@@ -323,6 +317,12 @@ static void veth_setup(struct net_device *dev)
 	dev->hw_features = VETH_FEATURES;
 	dev->hw_enc_features = VETH_FEATURES;
 	dev->mpls_features = NETIF_F_HW_CSUM | NETIF_F_GSO_SOFTWARE;
+}
+
+static void veth_setup(struct net_device *dev)
+{
+	veth_common_setup(dev);
+	dev->priv_flags |= IFF_NO_QUEUE;
 }
 
 /*
@@ -465,7 +465,7 @@ err_register_peer:
 	return err;
 }
 
-static void veth_dellink(struct net_device *dev, struct list_head *head)
+void veth_dellink(struct net_device *dev, struct list_head *head)
 {
 	struct veth_priv *priv;
 	struct net_device *peer;
@@ -503,21 +503,40 @@ static struct rtnl_link_ops veth_link_ops = {
 	.kind		= DRV_NAME,
 	.priv_size	= sizeof(struct veth_priv),
 	.setup		= veth_setup,
-	.validate	= veth_validate,
 	.newlink	= veth_newlink,
 	.dellink	= veth_dellink,
-	.policy		= veth_policy,
-	.maxtype	= VETH_INFO_MAX,
-	.get_link_net	= veth_get_link_net,
 };
 
+int veth_link_register(struct rtnl_link_ops *ops)
+{
+	/* common fields */
+	ops->validate     = veth_validate;
+	ops->policy       = veth_policy;
+	ops->maxtype      = VETH_INFO_MAX;
+	ops->get_link_net = veth_get_link_net;
+
+	return rtnl_link_register(ops);
+}
+
+void veth_link_ops_init(struct rtnl_link_ops *ops)
+{
+	/*common fields*/
+	ops->validate       = veth_validate;
+	ops->policy         = veth_policy;
+	ops->maxtype        = VETH_INFO_MAX;
+	ops->get_link_net   = veth_get_link_net;
+}
 /*
  * init/fini
  */
 
 static __init int veth_init(void)
 {
-	return rtnl_link_register(&veth_link_ops);
+	int err;
+
+	err = veth_link_register(&veth_link_ops);
+
+	return err;
 }
 
 static __exit void veth_exit(void)
