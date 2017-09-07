@@ -359,6 +359,9 @@ static int veth_newlink(struct net *src_net, struct net_device *dev,
 	unsigned char name_assign_type;
 	struct ifinfomsg *ifmp;
 	struct net *net;
+	struct nlattr *linkinfo[IFLA_INFO_MAX + 1];
+	char peer_type[8];
+	struct rtnl_link_ops *link_ops;
 
 	/*
 	 * create and register peer first
@@ -393,16 +396,37 @@ static int veth_newlink(struct net *src_net, struct net_device *dev,
 		name_assign_type = NET_NAME_ENUM;
 	}
 
+	link_ops = &veth_link_ops;
+	if (tbp[IFLA_LINKINFO]) {
+		err = rtnl_nla_parse_ifla_info(linkinfo,
+					       nla_data(tbp[IFLA_LINKINFO]),
+					       nla_len(tbp[IFLA_LINKINFO]),
+					       NULL);
+
+		if (err < 0)
+			return err;
+
+		if (linkinfo[IFLA_INFO_KIND]) {
+			nla_strlcpy(peer_type, linkinfo[IFLA_INFO_KIND],
+				    sizeof(peer_type));
+			if (!strncmp(peer_type, "vethtap", sizeof(peer_type)))
+				link_ops = &vethtap_link_ops;
+		}
+	}
+
 	net = rtnl_link_get_net(src_net, tbp);
 	if (IS_ERR(net))
 		return PTR_ERR(net);
 
 	peer = rtnl_create_link(net, ifname, name_assign_type,
-				&veth_link_ops, tbp);
+				link_ops, tbp);
 	if (IS_ERR(peer)) {
 		put_net(net);
 		return PTR_ERR(peer);
 	}
+
+	if (!strncmp(peer_type, "vethtap", sizeof(peer_type)))
+		link_ops->newlink(net, peer, tbp, NULL, NULL);
 
 	if (!ifmp || !tbp[IFLA_ADDRESS])
 		eth_hw_addr_random(peer);
@@ -536,12 +560,19 @@ static __init int veth_init(void)
 
 	err = veth_link_register(&veth_link_ops);
 
+	if (err)
+		goto out1;
+
+	err = vethtap_init();
+
+out1:
 	return err;
 }
 
 static __exit void veth_exit(void)
 {
 	rtnl_link_unregister(&veth_link_ops);
+	vethtap_exit();
 }
 
 module_init(veth_init);
