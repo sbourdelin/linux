@@ -337,40 +337,6 @@ static struct irq_chip gic_local_irq_controller = {
 	.irq_unmask		=	gic_unmask_local_irq,
 };
 
-static void gic_mask_local_irq_all_vpes(struct irq_data *d)
-{
-	int intr = GIC_HWIRQ_TO_LOCAL(d->hwirq);
-	int i;
-	unsigned long flags;
-
-	spin_lock_irqsave(&gic_lock, flags);
-	for (i = 0; i < gic_vpes; i++) {
-		write_gic_vl_other(mips_cm_vp_id(i));
-		write_gic_vo_rmask(BIT(intr));
-	}
-	spin_unlock_irqrestore(&gic_lock, flags);
-}
-
-static void gic_unmask_local_irq_all_vpes(struct irq_data *d)
-{
-	int intr = GIC_HWIRQ_TO_LOCAL(d->hwirq);
-	int i;
-	unsigned long flags;
-
-	spin_lock_irqsave(&gic_lock, flags);
-	for (i = 0; i < gic_vpes; i++) {
-		write_gic_vl_other(mips_cm_vp_id(i));
-		write_gic_vo_smask(BIT(intr));
-	}
-	spin_unlock_irqrestore(&gic_lock, flags);
-}
-
-static struct irq_chip gic_all_vpes_local_irq_controller = {
-	.name			=	"MIPS GIC Local",
-	.irq_mask		=	gic_mask_local_irq_all_vpes,
-	.irq_unmask		=	gic_unmask_local_irq_all_vpes,
-};
-
 static void __gic_irq_dispatch(void)
 {
 	gic_handle_local_int(false);
@@ -471,35 +437,14 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int virq,
 		return gic_shared_irq_domain_map(d, virq, hwirq, 0);
 	}
 
-	switch (GIC_HWIRQ_TO_LOCAL(hwirq)) {
-	case GIC_LOCAL_INT_TIMER:
-	case GIC_LOCAL_INT_PERFCTR:
-	case GIC_LOCAL_INT_FDC:
-		/*
-		 * HACK: These are all really percpu interrupts, but
-		 * the rest of the MIPS kernel code does not use the
-		 * percpu IRQ API for them.
-		 */
-		err = irq_domain_set_hwirq_and_chip(d, virq, hwirq,
-						    &gic_all_vpes_local_irq_controller,
-						    NULL);
-		if (err)
-			return err;
+	err = irq_domain_set_hwirq_and_chip(d, virq, hwirq,
+					    &gic_local_irq_controller,
+					    NULL);
+	if (err)
+		return err;
 
-		irq_set_handler(virq, handle_percpu_irq);
-		break;
-
-	default:
-		err = irq_domain_set_hwirq_and_chip(d, virq, hwirq,
-						    &gic_local_irq_controller,
-						    NULL);
-		if (err)
-			return err;
-
-		irq_set_handler(virq, handle_percpu_devid_irq);
-		irq_set_percpu_devid(virq);
-		break;
-	}
+	irq_set_handler(virq, handle_percpu_devid_irq);
+	irq_set_percpu_devid(virq);
 
 	return gic_local_irq_domain_map(d, virq, hwirq);
 }
