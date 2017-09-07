@@ -77,6 +77,7 @@ struct scsi_disk {
 	unsigned int	zone_blocks;
 	unsigned int	zone_shift;
 	unsigned long	*zones_wlock;
+	unsigned long	*seq_zones;
 	unsigned int	zones_optimal_open;
 	unsigned int	zones_optimal_nonseq;
 	unsigned int	zones_max_open;
