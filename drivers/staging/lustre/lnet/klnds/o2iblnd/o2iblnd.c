@@ -1624,8 +1624,9 @@ int kiblnd_fmr_pool_map(struct kib_fmr_poolset *fps, struct kib_tx *tx,
 	__u64 version;
 	int rc;
 
- again:
+again:
 	spin_lock(&fps->fps_lock);
+again_locked:
 	version = fps->fps_version;
 	list_for_each_entry(fpo, &fps->fps_pool_list, fpo_list) {
 		fpo->fpo_deadline = cfs_time_shift(IBLND_POOL_DEADLINE);
@@ -1722,10 +1723,8 @@ int kiblnd_fmr_pool_map(struct kib_fmr_poolset *fps, struct kib_tx *tx,
 		}
 
 		/* EAGAIN and ... */
-		if (version != fps->fps_version) {
-			spin_unlock(&fps->fps_lock);
-			goto again;
-		}
+		if (version != fps->fps_version)
+			goto again_locked;
 	}
 
 	if (fps->fps_increasing) {
@@ -1754,9 +1753,8 @@ int kiblnd_fmr_pool_map(struct kib_fmr_poolset *fps, struct kib_tx *tx,
 	} else {
 		fps->fps_next_retry = cfs_time_shift(IBLND_POOL_RETRY);
 	}
-	spin_unlock(&fps->fps_lock);
 
-	goto again;
+	goto again_locked;
 }
 
 static void kiblnd_fini_pool(struct kib_pool *pool)
@@ -1901,8 +1899,9 @@ struct list_head *kiblnd_pool_alloc_node(struct kib_poolset *ps)
 	unsigned int trips = 0;
 	int rc;
 
- again:
+again:
 	spin_lock(&ps->ps_lock);
+again_locked:
 	list_for_each_entry(pool, &ps->ps_pool_list, po_list) {
 		if (list_empty(&pool->po_free_list))
 			continue;
@@ -1960,9 +1959,8 @@ struct list_head *kiblnd_pool_alloc_node(struct kib_poolset *ps)
 		CERROR("Can't allocate new %s pool because out of memory\n",
 		       ps->ps_name);
 	}
-	spin_unlock(&ps->ps_lock);
 
-	goto again;
+	goto again_locked;
 }
 
 static void kiblnd_destroy_tx_pool(struct kib_pool *pool)
