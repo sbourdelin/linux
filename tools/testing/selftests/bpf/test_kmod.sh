@@ -14,6 +14,16 @@ test_run()
 		if [ $? -ne 0 ]; then
 			rc=1
 		fi
+	 else
+		# Use modprobe dry run to check for missing test_bpf module
+		if ! /sbin/modprobe -q -n test_bpf; then
+			echo "test_bpf: [SKIP]"
+		elif /sbin/modprobe -q test_bpf; then
+			echo "test_bpf: ok"
+		else
+			echo "test_bpf: [FAIL]"
+			rc=1
+		fi
 	fi
 	rmmod  test_bpf 2> /dev/null
 	dmesg | grep FAIL
