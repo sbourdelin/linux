@@ -1688,6 +1688,14 @@ int rtnl_nla_parse_ifla(struct nlattr **tb, const struct nlattr *head, int len,
 }
 EXPORT_SYMBOL(rtnl_nla_parse_ifla);
 
+int rtnl_nla_parse_ifla_info(struct nlattr **tb, const struct nlattr *head,
+			     int len, struct netlink_ext_ack *exterr)
+{
+	return nla_parse(tb, IFLA_INFO_MAX, head, len, ifla_info_policy,
+			 exterr);
+}
+EXPORT_SYMBOL(rtnl_nla_parse_ifla_info);
+
 struct net *rtnl_link_get_net(struct net *src_net, struct nlattr *tb[])
 {
 	struct net *net;
