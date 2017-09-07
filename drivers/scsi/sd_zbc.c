@@ -206,17 +206,6 @@ static void sd_zbc_report_zones_complete(struct scsi_cmnd *scmd,
 	local_irq_restore(flags);
 }
 
-static inline sector_t sd_zbc_zone_sectors(struct scsi_disk *sdkp)
-{
-	return logical_to_sectors(sdkp->device, sdkp->zone_blocks);
-}
-
-static inline unsigned int sd_zbc_zone_no(struct scsi_disk *sdkp,
-					  sector_t sector)
-{
-	return sectors_to_logical(sdkp->device, sector) >> sdkp->zone_shift;
-}
-
 /*
  * Prepare a RESET WRITE POINTER scsi command for a REQ_OP_ZONE_RESET request.
  */
@@ -516,6 +505,7 @@ out:
 	}
 
 	sdkp->zone_blocks = zone_blocks;
+	sdkp->zone_shift = ilog2(zone_blocks);
 
 	return 0;
 }
@@ -523,10 +513,13 @@ out:
 static int sd_zbc_setup(struct scsi_disk *sdkp)
 {
 
+	/* READ16/WRITE16 is mandatory for ZBC disks */
+	sdkp->device->use_16_for_rw = 1;
+	sdkp->device->use_10_for_rw = 0;
+
 	/* chunk_sectors indicates the zone size */
 	blk_queue_chunk_sectors(sdkp->disk->queue,
 			logical_to_sectors(sdkp->device, sdkp->zone_blocks));
-	sdkp->zone_shift = ilog2(sdkp->zone_blocks);
 	sdkp->nr_zones = sdkp->capacity >> sdkp->zone_shift;
 	if (sdkp->capacity & (sdkp->zone_blocks - 1))
 		sdkp->nr_zones++;
@@ -588,10 +581,6 @@ int sd_zbc_read_zones(struct scsi_disk *sdkp, unsigned char *buf)
 	ret = sd_zbc_setup(sdkp);
 	if (ret)
 		goto err;
-
-	/* READ16/WRITE16 is mandatory for ZBC disks */
-	sdkp->device->use_16_for_rw = 1;
-	sdkp->device->use_10_for_rw = 0;
 
 	return 0;
 
