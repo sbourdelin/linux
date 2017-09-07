@@ -70,6 +70,18 @@ config MQ_IOSCHED_DEADLINE
 	---help---
 	  MQ version of the deadline IO scheduler.
 
+config MQ_IOSCHED_ZONED
+	tristate "Zoned I/O scheduler"
+	depends on BLK_DEV_ZONED
+	depends on SCSI_MOD
+	depends on BLK_DEV_SD
+	default y
+	---help---
+	  MQ deadline IO scheduler with support for zoned block devices.
+
+	  This should be set as the default I/O scheduler for host-managed
+	  zoned block devices. It is optional for host-aware block devices.
+
 config MQ_IOSCHED_KYBER
 	tristate "Kyber I/O scheduler"
 	default y

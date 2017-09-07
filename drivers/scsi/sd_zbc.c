@@ -223,7 +223,7 @@ int sd_zbc_setup_reset_cmnd(struct scsi_cmnd *cmd)
 	if (sdkp->device->changed)
 		return BLKPREP_KILL;
 
-	if (sector & (sd_zbc_zone_sectors(sdkp) - 1))
+	if (sector & (sdkp->zone_sectors - 1))
 		/* Unaligned request */
 		return BLKPREP_KILL;
 
@@ -251,7 +251,7 @@ int sd_zbc_write_lock_zone(struct scsi_cmnd *cmd)
 	struct request *rq = cmd->request;
 	struct scsi_disk *sdkp = scsi_disk(rq->rq_disk);
 	sector_t sector = blk_rq_pos(rq);
-	sector_t zone_sectors = sd_zbc_zone_sectors(sdkp);
+	sector_t zone_sectors = sdkp->zone_sectors;
 	unsigned int zno;
 
 	/*
@@ -274,7 +274,7 @@ int sd_zbc_write_lock_zone(struct scsi_cmnd *cmd)
 	 * ordering problems due to the unlocking of the request queue in the
 	 * dispatch path of the non scsi-mq (legacy) case.
 	 */
-	zno = sd_zbc_zone_no(sdkp, sector);
+	zno = sd_zbc_request_zone_no(sdkp, rq);
 	if (!test_bit(zno, sdkp->seq_zones))
 		return BLKPREP_OK;
 	if (test_and_set_bit(zno, sdkp->zones_wlock))
@@ -296,7 +296,7 @@ void sd_zbc_write_unlock_zone(struct scsi_cmnd *cmd)
 	struct scsi_disk *sdkp = scsi_disk(rq->rq_disk);
 
 	if (cmd->flags & SCMD_ZONE_WRITE_LOCK) {
-		unsigned int zno = sd_zbc_zone_no(sdkp, blk_rq_pos(rq));
+		unsigned int zno = sd_zbc_request_zone_no(sdkp, rq);
 
 		WARN_ON_ONCE(!test_bit(zno, sdkp->zones_wlock));
 		cmd->flags &= ~SCMD_ZONE_WRITE_LOCK;
@@ -509,7 +509,8 @@ out:
 	}
 
 	sdkp->zone_blocks = zone_blocks;
-	sdkp->zone_shift = ilog2(zone_blocks);
+	sdkp->zone_sectors = logical_to_sectors(sdkp->device, zone_blocks);
+	sdkp->zone_sectors_shift = ilog2(sdkp->zone_sectors);
 
 	return 0;
 }
@@ -574,6 +575,7 @@ out:
 
 static int sd_zbc_setup(struct scsi_disk *sdkp)
 {
+	sector_t zone_blocks = sdkp->zone_blocks;
 	int ret;
 
 	/* READ16/WRITE16 is mandatory for ZBC disks */
@@ -582,9 +584,9 @@ static int sd_zbc_setup(struct scsi_disk *sdkp)
 
 	/* chunk_sectors indicates the zone size */
 	blk_queue_chunk_sectors(sdkp->disk->queue,
-			logical_to_sectors(sdkp->device, sdkp->zone_blocks));
+				logical_to_sectors(sdkp->device, zone_blocks));
 	sdkp->nr_zones =
-		round_up(sdkp->capacity, sdkp->zone_blocks) >> sdkp->zone_shift;
+		round_up(sdkp->capacity, zone_blocks) >> ilog2(zone_blocks);
 
 	/*
 	 * Wait for the disk capacity to stabilize before

@@ -1,0 +1,48 @@
+Zoned I/O scheduler
+===================
+
+The Zoned I/O scheduler solves zoned block devices write ordering problems
+inherent to the absence of a global request queue lock in the blk-mq
+infrastructure. Multiple contexts may try to dispatch simultaneously write
+requests to the same sequential zone of a zoned block device, doing so
+potentially breaking the sequential write order imposed by the device.
+
+The Zoned I/O scheduler is based on the mq-deadline scheduler. It shares the
+same tunables and behaves in a comparable manner. The main difference introduced
+with the zoned scheduler is handling of write batches. Whereas mq-deadline will
+keep dispatching write requests to the device as long as the batching size
+allows and reads are not starved, the zoned scheduler introduces additional
+constraints:
+1) At most only one write request can be issued to a sequential zone of the
+device. This ensures that no reordering of sequential writes to a sequential
+zone can happen once the write request leaves the scheduler internal queue (rb
+tree).
+2) The number of sequential zones that can be simultaneously written is limited
+to the device advertized maximum number of open zones. This additional condition
+avoids performance degradation due to excessive open zone resource use at the
+device level.
+
+These conditions do not apply to write requests targeting conventional zones.
+For these, the zoned scheduler behaves exactly like the mq-deadline scheduler.
+
+The zoned I/O scheduler cannot be used with regular block devices. It can only
+be used with host-managed or host-aware zoned block devices.
+Using the zoned I/O scheduler is mandatory with host-managed disks unless the
+disk user tightly controls itself write sequencing to sequential zones. The
+zoned scheduler will treat host-aware disks exactly the same way as host-managed
+devices. That is, eventhough host aware disks can be randomly written, the zoned
+scheduler will still impose the limit to one write per zone so that sequential
+writes sequences are preserved.
+
+For host-managed disks, automating the used of the zoned scheduler can be done
+simply with a udev rule. An example of such rule is shown below.
+
+# Set zoned scheduler for host-managed zoned block devices
+ACTION=="add|change", KERNEL=="sd[a-z]", ATTR{queue/zoned}=="host-managed", \
+	ATTR{queue/scheduler}="zoned"
+
+Zoned I/O scheduler tunables
+============================
+
+Tunables of the Zoned I/O scheduler are identical to those of the deadline
+I/O scheduler. See Documentation/block/deadline-iosched.txt for details.

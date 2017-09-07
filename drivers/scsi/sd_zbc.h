@@ -24,12 +24,12 @@ static inline sector_t sd_zbc_zone_sectors(struct scsi_disk *sdkp)
 }
 
 /*
- * Zone number of the specified sector.
+ * Zone number of the specified request.
  */
-static inline unsigned int sd_zbc_zone_no(struct scsi_disk *sdkp,
-					  sector_t sector)
+static inline unsigned int sd_zbc_request_zone_no(struct scsi_disk *sdkp,
+						  struct request *rq)
 {
-	return sectors_to_logical(sdkp->device, sector) >> sdkp->zone_shift;
+	return blk_rq_pos(rq) >> sdkp->zone_sectors_shift;
 }
 
 /*
