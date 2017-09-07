@@ -40,8 +40,6 @@
 #define read_c0_perfhi2() __read_64bit_c0_register($25, 3)
 #define write_c0_perfhi2(val) __write_64bit_c0_register($25, 3, val)
 
-static int (*save_perf_irq)(void);
-
 static struct loongson3_register_config {
 	unsigned int control1;
 	unsigned int control2;
@@ -130,12 +128,13 @@ static void loongson3_cpu_stop(void *args)
 	memset(&reg, 0, sizeof(reg));
 }
 
-static int loongson3_perfcount_handler(void)
+static irqreturn_t loongson3_perfcount_handler(int irq, void *dev_id)
 {
 	unsigned long flags;
 	uint64_t counter1, counter2;
-	uint32_t cause, handled = IRQ_NONE;
+	uint32_t cause;
 	struct pt_regs *regs = get_irq_regs();
+	irqreturn_t handled = IRQ_NONE;
 
 	cause = read_c0_cause();
 	if (!(cause & CAUSEF_PCI))
@@ -182,25 +181,6 @@ static int loongson3_dying_cpu(unsigned int cpu)
 	return 0;
 }
 
-static int __init loongson3_init(void)
-{
-	on_each_cpu(reset_counters, NULL, 1);
-	cpuhp_setup_state_nocalls(CPUHP_AP_MIPS_OP_LOONGSON3_STARTING,
-				  "mips/oprofile/loongson3:starting",
-				  loongson3_starting_cpu, loongson3_dying_cpu);
-	save_perf_irq = perf_irq;
-	perf_irq = loongson3_perfcount_handler;
-
-	return 0;
-}
-
-static void loongson3_exit(void)
-{
-	on_each_cpu(reset_counters, NULL, 1);
-	cpuhp_remove_state_nocalls(CPUHP_AP_MIPS_OP_LOONGSON3_STARTING);
-	perf_irq = save_perf_irq;
-}
-
 struct op_mips_model op_model_loongson3_ops = {
 	.reg_setup	= loongson3_reg_setup,
 	.cpu_setup	= loongson3_cpu_setup,
@@ -211,3 +191,24 @@ struct op_mips_model op_model_loongson3_ops = {
 	.cpu_type	= "mips/loongson3",
 	.num_counters	= 2
 };
+
+static int __init loongson3_init(void)
+{
+	on_each_cpu(reset_counters, NULL, 1);
+	cpuhp_setup_state_nocalls(CPUHP_AP_MIPS_OP_LOONGSON3_STARTING,
+				  "mips/oprofile/loongson3:starting",
+				  loongson3_starting_cpu, loongson3_dying_cpu);
+
+	return request_irq(cp0_compare_irq, loongson3_perfcount_handler,
+			   IRQF_PERCPU | IRQF_NOBALANCING |
+			   IRQF_NO_THREAD | IRQF_NO_SUSPEND |
+			   IRQF_SHARED,
+			   "Perfcounter", &op_model_loongson3_ops);
+}
+
+static void loongson3_exit(void)
+{
+	free_irq(cp0_compare_irq, &op_model_loongson3_ops);
+	on_each_cpu(reset_counters, NULL, 1);
+	cpuhp_remove_state_nocalls(CPUHP_AP_MIPS_OP_LOONGSON3_STARTING);
+}

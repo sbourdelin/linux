@@ -2228,7 +2228,7 @@ void per_cpu_trap_init(bool is_boot_cpu)
 	} else {
 		cp0_compare_irq = CP0_LEGACY_COMPARE_IRQ;
 		cp0_compare_irq_shift = CP0_LEGACY_PERFCNT_IRQ;
-		cp0_perfcount_irq = -1;
+		cp0_perfcount_irq = cp0_compare_irq;
 		cp0_fdc_irq = -1;
 	}
 

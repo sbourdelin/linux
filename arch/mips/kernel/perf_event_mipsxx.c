@@ -25,7 +25,7 @@
 #include <asm/irq.h>
 #include <asm/irq_regs.h>
 #include <asm/stacktrace.h>
-#include <asm/time.h> /* For perf_irq */
+#include <asm/time.h>
 
 #define MIPS_MAX_HWEVENTS 4
 #define MIPS_TCS_PER_COUNTER 2
@@ -167,7 +167,6 @@ static unsigned int counters_total_to_per_cpu(unsigned int counters)
 static void resume_local_counters(void);
 static void pause_local_counters(void);
 static irqreturn_t mipsxx_pmu_handle_irq(int, void *);
-static int mipsxx_pmu_handle_shared_irq(void);
 
 static unsigned int mipsxx_pmu_swizzle_perf_idx(unsigned int idx)
 {
@@ -538,44 +537,25 @@ static void mipspmu_disable(struct pmu *pmu)
 
 static atomic_t active_events = ATOMIC_INIT(0);
 static DEFINE_MUTEX(pmu_reserve_mutex);
-static int (*save_perf_irq)(void);
 
 static int mipspmu_get_irq(void)
 {
 	int err;
 
-	if (mipspmu.irq >= 0) {
-		/* Request my own irq handler. */
-		err = request_irq(mipspmu.irq, mipsxx_pmu_handle_irq,
-				  IRQF_PERCPU | IRQF_NOBALANCING |
-				  IRQF_NO_THREAD | IRQF_NO_SUSPEND |
-				  IRQF_SHARED,
-				  "mips_perf_pmu", &mipspmu);
-		if (err) {
-			pr_warn("Unable to request IRQ%d for MIPS performance counters!\n",
-				mipspmu.irq);
-		}
-	} else if (cp0_perfcount_irq < 0) {
-		/*
-		 * We are sharing the irq number with the timer interrupt.
-		 */
-		save_perf_irq = perf_irq;
-		perf_irq = mipsxx_pmu_handle_shared_irq;
-		err = 0;
-	} else {
-		pr_warn("The platform hasn't properly defined its interrupt controller\n");
-		err = -ENOENT;
-	}
-
+	err = request_irq(mipspmu.irq, mipsxx_pmu_handle_irq,
+			  IRQF_PERCPU | IRQF_NOBALANCING |
+			  IRQF_NO_THREAD | IRQF_NO_SUSPEND |
+			  IRQF_SHARED,
+			  "mips_perf_pmu", &mipspmu);
+	if (err)
+		pr_warn("Unable to request IRQ%d for MIPS performance counters!\n",
+			mipspmu.irq);
 	return err;
 }
 
 static void mipspmu_free_irq(void)
 {
-	if (mipspmu.irq >= 0)
-		free_irq(mipspmu.irq, &mipspmu);
-	else if (cp0_perfcount_irq < 0)
-		perf_irq = save_perf_irq;
+	free_irq(mipspmu.irq, &mipspmu);
 }
 
 /*
@@ -1403,13 +1383,13 @@ static void resume_local_counters(void)
 	} while (ctr > 0);
 }
 
-static int mipsxx_pmu_handle_shared_irq(void)
+static irqreturn_t mipsxx_pmu_handle_irq(int irq, void *dev)
 {
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
 	struct perf_sample_data data;
 	unsigned int counters = mipspmu.num_counters;
 	u64 counter;
-	int handled = IRQ_NONE;
+	irqreturn_t handled = IRQ_NONE;
 	struct pt_regs *regs;
 
 	if (cpu_has_perf_cntr_intr_bit && !(read_c0_cause() & CAUSEF_PCI))
@@ -1460,11 +1440,6 @@ static int mipsxx_pmu_handle_shared_irq(void)
 		irq_work_run();
 
 	return handled;
-}
-
-static irqreturn_t mipsxx_pmu_handle_irq(int irq, void *dev)
-{
-	return mipsxx_pmu_handle_shared_irq();
 }
 
 /* 24K */
@@ -1736,6 +1711,11 @@ init_hw_perf_events(void)
 	else
 		irq = -1;
 
+	if (irq < 0) {
+		pr_warn("The platform hasn't properly defined its interrupt controller\n");
+		return -ENOENT;
+	}
+
 	mipspmu.map_raw_event = mipsxx_pmu_map_raw_event;
 
 	switch (current_cpu_type()) {
@@ -1850,9 +1830,8 @@ init_hw_perf_events(void)
 
 	on_each_cpu(reset_counters, (void *)(long)counters, 1);
 
-	pr_cont("%s PMU enabled, %d %d-bit counters available to each "
-		"CPU, irq %d%s\n", mipspmu.name, counters, counter_bits, irq,
-		irq < 0 ? " (share with timer interrupt)" : "");
+	pr_cont("%s PMU enabled, %d %d-bit counters available to each CPU, irq %d",
+		mipspmu.name, counters, counter_bits, irq);
 
 	perf_pmu_register(&pmu, "cpu", PERF_TYPE_RAW);
 

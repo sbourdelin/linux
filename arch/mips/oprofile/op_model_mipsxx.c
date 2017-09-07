@@ -21,7 +21,6 @@
 
 #define M_COUNTER_OVERFLOW		(1UL	  << 31)
 
-static int (*save_perf_irq)(void);
 static int perfcount_irq;
 
 /*
@@ -423,9 +422,6 @@ static int __init mipsxx_init(void)
 		return -ENODEV;
 	}
 
-	save_perf_irq = perf_irq;
-	perf_irq = mipsxx_perfcount_handler;
-
 	if (get_c0_perfcount_int)
 		perfcount_irq = get_c0_perfcount_int();
 	else if (cp0_perfcount_irq >= 0)
@@ -438,7 +434,7 @@ static int __init mipsxx_init(void)
 				   IRQF_PERCPU | IRQF_NOBALANCING |
 				   IRQF_NO_THREAD | IRQF_NO_SUSPEND |
 				   IRQF_SHARED,
-				   "Perfcounter", save_perf_irq);
+				   "Perfcounter", &op_model_mipsxx_ops);
 
 	return 0;
 }
@@ -448,12 +444,10 @@ static void mipsxx_exit(void)
 	int counters = op_model_mipsxx_ops.num_counters;
 
 	if (perfcount_irq >= 0)
-		free_irq(perfcount_irq, save_perf_irq);
+		free_irq(perfcount_irq, &op_model_mipsxx_ops);
 
 	counters = counters_per_cpu_to_total(counters);
 	on_each_cpu(reset_counters, (void *)(long)counters, 1);
-
-	perf_irq = save_perf_irq;
 }
 
 struct op_mips_model op_model_mipsxx_ops = {
