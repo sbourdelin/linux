@@ -264,6 +264,10 @@ int sd_zbc_write_lock_zone(struct scsi_cmnd *cmd)
 	    (sector & (zone_sectors - 1)) + blk_rq_sectors(rq) > zone_sectors)
 		return BLKPREP_KILL;
 
+	/* No write locking with scsi-mq */
+	if (rq->q->mq_ops)
+		return BLKPREP_OK;
+
 	/*
 	 * There is no write constraint on conventional zones, but do not issue
 	 * more than one write at a time per sequential zone. This avoids write
