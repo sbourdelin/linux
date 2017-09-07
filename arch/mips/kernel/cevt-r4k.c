@@ -108,54 +108,26 @@ static unsigned int calculate_min_delta(void)
 DEFINE_PER_CPU(struct clock_event_device, mips_clockevent_device);
 int cp0_timer_irq_installed;
 
-/*
- * Possibly handle a performance counter interrupt.
- * Return true if the timer interrupt should not be checked
- */
-static inline int handle_perf_irq(int r2)
-{
-	/*
-	 * The performance counter overflow interrupt may be shared with the
-	 * timer interrupt (cp0_perfcount_irq < 0). If it is and a
-	 * performance counter has overflowed (perf_irq() == IRQ_HANDLED)
-	 * and we can't reliably determine if a counter interrupt has also
-	 * happened (!r2) then don't check for a timer interrupt.
-	 */
-	return (cp0_perfcount_irq < 0) &&
-		perf_irq() == IRQ_HANDLED &&
-		!r2;
-}
-
 irqreturn_t c0_compare_interrupt(int irq, void *dev_id)
 {
-	const int r2 = cpu_has_mips_r2_r6;
 	struct clock_event_device *cd;
 	int cpu = smp_processor_id();
 
 	/*
-	 * Suckage alert:
-	 * Before R2 of the architecture there was no way to see if a
-	 * performance counter interrupt was pending, so we have to run
-	 * the performance counter interrupt handler anyway.
+	 * If we have the Cause.TI bit with which to decode whether this was in
+	 * fact a timer interrupt, rather than another which shares the CPU
+	 * pin, then check that & return if no timer interrupt is pending.
 	 */
-	if (handle_perf_irq(r2))
-		return IRQ_HANDLED;
+	if (cpu_has_mips_r2_r6 && !(read_c0_cause() & CAUSEF_TI))
+		return IRQ_NONE;
 
-	/*
-	 * The same applies to performance counter interrupts.	But with the
-	 * above we now know that the reason we got here must be a timer
-	 * interrupt.  Being the paranoiacs we are we check anyway.
-	 */
-	if (!r2 || (read_c0_cause() & CAUSEF_TI)) {
-		/* Clear Count/Compare Interrupt */
-		write_c0_compare(read_c0_compare());
-		cd = &per_cpu(mips_clockevent_device, cpu);
-		cd->event_handler(cd);
+	/* Clear Count/Compare Interrupt */
+	write_c0_compare(read_c0_compare());
 
-		return IRQ_HANDLED;
-	}
+	cd = &per_cpu(mips_clockevent_device, cpu);
+	cd->event_handler(cd);
 
-	return IRQ_NONE;
+	return IRQ_HANDLED;
 }
 
 struct irqaction c0_compare_irqaction = {

@@ -45,7 +45,6 @@ extern unsigned int mips_hpt_frequency;
  * The performance counter IRQ on MIPS is a close relative to the timer IRQ
  * so it lives here.
  */
-extern int (*perf_irq)(void);
 extern int __weak get_c0_perfcount_int(void);
 
 /*

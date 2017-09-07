@@ -10,8 +10,6 @@
 #ifndef OP_IMPL_H
 #define OP_IMPL_H 1
 
-extern int (*perf_irq)(void);
-
 /* Per-counter configuration as set via oprofilefs.  */
 struct op_counter_config {
 	unsigned long enabled;
