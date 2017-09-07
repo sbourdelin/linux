@@ -514,6 +514,11 @@ static void mipspmu_enable(struct pmu *pmu)
 	write_unlock(&pmuint_rwlock);
 #endif
 	resume_local_counters();
+
+	if (irq_is_percpu_devid(mipspmu.irq))
+		enable_percpu_irq(mipspmu.irq, IRQ_TYPE_NONE);
+	else
+		enable_irq(mipspmu.irq);
 }
 
 /*
@@ -538,24 +543,27 @@ static void mipspmu_disable(struct pmu *pmu)
 static atomic_t active_events = ATOMIC_INIT(0);
 static DEFINE_MUTEX(pmu_reserve_mutex);
 
+static struct irqaction c0_perf_irqaction = {
+	.handler = mipsxx_pmu_handle_irq,
+	.flags = IRQF_PERCPU | IRQF_TIMER | IRQF_SHARED | IRQF_NOAUTOEN,
+	.name = "mips_perf_pmu",
+	.percpu_dev_id = &mipspmu,
+};
+
 static int mipspmu_get_irq(void)
 {
-	int err;
+	if (irq_is_percpu_devid(mipspmu.irq))
+		return setup_percpu_irq(mipspmu.irq, &c0_perf_irqaction);
 
-	err = request_irq(mipspmu.irq, mipsxx_pmu_handle_irq,
-			  IRQF_PERCPU | IRQF_NOBALANCING |
-			  IRQF_NO_THREAD | IRQF_NO_SUSPEND |
-			  IRQF_SHARED,
-			  "mips_perf_pmu", &mipspmu);
-	if (err)
-		pr_warn("Unable to request IRQ%d for MIPS performance counters!\n",
-			mipspmu.irq);
-	return err;
+	return setup_irq(mipspmu.irq, &c0_perf_irqaction);
 }
 
 static void mipspmu_free_irq(void)
 {
-	free_irq(mipspmu.irq, &mipspmu);
+	if (irq_is_percpu_devid(mipspmu.irq))
+		remove_percpu_irq(mipspmu.irq, &c0_perf_irqaction);
+	else
+		remove_irq(mipspmu.irq, &c0_perf_irqaction);
 }
 
 /*
