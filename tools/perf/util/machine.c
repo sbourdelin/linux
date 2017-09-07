@@ -64,8 +64,8 @@ int machine__init(struct machine *machine, const char *root_dir, pid_t pid)
 
 	machine->id_hdr_size = 0;
 	machine->kptr_restrict_warned = false;
-	machine->comm_exec = false;
 	machine->kernel_start = 0;
+	atomic_set(&machine->comm_exec, 0);
 
 	memset(machine->vmlinux_maps, 0, sizeof(machine->vmlinux_maps));
 
@@ -238,14 +238,15 @@ struct machine *machines__add(struct machines *machines, pid_t pid,
 
 void machines__set_comm_exec(struct machines *machines, bool comm_exec)
 {
+	int exec = comm_exec ? 1 : 0;
 	struct rb_node *nd;
 
-	machines->host.comm_exec = comm_exec;
+	atomic_set(&machines->host.comm_exec, exec);
 
 	for (nd = rb_first(&machines->guests); nd; nd = rb_next(nd)) {
 		struct machine *machine = rb_entry(nd, struct machine, rb_node);
 
-		machine->comm_exec = comm_exec;
+		atomic_set(&machine->comm_exec, exec);
 	}
 }
 
@@ -505,7 +506,7 @@ struct thread *machine__find_thread(struct machine *machine, pid_t pid,
 struct comm *machine__thread_exec_comm(struct machine *machine,
 				       struct thread *thread)
 {
-	if (machine->comm_exec)
+	if (atomic_read(&machine->comm_exec))
 		return thread__exec_comm(thread);
 	else
 		return thread__comm(thread);
@@ -521,7 +522,7 @@ int machine__process_comm_event(struct machine *machine, union perf_event *event
 	int err = 0;
 
 	if (exec)
-		machine->comm_exec = true;
+		atomic_set(&machine->comm_exec, 1);
 
 	if (dump_trace)
 		perf_event__fprintf_comm(event, stdout);
