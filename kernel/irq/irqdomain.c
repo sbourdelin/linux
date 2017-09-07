@@ -112,6 +112,7 @@ EXPORT_SYMBOL_GPL(irq_domain_free_fwnode);
 /**
  * __irq_domain_add() - Allocate a new irq_domain data structure
  * @fwnode: firmware node for the interrupt controller
+ * @flags:	Irq domain flags associated to the domain
  * @size: Size of linear map; 0 for radix mapping only
  * @hwirq_max: Maximum number of interrupts supported by controller
  * @direct_max: Maximum value of direct maps; Use ~0 for no limit; 0 for no
@@ -122,7 +123,8 @@ EXPORT_SYMBOL_GPL(irq_domain_free_fwnode);
  * Allocates and initialize and irq_domain structure.
  * Returns pointer to IRQ domain, or NULL on failure.
  */
-struct irq_domain *__irq_domain_add(struct fwnode_handle *fwnode, int size,
+struct irq_domain *__irq_domain_add(struct fwnode_handle *fwnode,
+				    unsigned int flags, int size,
 				    irq_hw_number_t hwirq_max, int direct_max,
 				    const struct irq_domain_ops *ops,
 				    void *host_data)
@@ -212,6 +214,7 @@ struct irq_domain *__irq_domain_add(struct fwnode_handle *fwnode, int size,
 	INIT_RADIX_TREE(&domain->revmap_tree, GFP_KERNEL);
 	domain->ops = ops;
 	domain->host_data = host_data;
+	domain->flags |= flags;
 	domain->hwirq_max = hwirq_max;
 	domain->revmap_size = size;
 	domain->revmap_direct_max_irq = direct_max;
@@ -318,7 +321,7 @@ struct irq_domain *irq_domain_add_simple(struct device_node *of_node,
 {
 	struct irq_domain *domain;
 
-	domain = __irq_domain_add(of_node_to_fwnode(of_node), size, size, 0, ops, host_data);
+	domain = __irq_domain_add(of_node_to_fwnode(of_node), 0, size, size, 0, ops, host_data);
 	if (!domain)
 		return NULL;
 
@@ -362,7 +365,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
 {
 	struct irq_domain *domain;
 
-	domain = __irq_domain_add(of_node_to_fwnode(of_node), first_hwirq + size,
+	domain = __irq_domain_add(of_node_to_fwnode(of_node), 0, first_hwirq + size,
 				  first_hwirq + size, 0, ops, host_data);
 	if (domain)
 		irq_domain_associate_many(domain, first_irq, first_hwirq, size);
@@ -1132,14 +1135,10 @@ struct irq_domain *irq_domain_create_hierarchy(struct irq_domain *parent,
 {
 	struct irq_domain *domain;
 
-	if (size)
-		domain = irq_domain_create_linear(fwnode, size, ops, host_data);
-	else
-		domain = irq_domain_create_tree(fwnode, ops, host_data);
-	if (domain) {
+	domain = __irq_domain_add(fwnode, flags, size, size ? size : ~0, 0,
+				  ops, host_data);
+	if (domain)
 		domain->parent = parent;
-		domain->flags |= flags;
-	}
 
 	return domain;
 }
