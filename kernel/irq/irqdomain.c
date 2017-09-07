@@ -1531,6 +1531,9 @@ int irq_domain_push_irq(struct irq_domain *domain, int virq, void *arg)
 	tail_irq_data->chip = NULL;
 	tail_irq_data->chip_data = NULL;
 
+	/* clear the trigger type to avoid "type mismatch" error */
+	irqd_set_trigger_type(tail_irq_data, IRQ_TYPE_NONE);
+
 	/* May (probably does) set hwirq, chip, etc. */
 	rv = irq_domain_alloc_irqs_hierarchy(domain, virq, 1, arg);
 	if (rv) {
