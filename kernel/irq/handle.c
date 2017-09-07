@@ -142,9 +142,15 @@ irqreturn_t __handle_irq_event_percpu(struct irq_desc *desc, unsigned int *flags
 
 	for_each_action_of_desc(desc, action) {
 		irqreturn_t res;
+		void *dev_id;
+
+		if (irq_settings_is_per_cpu_devid(desc))
+			dev_id = raw_cpu_ptr(action->percpu_dev_id);
+		else
+			dev_id = action->dev_id;
 
 		trace_irq_handler_entry(irq, action);
-		res = action->handler(irq, action->dev_id);
+		res = action->handler(irq, dev_id);
 		trace_irq_handler_exit(irq, action, res);
 
 		if (WARN_ONCE(!irqs_disabled(),"irq %u handler %pF enabled interrupts\n",

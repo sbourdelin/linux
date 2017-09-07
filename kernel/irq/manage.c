@@ -1929,7 +1929,7 @@ EXPORT_SYMBOL_GPL(disable_percpu_irq);
 static struct irqaction *__free_percpu_irq(unsigned int irq, void __percpu *dev_id)
 {
 	struct irq_desc *desc = irq_to_desc(irq);
-	struct irqaction *action;
+	struct irqaction *action, **action_ptr;
 	unsigned long flags;
 
 	WARN(in_interrupt(), "Trying to free IRQ %d from IRQ context!\n", irq);
@@ -1939,20 +1939,34 @@ static struct irqaction *__free_percpu_irq(unsigned int irq, void __percpu *dev_
 
 	raw_spin_lock_irqsave(&desc->lock, flags);
 
-	action = desc->action;
-	if (!action || action->percpu_dev_id != dev_id) {
-		WARN(1, "Trying to free already-free IRQ %d\n", irq);
-		goto bad;
+	/*
+	 * There can be multiple actions per IRQ descriptor, find the right
+	 * one based on the dev_id:
+	 */
+	action_ptr = &desc->action;
+	for (;;) {
+		action = *action_ptr;
+
+		if (!action) {
+			WARN(1, "Trying to free already-free IRQ %d\n", irq);
+			goto bad;
+		}
+
+		if (action->percpu_dev_id == dev_id)
+			break;
+		action_ptr = &action->next;
 	}
 
-	if (!cpumask_empty(desc->percpu_enabled)) {
+	if ((action_ptr == &desc->action) &&
+	    !action->next &&
+	    !cpumask_empty(desc->percpu_enabled)) {
 		WARN(1, "percpu IRQ %d still enabled on CPU%d!\n",
 		     irq, cpumask_first(desc->percpu_enabled));
 		goto bad;
 	}
 
 	/* Found it - now remove it from the list of entries: */
-	desc->action = NULL;
+	*action_ptr = action->next;
 
 	raw_spin_unlock_irqrestore(&desc->lock, flags);
 
