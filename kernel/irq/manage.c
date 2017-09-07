@@ -1229,15 +1229,19 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 		 * agree on ONESHOT.
 		 */
 		unsigned int oldtype = irqd_get_trigger_type(&desc->irq_data);
+		unsigned int must_match;
+
+		/*
+		 * These flags must have the same value for all actions
+		 * registered for a shared interrupt.
+		 */
+		must_match = IRQF_ONESHOT |
+			     IRQF_PERCPU |
+			     IRQF_NOAUTOEN;
 
 		if (!((old->flags & new->flags) & IRQF_SHARED) ||
 		    (oldtype != (new->flags & IRQF_TRIGGER_MASK)) ||
-		    ((old->flags ^ new->flags) & IRQF_ONESHOT))
-			goto mismatch;
-
-		/* All handlers must agree on per-cpuness */
-		if ((old->flags & IRQF_PERCPU) !=
-		    (new->flags & IRQF_PERCPU))
+		    ((old->flags ^ new->flags) & must_match))
 			goto mismatch;
 
 		/* add new interrupt at end of irq queue */
@@ -1313,6 +1317,38 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 		goto out_unlock;
 	}
 
+	/*
+	 * Using shared interrupts with the IRQ_NOAUTOEN flag can be risky if
+	 * the flag is set when one or more of the drivers sharing the IRQ
+	 * don't expect it. For example if driver A does:
+	 *
+	 *   irq_set_status_flags(shared_irq, IRQ_NOAUTOEN);
+	 *   request_irq(shared_irq, handler_a, IRQF_SHARED, "a", dev_a);
+	 *
+	 * Then driver B does:
+	 *
+	 *   request_irq(shared_irq, handler_b, IRQF_SHARED, "b", dev_b);
+	 *
+	 * Driver B has no idea that driver A set the IRQ_NOAUTOEN flag, and
+	 * thus may expect that the shared_irq is enabled after its call to
+	 * request_irq(). It may then miss interrupts that it was expecting to
+	 * receive.
+	 *
+	 * We therefore require that if a shared IRQ is used with IRQ_NOAUTOEN
+	 * then all drivers sharing it explicitly declare that they are aware
+	 * of the fact that the interrupt won't be automatically enabled, by
+	 * setting the IRQF_NOAUTOEN flag in their struct irqaction or
+	 * providing it to request_irq().
+	 */
+	if (WARN((new->flags && IRQF_SHARED) &&
+		 !irq_settings_can_autoenable(desc) &&
+		 !(new->flags & IRQF_NOAUTOEN),
+		 "shared irq %d isn't automatically enabled, but the caller doesn't set IRQF_NOAUTOEN",
+		 irq)) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
 	if (!shared) {
 		init_waitqueue_head(&desc->wait_for_threads);
 
@@ -1343,16 +1379,12 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
 			irqd_set(&desc->irq_data, IRQD_NO_BALANCING);
 		}
 
+		if (new->flags & IRQF_NOAUTOEN)
+			irq_settings_set_noautoenable(desc);
+
 		if (irq_settings_can_autoenable(desc)) {
 			irq_startup(desc, IRQ_RESEND, IRQ_START_COND);
 		} else {
-			/*
-			 * Shared interrupts do not go well with disabling
-			 * auto enable. The sharing interrupt might request
-			 * it while it's still disabled and then wait for
-			 * interrupts forever.
-			 */
-			WARN_ON_ONCE(new->flags & IRQF_SHARED);
 			/* Undo nested disables: */
 			desc->depth = 1;
 		}

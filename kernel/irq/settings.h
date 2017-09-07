@@ -147,6 +147,11 @@ static inline bool irq_settings_can_autoenable(struct irq_desc *desc)
 	return !(desc->status_use_accessors & _IRQ_NOAUTOEN);
 }
 
+static inline void irq_settings_set_noautoenable(struct irq_desc *desc)
+{
+	desc->status_use_accessors |= _IRQ_NOAUTOEN;
+}
+
 static inline bool irq_settings_is_nested_thread(struct irq_desc *desc)
 {
 	return desc->status_use_accessors & _IRQ_NESTED_THREAD;
