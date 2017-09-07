@@ -28,14 +28,9 @@
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
-#include <scsi/scsi_dbg.h>
-#include <scsi/scsi_device.h>
-#include <scsi/scsi_driver.h>
-#include <scsi/scsi_host.h>
-#include <scsi/scsi_eh.h>
 
 #include "sd.h"
-#include "scsi_priv.h"
+#include "sd_zbc.h"
 
 /**
  * Convert a zone descriptor to a zone struct.
