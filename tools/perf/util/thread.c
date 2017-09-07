@@ -149,6 +149,16 @@ int thread__set_namespaces(struct thread *thread, u64 timestamp,
 	return 0;
 }
 
+void thread__namespaces_id(const struct thread *thread,
+			   u64 *dev, u64 *ino)
+{
+	struct namespaces *ns;
+
+	ns = thread__namespaces(thread);
+	*dev = ns ? ns->link_info[CGROUP_NS_INDEX].dev : 0;
+	*ino = ns ? ns->link_info[CGROUP_NS_INDEX].ino : 0;
+}
+
 struct comm *thread__comm(const struct thread *thread)
 {
 	if (list_empty(&thread->comm_list))

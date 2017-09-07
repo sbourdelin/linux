@@ -68,6 +68,8 @@ static inline void thread__exited(struct thread *thread)
 struct namespaces *thread__namespaces(const struct thread *thread);
 int thread__set_namespaces(struct thread *thread, u64 timestamp,
 			   struct namespaces_event *event);
+void thread__namespaces_id(const struct thread *thread,
+			   u64 *dev, u64 *ino);
 
 int __thread__set_comm(struct thread *thread, const char *comm, u64 timestamp,
 		       bool exec);
