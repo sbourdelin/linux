@@ -5320,6 +5320,7 @@ static void busy_poll_stop(struct napi_struct *napi, void *have_poll_lock)
 	 */
 	rc = napi->poll(napi, BUSY_POLL_BUDGET);
 	trace_napi_poll(napi, rc, BUSY_POLL_BUDGET);
+	xdp_do_map_check(napi);
 	netpoll_poll_unlock(have_poll_lock);
 	if (rc == BUSY_POLL_BUDGET)
 		__napi_schedule(napi);
@@ -5367,6 +5368,7 @@ restart:
 		}
 		work = napi_poll(napi, BUSY_POLL_BUDGET);
 		trace_napi_poll(napi, work, BUSY_POLL_BUDGET);
+		xdp_do_map_check(napi);
 count:
 		if (work > 0)
 			__NET_ADD_STATS(dev_net(napi->dev),
@@ -5529,6 +5531,7 @@ static int napi_poll(struct napi_struct *n, struct list_head *repoll)
 	if (test_bit(NAPI_STATE_SCHED, &n->state)) {
 		work = n->poll(n, weight);
 		trace_napi_poll(n, work, weight);
+		xdp_do_map_check(n);
 	}
 
 	WARN_ON_ONCE(work > weight);

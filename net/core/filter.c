@@ -2500,6 +2500,31 @@ void xdp_do_flush_map(void)
 }
 EXPORT_SYMBOL_GPL(xdp_do_flush_map);
 
+void xdp_do_map_check(struct napi_struct *napi)
+{
+	struct redirect_info *ri = this_cpu_ptr(&redirect_info);
+
+	/* XDP drivers (and XDP-generic) must invoke xdp_do_redirect()
+	 * when bpf_prog use helper bpf_redirect_map(), else the map
+	 * pointer can be left dangling.  Catch this invalid API
+	 * usage, instead of potentially crashing.
+	 */
+	if (ri->map) {
+		ri->map = NULL;
+		net_err_ratelimited("%s: caught invalid XDP bpf_redirect_map\n",
+				    napi->dev->name);
+		trace_xdp_exception(napi->dev, NULL, XDP_REDIRECT);
+	}
+	if (ri->map_to_flush) { /* Driver bug */
+		net_err_ratelimited("%s: XDP driver miss xdp_do_flush_map\n",
+				    napi->dev->name);
+		trace_xdp_exception(napi->dev, NULL, XDP_REDIRECT);
+		/* Flush map, else pkts can be stuck on XDP TXq */
+		xdp_do_flush_map();
+	}
+}
+EXPORT_SYMBOL_GPL(xdp_do_map_check);
+
 static int xdp_do_redirect_map(struct net_device *dev, struct xdp_buff *xdp,
 			       struct bpf_prog *xdp_prog)
 {
