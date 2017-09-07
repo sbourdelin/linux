@@ -348,35 +348,41 @@ void radix__tlb_flush(struct mmu_gather *tlb)
 }
 
 #define TLB_FLUSH_ALL -1UL
+
 /*
- * Number of pages above which we will do a bcast tlbie. Just a
- * number at this point copied from x86
+ * Number of pages above which we invalidate the entire PID rather than
+ * flush individual pages, for local and global flushes respectively.
+ *
+ * tlbie goes out to the interconnect and individual ops are more costly.
+ * It also does not iterate over sets like the local tlbiel variant when
+ * invalidating a full PID, so it has a far lower threshold to change from
+ * individual page flushes to full-pid flushes.
  */
 static unsigned long tlb_single_page_flush_ceiling __read_mostly = 33;
+static unsigned long tlb_local_single_page_flush_ceiling __read_mostly = POWER9_TLB_SETS_RADIX * 2;
 
 void radix__flush_tlb_range_psize(struct mm_struct *mm, unsigned long start,
 				  unsigned long end, int psize)
 {
 	unsigned long pid;
-	bool local;
-	unsigned long page_size = 1UL << mmu_psize_defs[psize].shift;
+	unsigned int page_shift = mmu_psize_defs[psize].shift;
+	unsigned long page_size = 1UL << page_shift;
 
 	pid = mm ? mm->context.id : 0;
 	if (unlikely(pid == MMU_NO_CONTEXT))
 		return;
 
 	preempt_disable();
-	local = mm_is_thread_local(mm);
-	if (end == TLB_FLUSH_ALL ||
-	    (end - start) > tlb_single_page_flush_ceiling * page_size) {
-		if (local)
+	if (mm_is_thread_local(mm)) {
+		if (end == TLB_FLUSH_ALL || ((end - start) >> page_shift) >
+					tlb_local_single_page_flush_ceiling)
 			_tlbiel_pid(pid, RIC_FLUSH_TLB);
 		else
-			_tlbie_pid(pid, RIC_FLUSH_TLB);
-
-	} else {
-		if (local)
 			_tlbiel_va_range(start, end, pid, page_size, psize);
+	} else {
+		if (end == TLB_FLUSH_ALL || ((end - start) >> page_shift) >
+					tlb_single_page_flush_ceiling)
+			_tlbie_pid(pid, RIC_FLUSH_TLB);
 		else
 			_tlbie_va_range(start, end, pid, page_size, psize);
 	}
@@ -387,7 +393,6 @@ void radix__flush_tlb_range_psize(struct mm_struct *mm, unsigned long start,
 void radix__flush_tlb_collapsed_pmd(struct mm_struct *mm, unsigned long addr)
 {
 	unsigned long pid, end;
-	bool local;
 
 	pid = mm ? mm->context.id : 0;
 	if (unlikely(pid == MMU_NO_CONTEXT))
@@ -399,21 +404,17 @@ void radix__flush_tlb_collapsed_pmd(struct mm_struct *mm, unsigned long addr)
 		return;
 	}
 
-	preempt_disable();
-	local = mm_is_thread_local(mm);
-	/* Otherwise first do the PWC */
-	if (local)
-		_tlbiel_pid(pid, RIC_FLUSH_PWC);
-	else
-		_tlbie_pid(pid, RIC_FLUSH_PWC);
-
-	/* Then iterate the pages */
 	end = addr + HPAGE_PMD_SIZE;
 
-	if (local)
+	/* Otherwise first do the PWC, then iterate the pages. */
+	preempt_disable();
+	if (mm_is_thread_local(mm)) {
+		_tlbiel_pid(pid, RIC_FLUSH_PWC);
 		_tlbiel_va_range(addr, end, pid, PAGE_SIZE, mmu_virtual_psize);
-	else
+	} else {
+		_tlbie_pid(pid, RIC_FLUSH_PWC);
 		_tlbie_va_range(addr, end, pid, PAGE_SIZE, mmu_virtual_psize);
+	}
 	preempt_enable();
 }
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
