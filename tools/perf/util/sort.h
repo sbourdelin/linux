@@ -96,7 +96,7 @@ struct hist_entry {
 	struct he_stat		*stat_acc;
 	struct map_symbol	ms;
 	struct thread		*thread;
-	struct comm		*comm;
+	const char		*comm_str;
 	struct namespace_id	cgroup_id;
 	u64			ip;
 	u64			transaction;

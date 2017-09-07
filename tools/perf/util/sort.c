@@ -114,26 +114,26 @@ static int64_t
 sort__comm_cmp(struct hist_entry *left, struct hist_entry *right)
 {
 	/* Compare the addr that should be unique among comm */
-	return strcmp(comm__str(right->comm), comm__str(left->comm));
+	return strcmp(right->comm_str, left->comm_str);
 }
 
 static int64_t
 sort__comm_collapse(struct hist_entry *left, struct hist_entry *right)
 {
 	/* Compare the addr that should be unique among comm */
-	return strcmp(comm__str(right->comm), comm__str(left->comm));
+	return strcmp(right->comm_str, left->comm_str);
 }
 
 static int64_t
 sort__comm_sort(struct hist_entry *left, struct hist_entry *right)
 {
-	return strcmp(comm__str(right->comm), comm__str(left->comm));
+	return strcmp(right->comm_str, left->comm_str);
 }
 
 static int hist_entry__comm_snprintf(struct hist_entry *he, char *bf,
 				     size_t size, unsigned int width)
 {
-	return repsep_snprintf(bf, size, "%-*.*s", width, width, comm__str(he->comm));
+	return repsep_snprintf(bf, size, "%-*.*s", width, width, he->comm_str);
 }
 
 struct sort_entry sort_comm = {
