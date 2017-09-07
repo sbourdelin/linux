@@ -805,6 +805,9 @@ unsigned int irq_create_fwspec_mapping(struct irq_fwspec *fwspec)
 		return 0;
 	}
 
+	if (domain->flags & IRQ_DOMAIN_FLAG_NO_CREATE)
+		return -EPROBE_DEFER;
+
 	if (irq_domain_is_hierarchy(domain)) {
 		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, fwspec);
 		if (virq <= 0)

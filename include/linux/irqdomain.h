@@ -195,6 +195,9 @@ enum {
 	/* Irq domain name was allocated in __irq_domain_add() */
 	IRQ_DOMAIN_NAME_ALLOCATED	= (1 << 6),
 
+	/* Do not allow irq consumers to create irq */
+	IRQ_DOMAIN_FLAG_NO_CREATE	= (1 << 7),
+
 	/*
 	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
 	 * for implementation specific purposes and ignored by the
