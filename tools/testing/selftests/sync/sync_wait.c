@@ -25,6 +25,7 @@
  *  OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <pthread.h>
 #include "sync.h"
 #include "sw_sync.h"
 #include "synctest.h"
@@ -88,4 +89,61 @@ int test_fence_multi_timeline_wait(void)
 	sw_sync_timeline_destroy(timelineA);
 
 	return 0;
+}
+
+struct fds_test {
+       int timeline;
+       int fencesig, fencekill;
+       int result;
+};
+
+static int test_fence_wait_on_destroyed_timeline_thread(void *d)
+{
+       struct fds_test *data = d;
+       int ret;
+
+       /* in case of errors */
+       data->result = 1;
+
+       ret = sw_sync_timeline_inc(data->timeline, 100);
+       ASSERT(ret == 0, "Failure advancing timeline\n");
+
+       ret = sync_wait(data->fencekill, -1);
+       ASSERT(ret == 1, "Failure waiting on fence\n");
+
+       /* no errors occurred */
+       data->result = 0;
+       return 0;
+}
+
+int test_fence_wait_on_destroyed_timeline(void)
+{
+       struct fds_test data;
+       pthread_t thread;
+       int valid;
+
+       data.timeline = sw_sync_timeline_create();
+       valid = sw_sync_timeline_is_valid(data.timeline);
+       ASSERT(valid, "Failure allocating timeline\n");
+
+       data.fencesig = sw_sync_fence_create(data.timeline, "allocFence", 100);
+       data.fencekill = sw_sync_fence_create(data.timeline, "allocFence", 200);
+
+       /* Spawn a thread to wait on a fence when the timeline is killed */
+       pthread_create(&thread, NULL, (void *(*)(void *))
+                      test_fence_wait_on_destroyed_timeline_thread, &data);
+
+       /* Wait for the thread to spool up */
+       sync_wait(data.fencesig, -1);
+
+       /* Kill the timeline */
+       sw_sync_timeline_destroy(data.timeline);
+
+       /* wait for the thread to clean up */
+       pthread_join(thread, NULL);
+
+       sw_sync_fence_destroy(data.fencesig);
+       sw_sync_fence_destroy(data.fencekill);
+
+       return data.result;
 }
