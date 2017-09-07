@@ -1,19 +1,14 @@
-#ifndef BLK_MQ_SCHED_H
-#define BLK_MQ_SCHED_H
+#ifndef INT_BLK_MQ_SCHED_H
+#define INT_BLK_MQ_SCHED_H
 
 #include "blk-mq.h"
 #include "blk-mq-tag.h"
 
-void blk_mq_sched_free_hctx_data(struct request_queue *q,
-				 void (*exit)(struct blk_mq_hw_ctx *));
+#include <linux/blk-mq-sched.h>
 
 void blk_mq_sched_assign_ioc(struct request *rq, struct bio *bio);
 
-void blk_mq_sched_request_inserted(struct request *rq);
-bool blk_mq_sched_try_merge(struct request_queue *q, struct bio *bio,
-				struct request **merged_request);
 bool __blk_mq_sched_bio_merge(struct request_queue *q, struct bio *bio);
-bool blk_mq_sched_try_insert_merge(struct request_queue *q, struct request *rq);
 void blk_mq_sched_restart(struct blk_mq_hw_ctx *hctx);
 
 void blk_mq_sched_insert_request(struct request *rq, bool at_head,
