@@ -1310,10 +1310,9 @@ static int init_vpbe_layer(int i, struct vpbe_display *disp_dev,
 		kzalloc(sizeof(struct vpbe_layer), GFP_KERNEL);
 
 	/* If memory allocation fails, return error */
-	if (!disp_dev->dev[i]) {
-		printk(KERN_ERR "ran out of memory\n");
+	if (!disp_dev->dev[i])
 		return  -ENOMEM;
-	}
+
 	spin_lock_init(&disp_dev->dev[i]->irqlock);
 	mutex_init(&disp_dev->dev[i]->opslock);
 
