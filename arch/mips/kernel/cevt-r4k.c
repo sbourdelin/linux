@@ -8,6 +8,7 @@
  */
 #include <linux/clockchips.h>
 #include <linux/interrupt.h>
+#include <linux/once.h>
 #include <linux/percpu.h>
 #include <linux/smp.h>
 #include <linux/irq.h>
@@ -106,7 +107,6 @@ static unsigned int calculate_min_delta(void)
 }
 
 DEFINE_PER_CPU(struct clock_event_device, mips_clockevent_device);
-int cp0_timer_irq_installed;
 
 irqreturn_t c0_compare_interrupt(int irq, void *dev_id)
 {
@@ -136,8 +136,9 @@ struct irqaction c0_compare_irqaction = {
 	 * IRQF_SHARED: The timer interrupt may be shared with other interrupts
 	 * such as perf counter and FDC interrupts.
 	 */
-	.flags = IRQF_PERCPU | IRQF_TIMER | IRQF_SHARED,
+	.flags = IRQF_PERCPU | IRQF_TIMER | IRQF_SHARED | IRQF_NOAUTOEN,
 	.name = "timer",
+	.percpu_dev_id = &mips_clockevent_device,
 };
 
 
@@ -222,11 +223,20 @@ unsigned int __weak get_c0_compare_int(void)
 	return MIPS_CPU_IRQ_BASE + cp0_compare_irq;
 }
 
+static void setup_c0_compare_int(int irq, int *err)
+{
+	if (irq_is_percpu_devid(irq))
+		*err = setup_percpu_irq(irq, &c0_compare_irqaction);
+	else
+		*err = setup_irq(irq, &c0_compare_irqaction);
+}
+
 int r4k_clockevent_init(void)
 {
 	unsigned int cpu = smp_processor_id();
 	struct clock_event_device *cd;
 	unsigned int irq, min_delta;
+	int err;
 
 	if (!cpu_has_counter || !mips_hpt_frequency)
 		return -ENXIO;
@@ -258,12 +268,17 @@ int r4k_clockevent_init(void)
 
 	clockevents_config_and_register(cd, mips_hpt_frequency, min_delta, 0x7fffffff);
 
-	if (cp0_timer_irq_installed)
-		return 0;
+	err = 0;
+	DO_ONCE(setup_c0_compare_int, irq, &err);
+	if (err) {
+		pr_err("Unable to setup timer IRQ %d: %d\n", irq, err);
+		return err;
+	}
 
-	cp0_timer_irq_installed = 1;
-
-	setup_irq(irq, &c0_compare_irqaction);
+	if (irq_is_percpu_devid(irq))
+		enable_percpu_irq(irq, IRQ_TYPE_NONE);
+	else
+		enable_irq(irq);
 
 	return 0;
 }
