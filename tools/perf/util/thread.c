@@ -45,6 +45,8 @@ struct thread *thread__new(pid_t pid, pid_t tid)
 		thread->cpu = -1;
 		INIT_LIST_HEAD(&thread->namespaces_list);
 		INIT_LIST_HEAD(&thread->comm_list);
+		pthread_mutex_init(&thread->namespaces_lock, NULL);
+		pthread_mutex_init(&thread->comm_lock, NULL);
 
 		comm_str = malloc(32);
 		if (!comm_str)
@@ -83,15 +85,21 @@ void thread__delete(struct thread *thread)
 		map_groups__put(thread->mg);
 		thread->mg = NULL;
 	}
+	pthread_mutex_lock(&thread->namespaces_lock);
 	list_for_each_entry_safe(namespaces, tmp_namespaces,
 				 &thread->namespaces_list, list) {
 		list_del(&namespaces->list);
 		namespaces__free(namespaces);
 	}
+	pthread_mutex_unlock(&thread->namespaces_lock);
+
+	pthread_mutex_lock(&thread->comm_lock);
 	list_for_each_entry_safe(comm, tmp_comm, &thread->comm_list, list) {
 		list_del(&comm->list);
 		comm__free(comm);
 	}
+	pthread_mutex_unlock(&thread->comm_lock);
+
 	unwind__finish_access(thread);
 	nsinfo__zput(thread->nsinfo);
 
@@ -128,11 +136,17 @@ struct namespaces *thread__namespaces(const struct thread *thread)
 int thread__set_namespaces(struct thread *thread, u64 timestamp,
 			   struct namespaces_event *event)
 {
-	struct namespaces *new, *curr = thread__namespaces(thread);
+	struct namespaces *new, *curr;
+
+	pthread_mutex_lock(&thread->namespaces_lock);
+
+	curr = thread__namespaces(thread);
 
 	new = namespaces__new(event);
-	if (!new)
+	if (!new) {
+		pthread_mutex_unlock(&thread->namespaces_lock);
 		return -ENOMEM;
+	}
 
 	list_add(&new->list, &thread->namespaces_list);
 
@@ -146,17 +160,21 @@ int thread__set_namespaces(struct thread *thread, u64 timestamp,
 		curr->end_time = timestamp;
 	}
 
+	pthread_mutex_unlock(&thread->namespaces_lock);
+
 	return 0;
 }
 
-void thread__namespaces_id(const struct thread *thread,
+void thread__namespaces_id(struct thread *thread,
 			   u64 *dev, u64 *ino)
 {
 	struct namespaces *ns;
 
+	pthread_mutex_lock(&thread->namespaces_lock);
 	ns = thread__namespaces(thread);
 	*dev = ns ? ns->link_info[CGROUP_NS_INDEX].dev : 0;
 	*ino = ns ? ns->link_info[CGROUP_NS_INDEX].ino : 0;
+	pthread_mutex_unlock(&thread->namespaces_lock);
 }
 
 struct comm *thread__comm(const struct thread *thread)
@@ -183,17 +201,23 @@ struct comm *thread__exec_comm(const struct thread *thread)
 int __thread__set_comm(struct thread *thread, const char *str, u64 timestamp,
 		       bool exec)
 {
-	struct comm *new, *curr = thread__comm(thread);
+	struct comm *new, *curr;
+	int err = 0;
+
+	pthread_mutex_lock(&thread->comm_lock);
+	curr = thread__comm(thread);
 
 	/* Override the default :tid entry */
 	if (!thread->comm_set) {
-		int err = comm__override(curr, str, timestamp, exec);
+		err = comm__override(curr, str, timestamp, exec);
 		if (err)
-			return err;
+			goto unlock;
 	} else {
 		new = comm__new(str, timestamp, exec);
-		if (!new)
-			return -ENOMEM;
+		if (!new) {
+			err = -ENOMEM;
+			goto unlock;
+		}
 		list_add(&new->list, &thread->comm_list);
 
 		if (exec)
@@ -202,7 +226,9 @@ int __thread__set_comm(struct thread *thread, const char *str, u64 timestamp,
 
 	thread->comm_set = true;
 
-	return 0;
+unlock:
+	pthread_mutex_unlock(&thread->comm_lock);
+	return err;
 }
 
 int thread__set_comm_from_proc(struct thread *thread)
@@ -222,14 +248,22 @@ int thread__set_comm_from_proc(struct thread *thread)
 	return err;
 }
 
-const char *thread__comm_str(const struct thread *thread)
+const char *thread__comm_str(struct thread *thread)
 {
-	const struct comm *comm = thread__comm(thread);
+	const struct comm *comm;
+	const char *str;
 
-	if (!comm)
+	pthread_mutex_lock(&thread->comm_lock);
+	comm = thread__comm(thread);
+
+	if (!comm) {
+		pthread_mutex_unlock(&thread->comm_lock);
 		return NULL;
+	}
+	str = comm__str(comm);
 
-	return comm__str(comm);
+	pthread_mutex_unlock(&thread->comm_lock);
+	return str;
 }
 
 /* CHECKME: it should probably better return the max comm len from its comm list */
