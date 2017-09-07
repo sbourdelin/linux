@@ -299,17 +299,40 @@ void radix__flush_tlb_kernel_range(unsigned long start, unsigned long end)
 }
 EXPORT_SYMBOL(radix__flush_tlb_kernel_range);
 
-/*
- * Currently, for range flushing, we just do a full mm flush. Because
- * we use this in code path where we don' track the page size.
- */
 void radix__flush_tlb_range(struct vm_area_struct *vma, unsigned long start,
 		     unsigned long end)
 
 {
 	struct mm_struct *mm = vma->vm_mm;
+	bool full;
 
-	radix__flush_tlb_mm(mm);
+#ifdef CONFIG_HUGETLB_PAGE
+	if (is_vm_hugetlb_page(vma))
+		return radix__flush_hugetlb_tlb_range(vma, start, end);
+#endif
+	full = radix__flush_tlb_range_psize(mm, start, end, mmu_virtual_psize);
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	if (!full) {
+		/*
+		 * If the small page flush was not a full PID flush, we have
+		 * to do a second pass to flush transparent huge pages. This
+		 * will be a far smaller number of invalidates, so it's not
+		 * worth calculating.
+		 *
+		 * Range flushes are still sub-optimal for cases of all or
+		 * no hugepages (moreso the former), which should be improved
+		 * by changing the flush API.
+		 */
+		unsigned long hstart, hend;
+		hstart = (start + HPAGE_PMD_SIZE - 1) >> HPAGE_PMD_SHIFT;
+		hend = end >> HPAGE_PMD_SHIFT;
+		if (hstart != hend) {
+			hstart <<= HPAGE_PMD_SHIFT;
+			hend <<= HPAGE_PMD_SHIFT;
+			radix__flush_tlb_range_psize(mm, hstart, hend, MMU_PAGE_2M);
+		}
+	}
+#endif
 }
 EXPORT_SYMBOL(radix__flush_tlb_range);
 
@@ -361,32 +384,39 @@ void radix__tlb_flush(struct mmu_gather *tlb)
 static unsigned long tlb_single_page_flush_ceiling __read_mostly = 33;
 static unsigned long tlb_local_single_page_flush_ceiling __read_mostly = POWER9_TLB_SETS_RADIX * 2;
 
-void radix__flush_tlb_range_psize(struct mm_struct *mm, unsigned long start,
+bool radix__flush_tlb_range_psize(struct mm_struct *mm, unsigned long start,
 				  unsigned long end, int psize)
 {
 	unsigned long pid;
 	unsigned int page_shift = mmu_psize_defs[psize].shift;
 	unsigned long page_size = 1UL << page_shift;
+	bool full = false;
 
 	pid = mm ? mm->context.id : 0;
 	if (unlikely(pid == MMU_NO_CONTEXT))
-		return;
+		return full;
 
 	preempt_disable();
 	if (mm_is_thread_local(mm)) {
 		if (end == TLB_FLUSH_ALL || ((end - start) >> page_shift) >
-					tlb_local_single_page_flush_ceiling)
+					tlb_local_single_page_flush_ceiling) {
+			full = true;
 			_tlbiel_pid(pid, RIC_FLUSH_TLB);
-		else
+		} else {
 			_tlbiel_va_range(start, end, pid, page_size, psize);
+		}
 	} else {
 		if (end == TLB_FLUSH_ALL || ((end - start) >> page_shift) >
-					tlb_single_page_flush_ceiling)
+					tlb_single_page_flush_ceiling) {
+			full = true;
 			_tlbie_pid(pid, RIC_FLUSH_TLB);
-		else
+		} else {
 			_tlbie_va_range(start, end, pid, page_size, psize);
+		}
 	}
 	preempt_enable();
+
+	return full;
 }
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
