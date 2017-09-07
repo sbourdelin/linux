@@ -396,6 +396,27 @@ void radix__tlb_flush(struct mmu_gather *tlb)
 static unsigned long tlb_single_page_flush_ceiling __read_mostly = 33;
 static unsigned long tlb_local_single_page_flush_ceiling __read_mostly = POWER9_TLB_SETS_RADIX * 2;
 
+void radix__local_flush_tlb_range_psize(struct mm_struct *mm,
+				unsigned long start, unsigned long end,
+				int psize)
+{
+	unsigned long pid;
+	unsigned int page_shift = mmu_psize_defs[psize].shift;
+	unsigned long page_size = 1UL << page_shift;
+
+	pid = mm ? mm->context.id : 0;
+	if (unlikely(pid == MMU_NO_CONTEXT))
+		return;
+
+	preempt_disable();
+	if (end == TLB_FLUSH_ALL || ((end - start) >> page_shift) >
+				tlb_local_single_page_flush_ceiling)
+		_tlbiel_pid(pid, RIC_FLUSH_TLB);
+	else
+		_tlbiel_va_range(start, end, pid, page_size, psize);
+	preempt_enable();
+}
+
 static bool __radix__flush_tlb_range_psize(struct mm_struct *mm,
 				unsigned long start, unsigned long end,
 				int psize, bool also_pwc)
@@ -517,6 +538,12 @@ void radix__flush_tlb_lpid(unsigned long lpid)
 	trace_tlbie(lpid, 0, rb, rs, ric, prs, r);
 }
 EXPORT_SYMBOL(radix__flush_tlb_lpid);
+
+void radix__local_flush_pmd_tlb_range(struct vm_area_struct *vma,
+				unsigned long start, unsigned long end)
+{
+	radix__local_flush_tlb_range_psize(vma->vm_mm, start, end, MMU_PAGE_2M);
+}
 
 void radix__flush_pmd_tlb_range(struct vm_area_struct *vma,
 				unsigned long start, unsigned long end)

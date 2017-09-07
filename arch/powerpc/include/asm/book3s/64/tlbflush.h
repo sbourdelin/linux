@@ -83,6 +83,17 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
 #define flush_tlb_mm(mm)		local_flush_tlb_mm(mm)
 #define flush_tlb_page(vma, addr)	local_flush_tlb_page(vma, addr)
 #endif /* CONFIG_SMP */
+
+#define flush_tlb_fix_spurious_fault flush_tlb_fix_spurious_fault
+static inline void flush_tlb_fix_spurious_fault(struct vm_area_struct *vma,
+						unsigned long address)
+{
+	if (radix_enabled())
+		radix__local_flush_tlb_page(vma, address);
+	else
+		flush_tlb_page(vma, address);
+}
+
 /*
  * flush the page walk cache for the address
  */
