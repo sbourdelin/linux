@@ -9,9 +9,11 @@ test_run()
 
 	echo "[ JIT enabled:$1 hardened:$2 ]"
 	dmesg -C
-	insmod $SRC_TREE/lib/test_bpf.ko 2> /dev/null
-	if [ $? -ne 0 ]; then
-		rc=1
+	if [ -f $SRC_TREE/lib/test_bpf.ko ]; then
+		insmod $SRC_TREE/lib/test_bpf.ko 2> /dev/null
+		if [ $? -ne 0 ]; then
+			rc=1
+		fi
 	fi
 	rmmod  test_bpf 2> /dev/null
 	dmesg | grep FAIL
