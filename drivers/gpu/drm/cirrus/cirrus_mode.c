@@ -348,11 +348,29 @@ static const struct drm_crtc_helper_funcs cirrus_helper_funcs = {
 	.commit = cirrus_crtc_commit,
 };
 
+static const uint32_t cirrus_plane_formats[] = {
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_ARGB8888,
+	DRM_FORMAT_RGB888,
+	DRM_FORMAT_RGB565,
+};
+
+static const struct drm_plane_funcs cirrus_plane_funcs = {
+	.update_plane	= drm_primary_helper_update,
+	.disable_plane	= drm_primary_helper_disable,
+	.destroy	= drm_primary_helper_destroy,
+};
+
+static const struct drm_plane_helper_funcs cirrus_plane_helper_funcs = {
+};
+
 /* CRTC setup */
 static void cirrus_crtc_init(struct drm_device *dev)
 {
 	struct cirrus_device *cdev = dev->dev_private;
 	struct cirrus_crtc *cirrus_crtc;
+	struct drm_plane *primary;
+	int ret;
 
 	cirrus_crtc = kzalloc(sizeof(struct cirrus_crtc) +
 			      (CIRRUSFB_CONN_LIMIT * sizeof(struct drm_connector *)),
@@ -361,12 +379,37 @@ static void cirrus_crtc_init(struct drm_device *dev)
 	if (cirrus_crtc == NULL)
 		return;
 
-	drm_crtc_init(dev, &cirrus_crtc->base, &cirrus_crtc_funcs);
+	primary = kzalloc(sizeof(*primary), GFP_KERNEL);
+	if (primary == NULL)
+		goto cleanup_crtc;
 
+	drm_plane_helper_add(primary, &cirrus_plane_helper_funcs);
+	ret = drm_universal_plane_init(dev, primary, 1,
+				       &cirrus_plane_funcs,
+				       cirrus_plane_formats,
+				       ARRAY_SIZE(cirrus_plane_formats),
+				       NULL, DRM_PLANE_TYPE_PRIMARY, NULL);
+	if (ret) {
+		kfree(primary);
+		goto cleanup_crtc;
+	}
+
+	ret = drm_crtc_init_with_planes(dev, &cirrus_crtc->base, primary, NULL,
+					&cirrus_crtc_funcs, NULL);
+	if (ret)
+		goto cleanup;
 	drm_mode_crtc_set_gamma_size(&cirrus_crtc->base, CIRRUS_LUT_SIZE);
 	cdev->mode_info.crtc = cirrus_crtc;
 
 	drm_crtc_helper_add(&cirrus_crtc->base, &cirrus_helper_funcs);
+	return;
+
+cleanup:
+	drm_plane_cleanup(primary);
+	kfree(primary);
+cleanup_crtc:
+	kfree(cirrus_crtc);
+	return;
 }
 
 static void cirrus_encoder_mode_set(struct drm_encoder *encoder,
