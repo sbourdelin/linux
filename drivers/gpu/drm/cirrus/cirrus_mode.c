@@ -217,6 +217,23 @@ static void cirrus_crtc_destroy(struct drm_crtc *crtc)
 	kfree(cirrus_crtc);
 }
 
+static void cirrus_crtc_atomic_flush(struct drm_crtc *crtc,
+				     struct drm_crtc_state *old_crtc_state)
+{
+	struct drm_device *dev = crtc->dev;
+	struct drm_pending_vblank_event *event;
+	unsigned long flags;
+
+	if (crtc->state && crtc->state->event) {
+		event = crtc->state->event;
+		crtc->state->event = NULL;
+
+		spin_lock_irqsave(&dev->event_lock, flags);
+		drm_crtc_send_vblank_event(crtc, event);
+		spin_unlock_irqrestore(&dev->event_lock, flags);
+	}
+}
+
 /* These provide the minimum set of functions required to handle a CRTC */
 static const struct drm_crtc_funcs cirrus_crtc_funcs = {
 	.gamma_set = cirrus_crtc_gamma_set,
@@ -234,6 +251,7 @@ static const struct drm_crtc_helper_funcs cirrus_helper_funcs = {
 	.mode_set_nofb = cirrus_mode_set_nofb,
 	.prepare = cirrus_crtc_prepare,
 	.commit = cirrus_crtc_commit,
+	.atomic_flush = cirrus_crtc_atomic_flush,
 };
 
 static int cirrus_plane_update(struct drm_plane *plane,
