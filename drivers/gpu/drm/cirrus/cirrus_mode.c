@@ -243,6 +243,231 @@ static const struct drm_crtc_helper_funcs cirrus_helper_funcs = {
 	.atomic_flush = cirrus_crtc_atomic_flush,
 };
 
+static void cirrus_argb_to_cursor(void *src , void __iomem *dst,
+				  uint32_t cursor_size)
+{
+	uint8_t *pixel = (uint8_t *)src;
+	const uint32_t row_size = cursor_size / 8;
+	const uint32_t plane_size = row_size * cursor_size;
+	uint32_t row_skip;
+	void __iomem *plane_0 = dst;
+	void __iomem *plane_1;
+	uint32_t x;
+	uint32_t y;
+
+	switch (cursor_size) {
+	case 32:
+		row_skip = 0;
+		plane_1 = plane_0 + plane_size;
+		break;
+	case 64:
+		row_skip = row_size;
+		plane_1 = plane_0 + row_size;
+		break;
+	default:
+		DRM_DEBUG("Cursor plane format is undefined for given size");
+		return;
+	}
+
+	for (y = 0; y < cursor_size; y++) {
+		uint8_t bits_0 = 0;
+		uint8_t bits_1 = 0;
+
+		for (x = 0; x < cursor_size; x++) {
+			uint8_t alpha = pixel[3];
+			int intensity = pixel[0] + pixel[1] + pixel[2];
+
+			intensity /= 3;
+			bits_0 <<= 1;
+			bits_1 <<= 1;
+			if (alpha > 0x7f) {
+				bits_1 |= 1;
+				if (intensity > 0x7f)
+					bits_0 |= 1;
+			}
+			if ((x % 8) == 7) {
+				iowrite8(bits_0, plane_0);
+				iowrite8(bits_1, plane_1);
+				plane_0++;
+				plane_1++;
+				bits_0 = 0;
+				bits_1 = 0;
+			}
+			pixel += 4;
+		}
+		plane_0 += row_skip;
+		plane_1 += row_skip;
+	}
+}
+
+static int cirrus_bo_to_cursor(struct cirrus_device *cdev,
+			       struct drm_framebuffer *fb,
+			       uint32_t cursor_size, uint32_t cursor_index)
+{
+	const uint32_t pixel_count = cursor_size * cursor_size;
+	const uint32_t plane_size = pixel_count / 8;
+	const uint32_t cursor_offset = cursor_index * plane_size * 2;
+	int ret = 0;
+	struct drm_device *dev = cdev->dev;
+	struct drm_gem_object *obj;
+	struct cirrus_bo *bo;
+	struct ttm_bo_kmap_obj bo_kmap;
+	bool is_iomem;
+	struct ttm_tt *ttm;
+	void *bo_ptr;
+
+	if ((cursor_size == 32 && cursor_index >= 64) ||
+	    (cursor_size == 64 && cursor_index >= 16)) {
+		DRM_ERROR("Cursor index is out of bounds\n");
+		return -EINVAL;
+	}
+
+	mutex_lock(&dev->struct_mutex);
+	obj = to_cirrus_framebuffer(fb)->obj;
+	if (obj == NULL) {
+		ret = -ENOENT;
+		DRM_ERROR("Buffer handle for cursor is invalid\n");
+		goto out_unlock;
+	}
+
+	bo = gem_to_cirrus_bo(obj);
+	ttm = bo->bo.ttm;
+
+	ret = ttm_bo_kmap(&bo->bo, 0, bo->bo.num_pages, &bo_kmap);
+	if (ret) {
+		DRM_ERROR("Cursor failed kmap of buffer object\n");
+		goto out_unlock;
+	}
+
+	bo_ptr = ttm_kmap_obj_virtual(&bo_kmap, &is_iomem);
+
+	cirrus_argb_to_cursor(bo_ptr, cdev->cursor_iomem + cursor_offset,
+			      cursor_size);
+
+	ttm_bo_kunmap(&bo_kmap);
+out_unlock:
+	mutex_unlock(&dev->struct_mutex);
+	return ret;
+}
+
+
+int cirrus_cursor_atomic_check(struct drm_plane *plane,
+			   struct drm_plane_state *state)
+{
+	struct drm_framebuffer *fb = state->fb;
+	struct drm_gem_object *obj;
+	struct cirrus_bo *bo;
+	uint32_t pixel_count;
+	uint32_t expected_pages;
+
+	if (!fb)
+		return 0;
+	if (fb->width != fb->height) {
+		DRM_DEBUG("Cursors are expected to have square dimensions\n");
+		return -EINVAL;
+	}
+
+	if (!(fb->width == 32 || fb->width == 64)) {
+		DRM_ERROR("Cursor dimension are expected to be 32 or 64\n");
+		return -EINVAL;
+	}
+
+	obj = to_cirrus_framebuffer(fb)->obj;
+	if (obj == NULL) {
+		DRM_ERROR("Buffer handle for cursor is invalid\n");
+		return -ENOENT;
+	}
+	bo = gem_to_cirrus_bo(obj);
+	pixel_count = fb->width * fb->width;
+	expected_pages = DIV_ROUND_UP(pixel_count * 4, PAGE_SIZE);
+	if (bo->bo.num_pages < expected_pages) {
+		DRM_ERROR("Buffer object for cursor is too small\n");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+static void cirrus_cursor_atomic_update(struct drm_plane *plane,
+				    struct drm_plane_state *old_state)
+{
+	int ret;
+	struct drm_device *dev = plane->state->crtc->dev;
+	struct cirrus_device *cdev = dev->dev_private;
+	struct drm_framebuffer *fb = plane->state->fb;
+	uint8_t cursor_index = 0;
+	int width, x, y;
+	int sr10, sr10_index;
+	int sr11, sr11_index;
+	int sr12, sr13;
+
+	width = fb->width;
+	if (fb != old_state->fb) {
+		WREG8(SEQ_INDEX, 0x12);
+		sr12 = RREG8(SEQ_DATA);
+		sr12 &= 0xfe;
+		WREG_SEQ(0x12, sr12);
+
+		/* This may still fail if the bo reservation fails. */
+		ret = cirrus_bo_to_cursor(cdev, fb, width, cursor_index);
+		if (ret)
+			return;
+
+		WREG8(SEQ_INDEX, 0x12);
+		sr12 = RREG8(SEQ_DATA);
+		sr12 &= 0xfa;
+		sr12 |= 0x03; /* enables cursor and write to extra DAC LUT */
+		if (width == 64)
+			sr12 |= 0x04;
+		WREG_SEQ(0x12, sr12);
+
+		/* Background set to black, foreground set to white */
+		WREG_PAL(0x00, 0, 0, 0);
+		WREG_PAL(0x0f, 255, 255, 255);
+
+		sr12 &= ~0x2; /* Disables writes to the extra LUT */
+		WREG_SEQ(0x12, sr12);
+
+		sr13 = 0;
+		if (width == 64)
+			sr13 |= (cursor_index & 0x0f) << 2;
+		else
+			sr13 |= cursor_index & 0x3f;
+		WREG_SEQ(0x13, sr13);
+	}
+
+	x = plane->state->crtc_x + fb->hot_x;
+	y = plane->state->crtc_y + fb->hot_y;
+	if (x < 0)
+		x = 0;
+	if (x > 0x7ff)
+		x = 0x7ff;
+	if (y < 0)
+		y = 0;
+	if (y > 0x7ff)
+		y = 0x7ff;
+
+	sr10 = (x >> 3) & 0xff;
+	sr10_index = 0x10;
+	sr10_index |= (x & 0x07) << 5;
+	WREG_SEQ(sr10_index, sr10);
+	sr11 = (y >> 3) & 0xff;
+	sr11_index = 0x11;
+	sr11_index |= (y & 0x07) << 5;
+	WREG_SEQ(sr11_index, sr11);
+}
+
+void cirrus_cursor_atomic_disable(struct drm_plane *plane,
+			       struct drm_plane_state *old_state)
+{
+	struct cirrus_device *cdev = plane->dev->dev_private;
+	int sr12;
+
+	WREG8(SEQ_INDEX, 0x12);
+	sr12 = (RREG8(SEQ_DATA) | 0x04) & 0xfe;
+	WREG8(SEQ_DATA, sr12);
+}
+
 static const uint32_t cirrus_plane_formats[] = {
 	DRM_FORMAT_XRGB8888,
 	DRM_FORMAT_ARGB8888,
@@ -440,6 +665,26 @@ static void cirrus_plane_atomic_update(struct drm_plane *plane,
 	outb(0x20, 0x3c0);
 }
 
+static const uint32_t cirrus_cursor_formats[] = {
+	DRM_FORMAT_ARGB8888,
+};
+
+static const struct drm_plane_funcs cirrus_cursor_plane_funcs = {
+	.update_plane	= drm_atomic_helper_update_plane,
+	.disable_plane	= drm_atomic_helper_disable_plane,
+	.destroy	= drm_primary_helper_destroy,
+	.reset		= drm_atomic_helper_plane_reset,
+	.atomic_duplicate_state = drm_atomic_helper_plane_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_plane_destroy_state,
+};
+
+static const struct drm_plane_helper_funcs cirrus_cursor_helper_funcs = {
+	.atomic_check = cirrus_cursor_atomic_check,
+	.atomic_update = cirrus_cursor_atomic_update,
+	.atomic_disable = cirrus_cursor_atomic_disable,
+	.prepare_fb = cirrus_plane_prepare_fb,
+	.cleanup_fb = cirrus_plane_cleanup_fb,
+};
 
 static const struct drm_plane_helper_funcs cirrus_plane_helper_funcs = {
 	.prepare_fb = cirrus_plane_prepare_fb,
@@ -454,7 +699,7 @@ static void cirrus_crtc_init(struct drm_device *dev)
 {
 	struct cirrus_device *cdev = dev->dev_private;
 	struct cirrus_crtc *cirrus_crtc;
-	struct drm_plane *primary;
+	struct drm_plane *primary, *cursor;
 	int ret;
 
 	cirrus_crtc = kzalloc(sizeof(struct cirrus_crtc) +
@@ -479,17 +724,35 @@ static void cirrus_crtc_init(struct drm_device *dev)
 		goto cleanup_crtc;
 	}
 
-	ret = drm_crtc_init_with_planes(dev, &cirrus_crtc->base, primary, NULL,
-					&cirrus_crtc_funcs, NULL);
+	cursor = kzalloc(sizeof(*cursor), GFP_KERNEL);
+	if (cursor == NULL)
+		goto cleanup_primary;
+
+	drm_plane_helper_add(cursor, &cirrus_cursor_helper_funcs);
+	ret = drm_universal_plane_init(dev, cursor, 1,
+				       &cirrus_cursor_plane_funcs,
+				       cirrus_cursor_formats,
+				       ARRAY_SIZE(cirrus_cursor_formats),
+				       NULL, DRM_PLANE_TYPE_CURSOR, NULL);
+	if (ret) {
+		kfree(cursor);
+		goto cleanup_primary;
+	}
+
+	ret = drm_crtc_init_with_planes(dev, &cirrus_crtc->base, primary, cursor,
+				      &cirrus_crtc_funcs, NULL);
 	if (ret)
-		goto cleanup;
+		goto cleanup_cursor;
 	drm_mode_crtc_set_gamma_size(&cirrus_crtc->base, CIRRUS_LUT_SIZE);
 	cdev->mode_info.crtc = cirrus_crtc;
 
 	drm_crtc_helper_add(&cirrus_crtc->base, &cirrus_helper_funcs);
 	return;
 
-cleanup:
+cleanup_cursor:
+	drm_plane_cleanup(cursor);
+	kfree(cursor);
+cleanup_primary:
 	drm_plane_cleanup(primary);
 	kfree(primary);
 cleanup_crtc:
