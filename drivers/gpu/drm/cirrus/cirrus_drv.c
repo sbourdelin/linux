@@ -130,7 +130,8 @@ static const struct file_operations cirrus_driver_fops = {
 	.compat_ioctl = drm_compat_ioctl,
 };
 static struct drm_driver driver = {
-	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME,
+	.driver_features = DRIVER_MODESET | DRIVER_GEM | DRIVER_PRIME |
+			DRIVER_ATOMIC,
 	.load = cirrus_driver_load,
 	.unload = cirrus_driver_unload,
 	.fops = &cirrus_driver_fops,
