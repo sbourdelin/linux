@@ -61,7 +61,16 @@ static irqreturn_t pps_gpio_irq_handler(int irq, void *data)
 
 	info = data;
 
-	rising_edge = gpio_get_value(info->gpio_pin);
+	/*
+	 * if not capturing both assert/clear events use the IRQ state
+	 * otherwise read the gpio state from the pin (which could miss
+	 * assertions on very small pulse-widths due to interrupt latency
+	 * and CPU performance).
+	 */
+	if (!info->capture_clear)
+		rising_edge = !info->assert_falling_edge;
+	else
+		rising_edge = gpio_get_value(info->gpio_pin);
 	if ((rising_edge && !info->assert_falling_edge) ||
 			(!rising_edge && info->assert_falling_edge))
 		pps_event(info->pps, &ts, PPS_CAPTUREASSERT, NULL);
