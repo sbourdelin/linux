@@ -44,7 +44,7 @@
  */
 void tinydrm_lastclose(struct drm_device *drm)
 {
-	struct tinydrm_device *tdev = drm->dev_private;
+	struct tinydrm_device *tdev = drm_to_tinydrm(drm);
 
 	DRM_DEBUG_KMS("\n");
 	drm_fbdev_cma_restore_mode(tdev->fbdev_cma);
@@ -126,7 +126,7 @@ static struct drm_framebuffer *
 tinydrm_fb_create(struct drm_device *drm, struct drm_file *file_priv,
 		  const struct drm_mode_fb_cmd2 *mode_cmd)
 {
-	struct tinydrm_device *tdev = drm->dev_private;
+	struct tinydrm_device *tdev = drm_to_tinydrm(drm);
 
 	return drm_fb_cma_create_with_funcs(drm, file_priv, mode_cmd,
 					    tdev->fb_funcs);
@@ -138,27 +138,37 @@ static const struct drm_mode_config_funcs tinydrm_mode_config_funcs = {
 	.atomic_commit = drm_atomic_helper_commit,
 };
 
+/**
+ * tinydrm_release - DRM driver release helper
+ * @drm: DRM device
+ *
+ * This function finalizes &drm_device. The caller is responsible for freeing
+ * &tinydrm_device.
+ *
+ * Drivers must use this in their &drm_driver->release callback.
+ */
+void tinydrm_release(struct drm_device *drm)
+{
+	DRM_DEBUG_DRIVER("\n");
+
+	drm_dev_fini(drm);
+}
+EXPORT_SYMBOL(tinydrm_release);
+
 static int tinydrm_init(struct device *parent, struct tinydrm_device *tdev,
 			const struct drm_framebuffer_funcs *fb_funcs,
 			struct drm_driver *driver)
 {
-	struct drm_device *drm;
+	struct drm_device *drm = &tdev->drm;
+	int ret;
 
 	mutex_init(&tdev->dirty_lock);
 	tdev->fb_funcs = fb_funcs;
 
-	/*
-	 * We don't embed drm_device, because that prevent us from using
-	 * devm_kzalloc() to allocate tinydrm_device in the driver since
-	 * drm_dev_unref() frees the structure. The devm_ functions provide
-	 * for easy error handling.
-	 */
-	drm = drm_dev_alloc(driver, parent);
-	if (IS_ERR(drm))
-		return PTR_ERR(drm);
+	ret = drm_dev_init(drm, driver, parent);
+	if (ret)
+		return ret;
 
-	tdev->drm = drm;
-	drm->dev_private = tdev;
 	drm_mode_config_init(drm);
 	drm->mode_config.funcs = &tinydrm_mode_config_funcs;
 
@@ -167,10 +177,9 @@ static int tinydrm_init(struct device *parent, struct tinydrm_device *tdev,
 
 static void tinydrm_fini(struct tinydrm_device *tdev)
 {
-	drm_mode_config_cleanup(tdev->drm);
+	drm_mode_config_cleanup(&tdev->drm);
 	mutex_destroy(&tdev->dirty_lock);
-	tdev->drm->dev_private = NULL;
-	drm_dev_unref(tdev->drm);
+	drm_dev_unref(&tdev->drm);
 }
 
 static void devm_tinydrm_release(void *data)
@@ -212,12 +221,12 @@ EXPORT_SYMBOL(devm_tinydrm_init);
 
 static int tinydrm_register(struct tinydrm_device *tdev)
 {
-	struct drm_device *drm = tdev->drm;
+	struct drm_device *drm = &tdev->drm;
 	int bpp = drm->mode_config.preferred_depth;
 	struct drm_fbdev_cma *fbdev;
 	int ret;
 
-	ret = drm_dev_register(tdev->drm, 0);
+	ret = drm_dev_register(drm, 0);
 	if (ret)
 		return ret;
 
@@ -236,10 +245,10 @@ static void tinydrm_unregister(struct tinydrm_device *tdev)
 {
 	struct drm_fbdev_cma *fbdev_cma = tdev->fbdev_cma;
 
-	drm_atomic_helper_shutdown(tdev->drm);
+	drm_atomic_helper_shutdown(&tdev->drm);
 	/* don't restore fbdev in lastclose, keep pipeline disabled */
 	tdev->fbdev_cma = NULL;
-	drm_dev_unregister(tdev->drm);
+	drm_dev_unregister(&tdev->drm);
 	if (fbdev_cma)
 		drm_fbdev_cma_fini(fbdev_cma);
 }
@@ -262,7 +271,7 @@ static void devm_tinydrm_register_release(void *data)
  */
 int devm_tinydrm_register(struct tinydrm_device *tdev)
 {
-	struct device *dev = tdev->drm->dev;
+	struct device *dev = tdev->drm.dev;
 	int ret;
 
 	ret = tinydrm_register(tdev);
@@ -287,7 +296,7 @@ EXPORT_SYMBOL(devm_tinydrm_register);
  */
 void tinydrm_shutdown(struct tinydrm_device *tdev)
 {
-	drm_atomic_helper_shutdown(tdev->drm);
+	drm_atomic_helper_shutdown(&tdev->drm);
 }
 EXPORT_SYMBOL(tinydrm_shutdown);
 
@@ -312,7 +321,7 @@ int tinydrm_suspend(struct tinydrm_device *tdev)
 	}
 
 	drm_fbdev_cma_set_suspend_unlocked(tdev->fbdev_cma, 1);
-	state = drm_atomic_helper_suspend(tdev->drm);
+	state = drm_atomic_helper_suspend(&tdev->drm);
 	if (IS_ERR(state)) {
 		drm_fbdev_cma_set_suspend_unlocked(tdev->fbdev_cma, 0);
 		return PTR_ERR(state);
@@ -346,7 +355,7 @@ int tinydrm_resume(struct tinydrm_device *tdev)
 
 	tdev->suspend_state = NULL;
 
-	ret = drm_atomic_helper_resume(tdev->drm, state);
+	ret = drm_atomic_helper_resume(&tdev->drm, state);
 	if (ret) {
 		DRM_ERROR("Error resuming state: %d\n", ret);
 		return ret;

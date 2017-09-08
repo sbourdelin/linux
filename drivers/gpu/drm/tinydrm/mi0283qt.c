@@ -23,7 +23,7 @@
 static int mi0283qt_init(struct mipi_dbi *mipi)
 {
 	struct tinydrm_device *tdev = &mipi->tinydrm;
-	struct device *dev = tdev->drm->dev;
+	struct device *dev = tdev->drm.dev;
 	u8 addr_mode;
 	int ret;
 
@@ -139,6 +139,7 @@ static struct drm_driver mi0283qt_driver = {
 				  DRIVER_ATOMIC,
 	.fops			= &mi0283qt_fops,
 	TINYDRM_GEM_DRIVER_OPS,
+	.release		= mipi_dbi_release,
 	.lastclose		= tinydrm_lastclose,
 	.debugfs_init		= mipi_dbi_debugfs_init,
 	.name			= "mi0283qt",
@@ -168,7 +169,7 @@ static int mi0283qt_probe(struct spi_device *spi)
 	u32 rotation = 0;
 	int ret;
 
-	mipi = devm_kzalloc(dev, sizeof(*mipi), GFP_KERNEL);
+	mipi = kzalloc(sizeof(*mipi), GFP_KERNEL);
 	if (!mipi)
 		return -ENOMEM;
 
@@ -200,8 +201,10 @@ static int mi0283qt_probe(struct spi_device *spi)
 
 	ret = mipi_dbi_init(&spi->dev, mipi, &mi0283qt_pipe_funcs,
 			    &mi0283qt_driver, &mi0283qt_mode, rotation);
-	if (ret)
+	if (ret) {
+		kfree(mipi);
 		return ret;
+	}
 
 	ret = mi0283qt_init(mipi);
 	if (ret)

@@ -112,7 +112,7 @@ static int st7586_fb_dirty(struct drm_framebuffer *fb,
 			   unsigned int color, struct drm_clip_rect *clips,
 			   unsigned int num_clips)
 {
-	struct tinydrm_device *tdev = fb->dev->dev_private;
+	struct tinydrm_device *tdev = drm_to_tinydrm(fb->dev);
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	struct drm_clip_rect clip;
 	int start, end;
@@ -178,7 +178,7 @@ static void st7586_pipe_enable(struct drm_simple_display_pipe *pipe,
 	struct tinydrm_device *tdev = pipe_to_tinydrm(pipe);
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	struct drm_framebuffer *fb = pipe->plane.fb;
-	struct device *dev = tdev->drm->dev;
+	struct device *dev = tdev->drm.dev;
 	int ret;
 	u8 addr_mode;
 
@@ -290,13 +290,13 @@ static int st7586_init(struct device *dev, struct mipi_dbi *mipi,
 	if (ret)
 		return ret;
 
-	tdev->drm->mode_config.preferred_depth = 32;
+	tdev->drm.mode_config.preferred_depth = 32;
 	mipi->rotation = rotation;
 
-	drm_mode_config_reset(tdev->drm);
+	drm_mode_config_reset(&tdev->drm);
 
 	DRM_DEBUG_KMS("preferred_depth=%u, rotation = %u\n",
-		      tdev->drm->mode_config.preferred_depth, rotation);
+		      tdev->drm.mode_config.preferred_depth, rotation);
 
 	return 0;
 }
@@ -319,6 +319,7 @@ static struct drm_driver st7586_driver = {
 				  DRIVER_ATOMIC,
 	.fops			= &st7586_fops,
 	TINYDRM_GEM_DRIVER_OPS,
+	.release		= mipi_dbi_release,
 	.lastclose		= tinydrm_lastclose,
 	.debugfs_init		= mipi_dbi_debugfs_init,
 	.name			= "st7586",
@@ -348,7 +349,7 @@ static int st7586_probe(struct spi_device *spi)
 	u32 rotation = 0;
 	int ret;
 
-	mipi = devm_kzalloc(dev, sizeof(*mipi), GFP_KERNEL);
+	mipi = kzalloc(sizeof(*mipi), GFP_KERNEL);
 	if (!mipi)
 		return -ENOMEM;
 
@@ -384,8 +385,10 @@ static int st7586_probe(struct spi_device *spi)
 
 	ret = st7586_init(&spi->dev, mipi, &st7586_pipe_funcs, &st7586_driver,
 			  &st7586_mode, rotation);
-	if (ret)
+	if (ret) {
+		kfree(mipi);
 		return ret;
+	}
 
 	spi_set_drvdata(spi, mipi);
 

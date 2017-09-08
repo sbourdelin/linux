@@ -528,7 +528,7 @@ static int repaper_fb_dirty(struct drm_framebuffer *fb,
 {
 	struct drm_gem_cma_object *cma_obj = drm_fb_cma_get_gem_obj(fb, 0);
 	struct dma_buf_attachment *import_attach = cma_obj->base.import_attach;
-	struct tinydrm_device *tdev = fb->dev->dev_private;
+	struct tinydrm_device *tdev = drm_to_tinydrm(fb->dev);
 	struct repaper_epd *epd = epd_from_tinydrm(tdev);
 	struct drm_clip_rect clip;
 	u8 *buf = NULL;
@@ -855,6 +855,15 @@ static const struct drm_simple_display_pipe_funcs repaper_pipe_funcs = {
 	.prepare_fb = tinydrm_display_pipe_prepare_fb,
 };
 
+static void repaper_release(struct drm_device *drm)
+{
+	struct tinydrm_device *tdev = drm_to_tinydrm(drm);
+	struct repaper_epd *epd = epd_from_tinydrm(tdev);
+
+	tinydrm_release(drm);
+	kfree(epd);
+}
+
 static const uint32_t repaper_formats[] = {
 	DRM_FORMAT_XRGB8888,
 };
@@ -894,6 +903,7 @@ static struct drm_driver repaper_driver = {
 				  DRIVER_ATOMIC,
 	.fops			= &repaper_fops,
 	TINYDRM_GEM_DRIVER_OPS,
+	.release		= repaper_release,
 	.name			= "repaper",
 	.desc			= "Pervasive Displays RePaper e-ink panels",
 	.date			= "20170405",
@@ -949,7 +959,7 @@ static int repaper_probe(struct spi_device *spi)
 		}
 	}
 
-	epd = devm_kzalloc(dev, sizeof(*epd), GFP_KERNEL);
+	epd = kzalloc(sizeof(*epd), GFP_KERNEL);
 	if (!epd)
 		return -ENOMEM;
 
@@ -1067,8 +1077,10 @@ static int repaper_probe(struct spi_device *spi)
 	tdev = &epd->tinydrm;
 
 	ret = devm_tinydrm_init(dev, tdev, &repaper_fb_funcs, &repaper_driver);
-	if (ret)
+	if (ret) {
+		kfree(epd);
 		return ret;
+	}
 
 	ret = tinydrm_display_pipe_init(tdev, &repaper_pipe_funcs,
 					DRM_MODE_CONNECTOR_VIRTUAL,
@@ -1077,7 +1089,7 @@ static int repaper_probe(struct spi_device *spi)
 	if (ret)
 		return ret;
 
-	drm_mode_config_reset(tdev->drm);
+	drm_mode_config_reset(&tdev->drm);
 	spi_set_drvdata(spi, tdev);
 
 	DRM_DEBUG_DRIVER("SPI speed: %uMHz\n", spi->max_speed_hz / 1000000);
