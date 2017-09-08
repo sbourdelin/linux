@@ -466,7 +466,13 @@ EXPORT_SYMBOL_GPL(drm_fbdev_cma_init);
  */
 void drm_fbdev_cma_fini(struct drm_fbdev_cma *fbdev_cma)
 {
-	drm_fb_helper_unregister_fbi(&fbdev_cma->fb_helper);
+	if (!fbdev_cma)
+		return;
+
+	/* Make sure it hasn't been unregistered already */
+	if (fbdev_cma->fb_helper.fbdev && fbdev_cma->fb_helper.fbdev->dev)
+		drm_fb_helper_unregister_fbi(&fbdev_cma->fb_helper);
+
 	if (fbdev_cma->fb_helper.fbdev)
 		drm_fbdev_cma_defio_fini(fbdev_cma->fb_helper.fbdev);
 
