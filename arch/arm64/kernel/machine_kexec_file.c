@@ -24,7 +24,11 @@
 static int __dt_root_addr_cells;
 static int __dt_root_size_cells;
 
-static struct kexec_file_ops *kexec_file_loaders[0];
+static struct kexec_file_ops *kexec_file_loaders[] = {
+#ifdef CONFIG_KEXEC_FILE_IMAGE_FMT
+	&kexec_image_ops,
+#endif
+};
 
 int arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
 				  unsigned long buf_len)
