@@ -163,6 +163,7 @@ struct cirrus_bo {
 	struct ttm_buffer_object bo;
 	struct ttm_placement placement;
 	struct ttm_bo_kmap_obj kmap;
+	struct ttm_bo_kmap_obj dma_buf_vmap;
 	struct drm_gem_object gem;
 	struct ttm_place placements[3];
 	int pin_count;
@@ -255,6 +256,15 @@ static inline void cirrus_bo_unreserve(struct cirrus_bo *bo)
 int cirrus_bo_push_sysram(struct cirrus_bo *bo);
 int cirrus_bo_pin(struct cirrus_bo *bo, u32 pl_flag, u64 *gpu_addr);
 int cirrus_bo_unpin(struct cirrus_bo *bo);
+
+struct sg_table *cirrus_gem_prime_get_sg_table(struct drm_gem_object *obj);
+void *cirrus_gem_prime_vmap(struct drm_gem_object *obj);
+void cirrus_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
+struct drm_gem_object *cirrus_gem_prime_import_sg_table(
+				struct drm_device *dev,
+				struct dma_buf_attachment *attach,
+				struct sg_table *sgt);
+int cirrus_gem_prime_pin(struct drm_gem_object *obj);
 
 extern int cirrus_bpp;
 
