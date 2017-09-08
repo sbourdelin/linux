@@ -1286,6 +1286,74 @@ static void vdm_state_machine_work(struct work_struct *work)
 	mutex_unlock(&port->lock);
 }
 
+static int tcpm_validate_caps(struct tcpm_port *port, const u32 *pdo,
+			      unsigned int nr_pdo)
+{
+	unsigned int i;
+
+	/* Should at least contain vSafe5v */
+	if (nr_pdo < 1) {
+		tcpm_log_force(port,
+			       " err: source/sink caps should atleast have vSafe5V");
+		return -EINVAL;
+	}
+
+	/* The vSafe5V Fixed Supply Object Shall always be the first object */
+	if (pdo_type(pdo[0]) != PDO_TYPE_FIXED ||
+	    pdo_fixed_voltage(pdo[0]) != VSAFE5V) {
+		tcpm_log_force(port,
+			       " err: vSafe5V Fixed Supply Object Shall always be the first object");
+		return -EINVAL;
+	}
+
+	for (i = 1; i < nr_pdo; i++) {
+		if (pdo_type(pdo[i]) < pdo_type(pdo[i - 1])) {
+			tcpm_log_force(port,
+				       " err:PDOs should be in the following order: Fixed; Battery; Variable. pdo index:%u"
+				       , i);
+			return -EINVAL;
+		} else if (pdo_type(pdo[i]) == pdo_type(pdo[i - 1])) {
+			enum pd_pdo_type type = pdo_type(pdo[i]);
+
+			switch (type) {
+			/*
+			 * The remaining Fixed Supply Objects, if
+			 * present, shall be sent in voltage order;
+			 * lowest to highest.
+			 */
+			case PDO_TYPE_FIXED:
+				if (pdo_fixed_voltage(pdo[i]) <=
+				    pdo_fixed_voltage(pdo[i - 1])) {
+					tcpm_log_force(port,
+						       " err: Fixed supply pdos should be in increasing order, pdo index:%u"
+						       , i);
+					return -EINVAL;
+				}
+				break;
+			/*
+			 * The Battery Supply Objects and Variable
+			 * supply, if present shall be sent in Minimum
+			 * Voltage order; lowest to highest.
+			 */
+			case PDO_TYPE_VAR:
+			case PDO_TYPE_BATT:
+				if (pdo_min_voltage(pdo[i]) <
+				    pdo_min_voltage(pdo[i - 1])) {
+					tcpm_log_force(port,
+						       " err: Variable supply pdos should be in increasing order, pdo index:%u"
+						       , i);
+					return -EINVAL;
+				}
+				break;
+			default:
+				tcpm_log_force(port, " Unknown pdo type");
+			}
+		}
+	}
+
+	return 0;
+}
+
 /*
  * PD (data, control) command handling functions
  */
@@ -1307,6 +1375,9 @@ static void tcpm_pd_data_request(struct tcpm_port *port,
 		port->nr_source_caps = cnt;
 
 		tcpm_log_source_caps(port);
+
+		tcpm_validate_caps(port, port->source_caps,
+				   port->nr_source_caps);
 
 		/*
 		 * This message may be received even if VBUS is not
@@ -3475,9 +3546,13 @@ static int tcpm_copy_vdos(u32 *dest_vdo, const u32 *src_vdo,
 	return nr_vdo;
 }
 
-void tcpm_update_source_capabilities(struct tcpm_port *port, const u32 *pdo,
-				     unsigned int nr_pdo)
+int tcpm_update_source_capabilities(struct tcpm_port *port, const u32 *pdo,
+				    unsigned int nr_pdo)
 {
+	if (tcpm_validate_caps(port, pdo, nr_pdo)) {
+		tcpm_log_force(port, "Invalid source caps");
+		return -EINVAL;
+	}
 	mutex_lock(&port->lock);
 	port->nr_src_pdo = tcpm_copy_pdos(port->src_pdo, pdo, nr_pdo);
 	switch (port->state) {
@@ -3497,16 +3572,21 @@ void tcpm_update_source_capabilities(struct tcpm_port *port, const u32 *pdo,
 		break;
 	}
 	mutex_unlock(&port->lock);
+	return 0;
 }
 EXPORT_SYMBOL_GPL(tcpm_update_source_capabilities);
 
-void tcpm_update_sink_capabilities(struct tcpm_port *port, const u32 *pdo,
-				   unsigned int nr_pdo,
-				   unsigned int max_snk_mv,
-				   unsigned int max_snk_ma,
-				   unsigned int max_snk_mw,
-				   unsigned int operating_snk_mw)
+int tcpm_update_sink_capabilities(struct tcpm_port *port, const u32 *pdo,
+				  unsigned int nr_pdo,
+				  unsigned int max_snk_mv,
+				  unsigned int max_snk_ma,
+				  unsigned int max_snk_mw,
+				  unsigned int operating_snk_mw)
 {
+	if (tcpm_validate_caps(port, pdo, nr_pdo)) {
+		tcpm_log_force(port, "Invalid source caps");
+		return -EINVAL;
+	}
 	mutex_lock(&port->lock);
 	port->nr_snk_pdo = tcpm_copy_pdos(port->snk_pdo, pdo, nr_pdo);
 	port->max_snk_mv = max_snk_mv;
@@ -3525,6 +3605,7 @@ void tcpm_update_sink_capabilities(struct tcpm_port *port, const u32 *pdo,
 		break;
 	}
 	mutex_unlock(&port->lock);
+	return 0;
 }
 EXPORT_SYMBOL_GPL(tcpm_update_sink_capabilities);
 
@@ -3560,7 +3641,16 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 
 	init_completion(&port->tx_complete);
 	init_completion(&port->swap_complete);
+	tcpm_debugfs_init(port);
 
+	if (tcpm_validate_caps(port, tcpc->config->src_pdo,
+			       tcpc->config->nr_src_pdo) ||
+			       tcpm_validate_caps(port,
+						  tcpc->config->snk_pdo,
+						  tcpc->config->nr_snk_pdo)) {
+		err = -EINVAL;
+		goto out_destroy_wq;
+	}
 	port->nr_src_pdo = tcpm_copy_pdos(port->src_pdo, tcpc->config->src_pdo,
 					  tcpc->config->nr_src_pdo);
 	port->nr_snk_pdo = tcpm_copy_pdos(port->snk_pdo, tcpc->config->snk_pdo,
@@ -3620,7 +3710,6 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 		}
 	}
 
-	tcpm_debugfs_init(port);
 	mutex_lock(&port->lock);
 	tcpm_init(port);
 	mutex_unlock(&port->lock);

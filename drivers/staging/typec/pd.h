@@ -139,6 +139,8 @@ enum pd_pdo_type {
 #define PDO_FIXED_VOLT(mv)	((((mv) / 50) & PDO_VOLT_MASK) << PDO_FIXED_VOLT_SHIFT)
 #define PDO_FIXED_CURR(ma)	((((ma) / 10) & PDO_CURR_MASK) << PDO_FIXED_CURR_SHIFT)
 
+#define VSAFE5V 5000 /* mv units */
+
 #define PDO_FIXED(mv, ma, flags)			\
 	(PDO_TYPE(PDO_TYPE_FIXED) | (flags) |		\
 	 PDO_FIXED_VOLT(mv) | PDO_FIXED_CURR(ma))
