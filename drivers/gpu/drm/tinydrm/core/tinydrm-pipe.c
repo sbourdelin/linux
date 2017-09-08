@@ -14,7 +14,7 @@
 
 struct tinydrm_connector {
 	struct drm_connector base;
-	const struct drm_display_mode *mode;
+	struct drm_display_mode mode;
 };
 
 static inline struct tinydrm_connector *
@@ -28,7 +28,7 @@ static int tinydrm_connector_get_modes(struct drm_connector *connector)
 	struct tinydrm_connector *tconn = to_tinydrm_connector(connector);
 	struct drm_display_mode *mode;
 
-	mode = drm_mode_duplicate(connector->dev, tconn->mode);
+	mode = drm_mode_duplicate(connector->dev, &tconn->mode);
 	if (!mode) {
 		DRM_ERROR("Failed to duplicate mode\n");
 		return 0;
@@ -92,7 +92,7 @@ tinydrm_connector_create(struct drm_device *drm,
 	if (!tconn)
 		return ERR_PTR(-ENOMEM);
 
-	tconn->mode = mode;
+	tconn->mode = *mode;
 	connector = &tconn->base;
 
 	drm_connector_helper_add(connector, &tinydrm_connector_hfuncs);
@@ -199,27 +199,23 @@ tinydrm_display_pipe_init(struct tinydrm_device *tdev,
 			  unsigned int rotation)
 {
 	struct drm_device *drm = &tdev->drm;
-	struct drm_display_mode *mode_copy;
+	struct drm_display_mode mode_copy;
 	struct drm_connector *connector;
 	int ret;
 
-	mode_copy = devm_kmalloc(drm->dev, sizeof(*mode_copy), GFP_KERNEL);
-	if (!mode_copy)
-		return -ENOMEM;
-
-	*mode_copy = *mode;
-	ret = tinydrm_rotate_mode(mode_copy, rotation);
+	mode_copy = *mode;
+	ret = tinydrm_rotate_mode(&mode_copy, rotation);
 	if (ret) {
 		DRM_ERROR("Illegal rotation value %u\n", rotation);
 		return -EINVAL;
 	}
 
-	drm->mode_config.min_width = mode_copy->hdisplay;
-	drm->mode_config.max_width = mode_copy->hdisplay;
-	drm->mode_config.min_height = mode_copy->vdisplay;
-	drm->mode_config.max_height = mode_copy->vdisplay;
+	drm->mode_config.min_width = mode_copy.hdisplay;
+	drm->mode_config.max_width = mode_copy.hdisplay;
+	drm->mode_config.min_height = mode_copy.vdisplay;
+	drm->mode_config.max_height = mode_copy.vdisplay;
 
-	connector = tinydrm_connector_create(drm, mode_copy, connector_type);
+	connector = tinydrm_connector_create(drm, &mode_copy, connector_type);
 	if (IS_ERR(connector))
 		return PTR_ERR(connector);
 
