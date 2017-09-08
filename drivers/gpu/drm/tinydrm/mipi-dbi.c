@@ -203,9 +203,12 @@ static int mipi_dbi_fb_dirty(struct drm_framebuffer *fb,
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	bool swap = mipi->swap_bytes;
 	struct drm_clip_rect clip;
-	int ret = 0;
+	int ret = 0, idx;
 	bool full;
 	void *tr;
+
+	if (!drm_dev_enter(fb->dev, &idx))
+		return -ENODEV;
 
 	mutex_lock(&tdev->dirty_lock);
 
@@ -244,6 +247,7 @@ static int mipi_dbi_fb_dirty(struct drm_framebuffer *fb,
 
 out_unlock:
 	mutex_unlock(&tdev->dirty_lock);
+	drm_dev_exit(idx);
 
 	if (ret)
 		dev_err_once(fb->dev->dev, "Failed to update display %d\n",
@@ -273,12 +277,18 @@ void mipi_dbi_pipe_enable(struct drm_simple_display_pipe *pipe,
 	struct tinydrm_device *tdev = pipe_to_tinydrm(pipe);
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	struct drm_framebuffer *fb = pipe->plane.fb;
+	int idx;
+
+	if (!drm_dev_enter(&tdev->drm, &idx))
+		return;
 
 	mipi->enabled = true;
 	if (fb)
 		fb->funcs->dirty(fb, NULL, 0, 0, NULL, 0);
 
 	tinydrm_enable_backlight(mipi->backlight);
+
+	drm_dev_exit(idx);
 }
 EXPORT_SYMBOL(mipi_dbi_pipe_enable);
 
@@ -311,6 +321,10 @@ void mipi_dbi_pipe_disable(struct drm_simple_display_pipe *pipe)
 {
 	struct tinydrm_device *tdev = pipe_to_tinydrm(pipe);
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
+	int idx;
+
+	if (!drm_dev_enter(&tdev->drm, &idx))
+		return;
 
 	DRM_DEBUG_KMS("\n");
 
@@ -323,6 +337,8 @@ void mipi_dbi_pipe_disable(struct drm_simple_display_pipe *pipe)
 
 	if (mipi->regulator)
 		regulator_disable(mipi->regulator);
+
+	drm_dev_exit(idx);
 }
 EXPORT_SYMBOL(mipi_dbi_pipe_disable);
 

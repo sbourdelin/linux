@@ -27,14 +27,17 @@ static void mi0283qt_enable(struct drm_simple_display_pipe *pipe,
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	struct device *dev = tdev->drm.dev;
 	u8 addr_mode;
-	int ret;
+	int ret, idx;
+
+	if (!drm_dev_enter(&tdev->drm, &idx))
+		return;
 
 	DRM_DEBUG_KMS("\n");
 
 	ret = regulator_enable(mipi->regulator);
 	if (ret) {
 		dev_err(dev, "Failed to enable regulator (%d)\n", ret);
-		return;
+		goto exit;
 	}
 
 	if (mipi_dbi_display_is_on(mipi))
@@ -45,7 +48,7 @@ static void mi0283qt_enable(struct drm_simple_display_pipe *pipe,
 	if (ret) {
 		dev_err(dev, "Error sending command (%d)\n", ret);
 		regulator_disable(mipi->regulator);
-		return;
+		goto exit;
 	}
 
 	msleep(20);
@@ -113,6 +116,8 @@ static void mi0283qt_enable(struct drm_simple_display_pipe *pipe,
 
 out_enable:
 	mipi_dbi_pipe_enable(pipe, crtc_state);
+exit:
+	drm_dev_exit(idx);
 }
 
 static const struct drm_simple_display_pipe_funcs mi0283qt_pipe_funcs = {

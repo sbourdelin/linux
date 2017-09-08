@@ -531,8 +531,11 @@ static int repaper_fb_dirty(struct drm_framebuffer *fb,
 	struct tinydrm_device *tdev = drm_to_tinydrm(fb->dev);
 	struct repaper_epd *epd = epd_from_tinydrm(tdev);
 	struct drm_clip_rect clip;
+	int ret = 0, idx;
 	u8 *buf = NULL;
-	int ret = 0;
+
+	if (!drm_dev_enter(fb->dev, &idx))
+		return -ENODEV;
 
 	/* repaper can't do partial updates */
 	clip.x1 = 0;
@@ -632,6 +635,8 @@ out_unlock:
 		dev_err(fb->dev->dev, "Failed to update display (%d)\n", ret);
 	kfree(buf);
 
+	drm_dev_exit(idx);
+
 	return ret;
 }
 
@@ -666,7 +671,10 @@ static void repaper_pipe_enable(struct drm_simple_display_pipe *pipe,
 	struct spi_device *spi = epd->spi;
 	struct device *dev = &spi->dev;
 	bool dc_ok = false;
-	int i, ret;
+	int i, ret, idx;
+
+	if (!drm_dev_enter(&tdev->drm, &idx))
+		return;
 
 	DRM_DEBUG_DRIVER("\n");
 
@@ -705,7 +713,7 @@ static void repaper_pipe_enable(struct drm_simple_display_pipe *pipe,
 	if (!i) {
 		dev_err(dev, "timeout waiting for panel to become ready.\n");
 		power_off(epd);
-		return;
+		goto exit;
 	}
 
 	repaper_read_id(spi);
@@ -716,7 +724,7 @@ static void repaper_pipe_enable(struct drm_simple_display_pipe *pipe,
 		else
 			dev_err(dev, "wrong COG ID 0x%02x\n", ret);
 		power_off(epd);
-		return;
+		goto exit;
 	}
 
 	/* Disable OE */
@@ -729,7 +737,7 @@ static void repaper_pipe_enable(struct drm_simple_display_pipe *pipe,
 		else
 			dev_err(dev, "panel is reported broken\n");
 		power_off(epd);
-		return;
+		goto exit;
 	}
 
 	/* Power saving mode */
@@ -769,7 +777,7 @@ static void repaper_pipe_enable(struct drm_simple_display_pipe *pipe,
 		if (ret < 0) {
 			dev_err(dev, "failed to read chip (%d)\n", ret);
 			power_off(epd);
-			return;
+			goto exit;
 		}
 
 		if (ret & 0x40) {
@@ -781,7 +789,7 @@ static void repaper_pipe_enable(struct drm_simple_display_pipe *pipe,
 	if (!dc_ok) {
 		dev_err(dev, "dc/dc failed\n");
 		power_off(epd);
-		return;
+		goto exit;
 	}
 
 	/*
@@ -792,6 +800,8 @@ static void repaper_pipe_enable(struct drm_simple_display_pipe *pipe,
 
 	epd->enabled = true;
 	epd->partial = false;
+exit:
+	drm_dev_exit(idx);
 }
 
 static void repaper_pipe_disable(struct drm_simple_display_pipe *pipe)
@@ -800,6 +810,10 @@ static void repaper_pipe_disable(struct drm_simple_display_pipe *pipe)
 	struct repaper_epd *epd = epd_from_tinydrm(tdev);
 	struct spi_device *spi = epd->spi;
 	unsigned int line;
+	int idx;
+
+	if (!drm_dev_enter(&tdev->drm, &idx))
+		return;
 
 	DRM_DEBUG_DRIVER("\n");
 
@@ -846,6 +860,8 @@ static void repaper_pipe_disable(struct drm_simple_display_pipe *pipe)
 	msleep(50);
 
 	power_off(epd);
+
+	drm_dev_exit(idx);
 }
 
 static const struct drm_simple_display_pipe_funcs repaper_pipe_funcs = {

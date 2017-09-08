@@ -115,8 +115,11 @@ static int st7586_fb_dirty(struct drm_framebuffer *fb,
 	struct tinydrm_device *tdev = drm_to_tinydrm(fb->dev);
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	struct drm_clip_rect clip;
+	int ret = 0, idx;
 	int start, end;
-	int ret = 0;
+
+	if (!drm_dev_enter(fb->dev, &idx))
+		return -ENODEV;
 
 	mutex_lock(&tdev->dirty_lock);
 
@@ -158,6 +161,7 @@ static int st7586_fb_dirty(struct drm_framebuffer *fb,
 
 out_unlock:
 	mutex_unlock(&tdev->dirty_lock);
+	drm_dev_exit(idx);
 
 	if (ret)
 		dev_err_once(fb->dev->dev, "Failed to update display %d\n",
@@ -179,8 +183,11 @@ static void st7586_pipe_enable(struct drm_simple_display_pipe *pipe,
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	struct drm_framebuffer *fb = pipe->plane.fb;
 	struct device *dev = tdev->drm.dev;
-	int ret;
+	int ret, idx;
 	u8 addr_mode;
+
+	if (!drm_dev_enter(&tdev->drm, &idx))
+		return;
 
 	DRM_DEBUG_KMS("\n");
 
@@ -188,7 +195,7 @@ static void st7586_pipe_enable(struct drm_simple_display_pipe *pipe,
 	ret = mipi_dbi_command(mipi, ST7586_AUTO_READ_CTRL, 0x9f);
 	if (ret) {
 		dev_err(dev, "Error sending command %d\n", ret);
-		return;
+		goto exit;
 	}
 
 	mipi_dbi_command(mipi, ST7586_OTP_RW_CTRL, 0x00);
@@ -243,20 +250,28 @@ static void st7586_pipe_enable(struct drm_simple_display_pipe *pipe,
 
 	if (fb)
 		fb->funcs->dirty(fb, NULL, 0, 0, NULL, 0);
+exit:
+	drm_dev_exit(idx);
 }
 
 static void st7586_pipe_disable(struct drm_simple_display_pipe *pipe)
 {
 	struct tinydrm_device *tdev = pipe_to_tinydrm(pipe);
 	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
+	int idx;
+
+	if (!drm_dev_enter(&tdev->drm, &idx))
+		return;
 
 	DRM_DEBUG_KMS("\n");
 
 	if (!mipi->enabled)
-		return;
+		goto exit;
 
 	mipi_dbi_command(mipi, MIPI_DCS_SET_DISPLAY_OFF);
 	mipi->enabled = false;
+exit:
+	drm_dev_exit(idx);
 }
 
 static const u32 st7586_formats[] = {
