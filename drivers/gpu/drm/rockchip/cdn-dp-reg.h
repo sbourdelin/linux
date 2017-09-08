@@ -459,6 +459,9 @@ enum vic_bt_type {
 	BT_709 = 0x1,
 };
 
+struct cdn_dp_device;
+struct audio_info;
+
 void cdn_dp_clock_reset(struct cdn_dp_device *dp);
 
 void cdn_dp_set_fw_clk(struct cdn_dp_device *dp, unsigned long clk);
