@@ -162,6 +162,25 @@ int __weak arch_kexec_walk_mem(struct kexec_buf *kbuf,
 			       int (*func)(u64, u64, void *));
 extern int kexec_add_buffer(struct kexec_buf *kbuf);
 int kexec_locate_mem_hole(struct kexec_buf *kbuf);
+#ifdef CONFIG_CRASH_CORE
+extern int prepare_elf_headers(struct kimage *image, void **addr,
+				unsigned long *sz);
+
+/* This primarily represents number of split ranges due to exclusion */
+#define CRASH_MAX_RANGES        16
+
+struct crash_mem_range {
+	u64 start, end;
+};
+
+struct crash_mem {
+	unsigned int nr_ranges;
+	struct crash_mem_range ranges[CRASH_MAX_RANGES];
+};
+
+extern int exclude_mem_range(struct crash_mem *mem,
+		unsigned long long mstart, unsigned long long mend);
+#endif /* CONFIG_CRASH_CORE */
 #endif /* CONFIG_KEXEC_FILE */
 
 struct kimage {
