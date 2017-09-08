@@ -197,12 +197,12 @@ struct fsl_ssi_soc_data {
  * @use_dma: DMA is used or FIQ with stream filter
  * @use_dual_fifo: DMA with support for both FIFOs used
  * @fifo_deph: Depth of the SSI FIFOs
+ * @slots: number of slots
  * @rxtx_reg_val: Specific register settings for receive/transmit configuration
  *
  * @clk: SSI clock
  * @baudclk: SSI baud clock for master mode
  * @baudclk_streams: Active streams that are using baudclk
- * @bitclk_freq: bitclock frequency set by .set_dai_sysclk
  *
  * @dma_params_tx: DMA transmit parameters
  * @dma_params_rx: DMA receive parameters
@@ -233,12 +233,12 @@ struct fsl_ssi_private {
 	bool use_dual_fifo;
 	bool has_ipg_clk_name;
 	unsigned int fifo_depth;
+	unsigned int slots;
 	struct fsl_ssi_rxtx_reg_val rxtx_reg_val;
 
 	struct clk *clk;
 	struct clk *baudclk;
 	unsigned int baudclk_streams;
-	unsigned int bitclk_freq;
 
 	/* regcache for volatile regs */
 	u32 regcache_sfcsr;
@@ -700,8 +700,7 @@ static void fsl_ssi_shutdown(struct snd_pcm_substream *substream,
  * Note: This function can be only called when using SSI as DAI master
  *
  * Quick instruction for parameters:
- * freq: Output BCLK frequency = samplerate * 32 (fixed) * channels
- * dir: SND_SOC_CLOCK_OUT -> TxBCLK, SND_SOC_CLOCK_IN -> RxBCLK.
+ * freq: Output BCLK frequency = samplerate * 32 (fixed) * slots (or channels)
  */
 static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
 		struct snd_soc_dai *cpu_dai,
@@ -716,9 +715,9 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
 	unsigned int freq;
 	bool baudclk_is_used;
 
-	/* Prefer the explicitly set bitclock frequency */
-	if (ssi_private->bitclk_freq)
-		freq = ssi_private->bitclk_freq;
+	/* Generate bit clock based on the slot or channel number */
+	if (ssi_private->slots)
+		freq = ssi_private->slots * 32 * params_rate(hw_params);
 	else
 		freq = params_channels(hw_params) * 32 * params_rate(hw_params);
 
@@ -801,16 +800,6 @@ static int fsl_ssi_set_bclk(struct snd_pcm_substream *substream,
 			return -EINVAL;
 		}
 	}
-
-	return 0;
-}
-
-static int fsl_ssi_set_dai_sysclk(struct snd_soc_dai *cpu_dai,
-		int clk_id, unsigned int freq, int dir)
-{
-	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
-
-	ssi_private->bitclk_freq = freq;
 
 	return 0;
 }
@@ -1121,6 +1110,8 @@ static int fsl_ssi_set_dai_tdm_slot(struct snd_soc_dai *cpu_dai, u32 tx_mask,
 
 	regmap_update_bits(regs, CCSR_SSI_SCR, CCSR_SSI_SCR_SSIEN, val);
 
+	ssi_private->slots = slots;
+
 	return 0;
 }
 
@@ -1191,7 +1182,6 @@ static const struct snd_soc_dai_ops fsl_ssi_dai_ops = {
 	.hw_params	= fsl_ssi_hw_params,
 	.hw_free	= fsl_ssi_hw_free,
 	.set_fmt	= fsl_ssi_set_dai_fmt,
-	.set_sysclk	= fsl_ssi_set_dai_sysclk,
 	.set_tdm_slot	= fsl_ssi_set_dai_tdm_slot,
 	.trigger	= fsl_ssi_trigger,
 };
