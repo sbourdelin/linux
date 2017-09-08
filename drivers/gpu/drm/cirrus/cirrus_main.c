@@ -9,6 +9,7 @@
  *          Dave Airlie
  */
 #include <drm/drmP.h>
+#include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc_helper.h>
 
 #include "cirrus_drv.h"
@@ -82,6 +83,8 @@ cirrus_user_framebuffer_create(struct drm_device *dev,
 
 static const struct drm_mode_config_funcs cirrus_mode_funcs = {
 	.fb_create = cirrus_user_framebuffer_create,
+	.atomic_check = drm_atomic_helper_check,
+	.atomic_commit = drm_atomic_helper_commit,
 };
 
 /* Unmap the framebuffer from the core and release the memory */

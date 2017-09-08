@@ -167,6 +167,7 @@ struct cirrus_bo {
 	struct drm_gem_object gem;
 	struct ttm_place placements[3];
 	int pin_count;
+	u64 gpu_addr;
 };
 #define gem_to_cirrus_bo(gobj) container_of((gobj), struct cirrus_bo, gem)
 

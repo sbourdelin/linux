@@ -15,6 +15,8 @@
  * Copyright 1999-2001 Jeff Garzik <jgarzik@pobox.com>
  */
 #include <drm/drmP.h>
+#include <drm/drm_atomic.h>
+#include <drm/drm_atomic_helper.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_plane_helper.h>
 
@@ -72,95 +74,20 @@ static void cirrus_crtc_dpms(struct drm_crtc *crtc, int mode)
 	WREG_GFX(0xe, gr0e);
 }
 
-static void cirrus_set_start_address(struct drm_crtc *crtc, unsigned offset)
-{
-	struct cirrus_device *cdev = crtc->dev->dev_private;
-	u32 addr;
-	u8 tmp;
-
-	addr = offset >> 2;
-	WREG_CRT(0x0c, (u8)((addr >> 8) & 0xff));
-	WREG_CRT(0x0d, (u8)(addr & 0xff));
-
-	WREG8(CRT_INDEX, 0x1b);
-	tmp = RREG8(CRT_DATA);
-	tmp &= 0xf2;
-	tmp |= (addr >> 16) & 0x01;
-	tmp |= (addr >> 15) & 0x0c;
-	WREG_CRT(0x1b, tmp);
-	WREG8(CRT_INDEX, 0x1d);
-	tmp = RREG8(CRT_DATA);
-	tmp &= 0x7f;
-	tmp |= (addr >> 12) & 0x80;
-	WREG_CRT(0x1d, tmp);
-}
-
-/* cirrus is different - we will force move buffers out of VRAM */
-static int cirrus_crtc_do_set_base(struct drm_crtc *crtc,
-				struct drm_framebuffer *fb,
-				int x, int y, int atomic)
-{
-	struct cirrus_device *cdev = crtc->dev->dev_private;
-	struct drm_gem_object *obj;
-	struct cirrus_framebuffer *cirrus_fb;
-	struct cirrus_bo *bo;
-	int ret;
-	u64 gpu_addr;
-
-	/* push the previous fb to system ram */
-	if (!atomic && fb) {
-		cirrus_fb = to_cirrus_framebuffer(fb);
-		obj = cirrus_fb->obj;
-		bo = gem_to_cirrus_bo(obj);
-		cirrus_bo_unpin(bo);
-		cirrus_bo_push_sysram(bo);
-	}
-
-	cirrus_fb = to_cirrus_framebuffer(crtc->primary->fb);
-	obj = cirrus_fb->obj;
-	bo = gem_to_cirrus_bo(obj);
-
-	ret = cirrus_bo_pin(bo, TTM_PL_FLAG_VRAM, &gpu_addr);
-	if (ret)
-		return ret;
-
-	if (&cdev->mode_info.gfbdev->gfb == cirrus_fb) {
-		/* if pushing console in kmap it */
-		ret = ttm_bo_kmap(&bo->bo, 0, bo->bo.num_pages, &bo->kmap);
-		if (ret)
-			DRM_ERROR("failed to kmap fbcon\n");
-	}
-
-	cirrus_set_start_address(crtc, (u32)gpu_addr);
-	return 0;
-}
-
-static int cirrus_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
-			     struct drm_framebuffer *old_fb)
-{
-	return cirrus_crtc_do_set_base(crtc, old_fb, x, y, 0);
-}
-
 /*
- * The meat of this driver. The core passes us a mode and we have to program
- * it. The modesetting here is the bare minimum required to satisfy the qemu
- * emulation of this hardware, and running this against a real device is
- * likely to result in an inadequately programmed mode. We've already had
- * the opportunity to modify the mode, so whatever we receive here should
- * be something that can be correctly programmed and displayed
+ * The core passes us a mode and we have to program it. The modesetting here
+ * is the bare minimum required to satisfy the qemu emulation of this
+ * hardware, and running this against a real device is likely to result in
+ * an inadequately programmed mode.
  */
-static int cirrus_crtc_mode_set(struct drm_crtc *crtc,
-				struct drm_display_mode *mode,
-				struct drm_display_mode *adjusted_mode,
-				int x, int y, struct drm_framebuffer *old_fb)
+static void cirrus_mode_set_nofb(struct drm_crtc *crtc)
 {
 	struct drm_device *dev = crtc->dev;
 	struct cirrus_device *cdev = dev->dev_private;
-	const struct drm_framebuffer *fb = crtc->primary->fb;
+	struct drm_display_mode *mode = &crtc->mode;
 	int hsyncstart, hsyncend, htotal, hdispend;
 	int vtotal, vdispend;
 	int tmp;
-	int sr07 = 0, hdr = 0;
 
 	htotal = mode->htotal / 8;
 	hsyncend = mode->hsync_end / 8;
@@ -225,54 +152,11 @@ static int cirrus_crtc_mode_set(struct drm_crtc *crtc,
 	/* Disable Hercules/CGA compatibility */
 	WREG_CRT(VGA_CRTC_MODE, 0x03);
 
-	WREG8(SEQ_INDEX, 0x7);
-	sr07 = RREG8(SEQ_DATA);
-	sr07 &= 0xe0;
-	hdr = 0;
-	switch (fb->format->cpp[0] * 8) {
-	case 8:
-		sr07 |= 0x11;
-		break;
-	case 16:
-		sr07 |= 0x17;
-		hdr = 0xc1;
-		break;
-	case 24:
-		sr07 |= 0x15;
-		hdr = 0xc5;
-		break;
-	case 32:
-		sr07 |= 0x19;
-		hdr = 0xc5;
-		break;
-	default:
-		return -1;
-	}
-
-	WREG_SEQ(0x7, sr07);
-
-	/* Program the pitch */
-	tmp = fb->pitches[0] / 8;
-	WREG_CRT(VGA_CRTC_OFFSET, tmp);
-
-	/* Enable extended blanking and pitch bits, and enable full memory */
-	tmp = 0x22;
-	tmp |= (fb->pitches[0] >> 7) & 0x10;
-	tmp |= (fb->pitches[0] >> 6) & 0x40;
-	WREG_CRT(0x1b, tmp);
-
 	/* Enable high-colour modes */
 	WREG_GFX(VGA_GFX_MODE, 0x40);
 
 	/* And set graphics mode */
 	WREG_GFX(VGA_GFX_MISC, 0x01);
-
-	WREG_HDR(hdr);
-	cirrus_crtc_do_set_base(crtc, old_fb, x, y, 0);
-
-	/* Unblank (needed on S3 resume, vgabios doesn't do it then) */
-	outb(0x20, 0x3c0);
-	return 0;
 }
 
 /*
@@ -338,15 +222,32 @@ static const struct drm_crtc_funcs cirrus_crtc_funcs = {
 	.gamma_set = cirrus_crtc_gamma_set,
 	.set_config = drm_crtc_helper_set_config,
 	.destroy = cirrus_crtc_destroy,
+	.reset = drm_atomic_helper_crtc_reset,
+	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
 };
 
 static const struct drm_crtc_helper_funcs cirrus_helper_funcs = {
 	.dpms = cirrus_crtc_dpms,
-	.mode_set = cirrus_crtc_mode_set,
-	.mode_set_base = cirrus_crtc_mode_set_base,
+	.mode_set = drm_helper_crtc_mode_set,
+	.mode_set_base = drm_helper_crtc_mode_set_base,
+	.mode_set_nofb = cirrus_mode_set_nofb,
 	.prepare = cirrus_crtc_prepare,
 	.commit = cirrus_crtc_commit,
 };
+
+static int cirrus_plane_update(struct drm_plane *plane,
+			       struct drm_crtc *crtc,
+			       struct drm_framebuffer *fb, int crtc_x,
+			       int crtc_y, unsigned int crtc_w,
+			       unsigned int crtc_h, uint32_t src_x,
+			       uint32_t src_y, uint32_t src_w, uint32_t src_h,
+			       struct drm_modeset_acquire_ctx *ctx)
+{
+	return drm_plane_helper_update(plane, crtc, fb,
+				       crtc_x, crtc_y, crtc_w,
+				       crtc_h, src_x, src_y, src_w, src_h);
+}
 
 static const uint32_t cirrus_plane_formats[] = {
 	DRM_FORMAT_XRGB8888,
@@ -356,12 +257,202 @@ static const uint32_t cirrus_plane_formats[] = {
 };
 
 static const struct drm_plane_funcs cirrus_plane_funcs = {
-	.update_plane	= drm_primary_helper_update,
+	.update_plane	= cirrus_plane_update,
 	.disable_plane	= drm_primary_helper_disable,
 	.destroy	= drm_primary_helper_destroy,
+	.reset	= drm_atomic_helper_plane_reset,
+	.atomic_duplicate_state	= drm_atomic_helper_plane_duplicate_state,
+	.atomic_destroy_state	= drm_atomic_helper_plane_destroy_state,
 };
 
+static int cirrus_plane_prepare_fb(struct drm_plane *plane,
+				   struct drm_plane_state *new_state)
+{
+	struct cirrus_device *cdev = plane->dev->dev_private;
+	struct drm_gem_object *obj;
+	struct cirrus_framebuffer *cirrus_fb;
+	struct cirrus_bo *bo;
+	int ret;
+
+	if (!new_state->fb)
+		return 0;
+
+	if (plane->old_fb) {
+		cirrus_fb = to_cirrus_framebuffer(plane->old_fb);
+		obj = cirrus_fb->obj;
+		bo = gem_to_cirrus_bo(obj);
+		cirrus_bo_push_sysram(bo);
+	}
+
+	cirrus_fb = to_cirrus_framebuffer(new_state->fb);
+	obj = cirrus_fb->obj;
+	bo = gem_to_cirrus_bo(obj);
+
+	ret = cirrus_bo_pin(bo, TTM_PL_FLAG_VRAM, &bo->gpu_addr);
+	if (ret)
+		return ret;
+
+	if (&cdev->mode_info.gfbdev->gfb == cirrus_fb) {
+		/* if pushing console in kmap it */
+		ret = ttm_bo_kmap(&bo->bo, 0, bo->bo.num_pages, &bo->kmap);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
+static void cirrus_plane_cleanup_fb(struct drm_plane *plane,
+				    struct drm_plane_state *old_state)
+{
+	struct drm_gem_object *obj;
+	struct cirrus_bo *bo;
+
+	if (!plane->state->fb) {
+		/* we never executed prepare_fb, so there's nothing to
+		 * unpin.
+		 */
+		return;
+	}
+
+	obj = to_cirrus_framebuffer(plane->state->fb)->obj;
+	bo = gem_to_cirrus_bo(obj);
+
+	cirrus_bo_unpin(bo);
+}
+
+static int cirrus_plane_atomic_check(struct drm_plane *plane,
+				     struct drm_plane_state *state)
+{
+	struct cirrus_device *cdev = plane->dev->dev_private;
+	struct drm_framebuffer *fb = state->fb;
+	struct drm_crtc *crtc = state->crtc ? state->crtc : plane->crtc;
+	struct drm_crtc_state *crtc_state;
+	struct drm_rect clip = { 0 };
+	int ret;
+
+	if (!crtc || !fb)
+		return 0;
+
+	if (!cirrus_check_framebuffer(cdev, fb->width, fb->height,
+				      fb->format->cpp[0], fb->pitches[0]))
+		return -EINVAL;
+
+	crtc_state = drm_atomic_get_existing_crtc_state(state->state, crtc);
+	if (!crtc_state)
+		return -EINVAL;
+
+	clip.x2 = crtc_state->adjusted_mode.hdisplay;
+	clip.y2 = crtc_state->adjusted_mode.vdisplay;
+
+	ret = drm_plane_helper_check_state(state, &clip,
+					   DRM_PLANE_HELPER_NO_SCALING,
+					   DRM_PLANE_HELPER_NO_SCALING,
+					   false, true);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static void cirrus_plane_atomic_disable(struct drm_plane *plane,
+					struct drm_plane_state *old_state)
+{
+	return;
+}
+
+static void cirrus_set_framebuffer_regs(struct drm_plane *plane)
+{
+	struct cirrus_device *cdev = plane->dev->dev_private;
+	struct drm_framebuffer *fb = plane->state->fb;
+	int sr07 = 0, hdr = 0, tmp;
+
+	WREG8(SEQ_INDEX, 0x7);
+	sr07 = RREG8(SEQ_DATA);
+	sr07 &= 0xe0;
+	switch (fb->format->cpp[0] * 8) {
+	case 8:
+		sr07 |= 0x11;
+		break;
+	case 16:
+		sr07 |= 0x17;
+		hdr = 0xc1;
+		break;
+	case 24:
+		sr07 |= 0x15;
+		hdr = 0xc5;
+		break;
+	case 32:
+		sr07 |= 0x19;
+		hdr = 0xc5;
+		break;
+	default:
+		/* Should never reach here. */
+		break;
+	}
+
+	WREG_SEQ(0x7, sr07);
+
+	/* Program the pitch */
+	tmp = fb->pitches[0] / 8;
+	WREG_CRT(VGA_CRTC_OFFSET, tmp);
+
+	/* Enable extended blanking and pitch bits, and enable full memory */
+	tmp = 0x22;
+	tmp |= (fb->pitches[0] >> 7) & 0x10;
+	tmp |= (fb->pitches[0] >> 6) & 0x40;
+	WREG_CRT(0x1b, tmp);
+
+	WREG_HDR(hdr);
+}
+
+static void cirrus_set_start_address(struct drm_crtc *crtc, unsigned offset)
+{
+	struct cirrus_device *cdev = crtc->dev->dev_private;
+	u32 addr;
+	u8 tmp;
+
+	addr = offset >> 2;
+	WREG_CRT(0x0c, (u8)((addr >> 8) & 0xff));
+	WREG_CRT(0x0d, (u8)(addr & 0xff));
+
+	WREG8(CRT_INDEX, 0x1b);
+	tmp = RREG8(CRT_DATA);
+	tmp &= 0xf2;
+	tmp |= (addr >> 16) & 0x01;
+	tmp |= (addr >> 15) & 0x0c;
+	WREG_CRT(0x1b, tmp);
+	WREG8(CRT_INDEX, 0x1d);
+	tmp = RREG8(CRT_DATA);
+	tmp &= 0x7f;
+	tmp |= (addr >> 12) & 0x80;
+	WREG_CRT(0x1d, tmp);
+}
+
+static void cirrus_plane_atomic_update(struct drm_plane *plane,
+				       struct drm_plane_state *old_state)
+{
+	struct drm_plane_state *state = plane->state;
+	struct drm_gem_object *obj;
+	struct cirrus_bo *bo;
+
+	cirrus_set_framebuffer_regs(plane);
+
+	obj = to_cirrus_framebuffer(state->fb)->obj;
+	bo = gem_to_cirrus_bo(obj);
+	cirrus_set_start_address(state->crtc, (u32)bo->gpu_addr);
+
+	/* Unblank (needed on S3 resume, vgabios doesn't do it then) */
+	outb(0x20, 0x3c0);
+}
+
+
 static const struct drm_plane_helper_funcs cirrus_plane_helper_funcs = {
+	.prepare_fb = cirrus_plane_prepare_fb,
+	.cleanup_fb = cirrus_plane_cleanup_fb,
+	.atomic_check = cirrus_plane_atomic_check,
+	.atomic_disable = cirrus_plane_atomic_disable,
+	.atomic_update = cirrus_plane_atomic_update,
 };
 
 /* CRTC setup */
@@ -509,6 +600,9 @@ static const struct drm_connector_funcs cirrus_vga_connector_funcs = {
 	.dpms = drm_helper_connector_dpms,
 	.fill_modes = drm_helper_probe_single_connector_modes,
 	.destroy = cirrus_connector_destroy,
+	.reset = drm_atomic_helper_connector_reset,
+	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
+	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 };
 
 static struct drm_connector *cirrus_vga_init(struct drm_device *dev)
@@ -564,6 +658,8 @@ int cirrus_modeset_init(struct cirrus_device *cdev)
 	}
 
 	drm_mode_connector_attach_encoder(connector, encoder);
+
+	drm_mode_config_reset(cdev->dev);
 
 	ret = cirrus_fbdev_init(cdev);
 	if (ret) {
