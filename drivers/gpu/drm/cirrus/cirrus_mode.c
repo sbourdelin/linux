@@ -112,26 +112,17 @@ static int cirrus_crtc_do_set_base(struct drm_crtc *crtc,
 		cirrus_fb = to_cirrus_framebuffer(fb);
 		obj = cirrus_fb->obj;
 		bo = gem_to_cirrus_bo(obj);
-		ret = cirrus_bo_reserve(bo, false);
-		if (ret)
-			return ret;
+		cirrus_bo_unpin(bo);
 		cirrus_bo_push_sysram(bo);
-		cirrus_bo_unreserve(bo);
 	}
 
 	cirrus_fb = to_cirrus_framebuffer(crtc->primary->fb);
 	obj = cirrus_fb->obj;
 	bo = gem_to_cirrus_bo(obj);
 
-	ret = cirrus_bo_reserve(bo, false);
+	ret = cirrus_bo_pin(bo, TTM_PL_FLAG_VRAM, &gpu_addr);
 	if (ret)
 		return ret;
-
-	ret = cirrus_bo_pin(bo, TTM_PL_FLAG_VRAM, &gpu_addr);
-	if (ret) {
-		cirrus_bo_unreserve(bo);
-		return ret;
-	}
 
 	if (&cdev->mode_info.gfbdev->gfb == cirrus_fb) {
 		/* if pushing console in kmap it */
@@ -139,7 +130,6 @@ static int cirrus_crtc_do_set_base(struct drm_crtc *crtc,
 		if (ret)
 			DRM_ERROR("failed to kmap fbcon\n");
 	}
-	cirrus_bo_unreserve(bo);
 
 	cirrus_set_start_address(crtc, (u32)gpu_addr);
 	return 0;
