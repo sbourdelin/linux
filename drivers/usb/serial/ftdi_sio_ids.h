@@ -692,6 +692,13 @@
 #define WICED_USB20706V2_PID	0x6422
 
 /*
+ * Cypress WICED USB UART
+ */
+#define CYPRESS_VID		0x04B4
+#define CYPRESS_WICED_BT_USB_PID	0x009B
+#define CYPRESS_WICED_WL_USB_PID	0xF900
+
+/*
  * Definitions for ID TECH (www.idt-net.com) devices
  */
 #define IDTECH_VID		0x0ACD	/* ID TECH Vendor ID */
