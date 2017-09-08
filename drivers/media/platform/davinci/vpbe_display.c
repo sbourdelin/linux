@@ -1305,11 +1305,7 @@ static int init_vpbe_layer(int i, struct vpbe_display *disp_dev,
 	struct video_device *vbd = NULL;
 
 	/* Allocate memory for four plane display objects */
-
-	disp_dev->dev[i] =
-		kzalloc(sizeof(struct vpbe_layer), GFP_KERNEL);
-
-	/* If memory allocation fails, return error */
+	disp_dev->dev[i] = kzalloc(sizeof(*disp_dev->dev[i]), GFP_KERNEL);
 	if (!disp_dev->dev[i])
 		return  -ENOMEM;
 
@@ -1396,8 +1392,7 @@ static int vpbe_display_probe(struct platform_device *pdev)
 
 	printk(KERN_DEBUG "vpbe_display_probe\n");
 	/* Allocate memory for vpbe_display */
-	disp_dev = devm_kzalloc(&pdev->dev, sizeof(struct vpbe_display),
-				GFP_KERNEL);
+	disp_dev = devm_kzalloc(&pdev->dev, sizeof(*disp_dev), GFP_KERNEL);
 	if (!disp_dev)
 		return -ENOMEM;
 
