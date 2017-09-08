@@ -1094,6 +1094,280 @@ out_unlock:
 	return err;
 }
 
+static int check_cnl_ppat(struct drm_i915_private *dev_priv)
+{
+	struct intel_ppat *ppat = &dev_priv->ppat;
+	int i;
+
+	for (i = 0; i < ppat->max_entries; i++) {
+		u32 value = I915_READ(GEN10_PAT_INDEX(i));
+
+		if (value != ppat->entries[i].value) {
+			pr_err("expected PPAT value isn't written into HW\n");
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
+
+static int check_bdw_ppat(struct drm_i915_private *dev_priv)
+{
+	struct intel_ppat *ppat = &dev_priv->ppat;
+	u64 pat, hw_pat;
+	int i;
+
+	pat = hw_pat = 0;
+
+	for (i = 0; i < ppat->max_entries; i++)
+		pat |= GEN8_PPAT(i, ppat->entries[i].value);
+
+	hw_pat = I915_READ(GEN8_PRIVATE_PAT_HI);
+	hw_pat <<= 32;
+	hw_pat |= I915_READ(GEN8_PRIVATE_PAT_LO);
+
+	if (pat != hw_pat) {
+		pr_err("expected PPAT value isn't written into HW\n");
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int igt_ppat_check(void *arg)
+{
+	struct drm_i915_private *i915 = arg;
+	int ret;
+
+	if (!i915->ppat.max_entries)
+		return 0;
+
+	if (INTEL_GEN(i915) >= 10)
+		ret = check_cnl_ppat(i915);
+	else
+		ret = check_bdw_ppat(i915);
+
+	return ret;
+}
+
+static u8 generate_new_value(struct intel_ppat *ppat, bool partial,
+			     bool negative)
+{
+	u8 ca[] = { GEN8_PPAT_WB, GEN8_PPAT_WT, GEN8_PPAT_UC, GEN8_PPAT_WC };
+	u8 tc[] = { GEN8_PPAT_LLC, GEN8_PPAT_LLCELLC, GEN8_PPAT_LLCeLLC };
+	u8 age[] = { GEN8_PPAT_AGE(3), GEN8_PPAT_AGE(2), GEN8_PPAT_AGE(1),
+		     GEN8_PPAT_AGE(0) };
+	u8 value = 0;
+	bool same;
+	int ca_index, tc_index, age_index, i;
+
+#define for_each_ppat_attr(ca_index, tc_index, age_index) \
+	for ((ca_index) = 0 ; (ca_index) < ARRAY_SIZE(ca); (ca_index)++) \
+	for ((tc_index) = 0; (tc_index) < ARRAY_SIZE(tc); (tc_index)++) \
+	for ((age_index) = 0; (age_index) < ARRAY_SIZE(age); (age_index)++)
+
+	for_each_ppat_attr(ca_index, tc_index, age_index) {
+		value = age[age_index] | ca[ca_index] | tc[tc_index];
+		same = false;
+
+		for_each_set_bit(i, ppat->used, ppat->max_entries) {
+			if (value != ppat->entries[i].value)
+				continue;
+
+			same = true;
+			break;
+		}
+
+		if (same)
+			continue;
+
+		if (!partial && !negative)
+			return value;
+
+		if (partial) {
+			/* cache attribute has to be the same. */
+			for_each_set_bit(i, ppat->used, ppat->max_entries) {
+				if (GEN8_PPAT_GET_CA(value) !=
+				    GEN8_PPAT_GET_CA(ppat->entries[i].value))
+					continue;
+
+				return value;
+			}
+		}
+
+		if (negative) {
+			/* cache attribute has to be new. */
+			same = false;
+			for_each_set_bit(i, ppat->used, ppat->max_entries) {
+				if (GEN8_PPAT_GET_CA(value) ==
+				    GEN8_PPAT_GET_CA(ppat->entries[i].value)) {
+					same = true;
+					break;
+				}
+			}
+			if (same)
+				continue;
+			return value;
+		}
+	}
+#undef for_each_ppat_attr
+	return 0;
+}
+
+static inline bool ppat_table_is_full(struct intel_ppat *ppat)
+{
+	return bitmap_weight(ppat->used, ppat->max_entries) ==
+		ppat->max_entries;
+}
+
+static int igt_ppat_get(void *arg)
+{
+	struct drm_i915_private *i915 = arg;
+	struct intel_ppat *ppat = &i915->ppat;
+	const struct intel_ppat_entry **entries;
+	const struct intel_ppat_entry *entry;
+	unsigned int size = 0;
+	u8 value;
+	int i, ret;
+
+	if (!ppat->max_entries)
+		return 0;
+
+	ret = igt_ppat_check(i915);
+	if (ret)
+		return ret;
+
+	/* case 1: perfect match */
+	entry = intel_ppat_get(i915, ppat->entries[0].value);
+	if (IS_ERR(entry))
+		return PTR_ERR(entry);
+
+	if (entry != &ppat->entries[0]) {
+		pr_err("not expected entry\n");
+		intel_ppat_put(entry);
+		return -EINVAL;
+	}
+
+	intel_ppat_put(entry);
+
+	/* case 2: alloc new entries */
+	entries = NULL;
+	ret = 0;
+
+	while (!ppat_table_is_full(ppat)) {
+		const struct intel_ppat_entry **p;
+		DECLARE_BITMAP(used, INTEL_MAX_PPAT_ENTRIES);
+
+		bitmap_copy(used, ppat->used, ppat->max_entries);
+
+		p = krealloc(entries, (size + 1) *
+				   sizeof(struct intel_ppat_entry *),
+				   GFP_KERNEL);
+		if (!p) {
+			ret = -ENOSPC;
+			break;
+		}
+		entries = p;
+
+		p = &entries[size++];
+		*p = NULL;
+
+		value = generate_new_value(ppat, false, false);
+		if (!value) {
+			pr_err("cannot fill the unused PPAT entries?\n");
+			ret = -EINVAL;
+			break;
+		}
+
+		*p = entry = intel_ppat_get(i915, value);
+		if (IS_ERR(entry)) {
+			pr_err("fail to get new entry\n");
+			ret = PTR_ERR(entry);
+			break;
+		}
+
+		if (entry->value != value) {
+			pr_err("fail to get expected new value\n");
+			ret = -EINVAL;
+			break;
+		}
+
+		if (bitmap_equal(used, ppat->used, ppat->max_entries)) {
+			pr_err("fail to alloc a new entry\n");
+			ret = -EINVAL;
+			break;
+		}
+	}
+
+	if (ret)
+		goto ppat_put;
+
+	/* case 3: negative test, suppose PPAT table is full now */
+	value = generate_new_value(ppat, false, true);
+	if (!value) {
+		pr_err("fail to get new value\n");
+		ret = -EINVAL;
+		goto ppat_put;
+	}
+
+	entry = intel_ppat_get(i915, value);
+	if (!IS_ERR(entry) || PTR_ERR(entry) != -ENOSPC) {
+		pr_err("fail on negative test\n");
+		ret = -EINVAL;
+		goto ppat_put;
+	}
+
+	ret = 0;
+
+	/* case 4: partial match */
+	value = generate_new_value(ppat, true, false);
+	if (!value) {
+		pr_err("fail to get new value\n");
+		ret = -EINVAL;
+		goto ppat_put;
+	}
+
+	entry = intel_ppat_get(i915, value);
+	if (IS_ERR(entry)) {
+		pr_err("fail to get new entry\n");
+		ret = PTR_ERR(entry);
+		goto ppat_put;
+	}
+
+	if (!(entry->value != value &&
+	    GEN8_PPAT_GET_CA(entry->value) == GEN8_PPAT_GET_CA(value))) {
+		pr_err("fail to get expected value\n");
+		ret = -EINVAL;
+	}
+
+	intel_ppat_put(entry);
+
+ppat_put:
+	if (entries) {
+		for (i = 0; i < size; i++) {
+			if (IS_ERR(entries[i]) || !entries[i])
+				continue;
+
+			intel_ppat_put(entries[i]);
+
+			if (entries[i]->value != ppat->clear_value) {
+				pr_err("fail to put ppat value\n");
+				ret = -EINVAL;
+				break;
+			}
+		}
+		kfree(entries);
+		entries = NULL;
+	}
+
+	if (ret)
+		return ret;
+
+	ret = igt_ppat_check(i915);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
 static void track_vma_bind(struct i915_vma *vma)
 {
 	struct drm_i915_gem_object *obj = vma->obj;
@@ -1560,6 +1834,8 @@ int i915_gem_gtt_live_selftests(struct drm_i915_private *i915)
 		SUBTEST(igt_ggtt_pot),
 		SUBTEST(igt_ggtt_fill),
 		SUBTEST(igt_ggtt_page),
+		SUBTEST(igt_ppat_check),
+		SUBTEST(igt_ppat_get),
 	};
 
 	GEM_BUG_ON(offset_in_page(i915->ggtt.base.total));
