@@ -1,19 +1,22 @@
 #ifndef __DRM_FB_CMA_HELPER_H__
 #define __DRM_FB_CMA_HELPER_H__
 
-struct drm_fbdev_cma;
+#include <drm/drm_fb_helper.h>
+
 struct drm_gem_cma_object;
 
-struct drm_fb_helper_surface_size;
 struct drm_framebuffer_funcs;
-struct drm_fb_helper_funcs;
 struct drm_framebuffer;
-struct drm_fb_helper;
 struct drm_device;
 struct drm_file;
 struct drm_mode_fb_cmd2;
 struct drm_plane;
 struct drm_plane_state;
+
+struct drm_fbdev_cma {
+	struct drm_fb_helper fb_helper;
+	const struct drm_framebuffer_funcs *fb_funcs;
+};
 
 struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs(struct drm_device *dev,
 	unsigned int preferred_bpp, unsigned int max_conn_count,

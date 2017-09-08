@@ -27,11 +27,6 @@
 
 #define DEFAULT_FBDEFIO_DELAY_MS 50
 
-struct drm_fbdev_cma {
-	struct drm_fb_helper	fb_helper;
-	const struct drm_framebuffer_funcs *fb_funcs;
-};
-
 /**
  * DOC: framebuffer cma helper functions
  *
