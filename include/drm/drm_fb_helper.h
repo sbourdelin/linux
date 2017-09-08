@@ -223,6 +223,13 @@ struct drm_fb_helper {
 	 * See also: @deferred_setup
 	 */
 	int preferred_bpp;
+
+	/**
+	 * @open_count:
+	 *
+	 * Keeps track of fbdev users to know when to restore fbdev.
+	 */
+	atomic_t open_count;
 };
 
 /**

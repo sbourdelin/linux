@@ -504,6 +504,12 @@ int drm_fb_helper_restore_fbdev_mode_unlocked(struct drm_fb_helper *fb_helper)
 	if (READ_ONCE(fb_helper->deferred_setup))
 		return 0;
 
+	/* Don't restore if we track opens and it's zero */
+	if (fb_helper->fbdev && fb_helper->fbdev->fbops &&
+	    fb_helper->fbdev->fbops->fb_open == drm_fb_helper_fb_open &&
+	    !atomic_read(&fb_helper->open_count))
+		return 0;
+
 	mutex_lock(&fb_helper->lock);
 	ret = restore_fbdev_mode(fb_helper);
 
@@ -1041,6 +1047,7 @@ EXPORT_SYMBOL(drm_fb_helper_fb_destroy);
  * @info: fbdev registered by the helper
  * @user: 1=userspace, 0=fbcon
  *
+ * Increase fbdev use count.
  * If &fb_ops is wrapped in a library, pin the driver module.
  */
 int drm_fb_helper_fb_open(struct fb_info *info, int user)
@@ -1054,6 +1061,8 @@ int drm_fb_helper_fb_open(struct fb_info *info, int user)
 			return -ENODEV;
 	}
 
+	atomic_inc(&fb_helper->open_count);
+
 	return 0;
 }
 EXPORT_SYMBOL(drm_fb_helper_fb_open);
@@ -1063,12 +1072,17 @@ EXPORT_SYMBOL(drm_fb_helper_fb_open);
  * @info: fbdev registered by the helper
  * @user: 1=userspace, 0=fbcon
  *
+ * Decrease fbdev use count and turn off if there are no users left.
  * If &fb_ops is wrapped in a library, unpin the driver module.
  */
 int drm_fb_helper_fb_release(struct fb_info *info, int user)
 {
 	struct drm_fb_helper *fb_helper = info->par;
 	struct drm_device *dev = fb_helper->dev;
+
+	if (atomic_dec_and_test(&fb_helper->open_count) &&
+	    !drm_dev_is_unplugged(fb_helper->dev))
+		drm_fb_helper_blank(FB_BLANK_POWERDOWN, info);
 
 	if (user && info->fbops->owner != dev->driver->fops->owner)
 		module_put(dev->driver->fops->owner);
