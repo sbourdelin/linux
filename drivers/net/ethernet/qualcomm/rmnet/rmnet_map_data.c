@@ -95,10 +95,8 @@ struct sk_buff *rmnet_map_deaggregate(struct sk_buff *skb)
 	skb_pull(skb, packet_len);
 
 	/* Some hardware can send us empty frames. Catch them */
-	if (ntohs(maph->pkt_len) == 0) {
-		kfree_skb(skb);
+	if (ntohs(maph->pkt_len) == 0)
 		return NULL;
-	}
 
 	return skbn;
 }
