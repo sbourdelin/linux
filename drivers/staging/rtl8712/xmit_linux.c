@@ -50,8 +50,10 @@ static uint remainder_len(struct pkt_file *pfile)
 void _r8712_open_pktfile(_pkt *pktptr, struct pkt_file *pfile)
 {
 	pfile->pkt = pktptr;
-	pfile->cur_addr = pfile->buf_start = pktptr->data;
-	pfile->pkt_len = pfile->buf_len = pktptr->len;
+	pfile->cur_addr = pktptr->data;
+	pfile->buf_start = pfile->cur_addr;
+	pfile->pkt_len = pktptr->len;
+	pfile->buf_len = pfile->pkt_len;
 	pfile->cur_buffer = pfile->buf_start;
 }
 
