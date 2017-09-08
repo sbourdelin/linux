@@ -160,15 +160,6 @@ static void cirrus_mode_set_nofb(struct drm_crtc *crtc)
 }
 
 /*
- * This is called before a mode is programmed. A typical use might be to
- * enable DPMS during the programming to avoid seeing intermediate stages,
- * but that's not relevant to us
- */
-static void cirrus_crtc_prepare(struct drm_crtc *crtc)
-{
-}
-
-/*
  * This is called after a mode is programmed. It should reverse anything done
  * by the prepare function
  */
@@ -237,8 +228,9 @@ static void cirrus_crtc_atomic_flush(struct drm_crtc *crtc,
 /* These provide the minimum set of functions required to handle a CRTC */
 static const struct drm_crtc_funcs cirrus_crtc_funcs = {
 	.gamma_set = cirrus_crtc_gamma_set,
-	.set_config = drm_crtc_helper_set_config,
+	.set_config = drm_atomic_helper_set_config,
 	.destroy = cirrus_crtc_destroy,
+	.page_flip = drm_atomic_helper_page_flip,
 	.reset = drm_atomic_helper_crtc_reset,
 	.atomic_duplicate_state = drm_atomic_helper_crtc_duplicate_state,
 	.atomic_destroy_state = drm_atomic_helper_crtc_destroy_state,
@@ -246,26 +238,10 @@ static const struct drm_crtc_funcs cirrus_crtc_funcs = {
 
 static const struct drm_crtc_helper_funcs cirrus_helper_funcs = {
 	.dpms = cirrus_crtc_dpms,
-	.mode_set = drm_helper_crtc_mode_set,
-	.mode_set_base = drm_helper_crtc_mode_set_base,
 	.mode_set_nofb = cirrus_mode_set_nofb,
-	.prepare = cirrus_crtc_prepare,
 	.commit = cirrus_crtc_commit,
 	.atomic_flush = cirrus_crtc_atomic_flush,
 };
-
-static int cirrus_plane_update(struct drm_plane *plane,
-			       struct drm_crtc *crtc,
-			       struct drm_framebuffer *fb, int crtc_x,
-			       int crtc_y, unsigned int crtc_w,
-			       unsigned int crtc_h, uint32_t src_x,
-			       uint32_t src_y, uint32_t src_w, uint32_t src_h,
-			       struct drm_modeset_acquire_ctx *ctx)
-{
-	return drm_plane_helper_update(plane, crtc, fb,
-				       crtc_x, crtc_y, crtc_w,
-				       crtc_h, src_x, src_y, src_w, src_h);
-}
 
 static const uint32_t cirrus_plane_formats[] = {
 	DRM_FORMAT_XRGB8888,
@@ -275,7 +251,7 @@ static const uint32_t cirrus_plane_formats[] = {
 };
 
 static const struct drm_plane_funcs cirrus_plane_funcs = {
-	.update_plane	= cirrus_plane_update,
+	.update_plane	= drm_atomic_helper_update_plane,
 	.disable_plane	= drm_primary_helper_disable,
 	.destroy	= drm_primary_helper_destroy,
 	.reset	= drm_atomic_helper_plane_reset,
