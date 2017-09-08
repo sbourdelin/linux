@@ -232,6 +232,7 @@ struct drm_fb_helper {
  * functions. To be used in struct fb_ops of drm drivers.
  */
 #define DRM_FB_HELPER_DEFAULT_OPS \
+	.fb_destroy	= drm_fb_helper_fb_destroy, \
 	.fb_check_var	= drm_fb_helper_check_var, \
 	.fb_set_par	= drm_fb_helper_set_par, \
 	.fb_setcmap	= drm_fb_helper_setcmap, \
@@ -267,6 +268,8 @@ void drm_fb_helper_unlink_fbi(struct drm_fb_helper *fb_helper);
 
 void drm_fb_helper_deferred_io(struct fb_info *info,
 			       struct list_head *pagelist);
+
+void drm_fb_helper_fb_destroy(struct fb_info *info);
 
 ssize_t drm_fb_helper_sys_read(struct fb_info *info, char __user *buf,
 			       size_t count, loff_t *ppos);
@@ -395,6 +398,10 @@ static inline void drm_fb_helper_unlink_fbi(struct drm_fb_helper *fb_helper)
 
 static inline void drm_fb_helper_deferred_io(struct fb_info *info,
 					     struct list_head *pagelist)
+{
+}
+
+static inline void drm_fb_helper_fb_destroy(struct fb_info *info)
 {
 }
 

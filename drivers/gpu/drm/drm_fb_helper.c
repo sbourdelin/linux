@@ -498,7 +498,7 @@ int drm_fb_helper_restore_fbdev_mode_unlocked(struct drm_fb_helper *fb_helper)
 	bool do_delayed;
 	int ret;
 
-	if (!drm_fbdev_emulation)
+	if (!drm_fbdev_emulation || drm_dev_is_unplugged(fb_helper->dev))
 		return -ENODEV;
 
 	if (READ_ONCE(fb_helper->deferred_setup))
@@ -562,6 +562,9 @@ static bool drm_fb_helper_force_kernel_mode(void)
 
 	list_for_each_entry(helper, &kernel_fb_helper_list, kernel_fb_list) {
 		struct drm_device *dev = helper->dev;
+
+		if (drm_dev_is_unplugged(dev))
+			continue;
 
 		if (dev->switch_power_state == DRM_SWITCH_POWER_OFF)
 			continue;
@@ -735,6 +738,9 @@ static void drm_fb_helper_dirty_work(struct work_struct *work)
 	struct drm_clip_rect clip_copy;
 	unsigned long flags;
 
+	if (drm_dev_is_unplugged(helper->dev))
+		return;
+
 	spin_lock_irqsave(&helper->dirty_lock, flags);
 	clip_copy = *clip;
 	clip->x1 = clip->y1 = ~0;
@@ -886,13 +892,24 @@ EXPORT_SYMBOL(drm_fb_helper_alloc_fbi);
  * @fb_helper: driver-allocated fbdev helper
  *
  * A wrapper around unregister_framebuffer, to release the fb_info
- * framebuffer device. This must be called before releasing all resources for
- * @fb_helper by calling drm_fb_helper_fini().
+ * framebuffer device. Unless drm_fb_helper_fb_destroy() set by
+ * DRM_FB_HELPER_DEFAULT_OPS() is used, the ref taken on &drm_device in
+ * drm_fb_helper_initial_config() is dropped. This function must be called
+ * before releasing all resources for @fb_helper by calling
+ * drm_fb_helper_fini().
  */
 void drm_fb_helper_unregister_fbi(struct drm_fb_helper *fb_helper)
 {
-	if (fb_helper && fb_helper->fbdev)
-		unregister_framebuffer(fb_helper->fbdev);
+	struct fb_info *info;
+
+	if (!fb_helper || !fb_helper->fbdev)
+		return;
+
+	info = fb_helper->fbdev;
+	unregister_framebuffer(info);
+	if (!(info->fbops &&
+	      info->fbops->fb_destroy == drm_fb_helper_fb_destroy))
+		drm_dev_unref(fb_helper->dev);
 }
 EXPORT_SYMBOL(drm_fb_helper_unregister_fbi);
 
@@ -1000,6 +1017,24 @@ void drm_fb_helper_deferred_io(struct fb_info *info,
 	}
 }
 EXPORT_SYMBOL(drm_fb_helper_deferred_io);
+
+/**
+ * drm_fb_helper_fb_destroy - implementation for &fb_ops.fb_destroy
+ * @info: fbdev registered by the helper
+ *
+ * Drop ref taken on &drm_device in drm_fb_helper_initial_config().
+ *
+ * &fb_ops.fb_destroy is called during unregister_framebuffer() or the last
+ * fb_release() which ever comes last.
+ */
+void drm_fb_helper_fb_destroy(struct fb_info *info)
+{
+	struct drm_fb_helper *fb_helper = info->par;
+
+	DRM_DEBUG("\n");
+	drm_dev_unref(fb_helper->dev);
+}
+EXPORT_SYMBOL(drm_fb_helper_fb_destroy);
 
 /**
  * drm_fb_helper_sys_read - wrapper around fb_sys_read
@@ -2496,6 +2531,8 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 	if (ret < 0)
 		return ret;
 
+	drm_dev_ref(dev);
+
 	dev_info(dev->dev, "fb%d: %s frame buffer device\n",
 		 info->node, info->fix.id);
 
@@ -2526,6 +2563,9 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
  * drm framebuffer used to back the fbdev. drm_fb_helper_fill_var() and
  * drm_fb_helper_fill_fix() are provided as helpers to setup simple default
  * values for the fbdev info structure.
+ *
+ * A ref is taken on &drm_device if the framebuffer is registered. This ref is
+ * dropped in drm_fb_helper_unregister_fbi() or drm_fb_helper_fb_destroy().
  *
  * HANG DEBUGGING:
  *
@@ -2592,6 +2632,9 @@ int drm_fb_helper_hotplug_event(struct drm_fb_helper *fb_helper)
 
 	if (!drm_fbdev_emulation)
 		return 0;
+
+	if (drm_dev_is_unplugged(fb_helper->dev))
+		return -ENODEV;
 
 	mutex_lock(&fb_helper->lock);
 	if (fb_helper->deferred_setup) {
