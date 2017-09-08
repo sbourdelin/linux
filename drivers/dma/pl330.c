@@ -2390,7 +2390,8 @@ static inline void _init_desc(struct dma_pl330_desc *desc)
 }
 
 /* Returns the number of descriptors added to the DMAC pool */
-static int add_desc(struct pl330_dmac *pl330, gfp_t flg, int count)
+static int _add_desc(struct list_head *pool, spinlock_t *lock,
+	gfp_t flg, int count)
 {
 	struct dma_pl330_desc *desc;
 	unsigned long flags;
@@ -2400,27 +2401,33 @@ static int add_desc(struct pl330_dmac *pl330, gfp_t flg, int count)
 	if (!desc)
 		return 0;
 
-	spin_lock_irqsave(&pl330->pool_lock, flags);
+	spin_lock_irqsave(lock, flags);
 
 	for (i = 0; i < count; i++) {
 		_init_desc(&desc[i]);
-		list_add_tail(&desc[i].node, &pl330->desc_pool);
+		list_add_tail(&desc[i].node, pool);
 	}
 
-	spin_unlock_irqrestore(&pl330->pool_lock, flags);
+	spin_unlock_irqrestore(lock, flags);
 
 	return count;
 }
 
-static struct dma_pl330_desc *pluck_desc(struct pl330_dmac *pl330)
+static int add_desc(struct pl330_dmac *pl330, gfp_t flg, int count)
+{
+	return _add_desc(&pl330->desc_pool, &pl330->pool_lock, flg, count);
+}
+
+static struct dma_pl330_desc *_pluck_desc(struct list_head *pool,
+	spinlock_t *lock)
 {
 	struct dma_pl330_desc *desc = NULL;
 	unsigned long flags;
 
-	spin_lock_irqsave(&pl330->pool_lock, flags);
+	spin_lock_irqsave(lock, flags);
 
-	if (!list_empty(&pl330->desc_pool)) {
-		desc = list_entry(pl330->desc_pool.next,
+	if (!list_empty(pool)) {
+		desc = list_entry(pool->next,
 				struct dma_pl330_desc, node);
 
 		list_del_init(&desc->node);
@@ -2429,9 +2436,14 @@ static struct dma_pl330_desc *pluck_desc(struct pl330_dmac *pl330)
 		desc->txd.callback = NULL;
 	}
 
-	spin_unlock_irqrestore(&pl330->pool_lock, flags);
+	spin_unlock_irqrestore(lock, flags);
 
 	return desc;
+}
+
+static struct dma_pl330_desc *pluck_desc(struct pl330_dmac *pl330)
+{
+	return _pluck_desc(&pl330->desc_pool, &pl330->pool_lock);
 }
 
 static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
@@ -2445,16 +2457,14 @@ static struct dma_pl330_desc *pl330_get_desc(struct dma_pl330_chan *pch)
 
 	/* If the DMAC pool is empty, alloc new */
 	if (!desc) {
-		if (!add_desc(pl330, GFP_ATOMIC, 1))
+		DEFINE_SPINLOCK(lock);
+		LIST_HEAD(pool);
+
+		if (!_add_desc(&pool, &lock, GFP_ATOMIC, 1))
 			return NULL;
 
-		/* Try again */
-		desc = pluck_desc(pl330);
-		if (!desc) {
-			dev_err(pch->dmac->ddma.dev,
-				"%s:%d ALERT!\n", __func__, __LINE__);
-			return NULL;
-		}
+		desc = _pluck_desc(&pool, &lock);
+		WARN_ON(!desc || !list_empty(&pool));
 	}
 
 	/* Initialize the descriptor */
