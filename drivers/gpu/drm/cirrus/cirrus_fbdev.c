@@ -293,9 +293,6 @@ int cirrus_fbdev_init(struct cirrus_device *cdev)
 	if (ret)
 		return ret;
 
-	/* disable all the possible outputs/crtcs before entering KMS mode */
-	drm_helper_disable_unused_functions(cdev->dev);
-
 	return drm_fb_helper_initial_config(&gfbdev->helper, bpp_sel);
 }
 
