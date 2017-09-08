@@ -181,7 +181,6 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
 				    bool new_active_state)
 {
 	struct kvm_vcpu *requester_vcpu;
-	spin_lock(&irq->irq_lock);
 
 	/*
 	 * The vcpu parameter here can mean multiple things depending on how
@@ -195,8 +194,19 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
 	 * NULL, which is fine, because we guarantee that no VCPUs are running
 	 * when accessing VGIC state from user space so irq->vcpu->cpu is
 	 * always -1.
+	 *
+	 * We have to temporarily disable preemption to read the per-CPU
+	 * variable.  It doesn't matter if we actually get preempted
+	 * after enabling preemption because we only need to figure out if
+	 * this thread is a running VCPU thread, and in that case for which
+	 * VCPU.  If we're migrated the preempt notifiers will migrate the
+	 * running VCPU pointer with us.
 	 */
+	preempt_disable();
 	requester_vcpu = kvm_arm_get_running_vcpu();
+	preempt_enable();
+
+	spin_lock(&irq->irq_lock);
 
 	/*
 	 * If this virtual IRQ was written into a list register, we
