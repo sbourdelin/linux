@@ -1037,6 +1037,47 @@ void drm_fb_helper_fb_destroy(struct fb_info *info)
 EXPORT_SYMBOL(drm_fb_helper_fb_destroy);
 
 /**
+ * drm_fb_helper_fb_open - implementation for &fb_ops.fb_open
+ * @info: fbdev registered by the helper
+ * @user: 1=userspace, 0=fbcon
+ *
+ * If &fb_ops is wrapped in a library, pin the driver module.
+ */
+int drm_fb_helper_fb_open(struct fb_info *info, int user)
+{
+	struct drm_fb_helper *fb_helper = info->par;
+	struct drm_device *dev = fb_helper->dev;
+
+	/* Skip fbcon, it detaches itself in unregister_framebuffer() */
+	if (user && info->fbops->owner != dev->driver->fops->owner) {
+		if (!try_module_get(dev->driver->fops->owner))
+			return -ENODEV;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_fb_helper_fb_open);
+
+/**
+ * drm_fb_helper_fb_release - implementation for &fb_ops.fb_release
+ * @info: fbdev registered by the helper
+ * @user: 1=userspace, 0=fbcon
+ *
+ * If &fb_ops is wrapped in a library, unpin the driver module.
+ */
+int drm_fb_helper_fb_release(struct fb_info *info, int user)
+{
+	struct drm_fb_helper *fb_helper = info->par;
+	struct drm_device *dev = fb_helper->dev;
+
+	if (user && info->fbops->owner != dev->driver->fops->owner)
+		module_put(dev->driver->fops->owner);
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_fb_helper_fb_release);
+
+/**
  * drm_fb_helper_sys_read - wrapper around fb_sys_read
  * @info: fb_info struct pointer
  * @buf: userspace buffer to read from framebuffer memory

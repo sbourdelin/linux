@@ -233,6 +233,8 @@ struct drm_fb_helper {
  */
 #define DRM_FB_HELPER_DEFAULT_OPS \
 	.fb_destroy	= drm_fb_helper_fb_destroy, \
+	.fb_open	= drm_fb_helper_fb_open, \
+	.fb_release	= drm_fb_helper_fb_release, \
 	.fb_check_var	= drm_fb_helper_check_var, \
 	.fb_set_par	= drm_fb_helper_set_par, \
 	.fb_setcmap	= drm_fb_helper_setcmap, \
@@ -270,6 +272,8 @@ void drm_fb_helper_deferred_io(struct fb_info *info,
 			       struct list_head *pagelist);
 
 void drm_fb_helper_fb_destroy(struct fb_info *info);
+int drm_fb_helper_fb_open(struct fb_info *info, int user);
+int drm_fb_helper_fb_release(struct fb_info *info, int user);
 
 ssize_t drm_fb_helper_sys_read(struct fb_info *info, char __user *buf,
 			       size_t count, loff_t *ppos);
@@ -403,6 +407,16 @@ static inline void drm_fb_helper_deferred_io(struct fb_info *info,
 
 static inline void drm_fb_helper_fb_destroy(struct fb_info *info)
 {
+}
+
+static inline int drm_fb_helper_fb_open(struct fb_info *info, int user)
+{
+	return -ENODEV;
+}
+
+static inline int drm_fb_helper_fb_release(struct fb_info *info, int user)
+{
+	return -ENODEV;
 }
 
 static inline ssize_t drm_fb_helper_sys_read(struct fb_info *info,
