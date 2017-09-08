@@ -1141,6 +1141,38 @@ static const struct panel_desc innolux_g121x1_l03 = {
 	},
 };
 
+static const struct drm_display_mode mitsubishi_aa070mc01_mode = {
+	.clock = 30400,
+	.hdisplay = 800,
+	.hsync_start = 800 + 0,
+	.hsync_end = 800 + 1,
+	.htotal = 800 + 0 + 1 + 160,
+	.vdisplay = 480,
+	.vsync_start = 480 + 0,
+	.vsync_end = 480 + 48 + 1,
+	.vtotal = 480 + 48 + 1 + 0,
+	.vrefresh = 60,
+	.flags = DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
+};
+
+static const struct panel_desc mitsubishi_aa070mc01 = {
+	.modes = &mitsubishi_aa070mc01_mode,
+	.num_modes = 1,
+	.bpc = 8,
+	.size = {
+		.width = 152,
+		.height = 91,
+	},
+
+	.delay = {
+		.enable = 200,
+		.unprepare = 200,
+		.disable = 400,
+	},
+	.bus_format = MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
+	.bus_flags = DRM_BUS_FLAG_DE_HIGH,
+};
+
 static const struct drm_display_mode innolux_n116bge_mode = {
 	.clock = 76420,
 	.hdisplay = 1366,
@@ -2028,6 +2060,9 @@ static const struct of_device_id platform_of_match[] = {
 	}, {
 		.compatible = "innolux,g121x1-l03",
 		.data = &innolux_g121x1_l03,
+	}, {
+		.compatible = "mitsubishi,aa070mc01-ca1",
+		.data = &mitsubishi_aa070mc01,
 	}, {
 		.compatible = "innolux,n116bge",
 		.data = &innolux_n116bge,
