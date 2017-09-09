@@ -2822,18 +2822,28 @@ struct sk_buff *skb_dequeue_tail(struct sk_buff_head *list)
 EXPORT_SYMBOL(skb_dequeue_tail);
 
 /**
- *	skb_queue_purge - empty a list
- *	@list: list to empty
+ *	skb_queue_purge - empty a queue
+ *	@q: the queue to empty
  *
- *	Delete all buffers on an &sk_buff list. Each buffer is removed from
- *	the list and one reference dropped. This function takes the list
- *	lock and is atomic with respect to other list locking functions.
+ *	Dequeue and free each socket buffer that is in @q.
+ *
+ *	This function is atomic with respect to other queue-locking functions.
  */
-void skb_queue_purge(struct sk_buff_head *list)
+void skb_queue_purge(struct sk_buff_head *q)
 {
-	struct sk_buff *skb;
-	while ((skb = skb_dequeue(list)) != NULL)
+	unsigned long flags;
+	struct sk_buff *skb, *next, *head = (struct sk_buff *)q;
+
+	spin_lock_irqsave(&q->lock, flags);
+	skb = q->next;
+	__skb_queue_head_init(q);
+	spin_unlock_irqrestore(&q->lock, flags);
+
+	while (skb != head) {
+		next = skb->next;
 		kfree_skb(skb);
+		skb = next;
+	}
 }
 EXPORT_SYMBOL(skb_queue_purge);
 
