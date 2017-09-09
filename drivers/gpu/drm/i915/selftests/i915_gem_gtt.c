@@ -1094,6 +1094,382 @@ out_unlock:
 	return err;
 }
 
+static int check_cnl_ppat(struct drm_i915_private *dev_priv)
+{
+	struct intel_ppat *ppat = &dev_priv->ppat;
+	int i;
+
+	for (i = 0; i < ppat->max_entries; i++) {
+		u32 value = I915_READ(GEN10_PAT_INDEX(i));
+
+		if (value != ppat->entries[i].value) {
+			pr_err("check PPAT failed: expected %x found %x\n",
+			       ppat->entries[i].value, value);
+			return -EINVAL;
+		}
+	}
+	return 0;
+}
+
+static int check_bdw_ppat(struct drm_i915_private *dev_priv)
+{
+	struct intel_ppat *ppat = &dev_priv->ppat;
+	u64 pat, hw_pat;
+	int i;
+
+	pat = hw_pat = 0;
+
+	for (i = 0; i < ppat->max_entries; i++)
+		pat |= GEN8_PPAT(i, ppat->entries[i].value);
+
+	hw_pat = I915_READ(GEN8_PRIVATE_PAT_HI);
+	hw_pat <<= 32;
+	hw_pat |= I915_READ(GEN8_PRIVATE_PAT_LO);
+
+	if (pat != hw_pat) {
+		pr_err("check PPAT failed: expected %llx found %llx\n",
+		        pat, hw_pat);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int igt_ppat_check(void *arg)
+{
+	struct drm_i915_private *i915 = arg;
+	int ret;
+
+	if (!i915->ppat.max_entries)
+		return 0;
+
+	if (INTEL_GEN(i915) >= 10)
+		ret = check_cnl_ppat(i915);
+	else
+		ret = check_bdw_ppat(i915);
+
+	if (ret)
+		pr_err("check PPAT failed\n");
+
+	return ret;
+}
+
+static bool value_is_new(struct intel_ppat *ppat, u8 value)
+{
+	int i;
+
+	for_each_set_bit(i, ppat->used, ppat->max_entries) {
+		if (value != ppat->entries[i].value)
+			continue;
+
+		return false;
+	}
+	return true;
+}
+
+static bool value_for_partial_test(struct intel_ppat *ppat, u8 value)
+{
+	int i;
+
+	if (!value_is_new(ppat, value))
+		return false;
+
+	/*
+	 * At least, there should be one entry whose cache attribute is
+	 * same with the required value.
+	 */
+	for_each_set_bit(i, ppat->used, ppat->max_entries) {
+		if (GEN8_PPAT_GET_CA(value) !=
+		    GEN8_PPAT_GET_CA(ppat->entries[i].value))
+			continue;
+
+		return true;
+	}
+	return false;
+}
+
+static bool value_for_negative_test(struct intel_ppat *ppat, u8 value)
+{
+	int i;
+
+	if (!value_is_new(ppat, value))
+		return false;
+
+	/*
+	 * cache attribute has to be different, so i915_ppat_get() would
+	 * allocate a new entry.
+	 */
+	for_each_set_bit(i, ppat->used, ppat->max_entries) {
+		if (GEN8_PPAT_GET_CA(value) ==
+		    GEN8_PPAT_GET_CA(ppat->entries[i].value))
+			return false;
+	}
+	return true;
+}
+
+static u8 generate_new_value(struct intel_ppat *ppat,
+			     bool (*check_value)(struct intel_ppat *, u8))
+{
+	u8 ca[] = { GEN8_PPAT_WB, GEN8_PPAT_WT, GEN8_PPAT_UC, GEN8_PPAT_WC };
+	u8 tc[] = { GEN8_PPAT_LLC, GEN8_PPAT_LLCELLC, GEN8_PPAT_LLCeLLC };
+	u8 age[] = { GEN8_PPAT_AGE(3), GEN8_PPAT_AGE(2), GEN8_PPAT_AGE(1),
+		     GEN8_PPAT_AGE(0) };
+	int ca_index, tc_index, age_index;
+	u8 value;
+
+#define for_each_ppat_attr(ca_index, tc_index, age_index) \
+	for ((ca_index) = 0 ; (ca_index) < ARRAY_SIZE(ca); (ca_index)++) \
+	for ((tc_index) = 0; (tc_index) < ARRAY_SIZE(tc); (tc_index)++) \
+	for ((age_index) = 0; (age_index) < ARRAY_SIZE(age); (age_index)++)
+
+	for_each_ppat_attr(ca_index, tc_index, age_index) {
+		value = age[age_index] | ca[ca_index] | tc[tc_index];
+		if (check_value(ppat, value))
+			return value;
+	}
+#undef for_each_ppat_attr
+	return 0;
+}
+
+static const struct intel_ppat_entry *
+generate_and_check_new_value(struct intel_ppat *ppat)
+{
+	struct drm_i915_private *i915 = ppat->i915;
+	const struct intel_ppat_entry *entry;
+	u8 value;
+	DECLARE_BITMAP(used, INTEL_MAX_PPAT_ENTRIES);
+
+	value = generate_new_value(ppat, value_is_new);
+	if (!value) {
+		pr_err("fail to generate new value\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	bitmap_copy(used, ppat->used, ppat->max_entries);
+
+	entry = intel_ppat_get(i915, value);
+	if (IS_ERR(entry)) {
+		pr_err("fail to get new entry\n");
+		return ERR_PTR(-EINVAL);
+	}
+
+	if (entry->value != value) {
+		pr_err("value is not expected, expected %x found %x\n",
+				value, entry->value);
+		goto err;
+	}
+
+	if (bitmap_equal(used, ppat->used, ppat->max_entries)) {
+		pr_err("fail to alloc a new entry\n");
+		goto err;
+	}
+
+	return entry;
+err:
+	intel_ppat_put(entry);
+	return ERR_PTR(-EINVAL);
+}
+
+static int put_and_check_entry(const struct intel_ppat_entry *entry)
+{
+	intel_ppat_put(entry);
+
+	if (entry->value != entry->ppat->clear_value) {
+		pr_err("fail to put ppat value\n");
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int perform_perfect_match_test(struct intel_ppat *ppat)
+{
+	struct drm_i915_private *i915 = ppat->i915;
+	const struct intel_ppat_entry *entry;
+	int ret, i;
+
+	for_each_set_bit(i, ppat->used, ppat->max_entries) {
+		entry = intel_ppat_get(i915, ppat->entries[i].value);
+		if (IS_ERR(entry))
+			return PTR_ERR(entry);
+
+		if (entry != &ppat->entries[i]) {
+			pr_err("entry is not expected\n");
+			intel_ppat_put(entry);
+			return -EINVAL;
+		}
+		ret = put_and_check_entry(entry);
+		if (ret)
+			return ret;
+	}
+	return 0;
+}
+
+static int perform_negative_test(struct intel_ppat *ppat)
+{
+	struct drm_i915_private *i915 = ppat->i915;
+	const struct intel_ppat_entry *entry;
+	u8 value;
+
+	value = generate_new_value(ppat, value_for_negative_test);
+	if (!value) {
+		pr_err("fail to generate new value for negative test 2\n");
+		return -EINVAL;
+	}
+
+	entry = intel_ppat_get(i915, value);
+	if (!IS_ERR(entry) || PTR_ERR(entry) != -ENOSPC) {
+		pr_err("fail on negative test\n");
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static int perform_partial_match_test(struct intel_ppat *ppat)
+{
+	struct drm_i915_private *i915 = ppat->i915;
+	const struct intel_ppat_entry *entry;
+	u8 value;
+	int ret;
+
+	value = generate_new_value(ppat, value_for_partial_test);
+	if (!value) {
+		pr_err("fail to generate new value for partial test\n");
+		return -EINVAL;
+	}
+
+	entry = intel_ppat_get(i915, value);
+	if (IS_ERR(entry)) {
+		pr_err("fail to get new entry\n");
+		return PTR_ERR(entry);
+	}
+
+	if (!(entry->value != value &&
+	    GEN8_PPAT_GET_CA(entry->value) == GEN8_PPAT_GET_CA(value))) {
+		pr_err("value is not expected, expected %x found %x\n",
+				value, entry->value);
+		intel_ppat_put(entry);
+		return -EINVAL;
+	}
+
+	ret = put_and_check_entry(entry);
+	if (ret)
+		return ret;
+
+	return 0;
+}
+
+static int igt_ppat_get(void *arg)
+{
+	struct drm_i915_private *i915 = arg;
+	struct intel_ppat *ppat = &i915->ppat;
+	const struct intel_ppat_entry **entries, **p;
+	const struct intel_ppat_entry *entry;
+	unsigned int size = 0;
+	int i, ret;
+
+	if (!ppat->max_entries)
+		return 0;
+
+	ret = igt_ppat_check(i915);
+	if (ret)
+		return ret;
+
+	/* case 1: perfect match */
+	ret = perform_perfect_match_test(ppat);
+	if (ret) {
+		pr_err("fail on perfect match test\n");
+		return ret;
+	}
+
+	/* case 2: alloc new entries */
+	entries = NULL;
+	ret = 0;
+
+	while (!bitmap_full(ppat->used, ppat->max_entries)) {
+		p = krealloc(entries, (size + 1) *
+				   sizeof(struct intel_ppat_entry *),
+				   GFP_KERNEL);
+		if (!p) {
+			ret = -ENOMEM;
+			goto ppat_put;
+		}
+
+		entries = p;
+
+		p = &entries[size++];
+		*p = NULL;
+
+		entry = generate_and_check_new_value(ppat);
+		if (IS_ERR(entry)) {
+			ret = PTR_ERR(entry);
+			pr_err("fail on alloc new entries test\n");
+			goto ppat_put;
+		}
+		*p = entry;
+	}
+
+	/* case 3: negative test 1, suppose PPAT table is full now */
+	ret = perform_negative_test(ppat);
+	if (ret) {
+		pr_err("fail on negative test 1\n");
+		goto ppat_put;
+	}
+
+	/* case 4: partial match */
+	ret = perform_partial_match_test(ppat);
+	if (ret) {
+		pr_err("fail on partial match test\n");
+		goto ppat_put;
+	}
+
+	/* case 3: negative test 2, suppose PPAT table is still full now */
+	ret = perform_negative_test(ppat);
+	if (ret) {
+		pr_err("fail on negative test 2\n");
+		goto ppat_put;
+	}
+
+	/* case 5: re-alloc test, make a hole and it should work again */
+	if (entries) {
+		for(i = 0; i < size; i++) {
+			entry = entries[i];
+
+			ret = put_and_check_entry(entry);
+			entries[i] = NULL;
+			if (ret) {
+				pr_err("fail on re-alloc test\n");
+				goto ppat_put;
+			}
+
+			entry = generate_and_check_new_value(ppat);
+			if (IS_ERR(entry)) {
+				ret = PTR_ERR(entry);
+				pr_err("fail on re-alloc test\n");
+				goto ppat_put;
+			}
+			entries[i] = entry;
+		}
+	}
+
+ppat_put:
+	if (entries) {
+		for (i = 0; i < size; i++) {
+			if (IS_ERR(entries[i]) || !entries[i])
+				continue;
+
+			if (ret)
+				intel_ppat_put(entry);
+			else
+				ret = put_and_check_entry(entries[i]);
+		}
+		kfree(entries);
+		entries = NULL;
+	}
+	if (ret)
+		return ret;
+
+	return igt_ppat_check(i915);
+}
+
 static void track_vma_bind(struct i915_vma *vma)
 {
 	struct drm_i915_gem_object *obj = vma->obj;
@@ -1560,6 +1936,8 @@ int i915_gem_gtt_live_selftests(struct drm_i915_private *i915)
 		SUBTEST(igt_ggtt_pot),
 		SUBTEST(igt_ggtt_fill),
 		SUBTEST(igt_ggtt_page),
+		SUBTEST(igt_ppat_check),
+		SUBTEST(igt_ppat_get),
 	};
 
 	GEM_BUG_ON(offset_in_page(i915->ggtt.base.total));
