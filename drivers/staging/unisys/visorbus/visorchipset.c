@@ -1170,7 +1170,7 @@ parahotplug_request_kickoff(struct parahotplug_request *req)
 	struct controlvm_message_packet *cmd = &req->msg.cmd;
 	char env_cmd[40], env_id[40], env_state[40], env_bus[40], env_dev[40],
 	    env_func[40];
-	char *envp[] = {
+	static const char * const envp[] = {
 		env_cmd, env_id, env_state, env_bus, env_dev, env_func, NULL
 	};
 
@@ -1272,7 +1272,7 @@ static int
 chipset_selftest_uevent(struct controlvm_message_header *msg_hdr)
 {
 	char env_selftest[20];
-	char *envp[] = { env_selftest, NULL };
+	static const char * const envp[] = { env_selftest, NULL };
 	int res;
 
 	sprintf(env_selftest, "SPARSP_SELFTEST=%d", 1);
