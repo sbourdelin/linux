@@ -66,7 +66,7 @@ static void ion_buffer_add(struct ion_device *dev,
 			p = &(*p)->rb_right;
 		} else {
 			pr_err("%s: buffer already found.", __func__);
-			BUG();
+			WARN_ON(1);
 		}
 	}
 
