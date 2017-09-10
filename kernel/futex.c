@@ -72,6 +72,8 @@
 
 #include "locking/rtmutex_common.h"
 
+#include "pring.h"
+
 /*
  * READ this before attempting to hack on futexes!
  *
@@ -229,7 +231,7 @@ struct futex_pi_state {
  * we can wake only the relevant ones (hashed queues may be shared).
  *
  * A futex_q has a woken state, just like tasks have TASK_RUNNING.
- * It is considered woken when plist_node_empty(&q->list) || q->lock_ptr == 0.
+ * It is considered woken when futexq_lists_empty(&q) || q->lock_ptr == 0.
  * The order of wakeup is always to make the first condition true, then
  * the second.
  *
@@ -237,7 +239,8 @@ struct futex_pi_state {
  * the rt_mutex code. See unqueue_me_pi().
  */
 struct futex_q {
-	struct plist_node list;
+	struct list_head  list;
+	struct pring_node ring;
 
 	struct task_struct *task;
 	spinlock_t *lock_ptr;
@@ -262,7 +265,7 @@ static const struct futex_q futex_q_init = {
 struct futex_hash_bucket {
 	atomic_t waiters;
 	spinlock_t lock;
-	struct plist_head chain;
+	struct list_head chain;
 } ____cacheline_aligned_in_smp;
 
 /*
@@ -746,12 +749,77 @@ static struct futex_q *futex_top_waiter(struct futex_hash_bucket *hb,
 {
 	struct futex_q *this;
 
-	plist_for_each_entry(this, &hb->chain, list) {
+	list_for_each_entry(this, &hb->chain, list) {
 		if (match_futex(&this->key, key))
 			return this;
 	}
 	return NULL;
 }
+
+/**
+ * futexq_init() - initialize futex_q chain fields
+ * @q           The futex_q to initialize
+ * @prio:	priority
+ */
+static void futexq_init(struct futex_q *q, int prio)
+{
+	INIT_LIST_HEAD(&q->list);
+	pring_init(&q->ring, prio);
+}
+
+/**
+ * futexq_add() - Enqueue the futex_q on the futex_hash_bucket
+ * @q:	The futex_q to enqueue
+ * @hb:	The destination hash bucket
+ */
+static void futexq_add(struct futex_q *q, struct futex_hash_bucket *hb)
+{
+	struct futex_q *top;
+
+	top = futex_top_waiter(hb, &q->key);
+	if (top) {
+		if (pring_add(&q->ring, &top->ring) == &q->ring)
+			list_replace_init(&top->list, &q->list);
+	} else {
+		list_add_tail(&q->list, &hb->chain);
+	}
+}
+
+/**
+ * futexq_del() - Remove the futex_q from its futex_hash_bucket
+ * @q:	The futex_q to unqueue
+ * @hb:	hash bucket to remove from
+ */
+static void futexq_del(struct futex_q *q, struct futex_hash_bucket *hb)
+{
+	struct futex_q *next;
+
+	if (pring_is_singular(&q->ring)) {
+		list_del_init(&q->list);
+	} else {
+		next = pring_next_entry(q, ring);
+		if (!list_empty(&q->list))
+			list_replace_init(&q->list, &next->list);
+		pring_del(&q->ring);
+	}
+}
+
+static inline bool futexq_lists_empty(struct futex_q *q)
+{
+	return list_empty(&q->list) && pring_is_singular(&q->ring);
+}
+
+static inline struct futex_q *futexq_next_or_null(struct futex_q *q)
+{
+	struct futex_q *next = pring_next_entry(q, ring);
+
+	return list_empty(&next->list) ? next : 0;
+}
+
+#define futex_for_each_match_safe(pos, n, hb, key) \
+	for (pos = futex_top_waiter(hb, key); \
+		pos && ({ n = futexq_next_or_null(pos); 1; }); \
+		pos = n)
 
 static int cmpxchg_futex_value_locked(u32 *curval, u32 __user *uaddr,
 				      u32 uval, u32 newval)
@@ -1357,11 +1425,11 @@ static void __unqueue_futex(struct futex_q *q)
 	struct futex_hash_bucket *hb;
 
 	if (WARN_ON_SMP(!q->lock_ptr || !spin_is_locked(q->lock_ptr))
-	    || WARN_ON(plist_node_empty(&q->list)))
+	    || WARN_ON(futexq_lists_empty(q)))
 		return;
 
 	hb = container_of(q->lock_ptr, struct futex_hash_bucket, lock);
-	plist_del(&q->list, &hb->chain);
+	futexq_del(q, hb);
 	hb_waiters_dec(hb);
 }
 
@@ -1389,7 +1457,7 @@ static void mark_wake_futex(struct wake_q_head *wake_q, struct futex_q *q)
 	 * is written, without taking any locks. This is possible in the event
 	 * of a spurious wakeup, for example. A memory barrier is required here
 	 * to prevent the following store to lock_ptr from getting ahead of the
-	 * plist_del in __unqueue_futex().
+	 * futexq_del/pring_del in __unqueue_futex().
 	 */
 	smp_store_release(&q->lock_ptr, NULL);
 }
@@ -1526,21 +1594,19 @@ futex_wake(u32 __user *uaddr, unsigned int flags, int nr_wake, u32 bitset)
 
 	spin_lock(&hb->lock);
 
-	plist_for_each_entry_safe(this, next, &hb->chain, list) {
-		if (match_futex (&this->key, &key)) {
-			if (this->pi_state || this->rt_waiter) {
-				ret = -EINVAL;
-				break;
-			}
-
-			/* Check if one of the bits is set in both bitsets */
-			if (!(this->bitset & bitset))
-				continue;
-
-			mark_wake_futex(&wake_q, this);
-			if (++ret >= nr_wake)
-				break;
+	futex_for_each_match_safe(this, next, hb, &key) {
+		if (this->pi_state || this->rt_waiter) {
+			ret = -EINVAL;
+			break;
 		}
+
+		/* Check if one of the bits is set in both bitsets */
+		if (!(this->bitset & bitset))
+			continue;
+
+		mark_wake_futex(&wake_q, this);
+		if (++ret >= nr_wake)
+			break;
 	}
 
 	spin_unlock(&hb->lock);
@@ -1648,30 +1714,26 @@ retry_private:
 		goto retry;
 	}
 
-	plist_for_each_entry_safe(this, next, &hb1->chain, list) {
-		if (match_futex (&this->key, &key1)) {
+	futex_for_each_match_safe(this, next, hb1, &key1) {
+		if (this->pi_state || this->rt_waiter) {
+			ret = -EINVAL;
+			goto out_unlock;
+		}
+		mark_wake_futex(&wake_q, this);
+		if (++ret >= nr_wake)
+			break;
+	}
+
+	if (op_ret > 0) {
+		op_ret = 0;
+		futex_for_each_match_safe(this, next, hb2, &key2) {
 			if (this->pi_state || this->rt_waiter) {
 				ret = -EINVAL;
 				goto out_unlock;
 			}
 			mark_wake_futex(&wake_q, this);
-			if (++ret >= nr_wake)
+			if (++op_ret >= nr_wake2)
 				break;
-		}
-	}
-
-	if (op_ret > 0) {
-		op_ret = 0;
-		plist_for_each_entry_safe(this, next, &hb2->chain, list) {
-			if (match_futex (&this->key, &key2)) {
-				if (this->pi_state || this->rt_waiter) {
-					ret = -EINVAL;
-					goto out_unlock;
-				}
-				mark_wake_futex(&wake_q, this);
-				if (++op_ret >= nr_wake2)
-					break;
-			}
 		}
 		ret += op_ret;
 	}
@@ -1700,18 +1762,18 @@ void requeue_futex(struct futex_q *q, struct futex_hash_bucket *hb1,
 {
 
 	/*
-	 * If key1 and key2 hash to the same bucket, no need to
+	 * If key1 and key2 hash to the same bucket, we still need to
 	 * requeue.
 	 */
+	futexq_del(q, hb1);
 	if (likely(&hb1->chain != &hb2->chain)) {
-		plist_del(&q->list, &hb1->chain);
 		hb_waiters_dec(hb1);
 		hb_waiters_inc(hb2);
-		plist_add(&q->list, &hb2->chain);
 		q->lock_ptr = &hb2->lock;
 	}
 	get_futex_key_refs(key2);
 	q->key = *key2;
+	futexq_add(q, hb2);
 }
 
 /**
@@ -2002,12 +2064,9 @@ retry_private:
 		}
 	}
 
-	plist_for_each_entry_safe(this, next, &hb1->chain, list) {
+	futex_for_each_match_safe(this, next, hb1, &key1) {
 		if (task_count - nr_wake >= nr_requeue)
 			break;
-
-		if (!match_futex(&this->key, &key1))
-			continue;
 
 		/*
 		 * FUTEX_WAIT_REQEUE_PI and FUTEX_CMP_REQUEUE_PI should always
@@ -2163,8 +2222,8 @@ static inline void __queue_me(struct futex_q *q, struct futex_hash_bucket *hb)
 	 */
 	prio = min(current->normal_prio, MAX_RT_PRIO);
 
-	plist_node_init(&q->list, prio);
-	plist_add(&q->list, &hb->chain);
+	futexq_init(q, prio);
+	futexq_add(q, hb);
 	q->task = current;
 }
 
@@ -2449,7 +2508,7 @@ static void futex_wait_queue_me(struct futex_hash_bucket *hb, struct futex_q *q,
 	 * If we have been removed from the hash list, then another task
 	 * has tried to wake us, and we can skip the call to schedule().
 	 */
-	if (likely(!plist_node_empty(&q->list))) {
+	if (likely(!futexq_lists_empty(q))) {
 		/*
 		 * If the timer has already expired, current will already be
 		 * flagged for rescheduling. Only call schedule if there
@@ -2977,7 +3036,7 @@ int handle_early_requeue_pi_wakeup(struct futex_hash_bucket *hb,
 		 * We were woken prior to requeue by a timeout or a signal.
 		 * Unqueue the futex_q and determine which it was.
 		 */
-		plist_del(&q->list, &hb->chain);
+		futexq_del(q, hb);
 		hb_waiters_dec(hb);
 
 		/* Handle spurious wakeups gracefully */
@@ -3557,7 +3616,7 @@ static int __init futex_init(void)
 
 	for (i = 0; i < futex_hashsize; i++) {
 		atomic_set(&futex_queues[i].waiters, 0);
-		plist_head_init(&futex_queues[i].chain);
+		INIT_LIST_HEAD(&futex_queues[i].chain);
 		spin_lock_init(&futex_queues[i].lock);
 	}
 
