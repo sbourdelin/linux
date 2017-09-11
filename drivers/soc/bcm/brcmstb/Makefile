@@ -1,2 +1,2 @@
 obj-y				+= common.o biuctrl.o
-obj-y				+= pm/
+obj-$(CONFIG_BRCMSTB_PM)	+= pm/
