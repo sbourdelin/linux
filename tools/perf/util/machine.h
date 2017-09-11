@@ -38,7 +38,7 @@ struct machine {
 	struct rb_node	  rb_node;
 	pid_t		  pid;
 	u16		  id_hdr_size;
-	bool		  comm_exec;
+	atomic_t	  comm_exec;
 	bool		  kptr_restrict_warned;
 	char		  *root_dir;
 	struct threads    threads[THREADS__TABLE_SIZE];
