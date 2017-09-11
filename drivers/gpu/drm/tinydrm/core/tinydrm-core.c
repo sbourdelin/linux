@@ -221,9 +221,8 @@ static int tinydrm_register(struct tinydrm_device *tdev)
 	if (ret)
 		return ret;
 
-	fbdev = drm_fbdev_cma_init_with_funcs(drm, bpp ? bpp : 32,
-					      drm->mode_config.num_connector,
-					      tdev->fb_funcs);
+	fbdev = drm_fbdev_cma_init(drm, bpp ? bpp : 32,
+				   drm->mode_config.num_connector);
 	if (IS_ERR(fbdev))
 		DRM_ERROR("Failed to initialize fbdev: %ld\n", PTR_ERR(fbdev));
 	else
