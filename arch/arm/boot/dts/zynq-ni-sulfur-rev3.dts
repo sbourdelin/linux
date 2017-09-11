@@ -1,0 +1,118 @@
+/*
+ * Copyright (c) 2016,2017 National Instruments Corp.
+ *
+ * SPDX-License-Identifier: (GPL-2.0 OR X11)
+ */
+
+/dts-v1/;
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include "zynq-ni-sulfur.dtsi"
+
+/ {
+	model = "NI/Ettus Research Project Sulfur SDR Rev3";
+	compatible = "ettus,zynq-sulfur-rev3", "xlnx,zynq-7000";
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		power-button {
+			label = "Power Button";
+			linux,code = <KEY_POWER>;
+			gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
+		};
+	};
+
+	gpio-poweroff {
+		compatible = "gpio-poweroff";
+		gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
+	};
+
+	leds {
+		led0 {
+			label = "sulfur:ledn";
+			gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
+			linux,default-trigger = "heartbeat";
+		};
+	};
+};
+
+&i2c_switch0 {
+	reset-gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+
+	i2c@3 {
+		reg = <3>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		gpio1: gpio@22 {
+			compatible = "ti,tca6424";
+			reg = <0x22>;
+			gpio-controller;
+			#gpio-cells = <2>;
+		};
+	};
+
+	i2c@5 {
+		reg = <5>;
+		status = "okay";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		rtc0: rtc@68 {
+			compatible = "dallas,ds1374";
+			reg = <0x68>;
+		};
+	};
+
+};
+
+&i2c1 {
+	clock-frequency = <400000>;
+	status = "okay";
+
+	embedded-controller@1e {
+		reg = <0x1e>;
+		compatible = "google,cros-ec-i2c";
+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-parent = <&gpio0>;
+		google,has-vbc-nvram;
+
+		wakeup-source;
+
+		tun: i2c-tunnel {
+			compatible = "google,cros-ec-i2c-tunnel";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			google,remote-bus = <0>;
+			clock-frequency = <50000>;
+
+			nvmem0: eeprom@50 {
+				compatible = "atmel,24c02";
+				reg = <0x50>;
+			};
+		};
+	};
+};
+
+&gpio0 {
+	ledp {
+		gpio-hog;
+		gpios = <5 GPIO_ACTIVE_HIGH>;
+		output-high;
+	};
+};
+
+&ethernet_phy0 {
+	reset-gpios = <&gpio0 50 GPIO_ACTIVE_LOW>;
+};
+
+&usb_phy0 {
+	reset-gpios = <&gpio0 51 GPIO_ACTIVE_LOW>;
+};
+
+&clkc {
+	ps-clk-frequency = <33333333>;
+};

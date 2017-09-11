@@ -1,0 +1,133 @@
+/*
+ * Copyright (c) 2016,2017 National Instruments Corp.
+ *
+ * SPDX-License-Identifier: (GPL-2.0 OR X11)
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include "zynq-7000.dtsi"
+
+/ {
+	aliases {
+		ethernet0 = &gem0;
+		serial0 = &uart0;
+		serial1 = &uart1;
+		spi0 = &spi0;
+		spi1 = &spi1;
+		gpio0 = &gpio0;
+		i2c0 = &i2c0;
+		i2c1 = &i2c1;
+		i2c20 = &tun;
+		i2c706 = &usrpio_i2c0;
+		i2c707 = &usrpio_i2c1;
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x40000000>;
+	};
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	usb_phy0: phy0 {
+		compatible = "usb-nop-xceiv";
+		#phy-cells = <0>;
+	};
+};
+
+&cpu0 {
+	operating-points = <800000 1000000>;
+};
+
+&clkc {
+	ps-clk-frequency = <33333333>;
+};
+
+&sdhci0 {
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+};
+
+/* we use the ARM global timer */
+&ttc0 {
+	status = "disabled";
+};
+
+/* we use the ARM global timer */
+&ttc1 {
+	status = "disabled";
+};
+
+&i2c0 {
+	status = "okay";
+	clock-frequency = <400000>;
+
+	i2c_switch0: i2cswitch@70 {
+		compatible = "nxp,pca9548";
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0x70>;
+
+		usrpio_i2c0: i2c@6 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+
+			nvmem2: eeprom@50 {
+				compatible = "atmel,24c256";
+				reg = <0x50>;
+			};
+
+		};
+
+		usrpio_i2c1: i2c@7 {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <6>;
+
+			nvmem3: eeprom@50 {
+				compatible = "atmel,24c256";
+				reg = <0x50>;
+			};
+		};
+
+	};
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gem0 {
+	phy-mode = "rgmii-id";
+	phy-handle = <&ethernet_phy0>;
+	status = "okay";
+
+	ethernet_phy0: ethernet-phy@0 {
+		reg = <0>;
+	};
+};
+
+&usb0 {
+	usb-phy = <&usb_phy0>;
+	dr_mode = "otg";
+	status = "okay";
+};
+
+&amba {
+	ocm: sram@fffc0000 {
+		compatible = "mmio-sram";
+		reg = <0xfffc0000 0x10000>;
+	};
+};

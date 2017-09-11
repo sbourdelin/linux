@@ -1,0 +1,26 @@
+/*
+ * Copyright (c) 2016,2017 National Instruments Corp.
+ *
+ * SPDX-License-Identifier: (GPL-2.0 OR X11)
+ */
+
+/dts-v1/;
+#include "zynq-ni-sulfur-rev3.dts"
+
+/ {
+	model = "NI/Ettus Research Project Sulfur SDR Rev4";
+	compatible = "ettus,zynq-sulfur-rev4", "xlnx,zynq-7000";
+};
+
+&i2c_switch0 {
+	i2c@4 {
+		reg = <4>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		tpm: tpm@29 {
+			compatible = "atmel,at97sc3204t";
+			reg = <0x29>;
+		};
+	};
+};

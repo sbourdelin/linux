@@ -991,6 +991,9 @@ dtb-$(CONFIG_ARCH_VT8500) += \
 dtb-$(CONFIG_ARCH_ZYNQ) += \
 	zynq-microzed.dtb \
 	zynq-parallella.dtb \
+	zynq-ni-sulfur-rev2.dtb \
+	zynq-ni-sulfur-rev3.dtb \
+	zynq-ni-sulfur-rev4.dtb \
 	zynq-zc702.dtb \
 	zynq-zc706.dtb \
 	zynq-zed.dtb \

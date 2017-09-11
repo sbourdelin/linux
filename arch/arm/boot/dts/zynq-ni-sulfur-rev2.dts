@@ -1,0 +1,84 @@
+/*
+ * Copyright (c) 2016,2017 National Instruments Corp.
+ *
+ * SPDX-License-Identifier: (GPL-2.0 OR X11)
+ */
+
+/dts-v1/;
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/gpio/gpio.h>
+#include "zynq-ni-sulfur.dtsi"
+
+/ {
+	model = "NI/Ettus Research Project Sulfur SDR Rev2";
+	compatible = "ettus,zynq-sulfur-rev2", "xlnx,zynq-7000";
+
+	gpio-poweroff {
+		compatible = "gpio-poweroff";
+		gpios = <&gpio0 4 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&i2c_switch0 {
+	reset-gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
+
+	i2c@4 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <4>;
+
+		tpm: tpm@20 {
+			compatible = "infineon,slb9645tt";
+			reg = <0x20>;
+
+			interrupts = <1 IRQ_TYPE_LEVEL_LOW>;
+			interrupt-parent = <&gpio0>;
+
+			reset-gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
+		};
+	};
+
+};
+
+&spi1 {
+	status = "okay";
+
+	cros_ec: ec@0 {
+		compatible = "google,cros-ec-spi";
+		reg = <0>;
+		google,cros-ec-spi-msg-delay = <200>;
+		google,cros-ec-spi-pre-delay = <60>;
+		google,has-vbc-nvram;
+		spi-max-frequency = <3000000>;
+
+		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-parent = <&gpio0>;
+
+		tun: i2c-tunnel {
+			compatible = "google,cros-ec-i2c-tunnel";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			google,remote-bus = <1>;
+			clock-frequency = <50000>;
+
+			nvmem0: eeprom@50 {
+				compatible = "atmel,24c256";
+				reg = <0x50>;
+			};
+
+			rtc0: rtc@68 {
+				compatible = "dallas,ds1374";
+				reg = <0x68>;
+			};
+		};
+	};
+};
+
+&ethernet_phy0 {
+	reset-gpios = <&gpio0 6 GPIO_ACTIVE_LOW>;
+};
+
+&usb_phy0 {
+	reset-gpios = <&gpio0 7 GPIO_ACTIVE_LOW>;
+};
