@@ -1496,7 +1496,7 @@ sh_css_invalidate_shading_tables(struct ia_css_stream *stream)
 		"sh_css_invalidate_shading_tables() leave: return_void\n");
 }
 
-#ifndef ISP2401
+#if 1 /* was ndef ISP2401 but this function is used by ISP2401 on line 1758 */
 static void
 enable_interrupts(enum ia_css_irq_type irq_type)
 {
@@ -1709,7 +1709,7 @@ ia_css_init(const struct ia_css_env *env,
 	enable = gpio_reg_load(GPIO0_ID, _gpio_block_reg_do_e)
 							| GPIO_FLASH_PIN_MASK;
 	sh_css_mmu_set_page_table_base_index(mmu_l1_base);
-#ifndef ISP2401
+#if 1 /* was ndef ISP2401 but ia_css_save_mmu_base_addr is not declared */
 	my_css_save.mmu_base = mmu_l1_base;
 #else
 	ia_css_save_mmu_base_addr(mmu_l1_base);
@@ -1726,7 +1726,7 @@ ia_css_init(const struct ia_css_env *env,
 		return err;
 	}
 
-#ifndef ISP2401
+#if 1 /* was ndef ISP2401 but ia_css_save_restore_data_init is not declared */
 	IA_CSS_LOG("init: %d", my_css_save_initialized);
 #else
 	ia_css_save_restore_data_init();
@@ -1750,7 +1750,7 @@ ia_css_init(const struct ia_css_env *env,
 
 #endif
 	my_css.irq_type = irq_type;
-#ifndef ISP2401
+#if 1 /* was ndef ISP2401 but ia_css_save_irq_type is not declared */
 	my_css_save.irq_type = irq_type;
 #else
 	ia_css_save_irq_type(irq_type);
@@ -9776,7 +9776,7 @@ ia_css_stream_create(const struct ia_css_stream_config *stream_config,
 	*stream = curr_stream;
 
 ERR:
-#ifndef ISP2401
+#if 1 /* was ndef ISP2401, but ia_css_save_stream is not declared */
 	if (err == IA_CSS_SUCCESS)
 	{
 		/* working mode: enter into the seed list */
@@ -9819,7 +9819,7 @@ ia_css_stream_destroy(struct ia_css_stream *stream)
 	enum ia_css_err err = IA_CSS_SUCCESS;
 #ifdef ISP2401
 	enum ia_css_err err1 = IA_CSS_SUCCESS;
-	enum ia_css_err err2 = IA_CSS_SUCCESS;
+	/* unused enum ia_css_err err2 = IA_CSS_SUCCESS; */
 #endif
 
 	IA_CSS_ENTER_PRIVATE("stream = %p", stream);
@@ -9915,7 +9915,7 @@ ia_css_stream_destroy(struct ia_css_stream *stream)
 	kfree(stream->pipes);
 	stream->pipes = NULL;
 	stream->num_pipes = 0;
-#ifndef ISP2401
+#if 1 /*was ndef ISP2401, but ia_css_save_restore_remove_stream is not declared */
 	/* working mode: take out of the seed list */
 	if (my_css_save.mode == sh_css_mode_working)
 		for(i=0;i<MAX_ACTIVE_STREAMS;i++)
@@ -10113,7 +10113,6 @@ ia_css_stream_has_stopped(struct ia_css_stream *stream)
 	return stopped;
 }
 
-#ifndef ISP2401
 /*
  * Destroy the stream and all the pipes related to it.
  * The stream handle is used to identify the correct entry in the css_save struct
@@ -10141,7 +10140,6 @@ ia_css_stream_unload(struct ia_css_stream *stream)
 	return IA_CSS_SUCCESS;
 }
 
-#endif
 enum ia_css_err
 ia_css_temp_pipe_to_pipe_id(const struct ia_css_pipe *pipe, enum ia_css_pipe_id *pipe_id)
 {
@@ -10427,7 +10425,7 @@ ia_css_start_sp(void)
 	sh_css_setup_queues();
 	ia_css_bufq_dump_queue_info();
 
-#ifdef ISP2401
+#if 0 /* was def ISP2401, but ia_css_is_system_mode_suspend_or_resume and ia_css_set_system_mode are not declared */
 	if (ia_css_is_system_mode_suspend_or_resume() == false) { /* skip in suspend/resume flow */
 		ia_css_set_system_mode(IA_CSS_SYS_MODE_WORKING);
 	}
@@ -10495,7 +10493,7 @@ ia_css_stop_sp(void)
 
 	sh_css_hmm_buffer_record_uninit();
 
-#ifndef ISP2401
+#if 1 /* was ndef ISP2401, but ia_css_is_system_mode_suspend_or_resume is not declared */
 	/* clear pending param sets from refcount */
 	sh_css_param_clear_param_sets();
 #else
@@ -11003,7 +11001,7 @@ sh_css_hmm_buffer_record_init(void)
 {
 	int i;
 
-#ifndef ISP2401
+#if 1 /* was ndef ISP2401 but ia_css_is_system_mode_suspend_or_resume is not defined */
 	for (i = 0; i < MAX_HMM_BUFFER_NUM; i++) {
 		sh_css_hmm_buffer_record_reset(&hmm_buffer_record[i]);
 #else
@@ -11021,7 +11019,7 @@ sh_css_hmm_buffer_record_uninit(void)
 	int i;
 	struct sh_css_hmm_buffer_record *buffer_record = NULL;
 
-#ifndef ISP2401
+#if 1 /* was ndef ISP2401 but ia_css_is_system_mode_suspend_or_resume is not defined */
 	buffer_record = &hmm_buffer_record[0];
 	for (i = 0; i < MAX_HMM_BUFFER_NUM; i++) {
 		if (buffer_record->in_use) {

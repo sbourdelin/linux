@@ -222,6 +222,7 @@ struct ia_css_binary_info {
 		uint8_t	luma_only;
 		uint8_t	input_yuv;
 		uint8_t	input_raw;
+		uint8_t	lace_stats;
 #endif
 		uint8_t	reduced_pipe;
 		uint8_t	vf_veceven;

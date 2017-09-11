@@ -46,7 +46,7 @@
 #include "ia_css_pipeline.h"
 #include "ia_css_debug.h"
 #include "memory_access.h"
-#if 0   /* FIXME */
+#ifdef ISP2401
 #include "memory_realloc.h"
 #endif
 #include "ia_css_isp_param.h"
@@ -3128,9 +3128,6 @@ sh_css_init_isp_params_from_global(struct ia_css_stream *stream,
 
 		ia_css_sdis_clear_coefficients(&params->dvs_coefs);
 		params->dis_coef_table_changed = true;
-#ifdef ISP2401
-		ia_css_tnr3_set_default_config(&params->tnr3_config);
-#endif
 	}
 	else
 	{
@@ -3929,9 +3926,6 @@ sh_css_param_update_isp_params(struct ia_css_pipe *curr_pipe,
 			 */
 			g_param_buffer_enqueue_count++;
 			assert(g_param_buffer_enqueue_count < g_param_buffer_dequeue_count+50);
-#ifdef ISP2401
-			ia_css_save_latest_paramset_ptr(pipe, cpy);
-#endif
 			/*
 			 * Tell the SP which queues are not empty,
 			 * by sending the software event.

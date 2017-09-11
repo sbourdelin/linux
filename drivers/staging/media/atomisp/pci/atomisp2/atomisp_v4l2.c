@@ -1602,4 +1602,8 @@ module_exit(atomisp_exit);
 MODULE_AUTHOR("Wen Wang <wen.w.wang@intel.com>");
 MODULE_AUTHOR("Xiaolin Zhang <xiaolin.zhang@intel.com>");
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Intel ATOM Platform ISP Driver");
+#if defined(ISP2400) || defined(ISP2400B0)
+MODULE_DESCRIPTION("Intel ATOM Platform ISP Driver 2400");
+#elif defined(ISP2401)
+MODULE_DESCRIPTION("Intel ATOM Platform ISP Driver 2401");
+#endif

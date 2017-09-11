@@ -1045,9 +1045,8 @@ void atomisp_buf_done(struct atomisp_sub_device *asd, int error,
 				asd->re_trigger_capture = false;
 				dev_dbg(isp->dev, "Trigger capture again for new buffer. err=%d\n",
 						err);
-			} else {
-				asd->re_trigger_capture = true;
-			}
+		} else {
+			asd->re_trigger_capture = true;
 #endif
 		}
 		break;
