@@ -35,6 +35,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <drm/drmP.h>
+#include <drm/drm_auth.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_crtc_helper.h>
@@ -902,6 +903,7 @@ EXPORT_SYMBOL(drm_fb_helper_unregister_fbi);
  *
  * This cleans up all remaining resources associated with @fb_helper. Must be
  * called after drm_fb_helper_unlink_fbi() was called.
+ * drm_framebuffer_create_dumb() created framebuffers will be destroyed.
  */
 void drm_fb_helper_fini(struct drm_fb_helper *fb_helper)
 {
@@ -932,6 +934,7 @@ void drm_fb_helper_fini(struct drm_fb_helper *fb_helper)
 	mutex_destroy(&fb_helper->lock);
 	drm_fb_helper_crtc_free(fb_helper);
 
+	drm_file_free(fb_helper->file);
 }
 EXPORT_SYMBOL(drm_fb_helper_fini);
 
@@ -2465,6 +2468,16 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 	unsigned int width, height;
 	int ret;
 
+	fb_helper->file = drm_file_alloc(dev->primary);
+	if (IS_ERR(fb_helper->file)) {
+		ret = PTR_ERR(fb_helper->file);
+		fb_helper->file = NULL;
+		mutex_unlock(&fb_helper->lock);
+		return ret;
+	}
+
+	drm_dropmaster_ioctl(dev, NULL, fb_helper->file);
+
 	width = dev->mode_config.max_width;
 	height = dev->mode_config.max_height;
 
@@ -2478,7 +2491,7 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 		}
 		mutex_unlock(&fb_helper->lock);
 
-		return ret;
+		goto err_free_file;
 	}
 	drm_setup_crtcs_fb(fb_helper);
 
@@ -2494,7 +2507,7 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 
 	ret = register_framebuffer(info);
 	if (ret < 0)
-		return ret;
+		goto err_free_file;
 
 	dev_info(dev->dev, "fb%d: %s frame buffer device\n",
 		 info->node, info->fix.id);
@@ -2507,6 +2520,11 @@ __drm_fb_helper_initial_config_and_unlock(struct drm_fb_helper *fb_helper,
 	mutex_unlock(&kernel_fb_helper_lock);
 
 	return 0;
+
+err_free_file:
+	drm_file_free(fb_helper->file);
+
+	return ret;
 }
 
 /**

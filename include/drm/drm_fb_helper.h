@@ -154,6 +154,15 @@ struct drm_fb_helper_connector {
 struct drm_fb_helper {
 	struct drm_framebuffer *fb;
 	struct drm_device *dev;
+
+	/**
+	 * @file:
+	 *
+	 * DRM file that can be used with drm_framebuffer_create_dumb() to
+	 * create a framebuffer to back fbdev.
+	 */
+	struct drm_file *file;
+
 	int crtc_count;
 	struct drm_fb_helper_crtc *crtc_info;
 	int connector_count;
