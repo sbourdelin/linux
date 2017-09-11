@@ -316,7 +316,6 @@ drm_fbdev_cma_create(struct drm_fb_helper *helper,
 	struct drm_gem_cma_object *obj;
 	struct drm_framebuffer *fb;
 	unsigned int bytes_per_pixel;
-	unsigned long offset;
 	struct fb_info *fbi;
 	size_t size;
 	u32 format;
@@ -352,12 +351,9 @@ drm_fbdev_cma_create(struct drm_fb_helper *helper,
 	drm_fb_helper_fill_fix(fbi, fb->pitches[0], fb->format->depth);
 	drm_fb_helper_fill_var(fbi, helper, sizes->fb_width, sizes->fb_height);
 
-	offset = fbi->var.xoffset * bytes_per_pixel;
-	offset += fbi->var.yoffset * fb->pitches[0];
-
 	dev->mode_config.fb_base = (resource_size_t)obj->paddr;
-	fbi->screen_base = obj->vaddr + offset;
-	fbi->fix.smem_start = (unsigned long)(obj->paddr + offset);
+	fbi->screen_base = obj->vaddr;
+	fbi->fix.smem_start = (unsigned long)obj->paddr;
 	fbi->screen_size = size;
 	fbi->fix.smem_len = size;
 
