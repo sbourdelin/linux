@@ -29,7 +29,6 @@
 
 struct drm_fbdev_cma {
 	struct drm_fb_helper	fb_helper;
-	const struct drm_framebuffer_funcs *fb_funcs;
 };
 
 /**
@@ -46,33 +45,6 @@ struct drm_fbdev_cma {
  * If the &drm_framebuffer_funcs.dirty callback is set, fb_deferred_io will be
  * set up automatically. &drm_framebuffer_funcs.dirty is called by
  * drm_fb_helper_deferred_io() in process context (&struct delayed_work).
- *
- * Example fbdev deferred io code::
- *
- *     static int driver_fb_dirty(struct drm_framebuffer *fb,
- *                                struct drm_file *file_priv,
- *                                unsigned flags, unsigned color,
- *                                struct drm_clip_rect *clips,
- *                                unsigned num_clips)
- *     {
- *         struct drm_gem_cma_object *cma = drm_fb_cma_get_gem_obj(fb, 0);
- *         ... push changes ...
- *         return 0;
- *     }
- *
- *     static struct drm_framebuffer_funcs driver_fb_funcs = {
- *         .destroy       = drm_fb_cma_destroy,
- *         .create_handle = drm_fb_cma_create_handle,
- *         .dirty         = driver_fb_dirty,
- *     };
- *
- * Initialize::
- *
- *     fbdev = drm_fbdev_cma_init_with_funcs(dev, 16,
- *                                           dev->mode_config.num_crtc,
- *                                           dev->mode_config.num_connector,
- *                                           &driver_fb_funcs);
- *
  */
 
 static inline struct drm_fbdev_cma *to_fbdev_cma(struct drm_fb_helper *helper)
@@ -371,17 +343,15 @@ static const struct drm_fb_helper_funcs drm_fb_cma_helper_funcs = {
 };
 
 /**
- * drm_fbdev_cma_init_with_funcs() - Allocate and initializes a drm_fbdev_cma struct
+ * drm_fbdev_cma_init() - Allocate and initializes a drm_fbdev_cma struct
  * @dev: DRM device
  * @preferred_bpp: Preferred bits per pixel for the device
  * @max_conn_count: Maximum number of connectors
- * @funcs: fb helper functions, in particular a custom dirty() callback
  *
  * Returns a newly allocated drm_fbdev_cma struct or a ERR_PTR.
  */
-struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs(struct drm_device *dev,
-	unsigned int preferred_bpp, unsigned int max_conn_count,
-	const struct drm_framebuffer_funcs *funcs)
+struct drm_fbdev_cma *drm_fbdev_cma_init(struct drm_device *dev,
+	unsigned int preferred_bpp, unsigned int max_conn_count)
 {
 	struct drm_fbdev_cma *fbdev_cma;
 	struct drm_fb_helper *helper;
@@ -392,7 +362,6 @@ struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs(struct drm_device *dev,
 		dev_err(dev->dev, "Failed to allocate drm fbdev.\n");
 		return ERR_PTR(-ENOMEM);
 	}
-	fbdev_cma->fb_funcs = funcs;
 
 	helper = &fbdev_cma->fb_helper;
 
@@ -425,28 +394,6 @@ err_free:
 	kfree(fbdev_cma);
 
 	return ERR_PTR(ret);
-}
-EXPORT_SYMBOL_GPL(drm_fbdev_cma_init_with_funcs);
-
-static const struct drm_framebuffer_funcs drm_fb_cma_funcs = {
-	.destroy	= drm_gem_fb_destroy,
-	.create_handle	= drm_gem_fb_create_handle,
-};
-
-/**
- * drm_fbdev_cma_init() - Allocate and initializes a drm_fbdev_cma struct
- * @dev: DRM device
- * @preferred_bpp: Preferred bits per pixel for the device
- * @max_conn_count: Maximum number of connectors
- *
- * Returns a newly allocated drm_fbdev_cma struct or a ERR_PTR.
- */
-struct drm_fbdev_cma *drm_fbdev_cma_init(struct drm_device *dev,
-	unsigned int preferred_bpp, unsigned int max_conn_count)
-{
-	return drm_fbdev_cma_init_with_funcs(dev, preferred_bpp,
-					     max_conn_count,
-					     &drm_fb_cma_funcs);
 }
 EXPORT_SYMBOL_GPL(drm_fbdev_cma_init);
 
