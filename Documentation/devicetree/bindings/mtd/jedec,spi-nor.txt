@@ -30,6 +30,7 @@ Required properties:
                  s25sl12801
                  s25fl008k
                  s25fl064k
+                 sst25vf016b
                  sst25vf040b
                  m25p40
                  m25p80
