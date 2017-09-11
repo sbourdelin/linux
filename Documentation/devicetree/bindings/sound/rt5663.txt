@@ -19,6 +19,10 @@ Optional properties:
   Based on the different PCB layout, add the manual offset value to
   compensate the DC offset for each L and R channel, and they are different
   between headphone and headset.
+- "realtek,impedance_sensing_num"
+  The range number of impedance sensing.
+- "realtek,impedance_sensing_table"
+  The parameters table of impedance sensing.
 
 Pins on the device (for linking into audio routes) for RT5663:
 
