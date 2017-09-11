@@ -2638,9 +2638,9 @@ static int send_create_inode(struct send_ctx *sctx, u64 ino)
 	} else if (S_ISSOCK(mode)) {
 		cmd = BTRFS_SEND_C_MKSOCK;
 	} else {
-		btrfs_warn(sctx->send_root->fs_info, "unexpected inode type %o",
-				(int)(mode & S_IFMT));
-		ret = -ENOTSUPP;
+		btrfs_warn(fs_info, "unexpected type 0%o of inode %llu",
+				(int)(mode & S_IFMT), ino);
+		ret = -EOPNOTSUPP;
 		goto out;
 	}
 
