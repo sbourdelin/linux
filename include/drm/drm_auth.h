@@ -81,5 +81,7 @@ struct drm_master {
 struct drm_master *drm_master_get(struct drm_master *master);
 void drm_master_put(struct drm_master **master);
 bool drm_is_current_master(struct drm_file *fpriv);
+int drm_dropmaster_ioctl(struct drm_device *dev, void *data,
+			 struct drm_file *file_priv);
 
 #endif

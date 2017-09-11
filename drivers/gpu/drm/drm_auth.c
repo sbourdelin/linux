@@ -221,6 +221,7 @@ out_unlock:
 	mutex_unlock(&dev->master_mutex);
 	return ret;
 }
+EXPORT_SYMBOL(drm_dropmaster_ioctl);
 
 int drm_master_open(struct drm_file *file_priv)
 {
