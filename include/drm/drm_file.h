@@ -360,6 +360,8 @@ static inline bool drm_is_control_client(const struct drm_file *file_priv)
 	return file_priv->minor->type == DRM_MINOR_CONTROL;
 }
 
+struct drm_file *drm_file_alloc(struct drm_minor *minor);
+void drm_file_free(struct drm_file *file);
 int drm_open(struct inode *inode, struct file *filp);
 ssize_t drm_read(struct file *filp, char __user *buffer,
 		 size_t count, loff_t *offset);
