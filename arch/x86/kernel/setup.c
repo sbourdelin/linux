@@ -1039,8 +1039,6 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	init_hypervisor_platform();
 
-	simple_udelay_calibration();
-
 	x86_init.resources.probe_roms();
 
 	/* after parse_early_param, so could debug it */
@@ -1220,6 +1218,8 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_KVM_GUEST
 	kvmclock_init();
 #endif
+
+	simple_udelay_calibration();
 
 	x86_init.paging.pagetable_init();
 
