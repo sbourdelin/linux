@@ -1617,6 +1617,13 @@ ARM/NEC MOBILEPRO 900/c MACHINE SUPPORT
 M:	Michael Petchkovsky <mkpetch@internode.on.net>
 S:	Maintained
 
+ARM/NATIONAL INSTRUMENTS PROJECT SULFUR SDR
+M:	Moritz Fischer <mdf@kernel.org>
+L:	usrp-users@lists.ettus.com (moderated for non-subscribers)
+W:	http://www.ettus.com
+S:	Supported
+F:	arch/arm/boot/dts/zynq-ni-sulfur*
+
 ARM/NOMADIK ARCHITECTURE
 M:	Alessandro Rubini <rubini@unipv.it>
 M:	Linus Walleij <linus.walleij@linaro.org>
