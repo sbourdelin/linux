@@ -381,7 +381,7 @@ config FRAME_POINTER_UNWINDER
 
 config ORC_UNWINDER
 	bool "ORC unwinder"
-	depends on X86_64
+	depends on X86_64 && !KMEMCHECK
 	select STACK_VALIDATION
 	---help---
 	  This option enables the ORC (Oops Rewind Capability) unwinder for
@@ -397,7 +397,7 @@ config ORC_UNWINDER
 
 config GUESS_UNWINDER
 	bool "Guess unwinder"
-	depends on EXPERT
+	depends on EXPERT && !KMEMCHECK
 	---help---
 	  This option enables the "guess" unwinder for unwinding kernel stack
 	  traces.  It scans the stack and reports every kernel text address it
