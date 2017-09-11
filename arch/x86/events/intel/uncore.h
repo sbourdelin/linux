@@ -12,7 +12,25 @@
 #define UNCORE_FIXED_EVENT		0xff
 #define UNCORE_PMC_IDX_MAX_GENERIC	8
 #define UNCORE_PMC_IDX_FIXED		UNCORE_PMC_IDX_MAX_GENERIC
-#define UNCORE_PMC_IDX_MAX		(UNCORE_PMC_IDX_FIXED + 1)
+#define UNCORE_PMC_IDX_FREERUNNING	(UNCORE_PMC_IDX_FIXED + 1)
+#define UNCORE_PMC_IDX_MAX		(UNCORE_PMC_IDX_FREERUNNING + 1)
+
+/*
+ * Free running MSR events have the same event code 0xff as fixed events.
+ * The Free running events umask starts from 0x10.
+ * The umask which is less than 0x10 is reserved for fixed events.
+ *
+ * The Free running events are divided into different types according to
+ * MSR location, bit width or definition. Each type is limited to only have
+ * at most 16 events.
+ * So the umask of first type starts from 0x10, the second starts from 0x20,
+ * the rest can be done in the same manner.
+ */
+#define UNCORE_FREE_RUNNING_MSR_START			0x10
+#define UNCORE_FREE_RUNNING_MSR_IDX(config)		((config >> 8) & 0xf)
+#define UNCORE_FREE_RUNNING_MSR_TYPE_IDX(config)	\
+		((((config >> 8) - UNCORE_FREE_RUNNING_MSR_START) >> 4) & 0xf)
+
 
 #define UNCORE_PCI_DEV_FULL_DATA(dev, func, type, idx)	\
 		((dev << 24) | (func << 16) | (type << 8) | idx)
@@ -34,6 +52,7 @@ struct intel_uncore_ops;
 struct intel_uncore_pmu;
 struct intel_uncore_box;
 struct uncore_event_desc;
+struct free_running_msr;
 
 struct intel_uncore_type {
 	const char *name;
@@ -41,6 +60,7 @@ struct intel_uncore_type {
 	int num_boxes;
 	int perf_ctr_bits;
 	int fixed_ctr_bits;
+	int num_free_running_type;
 	unsigned perf_ctr;
 	unsigned event_ctl;
 	unsigned event_mask;
@@ -58,6 +78,7 @@ struct intel_uncore_type {
 	struct intel_uncore_pmu *pmus;
 	struct intel_uncore_ops *ops;
 	struct uncore_event_desc *event_descs;
+	struct free_running_msr *free_running;
 	const struct attribute_group *attr_groups[4];
 	struct pmu *pmu; /* for custom pmu ops */
 };
@@ -126,6 +147,13 @@ struct intel_uncore_box {
 struct uncore_event_desc {
 	struct kobj_attribute attr;
 	const char *config;
+};
+
+struct free_running_msr {
+	unsigned msr_base;
+	unsigned msr_off;
+	unsigned num_counters;
+	unsigned bits;
 };
 
 struct pci2phy_map {
@@ -214,6 +242,18 @@ static inline unsigned uncore_msr_fixed_ctr(struct intel_uncore_box *box)
 }
 
 static inline
+unsigned uncore_free_running_msr(struct intel_uncore_box *box,
+				 struct perf_event *event)
+{
+	unsigned type = UNCORE_FREE_RUNNING_MSR_TYPE_IDX(event->attr.config);
+	unsigned idx = UNCORE_FREE_RUNNING_MSR_IDX(event->attr.config);
+	struct intel_uncore_pmu *pmu = box->pmu;
+
+	return pmu->type->free_running[type].msr_base + idx +
+	       pmu->type->free_running[type].msr_off * pmu->pmu_idx;
+}
+
+static inline
 unsigned uncore_msr_event_ctl(struct intel_uncore_box *box, int idx)
 {
 	return box->pmu->type->event_ctl +
@@ -275,9 +315,34 @@ static inline int uncore_fixed_ctr_bits(struct intel_uncore_box *box)
 	return box->pmu->type->fixed_ctr_bits;
 }
 
+static inline unsigned
+uncore_free_running_bits(struct intel_uncore_box *box,
+			 struct perf_event *event)
+{
+	unsigned idx = UNCORE_FREE_RUNNING_MSR_TYPE_IDX(event->attr.config);
+
+	return box->pmu->type->free_running[idx].bits;
+}
+
+static inline int uncore_num_free_running(struct intel_uncore_box *box,
+					  struct perf_event *event)
+{
+	unsigned idx = UNCORE_FREE_RUNNING_MSR_TYPE_IDX(event->attr.config);
+
+	return box->pmu->type->free_running[idx].num_counters;
+}
+
 static inline int uncore_num_counters(struct intel_uncore_box *box)
 {
 	return box->pmu->type->num_counters;
+}
+
+static inline bool is_free_running_event(struct perf_event *event)
+{
+	u64 cfg = event->attr.config;
+
+	return (((cfg & UNCORE_FIXED_EVENT) == UNCORE_FIXED_EVENT) &&
+		(((cfg >> 8) & 0xff) >= UNCORE_FREE_RUNNING_MSR_START));
 }
 
 static inline void uncore_disable_box(struct intel_uncore_box *box)
