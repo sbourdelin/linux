@@ -449,6 +449,7 @@ static noinline void compress_file_range(struct inode *inode,
 	u64 num_bytes;
 	u64 blocksize = fs_info->sectorsize;
 	u64 actual_end;
+	u64 current_end;
 	u64 isize = i_size_read(inode);
 	int ret = 0;
 	struct page **pages = NULL;
@@ -498,6 +499,10 @@ again:
 			BTRFS_MAX_UNCOMPRESSED);
 	num_bytes = ALIGN(end - start + 1, blocksize);
 	num_bytes = max(blocksize,  num_bytes);
+	if (end - start > BTRFS_MAX_UNCOMPRESSED)
+		current_end = start + BTRFS_MAX_UNCOMPRESSED;
+	else
+		current_end = end;
 	total_in = 0;
 	ret = 0;
 
@@ -506,7 +511,7 @@ again:
 	 * inode has not been flagged as nocompress.  This flag can
 	 * change at any time if we discover bad compression ratios.
 	 */
-	if (inode_need_compress(inode, start, end)) {
+	if (inode_need_compress(inode, start, current_end)) {
 		WARN_ON(pages);
 		pages = kcalloc(nr_pages, sizeof(struct page *), GFP_NOFS);
 		if (!pages) {
@@ -528,7 +533,7 @@ again:
 		 * If the compression fails for any reason, we set the pages
 		 * dirty again later on.
 		 */
-		extent_range_clear_dirty_for_io(inode, start, end);
+		extent_range_clear_dirty_for_io(inode, start, current_end);
 		redirty = 1;
 		ret = btrfs_compress_pages(compress_type,
 					   inode->i_mapping, start,
@@ -667,7 +672,7 @@ cleanup_and_bail_uncompressed:
 		/* unlocked later on in the async handlers */
 
 	if (redirty)
-		extent_range_redirty_for_io(inode, start, end);
+		extent_range_redirty_for_io(inode, start, current_end);
 	add_async_extent(async_cow, start, end - start + 1, 0, NULL, 0,
 			 BTRFS_COMPRESS_NONE);
 	*num_added += 1;
