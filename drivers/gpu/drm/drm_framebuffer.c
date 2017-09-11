@@ -955,3 +955,64 @@ int drm_framebuffer_plane_height(int height,
 	return fb_plane_height(height, fb->format, plane);
 }
 EXPORT_SYMBOL(drm_framebuffer_plane_height);
+
+/**
+ * drm_framebuffer_create_dumb - Create dumb framebuffer
+ * @file_priv: DRM file
+ * @width: Framebuffer width
+ * @height: Framebuffer height
+ * @format: Framebuffer FOURCC format
+ *
+ * This function creates a framebuffer backed by a dumb buffer for in-kernel
+ * use. fbdev emulation code can use this to create a framebuffer.
+ *
+ * Returns:
+ * Pointer to a drm_framebuffer on success or an error pointer on failure.
+ */
+struct drm_framebuffer *
+drm_framebuffer_create_dumb(struct drm_file *file_priv, unsigned int width,
+			    unsigned int height, u32 format)
+{
+	struct drm_device *dev = file_priv->minor->dev;
+	struct drm_mode_create_dumb dumb_args = { 0 };
+	struct drm_mode_fb_cmd2 fb_args = { 0 };
+	struct drm_framebuffer *fb;
+	int ret;
+
+	dumb_args.width = width;
+	dumb_args.height = height;
+	dumb_args.bpp = drm_format_plane_cpp(format, 0) * 8;
+
+	ret = drm_mode_create_dumb_ioctl(dev, &dumb_args, file_priv);
+	if (ret)
+		return ERR_PTR(ret);
+
+	fb_args.width = width;
+	fb_args.height = height;
+	fb_args.pixel_format = format;
+	fb_args.handles[0] = dumb_args.handle;
+	fb_args.pitches[0] = dumb_args.pitch;
+
+	ret = drm_mode_addfb2(dev, &fb_args, file_priv);
+	if (ret)
+		goto err_destroy_dumb;
+
+	fb = drm_framebuffer_lookup(dev, fb_args.fb_id);
+	if (!fb) {
+		ret = -ENOENT;
+		goto err_rmfb;
+	}
+
+	/* drop the reference we picked up in framebuffer lookup */
+	drm_framebuffer_put(fb);
+
+	return fb;
+
+err_rmfb:
+	drm_mode_rmfb(dev, &fb_args, file_priv);
+err_destroy_dumb:
+	drm_mode_destroy_dumb_ioctl(dev, &dumb_args, file_priv);
+
+	return ERR_PTR(ret);
+}
+EXPORT_SYMBOL(drm_framebuffer_create_dumb);

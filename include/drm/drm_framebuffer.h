@@ -306,4 +306,8 @@ int drm_framebuffer_plane_width(int width,
 int drm_framebuffer_plane_height(int height,
 				 const struct drm_framebuffer *fb, int plane);
 
+struct drm_framebuffer *
+drm_framebuffer_create_dumb(struct drm_file *file_priv, unsigned int width,
+			    unsigned int height, u32 format);
+
 #endif
