@@ -27,17 +27,20 @@
  * DOC: overview
  *
  * This library provides helpers for drivers that don't subclass
- * &drm_framebuffer and and use &drm_gem_object for their backing storage.
+ * &drm_framebuffer and use &drm_gem_object for their backing storage.
  *
  * Drivers without additional needs to validate framebuffers can simply use
- * drm_gem_fb_create() and everything is wired up automatically. But all
- * parts can be used individually.
+ * drm_gem_fb_create() and everything is wired up automatically. Other drivers
+ * can use all parts independently.
  */
 
 /**
  * drm_gem_fb_get_obj() - Get GEM object for framebuffer
- * @fb: The framebuffer
+ * @fb: framebuffer
  * @plane: Which plane
+ *
+ * No additional reference is taken beyond the one that the &drm_frambuffer
+ * already holds.
  *
  * Returns the GEM object for given framebuffer.
  */
@@ -82,7 +85,7 @@ drm_gem_fb_alloc(struct drm_device *dev,
 
 /**
  * drm_gem_fb_destroy - Free GEM backed framebuffer
- * @fb: DRM framebuffer
+ * @fb: framebuffer
  *
  * Frees a GEM backed framebuffer with its backing buffer(s) and the structure
  * itself. Drivers can use this as their &drm_framebuffer_funcs->destroy
@@ -102,8 +105,8 @@ EXPORT_SYMBOL(drm_gem_fb_destroy);
 
 /**
  * drm_gem_fb_create_handle - Create handle for GEM backed framebuffer
- * @fb: DRM framebuffer
- * @file: drm file
+ * @fb: framebuffer
+ * @file: DRM file
  * @handle: handle created
  *
  * Drivers can use this as their &drm_framebuffer_funcs->create_handle
@@ -124,7 +127,7 @@ EXPORT_SYMBOL(drm_gem_fb_create_handle);
  *                                  &drm_mode_config_funcs.fb_create
  *                                  callback
  * @dev: DRM device
- * @file: drm file for the ioctl call
+ * @file: DRM file for the ioctl call
  * @mode_cmd: metadata from the userspace fb creation request
  * @funcs: vtable to be used for the new framebuffer object
  *
@@ -194,7 +197,7 @@ static const struct drm_framebuffer_funcs drm_gem_fb_funcs = {
 /**
  * drm_gem_fb_create() - &drm_mode_config_funcs.fb_create callback function
  * @dev: DRM device
- * @file: drm file for the ioctl call
+ * @file: DRM file for the ioctl call
  * @mode_cmd: metadata from the userspace fb creation request
  *
  * If your hardware has special alignment or pitch requirements these should be
@@ -214,11 +217,11 @@ EXPORT_SYMBOL_GPL(drm_gem_fb_create);
 /**
  * drm_gem_fb_prepare_fb() - Prepare gem framebuffer
  * @plane: Which plane
- * @state: Plane state attach fence to
+ * @state: Plane state the fence will be attached to
  *
  * This can be used as the &drm_plane_helper_funcs.prepare_fb hook.
  *
- * This function checks if the plane FB has an dma-buf attached, extracts
+ * This function checks if the plane FB has a dma-buf attached, extracts
  * the exclusive fence and attaches it to plane state for the atomic helper
  * to wait on.
  *
