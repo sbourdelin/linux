@@ -23,6 +23,11 @@
 #include <linux/ratelimit.h>
 #include <linux/spinlock.h>
 
+#ifdef CONFIG_SECURITY_SARA_WXPROT_EMUTRAMP
+#include <linux/uaccess.h>
+#include "include/trampolines.h"
+#endif
+
 #include "include/sara.h"
 #include "include/sara_data.h"
 #include "include/utils.h"
@@ -38,6 +43,7 @@
 #define SARA_WXP_COMPLAIN	0x0010
 #define SARA_WXP_VERBOSE	0x0020
 #define SARA_WXP_MMAP		0x0040
+#define SARA_WXP_EMUTRAMP	0x0100
 #define SARA_WXP_TRANSFER	0x0200
 #define SARA_WXP_NONE		0x0000
 #define SARA_WXP_MPROTECT	(SARA_WXP_HEAP	| \
@@ -48,7 +54,12 @@
 				SARA_WXP_WXORX		| \
 				SARA_WXP_COMPLAIN	| \
 				SARA_WXP_VERBOSE)
+#ifdef CONFIG_SECURITY_SARA_WXPROT_EMUTRAMP
+#define SARA_WXP_ALL		(__SARA_WXP_ALL		| \
+				SARA_WXP_EMUTRAMP)
+#else /* CONFIG_SECURITY_SARA_WXPROT_EMUTRAMP */
 #define SARA_WXP_ALL		__SARA_WXP_ALL
+#endif /* CONFIG_SECURITY_SARA_WXPROT_EMUTRAMP */
 
 struct wxprot_rule {
 	char *path;
@@ -73,7 +84,11 @@ static DEFINE_SPINLOCK(wxprot_config_lock);
 static u16 default_flags __ro_after_init =
 				CONFIG_SECURITY_SARA_WXPROT_DEFAULT_FLAGS;
 
+#ifdef CONFIG_SECURITY_SARA_WXPROT_EMUTRAMP
+static const bool wxprot_emutramp = true;
+#else
 static const bool wxprot_emutramp;
+#endif
 
 static void pr_wxp(char *msg)
 {
@@ -111,6 +126,9 @@ static bool are_flags_valid(u16 flags)
 		     !(flags & (SARA_WXP_MPROTECT |
 				SARA_WXP_WXORX |
 				SARA_WXP_MMAP))))
+		return false;
+	if (unlikely(flags & SARA_WXP_EMUTRAMP &&
+		     ((flags & SARA_WXP_MPROTECT) != SARA_WXP_MPROTECT)))
 		return false;
 	return true;
 }
@@ -403,10 +421,132 @@ static int sara_file_mprotect(struct vm_area_struct *vma,
 	return 0;
 }
 
+#ifdef CONFIG_SECURITY_SARA_WXPROT_EMUTRAMP
+#define PF_PROT		(1 << 0)
+#define PF_USER		(1 << 2)
+#define PF_INSTR	(1 << 4)
+static int sara_pagefault_handler_x86_32(struct pt_regs *regs);
+static int sara_pagefault_handler_x86_64(struct pt_regs *regs);
+static int sara_pagefault_handler_x86(struct pt_regs *regs,
+					unsigned long error_code,
+					unsigned long address)
+{
+	int ret = 0;
+
+	if (!sara_enabled || !wxprot_enabled ||
+	    !(error_code & PF_USER) ||
+	    !(error_code & PF_INSTR) ||
+	    !(error_code & PF_PROT) ||
+	    !(get_current_sara_wxp_flags() & SARA_WXP_EMUTRAMP))
+		return 0;
+
+	local_irq_enable();
+	might_sleep();
+	might_fault();
+
+#ifdef	CONFIG_X86_32
+	ret = sara_pagefault_handler_x86_32(regs);
+#else
+	if (regs->cs == __USER32_CS ||
+	    regs->cs & (1<<2)) {
+		if (!(address >> 32))	/* K8 erratum #100 */
+			ret = sara_pagefault_handler_x86_32(regs);
+	} else
+		ret = sara_pagefault_handler_x86_64(regs);
+#endif
+
+	return ret;
+}
+
+static int sara_pagefault_handler_x86_32(struct pt_regs *regs)
+{
+	int ret;
+	void __user *ip = (void __user *) regs->ip;
+	union trampolines_x86_32 t;
+
+	BUILD_BUG_ON(sizeof(t.lf) > sizeof(t.g1));
+	BUILD_BUG_ON(sizeof(t.g2) > sizeof(t.lf));
+
+	ret = copy_from_user(&t, ip, sizeof(t.g1));
+	if (ret)
+		ret = copy_from_user(&t, ip, sizeof(t.lf));
+	if (ret)
+		ret = copy_from_user(&t, ip, sizeof(t.g2));
+	if (ret)
+		return 0;
+
+	if (is_valid_gcc_trampoline_x86_32_type1(t, regs)) {
+		pr_debug("Trampoline: gcc1 x86_32.\n");
+		emulate_gcc_trampoline_x86_32_type1(t, regs);
+		return 1;
+	} else if (is_valid_libffi_trampoline_x86_32(t)) {
+		pr_debug("Trampoline: libffi x86_32.\n");
+		emulate_libffi_trampoline_x86_32(t, regs);
+		return 1;
+	} else if (is_valid_gcc_trampoline_x86_32_type2(t, regs)) {
+		pr_debug("Trampoline: gcc2 x86_32.\n");
+		emulate_gcc_trampoline_x86_32_type2(t, regs);
+		return 1;
+	}
+
+	pr_debug("Not a trampoline (x86_32).\n");
+
+	return 0;
+}
+
+#ifdef CONFIG_X86_64
+static int sara_pagefault_handler_x86_64(struct pt_regs *regs)
+{
+	int ret;
+	void __user *ip = (void __user *) regs->ip;
+	union trampolines_x86_64 t;
+
+	BUILD_BUG_ON(sizeof(t.g1) > sizeof(t.lf));
+	BUILD_BUG_ON(sizeof(t.g2) > sizeof(t.g1));
+
+	ret = copy_from_user(&t, ip, sizeof(t.lf));
+	if (ret)
+		ret = copy_from_user(&t, ip, sizeof(t.g1));
+	if (ret)
+		ret = copy_from_user(&t, ip, sizeof(t.g2));
+	if (ret)
+		return 0;
+
+	if (is_valid_libffi_trampoline_x86_64(t)) {
+		pr_debug("Trampoline: libffi x86_64.\n");
+		emulate_libffi_trampoline_x86_64(t, regs);
+		return 1;
+	} else if (is_valid_gcc_trampoline_x86_64_type1(t, regs)) {
+		pr_debug("Trampoline: gcc1 x86_64.\n");
+		emulate_gcc_trampoline_x86_64_type1(t, regs);
+		return 1;
+	} else if (is_valid_gcc_trampoline_x86_64_type2(t, regs)) {
+		pr_debug("Trampoline: gcc2 x86_64.\n");
+		emulate_gcc_trampoline_x86_64_type2(t, regs);
+		return 1;
+	}
+
+	pr_debug("Not a trampoline (x86_64).\n");
+
+	return 0;
+
+}
+#else /* CONFIG_X86_64 */
+static inline int sara_pagefault_handler_x86_64(struct pt_regs *regs)
+{
+	return 0;
+}
+#endif /* CONFIG_X86_64 */
+
+#endif /* CONFIG_SECURITY_SARA_WXPROT_EMUTRAMP */
+
 static struct security_hook_list wxprot_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(bprm_set_creds, sara_bprm_set_creds),
 	LSM_HOOK_INIT(check_vmflags, sara_check_vmflags),
 	LSM_HOOK_INIT(file_mprotect, sara_file_mprotect),
+#ifdef CONFIG_SECURITY_SARA_WXPROT_EMUTRAMP
+	LSM_HOOK_INIT(pagefault_handler, sara_pagefault_handler_x86),
+#endif
 };
 
 struct binary_config_header {
