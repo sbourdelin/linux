@@ -7,9 +7,26 @@
 DEFINE_PER_CPU(struct ida_bitmap *, ida_bitmap);
 static DEFINE_SPINLOCK(simple_ida_lock);
 
-int idr_alloc_cmn(struct idr *idr, void *ptr, unsigned long *index,
-		  unsigned long start, unsigned long end, gfp_t gfp,
-		  bool ext)
+/**
+ * idr_alloc_ul - allocate a large ID
+ * @idr: idr handle
+ * @ptr: pointer to be associated with the new ID
+ * @nextid: Pointer to minimum ID to allocate
+ * @max: the maximum ID (inclusive)
+ * @gfp: memory allocation flags
+ *
+ * Allocates an unused ID in the range [*nextid, end] and stores it in
+ * @nextid.  Note that @max differs from the @end parameter to idr_alloc().
+ *
+ * Simultaneous modifications to the @idr are not allowed and should be
+ * prevented by the user, usually with a lock.  idr_alloc_ul() may be called
+ * concurrently with read-only accesses to the @idr, such as idr_find() and
+ * idr_for_each_entry().
+ *
+ * Return: 0 on success or a negative errno on failure (ENOMEM or ENOSPC)
+ */
+int idr_alloc_ul(struct idr *idr, void *ptr, unsigned long *nextid,
+			unsigned long max, gfp_t gfp)
 {
 	struct radix_tree_iter iter;
 	void __rcu **slot;
@@ -17,22 +34,54 @@ int idr_alloc_cmn(struct idr *idr, void *ptr, unsigned long *index,
 	if (WARN_ON_ONCE(radix_tree_is_internal_node(ptr)))
 		return -EINVAL;
 
-	radix_tree_iter_init(&iter, start);
-	if (ext)
-		slot = idr_get_free_ext(&idr->idr_rt, &iter, gfp, end);
-	else
-		slot = idr_get_free(&idr->idr_rt, &iter, gfp, end);
+	radix_tree_iter_init(&iter, *nextid);
+	slot = idr_get_free(&idr->idr_rt, &iter, gfp, max);
 	if (IS_ERR(slot))
 		return PTR_ERR(slot);
 
 	radix_tree_iter_replace(&idr->idr_rt, &iter, slot, ptr);
 	radix_tree_iter_tag_clear(&idr->idr_rt, &iter, IDR_FREE);
 
-	if (index)
-		*index = iter.index;
+	*nextid = iter.index;
 	return 0;
 }
-EXPORT_SYMBOL_GPL(idr_alloc_cmn);
+EXPORT_SYMBOL_GPL(idr_alloc_ul);
+
+/**
+ * idr_alloc - allocate an id
+ * @idr: idr handle
+ * @ptr: pointer to be associated with the new id
+ * @start: the minimum id (inclusive)
+ * @end: the maximum id (exclusive)
+ * @gfp: memory allocation flags
+ *
+ * Allocates an unused ID in the range [start, end).  Returns -ENOSPC
+ * if there are no unused IDs in that range.
+ *
+ * Note that @end is treated as max when <= 0.  This is to always allow
+ * using @start + N as @end as long as N is inside integer range.
+ *
+ * Simultaneous modifications to the @idr are not allowed and should be
+ * prevented by the user, usually with a lock.  idr_alloc() may be called
+ * concurrently with read-only accesses to the @idr, such as idr_find() and
+ * idr_for_each_entry().
+ */
+int idr_alloc(struct idr *idr, void *ptr, int start, int end, gfp_t gfp)
+{
+	unsigned long id = start;
+	int ret;
+
+	if (WARN_ON_ONCE(start < 0))
+		return -EINVAL;
+
+	ret = idr_alloc_ul(idr, ptr, &id, end > 0 ? end - 1 : INT_MAX, gfp);
+
+	if (ret)
+		return ret;
+
+	return id;
+}
+EXPORT_SYMBOL_GPL(idr_alloc);
 
 /**
  * idr_alloc_cyclic - allocate new idr entry in a cyclical fashion
@@ -121,7 +170,7 @@ void *idr_get_next(struct idr *idr, int *nextid)
 }
 EXPORT_SYMBOL(idr_get_next);
 
-void *idr_get_next_ext(struct idr *idr, unsigned long *nextid)
+void *idr_get_next_ul(struct idr *idr, unsigned long *nextid)
 {
 	struct radix_tree_iter iter;
 	void __rcu **slot;
@@ -133,7 +182,7 @@ void *idr_get_next_ext(struct idr *idr, unsigned long *nextid)
 	*nextid = iter.index;
 	return rcu_dereference_raw(*slot);
 }
-EXPORT_SYMBOL(idr_get_next_ext);
+EXPORT_SYMBOL(idr_get_next_ul);
 
 /**
  * idr_replace - replace pointer for given id
@@ -149,16 +198,7 @@ EXPORT_SYMBOL(idr_get_next_ext);
  * Returns: 0 on success.  %-ENOENT indicates that @id was not found.
  * %-EINVAL indicates that @id or @ptr were not valid.
  */
-void *idr_replace(struct idr *idr, void *ptr, int id)
-{
-	if (WARN_ON_ONCE(id < 0))
-		return ERR_PTR(-EINVAL);
-
-	return idr_replace_ext(idr, ptr, id);
-}
-EXPORT_SYMBOL(idr_replace);
-
-void *idr_replace_ext(struct idr *idr, void *ptr, unsigned long id)
+void *idr_replace(struct idr *idr, void *ptr, unsigned long id)
 {
 	struct radix_tree_node *node;
 	void __rcu **slot = NULL;
@@ -175,7 +215,7 @@ void *idr_replace_ext(struct idr *idr, void *ptr, unsigned long id)
 
 	return entry;
 }
-EXPORT_SYMBOL(idr_replace_ext);
+EXPORT_SYMBOL(idr_replace);
 
 /**
  * DOC: IDA description

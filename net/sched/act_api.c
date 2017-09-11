@@ -73,7 +73,7 @@ static void free_tcf(struct rcu_head *head)
 static void tcf_idr_remove(struct tcf_idrinfo *idrinfo, struct tc_action *p)
 {
 	spin_lock_bh(&idrinfo->lock);
-	idr_remove_ext(&idrinfo->action_idr, p->tcfa_index);
+	idr_remove(&idrinfo->action_idr, p->tcfa_index);
 	spin_unlock_bh(&idrinfo->lock);
 	gen_kill_estimator(&p->tcfa_rate_est);
 	/*
@@ -121,7 +121,7 @@ static int tcf_dump_walker(struct tcf_idrinfo *idrinfo, struct sk_buff *skb,
 
 	s_i = cb->args[0];
 
-	idr_for_each_entry_ext(idr, p, id) {
+	idr_for_each_entry_ul(idr, p, id) {
 		index++;
 		if (index < s_i)
 			continue;
@@ -178,7 +178,7 @@ static int tcf_del_walker(struct tcf_idrinfo *idrinfo, struct sk_buff *skb,
 	if (nla_put_string(skb, TCA_KIND, ops->kind))
 		goto nla_put_failure;
 
-	idr_for_each_entry_ext(idr, p, id) {
+	idr_for_each_entry_ul(idr, p, id) {
 		ret = __tcf_idr_release(p, false, true);
 		if (ret == ACT_P_DELETED) {
 			module_put(p->ops->owner);
@@ -216,10 +216,10 @@ EXPORT_SYMBOL(tcf_generic_walker);
 
 static struct tc_action *tcf_idr_lookup(u32 index, struct tcf_idrinfo *idrinfo)
 {
-	struct tc_action *p = NULL;
+	struct tc_action *p;
 
 	spin_lock_bh(&idrinfo->lock);
-	p = idr_find_ext(&idrinfo->action_idr, index);
+	p = idr_find(&idrinfo->action_idr, index);
 	spin_unlock_bh(&idrinfo->lock);
 
 	return p;
@@ -296,10 +296,10 @@ err2:
 	spin_lock_init(&p->tcfa_lock);
 	/* user doesn't specify an index */
 	if (!index) {
+		idr_index = 1;
 		idr_preload(GFP_KERNEL);
 		spin_lock_bh(&idrinfo->lock);
-		err = idr_alloc_ext(idr, NULL, &idr_index, 1, 0,
-				    GFP_ATOMIC);
+		err = idr_alloc_ul(idr, NULL, &idr_index, UINT_MAX, GFP_ATOMIC);
 		spin_unlock_bh(&idrinfo->lock);
 		idr_preload_end();
 		if (err) {
@@ -309,10 +309,10 @@ err3:
 		}
 		p->tcfa_index = idr_index;
 	} else {
+		idr_index = index;
 		idr_preload(GFP_KERNEL);
 		spin_lock_bh(&idrinfo->lock);
-		err = idr_alloc_ext(idr, NULL, NULL, index, index + 1,
-				    GFP_ATOMIC);
+		err = idr_alloc_ul(idr, NULL, &idr_index, index, GFP_ATOMIC);
 		spin_unlock_bh(&idrinfo->lock);
 		idr_preload_end();
 		if (err)
@@ -345,7 +345,7 @@ void tcf_idr_insert(struct tc_action_net *tn, struct tc_action *a)
 	struct tcf_idrinfo *idrinfo = tn->idrinfo;
 
 	spin_lock_bh(&idrinfo->lock);
-	idr_replace_ext(&idrinfo->action_idr, a, a->tcfa_index);
+	idr_replace(&idrinfo->action_idr, a, a->tcfa_index);
 	spin_unlock_bh(&idrinfo->lock);
 }
 EXPORT_SYMBOL(tcf_idr_insert);
@@ -358,7 +358,7 @@ void tcf_idrinfo_destroy(const struct tc_action_ops *ops,
 	int ret;
 	unsigned long id = 1;
 
-	idr_for_each_entry_ext(idr, p, id) {
+	idr_for_each_entry_ul(idr, p, id) {
 		ret = __tcf_idr_release(p, false, true);
 		if (ret == ACT_P_DELETED)
 			module_put(ops->owner);
