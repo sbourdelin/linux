@@ -4758,7 +4758,7 @@ static int bfq_init_queue(struct request_queue *q, struct elevator_type *e)
 	 * The invocation of the next bfq_create_group_hierarchy
 	 * function is the head of a chain of function calls
 	 * (bfq_create_group_hierarchy->blkcg_activate_policy->
-	 * blk_mq_freeze_queue) that may lead to the invocation of the
+	 * blk_freeze_queue) that may lead to the invocation of the
 	 * has_work hook function. For this reason,
 	 * bfq_create_group_hierarchy is invoked only after all
 	 * scheduler data has been initialized, apart from the fields
