@@ -37,6 +37,7 @@
 #include <linux/pci_ids.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
+#include <linux/pm_wakeirq.h>
 #include <linux/reset.h>
 #include <linux/regmap.h>
 
@@ -995,6 +996,15 @@ static int rockchip_pcie_setup_irq(struct rockchip_pcie *rockchip)
 		return err;
 	}
 
+	/* Must init wakeup before setting dedicated wakeup irq. */
+	device_init_wakeup(dev, true);
+	irq = platform_get_irq_byname(pdev, "wakeup");
+	if (irq >= 0) {
+		err = dev_pm_set_dedicated_wake_irq(dev, irq);
+		if (err)
+			dev_err(dev, "failed to setup PCIe wakeup IRQ\n");
+	}
+
 	return 0;
 }
 
@@ -1542,11 +1552,11 @@ static int rockchip_pcie_probe(struct platform_device *pdev)
 
 	err = rockchip_pcie_parse_dt(rockchip);
 	if (err)
-		return err;
+		goto err_disable_wake;
 
 	err = rockchip_pcie_enable_clocks(rockchip);
 	if (err)
-		return err;
+		goto err_disable_wake;
 
 	err = rockchip_pcie_set_vpcie(rockchip);
 	if (err) {
@@ -1656,6 +1666,9 @@ err_vpcie:
 		regulator_disable(rockchip->vpcie0v9);
 err_set_vpcie:
 	rockchip_pcie_disable_clocks(rockchip);
+err_disable_wake:
+	dev_pm_clear_wake_irq(dev);
+	device_init_wakeup(dev, false);
 	return err;
 }
 
@@ -1682,6 +1695,8 @@ static int rockchip_pcie_remove(struct platform_device *pdev)
 	if (!IS_ERR(rockchip->vpcie0v9))
 		regulator_disable(rockchip->vpcie0v9);
 
+	dev_pm_clear_wake_irq(dev);
+	device_init_wakeup(dev, false);
 	return 0;
 }
 
