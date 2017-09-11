@@ -409,7 +409,7 @@ static void nest_imc_counters_release(struct perf_event *event)
 			return;
 		}
 	} else if (ref->refc < 0) {
-		WARN(1, "nest-imc: Invalid event reference count\n");
+		pr_info("nest-imc: Invalid event reference count\n");
 		ref->refc = 0;
 	}
 	mutex_unlock(&ref->lock);
@@ -656,7 +656,7 @@ static void core_imc_counters_release(struct perf_event *event)
 			return;
 		}
 	} else if (ref->refc < 0) {
-		WARN(1, "core-imc: Invalid event reference count\n");
+		pr_info("core-imc: Invalid event reference count\n");
 		ref->refc = 0;
 	}
 	mutex_unlock(&ref->lock);
