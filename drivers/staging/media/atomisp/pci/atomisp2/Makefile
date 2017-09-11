@@ -155,7 +155,7 @@ atomisp-objs += \
 	hmm/hmm_dynamic_pool.o \
 	hrt/hive_isp_css_mm_hrt.o \
 	atomisp_v4l2.o
-	
+
 # These will be needed when clean merge CHT support nicely into the driver
 # Keep them here handy for when we get to that point
 #
@@ -347,8 +347,16 @@ DEFINES := -DHRT_HW -DHRT_ISP_CSS_CUSTOM_HOST -DHRT_USE_VIR_ADDRS -D__HOST__
 #DEFINES += -DPUNIT_CAMERA_BUSY
 #DEFINES += -DUSE_KMEM_CACHE
 
+ifeq ($(CONFIG_VIDEO_ATOMISP_ISP2400),y)
+# Merrifield, Baytrail
 DEFINES += -DATOMISP_POSTFIX=\"css2400b0_v21\" -DISP2400B0
 DEFINES += -DSYSTEM_hive_isp_css_2400_system -DISP2400
+endif
+ifeq ($(CONFIG_VIDEO_ATOMISP_ISP2401),y)
+# Anniedale (Merrifield+ / Moorefield), Cherrytrail
+DEFINES += -DATOMISP_POSTFIX=\"css2401a0_v21\" -DISP2401A0
+DEFINES += -DSYSTEM_hive_isp_css_2400_system -DISP2401 -DISP2401_NEW_INPUT_SYSTEM
+endif
 
 ccflags-y += $(INCLUDES) $(DEFINES) -fno-common
 

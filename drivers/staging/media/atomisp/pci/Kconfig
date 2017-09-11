@@ -11,3 +11,26 @@ config VIDEO_ATOMISP
           camera imaging subsystem.
           To compile this driver as a module, choose M here: the
           module will be called atomisp
+
+choice
+        prompt "Intel Atom Image Signal Processor Driver Type"
+        depends on VIDEO_ATOMISP
+        default VIDEO_ATOMISP_ISP2400
+        help
+          Intel Atom Image Signal Processor Driver actually doesn't support
+          dynamically all SoC.
+          So need to choose at compilation time which SoC it can support.
+          Please refer to staging TODO for more details.
+
+config VIDEO_ATOMISP_ISP2400
+        bool "ISP2400"
+        help
+          Atom ISP for Merrifield, Baytrail SoC.
+
+config VIDEO_ATOMISP_ISP2401
+        bool "ISP2401"
+        help
+          Atom ISP for Anniedale (Merrifield+ / Moorefield), Cherrytrail SoC.
+
+endchoice
+
