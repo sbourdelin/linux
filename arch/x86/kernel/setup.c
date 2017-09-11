@@ -1039,8 +1039,6 @@ void __init setup_arch(char **cmdline_p)
 	 */
 	init_hypervisor_platform();
 
-	simple_udelay_calibration();
-
 	x86_init.resources.probe_roms();
 
 	/* after parse_early_param, so could debug it */
@@ -1117,9 +1115,6 @@ void __init setup_arch(char **cmdline_p)
 
 	memblock_set_current_limit(ISA_END_ADDRESS);
 	e820__memblock_setup();
-
-	if (!early_xdbc_setup_hardware())
-		early_xdbc_register_console();
 
 	reserve_bios_regions();
 
@@ -1220,6 +1215,10 @@ void __init setup_arch(char **cmdline_p)
 #ifdef CONFIG_KVM_GUEST
 	kvmclock_init();
 #endif
+
+	simple_udelay_calibration();
+	if (!early_xdbc_setup_hardware())
+		early_xdbc_register_console();
 
 	x86_init.paging.pagetable_init();
 
