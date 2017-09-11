@@ -312,7 +312,6 @@ static int
 drm_fbdev_cma_create(struct drm_fb_helper *helper,
 	struct drm_fb_helper_surface_size *sizes)
 {
-	struct drm_fbdev_cma *fbdev_cma = to_fbdev_cma(helper);
 	struct drm_device *dev = helper->dev;
 	struct drm_gem_cma_object *obj;
 	struct drm_framebuffer *fb;
@@ -320,6 +319,7 @@ drm_fbdev_cma_create(struct drm_fb_helper *helper,
 	unsigned long offset;
 	struct fb_info *fbi;
 	size_t size;
+	u32 format;
 	int ret;
 
 	DRM_DEBUG_KMS("surface width(%d), height(%d) and bpp(%d)\n",
@@ -327,26 +327,23 @@ drm_fbdev_cma_create(struct drm_fb_helper *helper,
 			sizes->surface_bpp);
 
 	bytes_per_pixel = DIV_ROUND_UP(sizes->surface_bpp, 8);
-	size = sizes->surface_width * sizes->surface_height * bytes_per_pixel;
-	obj = drm_gem_cma_create(dev, size);
-	if (IS_ERR(obj))
-		return -ENOMEM;
 
-	fbi = drm_fb_helper_alloc_fbi(helper);
-	if (IS_ERR(fbi)) {
-		ret = PTR_ERR(fbi);
-		goto err_gem_free_object;
-	}
-
-	fb = drm_gem_fbdev_fb_create(dev, sizes, 0, &obj->base,
-				     fbdev_cma->fb_funcs);
+	format = drm_mode_legacy_fb_format(sizes->surface_bpp,
+					   sizes->surface_depth);
+	fb = drm_framebuffer_create_dumb(helper->file, sizes->surface_width,
+					 sizes->surface_height, format);
 	if (IS_ERR(fb)) {
-		dev_err(dev->dev, "Failed to allocate DRM framebuffer.\n");
-		ret = PTR_ERR(fb);
-		goto err_fb_info_destroy;
+		DRM_DEV_ERROR(dev->dev, "Failed to create DRM framebuffer.\n");
+		return PTR_ERR(fb);
 	}
 
 	helper->fb = fb;
+	obj = to_drm_gem_cma_obj(fb->obj[0]);
+	size = fb->obj[0]->size;
+
+	fbi = drm_fb_helper_alloc_fbi(helper);
+	if (IS_ERR(fbi))
+		return PTR_ERR(fbi);
 
 	fbi->par = helper;
 	fbi->flags = FBINFO_FLAG_DEFAULT;
@@ -364,21 +361,13 @@ drm_fbdev_cma_create(struct drm_fb_helper *helper,
 	fbi->screen_size = size;
 	fbi->fix.smem_len = size;
 
-	if (fbdev_cma->fb_funcs->dirty) {
+	if (fb->funcs->dirty) {
 		ret = drm_fbdev_cma_defio_init(fbi, obj);
 		if (ret)
-			goto err_cma_destroy;
+			return ret;
 	}
 
 	return 0;
-
-err_cma_destroy:
-	drm_framebuffer_remove(fb);
-err_fb_info_destroy:
-	drm_fb_helper_fini(helper);
-err_gem_free_object:
-	drm_gem_object_put_unlocked(&obj->base);
-	return ret;
 }
 
 static const struct drm_fb_helper_funcs drm_fb_cma_helper_funcs = {
@@ -474,9 +463,6 @@ void drm_fbdev_cma_fini(struct drm_fbdev_cma *fbdev_cma)
 	drm_fb_helper_unregister_fbi(&fbdev_cma->fb_helper);
 	if (fbdev_cma->fb_helper.fbdev)
 		drm_fbdev_cma_defio_fini(fbdev_cma->fb_helper.fbdev);
-
-	if (fbdev_cma->fb_helper.fb)
-		drm_framebuffer_remove(fbdev_cma->fb_helper.fb);
 
 	drm_fb_helper_fini(&fbdev_cma->fb_helper);
 	kfree(fbdev_cma);
