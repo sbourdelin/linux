@@ -1484,6 +1484,7 @@ int dissolve_free_huge_page(struct page *page)
 		h->free_huge_pages--;
 		h->free_huge_pages_node[nid]--;
 		h->max_huge_pages--;
+		h->req_max_huge_pages--;
 		update_and_free_page(h, head);
 	}
 out:
@@ -2405,6 +2406,7 @@ static ssize_t __nr_hugepages_store_common(bool obey_mempolicy,
 		goto out;
 	}
 
+	h->req_max_huge_pages = count;
 	if (nid == NUMA_NO_NODE) {
 		/*
 		 * global hstate attribute
@@ -3006,14 +3008,39 @@ void hugetlb_show_meminfo(void)
 	if (!hugepages_supported())
 		return;
 
-	for_each_node_state(nid, N_MEMORY)
-		for_each_hstate(h)
-			pr_info("Node %d hugepages_total=%u hugepages_free=%u hugepages_surp=%u hugepages_size=%lukB\n",
+	for_each_node_state(nid, N_MEMORY) {
+		for_each_hstate(h) {
+			char hp_size[32];
+
+			string_get_size(huge_page_size(h), 1, STRING_UNITS_2,
+					hp_size, 32);
+			pr_info("Node %d hugepages_total=%u hugepages_free=%u hugepages_surp=%u hugepages_size=%s\n",
 				nid,
 				h->nr_huge_pages_node[nid],
 				h->free_huge_pages_node[nid],
 				h->surplus_huge_pages_node[nid],
-				1UL << (huge_page_order(h) + PAGE_SHIFT - 10));
+				hp_size);
+		}
+	}
+
+	for_each_hstate(h) {
+		if (h->max_huge_pages < h->req_max_huge_pages) {
+			char hp_size[32];
+			char hpr_size[32];
+			char hpt_size[32];
+
+			string_get_size(huge_page_size(h), 1, STRING_UNITS_2,
+					hp_size, 32);
+			string_get_size(huge_page_size(h),
+					h->req_max_huge_pages, STRING_UNITS_2,
+					hpr_size, 32);
+			string_get_size(huge_page_size(h), h->max_huge_pages,
+					STRING_UNITS_2, hpt_size, 32);
+			pr_warn("hugepage_size %s: Requested %lu hugepages (%s) but %lu hugepages (%s) were allocated.\n",
+				hp_size, h->req_max_huge_pages, hpr_size,
+				h->max_huge_pages, hpt_size);
+		}
+	}
 }
 
 void hugetlb_report_usage(struct seq_file *m, struct mm_struct *mm)

@@ -322,6 +322,7 @@ struct hstate {
 	unsigned int order;
 	unsigned long mask;
 	unsigned long max_huge_pages;
+	unsigned long req_max_huge_pages;
 	unsigned long nr_huge_pages;
 	unsigned long free_huge_pages;
 	unsigned long resv_huge_pages;
