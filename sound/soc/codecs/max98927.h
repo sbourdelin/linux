@@ -263,17 +263,13 @@
 struct max98927_priv {
 	struct regmap *regmap;
 	struct snd_soc_codec *codec;
-	struct max98927_pdata *pdata;
-	unsigned int spk_gain;
 	unsigned int sysclk;
 	unsigned int v_l_slot;
 	unsigned int i_l_slot;
 	bool interleave_mode;
 	unsigned int ch_size;
-	unsigned int rate;
 	unsigned int iface;
 	unsigned int master;
-	unsigned int digital_gain;
 	bool tdm_mode;
 };
 #endif
