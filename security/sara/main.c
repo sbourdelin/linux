@@ -15,6 +15,7 @@
 #include <linux/module.h>
 
 #include "include/sara.h"
+#include "include/sara_data.h"
 #include "include/securityfs.h"
 
 static const int sara_version = SARA_VERSION;
@@ -87,6 +88,11 @@ void __init sara_init(void)
 					main_fs,
 					ARRAY_SIZE(main_fs))) {
 		pr_crit("impossible to register main fs.\n");
+		goto error;
+	}
+
+	if (sara_data_init()) {
+		pr_crit("impossible to initialize creds.\n");
 		goto error;
 	}
 
