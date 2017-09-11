@@ -1290,8 +1290,8 @@ static int lan78xx_ethtool_set_eeprom(struct net_device *netdev,
 
 	/* Allow entire eeprom update only */
 	if ((ee->magic == LAN78XX_EEPROM_MAGIC) &&
-	    (ee->offset == 0) &&
-	    (ee->len == 512) &&
+	    (ee->offset >= 0 && ee->offset < MAX_EEPROM_SIZE) &&
+	    (ee->len > 0 && (ee->offset + ee->len) <= MAX_EEPROM_SIZE) &&
 	    (data[0] == EEPROM_INDICATOR))
 		ret = lan78xx_write_raw_eeprom(dev, ee->offset, ee->len, data);
 	else if ((ee->magic == LAN78XX_OTP_MAGIC) &&
