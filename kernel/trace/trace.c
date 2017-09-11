@@ -4011,11 +4011,17 @@ static int tracing_open(struct inode *inode, struct file *file)
 	/* If this file was open for write, then erase contents */
 	if ((file->f_mode & FMODE_WRITE) && (file->f_flags & O_TRUNC)) {
 		int cpu = tracing_get_cpu(inode);
+		struct trace_buffer *tr_buf = &tr->trace_buffer;
+
+#ifdef CONFIG_TRACER_MAX_TRACE
+		if (tr->current_trace->print_max)
+			tr_buf = &tr->max_buffer;
+#endif
 
 		if (cpu == RING_BUFFER_ALL_CPUS)
-			tracing_reset_online_cpus(&tr->trace_buffer);
+			tracing_reset_online_cpus(tr_buf);
 		else
-			tracing_reset(&tr->trace_buffer, cpu);
+			tracing_reset(tr_buf, cpu);
 	}
 
 	if (file->f_mode & FMODE_READ) {
