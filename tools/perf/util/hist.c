@@ -580,14 +580,9 @@ __hists__add_entry(struct hists *hists,
 		   bool sample_self,
 		   struct hist_entry_ops *ops)
 {
-	struct namespaces *ns = thread__namespaces(al->thread);
 	struct hist_entry entry = {
 		.thread	= al->thread,
 		.comm_str = thread__comm_str(al->thread),
-		.cgroup_id = {
-			.dev = ns ? ns->link_info[CGROUP_NS_INDEX].dev : 0,
-			.ino = ns ? ns->link_info[CGROUP_NS_INDEX].ino : 0,
-		},
 		.ms = {
 			.map	= al->map,
 			.sym	= al->sym,
@@ -613,6 +608,8 @@ __hists__add_entry(struct hists *hists,
 		.ops = ops,
 	};
 
+	thread__namespaces_id(al->thread, &entry.cgroup_id.dev,
+			      &entry.cgroup_id.ino);
 	return hists__findnew_entry(hists, &entry, al, sample_self);
 }
 
