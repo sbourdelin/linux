@@ -801,12 +801,6 @@ struct intel_crtc {
 	unsigned long long enabled_power_domains;
 	struct intel_overlay *overlay;
 
-	/* Display surface base address adjustement for pageflips. Note that on
-	 * gen4+ this only adjusts up to a tile, offsets within a tile are
-	 * handled in the hw itself (with the TILEOFF register). */
-	int adjusted_x;
-	int adjusted_y;
-
 	struct intel_crtc_state *config;
 
 	/* global reset count when the last flip was submitted */
@@ -1885,6 +1879,9 @@ int intel_sprite_set_colorkey(struct drm_device *dev, void *data,
 			      struct drm_file *file_priv);
 void intel_pipe_update_start(struct intel_crtc *crtc);
 void intel_pipe_update_end(struct intel_crtc *crtc);
+void skl_update_plane(struct intel_plane *plane,
+		      const struct intel_crtc_state *crtc_state,
+		      const struct intel_plane_state *plane_state);
 
 /* intel_tv.c */
 void intel_tv_init(struct drm_i915_private *dev_priv);
