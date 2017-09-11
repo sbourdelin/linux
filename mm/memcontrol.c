@@ -2661,6 +2661,231 @@ static inline bool memcg_has_children(struct mem_cgroup *memcg)
 	return ret;
 }
 
+static long memcg_oom_badness(struct mem_cgroup *memcg,
+			      const nodemask_t *nodemask,
+			      unsigned long totalpages)
+{
+	long points = 0;
+	int nid;
+	pg_data_t *pgdat;
+
+	/*
+	 * We don't have necessary stats for the root memcg,
+	 * so we define it's oom_score as the maximum oom_score
+	 * of the belonging tasks.
+	 */
+	if (memcg == root_mem_cgroup) {
+		struct css_task_iter it;
+		struct task_struct *task;
+		long score, max_score = 0;
+
+		css_task_iter_start(&memcg->css, 0, &it);
+		while ((task = css_task_iter_next(&it))) {
+			score = oom_badness(task, memcg, nodemask,
+					    totalpages);
+			if (max_score > score)
+				max_score = score;
+		}
+		css_task_iter_end(&it);
+
+		return max_score;
+	}
+
+	for_each_node_state(nid, N_MEMORY) {
+		if (nodemask && !node_isset(nid, *nodemask))
+			continue;
+
+		points += mem_cgroup_node_nr_lru_pages(memcg, nid,
+				LRU_ALL_ANON | BIT(LRU_UNEVICTABLE));
+
+		pgdat = NODE_DATA(nid);
+		points += lruvec_page_state(mem_cgroup_lruvec(pgdat, memcg),
+					    NR_SLAB_UNRECLAIMABLE);
+	}
+
+	points += memcg_page_state(memcg, MEMCG_KERNEL_STACK_KB) /
+		(PAGE_SIZE / 1024);
+	points += memcg_page_state(memcg, MEMCG_SOCK);
+	points += memcg_page_state(memcg, MEMCG_SWAP);
+
+	return points;
+}
+
+/*
+ * Checks if the given memcg is a valid OOM victim and returns a number,
+ * which means the folowing:
+ *   -1: there are inflight OOM victim tasks, belonging to the memcg
+ *    0: memcg is not eligible, e.g. all belonging tasks are protected
+ *       by oom_score_adj set to OOM_SCORE_ADJ_MIN
+ *   >0: memcg is eligible, and the returned value is an estimation
+ *       of the memory footprint
+ */
+static long oom_evaluate_memcg(struct mem_cgroup *memcg,
+			       const nodemask_t *nodemask,
+			       unsigned long totalpages)
+{
+	struct css_task_iter it;
+	struct task_struct *task;
+	int eligible = 0;
+
+	/*
+	 * Memcg is OOM eligible if there are OOM killable tasks inside.
+	 *
+	 * We treat tasks with oom_score_adj set to OOM_SCORE_ADJ_MIN
+	 * as unkillable.
+	 *
+	 * If there are inflight OOM victim tasks inside the memcg,
+	 * we return -1.
+	 */
+	css_task_iter_start(&memcg->css, 0, &it);
+	while ((task = css_task_iter_next(&it))) {
+		if (!eligible &&
+		    task->signal->oom_score_adj != OOM_SCORE_ADJ_MIN)
+			eligible = 1;
+
+		if (tsk_is_oom_victim(task) &&
+		    !test_bit(MMF_OOM_SKIP, &task->signal->oom_mm->flags)) {
+			eligible = -1;
+			break;
+		}
+	}
+	css_task_iter_end(&it);
+
+	if (eligible <= 0)
+		return eligible;
+
+	return memcg_oom_badness(memcg, nodemask, totalpages);
+}
+
+static void select_victim_memcg(struct mem_cgroup *root, struct oom_control *oc)
+{
+	struct mem_cgroup *iter, *parent;
+
+	/*
+	 * If OOM is memcg-wide, and the memcg has the oom_group flag,
+	 * simple select the memcg as a victim.
+	 */
+	if (oc->memcg && oc->memcg->oom_group) {
+		oc->chosen_memcg = oc->memcg;
+		css_get(&oc->chosen_memcg->css);
+		oc->chosen_points = oc->memcg->oom_score;
+		return;
+	}
+
+	/*
+	 * The oom_score is calculated for leaf memcgs and propagated upwards
+	 * by the tree.
+	 *
+	 * for_each_mem_cgroup_tree() walks the tree in pre-order,
+	 * so we simple reset oom_score for non-lead cgroups before
+	 * starting accumulating an actual value from underlying sub-tree.
+	 *
+	 * Root memcg is treated as a leaf memcg.
+	 */
+	for_each_mem_cgroup_tree(iter, root) {
+		if (memcg_has_children(iter) && iter != root_mem_cgroup) {
+			iter->oom_score = 0;
+			continue;
+		}
+
+		iter->oom_score = oom_evaluate_memcg(iter, oc->nodemask,
+						     oc->totalpages);
+
+		/*
+		 * Ignore empty and non-eligible memory cgroups.
+		 */
+		if (iter->oom_score == 0)
+			continue;
+
+		/*
+		 * If there are inflight OOM victims, we don't need to look
+		 * further for new victims.
+		 */
+		if (iter->oom_score == -1) {
+			oc->chosen_memcg = INFLIGHT_VICTIM;
+			mem_cgroup_iter_break(root, iter);
+			return;
+		}
+
+		for (parent = parent_mem_cgroup(iter); parent && parent != root;
+		     parent = parent_mem_cgroup(parent))
+			parent->oom_score += iter->oom_score;
+	}
+
+	for (;;) {
+		struct cgroup_subsys_state *css;
+		struct mem_cgroup *memcg = NULL;
+		long score = LONG_MIN;
+
+		/*
+		 * Root memcg is compared with top-level memcgs.
+		 */
+		if (root == root_mem_cgroup && root->oom_score > 0) {
+			score = root->oom_score;
+			memcg = root_mem_cgroup;
+		}
+
+		css_for_each_child(css, &root->css) {
+			struct mem_cgroup *iter = mem_cgroup_from_css(css);
+
+			/*
+			 * Ignore empty and non-eligible memory cgroups.
+			 */
+			if (iter->oom_score == 0)
+				continue;
+
+			if (iter->oom_score > score) {
+				memcg = iter;
+				score = iter->oom_score;
+			}
+		}
+
+		if (!memcg) {
+			if (oc->memcg && root == oc->memcg) {
+				oc->chosen_memcg = oc->memcg;
+				css_get(&oc->chosen_memcg->css);
+				oc->chosen_points = oc->memcg->oom_score;
+			}
+			break;
+		}
+
+		if (memcg->oom_group || !memcg_has_children(memcg) ||
+		    memcg == root_mem_cgroup) {
+			oc->chosen_memcg = memcg;
+			css_get(&oc->chosen_memcg->css);
+			oc->chosen_points = score;
+			break;
+		}
+
+		root = memcg;
+	}
+}
+
+bool mem_cgroup_select_oom_victim(struct oom_control *oc)
+{
+	struct mem_cgroup *root;
+
+	if (mem_cgroup_disabled())
+		return false;
+
+	if (!cgroup_subsys_on_dfl(memory_cgrp_subsys))
+		return false;
+
+	if (oc->memcg)
+		root = oc->memcg;
+	else
+		root = root_mem_cgroup;
+
+	oc->chosen_task = NULL;
+	oc->chosen_memcg = NULL;
+
+	rcu_read_lock();
+	select_victim_memcg(root, oc);
+	rcu_read_unlock();
+
+	return oc->chosen_task || oc->chosen_memcg;
+}
+
 /*
  * Reclaims as many pages from the given memcg as possible.
  *
@@ -5258,6 +5483,33 @@ static ssize_t memory_max_write(struct kernfs_open_file *of,
 	return nbytes;
 }
 
+static int memory_oom_group_show(struct seq_file *m, void *v)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
+	bool oom_group = memcg->oom_group;
+
+	seq_printf(m, "%d\n", oom_group);
+
+	return 0;
+}
+
+static ssize_t memory_oom_group_write(struct kernfs_open_file *of,
+					       char *buf, size_t nbytes,
+					       loff_t off)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(of_css(of));
+	int oom_group;
+	int err;
+
+	err = kstrtoint(strstrip(buf), 0, &oom_group);
+	if (err)
+		return err;
+
+	memcg->oom_group = oom_group;
+
+	return nbytes;
+}
+
 static int memory_events_show(struct seq_file *m, void *v)
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
@@ -5376,6 +5628,12 @@ static struct cftype memory_files[] = {
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = memory_max_show,
 		.write = memory_max_write,
+	},
+	{
+		.name = "oom_group",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = memory_oom_group_show,
+		.write = memory_oom_group_write,
 	},
 	{
 		.name = "events",
