@@ -337,7 +337,7 @@ static void tcp_probe_timer(struct sock *sk)
 	if (!start_ts)
 		tcp_send_head(sk)->skb_mstamp = tp->tcp_mstamp;
 	else if (icsk->icsk_user_timeout &&
-		 (s32)(tcp_time_stamp(tp) - start_ts) >
+		 keepalive_time_elapsed(tp) >=
 		 jiffies_to_msecs(icsk->icsk_user_timeout))
 		goto abort;
 
