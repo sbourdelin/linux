@@ -686,9 +686,11 @@ static void r5c_disable_writeback_async(struct work_struct *work)
 	wait_event(mddev->sb_wait,
 		   !test_bit(MD_SB_CHANGE_PENDING, &mddev->sb_flags));
 
+	mddev_lock_nointr(mddev);
 	mddev_suspend(mddev);
 	log->r5c_journal_mode = R5C_JOURNAL_MODE_WRITE_THROUGH;
 	mddev_resume(mddev);
+	mddev_unlock(mddev);
 }
 
 static void r5l_submit_current_io(struct r5l_log *log)
