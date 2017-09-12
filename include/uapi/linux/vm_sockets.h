@@ -18,6 +18,10 @@
 
 #include <linux/socket.h>
 
+#ifndef __KERNEL__
+#include <sys/socket.h> /* struct sockaddr */
+#endif
+
 /* Option name for STREAM socket buffer size.  Use as the option name in
  * setsockopt(3) or getsockopt(3) to set or get an unsigned long long that
  * specifies the size of the buffer underlying a vSockets STREAM socket.
@@ -146,7 +150,7 @@ struct sockaddr_vm {
 	unsigned int svm_port;
 	unsigned int svm_cid;
 	unsigned char svm_zero[sizeof(struct sockaddr) -
-			       sizeof(sa_family_t) -
+			       sizeof(__kernel_sa_family_t) -
 			       sizeof(unsigned short) -
 			       sizeof(unsigned int) - sizeof(unsigned int)];
 };
