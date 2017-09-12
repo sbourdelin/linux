@@ -66,6 +66,7 @@ static const struct nla_policy tunnel_key_policy[TCA_TUNNEL_KEY_MAX + 1] = {
 	[TCA_TUNNEL_KEY_ENC_KEY_ID]   = { .type = NLA_U32 },
 	[TCA_TUNNEL_KEY_ENC_DST_PORT] = {.type = NLA_U16},
 	[TCA_TUNNEL_KEY_NO_CSUM]      = { .type = NLA_U8 },
+	[TCA_TUNNEL_KEY_ENC_OPTS]     = { .type = NLA_BINARY },
 };
 
 static int tunnel_key_init(struct net *net, struct nlattr *nla,
@@ -81,9 +82,11 @@ static int tunnel_key_init(struct net *net, struct nlattr *nla,
 	struct tcf_tunnel_key *t;
 	bool exists = false;
 	__be16 dst_port = 0;
+	int opts_len = 0;
 	__be64 key_id;
 	__be16 flags;
 	int ret = 0;
+	u8 *opts;
 	int err;
 
 	if (!nla)
@@ -121,6 +124,11 @@ static int tunnel_key_init(struct net *net, struct nlattr *nla,
 		if (tb[TCA_TUNNEL_KEY_ENC_DST_PORT])
 			dst_port = nla_get_be16(tb[TCA_TUNNEL_KEY_ENC_DST_PORT]);
 
+		if (tb[TCA_TUNNEL_KEY_ENC_OPTS]) {
+			opts = nla_data(tb[TCA_TUNNEL_KEY_ENC_OPTS]);
+			opts_len = nla_len(tb[TCA_TUNNEL_KEY_ENC_OPTS]);
+		}
+
 		if (tb[TCA_TUNNEL_KEY_ENC_IPV4_SRC] &&
 		    tb[TCA_TUNNEL_KEY_ENC_IPV4_DST]) {
 			__be32 saddr;
@@ -131,7 +139,7 @@ static int tunnel_key_init(struct net *net, struct nlattr *nla,
 
 			metadata = __ip_tun_set_dst(saddr, daddr, 0, 0,
 						    dst_port, flags,
-						    key_id, 0);
+						    key_id, opts_len);
 		} else if (tb[TCA_TUNNEL_KEY_ENC_IPV6_SRC] &&
 			   tb[TCA_TUNNEL_KEY_ENC_IPV6_DST]) {
 			struct in6_addr saddr;
@@ -142,8 +150,12 @@ static int tunnel_key_init(struct net *net, struct nlattr *nla,
 
 			metadata = __ipv6_tun_set_dst(&saddr, &daddr, 0, 0, dst_port,
 						      0, flags,
-						      key_id, 0);
+						      key_id, opts_len);
 		}
+
+		if (opts_len)
+			ip_tunnel_info_opts_set(&metadata->u.tun_info,
+						opts, opts_len);
 
 		if (!metadata) {
 			ret = -EINVAL;
@@ -264,8 +276,9 @@ static int tunnel_key_dump(struct sk_buff *skb, struct tc_action *a,
 		goto nla_put_failure;
 
 	if (params->tcft_action == TCA_TUNNEL_KEY_ACT_SET) {
-		struct ip_tunnel_key *key =
-			&params->tcft_enc_metadata->u.tun_info.key;
+		struct ip_tunnel_info *info =
+			&params->tcft_enc_metadata->u.tun_info;
+		struct ip_tunnel_key *key = &info->key;
 		__be32 key_id = tunnel_id_to_key32(key->tun_id);
 
 		if (nla_put_be32(skb, TCA_TUNNEL_KEY_ENC_KEY_ID, key_id) ||
@@ -273,7 +286,10 @@ static int tunnel_key_dump(struct sk_buff *skb, struct tc_action *a,
 					      &params->tcft_enc_metadata->u.tun_info) ||
 		    nla_put_be16(skb, TCA_TUNNEL_KEY_ENC_DST_PORT, key->tp_dst) ||
 		    nla_put_u8(skb, TCA_TUNNEL_KEY_NO_CSUM,
-			       !(key->tun_flags & TUNNEL_CSUM)))
+			       !(key->tun_flags & TUNNEL_CSUM)) ||
+		    (info->options_len &&
+		     nla_put(skb, TCA_TUNNEL_KEY_ENC_OPTS, info->options_len,
+			     info + 1)))
 			goto nla_put_failure;
 	}
 
