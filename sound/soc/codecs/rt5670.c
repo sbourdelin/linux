@@ -2582,6 +2582,22 @@ static int rt5670_set_tdm_slot(struct snd_soc_dai *dai, unsigned int tx_mask,
 	return 0;
 }
 
+static int rt5670_set_bclk_ratio(struct snd_soc_dai *dai, unsigned int ratio)
+{
+	struct snd_soc_codec *codec = dai->codec;
+
+	dev_dbg(codec->dev, "%s ratio=%d\n", __func__, ratio);
+	if (dai->id != RT5670_AIF1)
+		return 0;
+
+	if (ratio == 50)
+		snd_soc_update_bits(codec, RT5670_GEN_CTRL3, 0x0800, 0x0800);
+	else
+		snd_soc_update_bits(codec, RT5670_GEN_CTRL3, 0x0800, 0x0);
+
+	return 0;
+}
+
 static int rt5670_set_bias_level(struct snd_soc_codec *codec,
 			enum snd_soc_bias_level level)
 {
@@ -2712,6 +2728,7 @@ static const struct snd_soc_dai_ops rt5670_aif_dai_ops = {
 	.set_fmt = rt5670_set_dai_fmt,
 	.set_tdm_slot = rt5670_set_tdm_slot,
 	.set_pll = rt5670_set_dai_pll,
+	.set_bclk_ratio = rt5670_set_bclk_ratio,
 };
 
 static struct snd_soc_dai_driver rt5670_dai[] = {
