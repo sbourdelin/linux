@@ -183,6 +183,18 @@ struct flow_dissector_key_ip {
 	__u8	ttl;
 };
 
+/**
+ * struct flow_dissector_key_enc_opts:
+ * @data: data
+ * @len: len
+ */
+struct flow_dissector_key_enc_opts {
+	u8 data[256];	/* Using IP_TUNNEL_OPTS_MAX is desired here
+			 * but seems difficult to #include
+			 */
+	u8 len;
+};
+
 enum flow_dissector_key_id {
 	FLOW_DISSECTOR_KEY_CONTROL, /* struct flow_dissector_key_control */
 	FLOW_DISSECTOR_KEY_BASIC, /* struct flow_dissector_key_basic */
@@ -205,6 +217,7 @@ enum flow_dissector_key_id {
 	FLOW_DISSECTOR_KEY_MPLS, /* struct flow_dissector_key_mpls */
 	FLOW_DISSECTOR_KEY_TCP, /* struct flow_dissector_key_tcp */
 	FLOW_DISSECTOR_KEY_IP, /* struct flow_dissector_key_ip */
+	FLOW_DISSECTOR_KEY_ENC_OPTS, /* struct flow_dissector_key_enc_opts */
 
 	FLOW_DISSECTOR_KEY_MAX,
 };

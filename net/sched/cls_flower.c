@@ -51,6 +51,7 @@ struct fl_flow_key {
 	struct flow_dissector_key_mpls mpls;
 	struct flow_dissector_key_tcp tcp;
 	struct flow_dissector_key_ip ip;
+	struct flow_dissector_key_enc_opts enc_opts;
 } __aligned(BITS_PER_LONG / 8); /* Ensure that we can do comparisons as longs. */
 
 struct fl_flow_mask_range {
@@ -181,6 +182,11 @@ static int fl_classify(struct sk_buff *skb, const struct tcf_proto *tp,
 		skb_key.enc_key_id.keyid = tunnel_id_to_key32(key->tun_id);
 		skb_key.enc_tp.src = key->tp_src;
 		skb_key.enc_tp.dst = key->tp_dst;
+
+		if (info->options_len) {
+			skb_key.enc_opts.len = info->options_len;
+			ip_tunnel_info_opts_get(skb_key.enc_opts.data, info);
+		}
 	}
 
 	skb_key.indev_ifindex = skb->skb_iif;
@@ -421,6 +427,8 @@ static const struct nla_policy fl_policy[TCA_FLOWER_MAX + 1] = {
 	[TCA_FLOWER_KEY_IP_TOS_MASK]	= { .type = NLA_U8 },
 	[TCA_FLOWER_KEY_IP_TTL]		= { .type = NLA_U8 },
 	[TCA_FLOWER_KEY_IP_TTL_MASK]	= { .type = NLA_U8 },
+	[TCA_FLOWER_KEY_ENC_OPTS]	= { .type = NLA_BINARY },
+	[TCA_FLOWER_KEY_ENC_OPTS_MASK]	= { .type = NLA_BINARY },
 };
 
 static void fl_set_key_val(struct nlattr **tb,
@@ -712,6 +720,26 @@ static int fl_set_key(struct net *net, struct nlattr **tb,
 		       &mask->enc_tp.dst, TCA_FLOWER_KEY_ENC_UDP_DST_PORT_MASK,
 		       sizeof(key->enc_tp.dst));
 
+	if (tb[TCA_FLOWER_KEY_ENC_OPTS]) {
+		key->enc_opts.len = nla_len(tb[TCA_FLOWER_KEY_ENC_OPTS]);
+
+		if (key->enc_opts.len > sizeof(key->enc_opts.data))
+			return -EINVAL;
+
+		/* enc_opts is variable length.
+		 * If present ensure the value and mask are the same length.
+		 */
+		if (tb[TCA_FLOWER_KEY_ENC_OPTS_MASK] &&
+		    nla_len(tb[TCA_FLOWER_KEY_ENC_OPTS_MASK]) != key->enc_opts.len)
+			return -EINVAL;
+
+		mask->enc_opts.len = key->enc_opts.len;
+		fl_set_key_val(tb, key->enc_opts.data, TCA_FLOWER_KEY_ENC_OPTS,
+			       mask->enc_opts.data,
+			       TCA_FLOWER_KEY_ENC_OPTS_MASK,
+			       key->enc_opts.len);
+	}
+
 	if (tb[TCA_FLOWER_KEY_FLAGS])
 		ret = fl_set_key_flags(tb, &key->control.flags, &mask->control.flags);
 
@@ -804,6 +832,8 @@ static void fl_init_dissector(struct cls_fl_head *head,
 			   enc_control);
 	FL_KEY_SET_IF_MASKED(&mask->key, keys, cnt,
 			     FLOW_DISSECTOR_KEY_ENC_PORTS, enc_tp);
+	FL_KEY_SET_IF_MASKED(&mask->key, keys, cnt,
+			     FLOW_DISSECTOR_KEY_ENC_OPTS, enc_opts);
 
 	skb_flow_dissector_init(&head->dissector, keys, cnt);
 }
@@ -1327,7 +1357,10 @@ static int fl_dump(struct net *net, struct tcf_proto *tp, void *fh,
 			    TCA_FLOWER_KEY_ENC_UDP_DST_PORT,
 			    &mask->enc_tp.dst,
 			    TCA_FLOWER_KEY_ENC_UDP_DST_PORT_MASK,
-			    sizeof(key->enc_tp.dst)))
+			    sizeof(key->enc_tp.dst)) ||
+	    fl_dump_key_val(skb, key->enc_opts.data, TCA_FLOWER_KEY_ENC_OPTS,
+			    mask->enc_opts.data, TCA_FLOWER_KEY_ENC_OPTS_MASK,
+			    key->enc_opts.len))
 		goto nla_put_failure;
 
 	if (fl_dump_key_flags(skb, key->control.flags, mask->control.flags))
