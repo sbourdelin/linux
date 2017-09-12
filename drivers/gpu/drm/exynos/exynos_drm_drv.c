@@ -230,6 +230,7 @@ struct exynos_drm_driver_info {
 #define DRM_COMPONENT_DRIVER	BIT(0)	/* supports component framework */
 #define DRM_VIRTUAL_DEVICE	BIT(1)	/* create virtual platform device */
 #define DRM_DMA_DEVICE		BIT(2)	/* can be used for dma allocations */
+#define DRM_SHARED_DEVICE	BIT(3)	/* devices shared with V4L2 subsystem */
 
 #define DRV_PTR(drv, cond) (IS_ENABLED(cond) ? &drv : NULL)
 
@@ -281,6 +282,17 @@ static struct exynos_drm_driver_info exynos_drm_drivers[] = {
 	}
 };
 
+int exynos_drm_check_shared_device(struct device *dev)
+{
+	/*
+	 * Exynos DRM drivers handle only devices that support
+	 * the LCD Writeback data path, rest is handled by V4L2 driver
+	 */
+	if (!of_property_read_bool(dev->of_node, "samsung,lcd-wb"))
+		return -ENODEV;
+	return 0;
+}
+
 static int compare_dev(struct device *dev, void *data)
 {
 	return dev == (struct device *)data;
@@ -302,7 +314,10 @@ static struct component_match *exynos_drm_match_add(struct device *dev)
 					    &info->driver->driver,
 					    (void *)platform_bus_type.match))) {
 			put_device(p);
-			component_match_add(dev, &match, compare_dev, d);
+
+			if (!(info->flags & DRM_SHARED_DEVICE) ||
+			    exynos_drm_check_shared_device(d) == 0)
+				component_match_add(dev, &match, compare_dev, d);
 			p = d;
 		}
 		put_device(p);
