@@ -26,9 +26,10 @@
 	};
 
 	lcd0: display {
-		compatible = "sharp,ls037v7dw01";
+		compatible = "omapdss,sharp,ls037v7dw01";
 		label = "lcd";
 		power-supply = <&lcd_3v3>;
+		envdd-supply = <&lcd_3v3>;
 
 		port {
 			lcd_in: endpoint {
