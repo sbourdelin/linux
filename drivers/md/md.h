@@ -234,6 +234,12 @@ enum mddev_flags {
 				 * never cause the array to become failed.
 				 */
 	MD_HAS_PPL,		/* The raid array has PPL feature set */
+	MD_ALLOW_SB_UPDATE,	/* md_check_recovery is allowed to update
+				 * the metadata without taking reconfig_mutex.
+				 */
+	MD_UPDATING_SB,		/* md_check_recovery is updating the metadata
+				 * without explicitly holding reconfig_mutex.
+				 */
 };
 
 enum mddev_sb_flags {
