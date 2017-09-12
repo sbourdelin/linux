@@ -33,10 +33,8 @@ int vmw_mmap(struct file *filp, struct vm_area_struct *vma)
 	struct drm_file *file_priv;
 	struct vmw_private *dev_priv;
 
-	if (unlikely(vma->vm_pgoff < VMWGFX_FILE_PAGE_OFFSET)) {
-		DRM_ERROR("Illegal attempt to mmap old fifo space.\n");
+	if (unlikely(vma->vm_pgoff < VMWGFX_FILE_PAGE_OFFSET))
 		return -EINVAL;
-	}
 
 	file_priv = filp->private_data;
 	dev_priv = vmw_priv(file_priv->minor->dev);
