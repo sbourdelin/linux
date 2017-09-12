@@ -27,6 +27,29 @@
 #include <asm/mmu.h>
 #include <asm/mce.h>
 #include <asm/machdep.h>
+#include <asm/pgtable.h>
+#include <asm/pte-walk.h>
+#include <asm/sstep.h>
+
+/*
+ * Convert an address related to an mm to a PFN. NOTE: we are in real
+ * mode, we could potentially race with page table updates.
+ */
+static unsigned long addr_to_pfn(struct mm_struct *mm, unsigned long addr)
+{
+	pte_t *ptep;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	if (mm == current->mm)
+		ptep = find_current_mm_pte(mm->pgd, addr, NULL, NULL);
+	else
+		ptep = find_init_mm_pte(addr, NULL);
+	local_irq_restore(flags);
+	if (!ptep || pte_special(*ptep))
+		return ULONG_MAX;
+	return pte_pfn(*ptep);
+}
 
 static void flush_tlb_206(unsigned int num_sets, unsigned int action)
 {
@@ -421,6 +444,50 @@ static const struct mce_derror_table mce_p9_derror_table[] = {
   MCE_INITIATOR_CPU,   MCE_SEV_ERROR_SYNC, },
 { 0, false, 0, 0, 0, 0 } };
 
+static int mce_find_instr_ea_and_pfn(struct pt_regs *regs, uint64_t *addr,
+					uint64_t *phys_addr)
+{
+	/*
+	 * Carefully look at the NIP to determine
+	 * the instruction to analyse. Reading the NIP
+	 * in real-mode is tricky and can lead to recursive
+	 * faults
+	 */
+	int instr;
+	struct mm_struct *mm;
+	unsigned long nip = regs->nip;
+	unsigned long pfn, instr_addr;
+	struct instruction_op op;
+	struct pt_regs tmp = *regs;
+
+	if (user_mode(regs))
+		mm = current->mm;
+	else
+		mm = &init_mm;
+
+	pfn = addr_to_pfn(mm, nip);
+	if (pfn != ULONG_MAX) {
+		instr_addr = (pfn << PAGE_SHIFT) + (nip & ~PAGE_MASK);
+		instr = *(unsigned int *)(instr_addr);
+		if (!analyse_instr(&op, &tmp, instr)) {
+			pfn = addr_to_pfn(mm, op.ea);
+			*addr = op.ea;
+			*phys_addr = pfn;
+			return 0;
+		}
+		/*
+		 * analyse_instr() might fail if the instruction
+		 * is not a load/store, although this is unexpected
+		 * for load/store errors or if we got the NIP
+		 * wrong
+		 */
+		pr_warn("failed to analyse instr %x\n", instr);
+	}
+	pr_warn("failed to get PFN for nip %lx\n", regs->nip);
+	*addr = 0;
+	return -1;
+}
+
 static int mce_handle_ierror(struct pt_regs *regs,
 		const struct mce_ierror_table table[],
 		struct mce_error_info *mce_err, uint64_t *addr)
@@ -489,7 +556,8 @@ static int mce_handle_ierror(struct pt_regs *regs,
 
 static int mce_handle_derror(struct pt_regs *regs,
 		const struct mce_derror_table table[],
-		struct mce_error_info *mce_err, uint64_t *addr)
+		struct mce_error_info *mce_err, uint64_t *addr,
+		uint64_t *phys_addr)
 {
 	uint64_t dsisr = regs->dsisr;
 	int handled = 0;
@@ -555,7 +623,10 @@ static int mce_handle_derror(struct pt_regs *regs,
 		mce_err->initiator = table[i].initiator;
 		if (table[i].dar_valid)
 			*addr = regs->dar;
-
+		else if (mce_err->severity == MCE_SEV_ERROR_SYNC &&
+				table[i].error_type == MCE_ERROR_TYPE_UE) {
+			mce_find_instr_ea_and_pfn(regs, addr, phys_addr);
+		}
 		found = 1;
 	}
 
@@ -592,19 +663,20 @@ static long mce_handle_error(struct pt_regs *regs,
 		const struct mce_ierror_table itable[])
 {
 	struct mce_error_info mce_err = { 0 };
-	uint64_t addr;
+	uint64_t addr, phys_addr;
 	uint64_t srr1 = regs->msr;
 	long handled;
 
 	if (SRR1_MC_LOADSTORE(srr1))
-		handled = mce_handle_derror(regs, dtable, &mce_err, &addr);
+		handled = mce_handle_derror(regs, dtable, &mce_err, &addr,
+				&phys_addr);
 	else
 		handled = mce_handle_ierror(regs, itable, &mce_err, &addr);
 
 	if (!handled && mce_err.error_type == MCE_ERROR_TYPE_UE)
 		handled = mce_handle_ue_error(regs);
 
-	save_mce_event(regs, handled, &mce_err, regs->nip, addr);
+	save_mce_event(regs, handled, &mce_err, regs->nip, addr, phys_addr);
 
 	return handled;
 }
