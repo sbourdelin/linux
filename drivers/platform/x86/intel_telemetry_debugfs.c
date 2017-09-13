@@ -76,7 +76,7 @@
 #define TELEM_IOSS_DX_D0IX_EVTS		25
 #define TELEM_IOSS_PG_EVTS		30
 
-#define TELEM_EVT_LEN(x) (sizeof(x)/sizeof((x)[0]))
+#define TELEM_EVT_LEN(x) (ARRAY_SIZE(x))
 
 #define TELEM_DEBUGFS_CPU(model, data) \
 	{ X86_VENDOR_INTEL, 6, model, X86_FEATURE_ANY, (unsigned long)&data}
