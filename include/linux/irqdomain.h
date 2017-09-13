@@ -259,6 +259,8 @@ extern void irq_set_default_host(struct irq_domain *host);
 extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
 				  irq_hw_number_t hwirq, int node,
 				  const struct cpumask *affinity);
+extern void of_phandle_args_to_fwspec(struct of_phandle_args *irq_data,
+				      struct irq_fwspec *fwspec);
 
 static inline struct fwnode_handle *of_node_to_fwnode(struct device_node *node)
 {
