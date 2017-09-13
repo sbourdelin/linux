@@ -152,6 +152,14 @@ struct nested_state {
 
 	/* Nested Paging related state */
 	u64 nested_cr3;
+
+	/* SMM related state */
+	struct {
+		/* in guest mode on SMM entry? */
+		bool guest_mode;
+		/* current nested VMCB on SMM entry */
+		u64 vmcb;
+	} smm;
 };
 
 #define MSRPM_OFFSETS	16
@@ -5365,13 +5373,38 @@ static void svm_setup_mce(struct kvm_vcpu *vcpu)
 
 static int svm_prep_enter_smm(struct kvm_vcpu *vcpu, char *smstate)
 {
-	/* TODO: Implement */
+	struct vcpu_svm *svm = to_svm(vcpu);
+	int ret;
+
+	svm->nested.smm.guest_mode = is_guest_mode(vcpu);
+	if (svm->nested.smm.guest_mode) {
+		svm->nested.smm.vmcb = svm->nested.vmcb;
+
+		svm->vmcb->save.rax = vcpu->arch.regs[VCPU_REGS_RAX];
+		svm->vmcb->save.rsp = vcpu->arch.regs[VCPU_REGS_RSP];
+		svm->vmcb->save.rip = vcpu->arch.regs[VCPU_REGS_RIP];
+
+		ret = nested_svm_vmexit(svm);
+		if (ret)
+			return ret;
+	}
 	return 0;
 }
 
 static int svm_post_leave_smm(struct kvm_vcpu *vcpu)
 {
-	/* TODO: Implement */
+	struct vcpu_svm *svm = to_svm(vcpu);
+	struct vmcb *nested_vmcb;
+	struct page *page;
+
+	if (svm->nested.smm.guest_mode) {
+		nested_vmcb = nested_svm_map(svm, svm->nested.smm.vmcb, &page);
+		if (!nested_vmcb)
+			return 1;
+		enter_svm_guest_mode(svm, svm->nested.smm.vmcb, nested_vmcb, page);
+
+		svm->nested.smm.guest_mode = false;
+	}
 	return 0;
 }
 
