@@ -710,6 +710,14 @@ static inline void *dma_zalloc_coherent(struct device *dev, size_t size,
 }
 
 #ifdef CONFIG_HAS_DMA
+
+#ifndef ARCH_HAS_PLAT_DEVICE_IS_COHERENT
+static inline int plat_device_is_coherent(struct device *dev)
+{
+	return 1;
+}
+#endif
+
 static inline int dma_get_cache_alignment(void)
 {
 #ifdef ARCH_DMA_MINALIGN

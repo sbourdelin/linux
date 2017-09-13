@@ -8,6 +8,7 @@
 #ifndef CONFIG_SGI_IP27 /* Kludge to fix 2.6.39 build for IP27 */
 #include <dma-coherence.h>
 #endif
+#define ARCH_HAS_PLAT_DEVICE_IS_COHERENT
 
 extern const struct dma_map_ops *mips_dma_map_ops;
 
