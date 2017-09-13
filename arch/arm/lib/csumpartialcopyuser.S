@@ -29,6 +29,7 @@
 		mcr	p15, 0, ip, c3, c0, 0
 		ret	lr
 		.endm
+#define ERR_PTR_OFFSET 9
 #else
 		.macro	save_regs
 		stmfd	sp!, {r1, r2, r4 - r8, lr}
@@ -37,6 +38,7 @@
 		.macro	load_regs
 		ldmfd	sp!, {r1, r2, r4 - r8, pc}
 		.endm
+#define ERR_PTR_OFFSET 8
 #endif
 
 		.macro	load1b,	reg1
@@ -85,7 +87,7 @@
 		.pushsection .text.fixup,"ax"
 		.align	4
 9001:		mov	r4, #-EFAULT
-		ldr	r5, [sp, #8*4]		@ *err_ptr
+		ldr	r5, [sp, #ERR_PTR_OFFSET*4]		@ *err_ptr
 		str	r4, [r5]
 		ldmia	sp, {r1, r2}		@ retrieve dst, len
 		add	r2, r2, r1
