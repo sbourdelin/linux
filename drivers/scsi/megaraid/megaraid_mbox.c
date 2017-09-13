@@ -726,8 +726,8 @@ megaraid_init_mbox(adapter_t *adapter)
 	 * controllers
 	 */
 	raid_dev = kzalloc(sizeof(mraid_device_t), GFP_KERNEL);
-	if (raid_dev == NULL) return -1;
-
+	if (!raid_dev)
+		return -ENOMEM;
 
 	/*
 	 * Attach the adapter soft state to raid device soft state
