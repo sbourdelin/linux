@@ -35,8 +35,13 @@ static int crypto_default_rng_refcnt;
 
 int crypto_rng_reset(struct crypto_rng *tfm, const u8 *seed, unsigned int slen)
 {
+	struct rng_alg *ralg = crypto_rng_alg(tfm);
 	u8 *buf = NULL;
 	int err;
+
+	/* In case of PRNG, no need to seed */
+	if (!ralg->seed)
+		return 0;
 
 	if (!seed && slen) {
 		buf = kmalloc(slen, GFP_KERNEL);
@@ -47,7 +52,7 @@ int crypto_rng_reset(struct crypto_rng *tfm, const u8 *seed, unsigned int slen)
 		seed = buf;
 	}
 
-	err = crypto_rng_alg(tfm)->seed(tfm, seed, slen);
+	err = ralg->seed(tfm, seed, slen);
 
 	kzfree(buf);
 	return err;
