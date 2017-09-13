@@ -3984,7 +3984,7 @@ static inline int cas_alloc_rx_desc(struct cas *cp, int ring)
 	size = RX_DESC_RINGN_SIZE(ring);
 	for (i = 0; i < size; i++) {
 		if ((page[i] = cas_page_alloc(cp, GFP_KERNEL)) == NULL)
-			return -1;
+			return -ENOMEM;
 	}
 	return 0;
 }
