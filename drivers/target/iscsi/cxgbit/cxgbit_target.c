@@ -399,7 +399,7 @@ cxgbit_map_skb(struct iscsi_cmd *cmd, struct sk_buff *skb, u32 data_offset,
 	if (padding) {
 		page = alloc_page(GFP_KERNEL | __GFP_ZERO);
 		if (!page)
-			return -1;
+			return -ENOMEM;
 		skb_fill_page_desc(skb, i, page, 0, padding);
 		skb->data_len += padding;
 		skb->len += padding;
