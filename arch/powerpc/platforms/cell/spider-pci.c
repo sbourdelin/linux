@@ -106,7 +106,7 @@ static int __init spiderpci_pci_setup_chip(struct pci_controller *phb,
 	dummy_page_va = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	if (!dummy_page_va) {
 		pr_err("SPIDERPCI-IOWA:Alloc dummy_page_va failed.\n");
-		return -1;
+		return -ENOMEM;
 	}
 
 	dummy_page_da = dma_map_single(phb->parent, dummy_page_va,
@@ -137,7 +137,7 @@ int __init spiderpci_iowa_init(struct iowa_bus *bus, void *data)
 	if (!priv) {
 		pr_err("SPIDERPCI-IOWA:"
 		       "Can't allocate struct spiderpci_iowa_private");
-		return -1;
+		return -ENOMEM;
 	}
 
 	if (of_address_to_resource(np, 0, &r)) {
