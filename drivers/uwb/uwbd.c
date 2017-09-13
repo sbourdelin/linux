@@ -303,7 +303,7 @@ static int uwbd(void *param)
 void uwbd_start(struct uwb_rc *rc)
 {
 	rc->uwbd.task = kthread_run(uwbd, rc, "uwbd");
-	if (rc->uwbd.task == NULL)
+	if (IS_ERR(rc->uwbd.task))
 		printk(KERN_ERR "UWB: Cannot start management daemon; "
 		       "UWB won't work\n");
 	else
