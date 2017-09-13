@@ -2417,7 +2417,21 @@ static int do_add_mount(struct mount *newmnt, struct path *path, int mnt_flags)
 	err = -EBUSY;
 	if (path->mnt->mnt_sb == newmnt->mnt.mnt_sb &&
 	    path->mnt->mnt_root == path->dentry)
+	{
+		if (IS_ENABLED(CONFIG_DEVTMPFS_MOUNT) &&
+		    !strcmp(path->mnt->mnt_sb->s_type->name, "devtmpfs"))
+		{
+			/* Debian's kernel config enables DEVTMPFS_MOUNT, then
+			   its initramfs setup script tries to mount devtmpfs
+			   again, and if the second mount-over-itself fails
+			   the script overmounts a tmpfs on /dev to hide the
+			   existing contents, then boot fails with empty /dev. */
+			printk(KERN_WARNING "Debian bug workaround for devtmpfs overmount.");
+
+			err = 0;
+		}
 		goto unlock;
+	}
 
 	err = -EINVAL;
 	if (d_is_symlink(newmnt->mnt.mnt_root))
