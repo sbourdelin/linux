@@ -112,6 +112,12 @@ struct xol_area {
 	unsigned long 			vaddr;		/* Page(s) of instruction slots */
 };
 
+static void uprobe_warn(struct task_struct *t, const char *msg)
+{
+	pr_warn("uprobe: %s:%d failed to %s\n",
+			current->comm, current->pid, msg);
+}
+
 /*
  * valid_vma: Verify if the specified vma is an executable vma
  * Relax restrictions while unregistering: vm_flags might have
@@ -1087,7 +1093,14 @@ int uprobe_mmap(struct vm_area_struct *vma)
 		if (!fatal_signal_pending(current) &&
 		    filter_chain(uprobe, UPROBE_FILTER_MMAP, vma->vm_mm)) {
 			unsigned long vaddr = offset_to_vaddr(vma, uprobe->offset);
-			install_breakpoint(uprobe, vma->vm_mm, vma, vaddr);
+			int ret = install_breakpoint(uprobe, vma->vm_mm, vma, vaddr);
+			if (ret) {
+				char msg[64];
+				snprintf(msg, sizeof(msg),
+						"setup probe at 0x%llx (%d)",
+						uprobe->offset, ret);
+				uprobe_warn(current, (const char *)msg);
+			}
 		}
 		put_uprobe(uprobe);
 	}
@@ -1468,12 +1481,6 @@ static int dup_utask(struct task_struct *t, struct uprobe_task *o_utask)
 	}
 
 	return 0;
-}
-
-static void uprobe_warn(struct task_struct *t, const char *msg)
-{
-	pr_warn("uprobe: %s:%d failed to %s\n",
-			current->comm, current->pid, msg);
 }
 
 static void dup_xol_work(struct callback_head *work)
