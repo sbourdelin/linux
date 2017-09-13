@@ -283,6 +283,8 @@ static inline int virtqueue_add(struct virtqueue *_vq,
 		return -EIO;
 	}
 
+	if (gfp == GFP_ATOMIC)
+		vq->indirect = false;
 #ifdef DEBUG
 	{
 		ktime_t now = ktime_get();
@@ -435,6 +437,131 @@ unmap_release:
 	END_USE(vq);
 	return -EIO;
 }
+
+/**
+ * virtqueue_add_chain - expose a chain of buffers to the other end
+ * @_vq: the struct virtqueue we're talking about.
+ * @head: desc id of the chain head.
+ * @indirect: set if the chain of descs are indrect descs.
+ * @indir_desc: the first indirect desc.
+ * @data: the token identifying the chain.
+ * @ctx: extra context for the token.
+ *
+ * Caller must ensure we don't call this with other virtqueue operations
+ * at the same time (except where noted).
+ *
+ * Returns zero or a negative error (ie. ENOSPC, ENOMEM, EIO).
+ */
+int virtqueue_add_chain(struct virtqueue *_vq,
+			unsigned int head,
+			bool indirect,
+			struct vring_desc *indir_desc,
+			void *data,
+			void *ctx)
+{
+	struct vring_virtqueue *vq = to_vvq(_vq);
+
+	/* The desc chain is empty. */
+	if (head == VIRTQUEUE_DESC_ID_INIT)
+		return 0;
+
+	START_USE(vq);
+
+	if (unlikely(vq->broken)) {
+		END_USE(vq);
+		return -EIO;
+	}
+
+	vq->desc_state[head].data = data;
+	if (indirect)
+		vq->desc_state[head].indir_desc = indir_desc;
+	if (ctx)
+		vq->desc_state[head].indir_desc = ctx;
+
+	virtqueue_kick(_vq);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(virtqueue_add_chain);
+
+/**
+ * virtqueue_add_chain_desc - add a buffer to a chain using a vring desc
+ * @vq: the struct virtqueue we're talking about.
+ * @addr: address of the buffer to add.
+ * @len: length of the buffer.
+ * @head_id: desc id of the chain head.
+ * @prev_id: desc id of the previous buffer.
+ * @in: set if the buffer is for the device to write.
+ *
+ * Caller must ensure we don't call this with other virtqueue operations
+ * at the same time (except where noted).
+ *
+ * Returns zero or a negative error (ie. ENOSPC, ENOMEM, EIO).
+ */
+int virtqueue_add_chain_desc(struct virtqueue *_vq,
+			     u64 addr,
+			     u32 len,
+			     unsigned int *head_id,
+			     unsigned int *prev_id,
+			     bool in)
+{
+	struct vring_virtqueue *vq = to_vvq(_vq);
+	struct vring_desc *desc = vq->vring.desc;
+	u16 flags = in ? VRING_DESC_F_WRITE : 0;
+	unsigned int i;
+
+	/* Sanity check */
+	if (!_vq || !head_id || !prev_id)
+		return -EINVAL;
+retry:
+	START_USE(vq);
+	if (unlikely(vq->broken)) {
+		END_USE(vq);
+		return -EIO;
+	}
+
+	if (vq->vq.num_free < 1) {
+		/*
+		 * If there is no desc avail in the vq, so kick what is
+		 * already added, and re-start to build a new chain for
+		 * the passed sg.
+		 */
+		if (likely(*head_id != VIRTQUEUE_DESC_ID_INIT)) {
+			END_USE(vq);
+			virtqueue_add_chain(_vq, *head_id, 0, NULL, vq, NULL);
+			virtqueue_kick_sync(_vq);
+			*head_id = VIRTQUEUE_DESC_ID_INIT;
+			*prev_id = VIRTQUEUE_DESC_ID_INIT;
+			goto retry;
+		} else {
+			END_USE(vq);
+			return -ENOSPC;
+		}
+	}
+
+	i = vq->free_head;
+	flags &= ~VRING_DESC_F_NEXT;
+	desc[i].flags = cpu_to_virtio16(_vq->vdev, flags);
+	desc[i].addr = cpu_to_virtio64(_vq->vdev, addr);
+	desc[i].len = cpu_to_virtio32(_vq->vdev, len);
+
+	/* Add the desc to the end of the chain */
+	if (*prev_id != VIRTQUEUE_DESC_ID_INIT) {
+		desc[*prev_id].next = cpu_to_virtio16(_vq->vdev, i);
+		desc[*prev_id].flags |= cpu_to_virtio16(_vq->vdev,
+							VRING_DESC_F_NEXT);
+	}
+	*prev_id = i;
+	if (*head_id == VIRTQUEUE_DESC_ID_INIT)
+		*head_id = *prev_id;
+
+	vq->vq.num_free--;
+	vq->free_head = virtio16_to_cpu(_vq->vdev, desc[i].next);
+	END_USE(vq);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(virtqueue_add_chain_desc);
 
 /**
  * virtqueue_add_sgs - expose buffers to other end
@@ -608,6 +735,56 @@ bool virtqueue_notify(struct virtqueue *_vq)
 EXPORT_SYMBOL_GPL(virtqueue_notify);
 
 /**
+ * virtqueue_kick_async - update after add_buf and blocking till update is done
+ * @vq: the struct virtqueue
+ *
+ * After one or more virtqueue_add_* calls, invoke this to kick
+ * the other side. Blocking till the other side is done with the update.
+ *
+ * Caller must ensure we don't call this with other virtqueue
+ * operations at the same time (except where noted).
+ *
+ * Returns false if kick failed, otherwise true.
+ */
+bool virtqueue_kick_async(struct virtqueue *vq, wait_queue_head_t wq)
+{
+	u32 len;
+
+	if (likely(virtqueue_kick(vq))) {
+		wait_event(wq, virtqueue_get_buf(vq, &len));
+		return true;
+	}
+	return false;
+}
+EXPORT_SYMBOL_GPL(virtqueue_kick_async);
+
+/**
+ * virtqueue_kick_sync - update after add_buf and busy wait till update is done
+ * @vq: the struct virtqueue
+ *
+ * After one or more virtqueue_add_* calls, invoke this to kick
+ * the other side. Busy wait till the other side is done with the update.
+ *
+ * Caller must ensure we don't call this with other virtqueue
+ * operations at the same time (except where noted).
+ *
+ * Returns false if kick failed, otherwise true.
+ */
+bool virtqueue_kick_sync(struct virtqueue *vq)
+{
+	u32 len;
+
+	if (likely(virtqueue_kick(vq))) {
+		while (!virtqueue_get_buf(vq, &len) &&
+		       !virtqueue_is_broken(vq))
+			cpu_relax();
+		return true;
+	}
+	return false;
+}
+EXPORT_SYMBOL_GPL(virtqueue_kick_sync);
+
+/**
  * virtqueue_kick - update after add_buf
  * @vq: the struct virtqueue
  *
@@ -621,6 +798,7 @@ EXPORT_SYMBOL_GPL(virtqueue_notify);
  */
 bool virtqueue_kick(struct virtqueue *vq)
 {
+	WARN_ON(1);
 	if (virtqueue_kick_prepare(vq))
 		return virtqueue_notify(vq);
 	return true;

@@ -32,6 +32,7 @@
 #include <linux/mm.h>
 #include <linux/mount.h>
 #include <linux/magic.h>
+#include <linux/page_hinting.h>
 
 /*
  * Balloon device works in 4K page units.  So each page is pointed to by
@@ -94,6 +95,48 @@ static struct virtio_device_id id_table[] = {
 	{ VIRTIO_ID_BALLOON, VIRTIO_DEV_ANY_ID },
 	{ 0 },
 };
+
+#ifdef CONFIG_KVM_FREE_PAGE_HINTING
+
+static void tell_host_one_page(struct virtio_balloon *vb, struct virtqueue *vq,
+			       unsigned int pfn)
+{
+	unsigned int id = VIRTQUEUE_DESC_ID_INIT;
+	u64 addr = pfn << VIRTIO_BALLOON_PFN_SHIFT;
+
+	virtqueue_add_chain_desc(vq, addr, PAGE_SIZE, &id, &id, 0);
+	virtqueue_add_chain(vq, id, 0, NULL, (void *)addr, NULL);
+	virtqueue_kick_sync(vq);
+}
+
+void virtballoon_page_hinting(struct virtio_balloon *vb, int hyper_entries)
+{
+	int i = 0, j = 0;
+	int pfn_cnt = 0;
+
+	for (i = 0; i < hyper_entries; i++) {
+		unsigned long pfn = hypervisor_pagelist[i].pfn;
+		unsigned long pfn_end = hypervisor_pagelist[i].pfn +
+					hypervisor_pagelist[i].pages - 1;
+		while (pfn <= pfn_end) {
+			if (pfn_cnt == VIRTIO_BALLOON_ARRAY_PFNS_MAX) {
+				j = 0;
+				while (j < pfn_cnt) {
+					tell_host_one_page(vb, vb->deflate_vq,
+							   vb->pfns[j]);
+					vb->pfns[j] = 0;
+					j++;
+				}
+				vb->num_pfns = 0;
+				pfn_cnt = 0;
+			}
+			vb->pfns[pfn_cnt++] = pfn;
+			vb->num_pfns++;
+			pfn++;
+		}
+	}
+}
+#endif
 
 static u32 page_to_balloon_pfn(struct page *page)
 {
@@ -580,6 +623,11 @@ static int virtballoon_probe(struct virtio_device *vdev)
 #endif
 
 	virtio_device_ready(vdev);
+
+#ifdef CONFIG_KVM_FREE_PAGE_HINTING
+	request_hypercall = (void *)&virtballoon_page_hinting;
+	balloon_ptr = vb;
+#endif
 
 	if (towards_target(vb))
 		virtballoon_changed(vdev);
