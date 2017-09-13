@@ -5674,6 +5674,7 @@ int x86_emulate_instruction(struct kvm_vcpu *vcpu,
 		ctxt->have_exception = false;
 		ctxt->exception.vector = -1;
 		ctxt->perm_ok = false;
+		ctxt->left_smm = false;
 
 		ctxt->ud = emulation_type & EMULTYPE_TRAP_UD;
 
@@ -5755,6 +5756,8 @@ restart:
 		toggle_interruptibility(vcpu, ctxt->interruptibility);
 		vcpu->arch.emulate_regs_need_sync_to_vcpu = false;
 		kvm_rip_write(vcpu, ctxt->eip);
+		if (r == EMULATE_DONE && ctxt->left_smm)
+			kvm_x86_ops->post_leave_smm(vcpu);
 		if (r == EMULATE_DONE &&
 		    (ctxt->tf || (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP)))
 			kvm_vcpu_do_singlestep(vcpu, &r);
@@ -6614,6 +6617,9 @@ static void enter_smm(struct kvm_vcpu *vcpu)
 	trace_kvm_enter_smm(vcpu->vcpu_id, vcpu->arch.smbase, true);
 	vcpu->arch.hflags |= HF_SMM_MASK;
 	memset(buf, 0, 512);
+
+	kvm_x86_ops->prep_enter_smm(vcpu, buf);
+
 	if (guest_cpuid_has_longmode(vcpu))
 		enter_smm_save_state_64(vcpu, buf);
 	else

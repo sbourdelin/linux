@@ -2601,6 +2601,8 @@ static int em_rsm(struct x86_emulate_ctxt *ctxt)
 
 	ctxt->ops->set_hflags(ctxt, ctxt->ops->get_hflags(ctxt) &
 		~(X86EMUL_SMM_INSIDE_NMI_MASK | X86EMUL_SMM_MASK));
+	ctxt->left_smm = true;
+
 	return X86EMUL_CONTINUE;
 }
 
