@@ -80,6 +80,11 @@ flag must be set in flags before registering. Calling
 led_classdev_notify_brightness_hw_changed on a classdev not registered with
 the LED_BRIGHT_HW_CHANGED flag is a bug and will trigger a WARN_ON.
 
+Optionally, the driver may choose to register with the LED_BRIGHTNESS_FAST flag.
+This flag indicates that the driver implements the brightness_set() callback
+function using a fastpath so the LED core can use hrtimer if the driver requires
+high precision for the trigger timing.
+
 Hardware accelerated blink of LEDs
 ==================================
 
