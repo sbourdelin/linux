@@ -4328,15 +4328,15 @@ initChainBuffers(MPT_ADAPTER *ioc)
 	if (ioc->ReqToChain == NULL) {
 		sz = ioc->req_depth * sizeof(int);
 		mem = kmalloc(sz, GFP_ATOMIC);
-		if (mem == NULL)
-			return -1;
+		if (!mem)
+			return -ENOMEM;
 
 		ioc->ReqToChain = (int *) mem;
 		dinitprintk(ioc, printk(MYIOC_s_DEBUG_FMT "ReqToChain alloc  @ %p, sz=%d bytes\n",
 			 	ioc->name, mem, sz));
 		mem = kmalloc(sz, GFP_ATOMIC);
-		if (mem == NULL)
-			return -1;
+		if (!mem)
+			return -ENOMEM;
 
 		ioc->RequestNB = (int *) mem;
 		dinitprintk(ioc, printk(MYIOC_s_DEBUG_FMT "RequestNB alloc  @ %p, sz=%d bytes\n",
@@ -4402,8 +4402,8 @@ initChainBuffers(MPT_ADAPTER *ioc)
 	sz = num_chain * sizeof(int);
 	if (ioc->ChainToChain == NULL) {
 		mem = kmalloc(sz, GFP_ATOMIC);
-		if (mem == NULL)
-			return -1;
+		if (!mem)
+			return -ENOMEM;
 
 		ioc->ChainToChain = (int *) mem;
 		dinitprintk(ioc, printk(MYIOC_s_DEBUG_FMT "ChainToChain alloc @ %p, sz=%d bytes\n",
