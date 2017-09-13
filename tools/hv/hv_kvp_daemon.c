@@ -231,6 +231,7 @@ static int kvp_file_init(void)
 	size_t records_read;
 	char *fname;
 	struct kvp_record *record;
+	struct kvp_record *record_tmp;
 	struct kvp_record *readp;
 	int num_blocks;
 	int i;
@@ -284,12 +285,15 @@ static int kvp_file_init(void)
 				 * We have more data to read.
 				 */
 				num_blocks++;
-				record = realloc(record, alloc_unit *
+				record_tmp = realloc(record, alloc_unit *
 						num_blocks);
-				if (record == NULL) {
+				if (!record_tmp) {
+					free(record);
 					fclose(filep);
 					close(fd);
 					return 1;
+				} else {
+					record = record_tmp;
 				}
 				continue;
 			}
@@ -355,6 +359,7 @@ static int kvp_key_add_or_modify(int pool, const __u8 *key, int key_size,
 	int i;
 	int num_records;
 	struct kvp_record *record;
+	struct kvp_record *record_tmp;
 	int num_blocks;
 
 	if ((key_size > HV_KVP_EXCHANGE_MAX_KEY_SIZE) ||
@@ -387,11 +392,15 @@ static int kvp_key_add_or_modify(int pool, const __u8 *key, int key_size,
 	 */
 	if (num_records == (ENTRIES_PER_BLOCK * num_blocks)) {
 		/* Need to allocate a larger array for reg entries. */
-		record = realloc(record, sizeof(struct kvp_record) *
+		record_tmp = realloc(record, sizeof(struct kvp_record) *
 			 ENTRIES_PER_BLOCK * (num_blocks + 1));
 
-		if (record == NULL)
+		if (!record_tmp) {
+			free(record);
 			return 1;
+		} else {
+			record = record_tmp;
+		}
 		kvp_file_info[pool].num_blocks++;
 
 	}
