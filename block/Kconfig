@@ -103,6 +103,20 @@ config BLK_DEV_ZONED
 
 	Say yes here if you have a ZAC or ZBC storage device.
 
+config BLK_DEV_SECURE_ERASE
+	bool "Block layer secure erase support (EXPERIMENTAL)"
+	default n
+	---help---
+	With this option set, every discard operation will be prepended by
+	a write operation which overwrites the data with random values.
+	Use this option for a secure deletion of data.
+
+	WARNING:
+	Due to unpredictable circumstances we cannot guarantee you that your
+	data will be irrecoverably deleted in every case.
+	This option also increases the amount of data written to block
+	devices which may reduce their lifetime.
+
 config BLK_DEV_THROTTLING
 	bool "Block layer bio throttling support"
 	depends on BLK_CGROUP=y

@@ -6,6 +6,9 @@
 #include <linux/bio.h>
 #include <linux/blkdev.h>
 #include <linux/scatterlist.h>
+#ifdef CONFIG_BLK_DEV_SECURE_ERASE
+#include <linux/random.h>
+#endif
 
 #include "blk.h"
 
@@ -22,6 +25,60 @@ static struct bio *next_bio(struct bio *bio, unsigned int nr_pages,
 	return new;
 }
 
+/*
+ * __blkdev_secure_erase - erase data queued for discard
+ * @bdev:	blockdev to issue discard for
+ * @sector:	start sector
+ * @nr_sects:	number of sectors to discard
+ * @gfp_mask:	memory allocation flags (for bio_alloc)
+ *
+ * Description:
+ *    Overwrites sectors issued to discard with random data before discarding
+ */
+#ifdef CONFIG_BLK_DEV_SECURE_ERASE
+static unsigned int __blkdev_sectors_to_bio_pages(sector_t nr_sects);
+static void __blkdev_secure_erase(struct block_device *bdev, sector_t sector,
+				  sector_t nr_sects, gfp_t gfp_mask,
+				  struct bio **biop)
+{
+	struct bio *bio = *biop;
+	int bi_size = 0;
+	static struct page *datapage;
+	void *page_cont;
+	static unsigned int count = 1;
+	unsigned int sz;
+
+	if (unlikely(!datapage))
+		datapage = alloc_page(GFP_NOIO);
+
+	if (unlikely(count % 64 == 1)) {
+		page_cont = kmap(datapage);
+		get_random_bytes(page_cont, PAGE_SIZE);
+		kunmap(datapage);
+	}
+	count++;
+
+	while (nr_sects != 0) {
+		bio = next_bio(bio, __blkdev_sectors_to_bio_pages(nr_sects),
+			       gfp_mask);
+		bio->bi_iter.bi_sector = sector;
+		bio_set_dev(bio, bdev);
+		bio_set_op_attrs(bio, REQ_OP_WRITE, 0);
+		bio_set_prio(bio, IOPRIO_PRIO_VALUE(IOPRIO_CLASS_IDLE, 0));
+
+		while (nr_sects != 0) {
+			sz = min((sector_t) PAGE_SIZE, nr_sects << 9);
+			bi_size = bio_add_page(bio, datapage, sz, 0);
+			nr_sects -= bi_size >> 9;
+			sector += bi_size >> 9;
+			if (bi_size < sz)
+				break;
+		}
+		cond_resched();
+	}
+}
+#endif
+
 int __blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 		sector_t nr_sects, gfp_t gfp_mask, int flags,
 		struct bio **biop)
@@ -29,13 +86,14 @@ int __blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 	struct request_queue *q = bdev_get_queue(bdev);
 	struct bio *bio = *biop;
 	unsigned int granularity;
-	unsigned int op;
+	unsigned int op = REQ_OP_DISCARD;
 	int alignment;
 	sector_t bs_mask;
 
 	if (!q)
 		return -ENXIO;
 
+#ifndef CONFIG_BLK_DEV_SECURE_ERASE
 	if (flags & BLKDEV_DISCARD_SECURE) {
 		if (!blk_queue_secure_erase(q))
 			return -EOPNOTSUPP;
@@ -45,6 +103,7 @@ int __blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 			return -EOPNOTSUPP;
 		op = REQ_OP_DISCARD;
 	}
+#endif
 
 	bs_mask = (bdev_logical_block_size(bdev) >> 9) - 1;
 	if ((sector | nr_sects) & bs_mask)
@@ -54,6 +113,31 @@ int __blkdev_issue_discard(struct block_device *bdev, sector_t sector,
 	granularity = max(q->limits.discard_granularity >> 9, 1U);
 	alignment = (bdev_discard_alignment(bdev) >> 9) % granularity;
 
+#ifdef CONFIG_BLK_DEV_SECURE_ERASE
+	if (!(bdev->bd_queue->sec_erase_flags & SECURE_ERASE_FLAG_ACTIVATED))
+		goto skip;
+
+	if (flags & BLKDEV_DISCARD_SECURE) {
+		if (blk_queue_secure_erase(q)) {
+			op = REQ_OP_SECURE_ERASE;
+			goto skip;
+		}
+	}
+
+	__blkdev_secure_erase(bdev, sector, nr_sects, gfp_mask, &bio);
+
+	/*
+	 * If the device originally did not support
+	 * discards it should not finish this function
+	 */
+	if (!(bdev->bd_queue->sec_erase_flags &
+	      SECURE_ERASE_FLAG_DISCARD_CAPABLE)) {
+		*biop = bio;
+		return 0;
+	}
+
+skip:
+#endif
 	while (nr_sects) {
 		unsigned int req_sects;
 		sector_t end_sect, tmp;

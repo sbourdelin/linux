@@ -1070,6 +1070,14 @@ struct dentry *mount_bdev(struct file_system_type *fs_type,
 	struct super_block *s;
 	fmode_t mode = FMODE_READ | FMODE_EXCL;
 	int error = 0;
+#ifdef CONFIG_BLK_DEV_SECURE_ERASE
+	struct request_queue *q;
+	int option_length;
+	char *data_string = data;
+	char *option_string = data;
+	char *se_opt = "sw_secure_erase";
+	int se_opt_len = strlen(se_opt);
+#endif
 
 	if (!(flags & MS_RDONLY))
 		mode |= FMODE_WRITE;
@@ -1077,6 +1085,46 @@ struct dentry *mount_bdev(struct file_system_type *fs_type,
 	bdev = blkdev_get_by_path(dev_name, mode, fs_type);
 	if (IS_ERR(bdev))
 		return ERR_CAST(bdev);
+
+#ifdef CONFIG_BLK_DEV_SECURE_ERASE
+	q = bdev->bd_queue;
+	if (option_string == NULL || (flags & MS_RDONLY))
+		goto skip;
+	option_string = strstr(option_string, se_opt);
+	if (option_string) {
+		if (blk_queue_discard(q))
+			q->sec_erase_flags |= SECURE_ERASE_FLAG_DISCARD_CAPABLE;
+		else
+			__set_bit(QUEUE_FLAG_DISCARD, &q->queue_flags);
+
+		q->sec_erase_flags |= SECURE_ERASE_FLAG_ACTIVATED;
+		option_length = strlen(option_string);
+		if (option_string != data_string) {
+			if (option_string[se_opt_len] == '\0') {
+				*(option_string-1) = '\0';
+			} else {
+				memmove(option_string,
+					&option_string[se_opt_len+1],
+					strlen(&option_string[se_opt_len+1])+1);
+			}
+		} else { /* first or only option */
+			if (option_string[se_opt_len] == ',')
+				data = &option_string[se_opt_len+1];
+			else if (option_string[se_opt_len] == '\0')
+				data = NULL;
+		}
+	}
+	if (strcmp(fs_type->name, "ext4") != 0 &&
+	    strcmp(fs_type->name, "btrfs") != 0 &&
+	    strcmp(fs_type->name, "gfs2") != 0 &&
+	    strcmp(fs_type->name, "gfs2meta") != 0 &&
+	    strcmp(fs_type->name, "xfs") != 0 &&
+	    strcmp(fs_type->name, "jfs") != 0) {
+		pr_warn("fs: The mounted %s filesystem on drive %s does not generate discards, secure erase won't work",
+				fs_type->name, dev_name);
+	}
+skip:
+#endif
 
 	/*
 	 * once the super is inserted into the list by sget, s_umount
@@ -1147,6 +1195,17 @@ void kill_block_super(struct super_block *sb)
 	sync_blockdev(bdev);
 	WARN_ON_ONCE(!(mode & FMODE_EXCL));
 	blkdev_put(bdev, mode | FMODE_EXCL);
+#ifdef CONFIG_BLK_DEV_SECURE_ERASE
+	if (bdev->bd_queue->sec_erase_flags & SECURE_ERASE_FLAG_ACTIVATED) {
+		if (!(bdev->bd_queue->sec_erase_flags &
+		      SECURE_ERASE_FLAG_DISCARD_CAPABLE)) {
+			WARN_ON(!blk_queue_discard(bdev->bd_queue));
+			bdev->bd_queue->queue_flags ^=
+						    (1 << QUEUE_FLAG_DISCARD);
+		}
+		bdev->bd_queue->sec_erase_flags = 0;
+	}
+#endif
 }
 
 EXPORT_SYMBOL(kill_block_super);

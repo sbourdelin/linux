@@ -596,6 +596,14 @@ struct request_queue {
 
 	struct work_struct	release_work;
 
+/*
+ * These flags are needed for the software implemented version
+ * of the secure erase functionality
+ */
+#ifdef CONFIG_BLK_DEV_SECURE_ERASE
+	unsigned char		sec_erase_flags;
+#endif
+
 #define BLK_MAX_WRITE_HINTS	5
 	u64			write_hints[BLK_MAX_WRITE_HINTS];
 };
@@ -642,6 +650,12 @@ struct request_queue {
 				 (1 << QUEUE_FLAG_STACKABLE)	|	\
 				 (1 << QUEUE_FLAG_SAME_COMP)	|	\
 				 (1 << QUEUE_FLAG_POLL))
+
+/* Needed for the secure erase functionality */
+#ifdef CONFIG_BLK_DEV_SECURE_ERASE
+#define SECURE_ERASE_FLAG_DISCARD_CAPABLE	1
+#define SECURE_ERASE_FLAG_ACTIVATED		2
+#endif
 
 /*
  * @q->queue_lock is set while a queue is being initialized. Since we know
