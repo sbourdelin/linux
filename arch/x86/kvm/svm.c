@@ -1078,10 +1078,8 @@ static __init int svm_hardware_setup(void)
 		kvm_tsc_scaling_ratio_frac_bits = 32;
 	}
 
-	if (nested) {
-		printk(KERN_INFO "kvm: Nested Virtualization enabled\n");
+	if (nested)
 		kvm_enable_efer_bits(EFER_SVME | EFER_LMSLE);
-	}
 
 	for_each_possible_cpu(cpu) {
 		r = svm_cpu_init(cpu);
@@ -1089,48 +1087,32 @@ static __init int svm_hardware_setup(void)
 			goto err;
 	}
 
-	if (!boot_cpu_has(X86_FEATURE_NPT))
+	if (!boot_cpu_has(X86_FEATURE_NPT) || !npt)
 		npt_enabled = false;
 
-	if (npt_enabled && !npt) {
-		printk(KERN_INFO "kvm: Nested Paging disabled\n");
-		npt_enabled = false;
-	}
-
-	if (npt_enabled) {
-		printk(KERN_INFO "kvm: Nested Paging enabled\n");
+	if (npt_enabled)
 		kvm_enable_tdp();
-	} else
+	else
 		kvm_disable_tdp();
 
-	if (avic) {
-		if (!npt_enabled ||
-		    !boot_cpu_has(X86_FEATURE_AVIC) ||
-		    !IS_ENABLED(CONFIG_X86_LOCAL_APIC)) {
-			avic = false;
-		} else {
-			pr_info("AVIC enabled\n");
+	if (!npt_enabled ||
+	    !boot_cpu_has(X86_FEATURE_AVIC) ||
+	    !IS_ENABLED(CONFIG_X86_LOCAL_APIC))
+		avic = false;
 
-			amd_iommu_register_ga_log_notifier(&avic_ga_log_notifier);
-		}
-	}
+	if (avic)
+		amd_iommu_register_ga_log_notifier(&avic_ga_log_notifier);
 
-	if (vls) {
-		if (!npt_enabled ||
-		    !boot_cpu_has(X86_FEATURE_V_VMSAVE_VMLOAD) ||
-		    !IS_ENABLED(CONFIG_X86_64)) {
-			vls = false;
-		} else {
-			pr_info("Virtual VMLOAD VMSAVE supported\n");
-		}
-	}
+	if (!npt_enabled ||
+	    !boot_cpu_has(X86_FEATURE_V_VMSAVE_VMLOAD) ||
+	    !IS_ENABLED(CONFIG_X86_64))
+		vls = false;
 
-	if (vgif) {
-		if (!boot_cpu_has(X86_FEATURE_VGIF))
-			vgif = false;
-		else
-			pr_info("Virtual GIF supported\n");
-	}
+	if (!boot_cpu_has(X86_FEATURE_VGIF))
+		vgif = false;
+
+	pr_info("SVM nested=%d npt=%d avic=%d vls=%d vgif=%d\n",
+			nested, npt_enabled, avic, vls, vgif);
 
 	return 0;
 
