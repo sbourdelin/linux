@@ -960,6 +960,8 @@ int main(int argc, const char *argv[])
 		output = fopen(option_output, "w");
 		if (output == NULL) {
 			fprintf(stderr, "Could not open %s, %m\n", option_output);
+			if (input)
+				fclose(input);
 			return -1;
 		}
 	}
