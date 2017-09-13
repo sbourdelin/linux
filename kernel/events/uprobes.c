@@ -1754,6 +1754,13 @@ static struct uprobe *find_active_uprobe(unsigned long bp_vaddr, int *is_swbp)
 			uprobe = find_uprobe(inode, offset);
 		}
 
+		/* Ensure that the breakpoint was actually installed */
+		if (uprobe) {
+			smp_rmb(); /* pairs with wmb() in prepare_uprobe() */
+			if (unlikely(!test_bit(UPROBE_COPY_INSN, &uprobe->flags)))
+				uprobe = NULL;
+		}
+
 		if (!uprobe)
 			*is_swbp = is_trap_at_addr(mm, bp_vaddr);
 	} else {
