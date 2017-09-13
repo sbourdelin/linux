@@ -86,9 +86,12 @@ Translation table lookup with 64KB pages:
  +-------------------------------------------------> [63] TTBR0/1
 
 
-When using KVM, the hypervisor maps kernel pages in EL2, at a fixed
-offset from the kernel VA (top 24bits of the kernel VA set to zero):
+When using KVM without Virtualization Host Extensions, the hypervisor maps
+kernel pages in EL2, at a fixed offset from the kernel VA. Namely, top 16
+or 25 bits of the kernel VA set to zero depending on ARM64_VA_BITS_48 or
+ARM64_VA_BITS_39 config option selected; or top 17 or 26 bits of the kernel
+VA set to zero if CPU has Reduced HYP mapping offset capability. See
+kern_hyp_va macro.
 
-Start			End			Size		Use
------------------------------------------------------------------------
-0000004000000000	0000007fffffffff	 256GB		kernel objects mapped in HYP
+When using KVM with Virtualization Host Extensions, no additional mappings
+created as host kernel already operates in EL2.
