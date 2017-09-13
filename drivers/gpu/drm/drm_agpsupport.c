@@ -70,7 +70,6 @@ int drm_agp_info(struct drm_device *dev, struct drm_agp_info *info)
 
 	return 0;
 }
-
 EXPORT_SYMBOL(drm_agp_info);
 
 int drm_agp_info_ioctl(struct drm_device *dev, void *data,
@@ -106,7 +105,6 @@ int drm_agp_acquire(struct drm_device * dev)
 	dev->agp->acquired = 1;
 	return 0;
 }
-
 EXPORT_SYMBOL(drm_agp_acquire);
 
 /**
@@ -171,7 +169,6 @@ int drm_agp_enable(struct drm_device * dev, struct drm_agp_mode mode)
 	dev->agp->enabled = 1;
 	return 0;
 }
-
 EXPORT_SYMBOL(drm_agp_enable);
 
 int drm_agp_enable_ioctl(struct drm_device *dev, void *data,
@@ -371,7 +368,6 @@ int drm_agp_free(struct drm_device *dev, struct drm_agp_buffer *request)
 	return 0;
 }
 EXPORT_SYMBOL(drm_agp_free);
-
 
 
 int drm_agp_free_ioctl(struct drm_device *dev, void *data,
