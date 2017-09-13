@@ -2,7 +2,6 @@
  * Copyright 2012 IBM Corporation
  *
  * Author: Ashley Lai <ashleydlai@gmail.com>
- *         Nayna Jain <nayna@linux.vnet.ibm.com>
  *
  * Maintained by: <tpmdd-devel@lists.sourceforge.net>
  *
