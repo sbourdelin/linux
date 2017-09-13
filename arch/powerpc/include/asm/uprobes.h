@@ -23,6 +23,7 @@
  */
 
 #include <linux/notifier.h>
+#include <asm/siginfo.h>
 #include <asm/probes.h>
 
 typedef ppc_opcode_t uprobe_opcode_t;
@@ -44,5 +45,11 @@ struct arch_uprobe {
 struct arch_uprobe_task {
 	unsigned long	saved_trap_nr;
 };
+
+#ifdef CONFIG_UPROBES
+extern void uprobe_fixup_exception(struct pt_regs *regs, siginfo_t *info);
+#else
+static inline void uprobe_fixup_exception(struct pt_regs *regs, siginfo_t *info) { }
+#endif
 
 #endif	/* _ASM_UPROBES_H */

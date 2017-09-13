@@ -25,6 +25,7 @@
 #include <linux/uprobes.h>
 #include <linux/uaccess.h>
 #include <linux/kdebug.h>
+#include <linux/signal.h>
 
 #include <asm/sstep.h>
 
@@ -213,4 +214,20 @@ bool arch_uretprobe_is_alive(struct return_instance *ret, enum rp_check ctx,
 		return regs->gpr[1] <= ret->stack;
 	else
 		return regs->gpr[1] < ret->stack;
+}
+
+void uprobe_fixup_exception(struct pt_regs *regs, siginfo_t *info)
+{
+	struct task_struct *t = current;
+	struct uprobe_task *utask = t->utask;
+
+	if (likely(!utask || !utask->active_uprobe))
+		return;
+
+	/*
+	 * We reset si_addr here.
+	 * regs->nip is reset during our way back through uprobe_deny_signal()
+	 */
+	if (info->si_addr == (void __user *) utask->xol_vaddr)
+		info->si_addr = (void __user *) utask->vaddr;
 }
