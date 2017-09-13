@@ -2918,7 +2918,7 @@ int btrfsic_mount(struct btrfs_fs_info *fs_info,
 	state = kvzalloc(sizeof(*state), GFP_KERNEL);
 	if (!state) {
 		pr_info("btrfs check-integrity: allocation failed!\n");
-		return -1;
+		return -ENOMEM;
 	}
 
 	if (!btrfsic_is_initialized) {
