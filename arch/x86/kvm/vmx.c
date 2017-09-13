@@ -11644,10 +11644,26 @@ static void vmx_setup_mce(struct kvm_vcpu *vcpu)
 static int vmx_prep_enter_smm(struct kvm_vcpu *vcpu, char *smstate)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	struct vmcs12 *vmcs12;
 
 	vmx->nested.smm.guest_mode = is_guest_mode(vcpu);
-	if (vmx->nested.smm.guest_mode)
+	if (vmx->nested.smm.guest_mode) {
+		vmcs12 = get_vmcs12(vcpu);
+		if (nested_cpu_has_ept(vmcs12)) {
+			/*
+			 * 34.14.1 Default Treatment of SMI Delivery
+			 * Bit 0 of the 32-bit field at offset SMBASE + 8000H + 7EE0H
+			 * indicates whether the cpu was in VMX non-root operation with
+			 * EPT enabled.
+			 * The 64-bit field at offset SMBASE + 8000H + 7ED8H holds the
+			 * value of the EPT pointer.
+			 */
+			put_smstate(u32, smstate, 0x7ee0,
+				    get_smstate(u32, smstate, 0x7ee0) | 1);
+			put_smstate(u64, smstate, 0x7ed8, vmcs12->ept_pointer);
+		}
 		nested_vmx_vmexit(vcpu, -1, 0, 0);
+	}
 
 	vmx->nested.smm.vmxon = vmx->nested.vmxon;
 	vmx->nested.vmxon = false;
