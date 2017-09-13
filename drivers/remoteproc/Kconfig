@@ -87,6 +87,7 @@ config QCOM_ADSP_PIL
 	select QCOM_MDT_LOADER
 	select QCOM_RPROC_COMMON
 	select QCOM_SCM
+	select QCOM_SMP2P
 	help
 	  Say y here to support the TrustZone based Peripherial Image Loader
 	  for the Qualcomm ADSP remote processors.
@@ -102,6 +103,7 @@ config QCOM_Q6V5_PIL
 	select MFD_SYSCON
 	select QCOM_RPROC_COMMON
 	select QCOM_SCM
+	select QCOM_SMP2P
 	help
 	  Say y here to support the Qualcomm Peripherial Image Loader for the
 	  Hexagon V5 based remote processors.
@@ -114,6 +116,7 @@ config QCOM_WCNSS_PIL
 	select QCOM_MDT_LOADER
 	select QCOM_RPROC_COMMON
 	select QCOM_SCM
+	select QCOM_SMP2P
 	help
 	  Say y here to support the Peripheral Image Loader for the Qualcomm
 	  Wireless Connectivity Subsystem.
