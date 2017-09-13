@@ -481,6 +481,14 @@ struct nested_vmx {
 	u64 nested_vmx_cr4_fixed0;
 	u64 nested_vmx_cr4_fixed1;
 	u64 nested_vmx_vmcs_enum;
+
+	/* SMM related state */
+	struct {
+		/* in VMX operation on SMM entry? */
+		bool vmxon;
+		/* in guest mode on SMM entry? */
+		bool guest_mode;
+	} smm;
 };
 
 #define POSTED_INTR_ON  0
@@ -11112,8 +11120,11 @@ static void nested_vmx_vmexit(struct kvm_vcpu *vcpu, u32 exit_reason,
 	WARN_ON_ONCE(vmx->nested.nested_run_pending);
 
 	leave_guest_mode(vcpu);
-	prepare_vmcs12(vcpu, vmcs12, exit_reason, exit_intr_info,
-		       exit_qualification);
+	if (exit_reason == -1)
+		sync_vmcs12(vcpu, vmcs12);
+	else
+		prepare_vmcs12(vcpu, vmcs12, exit_reason, exit_intr_info,
+			       exit_qualification);
 
 	if (nested_vmx_store_msr(vcpu, vmcs12->vm_exit_msr_store_addr,
 				 vmcs12->vm_exit_msr_store_count))
@@ -11139,12 +11150,13 @@ static void nested_vmx_vmexit(struct kvm_vcpu *vcpu, u32 exit_reason,
 			INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR;
 	}
 
-	trace_kvm_nested_vmexit_inject(vmcs12->vm_exit_reason,
-				       vmcs12->exit_qualification,
-				       vmcs12->idt_vectoring_info_field,
-				       vmcs12->vm_exit_intr_info,
-				       vmcs12->vm_exit_intr_error_code,
-				       KVM_ISA_VMX);
+	if (exit_reason != -1)
+		trace_kvm_nested_vmexit_inject(vmcs12->vm_exit_reason,
+					       vmcs12->exit_qualification,
+					       vmcs12->idt_vectoring_info_field,
+					       vmcs12->vm_exit_intr_info,
+					       vmcs12->vm_exit_intr_error_code,
+					       KVM_ISA_VMX);
 
 	vm_entry_controls_reset_shadow(vmx);
 	vm_exit_controls_reset_shadow(vmx);
@@ -11214,7 +11226,7 @@ static void nested_vmx_vmexit(struct kvm_vcpu *vcpu, u32 exit_reason,
 		nested_vmx_failValid(vcpu, vm_inst_error);
 	} else
 		nested_vmx_succeed(vcpu);
-	if (enable_shadow_vmcs)
+	if (enable_shadow_vmcs && exit_reason != -1)
 		vmx->nested.sync_shadow_vmcs = true;
 
 	/* in case we halted in L2 */
@@ -11631,13 +11643,34 @@ static void vmx_setup_mce(struct kvm_vcpu *vcpu)
 
 static int vmx_prep_enter_smm(struct kvm_vcpu *vcpu, char *smstate)
 {
-	/* TODO: Implement */
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	vmx->nested.smm.guest_mode = is_guest_mode(vcpu);
+	if (vmx->nested.smm.guest_mode)
+		nested_vmx_vmexit(vcpu, -1, 0, 0);
+
+	vmx->nested.smm.vmxon = vmx->nested.vmxon;
+	vmx->nested.vmxon = false;
 	return 0;
 }
 
 static int vmx_post_leave_smm(struct kvm_vcpu *vcpu)
 {
-	/* TODO: Implement */
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	int ret;
+
+	if (vmx->nested.smm.vmxon) {
+		vmx->nested.vmxon = true;
+		vmx->nested.smm.vmxon = false;
+	}
+
+	if (vmx->nested.smm.guest_mode) {
+		ret = enter_vmx_non_root_mode(vcpu, false);
+		if (ret)
+			return ret;
+
+		vmx->nested.smm.guest_mode = false;
+	}
 	return 0;
 }
 
