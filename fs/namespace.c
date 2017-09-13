@@ -21,6 +21,7 @@
 #include <linux/fs_struct.h>	/* get_fs_root et.al. */
 #include <linux/fsnotify.h>	/* fsnotify_vfsmount_delete */
 #include <linux/uaccess.h>
+#include <linux/file.h>
 #include <linux/proc_ns.h>
 #include <linux/magic.h>
 #include <linux/bootmem.h>
@@ -1629,7 +1630,8 @@ SYSCALL_DEFINE2(umount, char __user *, name, int, flags)
 	int retval;
 	int lookup_flags = 0;
 
-	if (flags & ~(MNT_FORCE | MNT_DETACH | MNT_EXPIRE | UMOUNT_NOFOLLOW))
+	if (flags & ~(MNT_FORCE | MNT_DETACH | MNT_EXPIRE | UMOUNT_NOFOLLOW |
+			UMOUNT_WAIT))
 		return -EINVAL;
 
 	if (!may_mount())
@@ -1652,12 +1654,20 @@ SYSCALL_DEFINE2(umount, char __user *, name, int, flags)
 	retval = -EPERM;
 	if (flags & MNT_FORCE && !capable(CAP_SYS_ADMIN))
 		goto dput_and_out;
+	if (flags & UMOUNT_WAIT)
+		flush_delayed_fput();
 
 	retval = do_umount(mnt, flags);
 dput_and_out:
 	/* we mustn't call path_put() as that would clear mnt_expiry_mark */
 	dput(path.dentry);
 	mntput_no_expire(mnt);
+	if (!retval && (flags & UMOUNT_WAIT)) {
+		if (likely(!(current->flags & PF_KTHREAD)))
+			task_work_run();
+		else
+			flush_scheduled_work();
+	}
 out:
 	return retval;
 }
