@@ -227,7 +227,7 @@ static int stm32_qspi_tx_poll(struct stm32_qspi *qspi,
 	void (*tx_fifo)(u8 *, void __iomem *);
 	u32 len = cmd->len, sr;
 	u8 *buf = cmd->buf;
-	int ret;
+	int ret = -EINVAL;
 
 	if (cmd->qspimode == CCR_FMODE_INDW)
 		tx_fifo = stm32_qspi_write_fifo;
