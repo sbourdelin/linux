@@ -654,6 +654,12 @@ static void iwl_mvm_mac_ctxt_cmd_common(struct iwl_mvm *mvm,
 
 	cmd->filter_flags = cpu_to_le32(MAC_FILTER_ACCEPT_GRP);
 
+	if (mvm->hw->conf.flags & IEEE80211_CONF_MONITOR)
+		cmd->filter_flags |= cpu_to_le32(MAC_FILTER_IN_PROMISC |
+						 MAC_FILTER_IN_CONTROL_AND_MGMT |
+						 MAC_FILTER_IN_BEACON |
+						 MAC_FILTER_IN_PROBE_REQUEST);
+
 	for (i = 0; i < IEEE80211_NUM_ACS; i++) {
 		u8 txf = iwl_mvm_mac_ac_to_tx_fifo(mvm, i);
 

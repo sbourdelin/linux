@@ -1530,8 +1530,23 @@ out_release:
 	mutex_unlock(&mvm->mutex);
 }
 
+static void iwl_mvm_monitor_changed_iterator(void *_mvm, u8 *mac, struct ieee80211_vif *vif)
+{
+	struct iwl_mvm *mvm = _mvm;
+	iwl_mvm_mac_ctxt_changed(mvm, vif, false, NULL);
+}
+
 static int iwl_mvm_mac_config(struct ieee80211_hw *hw, u32 changed)
 {
+	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
+
+	if (changed & IEEE80211_CONF_CHANGE_MONITOR) {
+		mutex_lock(&mvm->mutex);
+		ieee80211_iterate_active_interfaces(hw, IEEE80211_IFACE_ITER_NORMAL,
+				iwl_mvm_monitor_changed_iterator, mvm);
+		mutex_unlock(&mvm->mutex);
+	}
+
 	return 0;
 }
 
