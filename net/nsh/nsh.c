@@ -14,6 +14,59 @@
 #include <net/nsh.h>
 #include <net/tun_proto.h>
 
+int skb_push_nsh(struct sk_buff *skb, const struct nshhdr *src_nsh_hdr)
+{
+	struct nshhdr *nsh_hdr;
+	size_t length = nsh_hdr_len(src_nsh_hdr);
+	u8 next_proto;
+
+	if (skb->mac_len) {
+		next_proto = TUN_P_ETHERNET;
+	} else {
+		next_proto = tun_p_from_eth_p(skb->protocol);
+		if (!next_proto)
+			return -EAFNOSUPPORT;
+	}
+
+	/* Add the NSH header */
+	if (skb_cow_head(skb, length) < 0)
+		return -ENOMEM;
+
+	skb_push(skb, length);
+	nsh_hdr = (struct nshhdr *)(skb->data);
+	memcpy(nsh_hdr, src_nsh_hdr, length);
+	nsh_hdr->np = next_proto;
+
+	skb->protocol = htons(ETH_P_NSH);
+	skb_reset_mac_header(skb);
+	skb_reset_mac_len(skb);
+	skb_reset_network_header(skb);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(skb_push_nsh);
+
+int skb_pop_nsh(struct sk_buff *skb)
+{
+	struct nshhdr *nsh_hdr = (struct nshhdr *)(skb->data);
+	size_t length;
+	u16 inner_proto;
+
+	inner_proto = tun_p_to_eth_p(nsh_hdr->np);
+	if (!inner_proto)
+		return -EAFNOSUPPORT;
+
+	length = nsh_hdr_len(nsh_hdr);
+	skb_pull(skb, length);
+	skb_reset_mac_header(skb);
+	skb_reset_mac_len(skb);
+	skb_reset_network_header(skb);
+	skb->protocol = inner_proto;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(skb_pop_nsh);
+
 static struct sk_buff *nsh_gso_segment(struct sk_buff *skb,
 				       netdev_features_t features)
 {
