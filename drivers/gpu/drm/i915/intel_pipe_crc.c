@@ -208,7 +208,7 @@ static int display_crc_ctl_show(struct seq_file *m, void *data)
 	struct drm_i915_private *dev_priv = m->private;
 	int i;
 
-	for (i = 0; i < I915_MAX_PIPES; i++)
+	for_each_pipe(dev_priv, i)
 		seq_printf(m, "%c %s\n", pipe_name(i),
 			   pipe_crc_source_name(dev_priv->pipe_crc[i].source));
 
