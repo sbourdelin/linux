@@ -4745,16 +4745,18 @@ static inline bool skl_ddb_entries_overlap(const struct skl_ddb_entry *a,
 	return a->start < b->end && b->start < a->end;
 }
 
-bool skl_ddb_allocation_overlaps(const struct skl_ddb_entry **entries,
+bool skl_ddb_allocation_overlaps(struct drm_i915_private *dev_priv,
+				 const struct skl_ddb_entry **entries,
 				 const struct skl_ddb_entry *ddb,
 				 int ignore)
 {
 	int i;
 
-	for (i = 0; i < I915_MAX_PIPES; i++)
+	for_each_pipe(dev_priv, i) {
 		if (i != ignore && entries[i] &&
 		    skl_ddb_entries_overlap(ddb, entries[i]))
 			return true;
+	}
 
 	return false;
 }
