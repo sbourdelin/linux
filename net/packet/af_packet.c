@@ -363,10 +363,12 @@ static void __unregister_prot_hook(struct sock *sk, bool sync)
 
 	po->running = 0;
 
+	mutex_lock(&fanout_mutex);
 	if (po->fanout)
 		__fanout_unlink(sk, po);
 	else
 		__dev_remove_pack(&po->prot_hook);
+	mutex_unlock(&fanout_mutex);
 
 	__sock_put(sk);
 
