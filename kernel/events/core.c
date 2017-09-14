@@ -662,7 +662,9 @@ static inline void update_cgrp_time_from_event(struct perf_event *event)
 	/*
 	 * Do not update time when cgroup is not active
 	 */
-	if (cgrp == event->cgrp)
+	if (cgrp == event->cgrp ||
+		cgroup_is_descendant(cgrp->css.cgroup,
+			event->cgrp->css.cgroup))
 		__update_cgrp_time(event->cgrp);
 }
 
