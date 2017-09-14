@@ -48,6 +48,7 @@
 #include <linux/mutex.h>
 #include <linux/poll.h>
 #include <linux/vmalloc.h>
+#include <linux/kmemleak.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
@@ -4512,7 +4513,9 @@ megasas_alloc_fusion_context(struct megasas_instance *instance)
 			dev_err(&instance->pdev->dev, "Failed from %s %d\n", __func__, __LINE__);
 			return -ENOMEM;
 		}
-	}
+	} else
+		kmemleak_alloc(instance->ctrl_context,
+			sizeof(struct fusion_context), 1, GFP_KERNEL);
 
 	fusion = instance->ctrl_context;
 
@@ -4548,9 +4551,11 @@ megasas_free_fusion_context(struct megasas_instance *instance)
 
 		if (is_vmalloc_addr(fusion))
 			vfree(fusion);
-		else
+		else {
 			free_pages((ulong)fusion,
 				instance->ctrl_context_pages);
+			kmemleak_free(fusion);
+		}
 	}
 }
 
