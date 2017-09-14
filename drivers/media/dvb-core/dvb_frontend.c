@@ -1914,6 +1914,192 @@ static int dtv_property_process_set(struct dvb_frontend *fe,
 	return r;
 }
 
+/**
+ * dtv_property_short_process_set
+ * @fe: Pointer to struct dvb_frontend
+ * @tvp: Pointer to struct dtv_property_short
+ * @file: Pointer to struct file
+ *
+ * helper function for dvb_frontend_ioctl_properties,
+ * which can be used to set dtv property using ioctl
+ * cmd FE_SET_PROPERTY_SHORT.
+ * It assigns property value to corresponding member of
+ * property-cache structure
+ * This func is a variant of the func dtv_property_process_set
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+static int dtv_property_short_process_set(struct dvb_frontend *fe,
+				    struct dtv_property_short *tvp,
+				    struct file *file)
+{
+	int r = 0;
+	struct dtv_frontend_properties *c = &fe->dtv_property_cache;
+	/* Currently, We do not allow the frontend to validate incoming
+	 * properties, currently, just 2 drivers are using
+	 * ops.set_property method , If required, we can define new
+	 * ops.set_property_short method for this purpose
+	 */
+	switch (tvp->cmd) {
+	case DTV_CLEAR:
+		/*
+		 * Reset a cache of data specific to the frontend here. This
+		 * does not effect hardware.
+		 */
+		dvb_frontend_clear_cache(fe);
+		break;
+	case DTV_TUNE:
+		/* interpret the cache of data, build either a traditional
+		 * frontend tune request so we can pass validation in the
+		 * FE_SET_FRONTEND  ioctl.
+		 */
+		c->state = tvp->cmd;
+		dev_dbg(fe->dvb->device, "%s: Finalised property cache\n",
+				__func__);
+
+		r = dtv_set_frontend(fe);
+		break;
+	case DTV_FREQUENCY:
+		c->frequency = tvp->data;
+		break;
+	case DTV_MODULATION:
+		c->modulation = tvp->data;
+		break;
+	case DTV_BANDWIDTH_HZ:
+		c->bandwidth_hz = tvp->data;
+		break;
+	case DTV_INVERSION:
+		c->inversion = tvp->data;
+		break;
+	case DTV_SYMBOL_RATE:
+		c->symbol_rate = tvp->data;
+		break;
+	case DTV_INNER_FEC:
+		c->fec_inner = tvp->data;
+		break;
+	case DTV_PILOT:
+		c->pilot = tvp->data;
+		break;
+	case DTV_ROLLOFF:
+		c->rolloff = tvp->data;
+		break;
+	case DTV_DELIVERY_SYSTEM:
+		r = dvbv5_set_delivery_system(fe, tvp->data);
+		break;
+	case DTV_VOLTAGE:
+		c->voltage = tvp->data;
+		r = dvb_frontend_ioctl_legacy(file, FE_SET_VOLTAGE,
+			(void *)c->voltage);
+		break;
+	case DTV_TONE:
+		c->sectone = tvp->data;
+		r = dvb_frontend_ioctl_legacy(file, FE_SET_TONE,
+			(void *)c->sectone);
+		break;
+	case DTV_CODE_RATE_HP:
+		c->code_rate_HP = tvp->data;
+		break;
+	case DTV_CODE_RATE_LP:
+		c->code_rate_LP = tvp->data;
+		break;
+	case DTV_GUARD_INTERVAL:
+		c->guard_interval = tvp->data;
+		break;
+	case DTV_TRANSMISSION_MODE:
+		c->transmission_mode = tvp->data;
+		break;
+	case DTV_HIERARCHY:
+		c->hierarchy = tvp->data;
+		break;
+	case DTV_INTERLEAVING:
+		c->interleaving = tvp->data;
+		break;
+
+	/* ISDB-T Support here */
+	case DTV_ISDBT_PARTIAL_RECEPTION:
+		c->isdbt_partial_reception = tvp->data;
+		break;
+	case DTV_ISDBT_SOUND_BROADCASTING:
+		c->isdbt_sb_mode = tvp->data;
+		break;
+	case DTV_ISDBT_SB_SUBCHANNEL_ID:
+		c->isdbt_sb_subchannel = tvp->data;
+		break;
+	case DTV_ISDBT_SB_SEGMENT_IDX:
+		c->isdbt_sb_segment_idx = tvp->data;
+		break;
+	case DTV_ISDBT_SB_SEGMENT_COUNT:
+		c->isdbt_sb_segment_count = tvp->data;
+		break;
+	case DTV_ISDBT_LAYER_ENABLED:
+		c->isdbt_layer_enabled = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERA_FEC:
+		c->layer[0].fec = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERA_MODULATION:
+		c->layer[0].modulation = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERA_SEGMENT_COUNT:
+		c->layer[0].segment_count = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERA_TIME_INTERLEAVING:
+		c->layer[0].interleaving = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERB_FEC:
+		c->layer[1].fec = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERB_MODULATION:
+		c->layer[1].modulation = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERB_SEGMENT_COUNT:
+		c->layer[1].segment_count = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERB_TIME_INTERLEAVING:
+		c->layer[1].interleaving = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERC_FEC:
+		c->layer[2].fec = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERC_MODULATION:
+		c->layer[2].modulation = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERC_SEGMENT_COUNT:
+		c->layer[2].segment_count = tvp->data;
+		break;
+	case DTV_ISDBT_LAYERC_TIME_INTERLEAVING:
+		c->layer[2].interleaving = tvp->data;
+		break;
+
+	/* Multistream support */
+	case DTV_STREAM_ID:
+	case DTV_DVBT2_PLP_ID_LEGACY:
+		c->stream_id = tvp->data;
+		break;
+
+	/* ATSC-MH */
+	case DTV_ATSCMH_PARADE_ID:
+		fe->dtv_property_cache.atscmh_parade_id = tvp->data;
+		break;
+	case DTV_ATSCMH_RS_FRAME_ENSEMBLE:
+		fe->dtv_property_cache.atscmh_rs_frame_ensemble = tvp->data;
+		break;
+
+	case DTV_LNA:
+		c->lna = tvp->data;
+		if (fe->ops.set_lna)
+			r = fe->ops.set_lna(fe);
+		if (r < 0)
+			c->lna = LNA_AUTO;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return r;
+}
+
 static int dvb_frontend_ioctl(struct file *file,
 			unsigned int cmd, void *parg)
 {
@@ -1939,7 +2125,8 @@ static int dvb_frontend_ioctl(struct file *file,
 		return -EPERM;
 	}
 
-	if ((cmd == FE_SET_PROPERTY) || (cmd == FE_GET_PROPERTY))
+	if ((cmd == FE_SET_PROPERTY) || (cmd == FE_GET_PROPERTY)
+		|| (cmd == FE_SET_PROPERTY_SHORT))
 		err = dvb_frontend_ioctl_properties(file, cmd, parg);
 	else {
 		c->state = DTV_UNDEFINED;
@@ -2026,9 +2213,42 @@ static int dvb_frontend_ioctl_properties(struct file *file,
 			err = -EFAULT;
 			goto out;
 		}
+	/* New ioctl for optimizing property set
+	 */
+	} else if (cmd == FE_SET_PROPERTY_SHORT) {
+		struct dtv_property_short *tvp_short = NULL;
+		struct dtv_properties_short *tvps_short = parg;
 
-	} else
-		err = -EOPNOTSUPP;
+		dev_dbg(fe->dvb->device, "%s: properties.num = %d\n", \
+		__func__, tvps_short->num);
+		dev_dbg(fe->dvb->device, "%s: properties.props = %p\n", \
+		__func__, tvps_short->props);
+		if ((!tvps_short->num) ||
+		(tvps_short->num > DTV_IOCTL_MAX_MSGS))
+			return -EINVAL;
+		tvp_short = memdup_user(tvps_short->props,
+		tvps_short->num * sizeof(*tvp_short));
+		if (IS_ERR(tvp_short))
+			return PTR_ERR(tvp_short);
+		for (i = 0; i < tvps_short->num; i++) {
+			err = dtv_property_short_process_set(fe, tvp_short + i,\
+				file);
+			if (err < 0) {
+				kfree(tvp_short);
+				return err;
+			}
+			/* Since we are returning when error occurs
+			 * There is no need to store the result as it
+			 * would have been >=0 in case we didn't return
+			 * (tvp + i)->result = err;
+			 */
+		}
+		if (c->state == DTV_TUNE)
+			dev_dbg(fe->dvb->device, "%s: Property cache\
+		is full, tuning\n", __func__);
+		kfree(tvp_short);
+		} else
+			err = -EOPNOTSUPP;
 
 out:
 	kfree(tvp);
