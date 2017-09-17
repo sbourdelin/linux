@@ -206,7 +206,7 @@ static int tda18212_probe(struct i2c_client *client,
 		goto report_failure;
 	}
 
-	memcpy(&dev->cfg, cfg, sizeof(struct tda18212_config));
+	memcpy(&dev->cfg, cfg, sizeof(*cfg));
 	dev->client = client;
 	dev->regmap = devm_regmap_init_i2c(client, &regmap_config);
 	if (IS_ERR(dev->regmap)) {
@@ -244,7 +244,7 @@ static int tda18212_probe(struct i2c_client *client,
 
 	fe->tuner_priv = dev;
 	memcpy(&fe->ops.tuner_ops, &tda18212_tuner_ops,
-			sizeof(struct dvb_tuner_ops));
+	       sizeof(fe->ops.tuner_ops));
 	i2c_set_clientdata(client, dev);
 
 	return 0;
@@ -261,8 +261,7 @@ static int tda18212_remove(struct i2c_client *client)
 	struct dvb_frontend *fe = dev->cfg.fe;
 
 	dev_dbg(&client->dev, "\n");
-
-	memset(&fe->ops.tuner_ops, 0, sizeof(struct dvb_tuner_ops));
+	memset(&fe->ops.tuner_ops, 0, sizeof(fe->ops.tuner_ops));
 	fe->tuner_priv = NULL;
 	kfree(dev);
 
