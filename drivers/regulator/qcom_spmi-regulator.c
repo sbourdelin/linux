@@ -1657,8 +1657,10 @@ static int qcom_spmi_regulator_probe(struct platform_device *pdev)
 
 	for (reg = match->data; reg->name; reg++) {
 		vreg = devm_kzalloc(dev, sizeof(*vreg), GFP_KERNEL);
-		if (!vreg)
-			return -ENOMEM;
+		if (!vreg) {
+			ret = -ENOMEM;
+			goto err;
+		}
 
 		vreg->dev = dev;
 		vreg->base = reg->base;
