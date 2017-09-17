@@ -203,8 +203,7 @@ static int tda18212_probe(struct i2c_client *client,
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (dev == NULL) {
 		ret = -ENOMEM;
-		dev_err(&client->dev, "kzalloc() failed\n");
-		goto err;
+		goto report_failure;
 	}
 
 	memcpy(&dev->cfg, cfg, sizeof(struct tda18212_config));
@@ -250,8 +249,9 @@ static int tda18212_probe(struct i2c_client *client,
 
 	return 0;
 err:
-	dev_dbg(&client->dev, "failed=%d\n", ret);
 	kfree(dev);
+report_failure:
+	dev_dbg(&client->dev, "failed=%d\n", ret);
 	return ret;
 }
 
