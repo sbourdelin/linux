@@ -515,11 +515,29 @@ int dirty_background_ratio_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp,
 		loff_t *ppos)
 {
+	int old_ratio = dirty_background_ratio;
+	unsigned long bytes;
 	int ret;
 
 	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
-	if (ret == 0 && write)
-		dirty_background_bytes = 0;
+
+	if (ret == 0 && write) {
+		if (vm_dirty_ratio > 0) {
+			if (dirty_background_ratio >= vm_dirty_ratio)
+				ret = -EINVAL;
+		} else if (vm_dirty_bytes > 0) {
+			bytes = global_dirtyable_memory() * PAGE_SIZE *
+					dirty_background_ratio / 100;
+			if (bytes >= vm_dirty_bytes)
+				ret = -EINVAL;
+		}
+
+		if (ret == 0)
+			dirty_background_bytes = 0;
+		else
+			dirty_background_ratio = old_ratio;
+	}
+
 	return ret;
 }
 
@@ -527,11 +545,29 @@ int dirty_background_bytes_handler(struct ctl_table *table, int write,
 		void __user *buffer, size_t *lenp,
 		loff_t *ppos)
 {
+	unsigned long old_bytes = dirty_background_bytes;
+	unsigned long bytes;
 	int ret;
 
 	ret = proc_doulongvec_minmax(table, write, buffer, lenp, ppos);
-	if (ret == 0 && write)
-		dirty_background_ratio = 0;
+
+	if (ret == 0 && write) {
+		if (vm_dirty_bytes > 0) {
+			if (dirty_background_bytes >= vm_dirty_bytes)
+				ret = -EINVAL;
+		} else if (vm_dirty_ratio > 0) {
+			bytes = global_dirtyable_memory() * PAGE_SIZE *
+					vm_dirty_ratio / 100;
+			if (dirty_background_bytes >= bytes)
+				ret = -EINVAL;
+		}
+
+		if (ret == 0)
+			dirty_background_ratio = 0;
+		else
+			dirty_background_bytes = old_bytes;
+	}
+
 	return ret;
 }
 
@@ -540,13 +576,29 @@ int dirty_ratio_handler(struct ctl_table *table, int write,
 		loff_t *ppos)
 {
 	int old_ratio = vm_dirty_ratio;
+	unsigned long bytes;
 	int ret;
 
 	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+
 	if (ret == 0 && write && vm_dirty_ratio != old_ratio) {
-		writeback_set_ratelimit();
-		vm_dirty_bytes = 0;
+		if (dirty_background_ratio > 0) {
+			if (vm_dirty_ratio <= dirty_background_ratio)
+				ret = -EINVAL;
+		} else if (dirty_background_bytes > 0) {
+			bytes = global_dirtyable_memory() * PAGE_SIZE *
+					vm_dirty_ratio / 100;
+			if (bytes <= dirty_background_bytes)
+				ret = -EINVAL;
+		}
+
+		if (ret == 0) {
+			writeback_set_ratelimit();
+			vm_dirty_bytes = 0;
+		} else
+			vm_dirty_ratio = old_ratio;
 	}
+
 	return ret;
 }
 
@@ -555,13 +607,29 @@ int dirty_bytes_handler(struct ctl_table *table, int write,
 		loff_t *ppos)
 {
 	unsigned long old_bytes = vm_dirty_bytes;
+	unsigned long bytes;
 	int ret;
 
 	ret = proc_doulongvec_minmax(table, write, buffer, lenp, ppos);
+
 	if (ret == 0 && write && vm_dirty_bytes != old_bytes) {
-		writeback_set_ratelimit();
-		vm_dirty_ratio = 0;
+		if (dirty_background_ratio > 0) {
+			bytes = global_dirtyable_memory() * PAGE_SIZE *
+					dirty_background_ratio / 100;
+			if (vm_dirty_bytes <= bytes)
+				ret = -EINVAL;
+		} else if (dirty_background_bytes > 0) {
+			if (vm_dirty_bytes <= dirty_background_bytes)
+				ret = -EINVAL;
+		}
+
+		if (ret == 0) {
+			writeback_set_ratelimit();
+			vm_dirty_ratio = 0;
+		} else
+			vm_dirty_bytes = old_bytes;
 	}
+
 	return ret;
 }
 
