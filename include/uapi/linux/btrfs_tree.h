@@ -924,6 +924,13 @@ static inline __u64 btrfs_qgroup_level(__u64 qgroupid)
  * Turning qouta off and on again makes it inconsistent, too.
  */
 #define BTRFS_QGROUP_STATUS_FLAG_INCONSISTENT	(1ULL << 2)
+/*
+ * When the filesystem is mounted with this option enabled
+ * level-0 qgroups will be automatically removed when their
+ * associated subvolume is deleted. If mounted on on an older
+ * version of btrfs, it will be ignored.
+ */
+#define BTRFS_QGROUP_AUTOREMOVE_FLAG		(1ULL << 3)
 
 #define BTRFS_QGROUP_STATUS_VERSION        1
 

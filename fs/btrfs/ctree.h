@@ -1021,7 +1021,7 @@ struct btrfs_fs_info {
 #ifdef CONFIG_BTRFS_FS_CHECK_INTEGRITY
 	u32 check_integrity_print_mask;
 #endif
-	/* is qgroup tracking in a consistent state? */
+	/* qgroup configuration; is qgroup tracking in a consistent state? */
 	u64 qgroup_flags;
 
 	/* holds configuration and tracking. Protected by qgroup_lock */

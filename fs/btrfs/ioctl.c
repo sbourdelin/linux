@@ -2369,6 +2369,7 @@ static noinline int btrfs_ioctl_snap_destroy(struct file *file,
 	struct btrfs_ioctl_vol_args *vol_args;
 	struct btrfs_trans_handle *trans;
 	struct btrfs_block_rsv block_rsv;
+	bool remove_qgroup = false;
 	u64 root_flags;
 	u64 qgroup_reserved;
 	int namelen;
@@ -2549,6 +2550,19 @@ static noinline int btrfs_ioctl_snap_destroy(struct file *file,
 			err = ret;
 			goto out_end_trans;
 		}
+	}
+
+
+	spin_lock(&fs_info->qgroup_lock);
+	if (fs_info->qgroup_flags & BTRFS_QGROUP_AUTOREMOVE_FLAG)
+		remove_qgroup = true;
+	spin_unlock(&fs_info->qgroup_lock);
+	if (remove_qgroup) {
+		ret = btrfs_remove_qgroup(trans, fs_info,
+					  dest->root_key.objectid);
+		if (ret && ret != -ENOENT)
+			btrfs_warn(fs_info,
+				   "Failed to cleanup qgroup. err: %d", ret);
 	}
 
 out_end_trans:

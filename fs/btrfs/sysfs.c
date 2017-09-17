@@ -90,6 +90,15 @@ static int can_modify_feature(struct btrfs_feature_attr *fa)
 	return val;
 }
 
+static void set_pending_commit(struct btrfs_fs_info *fs_info)
+{
+	/*
+	 * We don't want to do full transaction commit from inside sysfs
+	 */
+	btrfs_set_pending(fs_info, COMMIT);
+	wake_up_process(fs_info->transaction_kthread);
+}
+
 static ssize_t btrfs_feature_attr_show(struct kobject *kobj,
 				       struct kobj_attribute *a, char *buf)
 {
@@ -165,11 +174,7 @@ static ssize_t btrfs_feature_attr_store(struct kobject *kobj,
 	set_features(fs_info, fa->feature_set, features);
 	spin_unlock(&fs_info->super_lock);
 
-	/*
-	 * We don't want to do full transaction commit from inside sysfs
-	 */
-	btrfs_set_pending(fs_info, COMMIT);
-	wake_up_process(fs_info->transaction_kthread);
+	set_pending_commit(fs_info);
 
 	return count;
 }
@@ -407,11 +412,7 @@ static ssize_t btrfs_label_store(struct kobject *kobj,
 	memcpy(fs_info->super_copy->label, buf, p_len);
 	spin_unlock(&fs_info->super_lock);
 
-	/*
-	 * We don't want to do full transaction commit from inside sysfs
-	 */
-	btrfs_set_pending(fs_info, COMMIT);
-	wake_up_process(fs_info->transaction_kthread);
+	set_pending_commit(fs_info);
 
 	return len;
 }
@@ -489,12 +490,82 @@ static ssize_t quota_override_store(struct kobject *kobj,
 
 BTRFS_ATTR_RW(quota_override, quota_override_show, quota_override_store);
 
+static ssize_t qgroup_autoremove_show(struct kobject *kobj,
+				      struct kobj_attribute *a, char *buf)
+{
+	struct btrfs_fs_info *fs_info = to_fs_info(kobj);
+	int qgroup_autoremove = 0;
+
+	mutex_lock(&fs_info->qgroup_ioctl_lock);
+	/* Check if qgroups are enabled */
+	if (!test_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags))
+		goto out;
+	if (!fs_info->quota_root)
+		goto out;
+
+	if (fs_info->qgroup_flags & BTRFS_QGROUP_AUTOREMOVE_FLAG)
+		qgroup_autoremove = 1;
+
+out:
+	mutex_unlock(&fs_info->qgroup_ioctl_lock);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", qgroup_autoremove);
+}
+
+static ssize_t qgroup_autoremove_store(struct kobject *kobj,
+				       struct kobj_attribute *a,
+				       const char *buf, size_t len)
+{
+	struct btrfs_fs_info *fs_info = to_fs_info(kobj);
+	unsigned long knob;
+	int err;
+
+	if (!fs_info)
+		return -EPERM;
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	err = kstrtoul(buf, 10, &knob);
+	if (err)
+		return err;
+	if (knob > 1)
+		return -EINVAL;
+
+	err = -EINVAL;
+
+	mutex_lock(&fs_info->qgroup_ioctl_lock);
+	/* Check if qgroups are enabled */
+	if (!test_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags))
+		goto error;
+	if (!fs_info->quota_root)
+		goto error;
+
+	spin_lock(&fs_info->qgroup_lock);
+	if (knob)
+		fs_info->qgroup_flags |= BTRFS_QGROUP_AUTOREMOVE_FLAG;
+	else
+		fs_info->qgroup_flags &= ~BTRFS_QGROUP_AUTOREMOVE_FLAG;
+	spin_unlock(&fs_info->qgroup_lock);
+
+	mutex_unlock(&fs_info->qgroup_ioctl_lock);
+	set_pending_commit(fs_info);
+
+	return len;
+
+error:
+	mutex_unlock(&fs_info->qgroup_ioctl_lock);
+	return err;
+}
+
+BTRFS_ATTR_RW(qgroup_autoremove, qgroup_autoremove_show, qgroup_autoremove_store);
+
 static const struct attribute *btrfs_attrs[] = {
 	BTRFS_ATTR_PTR(label),
 	BTRFS_ATTR_PTR(nodesize),
 	BTRFS_ATTR_PTR(sectorsize),
 	BTRFS_ATTR_PTR(clone_alignment),
 	BTRFS_ATTR_PTR(quota_override),
+	BTRFS_ATTR_PTR(qgroup_autoremove),
 	NULL,
 };
 
