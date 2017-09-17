@@ -580,10 +580,8 @@ static int au0828_usb_probe(struct usb_interface *interface,
 	}
 
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-	if (dev == NULL) {
-		pr_err("%s() Unable to allocate memory\n", __func__);
+	if (!dev)
 		return -ENOMEM;
-	}
 
 	mutex_init(&dev->lock);
 	mutex_lock(&dev->lock);
