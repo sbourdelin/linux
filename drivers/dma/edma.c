@@ -887,8 +887,8 @@ static int edma_slave_config(struct dma_chan *chan,
 {
 	struct edma_chan *echan = to_edma_chan(chan);
 
-	if (cfg->src_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES ||
-	    cfg->dst_addr_width == DMA_SLAVE_BUSWIDTH_8_BYTES)
+	if (cfg->src_addr_width >= DMA_SLAVE_BUSWIDTH_8_BYTES ||
+	    cfg->dst_addr_width >= DMA_SLAVE_BUSWIDTH_8_BYTES)
 		return -EINVAL;
 
 	memcpy(&echan->cfg, cfg, sizeof(echan->cfg));
