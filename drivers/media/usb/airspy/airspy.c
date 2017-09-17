@@ -981,7 +981,7 @@ static int airspy_probe(struct usb_interface *intf,
 	int ret;
 	u8 u8tmp, buf[BUF_SIZE];
 
-	s = kzalloc(sizeof(struct airspy), GFP_KERNEL);
+	s = kzalloc(sizeof(*s), GFP_KERNEL);
 	if (!s)
 		return -ENOMEM;
 
