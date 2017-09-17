@@ -3870,6 +3870,7 @@ static int delay_drop_debugfs_init(struct mlx5_ib_dev *dev)
 	return 0;
 
 out_debugfs:
+	dev->delay_drop.dbg = dbg;
 	delay_drop_debugfs_cleanup(dev);
 	return -ENOMEM;
 }
