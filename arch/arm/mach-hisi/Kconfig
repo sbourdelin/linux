@@ -12,6 +12,12 @@ if ARCH_HISI
 
 menu "Hisilicon platform type"
 
+config ARCH_HI3521A
+	bool "Hisilicon Hi3521A/Hi3520DCV300 family"
+	depends on ARCH_MULTI_V7
+	help
+	  Support for Hisilicon Hi3521A/Hi3520DCV300 SoC family
+
 config ARCH_HI3xxx
 	bool "Hisilicon Hi36xx family"
 	depends on ARCH_MULTI_V7
