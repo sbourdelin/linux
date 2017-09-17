@@ -19,6 +19,7 @@ Three different ways of output formatting are available:
 
 The data is sampled from the KVM's debugfs entries and its perf events.
 """
+from __future__ import print_function
 
 import curses
 import sys
@@ -666,7 +667,7 @@ class TracepointProvider(Provider):
         """Returns 'event name: current value' for all enabled events."""
         ret = defaultdict(int)
         for group in self.group_leaders:
-            for name, val in group.read().iteritems():
+            for name, val in group.read().items():
                 if name in self._fields:
                     ret[name] += val
         return ret
@@ -1369,7 +1370,7 @@ def batch(stats):
         s = stats.get()
         for key in sorted(s.keys()):
             values = s[key]
-            print '%-42s%10d%10d' % (key, values[0], values[1])
+            print('%-42s%10d%10d' % (key, values[0], values[1]))
     except KeyboardInterrupt:
         pass
 
@@ -1380,14 +1381,14 @@ def log(stats):
 
     def banner():
         for k in keys:
-            print '%s' % k,
-        print
+            print(k)
+        print()
 
     def statline():
         s = stats.get()
         for k in keys:
-            print ' %9d' % s[k][1],
-        print
+            print(' %9d' % s[k][1])
+        print()
     line = 0
     banner_repeat = 20
     while True:
