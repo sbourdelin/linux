@@ -154,7 +154,6 @@ static void process_frame(struct camera_data *cam)
 	}
 
 	cam->workbuff->status = FRAME_ERROR;
-	return;
 }
 
 /******************************************************************************
