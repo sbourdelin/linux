@@ -367,7 +367,8 @@ static void cpia2_usb_complete(struct urb *urb)
 	if(cam->streaming) {
 		/* resubmit */
 		urb->dev = cam->dev;
-		if ((i = usb_submit_urb(urb, GFP_ATOMIC)) != 0)
+		i = usb_submit_urb(urb, GFP_ATOMIC);
+		if (i != 0)
 			ERR("%s: usb_submit_urb ret %d!\n", __func__, i);
 	}
 }
@@ -851,8 +852,8 @@ static int cpia2_usb_probe(struct usb_interface *intf,
 		goto free_data;
 	}
 
-
-	if((ret = cpia2_init_camera(cam)) < 0) {
+	ret = cpia2_init_camera(cam);
+	if (ret < 0) {
 		ERR("%s: failed to initialize cpia2 camera (ret = %d)\n", __func__, ret);
 		goto free_data;
 	}
