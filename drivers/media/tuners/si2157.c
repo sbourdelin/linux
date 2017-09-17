@@ -457,7 +457,7 @@ static int si2157_probe(struct i2c_client *client,
 	if (ret)
 		goto err_kfree;
 
-	memcpy(&fe->ops.tuner_ops, &si2157_ops, sizeof(struct dvb_tuner_ops));
+	memcpy(&fe->ops.tuner_ops, &si2157_ops, sizeof(si2157_ops));
 	fe->tuner_priv = client;
 
 #ifdef CONFIG_MEDIA_CONTROLLER
@@ -514,7 +514,7 @@ static int si2157_remove(struct i2c_client *client)
 		media_device_unregister_entity(&dev->ent);
 #endif
 
-	memset(&fe->ops.tuner_ops, 0, sizeof(struct dvb_tuner_ops));
+	memset(&fe->ops.tuner_ops, 0, sizeof(fe->ops.tuner_ops));
 	fe->tuner_priv = NULL;
 	kfree(dev);
 
