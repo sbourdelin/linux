@@ -954,16 +954,13 @@ static int cx231xx_load_firmware(struct cx231xx *dev)
 
 	p_current_fw = vmalloc(1884180 * 4);
 	p_fw = p_current_fw;
-	if (!p_current_fw) {
-		dprintk(2, "FAIL!!!\n");
-		return -ENOMEM;
-	}
+	if (!p_current_fw)
+		goto e_nomem;
 
 	p_buffer = vmalloc(4096);
 	if (!p_buffer) {
-		dprintk(2, "FAIL!!!\n");
 		vfree(p_current_fw);
-		return -ENOMEM;
+		goto e_nomem;
 	}
 
 	dprintk(2, "%s()\n", __func__);
@@ -986,9 +983,7 @@ static int cx231xx_load_firmware(struct cx231xx *dev)
 	if (retval != 0) {
 		dev_err(dev->dev,
 			"%s: Error with mc417_register_write\n", __func__);
-		vfree(p_current_fw);
-		vfree(p_buffer);
-		return retval;
+		goto free_fw;
 	}
 
 	retval = request_firmware(&firmware, CX231xx_FIRM_IMAGE_NAME,
@@ -1000,28 +995,20 @@ static int cx231xx_load_firmware(struct cx231xx *dev)
 			CX231xx_FIRM_IMAGE_NAME);
 		dev_err(dev->dev,
 			"Please fix your hotplug setup, the board will not work without firmware loaded!\n");
-		vfree(p_current_fw);
-		vfree(p_buffer);
-		return retval;
+		goto free_fw;
 	}
 
 	if (firmware->size != CX231xx_FIRM_IMAGE_SIZE) {
 		dev_err(dev->dev,
 			"ERROR: Firmware size mismatch (have %zd, expected %d)\n",
 			firmware->size, CX231xx_FIRM_IMAGE_SIZE);
-		release_firmware(firmware);
-		vfree(p_current_fw);
-		vfree(p_buffer);
-		return -EINVAL;
+		goto e_inval;
 	}
 
 	if (0 != memcmp(firmware->data, magic, 8)) {
 		dev_err(dev->dev,
 			"ERROR: Firmware magic mismatch, wrong file?\n");
-		release_firmware(firmware);
-		vfree(p_current_fw);
-		vfree(p_buffer);
-		return -EINVAL;
+		goto e_inval;
 	}
 
 	initGPIO(dev);
@@ -1065,26 +1052,36 @@ static int cx231xx_load_firmware(struct cx231xx *dev)
 
 	retval |= mc417_register_write(dev, IVTV_REG_HW_BLOCKS,
 		IVTV_CMD_HW_BLOCKS_RST);
-	if (retval < 0) {
-		dev_err(dev->dev,
-			"%s: Error with mc417_register_write\n",
-			__func__);
-		return retval;
-	}
+	if (retval < 0)
+		goto report_write_failure;
+
 	/* F/W power up disturbs the GPIOs, restore state */
 	retval |= mc417_register_write(dev, 0x9020, gpio_output);
 	retval |= mc417_register_write(dev, 0x900C, value);
 
 	retval |= mc417_register_read(dev, IVTV_REG_VPU, &value);
 	retval |= mc417_register_write(dev, IVTV_REG_VPU, value & 0xFFFFFFE8);
+	if (retval < 0)
+		goto report_write_failure;
 
-	if (retval < 0) {
-		dev_err(dev->dev,
-			"%s: Error with mc417_register_write\n",
-			__func__);
-		return retval;
-	}
 	return 0;
+
+e_nomem:
+	dprintk(2, "FAIL!!!\n");
+	return -ENOMEM;
+
+e_inval:
+	retval = -EINVAL;
+	release_firmware(firmware);
+
+free_fw:
+	vfree(p_current_fw);
+	vfree(p_buffer);
+	return retval;
+
+report_write_failure:
+	dev_err(dev->dev, "%s: Error with mc417_register_write\n", __func__);
+	return retval;
 }
 
 static void cx231xx_417_check_encoder(struct cx231xx *dev)
