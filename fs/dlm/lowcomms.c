@@ -758,13 +758,12 @@ static int tcp_accept_from_sock(struct connection *con)
 	/* Get the new node's NODEID */
 	make_sockaddr(&peeraddr, 0, &len);
 	if (addr_to_nodeid(&peeraddr, &nodeid)) {
-		unsigned char *b=(unsigned char *)&peeraddr;
+		unsigned char *b = (unsigned char *)&peeraddr;
 		log_print("connect from non cluster node");
 		print_hex_dump_bytes("ss: ", DUMP_PREFIX_NONE, 
 				     b, sizeof(struct sockaddr_storage));
-		sock_release(newsock);
-		mutex_unlock(&con->sock_mutex);
-		return -1;
+		result = -1;
+		goto accept_err;
 	}
 
 	log_print("got connection from %d", nodeid);
