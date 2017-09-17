@@ -615,12 +615,9 @@ static int dvb_init(struct cx231xx *dev)
 	}
 
 	dvb = kzalloc(sizeof(struct cx231xx_dvb), GFP_KERNEL);
-
-	if (dvb == NULL) {
-		dev_info(dev->dev,
-			 "cx231xx_dvb: memory allocation failed\n");
+	if (!dvb)
 		return -ENOMEM;
-	}
+
 	dev->dvb = dvb;
 	dev->cx231xx_set_analog_freq = cx231xx_set_analog_freq;
 	dev->cx231xx_reset_analog_tuner = cx231xx_reset_analog_tuner;
