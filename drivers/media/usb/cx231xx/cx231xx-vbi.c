@@ -630,8 +630,7 @@ void cx231xx_reset_vbi_buffer(struct cx231xx *dev,
 	struct cx231xx_buffer *buf;
 
 	buf = dev->vbi_mode.bulk_ctl.buf;
-
-	if (buf == NULL) {
+	if (!buf) {
 		/* first try to get the buffer */
 		get_next_vbi_buf(dma_q, &buf);
 
@@ -654,8 +653,7 @@ int cx231xx_do_vbi_copy(struct cx231xx *dev, struct cx231xx_dmaqueue *dma_q,
 	int offset, lencopy;
 
 	buf = dev->vbi_mode.bulk_ctl.buf;
-
-	if (buf == NULL)
+	if (!buf)
 		return -EINVAL;
 
 	p_out_buffer = videobuf_to_vmalloc(&buf->vb);

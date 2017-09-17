@@ -69,9 +69,9 @@ static DEFINE_MUTEX(cx231xx_devlist_mutex);
 */
 void cx231xx_remove_from_devlist(struct cx231xx *dev)
 {
-	if (dev == NULL)
+	if (!dev)
 		return;
-	if (dev->udev == NULL)
+	if (!dev->udev)
 		return;
 
 	if (atomic_read(&dev->devlist_count) > 0) {
@@ -508,7 +508,7 @@ int cx231xx_set_video_alternate(struct cx231xx *dev)
 		cx231xx_coredbg("minimum isoc packet size: %u (alt=%d)\n",
 				min_pkt_size, dev->video_mode.alt);
 
-		if (dev->video_mode.alt_max_pkt_size != NULL)
+		if (dev->video_mode.alt_max_pkt_size)
 			dev->video_mode.max_pkt_size =
 			dev->video_mode.alt_max_pkt_size[dev->video_mode.alt];
 		cx231xx_coredbg("setting alternate %d with wMaxPacketSize=%u\n",
@@ -539,7 +539,7 @@ int cx231xx_set_alt_setting(struct cx231xx *dev, u8 index, u8 alt)
 		    dev->current_pcb_config.hs_config_info[0].interface_info.
 		    ts1_index + 1;
 		dev->ts1_mode.alt = alt;
-		if (dev->ts1_mode.alt_max_pkt_size != NULL)
+		if (dev->ts1_mode.alt_max_pkt_size)
 			max_pkt_size = dev->ts1_mode.max_pkt_size =
 			    dev->ts1_mode.alt_max_pkt_size[dev->ts1_mode.alt];
 		break;
@@ -553,7 +553,7 @@ int cx231xx_set_alt_setting(struct cx231xx *dev, u8 index, u8 alt)
 		    dev->current_pcb_config.hs_config_info[0].interface_info.
 		    audio_index + 1;
 		dev->adev.alt = alt;
-		if (dev->adev.alt_max_pkt_size != NULL)
+		if (dev->adev.alt_max_pkt_size)
 			max_pkt_size = dev->adev.max_pkt_size =
 			    dev->adev.alt_max_pkt_size[dev->adev.alt];
 		break;
@@ -562,7 +562,7 @@ int cx231xx_set_alt_setting(struct cx231xx *dev, u8 index, u8 alt)
 		    dev->current_pcb_config.hs_config_info[0].interface_info.
 		    video_index + 1;
 		dev->video_mode.alt = alt;
-		if (dev->video_mode.alt_max_pkt_size != NULL)
+		if (dev->video_mode.alt_max_pkt_size)
 			max_pkt_size = dev->video_mode.max_pkt_size =
 			    dev->video_mode.alt_max_pkt_size[dev->video_mode.
 							     alt];
@@ -574,7 +574,7 @@ int cx231xx_set_alt_setting(struct cx231xx *dev, u8 index, u8 alt)
 		    dev->current_pcb_config.hs_config_info[0].interface_info.
 		    vanc_index + 1;
 		dev->vbi_mode.alt = alt;
-		if (dev->vbi_mode.alt_max_pkt_size != NULL)
+		if (dev->vbi_mode.alt_max_pkt_size)
 			max_pkt_size = dev->vbi_mode.max_pkt_size =
 			    dev->vbi_mode.alt_max_pkt_size[dev->vbi_mode.alt];
 		break;
@@ -583,7 +583,7 @@ int cx231xx_set_alt_setting(struct cx231xx *dev, u8 index, u8 alt)
 		    dev->current_pcb_config.hs_config_info[0].interface_info.
 		    hanc_index + 1;
 		dev->sliced_cc_mode.alt = alt;
-		if (dev->sliced_cc_mode.alt_max_pkt_size != NULL)
+		if (dev->sliced_cc_mode.alt_max_pkt_size)
 			max_pkt_size = dev->sliced_cc_mode.max_pkt_size =
 			    dev->sliced_cc_mode.alt_max_pkt_size[dev->
 								 sliced_cc_mode.
@@ -768,7 +768,7 @@ int cx231xx_ep5_bulkout(struct cx231xx *dev, u8 *firmware, u16 size)
 	u32 *buffer;
 
 	buffer = kzalloc(4096, GFP_KERNEL);
-	if (buffer == NULL)
+	if (!buffer)
 		return -ENOMEM;
 	memcpy(&buffer[0], firmware, 4096);
 
@@ -1009,7 +1009,7 @@ int cx231xx_init_isoc(struct cx231xx *dev, int max_packets,
 	cx231xx_uninit_isoc(dev);
 
 	dma_q->p_left_data = kzalloc(4096, GFP_KERNEL);
-	if (dma_q->p_left_data == NULL)
+	if (!dma_q->p_left_data)
 		return -ENOMEM;
 
 	dev->video_mode.isoc_ctl.isoc_copy = isoc_copy;

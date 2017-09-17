@@ -1156,7 +1156,7 @@ void cx231xx_card_setup(struct cx231xx *dev)
 		dev->sd_cx25840 = v4l2_i2c_new_subdev(&dev->v4l2_dev,
 					cx231xx_get_i2c_adap(dev, I2C_0),
 					"cx25840", 0x88 >> 1, NULL);
-		if (dev->sd_cx25840 == NULL)
+		if (!dev->sd_cx25840)
 			dev_err(dev->dev,
 				"cx25840 subdev registration failure\n");
 		cx25840_call(dev, core, load_fw);
@@ -1171,7 +1171,7 @@ void cx231xx_card_setup(struct cx231xx *dev)
 						    tuner_i2c,
 						    "tuner",
 						    dev->tuner_addr, NULL);
-		if (dev->sd_tuner == NULL)
+		if (!dev->sd_tuner)
 			dev_err(dev->dev,
 				"tuner subdev registration failure\n");
 		else
@@ -1190,7 +1190,7 @@ void cx231xx_card_setup(struct cx231xx *dev)
 			};
 			struct eeprom *e = kzalloc(sizeof(*e), GFP_KERNEL);
 
-			if (e == NULL) {
+			if (!e) {
 				dev_err(dev->dev,
 					"failed to allocate memory to read eeprom\n");
 				break;
@@ -1471,7 +1471,7 @@ static int cx231xx_init_v4l2(struct cx231xx *dev,
 		 dev->video_mode.num_alt);
 
 	dev->video_mode.alt_max_pkt_size = devm_kmalloc_array(&udev->dev, 32, dev->video_mode.num_alt, GFP_KERNEL);
-	if (dev->video_mode.alt_max_pkt_size == NULL)
+	if (!dev->video_mode.alt_max_pkt_size)
 		return -ENOMEM;
 
 	for (i = 0; i < dev->video_mode.num_alt; i++) {
@@ -1512,7 +1512,7 @@ static int cx231xx_init_v4l2(struct cx231xx *dev,
 
 	/* compute alternate max packet sizes for vbi */
 	dev->vbi_mode.alt_max_pkt_size = devm_kmalloc_array(&udev->dev, 32, dev->vbi_mode.num_alt, GFP_KERNEL);
-	if (dev->vbi_mode.alt_max_pkt_size == NULL)
+	if (!dev->vbi_mode.alt_max_pkt_size)
 		return -ENOMEM;
 
 	for (i = 0; i < dev->vbi_mode.num_alt; i++) {
@@ -1554,7 +1554,7 @@ static int cx231xx_init_v4l2(struct cx231xx *dev,
 		 dev->sliced_cc_mode.end_point_addr,
 		 dev->sliced_cc_mode.num_alt);
 	dev->sliced_cc_mode.alt_max_pkt_size = devm_kmalloc_array(&udev->dev, 32, dev->sliced_cc_mode.num_alt, GFP_KERNEL);
-	if (dev->sliced_cc_mode.alt_max_pkt_size == NULL)
+	if (!dev->sliced_cc_mode.alt_max_pkt_size)
 		return -ENOMEM;
 
 	for (i = 0; i < dev->sliced_cc_mode.num_alt; i++) {
@@ -1618,7 +1618,7 @@ static int cx231xx_usb_probe(struct usb_interface *interface,
 
 	/* allocate memory for our device state and initialize it */
 	dev = devm_kzalloc(&udev->dev, sizeof(*dev), GFP_KERNEL);
-	if (dev == NULL) {
+	if (!dev) {
 		retval = -ENOMEM;
 		goto err_if;
 	}
@@ -1748,7 +1748,7 @@ static int cx231xx_usb_probe(struct usb_interface *interface,
 			 dev->ts1_mode.num_alt);
 
 		dev->ts1_mode.alt_max_pkt_size = devm_kmalloc_array(&udev->dev, 32, dev->ts1_mode.num_alt, GFP_KERNEL);
-		if (dev->ts1_mode.alt_max_pkt_size == NULL) {
+		if (!dev->ts1_mode.alt_max_pkt_size) {
 			retval = -ENOMEM;
 			goto err_video_alt;
 		}

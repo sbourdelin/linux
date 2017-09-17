@@ -954,13 +954,13 @@ static int cx231xx_load_firmware(struct cx231xx *dev)
 
 	p_current_fw = vmalloc(1884180 * 4);
 	p_fw = p_current_fw;
-	if (p_current_fw == NULL) {
+	if (!p_current_fw) {
 		dprintk(2, "FAIL!!!\n");
 		return -ENOMEM;
 	}
 
 	p_buffer = vmalloc(4096);
-	if (p_buffer == NULL) {
+	if (!p_buffer) {
 		dprintk(2, "FAIL!!!\n");
 		vfree(p_current_fw);
 		return -ENOMEM;
@@ -1711,7 +1711,7 @@ static int mpeg_open(struct file *file)
 
 	/* allocate + initialize per filehandle data */
 	fh = kzalloc(sizeof(*fh), GFP_KERNEL);
-	if (NULL == fh) {
+	if (!fh) {
 		mutex_unlock(&dev->lock);
 		return -ENOMEM;
 	}

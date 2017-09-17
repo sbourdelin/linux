@@ -634,7 +634,7 @@ void cx231xx_reset_video_buffer(struct cx231xx *dev,
 	else
 		buf = dev->video_mode.bulk_ctl.buf;
 
-	if (buf == NULL) {
+	if (!buf) {
 		/* first try to get the buffer */
 		get_next_buf(dma_q, &buf);
 
@@ -663,7 +663,7 @@ int cx231xx_do_copy(struct cx231xx *dev, struct cx231xx_dmaqueue *dma_q,
 	else
 		buf = dev->video_mode.bulk_ctl.buf;
 
-	if (buf == NULL)
+	if (!buf)
 		return -1;
 
 	p_out_buffer = videobuf_to_vmalloc(&buf->vb);

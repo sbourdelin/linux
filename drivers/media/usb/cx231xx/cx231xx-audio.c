@@ -745,7 +745,7 @@ err_free_card:
 
 static int cx231xx_audio_fini(struct cx231xx *dev)
 {
-	if (dev == NULL)
+	if (!dev)
 		return 0;
 
 	if (dev->has_alsa_audio != 1) {

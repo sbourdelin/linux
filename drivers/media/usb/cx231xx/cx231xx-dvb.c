@@ -408,11 +408,10 @@ static int attach_xc5000(u8 addr, struct cx231xx *dev)
 
 int cx231xx_set_analog_freq(struct cx231xx *dev, u32 freq)
 {
-	if ((dev->dvb != NULL) && (dev->dvb->frontend != NULL)) {
-
+	if (dev->dvb && dev->dvb->frontend) {
 		struct dvb_tuner_ops *dops = &dev->dvb->frontend->ops.tuner_ops;
 
-		if (dops->set_analog_params != NULL) {
+		if (dops->set_analog_params) {
 			struct analog_parameters params;
 
 			params.frequency = freq;
@@ -433,12 +432,10 @@ int cx231xx_reset_analog_tuner(struct cx231xx *dev)
 {
 	int status = 0;
 
-	if ((dev->dvb != NULL) && (dev->dvb->frontend != NULL)) {
-
+	if (dev->dvb && dev->dvb->frontend) {
 		struct dvb_tuner_ops *dops = &dev->dvb->frontend->ops.tuner_ops;
 
-		if (dops->init != NULL && !dev->xc_fw_load_done) {
-
+		if (dops->init && !dev->xc_fw_load_done) {
 			dev_dbg(dev->dev,
 				"Reloading firmware for XC5000\n");
 			status = dops->init(dev->dvb->frontend);
@@ -635,8 +632,7 @@ static int dvb_init(struct cx231xx *dev)
 		dev->dvb->frontend = dvb_attach(s5h1432_attach,
 					&dvico_s5h1432_config,
 					demod_i2c);
-
-		if (dev->dvb->frontend == NULL) {
+		if (!dev->dvb->frontend) {
 			dev_err(dev->dev,
 				"Failed to attach s5h1432 front end\n");
 			result = -EINVAL;
@@ -660,8 +656,7 @@ static int dvb_init(struct cx231xx *dev)
 		dev->dvb->frontend = dvb_attach(s5h1411_attach,
 					       &xc5000_s5h1411_config,
 					       demod_i2c);
-
-		if (dev->dvb->frontend == NULL) {
+		if (!dev->dvb->frontend) {
 			dev_err(dev->dev,
 				"Failed to attach s5h1411 front end\n");
 			result = -EINVAL;
@@ -683,8 +678,7 @@ static int dvb_init(struct cx231xx *dev)
 		dev->dvb->frontend = dvb_attach(s5h1432_attach,
 					&dvico_s5h1432_config,
 					demod_i2c);
-
-		if (dev->dvb->frontend == NULL) {
+		if (!dev->dvb->frontend) {
 			dev_err(dev->dev,
 				"Failed to attach s5h1432 front end\n");
 			result = -EINVAL;
@@ -707,8 +701,7 @@ static int dvb_init(struct cx231xx *dev)
 		dev->dvb->frontend = dvb_attach(s5h1411_attach,
 					       &tda18271_s5h1411_config,
 					       demod_i2c);
-
-		if (dev->dvb->frontend == NULL) {
+		if (!dev->dvb->frontend) {
 			dev_err(dev->dev,
 				"Failed to attach s5h1411 front end\n");
 			result = -EINVAL;
@@ -734,8 +727,7 @@ static int dvb_init(struct cx231xx *dev)
 		dev->dvb->frontend = dvb_attach(lgdt3305_attach,
 						&hcw_lgdt3305_config,
 						demod_i2c);
-
-		if (dev->dvb->frontend == NULL) {
+		if (!dev->dvb->frontend) {
 			dev_err(dev->dev,
 				"Failed to attach LG3305 front end\n");
 			result = -EINVAL;
@@ -768,7 +760,7 @@ static int dvb_init(struct cx231xx *dev)
 		info.platform_data = &si2165_pdata;
 		request_module(info.type);
 		client = i2c_new_device(demod_i2c, &info);
-		if (client == NULL || client->dev.driver == NULL || dev->dvb->frontend == NULL) {
+		if (!client || !client->dev.driver || !dev->dvb->frontend) {
 			dev_err(dev->dev,
 				"Failed to attach SI2165 front end\n");
 			result = -EINVAL;
@@ -815,7 +807,7 @@ static int dvb_init(struct cx231xx *dev)
 		info.platform_data = &si2165_pdata;
 		request_module(info.type);
 		client = i2c_new_device(demod_i2c, &info);
-		if (client == NULL || client->dev.driver == NULL || dev->dvb->frontend == NULL) {
+		if (!client || !client->dev.driver || !dev->dvb->frontend) {
 			dev_err(dev->dev,
 				"Failed to attach SI2165 front end\n");
 			result = -EINVAL;
@@ -853,7 +845,7 @@ static int dvb_init(struct cx231xx *dev)
 		client = i2c_new_device(
 			tuner_i2c,
 			&info);
-		if (client == NULL || client->dev.driver == NULL) {
+		if (!client || !client->dev.driver) {
 			dvb_frontend_detach(dev->dvb->frontend);
 			result = -ENODEV;
 			goto out_free;
@@ -883,8 +875,7 @@ static int dvb_init(struct cx231xx *dev)
 			&hauppauge_955q_lgdt3306a_config,
 			demod_i2c
 			);
-
-		if (dev->dvb->frontend == NULL) {
+		if (!dev->dvb->frontend) {
 			dev_err(dev->dev,
 				"Failed to attach LGDT3306A frontend.\n");
 			result = -EINVAL;
@@ -912,7 +903,7 @@ static int dvb_init(struct cx231xx *dev)
 		client = i2c_new_device(
 			tuner_i2c,
 			&info);
-		if (client == NULL || client->dev.driver == NULL) {
+		if (!client || !client->dev.driver) {
 			dvb_frontend_detach(dev->dvb->frontend);
 			result = -ENODEV;
 			goto out_free;
@@ -940,8 +931,7 @@ static int dvb_init(struct cx231xx *dev)
 		dev->dvb->frontend = dvb_attach(mb86a20s_attach,
 						&pv_mb86a20s_config,
 						demod_i2c);
-
-		if (dev->dvb->frontend == NULL) {
+		if (!dev->dvb->frontend) {
 			dev_err(dev->dev,
 				"Failed to attach mb86a20s demod\n");
 			result = -EINVAL;
@@ -976,8 +966,7 @@ static int dvb_init(struct cx231xx *dev)
 
 		request_module(info.type);
 		client = i2c_new_device(demod_i2c, &info);
-
-		if (client == NULL || client->dev.driver == NULL) {
+		if (!client || !client->dev.driver) {
 			result = -ENODEV;
 			goto out_free;
 		}
@@ -1005,8 +994,7 @@ static int dvb_init(struct cx231xx *dev)
 
 		request_module(info.type);
 		client = i2c_new_device(tuner_i2c, &info);
-
-		if (client == NULL || client->dev.driver == NULL) {
+		if (!client || !client->dev.driver) {
 			module_put(dvb->i2c_client_demod->dev.driver->owner);
 			i2c_unregister_device(dvb->i2c_client_demod);
 			result = -ENODEV;
@@ -1042,8 +1030,7 @@ static int dvb_init(struct cx231xx *dev)
 
 		request_module(info.type);
 		client = i2c_new_device(demod_i2c, &info);
-
-		if (client == NULL || client->dev.driver == NULL) {
+		if (!client || !client->dev.driver) {
 			result = -ENODEV;
 			goto out_free;
 		}
@@ -1071,7 +1058,7 @@ static int dvb_init(struct cx231xx *dev)
 			dev->name);
 		break;
 	}
-	if (NULL == dvb->frontend) {
+	if (!dvb->frontend) {
 		dev_err(dev->dev,
 		       "%s/2: frontend initialization failed\n", dev->name);
 		result = -EINVAL;
