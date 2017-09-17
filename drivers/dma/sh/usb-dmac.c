@@ -768,7 +768,6 @@ static int usb_dmac_parse_of(struct device *dev, struct usb_dmac *dmac)
 
 static int usb_dmac_probe(struct platform_device *pdev)
 {
-	const enum dma_slave_buswidth widths = USB_DMAC_SLAVE_BUSWIDTH;
 	struct dma_device *engine;
 	struct usb_dmac *dmac;
 	struct resource *mem;
@@ -837,8 +836,12 @@ static int usb_dmac_probe(struct platform_device *pdev)
 
 	engine->dev = &pdev->dev;
 
-	engine->src_addr_widths = widths;
-	engine->dst_addr_widths = widths;
+	/*
+	 * FIXME: The controller supports a width of USB_DMAC_SLAVE_BUSWIDTH,
+	 * i.e. 32 bytes, but BIT(32) overflows the u32 bitmask fields.
+	 */
+	engine->src_addr_widths = 0;
+	engine->dst_addr_widths = 0;
 	engine->directions = BIT(DMA_MEM_TO_DEV) | BIT(DMA_DEV_TO_MEM);
 	engine->residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
 

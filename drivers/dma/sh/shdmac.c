@@ -679,10 +679,15 @@ MODULE_DEVICE_TABLE(of, sh_dmae_of_match);
 
 static int sh_dmae_probe(struct platform_device *pdev)
 {
-	const enum dma_slave_buswidth widths =
-		DMA_SLAVE_BUSWIDTH_1_BYTE   | DMA_SLAVE_BUSWIDTH_2_BYTES |
-		DMA_SLAVE_BUSWIDTH_4_BYTES  | DMA_SLAVE_BUSWIDTH_8_BYTES |
-		DMA_SLAVE_BUSWIDTH_16_BYTES | DMA_SLAVE_BUSWIDTH_32_BYTES;
+	/*
+	 * FIXME: Controller supports DMA_SLAVE_BUSWIDTH_32_BYTES
+	 * but this overflows the u32 src/dst_addr_widths fields
+	 */
+	const u32 widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
+			   BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
+			   BIT(DMA_SLAVE_BUSWIDTH_4_BYTES)  |
+			   BIT(DMA_SLAVE_BUSWIDTH_8_BYTES) |
+			   BIT(DMA_SLAVE_BUSWIDTH_16_BYTES);
 	const struct sh_dmae_pdata *pdata;
 	unsigned long chan_flag[SH_DMAE_MAX_CHANNELS] = {};
 	int chan_irq[SH_DMAE_MAX_CHANNELS];

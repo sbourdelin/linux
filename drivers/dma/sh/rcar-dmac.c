@@ -1734,10 +1734,16 @@ static int rcar_dmac_parse_of(struct device *dev, struct rcar_dmac *dmac)
 
 static int rcar_dmac_probe(struct platform_device *pdev)
 {
-	const enum dma_slave_buswidth widths = DMA_SLAVE_BUSWIDTH_1_BYTE |
-		DMA_SLAVE_BUSWIDTH_2_BYTES | DMA_SLAVE_BUSWIDTH_4_BYTES |
-		DMA_SLAVE_BUSWIDTH_8_BYTES | DMA_SLAVE_BUSWIDTH_16_BYTES |
-		DMA_SLAVE_BUSWIDTH_32_BYTES | DMA_SLAVE_BUSWIDTH_64_BYTES;
+	/*
+	 * FIXME: Controller supports DMA_SLAVE_BUSWIDTH_32_BYTES
+	 * and DMA_SLAVE_BUSWIDTH_64_BYTES,
+	 * but this overflows the u32 src/dst_addr_widths fields
+	 */
+	const u32 widths = BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) |
+			   BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) |
+			   BIT(DMA_SLAVE_BUSWIDTH_4_BYTES)  |
+			   BIT(DMA_SLAVE_BUSWIDTH_8_BYTES) |
+			   BIT(DMA_SLAVE_BUSWIDTH_16_BYTES);
 	unsigned int channels_offset = 0;
 	struct dma_device *engine;
 	struct rcar_dmac *dmac;
