@@ -611,7 +611,7 @@ static int dvb_init(struct cx231xx *dev)
 		return 0;
 	}
 
-	dvb = kzalloc(sizeof(struct cx231xx_dvb), GFP_KERNEL);
+	dvb = kzalloc(sizeof(*dvb), GFP_KERNEL);
 	if (!dvb)
 		return -ENOMEM;
 
@@ -754,7 +754,7 @@ static int dvb_init(struct cx231xx *dev)
 		si2165_pdata.chip_mode = SI2165_MODE_PLL_XTAL,
 		si2165_pdata.ref_freq_Hz = 16000000,
 
-		memset(&info, 0, sizeof(struct i2c_board_info));
+		memset(&info, 0, sizeof(info));
 		strlcpy(info.type, "si2165", I2C_NAME_SIZE);
 		info.addr = 0x64;
 		info.platform_data = &si2165_pdata;
@@ -801,7 +801,7 @@ static int dvb_init(struct cx231xx *dev)
 		si2165_pdata.chip_mode = SI2165_MODE_PLL_EXT,
 		si2165_pdata.ref_freq_Hz = 24000000,
 
-		memset(&info, 0, sizeof(struct i2c_board_info));
+		memset(&info, 0, sizeof(info));
 		strlcpy(info.type, "si2165", I2C_NAME_SIZE);
 		info.addr = 0x64;
 		info.platform_data = &si2165_pdata;
@@ -822,7 +822,7 @@ static int dvb_init(struct cx231xx *dev)
 
 		dvb->i2c_client_demod = client;
 
-		memset(&info, 0, sizeof(struct i2c_board_info));
+		memset(&info, 0, sizeof(info));
 
 		dev->dvb->frontend->ops.i2c_gate_ctrl = NULL;
 
@@ -869,7 +869,7 @@ static int dvb_init(struct cx231xx *dev)
 		struct i2c_board_info info;
 		struct si2157_config si2157_config;
 
-		memset(&info, 0, sizeof(struct i2c_board_info));
+		memset(&info, 0, sizeof(info));
 
 		dev->dvb->frontend = dvb_attach(lgdt3306a_attach,
 			&hauppauge_955q_lgdt3306a_config,

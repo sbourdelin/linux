@@ -1771,7 +1771,7 @@ static int cx231xx_v4l2_open(struct file *filp)
 	}
 #endif
 
-	fh = kzalloc(sizeof(struct cx231xx_fh), GFP_KERNEL);
+	fh = kzalloc(sizeof(*fh), GFP_KERNEL);
 	if (!fh)
 		return -ENOMEM;
 	if (mutex_lock_interruptible(&dev->lock)) {
