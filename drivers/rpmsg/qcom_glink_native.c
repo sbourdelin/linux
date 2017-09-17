@@ -640,13 +640,17 @@ qcom_glink_alloc_intent(struct qcom_glink *glink,
 		return NULL;
 
 	intent->data = kzalloc(size, GFP_KERNEL);
-	if (!intent->data)
+	if (!intent->data) {
+		kfree(intent);
 		return NULL;
+	}
 
 	spin_lock_irqsave(&channel->intent_lock, flags);
 	ret = idr_alloc_cyclic(&channel->liids, intent, 1, -1, GFP_ATOMIC);
 	if (ret < 0) {
 		spin_unlock_irqrestore(&channel->intent_lock, flags);
+		kfree(intent->data);
+		kfree(intent);
 		return NULL;
 	}
 	spin_unlock_irqrestore(&channel->intent_lock, flags);
