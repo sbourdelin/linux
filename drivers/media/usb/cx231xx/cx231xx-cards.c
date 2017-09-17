@@ -1117,20 +1117,17 @@ static int read_eeprom(struct cx231xx *dev, struct i2c_client *client,
 
 	/* start reading at offset 0 */
 	ret = i2c_transfer(client->adapter, &msg_write, 1);
-	if (ret < 0) {
-		dev_err(dev->dev, "Can't read eeprom\n");
-		return ret;
-	}
+	if (ret < 0)
+		goto report_failure;
 
 	while (len_todo > 0) {
 		msg_read.len = (len_todo > 64) ? 64 : len_todo;
 		msg_read.buf = eedata_cur;
 
 		ret = i2c_transfer(client->adapter, &msg_read, 1);
-		if (ret < 0) {
-			dev_err(dev->dev, "Can't read eeprom\n");
-			return ret;
-		}
+		if (ret < 0)
+			goto report_failure;
+
 		eedata_cur += msg_read.len;
 		len_todo -= msg_read.len;
 	}
@@ -1140,6 +1137,10 @@ static int read_eeprom(struct cx231xx *dev, struct i2c_client *client,
 			i, 16, &eedata[i]);
 
 	return 0;
+
+report_failure:
+	dev_err(dev->dev, "Can't read eeprom\n");
+	return ret;
 }
 
 void cx231xx_card_setup(struct cx231xx *dev)
