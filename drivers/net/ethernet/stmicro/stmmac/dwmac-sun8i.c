@@ -782,6 +782,7 @@ static int sun8i_dwmac_unpower_internal_phy(struct sunxi_priv_data *gmac)
 
 	clk_disable_unprepare(gmac->ephy_clk);
 	reset_control_assert(gmac->rst_ephy);
+	reset_control_put(gmac->rst_ephy);
 	return 0;
 }
 
@@ -942,7 +943,7 @@ static int sun8i_dwmac_probe(struct platform_device *pdev)
 			return -EINVAL;
 		}
 
-		gmac->rst_ephy = of_reset_control_get(plat_dat->phy_node, NULL);
+		gmac->rst_ephy = of_reset_control_get_exclusive(plat_dat->phy_node, NULL);
 		if (IS_ERR(gmac->rst_ephy)) {
 			ret = PTR_ERR(gmac->rst_ephy);
 			if (ret == -EPROBE_DEFER)
