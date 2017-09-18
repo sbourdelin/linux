@@ -184,7 +184,7 @@ static void vicam_dostream(struct work_struct *work)
 		   HEADER_SIZE;
 	buffer = kmalloc(frame_sz, GFP_KERNEL | GFP_DMA);
 	if (!buffer)
-		goto exit;
+		return;
 
 	while (gspca_dev->present && gspca_dev->streaming) {
 #ifdef CONFIG_PM
@@ -205,7 +205,7 @@ static void vicam_dostream(struct work_struct *work)
 				frame_sz - HEADER_SIZE);
 		gspca_frame_add(gspca_dev, LAST_PACKET, NULL, 0);
 	}
-exit:
+
 	kfree(buffer);
 }
 
