@@ -183,10 +183,8 @@ static void vicam_dostream(struct work_struct *work)
 	frame_sz = gspca_dev->cam.cam_mode[gspca_dev->curr_mode].sizeimage +
 		   HEADER_SIZE;
 	buffer = kmalloc(frame_sz, GFP_KERNEL | GFP_DMA);
-	if (!buffer) {
-		pr_err("Couldn't allocate USB buffer\n");
+	if (!buffer)
 		goto exit;
-	}
 
 	while (gspca_dev->present && gspca_dev->streaming) {
 #ifdef CONFIG_PM
