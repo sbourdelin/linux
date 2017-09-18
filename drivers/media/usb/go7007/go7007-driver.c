@@ -104,7 +104,6 @@ static int go7007_load_encoder(struct go7007 *go)
 		fw_len = fw_entry->size - 16;
 		bounce = kmemdup(fw_entry->data + 16, fw_len, GFP_KERNEL);
 		if (bounce == NULL) {
-			v4l2_err(go, "unable to allocate %d bytes for firmware transfer\n", fw_len);
 			release_firmware(fw_entry);
 			return -1;
 		}
