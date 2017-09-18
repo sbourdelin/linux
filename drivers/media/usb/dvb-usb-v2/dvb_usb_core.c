@@ -921,7 +921,6 @@ int dvb_usbv2_probe(struct usb_interface *intf,
 
 	d = kzalloc(sizeof(struct dvb_usb_device), GFP_KERNEL);
 	if (!d) {
-		dev_err(&udev->dev, "%s: kzalloc() failed\n", KBUILD_MODNAME);
 		ret = -ENOMEM;
 		goto err;
 	}
@@ -944,8 +943,6 @@ int dvb_usbv2_probe(struct usb_interface *intf,
 	if (d->props->size_of_priv) {
 		d->priv = kzalloc(d->props->size_of_priv, GFP_KERNEL);
 		if (!d->priv) {
-			dev_err(&d->udev->dev, "%s: kzalloc() failed\n",
-					KBUILD_MODNAME);
 			ret = -ENOMEM;
 			goto err_free_all;
 		}
