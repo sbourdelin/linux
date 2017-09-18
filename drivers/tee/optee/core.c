@@ -441,6 +441,8 @@ static optee_invoke_fn *get_invoke_func(struct device_node *np)
 		return optee_smccc_hvc;
 	else if (!strcmp("smc", method))
 		return optee_smccc_smc;
+	else if (!strcmp("ti-smc", method))
+		return arm_ti_smccc_smc;
 
 	pr_warn("invalid \"method\" property: %s\n", method);
 	return ERR_PTR(-EINVAL);

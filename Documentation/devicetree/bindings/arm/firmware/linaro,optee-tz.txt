@@ -20,6 +20,8 @@ the reference implementation maintained by Linaro.
                    "hvc" : HVC #0, with the register assignments specified
 		           in drivers/tee/optee/optee_smc.h
 
+                   "ti-smc" : Similar to "smc" with TI specific register
+		              adjustments
 
 
 Example:
