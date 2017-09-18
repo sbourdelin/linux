@@ -4136,6 +4136,8 @@ static inline u64 intel_rc6_residency_us(struct drm_i915_private *dev_priv,
 	return DIV_ROUND_UP_ULL(intel_rc6_residency_ns(dev_priv, reg), 1000);
 }
 
+u32 intel_get_cagf(struct drm_i915_private *dev_priv, u32 rpstat1);
+
 #define I915_READ8(reg)		dev_priv->uncore.funcs.mmio_readb(dev_priv, (reg), true)
 #define I915_WRITE8(reg, val)	dev_priv->uncore.funcs.mmio_writeb(dev_priv, (reg), (val), true)
 
