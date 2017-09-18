@@ -910,6 +910,14 @@ out_qunlock:
 	return error;
 }
 
+/*
+ * Supported fallocate modes
+ */
+#define GFS2_FALLOC_SUPPORTED   (FALLOC_FL_KEEP_SIZE |		\
+				 FALLOC_FL_QUERY_SUPPORT |	\
+				 FALLOC_FL_PREALLOC_RANGE)
+
+
 static long gfs2_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 {
 	struct inode *inode = file_inode(file);
@@ -918,11 +926,18 @@ static long gfs2_fallocate(struct file *file, int mode, loff_t offset, loff_t le
 	struct gfs2_holder gh;
 	int ret;
 
-	if (mode & ~FALLOC_FL_KEEP_SIZE)
+	if (mode & ~GFS2_FALLOC_SUPPORTED)
 		return -EOPNOTSUPP;
+
 	/* fallocate is needed by gfs2_grow to reserve space in the rindex */
-	if (gfs2_is_jdata(ip) && inode != sdp->sd_rindex)
+	if (gfs2_is_jdata(ip) && inode != sdp->sd_rindex) {
+		if (mode & FALLOC_FL_QUERY_SUPPORT)
+			return 0;
 		return -EOPNOTSUPP;
+	}
+
+	if (mode & FALLOC_FL_QUERY_SUPPORT)
+		return GFS2_FALLOC_SUPPORTED;
 
 	inode_lock(inode);
 
