@@ -239,12 +239,11 @@ static long fat_fallocate(struct file *file, int mode,
 	int err = 0;
 
 	/* No support for hole punch or other fallocate flags. */
-	if (mode & ~FALLOC_FL_KEEP_SIZE)
+	if (mode & ~FAT_FALLOC_SUPPORTED)
 		return -EOPNOTSUPP;
 
-	/* No support for dir */
-	if (!S_ISREG(inode->i_mode))
-		return -EOPNOTSUPP;
+	if (mode & FALLOC_FL_QUERY_SUPPORT)
+		return FAT_FALLOC_SUPPORTED;
 
 	inode_lock(inode);
 	if (mode & FALLOC_FL_KEEP_SIZE) {

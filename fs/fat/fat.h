@@ -57,6 +57,13 @@ struct fat_mount_options {
 #define FAT_HASH_SIZE	(1UL << FAT_HASH_BITS)
 
 /*
+ * Supported fallocate modes
+ */
+#define FAT_FALLOC_SUPPORTED	(FALLOC_FL_KEEP_SIZE |		\
+				 FALLOC_FL_QUERY_SUPPORT |	\
+				 FALLOC_FL_PREALLOC_RANGE)
+
+/*
  * MS-DOS file system in-core superblock data
  */
 struct msdos_sb_info {
