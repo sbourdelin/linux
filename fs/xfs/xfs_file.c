@@ -746,7 +746,8 @@ buffered:
 #define	XFS_FALLOC_FL_SUPPORTED						\
 		(FALLOC_FL_KEEP_SIZE | FALLOC_FL_PUNCH_HOLE |		\
 		 FALLOC_FL_COLLAPSE_RANGE | FALLOC_FL_ZERO_RANGE |	\
-		 FALLOC_FL_INSERT_RANGE | FALLOC_FL_UNSHARE_RANGE)
+		 FALLOC_FL_INSERT_RANGE | FALLOC_FL_UNSHARE_RANGE |	\
+		 FALLOC_FL_QUERY_SUPPORT | FALLOC_FL_PREALLOC_RANGE)
 
 STATIC long
 xfs_file_fallocate(
@@ -767,6 +768,9 @@ xfs_file_fallocate(
 		return -EINVAL;
 	if (mode & ~XFS_FALLOC_FL_SUPPORTED)
 		return -EOPNOTSUPP;
+
+	if (mode & FALLOC_FL_QUERY_SUPPORT)
+		return XFS_FALLOC_FL_SUPPORTED;
 
 	xfs_ilock(ip, iolock);
 	error = xfs_break_layouts(inode, &iolock);
