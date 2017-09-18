@@ -241,8 +241,11 @@ static int cpus_mon_write(struct rdtgroup *rdtgrp, cpumask_var_t newmask,
 
 	/* Check whether cpus belong to parent ctrl group */
 	cpumask_andnot(tmpmask, newmask, &prgrp->cpu_mask);
-	if (cpumask_weight(tmpmask))
+	if (cpumask_weight(tmpmask)) {
+		seq_buf_puts(&last_cmd_status,
+			     "can only add CPUs to mongroup that belong to parent\n");
 		return -EINVAL;
+	}
 
 	/* Check whether cpus are dropped from this group */
 	cpumask_andnot(tmpmask, &rdtgrp->cpu_mask, newmask);
@@ -294,8 +297,11 @@ static int cpus_ctrl_write(struct rdtgroup *rdtgrp, cpumask_var_t newmask,
 	cpumask_andnot(tmpmask, &rdtgrp->cpu_mask, newmask);
 	if (cpumask_weight(tmpmask)) {
 		/* Can't drop from default group */
-		if (rdtgrp == &rdtgroup_default)
+		if (rdtgrp == &rdtgroup_default) {
+			seq_buf_puts(&last_cmd_status,
+				     "Can't drop CPUs from default group\n");
 			return -EINVAL;
+		}
 
 		/* Give any dropped cpus to rdtgroup_default */
 		cpumask_or(&rdtgroup_default.cpu_mask,
@@ -360,8 +366,10 @@ static ssize_t rdtgroup_cpus_write(struct kernfs_open_file *of,
 	}
 
 	rdtgrp = rdtgroup_kn_lock_live(of->kn);
+	seq_buf_clear(&last_cmd_status);
 	if (!rdtgrp) {
 		ret = -ENOENT;
+		seq_buf_puts(&last_cmd_status, "directory was removed\n");
 		goto unlock;
 	}
 
@@ -370,13 +378,16 @@ static ssize_t rdtgroup_cpus_write(struct kernfs_open_file *of,
 	else
 		ret = cpumask_parse(buf, newmask);
 
-	if (ret)
+	if (ret) {
+		seq_buf_puts(&last_cmd_status, "bad cpu list/mask\n");
 		goto unlock;
+	}
 
 	/* check that user didn't specify any offline cpus */
 	cpumask_andnot(tmpmask, newmask, cpu_online_mask);
 	if (cpumask_weight(tmpmask)) {
 		ret = -EINVAL;
+		seq_buf_puts(&last_cmd_status, "can only assign online cpus\n");
 		goto unlock;
 	}
 
