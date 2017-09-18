@@ -68,9 +68,9 @@ static int qtnf_netdev_open(struct net_device *ndev)
  */
 static int qtnf_netdev_close(struct net_device *ndev)
 {
-	netif_carrier_off(ndev);
 	qtnf_virtual_intf_cleanup(ndev);
 	qtnf_netdev_updown(ndev, 0);
+	netif_carrier_off(ndev);
 	return 0;
 }
 
