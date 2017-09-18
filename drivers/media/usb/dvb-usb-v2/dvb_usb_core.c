@@ -278,7 +278,7 @@ static int dvb_usb_start_feed(struct dvb_demux_feed *dvbdmxfeed)
 	/* resolve input and output streaming parameters */
 	if (d->props->get_stream_config) {
 		memcpy(&stream_props, &adap->props->stream,
-				sizeof(struct usb_data_stream_properties));
+		       sizeof(stream_props));
 		ret = d->props->get_stream_config(adap->fe[adap->active_fe],
 				&adap->ts_type, &stream_props);
 		if (ret)
@@ -919,7 +919,7 @@ int dvb_usbv2_probe(struct usb_interface *intf,
 		goto err;
 	}
 
-	d = kzalloc(sizeof(struct dvb_usb_device), GFP_KERNEL);
+	d = kzalloc(sizeof(*d), GFP_KERNEL);
 	if (!d) {
 		ret = -ENOMEM;
 		goto err;
