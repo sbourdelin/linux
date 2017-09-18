@@ -12579,20 +12579,9 @@ static int intel_atomic_commit(struct drm_device *dev,
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	int ret = 0;
 
-	ret = drm_atomic_helper_setup_commit(state, nonblock);
-	if (ret)
-		return ret;
-
 	drm_atomic_state_get(state);
 	i915_sw_fence_init(&intel_state->commit_ready,
 			   intel_atomic_commit_ready);
-
-	ret = intel_atomic_prepare_commit(dev, state);
-	if (ret) {
-		DRM_DEBUG_ATOMIC("Preparing state failed with %i\n", ret);
-		i915_sw_fence_commit(&intel_state->commit_ready);
-		return ret;
-	}
 
 	/*
 	 * The intel_legacy_cursor_update() fast path takes care
@@ -12602,19 +12591,37 @@ static int intel_atomic_commit(struct drm_device *dev,
 	 * updates happen during the correct frames. Gen9+ have
 	 * double buffered watermarks and so shouldn't need this.
 	 *
-	 * Do this after drm_atomic_helper_setup_commit() and
-	 * intel_atomic_prepare_commit() because we still want
-	 * to skip the flip and fb cleanup waits. Although that
-	 * does risk yanking the mapping from under the display
-	 * engine.
+	 * Unset state->legacy_cursor_update before the call to
+	 * drm_atomic_helper_setup_commit() because otherwise
+	 * drm_atomic_helper_wait_for_flip_done() is a noop and
+	 * we get FIFO underruns because we didn't wait
+	 * for vblank.
 	 *
 	 * FIXME doing watermarks and fb cleanup from a vblank worker
 	 * (assuming we had any) would solve these problems.
 	 */
-	if (INTEL_GEN(dev_priv) < 9)
-		state->legacy_cursor_update = false;
+	if (INTEL_GEN(dev_priv) < 9 && state->legacy_cursor_update) {
+		struct intel_crtc_state *new_crtc_state;
+		struct intel_crtc *crtc;
+		int i;
 
-	ret = drm_atomic_helper_swap_state(state, true);
+		for_each_new_intel_crtc_in_state(intel_state, crtc, new_crtc_state, i)
+			if (new_crtc_state->wm.need_postvbl_update ||
+			    new_crtc_state->update_wm_post)
+				state->legacy_cursor_update = false;
+	}
+
+	ret = intel_atomic_prepare_commit(dev, state);
+	if (ret) {
+		DRM_DEBUG_ATOMIC("Preparing state failed with %i\n", ret);
+		i915_sw_fence_commit(&intel_state->commit_ready);
+		return ret;
+	}
+
+	ret = drm_atomic_helper_setup_commit(state, nonblock);
+	if (!ret)
+		ret = drm_atomic_helper_swap_state(state, true);
+
 	if (ret) {
 		i915_sw_fence_commit(&intel_state->commit_ready);
 
