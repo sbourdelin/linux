@@ -892,6 +892,51 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
 	NODE_DATA(nid)->node_spanned_pages = spanned_pages;
 }
 
+static void __init node_associativity_setup(void)
+{
+	struct device_node *rtas;
+
+	rtas = of_find_node_by_path("/rtas");
+	if (rtas) {
+		const __be32 *prop;
+		u32 len, entries, numnodes, i;
+
+		prop = of_get_property(rtas,
+					"ibm,current-associativity-domains", &len);
+		if (!prop || len < sizeof(unsigned int)) {
+			prop = of_get_property(rtas,
+					"ibm,max-associativity-domains", &len);
+			goto endit;
+		}
+
+		entries = of_read_number(prop++, 1);
+
+		if (len < (entries * sizeof(unsigned int)))
+			goto endit;
+
+		if ((0 <= min_common_depth) && (min_common_depth <= (entries-1)))
+			entries = min_common_depth;
+		else
+			entries -= 1;
+
+		numnodes = of_read_number(&prop[entries], 1);
+
+		printk(KERN_INFO "numa: Nodes = %d (mcd = %d)\n", numnodes,
+			min_common_depth);
+
+		for (i = 0; i < numnodes; i++) {
+			if (!node_possible(i)) {
+				setup_node_data(i, 0, 0);
+				node_set(i, node_possible_map);
+			}
+		}
+	}
+
+endit:
+	if (rtas)
+		of_node_put(rtas);
+}
+
 void __init initmem_init(void)
 {
 	int nid, cpu;
@@ -910,6 +955,8 @@ void __init initmem_init(void)
 	 * lower the maximum NUMA node ID to what is actually present.
 	 */
 	nodes_and(node_possible_map, node_possible_map, node_online_map);
+
+	node_associativity_setup();
 
 	for_each_online_node(nid) {
 		unsigned long start_pfn, end_pfn;
