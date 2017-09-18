@@ -829,7 +829,7 @@ static void go7007_usb_read_audio_pipe_complete(struct urb *urb)
 		dev_err(go->dev, "short read in audio pipe!\n");
 		return;
 	}
-	if (go->audio_deliver != NULL)
+	if (go->audio_deliver)
 		go->audio_deliver(go, urb->transfer_buffer, urb->actual_length);
 	r = usb_submit_urb(urb, GFP_ATOMIC);
 	if (r < 0)
@@ -1119,11 +1119,11 @@ static int go7007_usb_probe(struct usb_interface *intf,
 	}
 
 	go = go7007_alloc(&board->main_info, &intf->dev);
-	if (go == NULL)
+	if (!go)
 		return -ENOMEM;
 
 	usb = kzalloc(sizeof(struct go7007_usb), GFP_KERNEL);
-	if (usb == NULL) {
+	if (!usb) {
 		kfree(go);
 		return -ENOMEM;
 	}
@@ -1141,10 +1141,10 @@ static int go7007_usb_probe(struct usb_interface *intf,
 
 	/* Allocate the URB and buffer for receiving incoming interrupts */
 	usb->intr_urb = usb_alloc_urb(0, GFP_KERNEL);
-	if (usb->intr_urb == NULL)
+	if (!usb->intr_urb)
 		goto allocfail;
 	usb->intr_urb->transfer_buffer = kmalloc(2*sizeof(u16), GFP_KERNEL);
-	if (usb->intr_urb->transfer_buffer == NULL)
+	if (!usb->intr_urb->transfer_buffer)
 		goto allocfail;
 
 	if (go->board_id == GO7007_BOARDID_SENSORAY_2250)
@@ -1276,11 +1276,11 @@ static int go7007_usb_probe(struct usb_interface *intf,
 	}
 	for (i = 0; i < 8; ++i) {
 		usb->video_urbs[i] = usb_alloc_urb(0, GFP_KERNEL);
-		if (usb->video_urbs[i] == NULL)
+		if (!usb->video_urbs[i])
 			goto allocfail;
 		usb->video_urbs[i]->transfer_buffer =
 						kmalloc(v_urb_len, GFP_KERNEL);
-		if (usb->video_urbs[i]->transfer_buffer == NULL)
+		if (!usb->video_urbs[i]->transfer_buffer)
 			goto allocfail;
 		usb_fill_bulk_urb(usb->video_urbs[i], usb->usbdev, video_pipe,
 				usb->video_urbs[i]->transfer_buffer, v_urb_len,
@@ -1292,11 +1292,11 @@ static int go7007_usb_probe(struct usb_interface *intf,
 	    (board->main_info.flags & GO7007_BOARD_HAS_AUDIO)) {
 		for (i = 0; i < 8; ++i) {
 			usb->audio_urbs[i] = usb_alloc_urb(0, GFP_KERNEL);
-			if (usb->audio_urbs[i] == NULL)
+			if (!usb->audio_urbs[i])
 				goto allocfail;
 			usb->audio_urbs[i]->transfer_buffer = kmalloc(4096,
 								GFP_KERNEL);
-			if (usb->audio_urbs[i]->transfer_buffer == NULL)
+			if (!usb->audio_urbs[i]->transfer_buffer)
 				goto allocfail;
 			usb_fill_bulk_urb(usb->audio_urbs[i], usb->usbdev,
 				usb_rcvbulkpipe(usb->usbdev, 8),

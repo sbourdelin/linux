@@ -91,7 +91,7 @@ static int go7007_load_encoder(struct go7007 *go)
 	int fw_len, rv = 0;
 	u16 intr_val, intr_data;
 
-	if (go->boot_fw == NULL) {
+	if (!go->boot_fw) {
 		if (request_firmware(&fw_entry, fw_name, go->dev)) {
 			v4l2_err(go, "unable to load firmware from file \"%s\"\n", fw_name);
 			return -1;
@@ -103,7 +103,7 @@ static int go7007_load_encoder(struct go7007 *go)
 		}
 		fw_len = fw_entry->size - 16;
 		bounce = kmemdup(fw_entry->data + 16, fw_len, GFP_KERNEL);
-		if (bounce == NULL) {
+		if (!bounce) {
 			release_firmware(fw_entry);
 			return -1;
 		}
@@ -448,7 +448,7 @@ static struct go7007_buffer *frame_boundary(struct go7007 *go, struct go7007_buf
 	u32 *bytesused;
 	struct go7007_buffer *vb_tmp = NULL;
 
-	if (vb == NULL) {
+	if (!vb) {
 		spin_lock(&go->spinlock);
 		if (!list_empty(&go->vidq_active))
 			vb = go->active_buf =
@@ -598,7 +598,7 @@ void go7007_parse_video_stream(struct go7007 *go, u8 *buf, int length)
 			    (buf[i] == seq_start_code ||
 			     buf[i] == gop_start_code ||
 			     buf[i] == frame_start_code)) {
-				if (vb == NULL || go->seen_frame)
+				if (!vb || go->seen_frame)
 					vb = frame_boundary(go, vb);
 				go->seen_frame = buf[i] == frame_start_code;
 				if (vb && go->seen_frame)
@@ -700,7 +700,7 @@ struct go7007 *go7007_alloc(const struct go7007_board_info *board,
 	int i;
 
 	go = kzalloc(sizeof(struct go7007), GFP_KERNEL);
-	if (go == NULL)
+	if (!go)
 		return NULL;
 	go->dev = dev;
 	go->board_info = board;

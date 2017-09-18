@@ -164,14 +164,14 @@ static int write_reg(struct i2c_client *client, u8 reg, u8 value)
 	int dev_addr = client->addr << 1;  /* firmware wants 8-bit address */
 	u8 *buf;
 
-	if (go == NULL)
+	if (!go)
 		return -ENODEV;
 
 	if (go->status == STATUS_SHUTDOWN)
 		return -EBUSY;
 
 	buf = kzalloc(16, GFP_KERNEL);
-	if (buf == NULL)
+	if (!buf)
 		return -ENOMEM;
 
 	usb = go->hpi_context;
@@ -198,15 +198,14 @@ static int write_reg_fp(struct i2c_client *client, u16 addr, u16 val)
 	u8 *buf;
 	struct s2250 *dec = i2c_get_clientdata(client);
 
-	if (go == NULL)
+	if (!go)
 		return -ENODEV;
 
 	if (go->status == STATUS_SHUTDOWN)
 		return -EBUSY;
 
 	buf = kzalloc(16, GFP_KERNEL);
-
-	if (buf == NULL)
+	if (!buf)
 		return -ENOMEM;
 
 
@@ -261,15 +260,14 @@ static int read_reg_fp(struct i2c_client *client, u16 addr, u16 *val)
 	int rc;
 	u8 *buf;
 
-	if (go == NULL)
+	if (!go)
 		return -ENODEV;
 
 	if (go->status == STATUS_SHUTDOWN)
 		return -EBUSY;
 
 	buf = kzalloc(16, GFP_KERNEL);
-
-	if (buf == NULL)
+	if (!buf)
 		return -ENOMEM;
 
 
@@ -514,11 +512,11 @@ static int s2250_probe(struct i2c_client *client,
 	struct go7007_usb *usb = go->hpi_context;
 
 	audio = i2c_new_dummy(adapter, TLV320_ADDRESS >> 1);
-	if (audio == NULL)
+	if (!audio)
 		return -ENOMEM;
 
 	state = kzalloc(sizeof(struct s2250), GFP_KERNEL);
-	if (state == NULL) {
+	if (!state) {
 		i2c_unregister_device(audio);
 		return -ENOMEM;
 	}
@@ -580,7 +578,7 @@ static int s2250_probe(struct i2c_client *client,
 
 	if (mutex_lock_interruptible(&usb->i2c_lock) == 0) {
 		data = kzalloc(16, GFP_KERNEL);
-		if (data != NULL) {
+		if (data) {
 			int rc = go7007_usb_vendor_request(go, 0x41, 0, 0,
 						       data, 16, 1);
 

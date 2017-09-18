@@ -186,12 +186,12 @@ static int set_capture_size(struct go7007 *go, struct v4l2_format *fmt, int try)
 	int sensor_height = 0, sensor_width = 0;
 	int width, height;
 
-	if (fmt != NULL && !valid_pixelformat(fmt->fmt.pix.pixelformat))
+	if (fmt && !valid_pixelformat(fmt->fmt.pix.pixelformat))
 		return -EINVAL;
 
 	get_resolution(go, &sensor_width, &sensor_height);
 
-	if (fmt == NULL) {
+	if (!fmt) {
 		width = sensor_width;
 		height = sensor_height;
 	} else if (go->board_info->sensor_flags & GO7007_SENSOR_SCALING) {
@@ -225,7 +225,7 @@ static int set_capture_size(struct go7007 *go, struct v4l2_format *fmt, int try)
 		height &= ~0xf;
 	}
 
-	if (fmt != NULL) {
+	if (fmt) {
 		u32 pixelformat = fmt->fmt.pix.pixelformat;
 
 		memset(fmt, 0, sizeof(*fmt));

@@ -114,7 +114,7 @@ static int go7007_snd_hw_params(struct snd_pcm_substream *substream,
 		vfree(substream->runtime->dma_area);
 	substream->runtime->dma_bytes = 0;
 	substream->runtime->dma_area = vmalloc(bytes);
-	if (substream->runtime->dma_area == NULL)
+	if (!substream->runtime->dma_area)
 		return -ENOMEM;
 	substream->runtime->dma_bytes = bytes;
 	go->audio_deliver = parse_audio_stream_data;
@@ -140,7 +140,7 @@ static int go7007_snd_capture_open(struct snd_pcm_substream *substream)
 	int r;
 
 	spin_lock_irqsave(&gosnd->lock, flags);
-	if (gosnd->substream == NULL) {
+	if (!gosnd->substream) {
 		gosnd->substream = substream;
 		substream->runtime->hw = go7007_snd_capture_hw;
 		r = 0;
@@ -236,7 +236,7 @@ int go7007_snd_init(struct go7007 *go)
 		return -ENOENT;
 	}
 	gosnd = kmalloc(sizeof(struct go7007_snd), GFP_KERNEL);
-	if (gosnd == NULL)
+	if (!gosnd)
 		return -ENOMEM;
 	spin_lock_init(&gosnd->lock);
 	gosnd->hw_ptr = gosnd->w_idx = gosnd->avail = 0;

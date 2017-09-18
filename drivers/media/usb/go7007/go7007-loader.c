@@ -67,7 +67,7 @@ static int go7007_loader_probe(struct usb_interface *interface,
 			break;
 
 	/* Should never happen */
-	if (fw_configs[i].fw_name1 == NULL)
+	if (!fw_configs[i].fw_name1)
 		goto failed2;
 
 	fw1 = fw_configs[i].fw_name1;
@@ -87,7 +87,7 @@ static int go7007_loader_probe(struct usb_interface *interface,
 		goto failed2;
 	}
 
-	if (fw2 == NULL)
+	if (!fw2)
 		return 0;
 
 	if (request_firmware(&fw, fw2, &usbdev->dev)) {
