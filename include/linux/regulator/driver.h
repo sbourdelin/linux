@@ -402,6 +402,20 @@ struct regulator_config {
 };
 
 /*
+ * struct coupled_reg_desc
+ *
+ * Describes coupling of two regulators. Each coupled regulator
+ * contains a pointer to that structure. If the regulator is not
+ * coupled with any other, it should remain NULL.
+ */
+struct coupled_reg_desc {
+	struct mutex mutex;
+	struct regulator_dev *coupled_rdevs[2];
+	int max_spread;
+	int enable_count;
+};
+
+/*
  * struct regulator_dev
  *
  * Voltage / Current regulator class device. One for each
@@ -423,6 +437,8 @@ struct regulator_dev {
 
 	/* lists we own */
 	struct list_head consumer_list; /* consumers we supply */
+
+	struct coupled_reg_desc *coupled_desc;
 
 	struct blocking_notifier_head notifier;
 	struct mutex mutex; /* consumer lock */
