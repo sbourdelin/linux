@@ -119,6 +119,7 @@ static const struct dma_map_ops loongson_dma_map_ops = {
 	.sync_sg_for_device = loongson_dma_sync_sg_for_device,
 	.mapping_error = swiotlb_dma_mapping_error,
 	.dma_supported = loongson_dma_supported,
+	.device_is_coherent = plat_device_is_coherent
 };
 
 void __init plat_swiotlb_setup(void)

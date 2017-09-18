@@ -131,6 +131,7 @@ struct dma_map_ops {
 #ifdef ARCH_HAS_DMA_GET_REQUIRED_MASK
 	u64 (*get_required_mask)(struct device *dev);
 #endif
+	int (*device_is_coherent)(struct device *dev);
 	int is_phys;
 };
 
@@ -697,6 +698,15 @@ static inline void *dma_zalloc_coherent(struct device *dev, size_t size,
 }
 
 #ifdef CONFIG_HAS_DMA
+static inline int device_is_coherent(struct device *dev)
+{
+	const struct dma_map_ops *ops = get_dma_ops(dev);
+	if (ops && ops->device_is_coherent)
+		return ops->device_is_coherent(dev);
+	else
+		return 1;    /* compatible behavior */
+}
+
 static inline int dma_get_cache_alignment(void)
 {
 #ifdef ARCH_DMA_MINALIGN

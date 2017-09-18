@@ -407,7 +407,8 @@ static const struct dma_map_ops mips_default_dma_map_ops = {
 	.sync_sg_for_cpu = mips_dma_sync_sg_for_cpu,
 	.sync_sg_for_device = mips_dma_sync_sg_for_device,
 	.mapping_error = mips_dma_mapping_error,
-	.dma_supported = mips_dma_supported
+	.dma_supported = mips_dma_supported,
+	.device_is_coherent = plat_device_is_coherent
 };
 
 const struct dma_map_ops *mips_dma_map_ops = &mips_default_dma_map_ops;
