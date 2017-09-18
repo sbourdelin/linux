@@ -205,4 +205,49 @@ static inline void memalloc_noreclaim_restore(unsigned int flags)
 	current->flags = (current->flags & ~PF_MEMALLOC) | flags;
 }
 
+#ifdef CONFIG_ARCH_HAS_MEMBARRIER_HOOKS
+#include <asm/membarrier.h>
+#else
+static inline void membarrier_arch_sched_in(struct task_struct *prev,
+		struct task_struct *next)
+{
+}
+static inline void membarrier_arch_register_private_expedited(
+		struct task_struct *p)
+{
+}
+static inline void membarrier_arch_fork(struct task_struct *t,
+		unsigned long clone_flags)
+{
+}
+static inline void membarrier_arch_execve(struct task_struct *t)
+{
+}
+#endif
+
+#ifdef CONFIG_MEMBARRIER
+static inline void membarrier_fork(struct task_struct *t,
+		unsigned long clone_flags)
+{
+	if (!current->mm || !t->mm)
+		return;
+	t->mm->membarrier_private_expedited =
+		current->mm->membarrier_private_expedited;
+	membarrier_arch_fork(t, clone_flags);
+}
+static inline void membarrier_execve(struct task_struct *t)
+{
+	t->mm->membarrier_private_expedited = 0;
+	membarrier_arch_execve(t);
+}
+#else
+static inline void membarrier_fork(struct task_struct *t,
+		unsigned long clone_flags)
+{
+}
+static inline void membarrier_execve(struct task_struct *t)
+{
+}
+#endif
+
 #endif /* _LINUX_SCHED_MM_H */
