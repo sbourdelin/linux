@@ -39,7 +39,9 @@ ams,input-max-microamp: Maximum flash controller input current. The
 Optional properties of the flash child node
 ===========================================
 
-label		: The label of the flash LED.
+label		: The label of the flash LED. The label is otherwise assumed to
+		  be the device node name concatenated with ":white:" and the
+		  name of the flash LED node is assumed if omitted.
 
 
 Required properties of the indicator child node (1)
@@ -52,7 +54,9 @@ led-max-microamp: Maximum indicator current. The allowed values are
 Optional properties of the indicator child node
 ===============================================
 
-label		: The label of the indicator LED.
+label		: The label of the indicator LED. The label is otherwise assumed
+		  to be the device node name concatenated with ":red:" and the
+		  name of the indicator LED node is assumed if omitted.
 
 
 Example
@@ -69,11 +73,11 @@ Example
 			flash-max-microamp = <320000>;
 			led-max-microamp = <60000>;
 			ams,input-max-microamp = <1750000>;
-			label = "as3645a:flash";
+			label = "as3645a:white:flash";
 		};
 		indicator@1 {
 			reg = <0x1>;
 			led-max-microamp = <10000>;
-			label = "as3645a:indicator";
+			label = "as3645a:red:indicator";
 		};
 	};
