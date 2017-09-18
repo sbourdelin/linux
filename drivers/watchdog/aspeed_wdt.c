@@ -221,7 +221,8 @@ static int aspeed_wdt_probe(struct platform_device *pdev)
 		return -EINVAL;
 	config = ofdid->data;
 
-	wdt->ctrl = WDT_CTRL_1MHZ_CLK;
+	wdt->ctrl |= readl(wdt->base + WDT_CTRL) & WDT_CTRL_ENABLE;
+	wdt->ctrl |= WDT_CTRL_1MHZ_CLK;
 
 	/*
 	 * Control reset on a per-device basis to ensure the
@@ -243,11 +244,11 @@ static int aspeed_wdt_probe(struct platform_device *pdev)
 	if (of_property_read_bool(np, "aspeed,external-signal"))
 		wdt->ctrl |= WDT_CTRL_WDT_EXT;
 
-	writel(wdt->ctrl, wdt->base + WDT_CTRL);
-
-	if (readl(wdt->base + WDT_CTRL) & WDT_CTRL_ENABLE)  {
+	if (wdt->ctrl & WDT_CTRL_ENABLE) {
 		aspeed_wdt_start(&wdt->wdd);
 		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
+	} else {
+		writel(wdt->ctrl, wdt->base + WDT_CTRL);
 	}
 
 	if (of_device_is_compatible(np, "aspeed,ast2500-wdt")) {
