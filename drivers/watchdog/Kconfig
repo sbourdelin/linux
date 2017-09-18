@@ -741,17 +741,15 @@ config RENESAS_RZAWDT
 	  Renesas RZ/A SoCs. These watchdogs can be used to reset a system.
 
 config ASPEED_WATCHDOG
-	tristate "Aspeed BMC watchdog support"
+	bool "Aspeed BMC watchdog support"
 	depends on ARCH_ASPEED || COMPILE_TEST
+	default y if ARCH_ASPEED
 	select WATCHDOG_CORE
 	help
 	  Say Y here to include support for the watchdog timer
 	  in Aspeed BMC SoCs.
 
 	  This driver is required to reboot the SoC.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called aspeed_wdt.
 
 config ZX2967_WATCHDOG
 	tristate "ZTE zx2967 SoCs watchdog support"
