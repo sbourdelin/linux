@@ -4144,9 +4144,6 @@ int ext4_punch_hole(struct inode *inode, loff_t offset, loff_t length)
 	unsigned int credits;
 	int ret = 0;
 
-	if (!S_ISREG(inode->i_mode))
-		return -EOPNOTSUPP;
-
 	trace_ext4_punch_hole(inode, offset, length, 0);
 
 	/*
