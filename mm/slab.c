@@ -4132,6 +4132,7 @@ void get_slabinfo(struct kmem_cache *cachep, struct slabinfo *sinfo)
 	sinfo->shared = cachep->shared;
 	sinfo->objects_per_slab = cachep->num;
 	sinfo->cache_order = cachep->gfporder;
+	sinfo->reclaim = is_reclaimable(cachep);
 }
 
 void slabinfo_show_stats(struct seq_file *m, struct kmem_cache *cachep)
