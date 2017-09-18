@@ -66,7 +66,7 @@ struct dentry_stat_t {
 	long age_limit;		/* age in seconds */
 	long want_pages;	/* pages requested by system */
 	long nr_negative;	/* # of negative dentries */
-	long dummy;
+	long nr_killed;		/* # of negative dentries killed */
 };
 extern struct dentry_stat_t dentry_stat;
 
