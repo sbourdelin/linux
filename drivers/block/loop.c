@@ -414,7 +414,7 @@ out_free_page:
 	return ret;
 }
 
-static int lo_discard(struct loop_device *lo, struct request *rq, loff_t pos)
+static int lo_falloc(struct loop_device *lo, struct request *rq, loff_t pos)
 {
 	/*
 	 * We use punch hole to reclaim the free space used by the
@@ -423,10 +423,24 @@ static int lo_discard(struct loop_device *lo, struct request *rq, loff_t pos)
 	 * useful information.
 	 */
 	struct file *file = lo->lo_backing_file;
-	int mode = FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE;
-	int ret;
+	int mode, ret;
 
 	if ((!file->f_op->fallocate) || lo->lo_encrypt_key_size) {
+		ret = -EOPNOTSUPP;
+		goto out;
+	}
+
+	switch (req_op(rq)) {
+	case REQ_OP_WRITE_ZEROES:
+		if (rq->cmd_flags & REQ_NOUNMAP)
+			mode = FALLOC_FL_ZERO_RANGE | FALLOC_FL_KEEP_SIZE;
+		else
+			mode = FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE;
+		break;
+	case REQ_OP_DISCARD:
+		mode = FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE;
+		break;
+	default:
 		ret = -EOPNOTSUPP;
 		goto out;
 	}
@@ -567,7 +581,7 @@ static int do_req_filebacked(struct loop_device *lo, struct request *rq)
 		return lo_req_flush(lo, rq);
 	case REQ_OP_DISCARD:
 	case REQ_OP_WRITE_ZEROES:
-		return lo_discard(lo, rq, pos);
+		return lo_falloc(lo, rq, pos);
 	case REQ_OP_WRITE:
 		if (lo->transfer)
 			return lo_write_transfer(lo, rq, pos);
@@ -794,11 +808,18 @@ static void loop_sysfs_exit(struct loop_device *lo)
 			   &loop_attribute_group);
 }
 
-static void loop_config_discard(struct loop_device *lo)
+static void loop_config_falloc(struct loop_device *lo)
 {
 	struct file *file = lo->lo_backing_file;
 	struct inode *inode = file->f_mapping->host;
 	struct request_queue *q = lo->lo_queue;
+	int mode, ret;
+
+	q->limits.discard_granularity = 0;
+	q->limits.discard_alignment = 0;
+	blk_queue_max_discard_sectors(q, 0);
+	blk_queue_max_write_zeroes_sectors(q, 0);
+	queue_flag_clear_unlocked(QUEUE_FLAG_DISCARD, q);
 
 	/*
 	 * We use punch hole to reclaim the free space used by the
@@ -807,21 +828,25 @@ static void loop_config_discard(struct loop_device *lo)
 	 * useful information.
 	 */
 	if ((!file->f_op->fallocate) ||
-	    lo->lo_encrypt_key_size) {
-		q->limits.discard_granularity = 0;
-		q->limits.discard_alignment = 0;
-		blk_queue_max_discard_sectors(q, 0);
-		blk_queue_max_write_zeroes_sectors(q, 0);
-		queue_flag_clear_unlocked(QUEUE_FLAG_DISCARD, q);
+	    lo->lo_encrypt_key_size)
 		return;
+
+	/*
+	 * Now find out whether the backing file supports punch hole
+	 * or at least zero range operations.
+	 */
+	mode = FALLOC_FL_QUERY_SUPPORT;
+	ret = file->f_op->fallocate(file, mode, 0, 0);
+	if (ret & FALLOC_FL_ZERO_RANGE)
+		blk_queue_max_write_zeroes_sectors(q, UINT_MAX >> 9);
+	if (ret & FALLOC_FL_PUNCH_HOLE) {
+		q->limits.discard_granularity = inode->i_sb->s_blocksize;
+		q->limits.discard_alignment = 0;
+
+		blk_queue_max_discard_sectors(q, UINT_MAX >> 9);
+		blk_queue_max_write_zeroes_sectors(q, UINT_MAX >> 9);
+		queue_flag_set_unlocked(QUEUE_FLAG_DISCARD, q);
 	}
-
-	q->limits.discard_granularity = inode->i_sb->s_blocksize;
-	q->limits.discard_alignment = 0;
-
-	blk_queue_max_discard_sectors(q, UINT_MAX >> 9);
-	blk_queue_max_write_zeroes_sectors(q, UINT_MAX >> 9);
-	queue_flag_set_unlocked(QUEUE_FLAG_DISCARD, q);
 }
 
 static void loop_unprepare_queue(struct loop_device *lo)
@@ -1118,7 +1143,7 @@ loop_set_status(struct loop_device *lo, const struct loop_info64 *info)
 		}
 	}
 
-	loop_config_discard(lo);
+	loop_config_falloc(lo);
 
 	memcpy(lo->lo_file_name, info->lo_file_name, LO_NAME_SIZE);
 	memcpy(lo->lo_crypt_name, info->lo_crypt_name, LO_NAME_SIZE);
