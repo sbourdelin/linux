@@ -365,12 +365,14 @@ execlists_context_status_change(struct drm_i915_gem_request *rq,
 static inline void
 execlists_context_schedule_in(struct drm_i915_gem_request *rq)
 {
+	intel_engine_context_in(rq->engine);
 	execlists_context_status_change(rq, INTEL_CONTEXT_SCHEDULE_IN);
 }
 
 static inline void
 execlists_context_schedule_out(struct drm_i915_gem_request *rq)
 {
+	intel_engine_context_out(rq->engine);
 	execlists_context_status_change(rq, INTEL_CONTEXT_SCHEDULE_OUT);
 }
 
