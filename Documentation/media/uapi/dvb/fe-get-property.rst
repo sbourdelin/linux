@@ -2,14 +2,14 @@
 
 .. _FE_GET_PROPERTY:
 
-**************************************
-ioctl FE_SET_PROPERTY, FE_GET_PROPERTY
-**************************************
+**************************************************************
+ioctl FE_SET_PROPERTY, FE_GET_PROPERTY, FE_SET_PROPERTY_SHORT
+**************************************************************
 
 Name
 ====
 
-FE_SET_PROPERTY - FE_GET_PROPERTY - FE_SET_PROPERTY sets one or more frontend properties. - FE_GET_PROPERTY returns one or more frontend properties.
+FE_SET_PROPERTY and FE_SET_PROPERTY_SHORT set one or more frontend properties. FE_GET_PROPERTY returns one or more frontend properties.
 
 
 Synopsis
@@ -21,6 +21,8 @@ Synopsis
 .. c:function:: int ioctl( int fd, FE_SET_PROPERTY, struct dtv_properties *argp )
     :name: FE_SET_PROPERTY
 
+.. c:function:: int ioctl( int fd, FE_SET_PROPERTY_SHORT, struct dtv_properties_short *argp )
+    :name: FE_SET_PROPERTY_SHORT
 
 Arguments
 =========
@@ -29,15 +31,16 @@ Arguments
     File descriptor returned by :ref:`open() <frontend_f_open>`.
 
 ``argp``
-    pointer to struct :c:type:`dtv_properties`
+    Pointer to struct :c:type:`dtv_properties` or
+	struct :c:type:`dtv_properties_short`.
 
 
 Description
 ===========
 
-All DVB frontend devices support the ``FE_SET_PROPERTY`` and
-``FE_GET_PROPERTY`` ioctls. The supported properties and statistics
-depends on the delivery system and on the device:
+All DVB frontend devices support the ``FE_SET_PROPERTY``, ``FE_GET_PROPERTY``
+and ``FE_SET_PROPERTY_SHORT`` ioctls. The supported  properties and
+statistics depends on the delivery system and on the device:
 
 -  ``FE_SET_PROPERTY:``
 
@@ -60,6 +63,11 @@ depends on the delivery system and on the device:
 
    -  This call only requires read-only access to the device.
 
+-  ``FE_SET_PROPERTY_SHORT:``
+
+   -  This ioctl is similar to FE_SET_PROPERTY ioctl mentioned above
+      except that the arguments of the former utilize a struct :c:type:`dtv_property_short`
+      which is smaller in size.
 
 Return Value
 ============
