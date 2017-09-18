@@ -5872,6 +5872,7 @@ void get_slabinfo(struct kmem_cache *s, struct slabinfo *sinfo)
 	sinfo->num_slabs = nr_slabs;
 	sinfo->objects_per_slab = oo_objects(s->oo);
 	sinfo->cache_order = oo_order(s->oo);
+	sinfo->reclaim = is_reclaimable(s);
 }
 
 void slabinfo_show_stats(struct seq_file *m, struct kmem_cache *s)

@@ -186,6 +186,7 @@ struct slabinfo {
 	unsigned int shared;
 	unsigned int objects_per_slab;
 	unsigned int cache_order;
+	unsigned int reclaim;
 };
 
 void get_slabinfo(struct kmem_cache *s, struct slabinfo *sinfo);
@@ -352,6 +353,11 @@ static inline void memcg_link_cache(struct kmem_cache *s)
 
 #endif /* CONFIG_MEMCG && !CONFIG_SLOB */
 
+static inline bool is_reclaimable(struct kmem_cache *s)
+{
+	return (s->flags & SLAB_RECLAIM_ACCOUNT) ? true : false;
+}
+
 static inline struct kmem_cache *cache_from_obj(struct kmem_cache *s, void *x)
 {
 	struct kmem_cache *cachep;
@@ -504,6 +510,7 @@ void *memcg_slab_start(struct seq_file *m, loff_t *pos);
 void *memcg_slab_next(struct seq_file *m, void *p, loff_t *pos);
 void memcg_slab_stop(struct seq_file *m, void *p);
 int memcg_slab_show(struct seq_file *m, void *p);
+void show_unreclaimable_slab(void);
 
 void ___cache_free(struct kmem_cache *cache, void *x, unsigned long addr);
 

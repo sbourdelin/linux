@@ -35,6 +35,8 @@ static void slab_caches_to_rcu_destroy_workfn(struct work_struct *work);
 static DECLARE_WORK(slab_caches_to_rcu_destroy_work,
 		    slab_caches_to_rcu_destroy_workfn);
 
+#define K(x) ((x)/1024)
+
 /*
  * Set of flags that will prevent slab merging
  */
@@ -1271,6 +1273,34 @@ static int slab_show(struct seq_file *m, void *p)
 	cache_show(s, m);
 	return 0;
 }
+
+void show_unreclaimable_slab()
+{
+	struct kmem_cache *s = NULL;
+	struct slabinfo sinfo;
+
+	memset(&sinfo, 0, sizeof(sinfo));
+
+	printk("Unreclaimable slabs:\n");
+
+	/*
+	 * Here acquiring slab_mutex is unnecessary since we don't prefer to
+	 * get sleep in oom path right before kernel panic, and avoid race condition.
+	 * Since it is already oom, so there should be not any big allocation
+	 * which could change the statistics significantly.
+	 */
+	list_for_each_entry(s, &slab_caches, list) {
+		if (!is_root_cache(s))
+			continue;
+
+		get_slabinfo(s, &sinfo);
+
+		if (!is_reclaimable(s) && sinfo.num_objs > 0)
+			printk("%-17s %luKB\n", cache_name(s), K(sinfo.num_objs * s->size));
+	}
+}
+EXPORT_SYMBOL(show_unreclaimable_slab);
+#undef K
 
 #if defined(CONFIG_MEMCG) && !defined(CONFIG_SLOB)
 void *memcg_slab_start(struct seq_file *m, loff_t *pos)
