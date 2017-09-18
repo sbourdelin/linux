@@ -227,6 +227,7 @@ error_inst:
 	key_revoke(authkey);
 	key_put(authkey);
 error_alloc:
+	put_cred(rka->cred);
 	key_put(rka->target_key);
 	key_put(rka->dest_keyring);
 	kfree(rka->callout_info);
