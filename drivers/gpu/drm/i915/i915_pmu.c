@@ -499,11 +499,17 @@ static void i915_pmu_enable(struct perf_event *event)
 		GEM_BUG_ON(sample >= I915_PMU_SAMPLE_BITS);
 		GEM_BUG_ON(engine->pmu.enable_count[sample] == ~0);
 		if (engine->pmu.enable_count[sample]++ == 0) {
+			/*
+			 * Enable engine busy stats tracking if needed or
+			 * alternatively cancel the scheduled disabling of the
+			 * same.
+			 */
 			if (engine_needs_busy_stats(engine) &&
 			    !engine->pmu.busy_stats) {
-				engine->pmu.busy_stats =
-					intel_enable_engine_stats(engine) == 0;
-				WARN_ON_ONCE(!engine->pmu.busy_stats);
+				engine->pmu.busy_stats = true;
+				if (!cancel_delayed_work(&engine->pmu.disable_busy_stats))
+					queue_work(system_long_wq,
+						   &engine->pmu.enable_busy_stats);
 			}
 		}
 	}
@@ -546,7 +552,15 @@ static void i915_pmu_disable(struct perf_event *event)
 			if (!engine_needs_busy_stats(engine) &&
 			    engine->pmu.busy_stats) {
 				engine->pmu.busy_stats = false;
-				intel_disable_engine_stats(engine);
+				/*
+				 * We request a delayed disable to handle the
+				 * rapid on/off cycles on events which can
+				 * happen when tools like perf stat start in a
+				 * nicer way.
+				 */
+				queue_delayed_work(system_long_wq,
+						   &engine->pmu.disable_busy_stats,
+						   round_jiffies_up_relative(HZ));
 			}
 		}
 	}
@@ -737,9 +751,27 @@ static int i915_pmu_cpu_offline(unsigned int cpu, struct hlist_node *node)
 	return 0;
 }
 
+static void __enable_busy_stats(struct work_struct *work)
+{
+	struct intel_engine_cs *engine =
+		container_of(work, typeof(*engine), pmu.enable_busy_stats);
+
+	WARN_ON_ONCE(intel_enable_engine_stats(engine));
+}
+
+static void __disable_busy_stats(struct work_struct *work)
+{
+	struct intel_engine_cs *engine =
+	       container_of(work, typeof(*engine), pmu.disable_busy_stats.work);
+
+	intel_disable_engine_stats(engine);
+}
+
 void i915_pmu_register(struct drm_i915_private *i915)
 {
 	int ret;
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
 
 	if (INTEL_GEN(i915) <= 2) {
 		DRM_INFO("PMU not supported for this GPU.");
@@ -773,6 +805,12 @@ void i915_pmu_register(struct drm_i915_private *i915)
 	i915->pmu.timer.function = i915_sample;
 	i915->pmu.enable = 0;
 
+	for_each_engine(engine, i915, id) {
+		INIT_WORK(&engine->pmu.enable_busy_stats, __enable_busy_stats);
+		INIT_DELAYED_WORK(&engine->pmu.disable_busy_stats,
+				  __disable_busy_stats);
+	}
+
 	ret = perf_pmu_register(&i915->pmu.base, "i915", -1);
 	if (ret == 0)
 		return;
@@ -791,6 +829,9 @@ err_hp_state:
 
 void i915_pmu_unregister(struct drm_i915_private *i915)
 {
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+
 	if (!i915->pmu.base.event_init)
 		return;
 
@@ -801,6 +842,11 @@ void i915_pmu_unregister(struct drm_i915_private *i915)
 	i915->pmu.enable = 0;
 
 	hrtimer_cancel(&i915->pmu.timer);
+
+	for_each_engine(engine, i915, id) {
+		flush_work(&engine->pmu.enable_busy_stats);
+		flush_delayed_work(&engine->pmu.disable_busy_stats);
+	}
 
 	perf_pmu_unregister(&i915->pmu.base);
 	i915->pmu.base.event_init = NULL;

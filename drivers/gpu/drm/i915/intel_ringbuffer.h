@@ -270,6 +270,22 @@ struct intel_engine_cs {
 		 * 		requested.
 		 */
 		bool busy_stats;
+		/**
+		 * @enable_busy_stats: Work item for engine busy stats enabling.
+		 *
+		 * Since the action can sleep it needs to be decoupled from the
+		 * perf API callback.
+		 */
+		struct work_struct enable_busy_stats;
+		/**
+		 * @disable_busy_stats: Work item for busy stats disabling.
+		 *
+		 * Same as with @enable_busy_stats action, with the difference
+		 * that we delay it in case there are rapid enable-disable
+		 * actions, which can happen during tool startup (like perf
+		 * stat).
+		 */
+		struct delayed_work disable_busy_stats;
 	} pmu;
 
 	/*
@@ -813,59 +829,68 @@ bool intel_engine_can_store_dword(struct intel_engine_cs *engine);
 struct intel_engine_cs *
 intel_engine_lookup_user(struct drm_i915_private *i915, u8 class, u8 instance);
 
+DECLARE_STATIC_KEY_FALSE(i915_engine_stats_key);
+
 static inline void intel_engine_context_in(struct intel_engine_cs *engine)
 {
 	unsigned long flags;
 
-	if (READ_ONCE(engine->stats.enabled) == 0)
-		return;
+	if (static_branch_unlikely(&i915_engine_stats_key)) {
+		if (READ_ONCE(engine->stats.enabled) == 0)
+			return;
 
-	spin_lock_irqsave(&engine->stats.lock, flags);
+		spin_lock_irqsave(&engine->stats.lock, flags);
 
-	if (engine->stats.enabled > 0) {
-		if (engine->stats.active++ == 0)
-			engine->stats.start = ktime_get();
-		GEM_BUG_ON(engine->stats.active == 0);
+			if (engine->stats.enabled > 0) {
+				if (engine->stats.active++ == 0)
+					engine->stats.start = ktime_get();
+				GEM_BUG_ON(engine->stats.active == 0);
+			}
+
+		spin_unlock_irqrestore(&engine->stats.lock, flags);
 	}
-
-	spin_unlock_irqrestore(&engine->stats.lock, flags);
 }
 
 static inline void intel_engine_context_out(struct intel_engine_cs *engine)
 {
 	unsigned long flags;
 
-	if (READ_ONCE(engine->stats.enabled) == 0)
-		return;
+	if (static_branch_unlikely(&i915_engine_stats_key)) {
+		if (READ_ONCE(engine->stats.enabled) == 0)
+			return;
 
-	spin_lock_irqsave(&engine->stats.lock, flags);
+		spin_lock_irqsave(&engine->stats.lock, flags);
 
-	if (engine->stats.enabled > 0) {
-		ktime_t last, now = ktime_get();
+		if (engine->stats.enabled > 0) {
+			ktime_t last, now = ktime_get();
 
-		if (engine->stats.active && --engine->stats.active == 0) {
-			/*
-			 * Decrement the active context count and in case GPU
-			 * is now idle add up to the running total.
-			 */
-			last = ktime_sub(now, engine->stats.start);
+			if (engine->stats.active &&
+			    --engine->stats.active == 0) {
+				/*
+				 * Decrement the active context count and in
+				 * case GPU is now idle add up to the running
+				 * total.
+				 */
+				last = ktime_sub(now, engine->stats.start);
 
-			engine->stats.total = ktime_add(engine->stats.total,
-							last);
-		} else if (engine->stats.active == 0) {
-			/*
-			 * After turning on engine stats, context out might be
-			 * the first event in which case we account from the
-			 * time stats gathering was turned on.
-			 */
-			last = ktime_sub(now, engine->stats.enabled_at);
+				engine->stats.total =
+					ktime_add(engine->stats.total, last);
+			} else if (engine->stats.active == 0) {
+				/*
+				 * After turning on engine stats, context out
+				 * might be the first event in which case we
+				 * account from the time stats gathering was
+				 * turned on.
+				 */
+				last = ktime_sub(now, engine->stats.enabled_at);
 
-			engine->stats.total = ktime_add(engine->stats.total,
-							last);
+				engine->stats.total =
+					ktime_add(engine->stats.total, last);
+			}
+
+			spin_unlock_irqrestore(&engine->stats.lock, flags);
 		}
 	}
-
-	spin_unlock_irqrestore(&engine->stats.lock, flags);
 }
 
 int intel_enable_engine_stats(struct intel_engine_cs *engine);

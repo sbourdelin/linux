@@ -21,6 +21,7 @@
  * IN THE SOFTWARE.
  *
  */
+#include <linux/static_key.h>
 
 #include "i915_drv.h"
 #include "intel_ringbuffer.h"
@@ -1558,6 +1559,10 @@ bool intel_engine_can_store_dword(struct intel_engine_cs *engine)
 	}
 }
 
+DEFINE_STATIC_KEY_FALSE(i915_engine_stats_key);
+static DEFINE_MUTEX(i915_engine_stats_mutex);
+static int i915_engine_stats_ref;
+
 /**
  * intel_enable_engine_stats() - Enable engine busy tracking on engine
  * @engine: engine to enable stats collection
@@ -1573,6 +1578,8 @@ int intel_enable_engine_stats(struct intel_engine_cs *engine)
 	if (!i915.enable_execlists)
 		return -ENODEV;
 
+	mutex_lock(&i915_engine_stats_mutex);
+
 	spin_lock_irqsave(&engine->stats.lock, flags);
 	if (engine->stats.enabled == ~0)
 		goto busy;
@@ -1580,10 +1587,16 @@ int intel_enable_engine_stats(struct intel_engine_cs *engine)
 		engine->stats.enabled_at = ktime_get();
 	spin_unlock_irqrestore(&engine->stats.lock, flags);
 
+	if (i915_engine_stats_ref++ == 0)
+		static_branch_enable(&i915_engine_stats_key);
+
+	mutex_unlock(&i915_engine_stats_mutex);
+
 	return 0;
 
 busy:
 	spin_unlock_irqrestore(&engine->stats.lock, flags);
+	mutex_unlock(&i915_engine_stats_mutex);
 
 	return -EBUSY;
 }
@@ -1601,6 +1614,7 @@ void intel_disable_engine_stats(struct intel_engine_cs *engine)
 	if (!i915.enable_execlists)
 		return;
 
+	mutex_lock(&i915_engine_stats_mutex);
 	spin_lock_irqsave(&engine->stats.lock, flags);
 	WARN_ON_ONCE(engine->stats.enabled == 0);
 	if (--engine->stats.enabled == 0) {
@@ -1610,6 +1624,9 @@ void intel_disable_engine_stats(struct intel_engine_cs *engine)
 		engine->stats.total = 0;
 	}
 	spin_unlock_irqrestore(&engine->stats.lock, flags);
+	if (--i915_engine_stats_ref == 0)
+		static_branch_disable(&i915_engine_stats_key);
+	mutex_unlock(&i915_engine_stats_mutex);
 }
 
 /**
