@@ -476,12 +476,35 @@ struct dtv_property {
 	int result;
 } __attribute__ ((packed));
 
+/**
+ * struct dtv_property_short - A shorter version of &struct dtv_property
+ *
+ * @cmd:	Digital TV command.
+ * @data:	An unsigned 32-bits number.
+ */
+struct dtv_property_short {
+	__u32 cmd;
+	__u32 data;
+};
+
 /* num of properties cannot exceed DTV_IOCTL_MAX_MSGS per ioctl */
 #define DTV_IOCTL_MAX_MSGS 64
 
 struct dtv_properties {
 	__u32 num;
 	struct dtv_property *props;
+};
+
+/**
+ * struct dtv_properties_short - A variant of &struct dtv_properties
+ * to support &struct dtv_property_short
+ *
+ * @num:	Number of properties
+ * @props:	Pointer to &struct dtv_property_short
+ */
+struct dtv_properties_short {
+	__u32 num;
+	struct dtv_property_short *props;
 };
 
 #if defined(__DVB_CORE__) || !defined (__KERNEL__)
@@ -565,6 +588,7 @@ struct dvb_frontend_event {
 
 #define FE_SET_PROPERTY		   _IOW('o', 82, struct dtv_properties)
 #define FE_GET_PROPERTY		   _IOR('o', 83, struct dtv_properties)
+#define FE_SET_PROPERTY_SHORT	   _IOW('o', 84, struct dtv_properties_short)
 
 /**
  * When set, this flag will disable any zigzagging or other "normal" tuning
