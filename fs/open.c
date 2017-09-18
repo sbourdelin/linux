@@ -241,12 +241,21 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 	struct inode *inode = file_inode(file);
 	long ret;
 
-	if (offset < 0 || len <= 0)
+	if ((offset < 0 || len <= 0) && !(mode & FALLOC_FL_QUERY_SUPPORT))
 		return -EINVAL;
 
 	/* Return error if mode is not supported */
 	if (mode & ~FALLOC_FL_SUPPORTED_MASK)
 		return -EOPNOTSUPP;
+
+	/* offset and length are not used in query support */
+	if ((mode & FALLOC_FL_QUERY_SUPPORT) && (offset != 0 || len != 0))
+		return -EINVAL;
+
+	/* Query support should only be used exclusively */
+	if ((mode & FALLOC_FL_QUERY_SUPPORT) &&
+	    (mode & ~FALLOC_FL_QUERY_SUPPORT))
+		return -EINVAL;
 
 	/* Punch hole and zero range are mutually exclusive */
 	if ((mode & (FALLOC_FL_PUNCH_HOLE | FALLOC_FL_ZERO_RANGE)) ==
@@ -327,6 +336,13 @@ int vfs_fallocate(struct file *file, int mode, loff_t offset, loff_t len)
 	 */
 	if (ret == 0)
 		fsnotify_modify(file);
+
+	/*
+	 * Let's not allow file systems return any random data, just fallocate
+	 * modes.
+	 */
+	if ((ret > 0) && (mode & FALLOC_FL_QUERY_SUPPORT))
+		ret &= FALLOC_FL_SUPPORTED_MASK;
 
 	file_end_write(file);
 	return ret;

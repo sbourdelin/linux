@@ -76,4 +76,17 @@
  */
 #define FALLOC_FL_UNSHARE_RANGE		0x40
 
+/*
+ * FALLOC_FL_QUERY_SUPPORT is used to query file system, or block device
+ * for a supported fallocate flags.
+ */
+#define FALLOC_FL_QUERY_SUPPORT		0x80
+
+/*
+ * FALLOC_FL_PREALLOC_RANGE is a placeholder for a default preallocation
+ * mode. It has the same effect as not specifying any flag at all. We need
+ * this to report back support for this particular mode,
+ */
+#define FALLOC_FL_PREALLOC_RANGE	0x100
+
 #endif /* _UAPI_FALLOC_H_ */
