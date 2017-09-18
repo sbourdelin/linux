@@ -57,6 +57,7 @@ static const char		*cpu_list;
 static DECLARE_BITMAP(cpu_bitmap, MAX_NR_CPUS);
 static struct perf_stat_config	stat_config;
 static int			max_blocks;
+static FILE			*per_event_dump_file;
 
 unsigned int scripting_max_stack = PERF_MAX_STACK_DEPTH;
 
@@ -2690,6 +2691,7 @@ int cmd_script(int argc, const char **argv)
 			.cpu_map	 = process_cpu_map_event,
 			.ordered_events	 = true,
 			.ordering_requires_timestamps = true,
+			.per_event_dump = false,
 		},
 	};
 	struct perf_data_file file = {
@@ -2760,6 +2762,8 @@ int cmd_script(int argc, const char **argv)
 		    "Show context switch events (if recorded)"),
 	OPT_BOOLEAN('\0', "show-namespace-events", &script.show_namespace_events,
 		    "Show namespace events (if recorded)"),
+	OPT_BOOLEAN('\0', "per-event-dump", &script.tool.per_event_dump,
+		    "print trace output to files named by the monitored events"),
 	OPT_BOOLEAN('f', "force", &symbol_conf.force, "don't complain, do it"),
 	OPT_INTEGER(0, "max-blocks", &max_blocks,
 		    "Maximum number of code blocks to dump with brstackinsn"),
@@ -2797,7 +2801,12 @@ int cmd_script(int argc, const char **argv)
 
 	file.path = input_name;
 	file.force = symbol_conf.force;
-
+	for (i = 1; argv[i] != NULL; i++) {
+		if (strcmp(argv[i], "--per-event-dump") == 0) {
+			script.tool.per_event_dump = true;
+			break;
+		}
+	}
 	if (argc > 1 && !strncmp(argv[0], "rec", strlen("rec"))) {
 		rec_script_path = get_script_path(argv[1], RECORD_SUFFIX);
 		if (!rec_script_path)
