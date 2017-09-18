@@ -238,7 +238,7 @@ static void qe_ic_mask_irq(struct irq_data *d)
 	raw_spin_unlock_irqrestore(&qe_ic_lock, flags);
 }
 
-static struct irq_chip qe_ic_irq_chip = {
+static const struct irq_chip qe_ic_irq_chip __initconst = {
 	.name = "QEIC",
 	.irq_unmask = qe_ic_unmask_irq,
 	.irq_mask = qe_ic_mask_irq,
