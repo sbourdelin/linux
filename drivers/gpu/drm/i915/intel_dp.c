@@ -4191,57 +4191,44 @@ update_status:
 static int
 intel_dp_check_mst_status(struct intel_dp *intel_dp)
 {
-	bool bret;
+	u8 esi[DP_DPRX_ESI_LEN] = { 0 };
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
 
-	if (intel_dp->is_mst) {
-		u8 esi[DP_DPRX_ESI_LEN] = { 0 };
-		int ret = 0;
-		int retry;
+	if (!intel_dp->is_mst)
+		return -EINVAL;
+
+	while (intel_dp_get_sink_irq_esi(intel_dp, esi)) {
+		int ret, retry;
 		bool handled;
-		bret = intel_dp_get_sink_irq_esi(intel_dp, esi);
-go_again:
-		if (bret == true) {
 
-			/* check link status - esi[10] = 0x200c */
-			if (intel_dp->active_mst_links &&
-			    !drm_dp_channel_eq_ok(&esi[10], intel_dp->lane_count)) {
-				DRM_DEBUG_KMS("channel EQ not ok, retraining\n");
-				intel_dp_start_link_train(intel_dp);
-				intel_dp_stop_link_train(intel_dp);
-			}
+		DRM_DEBUG_KMS("ESI %3ph\n", esi);
 
-			DRM_DEBUG_KMS("got esi %3ph\n", esi);
-			ret = drm_dp_mst_hpd_irq(&intel_dp->mst_mgr, esi, &handled);
+		/* check link status - esi[10] = 0x200c */
+		if (intel_dp->active_mst_links &&
+		    !drm_dp_channel_eq_ok(&esi[10], intel_dp->lane_count)) {
+			intel_dp_start_link_train(intel_dp);
+			intel_dp_stop_link_train(intel_dp);
+		}
 
-			if (handled) {
-				for (retry = 0; retry < 3; retry++) {
-					int wret;
-					wret = drm_dp_dpcd_write(&intel_dp->aux,
-								 DP_SINK_COUNT_ESI+1,
-								 &esi[1], 3);
-					if (wret == 3) {
-						break;
-					}
-				}
+		ret = drm_dp_mst_hpd_irq(&intel_dp->mst_mgr, esi, &handled);
+		if (!handled)
+			return 0;
 
-				bret = intel_dp_get_sink_irq_esi(intel_dp, esi);
-				if (bret == true) {
-					DRM_DEBUG_KMS("got esi2 %3ph\n", esi);
-					goto go_again;
-				}
-			} else
-				ret = 0;
+		for (retry = 0; retry < 3; retry++) {
+			int wret;
 
-			return ret;
-		} else {
-			struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
-			DRM_DEBUG_KMS("failed to get ESI - device may have failed\n");
-			intel_dp->is_mst = false;
-			drm_dp_mst_topology_mgr_set_mst(&intel_dp->mst_mgr, intel_dp->is_mst);
-			/* send a hotplug event */
-			drm_kms_helper_hotplug_event(intel_dig_port->base.base.dev);
+			wret = drm_dp_dpcd_write(&intel_dp->aux,
+						 DP_SINK_COUNT_ESI + 1, &esi[1],
+						 3);
+			if (wret == 3)
+				break;
 		}
 	}
+
+	DRM_DEBUG_KMS("failed to get ESI - device may have failed\n");
+	intel_dp->is_mst = false;
+	drm_dp_mst_topology_mgr_set_mst(&intel_dp->mst_mgr, intel_dp->is_mst);
+	drm_kms_helper_hotplug_event(intel_dig_port->base.base.dev);
 	return -EINVAL;
 }
 
