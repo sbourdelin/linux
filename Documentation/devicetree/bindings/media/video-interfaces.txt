@@ -55,6 +55,18 @@ divided into two separate ITU-R BT.656 8-bit busses.  In such case bus-width
 and data-shift properties can be used to assign physical data lines to each
 endpoint node (logical bus).
 
+Port and endpoint numbering
+---------------------------
+
+While the port and endpoint numbers are ultimately specific to a device,
+most devices have more limited scope than what the interface allows. They
+may, for instance, only support a single endpoint on a port. Or there may
+be only a single port on a device.
+
+Therefore, if ports are not explicitly documented for a device, only port
+number zero shall be used. The same applies to endpoints: if endpoint
+numbers are not explicitly documented, only endpoint number zero shall be
+used.
 
 Required properties
 -------------------
