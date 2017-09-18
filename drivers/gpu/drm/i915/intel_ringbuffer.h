@@ -265,6 +265,11 @@ struct intel_engine_cs {
 		 * Our internal timer stores the current counter in this field.
 		 */
 		u64 sample[I915_ENGINE_SAMPLE_MAX];
+		/**
+		 * @busy_stats: Has enablement of engine stats tracking been
+		 * 		requested.
+		 */
+		bool busy_stats;
 	} pmu;
 
 	/*

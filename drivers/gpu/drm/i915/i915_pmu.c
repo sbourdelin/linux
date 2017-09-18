@@ -90,6 +90,11 @@ static unsigned int event_enabled_bit(struct perf_event *event)
 	return config_enabled_bit(event->attr.config);
 }
 
+static bool supports_busy_stats(void)
+{
+	return i915.enable_execlists;
+}
+
 static bool pmu_needs_timer(struct drm_i915_private *i915, bool gpu_active)
 {
 	u64 enable;
@@ -115,6 +120,12 @@ static bool pmu_needs_timer(struct drm_i915_private *i915, bool gpu_active)
 	 */
 	if (!gpu_active)
 		enable &= ~ENGINE_SAMPLE_MASK;
+	/**
+	 * Also there is software busyness tracking available we do not
+	 * need the timer for I915_SAMPLE_BUSY counter.
+	 */
+	else if (supports_busy_stats())
+		enable &= ~BIT(I915_SAMPLE_BUSY);
 
 	/**
 	 * If some bits remain it means we need the sampling timer running.
@@ -192,7 +203,8 @@ static void engines_sample(struct drm_i915_private *dev_priv)
 		if (enable & BIT(I915_SAMPLE_QUEUED))
 			engine->pmu.sample[I915_SAMPLE_QUEUED] += PERIOD;
 
-		if (enable & BIT(I915_SAMPLE_BUSY)) {
+		if ((enable & BIT(I915_SAMPLE_BUSY)) &&
+		    !engine->pmu.busy_stats) {
 			u32 val;
 
 			fw = grab_forcewake(dev_priv, fw);
@@ -385,6 +397,9 @@ static u64 __i915_pmu_event_read(struct perf_event *event)
 
 		if (WARN_ON_ONCE(!engine)) {
 			/* Do nothing */
+		} else if (sample == I915_SAMPLE_BUSY &&
+			   engine->pmu.busy_stats) {
+			val = ktime_to_ns(intel_engine_get_busy_time(engine));
 		} else {
 			val = engine->pmu.sample[sample];
 		}
@@ -438,6 +453,12 @@ again:
 	local64_add(new - prev, &event->count);
 }
 
+static bool engine_needs_busy_stats(struct intel_engine_cs *engine)
+{
+	return supports_busy_stats() &&
+	       (engine->pmu.enable & BIT(I915_SAMPLE_BUSY));
+}
+
 static void i915_pmu_enable(struct perf_event *event)
 {
 	struct drm_i915_private *i915 =
@@ -477,7 +498,14 @@ static void i915_pmu_enable(struct perf_event *event)
 
 		GEM_BUG_ON(sample >= I915_PMU_SAMPLE_BITS);
 		GEM_BUG_ON(engine->pmu.enable_count[sample] == ~0);
-		engine->pmu.enable_count[sample]++;
+		if (engine->pmu.enable_count[sample]++ == 0) {
+			if (engine_needs_busy_stats(engine) &&
+			    !engine->pmu.busy_stats) {
+				engine->pmu.busy_stats =
+					intel_enable_engine_stats(engine) == 0;
+				WARN_ON_ONCE(!engine->pmu.busy_stats);
+			}
+		}
 	}
 
 	/*
@@ -513,8 +541,14 @@ static void i915_pmu_disable(struct perf_event *event)
 		 * Decrement the reference count and clear the enabled
 		 * bitmask when the last listener on an event goes away.
 		 */
-		if (--engine->pmu.enable_count[sample] == 0)
+		if (--engine->pmu.enable_count[sample] == 0) {
 			engine->pmu.enable &= ~BIT(sample);
+			if (!engine_needs_busy_stats(engine) &&
+			    engine->pmu.busy_stats) {
+				engine->pmu.busy_stats = false;
+				intel_disable_engine_stats(engine);
+			}
+		}
 	}
 
 	GEM_BUG_ON(bit >= I915_PMU_MASK_BITS);
