@@ -2,6 +2,7 @@
 #define _ASM_X86_INTEL_RDT_H
 
 #include <linux/sched.h>
+#include <linux/seq_buf.h>
 #include <linux/kernfs.h>
 #include <linux/jump_label.h>
 
@@ -29,6 +30,8 @@
 #define RMID_VAL_UNAVAIL		BIT_ULL(62)
 
 DECLARE_STATIC_KEY_FALSE(rdt_enable_key);
+
+extern struct seq_buf last_cmd_status;
 
 /**
  * struct mon_evt - Entry in the event list of a resource
@@ -126,12 +129,15 @@ struct rdtgroup {
 #define RFTYPE_BASE			BIT(1)
 #define RF_CTRLSHIFT			4
 #define RF_MONSHIFT			5
+#define RF_TOPSHIFT			6
 #define RFTYPE_CTRL			BIT(RF_CTRLSHIFT)
 #define RFTYPE_MON			BIT(RF_MONSHIFT)
+#define RFTYPE_TOP			BIT(RF_TOPSHIFT)
 #define RFTYPE_RES_CACHE		BIT(8)
 #define RFTYPE_RES_MB			BIT(9)
 #define RF_CTRL_INFO			(RFTYPE_INFO | RFTYPE_CTRL)
 #define RF_MON_INFO			(RFTYPE_INFO | RFTYPE_MON)
+#define RF_TOP_INFO			(RFTYPE_INFO | RFTYPE_TOP)
 #define RF_CTRL_BASE			(RFTYPE_BASE | RFTYPE_CTRL)
 
 /* List of all resource groups */
