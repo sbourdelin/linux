@@ -130,6 +130,30 @@ struct dentry_stat_t dentry_stat = {
 	.age_limit = 45,
 };
 
+/*
+ * There is a system-wide limit to the amount of negative dentries allowed
+ * in the super blocks' LRU lists. The current limit is 2% of the total
+ * system memory. On a 64-bit system with 1G memory, that translated to
+ * about 100k dentries which is quite a lot.
+ *
+ * To avoid performance problem with a global counter on an SMP system,
+ * the tracking is done mostly on a per-cpu basis. The total limit is
+ * distributed in a 80/20 ratio to per-cpu counters and a global free pool.
+ *
+ * If a per-cpu counter runs out of negative dentries, it can borrow extra
+ * ones from the global free pool. If it has more than its percpu limit,
+ * the extra ones will be returned back to the global pool.
+ */
+#define NEG_DENTRY_PC		2
+#define NEG_DENTRY_BATCH	(1 << 8)
+
+static long neg_dentry_percpu_limit __read_mostly;
+static long neg_dentry_nfree_init __read_mostly; /* Free pool initial value */
+static struct {
+	raw_spinlock_t nfree_lock;
+	long nfree;			/* Negative dentry free pool */
+} ndblk ____cacheline_aligned_in_smp;
+
 static DEFINE_PER_CPU(long, nr_dentry);
 static DEFINE_PER_CPU(long, nr_dentry_unused);
 static DEFINE_PER_CPU(long, nr_dentry_neg);
@@ -173,6 +197,7 @@ static long get_nr_dentry_neg(void)
 
 	for_each_possible_cpu(i)
 		sum += per_cpu(nr_dentry_neg, i);
+	sum += neg_dentry_nfree_init - ndblk.nfree;
 	return sum < 0 ? 0 : sum;
 }
 
@@ -239,9 +264,21 @@ static inline int dentry_string_cmp(const unsigned char *cs, const unsigned char
 
 #endif
 
-static inline void __neg_dentry_dec(struct dentry *dentry)
+/*
+ * Decrement negative dentry count if applicable.
+ */
+static void __neg_dentry_dec(struct dentry *dentry)
 {
-	this_cpu_dec(nr_dentry_neg);
+	if (unlikely(this_cpu_dec_return(nr_dentry_neg) < 0)) {
+		long *pcnt = get_cpu_ptr(&nr_dentry_neg);
+
+		if ((*pcnt < 0) && raw_spin_trylock(&ndblk.nfree_lock)) {
+			ACCESS_ONCE(ndblk.nfree) += NEG_DENTRY_BATCH;
+			*pcnt += NEG_DENTRY_BATCH;
+			raw_spin_unlock(&ndblk.nfree_lock);
+		}
+		put_cpu_ptr(&nr_dentry_neg);
+	}
 }
 
 static inline void neg_dentry_dec(struct dentry *dentry)
@@ -250,9 +287,45 @@ static inline void neg_dentry_dec(struct dentry *dentry)
 		__neg_dentry_dec(dentry);
 }
 
-static inline void __neg_dentry_inc(struct dentry *dentry)
+/*
+ * Try to decrement the negative dentry free pool by NEG_DENTRY_BATCH.
+ * The actual decrement returned by the function may be smaller.
+ */
+static long __neg_dentry_nfree_dec(void)
 {
-	this_cpu_inc(nr_dentry_neg);
+	long cnt = NEG_DENTRY_BATCH;
+
+	raw_spin_lock(&ndblk.nfree_lock);
+	if (ndblk.nfree < cnt)
+		cnt = ndblk.nfree;
+	ACCESS_ONCE(ndblk.nfree) -= cnt;
+	raw_spin_unlock(&ndblk.nfree_lock);
+	return cnt;
+}
+
+/*
+ * Increment negative dentry count if applicable.
+ */
+static void __neg_dentry_inc(struct dentry *dentry)
+{
+	long cnt = 0, *pcnt;
+
+	if (likely(this_cpu_inc_return(nr_dentry_neg) <=
+		   neg_dentry_percpu_limit))
+		return;
+
+	pcnt = get_cpu_ptr(&nr_dentry_neg);
+	if (READ_ONCE(ndblk.nfree) && (*pcnt > neg_dentry_percpu_limit)) {
+		cnt = __neg_dentry_nfree_dec();
+		*pcnt -= cnt;
+	}
+	put_cpu_ptr(&nr_dentry_neg);
+	/*
+	 * If there are too many negative dentries, set DCACHE_KILL_NEGATIVE
+	 * flag to indicate that the dentry should be killed.
+	 */
+	if (!cnt)
+		dentry->d_flags |= DCACHE_KILL_NEGATIVE;
 }
 
 static inline void neg_dentry_inc(struct dentry *dentry)
@@ -677,7 +750,40 @@ static struct dentry *dentry_kill(struct dentry *dentry)
 
 	if (!IS_ROOT(dentry)) {
 		parent = dentry->d_parent;
-		if (unlikely(!spin_trylock(&parent->d_lock))) {
+		if (unlikely(dentry->d_flags & DCACHE_KILL_NEGATIVE)) {
+			/*
+			 * Force the killing of this negative dentry when
+			 * DCACHE_KILL_NEGATIVE flag is set. This is to
+			 * protect against the worst case situation where
+			 * the parent d_lock is kept busy most of the time
+			 * while the number of negative dentries has
+			 * exceeded the limit. Leaving the dentry as is
+			 * will cause the number of negative entries to
+			 * continue to increase way past the limit under
+			 * the worst case situation.
+			 *
+			 * As the reference count is kept at 1 before
+			 * calling dentry_kill(), the dentry won't
+			 * disappear under the hood even if the dentry
+			 * lock is temporarily released.
+			 */
+			unsigned int dflags;
+
+			dentry->d_flags &= ~DCACHE_KILL_NEGATIVE;
+			dflags = dentry->d_flags;
+			parent = lock_parent(dentry);
+			/*
+			 * Abort the killing if the reference count or
+			 * d_flags changed.
+			 */
+			if ((dentry->d_flags != dflags) ||
+			    (dentry->d_lockref.count != 1)) {
+				if (parent)
+					spin_unlock(&parent->d_lock);
+				goto failed;
+			}
+
+		} else if (unlikely(!spin_trylock(&parent->d_lock))) {
 			if (inode)
 				spin_unlock(&inode->i_lock);
 			goto failed;
@@ -854,6 +960,9 @@ repeat:
 	}
 
 	dentry_lru_add(dentry);
+
+	if (unlikely(dentry->d_flags & DCACHE_KILL_NEGATIVE))
+		goto kill_it;
 
 	dentry->d_lockref.count--;
 	spin_unlock(&dentry->d_lock);
@@ -3611,6 +3720,26 @@ void d_tmpfile(struct dentry *dentry, struct inode *inode)
 }
 EXPORT_SYMBOL(d_tmpfile);
 
+static void __init neg_dentry_init(void)
+{
+	/* Rough estimate of # of dentries allocated per page */
+	unsigned int nr_dentry_page = PAGE_SIZE/sizeof(struct dentry) - 1;
+	unsigned long cnt;
+
+	raw_spin_lock_init(&ndblk.nfree_lock);
+
+	/* 20% in global pool & 80% in percpu free */
+	ndblk.nfree = neg_dentry_nfree_init
+		    = totalram_pages * nr_dentry_page * NEG_DENTRY_PC / 500;
+	cnt = ndblk.nfree * 4 / num_possible_cpus();
+	if (unlikely(cnt < 2 * NEG_DENTRY_BATCH))
+		cnt = 2 * NEG_DENTRY_BATCH;
+	neg_dentry_percpu_limit = cnt;
+
+	pr_info("Negative dentry: percpu limit = %ld, free pool = %ld\n",
+		neg_dentry_percpu_limit, ndblk.nfree);
+}
+
 static __initdata unsigned long dhash_entries;
 static int __init set_dhash_entries(char *str)
 {
@@ -3650,6 +3779,8 @@ static void __init dcache_init(void)
 	 */
 	dentry_cache = KMEM_CACHE(dentry,
 		SLAB_RECLAIM_ACCOUNT|SLAB_PANIC|SLAB_MEM_SPREAD|SLAB_ACCOUNT);
+
+	neg_dentry_init();
 
 	/* Hash may have been set up in dcache_init_early */
 	if (!hashdist)
