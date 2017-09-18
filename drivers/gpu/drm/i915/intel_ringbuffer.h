@@ -245,6 +245,28 @@ struct intel_engine_cs {
 		I915_SELFTEST_DECLARE(bool mock : 1);
 	} breadcrumbs;
 
+	struct {
+		/**
+		 * @enable: Bitmask of enable sample events on this engine.
+		 *
+		 * Bits correspond to sample event types, for instance
+		 * I915_SAMPLE_QUEUED is bit 0 etc.
+		 */
+		u32 enable;
+		/**
+		 * @enable_count: Reference count for the enabled samplers.
+		 *
+		 * Index number corresponds to the bit number from @enable.
+		 */
+		unsigned int enable_count[I915_PMU_SAMPLE_BITS];
+		/**
+		 * @sample: Counter value for sampling events.
+		 *
+		 * Our internal timer stores the current counter in this field.
+		 */
+		u64 sample[I915_ENGINE_SAMPLE_MAX];
+	} pmu;
+
 	/*
 	 * A pool of objects to use as shadow copies of client batch buffers
 	 * when the command parser is enabled. Prevents the client from
@@ -750,5 +772,8 @@ void intel_engines_mark_idle(struct drm_i915_private *i915);
 void intel_engines_reset_default_submission(struct drm_i915_private *i915);
 
 bool intel_engine_can_store_dword(struct intel_engine_cs *engine);
+
+struct intel_engine_cs *
+intel_engine_lookup_user(struct drm_i915_private *i915, u8 class, u8 instance);
 
 #endif /* _INTEL_RINGBUFFER_H_ */

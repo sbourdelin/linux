@@ -2183,3 +2183,28 @@ int intel_init_vebox_ring_buffer(struct intel_engine_cs *engine)
 
 	return intel_init_ring_buffer(engine);
 }
+
+static u8 user_class_map[I915_ENGINE_CLASS_MAX] = {
+	[I915_ENGINE_CLASS_OTHER] = OTHER_CLASS,
+	[I915_ENGINE_CLASS_RENDER] = RENDER_CLASS,
+	[I915_ENGINE_CLASS_COPY] = COPY_ENGINE_CLASS,
+	[I915_ENGINE_CLASS_VIDEO] = VIDEO_DECODE_CLASS,
+	[I915_ENGINE_CLASS_VIDEO_ENHANCE] = VIDEO_ENHANCEMENT_CLASS,
+};
+
+struct intel_engine_cs *
+intel_engine_lookup_user(struct drm_i915_private *i915, u8 class, u8 instance)
+{
+	if (class >= ARRAY_SIZE(user_class_map))
+		return NULL;
+
+	class = user_class_map[class];
+
+	if (WARN_ON_ONCE(class > MAX_ENGINE_CLASS))
+		return NULL;
+
+	if (instance > MAX_ENGINE_INSTANCE)
+		return NULL;
+
+	return i915->engine_class[class][instance];
+}

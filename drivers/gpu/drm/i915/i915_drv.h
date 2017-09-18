@@ -40,6 +40,7 @@
 #include <linux/hash.h>
 #include <linux/intel-iommu.h>
 #include <linux/kref.h>
+#include <linux/perf_event.h>
 #include <linux/pm_qos.h>
 #include <linux/reservation.h>
 #include <linux/shmem_fs.h>
@@ -2198,6 +2199,70 @@ struct intel_cdclk_state {
 	unsigned int cdclk, vco, ref;
 };
 
+enum {
+	__I915_SAMPLE_FREQ_ACT = 0,
+	__I915_SAMPLE_FREQ_REQ,
+	__I915_NUM_PMU_SAMPLERS
+};
+
+/**
+ * How many different events we track in the global PMU mask.
+ *
+ * It is also used to know to needed number of event reference counters.
+ */
+#define I915_PMU_MASK_BITS \
+	((1 << I915_PMU_SAMPLE_BITS) + \
+	 (I915_PMU_LAST + 1 - __I915_PMU_OTHER(0)))
+
+struct i915_pmu {
+	/**
+	 * @node: List node for CPU hotplug handling.
+	 */
+	struct hlist_node node;
+	/**
+	 * @base: PMU base.
+	 */
+	struct pmu base;
+	/**
+	 * @lock: Lock protecting enable mask and ref count handling.
+	 */
+	spinlock_t lock;
+	/**
+	 * @timer: Timer for internal i915 PMU sampling.
+	 */
+	struct hrtimer timer;
+	/**
+	 * @enable: Bitmask of all currently enabled events.
+	 *
+	 * Bits are derived from uAPI event numbers in a way that low 16 bits
+	 * correspond to engine event _sample_ _type_ (I915_SAMPLE_QUEUED is
+	 * bit 0), and higher bits correspond to other events (for instance
+	 * I915_PMU_ACTUAL_FREQUENCY is bit 16 etc).
+	 *
+	 * In other words, low 16 bits are not per engine but per engine
+	 * sampler type, while the upper bits are directly mapped to other
+	 * event types.
+	 */
+	u64 enable;
+	/**
+	 * @enable_count: Reference counts for the enabled events.
+	 *
+	 * Array indices are mapped in the same way as bits in the @enable field
+	 * and they are used to control sampling on/off when multiple clients
+	 * are using the PMU API.
+	 */
+	unsigned int enable_count[I915_PMU_MASK_BITS];
+	/**
+	 * @sample: Current counter value for i915 events which need sampling.
+	 *
+	 * These counters are updated from the i915 PMU sampling timer.
+	 *
+	 * Only global counters are held here, while the per-engine ones are in
+	 * struct intel_engine_cs.
+	 */
+	u64 sample[__I915_NUM_PMU_SAMPLERS];
+};
+
 struct drm_i915_private {
 	struct drm_device drm;
 
@@ -2246,6 +2311,8 @@ struct drm_i915_private {
 	struct pci_dev *bridge_dev;
 	struct i915_gem_context *kernel_context;
 	struct intel_engine_cs *engine[I915_NUM_ENGINES];
+	struct intel_engine_cs *engine_class[MAX_ENGINE_CLASS + 1]
+					    [MAX_ENGINE_INSTANCE + 1];
 	struct i915_vma *semaphore;
 
 	struct drm_dma_handle *status_page_dmah;
@@ -2707,6 +2774,8 @@ struct drm_i915_private {
 		struct platform_device *platdev;
 		int	irq;
 	} lpe_audio;
+
+	struct i915_pmu pmu;
 
 	/*
 	 * NOTE: This is the dri1/ums dungeon, don't add stuff here. Your patch
@@ -3930,6 +3999,15 @@ extern void i915_perf_init(struct drm_i915_private *dev_priv);
 extern void i915_perf_fini(struct drm_i915_private *dev_priv);
 extern void i915_perf_register(struct drm_i915_private *dev_priv);
 extern void i915_perf_unregister(struct drm_i915_private *dev_priv);
+
+/* i915_pmu.c */
+#ifdef CONFIG_PERF_EVENTS
+void i915_pmu_register(struct drm_i915_private *i915);
+void i915_pmu_unregister(struct drm_i915_private *i915);
+#else
+static inline void i915_pmu_register(struct drm_i915_private *i915) {}
+static inline void i915_pmu_unregister(struct drm_i915_private *i915) {}
+#endif
 
 /* i915_suspend.c */
 extern int i915_save_state(struct drm_i915_private *dev_priv);
