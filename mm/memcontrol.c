@@ -65,6 +65,7 @@
 #include <linux/lockdep.h>
 #include <linux/file.h>
 #include <linux/tracehook.h>
+#include <linux/memdelay.h>
 #include "internal.h"
 #include <net/sock.h>
 #include <net/ip.h>
@@ -3926,6 +3927,8 @@ out_kfree:
 	return ret;
 }
 
+static int memory_memdelay_show(struct seq_file *m, void *v);
+
 static struct cftype mem_cgroup_legacy_files[] = {
 	{
 		.name = "usage_in_bytes",
@@ -3992,6 +3995,10 @@ static struct cftype mem_cgroup_legacy_files[] = {
 	},
 	{
 		.name = "pressure_level",
+	},
+	{
+		.name = "memdelay",
+		.seq_show = memory_memdelay_show,
 	},
 #ifdef CONFIG_NUMA
 	{
@@ -4170,6 +4177,7 @@ static void __mem_cgroup_free(struct mem_cgroup *memcg)
 
 	for_each_node(node)
 		free_mem_cgroup_per_node_info(memcg, node);
+	memdelay_domain_free(memcg->memdelay_domain);
 	free_percpu(memcg->stat);
 	kfree(memcg);
 }
@@ -4275,9 +4283,14 @@ mem_cgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 
 	/* The following stuff does not apply to the root */
 	if (!parent) {
+		memcg->memdelay_domain = &memdelay_global_domain;
 		root_mem_cgroup = memcg;
 		return &memcg->css;
 	}
+
+	memcg->memdelay_domain = memdelay_domain_alloc();
+	if (!memcg->memdelay_domain)
+		goto fail;
 
 	error = memcg_online_kmem(memcg);
 	if (error)
@@ -5274,10 +5287,19 @@ static int memory_stat_show(struct seq_file *m, void *v)
 		   stat[WORKINGSET_REFAULT]);
 	seq_printf(m, "workingset_activate %lu\n",
 		   stat[WORKINGSET_ACTIVATE]);
+	seq_printf(m, "workingset_restore %lu\n",
+		   stat[WORKINGSET_RESTORE]);
 	seq_printf(m, "workingset_nodereclaim %lu\n",
 		   stat[WORKINGSET_NODERECLAIM]);
 
 	return 0;
+}
+
+static int memory_memdelay_show(struct seq_file *m, void *v)
+{
+	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
+
+	return memdelay_domain_show(m, memcg->memdelay_domain);
 }
 
 static struct cftype memory_files[] = {
@@ -5314,6 +5336,11 @@ static struct cftype memory_files[] = {
 		.name = "stat",
 		.flags = CFTYPE_NOT_ON_ROOT,
 		.seq_show = memory_stat_show,
+	},
+	{
+		.name = "memdelay",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.seq_show = memory_memdelay_show,
 	},
 	{ }	/* terminate */
 };

@@ -26,6 +26,7 @@
 #include <linux/profile.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
+#include <linux/memdelay.h>
 
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
@@ -759,6 +760,14 @@ static inline void enqueue_task(struct rq *rq, struct task_struct *p, int flags)
 	if (!(flags & ENQUEUE_RESTORE))
 		sched_info_queued(rq, p);
 
+	WARN_ON_ONCE(!(flags & ENQUEUE_WAKEUP) && p->memdelay_migrate_enqueue);
+	if (!(flags & ENQUEUE_WAKEUP) || p->memdelay_migrate_enqueue) {
+		memdelay_add_runnable(p);
+		p->memdelay_migrate_enqueue = 0;
+	} else {
+		memdelay_wakeup(p);
+	}
+
 	p->sched_class->enqueue_task(rq, p, flags);
 }
 
@@ -769,6 +778,11 @@ static inline void dequeue_task(struct rq *rq, struct task_struct *p, int flags)
 
 	if (!(flags & DEQUEUE_SAVE))
 		sched_info_dequeued(rq, p);
+
+	if (!(flags & DEQUEUE_SLEEP))
+		memdelay_del_runnable(p);
+	else
+		memdelay_sleep(p);
 
 	p->sched_class->dequeue_task(rq, p, flags);
 }
@@ -2044,7 +2058,16 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 
 	cpu = select_task_rq(p, p->wake_cpu, SD_BALANCE_WAKE, wake_flags);
 	if (task_cpu(p) != cpu) {
+		struct rq_flags rf;
+		struct rq *rq;
+
 		wake_flags |= WF_MIGRATED;
+
+		rq = __task_rq_lock(p, &rf);
+		memdelay_del_sleeping(p);
+		__task_rq_unlock(rq, &rf);
+		p->memdelay_migrate_enqueue = 1;
+
 		set_task_cpu(p, cpu);
 	}
 
@@ -3325,6 +3348,8 @@ static void __sched notrace __schedule(bool preempt)
 		rq->nr_switches++;
 		rq->curr = next;
 		++*switch_count;
+
+		memdelay_schedule(prev, next);
 
 		trace_sched_switch(preempt, prev, next);
 
@@ -5918,6 +5943,8 @@ void __init sched_init(void)
 	init_sched_fair_class();
 
 	init_schedstats();
+
+	memdelay_init();
 
 	scheduler_running = 1;
 }

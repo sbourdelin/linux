@@ -67,6 +67,7 @@
 #include <linux/memcontrol.h>
 #include <linux/ftrace.h>
 #include <linux/nmi.h>
+#include <linux/memdelay.h>
 
 #include <asm/sections.h>
 #include <asm/tlbflush.h>
@@ -3364,16 +3365,19 @@ __alloc_pages_direct_compact(gfp_t gfp_mask, unsigned int order,
 		unsigned int alloc_flags, const struct alloc_context *ac,
 		enum compact_priority prio, enum compact_result *compact_result)
 {
-	struct page *page;
 	unsigned int noreclaim_flag;
+	unsigned long mdflags;
+	struct page *page;
 
 	if (!order)
 		return NULL;
 
+	memdelay_enter(&mdflags);
 	noreclaim_flag = memalloc_noreclaim_save();
 	*compact_result = try_to_compact_pages(gfp_mask, order, alloc_flags, ac,
 									prio);
 	memalloc_noreclaim_restore(noreclaim_flag);
+	memdelay_leave(&mdflags);
 
 	if (*compact_result <= COMPACT_INACTIVE)
 		return NULL;
@@ -3519,13 +3523,15 @@ __perform_reclaim(gfp_t gfp_mask, unsigned int order,
 					const struct alloc_context *ac)
 {
 	struct reclaim_state reclaim_state;
-	int progress;
 	unsigned int noreclaim_flag;
+	unsigned long mdflags;
+	int progress;
 
 	cond_resched();
 
 	/* We now go into synchronous reclaim */
 	cpuset_memory_pressure_bump();
+	memdelay_enter(&mdflags);
 	noreclaim_flag = memalloc_noreclaim_save();
 	lockdep_set_current_reclaim_state(gfp_mask);
 	reclaim_state.reclaimed_slab = 0;
@@ -3537,6 +3543,7 @@ __perform_reclaim(gfp_t gfp_mask, unsigned int order,
 	current->reclaim_state = NULL;
 	lockdep_clear_current_reclaim_state();
 	memalloc_noreclaim_restore(noreclaim_flag);
+	memdelay_leave(&mdflags);
 
 	cond_resched();
 
