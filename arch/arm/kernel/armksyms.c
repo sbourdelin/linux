@@ -182,4 +182,5 @@ EXPORT_SYMBOL(__pv_offset);
 #ifdef CONFIG_HAVE_ARM_SMCCC
 EXPORT_SYMBOL(__arm_smccc_smc);
 EXPORT_SYMBOL(__arm_smccc_hvc);
+EXPORT_SYMBOL(arm_ti_smccc_smc);
 #endif

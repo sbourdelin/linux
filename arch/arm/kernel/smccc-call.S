@@ -43,6 +43,21 @@ UNWIND(	.save	{r4-r7})
 UNWIND(	.fnend)
 	.endm
 
+	.macro TI_SMCCC instr
+UNWIND(	.fnstart)
+	mov	r12, sp
+	push	{r4-r11}
+UNWIND(	.save	{r4-r11})
+	ldm	r12, {r4-r7}
+	mov	r12, #0x200
+	\instr
+	pop	{r4-r11}
+	ldr	r12, [sp, #(4 * 4)]
+	stm	r12, {r0-r3}
+	bx	lr
+UNWIND(	.fnend)
+	.endm
+
 /*
  * void smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
  *		  unsigned long a3, unsigned long a4, unsigned long a5,
@@ -62,3 +77,13 @@ ENDPROC(__arm_smccc_smc)
 ENTRY(__arm_smccc_hvc)
 	SMCCC SMCCC_HVC
 ENDPROC(__arm_smccc_hvc)
+
+/*
+ * void ti_smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
+ *		     unsigned long a3, unsigned long a4, unsigned long a5,
+ *		     unsigned long a6, unsigned long a7,
+ *		     struct arm_smccc_res *res)
+ */
+ENTRY(arm_ti_smccc_smc)
+	TI_SMCCC SMCCC_SMC
+ENDPROC(arm_ti_smccc_smc)

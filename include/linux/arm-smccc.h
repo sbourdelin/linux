@@ -130,5 +130,21 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
 
 #define arm_smccc_hvc_quirk(...) __arm_smccc_hvc(__VA_ARGS__)
 
+/**
+ * arm_ti_smccc_smc() - make TI SMC calls
+ * @a0-a7: arguments passed in registers 0 to 7
+ * @res: result values from registers 0 to 3
+ *
+ * This function is used to make TI style SMC calls following a TI proprietary
+ * SMC Call. The content of the supplied params are copied to registers 0 to 7
+ * and register 12 is set to a sentinel value prior to the SMC instruction.
+ * The return values are updated with the content from register 0 to 3 on
+ * return from the SMC instruction.
+ */
+asmlinkage void arm_ti_smccc_smc(unsigned long a0, unsigned long a1,
+			unsigned long a2, unsigned long a3, unsigned long a4,
+			unsigned long a5, unsigned long a6, unsigned long a7,
+			struct arm_smccc_res *res);
+
 #endif /*__ASSEMBLY__*/
 #endif /*__LINUX_ARM_SMCCC_H*/
