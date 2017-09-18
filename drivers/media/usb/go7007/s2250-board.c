@@ -510,6 +510,7 @@ static int s2250_probe(struct i2c_client *client,
 	u8 *data;
 	struct go7007 *go = i2c_get_adapdata(adapter);
 	struct go7007_usb *usb = go->hpi_context;
+	int code;
 
 	audio = i2c_new_dummy(adapter, TLV320_ADDRESS >> 1);
 	if (!audio)
@@ -517,8 +518,8 @@ static int s2250_probe(struct i2c_client *client,
 
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
 	if (!state) {
-		i2c_unregister_device(audio);
-		return -ENOMEM;
+		code = -ENOMEM;
+		goto unregister_device;
 	}
 
 	sd = &state->sd;
@@ -538,11 +539,8 @@ static int s2250_probe(struct i2c_client *client,
 		V4L2_CID_HUE, -512, 511, 1, 0);
 	sd->ctrl_handler = &state->hdl;
 	if (state->hdl.error) {
-		int err = state->hdl.error;
-
-		v4l2_ctrl_handler_free(&state->hdl);
-		kfree(state);
-		return err;
+		code = state->hdl.error;
+		goto free_handler;
 	}
 
 	state->std = V4L2_STD_NTSC;
@@ -555,17 +553,13 @@ static int s2250_probe(struct i2c_client *client,
 	/* initialize the audio */
 	if (write_regs(audio, aud_regs) < 0) {
 		dev_err(&client->dev, "error initializing audio\n");
-		goto fail;
+		goto e_io;
 	}
 
-	if (write_regs(client, vid_regs) < 0) {
-		dev_err(&client->dev, "error initializing decoder\n");
-		goto fail;
-	}
-	if (write_regs_fp(client, vid_regs_fp) < 0) {
-		dev_err(&client->dev, "error initializing decoder\n");
-		goto fail;
-	}
+	if (write_regs(client, vid_regs) < 0 ||
+	    write_regs_fp(client, vid_regs_fp) < 0)
+		goto report_write_failure;
+
 	/* set default channel */
 	/* composite */
 	write_reg_fp(client, 0x20, 0x020 | 1);
@@ -602,11 +596,16 @@ static int s2250_probe(struct i2c_client *client,
 	v4l2_info(sd, "initialized successfully\n");
 	return 0;
 
-fail:
-	i2c_unregister_device(audio);
+report_write_failure:
+	dev_err(&client->dev, "error initializing decoder\n");
+e_io:
+	code = -EIO;
+free_handler:
 	v4l2_ctrl_handler_free(&state->hdl);
 	kfree(state);
-	return -EIO;
+unregister_device:
+	i2c_unregister_device(audio);
+	return code;
 }
 
 static int s2250_remove(struct i2c_client *client)
