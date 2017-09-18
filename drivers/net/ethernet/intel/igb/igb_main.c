@@ -1598,6 +1598,40 @@ static void igb_get_hw_control(struct igb_adapter *adapter)
 			ctrl_ext | E1000_CTRL_EXT_DRV_LOAD);
 }
 
+static void igb_qav_config(struct igb_adapter *adapter)
+{
+	struct e1000_hw *hw = &adapter->hw;
+
+	/*
+	 * Global Qav configuration  (see 7.2.7.7 on page 312)
+	 */
+	wr32(E1000_I210_DTXMXPKTSZ, 1536 >> 6);
+	wr32(E1000_I210_TQAVCTRL, (u32) E1000_DEFAULT_TQAVCTRL);
+
+	/*
+	 * Per Queue (0/1) Qav configuration
+	 *
+	 * Note: Queue0 QueueMode must be set to 1
+	 *       when TransmitMode is set to Qav.
+	 */
+	wr32(E1000_I210_TQAVCC0, E1000_TQAVCC_QUEUEMODE_STREAM_RESERVATION);
+}
+
+static u16 igb_select_queue(struct net_device *netdev, struct sk_buff *skb,
+				 void *accel, select_queue_fallback_t fallback)
+{
+	struct igb_adapter *adapter = netdev_priv(netdev);
+	struct e1000_hw *hw = &adapter->hw;
+
+	if (hw->mac.type != e1000_i210)
+		return fallback(netdev, skb);
+
+	if (skb->transmit_time)
+		return 0;
+	else
+		return 1;
+}
+
 /**
  *  igb_configure - configure the hardware for RX and TX
  *  @adapter: private board structure
@@ -1615,6 +1649,8 @@ static void igb_configure(struct igb_adapter *adapter)
 	igb_setup_tctl(adapter);
 	igb_setup_mrqc(adapter);
 	igb_setup_rctl(adapter);
+
+	igb_qav_config(adapter);
 
 	igb_nfc_filter_restore(adapter);
 	igb_configure_tx(adapter);
@@ -2175,6 +2211,7 @@ static const struct net_device_ops igb_netdev_ops = {
 	.ndo_set_features	= igb_set_features,
 	.ndo_fdb_add		= igb_ndo_fdb_add,
 	.ndo_features_check	= igb_features_check,
+	.ndo_select_queue	= igb_select_queue,
 };
 
 /**
@@ -3062,7 +3099,11 @@ static void igb_init_queue_configuration(struct igb_adapter *adapter)
 		break;
 	}
 
-	adapter->rss_queues = min_t(u32, max_rss_queues, num_online_cpus());
+	/*
+	 * For time based Tx, we must configure four Tx queues.
+	 */
+	adapter->rss_queues = hw->mac.type == e1000_i210 ?
+		max_rss_queues : min_t(u32, max_rss_queues, num_online_cpus());
 
 	igb_set_flag_queue_pairs(adapter, max_rss_queues);
 }
@@ -3462,6 +3503,9 @@ void igb_configure_tx_ring(struct igb_adapter *adapter,
 	memset(ring->tx_buffer_info, 0,
 	       sizeof(struct igb_tx_buffer) * ring->count);
 
+	if (ring->flags & IGB_RING_FLAG_HIGH_PRIORITY)
+		txdctl |= E1000_TXDCTL_HIGH_PRIORITY;
+
 	txdctl |= E1000_TXDCTL_QUEUE_ENABLE;
 	wr32(E1000_TXDCTL(reg_idx), txdctl);
 }
@@ -3475,6 +3519,11 @@ void igb_configure_tx_ring(struct igb_adapter *adapter,
 static void igb_configure_tx(struct igb_adapter *adapter)
 {
 	int i;
+
+	/*
+	 * Reserve the first queue for time based Tx.
+	 */
+	adapter->tx_ring[0]->flags |= IGB_RING_FLAG_HIGH_PRIORITY;
 
 	for (i = 0; i < adapter->num_tx_queues; i++)
 		igb_configure_tx_ring(adapter, adapter->tx_ring[i]);
@@ -4948,11 +4997,12 @@ set_itr_now:
 	}
 }
 
-static void igb_tx_ctxtdesc(struct igb_ring *tx_ring, u32 vlan_macip_lens,
-			    u32 type_tucmd, u32 mss_l4len_idx)
+static void igb_tx_ctxtdesc(struct igb_ring *tx_ring, struct igb_tx_buffer *first,
+			    u32 vlan_macip_lens, u32 type_tucmd, u32 mss_l4len_idx)
 {
 	struct e1000_adv_tx_context_desc *context_desc;
 	u16 i = tx_ring->next_to_use;
+	struct timespec64 ts;
 
 	context_desc = IGB_TX_CTXTDESC(tx_ring, i);
 
@@ -4967,9 +5017,15 @@ static void igb_tx_ctxtdesc(struct igb_ring *tx_ring, u32 vlan_macip_lens,
 		mss_l4len_idx |= tx_ring->reg_idx << 4;
 
 	context_desc->vlan_macip_lens	= cpu_to_le32(vlan_macip_lens);
-	context_desc->seqnum_seed	= 0;
 	context_desc->type_tucmd_mlhl	= cpu_to_le32(type_tucmd);
 	context_desc->mss_l4len_idx	= cpu_to_le32(mss_l4len_idx);
+
+	if (tx_ring->flags & IGB_RING_FLAG_HIGH_PRIORITY && tx_ring->reg_idx == 0) {
+		ts = ns_to_timespec64(first->skb->transmit_time);
+		context_desc->seqnum_seed = cpu_to_le32(ts.tv_nsec / 32);
+	} else {
+		context_desc->seqnum_seed = 0;
+	}
 }
 
 static int igb_tso(struct igb_ring *tx_ring,
@@ -5052,7 +5108,7 @@ static int igb_tso(struct igb_ring *tx_ring,
 	vlan_macip_lens |= (ip.hdr - skb->data) << E1000_ADVTXD_MACLEN_SHIFT;
 	vlan_macip_lens |= first->tx_flags & IGB_TX_FLAGS_VLAN_MASK;
 
-	igb_tx_ctxtdesc(tx_ring, vlan_macip_lens, type_tucmd, mss_l4len_idx);
+	igb_tx_ctxtdesc(tx_ring, first, vlan_macip_lens, type_tucmd, mss_l4len_idx);
 
 	return 1;
 }
@@ -5107,7 +5163,7 @@ no_csum:
 	vlan_macip_lens |= skb_network_offset(skb) << E1000_ADVTXD_MACLEN_SHIFT;
 	vlan_macip_lens |= first->tx_flags & IGB_TX_FLAGS_VLAN_MASK;
 
-	igb_tx_ctxtdesc(tx_ring, vlan_macip_lens, type_tucmd, 0);
+	igb_tx_ctxtdesc(tx_ring, first, vlan_macip_lens, type_tucmd, 0);
 }
 
 #define IGB_SET_FLAG(_input, _flag, _result) \

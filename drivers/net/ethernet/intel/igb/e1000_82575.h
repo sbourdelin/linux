@@ -159,6 +159,7 @@ struct e1000_adv_tx_context_desc {
 /* Additional Transmit Descriptor Control definitions */
 #define E1000_TXDCTL_QUEUE_ENABLE  0x02000000 /* Enable specific Tx Queue */
 /* Tx Queue Arbitration Priority 0=low, 1=high */
+#define E1000_TXDCTL_HIGH_PRIORITY 0x08000000
 
 /* Additional Receive Descriptor Control definitions */
 #define E1000_RXDCTL_QUEUE_ENABLE  0x02000000 /* Enable specific Rx Queue */

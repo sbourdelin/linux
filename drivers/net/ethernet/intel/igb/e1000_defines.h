@@ -352,8 +352,35 @@
 /* Timestamp in Rx buffer */
 #define E1000_RXPBS_CFG_TS_EN           0x80000000
 
-#define I210_RXPBSIZE_DEFAULT		0x000000A2 /* RXPBSIZE default */
-#define I210_TXPBSIZE_DEFAULT		0x04000014 /* TXPBSIZE default */
+/*
+ * Internal Packet Buffer Size Registers
+ * For transmit, Section 7.2.7.7 on page 312 recommends 8, 8, 4, and 4 KB.
+ * TXPB[0-3]SIZE are in KB for TxQ[0-3].
+ */
+#define RXPBSIZE	0x22
+#define BMC2OSPBSIZE	0x02
+#define TXPB0SIZE	8
+#define TXPB1SIZE	12
+#define TXPB2SIZE	0
+#define TXPB3SIZE	0
+#define OS2BMCPBSIZE	4
+
+#define TOTAL_RXTX_PBSIZE \
+	(RXPBSIZE + BMC2OSPBSIZE + \
+	 TXPB0SIZE + TXPB1SIZE + TXPB2SIZE + TXPB3SIZE + OS2BMCPBSIZE)
+
+#if TOTAL_RXTX_PBSIZE > 60
+#error RX TX PBSIZE exceeds 60 KB.
+#elif TOTAL_RXTX_PBSIZE < 60
+#error RX TX PBSIZE too small.
+#endif
+
+#define I210_TXPBSIZE_DEFAULT \
+	(TXPB0SIZE | (TXPB1SIZE << 6) | (TXPB2SIZE << 12) | \
+	 (TXPB3SIZE << 18) | (OS2BMCPBSIZE << 24))
+
+#define I210_RXPBSIZE_DEFAULT \
+	(RXPBSIZE | (BMC2OSPBSIZE << 6))
 
 /* SerDes Control */
 #define E1000_SCTL_DISABLE_SERDES_LOOPBACK 0x0400
@@ -1050,5 +1077,42 @@
 #define E1000_VLAPQF_QUEUE_SEL(_n, q_idx) (q_idx << ((_n) * 4))
 #define E1000_VLAPQF_P_VALID(_n)	(0x1 << (3 + (_n) * 4))
 #define E1000_VLAPQF_QUEUE_MASK	0x03
+
+/* DMA TX Maximum Packet Size */
+#define E1000_DMA_TX_MAXIMUM_PACKET_SIZE (1536 >> 6) /* Units of 64 bytes. */
+
+/* TX Qav Credit Control fields */
+#define E1000_TQAVCC_QUEUEMODE_STREAM_RESERVATION BIT(31)
+
+/* Tx Qav Control */
+#define E1000_TQAVCTRL_TRANSMITMODE_QAV			BIT(0)
+#define E1000_TQAVCTRL_1588_STAT_EN			BIT(2)
+#define E1000_TQAVCTRL_DATA_FETCH_ARB_MOSTEMPTY		BIT(4)
+#define E1000_TQAVCTRL_DATA_TRAN_ARB_CREDITSHAPER	BIT(8)
+#define E1000_TQAVCTRL_DATA_TRAN_TIM			BIT(9)
+#define E1000_TQAVCTRL_SP_WAIT_SR			BIT(10)
+#define E1000_TQAVCTRL_FETCH_TIM_DELTA_SHIFT		16
+/*
+ * Fetch Time Delta - bits 31:16
+ *
+ * This field holds the value to be reduced from the launch time for
+ * fetch time decision. The FetchTimeDelta value is defined in 32 ns
+ * granularity.
+ *
+ * This field is 16 bits wide, and so the maximum value is:
+ *
+ * 65535 * 32 = 2097120 ~= 2 msec
+ *
+ * Is there any reason not to dial max here?
+ */
+#define E1000_FETCH_TIME_DELTA 0xffff
+
+#define	E1000_DEFAULT_TQAVCTRL (			\
+	E1000_TQAVCTRL_TRANSMITMODE_QAV |		\
+	E1000_TQAVCTRL_DATA_FETCH_ARB_MOSTEMPTY |	\
+	E1000_TQAVCTRL_DATA_TRAN_TIM |			\
+	E1000_TQAVCTRL_SP_WAIT_SR |			\
+	(E1000_FETCH_TIME_DELTA << E1000_TQAVCTRL_FETCH_TIM_DELTA_SHIFT) \
+)
 
 #endif

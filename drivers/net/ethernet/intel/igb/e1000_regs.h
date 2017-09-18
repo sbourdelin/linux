@@ -421,6 +421,11 @@ do { \
 
 #define E1000_I210_FLA		0x1201C
 
+#define E1000_I210_TQAVCC0	0x3004
+#define E1000_I210_TQAVCC1	0x3044
+#define E1000_I210_DTXMXPKTSZ	0x355C /* DMA TX Maximum Packet Size */
+#define E1000_I210_TQAVCTRL	0x3570 /* Tx Qav Control */
+
 #define E1000_INVM_DATA_REG(_n)	(0x12120 + 4*(_n))
 #define E1000_INVM_SIZE		64 /* Number of INVM Data Registers */
 
