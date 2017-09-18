@@ -17,6 +17,7 @@
 #ifndef _ION_H
 #define _ION_H
 
+#include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/dma-direction.h>
 #include <linux/kref.h>
@@ -26,7 +27,6 @@
 #include <linux/sched.h>
 #include <linux/shrinker.h>
 #include <linux/types.h>
-#include <linux/miscdevice.h>
 
 #include "../uapi/ion.h"
 
@@ -91,13 +91,13 @@ void ion_buffer_destroy(struct ion_buffer *buffer);
 
 /**
  * struct ion_device - the metadata of the ion device node
- * @dev:		the actual misc device
+ * @dev:		the actual device
  * @buffers:		an rb tree of all the existing buffers
  * @buffer_lock:	lock protecting the tree of buffers
  * @lock:		rwsem protecting the tree of heaps and clients
  */
 struct ion_device {
-	struct miscdevice dev;
+	dev_t devt;
 	struct rb_root buffers;
 	struct mutex buffer_lock;
 	struct rw_semaphore lock;
@@ -153,6 +153,8 @@ struct ion_heap_ops {
  * struct ion_heap - represents a heap in the system
  * @node:		rb node to put the heap on the device's tree of heaps
  * @dev:		back pointer to the ion_device
+ * @ddev:		device structure
+ * @chrdev:		associated character device
  * @type:		type of heap
  * @ops:		ops struct as above
  * @flags:		flags
@@ -177,6 +179,8 @@ struct ion_heap_ops {
 struct ion_heap {
 	struct plist_node node;
 	struct ion_device *dev;
+	struct device ddev;
+	struct cdev chrdev;
 	enum ion_heap_type type;
 	struct ion_heap_ops *ops;
 	unsigned long flags;

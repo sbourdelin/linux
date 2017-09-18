@@ -40,6 +40,8 @@
 
 #include "ion.h"
 
+#define ION_DEV_MAX 32
+
 static struct ion_device *internal_dev;
 static int heap_id;
 
@@ -541,10 +543,20 @@ void ion_device_add_heap(struct ion_heap *heap)
 {
 	struct dentry *debug_file;
 	struct ion_device *dev = internal_dev;
+	int ret;
 
 	if (!heap->ops->allocate || !heap->ops->free)
 		pr_err("%s: can not add heap with invalid ops struct.\n",
 		       __func__);
+
+	heap->ddev.devt = MKDEV(MAJOR(dev->devt), heap_id);
+	dev_set_name(&heap->ddev, "ion%d", heap_id);
+	device_initialize(&heap->ddev);
+	cdev_init(&heap->chrdev, &ion_fops);
+	heap->chrdev.owner = THIS_MODULE;
+	ret = cdev_device_add(&heap->chrdev, &heap->ddev);
+	if (ret < 0)
+		return;
 
 	spin_lock_init(&heap->free_lock);
 	heap->free_list_size = 0;
@@ -595,13 +607,9 @@ static int ion_device_create(void)
 	if (!idev)
 		return -ENOMEM;
 
-	idev->dev.minor = MISC_DYNAMIC_MINOR;
-	idev->dev.name = "ion";
-	idev->dev.fops = &ion_fops;
-	idev->dev.parent = NULL;
-	ret = misc_register(&idev->dev);
+	ret = alloc_chrdev_region(&idev->devt, 0, ION_DEV_MAX, "ion");
 	if (ret) {
-		pr_err("ion: failed to register misc device.\n");
+		pr_err("ion: unable to allocate major\n");
 		kfree(idev);
 		return ret;
 	}
