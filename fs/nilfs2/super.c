@@ -1306,15 +1306,15 @@ nilfs_mount(struct file_system_type *fs_type, int flags,
 	 * will protect the lockfs code from trying to start a snapshot
 	 * while we are mounting
 	 */
-	mutex_lock(&sd.bdev->bd_fsfreeze_mutex);
+	mutex_lock(&sd.bdev->bd_fsfreeze_blktrace_mutex);
 	if (sd.bdev->bd_fsfreeze_count > 0) {
-		mutex_unlock(&sd.bdev->bd_fsfreeze_mutex);
+		mutex_unlock(&sd.bdev->bd_fsfreeze_blktrace_mutex);
 		err = -EBUSY;
 		goto failed;
 	}
 	s = sget(fs_type, nilfs_test_bdev_super, nilfs_set_bdev_super, flags,
 		 sd.bdev);
-	mutex_unlock(&sd.bdev->bd_fsfreeze_mutex);
+	mutex_unlock(&sd.bdev->bd_fsfreeze_blktrace_mutex);
 	if (IS_ERR(s)) {
 		err = PTR_ERR(s);
 		goto failed;

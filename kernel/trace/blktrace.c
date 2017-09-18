@@ -656,7 +656,7 @@ EXPORT_SYMBOL_GPL(blk_trace_startstop);
  * Protection from multiple readers and writers accessing blktrace data
  * concurrently is still required. The bd_mutex was used for this purpose.
  * That could lead to deadlock with concurrent block device deletion and
- * sysfs access. Instead, the block device bd_fsfreeze_mutex is now
+ * sysfs access. Instead, the block device bd_fsfreeze_blktrace_mutex is now
  * overloaded for blktrace data protection. Like freeze/thaw, blktrace
  * functionality is not frequently used. There is no point in adding
  * one more mutex to the block_device structure just for blktrace.
@@ -679,7 +679,7 @@ int blk_trace_ioctl(struct block_device *bdev, unsigned cmd, char __user *arg)
 	if (!q)
 		return -ENXIO;
 
-	mutex_lock(&bdev->bd_fsfreeze_mutex);
+	mutex_lock(&bdev->bd_fsfreeze_blktrace_mutex);
 
 	switch (cmd) {
 	case BLKTRACESETUP:
@@ -705,7 +705,7 @@ int blk_trace_ioctl(struct block_device *bdev, unsigned cmd, char __user *arg)
 		break;
 	}
 
-	mutex_unlock(&bdev->bd_fsfreeze_mutex);
+	mutex_unlock(&bdev->bd_fsfreeze_blktrace_mutex);
 	return ret;
 }
 
@@ -1741,7 +1741,7 @@ static ssize_t sysfs_blk_trace_attr_show(struct device *dev,
 	if (q == NULL)
 		goto out_bdput;
 
-	mutex_lock(&bdev->bd_fsfreeze_mutex);
+	mutex_lock(&bdev->bd_fsfreeze_blktrace_mutex);
 
 	if (attr == &dev_attr_enable) {
 		ret = sprintf(buf, "%u\n", !!q->blk_trace);
@@ -1760,7 +1760,7 @@ static ssize_t sysfs_blk_trace_attr_show(struct device *dev,
 		ret = sprintf(buf, "%llu\n", q->blk_trace->end_lba);
 
 out_unlock_bdev:
-	mutex_unlock(&bdev->bd_fsfreeze_mutex);
+	mutex_unlock(&bdev->bd_fsfreeze_blktrace_mutex);
 out_bdput:
 	bdput(bdev);
 out:
@@ -1802,7 +1802,7 @@ static ssize_t sysfs_blk_trace_attr_store(struct device *dev,
 	if (q == NULL)
 		goto out_bdput;
 
-	mutex_lock(&bdev->bd_fsfreeze_mutex);
+	mutex_lock(&bdev->bd_fsfreeze_blktrace_mutex);
 
 	if (attr == &dev_attr_enable) {
 		if (value)
@@ -1828,7 +1828,7 @@ static ssize_t sysfs_blk_trace_attr_store(struct device *dev,
 	}
 
 out_unlock_bdev:
-	mutex_unlock(&bdev->bd_fsfreeze_mutex);
+	mutex_unlock(&bdev->bd_fsfreeze_blktrace_mutex);
 out_bdput:
 	bdput(bdev);
 out:

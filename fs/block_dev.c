@@ -504,7 +504,7 @@ struct super_block *freeze_bdev(struct block_device *bdev)
 	struct super_block *sb;
 	int error = 0;
 
-	mutex_lock(&bdev->bd_fsfreeze_mutex);
+	mutex_lock(&bdev->bd_fsfreeze_blktrace_mutex);
 	if (++bdev->bd_fsfreeze_count > 1) {
 		/*
 		 * We don't even need to grab a reference - the first call
@@ -514,7 +514,7 @@ struct super_block *freeze_bdev(struct block_device *bdev)
 		sb = get_super(bdev);
 		if (sb)
 			drop_super(sb);
-		mutex_unlock(&bdev->bd_fsfreeze_mutex);
+		mutex_unlock(&bdev->bd_fsfreeze_blktrace_mutex);
 		return sb;
 	}
 
@@ -528,13 +528,13 @@ struct super_block *freeze_bdev(struct block_device *bdev)
 	if (error) {
 		deactivate_super(sb);
 		bdev->bd_fsfreeze_count--;
-		mutex_unlock(&bdev->bd_fsfreeze_mutex);
+		mutex_unlock(&bdev->bd_fsfreeze_blktrace_mutex);
 		return ERR_PTR(error);
 	}
 	deactivate_super(sb);
  out:
 	sync_blockdev(bdev);
-	mutex_unlock(&bdev->bd_fsfreeze_mutex);
+	mutex_unlock(&bdev->bd_fsfreeze_blktrace_mutex);
 	return sb;	/* thaw_bdev releases s->s_umount */
 }
 EXPORT_SYMBOL(freeze_bdev);
@@ -550,7 +550,7 @@ int thaw_bdev(struct block_device *bdev, struct super_block *sb)
 {
 	int error = -EINVAL;
 
-	mutex_lock(&bdev->bd_fsfreeze_mutex);
+	mutex_lock(&bdev->bd_fsfreeze_blktrace_mutex);
 	if (!bdev->bd_fsfreeze_count)
 		goto out;
 
@@ -568,7 +568,7 @@ int thaw_bdev(struct block_device *bdev, struct super_block *sb)
 	if (error)
 		bdev->bd_fsfreeze_count++;
 out:
-	mutex_unlock(&bdev->bd_fsfreeze_mutex);
+	mutex_unlock(&bdev->bd_fsfreeze_blktrace_mutex);
 	return error;
 }
 EXPORT_SYMBOL(thaw_bdev);
@@ -767,7 +767,7 @@ static void init_once(void *foo)
 	bdev->bd_bdi = &noop_backing_dev_info;
 	inode_init_once(&ei->vfs_inode);
 	/* Initialize mutex for freeze. */
-	mutex_init(&bdev->bd_fsfreeze_mutex);
+	mutex_init(&bdev->bd_fsfreeze_blktrace_mutex);
 }
 
 static void bdev_evict_inode(struct inode *inode)

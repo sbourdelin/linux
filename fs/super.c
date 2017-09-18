@@ -1083,15 +1083,15 @@ struct dentry *mount_bdev(struct file_system_type *fs_type,
 	 * will protect the lockfs code from trying to start a snapshot
 	 * while we are mounting
 	 */
-	mutex_lock(&bdev->bd_fsfreeze_mutex);
+	mutex_lock(&bdev->bd_fsfreeze_blktrace_mutex);
 	if (bdev->bd_fsfreeze_count > 0) {
-		mutex_unlock(&bdev->bd_fsfreeze_mutex);
+		mutex_unlock(&bdev->bd_fsfreeze_blktrace_mutex);
 		error = -EBUSY;
 		goto error_bdev;
 	}
 	s = sget(fs_type, test_bdev_super, set_bdev_super, flags | SB_NOSEC,
 		 bdev);
-	mutex_unlock(&bdev->bd_fsfreeze_mutex);
+	mutex_unlock(&bdev->bd_fsfreeze_blktrace_mutex);
 	if (IS_ERR(s))
 		goto error_s;
 
