@@ -143,12 +143,19 @@ struct dentry_stat_t dentry_stat = {
  * If a per-cpu counter runs out of negative dentries, it can borrow extra
  * ones from the global free pool. If it has more than its percpu limit,
  * the extra ones will be returned back to the global pool.
+ *
+ * In order to have a proper balance between negative and positive dentries,
+ * the free pool negative dentry limit can be tuned up dynamically at run
+ * time to no more than the highest number of positive dentries that were
+ * ever used. Total positive dentry count is checked no more than once
+ * every 5 mins to reduce performance impact.
  */
 #define NEG_DENTRY_PC		2
 #define NEG_DENTRY_BATCH	(1 << 8)
 #define NEG_PRUNING_SIZE	(1 << 6)
 #define NEG_PRUNING_SLOW_RATE	(HZ/10)
 #define NEG_PRUNING_FAST_RATE	(HZ/50)
+#define NEG_COUNT_CHECK_PERIOD	(HZ*5*60)
 #define NEG_IS_SB_UMOUNTING(sb)	\
 	unlikely(!(sb)->s_root || !((sb)->s_flags & MS_ACTIVE))
 
@@ -163,6 +170,7 @@ static struct {
 	long nfree;			/* Negative dentry free pool */
 	struct super_block *prune_sb;	/* Super_block for pruning */
 	atomic_long_t nr_neg_killed;	/* # of negative entries killed */
+	unsigned long last_jiffies;	/* Last time +ve count is checked */
 } ndblk ____cacheline_aligned_in_smp;
 
 static void prune_negative_dentry(struct work_struct *work);
@@ -1467,6 +1475,36 @@ static void prune_negative_dentry(struct work_struct *work)
 	if (freed)
 		shrink_dentry_list(&dispose);
 	ndblk.n_pos += freed - (ndblk.n_neg - last_n_neg);
+
+	/*
+	 * Also check the total negative & positive dentries count to see
+	 * if we can increase the free pool negative dentry limit.
+	 */
+	if (time_after(jiffies, ndblk.last_jiffies + NEG_COUNT_CHECK_PERIOD)) {
+		unsigned long pos = 0, neg = 0;
+		int i;
+
+		/*
+		 * The positive count may include a small number of
+		 * negative dentries in transit, but that should be
+		 * negligible.
+		 */
+		for_each_possible_cpu(i) {
+			pos += per_cpu(nr_dentry, i);
+			neg += per_cpu(nr_dentry_neg, i);
+		}
+		pos -= neg;
+
+		if (unlikely(pos > neg_dentry_nfree_init)) {
+			unsigned long inc = pos - neg_dentry_nfree_init;
+
+			raw_spin_lock(&ndblk.nfree_lock);
+			ndblk.nfree += inc;
+			raw_spin_unlock(&ndblk.nfree_lock);
+			WRITE_ONCE(neg_dentry_nfree_init, pos);
+		}
+		ndblk.last_jiffies = jiffies;
+	}
 
 	/*
 	 * Continue delayed pruning until negative dentry free pool is at
