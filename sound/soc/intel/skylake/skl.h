@@ -25,6 +25,7 @@
 #include <sound/hdaudio_ext.h>
 #include <sound/soc.h>
 #include "skl-nhlt.h"
+#include "skl-ssp-clk.h"
 
 #define SKL_SUSPEND_DELAY 2000
 
@@ -123,6 +124,8 @@ const struct skl_dsp_ops *skl_get_dsp_ops(int pci_id);
 void skl_update_d0i3c(struct device *dev, bool enable);
 int skl_nhlt_create_sysfs(struct skl *skl);
 void skl_nhlt_remove_sysfs(struct skl *skl);
+void skl_get_clks(struct skl *skl, struct skl_ssp_clk *ssp_clks);
+struct skl_clk_parent_src *skl_get_parent_clk(u8 clk_id);
 
 struct skl_module_cfg;
 
