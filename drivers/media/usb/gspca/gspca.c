@@ -2034,13 +2034,11 @@ int gspca_dev_probe2(struct usb_interface *intf,
 	if (dev_size < sizeof *gspca_dev)
 		dev_size = sizeof *gspca_dev;
 	gspca_dev = kzalloc(dev_size, GFP_KERNEL);
-	if (!gspca_dev) {
-		pr_err("couldn't kzalloc gspca struct\n");
+	if (!gspca_dev)
 		return -ENOMEM;
-	}
+
 	gspca_dev->usb_buf = kmalloc(USB_BUF_SZ, GFP_KERNEL);
 	if (!gspca_dev->usb_buf) {
-		pr_err("out of memory\n");
 		ret = -ENOMEM;
 		goto out;
 	}
