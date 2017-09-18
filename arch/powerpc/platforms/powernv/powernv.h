@@ -3,6 +3,7 @@
 
 #ifdef CONFIG_SMP
 extern void pnv_smp_init(void);
+extern int pnv_system_reset_exception(struct pt_regs *regs);
 #else
 static inline void pnv_smp_init(void) { }
 #endif
