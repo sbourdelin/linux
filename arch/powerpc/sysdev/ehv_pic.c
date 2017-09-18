@@ -141,7 +141,7 @@ int ehv_pic_set_irq_type(struct irq_data *d, unsigned int flow_type)
 	return IRQ_SET_MASK_OK_NOCOPY;
 }
 
-static struct irq_chip ehv_pic_irq_chip = {
+static const struct irq_chip ehv_pic_irq_chip __initconst = {
 	.irq_mask	= ehv_pic_mask_irq,
 	.irq_unmask	= ehv_pic_unmask_irq,
 	.irq_eoi	= ehv_pic_end_irq,
