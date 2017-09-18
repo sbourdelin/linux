@@ -60,18 +60,20 @@ V_FUNCTION_END(__kernel_gettimeofday)
  */
 V_FUNCTION_BEGIN(__kernel_clock_gettime)
   .cfi_startproc
+	mr	r11,r4			/* r11 saves tp */
+	mflr	r12			/* r12 saves lr */
+	lis	r7,NSEC_PER_SEC@h	/* want nanoseconds */
+	ori	r7,r7,NSEC_PER_SEC@l
+
 	/* Check for supported clock IDs */
 	cmpwi	cr0,r3,CLOCK_REALTIME
 	cmpwi	cr1,r3,CLOCK_MONOTONIC
 	cror	cr0*4+eq,cr0*4+eq,cr1*4+eq
-	bne	cr0,99f
+	beq	cr0,49f
 
-	mflr	r12			/* r12 saves lr */
+	b	99f		/* Fallback to syscall */
   .cfi_register lr,r12
-	mr	r11,r4			/* r11 saves tp */
-	bl	V_LOCAL_FUNC(__get_datapage)	/* get data page */
-	lis	r7,NSEC_PER_SEC@h	/* want nanoseconds */
-	ori	r7,r7,NSEC_PER_SEC@l
+49:	bl	V_LOCAL_FUNC(__get_datapage)	/* get data page */
 50:	bl	V_LOCAL_FUNC(__do_get_tspec)	/* get time from tb & kernel */
 	bne	cr1,80f			/* if not monotonic, all done */
 
