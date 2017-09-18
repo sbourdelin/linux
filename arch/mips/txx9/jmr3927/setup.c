@@ -209,7 +209,7 @@ static void __init jmr3927_arch_init(void)
 	gpio_request(10, "dipsw2");
 }
 
-struct txx9_board_vec jmr3927_vec __initdata = {
+struct txx9_board_vec jmr3927_vec = {
 	.system = "Toshiba JMR_TX3927",
 	.prom_init = jmr3927_prom_init,
 	.mem_setup = jmr3927_mem_setup,

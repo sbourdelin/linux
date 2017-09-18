@@ -358,7 +358,7 @@ static void __init rbtx4938_device_init(void)
 	txx9_iocled_init(RBTX4938_LED_ADDR - IO_BASE, -1, 8, 1, "green", NULL);
 }
 
-struct txx9_board_vec rbtx4938_vec __initdata = {
+struct txx9_board_vec rbtx4938_vec = {
 	.system = "Toshiba RBTX4938",
 	.prom_init = rbtx4938_prom_init,
 	.mem_setup = rbtx4938_mem_setup,

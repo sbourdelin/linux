@@ -354,7 +354,7 @@ static void __init rbtx4927_device_init(void)
 	rbtx4927_gpioled_init();
 }
 
-struct txx9_board_vec rbtx4927_vec __initdata = {
+struct txx9_board_vec rbtx4927_vec = {
 	.system = "Toshiba RBTX4927",
 	.prom_init = rbtx4927_prom_init,
 	.mem_setup = rbtx4927_mem_setup,
@@ -366,7 +366,7 @@ struct txx9_board_vec rbtx4927_vec __initdata = {
 	.pci_map_irq = rbtx4927_pci_map_irq,
 #endif
 };
-struct txx9_board_vec rbtx4937_vec __initdata = {
+struct txx9_board_vec rbtx4937_vec = {
 	.system = "Toshiba RBTX4937",
 	.prom_init = rbtx4927_prom_init,
 	.mem_setup = rbtx4927_mem_setup,

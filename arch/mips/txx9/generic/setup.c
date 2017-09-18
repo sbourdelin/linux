@@ -88,7 +88,7 @@ int txx9_ccfg_toeon __initdata = 1;
 #include <asm/txx9/boards.h>
 #undef BOARD_VEC
 
-struct txx9_board_vec *txx9_board_vec __initdata;
+struct txx9_board_vec *txx9_board_vec;
 static char txx9_system_type[32];
 
 static struct txx9_board_vec *board_vecs[] __initdata = {

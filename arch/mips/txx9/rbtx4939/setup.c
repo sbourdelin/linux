@@ -540,7 +540,7 @@ static void __init rbtx4939_setup(void)
 	tx4939_sio_init(TX4939_SCLK0(txx9_master_clock), 0);
 }
 
-struct txx9_board_vec rbtx4939_vec __initdata = {
+struct txx9_board_vec rbtx4939_vec = {
 	.system = "Toshiba RBTX4939",
 	.prom_init = rbtx4939_prom_init,
 	.mem_setup = rbtx4939_setup,
