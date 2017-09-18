@@ -558,6 +558,17 @@ enum {
 };
 
 /*
+ * Supported fallocate modes
+ */
+#define EXT4_FALLOC_SUPPORTED	(FALLOC_FL_KEEP_SIZE |		\
+				 FALLOC_FL_PUNCH_HOLE |		\
+				 FALLOC_FL_COLLAPSE_RANGE |	\
+				 FALLOC_FL_ZERO_RANGE |		\
+				 FALLOC_FL_INSERT_RANGE |	\
+				 FALLOC_FL_QUERY_SUPPORT |	\
+				 FALLOC_FL_PREALLOC_RANGE)
+
+/*
  * Flags used by ext4_map_blocks()
  */
 	/* Allocate any needed blocks and/or convert an unwritten
