@@ -551,7 +551,7 @@ static int numa_setup_cpu(unsigned long lcpu)
 	nid = of_node_to_nid_single(cpu);
 
 out_present:
-	if (nid < 0 || !node_online(nid))
+	if (nid < 0 || !node_possible(nid))
 		nid = first_online_node;
 
 	map_cpu_to_node(lcpu, nid);
@@ -1298,6 +1298,17 @@ static long vphn_get_associativity(unsigned long cpu,
 	return rc;
 }
 
+static int verify_node_preparation(int nid)
+{
+	if ((NODE_DATA(nid) == NULL) ||
+	    (NODE_DATA(nid)->node_spanned_pages == 0)) {
+		if (try_online_node(nid))
+			return first_online_node;
+	}
+
+	return nid;
+}
+
 /*
  * Update the CPU maps and sysfs entries for a single CPU when its NUMA
  * characteristics change. This function doesn't perform any locking and is
@@ -1403,8 +1414,10 @@ int numa_update_cpu_topology(bool cpus_locked)
 		/* Use associativity from first thread for all siblings */
 		vphn_get_associativity(cpu, associativity);
 		new_nid = associativity_to_nid(associativity);
-		if (new_nid < 0 || !node_online(new_nid))
+		if (new_nid < 0 || !node_possible(new_nid))
 			new_nid = first_online_node;
+
+		new_nid = verify_node_preparation(new_nid);
 
 		if (new_nid == numa_cpu_lookup_table[cpu]) {
 			cpumask_andnot(&cpu_associativity_changes_mask,
