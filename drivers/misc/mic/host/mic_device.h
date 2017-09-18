@@ -26,7 +26,6 @@
 #include <linux/notifier.h>
 #include <linux/irqreturn.h>
 #include <linux/dmaengine.h>
-#include <linux/miscdevice.h>
 #include <linux/mic_bus.h>
 #include "../bus/scif_bus.h"
 #include "../bus/vop_bus.h"
