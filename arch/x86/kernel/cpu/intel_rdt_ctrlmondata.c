@@ -42,15 +42,25 @@ static bool bw_validate(char *buf, unsigned long *data, struct rdt_resource *r)
 	/*
 	 * Only linear delay values is supported for current Intel SKUs.
 	 */
-	if (!r->membw.delay_linear)
+	if (!r->membw.delay_linear) {
+		seq_buf_puts(&last_cmd_status,
+			     "No support for non-linear MB domains\n");
 		return false;
+	}
 
 	ret = kstrtoul(buf, 10, &bw);
-	if (ret)
+	if (ret) {
+		seq_buf_printf(&last_cmd_status,
+			       "Non-decimal digit in MB value %s\n", buf);
 		return false;
+	}
 
-	if (bw < r->membw.min_bw || bw > r->default_ctrl)
+	if (bw < r->membw.min_bw || bw > r->default_ctrl) {
+		seq_buf_printf(&last_cmd_status,
+			       "MB value %ld out of range [%d,%d]\n", bw,
+			       r->membw.min_bw, r->default_ctrl);
 		return false;
+	}
 
 	*data = roundup(bw, (unsigned long)r->membw.bw_gran);
 	return true;
@@ -60,8 +70,11 @@ int parse_bw(char *buf, struct rdt_resource *r, struct rdt_domain *d)
 {
 	unsigned long data;
 
-	if (d->have_new_ctrl)
+	if (d->have_new_ctrl) {
+		seq_buf_printf(&last_cmd_status, "duplicate domain %d\n",
+			       d->id);
 		return -EINVAL;
+	}
 
 	if (!bw_validate(buf, &data, r))
 		return -EINVAL;
@@ -84,20 +97,32 @@ static bool cbm_validate(char *buf, unsigned long *data, struct rdt_resource *r)
 	int ret;
 
 	ret = kstrtoul(buf, 16, &val);
-	if (ret)
+	if (ret) {
+		seq_buf_printf(&last_cmd_status,
+			       "non-hex character in mask %s\n", buf);
 		return false;
+	}
 
-	if (val == 0 || val > r->default_ctrl)
+	if (val == 0 || val > r->default_ctrl) {
+		seq_buf_puts(&last_cmd_status, "mask out of range\n");
 		return false;
+	}
 
 	first_bit = find_first_bit(&val, cbm_len);
 	zero_bit = find_next_zero_bit(&val, cbm_len, first_bit);
 
-	if (find_next_bit(&val, cbm_len, zero_bit) < cbm_len)
+	if (find_next_bit(&val, cbm_len, zero_bit) < cbm_len) {
+		seq_buf_printf(&last_cmd_status,
+			       "mask %lx has non-consecutive 1-bits\n", val);
 		return false;
+	}
 
-	if ((zero_bit - first_bit) < r->cache.min_cbm_bits)
+	if ((zero_bit - first_bit) < r->cache.min_cbm_bits) {
+		seq_buf_printf(&last_cmd_status,
+			       "Need at least %d bits in mask\n",
+			       r->cache.min_cbm_bits);
 		return false;
+	}
 
 	*data = val;
 	return true;
@@ -111,8 +136,11 @@ int parse_cbm(char *buf, struct rdt_resource *r, struct rdt_domain *d)
 {
 	unsigned long data;
 
-	if (d->have_new_ctrl)
+	if (d->have_new_ctrl) {
+		seq_buf_printf(&last_cmd_status, "duplicate domain %d\n",
+			       d->id);
 		return -EINVAL;
+	}
 
 	if(!cbm_validate(buf, &data, r))
 		return -EINVAL;
@@ -139,8 +167,11 @@ next:
 		return 0;
 	dom = strsep(&line, ";");
 	id = strsep(&dom, "=");
-	if (!dom || kstrtoul(id, 10, &dom_id))
+	if (!dom || kstrtoul(id, 10, &dom_id)) {
+		seq_buf_puts(&last_cmd_status,
+			     "Missing '=' or non-numeric domain\n");
 		return -EINVAL;
+	}
 	dom = strim(dom);
 	list_for_each_entry(d, &r->domains, list) {
 		if (d->id == dom_id) {
@@ -196,6 +227,8 @@ static int rdtgroup_parse_resource(char *resname, char *tok, int closid)
 		if (!strcmp(resname, r->name) && closid < r->num_closid)
 			return parse_line(tok, r);
 	}
+	seq_buf_printf(&last_cmd_status,
+		       "unknown/unsupported resource name '%s'\n", resname);
 	return -EINVAL;
 }
 
@@ -208,14 +241,19 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 	char *tok, *resname;
 	int closid, ret = 0;
 
+	seq_buf_clear(&last_cmd_status);
+
 	/* Valid input requires a trailing newline */
-	if (nbytes == 0 || buf[nbytes - 1] != '\n')
+	if (nbytes == 0 || buf[nbytes - 1] != '\n') {
+		seq_buf_puts(&last_cmd_status, "no trailing newline\n");
 		return -EINVAL;
+	}
 	buf[nbytes - 1] = '\0';
 
 	rdtgrp = rdtgroup_kn_lock_live(of->kn);
 	if (!rdtgrp) {
 		rdtgroup_kn_unlock(of->kn);
+		seq_buf_puts(&last_cmd_status, "directory was removed\n");
 		return -ENOENT;
 	}
 
@@ -229,6 +267,7 @@ ssize_t rdtgroup_schemata_write(struct kernfs_open_file *of,
 	while ((tok = strsep(&buf, "\n")) != NULL) {
 		resname = strim(strsep(&tok, ":"));
 		if (!tok) {
+			seq_buf_puts(&last_cmd_status, "Missing ':'\n");
 			ret = -EINVAL;
 			goto out;
 		}
