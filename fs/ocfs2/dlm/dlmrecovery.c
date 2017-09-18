@@ -1129,7 +1129,6 @@ static int dlm_send_mig_lockres_msg(struct dlm_ctxt *dlm,
 		(mres->num_locks * sizeof(struct dlm_migratable_lock));
 
 	/* add an all-done flag if we reached the last lock */
-	orig_flags = mres->flags;
 	BUG_ON(total_locks > mres_total_locks);
 	if (total_locks == mres_total_locks)
 		mres->flags |= DLM_MRES_ALL_DONE;
