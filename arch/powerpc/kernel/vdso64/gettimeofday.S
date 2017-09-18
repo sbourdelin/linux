@@ -71,6 +71,11 @@ V_FUNCTION_BEGIN(__kernel_clock_gettime)
 	cror	cr0*4+eq,cr0*4+eq,cr1*4+eq
 	beq	cr0,49f
 
+	cmpwi	cr0,r3,CLOCK_REALTIME_COARSE
+	cmpwi	cr1,r3,CLOCK_MONOTONIC_COARSE
+	cror	cr0*4+eq,cr0*4+eq,cr1*4+eq
+	beq	cr0,65f
+
 	b	99f		/* Fallback to syscall */
   .cfi_register lr,r12
 49:	bl	V_LOCAL_FUNC(__get_datapage)	/* get data page */
@@ -110,6 +115,57 @@ V_FUNCTION_BEGIN(__kernel_clock_gettime)
 	subf	r5,r7,r5
 	addi	r4,r4,1
 1:	bge	cr1,80f
+	addi	r4,r4,-1
+	add	r5,r5,r7
+	b	80f
+
+	/*
+	 * For coarse clocks we get data directly from the vdso data page, so
+	 * we don't need to call __do_get_tspec, but we still need to do the
+	 * counter trick.
+	 */
+65:	bl	V_LOCAL_FUNC(__get_datapage)	/* get data page */
+70:	ld	r8,CFG_TB_UPDATE_COUNT(r3)
+	andi.	r0,r8,1			/* pending update ? loop */
+	bne-	70b
+	xor	r0,r8,r8		/* create dependency */
+	add	r3,r3,r0
+
+	/*
+	 * CLOCK_REALTIME_COARSE, below values are needed for MONOTONIC_COARSE
+	 * too
+	 */
+	ld	r4,STAMP_XTIME+TSPC64_TV_SEC(r3)
+	ld	r5,STAMP_XTIME+TSPC64_TV_NSEC(r3)
+	bne	cr1,78f
+
+	/* CLOCK_MONOTONIC_COARSE */
+	lwa	r6,WTOM_CLOCK_SEC(r3)
+	lwa	r9,WTOM_CLOCK_NSEC(r3)
+
+	/* check if counter has updated */
+78:	or	r0,r6,r9
+	xor	r0,r0,r0
+	add	r3,r3,r0
+	ld	r0,CFG_TB_UPDATE_COUNT(r3)
+	cmpld	cr0,r0,r8		/* check if updated */
+	bne-	70b
+
+	/* Counter has not updated, so continue calculating proper values for
+	 * sec and nsec if monotonic coarse, or just return with the proper
+	 * values for realtime.
+	 */
+	bne	cr1,80f
+
+	/* Add wall->monotonic offset and check for overflow or underflow */
+	add	r4,r4,r6
+	add	r5,r5,r9
+	cmpd	cr0,r5,r7
+	cmpdi	cr1,r5,0
+	blt	79f
+	subf	r5,r7,r5
+	addi	r4,r4,1
+79:	bge	cr1,80f
 	addi	r4,r4,-1
 	add	r5,r5,r7
 
