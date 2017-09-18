@@ -10353,6 +10353,66 @@ static bool needs_scaling(const struct intel_plane_state *state)
 	return (src_w != dst_w || src_h != dst_h);
 }
 
+/*
+ * For Gen9 DSI, pipe scanline register will not
+ * work to get the scanline since the timings
+ * are driven from the PORT (unlike DDI encoders).
+ * This function will use Framestamp and current
+ * timestamp registers to calculate the scanline.
+ */
+u32 gen9_get_scanline(struct intel_crtc *crtc)
+{
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	u32 crtc_vblank_start = crtc->base.mode.crtc_vblank_start;
+	u32 crtc_vtotal = crtc->base.mode.crtc_vtotal;
+	u32 crtc_htotal = crtc->base.mode.crtc_htotal;
+	u32 crtc_clock = crtc->base.mode.crtc_clock;
+	u64 scanline = 0, scan_prev_time, scan_curr_time, scan_post_time;
+
+	WARN_ON(!crtc_vtotal);
+	if (!crtc_vtotal)
+		return scanline;
+
+	/* To avoid the race condition where we might cross into the
+	 * next vblank just between the PIPE_FRMTMSTMP and TIMESTAMP_CTR
+	 * reads. We make sure we read PIPE_FRMTMSTMP and TIMESTAMP_CTR
+	 * during the same frame.
+	 */
+	do {
+		/*
+		 * This field provides read back of the display
+		 * pipe frame time stamp. The time stamp value
+		 * is sampled at every start of vertical blank.
+		 */
+		scan_prev_time = I915_READ_FW(PIPE_FRMTMSTMP(crtc->pipe));
+
+		/*
+		 * The TIMESTAMP_CTR register has the current
+		 * time stamp value.
+		 */
+		scan_curr_time = I915_READ_FW(GEN7_TIMESTAMP_CTR);
+
+		scan_post_time = I915_READ_FW(PIPE_FRMTMSTMP(crtc->pipe));
+	} while (scan_post_time != scan_prev_time);
+
+	/*
+	 * Since the register is 32 bit and the values
+	 * can overflow and wrap around, making sure
+	 * current time accounts for the register
+	 * wrap
+	 */
+	if (scan_curr_time < scan_prev_time)
+		scan_curr_time += 0x100000000;
+
+	scanline = div_u64(mul_u64_u32_shr((scan_curr_time - scan_prev_time),
+					crtc_clock, 0), 1000 * crtc_htotal);
+	scanline = min(scanline, (u64)(crtc_vtotal - 1));
+	scanline = (scanline + crtc_vblank_start) % crtc_vtotal;
+
+	return scanline;
+}
+
 int intel_plane_atomic_calc_changes(const struct intel_crtc_state *old_crtc_state,
 				    struct drm_crtc_state *crtc_state,
 				    const struct intel_plane_state *old_plane_state,

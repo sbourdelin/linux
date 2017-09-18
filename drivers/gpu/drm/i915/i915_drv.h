@@ -4090,6 +4090,8 @@ void intel_sbi_write(struct drm_i915_private *dev_priv, u16 reg, u32 value,
 u32 vlv_flisdsi_read(struct drm_i915_private *dev_priv, u32 reg);
 void vlv_flisdsi_write(struct drm_i915_private *dev_priv, u32 reg, u32 val);
 
+u32 gen9_get_scanline(struct intel_crtc *crtc);
+
 /* intel_dpio_phy.c */
 void bxt_port_to_phy_channel(struct drm_i915_private *dev_priv, enum port port,
 			     enum dpio_phy *phy, enum dpio_channel *ch);

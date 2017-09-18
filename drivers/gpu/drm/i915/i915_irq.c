@@ -814,6 +814,7 @@ static int __intel_get_crtc_scanline(struct intel_crtc *crtc)
 	struct drm_vblank_crtc *vblank;
 	enum pipe pipe = crtc->pipe;
 	int position, vtotal;
+	struct intel_encoder *encoder;
 
 	if (!crtc->active)
 		return -1;
@@ -824,6 +825,12 @@ static int __intel_get_crtc_scanline(struct intel_crtc *crtc)
 	vtotal = mode->crtc_vtotal;
 	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
 		vtotal /= 2;
+
+	if (IS_BROXTON(dev_priv) || IS_GEMINILAKE(dev_priv)) {
+		for_each_encoder_on_crtc(crtc->base.dev, &crtc->base, encoder)
+			if (encoder->type == INTEL_OUTPUT_DSI)
+				return gen9_get_scanline(crtc);
+	}
 
 	if (IS_GEN2(dev_priv))
 		position = I915_READ_FW(PIPEDSL(pipe)) & DSL_LINEMASK_GEN2;
