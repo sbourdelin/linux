@@ -448,7 +448,7 @@ struct block_device {
 
 	/* The counter of freeze processes */
 	int			bd_fsfreeze_count;
-	/* Mutex for freeze */
+	/* Mutex for freeze and blktrace */
 	struct mutex		bd_fsfreeze_mutex;
 } __randomize_layout;
 
