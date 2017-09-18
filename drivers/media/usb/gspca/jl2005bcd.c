@@ -320,10 +320,8 @@ static void jl2005c_dostream(struct work_struct *work)
 	u8 *buffer;
 
 	buffer = kmalloc(JL2005C_MAX_TRANSFER, GFP_KERNEL | GFP_DMA);
-	if (!buffer) {
-		pr_err("Couldn't allocate USB buffer\n");
+	if (!buffer)
 		goto quit_stream;
-	}
 
 	while (gspca_dev->present && gspca_dev->streaming) {
 #ifdef CONFIG_PM
