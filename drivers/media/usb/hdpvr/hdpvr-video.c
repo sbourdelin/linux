@@ -145,8 +145,7 @@ int hdpvr_alloc_buffers(struct hdpvr_device *dev, uint count)
 		 "allocating %u buffers\n", count);
 
 	for (i = 0; i < count; i++) {
-
-		buf = kzalloc(sizeof(struct hdpvr_buffer), GFP_KERNEL);
+		buf = kzalloc(sizeof(*buf), GFP_KERNEL);
 		if (!buf)
 			goto exit;
 
