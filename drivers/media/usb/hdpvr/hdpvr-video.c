@@ -147,10 +147,9 @@ int hdpvr_alloc_buffers(struct hdpvr_device *dev, uint count)
 	for (i = 0; i < count; i++) {
 
 		buf = kzalloc(sizeof(struct hdpvr_buffer), GFP_KERNEL);
-		if (!buf) {
-			v4l2_err(&dev->v4l2_dev, "cannot allocate buffer\n");
+		if (!buf)
 			goto exit;
-		}
+
 		buf->dev = dev;
 
 		urb = usb_alloc_urb(0, GFP_KERNEL);

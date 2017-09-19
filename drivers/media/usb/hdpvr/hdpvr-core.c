@@ -279,10 +279,8 @@ static int hdpvr_probe(struct usb_interface *interface,
 
 	/* allocate memory for our device state and initialize it */
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-	if (!dev) {
-		dev_err(&interface->dev, "Out of memory\n");
+	if (!dev)
 		goto error;
-	}
 
 	/* init video transfer queues first of all */
 	/* to prevent oops in hdpvr_delete() on error paths */
@@ -299,10 +297,8 @@ static int hdpvr_probe(struct usb_interface *interface,
 	mutex_init(&dev->i2c_mutex);
 	mutex_init(&dev->usbc_mutex);
 	dev->usbc_buf = kmalloc(64, GFP_KERNEL);
-	if (!dev->usbc_buf) {
-		v4l2_err(&dev->v4l2_dev, "Out of memory\n");
+	if (!dev->usbc_buf)
 		goto error;
-	}
 
 	init_waitqueue_head(&dev->wait_buffer);
 	init_waitqueue_head(&dev->wait_data);
