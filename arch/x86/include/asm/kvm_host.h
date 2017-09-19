@@ -1059,6 +1059,7 @@ struct kvm_x86_ops {
 
 	void (*setup_mce)(struct kvm_vcpu *vcpu);
 
+	int (*smi_allowed)(struct kvm_vcpu *vcpu);
 	int (*prep_enter_smm)(struct kvm_vcpu *vcpu, char *smstate);
 	int (*post_leave_smm)(struct kvm_vcpu *vcpu);
 };
