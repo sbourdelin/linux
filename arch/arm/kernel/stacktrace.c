@@ -121,13 +121,20 @@ static noinline void __save_stack_trace(struct task_struct *tsk,
 	if (tsk != current) {
 #ifdef CONFIG_SMP
 		/*
-		 * What guarantees do we have here that 'tsk' is not
-		 * running on another CPU?  For now, ignore it as we
-		 * can't guarantee we won't explode.
+		 * There is no way to prevent tsk becoming rq->curr during
+		 * walk_stackframe. frame.xx should be sanity checked in
+		 * function unwind_frame.
 		 */
-		if (trace->nr_entries < trace->max_entries)
-			trace->entries[trace->nr_entries++] = ULONG_MAX;
-		return;
+		if (!task_curr(tsk)) {
+			frame.fp = thread_saved_fp(tsk);
+			frame.sp = thread_saved_sp(tsk);
+			frame.lr = 0;		/* recovered from the stack */
+			frame.pc = thread_saved_pc(tsk);
+		} else {
+			if (trace->nr_entries < trace->max_entries)
+				trace->entries[trace->nr_entries++] = ULONG_MAX;
+			return;
+		}
 #else
 		frame.fp = thread_saved_fp(tsk);
 		frame.sp = thread_saved_sp(tsk);
