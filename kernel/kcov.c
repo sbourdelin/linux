@@ -71,14 +71,6 @@ void notrace __sanitizer_cov_trace_pc(void)
 
 		ip -= kaslr_offset();
 
-		/*
-		 * There is some code that runs in interrupts but for which
-		 * in_interrupt() returns false (e.g. preempt_schedule_irq()).
-		 * READ_ONCE()/barrier() effectively provides load-acquire wrt
-		 * interrupts, there are paired barrier()/WRITE_ONCE() in
-		 * kcov_ioctl_locked().
-		 */
-		barrier();
 		area = t->kcov_area;
 		/* The first word is number of subsequent PCs. */
 		pos = READ_ONCE(area[0]) + 1;
@@ -228,8 +220,6 @@ static int kcov_ioctl_locked(struct kcov *kcov, unsigned int cmd,
 		/* Cache in task struct for performance. */
 		t->kcov_size = kcov->size;
 		t->kcov_area = kcov->area;
-		/* See comment in __sanitizer_cov_trace_pc(). */
-		barrier();
 		WRITE_ONCE(t->kcov_mode, kcov->mode);
 		t->kcov = kcov;
 		kcov->t = t;
