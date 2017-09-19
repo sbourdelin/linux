@@ -17,6 +17,7 @@
 #include <asm/unified.h>
 #include <asm/compiler.h>
 
+#include <linux/thread_info.h>
 #include <asm/extable.h>
 
 /*
