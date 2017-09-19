@@ -186,14 +186,16 @@ static inline void __up_read(struct rw_semaphore *sem)
 static inline void __up_write(struct rw_semaphore *sem)
 {
 	long tmp;
+	register void *__sp asm(_ASM_SP);
+
 	asm volatile("# beginning __up_write\n\t"
-		     LOCK_PREFIX "  xadd      %1,(%2)\n\t"
+		     LOCK_PREFIX "  xadd      %1,(%3)\n\t"
 		     /* subtracts 0xffff0001, returns the old value */
 		     "  jns        1f\n\t"
 		     "  call call_rwsem_wake\n" /* expects old value in %edx */
 		     "1:\n\t"
 		     "# ending __up_write\n"
-		     : "+m" (sem->count), "=d" (tmp)
+		     : "+m" (sem->count), "=d" (tmp), "+r" (__sp)
 		     : "a" (sem), "1" (-RWSEM_ACTIVE_WRITE_BIAS)
 		     : "memory", "cc");
 }
