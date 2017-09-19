@@ -298,6 +298,7 @@ struct x86_emulate_ctxt {
 	bool perm_ok; /* do not check permissions if true */
 	bool ud;	/* inject an #UD if host doesn't support insn */
 	bool tf;	/* TF value before instruction (after for syscall/sysret) */
+	bool left_smm;  /* post_leave_smm() needs to be called after emulation */
 
 	bool have_exception;
 	struct x86_exception exception;

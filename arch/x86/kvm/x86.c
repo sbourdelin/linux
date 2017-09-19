@@ -5254,7 +5254,11 @@ static unsigned emulator_get_hflags(struct x86_emulate_ctxt *ctxt)
 
 static void emulator_set_hflags(struct x86_emulate_ctxt *ctxt, unsigned emul_flags)
 {
-	kvm_set_hflags(emul_to_vcpu(ctxt), emul_flags);
+	struct kvm_vcpu *vcpu = emul_to_vcpu(ctxt);
+
+	if ((vcpu->arch.hflags & HF_SMM_MASK) && !(emul_flags & HF_SMM_MASK))
+		ctxt->left_smm = true;
+	kvm_set_hflags(vcpu, emul_flags);
 }
 
 static const struct x86_emulate_ops emulate_ops = {
@@ -5674,6 +5678,7 @@ int x86_emulate_instruction(struct kvm_vcpu *vcpu,
 		ctxt->have_exception = false;
 		ctxt->exception.vector = -1;
 		ctxt->perm_ok = false;
+		ctxt->left_smm = false;
 
 		ctxt->ud = emulation_type & EMULTYPE_TRAP_UD;
 
@@ -5761,6 +5766,8 @@ restart:
 		if (!ctxt->have_exception ||
 		    exception_type(ctxt->exception.vector) == EXCPT_TRAP)
 			__kvm_set_rflags(vcpu, ctxt->eflags);
+		if (r == EMULATE_DONE && ctxt->left_smm)
+			kvm_x86_ops->post_leave_smm(vcpu);
 
 		/*
 		 * For STI, interrupts are shadowed; so KVM_REQ_EVENT will
@@ -6614,6 +6621,9 @@ static void enter_smm(struct kvm_vcpu *vcpu)
 	trace_kvm_enter_smm(vcpu->vcpu_id, vcpu->arch.smbase, true);
 	vcpu->arch.hflags |= HF_SMM_MASK;
 	memset(buf, 0, 512);
+
+	kvm_x86_ops->prep_enter_smm(vcpu, buf);
+
 	if (guest_cpuid_has_longmode(vcpu))
 		enter_smm_save_state_64(vcpu, buf);
 	else

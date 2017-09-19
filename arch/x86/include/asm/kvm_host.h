@@ -1058,6 +1058,9 @@ struct kvm_x86_ops {
 	void (*cancel_hv_timer)(struct kvm_vcpu *vcpu);
 
 	void (*setup_mce)(struct kvm_vcpu *vcpu);
+
+	int (*prep_enter_smm)(struct kvm_vcpu *vcpu, char *smstate);
+	int (*post_leave_smm)(struct kvm_vcpu *vcpu);
 };
 
 struct kvm_arch_async_pf {
