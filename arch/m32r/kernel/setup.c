@@ -66,14 +66,14 @@ extern int root_mountflags;
 
 static char __initdata command_line[COMMAND_LINE_SIZE];
 
-static struct resource data_resource = {
+static struct resource data_resource __initdata = {
 	.name   = "Kernel data",
 	.start  = 0,
 	.end    = 0,
 	.flags  = IORESOURCE_BUSY | IORESOURCE_SYSTEM_RAM
 };
 
-static struct resource code_resource = {
+static struct resource code_resource __initdata = {
 	.name   = "Kernel code",
 	.start  = 0,
 	.end    = 0,
