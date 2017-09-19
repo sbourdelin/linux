@@ -449,11 +449,20 @@ static int uhid_event_from_user(const char __user *buffer, size_t len,
 			kfree(compat);
 			return 0;
 		}
-		/* All others can be copied directly */
-	}
 
-	if (copy_from_user(event, buffer, min(len, sizeof(*event))))
-		return -EFAULT;
+		/* All others can be copied directly */
+		if (copy_from_user(event, buffer, min(len, sizeof(*event))))
+			return -EFAULT;
+
+		/* 
+		 * Override type in case the user process rushes to change it 
+		 * between two fetches 
+		 * */
+		event->type = type;
+	} else {
+		if (copy_from_user(event, buffer, min(len, sizeof(*event))))
+			return -EFAULT;
+	}
 
 	return 0;
 }
