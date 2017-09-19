@@ -284,6 +284,39 @@ int ip_tunnel_newlink(struct net_device *dev, struct nlattr *tb[],
 		      struct ip_tunnel_parm *p, __u32 fwmark);
 void ip_tunnel_setup(struct net_device *dev, unsigned int net_id);
 
+struct rtable *__ip_tunnel_get_route(struct net_device *dev,
+				     struct sk_buff *skb, u8 proto,
+				     int oif, u8 tos,
+				     __be32 daddr, __be32 *saddr,
+				     __be16 dport, __be16 sport,
+				     struct dst_cache *dst_cache,
+				     const struct ip_tunnel_info *info,
+				     bool use_cache);
+
+static inline struct rtable *ip_tunnel_get_route(struct net_device *dev,
+				     struct sk_buff *skb, u8 proto,
+				     int oif, u8 tos,
+				     __be32 daddr, __be32 *saddr,
+				     __be16 dport, __be16 sport,
+				     struct dst_cache *dst_cache,
+				     const struct ip_tunnel_info *info)
+{
+	bool use_cache = (ip_tunnel_dst_cache_usable(skb, info) &&
+		(!tos || info));
+
+	if (use_cache) {
+		struct rtable *rt;
+
+		rt = dst_cache_get_ip4(dst_cache, saddr);
+		if (rt)
+			return rt;
+	}
+
+	return __ip_tunnel_get_route(dev, skb, proto, oif, tos,
+				     daddr, saddr, dport, sport,
+				     dst_cache, info, use_cache);
+}
+
 struct ip_tunnel_encap_ops {
 	size_t (*encap_hlen)(struct ip_tunnel_encap *e);
 	int (*build_header)(struct sk_buff *skb, struct ip_tunnel_encap *e,

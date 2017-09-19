@@ -142,6 +142,39 @@ __u32 ip6_tnl_get_cap(struct ip6_tnl *t, const struct in6_addr *laddr,
 struct net *ip6_tnl_get_link_net(const struct net_device *dev);
 int ip6_tnl_get_iflink(const struct net_device *dev);
 int ip6_tnl_change_mtu(struct net_device *dev, int new_mtu);
+struct dst_entry *__ip6_tnl_get_route(struct net_device *dev,
+				      struct sk_buff *skb, struct sock *sk,
+				      u8 proto, int oif, u8 tos, __be32 label,
+				      const struct in6_addr *daddr,
+				      struct in6_addr *saddr,
+				      __be16 dport, __be16 sport,
+				      struct dst_cache *dst_cache,
+				      const struct ip_tunnel_info *info,
+				      bool use_cache);
+
+static inline struct dst_entry *ip6_tnl_get_route(struct net_device *dev,
+			struct sk_buff *skb, struct sock *sk, u8 proto,
+			int oif, u8 tos, __be32 label,
+			const struct in6_addr *daddr,
+			struct in6_addr *saddr,
+			__be16 dport, __be16 sport,
+			struct dst_cache *dst_cache,
+			const struct ip_tunnel_info *info)
+{
+	 bool use_cache = (ip_tunnel_dst_cache_usable(skb, info) &&
+		(!tos || info));
+
+	if (use_cache) {
+		struct dst_entry *ndst = dst_cache_get_ip6(dst_cache, saddr);
+
+		if (ndst)
+			return ndst;
+	}
+
+	return __ip6_tnl_get_route(dev, skb, sk, proto, oif, tos, label,
+				   daddr, saddr, dport, sport, dst_cache,
+				   info, use_cache);
+}
 
 static inline void ip6tunnel_xmit(struct sock *sk, struct sk_buff *skb,
 				  struct net_device *dev)

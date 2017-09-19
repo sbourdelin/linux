@@ -935,6 +935,47 @@ done:
 }
 EXPORT_SYMBOL_GPL(ip_tunnel_ioctl);
 
+struct rtable *__ip_tunnel_get_route(struct net_device *dev,
+				     struct sk_buff *skb, u8 proto,
+				    int oif, u8 tos,
+				     __be32 daddr, __be32 *saddr,
+				     __be16 dport, __be16 sport,
+				     struct dst_cache *dst_cache,
+				     const struct ip_tunnel_info *info,
+				     bool use_cache)
+{
+	struct rtable *rt = NULL;
+	struct flowi4 fl4;
+
+	memset(&fl4, 0, sizeof(fl4));
+	fl4.flowi4_oif = oif;
+	fl4.flowi4_tos = RT_TOS(tos);
+	fl4.flowi4_mark = skb->mark;
+	fl4.flowi4_proto = proto;
+	fl4.daddr = daddr;
+	fl4.saddr = *saddr;
+	fl4.fl4_dport = dport;
+	fl4.fl4_sport = sport;
+
+	rt = ip_route_output_key(dev_net(dev), &fl4);
+	if (likely(!IS_ERR(rt))) {
+		if (rt->dst.dev == dev) {
+			netdev_dbg(dev, "circular route to %pI4\n", &daddr);
+			ip_rt_put(rt);
+			return ERR_PTR(-ELOOP);
+		}
+
+		*saddr = fl4.saddr;
+		if (use_cache)
+			dst_cache_set_ip4(dst_cache, &rt->dst, fl4.saddr);
+	} else {
+		netdev_dbg(dev, "no route to %pI4\n", &daddr);
+		return ERR_PTR(-ENETUNREACH);
+	}
+	return rt;
+}
+EXPORT_SYMBOL_GPL(__ip_tunnel_get_route);
+
 int __ip_tunnel_change_mtu(struct net_device *dev, int new_mtu, bool strict)
 {
 	struct ip_tunnel *tunnel = netdev_priv(dev);
