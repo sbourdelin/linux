@@ -44,6 +44,8 @@
 
 static struct workqueue_struct *ethsw_owq;
 
+const char ethsw_drv_version[] = "0.1";
+
 /* Minimal supported DPSW version */
 #define DPSW_MIN_VER_MAJOR		8
 #define DPSW_MIN_VER_MINOR		0
@@ -1389,6 +1391,7 @@ static int ethsw_probe_port(struct ethsw_core *ethsw, u16 port_idx)
 
 	SET_NETDEV_DEV(port_netdev, dev);
 	port_netdev->netdev_ops = &ethsw_port_ops;
+	port_netdev->ethtool_ops = &ethsw_port_ethtool_ops;
 	port_netdev->switchdev_ops = &ethsw_port_switchdev_ops;
 
 	/* Set MTU limits */
