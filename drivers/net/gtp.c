@@ -75,6 +75,13 @@ struct pdp_ctx {
 	struct rcu_head		rcu_head;
 
 	struct dst_cache	dst_cache;
+
+	unsigned int		cfg_flags;
+
+#define GTP_F_UDP_ZERO_CSUM_TX		0x1
+#define GTP_F_UDP_ZERO_CSUM6_TX		0x2
+#define GTP_F_UDP_ZERO_CSUM6_RX		0x4
+
 };
 
 /* One instance of the GTP device. */
@@ -536,6 +543,7 @@ static int gtp_xmit(struct sk_buff *skb, struct net_device *dev,
 	struct gtp_dev *gtp = netdev_priv(dev);
 	bool xnet = !net_eq(gtp->net, dev_net(gtp->dev));
 	struct sock *sk = pctx->sk;
+	bool udp_csum;
 	int err = 0;
 
 	/* Ensure there is sufficient headroom. */
@@ -563,11 +571,12 @@ static int gtp_xmit(struct sk_buff *skb, struct net_device *dev,
 		skb_dst_drop(skb);
 
 		gtp_push_header(skb, pctx);
+		udp_csum = !(pctx->cfg_flags & GTP_F_UDP_ZERO_CSUM_TX);
 		udp_tunnel_xmit_skb(rt, sk, skb, saddr,
 				    pctx->peer_addr_ip4.s_addr,
 				    0, ip4_dst_hoplimit(&rt->dst), 0,
 				    pctx->gtp_port, pctx->gtp_port,
-				    xnet, false);
+				    xnet, !udp_csum);
 
 		netdev_dbg(dev, "gtp -> IP src: %pI4 dst: %pI4\n",
 			   &saddr, &pctx->peer_addr_ip4.s_addr);
@@ -591,11 +600,12 @@ static int gtp_xmit(struct sk_buff *skb, struct net_device *dev,
 		skb_dst_drop(skb);
 
 		gtp_push_header(skb, pctx);
+		udp_csum = !(pctx->cfg_flags & GTP_F_UDP_ZERO_CSUM6_TX);
 		udp_tunnel6_xmit_skb(dst, sk, skb, dev,
 				     &saddr, &pctx->peer_addr_ip6,
 				     0, ip6_dst_hoplimit(dst), 0,
 				     pctx->gtp_port, pctx->gtp_port,
-				     true);
+				     !udp_csum);
 
 		netdev_dbg(dev, "gtp -> IP src: %pI6 dst: %pI6\n",
 			   &saddr, &pctx->peer_addr_ip6);
@@ -728,6 +738,7 @@ static int gtp_newlink(struct net *src_net, struct net_device *dev,
 {
 	unsigned int role = GTP_ROLE_GGSN;
 	bool have_fd, have_ports;
+	unsigned int flags = 0;
 	bool is_ipv6 = false;
 	struct gtp_dev *gtp;
 	struct gtp_net *gn;
@@ -745,6 +756,21 @@ static int gtp_newlink(struct net *src_net, struct net_device *dev,
 		role = nla_get_u32(data[IFLA_GTP_ROLE]);
 		if (role > GTP_ROLE_SGSN)
 			return -EINVAL;
+	}
+
+	if (data[IFLA_GTP_UDP_CSUM]) {
+		if (!nla_get_u8(data[IFLA_GTP_UDP_CSUM]))
+			flags |= GTP_F_UDP_ZERO_CSUM_TX;
+	}
+
+	if (data[IFLA_GTP_UDP_ZERO_CSUM6_TX]) {
+		if (nla_get_u8(data[IFLA_GTP_UDP_ZERO_CSUM6_TX]))
+			flags |= GTP_F_UDP_ZERO_CSUM6_TX;
+	}
+
+	if (data[IFLA_GTP_UDP_ZERO_CSUM6_RX]) {
+		if (nla_get_u8(data[IFLA_GTP_UDP_ZERO_CSUM6_RX]))
+			flags |= GTP_F_UDP_ZERO_CSUM6_RX;
 	}
 
 	if (data[IFLA_GTP_AF]) {
@@ -819,6 +845,9 @@ static const struct nla_policy gtp_policy[IFLA_GTP_MAX + 1] = {
 	[IFLA_GTP_ROLE]			= { .type = NLA_U32 },
 	[IFLA_GTP_PORT0]		= { .type = NLA_U16 },
 	[IFLA_GTP_PORT1]		= { .type = NLA_U16 },
+	[IFLA_GTP_UDP_CSUM]		= { .type = NLA_U8 },
+	[IFLA_GTP_UDP_ZERO_CSUM6_TX]	= { .type = NLA_U8 },
+	[IFLA_GTP_UDP_ZERO_CSUM6_RX]	= { .type = NLA_U8 },
 };
 
 static int gtp_validate(struct nlattr *tb[], struct nlattr *data[],
@@ -990,6 +1019,8 @@ static struct socket *gtp_create_sock(struct net *net, bool ipv6,
 
 	if (ipv6) {
 		udp_conf.family = AF_INET6;
+		udp_conf.use_udp6_rx_checksums =
+		    !(flags & GTP_F_UDP_ZERO_CSUM6_RX);
 		udp_conf.ipv6_v6only = 1;
 	} else {
 		udp_conf.family = AF_INET;
