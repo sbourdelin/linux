@@ -173,6 +173,20 @@ struct net_device *__ip_dev_find(struct net *net, __be32 addr, bool devref)
 }
 EXPORT_SYMBOL(__ip_dev_find);
 
+/* called under RCU lock */
+struct in_ifaddr *inet_lookup_ifaddr_rcu(struct net *net, __be32 addr)
+{
+	u32 hash = inet_addr_hash(net, addr);
+	struct in_ifaddr *ifa;
+
+	hlist_for_each_entry_rcu(ifa, &inet_addr_lst[hash], hash)
+		if (ifa->ifa_local == addr &&
+		    net_eq(dev_net(ifa->ifa_dev->dev), net))
+			return ifa;
+
+	return NULL;
+}
+
 static void rtmsg_ifa(int event, struct in_ifaddr *, struct nlmsghdr *, u32);
 
 static BLOCKING_NOTIFIER_HEAD(inetaddr_chain);

@@ -345,9 +345,6 @@ static int __fib_validate_source(struct sk_buff *skb, __be32 src, __be32 dst,
 	if (res.type != RTN_UNICAST &&
 	    (res.type != RTN_LOCAL || !IN_DEV_ACCEPT_LOCAL(idev)))
 		goto e_inval;
-	if (!rpf && !fib_num_tclassid_users(net) &&
-	    (dev->ifindex != oif || !IN_DEV_TX_REDIRECTS(idev)))
-		goto last_resort;
 	fib_combine_itag(itag, &res);
 	dev_match = false;
 
@@ -404,8 +401,14 @@ int fib_validate_source(struct sk_buff *skb, __be32 src, __be32 dst,
 	int r = secpath_exists(skb) ? 0 : IN_DEV_RPFILTER(idev);
 
 	if (!r && !fib_num_tclassid_users(dev_net(dev)) &&
-	    IN_DEV_ACCEPT_LOCAL(idev) &&
 	    (dev->ifindex != oif || !IN_DEV_TX_REDIRECTS(idev))) {
+		/* we need only to ensure that the src address is not a
+		 * local one
+		 */
+		if (!IN_DEV_ACCEPT_LOCAL(idev) &&
+		    inet_lookup_ifaddr_rcu(dev_net(dev), src))
+			return -EINVAL;
+
 		*itag = 0;
 		return 0;
 	}
