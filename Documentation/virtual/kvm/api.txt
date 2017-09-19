@@ -3405,6 +3405,28 @@ VMs.
 Currently, this ioctl is used for issuing Secure Encrypted Virtualization (SEV)
 commands on AMD Processors.
 
+4.110 KVM_MEMORY_ENCRYPTION_REGISTER_REGION
+
+Capability: basic
+Architectures: x86
+Type: system
+Parameters: struct kvm_enc_region (in)
+Returns: 0 on success; -1 on error
+
+This ioctl can be used to register the guest memory region which may contain the
+encrypted data (e.g guest RAM, SMRAM etc).
+
+4.111 KVM_MEMORY_ENCRYPTION_UNREGISTER_REGION
+
+Capability: basic
+Architectures: x86
+Type: system
+Parameters: struct kvm_enc_region (in)
+Returns: 0 on success; -1 on error
+
+This ioctl can be used to unregister the memory region registered with
+KVM_MEMORY_ENCRYPTION_REGISTER_REGION ioctl.
+
 5. The kvm_run structure
 ------------------------
 
