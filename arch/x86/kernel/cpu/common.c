@@ -1303,7 +1303,7 @@ static __init int setup_disablecpuid(char *arg)
 
 	return 1;
 }
-__setup("clearcpuid=", setup_disablecpuid);
+early_param("clearcpuid", setup_disablecpuid);
 
 #ifdef CONFIG_X86_64
 DEFINE_PER_CPU_FIRST(union irq_stack_union,
