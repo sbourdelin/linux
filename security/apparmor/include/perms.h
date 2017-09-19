@@ -90,7 +90,7 @@ struct aa_perms {
 
 #define ALL_PERMS_MASK 0xffffffff
 extern struct aa_perms nullperms;
-extern struct aa_perms allperms;
+extern const struct aa_perms allperms;
 
 
 #define xcheck(FN1, FN2)	\

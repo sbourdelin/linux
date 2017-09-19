@@ -25,7 +25,7 @@
 #include "include/policy.h"
 
 struct aa_perms nullperms;
-struct aa_perms allperms = { .allow = ALL_PERMS_MASK,
+const struct aa_perms allperms = { .allow = ALL_PERMS_MASK,
 			     .quiet = ALL_PERMS_MASK,
 			     .hide = ALL_PERMS_MASK };
 
