@@ -1143,7 +1143,8 @@ static __init int svm_hardware_setup(void)
 		kvm_tsc_scaling_ratio_frac_bits = 32;
 	}
 
-	if (boot_cpu_has(X86_FEATURE_SEV))
+	if (boot_cpu_has(X86_FEATURE_SEV) &&
+	    IS_ENABLED(CONFIG_KVM_AMD_SEV))
 		sev_hardware_setup();
 
 	if (nested) {
