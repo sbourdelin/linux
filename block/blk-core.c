@@ -905,6 +905,8 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 	if (blkcg_init_queue(q))
 		goto fail_ref;
 
+	spin_lock_init(&q->freeze_lock);
+
 	return q;
 
 fail_ref:

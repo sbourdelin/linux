@@ -118,19 +118,6 @@ void blk_mq_in_flight(struct request_queue *q, struct hd_struct *part,
 	blk_mq_queue_tag_busy_iter(q, blk_mq_check_inflight, &mi);
 }
 
-void blk_freeze_queue_start(struct request_queue *q)
-{
-	int freeze_depth;
-
-	freeze_depth = atomic_inc_return(&q->freeze_depth);
-	if (freeze_depth == 1) {
-		percpu_ref_kill(&q->q_usage_counter);
-		if (q->mq_ops)
-			blk_mq_run_hw_queues(q, false);
-	}
-}
-EXPORT_SYMBOL_GPL(blk_freeze_queue_start);
-
 void blk_freeze_queue_wait(struct request_queue *q)
 {
 	if (!q->mq_ops)
@@ -147,6 +134,69 @@ int blk_mq_freeze_queue_wait_timeout(struct request_queue *q,
 					timeout);
 }
 EXPORT_SYMBOL_GPL(blk_mq_freeze_queue_wait_timeout);
+
+static bool queue_freeze_is_over(struct request_queue *q,
+		bool preempt, bool *queue_dying)
+{
+	/*
+	 * preempt freeze has to be prevented after queue is set as
+	 * dying, otherwise we may hang forever
+	 */
+	if (preempt) {
+		spin_lock_irq(q->queue_lock);
+		*queue_dying = !!blk_queue_dying(q);
+		spin_unlock_irq(q->queue_lock);
+
+		return !q->normal_freezing || *queue_dying;
+	}
+	return !q->preempt_freezing;
+}
+
+static void __blk_freeze_queue_start(struct request_queue *q, bool preempt)
+{
+	int freeze_depth;
+	bool queue_dying;
+
+	/*
+	 * Make sure normal freeze and preempt freeze are run
+	 * exclusively, but each kind itself is allowed to be
+	 * run concurrently, even nested.
+	 */
+	spin_lock(&q->freeze_lock);
+	wait_event_cmd(q->freeze_wq,
+		       queue_freeze_is_over(q, preempt, &queue_dying),
+		       spin_unlock(&q->freeze_lock),
+		       spin_lock(&q->freeze_lock));
+
+	if (preempt && queue_dying)
+		goto unlock;
+
+	freeze_depth = atomic_inc_return(&q->freeze_depth);
+	if (freeze_depth == 1) {
+		if (preempt) {
+			q->preempt_freezing = 1;
+			q->preempt_unfreezing = 0;
+		} else
+			q->normal_freezing = 1;
+		spin_unlock(&q->freeze_lock);
+
+		percpu_ref_kill(&q->q_usage_counter);
+		if (q->mq_ops)
+			blk_mq_run_hw_queues(q, false);
+
+		/* have to drain I/O here for preempt quiesce */
+		if (preempt)
+			blk_freeze_queue_wait(q);
+	} else
+ unlock:
+		spin_unlock(&q->freeze_lock);
+}
+
+void blk_freeze_queue_start(struct request_queue *q)
+{
+	__blk_freeze_queue_start(q, false);
+}
+EXPORT_SYMBOL_GPL(blk_freeze_queue_start);
 
 /*
  * Guarantee no request is in use, so we can change any data structure of
@@ -166,18 +216,73 @@ void blk_freeze_queue(struct request_queue *q)
 }
 EXPORT_SYMBOL_GPL(blk_freeze_queue);
 
-void blk_unfreeze_queue(struct request_queue *q)
+static void blk_start_unfreeze_queue_preempt(struct request_queue *q)
+{
+	/* no new request can be coming after unfreezing */
+	spin_lock(&q->freeze_lock);
+	q->preempt_unfreezing = 1;
+	spin_unlock(&q->freeze_lock);
+
+	blk_freeze_queue_wait(q);
+}
+
+static void __blk_unfreeze_queue(struct request_queue *q, bool preempt)
 {
 	int freeze_depth;
 
 	freeze_depth = atomic_dec_return(&q->freeze_depth);
 	WARN_ON_ONCE(freeze_depth < 0);
 	if (!freeze_depth) {
+		if (preempt)
+			blk_start_unfreeze_queue_preempt(q);
+
 		percpu_ref_reinit(&q->q_usage_counter);
+
+		/*
+		 * clearing the freeze flag so that any pending
+		 * freeze can move on
+		 */
+		spin_lock(&q->freeze_lock);
+		if (preempt)
+			q->preempt_freezing = 0;
+		else
+			q->normal_freezing = 0;
+		spin_unlock(&q->freeze_lock);
 		wake_up_all(&q->freeze_wq);
 	}
 }
+
+void blk_unfreeze_queue(struct request_queue *q)
+{
+	__blk_unfreeze_queue(q, false);
+}
 EXPORT_SYMBOL_GPL(blk_unfreeze_queue);
+
+/*
+ * Once this function is returned, only allow to get request
+ * of RQF_PREEMPT.
+ */
+void blk_freeze_queue_preempt(struct request_queue *q)
+{
+	/*
+	 * If queue isn't in preempt_frozen, the queue has
+	 * to be dying, so do nothing since no I/O can
+	 * succeed any more.
+	 */
+	__blk_freeze_queue_start(q, true);
+}
+EXPORT_SYMBOL_GPL(blk_freeze_queue_preempt);
+
+void blk_unfreeze_queue_preempt(struct request_queue *q)
+{
+	/*
+	 * If queue isn't in preempt_frozen, the queue should
+	 * be dying , so do nothing since no I/O can succeed.
+	 */
+	if (blk_queue_is_preempt_frozen(q))
+		__blk_unfreeze_queue(q, true);
+}
+EXPORT_SYMBOL_GPL(blk_unfreeze_queue_preempt);
 
 /*
  * FIXME: replace the scsi_internal_device_*block_nowait() calls in the

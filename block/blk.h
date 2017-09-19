@@ -79,6 +79,17 @@ static inline void blk_queue_enter_live(struct request_queue *q)
 	percpu_ref_get(&q->q_usage_counter);
 }
 
+static inline bool blk_queue_is_preempt_frozen(struct request_queue *q)
+{
+	bool preempt_frozen;
+
+	spin_lock(&q->freeze_lock);
+	preempt_frozen = q->preempt_freezing && !q->preempt_unfreezing;
+	spin_unlock(&q->freeze_lock);
+
+	return preempt_frozen;
+}
+
 #ifdef CONFIG_BLK_DEV_INTEGRITY
 void blk_flush_integrity(void);
 bool __bio_integrity_endio(struct bio *);

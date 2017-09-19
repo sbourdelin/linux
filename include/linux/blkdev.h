@@ -566,6 +566,12 @@ struct request_queue {
 	int			bypass_depth;
 	atomic_t		freeze_depth;
 
+	/* for run normal freeze and preempt freeze exclusive */
+	spinlock_t		freeze_lock;
+	unsigned		normal_freezing:1;
+	unsigned		preempt_freezing:1;
+	unsigned		preempt_unfreezing:1;
+
 #if defined(CONFIG_BLK_DEV_BSG)
 	bsg_job_fn		*bsg_job_fn;
 	struct bsg_class_device bsg_dev;

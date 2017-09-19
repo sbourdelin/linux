@@ -255,6 +255,8 @@ void blk_mq_tagset_busy_iter(struct blk_mq_tag_set *tagset,
 		busy_tag_iter_fn *fn, void *priv);
 void blk_freeze_queue(struct request_queue *q);
 void blk_unfreeze_queue(struct request_queue *q);
+void blk_freeze_queue_preempt(struct request_queue *q);
+void blk_unfreeze_queue_preempt(struct request_queue *q);
 void blk_freeze_queue_start(struct request_queue *q);
 void blk_freeze_queue_wait(struct request_queue *q);
 int blk_mq_freeze_queue_wait_timeout(struct request_queue *q,
