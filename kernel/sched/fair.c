@@ -5523,7 +5523,7 @@ find_idlest_group(struct sched_domain *sd, struct task_struct *p,
 
 		/* Skip over this group if it has no CPUs allowed */
 		if (!cpumask_intersects(sched_group_span(group),
-					&p->cpus_allowed))
+					&p->cpus_preferred))
 			continue;
 
 		local_group = cpumask_test_cpu(this_cpu,
@@ -5643,7 +5643,7 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 		return cpumask_first(sched_group_span(group));
 
 	/* Traverse only the allowed CPUs */
-	for_each_cpu_and(i, sched_group_span(group), &p->cpus_allowed) {
+	for_each_cpu_and(i, sched_group_span(group), &p->cpus_preferred) {
 		if (idle_cpu(i)) {
 			struct rq *rq = cpu_rq(i);
 			struct cpuidle_state *idle = idle_get_state(rq);
@@ -5729,23 +5729,10 @@ unlock:
 	rcu_read_unlock();
 }
 
-/*
- * Scan the entire LLC domain for idle cores; this dynamically switches off if
- * there are no idle cores left in the system; tracked through
- * sd_llc->shared->has_idle_cores and enabled through update_idle_core() above.
- */
-static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int target)
+static inline int
+scan_cpu_mask_for_idle_cores(struct cpumask *cpus, int target)
 {
-	struct cpumask *cpus = this_cpu_cpumask_var_ptr(select_idle_mask);
 	int core, cpu;
-
-	if (!static_branch_likely(&sched_smt_present))
-		return -1;
-
-	if (!test_idle_cores(target, false))
-		return -1;
-
-	cpumask_and(cpus, sched_domain_span(sd), &p->cpus_allowed);
 
 	for_each_cpu_wrap(core, cpus, target) {
 		bool idle = true;
@@ -5760,10 +5747,61 @@ static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int 
 			return core;
 	}
 
+	return -1;
+}
+
+/*
+ * Scan the entire LLC domain for idle cores; this dynamically switches off if
+ * there are no idle cores left in the system; tracked through
+ * sd_llc->shared->has_idle_cores and enabled through update_idle_core() above.
+ */
+static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int target)
+{
+	struct cpumask *cpus = this_cpu_cpumask_var_ptr(select_idle_mask);
+	struct cpumask *pcpus = this_cpu_cpumask_var_ptr(select_idle_mask);
+	int core;
+
+	if (!static_branch_likely(&sched_smt_present))
+		return -1;
+
+	if (!test_idle_cores(target, false))
+		return -1;
+
+	cpumask_and(cpus, sched_domain_span(sd), &p->cpus_allowed);
+	cpumask_and(pcpus, cpus, &p->cpus_preferred);
+	core = scan_cpu_mask_for_idle_cores(pcpus, target);
+
+	if (core >= 0)
+		return core;
+
+	if (cpumask_equal(cpus, pcpus))
+		goto out;
+
+	cpumask_andnot(cpus, cpus, pcpus);
+	core = scan_cpu_mask_for_idle_cores(cpus, target);
+
+	if (core >= 0)
+		return core;
+out:
 	/*
 	 * Failed to find an idle core; stop looking for one.
 	 */
 	set_idle_cores(target, 0);
+
+	return -1;
+}
+
+static inline int
+scan_cpu_mask_for_idle_smt(struct cpumask *cpus, int target)
+{
+	int cpu;
+
+	for_each_cpu(cpu, cpu_smt_mask(target)) {
+		if (!cpumask_test_cpu(cpu, cpus))
+			continue;
+		if (idle_cpu(cpu))
+			return cpu;
+	}
 
 	return -1;
 }
@@ -5773,19 +5811,20 @@ static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int 
  */
 static int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int target)
 {
+	struct cpumask *cpus = &p->cpus_allowed;
 	int cpu;
 
 	if (!static_branch_likely(&sched_smt_present))
 		return -1;
 
-	for_each_cpu(cpu, cpu_smt_mask(target)) {
-		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
-			continue;
-		if (idle_cpu(cpu))
-			return cpu;
-	}
+	cpu = scan_cpu_mask_for_idle_smt(&p->cpus_preferred, target);
 
-	return -1;
+	if (cpu >= 0 || cpumask_equal(&p->cpus_preferred, cpus))
+		return cpu;
+
+	cpumask_andnot(cpus, cpus, &p->cpus_preferred);
+
+	return scan_cpu_mask_for_idle_smt(cpus, target);
 }
 
 #else /* CONFIG_SCHED_SMT */
@@ -5802,6 +5841,24 @@ static inline int select_idle_smt(struct task_struct *p, struct sched_domain *sd
 
 #endif /* CONFIG_SCHED_SMT */
 
+static inline int
+scan_cpu_mask_for_idle_cpu(struct cpumask *cpus, int target,
+			   struct sched_domain *sd, int nr)
+{
+	int cpu;
+
+	for_each_cpu_wrap(cpu, sched_domain_span(sd), target) {
+		if (!--nr)
+			return -1;
+		if (!cpumask_test_cpu(cpu, cpus))
+			continue;
+		if (idle_cpu(cpu))
+			break;
+	}
+
+	return cpu;
+}
+
 /*
  * Scan the LLC domain for idle CPUs; this is dynamically regulated by
  * comparing the average scan cost (tracked in sd->avg_scan_cost) against the
@@ -5810,6 +5867,7 @@ static inline int select_idle_smt(struct task_struct *p, struct sched_domain *sd
 static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int target)
 {
 	struct sched_domain *this_sd;
+	struct cpumask *cpus = this_cpu_cpumask_var_ptr(select_idle_mask);
 	u64 avg_cost, avg_idle;
 	u64 time, cost;
 	s64 delta;
@@ -5839,15 +5897,15 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 
 	time = local_clock();
 
-	for_each_cpu_wrap(cpu, sched_domain_span(sd), target) {
-		if (!--nr)
-			return -1;
-		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
-			continue;
-		if (idle_cpu(cpu))
-			break;
-	}
+	cpu = scan_cpu_mask_for_idle_cpu(&p->cpus_preferred, target, sd, nr);
 
+	if (cpu >= 0 || cpumask_equal(&p->cpus_preferred, &p->cpus_allowed))
+		goto out;
+
+	cpumask_andnot(cpus, &p->cpus_allowed, &p->cpus_preferred);
+
+	cpu = scan_cpu_mask_for_idle_cpu(cpus, target, sd, nr);
+out:
 	time = local_clock() - time;
 	cost = this_sd->avg_scan_cost;
 	delta = (s64)(time - cost) / 8;
@@ -5997,7 +6055,7 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int sd_flag, int wake_f
 	if (sd_flag & SD_BALANCE_WAKE) {
 		record_wakee(p);
 		want_affine = !wake_wide(p) && !wake_cap(p, cpu, prev_cpu)
-			      && cpumask_test_cpu(cpu, &p->cpus_allowed);
+			      && cpumask_test_cpu(cpu, &p->cpus_preferred);
 	}
 
 	rcu_read_lock();
