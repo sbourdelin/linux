@@ -53,6 +53,7 @@ struct pdp_ctx {
 		} v1;
 	} u;
 	u8			gtp_version;
+	__be16			gtp_port;
 	u16			af;
 
 	struct in_addr		ms_addr_ip4;
@@ -418,149 +419,112 @@ static inline void gtp1_push_header(struct sk_buff *skb, struct pdp_ctx *pctx)
 	 */
 }
 
-struct gtp_pktinfo {
-	struct sock		*sk;
-	struct iphdr		*iph;
-	struct flowi4		fl4;
-	struct rtable		*rt;
-	struct pdp_ctx		*pctx;
-	struct net_device	*dev;
-	__be16			gtph_port;
-};
-
-static void gtp_push_header(struct sk_buff *skb, struct gtp_pktinfo *pktinfo)
+static void gtp_push_header(struct sk_buff *skb, struct pdp_ctx *pctx)
 {
-	switch (pktinfo->pctx->gtp_version) {
+	switch (pctx->gtp_version) {
 	case GTP_V0:
-		pktinfo->gtph_port = htons(GTP0_PORT);
-		gtp0_push_header(skb, pktinfo->pctx);
+		gtp0_push_header(skb, pctx);
 		break;
 	case GTP_V1:
-		pktinfo->gtph_port = htons(GTP1U_PORT);
-		gtp1_push_header(skb, pktinfo->pctx);
+		gtp1_push_header(skb, pctx);
 		break;
 	}
 }
 
-static inline void gtp_set_pktinfo_ipv4(struct gtp_pktinfo *pktinfo,
-					struct sock *sk, struct iphdr *iph,
-					struct pdp_ctx *pctx, struct rtable *rt,
-					struct flowi4 *fl4,
-					struct net_device *dev)
+static int gtp_xmit(struct sk_buff *skb, struct net_device *dev,
+		    struct pdp_ctx *pctx)
 {
-	pktinfo->sk	= sk;
-	pktinfo->iph	= iph;
-	pktinfo->pctx	= pctx;
-	pktinfo->rt	= rt;
-	pktinfo->fl4	= *fl4;
-	pktinfo->dev	= dev;
-}
-
-static int gtp_build_skb_ip4(struct sk_buff *skb, struct net_device *dev,
-			     struct gtp_pktinfo *pktinfo)
-{
-	struct gtp_dev *gtp = netdev_priv(dev);
-	struct pdp_ctx *pctx;
+	struct sock *sk = pctx->sk;
+	__be32 saddr = inet_sk(sk)->inet_saddr;
 	struct rtable *rt;
-	struct flowi4 fl4;
-	struct iphdr *iph;
-	struct sock *sk;
-	__be32 saddr;
+	int err = 0;
 
-	/* Read the IP destination address and resolve the PDP context.
-	 * Prepend PDP header with TEI/TID from PDP ctx.
-	 */
-	iph = ip_hdr(skb);
-	if (gtp->role == GTP_ROLE_SGSN)
-		pctx = ipv4_pdp_find(gtp, iph->saddr);
-	else
-		pctx = ipv4_pdp_find(gtp, iph->daddr);
+	/* Ensure there is sufficient headroom. */
+	err = skb_cow_head(skb, dev->needed_headroom);
+	if (unlikely(err))
+		goto out_err;
 
-	if (!pctx) {
-		netdev_dbg(dev, "no PDP ctx found for %pI4, skip\n",
-			   &iph->daddr);
-		return -ENOENT;
-	}
-	netdev_dbg(dev, "found PDP context %p\n", pctx);
-
-	sk = pctx->sk;
-	saddr = inet_sk(sk)->inet_saddr;
+	skb_reset_inner_headers(skb);
 
 	rt = ip_tunnel_get_route(dev, skb, sk->sk_protocol,
 				 sk->sk_bound_dev_if, RT_CONN_FLAGS(sk),
 				 pctx->peer_addr_ip4.s_addr, &saddr,
-				 pktinfo->gtph_port, pktinfo->gtph_port,
+				 pctx->gtp_port, pctx->gtp_port,
 				 &pctx->dst_cache, NULL);
 
 	if (IS_ERR(rt)) {
-		if (rt == ERR_PTR(-ELOOP)) {
-			netdev_dbg(dev, "circular route to SSGN %pI4\n",
-				   &pctx->peer_addr_ip4.s_addr);
-			dev->stats.collisions++;
-			goto err_rt;
-		} else {
-			netdev_dbg(dev, "no route to SSGN %pI4\n",
-				   &pctx->peer_addr_ip4.s_addr);
-			dev->stats.tx_carrier_errors++;
-			goto err;
-		}
+		err = PTR_ERR(rt);
+		goto out_err;
 	}
 
 	skb_dst_drop(skb);
 
-	gtp_set_pktinfo_ipv4(pktinfo, sk, iph, pctx, rt, &fl4, dev);
-	gtp_push_header(skb, pktinfo);
+	gtp_push_header(skb, pctx);
+	udp_tunnel_xmit_skb(rt, sk, skb, saddr,
+			    pctx->peer_addr_ip4.s_addr,
+			    0, ip4_dst_hoplimit(&rt->dst), 0,
+			    pctx->gtp_port, pctx->gtp_port,
+			    false, false);
+
+	netdev_dbg(dev, "gtp -> IP src: %pI4 dst: %pI4\n",
+		   &saddr, &pctx->peer_addr_ip4.s_addr);
 
 	return 0;
-err_rt:
-	ip_rt_put(rt);
-err:
-	return -EBADMSG;
+
+out_err:
+	if (err == -ELOOP)
+		dev->stats.collisions++;
+	else
+		dev->stats.tx_carrier_errors++;
+
+	return err;
 }
 
 static netdev_tx_t gtp_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	unsigned int proto = ntohs(skb->protocol);
-	struct gtp_pktinfo pktinfo;
+	struct gtp_dev *gtp = netdev_priv(dev);
+	struct pdp_ctx *pctx;
 	int err;
-
-	/* Ensure there is sufficient headroom. */
-	if (skb_cow_head(skb, dev->needed_headroom))
-		goto tx_err;
-
-	skb_reset_inner_headers(skb);
 
 	/* PDP context lookups in gtp_build_skb_*() need rcu read-side lock. */
 	rcu_read_lock();
 	switch (proto) {
-	case ETH_P_IP:
-		err = gtp_build_skb_ip4(skb, dev, &pktinfo);
-		break;
-	default:
-		err = -EOPNOTSUPP;
+	case ETH_P_IP: {
+		struct iphdr *iph = ip_hdr(skb);
+
+		if (gtp->role == GTP_ROLE_SGSN)
+			pctx = ipv4_pdp_find(gtp, iph->saddr);
+		else
+			pctx = ipv4_pdp_find(gtp, iph->daddr);
+
+		if (!pctx) {
+			netdev_dbg(dev, "no PDP ctx found for %pI4, skip\n",
+				   &iph->daddr);
+			err = -ENOENT;
+			goto tx_err;
+		}
+
 		break;
 	}
-	rcu_read_unlock();
+	default:
+		err = -EOPNOTSUPP;
+		goto tx_err;
+	}
+
+	netdev_dbg(dev, "found PDP context %p\n", pctx);
+
+	err = gtp_xmit(skb, dev, pctx);
 
 	if (err < 0)
 		goto tx_err;
 
-	switch (proto) {
-	case ETH_P_IP:
-		netdev_dbg(pktinfo.dev, "gtp -> IP src: %pI4 dst: %pI4\n",
-			   &pktinfo.iph->saddr, &pktinfo.iph->daddr);
-		udp_tunnel_xmit_skb(pktinfo.rt, pktinfo.sk, skb,
-				    pktinfo.fl4.saddr, pktinfo.fl4.daddr,
-				    pktinfo.iph->tos,
-				    ip4_dst_hoplimit(&pktinfo.rt->dst),
-				    0,
-				    pktinfo.gtph_port, pktinfo.gtph_port,
-				    true, false);
-		break;
-	}
+	rcu_read_unlock();
 
 	return NETDEV_TX_OK;
+
 tx_err:
+	rcu_read_unlock();
 	dev->stats.tx_errors++;
 	dev_kfree_skb(skb);
 	return NETDEV_TX_OK;
@@ -864,6 +828,8 @@ static struct gtp_dev *gtp_find_dev(struct net *src_net, struct nlattr *nla[])
 
 static void ipv4_pdp_fill(struct pdp_ctx *pctx, struct genl_info *info)
 {
+	__be16 default_port = 0;
+
 	pctx->gtp_version = nla_get_u32(info->attrs[GTPA_VERSION]);
 	pctx->af = AF_INET;
 	pctx->peer_addr_ip4.s_addr =
@@ -879,14 +845,21 @@ static void ipv4_pdp_fill(struct pdp_ctx *pctx, struct genl_info *info)
 		 */
 		pctx->u.v0.tid = nla_get_u64(info->attrs[GTPA_TID]);
 		pctx->u.v0.flow = nla_get_u16(info->attrs[GTPA_FLOW]);
+		default_port = htons(GTP0_PORT);
 		break;
 	case GTP_V1:
 		pctx->u.v1.i_tei = nla_get_u32(info->attrs[GTPA_I_TEI]);
 		pctx->u.v1.o_tei = nla_get_u32(info->attrs[GTPA_O_TEI]);
+		default_port = htons(GTP1U_PORT);
 		break;
 	default:
 		break;
 	}
+
+	if (info->attrs[GTPA_PORT])
+		pctx->gtp_port = nla_get_u16(info->attrs[GTPA_PORT]);
+	else
+		pctx->gtp_port = default_port;
 }
 
 static int ipv4_pdp_add(struct gtp_dev *gtp, struct sock *sk,
