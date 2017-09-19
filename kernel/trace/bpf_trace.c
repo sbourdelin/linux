@@ -255,13 +255,13 @@ const struct bpf_func_proto *bpf_get_trace_printk_proto(void)
 	return &bpf_trace_printk_proto;
 }
 
-BPF_CALL_2(bpf_perf_event_read, struct bpf_map *, map, u64, flags)
-{
+static __always_inline int
+get_map_perf_counter(struct bpf_map *map, u64 flags,
+		u64 *value, u64 *enabled, u64 *running) {
 	struct bpf_array *array = container_of(map, struct bpf_array, map);
 	unsigned int cpu = smp_processor_id();
 	u64 index = flags & BPF_F_INDEX_MASK;
 	struct bpf_event_entry *ee;
-	u64 value = 0;
 	int err;
 
 	if (unlikely(flags & ~(BPF_F_INDEX_MASK)))
@@ -275,7 +275,17 @@ BPF_CALL_2(bpf_perf_event_read, struct bpf_map *, map, u64, flags)
 	if (!ee)
 		return -ENOENT;
 
-	err = perf_event_read_local(ee->event, &value);
+	err = perf_event_read_local(ee->event, value, enabled, running);
+	return err;
+}
+
+
+BPF_CALL_2(bpf_perf_event_read, struct bpf_map *, map, u64, flags)
+{
+	u64 value = 0;
+	int err;
+
+	err = get_map_perf_counter(map, flags, &value, NULL, NULL);
 	/*
 	 * this api is ugly since we miss [-22..-2] range of valid
 	 * counter values, but that's uapi
@@ -285,12 +295,36 @@ BPF_CALL_2(bpf_perf_event_read, struct bpf_map *, map, u64, flags)
 	return value;
 }
 
+BPF_CALL_4(bpf_perf_event_read_value, struct bpf_map *, map, u64, flags,
+	struct bpf_perf_event_value *, buf, u32, size)
+{
+	int err;
+
+	if (unlikely(size != sizeof(struct bpf_perf_event_value)))
+		return -EINVAL;
+	err = get_map_perf_counter(map, flags, &buf->counter, &buf->enabled,
+                            &buf->running);
+	if (err)
+		return err;
+	return 0;
+}
+
 static const struct bpf_func_proto bpf_perf_event_read_proto = {
 	.func		= bpf_perf_event_read,
 	.gpl_only	= true,
 	.ret_type	= RET_INTEGER,
 	.arg1_type	= ARG_CONST_MAP_PTR,
 	.arg2_type	= ARG_ANYTHING,
+};
+
+static const struct bpf_func_proto bpf_perf_event_read_value_proto = {
+	.func		= bpf_perf_event_read_value,
+	.gpl_only	= true,
+	.ret_type	= RET_INTEGER,
+	.arg1_type	= ARG_CONST_MAP_PTR,
+	.arg2_type	= ARG_ANYTHING,
+	.arg3_type	= ARG_PTR_TO_UNINIT_MEM,
+	.arg4_type	= ARG_CONST_SIZE,
 };
 
 static DEFINE_PER_CPU(struct perf_sample_data, bpf_sd);
@@ -499,6 +533,8 @@ static const struct bpf_func_proto *kprobe_prog_func_proto(enum bpf_func_id func
 		return &bpf_perf_event_output_proto;
 	case BPF_FUNC_get_stackid:
 		return &bpf_get_stackid_proto;
+	case BPF_FUNC_perf_event_read_value:
+		return &bpf_perf_event_read_value_proto;
 	default:
 		return tracing_func_proto(func_id);
 	}
