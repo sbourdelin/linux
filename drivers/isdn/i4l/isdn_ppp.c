@@ -857,6 +857,7 @@ isdn_ppp_write(int min, struct file *file, const char __user *buf, int count)
 		    (lp->flags & ISDN_NET_CONNECTED)) {
 			unsigned short hl;
 			struct sk_buff *skb;
+			void *skb_tail;
 			/*
 			 * we need to reserve enough space in front of
 			 * sk_buff. old call to dev_alloc_skb only reserved
@@ -869,11 +870,21 @@ isdn_ppp_write(int min, struct file *file, const char __user *buf, int count)
 				return count;
 			}
 			skb_reserve(skb, hl);
-			if (copy_from_user(skb_put(skb, count), buf, count))
+			skb_tail = skb_put(skb, count);
+			if (copy_from_user(skb_tail, buf, count))
 			{
 				kfree_skb(skb);
 				return -EFAULT;
 			}
+
+			/*
+			 * abort if the message proto is changed between the fetches
+			 */
+			if (memcmp(skb_tail, protobuf, 4)) {
+				kfree_skb(skb);
+				return -EFAULT;
+			}
+
 			if (is->debug & 0x40) {
 				printk(KERN_DEBUG "ppp xmit: len %d\n", (int) skb->len);
 				isdn_ppp_frame_log("xmit", skb->data, skb->len, 32, is->unit, lp->ppp_slot);
