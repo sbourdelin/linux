@@ -136,7 +136,6 @@ int hdpvr_free_buffers(struct hdpvr_device *dev)
 int hdpvr_alloc_buffers(struct hdpvr_device *dev, uint count)
 {
 	uint i;
-	int retval = -ENOMEM;
 	u8 *mem;
 	struct hdpvr_buffer *buf;
 	struct urb *urb;
@@ -181,7 +180,7 @@ exit_urb:
 	kfree(buf);
 exit:
 	hdpvr_free_buffers(dev);
-	return retval;
+	return -ENOMEM;
 }
 
 static int hdpvr_submit_buffers(struct hdpvr_device *dev)
