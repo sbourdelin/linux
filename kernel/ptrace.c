@@ -1092,6 +1092,10 @@ int ptrace_request(struct task_struct *child, long request,
 		ret = seccomp_get_filter(child, addr, datavp);
 		break;
 
+	case PTRACE_SECCOMP_GET_FLAGS:
+		ret = seccomp_get_flags(child, addr);
+		break;
+
 	default:
 		break;
 	}

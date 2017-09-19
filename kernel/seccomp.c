@@ -968,24 +968,16 @@ long prctl_set_seccomp(unsigned long seccomp_mode, char __user *filter)
 }
 
 #if defined(CONFIG_SECCOMP_FILTER) && defined(CONFIG_CHECKPOINT_RESTORE)
-long seccomp_get_filter(struct task_struct *task, unsigned long filter_off,
-			void __user *data)
+static struct seccomp_filter *get_nth_filter(struct task_struct *task,
+					     unsigned long filter_off)
 {
 	struct seccomp_filter *filter;
-	struct sock_fprog_kern *fprog;
-	long ret;
 	unsigned long count = 0;
 
-	if (!capable(CAP_SYS_ADMIN) ||
-	    current->seccomp.mode != SECCOMP_MODE_DISABLED) {
-		return -EACCES;
-	}
+	WARN_ON_ONCE(!spin_is_locked(&task->sighand->siglock));
 
-	spin_lock_irq(&task->sighand->siglock);
-	if (task->seccomp.mode != SECCOMP_MODE_FILTER) {
-		ret = -EINVAL;
-		goto out;
-	}
+	if (task->seccomp.mode != SECCOMP_MODE_FILTER)
+		return ERR_PTR(-EINVAL);
 
 	filter = task->seccomp.filter;
 	while (filter) {
@@ -993,10 +985,9 @@ long seccomp_get_filter(struct task_struct *task, unsigned long filter_off,
 		count++;
 	}
 
-	if (filter_off >= count) {
-		ret = -ENOENT;
-		goto out;
-	}
+	if (filter_off >= count)
+		return ERR_PTR(-ENOENT);
+
 	count -= filter_off;
 
 	filter = task->seccomp.filter;
@@ -1007,7 +998,28 @@ long seccomp_get_filter(struct task_struct *task, unsigned long filter_off,
 
 	if (WARN_ON(count != 1 || !filter)) {
 		/* The filter tree shouldn't shrink while we're using it. */
-		ret = -ENOENT;
+		return ERR_PTR(-ENOENT);
+	}
+
+	return filter;
+}
+
+long seccomp_get_filter(struct task_struct *task, unsigned long filter_off,
+			void __user *data)
+{
+	struct seccomp_filter *filter;
+	struct sock_fprog_kern *fprog;
+	long ret;
+
+	if (!capable(CAP_SYS_ADMIN) ||
+	    current->seccomp.mode != SECCOMP_MODE_DISABLED) {
+		return -EACCES;
+	}
+
+	spin_lock_irq(&task->sighand->siglock);
+	filter = get_nth_filter(task, filter_off);
+	if (IS_ERR(filter)) {
+		ret = PTR_ERR(filter);
 		goto out;
 	}
 
@@ -1037,6 +1049,32 @@ long seccomp_get_filter(struct task_struct *task, unsigned long filter_off,
 out:
 	spin_unlock_irq(&task->sighand->siglock);
 	return ret;
+}
+
+long seccomp_get_flags(struct task_struct *task, unsigned long filter_off)
+{
+	long flags = 0L;
+	struct seccomp_filter *filter;
+
+	if (!capable(CAP_SYS_ADMIN) ||
+	    current->seccomp.mode != SECCOMP_MODE_DISABLED) {
+		return -EACCES;
+	}
+
+	spin_lock_irq(&task->sighand->siglock);
+	filter = get_nth_filter(task, filter_off);
+	if (IS_ERR(filter)) {
+		flags = PTR_ERR(filter);
+		goto out;
+	}
+
+	if (filter->log)
+		flags |= SECCOMP_FILTER_FLAG_LOG;
+
+out:
+	spin_unlock_irq(&task->sighand->siglock);
+	return flags;
+
 }
 #endif
 
