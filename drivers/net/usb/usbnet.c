@@ -1103,8 +1103,6 @@ static void __handle_link_change(struct usbnet *dev)
 
 	/* hard_mtu or rx_urb_size may change during link change */
 	usbnet_update_max_qlen(dev);
-
-	clear_bit(EVENT_LINK_CHANGE, &dev->flags);
 }
 
 static void usbnet_set_rx_mode(struct net_device *net)
@@ -1118,8 +1116,6 @@ static void __handle_set_rx_mode(struct usbnet *dev)
 {
 	if (dev->driver_info->set_rx_mode)
 		(dev->driver_info->set_rx_mode)(dev);
-
-	clear_bit(EVENT_SET_RX_MODE, &dev->flags);
 }
 
 /* work that cannot be done in interrupt context uses keventd.
@@ -1135,7 +1131,7 @@ usbnet_deferred_kevent (struct work_struct *work)
 	int			status;
 
 	/* usb_clear_halt() needs a thread context */
-	if (test_bit (EVENT_TX_HALT, &dev->flags)) {
+	if (test_and_clear_bit (EVENT_TX_HALT, &dev->flags)) {
 		unlink_urbs (dev, &dev->txq);
 		status = usb_autopm_get_interface(dev->intf);
 		if (status < 0)
@@ -1150,12 +1146,11 @@ fail_pipe:
 				netdev_err(dev->net, "can't clear tx halt, status %d\n",
 					   status);
 		} else {
-			clear_bit (EVENT_TX_HALT, &dev->flags);
 			if (status != -ESHUTDOWN)
 				netif_wake_queue (dev->net);
 		}
 	}
-	if (test_bit (EVENT_RX_HALT, &dev->flags)) {
+	if (test_and_clear_bit (EVENT_RX_HALT, &dev->flags)) {
 		unlink_urbs (dev, &dev->rxq);
 		status = usb_autopm_get_interface(dev->intf);
 		if (status < 0)
@@ -1170,41 +1165,39 @@ fail_halt:
 				netdev_err(dev->net, "can't clear rx halt, status %d\n",
 					   status);
 		} else {
-			clear_bit (EVENT_RX_HALT, &dev->flags);
 			tasklet_schedule (&dev->bh);
 		}
 	}
 
 	/* tasklet could resubmit itself forever if memory is tight */
-	if (test_bit (EVENT_RX_MEMORY, &dev->flags)) {
+	if (test_and_clear_bit (EVENT_RX_MEMORY, &dev->flags)) {
 		struct urb	*urb = NULL;
 		int resched = 1;
 
-		if (netif_running (dev->net))
+		if (netif_running (dev->net)) {
 			urb = usb_alloc_urb (0, GFP_KERNEL);
-		else
-			clear_bit (EVENT_RX_MEMORY, &dev->flags);
-		if (urb != NULL) {
-			clear_bit (EVENT_RX_MEMORY, &dev->flags);
-			status = usb_autopm_get_interface(dev->intf);
-			if (status < 0) {
-				usb_free_urb(urb);
-				goto fail_lowmem;
-			}
-			if (rx_submit (dev, urb, GFP_KERNEL) == -ENOLINK)
-				resched = 0;
-			usb_autopm_put_interface(dev->intf);
+			if (urb != NULL) {
+				status = usb_autopm_get_interface(dev->intf);
+				if (status < 0) {
+					usb_free_urb(urb);
+					goto fail_lowmem;
+				}
+				if (rx_submit (dev, urb, GFP_KERNEL) ==
+				    -ENOLINK)
+					resched = 0;
+				usb_autopm_put_interface(dev->intf);
 fail_lowmem:
-			if (resched)
-				tasklet_schedule (&dev->bh);
+				if (resched)
+					tasklet_schedule (&dev->bh);
+			}
 		}
+
 	}
 
-	if (test_bit (EVENT_LINK_RESET, &dev->flags)) {
+	if (test_and_clear_bit (EVENT_LINK_RESET, &dev->flags)) {
 		struct driver_info	*info = dev->driver_info;
 		int			retval = 0;
 
-		clear_bit (EVENT_LINK_RESET, &dev->flags);
 		status = usb_autopm_get_interface(dev->intf);
 		if (status < 0)
 			goto skip_reset;
@@ -1221,13 +1214,14 @@ skip_reset:
 		}
 
 		/* handle link change from link resetting */
+		clear_bit(EVENT_LINK_CHANGE, &dev->flags);
 		__handle_link_change(dev);
 	}
 
-	if (test_bit (EVENT_LINK_CHANGE, &dev->flags))
+	if (test_and_clear_bit (EVENT_LINK_CHANGE, &dev->flags))
 		__handle_link_change(dev);
 
-	if (test_bit (EVENT_SET_RX_MODE, &dev->flags))
+	if (test_and_clear_bit (EVENT_SET_RX_MODE, &dev->flags))
 		__handle_set_rx_mode(dev);
 
 
