@@ -122,7 +122,7 @@ void blk_freeze_queue_start(struct request_queue *q)
 {
 	int freeze_depth;
 
-	freeze_depth = atomic_inc_return(&q->mq_freeze_depth);
+	freeze_depth = atomic_inc_return(&q->freeze_depth);
 	if (freeze_depth == 1) {
 		percpu_ref_kill(&q->q_usage_counter);
 		if (q->mq_ops)
@@ -135,14 +135,14 @@ void blk_freeze_queue_wait(struct request_queue *q)
 {
 	if (!q->mq_ops)
 		blk_drain_queue(q);
-	wait_event(q->mq_freeze_wq, percpu_ref_is_zero(&q->q_usage_counter));
+	wait_event(q->freeze_wq, percpu_ref_is_zero(&q->q_usage_counter));
 }
 EXPORT_SYMBOL_GPL(blk_freeze_queue_wait);
 
 int blk_mq_freeze_queue_wait_timeout(struct request_queue *q,
 				     unsigned long timeout)
 {
-	return wait_event_timeout(q->mq_freeze_wq,
+	return wait_event_timeout(q->freeze_wq,
 					percpu_ref_is_zero(&q->q_usage_counter),
 					timeout);
 }
@@ -170,11 +170,11 @@ void blk_unfreeze_queue(struct request_queue *q)
 {
 	int freeze_depth;
 
-	freeze_depth = atomic_dec_return(&q->mq_freeze_depth);
+	freeze_depth = atomic_dec_return(&q->freeze_depth);
 	WARN_ON_ONCE(freeze_depth < 0);
 	if (!freeze_depth) {
 		percpu_ref_reinit(&q->q_usage_counter);
-		wake_up_all(&q->mq_freeze_wq);
+		wake_up_all(&q->freeze_wq);
 	}
 }
 EXPORT_SYMBOL_GPL(blk_unfreeze_queue);
@@ -2424,7 +2424,7 @@ void blk_mq_free_queue(struct request_queue *q)
 /* Basically redo blk_mq_init_queue with queue frozen */
 static void blk_mq_queue_reinit(struct request_queue *q)
 {
-	WARN_ON_ONCE(!atomic_read(&q->mq_freeze_depth));
+	WARN_ON_ONCE(!atomic_read(&q->freeze_depth));
 
 	blk_mq_debugfs_unregister_hctxs(q);
 	blk_mq_sysfs_unregister(q);
