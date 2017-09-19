@@ -787,6 +787,20 @@ int blk_queue_enter(struct request_queue *q, unsigned flags)
 		if (percpu_ref_tryget_live(&q->q_usage_counter))
 			return 0;
 
+		/*
+		 * If queue is preempt frozen and caller need to allocate
+		 * request for RQF_PREEMPT, we grab the .q_usage_counter
+		 * unconditionally and return successfully.
+		 *
+		 * There isn't race with queue cleanup because
+		 * both block legacy and blk-mq requires driver
+		 * to handle requests after queue is set as dying.
+		 *
+		 */
+		if ((flags & BLK_REQ_PREEMPT) &&
+				blk_queue_enter_preempt_freeze(q))
+			return 0;
+
 		if (flags & BLK_REQ_NOWAIT)
 			return -EBUSY;
 
@@ -1410,7 +1424,8 @@ retry:
 }
 
 static struct request *blk_old_get_request(struct request_queue *q,
-					   unsigned int op, gfp_t gfp_mask)
+					   unsigned int op, gfp_t gfp_mask,
+					   unsigned int flags)
 {
 	struct request *rq;
 	int ret = 0;
@@ -1420,8 +1435,7 @@ static struct request *blk_old_get_request(struct request_queue *q,
 	/* create ioc upfront */
 	create_io_context(gfp_mask, q->node);
 
-	ret = blk_queue_enter(q, !(gfp_mask & __GFP_DIRECT_RECLAIM) ?
-			BLK_REQ_NOWAIT : 0);
+	ret = blk_queue_enter(q, flags & BLK_REQ_BITS_MASK);
 	if (ret)
 		return ERR_PTR(ret);
 	spin_lock_irq(q->queue_lock);
@@ -1439,26 +1453,25 @@ static struct request *blk_old_get_request(struct request_queue *q,
 	return rq;
 }
 
-struct request *blk_get_request(struct request_queue *q, unsigned int op,
-				gfp_t gfp_mask)
+struct request *__blk_get_request(struct request_queue *q, unsigned int op,
+				  gfp_t gfp_mask, unsigned int flags)
 {
 	struct request *req;
 
+	flags |= gfp_mask & __GFP_DIRECT_RECLAIM ? 0 : BLK_REQ_NOWAIT;
 	if (q->mq_ops) {
-		req = blk_mq_alloc_request(q, op,
-			(gfp_mask & __GFP_DIRECT_RECLAIM) ?
-				0 : BLK_MQ_REQ_NOWAIT);
+		req = blk_mq_alloc_request(q, op, flags);
 		if (!IS_ERR(req) && q->mq_ops->initialize_rq_fn)
 			q->mq_ops->initialize_rq_fn(req);
 	} else {
-		req = blk_old_get_request(q, op, gfp_mask);
+		req = blk_old_get_request(q, op, gfp_mask, flags);
 		if (!IS_ERR(req) && q->initialize_rq_fn)
 			q->initialize_rq_fn(req);
 	}
 
 	return req;
 }
-EXPORT_SYMBOL(blk_get_request);
+EXPORT_SYMBOL(__blk_get_request);
 
 /**
  * blk_requeue_request - put a request back on queue

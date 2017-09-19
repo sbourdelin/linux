@@ -90,6 +90,19 @@ static inline bool blk_queue_is_preempt_frozen(struct request_queue *q)
 	return preempt_frozen;
 }
 
+static inline bool blk_queue_enter_preempt_freeze(struct request_queue *q)
+{
+	bool preempt_frozen;
+
+	spin_lock(&q->freeze_lock);
+	preempt_frozen = q->preempt_freezing && !q->preempt_unfreezing;
+	if (preempt_frozen)
+		blk_queue_enter_live(q);
+	spin_unlock(&q->freeze_lock);
+
+	return preempt_frozen;
+}
+
 #ifdef CONFIG_BLK_DEV_INTEGRITY
 void blk_flush_integrity(void);
 bool __bio_integrity_endio(struct bio *);
