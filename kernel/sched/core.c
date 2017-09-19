@@ -1018,6 +1018,11 @@ void set_cpus_allowed_common(struct task_struct *p, const struct cpumask *new_ma
 	p->nr_cpus_allowed = cpumask_weight(new_mask);
 }
 
+void set_cpus_preferred_common(struct task_struct *p, const struct cpumask *new_mask)
+{
+	cpumask_copy(&p->cpus_preferred, new_mask);
+}
+
 void do_set_cpus_allowed(struct task_struct *p, const struct cpumask *new_mask)
 {
 	struct rq *rq = task_rq(p);
@@ -1040,6 +1045,36 @@ void do_set_cpus_allowed(struct task_struct *p, const struct cpumask *new_mask)
 		put_prev_task(rq, p);
 
 	p->sched_class->set_cpus_allowed(p, new_mask);
+	set_cpus_preferred_common(p, new_mask);
+
+	if (queued)
+		enqueue_task(rq, p, ENQUEUE_RESTORE | ENQUEUE_NOCLOCK);
+	if (running)
+		set_curr_task(rq, p);
+}
+
+void do_set_cpus_preferred(struct task_struct *p, const struct cpumask *new_mask)
+{
+	struct rq *rq = task_rq(p);
+	bool queued, running;
+
+	lockdep_assert_held(&p->pi_lock);
+
+	queued = task_on_rq_queued(p);
+	running = task_current(rq, p);
+
+	if (queued) {
+		/*
+		 * Because __kthread_bind() calls this on blocked tasks without
+		 * holding rq->lock.
+		 */
+		lockdep_assert_held(&rq->lock);
+		dequeue_task(rq, p, DEQUEUE_SAVE | DEQUEUE_NOCLOCK);
+	}
+	if (running)
+		put_prev_task(rq, p);
+
+	set_cpus_preferred_common(p, new_mask);
 
 	if (queued)
 		enqueue_task(rq, p, ENQUEUE_RESTORE | ENQUEUE_NOCLOCK);
@@ -1117,6 +1152,63 @@ static int __set_cpus_allowed_ptr(struct task_struct *p,
 		tlb_migrate_finish(p->mm);
 		return 0;
 	} else if (task_on_rq_queued(p)) {
+		/*
+		 * OK, since we're going to drop the lock immediately
+		 * afterwards anyway.
+		 */
+		rq = move_queued_task(rq, &rf, p, dest_cpu);
+	}
+out:
+	task_rq_unlock(rq, p, &rf);
+
+	return ret;
+}
+
+static int
+__set_cpus_preferred_ptr(struct task_struct *p, const struct cpumask *new_mask)
+{
+	const struct cpumask *cpu_valid_mask = cpu_active_mask;
+	unsigned int dest_cpu;
+	struct rq_flags rf;
+	struct rq *rq;
+	int ret = 0;
+
+	rq = task_rq_lock(p, &rf);
+	update_rq_clock(rq);
+
+	if (p->flags & PF_KTHREAD) {
+		/*
+		 * Kernel threads are allowed on online && !active CPUs
+		 */
+		cpu_valid_mask = cpu_online_mask;
+	}
+
+	if (cpumask_equal(&p->cpus_preferred, new_mask))
+		goto out;
+
+	if (!cpumask_intersects(new_mask, cpu_valid_mask)) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	do_set_cpus_preferred(p, new_mask);
+
+	if (p->flags & PF_KTHREAD) {
+		/*
+		 * For kernel threads that do indeed end up on online &&
+		 * !active we want to ensure they are strict per-CPU threads.
+		 */
+		WARN_ON(cpumask_intersects(new_mask, cpu_online_mask) &&
+			!cpumask_intersects(new_mask, cpu_active_mask) &&
+			p->nr_cpus_allowed != 1);
+	}
+
+	/* Can the task run on the task's current CPU? If so, we're done */
+	if (cpumask_test_cpu(task_cpu(p), new_mask))
+		goto out;
+
+	dest_cpu = cpumask_any_and(cpu_valid_mask, new_mask);
+	if (task_on_rq_queued(p)) {
 		/*
 		 * OK, since we're going to drop the lock immediately
 		 * afterwards anyway.
@@ -4580,7 +4672,7 @@ out_unlock:
 	return retval;
 }
 
-long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
+long sched_setaffinity(pid_t pid, const struct cpumask *in_mask, int flags)
 {
 	cpumask_var_t cpus_allowed, new_mask;
 	struct task_struct *p;
@@ -4646,19 +4738,23 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 	}
 #endif
 again:
-	retval = __set_cpus_allowed_ptr(p, new_mask, true);
+	if (flags == SCHED_HARD_AFFINITY) {
+		retval = __set_cpus_allowed_ptr(p, new_mask, true);
 
-	if (!retval) {
-		cpuset_cpus_allowed(p, cpus_allowed);
-		if (!cpumask_subset(new_mask, cpus_allowed)) {
-			/*
-			 * We must have raced with a concurrent cpuset
-			 * update. Just reset the cpus_allowed to the
-			 * cpuset's cpus_allowed
-			 */
-			cpumask_copy(new_mask, cpus_allowed);
-			goto again;
+		if (!retval) {
+			cpuset_cpus_allowed(p, cpus_allowed);
+			if (!cpumask_subset(new_mask, cpus_allowed)) {
+				/*
+				 * We must have raced with a concurrent cpuset
+				 * update. Just reset the cpus_allowed to the
+				 * cpuset's cpus_allowed
+				 */
+				cpumask_copy(new_mask, cpus_allowed);
+				goto again;
+			}
 		}
+	} else if (flags == SCHED_SOFT_AFFINITY) {
+		retval = __set_cpus_preferred_ptr(p, new_mask);
 	}
 out_free_new_mask:
 	free_cpumask_var(new_mask);
@@ -4680,6 +4776,38 @@ static int get_user_cpu_mask(unsigned long __user *user_mask_ptr, unsigned len,
 	return copy_from_user(new_mask, user_mask_ptr, len) ? -EFAULT : 0;
 }
 
+static bool
+valid_affinity_flags(int flags)
+{
+	return flags == SCHED_HARD_AFFINITY || flags == SCHED_SOFT_AFFINITY;
+}
+
+static int
+sched_setaffinity_common(pid_t pid, unsigned int len,
+			 unsigned long __user *user_mask_ptr, int flags)
+{
+	cpumask_var_t new_mask;
+	int retval;
+
+	if (!valid_affinity_flags(flags))
+		return -EINVAL;
+
+	if (!alloc_cpumask_var(&new_mask, GFP_KERNEL))
+		return -ENOMEM;
+
+	retval = get_user_cpu_mask(user_mask_ptr, len, new_mask);
+	if (retval == 0)
+		retval = sched_setaffinity(pid, new_mask, flags);
+	free_cpumask_var(new_mask);
+	return retval;
+}
+
+SYSCALL_DEFINE4(sched_setaffinity_flags, pid_t, pid, unsigned int, len,
+		unsigned long __user *, user_mask_ptr, int, flags)
+{
+	return sched_setaffinity_common(pid, len, user_mask_ptr, flags);
+}
+
 /**
  * sys_sched_setaffinity - set the CPU affinity of a process
  * @pid: pid of the process
@@ -4691,17 +4819,8 @@ static int get_user_cpu_mask(unsigned long __user *user_mask_ptr, unsigned len,
 SYSCALL_DEFINE3(sched_setaffinity, pid_t, pid, unsigned int, len,
 		unsigned long __user *, user_mask_ptr)
 {
-	cpumask_var_t new_mask;
-	int retval;
-
-	if (!alloc_cpumask_var(&new_mask, GFP_KERNEL))
-		return -ENOMEM;
-
-	retval = get_user_cpu_mask(user_mask_ptr, len, new_mask);
-	if (retval == 0)
-		retval = sched_setaffinity(pid, new_mask);
-	free_cpumask_var(new_mask);
-	return retval;
+	return sched_setaffinity_common(pid, len, user_mask_ptr,
+					SCHED_HARD_AFFINITY);
 }
 
 long sched_getaffinity(pid_t pid, struct cpumask *mask)

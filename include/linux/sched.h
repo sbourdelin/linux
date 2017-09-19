@@ -579,6 +579,7 @@ struct task_struct {
 	unsigned int			policy;
 	int				nr_cpus_allowed;
 	cpumask_t			cpus_allowed;
+	cpumask_t			cpus_preferred;
 
 #ifdef CONFIG_PREEMPT_RCU
 	int				rcu_read_lock_nesting;
@@ -1632,7 +1633,8 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 # define vcpu_is_preempted(cpu)	false
 #endif
 
-extern long sched_setaffinity(pid_t pid, const struct cpumask *new_mask);
+extern long sched_setaffinity(pid_t pid, const struct cpumask *new_mask,
+			      int flags);
 extern long sched_getaffinity(pid_t pid, struct cpumask *mask);
 
 #ifndef TASK_SIZE_OF

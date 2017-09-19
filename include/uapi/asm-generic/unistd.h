@@ -376,6 +376,8 @@ __SYSCALL(__NR_sched_getparam, sys_sched_getparam)
 #define __NR_sched_setaffinity 122
 __SC_COMP(__NR_sched_setaffinity, sys_sched_setaffinity, \
 	  compat_sys_sched_setaffinity)
+#define __NR_sched_setaffinity_flags 293
+__SYSCALL(__NR_sched_setaffinity_flags, sys_sched_setaffinity_flags)
 #define __NR_sched_getaffinity 123
 __SC_COMP(__NR_sched_getaffinity, sys_sched_getaffinity, \
 	  compat_sys_sched_getaffinity)
@@ -733,7 +735,7 @@ __SYSCALL(__NR_pkey_free,     sys_pkey_free)
 __SYSCALL(__NR_statx,     sys_statx)
 
 #undef __NR_syscalls
-#define __NR_syscalls 292
+#define __NR_syscalls 293
 
 /*
  * All syscalls below here should go away really,
