@@ -3932,6 +3932,37 @@ struct sk_buff *__skb_gso_segment(struct sk_buff *skb,
 struct sk_buff *skb_mac_gso_segment(struct sk_buff *skb,
 				    netdev_features_t features);
 
+struct skb_gso_app {
+	unsigned int check_flags;
+	struct sk_buff *(*gso_segment)(struct sk_buff *skb,
+				       netdev_features_t features);
+};
+
+extern struct skb_gso_app *skb_gso_apps[];
+int skb_gso_app_register(const struct skb_gso_app *app);
+void skb_gso_app_unregister(int num, const struct skb_gso_app *app);
+
+/* rcu_read_lock() must be held */
+static inline struct skb_gso_app *skb_gso_app_lookup(struct sk_buff *skb,
+						     netdev_features_t features,
+						     unsigned int check_flags)
+{
+	struct skb_gso_app *app;
+	int type;
+
+	if (!(skb_shinfo(skb)->gso_type & SKB_GSO_APP_MASK))
+		return false;
+
+	type = skb_gso_app_to_index(skb_shinfo(skb)->gso_type);
+
+	app = rcu_dereference(skb_gso_apps[type]);
+	if (app && app->gso_segment &&
+	    (check_flags & app->check_flags))
+		return app;
+
+	return NULL;
+}
+
 struct netdev_bonding_info {
 	ifslave	slave;
 	ifbond	master;

@@ -152,19 +152,29 @@ struct sk_buff *skb_udp_tunnel_segment(struct sk_buff *skb,
 				       netdev_features_t features,
 				       bool is_ipv6)
 {
-	__be16 protocol = skb->protocol;
-	const struct net_offload **offloads;
-	const struct net_offload *ops;
-	struct sk_buff *segs = ERR_PTR(-EINVAL);
 	struct sk_buff *(*gso_inner_segment)(struct sk_buff *skb,
 					     netdev_features_t features);
+	const struct net_offload **offloads;
+	__be16 protocol = skb->protocol;
+	struct skb_gso_app *gso_app;
+	const struct net_offload *ops;
+	struct sk_buff *segs;
+
+	segs = ERR_PTR(-EINVAL);
 
 	rcu_read_lock();
+
+	gso_app = skb_gso_app_lookup(skb, features,
+				     SKB_GSO_UDP_TUNNEL_CSUM |
+				     SKB_GSO_UDP_TUNNEL);
 
 	switch (skb->inner_protocol_type) {
 	case ENCAP_TYPE_ETHER:
 		protocol = skb->inner_protocol;
-		gso_inner_segment = skb_mac_gso_segment;
+		if (gso_app && gso_app->gso_segment)
+			gso_inner_segment = gso_app->gso_segment;
+		else
+			gso_inner_segment = skb_mac_gso_segment;
 		break;
 	case ENCAP_TYPE_IPPROTO:
 		offloads = is_ipv6 ? inet6_offloads : inet_offloads;

@@ -171,6 +171,12 @@ int iptunnel_handle_offloads(struct sk_buff *skb,
 		err = skb_header_unclone(skb, GFP_ATOMIC);
 		if (unlikely(err))
 			return err;
+		if (!!(gso_type_mask & SKB_GSO_APP_MASK) &&
+		    !!(skb_shinfo(skb)->gso_type & SKB_GSO_APP_MASK)) {
+			/* Only allow one GSO app per packet */
+			return -EALREADY;
+		}
+
 		skb_shinfo(skb)->gso_type |= gso_type_mask;
 		return 0;
 	}

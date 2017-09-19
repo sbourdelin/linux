@@ -156,6 +156,7 @@
 
 static DEFINE_SPINLOCK(ptype_lock);
 static DEFINE_SPINLOCK(offload_lock);
+static DEFINE_SPINLOCK(skb_gso_app_lock);
 struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;
 struct list_head ptype_all __read_mostly;	/* Taps */
 static struct list_head offload_base __read_mostly;
@@ -2725,6 +2726,52 @@ struct sk_buff *skb_mac_gso_segment(struct sk_buff *skb,
 }
 EXPORT_SYMBOL(skb_mac_gso_segment);
 
+struct skb_gso_app *skb_gso_apps[SKB_GSO_APP_NUM];
+EXPORT_SYMBOL(skb_gso_apps);
+
+int skb_gso_app_register(const struct skb_gso_app *app)
+{
+	int i, ret = 0;
+
+	spin_lock(&skb_gso_app_lock);
+
+	for (i = 0; i < SKB_GSO_APP_NUM; i++) {
+		if (!rcu_dereference_protected(skb_gso_apps[i],
+				lockdep_is_held(&skb_gso_app_lock))) {
+			/* Found an empty slot */
+			rcu_assign_pointer(skb_gso_apps[i], app);
+
+			ret = skb_gso_app_to_gso_type(i);
+
+			break;
+		}
+	}
+
+	spin_unlock(&skb_gso_app_lock);
+
+	return ret;
+return 0;
+}
+EXPORT_SYMBOL(skb_gso_app_register);
+
+void skb_gso_app_unregister(int num, const struct skb_gso_app *app)
+{
+	if (!num)
+		return;
+
+	num = skb_gso_app_to_index(num);
+
+	spin_lock(&skb_gso_app_lock);
+
+	if (app == rcu_dereference_protected(skb_gso_apps[num],
+				lockdep_is_held(&skb_gso_app_lock))) {
+		/* Matched entry */
+		rcu_assign_pointer(skb_gso_apps[num], NULL);
+	}
+
+	spin_unlock(&skb_gso_app_lock);
+}
+EXPORT_SYMBOL(skb_gso_app_unregister);
 
 /* openvswitch calls this on rx path, so we need a different check.
  */

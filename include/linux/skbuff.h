@@ -535,6 +535,9 @@ enum {
 	SKB_FCLONE_CLONE,	/* companion fclone skb (from fclone_cache) */
 };
 
+#define SKB_GSO_APP_LOW_SHIFT	28
+#define SKB_GSO_APP_HIGH_SHIFT	31
+
 enum {
 	SKB_GSO_TCPV4 = 1 << 0,
 
@@ -569,7 +572,29 @@ enum {
 	SKB_GSO_SCTP = 1 << 14,
 
 	SKB_GSO_ESP = 1 << 15,
+
+	/* UDP encapsulation specific GSO consumes bits 28 through 31 */
+
+	SKB_GSO_APP_LOW = 1 << SKB_GSO_APP_LOW_SHIFT,
+
+	SKB_GSO_APP_HIGH = 1 << SKB_GSO_APP_HIGH_SHIFT,
 };
+
+#define SKB_GSO_APP_MASK ((-1U << SKB_GSO_APP_LOW_SHIFT) & \
+			  (-1U >> (8*sizeof(u32) - SKB_GSO_APP_HIGH_SHIFT - 1)))
+#define SKB_GSO_APP_NUM (SKB_GSO_APP_MASK >> SKB_GSO_APP_LOW_SHIFT)
+
+static inline int skb_gso_app_to_index(unsigned int x)
+{
+	/* Caller should check that app bits are non-zero */
+
+	return ((SKB_GSO_APP_MASK & x) >> SKB_GSO_APP_LOW_SHIFT) - 1;
+}
+
+static inline int skb_gso_app_to_gso_type(unsigned int x)
+{
+	return (x + 1) << SKB_GSO_APP_LOW_SHIFT;
+}
 
 #if BITS_PER_LONG > 32
 #define NET_SKBUFF_DATA_USES_OFFSET 1
