@@ -530,6 +530,21 @@ static void __blk_drain_queue(struct request_queue *q, bool drain_all)
 }
 
 /**
+ * blk_drain_queue - drain requests from request_queue
+ * @q: queue to drain
+ *
+ * Drain requests from @q.  All pending requests are drained.
+ * The caller is responsible for ensuring that no new requests
+ * which need to be drained are queued.
+ */
+void blk_drain_queue(struct request_queue *q)
+{
+	spin_lock_irq(q->queue_lock);
+	__blk_drain_queue(q, true);
+	spin_unlock_irq(q->queue_lock);
+}
+
+/**
  * blk_queue_bypass_start - enter queue bypass mode
  * @q: queue of interest
  *
@@ -659,8 +674,6 @@ void blk_cleanup_queue(struct request_queue *q)
 	 */
 	blk_freeze_queue(q);
 	spin_lock_irq(lock);
-	if (!q->mq_ops)
-		__blk_drain_queue(q, true);
 	queue_flag_set(QUEUE_FLAG_DEAD, q);
 	spin_unlock_irq(lock);
 
