@@ -79,7 +79,8 @@ const struct dma_map_ops nlm_swiotlb_dma_ops = {
 	.sync_sg_for_cpu = swiotlb_sync_sg_for_cpu,
 	.sync_sg_for_device = swiotlb_sync_sg_for_device,
 	.mapping_error = swiotlb_dma_mapping_error,
-	.dma_supported = swiotlb_dma_supported
+	.dma_supported = swiotlb_dma_supported,
+	.device_is_coherent = plat_device_is_coherent
 };
 
 void __init plat_swiotlb_setup(void)
