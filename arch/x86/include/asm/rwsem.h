@@ -208,7 +208,7 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 	register void *__sp asm(_ASM_SP);
 
 	asm volatile("# beginning __downgrade_write\n\t"
-		     LOCK_PREFIX _ASM_ADD "%3,(%2)\n\t"
+		     LOCK_PREFIX _ASM_ADD "%[inc],(%[sem])\n\t"
 		     /*
 		      * transitions 0xZZZZ0001 -> 0xYYYY0001 (i386)
 		      *     0xZZZZZZZZ00000001 -> 0xYYYYYYYY00000001 (x86_64)
@@ -218,7 +218,7 @@ static inline void __downgrade_write(struct rw_semaphore *sem)
 		     "1:\n\t"
 		     "# ending __downgrade_write\n"
 		     : "+m" (sem->count), "+r" (__sp)
-		     : "a" (sem), "er" (-RWSEM_WAITING_BIAS)
+		     : [sem] "a" (sem), [inc] "er" (-RWSEM_WAITING_BIAS)
 		     : "memory", "cc");
 }
 
