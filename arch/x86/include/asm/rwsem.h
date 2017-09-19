@@ -169,14 +169,14 @@ static inline void __up_read(struct rw_semaphore *sem)
 	register void *__sp asm(_ASM_SP);
 
 	asm volatile("# beginning __up_read\n\t"
-		     LOCK_PREFIX "  xadd      %1,(%3)\n\t"
+		     LOCK_PREFIX "  xadd      %[tmp],(%[sem])\n\t"
 		     /* subtracts 1, returns the old value */
 		     "  jns        1f\n\t"
 		     "  call call_rwsem_wake\n" /* expects old value in %edx */
 		     "1:\n"
 		     "# ending __up_read\n"
-		     : "+m" (sem->count), "=d" (tmp), "+r" (__sp)
-		     : "a" (sem), "1" (-RWSEM_ACTIVE_READ_BIAS)
+		     : "+m" (sem->count), [tmp] "=d" (tmp), "+r" (__sp)
+		     : [sem] "a" (sem), "[tmp]" (-RWSEM_ACTIVE_READ_BIAS)
 		     : "memory", "cc");
 }
 
