@@ -34,6 +34,7 @@
 #include <net/smc.h>
 
 #include "smc.h"
+#include "smc_rv.h"
 #include "smc_clc.h"
 #include "smc_llc.h"
 #include "smc_cdc.h"
@@ -109,6 +110,7 @@ static int smc_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 	struct smc_sock *smc;
+	int old_state;
 	int rc = 0;
 
 	if (!sk)
@@ -123,6 +125,7 @@ static int smc_release(struct socket *sock)
 		lock_sock_nested(sk, SINGLE_DEPTH_NESTING);
 	else
 		lock_sock(sk);
+	old_state = sk->sk_state;
 
 	if (smc->use_fallback) {
 		sk->sk_state = SMC_CLOSED;
@@ -131,6 +134,10 @@ static int smc_release(struct socket *sock)
 		rc = smc_close_active(smc);
 		sock_set_flag(sk, SOCK_DEAD);
 		sk->sk_shutdown |= SHUTDOWN_MASK;
+	}
+	if (old_state == SMC_LISTEN) {
+		smc_rv_nf_unregister_hook(sock_net(sk), &smc_nfho_serv);
+		kfree(smc->listen_pends);
 	}
 	if (smc->clcsock) {
 		sock_release(smc->clcsock);
@@ -178,6 +185,7 @@ static struct sock *smc_sock_alloc(struct net *net, struct socket *sock)
 	sk->sk_destruct = smc_destruct;
 	sk->sk_protocol = SMCPROTO_SMC;
 	smc = smc_sk(sk);
+	smc->use_fallback = true; /* default: not SMC-capable */
 	INIT_WORK(&smc->tcp_listen_work, smc_tcp_listen_work);
 	INIT_LIST_HEAD(&smc->accept_q);
 	spin_lock_init(&smc->accept_q_lock);
@@ -386,6 +394,10 @@ static int smc_connect_rdma(struct smc_sock *smc)
 	int rc = 0;
 	u8 ibport;
 
+	if (smc->use_fallback)
+		/* peer has not signalled SMC-capability */
+		goto out_connected;
+
 	/* IPSec connections opt out of SMC-R optimizations */
 	if (using_ipsec(smc)) {
 		reason_code = SMC_CLC_DECL_IPSEC;
@@ -496,7 +508,6 @@ static int smc_connect_rdma(struct smc_sock *smc)
 	smc_tx_init(smc);
 
 out_connected:
-	smc_copy_sock_settings_to_clc(smc);
 	if (smc->sk.sk_state == SMC_INIT)
 		smc->sk.sk_state = SMC_ACTIVE;
 
@@ -551,7 +562,11 @@ static int smc_connect(struct socket *sock, struct sockaddr *addr,
 	}
 
 	smc_copy_sock_settings_to_clc(smc);
+	smc_rv_nf_register_hook(sock_net(sk), &smc_nfho_clnt);
+
 	rc = kernel_connect(smc->clcsock, addr, alen, flags);
+	if (rc != -EINPROGRESS)
+		smc_rv_nf_unregister_hook(sock_net(sk), &smc_nfho_clnt);
 	if (rc)
 		goto out;
 
@@ -570,10 +585,12 @@ out_err:
 
 static int smc_clcsock_accept(struct smc_sock *lsmc, struct smc_sock **new_smc)
 {
+	struct smc_listen_pending *pnd;
 	struct sock *sk = &lsmc->sk;
 	struct socket *new_clcsock;
 	struct sock *new_sk;
-	int rc;
+	unsigned long flags;
+	int i, rc;
 
 	release_sock(&lsmc->sk);
 	new_sk = smc_sock_alloc(sock_net(sk), NULL);
@@ -609,6 +626,25 @@ static int smc_clcsock_accept(struct smc_sock *lsmc, struct smc_sock **new_smc)
 	}
 
 	(*new_smc)->clcsock = new_clcsock;
+
+	/* enable SMC-capability if an SMC-capable connecting socket is
+	 * contained in listen_pends; invalidate this entry
+	 */
+	spin_lock_irqsave(&lsmc->listen_pends_lock, flags);
+	for (i = 0; i < 2 * lsmc->sk.sk_max_ack_backlog; i++) {
+		pnd = lsmc->listen_pends + i;
+		if (pnd->used &&
+		    pnd->addr == new_clcsock->sk->sk_daddr &&
+		    pnd->port == new_clcsock->sk->sk_dport &&
+		    jiffies_to_msecs(get_jiffies_64() - pnd->time) <=
+						SMC_LISTEN_PEND_VALID_TIME) {
+			(*new_smc)->use_fallback = false;
+			pnd->used = false;
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&lsmc->listen_pends_lock, flags);
+
 out:
 	return rc;
 }
@@ -754,6 +790,10 @@ static void smc_listen_work(struct work_struct *work)
 	__be32 subnet;
 	u8 prefix_len;
 	u8 ibport;
+
+	if (new_smc->use_fallback)
+		/* peer has not signalled SMC-capability */
+		goto out_connected;
 
 	/* do inband token exchange -
 	 *wait for and receive SMC Proposal CLC message
@@ -927,7 +967,6 @@ static void smc_tcp_listen_work(struct work_struct *work)
 			continue;
 
 		new_smc->listen_smc = lsmc;
-		new_smc->use_fallback = false; /* assume rdma capability first*/
 		sock_hold(&lsmc->sk); /* sock_put in smc_listen_work */
 		INIT_WORK(&new_smc->smc_listen_work, smc_listen_work);
 		smc_copy_sock_settings_to_smc(new_smc);
@@ -952,15 +991,31 @@ static int smc_listen(struct socket *sock, int backlog)
 	if ((sk->sk_state != SMC_INIT) && (sk->sk_state != SMC_LISTEN))
 		goto out;
 
+	rc = -ENOMEM;
+	/* Addresses and ports of incoming SYN packets with experimental option
+	 * SMC are saved, but TCP might decide to drop them. Thus more slots
+	 * than the backlog value are allocated for pending connecting sockets
+	 */
+	smc->listen_pends = kzalloc(
+			2 * backlog * sizeof(struct smc_listen_pending),
+			GFP_KERNEL);
+	if (!smc->listen_pends)
+		goto out;
+	spin_lock_init(&smc->listen_pends_lock);
+
 	rc = 0;
 	if (sk->sk_state == SMC_LISTEN) {
 		sk->sk_max_ack_backlog = backlog;
 		goto out;
 	}
+
+	smc->use_fallback = false; /* listen sockets are SMC-capable */
 	/* some socket options are handled in core, so we could not apply
 	 * them to the clc socket -- copy smc socket options to clc socket
 	 */
 	smc_copy_sock_settings_to_clc(smc);
+
+	smc_rv_nf_register_hook(sock_net(sk), &smc_nfho_serv);
 
 	rc = kernel_listen(smc->clcsock, backlog);
 	if (rc)
@@ -1112,7 +1167,7 @@ static unsigned int smc_poll(struct file *file, struct socket *sock,
 	struct sock *sk = sock->sk;
 	unsigned int mask = 0;
 	struct smc_sock *smc;
-	int rc;
+	int rc = 0;
 
 	smc = smc_sk(sock->sk);
 	if ((sk->sk_state == SMC_INIT) || smc->use_fallback) {
@@ -1121,6 +1176,7 @@ static unsigned int smc_poll(struct file *file, struct socket *sock,
 		/* if non-blocking connect finished ... */
 		lock_sock(sk);
 		if ((sk->sk_state == SMC_INIT) && (mask & POLLOUT)) {
+			smc_rv_nf_unregister_hook(sock_net(sk), &smc_nfho_clnt);
 			sk->sk_err = smc->clcsock->sk->sk_err;
 			if (sk->sk_err) {
 				mask |= POLLERR;
@@ -1346,7 +1402,6 @@ static int smc_create(struct net *net, struct socket *sock, int protocol,
 
 	/* create internal TCP socket for CLC handshake and fallback */
 	smc = smc_sk(sk);
-	smc->use_fallback = false; /* assume rdma capability first */
 	rc = sock_create_kern(net, PF_INET, SOCK_STREAM,
 			      IPPROTO_TCP, &smc->clcsock);
 	if (rc)
@@ -1368,6 +1423,7 @@ static int __init smc_init(void)
 {
 	int rc;
 
+	smc_rv_init();
 	rc = smc_pnet_init();
 	if (rc)
 		return rc;
