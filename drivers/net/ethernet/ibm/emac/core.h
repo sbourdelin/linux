@@ -68,7 +68,7 @@ static inline int emac_rx_size(int mtu)
 		return mal_rx_size(ETH_DATA_LEN + EMAC_MTU_OVERHEAD);
 }
 
-#define EMAC_DMA_ALIGN(x)		ALIGN((x), dma_get_cache_alignment())
+#define EMAC_DMA_ALIGN(x)		ALIGN((x), dma_get_cache_alignment(NULL))
 
 #define EMAC_RX_SKB_HEADROOM		\
 	EMAC_DMA_ALIGN(CONFIG_IBM_EMAC_RX_SKB_HEADROOM)

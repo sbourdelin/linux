@@ -707,12 +707,16 @@ static inline int device_is_coherent(struct device *dev)
 		return 1;    /* compatible behavior */
 }
 
-static inline int dma_get_cache_alignment(void)
-{
-#ifdef ARCH_DMA_MINALIGN
-	return ARCH_DMA_MINALIGN;
+#ifndef ARCH_DMA_MINALIGN
+#define ARCH_DMA_MINALIGN 1
 #endif
-	return 1;
+
+static inline int dma_get_cache_alignment(struct device *dev)
+{
+	if (dev && device_is_coherent(dev))
+		return 1;
+	else /* dev is NULL or noncoherent */
+		return ARCH_DMA_MINALIGN;
 }
 #endif
 

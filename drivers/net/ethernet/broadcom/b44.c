@@ -2587,7 +2587,7 @@ static inline void b44_pci_exit(void)
 
 static int __init b44_init(void)
 {
-	unsigned int dma_desc_align_size = dma_get_cache_alignment();
+	unsigned int dma_desc_align_size = dma_get_cache_alignment(NULL);
 	int err;
 
 	/* Setup paramaters for syncing RX/TX DMA descriptors */

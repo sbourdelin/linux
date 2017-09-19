@@ -81,19 +81,19 @@
  * Number of Tx & Rx descriptors must be powers of 2.
  */
 #define	MPSC_RXR_ENTRIES	32
-#define	MPSC_RXRE_SIZE		dma_get_cache_alignment()
+#define	MPSC_RXRE_SIZE		dma_get_cache_alignment(NULL)
 #define	MPSC_RXR_SIZE		(MPSC_RXR_ENTRIES * MPSC_RXRE_SIZE)
-#define	MPSC_RXBE_SIZE		dma_get_cache_alignment()
+#define	MPSC_RXBE_SIZE		dma_get_cache_alignment(NULL)
 #define	MPSC_RXB_SIZE		(MPSC_RXR_ENTRIES * MPSC_RXBE_SIZE)
 
 #define	MPSC_TXR_ENTRIES	32
-#define	MPSC_TXRE_SIZE		dma_get_cache_alignment()
+#define	MPSC_TXRE_SIZE		dma_get_cache_alignment(NULL)
 #define	MPSC_TXR_SIZE		(MPSC_TXR_ENTRIES * MPSC_TXRE_SIZE)
-#define	MPSC_TXBE_SIZE		dma_get_cache_alignment()
+#define	MPSC_TXBE_SIZE		dma_get_cache_alignment(NULL)
 #define	MPSC_TXB_SIZE		(MPSC_TXR_ENTRIES * MPSC_TXBE_SIZE)
 
 #define	MPSC_DMA_ALLOC_SIZE	(MPSC_RXR_SIZE + MPSC_RXB_SIZE + MPSC_TXR_SIZE \
-		+ MPSC_TXB_SIZE + dma_get_cache_alignment() /* for alignment */)
+		+ MPSC_TXB_SIZE + dma_get_cache_alignment(NULL) /* for alignment */)
 
 /* Rx and Tx Ring entry descriptors -- assume entry size is <= cacheline size */
 struct mpsc_rx_desc {
@@ -738,7 +738,7 @@ static void mpsc_init_hw(struct mpsc_port_info *pi)
 
 	mpsc_brg_init(pi, pi->brg_clk_src);
 	mpsc_brg_enable(pi);
-	mpsc_sdma_init(pi, dma_get_cache_alignment());	/* burst a cacheline */
+	mpsc_sdma_init(pi, dma_get_cache_alignment(NULL));	/* burst a cacheline */
 	mpsc_sdma_stop(pi);
 	mpsc_hw_init(pi);
 }
@@ -798,8 +798,8 @@ static void mpsc_init_rings(struct mpsc_port_info *pi)
 	 * Descriptors & buffers are multiples of cacheline size and must be
 	 * cacheline aligned.
 	 */
-	dp = ALIGN((u32)pi->dma_region, dma_get_cache_alignment());
-	dp_p = ALIGN((u32)pi->dma_region_p, dma_get_cache_alignment());
+	dp = ALIGN((u32)pi->dma_region, dma_get_cache_alignment(NULL));
+	dp_p = ALIGN((u32)pi->dma_region_p, dma_get_cache_alignment(NULL));
 
 	/*
 	 * Partition dma region into rx ring descriptor, rx buffers,
