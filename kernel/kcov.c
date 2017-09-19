@@ -69,9 +69,7 @@ void notrace __sanitizer_cov_trace_pc(void)
 		unsigned long pos;
 		unsigned long ip = _RET_IP_;
 
-#ifdef CONFIG_RANDOMIZE_BASE
 		ip -= kaslr_offset();
-#endif
 
 		/*
 		 * There is some code that runs in interrupts but for which
