@@ -64,7 +64,22 @@
 #define	AB_DATA(addr)		((addr) + 0x04)
 #define	AX_INDXC		0x30
 #define	AX_DATAC		0x34
-
+#define PT_ADDR_INDEX		0xE8
+#define PT_READ_INDEX		0xE4
+#define PT_SIG_1_ADDR		0xA520
+#define PT_SIG_2_ADDR		0xA521
+#define PT_SIG_3_ADDR		0xA522
+#define PT_SIG_4_ADDR		0xA523
+#define PT_SIG_1_DATA		0x78
+#define PT_SIG_2_DATA		0x56
+#define PT_SIG_3_DATA		0x34
+#define PT_SIG_4_DATA		0x12
+#define PT_4_PORT_1_REG		0xB521
+#define PT_4_PORT_2_REG		0xB522
+#define PT_2_PORT_1_REG		0xD520
+#define PT_2_PORT_2_REG		0xD521
+#define PT_1_PORT_1_REG		0xD522
+#define PT_1_PORT_2_REG		0xD523
 #define	NB_PCIE_INDX_ADDR	0xe0
 #define	NB_PCIE_INDX_DATA	0xe4
 #define	PCIE_P_CNTL		0x10040
@@ -510,6 +525,106 @@ void usb_amd_dev_put(void)
 	pci_dev_put(smbus);
 }
 EXPORT_SYMBOL_GPL(usb_amd_dev_put);
+
+int usb_amd_pt_check_port(struct device *device, int port)
+{
+	unsigned char value;
+	struct pci_dev *pdev;
+
+	pdev = to_pci_dev(device);
+	pci_write_config_word(pdev, PT_ADDR_INDEX, PT_SIG_1_ADDR);
+	pci_read_config_byte(pdev, PT_READ_INDEX, &value);
+	if (value != PT_SIG_1_DATA)
+		return 0;
+	pci_write_config_word(pdev, PT_ADDR_INDEX, PT_SIG_2_ADDR);
+	pci_read_config_byte(pdev, PT_READ_INDEX, &value);
+	if (value != PT_SIG_2_DATA)
+		return 0;
+	pci_write_config_word(pdev, PT_ADDR_INDEX, PT_SIG_3_ADDR);
+	pci_read_config_byte(pdev, PT_READ_INDEX, &value);
+	if (value != PT_SIG_3_DATA)
+		return 0;
+	pci_write_config_word(pdev, PT_ADDR_INDEX, PT_SIG_4_ADDR);
+	pci_read_config_byte(pdev, PT_READ_INDEX, &value);
+	if (value != PT_SIG_4_DATA)
+		return 0;
+	if ((pdev->device == 0x43b9) || (pdev->device == 0x43ba)) {
+		/* device is AMD_PROMONTORYA_4(0x43b9) or
+		 * PROMONTORYA_3(0x43ba)
+		 * disable port setting PT_4_PORT_1_REG[7..1] is
+		 * USB2.0 port6 to 0
+		 * PT_4_PORT_2_REG[6..0] is USB 13 to port 7
+		 * 0 : disable ;1 : enable
+		 */
+		if (port > 6) {
+			pci_write_config_word(
+			pdev, PT_ADDR_INDEX, PT_4_PORT_2_REG);
+			pci_read_config_byte(pdev, PT_READ_INDEX, &value);
+			if (value & (1<<(port - 7)))
+				return 0;
+			else
+				return 1;
+		} else {
+			pci_write_config_word(
+			pdev, PT_ADDR_INDEX, PT_4_PORT_1_REG);
+			pci_read_config_byte(pdev, PT_READ_INDEX, &value);
+			if (value & (1<<(port + 1)))
+				return 0;
+			else
+				return 1;
+		}
+	} else if (pdev->device == 0x43bb) {
+		/* device is AMD_PROMONTORYA_2(0x43bb)
+		 * disable port setting PT_2_PORT_1_REG[7..5] is
+		 * USB2.0 port2 to
+		 * PT_2_PORT_2_REG[5..0] is USB9 to port3
+		 * 0 : disable ;1 : enable
+		 */
+		if (port > 2) {
+			pci_write_config_word(
+			pdev, PT_ADDR_INDEX, PT_2_PORT_2_REG);
+			pci_read_config_byte(pdev, PT_READ_INDEX, &value);
+			if (value & (1<<(port - 3)))
+				return 0;
+			else
+				return 1;
+		} else {
+			pci_write_config_word(
+			pdev, PT_ADDR_INDEX, PT_2_PORT_1_REG);
+			pci_read_config_byte(pdev, PT_READ_INDEX, &value);
+			if (value & (1<<(port + 5)))
+				return 0;
+			else
+				return 1;
+		}
+	} else {
+		/* device is AMD_PROMONTORYA_1(0x43bc)
+		 * disable port setting PT_1_PORT_1_REG[7..4] is
+		 * USB2.0 port3 to 0
+		 * PT_1_PORT_2_REG[5..0] is USB9 to port4
+		 * 0 : disable ;1 : enable
+		 */
+		if (port > 3) {
+			pci_write_config_word(
+			pdev, PT_ADDR_INDEX, PT_1_PORT_2_REG);
+			pci_read_config_byte(pdev, PT_READ_INDEX, &value);
+			if (value & (1<<(port - 4)))
+				return 0;
+			else
+				return 1;
+		} else {
+			pci_write_config_word(
+			pdev, PT_ADDR_INDEX, PT_1_PORT_1_REG);
+			pci_read_config_byte(
+			pdev, PT_READ_INDEX, &value);
+			if (value & (1<<(port + 4)))
+				return 0;
+			else
+				return 1;
+		}
+	}
+}
+EXPORT_SYMBOL_GPL(usb_amd_pt_check_port);
 
 /*
  * Make sure the controller is completely inactive, unable to
