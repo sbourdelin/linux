@@ -1182,9 +1182,12 @@ fail_halt:
 					usb_free_urb(urb);
 					goto fail_lowmem;
 				}
-				if (rx_submit (dev, urb, GFP_KERNEL) ==
-				    -ENOLINK)
-					resched = 0;
+				status = rx_submit (dev, urb, GFP_KERNEL);
+				if (status) {
+					usb_free_urb(urb);
+					if (status == -ENOLINK)
+						resched = 0;
+				}
 				usb_autopm_put_interface(dev->intf);
 fail_lowmem:
 				if (resched)
