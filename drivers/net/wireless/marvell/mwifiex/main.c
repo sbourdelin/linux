@@ -1265,12 +1265,35 @@ mwifiex_netdev_select_wmm_queue(struct net_device *dev, struct sk_buff *skb,
 	return mwifiex_1d_to_wmm_queue[skb->priority];
 }
 
+static int mwifiex_do_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
+{
+	struct mwifiex_private *priv = mwifiex_netdev_get_priv(dev);
+	int ret;
+
+	if (!priv->adapter->mfg_mode)
+		return -EINVAL;
+
+	mwifiex_dbg(priv->adapter, "ioctl cmd = 0x%x\n", cmd);
+
+	switch (cmd) {
+	case MWIFIEX_HOSTCMD_IOCTL:
+		ret = mwifiex_process_host_command(priv, req);
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	return ret;
+}
+
 /* Network device handlers */
 static const struct net_device_ops mwifiex_netdev_ops = {
 	.ndo_open = mwifiex_open,
 	.ndo_stop = mwifiex_close,
 	.ndo_start_xmit = mwifiex_hard_start_xmit,
 	.ndo_set_mac_address = mwifiex_ndo_set_mac_address,
+	.ndo_do_ioctl = mwifiex_do_ioctl,
 	.ndo_validate_addr = eth_validate_addr,
 	.ndo_tx_timeout = mwifiex_tx_timeout,
 	.ndo_get_stats = mwifiex_get_stats,

@@ -839,6 +839,8 @@ int mwifiex_process_cmdresp(struct mwifiex_adapter *adapter)
 			hostcmd = adapter->curr_cmd->data_buf;
 			hostcmd->len = size;
 			memcpy(hostcmd->cmd, resp, size);
+			adapter->hostcmd_resp_data.len = size;
+			memcpy(adapter->hostcmd_resp_data.cmd, resp, size);
 		}
 	}
 	orig_cmdresp_no = le16_to_cpu(resp->command);
@@ -1220,6 +1222,63 @@ mwifiex_process_hs_config(struct mwifiex_adapter *adapter)
 				   false);
 }
 EXPORT_SYMBOL_GPL(mwifiex_process_hs_config);
+
+/* This function get hostcmd data from userspace and construct a cmd
+ * to be download to FW.
+ */
+int mwifiex_process_host_command(struct mwifiex_private *priv,
+				 struct ifreq *req)
+{
+	struct mwifiex_ds_misc_cmd *hostcmd_buf;
+	struct host_cmd_ds_command *cmd;
+	struct mwifiex_adapter *adapter = priv->adapter;
+	int ret;
+
+	hostcmd_buf = kzalloc(sizeof(*hostcmd_buf), GFP_KERNEL);
+	if (!hostcmd_buf)
+		return -ENOMEM;
+
+	cmd = (void *)hostcmd_buf->cmd;
+
+	if (copy_from_user(cmd, req->ifr_data,
+			   sizeof(cmd->command) + sizeof(cmd->size))) {
+		ret = -EFAULT;
+		goto done;
+	}
+
+	hostcmd_buf->len = le16_to_cpu(cmd->size);
+	if (hostcmd_buf->len > MWIFIEX_SIZE_OF_CMD_BUFFER) {
+		ret = -EINVAL;
+		goto done;
+	}
+
+	if (copy_from_user(cmd, req->ifr_data, hostcmd_buf->len)) {
+		ret = -EFAULT;
+		goto done;
+	}
+
+	if (mwifiex_send_cmd(priv, 0, 0, 0, hostcmd_buf, true)) {
+		dev_err(priv->adapter->dev, "Failed to process hostcmd\n");
+		ret = -EFAULT;
+		goto done;
+	}
+
+	if (adapter->hostcmd_resp_data.len > hostcmd_buf->len) {
+		ret = -EFBIG;
+		goto done;
+	}
+
+	if (copy_to_user(req->ifr_data, adapter->hostcmd_resp_data.cmd,
+			 adapter->hostcmd_resp_data.len)) {
+		ret = -EFAULT;
+		goto done;
+	}
+
+	ret = 0;
+done:
+	kfree(hostcmd_buf);
+	return ret;
+}
 
 /*
  * This function handles the command response of a sleep confirm command.
