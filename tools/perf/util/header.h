@@ -56,6 +56,8 @@ struct perf_file_header {
 	/* event_types is ignored */
 	struct perf_file_section	event_types;
 	DECLARE_BITMAP(adds_features, HEADER_FEAT_BITS);
+	u64				first_sample_time;
+	u64				last_sample_time;
 };
 
 struct perf_pipe_file_header {
@@ -100,6 +102,8 @@ int perf_header__process_sections(struct perf_header *header, int fd,
 				  int feat, int fd, void *data));
 
 int perf_header__fprintf_info(struct perf_session *s, FILE *fp, bool full);
+
+int perf_header__update_sample_time(int fd, u64 first_time, u64 last_time);
 
 int perf_event__synthesize_features(struct perf_tool *tool,
 				    struct perf_session *session,

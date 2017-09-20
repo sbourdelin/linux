@@ -2277,6 +2277,37 @@ int perf_header__fprintf_info(struct perf_session *session, FILE *fp, bool full)
 	return 0;
 }
 
+int perf_header__update_sample_time(int fd, u64 first_time, u64 last_time)
+{
+	struct perf_file_header header;
+	struct feat_fd ff;
+	off_t tmp;
+	ssize_t ret;
+	int err = -1;
+
+	tmp = lseek(fd, 0, SEEK_CUR);
+
+	lseek(fd, 0, SEEK_SET);
+	ret = readn(fd, &header, sizeof(header));
+	if (ret < 0)
+		goto exit;
+
+	header.first_sample_time = first_time;
+	header.last_sample_time = last_time;
+
+	lseek(fd, 0, SEEK_SET);
+	ff = (struct feat_fd){ .fd = fd};
+	err = do_write(&ff, &header, sizeof(header));
+	if (err < 0)
+		goto exit;
+
+	err = 0;
+
+exit:
+	lseek(fd, tmp, SEEK_SET);
+	return err;
+}
+
 static int do_write_feat(struct feat_fd *ff, int type,
 			 struct perf_file_section **p,
 			 struct perf_evlist *evlist)
@@ -2440,6 +2471,7 @@ int perf_session__write_header(struct perf_session *session,
 			.size	= header->data_size,
 		},
 		/* event_types is ignored, store zeros */
+		/* first_sample_time and last_sample_time store 0 */
 	};
 
 	memcpy(&f_header.adds_features, &header->adds_features, sizeof(header->adds_features));
@@ -2627,6 +2659,8 @@ int perf_file_header__read(struct perf_file_header *header,
 			   struct perf_header *ph, int fd)
 {
 	ssize_t ret;
+	bool format_feature = true;
+	bool format_time = true;
 
 	lseek(fd, 0, SEEK_SET);
 
@@ -2647,11 +2681,22 @@ int perf_file_header__read(struct perf_file_header *header,
 
 	if (header->size != sizeof(*header)) {
 		/* Support the previous format */
-		if (header->size == offsetof(typeof(*header), adds_features))
+		if (header->size == offsetof(typeof(*header), adds_features)) {
 			bitmap_zero(header->adds_features, HEADER_FEAT_BITS);
-		else
+			header->first_sample_time = 0;
+			header->last_sample_time = 0;
+			format_feature = false;
+			format_time = false;
+		} else if (header->size == offsetof(typeof(*header),
+				first_sample_time)) {
+			header->first_sample_time = 0;
+			header->last_sample_time = 0;
+			format_time = false;
+		} else
 			return -1;
-	} else if (ph->needs_swap) {
+	}
+
+	if (ph->needs_swap && format_feature) {
 		/*
 		 * feature bitmap is declared as an array of unsigned longs --
 		 * not good since its size can differ between the host that
@@ -2684,6 +2729,11 @@ int perf_file_header__read(struct perf_file_header *header,
 			bitmap_zero(header->adds_features, HEADER_FEAT_BITS);
 			set_bit(HEADER_BUILD_ID, header->adds_features);
 		}
+	}
+
+	if (ph->needs_swap && format_time) {
+		header->first_sample_time = bswap_64(header->first_sample_time);
+		header->last_sample_time = bswap_64(header->last_sample_time);
 	}
 
 	memcpy(&ph->adds_features, &header->adds_features,
@@ -2941,6 +2991,9 @@ int perf_session__read_header(struct perf_session *session)
 
 		lseek(fd, tmp, SEEK_SET);
 	}
+
+	session->first_sample_time = f_header.first_sample_time;
+	session->last_sample_time = f_header.last_sample_time;
 
 	symbol_conf.nr_events = nr_attrs;
 

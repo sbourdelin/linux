@@ -80,6 +80,8 @@ struct record {
 	bool			timestamp_filename;
 	struct switch_output	switch_output;
 	unsigned long long	samples;
+	u64			first_sample_time;
+	u64			last_sample_time;
 };
 
 static volatile int auxtrace_record__snapshot_started;
@@ -487,6 +489,11 @@ static int process_sample_event(struct perf_tool *tool,
 	struct record *rec = container_of(tool, struct record, tool);
 
 	rec->samples++;
+
+	if (rec->first_sample_time == 0)
+		rec->first_sample_time = sample->time;
+
+	rec->last_sample_time = sample->time;
 
 	return build_id__mark_dso_hit(tool, event, sample, evsel, machine);
 }
@@ -1200,6 +1207,14 @@ out_child:
 	}
 
 	perf_hooks__invoke_record_end();
+
+	if (!err && !file->is_pipe) {
+		err = perf_header__update_sample_time(fd,
+						      rec->first_sample_time,
+						      rec->last_sample_time);
+		if (err < 0)
+			goto out_child;
+	}
 
 	if (!err && !quiet) {
 		char samples[128];

@@ -31,6 +31,8 @@ struct perf_session {
 	bool			one_mmap;
 	void			*one_mmap_addr;
 	u64			one_mmap_offset;
+	u64			first_sample_time;
+	u64			last_sample_time;
 	struct ordered_events	ordered_events;
 	struct perf_data_file	*file;
 	struct perf_tool	*tool;
