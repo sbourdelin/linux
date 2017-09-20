@@ -444,8 +444,11 @@ static bool vhost_exceeds_maxpend(struct vhost_net *net)
  * read-size critical section for our kind of RCU. */
 static void handle_tx(struct vhost_net *net)
 {
+	struct vhost_net_virtqueue *rx_nvq = &net->vqs[VHOST_NET_VQ_RX];
 	struct vhost_net_virtqueue *nvq = &net->vqs[VHOST_NET_VQ_TX];
 	struct vhost_virtqueue *vq = &nvq->vq;
+	struct vhost_virtqueue *rx_vq = &rx_nvq->vq;
+
 	unsigned out, in;
 	int head;
 	struct msghdr msg = {
@@ -461,6 +464,10 @@ static void handle_tx(struct vhost_net *net)
 	struct socket *sock;
 	struct vhost_net_ubuf_ref *uninitialized_var(ubufs);
 	bool zcopy, zcopy_used;
+
+	mutex_lock(&rx_vq->mutex);
+	vhost_net_disable_vq(net, rx_vq);
+	mutex_unlock(&rx_vq->mutex);
 
 	mutex_lock(&vq->mutex);
 	sock = vq->private_data;
@@ -571,13 +578,21 @@ static void handle_tx(struct vhost_net *net)
 		else
 			vhost_zerocopy_signal_used(net, vq);
 		vhost_net_tx_packet(net);
-		if (unlikely(total_len >= VHOST_NET_WEIGHT)) {
-			vhost_poll_queue(&vq->poll);
+		if (unlikely(total_len >= VHOST_NET_WEIGHT))
 			break;
-		}
 	}
 out:
 	mutex_unlock(&vq->mutex);
+
+	mutex_lock(&rx_vq->mutex);
+	vhost_net_enable_vq(net, rx_vq);
+	mutex_unlock(&rx_vq->mutex);
+
+	if (unlikely(total_len >= VHOST_NET_WEIGHT)) {
+		mutex_lock(&vq->mutex);
+		vhost_poll_queue(&vq->poll);
+		mutex_unlock(&vq->mutex);
+	}
 }
 
 static int peek_head_len(struct vhost_net_virtqueue *rvq, struct sock *sk)
