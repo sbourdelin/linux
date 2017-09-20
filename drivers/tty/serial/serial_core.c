@@ -2784,7 +2784,7 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 				    GFP_KERNEL);
 	if (!uport->tty_groups) {
 		ret = -ENOMEM;
-		goto out;
+		goto out1;
 	}
 	uport->tty_groups[0] = &tty_dev_attr_group;
 	if (uport->attr_group)
@@ -2808,6 +2808,8 @@ int uart_add_one_port(struct uart_driver *drv, struct uart_port *uport)
 	 */
 	uport->flags &= ~UPF_DEAD;
 
+ out1:
+	kfree(uport->name);
  out:
 	mutex_unlock(&port->mutex);
 	mutex_unlock(&port_mutex);
