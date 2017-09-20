@@ -51,6 +51,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#define PTIME_RANGE_MAX	10
+
 struct report {
 	struct perf_tool	tool;
 	struct perf_session	*session;
@@ -69,6 +71,8 @@ struct report {
 	const char		*symbol_filter_str;
 	const char		*time_str;
 	struct perf_time_interval ptime;
+	struct perf_time_interval ptime_range[PTIME_RANGE_MAX];
+	int			range_num;
 	float			min_percent;
 	u64			nr_entries;
 	u64			queue_size;
@@ -185,8 +189,11 @@ static int process_sample_event(struct perf_tool *tool,
 	};
 	int ret = 0;
 
-	if (perf_time__skip_sample(&rep->ptime, sample->time))
+	if (perf_time__skip_sample(&rep->ptime, sample->time) ||
+	    perf_time__ranges_skip_sample(rep->ptime_range, rep->range_num,
+					  sample->time)) {
 		return 0;
+	}
 
 	if (machine__resolve(machine, &al, sample) < 0) {
 		pr_debug("problem processing %d event, skipping it.\n",
@@ -1074,7 +1081,20 @@ repeat:
 		goto error;
 
 	if (perf_time__parse_str(&report.ptime, report.time_str) != 0) {
-		pr_err("Invalid time string\n");
+		report.range_num = perf_time__percent_parse_str(
+					report.ptime_range, PTIME_RANGE_MAX,
+					report.time_str,
+					session->first_sample_time,
+					session->last_sample_time);
+
+		if (report.range_num < 0) {
+			pr_err("Invalid time string\n");
+			return -EINVAL;
+		}
+	}
+
+	if (report.range_num > 0 && perf_data_file__is_pipe(session->file)) {
+		pr_err("Time percent range is not supported in pipe\n");
 		return -EINVAL;
 	}
 
