@@ -536,3 +536,19 @@ int fpu__exception_code(struct fpu *fpu, int trap_nr)
 	 */
 	return 0;
 }
+
+/*
+ * We should never get here because the fpregs_state stored in 'struct fpu'
+ * should always be readable and contain a valid FPU state.  However, past bugs
+ * have allowed userspace to set reserved bits in the XSAVE area using
+ * PTRACE_SETREGSET or sys_rt_sigreturn().  These caused XRSTOR to fail when
+ * switching to the task, leaking the FPU registers of the task previously
+ * executing on the CPU.  Mitigate this class of vulnerability by restoring from
+ * the initial state (essentially, zeroing out all the FPU registers) if we
+ * can't restore from the task's FPU state.
+ */
+void __handle_bad_fpstate(union fpregs_state *fpstate, u64 mask)
+{
+	WARN_ONCE(1, "Bad FPU state detected, reinitializing FPU registers");
+	____copy_kernel_to_fpregs(&init_fpstate, mask);
+}

@@ -104,6 +104,8 @@ static inline void fpstate_init_fxstate(struct fxregs_state *fx)
 }
 extern void fpstate_sanitize_xstate(struct fpu *fpu);
 
+extern void __handle_bad_fpstate(union fpregs_state *fpstate, u64 mask);
+
 #define user_insn(insn, output, input...)				\
 ({									\
 	int err;							\
@@ -151,7 +153,7 @@ static inline int copy_fxregs_to_user(struct fxregs_state __user *fx)
 	return user_insn(rex64/fxsave (%[fx]), "=m" (*fx), [fx] "R" (fx));
 }
 
-static inline void copy_kernel_to_fxregs(struct fxregs_state *fx)
+static inline int copy_kernel_to_fxregs(struct fxregs_state *fx)
 {
 	int err;
 
@@ -165,8 +167,8 @@ static inline void copy_kernel_to_fxregs(struct fxregs_state *fx)
 			err = check_insn(rex64/fxrstor (%[fx]), "=m" (*fx), [fx] "R" (fx), "m" (*fx));
 		}
 	}
-	/* Copying from a kernel buffer to FPU registers should never fail: */
 	WARN_ON_FPU(err);
+	return err;
 }
 
 static inline int copy_user_to_fxregs(struct fxregs_state __user *fx)
@@ -181,11 +183,12 @@ static inline int copy_user_to_fxregs(struct fxregs_state __user *fx)
 			  "m" (*fx));
 }
 
-static inline void copy_kernel_to_fregs(struct fregs_state *fx)
+static inline int copy_kernel_to_fregs(struct fregs_state *fx)
 {
 	int err = check_insn(frstor %[fx], "=m" (*fx), [fx] "m" (*fx));
 
 	WARN_ON_FPU(err);
+	return err;
 }
 
 static inline int copy_user_to_fregs(struct fregs_state __user *fx)
@@ -361,7 +364,7 @@ static inline void copy_xregs_to_kernel(struct xregs_state *xstate)
 /*
  * Restore processor xstate from xsave area.
  */
-static inline void copy_kernel_to_xregs(struct xregs_state *xstate, u64 mask)
+static inline int copy_kernel_to_xregs(struct xregs_state *xstate, u64 mask)
 {
 	u32 lmask = mask;
 	u32 hmask = mask >> 32;
@@ -369,8 +372,8 @@ static inline void copy_kernel_to_xregs(struct xregs_state *xstate, u64 mask)
 
 	XSTATE_XRESTORE(xstate, lmask, hmask, err);
 
-	/* We should never fault when copying from a kernel buffer: */
 	WARN_ON_FPU(err);
+	return err;
 }
 
 /*
@@ -450,16 +453,24 @@ static inline int copy_fpregs_to_fpstate(struct fpu *fpu)
 	return 0;
 }
 
-static inline void __copy_kernel_to_fpregs(union fpregs_state *fpstate, u64 mask)
+static inline int ____copy_kernel_to_fpregs(union fpregs_state *fpstate, u64 mask)
 {
 	if (use_xsave()) {
-		copy_kernel_to_xregs(&fpstate->xsave, mask);
+		return copy_kernel_to_xregs(&fpstate->xsave, mask);
 	} else {
 		if (use_fxsr())
-			copy_kernel_to_fxregs(&fpstate->fxsave);
+			return copy_kernel_to_fxregs(&fpstate->fxsave);
 		else
-			copy_kernel_to_fregs(&fpstate->fsave);
+			return copy_kernel_to_fregs(&fpstate->fsave);
 	}
+}
+
+static inline void __copy_kernel_to_fpregs(union fpregs_state *fpstate, u64 mask)
+{
+	int err = ____copy_kernel_to_fpregs(fpstate, mask);
+
+	if (unlikely(err))
+		__handle_bad_fpstate(fpstate, mask);
 }
 
 static inline void copy_kernel_to_fpregs(union fpregs_state *fpstate)
