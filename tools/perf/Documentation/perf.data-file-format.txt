@@ -14,17 +14,18 @@ format that does not rely on seeking to adjust data offsets.  This
 format is described in "Pipe-mode data" section. The pipe data version can be
 augmented with additional events using perf inject.
 
-The file starts with a perf_header:
+The file starts with a perf_file_header:
 
-struct perf_header {
-	char magic[8];		/* PERFILE2 */
-	uint64_t size;		/* size of the header */
-	uint64_t attr_size;	/* size of an attribute in attrs */
-	struct perf_file_section attrs;
-	struct perf_file_section data;
-	struct perf_file_section event_types;
-	uint64_t flags;
-	uint64_t flags1[3];
+struct perf_file_header {
+	u64				magic;
+	u64				size;
+	u64				attr_size;
+	struct perf_file_section	attrs;
+	struct perf_file_section	data;
+	struct perf_file_section	event_types;
+	DECLARE_BITMAP(adds_features, HEADER_FEAT_BITS);
+	u64				first_sample_time;
+	u64				last_sample_time;
 };
 
 The magic number identifies the perf file and the version. Current perf versions
@@ -415,6 +416,10 @@ An array bound by the perf_file_section size.
 	}
 
 ids points to a array of uint64_t defining the ids for event attr attr.
+
+first_sample_time and last_sample_time record the timestmaps of first sample
+and last sample. In later, perf record will fetch the time from perf file
+header and use them to slice the traces for parallelization.
 
 Pipe-mode data
 
