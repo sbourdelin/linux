@@ -540,6 +540,12 @@ static int aac_send_raw_srb(struct aac_dev* dev, void __user * arg)
 		goto cleanup;
 	}
 
+	/* 
+	 * re-establish the relation that user_srbcmd->count holds the 
+	 * size of user_srbcmd 
+	 */
+	user_srbcmd->count = fibsize;
+
 	flags = user_srbcmd->flags; /* from user in cpu order */
 	switch (flags & (SRB_DataIn | SRB_DataOut)) {
 	case SRB_DataOut:
