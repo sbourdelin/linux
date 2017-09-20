@@ -417,6 +417,9 @@ static int coda_alloc_framebuffers(struct coda_ctx *ctx,
 		    dev->devtype->product != CODA_DX6)
 			size += ysize / 4;
 		name = kasprintf(GFP_KERNEL, "fb%d", i);
+		if (!name)
+			return -ENOMEM;
+
 		ret = coda_alloc_context_buf(ctx, &ctx->internal_frames[i],
 					     size, name);
 		kfree(name);
