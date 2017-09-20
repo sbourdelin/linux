@@ -45,7 +45,8 @@ static bool opp_debug_create_supplies(struct dev_pm_opp *opp,
 
 	for (i = 0; i < opp_table->regulator_count; i++) {
 		name = kasprintf(GFP_KERNEL, "supply-%d", i);
-
+		if (!name)
+			return false;
 		/* Create per-opp directory */
 		d = debugfs_create_dir(name, pdentry);
 
