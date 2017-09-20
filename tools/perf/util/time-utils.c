@@ -297,6 +297,27 @@ bool perf_time__skip_sample(struct perf_time_interval *ptime, u64 timestamp)
 	return false;
 }
 
+bool perf_time__ranges_skip_sample(struct perf_time_interval *ptime_buf,
+				   int num, u64 timestamp)
+{
+	struct perf_time_interval *ptime;
+	int i;
+
+	if ((timestamp == 0) || (num == 0))
+		return false;
+
+	for (i = 0; i < num; i++) {
+		ptime = &ptime_buf[i];
+
+		if ((timestamp >= ptime->start) &&
+		    (timestamp < ptime->end)) {
+			break;
+		}
+	}
+
+	return (i == num) ? true : false;
+}
+
 int timestamp__scnprintf_usec(u64 timestamp, char *buf, size_t sz)
 {
 	u64  sec = timestamp / NSEC_PER_SEC;
