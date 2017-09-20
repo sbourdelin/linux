@@ -1032,10 +1032,6 @@ static int dapm_new_dai_link(struct snd_soc_dapm_widget *w)
 	struct snd_soc_dapm_context *dapm = w->dapm;
 	struct snd_card *card = dapm->card->snd_card;
 
-	/* create control for links with > 1 config */
-	if (w->num_params <= 1)
-		return 0;
-
 	/* add kcontrol */
 	for (i = 0; i < w->num_kcontrols; i++) {
 		kcontrol = snd_soc_cnew(&w->kcontrol_news[i], w,
