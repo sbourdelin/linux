@@ -469,6 +469,11 @@ config IR_SIR
 	   To compile this driver as a module, choose M here: the module will
 	   be called sir-ir.
 
+config IR_TANGO
+	tristate "Sigma Designs SMP86xx IR decoder"
+	depends on RC_CORE
+	depends on ARCH_TANGO || COMPILE_TEST
+
 config IR_ZX
 	tristate "ZTE ZX IR remote control"
 	depends on RC_CORE
