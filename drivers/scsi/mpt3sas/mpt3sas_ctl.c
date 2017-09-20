@@ -1065,7 +1065,7 @@ _ctl_getiocinfo(struct MPT3SAS_ADAPTER *ioc, void __user *arg)
 {
 	struct mpt3_ioctl_iocinfo karg;
 
-	if (copy_from_user(&karg, arg, sizeof(karg))) {
+	if (!access_ok(VERIFY_READ, arg, sizeof(karg))) {
 		pr_err("failure at %s:%d/%s()!\n",
 		    __FILE__, __LINE__, __func__);
 		return -EFAULT;
