@@ -2955,14 +2955,16 @@ int ll_getattr(const struct path *path, struct kstat *stat,
 	struct ll_inode_info *lli = ll_i2info(inode);
 	int res;
 
-	res = ll_inode_revalidate(path->dentry,
+	if (!(flags & AT_STATX_DONT_SYNC)) {
+		res = ll_inode_revalidate(path->dentry,
 				  MDS_INODELOCK_UPDATE | MDS_INODELOCK_LOOKUP);
-	ll_stats_ops_tally(sbi, LPROC_LL_GETATTR, 1);
+		ll_stats_ops_tally(sbi, LPROC_LL_GETATTR, 1);
 
-	if (res)
-		return res;
+		if (res)
+			return res;
 
-	OBD_FAIL_TIMEOUT(OBD_FAIL_GETATTR_DELAY, 30);
+		OBD_FAIL_TIMEOUT(OBD_FAIL_GETATTR_DELAY, 30);
+	}
 
 	stat->dev = inode->i_sb->s_dev;
 	if (ll_need_32bit_api(sbi))
