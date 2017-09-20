@@ -632,7 +632,8 @@ union bpf_attr {
 	FN(skb_adjust_room),		\
 	FN(redirect_map),		\
 	FN(sk_redirect_map),		\
-	FN(sock_map_update),
+	FN(sock_map_update),		\
+	FN(perf_event_read_value),
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
  * function eBPF program intends to call
