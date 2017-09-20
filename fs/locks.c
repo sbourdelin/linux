@@ -2683,11 +2683,20 @@ static void lock_get_status(struct seq_file *f, struct file_lock *fl,
 			       : (fl->fl_type == F_WRLCK) ? "WRITE" : "READ ");
 	}
 	if (inode) {
+		struct kstat st;
+		int err;
+
+		err = vfs_getattr(&fl->fl_file->f_path, &st,
+				  STATX_INO, AT_STATX_DONT_SYNC);
+		if (err)
+			goto nostat;
+
 		/* userspace relies on this representation of dev_t */
-		seq_printf(f, "%d %02x:%02x:%ld ", fl_pid,
-				MAJOR(inode->i_sb->s_dev),
-				MINOR(inode->i_sb->s_dev), inode->i_ino);
+		seq_printf(f, "%d %02x:%02x:%lld ", fl_pid,
+			   MAJOR(st.dev), MINOR(st.dev),
+			   (unsigned long long) st.ino);
 	} else {
+nostat:
 		seq_printf(f, "%d <none>:0 ", fl_pid);
 	}
 	if (IS_POSIX(fl)) {
