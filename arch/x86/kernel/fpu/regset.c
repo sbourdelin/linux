@@ -131,31 +131,24 @@ int xstateregs_set(struct task_struct *target, const struct user_regset *regset,
 
 	fpu__activate_fpstate_write(fpu);
 
-	if (boot_cpu_has(X86_FEATURE_XSAVES)) {
+	if (using_compacted_format()) {
 		ret = copyin_to_xsaves(kbuf, ubuf, xsave);
 	} else {
 		ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, xsave, 0, -1);
-
-		/* xcomp_bv must be 0 when using uncompacted format */
-		if (!ret && xsave->header.xcomp_bv)
-			ret = -EINVAL;
+		if (!ret)
+			ret = validate_xstate_header(&xsave->header);
 	}
+
+	/*
+	 * mxcsr reserved bits must be masked to zero for security reasons.
+	 */
+	xsave->i387.mxcsr &= mxcsr_feature_mask;
 
 	/*
 	 * In case of failure, mark all states as init:
 	 */
 	if (ret)
 		fpstate_init(&fpu->state);
-
-	/*
-	 * mxcsr reserved bits must be masked to zero for security reasons.
-	 */
-	xsave->i387.mxcsr &= mxcsr_feature_mask;
-	xsave->header.xfeatures &= xfeatures_mask;
-	/*
-	 * These bits must be zero.
-	 */
-	memset(&xsave->header.reserved, 0, 48);
 
 	return ret;
 }

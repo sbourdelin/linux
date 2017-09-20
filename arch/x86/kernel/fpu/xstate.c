@@ -1018,41 +1018,34 @@ int copyout_from_xsaves(unsigned int pos, unsigned int count, void *kbuf,
 }
 
 /*
- * Convert from a ptrace standard-format buffer to kernel XSAVES format
- * and copy to the target thread. This is called from xstateregs_set() and
- * there we check the CPU has XSAVES and a whole standard-sized buffer
- * exists.
+ * Convert from a ptrace or sigreturn standard-format buffer to kernel XSAVES
+ * format and copy to the target thread.  This is called from xstateregs_set(),
+ * as well as potentially from the sigreturn() and rt_sigreturn() system calls.
  */
 int copyin_to_xsaves(const void *kbuf, const void __user *ubuf,
 		     struct xregs_state *xsave)
 {
 	unsigned int offset, size;
 	int i;
-	u64 xfeatures;
-	u64 allowed_features;
+	struct xstate_header hdr;
 
 	offset = offsetof(struct xregs_state, header);
-	size = sizeof(xfeatures);
+	size = sizeof(hdr);
 
 	if (kbuf) {
-		memcpy(&xfeatures, kbuf + offset, size);
+		memcpy(&hdr, kbuf + offset, size);
 	} else {
-		if (__copy_from_user(&xfeatures, ubuf + offset, size))
+		if (__copy_from_user(&hdr, ubuf + offset, size))
 			return -EFAULT;
 	}
 
-	/*
-	 * Reject if the user sets any disabled or supervisor features:
-	 */
-	allowed_features = xfeatures_mask & ~XFEATURE_MASK_SUPERVISOR;
-
-	if (xfeatures & ~allowed_features)
+	if (validate_xstate_header(&hdr) != 0)
 		return -EINVAL;
 
 	for (i = 0; i < XFEATURE_MAX; i++) {
 		u64 mask = ((u64)1 << i);
 
-		if (xfeatures & mask) {
+		if (hdr.xfeatures & mask) {
 			void *dst = __raw_xsave_addr(xsave, 1 << i);
 
 			offset = xstate_offsets[i];
@@ -1076,7 +1069,7 @@ int copyin_to_xsaves(const void *kbuf, const void __user *ubuf,
 	/*
 	 * Add back in the features that came in from userspace:
 	 */
-	xsave->header.xfeatures |= xfeatures;
+	xsave->header.xfeatures |= hdr.xfeatures;
 
 	return 0;
 }

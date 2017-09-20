@@ -52,4 +52,23 @@ int copyout_from_xsaves(unsigned int pos, unsigned int count, void *kbuf,
 			void __user *ubuf, struct xregs_state *xsave);
 int copyin_to_xsaves(const void *kbuf, const void __user *ubuf,
 		     struct xregs_state *xsave);
+
+/* Validate an xstate header supplied by userspace (ptrace or sigreturn) */
+static inline int validate_xstate_header(const struct xstate_header *hdr)
+{
+	/* No unknown or supervisor features may be set */
+	if (hdr->xfeatures & (~xfeatures_mask | XFEATURE_MASK_SUPERVISOR))
+		return -EINVAL;
+
+	/* Userspace must use the uncompacted format */
+	if (hdr->xcomp_bv)
+		return -EINVAL;
+
+	/* No reserved bits may be set */
+	if (memchr_inv(hdr->reserved, 0, sizeof(hdr->reserved)))
+		return -EINVAL;
+
+	return 0;
+}
+
 #endif

@@ -213,8 +213,11 @@ sanitize_restored_xstate(struct task_struct *tsk,
 	struct xstate_header *header = &xsave->header;
 
 	if (use_xsave()) {
-		/* These bits must be zero. */
-		memset(header->reserved, 0, 48);
+		/*
+		 * Note: we don't need to zero the reserved bits in the
+		 * xstate_header here because we either didn't copy them at all,
+		 * or we checked earlier that they aren't set.
+		 */
 
 		/*
 		 * Init the state that is not present in the memory
@@ -223,7 +226,7 @@ sanitize_restored_xstate(struct task_struct *tsk,
 		if (fx_only)
 			header->xfeatures = XFEATURE_MASK_FPSSE;
 		else
-			header->xfeatures &= (xfeatures_mask & xfeatures);
+			header->xfeatures &= xfeatures;
 	}
 
 	if (use_fxsr()) {
@@ -307,7 +310,7 @@ static int __fpu__restore_sig(void __user *buf, void __user *buf_fx, int size)
 		/*
 		 * For 32-bit frames with fxstate, copy the user state to the
 		 * thread's fpu state, reconstruct fxstate from the fsave
-		 * header. Sanitize the copied state etc.
+		 * header. Validate and sanitize the copied state.
 		 */
 		struct fpu *fpu = &tsk->thread.fpu;
 		struct user_i387_ia32_struct env;
@@ -329,10 +332,10 @@ static int __fpu__restore_sig(void __user *buf, void __user *buf_fx, int size)
 		} else {
 			err = __copy_from_user(&fpu->state.xsave,
 					       buf_fx, state_size);
-
-			/* xcomp_bv must be 0 when using uncompacted format */
-			if (!err && fpu->state.xsave.header.xcomp_bv)
-				err = -EINVAL;
+			if (!err) {
+				err = validate_xstate_header(
+						&fpu->state.xsave.header);
+			}
 		}
 
 		if (err || __copy_from_user(&env, buf, sizeof(env))) {
