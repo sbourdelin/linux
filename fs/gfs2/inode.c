@@ -1989,7 +1989,8 @@ static int gfs2_getattr(const struct path *path, struct kstat *stat,
 	int error;
 
 	gfs2_holder_mark_uninitialized(&gh);
-	if (gfs2_glock_is_locked_by_me(ip->i_gl) == NULL) {
+	if (!(flags & AT_STATX_DONT_SYNC) &&
+	    gfs2_glock_is_locked_by_me(ip->i_gl) == NULL) {
 		error = gfs2_glock_nq_init(ip->i_gl, LM_ST_SHARED, LM_FLAG_ANY, &gh);
 		if (error)
 			return error;
