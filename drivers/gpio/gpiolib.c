@@ -1676,14 +1676,22 @@ static const struct irq_domain_ops gpiochip_domain_ops = {
 static int gpiochip_irq_reqres(struct irq_data *d)
 {
 	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
+	int ret;
 
 	if (!try_module_get(chip->gpiodev->owner))
 		return -ENODEV;
+
+	ret = pm_runtime_get_sync(chip->parent);
+	if (ret < 0) {
+		module_put(chip->gpiodev->owner);
+		return ret;
+	}
 
 	if (gpiochip_lock_as_irq(chip, d->hwirq)) {
 		chip_err(chip,
 			"unable to lock HW IRQ %lu for IRQ\n",
 			d->hwirq);
+		pm_runtime_put(chip->parent);
 		module_put(chip->gpiodev->owner);
 		return -EINVAL;
 	}
@@ -1695,6 +1703,7 @@ static void gpiochip_irq_relres(struct irq_data *d)
 	struct gpio_chip *chip = irq_data_get_irq_chip_data(d);
 
 	gpiochip_unlock_as_irq(chip, d->hwirq);
+	pm_runtime_put(chip->parent);
 	module_put(chip->gpiodev->owner);
 }
 
