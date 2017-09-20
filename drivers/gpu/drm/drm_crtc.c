@@ -328,6 +328,7 @@ int drm_crtc_init_with_planes(struct drm_device *dev, struct drm_crtc *crtc,
 	ret = drm_crtc_crc_init(crtc);
 	if (ret) {
 		drm_mode_object_unregister(dev, &crtc->base);
+		kfree(crtc->name);
 		return ret;
 	}
 
