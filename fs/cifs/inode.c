@@ -2003,22 +2003,24 @@ int cifs_getattr(const struct path *path, struct kstat *stat,
 	struct inode *inode = d_inode(dentry);
 	int rc;
 
-	/*
-	 * We need to be sure that all dirty pages are written and the server
-	 * has actual ctime, mtime and file length.
-	 */
-	if (!CIFS_CACHE_READ(CIFS_I(inode)) && inode->i_mapping &&
-	    inode->i_mapping->nrpages != 0) {
-		rc = filemap_fdatawait(inode->i_mapping);
-		if (rc) {
-			mapping_set_error(inode->i_mapping, rc);
-			return rc;
+	if (!(flags & AT_STATX_DONT_SYNC)) {
+		/*
+		 * We need to be sure that all dirty pages are written and the
+		 * server has actual ctime, mtime and file length.
+		 */
+		if (!CIFS_CACHE_READ(CIFS_I(inode)) && inode->i_mapping &&
+		    inode->i_mapping->nrpages != 0) {
+			rc = filemap_fdatawait(inode->i_mapping);
+			if (rc) {
+				mapping_set_error(inode->i_mapping, rc);
+				return rc;
+			}
 		}
-	}
 
-	rc = cifs_revalidate_dentry_attr(dentry);
-	if (rc)
-		return rc;
+		rc = cifs_revalidate_dentry_attr(dentry);
+		if (rc)
+			return rc;
+	}
 
 	generic_fillattr(inode, stat);
 	stat->blksize = CIFS_MAX_MSGSIZE;
