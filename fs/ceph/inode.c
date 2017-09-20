@@ -2201,9 +2201,11 @@ int ceph_getattr(const struct path *path, struct kstat *stat,
 {
 	struct inode *inode = d_inode(path->dentry);
 	struct ceph_inode_info *ci = ceph_inode(inode);
-	int err;
+	int err = 0;
 
-	err = ceph_do_getattr(inode, CEPH_STAT_CAP_INODE_ALL, false);
+	if (!(flags & AT_STATX_DONT_SYNC))
+		err = ceph_do_getattr(inode, CEPH_STAT_CAP_INODE_ALL, false);
+
 	if (!err) {
 		generic_fillattr(inode, stat);
 		stat->ino = ceph_translate_ino(inode->i_sb, inode->i_ino);
