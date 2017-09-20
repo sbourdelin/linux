@@ -247,7 +247,7 @@ out:
 int orangefs_getattr(const struct path *path, struct kstat *stat,
 		     u32 request_mask, unsigned int flags)
 {
-	int ret = -ENOENT;
+	int ret = 0;
 	struct inode *inode = path->dentry->d_inode;
 	struct orangefs_inode_s *orangefs_inode = NULL;
 
@@ -255,7 +255,9 @@ int orangefs_getattr(const struct path *path, struct kstat *stat,
 		     "orangefs_getattr: called on %pd\n",
 		     path->dentry);
 
-	ret = orangefs_inode_getattr(inode, 0, 0, request_mask);
+	if (!(flags & AT_STATX_DONT_SYNC))
+		ret = orangefs_inode_getattr(inode, 0, 0, request_mask);
+
 	if (ret == 0) {
 		generic_fillattr(inode, stat);
 
