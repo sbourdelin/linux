@@ -739,6 +739,10 @@ int nfs_getattr(const struct path *path, struct kstat *stat,
 	int err = 0;
 
 	trace_nfs_getattr_enter(inode);
+
+	if (query_flags & AT_STATX_DONT_SYNC)
+		goto out;
+
 	/* Flush out writes to the server in order to update c/mtime.  */
 	if (S_ISREG(inode->i_mode)) {
 		err = filemap_write_and_wait(inode->i_mapping);
@@ -769,13 +773,13 @@ int nfs_getattr(const struct path *path, struct kstat *stat,
 		err = __nfs_revalidate_inode(server, inode);
 	} else
 		nfs_readdirplus_parent_cache_hit(path->dentry);
+out:
 	if (!err) {
 		generic_fillattr(inode, stat);
 		stat->ino = nfs_compat_user_ino64(NFS_FILEID(inode));
 		if (S_ISDIR(inode->i_mode))
 			stat->blksize = NFS_SERVER(inode)->dtsize;
 	}
-out:
 	trace_nfs_getattr_exit(inode, err);
 	return err;
 }
