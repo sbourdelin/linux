@@ -766,20 +766,23 @@ static int rtc_timer_enqueue(struct rtc_device *rtc, struct rtc_timer *timer)
 	struct timerqueue_node *next = timerqueue_getnext(&rtc->timerqueue);
 	struct rtc_time tm;
 	ktime_t now;
+	ktime_t next_effect = KTIME_MAX;
 
 	timer->enabled = 1;
 	__rtc_read_time(rtc, &tm);
 	now = rtc_tm_to_ktime(tm);
 
-	/* Skip over expired timers */
+	/* Skip over expired timers, get next effect timer */
 	while (next) {
-		if (next->expires >= now)
+		if (next->expires >= now) {
+			next_effect = next->expires;
 			break;
+		}
 		next = timerqueue_iterate_next(next);
 	}
 
 	timerqueue_add(&rtc->timerqueue, &timer->node);
-	if (!next) {
+	if (timer->node.expires < next_effect) {
 		struct rtc_wkalrm alarm;
 		int err;
 		alarm.time = rtc_ktime_to_tm(timer->node.expires);
