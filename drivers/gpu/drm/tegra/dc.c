@@ -1693,6 +1693,8 @@ static int tegra_dc_debugfs_init(struct tegra_dc *dc, struct drm_minor *minor)
 	int err;
 
 	name = kasprintf(GFP_KERNEL, "dc.%d", dc->pipe);
+	if (!name)
+		return -ENOMEM;
 	dc->debugfs = debugfs_create_dir(name, minor->debugfs_root);
 	kfree(name);
 
