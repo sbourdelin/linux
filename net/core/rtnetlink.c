@@ -274,6 +274,8 @@ static const struct rtnl_link_ops *rtnl_link_ops_get(const char *kind)
 {
 	const struct rtnl_link_ops *ops;
 
+	ASSERT_RTNL();
+
 	list_for_each_entry(ops, &link_ops, list) {
 		if (!strcmp(ops->kind, kind))
 			return ops;
@@ -1617,6 +1619,8 @@ static const struct rtnl_link_ops *linkinfo_to_kind_ops(const struct nlattr *nla
 {
 	const struct rtnl_link_ops *ops = NULL;
 	struct nlattr *linfo[IFLA_INFO_MAX + 1];
+
+	ASSERT_RTNL();
 
 	if (nla_parse_nested(linfo, IFLA_INFO_MAX, nla,
 			     ifla_info_policy, NULL) < 0)
