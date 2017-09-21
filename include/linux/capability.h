@@ -250,6 +250,7 @@ extern bool ptracer_capable(struct task_struct *tsk, struct user_namespace *ns);
 extern int get_vfs_caps_from_disk(const struct dentry *dentry, struct cpu_vfs_cap_data *cpu_caps);
 int proc_douserns_caps_whitelist(struct ctl_table *table, int write,
 				 void __user *buff, size_t *lenp, loff_t *ppos);
+bool is_capability_controlled(int cap);
 
 extern int cap_convert_nscap(struct dentry *dentry, void **ivalue, size_t size);
 

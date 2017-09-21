@@ -22,6 +22,7 @@ struct uid_gid_map {	/* 64 bytes -- 1 cache line */
 };
 
 #define USERNS_SETGROUPS_ALLOWED 1UL
+#define USERNS_CONTROLLED	 2UL
 
 #define USERNS_INIT_FLAGS USERNS_SETGROUPS_ALLOWED
 
@@ -102,6 +103,16 @@ static inline void put_user_ns(struct user_namespace *ns)
 		__put_user_ns(ns);
 }
 
+static inline bool is_user_ns_controlled(const struct user_namespace *ns)
+{
+	return ns->flags & USERNS_CONTROLLED;
+}
+
+static inline void mark_user_ns_controlled(struct user_namespace *ns)
+{
+	ns->flags |= USERNS_CONTROLLED;
+}
+
 struct seq_operations;
 extern const struct seq_operations proc_uid_seq_operations;
 extern const struct seq_operations proc_gid_seq_operations;
@@ -159,6 +170,15 @@ static inline bool current_in_userns(const struct user_namespace *target_ns)
 static inline struct ns_common *ns_get_owner(struct ns_common *ns)
 {
 	return ERR_PTR(-EPERM);
+}
+
+static inline bool is_user_ns_controlled(const struct user_namespace *ns)
+{
+	return false;
+}
+
+static inline void mark_user_ns_controlled(struct user_namespace *ns)
+{
 }
 #endif
 

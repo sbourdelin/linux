@@ -53,6 +53,9 @@ static void set_cred_user_ns(struct cred *cred, struct user_namespace *user_ns)
 	cred->cap_effective = CAP_FULL_SET;
 	cred->cap_ambient = CAP_EMPTY_SET;
 	cred->cap_bset = CAP_FULL_SET;
+	if (!ns_capable(user_ns->parent, CAP_SYS_ADMIN) ||
+	    is_user_ns_controlled(user_ns->parent))
+		mark_user_ns_controlled(user_ns);
 #ifdef CONFIG_KEYS
 	key_put(cred->request_key_auth);
 	cred->request_key_auth = NULL;

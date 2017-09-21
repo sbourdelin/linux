@@ -73,6 +73,14 @@ int cap_capable(const struct cred *cred, struct user_namespace *targ_ns,
 {
 	struct user_namespace *ns = targ_ns;
 
+	/* If the capability is controlled and user-ns that process
+	 * belongs-to is 'controlled' then return EPERM and no need
+	 * to check the user-ns hierarchy.
+	 */
+	if (is_user_ns_controlled(cred->user_ns) &&
+	    is_capability_controlled(cap))
+		return -EPERM;
+
 	/* See if cred has the capability in the target user namespace
 	 * by examining the target user namespace and all of the target
 	 * user namespace's parents.
