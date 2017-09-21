@@ -412,10 +412,19 @@ static int gre_rcv(struct sk_buff *skb)
 			return 0;
 	}
 
+#if IS_ENABLED(CONFIG_MPLS)
+	if (unlikely(tpi.proto == htons(ETH_P_MPLS_UC))) {
+		if (mpls_gre_rcv(skb, hdr_len))
+			goto drop;
+		return 0;
+	}
+#endif
+
 	if (ipgre_rcv(skb, &tpi, hdr_len) == PACKET_RCVD)
 		return 0;
 
 	icmp_send(skb, ICMP_DEST_UNREACH, ICMP_PORT_UNREACH, 0);
+
 drop:
 	kfree_skb(skb);
 	return 0;

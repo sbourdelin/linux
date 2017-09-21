@@ -16,6 +16,7 @@
 #include <net/arp.h>
 #include <net/ip_fib.h>
 #include <net/netevent.h>
+#include <net/ip_tunnels.h>
 #include <net/netns/generic.h>
 #if IS_ENABLED(CONFIG_IPV6)
 #include <net/ipv6.h>
@@ -38,6 +39,40 @@ static int zero = 0;
 static int one = 1;
 static int label_limit = (1 << 20) - 1;
 static int ttl_max = 255;
+
+size_t ipgre_mpls_encap_hlen(struct ip_tunnel_encap *e)
+{
+	return sizeof(struct mpls_shim_hdr);
+}
+
+int ipgre_mpls_build_header(struct sk_buff *skb, struct ip_tunnel_encap *e,
+			    u8 *protocol, struct flowi4 *fl4)
+{
+	return 0;
+}
+
+static const struct ip_tunnel_encap_ops mpls_iptun_ops = {
+	.encap_hlen = ipgre_mpls_encap_hlen,
+	.build_header = ipgre_mpls_build_header,
+};
+
+int ipgre_tunnel_encap_add_mpls_ops(void)
+{
+	int ret;
+
+	ret = ip_tunnel_encap_add_ops(&mpls_iptun_ops, TUNNEL_ENCAP_MPLS);
+	if (ret < 0) {
+		pr_err("can't add mplsgre ops\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+static void ipgre_tunnel_encap_del_mpls_ops(void)
+{
+	ip_tunnel_encap_del_ops(&mpls_iptun_ops, TUNNEL_ENCAP_MPLS);
+}
 
 static void rtmsg_lfib(int event, u32 label, struct mpls_route *rt,
 		       struct nlmsghdr *nlh, struct net *net, u32 portid,
@@ -2486,6 +2521,7 @@ static int __init mpls_init(void)
 		      0);
 	rtnl_register(PF_MPLS, RTM_GETNETCONF, mpls_netconf_get_devconf,
 		      mpls_netconf_dump_devconf, 0);
+	ipgre_tunnel_encap_add_mpls_ops();
 	err = 0;
 out:
 	return err;
@@ -2503,6 +2539,7 @@ static void __exit mpls_exit(void)
 	dev_remove_pack(&mpls_packet_type);
 	unregister_netdevice_notifier(&mpls_dev_notifier);
 	unregister_pernet_subsys(&mpls_net_ops);
+	ipgre_tunnel_encap_del_mpls_ops();
 }
 module_exit(mpls_exit);
 
