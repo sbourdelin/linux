@@ -980,6 +980,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 		int may_enter_fs;
 		enum page_references references = PAGEREF_RECLAIM_CLEAN;
 		bool dirty, writeback;
+		bool new_swap_page = false;
 
 		cond_resched();
 
@@ -1165,6 +1166,7 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 
 				/* Adding to swap updated mapping */
 				mapping = page_mapping(page);
+				new_swap_page = true;
 			}
 		} else if (unlikely(PageTransHuge(page))) {
 			/* Split file THP */
@@ -1185,6 +1187,16 @@ static unsigned long shrink_page_list(struct list_head *page_list,
 				nr_unmap_fail++;
 				goto activate_locked;
 			}
+
+			/*
+			 * MADV_FREE clear pte dirty bit, but not yet clear
+			 * SwapBacked for a page. We can't directly free the
+			 * page because we already set swap entry in pte. The
+			 * check guarantees this is such page and not a clean
+			 * swapin page
+			 */
+			if (!PageDirty(page) && new_swap_page)
+				set_page_dirty(page);
 		}
 
 		if (PageDirty(page)) {
