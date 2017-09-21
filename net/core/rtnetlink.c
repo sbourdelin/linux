@@ -524,11 +524,15 @@ static size_t rtnl_link_get_af_size(const struct net_device *dev,
 static bool rtnl_have_link_slave_info(const struct net_device *dev)
 {
 	struct net_device *master_dev;
+	bool ret = false;
 
-	master_dev = netdev_master_upper_dev_get((struct net_device *) dev);
+	rcu_read_lock();
+
+	master_dev = netdev_master_upper_dev_get_rcu((struct net_device *) dev);
 	if (master_dev && master_dev->rtnl_link_ops)
-		return true;
-	return false;
+		ret = true;
+	rcu_read_unlock();
+	return ret;
 }
 
 static int rtnl_link_slave_info_fill(struct sk_buff *skb,
@@ -538,6 +542,8 @@ static int rtnl_link_slave_info_fill(struct sk_buff *skb,
 	const struct rtnl_link_ops *ops;
 	struct nlattr *slave_data;
 	int err;
+
+	ASSERT_RTNL();
 
 	master_dev = netdev_master_upper_dev_get((struct net_device *) dev);
 	if (!master_dev)
@@ -570,6 +576,8 @@ static int rtnl_link_info_fill(struct sk_buff *skb,
 	struct nlattr *data;
 	int err;
 
+	ASSERT_RTNL();
+
 	if (!ops)
 		return 0;
 	if (nla_put_string(skb, IFLA_INFO_KIND, ops->kind) < 0)
@@ -599,6 +607,8 @@ static int rtnl_link_fill(struct sk_buff *skb, const struct net_device *dev)
 {
 	struct nlattr *linkinfo;
 	int err = -EMSGSIZE;
+
+	ASSERT_RTNL();
 
 	linkinfo = nla_nest_start(skb, IFLA_LINKINFO);
 	if (linkinfo == NULL)
