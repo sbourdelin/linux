@@ -282,6 +282,14 @@ static int ifb_validate(struct nlattr *tb[], struct nlattr *data[],
 		if (!is_valid_ether_addr(nla_data(tb[IFLA_ADDRESS])))
 			return -EADDRNOTAVAIL;
 	}
+
+	if (tb[IFLA_MTU]) {
+		u32 mtu = nla_get_u32(tb[IFLA_MTU]);
+
+		if (mtu < ETH_MIN_MTU || mtu > ETH_DATA_LEN)
+			return -EINVAL;
+	}
+
 	return 0;
 }
 
