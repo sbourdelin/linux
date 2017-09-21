@@ -76,6 +76,7 @@
 #define XXHASH_H
 
 #include <linux/types.h>
+#include <linux/bitops.h> /* BITS_PER_LONG */
 
 /*-****************************
  * Simple Hash Functions
@@ -106,6 +107,29 @@ uint32_t xxh32(const void *input, size_t length, uint32_t seed);
  * Return:  The 64-bit hash of the data.
  */
 uint64_t xxh64(const void *input, size_t length, uint64_t seed);
+
+#if BITS_PER_LONG == 64
+typedef	u64	xxhash_t;
+#else
+typedef	u32	xxhash_t;
+#endif
+
+/**
+ * xxhash() - calculate 32/64-bit hash based on cpu word size
+ *
+ * @input:  The data to hash.
+ * @length: The length of the data to hash.
+ * @seed:   The seed can be used to alter the result predictably.
+ *
+ * This function always work as xxh32() for 32-bit systems
+ * and as xxh64() for 64-bit systems.
+ * Because result depends on cpu work size,
+ * the main proporse of that function is for  in memory hashing.
+ *
+ * Return:  32/64-bit hash of the data.
+ */
+
+xxhash_t xxhash(const void *input, size_t length, uint64_t seed);
 
 /*-****************************
  * Streaming Hash Functions

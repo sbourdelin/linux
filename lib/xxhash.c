@@ -236,6 +236,16 @@ uint64_t xxh64(const void *input, const size_t len, const uint64_t seed)
 }
 EXPORT_SYMBOL(xxh64);
 
+xxhash_t xxhash(const void *input, size_t length, uint64_t seed)
+{
+#if BITS_PER_LONG == 64
+	return xxh64(input, length, seed);
+#else
+	return xxh32(input, length, seed);
+#endif
+}
+EXPORT_SYMBOL(xxhash);
+
 /*-**************************************************
  * Advanced Hash Functions
  ***************************************************/
