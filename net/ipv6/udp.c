@@ -773,11 +773,16 @@ start_lookup:
 
 static void udp6_sk_rx_dst_set(struct sock *sk, struct dst_entry *dst)
 {
-	if (udp_sk_rx_dst_set(sk, dst)) {
+	if (unlikely(dst_update(&sk->sk_rx_dst, dst))) {
 		const struct rt6_info *rt = (const struct rt6_info *)dst;
 
 		inet6_sk(sk)->rx_dst_cookie = rt6_get_cookie(rt);
 	}
+}
+
+static bool udp6_use_rx_dst_cache(struct sock *sk)
+{
+	return sk->sk_state == TCP_ESTABLISHED;
 }
 
 int __udp6_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
@@ -830,7 +835,7 @@ int __udp6_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 		struct dst_entry *dst = skb_dst(skb);
 		int ret;
 
-		if (unlikely(sk->sk_rx_dst != dst))
+		if (udp6_use_rx_dst_cache(sk))
 			udp6_sk_rx_dst_set(sk, dst);
 
 		ret = udpv6_queue_rcv_skb(sk, skb);
@@ -905,37 +910,13 @@ discard:
 	return 0;
 }
 
-
-static struct sock *__udp6_lib_demux_lookup(struct net *net,
-			__be16 loc_port, const struct in6_addr *loc_addr,
-			__be16 rmt_port, const struct in6_addr *rmt_addr,
-			int dif, int sdif)
-{
-	unsigned short hnum = ntohs(loc_port);
-	unsigned int hash2 = udp6_portaddr_hash(net, loc_addr, hnum);
-	unsigned int slot2 = hash2 & udp_table.mask;
-	struct udp_hslot *hslot2 = &udp_table.hash2[slot2];
-	const __portpair ports = INET_COMBINED_PORTS(rmt_port, hnum);
-	struct sock *sk;
-
-	udp_portaddr_for_each_entry_rcu(sk, &hslot2->head) {
-		if (sk->sk_state == TCP_ESTABLISHED &&
-		    INET6_MATCH(sk, net, rmt_addr, loc_addr, ports, dif, sdif))
-			return sk;
-		/* Only check first socket in chain */
-		break;
-	}
-	return NULL;
-}
-
 static void udp_v6_early_demux(struct sk_buff *skb)
 {
 	struct net *net = dev_net(skb->dev);
-	const struct udphdr *uh;
-	struct sock *sk;
-	struct dst_entry *dst;
 	int dif = skb->dev->ifindex;
 	int sdif = inet6_sdif(skb);
+	const struct udphdr *uh;
+	struct sock *sk;
 
 	if (!pskb_may_pull(skb, skb_transport_offset(skb) +
 	    sizeof(struct udphdr)))
@@ -944,10 +925,9 @@ static void udp_v6_early_demux(struct sk_buff *skb)
 	uh = udp_hdr(skb);
 
 	if (skb->pkt_type == PACKET_HOST)
-		sk = __udp6_lib_demux_lookup(net, uh->dest,
-					     &ipv6_hdr(skb)->daddr,
-					     uh->source, &ipv6_hdr(skb)->saddr,
-					     dif, sdif);
+		sk = __udp6_lib_lookup(net, &ipv6_hdr(skb)->saddr, uh->source,
+				       &ipv6_hdr(skb)->daddr, uh->dest, dif,
+				       sdif, &udp_table, skb);
 	else
 		return;
 
@@ -955,17 +935,8 @@ static void udp_v6_early_demux(struct sk_buff *skb)
 		return;
 
 	skb_set_noref_sk(skb, sk);
-	dst = READ_ONCE(sk->sk_rx_dst);
-
-	if (dst)
-		dst = dst_check(dst, inet6_sk(sk)->rx_dst_cookie);
-	if (dst) {
-		/* set noref for now.
-		 * any place which wants to hold dst has to call
-		 * dst_hold_safe()
-		 */
-		skb_dst_set_noref(skb, dst);
-	}
+	if (udp6_use_rx_dst_cache(sk))
+		udp_set_skb_rx_dst(sk, skb, inet6_sk(sk)->rx_dst_cookie);
 }
 
 static __inline__ int udpv6_rcv(struct sk_buff *skb)

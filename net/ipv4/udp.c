@@ -2043,6 +2043,11 @@ static inline int udp4_csum_init(struct sk_buff *skb, struct udphdr *uh,
 							 inet_compute_pseudo);
 }
 
+static bool udp_use_rx_dst_cache(struct sock *sk, struct sk_buff *skb)
+{
+	return sk->sk_state == TCP_ESTABLISHED || skb->pkt_type != PACKET_HOST;
+}
+
 /*
  *	All we need to do is get the socket, and then do a checksum.
  */
@@ -2088,8 +2093,8 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 		struct dst_entry *dst = skb_dst(skb);
 		int ret;
 
-		if (unlikely(sk->sk_rx_dst != dst))
-			udp_sk_rx_dst_set(sk, dst);
+		if (udp_use_rx_dst_cache(sk, skb))
+			dst_update(&sk->sk_rx_dst, dst);
 
 		ret = udp_queue_rcv_skb(sk, skb);
 		if (!noref_sk)
@@ -2196,42 +2201,28 @@ static struct sock *__udp4_lib_mcast_demux_lookup(struct net *net,
 	return result;
 }
 
-/* For unicast we should only early demux connected sockets or we can
- * break forwarding setups.  The chains here can be long so only check
- * if the first socket is an exact match and if not move on.
- */
-static struct sock *__udp4_lib_demux_lookup(struct net *net,
-					    __be16 loc_port, __be32 loc_addr,
-					    __be16 rmt_port, __be32 rmt_addr,
-					    int dif, int sdif)
+void udp_set_skb_rx_dst(struct sock *sk, struct sk_buff *skb, u32 cookie)
 {
-	unsigned short hnum = ntohs(loc_port);
-	unsigned int hash2 = udp4_portaddr_hash(net, loc_addr, hnum);
-	unsigned int slot2 = hash2 & udp_table.mask;
-	struct udp_hslot *hslot2 = &udp_table.hash2[slot2];
-	INET_ADDR_COOKIE(acookie, rmt_addr, loc_addr);
-	const __portpair ports = INET_COMBINED_PORTS(rmt_port, hnum);
-	struct sock *sk;
+	struct dst_entry *dst = dst_access(&sk->sk_rx_dst, cookie);
 
-	udp_portaddr_for_each_entry_rcu(sk, &hslot2->head) {
-		if (INET_MATCH(sk, net, acookie, rmt_addr,
-			       loc_addr, ports, dif, sdif))
-			return sk;
-		/* Only check first socket in chain */
-		break;
+	if (dst) {
+		/* set noref for now.
+		 * any place which wants to hold dst has to call
+		 * dst_hold_safe()
+		 */
+		skb_dst_set_noref(skb, dst);
 	}
-	return NULL;
 }
+EXPORT_SYMBOL_GPL(udp_set_skb_rx_dst);
 
 void udp_v4_early_demux(struct sk_buff *skb)
 {
 	struct net *net = dev_net(skb->dev);
+	int dif = skb->dev->ifindex;
+	int sdif = inet_sdif(skb);
 	const struct iphdr *iph;
 	const struct udphdr *uh;
 	struct sock *sk = NULL;
-	struct dst_entry *dst;
-	int dif = skb->dev->ifindex;
-	int sdif = inet_sdif(skb);
 	int ours;
 
 	/* validate the packet */
@@ -2260,25 +2251,16 @@ void udp_v4_early_demux(struct sk_buff *skb)
 						   uh->source, iph->saddr,
 						   dif, sdif);
 	} else if (skb->pkt_type == PACKET_HOST) {
-		sk = __udp4_lib_demux_lookup(net, uh->dest, iph->daddr,
-					     uh->source, iph->saddr, dif, sdif);
+		sk = __udp4_lib_lookup(net, iph->saddr, uh->source, iph->daddr,
+				       uh->dest, dif, sdif, &udp_table, skb);
 	}
 
 	if (!sk)
 		return;
 
 	skb_set_noref_sk(skb, sk);
-	dst = READ_ONCE(sk->sk_rx_dst);
-
-	if (dst)
-		dst = dst_check(dst, 0);
-	if (dst) {
-		/* set noref for now.
-		 * any place which wants to hold dst has to call
-		 * dst_hold_safe()
-		 */
-		skb_dst_set_noref(skb, dst);
-	}
+	if (udp_use_rx_dst_cache(sk, skb))
+		udp_set_skb_rx_dst(sk, skb, 0);
 }
 
 int udp_rcv(struct sk_buff *skb)

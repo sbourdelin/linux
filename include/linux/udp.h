@@ -92,6 +92,8 @@ static inline struct udp_sock *udp_sk(const struct sock *sk)
 	return (struct udp_sock *)sk;
 }
 
+void udp_set_skb_rx_dst(struct sock *sk, struct sk_buff *skb, u32 cookie);
+
 static inline void udp_set_no_check6_tx(struct sock *sk, bool val)
 {
 	udp_sk(sk)->no_check6_tx = val;
