@@ -351,6 +351,14 @@ static int ip_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 		}
 	}
 
+	/* Since the sk has no reference to the socket, we must
+	 * clear it before escaping this RCU section.
+	 * The sk is just an hint and we know we are not going to use
+	 * it outside the input path.
+	 */
+	if (skb_dst(skb)->input != ip_local_deliver)
+		skb_clear_noref_sk(skb);
+
 #ifdef CONFIG_IP_ROUTE_CLASSID
 	if (unlikely(skb_dst(skb)->tclassid)) {
 		struct ip_rt_acct *st = this_cpu_ptr(ip_rt_acct);

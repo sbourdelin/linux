@@ -145,6 +145,9 @@ static int __nf_queue(struct sk_buff *skb, const struct nf_hook_state *state,
 		.size	= sizeof(*entry) + afinfo->route_key_size,
 	};
 
+	/* Avoid leaking noref sk outside the input path */
+	skb_clear_noref_sk(skb);
+
 	nf_queue_entry_get_refs(entry);
 	skb_dst_force(skb);
 	afinfo->saveroute(skb, entry);

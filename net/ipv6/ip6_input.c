@@ -68,6 +68,10 @@ int ip6_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 	if (!skb_valid_dst(skb))
 		ip6_route_input(skb);
 
+	/* see comment on ipv4 edmux */
+	if (skb_dst(skb)->input != ip6_input)
+		skb_clear_noref_sk(skb);
+
 	return dst_input(skb);
 }
 

@@ -71,6 +71,9 @@ void nf_dup_ipv4(struct net *net, struct sk_buff *skb, unsigned int hooknum,
 	nf_reset(skb);
 	nf_ct_set(skb, NULL, IP_CT_UNTRACKED);
 #endif
+	/* Avoid leaking noref sk outside the input path */
+	skb_clear_noref_sk(skb);
+
 	/*
 	 * If we are in PREROUTING/INPUT, decrease the TTL to mitigate potential
 	 * loops between two hosts.
