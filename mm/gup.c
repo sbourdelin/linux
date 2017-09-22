@@ -110,7 +110,7 @@ retry:
 		return NULL;
 	}
 
-	page = vm_normal_page(vma, address, pte);
+	page = _vm_normal_page(vma, address, pte, flags & FOLL_DEVICE);
 	if (!page && pte_devmap(pte) && (flags & FOLL_GET)) {
 		/*
 		 * Only return device mapping pages in the FOLL_GET case since

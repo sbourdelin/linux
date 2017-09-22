@@ -1690,7 +1690,7 @@ static void do_pages_stat_array(struct mm_struct *mm, unsigned long nr_pages,
 			goto set_status;
 
 		/* FOLL_DUMP to ignore special (like zero) pages */
-		page = follow_page(vma, addr, FOLL_DUMP);
+		page = follow_page(vma, addr, FOLL_DUMP | FOLL_DEVICE);
 
 		err = PTR_ERR(page);
 		if (IS_ERR(page))
