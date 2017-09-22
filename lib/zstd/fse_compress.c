@@ -618,7 +618,10 @@ size_t FSE_normalizeCount(short *normalizedCounter, unsigned tableLog, const uns
 		return ERROR(GENERIC); /* Too small tableLog, compression potentially impossible */
 
 	{
-		U32 const rtbTable[] = {0, 473195, 504333, 520860, 550000, 700000, 750000, 830000};
+		U32 static const rtbTable[] = {
+			0, 473195, 504333, 520860,
+			550000, 700000, 750000, 830000
+		};
 		U64 const scale = 62 - tableLog;
 		U64 const step = div_u64((U64)1 << 62, (U32)total); /* <== here, one division ! */
 		U64 const vStep = 1ULL << (scale - 20);
