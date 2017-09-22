@@ -923,6 +923,37 @@ static inline struct rtable *skb_rtable(const struct sk_buff *skb)
 	return (struct rtable *)skb_dst(skb);
 }
 
+void sock_dummyfree(struct sk_buff *skb);
+
+/* only early demux can set noref socks
+ * noref socks do not carry any refcount and must be
+ * cleared before exiting the current RCU section
+ */
+static inline void skb_set_noref_sk(struct sk_buff *skb, struct sock *sk)
+{
+	skb->sk = sk;
+	skb->destructor = sock_dummyfree;
+}
+
+static inline bool skb_has_noref_sk(struct sk_buff *skb)
+{
+	return skb->destructor == sock_dummyfree;
+}
+
+static inline struct sock *skb_clear_noref_sk(struct sk_buff *skb)
+{
+	struct sock *ret;
+
+	if (!skb_has_noref_sk(skb))
+		return NULL;
+
+	WARN_ON_ONCE(!rcu_read_lock_held());
+	ret = skb->sk;
+	skb->sk = NULL;
+	skb->destructor = NULL;
+	return ret;
+}
+
 /* For mangling skb->pkt_type from user space side from applications
  * such as nft, tc, etc, we only allow a conservative subset of
  * possible pkt_types to be set.

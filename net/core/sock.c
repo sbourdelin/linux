@@ -1893,6 +1893,13 @@ void sock_efree(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(sock_efree);
 
+/* dummy destructor used by noref sockets */
+void sock_dummyfree(struct sk_buff *skb)
+{
+	WARN_ON_ONCE(!rcu_read_lock_held());
+}
+EXPORT_SYMBOL(sock_dummyfree);
+
 kuid_t sock_i_uid(struct sock *sk)
 {
 	kuid_t uid;
