@@ -2079,6 +2079,49 @@ martian_source:
 	goto out;
 }
 
+/* try to resolve and set the route for the ingress packet in the local
+ * destination, looking-up the destination address against the local ones
+ * and performing source validation
+ * return an error only if the local look up is successful and validation fails
+ * Called under RCU
+ */
+int ip_route_try_local_rcu(struct net *net, struct sk_buff *skb,
+			   const struct iphdr *iph)
+{
+	__be32 saddr = iph->saddr;
+	struct in_device *in_dev;
+	struct dst_entry *dst;
+	int err = -EINVAL;
+	u32 itag;
+
+	dst = inet_get_ifaddr_dst_rcu(net, iph->daddr);
+	if (!dst)
+		return 0;
+
+	in_dev = __in_dev_get_rcu(skb->dev);
+	if (ipv4_is_multicast(saddr) || ipv4_is_lbcast(saddr))
+		goto martian_source;
+
+	/* check for zeronet only after successful lookup, so that we don't trip
+	 * over limited broadcast destination, see ip_route_input_slow()
+	 */
+	if (ipv4_is_zeronet(saddr) || (ipv4_is_loopback(saddr) &&
+				       !IN_DEV_NET_ROUTE_LOCALNET(in_dev, net)))
+		goto martian_source;
+
+	err = fib_validate_source(skb, saddr, iph->daddr, iph->tos, 0, skb->dev,
+				  in_dev, &itag);
+	if (err < 0)
+		goto martian_source;
+
+	skb_dst_set_noref(skb, dst);
+	return 0;
+
+martian_source:
+	ip_handle_martian_source(skb->dev, in_dev, skb, iph->daddr, iph->saddr);
+	return err;
+}
+
 int ip_route_input_noref(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 			 u8 tos, struct net_device *dev)
 {

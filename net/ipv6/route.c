@@ -1283,6 +1283,19 @@ void ip6_route_input(struct sk_buff *skb)
 	skb_dst_set(skb, ip6_route_input_lookup(net, skb->dev, &fl6, flags));
 }
 
+/* try to resolve and set the route for the ingress packet in the local
+ * destination
+ * Called under RCU
+ */
+void ip6_route_try_local_rcu_bh(struct net *net, struct sk_buff *skb)
+{
+	struct dst_entry *dst;
+
+	dst = inet6_get_ifaddr_dst_rcu_bh(net, &ipv6_hdr(skb)->daddr);
+	if (dst)
+		skb_dst_set_noref(skb, dst);
+}
+
 static struct rt6_info *ip6_pol_route_output(struct net *net, struct fib6_table *table,
 					     struct flowi6 *fl6, int flags)
 {
