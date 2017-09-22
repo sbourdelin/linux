@@ -130,6 +130,8 @@ static inline void ipv4_devconf_setall(struct in_device *in_dev)
 #define IN_DEV_ARP_IGNORE(in_dev)	IN_DEV_MAXCONF((in_dev), ARP_IGNORE)
 #define IN_DEV_ARP_NOTIFY(in_dev)	IN_DEV_MAXCONF((in_dev), ARP_NOTIFY)
 
+struct dst_entry;
+
 struct in_ifaddr {
 	struct hlist_node	hash;
 	struct in_ifaddr	*ifa_next;
@@ -149,6 +151,7 @@ struct in_ifaddr {
 	__u32			ifa_preferred_lft;
 	unsigned long		ifa_cstamp; /* created timestamp */
 	unsigned long		ifa_tstamp; /* updated timestamp */
+	struct dst_entry	*dst; /* local route to self */
 };
 
 struct in_validator_info {
@@ -180,6 +183,7 @@ __be32 inet_confirm_addr(struct net *net, struct in_device *in_dev, __be32 dst,
 struct in_ifaddr *inet_ifa_byprefix(struct in_device *in_dev, __be32 prefix,
 				    __be32 mask);
 struct in_ifaddr *inet_lookup_ifaddr_rcu(struct net *net, __be32 addr);
+struct dst_entry *inet_get_ifaddr_dst_rcu(struct net *net, __be32 addr);
 static __inline__ bool inet_ifa_match(__be32 addr, struct in_ifaddr *ifa)
 {
 	return !((addr^ifa->ifa_address)&ifa->ifa_mask);

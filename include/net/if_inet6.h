@@ -39,6 +39,8 @@ enum {
 	INET6_IFADDR_STATE_DEAD,
 };
 
+struct dst_entry;
+
 struct inet6_ifaddr {
 	struct in6_addr		addr;
 	__u32			prefix_len;
@@ -77,6 +79,8 @@ struct inet6_ifaddr {
 
 	struct rcu_head		rcu;
 	struct in6_addr		peer_addr;
+
+	struct dst_entry	*dst; /* local route to self */
 };
 
 struct ip6_sf_socklist {

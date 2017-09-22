@@ -904,6 +904,26 @@ static int addrconf_fixup_linkdown(struct ctl_table *table, int *p, int newf)
 
 #endif
 
+static void inet6_addr_dst_clear(struct inet6_ifaddr *ifp)
+{
+	dst_release(xchg(&ifp->dst, NULL));
+}
+
+static void inet6_addr_dst_update(struct inet6_dev *idev,
+				  struct inet6_ifaddr *ifp)
+{
+	struct rt6_info *rt = addrconf_dst_alloc(idev, &ifp->addr, false);
+
+	if (IS_ERR(rt))
+		return;
+
+	/* we are going to manully clear the cache when the related dev will
+	 * go down
+	 */
+	rt->dst.obsolete = DST_OBSOLETE_NONE;
+	__dst_update(&ifp->dst, &rt->dst);
+}
+
 /* Nobody refers to this ifaddr, destroy it */
 void inet6_ifa_finish_destroy(struct inet6_ifaddr *ifp)
 {
@@ -914,6 +934,7 @@ void inet6_ifa_finish_destroy(struct inet6_ifaddr *ifp)
 #endif
 
 	in6_dev_put(ifp->idev);
+	inet6_addr_dst_clear(ifp);
 
 	if (cancel_delayed_work(&ifp->dad_work))
 		pr_notice("delayed DAD work was pending while freeing ifa=%p\n",
@@ -1914,6 +1935,18 @@ int ipv6_chk_prefix(const struct in6_addr *addr, struct net_device *dev)
 	return onlink;
 }
 EXPORT_SYMBOL(ipv6_chk_prefix);
+
+/* called under RCU lock */
+struct dst_entry *inet6_get_ifaddr_dst_rcu_bh(struct net *net,
+					      const struct in6_addr *addr)
+{
+	struct inet6_ifaddr *ifp = ipv6_lookup_ifaddr_rcu_bh(net, addr);
+
+	if (!ifp)
+		return NULL;
+
+	return dst_access(&ifp->dst, 0);
+}
 
 struct inet6_ifaddr *ipv6_get_ifaddr(struct net *net, const struct in6_addr *addr,
 				     struct net_device *dev, int strict)
@@ -3310,6 +3343,15 @@ static int fixup_permanent_addr(struct inet6_dev *idev,
 		ifp->rt = rt;
 		spin_unlock(&ifp->lock);
 
+		/* if dad is not going to start, we must cache the new route
+		 * elsewhere we can just clear the old one
+		 */
+		if (ifp->state == INET6_IFADDR_STATE_PREDAD ||
+		    ifp->flags & IFA_F_TENTATIVE)
+			inet6_addr_dst_clear(ifp);
+		else
+			inet6_addr_dst_update(idev, ifp);
+
 		ip6_rt_put(prev);
 	}
 
@@ -3689,6 +3731,7 @@ restart:
 
 		spin_unlock_bh(&ifa->lock);
 
+		inet6_addr_dst_clear(ifa);
 		if (rt)
 			ip6_del_rt(rt);
 
@@ -4022,6 +4065,7 @@ static void addrconf_dad_completed(struct inet6_ifaddr *ifp, bool bump_id)
 	 */
 
 	ipv6_ifa_notify(RTM_NEWADDR, ifp);
+	inet6_addr_dst_update(ifp->idev, ifp);
 
 	/* If added prefix is link local and we are prepared to process
 	   router advertisements, start sending router solicitations.

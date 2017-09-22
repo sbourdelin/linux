@@ -87,6 +87,9 @@ struct inet6_ifaddr *ipv6_get_ifaddr(struct net *net,
 				     const struct in6_addr *addr,
 				     struct net_device *dev, int strict);
 
+struct dst_entry *inet6_get_ifaddr_dst_rcu_bh(struct net *net,
+					      const struct in6_addr *addr);
+
 int ipv6_dev_get_saddr(struct net *net, const struct net_device *dev,
 		       const struct in6_addr *daddr, unsigned int srcprefs,
 		       struct in6_addr *saddr);

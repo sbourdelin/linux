@@ -179,6 +179,17 @@ struct in_ifaddr *inet_lookup_ifaddr_rcu(struct net *net, __be32 addr)
 	return NULL;
 }
 
+/* called under RCU lock */
+struct dst_entry *inet_get_ifaddr_dst_rcu(struct net *net, __be32 addr)
+{
+	struct in_ifaddr *ifa = inet_lookup_ifaddr_rcu(net, addr);
+
+	if (!ifa)
+		return NULL;
+
+	return dst_access(&ifa->dst, 0);
+}
+
 static void rtmsg_ifa(int event, struct in_ifaddr *, struct nlmsghdr *, u32);
 
 static BLOCKING_NOTIFIER_HEAD(inetaddr_chain);
@@ -337,6 +348,7 @@ static void __inet_del_ifa(struct in_device *in_dev, struct in_ifaddr **ifap,
 	struct in_ifaddr *last_prim = in_dev->ifa_list;
 	struct in_ifaddr *prev_prom = NULL;
 	int do_promote = IN_DEV_PROMOTE_SECONDARIES(in_dev);
+	struct dst_entry *dst;
 
 	ASSERT_RTNL();
 
@@ -395,7 +407,12 @@ no_promotions:
 	*ifap = ifa1->ifa_next;
 	inet_hash_remove(ifa1);
 
-	/* 3. Announce address deletion */
+	/* 3. Clear dst cache */
+
+	dst = xchg(&ifa1->dst, NULL);
+	dst_release(dst);
+
+	/* 4. Announce address deletion */
 
 	/* Send message first, then call notifier.
 	   At first sight, FIB update triggered by notifier
@@ -449,6 +466,7 @@ static int __inet_insert_ifa(struct in_ifaddr *ifa, struct nlmsghdr *nlh,
 	struct in_device *in_dev = ifa->ifa_dev;
 	struct in_ifaddr *ifa1, **ifap, **last_primary;
 	struct in_validator_info ivi;
+	struct rtable *rt;
 	int ret;
 
 	ASSERT_RTNL();
@@ -516,6 +534,15 @@ static int __inet_insert_ifa(struct in_ifaddr *ifa, struct nlmsghdr *nlh,
 	rtmsg_ifa(RTM_NEWADDR, ifa, nlh, portid);
 	blocking_notifier_call_chain(&inetaddr_chain, NETDEV_UP, ifa);
 
+	/* fill the dst cache and transfer the dst ownership to it */
+	rt = ip_local_route_alloc(in_dev->dev, 0, 0, RTN_LOCAL, false);
+	if (rt) {
+		/* the local route will be valid for till the address will be
+		 * up
+		 */
+		rt->dst.obsolete = DST_OBSOLETE_NONE;
+		__dst_update(&ifa->dst, &rt->dst);
+	}
 	return 0;
 }
 
