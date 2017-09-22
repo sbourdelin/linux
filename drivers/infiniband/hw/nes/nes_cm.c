@@ -2670,8 +2670,7 @@ static struct nes_cm_core *nes_cm_alloc_core(void)
 		return NULL;
 
 	INIT_LIST_HEAD(&cm_core->connected_nodes);
-	init_timer(&cm_core->tcp_timer);
-	cm_core->tcp_timer.function = nes_cm_timer_tick;
+	setup_timer(&cm_core->tcp_timer, nes_cm_timer_tick, 0UL);
 
 	cm_core->mtu = NES_CM_DEFAULT_MTU;
 	cm_core->state = NES_CM_STATE_INITED;
