@@ -926,6 +926,8 @@ static void __gb_lights_led_unregister(struct gb_channel *channel)
 
 	led_classdev_unregister(cdev);
 	channel->led = NULL;
+	kfree(cdev->name);
+	cdev->name = NULL;
 }
 
 static void gb_lights_channel_unregister(struct gb_channel *channel)
@@ -998,11 +1000,8 @@ static int gb_lights_channel_config(struct gb_light *light,
 
 	light->has_flash = true;
 
-	ret = gb_lights_channel_flash_config(channel);
-	if (ret < 0)
-		return ret;
+	return gb_lights_channel_flash_config(channel);
 
-	return ret;
 }
 
 static int gb_lights_light_config(struct gb_lights *glights, u8 id)
