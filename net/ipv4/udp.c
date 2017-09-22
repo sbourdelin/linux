@@ -2050,12 +2050,13 @@ static inline int udp4_csum_init(struct sk_buff *skb, struct udphdr *uh,
 int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 		   int proto)
 {
-	struct sock *sk;
-	struct udphdr *uh;
-	unsigned short ulen;
-	struct rtable *rt = skb_rtable(skb);
-	__be32 saddr, daddr;
 	struct net *net = dev_net(skb->dev);
+	struct rtable *rt = skb_rtable(skb);
+	unsigned short ulen;
+	__be32 saddr, daddr;
+	struct udphdr *uh;
+	struct sock *sk;
+	bool noref_sk;
 
 	/*
 	 *  Validate the packet.
@@ -2081,6 +2082,7 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 	if (udp4_csum_init(skb, uh, proto))
 		goto csum_error;
 
+	noref_sk = skb_has_noref_sk(skb);
 	sk = skb_steal_sock(skb);
 	if (sk) {
 		struct dst_entry *dst = skb_dst(skb);
@@ -2090,7 +2092,8 @@ int __udp4_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 			udp_sk_rx_dst_set(sk, dst);
 
 		ret = udp_queue_rcv_skb(sk, skb);
-		sock_put(sk);
+		if (!noref_sk)
+			sock_put(sk);
 		/* a return value > 0 means to resubmit the input, but
 		 * it wants the return to be -protocol, or 0
 		 */
@@ -2261,11 +2264,10 @@ void udp_v4_early_demux(struct sk_buff *skb)
 					     uh->source, iph->saddr, dif, sdif);
 	}
 
-	if (!sk || !refcount_inc_not_zero(&sk->sk_refcnt))
+	if (!sk)
 		return;
 
-	skb->sk = sk;
-	skb->destructor = sock_efree;
+	skb_set_noref_sk(skb, sk);
 	dst = READ_ONCE(sk->sk_rx_dst);
 
 	if (dst)

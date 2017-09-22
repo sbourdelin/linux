@@ -787,6 +787,7 @@ int __udp6_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 	struct net *net = dev_net(skb->dev);
 	struct udphdr *uh;
 	struct sock *sk;
+	bool noref_sk;
 	u32 ulen = 0;
 
 	if (!pskb_may_pull(skb, sizeof(struct udphdr)))
@@ -823,6 +824,7 @@ int __udp6_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 		goto csum_error;
 
 	/* Check if the socket is already available, e.g. due to early demux */
+	noref_sk = skb_has_noref_sk(skb);
 	sk = skb_steal_sock(skb);
 	if (sk) {
 		struct dst_entry *dst = skb_dst(skb);
@@ -832,7 +834,8 @@ int __udp6_lib_rcv(struct sk_buff *skb, struct udp_table *udptable,
 			udp6_sk_rx_dst_set(sk, dst);
 
 		ret = udpv6_queue_rcv_skb(sk, skb);
-		sock_put(sk);
+		if (!noref_sk)
+			sock_put(sk);
 
 		/* a return value > 0 means to resubmit the input */
 		if (ret > 0)
@@ -948,11 +951,10 @@ static void udp_v6_early_demux(struct sk_buff *skb)
 	else
 		return;
 
-	if (!sk || !refcount_inc_not_zero(&sk->sk_refcnt))
+	if (!sk)
 		return;
 
-	skb->sk = sk;
-	skb->destructor = sock_efree;
+	skb_set_noref_sk(skb, sk);
 	dst = READ_ONCE(sk->sk_rx_dst);
 
 	if (dst)
