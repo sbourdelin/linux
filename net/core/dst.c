@@ -205,6 +205,18 @@ void dst_release_immediate(struct dst_entry *dst)
 }
 EXPORT_SYMBOL(dst_release_immediate);
 
+/* update the cache with dst, assuming the latter does not carry a refcount */
+bool dst_update(struct dst_entry **cache, struct dst_entry *dst)
+{
+	if (likely(*cache == dst))
+		return false;
+
+	if (dst_hold_safe(dst))
+		return __dst_update(cache, dst);
+	return false;
+}
+EXPORT_SYMBOL_GPL(dst_update);
+
 u32 *dst_cow_metrics_generic(struct dst_entry *dst, unsigned long old)
 {
 	struct dst_metrics *p = kmalloc(sizeof(*p), GFP_ATOMIC);

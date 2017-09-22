@@ -471,6 +471,26 @@ static inline struct dst_entry *dst_check(struct dst_entry *dst, u32 cookie)
 	return dst;
 }
 
+/* update the cache with dst, assuming the latter already carries a refcount */
+static inline bool __dst_update(struct dst_entry **cache, struct dst_entry *dst)
+{
+	struct dst_entry *old = xchg(cache, dst);
+
+	dst_release(old);
+	return old != dst;
+}
+bool dst_update(struct dst_entry **cache, struct dst_entry *dst);
+static inline struct dst_entry *dst_access(struct dst_entry **cache,
+					      u32 cookie)
+{
+	struct dst_entry *dst = READ_ONCE(*cache);
+
+	if (!dst)
+		return NULL;
+
+	return dst_check(dst, cookie);
+}
+
 /* Flags for xfrm_lookup flags argument. */
 enum {
 	XFRM_LOOKUP_ICMP = 1 << 0,
