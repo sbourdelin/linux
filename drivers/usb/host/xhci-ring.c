@@ -171,25 +171,24 @@ static void inc_deq(struct xhci_hcd *xhci, struct xhci_ring *ring)
 	if (ring->type == TYPE_EVENT) {
 		if (!last_trb_on_seg(ring->deq_seg, ring->dequeue)) {
 			ring->dequeue++;
-			return;
+		} else {
+			if (last_trb_on_ring(ring, ring->deq_seg,
+				ring->dequeue))
+				ring->cycle_state ^= 1;
+			ring->deq_seg = ring->deq_seg->next;
+			ring->dequeue = ring->deq_seg->trbs;
 		}
-		if (last_trb_on_ring(ring, ring->deq_seg, ring->dequeue))
-			ring->cycle_state ^= 1;
-		ring->deq_seg = ring->deq_seg->next;
-		ring->dequeue = ring->deq_seg->trbs;
-		return;
+	} else {
+		/* All other rings have link trbs */
+		if (!trb_is_link(ring->dequeue)) {
+			ring->dequeue++;
+			ring->num_trbs_free++;
+		}
+		while (trb_is_link(ring->dequeue)) {
+			ring->deq_seg = ring->deq_seg->next;
+			ring->dequeue = ring->deq_seg->trbs;
+		}
 	}
-
-	/* All other rings have link trbs */
-	if (!trb_is_link(ring->dequeue)) {
-		ring->dequeue++;
-		ring->num_trbs_free++;
-	}
-	while (trb_is_link(ring->dequeue)) {
-		ring->deq_seg = ring->deq_seg->next;
-		ring->dequeue = ring->deq_seg->trbs;
-	}
-
 	trace_xhci_inc_deq(ring);
 
 	return;
