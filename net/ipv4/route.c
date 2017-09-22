@@ -1859,6 +1859,27 @@ static int ip_mkroute_input(struct sk_buff *skb,
 	return __mkroute_input(skb, res, in_dev, daddr, saddr, tos);
 }
 
+struct rtable *ip_local_route_alloc(struct net_device *dev, unsigned int flags,
+				    u32 itag, unsigned char type, bool do_cache)
+{
+	struct in_device *in_dev = __in_dev_get_rcu(dev);
+	struct net *net = dev_net(dev);
+	struct rtable *rth;
+
+	rth = rt_dst_alloc(l3mdev_master_dev_rcu(dev) ? : net->loopback_dev,
+			   flags | RTCF_LOCAL, type,
+			   IN_DEV_CONF_GET(in_dev, NOPOLICY), false, do_cache);
+	if (!rth)
+		return NULL;
+
+	rth->dst.output= ip_rt_bug;
+#ifdef CONFIG_IP_ROUTE_CLASSID
+	rth->dst.tclassid = itag;
+#endif
+	rth->rt_is_input = 1;
+	return rth;
+}
+
 /*
  *	NOTE. We drop all the packets that has local source
  *	addresses, because every properly looped back packet
@@ -1996,17 +2017,10 @@ local_input:
 		}
 	}
 
-	rth = rt_dst_alloc(l3mdev_master_dev_rcu(dev) ? : net->loopback_dev,
-			   flags | RTCF_LOCAL, res->type,
-			   IN_DEV_CONF_GET(in_dev, NOPOLICY), false, do_cache);
+	rth = ip_local_route_alloc(dev, flags, itag, res->type, do_cache);
 	if (!rth)
 		goto e_nobufs;
 
-	rth->dst.output= ip_rt_bug;
-#ifdef CONFIG_IP_ROUTE_CLASSID
-	rth->dst.tclassid = itag;
-#endif
-	rth->rt_is_input = 1;
 	if (res->table)
 		rth->rt_table_id = res->table->tb_id;
 

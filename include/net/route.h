@@ -176,6 +176,8 @@ static inline struct rtable *ip_route_output_gre(struct net *net, struct flowi4 
 	return ip_route_output_key(net, fl4);
 }
 
+struct rtable *ip_local_route_alloc(struct net_device *dev, unsigned int flags,
+				    u32 itag, unsigned char type, bool docache);
 int ip_route_input_noref(struct sk_buff *skb, __be32 dst, __be32 src,
 			 u8 tos, struct net_device *devin);
 int ip_route_input_rcu(struct sk_buff *skb, __be32 dst, __be32 src,
