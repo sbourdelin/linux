@@ -210,7 +210,7 @@ void amdgpu_gart_table_vram_free(struct amdgpu_device *adev)
 	if (adev->gart.robj == NULL) {
 		return;
 	}
-	amdgpu_bo_unref(&adev->gart.robj);
+	amdgpu_bo_put(&adev->gart.robj);
 }
 
 /*

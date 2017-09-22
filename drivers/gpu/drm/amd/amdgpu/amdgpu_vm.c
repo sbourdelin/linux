@@ -311,7 +311,7 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 			if (vm->use_cpu_for_update) {
 				r = amdgpu_bo_kmap(pt, NULL);
 				if (r) {
-					amdgpu_bo_unref(&pt);
+					amdgpu_bo_put(&pt);
 					return r;
 				}
 			}
@@ -319,7 +319,7 @@ static int amdgpu_vm_alloc_levels(struct amdgpu_device *adev,
 			/* Keep a reference to the root directory to avoid
 			* freeing them up in the wrong order.
 			*/
-			pt->parent = amdgpu_bo_ref(vm->root.bo);
+			pt->parent = amdgpu_bo_get(vm->root.bo);
 
 			entry->bo = pt;
 			entry->addr = 0;
@@ -2540,8 +2540,8 @@ int amdgpu_vm_init(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 	return 0;
 
 error_free_root:
-	amdgpu_bo_unref(&vm->root.bo->shadow);
-	amdgpu_bo_unref(&vm->root.bo);
+	amdgpu_bo_put(&vm->root.bo->shadow);
+	amdgpu_bo_put(&vm->root.bo);
 	vm->root.bo = NULL;
 
 error_free_sched_entity:
@@ -2562,8 +2562,8 @@ static void amdgpu_vm_free_levels(struct amdgpu_vm_pt *level)
 	unsigned i;
 
 	if (level->bo) {
-		amdgpu_bo_unref(&level->bo->shadow);
-		amdgpu_bo_unref(&level->bo);
+		amdgpu_bo_put(&level->bo->shadow);
+		amdgpu_bo_put(&level->bo);
 	}
 
 	if (level->entries)

@@ -208,12 +208,12 @@ out_lclean_unpin:
 out_lclean_unres:
 		amdgpu_bo_unreserve(gtt_obj[i]);
 out_lclean_unref:
-		amdgpu_bo_unref(&gtt_obj[i]);
+		amdgpu_bo_put(&gtt_obj[i]);
 out_lclean:
 		for (--i; i >= 0; --i) {
 			amdgpu_bo_unpin(gtt_obj[i]);
 			amdgpu_bo_unreserve(gtt_obj[i]);
-			amdgpu_bo_unref(&gtt_obj[i]);
+			amdgpu_bo_put(&gtt_obj[i]);
 		}
 		if (fence)
 			dma_fence_put(fence);
@@ -224,7 +224,7 @@ out_lclean:
 out_unres:
 	amdgpu_bo_unreserve(vram_obj);
 out_unref:
-	amdgpu_bo_unref(&vram_obj);
+	amdgpu_bo_put(&vram_obj);
 out_cleanup:
 	kfree(gtt_obj);
 	if (r) {

@@ -128,7 +128,7 @@ out_cleanup:
 			amdgpu_bo_unpin(sobj);
 			amdgpu_bo_unreserve(sobj);
 		}
-		amdgpu_bo_unref(&sobj);
+		amdgpu_bo_put(&sobj);
 	}
 	if (dobj) {
 		r = amdgpu_bo_reserve(dobj, true);
@@ -136,7 +136,7 @@ out_cleanup:
 			amdgpu_bo_unpin(dobj);
 			amdgpu_bo_unreserve(dobj);
 		}
-		amdgpu_bo_unref(&dobj);
+		amdgpu_bo_put(&dobj);
 	}
 }
 

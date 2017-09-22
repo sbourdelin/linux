@@ -48,7 +48,7 @@ static void amdgpu_bo_list_release_rcu(struct kref *ref)
 						   refcount);
 
 	for (i = 0; i < list->num_entries; ++i)
-		amdgpu_bo_unref(&list->array[i].robj);
+		amdgpu_bo_put(&list->array[i].robj);
 
 	mutex_destroy(&list->lock);
 	kvfree(list->array);
@@ -135,13 +135,13 @@ static int amdgpu_bo_list_set(struct amdgpu_device *adev,
 			goto error_free;
 		}
 
-		bo = amdgpu_bo_ref(gem_to_amdgpu_bo(gobj));
+		bo = amdgpu_bo_get(gem_to_amdgpu_bo(gobj));
 		drm_gem_object_put_unlocked(gobj);
 
 		usermm = amdgpu_ttm_tt_get_usermm(bo->tbo.ttm);
 		if (usermm) {
 			if (usermm != current->mm) {
-				amdgpu_bo_unref(&bo);
+				amdgpu_bo_put(&bo);
 				r = -EPERM;
 				goto error_free;
 			}
@@ -168,7 +168,7 @@ static int amdgpu_bo_list_set(struct amdgpu_device *adev,
 	}
 
 	for (i = 0; i < list->num_entries; ++i)
-		amdgpu_bo_unref(&list->array[i].robj);
+		amdgpu_bo_put(&list->array[i].robj);
 
 	kvfree(list->array);
 
@@ -184,7 +184,7 @@ static int amdgpu_bo_list_set(struct amdgpu_device *adev,
 
 error_free:
 	while (i--)
-		amdgpu_bo_unref(&array[i].robj);
+		amdgpu_bo_put(&array[i].robj);
 	kvfree(array);
 	return r;
 }
@@ -254,7 +254,7 @@ void amdgpu_bo_list_free(struct amdgpu_bo_list *list)
 	unsigned i;
 
 	for (i = 0; i < list->num_entries; ++i)
-		amdgpu_bo_unref(&list->array[i].robj);
+		amdgpu_bo_put(&list->array[i].robj);
 
 	mutex_destroy(&list->lock);
 	kvfree(list->array);

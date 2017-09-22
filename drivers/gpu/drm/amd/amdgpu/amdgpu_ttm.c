@@ -1368,7 +1368,7 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 			amdgpu_bo_unpin(adev->stolen_vga_memory);
 			amdgpu_bo_unreserve(adev->stolen_vga_memory);
 		}
-		amdgpu_bo_unref(&adev->stolen_vga_memory);
+		amdgpu_bo_put(&adev->stolen_vga_memory);
 	}
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_VRAM);
 	ttm_bo_clean_mm(&adev->mman.bdev, TTM_PL_TT);

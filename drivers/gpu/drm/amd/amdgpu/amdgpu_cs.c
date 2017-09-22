@@ -42,7 +42,7 @@ static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 	if (gobj == NULL)
 		return -EINVAL;
 
-	p->uf_entry.robj = amdgpu_bo_ref(gem_to_amdgpu_bo(gobj));
+	p->uf_entry.robj = amdgpu_bo_get(gem_to_amdgpu_bo(gobj));
 	p->uf_entry.priority = 0;
 	p->uf_entry.tv.bo = &p->uf_entry.robj->tbo;
 	p->uf_entry.tv.shared = true;
@@ -57,7 +57,7 @@ static int amdgpu_cs_user_fence_chunk(struct amdgpu_cs_parser *p,
 	drm_gem_object_put_unlocked(gobj);
 
 	if (amdgpu_ttm_tt_get_usermm(p->uf_entry.robj->tbo.ttm)) {
-		amdgpu_bo_unref(&p->uf_entry.robj);
+		amdgpu_bo_put(&p->uf_entry.robj);
 		return -EINVAL;
 	}
 
@@ -752,7 +752,7 @@ static void amdgpu_cs_parser_fini(struct amdgpu_cs_parser *parser, int error,
 	kfree(parser->chunks);
 	if (parser->job)
 		amdgpu_job_free(parser->job);
-	amdgpu_bo_unref(&parser->uf_entry.robj);
+	amdgpu_bo_put(&parser->uf_entry.robj);
 }
 
 static int amdgpu_bo_vm_update_pte(struct amdgpu_cs_parser *p)

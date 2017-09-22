@@ -88,7 +88,7 @@ void amdgpu_sa_bo_manager_fini(struct amdgpu_device *adev,
 	list_for_each_entry_safe(sa_bo, tmp, &sa_manager->olist, olist) {
 		amdgpu_sa_bo_remove_locked(sa_bo);
 	}
-	amdgpu_bo_unref(&sa_manager->bo);
+	amdgpu_bo_put(&sa_manager->bo);
 	sa_manager->size = 0;
 }
 

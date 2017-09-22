@@ -445,7 +445,7 @@ failed_kmap:
 failed_pin:
 	amdgpu_bo_unreserve(*bo);
 failed_reserve:
-	amdgpu_bo_unref(bo);
+	amdgpu_bo_put(bo);
 failed:
 	if (err)
 		adev->firmware.load_type = AMDGPU_FW_LOAD_DIRECT;
@@ -468,7 +468,7 @@ int amdgpu_ucode_fini_bo(struct amdgpu_device *adev)
 			ucode->kaddr = NULL;
 		}
 	}
-	amdgpu_bo_unref(&adev->firmware.fw_buf);
+	amdgpu_bo_put(&adev->firmware.fw_buf);
 	adev->firmware.fw_buf = NULL;
 
 	return 0;

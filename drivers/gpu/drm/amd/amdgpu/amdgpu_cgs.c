@@ -145,7 +145,7 @@ static int amdgpu_cgs_free_gpu_mem(struct cgs_device *cgs_device, cgs_handle_t h
 			amdgpu_bo_unpin(obj);
 			amdgpu_bo_unreserve(obj);
 		}
-		amdgpu_bo_unref(&obj);
+		amdgpu_bo_put(&obj);
 
 	}
 	return 0;

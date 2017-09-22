@@ -223,7 +223,7 @@ allocate_mem_kmap_bo_failed:
 allocate_mem_pin_bo_failed:
 	amdgpu_bo_unreserve((*mem)->bo);
 allocate_mem_reserve_bo_failed:
-	amdgpu_bo_unref(&(*mem)->bo);
+	amdgpu_bo_put(&(*mem)->bo);
 
 	return r;
 }
@@ -238,7 +238,7 @@ void free_gtt_mem(struct kgd_dev *kgd, void *mem_obj)
 	amdgpu_bo_kunmap(mem->bo);
 	amdgpu_bo_unpin(mem->bo);
 	amdgpu_bo_unreserve(mem->bo);
-	amdgpu_bo_unref(&(mem->bo));
+	amdgpu_bo_put(&(mem->bo));
 	kfree(mem);
 }
 

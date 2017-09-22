@@ -47,7 +47,7 @@ static void amdgpu_ttm_bo_destroy(struct ttm_buffer_object *tbo)
 	amdgpu_bo_kunmap(bo);
 
 	drm_gem_object_release(&bo->gem_base);
-	amdgpu_bo_unref(&bo->parent);
+	amdgpu_bo_put(&bo->parent);
 	if (!list_empty(&bo->shadow_list)) {
 		mutex_lock(&adev->shadow_list_lock);
 		list_del_init(&bo->shadow_list);
@@ -236,7 +236,7 @@ error_unreserve:
 
 error_free:
 	if (free)
-		amdgpu_bo_unref(bo_ptr);
+		amdgpu_bo_put(bo_ptr);
 
 	return r;
 }
@@ -294,7 +294,7 @@ void amdgpu_bo_free_kernel(struct amdgpu_bo **bo, u64 *gpu_addr,
 		amdgpu_bo_unpin(*bo);
 		amdgpu_bo_unreserve(*bo);
 	}
-	amdgpu_bo_unref(bo);
+	amdgpu_bo_put(bo);
 
 	if (gpu_addr)
 		*gpu_addr = 0;
@@ -464,7 +464,7 @@ static int amdgpu_bo_create_shadow(struct amdgpu_device *adev,
 					0,
 					&bo->shadow);
 	if (!r) {
-		bo->shadow->parent = amdgpu_bo_ref(bo);
+		bo->shadow->parent = amdgpu_bo_get(bo);
 		mutex_lock(&adev->shadow_list_lock);
 		list_add_tail(&bo->shadow_list, &adev->shadow_list);
 		mutex_unlock(&adev->shadow_list_lock);
@@ -510,7 +510,7 @@ int amdgpu_bo_create(struct amdgpu_device *adev,
 			reservation_object_unlock((*bo_ptr)->tbo.resv);
 
 		if (r)
-			amdgpu_bo_unref(bo_ptr);
+			amdgpu_bo_put(bo_ptr);
 	}
 
 	return r;
@@ -644,7 +644,7 @@ void amdgpu_bo_kunmap(struct amdgpu_bo *bo)
 		ttm_bo_kunmap(&bo->kmap);
 }
 
-struct amdgpu_bo *amdgpu_bo_ref(struct amdgpu_bo *bo)
+struct amdgpu_bo *amdgpu_bo_get(struct amdgpu_bo *bo)
 {
 	if (bo == NULL)
 		return NULL;
@@ -653,7 +653,7 @@ struct amdgpu_bo *amdgpu_bo_ref(struct amdgpu_bo *bo)
 	return bo;
 }
 
-void amdgpu_bo_unref(struct amdgpu_bo **bo)
+void amdgpu_bo_put(struct amdgpu_bo **bo)
 {
 	struct ttm_buffer_object *tbo;
 
@@ -664,6 +664,18 @@ void amdgpu_bo_unref(struct amdgpu_bo **bo)
 	ttm_bo_unref(&tbo);
 	if (tbo == NULL)
 		*bo = NULL;
+}
+
+/* Compatibility wrapper for amdgpu_bo_get(). */
+struct amdgpu_bo *amdgpu_bo_ref(struct amdgpu_bo *bo)
+{
+	return amdgpu_bo_get(bo);
+}
+
+/* Compatibility wrapper for amdgpu_bo_put(). */
+void amdgpu_bo_unref(struct amdgpu_bo **bo)
+{
+	amdgpu_bo_put(bo);
 }
 
 int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,

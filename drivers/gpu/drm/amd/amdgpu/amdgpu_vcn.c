@@ -334,7 +334,7 @@ static int amdgpu_vcn_dec_send_msg(struct amdgpu_ring *ring, struct amdgpu_bo *b
 
 	if (fence)
 		*fence = dma_fence_get(f);
-	amdgpu_bo_unref(&bo);
+	amdgpu_bo_put(&bo);
 	dma_fence_put(f);
 
 	return 0;
@@ -365,14 +365,14 @@ static int amdgpu_vcn_dec_get_create_msg(struct amdgpu_ring *ring, uint32_t hand
 
 	r = amdgpu_bo_reserve(bo, false);
 	if (r) {
-		amdgpu_bo_unref(&bo);
+		amdgpu_bo_put(&bo);
 		return r;
 	}
 
 	r = amdgpu_bo_kmap(bo, (void **)&msg);
 	if (r) {
 		amdgpu_bo_unreserve(bo);
-		amdgpu_bo_unref(&bo);
+		amdgpu_bo_put(&bo);
 		return r;
 	}
 
@@ -417,14 +417,14 @@ static int amdgpu_vcn_dec_get_destroy_msg(struct amdgpu_ring *ring, uint32_t han
 
 	r = amdgpu_bo_reserve(bo, false);
 	if (r) {
-		amdgpu_bo_unref(&bo);
+		amdgpu_bo_put(&bo);
 		return r;
 	}
 
 	r = amdgpu_bo_kmap(bo, (void **)&msg);
 	if (r) {
 		amdgpu_bo_unreserve(bo);
-		amdgpu_bo_unref(&bo);
+		amdgpu_bo_put(&bo);
 		return r;
 	}
 
