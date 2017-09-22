@@ -57,6 +57,7 @@
 #include <net/if.h>
 #include <inttypes.h>
 #include <poll.h>
+#include <errno.h>
 
 #include "psock_lib.h"
 
@@ -676,7 +677,7 @@ static void __v3_fill(struct ring *ring, unsigned int blocks, int type)
 	ring->flen = ring->req3.tp_block_size;
 }
 
-static void setup_ring(int sock, struct ring *ring, int version, int type)
+static int setup_ring(int sock, struct ring *ring, int version, int type)
 {
 	int ret = 0;
 	unsigned int blocks = 256;
@@ -703,7 +704,11 @@ static void setup_ring(int sock, struct ring *ring, int version, int type)
 
 	if (ret == -1) {
 		perror("setsockopt");
-		exit(1);
+		if (errno == EINVAL) {
+			printf("[SKIP] This type seems un-supported in current kernel, skipped.\n");
+			return -1;
+		} else
+			exit(1);
 	}
 
 	ring->rd_len = ring->rd_num * sizeof(*ring->rd);
@@ -715,6 +720,7 @@ static void setup_ring(int sock, struct ring *ring, int version, int type)
 
 	total_packets = 0;
 	total_bytes = 0;
+	return 0;
 }
 
 static void mmap_ring(int sock, struct ring *ring)
@@ -830,7 +836,12 @@ static int test_tpacket(int version, int type)
 
 	sock = pfsocket(version);
 	memset(&ring, 0, sizeof(ring));
-	setup_ring(sock, &ring, version, type);
+	if(setup_ring(sock, &ring, version, type)) {
+		/* skip test when error of invalid argument */
+		close(sock);
+		return 0;
+	}
+
 	mmap_ring(sock, &ring);
 	bind_ring(sock, &ring);
 	walk_ring(sock, &ring);
