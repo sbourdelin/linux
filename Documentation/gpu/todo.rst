@@ -180,12 +180,6 @@ Contact: Daniel Vetter, respective driver maintainers
 Core refactorings
 =================
 
-Use new IDR deletion interface to clean up drm_gem_handle_delete()
-------------------------------------------------------------------
-
-See the "This is gross" comment -- apparently the IDR system now can return an
-error code instead of oopsing.
-
 Clean up the DRM header mess
 ----------------------------
 
