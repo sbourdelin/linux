@@ -4100,9 +4100,8 @@ static int qib_init_7220_variables(struct qib_devdata *dd)
 	dd->rhdrhead_intr_off = 1ULL << 32;
 
 	/* setup the stats timer; the add_timer is done at end of init */
-	init_timer(&dd->stats_timer);
-	dd->stats_timer.function = qib_get_7220_faststats;
-	dd->stats_timer.data = (unsigned long) dd;
+	setup_timer(&dd->stats_timer, qib_get_7220_faststats,
+		    (unsigned long)dd);
 	dd->stats_timer.expires = jiffies + ACTIVITY_TIMER * HZ;
 
 	/*
