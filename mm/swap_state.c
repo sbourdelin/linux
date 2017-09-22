@@ -231,7 +231,7 @@ int add_to_swap(struct page *page)
 	 * deadlock in the swap out path.
 	 */
 	/*
-	 * Add it to the swap cache.
+	 * Add it to the swap cache and mark it dirty
 	 */
 	err = add_to_swap_cache(page, entry,
 			__GFP_HIGH|__GFP_NOMEMALLOC|__GFP_NOWARN);
@@ -242,6 +242,7 @@ int add_to_swap(struct page *page)
 		 * clear SWAP_HAS_CACHE flag.
 		 */
 		goto fail;
+	set_page_dirty(page);
 
 	return 1;
 
