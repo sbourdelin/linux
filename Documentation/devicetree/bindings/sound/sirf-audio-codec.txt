@@ -3,6 +3,7 @@ SiRF internal audio CODEC
 Required properties:
 
   - compatible : "sirf,atlas6-audio-codec" or "sirf,prima2-audio-codec"
+		 "toshiba,apb-dummy-codec"
 
   - reg : the register address of the device.
 
@@ -11,7 +12,7 @@ Required properties:
 Example:
 
 audiocodec: audiocodec@b0040000 {
-	compatible = "sirf,atlas6-audio-codec";
+	compatible = "sirf,atlas6-audio-codec", "toshiba,apb-dummy-codec";
 	reg = <0xb0040000 0x10000>;
 	clocks = <&clks 27>;
 };
