@@ -1106,9 +1106,8 @@ static int dsa_slave_phy_setup(struct net_device *slave_dev)
 				of_phy_deregister_fixed_link(port_dn);
 			return ret;
 		}
+		phy_attached_info(p->phy);
 	}
-
-	phy_attached_info(p->phy);
 
 	return 0;
 }
