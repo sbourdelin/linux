@@ -4603,7 +4603,7 @@ struct sctp_transport *sctp_transport_get_next(struct net *net,
 
 struct sctp_transport *sctp_transport_get_idx(struct net *net,
 					      struct rhashtable_iter *iter,
-					      int pos)
+					      long pos)
 {
 	void *obj = SEQ_START_TOKEN;
 
@@ -4659,7 +4659,7 @@ EXPORT_SYMBOL_GPL(sctp_transport_lookup_process);
 
 int sctp_for_each_transport(int (*cb)(struct sctp_transport *, void *),
 			    int (*cb_done)(struct sctp_transport *, void *),
-			    struct net *net, int *pos, void *p) {
+			    struct net *net, long *pos, void *p) {
 	struct rhashtable_iter hti;
 	struct sctp_transport *tsp;
 	int ret;

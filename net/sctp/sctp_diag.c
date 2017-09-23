@@ -493,7 +493,7 @@ skip:
 		goto done;
 
 	sctp_for_each_transport(sctp_sock_filter, sctp_sock_dump,
-				net, (int *)&cb->args[2], &commp);
+				net, &cb->args[2], &commp);
 
 done:
 	cb->args[1] = cb->args[4];
