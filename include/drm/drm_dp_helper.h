@@ -735,6 +735,9 @@
 # define DP_PSR_SINK_INTERNAL_ERROR         7
 # define DP_PSR_SINK_STATE_MASK             0x07
 
+#define DP_SINK_SYNCHRONIZATION_LATENCY	    0x2009
+# define DP_MAX_RESYNC_FRAME_CNT_MASK	    0xf
+
 #define DP_RECEIVER_ALPM_STATUS		    0x200b  /* eDP 1.4 */
 # define DP_ALPM_LOCK_TIMEOUT_ERROR	    (1 << 0)
 
