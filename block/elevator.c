@@ -222,19 +222,14 @@ int elevator_init(struct request_queue *q, char *name)
 
 	if (!e) {
 		/*
-		 * For blk-mq devices, we default to using mq-deadline,
-		 * if available, for single queue devices. If deadline
-		 * isn't available OR we have multiple queues, default
-		 * to "none".
+		 * For blk-mq devices, default to "none". udev can later set
+		 * an appropriate default scheduler based on the disk
+		 * characteristics which we do not yet have here.
 		 */
-		if (q->mq_ops) {
-			if (q->nr_hw_queues == 1)
-				e = elevator_get("mq-deadline", false);
-			if (!e)
-				return 0;
-		} else
-			e = elevator_get(CONFIG_DEFAULT_IOSCHED, false);
+		if (q->mq_ops)
+			return 0;
 
+		e = elevator_get(CONFIG_DEFAULT_IOSCHED, false);
 		if (!e) {
 			printk(KERN_ERR
 				"Default I/O scheduler not found. " \
