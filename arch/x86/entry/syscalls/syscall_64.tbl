@@ -340,6 +340,7 @@
 331	common	pkey_free		sys_pkey_free
 332	common	statx			sys_statx
 333	common	fdmap			sys_fdmap
+334	common	pidmap			sys_pidmap
 
 #
 # x32-specific system call numbers start at 512 to avoid cache impact

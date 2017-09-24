@@ -1407,6 +1407,13 @@ config FDMAP
 	  Enable fdmap() system call that allows to query file descriptors
 	  in binary form avoiding /proc overhead.
 
+config PIDMAP
+	bool "pidmap() system call" if EXPERT
+	default y
+	help
+	  Enable pidmap() system call that allows to query PIDs in binary form
+	  avoiding /proc overhead.
+
 config EMBEDDED
 	bool "Embedded system"
 	option allnoconfig_y

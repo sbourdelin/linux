@@ -21,6 +21,7 @@ TARGETS += mount
 TARGETS += mqueue
 TARGETS += net
 TARGETS += nsfs
+TARGETS += pidmap
 TARGETS += powerpc
 TARGETS += pstore
 TARGETS += ptrace

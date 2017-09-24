@@ -1,0 +1,10 @@
+#ifndef _UAPI_LINUX_PIDMAP_H
+#define _UAPI_LINUX_PIDMAP_H
+
+#define PIDMAP_TASKS	1
+#define PIDMAP_PROC	2
+#define PIDMAP_CHILDREN	3
+#define PIDMAP_THREADS	4
+#define PIDMAP_IGNORE_KTHREADS	(1 << 30)
+
+#endif /* _UAPI_LINUX_PIDMAP_H */

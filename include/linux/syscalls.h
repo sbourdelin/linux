@@ -943,4 +943,9 @@ asmlinkage long sys_statx(int dfd, const char __user *path, unsigned flags,
 asmlinkage long sys_fdmap(pid_t pid, int __user *fds, unsigned int count,
 			  int start_fd, int flags);
 
+asmlinkage long sys_pidmap(pid_t pid,
+			   int __user *pids,
+			   unsigned int pids_count,
+			   unsigned int start_pid,
+			   int flags);
 #endif
