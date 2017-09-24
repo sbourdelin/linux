@@ -460,7 +460,15 @@ diva_xdi_write(void *adapter, void *os_handle, const void __user *src,
 
 	length = (*cp_fn) (os_handle, data, src, length);
 	if (length > 0) {
-		if ((*(a->interface.cmd_proc))
+		/* do the integrity check early */
+		if(((diva_xdi_um_cfg_cmd_t *)data)->adapter != a->controller){
+			DBG_ERR(("A: A(%d) write, invalid controller=%d != %d",
+						((diva_xdi_um_cfg_cmd_t *)data)->adapter, a->controller));
+
+			length = -1;
+		}
+
+		else if ((*(a->interface.cmd_proc))
 		    (a, (diva_xdi_um_cfg_cmd_t *) data, length)) {
 			length = -3;
 		}

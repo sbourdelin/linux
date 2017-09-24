@@ -629,12 +629,6 @@ diva_4bri_cmd_card_proc(struct _diva_os_xdi_adapter *a,
 {
 	int ret = -1;
 
-	if (cmd->adapter != a->controller) {
-		DBG_ERR(("A: 4bri_cmd, invalid controller=%d != %d",
-			 cmd->adapter, a->controller))
-			return (-1);
-	}
-
 	switch (cmd->command) {
 	case DIVA_XDI_UM_CMD_GET_CARD_ORDINAL:
 		a->xdi_mbox.data_length = sizeof(dword);
