@@ -60,6 +60,10 @@ struct deadline_data {
 
 	spinlock_t lock;
 	struct list_head dispatch;
+
+	struct request_queue *q;
+	spinlock_t zone_lock;
+	unsigned long *zones_wlock;
 };
 
 static inline struct rb_root *
@@ -300,6 +304,24 @@ static struct request *dd_dispatch_request(struct blk_mq_hw_ctx *hctx)
 	return rq;
 }
 
+static int deadline_enable_zones_wlock(struct deadline_data *dd,
+				       gfp_t gfp_mask)
+{
+	dd->zones_wlock = kzalloc_node(BITS_TO_LONGS(blk_queue_nr_zones(dd->q))
+				       * sizeof(unsigned long),
+				       gfp_mask, dd->q->node);
+	if (!dd->zones_wlock)
+		return -ENOMEM;
+
+	return 0;
+}
+
+static void deadline_disable_zones_wlock(struct deadline_data *dd)
+{
+	kfree(dd->zones_wlock);
+	dd->zones_wlock = NULL;
+}
+
 static void dd_exit_queue(struct elevator_queue *e)
 {
 	struct deadline_data *dd = e->elevator_data;
@@ -307,7 +329,30 @@ static void dd_exit_queue(struct elevator_queue *e)
 	BUG_ON(!list_empty(&dd->fifo_list[READ]));
 	BUG_ON(!list_empty(&dd->fifo_list[WRITE]));
 
+	deadline_disable_zones_wlock(dd);
 	kfree(dd);
+}
+
+/*
+ * initialize zoned block device related elevator private data.
+ */
+static int deadline_zoned_init_queue(struct request_queue *q,
+				     struct deadline_data *dd)
+{
+	if (!blk_queue_is_zoned(q) ||
+	    !blk_queue_nr_zones(q)) {
+		/*
+		 * Regular drive, or non-conforming zoned block device.
+		 * Do not use zone write locking.
+		 */
+		return 0;
+	}
+
+	/*
+	 * Enable zone write locking by default for any zoned
+	 * block device model.
+	 */
+	return deadline_enable_zones_wlock(dd, GFP_KERNEL);
 }
 
 /*
@@ -317,6 +362,7 @@ static int dd_init_queue(struct request_queue *q, struct elevator_type *e)
 {
 	struct deadline_data *dd;
 	struct elevator_queue *eq;
+	int ret;
 
 	eq = elevator_alloc(q, e);
 	if (!eq)
@@ -340,6 +386,15 @@ static int dd_init_queue(struct request_queue *q, struct elevator_type *e)
 	dd->fifo_batch = fifo_batch;
 	spin_lock_init(&dd->lock);
 	INIT_LIST_HEAD(&dd->dispatch);
+
+	dd->q = q;
+	spin_lock_init(&dd->zone_lock);
+	ret = deadline_zoned_init_queue(q, dd);
+	if (ret) {
+		kfree(dd);
+		kobject_put(&eq->kobj);
+		return ret;
+	}
 
 	q->elevator = eq;
 	return 0;
