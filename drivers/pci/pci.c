@@ -4056,7 +4056,7 @@ static int pci_parent_bus_reset(struct pci_dev *dev, int probe)
 
 	pci_reset_bridge_secondary_bus(dev->bus->self);
 
-	return 0;
+	return pci_dev_wait(dev, "bus reset", 1000, 60000);
 }
 
 static int pci_reset_hotplug_slot(struct hotplug_slot *hotplug, int probe)
@@ -4077,6 +4077,7 @@ static int pci_reset_hotplug_slot(struct hotplug_slot *hotplug, int probe)
 static int pci_dev_reset_slot_function(struct pci_dev *dev, int probe)
 {
 	struct pci_dev *pdev;
+	int rc;
 
 	if (dev->subordinate || !dev->slot ||
 	    dev->dev_flags & PCI_DEV_FLAGS_NO_BUS_RESET)
@@ -4086,7 +4087,11 @@ static int pci_dev_reset_slot_function(struct pci_dev *dev, int probe)
 		if (pdev != dev && pdev->slot == dev->slot)
 			return -ENOTTY;
 
-	return pci_reset_hotplug_slot(dev->slot->hotplug, probe);
+	rc = pci_reset_hotplug_slot(dev->slot->hotplug, probe);
+	if (!rc && !probe)
+		rc = pci_dev_wait(dev, "slot reset", 1000, 60000);
+
+	return rc;
 }
 
 static void pci_dev_lock(struct pci_dev *dev)
