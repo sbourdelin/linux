@@ -1945,10 +1945,8 @@ static int __init omap_vout_create_video_devices(struct platform_device *pdev)
 	for (k = 0; k < pdev->num_resources; k++) {
 
 		vout = kzalloc(sizeof(struct omap_vout_device), GFP_KERNEL);
-		if (!vout) {
-			dev_err(&pdev->dev, ": could not allocate memory\n");
+		if (!vout)
 			return -ENOMEM;
-		}
 
 		vout->vid = k;
 		vid_dev->vouts[k] = vout;
