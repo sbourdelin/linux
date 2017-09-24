@@ -1315,14 +1315,12 @@ static int isp_video_open(struct file *file)
 	/* If this is the first user, initialise the pipeline. */
 	if (omap3isp_get(video->isp) == NULL) {
 		ret = -EBUSY;
-		goto done;
+		goto delete_fh;
 	}
 
 	ret = v4l2_pipeline_pm_use(&video->video.entity, 1);
-	if (ret < 0) {
-		omap3isp_put(video->isp);
-		goto done;
-	}
+	if (ret < 0)
+		goto put_isp;
 
 	queue = &handle->queue;
 	queue->type = video->type;
@@ -1335,10 +1333,8 @@ static int isp_video_open(struct file *file)
 	queue->dev = video->isp->dev;
 
 	ret = vb2_queue_init(&handle->queue);
-	if (ret < 0) {
-		omap3isp_put(video->isp);
-		goto done;
-	}
+	if (ret < 0)
+		goto put_isp;
 
 	memset(&handle->format, 0, sizeof(handle->format));
 	handle->format.type = video->type;
@@ -1346,14 +1342,15 @@ static int isp_video_open(struct file *file)
 
 	handle->video = video;
 	file->private_data = &handle->vfh;
+	goto exit;
 
-done:
-	if (ret < 0) {
-		v4l2_fh_del(&handle->vfh);
-		v4l2_fh_exit(&handle->vfh);
-		kfree(handle);
-	}
-
+put_isp:
+	omap3isp_put(video->isp);
+delete_fh:
+	v4l2_fh_del(&handle->vfh);
+	v4l2_fh_exit(&handle->vfh);
+	kfree(handle);
+exit:
 	return ret;
 }
 
