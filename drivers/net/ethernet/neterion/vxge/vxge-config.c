@@ -1286,8 +1286,8 @@ __vxge_hw_device_config_check(struct vxge_hw_device_config *new_config)
 	    (new_config->intr_mode != VXGE_HW_INTR_MODE_DEF))
 		return VXGE_HW_BADCFG_INTR_MODE;
 
-	if ((new_config->rts_mac_en != VXGE_HW_RTS_MAC_DISABLE) &&
-	    (new_config->rts_mac_en != VXGE_HW_RTS_MAC_ENABLE))
+	if (new_config->rts_mac_en != VXGE_HW_RTS_MAC_DISABLE ||
+	    new_config->rts_mac_en != VXGE_HW_RTS_MAC_ENABLE)
 		return VXGE_HW_BADCFG_RTS_MAC_EN;
 
 	for (i = 0; i < VXGE_HW_MAX_VIRTUAL_PATHS; i++) {
