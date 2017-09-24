@@ -193,6 +193,9 @@ struct fsnotify_group {
 		} fanotify_data;
 #endif /* CONFIG_FANOTIFY */
 	};
+#ifdef CONFIG_AUDITSYSCALL
+	unsigned int audit_enabled;
+#endif
 };
 
 /* when calling fsnotify tell it if the data is a path or inode */

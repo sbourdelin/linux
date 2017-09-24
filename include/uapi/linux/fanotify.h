@@ -35,10 +35,11 @@
 
 #define FAN_UNLIMITED_QUEUE	0x00000010
 #define FAN_UNLIMITED_MARKS	0x00000020
+#define FAN_ENABLE_AUDIT	0x00000040
 
 #define FAN_ALL_INIT_FLAGS	(FAN_CLOEXEC | FAN_NONBLOCK | \
 				 FAN_ALL_CLASS_BITS | FAN_UNLIMITED_QUEUE |\
-				 FAN_UNLIMITED_MARKS)
+				 FAN_UNLIMITED_MARKS | FAN_ENABLE_AUDIT)
 
 /* flags used for fanotify_modify_mark() */
 #define FAN_MARK_ADD		0x00000001
@@ -99,6 +100,8 @@ struct fanotify_response {
 /* Legit userspace responses to a _PERM event */
 #define FAN_ALLOW	0x01
 #define FAN_DENY	0x02
+#define FAN_AUDIT	0x10	/* Bit mask to create audit record for result */
+
 /* No fd set in event */
 #define FAN_NOFD	-1
 
