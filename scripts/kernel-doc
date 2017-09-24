@@ -2036,26 +2036,18 @@ sub output_struct_rst(%) {
     print "**Definition**\n\n";
     print "::\n\n";
     print "  " . $args{'type'} . " " . $args{'struct'} . " {\n";
-    foreach $parameter (@{$args{'parameterlist'}}) {
-	if ($parameter =~ /^#/) {
-	    print "  " . "$parameter\n";
-	    next;
-	}
 
-	my $parameter_name = $parameter;
-	$parameter_name =~ s/\[.*//;
-
-	($args{'parameterdescs'}{$parameter_name} ne $undescribed) || next;
-	$type = $args{'parametertypes'}{$parameter};
-	if ($type =~ m/([^\(]*\(\*)\s*\)\s*\(([^\)]*)\)/) {
-	    # pointer-to-function
-	    print "    $1 $parameter) ($2);\n";
-	} elsif ($type =~ m/^(.*?)\s*(:.*)/) {
-	    # bitfield
-	    print "    $1 $parameter$2;\n";
-	} else {
-	    print "    " . $type . " " . $parameter . ";\n";
-	}
+    my $def = $args{'definition'};
+    $def =~ s/([{,;])/$1\n/g;
+    $def =~ s/}\s+;/};/g;
+    my @def_args = split /\n/, $def;
+    my $level = 1;
+    foreach my $clause (@def_args) {
+	$clause =~ s/^\s+//;
+	$clause =~ s/\s+$//;
+	$level-- if ($clause =~ m/}/ && $level > 1);
+	print "  " . "  " x $level. "$clause\n" if ($clause);
+	$level++ if ($clause =~ m/{/);
     }
     print "  };\n\n";
 
@@ -2168,13 +2160,22 @@ sub dump_struct($$) {
     my $nested;
 
     if ($x =~ /(struct|union)\s+(\w+)\s*{(.*)}/) {
-	#my $decl_type = $1;
+	my $decl_type = $1;
 	$declaration_name = $2;
 	my $members = $3;
+	my $clause = $3;
 
-	# ignore embedded structs or unions
-	$members =~ s/({.*})//g;
-	$nested = $1;
+	# Split nested struct/union elements as newer ones
+	my $cont = 1;
+	while ($cont) {
+		$cont = 0;
+		while ($members =~ s/(struct|union)\s+{([^{}]*)}(\s*\S+\s*)\;?/$1 $3; $2 /g) {
+			$cont = 1;
+		};
+	};
+	# Ignore other nested elements, like enums
+	$members =~ s/({[^\{\}]*})//g;
+	$nested = $decl_type;
 
 	# ignore members marked private:
 	$members =~ s/\/\*\s*private:.*?\/\*\s*public:.*?\*\///gosi;
@@ -2200,6 +2201,7 @@ sub dump_struct($$) {
 			   'struct',
 			   {'struct' => $declaration_name,
 			    'module' => $modulename,
+			    'definition' => $clause,
 			    'parameterlist' => \@parameterlist,
 			    'parameterdescs' => \%parameterdescs,
 			    'parametertypes' => \%parametertypes,
