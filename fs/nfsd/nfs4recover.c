@@ -753,6 +753,11 @@ cld_pipe_downcall(struct file *filp, const char __user *src, size_t mlen)
 	if (copy_from_user(&cup->cu_msg, src, mlen) != 0)
 		return -EFAULT;
 
+	/* ensure that the xid has not been changed */
+	if (cup->cu_msg.cm_xid != xid) {
+		return -EFAULT;
+	}
+
 	wake_up_process(cup->cu_task);
 	return mlen;
 }
