@@ -1137,7 +1137,7 @@ static void tegra_dc_commit_state(struct tegra_dc *dc,
 
 	err = clk_set_parent(dc->clk, state->clk);
 	if (err < 0)
-		dev_err(dc->dev, "failed to set parent clock: %d\n", err);
+		DRM_DEV_ERROR(dc->dev, "failed to set parent clock: %d\n", err);
 
 	/*
 	 * Outputs may not want to change the parent clock rate. This is only
@@ -1150,7 +1150,7 @@ static void tegra_dc_commit_state(struct tegra_dc *dc,
 	if (state->pclk > 0) {
 		err = clk_set_rate(state->clk, state->pclk);
 		if (err < 0)
-			dev_err(dc->dev,
+			DRM_DEV_ERROR(dc->dev,
 				"failed to set clock rate to %lu Hz\n",
 				state->pclk);
 	}
@@ -1195,7 +1195,7 @@ static int tegra_dc_wait_idle(struct tegra_dc *dc, unsigned long timeout)
 		usleep_range(1000, 2000);
 	}
 
-	dev_dbg(dc->dev, "timeout waiting for DC to become idle\n");
+	DRM_DEV_DEBUG(dc->dev, "timeout waiting for DC to become idle\n");
 	return -ETIMEDOUT;
 }
 
@@ -1370,14 +1370,14 @@ static irqreturn_t tegra_dc_irq(int irq, void *data)
 
 	if (status & FRAME_END_INT) {
 		/*
-		dev_dbg(dc->dev, "%s(): frame end\n", __func__);
+		DRM_DEV_DEBUG(dc->dev, "%s(): frame end\n", __func__);
 		*/
 		dc->stats.frames++;
 	}
 
 	if (status & VBLANK_INT) {
 		/*
-		dev_dbg(dc->dev, "%s(): vertical blank\n", __func__);
+		DRM_DEV_DEBUG(dc->dev, "%s(): vertical blank\n", __func__);
 		*/
 		drm_crtc_handle_vblank(&dc->base);
 		tegra_dc_finish_page_flip(dc);
@@ -1386,14 +1386,14 @@ static irqreturn_t tegra_dc_irq(int irq, void *data)
 
 	if (status & (WIN_A_UF_INT | WIN_B_UF_INT | WIN_C_UF_INT)) {
 		/*
-		dev_dbg(dc->dev, "%s(): underflow\n", __func__);
+		DRM_DEV_DEBUG(dc->dev, "%s(): underflow\n", __func__);
 		*/
 		dc->stats.underflow++;
 	}
 
 	if (status & (WIN_A_OF_INT | WIN_B_OF_INT | WIN_C_OF_INT)) {
 		/*
-		dev_dbg(dc->dev, "%s(): overflow\n", __func__);
+		DRM_DEV_DEBUG(dc->dev, "%s(): overflow\n", __func__);
 		*/
 		dc->stats.overflow++;
 	}
@@ -1763,7 +1763,7 @@ static int tegra_dc_init(struct host1x_client *client)
 	if (tegra->domain) {
 		err = iommu_attach_device(tegra->domain, dc->dev);
 		if (err < 0) {
-			dev_err(dc->dev, "failed to attach to domain: %d\n",
+			DRM_DEV_ERROR(dc->dev, "failed to attach to domain: %d\n",
 				err);
 			return err;
 		}
@@ -1801,7 +1801,7 @@ static int tegra_dc_init(struct host1x_client *client)
 
 	err = tegra_dc_rgb_init(drm, dc);
 	if (err < 0 && err != -ENODEV) {
-		dev_err(dc->dev, "failed to initialize RGB output: %d\n", err);
+		DRM_DEV_ERROR(dc->dev, "failed to initialize RGB output: %d\n", err);
 		goto cleanup;
 	}
 
@@ -1812,13 +1812,13 @@ static int tegra_dc_init(struct host1x_client *client)
 	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
 		err = tegra_dc_debugfs_init(dc, drm->primary);
 		if (err < 0)
-			dev_err(dc->dev, "debugfs setup failed: %d\n", err);
+			DRM_DEV_ERROR(dc->dev, "debugfs setup failed: %d\n", err);
 	}
 
 	err = devm_request_irq(dc->dev, dc->irq, tegra_dc_irq, 0,
 			       dev_name(dc->dev), dc);
 	if (err < 0) {
-		dev_err(dc->dev, "failed to request IRQ#%u: %d\n", dc->irq,
+		DRM_DEV_ERROR(dc->dev, "failed to request IRQ#%u: %d\n", dc->irq,
 			err);
 		goto cleanup;
 	}
@@ -1850,12 +1850,12 @@ static int tegra_dc_exit(struct host1x_client *client)
 	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
 		err = tegra_dc_debugfs_exit(dc);
 		if (err < 0)
-			dev_err(dc->dev, "debugfs cleanup failed: %d\n", err);
+			DRM_DEV_ERROR(dc->dev, "debugfs cleanup failed: %d\n", err);
 	}
 
 	err = tegra_dc_rgb_exit(dc);
 	if (err) {
-		dev_err(dc->dev, "failed to shutdown RGB output: %d\n", err);
+		DRM_DEV_ERROR(dc->dev, "failed to shutdown RGB output: %d\n", err);
 		return err;
 	}
 
@@ -1954,7 +1954,7 @@ static int tegra_dc_parse_dt(struct tegra_dc *dc)
 
 	err = of_property_read_u32(dc->dev->of_node, "nvidia,head", &value);
 	if (err < 0) {
-		dev_err(dc->dev, "missing \"nvidia,head\" property\n");
+		DRM_DEV_ERROR(dc->dev, "missing \"nvidia,head\" property\n");
 
 		/*
 		 * If the nvidia,head property isn't present, try to find the
@@ -2009,13 +2009,13 @@ static int tegra_dc_probe(struct platform_device *pdev)
 
 	dc->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(dc->clk)) {
-		dev_err(&pdev->dev, "failed to get clock\n");
+		DRM_DEV_ERROR(&pdev->dev, "failed to get clock\n");
 		return PTR_ERR(dc->clk);
 	}
 
 	dc->rst = devm_reset_control_get(&pdev->dev, "dc");
 	if (IS_ERR(dc->rst)) {
-		dev_err(&pdev->dev, "failed to get reset\n");
+		DRM_DEV_ERROR(&pdev->dev, "failed to get reset\n");
 		return PTR_ERR(dc->rst);
 	}
 
@@ -2038,13 +2038,13 @@ static int tegra_dc_probe(struct platform_device *pdev)
 
 	dc->irq = platform_get_irq(pdev, 0);
 	if (dc->irq < 0) {
-		dev_err(&pdev->dev, "failed to get IRQ\n");
+		DRM_DEV_ERROR(&pdev->dev, "failed to get IRQ\n");
 		return -ENXIO;
 	}
 
 	err = tegra_dc_rgb_probe(dc);
 	if (err < 0 && err != -ENODEV) {
-		dev_err(&pdev->dev, "failed to probe RGB output: %d\n", err);
+		DRM_DEV_ERROR(&pdev->dev, "failed to probe RGB output: %d\n", err);
 		return err;
 	}
 
@@ -2057,7 +2057,7 @@ static int tegra_dc_probe(struct platform_device *pdev)
 
 	err = host1x_client_register(&dc->client);
 	if (err < 0) {
-		dev_err(&pdev->dev, "failed to register host1x client: %d\n",
+		DRM_DEV_ERROR(&pdev->dev, "failed to register host1x client: %d\n",
 			err);
 		return err;
 	}
@@ -2072,14 +2072,14 @@ static int tegra_dc_remove(struct platform_device *pdev)
 
 	err = host1x_client_unregister(&dc->client);
 	if (err < 0) {
-		dev_err(&pdev->dev, "failed to unregister host1x client: %d\n",
+		DRM_DEV_ERROR(&pdev->dev, "failed to unregister host1x client: %d\n",
 			err);
 		return err;
 	}
 
 	err = tegra_dc_rgb_remove(dc);
 	if (err < 0) {
-		dev_err(&pdev->dev, "failed to remove RGB output: %d\n", err);
+		DRM_DEV_ERROR(&pdev->dev, "failed to remove RGB output: %d\n", err);
 		return err;
 	}
 
@@ -2097,7 +2097,7 @@ static int tegra_dc_suspend(struct device *dev)
 	if (!dc->soc->broken_reset) {
 		err = reset_control_assert(dc->rst);
 		if (err < 0) {
-			dev_err(dev, "failed to assert reset: %d\n", err);
+			DRM_DEV_ERROR(dev, "failed to assert reset: %d\n", err);
 			return err;
 		}
 	}
@@ -2119,20 +2119,20 @@ static int tegra_dc_resume(struct device *dev)
 		err = tegra_powergate_sequence_power_up(dc->powergate, dc->clk,
 							dc->rst);
 		if (err < 0) {
-			dev_err(dev, "failed to power partition: %d\n", err);
+			DRM_DEV_ERROR(dev, "failed to power partition: %d\n", err);
 			return err;
 		}
 	} else {
 		err = clk_prepare_enable(dc->clk);
 		if (err < 0) {
-			dev_err(dev, "failed to enable clock: %d\n", err);
+			DRM_DEV_ERROR(dev, "failed to enable clock: %d\n", err);
 			return err;
 		}
 
 		if (!dc->soc->broken_reset) {
 			err = reset_control_deassert(dc->rst);
 			if (err < 0) {
-				dev_err(dev,
+				DRM_DEV_ERROR(dev,
 					"failed to deassert reset: %d\n", err);
 				return err;
 			}
