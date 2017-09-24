@@ -14,7 +14,7 @@ crypto_algapi-$(CONFIG_PROC_FS) += proc.o
 crypto_algapi-y := algapi.o scatterwalk.o $(crypto_algapi-y)
 obj-$(CONFIG_CRYPTO_ALGAPI2) += crypto_algapi.o
 
-obj-$(CONFIG_CRYPTO_AEAD2) += aead.o
+obj-$(CONFIG_CRYPTO_AEAD2) += aead.o aead_api.o
 
 crypto_blkcipher-y := ablkcipher.o
 crypto_blkcipher-y += blkcipher.o
