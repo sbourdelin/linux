@@ -642,9 +642,7 @@ outrel:
 			struct ncp_objectname_ioctl user;
 			void* newname;
 			void* oldname;
-			size_t oldnamelen;
 			void* oldprivate;
-			size_t oldprivatelen;
 
 #ifdef CONFIG_COMPAT
 			if (cmd == NCP_IOC_SETOBJECTNAME_32) {
@@ -671,9 +669,7 @@ outrel:
 			}
 			down_write(&server->auth_rwsem);
 			oldname = server->auth.object_name;
-			oldnamelen = server->auth.object_name_len;
 			oldprivate = server->priv.data;
-			oldprivatelen = server->priv.len;
 			server->auth.auth_type = user.auth_type;
 			server->auth.object_name_len = user.object_name_len;
 			server->auth.object_name = newname;
@@ -742,7 +738,6 @@ outrel:
 			struct ncp_privatedata_ioctl user;
 			void* new;
 			void* old;
-			size_t oldlen;
 
 #ifdef CONFIG_COMPAT
 			if (cmd == NCP_IOC_SETPRIVATEDATA_32) {
@@ -767,7 +762,6 @@ outrel:
 			}
 			down_write(&server->auth_rwsem);
 			old = server->priv.data;
-			oldlen = server->priv.len;
 			server->priv.len = user.len;
 			server->priv.data = new;
 			up_write(&server->auth_rwsem);
