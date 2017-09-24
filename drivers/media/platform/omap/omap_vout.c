@@ -1001,7 +1001,7 @@ static int omap_vout_release(struct file *file)
 static int omap_vout_open(struct file *file)
 {
 	struct videobuf_queue *q;
-	struct omap_vout_device *vout = NULL;
+	struct omap_vout_device *vout;
 
 	vout = video_drvdata(file);
 	if (!vout)
