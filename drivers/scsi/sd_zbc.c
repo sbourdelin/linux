@@ -298,10 +298,11 @@ int sd_zbc_setup_reset_cmnd(struct scsi_cmnd *cmd)
 int sd_zbc_write_lock_zone(struct scsi_cmnd *cmd)
 {
 	struct request *rq = cmd->request;
+	struct request_queue *q = rq->q;
 	struct scsi_disk *sdkp = scsi_disk(rq->rq_disk);
 	sector_t sector = blk_rq_pos(rq);
 	sector_t zone_sectors = sd_zbc_zone_sectors(sdkp);
-	unsigned int zno = sd_zbc_zone_no(sdkp, sector);
+	unsigned int zno;
 
 	/*
 	 * Note: Checks of the alignment of the write command on
@@ -309,18 +310,21 @@ int sd_zbc_write_lock_zone(struct scsi_cmnd *cmd)
 	 */
 
 	/* Do not allow zone boundaries crossing on host-managed drives */
-	if (blk_queue_zoned_model(sdkp->disk->queue) == BLK_ZONED_HM &&
+	if (blk_queue_zoned_model(q) == BLK_ZONED_HM &&
 	    (sector & (zone_sectors - 1)) + blk_rq_sectors(rq) > zone_sectors)
 		return BLKPREP_KILL;
 
 	/*
-	 * Do not issue more than one write at a time per
-	 * zone. This solves write ordering problems due to
-	 * the unlocking of the request queue in the dispatch
-	 * path in the non scsi-mq case.
+	 * There is no write constraints on conventional zones. So any write
+	 * command can be sent. But do not issue more than one write command
+	 * at a time per sequential zone. This avoids write ordering problems
+	 * due to the unlocking of the request queue in the dispatch path of
+	 * legacy scsi path, as well as at the HBA level (e.g. AHCI).
 	 */
-	if (sdkp->zones_wlock &&
-	    test_and_set_bit(zno, sdkp->zones_wlock))
+	zno = sd_zbc_zone_no(sdkp, sector);
+	if (q->seq_zones && test_bit(zno, q->seq_zones))
+		return BLKPREP_OK;
+	if (sdkp->zones_wlock && test_and_set_bit(zno, sdkp->zones_wlock))
 		return BLKPREP_DEFER;
 
 	WARN_ON_ONCE(cmd->flags & SCMD_ZONE_WRITE_LOCK);
@@ -341,8 +345,9 @@ void sd_zbc_write_unlock_zone(struct scsi_cmnd *cmd)
 	struct request *rq = cmd->request;
 	struct scsi_disk *sdkp = scsi_disk(rq->rq_disk);
 
-	if (sdkp->zones_wlock && cmd->flags & SCMD_ZONE_WRITE_LOCK) {
+	if (cmd->flags & SCMD_ZONE_WRITE_LOCK) {
 		unsigned int zno = sd_zbc_zone_no(sdkp, blk_rq_pos(rq));
+
 		WARN_ON_ONCE(!test_bit(zno, sdkp->zones_wlock));
 		cmd->flags &= ~SCMD_ZONE_WRITE_LOCK;
 		clear_bit_unlock(zno, sdkp->zones_wlock);
