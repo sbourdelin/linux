@@ -2075,9 +2075,9 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 {
 	int ret = 0, i;
 	struct omap_overlay *ovl;
-	struct omap_dss_device *dssdev = NULL;
+	struct omap_dss_device *dssdev;
 	struct omap_dss_device *def_display;
-	struct omap2video_device *vid_dev = NULL;
+	struct omap2video_device *vid_dev;
 
 	if (omapdss_is_initialized() == false)
 		return -EPROBE_DEFER;
