@@ -354,12 +354,6 @@ static int do_tls_setsockopt_tx(struct sock *sk, char __user *optval,
 		goto out;
 	}
 
-	/* check version */
-	if (tmp_crypto_info.version != TLS_1_2_VERSION) {
-		rc = -ENOTSUPP;
-		goto out;
-	}
-
 	/* get user crypto info */
 	crypto_info = &ctx->crypto_send;
 
@@ -380,6 +374,12 @@ static int do_tls_setsockopt_tx(struct sock *sk, char __user *optval,
 
 		if (rc) {
 			rc = -EFAULT;
+			goto err_crypto_info;
+		}
+
+		/* check version */
+		if (crypto_info->version != TLS_1_2_VERSION) {
+			rc = -ENOTSUPP;
 			goto err_crypto_info;
 		}
 		break;
