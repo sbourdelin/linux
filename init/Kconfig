@@ -1400,6 +1400,13 @@ config MEMBARRIER
 
 	  If unsure, say Y.
 
+config FDMAP
+	bool "fdmap() system call" if EXPERT
+	default y
+	help
+	  Enable fdmap() system call that allows to query file descriptors
+	  in binary form avoiding /proc overhead.
+
 config EMBEDDED
 	bool "Embedded system"
 	option allnoconfig_y

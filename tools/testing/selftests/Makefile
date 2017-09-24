@@ -5,6 +5,7 @@ TARGETS += cpufreq
 TARGETS += cpu-hotplug
 TARGETS += efivarfs
 TARGETS += exec
+TARGETS += fdmap
 TARGETS += firmware
 TARGETS += ftrace
 TARGETS += futex
