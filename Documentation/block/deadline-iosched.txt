@@ -69,6 +69,23 @@ Front merges may still occur due to the cached last_merge hint, but since
 that comes at basically 0 cost we leave that on. We simply disable the
 rbtree front sector lookup when the io scheduler merge function is called.
 
+zones_wlock	(bool)
+-----------
+
+(mq-deadlines only)
+The blk-mq version of the deadline I/O scheduler, mq-deadline, introduced
+support for zoned block devices. This added support prevents dispatching of more
+than one write command per zone of the device to avoid write sequence reordering
+due to the possible concurrent execution of many blk-mq operations, in
+particular request dispatching. This is achieved using a per zone lock
+implemented as a bitmap. When a write request is dispatched, the target zone of
+the  request is locked, preventing further dispatch of write requests to it
+(there are no limitations on read commands). The zones_wlock tunable allows
+disabling zone write locking for host aware zoned block devices as these drive
+can handle random writes to zones in firmware. This tunable default setting
+cannot be changed for host managed disks (always enabled) and regular disks
+(always disabled).
+
 
 Nov 11 2002, Jens Axboe <jens.axboe@oracle.com>
 
