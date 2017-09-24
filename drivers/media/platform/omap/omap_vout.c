@@ -1006,7 +1006,7 @@ static int omap_vout_open(struct file *file)
 	vout = video_drvdata(file);
 	v4l2_dbg(1, debug, &vout->vid_dev->v4l2_dev, "Entering %s\n", __func__);
 
-	if (vout == NULL)
+	if (!vout)
 		return -ENODEV;
 
 	/* for now, we only support single open */
@@ -2095,7 +2095,7 @@ static int __init omap_vout_probe(struct platform_device *pdev)
 	}
 
 	vid_dev = kzalloc(sizeof(*vid_dev), GFP_KERNEL);
-	if (vid_dev == NULL) {
+	if (!vid_dev) {
 		ret = -ENOMEM;
 		goto err_dss_init;
 	}
