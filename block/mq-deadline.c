@@ -339,8 +339,7 @@ static void dd_exit_queue(struct elevator_queue *e)
 static int deadline_zoned_init_queue(struct request_queue *q,
 				     struct deadline_data *dd)
 {
-	if (!blk_queue_is_zoned(q) ||
-	    !blk_queue_nr_zones(q)) {
+	if (!blk_queue_is_zoned(q) || !blk_queue_nr_zones(q)) {
 		/*
 		 * Regular drive, or non-conforming zoned block device.
 		 * Do not use zone write locking.
@@ -559,6 +558,45 @@ STORE_FUNCTION(deadline_front_merges_store, &dd->front_merges, 0, 1, 0);
 STORE_FUNCTION(deadline_fifo_batch_store, &dd->fifo_batch, 0, INT_MAX, 0);
 #undef STORE_FUNCTION
 
+static ssize_t deadline_zones_wlock_show(struct elevator_queue *e, char *page)
+{
+	struct deadline_data *dd = e->elevator_data;
+
+	return deadline_var_show(dd->zones_wlock ? 1 : 0, page);
+}
+
+static ssize_t deadline_zones_wlock_store(struct elevator_queue *e,
+					  const char *page, size_t count)
+{
+	struct deadline_data *dd = e->elevator_data;
+	int ret, enable_zones_wlock;
+
+	deadline_var_store(&enable_zones_wlock, page);
+	if (enable_zones_wlock != 0 && enable_zones_wlock != 1)
+		return -EINVAL;
+
+	if ((enable_zones_wlock && dd->zones_wlock) ||
+	    (!enable_zones_wlock && !dd->zones_wlock))
+		return count;
+
+	/* Changes are allowed only for host-aware disks */
+	if (blk_queue_zoned_model(dd->q) != BLK_ZONED_HA)
+		return -EPERM;
+
+	blk_mq_freeze_queue(dd->q);
+
+	if (enable_zones_wlock) {
+		ret = deadline_enable_zones_wlock(dd, GFP_NOIO);
+	} else {
+		deadline_disable_zones_wlock(dd);
+		ret = 0;
+	}
+
+	blk_mq_unfreeze_queue(dd->q);
+
+	return ret ? ret : count;
+}
+
 #define DD_ATTR(name) \
 	__ATTR(name, S_IRUGO|S_IWUSR, deadline_##name##_show, \
 				      deadline_##name##_store)
@@ -569,6 +607,7 @@ static struct elv_fs_entry deadline_attrs[] = {
 	DD_ATTR(writes_starved),
 	DD_ATTR(front_merges),
 	DD_ATTR(fifo_batch),
+	DD_ATTR(zones_wlock),
 	__ATTR_NULL
 };
 
