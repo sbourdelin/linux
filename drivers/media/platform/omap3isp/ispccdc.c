@@ -355,7 +355,7 @@ static void ccdc_lsc_free_request(struct isp_ccdc_device *ccdc,
 {
 	struct isp_device *isp = to_isp_device(ccdc);
 
-	if (req == NULL)
+	if (!req)
 		return;
 
 	if (req->table.addr) {
@@ -423,7 +423,7 @@ static int ccdc_lsc_config(struct isp_ccdc_device *ccdc,
 	}
 
 	req = kzalloc(sizeof(*req), GFP_KERNEL);
-	if (req == NULL)
+	if (!req)
 		return -ENOMEM;
 
 	if (config->flag & OMAP3ISP_CCDC_CONFIG_LSC) {
@@ -438,7 +438,7 @@ static int ccdc_lsc_config(struct isp_ccdc_device *ccdc,
 		req->table.addr = dma_alloc_coherent(isp->dev, req->config.size,
 						     &req->table.dma,
 						     GFP_KERNEL);
-		if (req->table.addr == NULL) {
+		if (!req->table.addr) {
 			ret = -ENOMEM;
 			goto done;
 		}
@@ -731,7 +731,7 @@ static int ccdc_config(struct isp_ccdc_device *ccdc,
 			fpc_new.addr = dma_alloc_coherent(isp->dev, size,
 							  &fpc_new.dma,
 							  GFP_KERNEL);
-			if (fpc_new.addr == NULL)
+			if (!fpc_new.addr)
 				return -ENOMEM;
 
 			if (copy_from_user(fpc_new.addr,
@@ -748,7 +748,7 @@ static int ccdc_config(struct isp_ccdc_device *ccdc,
 
 		ccdc_configure_fpc(ccdc);
 
-		if (fpc_old.addr != NULL)
+		if (fpc_old.addr)
 			dma_free_coherent(isp->dev, fpc_old.fpnum * 4,
 					  fpc_old.addr, fpc_old.dma);
 	}
@@ -941,7 +941,7 @@ void omap3isp_ccdc_max_rate(struct isp_ccdc_device *ccdc,
 	struct isp_pipeline *pipe = to_isp_pipeline(&ccdc->subdev.entity);
 	unsigned int rate;
 
-	if (pipe == NULL)
+	if (!pipe)
 		return;
 
 	/*
@@ -1287,7 +1287,7 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
 
 	/* Lens shading correction. */
 	spin_lock_irqsave(&ccdc->lsc.req_lock, flags);
-	if (ccdc->lsc.request == NULL)
+	if (!ccdc->lsc.request)
 		goto unlock;
 
 	WARN_ON(ccdc->lsc.active);
@@ -1295,7 +1295,7 @@ static void ccdc_configure(struct isp_ccdc_device *ccdc)
 	/* Get last good LSC configuration. If it is not supported for
 	 * the current active resolution discard it.
 	 */
-	if (ccdc->lsc.active == NULL &&
+	if (!ccdc->lsc.active &&
 	    __ccdc_lsc_configure(ccdc, ccdc->lsc.request) == 0) {
 		ccdc->lsc.active = ccdc->lsc.request;
 	} else {
@@ -1521,7 +1521,7 @@ static void ccdc_lsc_isr(struct isp_ccdc_device *ccdc, u32 events)
 	/* The LSC engine is stopped at this point. Enable it if there's a
 	 * pending request.
 	 */
-	if (ccdc->lsc.request == NULL)
+	if (!ccdc->lsc.request)
 		goto done;
 
 	ccdc_lsc_enable(ccdc);
@@ -1614,7 +1614,7 @@ static int ccdc_isr_buffer(struct isp_ccdc_device *ccdc)
 		return 1;
 
 	buffer = omap3isp_video_buffer_next(&ccdc->video_out);
-	if (buffer != NULL)
+	if (buffer)
 		ccdc_set_outaddr(ccdc, buffer->dma);
 
 	pipe->state |= ISP_PIPELINE_IDLE_OUTPUT;
@@ -1734,7 +1734,7 @@ static void ccdc_vd1_isr(struct isp_ccdc_device *ccdc)
 	if (ccdc_handle_stopping(ccdc, CCDC_EVENT_VD1))
 		goto done;
 
-	if (ccdc->lsc.request == NULL)
+	if (!ccdc->lsc.request)
 		goto done;
 
 	/*
@@ -2312,7 +2312,7 @@ static int ccdc_get_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config
 	struct v4l2_mbus_framefmt *format;
 
 	format = __ccdc_get_format(ccdc, cfg, fmt->pad, fmt->which);
-	if (format == NULL)
+	if (!format)
 		return -EINVAL;
 
 	fmt->format = *format;
@@ -2336,7 +2336,7 @@ static int ccdc_set_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config
 	struct v4l2_rect *crop;
 
 	format = __ccdc_get_format(ccdc, cfg, fmt->pad, fmt->which);
-	if (format == NULL)
+	if (!format)
 		return -EINVAL;
 
 	ccdc_try_format(ccdc, cfg, fmt->pad, &fmt->format, fmt->which);
@@ -2732,7 +2732,7 @@ void omap3isp_ccdc_cleanup(struct isp_device *isp)
 	cancel_work_sync(&ccdc->lsc.table_work);
 	ccdc_lsc_free_queue(ccdc, &ccdc->lsc.free_queue);
 
-	if (ccdc->fpc.addr != NULL)
+	if (ccdc->fpc.addr)
 		dma_free_coherent(isp->dev, ccdc->fpc.fpnum * 4, ccdc->fpc.addr,
 				  ccdc->fpc.dma);
 

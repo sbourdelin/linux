@@ -264,7 +264,7 @@ int omap3isp_csiphy_acquire(struct isp_csiphy *phy, struct media_entity *entity)
 {
 	int rval;
 
-	if (phy->vdd == NULL) {
+	if (!phy->vdd) {
 		dev_err(phy->isp->dev,
 			"Power regulator for CSI PHY not available\n");
 		return -ENODEV;

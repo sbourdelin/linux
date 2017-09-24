@@ -245,7 +245,7 @@ static int isp_video_get_graph_data(struct isp_video *video,
 
 		media_entity_enum_set(&pipe->ent_enum, entity);
 
-		if (far_end != NULL)
+		if (far_end)
 			continue;
 
 		if (entity == &video->video.entity)
@@ -267,7 +267,7 @@ static int isp_video_get_graph_data(struct isp_video *video,
 		pipe->input = far_end;
 		pipe->output = video;
 	} else {
-		if (far_end == NULL)
+		if (!far_end)
 			return -EPIPE;
 
 		pipe->input = video;
@@ -286,7 +286,7 @@ __isp_video_get_format(struct isp_video *video, struct v4l2_format *format)
 	int ret;
 
 	subdev = isp_video_remote_subdev(video, &pad);
-	if (subdev == NULL)
+	if (!subdev)
 		return -EINVAL;
 
 	fmt.pad = pad;
@@ -583,7 +583,7 @@ struct isp_buffer *omap3isp_video_buffer_next(struct isp_video *video)
 		return NULL;
 	}
 
-	if (video->type == V4L2_BUF_TYPE_VIDEO_CAPTURE && pipe->input != NULL) {
+	if (video->type == V4L2_BUF_TYPE_VIDEO_CAPTURE && pipe->input) {
 		spin_lock(&pipe->lock);
 		pipe->state &= ~ISP_PIPELINE_STREAM;
 		spin_unlock(&pipe->lock);
@@ -756,7 +756,7 @@ isp_video_try_format(struct file *file, void *fh, struct v4l2_format *format)
 		return -EINVAL;
 
 	subdev = isp_video_remote_subdev(video, &pad);
-	if (subdev == NULL)
+	if (!subdev)
 		return -EINVAL;
 
 	isp_video_pix_to_mbus(&format->fmt.pix, &fmt.format);
@@ -801,7 +801,7 @@ isp_video_get_selection(struct file *file, void *fh, struct v4l2_selection *sel)
 		return -EINVAL;
 	}
 	subdev = isp_video_remote_subdev(video, &pad);
-	if (subdev == NULL)
+	if (!subdev)
 		return -EINVAL;
 
 	/* Try the get selection operation first and fallback to get format if not
@@ -855,7 +855,7 @@ isp_video_set_selection(struct file *file, void *fh, struct v4l2_selection *sel)
 		return -EINVAL;
 	}
 	subdev = isp_video_remote_subdev(video, &pad);
-	if (subdev == NULL)
+	if (!subdev)
 		return -EINVAL;
 
 	sdsel.pad = pad;
@@ -980,7 +980,7 @@ static int isp_video_check_external_subdevs(struct isp_video *video,
 	int ret;
 
 	/* Memory-to-memory pipelines have no external subdev. */
-	if (pipe->input != NULL)
+	if (pipe->input)
 		return 0;
 
 	for (i = 0; i < ARRAY_SIZE(ents); i++) {
@@ -990,7 +990,7 @@ static int isp_video_check_external_subdevs(struct isp_video *video,
 
 		/* ISP entities have always sink pad == 0. Find source. */
 		source_pad = media_entity_remote_pad(&ents[i]->pads[0]);
-		if (source_pad == NULL)
+		if (!source_pad)
 			continue;
 
 		source = source_pad->entity;
@@ -1306,7 +1306,7 @@ static int isp_video_open(struct file *file)
 	int ret = 0;
 
 	handle = kzalloc(sizeof(*handle), GFP_KERNEL);
-	if (handle == NULL)
+	if (!handle)
 		return -ENOMEM;
 
 	v4l2_fh_init(&handle->vfh, &video->video);
@@ -1454,7 +1454,7 @@ int omap3isp_video_init(struct isp_video *video, const char *name)
 	spin_lock_init(&video->irqlock);
 
 	/* Initialize the video device. */
-	if (video->ops == NULL)
+	if (!video->ops)
 		video->ops = &isp_video_dummy_ops;
 
 	video->video.fops = &isp_video_fops;

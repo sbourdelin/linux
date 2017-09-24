@@ -206,7 +206,7 @@ static int hist_buf_dma(struct ispstat *hist)
 	tx = dmaengine_prep_slave_single(hist->dma_ch, dma_addr,
 					 hist->buf_size, DMA_DEV_TO_MEM,
 					 DMA_CTRL_ACK);
-	if (tx == NULL) {
+	if (!tx) {
 		dev_dbg(hist->isp->dev,
 			"hist: DMA slave preparation failed\n");
 		goto error;
@@ -479,7 +479,7 @@ int omap3isp_hist_init(struct isp_device *isp)
 	int ret = -1;
 
 	hist_cfg = devm_kzalloc(isp->dev, sizeof(*hist_cfg), GFP_KERNEL);
-	if (hist_cfg == NULL)
+	if (!hist_cfg)
 		return -ENOMEM;
 
 	hist->isp = isp;

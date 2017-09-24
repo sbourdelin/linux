@@ -355,7 +355,7 @@ int omap3isp_h3a_af_init(struct isp_device *isp)
 	struct omap3isp_h3a_af_config *af_recover_cfg;
 
 	af_cfg = devm_kzalloc(isp->dev, sizeof(*af_cfg), GFP_KERNEL);
-	if (af_cfg == NULL)
+	if (!af_cfg)
 		return -ENOMEM;
 
 	af->ops = &h3a_af_ops;

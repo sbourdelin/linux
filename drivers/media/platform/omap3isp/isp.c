@@ -552,25 +552,25 @@ static void isp_isr_sbl(struct isp_device *isp)
 
 	if (sbl_pcr & ISPSBL_PCR_CSIB_WBL_OVF) {
 		pipe = to_isp_pipeline(&isp->isp_ccp2.subdev.entity);
-		if (pipe != NULL)
+		if (pipe)
 			pipe->error = true;
 	}
 
 	if (sbl_pcr & ISPSBL_PCR_CSIA_WBL_OVF) {
 		pipe = to_isp_pipeline(&isp->isp_csi2a.subdev.entity);
-		if (pipe != NULL)
+		if (pipe)
 			pipe->error = true;
 	}
 
 	if (sbl_pcr & ISPSBL_PCR_CCDC_WBL_OVF) {
 		pipe = to_isp_pipeline(&isp->isp_ccdc.subdev.entity);
-		if (pipe != NULL)
+		if (pipe)
 			pipe->error = true;
 	}
 
 	if (sbl_pcr & ISPSBL_PCR_PRV_WBL_OVF) {
 		pipe = to_isp_pipeline(&isp->isp_prev.subdev.entity);
-		if (pipe != NULL)
+		if (pipe)
 			pipe->error = true;
 	}
 
@@ -579,7 +579,7 @@ static void isp_isr_sbl(struct isp_device *isp)
 		       | ISPSBL_PCR_RSZ3_WBL_OVF
 		       | ISPSBL_PCR_RSZ4_WBL_OVF)) {
 		pipe = to_isp_pipeline(&isp->isp_res.subdev.entity);
-		if (pipe != NULL)
+		if (pipe)
 			pipe->error = true;
 	}
 
@@ -1401,7 +1401,7 @@ static struct isp_device *__omap3isp_get(struct isp_device *isp, bool irq)
 {
 	struct isp_device *__isp = isp;
 
-	if (isp == NULL)
+	if (!isp)
 		return NULL;
 
 	mutex_lock(&isp->isp_mutex);
@@ -1421,7 +1421,7 @@ static struct isp_device *__omap3isp_get(struct isp_device *isp, bool irq)
 		isp_enable_interrupts(isp);
 
 out:
-	if (__isp != NULL)
+	if (__isp)
 		isp->ref_count++;
 	mutex_unlock(&isp->isp_mutex);
 
@@ -1441,7 +1441,7 @@ struct isp_device *omap3isp_get(struct isp_device *isp)
  */
 static void __omap3isp_put(struct isp_device *isp, bool save_ctx)
 {
-	if (isp == NULL)
+	if (!isp)
 		return;
 
 	mutex_lock(&isp->isp_mutex);

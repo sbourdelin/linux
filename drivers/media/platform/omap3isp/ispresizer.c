@@ -1025,7 +1025,7 @@ static void resizer_isr_buffer(struct isp_res_device *res)
 	 * buffer.
 	 */
 	buffer = omap3isp_video_buffer_next(&res->video_out);
-	if (buffer != NULL) {
+	if (buffer) {
 		resizer_set_outaddr(res, buffer->dma);
 		restart = 1;
 	}
@@ -1034,7 +1034,7 @@ static void resizer_isr_buffer(struct isp_res_device *res)
 
 	if (res->input == RESIZER_INPUT_MEMORY) {
 		buffer = omap3isp_video_buffer_next(&res->video_in);
-		if (buffer != NULL)
+		if (buffer)
 			resizer_set_inaddr(res, buffer->dma);
 		pipe->state |= ISP_PIPELINE_IDLE_INPUT;
 	}
@@ -1482,7 +1482,7 @@ static int resizer_get_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_con
 	struct v4l2_mbus_framefmt *format;
 
 	format = __resizer_get_format(res, cfg, fmt->pad, fmt->which);
-	if (format == NULL)
+	if (!format)
 		return -EINVAL;
 
 	fmt->format = *format;
@@ -1504,7 +1504,7 @@ static int resizer_set_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_con
 	struct v4l2_rect *crop;
 
 	format = __resizer_get_format(res, cfg, fmt->pad, fmt->which);
-	if (format == NULL)
+	if (!format)
 		return -EINVAL;
 
 	resizer_try_format(res, cfg, fmt->pad, &fmt->format, fmt->which);

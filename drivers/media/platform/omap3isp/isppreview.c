@@ -1482,7 +1482,7 @@ static void preview_isr_buffer(struct isp_prev_device *prev)
 
 	if (prev->output & PREVIEW_OUTPUT_MEMORY) {
 		buffer = omap3isp_video_buffer_next(&prev->video_out);
-		if (buffer != NULL) {
+		if (buffer) {
 			preview_set_outaddr(prev, buffer->dma);
 			restart = 1;
 		}
@@ -1491,7 +1491,7 @@ static void preview_isr_buffer(struct isp_prev_device *prev)
 
 	if (prev->input == PREVIEW_INPUT_MEMORY) {
 		buffer = omap3isp_video_buffer_next(&prev->video_in);
-		if (buffer != NULL)
+		if (buffer)
 			preview_set_inaddr(prev, buffer->dma);
 		pipe->state |= ISP_PIPELINE_IDLE_INPUT;
 	}
@@ -2020,7 +2020,7 @@ static int preview_get_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_con
 	struct v4l2_mbus_framefmt *format;
 
 	format = __preview_get_format(prev, cfg, fmt->pad, fmt->which);
-	if (format == NULL)
+	if (!format)
 		return -EINVAL;
 
 	fmt->format = *format;
@@ -2042,7 +2042,7 @@ static int preview_set_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_con
 	struct v4l2_rect *crop;
 
 	format = __preview_get_format(prev, cfg, fmt->pad, fmt->which);
-	if (format == NULL)
+	if (!format)
 		return -EINVAL;
 
 	preview_try_format(prev, cfg, fmt->pad, &fmt->format, fmt->which);

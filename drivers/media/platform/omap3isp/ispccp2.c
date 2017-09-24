@@ -542,7 +542,7 @@ static void ccp2_isr_buffer(struct isp_ccp2_device *ccp2)
 	struct isp_buffer *buffer;
 
 	buffer = omap3isp_video_buffer_next(&ccp2->video_in);
-	if (buffer != NULL)
+	if (buffer)
 		ccp2_set_inaddr(ccp2, buffer->dma);
 
 	pipe->state |= ISP_PIPELINE_IDLE_INPUT;
@@ -758,7 +758,7 @@ static int ccp2_get_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config
 	struct v4l2_mbus_framefmt *format;
 
 	format = __ccp2_get_format(ccp2, cfg, fmt->pad, fmt->which);
-	if (format == NULL)
+	if (!format)
 		return -EINVAL;
 
 	fmt->format = *format;
@@ -779,7 +779,7 @@ static int ccp2_set_format(struct v4l2_subdev *sd, struct v4l2_subdev_pad_config
 	struct v4l2_mbus_framefmt *format;
 
 	format = __ccp2_get_format(ccp2, cfg, fmt->pad, fmt->which);
-	if (format == NULL)
+	if (!format)
 		return -EINVAL;
 
 	ccp2_try_format(ccp2, cfg, fmt->pad, &fmt->format, fmt->which);

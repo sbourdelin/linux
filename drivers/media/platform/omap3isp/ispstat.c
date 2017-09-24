@@ -411,7 +411,7 @@ static int isp_stat_bufs_alloc(struct ispstat *stat, u32 size)
 
 	spin_lock_irqsave(&stat->isp->stat_lock, flags);
 
-	BUG_ON(stat->locked_buf != NULL);
+	BUG_ON(stat->locked_buf);
 
 	/* Are the old buffers big enough? */
 	if (stat->buf_alloc_size >= size) {
@@ -686,7 +686,7 @@ static void isp_stat_try_enable(struct ispstat *stat)
 {
 	unsigned long irqflags;
 
-	if (stat->priv == NULL)
+	if (!stat->priv)
 		/* driver wasn't initialised */
 		return;
 
