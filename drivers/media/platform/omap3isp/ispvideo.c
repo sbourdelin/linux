@@ -1303,7 +1303,7 @@ static int isp_video_open(struct file *file)
 	struct isp_video *video = video_drvdata(file);
 	struct isp_video_fh *handle;
 	struct vb2_queue *queue;
-	int ret = 0;
+	int ret;
 
 	handle = kzalloc(sizeof(*handle), GFP_KERNEL);
 	if (!handle)
