@@ -314,6 +314,10 @@ int sd_zbc_write_lock_zone(struct scsi_cmnd *cmd)
 	    (sector & (zone_sectors - 1)) + blk_rq_sectors(rq) > zone_sectors)
 		return BLKPREP_KILL;
 
+	/* No write locking with scsi-mq */
+	if (q->mq_ops)
+		return BLKPREP_OK;
+
 	/*
 	 * There is no write constraints on conventional zones. So any write
 	 * command can be sent. But do not issue more than one write command
@@ -713,7 +717,8 @@ static int sd_zbc_setup(struct scsi_disk *sdkp)
 	if (sdkp->first_scan)
 		return 0;
 
-	if (!sdkp->zones_wlock || q->nr_zones != sdkp->nr_zones) {
+	if (!q->mq_ops &&
+	    (!sdkp->zones_wlock || q->nr_zones != sdkp->nr_zones)) {
 		kfree(sdkp->zones_wlock);
 		sdkp->zones_wlock = sd_zbc_alloc_zone_bitmap(sdkp);
 		if (!sdkp->zones_wlock)
