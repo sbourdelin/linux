@@ -1240,26 +1240,31 @@ static struct dma_async_tx_descriptor *sdma_prep_slave_sg(
 		sdmac->chn_count += count;
 
 		if (sdmac->word_size > DMA_SLAVE_BUSWIDTH_4_BYTES) {
-			ret =  -EINVAL;
+			ret = -EINVAL;
 			goto err_out;
 		}
 
 		switch (sdmac->word_size) {
 		case DMA_SLAVE_BUSWIDTH_4_BYTES:
 			bd->mode.command = 0;
-			if (count & 3 || sg->dma_address & 3)
-				return NULL;
+			if (count & 3 || sg->dma_address & 3) {
+				ret = -EINVAL;
+				goto err_out;
+			}
 			break;
 		case DMA_SLAVE_BUSWIDTH_2_BYTES:
 			bd->mode.command = 2;
-			if (count & 1 || sg->dma_address & 1)
-				return NULL;
+			if (count & 1 || sg->dma_address & 1) {
+				ret = -EINVAL;
+				goto err_out;
+			}
 			break;
 		case DMA_SLAVE_BUSWIDTH_1_BYTE:
 			bd->mode.command = 1;
 			break;
 		default:
-			return NULL;
+			ret = -EINVAL;
+			goto err_out;
 		}
 
 		param = BD_DONE | BD_EXTD | BD_CONT;
