@@ -2236,10 +2236,8 @@ static int isp_probe(struct platform_device *pdev)
 	int i, m;
 
 	isp = devm_kzalloc(&pdev->dev, sizeof(*isp), GFP_KERNEL);
-	if (!isp) {
-		dev_err(&pdev->dev, "could not allocate memory\n");
+	if (!isp)
 		return -ENOMEM;
-	}
 
 	ret = fwnode_property_read_u32(of_fwnode_handle(pdev->dev.of_node),
 				       "ti,phy-type", &isp->phy_type);

@@ -366,11 +366,8 @@ int omap3isp_h3a_af_init(struct isp_device *isp)
 	/* Set recover state configuration */
 	af_recover_cfg = devm_kzalloc(isp->dev, sizeof(*af_recover_cfg),
 				      GFP_KERNEL);
-	if (!af_recover_cfg) {
-		dev_err(af->isp->dev,
-			"AF: cannot allocate memory for recover configuration.\n");
+	if (!af_recover_cfg)
 		return -ENOMEM;
-	}
 
 	af_recover_cfg->paxel.h_start = OMAP3ISP_AF_PAXEL_HZSTART_MIN;
 	af_recover_cfg->paxel.width = OMAP3ISP_AF_PAXEL_WIDTH_MIN;

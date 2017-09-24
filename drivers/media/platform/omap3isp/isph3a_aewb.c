@@ -303,11 +303,8 @@ int omap3isp_h3a_aewb_init(struct isp_device *isp)
 	/* Set recover state configuration */
 	aewb_recover_cfg = devm_kzalloc(isp->dev, sizeof(*aewb_recover_cfg),
 					GFP_KERNEL);
-	if (!aewb_recover_cfg) {
-		dev_err(aewb->isp->dev,
-			"AEWB: cannot allocate memory for recover configuration.\n");
+	if (!aewb_recover_cfg)
 		return -ENOMEM;
-	}
 
 	aewb_recover_cfg->saturation_limit = OMAP3ISP_AEWB_MAX_SATURATION_LIM;
 	aewb_recover_cfg->win_height = OMAP3ISP_AEWB_MIN_WIN_H;
