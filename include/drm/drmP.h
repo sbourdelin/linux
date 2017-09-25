@@ -172,8 +172,8 @@ struct pci_controller;
  * \param arg arguments
  */
 #define DRM_DEV_ERROR(dev, fmt, ...)					\
-	drm_dev_printk(dev, KERN_ERR, DRM_UT_NONE, __func__, " *ERROR*",\
-		       fmt, ##__VA_ARGS__)
+	drm_dev_printk(dev, KERN_ERR, DRM_UT_NONE,			\
+		       "*ERROR* " fmt, ##__VA_ARGS__)
 #define DRM_ERROR(fmt, ...)						\
 	drm_printk(KERN_ERR, DRM_UT_NONE, fmt,	##__VA_ARGS__)
 
@@ -196,8 +196,8 @@ struct pci_controller;
 	DRM_DEV_ERROR_RATELIMITED(NULL, fmt, ##__VA_ARGS__)
 
 #define DRM_DEV_INFO(dev, fmt, ...)					\
-	drm_dev_printk(dev, KERN_INFO, DRM_UT_NONE, __func__, "", fmt,	\
-		       ##__VA_ARGS__)
+	drm_dev_printk(dev, KERN_INFO, DRM_UT_NONE,			\
+		       fmt, ##__VA_ARGS__)
 
 #define DRM_DEV_INFO_ONCE(dev, fmt, ...)				\
 ({									\
@@ -214,50 +214,44 @@ struct pci_controller;
  * \param fmt printf() like format string.
  * \param arg arguments
  */
-#define DRM_DEV_DEBUG(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_CORE, __func__, "", fmt,	\
-		       ##args)
+#define DRM_DEV_DEBUG(dev, fmt, ...)					\
+	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_CORE, fmt, ##__VA_ARGS__)
 #define DRM_DEBUG(fmt, ...)						\
 	drm_printk(KERN_DEBUG, DRM_UT_CORE, fmt, ##__VA_ARGS__)
 
-#define DRM_DEV_DEBUG_DRIVER(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_DRIVER, __func__, "",	\
-		       fmt, ##args)
+#define DRM_DEV_DEBUG_DRIVER(dev, fmt, ...)				\
+	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_DRIVER, fmt, ##__VA_ARGS__)
 #define DRM_DEBUG_DRIVER(fmt, ...)					\
 	drm_printk(KERN_DEBUG, DRM_UT_DRIVER, fmt, ##__VA_ARGS__)
 
-#define DRM_DEV_DEBUG_KMS(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_KMS, __func__, "", fmt,	\
-		       ##args)
+#define DRM_DEV_DEBUG_KMS(dev, fmt, ...)				\
+	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_KMS, fmt, ##__VA_ARGS__)
 #define DRM_DEBUG_KMS(fmt, ...)					\
 	drm_printk(KERN_DEBUG, DRM_UT_KMS, fmt, ##__VA_ARGS__)
 
-#define DRM_DEV_DEBUG_PRIME(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_PRIME, __func__, "",	\
-		       fmt, ##args)
+#define DRM_DEV_DEBUG_PRIME(dev, fmt, ...)				\
+	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_PRIME, ##__VA_ARGS__)
 #define DRM_DEBUG_PRIME(fmt, ...)					\
 	drm_printk(KERN_DEBUG, DRM_UT_PRIME, fmt, ##__VA_ARGS__)
 
-#define DRM_DEV_DEBUG_ATOMIC(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_ATOMIC, __func__, "",	\
-		       fmt, ##args)
+#define DRM_DEV_DEBUG_ATOMIC(dev, fmt, ...)				\
+	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_ATOMIC, fmt, ##__VA_ARGS__)
 #define DRM_DEBUG_ATOMIC(fmt, ...)					\
 	drm_printk(KERN_DEBUG, DRM_UT_ATOMIC, fmt, ##__VA_ARGS__)
 
-#define DRM_DEV_DEBUG_VBL(dev, fmt, args...)				\
-	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_VBL, __func__, "", fmt,	\
-		       ##args)
+#define DRM_DEV_DEBUG_VBL(dev, fmt, ...)				\
+	drm_dev_printk(dev, KERN_DEBUG, DRM_UT_VBL, fmt, ##__VA_ARGS__)
 #define DRM_DEBUG_VBL(fmt, ...)					\
 	drm_printk(KERN_DEBUG, DRM_UT_VBL, fmt, ##__VA_ARGS__)
 
-#define _DRM_DEV_DEFINE_DEBUG_RATELIMITED(dev, level, fmt, args...)	\
+#define _DRM_DEV_DEFINE_DEBUG_RATELIMITED(dev, level, fmt, ...)		\
 ({									\
 	static DEFINE_RATELIMIT_STATE(_rs,				\
 				      DEFAULT_RATELIMIT_INTERVAL,	\
 				      DEFAULT_RATELIMIT_BURST);		\
 	if (__ratelimit(&_rs))						\
 		drm_dev_printk(dev, KERN_DEBUG, DRM_UT_ ## level,	\
-			       __func__, "", fmt, ##args);		\
+			       fmt, ##__VA_ARGS__);		\
 })
 
 /**
