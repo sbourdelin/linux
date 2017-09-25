@@ -144,6 +144,7 @@ struct dw_hdmi {
 	const struct dw_hdmi_plat_data *plat_data;
 
 	int vic;
+	enum dw_hdmi_devtype dev_type;
 
 	u8 edid[HDMI_EDID_LEN];
 	bool cable_plugin;
@@ -2202,7 +2203,9 @@ static int dw_hdmi_detect_phy(struct dw_hdmi *hdmi)
 
 	phy_type = hdmi_readb(hdmi, HDMI_CONFIG2_ID);
 
-	if (phy_type == DW_HDMI_PHY_VENDOR_PHY) {
+	if (phy_type == DW_HDMI_PHY_VENDOR_PHY ||
+	    hdmi->dev_type == RK3328_HDMI ||
+	    hdmi->dev_type == RK3228_HDMI) {
 		/* Vendor PHYs require support from the glue layer. */
 		if (!hdmi->plat_data->phy_ops || !hdmi->plat_data->phy_name) {
 			dev_err(hdmi->dev,
@@ -2298,6 +2301,7 @@ __dw_hdmi_probe(struct platform_device *pdev,
 	if (!hdmi)
 		return ERR_PTR(-ENOMEM);
 
+	hdmi->dev_type = plat_data->dev_type;
 	hdmi->plat_data = plat_data;
 	hdmi->dev = dev;
 	hdmi->sample_rate = 48000;
