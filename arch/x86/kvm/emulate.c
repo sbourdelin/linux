@@ -2479,6 +2479,9 @@ static int rsm_load_state_32(struct x86_emulate_ctxt *ctxt, u64 smbase)
 
 	ctxt->ops->set_smbase(ctxt, GET_SMSTATE(u32, smbase, 0x7ef8));
 
+	ctxt->ops->set_hflags(ctxt, ctxt->ops->get_hflags(ctxt) &
+		~X86EMUL_SMM_MASK);
+
 	return rsm_enter_protected_mode(ctxt, cr0, cr4);
 }
 
@@ -2531,7 +2534,8 @@ static int rsm_load_state_64(struct x86_emulate_ctxt *ctxt, u64 smbase)
 	dt.address =                GET_SMSTATE(u64, smbase, 0x7e68);
 	ctxt->ops->set_gdt(ctxt, &dt);
 
-	r = rsm_enter_protected_mode(ctxt, cr0, cr4);
+	/* We're still in SMM so CR4.VMXE is reserved. */
+	r = rsm_enter_protected_mode(ctxt, cr0, cr4 & ~X86_CR4_VMXE);
 	if (r != X86EMUL_CONTINUE)
 		return r;
 
@@ -2540,6 +2544,13 @@ static int rsm_load_state_64(struct x86_emulate_ctxt *ctxt, u64 smbase)
 		if (r != X86EMUL_CONTINUE)
 			return r;
 	}
+
+	/* Out of SMM now and finish off CR4. */
+	ctxt->ops->set_hflags(ctxt, ctxt->ops->get_hflags(ctxt) &
+		~X86EMUL_SMM_MASK);
+
+	if (ctxt->ops->set_cr(ctxt, 4, cr4))
+		return X86EMUL_UNHANDLEABLE;
 
 	return X86EMUL_CONTINUE;
 }
@@ -2601,9 +2612,10 @@ static int em_rsm(struct x86_emulate_ctxt *ctxt)
 
 	if ((ctxt->ops->get_hflags(ctxt) & X86EMUL_SMM_INSIDE_NMI_MASK) == 0)
 		ctxt->ops->set_nmi_mask(ctxt, false);
+	else
+		ctxt->ops->set_hflags(ctxt, ctxt->ops->get_hflags(ctxt) &
+			~X86EMUL_SMM_INSIDE_NMI_MASK);
 
-	ctxt->ops->set_hflags(ctxt, ctxt->ops->get_hflags(ctxt) &
-		~(X86EMUL_SMM_INSIDE_NMI_MASK | X86EMUL_SMM_MASK));
 	return X86EMUL_CONTINUE;
 }
 

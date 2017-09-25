@@ -4366,6 +4366,10 @@ static int vmx_set_cr4(struct kvm_vcpu *vcpu, unsigned long cr4)
 		 */
 		if (!nested_vmx_allowed(vcpu))
 			return 1;
+
+		/* cr4.VMXE is a reserved bit in SMM */
+		if (is_smm(vcpu))
+			return 1;
 	}
 
 	if (to_vmx(vcpu)->nested.vmxon && !nested_cr4_valid(vcpu, cr4))
