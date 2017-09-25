@@ -23,6 +23,7 @@ generic-y += mcs_spinlock.h
 generic-y += mm-arch-hooks.h
 generic-y += mmu.h
 generic-y += mmu_context.h
+generic-y += page_memops.h
 generic-y += pci.h
 generic-y += percpu.h
 generic-y += pgalloc.h

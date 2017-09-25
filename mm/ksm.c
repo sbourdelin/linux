@@ -41,6 +41,7 @@
 #include <linux/numa.h>
 
 #include <asm/tlbflush.h>
+#include <asm/page_memops.h>
 #include "internal.h"
 
 #ifdef CONFIG_NUMA
@@ -981,28 +982,6 @@ error:
 	return err;
 }
 #endif /* CONFIG_SYSFS */
-
-static u32 calc_checksum(struct page *page)
-{
-	u32 checksum;
-	void *addr = kmap_atomic(page);
-	checksum = jhash2(addr, PAGE_SIZE / 4, 17);
-	kunmap_atomic(addr);
-	return checksum;
-}
-
-static int memcmp_pages(struct page *page1, struct page *page2)
-{
-	char *addr1, *addr2;
-	int ret;
-
-	addr1 = kmap_atomic(page1);
-	addr2 = kmap_atomic(page2);
-	ret = memcmp(addr1, addr2, PAGE_SIZE);
-	kunmap_atomic(addr2);
-	kunmap_atomic(addr1);
-	return ret;
-}
 
 static inline int pages_identical(struct page *page1, struct page *page2)
 {
@@ -2049,7 +2028,7 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 	 * don't want to insert it in the unstable tree, and we don't want
 	 * to waste our time searching for something identical to it there.
 	 */
-	checksum = calc_checksum(page);
+	checksum = calc_page_checksum(page);
 	if (rmap_item->oldchecksum != checksum) {
 		rmap_item->oldchecksum = checksum;
 		return;
@@ -3055,7 +3034,7 @@ static int __init ksm_init(void)
 	int err;
 
 	/* The correct value depends on page size and endianness */
-	zero_checksum = calc_checksum(ZERO_PAGE(0));
+	zero_checksum = calc_page_checksum(ZERO_PAGE(0));
 	/* Default to false for backwards compatibility */
 	ksm_use_zero_pages = false;
 
