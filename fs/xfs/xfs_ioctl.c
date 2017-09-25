@@ -1012,12 +1012,10 @@ xfs_diflags_to_linux(
 		inode->i_flags |= S_NOATIME;
 	else
 		inode->i_flags &= ~S_NOATIME;
-#if 0	/* disabled until the flag switching races are sorted out */
 	if ((xflags & FS_XFLAG_DAX) || (ip->i_mount->m_flags & XFS_MOUNT_DAX))
 		inode->i_flags |= S_DAX;
 	else
 		inode->i_flags &= ~S_DAX;
-#endif
 }
 
 static bool
@@ -1049,6 +1047,8 @@ xfs_ioctl_setattr_xflags(
 {
 	struct xfs_mount	*mp = ip->i_mount;
 	uint64_t		di_flags2;
+	struct address_space	*mapping = VFS_I(ip)->i_mapping;
+	bool			dax_changing;
 
 	/* Can't change realtime flag if any extents are allocated. */
 	if ((ip->i_d.di_nextents || ip->i_delayed_blks) &&
@@ -1084,10 +1084,23 @@ xfs_ioctl_setattr_xflags(
 	if (di_flags2 && ip->i_d.di_version < 3)
 		return -EINVAL;
 
+	dax_changing = xfs_is_dax_state_changing(fa->fsx_xflags, ip);
+	if (dax_changing) {
+		i_mmap_lock_read(mapping);
+		if (mapping_mapped(mapping)) {
+			i_mmap_unlock_read(mapping);
+			return -EBUSY;
+		}
+	}
+
 	ip->i_d.di_flags = xfs_flags2diflags(ip, fa->fsx_xflags);
 	ip->i_d.di_flags2 = di_flags2;
 
 	xfs_diflags_to_linux(ip);
+
+	if (dax_changing)
+		i_mmap_unlock_read(mapping);
+
 	xfs_trans_ichgtime(tp, ip, XFS_ICHGTIME_CHG);
 	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	XFS_STATS_INC(mp, xs_ig_attrchg);
