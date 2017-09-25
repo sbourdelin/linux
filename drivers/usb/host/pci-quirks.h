@@ -9,6 +9,7 @@ int usb_hcd_amd_remote_wakeup_quirk(struct pci_dev *pdev);
 bool usb_amd_hang_symptom_quirk(void);
 bool usb_amd_prefetch_quirk(void);
 void usb_amd_dev_put(void);
+int usb_amd_pt_check_port(struct device *device, int port);
 void usb_amd_quirk_pll_disable(void);
 void usb_amd_quirk_pll_enable(void);
 void usb_asmedia_modifyflowcontrol(struct pci_dev *pdev);
