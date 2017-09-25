@@ -544,6 +544,18 @@ struct request_queue {
 	struct queue_limits	limits;
 
 	/*
+	 * Zoned block device information for mq I/O schedulers.
+	 * nr_zones is the total number of zones of the device. This is always
+	 * 0 for regular block devices. seq_zone_bitmap is a bitmap of nr_zones
+	 * bits which indicates if a zone is conventional (bit clear) or
+	 * sequential (bit set). Both nr_zones and seq_zone_bitmap are set
+	 * by the low level device driver. Stacking drivers (device mappers)
+	 * may or may not initialize these fields.
+	 */
+	unsigned int	nr_zones;
+	unsigned long	*seq_zone_bitmap;
+
+	/*
 	 * sg stuff
 	 */
 	unsigned int		sg_timeout;
@@ -783,6 +795,27 @@ static inline bool blk_queue_is_zoned(struct request_queue *q)
 static inline unsigned int blk_queue_zone_sectors(struct request_queue *q)
 {
 	return blk_queue_is_zoned(q) ? q->limits.chunk_sectors : 0;
+}
+
+static inline unsigned int blk_queue_nr_zones(struct request_queue *q)
+{
+	return q->nr_zones;
+}
+
+static inline unsigned int blk_queue_zone_no(struct request_queue *q,
+					     sector_t sector)
+{
+	if (!blk_queue_is_zoned(q))
+		return 0;
+	return sector >> ilog2(q->limits.chunk_sectors);
+}
+
+static inline bool blk_queue_zone_is_seq(struct request_queue *q,
+					 sector_t sector)
+{
+	if (!blk_queue_is_zoned(q) || !q->seq_zone_bitmap)
+		return false;
+	return test_bit(blk_queue_zone_no(q, sector), q->seq_zone_bitmap);
 }
 
 static inline bool rq_is_sync(struct request *rq)
@@ -1029,6 +1062,16 @@ static inline unsigned int blk_rq_sectors(const struct request *rq)
 static inline unsigned int blk_rq_cur_sectors(const struct request *rq)
 {
 	return blk_rq_cur_bytes(rq) >> 9;
+}
+
+static inline unsigned int blk_rq_zone_no(struct request *rq)
+{
+	return blk_queue_zone_no(rq->q, blk_rq_pos(rq));
+}
+
+static inline unsigned int blk_rq_zone_is_seq(struct request *rq)
+{
+	return blk_queue_zone_is_seq(rq->q, blk_rq_pos(rq));
 }
 
 /*
@@ -1578,6 +1621,16 @@ static inline unsigned int bdev_zone_sectors(struct block_device *bdev)
 
 	if (q)
 		return blk_queue_zone_sectors(q);
+
+	return 0;
+}
+
+static inline unsigned int bdev_nr_zones(struct block_device *bdev)
+{
+	struct request_queue *q = bdev_get_queue(bdev);
+
+	if (q)
+		return blk_queue_nr_zones(q);
 
 	return 0;
 }
