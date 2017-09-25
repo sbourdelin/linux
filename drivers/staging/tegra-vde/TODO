@@ -1,0 +1,8 @@
+All TODO's require reverse-engineering to be done first, it is very
+unlikely that NVIDIA would ever release HW specs to public.
+
+TODO:
+	- properly handle decoding faults
+	- support more formats
+
+Contact: Dmitry Osipenko <digetx@gmail.com>
