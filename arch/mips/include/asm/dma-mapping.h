@@ -39,4 +39,6 @@ static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base,
 #endif
 }
 
+int mips_get_cache_alignment(struct device *dev);
+
 #endif /* _ASM_DMA_MAPPING_H */
