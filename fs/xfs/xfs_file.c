@@ -207,7 +207,6 @@ xfs_file_dio_aio_read(
 {
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
 	size_t			count = iov_iter_count(to);
-	ssize_t			ret;
 
 	trace_xfs_file_direct_read(ip, count, iocb->ki_pos);
 
@@ -215,12 +214,7 @@ xfs_file_dio_aio_read(
 		return 0; /* skip atime */
 
 	file_accessed(iocb->ki_filp);
-
-	xfs_ilock(ip, XFS_IOLOCK_SHARED);
-	ret = iomap_dio_rw(iocb, to, &xfs_iomap_ops, NULL);
-	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
-
-	return ret;
+	return iomap_dio_rw(iocb, to, &xfs_iomap_ops, NULL);
 }
 
 static noinline ssize_t
@@ -230,23 +224,14 @@ xfs_file_dax_read(
 {
 	struct xfs_inode	*ip = XFS_I(iocb->ki_filp->f_mapping->host);
 	size_t			count = iov_iter_count(to);
-	ssize_t			ret = 0;
 
 	trace_xfs_file_dax_read(ip, count, iocb->ki_pos);
 
 	if (!count)
 		return 0; /* skip atime */
 
-	if (!xfs_ilock_nowait(ip, XFS_IOLOCK_SHARED)) {
-		if (iocb->ki_flags & IOCB_NOWAIT)
-			return -EAGAIN;
-		xfs_ilock(ip, XFS_IOLOCK_SHARED);
-	}
-	ret = dax_iomap_rw(iocb, to, &xfs_iomap_ops);
-	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
-
 	file_accessed(iocb->ki_filp);
-	return ret;
+	return dax_iomap_rw(iocb, to, &xfs_iomap_ops);
 }
 
 STATIC ssize_t
@@ -255,19 +240,9 @@ xfs_file_buffered_aio_read(
 	struct iov_iter		*to)
 {
 	struct xfs_inode	*ip = XFS_I(file_inode(iocb->ki_filp));
-	ssize_t			ret;
 
 	trace_xfs_file_buffered_read(ip, iov_iter_count(to), iocb->ki_pos);
-
-	if (!xfs_ilock_nowait(ip, XFS_IOLOCK_SHARED)) {
-		if (iocb->ki_flags & IOCB_NOWAIT)
-			return -EAGAIN;
-		xfs_ilock(ip, XFS_IOLOCK_SHARED);
-	}
-	ret = generic_file_read_iter(iocb, to);
-	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
-
-	return ret;
+	return generic_file_read_iter(iocb, to);
 }
 
 STATIC ssize_t
@@ -276,7 +251,8 @@ xfs_file_read_iter(
 	struct iov_iter		*to)
 {
 	struct inode		*inode = file_inode(iocb->ki_filp);
-	struct xfs_mount	*mp = XFS_I(inode)->i_mount;
+	struct xfs_inode	*ip = XFS_I(inode);
+	struct xfs_mount	*mp = ip->i_mount;
 	ssize_t			ret = 0;
 
 	XFS_STATS_INC(mp, xs_read_calls);
@@ -284,12 +260,20 @@ xfs_file_read_iter(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return -EIO;
 
+	if (!xfs_ilock_nowait(ip, XFS_IOLOCK_SHARED)) {
+		if (iocb->ki_flags & IOCB_NOWAIT)
+			return -EAGAIN;
+		xfs_ilock(ip, XFS_IOLOCK_SHARED);
+	}
+
 	if (IS_DAX(inode))
 		ret = xfs_file_dax_read(iocb, to);
 	else if (iocb->ki_flags & IOCB_DIRECT)
 		ret = xfs_file_dio_aio_read(iocb, to);
 	else
 		ret = xfs_file_buffered_aio_read(iocb, to);
+
+	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	if (ret > 0)
 		XFS_STATS_ADD(mp, xs_read_bytes, ret);
