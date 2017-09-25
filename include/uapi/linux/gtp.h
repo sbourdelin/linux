@@ -9,6 +9,11 @@ enum gtp_genl_cmds {
 	GTP_CMD_MAX,
 };
 
+/* NETLINK_GENERIC related info
+ */
+#define GTP_GENL_NAME		"gtp"
+#define GTP_GENL_VERSION	0
+
 enum gtp_version {
 	GTP_V0 = 0,
 	GTP_V1,
