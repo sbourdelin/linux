@@ -68,13 +68,15 @@
 #define DMA_CHAN_CFG_SRC_DRQ(x)		((x) & 0x1f)
 #define DMA_CHAN_CFG_SRC_IO_MODE	BIT(5)
 #define DMA_CHAN_CFG_SRC_LINEAR_MODE	(0 << 5)
-#define DMA_CHAN_CFG_SRC_BURST(x)	(((x) & 0x3) << 7)
+#define DMA_CHAN_CFG_SRC_BURST_A31(x)	(((x) & 0x3) << 7)
+#define DMA_CHAN_CFG_SRC_BURST_H3(x)	(((x) & 0x3) << 6)
 #define DMA_CHAN_CFG_SRC_WIDTH(x)	(((x) & 0x3) << 9)
 
 #define DMA_CHAN_CFG_DST_DRQ(x)		(DMA_CHAN_CFG_SRC_DRQ(x) << 16)
 #define DMA_CHAN_CFG_DST_IO_MODE	(DMA_CHAN_CFG_SRC_IO_MODE << 16)
 #define DMA_CHAN_CFG_DST_LINEAR_MODE	(DMA_CHAN_CFG_SRC_LINEAR_MODE << 16)
-#define DMA_CHAN_CFG_DST_BURST(x)	(DMA_CHAN_CFG_SRC_BURST(x) << 16)
+#define DMA_CHAN_CFG_DST_BURST_A31(x)	(DMA_CHAN_CFG_SRC_BURST_A31(x) << 16)
+#define DMA_CHAN_CFG_DST_BURST_H3(x)	(DMA_CHAN_CFG_SRC_BURST_H3(x) << 16)
 #define DMA_CHAN_CFG_DST_WIDTH(x)	(DMA_CHAN_CFG_SRC_WIDTH(x) << 16)
 
 #define DMA_CHAN_CUR_SRC	0x10
@@ -115,6 +117,7 @@ struct sun6i_dma_config {
 	 * BSP kernel source code.
 	 */
 	void (*clock_autogate_enable)();
+	void (*set_burst_length)(u32 *p_cfg, s8 src_burst, s8 dst_burst);
 };
 
 /*
@@ -278,6 +281,18 @@ static void sun6i_enable_clock_autogate_a23(struct sun6i_dma_dev *sdev)
 static void sun6i_enable_clock_autogate_h3(struct sun6i_dma_dev *sdev)
 {
 	writel(SUNXI_H3_DMA_GATE_ENABLE, sdev->base + SUNXI_H3_DMA_GATE);
+}
+
+static void sun6i_set_burst_length_a31(u32 *p_cfg, s8 src_burst, s8 dst_burst)
+{
+	*p_cfg |= DMA_CHAN_CFG_SRC_BURST_A31(src_burst) |
+		  DMA_CHAN_CFG_DST_BURST_A31(dst_burst);
+}
+
+static void sun6i_set_burst_length_h3(u32 *p_cfg, s8 src_burst, s8 dst_burst)
+{
+	*p_cfg |= DMA_CHAN_CFG_SRC_BURST_H3(src_burst) |
+		  DMA_CHAN_CFG_DST_BURST_H3(dst_burst);
 }
 
 static size_t sun6i_get_chan_size(struct sun6i_pchan *pchan)
@@ -559,10 +574,10 @@ static int set_config(struct sun6i_dma_dev *sdev,
 	if (dst_width < 0)
 		return dst_width;
 
-	*p_cfg = DMA_CHAN_CFG_SRC_BURST(src_burst) |
-		DMA_CHAN_CFG_SRC_WIDTH(src_width) |
-		DMA_CHAN_CFG_DST_BURST(dst_burst) |
+	*p_cfg = DMA_CHAN_CFG_SRC_WIDTH(src_width) |
 		DMA_CHAN_CFG_DST_WIDTH(dst_width);
+
+	sdev->cfg->set_burst_length(p_cfg, src_burst, dst_burst);
 
 	return 0;
 }
@@ -606,10 +621,10 @@ static struct dma_async_tx_descriptor *sun6i_dma_prep_dma_memcpy(
 		DMA_CHAN_CFG_DST_DRQ(DRQ_SDRAM) |
 		DMA_CHAN_CFG_DST_LINEAR_MODE |
 		DMA_CHAN_CFG_SRC_LINEAR_MODE |
-		DMA_CHAN_CFG_SRC_BURST(burst) |
 		DMA_CHAN_CFG_SRC_WIDTH(width) |
-		DMA_CHAN_CFG_DST_BURST(burst) |
 		DMA_CHAN_CFG_DST_WIDTH(width);
+
+	sdev->cfg->set_burst_length(v_lli->cfg, burst, burst);
 
 	sun6i_dma_lli_add(NULL, v_lli, p_lli, txd);
 
@@ -1022,6 +1037,7 @@ static struct sun6i_dma_config sun6i_a31_dma_cfg = {
 	.nr_max_channels = 16,
 	.nr_max_requests = 30,
 	.nr_max_vchans   = 53,
+	.set_burst_length = sun6i_set_burst_length_a31;
 };
 
 /*
@@ -1034,6 +1050,7 @@ static struct sun6i_dma_config sun8i_a23_dma_cfg = {
 	.nr_max_requests = 24,
 	.nr_max_vchans   = 37,
 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
+	.set_burst_length = sun6i_set_burst_length_a31;
 };
 
 static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
@@ -1041,13 +1058,12 @@ static struct sun6i_dma_config sun8i_a83t_dma_cfg = {
 	.nr_max_requests = 28,
 	.nr_max_vchans   = 39,
 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
+	.set_burst_length = sun6i_set_burst_length_a31;
 };
 
 /*
  * The H3 has 12 physical channels, a maximum DRQ port id of 27,
  * and a total of 34 usable source and destination endpoints.
- * It also supports additional burst lengths and bus widths,
- * and the burst length fields have different offsets.
  */
 
 static struct sun6i_dma_config sun8i_h3_dma_cfg = {
@@ -1055,6 +1071,7 @@ static struct sun6i_dma_config sun8i_h3_dma_cfg = {
 	.nr_max_requests = 27,
 	.nr_max_vchans   = 34,
 	.clock_autogate_enable = sun6i_enable_clock_autogate_h3;
+	.set_burst_length = sun6i_set_burst_length_h3;
 };
 
 /*
@@ -1067,6 +1084,7 @@ static struct sun6i_dma_config sun8i_v3s_dma_cfg = {
 	.nr_max_requests = 23,
 	.nr_max_vchans   = 24,
 	.clock_autogate_enable = sun6i_enable_clock_autogate_a23;
+	.set_burst_length = sun6i_set_burst_length_a31;
 };
 
 static const struct of_device_id sun6i_dma_match[] = {
