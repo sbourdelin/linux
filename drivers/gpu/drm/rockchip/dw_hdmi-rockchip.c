@@ -61,6 +61,7 @@ struct rockchip_hdmi {
 	enum dw_hdmi_devtype dev_type;
 	struct clk *vpll_clk;
 	struct clk *grf_clk;
+	struct clk *hclk_vio;
 	struct phy *phy;
 };
 
@@ -277,12 +278,27 @@ static int rockchip_hdmi_parse_dt(struct rockchip_hdmi *hdmi)
 		return PTR_ERR(hdmi->grf_clk);
 	}
 
+	hdmi->hclk_vio = devm_clk_get(hdmi->dev, "hclk_vio");
+	if (PTR_ERR(hdmi->hclk_vio) == -ENOENT) {
+		hdmi->hclk_vio = NULL;
+	} else if (PTR_ERR(hdmi->hclk_vio) == -EPROBE_DEFER) {
+		return -EPROBE_DEFER;
+	} else if (IS_ERR(hdmi->hclk_vio)) {
+		dev_dbg(hdmi->dev, "failed to get hclk_vio clock\n");
+		return PTR_ERR(hdmi->hclk_vio);
+	}
 	ret = clk_prepare_enable(hdmi->vpll_clk);
 	if (ret) {
 		dev_err(hdmi->dev, "Failed to enable HDMI vpll: %d\n", ret);
 		return ret;
 	}
 
+	ret = clk_prepare_enable(hdmi->hclk_vio);
+	if (ret) {
+		dev_dbg(hdmi->dev, "Failed to eanble HDMI hclk_vio: %d\n",
+			ret);
+		return ret;
+	}
 	return 0;
 }
 
@@ -507,6 +523,11 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
 static void dw_hdmi_rockchip_unbind(struct device *dev, struct device *master,
 				    void *data)
 {
+	struct rockchip_hdmi *hdmi = container_of(&dev, struct rockchip_hdmi,
+						  dev);
+
+	clk_disable_unprepare(hdmi->hclk_vio);
+
 	return dw_hdmi_unbind(dev);
 }
 
