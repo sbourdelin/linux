@@ -43,6 +43,7 @@
 #include "flow.h"
 #include "conntrack.h"
 #include "vport.h"
+#include "flow_netlink.h"
 
 struct deferred_action {
 	struct sk_buff *skb;
@@ -380,6 +381,45 @@ static int push_eth(struct sk_buff *skb, struct sw_flow_key *key,
 	return 0;
 }
 
+static int push_nsh(struct sk_buff *skb, struct sw_flow_key *key,
+		    const struct nshhdr *src_nsh_hdr)
+{
+	int err;
+
+	err = skb_push_nsh(skb, src_nsh_hdr);
+	if (err)
+		return err;
+
+	key->eth.type = htons(ETH_P_NSH);
+
+	/* safe right before invalidate_flow_key */
+	key->mac_proto = MAC_PROTO_NONE;
+	invalidate_flow_key(key);
+	return 0;
+}
+
+static int pop_nsh(struct sk_buff *skb, struct sw_flow_key *key)
+{
+	int err;
+
+	if (ovs_key_mac_proto(key) != MAC_PROTO_NONE ||
+	    skb->protocol != htons(ETH_P_NSH)) {
+		return -EINVAL;
+	}
+
+	err = skb_pop_nsh(skb);
+	if (err)
+		return err;
+
+	/* safe right before invalidate_flow_key */
+	if (skb->protocol == htons(ETH_P_TEB))
+		key->mac_proto = MAC_PROTO_ETHERNET;
+	else
+		key->mac_proto = MAC_PROTO_NONE;
+	invalidate_flow_key(key);
+	return 0;
+}
+
 static void update_ip_l4_checksum(struct sk_buff *skb, struct iphdr *nh,
 				  __be32 addr, __be32 new_addr)
 {
@@ -598,6 +638,59 @@ static int set_ipv6(struct sk_buff *skb, struct sw_flow_key *flow_key,
 		OVS_SET_MASKED(nh->hop_limit, key->ipv6_hlimit,
 			       mask->ipv6_hlimit);
 		flow_key->ip.ttl = nh->hop_limit;
+	}
+	return 0;
+}
+
+static int set_nsh(struct sk_buff *skb, struct sw_flow_key *flow_key,
+		   const struct nlattr *a)
+{
+	struct nshhdr *nsh_hdr;
+	int err;
+	u8 flags;
+	u8 ttl;
+	int i;
+
+	struct ovs_key_nsh key;
+	struct ovs_key_nsh mask;
+
+	err = nsh_key_from_nlattr(a, &key, &mask);
+	if (err)
+		return err;
+
+	err = skb_ensure_writable(skb, skb_network_offset(skb) +
+				  sizeof(struct nshhdr));
+	if (unlikely(err))
+		return err;
+
+	nsh_hdr = (struct nshhdr *)skb_network_header(skb);
+
+	flags = nsh_get_flags(nsh_hdr);
+	flags = OVS_MASKED(flags, key.flags, mask.flags);
+	flow_key->nsh.flags = flags;
+	ttl = nsh_get_ttl(nsh_hdr);
+	ttl = OVS_MASKED(ttl, key.ttl, mask.ttl);
+	flow_key->nsh.ttl = ttl;
+	nsh_set_flags_and_ttl(nsh_hdr, flags, ttl);
+	nsh_hdr->path_hdr = OVS_MASKED(nsh_hdr->path_hdr, key.path_hdr,
+				       mask.path_hdr);
+	flow_key->nsh.path_hdr = nsh_hdr->path_hdr;
+	switch (nsh_hdr->mdtype) {
+	case NSH_M_TYPE1:
+		for (i = 0; i < NSH_MD1_CONTEXT_SIZE; i++) {
+			nsh_hdr->md1.context[i] =
+			    OVS_MASKED(nsh_hdr->md1.context[i], key.context[i],
+				       mask.context[i]);
+		}
+		memcpy(flow_key->nsh.context, nsh_hdr->md1.context,
+		       sizeof(nsh_hdr->md1.context));
+		break;
+	case NSH_M_TYPE2:
+		memset(flow_key->nsh.context, 0,
+		       sizeof(flow_key->nsh.context));
+		break;
+	default:
+		return -EINVAL;
 	}
 	return 0;
 }
@@ -1024,6 +1117,10 @@ static int execute_masked_set_action(struct sk_buff *skb,
 				   get_mask(a, struct ovs_key_ethernet *));
 		break;
 
+	case OVS_KEY_ATTR_NSH:
+		err = set_nsh(skb, flow_key, a);
+		break;
+
 	case OVS_KEY_ATTR_IPV4:
 		err = set_ipv4(skb, flow_key, nla_data(a),
 			       get_mask(a, struct ovs_key_ipv4 *));
@@ -1209,6 +1306,21 @@ static int do_execute_actions(struct datapath *dp, struct sk_buff *skb,
 
 		case OVS_ACTION_ATTR_POP_ETH:
 			err = pop_eth(skb, key);
+			break;
+
+		case OVS_ACTION_ATTR_PUSH_NSH: {
+			u8 buffer[NSH_HDR_MAX_LEN];
+			struct nshhdr *nsh_hdr = (struct nshhdr *)buffer;
+			const struct nshhdr *src_nsh_hdr = nsh_hdr;
+
+			nsh_hdr_from_nlattr(nla_data(a), nsh_hdr,
+					    NSH_HDR_MAX_LEN);
+			err = push_nsh(skb, key, src_nsh_hdr);
+			break;
+		}
+
+		case OVS_ACTION_ATTR_POP_NSH:
+			err = pop_nsh(skb, key);
 			break;
 		}
 
