@@ -46,6 +46,7 @@ struct rockchip_hdmi {
 	struct regmap *regmap;
 	struct drm_encoder encoder;
 	const struct rockchip_hdmi_chip_data *chip_data;
+	enum dw_hdmi_devtype dev_type;
 	struct clk *vpll_clk;
 	struct clk *grf_clk;
 };
@@ -305,6 +306,7 @@ static const struct dw_hdmi_plat_data rk3288_hdmi_drv_data = {
 	.cur_ctr    = rockchip_cur_ctr,
 	.phy_config = rockchip_phy_config,
 	.phy_data = &rk3288_chip_data,
+	.dev_type   = RK3288_HDMI,
 };
 
 static struct rockchip_hdmi_chip_data rk3399_chip_data = {
@@ -315,6 +317,7 @@ static struct rockchip_hdmi_chip_data rk3399_chip_data = {
 
 static const struct dw_hdmi_plat_data rk3328_hdmi_drv_data = {
 	.mode_valid = dw_hdmi_rockchip_mode_valid,
+	.dev_type   = RK3328_HDMI,
 };
 
 static const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
@@ -323,6 +326,7 @@ static const struct dw_hdmi_plat_data rk3399_hdmi_drv_data = {
 	.cur_ctr    = rockchip_cur_ctr,
 	.phy_config = rockchip_phy_config,
 	.phy_data = &rk3399_chip_data,
+	.dev_type   = RK3399_HDMI,
 };
 
 static const struct of_device_id dw_hdmi_rockchip_dt_ids[] = {
@@ -361,6 +365,7 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
 	plat_data = match->data;
 	hdmi->dev = &pdev->dev;
 	hdmi->chip_data = plat_data->phy_data;
+	hdmi->dev_type = plat_data->dev_type;
 	encoder = &hdmi->encoder;
 
 	encoder->possible_crtcs = drm_of_find_possible_crtcs(drm, dev->of_node);

@@ -92,6 +92,15 @@ enum dw_hdmi_phy_type {
 	DW_HDMI_PHY_VENDOR_PHY = 0xfe,
 };
 
+enum dw_hdmi_devtype {
+	RK3228_HDMI,
+	RK3288_HDMI,
+	RK3328_HDMI,
+	RK3366_HDMI,
+	RK3368_HDMI,
+	RK3399_HDMI,
+};
+
 struct dw_hdmi_mpll_config {
 	unsigned long mpixelclock;
 	struct {
@@ -124,6 +133,7 @@ struct dw_hdmi_phy_ops {
 
 struct dw_hdmi_plat_data {
 	struct regmap *regm;
+	enum dw_hdmi_devtype dev_type;
 	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
 					   const struct drm_display_mode *mode);
 	unsigned long input_bus_format;
