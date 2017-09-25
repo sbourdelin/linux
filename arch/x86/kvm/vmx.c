@@ -107,6 +107,9 @@ static u64 __read_mostly host_xss;
 static bool __read_mostly enable_pml = 1;
 module_param_named(pml, enable_pml, bool, S_IRUGO);
 
+static bool __read_mostly enable_lbrv = 1;
+module_param_named(lbrv, enable_lbrv, bool, 0444);
+
 #define KVM_VMX_TSC_MULTIPLIER_MAX     0xffffffffffffffffULL
 
 /* Guest_tsc -> host_tsc conversion requires 64-bit division.  */
@@ -5428,6 +5431,25 @@ static void ept_set_mmio_spte_mask(void)
 				   VMX_EPT_MISCONFIG_WX_VALUE);
 }
 
+static void auto_switch_lbr_msrs(struct vcpu_vmx *vmx)
+{
+	int i;
+	struct perf_lbr_stack lbr_stack;
+
+	perf_get_lbr_stack(&lbr_stack);
+
+	add_atomic_switch_msr(vmx, MSR_LBR_SELECT, 0, 0);
+	add_atomic_switch_msr(vmx, lbr_stack.lbr_tos, 0, 0);
+
+	for (i = 0; i < lbr_stack.lbr_nr; i++) {
+		add_atomic_switch_msr(vmx, lbr_stack.lbr_from + i, 0, 0);
+		add_atomic_switch_msr(vmx, lbr_stack.lbr_to + i, 0, 0);
+		if (lbr_stack.lbr_info)
+			add_atomic_switch_msr(vmx, lbr_stack.lbr_info + i, 0,
+					      0);
+	}
+}
+
 #define VMX_XSS_EXIT_BITMAP 0
 /*
  * Sets up the vmcs for emulated real mode.
@@ -5507,6 +5529,9 @@ static int vmx_vcpu_setup(struct vcpu_vmx *vmx)
 	vmcs_write64(VM_ENTRY_MSR_LOAD_ADDR, __pa(vmx->msr_autoload.guest));
 
 	add_atomic_switch_msr(vmx, MSR_IA32_DEBUGCTLMSR, 0, 0);
+
+	if (enable_lbrv)
+		auto_switch_lbr_msrs(vmx);
 
 	if (vmcs_config.vmentry_ctrl & VM_ENTRY_LOAD_IA32_PAT)
 		vmcs_write64(GUEST_IA32_PAT, vmx->vcpu.arch.pat);
@@ -6721,6 +6746,28 @@ void vmx_enable_tdp(void)
 	kvm_enable_tdp();
 }
 
+static void vmx_passthrough_lbr_msrs(void)
+{
+	int i;
+	struct perf_lbr_stack lbr_stack;
+
+	if (perf_get_lbr_stack(&lbr_stack) < 0) {
+		enable_lbrv = false;
+		return;
+	}
+
+	vmx_disable_intercept_for_msr(MSR_LBR_SELECT, false);
+	vmx_disable_intercept_for_msr(lbr_stack.lbr_tos, false);
+
+	for (i = 0; i < lbr_stack.lbr_nr; i++) {
+		vmx_disable_intercept_for_msr(lbr_stack.lbr_from + i, false);
+		vmx_disable_intercept_for_msr(lbr_stack.lbr_to + i, false);
+		if (lbr_stack.lbr_info)
+			vmx_disable_intercept_for_msr(lbr_stack.lbr_info + i,
+						      false);
+	}
+}
+
 static __init int hardware_setup(void)
 {
 	int r = -ENOMEM, i, msr;
@@ -6821,6 +6868,9 @@ static __init int hardware_setup(void)
 	vmx_disable_intercept_for_msr(MSR_IA32_SYSENTER_ESP, false);
 	vmx_disable_intercept_for_msr(MSR_IA32_SYSENTER_EIP, false);
 	vmx_disable_intercept_for_msr(MSR_IA32_DEBUGCTLMSR, false);
+
+	if (enable_lbrv)
+		vmx_passthrough_lbr_msrs();
 
 	memcpy(vmx_msr_bitmap_legacy_x2apic_apicv,
 			vmx_msr_bitmap_legacy, PAGE_SIZE);
