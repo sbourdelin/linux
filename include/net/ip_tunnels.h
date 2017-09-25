@@ -318,6 +318,10 @@ static inline struct rtable *ip_tunnel_get_route(struct net_device *dev,
 				     dst_cache, info, use_cache);
 }
 
+int __iptunnel_update_pmtu(struct net_device *dev, struct sk_buff *skb,
+			   struct dst_entry *dst, __be16 df,
+			   const struct iphdr *inner_iph, int hlen, u32 daddr);
+
 struct ip_tunnel_encap_ops {
 	size_t (*encap_hlen)(struct ip_tunnel_encap *e);
 	int (*build_header)(struct sk_buff *skb, struct ip_tunnel_encap *e,
