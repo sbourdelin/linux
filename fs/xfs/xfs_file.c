@@ -1087,9 +1087,21 @@ xfs_file_mmap(
 {
 	file_accessed(filp);
 	vma->vm_ops = &xfs_file_vm_ops;
+	return 0;
+}
+
+/* This call happens during mmap(), after the vma has been inserted into the
+ * inode->i_mapping->i_mmap tree.  At this point the decision on whether or
+ * not to use DAX for this mapping has been set and will not change for the
+ * duration of the mapping.
+ */
+STATIC void
+xfs_file_post_mmap(
+	struct file	*filp,
+	struct vm_area_struct *vma)
+{
 	if (IS_DAX(file_inode(filp)))
 		vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
-	return 0;
 }
 
 const struct file_operations xfs_file_operations = {
@@ -1103,6 +1115,7 @@ const struct file_operations xfs_file_operations = {
 	.compat_ioctl	= xfs_file_compat_ioctl,
 #endif
 	.mmap		= xfs_file_mmap,
+	.post_mmap	= xfs_file_post_mmap,
 	.open		= xfs_file_open,
 	.release	= xfs_file_release,
 	.fsync		= xfs_file_fsync,
