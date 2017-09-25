@@ -5502,12 +5502,11 @@ static int vmx_vcpu_setup(struct vcpu_vmx *vmx)
 	if (cpu_has_vmx_vmfunc())
 		vmcs_write64(VM_FUNCTION_CONTROL, 0);
 
-	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, 0);
-	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, 0);
 	vmcs_write64(VM_EXIT_MSR_LOAD_ADDR, __pa(vmx->msr_autoload.host));
 	vmcs_write64(VM_EXIT_MSR_STORE_ADDR, __pa(vmx->msr_autoload.guest));
-	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, 0);
 	vmcs_write64(VM_ENTRY_MSR_LOAD_ADDR, __pa(vmx->msr_autoload.guest));
+
+	add_atomic_switch_msr(vmx, MSR_IA32_DEBUGCTLMSR, 0, 0);
 
 	if (vmcs_config.vmentry_ctrl & VM_ENTRY_LOAD_IA32_PAT)
 		vmcs_write64(GUEST_IA32_PAT, vmx->vcpu.arch.pat);
@@ -6821,6 +6820,7 @@ static __init int hardware_setup(void)
 	vmx_disable_intercept_for_msr(MSR_IA32_SYSENTER_CS, false);
 	vmx_disable_intercept_for_msr(MSR_IA32_SYSENTER_ESP, false);
 	vmx_disable_intercept_for_msr(MSR_IA32_SYSENTER_EIP, false);
+	vmx_disable_intercept_for_msr(MSR_IA32_DEBUGCTLMSR, false);
 
 	memcpy(vmx_msr_bitmap_legacy_x2apic_apicv,
 			vmx_msr_bitmap_legacy, PAGE_SIZE);
@@ -9285,7 +9285,7 @@ static void vmx_save_host_msrs(struct msr_autoload *m)
 static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
-	unsigned long debugctlmsr, cr3, cr4;
+	unsigned long cr3, cr4;
 
 	/* Don't enter VMX if guest state is invalid, let the exit handler
 	   start emulation until we arrive back to a valid state */
@@ -9333,7 +9333,6 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 		__write_pkru(vcpu->arch.pkru);
 
 	atomic_switch_perf_msrs(vmx);
-	debugctlmsr = get_debugctlmsr();
 
 	vmx_arm_hv_timer(vcpu);
 
@@ -9444,10 +9443,6 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 		, "eax", "ebx", "edi", "esi"
 #endif
 	      );
-
-	/* MSR_IA32_DEBUGCTLMSR is zeroed on vmexit. Restore it if needed */
-	if (debugctlmsr)
-		update_debugctlmsr(debugctlmsr);
 
 #ifndef CONFIG_X86_64
 	/*
