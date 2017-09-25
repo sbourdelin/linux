@@ -1592,13 +1592,7 @@ int fib6_del(struct rt6_info *rt, struct nl_info *info)
 	struct net *net = info->nl_net;
 	struct rt6_info **rtp;
 
-#if RT6_DEBUG >= 2
-	if (rt->dst.obsolete > 0) {
-		WARN_ON(fn);
-		return -ENOENT;
-	}
-#endif
-	if (!fn || rt == net->ipv6.ip6_null_entry)
+	if (!fn || rt->dst.obsolete > 0 || rt == net->ipv6.ip6_null_entry)
 		return -ENOENT;
 
 	WARN_ON(!(fn->fn_flags & RTN_RTINFO));
