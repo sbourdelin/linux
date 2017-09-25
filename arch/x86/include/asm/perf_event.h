@@ -266,7 +266,16 @@ struct perf_guest_switch_msr {
 	u64 host, guest;
 };
 
+struct perf_lbr_stack {
+	int		lbr_nr;
+	unsigned long	lbr_tos;
+	unsigned long	lbr_from;
+	unsigned long	lbr_to;
+	unsigned long	lbr_info;
+};
+
 extern struct perf_guest_switch_msr *perf_guest_get_msrs(int *nr);
+extern int perf_get_lbr_stack(struct perf_lbr_stack *stack);
 extern void perf_get_x86_pmu_capability(struct x86_pmu_capability *cap);
 extern void perf_check_microcode(void);
 #else
@@ -274,6 +283,11 @@ static inline struct perf_guest_switch_msr *perf_guest_get_msrs(int *nr)
 {
 	*nr = 0;
 	return NULL;
+}
+
+static inline int perf_get_lbr_stack(struct perf_lbr_stack *stack)
+{
+	return -1;
 }
 
 static inline void perf_get_x86_pmu_capability(struct x86_pmu_capability *cap)

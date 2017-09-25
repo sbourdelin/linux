@@ -1230,3 +1230,26 @@ void intel_pmu_lbr_init_knl(void)
 	x86_pmu.lbr_sel_mask = LBR_SEL_MASK;
 	x86_pmu.lbr_sel_map  = snb_lbr_sel_map;
 }
+
+/**
+ * perf_get_lbr_stack - get the lbr stack related MSRs
+ *
+ * @stack: the caller's memory to get the lbr stack
+ *
+ * Returns: 0 indicates that the lbr stack has been successfully obtained.
+ */
+int perf_get_lbr_stack(struct perf_lbr_stack *stack)
+{
+	stack->lbr_nr = x86_pmu.lbr_nr;
+	stack->lbr_tos = x86_pmu.lbr_tos;
+	stack->lbr_from = x86_pmu.lbr_from;
+	stack->lbr_to = x86_pmu.lbr_to;
+
+	if (x86_pmu.intel_cap.lbr_format == LBR_FORMAT_INFO)
+		stack->lbr_info = MSR_LBR_INFO_0;
+	else
+		stack->lbr_info = 0;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(perf_get_lbr_stack);
