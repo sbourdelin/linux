@@ -349,8 +349,25 @@ static void dw_hdmi_rockchip_encoder_mode_set(struct drm_encoder *encoder,
 static void dw_hdmi_rockchip_encoder_enable(struct drm_encoder *encoder)
 {
 	struct rockchip_hdmi *hdmi = to_rockchip_hdmi(encoder);
-	u32 val;
+	struct drm_crtc *crtc = encoder->crtc;
+	u32 val, lcdsel_grf_reg, lcdsel_mask;
 	int ret;
+
+	if (WARN_ON(!crtc || !crtc->state))
+		return;
+
+	switch (hdmi->dev_type) {
+	case RK3288_HDMI:
+		lcdsel_grf_reg = RK3288_GRF_SOC_CON6;
+		lcdsel_mask = RK3288_HDMI_LCDC_SEL;
+		break;
+	case RK3399_HDMI:
+		lcdsel_grf_reg = RK3399_GRF_SOC_CON20;
+		lcdsel_mask = RK3399_HDMI_LCDC_SEL;
+		break;
+	default:
+		return;
+	}
 
 	ret = drm_of_encoder_active_endpoint_id(hdmi->dev->of_node, encoder);
 	if (ret)
