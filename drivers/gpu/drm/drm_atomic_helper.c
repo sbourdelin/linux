@@ -1388,22 +1388,29 @@ int drm_atomic_helper_async_check(struct drm_device *dev,
 {
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *crtc_state;
-	struct drm_plane *plane;
+	struct drm_plane *plane = NULL, *__plane;
 	struct drm_plane_state *old_plane_state, *new_plane_state;
 	const struct drm_plane_helper_funcs *funcs;
-	int i, n_planes = 0;
+	int i;
 
 	for_each_new_crtc_in_state(state, crtc, crtc_state, i) {
 		if (drm_atomic_crtc_needs_modeset(crtc_state))
 			return -EINVAL;
 	}
 
-	for_each_oldnew_plane_in_state(state, plane, old_plane_state, new_plane_state, i)
-		n_planes++;
+	for_each_new_plane_in_state(state, __plane, new_plane_state, i) {
+		/* FIXME: we support only single plane updates for now */
+		if (plane)
+			return -EINVAL;
 
-	/* FIXME: we support only single plane updates for now */
-	if (n_planes != 1)
+		plane = __plane;
+	}
+
+	if (!plane)
 		return -EINVAL;
+
+	old_plane_state = drm_atomic_get_old_plane_state(state, plane);
+	new_plane_state = drm_atomic_get_new_plane_state(state, plane);
 
 	if (!new_plane_state->crtc)
 		return -EINVAL;
