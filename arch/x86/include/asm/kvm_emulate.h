@@ -289,6 +289,7 @@ struct x86_emulate_ctxt {
 	/* Register state before/after emulation. */
 	unsigned long eflags;
 	unsigned long eip; /* eip before instruction emulation */
+	u64 smbase; /* smbase before instruction emulation */
 	/* Emulated execution mode, represented by an X86EMUL_MODE value. */
 	enum x86emul_mode mode;
 
@@ -298,6 +299,7 @@ struct x86_emulate_ctxt {
 	bool perm_ok; /* do not check permissions if true */
 	bool ud;	/* inject an #UD if host doesn't support insn */
 	bool tf;	/* TF value before instruction (after for syscall/sysret) */
+	bool left_smm;  /* post_leave_smm() needs to be called after emulation */
 
 	bool have_exception;
 	struct x86_exception exception;
