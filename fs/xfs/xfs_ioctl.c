@@ -1020,6 +1020,27 @@ xfs_diflags_to_linux(
 #endif
 }
 
+static bool
+xfs_is_dax_state_changing(
+	unsigned int		xflags,
+	struct xfs_inode	*ip)
+{
+	struct inode		*inode = VFS_I(ip);
+
+	/*
+	 * If the DAX mount option was used we will update the DAX inode flag
+	 * as the user requested but we will continue to use DAX for I/O and
+	 * page faults regardless of how the inode flag is set.
+	 */
+	if (ip->i_mount->m_flags & XFS_MOUNT_DAX)
+		return false;
+	if ((xflags & FS_XFLAG_DAX) && IS_DAX(inode))
+		return false;
+	if (!(xflags & FS_XFLAG_DAX) && !IS_DAX(inode))
+		return false;
+	return true;
+}
+
 static int
 xfs_ioctl_setattr_xflags(
 	struct xfs_trans	*tp,
@@ -1105,17 +1126,8 @@ xfs_ioctl_setattr_dax_invalidate(
 			return -EINVAL;
 	}
 
-	/*
-	 * If the DAX state is not changing, we have nothing to do here.  If
-	 * the DAX mount option was used we will update the DAX inode flag as
-	 * the user requested but we will continue to use DAX for I/O and page
-	 * faults regardless of how the inode flag is set.
-	 */
-	if (ip->i_mount->m_flags & XFS_MOUNT_DAX)
-		return 0;
-	if ((fa->fsx_xflags & FS_XFLAG_DAX) && IS_DAX(inode))
-		return 0;
-	if (!(fa->fsx_xflags & FS_XFLAG_DAX) && !IS_DAX(inode))
+	/* If the DAX state is not changing, we have nothing to do here. */
+	if (!xfs_is_dax_state_changing(fa->fsx_xflags, ip))
 		return 0;
 
 	/* lock, flush and invalidate mapping in preparation for flag change */
