@@ -313,6 +313,26 @@ static int tcpci_pd_transmit(struct tcpc_dev *tcpc,
 	return 0;
 }
 
+static int tcpci_vbus_detect(struct tcpc_dev *tcpc, bool enable)
+{
+	struct tcpci *tcpci = tcpc_to_tcpci(tcpc);
+	int ret;
+
+	if (enable) {
+		ret = regmap_write(tcpci->regmap, TCPC_COMMAND,
+				   TCPC_CMD_ENABLE_VBUS_DETECT);
+		if (ret < 0)
+			return ret;
+	} else {
+		ret = regmap_write(tcpci->regmap, TCPC_COMMAND,
+				   TCPC_CMD_DISABLE_VBUS_DETECT);
+		if (ret < 0)
+			return ret;
+	}
+
+	return 0;
+}
+
 static int tcpci_init(struct tcpc_dev *tcpc)
 {
 	struct tcpci *tcpci = tcpc_to_tcpci(tcpc);
@@ -343,6 +363,9 @@ static int tcpci_init(struct tcpc_dev *tcpc)
 	ret = regmap_write(tcpci->regmap, TCPC_POWER_STATUS_MASK, reg);
 	if (ret < 0)
 		return ret;
+
+	/* Enable Vbus detection */
+	tcpci_vbus_detect(tcpc, true);
 
 	reg = TCPC_ALERT_TX_SUCCESS | TCPC_ALERT_TX_FAILED |
 		TCPC_ALERT_TX_DISCARDED | TCPC_ALERT_RX_STATUS |
