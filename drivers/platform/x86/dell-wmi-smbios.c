@@ -21,6 +21,7 @@
 #include <linux/err.h>
 #include <linux/mutex.h>
 #include <linux/wmi.h>
+#include <linux/uaccess.h>
 #include "dell-wmi-smbios.h"
 
 #ifdef CONFIG_DCDBAS
@@ -39,7 +40,8 @@ struct calling_interface_structure {
 } __packed;
 
 static struct calling_interface_buffer *smi_buffer;
-static struct wmi_calling_interface_buffer *wmi_buffer;
+static struct wmi_calling_interface_buffer *internal_wmi_buffer;
+static struct wmi_calling_interface_buffer *sysfs_wmi_buffer;
 static DEFINE_MUTEX(buffer_mutex);
 
 static int da_command_address;
@@ -68,7 +70,7 @@ struct calling_interface_buffer *dell_smbios_get_buffer(void)
 	mutex_lock(&buffer_mutex);
 	dell_smbios_clear_buffer();
 	if (has_wmi)
-		return &wmi_buffer->smi;
+		return &internal_wmi_buffer->smi;
 	return smi_buffer;
 }
 EXPORT_SYMBOL_GPL(dell_smbios_get_buffer);
@@ -76,7 +78,7 @@ EXPORT_SYMBOL_GPL(dell_smbios_get_buffer);
 void dell_smbios_clear_buffer(void)
 {
 	if (has_wmi)
-		memset(wmi_buffer, 0,
+		memset(internal_wmi_buffer, 0,
 		       sizeof(struct wmi_calling_interface_buffer));
 	else
 		memset(smi_buffer, 0,
@@ -122,9 +124,9 @@ int run_wmi_smbios_call(struct wmi_calling_interface_buffer *buf)
 void dell_smbios_send_request(int class, int select)
 {
 	if (has_wmi) {
-		wmi_buffer->smi.class = class;
-		wmi_buffer->smi.select = select;
-		run_wmi_smbios_call(wmi_buffer);
+		internal_wmi_buffer->smi.class = class;
+		internal_wmi_buffer->smi.select = select;
+		run_wmi_smbios_call(internal_wmi_buffer);
 	}
 
 #ifdef CONFIG_DCDBAS
@@ -224,6 +226,74 @@ static void __init find_tokens(const struct dmi_header *dm, void *dummy)
 	}
 }
 
+static int dell_wmi_smbios_open(struct inode *inode, struct file *file)
+{
+	return nonseekable_open(inode, file);
+}
+
+static int dell_wmi_smbios_release(struct inode *inode, struct file *file)
+{
+	return 0;
+}
+
+static long dell_wmi_smbios_ioctl(struct file *filp, unsigned int cmd,
+	unsigned long arg)
+{
+	struct token_ioctl_buffer *tokens_buffer;
+	void __user *p = (void __user *) arg;
+	size_t size;
+	int ret = 0;
+
+	if (_IOC_TYPE(cmd) != DELL_WMI_SMBIOS_IOC)
+		return -ENOTTY;
+
+	switch (cmd) {
+	case DELL_WMI_SMBIOS_CALL_CMD:
+		size = sizeof(struct wmi_calling_interface_buffer);
+		mutex_lock(&buffer_mutex);
+		if (copy_from_user(sysfs_wmi_buffer, p, size)) {
+			ret = -EFAULT;
+			goto fail_smbios_cmd;
+		}
+		ret = run_wmi_smbios_call(sysfs_wmi_buffer);
+		if (ret != 0)
+			goto fail_smbios_cmd;
+		if (copy_to_user(p, sysfs_wmi_buffer, size))
+			ret = -EFAULT;
+fail_smbios_cmd:
+		mutex_unlock(&buffer_mutex);
+		break;
+	case DELL_WMI_SMBIOS_GET_NUM_TOKENS_CMD:
+		if (copy_to_user(p, &da_num_tokens, sizeof(u32)))
+			ret = -EFAULT;
+		break;
+	case DELL_WMI_SMBIOS_GET_TOKENS_CMD:
+		tokens_buffer = kmalloc(sizeof(struct token_ioctl_buffer),
+					GFP_KERNEL);
+		size = sizeof(struct token_ioctl_buffer);
+		if (copy_from_user(tokens_buffer, p, size)) {
+			ret = -EFAULT;
+			goto fail_get_tokens_cmd;
+		}
+		if (tokens_buffer->num_tokens < da_num_tokens) {
+			ret = -EOVERFLOW;
+			goto fail_get_tokens_cmd;
+		}
+		size = sizeof(struct calling_interface_token) * da_num_tokens;
+		if (copy_to_user(tokens_buffer->tokens, da_tokens, size)) {
+			ret = -EFAULT;
+			goto fail_get_tokens_cmd;
+		}
+fail_get_tokens_cmd:
+		kfree(tokens_buffer);
+		break;
+	default:
+		pr_err("unsupported ioctl: %d.\n", cmd);
+		ret = -ENOIOCTLCMD;
+	}
+	return ret;
+}
+
 /*
  * Descriptor buffer is 128 byte long and contains:
  *
@@ -301,10 +371,16 @@ static int dell_smbios_wmi_probe(struct wmi_device *wdev)
 	int ret;
 	u32 interface_version;
 
-	/* WMI buffer should be 32k */
-	wmi_buffer = (void *)__get_free_pages(GFP_KERNEL, 3);
-	if (!wmi_buffer)
+	/* WMI buffers should be 32k */
+	internal_wmi_buffer = (void *)__get_free_pages(GFP_KERNEL, 3);
+	if (!internal_wmi_buffer)
 		return -ENOMEM;
+
+	sysfs_wmi_buffer = (void *)__get_free_pages(GFP_KERNEL, 3);
+	if (!sysfs_wmi_buffer) {
+		ret = -ENOMEM;
+		goto fail_sysfs_wmi_buffer;
+	}
 
 	ret = dell_wmi_check_descriptor_buffer(wdev, &interface_version);
 	if (ret)
@@ -320,19 +396,30 @@ static int dell_smbios_wmi_probe(struct wmi_device *wdev)
 	return 0;
 
 fail_wmi_probe:
-	free_pages((unsigned long)wmi_buffer, 3);
+	free_pages((unsigned long)sysfs_wmi_buffer, 3);
+
+fail_sysfs_wmi_buffer:
+	free_pages((unsigned long)internal_wmi_buffer, 3);
 	return ret;
 }
 
 static int dell_smbios_wmi_remove(struct wmi_device *wdev)
 {
-	free_pages((unsigned long)wmi_buffer, 3);
+	free_pages((unsigned long)internal_wmi_buffer, 3);
+	free_pages((unsigned long)sysfs_wmi_buffer, 3);
 	return 0;
 }
 
 static const struct wmi_device_id dell_smbios_wmi_id_table[] = {
 	{ .guid_string = DELL_WMI_SMBIOS_GUID },
 	{ },
+};
+
+static const struct file_operations dell_wmi_smbios_fops = {
+	.owner		= THIS_MODULE,
+	.unlocked_ioctl	= dell_wmi_smbios_ioctl,
+	.open		= dell_wmi_smbios_open,
+	.release	= dell_wmi_smbios_release,
 };
 
 static struct wmi_driver dell_wmi_smbios_driver = {
@@ -342,6 +429,7 @@ static struct wmi_driver dell_wmi_smbios_driver = {
 	.probe = dell_smbios_wmi_probe,
 	.remove = dell_smbios_wmi_remove,
 	.id_table = dell_smbios_wmi_id_table,
+	.file_operations = &dell_wmi_smbios_fops,
 };
 
 static int __init dell_wmi_smbios_init(void)
