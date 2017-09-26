@@ -1995,12 +1995,7 @@ static int intel_compute_max_dotclk(struct drm_i915_private *dev_priv)
 	int max_cdclk_freq = dev_priv->max_cdclk_freq;
 
 	if (INTEL_GEN(dev_priv) >= 10)
-		/*
-		 * FIXME: Allow '2 * max_cdclk_freq'
-		 * once DDI clock voltage requirements are
-		 * handled correctly.
-		 */
-		return max_cdclk_freq;
+		return 2 * max_cdclk_freq;
 	else if (IS_GEMINILAKE(dev_priv))
 		/*
 		 * FIXME: Limiting to 99% as a temporary workaround. See
