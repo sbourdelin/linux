@@ -652,7 +652,10 @@ KBUILD_CFLAGS += $(call cc-ifversion, -lt, 0409, \
 KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
 
 # check for 'asm goto'
-ifeq ($(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-goto.sh $(CC) $(KBUILD_CFLAGS)), y)
+ASM_GOTO = $(call cached-val,$(call __sanitize-opt,asm_goto_$(CC)),\
+	   $$(shell $(CONFIG_SHELL) \
+	   $(srctree)/scripts/gcc-goto.sh $(CC) $(KBUILD_CFLAGS)))
+ifeq ($(ASM_GOTO), y)
 	KBUILD_CFLAGS += -DCC_HAVE_ASM_GOTO
 	KBUILD_AFLAGS += -DCC_HAVE_ASM_GOTO
 endif
@@ -788,7 +791,9 @@ KBUILD_CFLAGS	+= $(call cc-option,-fdata-sections,)
 endif
 
 # arch Makefile may override CC so keep this after arch Makefile is included
-NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)
+NOSTDINC_FLAGS += -nostdinc -isystem \
+		  $(call cached-val,$(call __sanitize-opt,cc_include_$(CC)),\
+		  $$(shell $(CC) -print-file-name=include))
 CHECKFLAGS     += $(NOSTDINC_FLAGS)
 
 # warn about C99 declaration after statement
