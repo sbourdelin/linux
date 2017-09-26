@@ -28,6 +28,7 @@
 #endif
 
 #define DELL_WMI_SMBIOS_GUID "A80593CE-A997-11DA-B012-B622A1EF5492"
+#define DELL_DESCRIPTOR_GUID "8D9DDCBC-A997-11DA-B012-B622A1EF5492"
 
 struct calling_interface_structure {
 	struct dmi_header header;
@@ -223,12 +224,91 @@ static void __init find_tokens(const struct dmi_header *dm, void *dummy)
 	}
 }
 
+/*
+ * Descriptor buffer is 128 byte long and contains:
+ *
+ *       Name             Offset  Length  Value
+ * Vendor Signature          0       4    "DELL"
+ * Object Signature          4       4    " WMI"
+ * WMI Interface Version     8       4    <version>
+ * WMI buffer length        12       4    4096
+ */
+int dell_wmi_check_descriptor_buffer(struct wmi_device *wdev, u32 *version)
+{
+	union acpi_object *obj = NULL;
+	struct wmi_device *desc_dev;
+	u32 *desc_buffer;
+	int ret;
+
+	desc_dev = wmidev_get_other_guid(wdev, DELL_DESCRIPTOR_GUID);
+	if (!desc_dev) {
+		dev_err(&wdev->dev, "Dell WMI descriptor does not exist\n");
+		return -ENODEV;
+	}
+
+	obj = wmidev_block_query(desc_dev, 0);
+	if (!obj) {
+		dev_err(&wdev->dev, "failed to read Dell WMI descriptor\n");
+		ret = -EIO;
+		goto out;
+	}
+
+	if (obj->type != ACPI_TYPE_BUFFER) {
+		dev_err(&wdev->dev, "Dell descriptor has wrong type\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (obj->buffer.length != 128) {
+		dev_err(&wdev->dev,
+			"Dell descriptor buffer has invalid length (%d)\n",
+			obj->buffer.length);
+		if (obj->buffer.length < 16) {
+			ret = -EINVAL;
+			goto out;
+		}
+	}
+	desc_buffer = (u32 *)obj->buffer.pointer;
+
+	if (desc_buffer[0] != 0x4C4C4544 && desc_buffer[1] != 0x494D5720)
+		dev_warn(&wdev->dev, "Dell descriptor buffer has invalid signature (%*ph)\n",
+			8, desc_buffer);
+
+	if (desc_buffer[2] != 0 && desc_buffer[2] != 1)
+		dev_warn(&wdev->dev, "Dell descriptor buffer has unknown version (%d)\n",
+			desc_buffer[2]);
+
+	if (desc_buffer[3] != 4096)
+		dev_warn(&wdev->dev, "Dell descriptor buffer has invalid buffer length (%d)\n",
+			desc_buffer[3]);
+
+	*version = desc_buffer[2];
+	ret = 0;
+
+	dev_info(&wdev->dev, "Detected Dell WMI interface version %u\n",
+		*version);
+
+out:
+	kfree(obj);
+	put_device(&desc_dev->dev);
+	return ret;
+}
+EXPORT_SYMBOL_GPL(dell_wmi_check_descriptor_buffer);
+
+
 static int dell_smbios_wmi_probe(struct wmi_device *wdev)
 {
+	int ret;
+	u32 interface_version;
+
 	/* WMI buffer should be 32k */
 	wmi_buffer = (void *)__get_free_pages(GFP_KERNEL, 3);
 	if (!wmi_buffer)
 		return -ENOMEM;
+
+	ret = dell_wmi_check_descriptor_buffer(wdev, &interface_version);
+	if (ret)
+		goto fail_wmi_probe;
 
 #ifdef CONFIG_DCDBAS
 	/* no longer need the SMI page */
@@ -238,6 +318,10 @@ static int dell_smbios_wmi_probe(struct wmi_device *wdev)
 
 	has_wmi = 1;
 	return 0;
+
+fail_wmi_probe:
+	free_pages((unsigned long)wmi_buffer, 3);
+	return ret;
 }
 
 static int dell_smbios_wmi_remove(struct wmi_device *wdev)

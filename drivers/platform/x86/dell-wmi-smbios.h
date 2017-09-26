@@ -17,6 +17,8 @@
 #ifndef _DELL_WMI_SMBIOS_H_
 #define _DELL_WMI_SMBIOS_H_
 
+#include <linux/wmi.h>
+
 struct notifier_block;
 
 /* If called through fallback SMI rather than WMI this structure will be
@@ -62,5 +64,6 @@ enum dell_laptop_notifier_actions {
 int dell_laptop_register_notifier(struct notifier_block *nb);
 int dell_laptop_unregister_notifier(struct notifier_block *nb);
 void dell_laptop_call_notifier(unsigned long action, void *data);
+int dell_wmi_check_descriptor_buffer(struct wmi_device *wdev, u32 *version);
 
 #endif
