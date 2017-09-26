@@ -47,6 +47,8 @@ enum {
 	dma_debug_sg,
 	dma_debug_coherent,
 	dma_debug_resource,
+	dma_debug_noncoherent,
+	nr_dma_debug_types,
 };
 
 enum map_err_types {
@@ -154,9 +156,9 @@ static const char *const maperr2str[] = {
 	[MAP_ERR_CHECKED] = "dma map error checked",
 };
 
-static const char *type2name[5] = { "single", "page",
+static const char *type2name[nr_dma_debug_types] = { "single", "page",
 				    "scather-gather", "coherent",
-				    "resource" };
+				    "resource", "noncoherent" };
 
 static const char *dir2name[4] = { "DMA_BIDIRECTIONAL", "DMA_TO_DEVICE",
 				   "DMA_FROM_DEVICE", "DMA_NONE" };
@@ -1484,6 +1486,7 @@ void debug_dma_alloc_coherent(struct device *dev, size_t size,
 			      dma_addr_t dma_addr, void *virt)
 {
 	struct dma_debug_entry *entry;
+	bool coherent = is_device_dma_coherent(dev);
 
 	if (unlikely(dma_debug_disabled()))
 		return;
@@ -1495,9 +1498,11 @@ void debug_dma_alloc_coherent(struct device *dev, size_t size,
 	if (!entry)
 		return;
 
-	entry->type      = dma_debug_coherent;
+	entry->type      = coherent ? dma_debug_coherent :
+					dma_debug_noncoherent;
 	entry->dev       = dev;
-	entry->pfn	 = page_to_pfn(virt_to_page(virt));
+	entry->pfn	 = coherent ? page_to_pfn(virt_to_page(virt)) :
+					dma_addr >> PAGE_SHIFT;
 	entry->offset	 = offset_in_page(virt);
 	entry->size      = size;
 	entry->dev_addr  = dma_addr;
@@ -1510,10 +1515,13 @@ EXPORT_SYMBOL(debug_dma_alloc_coherent);
 void debug_dma_free_coherent(struct device *dev, size_t size,
 			 void *virt, dma_addr_t addr)
 {
+	bool coherent = is_device_dma_coherent(dev);
 	struct dma_debug_entry ref = {
-		.type           = dma_debug_coherent,
+		.type           = coherent ? dma_debug_coherent :
+						dma_debug_noncoherent,
 		.dev            = dev,
-		.pfn		= page_to_pfn(virt_to_page(virt)),
+		.pfn		= coherent ? page_to_pfn(virt_to_page(virt)) :
+						addr >> PAGE_SHIFT,
 		.offset		= offset_in_page(virt),
 		.dev_addr       = addr,
 		.size           = size,
