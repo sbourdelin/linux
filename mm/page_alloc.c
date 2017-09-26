@@ -3642,7 +3642,7 @@ static void wake_all_kswapds(unsigned int order, const struct alloc_context *ac)
 }
 
 static inline unsigned int
-gfp_to_alloc_flags(gfp_t gfp_mask)
+gfp_to_alloc_flags(gfp_t gfp_mask, int order, int migratetype)
 {
 	unsigned int alloc_flags = ALLOC_WMARK_MIN | ALLOC_CPUSET;
 
@@ -3670,6 +3670,8 @@ gfp_to_alloc_flags(gfp_t gfp_mask)
 		 */
 		alloc_flags &= ~ALLOC_CPUSET;
 	} else if (unlikely(rt_task(current)) && !in_interrupt())
+		alloc_flags |= ALLOC_HARDER;
+	else if (order > 0 && migratetype == MIGRATE_UNMOVABLE)
 		alloc_flags |= ALLOC_HARDER;
 
 #ifdef CONFIG_CMA
@@ -3903,7 +3905,7 @@ retry_cpuset:
 	 * kswapd needs to be woken up, and to avoid the cost of setting up
 	 * alloc_flags precisely. So we do that now.
 	 */
-	alloc_flags = gfp_to_alloc_flags(gfp_mask);
+	alloc_flags = gfp_to_alloc_flags(gfp_mask, order, ac->migratetype);
 
 	/*
 	 * We need to recalculate the starting point for the zonelist iterator
