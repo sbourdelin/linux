@@ -338,9 +338,11 @@ static void mv88e6xxx_g1_irq_free(struct mv88e6xxx_chip *chip)
 	int irq, virq;
 	u16 mask;
 
+	mutex_lock(&chip->reg_lock);
 	mv88e6xxx_g1_read(chip, MV88E6XXX_G1_CTL1, &mask);
 	mask |= GENMASK(chip->g1_irq.nirqs, 0);
 	mv88e6xxx_g1_write(chip, MV88E6XXX_G1_CTL1, mask);
+	mutex_unlock(&chip->reg_lock);
 
 	free_irq(chip->irq, chip);
 
