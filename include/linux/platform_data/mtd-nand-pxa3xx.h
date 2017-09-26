@@ -28,6 +28,9 @@ struct pxa3xx_nand_platform_data {
 	/* allow platform code to keep OBM/bootloader defined NFC config */
 	int	keep_config;
 
+	/* Force chip select false on busy */
+	int	force_csx;
+
 	/* indicate how many chip selects will be used */
 	int	num_cs;
 

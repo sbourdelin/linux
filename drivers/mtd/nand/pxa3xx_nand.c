@@ -68,6 +68,7 @@
 #define NDCR_PAGE_SZ		(0x1 << 24)
 #define NDCR_NCSX		(0x1 << 23)
 #define NDCR_ND_MODE		(0x3 << 21)
+#define NDCR_FORCE_CSX		(0x1 << 21)
 #define NDCR_NAND_MODE   	(0x0)
 #define NDCR_CLR_PG_CNT		(0x1 << 20)
 #define NFCV1_NDCR_ARB_CNTL	(0x1 << 19)
@@ -1464,6 +1465,7 @@ static int pxa3xx_nand_config_ident(struct pxa3xx_nand_info *info)
 	info->chunk_size = PAGE_CHUNK_SIZE;
 	info->reg_ndcr = 0x0; /* enable all interrupts */
 	info->reg_ndcr |= (pdata->enable_arbiter) ? NDCR_ND_ARB_EN : 0;
+	info->reg_ndcr |= (pdata->force_csx) ? NDCR_FORCE_CSX : 0;
 	info->reg_ndcr |= NDCR_RD_ID_CNT(READ_ID_BYTES);
 	info->reg_ndcr |= NDCR_SPARE_EN;
 
@@ -1498,6 +1500,7 @@ static void pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
 	info->reg_ndcr = ndcr &
 		~(NDCR_INT_MASK | NDCR_ND_ARB_EN | NFCV1_NDCR_ARB_CNTL);
 	info->reg_ndcr |= (pdata->enable_arbiter) ? NDCR_ND_ARB_EN : 0;
+	info->reg_ndcr |= (pdata->force_csx) ? NDCR_FORCE_CSX : 0;
 	info->ndtr0cs0 = nand_readl(info, NDTR0CS0);
 	info->ndtr1cs0 = nand_readl(info, NDTR1CS0);
 }
@@ -1936,6 +1939,9 @@ static int pxa3xx_nand_probe_dt(struct platform_device *pdev)
 		pdata->enable_arbiter = 1;
 	if (of_get_property(np, "marvell,nand-keep-config", NULL))
 		pdata->keep_config = 1;
+	if (of_get_property(np, "marvell,nand-force-csx", NULL))
+		/* Ref#: GL-5830741 */
+		pdata->force_csx = 1;
 	of_property_read_u32(np, "num-cs", &pdata->num_cs);
 
 	pdev->dev.platform_data = pdata;
