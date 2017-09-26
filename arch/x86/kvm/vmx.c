@@ -12075,7 +12075,12 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 
 static int __init vmx_init(void)
 {
-	int r = kvm_init(&vmx_x86_ops, sizeof(struct vcpu_vmx),
+	int r;
+
+	if (!x86_match_cpu(vmx_cpu_id))
+		return -ENODEV;
+
+	r = kvm_init(&vmx_x86_ops, sizeof(struct vcpu_vmx),
                      __alignof__(struct vcpu_vmx), THIS_MODULE);
 	if (r)
 		return r;
