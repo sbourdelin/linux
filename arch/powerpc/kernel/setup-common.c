@@ -904,7 +904,9 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 
-#ifdef CONFIG_PPC_64K_PAGES
+#if defined(CONFIG_PPC_64K_PAGES) && \
+    defined(CONFIG_PPC_BOOK3S_64) && \
+    defined(CONFIG_PPC_BOOK3E_MMU)
 	init_mm.context.pte_frag = NULL;
 #endif
 #ifdef CONFIG_SPAPR_TCE_IOMMU
