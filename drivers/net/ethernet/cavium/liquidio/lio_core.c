@@ -899,11 +899,12 @@ int octeon_setup_interrupt(struct octeon_device *oct, u32 num_ioqs)
 {
 	struct msix_entry *msix_entries;
 	char *queue_irq_names = NULL;
-	int i, num_interrupts = 0;
+	int num_interrupts = 0;
 	int num_alloc_ioq_vectors;
 	char *aux_irq_name = NULL;
 	int num_ioq_vectors;
 	int irqret, err;
+	short i;
 
 	oct->num_msix_irqs = num_ioqs;
 	if (oct->msix_on) {
