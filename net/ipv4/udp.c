@@ -2259,9 +2259,15 @@ int udp_v4_early_demux(struct sk_buff *skb)
 		return 0;
 
 	skb_set_noref_sk(skb, sk);
-	if (udp_use_rx_dst_cache(sk, skb))
+	if (udp_use_rx_dst_cache(sk, skb)) {
 		udp_set_skb_rx_dst(sk, skb, 0);
-	return 0;
+		return 0;
+	}
+
+	if (net->ipv4.sysctl_ip_nonlocal_bind)
+		return 0;
+
+	return ip_route_try_local_rcu(net, skb, iph);
 }
 
 int udp_rcv(struct sk_buff *skb)

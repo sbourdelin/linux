@@ -935,8 +935,15 @@ static void udp_v6_early_demux(struct sk_buff *skb)
 		return;
 
 	skb_set_noref_sk(skb, sk);
-	if (udp6_use_rx_dst_cache(sk))
+	if (udp6_use_rx_dst_cache(sk)) {
 		udp_set_skb_rx_dst(sk, skb, inet6_sk(sk)->rx_dst_cookie);
+		return;
+	}
+
+	if (net->ipv6.sysctl.ip_nonlocal_bind)
+		return;
+
+	ip6_route_try_local_rcu_bh(net, skb);
 }
 
 static __inline__ int udpv6_rcv(struct sk_buff *skb)
