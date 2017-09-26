@@ -124,13 +124,17 @@ struct cpuinfo_x86 {
 	u16			booted_cores;
 	/* Physical processor id: */
 	u16			phys_proc_id;
-	/* Logical processor id: */
+	/* Logical processor (package) id: */
 	u16			logical_proc_id;
+	/* Physical package ID */
+	u16			phys_pkg_id;
 	/* Core id: */
 	u16			cpu_core_id;
 	/* Index into per_cpu list: */
 	u16			cpu_index;
 	u32			microcode;
+	/* Flags */
+	unsigned		logical_proc_set : 1;
 } __randomize_layout;
 
 struct cpuid_regs {

@@ -100,9 +100,6 @@ DEFINE_PER_CPU_READ_MOSTLY(struct cpuinfo_x86, cpu_info);
 EXPORT_PER_CPU_SYMBOL(cpu_info);
 
 /* Logical package management. We might want to allocate that dynamically */
-static int *physical_to_logical_pkg __read_mostly;
-static unsigned long *physical_package_map __read_mostly;;
-static unsigned int max_physical_pkg_id __read_mostly;
 unsigned int __max_logical_packages __read_mostly;
 EXPORT_SYMBOL(__max_logical_packages);
 static unsigned int logical_packages __read_mostly;
@@ -285,17 +282,11 @@ static void notrace start_secondary(void *unused)
  */
 int topology_update_package_map(unsigned int pkg, unsigned int cpu)
 {
-	unsigned int new;
+	int new;
 
-	/* Called from early boot ? */
-	if (!physical_package_map)
-		return 0;
-
-	if (pkg >= max_physical_pkg_id)
-		return -EINVAL;
-
-	/* Set the logical package id */
-	if (test_and_set_bit(pkg, physical_package_map))
+	/* Already available somewhere? */
+	new = topology_phys_to_logical_pkg(pkg);
+	if (new >= 0)
 		goto found;
 
 	if (logical_packages >= __max_logical_packages) {
@@ -305,14 +296,14 @@ int topology_update_package_map(unsigned int pkg, unsigned int cpu)
 	}
 
 	new = logical_packages++;
-	if (new != pkg) {
+	if (new != pkg)
 		pr_info("CPU %u Converting physical %u to logical package %u\n",
 			cpu, pkg, new);
-	}
-	physical_to_logical_pkg[pkg] = new;
 
 found:
-	cpu_data(cpu).logical_proc_id = physical_to_logical_pkg[pkg];
+	cpu_data(cpu).phys_pkg_id = pkg;
+	cpu_data(cpu).logical_proc_id = new;
+	cpu_data(cpu).logical_proc_set = 1;
 	return 0;
 }
 
@@ -323,16 +314,21 @@ found:
  */
 int topology_phys_to_logical_pkg(unsigned int phys_pkg)
 {
-	if (phys_pkg >= max_physical_pkg_id)
-		return -1;
-	return physical_to_logical_pkg[phys_pkg];
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		if (cpu_data(cpu).phys_pkg_id == phys_pkg &&
+		    cpu_data(cpu).logical_proc_set) {
+			return cpu_data(cpu).logical_proc_id;
+		}
+	}
+	return -1;
 }
 EXPORT_SYMBOL(topology_phys_to_logical_pkg);
 
 static void __init smp_init_package_map(struct cpuinfo_x86 *c, unsigned int cpu)
 {
 	unsigned int ncpus;
-	size_t size;
 
 	/*
 	 * Today neither Intel nor AMD support heterogenous systems. That
@@ -363,20 +359,9 @@ static void __init smp_init_package_map(struct cpuinfo_x86 *c, unsigned int cpu)
 	}
 
 	__max_logical_packages = DIV_ROUND_UP(total_cpus, ncpus);
-	logical_packages = 0;
-
-	/*
-	 * Possibly larger than what we need as the number of apic ids per
-	 * package can be smaller than the actual used apic ids.
-	 */
-	max_physical_pkg_id = DIV_ROUND_UP(MAX_LOCAL_APIC, ncpus);
-	size = max_physical_pkg_id * sizeof(unsigned int);
-	physical_to_logical_pkg = kmalloc(size, GFP_KERNEL);
-	memset(physical_to_logical_pkg, 0xff, size);
-	size = BITS_TO_LONGS(max_physical_pkg_id) * sizeof(unsigned long);
-	physical_package_map = kzalloc(size, GFP_KERNEL);
-
 	pr_info("Max logical packages: %u\n", __max_logical_packages);
+
+	logical_packages = 0;
 
 	topology_update_package_map(c->phys_proc_id, cpu);
 }
@@ -1472,7 +1457,7 @@ static void recompute_smt_state(void)
 
 static void remove_siblinginfo(int cpu)
 {
-	int sibling;
+	int phys_pkg_id, sibling;
 	struct cpuinfo_x86 *c = &cpu_data(cpu);
 
 	for_each_cpu(sibling, topology_core_cpumask(cpu)) {
@@ -1493,6 +1478,13 @@ static void remove_siblinginfo(int cpu)
 	cpumask_clear(topology_core_cpumask(cpu));
 	c->phys_proc_id = 0;
 	c->cpu_core_id = 0;
+
+	/* last core in socket going down? */
+	phys_pkg_id = c->phys_pkg_id;
+	c->phys_pkg_id = U16_MAX;
+	if (topology_phys_to_logical_pkg(phys_pkg_id) < 0)
+		logical_packages--;
+
 	cpumask_clear_cpu(cpu, cpu_sibling_setup_mask);
 	recompute_smt_state();
 }
