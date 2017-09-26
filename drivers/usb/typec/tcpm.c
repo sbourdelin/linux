@@ -1857,9 +1857,15 @@ static bool tcpm_start_drp_toggling(struct tcpm_port *port,
 
 static void tcpm_set_cc(struct tcpm_port *port, enum typec_cc_status cc)
 {
+	bool attached;
+
 	tcpm_log(port, "cc:=%d", cc);
 	port->cc_req = cc;
-	port->tcpc->set_cc(port->tcpc, cc);
+	if (port->state == SRC_ATTACHED || port->state == SNK_ATTACHED)
+		attached = true;
+	else
+		attached = false;
+	port->tcpc->set_cc(port->tcpc, cc, attached, port->polarity);
 }
 
 static int tcpm_init_vbus(struct tcpm_port *port)
@@ -1912,6 +1918,8 @@ static int tcpm_src_attach(struct tcpm_port *port)
 	ret = tcpm_set_polarity(port, polarity);
 	if (ret < 0)
 		return ret;
+
+	tcpm_set_cc(port, tcpm_rp_cc(port));
 
 	ret = tcpm_set_roles(port, true, TYPEC_SOURCE, TYPEC_HOST);
 	if (ret < 0)
@@ -2027,6 +2035,8 @@ static int tcpm_snk_attach(struct tcpm_port *port)
 				TYPEC_POLARITY_CC2 : TYPEC_POLARITY_CC1);
 	if (ret < 0)
 		return ret;
+
+	tcpm_set_cc(port, TYPEC_CC_RD);
 
 	ret = tcpm_set_roles(port, true, TYPEC_SINK, TYPEC_DEVICE);
 	if (ret < 0)

@@ -159,7 +159,8 @@ struct tcpc_dev {
 	int (*init)(struct tcpc_dev *dev);
 	int (*get_vbus)(struct tcpc_dev *dev);
 	int (*get_current_limit)(struct tcpc_dev *dev);
-	int (*set_cc)(struct tcpc_dev *dev, enum typec_cc_status cc);
+	int (*set_cc)(struct tcpc_dev *dev, enum typec_cc_status cc,
+			bool attached, enum typec_cc_polarity polarity);
 	int (*get_cc)(struct tcpc_dev *dev, enum typec_cc_status *cc1,
 		      enum typec_cc_status *cc2);
 	int (*set_polarity)(struct tcpc_dev *dev,
