@@ -552,15 +552,14 @@ static int tcpci_probe(struct i2c_client *client,
 	/* Disable chip interrupts */
 	tcpci_write16(tcpci, TCPC_ALERT_MASK, 0);
 
-	err = devm_request_threaded_irq(tcpci->dev, client->irq, NULL,
+	tcpci->port = tcpm_register_port(tcpci->dev, &tcpci->tcpc);
+	if (IS_ERR(tcpci->port))
+		return PTR_ERR(tcpci->port);
+
+	return devm_request_threaded_irq(tcpci->dev, client->irq, NULL,
 					tcpci_irq,
 					IRQF_ONESHOT | IRQF_TRIGGER_LOW,
 					dev_name(tcpci->dev), tcpci);
-	if (err < 0)
-		return err;
-
-	tcpci->port = tcpm_register_port(tcpci->dev, &tcpci->tcpc);
-	return PTR_ERR_OR_ZERO(tcpci->port);
 }
 
 static int tcpci_remove(struct i2c_client *client)
