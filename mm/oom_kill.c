@@ -794,8 +794,10 @@ static bool task_will_free_mem(struct task_struct *task)
 	 * This task has already been drained by the oom reaper so there are
 	 * only small chances it will free some more
 	 */
-	if (test_bit(MMF_OOM_SKIP, &mm->flags))
+	if (test_bit(MMF_OOM_SKIP, &mm->flags)) {
+		WARN(1, "Racing OOM victim selection. Please report to linux-mm@kvack.org if you saw this warning from non-artificial workloads.\n");
 		return false;
+	}
 
 	if (atomic_read(&mm->mm_users) <= 1)
 		return true;
