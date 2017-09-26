@@ -92,13 +92,13 @@ config ASUS_LAPTOP
 	  If you have an ACPI-compatible ASUS laptop, say Y or M here.
 
 config DELL_SMBIOS
-	tristate
-	select DCDBAS
+	tristate "Dell WMI SMBIOS calling interface"
+	depends on ACPI_WMI
 	---help---
 	This module provides common functions for kernel modules using
-	Dell SMBIOS.
+	Dell SMBIOS over ACPI-WMI.
 
-	If you have a Dell laptop, say Y or M here.
+	If you have a Dell computer, say Y or M here.
 
 config DELL_LAPTOP
 	tristate "Dell Laptop Extras"
