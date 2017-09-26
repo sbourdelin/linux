@@ -17,10 +17,7 @@
 #include <linux/module.h>
 #include <linux/dmi.h>
 #include <linux/err.h>
-#include <linux/gfp.h>
 #include <linux/mutex.h>
-#include <linux/slab.h>
-#include <linux/io.h>
 #include "../../firmware/dcdbas.h"
 #include "dell-smbios.h"
 
