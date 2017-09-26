@@ -91,7 +91,7 @@ config ASUS_LAPTOP
 
 	  If you have an ACPI-compatible ASUS laptop, say Y or M here.
 
-config DELL_SMBIOS
+config DELL_WMI_SMBIOS
 	tristate "Dell WMI SMBIOS calling interface"
 	depends on ACPI_WMI
 	---help---

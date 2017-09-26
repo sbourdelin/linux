@@ -21,7 +21,7 @@
 #include <linux/err.h>
 #include <linux/mutex.h>
 #include <linux/wmi.h>
-#include "dell-smbios.h"
+#include "dell-wmi-smbios.h"
 
 #ifdef CONFIG_DCDBAS
 #include "../../firmware/dcdbas.h"
@@ -253,14 +253,14 @@ static const struct wmi_device_id dell_smbios_wmi_id_table[] = {
 
 static struct wmi_driver dell_wmi_smbios_driver = {
 	.driver = {
-		.name = "dell-smbios",
+		.name = "dell-wmi-smbios",
 	},
 	.probe = dell_smbios_wmi_probe,
 	.remove = dell_smbios_wmi_remove,
 	.id_table = dell_smbios_wmi_id_table,
 };
 
-static int __init dell_smbios_init(void)
+static int __init dell_wmi_smbios_init(void)
 {
 	dmi_walk(find_tokens, NULL);
 
@@ -287,7 +287,7 @@ static int __init dell_smbios_init(void)
 	return 0;
 }
 
-static void __exit dell_smbios_exit(void)
+static void __exit dell_wmi_smbios_exit(void)
 {
 	kfree(da_tokens);
 #ifdef CONFIG_DCDBAS
@@ -297,8 +297,8 @@ static void __exit dell_smbios_exit(void)
 	wmi_driver_unregister(&dell_wmi_smbios_driver);
 }
 
-subsys_initcall(dell_smbios_init);
-module_exit(dell_smbios_exit);
+subsys_initcall(dell_wmi_smbios_init);
+module_exit(dell_wmi_smbios_exit);
 
 
 MODULE_AUTHOR("Matthew Garrett <mjg@redhat.com>");

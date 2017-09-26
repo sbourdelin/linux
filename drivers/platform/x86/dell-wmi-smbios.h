@@ -14,8 +14,8 @@
  *  published by the Free Software Foundation.
  */
 
-#ifndef _DELL_SMBIOS_H_
-#define _DELL_SMBIOS_H_
+#ifndef _DELL_WMI_SMBIOS_H_
+#define _DELL_WMI_SMBIOS_H_
 
 struct notifier_block;
 

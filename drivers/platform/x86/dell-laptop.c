@@ -33,7 +33,7 @@
 #include <linux/seq_file.h>
 #include <acpi/video.h>
 #include "dell-rbtn.h"
-#include "dell-smbios.h"
+#include "dell-wmi-smbios.h"
 
 #define BRIGHTNESS_TOKEN 0x7d
 #define KBD_LED_OFF_TOKEN 0x01E1

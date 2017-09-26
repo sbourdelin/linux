@@ -38,7 +38,7 @@
 #include <linux/dmi.h>
 #include <linux/wmi.h>
 #include <acpi/video.h>
-#include "dell-smbios.h"
+#include "dell-wmi-smbios.h"
 
 MODULE_AUTHOR("Matthew Garrett <mjg@redhat.com>");
 MODULE_AUTHOR("Pali Rohár <pali.rohar@gmail.com>");
