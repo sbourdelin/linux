@@ -40,5 +40,6 @@ int devm_irq_sim_init(struct device *dev, struct irq_sim *sim,
 void irq_sim_fini(struct irq_sim *sim);
 void irq_sim_fire(struct irq_sim *sim, unsigned int offset);
 int irq_sim_irqnum(struct irq_sim *sim, unsigned int offset);
+int irq_sim_baseirq(struct irq_sim *sim);
 
 #endif /* _LINUX_IRQ_SIM_H */

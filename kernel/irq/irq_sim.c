@@ -162,3 +162,14 @@ int irq_sim_irqnum(struct irq_sim *sim, unsigned int offset)
 	return sim->irqs[offset].irqnum;
 }
 EXPORT_SYMBOL_GPL(irq_sim_irqnum);
+
+/**
+ * irq_sim_baseirq - Get the base interrupt number.
+ *
+ * @sim:        The interrupt simulator object.
+ */
+int irq_sim_baseirq(struct irq_sim *sim)
+{
+	return irq_sim_irqnum(sim, 0);
+}
+EXPORT_SYMBOL_GPL(irq_sim_baseirq);
