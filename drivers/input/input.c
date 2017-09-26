@@ -2436,7 +2436,7 @@ static int __init input_init(void)
 	err = register_chrdev_region(MKDEV(INPUT_MAJOR, 0),
 				     INPUT_MAX_CHAR_DEVICES, "input");
 	if (err) {
-		pr_err("unable to register char major %d", INPUT_MAJOR);
+		pr_err("unable to register char major %d\n", INPUT_MAJOR);
 		goto fail2;
 	}
 
