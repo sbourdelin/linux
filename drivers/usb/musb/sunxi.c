@@ -297,6 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
 	if (test_bit(SUNXI_MUSB_FL_HAS_SRAM, &glue->flags))
 		sunxi_sram_release(musb->controller->parent);
 
+	usb_put_phy(glue->xceiv);
+
 	return 0;
 }
 
@@ -781,7 +783,7 @@ static int sunxi_musb_probe(struct platform_device *pdev)
 		return PTR_ERR(glue->usb_phy);
 	}
 
-	glue->xceiv = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
+	glue->xceiv = usb_get_phy(USB_PHY_TYPE_USB2);
 	if (IS_ERR(glue->xceiv)) {
 		ret = PTR_ERR(glue->xceiv);
 		dev_err(&pdev->dev, "Error getting usb-phy %d\n", ret);
@@ -803,11 +805,13 @@ static int sunxi_musb_probe(struct platform_device *pdev)
 	if (IS_ERR(glue->musb_pdev)) {
 		ret = PTR_ERR(glue->musb_pdev);
 		dev_err(&pdev->dev, "Error registering musb dev: %d\n", ret);
-		goto err_unregister_usb_phy;
+		goto err_put_usb_phy;
 	}
 
 	return 0;
 
+err_put_usb_phy:
+	usb_put_phy(glue->xceiv);
 err_unregister_usb_phy:
 	usb_phy_generic_unregister(glue->usb_phy);
 	return ret;
