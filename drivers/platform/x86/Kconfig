@@ -94,6 +94,7 @@ config ASUS_LAPTOP
 config DELL_WMI_SMBIOS
 	tristate "Dell WMI SMBIOS calling interface"
 	depends on ACPI_WMI
+	default ACPI_WMI
 	---help---
 	This module provides common functions for kernel modules using
 	Dell SMBIOS over ACPI-WMI.
