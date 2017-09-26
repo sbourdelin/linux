@@ -632,6 +632,8 @@ struct hid_descriptor {
 	struct hid_class_descriptor desc[1];
 } __attribute__ ((packed));
 
+#define HID_DESCRIPTOR_MIN_SIZE	9
+
 #define HID_DEVICE(b, g, ven, prod)					\
 	.bus = (b), .group = (g), .vendor = (ven), .product = (prod)
 #define HID_USB_DEVICE(ven, prod)				\

@@ -970,11 +970,18 @@ static int usbhid_parse(struct hid_device *hid)
 	struct usb_interface *intf = to_usb_interface(hid->dev.parent);
 	struct usb_host_interface *interface = intf->cur_altsetting;
 	struct usb_device *dev = interface_to_usbdev (intf);
-	struct hid_descriptor *hdesc;
+	unsigned char *buffer = intf->altsetting->extra;
+	int buflen = intf->altsetting->extralen;
+	int length;
 	u32 quirks = 0;
 	unsigned int rsize = 0;
 	char *rdesc;
 	int ret, n;
+
+	if (!buffer) {
+		dbg_hid("class descriptor not present\n");
+		return -ENODEV;
+	}
 
 	quirks = usbhid_lookup_quirk(le16_to_cpu(dev->descriptor.idVendor),
 			le16_to_cpu(dev->descriptor.idProduct));
@@ -990,19 +997,27 @@ static int usbhid_parse(struct hid_device *hid)
 				quirks |= HID_QUIRK_NOGET;
 	}
 
-	if (usb_get_extra_descriptor(interface, HID_DT_HID, &hdesc) &&
-	    (!interface->desc.bNumEndpoints ||
-	     usb_get_extra_descriptor(&interface->endpoint[0], HID_DT_HID, &hdesc))) {
-		dbg_hid("class descriptor not present\n");
-		return -ENODEV;
+	while (buflen > 2) {
+		length = buffer[0];
+		if (!length || length < HID_DESCRIPTOR_MIN_SIZE)
+			goto next_desc;
+
+		if (buffer[1] == HID_DT_HID) {
+			hid->version = get_unaligned_le16(&buffer[2]);
+			hid->country = buffer[4];
+
+			for (n = 0; n < buffer[5]; n++) {
+				/* we are just interested in report descriptor */
+				if (buffer[6+3*n] != HID_DT_REPORT)
+					continue;
+				rsize = get_unaligned_le16(&buffer[7+3*n]);
+			}
+		}
+
+next_desc:
+		buflen -= length;
+		buffer += length;
 	}
-
-	hid->version = le16_to_cpu(hdesc->bcdHID);
-	hid->country = hdesc->bCountryCode;
-
-	for (n = 0; n < hdesc->bNumDescriptors; n++)
-		if (hdesc->desc[n].bDescriptorType == HID_DT_REPORT)
-			rsize = le16_to_cpu(hdesc->desc[n].wDescriptorLength);
 
 	if (!rsize || rsize > HID_MAX_DESCRIPTOR_SIZE) {
 		dbg_hid("weird size of report descriptor (%u)\n", rsize);
