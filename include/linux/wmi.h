@@ -41,6 +41,7 @@ struct wmi_device_id {
 struct wmi_driver {
 	struct device_driver driver;
 	const struct wmi_device_id *id_table;
+	const struct file_operations *file_operations;
 
 	int (*probe)(struct wmi_device *wdev);
 	int (*remove)(struct wmi_device *wdev);
