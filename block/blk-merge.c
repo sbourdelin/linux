@@ -474,28 +474,50 @@ EXPORT_SYMBOL(blk_rq_map_sg);
 
 static inline int ll_new_hw_segment(struct request_queue *q,
 				    struct request *req,
-				    struct bio *bio)
+				    struct bio *bio,
+				    bool at_head)
 {
-	int nr_phys_segs = bio_phys_segments(q, bio);
-
-	if (req->nr_phys_segments + nr_phys_segs > queue_max_segments(q))
-		goto no_merge;
+	unsigned int seg_size;
+	int total_nr_phys_segs;
+	bool contig;
 
 	if (blk_integrity_merge_bio(q, req, bio) == false)
 		goto no_merge;
 
-	/*
-	 * This will form the start of a new hw segment.  Bump both
-	 * counters.
-	 */
-	req->nr_phys_segments += nr_phys_segs;
-	return 1;
+	total_nr_phys_segs = req->nr_phys_segments + bio_phys_segments(q, bio);
+	if (at_head) {
+		seg_size = bio->bi_seg_back_size + req->bio->bi_seg_front_size;
+		contig = blk_phys_contig_segment(q, bio, req->bio);
+	} else {
+		seg_size = req->biotail->bi_seg_back_size + bio->bi_seg_front_size;
+		contig = blk_phys_contig_segment(q, req->biotail, bio);
+	}
+	if (contig)
+		total_nr_phys_segs--;
 
+	if (unlikely(total_nr_phys_segs > queue_max_segments(q)))
+		goto no_merge;
+
+	if (contig) {
+		if (at_head) {
+			if (bio->bi_phys_segments == 1)
+				bio->bi_seg_front_size = seg_size;
+			if (req->nr_phys_segments == 1)
+				req->biotail->bi_seg_back_size = seg_size;
+		} else {
+			if (req->nr_phys_segments == 1)
+				req->bio->bi_seg_front_size = seg_size;
+			if (bio->bi_phys_segments == 1)
+				bio->bi_seg_back_size = seg_size;
+		}
+	}
+
+	req->nr_phys_segments = total_nr_phys_segs;
+	return 1;
 no_merge:
 	req_set_nomerge(q, req);
 	return 0;
 }
-
 int ll_back_merge_fn(struct request_queue *q, struct request *req,
 		     struct bio *bio)
 {
@@ -514,13 +536,12 @@ int ll_back_merge_fn(struct request_queue *q, struct request *req,
 	if (!bio_flagged(bio, BIO_SEG_VALID))
 		blk_recount_segments(q, bio);
 
-	return ll_new_hw_segment(q, req, bio);
+	return ll_new_hw_segment(q, req, bio, false);
 }
 
 int ll_front_merge_fn(struct request_queue *q, struct request *req,
 		      struct bio *bio)
 {
-
 	if (req_gap_front_merge(req, bio))
 		return 0;
 	if (blk_integrity_rq(req) &&
@@ -536,7 +557,7 @@ int ll_front_merge_fn(struct request_queue *q, struct request *req,
 	if (!bio_flagged(req->bio, BIO_SEG_VALID))
 		blk_recount_segments(q, req->bio);
 
-	return ll_new_hw_segment(q, req, bio);
+	return ll_new_hw_segment(q, req, bio, true);
 }
 
 /*
