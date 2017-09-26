@@ -238,6 +238,10 @@ struct auxtrace_index {
 	struct auxtrace_index_entry entries[PERF_AUXTRACE_INDEX_ENTRY_COUNT];
 };
 
+	HEADER_SAMPLE_TIME = 21,
+
+Two uint64_t for the time of first sample and the time of last sample.
+
 	other bits are reserved and should ignored for now
 	HEADER_FEAT_BITS	= 256,
 

@@ -1181,6 +1181,20 @@ static int write_stat(struct feat_fd *ff __maybe_unused,
 	return 0;
 }
 
+static int write_sample_time(struct feat_fd *ff,
+			     struct perf_evlist *evlist)
+{
+	int ret;
+
+	ret = do_write(ff, &evlist->first_sample_time,
+		       sizeof(evlist->first_sample_time));
+	if (ret < 0)
+		return ret;
+
+	return do_write(ff, &evlist->last_sample_time,
+			sizeof(evlist->last_sample_time));
+}
+
 static void print_hostname(struct feat_fd *ff, FILE *fp)
 {
 	fprintf(fp, "# hostname : %s\n", ff->ph->env.hostname);
@@ -1504,6 +1518,19 @@ static void print_group_desc(struct feat_fd *ff, FILE *fp)
 				fprintf(fp, "}\n");
 		}
 	}
+}
+
+static void print_sample_time(struct feat_fd *ff, FILE *fp)
+{
+	struct perf_session *session;
+
+	session = container_of(ff->ph, struct perf_session, header);
+
+	fprintf(fp, "# time of first sample : %" PRIu64 "\n",
+		session->first_sample_time);
+
+	fprintf(fp, "# time of last sample : %" PRIu64 "\n",
+		session->last_sample_time);
 }
 
 static int __event_process_build_id(struct build_id_event *bev,
@@ -2147,6 +2174,27 @@ out_free_caches:
 	return -1;
 }
 
+static int process_sample_time(struct feat_fd *ff, void *data __maybe_unused)
+{
+	struct perf_session *session;
+	u64 first_sample_time, last_sample_time;
+	int ret;
+
+	session = container_of(ff->ph, struct perf_session, header);
+
+	ret = do_read_u64(ff, &first_sample_time);
+	if (ret)
+		return -1;
+
+	ret = do_read_u64(ff, &last_sample_time);
+	if (ret)
+		return -1;
+
+	session->first_sample_time = first_sample_time;
+	session->last_sample_time = last_sample_time;
+	return 0;
+}
+
 struct feature_ops {
 	int (*write)(struct feat_fd *ff, struct perf_evlist *evlist);
 	void (*print)(struct feat_fd *ff, FILE *fp);
@@ -2204,6 +2252,7 @@ static const struct feature_ops feat_ops[HEADER_LAST_FEATURE] = {
 	FEAT_OPN(AUXTRACE,	auxtrace,	false),
 	FEAT_OPN(STAT,		stat,		false),
 	FEAT_OPN(CACHE,		cache,		true),
+	FEAT_OPR(SAMPLE_TIME,	sample_time,	false),
 };
 
 struct header_print_data {

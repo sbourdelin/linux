@@ -34,6 +34,8 @@ struct perf_session {
 	struct ordered_events	ordered_events;
 	struct perf_data_file	*file;
 	struct perf_tool	*tool;
+	u64			first_sample_time;
+	u64			last_sample_time;
 };
 
 struct perf_tool;
