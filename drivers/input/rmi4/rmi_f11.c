@@ -596,7 +596,7 @@ static void rmi_f11_finger_handler(struct f11_data *f11,
 			/* Possible of having 4 fingers per f_state register */
 			finger_state = rmi_f11_parse_finger_state(f_state, i);
 			if (finger_state == F11_RESERVED) {
-				pr_err("Invalid finger state[%d]: 0x%02x", i,
+				pr_err("Invalid finger state[%d]: 0x%02x\n", i,
 					finger_state);
 				continue;
 			}
