@@ -20,6 +20,7 @@ Optional properties:
 				not present false
  - nand-ecc-strength:           number of bits to correct per ECC step
  - nand-ecc-step-size:          number of data bytes covered by a single ECC step
+ - marvell,nand-force-csx:      Set to implement guideline when arbitration of NAND and NOR flash is enabled.
 
 The following ECC strength and step size are currently supported:
 
