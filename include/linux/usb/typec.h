@@ -243,5 +243,7 @@ void typec_set_data_role(struct typec_port *port, enum typec_data_role role);
 void typec_set_pwr_role(struct typec_port *port, enum typec_role role);
 void typec_set_vconn_role(struct typec_port *port, enum typec_role role);
 void typec_set_pwr_opmode(struct typec_port *port, enum typec_pwr_opmode mode);
+int typec_get_port_type(struct device *dev);
+int typec_get_power_role(struct device *dev);
 
 #endif /* __LINUX_USB_TYPEC_H */

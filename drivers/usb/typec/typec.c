@@ -12,6 +12,7 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/of.h>
 #include <linux/slab.h>
 #include <linux/usb/typec.h>
 
@@ -1249,6 +1250,50 @@ void typec_set_pwr_opmode(struct typec_port *port,
 }
 EXPORT_SYMBOL_GPL(typec_set_pwr_opmode);
 
+/**
+ * typec_get_port_type - Get the typec port type
+ * @dev: Device to get the property of
+ *
+ * This routine is used by typec hardware driver to read property port type
+ * from the device firmware description.
+ *
+ * Returns typec_port_type if success, otherwise negative error code.
+ */
+int typec_get_port_type(struct device *dev)
+{
+	const char *type_str;
+	int ret;
+
+	ret = device_property_read_string(dev, "port-type", &type_str);
+	if (ret < 0)
+		return ret;
+
+	return match_string(typec_port_types, ARRAY_SIZE(typec_port_types),
+								 type_str);
+}
+EXPORT_SYMBOL_GPL(typec_get_port_type);
+
+/**
+ * typec_get_power_role - Get the typec preferred role
+ * @dev: Device to get the property of
+ *
+ * This routine is used by typec hardware driver to read property default role
+ * from the device firmware description.
+ *
+ * Returns typec_role if success, otherwise negative error code.
+ */
+int typec_get_power_role(struct device *dev)
+{
+	const char *power_str;
+	int ret;
+
+	ret = device_property_read_string(dev, "default-role", &power_str);
+	if (ret < 0)
+		return ret;
+
+	return match_string(typec_roles, ARRAY_SIZE(typec_roles), power_str);
+}
+EXPORT_SYMBOL_GPL(typec_get_power_role);
 /* --------------------------------------- */
 
 /**
