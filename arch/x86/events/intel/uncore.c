@@ -939,6 +939,7 @@ static int uncore_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id
 
 	atomic_inc(&box->refcnt);
 	box->pci_phys_id = phys_id;
+	box->logical_pkg_id = topology_phys_to_logical_pkg(box->pci_phys_id);
 	box->pkgid = pkg;
 	box->pci_dev = pdev;
 	box->pmu = pmu;
