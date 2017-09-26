@@ -581,6 +581,27 @@ more details, with real examples.
 		LDFLAGS_vmlinux += $(call ld-option, -X)
 
 
+--- 3.14 $(LD) support function cache
+
+One thing to realize about all the calls to the above support functions
+is that each use of them requires a full invocation of an external tool, like
+the C compiler, assembler, or linker.  If nothing else that invocation will
+cause a fork/exec/shared library link.  In some build environments, however, it
+could also involve traversing thorough one or more wrappers.  To put some
+numbers on it, I've measured compiler invocations of as fast as 4ms or
+as slow as 150ms.
+
+Many of the above support functions are used in places where they are
+evaluated on each invocation of Make before anything else can run.  Even on
+a simple command like "make help" we need to evaluate every single one of the
+variables.
+
+To avoid this slow overhead we can cache the result of these invocations.
+If we store this cache in a way that's easy for Make to use (like in Makefile
+format) then it will be very quick and we'll save a lot of time with each
+invocation of make.
+
+
 === 4 Host Program support
 
 Kbuild supports building executables on the host for use during the

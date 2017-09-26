@@ -8,6 +8,8 @@ squote  := '
 empty   :=
 space   := $(empty) $(empty)
 space_escape := _-_SPACE_-_
+right_paren := )
+left_paren := (
 
 ###
 # Name of target with a '.' as filename prefix. foo/bar.o => foo/.bar.o
@@ -69,6 +71,53 @@ endef
 # gcc support functions
 # See documentation in Documentation/kbuild/makefiles.txt
 
+# Tools for caching Makefile variables that are "expensive" to compute.
+#
+# Here we want to help deal with variables that take a long time to compute
+# by making it easy to store these variables in a cache.
+#
+# The canonical example here is testing for compiler flags.  On a simple system
+# each call to the compiler takes 10 ms, but on a system with a compiler that's
+# called through various wrappers it can take upwards of 100 ms.  If we have
+# 100 calls to the compiler this can take 1 second (on a simple system) or 10
+# seconds (on a complicated system).
+#
+# The "cache" will be in Makefile syntax and can be directly included.
+# Any time we try to reference a variable that's not in the cache we'll
+# calculate it and store it in the cache for next time.
+
+# Include values from last time
+-include Makefile-cache.o
+
+# Usage:   $(call cached-val,variable_name,escaped_expensive_operation)
+# Example: $(call cached-val,md5_val,$$(shell md5sum /usr/bin/gcc)
+#
+# If the variable is already defined we'll just use it.  If it's not, it will
+# be calculated and stored in a persistent (disk-based) cache for the next
+# invocation of Make.  The call will evaluate to the value of the variable.
+#
+# This is a bit of voodoo, but basic explanation is that if the variable
+# was undefined then we'll evaluate the expensive operation and store it into
+# the variable.  We'll then store that value in the cache and finally output
+# the value.
+define __set-and-store
+ifeq ($(origin $(1)),undefined)
+  $$(eval $(1) := $$(2))
+  $$(shell echo '$(1) := $$($(1))' >> Makefile-cache.o)
+endif
+endef
+cached-val = $(eval $(call __set-and-store,__cached_$(1)))$(__cached_$(1))
+
+# Usage: $(call __sanitize-opt,Hello=Hola$(comma)Goodbye Adios)
+#
+# Convert all '$', ')', '(', '\', '=', ' ', ',' to '_'
+__sanitize-opt = $(subst $$,_,$(subst $(right_paren),_,$(subst $(left_paren),_,$(subst \,_,$(subst =,_,$(subst $(space),_,$(subst $(comma),_,$(1))))))))
+
+# Usage = $(call __comma,something_with_comma)
+#
+# Convert ',' to '$(comma)' which can help it getting interpreted by eval.
+__comma = $(subst $(comma),$$(comma),$(1))
+
 # cc-cross-prefix
 # Usage: CROSS_COMPILE := $(call cc-cross-prefix, m68k-linux-gnu- m68k-linux-)
 # Return first prefix where a prefix$(CC) is found in PATH.
@@ -99,19 +148,34 @@ try-run = $(shell set -e;		\
 # as-option
 # Usage: cflags-y += $(call as-option,-Wa$(comma)-isa=foo,)
 
-as-option = $(call try-run,\
-	$(CC) $(KBUILD_CFLAGS) $(1) -c -x assembler /dev/null -o "$$TMP",$(1),$(2))
+as-option = \
+	$(call cached-val,$(call __sanitize-opt,\
+		as_opt_$(CC)_$(KBUILD_CFLAGS)_$(1)_$(2)),\
+	$$(call try-run,\
+	$(CC) $(call __comma,$(KBUILD_CFLAGS)) $(call __comma,$(1)) \
+	-c -x assembler /dev/null \
+	-o "$$$$TMP",$(call __comma,$(1)),$(call __comma,$(2))))
 
 # as-instr
 # Usage: cflags-y += $(call as-instr,instr,option1,option2)
 
-as-instr = $(call try-run,\
-	printf "%b\n" "$(1)" | $(CC) $(KBUILD_AFLAGS) -c -x assembler -o "$$TMP" -,$(2),$(3))
+as-instr = \
+	$(call cached-val,$(call __sanitize-opt,\
+		as_instr_$(CC)_$(KBUILD_AFLAGS)_$(1)_$(2)_$(3)),\
+	$$(call try-run,\
+	printf "%b\n" "$(call __comma,$(1))" | \
+	$(CC) $(call __comma,$(KBUILD_AFLAGS)) -c -x assembler \
+	-o "$$$$TMP" -,$(call __comma,$(2)),$(call __comma,$(3))))
 
 # __cc-option
 # Usage: MY_CFLAGS += $(call __cc-option,$(CC),$(MY_CFLAGS),-march=winchip-c6,-march=i586)
-__cc-option = $(call try-run,\
-	$(1) -Werror $(2) $(3) -c -x c /dev/null -o "$$TMP",$(3),$(4))
+__cc-option = \
+	$(call cached-val,$(call __sanitize-opt,__cc_opt_$(1)_$(2)_$(3)_$(4)),\
+	$$(call try-run,\
+	$(call __comma,$(1)) -Werror \
+	$(call __comma,$(2)) \
+	$(call __comma,$(3)) -c -x c /dev/null \
+	-o "$$$$TMP",$(call __comma,$(strip $(3))),$(call __comma,$(strip $(4)))))
 
 # Do not attempt to build with gcc plugins during cc-option tests.
 # (And this uses delayed resolution so the flags will be up to date.)
@@ -130,24 +194,42 @@ hostcc-option = $(call __cc-option, $(HOSTCC),\
 
 # cc-option-yn
 # Usage: flag := $(call cc-option-yn,-march=winchip-c6)
-cc-option-yn = $(call try-run,\
-	$(CC) -Werror $(KBUILD_CPPFLAGS) $(CC_OPTION_CFLAGS) $(1) -c -x c /dev/null -o "$$TMP",y,n)
+cc-option-yn = \
+	$(call cached-val,$(call __sanitize-opt,\
+		cc_opt_yn_$(CC)_$(KBUILD_CPPFLAGS)_$(CC_OPTION_CFLAGS)$(1)),\
+	$$(call try-run,\
+	$(CC) -Werror $(call __comma,$(KBUILD_CPPFLAGS)) \
+	$(call __comma,$(CC_OPTION_CFLAGS)) \
+	$(call __comma,$(1)) \
+	-c -x c /dev/null -o "$$$$TMP",y,n))
 
 # cc-disable-warning
 # Usage: cflags-y += $(call cc-disable-warning,unused-but-set-variable)
-cc-disable-warning = $(call try-run,\
-	$(CC) -Werror $(KBUILD_CPPFLAGS) $(CC_OPTION_CFLAGS) -W$(strip $(1)) -c -x c /dev/null -o "$$TMP",-Wno-$(strip $(1)))
+cc-disable-warning = \
+	$(call cached-val,$(call __sanitize-opt,\
+		cc_dis_wn_$(CC)_$(KBUILD_CPPFLAGS)_$(CC_OPTION_CFLAGS)$(1)_$(2)),\
+	$$(call try-run,\
+	$(CC) -Werror $(call __comma,$(KBUILD_CPPFLAGS)) \
+	$(call __comma,$(CC_OPTION_CFLAGS)) \
+	-W$(strip $(call __comma,$(1))) -c -x c /dev/null \
+	-o "$$$$TMP",-Wno-$(strip $(call __comma,$(1)))))
 
 # cc-name
 # Expands to either gcc or clang
-cc-name = $(shell $(CC) -v 2>&1 | grep -q "clang version" && echo clang || echo gcc)
+cc-name = \
+	$(call cached-val,$(call __sanitize-opt,cc_name_$(CC)),\
+	$$(shell $(CC) -v 2>&1 | grep -q "clang version" && echo clang || echo gcc))
 
 # cc-version
-cc-version = $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-version.sh $(CC))
+cc-version = \
+	$(call cached-val,$(call __sanitize-opt,cc_version_$(CC)),\
+	$$(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-version.sh $(CC)))
 
 # cc-fullversion
-cc-fullversion = $(shell $(CONFIG_SHELL) \
-	$(srctree)/scripts/gcc-version.sh -p $(CC))
+cc-fullversion = \
+	$(call cached-val,$(call __sanitize-opt,cc_full_version_$(CC)),\
+	$$(shell $(CONFIG_SHELL) \
+	$(srctree)/scripts/gcc-version.sh -p $(CC)))
 
 # cc-ifversion
 # Usage:  EXTRA_CFLAGS += $(call cc-ifversion, -lt, 0402, -O1)
@@ -159,18 +241,31 @@ cc-if-fullversion = $(shell [ $(cc-fullversion) $(1) $(2) ] && echo $(3) || echo
 
 # cc-ldoption
 # Usage: ldflags += $(call cc-ldoption, -Wl$(comma)--hash-style=both)
-cc-ldoption = $(call try-run,\
-	$(CC) $(1) -nostdlib -x c /dev/null -o "$$TMP",$(1),$(2))
+cc-ldoption = \
+	$(call cached-val,$(call __sanitize-opt,\
+		cc_ld_opt_$(CC)_$(1)_$(2)),\
+	$$(call try-run,\
+	$(CC) $(call __comma,$(1)) -nostdlib -x c /dev/null \
+	-o "$$$$TMP",$(call __comma,$(1)),$(call __comma,$(2))))
 
 # ld-option
 # Usage: LDFLAGS += $(call ld-option, -X)
-ld-option = $(call try-run,\
-	$(CC) -x c /dev/null -c -o "$$TMPO" ; $(LD) $(1) "$$TMPO" -o "$$TMP",$(1),$(2))
+ld-option = \
+	$(call cached-val,$(call __sanitize-opt,\
+		ld_opt_$(CC)_$(LD)_$(1)_$(2)),\
+	$$(call try-run,\
+	$(CC) -x c /dev/null -c -o "$$$$TMPO" ; \
+	$(LD) $(call __comma,$(1)) "$$$$TMPO" \
+	-o "$$$$TMP",$(call __comma,$(1)),$(call __comma,$(2))))
 
 # ar-option
 # Usage: KBUILD_ARFLAGS := $(call ar-option,D)
 # Important: no spaces around options
-ar-option = $(call try-run, $(AR) rc$(1) "$$TMP",$(1),$(2))
+ar-option = \
+	$(call cached-val,$(call __sanitize-opt,\
+		ar_opt_$(AR)_$(1)_$(2)),\
+	$$(call try-run, $(AR) rc$(call __comma,$(1)) \
+	"$$$$TMP",$(call __comma,$(1)),$(call __comma,$(2))))
 
 # ld-version
 # Note this is mainly for HJ Lu's 3 number binutil versions
