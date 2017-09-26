@@ -425,17 +425,92 @@ static const struct regmap_config tcpci_regmap_config = {
 	.max_register = 0x7F, /* 0x80 .. 0xFF are vendor defined */
 };
 
-static const struct tcpc_config tcpci_tcpc_config = {
-	.type = TYPEC_PORT_DFP,
-	.default_role = TYPEC_SINK,
-};
-
+/* Populate struct tcpc_config from device-tree */
 static int tcpci_parse_config(struct tcpci *tcpci)
 {
+	struct tcpc_config *tcfg;
+	int ret = -EINVAL;
+
 	tcpci->controls_vbus = true; /* XXX */
 
-	/* TODO: Populate struct tcpc_config from ACPI/device-tree */
-	tcpci->tcpc.config = &tcpci_tcpc_config;
+	tcpci->tcpc.config = devm_kzalloc(tcpci->dev, sizeof(*tcfg),
+					  GFP_KERNEL);
+	if (!tcpci->tcpc.config)
+		return -ENOMEM;
+
+	tcfg = tcpci->tcpc.config;
+
+	/* Get port-type */
+	ret = typec_get_port_type(tcpci->dev);
+	if (ret < 0) {
+		dev_err(tcpci->dev, "typec port type is NOT correct!\n");
+		return ret;
+	}
+	tcfg->type = ret;
+
+	if (tcfg->type == TYPEC_PORT_UFP)
+		goto sink;
+
+	/* Get source PDO */
+	tcfg->nr_src_pdo = device_property_read_u32_array(tcpci->dev,
+						"src-pdos", NULL, 0);
+	if (tcfg->nr_src_pdo <= 0) {
+		dev_err(tcpci->dev, "typec source pdo is missing!\n");
+		return -EINVAL;
+	}
+
+	tcfg->src_pdo = devm_kzalloc(tcpci->dev,
+		sizeof(*tcfg->src_pdo) * tcfg->nr_src_pdo, GFP_KERNEL);
+	if (!tcfg->src_pdo)
+		return -ENOMEM;
+
+	ret = device_property_read_u32_array(tcpci->dev, "src-pdos",
+				tcfg->src_pdo, tcfg->nr_src_pdo);
+	if (ret) {
+		dev_err(tcpci->dev, "Failed to read src pdo!\n");
+		return -EINVAL;
+	}
+
+	if (tcfg->type == TYPEC_PORT_DFP)
+		return 0;
+
+	/* Get the preferred power role for drp */
+	ret = typec_get_power_role(tcpci->dev);
+	if (ret < 0) {
+		dev_err(tcpci->dev, "typec preferred role is wrong!\n");
+		return ret;
+	}
+	tcfg->default_role = ret;
+sink:
+	/* Get sink power capability */
+	tcfg->nr_snk_pdo = device_property_read_u32_array(tcpci->dev,
+						"snk-pdos", NULL, 0);
+	if (tcfg->nr_snk_pdo <= 0) {
+		dev_err(tcpci->dev, "typec sink pdo is missing!\n");
+		return -EINVAL;
+	}
+
+	tcfg->snk_pdo = devm_kzalloc(tcpci->dev,
+		sizeof(*tcfg->snk_pdo) * tcfg->nr_snk_pdo, GFP_KERNEL);
+	if (!tcfg->snk_pdo)
+		return -ENOMEM;
+
+	ret = device_property_read_u32_array(tcpci->dev, "snk-pdos",
+				tcfg->snk_pdo, tcfg->nr_snk_pdo);
+	if (ret) {
+		dev_err(tcpci->dev, "Failed to read sink pdo!\n");
+		return -EINVAL;
+	}
+
+	if (device_property_read_u32(tcpci->dev, "max-snk-mv",
+				     &tcfg->max_snk_mv) ||
+		device_property_read_u32(tcpci->dev, "max-snk-ma",
+					 &tcfg->max_snk_ma) ||
+		device_property_read_u32(tcpci->dev, "op-snk-mw",
+					 &tcfg->operating_snk_mw)) {
+		dev_err(tcpci->dev, "Failed to read sink capability!\n");
+		return -EINVAL;
+	}
 
 	return 0;
 }
