@@ -35,6 +35,9 @@ struct net_device *gretap_fb_dev_create(struct net *net, const char *name,
 				       u8 name_assign_type);
 int gre_parse_header(struct sk_buff *skb, struct tnl_ptk_info *tpi,
 		     bool *csum_err, __be16 proto, int nhs);
+#if IS_ENABLED(CONFIG_MPLS)
+int mpls_gre_rcv(struct sk_buff *skb, int gre_hdr_len);
+#endif
 
 static inline int gre_calc_hlen(__be16 o_flags)
 {

@@ -476,6 +476,13 @@ static int gre_rcv(struct sk_buff *skb)
 	if (hdr_len < 0)
 		goto drop;
 
+#if IS_ENABLED(CONFIG_MPLS)
+	if (unlikely(tpi.proto == htons(ETH_P_MPLS_UC))) {
+		if (mpls_gre_rcv(skb, hdr_len))
+			goto drop;
+		return 0;
+	}
+#endif
 	if (iptunnel_pull_header(skb, hdr_len, tpi.proto, false))
 		goto drop;
 

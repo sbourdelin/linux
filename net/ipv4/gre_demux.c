@@ -23,6 +23,9 @@
 #include <linux/netdevice.h>
 #include <linux/if_tunnel.h>
 #include <linux/spinlock.h>
+#if IS_ENABLED(CONFIG_MPLS)
+#include <linux/mpls.h>
+#endif
 #include <net/protocol.h>
 #include <net/gre.h>
 
@@ -121,6 +124,25 @@ int gre_parse_header(struct sk_buff *skb, struct tnl_ptk_info *tpi,
 	return hdr_len;
 }
 EXPORT_SYMBOL(gre_parse_header);
+
+#if IS_ENABLED(CONFIG_MPLS)
+int mpls_gre_rcv(struct sk_buff *skb, int gre_hdr_len)
+{
+	if (unlikely(!pskb_may_pull(skb, gre_hdr_len)))
+		goto drop;
+
+	/* Pop GRE hdr and reset the skb */
+	skb_pull(skb, gre_hdr_len);
+	skb_reset_network_header(skb);
+
+	mpls_forward(skb, skb->dev, NULL, NULL);
+
+	return 0;
+drop:
+	return NET_RX_DROP;
+}
+EXPORT_SYMBOL(mpls_gre_rcv);
+#endif
 
 static int gre_rcv(struct sk_buff *skb)
 {
