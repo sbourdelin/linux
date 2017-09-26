@@ -19,6 +19,7 @@
 #include <linux/percpu.h>
 #include <linux/nmi.h>
 #include <linux/profile.h>
+#include <linux/vmstat.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/clock.h>
 #include <linux/sched/stat.h>
