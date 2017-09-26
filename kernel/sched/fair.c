@@ -5308,6 +5308,11 @@ static unsigned long capacity_orig_of(int cpu)
 	return cpu_rq(cpu)->cpu_capacity_orig;
 }
 
+static inline bool full_capacity(int cpu)
+{
+	return (capacity_of(cpu) >= (capacity_orig_of(cpu)*819 >> 10));
+}
+
 static unsigned long cpu_avg_load_per_task(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
@@ -5634,8 +5639,10 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 	unsigned long load, min_load = ULONG_MAX;
 	unsigned int min_exit_latency = UINT_MAX;
 	u64 latest_idle_timestamp = 0;
+	unsigned int backup_cap = 0;
 	int least_loaded_cpu = this_cpu;
 	int shallowest_idle_cpu = -1;
+	int shallowest_idle_cpu_backup = -1;
 	int i;
 
 	/* Check if we have any choice: */
@@ -5655,7 +5662,12 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 				 */
 				min_exit_latency = idle->exit_latency;
 				latest_idle_timestamp = rq->idle_stamp;
-				shallowest_idle_cpu = i;
+				if (full_capacity(i)) {
+					shallowest_idle_cpu = i;
+				} else if (capacity_of(i) > backup_cap) {
+					shallowest_idle_cpu_backup = i;
+					backup_cap = capacity_of(i);
+				}
 			} else if ((!idle || idle->exit_latency == min_exit_latency) &&
 				   rq->idle_stamp > latest_idle_timestamp) {
 				/*
@@ -5664,7 +5676,12 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 				 * a warmer cache.
 				 */
 				latest_idle_timestamp = rq->idle_stamp;
-				shallowest_idle_cpu = i;
+				if (full_capacity(i)) {
+					shallowest_idle_cpu = i;
+				} else if (capacity_of(i) > backup_cap) {
+					shallowest_idle_cpu_backup = i;
+					backup_cap = capacity_of(i);
+				}
 			}
 		} else if (shallowest_idle_cpu == -1) {
 			load = weighted_cpuload(cpu_rq(i));
@@ -5675,7 +5692,11 @@ find_idlest_cpu(struct sched_group *group, struct task_struct *p, int this_cpu)
 		}
 	}
 
-	return shallowest_idle_cpu != -1 ? shallowest_idle_cpu : least_loaded_cpu;
+	if (shallowest_idle_cpu != -1)
+		return shallowest_idle_cpu;
+
+	return (shallowest_idle_cpu_backup != -1 ?
+		shallowest_idle_cpu_backup : least_loaded_cpu);
 }
 
 #ifdef CONFIG_SCHED_SMT
