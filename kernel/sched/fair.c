@@ -5758,7 +5758,10 @@ unlock:
 static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int target)
 {
 	struct cpumask *cpus = this_cpu_cpumask_var_ptr(select_idle_mask);
-	int core, cpu;
+	int core, cpu, rcpu, rcpu_backup;
+	unsigned int backup_cap = 0;
+
+	rcpu = rcpu_backup = -1;
 
 	if (!static_branch_likely(&sched_smt_present))
 		return -1;
@@ -5775,10 +5778,20 @@ static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int 
 			cpumask_clear_cpu(cpu, cpus);
 			if (!idle_cpu(cpu))
 				idle = false;
+
+			if (full_capacity(cpu)) {
+				rcpu = cpu;
+			} else if ((rcpu == -1) && (capacity_of(cpu) > backup_cap)) {
+				backup_cap = capacity_of(cpu);
+				rcpu_backup = cpu;
+			}
 		}
 
-		if (idle)
-			return core;
+		if (idle) {
+			if (rcpu == -1)
+				return (rcpu_backup != -1 ? rcpu_backup : core);
+			return rcpu;
+		}
 	}
 
 	/*
@@ -5794,7 +5807,8 @@ static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int 
  */
 static int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int target)
 {
-	int cpu;
+	int cpu, backup_cpu = -1;
+	unsigned int backup_cap = 0;
 
 	if (!static_branch_likely(&sched_smt_present))
 		return -1;
@@ -5802,11 +5816,17 @@ static int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int t
 	for_each_cpu(cpu, cpu_smt_mask(target)) {
 		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
 			continue;
-		if (idle_cpu(cpu))
-			return cpu;
+		if (idle_cpu(cpu)) {
+			if (full_capacity(cpu))
+				return cpu;
+			if (capacity_of(cpu) > backup_cap) {
+				backup_cap = capacity_of(cpu);
+				backup_cpu = cpu;
+			}
+		}
 	}
 
-	return -1;
+	return backup_cpu;
 }
 
 #else /* CONFIG_SCHED_SMT */
@@ -5835,6 +5855,8 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	u64 time, cost;
 	s64 delta;
 	int cpu, nr = INT_MAX;
+	int backup_cpu = -1;
+	unsigned int backup_cap = 0;
 
 	this_sd = rcu_dereference(*this_cpu_ptr(&sd_llc));
 	if (!this_sd)
@@ -5865,10 +5887,19 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 			return -1;
 		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
 			continue;
-		if (idle_cpu(cpu))
-			break;
+		if (idle_cpu(cpu)) {
+			if (full_capacity(cpu)) {
+				backup_cpu = -1;
+				break;
+			} else if (capacity_of(cpu) > backup_cap) {
+				backup_cap = capacity_of(cpu);
+				backup_cpu = cpu;
+			}
+		}
 	}
 
+	if (backup_cpu >= 0)
+		cpu = backup_cpu;
 	time = local_clock() - time;
 	cost = this_sd->avg_scan_cost;
 	delta = (s64)(time - cost) / 8;
@@ -5885,13 +5916,14 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 	struct sched_domain *sd;
 	int i;
 
-	if (idle_cpu(target))
+	if (idle_cpu(target) && full_capacity(target))
 		return target;
 
 	/*
 	 * If the previous cpu is cache affine and idle, don't be stupid.
 	 */
-	if (prev != target && cpus_share_cache(prev, target) && idle_cpu(prev))
+	if (prev != target && cpus_share_cache(prev, target) && idle_cpu(prev)
+	    && full_capacity(prev))
 		return prev;
 
 	sd = rcu_dereference(per_cpu(sd_llc, target));
