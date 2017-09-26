@@ -26,7 +26,12 @@
 #include <linux/sched.h>
 #include <linux/shrinker.h>
 #include <linux/types.h>
+
+#ifdef CONFIG_ION_ONE_DEVICE_ENTRY_PER_HEAP
+#include <linux/cdev.h>
+#else
 #include <linux/miscdevice.h>
+#endif
 
 #include "../uapi/ion.h"
 
@@ -91,13 +96,18 @@ void ion_buffer_destroy(struct ion_buffer *buffer);
 
 /**
  * struct ion_device - the metadata of the ion device node
+ * @devt:		Ion device if heap have own device entry
  * @dev:		the actual misc device
  * @buffers:		an rb tree of all the existing buffers
  * @buffer_lock:	lock protecting the tree of buffers
  * @lock:		rwsem protecting the tree of heaps and clients
  */
 struct ion_device {
+#ifdef CONFIG_ION_ONE_DEVICE_ENTRY_PER_HEAP
+	dev_t devt;
+#else
 	struct miscdevice dev;
+#endif
 	struct rb_root buffers;
 	struct mutex buffer_lock;
 	struct rw_semaphore lock;
@@ -153,6 +163,8 @@ struct ion_heap_ops {
  * struct ion_heap - represents a heap in the system
  * @node:		rb node to put the heap on the device's tree of heaps
  * @dev:		back pointer to the ion_device
+ * @ddev:		device structure
+ * @chrdev:		associated character device
  * @type:		type of heap
  * @ops:		ops struct as above
  * @flags:		flags
@@ -177,6 +189,10 @@ struct ion_heap_ops {
 struct ion_heap {
 	struct plist_node node;
 	struct ion_device *dev;
+#ifdef CONFIG_ION_ONE_DEVICE_ENTRY_PER_HEAP
+	struct device ddev;
+	struct cdev chrdev;
+#endif
 	enum ion_heap_type type;
 	struct ion_heap_ops *ops;
 	unsigned long flags;
@@ -213,7 +229,7 @@ bool ion_buffer_fault_user_mappings(struct ion_buffer *buffer);
  * ion_device_add_heap - adds a heap to the ion device
  * @heap:		the heap to add
  */
-void ion_device_add_heap(struct ion_heap *heap);
+int ion_device_add_heap(struct ion_heap *heap);
 
 /**
  * some helpers for common operations on buffers using the sg_table

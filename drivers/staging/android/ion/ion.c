@@ -40,6 +40,10 @@
 
 #include "ion.h"
 
+#ifdef CONFIG_ION_ONE_DEVICE_ENTRY_PER_HEAP
+#define ION_DEV_MAX 32
+#endif
+
 static struct ion_device *internal_dev;
 static int heap_id;
 
@@ -537,14 +541,29 @@ static int debug_shrink_get(void *data, u64 *val)
 DEFINE_SIMPLE_ATTRIBUTE(debug_shrink_fops, debug_shrink_get,
 			debug_shrink_set, "%llu\n");
 
-void ion_device_add_heap(struct ion_heap *heap)
+int ion_device_add_heap(struct ion_heap *heap)
 {
 	struct dentry *debug_file;
 	struct ion_device *dev = internal_dev;
+	int ret = 0;
 
 	if (!heap->ops->allocate || !heap->ops->free)
 		pr_err("%s: can not add heap with invalid ops struct.\n",
 		       __func__);
+
+#ifdef CONFIG_ION_ONE_DEVICE_ENTRY_PER_HEAP
+	if (heap_id >= ION_DEV_MAX)
+		return -EBUSY;
+
+	heap->ddev.devt = MKDEV(MAJOR(dev->devt), heap_id);
+	dev_set_name(&heap->ddev, "ion%d", heap_id);
+	device_initialize(&heap->ddev);
+	cdev_init(&heap->chrdev, &ion_fops);
+	heap->chrdev.owner = THIS_MODULE;
+	ret = cdev_device_add(&heap->chrdev, &heap->ddev);
+	if (ret < 0)
+		return ret;
+#endif
 
 	spin_lock_init(&heap->free_lock);
 	heap->free_list_size = 0;
@@ -583,6 +602,8 @@ void ion_device_add_heap(struct ion_heap *heap)
 
 	dev->heap_cnt++;
 	up_write(&dev->lock);
+
+	return ret;
 }
 EXPORT_SYMBOL(ion_device_add_heap);
 
@@ -595,13 +616,17 @@ static int ion_device_create(void)
 	if (!idev)
 		return -ENOMEM;
 
+#ifdef CONFIG_ION_ONE_DEVICE_ENTRY_PER_HEAP
+	ret = alloc_chrdev_region(&idev->devt, 0, ION_DEV_MAX, "ion");
+#else
 	idev->dev.minor = MISC_DYNAMIC_MINOR;
 	idev->dev.name = "ion";
 	idev->dev.fops = &ion_fops;
 	idev->dev.parent = NULL;
 	ret = misc_register(&idev->dev);
+#endif
 	if (ret) {
-		pr_err("ion: failed to register misc device.\n");
+		pr_err("ion: unable to allocate device\n");
 		kfree(idev);
 		return ret;
 	}

@@ -10,6 +10,14 @@ menuconfig ION
 	  If you're not using Android its probably safe to
 	  say N here.
 
+config ION_ONE_DEVICE_ENTRY_PER_HEAP
+	bool "Create one Ion device per heap"
+	depends on ION
+	help
+	  Choose this option to have one device entry per heap. Each
+	  device with named "/dev/ionX" where X is heap ID.
+	  Selecting this option remove the legacy Ion misc device.
+
 config ION_SYSTEM_HEAP
 	bool "Ion system heap"
 	depends on ION
