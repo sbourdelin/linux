@@ -183,10 +183,10 @@ static inline void init_llist_head(struct llist_head *list)
  * reverse the order by yourself before traversing.
  */
 #define llist_for_each_entry_safe(pos, n, node, member)			       \
-	for (pos = llist_entry((node), typeof(*pos), member);		       \
+	for ((pos) = llist_entry((node), typeof(*(pos)), member);		       \
 	     member_address_is_nonnull(pos, member) &&			       \
-	        (n = llist_entry(pos->member.next, typeof(*n), member), true); \
-	     pos = n)
+	        ((n) = llist_entry((pos)->member.next, typeof(*(n)), member), true); \
+	     (pos) = (n))
 
 /**
  * llist_empty - tests whether a lock-less list is empty
