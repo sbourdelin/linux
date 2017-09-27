@@ -71,6 +71,14 @@ struct vc4_dev {
 		u32 size_allocated;
 	} *bo_labels;
 
+	/* Purgeable BO pool. All BOs in this pool can have their memory
+	 * reclaimed if the driver is unable to allocate new BOs.
+	 */
+	struct {
+		struct list_head list;
+		struct mutex lock;
+	} purgeable;
+
 	/* Protects bo_cache and bo_labels. */
 	struct mutex bo_lock;
 
@@ -192,6 +200,17 @@ struct vc4_bo {
 	 * for user-allocated labels.
 	 */
 	int label;
+
+	/* Count the number of users with this BO mapped in their address
+	 * space. This is needed to determine whether we can tag the BO as
+	 * purgeable or not (when the BO is used by the GPU or the display
+	 * engine we can't free it).
+	 */
+	refcount_t usecnt;
+
+	/* Store purgeable/purged state here */
+	u32 madv;
+	struct mutex madv_lock;
 };
 
 static inline struct vc4_bo *
@@ -503,6 +522,7 @@ int vc4_get_hang_state_ioctl(struct drm_device *dev, void *data,
 			     struct drm_file *file_priv);
 int vc4_label_bo_ioctl(struct drm_device *dev, void *data,
 		       struct drm_file *file_priv);
+int vc4_fault(struct vm_fault *vmf);
 int vc4_mmap(struct file *filp, struct vm_area_struct *vma);
 struct reservation_object *vc4_prime_res_obj(struct drm_gem_object *obj);
 int vc4_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma);
@@ -513,6 +533,9 @@ void *vc4_prime_vmap(struct drm_gem_object *obj);
 int vc4_bo_cache_init(struct drm_device *dev);
 void vc4_bo_cache_destroy(struct drm_device *dev);
 int vc4_bo_stats_debugfs(struct seq_file *m, void *arg);
+int vc4_bo_inc_usecnt(struct vc4_bo *bo);
+void vc4_bo_dec_usecnt(struct vc4_bo *bo);
+void vc4_bo_cache_purge(struct drm_device *dev);
 
 /* vc4_crtc.c */
 extern struct platform_driver vc4_crtc_driver;
@@ -557,6 +580,9 @@ void vc4_job_handle_completed(struct vc4_dev *vc4);
 int vc4_queue_seqno_cb(struct drm_device *dev,
 		       struct vc4_seqno_cb *cb, uint64_t seqno,
 		       void (*func)(struct vc4_seqno_cb *cb));
+int vc4_gem_madvise_ioctl(struct drm_device *dev, void *data,
+			  struct drm_file *file_priv);
+void vc4_userspace_bo_cache_purge(struct drm_device *dev);
 
 /* vc4_hdmi.c */
 extern struct platform_driver vc4_hdmi_driver;

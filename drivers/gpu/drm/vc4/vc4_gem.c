@@ -54,8 +54,12 @@ vc4_free_hang_state(struct drm_device *dev, struct vc4_hang_state *state)
 {
 	unsigned int i;
 
-	for (i = 0; i < state->user_state.bo_count; i++)
+	for (i = 0; i < state->user_state.bo_count; i++) {
+		struct vc4_bo *bo = to_vc4_bo(state->bo[i]);
+
+		vc4_bo_dec_usecnt(bo);
 		drm_gem_object_put_unlocked(state->bo[i]);
+	}
 
 	kfree(state);
 }
@@ -188,11 +192,14 @@ vc4_save_hang_state(struct drm_device *dev)
 			continue;
 
 		for (j = 0; j < exec[i]->bo_count; j++) {
+			bo = to_vc4_bo(&exec[i]->bo[j]->base);
+			WARN_ON(vc4_bo_inc_usecnt(bo));
 			drm_gem_object_get(&exec[i]->bo[j]->base);
 			kernel_state->bo[j + prev_idx] = &exec[i]->bo[j]->base;
 		}
 
 		list_for_each_entry(bo, &exec[i]->unref_list, unref_head) {
+			WARN_ON(vc4_bo_inc_usecnt(bo));
 			drm_gem_object_get(&bo->base.base);
 			kernel_state->bo[j + prev_idx] = &bo->base.base;
 			j++;
@@ -689,17 +696,41 @@ vc4_cl_lookup_bos(struct drm_device *dev,
 	for (i = 0; i < exec->bo_count; i++) {
 		struct drm_gem_object *bo = idr_find(&file_priv->object_idr,
 						     handles[i]);
+		struct vc4_bo *vc4bo;
 		if (!bo) {
 			DRM_DEBUG("Failed to look up GEM BO %d: %d\n",
 				  i, handles[i]);
 			ret = -EINVAL;
-			spin_unlock(&file_priv->table_lock);
-			goto fail;
+			break;
 		}
+
+		vc4bo = to_vc4_bo(bo);
 		drm_gem_object_get(bo);
 		exec->bo[i] = (struct drm_gem_cma_object *)bo;
 	}
 	spin_unlock(&file_priv->table_lock);
+
+	if (ret)
+		goto fail_put_bo;
+
+	for (i = 0; i < exec->bo_count; i++) {
+		ret = vc4_bo_inc_usecnt(to_vc4_bo(&exec->bo[i]->base));
+		if (ret)
+			goto fail_dec_usecnt;
+	}
+
+	kvfree(handles);
+	return ret;
+
+fail_dec_usecnt:
+	/* Decrease usecnt on acquired objects. */
+	for (i-- ; i >= 0; i--)
+		vc4_bo_dec_usecnt(to_vc4_bo(&exec->bo[i]->base));
+
+fail_put_bo:
+	/* Release any reference to acquired objects. */
+	for (i = 0; i < exec->bo_count && exec->bo[i]; i++)
+		drm_gem_object_put(&exec->bo[i]->base);
 
 fail:
 	kvfree(handles);
@@ -782,6 +813,11 @@ vc4_get_bcl(struct drm_device *dev, struct vc4_exec_info *exec)
 	}
 	exec->exec_bo = &bo->base;
 
+	ret = vc4_bo_inc_usecnt(bo);
+	if (WARN_ON(ret)) {
+		DRM_ERROR("Couldn't increment BO usecnt\n");
+		goto fail;
+	}
 	list_add_tail(&to_vc4_bo(&exec->exec_bo->base)->unref_head,
 		      &exec->unref_list);
 
@@ -802,17 +838,25 @@ vc4_get_bcl(struct drm_device *dev, struct vc4_exec_info *exec)
 				  bin,
 				  exec);
 	if (ret)
-		goto fail;
+		goto fail_dec_usecnt;
 
 	ret = vc4_validate_shader_recs(dev, exec);
 	if (ret)
-		goto fail;
+		goto fail_dec_usecnt;
 
 	/* Block waiting on any previous rendering into the CS's VBO,
 	 * IB, or textures, so that pixels are actually written by the
 	 * time we try to read them.
 	 */
 	ret = vc4_wait_for_seqno(dev, exec->bin_dep_seqno, ~0ull, true);
+	if (ret)
+		goto fail_dec_usecnt;
+
+	kvfree(temp);
+	return 0;
+
+fail_dec_usecnt:
+	vc4_bo_dec_usecnt(bo);
 
 fail:
 	kvfree(temp);
@@ -833,8 +877,12 @@ vc4_complete_exec(struct drm_device *dev, struct vc4_exec_info *exec)
 		dma_fence_signal(exec->fence);
 
 	if (exec->bo) {
-		for (i = 0; i < exec->bo_count; i++)
+		for (i = 0; i < exec->bo_count; i++) {
+			struct vc4_bo *bo = to_vc4_bo(&exec->bo[i]->base);
+
+			vc4_bo_dec_usecnt(bo);
 			drm_gem_object_put_unlocked(&exec->bo[i]->base);
+		}
 		kvfree(exec->bo);
 	}
 
@@ -842,6 +890,7 @@ vc4_complete_exec(struct drm_device *dev, struct vc4_exec_info *exec)
 		struct vc4_bo *bo = list_first_entry(&exec->unref_list,
 						     struct vc4_bo, unref_head);
 		list_del(&bo->unref_head);
+		vc4_bo_dec_usecnt(bo);
 		drm_gem_object_put_unlocked(&bo->base.base);
 	}
 
@@ -1098,6 +1147,9 @@ vc4_gem_init(struct drm_device *dev)
 	INIT_WORK(&vc4->job_done_work, vc4_job_done_work);
 
 	mutex_init(&vc4->power_lock);
+
+	INIT_LIST_HEAD(&vc4->purgeable.list);
+	mutex_init(&vc4->purgeable.lock);
 }
 
 void
@@ -1114,10 +1166,159 @@ vc4_gem_destroy(struct drm_device *dev)
 	 * the overflow allocation registers.  Now free the object.
 	 */
 	if (vc4->bin_bo) {
+		vc4_bo_dec_usecnt(vc4->bin_bo);
 		drm_gem_object_put_unlocked(&vc4->bin_bo->base.base);
 		vc4->bin_bo = NULL;
 	}
 
 	if (vc4->hang_state)
 		vc4_free_hang_state(dev, vc4->hang_state);
+}
+
+static void vc4_gem_purge(struct drm_gem_object *obj)
+{
+	struct vc4_bo *bo = to_vc4_bo(obj);
+	struct drm_device *dev = obj->dev;
+
+	WARN_ON(!mutex_is_locked(&bo->madv_lock));
+	WARN_ON(bo->madv != VC4_MADV_DONTNEED);
+
+	drm_vma_node_unmap(&obj->vma_node, dev->anon_inode->i_mapping);
+	/* Reset the BO content to not leak sensitive data. */
+	memset(bo->base.vaddr, 0, obj->size);
+
+	dma_free_wc(dev->dev, obj->size, bo->base.vaddr, bo->base.paddr);
+	bo->base.vaddr = NULL;
+	bo->madv = __VC4_MADV_PURGED;
+}
+
+void vc4_userspace_bo_cache_purge(struct drm_device *dev)
+{
+	struct vc4_dev *vc4 = to_vc4_dev(dev);
+
+	mutex_lock(&vc4->purgeable.lock);
+	while (!list_empty(&vc4->purgeable.list)) {
+		struct vc4_bo *bo = list_first_entry(&vc4->purgeable.list,
+						     struct vc4_bo, size_head);
+		struct drm_gem_object *obj = &bo->base.base;
+
+		/* list_del_init() is used here because we are about to release
+		 * the purgeable lock in order to acquire the madv one.
+		 * During this short period of time a user might decide to mark
+		 * the BO as unpurgeable, and if bo->madv is set to
+		 * VC4_MADV_DONTNEED it will try to remove the BO from the
+		 * purgeable list which will fail if the ->next/prev fields
+		 * are set to LIST_POISON1/LIST_POISON2 (which is what
+		 * list_del() does).
+		 * Re-initializing the list element guarantees that list_del()
+		 * will work correctly even if it's a NOP.
+		 */
+		list_del_init(&bo->size_head);
+
+		/* Release the purgeable lock while we're purging the BO so
+		 * that other people can continue inserting things in the
+		 * purgeable pool without having to wait for all BOs to be
+		 * purged.
+		 */
+		mutex_unlock(&vc4->purgeable.lock);
+		mutex_lock(&bo->madv_lock);
+
+		/* Since we released the purgeable pool lock before acquiring
+		 * the BO madv one, vc4_gem_madvise_ioctl() may have changed
+		 * the bo->madv status. In this case, just skip this entry.
+		 */
+		if (bo->madv == VC4_MADV_DONTNEED)
+			vc4_gem_purge(obj);
+		mutex_unlock(&bo->madv_lock);
+		mutex_lock(&vc4->purgeable.lock);
+	}
+	mutex_unlock(&vc4->purgeable.lock);
+}
+
+int vc4_gem_madvise_ioctl(struct drm_device *dev, void *data,
+			  struct drm_file *file_priv)
+{
+	struct drm_vc4_gem_madvise *args = data;
+	struct vc4_dev *vc4 = to_vc4_dev(dev);
+	struct drm_gem_object *gem_obj;
+	struct vc4_bo *bo;
+	int ret;
+
+	switch (args->madv) {
+	case VC4_MADV_DONTNEED:
+	case VC4_MADV_WILLNEED:
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	gem_obj = drm_gem_object_lookup(file_priv, args->handle);
+	if (!gem_obj) {
+		DRM_ERROR("Failed to look up GEM BO %d\n", args->handle);
+		return -EINVAL;
+	}
+
+	bo = to_vc4_bo(gem_obj);
+
+	/* Not sure it's safe to purge imported BOs. Let's just assume it's
+	 * not until proven otherwise.
+	 */
+	if (args->madv == VC4_MADV_DONTNEED && gem_obj->import_attach) {
+		ret = -EINVAL;
+		goto out_put_gem;
+	}
+
+	mutex_lock(&bo->madv_lock);
+
+	if (args->madv == VC4_MADV_DONTNEED && bo->madv == VC4_MADV_WILLNEED &&
+	    !refcount_read(&bo->usecnt)) {
+		/* If the BO is about to be marked as purgeable, is not used
+		 * and is not already purgeable or purged, add it to the
+		 * purgeable list.
+		 */
+		mutex_lock(&vc4->purgeable.lock);
+		list_add_tail(&bo->size_head, &vc4->purgeable.list);
+		mutex_unlock(&vc4->purgeable.lock);
+	} else if (args->madv == VC4_MADV_WILLNEED &&
+		   bo->madv == VC4_MADV_DONTNEED &&
+		   !refcount_read(&bo->usecnt)) {
+		/* The BO has not been purged yet, just remove it from
+		 * the purgeable list.
+		 */
+		mutex_lock(&vc4->purgeable.lock);
+		list_del(&bo->size_head);
+		mutex_unlock(&vc4->purgeable.lock);
+	} else if (bo->madv == __VC4_MADV_PURGED) {
+		bo->base.vaddr = dma_alloc_wc(dev->dev, gem_obj->size,
+					      &bo->base.paddr,
+					      GFP_KERNEL | __GFP_NOWARN);
+		if (!bo->base.vaddr) {
+			/* CMA allocation failed, try to purge the in-kernel BO
+			 * cache.
+			 */
+			vc4_bo_cache_purge(dev);
+			bo->base.vaddr = dma_alloc_wc(dev->dev, gem_obj->size,
+						      &bo->base.paddr,
+						      GFP_KERNEL |
+						      __GFP_NOWARN);
+		}
+
+		if (!bo->base.vaddr) {
+			ret = -ENOMEM;
+			goto out_unlock;
+		}
+	}
+
+	/* Save the purged state. */
+	args->retained = bo->madv != __VC4_MADV_PURGED;
+	bo->madv = args->madv;
+	ret = 0;
+
+out_unlock:
+	mutex_unlock(&bo->madv_lock);
+
+out_put_gem:
+	drm_gem_object_put_unlocked(gem_obj);
+
+	return ret;
 }

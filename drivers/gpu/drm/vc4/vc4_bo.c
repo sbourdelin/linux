@@ -233,7 +233,7 @@ static struct list_head *vc4_get_cache_list_for_size(struct drm_device *dev,
 	return &vc4->bo_cache.size_list[page_index];
 }
 
-static void vc4_bo_cache_purge(struct drm_device *dev)
+void vc4_bo_cache_purge(struct drm_device *dev)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
 
@@ -293,6 +293,8 @@ struct drm_gem_object *vc4_create_object(struct drm_device *dev, size_t size)
 	if (!bo)
 		return ERR_PTR(-ENOMEM);
 
+	bo->madv = VC4_MADV_WILLNEED;
+	mutex_init(&bo->madv_lock);
 	mutex_lock(&vc4->bo_lock);
 	bo->label = VC4_BO_TYPE_KERNEL;
 	vc4->bo_labels[VC4_BO_TYPE_KERNEL].num_allocated++;
@@ -330,13 +332,29 @@ struct vc4_bo *vc4_bo_create(struct drm_device *dev, size_t unaligned_size,
 		 * CMA allocations we've got laying around and try again.
 		 */
 		vc4_bo_cache_purge(dev);
-
 		cma_obj = drm_gem_cma_create(dev, size);
-		if (IS_ERR(cma_obj)) {
-			DRM_ERROR("Failed to allocate from CMA:\n");
-			vc4_bo_stats_dump(vc4);
-			return ERR_PTR(-ENOMEM);
-		}
+	}
+
+	if (IS_ERR(cma_obj)) {
+		/*
+		 * Still not enough CMA memory, purge the userspace BO
+		 * cache and retry.
+		 * This is sub-optimal since we purge the whole userspace
+		 * BO cache which forces user that want to re-use the BO to
+		 * restore its initial content.
+		 * Ideally, we should purge entries one by one and retry
+		 * after each to see if CMA allocation succeeds. Or even
+		 * better, try to find an entry with at least the same
+		 * size.
+		 */
+		vc4_userspace_bo_cache_purge(dev);
+		cma_obj = drm_gem_cma_create(dev, size);
+	}
+
+	if (IS_ERR(cma_obj)) {
+		DRM_ERROR("Failed to allocate from CMA:\n");
+		vc4_bo_stats_dump(vc4);
+		return ERR_PTR(-ENOMEM);
 	}
 	bo = to_vc4_bo(&cma_obj->base);
 
@@ -403,6 +421,15 @@ void vc4_free_object(struct drm_gem_object *gem_bo)
 	struct vc4_bo *bo = to_vc4_bo(gem_bo);
 	struct list_head *cache_list;
 
+	/* Remove the BO from the purgeable list. */
+	mutex_lock(&bo->madv_lock);
+	if (bo->madv == VC4_MADV_DONTNEED && !refcount_read(&bo->usecnt)) {
+		mutex_lock(&vc4->purgeable.lock);
+		list_del(&bo->size_head);
+		mutex_unlock(&vc4->purgeable.lock);
+	}
+	mutex_unlock(&bo->madv_lock);
+
 	mutex_lock(&vc4->bo_lock);
 	/* If the object references someone else's memory, we can't cache it.
 	 */
@@ -418,7 +445,8 @@ void vc4_free_object(struct drm_gem_object *gem_bo)
 	}
 
 	/* If this object was partially constructed but CMA allocation
-	 * had failed, just free it.
+	 * had failed, just free it. Can also happen when the BO has been
+	 * purged.
 	 */
 	if (!bo->base.vaddr) {
 		vc4_bo_destroy(bo);
@@ -436,6 +464,9 @@ void vc4_free_object(struct drm_gem_object *gem_bo)
 		kfree(bo->validated_shader);
 		bo->validated_shader = NULL;
 	}
+
+	/* Reset the madv status before adding the BO to the cache. */
+	bo->madv = VC4_MADV_WILLNEED;
 
 	bo->t_format = false;
 	bo->free_time = jiffies;
@@ -461,6 +492,64 @@ static void vc4_bo_cache_time_work(struct work_struct *work)
 	mutex_unlock(&vc4->bo_lock);
 }
 
+int vc4_bo_inc_usecnt(struct vc4_bo *bo)
+{
+	int ret;
+
+	/* Fast path: if the BO is already retained by someone, no need to
+	 * check the madv status.
+	 */
+	if (refcount_inc_not_zero(&bo->usecnt))
+		return 0;
+
+	mutex_lock(&bo->madv_lock);
+	switch (bo->madv) {
+	case VC4_MADV_WILLNEED:
+		refcount_inc(&bo->usecnt);
+		ret = 0;
+		break;
+	case VC4_MADV_DONTNEED:
+		/* We shouldn't use a BO marked as purgeable if at least
+		 * someone else retained its content by incrementing usecnt.
+		 * Luckily the BO hasn't been purged yet, but something wrong
+		 * is happening here. Just throw an error instead of
+		 * authorizing this use case.
+		 */
+	case __VC4_MADV_PURGED:
+		/* We can't use a purged BO. */
+	default:
+		/* Invalid madv value. */
+		ret = -EINVAL;
+		break;
+	}
+	mutex_unlock(&bo->madv_lock);
+
+	return ret;
+}
+
+void vc4_bo_dec_usecnt(struct vc4_bo *bo)
+{
+	struct vc4_dev *vc4 = to_vc4_dev(bo->base.base.dev);
+
+	if (WARN_ON(!refcount_read(&bo->usecnt)))
+		return;
+
+	/* Fast path: if the BO is still retained by someone, no need to test
+	 * the madv value.
+	 */
+	if (!refcount_dec_not_one(&bo->usecnt))
+		return;
+
+	mutex_lock(&bo->madv_lock);
+	if (refcount_dec_and_test(&bo->usecnt) &&
+	    bo->madv == VC4_MADV_DONTNEED) {
+		mutex_lock(&vc4->purgeable.lock);
+		list_add_tail(&bo->size_head, &vc4->purgeable.list);
+		mutex_unlock(&vc4->purgeable.lock);
+	}
+	mutex_unlock(&bo->madv_lock);
+}
+
 static void vc4_bo_cache_time_timer(unsigned long data)
 {
 	struct drm_device *dev = (struct drm_device *)data;
@@ -480,18 +569,77 @@ struct dma_buf *
 vc4_prime_export(struct drm_device *dev, struct drm_gem_object *obj, int flags)
 {
 	struct vc4_bo *bo = to_vc4_bo(obj);
+	struct dma_buf *dmabuf;
+	int ret;
 
 	if (bo->validated_shader) {
 		DRM_DEBUG("Attempting to export shader BO\n");
 		return ERR_PTR(-EINVAL);
 	}
 
-	return drm_gem_prime_export(dev, obj, flags);
+	/* Note: as soon as the BO is exported it becomes unpurgeable because
+	 * noone ever decrements the usecnt even if the reference held by the
+	 * exported BO is released. This shouldn't be a problem since we don't
+	 * expect exported BO to be marked as purgeable.
+	 */
+	ret = vc4_bo_inc_usecnt(bo);
+	if (ret) {
+		DRM_ERROR("Failed to increment BO usecnt\n");
+		return ERR_PTR(ret);
+	}
+
+	dmabuf = drm_gem_prime_export(dev, obj, flags);
+	if (IS_ERR(dmabuf))
+		vc4_bo_dec_usecnt(bo);
+
+	return dmabuf;
+}
+
+int vc4_fault(struct vm_fault *vmf)
+{
+	struct vm_area_struct *vma = vmf->vma;
+	struct drm_gem_object *obj = vma->vm_private_data;
+	unsigned long vm_pgoff;
+	struct vc4_bo *bo = to_vc4_bo(obj);
+	int ret;
+
+	mutex_lock(&bo->madv_lock);
+	if (WARN_ON(bo->madv != VC4_MADV_WILLNEED)) {
+		ret = -EINVAL;
+		goto out_unlock;
+	}
+
+	vm_pgoff = vma->vm_pgoff;
+	vma->vm_pgoff = 0;
+	ret = dma_mmap_wc(obj->dev->dev, vma, bo->base.vaddr,
+			  bo->base.paddr, vma->vm_end - vma->vm_start);
+	vma->vm_pgoff = vm_pgoff;
+
+out_unlock:
+	mutex_unlock(&bo->madv_lock);
+
+	switch (ret) {
+	case -EAGAIN:
+	case 0:
+	case -ERESTARTSYS:
+	case -EINTR:
+	case -EBUSY:
+		/*
+		 * EBUSY is ok: this just means that another thread
+		 * already did the job.
+		 */
+		return VM_FAULT_NOPAGE;
+	case -ENOMEM:
+		return VM_FAULT_OOM;
+	default:
+		return VM_FAULT_SIGBUS;
+	}
 }
 
 int vc4_mmap(struct file *filp, struct vm_area_struct *vma)
 {
 	struct drm_gem_object *gem_obj;
+	unsigned long vm_pgoff;
 	struct vc4_bo *bo;
 	int ret;
 
@@ -504,6 +652,14 @@ int vc4_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	if (bo->validated_shader && (vma->vm_flags & VM_WRITE)) {
 		DRM_DEBUG("mmaping of shader BOs for writing not allowed.\n");
+		ret = -EINVAL;
+		goto out;
+	}
+
+	if (bo->madv != VC4_MADV_WILLNEED) {
+		DRM_DEBUG("mmaping of %s BO not allowed\n",
+			  bo->madv == VC4_MADV_DONTNEED ?
+			  "purgeable" : "purged");
 		return -EINVAL;
 	}
 
@@ -513,10 +669,24 @@ int vc4_mmap(struct file *filp, struct vm_area_struct *vma)
 	 * the whole buffer.
 	 */
 	vma->vm_flags &= ~VM_PFNMAP;
-	vma->vm_pgoff = 0;
 
+	/* This ->vm_pgoff dance is needed to make all parties happy:
+	 * - dma_mmap_wc() uses ->vm_pgoff as an offset within the allocated
+	 *   mem-region, hence the need to set it to zero (the value set by
+	 *   the DRM core is a virtual offset encoding the GEM object-id)
+	 * - the mmap() core logic needs ->vm_pgoff to be restored to its
+	 *   initial before returning from this function because it encodes the
+	 *   offset of this GEM in the dev->anon_inode pseudo-file and this
+	 *   information will be used when we invalidate userspace mappings
+	 *   with drm_vma_node_unmap() (called from vc4_gem_purge()).
+	 */
+	vm_pgoff = vma->vm_pgoff;
+	vma->vm_pgoff = 0;
 	ret = dma_mmap_wc(bo->base.base.dev->dev, vma, bo->base.vaddr,
 			  bo->base.paddr, vma->vm_end - vma->vm_start);
+	vma->vm_pgoff = vm_pgoff;
+
+out:
 	if (ret)
 		drm_gem_vm_close(vma);
 
