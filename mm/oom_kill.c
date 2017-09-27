@@ -43,6 +43,7 @@
 
 #include <asm/tlb.h>
 #include "internal.h"
+#include "slab.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/oom.h>
@@ -50,6 +51,8 @@
 int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
 int sysctl_oom_dump_tasks = 1;
+/* unreclaimable slabs is 50% of all LRU pages */
+int sysctl_unreclaim_slabs_oom_ratio = 50;
 
 DEFINE_MUTEX(oom_lock);
 
@@ -158,6 +161,30 @@ static bool oom_unkillable_task(struct task_struct *p,
 		return true;
 
 	return false;
+}
+
+/*
+ * Print out unreclaimble slabs info unconditionally when
+ * sysctl_unreclaim_slabs_oom_ratio is 0. Otherwise when
+ * unreclaimable slabs : all LRU pages > sysctl_unreclaim_slabs_oom_ratio.
+ */
+static bool is_dump_unreclaim_slabs(void)
+{
+	unsigned long nr_lru;
+
+	nr_lru = global_node_page_state(NR_ACTIVE_ANON) +
+		 global_node_page_state(NR_INACTIVE_ANON) +
+		 global_node_page_state(NR_ACTIVE_FILE) +
+		 global_node_page_state(NR_INACTIVE_FILE) +
+		 global_node_page_state(NR_ISOLATED_ANON) +
+		 global_node_page_state(NR_ISOLATED_FILE) +
+		 global_node_page_state(NR_UNEVICTABLE);
+
+	if (sysctl_unreclaim_slabs_oom_ratio > 0)
+		return (global_node_page_state(NR_SLAB_UNRECLAIMABLE) * 100 /
+			nr_lru) > (unsigned long)sysctl_unreclaim_slabs_oom_ratio;
+	else
+		return true;
 }
 
 /**
@@ -960,6 +987,8 @@ static void check_panic_on_oom(struct oom_control *oc,
 	if (is_sysrq_oom(oc))
 		return;
 	dump_header(oc, NULL);
+	if (is_dump_unreclaim_slabs())
+		dump_unreclaimable_slab();
 	panic("Out of memory: %s panic_on_oom is enabled\n",
 		sysctl_panic_on_oom == 2 ? "compulsory" : "system-wide");
 }
@@ -1044,6 +1073,8 @@ bool out_of_memory(struct oom_control *oc)
 	/* Found nothing?!?! Either we hang forever, or we panic. */
 	if (!oc->chosen && !is_sysrq_oom(oc) && !is_memcg_oom(oc)) {
 		dump_header(oc, NULL);
+		if (is_dump_unreclaim_slabs())
+			dump_unreclaimable_slab();
 		panic("Out of memory and no killable processes...\n");
 	}
 	if (oc->chosen && oc->chosen != (void *)-1UL) {

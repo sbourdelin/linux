@@ -1266,6 +1266,15 @@ static struct ctl_table vm_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 	{
+		.procname	= "unreclaim_slabs_oom_ratio",
+		.data		= &sysctl_unreclaim_slabs_oom_ratio,
+		.maxlen		= sizeof(sysctl_unreclaim_slabs_oom_ratio),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one_hundred,
+	},
+	{
 		.procname	= "overcommit_ratio",
 		.data		= &sysctl_overcommit_ratio,
 		.maxlen		= sizeof(sysctl_overcommit_ratio),
