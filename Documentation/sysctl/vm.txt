@@ -59,6 +59,7 @@ Currently, these files are in /proc/sys/vm:
 - stat_interval
 - stat_refresh
 - swappiness
+- unreclaim_slabs_oom_ratio
 - user_reserve_kbytes
 - vfs_cache_pressure
 - watermark_scale_factor
@@ -801,6 +802,17 @@ initiate swap until the amount of free and file-backed pages is less
 than the high water mark in a zone.
 
 The default value is 60.
+
+==============================================================
+
+unreclaim_slabs_oom_ratio
+
+The percentage of total unreclaimable slabs amount vs all user memory amount
+(LRU pages). When the real ratio is greater than the value, oom killer would
+dump unreclaimable slabs info when kernel panic.
+The range is 0 - 100. 0 means dump unreclaimable slabs info unconditionally.
+
+The default value is 50.
 
 ==============================================================
 
