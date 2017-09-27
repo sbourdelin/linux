@@ -276,15 +276,12 @@ static int drm_gem_cma_mmap_obj(struct drm_gem_cma_object *cma_obj,
 	int ret;
 
 	/*
-	 * Clear the VM_PFNMAP flag that was set by drm_gem_mmap(), and set the
-	 * vm_pgoff (used as a fake buffer offset by DRM) to 0 as we want to map
-	 * the whole buffer.
+	 * Clear the VM_PFNMAP flag that was set by drm_gem_mmap()
 	 */
 	vma->vm_flags &= ~VM_PFNMAP;
-	vma->vm_pgoff = 0;
 
 	ret = dma_mmap_wc(cma_obj->base.dev->dev, vma, cma_obj->vaddr,
-			  cma_obj->paddr, vma->vm_end - vma->vm_start);
+			  cma_obj->paddr, cma_obj->base.size);
 	if (ret)
 		drm_gem_vm_close(vma);
 
@@ -321,6 +318,12 @@ int drm_gem_cma_mmap(struct file *filp, struct vm_area_struct *vma)
 
 	gem_obj = vma->vm_private_data;
 	cma_obj = to_drm_gem_cma_obj(gem_obj);
+
+	/*
+	 * Set the vm_pgoff (used as a fake buffer offset by DRM) to 0 as we
+	 * want to map the whole buffer.
+	 */
+	vma->vm_pgoff = 0;
 
 	return drm_gem_cma_mmap_obj(cma_obj, vma);
 }
