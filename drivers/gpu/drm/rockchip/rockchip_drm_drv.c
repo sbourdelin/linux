@@ -15,6 +15,7 @@
  */
 
 #include <drm/drmP.h>
+#include <drm/drm_atomic.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_gem_cma_helper.h>
@@ -299,6 +300,7 @@ static int rockchip_drm_sys_resume(struct device *dev)
 
 	priv = drm->dev_private;
 	drm_atomic_helper_resume(drm, priv->state);
+	drm_atomic_state_put(priv->state);
 	rockchip_drm_fb_resume(drm);
 	drm_kms_helper_poll_enable(drm);
 
