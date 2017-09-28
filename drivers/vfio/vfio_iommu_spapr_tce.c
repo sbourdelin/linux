@@ -505,8 +505,15 @@ static int tce_iommu_clear(struct tce_container *container,
 	unsigned long oldhpa;
 	long ret;
 	enum dma_data_direction direction;
+	unsigned long time_limit = jiffies + HZ;
 
 	for ( ; pages; --pages, ++entry) {
+
+		if (time_after(jiffies, time_limit)) {
+			cond_resched();
+			time_limit = jiffies + HZ;
+		}
+
 		direction = DMA_NONE;
 		oldhpa = 0;
 		ret = iommu_tce_xchg(tbl, entry, &oldhpa, &direction);
