@@ -3572,7 +3572,7 @@ struct tcpm_port *tcpm_register_port(struct device *dev, struct tcpc_dev *tcpc)
 		while (paltmode->svid && i < ARRAY_SIZE(port->port_altmode)) {
 			port->port_altmode[i] =
 			  typec_port_register_altmode(port->typec_port,
-						      paltmode);
+						      paltmode, NULL, NULL);
 			if (!port->port_altmode[i]) {
 				tcpm_log(port,
 					 "%s: failed to register port alternate mode 0x%x",

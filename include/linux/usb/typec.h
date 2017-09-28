@@ -12,6 +12,7 @@
 #define USB_TYPEC_REV_1_1	0x110 /* 1.1 */
 #define USB_TYPEC_REV_1_2	0x120 /* 1.2 */
 
+struct typec_altmode_ops;
 struct typec_altmode;
 struct typec_partner;
 struct typec_cable;
@@ -123,7 +124,10 @@ struct typec_altmode
 			     const struct typec_altmode_desc *desc);
 struct typec_altmode
 *typec_port_register_altmode(struct typec_port *port,
-			     const struct typec_altmode_desc *desc);
+			    const struct typec_altmode_desc *desc,
+			    const struct typec_altmode_ops *ops,
+			    void *driver_data);
+
 void typec_unregister_altmode(struct typec_altmode *altmode);
 
 struct typec_port *typec_altmode2port(struct typec_altmode *alt);
