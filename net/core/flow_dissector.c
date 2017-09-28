@@ -9,6 +9,7 @@
 #include <net/ipv6.h>
 #include <net/gre.h>
 #include <net/pptp.h>
+#include <net/protocol.h>
 #include <linux/igmp.h>
 #include <linux/icmp.h>
 #include <linux/sctp.h>
@@ -721,7 +722,11 @@ proto_again:
 		break;
 
 	default:
-		fdret = FLOW_DISSECT_RET_OUT_BAD;
+		fdret = flow_dissect_by_type(skb, proto, key_control,
+					     flow_dissector,
+					     target_container,
+					     data, &proto, &ip_proto, &nhoff,
+					     &hlen, flags);
 		break;
 	}
 
@@ -838,6 +843,12 @@ ip_proto_again:
 		break;
 
 	default:
+		fdret = flow_dissect_by_type_proto(skb, proto,
+						ip_proto, key_control,
+						flow_dissector,
+						target_container,
+						data, &proto, &ip_proto, &nhoff,
+						&hlen, flags);
 		break;
 	}
 
@@ -1022,7 +1033,8 @@ static inline u32 ___skb_get_hash(struct sk_buff *skb,
 				  struct flow_keys *keys, u32 keyval)
 {
 	skb_flow_dissect_flow_keys(skb, keys,
-				   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL);
+				   FLOW_DISSECTOR_F_STOP_AT_FLOW_LABEL |
+				   FLOW_DISSECTOR_F_STOP_AT_L4);
 
 	return __flow_hash_from_keys(keys, keyval);
 }

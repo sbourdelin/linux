@@ -1811,7 +1811,9 @@ int fib_multipath_hash(const struct fib_info *fi, const struct flowi4 *fl4,
 	case 1:
 		/* skb is currently provided only when forwarding */
 		if (skb) {
-			unsigned int flag = FLOW_DISSECTOR_F_STOP_AT_ENCAP;
+			unsigned int flag = FLOW_DISSECTOR_F_STOP_AT_ENCAP |
+					    FLOW_DISSECTOR_F_STOP_AT_L4;
+;
 			struct flow_keys keys;
 
 			/* short-circuit if we already have L4 hash present */

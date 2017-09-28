@@ -104,6 +104,7 @@
 #include <linux/stat.h>
 #include <net/dst.h>
 #include <net/dst_metadata.h>
+#include <net/flow_dissector.h>
 #include <net/pkt_sched.h>
 #include <net/pkt_cls.h>
 #include <net/checksum.h>
@@ -4906,6 +4907,70 @@ struct packet_offload *gro_find_complete_by_type(__be16 type)
 	return NULL;
 }
 EXPORT_SYMBOL(gro_find_complete_by_type);
+
+enum flow_dissect_ret flow_dissect_by_type(struct sk_buff *skb,
+			__be16 type,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags)
+{
+	enum flow_dissect_ret ret = FLOW_DISSECT_RET_CONTINUE;
+	struct list_head *offload_head = &offload_base;
+	struct packet_offload *ptype;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(ptype, offload_head, list) {
+		if (ptype->type != type || !ptype->callbacks.flow_dissect)
+			continue;
+		ret = ptype->callbacks.flow_dissect(skb, key_control,
+						    flow_dissector,
+						    target_container,
+						    data, p_proto,
+						    p_ip_proto, p_nhoff,
+						    p_hlen, flags);
+		break;
+	}
+
+	rcu_read_unlock();
+
+	return ret;
+}
+EXPORT_SYMBOL(flow_dissect_by_type);
+
+enum flow_dissect_ret flow_dissect_by_type_proto(struct sk_buff *skb,
+			__be16 type, u8 proto,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags)
+{
+	enum flow_dissect_ret ret = FLOW_DISSECT_RET_CONTINUE;
+	struct list_head *offload_head = &offload_base;
+	struct packet_offload *ptype;
+
+	rcu_read_lock();
+
+	list_for_each_entry_rcu(ptype, offload_head, list) {
+		if (ptype->type != type || !ptype->proto_flow_dissect)
+			continue;
+		ret = ptype->proto_flow_dissect(skb, proto, key_control,
+						    flow_dissector,
+						    target_container,
+						    data, p_proto,
+						    p_ip_proto, p_nhoff,
+						    p_hlen, flags);
+		break;
+	}
+
+	rcu_read_unlock();
+
+	return ret;
+}
+EXPORT_SYMBOL(flow_dissect_by_type_proto);
 
 static void napi_skb_free_stolen_head(struct sk_buff *skb)
 {

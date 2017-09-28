@@ -2207,12 +2207,25 @@ struct offload_callbacks {
 	struct sk_buff		**(*gro_receive)(struct sk_buff **head,
 						 struct sk_buff *skb);
 	int			(*gro_complete)(struct sk_buff *skb, int nhoff);
+	enum flow_dissect_ret (*flow_dissect)(struct sk_buff *skb,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags);
 };
 
 struct packet_offload {
 	__be16			 type;	/* This is really htons(ether_type). */
 	u16			 priority;
 	struct offload_callbacks callbacks;
+	enum flow_dissect_ret (*proto_flow_dissect)(struct sk_buff *skb,
+			u8 proto,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags);
 	struct list_head	 list;
 };
 
@@ -3252,6 +3265,20 @@ struct sk_buff *napi_get_frags(struct napi_struct *napi);
 gro_result_t napi_gro_frags(struct napi_struct *napi);
 struct packet_offload *gro_find_receive_by_type(__be16 type);
 struct packet_offload *gro_find_complete_by_type(__be16 type);
+enum flow_dissect_ret flow_dissect_by_type(struct sk_buff *skb,
+			__be16 type,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags);
+enum flow_dissect_ret flow_dissect_by_type_proto(struct sk_buff *skb,
+			__be16 type, u8 proto,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags);
 
 static inline void napi_free_frags(struct napi_struct *napi)
 {
