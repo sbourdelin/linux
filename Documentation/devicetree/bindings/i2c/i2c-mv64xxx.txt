@@ -10,10 +10,12 @@ Required properties :
                      - "marvell,mv64xxx-i2c"
                      - "marvell,mv78230-i2c"
                      - "marvell,mv78230-a0-i2c"
-                       * Note: Only use "marvell,mv78230-a0-i2c" for a
-                         very rare, initial version of the SoC which
-                         had broken offload support.  Linux
-                         auto-detects this and sets it appropriately.
+                       * Note: Use "marvell,mv78230-a0-i2c" for
+                         controller which do not support offload
+                         but still have the i2c repeated start
+                         timing violation issue, such as the
+                         ones found in the Armada XP A0 and the
+                         Armada 38x SoCs.
  - interrupts      : The interrupt number
 
 Optional properties :
