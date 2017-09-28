@@ -35,4 +35,6 @@ config TYPEC_WCOVE
 
 source "drivers/usb/typec/ucsi/Kconfig"
 
+source "drivers/usb/typec/altmodes/Kconfig"
+
 endmenu

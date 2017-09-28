@@ -1,0 +1,9 @@
+
+menu "USB Type-C Alternate Mode drivers"
+
+config TYPEC_DUMMY_ALTMODE
+	tristate "Dummy Alternate Mode driver"
+	help
+	  Driver for Dummy Alternate Mode.
+
+endmenu
