@@ -1813,7 +1813,9 @@ static int __udp_queue_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	return 0;
 }
 
-static struct static_key udp_encap_needed __read_mostly;
+struct static_key udp_encap_needed __read_mostly;
+EXPORT_SYMBOL(udp_encap_needed);
+
 void udp_encap_enable(void)
 {
 	static_key_enable(&udp_encap_needed);
