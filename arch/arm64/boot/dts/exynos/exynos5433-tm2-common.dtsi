@@ -135,6 +135,28 @@
 			"RCV", "HPOUT3R";
 		status = "okay";
 	};
+
+	musb_con: musb_connector {
+		compatible = "samsung,usb-connector-11pin", "usb-connector";
+		label = "micro-usb";
+		type = "b";
+		size = "micro";
+		max-mode = "hs";
+
+		port {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			musb_con_to_muic: endpoint@0 {
+				reg = <0>;
+				remote-endpoint = <&muic_to_musb_con>;
+			};
+			musb_con_to_mhl: endpoint@1 {
+				reg = <1>;
+				remote-endpoint = <&mhl_to_musb_con>;
+			};
+		};
+	};
 };
 
 &adc {
@@ -768,9 +790,22 @@
 		clocks = <&pmu_system_controller 0>;
 		clock-names = "xtal";
 
-		port {
-			mhl_to_hdmi: endpoint {
-				remote-endpoint = <&hdmi_to_mhl>;
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				mhl_to_hdmi: endpoint {
+					remote-endpoint = <&hdmi_to_mhl>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+				mhl_to_musb_con: endpoint {
+					remote-endpoint = <&musb_con_to_mhl>;
+				};
 			};
 		};
 	};
@@ -787,6 +822,12 @@
 
 		muic: max77843-muic {
 			compatible = "maxim,max77843-muic";
+
+			port {
+				muic_to_musb_con: endpoint@0 {
+					remote-endpoint = <&musb_con_to_muic>;
+				};
+			};
 		};
 
 		regulators {
