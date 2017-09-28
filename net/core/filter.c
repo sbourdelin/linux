@@ -2521,10 +2521,37 @@ static int __bpf_tx_xdp(struct net_device *dev,
 	err = dev->netdev_ops->ndo_xdp_xmit(dev, xdp);
 	if (err)
 		return err;
-	if (map)
+	dev->netdev_ops->ndo_xdp_flush(dev);
+	return 0;
+}
+
+static int __bpf_tx_xdp_map(struct net_device *dev_rx, void *fwd,
+			    struct bpf_map *map,
+			    struct xdp_buff *xdp,
+			    u32 index)
+{
+	int err;
+
+	if (map->map_type == BPF_MAP_TYPE_DEVMAP) {
+		struct net_device *dev = fwd;
+
+		if (!dev->netdev_ops->ndo_xdp_xmit) {
+			return -EOPNOTSUPP;
+		}
+
+		err = dev->netdev_ops->ndo_xdp_xmit(dev, xdp);
+		if (err)
+			return err;
 		__dev_map_insert_ctx(map, index);
-	else
-		dev->netdev_ops->ndo_xdp_flush(dev);
+
+	} else if (map->map_type == BPF_MAP_TYPE_CPUMAP) {
+		struct bpf_cpu_map_entry *rcpu = fwd;
+
+		err = cpu_map_enqueue(rcpu, xdp, dev_rx);
+		if (err)
+			return err;
+		__cpu_map_insert_ctx(map, index);
+	}
 	return 0;
 }
 
@@ -2534,10 +2561,32 @@ void xdp_do_flush_map(void)
 	struct bpf_map *map = ri->map_to_flush;
 
 	ri->map_to_flush = NULL;
-	if (map)
-		__dev_map_flush(map);
+	if (map) {
+		switch (map->map_type) {
+		case BPF_MAP_TYPE_DEVMAP:
+			__dev_map_flush(map);
+			break;
+		case BPF_MAP_TYPE_CPUMAP:
+			__cpu_map_flush(map);
+			break;
+		default:
+			break;
+		}
+	}
 }
 EXPORT_SYMBOL_GPL(xdp_do_flush_map);
+
+static void *__xdp_map_lookup_elem(struct bpf_map *map, u32 index)
+{
+	switch (map->map_type) {
+	case BPF_MAP_TYPE_DEVMAP:
+		return __dev_map_lookup_elem(map, index);
+	case BPF_MAP_TYPE_CPUMAP:
+		return __cpu_map_lookup_elem(map, index);
+	default:
+		return NULL;
+	}
+}
 
 static inline bool xdp_map_invalid(const struct bpf_prog *xdp_prog,
 				   unsigned long aux)
@@ -2551,8 +2600,8 @@ static int xdp_do_redirect_map(struct net_device *dev, struct xdp_buff *xdp,
 	struct redirect_info *ri = this_cpu_ptr(&redirect_info);
 	unsigned long map_owner = ri->map_owner;
 	struct bpf_map *map = ri->map;
-	struct net_device *fwd = NULL;
 	u32 index = ri->ifindex;
+	void *fwd = NULL;
 	int err;
 
 	ri->ifindex = 0;
@@ -2565,7 +2614,7 @@ static int xdp_do_redirect_map(struct net_device *dev, struct xdp_buff *xdp,
 		goto err;
 	}
 
-	fwd = __dev_map_lookup_elem(map, index);
+	fwd = __xdp_map_lookup_elem(map, index);
 	if (!fwd) {
 		err = -EINVAL;
 		goto err;
@@ -2573,7 +2622,7 @@ static int xdp_do_redirect_map(struct net_device *dev, struct xdp_buff *xdp,
 	if (ri->map_to_flush && ri->map_to_flush != map)
 		xdp_do_flush_map();
 
-	err = __bpf_tx_xdp(fwd, map, xdp, index);
+	err = __bpf_tx_xdp_map(dev, fwd, map, xdp, index);
 	if (unlikely(err))
 		goto err;
 

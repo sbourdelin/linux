@@ -488,7 +488,8 @@ static int bq_enqueue(struct bpf_cpu_map_entry *rcpu, struct xdp_pkt *xdp_pkt)
 	return 0;
 }
 
-int cpu_map_enqueue(struct bpf_cpu_map_entry *rcpu, struct xdp_buff *xdp)
+int cpu_map_enqueue(struct bpf_cpu_map_entry *rcpu, struct xdp_buff *xdp,
+		    struct net_device *dev_rx)
 {
 	struct xdp_pkt *xdp_pkt;
 	int headroom;
@@ -500,7 +501,7 @@ int cpu_map_enqueue(struct bpf_cpu_map_entry *rcpu, struct xdp_buff *xdp)
 	xdp_pkt = xdp->data_hard_start;
 	xdp_pkt->data = xdp->data;
 	xdp_pkt->len  = xdp->data_end - xdp->data;
-	xdp_pkt->headroom = headroom;
+	xdp_pkt->headroom = headroom - sizeof(*xdp_pkt);
 	/* For now this is just used as a void pointer to data_hard_start */
 
 	bq_enqueue(rcpu, xdp_pkt);
