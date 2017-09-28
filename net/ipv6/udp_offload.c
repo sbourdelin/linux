@@ -34,6 +34,13 @@ static struct sk_buff **udp6_gro_receive(struct sk_buff **head,
 {
 	struct udphdr *uh = udp_gro_udphdr(skb);
 
+	if (!static_key_false(&udp_encap_needed)) {
+		/* Currently udp_gro_receive only does something if
+		 * a UDP encapsulation has been set.
+		 */
+		goto flush;
+	}
+
 	if (unlikely(!uh))
 		goto flush;
 

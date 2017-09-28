@@ -97,6 +97,8 @@ static inline struct udp_hslot *udp_hashslot2(struct udp_table *table,
 
 extern struct proto udp_prot;
 
+extern struct static_key udp_encap_needed;
+
 extern atomic_long_t udp_memory_allocated;
 
 /* sysctl variables for udp */
