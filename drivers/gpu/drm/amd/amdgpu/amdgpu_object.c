@@ -202,7 +202,7 @@ int amdgpu_bo_create_reserved(struct amdgpu_device *adev,
 				     AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS,
 				     NULL, NULL, 0, bo_ptr);
 		if (r) {
-			dev_err(adev->dev, "(%d) failed to allocate kernel bo\n",
+			DRM_DEV_ERROR(adev->dev, "(%d) failed to allocate kernel bo\n",
 				r);
 			return r;
 		}
@@ -211,20 +211,20 @@ int amdgpu_bo_create_reserved(struct amdgpu_device *adev,
 
 	r = amdgpu_bo_reserve(*bo_ptr, false);
 	if (r) {
-		dev_err(adev->dev, "(%d) failed to reserve kernel bo\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to reserve kernel bo\n", r);
 		goto error_free;
 	}
 
 	r = amdgpu_bo_pin(*bo_ptr, domain, gpu_addr);
 	if (r) {
-		dev_err(adev->dev, "(%d) kernel bo pin failed\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) kernel bo pin failed\n", r);
 		goto error_unreserve;
 	}
 
 	if (cpu_addr) {
 		r = amdgpu_bo_kmap(*bo_ptr, cpu_addr);
 		if (r) {
-			dev_err(adev->dev, "(%d) kernel bo map failed\n", r);
+			DRM_DEV_ERROR(adev->dev, "(%d) kernel bo map failed\n", r);
 			goto error_unreserve;
 		}
 	}
@@ -730,7 +730,7 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 
 	r = ttm_bo_validate(&bo->tbo, &bo->placement, false, false);
 	if (unlikely(r)) {
-		dev_err(adev->dev, "%p pin failed\n", bo);
+		DRM_DEV_ERROR(adev->dev, "%p pin failed\n", bo);
 		goto error;
 	}
 
@@ -738,7 +738,7 @@ int amdgpu_bo_pin_restricted(struct amdgpu_bo *bo, u32 domain,
 	if (gpu_addr != NULL) {
 		r = amdgpu_ttm_bind(&bo->tbo, &bo->tbo.mem);
 		if (unlikely(r)) {
-			dev_err(adev->dev, "%p bind failed\n", bo);
+			DRM_DEV_ERROR(adev->dev, "%p bind failed\n", bo);
 			goto error;
 		}
 		*gpu_addr = amdgpu_bo_gpu_offset(bo);
@@ -778,7 +778,7 @@ int amdgpu_bo_unpin(struct amdgpu_bo *bo)
 	}
 	r = ttm_bo_validate(&bo->tbo, &bo->placement, false, false);
 	if (unlikely(r)) {
-		dev_err(adev->dev, "%p validate failed for unpin\n", bo);
+		DRM_DEV_ERROR(adev->dev, "%p validate failed for unpin\n", bo);
 		goto error;
 	}
 

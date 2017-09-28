@@ -173,14 +173,14 @@ int amdgpu_uvd_sw_init(struct amdgpu_device *adev)
 
 	r = request_firmware(&adev->uvd.fw, fw_name, adev->dev);
 	if (r) {
-		dev_err(adev->dev, "amdgpu_uvd: Can't load firmware \"%s\"\n",
+		DRM_DEV_ERROR(adev->dev, "amdgpu_uvd: Can't load firmware \"%s\"\n",
 			fw_name);
 		return r;
 	}
 
 	r = amdgpu_ucode_validate(adev->uvd.fw);
 	if (r) {
-		dev_err(adev->dev, "amdgpu_uvd: Can't validate firmware \"%s\"\n",
+		DRM_DEV_ERROR(adev->dev, "amdgpu_uvd: Can't validate firmware \"%s\"\n",
 			fw_name);
 		release_firmware(adev->uvd.fw);
 		adev->uvd.fw = NULL;
@@ -225,7 +225,7 @@ int amdgpu_uvd_sw_init(struct amdgpu_device *adev)
 				    AMDGPU_GEM_DOMAIN_VRAM, &adev->uvd.vcpu_bo,
 				    &adev->uvd.gpu_addr, &adev->uvd.cpu_addr);
 	if (r) {
-		dev_err(adev->dev, "(%d) failed to allocate UVD bo\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to allocate UVD bo\n", r);
 		return r;
 	}
 

@@ -150,7 +150,7 @@ int psp_v3_1_init_microcode(struct psp_context *psp)
 	return 0;
 out:
 	if (err) {
-		dev_err(adev->dev,
+		DRM_DEV_ERROR(adev->dev,
 			"psp v3.1: Failed to load firmware \"%s\"\n",
 			fw_name);
 		release_firmware(adev->psp.sos_fw);

@@ -140,14 +140,14 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 
 	r = request_firmware(&adev->vce.fw, fw_name, adev->dev);
 	if (r) {
-		dev_err(adev->dev, "amdgpu_vce: Can't load firmware \"%s\"\n",
+		DRM_DEV_ERROR(adev->dev, "amdgpu_vce: Can't load firmware \"%s\"\n",
 			fw_name);
 		return r;
 	}
 
 	r = amdgpu_ucode_validate(adev->vce.fw);
 	if (r) {
-		dev_err(adev->dev, "amdgpu_vce: Can't validate firmware \"%s\"\n",
+		DRM_DEV_ERROR(adev->dev, "amdgpu_vce: Can't validate firmware \"%s\"\n",
 			fw_name);
 		release_firmware(adev->vce.fw);
 		adev->vce.fw = NULL;
@@ -169,7 +169,7 @@ int amdgpu_vce_sw_init(struct amdgpu_device *adev, unsigned long size)
 				    AMDGPU_GEM_DOMAIN_VRAM, &adev->vce.vcpu_bo,
 				    &adev->vce.gpu_addr, &adev->vce.cpu_addr);
 	if (r) {
-		dev_err(adev->dev, "(%d) failed to allocate VCE bo\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to allocate VCE bo\n", r);
 		return r;
 	}
 
@@ -264,14 +264,14 @@ int amdgpu_vce_resume(struct amdgpu_device *adev)
 
 	r = amdgpu_bo_reserve(adev->vce.vcpu_bo, false);
 	if (r) {
-		dev_err(adev->dev, "(%d) failed to reserve VCE bo\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to reserve VCE bo\n", r);
 		return r;
 	}
 
 	r = amdgpu_bo_kmap(adev->vce.vcpu_bo, &cpu_addr);
 	if (r) {
 		amdgpu_bo_unreserve(adev->vce.vcpu_bo);
-		dev_err(adev->dev, "(%d) VCE map failed\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) VCE map failed\n", r);
 		return r;
 	}
 

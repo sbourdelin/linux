@@ -605,7 +605,7 @@ void amdgpu_vram_location(struct amdgpu_device *adev, struct amdgpu_mc *mc, u64 
 	mc->vram_end = mc->vram_start + mc->mc_vram_size - 1;
 	if (limit && limit < mc->real_vram_size)
 		mc->real_vram_size = limit;
-	dev_info(adev->dev, "VRAM: %lluM 0x%016llX - 0x%016llX (%lluM used)\n",
+	DRM_DEV_INFO(adev->dev, "VRAM: %lluM 0x%016llX - 0x%016llX (%lluM used)\n",
 			mc->mc_vram_size >> 20, mc->vram_start,
 			mc->vram_end, mc->real_vram_size >> 20);
 }
@@ -642,7 +642,7 @@ void amdgpu_gart_location(struct amdgpu_device *adev, struct amdgpu_mc *mc)
 		mc->gart_start = mc->vram_end + 1;
 	}
 	mc->gart_end = mc->gart_start + mc->gart_size - 1;
-	dev_info(adev->dev, "GTT: %lluM 0x%016llX - 0x%016llX\n",
+	DRM_DEV_INFO(adev->dev, "GTT: %lluM 0x%016llX - 0x%016llX\n",
 			mc->gart_size >> 20, mc->gart_start, mc->gart_end);
 }
 
@@ -728,7 +728,7 @@ int amdgpu_dummy_page_init(struct amdgpu_device *adev)
 	adev->dummy_page.addr = pci_map_page(adev->pdev, adev->dummy_page.page,
 					0, PAGE_SIZE, PCI_DMA_BIDIRECTIONAL);
 	if (pci_dma_mapping_error(adev->pdev, adev->dummy_page.addr)) {
-		dev_err(&adev->pdev->dev, "Failed to DMA MAP the dummy page\n");
+		DRM_DEV_ERROR(&adev->pdev->dev, "Failed to DMA MAP the dummy page\n");
 		__free_page(adev->dummy_page.page);
 		adev->dummy_page.page = NULL;
 		return -ENOMEM;
@@ -1396,14 +1396,14 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 	snprintf(fw_name, sizeof(fw_name), "amdgpu/%s_gpu_info.bin", chip_name);
 	err = request_firmware(&adev->firmware.gpu_info_fw, fw_name, adev->dev);
 	if (err) {
-		dev_err(adev->dev,
+		DRM_DEV_ERROR(adev->dev,
 			"Failed to load gpu_info firmware \"%s\"\n",
 			fw_name);
 		goto out;
 	}
 	err = amdgpu_ucode_validate(adev->firmware.gpu_info_fw);
 	if (err) {
-		dev_err(adev->dev,
+		DRM_DEV_ERROR(adev->dev,
 			"Failed to validate gpu_info firmware \"%s\"\n",
 			fw_name);
 		goto out;
@@ -1440,7 +1440,7 @@ static int amdgpu_device_parse_gpu_info_fw(struct amdgpu_device *adev)
 		break;
 	}
 	default:
-		dev_err(adev->dev,
+		DRM_DEV_ERROR(adev->dev,
 			"Unsupported gpu_info table %d\n", hdr->header.ucode_version);
 		err = -EINVAL;
 		goto out;
@@ -2094,7 +2094,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 
 	r = amdgpu_atombios_init(adev);
 	if (r) {
-		dev_err(adev->dev, "amdgpu_atombios_init failed\n");
+		DRM_DEV_ERROR(adev->dev, "amdgpu_atombios_init failed\n");
 		amdgpu_vf_error_put(AMDGIM_ERROR_VF_ATOMBIOS_INIT_FAIL, 0, 0);
 		goto failed;
 	}
@@ -2105,7 +2105,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	/* Post card if necessary */
 	if (amdgpu_vpost_needed(adev)) {
 		if (!adev->bios) {
-			dev_err(adev->dev, "no vBIOS found\n");
+			DRM_DEV_ERROR(adev->dev, "no vBIOS found\n");
 			amdgpu_vf_error_put(AMDGIM_ERROR_VF_NO_VBIOS, 0, 0);
 			r = -EINVAL;
 			goto failed;
@@ -2113,7 +2113,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		DRM_INFO("GPU posting now...\n");
 		r = amdgpu_atom_asic_init(adev->mode_info.atom_context);
 		if (r) {
-			dev_err(adev->dev, "gpu post error!\n");
+			DRM_DEV_ERROR(adev->dev, "gpu post error!\n");
 			amdgpu_vf_error_put(AMDGIM_ERROR_VF_GPU_POST_ERROR, 0, 0);
 			goto failed;
 		}
@@ -2125,7 +2125,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		/* Initialize clocks */
 		r = amdgpu_atomfirmware_get_clock_info(adev);
 		if (r) {
-			dev_err(adev->dev, "amdgpu_atomfirmware_get_clock_info failed\n");
+			DRM_DEV_ERROR(adev->dev, "amdgpu_atomfirmware_get_clock_info failed\n");
 			amdgpu_vf_error_put(AMDGIM_ERROR_VF_ATOMBIOS_GET_CLOCK_FAIL, 0, 0);
 			goto failed;
 		}
@@ -2133,7 +2133,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		/* Initialize clocks */
 		r = amdgpu_atombios_get_clock_info(adev);
 		if (r) {
-			dev_err(adev->dev, "amdgpu_atombios_get_clock_info failed\n");
+			DRM_DEV_ERROR(adev->dev, "amdgpu_atombios_get_clock_info failed\n");
 			amdgpu_vf_error_put(AMDGIM_ERROR_VF_ATOMBIOS_GET_CLOCK_FAIL, 0, 0);
 			goto failed;
 		}
@@ -2144,7 +2144,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	/* Fence driver */
 	r = amdgpu_fence_driver_init(adev);
 	if (r) {
-		dev_err(adev->dev, "amdgpu_fence_driver_init failed\n");
+		DRM_DEV_ERROR(adev->dev, "amdgpu_fence_driver_init failed\n");
 		amdgpu_vf_error_put(AMDGIM_ERROR_VF_FENCE_INIT_FAIL, 0, 0);
 		goto failed;
 	}
@@ -2154,7 +2154,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 
 	r = amdgpu_init(adev);
 	if (r) {
-		dev_err(adev->dev, "amdgpu_init failed\n");
+		DRM_DEV_ERROR(adev->dev, "amdgpu_init failed\n");
 		amdgpu_vf_error_put(AMDGIM_ERROR_VF_AMDGPU_INIT_FAIL, 0, 0);
 		amdgpu_fini(adev);
 		goto failed;
@@ -2174,7 +2174,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 
 	r = amdgpu_ib_pool_init(adev);
 	if (r) {
-		dev_err(adev->dev, "IB initialization failed (%d).\n", r);
+		DRM_DEV_ERROR(adev->dev, "IB initialization failed (%d).\n", r);
 		amdgpu_vf_error_put(AMDGIM_ERROR_VF_IB_INIT_FAIL, 0, r);
 		goto failed;
 	}
@@ -2219,7 +2219,7 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 	 */
 	r = amdgpu_late_init(adev);
 	if (r) {
-		dev_err(adev->dev, "amdgpu_late_init failed\n");
+		DRM_DEV_ERROR(adev->dev, "amdgpu_late_init failed\n");
 		amdgpu_vf_error_put(AMDGIM_ERROR_VF_AMDGPU_LATE_INIT_FAIL, 0, r);
 		goto failed;
 	}
@@ -2709,7 +2709,7 @@ int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, struct amdgpu_job *job)
 	amdgpu_irq_gpu_reset_resume_helper(adev);
 
 	if (amdgpu_ib_ring_tests(adev))
-		dev_err(adev->dev, "[GPU_RESET] ib ring test failed (%d).\n", r);
+		DRM_DEV_ERROR(adev->dev, "[GPU_RESET] ib ring test failed (%d).\n", r);
 
 	/* release full control of GPU after ib test */
 	amdgpu_virt_release_full_gpu(adev, true);
@@ -2760,9 +2760,9 @@ give_up_reset:
 	ttm_bo_unlock_delayed_workqueue(&adev->mman.bdev, resched);
 	if (r) {
 		/* bad news, how to tell it to userspace ? */
-		dev_info(adev->dev, "GPU reset failed\n");
+		DRM_DEV_INFO(adev->dev, "GPU reset failed\n");
 	} else {
-		dev_info(adev->dev, "GPU reset successed!\n");
+		DRM_DEV_INFO(adev->dev, "GPU reset successed!\n");
 	}
 
 	adev->gfx.in_reset = false;
@@ -2829,7 +2829,7 @@ retry:
 		amdgpu_atom_asic_init(adev->mode_info.atom_context);
 
 		if (!r) {
-			dev_info(adev->dev, "GPU reset succeeded, trying to resume\n");
+			DRM_DEV_INFO(adev->dev, "GPU reset succeeded, trying to resume\n");
 			r = amdgpu_resume_phase1(adev);
 			if (r)
 				goto out;
@@ -2853,7 +2853,7 @@ out:
 		amdgpu_irq_gpu_reset_resume_helper(adev);
 		r = amdgpu_ib_ring_tests(adev);
 		if (r) {
-			dev_err(adev->dev, "ib ring test failed (%d).\n", r);
+			DRM_DEV_ERROR(adev->dev, "ib ring test failed (%d).\n", r);
 			r = amdgpu_suspend(adev);
 			need_full_reset = true;
 			goto retry;
@@ -2901,7 +2901,7 @@ out:
 			kthread_unpark(ring->sched.thread);
 		}
 	} else {
-		dev_err(adev->dev, "asic resume failed (%d).\n", r);
+		DRM_DEV_ERROR(adev->dev, "asic resume failed (%d).\n", r);
 		amdgpu_vf_error_put(AMDGIM_ERROR_VF_ASIC_RESUME_FAIL, 0, r);
 		for (i = 0; i < AMDGPU_MAX_RINGS; ++i) {
 			if (adev->rings[i] && adev->rings[i]->sched.thread) {
@@ -2915,11 +2915,11 @@ out:
 	ttm_bo_unlock_delayed_workqueue(&adev->mman.bdev, resched);
 	if (r) {
 		/* bad news, how to tell it to userspace ? */
-		dev_info(adev->dev, "GPU reset failed\n");
+		DRM_DEV_INFO(adev->dev, "GPU reset failed\n");
 		amdgpu_vf_error_put(AMDGIM_ERROR_VF_GPU_RESET_FAIL, 0, r);
 	}
 	else {
-		dev_info(adev->dev, "GPU reset successed!\n");
+		DRM_DEV_INFO(adev->dev, "GPU reset successed!\n");
 	}
 
 	amdgpu_vf_error_trans_all(adev);

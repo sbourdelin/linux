@@ -888,7 +888,7 @@ static int sdma_v4_0_ring_test_ring(struct amdgpu_ring *ring)
 
 	r = amdgpu_wb_get(adev, &index);
 	if (r) {
-		dev_err(adev->dev, "(%d) failed to allocate wb slot\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to allocate wb slot\n", r);
 		return r;
 	}
 
@@ -950,7 +950,7 @@ static int sdma_v4_0_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 
 	r = amdgpu_wb_get(adev, &index);
 	if (r) {
-		dev_err(adev->dev, "(%ld) failed to allocate wb slot\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%ld) failed to allocate wb slot\n", r);
 		return r;
 	}
 

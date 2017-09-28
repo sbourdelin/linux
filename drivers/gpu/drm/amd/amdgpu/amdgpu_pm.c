@@ -1363,7 +1363,7 @@ int amdgpu_pm_sysfs_init(struct amdgpu_device *adev)
 								   hwmon_groups);
 	if (IS_ERR(adev->pm.int_hwmon_dev)) {
 		ret = PTR_ERR(adev->pm.int_hwmon_dev);
-		dev_err(adev->dev,
+		DRM_DEV_ERROR(adev->dev,
 			"Unable to register hwmon device: %d\n", ret);
 		return ret;
 	}

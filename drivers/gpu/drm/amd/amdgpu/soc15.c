@@ -411,7 +411,7 @@ static void soc15_gpu_pci_config_reset(struct amdgpu_device *adev)
 {
 	u32 i;
 
-	dev_info(adev->dev, "GPU pci config reset\n");
+	DRM_DEV_INFO(adev->dev, "GPU pci config reset\n");
 
 	/* disable BM */
 	pci_clear_master(adev->pdev);

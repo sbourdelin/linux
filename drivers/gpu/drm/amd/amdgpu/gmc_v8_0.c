@@ -784,7 +784,7 @@ static int gmc_v8_0_gart_enable(struct amdgpu_device *adev)
 	u32 tmp, field;
 
 	if (adev->gart.robj == NULL) {
-		dev_err(adev->dev, "No VRAM object for PCIE GART.\n");
+		DRM_DEV_ERROR(adev->dev, "No VRAM object for PCIE GART.\n");
 		return -EINVAL;
 	}
 	r = amdgpu_gart_table_vram_pin(adev);
@@ -977,7 +977,7 @@ static void gmc_v8_0_vm_decode_fault(struct amdgpu_device *adev,
 	mc_id = REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 			      MEMORY_CLIENT_ID);
 
-	dev_err(adev->dev, "VM fault (0x%02x, vmid %d) at page %u, %s from '%s' (0x%08x) (%d)\n",
+	DRM_DEV_ERROR(adev->dev, "VM fault (0x%02x, vmid %d) at page %u, %s from '%s' (0x%08x) (%d)\n",
 	       protections, vmid, addr,
 	       REG_GET_FIELD(status, VM_CONTEXT1_PROTECTION_FAULT_STATUS,
 			     MEMORY_CLIENT_RW) ?
@@ -1304,7 +1304,7 @@ static int gmc_v8_0_soft_reset(void *handle)
 
 		tmp = RREG32(mmSRBM_SOFT_RESET);
 		tmp |= srbm_soft_reset;
-		dev_info(adev->dev, "SRBM_SOFT_RESET=0x%08X\n", tmp);
+		DRM_DEV_INFO(adev->dev, "SRBM_SOFT_RESET=0x%08X\n", tmp);
 		WREG32(mmSRBM_SOFT_RESET, tmp);
 		tmp = RREG32(mmSRBM_SOFT_RESET);
 
@@ -1381,9 +1381,9 @@ static int gmc_v8_0_process_interrupt(struct amdgpu_device *adev,
 	u32 addr, status, mc_client;
 
 	if (amdgpu_sriov_vf(adev)) {
-		dev_err(adev->dev, "GPU fault detected: %d 0x%08x\n",
+		DRM_DEV_ERROR(adev->dev, "GPU fault detected: %d 0x%08x\n",
 			entry->src_id, entry->src_data[0]);
-		dev_err(adev->dev, " Can't decode VM fault info here on SRIOV VF\n");
+		DRM_DEV_ERROR(adev->dev, " Can't decode VM fault info here on SRIOV VF\n");
 		return 0;
 	}
 
@@ -1400,11 +1400,11 @@ static int gmc_v8_0_process_interrupt(struct amdgpu_device *adev,
 		gmc_v8_0_set_fault_enable_default(adev, false);
 
 	if (printk_ratelimit()) {
-		dev_err(adev->dev, "GPU fault detected: %d 0x%08x\n",
+		DRM_DEV_ERROR(adev->dev, "GPU fault detected: %d 0x%08x\n",
 			entry->src_id, entry->src_data[0]);
-		dev_err(adev->dev, "  VM_CONTEXT1_PROTECTION_FAULT_ADDR   0x%08X\n",
+		DRM_DEV_ERROR(adev->dev, "  VM_CONTEXT1_PROTECTION_FAULT_ADDR   0x%08X\n",
 			addr);
-		dev_err(adev->dev, "  VM_CONTEXT1_PROTECTION_FAULT_STATUS 0x%08X\n",
+		DRM_DEV_ERROR(adev->dev, "  VM_CONTEXT1_PROTECTION_FAULT_STATUS 0x%08X\n",
 			status);
 		gmc_v8_0_vm_decode_fault(adev, status, addr, mc_client);
 	}

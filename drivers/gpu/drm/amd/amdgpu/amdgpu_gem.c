@@ -181,7 +181,7 @@ void amdgpu_gem_object_close(struct drm_gem_object *obj,
 
 	r = ttm_eu_reserve_buffers(&ticket, &list, false, NULL);
 	if (r) {
-		dev_err(adev->dev, "leaking bo va because "
+		DRM_DEV_ERROR(adev->dev, "leaking bo va because "
 			"we fail to reserve bo (%d)\n", r);
 		return;
 	}
@@ -194,7 +194,7 @@ void amdgpu_gem_object_close(struct drm_gem_object *obj,
 
 			r = amdgpu_vm_clear_freed(adev, vm, &fence);
 			if (unlikely(r)) {
-				dev_err(adev->dev, "failed to clear page "
+				DRM_DEV_ERROR(adev->dev, "failed to clear page "
 					"tables on GEM object close (%d)\n", r);
 			}
 
@@ -556,7 +556,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	int r = 0;
 
 	if (args->va_address < AMDGPU_VA_RESERVED_SIZE) {
-		dev_err(&dev->pdev->dev,
+		DRM_DEV_ERROR(&dev->pdev->dev,
 			"va_address 0x%lX is in reserved area 0x%X\n",
 			(unsigned long)args->va_address,
 			AMDGPU_VA_RESERVED_SIZE);
@@ -564,7 +564,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	}
 
 	if ((args->flags & ~valid_flags) && (args->flags & ~prt_flags)) {
-		dev_err(&dev->pdev->dev, "invalid flags combination 0x%08X\n",
+		DRM_DEV_ERROR(&dev->pdev->dev, "invalid flags combination 0x%08X\n",
 			args->flags);
 		return -EINVAL;
 	}
@@ -576,7 +576,7 @@ int amdgpu_gem_va_ioctl(struct drm_device *dev, void *data,
 	case AMDGPU_VA_OP_REPLACE:
 		break;
 	default:
-		dev_err(&dev->pdev->dev, "unsupported operation %d\n",
+		DRM_DEV_ERROR(&dev->pdev->dev, "unsupported operation %d\n",
 			args->operation);
 		return -EINVAL;
 	}

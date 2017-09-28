@@ -66,7 +66,7 @@ int amdgpu_sa_bo_manager_init(struct amdgpu_device *adev,
 	r = amdgpu_bo_create(adev, size, align, true, domain,
 			     0, NULL, NULL, 0, &sa_manager->bo);
 	if (r) {
-		dev_err(adev->dev, "(%d) failed to allocate bo for manager\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to allocate bo for manager\n", r);
 		return r;
 	}
 
@@ -82,7 +82,7 @@ void amdgpu_sa_bo_manager_fini(struct amdgpu_device *adev,
 		sa_manager->hole = &sa_manager->olist,
 		amdgpu_sa_bo_try_free(sa_manager);
 		if (!list_empty(&sa_manager->olist)) {
-			dev_err(adev->dev, "sa_manager is not empty, clearing anyway\n");
+			DRM_DEV_ERROR(adev->dev, "sa_manager is not empty, clearing anyway\n");
 		}
 	}
 	list_for_each_entry_safe(sa_bo, tmp, &sa_manager->olist, olist) {
@@ -98,20 +98,20 @@ int amdgpu_sa_bo_manager_start(struct amdgpu_device *adev,
 	int r;
 
 	if (sa_manager->bo == NULL) {
-		dev_err(adev->dev, "no bo for sa manager\n");
+		DRM_DEV_ERROR(adev->dev, "no bo for sa manager\n");
 		return -EINVAL;
 	}
 
 	/* map the buffer */
 	r = amdgpu_bo_reserve(sa_manager->bo, false);
 	if (r) {
-		dev_err(adev->dev, "(%d) failed to reserve manager bo\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to reserve manager bo\n", r);
 		return r;
 	}
 	r = amdgpu_bo_pin(sa_manager->bo, sa_manager->domain, &sa_manager->gpu_addr);
 	if (r) {
 		amdgpu_bo_unreserve(sa_manager->bo);
-		dev_err(adev->dev, "(%d) failed to pin manager bo\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to pin manager bo\n", r);
 		return r;
 	}
 	r = amdgpu_bo_kmap(sa_manager->bo, &sa_manager->cpu_ptr);
@@ -126,7 +126,7 @@ int amdgpu_sa_bo_manager_suspend(struct amdgpu_device *adev,
 	int r;
 
 	if (sa_manager->bo == NULL) {
-		dev_err(adev->dev, "no bo for sa manager\n");
+		DRM_DEV_ERROR(adev->dev, "no bo for sa manager\n");
 		return -EINVAL;
 	}
 

@@ -612,7 +612,7 @@ static int sdma_v2_4_ring_test_ring(struct amdgpu_ring *ring)
 
 	r = amdgpu_wb_get(adev, &index);
 	if (r) {
-		dev_err(adev->dev, "(%d) failed to allocate wb slot\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to allocate wb slot\n", r);
 		return r;
 	}
 
@@ -674,7 +674,7 @@ static int sdma_v2_4_ring_test_ib(struct amdgpu_ring *ring, long timeout)
 
 	r = amdgpu_wb_get(adev, &index);
 	if (r) {
-		dev_err(adev->dev, "(%ld) failed to allocate wb slot\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%ld) failed to allocate wb slot\n", r);
 		return r;
 	}
 
@@ -1063,7 +1063,7 @@ static int sdma_v2_4_soft_reset(void *handle)
 	if (srbm_soft_reset) {
 		tmp = RREG32(mmSRBM_SOFT_RESET);
 		tmp |= srbm_soft_reset;
-		dev_info(adev->dev, "SRBM_SOFT_RESET=0x%08X\n", tmp);
+		DRM_DEV_INFO(adev->dev, "SRBM_SOFT_RESET=0x%08X\n", tmp);
 		WREG32(mmSRBM_SOFT_RESET, tmp);
 		tmp = RREG32(mmSRBM_SOFT_RESET);
 

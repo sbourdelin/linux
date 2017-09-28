@@ -167,7 +167,7 @@ static int amdgpufb_create_pinned_object(struct amdgpu_fbdev *rfbdev,
 		ret = amdgpu_bo_set_tiling_flags(abo,
 						 tiling_flags);
 		if (ret)
-			dev_err(adev->dev, "FB failed to set tiling flags\n");
+			DRM_DEV_ERROR(adev->dev, "FB failed to set tiling flags\n");
 	}
 
 

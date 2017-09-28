@@ -237,7 +237,7 @@ int amdgpu_irq_init(struct amdgpu_device *adev)
 		int ret = pci_enable_msi(adev->pdev);
 		if (!ret) {
 			adev->irq.msi_enabled = true;
-			dev_info(adev->dev, "amdgpu: using MSI.\n");
+			DRM_DEV_INFO(adev->dev, "amdgpu: using MSI.\n");
 		}
 	}
 

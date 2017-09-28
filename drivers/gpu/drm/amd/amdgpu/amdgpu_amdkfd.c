@@ -85,7 +85,7 @@ void amdgpu_amdkfd_device_probe(struct amdgpu_device *adev)
 		kfd2kgd = amdgpu_amdkfd_gfx_8_0_get_functions();
 		break;
 	default:
-		dev_info(adev->dev, "kfd not supported on this ASIC\n");
+		DRM_DEV_INFO(adev->dev, "kfd not supported on this ASIC\n");
 		return;
 	}
 
@@ -186,7 +186,7 @@ int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 			     AMDGPU_GEM_CREATE_CPU_GTT_USWC, NULL, NULL, 0,
 			     &(*mem)->bo);
 	if (r) {
-		dev_err(adev->dev,
+		DRM_DEV_ERROR(adev->dev,
 			"failed to allocate BO for amdkfd (%d)\n", r);
 		return r;
 	}
@@ -194,21 +194,21 @@ int alloc_gtt_mem(struct kgd_dev *kgd, size_t size,
 	/* map the buffer */
 	r = amdgpu_bo_reserve((*mem)->bo, true);
 	if (r) {
-		dev_err(adev->dev, "(%d) failed to reserve bo for amdkfd\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to reserve bo for amdkfd\n", r);
 		goto allocate_mem_reserve_bo_failed;
 	}
 
 	r = amdgpu_bo_pin((*mem)->bo, AMDGPU_GEM_DOMAIN_GTT,
 				&(*mem)->gpu_addr);
 	if (r) {
-		dev_err(adev->dev, "(%d) failed to pin bo for amdkfd\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to pin bo for amdkfd\n", r);
 		goto allocate_mem_pin_bo_failed;
 	}
 	*gpu_addr = (*mem)->gpu_addr;
 
 	r = amdgpu_bo_kmap((*mem)->bo, &(*mem)->cpu_ptr);
 	if (r) {
-		dev_err(adev->dev,
+		DRM_DEV_ERROR(adev->dev,
 			"(%d) failed to map bo to kernel for amdkfd\n", r);
 		goto allocate_mem_kmap_bo_failed;
 	}

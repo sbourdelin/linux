@@ -95,9 +95,9 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 		case CHIP_VERDE:
 		case CHIP_OLAND:
 		case CHIP_HAINAN:
-			dev_info(dev->dev,
+			DRM_DEV_INFO(dev->dev,
 				 "SI support provided by radeon.\n");
-			dev_info(dev->dev,
+			DRM_DEV_INFO(dev->dev,
 				 "Use radeon.si_support=0 amdgpu.si_support=1 to override.\n"
 				);
 			return -ENODEV;
@@ -112,9 +112,9 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 		case CHIP_HAWAII:
 		case CHIP_KABINI:
 		case CHIP_MULLINS:
-			dev_info(dev->dev,
+			DRM_DEV_INFO(dev->dev,
 				 "CIK support provided by radeon.\n");
-			dev_info(dev->dev,
+			DRM_DEV_INFO(dev->dev,
 				 "Use radeon.cik_support=0 amdgpu.cik_support=1 to override.\n"
 				);
 			return -ENODEV;
@@ -144,7 +144,7 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 	 */
 	r = amdgpu_device_init(adev, dev, dev->pdev, flags);
 	if (r) {
-		dev_err(&dev->pdev->dev, "Fatal error during GPU init\n");
+		DRM_DEV_ERROR(&dev->pdev->dev, "Fatal error during GPU init\n");
 		goto out;
 	}
 
@@ -154,7 +154,7 @@ int amdgpu_driver_load_kms(struct drm_device *dev, unsigned long flags)
 	if (!r) {
 		acpi_status = amdgpu_acpi_init(adev);
 		if (acpi_status)
-		dev_dbg(&dev->pdev->dev,
+		DRM_DEV_DEBUG(&dev->pdev->dev,
 				"Error during ACPI methods call\n");
 	}
 

@@ -1105,7 +1105,7 @@ static int gfx_v8_0_init_microcode(struct amdgpu_device *adev)
 
 out:
 	if (err) {
-		dev_err(adev->dev,
+		DRM_DEV_ERROR(adev->dev,
 			"gfx8: Failed to load firmware \"%s\"\n",
 			fw_name);
 		release_firmware(adev->gfx.pfp_fw);
@@ -5163,7 +5163,7 @@ static int gfx_v8_0_soft_reset(void *handle)
 	if (grbm_soft_reset) {
 		tmp = RREG32(mmGRBM_SOFT_RESET);
 		tmp |= grbm_soft_reset;
-		dev_info(adev->dev, "GRBM_SOFT_RESET=0x%08X\n", tmp);
+		DRM_DEV_INFO(adev->dev, "GRBM_SOFT_RESET=0x%08X\n", tmp);
 		WREG32(mmGRBM_SOFT_RESET, tmp);
 		tmp = RREG32(mmGRBM_SOFT_RESET);
 
@@ -5177,7 +5177,7 @@ static int gfx_v8_0_soft_reset(void *handle)
 	if (srbm_soft_reset) {
 		tmp = RREG32(mmSRBM_SOFT_RESET);
 		tmp |= srbm_soft_reset;
-		dev_info(adev->dev, "SRBM_SOFT_RESET=0x%08X\n", tmp);
+		DRM_DEV_INFO(adev->dev, "SRBM_SOFT_RESET=0x%08X\n", tmp);
 		WREG32(mmSRBM_SOFT_RESET, tmp);
 		tmp = RREG32(mmSRBM_SOFT_RESET);
 

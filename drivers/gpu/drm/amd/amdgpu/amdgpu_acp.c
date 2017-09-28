@@ -245,7 +245,7 @@ static struct device *get_mfd_cell_dev(const char *device_name, int r)
 	snprintf(auto_dev_name, sizeof(auto_dev_name),
 		 "%s.%d.auto", device_name, r);
 	dev = bus_find_device_by_name(&platform_bus_type, NULL, auto_dev_name);
-	dev_info(dev, "device %s added to pm domain\n", auto_dev_name);
+	DRM_DEV_INFO(dev, "device %s added to pm domain\n", auto_dev_name);
 
 	return dev;
 }
@@ -394,7 +394,7 @@ static int acp_hw_init(void *handle)
 			dev = get_mfd_cell_dev(adev->acp.acp_cell[i].name, i);
 			r = pm_genpd_add_device(&adev->acp.acp_genpd->gpd, dev);
 			if (r) {
-				dev_err(dev, "Failed to add dev to genpd\n");
+				DRM_DEV_ERROR(dev, "Failed to add dev to genpd\n");
 				return r;
 			}
 		}
@@ -425,7 +425,7 @@ static int acp_hw_fini(void *handle)
 			ret = pm_genpd_remove_device(&adev->acp.acp_genpd->gpd, dev);
 			/* If removal fails, dont giveup and try rest */
 			if (ret)
-				dev_err(dev, "remove dev from genpd failed\n");
+				DRM_DEV_ERROR(dev, "remove dev from genpd failed\n");
 		}
 		kfree(adev->acp.acp_genpd);
 	}

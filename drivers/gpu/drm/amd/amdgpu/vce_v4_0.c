@@ -192,7 +192,7 @@ static int vce_v4_0_mmsch_start(struct amdgpu_device *adev,
 	}
 
 	if (!loop) {
-		dev_err(adev->dev, "failed to init MMSCH, mmVCE_MMSCH_VF_MAILBOX_RESP = %x\n", data);
+		DRM_DEV_ERROR(adev->dev, "failed to init MMSCH, mmVCE_MMSCH_VF_MAILBOX_RESP = %x\n", data);
 		return -EBUSY;
 	}
 

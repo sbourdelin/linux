@@ -547,7 +547,7 @@ static int gfx_v9_0_init_microcode(struct amdgpu_device *adev)
 
 out:
 	if (err) {
-		dev_err(adev->dev,
+		DRM_DEV_ERROR(adev->dev,
 			"gfx9: Failed to load firmware \"%s\"\n",
 			fw_name);
 		release_firmware(adev->gfx.pfp_fw);
@@ -780,7 +780,7 @@ static int gfx_v9_0_rlc_init(struct amdgpu_device *adev)
 					      &adev->gfx.rlc.clear_state_gpu_addr,
 					      (void **)&adev->gfx.rlc.cs_ptr);
 		if (r) {
-			dev_err(adev->dev, "(%d) failed to create rlc csb bo\n",
+			DRM_DEV_ERROR(adev->dev, "(%d) failed to create rlc csb bo\n",
 				r);
 			gfx_v9_0_rlc_fini(adev);
 			return r;
@@ -801,7 +801,7 @@ static int gfx_v9_0_rlc_init(struct amdgpu_device *adev)
 					      &adev->gfx.rlc.cp_table_gpu_addr,
 					      (void **)&adev->gfx.rlc.cp_table_ptr);
 		if (r) {
-			dev_err(adev->dev,
+			DRM_DEV_ERROR(adev->dev,
 				"(%d) failed to create cp table bo\n", r);
 			gfx_v9_0_rlc_fini(adev);
 			return r;
@@ -1018,7 +1018,7 @@ static int gfx_v9_0_ngg_create_buf(struct amdgpu_device *adev,
 	int r;
 
 	if (size_se < 0) {
-		dev_err(adev->dev, "Buffer size is invalid: %d\n", size_se);
+		DRM_DEV_ERROR(adev->dev, "Buffer size is invalid: %d\n", size_se);
 		return -EINVAL;
 	}
 	size_se = size_se ? size_se : default_size_se;
@@ -1030,7 +1030,7 @@ static int gfx_v9_0_ngg_create_buf(struct amdgpu_device *adev,
 				    &ngg_buf->gpu_addr,
 				    NULL);
 	if (r) {
-		dev_err(adev->dev, "(%d) failed to create NGG buffer\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) failed to create NGG buffer\n", r);
 		return r;
 	}
 	ngg_buf->bo_size = amdgpu_bo_size(ngg_buf->bo);
@@ -1074,7 +1074,7 @@ static int gfx_v9_0_ngg_init(struct amdgpu_device *adev)
 				    amdgpu_prim_buf_per_se,
 				    64 * 1024);
 	if (r) {
-		dev_err(adev->dev, "Failed to create Primitive Buffer\n");
+		DRM_DEV_ERROR(adev->dev, "Failed to create Primitive Buffer\n");
 		goto err;
 	}
 
@@ -1083,7 +1083,7 @@ static int gfx_v9_0_ngg_init(struct amdgpu_device *adev)
 				    amdgpu_pos_buf_per_se,
 				    256 * 1024);
 	if (r) {
-		dev_err(adev->dev, "Failed to create Position Buffer\n");
+		DRM_DEV_ERROR(adev->dev, "Failed to create Position Buffer\n");
 		goto err;
 	}
 
@@ -1092,7 +1092,7 @@ static int gfx_v9_0_ngg_init(struct amdgpu_device *adev)
 				    amdgpu_cntl_sb_buf_per_se,
 				    256);
 	if (r) {
-		dev_err(adev->dev, "Failed to create Control Sideband Buffer\n");
+		DRM_DEV_ERROR(adev->dev, "Failed to create Control Sideband Buffer\n");
 		goto err;
 	}
 
@@ -1104,7 +1104,7 @@ static int gfx_v9_0_ngg_init(struct amdgpu_device *adev)
 				    amdgpu_param_buf_per_se,
 				    512 * 1024);
 	if (r) {
-		dev_err(adev->dev, "Failed to create Parameter Cache\n");
+		DRM_DEV_ERROR(adev->dev, "Failed to create Parameter Cache\n");
 		goto err;
 	}
 
@@ -2990,7 +2990,7 @@ static int gfx_v9_0_soft_reset(void *handle)
 		if (grbm_soft_reset) {
 			tmp = RREG32_SOC15(GC, 0, mmGRBM_SOFT_RESET);
 			tmp |= grbm_soft_reset;
-			dev_info(adev->dev, "GRBM_SOFT_RESET=0x%08X\n", tmp);
+			DRM_DEV_INFO(adev->dev, "GRBM_SOFT_RESET=0x%08X\n", tmp);
 			WREG32_SOC15(GC, 0, mmGRBM_SOFT_RESET, tmp);
 			tmp = RREG32_SOC15(GC, 0, mmGRBM_SOFT_RESET);
 

@@ -66,7 +66,7 @@ int amdgpu_ib_get(struct amdgpu_device *adev, struct amdgpu_vm *vm,
 		r = amdgpu_sa_bo_new(&adev->ring_tmp_bo,
 				      &ib->sa_bo, size, 256);
 		if (r) {
-			dev_err(adev->dev, "failed to get a new IB (%d)\n", r);
+			DRM_DEV_ERROR(adev->dev, "failed to get a new IB (%d)\n", r);
 			return r;
 		}
 
@@ -145,12 +145,12 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 	}
 
 	if (!ring->ready) {
-		dev_err(adev->dev, "couldn't schedule ib on ring <%s>\n", ring->name);
+		DRM_DEV_ERROR(adev->dev, "couldn't schedule ib on ring <%s>\n", ring->name);
 		return -EINVAL;
 	}
 
 	if (vm && !job->vm_id) {
-		dev_err(adev->dev, "VM IB without ID\n");
+		DRM_DEV_ERROR(adev->dev, "VM IB without ID\n");
 		return -EINVAL;
 	}
 
@@ -159,7 +159,7 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 
 	r = amdgpu_ring_alloc(ring, alloc_size);
 	if (r) {
-		dev_err(adev->dev, "scheduling IB failed (%d).\n", r);
+		DRM_DEV_ERROR(adev->dev, "scheduling IB failed (%d).\n", r);
 		return r;
 	}
 
@@ -228,7 +228,7 @@ int amdgpu_ib_schedule(struct amdgpu_ring *ring, unsigned num_ibs,
 
 	r = amdgpu_fence_emit(ring, f);
 	if (r) {
-		dev_err(adev->dev, "failed to emit fence (%d)\n", r);
+		DRM_DEV_ERROR(adev->dev, "failed to emit fence (%d)\n", r);
 		if (job && job->vm_id)
 			amdgpu_vm_reset_id(adev, ring->funcs->vmhub,
 					   job->vm_id);
@@ -286,7 +286,7 @@ int amdgpu_ib_pool_init(struct amdgpu_device *adev)
 
 	adev->ib_pool_ready = true;
 	if (amdgpu_debugfs_sa_init(adev)) {
-		dev_err(adev->dev, "failed to register debugfs file for SA\n");
+		DRM_DEV_ERROR(adev->dev, "failed to register debugfs file for SA\n");
 	}
 	return 0;
 }

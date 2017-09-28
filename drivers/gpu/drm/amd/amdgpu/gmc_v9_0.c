@@ -150,15 +150,15 @@ static int gmc_v9_0_process_interrupt(struct amdgpu_device *adev,
 	}
 
 	if (printk_ratelimit()) {
-		dev_err(adev->dev,
+		DRM_DEV_ERROR(adev->dev,
 			"[%s] VMC page fault (src_id:%u ring:%u vm_id:%u pas_id:%u)\n",
 			entry->vm_id_src ? "mmhub" : "gfxhub",
 			entry->src_id, entry->ring_id, entry->vm_id,
 			entry->pas_id);
-		dev_err(adev->dev, "  at page 0x%016llx from %d\n",
+		DRM_DEV_ERROR(adev->dev, "  at page 0x%016llx from %d\n",
 			addr, entry->client_id);
 		if (!amdgpu_sriov_vf(adev))
-			dev_err(adev->dev,
+			DRM_DEV_ERROR(adev->dev,
 				"VM_L2_PROTECTION_FAULT_STATUS:0x%08X\n",
 				status);
 	}
@@ -403,7 +403,7 @@ static int gmc_v9_0_late_init(void *handle)
 		unsigned vmhub = ring->funcs->vmhub;
 
 		ring->vm_inv_eng = vm_inv_eng[vmhub]++;
-		dev_info(adev->dev, "ring %u(%s) uses VM inv eng %u on hub %u\n",
+		DRM_DEV_INFO(adev->dev, "ring %u(%s) uses VM inv eng %u on hub %u\n",
 			 ring->idx, ring->name, ring->vm_inv_eng,
 			 ring->funcs->vmhub);
 	}
@@ -706,7 +706,7 @@ static int gmc_v9_0_gart_enable(struct amdgpu_device *adev)
 		(const u32)ARRAY_SIZE(golden_settings_vega10_hdp));
 
 	if (adev->gart.robj == NULL) {
-		dev_err(adev->dev, "No VRAM object for PCIE GART.\n");
+		DRM_DEV_ERROR(adev->dev, "No VRAM object for PCIE GART.\n");
 		return -EINVAL;
 	}
 	r = amdgpu_gart_table_vram_pin(adev);

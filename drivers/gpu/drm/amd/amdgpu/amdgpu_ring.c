@@ -195,25 +195,25 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 
 	r = amdgpu_wb_get(adev, &ring->rptr_offs);
 	if (r) {
-		dev_err(adev->dev, "(%d) ring rptr_offs wb alloc failed\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) ring rptr_offs wb alloc failed\n", r);
 		return r;
 	}
 
 	r = amdgpu_wb_get(adev, &ring->wptr_offs);
 	if (r) {
-		dev_err(adev->dev, "(%d) ring wptr_offs wb alloc failed\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) ring wptr_offs wb alloc failed\n", r);
 		return r;
 	}
 
 	r = amdgpu_wb_get(adev, &ring->fence_offs);
 	if (r) {
-		dev_err(adev->dev, "(%d) ring fence_offs wb alloc failed\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) ring fence_offs wb alloc failed\n", r);
 		return r;
 	}
 
 	r = amdgpu_wb_get(adev, &ring->cond_exe_offs);
 	if (r) {
-		dev_err(adev->dev, "(%d) ring cond_exec_polling wb alloc failed\n", r);
+		DRM_DEV_ERROR(adev->dev, "(%d) ring cond_exec_polling wb alloc failed\n", r);
 		return r;
 	}
 	ring->cond_exe_gpu_addr = adev->wb.gpu_addr + (ring->cond_exe_offs * 4);
@@ -223,7 +223,7 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 
 	r = amdgpu_fence_driver_start_ring(ring, irq_src, irq_type);
 	if (r) {
-		dev_err(adev->dev, "failed initializing fences (%d).\n", r);
+		DRM_DEV_ERROR(adev->dev, "failed initializing fences (%d).\n", r);
 		return r;
 	}
 
@@ -240,7 +240,7 @@ int amdgpu_ring_init(struct amdgpu_device *adev, struct amdgpu_ring *ring,
 					    &ring->gpu_addr,
 					    (void **)&ring->ring);
 		if (r) {
-			dev_err(adev->dev, "(%d) ring create failed\n", r);
+			DRM_DEV_ERROR(adev->dev, "(%d) ring create failed\n", r);
 			return r;
 		}
 		amdgpu_ring_clear_ring(ring);

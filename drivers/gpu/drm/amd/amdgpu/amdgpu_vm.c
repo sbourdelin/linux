@@ -363,7 +363,7 @@ int amdgpu_vm_alloc_pts(struct amdgpu_device *adev,
 	eaddr = saddr + size - 1;
 	last_pfn = eaddr / AMDGPU_GPU_PAGE_SIZE;
 	if (last_pfn >= adev->vm_manager.max_pfn) {
-		dev_err(adev->dev, "va above limit (0x%08llX >= 0x%08llX)\n",
+		DRM_DEV_ERROR(adev->dev, "va above limit (0x%08llX >= 0x%08llX)\n",
 			last_pfn, adev->vm_manager.max_pfn);
 		return -EINVAL;
 	}
@@ -2090,7 +2090,7 @@ int amdgpu_vm_bo_map(struct amdgpu_device *adev,
 	tmp = amdgpu_vm_it_iter_first(&vm->va, saddr, eaddr);
 	if (tmp) {
 		/* bo and tmp overlap, invalid addr */
-		dev_err(adev->dev, "bo %p va 0x%010Lx-0x%010Lx conflict with "
+		DRM_DEV_ERROR(adev->dev, "bo %p va 0x%010Lx-0x%010Lx conflict with "
 			"0x%010Lx-0x%010Lx\n", bo, saddr, eaddr,
 			tmp->start, tmp->last + 1);
 		return -EINVAL;
@@ -2591,7 +2591,7 @@ void amdgpu_vm_fini(struct amdgpu_device *adev, struct amdgpu_vm *vm)
 	amd_sched_entity_fini(vm->entity.sched, &vm->entity);
 
 	if (!RB_EMPTY_ROOT(&vm->va.rb_root)) {
-		dev_err(adev->dev, "still active bo inside vm\n");
+		DRM_DEV_ERROR(adev->dev, "still active bo inside vm\n");
 	}
 	rbtree_postorder_for_each_entry_safe(mapping, tmp,
 					     &vm->va.rb_root, rb) {

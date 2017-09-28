@@ -381,26 +381,26 @@ int amdgpu_ucode_init_bo(struct amdgpu_device *adev)
 				AMDGPU_GEM_CREATE_VRAM_CONTIGUOUS,
 				NULL, NULL, 0, bo);
 	if (err) {
-		dev_err(adev->dev, "(%d) Firmware buffer allocate failed\n", err);
+		DRM_DEV_ERROR(adev->dev, "(%d) Firmware buffer allocate failed\n", err);
 		goto failed;
 	}
 
 	err = amdgpu_bo_reserve(*bo, false);
 	if (err) {
-		dev_err(adev->dev, "(%d) Firmware buffer reserve failed\n", err);
+		DRM_DEV_ERROR(adev->dev, "(%d) Firmware buffer reserve failed\n", err);
 		goto failed_reserve;
 	}
 
 	err = amdgpu_bo_pin(*bo, amdgpu_sriov_vf(adev) ? AMDGPU_GEM_DOMAIN_VRAM : AMDGPU_GEM_DOMAIN_GTT,
 				&fw_mc_addr);
 	if (err) {
-		dev_err(adev->dev, "(%d) Firmware buffer pin failed\n", err);
+		DRM_DEV_ERROR(adev->dev, "(%d) Firmware buffer pin failed\n", err);
 		goto failed_pin;
 	}
 
 	err = amdgpu_bo_kmap(*bo, &fw_buf_ptr);
 	if (err) {
-		dev_err(adev->dev, "(%d) Firmware buffer kmap failed\n", err);
+		DRM_DEV_ERROR(adev->dev, "(%d) Firmware buffer kmap failed\n", err);
 		goto failed_kmap;
 	}
 

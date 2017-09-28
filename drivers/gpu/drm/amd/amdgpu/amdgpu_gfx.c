@@ -174,7 +174,7 @@ static int amdgpu_gfx_kiq_acquire(struct amdgpu_device *adev,
 		return 0;
 	}
 
-	dev_err(adev->dev, "Failed to find a queue for KIQ\n");
+	DRM_DEV_ERROR(adev->dev, "Failed to find a queue for KIQ\n");
 	return -EINVAL;
 }
 
