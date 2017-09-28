@@ -1440,6 +1440,32 @@ static struct sk_buff **ipip_gro_receive(struct sk_buff **head,
 	return inet_gro_receive(head, skb);
 }
 
+static enum flow_dissect_ret inet_proto_flow_dissect(struct sk_buff *skb,
+			u8 proto,
+			struct flow_dissector_key_control *key_control,
+			struct flow_dissector *flow_dissector,
+			void *target_container, void *data,
+			__be16 *p_proto, u8 *p_ip_proto, int *p_nhoff,
+			int *p_hlen, unsigned int flags)
+{
+	enum flow_dissect_ret ret = FLOW_DISSECT_RET_CONTINUE;
+	const struct net_offload *ops;
+
+	rcu_read_lock();
+
+	ops = rcu_dereference(inet_offloads[proto]);
+	if (ops && ops->callbacks.flow_dissect)
+		ret =  ops->callbacks.flow_dissect(skb, key_control,
+						   flow_dissector,
+						   target_container,
+						   data, p_proto, p_ip_proto,
+						   p_nhoff, p_hlen, flags);
+
+	rcu_read_unlock();
+
+	return ret;
+}
+
 #define SECONDS_PER_DAY	86400
 
 /* inet_current_timestamp - Return IP network timestamp
@@ -1763,6 +1789,7 @@ static int ipv4_proc_init(void);
 
 static struct packet_offload ip_packet_offload __read_mostly = {
 	.type = cpu_to_be16(ETH_P_IP),
+	.proto_flow_dissect = inet_proto_flow_dissect,
 	.callbacks = {
 		.gso_segment = inet_gso_segment,
 		.gro_receive = inet_gro_receive,
