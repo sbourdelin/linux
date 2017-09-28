@@ -2065,11 +2065,6 @@ static inline int i40e_check_vf_permission(struct i40e_vf *vf, u8 *macaddr)
 		dev_err(&pf->pdev->dev,
 			"VF attempting to override administratively set MAC address, reload the VF driver to resume normal operation\n");
 		ret = -EPERM;
-	} else if ((vf->num_mac >= I40E_VC_MAX_MAC_ADDR_PER_VF) &&
-		   !test_bit(I40E_VIRTCHNL_VF_CAP_PRIVILEGE, &vf->vf_caps)) {
-		dev_err(&pf->pdev->dev,
-			"VF is not trusted, switch the VF to trusted to add more functionality\n");
-		ret = -EPERM;
 	}
 	return ret;
 }
@@ -2127,6 +2122,15 @@ static int i40e_vc_add_mac_addr_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 			goto error_param;
 		} else {
 			vf->num_mac++;
+		}
+
+		if ((vf->num_mac >= I40E_VC_MAX_MAC_ADDR_PER_VF) &&
+		    !test_bit(I40E_VIRTCHNL_VF_CAP_PRIVILEGE, &vf->vf_caps)) {
+			dev_err(&pf->pdev->dev,
+				"VF is not trusted, switch the VF to trusted to add more functionality\n");
+			ret = -EPERM;
+			spin_unlock_bh(&vsi->mac_filter_hash_lock);
+			goto error_param;
 		}
 	}
 	spin_unlock_bh(&vsi->mac_filter_hash_lock);
@@ -2221,12 +2225,6 @@ static int i40e_vc_add_vlan_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 	i40e_status aq_ret = 0;
 	int i;
 
-	if ((vf->num_vlan >= I40E_VC_MAX_VLAN_PER_VF) &&
-	    !test_bit(I40E_VIRTCHNL_VF_CAP_PRIVILEGE, &vf->vf_caps)) {
-		dev_err(&pf->pdev->dev,
-			"VF is not trusted, switch the VF to trusted to add more VLAN addresses\n");
-		goto error_param;
-	}
 	if (!test_bit(I40E_VF_STATE_ACTIVE, &vf->vf_states) ||
 	    !i40e_vc_isvalid_vsi_id(vf, vsi_id)) {
 		aq_ret = I40E_ERR_PARAM;
@@ -2269,6 +2267,13 @@ static int i40e_vc_add_vlan_msg(struct i40e_vf *vf, u8 *msg, u16 msglen)
 			dev_err(&pf->pdev->dev,
 				"Unable to add VLAN filter %d for VF %d, error %d\n",
 				vfl->vlan_id[i], vf->vf_id, ret);
+		if ((vf->num_vlan >= I40E_VC_MAX_VLAN_PER_VF) &&
+		    !test_bit(I40E_VIRTCHNL_VF_CAP_PRIVILEGE, &vf->vf_caps)) {
+			dev_err(&pf->pdev->dev,
+				"VF is not trusted, switch the VF to trusted to add more VLAN addresses\n");
+			aq_ret = -EPERM;
+			goto error_param;
+		}
 	}
 
 error_param:
