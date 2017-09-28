@@ -19,6 +19,7 @@
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <linux/if_vlan.h>
+#include <linux/gpio/consumer.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/module.h>
@@ -2268,6 +2269,7 @@ static int __maybe_unused ravb_resume(struct device *dev)
 {
 	struct net_device *ndev = dev_get_drvdata(dev);
 	struct ravb_private *priv = netdev_priv(ndev);
+	struct mii_bus *bus = priv->mii_bus;
 	int ret = 0;
 
 	if (priv->wol_enabled) {
@@ -2301,6 +2303,13 @@ static int __maybe_unused ravb_resume(struct device *dev)
 	 * Restore all registers which where setup at probe time and
 	 * reopen device if it was running before system suspended.
 	 */
+
+	/* PHY reset */
+	if (bus->reset_gpiod) {
+		gpiod_set_value_cansleep(bus->reset_gpiod, 1);
+		udelay(bus->reset_delay_us);
+		gpiod_set_value_cansleep(bus->reset_gpiod, 0);
+	}
 
 	/* Set AVB config mode */
 	ravb_set_config_mode(ndev);
