@@ -71,6 +71,7 @@ void setup_udp_tunnel_sock(struct net *net, struct socket *sock,
 	udp_sk(sk)->encap_destroy = cfg->encap_destroy;
 	udp_sk(sk)->gro_receive = cfg->gro_receive;
 	udp_sk(sk)->gro_complete = cfg->gro_complete;
+	udp_sk(sk)->flow_dissect = cfg->flow_dissect;
 
 	udp_tunnel_encap_enable(sock);
 }
