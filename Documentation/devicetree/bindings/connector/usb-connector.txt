@@ -1,0 +1,49 @@
+USB Connector
+=============
+
+Required properties:
+- compatible: "usb-connector"
+  connectors with vendor specific extensions can add one of additional
+  compatibles:
+    "samsung,usb-connector-11pin": 11-pin Samsung micro-USB connector
+- type: the USB connector type: "a", "b", "ab", "c"
+- max-mode: max USB speed mode supported by the connector:
+  "ls", "fs", "hs", "ss", "ss+"
+
+Optional properties:
+- label: a symbolic name for the connector
+- size: size of the connector, should be specified in case of
+  non-standard USB connectors: "mini", "micro", "powered"
+
+Required nodes:
+- any data bus to the connector should be modeled using the
+  OF graph bindings specified in bindings/graph.txt.
+  There should be exactly one port with at least one endpoint to
+  different device nodes. The first endpoint (reg = <0>) should
+  point to USB Interface Controller.
+
+Example
+-------
+
+musb_con: connector {
+	compatible = "samsung,usb-connector-11pin", "usb-connector";
+	label = "usb";
+	type = "b";
+	size = "micro";
+	max-mode = "hs";
+
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		musb_con_usb_in: endpoint@0 {
+			reg = <0>;
+			remote-endpoint = <&muic_usb_out>;
+		};
+
+		musb_con_mhl_in: endpoint@1 {
+			reg = <1>;
+			remote-endpoint = <&mhl_out>;
+		};
+	};
+};
