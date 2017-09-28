@@ -424,7 +424,7 @@ static bool skb_flow_dissect_allowed(int *num_hdrs)
  *
  * Caller must take care of zeroing target container memory.
  */
-bool __skb_flow_dissect(const struct sk_buff *skb,
+bool __skb_flow_dissect(struct sk_buff *skb,
 			struct flow_dissector *flow_dissector,
 			void *target_container,
 			void *data, __be16 proto, int nhoff, int hlen,
@@ -1015,7 +1015,7 @@ u32 flow_hash_from_keys(struct flow_keys *keys)
 }
 EXPORT_SYMBOL(flow_hash_from_keys);
 
-static inline u32 ___skb_get_hash(const struct sk_buff *skb,
+static inline u32 ___skb_get_hash(struct sk_buff *skb,
 				  struct flow_keys *keys, u32 keyval)
 {
 	skb_flow_dissect_flow_keys(skb, keys,
@@ -1053,7 +1053,7 @@ EXPORT_SYMBOL(make_flow_keys_digest);
 
 static struct flow_dissector flow_keys_dissector_symmetric __read_mostly;
 
-u32 __skb_get_hash_symmetric(const struct sk_buff *skb)
+u32 __skb_get_hash_symmetric(struct sk_buff *skb)
 {
 	struct flow_keys keys;
 
@@ -1090,7 +1090,7 @@ void __skb_get_hash(struct sk_buff *skb)
 }
 EXPORT_SYMBOL(__skb_get_hash);
 
-__u32 skb_get_hash_perturb(const struct sk_buff *skb, u32 perturb)
+__u32 skb_get_hash_perturb(struct sk_buff *skb, u32 perturb)
 {
 	struct flow_keys keys;
 
@@ -1158,7 +1158,7 @@ u32 __skb_get_poff(const struct sk_buff *skb, void *data,
  * truncate packets without needing to push actual payload to the user
  * space and can analyze headers only, instead.
  */
-u32 skb_get_poff(const struct sk_buff *skb)
+u32 skb_get_poff(struct sk_buff *skb)
 {
 	struct flow_keys keys;
 

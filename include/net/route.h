@@ -114,10 +114,10 @@ int ip_rt_init(void);
 void rt_cache_flush(struct net *net);
 void rt_flush_dev(struct net_device *dev);
 struct rtable *ip_route_output_key_hash(struct net *net, struct flowi4 *flp,
-					const struct sk_buff *skb);
+					struct sk_buff *skb);
 struct rtable *ip_route_output_key_hash_rcu(struct net *net, struct flowi4 *flp,
 					    struct fib_result *res,
-					    const struct sk_buff *skb);
+					    struct sk_buff *skb);
 
 static inline struct rtable *__ip_route_output_key(struct net *net,
 						   struct flowi4 *flp)
