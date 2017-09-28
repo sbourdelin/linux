@@ -1791,7 +1791,7 @@ static void ip_multipath_l3_keys(const struct sk_buff *skb,
 
 /* if skb is set it will be used and fl4 can be NULL */
 int fib_multipath_hash(const struct fib_info *fi, const struct flowi4 *fl4,
-		       const struct sk_buff *skb)
+		       struct sk_buff *skb)
 {
 	struct net *net = fi->fib_net;
 	struct flow_keys hash_keys;
@@ -2270,7 +2270,7 @@ add:
  */
 
 struct rtable *ip_route_output_key_hash(struct net *net, struct flowi4 *fl4,
-					const struct sk_buff *skb)
+					struct sk_buff *skb)
 {
 	__u8 tos = RT_FL_TOS(fl4);
 	struct fib_result res;
@@ -2295,7 +2295,7 @@ EXPORT_SYMBOL_GPL(ip_route_output_key_hash);
 
 struct rtable *ip_route_output_key_hash_rcu(struct net *net, struct flowi4 *fl4,
 					    struct fib_result *res,
-					    const struct sk_buff *skb)
+					    struct sk_buff *skb)
 {
 	struct net_device *dev_out = NULL;
 	int orig_oif = fl4->flowi4_oif;

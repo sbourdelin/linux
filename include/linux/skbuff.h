@@ -1155,8 +1155,8 @@ __skb_set_sw_hash(struct sk_buff *skb, __u32 hash, bool is_l4)
 }
 
 void __skb_get_hash(struct sk_buff *skb);
-u32 __skb_get_hash_symmetric(const struct sk_buff *skb);
-u32 skb_get_poff(const struct sk_buff *skb);
+u32 __skb_get_hash_symmetric(struct sk_buff *skb);
+u32 skb_get_poff(struct sk_buff *skb);
 u32 __skb_get_poff(const struct sk_buff *skb, void *data,
 		   const struct flow_keys *keys, int hlen);
 __be32 __skb_flow_get_ports(const struct sk_buff *skb, int thoff, u8 ip_proto,
@@ -1172,13 +1172,13 @@ void skb_flow_dissector_init(struct flow_dissector *flow_dissector,
 			     const struct flow_dissector_key *key,
 			     unsigned int key_count);
 
-bool __skb_flow_dissect(const struct sk_buff *skb,
+bool __skb_flow_dissect(struct sk_buff *skb,
 			struct flow_dissector *flow_dissector,
 			void *target_container,
 			void *data, __be16 proto, int nhoff, int hlen,
 			unsigned int flags);
 
-static inline bool skb_flow_dissect(const struct sk_buff *skb,
+static inline bool skb_flow_dissect(struct sk_buff *skb,
 				    struct flow_dissector *flow_dissector,
 				    void *target_container, unsigned int flags)
 {
@@ -1186,7 +1186,7 @@ static inline bool skb_flow_dissect(const struct sk_buff *skb,
 				  NULL, 0, 0, 0, flags);
 }
 
-static inline bool skb_flow_dissect_flow_keys(const struct sk_buff *skb,
+static inline bool skb_flow_dissect_flow_keys(struct sk_buff *skb,
 					      struct flow_keys *flow,
 					      unsigned int flags)
 {
@@ -1225,7 +1225,7 @@ static inline __u32 skb_get_hash_flowi6(struct sk_buff *skb, const struct flowi6
 	return skb->hash;
 }
 
-__u32 skb_get_hash_perturb(const struct sk_buff *skb, u32 perturb);
+__u32 skb_get_hash_perturb(struct sk_buff *skb, u32 perturb);
 
 static inline __u32 skb_get_hash_raw(const struct sk_buff *skb)
 {

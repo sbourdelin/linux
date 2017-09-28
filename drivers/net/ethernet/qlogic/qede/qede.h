@@ -445,7 +445,7 @@ struct qede_fastpath {
 #define QEDE_SP_RX_MODE			1
 
 #ifdef CONFIG_RFS_ACCEL
-int qede_rx_flow_steer(struct net_device *dev, const struct sk_buff *skb,
+int qede_rx_flow_steer(struct net_device *dev, struct sk_buff *skb,
 		       u16 rxq_index, u32 flow_id);
 #define QEDE_SP_ARFS_CONFIG	4
 #define QEDE_SP_TASK_POLL_DELAY	(5 * HZ)

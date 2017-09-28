@@ -13,7 +13,7 @@ void enic_rfs_flw_tbl_free(struct enic *enic);
 struct enic_rfs_fltr_node *htbl_fltr_search(struct enic *enic, u16 fltr_id);
 
 #ifdef CONFIG_RFS_ACCEL
-int enic_rx_flow_steer(struct net_device *dev, const struct sk_buff *skb,
+int enic_rx_flow_steer(struct net_device *dev, struct sk_buff *skb,
 		       u16 rxq_index, u32 flow_id);
 void enic_flow_may_expire(unsigned long data);
 

@@ -167,7 +167,7 @@ static struct enic_rfs_fltr_node *htbl_key_search(struct hlist_head *h,
 	return NULL;
 }
 
-int enic_rx_flow_steer(struct net_device *dev, const struct sk_buff *skb,
+int enic_rx_flow_steer(struct net_device *dev, struct sk_buff *skb,
 		       u16 rxq_index, u32 flow_id)
 {
 	struct flow_keys keys;

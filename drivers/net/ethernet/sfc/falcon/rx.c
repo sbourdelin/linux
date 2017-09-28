@@ -833,7 +833,7 @@ MODULE_PARM_DESC(rx_refill_threshold,
 
 #ifdef CONFIG_RFS_ACCEL
 
-int ef4_filter_rfs(struct net_device *net_dev, const struct sk_buff *skb,
+int ef4_filter_rfs(struct net_device *net_dev, struct sk_buff *skb,
 		   u16 rxq_index, u32 flow_id)
 {
 	struct ef4_nic *efx = netdev_priv(net_dev);

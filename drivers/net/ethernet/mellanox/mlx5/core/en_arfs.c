@@ -699,7 +699,7 @@ static struct arfs_rule *arfs_find_rule(struct arfs_table *arfs_t,
 	return NULL;
 }
 
-int mlx5e_rx_flow_steer(struct net_device *dev, const struct sk_buff *skb,
+int mlx5e_rx_flow_steer(struct net_device *dev, struct sk_buff *skb,
 			u16 rxq_index, u32 flow_id)
 {
 	struct mlx5e_priv *priv = netdev_priv(dev);

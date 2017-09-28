@@ -7344,7 +7344,7 @@ static bool bnxt_fltr_match(struct bnxt_ntuple_filter *f1,
 	return false;
 }
 
-static int bnxt_rx_flow_steer(struct net_device *dev, const struct sk_buff *skb,
+static int bnxt_rx_flow_steer(struct net_device *dev, struct sk_buff *skb,
 			      u16 rxq_index, u32 flow_id)
 {
 	struct bnxt *bp = netdev_priv(dev);

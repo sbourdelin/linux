@@ -1759,7 +1759,7 @@ void fib_select_multipath(struct fib_result *res, int hash)
 #endif
 
 void fib_select_path(struct net *net, struct fib_result *res,
-		     struct flowi4 *fl4, const struct sk_buff *skb)
+		     struct flowi4 *fl4, struct sk_buff *skb)
 {
 	bool oif_check;
 

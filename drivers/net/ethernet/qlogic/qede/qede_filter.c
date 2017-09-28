@@ -411,7 +411,7 @@ qede_alloc_filter(struct qede_dev *edev, int min_hlen)
 	return n;
 }
 
-int qede_rx_flow_steer(struct net_device *dev, const struct sk_buff *skb,
+int qede_rx_flow_steer(struct net_device *dev, struct sk_buff *skb,
 		       u16 rxq_index, u32 flow_id)
 {
 	struct qede_dev *edev = netdev_priv(dev);

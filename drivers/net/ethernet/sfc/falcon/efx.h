@@ -164,7 +164,7 @@ static inline s32 ef4_filter_get_rx_ids(struct ef4_nic *efx,
 	return efx->type->filter_get_rx_ids(efx, priority, buf, size);
 }
 #ifdef CONFIG_RFS_ACCEL
-int ef4_filter_rfs(struct net_device *net_dev, const struct sk_buff *skb,
+int ef4_filter_rfs(struct net_device *net_dev, struct sk_buff *skb,
 		   u16 rxq_index, u32 flow_id);
 bool __ef4_filter_rfs_expire(struct ef4_nic *efx, unsigned quota);
 static inline void ef4_filter_rfs_expire(struct ef4_channel *channel)

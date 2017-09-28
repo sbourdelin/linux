@@ -1010,7 +1010,7 @@ struct xfrmdev_ops {
  *	protocol stack to use.
  *
  *	RFS acceleration.
- * int (*ndo_rx_flow_steer)(struct net_device *dev, const struct sk_buff *skb,
+ * int (*ndo_rx_flow_steer)(struct net_device *dev, struct sk_buff *skb,
  *			    u16 rxq_index, u32 flow_id);
  *	Set hardware filter for RFS.  rxq_index is the target queue index;
  *	flow_id is a flow ID to be passed to rps_may_expire_flow() later.
@@ -1236,7 +1236,7 @@ struct net_device_ops {
 
 #ifdef CONFIG_RFS_ACCEL
 	int			(*ndo_rx_flow_steer)(struct net_device *dev,
-						     const struct sk_buff *skb,
+						     struct sk_buff *skb,
 						     u16 rxq_index,
 						     u32 flow_id);
 #endif

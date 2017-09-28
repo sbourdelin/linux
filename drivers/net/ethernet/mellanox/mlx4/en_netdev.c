@@ -348,7 +348,7 @@ mlx4_en_filter_find(struct mlx4_en_priv *priv, __be32 src_ip, __be32 dst_ip,
 }
 
 static int
-mlx4_en_filter_rfs(struct net_device *net_dev, const struct sk_buff *skb,
+mlx4_en_filter_rfs(struct net_device *net_dev, struct sk_buff *skb,
 		   u16 rxq_index, u32 flow_id)
 {
 	struct mlx4_en_priv *priv = netdev_priv(net_dev);
