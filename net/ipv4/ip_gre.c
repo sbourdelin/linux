@@ -412,6 +412,9 @@ static int gre_rcv(struct sk_buff *skb)
 			return 0;
 	}
 
+	if (unlikely(tpi.proto == htons(ETH_P_MPLS_UC)))
+		return mpls_gre_rcv(skb, hdr_len);
+
 	if (ipgre_rcv(skb, &tpi, hdr_len) == PACKET_RCVD)
 		return 0;
 
