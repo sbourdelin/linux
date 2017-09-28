@@ -436,8 +436,8 @@ static bool vhost_exceeds_maxpend(struct vhost_net *net)
 	struct vhost_net_virtqueue *nvq = &net->vqs[VHOST_NET_VQ_TX];
 	struct vhost_virtqueue *vq = &nvq->vq;
 
-	return (nvq->upend_idx + vq->num - VHOST_MAX_PEND) % UIO_MAXIOV
-		== nvq->done_idx;
+	return (nvq->upend_idx + UIO_MAXIOV - nvq->done_idx) % UIO_MAXIOV >
+	       min(VHOST_MAX_PEND, vq->num >> 2);
 }
 
 /* Expects to be always run from workqueue - which acts as
@@ -480,12 +480,6 @@ static void handle_tx(struct vhost_net *net)
 		if (zcopy)
 			vhost_zerocopy_signal_used(net, vq);
 
-		/* If more outstanding DMAs, queue the work.
-		 * Handle upend_idx wrap around
-		 */
-		if (unlikely(vhost_exceeds_maxpend(net)))
-			break;
-
 		head = vhost_net_tx_get_vq_desc(net, vq, vq->iov,
 						ARRAY_SIZE(vq->iov),
 						&out, &in);
@@ -509,6 +503,7 @@ static void handle_tx(struct vhost_net *net)
 		len = iov_length(vq->iov, out);
 		iov_iter_init(&msg.msg_iter, WRITE, vq->iov, out, len);
 		iov_iter_advance(&msg.msg_iter, hdr_size);
+
 		/* Sanity check */
 		if (!msg_data_left(&msg)) {
 			vq_err(vq, "Unexpected header len for TX: "
@@ -519,8 +514,7 @@ static void handle_tx(struct vhost_net *net)
 		len = msg_data_left(&msg);
 
 		zcopy_used = zcopy && len >= VHOST_GOODCOPY_LEN
-				   && (nvq->upend_idx + 1) % UIO_MAXIOV !=
-				      nvq->done_idx
+				   && !vhost_exceeds_maxpend(net)
 				   && vhost_net_tx_select_zcopy(net);
 
 		/* use msg_control to pass vhost zerocopy ubuf info to skb */
