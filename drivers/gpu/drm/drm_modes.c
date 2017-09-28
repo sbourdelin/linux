@@ -1185,7 +1185,8 @@ void drm_mode_prune_invalid(struct drm_device *dev,
 	struct drm_display_mode *mode, *t;
 
 	list_for_each_entry_safe(mode, t, mode_list, head) {
-		if (mode->status != MODE_OK) {
+		if (mode->status != MODE_OK &&
+		    !(list_is_last(&mode->head, mode_list))) {
 			list_del(&mode->head);
 			if (verbose) {
 				drm_mode_debug_printmodeline(mode);
