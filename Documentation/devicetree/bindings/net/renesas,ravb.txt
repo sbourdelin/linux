@@ -50,6 +50,7 @@ Optional properties:
 			 AVB_LINK signal.
 - renesas,ether-link-active-low: boolean, specify when the AVB_LINK signal is
 				 active-low instead of normal active-high.
+- reset-gpios: see mdio.txt in the same directory.
 
 Example:
 
@@ -97,6 +98,7 @@ Example:
 		pinctrl-0 = <&ether_pins>;
 		pinctrl-names = "default";
 		renesas,no-ether-link;
+		reset-gpios = <&gpio2 10 GPIO_ACTIVE_LOW>;
 		#address-cells = <1>;
 		#size-cells = <0>;
 
