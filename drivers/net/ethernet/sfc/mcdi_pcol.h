@@ -11505,7 +11505,7 @@
 
 /***********************************/
 /* MC_CMD_GET_SNAPSHOT_LENGTH
- * Obtain the curent range of allowable values for the SNAPSHOT_LENGTH
+ * Obtain the current range of allowable values for the SNAPSHOT_LENGTH
  * parameter to MC_CMD_INIT_RXQ.
  */
 #define MC_CMD_GET_SNAPSHOT_LENGTH 0x101
