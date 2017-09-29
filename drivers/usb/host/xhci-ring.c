@@ -914,6 +914,7 @@ void xhci_hc_died(struct xhci_hcd *xhci)
 	xhci_err(xhci, "xHCI host controller not responding, assume dead\n");
 	xhci->xhc_state |= XHCI_STATE_DYING;
 
+	cancel_delayed_work_sync(&xhci->cmd_timer);
 	xhci_cleanup_command_queue(xhci);
 
 	/* return any pending urbs, remove may be waiting for them */
