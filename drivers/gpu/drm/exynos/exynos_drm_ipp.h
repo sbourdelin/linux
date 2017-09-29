@@ -147,6 +147,10 @@ struct exynos_drm_ipp_formats {
      .type = (DRM_EXYNOS_IPP_LIMIT_TYPE_SIZE | DRM_EXYNOS_IPP_LIMIT_SIZE_##l), \
      val
 
+#define IPP_SCALE_LIMIT(val...)	\
+	.type = (DRM_EXYNOS_IPP_LIMIT_TYPE_SCALE),\
+	val
+
 int exynos_drm_ipp_register(struct drm_device *dev, struct exynos_drm_ipp *ipp,
 		const struct exynos_drm_ipp_funcs *funcs, unsigned int caps,
 		const struct exynos_drm_ipp_formats *formats, const char *name);
