@@ -493,14 +493,18 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
 	struct device_node *np_codec;
 	struct snd_soc_dai_link *dai;
 	struct snd_soc_dapm_route *routes;
-	int i, index;
+	int i, index, max_num_routes;
 
 	card->dai_link = devm_kzalloc(dev, sizeof(rockchip_dais),
 				      GFP_KERNEL);
 	if (!card->dai_link)
 		return -ENOMEM;
 
-	routes = devm_kzalloc(dev, sizeof(rockchip_routes),
+	max_num_routes = 0;
+	for (i = 0; i < ARRAY_SIZE(rockchip_dais); i++)
+		max_num_routes += rockchip_routes[i].num_routes;
+
+	routes = devm_kzalloc(dev, max_num_routes * sizeof(*routes),
 			      GFP_KERNEL);
 	if (!routes)
 		return -ENOMEM;
