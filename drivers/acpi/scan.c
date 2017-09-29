@@ -652,7 +652,6 @@ int acpi_device_add(struct acpi_device *device,
 
 	new_bus_id = kzalloc(sizeof(struct acpi_device_bus_id), GFP_KERNEL);
 	if (!new_bus_id) {
-		pr_err(PREFIX "Memory allocation error\n");
 		result = -ENOMEM;
 		goto err_detach;
 	}
@@ -1579,10 +1578,8 @@ static int acpi_add_single_object(struct acpi_device **child,
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
 
 	device = kzalloc(sizeof(struct acpi_device), GFP_KERNEL);
-	if (!device) {
-		printk(KERN_ERR PREFIX "Memory allocation error\n");
+	if (!device)
 		return -ENOMEM;
-	}
 
 	acpi_init_device_object(device, handle, type, sta);
 	acpi_bus_get_power_flags(device);
