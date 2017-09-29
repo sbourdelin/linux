@@ -213,13 +213,16 @@ enum nand_ecc_algo {
 
 /*
  * In case your controller is implementing ->cmd_ctrl() and is relying on the
- * default ->cmdfunc() implementation, you may want to let the core handle the
- * tCCS delay which is required when a column change (RNDIN or RNDOUT) is
- * requested.
- * If your controller already takes care of this delay, you don't need to set
- * this flag.
+ * default ->cmdfunc() implementation, you may want to let the core handle
+ * some delays to meet the timing specification.
+ * If your controller already takes care of these delays, you don't need to set
+ * the following flags.
  */
+
+/* tCCS for a column change (RNDIN or RNDOUT) */
 #define NAND_WAIT_TCCS		0x00200000
+/* tWHR for STATUS, READID, etc. */
+#define NAND_WAIT_TWHR		0x00400000
 
 /* Options set by nand scan */
 /* Nand scan has allocated controller struct */

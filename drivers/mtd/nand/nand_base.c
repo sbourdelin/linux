@@ -676,6 +676,17 @@ static void nand_wait_status_ready(struct mtd_info *mtd, unsigned long timeo)
 	} while (time_before(jiffies, timeo));
 };
 
+static void nand_whr_delay(struct nand_chip *chip)
+{
+	if (!(chip->options & NAND_WAIT_TWHR))
+		return;
+
+	if (chip->data_interface && chip->data_interface->timings.sdr.tWHR_min)
+		ndelay(chip->data_interface->timings.sdr.tWHR_min / 1000);
+	else
+		ndelay(200);
+}
+
 /**
  * nand_command - [DEFAULT] Send command to NAND device
  * @mtd: MTD device structure
@@ -742,9 +753,12 @@ static void nand_command(struct mtd_info *mtd, unsigned int command,
 	case NAND_CMD_ERASE1:
 	case NAND_CMD_ERASE2:
 	case NAND_CMD_SEQIN:
+	case NAND_CMD_SET_FEATURES:
+		return;
+
 	case NAND_CMD_STATUS:
 	case NAND_CMD_READID:
-	case NAND_CMD_SET_FEATURES:
+		nand_whr_delay(chip);
 		return;
 
 	case NAND_CMD_RESET:
@@ -871,9 +885,12 @@ static void nand_command_lp(struct mtd_info *mtd, unsigned int command,
 	case NAND_CMD_ERASE1:
 	case NAND_CMD_ERASE2:
 	case NAND_CMD_SEQIN:
+	case NAND_CMD_SET_FEATURES:
+		return;
+
 	case NAND_CMD_STATUS:
 	case NAND_CMD_READID:
-	case NAND_CMD_SET_FEATURES:
+		nand_whr_delay(chip);
 		return;
 
 	case NAND_CMD_RNDIN:
