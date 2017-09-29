@@ -189,6 +189,9 @@ struct dsa_port {
 	 * Original copy of the master netdev ethtool_ops
 	 */
 	const struct ethtool_ops *orig_ethtool_ops;
+
+	/* CPU port tagging operations used by master or slave devices */
+	const struct dsa_device_ops *tag_ops;
 };
 
 struct dsa_switch {
