@@ -935,6 +935,25 @@ bool kvm_intr_is_single_vcpu_fast(struct kvm *kvm, struct kvm_lapic_irq *irq,
 	return ret;
 }
 
+static void apic_error(struct kvm_lapic *apic, unsigned long errmask)
+{
+	uint32_t esr;
+
+	esr = kvm_lapic_get_reg(apic, APIC_ESR);
+
+	if ((esr & errmask) != errmask) {
+		uint32_t lvterr = kvm_lapic_get_reg(apic, APIC_LVTERR);
+
+		kvm_lapic_set_reg(apic, APIC_ESR, esr | errmask);
+		if (!(lvterr & APIC_LVT_MASKED)) {
+			struct kvm_lapic_irq irq;
+
+			irq.vector = lvterr & 0xff;
+			kvm_irq_delivery_to_apic(apic->vcpu->kvm, apic, &irq, NULL);
+		}
+	}
+}
+
 /*
  * Add a pending IRQ into lapic.
  * Return 1 if successfully added and 0 if discarded.
@@ -945,6 +964,11 @@ static int __apic_accept_irq(struct kvm_lapic *apic, int delivery_mode,
 {
 	int result = 0;
 	struct kvm_vcpu *vcpu = apic->vcpu;
+
+	if (unlikely(vector < 16) && delivery_mode == APIC_DM_FIXED) {
+		apic_error(apic, APIC_ESR_RECVILL);
+		return 0;
+	}
 
 	trace_kvm_apic_accept_irq(vcpu->vcpu_id, delivery_mode,
 				  trig_mode, vector);
@@ -1146,7 +1170,10 @@ static void apic_send_ipi(struct kvm_lapic *apic)
 		   irq.trig_mode, irq.level, irq.dest_mode, irq.delivery_mode,
 		   irq.vector, irq.msi_redir_hint);
 
-	kvm_irq_delivery_to_apic(apic->vcpu->kvm, apic, &irq, NULL);
+	if (unlikely(irq.vector < 16 && irq.delivery_mode == APIC_DM_FIXED))
+		apic_error(apic, APIC_ESR_SENDILL);
+	else
+		kvm_irq_delivery_to_apic(apic->vcpu->kvm, apic, &irq, NULL);
 }
 
 static u32 apic_get_tmcct(struct kvm_lapic *apic)
@@ -1734,7 +1761,6 @@ int kvm_lapic_reg_write(struct kvm_lapic *apic, u32 reg, u32 val)
 	case APIC_LVTPC:
 	case APIC_LVT1:
 	case APIC_LVTERR:
-		/* TODO: Check vector */
 		if (!kvm_apic_sw_enabled(apic))
 			val |= APIC_LVT_MASKED;
 
