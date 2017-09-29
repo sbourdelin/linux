@@ -105,6 +105,8 @@ enum devkmsg_log_masks {
 
 static unsigned int __read_mostly devkmsg_log = DEVKMSG_LOG_MASK_DEFAULT;
 
+static struct kobject *consoles_dir_kobj;
+
 static int __control_devkmsg(char *str)
 {
 	if (!str)
@@ -2371,6 +2373,82 @@ static int __init keep_bootcon_setup(char *str)
 
 early_param("keep_bootcon", keep_bootcon_setup);
 
+static ssize_t loglevel_show(struct kobject *kobj, struct kobj_attribute *attr,
+			     char *buf)
+{
+	struct console *con;
+	ssize_t ret = -ENODEV;
+
+	console_lock();
+	for_each_console(con) {
+		if (con->kobj == kobj) {
+			ret = sprintf(buf, "%d\n", con->level);
+			break;
+		}
+	}
+	console_unlock();
+
+	return ret;
+}
+
+static ssize_t loglevel_store(struct kobject *kobj, struct kobj_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct console *con;
+	ssize_t ret;
+	int tmp;
+
+	ret = kstrtoint(buf, 10, &tmp);
+	if (ret < 0)
+		return ret;
+
+	if (tmp < LOGLEVEL_EMERG)
+		return -ERANGE;
+
+	/*
+	 * Mimic the behavior of /dev/kmsg with respect to minimum_loglevel
+	 */
+	if (tmp < minimum_console_loglevel)
+		tmp = minimum_console_loglevel;
+
+	ret = -ENODEV;
+	console_lock();
+	for_each_console(con) {
+		if (con->kobj == kobj) {
+			con->level = tmp;
+			ret = count;
+			break;
+		}
+	}
+	console_unlock();
+
+	return ret;
+}
+
+static const struct kobj_attribute console_loglevel_attr =
+	__ATTR(loglevel, 0644, loglevel_show, loglevel_store);
+
+static void console_register_sysfs(struct console *newcon)
+{
+	/*
+	 * We might be called very early from register_console(): in that case,
+	 * printk_late_init() will take care of this later.
+	 */
+	if (!consoles_dir_kobj)
+		return;
+
+	newcon->kobj = kobject_create_and_add(newcon->name, consoles_dir_kobj);
+	if (WARN_ON(!newcon->kobj))
+		return;
+
+	WARN_ON(sysfs_create_file(newcon->kobj, &console_loglevel_attr.attr));
+}
+
+static void console_unregister_sysfs(struct console *oldcon)
+{
+	kobject_put(oldcon->kobj);
+}
+
 /*
  * The console driver calls this routine during kernel initialization
  * to register the console printing procedure with printk() and to
@@ -2495,6 +2573,7 @@ void register_console(struct console *newcon)
 	 * By default, the per-console minimum forces no messages through.
 	 */
 	newcon->level = LOGLEVEL_EMERG;
+	newcon->kobj = NULL;
 
 	/*
 	 *	Put this console in the list - keep the
@@ -2531,6 +2610,7 @@ void register_console(struct console *newcon)
 		 */
 		exclusive_console = newcon;
 	}
+	console_register_sysfs(newcon);
 	console_unlock();
 	console_sysfs_notify();
 
@@ -2597,6 +2677,7 @@ int unregister_console(struct console *console)
 		console_drivers->flags |= CON_CONSDEV;
 
 	console->flags &= ~CON_ENABLED;
+	console_unregister_sysfs(console);
 	console_unlock();
 	console_sysfs_notify();
 	return res;
@@ -2672,6 +2753,13 @@ static int __init printk_late_init(void)
 	ret = cpuhp_setup_state_nocalls(CPUHP_AP_ONLINE_DYN, "printk:online",
 					console_cpu_notify, NULL);
 	WARN_ON(ret < 0);
+
+	consoles_dir_kobj = kobject_create_and_add("consoles", NULL);
+	WARN_ON(!consoles_dir_kobj);
+
+	for_each_console(con)
+		console_register_sysfs(con);
+
 	return 0;
 }
 late_initcall(printk_late_init);

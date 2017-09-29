@@ -1,0 +1,13 @@
+What:		/sys/consoles/
+Date:		September 2017
+KernelVersion:	4.15
+Contact:	Calvin Owens <calvinowens@fb.com>
+Description:	The /sys/consoles tree contains a directory for each console
+		configured on the system. These directories contain the
+		following attributes:
+
+		* "loglevel"	Set the per-console loglevel: the kernel uses
+				max(system_loglevel, perconsole_loglevel) when
+				deciding whether to emit a given message. The
+				default is 0, which means max() always yields
+				the system setting in the kernel.printk sysctl.

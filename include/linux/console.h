@@ -148,6 +148,7 @@ struct console {
 	void	*data;
 	struct	 console *next;
 	int	level;
+	struct kobject *kobj;
 };
 
 /*
