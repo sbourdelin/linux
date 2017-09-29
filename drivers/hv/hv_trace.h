@@ -19,6 +19,11 @@ DEFINE_EVENT_PRINT(vmbus_hdr_msg, vmbus_on_msg_dpc,
 	TP_ARGS(hdr),
 	TP_printk("message %u received", __entry->msgtype));
 
+DEFINE_EVENT_PRINT(vmbus_hdr_msg, vmbus_on_message,
+        TP_PROTO(const struct vmbus_channel_message_header *hdr),
+        TP_ARGS(hdr),
+        TP_printk("processing message %u", __entry->msgtype));
+
 #undef TRACE_INCLUDE_PATH
 #define TRACE_INCLUDE_PATH .
 #undef TRACE_INCLUDE_FILE
