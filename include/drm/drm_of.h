@@ -60,10 +60,23 @@ static inline int drm_of_encoder_active_endpoint(struct device_node *node,
 {
 	return -EINVAL;
 }
+
 static inline int drm_of_find_panel_or_bridge(const struct device_node *np,
 					      int port, int endpoint,
 					      struct drm_panel **panel,
 					      struct drm_bridge **bridge)
+{
+	return -EINVAL;
+}
+
+static inline struct backlight_device *drm_of_find_backlight(
+					struct device *dev);
+{
+	return -EINVAL;
+}
+
+static inline struct backlight_device *devm_drm_of_find_backlight(
+						struct device *dev);
 {
 	return -EINVAL;
 }
