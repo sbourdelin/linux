@@ -1,0 +1,130 @@
+/*
+ * Copyright © 2014-2017 Intel Corporation
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice (including the next
+ * paragraph) shall be included in all copies or substantial portions of the
+ * Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+ * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *
+ */
+#include "i915_drv.h"
+
+static void gen8_guc_raise_irq(struct intel_guc *guc)
+{
+	struct drm_i915_private *dev_priv = guc_to_i915(guc);
+
+	I915_WRITE(GUC_SEND_INTERRUPT, GUC_SEND_TRIGGER);
+}
+
+static inline i915_reg_t guc_send_reg(struct intel_guc *guc, u32 i)
+{
+	GEM_BUG_ON(!guc->send_regs.base);
+	GEM_BUG_ON(!guc->send_regs.count);
+	GEM_BUG_ON(i >= guc->send_regs.count);
+
+	return _MMIO(guc->send_regs.base + 4 * i);
+}
+
+static void guc_init_send_regs(struct intel_guc *guc)
+{
+	struct drm_i915_private *dev_priv = guc_to_i915(guc);
+	enum forcewake_domains fw_domains = 0;
+	unsigned int i;
+
+	guc->send_regs.base = i915_mmio_reg_offset(SOFT_SCRATCH(0));
+	guc->send_regs.count = SOFT_SCRATCH_COUNT - 1;
+
+	for (i = 0; i < guc->send_regs.count; i++) {
+		fw_domains |= intel_uncore_forcewake_for_reg(dev_priv,
+					guc_send_reg(guc, i),
+					FW_REG_READ | FW_REG_WRITE);
+	}
+	guc->send_regs.fw_domains = fw_domains;
+}
+
+void intel_guc_init_early(struct intel_guc *guc)
+{
+	intel_guc_ct_init_early(&guc->ct);
+
+	mutex_init(&guc->send_mutex);
+	guc->send = intel_guc_send_nop;
+	guc->notify = gen8_guc_raise_irq;
+	guc_init_send_regs(guc);
+}
+
+int intel_guc_send_nop(struct intel_guc *guc, const u32 *action, u32 len)
+{
+	WARN(1, "Unexpected send: action=%#x\n", *action);
+	return -ENODEV;
+}
+
+/*
+ * This function implements the MMIO based host to GuC interface.
+ */
+int intel_guc_send_mmio(struct intel_guc *guc, const u32 *action, u32 len)
+{
+	struct drm_i915_private *dev_priv = guc_to_i915(guc);
+	u32 status;
+	int i;
+	int ret;
+
+	GEM_BUG_ON(!len);
+	GEM_BUG_ON(len > guc->send_regs.count);
+
+	/* If CT is available, we expect to use MMIO only during init/fini */
+	GEM_BUG_ON(HAS_GUC_CT(dev_priv) &&
+		*action != INTEL_GUC_ACTION_REGISTER_COMMAND_TRANSPORT_BUFFER &&
+		*action != INTEL_GUC_ACTION_DEREGISTER_COMMAND_TRANSPORT_BUFFER);
+
+	mutex_lock(&guc->send_mutex);
+	intel_uncore_forcewake_get(dev_priv, guc->send_regs.fw_domains);
+
+	for (i = 0; i < len; i++)
+		I915_WRITE(guc_send_reg(guc, i), action[i]);
+
+	POSTING_READ(guc_send_reg(guc, i - 1));
+
+	intel_guc_notify(guc);
+
+	/*
+	 * No GuC command should ever take longer than 10ms.
+	 * Fast commands should still complete in 10us.
+	 */
+	ret = __intel_wait_for_register_fw(dev_priv,
+					   guc_send_reg(guc, 0),
+					   INTEL_GUC_RECV_MASK,
+					   INTEL_GUC_RECV_MASK,
+					   10, 10, &status);
+	if (status != INTEL_GUC_STATUS_SUCCESS) {
+		/*
+		 * Either the GuC explicitly returned an error (which
+		 * we convert to -EIO here) or no response at all was
+		 * received within the timeout limit (-ETIMEDOUT)
+		 */
+		if (ret != -ETIMEDOUT)
+			ret = -EIO;
+
+		DRM_WARN("INTEL_GUC_SEND: Action 0x%X failed;"
+			 " ret=%d status=0x%08X response=0x%08X\n",
+			 action[0], ret, status, I915_READ(SOFT_SCRATCH(15)));
+	}
+
+	intel_uncore_forcewake_put(dev_priv, guc->send_regs.fw_domains);
+	mutex_unlock(&guc->send_mutex);
+
+	return ret;
+}
