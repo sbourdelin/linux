@@ -950,6 +950,7 @@ static int add_setting(struct pinctrl *p, struct pinctrl_dev *pctldev,
 	setting->dev_name = map->dev_name;
 
 	switch (map->type) {
+	case PIN_MAP_TYPE_MUX_PIN:
 	case PIN_MAP_TYPE_MUX_GROUP:
 		ret = pinmux_map_to_setting(map, setting);
 		break;
@@ -1104,6 +1105,7 @@ static void pinctrl_free_setting(bool disable_setting,
 				 struct pinctrl_setting *setting)
 {
 	switch (setting->type) {
+	case PIN_MAP_TYPE_MUX_PIN:
 	case PIN_MAP_TYPE_MUX_GROUP:
 		if (disable_setting)
 			pinmux_disable_setting(setting);
@@ -1210,9 +1212,14 @@ int pinctrl_select_state(struct pinctrl *p, struct pinctrl_state *state)
 		 * to pinmux_enable_setting() in the loop below.
 		 */
 		list_for_each_entry(setting, &p->state->settings, node) {
-			if (setting->type != PIN_MAP_TYPE_MUX_GROUP)
-				continue;
-			pinmux_disable_setting(setting);
+			switch (setting->type) {
+			case PIN_MAP_TYPE_MUX_GROUP:
+			case PIN_MAP_TYPE_MUX_PIN:
+				pinmux_disable_setting(setting);
+				break;
+			default:
+				break;
+			}
 		}
 	}
 
@@ -1221,6 +1228,7 @@ int pinctrl_select_state(struct pinctrl *p, struct pinctrl_state *state)
 	/* Apply all the settings for the new state */
 	list_for_each_entry(setting, &state->settings, node) {
 		switch (setting->type) {
+		case PIN_MAP_TYPE_MUX_PIN:
 		case PIN_MAP_TYPE_MUX_GROUP:
 			ret = pinmux_enable_setting(setting);
 			break;
@@ -1255,8 +1263,14 @@ unapply_new_state:
 		 * "unmux a pin"!), but it's not a big deal since the pins
 		 * are free to be muxed by another apply_setting.
 		 */
-		if (setting2->type == PIN_MAP_TYPE_MUX_GROUP)
+		switch (setting2->type) {
+		case PIN_MAP_TYPE_MUX_GROUP:
+		case PIN_MAP_TYPE_MUX_PIN:
 			pinmux_disable_setting(setting2);
+			break;
+		default:
+			break;
+		}
 	}
 
 	/* There's no infinite recursive loop here because p->state is NULL */
@@ -1353,6 +1367,7 @@ int pinctrl_register_map(const struct pinctrl_map *maps, unsigned num_maps,
 		switch (maps[i].type) {
 		case PIN_MAP_TYPE_DUMMY_STATE:
 			break;
+		case PIN_MAP_TYPE_MUX_PIN:
 		case PIN_MAP_TYPE_MUX_GROUP:
 			ret = pinmux_validate_map(&maps[i], i);
 			if (ret < 0)
@@ -1686,6 +1701,7 @@ static inline const char *map_type(enum pinctrl_map_type type)
 	static const char * const names[] = {
 		"INVALID",
 		"DUMMY_STATE",
+		"MUX_PIN",
 		"MUX_GROUP",
 		"CONFIGS_PIN",
 		"CONFIGS_GROUP",
@@ -1716,6 +1732,7 @@ static int pinctrl_maps_show(struct seq_file *s, void *what)
 				   map->ctrl_dev_name);
 
 		switch (map->type) {
+		case PIN_MAP_TYPE_MUX_PIN:
 		case PIN_MAP_TYPE_MUX_GROUP:
 			pinmux_show_map(s, map);
 			break;
@@ -1760,6 +1777,7 @@ static int pinctrl_show(struct seq_file *s, void *what)
 					   pinctrl_dev_get_name(pctldev));
 
 				switch (setting->type) {
+				case PIN_MAP_TYPE_MUX_PIN:
 				case PIN_MAP_TYPE_MUX_GROUP:
 					pinmux_show_setting(s, setting);
 					break;

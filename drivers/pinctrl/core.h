@@ -166,6 +166,7 @@ struct pin_desc {
 #ifdef CONFIG_PINMUX
 	unsigned mux_usecount;
 	const char *mux_owner;
+	enum pinctrl_map_type mux_type;
 	const struct pinctrl_setting_mux *mux_setting;
 	const char *gpio_owner;
 #endif

@@ -45,6 +45,11 @@ struct pinctrl_dev;
  *	are handled by the pinmux subsystem. The @func_selector selects a
  *	certain function whereas @group_selector selects a certain set of pins
  *	to be used. On simple controllers the latter argument may be ignored
+ * @set_mux_pin: enable a certain muxing function with a certain pin. The driver
+ *	does not need to figure out whether enabling this function conflicts
+ *	some other use of the pin, such collisions are handled by the pinmux
+ *	subsystem. The @func_selector selects a certain function whereas
+ *	@pin_selector selects a certain pin to be used.
  * @gpio_request_enable: requests and enables GPIO on a certain pin.
  *	Implement this only if you can mux every pin individually as GPIO. The
  *	affected GPIO range is passed along with an offset(pin number) into that
@@ -72,6 +77,8 @@ struct pinmux_ops {
 				  unsigned *num_groups);
 	int (*set_mux) (struct pinctrl_dev *pctldev, unsigned func_selector,
 			unsigned group_selector);
+	int (*set_mux_pin) (struct pinctrl_dev *pctldev, unsigned func_selector,
+			    unsigned pin_selector);
 	int (*gpio_request_enable) (struct pinctrl_dev *pctldev,
 				    struct pinctrl_gpio_range *range,
 				    unsigned offset);
