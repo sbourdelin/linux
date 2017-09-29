@@ -270,11 +270,11 @@ static inline int w1_therm_eeprom(struct device *device)
 
 	ret = mutex_lock_interruptible(&dev->bus_mutex);
 	if (ret != 0)
-		goto post_unlock;
+		return ret;
 
 	if (!sl->family_data) {
-		ret = -ENODEV;
-		goto pre_unlock;
+		mutex_unlock(&dev->bus_mutex);
+		return -ENODEV;
 	}
 
 	/* prevent the slave from going away in sleep */
@@ -326,7 +326,6 @@ static inline int w1_therm_eeprom(struct device *device)
 
 pre_unlock:
 	mutex_unlock(&dev->bus_mutex);
-
 post_unlock:
 	atomic_dec(THERM_REFCNT(family_data));
 	return ret;
@@ -350,16 +349,16 @@ static inline int w1_DS18B20_precision(struct device *device, int val)
 
 	if (val > 12 || val < 9) {
 		pr_warn("Unsupported precision\n");
-		return -1;
+		return -EINVAL;
 	}
 
 	ret = mutex_lock_interruptible(&dev->bus_mutex);
 	if (ret != 0)
-		goto post_unlock;
+		return ret;
 
 	if (!sl->family_data) {
-		ret = -ENODEV;
-		goto pre_unlock;
+		mutex_unlock(&dev->bus_mutex);
+		return -ENODEV;
 	}
 
 	/* prevent the slave from going away in sleep */
@@ -411,10 +410,7 @@ static inline int w1_DS18B20_precision(struct device *device, int val)
 		}
 	}
 
-pre_unlock:
 	mutex_unlock(&dev->bus_mutex);
-
-post_unlock:
 	atomic_dec(THERM_REFCNT(family_data));
 	return ret;
 }
@@ -492,11 +488,11 @@ static ssize_t read_therm(struct device *device,
 
 	ret = mutex_lock_interruptible(&dev->bus_mutex);
 	if (ret != 0)
-		goto error;
+		return ret;
 
 	if (!family_data) {
-		ret = -ENODEV;
-		goto mt_unlock;
+		mutex_unlock(&dev->bus_mutex);
+		return -ENODEV;
 	}
 
 	/* prevent the slave from going away in sleep */
@@ -532,17 +528,17 @@ static ssize_t read_therm(struct device *device,
 				sleep_rem = msleep_interruptible(tm);
 				if (sleep_rem != 0) {
 					ret = -EINTR;
-					goto dec_refcnt;
+					goto post_unlock;
 				}
 
 				ret = mutex_lock_interruptible(&dev->bus_mutex);
 				if (ret != 0)
-					goto dec_refcnt;
+					goto post_unlock;
 			} else if (!w1_strong_pullup) {
 				sleep_rem = msleep_interruptible(tm);
 				if (sleep_rem != 0) {
 					ret = -EINTR;
-					goto dec_refcnt;
+					goto pre_unlock;
 				}
 			}
 
@@ -567,11 +563,10 @@ static ssize_t read_therm(struct device *device,
 			break;
 	}
 
-dec_refcnt:
-	atomic_dec(THERM_REFCNT(family_data));
-mt_unlock:
+pre_unlock:
 	mutex_unlock(&dev->bus_mutex);
-error:
+post_unlock:
+	atomic_dec(THERM_REFCNT(family_data));
 	return ret;
 }
 
