@@ -121,6 +121,7 @@
 			clocks = <&timer_clk>;
 			#dma-cells = <4>;
 			st,mem2mem;
+			dma-requests = <8>;
 			status = "disabled";
 		};
 
@@ -138,6 +139,7 @@
 			clocks = <&timer_clk>;
 			#dma-cells = <4>;
 			st,mem2mem;
+			dma-requests = <8>;
 			status = "disabled";
 		};
 
@@ -192,6 +194,16 @@
 				interrupts = <0>;
 				status = "disabled";
 			};
+		};
+
+		dmamux1: dma-router@40020800 {
+			compatible = "st,stm32h7-dmamux";
+			reg = <0x40020800 0x1c>;
+			#dma-cells = <3>;
+			dma-channels = <16>;
+			dma-requests = <128>;
+			dma-masters = <&dma1 &dma2>;
+			clocks = <&timer_clk>;
 		};
 	};
 };
