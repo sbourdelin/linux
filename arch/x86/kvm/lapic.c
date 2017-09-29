@@ -1301,7 +1301,7 @@ static void update_divide_count(struct kvm_lapic *apic)
 				   apic->divide_count);
 }
 
-static void apic_update_lvtt(struct kvm_lapic *apic)
+static bool apic_update_lvtt(struct kvm_lapic *apic)
 {
 	u32 timer_mode = kvm_lapic_get_reg(apic, APIC_LVTT) &
 			apic->lapic_timer.timer_mode_mask;
@@ -1309,7 +1309,9 @@ static void apic_update_lvtt(struct kvm_lapic *apic)
 	if (apic->lapic_timer.timer_mode != timer_mode) {
 		apic->lapic_timer.timer_mode = timer_mode;
 		hrtimer_cancel(&apic->lapic_timer.timer);
+		return true;
 	}
+	return false;
 }
 
 static void apic_timer_expired(struct kvm_lapic *apic)
@@ -1430,11 +1432,12 @@ static void start_sw_period(struct kvm_lapic *apic)
 		HRTIMER_MODE_ABS_PINNED);
 }
 
-static bool set_target_expiration(struct kvm_lapic *apic)
+static bool set_target_expiration(struct kvm_lapic *apic, bool timer_update)
 {
-	ktime_t now;
-	u64 tscl = rdtsc();
+	ktime_t now, remaining;
+	u64 tscl = rdtsc(), delta;
 
+	/* Calculate the next time the timer should trigger an interrupt */
 	now = ktime_get();
 	apic->lapic_timer.period = (u64)kvm_lapic_get_reg(apic, APIC_TMICT)
 		* APIC_BUS_CYCLE_NS * apic->divide_count;
@@ -1470,9 +1473,21 @@ static bool set_target_expiration(struct kvm_lapic *apic)
 		   ktime_to_ns(ktime_add_ns(now,
 				apic->lapic_timer.period)));
 
+	if (!timer_update)
+		delta = apic->lapic_timer.period;
+	else {
+		remaining = ktime_sub(apic->lapic_timer.target_expiration, now);
+		if (ktime_to_ns(remaining) < 0)
+			remaining = 0;
+		delta = mod_64(ktime_to_ns(remaining), apic->lapic_timer.period);
+	}
+
+	if (!delta)
+		return false;
+
 	apic->lapic_timer.tscdeadline = kvm_read_l1_tsc(apic->vcpu, tscl) +
-		nsec_to_cycles(apic->vcpu, apic->lapic_timer.period);
-	apic->lapic_timer.target_expiration = ktime_add_ns(now, apic->lapic_timer.period);
+		nsec_to_cycles(apic->vcpu, delta);
+	apic->lapic_timer.target_expiration = ktime_add_ns(now, delta);
 
 	return true;
 }
@@ -1609,12 +1624,12 @@ void kvm_lapic_restart_hv_timer(struct kvm_vcpu *vcpu)
 	restart_apic_timer(apic);
 }
 
-static void start_apic_timer(struct kvm_lapic *apic)
+static void start_apic_timer(struct kvm_lapic *apic, bool timer_update)
 {
 	atomic_set(&apic->lapic_timer.pending, 0);
 
 	if ((apic_lvtt_period(apic) || apic_lvtt_oneshot(apic))
-	    && !set_target_expiration(apic))
+	    && !set_target_expiration(apic, timer_update))
 		return;
 
 	restart_apic_timer(apic);
@@ -1729,7 +1744,8 @@ int kvm_lapic_reg_write(struct kvm_lapic *apic, u32 reg, u32 val)
 			val |= APIC_LVT_MASKED;
 		val &= (apic_lvt_mask[0] | apic->lapic_timer.timer_mode_mask);
 		kvm_lapic_set_reg(apic, APIC_LVTT, val);
-		apic_update_lvtt(apic);
+		if (apic_update_lvtt(apic) && !apic_lvtt_tscdeadline(apic))
+			start_apic_timer(apic, true);
 		break;
 
 	case APIC_TMICT:
@@ -1738,7 +1754,7 @@ int kvm_lapic_reg_write(struct kvm_lapic *apic, u32 reg, u32 val)
 
 		hrtimer_cancel(&apic->lapic_timer.timer);
 		kvm_lapic_set_reg(apic, APIC_TMICT, val);
-		start_apic_timer(apic);
+		start_apic_timer(apic, false);
 		break;
 
 	case APIC_TDCR:
@@ -1872,7 +1888,7 @@ void kvm_set_lapic_tscdeadline_msr(struct kvm_vcpu *vcpu, u64 data)
 
 	hrtimer_cancel(&apic->lapic_timer.timer);
 	apic->lapic_timer.tscdeadline = data;
-	start_apic_timer(apic);
+	start_apic_timer(apic, false);
 }
 
 void kvm_lapic_set_tpr(struct kvm_vcpu *vcpu, unsigned long cr8)
@@ -2238,7 +2254,7 @@ int kvm_apic_set_state(struct kvm_vcpu *vcpu, struct kvm_lapic_state *s)
 	apic_update_lvtt(apic);
 	apic_manage_nmi_watchdog(apic, kvm_lapic_get_reg(apic, APIC_LVT0));
 	update_divide_count(apic);
-	start_apic_timer(apic);
+	start_apic_timer(apic, false);
 	apic->irr_pending = true;
 	apic->isr_count = vcpu->arch.apicv_active ?
 				1 : count_vectors(apic->regs + APIC_ISR);
