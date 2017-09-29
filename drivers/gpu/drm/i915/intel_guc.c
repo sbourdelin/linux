@@ -128,3 +128,19 @@ int intel_guc_send_mmio(struct intel_guc *guc, const u32 *action, u32 len)
 
 	return ret;
 }
+
+int intel_guc_sample_forcewake(struct intel_guc *guc)
+{
+	struct drm_i915_private *i915 = guc_to_i915(guc);
+	u32 action[2];
+
+	action[0] = INTEL_GUC_ACTION_SAMPLE_FORCEWAKE;
+	/* WaRsDisableCoarsePowerGating:skl,bxt */
+	if (!intel_enable_rc6() || NEEDS_WaRsDisableCoarsePowerGating(i915))
+		action[1] = 0;
+	else
+		/* bit 0 and 1 are for Render and Media domain separately */
+		action[1] = GUC_FORCEWAKE_RENDER | GUC_FORCEWAKE_MEDIA;
+
+	return intel_guc_send(guc, action, ARRAY_SIZE(action));
+}

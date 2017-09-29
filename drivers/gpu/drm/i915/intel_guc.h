@@ -144,13 +144,13 @@ static inline u32 guc_ggtt_offset(struct i915_vma *vma)
 }
 
 /* intel_uc.c */
-int intel_guc_sample_forcewake(struct intel_guc *guc);
 int intel_guc_auth_huc(struct intel_guc *guc, u32 rsa_offset);
 
 /* intel_guc.c */
 void intel_guc_init_early(struct intel_guc *guc);
 int intel_guc_send_nop(struct intel_guc *guc, const u32 *action, u32 len);
 int intel_guc_send_mmio(struct intel_guc *guc, const u32 *action, u32 len);
+int intel_guc_sample_forcewake(struct intel_guc *guc);
 
 /* intel_guc_loader.c */
 int intel_guc_select_fw(struct intel_guc *guc);
