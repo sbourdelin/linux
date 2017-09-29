@@ -650,7 +650,7 @@ int acpi_device_add(struct acpi_device *device,
 	INIT_LIST_HEAD(&device->del_list);
 	mutex_init(&device->physical_node_lock);
 
-	new_bus_id = kzalloc(sizeof(struct acpi_device_bus_id), GFP_KERNEL);
+	new_bus_id = kzalloc(sizeof(*new_bus_id), GFP_KERNEL);
 	if (!new_bus_id) {
 		result = -ENOMEM;
 		goto err_detach;
@@ -1577,7 +1577,7 @@ static int acpi_add_single_object(struct acpi_device **child,
 	struct acpi_device *device;
 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
 
-	device = kzalloc(sizeof(struct acpi_device), GFP_KERNEL);
+	device = kzalloc(sizeof(*device), GFP_KERNEL);
 	if (!device)
 		return -ENOMEM;
 
@@ -1786,7 +1786,7 @@ static void acpi_device_dep_initialize(struct acpi_device *adev)
 		if (skip)
 			continue;
 
-		dep = kzalloc(sizeof(struct acpi_dep_data), GFP_KERNEL);
+		dep = kzalloc(sizeof(*dep), GFP_KERNEL);
 		if (!dep)
 			return;
 
