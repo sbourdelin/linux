@@ -147,6 +147,7 @@ struct console {
 	int	cflag;
 	void	*data;
 	struct	 console *next;
+	int	level;
 };
 
 /*
