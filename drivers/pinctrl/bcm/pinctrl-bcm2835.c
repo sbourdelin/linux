@@ -696,7 +696,7 @@ static int bcm2835_pctl_dt_node_to_map_func(struct bcm2835_pinctrl *pc,
 	}
 
 	map->type = PIN_MAP_TYPE_MUX_GROUP;
-	map->data.mux.group = bcm2835_gpio_groups[pin];
+	map->data.mux.group_or_pin = bcm2835_gpio_groups[pin];
 	map->data.mux.function = bcm2835_functions[fnum];
 	(*maps)++;
 

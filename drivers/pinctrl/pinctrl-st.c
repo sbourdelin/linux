@@ -838,7 +838,7 @@ static int st_pctl_dt_node_to_map(struct pinctrl_dev *pctldev,
 	*num_maps = map_num;
 	new_map[0].type = PIN_MAP_TYPE_MUX_GROUP;
 	new_map[0].data.mux.function = parent->name;
-	new_map[0].data.mux.group = np->name;
+	new_map[0].data.mux.group_or_pin = np->name;
 	of_node_put(parent);
 
 	/* create config map per pin */

@@ -475,7 +475,7 @@ static int mtk_pctrl_dt_node_to_map_func(struct mtk_pinctrl *pctl,
 		return -ENOSPC;
 
 	(*map)[*num_maps].type = PIN_MAP_TYPE_MUX_GROUP;
-	(*map)[*num_maps].data.mux.group = grp->name;
+	(*map)[*num_maps].data.mux.group_or_pin = grp->name;
 
 	ret = mtk_pctrl_is_function_valid(pctl, pin, fnum);
 	if (!ret) {

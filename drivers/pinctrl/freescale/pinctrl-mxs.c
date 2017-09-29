@@ -111,7 +111,7 @@ static int mxs_dt_node_to_map(struct pinctrl_dev *pctldev,
 			goto free;
 		}
 		snprintf(group, length, "%s.%d", np->name, reg);
-		new_map[i].data.mux.group = group;
+		new_map[i].data.mux.group_or_pin = group;
 		i++;
 	}
 
@@ -149,7 +149,7 @@ static void mxs_dt_free_map(struct pinctrl_dev *pctldev,
 
 	for (i = 0; i < num_maps; i++) {
 		if (map[i].type == PIN_MAP_TYPE_MUX_GROUP)
-			kfree(map[i].data.mux.group);
+			kfree(map[i].data.mux.group_or_pin);
 		if (map[i].type == PIN_MAP_TYPE_CONFIGS_GROUP)
 			kfree(map[i].data.configs.configs);
 	}

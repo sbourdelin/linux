@@ -254,7 +254,7 @@ skip_cfgs:
 		if (!fname)
 			goto free_cfg;
 
-		map[*nmaps].data.mux.group = gname;
+		map[*nmaps].data.mux.group_or_pin = gname;
 		map[*nmaps].data.mux.function = fname;
 		map[*nmaps].type = PIN_MAP_TYPE_MUX_GROUP;
 		*nmaps += 1;
@@ -282,7 +282,7 @@ static void exynos5440_dt_free_map(struct pinctrl_dev *pctldev,
 		if (map[idx].type == PIN_MAP_TYPE_MUX_GROUP) {
 			kfree(map[idx].data.mux.function);
 			if (!idx)
-				kfree(map[idx].data.mux.group);
+				kfree(map[idx].data.mux.group_or_pin);
 		} else if (map->type == PIN_MAP_TYPE_CONFIGS_GROUP) {
 			kfree(map[idx].data.configs.configs);
 			if (!idx)

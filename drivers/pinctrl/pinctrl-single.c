@@ -1019,7 +1019,7 @@ static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
 		goto free_function;
 
 	(*map)->type = PIN_MAP_TYPE_MUX_GROUP;
-	(*map)->data.mux.group = np->name;
+	(*map)->data.mux.group_or_pin = np->name;
 	(*map)->data.mux.function = np->name;
 
 	if (PCS_HAS_PINCONF) {
@@ -1153,7 +1153,7 @@ static int pcs_parse_bits_in_pinctrl_entry(struct pcs_device *pcs,
 		goto free_function;
 
 	(*map)->type = PIN_MAP_TYPE_MUX_GROUP;
-	(*map)->data.mux.group = np->name;
+	(*map)->data.mux.group_or_pin = np->name;
 	(*map)->data.mux.function = np->name;
 
 	if (PCS_HAS_PINCONF) {

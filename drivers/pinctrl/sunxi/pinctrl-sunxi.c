@@ -377,7 +377,7 @@ static int sunxi_pctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
 		}
 
 		(*map)[i].type = PIN_MAP_TYPE_MUX_GROUP;
-		(*map)[i].data.mux.group = group;
+		(*map)[i].data.mux.group_or_pin = group;
 		(*map)[i].data.mux.function = function;
 
 		i++;

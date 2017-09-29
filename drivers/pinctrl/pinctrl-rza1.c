@@ -952,7 +952,7 @@ static int rza1_dt_node_to_map(struct pinctrl_dev *pctldev,
 	}
 
 	(*map)->type = PIN_MAP_TYPE_MUX_GROUP;
-	(*map)->data.mux.group = np->name;
+	(*map)->data.mux.group_or_pin = np->name;
 	(*map)->data.mux.function = np->name;
 	*num_maps = 1;
 

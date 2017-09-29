@@ -102,7 +102,7 @@ struct pinctrl_state {
  * @func: the function selector to program
  */
 struct pinctrl_setting_mux {
-	unsigned group;
+	unsigned group_or_pin;
 	unsigned func;
 };
 

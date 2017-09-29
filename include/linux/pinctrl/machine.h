@@ -32,7 +32,7 @@ enum pinctrl_map_type {
  * @function: the mux function to select for the group
  */
 struct pinctrl_map_mux {
-	const char *group;
+	const char *group_or_pin;
 	const char *function;
 };
 

@@ -62,7 +62,7 @@ int pinctrl_utils_add_map_mux(struct pinctrl_dev *pctldev,
 		return -ENOSPC;
 
 	(*map)[*num_maps].type = PIN_MAP_TYPE_MUX_GROUP;
-	(*map)[*num_maps].data.mux.group = group;
+	(*map)[*num_maps].data.mux.group_or_pin = group;
 	(*map)[*num_maps].data.mux.function = function;
 	(*num_maps)++;
 

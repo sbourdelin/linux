@@ -232,7 +232,7 @@ static int wmt_pctl_dt_node_to_map_func(struct wmt_pinctrl_data *data,
 	}
 
 	map->type = PIN_MAP_TYPE_MUX_GROUP;
-	map->data.mux.group = data->groups[group];
+	map->data.mux.group_or_pin = data->groups[group];
 	map->data.mux.function = wmt_functions[fnum];
 	(*maps)++;
 

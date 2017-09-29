@@ -445,7 +445,7 @@ static int mvebu_pinctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
 		}
 
 		(*map)[n].type = PIN_MAP_TYPE_MUX_GROUP;
-		(*map)[n].data.mux.group = group;
+		(*map)[n].data.mux.group_or_pin = group;
 		(*map)[n].data.mux.function = function;
 		n++;
 	}

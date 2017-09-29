@@ -96,7 +96,7 @@ static void ltq_pinctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 		of_property_for_each_string(np, "lantiq,groups", prop, group) {
 			(*map)->type = PIN_MAP_TYPE_MUX_GROUP;
 			(*map)->name = function;
-			(*map)->data.mux.group = group;
+			(*map)->data.mux.group_or_pin = group;
 			(*map)->data.mux.function = function;
 			(*map)++;
 		}

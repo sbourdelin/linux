@@ -348,8 +348,8 @@ int pinmux_map_to_setting(const struct pinctrl_map *map,
 			map->data.mux.function);
 		return -EINVAL;
 	}
-	if (map->data.mux.group) {
-		group = map->data.mux.group;
+	if (map->data.mux.group_or_pin) {
+		group = map->data.mux.group_or_pin;
 		ret = match_string(groups, num_groups, group);
 		if (ret < 0) {
 			dev_err(pctldev->dev,
@@ -364,10 +364,10 @@ int pinmux_map_to_setting(const struct pinctrl_map *map,
 	ret = pinctrl_get_group_selector(pctldev, group);
 	if (ret < 0) {
 		dev_err(pctldev->dev, "invalid group %s in map table\n",
-			map->data.mux.group);
+			map->data.mux.group_or_pin);
 		return ret;
 	}
-	setting->data.mux.group = ret;
+	setting->data.mux.group_or_pin = ret;
 
 	return 0;
 }
@@ -389,7 +389,8 @@ int pinmux_enable_setting(const struct pinctrl_setting *setting)
 	struct pin_desc *desc;
 
 	if (pctlops->get_group_pins)
-		ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
+		ret = pctlops->get_group_pins(pctldev,
+					      setting->data.mux.group_or_pin,
 					      &pins, &num_pins);
 
 	if (ret) {
@@ -397,7 +398,7 @@ int pinmux_enable_setting(const struct pinctrl_setting *setting)
 
 		/* errors only affect debug data, so just warn */
 		gname = pctlops->get_group_name(pctldev,
-						setting->data.mux.group);
+						setting->data.mux.group_or_pin);
 		dev_warn(pctldev->dev,
 			 "could not get pins for group %s\n",
 			 gname);
@@ -414,7 +415,7 @@ int pinmux_enable_setting(const struct pinctrl_setting *setting)
 			desc = pin_desc_get(pctldev, pins[i]);
 			pname = desc ? desc->name : "non-existing";
 			gname = pctlops->get_group_name(pctldev,
-						setting->data.mux.group);
+						setting->data.mux.group_or_pin);
 			dev_err(pctldev->dev,
 				"could not request pin %d (%s) from group %s "
 				" on device %s\n",
@@ -437,7 +438,7 @@ int pinmux_enable_setting(const struct pinctrl_setting *setting)
 	}
 
 	ret = ops->set_mux(pctldev, setting->data.mux.func,
-			   setting->data.mux.group);
+			   setting->data.mux.group_or_pin);
 
 	if (ret)
 		goto err_set_mux;
@@ -469,14 +470,15 @@ void pinmux_disable_setting(const struct pinctrl_setting *setting)
 	struct pin_desc *desc;
 
 	if (pctlops->get_group_pins)
-		ret = pctlops->get_group_pins(pctldev, setting->data.mux.group,
+		ret = pctlops->get_group_pins(pctldev,
+					      setting->data.mux.group_or_pin,
 					      &pins, &num_pins);
 	if (ret) {
 		const char *gname;
 
 		/* errors only affect debug data, so just warn */
 		gname = pctlops->get_group_name(pctldev,
-						setting->data.mux.group);
+						setting->data.mux.group_or_pin);
 		dev_warn(pctldev->dev,
 			 "could not get pins for group %s\n",
 			 gname);
@@ -500,7 +502,7 @@ void pinmux_disable_setting(const struct pinctrl_setting *setting)
 			const char *gname;
 
 			gname = pctlops->get_group_name(pctldev,
-						setting->data.mux.group);
+						setting->data.mux.group_or_pin);
 			dev_warn(pctldev->dev,
 				 "not freeing pin %d (%s) as part of "
 				 "deactivating group %s - it is already "
@@ -598,7 +600,7 @@ static int pinmux_pin_show(struct seq_file *s, unsigned int pin)
 			   pmxops->get_function_name(pctldev,
 				desc->mux_setting->func),
 			   pctlops->get_group_name(pctldev,
-				desc->mux_setting->group));
+				desc->mux_setting->group_or_pin));
 	else
 		seq_puts(s, "\n");
 
@@ -635,9 +637,11 @@ static int pinmux_pins_show(struct seq_file *s, void *what)
 
 void pinmux_show_map(struct seq_file *s, const struct pinctrl_map *map)
 {
+	const struct pinctrl_map_mux *mux = &map->data.mux;
+
 	seq_printf(s, "group %s\nfunction %s\n",
-		map->data.mux.group ? map->data.mux.group : "(default)",
-		map->data.mux.function);
+		   mux->group_or_pin ? mux->group_or_pin : "(default)",
+		   mux->function);
 }
 
 void pinmux_show_setting(struct seq_file *s,
@@ -648,8 +652,9 @@ void pinmux_show_setting(struct seq_file *s,
 	const struct pinctrl_ops *pctlops = pctldev->desc->pctlops;
 
 	seq_printf(s, "group: %s (%u) function: %s (%u)\n",
-		   pctlops->get_group_name(pctldev, setting->data.mux.group),
-		   setting->data.mux.group,
+		   pctlops->get_group_name(pctldev,
+					   setting->data.mux.group_or_pin),
+		   setting->data.mux.group_or_pin,
 		   pmxops->get_function_name(pctldev, setting->data.mux.func),
 		   setting->data.mux.func);
 }

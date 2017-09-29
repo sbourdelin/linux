@@ -284,7 +284,7 @@ static int at91_dt_node_to_map(struct pinctrl_dev *pctldev,
 	}
 	new_map[0].type = PIN_MAP_TYPE_MUX_GROUP;
 	new_map[0].data.mux.function = parent->name;
-	new_map[0].data.mux.group = np->name;
+	new_map[0].data.mux.group_or_pin = np->name;
 	of_node_put(parent);
 
 	/* create config map */
@@ -298,7 +298,8 @@ static int at91_dt_node_to_map(struct pinctrl_dev *pctldev,
 	}
 
 	dev_dbg(pctldev->dev, "maps: function %s group %s num %d\n",
-		(*map)->data.mux.function, (*map)->data.mux.group, map_num);
+		(*map)->data.mux.function, (*map)->data.mux.group_or_pin,
+		map_num);
 
 	return 0;
 }

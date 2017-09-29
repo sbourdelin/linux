@@ -202,7 +202,7 @@ static int sh_pfc_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 	of_property_for_each_string(np, pmx->groups_prop_name, prop, group) {
 		if (function) {
 			maps[idx].type = PIN_MAP_TYPE_MUX_GROUP;
-			maps[idx].data.mux.group = group;
+			maps[idx].data.mux.group_or_pin = group;
 			maps[idx].data.mux.function = function;
 			idx++;
 		}

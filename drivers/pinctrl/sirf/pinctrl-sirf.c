@@ -116,7 +116,7 @@ static int sirfsoc_dt_node_to_map(struct pinctrl_dev *pctldev,
 		of_property_read_string(np, "sirf,function", &function);
 		of_property_for_each_string(np, "sirf,pins", prop, group) {
 			(*map)[index].type = PIN_MAP_TYPE_MUX_GROUP;
-			(*map)[index].data.mux.group = group;
+			(*map)[index].data.mux.group_or_pin = group;
 			(*map)[index].data.mux.function = function;
 			index++;
 		}
