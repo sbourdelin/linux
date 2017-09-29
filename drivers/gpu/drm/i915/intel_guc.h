@@ -151,6 +151,7 @@ int intel_guc_sample_forcewake(struct intel_guc *guc);
 int intel_guc_auth_huc(struct intel_guc *guc, u32 rsa_offset);
 int intel_guc_suspend(struct drm_i915_private *dev_priv);
 int intel_guc_resume(struct drm_i915_private *dev_priv);
+struct i915_vma *intel_guc_allocate_vma(struct intel_guc *guc, u32 size);
 
 /* intel_guc_loader.c */
 int intel_guc_select_fw(struct intel_guc *guc);
@@ -162,7 +163,6 @@ int i915_guc_submission_init(struct drm_i915_private *dev_priv);
 int i915_guc_submission_enable(struct drm_i915_private *dev_priv);
 void i915_guc_submission_disable(struct drm_i915_private *dev_priv);
 void i915_guc_submission_fini(struct drm_i915_private *dev_priv);
-struct i915_vma *intel_guc_allocate_vma(struct intel_guc *guc, u32 size);
 
 /* intel_guc_log.c */
 int intel_guc_log_create(struct intel_guc *guc);

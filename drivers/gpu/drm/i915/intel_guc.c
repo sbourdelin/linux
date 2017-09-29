@@ -219,3 +219,45 @@ int intel_guc_resume(struct drm_i915_private *dev_priv)
 
 	return intel_guc_send(guc, data, ARRAY_SIZE(data));
 }
+
+/**
+ * intel_guc_allocate_vma() - Allocate a GGTT VMA for GuC usage
+ * @guc:	the guc
+ * @size:	size of area to allocate (both virtual space and memory)
+ *
+ * This is a wrapper to create an object for use with the GuC. In order to
+ * use it inside the GuC, an object needs to be pinned lifetime, so we allocate
+ * both some backing storage and a range inside the Global GTT. We must pin
+ * it in the GGTT somewhere other than than [0, GUC_WOPCM_TOP) because that
+ * range is reserved inside GuC.
+ *
+ * Return:	A i915_vma if successful, otherwise an ERR_PTR.
+ */
+struct i915_vma *intel_guc_allocate_vma(struct intel_guc *guc, u32 size)
+{
+	struct drm_i915_private *i915 = guc_to_i915(guc);
+	struct drm_i915_gem_object *obj;
+	struct i915_vma *vma;
+	int ret;
+
+	obj = i915_gem_object_create(i915, size);
+	if (IS_ERR(obj))
+		return ERR_CAST(obj);
+
+	vma = i915_vma_instance(obj, &i915->ggtt.base, NULL);
+	if (IS_ERR(vma))
+		goto err;
+
+	ret = i915_vma_pin(vma, 0, PAGE_SIZE,
+			   PIN_GLOBAL | PIN_OFFSET_BIAS | GUC_WOPCM_TOP);
+	if (ret) {
+		vma = ERR_PTR(ret);
+		goto err;
+	}
+
+	return vma;
+
+err:
+	i915_gem_object_put(obj);
+	return vma;
+}
