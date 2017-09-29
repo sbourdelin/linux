@@ -53,22 +53,22 @@ int pinctrl_utils_reserve_map(struct pinctrl_dev *pctldev,
 }
 EXPORT_SYMBOL_GPL(pinctrl_utils_reserve_map);
 
-int pinctrl_utils_add_map_mux(struct pinctrl_dev *pctldev,
+int pinctrl_utils_add_map_mux_type(struct pinctrl_dev *pctldev,
 		struct pinctrl_map **map, unsigned *reserved_maps,
 		unsigned *num_maps, const char *group,
-		const char *function)
+		const char *function, enum pinctrl_map_type type)
 {
 	if (WARN_ON(*num_maps == *reserved_maps))
 		return -ENOSPC;
 
-	(*map)[*num_maps].type = PIN_MAP_TYPE_MUX_GROUP;
+	(*map)[*num_maps].type = type;
 	(*map)[*num_maps].data.mux.group_or_pin = group;
 	(*map)[*num_maps].data.mux.function = function;
 	(*num_maps)++;
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(pinctrl_utils_add_map_mux);
+EXPORT_SYMBOL_GPL(pinctrl_utils_add_map_mux_type);
 
 int pinctrl_utils_add_map_configs(struct pinctrl_dev *pctldev,
 		struct pinctrl_map **map, unsigned *reserved_maps,

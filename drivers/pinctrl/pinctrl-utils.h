@@ -25,10 +25,10 @@
 int pinctrl_utils_reserve_map(struct pinctrl_dev *pctldev,
 		struct pinctrl_map **map, unsigned *reserved_maps,
 		unsigned *num_maps, unsigned reserve);
-int pinctrl_utils_add_map_mux(struct pinctrl_dev *pctldev,
+int pinctrl_utils_add_map_mux_type(struct pinctrl_dev *pctldev,
 		struct pinctrl_map **map, unsigned *reserved_maps,
 		unsigned *num_maps, const char *group,
-		const char *function);
+		const char *function, enum pinctrl_map_type type);
 int pinctrl_utils_add_map_configs(struct pinctrl_dev *pctldev,
 		struct pinctrl_map **map, unsigned *reserved_maps,
 		unsigned *num_maps, const char *group,
@@ -39,5 +39,15 @@ int pinctrl_utils_add_config(struct pinctrl_dev *pctldev,
 		unsigned long config);
 void pinctrl_utils_free_map(struct pinctrl_dev *pctldev,
 		struct pinctrl_map *map, unsigned num_maps);
+
+static inline int pinctrl_utils_add_map_mux(struct pinctrl_dev *pctldev,
+		struct pinctrl_map **map, unsigned *reserved_maps,
+		unsigned *num_maps, const char *group,
+		const char *function)
+{
+	return pinctrl_utils_add_map_mux_type(pctldev, map, reserved_maps,
+					      num_maps, group, function,
+					      PIN_MAP_TYPE_MUX_GROUP);
+}
 
 #endif /* __PINCTRL_UTILS_H__ */

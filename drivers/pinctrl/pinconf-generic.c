@@ -287,7 +287,8 @@ out:
 int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 		struct device_node *np, struct pinctrl_map **map,
 		unsigned *reserved_maps, unsigned *num_maps,
-		enum pinctrl_map_type type)
+		enum pinctrl_map_type conf_type,
+		enum pinctrl_map_type mux_type)
 {
 	int ret;
 	const char *function;
@@ -305,12 +306,16 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 		if (ret < 0)
 			/* skip this node; may contain config child nodes */
 			return 0;
-		if (type == PIN_MAP_TYPE_INVALID)
-			type = PIN_MAP_TYPE_CONFIGS_GROUP;
+		if (conf_type == PIN_MAP_TYPE_INVALID)
+			conf_type = PIN_MAP_TYPE_CONFIGS_GROUP;
+		if (mux_type == PIN_MAP_TYPE_INVALID)
+			mux_type = PIN_MAP_TYPE_MUX_GROUP;
 		subnode_target_type = "groups";
 	} else {
-		if (type == PIN_MAP_TYPE_INVALID)
-			type = PIN_MAP_TYPE_CONFIGS_PIN;
+		if (conf_type == PIN_MAP_TYPE_INVALID)
+			conf_type = PIN_MAP_TYPE_CONFIGS_PIN;
+		if (mux_type == PIN_MAP_TYPE_INVALID)
+			mux_type = PIN_MAP_TYPE_MUX_PIN;
 	}
 	strings_count = ret;
 
@@ -345,9 +350,9 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 
 	of_property_for_each_string(np, subnode_target_type, prop, group) {
 		if (function) {
-			ret = pinctrl_utils_add_map_mux(pctldev, map,
+			ret = pinctrl_utils_add_map_mux_type(pctldev, map,
 					reserved_maps, num_maps, group,
-					function);
+					function, mux_type);
 			if (ret < 0)
 				goto exit;
 		}
@@ -355,7 +360,7 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
 		if (num_configs) {
 			ret = pinctrl_utils_add_map_configs(pctldev, map,
 					reserved_maps, num_maps, group, configs,
-					num_configs, type);
+					num_configs, conf_type);
 			if (ret < 0)
 				goto exit;
 		}
@@ -370,7 +375,8 @@ EXPORT_SYMBOL_GPL(pinconf_generic_dt_subnode_to_map);
 
 int pinconf_generic_dt_node_to_map(struct pinctrl_dev *pctldev,
 		struct device_node *np_config, struct pinctrl_map **map,
-		unsigned *num_maps, enum pinctrl_map_type type)
+		unsigned *num_maps, enum pinctrl_map_type conf_type,
+		enum pinctrl_map_type mux_type)
 {
 	unsigned reserved_maps;
 	struct device_node *np;
@@ -381,13 +387,15 @@ int pinconf_generic_dt_node_to_map(struct pinctrl_dev *pctldev,
 	*num_maps = 0;
 
 	ret = pinconf_generic_dt_subnode_to_map(pctldev, np_config, map,
-						&reserved_maps, num_maps, type);
+						&reserved_maps, num_maps,
+						conf_type, mux_type);
 	if (ret < 0)
 		goto exit;
 
 	for_each_available_child_of_node(np_config, np) {
 		ret = pinconf_generic_dt_subnode_to_map(pctldev, np, map,
-					&reserved_maps, num_maps, type);
+					&reserved_maps, num_maps,
+					conf_type, mux_type);
 		if (ret < 0)
 			goto exit;
 	}

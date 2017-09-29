@@ -5301,7 +5301,8 @@ static int atlas7_pinctrl_dt_node_to_map(struct pinctrl_dev *pctldev,
 					u32 *num_maps)
 {
 	return pinconf_generic_dt_node_to_map(pctldev, np_config, map,
-				num_maps, PIN_MAP_TYPE_INVALID);
+				num_maps, PIN_MAP_TYPE_INVALID,
+				PIN_MAP_TYPE_MUX_GROUP);
 }
 
 static void atlas7_pinctrl_dt_free_map(struct pinctrl_dev *pctldev,
