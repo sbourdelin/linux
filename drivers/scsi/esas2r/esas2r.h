@@ -1421,6 +1421,6 @@ extern struct bin_attribute bin_attr_fs;
 extern struct bin_attribute bin_attr_vda;
 extern struct bin_attribute bin_attr_hw;
 extern struct bin_attribute bin_attr_live_nvram;
-extern struct bin_attribute bin_attr_default_nvram;
+extern const struct bin_attribute bin_attr_default_nvram;
 
 #endif /* ESAS2R_H */
