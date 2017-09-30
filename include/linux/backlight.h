@@ -172,4 +172,15 @@ of_find_backlight_by_node(struct device_node *node)
 }
 #endif
 
+#if defined(CONFIG_OF) && IS_ENABLED(CONFIG_BACKLIGHT_CLASS_DEVICE)
+struct backlight_device *
+drm_of_find_backlight(struct device *dev);
+#else
+static inline struct backlight_device *
+drm_of_find_backlight(struct device *dev)
+{
+	return NULL;
+}
+#endif
+
 #endif
