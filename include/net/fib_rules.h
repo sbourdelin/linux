@@ -74,7 +74,7 @@ struct fib_rules_ops {
 	int			(*delete)(struct fib_rule *);
 	int			(*compare)(struct fib_rule *,
 					   struct fib_rule_hdr *,
-					   struct nlattr **);
+					   struct nlattr **, bool);
 	int			(*fill)(struct fib_rule *, struct sk_buff *,
 					struct fib_rule_hdr *);
 	size_t			(*nlmsg_payload)(struct fib_rule *);

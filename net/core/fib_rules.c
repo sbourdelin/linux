@@ -422,7 +422,7 @@ static int rule_exists(struct fib_rules_ops *ops, struct fib_rule_hdr *frh,
 		    !uid_eq(r->uid_range.end, rule->uid_range.end))
 			continue;
 
-		if (!ops->compare(r, frh, tb))
+		if (!ops->compare(r, frh, tb, true))
 			continue;
 		return 1;
 	}
@@ -702,7 +702,7 @@ int fib_nl_delrule(struct sk_buff *skb, struct nlmsghdr *nlh,
 		     !uid_eq(rule->uid_range.end, range.end)))
 			continue;
 
-		if (!ops->compare(rule, frh, tb))
+		if (!ops->compare(rule, frh, tb, false))
 			continue;
 
 		if (rule->flags & FIB_RULE_PERMANENT) {

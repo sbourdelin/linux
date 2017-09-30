@@ -277,17 +277,17 @@ errout:
 }
 
 static int fib4_rule_compare(struct fib_rule *rule, struct fib_rule_hdr *frh,
-			     struct nlattr **tb)
+			     struct nlattr **tb, bool exact)
 {
 	struct fib4_rule *rule4 = (struct fib4_rule *) rule;
 
-	if (frh->src_len && (rule4->src_len != frh->src_len))
+	if ((exact || frh->src_len) && rule4->src_len != frh->src_len)
 		return 0;
 
-	if (frh->dst_len && (rule4->dst_len != frh->dst_len))
+	if ((exact || frh->dst_len) && rule4->dst_len != frh->dst_len)
 		return 0;
 
-	if (frh->tos && (rule4->tos != frh->tos))
+	if ((exact || frh->tos) && rule4->tos != frh->tos)
 		return 0;
 
 #ifdef CONFIG_IP_ROUTE_CLASSID

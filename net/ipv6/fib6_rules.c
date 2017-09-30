@@ -265,17 +265,17 @@ errout:
 }
 
 static int fib6_rule_compare(struct fib_rule *rule, struct fib_rule_hdr *frh,
-			     struct nlattr **tb)
+			     struct nlattr **tb, bool exact)
 {
 	struct fib6_rule *rule6 = (struct fib6_rule *) rule;
 
-	if (frh->src_len && (rule6->src.plen != frh->src_len))
+	if ((exact || frh->src_len) && rule6->src.plen != frh->src_len)
 		return 0;
 
-	if (frh->dst_len && (rule6->dst.plen != frh->dst_len))
+	if ((exact || frh->dst_len) && rule6->dst.plen != frh->dst_len)
 		return 0;
 
-	if (frh->tos && (rule6->tclass != frh->tos))
+	if ((exact || frh->tos) && rule6->tclass != frh->tos)
 		return 0;
 
 	if (frh->src_len &&

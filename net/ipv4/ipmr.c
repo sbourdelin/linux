@@ -192,7 +192,7 @@ static int ipmr_rule_configure(struct fib_rule *rule, struct sk_buff *skb,
 }
 
 static int ipmr_rule_compare(struct fib_rule *rule, struct fib_rule_hdr *frh,
-			     struct nlattr **tb)
+			     struct nlattr **tb, bool exact)
 {
 	return 1;
 }

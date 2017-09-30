@@ -158,14 +158,14 @@ errout:
 }
 
 static int dn_fib_rule_compare(struct fib_rule *rule, struct fib_rule_hdr *frh,
-			       struct nlattr **tb)
+			       struct nlattr **tb, bool exact)
 {
 	struct dn_fib_rule *r = (struct dn_fib_rule *)rule;
 
-	if (frh->src_len && (r->src_len != frh->src_len))
+	if ((exact || frh->src_len) && r->src_len != frh->src_len)
 		return 0;
 
-	if (frh->dst_len && (r->dst_len != frh->dst_len))
+	if ((exact || frh->dst_len) && r->dst_len != frh->dst_len)
 		return 0;
 
 	if (frh->src_len && (r->src != nla_get_le16(tb[FRA_SRC])))
