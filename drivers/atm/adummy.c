@@ -146,9 +146,7 @@ static int __init adummy_init(void)
 	int err = 0;
 
 	printk(KERN_ERR "adummy: version %s\n", DRV_VERSION);
-
-	adummy_dev = kzalloc(sizeof(struct adummy_dev),
-						   GFP_KERNEL);
+	adummy_dev = kzalloc(sizeof(*adummy_dev), GFP_KERNEL);
 	if (!adummy_dev) {
 		err = -ENOMEM;
 		goto out;
