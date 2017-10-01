@@ -264,3 +264,95 @@ int dsa_port_vlan_del(struct dsa_port *dp,
 
 	return dsa_port_notify(dp, DSA_NOTIFIER_VLAN_DEL, &info);
 }
+
+static int dsa_port_lag_member(struct dsa_port *dp, u8 lag_id)
+{
+	struct dsa_switch *ds = dp->ds;
+	int err = -EOPNOTSUPP;
+	unsigned int i;
+
+	if (!ds->ops->port_lag_member && !ds->max_lag_members)
+		return err;
+
+	for (i = 0; i < ds->max_lag_members; i++) {
+		if (!ds->ops->port_lag_member(ds, i, lag_id)) {
+			return 0;
+		}
+	}
+
+	return -EBUSY;
+}
+
+int dsa_port_lag_join(struct dsa_port *dp, struct net_device *lag_dev)
+{
+	struct dsa_switch *ds = dp->ds;
+	struct dsa_lag_group *lag;
+	int err = -EOPNOTSUPP;
+	u8 lag_id;
+
+	if (!ds->ops->port_lag_join)
+		return err;
+
+	/* Obtain a new lag identifier */
+	err = dsa_switch_lag_get_index(ds, lag_dev, &lag_id);
+	if (err)
+		return err;
+
+	/* Create a lag group if non-existent */
+	lag = &ds->lags[lag_id];
+	if (!lag->ref_count)
+		lag->lag_dev = lag_dev;
+
+	err = dsa_port_lag_member(dp, lag_id);
+	if (err)
+		return err;
+
+	err = ds->ops->port_lag_join(ds, dp->index, lag_id);
+	if (err)
+		return err;
+
+	dp->lag_id = lag_id;
+	dp->lagged = true;
+	lag->ref_count++;
+
+	return err;
+}
+
+int dsa_port_lag_leave(struct dsa_port *dp, struct net_device *lag_dev)
+{
+	struct dsa_switch *ds = dp->ds;
+	struct dsa_lag_group *lag;
+	bool lag_disable = false;
+	int err = -EOPNOTSUPP;
+	u8 lag_id;
+
+	if (!ds->ops->port_lag_join)
+		return err;
+
+	if (!dp->lagged)
+		return 0;
+
+	lag_id = dp->lag_id;
+	lag = &ds->lags[lag_id];
+	WARN_ON(lag->ref_count == 0);
+
+	if (lag->ref_count == 1)
+		lag_disable = true;
+
+	ds->ops->port_lag_leave(ds, dp->index, lag_id, lag_disable);
+	dp->lagged = false;
+	lag->ref_count--;
+
+	return err;
+}
+
+int dsa_port_lag_change(struct dsa_port *dp,
+			struct netdev_lag_lower_state_info *info)
+{
+	struct dsa_switch *ds = dp->ds;
+
+	if (!ds->ops->port_lag_change)
+		return -EOPNOTSUPP;
+
+	return ds->ops->port_lag_change(ds, dp->index, info);
+}

@@ -139,6 +139,11 @@ int dsa_port_vlan_add(struct dsa_port *dp,
 		      struct switchdev_trans *trans);
 int dsa_port_vlan_del(struct dsa_port *dp,
 		      const struct switchdev_obj_port_vlan *vlan);
+int dsa_port_lag_join(struct dsa_port *dp, struct net_device *lag_dev);
+int dsa_port_lag_leave(struct dsa_port *dp, struct net_device *lag_dev);
+int dsa_port_lag_change(struct dsa_port *dp,
+			struct netdev_lag_lower_state_info *info);
+
 /* slave.c */
 extern const struct dsa_device_ops notag_netdev_ops;
 void dsa_slave_mii_bus_init(struct dsa_switch *ds);
@@ -150,6 +155,8 @@ int dsa_slave_register_notifier(void);
 void dsa_slave_unregister_notifier(void);
 
 /* switch.c */
+int dsa_switch_lag_get_index(struct dsa_switch *ds, struct net_device *lag_dev,
+			     u8 *lag_id);
 int dsa_switch_register_notifier(struct dsa_switch *ds);
 void dsa_switch_unregister_notifier(struct dsa_switch *ds);
 
