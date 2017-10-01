@@ -441,7 +441,7 @@ static const unsigned char gdbstub_insn_sizes[256] =
 static int __gdbstub_mark_bp(u8 *addr, int ix)
 {
 	/* vmalloc area */
-	if (((u8 *) VMALLOC_START <= addr) && (addr < (u8 *) VMALLOC_END))
+	if (is_vmalloc_addr((void *)addr))
 		goto okay;
 	/* SRAM, SDRAM */
 	if (((u8 *) 0x80000000UL <= addr) && (addr < (u8 *) 0xa0000000UL))
