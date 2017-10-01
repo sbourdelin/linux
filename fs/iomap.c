@@ -713,29 +713,29 @@ struct iomap_dio {
 static ssize_t iomap_dio_complete(struct iomap_dio *dio)
 {
 	struct kiocb *iocb = dio->iocb;
-	ssize_t ret;
+	ssize_t err;
+	ssize_t transferred = dio->size;
 
 	if (dio->end_io) {
-		ret = dio->end_io(iocb,
-				dio->error ? dio->error : dio->size,
+		err = dio->end_io(iocb,
+				transferred ? transferred : dio->error,
 				dio->flags);
 	} else {
-		ret = dio->error;
+		err = dio->error;
 	}
 
-	if (likely(!ret)) {
-		ret = dio->size;
+	if (likely(transferred)) {
 		/* check for short read */
-		if (iocb->ki_pos + ret > dio->i_size &&
+		if (iocb->ki_pos + transferred > dio->i_size &&
 		    !(dio->flags & IOMAP_DIO_WRITE))
-			ret = dio->i_size - iocb->ki_pos;
-		iocb->ki_pos += ret;
+			transferred = dio->i_size - iocb->ki_pos;
+		iocb->ki_pos += transferred;
 	}
 
 	inode_dio_end(file_inode(iocb->ki_filp));
 	kfree(dio);
 
-	return ret;
+	return transferred ? transferred : err;
 }
 
 static void iomap_dio_complete_work(struct work_struct *work)

@@ -255,8 +255,6 @@ static ssize_t dio_complete(struct dio *dio, ssize_t ret, bool is_async)
 		ret = dio->page_errors;
 	if (ret == 0)
 		ret = dio->io_error;
-	if (ret == 0)
-		ret = transferred;
 
 	if (dio->end_io) {
 		int err;
@@ -284,7 +282,7 @@ static ssize_t dio_complete(struct dio *dio, ssize_t ret, bool is_async)
 	}
 
 	kmem_cache_free(dio_cache, dio);
-	return ret;
+	return transferred ? transferred : ret;
 }
 
 static void dio_aio_complete_work(struct work_struct *work)
