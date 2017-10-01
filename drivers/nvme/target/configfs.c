@@ -767,7 +767,7 @@ static struct configfs_group_operations nvmet_subsystems_group_ops = {
 	.make_group		= nvmet_subsys_make,
 };
 
-static struct config_item_type nvmet_subsystems_type = {
+static struct config_item_type nvmet_subsystems_type __ro_after_init = {
 	.ct_group_ops		= &nvmet_subsystems_group_ops,
 	.ct_owner		= THIS_MODULE,
 };
@@ -921,7 +921,7 @@ static struct configfs_group_operations nvmet_ports_group_ops = {
 	.make_group		= nvmet_ports_make,
 };
 
-static struct config_item_type nvmet_ports_type = {
+static struct config_item_type nvmet_ports_type __ro_after_init = {
 	.ct_group_ops		= &nvmet_ports_group_ops,
 	.ct_owner		= THIS_MODULE,
 };
@@ -963,7 +963,7 @@ static struct configfs_group_operations nvmet_hosts_group_ops = {
 	.make_group		= nvmet_hosts_make_group,
 };
 
-static struct config_item_type nvmet_hosts_type = {
+static struct config_item_type nvmet_hosts_type __ro_after_init = {
 	.ct_group_ops		= &nvmet_hosts_group_ops,
 	.ct_owner		= THIS_MODULE,
 };
