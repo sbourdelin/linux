@@ -96,4 +96,8 @@ config OFFSET
         hex "Load offset"
 	default 0
 
+config RAMBASE
+	hex "RAM base address"
+	default 0x400000
+
 endmenu
