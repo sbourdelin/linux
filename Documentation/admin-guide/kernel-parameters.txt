@@ -1318,6 +1318,14 @@
 			x86-64 are 2M (when the CPU supports "pse") and 1G
 			(when the CPU supports the "pdpe1gb" cpuinfo flag).
 
+	hugepages_movable=
+			[HW,IA-64,PPC,X86-64] Default value for the
+			hugepages_treat_as_movable sysctl (default is 1).
+			When 1 this will attempt to allocate hugepages from
+			ZONE_MOVABLE, if 0 it will attempt to allocate hugepages
+			from the non-movable zone created with the "kernelcore="
+			kernel parameter.
+
 	hvc_iucv=	[S390] Number of z/VM IUCV hypervisor console (HVC)
 			       terminal devices. Valid values: 0..8
 	hvc_iucv_allow=	[S390] Comma-separated list of z/VM user IDs.

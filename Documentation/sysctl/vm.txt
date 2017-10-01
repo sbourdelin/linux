@@ -267,6 +267,9 @@ or not. If set to non-zero, hugepages can be allocated from ZONE_MOVABLE.
 ZONE_MOVABLE is created when kernel boot parameter kernelcore= is specified,
 so this parameter has no effect if used without kernelcore=.
 
+The default value for this sysctl can also be set via the hugepages_movable=
+kernel boot parameter (to 0 or 1), default is 1.
+
 Hugepage migration is now available in some situations which depend on the
 architecture and/or the hugepage size. If a hugepage supports migration,
 allocation from ZONE_MOVABLE is always enabled for the hugepage regardless

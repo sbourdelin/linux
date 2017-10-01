@@ -36,7 +36,7 @@
 #include <linux/userfaultfd_k.h>
 #include "internal.h"
 
-int hugepages_treat_as_movable;
+int hugepages_treat_as_movable = 1;
 
 int hugetlb_max_hstate __read_mostly;
 unsigned int default_hstate_idx;
@@ -926,7 +926,7 @@ retry_cpuset:
 /* Movability of hugepages depends on migration support. */
 static inline gfp_t htlb_alloc_mask(struct hstate *h)
 {
-	if (hugepages_treat_as_movable || hugepage_migration_supported(h))
+	if (hugepages_treat_as_movable && hugepage_migration_supported(h))
 		return GFP_HIGHUSER_MOVABLE;
 	else
 		return GFP_HIGHUSER;
@@ -2804,6 +2804,17 @@ static int __init hugetlb_init(void)
 	return 0;
 }
 subsys_initcall(hugetlb_init);
+
+static int __init hugepages_movable(char *str)
+{
+	if (!strncmp(str, "0", 1))
+		hugepages_treat_as_movable = 0;
+	else if (!strncmp(str, "1", 1))
+		hugepages_treat_as_movable = 1;
+
+	return 1;
+}
+__setup("hugepages_movable=", hugepages_movable);
 
 /* Should be called on processing a hugepagesz=... option */
 void __init hugetlb_bad_size(void)

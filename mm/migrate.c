@@ -1266,6 +1266,7 @@ static int unmap_and_move_huge_page(new_page_t get_new_page,
 	int page_was_mapped = 0;
 	struct page *new_hpage;
 	struct anon_vma *anon_vma = NULL;
+	bool zone_movable_present;
 
 	/*
 	 * Movability of hugepages depends on architectures and hugepage size.
@@ -1274,7 +1275,12 @@ static int unmap_and_move_huge_page(new_page_t get_new_page,
 	 * tables or check whether the hugepage is pmd-based or not before
 	 * kicking migration.
 	 */
-	if (!hugepage_migration_supported(page_hstate(hpage))) {
+	zone_movable_present = (NODE_DATA(page_to_nid(hpage))->node_zones[ZONE_MOVABLE].spanned_pages > 0);
+
+	if (!hugepage_migration_supported(page_hstate(hpage)) ||
+		zone_movable_present ?
+		!(zone_idx(page_zone(hpage)) == ZONE_MOVABLE) :
+			false) {
 		putback_active_hugepage(hpage);
 		return -ENOSYS;
 	}
