@@ -663,11 +663,11 @@ static enum match_result match_chain(struct callchain_cursor_node *node,
 				     struct callchain_list *cnode)
 {
 	struct symbol *sym = node->sym;
+	enum match_result match;
 	u64 left, right;
 
 	if (callchain_param.key == CCKEY_SRCLINE) {
-		enum match_result match = match_chain_strings(cnode->srcline,
-							      node->srcline);
+		match = match_chain_strings(cnode->srcline, node->srcline);
 
 		/* if no srcline is available, fallback to symbol name */
 		if (match == MATCH_ERROR && cnode->ms.sym && node->sym)
@@ -681,6 +681,13 @@ static enum match_result match_chain(struct callchain_cursor_node *node,
 	}
 
 	if (cnode->ms.sym && sym && callchain_param.key == CCKEY_FUNCTION) {
+		/* compare inlined frames based on their symbol name because
+		 * different inlined frames will have the same symbol start
+		 */
+		if (cnode->ms.sym->inlined || node->sym->inlined)
+			return match_chain_strings(cnode->ms.sym->name,
+						   node->sym->name);
+
 		left = cnode->ms.sym->start;
 		right = sym->start;
 	} else {
