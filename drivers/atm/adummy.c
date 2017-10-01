@@ -150,7 +150,6 @@ static int __init adummy_init(void)
 	adummy_dev = kzalloc(sizeof(struct adummy_dev),
 						   GFP_KERNEL);
 	if (!adummy_dev) {
-		printk(KERN_ERR DEV_LABEL ": kzalloc() failed\n");
 		err = -ENOMEM;
 		goto out;
 	}
