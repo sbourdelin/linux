@@ -44,7 +44,6 @@
 
 #define INA226_MASK_ENABLE		0x06
 #define INA226_CVRF			BIT(3)
-#define INA219_CNVR			BIT(1)
 
 #define INA2XX_MAX_REGISTERS            8
 
@@ -78,6 +77,11 @@
 #define INA219_SHIFT_ITS(val)	((val) << 3)
 #define INA226_ITS_MASK		GENMASK(5, 3)
 #define INA226_SHIFT_ITS(val)	((val) << 3)
+
+/* INA219 Bus voltage register, low bits are flags */
+#define INA219_OVF		BIT(0)
+#define INA219_CNVR		BIT(1)
+#define INA219_BUS_VOLTAGE_MASK	GENMASK(16, 3)
 
 /* Cosmetic macro giving the sampling period for a full P=UxI cycle */
 #define SAMPLING_PERIOD(c)	((c->int_time_vbus + c->int_time_vshunt) \
@@ -169,6 +173,10 @@ static int ina2xx_read_raw(struct iio_dev *indio_dev,
 			*val = (s16) regval;
 		else
 			*val  = regval;
+
+		if ((chip->config->chip_id == ina219) &&
+		    (chan->address == INA2XX_SHUNT_VOLTAGE))
+			*val &= INA219_BUS_VOLTAGE_MASK;
 
 		return IIO_VAL_INT;
 
@@ -638,6 +646,10 @@ static int ina2xx_work_buffer(struct iio_dev *indio_dev)
 				  INA2XX_SHUNT_VOLTAGE + bit, &val);
 		if (ret < 0)
 			return ret;
+
+		if ((chip->config->chip_id == ina219) &&
+		    (INA2XX_SHUNT_VOLTAGE + bit == INA2XX_BUS_VOLTAGE))
+			val &= INA219_BUS_VOLTAGE_MASK;
 
 		data[i++] = val;
 
