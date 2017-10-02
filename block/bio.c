@@ -1925,6 +1925,9 @@ mempool_t *biovec_create_pool(int pool_entries)
 
 void bioset_free(struct bio_set *bs)
 {
+	if (unlikely(!bs))
+		return;
+
 	if (bs->rescue_workqueue)
 		destroy_workqueue(bs->rescue_workqueue);
 
