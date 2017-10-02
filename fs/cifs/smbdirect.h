@@ -249,6 +249,9 @@ struct smbd_response {
 struct smbd_connection *smbd_get_connection(
 	struct TCP_Server_Info *server, struct sockaddr *dstaddr);
 
+/* Reconnect SMBDirect session */
+int smbd_reconnect(struct TCP_Server_Info *server);
+
 void profiling_display_histogram(
 	struct seq_file *m, unsigned long long array[]);
 #endif
