@@ -245,6 +245,10 @@ struct smbd_response {
 	u8 packet[];
 };
 
+/* Create a SMBDirect session */
+struct smbd_connection *smbd_get_connection(
+	struct TCP_Server_Info *server, struct sockaddr *dstaddr);
+
 void profiling_display_histogram(
 	struct seq_file *m, unsigned long long array[]);
 #endif
