@@ -252,6 +252,9 @@ struct smbd_connection *smbd_get_connection(
 /* Reconnect SMBDirect session */
 int smbd_reconnect(struct TCP_Server_Info *server);
 
+/* Destroy SMBDirect session */
+void smbd_destroy(struct smbd_connection *info);
+
 void profiling_display_histogram(
 	struct seq_file *m, unsigned long long array[]);
 #endif
