@@ -819,6 +819,30 @@
 				phy-names = "usb2-phy", "usb3-phy";
 			};
 		};
+
+		cci: qcom,cci@a0c000 {
+			compatible = "qcom,cci-v1.4.0";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			reg = <0xa0c000 0x1000>;
+			reg-names = "cci";
+			interrupts = <GIC_SPI 295 IRQ_TYPE_EDGE_RISING>;
+			interrupt-names = "cci";
+			power-domains = <&mmcc CAMSS_GDSC>;
+			clocks = <&mmcc MMSS_MMAGIC_AHB_CLK>,
+					<&mmcc CAMSS_TOP_AHB_CLK>,
+					<&mmcc CAMSS_CCI_AHB_CLK>,
+					<&mmcc CAMSS_CCI_CLK>,
+					<&mmcc CAMSS_AHB_CLK>;
+			clock-names = "mmss_mmagic_ahb",
+					"camss_top_ahb",
+					"cci_ahb",
+					"cci",
+					"camss_ahb";
+			pinctrl-names = "default";
+			pinctrl-0 = <&cci0_default>;
+			status = "disabled";
+		};
 	};
 
 	adsp-pil {
