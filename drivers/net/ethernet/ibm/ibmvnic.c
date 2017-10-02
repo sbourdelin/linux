@@ -1862,6 +1862,7 @@ static void ibmvnic_get_ethtool_stats(struct net_device *dev,
 {
 	struct ibmvnic_adapter *adapter = netdev_priv(dev);
 	union ibmvnic_crq crq;
+	u64 stat;
 	int i, j;
 
 	memset(&crq, 0, sizeof(crq));
@@ -1876,9 +1877,11 @@ static void ibmvnic_get_ethtool_stats(struct net_device *dev,
 	ibmvnic_send_crq(adapter, &crq);
 	wait_for_completion(&adapter->stats_done);
 
-	for (i = 0; i < ARRAY_SIZE(ibmvnic_stats); i++)
-		data[i] = be64_to_cpu(IBMVNIC_GET_STAT(adapter,
-						ibmvnic_stats[i].offset));
+	for (i = 0; i < ARRAY_SIZE(ibmvnic_stats); i++) {
+		stat = be64_to_cpu(IBMVNIC_GET_STAT(adapter,
+						    ibmvnic_stats[i].offset));
+		data[i] = stat == -1 ? 0 : stat;
+	}
 
 	for (j = 0; j < adapter->req_tx_queues; j++) {
 		data[i] = adapter->tx_stats_buffers[j].packets;
