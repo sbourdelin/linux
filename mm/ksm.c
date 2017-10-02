@@ -991,14 +991,58 @@ static u32 calc_checksum(struct page *page)
 	return checksum;
 }
 
-static int memcmp_pages(struct page *page1, struct page *page2)
+
+/*
+ * memcmp used to compare pages in RB-tree
+ * but on every step down the tree forward progress
+ * just has been ignored, that make performance pitfall
+ * on deep tree and/or big pages (ex. 4KiB+)
+ *
+ * Fix that by add memcmp wrapper that will try to guess
+ * where difference happens, to only scan from that offset against
+ * next pages
+ */
+
+static int memcmpe(const void *p, const void *q, const u32 len,
+		   u32 *offset)
+{
+	const u32 max_offset_error = 8;
+	u32 iter = 1024, i = 0;
+	int ret;
+
+	if (offset == NULL)
+		return memcmp(p, q, len);
+
+	if (*offset < len)
+		i = *offset;
+
+	while (i < len) {
+		iter = min_t(u32, iter, len - i);
+		ret = memcmp(p, q, iter);
+
+		if (ret) {
+			iter = iter >> 1;
+			if (iter < max_offset_error)
+				break;
+			continue;
+		}
+
+		i += iter;
+	}
+
+	*offset = i;
+
+	return ret;
+}
+
+static int memcmp_pages(struct page *page1, struct page *page2, u32 *offset)
 {
 	char *addr1, *addr2;
 	int ret;
 
 	addr1 = kmap_atomic(page1);
 	addr2 = kmap_atomic(page2);
-	ret = memcmp(addr1, addr2, PAGE_SIZE);
+	ret = memcmpe(addr1, addr2, PAGE_SIZE, offset);
 	kunmap_atomic(addr2);
 	kunmap_atomic(addr1);
 	return ret;
@@ -1006,7 +1050,7 @@ static int memcmp_pages(struct page *page1, struct page *page2)
 
 static inline int pages_identical(struct page *page1, struct page *page2)
 {
-	return !memcmp_pages(page1, page2);
+	return !memcmp_pages(page1, page2, NULL);
 }
 
 static int write_protect_page(struct vm_area_struct *vma, struct page *page,
@@ -1514,6 +1558,7 @@ static __always_inline struct page *chain(struct stable_node **s_n_d,
 static struct page *stable_tree_search(struct page *page)
 {
 	int nid;
+	u32 diff_offset;
 	struct rb_root *root;
 	struct rb_node **new;
 	struct rb_node *parent;
@@ -1532,6 +1577,7 @@ static struct page *stable_tree_search(struct page *page)
 again:
 	new = &root->rb_node;
 	parent = NULL;
+	diff_offset = 0;
 
 	while (*new) {
 		struct page *tree_page;
@@ -1590,7 +1636,7 @@ again:
 			goto again;
 		}
 
-		ret = memcmp_pages(page, tree_page);
+		ret = memcmp_pages(page, tree_page, &diff_offset);
 		put_page(tree_page);
 
 		parent = *new;
@@ -1760,6 +1806,7 @@ chain_append:
 static struct stable_node *stable_tree_insert(struct page *kpage)
 {
 	int nid;
+	u32 diff_offset;
 	unsigned long kpfn;
 	struct rb_root *root;
 	struct rb_node **new;
@@ -1773,6 +1820,7 @@ static struct stable_node *stable_tree_insert(struct page *kpage)
 again:
 	parent = NULL;
 	new = &root->rb_node;
+	diff_offset = 0;
 
 	while (*new) {
 		struct page *tree_page;
@@ -1819,7 +1867,7 @@ again:
 			goto again;
 		}
 
-		ret = memcmp_pages(kpage, tree_page);
+		ret = memcmp_pages(kpage, tree_page, &diff_offset);
 		put_page(tree_page);
 
 		parent = *new;
@@ -1884,6 +1932,7 @@ struct rmap_item *unstable_tree_search_insert(struct rmap_item *rmap_item,
 	struct rb_root *root;
 	struct rb_node *parent = NULL;
 	int nid;
+	u32 diff_offset = 0;
 
 	nid = get_kpfn_nid(page_to_pfn(page));
 	root = root_unstable_tree + nid;
@@ -1908,7 +1957,7 @@ struct rmap_item *unstable_tree_search_insert(struct rmap_item *rmap_item,
 			return NULL;
 		}
 
-		ret = memcmp_pages(page, tree_page);
+		ret = memcmp_pages(page, tree_page, &diff_offset);
 
 		parent = *new;
 		if (ret < 0) {
