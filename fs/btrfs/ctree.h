@@ -719,12 +719,11 @@ struct btrfs_delayed_root;
 #define BTRFS_FS_QUOTA_OVERRIDE			14
 /* Used to record internally whether fs has been frozen */
 #define BTRFS_FS_FROZEN				15
-
 /*
  * Indicate that a whole-filesystem exclusive operation is running
  * (device replace, resize, device add/delete, balance)
  */
-#define BTRFS_FS_EXCL_OP			14
+#define BTRFS_FS_EXCL_OP			16
 
 struct btrfs_fs_info {
 	u8 fsid[BTRFS_FSID_SIZE];
