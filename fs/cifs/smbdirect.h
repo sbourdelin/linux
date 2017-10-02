@@ -88,6 +88,9 @@ struct smbd_connection {
 	int fragment_reassembly_remaining;
 
 	/* Activity accoutning */
+	/* Pending reqeusts issued from upper layer */
+	int smbd_recv_pending;
+	wait_queue_head_t wait_smbd_recv_pending;
 
 	atomic_t send_pending;
 	wait_queue_head_t wait_send_pending;
@@ -254,6 +257,9 @@ int smbd_reconnect(struct TCP_Server_Info *server);
 
 /* Destroy SMBDirect session */
 void smbd_destroy(struct smbd_connection *info);
+
+/* Interface for carrying upper layer I/O through send/recv */
+int smbd_recv(struct smbd_connection *info, struct msghdr *msg);
 
 void profiling_display_histogram(
 	struct seq_file *m, unsigned long long array[]);
