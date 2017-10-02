@@ -594,7 +594,7 @@ error_inode:
 	goto out;
 }
 
-/***** Rename, a wrapper for rename_same_dir & rename_diff_dir */
+/***** Rename a file */
 static int msdos_rename(struct inode *old_dir, struct dentry *old_dentry,
 			struct inode *new_dir, struct dentry *new_dentry,
 			unsigned int flags)
