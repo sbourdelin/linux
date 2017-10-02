@@ -49,6 +49,8 @@
 #define PDC_IRQ_ROUTE_EXT_EN_WD		0x00000004
 #define PDC_IRQ_ROUTE_EXT_EN_IR		0x00000002
 #define PDC_IRQ_ROUTE_EXT_EN_RTC	0x00000001
+#define PDC_SYS_WAKE_POL		0x00000020
+#define PDC_SYS_WAKE_POL_SHIFT		5
 #define PDC_SYS_WAKE_RESET		0x00000010
 #define PDC_SYS_WAKE_INT_MODE		0x0000000e
 #define PDC_SYS_WAKE_INT_MODE_SHIFT	1
@@ -62,6 +64,9 @@
 #define PDC_SYS_WAKE_INT_UP		0x3
 #define PDC_SYS_WAKE_INT_CHANGE		0x6
 #define PDC_SYS_WAKE_INT_NONE		0x4
+
+#define PDC_SYS_WAKE_ACTIVE_LOW		0x0
+#define PDC_SYS_WAKE_ACTIVE_HIGH	0x1
 
 /**
  * struct pdc_intc_priv - private pdc interrupt data.
@@ -335,8 +340,9 @@ static void pdc_intc_setup(struct pdc_intc_priv *priv)
 	for (i = 0; i < priv->nr_syswakes; ++i) {
 		/* set the IRQ mode to none */
 		soc_sys_wake_regoff = PDC_SYS_WAKE_BASE + i*PDC_SYS_WAKE_STRIDE;
-		soc_sys_wake = PDC_SYS_WAKE_INT_NONE
-				<< PDC_SYS_WAKE_INT_MODE_SHIFT;
+		soc_sys_wake =
+			PDC_SYS_WAKE_ACTIVE_HIGH << PDC_SYS_WAKE_POL_SHIFT |
+			PDC_SYS_WAKE_INT_NONE << PDC_SYS_WAKE_INT_MODE_SHIFT;
 		pdc_write(priv, soc_sys_wake_regoff, soc_sys_wake);
 	}
 }
