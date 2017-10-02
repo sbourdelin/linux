@@ -63,17 +63,14 @@ struct qed_ll2_rx_packet {
 struct qed_ll2_tx_packet {
 	struct list_head list_entry;
 	u16 bd_used;
-	u16 vlan;
-	u16 l4_hdr_offset_w;
-	u8 bd_flags;
 	bool notify_fw;
 	void *cookie;
-
+	/* Flexible Array of bds_set determined by max_bds_per_packet */
 	struct {
 		struct core_tx_bd *txq_bd;
 		dma_addr_t tx_frag;
 		u16 frag_len;
-	} bds_set[ETH_TX_MAX_BDS_PER_NON_LSO_PACKET];
+	} bds_set[1];
 };
 
 struct qed_ll2_rx_queue {
