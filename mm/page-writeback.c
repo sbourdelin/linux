@@ -2851,3 +2851,87 @@ void wait_for_stable_page(struct page *page)
 		wait_on_page_writeback(page);
 }
 EXPORT_SYMBOL_GPL(wait_for_stable_page);
+
+int vm_dirty_write_behind __read_mostly;
+EXPORT_SYMBOL(vm_dirty_write_behind);
+
+/**
+ * generic_write_behind() - writeback dirty pages behind current position.
+ *
+ * This function tracks writing position and starts background writeback if
+ * file has enough sequentially written data.
+ *
+ * Returns @count or a negative error code if I/O failed.
+ */
+extern ssize_t generic_write_behind(struct kiocb *iocb, ssize_t count)
+{
+	struct file *file = iocb->ki_filp;
+	struct address_space *mapping = file->f_mapping;
+	struct backing_dev_info *bdi = inode_to_bdi(mapping->host);
+	unsigned long min_size = READ_ONCE(bdi->min_write_behind);
+	unsigned long async_size = READ_ONCE(bdi->async_write_behind);
+	pgoff_t head = file->f_write_behind;
+	pgoff_t begin = (iocb->ki_pos - count) >> PAGE_SHIFT;
+	pgoff_t end = iocb->ki_pos >> PAGE_SHIFT;
+	int ret;
+
+	/* Disabled, contiguous and not big enough yet or marked as random. */
+	if (!min_size || end - head < min_size || (file->f_mode & FMODE_RANDOM))
+		goto out;
+
+	spin_lock(&file->f_lock);
+
+	/* Re-read under lock. */
+	head = file->f_write_behind;
+
+	/* Non-contiguous, move head position. */
+	if (head > end || begin - head > async_size)
+		file->f_write_behind = head = begin;
+
+	/* Still not big enough. */
+	if (end - head < min_size) {
+		spin_unlock(&file->f_lock);
+		goto out;
+	}
+
+	/* Set head for next iteration, everything behind will be written. */
+	file->f_write_behind = end;
+
+	spin_unlock(&file->f_lock);
+
+	/* Non-blocking files always works in async mode. */
+	if (file->f_flags & O_NONBLOCK)
+		async_size = 0;
+
+	/* Skip pages in async mode if disk is congested. */
+	if (!async_size && inode_write_congested(mapping->host))
+		goto out;
+
+	/* Start background writeback. */
+	ret = __filemap_fdatawrite_range(mapping,
+					 (loff_t)head << PAGE_SHIFT,
+					 ((loff_t)end << PAGE_SHIFT) - 1,
+					 WB_SYNC_NONE);
+	if (ret < 0)
+		return ret;
+
+	if (!async_size || head < async_size)
+		goto out;
+
+	/* Wait for pages falling behind async window. */
+	head -= async_size;
+	end -= async_size;
+	ret = filemap_fdatawait_range(mapping,
+				      (loff_t)head << PAGE_SHIFT,
+				      ((loff_t)end << PAGE_SHIFT) - 1);
+	if (ret < 0)
+		return ret;
+
+	/* Evict completely written pages if no more access expected. */
+	if (file->f_mode & FMODE_NOREUSE)
+		invalidate_mapping_pages(mapping, head, end - 1);
+
+out:
+	return count;
+}
+EXPORT_SYMBOL(generic_write_behind);

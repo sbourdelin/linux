@@ -30,6 +30,17 @@ read_ahead_kb (read-write)
 
 	Size of the read-ahead window in kilobytes
 
+min_write_behind_kb (read-write)
+
+	Size of minimal write-behind request in kilobytes.
+	0 -> disable write-behind for this disk.
+
+async_write_behind_kb (read-write)
+
+	Size of async write-behind window in kilobytes.
+	Next write will wait for writeback falling behind window.
+	0 -> completely async mode, skip if disk is congested.
+
 min_ratio (read-write)
 
 	Under normal circumstances each device is given a part of the

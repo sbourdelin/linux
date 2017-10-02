@@ -138,25 +138,6 @@ static inline void bdi_debug_unregister(struct backing_dev_info *bdi)
 }
 #endif
 
-static ssize_t read_ahead_kb_store(struct device *dev,
-				  struct device_attribute *attr,
-				  const char *buf, size_t count)
-{
-	struct backing_dev_info *bdi = dev_get_drvdata(dev);
-	unsigned long read_ahead_kb;
-	ssize_t ret;
-
-	ret = kstrtoul(buf, 10, &read_ahead_kb);
-	if (ret < 0)
-		return ret;
-
-	bdi->ra_pages = read_ahead_kb >> (PAGE_SHIFT - 10);
-
-	return count;
-}
-
-#define K(pages) ((pages) << (PAGE_SHIFT - 10))
-
 #define BDI_SHOW(name, expr)						\
 static ssize_t name##_show(struct device *dev,				\
 			   struct device_attribute *attr, char *page)	\
@@ -167,7 +148,27 @@ static ssize_t name##_show(struct device *dev,				\
 }									\
 static DEVICE_ATTR_RW(name);
 
-BDI_SHOW(read_ahead_kb, K(bdi->ra_pages))
+#define BDI_ATTR_KB(name, field)					\
+static ssize_t name##_store(struct device *dev,				\
+			    struct device_attribute *attr,		\
+			    const char *buf, size_t count)		\
+{									\
+	struct backing_dev_info *bdi = dev_get_drvdata(dev);		\
+	unsigned long kb;						\
+	ssize_t ret;							\
+									\
+	ret = kstrtoul(buf, 10, &kb);					\
+	if (ret < 0)							\
+		return ret;						\
+									\
+	bdi->field = kb >> (PAGE_SHIFT - 10);				\
+	return count;							\
+}									\
+BDI_SHOW(name, ((bdi->field) << (PAGE_SHIFT - 10)))
+
+BDI_ATTR_KB(read_ahead_kb, ra_pages)
+BDI_ATTR_KB(min_write_behind_kb, min_write_behind)
+BDI_ATTR_KB(async_write_behind_kb, async_write_behind)
 
 static ssize_t min_ratio_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t count)
@@ -220,6 +221,8 @@ static DEVICE_ATTR_RO(stable_pages_required);
 
 static struct attribute *bdi_dev_attrs[] = {
 	&dev_attr_read_ahead_kb.attr,
+	&dev_attr_min_write_behind_kb.attr,
+	&dev_attr_async_write_behind_kb.attr,
 	&dev_attr_min_ratio.attr,
 	&dev_attr_max_ratio.attr,
 	&dev_attr_stable_pages_required.attr,
@@ -835,6 +838,9 @@ static int bdi_init(struct backing_dev_info *bdi)
 	INIT_LIST_HEAD(&bdi->bdi_list);
 	INIT_LIST_HEAD(&bdi->wb_list);
 	init_waitqueue_head(&bdi->wb_waitq);
+
+	bdi->min_write_behind = VM_MIN_WRITE_BEHIND_KB >> (PAGE_SHIFT - 10);
+	bdi->async_write_behind = VM_ASYNC_WRITE_BEHIND_KB >> (PAGE_SHIFT - 10);
 
 	ret = cgwb_bdi_init(bdi);
 

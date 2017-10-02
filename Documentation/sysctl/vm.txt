@@ -28,6 +28,7 @@ Currently, these files are in /proc/sys/vm:
 - dirty_expire_centisecs
 - dirty_ratio
 - dirty_writeback_centisecs
+- dirty_write_behind
 - drop_caches
 - extfrag_threshold
 - hugepages_treat_as_movable
@@ -185,6 +186,20 @@ out to disk.  This tunable expresses the interval between those wakeups, in
 100'ths of a second.
 
 Setting this to zero disables periodic writeback altogether.
+
+==============================================================
+
+dirty_write_behind
+
+This controls write-behind writeback policy - automatic background writeback
+for sequentially written data behind current writing position.
+
+=0: disabled, default
+=1: enabled
+
+Minimum requeqst size and async window size configured in for each bdi:
+/sys/block/$DEV/bdi/min_write_behind_kb
+/sys/block/$DEV/bdi/async_write_behind_kb
 
 ==============================================================
 

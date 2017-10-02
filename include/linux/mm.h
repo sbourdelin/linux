@@ -2217,6 +2217,9 @@ extern int filemap_page_mkwrite(struct vm_fault *vmf);
 int __must_check write_one_page(struct page *page);
 void task_dirty_inc(struct task_struct *tsk);
 
+#define VM_MIN_WRITE_BEHIND_KB		256
+#define VM_ASYNC_WRITE_BEHIND_KB	1024
+
 /* readahead.c */
 #define VM_MAX_READAHEAD	128	/* kbytes */
 #define VM_MIN_READAHEAD	16	/* kbytes (includes current page) */

@@ -144,6 +144,8 @@ typedef int (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 #define FMODE_CAN_READ          ((__force fmode_t)0x20000)
 /* Has write method(s) */
 #define FMODE_CAN_WRITE         ((__force fmode_t)0x40000)
+/* "Use once" access pattern is expected */
+#define FMODE_NOREUSE		((__force fmode_t)0x80000)
 
 /* File was opened by fanotify and shouldn't generate fanotify events */
 #define FMODE_NONOTIFY		((__force fmode_t)0x4000000)
@@ -871,6 +873,7 @@ struct file {
 	struct fown_struct	f_owner;
 	const struct cred	*f_cred;
 	struct file_ra_state	f_ra;
+	pgoff_t			f_write_behind;
 
 	u64			f_version;
 #ifdef CONFIG_SECURITY
@@ -2655,6 +2658,9 @@ extern int vfs_fsync_range(struct file *file, loff_t start, loff_t end,
 			   int datasync);
 extern int vfs_fsync(struct file *file, int datasync);
 
+extern int vm_dirty_write_behind;
+extern ssize_t generic_write_behind(struct kiocb *iocb, ssize_t count);
+
 /*
  * Sync the bytes written if this was a synchronous write.  Expect ki_pos
  * to already be updated for the write, and will return either the amount
@@ -2668,7 +2674,8 @@ static inline ssize_t generic_write_sync(struct kiocb *iocb, ssize_t count)
 				(iocb->ki_flags & IOCB_SYNC) ? 0 : 1);
 		if (ret)
 			return ret;
-	}
+	} else if (vm_dirty_write_behind)
+		return generic_write_behind(iocb, count);
 
 	return count;
 }

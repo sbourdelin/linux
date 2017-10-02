@@ -143,6 +143,8 @@ struct backing_dev_info {
 	struct list_head bdi_list;
 	unsigned long ra_pages;	/* max readahead in PAGE_SIZE units */
 	unsigned long io_pages;	/* max allowed IO size */
+	unsigned long min_write_behind; /* Minimum write-behind in pages */
+	unsigned long async_write_behind; /* Async write-behind in pages */
 	congested_fn *congested_fn; /* Function pointer if device is md/dm */
 	void *congested_data;	/* Pointer to aux data for congested func */
 
