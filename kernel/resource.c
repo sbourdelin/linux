@@ -23,6 +23,8 @@
 #include <linux/pfn.h>
 #include <linux/mm.h>
 #include <linux/resource_ext.h>
+#include <linux/string.h>
+#include <linux/vmalloc.h>
 #include <asm/io.h>
 
 
@@ -466,6 +468,63 @@ int walk_system_ram_res(u64 start, u64 end, void *arg,
 		res.start = res.end + 1;
 		res.end = orig_end;
 	}
+	return ret;
+}
+
+int walk_system_ram_res_rev(u64 start, u64 end, void *arg,
+				int (*func)(u64, u64, void *))
+{
+	struct resource res, *rams;
+	u64 orig_end;
+	int count, i;
+	int ret = -1;
+
+	count = 16; /* initial */
+
+	/* create a list */
+	rams = vmalloc(sizeof(struct resource) * count);
+	if (!rams)
+		return ret;
+
+	res.start = start;
+	res.end = end;
+	res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+	orig_end = res.end;
+	i = 0;
+	while ((res.start < res.end) &&
+		(!find_next_iomem_res(&res, IORES_DESC_NONE, true))) {
+		if (i >= count) {
+			/* re-alloc */
+			struct resource *rams_new;
+			int count_new;
+
+			count_new = count + 16;
+			rams_new = vmalloc(sizeof(struct resource) * count_new);
+			if (!rams_new)
+				goto out;
+
+			memcpy(rams_new, rams, count);
+			vfree(rams);
+			rams = rams_new;
+			count = count_new;
+		}
+
+		rams[i].start = res.start;
+		rams[i++].end = res.end;
+
+		res.start = res.end + 1;
+		res.end = orig_end;
+	}
+
+	/* go reverse */
+	for (i--; i >= 0; i--) {
+		ret = (*func)(rams[i].start, rams[i].end, arg);
+		if (ret)
+			break;
+	}
+
+out:
+	vfree(rams);
 	return ret;
 }
 
