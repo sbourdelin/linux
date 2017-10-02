@@ -43,6 +43,7 @@
 #include "cifs_unicode.h"
 #include "cifs_debug.h"
 #include "fscache.h"
+#include "smbdirect.h"
 
 #ifdef CONFIG_CIFS_POSIX
 static struct {
@@ -1923,6 +1924,11 @@ cifs_writedata_release(struct kref *refcount)
 {
 	struct cifs_writedata *wdata = container_of(refcount,
 					struct cifs_writedata, refcount);
+
+	if (wdata->mr) {
+		smbd_deregister_mr(wdata->mr);
+		wdata->mr = NULL;
+	}
 
 	if (wdata->cfile)
 		cifsFileInfo_put(wdata->cfile);

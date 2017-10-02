@@ -1174,6 +1174,7 @@ struct cifs_writedata {
 	pid_t				pid;
 	unsigned int			bytes;
 	int				result;
+	struct smbd_mr			*mr;
 	unsigned int			pagesz;
 	unsigned int			tailsz;
 	unsigned int			credits;
