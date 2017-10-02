@@ -138,6 +138,7 @@ static inline size_t br_port_info_size(void)
 		+ nla_total_size(1)	/* IFLA_BRPORT_PROXYARP */
 		+ nla_total_size(1)	/* IFLA_BRPORT_PROXYARP_WIFI */
 		+ nla_total_size(1)	/* IFLA_BRPORT_VLAN_TUNNEL */
+		+ nla_total_size(1)	/* IFLA_BRPORT_NEIGH_SUPPRESS */
 		+ nla_total_size(sizeof(struct ifla_bridge_id))	/* IFLA_BRPORT_ROOT_ID */
 		+ nla_total_size(sizeof(struct ifla_bridge_id))	/* IFLA_BRPORT_BRIDGE_ID */
 		+ nla_total_size(sizeof(u16))	/* IFLA_BRPORT_DESIGNATED_PORT */
@@ -208,7 +209,9 @@ static int br_port_fill_attrs(struct sk_buff *skb,
 		       p->topology_change_ack) ||
 	    nla_put_u8(skb, IFLA_BRPORT_CONFIG_PENDING, p->config_pending) ||
 	    nla_put_u8(skb, IFLA_BRPORT_VLAN_TUNNEL, !!(p->flags &
-							BR_VLAN_TUNNEL)))
+							BR_VLAN_TUNNEL)) ||
+	    nla_put_u8(skb, IFLA_BRPORT_NEIGH_SUPPRESS, !!(p->flags &
+							BR_NEIGH_SUPPRESS)))
 		return -EMSGSIZE;
 
 	timerval = br_timer_value(&p->message_age_timer);
@@ -618,6 +621,9 @@ static int br_afspec(struct net_bridge *br,
 		}
 	}
 
+	if (p)
+		br_recalculate_neigh_suppress_enabled(p->br);
+
 	return err;
 }
 
@@ -689,6 +695,7 @@ static int br_setport(struct net_bridge_port *p, struct nlattr *tb[])
 {
 	unsigned long old_flags = p->flags;
 	bool br_vlan_tunnel_old = false;
+	int neigh_suppress_old = 0;
 	int err;
 
 	err = br_set_port_flag(p, tb, IFLA_BRPORT_MODE, BR_HAIRPIN_MODE);
@@ -773,6 +780,13 @@ static int br_setport(struct net_bridge_port *p, struct nlattr *tb[])
 			return err;
 	}
 #endif
+
+	neigh_suppress_old = (p->flags & BR_NEIGH_SUPPRESS);
+	br_set_port_flag(p, tb, IFLA_BRPORT_NEIGH_SUPPRESS,
+			 BR_NEIGH_SUPPRESS);
+	if (neigh_suppress_old != (p->flags & BR_NEIGH_SUPPRESS))
+		br_recalculate_neigh_suppress_enabled(p->br);
+
 	br_port_flags_change(p, old_flags ^ p->flags);
 	return 0;
 }
