@@ -1543,8 +1543,8 @@ cifs_readv_receive(struct TCP_Server_Info *server, struct mid_q_entry *mid)
 		 rdata->iov[0].iov_base, server->total_read);
 
 	/* how much data is in the response? */
-	data_len = server->ops->read_data_length(buf);
-	if (data_offset + data_len > buflen) {
+	data_len = server->ops->read_data_length(buf, rdata->mr);
+	if (!rdata->mr && (data_offset + data_len > buflen)) {
 		/* data_len is corrupt -- discard frame */
 		rdata->result = -EIO;
 		return cifs_readv_discard(server, mid);

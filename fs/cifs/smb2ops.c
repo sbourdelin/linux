@@ -937,9 +937,13 @@ smb2_read_data_offset(char *buf)
 }
 
 static unsigned int
-smb2_read_data_length(char *buf)
+smb2_read_data_length(char *buf, bool in_remaining)
 {
 	struct smb2_read_rsp *rsp = (struct smb2_read_rsp *)buf;
+
+	if (in_remaining)
+		return le32_to_cpu(rsp->DataRemaining);
+
 	return le32_to_cpu(rsp->DataLength);
 }
 
@@ -2448,7 +2452,7 @@ handle_read_data(struct TCP_Server_Info *server, struct mid_q_entry *mid,
 	}
 
 	data_offset = server->ops->read_data_offset(buf) + 4;
-	data_len = server->ops->read_data_length(buf);
+	data_len = server->ops->read_data_length(buf, rdata->mr);
 
 	if (data_offset < server->vals->read_rsp_size) {
 		/*

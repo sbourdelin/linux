@@ -87,7 +87,7 @@ cifs_read_data_offset(char *buf)
 }
 
 static unsigned int
-cifs_read_data_length(char *buf)
+cifs_read_data_length(char *buf, bool in_remaining)
 {
 	READ_RSP *rsp = (READ_RSP *)buf;
 	return (le16_to_cpu(rsp->DataLengthHigh) << 16) +
