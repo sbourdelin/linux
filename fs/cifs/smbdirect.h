@@ -89,6 +89,9 @@ struct smbd_connection {
 
 	/* Activity accoutning */
 	/* Pending reqeusts issued from upper layer */
+	int smbd_send_pending;
+	wait_queue_head_t wait_smbd_send_pending;
+
 	int smbd_recv_pending;
 	wait_queue_head_t wait_smbd_recv_pending;
 
@@ -260,6 +263,7 @@ void smbd_destroy(struct smbd_connection *info);
 
 /* Interface for carrying upper layer I/O through send/recv */
 int smbd_recv(struct smbd_connection *info, struct msghdr *msg);
+int smbd_send(struct smbd_connection *info, struct smb_rqst *rqst);
 
 void profiling_display_histogram(
 	struct seq_file *m, unsigned long long array[]);
