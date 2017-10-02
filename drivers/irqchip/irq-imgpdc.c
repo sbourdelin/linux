@@ -8,6 +8,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/irqdomain.h>
 #include <linux/io.h>
@@ -18,6 +19,7 @@
 
 /* PDC interrupt register numbers */
 
+#define PDC_SOC_POWER			0x300
 #define PDC_IRQ_STATUS			0x310
 #define PDC_IRQ_ENABLE			0x314
 #define PDC_IRQ_CLEAR			0x318
@@ -204,6 +206,8 @@ static int pdc_irq_set_wake(struct irq_data *data, unsigned int on)
 	unsigned int mask = (1 << 16) << hw;
 	unsigned int dst_irq;
 	unsigned int *dst_irq_wake_depth;
+	unsigned int syswake, soc_sys_wake_cfg_regoff;
+	u32 soc_sys_wake_cfg, soc_power;
 	int ret;
 
 	/* control the destination IRQ wakeup too for standby mode */
@@ -216,6 +220,27 @@ static int pdc_irq_set_wake(struct irq_data *data, unsigned int on)
 	}
 
 	raw_spin_lock(&priv->lock);
+	/*
+	 * When enabling sys wakes, an immediate power transition may occur if
+	 * the wake input has been active in the past. Work around this:
+	 * 1) Set SYS_WAKE_CONFIG to the current value of SOC_POWER so that an
+	 *    immediate power transition has no effect
+	 * 2) Enable and disable the sys wake to flush the stale wake event
+	 * 3) Set SYS_WAKE_CONFIG back to the original value
+	 */
+	if (hwirq_is_syswake(hw) && on) {
+		syswake = hwirq_to_syswake(hw);
+		soc_sys_wake_cfg_regoff = PDC_SYS_WAKE_CONFIG_BASE +
+					  syswake * PDC_SYS_WAKE_CONFIG_STRIDE;
+		soc_sys_wake_cfg = pdc_read(priv, soc_sys_wake_cfg_regoff);
+		soc_power = pdc_read(priv, PDC_SOC_POWER);
+		pdc_write(priv, soc_sys_wake_cfg_regoff, soc_power);
+		pdc_write(priv, PDC_IRQ_ROUTE, priv->irq_route | mask);
+		udelay(31);
+		pdc_write(priv, PDC_IRQ_ROUTE, priv->irq_route);
+		pdc_write(priv, soc_sys_wake_cfg_regoff, soc_sys_wake_cfg);
+	}
+
 	if (on)
 		priv->irq_route |= mask;
 	else
