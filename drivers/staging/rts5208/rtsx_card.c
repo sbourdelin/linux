@@ -825,7 +825,7 @@ int switch_normal_clock(struct rtsx_chip *chip, int clk)
 	}
 
 	if (sd_vpclk_phase_reset) {
-		udelay(200);
+		usleep_range(200, 300);
 		retval = rtsx_write_register(chip, SD_VPCLK0_CTL,
 					     PHASE_NOT_RESET, PHASE_NOT_RESET);
 		if (retval) {
@@ -838,7 +838,7 @@ int switch_normal_clock(struct rtsx_chip *chip, int clk)
 			rtsx_trace(chip);
 			return retval;
 		}
-		udelay(200);
+		usleep_range(200, 300);
 	}
 	retval = rtsx_write_register(chip, CLK_CTL, 0xFF, 0);
 	if (retval) {
