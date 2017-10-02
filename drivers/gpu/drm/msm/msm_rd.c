@@ -114,7 +114,7 @@ static void rd_write(struct msm_rd_state *rd, const void *buf, int sz)
 		n = min(sz, circ_space_to_end(&rd->fifo));
 		memcpy(fptr, ptr, n);
 
-		fifo->head = (fifo->head + n) & (BUF_SZ - 1);
+		smp_store_release(&fifo->head, (fifo->head + n) & (BUF_SZ - 1));
 		sz  -= n;
 		ptr += n;
 
@@ -151,7 +151,7 @@ static ssize_t rd_read(struct file *file, char __user *buf,
 		goto out;
 	}
 
-	fifo->tail = (fifo->tail + n) & (BUF_SZ - 1);
+	smp_store_release(&fifo->tail, (fifo->tail + n) & (BUF_SZ - 1));
 	*ppos += n;
 
 	wake_up_all(&rd->fifo_event);
