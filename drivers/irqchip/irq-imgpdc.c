@@ -63,21 +63,25 @@
 
 /**
  * struct pdc_intc_priv - private pdc interrupt data.
- * @nr_perips:		Number of peripheral interrupt signals.
- * @nr_syswakes:	Number of syswake signals.
- * @perip_irqs:		List of peripheral IRQ numbers handled.
- * @syswake_irq:	Shared PDC syswake IRQ number.
- * @domain:		IRQ domain for PDC peripheral and syswake IRQs.
- * @pdc_base:		Base of PDC registers.
- * @irq_route:		Cached version of PDC_IRQ_ROUTE register.
- * @lock:		Lock to protect the PDC syswake registers and the cached
- *			values of those registers in this struct.
+ * @nr_perips:			Number of peripheral interrupt signals.
+ * @nr_syswakes:		Number of syswake signals.
+ * @perip_irqs:			List of peripheral IRQ numbers handled.
+ * @perip_irq_wake_depths:	List of peripheral IRQs wake depths.
+ * @syswake_irq:		Shared PDC syswake IRQ number.
+ * @syswake_irq_wake_depth:	Shared PDC syswake IRQ wake depth.
+ * @domain:			IRQ domain for PDC peripheral and syswake IRQs.
+ * @pdc_base:			Base of PDC registers.
+ * @irq_route:			Cached version of PDC_IRQ_ROUTE register.
+ * @lock:			Lock to protect the PDC syswake regs and the
+ *				cached values of those regs in this struct.
  */
 struct pdc_intc_priv {
 	unsigned int		nr_perips;
 	unsigned int		nr_syswakes;
 	unsigned int		*perip_irqs;
+	unsigned int		*perip_irq_wake_depths;
 	unsigned int		syswake_irq;
+	unsigned int		syswake_irq_wake_depth;
 	struct irq_domain	*domain;
 	void __iomem		*pdc_base;
 
@@ -199,6 +203,17 @@ static int pdc_irq_set_wake(struct irq_data *data, unsigned int on)
 	irq_hw_number_t hw = data->hwirq;
 	unsigned int mask = (1 << 16) << hw;
 	unsigned int dst_irq;
+	unsigned int *dst_irq_wake_depth;
+	int ret;
+
+	/* control the destination IRQ wakeup too for standby mode */
+	if (hwirq_is_syswake(hw)) {
+		dst_irq = priv->syswake_irq;
+		dst_irq_wake_depth = &priv->syswake_irq_wake_depth;
+	} else {
+		dst_irq = priv->perip_irqs[hw];
+		dst_irq_wake_depth = &priv->perip_irq_wake_depths[hw];
+	}
 
 	raw_spin_lock(&priv->lock);
 	if (on)
@@ -206,14 +221,22 @@ static int pdc_irq_set_wake(struct irq_data *data, unsigned int on)
 	else
 		priv->irq_route &= ~mask;
 	pdc_write(priv, PDC_IRQ_ROUTE, priv->irq_route);
-	raw_spin_unlock(&priv->lock);
 
-	/* control the destination IRQ wakeup too for standby mode */
-	if (hwirq_is_syswake(hw))
-		dst_irq = priv->syswake_irq;
-	else
-		dst_irq = priv->perip_irqs[hw];
-	irq_set_irq_wake(dst_irq, on);
+	/*
+	 * Pass on the set_wake request to the parent interrupt controller.
+	 * The parent isn't required to support wake, but we must balance
+	 * successful irq_set_irq_wake calls.
+	 */
+	if (on || *dst_irq_wake_depth) {
+		ret = irq_set_irq_wake(dst_irq, on);
+		if (!ret) {
+			if (on)
+				(*dst_irq_wake_depth)++;
+			else
+				(*dst_irq_wake_depth)--;
+		}
+	}
+	raw_spin_unlock(&priv->lock);
 
 	return 0;
 }
@@ -357,6 +380,13 @@ static int pdc_intc_probe(struct platform_device *pdev)
 					GFP_KERNEL);
 	if (!priv->perip_irqs) {
 		dev_err(&pdev->dev, "cannot allocate perip IRQ list\n");
+		return -ENOMEM;
+	}
+	priv->perip_irq_wake_depths = devm_kzalloc(&pdev->dev,
+						   4 * priv->nr_perips,
+						   GFP_KERNEL);
+	if (!priv->perip_irq_wake_depths) {
+		dev_err(&pdev->dev, "cannot allocate perip IRQ wake depth list\n");
 		return -ENOMEM;
 	}
 	for (i = 0; i < priv->nr_perips; ++i) {
