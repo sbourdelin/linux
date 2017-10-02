@@ -68,6 +68,16 @@ netdev_tx_t br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 	    (ntohs(eth->h_proto) == ETH_P_ARP ||
 	     ntohs(eth->h_proto) == ETH_P_RARP)) {
 		br_do_proxy_suppress_arp(skb, br, vid, NULL);
+	} else if (IS_ENABLED(CONFIG_IPV6) && br->neigh_suppress_enabled &&
+		   skb->protocol == htons(ETH_P_IPV6) &&
+		   pskb_may_pull(skb, sizeof(struct ipv6hdr) +
+				 sizeof(struct nd_msg)) &&
+		   ipv6_hdr(skb)->nexthdr == IPPROTO_ICMPV6) {
+			struct nd_msg *msg, _msg;
+
+			msg = br_is_nd_neigh_msg(skb, &_msg);
+			if (msg)
+				br_do_suppress_nd(skb, br, vid, NULL, msg);
 	}
 
 	dest = eth_hdr(skb)->h_dest;
