@@ -141,21 +141,31 @@ static struct pdc_intc_priv *irqd_to_priv(struct irq_data *data)
 static void perip_irq_mask(struct irq_data *data)
 {
 	struct pdc_intc_priv *priv = irqd_to_priv(data);
+	unsigned int parent_irq = priv->perip_irqs[data->hwirq];
+	struct irq_data *parent_irq_data = irq_get_irq_data(parent_irq);
 
 	raw_spin_lock(&priv->lock);
 	priv->irq_route &= ~data->mask;
 	pdc_write(priv, PDC_IRQ_ROUTE, priv->irq_route);
 	raw_spin_unlock(&priv->lock);
+
+	/* Pass on the mask to the parent */
+	parent_irq_data->chip->irq_mask(parent_irq_data);
 }
 
 static void perip_irq_unmask(struct irq_data *data)
 {
 	struct pdc_intc_priv *priv = irqd_to_priv(data);
+	unsigned int parent_irq = priv->perip_irqs[data->hwirq];
+	struct irq_data *parent_irq_data = irq_get_irq_data(parent_irq);
 
 	raw_spin_lock(&priv->lock);
 	priv->irq_route |= data->mask;
 	pdc_write(priv, PDC_IRQ_ROUTE, priv->irq_route);
 	raw_spin_unlock(&priv->lock);
+
+	/* Pass on the unmask to the parent */
+	parent_irq_data->chip->irq_unmask(parent_irq_data);
 }
 
 static int syswake_irq_set_type(struct irq_data *data, unsigned int flow_type)
