@@ -598,19 +598,16 @@ struct nes_adapter *nes_init_adapter(struct nes_device *nesdev, u8 hw_rev) {
 	}
 
 	if (nesadapter->hw_rev == NE020_REV) {
-		init_timer(&nesadapter->mh_timer);
-		nesadapter->mh_timer.function = nes_mh_fix;
+		setup_timer(&nesadapter->mh_timer, nes_mh_fix,
+			    (unsigned long)nesdev);
 		nesadapter->mh_timer.expires = jiffies + (HZ/5);  /* 1 second */
-		nesadapter->mh_timer.data = (unsigned long)nesdev;
 		add_timer(&nesadapter->mh_timer);
 	} else {
 		nes_write32(nesdev->regs+NES_INTF_INT_STAT, 0x0f000000);
 	}
 
-	init_timer(&nesadapter->lc_timer);
-	nesadapter->lc_timer.function = nes_clc;
+	setup_timer(&nesadapter->lc_timer, nes_clc, (unsigned long)nesdev);
 	nesadapter->lc_timer.expires = jiffies + 3600 * HZ;  /* 1 hour */
-	nesadapter->lc_timer.data = (unsigned long)nesdev;
 	add_timer(&nesadapter->lc_timer);
 
 	list_add_tail(&nesadapter->list, &nes_adapter_list);

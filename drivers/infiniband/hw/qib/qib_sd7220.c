@@ -1440,9 +1440,8 @@ void set_7220_relock_poll(struct qib_devdata *dd, int ibup)
 		/* If timer has not yet been started, do so. */
 		if (!cs->relock_timer_active) {
 			cs->relock_timer_active = 1;
-			init_timer(&cs->relock_timer);
-			cs->relock_timer.function = qib_run_relock;
-			cs->relock_timer.data = (unsigned long) dd;
+			setup_timer(&cs->relock_timer, qib_run_relock,
+				    (unsigned long)dd);
 			cs->relock_interval = timeout;
 			cs->relock_timer.expires = jiffies + timeout;
 			add_timer(&cs->relock_timer);
