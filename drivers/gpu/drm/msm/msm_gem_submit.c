@@ -256,41 +256,38 @@ static int submit_fence_sync(struct msm_gem_submit *submit, bool no_implicit)
 	return ret;
 }
 
-static int submit_pin_objects(struct msm_gem_submit *submit)
+static int submit_pin_object(struct msm_gem_submit *submit, int i)
 {
-	int i, ret = 0;
+	struct msm_gem_object *msm_obj = submit->bos[i].obj;
+	uint64_t iova;
+	int ret;
 
-	submit->valid = true;
+	if (submit->bos[i].flags & BO_PINNED)
+		return 0;
 
-	for (i = 0; i < submit->nr_bos; i++) {
-		struct msm_gem_object *msm_obj = submit->bos[i].obj;
-		uint64_t iova;
+	/* if locking succeeded, pin bo: */
+	ret = msm_gem_get_iova(&msm_obj->base, submit->gpu->aspace, &iova);
+	if (ret)
+		return ret;
 
-		/* if locking succeeded, pin bo: */
-		ret = msm_gem_get_iova(&msm_obj->base,
-				submit->gpu->aspace, &iova);
+	submit->bos[i].flags |= BO_PINNED;
 
-		if (ret)
-			break;
-
-		submit->bos[i].flags |= BO_PINNED;
-
-		if (iova == submit->bos[i].iova) {
-			submit->bos[i].flags |= BO_VALID;
-		} else {
-			submit->bos[i].iova = iova;
-			/* iova changed, so address in cmdstream is not valid: */
-			submit->bos[i].flags &= ~BO_VALID;
-			submit->valid = false;
-		}
+	if (iova == submit->bos[i].iova) {
+		submit->bos[i].flags |= BO_VALID;
+	} else {
+		submit->bos[i].iova = iova;
+		/* iova changed, so address in cmdstream is not valid: */
+		submit->bos[i].flags &= ~BO_VALID;
 	}
 
-	return ret;
+	return 0;
 }
 
 static int submit_bo(struct msm_gem_submit *submit, uint32_t idx,
 		struct msm_gem_object **obj, uint64_t *iova, bool *valid)
 {
+	int ret;
+
 	if (idx >= submit->nr_bos) {
 		DRM_ERROR("invalid buffer index: %u (out of %u)\n",
 				idx, submit->nr_bos);
@@ -299,6 +296,14 @@ static int submit_bo(struct msm_gem_submit *submit, uint32_t idx,
 
 	if (obj)
 		*obj = submit->bos[idx].obj;
+
+	if (!iova && !valid)
+		return 0;
+
+	ret = submit_pin_object(submit, idx);
+	if (ret)
+		return ret;
+
 	if (iova)
 		*iova = submit->bos[idx].iova;
 	if (valid)
@@ -482,10 +487,6 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 	if (ret)
 		goto out;
 
-	ret = submit_pin_objects(submit);
-	if (ret)
-		goto out;
-
 	for (i = 0; i < args->nr_cmds; i++) {
 		struct drm_msm_gem_submit_cmd submit_cmd;
 		void __user *userptr =
@@ -535,9 +536,6 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 		submit->cmd[i].size = submit_cmd.size / 4;
 		submit->cmd[i].iova = iova + submit_cmd.submit_offset;
 		submit->cmd[i].idx  = submit_cmd.submit_idx;
-
-		if (submit->valid)
-			continue;
 
 		ret = submit_reloc(submit, msm_obj, submit_cmd.submit_offset,
 				submit_cmd.nr_relocs, submit_cmd.relocs);
