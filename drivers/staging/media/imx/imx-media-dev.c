@@ -508,8 +508,15 @@ static int imx_media_link_notify(struct media_link *link, u32 flags,
 	imxmd = dev_get_drvdata(sd->v4l2_dev->dev);
 
 	imxsd = imx_media_find_subdev_by_sd(imxmd, sd);
-	if (IS_ERR(imxsd))
-		return PTR_ERR(imxsd);
+	if (IS_ERR(imxsd)) {
+		/*
+		 * don't bother if the source subdev isn't known to
+		 * imx-media. If the subdev has controls they will be
+		 * inherited starting from a known subdev.
+		 */
+		return 0;
+	}
+
 	imxpad = &imxsd->pad[pad_idx];
 
 	/*
