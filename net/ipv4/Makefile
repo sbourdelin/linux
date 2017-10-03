@@ -2,14 +2,11 @@
 # Makefile for the Linux TCP/IP (INET) layer.
 #
 
-obj-y     := route.o inetpeer.o protocol.o \
+obj-y     := tcp/ route.o inetpeer.o protocol.o \
 	     ip_input.o ip_fragment.o ip_forward.o ip_options.o \
 	     ip_output.o ip_sockglue.o inet_hashtables.o \
 	     inet_timewait_sock.o inet_connection_sock.o \
-	     tcp.o tcp_input.o tcp_output.o tcp_timer.o tcp_ipv4.o \
-	     tcp_minisocks.o tcp_cong.o tcp_metrics.o tcp_fastopen.o \
-	     tcp_rate.o tcp_recovery.o tcp_ulp.o \
-	     tcp_offload.o datagram.o raw.o udp.o udplite.o \
+	     datagram.o raw.o udp.o udplite.o tcp_offload.o tcp_ipv4.o \
 	     udp_offload.o arp.o icmp.o devinet.o af_inet.o igmp.o \
 	     fib_frontend.o fib_semantics.o fib_trie.o fib_notifier.o \
 	     inet_fragment.o ping.o ip_tunnel_core.o gre_offload.o
@@ -39,26 +36,8 @@ obj-$(CONFIG_INET_XFRM_MODE_TUNNEL) += xfrm4_mode_tunnel.o
 obj-$(CONFIG_IP_PNP) += ipconfig.o
 obj-$(CONFIG_NETFILTER)	+= netfilter.o netfilter/
 obj-$(CONFIG_INET_DIAG) += inet_diag.o 
-obj-$(CONFIG_INET_TCP_DIAG) += tcp_diag.o
 obj-$(CONFIG_INET_UDP_DIAG) += udp_diag.o
 obj-$(CONFIG_INET_RAW_DIAG) += raw_diag.o
-obj-$(CONFIG_NET_TCPPROBE) += tcp_probe.o
-obj-$(CONFIG_TCP_CONG_BBR) += tcp_bbr.o
-obj-$(CONFIG_TCP_CONG_BIC) += tcp_bic.o
-obj-$(CONFIG_TCP_CONG_CDG) += tcp_cdg.o
-obj-$(CONFIG_TCP_CONG_CUBIC) += tcp_cubic.o
-obj-$(CONFIG_TCP_CONG_DCTCP) += tcp_dctcp.o
-obj-$(CONFIG_TCP_CONG_WESTWOOD) += tcp_westwood.o
-obj-$(CONFIG_TCP_CONG_HSTCP) += tcp_highspeed.o
-obj-$(CONFIG_TCP_CONG_HYBLA) += tcp_hybla.o
-obj-$(CONFIG_TCP_CONG_HTCP) += tcp_htcp.o
-obj-$(CONFIG_TCP_CONG_VEGAS) += tcp_vegas.o
-obj-$(CONFIG_TCP_CONG_NV) += tcp_nv.o
-obj-$(CONFIG_TCP_CONG_VENO) += tcp_veno.o
-obj-$(CONFIG_TCP_CONG_SCALABLE) += tcp_scalable.o
-obj-$(CONFIG_TCP_CONG_LP) += tcp_lp.o
-obj-$(CONFIG_TCP_CONG_YEAH) += tcp_yeah.o
-obj-$(CONFIG_TCP_CONG_ILLINOIS) += tcp_illinois.o
 obj-$(CONFIG_NETLABEL) += cipso_ipv4.o
 
 obj-$(CONFIG_XFRM) += xfrm4_policy.o xfrm4_state.o xfrm4_input.o \
