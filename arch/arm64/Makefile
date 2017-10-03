@@ -56,15 +56,15 @@ KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
 ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
 KBUILD_CPPFLAGS	+= -mbig-endian
 CHECKFLAGS	+= -D__AARCH64EB__
-AS		+= -EB
-LD		+= -EB
+override AS		+= -EB
+override LD		+= -EB
 LDFLAGS		+= -maarch64linuxb
 UTS_MACHINE	:= aarch64_be
 else
 KBUILD_CPPFLAGS	+= -mlittle-endian
 CHECKFLAGS	+= -D__AARCH64EL__
-AS		+= -EL
-LD		+= -EL
+override AS		+= -EL
+override LD		+= -EL
 LDFLAGS		+= -maarch64linux
 UTS_MACHINE	:= aarch64
 endif
