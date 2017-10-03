@@ -829,9 +829,9 @@ static int msm_ioctl_submitqueue_new(struct drm_device *dev, void *data,
 static int msm_ioctl_submitqueue_close(struct drm_device *dev, void *data,
 		struct drm_file *file)
 {
-	struct drm_msm_submitqueue *args = data;
+	u32 *args = data;
 
-	return msm_submitqueue_remove(file->driver_priv, args->id);
+	return msm_submitqueue_remove(file->driver_priv, *args);
 }
 
 static const struct drm_ioctl_desc msm_ioctls[] = {

@@ -172,7 +172,6 @@ struct msm_gpu_submitqueue {
 	int faults;
 	struct list_head node;
 	struct kref ref;
-
 	struct msm_fence_context *fctx;
 };
 
