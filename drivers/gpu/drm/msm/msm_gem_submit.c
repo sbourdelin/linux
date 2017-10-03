@@ -421,7 +421,7 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 	struct msm_gpu_submitqueue *queue;
 	int out_fence_fd = -1;
 	unsigned i;
-	int ret, ring;
+	int ret;
 
 	if (!gpu)
 		return -ENXIO;
@@ -438,6 +438,9 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 	queue = msm_submitqueue_get(ctx, args->queueid);
 	if (!queue)
 		return -ENOENT;
+
+	if (queue->prio >= gpu->nr_rings)
+		return -EINVAL;
 
 	if (args->flags & MSM_SUBMIT_FENCE_FD_IN) {
 		in_fence = sync_file_get_fence(args->fence_fd);
@@ -545,8 +548,7 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 
 	submit->nr_cmds = i;
 
-	ring = clamp_t(uint32_t, queue->prio, 0, gpu->nr_rings - 1);
-	submit->ring = gpu->rb[ring];
+	submit->ring = gpu->rb[queue->prio];
 
 	submit->fence = msm_fence_alloc(queue->fctx);
 	if (IS_ERR(submit->fence)) {
