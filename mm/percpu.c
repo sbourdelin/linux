@@ -1841,13 +1841,17 @@ struct pcpu_alloc_info * __init pcpu_alloc_alloc_info(int nr_groups,
 	struct pcpu_alloc_info *ai;
 	size_t base_size, ai_size;
 	void *ptr;
-	int unit;
+	int unit, align;
 
-	base_size = ALIGN(sizeof(*ai) + nr_groups * sizeof(ai->groups[0]),
-			  __alignof__(ai->groups[0].cpu_map[0]));
+	align = __alignof__(ai->groups[0].cpu_map[0]);
+	base_size = ALIGN(sizeof(*ai) + nr_groups * sizeof(ai->groups[0]), align);
 	ai_size = base_size + nr_units * sizeof(ai->groups[0].cpu_map[0]);
+	if (ai_size >= PAGE_SIZE) {
+		ai_size = PFN_ALIGN(ai_size);
+		align = PAGE_SIZE;
+	}
 
-	ptr = memblock_virt_alloc_nopanic(PFN_ALIGN(ai_size), 0);
+	ptr = memblock_virt_alloc_nopanic(ai_size, align);
 	if (!ptr)
 		return NULL;
 	ai = ptr;
@@ -1859,7 +1863,7 @@ struct pcpu_alloc_info * __init pcpu_alloc_alloc_info(int nr_groups,
 		ai->groups[0].cpu_map[unit] = NR_CPUS;
 
 	ai->nr_groups = nr_groups;
-	ai->__ai_size = PFN_ALIGN(ai_size);
+	ai->__ai_size = ai_size;
 
 	return ai;
 }
