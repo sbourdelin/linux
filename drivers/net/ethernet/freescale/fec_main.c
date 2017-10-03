@@ -1602,10 +1602,6 @@ fec_enet_interrupt(int irq, void *dev_id)
 		ret = IRQ_HANDLED;
 		complete(&fep->mdio_done);
 	}
-
-	if (fep->ptp_clock)
-		if (fec_ptp_check_pps_event(fep))
-			ret = IRQ_HANDLED;
 	return ret;
 }
 
@@ -3325,6 +3321,7 @@ fec_probe(struct platform_device *pdev)
 	struct device_node *np = pdev->dev.of_node, *phy_node;
 	int num_tx_qs;
 	int num_rx_qs;
+	int ptp_irq, j;
 
 	fec_enet_get_queue_num(pdev, &num_tx_qs, &num_rx_qs);
 
@@ -3472,20 +3469,24 @@ fec_probe(struct platform_device *pdev)
 	if (ret)
 		goto failed_init;
 
-	for (i = 0; i < FEC_IRQ_NUM; i++) {
-		irq = platform_get_irq(pdev, i);
+	ptp_irq = platform_get_irq_byname(pdev, "ptp");
+	i = j = 0;
+	while (i < FEC_IRQ_NUM) {
+		irq = platform_get_irq(pdev, j++);
 		if (irq < 0) {
 			if (i)
 				break;
 			ret = irq;
 			goto failed_irq;
 		}
+		if (irq == ptp_irq)
+			continue;
 		ret = devm_request_irq(&pdev->dev, irq, fec_enet_interrupt,
 				       0, pdev->name, ndev);
 		if (ret)
 			goto failed_irq;
 
-		fep->irq[i] = irq;
+		fep->irq[i++] = irq;
 	}
 
 	init_completion(&fep->mdio_done);
