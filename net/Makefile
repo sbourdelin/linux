@@ -14,7 +14,11 @@ obj-$(CONFIG_NET)		+= $(tmp-y)
 obj-$(CONFIG_LLC)		+= llc/
 obj-$(CONFIG_NET)		+= ethernet/ 802/ sched/ netlink/ bpf/
 obj-$(CONFIG_NETFILTER)		+= netfilter/
-obj-$(CONFIG_INET)		+= ipv4/
+
+# IPv6 depends on CONFIG_INET anyways, so this also includes the shared code
+# for IPv6 when needed.
+obj-$(CONFIG_INET)		+= ipv4/ ipv4v6_shared/
+
 obj-$(CONFIG_TLS)		+= tls/
 obj-$(CONFIG_XFRM)		+= xfrm/
 obj-$(CONFIG_UNIX)		+= unix/
