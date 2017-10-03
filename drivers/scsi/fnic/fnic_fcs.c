@@ -265,7 +265,9 @@ void fnic_handle_event(struct work_struct *work)
 		case FNIC_EVT_START_FCF_DISC:
 			FNIC_FCS_DBG(KERN_DEBUG, fnic->lport->host,
 				  "Start FCF Discovery\n");
+			spin_unlock_irqrestore(&fnic->fnic_lock, flags);
 			fnic_fcoe_start_fcf_disc(fnic);
+			spin_lock_irqsave(&fnic->fnic_lock, flags);
 			break;
 		default:
 			FNIC_FCS_DBG(KERN_DEBUG, fnic->lport->host,
