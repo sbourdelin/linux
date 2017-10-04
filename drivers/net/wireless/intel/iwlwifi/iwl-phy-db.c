@@ -325,8 +325,8 @@ static u16 channel_id_to_txp(struct iwl_phy_db *phy_db, u16 ch_id)
 	}
 	return 0xff;
 }
-static
-int iwl_phy_db_get_section_data(struct iwl_phy_db *phy_db,
+
+static int iwl_phy_db_get_section_data(struct iwl_phy_db *phy_db,
 				u32 type, u8 **data, u16 *size, u16 ch_id)
 {
 	struct iwl_phy_db_entry *entry;
