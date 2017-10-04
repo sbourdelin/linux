@@ -108,7 +108,6 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
 
 	struct mtd_info_wrapper *wrapper;
 	struct nand_chip *this;
-	int err = 0;
 
 	reg_pio_rw_man_ctrl man_ctrl = {
 		.regf_NCE = regk_pio_yes,
@@ -135,10 +134,8 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
 
 	/* Allocate memory for MTD device structure and private data */
 	wrapper = kzalloc(sizeof(*wrapper), GFP_KERNEL);
-	if (!wrapper) {
-		err = -ENOMEM;
+	if (!wrapper)
 		return NULL;
-	}
 
 	read_cs = write_cs = (void __iomem *)REG_ADDR(pio, regi_pio,
 		rw_io_access0);
@@ -162,7 +159,6 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
 
 	/* Scan to find existence of the device */
 	if (nand_scan(crisv32_mtd, 1)) {
-		err = -ENXIO;
 		kfree(wrapper);
 		return NULL;
 	}

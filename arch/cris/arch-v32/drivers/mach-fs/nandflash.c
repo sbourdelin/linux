@@ -106,21 +106,17 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
 	reg_gio_rw_pa_oe pa_oe = REG_RD(gio, regi_gio, rw_pa_oe);
 	struct mtd_info_wrapper *wrapper;
 	struct nand_chip *this;
-	int err = 0;
 
 	/* Allocate memory for MTD device structure and private data */
 	wrapper = kzalloc(sizeof(*wrapper), GFP_KERNEL);
-	if (!wrapper) {
-		err = -ENOMEM;
+	if (!wrapper)
 		return NULL;
-	}
 
 	read_cs = ioremap(MEM_CSP0_START | MEM_NON_CACHEABLE, 8192);
 	write_cs = ioremap(MEM_CSP1_START | MEM_NON_CACHEABLE, 8192);
 
 	if (!read_cs || !write_cs) {
 		printk(KERN_ERR "CRISv32 NAND ioremap failed\n");
-		err = -EIO;
 		goto out_mtd;
 	}
 
@@ -152,10 +148,8 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
 	/* this->bbt_options = NAND_BBT_USE_FLASH; */
 
 	/* Scan to find existence of the device */
-	if (nand_scan(crisv32_mtd, 1)) {
-		err = -ENXIO;
+	if (nand_scan(crisv32_mtd, 1))
 		goto out_ior;
-	}
 
 	return crisv32_mtd;
 
