@@ -267,14 +267,12 @@ int iwl_phy_db_set_section(struct iwl_phy_db *phy_db,
 }
 IWL_EXPORT_SYMBOL(iwl_phy_db_set_section);
 
-static int is_valid_channel(u16 ch_id)
+static bool is_valid_channel(u16 ch_id)
 {
-	if (ch_id <= 14 ||
-	    (36 <= ch_id && ch_id <= 64 && ch_id % 4 == 0) ||
-	    (100 <= ch_id && ch_id <= 140 && ch_id % 4 == 0) ||
-	    (145 <= ch_id && ch_id <= 165 && ch_id % 4 == 1))
-		return 1;
-	return 0;
+	return (ch_id <= 14 ||
+	       (36 <= ch_id && ch_id <= 64 && ch_id % 4 == 0) ||
+	       (100 <= ch_id && ch_id <= 140 && ch_id % 4 == 0) ||
+	       (145 <= ch_id && ch_id <= 165 && ch_id % 4 == 1));
 }
 
 static u8 ch_id_to_ch_index(u16 ch_id)
