@@ -71,7 +71,7 @@ leds {
 };
 
 &extal_clk {
-	clock-frequency = <13333000>;
+	clock-frequency = <13330000>;
 };
 
 &usb_x1_clk {
