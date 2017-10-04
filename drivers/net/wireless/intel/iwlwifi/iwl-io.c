@@ -252,7 +252,7 @@ IWL_EXPORT_SYMBOL(iwl_force_nmi);
 
 static const char *get_rfh_string(int cmd)
 {
-#define IWL_CMD(x) case x: return #x
+#define IWL_CMD(x) { case x: return #x; }
 #define IWL_CMD_MQ(arg, reg, q) { if (arg == reg(q)) return #reg; }
 
 	int i;
