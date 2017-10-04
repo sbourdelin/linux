@@ -61,6 +61,7 @@
 #define PCA955X_LS_BLINK0	0x2	/* Blink at PWM0 rate */
 #define PCA955X_LS_BLINK1	0x3	/* Blink at PWM1 rate */
 
+#define PCA955X_GPIO_INPUT	LED_OFF
 #define PCA955X_GPIO_HIGH	LED_OFF
 #define PCA955X_GPIO_LOW	LED_FULL
 
@@ -358,8 +359,11 @@ static int pca955x_gpio_get_value(struct gpio_chip *gc, unsigned int offset)
 static int pca955x_gpio_direction_input(struct gpio_chip *gc,
 					unsigned int offset)
 {
-	/* To use as input ensure pin is not driven */
-	return pca955x_set_value(gc, offset, 0);
+	struct pca955x *pca955x = gpiochip_get_data(gc);
+	struct pca955x_led *led = &pca955x->leds[offset];
+
+	/* To use as input ensure pin is not driven. */
+	return pca955x_led_set(&led->led_cdev, PCA955X_GPIO_INPUT);
 }
 
 static int pca955x_gpio_direction_output(struct gpio_chip *gc,
