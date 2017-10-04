@@ -163,13 +163,10 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
 	/* Scan to find existence of the device */
 	if (nand_scan(crisv32_mtd, 1)) {
 		err = -ENXIO;
-		goto out_mtd;
+		kfree(wrapper);
+		return NULL;
 	}
 
 	return crisv32_mtd;
-
-out_mtd:
-	kfree(wrapper);
-	return NULL;
 }
 
