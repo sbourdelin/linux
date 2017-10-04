@@ -54,6 +54,7 @@ struct dlock_list_node {
  */
 struct dlock_list_iter {
 	int index;
+	unsigned long flags;
 	struct dlock_list_head *head, *entry;
 };
 
@@ -100,6 +101,24 @@ static inline void dlock_list_relock(struct dlock_list_iter *iter)
 	spin_lock(&iter->entry->lock);
 }
 
+/**
+ * dlock_list_unlock_irqsafe - unlock spinlock that protects the current list
+ * @iter: Pointer to the dlock list iterator structure
+ */
+static inline void dlock_list_unlock_irqsafe(struct dlock_list_iter *iter)
+{
+	spin_unlock_irqrestore(&iter->entry->lock, iter->flags);
+}
+
+/**
+ * dlock_list_relock_irqsafe - lock spinlock that protects the current list
+ * @iter: Pointer to the dlock list iterator structure
+ */
+static inline void dlock_list_relock_irqsafe(struct dlock_list_iter *iter)
+{
+	spin_lock_irqsave(&iter->entry->lock, iter->flags);
+}
+
 /*
  * Allocation and freeing of dlock list
  */
@@ -113,11 +132,14 @@ extern bool dlock_lists_empty(struct dlock_list_heads *dlist);
 
 /*
  * The dlock list addition and deletion functions here are not irq-safe.
- * Special irq-safe variants will have to be added if we need them.
  */
 extern void dlock_lists_add(struct dlock_list_node *node,
 			    struct dlock_list_heads *dlist);
 extern void dlock_lists_del(struct dlock_list_node *node);
+
+extern void dlock_lists_add_irqsafe(struct dlock_list_node *node,
+				    struct dlock_list_heads *dlist);
+extern void dlock_lists_del_irqsafe(struct dlock_list_node *node);
 
 /*
  * Instead of individual list mapping by CPU number, it can be based on
@@ -127,24 +149,28 @@ extern struct dlock_list_head *dlock_list_hash(struct dlock_list_heads *dlist,
 					       void *context);
 extern void dlock_list_add(struct dlock_list_node *node,
 			   struct dlock_list_head *head);
+extern void dlock_list_add_irqsafe(struct dlock_list_node *node,
+				   struct dlock_list_head *head);
 
 /*
  * Find the first entry of the next available list.
  */
 extern struct dlock_list_node *
-__dlock_list_next_list(struct dlock_list_iter *iter);
+__dlock_list_next_list(struct dlock_list_iter *iter, bool irqsafe);
 
 /**
  * __dlock_list_next_entry - Iterate to the next entry of the dlock list
- * @curr : Pointer to the current dlock_list_node structure
- * @iter : Pointer to the dlock list iterator structure
+ * @curr   : Pointer to the current dlock_list_node structure
+ * @iter   : Pointer to the dlock list iterator structure
+ * @irqsafe: IRQ safe flag
  * Return: Pointer to the next entry or NULL if all the entries are iterated
  *
  * The iterator has to be properly initialized before calling this function.
  */
 static inline struct dlock_list_node *
 __dlock_list_next_entry(struct dlock_list_node *curr,
-			struct dlock_list_iter *iter)
+			struct dlock_list_iter *iter,
+			bool irqsafe)
 {
 	/*
 	 * Find next entry
@@ -157,7 +183,7 @@ __dlock_list_next_entry(struct dlock_list_node *curr,
 		 * The current list has been exhausted, try the next available
 		 * list.
 		 */
-		curr = __dlock_list_next_list(iter);
+		curr = __dlock_list_next_list(iter, irqsafe);
 	}
 
 	return curr;	/* Continue the iteration */
@@ -165,31 +191,33 @@ __dlock_list_next_entry(struct dlock_list_node *curr,
 
 /**
  * dlock_list_first_entry - get the first element from a list
- * @iter  : The dlock list iterator.
- * @type  : The type of the struct this is embedded in.
- * @member: The name of the dlock_list_node within the struct.
+ * @iter   : The dlock list iterator.
+ * @type   : The type of the struct this is embedded in.
+ * @member : The name of the dlock_list_node within the struct.
+ * @irqsafe: IRQ safe flag
  * Return : Pointer to the next entry or NULL if all the entries are iterated.
  */
-#define dlock_list_first_entry(iter, type, member)			\
+#define dlock_list_first_entry(iter, type, member, irqsafe)		\
 	({								\
 		struct dlock_list_node *_n;				\
-		_n = __dlock_list_next_entry(NULL, iter);		\
+		_n = __dlock_list_next_entry(NULL, iter, irqsafe);	\
 		_n ? list_entry(_n, type, member) : NULL;		\
 	})
 
 /**
  * dlock_list_next_entry - iterate to the next entry of the list
- * @pos   : The type * to cursor
- * @iter  : The dlock list iterator.
- * @member: The name of the dlock_list_node within the struct.
+ * @pos    : The type * to cursor
+ * @iter   : The dlock list iterator.
+ * @member : The name of the dlock_list_node within the struct.
+ * @irqsafe: IRQ safe flag
  * Return : Pointer to the next entry or NULL if all the entries are iterated.
  *
  * Note that pos can't be NULL.
  */
-#define dlock_list_next_entry(pos, iter, member)			\
+#define dlock_list_next_entry(pos, iter, member, irqsafe)		\
 	({								\
 		struct dlock_list_node *_n;				\
-		_n = __dlock_list_next_entry(&(pos)->member, iter);	\
+		_n = __dlock_list_next_entry(&(pos)->member, iter, irqsafe);\
 		_n ? list_entry(_n, typeof(*(pos)), member) : NULL;	\
 	})
 
@@ -204,9 +232,9 @@ __dlock_list_next_entry(struct dlock_list_node *curr,
  * This iteration function is designed to be used in a while loop.
  */
 #define dlist_for_each_entry(pos, iter, member)				\
-	for (pos = dlock_list_first_entry(iter, typeof(*(pos)), member);\
+	for (pos = dlock_list_first_entry(iter, typeof(*(pos)), member, 0);\
 	     pos != NULL;						\
-	     pos = dlock_list_next_entry(pos, iter, member))
+	     pos = dlock_list_next_entry(pos, iter, member, 0))
 
 /**
  * dlist_for_each_entry_safe - iterate over the dlock list & safe over removal
@@ -220,11 +248,48 @@ __dlock_list_next_entry(struct dlock_list_node *curr,
  * current one.
  */
 #define dlist_for_each_entry_safe(pos, n, iter, member)			\
-	for (pos = dlock_list_first_entry(iter, typeof(*(pos)), member);\
+	for (pos = dlock_list_first_entry(iter, typeof(*(pos)), member, 0);\
 	    ({								\
 		bool _b = (pos != NULL);				\
 		if (_b)							\
-			n = dlock_list_next_entry(pos, iter, member);	\
+			n = dlock_list_next_entry(pos, iter, member, 0);\
+		_b;							\
+	    });								\
+	    pos = n)
+
+/**
+ * dlist_for_each_entry_irqsafe - iterate over an irqsafe dlock list
+ * @pos   : Type * to use as a loop cursor
+ * @iter  : The dlock list iterator
+ * @member: The name of the dlock_list_node within the struct
+ *
+ * This iteration macro isn't safe with respect to list entry removal, but
+ * it can correctly iterate newly added entries right after the current one.
+ * This iteration function is designed to be used in a while loop.
+ */
+#define dlist_for_each_entry_irqsafe(pos, iter, member)			\
+	for (pos = dlock_list_first_entry(iter, typeof(*(pos)), member, 1);\
+	     pos != NULL;						\
+	     pos = dlock_list_next_entry(pos, iter, member, 1))
+
+/**
+ * dlist_for_each_entry_safe_irqsafe - iterate over an irqsafe dlock list &
+ *			       safe over removal
+ * @pos   : Type * to use as a loop cursor
+ * @n	  : Another type * to use as temporary storage
+ * @iter  : The dlock list iterator
+ * @member: The name of the dlock_list_node within the struct
+ *
+ * This iteration macro is safe with respect to list entry removal.
+ * However, it cannot correctly iterate newly added entries right after the
+ * current one.
+ */
+#define dlist_for_each_entry_safe_irqsafe(pos, n, iter, member)		\
+	for (pos = dlock_list_first_entry(iter, typeof(*(pos)), member, 1);\
+	    ({								\
+		bool _b = (pos != NULL);				\
+		if (_b)							\
+			n = dlock_list_next_entry(pos, iter, member, 1);\
 		_b;							\
 	    });								\
 	    pos = n)

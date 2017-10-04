@@ -197,6 +197,22 @@ void dlock_list_add(struct dlock_list_node *node,
 }
 
 /**
+ * dlock_list_add_irqsafe - Add node to a particular head of irqsafe dlock list
+ * @node: The node to be added
+ * @head: The dlock list head where the node is to be added
+ */
+void dlock_list_add_irqsafe(struct dlock_list_node *node,
+			    struct dlock_list_head *head)
+{
+	unsigned long flags;
+
+	spin_lock_irqsave(&head->lock, flags);
+	node->head = head;
+	list_add(&node->list, &head->list);
+	spin_unlock_irqrestore(&head->lock, flags);
+}
+
+/**
  * dlock_lists_add - Adds a node to the given dlock list
  * @node : The node to be added
  * @dlist: The dlock list where the node is to be added
@@ -213,8 +229,24 @@ void dlock_lists_add(struct dlock_list_node *node,
 }
 
 /**
- * dlock_lists_del - Delete a node from a dlock list
- * @node : The node to be deleted
+ * dlock_lists_add_irqsafe - Adds a node to the given irqsafe dlock list
+ * @node : The node to be added
+ * @dlist: The dlock list where the node is to be added
+ *
+ * List selection is based on the CPU being used when the
+ * dlock_list_add_irqsafe() function is called. However, deletion may be
+ * done by a different CPU.
+ */
+void dlock_lists_add_irqsafe(struct dlock_list_node *node,
+			     struct dlock_list_heads *dlist)
+{
+	struct dlock_list_head *head = &dlist->heads[this_cpu_read(cpu2idx)];
+
+	dlock_list_add_irqsafe(node, head);
+}
+
+/*
+ * Delete a node from a dlock list
  *
  * We need to check the lock pointer again after taking the lock to guard
  * against concurrent deletion of the same node. If the lock pointer changes
@@ -222,9 +254,11 @@ void dlock_lists_add(struct dlock_list_node *node,
  * elsewhere. A warning will be printed if this happens as it is likely to be
  * a bug.
  */
-void dlock_lists_del(struct dlock_list_node *node)
+static __always_inline void __dlock_lists_del(struct dlock_list_node *node,
+					      bool irqsafe)
 {
 	struct dlock_list_head *head;
+	unsigned long flags;
 	bool retry;
 
 	do {
@@ -233,7 +267,11 @@ void dlock_lists_del(struct dlock_list_node *node)
 			      __func__, (unsigned long)node))
 			return;
 
-		spin_lock(&head->lock);
+		if (irqsafe)
+			spin_lock_irqsave(&head->lock, flags);
+		else
+			spin_lock(&head->lock);
+
 		if (likely(head == node->head)) {
 			list_del_init(&node->list);
 			node->head = NULL;
@@ -246,26 +284,53 @@ void dlock_lists_del(struct dlock_list_node *node)
 			 */
 			retry = (node->head != NULL);
 		}
-		spin_unlock(&head->lock);
+
+		if (irqsafe)
+			spin_unlock_irqrestore(&head->lock, flags);
+		else
+			spin_unlock(&head->lock);
 	} while (retry);
 }
 
 /**
+ * dlock_lists_del - Delete a node from a dlock list
+ * @node : The node to be deleted
+ */
+void dlock_lists_del(struct dlock_list_node *node)
+{
+	__dlock_lists_del(node, false);
+}
+
+/**
+ * dlock_lists_del_irqsafe - Delete a node from a irqsafe dlock list
+ * @node : The node to be deleted
+ */
+void dlock_lists_del_irqsafe(struct dlock_list_node *node)
+{
+	__dlock_lists_del(node, true);
+}
+
+/**
  * __dlock_list_next_list: Find the first entry of the next available list
- * @dlist: Pointer to the dlock_list_heads structure
- * @iter : Pointer to the dlock list iterator structure
+ * @dlist  : Pointer to the dlock_list_heads structure
+ * @iter   : Pointer to the dlock list iterator structure
+ * @irqsafe: IRQ safe flag
  * Return: true if the entry is found, false if all the lists exhausted
  *
  * The information about the next available list will be put into the iterator.
  */
-struct dlock_list_node *__dlock_list_next_list(struct dlock_list_iter *iter)
+struct dlock_list_node *__dlock_list_next_list(struct dlock_list_iter *iter,
+					       bool irqsafe)
 {
 	struct dlock_list_node *next;
 	struct dlock_list_head *head;
 
 restart:
 	if (iter->entry) {
-		spin_unlock(&iter->entry->lock);
+		if (irqsafe)
+			dlock_list_unlock_irqsafe(iter);
+		else
+			dlock_list_unlock(iter);
 		iter->entry = NULL;
 	}
 
@@ -280,7 +345,11 @@ next_list:
 		goto next_list;
 
 	head = iter->entry = &iter->head[iter->index];
-	spin_lock(&head->lock);
+	if (irqsafe)
+		dlock_list_relock_irqsafe(iter);
+	else
+		dlock_list_relock(iter);
+
 	/*
 	 * There is a slight chance that the list may become empty just
 	 * before the lock is acquired. So an additional check is
