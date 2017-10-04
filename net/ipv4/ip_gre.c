@@ -1551,6 +1551,51 @@ static struct pernet_operations ipgre_tap_net_ops = {
 	.size = sizeof(struct ip_tunnel_net),
 };
 
+struct net_device *erspan_fb_dev_create(struct net *net, const char *name,
+					u8 name_assign_type)
+{
+	struct nlattr *tb[IFLA_MAX + 1];
+	struct net_device *dev;
+	LIST_HEAD(list_kill);
+	struct ip_tunnel *t;
+	int err;
+
+	memset(&tb, 0, sizeof(tb));
+
+	dev = rtnl_create_link(net, name, name_assign_type,
+			       &erspan_link_ops, tb);
+	if (IS_ERR(dev))
+		return dev;
+
+	/* Configure flow based ERSPAN device. */
+	t = netdev_priv(dev);
+	t->collect_md = true;
+
+	err = ipgre_newlink(net, dev, tb, NULL, NULL);
+	if (err < 0) {
+		free_netdev(dev);
+		return ERR_PTR(err);
+	}
+
+	/* openvswitch users expect packet sizes to be unrestricted,
+	 * so set the largest MTU we can.
+	 */
+	err = __ip_tunnel_change_mtu(dev, IP_MAX_MTU, false);
+	if (err)
+		goto out;
+
+	err = rtnl_configure_link(dev, NULL);
+	if (err < 0)
+		goto out;
+
+	return dev;
+out:
+	ip_tunnel_dellink(dev, &list_kill);
+	unregister_netdevice_many(&list_kill);
+	return ERR_PTR(err);
+}
+EXPORT_SYMBOL_GPL(erspan_fb_dev_create);
+
 static int __net_init erspan_init_net(struct net *net)
 {
 	return ip_tunnel_init_net(net, erspan_net_id,
