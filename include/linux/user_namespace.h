@@ -10,15 +10,29 @@
 #include <linux/sysctl.h>
 #include <linux/err.h>
 
+#define UID_GID_MAP_PTR_SIZE 8
 #define UID_GID_MAP_MAX_EXTENTS 5
+#define UID_GID_MAP_BASE 3
+#define UID_GID_MAP_DIRECT UID_GID_MAP_MAX_EXTENTS
+#define UID_GID_MAP_IDIRECT (UID_GID_MAP_MAX_EXTENTS * UID_GID_MAP_PTR_SIZE)
+#define UID_GID_MAP_DIDIRECT (UID_GID_MAP_IDIRECT * UID_GID_MAP_PTR_SIZE)
+#define UID_GID_MAP_MAX                                                        \
+	(UID_GID_MAP_BASE + UID_GID_MAP_DIRECT + UID_GID_MAP_IDIRECT +         \
+	 UID_GID_MAP_DIDIRECT)
 
 struct uid_gid_map {	/* 64 bytes -- 1 cache line */
-	u32 nr_extents;
+	/* Pointer to an extent of size UID_GID_MAP_MAX_EXTENTS */
+	struct uid_gid_extent *direct;
+	/* Pointer to a 64 byte array of 8 direct pointers. */
+	struct uid_gid_extent **idirect;
+	/* Pointer to a 64 byte array of 8 idirect pointers. */
+	struct uid_gid_extent ***didirect;
 	struct uid_gid_extent {
 		u32 first;
 		u32 lower_first;
 		u32 count;
-	} extent[UID_GID_MAP_MAX_EXTENTS];
+	} extent[3];
+	u32 nr_extents;
 };
 
 #define USERNS_SETGROUPS_ALLOWED 1UL

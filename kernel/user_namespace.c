@@ -24,6 +24,11 @@
 #include <linux/projid.h>
 #include <linux/fs_struct.h>
 
+#define UID_GID_MAP_BASE_MAX UID_GID_MAP_BASE
+#define UID_GID_MAP_DIRECT_MAX (UID_GID_MAP_BASE_MAX + UID_GID_MAP_MAX_EXTENTS)
+#define UID_GID_MAP_IDIRECT_MAX (UID_GID_MAP_IDIRECT + UID_GID_MAP_DIRECT_MAX)
+#define UID_GID_MAP_DIDIRECT_MAX (UID_GID_MAP_DIDIRECT + UID_GID_MAP_IDIRECT_MAX)
+
 static struct kmem_cache *user_ns_cachep __read_mostly;
 static DEFINE_MUTEX(userns_state_mutex);
 
@@ -173,6 +178,78 @@ int unshare_userns(unsigned long unshare_flags, struct cred **new_cred)
 	return err;
 }
 
+/* Get indeces for an extent. */
+static inline u32 get_eidx(u32 idx)
+{
+	/*
+	 * Subtract 3 to adjust for missing 2 extents in the main {g,u}idmap
+	 * struct.
+	 */
+	return ((idx - UID_GID_MAP_MAX_EXTENTS - 3) % UID_GID_MAP_MAX_EXTENTS);
+}
+
+/* Get indeces for the direct pointer. */
+static inline u32 get_didx(u32 idx)
+{
+	return idx - UID_GID_MAP_BASE_MAX;
+}
+
+/* Get indeces for the indirect pointer. */
+static inline u32 get_iidx(u32 idx)
+{
+	if (idx < UID_GID_MAP_IDIRECT_MAX)
+		return (idx - UID_GID_MAP_DIRECT_MAX) / UID_GID_MAP_MAX_EXTENTS;
+
+	return ((idx - UID_GID_MAP_IDIRECT_MAX) / UID_GID_MAP_MAX_EXTENTS) %
+	       UID_GID_MAP_PTR_SIZE;
+}
+
+/* Get indeces for the double indirect pointer. */
+static inline u32 get_diidx(u32 idx)
+{
+	return (idx - UID_GID_MAP_IDIRECT_MAX) /
+	       (UID_GID_MAP_PTR_SIZE * UID_GID_MAP_MAX_EXTENTS);
+}
+
+static void free_extents(struct uid_gid_map *maps)
+{
+	u32 diidx, i, idx, iidx;
+
+	if (!maps->direct)
+		return;
+	kfree(maps->direct);
+	maps->direct = NULL;
+
+	if (!maps->idirect)
+		return;
+
+	if (maps->nr_extents >= UID_GID_MAP_IDIRECT_MAX)
+		iidx = get_iidx(UID_GID_MAP_IDIRECT_MAX - 1);
+	else
+		iidx = get_iidx(maps->nr_extents - 1);
+	for (idx = 0; idx <= iidx; idx++)
+		kfree(maps->idirect[idx]);
+	kfree(maps->idirect);
+	maps->idirect = NULL;
+
+	if (!maps->didirect)
+		return;
+
+	diidx = get_diidx(maps->nr_extents - 1);
+	iidx = (64 / UID_GID_MAP_PTR_SIZE) - 1;
+	for (idx = 0; idx <= diidx; idx++) {
+		if (idx == diidx)
+			iidx = get_iidx(maps->nr_extents - 1);
+
+		for (i = 0; i <= iidx; i++)
+			kfree(maps->didirect[idx][i]);
+
+		kfree(maps->didirect[idx]);
+	}
+	kfree(maps->didirect);
+	maps->didirect = NULL;
+}
+
 static void free_user_ns(struct work_struct *work)
 {
 	struct user_namespace *parent, *ns =
@@ -185,6 +262,12 @@ static void free_user_ns(struct work_struct *work)
 #ifdef CONFIG_PERSISTENT_KEYRINGS
 		key_put(ns->persistent_keyring_register);
 #endif
+		mutex_lock(&userns_state_mutex);
+		free_extents(&ns->uid_map);
+		free_extents(&ns->gid_map);
+		free_extents(&ns->projid_map);
+		mutex_unlock(&userns_state_mutex);
+
 		ns_free_inum(&ns->ns);
 		kmem_cache_free(user_ns_cachep, ns);
 		dec_user_namespaces(ucounts);
@@ -198,8 +281,36 @@ void __put_user_ns(struct user_namespace *ns)
 }
 EXPORT_SYMBOL(__put_user_ns);
 
+static struct uid_gid_extent *get_idmap(struct uid_gid_map *maps, u32 idx)
+{
+		if (idx < UID_GID_MAP_BASE_MAX)
+			return &maps->extent[idx];
+
+		if ((idx >= UID_GID_MAP_BASE_MAX) &&
+		    (idx < UID_GID_MAP_DIRECT_MAX))
+			return &maps->direct[get_didx(idx)];
+
+		if ((idx >= UID_GID_MAP_DIRECT_MAX) &&
+		    (idx < UID_GID_MAP_IDIRECT_MAX)) {
+			u32 iidx = get_iidx(idx);
+			u32 eidx = get_eidx(idx);
+			return &maps->idirect[iidx][eidx];
+		}
+
+		if ((idx >= UID_GID_MAP_IDIRECT_MAX) &&
+		    (idx < UID_GID_MAP_DIDIRECT_MAX)) {
+			u32 diidx = get_diidx(idx);
+			u32 iidx = get_iidx(idx);
+			u32 eidx = get_eidx(idx);
+			return &maps->didirect[diidx][iidx][eidx];
+		}
+
+		return NULL;
+}
+
 static u32 map_id_range_down(struct uid_gid_map *map, u32 id, u32 count)
 {
+	struct uid_gid_extent *extent;
 	unsigned idx, extents;
 	u32 first, last, id2;
 
@@ -209,15 +320,16 @@ static u32 map_id_range_down(struct uid_gid_map *map, u32 id, u32 count)
 	extents = map->nr_extents;
 	smp_rmb();
 	for (idx = 0; idx < extents; idx++) {
-		first = map->extent[idx].first;
-		last = first + map->extent[idx].count - 1;
+		extent = get_idmap(map, idx);
+		first = extent->first;
+		last = first + extent->count - 1;
 		if (id >= first && id <= last &&
 		    (id2 >= first && id2 <= last))
 			break;
 	}
 	/* Map the id or note failure */
 	if (idx < extents)
-		id = (id - first) + map->extent[idx].lower_first;
+		id = (id - first) + extent->lower_first;
 	else
 		id = (u32) -1;
 
@@ -226,6 +338,7 @@ static u32 map_id_range_down(struct uid_gid_map *map, u32 id, u32 count)
 
 static u32 map_id_down(struct uid_gid_map *map, u32 id)
 {
+	struct uid_gid_extent *extent;
 	unsigned idx, extents;
 	u32 first, last;
 
@@ -233,14 +346,15 @@ static u32 map_id_down(struct uid_gid_map *map, u32 id)
 	extents = map->nr_extents;
 	smp_rmb();
 	for (idx = 0; idx < extents; idx++) {
-		first = map->extent[idx].first;
-		last = first + map->extent[idx].count - 1;
+		extent = get_idmap(map, idx);
+		first = extent->first;
+		last = first + extent->count - 1;
 		if (id >= first && id <= last)
 			break;
 	}
 	/* Map the id or note failure */
 	if (idx < extents)
-		id = (id - first) + map->extent[idx].lower_first;
+		id = (id - first) + extent->lower_first;
 	else
 		id = (u32) -1;
 
@@ -249,6 +363,7 @@ static u32 map_id_down(struct uid_gid_map *map, u32 id)
 
 static u32 map_id_up(struct uid_gid_map *map, u32 id)
 {
+	struct uid_gid_extent *extent;
 	unsigned idx, extents;
 	u32 first, last;
 
@@ -256,14 +371,15 @@ static u32 map_id_up(struct uid_gid_map *map, u32 id)
 	extents = map->nr_extents;
 	smp_rmb();
 	for (idx = 0; idx < extents; idx++) {
-		first = map->extent[idx].lower_first;
-		last = first + map->extent[idx].count - 1;
+		extent = get_idmap(map, idx);
+		first = extent->lower_first;
+		last = first + extent->count - 1;
 		if (id >= first && id <= last)
 			break;
 	}
 	/* Map the id or note failure */
 	if (idx < extents)
-		id = (id - first) + map->extent[idx].first;
+		id = (id - first) + extent->first;
 	else
 		id = (u32) -1;
 
@@ -544,7 +660,7 @@ static void *m_start(struct seq_file *seq, loff_t *ppos,
 	loff_t pos = *ppos;
 
 	if (pos < map->nr_extents)
-		extent = &map->extent[pos];
+		extent = get_idmap(map, pos);
 
 	return extent;
 }
@@ -618,7 +734,7 @@ static bool mappings_overlap(struct uid_gid_map *new_map,
 		u32 prev_upper_last, prev_lower_last;
 		struct uid_gid_extent *prev;
 
-		prev = &new_map->extent[idx];
+		prev = get_idmap(new_map, idx);
 
 		prev_upper_first = prev->first;
 		prev_lower_first = prev->lower_first;
@@ -636,6 +752,110 @@ static bool mappings_overlap(struct uid_gid_map *new_map,
 			return true;
 	}
 	return false;
+}
+
+static struct uid_gid_extent *alloc_extent(struct uid_gid_map *maps)
+{
+	void *tmp;
+	u32 next = maps->nr_extents;
+	u32 eidx, iidx, ldiidx, diidx, liidx;
+
+	if (next < UID_GID_MAP_BASE_MAX)
+		return &maps->extent[next];
+
+	if ((next >= UID_GID_MAP_BASE_MAX) && (next < UID_GID_MAP_DIRECT_MAX)) {
+		if (!maps->direct)
+			maps->direct = kzalloc(sizeof(struct uid_gid_extent) *
+						  UID_GID_MAP_MAX_EXTENTS,
+					      GFP_KERNEL);
+		if (!maps->direct)
+			return ERR_PTR(-ENOMEM);
+
+		return &maps->direct[next - UID_GID_MAP_BASE_MAX];
+	}
+
+	if ((next >= UID_GID_MAP_DIRECT_MAX) &&
+	    (next < UID_GID_MAP_IDIRECT_MAX)) {
+		liidx = 0;
+		iidx = get_iidx(next);
+		eidx = get_eidx(next);
+
+		if (iidx > 0)
+			liidx = get_iidx(next - 1);
+
+		if (!maps->idirect || iidx > liidx) {
+			tmp = krealloc(maps->idirect,
+				       sizeof(struct uid_gid_extent *) * (iidx + 1),
+				       GFP_KERNEL);
+			if (!tmp)
+				return ERR_PTR(-ENOMEM);
+
+			maps->idirect = tmp;
+			maps->idirect[iidx] = NULL;
+		}
+
+		tmp = krealloc(maps->idirect[iidx],
+			       sizeof(struct uid_gid_extent) * (eidx + 1),
+			       GFP_KERNEL);
+		if (!tmp)
+			return ERR_PTR(-ENOMEM);
+
+		maps->idirect[iidx] = tmp;
+		memset(&maps->idirect[iidx][eidx], 0,
+		       sizeof(struct uid_gid_extent));
+
+		return &maps->idirect[iidx][eidx];
+	}
+
+	if (next >= UID_GID_MAP_IDIRECT_MAX &&
+	    next < UID_GID_MAP_DIDIRECT_MAX) {
+		ldiidx = 0;
+		diidx = get_diidx(next);
+		liidx = 0;
+		iidx = get_iidx(next);
+		eidx = get_eidx(next);
+
+		if (diidx > 0)
+			ldiidx = get_diidx(next - 1);
+
+		if (iidx > 0)
+			liidx = get_iidx(next - 1);
+
+		if (!maps->didirect || diidx > ldiidx) {
+			tmp = krealloc(maps->didirect, sizeof(struct uid_gid_extent **) *
+					   (diidx + 1),
+				       GFP_KERNEL);
+			if (!tmp)
+				return ERR_PTR(-ENOMEM);
+			maps->didirect = tmp;
+			maps->didirect[diidx] = NULL;
+		}
+
+		if (!maps->didirect[diidx] || iidx > liidx) {
+			tmp = krealloc(maps->didirect[diidx],
+				       sizeof(struct uid_gid_extent *) * (iidx + 1),
+				       GFP_KERNEL);
+			if (!tmp)
+				return ERR_PTR(-ENOMEM);
+
+			maps->didirect[diidx] = tmp;
+			maps->didirect[diidx][iidx] = NULL;
+		}
+
+		tmp = krealloc(maps->didirect[diidx][iidx],
+			       sizeof(struct uid_gid_extent) * (eidx + 1),
+			       GFP_KERNEL);
+		if (!tmp)
+			return ERR_PTR(-ENOMEM);
+
+		maps->didirect[diidx][iidx] = tmp;
+		memset(&maps->didirect[diidx][iidx][eidx], 0,
+		       sizeof(struct uid_gid_extent));
+
+		return &maps->didirect[diidx][iidx][eidx];
+	}
+
+	return ERR_PTR(-ENOMEM);
 }
 
 static ssize_t map_write(struct file *file, const char __user *buf,
@@ -672,6 +892,7 @@ static ssize_t map_write(struct file *file, const char __user *buf,
 	 * architectures returning stale data.
 	 */
 	mutex_lock(&userns_state_mutex);
+	memset(&new_map, 0, sizeof(new_map));
 
 	ret = -EPERM;
 	/* Only allow one successful write to the map */
@@ -702,7 +923,11 @@ static ssize_t map_write(struct file *file, const char __user *buf,
 	pos = kbuf;
 	new_map.nr_extents = 0;
 	for (; pos; pos = next_line) {
-		extent = &new_map.extent[new_map.nr_extents];
+		extent = alloc_extent(&new_map);
+		if (IS_ERR(extent)) {
+			ret = PTR_ERR(extent);
+			goto out;
+		}
 
 		/* Find the end of line and ensure I don't look past it */
 		next_line = strchr(pos, '\n');
@@ -754,11 +979,11 @@ static ssize_t map_write(struct file *file, const char __user *buf,
 		new_map.nr_extents++;
 
 		/* Fail if the file contains too many extents */
-		if ((new_map.nr_extents == UID_GID_MAP_MAX_EXTENTS) &&
+		if ((new_map.nr_extents == UID_GID_MAP_MAX) &&
 		    (next_line != NULL))
 			goto out;
 	}
-	/* Be very certaint the new map actually exists */
+	/* Be very certain the new map actually exists */
 	if (new_map.nr_extents == 0)
 		goto out;
 
@@ -772,7 +997,7 @@ static ssize_t map_write(struct file *file, const char __user *buf,
 	 */
 	for (idx = 0; idx < new_map.nr_extents; idx++) {
 		u32 lower_first;
-		extent = &new_map.extent[idx];
+		extent = get_idmap(&new_map, idx);
 
 		lower_first = map_id_range_down(parent_map,
 						extent->lower_first,
@@ -788,15 +1013,20 @@ static ssize_t map_write(struct file *file, const char __user *buf,
 	}
 
 	/* Install the map */
-	memcpy(map->extent, new_map.extent,
-		new_map.nr_extents*sizeof(new_map.extent[0]));
+	memcpy(map->extent, new_map.extent, sizeof(new_map.extent));
+	map->direct = new_map.direct;
+	map->idirect = new_map.idirect;
+	map->didirect = new_map.didirect;
 	smp_wmb();
 	map->nr_extents = new_map.nr_extents;
 
 	*ppos = count;
 	ret = count;
 out:
+	if (ret < 0)
+		free_extents(&new_map);
 	mutex_unlock(&userns_state_mutex);
+
 	kfree(kbuf);
 	return ret;
 }
