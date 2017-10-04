@@ -187,14 +187,18 @@ static inline struct metapage *alloc_metapage(gfp_t gfp_mask)
 {
 	struct metapage *mp = mempool_alloc(metapage_mempool, gfp_mask);
 
-	if (mp) {
-		mp->lid = 0;
-		mp->lsn = 0;
-		mp->data = NULL;
-		mp->clsn = 0;
-		mp->log = NULL;
-		init_waitqueue_head(&mp->wait);
+	if (!mp) {
+		jfs_err("mempool_alloc failed!\n");
+		return NULL;
 	}
+
+	mp->lid = 0;
+	mp->lsn = 0;
+	mp->data = NULL;
+	mp->clsn = 0;
+	mp->log = NULL;
+	init_waitqueue_head(&mp->wait);
+
 	return mp;
 }
 
@@ -663,6 +667,8 @@ struct metapage *__get_metapage(struct inode *inode, unsigned long lblock,
 	} else {
 		INCREMENT(mpStat.pagealloc);
 		mp = alloc_metapage(GFP_NOFS);
+		if (!mp)
+			goto unlock;
 		mp->page = page;
 		mp->sb = inode->i_sb;
 		mp->flag = 0;
