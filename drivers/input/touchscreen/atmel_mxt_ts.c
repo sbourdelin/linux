@@ -1945,8 +1945,7 @@ static int mxt_initialize_input_device(struct mxt_data *data)
 		input_set_abs_params(input_dev, ABS_PRESSURE, 0, 255, 0, 0);
 	}
 
-	/* If device has buttons we assume it is a touchpad */
-	if (pdata->t19_num_keys) {
+	if (pdata->touchpad) {
 		mxt_set_up_as_touchpad(input_dev, data);
 		mt_flags |= INPUT_MT_POINTER;
 	} else {
@@ -2936,6 +2935,9 @@ static const struct mxt_platform_data *mxt_parse_dt(struct i2c_client *client)
 	if (!pdata)
 		return ERR_PTR(-ENOMEM);
 
+	if (of_device_is_compatible(np, "atmel,atmel_mxt_tp"))
+		pdata->touchpad = true;
+
 	if (of_find_property(np, "linux,gpio-keymap", &proplen)) {
 		pdata->t19_num_keys = proplen / sizeof(u32);
 
@@ -2986,6 +2988,7 @@ static struct mxt_acpi_platform_data samus_platform_data[] = {
 		.pdata	= {
 			.t19_num_keys	= ARRAY_SIZE(samus_touchpad_buttons),
 			.t19_keymap	= samus_touchpad_buttons,
+			.touchpad	= true,
 		},
 	},
 	{
@@ -3011,6 +3014,7 @@ static struct mxt_acpi_platform_data chromebook_platform_data[] = {
 		.pdata	= {
 			.t19_num_keys	= ARRAY_SIZE(chromebook_tp_buttons),
 			.t19_keymap	= chromebook_tp_buttons,
+			.touchpad	= true,
 		},
 	},
 	{
