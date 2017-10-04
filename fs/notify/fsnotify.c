@@ -51,9 +51,9 @@ void __fsnotify_vfsmount_delete(struct vfsmount *mnt)
 void fsnotify_unmount_inodes(struct super_block *sb)
 {
 	struct inode *inode, *iput_inode = NULL;
+	DEFINE_DLOCK_LIST_ITER(iter, &sb->s_inodes);
 
-	spin_lock(&sb->s_inode_list_lock);
-	list_for_each_entry(inode, &sb->s_inodes, i_sb_list) {
+	dlist_for_each_entry(inode, &iter, i_sb_list) {
 		/*
 		 * We cannot __iget() an inode in state I_FREEING,
 		 * I_WILL_FREE, or I_NEW which is fine because by that point
@@ -78,7 +78,7 @@ void fsnotify_unmount_inodes(struct super_block *sb)
 
 		__iget(inode);
 		spin_unlock(&inode->i_lock);
-		spin_unlock(&sb->s_inode_list_lock);
+		dlock_list_unlock(&iter);
 
 		if (iput_inode)
 			iput(iput_inode);
@@ -90,9 +90,8 @@ void fsnotify_unmount_inodes(struct super_block *sb)
 
 		iput_inode = inode;
 
-		spin_lock(&sb->s_inode_list_lock);
+		dlock_list_relock(&iter);
 	}
-	spin_unlock(&sb->s_inode_list_lock);
 
 	if (iput_inode)
 		iput(iput_inode);
