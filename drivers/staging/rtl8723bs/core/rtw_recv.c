@@ -1230,7 +1230,8 @@ sint validate_recv_ctrl_frame(struct adapter *padapter, union recv_frame *precv_
 
 union recv_frame *recvframe_chk_defrag(struct adapter *padapter, union recv_frame *precv_frame);
 
-static sint validate_recv_mgnt_frame(struct adapter *padapter, union recv_frame *precv_frame)
+static int validate_recv_mgnt_frame(struct adapter *padapter,
+				    union recv_frame *precv_frame)
 {
 	/* struct mlme_priv *pmlmepriv = &adapter->mlmepriv; */
 
