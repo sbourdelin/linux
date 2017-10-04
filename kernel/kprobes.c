@@ -976,18 +976,27 @@ static int prepare_kprobe(struct kprobe *p)
 }
 
 /* Caller must lock kprobe_mutex */
-static void arm_kprobe_ftrace(struct kprobe *p)
+static int arm_kprobe_ftrace(struct kprobe *p)
 {
-	int ret;
+	int ret = 0;
 
 	ret = ftrace_set_filter_ip(&kprobe_ftrace_ops,
 				   (unsigned long)p->addr, 0, 0);
-	WARN(ret < 0, "Failed to arm kprobe-ftrace at %p (%d)\n", p->addr, ret);
-	kprobe_ftrace_enabled++;
-	if (kprobe_ftrace_enabled == 1) {
+	if (WARN(ret < 0, "Failed to arm kprobe-ftrace at %p (%d)\n", p->addr, ret))
+		return ret;
+
+	if (kprobe_ftrace_enabled == 0) {
 		ret = register_ftrace_function(&kprobe_ftrace_ops);
-		WARN(ret < 0, "Failed to init kprobe-ftrace (%d)\n", ret);
+		if (WARN(ret < 0, "Failed to init kprobe-ftrace (%d)\n", ret))
+			goto err_ftrace;
 	}
+
+	kprobe_ftrace_enabled++;
+	return ret;
+
+err_ftrace:
+	ftrace_set_filter_ip(&kprobe_ftrace_ops, (unsigned long)p->addr, 1, 0);
+	return ret;
 }
 
 /* Caller must lock kprobe_mutex */
@@ -1006,22 +1015,23 @@ static void disarm_kprobe_ftrace(struct kprobe *p)
 }
 #else	/* !CONFIG_KPROBES_ON_FTRACE */
 #define prepare_kprobe(p)	arch_prepare_kprobe(p)
-#define arm_kprobe_ftrace(p)	do {} while (0)
+#define arm_kprobe_ftrace(p)	(0)
 #define disarm_kprobe_ftrace(p)	do {} while (0)
 #endif
 
 /* Arm a kprobe with text_mutex */
-static void arm_kprobe(struct kprobe *kp)
+static int arm_kprobe(struct kprobe *kp)
 {
-	if (unlikely(kprobe_ftrace(kp))) {
-		arm_kprobe_ftrace(kp);
-		return;
-	}
+	if (unlikely(kprobe_ftrace(kp)))
+		return arm_kprobe_ftrace(kp);
+
 	cpus_read_lock();
 	mutex_lock(&text_mutex);
 	__arm_kprobe(kp);
 	mutex_unlock(&text_mutex);
 	cpus_read_unlock();
+
+	return 0;
 }
 
 /* Disarm a kprobe with text_mutex */
@@ -1360,9 +1370,14 @@ out:
 
 	if (ret == 0 && kprobe_disabled(ap) && !kprobe_disabled(p)) {
 		ap->flags &= ~KPROBE_FLAG_DISABLED;
-		if (!kprobes_all_disarmed)
+		if (!kprobes_all_disarmed) {
 			/* Arm the breakpoint again. */
-			arm_kprobe(ap);
+			ret = arm_kprobe(ap);
+			if (ret) {
+				ap->flags |= KPROBE_FLAG_DISABLED;
+				list_del_rcu(&p->list);
+			}
+		}
 	}
 	return ret;
 }
@@ -1567,12 +1582,15 @@ int register_kprobe(struct kprobe *p)
 	if (ret)
 		goto out;
 
+	if (!kprobes_all_disarmed && !kprobe_disabled(p)) {
+		ret = arm_kprobe(p);
+		if (ret)
+			goto out;
+	}
+
 	INIT_HLIST_NODE(&p->hlist);
 	hlist_add_head_rcu(&p->hlist,
 		       &kprobe_table[hash_ptr(p->addr, KPROBE_HASH_BITS)]);
-
-	if (!kprobes_all_disarmed && !kprobe_disabled(p))
-		arm_kprobe(p);
 
 	/* Try to optimize kprobe */
 	try_to_optimize_kprobe(p);
@@ -2112,7 +2130,9 @@ int enable_kprobe(struct kprobe *kp)
 
 	if (!kprobes_all_disarmed && kprobe_disabled(p)) {
 		p->flags &= ~KPROBE_FLAG_DISABLED;
-		arm_kprobe(p);
+		ret = arm_kprobe(p);
+		if (ret)
+			p->flags |= KPROBE_FLAG_DISABLED;
 	}
 out:
 	mutex_unlock(&kprobe_mutex);
@@ -2403,11 +2423,12 @@ static const struct file_operations debugfs_kprobe_blacklist_ops = {
 	.release        = seq_release,
 };
 
-static void arm_all_kprobes(void)
+static int arm_all_kprobes(void)
 {
 	struct hlist_head *head;
 	struct kprobe *p;
-	unsigned int i;
+	unsigned int i, errors = 0;
+	int err, ret = 0;
 
 	mutex_lock(&kprobe_mutex);
 
@@ -2424,16 +2445,26 @@ static void arm_all_kprobes(void)
 	/* Arming kprobes doesn't optimize kprobe itself */
 	for (i = 0; i < KPROBE_TABLE_SIZE; i++) {
 		head = &kprobe_table[i];
-		hlist_for_each_entry_rcu(p, head, hlist)
-			if (!kprobe_disabled(p))
-				arm_kprobe(p);
+		/* Arm all kprobes on a best-effort basis */
+		hlist_for_each_entry_rcu(p, head, hlist) {
+			if (!kprobe_disabled(p)) {
+				err = arm_kprobe(p);
+				if (err)  {
+					errors++;
+					ret = err;
+				}
+			}
+		}
 	}
 
-	printk(KERN_INFO "Kprobes globally enabled\n");
+	if (errors)
+		pr_warn("Kprobes globally enabled, but failed to arm %d kprobes\n", errors);
+	else
+		pr_info("Kprobes globally enabled\n");
 
 already_enabled:
 	mutex_unlock(&kprobe_mutex);
-	return;
+	return ret;
 }
 
 static void disarm_all_kprobes(void)
@@ -2490,6 +2521,7 @@ static ssize_t write_enabled_file_bool(struct file *file,
 {
 	char buf[32];
 	size_t buf_size;
+	int ret = 0;
 
 	buf_size = min(count, (sizeof(buf)-1));
 	if (copy_from_user(buf, user_buf, buf_size))
@@ -2500,7 +2532,7 @@ static ssize_t write_enabled_file_bool(struct file *file,
 	case 'y':
 	case 'Y':
 	case '1':
-		arm_all_kprobes();
+		ret = arm_all_kprobes();
 		break;
 	case 'n':
 	case 'N':
@@ -2510,6 +2542,9 @@ static ssize_t write_enabled_file_bool(struct file *file,
 	default:
 		return -EINVAL;
 	}
+
+	if (ret)
+		return ret;
 
 	return count;
 }
