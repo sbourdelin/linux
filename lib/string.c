@@ -825,6 +825,17 @@ void *memmove(void *dest, const void *src, size_t count)
 	char *tmp;
 	const char *s;
 
+#ifdef __HAVE_ARCH_MEMCPY
+	/* Use optimised memcpy when there is no overlap */
+	const char *s_end = src + count;
+	const char *d = dest;
+	char *d_end = dest + count;
+
+	s = src;
+	if ((d_end <= s) || (s_end <= d))
+		return memcpy(dest, src, count);
+#endif /* __HAVE_ARCH_MEMCPY */
+
 	if (dest <= src) {
 		tmp = dest;
 		s = src;
