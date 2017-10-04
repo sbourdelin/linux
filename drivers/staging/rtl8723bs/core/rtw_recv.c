@@ -26,7 +26,7 @@ u8 rtw_rfc1042_header[] = { 0xaa, 0xaa, 0x03, 0x00, 0x00, 0x00 };
 /* Bridge-Tunnel header (for EtherTypes ETH_P_AARP and ETH_P_IPX) */
 u8 rtw_bridge_tunnel_header[] = { 0xaa, 0xaa, 0x03, 0x00, 0x00, 0xf8 };
 
-void rtw_signal_stat_timer_hdl(RTW_TIMER_HDL_ARGS);
+static void rtw_signal_stat_timer_hdl(RTW_TIMER_HDL_ARGS);
 
 void _rtw_init_sta_recv_priv(struct sta_recv_priv *psta_recvpriv)
 {
@@ -1229,8 +1229,8 @@ sint validate_recv_ctrl_frame(struct adapter *padapter, union recv_frame *precv_
 }
 
 union recv_frame *recvframe_chk_defrag(struct adapter *padapter, union recv_frame *precv_frame);
-sint validate_recv_mgnt_frame(struct adapter *padapter, union recv_frame *precv_frame);
-sint validate_recv_mgnt_frame(struct adapter *padapter, union recv_frame *precv_frame)
+
+static sint validate_recv_mgnt_frame(struct adapter *padapter, union recv_frame *precv_frame)
 {
 	/* struct mlme_priv *pmlmepriv = &adapter->mlmepriv; */
 
@@ -2601,7 +2601,7 @@ _recv_entry_drop:
 	return ret;
 }
 
-void rtw_signal_stat_timer_hdl(RTW_TIMER_HDL_ARGS)
+static void rtw_signal_stat_timer_hdl(RTW_TIMER_HDL_ARGS)
 {
 	struct adapter *adapter = (struct adapter *)FunctionContext;
 	struct recv_priv *recvpriv = &adapter->recvpriv;

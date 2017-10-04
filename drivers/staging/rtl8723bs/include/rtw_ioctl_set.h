@@ -37,5 +37,7 @@ u8 rtw_validate_bssid(u8 *bssid);
 u8 rtw_validate_ssid(struct ndis_802_11_ssid *ssid);
 
 u16 rtw_get_cur_max_rate(struct adapter *adapter);
+u8 rtw_do_join(struct adapter *padapter);
+
 
 #endif

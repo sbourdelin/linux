@@ -18,8 +18,6 @@
 #include <rtw_debug.h>
 #include <linux/jiffies.h>
 
-extern u8 rtw_do_join(struct adapter *padapter);
-
 sint	_rtw_init_mlme_priv(struct adapter *padapter)
 {
 	sint	i;
