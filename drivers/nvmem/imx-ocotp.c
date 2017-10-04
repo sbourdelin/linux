@@ -28,10 +28,16 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <asm/system_info.h>
 
 #define IMX_OCOTP_OFFSET_B0W0		0x400 /* Offset from base address of the
 					       * OTP Bank0 Word0
 					       */
+
+/* Uniq ID used for Serial number */
+#define IMX_OCOTP_OFFSET_UID_LOW	(IMX_OCOTP_OFFSET_B0W0 + 0x10)
+#define IMX_OCOTP_OFFSET_UID_HIGH	(IMX_OCOTP_OFFSET_B0W0 + 0x20)
+
 #define IMX_OCOTP_OFFSET_PER_WORD	0x10  /* Offset between the start addr
 					       * of two consecutive OTP words.
 					       */
@@ -298,6 +304,34 @@ write_end:
 	return bytes;
 }
 
+static int imx_ocotp_setserial(struct ocotp_priv *priv)
+{
+	int ret;
+
+	mutex_lock(&ocotp_mutex);
+
+	ret = clk_prepare_enable(priv->clk);
+	if (ret < 0) {
+		mutex_unlock(&ocotp_mutex);
+		dev_err(priv->dev, "failed to prepare/enable ocotp clk\n");
+		return ret;
+	}
+
+	ret = imx_ocotp_wait_for_busy(priv->base, 0);
+	if (ret < 0) {
+		dev_err(priv->dev, "timeout during read setup\n");
+		goto out;
+	}
+
+	system_serial_low = readl(priv->base + IMX_OCOTP_OFFSET_UID_LOW);
+	system_serial_high = readl(priv->base + IMX_OCOTP_OFFSET_UID_HIGH);
+
+out:
+	clk_disable_unprepare(priv->clk);
+	mutex_unlock(&ocotp_mutex);
+	return ret;
+}
+
 static struct nvmem_config imx_ocotp_nvmem_config = {
 	.name = "imx-ocotp",
 	.read_only = false,
@@ -352,6 +386,10 @@ static int imx_ocotp_probe(struct platform_device *pdev)
 	if (IS_ERR(nvmem))
 		return PTR_ERR(nvmem);
 
+	if (of_property_read_bool(pdev->dev.of_node, "read-system-serial")) {
+		if (!imx_ocotp_setserial(priv))
+			dev_warn(&pdev->dev, "Could not read CPU uniq serial number");
+	}
 	platform_set_drvdata(pdev, nvmem);
 
 	return 0;

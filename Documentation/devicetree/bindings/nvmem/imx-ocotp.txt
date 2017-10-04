@@ -16,6 +16,7 @@ Required properties:
 
 Optional properties:
 - read-only: disable write access
+- read-system-serial: read uniq ID and export as system serial number. Available in /proc/cpuinfo
 
 Example:
 
