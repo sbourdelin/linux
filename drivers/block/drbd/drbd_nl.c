@@ -4537,7 +4537,7 @@ void drbd_bcast_event(struct drbd_device *device, const struct sib_info *sib)
 	int err = -ENOMEM;
 
 	seq = atomic_inc_return(&drbd_genl_seq);
-	msg = genlmsg_new(NLMSG_GOODSIZE, GFP_NOIO);
+	msg = genlmsg_new(NLMSG_GOODSIZE, GFP_ATOMIC);
 	if (!msg)
 		goto failed;
 
