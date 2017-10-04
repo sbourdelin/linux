@@ -23,6 +23,7 @@
 #include <linux/sched.h>
 #include <linux/workqueue.h>
 #include <linux/kthread.h>
+#include <trace/events/xdp.h>
 
 #include <linux/netdevice.h>   /* netif_receive_skb_core */
 #include <linux/etherdevice.h> /* eth_type_trans */
@@ -258,14 +259,15 @@ static int cpu_map_kthread_run(void *data)
 
 	set_current_state(TASK_INTERRUPTIBLE);
 	while (!kthread_should_stop()) {
-		unsigned int processed = 0, drops = 0;
+		unsigned int processed = 0, drops = 0, sched = 0;
 		struct xdp_pkt *xdp_pkt;
 
 		/* Release CPU reschedule checks */
 		if (__ptr_ring_empty(rcpu->queue)) {
 			schedule();
+			sched = 1;
 		} else {
-			cond_resched();
+			sched = cond_resched();
 		}
 
 		/* Process packets in rcpu->queue */
@@ -294,6 +296,9 @@ static int cpu_map_kthread_run(void *data)
 			if (++processed == 8)
 				break;
 		}
+		/* Feedback loop via tracepoint */
+		trace_xdp_cpumap_kthread(rcpu->map_id, processed, drops, sched);
+
 		local_bh_enable(); /* resched point, may call do_softirq() */
 
 		__set_current_state(TASK_INTERRUPTIBLE);
@@ -331,7 +336,10 @@ struct bpf_cpu_map_entry *__cpu_map_entry_alloc(u32 qsize, u32 cpu, int map_id)
 	err = ptr_ring_init(rcpu->queue, qsize, gfp);
 	if (err)
 		goto fail;
-	rcpu->qsize = qsize;
+
+	rcpu->cpu    = cpu;
+	rcpu->map_id = map_id;
+	rcpu->qsize  = qsize;
 
 	/* Setup kthread */
 	rcpu->kthread = kthread_create_on_node(cpu_map_kthread_run, rcpu, numa,
@@ -557,6 +565,8 @@ const struct bpf_map_ops cpu_map_ops = {
 static int bq_flush_to_queue(struct bpf_cpu_map_entry *rcpu,
 			     struct xdp_bulk_queue *bq)
 {
+	unsigned int processed = 0, drops = 0;
+	const int to_cpu = rcpu->cpu;
 	struct ptr_ring *q;
 	int i;
 
@@ -572,13 +582,16 @@ static int bq_flush_to_queue(struct bpf_cpu_map_entry *rcpu,
 
 		err = __ptr_ring_produce(q, xdp_pkt);
 		if (err) {
-			/* Free xdp_pkt */
-			page_frag_free(xdp_pkt);
+			drops++;
+			page_frag_free(xdp_pkt); /* Free xdp_pkt */
 		}
+		processed++;
 	}
 	bq->count = 0;
 	spin_unlock(&q->producer_lock);
 
+	/* Feedback loop via tracepoints */
+	trace_xdp_cpumap_enqueue(rcpu->map_id, processed, drops, to_cpu);
 	return 0;
 }
 
