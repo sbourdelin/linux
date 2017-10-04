@@ -20,6 +20,7 @@
 #include <linux/lockdep.h>
 #include <linux/slab.h>
 #include <linux/cpumask.h>
+#include <linux/jhash.h>
 
 /*
  * The distributed and locked list is a distributed set of lists each of
@@ -156,6 +157,46 @@ bool dlock_lists_empty(struct dlock_list_heads *dlist)
 }
 
 /**
+ * dlock_list_hash - Hash the given context to a particular list
+ * @dlist: The dlock list
+ * @ctx  : The context for hashing
+ */
+struct dlock_list_head *dlock_list_hash(struct dlock_list_heads *dlist,
+					void *ctx)
+{
+	unsigned long val = (unsigned long)ctx;
+	u32 hash;
+
+	if (unlikely(!nr_dlock_lists)) {
+		WARN_ON_ONCE(1);
+		return &dlist->heads[0];
+	}
+	if (val < nr_dlock_lists)
+		hash = val;
+	else
+		hash = jhash2((u32 *)&ctx, sizeof(ctx)/sizeof(u32), 0)
+				% nr_dlock_lists;
+	return &dlist->heads[hash];
+}
+
+/**
+ * dlock_list_add - Add a node to a particular head of dlock list
+ * @node: The node to be added
+ * @head: The dlock list head where the node is to be added
+ */
+void dlock_list_add(struct dlock_list_node *node,
+		    struct dlock_list_head *head)
+{
+	/*
+	 * There is no need to disable preemption
+	 */
+	spin_lock(&head->lock);
+	node->head = head;
+	list_add(&node->list, &head->list);
+	spin_unlock(&head->lock);
+}
+
+/**
  * dlock_lists_add - Adds a node to the given dlock list
  * @node : The node to be added
  * @dlist: The dlock list where the node is to be added
@@ -168,13 +209,7 @@ void dlock_lists_add(struct dlock_list_node *node,
 {
 	struct dlock_list_head *head = &dlist->heads[this_cpu_read(cpu2idx)];
 
-	/*
-	 * There is no need to disable preemption
-	 */
-	spin_lock(&head->lock);
-	node->head = head;
-	list_add(&node->list, &head->list);
-	spin_unlock(&head->lock);
+	dlock_list_add(node, head);
 }
 
 /**

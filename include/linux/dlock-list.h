@@ -120,6 +120,15 @@ extern void dlock_lists_add(struct dlock_list_node *node,
 extern void dlock_lists_del(struct dlock_list_node *node);
 
 /*
+ * Instead of individual list mapping by CPU number, it can be based on
+ * a given context to speed up loockup performance.
+ */
+extern struct dlock_list_head *dlock_list_hash(struct dlock_list_heads *dlist,
+					       void *context);
+extern void dlock_list_add(struct dlock_list_node *node,
+			   struct dlock_list_head *head);
+
+/*
  * Find the first entry of the next available list.
  */
 extern struct dlock_list_node *
