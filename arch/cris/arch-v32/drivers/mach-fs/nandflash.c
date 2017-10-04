@@ -113,11 +113,15 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
 		return NULL;
 
 	read_cs = ioremap(MEM_CSP0_START | MEM_NON_CACHEABLE, 8192);
-	write_cs = ioremap(MEM_CSP1_START | MEM_NON_CACHEABLE, 8192);
-
-	if (!read_cs || !write_cs) {
+	if (!read_cs) {
 		printk(KERN_ERR "CRISv32 NAND ioremap failed\n");
 		goto out_mtd;
+	}
+
+	write_cs = ioremap(MEM_CSP1_START | MEM_NON_CACHEABLE, 8192);
+	if (!write_cs) {
+		printk(KERN_ERR "CRISv32 NAND ioremap failed\n");
+		goto unmap_read;
 	}
 
 	/* Get pointer to private data */
@@ -149,13 +153,14 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
 
 	/* Scan to find existence of the device */
 	if (nand_scan(crisv32_mtd, 1))
-		goto out_ior;
+		goto unmap_io;
 
 	return crisv32_mtd;
 
-out_ior:
-	iounmap((void *)read_cs);
+unmap_io:
 	iounmap((void *)write_cs);
+unmap_read:
+	iounmap((void *)read_cs);
 out_mtd:
 	kfree(wrapper);
 	return NULL;
