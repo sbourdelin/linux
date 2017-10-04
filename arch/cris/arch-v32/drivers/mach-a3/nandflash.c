@@ -134,7 +134,7 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
 	REG_WR(pio, regi_pio, rw_oe, oe);
 
 	/* Allocate memory for MTD device structure and private data */
-	wrapper = kzalloc(sizeof(struct mtd_info_wrapper), GFP_KERNEL);
+	wrapper = kzalloc(sizeof(*wrapper), GFP_KERNEL);
 	if (!wrapper) {
 		err = -ENOMEM;
 		return NULL;
