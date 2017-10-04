@@ -5446,6 +5446,7 @@ _abort_event_:
 
 u8 tx_beacon_hdl(struct adapter *padapter, unsigned char *pbuf)
 {
+	struct xmit_frame *tmp;
 	if (send_beacon(padapter) == _FAIL) {
 		DBG_88E("issue_beacon, fail!\n");
 		return H2C_PARAMETERS_ERROR;
@@ -5469,11 +5470,8 @@ u8 tx_beacon_hdl(struct adapter *padapter, unsigned char *pbuf)
 			xmitframe_phead = get_list_head(&psta_bmc->sleep_q);
 			xmitframe_plist = xmitframe_phead->next;
 
-			while (xmitframe_phead != xmitframe_plist) {
-				pxmitframe = container_of(xmitframe_plist, struct xmit_frame, list);
-
-				xmitframe_plist = xmitframe_plist->next;
-
+			list_for_each_entry_safe(pxmitframe, tmp,
+						 xmitframe_plist, list) {
 				list_del_init(&pxmitframe->list);
 
 				psta_bmc->sleepq_len--;
