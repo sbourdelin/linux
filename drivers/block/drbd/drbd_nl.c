@@ -4790,7 +4790,7 @@ void notify_helper(enum drbd_notification_type type,
 	helper_info.helper_name_len = min(strlen(name), sizeof(helper_info.helper_name));
 	helper_info.helper_status = status;
 
-	skb = genlmsg_new(NLMSG_GOODSIZE, GFP_NOIO);
+	skb = genlmsg_new(NLMSG_GOODSIZE, GFP_ATOMIC);
 	err = -ENOMEM;
 	if (!skb)
 		goto fail;
