@@ -831,8 +831,11 @@ static u16 mv88e6xxx_port_vlan(struct mv88e6xxx_chip *chip, int dev, int port)
 	u16 pvlan;
 	int i;
 
-	if (dev < DSA_MAX_SWITCHES)
+	if (dev < DSA_MAX_SWITCHES) {
 		ds = chip->ds->dst->ds[dev];
+		if (ds == NULL)
+			ds = chip->ds;
+	}
 
 	/* Prevent frames from unknown switch or port */
 	if (!ds || port >= ds->num_ports)
