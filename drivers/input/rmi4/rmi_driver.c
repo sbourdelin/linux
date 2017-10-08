@@ -601,7 +601,7 @@ int rmi_read_register_desc(struct rmi_device *d, u16 addr,
 		return ret;
 	++addr;
 
-	if (size_presence_reg < 0 || size_presence_reg > 35)
+	if (size_presence_reg > 35)
 		return -EIO;
 
 	memset(buf, 0, sizeof(buf));
