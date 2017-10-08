@@ -403,10 +403,7 @@ static ssize_t write_file_spectral_count(struct file *file,
 		return -EFAULT;
 
 	buf[len] = '\0';
-	if (kstrtoul(buf, 0, &val))
-		return -EINVAL;
-
-	if (val < 0 || val > 255)
+	if (kstrtoul(buf, 0, &val) || val > 255)
 		return -EINVAL;
 
 	mutex_lock(&ar->conf_mutex);
