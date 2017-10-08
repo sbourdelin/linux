@@ -2269,6 +2269,15 @@ static struct protection_domain *get_domain(struct device *dev)
 	return domain;
 }
 
+static struct iommu_domain *amd_dma_get_iommu(struct device *dev)
+{
+	struct protection_domain *domain = get_domain(dev);
+
+	if (IS_ERR(domain))
+		return NULL;
+	return &domain->domain;
+}
+
 static void update_device_table(struct protection_domain *domain)
 {
 	struct iommu_dev_data *dev_data;
@@ -2687,6 +2696,7 @@ static const struct dma_map_ops amd_iommu_dma_ops = {
 	.unmap_sg	= unmap_sg,
 	.dma_supported	= amd_iommu_dma_supported,
 	.mapping_error	= amd_iommu_mapping_error,
+	.get_iommu	= amd_dma_get_iommu,
 };
 
 static int init_reserved_iova_ranges(void)

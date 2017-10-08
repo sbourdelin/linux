@@ -369,3 +369,13 @@ void dma_deconfigure(struct device *dev)
 	of_dma_deconfigure(dev);
 	acpi_dma_deconfigure(dev);
 }
+
+struct iommu_domain *dma_get_iommu_domain(struct device *dev)
+{
+	const struct dma_map_ops *ops = get_dma_ops(dev);
+
+	if (ops && ops->get_iommu)
+		return ops->get_iommu(dev);
+	return NULL;
+}
+EXPORT_SYMBOL(dma_get_iommu_domain);

@@ -3574,6 +3574,20 @@ static int iommu_no_mapping(struct device *dev)
 	return 0;
 }
 
+static struct iommu_domain *intel_dma_get_iommu(struct device *dev)
+{
+	struct dmar_domain *domain;
+
+	if (iommu_no_mapping(dev))
+		return NULL;
+
+	domain = get_valid_domain_for_dev(dev);
+	if (!domain)
+		return NULL;
+
+	return &domain->domain;
+}
+
 static dma_addr_t __intel_map_single(struct device *dev, phys_addr_t paddr,
 				     size_t size, int dir, u64 dma_mask)
 {
@@ -3868,6 +3882,7 @@ const struct dma_map_ops intel_dma_ops = {
 	.map_page = intel_map_page,
 	.unmap_page = intel_unmap_page,
 	.mapping_error = intel_mapping_error,
+	.get_iommu = intel_dma_get_iommu,
 #ifdef CONFIG_X86
 	.dma_supported = x86_dma_supported,
 #endif

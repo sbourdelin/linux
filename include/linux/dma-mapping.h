@@ -128,6 +128,7 @@ struct dma_map_ops {
 				   enum dma_data_direction dir);
 	int (*mapping_error)(struct device *dev, dma_addr_t dma_addr);
 	int (*dma_supported)(struct device *dev, u64 mask);
+	struct iommu_domain *(*get_iommu)(struct device *dev);
 #ifdef ARCH_HAS_DMA_GET_REQUIRED_MASK
 	u64 (*get_required_mask)(struct device *dev);
 #endif
@@ -220,6 +221,8 @@ static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
 	return &bad_dma_ops;
 }
 #endif
+
+extern struct iommu_domain *dma_get_iommu_domain(struct device *dev);
 
 static inline dma_addr_t dma_map_single_attrs(struct device *dev, void *ptr,
 					      size_t size,
