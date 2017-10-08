@@ -1112,7 +1112,7 @@ static struct rt6_info *rt6_get_pcpu_route(struct rt6_info *rt)
 {
 	struct rt6_info *pcpu_rt, **p;
 
-	p = this_cpu_ptr(rt->rt6i_pcpu);
+	p = raw_cpu_ptr(rt->rt6i_pcpu);
 	pcpu_rt = *p;
 
 	if (pcpu_rt && ip6_hold_safe(NULL, &pcpu_rt, false))
@@ -1134,7 +1134,7 @@ static struct rt6_info *rt6_make_pcpu_route(struct rt6_info *rt)
 	}
 
 	dst_hold(&pcpu_rt->dst);
-	p = this_cpu_ptr(rt->rt6i_pcpu);
+	p = raw_cpu_ptr(rt->rt6i_pcpu);
 	prev = cmpxchg(p, NULL, pcpu_rt);
 	if (prev) {
 		/* If someone did it before us, return prev instead */
