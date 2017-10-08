@@ -32,7 +32,7 @@
 #include <linux/types.h>
 #include <linux/irqhandler.h>
 #include <linux/of.h>
-#include <linux/radix-tree.h>
+#include <linux/radix-tree-root.h>
 
 struct device_node;
 struct irq_domain;
