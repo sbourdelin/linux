@@ -34,6 +34,7 @@
 #define IB_UMEM_H
 
 #include <linux/list.h>
+#include <linux/iommu.h>
 #include <linux/scatterlist.h>
 #include <linux/workqueue.h>
 
@@ -55,6 +56,13 @@ struct ib_umem {
 	struct sg_table sg_head;
 	int             nmap;
 	int             npages;
+	/*
+	 * Note: no lock protects this list since we assume memory
+	 * registration never races unregistration for a given ib_umem
+	 * instance.
+	 */
+	struct list_head	leases;
+	struct iommu_domain	*iommu;
 };
 
 /* Returns the offset of the umem start relative to the first page. */

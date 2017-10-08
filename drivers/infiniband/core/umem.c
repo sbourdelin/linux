@@ -36,6 +36,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/mm.h>
+#include <linux/mapdirect.h>
 #include <linux/export.h>
 #include <linux/hugetlb.h>
 #include <linux/slab.h>
@@ -46,9 +47,15 @@
 
 static void __ib_umem_release(struct ib_device *dev, struct ib_umem *umem, int dirty)
 {
+	struct lease_direct *ld, *_ld;
 	struct scatterlist *sg;
 	struct page *page;
 	int i;
+
+	list_for_each_entry_safe(ld, _ld, &umem->leases, list) {
+		list_del_init(&ld->list);
+		map_direct_lease_destroy(ld);
+	}
 
 	if (umem->nmap > 0)
 		ib_dma_unmap_sg(dev, umem->sg_head.sgl,
@@ -64,8 +71,18 @@ static void __ib_umem_release(struct ib_device *dev, struct ib_umem *umem, int d
 	}
 
 	sg_free_table(&umem->sg_head);
-	return;
 
+}
+
+static void ib_umem_lease_break(void *__umem)
+{
+	struct ib_umem *umem = umem;
+	struct ib_device *idev = umem->context->device;
+	struct device *dev = idev->dma_device;
+	struct scatterlist *sgl = umem->sg_head.sgl;
+
+	iommu_unmap(umem->iommu, sg_dma_address(sgl) & PAGE_MASK,
+			iommu_sg_num_pages(dev, sgl, umem->npages));
 }
 
 /**
@@ -96,7 +113,10 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
 	struct scatterlist *sg, *sg_list_start;
 	int need_release = 0;
 	unsigned int gup_flags = FOLL_WRITE;
+	struct vm_area_struct *vma_prev = NULL;
+	struct device *dma_dev;
 
+	dma_dev = context->device->dma_device;
 	if (dmasync)
 		dma_attrs |= DMA_ATTR_WRITE_BARRIER;
 
@@ -120,6 +140,7 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
 	umem->address    = addr;
 	umem->page_shift = PAGE_SHIFT;
 	umem->pid	 = get_task_pid(current, PIDTYPE_PID);
+	INIT_LIST_HEAD(&umem->leases);
 	/*
 	 * We ask for writable memory if any of the following
 	 * access flags are set.  "Local write" and "remote write"
@@ -147,19 +168,21 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
 	umem->hugetlb   = 1;
 
 	page_list = (struct page **) __get_free_page(GFP_KERNEL);
-	if (!page_list) {
-		put_pid(umem->pid);
-		kfree(umem);
-		return ERR_PTR(-ENOMEM);
-	}
+	if (!page_list)
+		goto err_pagelist;
 
 	/*
-	 * if we can't alloc the vma_list, it's not so bad;
-	 * just assume the memory is not hugetlb memory
+	 * If DAX is enabled we need the vma to setup a ->lease_direct()
+	 * lease to protect against file modifications, otherwise we can
+	 * tolerate a failure to allocate the vma_list and just assume
+	 * that all vmas are not hugetlb-vmas.
 	 */
 	vma_list = (struct vm_area_struct **) __get_free_page(GFP_KERNEL);
-	if (!vma_list)
+	if (!vma_list) {
+		if (IS_ENABLED(CONFIG_DAX_MAP_DIRECT))
+			goto err_vmalist;
 		umem->hugetlb = 0;
+	}
 
 	npages = ib_umem_num_pages(umem);
 
@@ -199,15 +222,52 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
 		if (ret < 0)
 			goto out;
 
-		umem->npages += ret;
 		cur_base += ret * PAGE_SIZE;
 		npages   -= ret;
 
 		for_each_sg(sg_list_start, sg, ret, i) {
-			if (vma_list && !is_vm_hugetlb_page(vma_list[i]))
-				umem->hugetlb = 0;
+			const struct vm_operations_struct *vm_ops;
+			struct vm_area_struct *vma;
+			struct lease_direct *ld;
 
 			sg_set_page(sg, page_list[i], PAGE_SIZE, 0);
+			umem->npages++;
+
+			if (!vma_list)
+				continue;
+			vma = vma_list[i];
+
+			if (vma == vma_prev)
+				continue;
+			vma_prev = vma;
+
+			if (!is_vm_hugetlb_page(vma))
+				umem->hugetlb = 0;
+
+			if (!vma_is_dax(vma))
+				continue;
+
+			vm_ops = vma->vm_ops;
+			if (!vm_ops->lease_direct) {
+				dev_info(dma_dev, "DAX-RDMA requires a MAP_DIRECT mapping\n");
+				ret = -EOPNOTSUPP;
+				goto out;
+			}
+
+			if (!umem->iommu)
+				umem->iommu = dma_get_iommu_domain(dma_dev);
+			if (!umem->iommu) {
+				dev_info(dma_dev, "DAX-RDMA requires an iommu protected device\n");
+				ret = -EOPNOTSUPP;
+				goto out;
+			}
+			ld = vm_ops->lease_direct(vma, ib_umem_lease_break,
+					umem);
+			if (IS_ERR(ld)) {
+				ret = PTR_ERR(ld);
+				goto out;
+			}
+			list_add(&ld->list, &umem->leases);
 		}
 
 		/* preparing for next loop */
@@ -242,6 +302,12 @@ out:
 	free_page((unsigned long) page_list);
 
 	return ret < 0 ? ERR_PTR(ret) : umem;
+err_vmalist:
+	free_page((unsigned long) page_list);
+err_pagelist:
+	put_pid(umem->pid);
+	kfree(umem);
+	return ERR_PTR(-ENOMEM);
 }
 EXPORT_SYMBOL(ib_umem_get);
 
