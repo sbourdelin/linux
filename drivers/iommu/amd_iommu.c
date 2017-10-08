@@ -2450,32 +2450,6 @@ static void unmap_page(struct device *dev, dma_addr_t dma_addr, size_t size,
 	__unmap_single(dma_dom, dma_addr, size, dir);
 }
 
-static int sg_num_pages(struct device *dev,
-			struct scatterlist *sglist,
-			int nelems)
-{
-	unsigned long mask, boundary_size;
-	struct scatterlist *s;
-	int i, npages = 0;
-
-	mask          = dma_get_seg_boundary(dev);
-	boundary_size = mask + 1 ? ALIGN(mask + 1, PAGE_SIZE) >> PAGE_SHIFT :
-				   1UL << (BITS_PER_LONG - PAGE_SHIFT);
-
-	for_each_sg(sglist, s, nelems, i) {
-		int p, n;
-
-		s->dma_address = npages << PAGE_SHIFT;
-		p = npages % boundary_size;
-		n = iommu_num_pages(sg_phys(s), s->length, PAGE_SIZE);
-		if (p + n > boundary_size)
-			npages += boundary_size - p;
-		npages += n;
-	}
-
-	return npages;
-}
-
 /*
  * The exported map_sg function for dma_ops (handles scatter-gather
  * lists).
@@ -2498,7 +2472,7 @@ static int map_sg(struct device *dev, struct scatterlist *sglist,
 	dma_dom  = to_dma_ops_domain(domain);
 	dma_mask = *dev->dma_mask;
 
-	npages = sg_num_pages(dev, sglist, nelems);
+	npages = iommu_sg_num_pages(dev, sglist, nelems);
 
 	address = dma_ops_alloc_iova(dev, dma_dom, npages, dma_mask);
 	if (address == AMD_IOMMU_MAPPING_ERROR)
@@ -2576,7 +2550,7 @@ static void unmap_sg(struct device *dev, struct scatterlist *sglist,
 
 	startaddr = sg_dma_address(sglist) & PAGE_MASK;
 	dma_dom   = to_dma_ops_domain(domain);
-	npages    = sg_num_pages(dev, sglist, nelems);
+	npages    = iommu_sg_num_pages(dev, sglist, nelems);
 
 	__unmap_single(dma_dom, startaddr, npages << PAGE_SHIFT, dir);
 }
