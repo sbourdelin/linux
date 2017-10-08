@@ -157,17 +157,18 @@ i915_gem_evict_something(struct i915_address_space *vm,
 				    min_size, alignment, cache_level,
 				    start, end, mode);
 
-	/* Retire before we search the active list. Although we have
+	/*
+	 * Retire before we search the active list. Although we have
 	 * reasonable accuracy in our retirement lists, we may have
 	 * a stray pin (preventing eviction) that can only be resolved by
 	 * retiring.
 	 */
+search_again:
 	if (!(flags & PIN_NONBLOCK))
 		i915_gem_retire_requests(dev_priv);
 	else
 		phases[1] = NULL;
 
-search_again:
 	INIT_LIST_HEAD(&eviction_list);
 	phase = phases;
 	do {
@@ -380,6 +381,8 @@ int i915_gem_evict_vm(struct i915_address_space *vm)
 		ret = ggtt_flush(vm->i915);
 		if (ret)
 			return ret;
+
+		i915_gem_retire_requests(vm->i915);
 	}
 
 	INIT_LIST_HEAD(&eviction_list);
