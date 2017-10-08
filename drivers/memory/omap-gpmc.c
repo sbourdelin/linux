@@ -1926,7 +1926,11 @@ static void __maybe_unused gpmc_read_timings_dt(struct device_node *np,
 static int gpmc_probe_onenand_child(struct platform_device *pdev,
 				 struct device_node *child)
 {
-	u32 val;
+	u32 cs, val;
+	int ret;
+	unsigned long base;
+	struct resource res;
+	struct platform_device *onenand_pdev;
 	struct omap_onenand_platform_data *gpmc_onenand_data;
 
 	if (of_property_read_u32(child, "reg", &val) < 0) {
@@ -1935,19 +1939,85 @@ static int gpmc_probe_onenand_child(struct platform_device *pdev,
 		return -ENODEV;
 	}
 
+	memset(&res, 0, sizeof(res));
+	res.flags = IORESOURCE_MEM;
+	if (of_address_to_resource(child, 0, &res) < 0) {
+		dev_err(&pdev->dev, "%pOF has malformed 'reg' property\n",
+			child);
+		return -ENODEV;
+	}
+
+	ret = gpmc_cs_request(cs, resource_size(&res), &base);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "cannot request GPMC CS %d\n", cs);
+		return ret;
+	}
+	gpmc_cs_set_name(cs, child->name);
+
+	/* CS must be disabled while making changes to gpmc configuration */
+	gpmc_cs_disable_mem(cs);
+
+	ret = gpmc_cs_remap(cs, res.start);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "cannot remap GPMC CS %d to 0x%x\n",
+			cs, res.start);
+		if (res.start < GPMC_MEM_START) {
+			dev_info(&pdev->dev,
+				 "GPMC CS %d start cannot be lesser than 0x%x\n",
+				 cs, GPMC_MEM_START);
+		} else if (res.end > GPMC_MEM_END) {
+			dev_info(&pdev->dev,
+				 "GPMC CS %d end cannot be greater than 0x%x\n",
+				 cs, GPMC_MEM_END);
+		}
+		return ret;
+	}
+
+	/* Enable CS region */
+	gpmc_cs_enable_mem(cs);
+
 	gpmc_onenand_data = devm_kzalloc(&pdev->dev, sizeof(*gpmc_onenand_data),
 					 GFP_KERNEL);
-	if (!gpmc_onenand_data)
-		return -ENOMEM;
-
-	gpmc_onenand_data->cs = val;
-	gpmc_onenand_data->of_node = child;
-	gpmc_onenand_data->dma_channel = -1;
+	if (!gpmc_onenand_data) {
+		ret = -ENOMEM;
+		goto out_free_cs;
+	}
 
 	if (!of_property_read_u32(child, "dma-channel", &val))
 		gpmc_onenand_data->dma_channel = val;
+	else
+		gpmc_onenand_data->dma_channel = -1;
 
-	return gpmc_onenand_init(gpmc_onenand_data);
+	gpmc_onenand_data->cs = cs;
+	gpmc_onenand_data->of_node = child;
+
+	onenand_pdev = platform_device_alloc("omap2-onenand", cs);
+	if (!onenand_pdev) {
+		ret = -ENOMEM;
+		goto out_free_cs;
+	}
+
+	ret = platform_device_add_resources(onenand_pdev, &res, 1);
+	if (ret)
+		goto out_free_pdev;
+
+	onenand_pdev->dev.platform_data = gpmc_onenand_data;
+
+	ret = platform_device_add(onenand_pdev);
+	if (ret)
+		goto out_free_pdev;
+
+	gpmc_onenand_init(gpmc_onenand_data);
+
+	return 0;
+
+out_free_pdev:
+	platform_device_put(onenand_pdev);
+
+out_free_cs:
+	gpmc_cs_free(cs);
+	return ret;
+
 }
 #else
 static int gpmc_probe_onenand_child(struct platform_device *pdev,
