@@ -2,7 +2,7 @@
 #define __LINUX_BACKING_DEV_DEFS_H
 
 #include <linux/list.h>
-#include <linux/radix-tree.h>
+#include <linux/radix-tree-root.h>
 #include <linux/rbtree.h>
 #include <linux/spinlock.h>
 #include <linux/percpu_counter.h>
