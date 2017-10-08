@@ -35,6 +35,7 @@
 
 #include <linux/mlx5/device.h>
 #include <linux/mlx5/driver.h>
+#include <linux/radix-tree.h>
 
 #define MLX5_INVALID_LKEY	0x100
 #define MLX5_SIG_WQE_SIZE	(MLX5_SEND_WQE_BB * 5)
