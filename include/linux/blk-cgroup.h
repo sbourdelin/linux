@@ -16,7 +16,7 @@
 #include <linux/cgroup.h>
 #include <linux/percpu_counter.h>
 #include <linux/seq_file.h>
-#include <linux/radix-tree.h>
+#include <linux/radix-tree-root.h>
 #include <linux/blkdev.h>
 #include <linux/atomic.h>
 
