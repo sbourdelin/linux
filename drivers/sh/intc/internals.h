@@ -4,7 +4,7 @@
 #include <linux/list.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
-#include <linux/radix-tree.h>
+#include <linux/radix-tree-root.h>
 #include <linux/device.h>
 
 #define _INTC_MK(fn, mode, addr_e, addr_d, width, shift) \
