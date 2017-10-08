@@ -7810,6 +7810,8 @@ void kvm_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 	vcpu->arch.regs_avail = ~0;
 	vcpu->arch.regs_dirty = ~0;
 
+	vcpu->arch.xcr0 = XFEATURE_MASK_FP;
+
 	kvm_x86_ops->vcpu_reset(vcpu, init_event);
 }
 
