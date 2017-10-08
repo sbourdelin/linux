@@ -56,6 +56,12 @@ void notrace __sanitizer_cov_trace_pc(void)
 	struct task_struct *t;
 	enum kcov_mode mode;
 
+#ifdef CONFIG_UML
+	if(!(system_state == SYSTEM_SCHEDULING ||
+	     system_state == SYSTEM_RUNNING))
+		return;
+#endif
+
 	t = current;
 	/*
 	 * We are interested in code coverage as a function of a syscall inputs,
