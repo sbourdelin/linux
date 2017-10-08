@@ -22,6 +22,7 @@
 #include <linux/list.h>
 #include <linux/pagemap.h>
 #include <linux/pagevec.h>
+#include <linux/radix-tree-root.h>
 
 #if defined(CONFIG_FSCACHE) || defined(CONFIG_FSCACHE_MODULE)
 #define fscache_available() (1)
