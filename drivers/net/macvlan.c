@@ -484,7 +484,8 @@ static rx_handler_result_t macvlan_handle_frame(struct sk_buff **pskb)
 		return RX_HANDLER_PASS;
 
 	dev = vlan->dev;
-	if (unlikely(!(dev->flags & IFF_UP))) {
+	if ((vlan->mode == MACVLAN_MODE_SOURCE) ||
+	    unlikely(!(dev->flags & IFF_UP))) {
 		kfree_skb(skb);
 		return RX_HANDLER_CONSUMED;
 	}
