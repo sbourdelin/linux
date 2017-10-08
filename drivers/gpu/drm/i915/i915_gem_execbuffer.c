@@ -27,6 +27,7 @@
  */
 
 #include <linux/dma_remapping.h>
+#include <linux/radix-tree.h>
 #include <linux/reservation.h>
 #include <linux/sync_file.h>
 #include <linux/uaccess.h>

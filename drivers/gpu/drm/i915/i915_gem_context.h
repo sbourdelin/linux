@@ -27,7 +27,7 @@
 
 #include <linux/bitops.h>
 #include <linux/list.h>
-#include <linux/radix-tree.h>
+#include <linux/radix-tree-root.h>
 
 struct pid;
 
