@@ -2332,12 +2332,11 @@ static irqreturn_t ihdlr(struct Scsi_Host *shost)
 		printk
 		    ("%s: ihdlr, spp->eoc == 0, irq %d, reg 0x%x, count %d.\n",
 		     ha->board_name, irq, reg, ha->iocount);
-	if (spp->cpp_index < 0 || spp->cpp_index >= shost->can_queue)
+	if (spp->cpp_index >= shost->can_queue)
 		printk
 		    ("%s: ihdlr, bad spp->cpp_index %d, irq %d, reg 0x%x, count %d.\n",
 		     ha->board_name, spp->cpp_index, irq, reg, ha->iocount);
-	if (spp->eoc == 0 || spp->cpp_index < 0
-	    || spp->cpp_index >= shost->can_queue)
+	if (spp->eoc == 0 || spp->cpp_index >= shost->can_queue)
 		goto handled;
 
 	/* Find the mailbox to be serviced on this board */
