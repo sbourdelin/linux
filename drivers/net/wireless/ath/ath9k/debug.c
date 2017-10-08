@@ -1164,10 +1164,7 @@ static ssize_t write_file_tpc(struct file *file, const char __user *user_buf,
 		return -EFAULT;
 
 	buf[len] = '\0';
-	if (kstrtoul(buf, 0, &val))
-		return -EINVAL;
-
-	if (val < 0 || val > 1)
+	if (kstrtoul(buf, 0, &val) || val > 1)
 		return -EINVAL;
 
 	tpc_enabled = !!val;
