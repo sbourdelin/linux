@@ -513,6 +513,8 @@ i915_vma_insert(struct i915_vma *vma, u64 size, u64 alignment, u64 flags)
 				rounddown_pow_of_two(vma->page_sizes.sg |
 						     I915_GTT_PAGE_SIZE_2M);
 
+			GEM_BUG_ON((flags & PIN_USER) == 0); /* No GGTT! */
+
 			alignment = max(alignment, page_alignment);
 
 			if (vma->page_sizes.sg & I915_GTT_PAGE_SIZE_64K)
