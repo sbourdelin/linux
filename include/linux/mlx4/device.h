@@ -36,7 +36,7 @@
 #include <linux/if_ether.h>
 #include <linux/pci.h>
 #include <linux/completion.h>
-#include <linux/radix-tree.h>
+#include <linux/radix-tree-root.h>
 #include <linux/cpu_rmap.h>
 #include <linux/crash_dump.h>
 

@@ -35,6 +35,7 @@
 
 #include <linux/types.h>
 #include <linux/if_ether.h>
+#include <linux/radix-tree.h>
 
 #include <linux/mlx4/device.h>
 

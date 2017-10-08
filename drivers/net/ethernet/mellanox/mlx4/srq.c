@@ -36,6 +36,7 @@
 #include <linux/mlx4/srq.h>
 #include <linux/export.h>
 #include <linux/gfp.h>
+#include <linux/radix-tree.h>
 
 #include "mlx4.h"
 #include "icm.h"

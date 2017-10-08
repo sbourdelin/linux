@@ -38,7 +38,7 @@
 #define MLX4_H
 
 #include <linux/mutex.h>
-#include <linux/radix-tree.h>
+#include <linux/radix-tree-root.h>
 #include <linux/rbtree.h>
 #include <linux/timer.h>
 #include <linux/semaphore.h>
