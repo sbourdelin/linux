@@ -68,12 +68,10 @@
  */
 #define OT_EC_DEVICE_STATE_ADDRESS	0xD6
 
-#define OT_EC_CAMERA_MASK	(1 << 0)
 #define OT_EC_BT_MASK		(1 << 1)
 #define OT_EC_GPS_MASK		(1 << 2)
 #define OT_EC_WIFI_MASK		(1 << 3)
 #define OT_EC_WWAN_MASK		(1 << 4)
-#define OT_EC_TS_MASK		(1 << 5)
 
 /*
  * This is the address in EC space and commands used to control LCD backlight:
@@ -228,7 +226,7 @@ static int get_backlight_brightness(struct backlight_device *b)
 static int set_backlight_brightness(struct backlight_device *b)
 {
 	u8 percent = (u8) b->props.brightness;
-	if (percent < 0 || percent > OT_EC_BL_BRIGHTNESS_MAX)
+	if (percent > OT_EC_BL_BRIGHTNESS_MAX)
 		return -EINVAL;
 
 	ec_write(OT_EC_BL_BRIGHTNESS_ADDRESS, percent);
