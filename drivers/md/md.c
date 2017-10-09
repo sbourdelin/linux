@@ -66,6 +66,8 @@
 #include <linux/raid/md_u.h>
 #include <linux/slab.h>
 #include <linux/percpu-refcount.h>
+#include <linux/freezer.h>
+#include <linux/suspend.h>
 
 #include <trace/events/block.h>
 #include "md.h"
@@ -7438,6 +7440,7 @@ static int md_thread(void *arg)
 	 */
 
 	allow_signal(SIGKILL);
+	set_freezable();
 	while (!kthread_should_stop()) {
 
 		/* We need to wait INTERRUPTIBLE so that
@@ -7448,7 +7451,7 @@ static int md_thread(void *arg)
 		if (signal_pending(current))
 			flush_signals(current);
 
-		wait_event_interruptible_timeout
+		wait_event_freezable_timeout
 			(thread->wqueue,
 			 test_bit(THREAD_WAKEUP, &thread->flags)
 			 || kthread_should_stop() || kthread_should_park(),
@@ -8961,6 +8964,29 @@ static void md_stop_all_writes(void)
 		mdelay(1000*1);
 }
 
+/*
+ * Ensure that neither resyncing nor reshaping occurs while the system is
+ * frozen.
+ */
+static int md_notify_pm(struct notifier_block *bl, unsigned long state,
+			void *unused)
+{
+	pr_debug("%s: state = %ld\n", __func__, state);
+
+	switch (state) {
+	case PM_HIBERNATION_PREPARE:
+	case PM_SUSPEND_PREPARE:
+	case PM_RESTORE_PREPARE:
+		md_stop_all_writes();
+		break;
+	}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block md_pm_notifier = {
+	.notifier_call	= md_notify_pm,
+};
+
 static int md_notify_reboot(struct notifier_block *this,
 			    unsigned long code, void *x)
 {
@@ -9007,6 +9033,7 @@ static int __init md_init(void)
 			    md_probe, NULL, NULL);
 
 	register_reboot_notifier(&md_reboot_notifier);
+	register_pm_notifier(&md_pm_notifier);
 	raid_table_header = register_sysctl_table(raid_root_table);
 
 	md_geninit();
@@ -9246,6 +9273,7 @@ static __exit void md_exit(void)
 
 	unregister_blkdev(MD_MAJOR,"md");
 	unregister_blkdev(mdp_major, "mdp");
+	unregister_pm_notifier(&md_pm_notifier);
 	unregister_reboot_notifier(&md_reboot_notifier);
 	unregister_sysctl_table(raid_table_header);
 
