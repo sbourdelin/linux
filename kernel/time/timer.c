@@ -1560,8 +1560,7 @@ static int collect_expired_timers(struct timer_base *base,
 		 * jiffies, otherwise forward to the next expiry time:
 		 */
 		if (time_after(next, jiffies)) {
-			/* The call site will increment clock! */
-			base->clk = jiffies - 1;
+			base->clk = jiffies;
 			return 0;
 		}
 		base->clk = next;
