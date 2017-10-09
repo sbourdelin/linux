@@ -90,6 +90,7 @@
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
 #include "i915_trace.h"
+#include "i915_workarounds.h"
 
 #define ALL_L3_SLICES(dev) (1 << NUM_L3_SLICES(dev)) - 1
 
@@ -453,6 +454,10 @@ int i915_gem_contexts_init(struct drm_i915_private *dev_priv)
 	int err;
 
 	GEM_BUG_ON(dev_priv->kernel_context);
+
+	err = i915_ctx_workarounds_init(dev_priv);
+	if (err)
+		goto err;
 
 	INIT_LIST_HEAD(&dev_priv->contexts.list);
 	INIT_WORK(&dev_priv->contexts.free_work, contexts_free_worker);

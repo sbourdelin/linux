@@ -32,6 +32,7 @@
 #include "i915_gem_clflush.h"
 #include "i915_vgpu.h"
 #include "i915_trace.h"
+#include "i915_workarounds.h"
 #include "intel_drv.h"
 #include "intel_frontbuffer.h"
 #include "intel_mocs.h"
@@ -4761,6 +4762,8 @@ int i915_gem_init_hw(struct drm_i915_private *dev_priv)
 			I915_WRITE(HSW_NDE_RSTWRN_OPT, temp);
 		}
 	}
+
+	i915_mmio_workarounds_apply(dev_priv);
 
 	i915_gem_init_swizzling(dev_priv);
 

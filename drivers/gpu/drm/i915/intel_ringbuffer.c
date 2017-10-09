@@ -638,7 +638,7 @@ static int intel_rcs_ctx_init(struct drm_i915_gem_request *req)
 {
 	int ret;
 
-	ret = intel_ring_workarounds_emit(req);
+	ret = i915_ctx_workarounds_emit(req);
 	if (ret != 0)
 		return ret;
 
@@ -697,7 +697,7 @@ static int init_render_ring(struct intel_engine_cs *engine)
 	if (INTEL_INFO(dev_priv)->gen >= 6)
 		I915_WRITE_IMR(engine, ~engine->irq_keep_mask);
 
-	return init_workarounds_ring(engine);
+	return 0;
 }
 
 static void render_ring_cleanup(struct intel_engine_cs *engine)
