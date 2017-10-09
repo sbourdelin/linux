@@ -2786,7 +2786,7 @@ static int gsm_create_network(struct gsm_dlci *dlci, struct gsm_netconfig *nc)
 	net = alloc_netdev(sizeof(struct gsm_mux_net), netname,
 			   NET_NAME_UNKNOWN, gsm_mux_net_init);
 	if (!net) {
-		pr_err("alloc_netdev failed");
+		pr_err("alloc_netdev failed\n");
 		return -ENOMEM;
 	}
 	net->mtu = dlci->gsm->mtu;
