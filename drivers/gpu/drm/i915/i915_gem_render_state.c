@@ -60,12 +60,12 @@ render_state_get_rodata(const struct intel_engine_cs *engine)
  * this is sufficient as the null state generator makes the final batch
  * with two passes to build command and state separately. At this point
  * the size of both are known and it compacts them by relocating the state
- * right after the commands taking care of alignment so we should sufficient
- * space below them for adding new commands.
+ * right after the commands taking care of alignment so we should have
+ * sufficient space below them for adding new commands.
  */
-#define OUT_BATCH(batch, i, val)				\
+#define OUT_BATCH(batch, size, i, val)				\
 	do {							\
-		if ((i) >= PAGE_SIZE / sizeof(u32))		\
+		if ((i) >= size / sizeof(u32))			\
 			goto err;				\
 		(batch)[(i)++] = (val);				\
 	} while(0)
@@ -84,7 +84,11 @@ static int render_state_setup(struct intel_render_state *so,
 	if (ret)
 		return ret;
 
-	d = kmap_atomic(i915_gem_object_get_dirty_page(obj, 0));
+	d = i915_gem_object_pin_map(obj, I915_MAP_WB);
+	if (IS_ERR(d)) {
+		ret = PTR_ERR(d);
+		goto out;
+	}
 
 	while (i < rodata->batch_items) {
 		u32 s = rodata->batch[i];
@@ -116,7 +120,7 @@ static int render_state_setup(struct intel_render_state *so,
 	so->batch_size = rodata->batch_items * sizeof(u32);
 
 	while (i % CACHELINE_DWORDS)
-		OUT_BATCH(d, i, MI_NOOP);
+		OUT_BATCH(d, obj->base.size, i, MI_NOOP);
 
 	so->aux_offset = i * sizeof(u32);
 
@@ -139,15 +143,15 @@ static int render_state_setup(struct intel_render_state *so,
 		 */
 		u32 eu_pool_config = 0x00777000;
 
-		OUT_BATCH(d, i, GEN9_MEDIA_POOL_STATE);
-		OUT_BATCH(d, i, GEN9_MEDIA_POOL_ENABLE);
-		OUT_BATCH(d, i, eu_pool_config);
-		OUT_BATCH(d, i, 0);
-		OUT_BATCH(d, i, 0);
-		OUT_BATCH(d, i, 0);
+		OUT_BATCH(d, obj->base.size, i, GEN9_MEDIA_POOL_STATE);
+		OUT_BATCH(d, obj->base.size, i, GEN9_MEDIA_POOL_ENABLE);
+		OUT_BATCH(d, obj->base.size, i, eu_pool_config);
+		OUT_BATCH(d, obj->base.size, i, 0);
+		OUT_BATCH(d, obj->base.size, i, 0);
+		OUT_BATCH(d, obj->base.size, i, 0);
 	}
 
-	OUT_BATCH(d, i, MI_BATCH_BUFFER_END);
+	OUT_BATCH(d, obj->base.size, i, MI_BATCH_BUFFER_END);
 	so->aux_size = i * sizeof(u32) - so->aux_offset;
 	so->aux_offset += so->batch_offset;
 	/*
@@ -158,7 +162,7 @@ static int render_state_setup(struct intel_render_state *so,
 
 	if (needs_clflush)
 		drm_clflush_virt_range(d, i * sizeof(u32));
-	kunmap_atomic(d);
+	i915_gem_object_unpin_map(obj);
 
 	ret = i915_gem_object_set_to_gtt_domain(obj, false);
 out:
@@ -166,7 +170,7 @@ out:
 	return ret;
 
 err:
-	kunmap_atomic(d);
+	i915_gem_object_unpin_map(obj);
 	ret = -EINVAL;
 	goto out;
 }
@@ -187,14 +191,12 @@ int i915_gem_render_state_init(struct intel_engine_cs *engine)
 	if (!rodata)
 		return 0;
 
-	if (rodata->batch_items * 4 > PAGE_SIZE)
-		return -EINVAL;
-
 	so = kmalloc(sizeof(*so), GFP_KERNEL);
 	if (!so)
 		return -ENOMEM;
 
-	obj = i915_gem_object_create_internal(engine->i915, PAGE_SIZE);
+	obj = i915_gem_object_create_internal(engine->i915,
+			PAGE_ALIGN(rodata->batch_items * 4));
 	if (IS_ERR(obj)) {
 		ret = PTR_ERR(obj);
 		goto err_free;
