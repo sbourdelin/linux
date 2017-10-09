@@ -17,18 +17,9 @@
 #define _DELL_SMBIOS_H_
 
 #include <linux/device.h>
+#include <uapi/linux/dell-smbios.h>
 
 struct notifier_block;
-
-/* This structure will be modified by the firmware when we enter
- * system management mode, hence the volatiles */
-
-struct calling_interface_buffer {
-	u16 class;
-	u16 select;
-	volatile u32 input[4];
-	volatile u32 output[4];
-} __packed;
 
 struct calling_interface_token {
 	u16 tokenID;
