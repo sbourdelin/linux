@@ -95,6 +95,18 @@ static void blk_mq_do_dispatch_sched(struct blk_mq_hw_ctx *hctx)
 	struct elevator_queue *e = q->elevator;
 	LIST_HEAD(rq_list);
 
+	/*
+	 * If DISPATCH_BUSY is set, that means hw queue is busy
+	 * and requests in the list of hctx->dispatch need to
+	 * be flushed first, so return early.
+	 *
+	 * Wherever DISPATCH_BUSY is set, blk_mq_run_hw_queue()
+	 * will be run to try to make progress, so it is always
+	 * safe to check the state here.
+	 */
+	if (test_bit(BLK_MQ_S_DISPATCH_BUSY, &hctx->state))
+		return;
+
 	do {
 		struct request *rq = e->type->ops.mq.dispatch_request(hctx);
 
@@ -120,6 +132,10 @@ static void blk_mq_do_dispatch_ctx(struct blk_mq_hw_ctx *hctx)
 	struct request_queue *q = hctx->queue;
 	LIST_HEAD(rq_list);
 	struct blk_mq_ctx *ctx = READ_ONCE(hctx->dispatch_from);
+
+	/* See same comment in blk_mq_do_dispatch_sched() */
+	if (test_bit(BLK_MQ_S_DISPATCH_BUSY, &hctx->state))
+		return;
 
 	do {
 		struct request *rq;
@@ -176,12 +192,22 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 	 */
 	if (!list_empty(&rq_list)) {
 		blk_mq_sched_mark_restart_hctx(hctx);
-		if (blk_mq_dispatch_rq_list(q, &rq_list)) {
-			if (has_sched_dispatch)
-				blk_mq_do_dispatch_sched(hctx);
-			else
-				blk_mq_do_dispatch_ctx(hctx);
-		}
+		blk_mq_dispatch_rq_list(q, &rq_list);
+
+		/*
+		 * We may clear DISPATCH_BUSY just after it is set from
+		 * another context, the only cost is that one request is
+		 * dequeued a bit early, we can survive that. Given the
+		 * window is small enough, no need to worry about performance
+		 * effect.
+		 */
+		if (list_empty_careful(&hctx->dispatch))
+			clear_bit(BLK_MQ_S_DISPATCH_BUSY, &hctx->state);
+
+		if (has_sched_dispatch)
+			blk_mq_do_dispatch_sched(hctx);
+		else
+			blk_mq_do_dispatch_ctx(hctx);
 	} else if (has_sched_dispatch) {
 		blk_mq_do_dispatch_sched(hctx);
 	} else if (q->queue_depth) {
