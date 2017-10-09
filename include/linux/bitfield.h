@@ -15,6 +15,7 @@
 #ifndef _LINUX_BITFIELD_H
 #define _LINUX_BITFIELD_H
 
+#include <linux/bitops.h>
 #include <linux/bug.h>
 
 /*
@@ -46,7 +47,7 @@
  *  reg |= FIELD_PREP(REG_FIELD_C, c);
  */
 
-#define __bf_shf(x) (__builtin_ffsll(x) - 1)
+#define __bf_shf(x) __ffs64(x)
 
 #define __BF_FIELD_CHECK(_mask, _reg, _val, _pfx)			\
 	({								\
