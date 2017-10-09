@@ -60,7 +60,7 @@ static int to_atmarpd(enum atmarp_ctrl_type type, int itf, __be32 ip)
 	skb = alloc_skb(sizeof(struct atmarp_ctrl), GFP_ATOMIC);
 	if (!skb)
 		return -ENOMEM;
-	ctrl = skb_put(skb, sizeof(struct atmarp_ctrl));
+	ctrl = skb_put(skb, sizeof(*ctrl));
 	ctrl->type = type;
 	ctrl->itf_num = itf;
 	ctrl->ip = ip;
@@ -418,7 +418,7 @@ static int clip_mkip(struct atm_vcc *vcc, int timeout)
 
 	if (!vcc->push)
 		return -EBADFD;
-	clip_vcc = kmalloc(sizeof(struct clip_vcc), GFP_KERNEL);
+	clip_vcc = kmalloc(sizeof(*clip_vcc), GFP_KERNEL);
 	if (!clip_vcc)
 		return -ENOMEM;
 	pr_debug("%p vcc %p\n", clip_vcc, vcc);

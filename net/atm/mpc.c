@@ -183,7 +183,7 @@ struct atm_mpoa_qos *atm_mpoa_add_qos(__be32 dst_ip, struct atm_qos *qos)
 		return entry;
 	}
 
-	entry = kmalloc(sizeof(struct atm_mpoa_qos), GFP_KERNEL);
+	entry = kmalloc(sizeof(*entry), GFP_KERNEL);
 	if (!entry)
 		return entry;
 
@@ -279,7 +279,7 @@ static struct mpoa_client *alloc_mpc(void)
 {
 	struct mpoa_client *mpc;
 
-	mpc = kzalloc(sizeof(struct mpoa_client), GFP_KERNEL);
+	mpc = kzalloc(sizeof(*mpc), GFP_KERNEL);
 	if (mpc == NULL)
 		return NULL;
 	rwlock_init(&mpc->ingress_lock);
