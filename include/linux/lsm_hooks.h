@@ -1385,6 +1385,19 @@
  * @bpf_prog_free_security:
  *	Clean up the security information stored inside bpf prog.
  *
+ * @bpf_map_file:
+ *	When creating a bpf map fd, set up the file security information with
+ *	the bpf security information stored in the map struct. So when the map
+ *	fd is passed between processes, the security module can directly read
+ *	the security information from file security struct rather than the bpf
+ *	security struct.
+ *
+ * @bpf_prog_file:
+ *	When creating a bpf prog fd, set up the file security information with
+ *	the bpf security information stored in the prog struct. So when the prog
+ *	fd is passed between processes, the security module can directly read
+ *	the security information from file security struct rather than the bpf
+ *	security struct.
  */
 union security_list_options {
 	int (*binder_set_context_mgr)(struct task_struct *mgr);
@@ -1726,6 +1739,8 @@ union security_list_options {
 	void (*bpf_map_free_security)(struct bpf_map *map);
 	int (*bpf_prog_alloc_security)(struct bpf_prog_aux *aux);
 	void (*bpf_prog_free_security)(struct bpf_prog_aux *aux);
+	void (*bpf_map_file)(struct bpf_map *map, struct file *file);
+	void (*bpf_prog_file)(struct bpf_prog_aux *aux, struct file *file);
 #endif /* CONFIG_BPF_SYSCALL */
 };
 
@@ -1954,6 +1969,8 @@ struct security_hook_heads {
 	struct list_head bpf_map_free_security;
 	struct list_head bpf_prog_alloc_security;
 	struct list_head bpf_prog_free_security;
+	struct list_head bpf_map_file;
+	struct list_head bpf_prog_file;
 #endif /* CONFIG_BPF_SYSCALL */
 } __randomize_layout;
 
