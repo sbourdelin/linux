@@ -212,7 +212,7 @@ static int br2684_xmit_vcc(struct sk_buff *skb, struct net_device *dev,
 		struct sk_buff *skb2 = skb_realloc_headroom(skb, minheadroom);
 		brvcc->copies_needed++;
 		dev_kfree_skb(skb);
-		if (skb2 == NULL) {
+		if (!skb2) {
 			brvcc->copies_failed++;
 			return 0;
 		}
@@ -299,7 +299,7 @@ static netdev_tx_t br2684_start_xmit(struct sk_buff *skb,
 	pr_debug("skb_dst(skb)=%p\n", skb_dst(skb));
 	read_lock(&devs_lock);
 	brvcc = pick_outgoing_vcc(skb, brdev);
-	if (brvcc == NULL) {
+	if (!brvcc) {
 		pr_debug("no vcc attached to dev %s\n", dev->name);
 		dev->stats.tx_errors++;
 		dev->stats.tx_carrier_errors++;
@@ -372,13 +372,13 @@ static int br2684_setfilt(struct atm_vcc *atmvcc, void __user * arg)
 		struct br2684_dev *brdev;
 		read_lock(&devs_lock);
 		brdev = BRPRIV(br2684_find_dev(&fs.ifspec));
-		if (brdev == NULL || list_empty(&brdev->brvccs) ||
+		if (!brdev || list_empty(&brdev->brvccs) ||
 		    brdev->brvccs.next != brdev->brvccs.prev)	/* >1 VCC */
 			brvcc = NULL;
 		else
 			brvcc = list_entry_brvcc(brdev->brvccs.next);
 		read_unlock(&devs_lock);
-		if (brvcc == NULL)
+		if (!brvcc)
 			return -ESRCH;
 	} else
 		brvcc = BR2684_VCC(atmvcc);
@@ -427,8 +427,7 @@ static void br2684_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 	struct br2684_dev *brdev = BRPRIV(net_dev);
 
 	pr_debug("\n");
-
-	if (unlikely(skb == NULL)) {
+	if (unlikely(!skb)) {
 		/* skb==NULL means VCC is being destroyed */
 		br2684_close_vcc(brvcc);
 		if (list_empty(&brdev->brvccs)) {
@@ -550,13 +549,13 @@ static int br2684_regvcc(struct atm_vcc *atmvcc, void __user * arg)
 	atomic_set(&brvcc->qspace, 2);
 	write_lock_irq(&devs_lock);
 	net_dev = br2684_find_dev(&be.ifspec);
-	if (net_dev == NULL) {
+	if (!net_dev) {
 		pr_err("tried to attach to non-existent device\n");
 		err = -ENXIO;
 		goto error;
 	}
 	brdev = BRPRIV(net_dev);
-	if (atmvcc->push == NULL) {
+	if (!atmvcc->push) {
 		err = -EBADFD;
 		goto error;
 	}
@@ -839,7 +838,7 @@ static int __init br2684_init(void)
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *p;
 	p = proc_create("br2684", 0, atm_proc_root, &br2684_proc_ops);
-	if (p == NULL)
+	if (!p)
 		return -ENOMEM;
 #endif
 	register_atm_ioctl(&br2684_ioctl_ops);

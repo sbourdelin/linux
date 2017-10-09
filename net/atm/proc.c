@@ -118,7 +118,7 @@ static int __vcc_seq_open(struct inode *inode, struct file *file,
 	struct vcc_state *state;
 
 	state = __seq_open_private(file, ops, sizeof(*state));
-	if (state == NULL)
+	if (!state)
 		return -ENOMEM;
 
 	state->family = family;

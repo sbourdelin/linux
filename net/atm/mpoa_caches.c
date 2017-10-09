@@ -38,7 +38,7 @@ static in_cache_entry *in_cache_get(__be32 dst_ip,
 
 	read_lock_bh(&client->ingress_lock);
 	entry = client->in_cache;
-	while (entry != NULL) {
+	while (entry) {
 		if (entry->ctrl_info.in_dst_ip == dst_ip) {
 			refcount_inc(&entry->use);
 			read_unlock_bh(&client->ingress_lock);
@@ -59,7 +59,7 @@ static in_cache_entry *in_cache_get_with_mask(__be32 dst_ip,
 
 	read_lock_bh(&client->ingress_lock);
 	entry = client->in_cache;
-	while (entry != NULL) {
+	while (entry) {
 		if ((entry->ctrl_info.in_dst_ip & mask) == (dst_ip & mask)) {
 			refcount_inc(&entry->use);
 			read_unlock_bh(&client->ingress_lock);
@@ -80,7 +80,7 @@ static in_cache_entry *in_cache_get_by_vcc(struct atm_vcc *vcc,
 
 	read_lock_bh(&client->ingress_lock);
 	entry = client->in_cache;
-	while (entry != NULL) {
+	while (entry) {
 		if (entry->shortcut == vcc) {
 			refcount_inc(&entry->use);
 			read_unlock_bh(&client->ingress_lock);
@@ -108,7 +108,7 @@ static in_cache_entry *in_cache_add_entry(__be32 dst_ip,
 	write_lock_bh(&client->ingress_lock);
 	entry->next = client->in_cache;
 	entry->prev = NULL;
-	if (client->in_cache != NULL)
+	if (client->in_cache)
 		client->in_cache->prev = entry;
 	client->in_cache = entry;
 
@@ -133,7 +133,7 @@ static int cache_hit(in_cache_entry *entry, struct mpoa_client *mpc)
 	struct k_message msg;
 
 	entry->count++;
-	if (entry->entry_state == INGRESS_RESOLVED && entry->shortcut != NULL)
+	if (entry->entry_state == INGRESS_RESOLVED && entry->shortcut)
 		return OPEN;
 
 	if (entry->entry_state == INGRESS_REFRESHING) {
@@ -142,18 +142,18 @@ static int cache_hit(in_cache_entry *entry, struct mpoa_client *mpc)
 			msg.content.in_info = entry->ctrl_info;
 			memcpy(msg.MPS_ctrl, mpc->mps_ctrl_addr, ATM_ESA_LEN);
 			qos = atm_mpoa_search_qos(entry->ctrl_info.in_dst_ip);
-			if (qos != NULL)
+			if (qos)
 				msg.qos = qos->qos;
 			msg_to_mpoad(&msg, mpc);
 			do_gettimeofday(&(entry->reply_wait));
 			entry->entry_state = INGRESS_RESOLVING;
 		}
-		if (entry->shortcut != NULL)
+		if (entry->shortcut)
 			return OPEN;
 		return CLOSED;
 	}
 
-	if (entry->entry_state == INGRESS_RESOLVING && entry->shortcut != NULL)
+	if (entry->entry_state == INGRESS_RESOLVING && entry->shortcut)
 		return OPEN;
 
 	if (entry->count > mpc->parameters.mpc_p1 &&
@@ -165,7 +165,7 @@ static int cache_hit(in_cache_entry *entry, struct mpoa_client *mpc)
 		memcpy(msg.MPS_ctrl, mpc->mps_ctrl_addr, ATM_ESA_LEN);
 		msg.content.in_info = entry->ctrl_info;
 		qos = atm_mpoa_search_qos(entry->ctrl_info.in_dst_ip);
-		if (qos != NULL)
+		if (qos)
 			msg.qos = qos->qos;
 		msg_to_mpoad(&msg, mpc);
 		do_gettimeofday(&(entry->reply_wait));
@@ -195,23 +195,24 @@ static void in_cache_remove_entry(in_cache_entry *entry,
 	dprintk("removing an ingress entry, ip = %pI4\n",
 		&entry->ctrl_info.in_dst_ip);
 
-	if (entry->prev != NULL)
+	if (entry->prev)
 		entry->prev->next = entry->next;
 	else
 		client->in_cache = entry->next;
-	if (entry->next != NULL)
+	if (entry->next)
 		entry->next->prev = entry->prev;
 	client->in_ops->put(entry);
-	if (client->in_cache == NULL && client->eg_cache == NULL) {
+	if (!client->in_cache && !client->eg_cache) {
 		msg.type = STOP_KEEP_ALIVE_SM;
 		msg_to_mpoad(&msg, client);
 	}
 
 	/* Check if the egress side still uses this VCC */
-	if (vcc != NULL) {
+	if (vcc) {
 		eg_cache_entry *eg_entry = client->eg_ops->get_by_vcc(vcc,
 								      client);
-		if (eg_entry != NULL) {
+
+		if (eg_entry) {
 			client->eg_ops->put(eg_entry);
 			return;
 		}
@@ -230,7 +231,7 @@ static void clear_count_and_expired(struct mpoa_client *client)
 
 	write_lock_bh(&client->ingress_lock);
 	entry = client->in_cache;
-	while (entry != NULL) {
+	while (entry) {
 		entry->count = 0;
 		next_entry = entry->next;
 		if ((now.tv_sec - entry->tv.tv_sec)
@@ -257,7 +258,7 @@ static void check_resolving_entries(struct mpoa_client *client)
 
 	read_lock_bh(&client->ingress_lock);
 	entry = client->in_cache;
-	while (entry != NULL) {
+	while (entry) {
 		if (entry->entry_state == INGRESS_RESOLVING) {
 			if ((now.tv_sec - entry->hold_down.tv_sec) <
 			    client->parameters.mpc_p6) {
@@ -283,7 +284,7 @@ static void check_resolving_entries(struct mpoa_client *client)
 				memcpy(msg.MPS_ctrl, client->mps_ctrl_addr, ATM_ESA_LEN);
 				msg.content.in_info = entry->ctrl_info;
 				qos = atm_mpoa_search_qos(entry->ctrl_info.in_dst_ip);
-				if (qos != NULL)
+				if (qos)
 					msg.qos = qos->qos;
 				msg_to_mpoad(&msg, client);
 				do_gettimeofday(&(entry->reply_wait));
@@ -304,7 +305,7 @@ static void refresh_entries(struct mpoa_client *client)
 	do_gettimeofday(&now);
 
 	read_lock_bh(&client->ingress_lock);
-	while (entry != NULL) {
+	while (entry) {
 		if (entry->entry_state == INGRESS_RESOLVED) {
 			if (!(entry->refresh_time))
 				entry->refresh_time = (2 * (entry->ctrl_info.holding_time))/3;
@@ -323,7 +324,7 @@ static void refresh_entries(struct mpoa_client *client)
 static void in_destroy_cache(struct mpoa_client *mpc)
 {
 	write_lock_irq(&mpc->ingress_lock);
-	while (mpc->in_cache != NULL)
+	while (mpc->in_cache)
 		mpc->in_ops->remove_entry(mpc->in_cache, mpc);
 	write_unlock_irq(&mpc->ingress_lock);
 }
@@ -335,7 +336,7 @@ static eg_cache_entry *eg_cache_get_by_cache_id(__be32 cache_id,
 
 	read_lock_irq(&mpc->egress_lock);
 	entry = mpc->eg_cache;
-	while (entry != NULL) {
+	while (entry) {
 		if (entry->ctrl_info.cache_id == cache_id) {
 			refcount_inc(&entry->use);
 			read_unlock_irq(&mpc->egress_lock);
@@ -356,7 +357,7 @@ static eg_cache_entry *eg_cache_get_by_tag(__be32 tag, struct mpoa_client *mpc)
 
 	read_lock_irqsave(&mpc->egress_lock, flags);
 	entry = mpc->eg_cache;
-	while (entry != NULL) {
+	while (entry) {
 		if (entry->ctrl_info.tag == tag) {
 			refcount_inc(&entry->use);
 			read_unlock_irqrestore(&mpc->egress_lock, flags);
@@ -378,7 +379,7 @@ static eg_cache_entry *eg_cache_get_by_vcc(struct atm_vcc *vcc,
 
 	read_lock_irqsave(&mpc->egress_lock, flags);
 	entry = mpc->eg_cache;
-	while (entry != NULL) {
+	while (entry) {
 		if (entry->shortcut == vcc) {
 			refcount_inc(&entry->use);
 			read_unlock_irqrestore(&mpc->egress_lock, flags);
@@ -398,7 +399,7 @@ static eg_cache_entry *eg_cache_get_by_src_ip(__be32 ipaddr,
 
 	read_lock_irq(&mpc->egress_lock);
 	entry = mpc->eg_cache;
-	while (entry != NULL) {
+	while (entry) {
 		if (entry->latest_ip_addr == ipaddr) {
 			refcount_inc(&entry->use);
 			read_unlock_irq(&mpc->egress_lock);
@@ -430,22 +431,22 @@ static void eg_cache_remove_entry(eg_cache_entry *entry,
 
 	vcc = entry->shortcut;
 	dprintk("removing an egress entry.\n");
-	if (entry->prev != NULL)
+	if (entry->prev)
 		entry->prev->next = entry->next;
 	else
 		client->eg_cache = entry->next;
-	if (entry->next != NULL)
+	if (entry->next)
 		entry->next->prev = entry->prev;
 	client->eg_ops->put(entry);
-	if (client->in_cache == NULL && client->eg_cache == NULL) {
+	if (!client->in_cache && !client->eg_cache) {
 		msg.type = STOP_KEEP_ALIVE_SM;
 		msg_to_mpoad(&msg, client);
 	}
 
 	/* Check if the ingress side still uses this VCC */
-	if (vcc != NULL) {
+	if (vcc) {
 		in_cache_entry *in_entry = client->in_ops->get_by_vcc(vcc, client);
-		if (in_entry != NULL) {
+		if (in_entry) {
 			client->in_ops->put(in_entry);
 			return;
 		}
@@ -469,7 +470,7 @@ static eg_cache_entry *eg_cache_add_entry(struct k_message *msg,
 	write_lock_irq(&client->egress_lock);
 	entry->next = client->eg_cache;
 	entry->prev = NULL;
-	if (client->eg_cache != NULL)
+	if (client->eg_cache)
 		client->eg_cache->prev = entry;
 	client->eg_cache = entry;
 
@@ -505,7 +506,7 @@ static void clear_expired(struct mpoa_client *client)
 
 	write_lock_irq(&client->egress_lock);
 	entry = client->eg_cache;
-	while (entry != NULL) {
+	while (entry) {
 		next_entry = entry->next;
 		if ((now.tv_sec - entry->tv.tv_sec)
 		   > entry->ctrl_info.holding_time) {
@@ -524,7 +525,7 @@ static void clear_expired(struct mpoa_client *client)
 static void eg_destroy_cache(struct mpoa_client *mpc)
 {
 	write_lock_irq(&mpc->egress_lock);
-	while (mpc->eg_cache != NULL)
+	while (mpc->eg_cache)
 		mpc->eg_ops->remove_entry(mpc->eg_cache, mpc);
 	write_unlock_irq(&mpc->egress_lock);
 }

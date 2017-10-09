@@ -183,7 +183,7 @@ static void pppoatm_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 {
 	struct pppoatm_vcc *pvcc = atmvcc_to_pvcc(atmvcc);
 	pr_debug("\n");
-	if (skb == NULL) {			/* VCC was closed */
+	if (!skb) {			/* VCC was closed */
 		struct module *module;
 
 		pr_debug("removing ATMPPP VCC %p\n", pvcc);
@@ -202,7 +202,7 @@ static void pppoatm_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 		skb_pull(skb, LLC_LEN);
 		break;
 	case e_autodetect:
-		if (pvcc->chan.ppp == NULL) {	/* Not bound yet! */
+		if (!pvcc->chan.ppp) {	/* Not bound yet! */
 			kfree_skb(skb);
 			return;
 		}
@@ -324,14 +324,13 @@ static int pppoatm_send(struct ppp_channel *chan, struct sk_buff *skb)
 		if (skb_headroom(skb) < LLC_LEN) {
 			struct sk_buff *n;
 			n = skb_realloc_headroom(skb, LLC_LEN);
-			if (n != NULL &&
-			    !pppoatm_may_send(pvcc, n->truesize)) {
+			if (n && !pppoatm_may_send(pvcc, n->truesize)) {
 				kfree_skb(n);
 				goto nospace;
 			}
 			consume_skb(skb);
 			skb = n;
-			if (skb == NULL) {
+			if (!skb) {
 				bh_unlock_sock(sk_atm(vcc));
 				return DROP_PACKET;
 			}
@@ -406,7 +405,7 @@ static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, void __user *arg)
 	    be.encaps != PPPOATM_ENCAPS_VC && be.encaps != PPPOATM_ENCAPS_LLC)
 		return -EINVAL;
 	pvcc = kzalloc(sizeof(*pvcc), GFP_KERNEL);
-	if (pvcc == NULL)
+	if (!pvcc)
 		return -ENOMEM;
 	pvcc->atmvcc = atmvcc;
 

@@ -809,7 +809,7 @@ static void *clip_seq_vcc_walk(struct clip_seq_state *state,
 	struct clip_vcc *vcc = state->vcc;
 
 	vcc = clip_seq_next_vcc(e, vcc);
-	if (vcc && pos != NULL) {
+	if (vcc && pos) {
 		while (*pos) {
 			vcc = clip_seq_next_vcc(e, vcc);
 			if (!vcc)
