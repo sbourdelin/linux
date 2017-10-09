@@ -3541,6 +3541,20 @@ static int i915_shared_dplls_info(struct seq_file *m, void *unused)
 	return 0;
 }
 
+static void check_wa_register(struct seq_file *m, struct i915_wa_reg *wa_reg)
+{
+	struct drm_i915_private *dev_priv = node_to_i915(m->private);
+	u32 read;
+	bool ok;
+
+	read = I915_READ(wa_reg->addr);
+	ok = (wa_reg->value & wa_reg->mask) == (read & wa_reg->mask);
+	seq_printf(m, "0x%X: 0x%08x, mask: 0x%08x, read: 0x%08x, status: %s\n",
+		   i915_mmio_reg_offset(wa_reg->addr),
+		   wa_reg->value, wa_reg->mask, read,
+		   ok ? "OK" : "FAIL");
+}
+
 static int i915_wa_registers(struct seq_file *m, void *unused)
 {
 	int i;
@@ -3550,6 +3564,7 @@ static int i915_wa_registers(struct seq_file *m, void *unused)
 	struct drm_device *dev = &dev_priv->drm;
 	struct i915_workarounds *workarounds = &dev_priv->workarounds;
 	enum intel_engine_id id;
+	u32 whitelist_wa_count = 0;
 
 	ret = mutex_lock_interruptible(&dev->struct_mutex);
 	if (ret)
@@ -3558,22 +3573,27 @@ static int i915_wa_registers(struct seq_file *m, void *unused)
 	intel_runtime_pm_get(dev_priv);
 
 	seq_printf(m, "Context workarounds applied: %d\n", workarounds->ctx_wa_count);
-	for_each_engine(engine, dev_priv, id)
-		seq_printf(m, "HW whitelist count for %s: %d\n",
-			   engine->name, workarounds->whitelist_wa_count[id]);
 	for (i = 0; i < workarounds->ctx_wa_count; ++i) {
-		i915_reg_t addr;
-		u32 mask, value, read;
-		bool ok;
+		struct i915_wa_reg *wa_reg = &workarounds->ctx_wa_reg[i];
 
-		addr = workarounds->ctx_wa_reg[i].addr;
-		mask = workarounds->ctx_wa_reg[i].mask;
-		value = workarounds->ctx_wa_reg[i].value;
-		read = I915_READ(addr);
-		ok = (value & mask) == (read & mask);
-		seq_printf(m, "0x%X: 0x%08X, mask: 0x%08X, read: 0x%08x, status: %s\n",
-			   i915_mmio_reg_offset(addr), value, mask, read, ok ? "OK" : "FAIL");
+		seq_printf(m, "0x%X: 0x%08x, mask: 0x%08x\n",
+			   i915_mmio_reg_offset(wa_reg->addr),
+			   wa_reg->value, wa_reg->mask);
 	}
+	seq_putc(m, '\n');
+
+	seq_printf(m, "MMIO workarounds applied: %d\n", workarounds->mmio_wa_count);
+	for (i = 0; i < workarounds->mmio_wa_count; ++i)
+		check_wa_register(m, &workarounds->mmio_wa_reg[i]);
+	seq_putc(m, '\n');
+
+	for_each_engine(engine, dev_priv, id)
+		whitelist_wa_count += workarounds->whitelist_wa_count[id];
+	seq_printf(m, "Whitelist workarounds applied: %d\n", whitelist_wa_count);
+	for_each_engine(engine, dev_priv, id)
+		for (i = 0; i < workarounds->whitelist_wa_count[id]; ++i)
+			check_wa_register(m, &workarounds->whitelist_wa_reg[id][i]);
+	seq_putc(m, '\n');
 
 	intel_runtime_pm_put(dev_priv);
 	mutex_unlock(&dev->struct_mutex);
