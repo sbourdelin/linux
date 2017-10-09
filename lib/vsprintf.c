@@ -1775,6 +1775,8 @@ char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 			default:
 				return string(buf, end, "(invalid address)", spec);
 			}}
+		default:
+			return string(buf, end, "(invalid specifier, form: %pi4)", spec);
 		}
 		break;
 	case 'E':
