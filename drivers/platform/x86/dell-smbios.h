@@ -45,6 +45,8 @@ void dell_smbios_unregister_device(struct device *d);
 
 void dell_smbios_get_smm_address(int *address, int *command);
 int dell_smbios_error(int value);
+int dell_smbios_call_filter(struct device *d,
+			    struct calling_interface_buffer *buffer);
 int dell_smbios_call(struct calling_interface_buffer *buffer);
 
 struct calling_interface_token *dell_smbios_find_token(int tokenid);
