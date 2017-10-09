@@ -4,7 +4,7 @@
  * for more details.
  *
  * Copyright (c) 2014 Imagination Technologies Ltd.
- * Author: Leonid Yegoshin <Leonid.Yegoshin@imgtec.com>
+ * Author: Leonid Yegoshin <leonid.yegoshin@mips.com>
  * Author: Markos Chandras <markos.chandras@imgtec.com>
  *
  *      MIPS R2 user space instruction emulator for MIPS R6

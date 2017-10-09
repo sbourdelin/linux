@@ -2,7 +2,7 @@
  * Xilfpga platform setup
  *
  * Copyright (C) 2015 Imagination Technologies
- * Author: Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com>
+ * Author: Zubair Lutfullah Kakakhel <zubair.kakakhel@mips.com>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
