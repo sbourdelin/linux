@@ -569,8 +569,7 @@ static void erspan_fb_xmit(struct sk_buff *skb, struct net_device *dev,
 
 	key = &tun_info->key;
 
-	/* ERSPAN has fixed 8 byte GRE header */
-	tunnel_hlen = 8 + sizeof(struct erspanhdr);
+	tunnel_hlen = ERSPAN_GREHDR_LEN + sizeof(struct erspanhdr);
 
 	rt = prepare_fb_xmit(skb, dev, &fl, tunnel_hlen);
 	if (!rt)
@@ -591,7 +590,7 @@ static void erspan_fb_xmit(struct sk_buff *skb, struct net_device *dev,
 	erspan_build_header(skb, tunnel_id_to_key32(key->tun_id),
 			    ntohl(md->index), truncate);
 
-	gre_build_header(skb, 8, TUNNEL_SEQ,
+	gre_build_header(skb, ERSPAN_GREHDR_LEN, TUNNEL_SEQ,
 			 htons(ETH_P_ERSPAN), 0, htonl(tunnel->o_seqno++));
 
 	df = key->tun_flags & TUNNEL_DONT_FRAGMENT ?  htons(IP_DF) : 0;
@@ -1242,14 +1241,14 @@ static int erspan_tunnel_init(struct net_device *dev)
 	struct ip_tunnel *tunnel = netdev_priv(dev);
 	int t_hlen;
 
-	tunnel->tun_hlen = 8;
+	tunnel->tun_hlen = ERSPAN_GREHDR_LEN;
 	tunnel->parms.iph.protocol = IPPROTO_GRE;
 	tunnel->hlen = tunnel->tun_hlen + tunnel->encap_hlen +
 		       sizeof(struct erspanhdr);
 	t_hlen = tunnel->hlen + sizeof(struct iphdr);
 
-	dev->needed_headroom = LL_MAX_HEADER + t_hlen + 4;
-	dev->mtu = ETH_DATA_LEN - t_hlen - 4;
+	dev->needed_headroom = LL_MAX_HEADER + t_hlen;
+	dev->mtu = ETH_DATA_LEN - t_hlen;
 	dev->features		|= GRE_FEATURES;
 	dev->hw_features	|= GRE_FEATURES;
 	dev->priv_flags		|= IFF_LIVE_ADDR_CHANGE;

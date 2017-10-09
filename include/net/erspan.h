@@ -28,6 +28,7 @@
  */
 
 #define ERSPAN_VERSION	0x1
+#define ERSPAN_GREHDR_LEN 8	/* ERSPAN has fixed 8-byte GRE header */
 
 #define VER_MASK	0xf000
 #define VLAN_MASK	0x0fff
