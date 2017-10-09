@@ -334,7 +334,7 @@ char *hist_entry__get_srcline(struct hist_entry *he)
 	if (!map)
 		return SRCLINE_UNKNOWN;
 
-	return get_srcline(map->dso, map__rip_2objdump(map, he->ip),
+	return get_srcline(map->dso, map__objdump_2mem(map, he->ip),
 			   he->ms.sym, true, true);
 }
 
