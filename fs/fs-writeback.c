@@ -2384,8 +2384,9 @@ EXPORT_SYMBOL(writeback_inodes_sb);
  * Invoke writeback_inodes_sb_nr if no writeback is currently underway.
  * Returns 1 if writeback was started, 0 if not.
  */
-bool try_to_writeback_inodes_sb_nr(struct super_block *sb, unsigned long nr,
-				   enum wb_reason reason)
+static bool try_to_writeback_inodes_sb_nr(struct super_block *sb,
+					  unsigned long nr,
+					  enum wb_reason reason)
 {
 	if (!down_read_trylock(&sb->s_umount))
 		return false;
@@ -2394,7 +2395,6 @@ bool try_to_writeback_inodes_sb_nr(struct super_block *sb, unsigned long nr,
 	up_read(&sb->s_umount);
 	return true;
 }
-EXPORT_SYMBOL(try_to_writeback_inodes_sb_nr);
 
 /**
  * try_to_writeback_inodes_sb - try to start writeback if none underway
