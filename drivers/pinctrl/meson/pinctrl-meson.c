@@ -481,42 +481,6 @@ static int meson_gpio_get(struct gpio_chip *chip, unsigned gpio)
 	return !!(val & BIT(bit));
 }
 
-static const struct of_device_id meson_pinctrl_dt_match[] = {
-	{
-		.compatible = "amlogic,meson8-cbus-pinctrl",
-		.data = &meson8_cbus_pinctrl_data,
-	},
-	{
-		.compatible = "amlogic,meson8b-cbus-pinctrl",
-		.data = &meson8b_cbus_pinctrl_data,
-	},
-	{
-		.compatible = "amlogic,meson8-aobus-pinctrl",
-		.data = &meson8_aobus_pinctrl_data,
-	},
-	{
-		.compatible = "amlogic,meson8b-aobus-pinctrl",
-		.data = &meson8b_aobus_pinctrl_data,
-	},
-	{
-		.compatible = "amlogic,meson-gxbb-periphs-pinctrl",
-		.data = &meson_gxbb_periphs_pinctrl_data,
-	},
-	{
-		.compatible = "amlogic,meson-gxbb-aobus-pinctrl",
-		.data = &meson_gxbb_aobus_pinctrl_data,
-	},
-	{
-		.compatible = "amlogic,meson-gxl-periphs-pinctrl",
-		.data = &meson_gxl_periphs_pinctrl_data,
-	},
-	{
-		.compatible = "amlogic,meson-gxl-aobus-pinctrl",
-		.data = &meson_gxl_aobus_pinctrl_data,
-	},
-	{ },
-};
-
 static int meson_gpiolib_register(struct meson_pinctrl *pc)
 {
 	int ret;
@@ -624,7 +588,7 @@ static int meson_pinctrl_parse_dt(struct meson_pinctrl *pc,
 	return 0;
 }
 
-static int meson_pinctrl_probe(struct platform_device *pdev)
+int meson_pinctrl_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *match;
 	struct device *dev = &pdev->dev;
@@ -636,10 +600,10 @@ static int meson_pinctrl_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	pc->dev = dev;
-	match = of_match_node(meson_pinctrl_dt_match, pdev->dev.of_node);
+	match = of_match_node(dev->driver->of_match_table, dev->of_node);
 	pc->data = (struct meson_pinctrl_data *) match->data;
 
-	ret = meson_pinctrl_parse_dt(pc, pdev->dev.of_node);
+	ret = meson_pinctrl_parse_dt(pc, dev->of_node);
 	if (ret)
 		return ret;
 
@@ -659,12 +623,3 @@ static int meson_pinctrl_probe(struct platform_device *pdev)
 
 	return meson_gpiolib_register(pc);
 }
-
-static struct platform_driver meson_pinctrl_driver = {
-	.probe		= meson_pinctrl_probe,
-	.driver = {
-		.name	= "meson-pinctrl",
-		.of_match_table = meson_pinctrl_dt_match,
-	},
-};
-builtin_platform_driver(meson_pinctrl_driver);
