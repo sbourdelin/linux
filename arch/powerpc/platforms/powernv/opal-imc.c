@@ -22,6 +22,28 @@
 #include <asm/imc-pmu.h>
 #include <asm/cputhreads.h>
 
+static bool disable_nest_imc;
+static bool disable_core_imc;
+
+/*
+ * diasble_imc=nest: skip the registration of nest pmus.
+ * disable_imc=core: skip the registration of core and thread pmus.
+ * disable_imc=all : disables nest, core and thread.
+ */
+static int __init disable_imc_counters(char *p)
+{
+	if (strncmp(p, "nest", 4) == 0)
+		disable_nest_imc = true;
+	else if (strncmp(p, "core", 4) == 0)
+		disable_core_imc = true;
+	else if (strncmp(p, "all", 3) == 0) {
+		disable_nest_imc = true;
+		disable_core_imc = true;
+	}
+	return 0;
+}
+early_param("disable_imc", disable_imc_counters);
+
 /*
  * imc_get_mem_addr_nest: Function to get nest counter memory region
  * for each chip
@@ -169,6 +191,10 @@ static int opal_imc_counters_probe(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	/* If kernel is booted with disable_imc parameters, then return */
+	if (disable_nest_imc && disable_core_imc)
+		return -ENODEV;
+
 	for_each_compatible_node(imc_dev, NULL, IMC_DTB_UNIT_COMPAT) {
 		if (of_property_read_u32(imc_dev, "type", &type)) {
 			pr_warn("IMC Device without type property\n");
@@ -177,12 +203,21 @@ static int opal_imc_counters_probe(struct platform_device *pdev)
 
 		switch (type) {
 		case IMC_TYPE_CHIP:
+			if (disable_nest_imc)
+				continue;
+
 			domain = IMC_DOMAIN_NEST;
 			break;
 		case IMC_TYPE_CORE:
+			if (disable_core_imc)
+				continue;
+
 			domain =IMC_DOMAIN_CORE;
 			break;
 		case IMC_TYPE_THREAD:
+			if (disable_core_imc)
+				continue;
+
 			domain = IMC_DOMAIN_THREAD;
 			break;
 		default:

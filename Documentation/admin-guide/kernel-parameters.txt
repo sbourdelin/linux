@@ -820,6 +820,13 @@
 	disable_ipv6=	[IPV6]
 			See Documentation/networking/ipv6.txt.
 
+	disable_imc=	[PPC]
+			Format {nest | core | all}
+			Disable imc counters during boot.
+			nest----- Disable nest-imc counters.
+			core----- Disable core and thread imc counters.
+			all------ Disable nest, core and thread imc counters.
+
 	disable_mtrr_cleanup [X86]
 			The kernel tries to adjust MTRR layout from continuous
 			to discrete, to make X server driver able to add WB
