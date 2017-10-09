@@ -18,11 +18,9 @@
 #include <linux/module.h>
 #include <linux/dmi.h>
 #include <linux/err.h>
-#include <linux/gfp.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/io.h>
-#include "../../firmware/dcdbas.h"
 #include <linux/platform_device.h>
 #include "dell-smbios.h"
 
@@ -34,9 +32,6 @@ struct calling_interface_structure {
 	struct calling_interface_token tokens[];
 } __packed;
 
-static struct calling_interface_buffer *buffer;
-static DEFINE_MUTEX(buffer_mutex);
-
 static int da_command_address;
 static int da_command_code;
 static int da_num_tokens;
@@ -45,6 +40,22 @@ static struct calling_interface_token *da_tokens;
 static struct device_attribute *token_location_attrs;
 static struct device_attribute *token_value_attrs;
 static struct attribute **token_attrs;
+static DEFINE_MUTEX(smbios_mutex);
+
+struct smbios_device {
+	struct list_head list;
+	struct device *device;
+	int (*call_fn)(struct calling_interface_buffer *);
+};
+
+static LIST_HEAD(smbios_device_list);
+
+void dell_smbios_get_smm_address(int *address, int *code)
+{
+	*address = da_command_address;
+	*code = da_command_code;
+}
+EXPORT_SYMBOL_GPL(dell_smbios_get_smm_address);
 
 int dell_smbios_error(int value)
 {
@@ -61,42 +72,71 @@ int dell_smbios_error(int value)
 }
 EXPORT_SYMBOL_GPL(dell_smbios_error);
 
-struct calling_interface_buffer *dell_smbios_get_buffer(void)
+int dell_smbios_register_device(struct device *d, void *call_fn)
 {
-	mutex_lock(&buffer_mutex);
-	dell_smbios_clear_buffer();
-	return buffer;
-}
-EXPORT_SYMBOL_GPL(dell_smbios_get_buffer);
+	struct smbios_device *priv;
 
-void dell_smbios_clear_buffer(void)
+	priv = devm_kzalloc(d, sizeof(struct smbios_device), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+	get_device(d);
+	priv->device = d;
+	priv->call_fn = call_fn;
+	mutex_lock(&smbios_mutex);
+	list_add_tail(&priv->list, &smbios_device_list);
+	mutex_unlock(&smbios_mutex);
+	dev_dbg(d, "Added device: %s\n", d->driver->name);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(dell_smbios_register_device);
+
+void dell_smbios_unregister_device(struct device *d)
 {
-	memset(buffer, 0, sizeof(struct calling_interface_buffer));
-}
-EXPORT_SYMBOL_GPL(dell_smbios_clear_buffer);
+	struct smbios_device *priv;
 
-void dell_smbios_release_buffer(void)
+	mutex_lock(&smbios_mutex);
+	list_for_each_entry(priv, &smbios_device_list, list) {
+		if (priv->device == d) {
+			list_del(&priv->list);
+			put_device(d);
+			break;
+		}
+	};
+	mutex_unlock(&smbios_mutex);
+	dev_dbg(d, "Remove device: %s\n", d->driver->name);
+}
+EXPORT_SYMBOL_GPL(dell_smbios_unregister_device);
+
+int dell_smbios_call(struct calling_interface_buffer *buffer)
 {
-	mutex_unlock(&buffer_mutex);
+	int (*call_fn)(struct calling_interface_buffer *) = NULL;
+	struct device *selected_dev = NULL;
+	struct smbios_device *priv;
+	int ret;
+
+	mutex_lock(&smbios_mutex);
+	list_for_each_entry(priv, &smbios_device_list, list) {
+		if (!selected_dev || priv->device->id >= selected_dev->id) {
+			dev_dbg(priv->device, "Trying device ID: %d\n",
+				priv->device->id);
+			call_fn = priv->call_fn;
+			selected_dev = priv->device;
+		}
+	};
+
+	if (!selected_dev) {
+		ret = -ENODEV;
+		pr_err("No dell-smbios drivers are loaded\n");
+		goto out_smbios_call;
+	}
+
+	ret = call_fn(buffer);
+
+out_smbios_call:
+	mutex_unlock(&smbios_mutex);
+	return ret;
 }
-EXPORT_SYMBOL_GPL(dell_smbios_release_buffer);
-
-void dell_smbios_send_request(int class, int select)
-{
-	struct smi_cmd command;
-
-	command.magic = SMI_CMD_MAGIC;
-	command.command_address = da_command_address;
-	command.command_code = da_command_code;
-	command.ebx = virt_to_phys(buffer);
-	command.ecx = 0x42534931;
-
-	buffer->class = class;
-	buffer->select = select;
-
-	dcdbas_smi_request(&command);
-}
-EXPORT_SYMBOL_GPL(dell_smbios_send_request);
+EXPORT_SYMBOL_GPL(dell_smbios_call);
 
 struct calling_interface_token *dell_smbios_find_token(int tokenid)
 {
@@ -355,15 +395,6 @@ static int __init dell_smbios_init(void)
 		return -ENODEV;
 	}
 
-	/*
-	 * Allocate buffer below 4GB for SMI data--only 32-bit physical addr
-	 * is passed to SMI handler.
-	 */
-	buffer = (void *)__get_free_page(GFP_KERNEL | GFP_DMA32);
-	if (!buffer) {
-		ret = -ENOMEM;
-		goto fail_buffer;
-	}
 	ret = platform_driver_register(&platform_driver);
 	if (ret)
 		goto fail_platform_driver;
@@ -396,22 +427,20 @@ fail_platform_device_alloc:
 	platform_driver_unregister(&platform_driver);
 
 fail_platform_driver:
-	free_page((unsigned long)buffer);
-
-fail_buffer:
 	kfree(da_tokens);
 	return ret;
 }
 
 static void __exit dell_smbios_exit(void)
 {
+	mutex_lock(&smbios_mutex);
 	if (platform_device) {
 		free_group(platform_device);
 		platform_device_unregister(platform_device);
 		platform_driver_unregister(&platform_driver);
 	}
-	free_page((unsigned long)buffer);
 	kfree(da_tokens);
+	mutex_unlock(&smbios_mutex);
 }
 
 subsys_initcall(dell_smbios_init);

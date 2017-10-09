@@ -641,13 +641,16 @@ static int dell_wmi_events_set_enabled(bool enable)
 	struct calling_interface_buffer *buffer;
 	int ret;
 
-	buffer = dell_smbios_get_buffer();
+	buffer = (void *)get_zeroed_page(GFP_KERNEL);
+	buffer->class = 17;
+	buffer->select = 3;
 	buffer->input[0] = 0x10000;
 	buffer->input[1] = 0x51534554;
 	buffer->input[3] = enable;
-	dell_smbios_send_request(17, 3);
-	ret = buffer->output[0];
-	dell_smbios_release_buffer();
+	ret = dell_smbios_call(buffer);
+	if (ret == 0)
+		ret = buffer->output[0];
+	free_page((unsigned long)buffer);
 
 	return dell_smbios_error(ret);
 }
