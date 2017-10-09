@@ -8964,7 +8964,7 @@ static int md_notify_reboot(struct notifier_block *this,
 	return NOTIFY_DONE;
 }
 
-static struct notifier_block md_notifier = {
+static struct notifier_block md_reboot_notifier = {
 	.notifier_call	= md_notify_reboot,
 	.next		= NULL,
 	.priority	= INT_MAX, /* before any real devices */
@@ -9001,7 +9001,7 @@ static int __init md_init(void)
 	blk_register_region(MKDEV(mdp_major, 0), 1UL<<MINORBITS, THIS_MODULE,
 			    md_probe, NULL, NULL);
 
-	register_reboot_notifier(&md_notifier);
+	register_reboot_notifier(&md_reboot_notifier);
 	raid_table_header = register_sysctl_table(raid_root_table);
 
 	md_geninit();
@@ -9241,7 +9241,7 @@ static __exit void md_exit(void)
 
 	unregister_blkdev(MD_MAJOR,"md");
 	unregister_blkdev(mdp_major, "mdp");
-	unregister_reboot_notifier(&md_notifier);
+	unregister_reboot_notifier(&md_reboot_notifier);
 	unregister_sysctl_table(raid_table_header);
 
 	/* We cannot unload the modules while some process is
