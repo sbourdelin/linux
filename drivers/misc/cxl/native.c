@@ -1261,10 +1261,21 @@ void cxl_native_err_irq_dump_regs(struct cxl *adapter)
 {
 	u64 fir1, fir2;
 
-	fir1 = cxl_p1_read(adapter, CXL_PSL_FIR1);
-	fir2 = cxl_p1_read(adapter, CXL_PSL_FIR2);
+	if (cxl_is_power8()) {
+		fir1 = cxl_p1_read(adapter, CXL_PSL_FIR1);
+		fir2 = cxl_p1_read(adapter, CXL_PSL_FIR2);
+		dev_crit(&adapter->dev,
+			 "PSL_FIR1: 0x%016llx\nPSL_FIR2: 0x%016llx\n",
+			 fir1, fir2);
 
-	dev_crit(&adapter->dev, "PSL_FIR1: 0x%016llx\nPSL_FIR2: 0x%016llx\n", fir1, fir2);
+	} else if (cxl_is_power9()) {
+		fir1 = cxl_p1_read(adapter, CXL_PSL9_FIR1);
+		dev_crit(&adapter->dev, "PSL_FIR: 0x%016llx\n", fir1);
+
+	} else {
+		WARN_ON(1);
+	}
+
 }
 
 static irqreturn_t native_irq_err(int irq, void *data)
