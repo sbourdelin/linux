@@ -781,7 +781,7 @@ static void _rtl_txrate_selectmode(struct ieee80211_hw *hw,
 
 	struct rtl_priv *rtlpriv = rtl_priv(hw);
 	struct rtl_mac *mac = rtl_mac(rtl_priv(hw));
-	struct rtl_sta_info *sta_entry = NULL;
+	struct rtl_sta_info *sta_entry;
 	u8 ratr_index = SET_RATE_ID(RATR_INX_WIRELESS_MC);
 
 	if (sta) {
