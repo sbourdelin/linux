@@ -104,6 +104,39 @@ static void blk_mq_do_dispatch_sched(struct blk_mq_hw_ctx *hctx)
 	} while (blk_mq_dispatch_rq_list(q, &rq_list));
 }
 
+static struct blk_mq_ctx *blk_mq_next_ctx(struct blk_mq_hw_ctx *hctx,
+					  struct blk_mq_ctx *ctx)
+{
+	unsigned idx = ctx->index_hw;
+
+	if (++idx == hctx->nr_ctx)
+		idx = 0;
+
+	return hctx->ctxs[idx];
+}
+
+static void blk_mq_do_dispatch_ctx(struct blk_mq_hw_ctx *hctx)
+{
+	struct request_queue *q = hctx->queue;
+	LIST_HEAD(rq_list);
+	struct blk_mq_ctx *ctx = READ_ONCE(hctx->dispatch_from);
+
+	do {
+		struct request *rq;
+
+		rq = blk_mq_dequeue_from_ctx(hctx, ctx);
+		if (!rq)
+			break;
+		list_add(&rq->queuelist, &rq_list);
+
+		/* round robin for fair dispatch */
+		ctx = blk_mq_next_ctx(hctx, rq->mq_ctx);
+
+	} while (blk_mq_dispatch_rq_list(q, &rq_list));
+
+	WRITE_ONCE(hctx->dispatch_from, ctx);
+}
+
 void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 {
 	struct request_queue *q = hctx->queue;
@@ -143,10 +176,23 @@ void blk_mq_sched_dispatch_requests(struct blk_mq_hw_ctx *hctx)
 	 */
 	if (!list_empty(&rq_list)) {
 		blk_mq_sched_mark_restart_hctx(hctx);
-		if (blk_mq_dispatch_rq_list(q, &rq_list) && has_sched_dispatch)
-			blk_mq_do_dispatch_sched(hctx);
+		if (blk_mq_dispatch_rq_list(q, &rq_list)) {
+			if (has_sched_dispatch)
+				blk_mq_do_dispatch_sched(hctx);
+			else
+				blk_mq_do_dispatch_ctx(hctx);
+		}
 	} else if (has_sched_dispatch) {
 		blk_mq_do_dispatch_sched(hctx);
+	} else if (q->queue_depth) {
+		/*
+		 * If there is per-request_queue depth, we dequeue
+		 * request one by one from sw queue for avoiding to mess
+		 * up I/O merge when dispatch runs out of resource, which
+		 * can be triggered easily when there is per-request_queue
+		 * queue depth or .cmd_per_lun, such as SCSI device.
+		 */
+		blk_mq_do_dispatch_ctx(hctx);
 	} else {
 		blk_mq_flush_busy_ctxs(hctx, &rq_list);
 		blk_mq_dispatch_rq_list(q, &rq_list);
