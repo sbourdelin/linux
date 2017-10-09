@@ -1957,8 +1957,9 @@ struct i915_wa_reg {
 #define I915_MAX_WA_REGS 16
 
 struct i915_workarounds {
-	struct i915_wa_reg reg[I915_MAX_WA_REGS];
-	u32 count;
+	struct i915_wa_reg ctx_wa_reg[I915_MAX_WA_REGS];
+	u32 ctx_wa_count;
+
 	u32 hw_whitelist_count[I915_NUM_ENGINES];
 };
 

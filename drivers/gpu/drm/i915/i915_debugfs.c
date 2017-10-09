@@ -3557,18 +3557,18 @@ static int i915_wa_registers(struct seq_file *m, void *unused)
 
 	intel_runtime_pm_get(dev_priv);
 
-	seq_printf(m, "Workarounds applied: %d\n", workarounds->count);
+	seq_printf(m, "Context workarounds applied: %d\n", workarounds->ctx_wa_count);
 	for_each_engine(engine, dev_priv, id)
 		seq_printf(m, "HW whitelist count for %s: %d\n",
 			   engine->name, workarounds->hw_whitelist_count[id]);
-	for (i = 0; i < workarounds->count; ++i) {
+	for (i = 0; i < workarounds->ctx_wa_count; ++i) {
 		i915_reg_t addr;
 		u32 mask, value, read;
 		bool ok;
 
-		addr = workarounds->reg[i].addr;
-		mask = workarounds->reg[i].mask;
-		value = workarounds->reg[i].value;
+		addr = workarounds->ctx_wa_reg[i].addr;
+		mask = workarounds->ctx_wa_reg[i].mask;
+		value = workarounds->ctx_wa_reg[i].value;
 		read = I915_READ(addr);
 		ok = (value & mask) == (read & mask);
 		seq_printf(m, "0x%X: 0x%08X, mask: 0x%08X, read: 0x%08x, status: %s\n",

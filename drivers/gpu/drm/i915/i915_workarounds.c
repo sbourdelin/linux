@@ -25,48 +25,48 @@
 #include "i915_drv.h"
 #include "i915_workarounds.h"
 
-static int wa_add(struct drm_i915_private *dev_priv,
-		  i915_reg_t addr,
-		  const u32 mask, const u32 val)
+static int ctx_wa_add(struct drm_i915_private *dev_priv,
+		      i915_reg_t addr,
+		      const u32 mask, const u32 val)
 {
-	const u32 idx = dev_priv->workarounds.count;
+	const u32 idx = dev_priv->workarounds.ctx_wa_count;
 
 	if (WARN_ON(idx >= I915_MAX_WA_REGS))
 		return -ENOSPC;
 
-	dev_priv->workarounds.reg[idx].addr = addr;
-	dev_priv->workarounds.reg[idx].value = val;
-	dev_priv->workarounds.reg[idx].mask = mask;
+	dev_priv->workarounds.ctx_wa_reg[idx].addr = addr;
+	dev_priv->workarounds.ctx_wa_reg[idx].value = val;
+	dev_priv->workarounds.ctx_wa_reg[idx].mask = mask;
 
-	dev_priv->workarounds.count++;
+	dev_priv->workarounds.ctx_wa_count++;
 
 	return 0;
 }
 
-#define WA_REG(addr, mask, val) do { \
-		const int r = wa_add(dev_priv, (addr), (mask), (val)); \
+#define CTXWA_REG(addr, mask, val) do { \
+		const int r = ctx_wa_add(dev_priv, (addr), (mask), (val)); \
 		if (r) \
 			return r; \
 	} while (0)
 
-#define WA_SET_BIT_MASKED(addr, mask) \
-	WA_REG(addr, (mask), _MASKED_BIT_ENABLE(mask))
+#define CTXWA_SET_BIT_MSK(addr, mask) \
+	CTXWA_REG(addr, (mask), _MASKED_BIT_ENABLE(mask))
 
-#define WA_CLR_BIT_MASKED(addr, mask) \
-	WA_REG(addr, (mask), _MASKED_BIT_DISABLE(mask))
+#define CTXWA_CLR_BIT_MSK(addr, mask) \
+	CTXWA_REG(addr, (mask), _MASKED_BIT_DISABLE(mask))
 
-#define WA_SET_FIELD_MASKED(addr, mask, value) \
-	WA_REG(addr, mask, _MASKED_FIELD(mask, value))
+#define CTXWA_SET_FIELD_MSK(addr, mask, value) \
+	CTXWA_REG(addr, mask, _MASKED_FIELD(mask, value))
 
 static int gen8_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 {
-	WA_SET_BIT_MASKED(INSTPM, INSTPM_FORCE_ORDERING);
+	CTXWA_SET_BIT_MSK(INSTPM, INSTPM_FORCE_ORDERING);
 
 	/* WaDisableAsyncFlipPerfMode:bdw,chv */
-	WA_SET_BIT_MASKED(MI_MODE, ASYNC_FLIP_PERF_DISABLE);
+	CTXWA_SET_BIT_MSK(MI_MODE, ASYNC_FLIP_PERF_DISABLE);
 
 	/* WaDisablePartialInstShootdown:bdw,chv */
-	WA_SET_BIT_MASKED(GEN8_ROW_CHICKEN,
+	CTXWA_SET_BIT_MSK(GEN8_ROW_CHICKEN,
 			  PARTIAL_INSTRUCTION_SHOOTDOWN_DISABLE);
 
 	/* Use Force Non-Coherent whenever executing a 3D context. This is a
@@ -75,7 +75,7 @@ static int gen8_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	 */
 	/* WaForceEnableNonCoherent:bdw,chv */
 	/* WaHdcDisableFetchWhenMasked:bdw,chv */
-	WA_SET_BIT_MASKED(HDC_CHICKEN0,
+	CTXWA_SET_BIT_MSK(HDC_CHICKEN0,
 			  HDC_DONOT_FETCH_MEM_WHEN_MASKED |
 			  HDC_FORCE_NON_COHERENT);
 
@@ -87,10 +87,10 @@ static int gen8_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	 *
 	 * This optimization is off by default for BDW and CHV; turn it on.
 	 */
-	WA_CLR_BIT_MASKED(CACHE_MODE_0_GEN7, HIZ_RAW_STALL_OPT_DISABLE);
+	CTXWA_CLR_BIT_MSK(CACHE_MODE_0_GEN7, HIZ_RAW_STALL_OPT_DISABLE);
 
 	/* Wa4x4STCOptimizationDisable:bdw,chv */
-	WA_SET_BIT_MASKED(CACHE_MODE_1, GEN8_4x4_STC_OPTIMIZATION_DISABLE);
+	CTXWA_SET_BIT_MSK(CACHE_MODE_1, GEN8_4x4_STC_OPTIMIZATION_DISABLE);
 
 	/*
 	 * BSpec recommends 8x4 when MSAA is used,
@@ -100,7 +100,7 @@ static int gen8_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	 * disable bit, which we don't touch here, but it's good
 	 * to keep in mind (see 3DSTATE_PS and 3DSTATE_WM).
 	 */
-	WA_SET_FIELD_MASKED(GEN7_GT_MODE,
+	CTXWA_SET_FIELD_MSK(GEN7_GT_MODE,
 			    GEN6_WIZ_HASHING_MASK,
 			    GEN6_WIZ_HASHING_16x4);
 
@@ -116,20 +116,20 @@ static int bdw_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 		return ret;
 
 	/* WaDisableThreadStallDopClockGating:bdw (pre-production) */
-	WA_SET_BIT_MASKED(GEN8_ROW_CHICKEN, STALL_DOP_GATING_DISABLE);
+	CTXWA_SET_BIT_MSK(GEN8_ROW_CHICKEN, STALL_DOP_GATING_DISABLE);
 
 	/* WaDisableDopClockGating:bdw
 	 *
 	 * Also see the related UCGTCL1 write in broadwell_init_clock_gating()
 	 * to disable EUTC clock gating.
 	 */
-	WA_SET_BIT_MASKED(GEN7_ROW_CHICKEN2,
+	CTXWA_SET_BIT_MSK(GEN7_ROW_CHICKEN2,
 			  DOP_CLOCK_GATING_DISABLE);
 
-	WA_SET_BIT_MASKED(HALF_SLICE_CHICKEN3,
+	CTXWA_SET_BIT_MSK(HALF_SLICE_CHICKEN3,
 			  GEN8_SAMPLER_POWER_BYPASS_DIS);
 
-	WA_SET_BIT_MASKED(HDC_CHICKEN0,
+	CTXWA_SET_BIT_MSK(HDC_CHICKEN0,
 			  /* WaForceContextSaveRestoreNonCoherent:bdw */
 			  HDC_FORCE_CONTEXT_SAVE_RESTORE_NON_COHERENT |
 			  /* WaDisableFenceDestinationToSLM:bdw (pre-prod) */
@@ -147,10 +147,10 @@ static int chv_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 		return ret;
 
 	/* WaDisableThreadStallDopClockGating:chv */
-	WA_SET_BIT_MASKED(GEN8_ROW_CHICKEN, STALL_DOP_GATING_DISABLE);
+	CTXWA_SET_BIT_MSK(GEN8_ROW_CHICKEN, STALL_DOP_GATING_DISABLE);
 
 	/* Improve HiZ throughput on CHV. */
-	WA_SET_BIT_MASKED(HIZ_CHICKEN, CHV_HZ_8X8_MODE_IN_1X);
+	CTXWA_SET_BIT_MSK(HIZ_CHICKEN, CHV_HZ_8X8_MODE_IN_1X);
 
 	return 0;
 }
@@ -163,31 +163,31 @@ static int gen9_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 		 * Must match Display Engine. See
 		 * WaCompressedResourceDisplayNewHashMode.
 		 */
-		WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
+		CTXWA_SET_BIT_MSK(COMMON_SLICE_CHICKEN2,
 				  GEN9_PBE_COMPRESSED_HASH_SELECTION);
-		WA_SET_BIT_MASKED(GEN9_HALF_SLICE_CHICKEN7,
+		CTXWA_SET_BIT_MSK(GEN9_HALF_SLICE_CHICKEN7,
 				  GEN9_SAMPLER_HASH_COMPRESSED_READ_ADDR);
 	}
 
 	/* WaClearFlowControlGpgpuContextSave:skl,bxt,kbl,glk,cfl */
 	/* WaDisablePartialInstShootdown:skl,bxt,kbl,glk,cfl */
-	WA_SET_BIT_MASKED(GEN8_ROW_CHICKEN,
+	CTXWA_SET_BIT_MSK(GEN8_ROW_CHICKEN,
 			  FLOW_CONTROL_ENABLE |
 			  PARTIAL_INSTRUCTION_SHOOTDOWN_DISABLE);
 
 	/* Syncing dependencies between camera and graphics:skl,bxt,kbl */
 	if (!IS_COFFEELAKE(dev_priv))
-		WA_SET_BIT_MASKED(HALF_SLICE_CHICKEN3,
+		CTXWA_SET_BIT_MSK(HALF_SLICE_CHICKEN3,
 				  GEN9_DISABLE_OCL_OOB_SUPPRESS_LOGIC);
 
 	/* WaDisableDgMirrorFixInHalfSliceChicken5:bxt */
 	if (IS_BXT_REVID(dev_priv, 0, BXT_REVID_A1))
-		WA_CLR_BIT_MASKED(GEN9_HALF_SLICE_CHICKEN5,
+		CTXWA_CLR_BIT_MSK(GEN9_HALF_SLICE_CHICKEN5,
 				  GEN9_DG_MIRROR_FIX_ENABLE);
 
 	/* WaSetDisablePixMaskCammingAndRhwoInCommonSliceChicken:bxt */
 	if (IS_BXT_REVID(dev_priv, 0, BXT_REVID_A1)) {
-		WA_SET_BIT_MASKED(GEN7_COMMON_SLICE_CHICKEN1,
+		CTXWA_SET_BIT_MSK(GEN7_COMMON_SLICE_CHICKEN1,
 				  GEN9_RHWO_OPTIMIZATION_DISABLE);
 		/*
 		 * WA also requires GEN9_SLICE_COMMON_ECO_CHICKEN0[14:14] to be set
@@ -198,26 +198,26 @@ static int gen9_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 
 	/* WaEnableYV12BugFixInHalfSliceChicken7:skl,bxt,kbl,glk,cfl */
 	/* WaEnableSamplerGPGPUPreemptionSupport:skl,bxt,kbl,cfl */
-	WA_SET_BIT_MASKED(GEN9_HALF_SLICE_CHICKEN7,
+	CTXWA_SET_BIT_MSK(GEN9_HALF_SLICE_CHICKEN7,
 			  GEN9_ENABLE_YV12_BUGFIX |
 			  GEN9_ENABLE_GPGPU_PREEMPTION);
 
 	/* Wa4x4STCOptimizationDisable:skl,bxt,kbl,glk,cfl */
 	/* WaDisablePartialResolveInVc:skl,bxt,kbl,cfl */
-	WA_SET_BIT_MASKED(CACHE_MODE_1, (GEN8_4x4_STC_OPTIMIZATION_DISABLE |
+	CTXWA_SET_BIT_MSK(CACHE_MODE_1, (GEN8_4x4_STC_OPTIMIZATION_DISABLE |
 					 GEN9_PARTIAL_RESOLVE_IN_VC_DISABLE));
 
 	/* WaCcsTlbPrefetchDisable:skl,bxt,kbl,glk,cfl */
-	WA_CLR_BIT_MASKED(GEN9_HALF_SLICE_CHICKEN5,
+	CTXWA_CLR_BIT_MSK(GEN9_HALF_SLICE_CHICKEN5,
 			  GEN9_CCS_TLB_PREFETCH_ENABLE);
 
 	/* WaDisableMaskBasedCammingInRCC:bxt */
 	if (IS_BXT_REVID(dev_priv, 0, BXT_REVID_A1))
-		WA_SET_BIT_MASKED(SLICE_ECO_CHICKEN0,
+		CTXWA_SET_BIT_MSK(SLICE_ECO_CHICKEN0,
 				  PIXEL_MASK_CAMMING_DISABLE);
 
 	/* WaForceContextSaveRestoreNonCoherent:skl,bxt,kbl,cfl */
-	WA_SET_BIT_MASKED(HDC_CHICKEN0,
+	CTXWA_SET_BIT_MSK(HDC_CHICKEN0,
 			  HDC_FORCE_CONTEXT_SAVE_RESTORE_NON_COHERENT |
 			  HDC_FORCE_CSR_NON_COHERENT_OVR_DISABLE);
 
@@ -235,7 +235,7 @@ static int gen9_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	 */
 
 	/* WaForceEnableNonCoherent:skl,bxt,kbl,cfl */
-	WA_SET_BIT_MASKED(HDC_CHICKEN0,
+	CTXWA_SET_BIT_MSK(HDC_CHICKEN0,
 			  HDC_FORCE_NON_COHERENT);
 
 	/* WaDisableSamplerPowerBypassForSOPingPong:skl,bxt,kbl,cfl */
@@ -243,11 +243,11 @@ static int gen9_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	    IS_KABYLAKE(dev_priv) ||
 	    IS_COFFEELAKE(dev_priv) ||
 	    IS_BXT_REVID(dev_priv, 0, BXT_REVID_B0))
-		WA_SET_BIT_MASKED(HALF_SLICE_CHICKEN3,
+		CTXWA_SET_BIT_MSK(HALF_SLICE_CHICKEN3,
 				  GEN8_SAMPLER_POWER_BYPASS_DIS);
 
 	/* WaDisableSTUnitPowerOptimization:skl,bxt,kbl,glk,cfl */
-	WA_SET_BIT_MASKED(HALF_SLICE_CHICKEN2, GEN8_ST_PO_DISABLE);
+	CTXWA_SET_BIT_MSK(HALF_SLICE_CHICKEN2, GEN8_ST_PO_DISABLE);
 
 	/*
 	 * Supporting preemption with fine-granularity requires changes in the
@@ -261,10 +261,10 @@ static int gen9_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	 */
 
 	/* WaDisable3DMidCmdPreemption:skl,bxt,glk,cfl,[cnl] */
-	WA_CLR_BIT_MASKED(GEN8_CS_CHICKEN1, GEN9_PREEMPT_3D_OBJECT_LEVEL);
+	CTXWA_CLR_BIT_MSK(GEN8_CS_CHICKEN1, GEN9_PREEMPT_3D_OBJECT_LEVEL);
 
 	/* WaDisableGPGPUMidCmdPreemption:skl,bxt,blk,cfl,[cnl] */
-	WA_SET_FIELD_MASKED(GEN8_CS_CHICKEN1, GEN9_PREEMPT_GPGPU_LEVEL_MASK,
+	CTXWA_SET_FIELD_MSK(GEN8_CS_CHICKEN1, GEN9_PREEMPT_GPGPU_LEVEL_MASK,
 			    GEN9_PREEMPT_GPGPU_COMMAND_LEVEL);
 
 	return 0;
@@ -299,7 +299,7 @@ static int skl_tune_iz_hashing(struct drm_i915_private *dev_priv)
 		return 0;
 
 	/* Tune IZ hashing. See intel_device_info_runtime_init() */
-	WA_SET_FIELD_MASKED(GEN7_GT_MODE,
+	CTXWA_SET_FIELD_MSK(GEN7_GT_MODE,
 			    GEN9_IZ_HASHING_MASK(2) |
 			    GEN9_IZ_HASHING_MASK(1) |
 			    GEN9_IZ_HASHING_MASK(0),
@@ -330,19 +330,19 @@ static int bxt_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 		return ret;
 
 	/* WaDisableThreadStallDopClockGating:bxt */
-	WA_SET_BIT_MASKED(GEN8_ROW_CHICKEN,
+	CTXWA_SET_BIT_MSK(GEN8_ROW_CHICKEN,
 			  STALL_DOP_GATING_DISABLE);
 
 	/* WaDisableSbeCacheDispatchPortSharing:bxt */
 	if (IS_BXT_REVID(dev_priv, 0, BXT_REVID_B0)) {
-		WA_SET_BIT_MASKED(
+		CTXWA_SET_BIT_MSK(
 			GEN7_HALF_SLICE_CHICKEN1,
 			GEN7_SBE_SS_CACHE_DISPATCH_PORT_SHARING_DISABLE);
 	}
 
 	/* WaToEnableHwFixForPushConstHWBug:bxt */
 	if (IS_BXT_REVID(dev_priv, BXT_REVID_C0, REVID_FOREVER))
-		WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
+		CTXWA_SET_BIT_MSK(COMMON_SLICE_CHICKEN2,
 				  GEN8_SBE_DISABLE_REPLAY_BUF_OPTIMIZATION);
 
 	return 0;
@@ -358,16 +358,16 @@ static int kbl_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 
 	/* WaDisableFenceDestinationToSLM:kbl (pre-prod) */
 	if (IS_KBL_REVID(dev_priv, KBL_REVID_A0, KBL_REVID_A0))
-		WA_SET_BIT_MASKED(HDC_CHICKEN0,
+		CTXWA_SET_BIT_MSK(HDC_CHICKEN0,
 				  HDC_FENCE_DEST_SLM_DISABLE);
 
 	/* WaToEnableHwFixForPushConstHWBug:kbl */
 	if (IS_KBL_REVID(dev_priv, KBL_REVID_C0, REVID_FOREVER))
-		WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
+		CTXWA_SET_BIT_MSK(COMMON_SLICE_CHICKEN2,
 				  GEN8_SBE_DISABLE_REPLAY_BUF_OPTIMIZATION);
 
 	/* WaDisableSbeCacheDispatchPortSharing:kbl */
-	WA_SET_BIT_MASKED(
+	CTXWA_SET_BIT_MSK(
 		GEN7_HALF_SLICE_CHICKEN1,
 		GEN7_SBE_SS_CACHE_DISPATCH_PORT_SHARING_DISABLE);
 
@@ -383,7 +383,7 @@ static int glk_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 		return ret;
 
 	/* WaToEnableHwFixForPushConstHWBug:glk */
-	WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
+	CTXWA_SET_BIT_MSK(COMMON_SLICE_CHICKEN2,
 			  GEN8_SBE_DISABLE_REPLAY_BUF_OPTIMIZATION);
 
 	return 0;
@@ -398,11 +398,11 @@ static int cfl_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 		return ret;
 
 	/* WaToEnableHwFixForPushConstHWBug:cfl */
-	WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
+	CTXWA_SET_BIT_MSK(COMMON_SLICE_CHICKEN2,
 			  GEN8_SBE_DISABLE_REPLAY_BUF_OPTIMIZATION);
 
 	/* WaDisableSbeCacheDispatchPortSharing:cfl */
-	WA_SET_BIT_MASKED(
+	CTXWA_SET_BIT_MSK(
 		GEN7_HALF_SLICE_CHICKEN1,
 		GEN7_SBE_SS_CACHE_DISPATCH_PORT_SHARING_DISABLE);
 
@@ -412,33 +412,33 @@ static int cfl_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 static int cnl_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 {
 	/* WaForceContextSaveRestoreNonCoherent:cnl */
-	WA_SET_BIT_MASKED(CNL_HDC_CHICKEN0,
+	CTXWA_SET_BIT_MSK(CNL_HDC_CHICKEN0,
 			  HDC_FORCE_CONTEXT_SAVE_RESTORE_NON_COHERENT);
 
 	/* WaThrottleEUPerfToAvoidTDBackPressure:cnl(pre-prod) */
 	if (IS_CNL_REVID(dev_priv, CNL_REVID_B0, CNL_REVID_B0))
-		WA_SET_BIT_MASKED(GEN8_ROW_CHICKEN, THROTTLE_12_5);
+		CTXWA_SET_BIT_MSK(GEN8_ROW_CHICKEN, THROTTLE_12_5);
 
 	/* WaDisableReplayBufferBankArbitrationOptimization:cnl */
-	WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
+	CTXWA_SET_BIT_MSK(COMMON_SLICE_CHICKEN2,
 			  GEN8_SBE_DISABLE_REPLAY_BUF_OPTIMIZATION);
 
 	/* WaDisableEnhancedSBEVertexCaching:cnl (pre-prod) */
 	if (IS_CNL_REVID(dev_priv, 0, CNL_REVID_B0))
-		WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
+		CTXWA_SET_BIT_MSK(COMMON_SLICE_CHICKEN2,
 				  GEN8_CSC2_SBE_VUE_CACHE_CONSERVATIVE);
 
 	/* WaPushConstantDereferenceHoldDisable:cnl */
-	WA_SET_BIT_MASKED(GEN7_ROW_CHICKEN2, PUSH_CONSTANT_DEREF_DISABLE);
+	CTXWA_SET_BIT_MSK(GEN7_ROW_CHICKEN2, PUSH_CONSTANT_DEREF_DISABLE);
 
 	/* FtrEnableFastAnisoL1BankingFix:cnl */
-	WA_SET_BIT_MASKED(HALF_SLICE_CHICKEN3, CNL_FAST_ANISO_L1_BANKING_FIX);
+	CTXWA_SET_BIT_MSK(HALF_SLICE_CHICKEN3, CNL_FAST_ANISO_L1_BANKING_FIX);
 
 	/* WaDisable3DMidCmdPreemption:cnl */
-	WA_CLR_BIT_MASKED(GEN8_CS_CHICKEN1, GEN9_PREEMPT_3D_OBJECT_LEVEL);
+	CTXWA_CLR_BIT_MSK(GEN8_CS_CHICKEN1, GEN9_PREEMPT_3D_OBJECT_LEVEL);
 
 	/* WaDisableGPGPUMidCmdPreemption:cnl */
-	WA_SET_FIELD_MASKED(GEN8_CS_CHICKEN1, GEN9_PREEMPT_GPGPU_LEVEL_MASK,
+	CTXWA_SET_FIELD_MSK(GEN8_CS_CHICKEN1, GEN9_PREEMPT_GPGPU_LEVEL_MASK,
 			    GEN9_PREEMPT_GPGPU_COMMAND_LEVEL);
 
 	return 0;
@@ -448,7 +448,7 @@ int i915_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 {
 	int err;
 
-	dev_priv->workarounds.count = 0;
+	dev_priv->workarounds.ctx_wa_count = 0;
 
 	if (IS_BROADWELL(dev_priv))
 		err = bdw_ctx_workarounds_init(dev_priv);
@@ -472,7 +472,7 @@ int i915_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 		return err;
 
 	DRM_DEBUG_DRIVER("Number of context specific w/a: %d\n",
-			 dev_priv->workarounds.count);
+			 dev_priv->workarounds.ctx_wa_count);
 	return 0;
 }
 
@@ -482,21 +482,21 @@ int i915_ctx_workarounds_emit(struct drm_i915_gem_request *req)
 	u32 *cs;
 	int ret, i;
 
-	if (w->count == 0)
+	if (w->ctx_wa_count == 0)
 		return 0;
 
 	ret = req->engine->emit_flush(req, EMIT_BARRIER);
 	if (ret)
 		return ret;
 
-	cs = intel_ring_begin(req, (w->count * 2 + 2));
+	cs = intel_ring_begin(req, (w->ctx_wa_count * 2 + 2));
 	if (IS_ERR(cs))
 		return PTR_ERR(cs);
 
-	*cs++ = MI_LOAD_REGISTER_IMM(w->count);
-	for (i = 0; i < w->count; i++) {
-		*cs++ = i915_mmio_reg_offset(w->reg[i].addr);
-		*cs++ = w->reg[i].value;
+	*cs++ = MI_LOAD_REGISTER_IMM(w->ctx_wa_count);
+	for (i = 0; i < w->ctx_wa_count; i++) {
+		*cs++ = i915_mmio_reg_offset(w->ctx_wa_reg[i].addr);
+		*cs++ = w->ctx_wa_reg[i].value;
 	}
 	*cs++ = MI_NOOP;
 
