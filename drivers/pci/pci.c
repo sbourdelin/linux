@@ -823,7 +823,7 @@ static void __pci_start_power_transition(struct pci_dev *dev, pci_power_t state)
 		 */
 		if (dev->runtime_d3cold) {
 			if (dev->d3cold_delay)
-				msleep(dev->d3cold_delay);
+				mdelay(dev->d3cold_delay);
 			/*
 			 * When powering on a bridge from D3cold, the
 			 * whole hierarchy may be powered on into
