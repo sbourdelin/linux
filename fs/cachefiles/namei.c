@@ -83,7 +83,7 @@ static noinline void cachefiles_printk_object(struct cachefiles_object *object,
 {
 	u8 *keybuf;
 
-	keybuf = kmalloc(CACHEFILES_KEYBUF_SIZE, GFP_NOIO);
+	keybuf = kmalloc(CACHEFILES_KEYBUF_SIZE, GFP_ATOMIC);
 	if (object)
 		__cachefiles_printk_object(object, "", keybuf);
 	if (xobject)
