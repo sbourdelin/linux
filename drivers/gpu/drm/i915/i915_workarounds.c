@@ -25,6 +25,36 @@
 #include "i915_drv.h"
 #include "i915_workarounds.h"
 
+/**
+ * DOC: Hardware workarounds
+ *
+ * This file is a central place to implement most* of the required workarounds
+ * required for HW to work as originally intended. They fall in four categories
+ * depending on how/when they are applied:
+ *
+ * - Workarounds that touch registers that are saved/restored to/from the HW
+ *   context image. The list is generated once and then emitted (via Load
+ *   Register Immediate commands) everytime a new context is created.
+ * - Workarounds that touch global MMIO registers. The list of these WAs is
+ *   generated once and then applied whenever these registers revert to default
+ *   values (on GPU reset, suspend/resume**, etc..).
+ * - Workarounds that whitelist a privileged register, so that UMDs can manage
+ *   them directly. This is just a special case of a MMMIO workaround (as we
+ *   write the list of these to/be-whitelisted registers to some special HW
+ *   registers).
+ * - Workaround batchbuffers, that get executed automatically by the hardware
+ *   on every HW context restore.
+ *
+ * * Please notice that there are other WAs that, due to their nature, cannot be
+ *   applied from a central place. Those are peppered around the rest of the
+ *   code, as needed).
+ *
+ * ** Technically, some registers are powercontext saved & restored, so they
+ *    survive a suspend/resume. In practice, writing them again is not too
+ *    costly and simplifies things. We can revisit this in the future.
+ *
+ */
+
 static int ctx_wa_add(struct drm_i915_private *dev_priv,
 		      i915_reg_t addr,
 		      const u32 mask, const u32 val)
@@ -190,9 +220,9 @@ static int gen9_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 		CTXWA_SET_BIT_MSK(GEN7_COMMON_SLICE_CHICKEN1,
 				  GEN9_RHWO_OPTIMIZATION_DISABLE);
 		/*
-		 * WA also requires GEN9_SLICE_COMMON_ECO_CHICKEN0[14:14] to be set
-		 * but we do that in per ctx batchbuffer as there is an issue
-		 * with this register not getting restored on ctx restore
+		 * WA also requires GEN9_SLICE_COMMON_ECO_CHICKEN0[14:14] to be
+		 * set but we do that in per ctx batchbuffer as there is an
+		 * issue with this register not getting restored on ctx restore.
 		 */
 	}
 
@@ -1029,10 +1059,11 @@ void i915_whitelist_workarounds_apply(struct intel_engine_cs *engine)
  * but there is a slight complication as this is applied in WA batch where the
  * values are only initialized once so we cannot take register value at the
  * beginning and reuse it further; hence we save its value to memory, upload a
- * constant value with bit21 set and then we restore it back with the saved value.
+ * constant value with bit21 set and then we restore it back with the saved
+ * value.
  * To simplify the WA, a constant value is formed by using the default value
  * of this register. This shouldn't be a problem because we are only modifying
- * it for a short period and this batch in non-premptible. We can ofcourse
+ * it for a short period and this batch in non-premptible. We can of course
  * use additional instructions that read the actual value of the register
  * at that time and set our bit of interest but it makes the WA complicated.
  *
@@ -1068,8 +1099,8 @@ gen8_emit_flush_coherentl3_wa(struct intel_engine_cs *engine, u32 *batch)
  * Typically we only have one indirect_ctx and per_ctx batch buffer which are
  * initialized at the beginning and shared across all contexts but this field
  * helps us to have multiple batches at different offsets and select them based
- * on a criteria. At the moment this batch always start at the beginning of the page
- * and at this point we don't have multiple wa_ctx batch buffers.
+ * on a criteria. At the moment this batch always start at the beginning of the
+ * page and at this point we don't have multiple wa_ctx batch buffers.
  *
  * The number of WA applied are not known at the beginning; we use this field
  * to return the no of DWORDS written.
