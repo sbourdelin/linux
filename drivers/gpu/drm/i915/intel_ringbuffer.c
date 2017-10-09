@@ -33,6 +33,7 @@
 #include <drm/i915_drm.h>
 #include "i915_trace.h"
 #include "intel_drv.h"
+#include "i915_workarounds.h"
 
 /* Rough estimate of the typical request size, performing a flush,
  * set-context and then emitting the batch.
