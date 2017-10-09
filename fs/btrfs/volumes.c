@@ -6378,9 +6378,14 @@ static int btrfs_check_chunk_valid(struct btrfs_fs_info *fs_info,
 }
 
 static void btrfs_report_missing_device(struct btrfs_fs_info *fs_info,
-						u64 devid, u8 *uuid)
+					u64 devid, u8 *uuid, int error)
 {
-	btrfs_warn_rl(fs_info, "devid %llu uuid %pU is missing", devid, uuid);
+	if (error)
+		btrfs_err_rl(fs_info, "devid %llu uuid %pU is missing",
+			      devid, uuid);
+	else
+		btrfs_warn_rl(fs_info, "devid %llu uuid %pU is missing",
+			      devid, uuid);
 }
 
 static int read_one_chunk(struct btrfs_fs_info *fs_info, struct btrfs_key *key,
@@ -6453,7 +6458,7 @@ static int read_one_chunk(struct btrfs_fs_info *fs_info, struct btrfs_key *key,
 		if (!map->stripes[i].dev &&
 		    !btrfs_test_opt(fs_info, DEGRADED)) {
 			free_extent_map(em);
-			btrfs_report_missing_device(fs_info, devid, uuid);
+			btrfs_report_missing_device(fs_info, devid, uuid, 1);
 			return -ENOENT;
 		}
 		if (!map->stripes[i].dev) {
@@ -6467,7 +6472,7 @@ static int read_one_chunk(struct btrfs_fs_info *fs_info, struct btrfs_key *key,
 					devid, PTR_ERR(map->stripes[i].dev));
 				return PTR_ERR(map->stripes[i].dev);
 			}
-			btrfs_report_missing_device(fs_info, devid, uuid);
+			btrfs_report_missing_device(fs_info, devid, uuid, 0);
 		}
 		map->stripes[i].dev->in_fs_metadata = 1;
 	}
@@ -6586,19 +6591,24 @@ static int read_one_dev(struct btrfs_fs_info *fs_info,
 	device = btrfs_find_device(fs_info, devid, dev_uuid, fs_uuid);
 	if (!device) {
 		if (!btrfs_test_opt(fs_info, DEGRADED)) {
-			btrfs_report_missing_device(fs_info, devid, dev_uuid);
+			btrfs_report_missing_device(fs_info, devid,
+							dev_uuid, 1);
 			return -ENOENT;
 		}
 
 		device = add_missing_dev(fs_devices, devid, dev_uuid);
 		if (IS_ERR(device))
 			return PTR_ERR(device);
-		btrfs_report_missing_device(fs_info, devid, dev_uuid);
+		btrfs_report_missing_device(fs_info, devid, dev_uuid, 0);
 	} else {
 		if (!device->bdev) {
-			btrfs_report_missing_device(fs_info, devid, dev_uuid);
-			if (!btrfs_test_opt(fs_info, DEGRADED))
+			if (!btrfs_test_opt(fs_info, DEGRADED)) {
+				btrfs_report_missing_device(fs_info,
+						devid, dev_uuid, 1);
 				return -ENOENT;
+			}
+			btrfs_report_missing_device(fs_info, devid,
+							dev_uuid, 0);
 		}
 
 		if(!device->bdev && !device->missing) {
