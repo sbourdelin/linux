@@ -117,6 +117,7 @@ struct ip_tunnel {
 
 	/* This field used only by ERSPAN */
 	u32		index;		/* ERSPAN type II index */
+	unsigned int	ether_mtu;	/* The mtu including the ether hdr */
 
 	struct dst_cache dst_cache;
 

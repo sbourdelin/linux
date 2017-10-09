@@ -578,8 +578,8 @@ static void erspan_fb_xmit(struct sk_buff *skb, struct net_device *dev,
 	if (gre_handle_offloads(skb, false))
 		goto err_free_rt;
 
-	if (skb->len > dev->mtu + dev->hard_header_len) {
-		pskb_trim(skb, dev->mtu + dev->hard_header_len);
+	if (skb->len > tunnel->ether_mtu) {
+		pskb_trim(skb, tunnel->ether_mtu);
 		truncate = true;
 	}
 
@@ -730,8 +730,8 @@ static netdev_tx_t erspan_xmit(struct sk_buff *skb,
 	if (skb_cow_head(skb, dev->needed_headroom))
 		goto free_skb;
 
-	if (skb->len > dev->mtu + dev->hard_header_len) {
-		pskb_trim(skb, dev->mtu + dev->hard_header_len);
+	if (skb->len > tunnel->ether_mtu) {
+		pskb_trim(skb, tunnel->ether_mtu);
 		truncate = true;
 	}
 

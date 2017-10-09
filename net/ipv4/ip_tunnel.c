@@ -348,6 +348,7 @@ static int ip_tunnel_bind_dev(struct net_device *dev)
 
 	dev->needed_headroom = t_hlen + hlen;
 	mtu -= (dev->hard_header_len + t_hlen);
+	tunnel->ether_mtu = mtu + dev->hard_header_len;
 
 	if (mtu < 68)
 		mtu = 68;
@@ -952,6 +953,7 @@ int __ip_tunnel_change_mtu(struct net_device *dev, int new_mtu, bool strict)
 	}
 
 	dev->mtu = new_mtu;
+	tunnel->ether_mtu = new_mtu + dev->hard_header_len;
 	return 0;
 }
 EXPORT_SYMBOL_GPL(__ip_tunnel_change_mtu);
@@ -1183,6 +1185,7 @@ int ip_tunnel_init(struct net_device *dev)
 
 	tunnel->dev = dev;
 	tunnel->net = dev_net(dev);
+	tunnel->ether_mtu = dev->mtu + dev->hard_header_len;
 	strcpy(tunnel->parms.name, dev->name);
 	iph->version		= 4;
 	iph->ihl		= 5;
