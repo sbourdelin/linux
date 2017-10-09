@@ -1922,50 +1922,15 @@ static void __maybe_unused gpmc_read_timings_dt(struct device_node *np,
 		of_property_read_bool(np, "gpmc,time-para-granularity");
 }
 
-#if IS_ENABLED(CONFIG_MTD_ONENAND)
-static int gpmc_probe_onenand_child(struct platform_device *pdev,
-				 struct device_node *child)
-{
-	u32 val;
-	struct omap_onenand_platform_data *gpmc_onenand_data;
-
-	if (of_property_read_u32(child, "reg", &val) < 0) {
-		dev_err(&pdev->dev, "%pOF has no 'reg' property\n",
-			child);
-		return -ENODEV;
-	}
-
-	gpmc_onenand_data = devm_kzalloc(&pdev->dev, sizeof(*gpmc_onenand_data),
-					 GFP_KERNEL);
-	if (!gpmc_onenand_data)
-		return -ENOMEM;
-
-	gpmc_onenand_data->cs = val;
-	gpmc_onenand_data->of_node = child;
-	gpmc_onenand_data->dma_channel = -1;
-
-	if (!of_property_read_u32(child, "dma-channel", &val))
-		gpmc_onenand_data->dma_channel = val;
-
-	return gpmc_onenand_init(gpmc_onenand_data);
-}
-#else
-static int gpmc_probe_onenand_child(struct platform_device *pdev,
-				    struct device_node *child)
-{
-	return 0;
-}
-#endif
-
 /**
- * gpmc_probe_generic_child - configures the gpmc for a child device
+ * gpmc_probe_child - configures the gpmc for a child device
  * @pdev:	pointer to gpmc platform device
  * @child:	pointer to device-tree node for child device
  *
  * Allocates and configures a GPMC chip-select for a child device.
  * Returns 0 on success and appropriate negative error code on failure.
  */
-static int gpmc_probe_generic_child(struct platform_device *pdev,
+static int gpmc_probe_child(struct platform_device *pdev,
 				struct device_node *child)
 {
 	struct gpmc_settings gpmc_s;
@@ -2080,6 +2045,51 @@ static int gpmc_probe_generic_child(struct platform_device *pdev,
 		/* disable write protect */
 		gpmc_configure(GPMC_CONFIG_WP, 0);
 		gpmc_s.device_nand = true;
+	} else if (of_device_is_compatible(child, "ti,omap2-onenand")) {
+		struct platform_device *onenand_pdev;
+		struct omap_onenand_platform_data *gpmc_onenand_data =
+			devm_kzalloc(&pdev->dev, sizeof(*gpmc_onenand_data),
+					GFP_KERNEL);
+
+		if (!gpmc_onenand_data) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		if (!of_property_read_u32(child, "dma-channel", &val))
+			gpmc_onenand_data->dma_channel = val;
+		else
+			gpmc_onenand_data->dma_channel = -1;
+
+		gpmc_onenand_data->cs = cs;
+		gpmc_onenand_data->of_node = child;
+
+		onenand_pdev = platform_device_alloc("omap2-onenand", cs);
+		if (!onenand_pdev) {
+			ret = -ENOMEM;
+			goto err;
+		}
+
+		ret = platform_device_add_resources(onenand_pdev, &res, 1);
+		if (ret) {
+			platform_device_put(onenand_pdev);
+			goto err;
+		}
+
+		onenand_pdev->dev.platform_data = gpmc_onenand_data;
+
+		ret = platform_device_add(onenand_pdev);
+		if (ret) {
+			platform_device_put(onenand_pdev);
+			goto err;
+		}
+
+		/* Enable CS region */
+		gpmc_cs_enable_mem(cs);
+
+		gpmc_onenand_init(gpmc_onenand_data);
+
+		return 0;
 	} else {
 		ret = of_property_read_u32(child, "bank-width",
 					   &gpmc_s.device_width);
@@ -2194,11 +2204,7 @@ static void gpmc_probe_dt_children(struct platform_device *pdev)
 		if (!child->name)
 			continue;
 
-		if (of_node_cmp(child->name, "onenand") == 0)
-			ret = gpmc_probe_onenand_child(pdev, child);
-		else
-			ret = gpmc_probe_generic_child(pdev, child);
-
+		ret = gpmc_probe_child(pdev, child);
 		if (ret) {
 			dev_err(&pdev->dev, "failed to probe DT child '%s': %d\n",
 				child->name, ret);

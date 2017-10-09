@@ -77,11 +77,7 @@ struct omap_nand_platform_data;
 struct omap_onenand_platform_data;
 
 #if IS_ENABLED(CONFIG_MTD_ONENAND_OMAP2)
-extern int gpmc_onenand_init(struct omap_onenand_platform_data *d);
+extern void gpmc_onenand_init(struct omap_onenand_platform_data *d);
 #else
-#define board_onenand_data	NULL
-static inline int gpmc_onenand_init(struct omap_onenand_platform_data *d)
-{
-	return 0;
-}
+static inline void gpmc_onenand_init(struct omap_onenand_platform_data *d) { }
 #endif
