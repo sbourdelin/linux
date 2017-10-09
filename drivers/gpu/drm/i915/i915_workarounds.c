@@ -608,8 +608,6 @@ static int gen9_mmio_workarounds_init(struct drm_i915_private *dev_priv)
 	/* See Bspec note for PSR2_CTL bit 31, Wa#828:skl,bxt,kbl,cfl */
 	MMIOWA_SET_BIT(CHICKEN_PAR1_1, SKL_EDP_PSR_FIX_RDWRAP);
 
-	MMIOWA_SET_BIT(GEN8_CONFIG0, GEN9_DEFAULT_FIXES);
-
 	/* WaEnableChickenDCPR:skl,bxt,kbl,glk,cfl */
 	MMIOWA_SET_BIT(GEN8_CHICKEN_DCPR_1, MASK_WAKEMEM);
 
