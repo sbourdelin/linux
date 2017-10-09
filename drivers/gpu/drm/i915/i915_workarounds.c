@@ -509,6 +509,14 @@ int i915_ctx_workarounds_emit(struct drm_i915_gem_request *req)
 	return 0;
 }
 
+static void bdw_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
+{
+}
+
+static void chv_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
+{
+}
+
 static void gen9_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 {
 	if (HAS_LLC(dev_priv)) {
@@ -521,7 +529,39 @@ static void gen9_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 			   I915_READ(MMCD_MISC_CTRL) |
 			   MMCD_PCLA |
 			   MMCD_HOTSPOT_EN);
+
+		/*
+		 * WaCompressedResourceDisplayNewHashMode:skl,kbl
+		 * Display WA#0390: skl,kbl
+		 *
+		 * Must match Sampler, Pixel Back End, and Media. See
+		 * WaCompressedResourceSamplerPbeMediaNewHashMode.
+		 */
+		I915_WRITE(CHICKEN_PAR1_1,
+			   I915_READ(CHICKEN_PAR1_1) |
+			   SKL_DE_COMPRESSED_HASH_MODE);
 	}
+
+	/* See Bspec note for PSR2_CTL bit 31, Wa#828:skl,bxt,kbl,cfl */
+	I915_WRITE(CHICKEN_PAR1_1,
+		   I915_READ(CHICKEN_PAR1_1) | SKL_EDP_PSR_FIX_RDWRAP);
+
+	I915_WRITE(GEN8_CONFIG0,
+		   I915_READ(GEN8_CONFIG0) | GEN9_DEFAULT_FIXES);
+
+	/* WaEnableChickenDCPR:skl,bxt,kbl,glk,cfl */
+	I915_WRITE(GEN8_CHICKEN_DCPR_1,
+		   I915_READ(GEN8_CHICKEN_DCPR_1) | MASK_WAKEMEM);
+
+	/* WaFbcTurnOffFbcWatermark:skl,bxt,kbl,cfl */
+	/* WaFbcWakeMemOn:skl,bxt,kbl,glk,cfl */
+	I915_WRITE(DISP_ARB_CTL, I915_READ(DISP_ARB_CTL) |
+		   DISP_FBC_WM_DIS |
+		   DISP_FBC_MEMORY_WAKE);
+
+	/* WaFbcHighMemBwCorruptionAvoidance:skl,bxt,kbl,cfl */
+	I915_WRITE(ILK_DPFC_CHICKEN, I915_READ(ILK_DPFC_CHICKEN) |
+		   ILK_DPFC_DISABLE_DUMMY0);
 
 	/* WaContextSwitchWithConcurrentTLBInvalidate:skl,bxt,kbl,glk,cfl */
 	I915_WRITE(GEN9_CSFE_CHICKEN1_RCS,
@@ -553,6 +593,18 @@ static void skl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 {
 	gen9_mmio_workarounds_apply(dev_priv);
 
+	/* WaDisableDopClockGating */
+	I915_WRITE(GEN7_MISCCPCTL, I915_READ(GEN7_MISCCPCTL)
+		   & ~GEN7_DOP_CLOCK_GATE_ENABLE);
+
+	/* WAC6entrylatency:skl */
+	I915_WRITE(FBC_LLC_READ_CTRL, I915_READ(FBC_LLC_READ_CTRL) |
+		   FBC_LLC_FULLY_OPEN);
+
+	/* WaFbcNukeOnHostModify:skl */
+	I915_WRITE(ILK_DPFC_CHICKEN, I915_READ(ILK_DPFC_CHICKEN) |
+		   ILK_DPFC_NUKE_ON_ANY_MODIFICATION);
+
 	/* WaEnableGapsTsvCreditFix:skl */
 	I915_WRITE(GEN8_GARBCNTL, (I915_READ(GEN8_GARBCNTL) |
 				   GEN9_GAPS_TSV_CREDIT_DISABLE));
@@ -571,6 +623,24 @@ static void skl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 static void bxt_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 {
 	gen9_mmio_workarounds_apply(dev_priv);
+
+	/* WaDisableSDEUnitClockGating:bxt */
+	I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
+		   GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
+
+	/*
+	 * FIXME:
+	 * GEN8_HDCUNIT_CLOCK_GATE_DISABLE_HDCREQ applies on 3x6 GT SKUs only.
+	 */
+	I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
+		   GEN8_HDCUNIT_CLOCK_GATE_DISABLE_HDCREQ);
+
+	/*
+	 * Wa: Backlight PWM may stop in the asserted state, causing backlight
+	 * to stay fully on.
+	 */
+	I915_WRITE(GEN9_CLKGATE_DIS_0, I915_READ(GEN9_CLKGATE_DIS_0) |
+		   PWM1_GATING_DIS | PWM2_GATING_DIS);
 
 	/* WaStoreMultiplePTEenable:bxt */
 	/* This is a requirement according to Hardware specification */
@@ -605,6 +675,20 @@ static void kbl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 {
 	gen9_mmio_workarounds_apply(dev_priv);
 
+	/* WaDisableSDEUnitClockGating:kbl */
+	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_B0))
+		I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
+			   GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
+
+	/* WaDisableGamClockGating:kbl */
+	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_B0))
+		I915_WRITE(GEN6_UCGCTL1, I915_READ(GEN6_UCGCTL1) |
+			   GEN6_GAMUNIT_CLOCK_GATE_DISABLE);
+
+	/* WaFbcNukeOnHostModify:kbl */
+	I915_WRITE(ILK_DPFC_CHICKEN, I915_READ(ILK_DPFC_CHICKEN) |
+		   ILK_DPFC_NUKE_ON_ANY_MODIFICATION);
+
 	/* WaEnableGapsTsvCreditFix:kbl */
 	I915_WRITE(GEN8_GARBCNTL, (I915_READ(GEN8_GARBCNTL) |
 				   GEN9_GAPS_TSV_CREDIT_DISABLE));
@@ -627,12 +711,42 @@ static void kbl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 
 static void glk_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 {
+	u32 val;
+
 	gen9_mmio_workarounds_apply(dev_priv);
+
+	/*
+	 * WaDisablePWMClockGating:glk
+	 * Backlight PWM may stop in the asserted state, causing backlight
+	 * to stay fully on.
+	 */
+	I915_WRITE(GEN9_CLKGATE_DIS_0, I915_READ(GEN9_CLKGATE_DIS_0) |
+		   PWM1_GATING_DIS | PWM2_GATING_DIS);
+
+	/* WaDDIIOTimeout:glk */
+	if (IS_GLK_REVID(dev_priv, 0, GLK_REVID_A1)) {
+		u32 val = I915_READ(CHICKEN_MISC_2);
+		val &= ~(GLK_CL0_PWR_DOWN |
+			 GLK_CL1_PWR_DOWN |
+			 GLK_CL2_PWR_DOWN);
+		I915_WRITE(CHICKEN_MISC_2, val);
+	}
+
+	/* Display WA #1133: WaFbcSkipSegments:glk */
+	val = I915_READ(ILK_DPFC_CHICKEN);
+	val &= ~GLK_SKIP_SEG_COUNT_MASK;
+	val |= GLK_SKIP_SEG_EN | GLK_SKIP_SEG_COUNT(1);
+	I915_WRITE(ILK_DPFC_CHICKEN, val);
 }
 
 static void cfl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 {
 	gen9_mmio_workarounds_apply(dev_priv);
+
+	/* WaFbcNukeOnHostModify:cfl */
+	I915_WRITE(ILK_DPFC_CHICKEN,
+		   I915_READ(ILK_DPFC_CHICKEN) |
+			     ILK_DPFC_NUKE_ON_ANY_MODIFICATION);
 
 	/* WaEnableGapsTsvCreditFix:cfl */
 	I915_WRITE(GEN8_GARBCNTL, (I915_READ(GEN8_GARBCNTL) |
@@ -650,6 +764,32 @@ static void cfl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 
 static void cnl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 {
+	u32 val;
+
+	/* This is not an Wa. Enable for better image quality */
+	I915_WRITE(_3D_CHICKEN3,
+		   _MASKED_BIT_ENABLE(_3D_CHICKEN3_AA_LINE_QUALITY_FIX_ENABLE));
+
+	/* WaEnableChickenDCPR:cnl */
+	I915_WRITE(GEN8_CHICKEN_DCPR_1,
+		   I915_READ(GEN8_CHICKEN_DCPR_1) | MASK_WAKEMEM);
+
+	/* WaFbcWakeMemOn:cnl */
+	I915_WRITE(DISP_ARB_CTL, I915_READ(DISP_ARB_CTL) |
+		   DISP_FBC_MEMORY_WAKE);
+
+	/* WaSarbUnitClockGatingDisable:cnl (pre-prod) */
+	if (IS_CNL_REVID(dev_priv, CNL_REVID_A0, CNL_REVID_B0))
+		I915_WRITE(SLICE_UNIT_LEVEL_CLKGATE,
+			   I915_READ(SLICE_UNIT_LEVEL_CLKGATE) |
+			   SARBUNIT_CLKGATE_DIS);
+
+	/* Display WA #1133: WaFbcSkipSegments:cnl */
+	val = I915_READ(ILK_DPFC_CHICKEN);
+	val &= ~GLK_SKIP_SEG_COUNT_MASK;
+	val |= GLK_SKIP_SEG_EN | GLK_SKIP_SEG_COUNT(1);
+	I915_WRITE(ILK_DPFC_CHICKEN, val);
+
 	/* WaDisableI2mCycleOnWRPort:cnl (pre-prod) */
 	if (IS_CNL_REVID(dev_priv, CNL_REVID_B0, CNL_REVID_B0))
 		I915_WRITE(GAMT_CHKN_BIT_REG,
@@ -668,7 +808,11 @@ static void cnl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 
 void i915_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	if (IS_SKYLAKE(dev_priv))
+	if (IS_BROADWELL(dev_priv))
+		bdw_mmio_workarounds_apply(dev_priv);
+	else if (IS_CHERRYVIEW(dev_priv))
+		chv_mmio_workarounds_apply(dev_priv);
+	else if (IS_SKYLAKE(dev_priv))
 		skl_mmio_workarounds_apply(dev_priv);
 	else if (IS_BROXTON(dev_priv))
 		bxt_mmio_workarounds_apply(dev_priv);
