@@ -230,6 +230,18 @@ config TI_SCI_PROTOCOL
 	  This protocol library is used by client drivers to use the features
 	  provided by the system controller.
 
+config MLX_BOOTCTL
+	tristate "Mellanox BlueField Firmware Boot Control"
+	depends on ARM64
+	help
+	  The Mellanox BlueField firmware implements functionality to
+	  request swapping the primary and alternate eMMC boot
+	  partition, and to set up a watchdog that can undo that swap
+	  if the system does not boot up correctly.  This driver
+	  provides sysfs access to the firmware, to be used in
+	  conjunction with the eMMC device driver to do any necessary
+	  initial swap of the boot partition.
+
 config HAVE_ARM_SMCCC
 	bool
 
