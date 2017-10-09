@@ -98,10 +98,8 @@ static in_cache_entry *in_cache_add_entry(__be32 dst_ip,
 {
 	in_cache_entry *entry = kzalloc(sizeof(in_cache_entry), GFP_KERNEL);
 
-	if (entry == NULL) {
-		pr_info("mpoa: mpoa_caches.c: new_in_cache_entry: out of memory\n");
+	if (!entry)
 		return NULL;
-	}
 
 	dprintk("adding an ingress entry, ip = %pI4\n", &dst_ip);
 
@@ -460,10 +458,8 @@ static eg_cache_entry *eg_cache_add_entry(struct k_message *msg,
 {
 	eg_cache_entry *entry = kzalloc(sizeof(eg_cache_entry), GFP_KERNEL);
 
-	if (entry == NULL) {
-		pr_info("out of memory\n");
+	if (!entry)
 		return NULL;
-	}
 
 	dprintk("adding an egress entry, ip = %pI4, this should be our IP\n",
 		&msg->content.eg_info.eg_dst_ip);

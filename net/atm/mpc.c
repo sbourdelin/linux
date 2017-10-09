@@ -184,10 +184,8 @@ struct atm_mpoa_qos *atm_mpoa_add_qos(__be32 dst_ip, struct atm_qos *qos)
 	}
 
 	entry = kmalloc(sizeof(struct atm_mpoa_qos), GFP_KERNEL);
-	if (entry == NULL) {
-		pr_info("mpoa: out of memory\n");
+	if (!entry)
 		return entry;
-	}
 
 	entry->ipaddr = dst_ip;
 	entry->qos = *qos;
@@ -473,10 +471,8 @@ static const uint8_t *copy_macs(struct mpoa_client *mpc,
 			kfree(mpc->mps_macs);
 		mpc->number_of_mps_macs = 0;
 		mpc->mps_macs = kmalloc(num_macs * ETH_ALEN, GFP_KERNEL);
-		if (mpc->mps_macs == NULL) {
-			pr_info("(%s) out of mem\n", mpc->dev->name);
+		if (!mpc->mps_macs)
 			return NULL;
-		}
 	}
 	ether_addr_copy(mpc->mps_macs, router_mac);
 	tlvs += 20; if (device_type == MPS_AND_MPC) tlvs += 20;
