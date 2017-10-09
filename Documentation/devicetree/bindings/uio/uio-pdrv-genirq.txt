@@ -1,0 +1,27 @@
+*Generic UIO platform driver with interrupts
+
+Required properties:
+- compatible: Should be a value set with the of_id module parameter.
+
+Optional properties:
+- interrupts: Should contain the interrupt to be associated with this device
+  (only a single interrupt is supported per device).
+- interrupt-parent: Specifies the phandle to the parent interrupt controller.
+- reg: Should specify the physical address spaces used by this device.
+
+Example:
+
+/* Device with MM IO and interrupt assuming of_id="me,my-device" */
+my-device@10000 {
+	compatible = "me,my-device";
+	reg = <0x10000 0x40>;
+	interrupts = <4 IRQ_TYPE_EDGE_BOTH>;
+	interrupt-parent = <&gic>;
+};
+
+/* Device with interrupt only assuming of_id="me,my-device" */
+my-int {
+	compatible = "me,my-device";
+	interrupts = <6 IRQ_TYPE_EDGE_BOTH>;
+	interrupt-parent = <&gic>;
+};
