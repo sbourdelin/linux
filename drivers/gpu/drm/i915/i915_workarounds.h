@@ -34,4 +34,7 @@ void i915_mmio_workarounds_apply(struct drm_i915_private *dev_priv);
 int i915_whitelist_workarounds_init(struct intel_engine_cs *engine);
 void i915_whitelist_workarounds_apply(struct intel_engine_cs *engine);
 
+int i915_bb_workarounds_init(struct intel_engine_cs *engine);
+void i915_bb_workarounds_fini(struct intel_engine_cs *engine);
+
 #endif
