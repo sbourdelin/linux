@@ -28,6 +28,7 @@
 int i915_ctx_workarounds_init(struct drm_i915_private *dev_priv);
 int i915_ctx_workarounds_emit(struct drm_i915_gem_request *req);
 
+int i915_mmio_workarounds_init(struct drm_i915_private *dev_priv);
 void i915_mmio_workarounds_apply(struct drm_i915_private *dev_priv);
 
 int i915_whitelist_workarounds_apply(struct intel_engine_cs *engine);

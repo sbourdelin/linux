@@ -49,6 +49,7 @@
 #include "i915_drv.h"
 #include "i915_trace.h"
 #include "i915_vgpu.h"
+#include "i915_workarounds.h"
 #include "intel_drv.h"
 #include "intel_uc.h"
 
@@ -885,6 +886,10 @@ static int i915_driver_init_early(struct drm_i915_private *dev_priv,
 
 	BUG_ON(device_info->gen > sizeof(device_info->gen_mask) * BITS_PER_BYTE);
 	device_info->gen_mask = BIT(device_info->gen - 1);
+
+	ret = i915_mmio_workarounds_init(dev_priv);
+	if (ret < 0)
+		return ret;
 
 	spin_lock_init(&dev_priv->irq_lock);
 	spin_lock_init(&dev_priv->gpu_error.lock);

@@ -31,7 +31,7 @@ static int ctx_wa_add(struct drm_i915_private *dev_priv,
 {
 	const u32 idx = dev_priv->workarounds.ctx_wa_count;
 
-	if (WARN_ON(idx >= I915_MAX_WA_REGS))
+	if (WARN_ON(idx >= I915_MAX_CTX_WA_REGS))
 		return -ENOSPC;
 
 	dev_priv->workarounds.ctx_wa_reg[idx].addr = addr;
@@ -509,15 +509,53 @@ int i915_ctx_workarounds_emit(struct drm_i915_gem_request *req)
 	return 0;
 }
 
-static void bdw_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
+static int mmio_wa_add(struct drm_i915_private *dev_priv,
+		       i915_reg_t addr,
+		       const u32 mask, const u32 val)
 {
+	const u32 idx = dev_priv->workarounds.mmio_wa_count;
+
+	if (WARN_ON(idx >= I915_MAX_MMIO_WA_REGS))
+		return -ENOSPC;
+
+	dev_priv->workarounds.mmio_wa_reg[idx].addr = addr;
+	dev_priv->workarounds.mmio_wa_reg[idx].value = val;
+	dev_priv->workarounds.mmio_wa_reg[idx].mask = mask;
+
+	dev_priv->workarounds.mmio_wa_count++;
+
+	return 0;
 }
 
-static void chv_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
+#define MMIOWA_REG(addr, mask, val) do { \
+		const int r = mmio_wa_add(dev_priv, (addr), (mask), (val)); \
+		if (r) \
+			return r; \
+	} while (0)
+
+#define MMIOWA_SET_BIT(addr, mask) \
+	MMIOWA_REG(addr, (mask), (mask))
+
+#define MMIOWA_SET_BIT_MSK(addr, mask) \
+	CTXWA_REG(addr, (mask), _MASKED_BIT_ENABLE(mask))
+
+#define MMIOWA_CLR_BIT(addr, mask) \
+	MMIOWA_REG(addr, (mask), 0)
+
+#define MMIOWA_SET_FIELD(addr, mask, value) \
+	MMIOWA_REG(addr, (mask), (value))
+
+static int bdw_mmio_workarounds_init(struct drm_i915_private *dev_priv)
 {
+	return 0;
 }
 
-static void gen9_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
+static int chv_mmio_workarounds_init(struct drm_i915_private *dev_priv)
+{
+	return 0;
+}
+
+static int gen9_mmio_workarounds_init(struct drm_i915_private *dev_priv)
 {
 	if (HAS_LLC(dev_priv)) {
 		/* WaCompressedResourceSamplerPbeMediaNewHashMode:skl,kbl
@@ -525,10 +563,7 @@ static void gen9_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 		 * Must match Display Engine. See
 		 * WaCompressedResourceDisplayNewHashMode.
 		 */
-		I915_WRITE(MMCD_MISC_CTRL,
-			   I915_READ(MMCD_MISC_CTRL) |
-			   MMCD_PCLA |
-			   MMCD_HOTSPOT_EN);
+		MMIOWA_SET_BIT(MMCD_MISC_CTRL, MMCD_PCLA | MMCD_HOTSPOT_EN);
 
 		/*
 		 * WaCompressedResourceDisplayNewHashMode:skl,kbl
@@ -537,293 +572,301 @@ static void gen9_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 		 * Must match Sampler, Pixel Back End, and Media. See
 		 * WaCompressedResourceSamplerPbeMediaNewHashMode.
 		 */
-		I915_WRITE(CHICKEN_PAR1_1,
-			   I915_READ(CHICKEN_PAR1_1) |
-			   SKL_DE_COMPRESSED_HASH_MODE);
+		MMIOWA_SET_BIT(CHICKEN_PAR1_1, SKL_DE_COMPRESSED_HASH_MODE);
 	}
 
 	/* See Bspec note for PSR2_CTL bit 31, Wa#828:skl,bxt,kbl,cfl */
-	I915_WRITE(CHICKEN_PAR1_1,
-		   I915_READ(CHICKEN_PAR1_1) | SKL_EDP_PSR_FIX_RDWRAP);
+	MMIOWA_SET_BIT(CHICKEN_PAR1_1, SKL_EDP_PSR_FIX_RDWRAP);
 
-	I915_WRITE(GEN8_CONFIG0,
-		   I915_READ(GEN8_CONFIG0) | GEN9_DEFAULT_FIXES);
+	MMIOWA_SET_BIT(GEN8_CONFIG0, GEN9_DEFAULT_FIXES);
 
 	/* WaEnableChickenDCPR:skl,bxt,kbl,glk,cfl */
-	I915_WRITE(GEN8_CHICKEN_DCPR_1,
-		   I915_READ(GEN8_CHICKEN_DCPR_1) | MASK_WAKEMEM);
+	MMIOWA_SET_BIT(GEN8_CHICKEN_DCPR_1, MASK_WAKEMEM);
 
 	/* WaFbcTurnOffFbcWatermark:skl,bxt,kbl,cfl */
 	/* WaFbcWakeMemOn:skl,bxt,kbl,glk,cfl */
-	I915_WRITE(DISP_ARB_CTL, I915_READ(DISP_ARB_CTL) |
-		   DISP_FBC_WM_DIS |
-		   DISP_FBC_MEMORY_WAKE);
+	MMIOWA_SET_BIT(DISP_ARB_CTL, DISP_FBC_WM_DIS | DISP_FBC_MEMORY_WAKE);
 
 	/* WaFbcHighMemBwCorruptionAvoidance:skl,bxt,kbl,cfl */
-	I915_WRITE(ILK_DPFC_CHICKEN, I915_READ(ILK_DPFC_CHICKEN) |
-		   ILK_DPFC_DISABLE_DUMMY0);
+	MMIOWA_SET_BIT(ILK_DPFC_CHICKEN, ILK_DPFC_DISABLE_DUMMY0);
 
 	/* WaContextSwitchWithConcurrentTLBInvalidate:skl,bxt,kbl,glk,cfl */
-	I915_WRITE(GEN9_CSFE_CHICKEN1_RCS,
-		   _MASKED_BIT_ENABLE(GEN9_PREEMPT_GPGPU_SYNC_SWITCH_DISABLE));
+	MMIOWA_SET_BIT_MSK(GEN9_CSFE_CHICKEN1_RCS,
+			   GEN9_PREEMPT_GPGPU_SYNC_SWITCH_DISABLE);
 
 	/* WaEnableLbsSlaRetryTimerDecrement:skl,bxt,kbl,glk,cfl */
-	I915_WRITE(BDW_SCRATCH1, I915_READ(BDW_SCRATCH1) |
-		   GEN9_LBS_SLA_RETRY_TIMER_DECREMENT_ENABLE);
+	MMIOWA_SET_BIT(BDW_SCRATCH1, GEN9_LBS_SLA_RETRY_TIMER_DECREMENT_ENABLE);
 
 	/* WaDisableKillLogic:bxt,skl,kbl */
 	if (!IS_COFFEELAKE(dev_priv))
-		I915_WRITE(GAM_ECOCHK, I915_READ(GAM_ECOCHK) |
-			   ECOCHK_DIS_TLB);
+		MMIOWA_SET_BIT(GAM_ECOCHK, ECOCHK_DIS_TLB);
 
 	/* WaDisableHDCInvalidation:skl,bxt,kbl,cfl */
-	I915_WRITE(GAM_ECOCHK, I915_READ(GAM_ECOCHK) |
-		   BDW_DISABLE_HDC_INVALIDATION);
+	MMIOWA_SET_BIT(GAM_ECOCHK, BDW_DISABLE_HDC_INVALIDATION);
 
 	/* WaOCLCoherentLineFlush:skl,bxt,kbl,cfl */
-	I915_WRITE(GEN8_L3SQCREG4, (I915_READ(GEN8_L3SQCREG4) |
-				    GEN8_LQSC_FLUSH_COHERENT_LINES));
+	MMIOWA_SET_BIT(GEN8_L3SQCREG4, GEN8_LQSC_FLUSH_COHERENT_LINES);
 
 	/* WaEnablePreemptionGranularityControlByUMD:skl,bxt,kbl,cfl,[cnl] */
-	I915_WRITE(GEN7_FF_SLICE_CS_CHICKEN1,
-		   _MASKED_BIT_ENABLE(GEN9_FFSC_PERCTX_PREEMPT_CTRL));
+	MMIOWA_SET_BIT_MSK(GEN7_FF_SLICE_CS_CHICKEN1,
+			   GEN9_FFSC_PERCTX_PREEMPT_CTRL);
+	
+	return 0;
 }
 
-static void skl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
+static int skl_mmio_workarounds_init(struct drm_i915_private *dev_priv)
 {
-	gen9_mmio_workarounds_apply(dev_priv);
+	int ret;
+
+	ret = gen9_mmio_workarounds_init(dev_priv);
+	if (ret)
+		return ret;
 
 	/* WaDisableDopClockGating */
-	I915_WRITE(GEN7_MISCCPCTL, I915_READ(GEN7_MISCCPCTL)
-		   & ~GEN7_DOP_CLOCK_GATE_ENABLE);
+	MMIOWA_CLR_BIT(GEN7_MISCCPCTL, GEN7_DOP_CLOCK_GATE_ENABLE);
 
 	/* WAC6entrylatency:skl */
-	I915_WRITE(FBC_LLC_READ_CTRL, I915_READ(FBC_LLC_READ_CTRL) |
-		   FBC_LLC_FULLY_OPEN);
+	MMIOWA_SET_BIT(FBC_LLC_READ_CTRL, FBC_LLC_FULLY_OPEN);
 
 	/* WaFbcNukeOnHostModify:skl */
-	I915_WRITE(ILK_DPFC_CHICKEN, I915_READ(ILK_DPFC_CHICKEN) |
-		   ILK_DPFC_NUKE_ON_ANY_MODIFICATION);
+	MMIOWA_SET_BIT(ILK_DPFC_CHICKEN, ILK_DPFC_NUKE_ON_ANY_MODIFICATION);
 
 	/* WaEnableGapsTsvCreditFix:skl */
-	I915_WRITE(GEN8_GARBCNTL, (I915_READ(GEN8_GARBCNTL) |
-				   GEN9_GAPS_TSV_CREDIT_DISABLE));
+	MMIOWA_SET_BIT(GEN8_GARBCNTL, GEN9_GAPS_TSV_CREDIT_DISABLE);
 
 	/* WaDisableGafsUnitClkGating:skl */
-	I915_WRITE(GEN7_UCGCTL4, (I915_READ(GEN7_UCGCTL4) |
-				  GEN8_EU_GAUNIT_CLOCK_GATE_DISABLE));
+	MMIOWA_SET_BIT(GEN7_UCGCTL4, GEN8_EU_GAUNIT_CLOCK_GATE_DISABLE);
 
 	/* WaInPlaceDecompressionHang:skl */
 	if (IS_SKL_REVID(dev_priv, SKL_REVID_H0, REVID_FOREVER))
-		I915_WRITE(GEN9_GAMT_ECO_REG_RW_IA,
-			   (I915_READ(GEN9_GAMT_ECO_REG_RW_IA) |
-			    GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS));
+		MMIOWA_SET_BIT(GEN9_GAMT_ECO_REG_RW_IA,
+			       GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS);
+
+	return 0;
 }
 
-static void bxt_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
+static int bxt_mmio_workarounds_init(struct drm_i915_private *dev_priv)
 {
-	gen9_mmio_workarounds_apply(dev_priv);
+	int ret;
+
+	ret = gen9_mmio_workarounds_init(dev_priv);
+	if (ret)
+		return ret;
 
 	/* WaDisableSDEUnitClockGating:bxt */
-	I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
-		   GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
+	MMIOWA_SET_BIT(GEN8_UCGCTL6, GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
 
 	/*
 	 * FIXME:
 	 * GEN8_HDCUNIT_CLOCK_GATE_DISABLE_HDCREQ applies on 3x6 GT SKUs only.
 	 */
-	I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
-		   GEN8_HDCUNIT_CLOCK_GATE_DISABLE_HDCREQ);
+	MMIOWA_SET_BIT(GEN8_UCGCTL6, GEN8_HDCUNIT_CLOCK_GATE_DISABLE_HDCREQ);
 
 	/*
 	 * Wa: Backlight PWM may stop in the asserted state, causing backlight
 	 * to stay fully on.
 	 */
-	I915_WRITE(GEN9_CLKGATE_DIS_0, I915_READ(GEN9_CLKGATE_DIS_0) |
-		   PWM1_GATING_DIS | PWM2_GATING_DIS);
+	MMIOWA_SET_BIT(GEN9_CLKGATE_DIS_0, PWM1_GATING_DIS | PWM2_GATING_DIS);
 
 	/* WaStoreMultiplePTEenable:bxt */
 	/* This is a requirement according to Hardware specification */
 	if (IS_BXT_REVID(dev_priv, 0, BXT_REVID_A1))
-		I915_WRITE(TILECTL, I915_READ(TILECTL) | TILECTL_TLBPF);
+		MMIOWA_SET_BIT(TILECTL, TILECTL_TLBPF);
 
 	/* WaSetClckGatingDisableMedia:bxt */
 	if (IS_BXT_REVID(dev_priv, 0, BXT_REVID_A1)) {
-		I915_WRITE(GEN7_MISCCPCTL, (I915_READ(GEN7_MISCCPCTL) &
-					    ~GEN8_DOP_CLOCK_GATE_MEDIA_ENABLE));
+		MMIOWA_CLR_BIT(GEN7_MISCCPCTL, GEN8_DOP_CLOCK_GATE_MEDIA_ENABLE);
 	}
 
 	/* WaDisablePooledEuLoadBalancingFix:bxt */
 	if (IS_BXT_REVID(dev_priv, BXT_REVID_B0, REVID_FOREVER)) {
-		I915_WRITE(FF_SLICE_CS_CHICKEN2,
-			   _MASKED_BIT_ENABLE(GEN9_POOLED_EU_LOAD_BALANCING_FIX_DISABLE));
+		MMIOWA_SET_BIT_MSK(FF_SLICE_CS_CHICKEN2,
+				   GEN9_POOLED_EU_LOAD_BALANCING_FIX_DISABLE);
 	}
 
 	/* WaProgramL3SqcReg1DefaultForPerf:bxt */
 	if (IS_BXT_REVID(dev_priv, BXT_REVID_B0, REVID_FOREVER))
-		I915_WRITE(GEN8_L3SQCREG1, L3_GENERAL_PRIO_CREDITS(62) |
-					   L3_HIGH_PRIO_CREDITS(2));
+		MMIOWA_SET_FIELD(GEN8_L3SQCREG1, L3_PRIO_CREDITS_MASK,
+				 L3_GENERAL_PRIO_CREDITS(62) |
+				 L3_HIGH_PRIO_CREDITS(2));
 
 	/* WaInPlaceDecompressionHang:bxt */
 	if (IS_BXT_REVID(dev_priv, BXT_REVID_C0, REVID_FOREVER))
-		I915_WRITE(GEN9_GAMT_ECO_REG_RW_IA,
-			   (I915_READ(GEN9_GAMT_ECO_REG_RW_IA) |
-			    GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS));
+		MMIOWA_SET_BIT(GEN9_GAMT_ECO_REG_RW_IA,
+			GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS);
+
+	return 0;
 }
 
-static void kbl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
+static int kbl_mmio_workarounds_init(struct drm_i915_private *dev_priv)
 {
-	gen9_mmio_workarounds_apply(dev_priv);
+	int ret;
+
+	ret = gen9_mmio_workarounds_init(dev_priv);
+	if (ret)
+		return ret;
 
 	/* WaDisableSDEUnitClockGating:kbl */
 	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_B0))
-		I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
-			   GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
+		MMIOWA_SET_BIT(GEN8_UCGCTL6, GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
 
 	/* WaDisableGamClockGating:kbl */
 	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_B0))
-		I915_WRITE(GEN6_UCGCTL1, I915_READ(GEN6_UCGCTL1) |
-			   GEN6_GAMUNIT_CLOCK_GATE_DISABLE);
+		MMIOWA_SET_BIT(GEN6_UCGCTL1, GEN6_GAMUNIT_CLOCK_GATE_DISABLE);
 
 	/* WaFbcNukeOnHostModify:kbl */
-	I915_WRITE(ILK_DPFC_CHICKEN, I915_READ(ILK_DPFC_CHICKEN) |
-		   ILK_DPFC_NUKE_ON_ANY_MODIFICATION);
+	MMIOWA_SET_BIT(ILK_DPFC_CHICKEN, ILK_DPFC_NUKE_ON_ANY_MODIFICATION);
 
 	/* WaEnableGapsTsvCreditFix:kbl */
-	I915_WRITE(GEN8_GARBCNTL, (I915_READ(GEN8_GARBCNTL) |
-				   GEN9_GAPS_TSV_CREDIT_DISABLE));
+	MMIOWA_SET_BIT(GEN8_GARBCNTL, GEN9_GAPS_TSV_CREDIT_DISABLE);
 
 	/* WaDisableDynamicCreditSharing:kbl */
 	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_B0))
-		I915_WRITE(GAMT_CHKN_BIT_REG,
-			   (I915_READ(GAMT_CHKN_BIT_REG) |
-			    GAMT_CHKN_DISABLE_DYNAMIC_CREDIT_SHARING));
+		MMIOWA_SET_BIT(GAMT_CHKN_BIT_REG,
+			       GAMT_CHKN_DISABLE_DYNAMIC_CREDIT_SHARING);
 
 	/* WaDisableGafsUnitClkGating:kbl */
-	I915_WRITE(GEN7_UCGCTL4, (I915_READ(GEN7_UCGCTL4) |
-				  GEN8_EU_GAUNIT_CLOCK_GATE_DISABLE));
+	MMIOWA_SET_BIT(GEN7_UCGCTL4, GEN8_EU_GAUNIT_CLOCK_GATE_DISABLE);
 
 	/* WaInPlaceDecompressionHang:kbl */
-	I915_WRITE(GEN9_GAMT_ECO_REG_RW_IA,
-		   (I915_READ(GEN9_GAMT_ECO_REG_RW_IA) |
-		    GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS));
+	MMIOWA_SET_BIT(GEN9_GAMT_ECO_REG_RW_IA,
+		       GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS);
+
+	return 0;
 }
 
-static void glk_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
+static int glk_mmio_workarounds_init(struct drm_i915_private *dev_priv)
 {
-	u32 val;
+	int ret;
 
-	gen9_mmio_workarounds_apply(dev_priv);
+	ret = gen9_mmio_workarounds_init(dev_priv);
+	if (ret)
+		return ret;
 
 	/*
 	 * WaDisablePWMClockGating:glk
 	 * Backlight PWM may stop in the asserted state, causing backlight
 	 * to stay fully on.
 	 */
-	I915_WRITE(GEN9_CLKGATE_DIS_0, I915_READ(GEN9_CLKGATE_DIS_0) |
-		   PWM1_GATING_DIS | PWM2_GATING_DIS);
+	MMIOWA_SET_BIT(GEN9_CLKGATE_DIS_0, PWM1_GATING_DIS | PWM2_GATING_DIS);
 
 	/* WaDDIIOTimeout:glk */
-	if (IS_GLK_REVID(dev_priv, 0, GLK_REVID_A1)) {
-		u32 val = I915_READ(CHICKEN_MISC_2);
-		val &= ~(GLK_CL0_PWR_DOWN |
-			 GLK_CL1_PWR_DOWN |
-			 GLK_CL2_PWR_DOWN);
-		I915_WRITE(CHICKEN_MISC_2, val);
-	}
+	if (IS_GLK_REVID(dev_priv, 0, GLK_REVID_A1))
+		MMIOWA_CLR_BIT(CHICKEN_MISC_2,
+			       GLK_CL0_PWR_DOWN |
+			       GLK_CL1_PWR_DOWN |
+			       GLK_CL2_PWR_DOWN);
 
 	/* Display WA #1133: WaFbcSkipSegments:glk */
-	val = I915_READ(ILK_DPFC_CHICKEN);
-	val &= ~GLK_SKIP_SEG_COUNT_MASK;
-	val |= GLK_SKIP_SEG_EN | GLK_SKIP_SEG_COUNT(1);
-	I915_WRITE(ILK_DPFC_CHICKEN, val);
+	MMIOWA_SET_FIELD(ILK_DPFC_CHICKEN, GLK_SKIP_SEG_COUNT_MASK,
+			 GLK_SKIP_SEG_EN | GLK_SKIP_SEG_COUNT(1));
+
+	return 0;
 }
 
-static void cfl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
+static int cfl_mmio_workarounds_init(struct drm_i915_private *dev_priv)
 {
-	gen9_mmio_workarounds_apply(dev_priv);
+	int ret;
+
+	ret = gen9_mmio_workarounds_init(dev_priv);
+	if (ret)
+		return ret;
 
 	/* WaFbcNukeOnHostModify:cfl */
-	I915_WRITE(ILK_DPFC_CHICKEN,
-		   I915_READ(ILK_DPFC_CHICKEN) |
-			     ILK_DPFC_NUKE_ON_ANY_MODIFICATION);
+	MMIOWA_SET_BIT(ILK_DPFC_CHICKEN, ILK_DPFC_NUKE_ON_ANY_MODIFICATION);
 
 	/* WaEnableGapsTsvCreditFix:cfl */
-	I915_WRITE(GEN8_GARBCNTL, (I915_READ(GEN8_GARBCNTL) |
-				   GEN9_GAPS_TSV_CREDIT_DISABLE));
+	MMIOWA_SET_BIT(GEN8_GARBCNTL, GEN9_GAPS_TSV_CREDIT_DISABLE);
 
 	/* WaDisableGafsUnitClkGating:cfl */
-	I915_WRITE(GEN7_UCGCTL4, (I915_READ(GEN7_UCGCTL4) |
-				  GEN8_EU_GAUNIT_CLOCK_GATE_DISABLE));
+	MMIOWA_SET_BIT(GEN7_UCGCTL4, GEN8_EU_GAUNIT_CLOCK_GATE_DISABLE);
 
 	/* WaInPlaceDecompressionHang:cfl */
-	I915_WRITE(GEN9_GAMT_ECO_REG_RW_IA,
-		   (I915_READ(GEN9_GAMT_ECO_REG_RW_IA) |
-		    GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS));
+	MMIOWA_SET_BIT(GEN9_GAMT_ECO_REG_RW_IA,
+		       GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS);
+
+	return 0;
 }
 
-static void cnl_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
+static int cnl_mmio_workarounds_init(struct drm_i915_private *dev_priv)
 {
-	u32 val;
-
 	/* This is not an Wa. Enable for better image quality */
-	I915_WRITE(_3D_CHICKEN3,
-		   _MASKED_BIT_ENABLE(_3D_CHICKEN3_AA_LINE_QUALITY_FIX_ENABLE));
+	MMIOWA_SET_BIT_MSK(_3D_CHICKEN3, _3D_CHICKEN3_AA_LINE_QUALITY_FIX_ENABLE);
 
 	/* WaEnableChickenDCPR:cnl */
-	I915_WRITE(GEN8_CHICKEN_DCPR_1,
-		   I915_READ(GEN8_CHICKEN_DCPR_1) | MASK_WAKEMEM);
+	MMIOWA_SET_BIT(GEN8_CHICKEN_DCPR_1, MASK_WAKEMEM);
 
 	/* WaFbcWakeMemOn:cnl */
-	I915_WRITE(DISP_ARB_CTL, I915_READ(DISP_ARB_CTL) |
-		   DISP_FBC_MEMORY_WAKE);
+	MMIOWA_SET_BIT(DISP_ARB_CTL, DISP_FBC_MEMORY_WAKE);
 
 	/* WaSarbUnitClockGatingDisable:cnl (pre-prod) */
 	if (IS_CNL_REVID(dev_priv, CNL_REVID_A0, CNL_REVID_B0))
-		I915_WRITE(SLICE_UNIT_LEVEL_CLKGATE,
-			   I915_READ(SLICE_UNIT_LEVEL_CLKGATE) |
-			   SARBUNIT_CLKGATE_DIS);
+		MMIOWA_SET_BIT(SLICE_UNIT_LEVEL_CLKGATE, SARBUNIT_CLKGATE_DIS);
 
 	/* Display WA #1133: WaFbcSkipSegments:cnl */
-	val = I915_READ(ILK_DPFC_CHICKEN);
-	val &= ~GLK_SKIP_SEG_COUNT_MASK;
-	val |= GLK_SKIP_SEG_EN | GLK_SKIP_SEG_COUNT(1);
-	I915_WRITE(ILK_DPFC_CHICKEN, val);
+	MMIOWA_SET_FIELD(ILK_DPFC_CHICKEN, GLK_SKIP_SEG_COUNT_MASK,
+			 GLK_SKIP_SEG_EN | GLK_SKIP_SEG_COUNT(1));
 
 	/* WaDisableI2mCycleOnWRPort:cnl (pre-prod) */
 	if (IS_CNL_REVID(dev_priv, CNL_REVID_B0, CNL_REVID_B0))
-		I915_WRITE(GAMT_CHKN_BIT_REG,
-			   (I915_READ(GAMT_CHKN_BIT_REG) |
-			    GAMT_CHKN_DISABLE_I2M_CYCLE_ON_WR_PORT));
+		MMIOWA_SET_BIT(GAMT_CHKN_BIT_REG,
+			       GAMT_CHKN_DISABLE_I2M_CYCLE_ON_WR_PORT);
 
 	/* WaInPlaceDecompressionHang:cnl */
-	I915_WRITE(GEN9_GAMT_ECO_REG_RW_IA,
-		   (I915_READ(GEN9_GAMT_ECO_REG_RW_IA) |
-		    GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS));
+	MMIOWA_SET_BIT(GEN9_GAMT_ECO_REG_RW_IA,
+		       GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS);
 
 	/* WaEnablePreemptionGranularityControlByUMD:cnl */
-	I915_WRITE(GEN7_FF_SLICE_CS_CHICKEN1,
-		   _MASKED_BIT_ENABLE(GEN9_FFSC_PERCTX_PREEMPT_CTRL));
+	MMIOWA_SET_BIT_MSK(GEN7_FF_SLICE_CS_CHICKEN1,
+			   GEN9_FFSC_PERCTX_PREEMPT_CTRL);
+
+	return 0;
+}
+
+int i915_mmio_workarounds_init(struct drm_i915_private *dev_priv)
+{
+	int err;
+
+	dev_priv->workarounds.mmio_wa_count = 0;
+
+	if (IS_BROADWELL(dev_priv))
+		err = bdw_mmio_workarounds_init(dev_priv);
+	else if (IS_CHERRYVIEW(dev_priv))
+		err = chv_mmio_workarounds_init(dev_priv);
+	else if (IS_SKYLAKE(dev_priv))
+		err = skl_mmio_workarounds_init(dev_priv);
+	else if (IS_BROXTON(dev_priv))
+		err = bxt_mmio_workarounds_init(dev_priv);
+	else if (IS_KABYLAKE(dev_priv))
+		err = kbl_mmio_workarounds_init(dev_priv);
+	else if (IS_GEMINILAKE(dev_priv))
+		err = glk_mmio_workarounds_init(dev_priv);
+	else if (IS_COFFEELAKE(dev_priv))
+		err = cfl_mmio_workarounds_init(dev_priv);
+	else if (IS_CANNONLAKE(dev_priv))
+		err = cnl_mmio_workarounds_init(dev_priv);
+	else
+		err = 0;
+	if (err)
+		return err;
+
+	DRM_DEBUG_DRIVER("Number of MMIO w/a: %d\n",
+			 dev_priv->workarounds.mmio_wa_count);
+	return 0;
 }
 
 void i915_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	if (IS_BROADWELL(dev_priv))
-		bdw_mmio_workarounds_apply(dev_priv);
-	else if (IS_CHERRYVIEW(dev_priv))
-		chv_mmio_workarounds_apply(dev_priv);
-	else if (IS_SKYLAKE(dev_priv))
-		skl_mmio_workarounds_apply(dev_priv);
-	else if (IS_BROXTON(dev_priv))
-		bxt_mmio_workarounds_apply(dev_priv);
-	else if (IS_KABYLAKE(dev_priv))
-		kbl_mmio_workarounds_apply(dev_priv);
-	else if (IS_GEMINILAKE(dev_priv))
-		glk_mmio_workarounds_apply(dev_priv);
-	else if (IS_COFFEELAKE(dev_priv))
-		cfl_mmio_workarounds_apply(dev_priv);
-	else if (IS_CANNONLAKE(dev_priv))
-		cnl_mmio_workarounds_apply(dev_priv);
+	struct i915_workarounds *w = &dev_priv->workarounds;
+	int i;
+
+	for (i = 0; i < w->mmio_wa_count; i++) {
+		i915_reg_t addr = w->mmio_wa_reg[i].addr;
+		u32 value = w->mmio_wa_reg[i].value;
+		u32 mask = w->mmio_wa_reg[i].mask;
+
+		I915_WRITE(addr, (I915_READ(addr) & ~mask) | value);
+	}
 }
 
 static int wa_ring_whitelist_reg(struct intel_engine_cs *engine,
