@@ -1156,8 +1156,13 @@ static int vfio_pci_mmap(void *device_data, struct vm_area_struct *vma)
 	}
 
 	vma->vm_private_data = vdev;
-	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 	vma->vm_pgoff = (pci_resource_start(pdev, index) >> PAGE_SHIFT) + pgoff;
+#ifdef __HAVE_PHYS_MEM_ACCESS_PROT
+	vma->vm_page_prot = phys_mem_access_prot(NULL, vma->vm_pgoff,
+			req_len, vma->vm_page_prot);
+#else
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+#endif
 
 	return remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
 			       req_len, vma->vm_page_prot);
