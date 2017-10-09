@@ -1499,9 +1499,7 @@ static int gen9_init_render_ring(struct intel_engine_cs *engine)
 	if (ret)
 		return ret;
 
-	ret = i915_whitelist_workarounds_apply(engine);
-	if (ret)
-		return ret;
+	i915_whitelist_workarounds_apply(engine);
 
 	return 0;
 }
@@ -1985,6 +1983,10 @@ int logical_render_ring_init(struct intel_engine_cs *engine)
 	engine->emit_breadcrumb_sz = gen8_emit_breadcrumb_render_sz;
 
 	ret = intel_engine_create_scratch(engine, PAGE_SIZE);
+	if (ret)
+		return ret;
+
+	ret = i915_whitelist_workarounds_init(engine);
 	if (ret)
 		return ret;
 

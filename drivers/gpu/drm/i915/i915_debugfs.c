@@ -3560,7 +3560,7 @@ static int i915_wa_registers(struct seq_file *m, void *unused)
 	seq_printf(m, "Context workarounds applied: %d\n", workarounds->ctx_wa_count);
 	for_each_engine(engine, dev_priv, id)
 		seq_printf(m, "HW whitelist count for %s: %d\n",
-			   engine->name, workarounds->hw_whitelist_count[id]);
+			   engine->name, workarounds->whitelist_wa_count[id]);
 	for (i = 0; i < workarounds->ctx_wa_count; ++i) {
 		i915_reg_t addr;
 		u32 mask, value, read;

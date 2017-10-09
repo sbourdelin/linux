@@ -869,64 +869,64 @@ void i915_mmio_workarounds_apply(struct drm_i915_private *dev_priv)
 	}
 }
 
-static int wa_ring_whitelist_reg(struct intel_engine_cs *engine,
-				 i915_reg_t reg)
+static int whitelist_wa_add(struct intel_engine_cs *engine,
+			    i915_reg_t reg)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
 	struct i915_workarounds *wa = &dev_priv->workarounds;
-	const uint32_t index = wa->hw_whitelist_count[engine->id];
+	const uint32_t index = wa->whitelist_wa_count[engine->id];
 
 	if (WARN_ON(index >= RING_MAX_NONPRIV_SLOTS))
 		return -EINVAL;
 
-	I915_WRITE(RING_FORCE_TO_NONPRIV(engine->mmio_base, index),
-		   i915_mmio_reg_offset(reg));
-	wa->hw_whitelist_count[engine->id]++;
+	wa->whitelist_wa_reg[engine->id][index].addr =
+		RING_FORCE_TO_NONPRIV(engine->mmio_base, index);
+	wa->whitelist_wa_reg[engine->id][index].value = i915_mmio_reg_offset(reg);
+	wa->whitelist_wa_reg[engine->id][index].mask = 0xffffffff;
+
+	wa->whitelist_wa_count[engine->id]++;
 
 	return 0;
 }
 
-static int gen9_whitelist_workarounds_apply(struct intel_engine_cs *engine)
-{
-	int ret;
+#define WHITELISTWA_REG(engine, reg) do { \
+	const int r = whitelist_wa_add(engine, reg); \
+	if (r) \
+		return r; \
+} while (0)
 
+static int gen9_whitelist_workarounds_init(struct intel_engine_cs *engine)
+{
 	/* WaVFEStateAfterPipeControlwithMediaStateClear:skl,bxt,glk,cfl */
-	ret = wa_ring_whitelist_reg(engine, GEN9_CTX_PREEMPT_REG);
-	if (ret)
-		return ret;
+	WHITELISTWA_REG(engine, GEN9_CTX_PREEMPT_REG);
 
 	/* WaEnablePreemptionGranularityControlByUMD:skl,bxt,kbl,cfl,[cnl] */
-	ret = wa_ring_whitelist_reg(engine, GEN8_CS_CHICKEN1);
-	if (ret)
-		return ret;
+	WHITELISTWA_REG(engine, GEN8_CS_CHICKEN1);
 
 	/* WaAllowUMDToModifyHDCChicken1:skl,bxt,kbl,glk,cfl */
-	ret = wa_ring_whitelist_reg(engine, GEN8_HDC_CHICKEN1);
-	if (ret)
-		return ret;
+	WHITELISTWA_REG(engine, GEN8_HDC_CHICKEN1);
 
 	return 0;
 }
 
-static int skl_whitelist_workarounds_apply(struct intel_engine_cs *engine)
+static int skl_whitelist_workarounds_init(struct intel_engine_cs *engine)
 {
-	int ret = gen9_whitelist_workarounds_apply(engine);
+	int ret = gen9_whitelist_workarounds_init(engine);
 	if (ret)
 		return ret;
 
 	/* WaDisableLSQCROPERFforOCL:skl */
-	ret = wa_ring_whitelist_reg(engine, GEN8_L3SQCREG4);
-	if (ret)
-		return ret;
+	WHITELISTWA_REG(engine, GEN8_L3SQCREG4);
 
 	return 0;
 }
 
-static int bxt_whitelist_workarounds_apply(struct intel_engine_cs *engine)
+static int bxt_whitelist_workarounds_init(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
+	int ret;
 
-	int ret = gen9_whitelist_workarounds_apply(engine);
+	ret = gen9_whitelist_workarounds_init(engine);
 	if (ret)
 		return ret;
 
@@ -935,89 +935,90 @@ static int bxt_whitelist_workarounds_apply(struct intel_engine_cs *engine)
 	/* WaDisableObjectLevelPreemtionForInstanceId:bxt */
 	/* WaDisableLSQCROPERFforOCL:bxt */
 	if (IS_BXT_REVID(dev_priv, 0, BXT_REVID_A1)) {
-		ret = wa_ring_whitelist_reg(engine, GEN9_CS_DEBUG_MODE1);
-		if (ret)
-			return ret;
-
-		ret = wa_ring_whitelist_reg(engine, GEN8_L3SQCREG4);
-		if (ret)
-			return ret;
+		WHITELISTWA_REG(engine, GEN9_CS_DEBUG_MODE1);
+		WHITELISTWA_REG(engine, GEN8_L3SQCREG4);
 	}
 
 	return 0;
 }
 
-static int kbl_whitelist_workarounds_apply(struct intel_engine_cs *engine)
+static int kbl_whitelist_workarounds_init(struct intel_engine_cs *engine)
 {
-	int ret = gen9_whitelist_workarounds_apply(engine);
+	int ret = gen9_whitelist_workarounds_init(engine);
 	if (ret)
 		return ret;
 
 	/* WaDisableLSQCROPERFforOCL:kbl */
-	ret = wa_ring_whitelist_reg(engine, GEN8_L3SQCREG4);
+	WHITELISTWA_REG(engine, GEN8_L3SQCREG4);
+
+	return 0;
+}
+
+static int glk_whitelist_workarounds_init(struct intel_engine_cs *engine)
+{
+	int ret = gen9_whitelist_workarounds_init(engine);
 	if (ret)
 		return ret;
 
 	return 0;
 }
 
-static int glk_whitelist_workarounds_apply(struct intel_engine_cs *engine)
+static int cfl_whitelist_workarounds_init(struct intel_engine_cs *engine)
 {
-	int ret = gen9_whitelist_workarounds_apply(engine);
+	int ret = gen9_whitelist_workarounds_init(engine);
 	if (ret)
 		return ret;
 
 	return 0;
 }
 
-static int cfl_whitelist_workarounds_apply(struct intel_engine_cs *engine)
+static int cnl_whitelist_workarounds_init(struct intel_engine_cs *engine)
 {
-	int ret = gen9_whitelist_workarounds_apply(engine);
-	if (ret)
-		return ret;
-
-	return 0;
-}
-
-static int cnl_whitelist_workarounds_apply(struct intel_engine_cs *engine)
-{
-	int ret;
-
 	/* WaEnablePreemptionGranularityControlByUMD:cnl */
-	ret = wa_ring_whitelist_reg(engine, GEN8_CS_CHICKEN1);
-	if (ret)
-		return ret;
+	WHITELISTWA_REG(engine, GEN8_CS_CHICKEN1);
 
 	return 0;
 }
 
-int i915_whitelist_workarounds_apply(struct intel_engine_cs *engine)
+int i915_whitelist_workarounds_init(struct intel_engine_cs *engine)
 {
 	struct drm_i915_private *dev_priv = engine->i915;
 	int err;
 
 	WARN_ON(engine->id != RCS);
 
-	dev_priv->workarounds.hw_whitelist_count[engine->id] = 0;
+	dev_priv->workarounds.whitelist_wa_count[engine->id] = 0;
 
 	if (IS_SKYLAKE(dev_priv))
-		err = skl_whitelist_workarounds_apply(engine);
+		err = skl_whitelist_workarounds_init(engine);
 	else if (IS_BROXTON(dev_priv))
-		err = bxt_whitelist_workarounds_apply(engine);
+		err = bxt_whitelist_workarounds_init(engine);
 	else if (IS_KABYLAKE(dev_priv))
-		err = kbl_whitelist_workarounds_apply(engine);
+		err = kbl_whitelist_workarounds_init(engine);
 	else if (IS_GEMINILAKE(dev_priv))
-		err = glk_whitelist_workarounds_apply(engine);
+		err = glk_whitelist_workarounds_init(engine);
 	else if (IS_COFFEELAKE(dev_priv))
-		err = cfl_whitelist_workarounds_apply(engine);
+		err = cfl_whitelist_workarounds_init(engine);
 	else if (IS_CANNONLAKE(dev_priv))
-		err = cnl_whitelist_workarounds_apply(engine);
+		err = cnl_whitelist_workarounds_init(engine);
 	else
 		err = 0;
 	if (err)
 		return err;
 
 	DRM_DEBUG_DRIVER("%s: Number of whitelist w/a: %d\n", engine->name,
-			 dev_priv->workarounds.hw_whitelist_count[engine->id]);
+			 dev_priv->workarounds.whitelist_wa_count[engine->id]);
 	return 0;
+}
+
+void i915_whitelist_workarounds_apply(struct intel_engine_cs *engine)
+{
+	struct drm_i915_private *dev_priv = engine->i915;
+	struct i915_workarounds *w = &dev_priv->workarounds;
+	int i;
+
+	for (i = 0; i < w->whitelist_wa_count[engine->id]; i++) {
+		I915_WRITE(w->whitelist_wa_reg[engine->id][i].addr,
+			   w->whitelist_wa_reg[engine->id][i].value);
+	}
 }

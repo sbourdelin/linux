@@ -1964,7 +1964,8 @@ struct i915_workarounds {
 	struct i915_wa_reg mmio_wa_reg[I915_MAX_MMIO_WA_REGS];
 	u32 mmio_wa_count;
 
-	u32 hw_whitelist_count[I915_NUM_ENGINES];
+	struct i915_wa_reg whitelist_wa_reg[I915_NUM_ENGINES][RING_MAX_NONPRIV_SLOTS];
+	u32 whitelist_wa_count[I915_NUM_ENGINES];
 };
 
 struct i915_virtual_gpu {
