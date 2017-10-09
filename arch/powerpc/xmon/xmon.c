@@ -127,6 +127,7 @@ static void byterev(unsigned char *, int);
 static void memex(void);
 static int bsesc(void);
 static void dump(void);
+static void show_pte(unsigned long);
 static void prdump(unsigned long, long);
 static int ppc_inst_dump(unsigned long, long, int);
 static void dump_log_buf(void);
@@ -234,6 +235,7 @@ Commands:\n\
 #endif
   "\
   dr	dump stream of raw bytes\n\
+  dv	dump virtual address translation \n\
   dt	dump the tracing buffers (uses printk)\n\
   dtc	dump the tracing buffers for current CPU (uses printk)\n\
 "
@@ -2607,6 +2609,9 @@ dump(void)
 		dump_log_buf();
 	} else if (c == 'o') {
 		dump_opal_msglog();
+	} else if (c == 'v') {
+		/* dump virtual to physical translation */
+		show_pte(adrs);
 	} else if (c == 'r') {
 		scanhex(&ndump);
 		if (ndump == 0)
@@ -2940,6 +2945,112 @@ static void show_task(struct task_struct *tsk)
 		tsk->comm);
 }
 
+void format_pte(void *ptep, unsigned long pte)
+{
+	printf("ptep @ 0x%016lx = 0x%016lx\n", (unsigned long)ptep, pte);;
+	printf("Maps physical address = 0x%016lx\n", pte & PTE_RPN_MASK);
+
+	printf("Flags = %s%s%s%s%s\n",
+	       (pte & _PAGE_ACCESSED) ? "Accessed " : "",
+	       (pte & _PAGE_DIRTY)    ? "Dirty " : "",
+	       (pte & _PAGE_READ)     ? "Read " : "",
+	       (pte & _PAGE_WRITE)    ? "Write " : "",
+	       (pte & _PAGE_EXEC)     ? "Exec " : "");
+}
+
+static void show_pte(unsigned long addr)
+{
+	unsigned long tskv = 0;
+	struct task_struct *tsk = NULL;
+	struct mm_struct *mm;
+	pgd_t *pgdp, *pgdir;
+	pud_t *pudp;
+	pmd_t *pmdp;
+	pte_t *ptep;
+
+	if (!scanhex(&tskv))
+		mm = &init_mm;
+	else
+		tsk = (struct task_struct *)tskv;
+
+	if (tsk == NULL)
+		mm = &init_mm;
+	else
+		mm = tsk->active_mm;
+
+	if (setjmp(bus_error_jmp) != 0) {
+		catch_memory_errors = 0;
+		printf("*** Error dumping pte for task %p\n", tsk);
+		return;
+	}
+
+	catch_memory_errors = 1;
+	sync();
+
+	if (mm == &init_mm) {
+		pgdp = pgd_offset_k(addr);
+		pgdir = pgd_offset_k(0);
+	} else {
+		pgdp = pgd_offset(mm, addr);
+		pgdir = pgd_offset(mm, 0);
+	}
+
+	if (pgd_none(*pgdp)) {
+		printf("no linux page table for address\n");
+		return;
+	}
+
+	printf("pgd  @ 0x%016lx\n", pgdir);
+
+	if (pgd_huge(*pgdp)) {
+		format_pte(pgdp, pgd_val(*pgdp));
+		return;
+	}
+	printf("pgdp @ 0x%016lx = 0x%016lx\n", pgdp, pgd_val(*pgdp));
+
+	pudp = pud_offset(pgdp, addr);
+
+	if (pud_none(*pudp)) {
+		printf("No valid PUD\n");
+		return;
+	}
+
+#ifdef CONFIG_HUGETLB_PAGE
+	if (pud_huge(*pudp)) {
+		format_pte(pudp, pud_val(*pudp));
+		return;
+	}
+#endif
+
+	printf("pudp @ 0x%016lx = 0x%016lx\n", pudp, pud_val(*pudp));
+
+	pmdp = pmd_offset(pudp, addr);
+
+	if (pmd_none(*pmdp)) {
+		printf("No valid PMD\n");
+		return;
+	}
+
+#ifdef CONFIG_HUGETLB_PAGE
+	if (pmd_huge(*pmdp)) {
+		format_pte(pmdp, pmd_val(*pmdp));
+		return;
+	}
+#endif
+	printf("pmdp @ 0x%016lx = 0x%016lx\n", pmdp, pmd_val(*pmdp));
+
+	ptep = pte_offset_map(pmdp, addr);
+	if (pte_none(*ptep)) {
+		printf("no valid PTE\n");
+		return;
+	}
+
+	format_pte(ptep, pte_val(*ptep));
+
+	sync();
+	__delay(200);
+	catch_memory_errors = 0;
+}
 static void show_tasks(void)
 {
 	unsigned long tskv;
