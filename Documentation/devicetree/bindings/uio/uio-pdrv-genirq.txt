@@ -1,7 +1,8 @@
 *Generic UIO platform driver with interrupts
 
 Required properties:
-- compatible: Should be a value set with the of_id module parameter.
+- compatible: Should be a value set with the of_id module parameter or the
+  built in value "st,stm32f100".
 
 Optional properties:
 - interrupts: Should contain the interrupt to be associated with this device
