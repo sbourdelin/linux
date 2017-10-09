@@ -264,7 +264,9 @@ bool gma_power_begin(struct drm_device *dev, bool force_on)
 		goto out_false;
 
 	/* Ok power up needed */
+	spin_unlock_irqrestore(&power_ctrl_lock, flags);
 	ret = gma_resume_pci(dev->pdev);
+	spin_lock_irqsave(&power_ctrl_lock, flags);
 	if (ret == 0) {
 		psb_irq_preinstall(dev);
 		psb_irq_postinstall(dev);
