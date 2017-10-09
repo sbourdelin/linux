@@ -2926,21 +2926,29 @@ static void scsi_wait_for_queuecommand(struct scsi_device *sdev)
 int
 scsi_device_quiesce(struct scsi_device *sdev)
 {
+	struct request_queue *q = sdev->request_queue;
 	int err;
+
+	/* If the SCSI device already has been quiesced, do nothing. */
+	if (blk_set_preempt_only(q))
+		return 0;
+
+	/*
+	 * Since blk_mq_freeze_queue() calls synchronize_rcu() indirectly the
+	 * effect of blk_set_preempt_only() will be visible for
+	 * percpu_ref_tryget() callers that occur after the queue
+	 * unfreeze. See also https://lwn.net/Articles/573497/.
+	 */
+	blk_mq_freeze_queue(q);
+	blk_mq_unfreeze_queue(q);
 
 	mutex_lock(&sdev->state_mutex);
 	err = scsi_device_set_state(sdev, SDEV_QUIESCE);
+	if (err)
+		blk_clear_preempt_only(q);
 	mutex_unlock(&sdev->state_mutex);
 
-	if (err)
-		return err;
-
-	scsi_run_queue(sdev->request_queue);
-	while (atomic_read(&sdev->device_busy)) {
-		msleep_interruptible(200);
-		scsi_run_queue(sdev->request_queue);
-	}
-	return 0;
+	return err;
 }
 EXPORT_SYMBOL(scsi_device_quiesce);
 
@@ -2962,7 +2970,7 @@ void scsi_device_resume(struct scsi_device *sdev)
 	mutex_lock(&sdev->state_mutex);
 	if (sdev->sdev_state == SDEV_QUIESCE &&
 	    scsi_device_set_state(sdev, SDEV_RUNNING) == 0)
-		scsi_run_queue(sdev->request_queue);
+		blk_clear_preempt_only(sdev->request_queue);
 	mutex_unlock(&sdev->state_mutex);
 }
 EXPORT_SYMBOL(scsi_device_resume);
