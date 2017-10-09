@@ -217,7 +217,7 @@ static int __init sh_clk_init_parent(struct clk *clk)
 		return 0;
 
 	if (!clk->src_width) {
-		pr_err("sh_clk_init_parent: cannot select parent clock\n");
+		pr_err("%s: cannot select parent clock\n", __func__);
 		return -EINVAL;
 	}
 
@@ -225,13 +225,13 @@ static int __init sh_clk_init_parent(struct clk *clk)
 	val &= (1 << clk->src_width) - 1;
 
 	if (val >= clk->parent_num) {
-		pr_err("sh_clk_init_parent: parent table size failed\n");
+		pr_err("%s: parent table size failed\n", __func__);
 		return -EINVAL;
 	}
 
 	clk_reparent(clk, clk->parent_table[val]);
 	if (!clk->parent) {
-		pr_err("sh_clk_init_parent: unable to set parent");
+		pr_err("%s: unable to set parent\n", __func__);
 		return -EINVAL;
 	}
 
