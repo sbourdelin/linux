@@ -4505,9 +4505,17 @@ static struct notifier_block mlxsw_sp_netdevice_nb __read_mostly = {
 	.notifier_call = mlxsw_sp_netdevice_event,
 };
 
+static struct notifier_block mlxsw_sp_inetaddr_valid_nb __read_mostly = {
+	.notifier_call = mlxsw_sp_inetaddr_valid_event,
+};
+
 static struct notifier_block mlxsw_sp_inetaddr_nb __read_mostly = {
 	.notifier_call = mlxsw_sp_inetaddr_event,
 	.priority = 10,	/* Must be called before FIB notifier block */
+};
+
+static struct notifier_block mlxsw_sp_inet6addr_valid_nb __read_mostly = {
+	.notifier_call = mlxsw_sp_inet6addr_valid_event,
 };
 
 static struct notifier_block mlxsw_sp_inet6addr_nb __read_mostly = {
@@ -4533,7 +4541,9 @@ static int __init mlxsw_sp_module_init(void)
 	int err;
 
 	register_netdevice_notifier(&mlxsw_sp_netdevice_nb);
+	register_inetaddr_validator_notifier(&mlxsw_sp_inetaddr_valid_nb);
 	register_inetaddr_notifier(&mlxsw_sp_inetaddr_nb);
+	register_inet6addr_validator_notifier(&mlxsw_sp_inet6addr_valid_nb);
 	register_inet6addr_notifier(&mlxsw_sp_inet6addr_nb);
 	register_netevent_notifier(&mlxsw_sp_router_netevent_nb);
 
