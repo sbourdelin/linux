@@ -690,6 +690,9 @@ static bool tilcdc_crtc_mode_fixup(struct drm_crtc *crtc,
 		adjusted_mode->flags &= ~DRM_MODE_FLAG_PHSYNC;
 	}
 
+	if (!adjusted_mode->vrefresh)
+		adjusted_mode->vrefresh = drm_mode_vrefresh(adjusted_mode);
+
 	return true;
 }
 
