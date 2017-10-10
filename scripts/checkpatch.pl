@@ -2548,6 +2548,14 @@ sub process {
 			      "Remove Gerrit Change-Id's before submitting upstream.\n" . $herecurr);
 		}
 
+# Check for incorrect format for Fixes line in commit log
+		if ($in_commit_log && $line =~ /^\s*Fixes:/i) {
+			if ($line !~ /^\s*Fixes: [a-z0-9]{12} \(\".*?\"\)$/i) {
+				ERROR("FIXES_FORMAT",
+				      "Follow format of Fixes: <12 characters commit id> (\"...\")\n" . $herecurr);
+			}
+		}
+
 # Check if the commit log is in a possible stack dump
 		if ($in_commit_log && !$commit_log_possible_stack_dump &&
 		    ($line =~ /^\s*(?:WARNING:|BUG:)/ ||
