@@ -432,7 +432,8 @@ static void irlap_recv_discovery_xid_rsp(struct irlap_cb *self,
 		return;
 	}
 
-	if ((discovery = kzalloc(sizeof(discovery_t), GFP_ATOMIC)) == NULL) {
+	discovery = kzalloc(sizeof(*discovery), GFP_ATOMIC);
+	if (!discovery) {
 		net_warn_ratelimited("%s: kmalloc failed!\n", __func__);
 		return;
 	}
@@ -539,7 +540,7 @@ static void irlap_recv_discovery_xid_cmd(struct irlap_cb *self,
 		/*
 		 *  We now have some discovery info to deliver!
 		 */
-		discovery = kzalloc(sizeof(discovery_t), GFP_ATOMIC);
+		discovery = kzalloc(sizeof(*discovery), GFP_ATOMIC);
 		if (!discovery)
 			return;
 
@@ -1201,7 +1202,7 @@ void irlap_send_test_frame(struct irlap_cb *self, __u8 caddr, __u32 daddr,
 
 	/* Broadcast frames must include saddr and daddr fields */
 	if (caddr == CBROADCAST) {
-		frame = skb_put(tx_skb, sizeof(struct test_frame));
+		frame = skb_put(tx_skb, sizeof(*frame));
 
 		/* Insert the swapped addresses */
 		frame->saddr = cpu_to_le32(self->saddr);

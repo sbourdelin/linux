@@ -403,7 +403,7 @@ struct tsap_cb *irttp_open_tsap(__u8 stsap_sel, int credit, notify_t *notify)
 		return NULL;
 	}
 
-	self = kzalloc(sizeof(struct tsap_cb), GFP_ATOMIC);
+	self = kzalloc(sizeof(*self), GFP_ATOMIC);
 	if (self == NULL)
 		return NULL;
 
@@ -1441,7 +1441,7 @@ struct tsap_cb *irttp_dup(struct tsap_cb *orig, void *instance)
 	}
 
 	/* Allocate a new instance */
-	new = kmemdup(orig, sizeof(struct tsap_cb), GFP_ATOMIC);
+	new = kmemdup(orig, sizeof(*new), GFP_ATOMIC);
 	if (!new) {
 		pr_debug("%s(), unable to kmalloc\n", __func__);
 		spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, flags);

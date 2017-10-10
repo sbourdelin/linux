@@ -48,7 +48,7 @@ struct ias_object *irias_new_object( char *name, int id)
 {
 	struct ias_object *obj;
 
-	obj = kzalloc(sizeof(struct ias_object), GFP_ATOMIC);
+	obj = kzalloc(sizeof(*obj), GFP_ATOMIC);
 	if (obj == NULL) {
 		net_warn_ratelimited("%s(), Unable to allocate object!\n",
 				     __func__);
@@ -318,7 +318,7 @@ void irias_add_integer_attrib(struct ias_object *obj, char *name, int value,
 	IRDA_ASSERT(obj->magic == IAS_OBJECT_MAGIC, return;);
 	IRDA_ASSERT(name != NULL, return;);
 
-	attrib = kzalloc(sizeof(struct ias_attrib), GFP_ATOMIC);
+	attrib = kzalloc(sizeof(*attrib), GFP_ATOMIC);
 	if (attrib == NULL) {
 		net_warn_ratelimited("%s: Unable to allocate attribute!\n",
 				     __func__);
@@ -362,7 +362,7 @@ void irias_add_octseq_attrib(struct ias_object *obj, char *name, __u8 *octets,
 	IRDA_ASSERT(name != NULL, return;);
 	IRDA_ASSERT(octets != NULL, return;);
 
-	attrib = kzalloc(sizeof(struct ias_attrib), GFP_ATOMIC);
+	attrib = kzalloc(sizeof(*attrib), GFP_ATOMIC);
 	if (attrib == NULL) {
 		net_warn_ratelimited("%s: Unable to allocate attribute!\n",
 				     __func__);
@@ -404,7 +404,7 @@ void irias_add_string_attrib(struct ias_object *obj, char *name, char *value,
 	IRDA_ASSERT(name != NULL, return;);
 	IRDA_ASSERT(value != NULL, return;);
 
-	attrib = kzalloc(sizeof( struct ias_attrib), GFP_ATOMIC);
+	attrib = kzalloc(sizeof(*attrib), GFP_ATOMIC);
 	if (attrib == NULL) {
 		net_warn_ratelimited("%s: Unable to allocate attribute!\n",
 				     __func__);
@@ -439,7 +439,7 @@ struct ias_value *irias_new_integer_value(int integer)
 {
 	struct ias_value *value;
 
-	value = kzalloc(sizeof(struct ias_value), GFP_ATOMIC);
+	value = kzalloc(sizeof(*value), GFP_ATOMIC);
 	if (value == NULL)
 		return NULL;
 
@@ -462,7 +462,7 @@ struct ias_value *irias_new_string_value(char *string)
 {
 	struct ias_value *value;
 
-	value = kzalloc(sizeof(struct ias_value), GFP_ATOMIC);
+	value = kzalloc(sizeof(*value), GFP_ATOMIC);
 	if (value == NULL)
 		return NULL;
 
@@ -491,7 +491,7 @@ struct ias_value *irias_new_octseq_value(__u8 *octseq , int len)
 {
 	struct ias_value *value;
 
-	value = kzalloc(sizeof(struct ias_value), GFP_ATOMIC);
+	value = kzalloc(sizeof(*value), GFP_ATOMIC);
 	if (value == NULL)
 		return NULL;
 
@@ -514,7 +514,7 @@ struct ias_value *irias_new_missing_value(void)
 {
 	struct ias_value *value;
 
-	value = kzalloc(sizeof(struct ias_value), GFP_ATOMIC);
+	value = kzalloc(sizeof(*value), GFP_ATOMIC);
 	if (value == NULL)
 		return NULL;
 

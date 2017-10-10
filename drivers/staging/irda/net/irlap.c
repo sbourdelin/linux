@@ -110,7 +110,7 @@ struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
 	struct irlap_cb *self;
 
 	/* Initialize the irlap structure. */
-	self = kzalloc(sizeof(struct irlap_cb), GFP_KERNEL);
+	self = kzalloc(sizeof(*self), GFP_KERNEL);
 	if (self == NULL)
 		return NULL;
 

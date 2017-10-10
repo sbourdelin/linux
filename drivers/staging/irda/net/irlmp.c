@@ -168,7 +168,7 @@ struct lsap_cb *irlmp_open_lsap(__u8 slsap_sel, notify_t *notify, __u8 pid)
 		return NULL;
 
 	/* Allocate new instance of a LSAP connection */
-	self = kzalloc(sizeof(struct lsap_cb), GFP_ATOMIC);
+	self = kzalloc(sizeof(*self), GFP_ATOMIC);
 	if (self == NULL)
 		return NULL;
 
@@ -290,7 +290,7 @@ void irlmp_register_link(struct irlap_cb *irlap, __u32 saddr, notify_t *notify)
 	/*
 	 *  Allocate new instance of a LSAP connection
 	 */
-	lap = kzalloc(sizeof(struct lap_cb), GFP_KERNEL);
+	lap = kzalloc(sizeof(*lap), GFP_KERNEL);
 	if (lap == NULL)
 		return;
 
@@ -1466,7 +1466,7 @@ void *irlmp_register_service(__u16 hints)
 	pr_debug("%s(), hints = %04x\n", __func__, hints);
 
 	/* Make a new registration */
-	service = kmalloc(sizeof(irlmp_service_t), GFP_ATOMIC);
+	service = kmalloc(sizeof(*service), GFP_ATOMIC);
 	if (!service)
 		return NULL;
 
@@ -1538,7 +1538,7 @@ void *irlmp_register_client(__u16 hint_mask, DISCOVERY_CALLBACK1 disco_clb,
 	IRDA_ASSERT(irlmp != NULL, return NULL;);
 
 	/* Make a new registration */
-	client = kmalloc(sizeof(irlmp_client_t), GFP_ATOMIC);
+	client = kmalloc(sizeof(*client), GFP_ATOMIC);
 	if (!client)
 		return NULL;
 

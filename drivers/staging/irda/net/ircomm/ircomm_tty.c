@@ -380,7 +380,7 @@ static int ircomm_tty_install(struct tty_driver *driver, struct tty_struct *tty)
 	self = hashbin_lock_find(ircomm_tty, line, NULL);
 	if (!self) {
 		/* No, so make new instance */
-		self = kzalloc(sizeof(struct ircomm_tty_cb), GFP_KERNEL);
+		self = kzalloc(sizeof(*self), GFP_KERNEL);
 		if (self == NULL)
 			return -ENOMEM;
 
