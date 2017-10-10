@@ -7978,12 +7978,16 @@ void perf_tp_event(u16 event_type, u64 count, void *record, int entry_size,
 
 	/* Use the given event instead of the hlist */
 	if (event) {
-		if (perf_tp_event_match(event, &data, regs))
+		if (perf_tp_event_match(event, &data, regs)) {
 			perf_swevent_event(event, count, &data, regs);
+			goto out;
+		}
 	} else {
 		hlist_for_each_entry_rcu(event, head, hlist_entry) {
-			if (perf_tp_event_match(event, &data, regs))
+			if (perf_tp_event_match(event, &data, regs)) {
 				perf_swevent_event(event, count, &data, regs);
+				goto out;
+			}
 		}
 	}
 
@@ -8005,13 +8009,15 @@ void perf_tp_event(u16 event_type, u64 count, void *record, int entry_size,
 				continue;
 			if (event->attr.config != entry->type)
 				continue;
-			if (perf_tp_event_match(event, &data, regs))
+			if (perf_tp_event_match(event, &data, regs)) {
 				perf_swevent_event(event, count, &data, regs);
+				break;
+			}
 		}
 unlock:
 		rcu_read_unlock();
 	}
-
+out:
 	perf_swevent_put_recursion_context(rctx);
 }
 EXPORT_SYMBOL_GPL(perf_tp_event);
