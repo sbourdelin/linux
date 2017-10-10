@@ -49,17 +49,12 @@ struct ias_object *irias_new_object( char *name, int id)
 	struct ias_object *obj;
 
 	obj = kzalloc(sizeof(*obj), GFP_ATOMIC);
-	if (obj == NULL) {
-		net_warn_ratelimited("%s(), Unable to allocate object!\n",
-				     __func__);
+	if (!obj)
 		return NULL;
-	}
 
 	obj->magic = IAS_OBJECT_MAGIC;
 	obj->name = kstrndup(name, IAS_MAX_CLASSNAME, GFP_ATOMIC);
 	if (!obj->name) {
-		net_warn_ratelimited("%s(), Unable to allocate name!\n",
-				     __func__);
 		kfree(obj);
 		return NULL;
 	}
@@ -319,11 +314,8 @@ void irias_add_integer_attrib(struct ias_object *obj, char *name, int value,
 	IRDA_ASSERT(name != NULL, return;);
 
 	attrib = kzalloc(sizeof(*attrib), GFP_ATOMIC);
-	if (attrib == NULL) {
-		net_warn_ratelimited("%s: Unable to allocate attribute!\n",
-				     __func__);
+	if (!attrib)
 		return;
-	}
 
 	attrib->magic = IAS_ATTRIB_MAGIC;
 	attrib->name = kstrndup(name, IAS_MAX_ATTRIBNAME, GFP_ATOMIC);
@@ -363,11 +355,8 @@ void irias_add_octseq_attrib(struct ias_object *obj, char *name, __u8 *octets,
 	IRDA_ASSERT(octets != NULL, return;);
 
 	attrib = kzalloc(sizeof(*attrib), GFP_ATOMIC);
-	if (attrib == NULL) {
-		net_warn_ratelimited("%s: Unable to allocate attribute!\n",
-				     __func__);
+	if (!attrib)
 		return;
-	}
 
 	attrib->magic = IAS_ATTRIB_MAGIC;
 	attrib->name = kstrndup(name, IAS_MAX_ATTRIBNAME, GFP_ATOMIC);
@@ -405,11 +394,8 @@ void irias_add_string_attrib(struct ias_object *obj, char *name, char *value,
 	IRDA_ASSERT(value != NULL, return;);
 
 	attrib = kzalloc(sizeof(*attrib), GFP_ATOMIC);
-	if (attrib == NULL) {
-		net_warn_ratelimited("%s: Unable to allocate attribute!\n",
-				     __func__);
+	if (!attrib)
 		return;
-	}
 
 	attrib->magic = IAS_ATTRIB_MAGIC;
 	attrib->name = kstrndup(name, IAS_MAX_ATTRIBNAME, GFP_ATOMIC);
@@ -470,7 +456,6 @@ struct ias_value *irias_new_string_value(char *string)
 	value->charset = CS_ASCII;
 	value->t.string = kstrndup(string, IAS_MAX_STRING, GFP_ATOMIC);
 	if (!value->t.string) {
-		net_warn_ratelimited("%s: Unable to kmalloc!\n", __func__);
 		kfree(value);
 		return NULL;
 	}
@@ -503,7 +488,6 @@ struct ias_value *irias_new_octseq_value(__u8 *octseq , int len)
 
 	value->t.oct_seq = kmemdup(octseq, len, GFP_ATOMIC);
 	if (value->t.oct_seq == NULL){
-		net_warn_ratelimited("%s: Unable to kmalloc!\n", __func__);
 		kfree(value);
 		return NULL;
 	}

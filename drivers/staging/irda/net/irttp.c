@@ -1443,7 +1443,6 @@ struct tsap_cb *irttp_dup(struct tsap_cb *orig, void *instance)
 	/* Allocate a new instance */
 	new = kmemdup(orig, sizeof(*new), GFP_ATOMIC);
 	if (!new) {
-		pr_debug("%s(), unable to kmalloc\n", __func__);
 		spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, flags);
 		return NULL;
 	}

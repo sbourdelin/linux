@@ -433,10 +433,8 @@ static void irlap_recv_discovery_xid_rsp(struct irlap_cb *self,
 	}
 
 	discovery = kzalloc(sizeof(*discovery), GFP_ATOMIC);
-	if (!discovery) {
-		net_warn_ratelimited("%s: kmalloc failed!\n", __func__);
+	if (!discovery)
 		return;
-	}
 
 	discovery->data.daddr = info->daddr;
 	discovery->data.saddr = self->saddr;
