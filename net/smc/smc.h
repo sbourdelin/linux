@@ -167,6 +167,13 @@ struct smc_connection {
 	struct work_struct	close_work;	/* peer sent some closing */
 };
 
+struct smc_listen_pending {
+	u64		time;			/* time when entry was created*/
+	bool		used;			/* true if entry is in use */
+	__be32		addr;			/* address of a listen socket */
+	__be16		port;			/* port of a listen socket */
+};
+
 struct smc_sock {				/* smc sock container */
 	struct sock		sk;
 	struct socket		*clcsock;	/* internal tcp socket */
@@ -175,6 +182,8 @@ struct smc_sock {				/* smc sock container */
 	struct smc_sock		*listen_smc;	/* listen parent */
 	struct work_struct	tcp_listen_work;/* handle tcp socket accepts */
 	struct work_struct	smc_listen_work;/* prepare new accept socket */
+	struct smc_listen_pending *listen_pends;/* listen pending SYNs */
+	spinlock_t		listen_pends_lock; /* protects listen_pends */
 	struct list_head	accept_q;	/* sockets to be accepted */
 	spinlock_t		accept_q_lock;	/* protects accept_q */
 	struct delayed_work	sock_put_work;	/* final socket freeing */
@@ -271,5 +280,4 @@ int smc_conn_create(struct smc_sock *smc, __be32 peer_in_addr,
 		    struct smc_clc_msg_local *lcl, int srv_first_contact);
 struct sock *smc_accept_dequeue(struct sock *parent, struct socket *new_sock);
 void smc_close_non_accepted(struct sock *sk);
-
 #endif	/* __SMC_H */
