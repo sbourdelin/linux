@@ -269,15 +269,17 @@ ABS_MT_ORIENTATION
     The orientation of the touching ellipse. The value should describe a signed
     quarter of a revolution clockwise around the touch center. The signed value
     range is arbitrary, but zero should be returned for an ellipse aligned with
-    the Y axis of the surface, a negative value when the ellipse is turned to
-    the left, and a positive value when the ellipse is turned to the
-    right. When completely aligned with the X axis, the range max should be
-    returned.
+    the Y axis of the surface (north). A negative value should be returned when
+    the ellipse is turned to the left (west), with the smallest value reported
+    when aligned with the negative X axis. The largest value should be returned
+    when aligned with the positive X axis.
+
+    The value range should be specified as [-range_max, range_max].
 
     Touch ellipsis are symmetrical by default. For devices capable of true 360
-    degree orientation, the reported orientation must exceed the range max to
+    degree orientation, the reported orientation will exceed range_max, in order to
     indicate more than a quarter of a revolution. For an upside-down finger,
-    range max * 2 should be returned.
+    +- 2 * range_max should be returned.
 
     Orientation can be omitted if the touch area is circular, or if the
     information is not available in the kernel driver. Partial orientation
