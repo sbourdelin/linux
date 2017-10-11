@@ -1740,6 +1740,8 @@ extern int security_bpf_map_alloc(struct bpf_map *map);
 extern void security_bpf_map_free(struct bpf_map *map);
 extern int security_bpf_prog_alloc(struct bpf_prog_aux *aux);
 extern void security_bpf_prog_free(struct bpf_prog_aux *aux);
+extern void security_bpf_map_file(struct bpf_map *map, struct file *file);
+extern void security_bpf_prog_file(struct bpf_prog_aux *aux, struct file *file);
 #else
 static inline int security_bpf(int cmd, union bpf_attr *attr,
 					     unsigned int size)
@@ -1771,6 +1773,13 @@ static inline int security_bpf_prog_alloc(struct bpf_prog_aux *aux)
 }
 
 static inline void security_bpf_prog_free(struct bpf_prog_aux *aux)
+{ }
+
+static inline void security_bpf_map_file(struct bpf_map *map, struct file *file)
+{ }
+
+static inline void security_bpf_prog_file(struct bpf_prog_aux *aux,
+					  struct file *file)
 { }
 #endif /* CONFIG_SECURITY */
 #endif /* CONFIG_BPF_SYSCALL */

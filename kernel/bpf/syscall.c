@@ -324,11 +324,22 @@ static const struct file_operations bpf_map_fops = {
 
 int bpf_map_new_fd(struct bpf_map *map, int flags)
 {
+	int fd;
+	struct fd f;
 	if (security_bpf_map(map, OPEN_FMODE(flags)))
 		return -EPERM;
 
-	return anon_inode_getfd("bpf-map", &bpf_map_fops, map,
+	fd = anon_inode_getfd("bpf-map", &bpf_map_fops, map,
 				flags | O_CLOEXEC);
+	if (fd < 0)
+		return fd;
+
+	f = fdget(fd);
+	if (!f.file)
+		return -EBADF;
+	security_bpf_map_file(map, f.file);
+	fdput(f);
+	return fd;
 }
 
 int bpf_get_file_flag(int flags)
@@ -975,11 +986,23 @@ static const struct file_operations bpf_prog_fops = {
 
 int bpf_prog_new_fd(struct bpf_prog *prog)
 {
+	int fd;
+	struct fd f;
+
 	if (security_bpf_prog(prog))
 		return -EPERM;
 
-	return anon_inode_getfd("bpf-prog", &bpf_prog_fops, prog,
+	fd =  anon_inode_getfd("bpf-prog", &bpf_prog_fops, prog,
 				O_RDWR | O_CLOEXEC);
+	if (fd < 0)
+		return fd;
+
+	f = fdget(fd);
+	if (!f.file)
+		return -EBADF;
+	security_bpf_prog_file(prog->aux, f.file);
+	fdput(f);
+	return fd;
 }
 
 static struct bpf_prog *____bpf_prog_get(struct fd f)

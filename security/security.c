@@ -1734,4 +1734,12 @@ void security_bpf_prog_free(struct bpf_prog_aux *aux)
 {
 	call_void_hook(bpf_prog_free_security, aux);
 }
+void security_bpf_map_file(struct bpf_map *map, struct file *file)
+{
+	call_void_hook(bpf_map_file, map, file);
+}
+void security_bpf_prog_file(struct bpf_prog_aux *aux, struct file *file)
+{
+	call_void_hook(bpf_prog_file, aux, file);
+}
 #endif /* CONFIG_BPF_SYSCALL */
