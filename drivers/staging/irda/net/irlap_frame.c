@@ -258,7 +258,7 @@ void irlap_send_ua_response_frame(struct irlap_cb *self, struct qos_info *qos)
  */
 void irlap_send_dm_frame( struct irlap_cb *self)
 {
-	struct sk_buff *tx_skb = NULL;
+	struct sk_buff *tx_skb;
 	struct dm_frame *frame;
 
 	IRDA_ASSERT(self, return;);
@@ -288,7 +288,7 @@ void irlap_send_dm_frame( struct irlap_cb *self)
  */
 void irlap_send_disc_frame(struct irlap_cb *self)
 {
-	struct sk_buff *tx_skb = NULL;
+	struct sk_buff *tx_skb;
 	struct disc_frame *frame;
 
 	IRDA_ASSERT(self, return;);
@@ -315,7 +315,7 @@ void irlap_send_disc_frame(struct irlap_cb *self)
 void irlap_send_discovery_xid_frame(struct irlap_cb *self, int S, __u8 s,
 				    __u8 command, discovery_t *discovery)
 {
-	struct sk_buff *tx_skb = NULL;
+	struct sk_buff *tx_skb;
 	struct xid_frame *frame;
 	__u32 bcast = BROADCAST;
 	__u8 *info;

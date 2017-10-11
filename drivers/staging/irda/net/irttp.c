@@ -811,7 +811,7 @@ static void irttp_run_tx_queue(struct tsap_cb *self)
  */
 static inline void irttp_give_credit(struct tsap_cb *self)
 {
-	struct sk_buff *tx_skb = NULL;
+	struct sk_buff *tx_skb;
 	unsigned long flags;
 	int n;
 
