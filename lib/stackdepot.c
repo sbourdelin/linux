@@ -214,6 +214,11 @@ depot_stack_handle_t depot_save_stack(struct stack_trace *trace,
 	if (unlikely(trace->nr_entries == 0))
 		goto fast_exit;
 
+	if (trace->entries[trace->nr_entries - 1] < MODULES_VADDR) {
+		trace->entries[trace->nr_entries - 1] = ULONG_MAX;
+		trace->nr_entries--;
+	}
+
 	hash = hash_stack(trace->entries, trace->nr_entries);
 	bucket = &stack_table[hash & STACK_HASH_MASK];
 
