@@ -409,16 +409,9 @@ static void stm32f4_i2c_handle_read(struct stm32f4_i2c_dev *i2c_dev)
 	 * So, here we just disable buffer interrupt in order to avoid another
 	 * system preemption due to RX not empty event.
 	 */
-	case 2:
-	case 3:
+	default:
 		stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR2_ITBUFEN);
 		break;
-	/*
-	 * For N byte reception with N > 3 we directly read data register
-	 * until N-2 data.
-	 */
-	default:
-		stm32f4_i2c_read_msg(i2c_dev);
 	}
 }
 
@@ -470,8 +463,6 @@ static void stm32f4_i2c_handle_rx_done(struct stm32f4_i2c_dev *i2c_dev)
 		 */
 		reg = i2c_dev->base + STM32F4_I2C_CR1;
 		stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR1_ACK);
-		stm32f4_i2c_read_msg(i2c_dev);
-		break;
 	default:
 		stm32f4_i2c_read_msg(i2c_dev);
 	}
