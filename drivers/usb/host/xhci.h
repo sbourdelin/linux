@@ -1771,6 +1771,9 @@ struct xhci_hcd {
 	struct dma_pool	*small_streams_pool;
 	struct dma_pool	*medium_streams_pool;
 
+	/* DMA alignment restrictions */
+	struct device_dma_parameters dma_parms;
+
 	/* Host controller watchdog timer structures */
 	unsigned int		xhc_state;
 

@@ -4890,6 +4890,10 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 		dma_set_coherent_mask(dev, DMA_BIT_MASK(32));
 	}
 
+	dev->dma_parms = &xhci->dma_parms;
+	dma_set_max_seg_size(dev, SZ_64K);
+	dma_set_seg_boundary(dev, SZ_64K - 1);
+
 	xhci_dbg(xhci, "Calling HCD init\n");
 	/* Initialize HCD and host controller data structures. */
 	retval = xhci_init(hcd);
