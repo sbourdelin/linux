@@ -862,7 +862,7 @@ void irlap_send_data_primary_poll(struct irlap_cb *self, struct sk_buff *skb)
 void irlap_send_data_secondary_final(struct irlap_cb *self,
 				     struct sk_buff *skb)
 {
-	struct sk_buff *tx_skb = NULL;
+	struct sk_buff *tx_skb;
 
 	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
@@ -922,7 +922,7 @@ void irlap_send_data_secondary_final(struct irlap_cb *self,
  */
 void irlap_send_data_secondary(struct irlap_cb *self, struct sk_buff *skb)
 {
-	struct sk_buff *tx_skb = NULL;
+	struct sk_buff *tx_skb;
 
 	/* Is this reliable or unreliable data? */
 	if (skb->data[1] == I_FRAME) {
