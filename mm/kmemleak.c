@@ -1376,6 +1376,7 @@ static void scan_block(void *_start, void *_end,
 static void scan_large_block(void *start, void *end)
 {
 	void *next;
+	start = PTR_ALIGN(start, BYTES_PER_POINTER);
 
 	while (start < end) {
 		next = min(start + MAX_SCAN_SIZE, end);
