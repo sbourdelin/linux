@@ -481,7 +481,7 @@ static void irlap_recv_discovery_xid_cmd(struct irlap_cb *self,
 					 struct irlap_info *info)
 {
 	struct xid_frame *xid;
-	discovery_t *discovery = NULL;
+	discovery_t *discovery;
 	__u8 *discovery_info;
 	char *text;
 
