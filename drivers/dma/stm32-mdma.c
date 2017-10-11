@@ -387,7 +387,9 @@ static int stm32_mdma_get_width(struct stm32_mdma_chan *chan,
 	}
 }
 
-static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
+static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len,
+							u32 addr,
+							u32 tlen)
 {
 	enum dma_slave_buswidth max_width = DMA_SLAVE_BUSWIDTH_8_BYTES;
 
@@ -397,6 +399,9 @@ static enum dma_slave_buswidth stm32_mdma_get_max_width(u32 buf_len, u32 tlen)
 		if (((buf_len % max_width) == 0) && (tlen >= max_width))
 			break;
 	}
+
+	if (addr % max_width)
+		max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
 
 	return max_width;
 }
@@ -567,7 +572,7 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
 		ctcr |= STM32_MDMA_CTCR_DBURST((ilog2(dst_best_burst)));
 
 		/* Set memory data size */
-		src_addr_width = stm32_mdma_get_max_width(buf_len, tlen);
+		src_addr_width = stm32_mdma_get_max_width(buf_len, 0, tlen);
 		chan->mem_width = src_addr_width;
 		src_bus_width = stm32_mdma_get_width(chan, src_addr_width);
 		if (src_bus_width < 0)
@@ -611,7 +616,7 @@ static int stm32_mdma_set_xfer_param(struct stm32_mdma_chan *chan,
 		ctcr |= STM32_MDMA_CTCR_SBURST((ilog2(src_best_burst)));
 
 		/* Set memory data size */
-		dst_addr_width = stm32_mdma_get_max_width(buf_len, tlen);
+		dst_addr_width = stm32_mdma_get_max_width(buf_len, 0, tlen);
 		chan->mem_width = dst_addr_width;
 		dst_bus_width = stm32_mdma_get_width(chan, dst_addr_width);
 		if (dst_bus_width < 0)
@@ -956,9 +961,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
 		ctcr |= STM32_MDMA_CTCR_TLEN((tlen - 1));
 
 		/* Set source best burst size */
-		max_width = stm32_mdma_get_max_width(len, tlen);
-		if (src % max_width)
-			max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+		max_width = stm32_mdma_get_max_width(len, src, tlen);
 		src_bus_width = stm32_mdma_get_width(chan, max_width);
 
 		max_burst = tlen / max_width;
@@ -971,9 +974,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
 			STM32_MDMA_CTCR_SINCOS(src_bus_width);
 
 		/* Set destination best burst size */
-		max_width = stm32_mdma_get_max_width(len, tlen);
-		if (dest % max_width)
-			max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+		max_width = stm32_mdma_get_max_width(len, dest, tlen);
 		dst_bus_width = stm32_mdma_get_width(chan, max_width);
 
 		max_burst = tlen / max_width;
@@ -1014,9 +1015,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
 					   STM32_MDMA_MAX_BLOCK_LEN);
 
 			/* Set source best burst size */
-			max_width = stm32_mdma_get_max_width(len, tlen);
-			if (src % max_width)
-				max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+			max_width = stm32_mdma_get_max_width(len, src, tlen);
 			src_bus_width = stm32_mdma_get_width(chan, max_width);
 
 			max_burst = tlen / max_width;
@@ -1030,9 +1029,7 @@ stm32_mdma_prep_dma_memcpy(struct dma_chan *c, dma_addr_t dest, dma_addr_t src,
 				STM32_MDMA_CTCR_SINCOS(src_bus_width);
 
 			/* Set destination best burst size */
-			max_width = stm32_mdma_get_max_width(len, tlen);
-			if (dest % max_width)
-				max_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+			max_width = stm32_mdma_get_max_width(len, dest, tlen);
 			dst_bus_width = stm32_mdma_get_width(chan, max_width);
 
 			max_burst = tlen / max_width;
