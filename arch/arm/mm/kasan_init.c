@@ -200,6 +200,7 @@ void __init kasan_init(void)
 {
 	struct memblock_region *reg;
 	u64 orig_ttbr0;
+	int i;
 
 	orig_ttbr0 = cpu_get_ttbr(0);
 
@@ -243,6 +244,17 @@ void __init kasan_init(void)
 	create_mapping((unsigned long)kasan_mem_to_shadow((void *)MODULES_VADDR),
 		(unsigned long)kasan_mem_to_shadow((void *)(PKMAP_BASE+PMD_SIZE)),
 		NUMA_NO_NODE);
+
+	/*
+	 * KAsan may reuse the contents of kasan_zero_pte directly, so we
+	 * should make sure that it maps the zero page read-only.
+	 */
+	for (i = 0; i < PTRS_PER_PTE; i++)
+                set_pte_at(&init_mm, KASAN_SHADOW_START + i*PAGE_SIZE,
+                        &kasan_zero_pte[i], pfn_pte(
+                                virt_to_pfn(kasan_zero_page),
+                                __pgprot(_L_PTE_DEFAULT | L_PTE_DIRTY | L_PTE_XN | L_PTE_RDONLY)));
+	memset(kasan_zero_page, 0, PAGE_SIZE);
 	cpu_set_ttbr0(orig_ttbr0);
 	flush_cache_all();
 	local_flush_bp_all();
