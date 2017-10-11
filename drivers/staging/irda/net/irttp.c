@@ -91,7 +91,7 @@ static pi_param_info_t param_info = { pi_major_call_table, 1, 0x0f, 4 };
 int __init irttp_init(void)
 {
 	irttp = kzalloc(sizeof(struct irttp_cb), GFP_KERNEL);
-	if (irttp == NULL)
+	if (!irttp)
 		return -ENOMEM;
 
 	irttp->magic = TTP_MAGIC;
@@ -209,7 +209,7 @@ static void irttp_flush_queues(struct tsap_cb *self)
 {
 	struct sk_buff *skb;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
 
 	/* Deallocate frames waiting to be sent */
@@ -237,7 +237,7 @@ static struct sk_buff *irttp_reassemble_skb(struct tsap_cb *self)
 	struct sk_buff *skb, *frag;
 	int n = 0;  /* Fragment index */
 
-	IRDA_ASSERT(self != NULL, return NULL;);
+	IRDA_ASSERT(self, return NULL;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return NULL;);
 
 	pr_debug("%s(), self->rx_sdu_size=%d\n", __func__,
@@ -294,9 +294,9 @@ static inline void irttp_fragment_skb(struct tsap_cb *self,
 	struct sk_buff *frag;
 	__u8 *frame;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
-	IRDA_ASSERT(skb != NULL, return;);
+	IRDA_ASSERT(skb, return;);
 
 	/*
 	 *  Split frame into a number of segments
@@ -350,7 +350,7 @@ static int irttp_param_max_sdu_size(void *instance, irda_param_t *param,
 
 	self = instance;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return -1;);
 
 	if (get)
@@ -404,7 +404,7 @@ struct tsap_cb *irttp_open_tsap(__u8 stsap_sel, int credit, notify_t *notify)
 	}
 
 	self = kzalloc(sizeof(*self), GFP_ATOMIC);
-	if (self == NULL)
+	if (!self)
 		return NULL;
 
 	/* Initialize internal objects */
@@ -422,7 +422,7 @@ struct tsap_cb *irttp_open_tsap(__u8 stsap_sel, int credit, notify_t *notify)
 	ttp_notify.data_indication = irttp_data_indication;
 	ttp_notify.udata_indication = irttp_udata_indication;
 	ttp_notify.flow_indication = irttp_flow_indication;
-	if (notify->status_indication != NULL)
+	if (notify->status_indication)
 		ttp_notify.status_indication = irttp_status_indication;
 	ttp_notify.instance = self;
 	strncpy(ttp_notify.name, notify->name, NOTIFY_MAX_NAME);
@@ -434,7 +434,7 @@ struct tsap_cb *irttp_open_tsap(__u8 stsap_sel, int credit, notify_t *notify)
 	 *  Create LSAP at IrLMP layer
 	 */
 	lsap = irlmp_open_lsap(stsap_sel, &ttp_notify, 0);
-	if (lsap == NULL) {
+	if (!lsap) {
 		pr_debug("%s: unable to allocate LSAP!!\n", __func__);
 		__irttp_close_tsap(self);
 		return NULL;
@@ -472,7 +472,7 @@ EXPORT_SYMBOL(irttp_open_tsap);
 static void __irttp_close_tsap(struct tsap_cb *self)
 {
 	/* First make sure we're connected. */
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
 
 	irttp_flush_queues(self);
@@ -504,7 +504,7 @@ int irttp_close_tsap(struct tsap_cb *self)
 {
 	struct tsap_cb *tsap;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return -1;);
 
 	/* Make sure tsap has been disconnected */
@@ -547,9 +547,9 @@ int irttp_udata_request(struct tsap_cb *self, struct sk_buff *skb)
 {
 	int ret;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return -1;);
-	IRDA_ASSERT(skb != NULL, return -1;);
+	IRDA_ASSERT(skb, return -1;);
 
 	/* Take shortcut on zero byte packets */
 	if (skb->len == 0) {
@@ -594,9 +594,9 @@ int irttp_data_request(struct tsap_cb *self, struct sk_buff *skb)
 	__u8 *frame;
 	int ret;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return -1;);
-	IRDA_ASSERT(skb != NULL, return -1;);
+	IRDA_ASSERT(skb, return -1;);
 
 	pr_debug("%s() : queue len = %d\n", __func__,
 		 skb_queue_len(&self->tx_queue));
@@ -769,7 +769,7 @@ static void irttp_run_tx_queue(struct tsap_cb *self)
 		 * remains in IrLAP (retry on the link or else) after we
 		 * close the socket, we are dead !
 		 * Jean II */
-		if (skb->sk != NULL) {
+		if (skb->sk) {
 			/* IrSOCK application, IrOBEX, ... */
 			skb_orphan(skb);
 		}
@@ -815,7 +815,7 @@ static inline void irttp_give_credit(struct tsap_cb *self)
 	unsigned long flags;
 	int n;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
 
 	pr_debug("%s() send=%d,avail=%d,remote=%d\n",
@@ -870,9 +870,9 @@ static int irttp_udata_indication(void *instance, void *sap,
 
 	self = instance;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return -1;);
-	IRDA_ASSERT(skb != NULL, return -1;);
+	IRDA_ASSERT(skb, return -1;);
 
 	self->stats.rx_packets++;
 
@@ -985,7 +985,7 @@ static void irttp_status_indication(void *instance,
 
 	self = instance;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
 
 	/* Check if client has already closed the TSAP and gone away */
@@ -995,7 +995,7 @@ static void irttp_status_indication(void *instance,
 	/*
 	 *  Inform service user if he has requested it
 	 */
-	if (self->notify.status_indication != NULL)
+	if (self->notify.status_indication)
 		self->notify.status_indication(self->notify.instance,
 					       link, lock);
 	else
@@ -1014,7 +1014,7 @@ static void irttp_flow_indication(void *instance, void *sap, LOCAL_FLOW flow)
 
 	self = instance;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
 
 	pr_debug("%s(instance=%p)\n", __func__, self);
@@ -1055,7 +1055,7 @@ static void irttp_flow_indication(void *instance, void *sap, LOCAL_FLOW flow)
  */
 void irttp_flow_request(struct tsap_cb *self, LOCAL_FLOW flow)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
 
 	switch (flow) {
@@ -1095,7 +1095,7 @@ int irttp_connect_request(struct tsap_cb *self, __u8 dtsap_sel,
 
 	pr_debug("%s(), max_sdu_size=%d\n", __func__, max_sdu_size);
 
-	IRDA_ASSERT(self != NULL, return -EBADR;);
+	IRDA_ASSERT(self, return -EBADR;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return -EBADR;);
 
 	if (self->connected) {
@@ -1105,7 +1105,7 @@ int irttp_connect_request(struct tsap_cb *self, __u8 dtsap_sel,
 	}
 
 	/* Any userdata supplied? */
-	if (userdata == NULL) {
+	if (!userdata) {
 		tx_skb = alloc_skb(TTP_MAX_HEADER + TTP_SAR_HEADER,
 				   GFP_ATOMIC);
 		if (!tx_skb)
@@ -1193,9 +1193,9 @@ static void irttp_connect_confirm(void *instance, void *sap,
 
 	self = instance;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
-	IRDA_ASSERT(skb != NULL, return;);
+	IRDA_ASSERT(skb, return;);
 
 	self->max_seg_size = max_seg_size - TTP_HEADER;
 	self->max_header_size = max_header_size + TTP_HEADER;
@@ -1277,9 +1277,9 @@ static void irttp_connect_indication(void *instance, void *sap,
 
 	self = instance;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
-	IRDA_ASSERT(skb != NULL, return;);
+	IRDA_ASSERT(skb, return;);
 
 	lsap = sap;
 
@@ -1345,14 +1345,14 @@ int irttp_connect_response(struct tsap_cb *self, __u32 max_sdu_size,
 	int ret;
 	__u8 n;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return -1;);
 
 	pr_debug("%s(), Source TSAP selector=%02x\n", __func__,
 		 self->stsap_sel);
 
 	/* Any userdata supplied? */
-	if (userdata == NULL) {
+	if (!userdata) {
 		tx_skb = alloc_skb(TTP_MAX_HEADER + TTP_SAR_HEADER,
 				   GFP_ATOMIC);
 		if (!tx_skb)
@@ -1484,7 +1484,7 @@ int irttp_disconnect_request(struct tsap_cb *self, struct sk_buff *userdata,
 {
 	int ret;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return -1;);
 
 	/* Already disconnected? */
@@ -1580,7 +1580,7 @@ static void irttp_disconnect_indication(void *instance, void *sap,
 
 	self = instance;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == TTP_TSAP_MAGIC, return;);
 
 	/* Prevent higher layer to send more data */
@@ -1800,7 +1800,7 @@ static void *irttp_seq_start(struct seq_file *seq, loff_t *pos)
 	iter->id = 0;
 
 	for (self = (struct tsap_cb *) hashbin_get_first(irttp->tsaps);
-	     self != NULL;
+	     self;
 	     self = (struct tsap_cb *) hashbin_get_next(irttp->tsaps)) {
 		if (iter->id == *pos)
 			break;

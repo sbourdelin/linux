@@ -278,8 +278,8 @@ static inline int value_highest_bit(__u32 value, __u32 *array, int size, __u16 *
  */
 void irda_qos_compute_intersection(struct qos_info *qos, struct qos_info *new)
 {
-	IRDA_ASSERT(qos != NULL, return;);
-	IRDA_ASSERT(new != NULL, return;);
+	IRDA_ASSERT(qos, return;);
+	IRDA_ASSERT(new, return;);
 
 	/* Apply */
 	qos->baud_rate.bits       &= new->baud_rate.bits;
@@ -529,7 +529,7 @@ static int irlap_param_baud_rate(void *instance, irda_param_t *param, int get)
 
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	if (get) {
@@ -565,7 +565,7 @@ static int irlap_param_link_disconnect(void *instance, irda_param_t *param,
 
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	if (get)
@@ -597,7 +597,7 @@ static int irlap_param_max_turn_time(void *instance, irda_param_t *param,
 {
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	if (get)
@@ -619,7 +619,7 @@ static int irlap_param_data_size(void *instance, irda_param_t *param, int get)
 {
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	if (get)
@@ -642,7 +642,7 @@ static int irlap_param_window_size(void *instance, irda_param_t *param,
 {
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	if (get)
@@ -663,7 +663,7 @@ static int irlap_param_additional_bofs(void *instance, irda_param_t *param, int 
 {
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	if (get)
@@ -685,7 +685,7 @@ static int irlap_param_min_turn_time(void *instance, irda_param_t *param,
 {
 	struct irlap_cb *self = (struct irlap_cb *) instance;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	if (get)
@@ -745,7 +745,7 @@ void irda_qos_bits_to_value(struct qos_info *qos)
 {
 	int index;
 
-	IRDA_ASSERT(qos != NULL, return;);
+	IRDA_ASSERT(qos, return;);
 
 	index = msb_index(qos->baud_rate.bits);
 	qos->baud_rate.value = baud_rates[index];

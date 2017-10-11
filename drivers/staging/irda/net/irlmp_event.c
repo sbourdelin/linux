@@ -137,7 +137,7 @@ static inline void irlmp_next_lsap_state(struct lsap_cb *self,
 int irlmp_do_lsap_event(struct lsap_cb *self, IRLMP_EVENT event,
 			struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LMP_LSAP_MAGIC, return -1;);
 
 	pr_debug("%s(), EVENT = %s, STATE = %s\n",
@@ -155,7 +155,7 @@ int irlmp_do_lsap_event(struct lsap_cb *self, IRLMP_EVENT event,
 void irlmp_do_lap_event(struct lap_cb *self, IRLMP_EVENT event,
 			struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 
 	pr_debug("%s(), EVENT = %s, STATE = %s\n", __func__,
@@ -180,7 +180,7 @@ void irlmp_watchdog_timer_expired(void *data)
 {
 	struct lsap_cb *self = (struct lsap_cb *) data;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LMP_LSAP_MAGIC, return;);
 
 	irlmp_do_lsap_event(self, LM_WATCHDOG_TIMEOUT, NULL);
@@ -190,7 +190,7 @@ void irlmp_idle_timer_expired(void *data)
 {
 	struct lap_cb *self = (struct lap_cb *) data;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 
 	irlmp_do_lap_event(self, LM_LAP_IDLE_TIMEOUT, NULL);
@@ -248,7 +248,7 @@ irlmp_do_all_lsap_event(hashbin_t *	lsap_hashbin,
 static void irlmp_state_standby(struct lap_cb *self, IRLMP_EVENT event,
 				struct sk_buff *skb)
 {
-	IRDA_ASSERT(self->irlap != NULL, return;);
+	IRDA_ASSERT(self->irlap, return;);
 
 	switch (event) {
 	case LM_LAP_DISCOVERY_REQUEST:
@@ -479,7 +479,7 @@ static int irlmp_state_disconnected(struct lsap_cb *self, IRLMP_EVENT event,
 {
 	int ret = 0;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LMP_LSAP_MAGIC, return -1;);
 
 	switch (event) {
@@ -557,7 +557,7 @@ static int irlmp_state_connect(struct lsap_cb *self, IRLMP_EVENT event,
 	struct lsap_cb *lsap;
 	int ret = 0;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LMP_LSAP_MAGIC, return -1;);
 
 	switch (event) {
@@ -570,8 +570,8 @@ static int irlmp_state_connect(struct lsap_cb *self, IRLMP_EVENT event,
 				      NULL);
 
 		IRDA_ASSERT(lsap == self, return -1;);
-		IRDA_ASSERT(self->lap != NULL, return -1;);
-		IRDA_ASSERT(self->lap->lsaps != NULL, return -1;);
+		IRDA_ASSERT(self->lap, return -1;);
+		IRDA_ASSERT(self->lap->lsaps, return -1;);
 
 		hashbin_insert(self->lap->lsaps, (irda_queue_t *) self,
 			       (long) self, NULL);
@@ -617,7 +617,7 @@ static int irlmp_state_connect_pend(struct lsap_cb *self, IRLMP_EVENT event,
 	struct sk_buff *tx_skb;
 	int ret = 0;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LMP_LSAP_MAGIC, return -1;);
 
 	switch (event) {
@@ -681,9 +681,9 @@ static int irlmp_state_dtr(struct lsap_cb *self, IRLMP_EVENT event,
 	LM_REASON reason;
 	int ret = 0;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LMP_LSAP_MAGIC, return -1;);
-	IRDA_ASSERT(self->lap != NULL, return -1;);
+	IRDA_ASSERT(self->lap, return -1;);
 
 	switch (event) {
 	case LM_DATA_REQUEST: /* Optimize for the common case */
@@ -694,7 +694,7 @@ static int irlmp_state_dtr(struct lsap_cb *self, IRLMP_EVENT event,
 		irlmp_data_indication(self, skb);
 		break;
 	case LM_UDATA_REQUEST:
-		IRDA_ASSERT(skb != NULL, return -1;);
+		IRDA_ASSERT(skb, return -1;);
 		irlmp_send_data_pdu(self->lap, self->dlsap_sel,
 				    self->slsap_sel, TRUE, skb);
 		break;
@@ -737,10 +737,9 @@ static int irlmp_state_dtr(struct lsap_cb *self, IRLMP_EVENT event,
 	case LM_DISCONNECT_INDICATION:
 		irlmp_next_lsap_state(self, LSAP_DISCONNECTED);
 
-		IRDA_ASSERT(self->lap != NULL, return -1;);
+		IRDA_ASSERT(self->lap, return -1;);
 		IRDA_ASSERT(self->lap->magic == LMP_LAP_MAGIC, return -1;);
-
-		IRDA_ASSERT(skb != NULL, return -1;);
+		IRDA_ASSERT(skb, return -1;);
 		IRDA_ASSERT(skb->len > 3, return -1;);
 		reason = skb->data[3];
 
@@ -771,7 +770,7 @@ static int irlmp_state_setup(struct lsap_cb *self, IRLMP_EVENT event,
 	LM_REASON reason;
 	int ret = 0;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LMP_LSAP_MAGIC, return -1;);
 
 	switch (event) {
@@ -785,10 +784,9 @@ static int irlmp_state_setup(struct lsap_cb *self, IRLMP_EVENT event,
 	case LM_DISCONNECT_INDICATION:
 		irlmp_next_lsap_state(self, LSAP_DISCONNECTED);
 
-		IRDA_ASSERT(self->lap != NULL, return -1;);
+		IRDA_ASSERT(self->lap, return -1;);
 		IRDA_ASSERT(self->lap->magic == LMP_LAP_MAGIC, return -1;);
-
-		IRDA_ASSERT(skb != NULL, return -1;);
+		IRDA_ASSERT(skb, return -1;);
 		IRDA_ASSERT(skb->len > 3, return -1;);
 		reason = skb->data[3];
 
@@ -803,7 +801,7 @@ static int irlmp_state_setup(struct lsap_cb *self, IRLMP_EVENT event,
 
 		del_timer(&self->watchdog_timer);
 
-		IRDA_ASSERT(self->lap != NULL, return -1;);
+		IRDA_ASSERT(self->lap, return -1;);
 		IRDA_ASSERT(self->lap->magic == LMP_LAP_MAGIC, return -1;);
 
 		reason = irlmp_convert_lap_reason(self->lap->reason);
@@ -813,7 +811,7 @@ static int irlmp_state_setup(struct lsap_cb *self, IRLMP_EVENT event,
 	case LM_WATCHDOG_TIMEOUT:
 		pr_debug("%s() WATCHDOG_TIMEOUT!\n", __func__);
 
-		IRDA_ASSERT(self->lap != NULL, return -1;);
+		IRDA_ASSERT(self->lap, return -1;);
 		irlmp_do_lap_event(self->lap, LM_LAP_DISCONNECT_REQUEST, NULL);
 		irlmp_next_lsap_state(self, LSAP_DISCONNECTED);
 
@@ -842,12 +840,12 @@ static int irlmp_state_setup_pend(struct lsap_cb *self, IRLMP_EVENT event,
 	LM_REASON reason;
 	int ret = 0;
 
-	IRDA_ASSERT(self != NULL, return -1;);
-	IRDA_ASSERT(irlmp != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
+	IRDA_ASSERT(irlmp, return -1;);
 
 	switch (event) {
 	case LM_LAP_CONNECT_CONFIRM:
-		IRDA_ASSERT(self->conn_skb != NULL, return -1;);
+		IRDA_ASSERT(self->conn_skb, return -1;);
 
 		tx_skb = self->conn_skb;
 		self->conn_skb = NULL;
@@ -862,7 +860,7 @@ static int irlmp_state_setup_pend(struct lsap_cb *self, IRLMP_EVENT event,
 	case LM_WATCHDOG_TIMEOUT:
 		pr_debug("%s() : WATCHDOG_TIMEOUT !\n",  __func__);
 
-		IRDA_ASSERT(self->lap != NULL, return -1;);
+		IRDA_ASSERT(self->lap, return -1;);
 		irlmp_do_lap_event(self->lap, LM_LAP_DISCONNECT_REQUEST, NULL);
 		irlmp_next_lsap_state(self, LSAP_DISCONNECTED);
 

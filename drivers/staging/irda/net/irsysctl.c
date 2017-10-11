@@ -99,8 +99,8 @@ static int do_discovery(struct ctl_table *table, int write,
        if (ret)
 	       return ret;
 
-       if (irlmp == NULL)
-	       return -ENODEV;
+	if (!irlmp)
+		return -ENODEV;
 
        if (sysctl_discovery)
 	       irlmp_start_discovery_timer(irlmp, sysctl_discovery_timeout*HZ);

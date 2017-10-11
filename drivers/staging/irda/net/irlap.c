@@ -82,7 +82,7 @@ int __init irlap_init(void)
 
 	/* Allocate master array */
 	irlap = hashbin_new(HB_LOCK);
-	if (irlap == NULL) {
+	if (!irlap) {
 		net_err_ratelimited("%s: can't allocate irlap hashbin!\n",
 				    __func__);
 		return -ENOMEM;
@@ -93,7 +93,7 @@ int __init irlap_init(void)
 
 void irlap_cleanup(void)
 {
-	IRDA_ASSERT(irlap != NULL, return;);
+	IRDA_ASSERT(irlap, return;);
 
 	hashbin_delete(irlap, (FREE_FUNC) __irlap_close);
 }
@@ -111,7 +111,7 @@ struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
 
 	/* Initialize the irlap structure. */
 	self = kzalloc(sizeof(*self), GFP_KERNEL);
-	if (self == NULL)
+	if (!self)
 		return NULL;
 
 	self->magic = LAP_MAGIC;
@@ -120,11 +120,10 @@ struct irlap_cb *irlap_open(struct net_device *dev, struct qos_info *qos,
 	self->netdev = dev;
 	self->qos_dev = qos;
 	/* Copy hardware name */
-	if(hw_name != NULL) {
+	if (hw_name)
 		strlcpy(self->hw_name, hw_name, sizeof(self->hw_name));
-	} else {
+	else
 		self->hw_name[0] = '\0';
-	}
 
 	/* FIXME: should we get our own field? */
 	dev->atalk_ptr = self;
@@ -179,7 +178,7 @@ EXPORT_SYMBOL(irlap_open);
  */
 static void __irlap_close(struct irlap_cb *self)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	/* Stop timers */
@@ -209,7 +208,7 @@ void irlap_close(struct irlap_cb *self)
 {
 	struct irlap_cb *lap;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	/* We used to send a LAP_DISC_INDICATION here, but this was
@@ -238,7 +237,7 @@ EXPORT_SYMBOL(irlap_close);
  */
 void irlap_connect_indication(struct irlap_cb *self, struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	irlap_init_qos_capabilities(self, NULL); /* No user QoS! */
@@ -270,7 +269,7 @@ void irlap_connect_request(struct irlap_cb *self, __u32 daddr,
 {
 	pr_debug("%s(), daddr=0x%08x\n", __func__, daddr);
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	self->daddr = daddr;
@@ -295,7 +294,7 @@ void irlap_connect_request(struct irlap_cb *self, __u32 daddr,
  */
 void irlap_connect_confirm(struct irlap_cb *self, struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	irlmp_link_connect_confirm(self->notify.instance, &self->qos_tx, skb);
@@ -327,7 +326,7 @@ void irlap_data_indication(struct irlap_cb *self, struct sk_buff *skb,
 void irlap_data_request(struct irlap_cb *self, struct sk_buff *skb,
 			int unreliable)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	IRDA_ASSERT(skb_headroom(skb) >= (LAP_ADDR_HEADER+LAP_CTRL_HEADER),
@@ -372,7 +371,7 @@ void irlap_data_request(struct irlap_cb *self, struct sk_buff *skb,
 #ifdef CONFIG_IRDA_ULTRA
 void irlap_unitdata_request(struct irlap_cb *self, struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	IRDA_ASSERT(skb_headroom(skb) >= (LAP_ADDR_HEADER+LAP_CTRL_HEADER),
@@ -399,9 +398,9 @@ void irlap_unitdata_request(struct irlap_cb *self, struct sk_buff *skb)
 #ifdef CONFIG_IRDA_ULTRA
 void irlap_unitdata_indication(struct irlap_cb *self, struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
-	IRDA_ASSERT(skb != NULL, return;);
+	IRDA_ASSERT(skb, return;);
 
 	/* Hide LAP header from IrLMP layer */
 	skb_pull(skb, LAP_ADDR_HEADER+LAP_CTRL_HEADER);
@@ -417,7 +416,7 @@ void irlap_unitdata_indication(struct irlap_cb *self, struct sk_buff *skb)
  */
 void irlap_disconnect_request(struct irlap_cb *self)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	/* Don't disconnect until all data frames are successfully sent */
@@ -452,7 +451,7 @@ void irlap_disconnect_indication(struct irlap_cb *self, LAP_REASON reason)
 {
 	pr_debug("%s(), reason=%s\n", __func__, lap_reasons[reason]);
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	/* Flush queues */
@@ -486,9 +485,9 @@ void irlap_discovery_request(struct irlap_cb *self, discovery_t *discovery)
 {
 	struct irlap_info info;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
-	IRDA_ASSERT(discovery != NULL, return;);
+	IRDA_ASSERT(discovery, return;);
 
 	pr_debug("%s(), nslots = %d\n", __func__, discovery->nslots);
 
@@ -512,15 +511,14 @@ void irlap_discovery_request(struct irlap_cb *self, discovery_t *discovery)
 
 	/* Check if last discovery request finished in time, or if
 	 * it was aborted due to the media busy flag. */
-	if (self->discovery_log != NULL) {
+	if (self->discovery_log) {
 		hashbin_delete(self->discovery_log, (FREE_FUNC) kfree);
 		self->discovery_log = NULL;
 	}
 
 	/* All operations will occur at predictable time, no need to lock */
 	self->discovery_log = hashbin_new(HB_NOLOCK);
-
-	if (self->discovery_log == NULL) {
+	if (!self->discovery_log) {
 		net_warn_ratelimited("%s(), Unable to allocate discovery log!\n",
 				     __func__);
 		return;
@@ -546,10 +544,10 @@ void irlap_discovery_request(struct irlap_cb *self, discovery_t *discovery)
  */
 void irlap_discovery_confirm(struct irlap_cb *self, hashbin_t *discovery_log)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
-	IRDA_ASSERT(self->notify.instance != NULL, return;);
+	IRDA_ASSERT(self->notify.instance, return;);
 
 	/*
 	 * Check for successful discovery, since we are then allowed to clear
@@ -577,11 +575,11 @@ void irlap_discovery_confirm(struct irlap_cb *self, hashbin_t *discovery_log)
  */
 void irlap_discovery_indication(struct irlap_cb *self, discovery_t *discovery)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
-	IRDA_ASSERT(discovery != NULL, return;);
+	IRDA_ASSERT(discovery, return;);
 
-	IRDA_ASSERT(self->notify.instance != NULL, return;);
+	IRDA_ASSERT(self->notify.instance, return;);
 
 	/* A device is very likely to connect immediately after it performs
 	 * a successful discovery. This means that in our case, we are much
@@ -621,7 +619,7 @@ void irlap_status_indication(struct irlap_cb *self, int quality_of_link)
  */
 void irlap_reset_indication(struct irlap_cb *self)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	if (self->state == LAP_RESET_WAIT)
@@ -691,8 +689,7 @@ void irlap_update_nr_received(struct irlap_cb *self, int nr)
 		self->va = nr - 1;
 	} else {
 		/* Remove all acknowledged frames in current window */
-		while ((skb_peek(&self->wx_list) != NULL) &&
-		       (((self->va+1) % 8) != nr))
+		while (skb_peek(&self->wx_list) && (((self->va + 1) % 8) != nr))
 		{
 			skb = skb_dequeue(&self->wx_list);
 			dev_kfree_skb(skb);
@@ -762,7 +759,7 @@ int irlap_validate_nr_received(struct irlap_cb *self, int nr)
  */
 void irlap_initiate_connection_state(struct irlap_cb *self)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	/* Next to send and next to receive */
@@ -818,7 +815,7 @@ void irlap_flush_all_queues(struct irlap_cb *self)
 {
 	struct sk_buff* skb;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	/* Free transmission queue */
@@ -845,7 +842,7 @@ static void irlap_change_speed(struct irlap_cb *self, __u32 speed, int now)
 
 	pr_debug("%s(), setting speed to %d\n", __func__, speed);
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	self->speed = speed;
@@ -870,9 +867,9 @@ static void irlap_change_speed(struct irlap_cb *self, __u32 speed, int now)
 static void irlap_init_qos_capabilities(struct irlap_cb *self,
 					struct qos_info *qos_user)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
-	IRDA_ASSERT(self->netdev != NULL, return;);
+	IRDA_ASSERT(self->netdev, return;);
 
 	/* Start out with the maximum QoS support possible */
 	irda_init_max_qos_capabilies(&self->qos_rx);
@@ -916,7 +913,7 @@ static void irlap_init_qos_capabilities(struct irlap_cb *self,
  */
 void irlap_apply_default_connection_parameters(struct irlap_cb *self)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	/* xbofs : Default value in NDM */
@@ -977,7 +974,7 @@ void irlap_apply_default_connection_parameters(struct irlap_cb *self)
  */
 void irlap_apply_connection_parameters(struct irlap_cb *self, int now)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	/* Set the negotiated xbofs value */
@@ -1189,7 +1186,7 @@ static const struct seq_operations irlap_seq_ops = {
 
 static int irlap_seq_open(struct inode *inode, struct file *file)
 {
-	if (irlap == NULL)
+	if (!irlap)
 		return -EINVAL;
 
 	return seq_open_private(file, &irlap_seq_ops,

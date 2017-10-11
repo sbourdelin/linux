@@ -167,7 +167,7 @@ static void irlap_poll_timer_expired(void *data)
 {
 	struct irlap_cb *self = (struct irlap_cb *) data;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 	irlap_do_event(self, POLL_TIMER_EXPIRED, NULL, NULL);
@@ -181,7 +181,7 @@ static void irlap_poll_timer_expired(void *data)
  */
 static void irlap_start_poll_timer(struct irlap_cb *self, int timeout)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return;);
 
 #ifdef CONFIG_IRDA_FAST_RR
@@ -327,12 +327,12 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 	discovery_t *discovery_rsp;
 	int ret = 0;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	switch (event) {
 	case CONNECT_REQUEST:
-		IRDA_ASSERT(self->netdev != NULL, return -1;);
+		IRDA_ASSERT(self->netdev, return -1;);
 
 		if (self->media_busy) {
 			/* Note : this will never happen, because we test
@@ -370,7 +370,7 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 		}
 		break;
 	case DISCOVERY_REQUEST:
-		IRDA_ASSERT(info != NULL, return -1;);
+		IRDA_ASSERT(info, return -1;);
 
 		if (self->media_busy) {
 			pr_debug("%s(), DISCOVERY_REQUEST: media busy!\n",
@@ -396,7 +396,7 @@ static int irlap_state_ndm(struct irlap_cb *self, IRLAP_EVENT event,
 		irlap_next_state(self, LAP_QUERY);
 		break;
 	case RECV_DISCOVERY_XID_CMD:
-		IRDA_ASSERT(info != NULL, return -1;);
+		IRDA_ASSERT(info, return -1;);
 
 		/* Assert that this is not the final slot */
 		if (info->s <= info->S) {
@@ -559,13 +559,13 @@ static int irlap_state_query(struct irlap_cb *self, IRLAP_EVENT event,
 {
 	int ret = 0;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	switch (event) {
 	case RECV_DISCOVERY_XID_RSP:
-		IRDA_ASSERT(info != NULL, return -1;);
-		IRDA_ASSERT(info->discovery != NULL, return -1;);
+		IRDA_ASSERT(info, return -1;);
+		IRDA_ASSERT(info->discovery, return -1;);
 
 		pr_debug("%s(), daddr=%08x\n", __func__,
 			 info->discovery->data.daddr);
@@ -595,7 +595,7 @@ static int irlap_state_query(struct irlap_cb *self, IRLAP_EVENT event,
 		 * Jean II
 		 */
 
-		IRDA_ASSERT(info != NULL, return -1;);
+		IRDA_ASSERT(info, return -1;);
 
 		pr_debug("%s(), Receiving discovery request (s = %d) while performing discovery :-(\n",
 			 __func__, info->s);
@@ -671,7 +671,7 @@ static int irlap_state_reply(struct irlap_cb *self, IRLAP_EVENT event,
 	discovery_t *discovery_rsp;
 	int ret=0;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	switch (event) {
@@ -681,7 +681,7 @@ static int irlap_state_reply(struct irlap_cb *self, IRLAP_EVENT event,
 		irlap_next_state(self, LAP_NDM);
 		break;
 	case RECV_DISCOVERY_XID_CMD:
-		IRDA_ASSERT(info != NULL, return -1;);
+		IRDA_ASSERT(info, return -1;);
 		/* Last frame? */
 		if (info->s == 0xff) {
 			del_timer(&self->query_timer);
@@ -738,14 +738,14 @@ static int irlap_state_conn(struct irlap_cb *self, IRLAP_EVENT event,
 
 	pr_debug("%s(), event=%s\n", __func__, irlap_event[event]);
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	switch (event) {
 	case CONNECT_RESPONSE:
 		skb_pull(skb, sizeof(struct snrm_frame));
 
-		IRDA_ASSERT(self->netdev != NULL, return -1;);
+		IRDA_ASSERT(self->netdev, return -1;);
 
 		irlap_qos_negotiate(self, skb);
 
@@ -830,7 +830,7 @@ static int irlap_state_setup(struct irlap_cb *self, IRLAP_EVENT event,
 {
 	int ret = 0;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	switch (event) {
@@ -859,8 +859,8 @@ static int irlap_state_setup(struct irlap_cb *self, IRLAP_EVENT event,
 	case RECV_SNRM_CMD:
 		pr_debug("%s(), SNRM battle!\n", __func__);
 
-		IRDA_ASSERT(skb != NULL, return 0;);
-		IRDA_ASSERT(info != NULL, return 0;);
+		IRDA_ASSERT(skb, return 0;);
+		IRDA_ASSERT(info, return 0;);
 
 		/*
 		 *  The device with the largest device address wins the battle
@@ -870,7 +870,7 @@ static int irlap_state_setup(struct irlap_cb *self, IRLAP_EVENT event,
 			del_timer(&self->final_timer);
 			irlap_initiate_connection_state(self);
 
-			IRDA_ASSERT(self->netdev != NULL, return -1;);
+			IRDA_ASSERT(self->netdev, return -1;);
 
 			skb_pull(skb, sizeof(struct snrm_frame));
 
@@ -906,7 +906,7 @@ static int irlap_state_setup(struct irlap_cb *self, IRLAP_EVENT event,
 
 		skb_pull(skb, sizeof(struct ua_frame));
 
-		IRDA_ASSERT(self->netdev != NULL, return -1;);
+		IRDA_ASSERT(self->netdev, return -1;);
 
 		irlap_qos_negotiate(self, skb);
 
@@ -1013,9 +1013,9 @@ static int irlap_state_xmit_p(struct irlap_cb *self, IRLAP_EVENT event,
 			 * end of the window and sending a extra RR.
 			 * Note : (skb_next != NULL) <=> (skb_queue_len() > 0)
 			 * Jean II */
-			nextfit = ((skb_next != NULL) &&
-				   ((skb_next->len + skb->len) <=
-				    self->bytes_left));
+			nextfit = skb_next &&
+				  (skb_next->len + skb->len)
+				  <= self->bytes_left;
 
 			/*
 			 * The current packet may not fit ! Because of test
@@ -1134,7 +1134,7 @@ static int irlap_state_pclose(struct irlap_cb *self, IRLAP_EVENT event,
 {
 	int ret = 0;
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	switch (event) {
@@ -1215,8 +1215,7 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 		 */
 		self->fast_RR = FALSE;
 #endif /* CONFIG_IRDA_FAST_RR */
-		IRDA_ASSERT( info != NULL, return -1;);
-
+		IRDA_ASSERT(info, return -1;);
 		ns_status = irlap_validate_ns_received(self, info->ns);
 		nr_status = irlap_validate_nr_received(self, info->nr);
 
@@ -1449,7 +1448,7 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 			/* Start poll timer */
 			irlap_start_poll_timer(self, self->poll_timeout);
 		} else if (ret == NR_UNEXPECTED) {
-			IRDA_ASSERT(info != NULL, return -1;);
+			IRDA_ASSERT(info, return -1;);
 			/*
 			 *  Unexpected nr!
 			 */
@@ -1477,7 +1476,7 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 		}
 		break;
 	case RECV_RNR_RSP:
-		IRDA_ASSERT(info != NULL, return -1;);
+		IRDA_ASSERT(info, return -1;);
 
 		/* Stop final timer */
 		del_timer(&self->final_timer);
@@ -1519,7 +1518,7 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 
 		/* N2 is the disconnect timer. Until we reach it, we retry */
 		if (self->retry_count < self->N2) {
-			if (skb_peek(&self->wx_list) == NULL) {
+			if (!skb_peek(&self->wx_list)) {
 				/* Retry sending the pf bit to the secondary */
 				pr_debug("nrm_p: resending rr");
 				irlap_wait_min_turn_around(self, &self->qos_tx);
@@ -1603,7 +1602,7 @@ static int irlap_state_reset_wait(struct irlap_cb *self, IRLAP_EVENT event,
 
 	pr_debug("%s(), event = %s\n", __func__, irlap_event[event]);
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	switch (event) {
@@ -1650,7 +1649,7 @@ static int irlap_state_reset(struct irlap_cb *self, IRLAP_EVENT event,
 
 	pr_debug("%s(), event = %s\n", __func__, irlap_event[event]);
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	switch (event) {
@@ -1684,7 +1683,7 @@ static int irlap_state_reset(struct irlap_cb *self, IRLAP_EVENT event,
 		if (self->retry_count < 3) {
 			irlap_wait_min_turn_around(self, &self->qos_tx);
 
-			IRDA_ASSERT(self->netdev != NULL, return -1;);
+			IRDA_ASSERT(self->netdev, return -1;);
 			irlap_send_snrm_frame(self, self->qos_dev);
 
 			self->retry_count++; /* Experimental!! */
@@ -1742,7 +1741,7 @@ static int irlap_state_xmit_s(struct irlap_cb *self, IRLAP_EVENT event,
 
 	pr_debug("%s(), event=%s\n", __func__, irlap_event[event]);
 
-	IRDA_ASSERT(self != NULL, return -ENODEV;);
+	IRDA_ASSERT(self, return -ENODEV;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -EBADR;);
 
 	switch (event) {
@@ -1766,9 +1765,9 @@ static int irlap_state_xmit_s(struct irlap_cb *self, IRLAP_EVENT event,
 			 * the current window (with respect to turnaround
 			 * time). - Jean II */
 			skb_next = skb_peek(&self->txq);
-			nextfit = ((skb_next != NULL) &&
-				   ((skb_next->len + skb->len) <=
-				    self->bytes_left));
+			nextfit = skb_next &&
+				  (skb_next->len + skb->len)
+				  <= self->bytes_left;
 
 			/*
 			 *  Test if we have transmitted more bytes over the
@@ -1864,7 +1863,7 @@ static int irlap_state_nrm_s(struct irlap_cb *self, IRLAP_EVENT event,
 
 	pr_debug("%s(), event=%s\n", __func__, irlap_event[event]);
 
-	IRDA_ASSERT(self != NULL, return -1;);
+	IRDA_ASSERT(self, return -1;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -1;);
 
 	switch (event) {
@@ -2215,7 +2214,7 @@ static int irlap_state_nrm_s(struct irlap_cb *self, IRLAP_EVENT event,
 static int irlap_state_sclose(struct irlap_cb *self, IRLAP_EVENT event,
 			      struct sk_buff *skb, struct irlap_info *info)
 {
-	IRDA_ASSERT(self != NULL, return -ENODEV;);
+	IRDA_ASSERT(self, return -ENODEV;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -EBADR;);
 
 	switch (event) {
@@ -2262,7 +2261,7 @@ static int irlap_state_sclose(struct irlap_cb *self, IRLAP_EVENT event,
 		/* IrLAP-1.1 p.82: in SCLOSE, basically any received frame
 		 * with pf=1 shall restart the wd-timer and resend the rd:rsp
 		 */
-		if (info != NULL  &&  info->pf) {
+		if (info && info->pf) {
 			del_timer(&self->wd_timer);
 			irlap_wait_min_turn_around(self, &self->qos_tx);
 			irlap_send_rd_frame(self);
@@ -2287,7 +2286,7 @@ static int irlap_state_reset_check( struct irlap_cb *self, IRLAP_EVENT event,
 
 	pr_debug("%s(), event=%s\n", __func__, irlap_event[event]);
 
-	IRDA_ASSERT(self != NULL, return -ENODEV;);
+	IRDA_ASSERT(self, return -ENODEV;);
 	IRDA_ASSERT(self->magic == LAP_MAGIC, return -EBADR;);
 
 	switch (event) {

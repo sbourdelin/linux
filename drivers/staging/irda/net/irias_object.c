@@ -64,8 +64,7 @@ struct ias_object *irias_new_object( char *name, int id)
 	 * than the objects spinlock. Never grap the objects spinlock
 	 * while holding any attrib spinlock (risk of deadlock). Jean II */
 	obj->attribs = hashbin_new(HB_LOCK);
-
-	if (obj->attribs == NULL) {
+	if (!obj->attribs) {
 		net_warn_ratelimited("%s(), Unable to allocate attribs!\n",
 				     __func__);
 		kfree(obj->name);
@@ -85,7 +84,7 @@ EXPORT_SYMBOL(irias_new_object);
  */
 static void __irias_delete_attrib(struct ias_attrib *attrib)
 {
-	IRDA_ASSERT(attrib != NULL, return;);
+	IRDA_ASSERT(attrib, return;);
 	IRDA_ASSERT(attrib->magic == IAS_ATTRIB_MAGIC, return;);
 
 	kfree(attrib->name);
@@ -98,7 +97,7 @@ static void __irias_delete_attrib(struct ias_attrib *attrib)
 
 void __irias_delete_object(struct ias_object *obj)
 {
-	IRDA_ASSERT(obj != NULL, return;);
+	IRDA_ASSERT(obj, return;);
 	IRDA_ASSERT(obj->magic == IAS_OBJECT_MAGIC, return;);
 
 	kfree(obj->name);
@@ -121,7 +120,7 @@ int irias_delete_object(struct ias_object *obj)
 {
 	struct ias_object *node;
 
-	IRDA_ASSERT(obj != NULL, return -1;);
+	IRDA_ASSERT(obj, return -1;);
 	IRDA_ASSERT(obj->magic == IAS_OBJECT_MAGIC, return -1;);
 
 	/* Remove from list */
@@ -149,9 +148,9 @@ int irias_delete_attrib(struct ias_object *obj, struct ias_attrib *attrib,
 {
 	struct ias_attrib *node;
 
-	IRDA_ASSERT(obj != NULL, return -1;);
+	IRDA_ASSERT(obj, return -1;);
 	IRDA_ASSERT(obj->magic == IAS_OBJECT_MAGIC, return -1;);
-	IRDA_ASSERT(attrib != NULL, return -1;);
+	IRDA_ASSERT(attrib, return -1;);
 
 	/* Remove attribute from object */
 	node = hashbin_remove_this(obj->attribs, (irda_queue_t *) attrib);
@@ -181,7 +180,7 @@ int irias_delete_attrib(struct ias_object *obj, struct ias_attrib *attrib,
  */
 void irias_insert_object(struct ias_object *obj)
 {
-	IRDA_ASSERT(obj != NULL, return;);
+	IRDA_ASSERT(obj, return;);
 	IRDA_ASSERT(obj->magic == IAS_OBJECT_MAGIC, return;);
 
 	hashbin_insert(irias_objects, (irda_queue_t *) obj, 0, obj->name);
@@ -196,7 +195,7 @@ EXPORT_SYMBOL(irias_insert_object);
  */
 struct ias_object *irias_find_object(char *name)
 {
-	IRDA_ASSERT(name != NULL, return NULL;);
+	IRDA_ASSERT(name, return NULL;);
 
 	/* Unsafe (locking), object might change */
 	return hashbin_lock_find(irias_objects, 0, name);
@@ -213,12 +212,12 @@ struct ias_attrib *irias_find_attrib(struct ias_object *obj, char *name)
 {
 	struct ias_attrib *attrib;
 
-	IRDA_ASSERT(obj != NULL, return NULL;);
+	IRDA_ASSERT(obj, return NULL;);
 	IRDA_ASSERT(obj->magic == IAS_OBJECT_MAGIC, return NULL;);
-	IRDA_ASSERT(name != NULL, return NULL;);
+	IRDA_ASSERT(name, return NULL;);
 
 	attrib = hashbin_lock_find(obj->attribs, 0, name);
-	if (attrib == NULL)
+	if (!attrib)
 		return NULL;
 
 	/* Unsafe (locking), attrib might change */
@@ -234,10 +233,9 @@ struct ias_attrib *irias_find_attrib(struct ias_object *obj, char *name)
 static void irias_add_attrib(struct ias_object *obj, struct ias_attrib *attrib,
 			     int owner)
 {
-	IRDA_ASSERT(obj != NULL, return;);
+	IRDA_ASSERT(obj, return;);
 	IRDA_ASSERT(obj->magic == IAS_OBJECT_MAGIC, return;);
-
-	IRDA_ASSERT(attrib != NULL, return;);
+	IRDA_ASSERT(attrib, return;);
 	IRDA_ASSERT(attrib->magic == IAS_ATTRIB_MAGIC, return;);
 
 	/* Set if attrib is owned by kernel or user space */
@@ -261,7 +259,7 @@ int irias_object_change_attribute(char *obj_name, char *attrib_name,
 
 	/* Find object */
 	obj = hashbin_lock_find(irias_objects, 0, obj_name);
-	if (obj == NULL) {
+	if (!obj) {
 		net_warn_ratelimited("%s: Unable to find object: %s\n",
 				     __func__, obj_name);
 		return -1;
@@ -272,7 +270,7 @@ int irias_object_change_attribute(char *obj_name, char *attrib_name,
 
 	/* Find attribute */
 	attrib = hashbin_find(obj->attribs, 0, attrib_name);
-	if (attrib == NULL) {
+	if (!attrib) {
 		net_warn_ratelimited("%s: Unable to find attribute: %s\n",
 				     __func__, attrib_name);
 		spin_unlock_irqrestore(&obj->attribs->hb_spinlock, flags);
@@ -309,9 +307,9 @@ void irias_add_integer_attrib(struct ias_object *obj, char *name, int value,
 {
 	struct ias_attrib *attrib;
 
-	IRDA_ASSERT(obj != NULL, return;);
+	IRDA_ASSERT(obj, return;);
 	IRDA_ASSERT(obj->magic == IAS_OBJECT_MAGIC, return;);
-	IRDA_ASSERT(name != NULL, return;);
+	IRDA_ASSERT(name, return;);
 
 	attrib = kzalloc(sizeof(*attrib), GFP_ATOMIC);
 	if (!attrib)
@@ -348,11 +346,10 @@ void irias_add_octseq_attrib(struct ias_object *obj, char *name, __u8 *octets,
 {
 	struct ias_attrib *attrib;
 
-	IRDA_ASSERT(obj != NULL, return;);
+	IRDA_ASSERT(obj, return;);
 	IRDA_ASSERT(obj->magic == IAS_OBJECT_MAGIC, return;);
-
-	IRDA_ASSERT(name != NULL, return;);
-	IRDA_ASSERT(octets != NULL, return;);
+	IRDA_ASSERT(name, return;);
+	IRDA_ASSERT(octets, return;);
 
 	attrib = kzalloc(sizeof(*attrib), GFP_ATOMIC);
 	if (!attrib)
@@ -387,11 +384,10 @@ void irias_add_string_attrib(struct ias_object *obj, char *name, char *value,
 {
 	struct ias_attrib *attrib;
 
-	IRDA_ASSERT(obj != NULL, return;);
+	IRDA_ASSERT(obj, return;);
 	IRDA_ASSERT(obj->magic == IAS_OBJECT_MAGIC, return;);
-
-	IRDA_ASSERT(name != NULL, return;);
-	IRDA_ASSERT(value != NULL, return;);
+	IRDA_ASSERT(name, return;);
+	IRDA_ASSERT(value, return;);
 
 	attrib = kzalloc(sizeof(*attrib), GFP_ATOMIC);
 	if (!attrib)
@@ -426,7 +422,7 @@ struct ias_value *irias_new_integer_value(int integer)
 	struct ias_value *value;
 
 	value = kzalloc(sizeof(*value), GFP_ATOMIC);
-	if (value == NULL)
+	if (!value)
 		return NULL;
 
 	value->type = IAS_INTEGER;
@@ -449,7 +445,7 @@ struct ias_value *irias_new_string_value(char *string)
 	struct ias_value *value;
 
 	value = kzalloc(sizeof(*value), GFP_ATOMIC);
-	if (value == NULL)
+	if (!value)
 		return NULL;
 
 	value->type = IAS_STRING;
@@ -477,7 +473,7 @@ struct ias_value *irias_new_octseq_value(__u8 *octseq , int len)
 	struct ias_value *value;
 
 	value = kzalloc(sizeof(*value), GFP_ATOMIC);
-	if (value == NULL)
+	if (!value)
 		return NULL;
 
 	value->type = IAS_OCT_SEQ;
@@ -487,7 +483,7 @@ struct ias_value *irias_new_octseq_value(__u8 *octseq , int len)
 	value->len = len;
 
 	value->t.oct_seq = kmemdup(octseq, len, GFP_ATOMIC);
-	if (value->t.oct_seq == NULL){
+	if (!value->t.oct_seq) {
 		kfree(value);
 		return NULL;
 	}
@@ -499,7 +495,7 @@ struct ias_value *irias_new_missing_value(void)
 	struct ias_value *value;
 
 	value = kzalloc(sizeof(*value), GFP_ATOMIC);
-	if (value == NULL)
+	if (!value)
 		return NULL;
 
 	value->type = IAS_MISSING;
@@ -515,7 +511,7 @@ struct ias_value *irias_new_missing_value(void)
  */
 void irias_delete_value(struct ias_value *value)
 {
-	IRDA_ASSERT(value != NULL, return;);
+	IRDA_ASSERT(value, return;);
 
 	switch (value->type) {
 	case IAS_INTEGER: /* Fallthrough */

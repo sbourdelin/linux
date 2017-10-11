@@ -74,7 +74,7 @@ void irlmp_add_discovery(hashbin_t *cachelog, discovery_t *new)
 	 * their device address between every discovery.
 	 */
 	discovery = (discovery_t *) hashbin_get_first(cachelog);
-	while (discovery != NULL ) {
+	while (discovery) {
 		node = discovery;
 
 		/* Be sure to stay one item ahead */
@@ -118,7 +118,7 @@ void irlmp_add_discovery_log(hashbin_t *cachelog, hashbin_t *log)
 	 *  of the normal one.
 	 */
 	/* Well... It means that there was nobody out there - Jean II */
-	if (log == NULL) {
+	if (!log) {
 		/* irlmp_start_discovery_timer(irlmp, 150); */
 		return;
 	}
@@ -129,7 +129,7 @@ void irlmp_add_discovery_log(hashbin_t *cachelog, hashbin_t *log)
 	 * We just need to lock the global log in irlmp_add_discovery().
 	 */
 	discovery = (discovery_t *) hashbin_remove_first(log);
-	while (discovery != NULL) {
+	while (discovery) {
 		irlmp_add_discovery(cachelog, discovery);
 
 		discovery = (discovery_t *) hashbin_remove_first(log);
@@ -156,11 +156,11 @@ void irlmp_expire_discoveries(hashbin_t *log, __u32 saddr, int force)
 	int			n;		/* Size of the full log */
 	int			i = 0;		/* How many we expired */
 
-	IRDA_ASSERT(log != NULL, return;);
+	IRDA_ASSERT(log, return;);
 	spin_lock_irqsave(&log->hb_spinlock, flags);
 
 	discovery = (discovery_t *) hashbin_get_first(log);
-	while (discovery != NULL) {
+	while (discovery) {
 		/* Be sure to be one item ahead */
 		curr = discovery;
 		discovery = (discovery_t *) hashbin_get_next(log);
@@ -175,7 +175,7 @@ void irlmp_expire_discoveries(hashbin_t *log, __u32 saddr, int force)
 			 * we don't have anything to put in the log (we are
 			 * quite picky), we can save a lot of overhead
 			 * by not calling kmalloc. Jean II */
-			if(buffer == NULL) {
+			if (!buffer) {
 				/* Create the client specific buffer */
 				n = HASHBIN_GET_SIZE(log);
 				buffer = kmalloc(n * sizeof(struct irda_device_info), GFP_ATOMIC);
@@ -203,7 +203,7 @@ void irlmp_expire_discoveries(hashbin_t *log, __u32 saddr, int force)
 	 * don't care to be interrupted. - Jean II */
 	spin_unlock_irqrestore(&log->hb_spinlock, flags);
 
-	if(buffer == NULL)
+	if (!buffer)
 		return;
 
 	/* Tell IrLMP and registered clients about it */
@@ -224,10 +224,10 @@ void irlmp_dump_discoveries(hashbin_t *log)
 {
 	discovery_t *discovery;
 
-	IRDA_ASSERT(log != NULL, return;);
+	IRDA_ASSERT(log, return;);
 
 	discovery = (discovery_t *) hashbin_get_first(log);
-	while (discovery != NULL) {
+	while (discovery) {
 		pr_debug("Discovery:\n");
 		pr_debug("  daddr=%08x\n", discovery->data.daddr);
 		pr_debug("  saddr=%08x\n", discovery->data.saddr);
@@ -268,14 +268,14 @@ struct irda_device_info *irlmp_copy_discoveries(hashbin_t *log, int *pn,
 	int			n;		/* Size of the full log */
 	int			i = 0;		/* How many we picked */
 
-	IRDA_ASSERT(pn != NULL, return NULL;);
-	IRDA_ASSERT(log != NULL, return NULL;);
+	IRDA_ASSERT(pn, return NULL;);
+	IRDA_ASSERT(log, return NULL;);
 
 	/* Save spin lock */
 	spin_lock_irqsave(&log->hb_spinlock, flags);
 
 	discovery = (discovery_t *) hashbin_get_first(log);
-	while (discovery != NULL) {
+	while (discovery) {
 		/* Mask out the ones we don't want :
 		 * We want to match the discovery mask, and to get only
 		 * the most recent one (unless we want old ones) */
@@ -287,7 +287,7 @@ struct irda_device_info *irlmp_copy_discoveries(hashbin_t *log, int *pn,
 			 * we don't have anything to put in the log (we are
 			 * quite picky), we can save a lot of overhead
 			 * by not calling kmalloc. Jean II */
-			if(buffer == NULL) {
+			if (!buffer) {
 				/* Create the client specific buffer */
 				n = HASHBIN_GET_SIZE(log);
 				buffer = kmalloc(n * sizeof(struct irda_device_info), GFP_ATOMIC);
@@ -320,7 +320,7 @@ static inline discovery_t *discovery_seq_idx(loff_t pos)
 	discovery_t *discovery;
 
 	for (discovery = (discovery_t *) hashbin_get_first(irlmp->cachelog);
-	     discovery != NULL;
+	     discovery;
 	     discovery = (discovery_t *) hashbin_get_next(irlmp->cachelog)) {
 		if (pos-- == 0)
 			break;
@@ -402,8 +402,7 @@ static const struct seq_operations discovery_seq_ops = {
 
 static int discovery_seq_open(struct inode *inode, struct file *file)
 {
-	IRDA_ASSERT(irlmp != NULL, return -EINVAL;);
-
+	IRDA_ASSERT(irlmp, return -EINVAL;);
 	return seq_open(file, &discovery_seq_ops);
 }
 

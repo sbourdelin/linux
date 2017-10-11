@@ -121,7 +121,7 @@ static void irda_disconnect_indication(void *instance, void *sap,
 		dev_kfree_skb(skb);
 
 	sk = instance;
-	if (sk == NULL) {
+	if (!sk) {
 		pr_debug("%s(%p) : BUG : sk is NULL\n",
 			 __func__, self);
 		return;
@@ -182,7 +182,7 @@ static void irda_connect_confirm(void *instance, void *sap,
 	pr_debug("%s(%p)\n", __func__, self);
 
 	sk = instance;
-	if (sk == NULL) {
+	if (!sk) {
 		dev_kfree_skb(skb);
 		return;
 	}
@@ -246,7 +246,7 @@ static void irda_connect_indication(void *instance, void *sap,
 	pr_debug("%s(%p)\n", __func__, self);
 
 	sk = instance;
-	if (sk == NULL) {
+	if (!sk) {
 		dev_kfree_skb(skb);
 		return;
 	}
@@ -301,7 +301,7 @@ static void irda_connect_response(struct irda_sock *self)
 	struct sk_buff *skb;
 
 	skb = alloc_skb(TTP_MAX_HEADER + TTP_SAR_HEADER, GFP_KERNEL);
-	if (skb == NULL) {
+	if (!skb) {
 		pr_debug("%s() Unable to allocate sk_buff!\n",
 			 __func__);
 		return;
@@ -326,7 +326,7 @@ static void irda_flow_indication(void *instance, void *sap, LOCAL_FLOW flow)
 
 	self = instance;
 	sk = instance;
-	BUG_ON(sk == NULL);
+	BUG_ON(!sk);
 
 	switch (flow) {
 	case FLOW_STOP:
@@ -434,7 +434,7 @@ static void irda_discovery_timeout(u_long priv)
 	struct irda_sock *self;
 
 	self = (struct irda_sock *) priv;
-	BUG_ON(self == NULL);
+	BUG_ON(!self);
 
 	/* Nothing for the caller */
 	self->cachelog = NULL;
@@ -473,7 +473,7 @@ static int irda_open_tsap(struct irda_sock *self, __u8 tsap_sel, char *name)
 
 	self->tsap = irttp_open_tsap(tsap_sel, DEFAULT_INITIAL_CREDIT,
 				     &notify);
-	if (self->tsap == NULL) {
+	if (!self->tsap) {
 		pr_debug("%s(), Unable to allocate TSAP!\n",
 			 __func__);
 		return -ENOMEM;
@@ -507,7 +507,7 @@ static int irda_open_lsap(struct irda_sock *self, int pid)
 	strncpy(notify.name, "Ultra", NOTIFY_MAX_NAME);
 
 	self->lsap = irlmp_open_lsap(LSAP_CONNLESS, &notify, pid);
-	if (self->lsap == NULL) {
+	if (!self->lsap) {
 		pr_debug("%s(), Unable to allocate LSAP!\n", __func__);
 		return -ENOMEM;
 	}
@@ -539,7 +539,7 @@ static int irda_find_lsap_sel(struct irda_sock *self, char *name)
 
 	self->iriap = iriap_open(LSAP_ANY, IAS_CLIENT, self,
 				 irda_getvalue_confirm);
-	if(self->iriap == NULL)
+	if (!self->iriap)
 		return -ENOMEM;
 
 	/* Treat unexpected wakeup as disconnect */
@@ -625,7 +625,7 @@ static int irda_discover_daddr_and_lsap_sel(struct irda_sock *self, char *name)
 	discoveries = irlmp_get_discoveries(&number, self->mask.word,
 					    self->nslots);
 	/* Check if the we got some results */
-	if (discoveries == NULL)
+	if (!discoveries)
 		return -ENETUNREACH;	/* No nodes discovered */
 
 	/*
@@ -801,7 +801,7 @@ static int irda_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 
 	self->ias_obj = irias_new_object(addr->sir_name, jiffies);
 	err = -ENOMEM;
-	if (self->ias_obj == NULL)
+	if (!self->ias_obj)
 		goto out;
 
 	err = irda_open_tsap(self, addr->sir_lsap_sel, addr->sir_name);
@@ -887,7 +887,7 @@ static int irda_accept(struct socket *sock, struct socket *newsock, int flags,
 
 	newsk = newsock->sk;
 	err = -EIO;
-	if (newsk == NULL)
+	if (!newsk)
 		goto out;
 
 	newsk->sk_state = TCP_ESTABLISHED;
@@ -1105,7 +1105,7 @@ static int irda_create(struct net *net, struct socket *sock, int protocol,
 
 	/* Allocate networking socket */
 	sk = sk_alloc(net, PF_IRDA, GFP_KERNEL, &irda_proto, kern);
-	if (sk == NULL)
+	if (!sk)
 		return -ENOMEM;
 
 	self = irda_sk(sk);
@@ -1208,7 +1208,7 @@ static int irda_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 
-	if (sk == NULL)
+	if (!sk)
 		return 0;
 
 	lock_sock(sk);
@@ -1431,7 +1431,7 @@ static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
 		int chunk;
 		struct sk_buff *skb = skb_dequeue(&sk->sk_receive_queue);
 
-		if (skb == NULL) {
+		if (!skb) {
 			DEFINE_WAIT(wait);
 			err = 0;
 
@@ -1454,7 +1454,7 @@ static int irda_recvmsg_stream(struct socket *sock, struct msghdr *msg,
 				err = sock_intr_errno(timeo);
 			else if (sk->sk_state != TCP_ESTABLISHED)
 				err = -ENOTCONN;
-			else if (skb_peek(&sk->sk_receive_queue) == NULL)
+			else if (!skb_peek(&sk->sk_receive_queue))
 				/* Wait process until data arrives */
 				schedule();
 
@@ -1649,8 +1649,7 @@ static int irda_sendmsg_ultra(struct socket *sock, struct msghdr *msg,
 	} else {
 		/* Check that the socket is properly bound to an Ultra
 		 * port. Jean II */
-		if ((self->lsap == NULL) ||
-		    (sk->sk_state != TCP_ESTABLISHED)) {
+		if (!self->lsap || sk->sk_state != TCP_ESTABLISHED) {
 			pr_debug("%s(), socket not bound to Ultra PID.\n",
 				 __func__);
 			err = -ENOTCONN;
@@ -1828,7 +1827,7 @@ static int irda_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	}
 
 	case SIOCGSTAMP:
-		if (sk != NULL)
+		if (sk)
 			err = sock_get_timestamp(sk, (struct timeval __user *)arg);
 		break;
 
@@ -1913,7 +1912,7 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		 * associated with this socket. This will workaround
 		 * duplicated class name - Jean II */
 		if(ias_opt->irda_class_name[0] == '\0') {
-			if(self->ias_obj == NULL) {
+			if (!self->ias_obj) {
 				kfree(ias_opt);
 				err = -EINVAL;
 				goto out;
@@ -1925,19 +1924,19 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		/* Only ROOT can mess with the global IAS database.
 		 * Users can only add attributes to the object associated
 		 * with the socket they own - Jean II */
-		if((!capable(CAP_NET_ADMIN)) &&
-		   ((ias_obj == NULL) || (ias_obj != self->ias_obj))) {
+		if (!capable(CAP_NET_ADMIN) &&
+		    (!ias_obj || ias_obj != self->ias_obj)) {
 			kfree(ias_opt);
 			err = -EPERM;
 			goto out;
 		}
 
 		/* If the object doesn't exist, create it */
-		if(ias_obj == (struct ias_object *) NULL) {
+		if (!ias_obj) {
 			/* Create a new object */
 			ias_obj = irias_new_object(ias_opt->irda_class_name,
 						   jiffies);
-			if (ias_obj == NULL) {
+			if (!ias_obj) {
 				kfree(ias_opt);
 				err = -ENOMEM;
 				goto out;
@@ -2050,8 +2049,8 @@ static int irda_setsockopt(struct socket *sock, int level, int optname,
 		/* Only ROOT can mess with the global IAS database.
 		 * Users can only del attributes from the object associated
 		 * with the socket they own - Jean II */
-		if((!capable(CAP_NET_ADMIN)) &&
-		   ((ias_obj == NULL) || (ias_obj != self->ias_obj))) {
+		if (!capable(CAP_NET_ADMIN) &&
+		    (!ias_obj || ias_obj != self->ias_obj)) {
 			kfree(ias_opt);
 			err = -EPERM;
 			goto out;
@@ -2253,7 +2252,7 @@ static int irda_getsockopt(struct socket *sock, int level, int optname,
 		discoveries = irlmp_get_discoveries(&list.len, self->mask.word,
 						    self->nslots);
 		/* Check if the we got some results */
-		if (discoveries == NULL) {
+		if (!discoveries) {
 			err = -EAGAIN;
 			goto out;		/* Didn't find any devices */
 		}
@@ -2404,8 +2403,7 @@ bed:
 
 		self->iriap = iriap_open(LSAP_ANY, IAS_CLIENT, self,
 					 irda_getvalue_confirm);
-
-		if (self->iriap == NULL) {
+		if (!self->iriap) {
 			kfree(ias_opt);
 			err = -ENOMEM;
 			goto out;

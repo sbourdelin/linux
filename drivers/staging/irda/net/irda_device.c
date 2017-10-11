@@ -190,7 +190,7 @@ static int irda_task_kick(struct irda_task *task)
 	int count = 0;
 	int timeout;
 
-	IRDA_ASSERT(task != NULL, return -1;);
+	IRDA_ASSERT(task, return -1;);
 	IRDA_ASSERT(task->magic == IRDA_TASK_MAGIC, return -1;);
 
 	/* Execute task until it's finished, or askes for a timeout */

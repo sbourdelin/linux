@@ -456,8 +456,8 @@ int irda_param_insert(void *self, __u8 pi, __u8 *buf, int len,
 	int ret = -1;
 	int n = 0;
 
-	IRDA_ASSERT(buf != NULL, return ret;);
-	IRDA_ASSERT(info != NULL, return ret;);
+	IRDA_ASSERT(buf, return ret;);
+	IRDA_ASSERT(info, return ret;);
 
 	pi_minor = pi & info->pi_mask;
 	pi_major = pi >> info->pi_major_offset;
@@ -511,8 +511,8 @@ static int irda_param_extract(void *self, __u8 *buf, int len,
 	int ret = -1;
 	int n = 0;
 
-	IRDA_ASSERT(buf != NULL, return ret;);
-	IRDA_ASSERT(info != NULL, return ret;);
+	IRDA_ASSERT(buf, return ret;);
+	IRDA_ASSERT(info, return ret;);
 
 	pi_minor = buf[n] & info->pi_mask;
 	pi_major = buf[n] >> info->pi_major_offset;
@@ -564,8 +564,8 @@ int irda_param_extract_all(void *self, __u8 *buf, int len,
 	int ret = -1;
 	int n = 0;
 
-	IRDA_ASSERT(buf != NULL, return ret;);
-	IRDA_ASSERT(info != NULL, return ret;);
+	IRDA_ASSERT(buf, return ret;);
+	IRDA_ASSERT(info, return ret;);
 
 	/*
 	 * Parse all parameters. Each parameter must be at least two bytes

@@ -219,8 +219,7 @@ async_bump(struct net_device *dev,
 	 * skb. But, if the frame is small, it is more efficient to
 	 * copy it to save memory (copy will be fast anyway - that's
 	 * called Rx-copy-break). Jean II */
-	docopy = ((rx_buff->skb == NULL) ||
-		  (rx_buff->len < IRDA_RX_COPY_THRESHOLD));
+	docopy = !rx_buff->skb || rx_buff->len < IRDA_RX_COPY_THRESHOLD;
 
 	/* Allocate a new skb */
 	newskb = dev_alloc_skb(docopy ? rx_buff->len + 1 : rx_buff->truesize);

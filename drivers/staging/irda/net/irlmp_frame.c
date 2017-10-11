@@ -60,9 +60,9 @@ void irlmp_send_lcf_pdu(struct lap_cb *self, __u8 dlsap, __u8 slsap,
 {
 	__u8 *frame;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
-	IRDA_ASSERT(skb != NULL, return;);
+	IRDA_ASSERT(skb, return;);
 
 	frame = skb->data;
 
@@ -93,7 +93,7 @@ void irlmp_link_data_indication(struct lap_cb *self, struct sk_buff *skb,
 	__u8   dlsap_sel;   /* Destination LSAP address */
 	__u8   *fp;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 	IRDA_ASSERT(skb->len > 2, return;);
 
@@ -129,7 +129,7 @@ void irlmp_link_data_indication(struct lap_cb *self, struct sk_buff *skb,
 		lsap = irlmp_find_lsap(self, dlsap_sel, slsap_sel, 0,
 				       self->lsaps);
 
-	if (lsap == NULL) {
+	if (!lsap) {
 		pr_debug("IrLMP, Sorry, no LSAP for received frame!\n");
 		pr_debug("%s(), slsap_sel = %02x, dlsap_sel = %02x\n",
 			 __func__, slsap_sel, dlsap_sel);
@@ -202,7 +202,7 @@ void irlmp_link_unitdata_indication(struct lap_cb *self, struct sk_buff *skb)
 	__u8   *fp;
 	unsigned long flags;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 	IRDA_ASSERT(skb->len > 2, return;);
 
@@ -231,7 +231,7 @@ void irlmp_link_unitdata_indication(struct lap_cb *self, struct sk_buff *skb)
 	/* Search the connectionless LSAP */
 	spin_lock_irqsave(&irlmp->unconnected_lsaps->hb_spinlock, flags);
 	lsap = (struct lsap_cb *) hashbin_get_first(irlmp->unconnected_lsaps);
-	while (lsap != NULL) {
+	while (lsap) {
 		/*
 		 *  Check if source LSAP and dest LSAP selectors and PID match.
 		 */
@@ -264,7 +264,7 @@ void irlmp_link_disconnect_indication(struct lap_cb *lap,
 				      LAP_REASON reason,
 				      struct sk_buff *skb)
 {
-	IRDA_ASSERT(lap != NULL, return;);
+	IRDA_ASSERT(lap, return;);
 	IRDA_ASSERT(lap->magic == LMP_LAP_MAGIC, return;);
 
 	lap->reason = reason;
@@ -307,9 +307,9 @@ void irlmp_link_connect_indication(struct lap_cb *self, __u32 saddr,
 void irlmp_link_connect_confirm(struct lap_cb *self, struct qos_info *qos,
 				struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
-	IRDA_ASSERT(qos != NULL, return;);
+	IRDA_ASSERT(qos, return;);
 
 	/* Don't need use the skb for now */
 
@@ -350,7 +350,7 @@ void irlmp_link_connect_confirm(struct lap_cb *self, struct qos_info *qos,
 void irlmp_link_discovery_indication(struct lap_cb *self,
 				     discovery_t *discovery)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 
 	/* Add to main log, cleanup */
@@ -371,7 +371,7 @@ void irlmp_link_discovery_indication(struct lap_cb *self,
  */
 void irlmp_link_discovery_confirm(struct lap_cb *self, hashbin_t *log)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == LMP_LAP_MAGIC, return;);
 
 	/* Add to main log, cleanup */
@@ -441,7 +441,7 @@ static struct lsap_cb *irlmp_find_lsap(struct lap_cb *self, __u8 dlsap_sel,
 	spin_lock_irqsave(&queue->hb_spinlock, flags);
 
 	lsap = (struct lsap_cb *) hashbin_get_first(queue);
-	while (lsap != NULL) {
+	while (lsap) {
 		/*
 		 *  If this is an incoming connection, then the destination
 		 *  LSAP selector may have been specified as LM_ANY so that

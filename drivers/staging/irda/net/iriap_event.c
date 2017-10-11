@@ -95,7 +95,7 @@ static void (*iriap_state[])(struct iriap_cb *self, IRIAP_EVENT event,
 
 void iriap_next_client_state(struct iriap_cb *self, IRIAP_STATE state)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == IAS_MAGIC, return;);
 
 	self->client_state = state;
@@ -103,7 +103,7 @@ void iriap_next_client_state(struct iriap_cb *self, IRIAP_STATE state)
 
 void iriap_next_call_state(struct iriap_cb *self, IRIAP_STATE state)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == IAS_MAGIC, return;);
 
 	self->call_state = state;
@@ -111,7 +111,7 @@ void iriap_next_call_state(struct iriap_cb *self, IRIAP_STATE state)
 
 void iriap_next_server_state(struct iriap_cb *self, IRIAP_STATE state)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == IAS_MAGIC, return;);
 
 	self->server_state = state;
@@ -119,7 +119,7 @@ void iriap_next_server_state(struct iriap_cb *self, IRIAP_STATE state)
 
 void iriap_next_r_connect_state(struct iriap_cb *self, IRIAP_STATE state)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == IAS_MAGIC, return;);
 
 	self->r_connect_state = state;
@@ -128,7 +128,7 @@ void iriap_next_r_connect_state(struct iriap_cb *self, IRIAP_STATE state)
 void iriap_do_client_event(struct iriap_cb *self, IRIAP_EVENT event,
 			   struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == IAS_MAGIC, return;);
 
 	(*iriap_state[ self->client_state]) (self, event, skb);
@@ -137,7 +137,7 @@ void iriap_do_client_event(struct iriap_cb *self, IRIAP_EVENT event,
 void iriap_do_call_event(struct iriap_cb *self, IRIAP_EVENT event,
 			 struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == IAS_MAGIC, return;);
 
 	(*iriap_state[ self->call_state]) (self, event, skb);
@@ -146,7 +146,7 @@ void iriap_do_call_event(struct iriap_cb *self, IRIAP_EVENT event,
 void iriap_do_server_event(struct iriap_cb *self, IRIAP_EVENT event,
 			   struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == IAS_MAGIC, return;);
 
 	(*iriap_state[ self->server_state]) (self, event, skb);
@@ -155,7 +155,7 @@ void iriap_do_server_event(struct iriap_cb *self, IRIAP_EVENT event,
 void iriap_do_r_connect_event(struct iriap_cb *self, IRIAP_EVENT event,
 			      struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == IAS_MAGIC, return;);
 
 	(*iriap_state[ self->r_connect_state]) (self, event, skb);
@@ -171,13 +171,13 @@ void iriap_do_r_connect_event(struct iriap_cb *self, IRIAP_EVENT event,
 static void state_s_disconnect(struct iriap_cb *self, IRIAP_EVENT event,
 			       struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == IAS_MAGIC, return;);
 
 	switch (event) {
 	case IAP_CALL_REQUEST_GVBC:
 		iriap_next_client_state(self, S_CONNECTING);
-		IRDA_ASSERT(self->request_skb == NULL, return;);
+		IRDA_ASSERT(!self->request_skb, return;);
 		/* Don't forget to refcount it -
 		 * see iriap_getvaluebyclass_request(). */
 		skb_get(skb);
@@ -201,7 +201,7 @@ static void state_s_disconnect(struct iriap_cb *self, IRIAP_EVENT event,
 static void state_s_connecting(struct iriap_cb *self, IRIAP_EVENT event,
 			       struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == IAS_MAGIC, return;);
 
 	switch (event) {
@@ -234,7 +234,7 @@ static void state_s_connecting(struct iriap_cb *self, IRIAP_EVENT event,
 static void state_s_call(struct iriap_cb *self, IRIAP_EVENT event,
 			 struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 
 	switch (event) {
 	case IAP_LM_DISCONNECT_INDICATION:
@@ -259,7 +259,7 @@ static void state_s_make_call(struct iriap_cb *self, IRIAP_EVENT event,
 {
 	struct sk_buff *tx_skb;
 
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 
 	switch (event) {
 	case IAP_CALL_REQUEST:
@@ -297,7 +297,7 @@ static void state_s_calling(struct iriap_cb *self, IRIAP_EVENT event,
 static void state_s_outstanding(struct iriap_cb *self, IRIAP_EVENT event,
 				struct sk_buff *skb)
 {
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(self, return;);
 
 	switch (event) {
 	case IAP_RECV_F_LST:
@@ -368,7 +368,7 @@ static void state_r_disconnect(struct iriap_cb *self, IRIAP_EVENT event,
 	switch (event) {
 	case IAP_LM_CONNECT_INDICATION:
 		tx_skb = alloc_skb(LMP_MAX_HEADER, GFP_ATOMIC);
-		if (tx_skb == NULL)
+		if (!tx_skb)
 			return;
 
 		/* Reserve space for MUX_CONTROL and LAP header */
@@ -458,8 +458,8 @@ static void state_r_receiving(struct iriap_cb *self, IRIAP_EVENT event,
 static void state_r_execute(struct iriap_cb *self, IRIAP_EVENT event,
 			    struct sk_buff *skb)
 {
-	IRDA_ASSERT(skb != NULL, return;);
-	IRDA_ASSERT(self != NULL, return;);
+	IRDA_ASSERT(skb, return;);
+	IRDA_ASSERT(self, return;);
 	IRDA_ASSERT(self->magic == IAS_MAGIC, return;);
 
 	switch (event) {
