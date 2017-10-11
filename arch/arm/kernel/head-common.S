@@ -101,7 +101,11 @@ __mmap_switched:
 	str	r2, [r6]			@ Save atags pointer
 	cmp	r7, #0
 	strne	r0, [r7]			@ Save control register values
+#ifdef CONFIG_KASAN
+	b	kasan_early_init
+#else
 	b	start_kernel
+#endif
 ENDPROC(__mmap_switched)
 
 	.align	2

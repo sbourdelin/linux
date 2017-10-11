@@ -358,7 +358,7 @@ void kasan_cache_create(struct kmem_cache *cache, size_t *size,
 	if (redzone_adjust > 0)
 		*size += redzone_adjust;
 
-	*size = min(KMALLOC_MAX_SIZE, max(*size, cache->object_size +
+	*size = min((size_t)KMALLOC_MAX_SIZE, max(*size, cache->object_size +
 					optimal_redzone(cache->object_size)));
 
 	/*
