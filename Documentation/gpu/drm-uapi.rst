@@ -290,6 +290,15 @@ Debugfs Support
 .. kernel-doc:: drivers/gpu/drm/drm_debugfs.c
    :export:
 
+Debug Support
+-------------
+
+.. kernel-doc:: include/drm/drm_debug.h
+   :internal:
+
+.. kernel-doc:: drivers/gpu/drm/drm_debug.c
+   :export:
+
 Sysfs Support
 =============
 
