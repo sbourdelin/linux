@@ -122,6 +122,8 @@ int drm_mode_obj_get_properties_ioctl(struct drm_device *dev, void *data,
 				      struct drm_file *file_priv);
 int drm_mode_obj_set_property_ioctl(struct drm_device *dev, void *data,
 				    struct drm_file *file_priv);
+int drm_mode_connector_dpms_ioctl(struct drm_device *dev,
+				  void *data, struct drm_file *file_priv);
 
 /* drm_encoder.c */
 int drm_encoder_register_all(struct drm_device *dev);

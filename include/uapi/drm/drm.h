@@ -862,6 +862,7 @@ extern "C" {
 #define DRM_IOCTL_SYNCOBJ_WAIT		DRM_IOWR(0xC3, struct drm_syncobj_wait)
 #define DRM_IOCTL_SYNCOBJ_RESET		DRM_IOWR(0xC4, struct drm_syncobj_array)
 #define DRM_IOCTL_SYNCOBJ_SIGNAL	DRM_IOWR(0xC5, struct drm_syncobj_array)
+#define DRM_IOCTL_MODE_DPMS		DRM_IOWR(0xC6, struct drm_mode_connector_set_property)
 
 /**
  * Device specific ioctls should only be in their respective headers

@@ -501,3 +501,44 @@ out_unref:
 	drm_mode_object_put(arg_obj);
 	return ret;
 }
+
+int drm_mode_connector_dpms_ioctl(struct drm_device *dev,
+				  void *data, struct drm_file *file_priv)
+{
+	struct drm_mode_connector_set_property *conn_set_prop = data;
+	struct drm_mode_obj_set_property obj_set_prop = {
+		.value = conn_set_prop->value,
+		.obj_id = conn_set_prop->connector_id,
+		.obj_type = DRM_MODE_OBJECT_CONNECTOR
+	};
+
+	struct drm_mode_obj_set_property *arg = &obj_set_prop;
+	struct drm_mode_object *arg_obj;
+	struct drm_property *property;
+	int ret = -EINVAL;
+
+	struct drm_connector *connector;
+
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
+		return -EINVAL;
+
+	arg_obj = drm_mode_object_find(dev, arg->obj_id, arg->obj_type);
+	if (!arg_obj)
+		return -ENOENT;
+
+	if (!arg_obj->properties)
+		goto out_unref;
+
+	/* XXX atomic */
+	connector = obj_to_connector(arg_obj);
+	property = connector->dev->mode_config.dpms_property;
+
+	if (drm_drv_uses_atomic_modeset(property->dev))
+		ret = set_property_atomic(arg_obj, property, arg->value);
+	else
+		ret = set_property_legacy(arg_obj, property, arg->value);
+
+out_unref:
+	drm_mode_object_put(arg_obj);
+	return ret;
+}
