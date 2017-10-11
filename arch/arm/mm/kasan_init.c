@@ -218,10 +218,6 @@ void __init kasan_init(void)
 
 	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
 
-	kasan_populate_zero_shadow(
-		kasan_mem_to_shadow((void *)KASAN_SHADOW_START),
-		kasan_mem_to_shadow((void *)KASAN_SHADOW_END));
-
 	kasan_populate_zero_shadow(kasan_mem_to_shadow((void *)VMALLOC_START),
 				kasan_mem_to_shadow((void *)-1UL) + 1);
 
