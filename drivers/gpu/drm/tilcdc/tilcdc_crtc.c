@@ -459,6 +459,16 @@ static void tilcdc_crtc_set_mode(struct drm_crtc *crtc)
 	drm_framebuffer_get(fb);
 
 	crtc->hwmode = crtc->state->adjusted_mode;
+
+	/* We are using the vrefresh to check if we are too close to
+	 * vertical sync to update the two framebuffer DMA registers
+	 * and risk a collision. The vrefresh is coming from user
+	 * space and normally it is not used for anything. We want to
+	 * make sure the value is valid and force its recalculation
+	 * here.
+	 */
+	crtc->hwmode.vrefresh = 0;
+	crtc->hwmode.vrefresh = drm_mode_vrefresh(&crtc->hwmode);
 }
 
 static void tilcdc_crtc_enable(struct drm_crtc *crtc)
