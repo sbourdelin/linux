@@ -38,6 +38,16 @@ config VIRTIO_PCI_LEGACY
 
 	  If unsure, say Y.
 
+config VIRTIO_PMEM
+	tristate "Virtio pmem driver"
+	depends on VIRTIO
+	---help---
+	 This driver adds persistent memory range within a KVM guest.
+         It also associates a block device corresponding to the pmem
+	 range.
+
+	 If unsure, say M.
+
 config VIRTIO_BALLOON
 	tristate "Virtio balloon driver"
 	depends on VIRTIO
