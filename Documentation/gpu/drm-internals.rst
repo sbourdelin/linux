@@ -230,6 +230,14 @@ Printer
 .. kernel-doc:: drivers/gpu/drm/drm_print.c
    :export:
 
+Debug Support
+-------------
+
+.. kernel-doc:: include/drm/drm_debug.h
+   :internal:
+
+.. kernel-doc:: drivers/gpu/drm/drm_debug.c
+   :export:
 
 Legacy Support Code
 ===================
