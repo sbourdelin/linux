@@ -2413,13 +2413,27 @@ static void intel_disable_ddi(struct intel_encoder *intel_encoder,
 	}
 }
 
+static void intel_ddi_pre_pll_enable(struct intel_encoder *encoder,
+				     const struct intel_crtc_state *pipe_config,
+				     const struct drm_connector_state *conn_state)
+{
+	struct drm_crtc *crtc = pipe_config->base.crtc;
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+
+	intel_enable_shared_dpll(intel_crtc);
+}
+
 static void bxt_ddi_pre_pll_enable(struct intel_encoder *encoder,
 				   const struct intel_crtc_state *pipe_config,
 				   const struct drm_connector_state *conn_state)
 {
+	struct drm_crtc *crtc = pipe_config->base.crtc;
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
 	uint8_t mask = pipe_config->lane_lat_optim_mask;
 
 	bxt_ddi_phy_set_lane_optim_mask(encoder, mask);
+
+	intel_enable_shared_dpll(intel_crtc);
 }
 
 void intel_ddi_prepare_link_retrain(struct intel_dp *intel_dp)
@@ -2727,6 +2741,8 @@ void intel_ddi_init(struct drm_i915_private *dev_priv, enum port port)
 	intel_encoder->enable = intel_enable_ddi;
 	if (IS_GEN9_LP(dev_priv))
 		intel_encoder->pre_pll_enable = bxt_ddi_pre_pll_enable;
+	else
+		intel_encoder->pre_pll_enable = intel_ddi_pre_pll_enable;
 	intel_encoder->pre_enable = intel_ddi_pre_enable;
 	intel_encoder->disable = intel_disable_ddi;
 	intel_encoder->post_disable = intel_ddi_post_disable;

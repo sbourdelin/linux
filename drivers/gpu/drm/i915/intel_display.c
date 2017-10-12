@@ -5490,9 +5490,6 @@ static void haswell_crtc_enable(struct intel_crtc_state *pipe_config,
 
 	intel_encoders_pre_pll_enable(crtc, pipe_config, old_state);
 
-	if (intel_crtc->config->shared_dpll)
-		intel_enable_shared_dpll(intel_crtc);
-
 	if (intel_crtc_has_dp_encoder(intel_crtc->config))
 		intel_dp_set_m_n(intel_crtc, M1_N1);
 

@@ -255,6 +255,8 @@ static void hsw_pre_pll_enable_crt(struct intel_encoder *encoder,
 	WARN_ON(!intel_crtc->config->has_pch_encoder);
 
 	intel_set_pch_fifo_underrun_reporting(dev_priv, PIPE_A, false);
+
+	intel_enable_shared_dpll(intel_crtc);
 }
 
 static void hsw_pre_enable_crt(struct intel_encoder *encoder,
