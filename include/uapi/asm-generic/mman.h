@@ -12,6 +12,7 @@
 #define MAP_NONBLOCK	0x10000		/* do not block on IO */
 #define MAP_STACK	0x20000		/* give out an address that is best suited for process/thread stacks */
 #define MAP_HUGETLB	0x40000		/* create a huge page mapping */
+#define MAP_DIRECT	0x80000		/* leased block map (layout) for DAX */
 
 /* Bits [26:31] are reserved, see mman-common.h for MAP_HUGETLB usage */
 

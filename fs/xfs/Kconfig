@@ -112,4 +112,4 @@ config XFS_ASSERT_FATAL
 
 config XFS_LAYOUT
 	def_bool y
-	depends on EXPORTFS_BLOCK_OPS
+	depends on EXPORTFS_BLOCK_OPS || FS_DAX

@@ -41,12 +41,22 @@
 #include "xfs_reflink.h"
 #include "xfs_layout.h"
 
+#include <linux/mman.h>
 #include <linux/dcache.h>
 #include <linux/falloc.h>
 #include <linux/pagevec.h>
+#include <linux/mapdirect.h>
 #include <linux/backing-dev.h>
 
 static const struct vm_operations_struct xfs_file_vm_ops;
+static const struct vm_operations_struct xfs_file_vm_direct_ops;
+
+static bool
+xfs_vma_is_direct(
+	struct vm_area_struct	*vma)
+{
+	return vma->vm_ops == &xfs_file_vm_direct_ops;
+}
 
 /*
  * Clear the specified ranges to zero through either the pagecache or DAX.
@@ -1013,6 +1023,25 @@ xfs_file_llseek(
 }
 
 /*
+ * MAP_DIRECT faults can only be serviced while the FL_LAYOUT lease is
+ * valid. See map_direct_invalidate.
+ */
+static bool
+xfs_vma_has_direct_lease(
+	struct vm_area_struct	*vma)
+{
+	/* Non MAP_DIRECT vmas do not require layout leases */
+	if (!xfs_vma_is_direct(vma))
+		return true;
+
+	if (!test_map_direct_valid(vma->vm_private_data))
+		return false;
+
+	/* We have a valid lease */
+	return true;
+}
+
+/*
  * Locking for serialisation of IO during page faults. This results in a lock
  * ordering of:
  *
@@ -1028,7 +1057,8 @@ __xfs_filemap_fault(
 	enum page_entry_size	pe_size,
 	bool			write_fault)
 {
-	struct inode		*inode = file_inode(vmf->vma->vm_file);
+	struct vm_area_struct	*vma = vmf->vma;
+	struct inode		*inode = file_inode(vma->vm_file);
 	struct xfs_inode	*ip = XFS_I(inode);
 	int			ret;
 
@@ -1036,10 +1066,15 @@ __xfs_filemap_fault(
 
 	if (write_fault) {
 		sb_start_pagefault(inode->i_sb);
-		file_update_time(vmf->vma->vm_file);
+		file_update_time(vma->vm_file);
 	}
 
 	xfs_ilock(XFS_I(inode), XFS_MMAPLOCK_SHARED);
+	if (!xfs_vma_has_direct_lease(vma)) {
+		ret = VM_FAULT_SIGBUS;
+		goto out_unlock;
+	}
+
 	if (IS_DAX(inode)) {
 		ret = dax_iomap_fault(vmf, pe_size, &xfs_iomap_ops);
 	} else {
@@ -1048,6 +1083,8 @@ __xfs_filemap_fault(
 		else
 			ret = filemap_fault(vmf);
 	}
+
+out_unlock:
 	xfs_iunlock(XFS_I(inode), XFS_MMAPLOCK_SHARED);
 
 	if (write_fault)
@@ -1119,6 +1156,17 @@ xfs_filemap_pfn_mkwrite(
 
 }
 
+static const struct vm_operations_struct xfs_file_vm_direct_ops = {
+	.fault		= xfs_filemap_fault,
+	.huge_fault	= xfs_filemap_huge_fault,
+	.map_pages	= filemap_map_pages,
+	.page_mkwrite	= xfs_filemap_page_mkwrite,
+	.pfn_mkwrite	= xfs_filemap_pfn_mkwrite,
+
+	.open		= generic_map_direct_open,
+	.close		= generic_map_direct_close,
+};
+
 static const struct vm_operations_struct xfs_file_vm_ops = {
 	.fault		= xfs_filemap_fault,
 	.huge_fault	= xfs_filemap_huge_fault,
@@ -1139,6 +1187,60 @@ xfs_file_mmap(
 	return 0;
 }
 
+static int
+xfs_file_mmap_direct(
+	struct file		*filp,
+	struct vm_area_struct	*vma,
+	int			fd)
+{
+	struct inode		*inode = file_inode(filp);
+	struct xfs_inode	*ip = XFS_I(inode);
+	struct map_direct_state	*mds;
+
+	/*
+	 * Not permitted to set up MAP_DIRECT mapping over reflinked or
+	 * non-DAX extents since reflink may cause block moves /
+	 * copy-on-write, and non-DAX is by definition always indirect
+	 * through the page cache.
+	 */
+	if (xfs_is_reflink_inode(ip))
+		return -EPERM;
+	if (!IS_DAX(inode))
+		return -EPERM;
+
+	mds = map_direct_register(fd, vma);
+	if (IS_ERR(mds))
+		return PTR_ERR(mds);
+
+	file_accessed(filp);
+	vma->vm_ops = &xfs_file_vm_direct_ops;
+	vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
+
+	/*
+	 * generic_map_direct_{open,close} expect ->vm_private_data is
+	 * set to the result of map_direct_register
+	 */
+	vma->vm_private_data = mds;
+	return 0;
+}
+
+#define XFS_MAP_SUPPORTED (LEGACY_MAP_MASK | MAP_DIRECT)
+
+static int
+xfs_file_mmap_validate(
+	struct file		*filp,
+	struct vm_area_struct	*vma,
+	unsigned long		map_flags,
+	int			fd)
+{
+	if (map_flags & ~(XFS_MAP_SUPPORTED))
+		return -EOPNOTSUPP;
+
+	if ((map_flags & MAP_DIRECT) == 0)
+		return xfs_file_mmap(filp, vma);
+	return xfs_file_mmap_direct(filp, vma, fd);
+}
+
 const struct file_operations xfs_file_operations = {
 	.llseek		= xfs_file_llseek,
 	.read_iter	= xfs_file_read_iter,
@@ -1150,6 +1252,7 @@ const struct file_operations xfs_file_operations = {
 	.compat_ioctl	= xfs_file_compat_ioctl,
 #endif
 	.mmap		= xfs_file_mmap,
+	.mmap_validate	= xfs_file_mmap_validate,
 	.open		= xfs_file_open,
 	.release	= xfs_file_release,
 	.fsync		= xfs_file_fsync,

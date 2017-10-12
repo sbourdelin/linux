@@ -20,6 +20,9 @@
 #ifndef MAP_HUGE_1GB
 #define MAP_HUGE_1GB 0
 #endif
+#ifndef MAP_DIRECT
+#define MAP_DIRECT 0
+#endif
 #ifndef MAP_UNINITIALIZED
 #define MAP_UNINITIALIZED 0
 #endif
