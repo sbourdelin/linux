@@ -67,11 +67,19 @@ struct inode_security_struct {
 	spinlock_t lock;
 };
 
+enum bpf_obj_type {
+	BPF_MAP = 1,
+	BPF_PROG,
+};
+
 struct file_security_struct {
 	u32 sid;		/* SID of open file description */
 	u32 fown_sid;		/* SID of file owner (for SIGIO) */
 	u32 isid;		/* SID of inode at the time of file open */
 	u32 pseqno;		/* Policy seqno at the time of file open */
+#ifdef CONFIG_BPF_SYSCALL
+	unsigned char bpf_type;
+#endif
 };
 
 struct superblock_security_struct {

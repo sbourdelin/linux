@@ -19,6 +19,7 @@
 #include <linux/kernel.h>
 #include <linux/magic.h>
 #include <linux/anon_inodes.h>
+#include <linux/security.h>
 
 #include <linux/uaccess.h>
 
@@ -152,6 +153,12 @@ int anon_inode_getfd(const char *name, const struct file_operations *fops,
 		error = PTR_ERR(file);
 		goto err_put_unused_fd;
 	}
+#ifdef CONFIG_BPF_SYSCALL
+	if (!strcmp(name, "bpf-map"))
+		security_bpf_map_file(file);
+	else if (!strcmp(name, "bpf-prog"))
+		security_bpf_prog_file(file);
+#endif
 	fd_install(fd, file);
 
 	return fd;
