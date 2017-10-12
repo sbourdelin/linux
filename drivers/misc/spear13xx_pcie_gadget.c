@@ -598,7 +598,7 @@ static struct configfs_attribute *pcie_gadget_target_attrs[] = {
 	NULL,
 };
 
-static struct config_item_type pcie_gadget_target_type = {
+static const struct config_item_type pcie_gadget_target_type = {
 	.ct_attrs		= pcie_gadget_target_attrs,
 	.ct_owner		= THIS_MODULE,
 };
