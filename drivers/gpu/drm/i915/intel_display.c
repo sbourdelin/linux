@@ -6531,11 +6531,9 @@ static void i9xx_update_pll_dividers(struct intel_crtc *crtc,
 
 	crtc_state->dpll_hw_state.fp0 = fp;
 
-	crtc->lowfreq_avail = false;
 	if (intel_crtc_has_type(crtc_state, INTEL_OUTPUT_LVDS) &&
 	    reduced_clock) {
 		crtc_state->dpll_hw_state.fp1 = fp2;
-		crtc->lowfreq_avail = true;
 	} else {
 		crtc_state->dpll_hw_state.fp1 = fp;
 	}
@@ -7227,15 +7225,6 @@ static void i9xx_set_pipeconf(struct intel_crtc *intel_crtc)
 		default:
 			/* Case prevented by intel_choose_pipe_bpp_dither. */
 			BUG();
-		}
-	}
-
-	if (HAS_PIPE_CXSR(dev_priv)) {
-		if (intel_crtc->lowfreq_avail) {
-			DRM_DEBUG_KMS("enabling CxSR downclocking\n");
-			pipeconf |= PIPECONF_CXSR_DOWNCLOCK;
-		} else {
-			DRM_DEBUG_KMS("disabling CxSR downclocking\n");
 		}
 	}
 
@@ -8374,8 +8363,6 @@ static int ironlake_crtc_compute_clock(struct intel_crtc *crtc,
 	memset(&crtc_state->dpll_hw_state, 0,
 	       sizeof(crtc_state->dpll_hw_state));
 
-	crtc->lowfreq_avail = false;
-
 	/* CPU eDP is the only output that doesn't need a PCH PLL of its own. */
 	if (!crtc_state->has_pch_encoder)
 		return 0;
@@ -9033,8 +9020,6 @@ static int haswell_crtc_compute_clock(struct intel_crtc *crtc,
 			return -EINVAL;
 		}
 	}
-
-	crtc->lowfreq_avail = false;
 
 	return 0;
 }
