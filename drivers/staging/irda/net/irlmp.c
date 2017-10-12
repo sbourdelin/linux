@@ -1920,8 +1920,7 @@ static int irlmp_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq,
 			   "slsap_sel: %#02x, dlsap_sel: %#02x, ",
 			   self->slsap_sel, self->dlsap_sel);
-		seq_printf(seq, "(%s)", self->notify.name);
-		seq_printf(seq, "\n");
+		seq_printf(seq, "(%s)\n", self->notify.name);
 	} else if (iter->hashbin == irlmp->links) {
 		struct lap_cb *lap = v;
 
@@ -1930,9 +1929,8 @@ static int irlmp_seq_show(struct seq_file *seq, void *v)
 
 		seq_printf(seq, "saddr: %#08x, daddr: %#08x, ",
 			   lap->saddr, lap->daddr);
-		seq_printf(seq, "num lsaps: %d",
+		seq_printf(seq, "num lsaps: %d\n",
 			   HASHBIN_GET_SIZE(lap->lsaps));
-		seq_printf(seq, "\n");
 
 		/* Careful for priority inversions here !
 		 * All other uses of attrib spinlock are independent of

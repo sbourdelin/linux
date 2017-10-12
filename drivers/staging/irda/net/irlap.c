@@ -1141,9 +1141,9 @@ static int irlap_seq_show(struct seq_file *seq, void *v)
 	seq_printf(seq, "vr: %d ", self->vr);
 	seq_printf(seq, "va: %d\n", self->va);
 
-	seq_printf(seq, "  qos\tbps\tmaxtt\tdsize\twinsize\taddbofs\tmintt\tldisc\tcomp\n");
-
-	seq_printf(seq, "  tx\t%d\t",
+	seq_printf(seq,
+		   "  qos\tbps\tmaxtt\tdsize\twinsize\taddbofs\tmintt\tldisc\tcomp\n"
+		   "  tx\t%d\t",
 		   self->qos_tx.baud_rate.value);
 	seq_printf(seq, "%d\t",
 		   self->qos_tx.max_turn_time.value);
@@ -1157,9 +1157,8 @@ static int irlap_seq_show(struct seq_file *seq, void *v)
 		   self->qos_tx.min_turn_time.value);
 	seq_printf(seq, "%d\t",
 		   self->qos_tx.link_disc_time.value);
-	seq_printf(seq, "\n");
 
-	seq_printf(seq, "  rx\t%d\t",
+	seq_printf(seq, "\n  rx\t%d\t",
 		   self->qos_rx.baud_rate.value);
 	seq_printf(seq, "%d\t",
 		   self->qos_rx.max_turn_time.value);
