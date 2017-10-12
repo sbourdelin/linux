@@ -15,20 +15,15 @@
  *
  */
 
-#ifndef __CUDBG_LIB_H__
-#define __CUDBG_LIB_H__
+#ifndef __CUDBG_ENTITY_H__
+#define __CUDBG_ENTITY_H__
 
-int collect_reg_dump(struct cudbg_init *pdbg_init,
-		     struct cudbg_buffer *dbg_buff,
-		     struct cudbg_error *cudbg_err);
-int collect_edc0_meminfo(struct cudbg_init *pdbg_init,
-			 struct cudbg_buffer *dbg_buff,
-			 struct cudbg_error *cudbg_err);
-int collect_edc1_meminfo(struct cudbg_init *pdbg_init,
-			 struct cudbg_buffer *dbg_buff,
-			 struct cudbg_error *cudbg_err);
+#define EDC0_FLAG 3
+#define EDC1_FLAG 4
 
-struct cudbg_entity_hdr *get_entity_hdr(void *outbuf, int i);
-void align_debug_buffer(struct cudbg_buffer *dbg_buff,
-			struct cudbg_entity_hdr *entity_hdr);
-#endif /* __CUDBG_LIB_H__ */
+struct card_mem {
+	u16 size_edc0;
+	u16 size_edc1;
+	u16 mem_flag;
+};
+#endif /* __CUDBG_ENTITY_H__ */

@@ -20,6 +20,7 @@
 
 /* Error codes */
 #define CUDBG_STATUS_NO_MEM -19
+#define CUDBG_STATUS_ENTITY_NOT_FOUND -24
 #define CUDBG_SYSTEM_ERROR -29
 
 #define CUDBG_MAJOR_VERSION 1
@@ -27,6 +28,8 @@
 
 enum cudbg_dbg_entity_type {
 	CUDBG_REG_DUMP = 1,
+	CUDBG_EDC0 = 18,
+	CUDBG_EDC1 = 19,
 	CUDBG_MAX_ENTITY = 70,
 };
 
@@ -35,4 +38,9 @@ struct cudbg_init {
 	void *outbuf; /* Output buffer */
 	u32 outbuf_size;  /* Output buffer size */
 };
+
+static inline unsigned int mbytes_to_bytes(unsigned int size)
+{
+	return size * 1024 * 1024;
+}
 #endif /* __CUDBG_IF_H__ */
