@@ -314,6 +314,26 @@ static int process_counter_maps(struct perf_stat_config *config,
 	return 0;
 }
 
+static int process_aggr_thread_counter(struct perf_evsel *counter)
+{
+	int nthreads = thread_map__nr(counter->threads);
+	int ncpus = cpu_map__nr(counter->cpus);
+	int cpu, thread;
+	u64 tmp;
+
+	for (thread = 0; thread < nthreads; thread++) {
+		u64 val = 0;
+
+		for (cpu = 0; cpu < ncpus; cpu++)
+			val += perf_counts(counter->counts, cpu, thread)->val;
+
+		tmp = val * counter->scale;
+		perf_stat__update_shadow_stats(counter, &tmp, 0);
+	}
+
+	return 0;
+}
+
 int perf_stat_process_counter(struct perf_stat_config *config,
 			      struct perf_evsel *counter)
 {
@@ -341,6 +361,9 @@ int perf_stat_process_counter(struct perf_stat_config *config,
 	ret = process_counter_maps(config, counter);
 	if (ret)
 		return ret;
+
+	if (config->aggr_mode == AGGR_THREAD)
+		return process_aggr_thread_counter(counter);
 
 	if (config->aggr_mode != AGGR_GLOBAL)
 		return 0;
