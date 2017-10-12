@@ -2364,6 +2364,15 @@ static inline int break_layout(struct inode *inode, bool wait)
 
 #endif /* CONFIG_FILE_LOCKING */
 
+/*
+ * For use in paths where we can not wait for the layout to be recalled,
+ * for example when we are holding mmap_sem.
+ */
+static inline int break_layout_nowait(struct inode *inode)
+{
+	return break_layout(inode, false);
+}
+
 /* fs/open.c */
 struct audit_names;
 struct filename {
