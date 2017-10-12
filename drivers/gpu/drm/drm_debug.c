@@ -29,6 +29,16 @@
 
 #define DRM_PRINTK_FMT "[" DRM_NAME ":%s]%s %pV"
 
+/**
+ * drm_dev_printk
+ *
+ * @dev: device pointer
+ * @level: logging level
+ * @category: debug category
+ * @function_name: function name
+ * @prefix: prefix string
+ * @format: printf() like format string
+ */
 void drm_dev_printk(const struct device *dev, const char *level,
 		    unsigned int category, const char *function_name,
 		    const char *prefix, const char *format, ...)
@@ -53,6 +63,13 @@ void drm_dev_printk(const struct device *dev, const char *level,
 }
 EXPORT_SYMBOL(drm_dev_printk);
 
+/**
+ * drm_printk
+ *
+ * @level: logging level
+ * @category: debug category
+ * @format: printf() like format string
+ */
 void drm_printk(const char *level, unsigned int category,
 		const char *format, ...)
 {
