@@ -1585,6 +1585,7 @@ static int ov7670_probe(struct i2c_client *client,
 		return -ENOMEM;
 	sd = &info->sd;
 	v4l2_i2c_subdev_init(sd, client, &ov7670_ops);
+	sd->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
 
 	info->clock_speed = 30; /* default: a guess */
 	if (client->dev.platform_data) {
