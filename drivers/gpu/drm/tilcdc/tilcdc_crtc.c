@@ -48,6 +48,7 @@ struct tilcdc_crtc {
 	unsigned int lcd_fck_rate;
 
 	ktime_t last_vblank;
+	unsigned int frametime_us;
 
 	struct drm_framebuffer *curr_fb;
 	struct drm_framebuffer *next_fb;
@@ -292,6 +293,16 @@ static void tilcdc_crtc_set_clk(struct drm_crtc *crtc)
 				LCDC_V2_CORE_CLK_EN);
 }
 
+u32 tilcdc_mode_frametime(const struct drm_display_mode *mode)
+{
+	u32 totalframes = mode->htotal * mode->vtotal;
+
+	if (totalframes < U32_MAX / 1000u)
+		return (1000u * totalframes) / mode->clock;
+	else
+		return 10u * ((100u * totalframes) / mode->clock);
+}
+
 static void tilcdc_crtc_set_mode(struct drm_crtc *crtc)
 {
 	struct tilcdc_crtc *tilcdc_crtc = to_tilcdc_crtc(crtc);
@@ -459,6 +470,9 @@ static void tilcdc_crtc_set_mode(struct drm_crtc *crtc)
 	drm_framebuffer_get(fb);
 
 	crtc->hwmode = crtc->state->adjusted_mode;
+
+	tilcdc_crtc->frametime_us =
+		tilcdc_mode_frametime(&crtc->hwmode);
 }
 
 static void tilcdc_crtc_enable(struct drm_crtc *crtc)
@@ -648,7 +662,7 @@ int tilcdc_crtc_update_fb(struct drm_crtc *crtc,
 		spin_lock_irqsave(&tilcdc_crtc->irq_lock, flags);
 
 		next_vblank = ktime_add_us(tilcdc_crtc->last_vblank,
-					   1000000 / crtc->hwmode.vrefresh);
+					   tilcdc_crtc->frametime_us);
 		tdiff = ktime_to_us(ktime_sub(next_vblank, ktime_get()));
 
 		if (tdiff < TILCDC_VBLANK_SAFETY_THRESHOLD_US)
