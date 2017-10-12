@@ -54,10 +54,9 @@ struct ias_object *irias_new_object( char *name, int id)
 
 	obj->magic = IAS_OBJECT_MAGIC;
 	obj->name = kstrndup(name, IAS_MAX_CLASSNAME, GFP_ATOMIC);
-	if (!obj->name) {
-		kfree(obj);
-		return NULL;
-	}
+	if (!obj->name)
+		goto free_object;
+
 	obj->id = id;
 
 	/* Locking notes : the attrib spinlock has lower precendence
@@ -68,11 +67,14 @@ struct ias_object *irias_new_object( char *name, int id)
 		net_warn_ratelimited("%s(), Unable to allocate attribs!\n",
 				     __func__);
 		kfree(obj->name);
-		kfree(obj);
-		return NULL;
+		goto free_object;
 	}
 
 	return obj;
+
+free_object:
+	kfree(obj);
+	return NULL;
 }
 EXPORT_SYMBOL(irias_new_object);
 
