@@ -9034,8 +9034,6 @@ static int haswell_crtc_compute_clock(struct intel_crtc *crtc,
 		}
 	}
 
-	crtc->lowfreq_avail = false;
-
 	return 0;
 }
 
