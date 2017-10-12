@@ -3137,7 +3137,18 @@ static int do_anonymous_page(struct vm_fault *vmf)
 	/* Allocate our own private page. */
 	if (unlikely(anon_vma_prepare(vma)))
 		goto oom;
-	page = alloc_zeroed_user_highpage_movable(vma, vmf->address);
+
+	/*
+	 * In the special VM_CONTIG case, pages have been pre-allocated. So,
+	 * simply grab the appropriate pre-allocated page.
+	 */
+	if (unlikely(vma->vm_flags & VM_CONTIG)) {
+		VM_BUG_ON(!vma->vm_private_data);
+		page = ((struct page *)vma->vm_private_data) +
+			((vmf->address - vma->vm_start) / PAGE_SIZE);
+	} else {
+		page = alloc_zeroed_user_highpage_movable(vma, vmf->address);
+	}
 	if (!page)
 		goto oom;
 
