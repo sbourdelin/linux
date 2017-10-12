@@ -270,6 +270,10 @@ struct devlink_ops {
 	int (*eswitch_inline_mode_set)(struct devlink *devlink, u8 inline_mode);
 	int (*eswitch_encap_mode_get)(struct devlink *devlink, u8 *p_encap_mode);
 	int (*eswitch_encap_mode_set)(struct devlink *devlink, u8 encap_mode);
+	int (*config_get)(struct devlink *devlink, enum devlink_attr attr,
+			  u32 *value);
+	int (*config_set)(struct devlink *devlink, enum devlink_attr attr,
+			  u32 value, u8 *restart_reqd);
 };
 
 static inline void *devlink_priv(struct devlink *devlink)

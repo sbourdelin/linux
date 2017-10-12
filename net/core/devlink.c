@@ -1566,6 +1566,164 @@ static int devlink_nl_cmd_eswitch_set_doit(struct sk_buff *skb,
 	return 0;
 }
 
+static const struct nla_policy devlink_nl_policy[DEVLINK_ATTR_MAX + 1];
+
+static int devlink_nl_config_fill(struct sk_buff *msg,
+				  struct devlink *devlink,
+				  enum devlink_command cmd,
+				  struct genl_info *info)
+{
+	const struct devlink_ops *ops = devlink->ops;
+	void *hdr;
+	int err;
+	enum devlink_attr attr = -1;
+	u32 value;
+	int i;
+	struct nla_policy policy;
+	u8 restart_reqd;
+
+	if (!ops->config_get)
+		return -EOPNOTSUPP;
+
+	hdr = genlmsg_put(msg, info->snd_portid, info->snd_seq,
+			  &devlink_nl_family, 0, cmd);
+	if (!hdr) {
+		err = -EMSGSIZE;
+		goto nla_msg_failure;
+	}
+
+	err = devlink_nl_put_handle(msg, devlink);
+	if (err)
+		goto nla_put_failure;
+
+	for (i = 0; i < DEVLINK_ATTR_MAX; i++)
+		if (info->attrs[i])
+			attr = i;
+
+	if (attr == -1) {
+		/* Not found - invalid/unknown attribute? */
+		err = -EINVAL;
+		goto nla_put_failure;
+	}
+
+	policy = devlink_nl_policy[attr];
+
+	if (cmd == DEVLINK_CMD_CONFIG_GET) {
+		err = ops->config_get(devlink, attr, &value);
+
+		if (err)
+			goto nla_put_failure;
+
+		switch (policy.type) {
+		case NLA_U8:
+			err = nla_put_u8(msg, attr, value);
+			break;
+		case NLA_U16:
+			err = nla_put_u16(msg, attr, value);
+			break;
+		case NLA_U32:
+			err = nla_put_u32(msg, attr, value);
+			break;
+		default:
+			goto nla_put_failure;
+		}
+
+		if (err)
+			goto nla_put_failure;
+	} else {
+		/* Must be config_set command */
+		u8 *val8;
+		u16 *val16;
+		u32 *val32;
+
+		switch (policy.type) {
+		case NLA_U8:
+			val8 = nla_data(info->attrs[attr]);
+			value = *val8;
+			break;
+		case NLA_U16:
+			val16 = nla_data(info->attrs[attr]);
+			value = *val16;
+			break;
+		case NLA_U32:
+			val32 = nla_data(info->attrs[attr]);
+			value = *val32;
+			break;
+		default:
+			goto nla_put_failure;
+		}
+
+		err = ops->config_set(devlink, attr, value, &restart_reqd);
+		if (err)
+			goto nla_put_failure;
+
+		if (restart_reqd) {
+			err = nla_put_u8(msg, DEVLINK_ATTR_RESTART_REQUIRED,
+					 restart_reqd);
+			if (err)
+				goto nla_put_failure;
+		}
+	}
+
+	genlmsg_end(msg, hdr);
+	return 0;
+
+nla_put_failure:
+	genlmsg_cancel(msg, hdr);
+nla_msg_failure:
+	return err;
+}
+
+static int devlink_nl_cmd_config_get_doit(struct sk_buff *skb,
+					  struct genl_info *info)
+{
+	struct devlink *devlink = info->user_ptr[0];
+	struct sk_buff *msg;
+	int err;
+
+	if (!devlink->ops)
+		return -EOPNOTSUPP;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	err = devlink_nl_config_fill(msg, devlink, DEVLINK_CMD_CONFIG_GET,
+				     info);
+
+	if (err) {
+		nlmsg_free(msg);
+		return err;
+	}
+
+	return genlmsg_reply(msg, info);
+}
+
+static int devlink_nl_cmd_config_set_doit(struct sk_buff *skb,
+					  struct genl_info *info)
+{
+	struct devlink *devlink = info->user_ptr[0];
+	struct sk_buff *msg;
+	int err;
+
+	if (!devlink->ops)
+		return -EOPNOTSUPP;
+
+	msg = nlmsg_new(NLMSG_DEFAULT_SIZE, GFP_KERNEL);
+	if (!msg)
+		return -ENOMEM;
+
+	err = devlink_nl_config_fill(msg, devlink, DEVLINK_CMD_CONFIG_SET,
+				     info);
+
+	if (err) {
+		nlmsg_free(msg);
+		return err;
+	}
+
+	return genlmsg_reply(msg, info);
+}
+
 int devlink_dpipe_match_put(struct sk_buff *skb,
 			    struct devlink_dpipe_match *match)
 {
@@ -2291,6 +2449,41 @@ static const struct nla_policy devlink_nl_policy[DEVLINK_ATTR_MAX + 1] = {
 	[DEVLINK_ATTR_ESWITCH_ENCAP_MODE] = { .type = NLA_U8 },
 	[DEVLINK_ATTR_DPIPE_TABLE_NAME] = { .type = NLA_NUL_STRING },
 	[DEVLINK_ATTR_DPIPE_TABLE_COUNTERS_ENABLED] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_SRIOV_ENABLED] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_NUM_VF_PER_PF] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_MAX_NUM_PF_MSIX_VECT] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_MSIX_VECTORS_PER_VF] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_NPAR_NUM_PARTITIONS_PER_PORT] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_NPAR_BW_IN_PERCENT] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_NPAR_BW_RESERVATION] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_NPAR_BW_RESERVATION_VALID] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_NPAR_BW_LIMIT] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_NPAR_BW_LIMIT_VALID] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_DCBX_MODE] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_RDMA_ENABLED] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_MULTIFUNC_MODE] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_SECURE_NIC_ENABLED] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_IGNORE_ARI_CAPABILITY] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_LLDP_NEAREST_BRIDGE_ENABLED] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_LLDP_NEAREST_NONTPMR_BRIDGE_ENABLED] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_PME_CAPABILITY_ENABLED] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_MAGIC_PACKET_WOL_ENABLED] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_EEE_PWR_SAVE_ENABLED] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_AUTONEG_PROTOCOL] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_MEDIA_AUTO_DETECT] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_PHY_SELECT] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_PRE_OS_LINK_SPEED_D0] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_PRE_OS_LINK_SPEED_D3] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_MBA_ENABLED] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_MBA_BOOT_TYPE] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_MBA_DELAY_TIME] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_MBA_SETUP_HOT_KEY] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_MBA_HIDE_SETUP_PROMPT] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_MBA_BOOT_RETRY_COUNT] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_MBA_VLAN_ENABLED] = { .type = NLA_U8 },
+	[DEVLINK_ATTR_MBA_VLAN_TAG] = { .type = NLA_U16 },
+	[DEVLINK_ATTR_MBA_BOOT_PROTOCOL] = { .type = NLA_U32 },
+	[DEVLINK_ATTR_MBA_LINK_SPEED] = { .type = NLA_U32 },
 };
 
 static const struct genl_ops devlink_nl_ops[] = {
@@ -2447,6 +2640,20 @@ static const struct genl_ops devlink_nl_ops[] = {
 	{
 		.cmd = DEVLINK_CMD_DPIPE_TABLE_COUNTERS_SET,
 		.doit = devlink_nl_cmd_dpipe_table_counters_set,
+		.policy = devlink_nl_policy,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = DEVLINK_NL_FLAG_NEED_DEVLINK,
+	},
+	{
+		.cmd = DEVLINK_CMD_CONFIG_GET,
+		.doit = devlink_nl_cmd_config_get_doit,
+		.policy = devlink_nl_policy,
+		.flags = GENL_ADMIN_PERM,
+		.internal_flags = DEVLINK_NL_FLAG_NEED_DEVLINK,
+	},
+	{
+		.cmd = DEVLINK_CMD_CONFIG_SET,
+		.doit = devlink_nl_cmd_config_set_doit,
 		.policy = devlink_nl_policy,
 		.flags = GENL_ADMIN_PERM,
 		.internal_flags = DEVLINK_NL_FLAG_NEED_DEVLINK,
