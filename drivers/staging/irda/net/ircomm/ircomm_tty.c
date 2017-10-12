@@ -1174,7 +1174,7 @@ static void ircomm_tty_line_info(struct ircomm_tty_cb *self, struct seq_file *m)
 
 	seq_printf(m, "Port name: %s\n", self->settings.port_name);
 
-	seq_printf(m, "DTE status:");
+	seq_puts(m, "DTE status:");
 	sep = ' ';
 	if (self->settings.dte & IRCOMM_RTS) {
 		seq_printf(m, "%cRTS", sep);

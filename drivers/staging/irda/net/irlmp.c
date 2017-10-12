@@ -1937,7 +1937,7 @@ static int irlmp_seq_show(struct seq_file *seq, void *v)
 		 * the object spinlock, so we are safe. Jean II */
 		spin_lock(&lap->lsaps->hb_spinlock);
 
-		seq_printf(seq, "\n  Connected LSAPs:\n");
+		seq_puts(seq, "\n  Connected LSAPs:\n");
 		for (self = (struct lsap_cb *) hashbin_get_first(lap->lsaps);
 		     self;
 		     self = (struct lsap_cb *)hashbin_get_next(lap->lsaps)) {

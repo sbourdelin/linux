@@ -530,13 +530,13 @@ static int ircomm_seq_show(struct seq_file *seq, void *v)
 		   self->slsap_sel, self->dlsap_sel);
 
 	if(self->service_type & IRCOMM_3_WIRE_RAW)
-		seq_printf(seq, " 3-wire-raw");
+		seq_puts(seq, " 3-wire-raw");
 	if(self->service_type & IRCOMM_3_WIRE)
-		seq_printf(seq, " 3-wire");
+		seq_puts(seq, " 3-wire");
 	if(self->service_type & IRCOMM_9_WIRE)
-		seq_printf(seq, " 9-wire");
+		seq_puts(seq, " 9-wire");
 	if(self->service_type & IRCOMM_CENTRONICS)
-		seq_printf(seq, " Centronics");
+		seq_puts(seq, " Centronics");
 	seq_putc(seq, '\n');
 
 	return 0;

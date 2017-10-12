@@ -1138,8 +1138,7 @@ static int irlan_seq_show(struct seq_file *seq, void *v)
 		seq_printf(seq,"media: %s\n",
 			       irlan_media[self->media]);
 
-		seq_printf(seq,"local filter:\n");
-		seq_printf(seq,"remote filter: ");
+		seq_puts(seq, "local filter:\nremote filter: ");
 		irlan_print_filter(seq, self->client.filter_type);
 		seq_printf(seq,"tx busy: %s\n",
 			       netif_queue_stopped(self->dev) ? "TRUE" : "FALSE");
