@@ -1389,6 +1389,18 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 		struct inode *inode = file_inode(file);
 
 		switch (flags & MAP_TYPE) {
+		case MAP_SHARED_VALIDATE:
+			if ((flags & ~LEGACY_MAP_MASK) == 0) {
+				/*
+				 * If all legacy mmap flags, downgrade
+				 * to MAP_SHARED, i.e. invoke ->mmap()
+				 * instead of ->mmap_validate()
+				 */
+				flags &= ~MAP_TYPE;
+				flags |= MAP_SHARED;
+			} else if (!file->f_op->mmap_validate)
+				return -EOPNOTSUPP;
+			/* fall through */
 		case MAP_SHARED:
 			if ((prot&PROT_WRITE) && !(file->f_mode&FMODE_WRITE))
 				return -EACCES;
@@ -1465,7 +1477,7 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 			vm_flags |= VM_NORESERVE;
 	}
 
-	addr = mmap_region(file, addr, len, vm_flags, pgoff, uf);
+	addr = mmap_region(file, addr, len, vm_flags, pgoff, uf, flags);
 	if (!IS_ERR_VALUE(addr) &&
 	    ((vm_flags & VM_LOCKED) ||
 	     (flags & (MAP_POPULATE | MAP_NONBLOCK)) == MAP_POPULATE))
@@ -1602,7 +1614,7 @@ static inline int accountable_mapping(struct file *file, vm_flags_t vm_flags)
 
 unsigned long mmap_region(struct file *file, unsigned long addr,
 		unsigned long len, vm_flags_t vm_flags, unsigned long pgoff,
-		struct list_head *uf)
+		struct list_head *uf, unsigned long map_flags)
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma, *prev;
@@ -1687,7 +1699,10 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 		 * new file must not have been exposed to user-space, yet.
 		 */
 		vma->vm_file = get_file(file);
-		error = call_mmap(file, vma);
+		if ((map_flags & MAP_TYPE) == MAP_SHARED_VALIDATE)
+			error = file->f_op->mmap_validate(file, vma, map_flags);
+		else
+			error = call_mmap(file, vma);
 		if (error)
 			goto unmap_and_free_vma;
 
