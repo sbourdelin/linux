@@ -1076,6 +1076,15 @@ ifdef stackp-check
 endif
 	@:
 
+# If possible, redefne __FILE__ as relative path from $(srctree).
+# $$ is needed to expand the following in submake
+ifeq ($(call cc-option-yn,-Wno-builtin-macro-redefined),y)
+KBUILD_CFLAGS   += -Wno-builtin-macro-redefined \
+		   -D__FILE__=$$(call stringify,$$(src)/$$(notdir $$<))
+endif
+# CAUTION: Do not add any reference to KBUILD_CFLAGS below this line.
+# Any call of cc-option, etc. will fail.
+
 # Generate some files
 # ---------------------------------------------------------------------------
 
