@@ -524,11 +524,13 @@ static int br_vlan_info(struct net_bridge *br, struct net_bridge_port *p,
 
 	case RTM_DELLINK:
 		if (p) {
-			nbp_vlan_delete(p, vinfo->vid);
+			err = nbp_vlan_delete(p, vinfo->vid);
+			if (err)
+				break;
 			if (vinfo->flags & BRIDGE_VLAN_INFO_MASTER)
-				br_vlan_delete(p->br, vinfo->vid);
+				err = br_vlan_delete(p->br, vinfo->vid);
 		} else {
-			br_vlan_delete(br, vinfo->vid);
+			err = br_vlan_delete(br, vinfo->vid);
 		}
 		break;
 	}
