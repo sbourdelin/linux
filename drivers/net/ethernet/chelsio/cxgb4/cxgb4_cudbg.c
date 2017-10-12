@@ -29,8 +29,22 @@ static const struct cudbg_collect_entity collect_hw_dump[] = {
 	{ CUDBG_MBOX_LOG, collect_mbox_log },
 	{ CUDBG_DEV_LOG, collect_fw_devlog },
 	{ CUDBG_REG_DUMP, collect_reg_dump },
+	{ CUDBG_CIM_IBQ_TP0, collect_cim_ibq_tp0 },
+	{ CUDBG_CIM_IBQ_TP1, collect_cim_ibq_tp1 },
+	{ CUDBG_CIM_IBQ_ULP, collect_cim_ibq_ulp },
+	{ CUDBG_CIM_IBQ_SGE0, collect_cim_ibq_sge0 },
+	{ CUDBG_CIM_IBQ_SGE1, collect_cim_ibq_sge1 },
+	{ CUDBG_CIM_IBQ_NCSI, collect_cim_ibq_ncsi },
+	{ CUDBG_CIM_OBQ_ULP0, collect_cim_obq_ulp0 },
+	{ CUDBG_CIM_OBQ_ULP1, collect_cim_obq_ulp1 },
+	{ CUDBG_CIM_OBQ_ULP2, collect_cim_obq_ulp2 },
+	{ CUDBG_CIM_OBQ_ULP3, collect_cim_obq_ulp3 },
+	{ CUDBG_CIM_OBQ_SGE, collect_cim_obq_sge },
+	{ CUDBG_CIM_OBQ_NCSI, collect_cim_obq_ncsi },
 	{ CUDBG_TP_INDIRECT, collect_tp_indirect },
 	{ CUDBG_SGE_INDIRECT, collect_sge_indirect },
+	{ CUDBG_CIM_OBQ_RXQ0, collect_obq_sge_rx_q0 },
+	{ CUDBG_CIM_OBQ_RXQ1, collect_obq_sge_rx_q1 },
 	{ CUDBG_PCIE_INDIRECT, collect_pcie_indirect },
 	{ CUDBG_PM_INDIRECT, collect_pm_indirect },
 	{ CUDBG_MA_INDIRECT, collect_ma_indirect },
@@ -58,6 +72,24 @@ static u32 cxgb4_get_entity_length(struct adapter *adap, u32 entity)
 		break;
 	case CUDBG_DEV_LOG:
 		len = adap->params.devlog.size;
+		break;
+	case CUDBG_CIM_IBQ_TP0:
+	case CUDBG_CIM_IBQ_TP1:
+	case CUDBG_CIM_IBQ_ULP:
+	case CUDBG_CIM_IBQ_SGE0:
+	case CUDBG_CIM_IBQ_SGE1:
+	case CUDBG_CIM_IBQ_NCSI:
+		len = CIM_IBQ_SIZE * 4 * sizeof(u32);
+		break;
+	case CUDBG_CIM_OBQ_ULP0:
+	case CUDBG_CIM_OBQ_ULP1:
+	case CUDBG_CIM_OBQ_ULP2:
+	case CUDBG_CIM_OBQ_ULP3:
+	case CUDBG_CIM_OBQ_SGE:
+	case CUDBG_CIM_OBQ_NCSI:
+	case CUDBG_CIM_OBQ_RXQ0:
+	case CUDBG_CIM_OBQ_RXQ1:
+		len = 6 * CIM_OBQ_SIZE * 4 * sizeof(u32);
 		break;
 	case CUDBG_EDC0:
 		value = t4_read_reg(adap, MA_TARGET_MEM_ENABLE_A);
