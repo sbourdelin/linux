@@ -686,6 +686,7 @@ static int arp_process(struct net *net, struct sock *sk, struct sk_buff *skb)
 	struct neighbour *n;
 	struct dst_entry *reply_dst = NULL;
 	bool is_garp = false;
+	bool is_unarp;
 
 	/* arp_rcv below verifies the ARP header and verifies the device
 	 * is ARP'able.
@@ -695,6 +696,8 @@ static int arp_process(struct net *net, struct sock *sk, struct sk_buff *skb)
 		goto out_free_skb;
 
 	arp = arp_hdr(skb);
+	/* arp_rcv has already verified the header for the UNARP case */
+	is_unarp = arp->ar_hln == 0;
 
 	switch (dev_type) {
 	default:
@@ -741,8 +744,8 @@ static int arp_process(struct net *net, struct sock *sk, struct sk_buff *skb)
  *	Extract fields
  */
 	arp_ptr = (unsigned char *)(arp + 1);
-	sha	= arp_ptr;
-	arp_ptr += dev->addr_len;
+	sha = is_unarp ? NULL : arp_ptr;
+	arp_ptr += arp->ar_hln;
 	memcpy(&sip, arp_ptr, 4);
 	arp_ptr += 4;
 	switch (dev_type) {
@@ -751,8 +754,8 @@ static int arp_process(struct net *net, struct sock *sk, struct sk_buff *skb)
 		break;
 #endif
 	default:
-		tha = arp_ptr;
-		arp_ptr += dev->addr_len;
+		tha = is_unarp ? NULL : arp_ptr;
+		arp_ptr += arp->ar_hln;
 	}
 	memcpy(&tip, arp_ptr, 4);
 /*
@@ -874,7 +877,10 @@ static int arp_process(struct net *net, struct sock *sk, struct sk_buff *skb)
 		   It is possible, that this option should be enabled for some
 		   devices (strip is candidate)
 		 */
-		if (!n &&
+		/* If the packet is UNARP and we don't have the corresponding
+		 * neighbour entry, then there is nothing to do.
+		 */
+		if (!n && !is_unarp &&
 		    (is_garp ||
 		     (arp->ar_op == htons(ARPOP_REPLY) &&
 		      (addr_type == RTN_UNICAST ||
@@ -899,12 +905,15 @@ static int arp_process(struct net *net, struct sock *sk, struct sk_buff *skb)
 				      NEIGH_VAR(n->parms, LOCKTIME)) ||
 			   is_garp;
 
-		/* Broadcast replies and request packets
-		   do not assert neighbour reachability.
-		 */
-		if (arp->ar_op != htons(ARPOP_REPLY) ||
-		    skb->pkt_type != PACKET_HOST)
+		if (is_unarp) {
+			state = NUD_FAILED;
+		} else if (arp->ar_op != htons(ARPOP_REPLY) ||
+			   skb->pkt_type != PACKET_HOST) {
+			/* Broadcast replies and request packets
+			 * do not assert neighbour reachability.
+			 */
 			state = NUD_STALE;
+		}
 		neigh_update(n, sha, state,
 			     override ? NEIGH_UPDATE_F_OVERRIDE : 0, 0);
 		neigh_release(n);
@@ -936,6 +945,7 @@ static int arp_rcv(struct sk_buff *skb, struct net_device *dev,
 		   struct packet_type *pt, struct net_device *orig_dev)
 {
 	const struct arphdr *arp;
+	bool is_unarp = false;
 
 	/* do not tweak dropwatch on an ARP we will ignore */
 	if (dev->flags & IFF_NOARP ||
@@ -952,7 +962,21 @@ static int arp_rcv(struct sk_buff *skb, struct net_device *dev,
 		goto freeskb;
 
 	arp = arp_hdr(skb);
-	if (arp->ar_hln != dev->addr_len || arp->ar_pln != 4)
+	/* RFC 1868 (UNARP) allows zero-length hardware address in
+	 * ARPOP_REPLY and target protocol address will be set to
+	 * 255.255.255.255.
+	 */
+	if (unlikely(arp->ar_hln == 0)) {
+		unsigned char *arp_ptr;
+
+		arp_ptr = (unsigned char *)(arp + 1);
+		if (arp->ar_op != htons(ARPOP_REPLY) ||
+		    !ipv4_is_lbcast(*(__be32 *)(arp_ptr + 4)))
+			goto freeskb;
+		is_unarp = true;
+	}
+
+	if ((!is_unarp && arp->ar_hln != dev->addr_len) || arp->ar_pln != 4)
 		goto freeskb;
 
 	memset(NEIGH_CB(skb), 0, sizeof(struct neighbour_cb));
