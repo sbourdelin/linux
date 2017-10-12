@@ -144,7 +144,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
 		addr = mmap_region(NULL, addr, INTRPT_SIZE,
 				   VM_READ|VM_EXEC|
 				   VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC, 0,
-				   NULL, 0);
+				   NULL, 0, -1);
 		if (addr > (unsigned long) -PAGE_SIZE)
 			retval = (int) addr;
 	}
