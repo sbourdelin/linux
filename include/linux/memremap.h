@@ -3,11 +3,34 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/percpu-refcount.h>
+#include <linux/sizes.h>
+#include <linux/pfn.h>
 
 #include <asm/pgtable.h>
 
 struct resource;
 struct device;
+
+/*
+ * We hotplug memory at section granularity, pad the reserved area from
+ * the previous section base to the namespace base address.
+ */
+static inline unsigned long init_altmap_base(resource_size_t base)
+{
+	unsigned long base_pfn = PHYS_PFN(base);
+
+	return PFN_SECTION_ALIGN_DOWN(base_pfn);
+}
+
+static inline unsigned long init_altmap_reserve(resource_size_t base)
+{
+	unsigned long reserve = PHYS_PFN(SZ_8K);
+	unsigned long base_pfn = PHYS_PFN(base);
+
+	reserve += base_pfn - PFN_SECTION_ALIGN_DOWN(base_pfn);
+	return reserve;
+}
+
 
 /**
  * struct vmem_altmap - pre-allocated storage for vmemmap_populate

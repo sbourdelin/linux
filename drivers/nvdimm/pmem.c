@@ -77,46 +77,6 @@ static blk_status_t pmem_clear_poison(struct pmem_device *pmem,
 	return rc;
 }
 
-static void write_pmem(void *pmem_addr, struct page *page,
-		unsigned int off, unsigned int len)
-{
-	unsigned int chunk;
-	void *mem;
-
-	while (len) {
-		mem = kmap_atomic(page);
-		chunk = min_t(unsigned int, len, PAGE_SIZE);
-		memcpy_flushcache(pmem_addr, mem + off, chunk);
-		kunmap_atomic(mem);
-		len -= chunk;
-		off = 0;
-		page++;
-		pmem_addr += PAGE_SIZE;
-	}
-}
-
-static blk_status_t read_pmem(struct page *page, unsigned int off,
-		void *pmem_addr, unsigned int len)
-{
-	unsigned int chunk;
-	int rc;
-	void *mem;
-
-	while (len) {
-		mem = kmap_atomic(page);
-		chunk = min_t(unsigned int, len, PAGE_SIZE);
-		rc = memcpy_mcsafe(mem + off, pmem_addr, chunk);
-		kunmap_atomic(mem);
-		if (rc)
-			return BLK_STS_IOERR;
-		len -= chunk;
-		off = 0;
-		page++;
-		pmem_addr += PAGE_SIZE;
-	}
-	return BLK_STS_OK;
-}
-
 static blk_status_t pmem_do_bvec(struct pmem_device *pmem, struct page *page,
 			unsigned int len, unsigned int off, bool is_write,
 			sector_t sector)

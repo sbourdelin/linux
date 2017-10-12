@@ -513,26 +513,6 @@ int nd_pfn_probe(struct device *dev, struct nd_namespace_common *ndns)
 }
 EXPORT_SYMBOL(nd_pfn_probe);
 
-/*
- * We hotplug memory at section granularity, pad the reserved area from
- * the previous section base to the namespace base address.
- */
-static unsigned long init_altmap_base(resource_size_t base)
-{
-	unsigned long base_pfn = PHYS_PFN(base);
-
-	return PFN_SECTION_ALIGN_DOWN(base_pfn);
-}
-
-static unsigned long init_altmap_reserve(resource_size_t base)
-{
-	unsigned long reserve = PHYS_PFN(SZ_8K);
-	unsigned long base_pfn = PHYS_PFN(base);
-
-	reserve += base_pfn - PFN_SECTION_ALIGN_DOWN(base_pfn);
-	return reserve;
-}
-
 static struct vmem_altmap *__nvdimm_setup_pfn(struct nd_pfn *nd_pfn,
 		struct resource *res, struct vmem_altmap *altmap)
 {
