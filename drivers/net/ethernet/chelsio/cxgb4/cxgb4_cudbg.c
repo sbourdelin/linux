@@ -18,6 +18,7 @@
 #include "t4_regs.h"
 #include "cxgb4.h"
 #include "cxgb4_cudbg.h"
+#include "cudbg_entity.h"
 
 static const struct cudbg_collect_entity collect_mem_dump[] = {
 	{ CUDBG_EDC0, collect_edc0_meminfo },
@@ -25,6 +26,8 @@ static const struct cudbg_collect_entity collect_mem_dump[] = {
 };
 
 static const struct cudbg_collect_entity collect_hw_dump[] = {
+	{ CUDBG_MBOX_LOG, collect_mbox_log },
+	{ CUDBG_DEV_LOG, collect_fw_devlog },
 	{ CUDBG_REG_DUMP, collect_reg_dump },
 };
 
@@ -46,6 +49,9 @@ static u32 cxgb4_get_entity_length(struct adapter *adap, u32 entity)
 			break;
 		}
 		break;
+	case CUDBG_DEV_LOG:
+		len = adap->params.devlog.size;
+		break;
 	case CUDBG_EDC0:
 		value = t4_read_reg(adap, MA_TARGET_MEM_ENABLE_A);
 		if (value & EDRAM0_ENABLE_F) {
@@ -61,6 +67,9 @@ static u32 cxgb4_get_entity_length(struct adapter *adap, u32 entity)
 			len = EDRAM1_SIZE_G(value);
 		}
 		len = mbytes_to_bytes(len);
+		break;
+	case CUDBG_MBOX_LOG:
+		len = sizeof(struct cudbg_mbox_log) * adap->mbox_log->size;
 		break;
 	default:
 		break;

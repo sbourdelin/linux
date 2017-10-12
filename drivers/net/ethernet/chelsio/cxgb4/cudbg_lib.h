@@ -21,12 +21,18 @@
 int collect_reg_dump(struct cudbg_init *pdbg_init,
 		     struct cudbg_buffer *dbg_buff,
 		     struct cudbg_error *cudbg_err);
+int collect_fw_devlog(struct cudbg_init *pdbg_init,
+		      struct cudbg_buffer *dbg_buff,
+		      struct cudbg_error *cudbg_err);
 int collect_edc0_meminfo(struct cudbg_init *pdbg_init,
 			 struct cudbg_buffer *dbg_buff,
 			 struct cudbg_error *cudbg_err);
 int collect_edc1_meminfo(struct cudbg_init *pdbg_init,
 			 struct cudbg_buffer *dbg_buff,
 			 struct cudbg_error *cudbg_err);
+int collect_mbox_log(struct cudbg_init *pdbg_init,
+		     struct cudbg_buffer *dbg_buff,
+		     struct cudbg_error *cudbg_err);
 
 struct cudbg_entity_hdr *get_entity_hdr(void *outbuf, int i);
 void align_debug_buffer(struct cudbg_buffer *dbg_buff,
