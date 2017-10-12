@@ -214,6 +214,9 @@ struct ov7670_devtype {
 struct ov7670_format_struct;  /* coming later */
 struct ov7670_info {
 	struct v4l2_subdev sd;
+#ifdef CONFIG_MEDIA_CONTROLLER
+	struct media_pad pad;
+#endif
 	struct v4l2_ctrl_handler hdl;
 	struct {
 		/* gain cluster */
@@ -1654,6 +1657,14 @@ static int ov7670_probe(struct i2c_client *client,
 	if (info->pclk_hb_disable)
 		ov7670_write(sd, REG_COM10, COM10_PCLK_HB);
 
+#ifdef CONFIG_MEDIA_CONTROLLER
+	info->pad.flags = MEDIA_PAD_FL_SOURCE;
+	sd->entity.function = MEDIA_ENT_F_CAM_SENSOR;
+	ret = media_entity_pads_init(&sd->entity, 1, &info->pad);
+	if (ret)
+		goto clk_disable;
+#endif
+
 	v4l2_ctrl_handler_init(&info->hdl, 10);
 	v4l2_ctrl_new_std(&info->hdl, &ov7670_ctrl_ops,
 			V4L2_CID_BRIGHTNESS, 0, 255, 1, 128);
@@ -1700,6 +1711,9 @@ static int ov7670_probe(struct i2c_client *client,
 
 hdl_free:
 	v4l2_ctrl_handler_free(&info->hdl);
+#ifdef CONFIG_MEDIA_CONTROLLER
+	media_entity_cleanup(&sd->entity);
+#endif
 clk_disable:
 	clk_disable_unprepare(info->clk);
 	return ret;
@@ -1713,6 +1727,9 @@ static int ov7670_remove(struct i2c_client *client)
 
 	v4l2_async_unregister_subdev(sd);
 	v4l2_ctrl_handler_free(&info->hdl);
+#ifdef CONFIG_MEDIA_CONTROLLER
+	media_entity_cleanup(&sd->entity);
+#endif
 	clk_disable_unprepare(info->clk);
 	return 0;
 }
