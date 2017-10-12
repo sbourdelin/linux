@@ -167,6 +167,16 @@ static struct vm_area_struct *remove_vma(struct vm_area_struct *vma)
 {
 	struct vm_area_struct *next = vma->vm_next;
 
+	if (vma->vm_flags & VM_CONTIG) {
+		/*
+		 * Do any necessary clean up when freeing a vma backed
+		 * by a contiguous allocation.
+		 *
+		 * Not very useful in it's present form.
+		 */
+		VM_BUG_ON(!vma->vm_private_data);
+		vma->vm_private_data = NULL;
+	}
 	might_sleep();
 	if (vma->vm_ops && vma->vm_ops->close)
 		vma->vm_ops->close(vma);
@@ -1378,6 +1388,18 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 	vm_flags |= calc_vm_prot_bits(prot, pkey) | calc_vm_flag_bits(flags) |
 			mm->def_flags | VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC;
 
+	/*
+	 * MAP_CONTIG has some restrictions,
+	 * and also implies additional mmap and vma flags.
+	 */
+	if (flags & MAP_CONTIG) {
+		if (!(flags & MAP_ANONYMOUS))
+			return -EINVAL;
+
+		flags |= MAP_POPULATE | MAP_LOCKED;
+		vm_flags |= (VM_CONTIG | VM_LOCKED | VM_DONTEXPAND);
+	}
+
 	if (flags & MAP_LOCKED)
 		if (!can_do_mlock())
 			return -EPERM;
@@ -1547,6 +1569,71 @@ SYSCALL_DEFINE1(old_mmap, struct mmap_arg_struct __user *, arg)
 #endif /* __ARCH_WANT_SYS_OLD_MMAP */
 
 /*
+ * Attempt to allocate a contiguous range of pages to back the
+ * specified vma.  vm_private_data is used as a 'pointer' to the
+ * allocated pages.  Larger requests and more fragmented memory
+ * make the allocation more likely to fail.  So, caller must deal
+ * with this situation.
+ */
+static long __alloc_vma_contig_range(struct vm_area_struct *vma)
+{
+	gfp_t gfp = GFP_HIGHUSER | __GFP_ZERO;
+	unsigned long order;
+
+	VM_BUG_ON_VMA(vma->vm_private_data != NULL, vma);
+	order = get_order(vma->vm_end - vma->vm_start);
+
+	/*
+	 * FIXME - Incomplete implementation.  For now, just handle
+	 * allocations < MAX_ORDER in size.  However, this should really
+	 * handle arbitrary size allocations.
+	 */
+	if (order >= MAX_ORDER)
+		return -ENOMEM;
+
+	vma->vm_private_data = alloc_pages_vma(gfp, order, vma, vma->vm_start,
+						numa_node_id(), false);
+	if (!vma->vm_private_data)
+		return -ENOMEM;
+
+	/*
+	 * split large allocation so it can be treated as individual
+	 * pages when populating the mapping and at unmap time.
+	 */
+	if (order) {
+		unsigned long vma_pages = (vma->vm_end - vma->vm_start) /
+								PAGE_SIZE;
+		unsigned long order_pages = 1 << order;
+		unsigned long i;
+		struct page *page = vma->vm_private_data;
+
+		split_page((struct page *)vma->vm_private_data, order);
+
+		/*
+		 * 'order' rounds up size of vma to next power of 2.  We
+		 * will not need/use the extra pages so free them now.
+		 */
+		for (i = vma_pages; i < order_pages; i++)
+			put_page(page + i);
+	}
+
+	return 0;
+}
+
+static void __free_vma_contig_range(struct vm_area_struct *vma)
+{
+	struct page *page = vma->vm_private_data;
+	unsigned long n_pages = (vma->vm_end - vma->vm_start) / PAGE_SIZE;
+	unsigned long i;
+
+	if (!page)
+		return;
+
+	for (i = 0; i < n_pages; i++)
+		put_page(page + i);
+}
+
+/*
  * Some shared mappigns will want the pages marked read-only
  * to track write events. If so, we'll downgrade vm_page_prot
  * to the private version (using protection_map[] without the
@@ -1669,6 +1756,12 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 	vma->vm_pgoff = pgoff;
 	INIT_LIST_HEAD(&vma->anon_vma_chain);
 
+	if (vm_flags & VM_CONTIG) {
+		error = __alloc_vma_contig_range(vma);
+		if (error)
+			goto free_vma;
+	}
+
 	if (file) {
 		if (vm_flags & VM_DENYWRITE) {
 			error = deny_write_access(file);
@@ -1759,6 +1852,7 @@ allow_write_and_free_vma:
 	if (vm_flags & VM_DENYWRITE)
 		allow_write_access(file);
 free_vma:
+	__free_vma_contig_range(vma);
 	kmem_cache_free(vm_area_cachep, vma);
 unacct_error:
 	if (charged)
