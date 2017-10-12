@@ -33,12 +33,11 @@
 #define LOWER_EL_AArch64_VECTOR		0x400
 #define LOWER_EL_AArch32_VECTOR		0x600
 
-static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
+static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset,
+				u32 return_offset)
 {
 	unsigned long cpsr;
 	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
-	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
-	u32 return_offset = (is_thumb) ? 4 : 0;
 	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
 
 	cpsr = mode | COMPAT_PSR_I_BIT;
@@ -65,7 +64,11 @@ static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
 
 static void inject_undef32(struct kvm_vcpu *vcpu)
 {
-	prepare_fault32(vcpu, COMPAT_PSR_MODE_UND, 4);
+	unsigned long spsr_value = *vcpu_cpsr(vcpu);
+	bool is_thumb = (spsr_value & COMPAT_PSR_T_BIT);
+	u32 return_offset = (is_thumb) ? 2 : 4;
+
+	prepare_fault32(vcpu, COMPAT_PSR_MODE_UND, 4, return_offset);
 }
 
 /*
@@ -75,21 +78,24 @@ static void inject_undef32(struct kvm_vcpu *vcpu)
 static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
 			 unsigned long addr)
 {
-	u32 vect_offset;
+	u32 vect_offset, return_offset;
 	u32 *far, *fsr;
 	bool is_lpae;
 
 	if (is_pabt) {
 		vect_offset = 12;
+		return_offset = 4;
 		far = &vcpu_cp15(vcpu, c6_IFAR);
 		fsr = &vcpu_cp15(vcpu, c5_IFSR);
 	} else { /* !iabt */
 		vect_offset = 16;
+		return_offset = 8;
 		far = &vcpu_cp15(vcpu, c6_DFAR);
 		fsr = &vcpu_cp15(vcpu, c5_DFSR);
 	}
 
-	prepare_fault32(vcpu, COMPAT_PSR_MODE_ABT | COMPAT_PSR_A_BIT, vect_offset);
+	prepare_fault32(vcpu, COMPAT_PSR_MODE_ABT | COMPAT_PSR_A_BIT,
+		       vect_offset, return_offset);
 
 	*far = addr;
 
