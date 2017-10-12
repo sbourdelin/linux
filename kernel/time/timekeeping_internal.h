@@ -30,6 +30,4 @@ static inline u64 clocksource_delta(u64 now, u64 last, u64 mask)
 }
 #endif
 
-extern time64_t __ktime_get_real_seconds(void);
-
 #endif /* _TIMEKEEPING_INTERNAL_H */
