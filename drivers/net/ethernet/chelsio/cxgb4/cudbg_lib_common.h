@@ -62,4 +62,17 @@ struct cudbg_buffer {
 	u32 offset;
 	char *data;
 };
+
+struct cudbg_error {
+	int sys_err;
+	int sys_warn;
+	int app_err;
+};
+
+int get_cudbg_buff(struct cudbg_buffer *pdbg_buff, u32 size,
+		   struct cudbg_buffer *pin_buff);
+void put_cudbg_buff(struct cudbg_buffer *pin_buff,
+		    struct cudbg_buffer *pdbg_buff);
+void update_cudbg_buff(struct cudbg_buffer *pin_buff,
+		       struct cudbg_buffer *pout_buff);
 #endif /* __CUDBG_LIB_COMMON_H__ */
