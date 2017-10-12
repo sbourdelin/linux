@@ -1393,6 +1393,7 @@ void i915_driver_unload(struct drm_device *dev)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct pci_dev *pdev = dev_priv->drm.pdev;
 
+	drm_vblank_get(dev_priv, 0);
 	i915_driver_unregister(dev_priv);
 
 	if (i915_gem_suspend(dev_priv))

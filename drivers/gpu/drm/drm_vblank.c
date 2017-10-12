@@ -402,6 +402,8 @@ void drm_vblank_cleanup(struct drm_device *dev)
 	if (dev->num_crtcs == 0)
 		return;
 
+	WARN_ON(atomic_read(&vblank->refcount) > 0);
+
 	for (pipe = 0; pipe < dev->num_crtcs; pipe++) {
 		struct drm_vblank_crtc *vblank = &dev->vblank[pipe];
 
