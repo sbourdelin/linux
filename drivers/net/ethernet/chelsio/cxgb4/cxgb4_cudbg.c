@@ -30,6 +30,12 @@ static const struct cudbg_collect_entity collect_hw_dump[] = {
 	{ CUDBG_DEV_LOG, collect_fw_devlog },
 	{ CUDBG_REG_DUMP, collect_reg_dump },
 	{ CUDBG_TP_INDIRECT, collect_tp_indirect },
+	{ CUDBG_SGE_INDIRECT, collect_sge_indirect },
+	{ CUDBG_PCIE_INDIRECT, collect_pcie_indirect },
+	{ CUDBG_PM_INDIRECT, collect_pm_indirect },
+	{ CUDBG_MA_INDIRECT, collect_ma_indirect },
+	{ CUDBG_UP_CIM_INDIRECT, collect_up_cim_indirect },
+	{ CUDBG_HMA_INDIRECT, collect_hma_indirect },
 };
 
 static u32 cxgb4_get_entity_length(struct adapter *adap, u32 entity)
@@ -87,8 +93,37 @@ static u32 cxgb4_get_entity_length(struct adapter *adap, u32 entity)
 		n = n / (IREG_NUM_ELEM * sizeof(u32));
 		len = sizeof(struct ireg_buf) * n;
 		break;
+	case CUDBG_SGE_INDIRECT:
+		len = sizeof(struct ireg_buf) * 2;
+		break;
+	case CUDBG_PCIE_INDIRECT:
+		n = sizeof(t5_pcie_pdbg_array) / (IREG_NUM_ELEM * sizeof(u32));
+		len = sizeof(struct ireg_buf) * n * 2;
+		break;
+	case CUDBG_PM_INDIRECT:
+		n = sizeof(t5_pm_rx_array) / (IREG_NUM_ELEM * sizeof(u32));
+		len = sizeof(struct ireg_buf) * n * 2;
+		break;
+	case CUDBG_MA_INDIRECT:
+		if (CHELSIO_CHIP_VERSION(adap->params.chip) > CHELSIO_T5) {
+			n = sizeof(t6_ma_ireg_array) /
+			    (IREG_NUM_ELEM * sizeof(u32));
+			len = sizeof(struct ireg_buf) * n * 2;
+		}
+		break;
+	case CUDBG_UP_CIM_INDIRECT:
+		n = sizeof(t5_up_cim_reg_array) / (IREG_NUM_ELEM * sizeof(u32));
+		len = sizeof(struct ireg_buf) * n;
+		break;
 	case CUDBG_MBOX_LOG:
 		len = sizeof(struct cudbg_mbox_log) * adap->mbox_log->size;
+		break;
+	case CUDBG_HMA_INDIRECT:
+		if (CHELSIO_CHIP_VERSION(adap->params.chip) > CHELSIO_T5) {
+			n = sizeof(t6_hma_ireg_array) /
+			    (IREG_NUM_ELEM * sizeof(u32));
+			len = sizeof(struct ireg_buf) * n;
+		}
 		break;
 	default:
 		break;

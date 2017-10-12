@@ -33,9 +33,27 @@ int collect_edc1_meminfo(struct cudbg_init *pdbg_init,
 int collect_tp_indirect(struct cudbg_init *pdbg_init,
 			struct cudbg_buffer *dbg_buff,
 			struct cudbg_error *cudbg_err);
+int collect_sge_indirect(struct cudbg_init *pdbg_init,
+			 struct cudbg_buffer *dbg_buff,
+			 struct cudbg_error *cudbg_err);
+int collect_pcie_indirect(struct cudbg_init *pdbg_init,
+			  struct cudbg_buffer *dbg_buff,
+			  struct cudbg_error *cudbg_err);
+int collect_pm_indirect(struct cudbg_init *pdbg_init,
+			struct cudbg_buffer *dbg_buff,
+			struct cudbg_error *cudbg_err);
+int collect_ma_indirect(struct cudbg_init *pdbg_init,
+			struct cudbg_buffer *dbg_buff,
+			struct cudbg_error *cudbg_err);
+int collect_up_cim_indirect(struct cudbg_init *pdbg_init,
+			    struct cudbg_buffer *dbg_buff,
+			    struct cudbg_error *cudbg_err);
 int collect_mbox_log(struct cudbg_init *pdbg_init,
 		     struct cudbg_buffer *dbg_buff,
 		     struct cudbg_error *cudbg_err);
+int collect_hma_indirect(struct cudbg_init *pdbg_init,
+			 struct cudbg_buffer *dbg_buff,
+			 struct cudbg_error *cudbg_err);
 
 struct cudbg_entity_hdr *get_entity_hdr(void *outbuf, int i);
 void align_debug_buffer(struct cudbg_buffer *dbg_buff,
