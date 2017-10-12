@@ -222,7 +222,7 @@ extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
 
 #else
 
-static inline int constant_fls(int x)
+static inline int constant_fls(unsigned long x)
 {
 	int r = 32;
 
@@ -270,7 +270,7 @@ static inline unsigned int __clz(unsigned int x)
  * fls() returns zero if the input is zero, otherwise returns the bit
  * position of the last set bit, where the LSB is 1 and MSB is 32.
  */
-static inline int fls(int x)
+static inline int fls(unsigned long x)
 {
 	if (__builtin_constant_p(x))
 	       return constant_fls(x);
@@ -291,7 +291,7 @@ static inline unsigned long __fls(unsigned long x)
  * ffs() returns zero if the input was zero, otherwise returns the bit
  * position of the first set bit, where the LSB is 1 and MSB is 32.
  */
-static inline int ffs(int x)
+static inline int ffs(unsigned long x)
 {
 	return fls(x & -x);
 }
