@@ -38,7 +38,7 @@ struct meson_sm_chip {
 	struct meson_sm_cmd cmd[];
 };
 
-struct meson_sm_chip gxbb_chip = {
+struct meson_sm_chip gx_chip = {
 	.shmem_size		= SZ_4K,
 	.cmd_shmem_in_base	= 0x82000020,
 	.cmd_shmem_out_base	= 0x82000021,
@@ -213,7 +213,7 @@ int meson_sm_call_write(void *buffer, unsigned int size, unsigned int cmd_index,
 EXPORT_SYMBOL(meson_sm_call_write);
 
 static const struct of_device_id meson_sm_ids[] = {
-	{ .compatible = "amlogic,meson-gxbb-sm", .data = &gxbb_chip },
+	{ .compatible = "amlogic,meson-gx-sm", .data = &gx_chip },
 	{ /* sentinel */ },
 };
 
