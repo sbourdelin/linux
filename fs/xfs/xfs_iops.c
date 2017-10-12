@@ -39,6 +39,7 @@
 #include "xfs_trans_space.h"
 #include "xfs_pnfs.h"
 #include "xfs_iomap.h"
+#include "xfs_layout.h"
 
 #include <linux/capability.h>
 #include <linux/xattr.h>

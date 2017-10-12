@@ -39,6 +39,7 @@
 #include "xfs_pnfs.h"
 #include "xfs_iomap.h"
 #include "xfs_reflink.h"
+#include "xfs_layout.h"
 
 #include <linux/dcache.h>
 #include <linux/falloc.h>

@@ -109,3 +109,7 @@ config XFS_ASSERT_FATAL
 	  result in warnings.
 
 	  This behavior can be modified at runtime via sysfs.
+
+config XFS_LAYOUT
+	def_bool y
+	depends on EXPORTFS_BLOCK_OPS
