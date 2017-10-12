@@ -19,6 +19,7 @@
 #include <linux/videodev2.h>
 #include <linux/gpio.h>
 #include <linux/gpio/consumer.h>
+#include <media/v4l2-async.h>
 #include <media/v4l2-device.h>
 #include <media/v4l2-ctrls.h>
 #include <media/v4l2-mediabus.h>
@@ -1710,7 +1711,7 @@ static int ov7670_remove(struct i2c_client *client)
 	struct v4l2_subdev *sd = i2c_get_clientdata(client);
 	struct ov7670_info *info = to_state(sd);
 
-	v4l2_device_unregister_subdev(sd);
+	v4l2_async_unregister_subdev(sd);
 	v4l2_ctrl_handler_free(&info->hdl);
 	clk_disable_unprepare(info->clk);
 	return 0;
