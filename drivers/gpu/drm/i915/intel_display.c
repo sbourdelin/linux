@@ -9020,23 +9020,6 @@ void hsw_disable_pc8(struct drm_i915_private *dev_priv)
 	}
 }
 
-static int haswell_crtc_compute_clock(struct intel_crtc *crtc,
-				      struct intel_crtc_state *crtc_state)
-{
-	if (!intel_crtc_has_type(crtc_state, INTEL_OUTPUT_DSI)) {
-		struct intel_encoder *encoder =
-			intel_ddi_get_crtc_new_encoder(crtc_state);
-
-		if (!intel_get_shared_dpll(crtc, crtc_state, encoder)) {
-			DRM_DEBUG_DRIVER("failed to find PLL for pipe %c\n",
-					 pipe_name(crtc->pipe));
-			return -EINVAL;
-		}
-	}
-
-	return 0;
-}
-
 static void cannonlake_get_ddi_pll(struct drm_i915_private *dev_priv,
 				   enum port port,
 				   struct intel_crtc_state *pipe_config)
@@ -14149,16 +14132,12 @@ void intel_init_display_hooks(struct drm_i915_private *dev_priv)
 		dev_priv->display.get_pipe_config = haswell_get_pipe_config;
 		dev_priv->display.get_initial_plane_config =
 			skylake_get_initial_plane_config;
-		dev_priv->display.crtc_compute_clock =
-			haswell_crtc_compute_clock;
 		dev_priv->display.crtc_enable = haswell_crtc_enable;
 		dev_priv->display.crtc_disable = haswell_crtc_disable;
 	} else if (HAS_DDI(dev_priv)) {
 		dev_priv->display.get_pipe_config = haswell_get_pipe_config;
 		dev_priv->display.get_initial_plane_config =
 			ironlake_get_initial_plane_config;
-		dev_priv->display.crtc_compute_clock =
-			haswell_crtc_compute_clock;
 		dev_priv->display.crtc_enable = haswell_crtc_enable;
 		dev_priv->display.crtc_disable = haswell_crtc_disable;
 	} else if (HAS_PCH_SPLIT(dev_priv)) {

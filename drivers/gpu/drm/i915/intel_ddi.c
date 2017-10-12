@@ -2587,6 +2587,7 @@ static bool intel_ddi_compute_config(struct intel_encoder *encoder,
 				     struct drm_connector_state *conn_state)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct intel_crtc *crtc = to_intel_crtc(pipe_config->base.crtc);
 	int type = encoder->type;
 	int port = intel_ddi_get_encoder_port(encoder);
 	int ret;
@@ -2605,6 +2606,12 @@ static bool intel_ddi_compute_config(struct intel_encoder *encoder,
 		pipe_config->lane_lat_optim_mask =
 			bxt_ddi_phy_calc_lane_lat_optim_mask(encoder,
 							     pipe_config->lane_count);
+
+	if (!intel_get_shared_dpll(crtc, pipe_config, encoder)) {
+		DRM_DEBUG_KMS("failed to find PLL for pipe %c\n",
+			      pipe_name(crtc->pipe));
+		return false;
+	}
 
 	return ret;
 

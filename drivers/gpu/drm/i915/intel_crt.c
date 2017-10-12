@@ -361,6 +361,7 @@ static bool hsw_crt_compute_config(struct intel_encoder *encoder,
 				   struct drm_connector_state *conn_state)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct intel_crtc *crtc = to_intel_crtc(pipe_config->base.crtc);
 
 	pipe_config->has_pch_encoder = true;
 
@@ -376,6 +377,12 @@ static bool hsw_crt_compute_config(struct intel_encoder *encoder,
 
 	/* FDI must always be 2.7 GHz */
 	pipe_config->port_clock = 135000 * 2;
+
+	if (!intel_get_shared_dpll(crtc, pipe_config, encoder)) {
+		DRM_DEBUG_KMS("failed to find PLL for pipe %c\n",
+			      pipe_name(crtc->pipe));
+		return false;
+	}
 
 	return true;
 }
