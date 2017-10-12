@@ -1,7 +1,7 @@
 = Amlogic eFuse device tree bindings =
 
 Required properties:
-- compatible: should be "amlogic,meson-gxbb-efuse"
+- compatible: should be "amlogic,meson-gx-efuse"
 
 = Data cells =
 Are child nodes of eFuse, bindings of which as described in
@@ -10,7 +10,7 @@ bindings/nvmem/nvmem.txt
 Example:
 
 	efuse: efuse {
-		compatible = "amlogic,meson-gxbb-efuse";
+		compatible = "amlogic,meson-gx-efuse";
 		#address-cells = <1>;
 		#size-cells = <1>;
 

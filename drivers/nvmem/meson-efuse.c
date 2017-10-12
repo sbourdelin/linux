@@ -44,7 +44,7 @@ static struct nvmem_config econfig = {
 };
 
 static const struct of_device_id meson_efuse_match[] = {
-	{ .compatible = "amlogic,meson-gxbb-efuse", },
+	{ .compatible = "amlogic,meson-gx-efuse", },
 	{ /* sentinel */ },
 };
 MODULE_DEVICE_TABLE(of, meson_efuse_match);
