@@ -553,8 +553,6 @@ static const struct attribute_group *interface_attr_groups[] = {
 /*		     ___     ___
  *		     ___A I M___
  */
-static struct list_head aim_list;
-
 static ssize_t links_show(struct device *dev, struct device_attribute *attr,
 			  char *buf)
 {
@@ -1305,6 +1303,7 @@ int most_register_aim(struct most_aim *aim)
 		pr_err("registering device %s failed\n", aim->name);
 		return ret;
 	}
+	list_add_tail(&aim->list, &mc.mod_list);
 	pr_info("registered new application interfacing module %s\n", aim->name);
 	return 0;
 }
@@ -1336,6 +1335,7 @@ int most_deregister_aim(struct most_aim *aim)
 		}
 	}
 	device_unregister(&aim->dev);
+	list_del(&aim->list);
 	pr_info("deregistering application interfacing module %s\n", aim->name);
 	return 0;
 }
@@ -1556,7 +1556,7 @@ static int __init most_init(void)
 
 	pr_info("init()\n");
 	INIT_LIST_HEAD(&instance_list);
-	INIT_LIST_HEAD(&aim_list);
+	INIT_LIST_HEAD(&mc.mod_list);
 	ida_init(&mdev_id);
 
 	mc.bus.name = "most",
