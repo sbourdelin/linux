@@ -23,8 +23,8 @@
 #define __MOST_CORE_H__
 
 #include <linux/types.h>
+#include <linux/device.h>
 
-struct kobject;
 struct module;
 
 /**
