@@ -3781,7 +3781,7 @@ static int __subn_get_opa_hfi1_cong_log(struct opa_smp *smp, u32 am,
 		 * required to wrap the counter are supposed to
 		 * be zeroed (CA10-49 IBTA, release 1.2.1, V1).
 		 */
-		if ((u64)(ts - cce->timestamp) > (2 * UINT_MAX))
+		if ((u64)(ts - cce->timestamp) > (2ULL * UINT_MAX))
 			continue;
 		memcpy(cong_log->events[i].local_qp_cn_entry, &cce->lqpn, 3);
 		memcpy(cong_log->events[i].remote_qp_number_cn_entry,
