@@ -39,7 +39,6 @@ static struct mostcore {
 	struct device dev;
 	struct device_driver drv;
 	struct bus_type bus;
-	struct class *class;
 	struct list_head comp_list;
 } mc;
 
@@ -1562,17 +1561,10 @@ static int __init most_init(void)
 		pr_info("Cannot register most bus\n");
 		return err;
 	}
-	mc.class = class_create(THIS_MODULE, "most");
-	if (IS_ERR(mc.class)) {
-		pr_info("No udev support.\n");
-		err = PTR_ERR(mc.class);
-		goto exit_bus;
-	}
-
 	err = driver_register(&mc.drv);
 	if (err) {
 		pr_info("Cannot register core driver\n");
-		goto exit_class;
+		goto exit_bus;
 	}
 	mc.dev.init_name = "most";
 	mc.dev.release = release_most_sub;
@@ -1584,8 +1576,6 @@ static int __init most_init(void)
 
 exit_driver:
 	driver_unregister(&mc.drv);
-exit_class:
-	class_destroy(mc.class);
 exit_bus:
 	bus_unregister(&mc.bus);
 	return err;
@@ -1596,7 +1586,6 @@ static void __exit most_exit(void)
 	pr_info("exit core module\n");
 	device_unregister(&mc.dev);
 	driver_unregister(&mc.drv);
-	class_destroy(mc.class);
 	bus_unregister(&mc.bus);
 	ida_destroy(&mdev_id);
 }
