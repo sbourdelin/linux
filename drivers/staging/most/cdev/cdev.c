@@ -24,13 +24,13 @@
 #include <linux/idr.h>
 #include <most/core.h>
 
-static dev_t aim_devno;
-static struct class *aim_class;
+static dev_t comp_devno;
+static struct class *comp_class;
 static struct ida minor_id;
 static unsigned int major;
-static struct most_aim cdev_aim;
+static struct core_component cdev_comp;
 
-struct aim_channel {
+struct comp_channel {
 	wait_queue_head_t wq;
 	spinlock_t unlink;	/* synchronization lock to unlink channels */
 	struct cdev cdev;
@@ -46,28 +46,28 @@ struct aim_channel {
 	struct list_head list;
 };
 
-#define to_channel(d) container_of(d, struct aim_channel, cdev)
+#define to_channel(d) container_of(d, struct comp_channel, cdev)
 static struct list_head channel_list;
 static spinlock_t ch_list_lock;
 
-static inline bool ch_has_mbo(struct aim_channel *c)
+static inline bool ch_has_mbo(struct comp_channel *c)
 {
-	return channel_has_mbo(c->iface, c->channel_id, &cdev_aim) > 0;
+	return channel_has_mbo(c->iface, c->channel_id, &cdev_comp) > 0;
 }
 
-static inline bool ch_get_mbo(struct aim_channel *c, struct mbo **mbo)
+static inline bool ch_get_mbo(struct comp_channel *c, struct mbo **mbo)
 {
 	if (!kfifo_peek(&c->fifo, mbo)) {
-		*mbo = most_get_mbo(c->iface, c->channel_id, &cdev_aim);
+		*mbo = most_get_mbo(c->iface, c->channel_id, &cdev_comp);
 		if (*mbo)
 			kfifo_in(&c->fifo, mbo, 1);
 	}
 	return *mbo;
 }
 
-static struct aim_channel *get_channel(struct most_interface *iface, int id)
+static struct comp_channel *get_channel(struct most_interface *iface, int id)
 {
-	struct aim_channel *c, *tmp;
+	struct comp_channel *c, *tmp;
 	unsigned long flags;
 	int found_channel = 0;
 
@@ -84,27 +84,27 @@ static struct aim_channel *get_channel(struct most_interface *iface, int id)
 	return c;
 }
 
-static void stop_channel(struct aim_channel *c)
+static void stop_channel(struct comp_channel *c)
 {
 	struct mbo *mbo;
 
 	while (kfifo_out((struct kfifo *)&c->fifo, &mbo, 1))
 		most_put_mbo(mbo);
-	most_stop_channel(c->iface, c->channel_id, &cdev_aim);
+	most_stop_channel(c->iface, c->channel_id, &cdev_comp);
 }
 
-static void destroy_cdev(struct aim_channel *c)
+static void destroy_cdev(struct comp_channel *c)
 {
 	unsigned long flags;
 
-	device_destroy(aim_class, c->devno);
+	device_destroy(comp_class, c->devno);
 	cdev_del(&c->cdev);
 	spin_lock_irqsave(&ch_list_lock, flags);
 	list_del(&c->list);
 	spin_unlock_irqrestore(&ch_list_lock, flags);
 }
 
-static void destroy_channel(struct aim_channel *c)
+static void destroy_channel(struct comp_channel *c)
 {
 	ida_simple_remove(&minor_id, MINOR(c->devno));
 	kfifo_free(&c->fifo);
@@ -112,16 +112,16 @@ static void destroy_channel(struct aim_channel *c)
 }
 
 /**
- * aim_open - implements the syscall to open the device
+ * comp_open - implements the syscall to open the device
  * @inode: inode pointer
  * @filp: file pointer
  *
  * This stores the channel pointer in the private data field of
  * the file structure and activates the channel within the core.
  */
-static int aim_open(struct inode *inode, struct file *filp)
+static int comp_open(struct inode *inode, struct file *filp)
 {
-	struct aim_channel *c;
+	struct comp_channel *c;
 	int ret;
 
 	c = to_channel(inode->i_cdev);
@@ -149,7 +149,7 @@ static int aim_open(struct inode *inode, struct file *filp)
 	}
 
 	c->mbo_offs = 0;
-	ret = most_start_channel(c->iface, c->channel_id, &cdev_aim);
+	ret = most_start_channel(c->iface, c->channel_id, &cdev_comp);
 	if (!ret)
 		c->access_ref = 1;
 	mutex_unlock(&c->io_mutex);
@@ -157,15 +157,15 @@ static int aim_open(struct inode *inode, struct file *filp)
 }
 
 /**
- * aim_close - implements the syscall to close the device
+ * comp_close - implements the syscall to close the device
  * @inode: inode pointer
  * @filp: file pointer
  *
  * This stops the channel within the core.
  */
-static int aim_close(struct inode *inode, struct file *filp)
+static int comp_close(struct inode *inode, struct file *filp)
 {
-	struct aim_channel *c = to_channel(inode->i_cdev);
+	struct comp_channel *c = to_channel(inode->i_cdev);
 
 	mutex_lock(&c->io_mutex);
 	spin_lock(&c->unlink);
@@ -182,19 +182,19 @@ static int aim_close(struct inode *inode, struct file *filp)
 }
 
 /**
- * aim_write - implements the syscall to write to the device
+ * comp_write - implements the syscall to write to the device
  * @filp: file pointer
  * @buf: pointer to user buffer
  * @count: number of bytes to write
  * @offset: offset from where to start writing
  */
-static ssize_t aim_write(struct file *filp, const char __user *buf,
-			 size_t count, loff_t *offset)
+static ssize_t comp_write(struct file *filp, const char __user *buf,
+			  size_t count, loff_t *offset)
 {
 	int ret;
 	size_t to_copy, left;
 	struct mbo *mbo = NULL;
-	struct aim_channel *c = filp->private_data;
+	struct comp_channel *c = filp->private_data;
 
 	mutex_lock(&c->io_mutex);
 	while (c->dev && !ch_get_mbo(c, &mbo)) {
@@ -236,18 +236,18 @@ unlock:
 }
 
 /**
- * aim_read - implements the syscall to read from the device
+ * comp_read - implements the syscall to read from the device
  * @filp: file pointer
  * @buf: pointer to user buffer
  * @count: number of bytes to read
  * @offset: offset from where to start reading
  */
 static ssize_t
-aim_read(struct file *filp, char __user *buf, size_t count, loff_t *offset)
+comp_read(struct file *filp, char __user *buf, size_t count, loff_t *offset)
 {
 	size_t to_copy, not_copied, copied;
 	struct mbo *mbo;
-	struct aim_channel *c = filp->private_data;
+	struct comp_channel *c = filp->private_data;
 
 	mutex_lock(&c->io_mutex);
 	while (c->dev && !kfifo_peek(&c->fifo, &mbo)) {
@@ -287,9 +287,9 @@ aim_read(struct file *filp, char __user *buf, size_t count, loff_t *offset)
 	return copied;
 }
 
-static unsigned int aim_poll(struct file *filp, poll_table *wait)
+static unsigned int comp_poll(struct file *filp, poll_table *wait)
 {
-	struct aim_channel *c = filp->private_data;
+	struct comp_channel *c = filp->private_data;
 	unsigned int mask = 0;
 
 	poll_wait(filp, &c->wq, wait);
@@ -309,24 +309,24 @@ static unsigned int aim_poll(struct file *filp, poll_table *wait)
  */
 static const struct file_operations channel_fops = {
 	.owner = THIS_MODULE,
-	.read = aim_read,
-	.write = aim_write,
-	.open = aim_open,
-	.release = aim_close,
-	.poll = aim_poll,
+	.read = comp_read,
+	.write = comp_write,
+	.open = comp_open,
+	.release = comp_close,
+	.poll = comp_poll,
 };
 
 /**
- * aim_disconnect_channel - disconnect a channel
+ * comp_disconnect_channel - disconnect a channel
  * @iface: pointer to interface instance
  * @channel_id: channel index
  *
  * This frees allocated memory and removes the cdev that represents this
  * channel in user space.
  */
-static int aim_disconnect_channel(struct most_interface *iface, int channel_id)
+static int comp_disconnect_channel(struct most_interface *iface, int channel_id)
 {
-	struct aim_channel *c;
+	struct comp_channel *c;
 
 	if (!iface) {
 		pr_info("Bad interface pointer\n");
@@ -354,15 +354,15 @@ static int aim_disconnect_channel(struct most_interface *iface, int channel_id)
 }
 
 /**
- * aim_rx_completion - completion handler for rx channels
+ * comp_rx_completion - completion handler for rx channels
  * @mbo: pointer to buffer object that has completed
  *
  * This searches for the channel linked to this MBO and stores it in the local
  * fifo buffer.
  */
-static int aim_rx_completion(struct mbo *mbo)
+static int comp_rx_completion(struct mbo *mbo)
 {
-	struct aim_channel *c;
+	struct comp_channel *c;
 
 	if (!mbo)
 		return -EINVAL;
@@ -387,15 +387,15 @@ static int aim_rx_completion(struct mbo *mbo)
 }
 
 /**
- * aim_tx_completion - completion handler for tx channels
+ * comp_tx_completion - completion handler for tx channels
  * @iface: pointer to interface instance
  * @channel_id: channel index/ID
  *
  * This wakes sleeping processes in the wait-queue.
  */
-static int aim_tx_completion(struct most_interface *iface, int channel_id)
+static int comp_tx_completion(struct most_interface *iface, int channel_id)
 {
-	struct aim_channel *c;
+	struct comp_channel *c;
 
 	if (!iface) {
 		pr_info("Bad interface pointer\n");
@@ -414,7 +414,7 @@ static int aim_tx_completion(struct most_interface *iface, int channel_id)
 }
 
 /**
- * aim_probe - probe function of the driver module
+ * comp_probe - probe function of the driver module
  * @iface: pointer to interface instance
  * @channel_id: channel index/ID
  * @cfg: pointer to actual channel configuration
@@ -425,17 +425,16 @@ static int aim_tx_completion(struct most_interface *iface, int channel_id)
  *
  * Returns 0 on success or error code otherwise.
  */
-static int aim_probe(struct most_interface *iface, int channel_id,
-		     struct most_channel_config *cfg,
-		     char *name)
+static int comp_probe(struct most_interface *iface, int channel_id,
+		      struct most_channel_config *cfg, char *name)
 {
-	struct aim_channel *c;
+	struct comp_channel *c;
 	unsigned long cl_flags;
 	int retval;
 	int current_minor;
 
 	if ((!iface) || (!cfg) || (!name)) {
-		pr_info("Probing AIM with bad arguments");
+		pr_info("Probing component with bad arguments");
 		return -EINVAL;
 	}
 	c = get_channel(iface, channel_id);
@@ -472,7 +471,7 @@ static int aim_probe(struct most_interface *iface, int channel_id,
 	spin_lock_irqsave(&ch_list_lock, cl_flags);
 	list_add_tail(&c->list, &channel_list);
 	spin_unlock_irqrestore(&ch_list_lock, cl_flags);
-	c->dev = device_create(aim_class,
+	c->dev = device_create(comp_class,
 				     NULL,
 				     c->devno,
 				     NULL,
@@ -497,12 +496,12 @@ error_alloc_channel:
 	return retval;
 }
 
-static struct most_aim cdev_aim = {
-	.name = "aim_cdev",
-	.probe_channel = aim_probe,
-	.disconnect_channel = aim_disconnect_channel,
-	.rx_completion = aim_rx_completion,
-	.tx_completion = aim_tx_completion,
+static struct core_component cdev_comp = {
+	.name = "cdev",
+	.probe_channel = comp_probe,
+	.disconnect_channel = comp_disconnect_channel,
+	.rx_completion = comp_rx_completion,
+	.tx_completion = comp_tx_completion,
 };
 
 static int __init mod_init(void)
@@ -515,26 +514,26 @@ static int __init mod_init(void)
 	spin_lock_init(&ch_list_lock);
 	ida_init(&minor_id);
 
-	err = alloc_chrdev_region(&aim_devno, 0, 50, "cdev");
+	err = alloc_chrdev_region(&comp_devno, 0, 50, "cdev");
 	if (err < 0)
 		goto dest_ida;
-	major = MAJOR(aim_devno);
+	major = MAJOR(comp_devno);
 
-	aim_class = class_create(THIS_MODULE, "most_cdev_aim");
-	if (IS_ERR(aim_class)) {
+	comp_class = class_create(THIS_MODULE, "most_cdev_comp");
+	if (IS_ERR(comp_class)) {
 		pr_err("no udev support\n");
-		err = PTR_ERR(aim_class);
+		err = PTR_ERR(comp_class);
 		goto free_cdev;
 	}
-	err = most_register_aim(&cdev_aim);
+	err = most_register_component(&cdev_comp);
 	if (err)
 		goto dest_class;
 	return 0;
 
 dest_class:
-	class_destroy(aim_class);
+	class_destroy(comp_class);
 free_cdev:
-	unregister_chrdev_region(aim_devno, 1);
+	unregister_chrdev_region(comp_devno, 1);
 dest_ida:
 	ida_destroy(&minor_id);
 	return err;
@@ -542,18 +541,18 @@ dest_ida:
 
 static void __exit mod_exit(void)
 {
-	struct aim_channel *c, *tmp;
+	struct comp_channel *c, *tmp;
 
 	pr_info("exit module\n");
 
-	most_deregister_aim(&cdev_aim);
+	most_deregister_component(&cdev_comp);
 
 	list_for_each_entry_safe(c, tmp, &channel_list, list) {
 		destroy_cdev(c);
 		destroy_channel(c);
 	}
-	class_destroy(aim_class);
-	unregister_chrdev_region(aim_devno, 1);
+	class_destroy(comp_class);
+	unregister_chrdev_region(comp_devno, 1);
 	ida_destroy(&minor_id);
 }
 
@@ -561,4 +560,4 @@ module_init(mod_init);
 module_exit(mod_exit);
 MODULE_AUTHOR("Christian Gromm <christian.gromm@microchip.com>");
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("character device AIM for mostcore");
+MODULE_DESCRIPTION("character device component for mostcore");
