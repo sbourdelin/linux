@@ -3,6 +3,8 @@
 # Licensed under the GPL
 #
 
+KCOV_INSTRUMENT                := n
+
 obj-y := clone.o mmu.o process.o syscall.o uaccess.o
 
 # clone.o is in the stub, so it can't be built with profiling
