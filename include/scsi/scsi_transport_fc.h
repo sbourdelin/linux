@@ -784,7 +784,7 @@ fc_vport_set_state(struct fc_vport *vport, enum fc_vport_state new_state)
 }
 
 struct scsi_transport_template *fc_attach_transport(
-			struct fc_function_template *);
+			const struct fc_function_template *);
 void fc_release_transport(struct scsi_transport_template *);
 void fc_remove_host(struct Scsi_Host *);
 struct fc_rport *fc_remote_port_add(struct Scsi_Host *shost,

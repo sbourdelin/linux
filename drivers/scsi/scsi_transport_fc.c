@@ -2162,7 +2162,7 @@ fc_user_scan(struct Scsi_Host *shost, uint channel, uint id, u64 lun)
 }
 
 struct scsi_transport_template *
-fc_attach_transport(struct fc_function_template *ft)
+fc_attach_transport(const struct fc_function_template *ft)
 {
 	int count;
 	struct fc_internal *i = kzalloc(sizeof(struct fc_internal),
