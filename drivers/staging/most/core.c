@@ -290,7 +290,6 @@ static ssize_t set_number_of_buffers_store(struct device *dev,
 					   size_t count)
 {
 	struct most_channel *c = to_channel(dev);
-
 	int ret = kstrtou16(buf, 0, &c->cfg.num_buffers);
 
 	if (ret)
@@ -313,7 +312,6 @@ static ssize_t set_buffer_size_store(struct device *dev,
 				     size_t count)
 {
 	struct most_channel *c = to_channel(dev);
-
 	int ret = kstrtou16(buf, 0, &c->cfg.buffer_size);
 
 	if (ret)
@@ -407,7 +405,6 @@ static ssize_t set_subbuffer_size_store(struct device *dev,
 					size_t count)
 {
 	struct most_channel *c = to_channel(dev);
-
 	int ret = kstrtou16(buf, 0, &c->cfg.subbuffer_size);
 
 	if (ret)
@@ -430,7 +427,6 @@ static ssize_t set_packets_per_xact_store(struct device *dev,
 					  size_t count)
 {
 	struct most_channel *c = to_channel(dev);
-
 	int ret = kstrtou16(buf, 0, &c->cfg.packets_per_xact);
 
 	if (ret)
@@ -683,7 +679,6 @@ static int link_channel_to_component(struct most_channel *c,
 		*comp_ptr = NULL;
 		return ret;
 	}
-
 	return 0;
 }
 
@@ -724,9 +719,7 @@ static ssize_t add_link_store(struct device_driver *drv,
 	size_t max_len = min_t(size_t, len + 1, STRING_SIZE);
 
 	strlcpy(buffer, buf, max_len);
-
-	ret = split_string(buffer, &mdev, &mdev_ch, &comp_name,
-			   &comp_param);
+	ret = split_string(buffer, &mdev, &mdev_ch, &comp_name, &comp_param);
 	if (ret)
 		return ret;
 	comp = match_component(comp_name);
@@ -743,7 +736,6 @@ static ssize_t add_link_store(struct device_driver *drv,
 	ret = link_channel_to_component(c, comp, comp_param);
 	if (ret)
 		return ret;
-
 	return len;
 }
 
