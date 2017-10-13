@@ -2994,9 +2994,8 @@ static int vega10_get_pp_table_entry_callback_func(struct pp_hwmgr *hwmgr,
 	struct vega10_power_state *vega10_power_state =
 			cast_phw_vega10_power_state(&(power_state->hardware));
 	struct vega10_performance_level *performance_level;
-	ATOM_Vega10_State *state_entry = (ATOM_Vega10_State *)state;
-	ATOM_Vega10_POWERPLAYTABLE *powerplay_table =
-			(ATOM_Vega10_POWERPLAYTABLE *)pp_table;
+	ATOM_Vega10_State *state_entry = state;
+	ATOM_Vega10_POWERPLAYTABLE *powerplay_table = pp_table;
 	ATOM_Vega10_SOCCLK_Dependency_Table *socclk_dep_table =
 			(ATOM_Vega10_SOCCLK_Dependency_Table *)
 			(((unsigned long)powerplay_table) +
@@ -3305,8 +3304,7 @@ static int vega10_apply_state_adjust_rules(struct pp_hwmgr *hwmgr,
 
 static int vega10_find_dpm_states_clocks_in_dpm_table(struct pp_hwmgr *hwmgr, const void *input)
 {
-	const struct phm_set_power_state_input *states =
-			(const struct phm_set_power_state_input *)input;
+	const struct phm_set_power_state_input *states = input;
 	const struct vega10_power_state *vega10_ps =
 			cast_const_phw_vega10_power_state(states->pnew_state);
 	struct vega10_hwmgr *data =
@@ -3396,12 +3394,10 @@ static int vega10_populate_and_upload_sclk_mclk_dpm_levels(
 		struct pp_hwmgr *hwmgr, const void *input)
 {
 	int result = 0;
-	const struct phm_set_power_state_input *states =
-			(const struct phm_set_power_state_input *)input;
+	const struct phm_set_power_state_input *states = input;
 	const struct vega10_power_state *vega10_ps =
 			cast_const_phw_vega10_power_state(states->pnew_state);
-	struct vega10_hwmgr *data =
-			(struct vega10_hwmgr *)(hwmgr->backend);
+	struct vega10_hwmgr *data = hwmgr->backend;
 	uint32_t sclk = vega10_ps->performance_levels
 			[vega10_ps->performance_level_count - 1].gfx_clock;
 	uint32_t mclk = vega10_ps->performance_levels
@@ -3810,10 +3806,8 @@ static int vega10_upload_dpm_max_level(struct pp_hwmgr *hwmgr)
 static int vega10_generate_dpm_level_enable_mask(
 		struct pp_hwmgr *hwmgr, const void *input)
 {
-	struct vega10_hwmgr *data =
-			(struct vega10_hwmgr *)(hwmgr->backend);
-	const struct phm_set_power_state_input *states =
-			(const struct phm_set_power_state_input *)input;
+	struct vega10_hwmgr *data = hwmgr->backend;
+	const struct phm_set_power_state_input *states = input;
 	const struct vega10_power_state *vega10_ps =
 			cast_const_phw_vega10_power_state(states->pnew_state);
 	int i;
@@ -4042,7 +4036,7 @@ static int vega10_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 			ret = -EINVAL;
 		else {
 			*size = sizeof(struct pp_gpu_power);
-			ret = vega10_get_gpu_power(hwmgr, (struct pp_gpu_power *)value);
+			ret = vega10_get_gpu_power(hwmgr, value);
 		}
 		break;
 	default:

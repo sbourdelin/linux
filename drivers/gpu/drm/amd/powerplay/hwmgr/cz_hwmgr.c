@@ -474,7 +474,7 @@ static int cz_tf_upload_pptable_to_smu(struct pp_hwmgr *hwmgr, void *input,
 	PP_ASSERT_WITH_CODE((0 == ret && NULL != table),
 			    "Fail to get clock table from SMU!", return -EINVAL;);
 
-	clock_table = (struct SMU8_Fusion_ClkTable *)table;
+	clock_table = table;
 
 	/* patch clock table */
 	PP_ASSERT_WITH_CODE((vddc_table->count <= CZ_MAX_HARDWARE_POWERLEVELS),
@@ -868,8 +868,8 @@ static int cz_tf_update_low_mem_pstate(struct pp_hwmgr *hwmgr,
 {
 	bool disable_switch;
 	bool enable_low_mem_state;
-	struct cz_hwmgr *hw_data = (struct cz_hwmgr *)(hwmgr->backend);
-	const struct phm_set_power_state_input *states = (struct phm_set_power_state_input *)input;
+	struct cz_hwmgr *hw_data = hwmgr->backend;
+	const struct phm_set_power_state_input *states = input;
 	const struct cz_power_state *pnew_state = cast_const_PhwCzPowerState(states->pnew_state);
 
 	if (hw_data->sys_info.nb_dpm_enable) {
