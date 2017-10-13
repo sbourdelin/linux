@@ -579,7 +579,7 @@ static ATOM_GPIO_PIN_LUT *get_gpio_lookup_table(void *device)
 	PP_ASSERT_WITH_CODE((NULL != table_address),
 			"Error retrieving BIOS Table Address!", return NULL;);
 
-	return (ATOM_GPIO_PIN_LUT *)table_address;
+	return table_address;
 }
 
 /**

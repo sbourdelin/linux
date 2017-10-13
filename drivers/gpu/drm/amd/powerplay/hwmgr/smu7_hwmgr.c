@@ -2952,13 +2952,13 @@ static int smu7_get_pp_table_entry_callback_func_v1(struct pp_hwmgr *hwmgr,
 		void *state, struct pp_power_state *power_state,
 		void *pp_table, uint32_t classification_flag)
 {
-	struct smu7_hwmgr *data = (struct smu7_hwmgr *)(hwmgr->backend);
+	struct smu7_hwmgr *data = hwmgr->backend;
 	struct smu7_power_state  *smu7_power_state =
-			(struct smu7_power_state *)(&(power_state->hardware));
+			&(power_state->hardware);
 	struct smu7_performance_level *performance_level;
-	ATOM_Tonga_State *state_entry = (ATOM_Tonga_State *)state;
+	ATOM_Tonga_State *state_entry = state;
 	ATOM_Tonga_POWERPLAYTABLE *powerplay_table =
-			(ATOM_Tonga_POWERPLAYTABLE *)pp_table;
+			pp_table;
 	PPTable_Generic_SubTable_Header *sclk_dep_table =
 			(PPTable_Generic_SubTable_Header *)
 			(((unsigned long)powerplay_table) +
@@ -3391,7 +3391,7 @@ static int smu7_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 		if (*size < sizeof(struct pp_gpu_power))
 			return -EINVAL;
 		*size = sizeof(struct pp_gpu_power);
-		return smu7_get_gpu_power(hwmgr, (struct pp_gpu_power *)value);
+		return smu7_get_gpu_power(hwmgr, value);
 	default:
 		return -EINVAL;
 	}
@@ -3400,7 +3400,7 @@ static int smu7_read_sensor(struct pp_hwmgr *hwmgr, int idx,
 static int smu7_find_dpm_states_clocks_in_dpm_table(struct pp_hwmgr *hwmgr, const void *input)
 {
 	const struct phm_set_power_state_input *states =
-			(const struct phm_set_power_state_input *)input;
+			input;
 	const struct smu7_power_state *smu7_ps =
 			cast_const_phw_smu7_power_state(states->pnew_state);
 	struct smu7_hwmgr *data = (struct smu7_hwmgr *)(hwmgr->backend);
@@ -3478,7 +3478,7 @@ static int smu7_request_link_speed_change_before_state_change(
 		struct pp_hwmgr *hwmgr, const void *input)
 {
 	const struct phm_set_power_state_input *states =
-			(const struct phm_set_power_state_input *)input;
+			input;
 	struct smu7_hwmgr *data = (struct smu7_hwmgr *)(hwmgr->backend);
 	const struct smu7_power_state *smu7_nps =
 			cast_const_phw_smu7_power_state(states->pnew_state);
@@ -3558,7 +3558,7 @@ static int smu7_populate_and_upload_sclk_mclk_dpm_levels(
 {
 	int result = 0;
 	const struct phm_set_power_state_input *states =
-			(const struct phm_set_power_state_input *)input;
+			input;
 	const struct smu7_power_state *smu7_ps =
 			cast_const_phw_smu7_power_state(states->pnew_state);
 	struct smu7_hwmgr *data = (struct smu7_hwmgr *)(hwmgr->backend);
@@ -3729,7 +3729,7 @@ static int smu7_generate_dpm_level_enable_mask(
 {
 	int result;
 	const struct phm_set_power_state_input *states =
-			(const struct phm_set_power_state_input *)input;
+			input;
 	struct smu7_hwmgr *data = (struct smu7_hwmgr *)(hwmgr->backend);
 	const struct smu7_power_state *smu7_ps =
 			cast_const_phw_smu7_power_state(states->pnew_state);
@@ -3789,7 +3789,7 @@ static int smu7_notify_link_speed_change_after_state_change(
 		struct pp_hwmgr *hwmgr, const void *input)
 {
 	const struct phm_set_power_state_input *states =
-			(const struct phm_set_power_state_input *)input;
+			input;
 	struct smu7_hwmgr *data = (struct smu7_hwmgr *)(hwmgr->backend);
 	const struct smu7_power_state *smu7_ps =
 			cast_const_phw_smu7_power_state(states->pnew_state);

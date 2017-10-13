@@ -66,7 +66,7 @@ static struct atom_voltage_objects_info_v4_1 *pp_atomfwctrl_get_voltage_info_tab
         "Error retrieving BIOS Table Address!",
         return NULL);
 
-    return (struct atom_voltage_objects_info_v4_1 *)table_address;
+    return table_address;
 }
 
 /**
@@ -173,7 +173,7 @@ static struct atom_gpio_pin_lut_v2_1 *pp_atomfwctrl_get_gpio_lookup_table(
 			"Error retrieving BIOS Table Address!",
 			return NULL);
 
-	return (struct atom_gpio_pin_lut_v2_1 *)table_address;
+	return table_address;
 }
 
 static bool pp_atomfwctrl_lookup_gpio_pin(
