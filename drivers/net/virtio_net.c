@@ -1903,13 +1903,14 @@ static const struct ethtool_ops virtnet_ethtool_ops = {
 	.set_link_ksettings = virtnet_set_link_ksettings,
 };
 
-static void virtnet_freeze_down(struct virtio_device *vdev)
+static void virtnet_freeze_down(struct virtio_device *vdev, bool in_config)
 {
 	struct virtnet_info *vi = vdev->priv;
 	int i;
 
-	/* Make sure no work handler is accessing the device */
-	flush_work(&vi->config_work);
+	/* Make sure no other work handler is accessing the device */
+	if (!in_config)
+		flush_work(&vi->config_work);
 
 	netif_device_detach(vi->dev);
 	netif_tx_disable(vi->dev);
@@ -1924,6 +1925,7 @@ static void virtnet_freeze_down(struct virtio_device *vdev)
 }
 
 static int init_vqs(struct virtnet_info *vi);
+static void remove_vq_common(struct virtnet_info *vi);
 
 static int virtnet_restore_up(struct virtio_device *vdev)
 {
@@ -1950,6 +1952,40 @@ static int virtnet_restore_up(struct virtio_device *vdev)
 
 	netif_device_attach(vi->dev);
 	return err;
+}
+
+static int virtnet_reset(struct virtnet_info *vi)
+{
+	struct virtio_device *dev = vi->vdev;
+	int ret;
+
+	virtio_config_disable(dev);
+	dev->failed = dev->config->get_status(dev) & VIRTIO_CONFIG_S_FAILED;
+	virtnet_freeze_down(dev, true);
+	remove_vq_common(vi);
+
+	virtio_add_status(dev, VIRTIO_CONFIG_S_ACKNOWLEDGE);
+	virtio_add_status(dev, VIRTIO_CONFIG_S_DRIVER);
+
+	ret = virtio_finalize_features(dev);
+	if (ret)
+		goto err;
+
+	ret = virtnet_restore_up(dev);
+	if (ret)
+		goto err;
+
+	ret = virtnet_set_queues(vi, vi->curr_queue_pairs);
+	if (ret)
+		goto err;
+
+	virtio_add_status(dev, VIRTIO_CONFIG_S_DRIVER_OK);
+	virtio_config_enable(dev);
+	return 0;
+
+err:
+	virtio_add_status(dev, VIRTIO_CONFIG_S_FAILED);
+	return ret;
 }
 
 static int virtnet_set_guest_offloads(struct virtnet_info *vi, u64 offloads)
@@ -2135,6 +2171,10 @@ static void virtnet_config_changed_work(struct work_struct *work)
 		netdev_notify_peers(vi->dev);
 		virtnet_ack_link_announce(vi);
 	}
+
+	if (vi->vdev->config->get_status(vi->vdev) &
+	    VIRTIO_CONFIG_S_NEEDS_RESET)
+		virtnet_reset(vi);
 
 	/* Ignore unknown (future) status bits */
 	v &= VIRTIO_NET_S_LINK_UP;
@@ -2756,7 +2796,7 @@ static __maybe_unused int virtnet_freeze(struct virtio_device *vdev)
 	struct virtnet_info *vi = vdev->priv;
 
 	virtnet_cpu_notif_remove(vi);
-	virtnet_freeze_down(vdev);
+	virtnet_freeze_down(vdev, false);
 	remove_vq_common(vi);
 
 	return 0;
