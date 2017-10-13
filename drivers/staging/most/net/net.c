@@ -298,7 +298,7 @@ static struct net_dev_context *get_net_dev_hold(struct most_interface *iface)
 
 static int aim_probe_channel(struct most_interface *iface, int channel_idx,
 			     struct most_channel_config *ccfg,
-			     struct kobject *parent, char *name)
+			     char *name)
 {
 	struct net_dev_context *nd;
 	struct net_dev_channel *ch;
@@ -502,7 +502,7 @@ put_nd:
 }
 
 static struct most_aim aim = {
-	.name = "networking",
+	.name = "aim_networking",
 	.probe_channel = aim_probe_channel,
 	.disconnect_channel = aim_disconnect_channel,
 	.tx_completion = aim_resume_tx_channel,
