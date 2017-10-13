@@ -214,8 +214,14 @@ of_find_backlight_by_node(struct device_node *node)
 
 #if IS_ENABLED(CONFIG_BACKLIGHT_CLASS_DEVICE)
 struct backlight_device *backlight_get(struct device *dev);
+struct backlight_device *devm_backlight_get(struct device *dev);
 #else
 static inline struct backlight_device *backlight_get(struct device *dev)
+{
+	return NULL;
+}
+
+static inline struct backlight_device *devm_backlight_get(struct device *dev)
 {
 	return NULL;
 }
