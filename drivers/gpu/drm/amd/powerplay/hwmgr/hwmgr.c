@@ -469,7 +469,7 @@ int phm_reset_single_dpm_table(void *table,
 {
 	int i;
 
-	struct vi_dpm_table *dpm_table = (struct vi_dpm_table *)table;
+	struct vi_dpm_table *dpm_table = table;
 
 	dpm_table->count = count > max ? max : count;
 
@@ -484,7 +484,7 @@ void phm_setup_pcie_table_entry(
 	uint32_t index, uint32_t pcie_gen,
 	uint32_t pcie_lanes)
 {
-	struct vi_dpm_table *dpm_table = (struct vi_dpm_table *)table;
+	struct vi_dpm_table *dpm_table = table;
 	dpm_table->dpm_level[index].value = pcie_gen;
 	dpm_table->dpm_level[index].param1 = pcie_lanes;
 	dpm_table->dpm_level[index].enabled = 1;
@@ -494,7 +494,7 @@ int32_t phm_get_dpm_level_enable_mask_value(void *table)
 {
 	int32_t i;
 	int32_t mask = 0;
-	struct vi_dpm_table *dpm_table = (struct vi_dpm_table *)table;
+	struct vi_dpm_table *dpm_table = table;
 
 	for (i = dpm_table->count; i > 0; i--) {
 		mask = mask << 1;
@@ -566,7 +566,7 @@ int phm_find_boot_level(void *table,
 {
 	int result = -EINVAL;
 	uint32_t i;
-	struct vi_dpm_table *dpm_table = (struct vi_dpm_table *)table;
+	struct vi_dpm_table *dpm_table = table;
 
 	for (i = 0; i < dpm_table->count; i++) {
 		if (value == dpm_table->dpm_level[i].value) {

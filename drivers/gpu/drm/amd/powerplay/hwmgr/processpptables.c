@@ -807,7 +807,7 @@ static const ATOM_PPLIB_POWERPLAYTABLE *get_powerplay_table(
 		hwmgr->soft_pp_table_size = size;
 	}
 
-	return (const ATOM_PPLIB_POWERPLAYTABLE *)table_addr;
+	return table_addr;
 }
 
 int pp_tables_get_response_times(struct pp_hwmgr *hwmgr,

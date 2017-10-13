@@ -452,7 +452,7 @@ static int tf_smu7_thermal_start_smc_fan_control(struct pp_hwmgr *hwmgr,
 static int tf_smu7_thermal_set_temperature_range(struct pp_hwmgr *hwmgr,
 		void *input, void *output, void *storage, int result)
 {
-	struct PP_TemperatureRange *range = (struct PP_TemperatureRange *)input;
+	struct PP_TemperatureRange *range = input;
 
 	if (range == NULL)
 		return -EINVAL;
