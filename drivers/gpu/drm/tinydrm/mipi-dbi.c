@@ -12,6 +12,7 @@
 #include <drm/drm_gem_framebuffer_helper.h>
 #include <drm/tinydrm/mipi-dbi.h>
 #include <drm/tinydrm/tinydrm-helpers.h>
+#include <linux/backlight.h>
 #include <linux/debugfs.h>
 #include <linux/dma-buf.h>
 #include <linux/gpio/consumer.h>
@@ -280,7 +281,7 @@ void mipi_dbi_pipe_enable(struct drm_simple_display_pipe *pipe,
 	if (fb)
 		fb->funcs->dirty(fb, NULL, 0, 0, NULL, 0);
 
-	tinydrm_enable_backlight(mipi->backlight);
+	backlight_enable(mipi->backlight);
 }
 EXPORT_SYMBOL(mipi_dbi_pipe_enable);
 
@@ -319,7 +320,7 @@ void mipi_dbi_pipe_disable(struct drm_simple_display_pipe *pipe)
 	mipi->enabled = false;
 
 	if (mipi->backlight)
-		tinydrm_disable_backlight(mipi->backlight);
+		backlight_disable(mipi->backlight);
 	else
 		mipi_dbi_blank(mipi);
 }
