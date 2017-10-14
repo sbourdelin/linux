@@ -1408,10 +1408,8 @@ static int __init nr_proto_init(void)
 	}
 
 	dev_nr = kzalloc(nr_ndevs * sizeof(struct net_device *), GFP_KERNEL);
-	if (dev_nr == NULL) {
-		printk(KERN_ERR "NET/ROM: nr_proto_init - unable to allocate device array\n");
+	if (!dev_nr)
 		return -1;
-	}
 
 	for (i = 0; i < nr_ndevs; i++) {
 		char name[IFNAMSIZ];
