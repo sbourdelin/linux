@@ -43,6 +43,7 @@ static int disp_num_counter;
 
 int omapdss_register_display(struct omap_dss_device *dssdev)
 {
+	struct omp_dss_device *ldev;
 	struct omap_dss_driver *drv = dssdev->driver;
 	struct list_head *cur;
 	int id;
@@ -67,13 +68,9 @@ int omapdss_register_display(struct omap_dss_device *dssdev)
 		drv->get_timings = omapdss_default_get_timings;
 
 	mutex_lock(&panel_list_mutex);
-	list_for_each(cur, &panel_list) {
-		struct omap_dss_device *ldev = list_entry(cur,
-							 struct omap_dss_device,
-							 panel_list);
+	list_for_each_entry(ldev, &panel_list, panel_list)
 		if (strcmp(ldev->alias, dssdev->alias) > 0)
 			break;
-	}
 	list_add_tail(&dssdev->panel_list, cur);
 	mutex_unlock(&panel_list_mutex);
 	return 0;
@@ -94,12 +91,11 @@ bool omapdss_component_is_display(struct device_node *node)
 	bool found = false;
 
 	mutex_lock(&panel_list_mutex);
-	list_for_each_entry(dssdev, &panel_list, panel_list) {
+	list_for_each_entry(dssdev, &panel_list, panel_list)
 		if (dssdev->dev->of_node == node) {
 			found = true;
 			goto out;
 		}
-	}
 out:
 	mutex_unlock(&panel_list_mutex);
 	return found;
@@ -152,8 +148,7 @@ struct omap_dss_device *omap_dss_get_next_device(struct omap_dss_device *from)
 
 	omap_dss_put_device(from);
 
-	list_for_each(l, &panel_list) {
-		dssdev = list_entry(l, struct omap_dss_device, panel_list);
+	list_for_each_entry(dssdev, &panel_list, panel_list)
 		if (dssdev == from) {
 			if (list_is_last(l, &panel_list)) {
 				dssdev = NULL;
@@ -165,7 +160,6 @@ struct omap_dss_device *omap_dss_get_next_device(struct omap_dss_device *from)
 			omap_dss_get_device(dssdev);
 			goto out;
 		}
-	}
 
 	WARN(1, "'from' dssdev not found\n");
 
