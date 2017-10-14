@@ -202,7 +202,7 @@ mISDN_sock_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 	if (!skb)
 		goto done;
 
-	if (memcpy_from_msg(skb_put(skb, len), msg, len)) {
+	if (skb_memcpy_from_msg(skb, msg, len)) {
 		err = -EFAULT;
 		goto done;
 	}

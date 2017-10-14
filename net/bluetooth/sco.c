@@ -288,7 +288,7 @@ static int sco_send_frame(struct sock *sk, struct msghdr *msg, int len)
 	if (!skb)
 		return err;
 
-	if (memcpy_from_msg(skb_put(skb, len), msg, len)) {
+	if (skb_memcpy_from_msg(skb, msg, len)) {
 		kfree_skb(skb);
 		return -EFAULT;
 	}

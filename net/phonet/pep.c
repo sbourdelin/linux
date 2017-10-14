@@ -1143,7 +1143,7 @@ static int pep_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		return err;
 
 	skb_reserve(skb, MAX_PHONET_HEADER + 3 + pn->aligned);
-	err = memcpy_from_msg(skb_put(skb, len), msg, len);
+	err = skb_memcpy_from_msg(skb, msg, len);
 	if (err < 0)
 		goto outfree;
 

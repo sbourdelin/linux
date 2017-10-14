@@ -766,7 +766,7 @@ static int raw_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 	can_skb_prv(skb)->ifindex = dev->ifindex;
 	can_skb_prv(skb)->skbcnt = 0;
 
-	err = memcpy_from_msg(skb_put(skb, size), msg, size);
+	err = skb_memcpy_from_msg(skb, msg, size);
 	if (err < 0)
 		goto free_skb;
 
@@ -813,7 +813,7 @@ static int raw_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 	else
 		size = skb->len;
 
-	err = memcpy_to_msg(msg, skb->data, size);
+	err = skb_memcpy_to_msg(msg, skb, size);
 	if (err < 0) {
 		skb_free_datagram(sk, skb);
 		return err;

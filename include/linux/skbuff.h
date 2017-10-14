@@ -3294,6 +3294,16 @@ int skb_vlan_push(struct sk_buff *skb, __be16 vlan_proto, u16 vlan_tci);
 struct sk_buff *pskb_extract(struct sk_buff *skb, int off, int to_copy,
 			     gfp_t gfp);
 
+static inline int skb_memcpy_from_msg(struct sk_buff *skb, struct msghdr *msg, int len)
+{
+	return memcpy_from_msg(skb_put(skb, len), msg, len);
+}
+
+static inline int skb_memcpy_to_msg(struct msghdr *msg, struct sk_buff *skb, int len)
+{
+	return memcpy_to_msg(msg, skb->data, len);
+}
+
 struct skb_checksum_ops {
 	__wsum (*update)(const void *mem, int len, __wsum wsum);
 	__wsum (*combine)(__wsum csum, __wsum csum2, int offset, int len);

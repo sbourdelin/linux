@@ -1658,7 +1658,7 @@ static int atalk_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 
 	SOCK_DEBUG(sk, "SK %p: Copy user data (%zd bytes).\n", sk, len);
 
-	err = memcpy_from_msg(skb_put(skb, len), msg, len);
+	err = skb_memcpy_from_msg(skb, msg, len);
 	if (err) {
 		kfree_skb(skb);
 		err = -EFAULT;

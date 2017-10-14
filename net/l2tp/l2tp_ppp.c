@@ -329,7 +329,7 @@ static int pppol2tp_sendmsg(struct socket *sock, struct msghdr *m,
 	skb_put(skb, 2);
 
 	/* Copy user data into skb */
-	error = memcpy_from_msg(skb_put(skb, total_len), m, total_len);
+	error = skb_memcpy_from_msg(skb, m, total_len);
 	if (error < 0) {
 		kfree_skb(skb);
 		goto error_put_sess_tun;

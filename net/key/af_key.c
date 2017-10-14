@@ -3637,7 +3637,7 @@ static int pfkey_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 		goto out;
 
 	err = -EFAULT;
-	if (memcpy_from_msg(skb_put(skb,len), msg, len))
+	if (skb_memcpy_from_msg(skb, msg, len))
 		goto out;
 
 	hdr = pfkey_get_base_msg(skb, &err);
