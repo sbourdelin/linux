@@ -38,12 +38,15 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
+#include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/types.h>
+#include <linux/uaccess.h>
 #include <linux/uuid.h>
 #include <linux/wmi.h>
+#include <uapi/linux/wmi.h>
 
 ACPI_MODULE_NAME("wmi");
 MODULE_AUTHOR("Carlos Corbacho");
@@ -69,6 +72,7 @@ struct wmi_block {
 	struct wmi_device dev;
 	struct list_head list;
 	struct guid_block gblock;
+	struct miscdevice misc_dev;
 	struct acpi_device *acpi_device;
 	wmi_notify_handler handler;
 	void *handler_data;
@@ -796,12 +800,119 @@ static int wmi_dev_match(struct device *dev, struct device_driver *driver)
 	return 0;
 }
 
+static long match_ioctl(struct file *filp, unsigned int cmd, unsigned long arg,
+			int compat)
+{
+	struct wmi_ioctl_buffer __user *input =
+		(struct wmi_ioctl_buffer __user *) arg;
+	struct wmi_driver *wdriver = NULL;
+	struct wmi_block *wblock = NULL;
+	struct wmi_block *next = NULL;
+	const char *driver_name;
+	u64 size;
+	int ret;
+
+	if (_IOC_TYPE(cmd) != WMI_IOC)
+		return -ENOTTY;
+
+	driver_name = filp->f_path.dentry->d_iname;
+
+	list_for_each_entry_safe(wblock, next, &wmi_block_list, list) {
+		wdriver = container_of(wblock->dev.dev.driver,
+					struct wmi_driver, driver);
+		if (!wdriver)
+			continue;
+		if (strcmp(driver_name, wdriver->driver.name) == 0)
+			break;
+	}
+
+	if (!wdriver)
+		return -ENODEV;
+
+	/* make sure we're not calling a higher instance than exists*/
+	if (_IOC_NR(cmd) >= wblock->gblock.instance_count)
+		return -EINVAL;
+
+	/* check that required buffer size was declared by driver */
+	if (!wblock->req_buf_size) {
+		dev_err(&wblock->dev.dev, "Required buffer size not set\n");
+		return -EINVAL;
+	}
+	if (get_user(size, &input->length)) {
+		dev_dbg(&wblock->dev.dev, "Read length from user failed\n");
+		return -EFAULT;
+	}
+	/* if it's too small, abort */
+	if (size < wblock->req_buf_size) {
+		dev_err(&wblock->dev.dev,
+			"Buffer %lld too small, need at least %lld\n",
+			size, wblock->req_buf_size);
+		return -EINVAL;
+	}
+	/* if it's too big, warn, driver will only use what is needed */
+	if (size > wblock->req_buf_size)
+		dev_warn(&wblock->dev.dev,
+			"Buffer %lld is bigger than required %lld\n",
+			size, wblock->req_buf_size);
+
+	if (!try_module_get(wdriver->driver.owner))
+		return -EBUSY;
+	if (compat) {
+		if (wdriver->compat_ioctl)
+			ret = wdriver->compat_ioctl(&wblock->dev, cmd, arg);
+		else
+			ret = -ENODEV;
+	} else
+		ret = wdriver->unlocked_ioctl(&wblock->dev, cmd, arg);
+	module_put(wdriver->driver.owner);
+
+	return ret;
+}
+static long wmi_unlocked_ioctl(struct file *filp, unsigned int cmd,
+			       unsigned long arg)
+{
+	return match_ioctl(filp, cmd, arg, 0);
+}
+
+static long wmi_compat_ioctl(struct file *filp, unsigned int cmd,
+			     unsigned long arg)
+{
+	return match_ioctl(filp, cmd, arg, 1);
+}
+
+static const struct file_operations wmi_fops = {
+	.owner		= THIS_MODULE,
+	.unlocked_ioctl	= wmi_unlocked_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = wmi_compat_ioctl,
+#endif
+};
+
 static int wmi_dev_probe(struct device *dev)
 {
 	struct wmi_block *wblock = dev_to_wblock(dev);
 	struct wmi_driver *wdriver =
 		container_of(dev->driver, struct wmi_driver, driver);
 	int ret = 0;
+	char *buf;
+
+	/* driver wants a character device made */
+	if (wdriver->unlocked_ioctl) {
+		buf = kmalloc(strlen(wdriver->driver.name) + 4, GFP_KERNEL);
+		if (!buf)
+			return -ENOMEM;
+		sprintf(buf, "wmi/%s", wdriver->driver.name);
+		wblock->misc_dev.minor = MISC_DYNAMIC_MINOR;
+		wblock->misc_dev.name = buf;
+		wblock->misc_dev.fops = &wmi_fops;
+		wblock->misc_dev.mode = 0444;
+		ret = misc_register(&wblock->misc_dev);
+		if (ret) {
+			dev_warn(dev, "failed to register char dev: %d", ret);
+			kfree(buf);
+			return -ENOMEM;
+		}
+	}
 
 	if (ACPI_FAILURE(wmi_method_enable(wblock, 1)))
 		dev_warn(dev, "failed to enable device -- probing anyway\n");
@@ -821,6 +932,11 @@ static int wmi_dev_remove(struct device *dev)
 	struct wmi_driver *wdriver =
 		container_of(dev->driver, struct wmi_driver, driver);
 	int ret = 0;
+
+	if (wdriver->unlocked_ioctl) {
+		misc_deregister(&wblock->misc_dev);
+		kfree(wblock->misc_dev.name);
+	}
 
 	if (wdriver->remove)
 		ret = wdriver->remove(dev_to_wdev(dev));

@@ -50,6 +50,12 @@ struct wmi_driver {
 	int (*probe)(struct wmi_device *wdev);
 	int (*remove)(struct wmi_device *wdev);
 	void (*notify)(struct wmi_device *device, union acpi_object *data);
+	long (*unlocked_ioctl)(struct wmi_device *wdev, unsigned int cmd,
+				unsigned long arg);
+#ifdef CONFIG_COMPAT
+	long (*compat_ioctl)(struct wmi_device *wdev, unsigned int cmd,
+				unsigned long arg);
+#endif
 };
 
 extern int __must_check __wmi_driver_register(struct wmi_driver *driver,
