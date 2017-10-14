@@ -30,17 +30,6 @@ struct misc_bios_flags_structure {
 
 #define DELL_WMI_SMBIOS_GUID "A80593CE-A997-11DA-B012-B622A1EF5492"
 
-struct dell_wmi_extensions {
-	__u32 argattrib;
-	__u32 blength;
-	__u8 data[];
-} __packed;
-
-struct dell_wmi_smbios_buffer {
-	struct calling_interface_buffer std;
-	struct dell_wmi_extensions ext;
-} __packed;
-
 struct wmi_smbios_priv {
 	struct dell_wmi_smbios_buffer *buf;
 	struct list_head list;
@@ -117,6 +106,66 @@ int dell_smbios_wmi_call(struct calling_interface_buffer *buffer)
 	return ret;
 }
 
+static void _debug_ioctl(struct device *d, unsigned int expected,
+			unsigned int cmd)
+{
+	if (_IOC_DIR(expected) != _IOC_DIR(cmd))
+		dev_dbg(d, "Invalid _IOC_DIR: %d\n", _IOC_DIR(cmd));
+	if (_IOC_TYPE(expected) != _IOC_TYPE(cmd))
+		dev_dbg(d, "Invalid _IOC_TYPE: %d\n", _IOC_TYPE(cmd));
+	if (_IOC_NR(expected) != _IOC_NR(cmd))
+		dev_dbg(d, "Invalid _IOC_NR: %d\n", _IOC_NR(cmd));
+	if (_IOC_SIZE(expected) != _IOC_SIZE(cmd))
+		dev_dbg(d, "Invalid _IOC_SIZE: %d\n", _IOC_SIZE(cmd));
+}
+
+static long dell_smbios_wmi_ioctl(struct wmi_device *wdev, unsigned int cmd,
+				  unsigned long arg)
+{
+	void __user *input = (void __user *) arg;
+	struct wmi_smbios_priv *priv;
+	int ret = 0;
+
+	switch (cmd) {
+	case DELL_WMI_SMBIOS_CMD:
+		priv = dev_get_drvdata(&wdev->dev);
+		if (!priv)
+			return -ENODEV;
+		mutex_lock(&call_mutex);
+		/* read the structure from userspace */
+		if (copy_from_user(priv->buf, input, priv->req_buf_size)) {
+			dev_dbg(&wdev->dev, "Copy %d from user failed\n",
+				priv->req_buf_size);
+			ret = -EFAULT;
+			goto fail_smbios_cmd;
+		}
+		/* check for any calls we should avoid */
+		if (dell_smbios_call_filter(&wdev->dev, &priv->buf->std)) {
+			dev_err(&wdev->dev, "Invalid call %d/%d:%8x\n",
+				priv->buf->std.class, priv->buf->std.select,
+				priv->buf->std.input[0]);
+			ret = -EFAULT;
+			goto fail_smbios_cmd;
+		}
+		ret = run_smbios_call(priv->wdev);
+		if (ret != 0)
+			goto fail_smbios_cmd;
+		/* return the result (only up to our internal buffer size) */
+		if (copy_to_user(input, priv->buf, priv->req_buf_size)) {
+			dev_dbg(&wdev->dev, "Copy %d to user failed\n",
+			priv->req_buf_size);
+			ret = -EFAULT;
+		}
+fail_smbios_cmd:
+		mutex_unlock(&call_mutex);
+		break;
+	default:
+		_debug_ioctl(&wdev->dev, DELL_WMI_SMBIOS_CMD, cmd);
+		ret = -ENOIOCTLCMD;
+	}
+	return ret;
+}
+
 static int dell_smbios_wmi_probe(struct wmi_device *wdev)
 {
 	struct wmi_smbios_priv *priv;
@@ -131,6 +180,12 @@ static int dell_smbios_wmi_probe(struct wmi_device *wdev)
 	/* WMI buffer size will be either 4k or 32k depending on machine */
 	if (!dell_wmi_get_size(&priv->req_buf_size))
 		return -EPROBE_DEFER;
+	/* add in the length object we will use internally with ioctl */
+	priv->req_buf_size += sizeof(u64);
+
+	ret = set_required_buffer_size(wdev, 0, priv->req_buf_size);
+	if (ret)
+		return ret;
 
 	count = get_order(priv->req_buf_size);
 	priv->buf = (void *)__get_free_pages(GFP_KERNEL, count);
@@ -207,6 +262,10 @@ static struct wmi_driver dell_smbios_wmi_driver = {
 	.probe = dell_smbios_wmi_probe,
 	.remove = dell_smbios_wmi_remove,
 	.id_table = dell_smbios_wmi_id_table,
+	.unlocked_ioctl = dell_smbios_wmi_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = dell_smbios_wmi_ioctl,
+#endif
 };
 
 static int __init init_dell_smbios_wmi(void)
