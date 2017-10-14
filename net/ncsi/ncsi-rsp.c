@@ -686,11 +686,8 @@ static int ncsi_rsp_handler_gc(struct ncsi_request *nr)
 
 		size = sizeof(*ncf) + cnt * entry_size;
 		ncf = kzalloc(size, GFP_ATOMIC);
-		if (!ncf) {
-			pr_warn("%s: Cannot alloc filter table (%d)\n",
-				__func__, i);
+		if (!ncf)
 			return -ENOMEM;
-		}
 
 		ncf->index = i;
 		ncf->total = cnt;
