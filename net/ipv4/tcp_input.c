@@ -4807,7 +4807,8 @@ restart:
 		start = TCP_SKB_CB(skb)->end_seq;
 	}
 	if (end_of_skbs ||
-	    (TCP_SKB_CB(skb)->tcp_flags & (TCPHDR_SYN | TCPHDR_FIN)))
+	    (TCP_SKB_CB(skb)->tcp_flags & (TCPHDR_SYN | TCPHDR_FIN)) ||
+	    (TCP_SKB_CB(skb)->seq == start && TCP_SKB_CB(skb)->end_seq == end))
 		return;
 
 	__skb_queue_head_init(&tmp);
