@@ -3801,7 +3801,6 @@ void ceph_mdsc_handle_fsmap(struct ceph_mds_client *mdsc, struct ceph_msg *msg)
 	u32 num_fs;
 	u32 mount_fscid = (u32)-1;
 	u8 struct_v, struct_cv;
-	int err = -EINVAL;
 
 	ceph_decode_need(&p, end, sizeof(u32), bad);
 	epoch = ceph_decode_32(&p);
@@ -3852,7 +3851,6 @@ void ceph_mdsc_handle_fsmap(struct ceph_mds_client *mdsc, struct ceph_msg *msg)
 				   0, true);
 		ceph_monc_renew_subs(&fsc->client->monc);
 	} else {
-		err = -ENOENT;
 		goto err_out;
 	}
 	return;
