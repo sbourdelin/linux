@@ -642,6 +642,8 @@ static int mtk_pcie_setup_irq(struct mtk_pcie_port *port,
 	int err, irq;
 
 	irq = platform_get_irq(pdev, port->slot);
+	if (irq < 0)
+		return irq;
 	err = devm_request_irq(dev, irq, mtk_pcie_intr_handler,
 			       IRQF_SHARED, "mtk-pcie", port);
 	if (err) {
