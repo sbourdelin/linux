@@ -4775,6 +4775,14 @@ tcp_collapse(struct sock *sk, struct sk_buff_head *list, struct rb_root *root,
 	 */
 restart:
 	for (end_of_skbs = true; skb != NULL && skb != tail; skb = n) {
+		/* If list is ooo queue, it will get purged when
+		 * this FIN will get moved to sk_receive_queue.
+		 * SYN packet is not expected here. We will get
+		 * error message when actual receiving.
+		 */
+		if (TCP_SKB_CB(skb)->tcp_flags & (TCPHDR_FIN | TCPHDR_SYN))
+			return;
+
 		n = tcp_skb_next(skb, list);
 
 		/* No new bits? It is possible on ofo queue. */
@@ -4786,13 +4794,11 @@ restart:
 		}
 
 		/* The first skb to collapse is:
-		 * - not SYN/FIN and
 		 * - bloated or contains data before "start" or
 		 *   overlaps to the next one.
 		 */
-		if (!(TCP_SKB_CB(skb)->tcp_flags & (TCPHDR_SYN | TCPHDR_FIN)) &&
-		    (tcp_win_from_space(skb->truesize) > skb->len ||
-		     before(TCP_SKB_CB(skb)->seq, start))) {
+		if (tcp_win_from_space(skb->truesize) > skb->len ||
+		    before(TCP_SKB_CB(skb)->seq, start)) {
 			end_of_skbs = false;
 			break;
 		}
@@ -4807,7 +4813,6 @@ restart:
 		start = TCP_SKB_CB(skb)->end_seq;
 	}
 	if (end_of_skbs ||
-	    (TCP_SKB_CB(skb)->tcp_flags & (TCPHDR_SYN | TCPHDR_FIN)) ||
 	    (TCP_SKB_CB(skb)->seq == start && TCP_SKB_CB(skb)->end_seq == end))
 		return;
 
@@ -4845,9 +4850,7 @@ restart:
 			}
 			if (!before(start, TCP_SKB_CB(skb)->end_seq)) {
 				skb = tcp_collapse_one(sk, skb, list, root);
-				if (!skb ||
-				    skb == tail ||
-				    (TCP_SKB_CB(skb)->tcp_flags & (TCPHDR_SYN | TCPHDR_FIN)))
+				if (!skb || skb == tail)
 					goto end;
 			}
 		}
