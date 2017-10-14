@@ -72,6 +72,7 @@ struct wmi_block {
 	struct acpi_device *acpi_device;
 	wmi_notify_handler handler;
 	void *handler_data;
+	u64 req_buf_size;
 
 	bool read_takes_no_args;
 };
@@ -188,6 +189,26 @@ static acpi_status wmi_method_enable(struct wmi_block *wblock, int enable)
 /*
  * Exported WMI functions
  */
+
+/**
+ * set_required_buffer_size - Sets the buffer size needed for performing IOCTL
+ * @wdev: A wmi bus device from a driver
+ * @instance: Instance index
+ *
+ * Allocates memory needed for buffer, stores the buffer size in that memory
+ */
+int set_required_buffer_size(struct wmi_device *wdev, u8 instance, u64 length)
+{
+	struct wmi_block *wblock;
+
+	wblock = container_of(wdev, struct wmi_block, dev);
+	if (!wblock)
+		return -ENODEV;
+	wblock->req_buf_size = length;
+	return 0;
+}
+EXPORT_SYMBOL_GPL(set_required_buffer_size);
+
 /**
  * wmi_evaluate_method - Evaluate a WMI method
  * @guid_string: 36 char string of the form fa50ff2b-f2e8-45de-83fa-65417f2f49ba
@@ -718,8 +739,18 @@ static struct attribute *wmi_data_attrs[] = {
 };
 ATTRIBUTE_GROUPS(wmi_data);
 
+static ssize_t required_buffer_size_show(struct device *dev,
+				      struct device_attribute *attr, char *buf)
+{
+	struct wmi_block *wblock = dev_to_wblock(dev);
+
+	return sprintf(buf, "%lld\n", wblock->req_buf_size);
+}
+static DEVICE_ATTR_RO(required_buffer_size);
+
 static struct attribute *wmi_method_attrs[] = {
 	&dev_attr_object_id.attr,
+	&dev_attr_required_buffer_size.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(wmi_method);
