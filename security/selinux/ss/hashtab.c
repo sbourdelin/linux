@@ -146,8 +146,6 @@ void hashtab_stat(struct hashtab *h, struct hashtab_info *info)
 	u32 i, chain_len, slots_used, max_chain_len;
 	struct hashtab_node *cur;
 
-	slots_used = 0;
-	max_chain_len = 0;
 	for (slots_used = max_chain_len = i = 0; i < h->size; i++) {
 		cur = h->htable[i];
 		if (cur) {
