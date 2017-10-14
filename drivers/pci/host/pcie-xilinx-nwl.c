@@ -591,7 +591,7 @@ static int nwl_pcie_enable_msi(struct nwl_pcie *pcie)
 	msi->irq_msi1 = platform_get_irq_byname(pdev, "msi1");
 	if (msi->irq_msi1 < 0) {
 		dev_err(dev, "failed to get IRQ#%d\n", msi->irq_msi1);
-		ret = -EINVAL;
+		ret = msi->irq_msi1;
 		goto err;
 	}
 
@@ -602,7 +602,7 @@ static int nwl_pcie_enable_msi(struct nwl_pcie *pcie)
 	msi->irq_msi0 = platform_get_irq_byname(pdev, "msi0");
 	if (msi->irq_msi0 < 0) {
 		dev_err(dev, "failed to get IRQ#%d\n", msi->irq_msi0);
-		ret = -EINVAL;
+		ret = msi->irq_msi0;
 		goto err;
 	}
 
@@ -735,7 +735,7 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
 	if (pcie->irq_misc < 0) {
 		dev_err(dev, "failed to get misc IRQ %d\n",
 			pcie->irq_misc);
-		return -EINVAL;
+		return pcie->irq_misc;
 	}
 
 	err = devm_request_irq(dev, pcie->irq_misc,
