@@ -510,7 +510,8 @@ static void xen_9pfs_front_changed(struct xenbus_device *dev,
 	case XenbusStateClosed:
 		if (dev->state == XenbusStateClosed)
 			break;
-		/* Missed the backend's CLOSING state -- fallthrough */
+		/* Missed the backend's CLOSING state */
+		/* fall through */
 	case XenbusStateClosing:
 		xenbus_frontend_closed(dev);
 		break;
