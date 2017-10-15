@@ -4090,14 +4090,7 @@ static int hpsa_set_local_logical_count(struct ctlr_info *h,
 	}
 	memset(id_ctlr, 0, sizeof(*id_ctlr));
 	rc = hpsa_bmic_id_controller(h, id_ctlr, sizeof(*id_ctlr));
-	if (!rc)
-		if (id_ctlr->configured_logical_drive_count < 256)
-			*nlocals = id_ctlr->configured_logical_drive_count;
-		else
-			*nlocals = le16_to_cpu(
-					id_ctlr->extended_logical_unit_count);
-	else
-		*nlocals = -1;
+	*nlocals = rc ? -1 : id_ctlr->configured_logical_drive_count;
 	return rc;
 }
 
