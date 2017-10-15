@@ -118,9 +118,6 @@ struct korina_private {
 	struct sk_buff *rx_skb[KORINA_NUM_RDS];
 
 	int rx_next_done;
-	int rx_chain_head;
-	int rx_chain_tail;
-	enum chain_status rx_chain_status;
 
 	int tx_next_done;
 	int tx_chain_head;
@@ -135,7 +132,6 @@ struct korina_private {
 	spinlock_t lock;	/* NIC xmit lock */
 
 	int dma_halt_cnt;
-	int dma_run_cnt;
 	struct napi_struct napi;
 	struct timer_list media_check_timer;
 	struct mii_if_info mii_if;
@@ -770,9 +766,6 @@ static int korina_alloc_ring(struct net_device *dev)
 	lp->rd_ring[i - 1].control |= DMA_DESC_COD;
 
 	lp->rx_next_done  = 0;
-	lp->rx_chain_head = 0;
-	lp->rx_chain_tail = 0;
-	lp->rx_chain_status = desc_empty;
 
 	return 0;
 }
