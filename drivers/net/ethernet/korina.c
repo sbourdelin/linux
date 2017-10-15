@@ -542,11 +542,10 @@ korina_tx_dma_interrupt(int irq, void *dev_id)
 	struct net_device *dev = dev_id;
 	struct korina_private *lp = netdev_priv(dev);
 	u32 dmas;
-	irqreturn_t retval;
 
 	dmas = readl(&lp->tx_dma_regs->dmas);
 
-	if (dmas & (DMA_STAT_FINI | DMA_STAT_ERR)) {
+	if (likely(dmas & KORINA_INT_TX)) {
 		korina_int_disable_tx(lp);
 
 		korina_tx(dev);
@@ -559,14 +558,14 @@ korina_tx_dma_interrupt(int irq, void *dev_id)
 			lp->tx_chain_head = lp->tx_chain_tail;
 			netif_trans_update(dev);
 		}
-		if (dmas & DMA_STAT_ERR)
-			printk(KERN_ERR "%s: DMA error\n", dev->name);
 
-		retval = IRQ_HANDLED;
-	} else
-		retval = IRQ_NONE;
+		if (unlikely(dmas & DMA_STAT_ERR))
+			lp->dma_halt_cnt++;
 
-	return retval;
+		return IRQ_HANDLED;
+	}
+
+	return IRQ_NONE;
 }
 
 /* Ethernet Rx DMA interrupt */
@@ -575,22 +574,21 @@ static irqreturn_t korina_rx_dma_interrupt(int irq, void *dev_id)
 	struct net_device *dev = dev_id;
 	struct korina_private *lp = netdev_priv(dev);
 	u32 dmas;
-	irqreturn_t retval;
 
 	dmas = readl(&lp->rx_dma_regs->dmas);
-	if (dmas & (DMA_STAT_DONE | DMA_STAT_HALT | DMA_STAT_ERR)) {
+
+	if (likely(dmas & KORINA_INT_RX)) {
 		korina_int_disable_rx(lp);
 
 		napi_schedule(&lp->napi);
 
-		if (dmas & DMA_STAT_ERR)
-			printk(KERN_ERR "%s: DMA error\n", dev->name);
+		if (unlikely(dmas & DMA_STAT_ERR))
+			lp->dma_halt_cnt++;
 
-		retval = IRQ_HANDLED;
-	} else
-		retval = IRQ_NONE;
+		return IRQ_HANDLED;
+	}
 
-	return retval;
+	return IRQ_NONE;
 }
 
 /*
