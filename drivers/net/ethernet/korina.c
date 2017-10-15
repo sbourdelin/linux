@@ -124,7 +124,6 @@ struct korina_private {
 	int tx_chain_tail;
 	enum chain_status tx_chain_status;
 	int tx_count;
-	int tx_full;
 
 	int rx_irq;
 	int tx_irq;
@@ -261,18 +260,9 @@ static int korina_send_packet(struct sk_buff *skb, struct net_device *dev)
 
 	td = &lp->td_ring[lp->tx_chain_tail];
 
-	/* stop queue when full, drop pkts if queue already full */
-	if (lp->tx_count >= (KORINA_NUM_TDS - 2)) {
-		lp->tx_full = 1;
+	/* stop queue when full */
+	if (unlikely(lp->tx_count > (KORINA_NUM_TDS - 3)))
 		netif_stop_queue(dev);
-
-		if (lp->tx_count > (KORINA_NUM_TDS - 2)) {
-			dev->stats.tx_dropped++;
-			dev_kfree_skb_any(skb);
-
-			return NETDEV_TX_BUSY;
-		}
-	}
 
 	lp->tx_count++;
 	lp->tx_skb[lp->tx_chain_tail] = skb;
@@ -323,10 +313,8 @@ static void korina_tx(struct net_device *dev)
 
 	/* Process all desc that are done */
 	while (IS_DMA_FINISHED(td->control)) {
-		if (lp->tx_full == 1) {
+		if (unlikely(lp->tx_count > (KORINA_NUM_TDS - 2)))
 			netif_wake_queue(dev);
-			lp->tx_full = 0;
-		}
 
 		devcs = lp->td_ring[lp->tx_next_done].devcs;
 
@@ -696,7 +684,7 @@ static int korina_alloc_ring(struct net_device *dev)
 		lp->td_ring[i].link = 0;
 	}
 	lp->tx_next_done = lp->tx_chain_head = lp->tx_chain_tail =
-			lp->tx_full = lp->tx_count = 0;
+			lp->tx_count = 0;
 	lp->tx_chain_status = desc_empty;
 
 	/* Initialize the receive descriptors */
