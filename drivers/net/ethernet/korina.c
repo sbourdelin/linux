@@ -342,43 +342,33 @@ static void korina_tx(struct net_device *dev)
 		}
 
 		devcs = lp->td_ring[lp->tx_next_done].devcs;
-		if ((devcs & (ETH_TX_FD | ETH_TX_LD)) !=
-				(ETH_TX_FD | ETH_TX_LD)) {
-			dev->stats.tx_errors++;
-			dev->stats.tx_dropped++;
 
-			/* Should never happen */
-			printk(KERN_ERR "%s: split tx ignored\n",
-							dev->name);
-		} else if (devcs & ETH_TX_TOK) {
-			dev->stats.tx_packets++;
-			dev->stats.tx_bytes +=
-					lp->tx_skb[lp->tx_next_done]->len;
-		} else {
+		if (!(devcs & ETH_TX_TOK)) {
 			dev->stats.tx_errors++;
 			dev->stats.tx_dropped++;
 
 			/* Underflow */
 			if (devcs & ETH_TX_UND)
 				dev->stats.tx_fifo_errors++;
-
 			/* Oversized frame */
 			if (devcs & ETH_TX_OF)
 				dev->stats.tx_aborted_errors++;
-
 			/* Excessive deferrals */
 			if (devcs & ETH_TX_ED)
 				dev->stats.tx_carrier_errors++;
-
 			/* Collisions: medium busy */
 			if (devcs & ETH_TX_EC)
 				dev->stats.collisions++;
-
 			/* Late collision */
 			if (devcs & ETH_TX_LC)
 				dev->stats.tx_window_errors++;
+
+			goto next;
 		}
 
+		dev->stats.tx_packets++;
+		dev->stats.tx_bytes += lp->tx_skb[lp->tx_next_done]->len;
+next:
 		/* We must always free the original skb */
 		if (lp->tx_skb[lp->tx_next_done]) {
 			dev_kfree_skb_any(lp->tx_skb[lp->tx_next_done]);
@@ -394,7 +384,6 @@ static void korina_tx(struct net_device *dev)
 		/* Go on to next transmission */
 		lp->tx_next_done = (lp->tx_next_done + 1) & KORINA_TDS_MASK;
 		td = &lp->td_ring[lp->tx_next_done];
-
 	}
 
 	/* Clear the DMA status register */
