@@ -356,10 +356,10 @@ int skb_p80211_to_ether(struct wlandevice *wlandev, u32 ethconv,
 		sizeof(struct wlan_llc));
 
 	/* Test for the various encodings */
-	if ((payload_length >= sizeof(struct wlan_ethhdr)) &&
+	if (payload_length >= sizeof(struct wlan_ethhdr) &&
 	    (e_llc->dsap != 0xaa || e_llc->ssap != 0xaa) &&
-	    ((!ether_addr_equal_unaligned(daddr, e_hdr->daddr)) ||
-	     (!ether_addr_equal_unaligned(saddr, e_hdr->saddr)))) {
+	    (!ether_addr_equal_unaligned(daddr, e_hdr->daddr) ||
+	     !ether_addr_equal_unaligned(saddr, e_hdr->saddr))) {
 		pr_debug("802.3 ENCAP len: %d\n", payload_length);
 		/* 802.3 Encapsulated */
 		/* Test for an overlength frame */

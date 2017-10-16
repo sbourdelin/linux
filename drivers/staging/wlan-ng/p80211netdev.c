@@ -427,7 +427,7 @@ static int p80211knetdev_hard_start_xmit(struct sk_buff *skb,
 
 failed:
 	/* Free up the WEP buffer if it's not the same as the skb */
-	if ((p80211_wep.data) && (p80211_wep.data != skb->data))
+	if (p80211_wep.data && p80211_wep.data != skb->data)
 		kzfree(p80211_wep.data);
 
 	/* we always free the skb here, never in a lower level. */
@@ -491,7 +491,7 @@ static int p80211netdev_ethtool(struct wlandevice *wlandev,
 		edata.cmd = ethcmd;
 
 		if (wlandev->linkstatus &&
-		    (wlandev->macmode != WLAN_MACMODE_NONE)) {
+		    wlandev->macmode != WLAN_MACMODE_NONE) {
 			edata.data = 1;
 		} else {
 			edata.data = 0;

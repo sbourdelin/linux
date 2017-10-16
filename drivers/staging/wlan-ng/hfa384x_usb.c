@@ -1781,9 +1781,9 @@ int hfa384x_drvr_enable(struct hfa384x *hw, u16 macport)
 {
 	int result = 0;
 
-	if ((!hw->isap && macport != 0) ||
-	    (hw->isap && !(macport <= HFA384x_PORTID_MAX)) ||
-	    (hw->port_enabled[macport])) {
+	if (!hw->isap && macport != 0 ||
+	    hw->isap && !(macport <= HFA384x_PORTID_MAX) ||
+	    hw->port_enabled[macport]) {
 		result = -EINVAL;
 	} else {
 		result = hfa384x_cmd_enable(hw, macport);
@@ -2465,7 +2465,7 @@ int hfa384x_drvr_start(struct hfa384x *hw)
 		netdev_err(hw->wlandev->netdev, "Cannot get bulk in endpoint status.\n");
 		goto done;
 	}
-	if ((status == 1) && usb_clear_halt(hw->usb, hw->endp_in))
+	if (status == 1 && usb_clear_halt(hw->usb, hw->endp_in))
 		netdev_err(hw->wlandev->netdev, "Failed to reset bulk in endpoint.\n");
 
 	result =
@@ -2474,7 +2474,7 @@ int hfa384x_drvr_start(struct hfa384x *hw)
 		netdev_err(hw->wlandev->netdev, "Cannot get bulk out endpoint status.\n");
 		goto done;
 	}
-	if ((status == 1) && usb_clear_halt(hw->usb, hw->endp_out))
+	if (status == 1 && usb_clear_halt(hw->usb, hw->endp_out))
 		netdev_err(hw->wlandev->netdev, "Failed to reset bulk out endpoint.\n");
 
 	/* Synchronous unlink, in case we're trying to restart the driver */
@@ -3054,7 +3054,7 @@ static void hfa384x_usbin_callback(struct urb *urb)
 		goto exit;
 
 	skb = hw->rx_urb_skb;
-	if (!skb || (skb->data != urb->transfer_buffer)) {
+	if (!skb || skb->data != urb->transfer_buffer) {
 		WARN_ON(1);
 		return;
 	}
@@ -3501,8 +3501,8 @@ static void hfa384x_int_rxmonitor(struct wlandevice *wlandev,
 		return;
 
 	/* only prepend the prism header if in the right mode */
-	if ((wlandev->netdev->type == ARPHRD_IEEE80211_PRISM) &&
-	    (hw->sniffhdr != 0)) {
+	if (wlandev->netdev->type == ARPHRD_IEEE80211_PRISM &&
+	    hw->sniffhdr != 0) {
 		struct p80211_caphdr *caphdr;
 		/* The NEW header format! */
 		datap = skb_put(skb, sizeof(struct p80211_caphdr));
@@ -3772,7 +3772,7 @@ delresp:
 
 	spin_unlock_irqrestore(&hw->ctlxq.lock, flags);
 
-	if (!timer_ok && (hw->resp_timer_done == 0)) {
+	if (!timer_ok && hw->resp_timer_done == 0) {
 		spin_lock_irqsave(&hw->ctlxq.lock, flags);
 		goto delresp;
 	}
