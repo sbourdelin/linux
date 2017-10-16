@@ -741,6 +741,13 @@ struct drm_mode_config {
 	 */
 	struct drm_property *suggested_y_property;
 
+	/**
+	 * @non_std_display_property: Optional connector property with a hint
+	 * that device isn't a standard display, and the console/desktop,
+	 * should not be displayed on it.
+	 */
+	struct drm_property *non_std_display_property;
+
 	/* dumb ioctl parameters */
 	uint32_t preferred_depth, prefer_shadow;
 

@@ -284,6 +284,11 @@ struct drm_display_info {
 	 * @hdmi: advance features of a HDMI sink.
 	 */
 	struct drm_hdmi_info hdmi;
+
+	/**
+	 * @non_std: Non standard display device (HMD).
+	 */
+	bool non_std;
 };
 
 int drm_display_info_set_bus_formats(struct drm_display_info *info,
