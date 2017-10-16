@@ -1057,6 +1057,16 @@ config MFD_SMSC
         To compile this driver as a module, choose M here: the
         module will be called smsc.
 
+config MFD_SC27XX_PMIC
+	tristate "Spreadtrum SC27xx PMICs"
+	depends on ARCH_SPRD || COMPILE_TEST
+	depends on SPI_MASTER
+	select MFD_CORE
+	select REGMAP_SPI
+	select REGMAP_IRQ
+	help
+	  This enables support for the Spreadtrum SC27xx PMICs.
+
 config ABX500_CORE
 	bool "ST-Ericsson ABX500 Mixed Signal Circuit register functions"
 	default y if ARCH_U300 || ARCH_U8500 || COMPILE_TEST
