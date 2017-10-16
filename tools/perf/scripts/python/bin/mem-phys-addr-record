@@ -1,0 +1,30 @@
+#!/bin/bash
+
+#
+# Profiling physical memory accesses
+#
+
+load=`perf list pmu | grep mem-loads`
+store=`perf list pmu | grep mem-stores`
+if [ -z "$load" ] && [ -z "$store" ] ; then
+	echo "There is no mem-loads or mem-stores support"
+	exit 1
+fi
+
+arg="-e"
+if [ ! -z "$store" ] ; then
+	arg="$arg mem-stores:P"
+fi
+
+if [ ! -z "$load" ] ; then
+	if [ ! -z "$store" ] ; then
+		arg="$arg,mem-loads:P"
+	else
+		arg="$arg mem-loads:P"
+	fi
+	arg="$arg -W"
+fi
+
+arg="$arg -d --phys-data"
+
+perf record $arg $@
