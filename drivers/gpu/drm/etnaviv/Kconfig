@@ -4,6 +4,7 @@ config DRM_ETNAVIV
 	depends on DRM
 	depends on ARCH_MXC || ARCH_DOVE || (ARM && COMPILE_TEST)
 	depends on MMU
+	depends on THERMAL || !THERMAL # if THERMAL=m, this can't be 'y'
 	select SHMEM
 	select SYNC_FILE
 	select TMPFS
