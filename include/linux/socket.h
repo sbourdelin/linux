@@ -2,6 +2,7 @@
 #define _LINUX_SOCKET_H
 
 
+#include <linux/errno.h>
 #include <asm/socket.h>			/* arch-dependent defines	*/
 #include <linux/sockios.h>		/* the SIOCxxx I/O controls	*/
 #include <linux/uio.h>			/* iovec support		*/
@@ -53,7 +54,17 @@ struct msghdr {
 	unsigned int	msg_flags;	/* flags on received message */
 	struct kiocb	*msg_iocb;	/* ptr to iocb for async requests */
 };
- 
+
+static inline int memcpy_from_msg(void *data, struct msghdr *msg, int len)
+{
+	return copy_from_iter_full(data, len, &msg->msg_iter) ? 0 : -EFAULT;
+}
+
+static inline int memcpy_to_msg(struct msghdr *msg, void *data, int len)
+{
+	return copy_to_iter(data, len, &msg->msg_iter) == len ? 0 : -EFAULT;
+}
+
 struct user_msghdr {
 	void		__user *msg_name;	/* ptr to socket address structure */
 	int		msg_namelen;		/* size of socket address structure */
