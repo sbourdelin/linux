@@ -229,7 +229,7 @@ int ipxrtr_route_packet(struct sock *sk, struct sockaddr_ipx *usipx,
 	memcpy(ipx->ipx_dest.node, usipx->sipx_node, IPX_NODE_LEN);
 	ipx->ipx_dest.sock		= usipx->sipx_port;
 
-	rc = memcpy_from_msg(skb_put(skb, len), msg, len);
+	rc = skb_memcpy_from_msg(skb, msg, len);
 	if (rc) {
 		kfree_skb(skb);
 		goto out_put;

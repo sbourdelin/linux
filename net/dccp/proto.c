@@ -785,7 +785,7 @@ int dccp_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		goto out_release;
 
 	skb_reserve(skb, sk->sk_prot->max_header);
-	rc = memcpy_from_msg(skb_put(skb, len), msg, len);
+	rc = skb_memcpy_from_msg(skb, msg, len);
 	if (rc != 0)
 		goto out_discard;
 

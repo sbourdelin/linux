@@ -1269,7 +1269,7 @@ static int bcm_tx_send(struct msghdr *msg, int ifindex, struct sock *sk,
 
 	can_skb_reserve(skb);
 
-	err = memcpy_from_msg(skb_put(skb, cfsiz), msg, cfsiz);
+	err = skb_memcpy_from_msg(skb, msg, cfsiz);
 	if (err < 0) {
 		kfree_skb(skb);
 		return err;
@@ -1642,7 +1642,7 @@ static int bcm_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 	if (skb->len < size)
 		size = skb->len;
 
-	err = memcpy_to_msg(msg, skb->data, size);
+	err = skb_memcpy_to_msg(msg, skb, size);
 	if (err < 0) {
 		skb_free_datagram(sk, skb);
 		return err;

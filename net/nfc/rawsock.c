@@ -230,7 +230,7 @@ static int rawsock_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 	if (skb == NULL)
 		return rc;
 
-	rc = memcpy_from_msg(skb_put(skb, len), msg, len);
+	rc = skb_memcpy_from_msg(skb, msg, len);
 	if (rc < 0) {
 		kfree_skb(skb);
 		return rc;

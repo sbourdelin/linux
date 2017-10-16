@@ -296,7 +296,7 @@ static int raw_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	skb_reset_mac_header(skb);
 	skb_reset_network_header(skb);
 
-	err = memcpy_from_msg(skb_put(skb, size), msg, size);
+	err = skb_memcpy_from_msg(skb, msg, size);
 	if (err < 0)
 		goto out_skb;
 
@@ -684,7 +684,7 @@ static int dgram_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	if (err < 0)
 		goto out_skb;
 
-	err = memcpy_from_msg(skb_put(skb, size), msg, size);
+	err = skb_memcpy_from_msg(skb, msg, size);
 	if (err < 0)
 		goto out_skb;
 

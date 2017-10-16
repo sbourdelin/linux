@@ -1601,7 +1601,7 @@ static int hci_logging_frame(struct sock *sk, struct msghdr *msg, int len)
 	if (!skb)
 		return err;
 
-	if (memcpy_from_msg(skb_put(skb, len), msg, len)) {
+	if (skb_memcpy_from_msg(skb, msg, len)) {
 		err = -EFAULT;
 		goto drop;
 	}
@@ -1726,7 +1726,7 @@ static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 	if (!skb)
 		goto done;
 
-	if (memcpy_from_msg(skb_put(skb, len), msg, len)) {
+	if (skb_memcpy_from_msg(skb, msg, len)) {
 		err = -EFAULT;
 		goto drop;
 	}

@@ -1765,7 +1765,7 @@ static int dn_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 		if ((chunk + copied) > size)
 			chunk = size - copied;
 
-		if (memcpy_to_msg(msg, skb->data, chunk)) {
+		if (skb_memcpy_to_msg(msg, skb, chunk)) {
 			rv = -EFAULT;
 			break;
 		}
@@ -2036,7 +2036,7 @@ static int dn_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 
 		skb_reserve(skb, 64 + DN_MAX_NSP_DATA_HEADER);
 
-		if (memcpy_from_msg(skb_put(skb, len), msg, len)) {
+		if (skb_memcpy_from_msg(skb, msg, len)) {
 			err = -EFAULT;
 			goto out;
 		}

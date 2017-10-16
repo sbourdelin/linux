@@ -1844,7 +1844,7 @@ static int netlink_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 	NETLINK_CB(skb).flags	= netlink_skb_flags;
 
 	err = -EFAULT;
-	if (memcpy_from_msg(skb_put(skb, len), msg, len)) {
+	if (skb_memcpy_from_msg(skb, msg, len)) {
 		kfree_skb(skb);
 		goto out;
 	}

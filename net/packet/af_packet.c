@@ -1972,7 +1972,7 @@ retry:
 			if (len < hhlen)
 				skb_reset_network_header(skb);
 		}
-		err = memcpy_from_msg(skb_put(skb, len), msg, len);
+		err = skb_memcpy_from_msg(skb, msg, len);
 		if (err)
 			goto out_free;
 		goto retry;

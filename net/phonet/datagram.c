@@ -108,7 +108,7 @@ static int pn_sendmsg(struct sock *sk, struct msghdr *msg, size_t len)
 		return err;
 	skb_reserve(skb, MAX_PHONET_HEADER);
 
-	err = memcpy_from_msg((void *)skb_put(skb, len), msg, len);
+	err = skb_memcpy_from_msg(skb, msg, len);
 	if (err < 0) {
 		kfree_skb(skb);
 		return err;

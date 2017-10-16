@@ -594,7 +594,7 @@ static int rfcomm_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 		}
 		skb_reserve(skb, RFCOMM_SKB_HEAD_RESERVE);
 
-		err = memcpy_from_msg(skb_put(skb, size), msg, size);
+		err = skb_memcpy_from_msg(skb, msg, size);
 		if (err) {
 			kfree_skb(skb);
 			if (sent == 0)
