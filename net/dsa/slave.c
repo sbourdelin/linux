@@ -976,12 +976,16 @@ static int dsa_slave_fixed_link_update(struct net_device *dev,
 }
 
 /* slave device setup *******************************************************/
-static int dsa_slave_phy_connect(struct net_device *slave_dev, int addr)
+static int dsa_slave_phy_connect(struct net_device *slave_dev,
+				 struct mii_bus *bus, int addr)
 {
 	struct dsa_slave_priv *p = netdev_priv(slave_dev);
 	struct dsa_switch *ds = p->dp->ds;
 
-	slave_dev->phydev = mdiobus_get_phy(ds->slave_mii_bus, addr);
+	if (!bus)
+		bus = ds->slave_mii_bus;
+
+	slave_dev->phydev = mdiobus_get_phy(bus, addr);
 	if (!slave_dev->phydev) {
 		netdev_err(slave_dev, "no phy at %d\n", addr);
 		return -ENODEV;
@@ -1029,6 +1033,7 @@ static int dsa_slave_phy_setup(struct net_device *slave_dev)
 
 	if (phy_dn) {
 		int phy_id = of_mdio_parse_addr(&slave_dev->dev, phy_dn);
+		struct mii_bus *bus = of_mdio_find_bus(phy_dn->parent);
 
 		/* If this PHY address is part of phys_mii_mask, which means
 		 * that we need to divert reads and writes to/from it, then we
@@ -1037,7 +1042,7 @@ static int dsa_slave_phy_setup(struct net_device *slave_dev)
 		 */
 		if (!phy_is_fixed && phy_id >= 0 &&
 		    (ds->phys_mii_mask & (1 << phy_id))) {
-			ret = dsa_slave_phy_connect(slave_dev, phy_id);
+			ret = dsa_slave_phy_connect(slave_dev, bus, phy_id);
 			if (ret) {
 				netdev_err(slave_dev, "failed to connect to phy%d: %d\n", phy_id, ret);
 				of_node_put(phy_dn);
@@ -1061,7 +1066,7 @@ static int dsa_slave_phy_setup(struct net_device *slave_dev)
 	 * MDIO bus instead
 	 */
 	if (!slave_dev->phydev) {
-		ret = dsa_slave_phy_connect(slave_dev, p->dp->index);
+		ret = dsa_slave_phy_connect(slave_dev, NULL, p->dp->index);
 		if (ret) {
 			netdev_err(slave_dev, "failed to connect to port %d: %d\n",
 				   p->dp->index, ret);
