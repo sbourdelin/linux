@@ -24,7 +24,7 @@
 #include <linux/kthread.h>
 #include <most/core.h>
 
-#define DRIVER_NAME "sound"
+#define DRIVER_NAME "aim_sound"
 
 static struct list_head dev_list;
 static struct most_aim audio_aim;
@@ -545,7 +545,6 @@ error:
  * @iface: pointer to interface instance
  * @channel_id: channel index/ID
  * @cfg: pointer to actual channel configuration
- * @parent: pointer to kobject (needed for sysfs hook-up)
  * @arg_list: string that provides the name of the device to be created in /dev
  *	      plus the desired audio resolution
  *
@@ -555,7 +554,7 @@ error:
  */
 static int audio_probe_channel(struct most_interface *iface, int channel_id,
 			       struct most_channel_config *cfg,
-			       struct kobject *parent, char *arg_list)
+			       char *arg_list)
 {
 	struct channel *channel;
 	struct snd_card *card;

@@ -427,14 +427,14 @@ static int aim_tx_completion(struct most_interface *iface, int channel_id)
  */
 static int aim_probe(struct most_interface *iface, int channel_id,
 		     struct most_channel_config *cfg,
-		     struct kobject *parent, char *name)
+		     char *name)
 {
 	struct aim_channel *c;
 	unsigned long cl_flags;
 	int retval;
 	int current_minor;
 
-	if ((!iface) || (!cfg) || (!parent) || (!name)) {
+	if ((!iface) || (!cfg) || (!name)) {
 		pr_info("Probing AIM with bad arguments");
 		return -EINVAL;
 	}
@@ -498,7 +498,7 @@ error_alloc_channel:
 }
 
 static struct most_aim cdev_aim = {
-	.name = "cdev",
+	.name = "aim_cdev",
 	.probe_channel = aim_probe,
 	.disconnect_channel = aim_disconnect_channel,
 	.rx_completion = aim_rx_completion,

@@ -487,7 +487,7 @@ static void aim_v4l2_dev_release(struct v4l2_device *v4l2_dev)
 
 static int aim_probe_channel(struct most_interface *iface, int channel_idx,
 			     struct most_channel_config *ccfg,
-			     struct kobject *parent, char *name)
+			     char *name)
 {
 	int ret;
 	struct most_video_dev *mdev = get_aim_dev(iface, channel_idx);
@@ -570,7 +570,7 @@ static int aim_disconnect_channel(struct most_interface *iface,
 }
 
 static struct most_aim aim_info = {
-	.name = "v4l",
+	.name = "aim_v4l",
 	.probe_channel = aim_probe_channel,
 	.disconnect_channel = aim_disconnect_channel,
 	.rx_completion = aim_rx_data,
