@@ -24,10 +24,10 @@
 #include <linux/kthread.h>
 #include <most/core.h>
 
-#define DRIVER_NAME "aim_sound"
+#define DRIVER_NAME "sound"
 
 static struct list_head dev_list;
-static struct most_aim audio_aim;
+static struct core_component snd_component;
 
 /**
  * struct channel - private structure to keep channel specific data
@@ -240,7 +240,7 @@ static int playback_thread(void *data)
 			kthread_should_stop() ||
 			(channel->is_stream_running &&
 			 (mbo = most_get_mbo(channel->iface, channel->id,
-					     &audio_aim))));
+					     &snd_component))));
 		if (!mbo)
 			continue;
 
@@ -283,7 +283,7 @@ static int pcm_open(struct snd_pcm_substream *substream)
 		}
 	}
 
-	if (most_start_channel(channel->iface, channel->id, &audio_aim)) {
+	if (most_start_channel(channel->iface, channel->id, &snd_component)) {
 		pr_err("most_start_channel() failed!\n");
 		if (cfg->direction == MOST_CH_TX)
 			kthread_stop(channel->playback_task);
@@ -310,7 +310,7 @@ static int pcm_close(struct snd_pcm_substream *substream)
 
 	if (channel->cfg->direction == MOST_CH_TX)
 		kthread_stop(channel->playback_task);
-	most_stop_channel(channel->iface, channel->id, &audio_aim);
+	most_stop_channel(channel->iface, channel->id, &snd_component);
 
 	return 0;
 }
@@ -723,9 +723,9 @@ static int audio_tx_completion(struct most_interface *iface, int channel_id)
 }
 
 /**
- * Initialization of the struct most_aim
+ * Initialization of the struct core_component
  */
-static struct most_aim audio_aim = {
+static struct core_component snd_component = {
 	.name = DRIVER_NAME,
 	.probe_channel = audio_probe_channel,
 	.disconnect_channel = audio_disconnect_channel,
@@ -739,7 +739,7 @@ static int __init audio_init(void)
 
 	INIT_LIST_HEAD(&dev_list);
 
-	return most_register_aim(&audio_aim);
+	return most_register_component(&snd_component);
 }
 
 static void __exit audio_exit(void)
@@ -753,7 +753,7 @@ static void __exit audio_exit(void)
 		snd_card_free(channel->card);
 	}
 
-	most_deregister_aim(&audio_aim);
+	most_deregister_component(&snd_component);
 }
 
 module_init(audio_init);
