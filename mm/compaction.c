@@ -1824,9 +1824,9 @@ static void compact_node(int nid)
 {
 	pg_data_t *pgdat = NODE_DATA(nid);
 	int zoneid;
-	struct zone *zone;
 	struct compact_control cc = {
 		.order = -1,
+		.alloc_flags = 0,
 		.total_migrate_scanned = 0,
 		.total_free_scanned = 0,
 		.mode = MIGRATE_SYNC,
@@ -1837,6 +1837,7 @@ static void compact_node(int nid)
 
 
 	for (zoneid = 0; zoneid < MAX_NR_ZONES; zoneid++) {
+		struct zone *zone;
 
 		zone = &pgdat->node_zones[zoneid];
 		if (!populated_zone(zone))
@@ -1955,6 +1956,7 @@ static void kcompactd_do_work(pg_data_t *pgdat)
 	struct zone *zone;
 	struct compact_control cc = {
 		.order = pgdat->kcompactd_max_order,
+		.alloc_flags = 0,
 		.total_migrate_scanned = 0,
 		.total_free_scanned = 0,
 		.classzone_idx = pgdat->kcompactd_classzone_idx,
@@ -1976,8 +1978,8 @@ static void kcompactd_do_work(pg_data_t *pgdat)
 		if (compaction_deferred(zone, cc.order))
 			continue;
 
-		if (compaction_suitable(zone, cc.order, 0, zoneid) !=
-							COMPACT_CONTINUE)
+		if (compaction_suitable(zone, cc.order, cc.alloc_flags,
+					zoneid) != COMPACT_CONTINUE)
 			continue;
 
 		cc.nr_freepages = 0;
