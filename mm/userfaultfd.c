@@ -323,7 +323,7 @@ out:
 		 * map of a private mapping, the map was modified to indicate
 		 * the reservation was consumed when the page was allocated.
 		 * We clear the PagePrivate flag now so that the global
-		 * reserve count will not be incremented in free_huge_page.
+		 * reserve count will not be incremented in huge_page_dtor.
 		 * The reservation map will still indicate the reservation
 		 * was consumed and possibly prevent later page allocation.
 		 * This is better than leaking a global reservation.  If no

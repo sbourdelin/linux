@@ -1248,7 +1248,7 @@ static void clear_page_huge_active(struct page *page)
 	ClearPagePrivate(&page[1]);
 }
 
-void free_huge_page(struct page *page)
+void huge_page_dtor(struct page *page)
 {
 	/*
 	 * Can't pass hstate in here because it is called from the
@@ -1361,7 +1361,7 @@ int PageHeadHuge(struct page *page_head)
 	if (!PageHead(page_head))
 		return 0;
 
-	return get_compound_page_dtor(page_head) == free_huge_page;
+	return get_compound_page_dtor(page_head) == huge_page_dtor;
 }
 
 pgoff_t __basepage_index(struct page *page)
@@ -1930,11 +1930,11 @@ static long vma_add_reservation(struct hstate *h,
  * specific error paths, a huge page was allocated (via alloc_huge_page)
  * and is about to be freed.  If a reservation for the page existed,
  * alloc_huge_page would have consumed the reservation and set PagePrivate
- * in the newly allocated page.  When the page is freed via free_huge_page,
+ * in the newly allocated page.  When the page is freed via huge_page_dtor,
  * the global reservation count will be incremented if PagePrivate is set.
- * However, free_huge_page can not adjust the reserve map.  Adjust the
+ * However, huge_page_dtor can not adjust the reserve map.  Adjust the
  * reserve map here to be consistent with global reserve count adjustments
- * to be made by free_huge_page.
+ * to be made by huge_page_dtor.
  */
 static void restore_reserve_on_error(struct hstate *h,
 			struct vm_area_struct *vma, unsigned long address,
@@ -1948,7 +1948,7 @@ static void restore_reserve_on_error(struct hstate *h,
 			 * Rare out of memory condition in reserve map
 			 * manipulation.  Clear PagePrivate so that
 			 * global reserve count will not be incremented
-			 * by free_huge_page.  This will make it appear
+			 * by huge_page_dtor.  This will make it appear
 			 * as though the reservation for this page was
 			 * consumed.  This may prevent the task from
 			 * faulting in the page at a later time.  This
@@ -2302,7 +2302,7 @@ static unsigned long set_max_huge_pages(struct hstate *h, unsigned long count,
 	while (count > persistent_huge_pages(h)) {
 		/*
 		 * If this allocation races such that we no longer need the
-		 * page, free_huge_page will handle it by freeing the page
+		 * page, huge_page_dtor will handle it by freeing the page
 		 * and reducing the surplus.
 		 */
 		spin_unlock(&hugetlb_lock);

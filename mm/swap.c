@@ -81,7 +81,7 @@ static void __put_single_page(struct page *page)
 
 static void __put_compound_page(struct page *page)
 {
-	compound_page_dtor *dtor;
+	compound_page_dtor_t *dtor;
 
 	/*
 	 * __page_cache_release() is supposed to be called for thp, not for

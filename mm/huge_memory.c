@@ -2731,7 +2731,7 @@ out:
 	return ret;
 }
 
-void free_transhuge_page(struct page *page)
+void transhuge_page_dtor(struct page *page)
 {
 	struct pglist_data *pgdata = NODE_DATA(page_to_nid(page));
 	unsigned long flags;
@@ -2742,7 +2742,7 @@ void free_transhuge_page(struct page *page)
 		list_del(page_deferred_list(page));
 	}
 	spin_unlock_irqrestore(&pgdata->split_queue_lock, flags);
-	free_compound_page(page);
+	compound_page_dtor(page);
 }
 
 void deferred_split_huge_page(struct page *page)

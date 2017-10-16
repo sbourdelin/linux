@@ -616,7 +616,7 @@ void split_page(struct page *page, unsigned int order);
  * prototype for that function and accessor functions.
  * These are _only_ valid on the head of a compound page.
  */
-typedef void compound_page_dtor(struct page *);
+typedef void compound_page_dtor_t(struct page *);
 
 /* Keep the enum in sync with compound_page_dtors array in mm/page_alloc.c */
 enum compound_dtor_id {
@@ -630,7 +630,7 @@ enum compound_dtor_id {
 #endif
 	NR_COMPOUND_DTORS,
 };
-extern compound_page_dtor * const compound_page_dtors[];
+extern compound_page_dtor_t * const compound_page_dtors[];
 
 static inline void set_compound_page_dtor(struct page *page,
 		enum compound_dtor_id compound_dtor)
@@ -639,7 +639,7 @@ static inline void set_compound_page_dtor(struct page *page,
 	page[1].compound_dtor = compound_dtor;
 }
 
-static inline compound_page_dtor *get_compound_page_dtor(struct page *page)
+static inline compound_page_dtor_t *get_compound_page_dtor(struct page *page)
 {
 	VM_BUG_ON_PAGE(page[1].compound_dtor >= NR_COMPOUND_DTORS, page);
 	return compound_page_dtors[page[1].compound_dtor];
@@ -657,7 +657,7 @@ static inline void set_compound_order(struct page *page, unsigned int order)
 	page[1].compound_order = order;
 }
 
-void free_compound_page(struct page *page);
+void compound_page_dtor(struct page *page);
 
 #ifdef CONFIG_MMU
 /*

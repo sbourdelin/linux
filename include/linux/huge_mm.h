@@ -130,7 +130,7 @@ extern unsigned long thp_get_unmapped_area(struct file *filp,
 		unsigned long addr, unsigned long len, unsigned long pgoff,
 		unsigned long flags);
 
-extern void free_transhuge_page(struct page *page);
+extern void transhuge_page_dtor(struct page *page);
 
 struct page *alloc_transhuge_page_vma(gfp_t gfp_mask,
 		struct vm_area_struct *vma, unsigned long addr);

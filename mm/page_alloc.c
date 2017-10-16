@@ -250,14 +250,14 @@ char * const migratetype_names[MIGRATE_TYPES] = {
 #endif
 };
 
-compound_page_dtor * const compound_page_dtors[] = {
+compound_page_dtor_t * const compound_page_dtors[] = {
 	NULL,
-	free_compound_page,
+	compound_page_dtor,
 #ifdef CONFIG_HUGETLB_PAGE
-	free_huge_page,
+	huge_page_dtor,
 #endif
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
-	free_transhuge_page,
+	transhuge_page_dtor,
 #endif
 };
 
@@ -588,7 +588,7 @@ out:
  * This usage means that zero-order pages may not be compound.
  */
 
-void free_compound_page(struct page *page)
+void compound_page_dtor(struct page *page)
 {
 	__free_pages_ok(page, compound_order(page));
 }
