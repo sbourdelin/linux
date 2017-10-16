@@ -190,6 +190,7 @@ static void kobject_init_internal(struct kobject *kobj)
 		return;
 	kref_init(&kobj->kref);
 	INIT_LIST_HEAD(&kobj->entry);
+	kobj->last_uevent_seqnum = 0;
 	kobj->state_in_sysfs = 0;
 	kobj->state_add_uevent_sent = 0;
 	kobj->state_remove_uevent_sent = 0;

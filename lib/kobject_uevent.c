@@ -454,8 +454,18 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 	}
 
 	mutex_lock(&uevent_sock_mutex);
-	/* we will send an event, so request a new sequence number */
+	/*
+	 * We will send an event, so request a new sequence number.
+	 * Also, record the number for next uevent's PREV_SEQNUM.
+	 */
 	retval = add_uevent_var(env, "SEQNUM=%llu", (unsigned long long)++uevent_seqnum);
+	if (retval) {
+		mutex_unlock(&uevent_sock_mutex);
+		goto exit;
+	}
+	retval = add_uevent_var(env, "PREV_SEQNUM=%llu",
+				(unsigned long long)kobj->last_uevent_seqnum);
+	kobj->last_uevent_seqnum = uevent_seqnum;
 	if (retval) {
 		mutex_unlock(&uevent_sock_mutex);
 		goto exit;
