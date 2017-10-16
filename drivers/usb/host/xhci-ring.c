@@ -2491,12 +2491,17 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 		 */
 		if (list_empty(&ep_ring->td_list)) {
 			/*
+			 * Don't print wanings in the following cases:
 			 * A stopped endpoint may generate an extra completion
-			 * event if the device was suspended.  Don't print
-			 * warnings.
+			 * event if the device was suspended. Or,
+			 * a second event for a TD is generated for the last
+			 * TRB if the previous event was a short event mid TD.
+			 * TD is alrady removed from list.
 			 */
+
 			if (!(trb_comp_code == COMP_STOPPED ||
-				trb_comp_code == COMP_STOPPED_LENGTH_INVALID)) {
+			      trb_comp_code == COMP_STOPPED_LENGTH_INVALID ||
+			      ep_ring->last_td_was_short)) {
 				xhci_warn(xhci, "WARN Event TRB for slot %d ep %d with no TDs queued?\n",
 						TRB_TO_SLOT_ID(le32_to_cpu(event->flags)),
 						ep_index);
