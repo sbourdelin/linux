@@ -448,7 +448,7 @@ static int qla2x00_start_nvme_mq(srb_t *sp)
 				req->ring_ptr++;
 			}
 			cont_pkt = (cont_a64_entry_t *)req->ring_ptr;
-			*((uint32_t *)(&cont_pkt->entry_type)) =
+			*((__le32 *)(&cont_pkt->entry_type)) =
 			    cpu_to_le32(CONTINUE_A64_TYPE);
 
 			cur_dsd = (uint32_t *)cont_pkt->dseg_0_address;
@@ -456,9 +456,9 @@ static int qla2x00_start_nvme_mq(srb_t *sp)
 		}
 
 		sle_dma = sg_dma_address(sg);
-		*cur_dsd++ = cpu_to_le32(LSD(sle_dma));
-		*cur_dsd++ = cpu_to_le32(MSD(sle_dma));
-		*cur_dsd++ = cpu_to_le32(sg_dma_len(sg));
+		*(__le32 __force *)cur_dsd++ = cpu_to_le32(LSD(sle_dma));
+		*(__le32 __force *)cur_dsd++ = cpu_to_le32(MSD(sle_dma));
+		*(__le32 __force *)cur_dsd++ = cpu_to_le32(sg_dma_len(sg));
 		avail_dsds--;
 	}
 

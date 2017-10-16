@@ -45,32 +45,32 @@ struct cmd_nvme {
 	uint8_t entry_status;           /* Entry Status. */
 
 	uint32_t handle;                /* System handle. */
-	uint16_t nport_handle;          /* N_PORT handle. */
-	uint16_t timeout;               /* Command timeout. */
+	__le16 nport_handle;          /* N_PORT handle. */
+	__le16 timeout;               /* Command timeout. */
 
-	uint16_t dseg_count;            /* Data segment count. */
-	uint16_t nvme_rsp_dsd_len;      /* NVMe RSP DSD length */
+	__le16 dseg_count;            /* Data segment count. */
+	__le16 nvme_rsp_dsd_len;      /* NVMe RSP DSD length */
 
 	uint64_t rsvd;
 
-	uint16_t control_flags;         /* Control Flags */
+	__le16 control_flags;         /* Control Flags */
 #define CF_NVME_ENABLE                  BIT_9
 #define CF_DIF_SEG_DESCR_ENABLE         BIT_3
 #define CF_DATA_SEG_DESCR_ENABLE        BIT_2
 #define CF_READ_DATA                    BIT_1
 #define CF_WRITE_DATA                   BIT_0
 
-	uint16_t nvme_cmnd_dseg_len;             /* Data segment length. */
-	uint32_t nvme_cmnd_dseg_address[2];      /* Data segment address. */
-	uint32_t nvme_rsp_dseg_address[2];       /* Data segment address. */
+	__le16 nvme_cmnd_dseg_len;             /* Data segment length. */
+	__le32 nvme_cmnd_dseg_address[2];      /* Data segment address. */
+	__le32 nvme_rsp_dseg_address[2];       /* Data segment address. */
 
-	uint32_t byte_count;            /* Total byte count. */
+	__le32 byte_count;            /* Total byte count. */
 
 	uint8_t port_id[3];             /* PortID of destination port. */
 	uint8_t vp_index;
 
-	uint32_t nvme_data_dseg_address[2];      /* Data segment address. */
-	uint32_t nvme_data_dseg_len;             /* Data segment length. */
+	__le32 nvme_data_dseg_address[2];      /* Data segment address. */
+	__le32 nvme_data_dseg_len;             /* Data segment length. */
 };
 
 #define PT_LS4_REQUEST 0x89	/* Link Service pass-through IOCB (request) */
