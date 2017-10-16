@@ -949,12 +949,10 @@ static struct page *new_node_page(struct page *page, unsigned long node, int **x
 	else if (thp_migration_supported() && PageTransHuge(page)) {
 		struct page *thp;
 
-		thp = alloc_pages_node(node,
-			(GFP_TRANSHUGE | __GFP_THISNODE),
-			HPAGE_PMD_ORDER);
+		thp = alloc_transhuge_page_node(node,
+			(GFP_TRANSHUGE | __GFP_THISNODE));
 		if (!thp)
 			return NULL;
-		prep_transhuge_page(thp);
 		return thp;
 	} else
 		return __alloc_pages_node(node, GFP_HIGHUSER_MOVABLE |
@@ -1125,11 +1123,9 @@ static struct page *new_page(struct page *page, unsigned long start, int **x)
 	} else if (thp_migration_supported() && PageTransHuge(page)) {
 		struct page *thp;
 
-		thp = alloc_hugepage_vma(GFP_TRANSHUGE, vma, address,
-					 HPAGE_PMD_ORDER);
+		thp = alloc_transhuge_page_vma(GFP_TRANSHUGE, vma, address);
 		if (!thp)
 			return NULL;
-		prep_transhuge_page(thp);
 		return thp;
 	}
 	/*

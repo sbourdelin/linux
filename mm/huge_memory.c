@@ -490,7 +490,7 @@ static inline struct list_head *page_deferred_list(struct page *page)
 	return (struct list_head *)&page[2].mapping;
 }
 
-void prep_transhuge_page(struct page *page)
+static void prep_transhuge_page(struct page *page)
 {
 	/*
 	 * we use page->mapping and page->indexlru in second tail page
@@ -499,6 +499,45 @@ void prep_transhuge_page(struct page *page)
 
 	INIT_LIST_HEAD(page_deferred_list(page));
 	set_compound_page_dtor(page, TRANSHUGE_PAGE_DTOR);
+}
+
+struct page *alloc_transhuge_page_vma(gfp_t gfp_mask,
+		struct vm_area_struct *vma, unsigned long addr)
+{
+	struct page *page;
+
+	page = alloc_pages_vma(gfp_mask | __GFP_COMP, HPAGE_PMD_ORDER,
+			       vma, addr, numa_node_id(), true);
+	if (unlikely(!page))
+		return NULL;
+	prep_transhuge_page(page);
+	return page;
+}
+
+struct page *alloc_transhuge_page_nodemask(gfp_t gfp_mask,
+		int preferred_nid, nodemask_t *nmask)
+{
+	struct page *page;
+
+	page = __alloc_pages_nodemask(gfp_mask | __GFP_COMP, HPAGE_PMD_ORDER,
+				      preferred_nid, nmask);
+	if (unlikely(!page))
+		return NULL;
+	prep_transhuge_page(page);
+	return page;
+}
+
+struct page *alloc_transhuge_page(gfp_t gfp_mask)
+{
+	struct page *page;
+
+	VM_BUG_ON(!(gfp_mask & __GFP_COMP));
+
+	page = alloc_pages(gfp_mask | __GFP_COMP, HPAGE_PMD_ORDER);
+	if (unlikely(!page))
+		return NULL;
+	prep_transhuge_page(page);
+	return page;
 }
 
 unsigned long __thp_get_unmapped_area(struct file *filp, unsigned long len,
@@ -719,12 +758,11 @@ int do_huge_pmd_anonymous_page(struct vm_fault *vmf)
 		return ret;
 	}
 	gfp = alloc_hugepage_direct_gfpmask(vma);
-	page = alloc_hugepage_vma(gfp, vma, haddr, HPAGE_PMD_ORDER);
+	page = alloc_transhuge_page_vma(gfp, vma, haddr);
 	if (unlikely(!page)) {
 		count_vm_event(THP_FAULT_FALLBACK);
 		return VM_FAULT_FALLBACK;
 	}
-	prep_transhuge_page(page);
 	return __do_huge_pmd_anonymous_page(vmf, page, gfp);
 }
 
@@ -1295,13 +1333,11 @@ alloc:
 	if (transparent_hugepage_enabled(vma) &&
 	    !transparent_hugepage_debug_cow()) {
 		huge_gfp = alloc_hugepage_direct_gfpmask(vma);
-		new_page = alloc_hugepage_vma(huge_gfp, vma, haddr, HPAGE_PMD_ORDER);
+		new_page = alloc_transhuge_page_vma(huge_gfp, vma, haddr);
 	} else
 		new_page = NULL;
 
-	if (likely(new_page)) {
-		prep_transhuge_page(new_page);
-	} else {
+	if (unlikely(!new_page)) {
 		if (!page) {
 			split_huge_pmd(vma, vmf->pmd, vmf->address);
 			ret |= VM_FAULT_FALLBACK;

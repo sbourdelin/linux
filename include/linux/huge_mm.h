@@ -130,8 +130,19 @@ extern unsigned long thp_get_unmapped_area(struct file *filp,
 		unsigned long addr, unsigned long len, unsigned long pgoff,
 		unsigned long flags);
 
-extern void prep_transhuge_page(struct page *page);
 extern void free_transhuge_page(struct page *page);
+
+struct page *alloc_transhuge_page_vma(gfp_t gfp_mask,
+		struct vm_area_struct *vma, unsigned long addr);
+struct page *alloc_transhuge_page_nodemask(gfp_t gfp_mask,
+		int preferred_nid, nodemask_t *nmask);
+
+static inline struct page *alloc_transhuge_page_node(int nid, gfp_t gfp_mask)
+{
+	return alloc_transhuge_page_nodemask(gfp_mask, nid, NULL);
+}
+
+struct page *alloc_transhuge_page(gfp_t gfp_mask);
 
 bool can_split_huge_page(struct page *page, int *pextra_pins);
 int split_huge_page_to_list(struct page *page, struct list_head *list);

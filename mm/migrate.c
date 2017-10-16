@@ -1472,12 +1472,10 @@ static struct page *new_page_node(struct page *p, unsigned long private,
 	else if (thp_migration_supported() && PageTransHuge(p)) {
 		struct page *thp;
 
-		thp = alloc_pages_node(pm->node,
-			(GFP_TRANSHUGE | __GFP_THISNODE) & ~__GFP_RECLAIM,
-			HPAGE_PMD_ORDER);
+		thp = alloc_transhuge_page_node(pm->node,
+			(GFP_TRANSHUGE | __GFP_THISNODE) & ~__GFP_RECLAIM);
 		if (!thp)
 			return NULL;
-		prep_transhuge_page(thp);
 		return thp;
 	} else
 		return __alloc_pages_node(pm->node,
@@ -2017,12 +2015,10 @@ int migrate_misplaced_transhuge_page(struct mm_struct *mm,
 	if (numamigrate_update_ratelimit(pgdat, HPAGE_PMD_NR))
 		goto out_dropref;
 
-	new_page = alloc_pages_node(node,
-		(GFP_TRANSHUGE_LIGHT | __GFP_THISNODE),
-		HPAGE_PMD_ORDER);
+	new_page = alloc_transhuge_page_node(node,
+			(GFP_TRANSHUGE_LIGHT | __GFP_THISNODE));
 	if (!new_page)
 		goto out_fail;
-	prep_transhuge_page(new_page);
 
 	isolated = numamigrate_isolate_page(pgdat, page);
 	if (!isolated) {

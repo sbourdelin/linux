@@ -42,19 +42,15 @@ static inline struct page *new_page_nodemask(struct page *page,
 		return alloc_huge_page_nodemask(page_hstate(compound_head(page)),
 				preferred_nid, nodemask);
 
-	if (thp_migration_supported() && PageTransHuge(page)) {
-		order = HPAGE_PMD_ORDER;
-		gfp_mask |= GFP_TRANSHUGE;
-	}
-
 	if (PageHighMem(page) || (zone_idx(page_zone(page)) == ZONE_MOVABLE))
 		gfp_mask |= __GFP_HIGHMEM;
 
-	new_page = __alloc_pages_nodemask(gfp_mask, order,
+	if (thp_migration_supported() && PageTransHuge(page))
+		return alloc_transhuge_page_nodemask(gfp_mask | GFP_TRANSHUGE,
 				preferred_nid, nodemask);
-
-	if (new_page && PageTransHuge(page))
-		prep_transhuge_page(new_page);
+	else
+		return __alloc_pages_nodemask(gfp_mask, order,
+				preferred_nid, nodemask);
 
 	return new_page;
 }
