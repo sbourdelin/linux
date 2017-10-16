@@ -68,6 +68,7 @@ static int mnt_group_start = 1;
 static struct hlist_head *mount_hashtable __read_mostly;
 static struct hlist_head *mountpoint_hashtable __read_mostly;
 static struct kmem_cache *mnt_cache __read_mostly;
+static struct workqueue_struct *unmounted_wq;
 static DECLARE_RWSEM(namespace_sem);
 
 /* /sys/fs */
@@ -1409,20 +1410,27 @@ EXPORT_SYMBOL(may_umount);
 
 static HLIST_HEAD(unmounted);	/* protected by namespace_sem */
 
-static void namespace_unlock(void)
+static void cleanup_unmounted(struct work_struct *work)
 {
 	struct hlist_head head;
+	down_write(&namespace_sem);
 
 	hlist_move_list(&unmounted, &head);
 
 	up_write(&namespace_sem);
 
-	if (likely(hlist_empty(&head)))
-		return;
-
 	synchronize_rcu();
 
 	group_pin_kill(&head);
+}
+
+static DECLARE_WORK(unmounted_cleanup_work, cleanup_unmounted);
+
+static void namespace_unlock(void)
+{
+	if (!likely(hlist_empty(&unmounted)))
+		queue_work(unmounted_wq, &unmounted_cleanup_work);
+	up_write(&namespace_sem);
 }
 
 static inline void namespace_lock(void)
@@ -3275,6 +3283,17 @@ void __init mnt_init(void)
 	init_rootfs();
 	init_mount_tree();
 }
+
+static int __init unmounted_wq_init(void)
+{
+	/* Create workqueue for cleanup */
+	unmounted_wq = create_singlethread_workqueue("unmounted");
+	if (!unmounted_wq)
+		panic("Could not create unmounted workq");
+	return 0;
+}
+
+pure_initcall(unmounted_wq_init);
 
 void put_mnt_ns(struct mnt_namespace *ns)
 {
