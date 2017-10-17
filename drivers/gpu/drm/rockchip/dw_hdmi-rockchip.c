@@ -383,8 +383,10 @@ static int dw_hdmi_rockchip_bind(struct device *dev, struct device *master,
 	 * If dw_hdmi_bind() fails we'll never call dw_hdmi_unbind(),
 	 * which would have called the encoder cleanup.  Do it manually.
 	 */
-	if (ret)
+	if (ret) {
 		drm_encoder_cleanup(encoder);
+		clk_disable_unprepare(hdmi->vpll_clk);
+	}
 
 	return ret;
 }
