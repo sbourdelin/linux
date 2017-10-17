@@ -68,20 +68,20 @@ static inline int emac_rx_size(int mtu)
 		return mal_rx_size(ETH_DATA_LEN + EMAC_MTU_OVERHEAD);
 }
 
-#define EMAC_DMA_ALIGN(x)		ALIGN((x), dma_get_cache_alignment())
+#define EMAC_DMA_ALIGN(x)		ALIGN((x), dma_get_cache_alignment(dma_dev))
 
 #define EMAC_RX_SKB_HEADROOM		\
 	EMAC_DMA_ALIGN(CONFIG_IBM_EMAC_RX_SKB_HEADROOM)
 
 /* Size of RX skb for the given MTU */
-static inline int emac_rx_skb_size(int mtu)
+static inline int emac_rx_skb_size(struct device *dma_dev, int mtu)
 {
 	int size = max(mtu + EMAC_MTU_OVERHEAD, emac_rx_size(mtu));
 	return EMAC_DMA_ALIGN(size + 2) + EMAC_RX_SKB_HEADROOM;
 }
 
 /* RX DMA sync size */
-static inline int emac_rx_sync_size(int mtu)
+static inline int emac_rx_sync_size(struct device *dma_dev, int mtu)
 {
 	return EMAC_DMA_ALIGN(emac_rx_size(mtu) + 2);
 }

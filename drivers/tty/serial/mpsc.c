@@ -81,19 +81,19 @@
  * Number of Tx & Rx descriptors must be powers of 2.
  */
 #define	MPSC_RXR_ENTRIES	32
-#define	MPSC_RXRE_SIZE		dma_get_cache_alignment()
+#define	MPSC_RXRE_SIZE		dma_get_cache_alignment(dma_dev)
 #define	MPSC_RXR_SIZE		(MPSC_RXR_ENTRIES * MPSC_RXRE_SIZE)
-#define	MPSC_RXBE_SIZE		dma_get_cache_alignment()
+#define	MPSC_RXBE_SIZE		dma_get_cache_alignment(dma_dev)
 #define	MPSC_RXB_SIZE		(MPSC_RXR_ENTRIES * MPSC_RXBE_SIZE)
 
 #define	MPSC_TXR_ENTRIES	32
-#define	MPSC_TXRE_SIZE		dma_get_cache_alignment()
+#define	MPSC_TXRE_SIZE		dma_get_cache_alignment(dma_dev)
 #define	MPSC_TXR_SIZE		(MPSC_TXR_ENTRIES * MPSC_TXRE_SIZE)
-#define	MPSC_TXBE_SIZE		dma_get_cache_alignment()
+#define	MPSC_TXBE_SIZE		dma_get_cache_alignment(dma_dev)
 #define	MPSC_TXB_SIZE		(MPSC_TXR_ENTRIES * MPSC_TXBE_SIZE)
 
 #define	MPSC_DMA_ALLOC_SIZE	(MPSC_RXR_SIZE + MPSC_RXB_SIZE + MPSC_TXR_SIZE \
-		+ MPSC_TXB_SIZE + dma_get_cache_alignment() /* for alignment */)
+		+ MPSC_TXB_SIZE + dma_get_cache_alignment(dma_dev) /* for alignment */)
 
 /* Rx and Tx Ring entry descriptors -- assume entry size is <= cacheline size */
 struct mpsc_rx_desc {
@@ -520,6 +520,7 @@ static uint mpsc_sdma_tx_active(struct mpsc_port_info *pi)
 static void mpsc_sdma_start_tx(struct mpsc_port_info *pi)
 {
 	struct mpsc_tx_desc *txre, *txre_p;
+	struct device *dma_dev = pi->port.dev;
 
 	/* If tx isn't running & there's a desc ready to go, start it */
 	if (!mpsc_sdma_tx_active(pi)) {
@@ -738,7 +739,7 @@ static void mpsc_init_hw(struct mpsc_port_info *pi)
 
 	mpsc_brg_init(pi, pi->brg_clk_src);
 	mpsc_brg_enable(pi);
-	mpsc_sdma_init(pi, dma_get_cache_alignment());	/* burst a cacheline */
+	mpsc_sdma_init(pi, dma_get_cache_alignment(pi->port.dev));	/* burst a cacheline */
 	mpsc_sdma_stop(pi);
 	mpsc_hw_init(pi);
 }
@@ -746,6 +747,7 @@ static void mpsc_init_hw(struct mpsc_port_info *pi)
 static int mpsc_alloc_ring_mem(struct mpsc_port_info *pi)
 {
 	int rc = 0;
+	struct device *dma_dev = pi->port.dev;
 
 	pr_debug("mpsc_alloc_ring_mem[%d]: Allocating ring mem\n",
 		pi->port.line);
@@ -769,6 +771,8 @@ static int mpsc_alloc_ring_mem(struct mpsc_port_info *pi)
 
 static void mpsc_free_ring_mem(struct mpsc_port_info *pi)
 {
+	struct device *dma_dev = pi->port.dev;
+
 	pr_debug("mpsc_free_ring_mem[%d]: Freeing ring mem\n", pi->port.line);
 
 	if (pi->dma_region) {
@@ -784,6 +788,7 @@ static void mpsc_init_rings(struct mpsc_port_info *pi)
 {
 	struct mpsc_rx_desc *rxre;
 	struct mpsc_tx_desc *txre;
+	struct device *dma_dev = pi->port.dev;
 	dma_addr_t dp, dp_p;
 	u8 *bp, *bp_p;
 	int i;
@@ -798,8 +803,8 @@ static void mpsc_init_rings(struct mpsc_port_info *pi)
 	 * Descriptors & buffers are multiples of cacheline size and must be
 	 * cacheline aligned.
 	 */
-	dp = ALIGN((u32)pi->dma_region, dma_get_cache_alignment());
-	dp_p = ALIGN((u32)pi->dma_region_p, dma_get_cache_alignment());
+	dp = ALIGN((u32)pi->dma_region, dma_get_cache_alignment(dma_dev));
+	dp_p = ALIGN((u32)pi->dma_region_p, dma_get_cache_alignment(dma_dev));
 
 	/*
 	 * Partition dma region into rx ring descriptor, rx buffers,
@@ -936,6 +941,7 @@ static int serial_polled;
 static int mpsc_rx_intr(struct mpsc_port_info *pi, unsigned long *flags)
 {
 	struct mpsc_rx_desc *rxre;
+	struct device *dma_dev = pi->port.dev;
 	struct tty_port *port = &pi->port.state->port;
 	u32	cmdstat, bytes_in, i;
 	int	rc = 0;
@@ -1091,6 +1097,7 @@ next_frame:
 static void mpsc_setup_tx_desc(struct mpsc_port_info *pi, u32 count, u32 intr)
 {
 	struct mpsc_tx_desc *txre;
+	struct device *dma_dev = pi->port.dev;
 
 	txre = (struct mpsc_tx_desc *)(pi->txr
 			+ (pi->txr_head * MPSC_TXRE_SIZE));
@@ -1113,6 +1120,7 @@ static void mpsc_setup_tx_desc(struct mpsc_port_info *pi, u32 count, u32 intr)
 
 static void mpsc_copy_tx_data(struct mpsc_port_info *pi)
 {
+	struct device *dma_dev = pi->port.dev;
 	struct circ_buf *xmit = &pi->port.state->xmit;
 	u8 *bp;
 	u32 i;
@@ -1166,6 +1174,7 @@ static void mpsc_copy_tx_data(struct mpsc_port_info *pi)
 static int mpsc_tx_intr(struct mpsc_port_info *pi)
 {
 	struct mpsc_tx_desc *txre;
+	struct device *dma_dev = pi->port.dev;
 	int rc = 0;
 	unsigned long iflags;
 
@@ -1360,6 +1369,7 @@ static int mpsc_startup(struct uart_port *port)
 {
 	struct mpsc_port_info *pi =
 		container_of(port, struct mpsc_port_info, port);
+	struct device *dma_dev = pi->port.dev;
 	u32 flag = 0;
 	int rc;
 
@@ -1555,9 +1565,10 @@ static void mpsc_put_poll_char(struct uart_port *port,
 
 static int mpsc_get_poll_char(struct uart_port *port)
 {
+	struct mpsc_rx_desc *rxre;
 	struct mpsc_port_info *pi =
 		container_of(port, struct mpsc_port_info, port);
-	struct mpsc_rx_desc *rxre;
+	struct device *dma_dev = pi->port.dev;
 	u32	cmdstat, bytes_in, i;
 	u8	*bp;
 
@@ -1706,6 +1717,7 @@ static const struct uart_ops mpsc_pops = {
 static void mpsc_console_write(struct console *co, const char *s, uint count)
 {
 	struct mpsc_port_info *pi = &mpsc_ports[co->index];
+	struct device *dma_dev = pi->port.dev;
 	u8 *bp, *dp, add_cr = 0;
 	int i;
 	unsigned long iflags;
@@ -2024,7 +2036,8 @@ static void mpsc_drv_unmap_regs(struct mpsc_port_info *pi)
 static void mpsc_drv_get_platform_data(struct mpsc_port_info *pi,
 		struct platform_device *pd, int num)
 {
-	struct mpsc_pdata	*pdata;
+	struct mpsc_pdata *pdata;
+	struct device *dma_dev = pi->port.dev;
 
 	pdata = dev_get_platdata(&pd->dev);
 

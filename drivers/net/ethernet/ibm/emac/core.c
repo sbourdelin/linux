@@ -1030,8 +1030,9 @@ static int emac_set_mac_address(struct net_device *ndev, void *sa)
 
 static int emac_resize_rx_ring(struct emac_instance *dev, int new_mtu)
 {
-	int rx_sync_size = emac_rx_sync_size(new_mtu);
-	int rx_skb_size = emac_rx_skb_size(new_mtu);
+	struct device *dma_dev = &dev->ofdev->dev;
+	int rx_skb_size = emac_rx_skb_size(dma_dev, new_mtu);
+	int rx_sync_size = emac_rx_sync_size(dma_dev, new_mtu);
 	int i, ret = 0;
 	int mr1_jumbo_bit_change = 0;
 
@@ -1115,20 +1116,21 @@ static int emac_resize_rx_ring(struct emac_instance *dev, int new_mtu)
 static int emac_change_mtu(struct net_device *ndev, int new_mtu)
 {
 	struct emac_instance *dev = netdev_priv(ndev);
+	struct device *dma_dev = &dev->ofdev->dev;
 	int ret = 0;
 
 	DBG(dev, "change_mtu(%d)" NL, new_mtu);
 
 	if (netif_running(ndev)) {
 		/* Check if we really need to reinitialize RX ring */
-		if (emac_rx_skb_size(ndev->mtu) != emac_rx_skb_size(new_mtu))
+		if (emac_rx_skb_size(dma_dev, ndev->mtu) != emac_rx_skb_size(dma_dev, new_mtu))
 			ret = emac_resize_rx_ring(dev, new_mtu);
 	}
 
 	if (!ret) {
 		ndev->mtu = new_mtu;
-		dev->rx_skb_size = emac_rx_skb_size(new_mtu);
-		dev->rx_sync_size = emac_rx_sync_size(new_mtu);
+		dev->rx_skb_size = emac_rx_skb_size(dma_dev, new_mtu);
+		dev->rx_sync_size = emac_rx_sync_size(dma_dev, new_mtu);
 	}
 
 	return ret;
@@ -1171,6 +1173,7 @@ static void emac_clean_rx_ring(struct emac_instance *dev)
 static inline int emac_alloc_rx_skb(struct emac_instance *dev, int slot,
 				    gfp_t flags)
 {
+	struct device *dma_dev = &dev->ofdev->dev;
 	struct sk_buff *skb = alloc_skb(dev->rx_skb_size, flags);
 	if (unlikely(!skb))
 		return -ENOMEM;
@@ -1649,11 +1652,12 @@ static inline void emac_recycle_rx_skb(struct emac_instance *dev, int slot,
 				       int len)
 {
 	struct sk_buff *skb = dev->rx_skb[slot];
+	struct device *dma_dev = &dev->ofdev->dev;
 
 	DBG2(dev, "recycle %d %d" NL, slot, len);
 
 	if (len)
-		dma_map_single(&dev->ofdev->dev, skb->data - 2,
+		dma_map_single(dma_dev, skb->data - 2,
 			       EMAC_DMA_ALIGN(len + 2), DMA_FROM_DEVICE);
 
 	dev->rx_desc[slot].data_len = 0;
@@ -1727,6 +1731,7 @@ static int emac_poll_rx(void *param, int budget)
 {
 	struct emac_instance *dev = param;
 	int slot = dev->rx_slot, received = 0;
+	struct device *dma_dev = &dev->ofdev->dev;
 
 	DBG2(dev, "poll_rx(%d)" NL, budget);
 
@@ -2998,6 +3003,7 @@ static int emac_probe(struct platform_device *ofdev)
 	struct emac_instance *dev;
 	struct device_node *np = ofdev->dev.of_node;
 	struct device_node **blist = NULL;
+	struct device *dma_dev = &ofdev->dev;
 	int err, i;
 
 	/* Skip unused/unwired EMACS.  We leave the check for an unused
@@ -3077,8 +3083,8 @@ static int emac_probe(struct platform_device *ofdev)
 		       np, dev->mal_dev->dev.of_node);
 		goto err_rel_deps;
 	}
-	dev->rx_skb_size = emac_rx_skb_size(ndev->mtu);
-	dev->rx_sync_size = emac_rx_sync_size(ndev->mtu);
+	dev->rx_skb_size = emac_rx_skb_size(dma_dev, ndev->mtu);
+	dev->rx_sync_size = emac_rx_sync_size(dma_dev, ndev->mtu);
 
 	/* Get pointers to BD rings */
 	dev->tx_desc =

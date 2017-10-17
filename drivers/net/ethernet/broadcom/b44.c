@@ -2344,6 +2344,10 @@ static int b44_init_one(struct ssb_device *sdev,
 	struct net_device *dev;
 	struct b44 *bp;
 	int err;
+	unsigned int dma_desc_align_size = dma_get_cache_alignment(sdev->dma_dev);
+
+	/* Setup paramaters for syncing RX/TX DMA descriptors */
+	dma_desc_sync_size = max_t(unsigned int, dma_desc_align_size, sizeof(struct dma_desc));
 
 	instance++;
 
@@ -2587,11 +2591,7 @@ static inline void b44_pci_exit(void)
 
 static int __init b44_init(void)
 {
-	unsigned int dma_desc_align_size = dma_get_cache_alignment();
 	int err;
-
-	/* Setup paramaters for syncing RX/TX DMA descriptors */
-	dma_desc_sync_size = max_t(unsigned int, dma_desc_align_size, sizeof(struct dma_desc));
 
 	err = b44_pci_init();
 	if (err)
