@@ -371,7 +371,7 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
 	ret = rockchip_dp_drm_create_encoder(dp);
 	if (ret) {
 		DRM_ERROR("failed to create drm encoder\n");
-		return ret;
+		goto err_deinit_dp;
 	}
 
 	dp->plat_data.encoder = &dp->encoder;
@@ -387,7 +387,17 @@ static int rockchip_dp_bind(struct device *dev, struct device *master,
 
 	rockchip_drm_psr_register(&dp->encoder, analogix_dp_psr_set);
 
-	return analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
+	ret = analogix_dp_bind(dev, dp->drm_dev, &dp->plat_data);
+	if (ret < 0)
+		goto err_unreg_psr;
+	return 0;
+
+err_unreg_psr:
+	rockchip_drm_psr_unregister(&dp->encoder);
+	rockchip_dp_drm_encoder_destroy(&dp->encoder);
+err_deinit_dp:
+	clk_disable_unprepare(dp->pclk);
+	return ret;
 }
 
 static void rockchip_dp_unbind(struct device *dev, struct device *master,
