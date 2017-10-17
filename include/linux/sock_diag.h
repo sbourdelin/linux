@@ -77,4 +77,5 @@ bool sock_diag_has_destroy_listeners(const struct sock *sk)
 void sock_diag_broadcast_destroy(struct sock *sk);
 
 int sock_diag_destroy(struct sock *sk, int err);
+int sock_diag_request_module(int family, int protocol);
 #endif
