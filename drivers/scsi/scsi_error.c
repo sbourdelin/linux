@@ -497,6 +497,16 @@ int scsi_check_sense(struct scsi_cmnd *scmd)
 		if (sshdr.asc == 0x10) /* DIF */
 			return SUCCESS;
 
+		if (!strncmp(scmd->device->vendor, "EMC", 3) &&
+		    !strncmp(scmd->device->model, "SYMMETRIX", 9) &&
+		    (sshdr.asc == 0x44) && (sshdr.ascq == 0x0)) {
+			/*
+			 * EMC Symmetrix returns 'Internal target failure'
+			 * for a variety of internal issues, all of which
+			 * can be recovered by retry.
+			 */
+			return ADD_TO_MLQUEUE;
+		}
 		return NEEDS_RETRY;
 	case NOT_READY:
 	case UNIT_ATTENTION:
@@ -1845,6 +1855,9 @@ int scsi_decide_disposition(struct scsi_cmnd *scmd)
 		rtn = scsi_check_sense(scmd);
 		if (rtn == NEEDS_RETRY)
 			goto maybe_retry;
+		else if (rtn == ADD_TO_MLQUEUE)
+			/* Always enforce a retry for ADD_TO_MLQUEUE */
+			rtn = NEEDS_RETRY;
 		/* if rtn == FAILED, we have no sense information;
 		 * returning FAILED will wake the error handler thread
 		 * to collect the sense and redo the decide
