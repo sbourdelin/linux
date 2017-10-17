@@ -1177,8 +1177,8 @@ static int validate_identity(void)
 				 s3info[i].info.compat.top);
 
 			/* MAC compat range */
-			if ((s3info[i].info.compat.role == 1) &&
-			    (s3info[i].info.compat.id == 2)) {
+			if (s3info[i].info.compat.role == 1 &&
+			    s3info[i].info.compat.id == 2) {
 				if (s3info[i].info.compat.variant !=
 				    macid.variant) {
 					result = 2;
@@ -1186,17 +1186,16 @@ static int validate_identity(void)
 			}
 
 			/* PRI compat range */
-			if ((s3info[i].info.compat.role == 1) &&
-			    (s3info[i].info.compat.id == 3)) {
-				if ((s3info[i].info.compat.bottom > priid.top)
-				    || (s3info[i].info.compat.top <
-					priid.bottom)) {
+			if (s3info[i].info.compat.role == 1 &&
+			    s3info[i].info.compat.id == 3) {
+				if (s3info[i].info.compat.bottom > priid.top ||
+				    s3info[i].info.compat.top < priid.bottom) {
 					result = 3;
 				}
 			}
 			/* SEC compat range */
-			if ((s3info[i].info.compat.role == 1) &&
-			    (s3info[i].info.compat.id == 4)) {
+			if (s3info[i].info.compat.role == 1 &&
+			    s3info[i].info.compat.id == 4) {
 				/* FIXME: isn't something missing here? */
 			}
 
@@ -1218,8 +1217,8 @@ static int validate_identity(void)
 				continue;
 			if (nicid.minor != s3info[i].info.version.minor)
 				continue;
-			if ((nicid.variant != s3info[i].info.version.variant) &&
-			    (nicid.id != 0x8008))
+			if (nicid.variant != s3info[i].info.version.variant &&
+			    nicid.id != 0x8008)
 				continue;
 
 			trump = 1;
@@ -1234,7 +1233,7 @@ static int validate_identity(void)
 	}
 	/* walk through */
 
-	if (trump && (result != 2))
+	if (trump && result != 2)
 		result = 0;
 	return result;
 }
