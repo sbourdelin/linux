@@ -444,9 +444,6 @@ struct cgroup_root {
 	/* Unique id for this hierarchy. */
 	int hierarchy_id;
 
-	/* The root cgroup.  Root is destroyed on its release. */
-	struct cgroup cgrp;
-
 	/* for cgrp->ancestor_ids[0] */
 	int cgrp_ancestor_id_storage;
 
@@ -467,6 +464,9 @@ struct cgroup_root {
 
 	/* The name for this hierarchy - may be empty */
 	char name[MAX_CGROUP_ROOT_NAMELEN];
+
+	/* The root cgroup.  Root is destroyed on its release. */
+	struct cgroup cgrp;
 };
 
 /*
