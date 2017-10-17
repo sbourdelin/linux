@@ -418,6 +418,40 @@ static int dsi_clk_init(struct msm_dsi_host *msm_host)
 				__func__, ret);
 		}
 	}
+
+	/*
+	 * If the bootloader enables the display, and the driver is
+	 * built-in (as opposed to module, loaded after clk/genpd
+	 * framework disables "unused" clocks and power domains, we
+	 * would already have clocks enabled.  But kms thinks that
+	 * everything is disabled.  This causes problems, for ex,
+	 * when trying to clk_set_rate() on bootloader enabled
+	 * clocks.
+	 *
+	 * Work around this for now, until we have a better solution
+	 * in place, by doing an extra enable/disable.  This forces
+	 * things to a disabled state.
+	 */
+	if (cfg_hnd->major == MSM_DSI_VER_MAJOR_6G) {
+		clk_prepare_enable(msm_host->byte_clk);
+		clk_prepare_enable(msm_host->pixel_clk);
+		clk_prepare_enable(msm_host->esc_clk);
+
+		clk_disable_unprepare(msm_host->esc_clk);
+		clk_disable_unprepare(msm_host->pixel_clk);
+		clk_disable_unprepare(msm_host->byte_clk);
+	} else {
+		clk_prepare_enable(msm_host->byte_clk);
+		clk_prepare_enable(msm_host->esc_clk);
+		clk_prepare_enable(msm_host->src_clk);
+		clk_prepare_enable(msm_host->pixel_clk);
+
+		clk_disable_unprepare(msm_host->pixel_clk);
+		clk_disable_unprepare(msm_host->src_clk);
+		clk_disable_unprepare(msm_host->esc_clk);
+		clk_disable_unprepare(msm_host->byte_clk);
+	}
+
 exit:
 	return ret;
 }
