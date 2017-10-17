@@ -459,6 +459,17 @@ static struct temp_data *init_temp_data(unsigned int cpu, int pkg_flag)
 	return tdata;
 }
 
+static void coretemp_remove_core(struct platform_data *pdata, int indx)
+{
+	struct temp_data *tdata = pdata->core_data[indx];
+
+	/* Remove the sysfs attributes */
+	sysfs_remove_group(&pdata->hwmon_dev->kobj, &tdata->attr_group);
+
+	kfree(pdata->core_data[indx]);
+	pdata->core_data[indx] = NULL;
+}
+
 static int create_core_data(struct platform_device *pdev, unsigned int cpu,
 			    int pkg_flag)
 {
@@ -478,6 +489,10 @@ static int create_core_data(struct platform_device *pdev, unsigned int cpu,
 
 	if (attr_no > MAX_CORE_DATA - 1)
 		return -ERANGE;
+
+	tdata = pdata->core_data[attr_no];
+	if (tdata != NULL)
+		coretemp_remove_core(pdata, attr_no);
 
 	tdata = init_temp_data(cpu, pkg_flag);
 	if (!tdata)
@@ -525,17 +540,6 @@ coretemp_add_core(struct platform_device *pdev, unsigned int cpu, int pkg_flag)
 {
 	if (create_core_data(pdev, cpu, pkg_flag))
 		dev_err(&pdev->dev, "Adding Core %u failed\n", cpu);
-}
-
-static void coretemp_remove_core(struct platform_data *pdata, int indx)
-{
-	struct temp_data *tdata = pdata->core_data[indx];
-
-	/* Remove the sysfs attributes */
-	sysfs_remove_group(&pdata->hwmon_dev->kobj, &tdata->attr_group);
-
-	kfree(pdata->core_data[indx]);
-	pdata->core_data[indx] = NULL;
 }
 
 static int coretemp_probe(struct platform_device *pdev)
