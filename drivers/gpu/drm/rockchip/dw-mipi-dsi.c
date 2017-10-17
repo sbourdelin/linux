@@ -1282,7 +1282,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
 	ret = dw_mipi_dsi_register(drm, dsi);
 	if (ret) {
 		DRM_DEV_ERROR(dev, "Failed to register mipi_dsi: %d\n", ret);
-		goto err_pllref;
+		goto err_disable_pllref;
 	}
 
 	pm_runtime_enable(dev);
@@ -1292,23 +1292,24 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
 	ret = mipi_dsi_host_register(&dsi->dsi_host);
 	if (ret) {
 		DRM_DEV_ERROR(dev, "Failed to register MIPI host: %d\n", ret);
-		goto err_cleanup;
+		goto err_disable_pm_runtime;
 	}
 
 	if (!dsi->panel) {
 		ret = -EPROBE_DEFER;
-		goto err_mipi_dsi_host;
+		goto err_unreg_mipi_dsi_host;
 	}
 
 	dev_set_drvdata(dev, dsi);
 	return 0;
 
-err_mipi_dsi_host:
+err_unreg_mipi_dsi_host:
 	mipi_dsi_host_unregister(&dsi->dsi_host);
-err_cleanup:
+err_disable_pm_runtime:
+	pm_runtime_disable(dev);
 	drm_encoder_cleanup(&dsi->encoder);
 	drm_connector_cleanup(&dsi->connector);
-err_pllref:
+err_disable_pllref:
 	clk_disable_unprepare(dsi->pllref_clk);
 	return ret;
 }
@@ -1320,6 +1321,10 @@ static void dw_mipi_dsi_unbind(struct device *dev, struct device *master,
 
 	mipi_dsi_host_unregister(&dsi->dsi_host);
 	pm_runtime_disable(dev);
+
+	dsi->connector.funcs->destroy(&dsi->connector);
+	dsi->encoder.funcs->destroy(&dsi->encoder);
+
 	clk_disable_unprepare(dsi->pllref_clk);
 }
 
