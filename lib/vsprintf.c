@@ -33,6 +33,7 @@
 #include <linux/uuid.h>
 #include <linux/of.h>
 #include <net/addrconf.h>
+#include <linux/siphash.h>
 #ifdef CONFIG_BLOCK
 #include <linux/blkdev.h>
 #endif
@@ -503,6 +504,7 @@ char *number(char *buf, char *end, unsigned long long num,
 			*buf = '0';
 		++buf;
 	}
+
 	/* actual digits of result */
 	while (--i >= 0) {
 		if (buf < end)
@@ -1591,6 +1593,28 @@ char *device_node_string(char *buf, char *end, struct device_node *dn,
 	return widen_string(buf, buf - buf_start, end, spec);
 }
 
+/* Maps a pointer to a 32 bit unique identifier. */
+static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
+{
+	static siphash_key_t ptr_secret __read_mostly;
+	static bool have_key = false;
+	unsigned long hashval;
+
+	/* Kernel doesn't boot if we use get_random_once() */
+	if (!have_key) {
+		get_random_bytes(&ptr_secret, sizeof(ptr_secret));
+		have_key = true;
+	}
+
+	hashval = siphash_1ulong((unsigned long)ptr, &ptr_secret);
+
+	spec.field_width = 2 + 2 * sizeof(unsigned int); /* 0x + hex */
+	spec.flags = SPECIAL | SMALL | ZEROPAD;
+	spec.base = 16;
+
+	return number(buf, end, (u32)hashval, spec);
+}
+
 int kptr_restrict __read_mostly;
 
 /*
@@ -1703,6 +1727,9 @@ int kptr_restrict __read_mostly;
  * Note: The difference between 'S' and 'F' is that on ia64 and ppc64
  * function pointers are really function descriptors, which contain a
  * pointer to the real address.
+ *
+ * Default behaviour (unadorned %p) is to hash the address, rendering it useful
+ * as a unique identifier.
  */
 static noinline_for_stack
 char *pointer(const char *fmt, char *buf, char *end, void *ptr,
@@ -1858,14 +1885,13 @@ char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 			return device_node_string(buf, end, ptr, spec, fmt + 1);
 		}
 	}
-	spec.flags |= SMALL;
+
 	if (spec.field_width == -1) {
 		spec.field_width = default_width;
 		spec.flags |= ZEROPAD;
 	}
-	spec.base = 16;
 
-	return number(buf, end, (unsigned long) ptr, spec);
+	return ptr_to_id(buf, end, ptr, spec);
 }
 
 /*

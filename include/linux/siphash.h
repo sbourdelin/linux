@@ -26,6 +26,8 @@ u64 __siphash_aligned(const void *data, size_t len, const siphash_key_t *key);
 u64 __siphash_unaligned(const void *data, size_t len, const siphash_key_t *key);
 #endif
 
+unsigned long siphash_1ulong(const unsigned long a, const siphash_key_t *key);
+
 u64 siphash_1u64(const u64 a, const siphash_key_t *key);
 u64 siphash_2u64(const u64 a, const u64 b, const siphash_key_t *key);
 u64 siphash_3u64(const u64 a, const u64 b, const u64 c,

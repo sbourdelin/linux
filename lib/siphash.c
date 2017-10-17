@@ -116,6 +116,19 @@ EXPORT_SYMBOL(__siphash_unaligned);
 #endif
 
 /**
+ * siphash_1ulong - computes siphash PRF value
+ * @first: value to hash
+ * @key: the siphash key
+ */
+unsigned long siphash_1ulong(const unsigned long first, const siphash_key_t *key)
+{
+#ifdef CONFIG_64BIT
+	return (unsigned long)siphash_1u64((u64)first, key);
+#endif
+	return (unsigned long)siphash_1u32((u32)first, key);
+}
+
+/**
  * siphash_1u64 - compute 64-bit siphash PRF value of a u64
  * @first: first u64
  * @key: the siphash key
