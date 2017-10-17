@@ -333,6 +333,10 @@ void of_node_release(struct kobject *kobj)
 	if (!of_node_check_flag(node, OF_DYNAMIC))
 		return;
 
+	if (!prop) {
+		prop = node->deadprops;
+		node->deadprops = NULL;
+	}
 	while (prop) {
 		struct property *next = prop->next;
 		kfree(prop->name);
