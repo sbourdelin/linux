@@ -80,8 +80,9 @@ static const struct renesas_sdhi_of_data of_rcar_gen3_compatible = {
 	.scc_offset	= 0x1000,
 	.taps		= rcar_gen3_scc_taps,
 	.taps_num	= ARRAY_SIZE(rcar_gen3_scc_taps),
-	/* Gen3 SDHI DMAC can handle 0xffffffff blk count, but seg = 1 */
-	.max_blk_count	= 0xffffffff,
+	/* The swiotlb can handle memory size up to 256 kbytes for now. */
+	.max_blk_count	= 512,
+	/* Gen3 SDHI DMAC cannot handle scatter-gather. So, max_segs = 1 */
 	.max_segs	= 1,
 };
 
