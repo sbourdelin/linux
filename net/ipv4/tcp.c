@@ -2821,6 +2821,16 @@ static int do_tcp_setsockopt(struct sock *sk, int level,
 			err = -EOPNOTSUPP;
 		}
 		break;
+	case TCP_NO_TFO_COOKIE:
+		if (!ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN))
+			err = -EPERM;
+		else if (val > 1 || val < 0)
+			err = -EINVAL;
+		else if (!((1 << sk->sk_state) & (TCPF_CLOSE | TCPF_LISTEN)))
+			err = -EINVAL;
+		else
+			tp->no_tfo_cookie = 1;
+		break;
 	case TCP_TIMESTAMP:
 		if (!tp->repair)
 			err = -EPERM;
@@ -3217,6 +3227,10 @@ static int do_tcp_getsockopt(struct sock *sk, int level,
 
 	case TCP_FASTOPEN_CONNECT:
 		val = tp->fastopen_connect;
+		break;
+
+	case TCP_NO_TFO_COOKIE:
+		val = tp->no_tfo_cookie;
 		break;
 
 	case TCP_TIMESTAMP:

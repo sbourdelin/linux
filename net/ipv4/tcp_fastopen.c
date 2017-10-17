@@ -309,7 +309,8 @@ struct sock *tcp_try_fastopen(struct sock *sk, struct sk_buff *skb,
 		return NULL;
 	}
 
-	if (syn_data && (tcp_fastopen & TFO_SERVER_COOKIE_NOT_REQD))
+	if (syn_data && ((tcp_fastopen & TFO_SERVER_COOKIE_NOT_REQD) ||
+			 tcp_sk(sk)->no_tfo_cookie))
 		goto fastopen;
 
 	if (foc->len >= 0 &&  /* Client presents or requests a cookie */
@@ -363,7 +364,8 @@ bool tcp_fastopen_cookie_check(struct sock *sk, u16 *mss,
 		return false;
 	}
 
-	if (sock_net(sk)->ipv4.sysctl_tcp_fastopen & TFO_CLIENT_NO_COOKIE) {
+	if ((sock_net(sk)->ipv4.sysctl_tcp_fastopen & TFO_CLIENT_NO_COOKIE) ||
+	    tcp_sk(sk)->no_tfo_cookie) {
 		cookie->len = -1;
 		return true;
 	}
