@@ -1705,6 +1705,16 @@ config RTC_DRV_MOXART
 	   This driver can also be built as a module. If so, the module
 	   will be called rtc-moxart
 
+config RTC_DRV_MEDIATEK
+	tristate "MediaTek SoC based RTC"
+	depends on ARCH_MEDIATEK || COMPILE_TEST
+	help
+	  This enables support for the real time clock built in the MediaTek
+	  SoCs.
+
+	  This drive can also be built as a module. If so, the module
+	  will be called rtc-mediatek.
+
 config RTC_DRV_MT6397
 	tristate "Mediatek Real Time Clock driver"
 	depends on MFD_MT6397 || (COMPILE_TEST && IRQ_DOMAIN)
