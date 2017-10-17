@@ -337,6 +337,8 @@ static struct component_match *rockchip_drm_match_add(struct device *dev)
 
 			if (!d)
 				break;
+
+			device_link_add(dev, d, DL_FLAG_STATELESS);
 			component_match_add(dev, &match, compare_dev, d);
 		} while (true);
 	}
@@ -406,6 +408,7 @@ static int rockchip_drm_platform_of_probe(struct device *dev)
 static int rockchip_drm_platform_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	struct device_link *link;
 	struct component_match *match = NULL;
 	int ret;
 
@@ -414,15 +417,30 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
 		return ret;
 
 	match = rockchip_drm_match_add(dev);
-	if (IS_ERR(match))
-		return PTR_ERR(match);
+	if (IS_ERR(match)) {
+		ret = PTR_ERR(match);
+		goto err_cleanup_dev_links;
+	}
 
-	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
+	ret = component_master_add_with_match(dev, &rockchip_drm_ops, match);
+	if (ret < 0)
+		goto err_cleanup_dev_links;
+
+	return 0;
+err_cleanup_dev_links:
+	list_for_each_entry(link, &dev->links.consumers, s_node)
+		device_link_del(link);
+	return ret;
 }
 
 static int rockchip_drm_platform_remove(struct platform_device *pdev)
 {
+	struct device_link *link;
+
 	component_master_del(&pdev->dev, &rockchip_drm_ops);
+
+	list_for_each_entry(link, &pdev->dev.links.consumers, s_node)
+		device_link_del(link);
 
 	return 0;
 }
