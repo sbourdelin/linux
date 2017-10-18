@@ -1929,8 +1929,8 @@ void prism2sta_commsqual_defer(struct work_struct *data)
 		return;
 
 	/* we don't care if we're in AP mode */
-	if ((wlandev->macmode == WLAN_MACMODE_NONE) ||
-	    (wlandev->macmode == WLAN_MACMODE_ESS_AP)) {
+	if (wlandev->macmode == WLAN_MACMODE_NONE ||
+	    wlandev->macmode == WLAN_MACMODE_ESS_AP) {
 		return;
 	}
 
