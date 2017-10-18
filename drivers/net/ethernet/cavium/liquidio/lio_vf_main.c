@@ -1691,7 +1691,8 @@ static void handle_timestamp(struct octeon_device *oct, u32 status, void *buf)
  */
 static int send_nic_timestamp_pkt(struct octeon_device *oct,
 				  struct octnic_data_pkt *ndata,
-				  struct octnet_buf_free_info *finfo)
+				  struct octnet_buf_free_info *finfo,
+				  int xmit_more)
 {
 	struct octeon_soft_command *sc;
 	int ring_doorbell;
@@ -1721,7 +1722,7 @@ static int send_nic_timestamp_pkt(struct octeon_device *oct,
 
 	len = (u32)((struct octeon_instr_ih3 *)(&sc->cmd.cmd3.ih3))->dlengsz;
 
-	ring_doorbell = 1;
+	ring_doorbell = !xmit_more;
 
 	retval = octeon_send_command(oct, sc->iq_no, ring_doorbell, &sc->cmd,
 				     sc, len, ndata->reqtype);
@@ -1753,6 +1754,7 @@ static int liquidio_xmit(struct sk_buff *skb, struct net_device *netdev)
 	struct octeon_device *oct;
 	int q_idx = 0, iq_no = 0;
 	union tx_info *tx_info;
+	int xmit_more = 0;
 	struct lio *lio;
 	int status = 0;
 	u64 dptr = 0;
@@ -1941,10 +1943,12 @@ static int liquidio_xmit(struct sk_buff *skb, struct net_device *netdev)
 		irh->vlan = skb_vlan_tag_get(skb) & VLAN_VID_MASK;
 	}
 
+	xmit_more = skb->xmit_more;
+
 	if (unlikely(cmdsetup.s.timestamp))
-		status = send_nic_timestamp_pkt(oct, &ndata, finfo);
+		status = send_nic_timestamp_pkt(oct, &ndata, finfo, xmit_more);
 	else
-		status = octnet_send_nic_data_pkt(oct, &ndata);
+		status = octnet_send_nic_data_pkt(oct, &ndata, xmit_more);
 	if (status == IQ_SEND_FAILED)
 		goto lio_xmit_failed;
 
@@ -1953,7 +1957,7 @@ static int liquidio_xmit(struct sk_buff *skb, struct net_device *netdev)
 	if (status == IQ_SEND_STOP) {
 		dev_err(&oct->pci_dev->dev, "Rcvd IQ_SEND_STOP signal; stopping IQ-%d\n",
 			iq_no);
-		stop_q(lio->netdev, q_idx);
+		stop_q(netdev, q_idx);
 	}
 
 	netif_trans_update(netdev);
