@@ -1591,8 +1591,11 @@ static void rt6_age_examine_exception(struct rt6_exception_bucket *bucket,
 {
 	struct rt6_info *rt = rt6_ex->rt6i;
 
-	if (atomic_read(&rt->dst.__refcnt) == 1 &&
-	    time_after_eq(now, rt->dst.lastuse + gc_args->timeout)) {
+	/* we are pruning and obsoleting the exception route even if others
+	 * have still reference to it, so that on next dst_check() such
+	 * reference can be dropped
+	 */
+	if (time_after_eq(now, rt->dst.lastuse + gc_args->timeout)) {
 		RT6_TRACE("aging clone %p\n", rt);
 		rt6_remove_exception(bucket, rt6_ex);
 		return;
