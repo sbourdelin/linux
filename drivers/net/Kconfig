@@ -214,6 +214,7 @@ config GTP
 	tristate "GPRS Tunneling Protocol datapath (GTP-U)"
 	depends on INET && NET_UDP_TUNNEL
 	select NET_IP_TUNNEL
+	select GRO_CELLS
 	---help---
 	  This allows one to create gtp virtual interfaces that provide
 	  the GPRS Tunneling Protocol datapath (GTP-U). This tunneling protocol
