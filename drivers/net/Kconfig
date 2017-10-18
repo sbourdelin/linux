@@ -226,7 +226,17 @@ config GTP
 	  3GPP TS 29.060 standards.
 
 	  To compile this drivers as a module, choose M here: the module
-	  wil be called gtp.
+	  will be called gtp.
+
+config GTP_IPV6_EXPERIMENTAL
+	bool "GTP IPv6 datapath (EXPERIMENTAL)"
+	default n
+	depends on GTP
+	---help---
+	  This is an experimental implementation that allows encapsulating
+	  IPv6 over GTP and using GTP over IPv6 for testing and development
+	  purpose. This is not a standards conformant implementation for
+	  IPv6 and GTP. More work is needed reach that level.
 
 config MACSEC
 	tristate "IEEE 802.1AE MAC-level encryption (MACsec)"
