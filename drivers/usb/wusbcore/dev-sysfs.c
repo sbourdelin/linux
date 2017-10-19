@@ -21,6 +21,8 @@
  *
  *
  * Get them out of the way...
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/jiffies.h>

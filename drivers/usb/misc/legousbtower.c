@@ -73,6 +73,8 @@
  *   - check for valid udev on resubmitting and unlinking urbs
  * 2004-08-03 - 0.96 Juergen Stuber <starblue@users.sourceforge.net>
  *   - move reset into open to clean out spurious data
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt

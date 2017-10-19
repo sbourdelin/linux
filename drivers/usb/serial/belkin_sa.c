@@ -21,6 +21,8 @@
  * -- Add true modem control line query capability.  Currently we track the
  *    states reported by the interrupt and the states we request.
  * -- Add support for flush commands
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/kernel.h>

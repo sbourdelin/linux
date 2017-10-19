@@ -11,6 +11,8 @@
  * Modified for of_platform bus from ohci-sa1111.c
  *
  * This file is licenced under the GPL.
+ *
+ * SPDX-License-Identifier: GPL-1.0+
  */
 
 #include <linux/signal.h>

@@ -12,6 +12,7 @@
  *	These definitions are used by both kernel-mode driver and the
  *	peripheral firmware and MUST be kept in sync.
  *
+ * SPDX-License-Identifier: GPL-2.0+
  ************************************************************************/
 
 /************************************************************************

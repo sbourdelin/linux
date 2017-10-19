@@ -2,6 +2,8 @@
  * The USB Monitor, inspired by Dave Harding's USBMon.
  *
  * This is a text format reader.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/kernel.h>

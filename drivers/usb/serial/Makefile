@@ -1,6 +1,7 @@
 #
 # Makefile for the USB serial device drivers.
 #
+# SPDX-License-Identifier: GPL-2.0
 
 # Object file lists.
 

@@ -11,6 +11,8 @@
  *           and St�hane Doyon   <s.doyon@videotron.ca>
  *
  *  Released under the GPLv2.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/module.h>

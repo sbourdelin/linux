@@ -4,6 +4,7 @@
 # 15 Aug 2000, Christoph Hellwig <hch@infradead.org>
 # Rewritten to use lists instead of if-statements.
 #
+# SPDX-License-Identifier: GPL-2.0
 
 ccflags-y := -Idrivers/scsi
 

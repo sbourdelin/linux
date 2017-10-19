@@ -17,6 +17,8 @@
  * the terms of the GNU General Public License version 2. This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/clk.h>
 #include <linux/dma-mapping.h>

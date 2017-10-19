@@ -1,4 +1,8 @@
-/* $XFree86$ */
+/*
+ * $XFree86$
+ *
+ * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+ */
 /* $XdotOrg$ */
 /*
  * Data and prototypes for init.c

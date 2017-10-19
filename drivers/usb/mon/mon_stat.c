@@ -5,6 +5,8 @@
  * Note that this code blows through locks, so make sure that
  * /dbg/usbmon/0s is well protected from non-root users.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/kernel.h>

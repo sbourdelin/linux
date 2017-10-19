@@ -3,6 +3,8 @@
  *
  * 2004 (C) Texas Instruments, Inc.
  * 2004 (C) David Brownell
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /*

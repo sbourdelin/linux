@@ -1,6 +1,7 @@
 #
 # USB peripheral controller drivers
 #
+# SPDX-License-Identifier: GPL-2.0
 subdir-ccflags-$(CONFIG_USB_GADGET_DEBUG)	:= -DDEBUG
 subdir-ccflags-$(CONFIG_USB_GADGET_VERBOSE)	+= -DVERBOSE_DEBUG
 ccflags-y				+= -I$(srctree)/drivers/usb/gadget/udc

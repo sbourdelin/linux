@@ -28,6 +28,8 @@
  * The code was only tested with a PalmConnect USB adapter; if you
  * are adventurous, try it with any KLSI-based device and let me know how it
  * breaks so that I can fix it!
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 /* TODO:

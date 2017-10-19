@@ -3,6 +3,8 @@
  *
  * based on ftdi_sio.c and the original serqt_usb.c from Quatech
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/errno.h>

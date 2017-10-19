@@ -23,7 +23,11 @@
 #define SUSBCR_SSL_SETDTR			0x0004
 #define SUSBCR_SSL_CLRDTR			0x0010
 
-/* Kill the pending/current writes to the comm port. */
+/*
+ * Kill the pending/current writes to the comm port.
+ *
+ * SPDX-License-Identifier: GPL-2.0
+ */
 #define SUSBCR_SSL_PURGE_TXABORT		0x0100
 /* Kill the pending/current reads to the comm port. */
 #define SUSBCR_SSL_PURGE_RXABORT		0x0200

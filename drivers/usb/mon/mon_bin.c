@@ -5,6 +5,8 @@
  *
  * Copyright (C) 2006 Paolo Abeni (paolo.abeni@email.it)
  * Copyright (C) 2006,2007 Pete Zaitcev (zaitcev@redhat.com)
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/kernel.h>

@@ -19,6 +19,8 @@
  *
  * Note that almost all the errata workarounds here are only needed for
  * rev1 chips.  Rev1a silicon (0110) fixes almost all of them.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 /*

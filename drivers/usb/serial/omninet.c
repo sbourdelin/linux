@@ -11,6 +11,8 @@
  * driver
  *
  * Please report both successes and troubles to the author at omninet@kroah.com
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/kernel.h>

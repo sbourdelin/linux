@@ -23,6 +23,8 @@
  * Change entries from 2004 and earlier can be found in versions of this
  * file in kernel versions prior to the 2.6.24 release.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 /* Bill Ryder - bryder@sgi.com - wrote the FTDI_SIO implementation */

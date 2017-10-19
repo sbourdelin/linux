@@ -13,6 +13,8 @@
 *
 *  Peter Berger (pberger@brimson.com)
 *  Al Borchers (borchers@steinerpoint.com)
+ *
+ * SPDX-License-Identifier: GPL-2.0+
 */
 
 #include <linux/kernel.h>

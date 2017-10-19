@@ -1,5 +1,7 @@
 /*
  * Definitions for USB serial mobile broadband cards
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #ifndef __LINUX_USB_USB_WWAN

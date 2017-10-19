@@ -20,6 +20,8 @@
  * people who decided that they want to do the same thing in a
  * completely different way.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/module.h>

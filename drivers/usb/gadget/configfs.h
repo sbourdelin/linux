@@ -1,5 +1,6 @@
 #ifndef USB__GADGET__CONFIGFS__H
 #define USB__GADGET__CONFIGFS__H
+/* SPDX-License-Identifier: GPL-2.0 */
 
 #include <linux/configfs.h>
 

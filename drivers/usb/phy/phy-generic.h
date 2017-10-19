@@ -1,5 +1,6 @@
 #ifndef _PHY_GENERIC_H_
 #define _PHY_GENERIC_H_
+/* SPDX-License-Identifier: GPL-2.0 */
 
 #include <linux/usb/usb_phy_generic.h>
 #include <linux/gpio/consumer.h>

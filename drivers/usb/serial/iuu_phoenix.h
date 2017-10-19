@@ -13,6 +13,8 @@
  *
  *  And tested with help of WB Electronics
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #define   IUU_USB_VENDOR_ID  0x104f

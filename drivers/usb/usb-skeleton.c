@@ -10,6 +10,8 @@
  * This driver is based on the 2.6.3 version of drivers/usb/usb-skeleton.c
  * but has been rewritten to be easier to read and use.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/kernel.h>

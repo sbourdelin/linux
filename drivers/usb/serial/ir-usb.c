@@ -22,6 +22,8 @@
  *
  * See Documentation/usb/usb-serial.txt for more information on using this
  * driver
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/kernel.h>

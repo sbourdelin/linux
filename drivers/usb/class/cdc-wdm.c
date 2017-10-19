@@ -10,6 +10,8 @@
  * Released under the GPLv2.
  *
  * Many thanks to Carl Nordbeck
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/kernel.h>
 #include <linux/errno.h>

@@ -57,6 +57,8 @@
 * module code will run in the context of one of the kernel threads
 * of the "ftdi-u132" module.
 *
+ *
+ * SPDX-License-Identifier: GPL-2.0
 */
 int ftdi_elan_switch_on_diagnostics(int number);
 void ftdi_elan_gone_away(struct platform_device *pdev);

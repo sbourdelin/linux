@@ -48,6 +48,8 @@
  * that, creates a 'struct wusbhc' instance that handles all the
  * common WUSB mechanisms. Links in the function ops that are specific
  * to it and then registers the host controller. Ready to run.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #ifndef __WUSBHC_H__

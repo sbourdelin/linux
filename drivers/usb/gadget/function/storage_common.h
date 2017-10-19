@@ -1,5 +1,6 @@
 #ifndef USB_STORAGE_COMMON_H
 #define USB_STORAGE_COMMON_H
+/* SPDX-License-Identifier: GPL-2.0 */
 
 #include <linux/device.h>
 #include <linux/usb/storage.h>

@@ -6,6 +6,8 @@
  * Enter bugs at http://blackfin.uclinux.org/
  *
  * Licensed under the GPL-2 or later.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/module.h>

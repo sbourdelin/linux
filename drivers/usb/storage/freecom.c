@@ -25,6 +25,8 @@
  * This driver was developed with information provided in FREECOM's USB
  * Programmers Reference Guide.  For further information contact Freecom
  * (http://www.freecom.de/)
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/module.h>

@@ -10,6 +10,8 @@
  * (C) Copyright 1999 Deti Fliegl, deti@fliegl.de
  * (C) Copyright 1999 Thomas Sailer, sailer@ife.ee.ethz.ch
  * (C) Copyright 2004 Alan Stern, stern@rowland.harvard.edu
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 static const __u8 root_hub_hub_des[] =

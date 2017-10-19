@@ -53,6 +53,8 @@
  * Damien Bergamini agree to put his code under a DUAL GPL/BSD license.
  *
  * The rest of the code was was rewritten from scratch.
+ *
+ * SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
  */
 
 #include <linux/module.h>

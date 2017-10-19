@@ -8,6 +8,8 @@
  * the Free Software Foundation, version 2.
  * 
  * emi26.c,v 1.13 2002/03/08 13:10:26 tapio Exp
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/kernel.h>
 #include <linux/errno.h>

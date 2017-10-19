@@ -17,6 +17,8 @@
   with GSM modems. Issues:
   - data loss -- one single Receive URB is not nearly enough
   - controlling the baud rate doesn't make sense
+
+ SPDX-License-Identifier: GPL-2.0
 */
 
 #define DRIVER_AUTHOR "Matthias Urlichs <smurf@smurf.noris.de>"

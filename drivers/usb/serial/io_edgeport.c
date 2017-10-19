@@ -27,6 +27,8 @@
  * Networks technical support, or Peter Berger <pberger@brimson.com>,
  * or Al Borchers <alborchers@steinerpoint.com>.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/kernel.h>

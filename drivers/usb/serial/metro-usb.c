@@ -4,6 +4,8 @@
 
   Copyright:	2007 Metrologic Instruments. All rights reserved.
   Copyright:	2011 Azimut Ltd. <http://azimutrzn.ru/>
+
+ SPDX-License-Identifier: GPL-2.0
 */
 
 #include <linux/kernel.h>

@@ -1,6 +1,7 @@
 #
 # Makefile for the kernel USB device drivers.
 #
+# SPDX-License-Identifier: GPL-2.0
 
 # Object files in subdirectories
 

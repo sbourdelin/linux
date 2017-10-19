@@ -4,6 +4,8 @@
  * This file implements a DMA  interface using TI's CPPI DMA.
  * For now it's DaVinci-only, but CPPI isn't specific to DaVinci or USB.
  * The TUSB6020, using VLYNQ, has CPPI that looks much like DaVinci.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/module.h>

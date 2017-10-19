@@ -19,6 +19,8 @@
  * The isight firmware loading was reverse engineered by Johannes Berg
  * <johannes@sipsolutions.de>, and this driver is based on code by Ronald
  * Bultje <rbultje@ronald.bitfreak.net>
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/usb.h>

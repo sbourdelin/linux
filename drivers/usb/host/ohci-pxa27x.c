@@ -17,6 +17,8 @@
  *  by Nick Bane <nick@cecomputing.co.uk> 26-8-2004
  *
  * This file is licenced under the GPL.
+ *
+ * SPDX-License-Identifier: GPL-1.0+
  */
 
 #include <linux/clk.h>

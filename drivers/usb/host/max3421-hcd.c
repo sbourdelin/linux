@@ -53,6 +53,8 @@
  * transactions while holding a spin-lock (and/or while interrupts are
  * masked).  To achieve this, all SPI transactions are issued from a
  * single thread (max3421_spi_thread).
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/jiffies.h>

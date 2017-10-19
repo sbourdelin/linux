@@ -1,4 +1,5 @@
 # define_trace.h needs to know how to find our header
+# SPDX-License-Identifier: GPL-2.0
 CFLAGS_trace.o				:= -I$(src)
 
 obj-$(CONFIG_USB_DWC3)			+= dwc3.o

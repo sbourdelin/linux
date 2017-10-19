@@ -5,6 +5,8 @@
  * (C) Copyright 2000-2004 David Brownell <dbrownell@users.sourceforge.net>
  *
  * This file is licenced under GPL
+ *
+ * SPDX-License-Identifier: GPL-1.0+
  */
 
 /*-------------------------------------------------------------------------*/

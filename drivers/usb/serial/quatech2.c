@@ -11,6 +11,8 @@
  *  These devices all have only 1 bulk in and 1 bulk out that is shared
  *  for all serial ports.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <asm/unaligned.h>

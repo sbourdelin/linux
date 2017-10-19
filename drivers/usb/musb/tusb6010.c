@@ -12,6 +12,8 @@
  * - Driver assumes that interface to external host (main CPU) is
  *   configured for NOR FLASH interface instead of VLYNQ serial
  *   interface.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/module.h>

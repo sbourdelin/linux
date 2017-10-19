@@ -7,6 +7,8 @@
  *
  * http://www.opensource.org/licenses/gpl-license.html
  * http://www.gnu.org/copyleft/gpl.html
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #ifndef __DRIVER_USB_CHIPIDEA_CI_HDRC_IMX_H

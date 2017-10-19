@@ -10,6 +10,8 @@
  *
  * (c) 2011 Arvid Brodin <arvid.brodin@enea.com>
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/gpio/consumer.h>
 #include <linux/module.h>

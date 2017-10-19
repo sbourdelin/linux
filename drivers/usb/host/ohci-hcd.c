@@ -18,6 +18,8 @@
  * through the http://www.usb.org website.
  *
  * This file is licenced under the GPL.
+ *
+ * SPDX-License-Identifier: GPL-1.0+
  */
 
 #include <linux/module.h>

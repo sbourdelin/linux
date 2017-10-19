@@ -1,5 +1,6 @@
 #ifndef __UCSI_DEBUG_H
 #define __UCSI_DEBUG_H
+/* SPDX-License-Identifier: GPL-2.0 */
 
 #include "ucsi.h"
 

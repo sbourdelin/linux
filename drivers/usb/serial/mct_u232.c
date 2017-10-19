@@ -19,6 +19,8 @@
  *   DTR/RTS signal handling may be incomplete or incorrect. I have mainly
  *   implemented what I have seen with SniffUSB or found in belkin_sa.c.
  *   For further TODOs check also belkin_sa.c.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/kernel.h>

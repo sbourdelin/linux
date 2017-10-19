@@ -25,6 +25,8 @@
  *  supported by a libusb-based userspace device driver.
  *
  *  Homepage: http://www.reiner-sct.de/support/treiber_cyberjack.php#linux
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 

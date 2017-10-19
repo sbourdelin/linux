@@ -11,6 +11,7 @@
  *          based on usb_skeleton.c.                                         *
  *          This new driver allows more than one USB-LCD to be connected     *
  *          and controlled, at once                                          *
+ * SPDX-License-Identifier: GPL-2.0
  *****************************************************************************/
 #include <linux/module.h>
 #include <linux/kernel.h>

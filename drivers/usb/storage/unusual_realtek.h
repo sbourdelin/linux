@@ -19,6 +19,8 @@
  * Author:
  *   wwang (wei_wang@realsil.com.cn)
  *   No. 450, Shenhu Road, Suzhou Industry Park, Suzhou, China
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #if defined(CONFIG_USB_STORAGE_REALTEK) || \

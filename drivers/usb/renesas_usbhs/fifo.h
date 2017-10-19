@@ -13,6 +13,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
+ *
+ * SPDX-License-Identifier: GPL-1.0+
  */
 #ifndef RENESAS_USB_FIFO_H
 #define RENESAS_USB_FIFO_H

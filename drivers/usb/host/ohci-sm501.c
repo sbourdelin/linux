@@ -9,6 +9,8 @@
  * SM501 Bus Glue - based on ohci-omap.c
  *
  * This file is licenced under the GPL.
+ *
+ * SPDX-License-Identifier: GPL-1.0+
  */
 
 #include <linux/interrupt.h>

@@ -10,6 +10,8 @@
  * and "ohci-ppc-of.c" by Sylvain Munaut <tnt@246tNt.com>
  *
  * This file is licenced under the GPL.
+ *
+ * SPDX-License-Identifier: GPL-1.0+
  */
 
 #include <linux/err.h>

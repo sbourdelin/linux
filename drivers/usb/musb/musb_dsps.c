@@ -27,6 +27,8 @@
  * such as dm64x, dm36x, dm35x, da8x, am35x and ti81x.
  * For now only ti81x is using this and in future davinci.c, am35x.c
  * da8xx.c would be merged to this file after testing.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/io.h>

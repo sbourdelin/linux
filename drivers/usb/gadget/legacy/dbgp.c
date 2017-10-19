@@ -4,6 +4,8 @@
  * Copyright (C) 2010 Stephane Duverger
  *
  * Released under the GPLv2.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /* verbose messages */

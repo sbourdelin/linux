@@ -5,6 +5,8 @@
  * Philipp Gühring - pg@futureware.at - added the Device ID of the USB relais
  * from Rudolf Gugler
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 

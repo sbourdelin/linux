@@ -1,5 +1,6 @@
 #ifndef _UVC_QUEUE_H_
 #define _UVC_QUEUE_H_
+/* SPDX-License-Identifier: GPL-2.0 */
 
 #ifdef __KERNEL__
 

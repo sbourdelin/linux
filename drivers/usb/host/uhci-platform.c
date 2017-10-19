@@ -5,6 +5,8 @@
  *
  * This file is based on uhci-grlib.c
  * (C) Copyright 2004-2007 Alan Stern, stern@rowland.harvard.edu
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/of.h>

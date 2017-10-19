@@ -1,5 +1,6 @@
 #ifndef __DRIVERS_USB_CHIPIDEA_HOST_H
 #define __DRIVERS_USB_CHIPIDEA_HOST_H
+/* SPDX-License-Identifier: GPL-2.0 */
 
 #ifdef CONFIG_USB_CHIPIDEA_HOST
 

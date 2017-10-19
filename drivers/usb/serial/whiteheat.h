@@ -15,6 +15,8 @@
  * See Documentation/usb/usb-serial.txt for more information on using this
  * driver
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #ifndef __LINUX_USB_SERIAL_WHITEHEAT_H

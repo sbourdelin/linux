@@ -12,6 +12,8 @@
  * and on ohci-sa1111.c by Christopher Hoover <ch@hpl.hp.com>
  *
  * This file is licenced under the GPL.
+ *
+ * SPDX-License-Identifier: GPL-1.0+
  */
 
 #include <linux/clk.h>

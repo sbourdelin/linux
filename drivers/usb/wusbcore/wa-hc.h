@@ -75,6 +75,8 @@
  * The rest of the traffic is in the usual entry points of a USB HCD,
  * which are hooked up in driver.c:hwahc_rc_driver, and defined in
  * hcd.c.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #ifndef __HWAHC_INTERNAL_H__

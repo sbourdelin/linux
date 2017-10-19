@@ -9,6 +9,8 @@
  *
  * Based on usbmouse.c (Vojtech Pavlik) and xpad.c (Marko Friedemann)
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 /*

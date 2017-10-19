@@ -1,5 +1,6 @@
 #ifndef __LINUX_UHCI_HCD_H
 #define __LINUX_UHCI_HCD_H
+/* SPDX-License-Identifier: GPL-2.0 */
 
 #include <linux/list.h>
 #include <linux/usb.h>

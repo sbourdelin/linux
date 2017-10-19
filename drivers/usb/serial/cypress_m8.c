@@ -16,6 +16,8 @@
  *
  * See http://geocities.com/i0xox0i for information on this driver and the
  * earthmate usb device.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 /* Thanks to Neil Whelchel for writing the first cypress m8 implementation

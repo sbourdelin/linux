@@ -28,6 +28,8 @@
  * This is so because usb_add_hcd() will start the HC, and thus, all
  * the HC specific stuff has to be already initialized (like sysfs
  * thingies).
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/device.h>
 #include <linux/module.h>

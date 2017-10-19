@@ -8,6 +8,8 @@
  * option) any later version.
  *
  * Freescale USB device/endpoint management registers
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 #ifndef __FSL_USB2_UDC_H
 #define __FSL_USB2_UDC_H

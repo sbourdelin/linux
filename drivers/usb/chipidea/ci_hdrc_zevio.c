@@ -7,6 +7,8 @@
  *
  * Based off drivers/usb/chipidea/ci_hdrc_msm.c
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/module.h>

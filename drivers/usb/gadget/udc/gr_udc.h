@@ -17,6 +17,8 @@
  * Contributors:
  * - Andreas Larsson <andreas@gaisler.com>
  * - Marko Isomaki
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 /* Control registers on the AMBA bus */

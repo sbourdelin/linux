@@ -20,6 +20,8 @@
  * Bill Ryder - bryder@sgi.com formerly of Silicon Graphics, Inc.- wrote the
  * FTDI_SIO implementation.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /* Commands */

@@ -7,6 +7,8 @@
  *
  * (c) 2007 Sebastian Siewior <bigeasy@linutronix.de>
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/usb.h>

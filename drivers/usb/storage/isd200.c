@@ -38,6 +38,8 @@
  *	      (Luc Saillard <luc@saillard.org>)
  *  2002-01-17: All bitfields removed.
  *	      (bjorn@haxx.se)
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 

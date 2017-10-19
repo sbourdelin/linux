@@ -1,6 +1,7 @@
 #
 # Makefile for physical layer USB drivers
 #
+# SPDX-License-Identifier: GPL-2.0
 obj-$(CONFIG_USB_PHY)			+= phy.o
 obj-$(CONFIG_OF)			+= of.o
 

@@ -14,6 +14,8 @@
  *	 4 ports : UPort 1410, UPort 1450, UPort 1450I
  *	 8 ports : UPort 1610-8, UPort 1650-8
  *	16 ports : UPort 1610-16, UPort 1650-16
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/kernel.h>

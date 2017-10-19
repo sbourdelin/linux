@@ -32,6 +32,8 @@
  *
  * Author:	Thomas Winischhofer <thomas@winischhofer.net>
  *
+ *
+ * SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
  */
 
 #ifndef _SISUSB_H_

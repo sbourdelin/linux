@@ -36,6 +36,8 @@
  * and made it all available inside a cd.
  * URL: http://kernel.org/pub/linux/kernel/people/gregkh/ddk/
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <asm/unaligned.h>

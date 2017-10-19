@@ -17,6 +17,8 @@
  *
  * The GNU General Public License is available at
  * http://www.gnu.org/copyleft/gpl.html.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt

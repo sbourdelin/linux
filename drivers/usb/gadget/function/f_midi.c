@@ -17,6 +17,8 @@
  *   Ben Williamson <ben.williamson@greyinnovation.com>
  *
  * Licensed under the GPL-2 or later.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/kernel.h>

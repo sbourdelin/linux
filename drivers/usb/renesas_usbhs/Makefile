@@ -1,6 +1,7 @@
 #
 # for Renesas USB
 #
+# SPDX-License-Identifier: GPL-2.0
 
 obj-$(CONFIG_USB_RENESAS_USBHS)	+= renesas_usbhs.o
 

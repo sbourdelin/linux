@@ -13,6 +13,8 @@
  * cannot be used simultaneously for status or signal strength.  Instead, the
  * ports here can be queried for that information using the Qualcomm DM
  * protocol.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/kernel.h>

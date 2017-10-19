@@ -10,6 +10,7 @@
  *	(at your option) any later version.
  *
  *
+ * SPDX-License-Identifier: GPL-2.0+
  ************************************************************************/
 
 #if !defined(_IO_EDGEPORT_H_)

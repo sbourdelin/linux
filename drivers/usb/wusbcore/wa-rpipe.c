@@ -56,6 +56,8 @@
  *  never take addresses from the urb->pipe, but from the
  *  urb->dev->devnum, to make sure that we always have the right
  *  destination address.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/atomic.h>
 #include <linux/bitmap.h>

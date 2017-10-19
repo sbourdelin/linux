@@ -47,6 +47,8 @@
  * 2000-07-05: Ashley Montanaro <ashley@compsoc.man.ac.uk>
  *   Converted file reading routine to dump to buffer once
  *   per device, not per bus
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/fs.h>

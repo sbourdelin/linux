@@ -6,6 +6,8 @@
  *
  *  Copyright (c) 1999 Martin Mares <mj@ucw.cz>
  *  (and others)
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/types.h>

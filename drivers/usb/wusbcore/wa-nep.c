@@ -48,6 +48,8 @@
  * wa_nep_cb()                 Callback for the notification
  *                                endpoint; when data is ready, this
  *                                does the dispatching.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/workqueue.h>
 #include <linux/ctype.h>

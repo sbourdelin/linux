@@ -26,6 +26,8 @@
   Some of the "one port" devices actually exhibit multiple USB instances
   on the USB bus. This is not a bug, these ports are used for different
   device features.
+
+ SPDX-License-Identifier: GPL-2.0
 */
 
 #define DRIVER_AUTHOR "Matthias Urlichs <smurf@smurf.noris.de>"

@@ -8,6 +8,8 @@
  *    Simon Pickering
  *
  *  Last update: 2005-05-12
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/kernel.h>

@@ -16,6 +16,8 @@
  *
  * Refer to the USB Device Class Definition for MIDI Devices:
  * http://www.usb.org/developers/devclass_docs/midi10.pdf
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /* #define VERBOSE_DEBUG */

@@ -24,6 +24,8 @@
  * It can be described by f81534_process_read_urb() and maybe received with
  * 128x1,2,3,4 bytes.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 #include <linux/slab.h>
 #include <linux/tty.h>

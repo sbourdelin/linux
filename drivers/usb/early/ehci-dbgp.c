@@ -9,6 +9,8 @@
  *  Jason Wessel <jason.wessel@windriver.com>
  *  Copyright (C) 2009 Wind River Systems, Inc.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/console.h>

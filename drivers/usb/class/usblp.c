@@ -29,6 +29,8 @@
  *	v0.13 - alloc space for statusbuf (<status> not on stack);
  *		use usb_alloc_coherent() for read buf & write buf;
  *      none  - Maintained in Linux kernel after v0.13
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 /*

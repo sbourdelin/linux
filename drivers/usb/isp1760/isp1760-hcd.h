@@ -1,5 +1,6 @@
 #ifndef _ISP1760_HCD_H_
 #define _ISP1760_HCD_H_
+/* SPDX-License-Identifier: GPL-2.0 */
 
 #include <linux/spinlock.h>
 

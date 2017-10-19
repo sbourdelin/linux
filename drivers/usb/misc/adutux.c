@@ -16,6 +16,8 @@
  * that was derived from USB Skeleton driver - 0.5
  * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt

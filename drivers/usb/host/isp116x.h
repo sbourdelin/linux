@@ -6,6 +6,8 @@
  * Copyright (C) 2004 Lothar Wassmann
  * Copyright (C) 2004 Psion Teklogix
  * Copyright (C) 2004 David Brownell
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /* us of 1ms frame */

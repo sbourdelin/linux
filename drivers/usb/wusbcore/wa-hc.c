@@ -21,6 +21,8 @@
  *
  *
  * FIXME: docs
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/slab.h>
 #include <linux/module.h>

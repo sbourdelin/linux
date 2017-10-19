@@ -12,6 +12,8 @@
  *
  * By:
  *      Stuart Lynne <sl@lineo.com>, Tom Rushworth <tbr@lineo.com>
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 /*

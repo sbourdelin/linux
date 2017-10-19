@@ -84,6 +84,8 @@
  *   Before the @wusbhc structure put()s the reference it owns for
  *   port->wusb_dev [and clean the wusb_dev pointer], it needs to
  *   lock @wusbhc->mutex.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/jiffies.h>

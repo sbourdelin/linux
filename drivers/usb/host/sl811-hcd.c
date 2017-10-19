@@ -15,6 +15,8 @@
  * For documentation, see the SL811HS spec and the "SL811HS Embedded Host"
  * document (providing significant pieces missing from that spec); plus
  * the SL811S spec if you want peripheral side info.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /*

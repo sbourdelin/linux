@@ -35,6 +35,8 @@
  *
  * FIXME:
  *  - add timers that autoremove intervalled IEs?
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/usb/wusb.h>
 #include <linux/slab.h>

@@ -117,6 +117,8 @@
  *	20010320 Version 0.4.3
  *	20010408 Identify version on module load.
  *	20011003 Fix multiple requests
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/module.h>

@@ -7,6 +7,8 @@
  * Copyright Sarah Sharp for Intel Corp, 2010
  *
  * Distributed under the terms of the GNU GPL, version two.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/blkdev.h>

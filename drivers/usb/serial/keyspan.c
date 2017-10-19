@@ -25,6 +25,8 @@
 
   Tip 'o the hat to IBM (and previously Linuxcare :) for supporting
   staff in their work on open source projects.
+
+ SPDX-License-Identifier: GPL-2.0+
 */
 
 

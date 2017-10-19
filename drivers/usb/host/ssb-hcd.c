@@ -17,6 +17,8 @@
  * Copyright 2005-2011 Broadcom Corporation
  *
  * Licensed under the GNU/GPL. See COPYING for details.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/ssb/ssb.h>
 #include <linux/delay.h>

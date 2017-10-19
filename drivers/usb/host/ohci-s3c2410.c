@@ -17,6 +17,8 @@
  * Thanks to basprog@mail.ru for updates to newer kernels
  *
  * This file is licenced under the GPL.
+ *
+ * SPDX-License-Identifier: GPL-1.0+
 */
 
 #include <linux/clk.h>

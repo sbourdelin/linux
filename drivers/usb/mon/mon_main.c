@@ -4,6 +4,8 @@
  * mon_main.c: Main file, module initiation and exit, registrations, etc.
  *
  * Copyright (C) 2005 Pete Zaitcev (zaitcev@redhat.com)
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/kernel.h>

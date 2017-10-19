@@ -85,6 +85,8 @@
  * References:
  *   [WUSB-AM] Association Models Supplement to the Certified Wireless
  *             Universal Serial Bus Specification, version 1.0.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/module.h>
 #include <linux/ctype.h>

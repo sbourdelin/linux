@@ -11,6 +11,8 @@
  * Periodic scheduling is based on Roman's OHCI code
  * Copyright (C) 1999 Roman Weissgaerber
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /*

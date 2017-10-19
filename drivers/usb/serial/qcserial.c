@@ -9,6 +9,8 @@
  *	modify it under the terms of the GNU General Public License version
  *	2 as published by the Free Software Foundation.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/tty.h>

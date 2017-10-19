@@ -2,6 +2,8 @@
  * ISP1362 HCD (Host Controller Driver) for USB.
  *
  * COPYRIGHT (C) by L. Wassmann <LW@KARO-electronics.de>
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /* ------------------------------------------------------------------------- */

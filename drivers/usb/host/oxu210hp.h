@@ -1,5 +1,7 @@
 /*
  * Host interface registers
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #define OXU_DEVICEID			0x00

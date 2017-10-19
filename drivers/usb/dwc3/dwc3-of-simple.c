@@ -17,6 +17,8 @@
  * This is a combination of the old dwc3-qcom.c by Ivan T. Ivanov
  * <iivanov@mm-sol.com> and the original patch adding support for Xilinx' SoC
  * by Subbaraya Sundeep Bhatta <subbaraya.sundeep.bhatta@xilinx.com>
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/module.h>

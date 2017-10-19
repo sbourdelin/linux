@@ -10,6 +10,8 @@
  *   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
  *   NON INFRINGEMENT.  See the GNU General Public License for
  *   more details.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /*

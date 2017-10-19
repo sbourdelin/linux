@@ -29,6 +29,8 @@
  *    I am using to write this driver was acquired by using a modified
  *    UsbSnoop on Windows2000.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #ifndef __LINUX_USB_SERIAL_BSA_H

@@ -52,6 +52,8 @@
  *   [__]hwahc_op_*()   Host-Wire-Adaptor specific functions for
  *                      starting/stopping/etc (some might be made also
  *                      DWA).
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/kernel.h>
 #include <linux/slab.h>

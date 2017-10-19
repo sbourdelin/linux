@@ -34,6 +34,8 @@
  * an embedded CardBus slot but do not work when they are connected
  * via an ELAN U132 adapter.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt

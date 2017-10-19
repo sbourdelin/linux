@@ -12,6 +12,8 @@
  * PCI Bus Glue
  *
  * This file is licenced under the GPL.
+ *
+ * SPDX-License-Identifier: GPL-1.0+
  */
 
 #include <linux/io.h>

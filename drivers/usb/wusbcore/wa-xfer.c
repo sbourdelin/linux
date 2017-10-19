@@ -78,6 +78,8 @@
  *     to where we have a list of transactions to do and based on the
  *     availability of the different required components (blocks,
  *     rpipes, segment slots, etc), we go scheduling them. Painful.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/spinlock.h>
 #include <linux/slab.h>

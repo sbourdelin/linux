@@ -1,5 +1,7 @@
 /*
  * Definitions for the KLSI KL5KUSB105 serial port adapter
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /* vendor/product pairs that are known to contain this chipset */

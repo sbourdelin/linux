@@ -16,6 +16,8 @@
  * (at your option) any later version.
  *
  * Inspired by dwc3-omap.c and dwc3-exynos.c.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/delay.h>

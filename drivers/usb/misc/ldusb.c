@@ -20,6 +20,8 @@
  * Derived from Lego USB Tower driver
  * Copyright (C) 2003 David Glance <advidgsf@sourceforge.net>
  *		 2001-2004 Juergen Stuber <starblue@users.sourceforge.net>
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/kernel.h>

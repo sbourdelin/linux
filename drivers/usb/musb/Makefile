@@ -1,6 +1,7 @@
 #
 # for USB OTG silicon based on Mentor Graphics INVENTRA designs
 #
+# SPDX-License-Identifier: GPL-2.0
 
 # define_trace.h needs to know how to find our header
 CFLAGS_musb_trace.o	:= -I$(src)

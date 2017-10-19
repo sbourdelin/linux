@@ -1,6 +1,7 @@
 #
 # Makefile for the usb common parts.
 #
+# SPDX-License-Identifier: GPL-2.0
 
 obj-$(CONFIG_USB_COMMON)	  += usb-common.o
 usb-common-y			  += common.o

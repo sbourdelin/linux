@@ -11,6 +11,8 @@
  * Based on fragments of previous driver by Russell King et al.
  *
  * This file is licenced under the GPL.
+ *
+ * SPDX-License-Identifier: GPL-1.0+
  */
 
 #include <asm/mach-types.h>

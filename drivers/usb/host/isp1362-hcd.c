@@ -9,6 +9,8 @@
  * Portions:
  * Copyright (C) 2004 Psion Teklogix (for NetBook PRO)
  * Copyright (C) 2004 David Brownell
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /*

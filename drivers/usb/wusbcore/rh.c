@@ -68,6 +68,8 @@
  * wusbhc_rh_[suspend|resume]() That
  *
  * wusbhc_rh_start_port_reset() ??? unimplemented
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/slab.h>
 #include <linux/export.h>

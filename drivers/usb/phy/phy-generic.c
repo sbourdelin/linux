@@ -22,6 +22,8 @@
  * Current status:
  *	This provides a "nop" transceiver for PHYs which are
  *	autonomous such as isp1504, isp1707, etc.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/module.h>

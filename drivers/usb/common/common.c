@@ -9,6 +9,8 @@
  * (ie. CONFIG_USB_GADGET=y) is compiled in the kernel, this module is
  * compiled-in as well.  Otherwise, if either of the two stacks is
  * compiled as module, this file is compiled as module as well.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/kernel.h>

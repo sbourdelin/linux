@@ -10,6 +10,8 @@
  * TODO:
  *	Add termios method that uses copy_hw but also kills all echo
  *	flags as the navman is rx only so cannot echo.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/gfp.h>

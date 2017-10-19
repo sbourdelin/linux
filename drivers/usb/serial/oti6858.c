@@ -35,6 +35,8 @@
  *  - implement more ioctls
  *  - test/implement flow control
  *  - allow setting custom baud rates
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/kernel.h>

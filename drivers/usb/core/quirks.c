@@ -9,6 +9,8 @@
  * Software Foundation, version 2.
  *
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/usb.h>

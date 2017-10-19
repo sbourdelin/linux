@@ -10,6 +10,8 @@
  *
  *		This software was originally developed in conformance with
  *		Microsoft's Remote NDIS Specification License Agreement.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #ifndef _LINUX_RNDIS_H

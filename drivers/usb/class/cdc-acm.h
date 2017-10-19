@@ -4,6 +4,8 @@
  *
  * Mainly take from usbnet's cdc-ether part
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 /*

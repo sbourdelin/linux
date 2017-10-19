@@ -15,6 +15,8 @@
 
   Portions based on the option driver by Matthias Urlichs <smurf@smurf.noris.de>
   Whom based his on the Keyspan driver by Hugh Blemings <hugh@blemings.org>
+
+ SPDX-License-Identifier: GPL-2.0
 */
 /* Uncomment to log function calls */
 /* #define DEBUG */

@@ -5,6 +5,7 @@
 #if !defined(__UCSI_TRACE_H) || defined(TRACE_HEADER_MULTI_READ)
 #define __UCSI_TRACE_H
 
+/* SPDX-License-Identifier: GPL-2.0 */
 #include <linux/tracepoint.h>
 #include "ucsi.h"
 #include "debug.h"

@@ -19,6 +19,8 @@
  * - flow control: none
  * - baud rates: 0, 2400, 4800, 9600, 19200, 38400, 57600, 115200, 153600
  * - signals: DTR, RTS and BREAK
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/module.h>

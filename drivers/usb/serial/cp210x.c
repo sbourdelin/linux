@@ -11,6 +11,8 @@
  * thanks to Karl Hiramoto karl@hiramoto.org. RTSCTS hardware flow
  * control thanks to Munir Nassar nassarmu@real-time.com
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/kernel.h>

@@ -20,6 +20,8 @@
  *      Copyright (C) 2000 Inside Out Networks, All rights reserved.
  *      Copyright (C) 2001-2002 Greg Kroah-Hartman <greg@kroah.com>
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/kernel.h>

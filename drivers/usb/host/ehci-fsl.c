@@ -21,6 +21,8 @@
  * Power Management support by Dave Liu <daveliu@freescale.com>,
  * Jerry Huang <Chang-Ming.Huang@freescale.com> and
  * Anton Vorontsov <avorontsov@ru.mvista.com>.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/kernel.h>

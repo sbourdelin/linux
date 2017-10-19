@@ -20,6 +20,8 @@
  *
  * Supported readers: USB TWIN, KAAN Standard Plus and SecOVID Reader Plus
  * (Adapter K), B1 Professional and KAAN Professional (Adapter B)
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 

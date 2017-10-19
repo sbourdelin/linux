@@ -13,6 +13,8 @@
  * This software is distributed under the terms of the GNU General
  * Public License ("GPL") as published by the Free Software Foundation,
  * either version 2 of that License or (at your option) any later version.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 /* #define VERBOSE_DEBUG */

@@ -1,5 +1,6 @@
 #ifndef CYPRESS_M8_H
 #define CYPRESS_M8_H
+/* SPDX-License-Identifier: GPL-2.0 */
 
 /*
  * definitions and function prototypes used for the cypress USB to Serial

@@ -34,6 +34,8 @@
  * DCD, DTR, RTS, CTS which are currently faked.
  * It's good enough for PPP at this point. It's based off all kinds of
  * code found in usb/serial and usb/class
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/kernel.h>

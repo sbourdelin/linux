@@ -17,6 +17,8 @@
  * All of the information about the device was acquired by using SniffUSB
  * on Windows98. The technical details of the reverse engineering are
  * summarized at the end of this file.
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #ifndef __LINUX_USB_SERIAL_MCT_U232_H

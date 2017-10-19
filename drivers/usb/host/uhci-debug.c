@@ -7,6 +7,8 @@
  *
  * (C) Copyright 1999 Linus Torvalds
  * (C) Copyright 1999-2001 Johannes Erdfelt
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <linux/slab.h>

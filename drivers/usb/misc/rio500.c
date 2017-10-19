@@ -1,4 +1,8 @@
-/* -*- linux-c -*- */
+/*
+ * -*- linux-c -*-
+ *
+ * SPDX-License-Identifier: GPL-2.0+
+ */
 
 /* 
  * Driver for USB Rio 500

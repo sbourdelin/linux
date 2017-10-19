@@ -11,6 +11,8 @@
  * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
  * for more details.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 /* this file is part of ehci-hcd.c */

@@ -18,6 +18,8 @@
  * Copyright 1999 Gregory P. Smith
  *
  * Licensed under the GNU/GPL. See COPYING for details.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/acpi.h>
 #include <linux/clk.h>

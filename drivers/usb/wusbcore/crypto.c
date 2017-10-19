@@ -43,6 +43,8 @@
  *
  *             Conveniently, some data structures that need to be
  *             funneled through AES are...16 bytes in size!
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 
 #include <crypto/skcipher.h>

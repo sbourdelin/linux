@@ -12,6 +12,7 @@
  *	May-29-2002	gkh	Ported to Linux
  *
  *
+ * SPDX-License-Identifier: GPL-2.0+
  ******************************************************************************/
 
 #ifndef _IO_TI_H_

@@ -12,6 +12,8 @@
  * Free Software Foundation; either version 2 of the License, or (at your
  * option) any later version.
  *
+ *
+ * SPDX-License-Identifier: GPL-2.0+
  */
 
 #include <linux/kernel.h>

@@ -5,6 +5,8 @@
  *
  * Author: Sebastian Andrzej Siewior <bigeasy at linutronix dot de>
  * License: GPLv2 as published by FSF.
+ *
+ * SPDX-License-Identifier: GPL-2.0
  */
 #include <linux/kernel.h>
 #include <linux/module.h>
