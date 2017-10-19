@@ -416,7 +416,7 @@ static inline int write_all_xattrs(struct inode *inode, __u32 hsize,
 							NODE, true);
 		/* no need to use xattr node block */
 		if (hsize <= inline_size) {
-			err = truncate_xattr_node(inode, ipage);
+			err = truncate_xattr_node(inode);
 			alloc_nid_failed(sbi, new_nid);
 			if (err) {
 				f2fs_put_page(in_page, 1);
