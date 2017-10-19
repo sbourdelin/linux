@@ -176,11 +176,14 @@ static int rdma_nl_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 		return -EPERM;
 
 	/* FIXME: Convert IWCM to properly handle doit callbacks */
-	if ((nlh->nlmsg_flags & NLM_F_DUMP) || index == RDMA_NL_RDMA_CM ||
-	    index == RDMA_NL_IWCM) {
+	if ((index != RDMA_NL_LS) &&
+	    ((nlh->nlmsg_flags & NLM_F_DUMP) || index == RDMA_NL_RDMA_CM ||
+	     index == RDMA_NL_IWCM)) {
 		struct netlink_dump_control c = {
 			.dump = cb_table[op].dump,
 		};
+		if (!c.dump)
+			return 0;
 		return netlink_dump_start(nls, skb, nlh, &c);
 	}
 
