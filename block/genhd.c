@@ -1354,13 +1354,7 @@ dev_t blk_lookup_devt(const char *name, int partno)
 }
 EXPORT_SYMBOL(blk_lookup_devt);
 
-struct gendisk *alloc_disk(int minors)
-{
-	return alloc_disk_node(minors, NUMA_NO_NODE);
-}
-EXPORT_SYMBOL(alloc_disk);
-
-struct gendisk *alloc_disk_node(int minors, int node_id)
+struct gendisk *__alloc_disk_node(int minors, int node_id, struct lock_class_key *key, const char *lock_name)
 {
 	struct gendisk *disk;
 	struct disk_part_tbl *ptbl;
@@ -1409,9 +1403,12 @@ struct gendisk *alloc_disk_node(int minors, int node_id)
 		disk_to_dev(disk)->type = &disk_type;
 		device_initialize(disk_to_dev(disk));
 	}
+
+	lockdep_init_map(&disk->lockdep_map, lock_name, key, 0);
+
 	return disk;
 }
-EXPORT_SYMBOL(alloc_disk_node);
+EXPORT_SYMBOL(__alloc_disk_node);
 
 struct kobject *get_disk(struct gendisk *disk)
 {
