@@ -520,6 +520,11 @@ static int br_vlan_info(struct net_bridge *br, struct net_bridge_port *p,
 		}
 		if (!err)
 			*changed = true;
+		else if (err == -EEXIST)
+			/* nothing changed, return 0 for overlapping range add
+			 * and compatibility reasons
+			 */
+			err = 0;
 		break;
 
 	case RTM_DELLINK:
