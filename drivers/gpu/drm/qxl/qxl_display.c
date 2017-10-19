@@ -502,6 +502,7 @@ static void qxl_primary_atomic_update(struct drm_plane *plane,
 	struct qxl_framebuffer *qfb_old;
 	struct qxl_bo *bo = gem_to_qxl_bo(qfb->obj);
 	struct qxl_bo *bo_old;
+	bool update_primary = true;
 	struct drm_clip_rect norect = {
 	    .x1 = 0,
 	    .y1 = 0,
@@ -519,15 +520,31 @@ static void qxl_primary_atomic_update(struct drm_plane *plane,
 	if (bo == bo_old)
 		return;
 
+	if (bo && bo_old &&
+	    plane->state->crtc == old_state->crtc &&
+	    plane->state->crtc_w == old_state->crtc_w &&
+	    plane->state->crtc_h == old_state->crtc_h &&
+	    plane->state->src_x == old_state->src_x &&
+	    plane->state->src_y == old_state->src_y &&
+	    plane->state->src_w == old_state->src_w &&
+	    plane->state->src_h == old_state->src_h &&
+	    plane->state->rotation == old_state->rotation &&
+	    plane->state->zpos == old_state->zpos)
+		/* this is likely a pageflip */
+		update_primary = false;
+
 	if (bo_old && bo_old->is_primary) {
-		qxl_io_destroy_primary(qdev);
+		if (update_primary)
+			qxl_io_destroy_primary(qdev);
 		bo_old->is_primary = false;
 	}
 
 	if (!bo->is_primary) {
-		qxl_io_create_primary(qdev, 0, bo);
+		if (update_primary)
+			qxl_io_create_primary(qdev, 0, bo);
 		bo->is_primary = true;
 	}
+
 	qxl_draw_dirty_fb(qdev, qfb, bo, 0, 0, &norect, 1, 1);
 }
 
