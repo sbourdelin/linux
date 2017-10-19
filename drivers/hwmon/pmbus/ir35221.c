@@ -267,6 +267,12 @@ static int ir35221_probe(struct i2c_client *client,
 				| I2C_FUNC_SMBUS_READ_BLOCK_DATA))
 		return -ENODEV;
 
+	ret = i2c_smbus_write_byte_data(client, PMBUS_PAGE, 0);
+	if (ret < 0) {
+		dev_err(&client->dev, "Failed to set PMBUS_PAGE\n");
+		return ret;
+	}
+
 	ret = i2c_smbus_read_block_data(client, PMBUS_MFR_ID, buf);
 	if (ret < 0) {
 		dev_err(&client->dev, "Failed to read PMBUS_MFR_ID\n");
