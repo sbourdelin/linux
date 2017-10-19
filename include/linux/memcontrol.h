@@ -30,6 +30,7 @@
 #include <linux/vmstat.h>
 #include <linux/writeback.h>
 #include <linux/page-flags.h>
+#include <linux/shrinker.h>
 
 struct mem_cgroup;
 struct page;
@@ -256,6 +257,10 @@ struct mem_cgroup {
 	struct list_head cgwb_list;
 	struct wb_domain cgwb_domain;
 #endif
+
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	struct thp_split_shrinker thp_split_shrinker;
+#endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 
 	/* List of events which userspace want to receive */
 	struct list_head event_list;

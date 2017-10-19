@@ -76,4 +76,23 @@ struct shrinker {
 
 extern int register_shrinker(struct shrinker *);
 extern void unregister_shrinker(struct shrinker *);
+
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+struct thp_split_shrinker {
+	spinlock_t split_queue_lock;
+	/*
+	 * List of partially mapped THPs, that can be split under memory
+	 * pressure.
+	 */
+	struct list_head split_queue;
+	unsigned long split_queue_len;
+};
+
+static inline void thp_split_shrinker_init(struct thp_split_shrinker *thp_ss)
+{
+	spin_lock_init(&thp_ss->split_queue_lock);
+	INIT_LIST_HEAD(&thp_ss->split_queue);
+	thp_ss->split_queue_len = 0;
+}
+#endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 #endif

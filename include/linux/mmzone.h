@@ -18,6 +18,7 @@
 #include <linux/page-flags-layout.h>
 #include <linux/atomic.h>
 #include <asm/page.h>
+#include <linux/shrinker.h>
 
 /* Free memory management - zoned buddy allocator.  */
 #ifndef CONFIG_FORCE_MAX_ZONEORDER
@@ -702,11 +703,9 @@ typedef struct pglist_data {
 	unsigned long static_init_size;
 #endif /* CONFIG_DEFERRED_STRUCT_PAGE_INIT */
 
-#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-	spinlock_t split_queue_lock;
-	struct list_head split_queue;
-	unsigned long split_queue_len;
-#endif
+#if defined CONFIG_TRANSPARENT_HUGEPAGE && !defined CONFIG_MEMCG
+	struct thp_split_shrinker thp_split_shrinker;
+#endif /*CONFIG_TRANSPARENT_HUGEPAGE && !CONFIG_MEMCG */
 
 	/* Fields commonly accessed by the page reclaim scanner */
 	struct lruvec		lruvec;

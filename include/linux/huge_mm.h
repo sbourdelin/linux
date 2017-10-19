@@ -130,6 +130,7 @@ extern unsigned long thp_get_unmapped_area(struct file *filp,
 		unsigned long addr, unsigned long len, unsigned long pgoff,
 		unsigned long flags);
 
+extern struct list_head *page_deferred_list(struct page *page);
 extern void prep_transhuge_page(struct page *page);
 extern void free_transhuge_page(struct page *page);
 

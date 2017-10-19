@@ -6056,11 +6056,9 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 	pgdat->numabalancing_migrate_nr_pages = 0;
 	pgdat->numabalancing_migrate_next_window = jiffies;
 #endif
-#ifdef CONFIG_TRANSPARENT_HUGEPAGE
-	spin_lock_init(&pgdat->split_queue_lock);
-	INIT_LIST_HEAD(&pgdat->split_queue);
-	pgdat->split_queue_len = 0;
-#endif
+#if defined CONFIG_TRANSPARENT_HUGEPAGE && !defined CONFIG_MEMCG
+	thp_split_shrinker_init(&pgdata->thp_split_shrinker);
+#endif /* CONFIG_TRANSPARENT_HUGEPAGE && !CONFIG_MEMCG */
 	init_waitqueue_head(&pgdat->kswapd_wait);
 	init_waitqueue_head(&pgdat->pfmemalloc_wait);
 #ifdef CONFIG_COMPACTION

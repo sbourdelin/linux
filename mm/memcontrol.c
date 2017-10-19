@@ -35,6 +35,7 @@
 #include <linux/memcontrol.h>
 #include <linux/cgroup.h>
 #include <linux/mm.h>
+#include <linux/huge_mm.h>
 #include <linux/sched/mm.h>
 #include <linux/shmem_fs.h>
 #include <linux/hugetlb.h>
@@ -4252,6 +4253,9 @@ static struct mem_cgroup *mem_cgroup_alloc(void)
 #ifdef CONFIG_CGROUP_WRITEBACK
 	INIT_LIST_HEAD(&memcg->cgwb_list);
 #endif
+#ifdef CONFIG_TRANSPARENT_HUGEPAGE
+	thp_split_shrinker_init(&memcg->thp_split_shrinker);
+#endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 	idr_replace(&mem_cgroup_idr, memcg, memcg->id.id);
 	return memcg;
 fail:
@@ -5682,8 +5686,25 @@ static void uncharge_page(struct page *page, struct uncharge_gather *ug)
 		unsigned int nr_pages = 1;
 
 		if (PageTransHuge(page)) {
+			struct page *head = compound_head(page);
+			unsigned long flags;
+			struct thp_split_shrinker *thp_ss =
+				&ug->memcg->thp_split_shrinker;
+
 			nr_pages <<= compound_order(page);
 			ug->nr_huge += nr_pages;
+
+			/*
+			 * If this transhuge_page is being uncharged from this
+			 * memcg, then remove it from this memcg's split queue.
+			 */
+			spin_lock_irqsave(&thp_ss->split_queue_lock, flags);
+			if (!list_empty(page_deferred_list(head))) {
+				thp_ss->split_queue_len--;
+				list_del(page_deferred_list(head));
+			}
+			spin_unlock_irqrestore(&thp_ss->split_queue_lock,
+					flags);
 		}
 		if (PageAnon(page))
 			ug->nr_anon += nr_pages;
