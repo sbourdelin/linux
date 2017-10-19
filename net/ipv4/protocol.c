@@ -77,3 +77,9 @@ int inet_del_offload(const struct net_offload *prot, unsigned char protocol)
 	return ret;
 }
 EXPORT_SYMBOL(inet_del_offload);
+
+bool inet_proto_is_added(unsigned char protocol)
+{
+	return !!rcu_access_pointer(inet_protos[protocol]);
+}
+EXPORT_SYMBOL(inet_proto_is_added);

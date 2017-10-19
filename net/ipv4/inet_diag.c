@@ -27,6 +27,7 @@
 #include <net/inet_hashtables.h>
 #include <net/inet_timewait_sock.h>
 #include <net/inet6_hashtables.h>
+#include <net/protocol.h>
 #include <net/netlink.h>
 
 #include <linux/inet.h>
@@ -52,7 +53,7 @@ static DEFINE_MUTEX(inet_diag_table_mutex);
 
 static const struct inet_diag_handler *inet_diag_lock_handler(int proto)
 {
-	if (!inet_diag_table[proto])
+	if (!inet_diag_table[proto] && inet_proto_is_added(proto))
 		request_module("net-pf-%d-proto-%d-type-%d-%d", PF_NETLINK,
 			       NETLINK_SOCK_DIAG, AF_INET, proto);
 
