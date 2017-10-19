@@ -19,6 +19,8 @@
 /* runstate info updated by Xen */
 static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate);
 
+static DEFINE_PER_CPU(u64, xen_old_steal);
+
 /* return an consistent snapshot of 64-bit time/counter value */
 static u64 get64(const u64 *p)
 {
@@ -83,9 +85,20 @@ bool xen_vcpu_stolen(int vcpu)
 u64 xen_steal_clock(int cpu)
 {
 	struct vcpu_runstate_info state;
+	u64 xen_new_steal;
+	s64 steal_delta;
 
 	xen_get_runstate_snapshot_cpu(&state, cpu);
-	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
+	xen_new_steal = state.time[RUNSTATE_runnable]
+					+ state.time[RUNSTATE_offline];
+	steal_delta = xen_new_steal - per_cpu(xen_old_steal, cpu);
+
+	if (steal_delta < 0)
+		xen_new_steal = per_cpu(xen_old_steal, cpu);
+	else
+		per_cpu(xen_old_steal, cpu) = xen_new_steal;
+
+	return xen_new_steal;
 }
 
 void xen_setup_runstate_info(int cpu)
