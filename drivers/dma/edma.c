@@ -1091,10 +1091,9 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 			echan->slot[i] =
 				edma_alloc_slot(echan->ecc, EDMA_SLOT_ANY);
 			if (echan->slot[i] < 0) {
-				kfree(edesc);
 				dev_err(dev, "%s: Failed to allocate slot\n",
 					__func__);
-				return NULL;
+				goto free_desc;
 			}
 		}
 	}
@@ -1110,10 +1109,8 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 		ret = edma_config_pset(chan, &edesc->pset[i], src_addr,
 				       dst_addr, burst, dev_width,
 				       sg_dma_len(sg), direction);
-		if (ret < 0) {
-			kfree(edesc);
-			return NULL;
-		}
+		if (ret < 0)
+			goto free_desc;
 
 		edesc->absync = ret;
 		edesc->residue += sg_dma_len(sg);
@@ -1133,6 +1130,10 @@ static struct dma_async_tx_descriptor *edma_prep_slave_sg(
 	edesc->residue_stat = edesc->residue;
 
 	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
+
+free_desc:
+	kfree(edesc);
+	return NULL;
 }
 
 static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
@@ -1203,10 +1204,8 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
 
 	ret = edma_config_pset(chan, &edesc->pset[0], src, dest, 1,
 			       width, pset_len, DMA_MEM_TO_MEM);
-	if (ret < 0) {
-		kfree(edesc);
-		return NULL;
-	}
+	if (ret < 0)
+		goto free_desc;
 
 	edesc->absync = ret;
 
@@ -1222,10 +1221,9 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
 			echan->slot[1] = edma_alloc_slot(echan->ecc,
 							 EDMA_SLOT_ANY);
 			if (echan->slot[1] < 0) {
-				kfree(edesc);
 				dev_err(dev, "%s: Failed to allocate slot\n",
 					__func__);
-				return NULL;
+				goto free_desc;
 			}
 		}
 		dest += pset_len;
@@ -1234,16 +1232,18 @@ static struct dma_async_tx_descriptor *edma_prep_dma_memcpy(
 
 		ret = edma_config_pset(chan, &edesc->pset[1], src, dest, 1,
 				       width, pset_len, DMA_MEM_TO_MEM);
-		if (ret < 0) {
-			kfree(edesc);
-			return NULL;
-		}
+		if (ret < 0)
+			goto free_desc;
 
 		edesc->pset[1].param.opt |= ITCCHEN;
 		edesc->pset[1].param.opt |= TCINTEN;
 	}
 
 	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
+
+free_desc:
+	kfree(edesc);
+	return NULL;
 }
 
 static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
@@ -1334,10 +1334,9 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
 			echan->slot[i] =
 				edma_alloc_slot(echan->ecc, EDMA_SLOT_ANY);
 			if (echan->slot[i] < 0) {
-				kfree(edesc);
 				dev_err(dev, "%s: Failed to allocate slot\n",
 					__func__);
-				return NULL;
+				goto free_desc;
 			}
 		}
 
@@ -1350,10 +1349,8 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
 		ret = edma_config_pset(chan, &edesc->pset[i], src_addr,
 				       dst_addr, burst, dev_width, period_len,
 				       direction);
-		if (ret < 0) {
-			kfree(edesc);
-			return NULL;
-		}
+		if (ret < 0)
+			goto free_desc;
 
 		if (direction == DMA_DEV_TO_MEM)
 			dst_addr += period_len;
@@ -1402,6 +1399,10 @@ static struct dma_async_tx_descriptor *edma_prep_dma_cyclic(
 		edma_assign_channel_eventq(echan, EVENTQ_0);
 
 	return vchan_tx_prep(&echan->vchan, &edesc->vdesc, tx_flags);
+
+free_desc:
+	kfree(edesc);
+	return NULL;
 }
 
 static void edma_completion_handler(struct edma_chan *echan)
