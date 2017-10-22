@@ -2844,9 +2844,6 @@ fec_enet_open(struct net_device *ndev)
 		return ret;
 
 	pinctrl_pm_select_default_state(&fep->pdev->dev);
-	ret = fec_enet_clk_enable(ndev, true);
-	if (ret)
-		goto clk_enable;
 
 	/* I should reset the ring buffers here, but I don't yet know
 	 * a simple way to do that.
@@ -2879,8 +2876,6 @@ fec_enet_open(struct net_device *ndev)
 err_enet_mii_probe:
 	fec_enet_free_buffers(ndev);
 err_enet_alloc:
-	fec_enet_clk_enable(ndev, false);
-clk_enable:
 	pm_runtime_mark_last_busy(&fep->pdev->dev);
 	pm_runtime_put_autosuspend(&fep->pdev->dev);
 	pinctrl_pm_select_sleep_state(&fep->pdev->dev);
@@ -2907,7 +2902,6 @@ fec_enet_close(struct net_device *ndev)
 
 	fec_enet_update_ethtool_stats(ndev);
 
-	fec_enet_clk_enable(ndev, false);
 	pinctrl_pm_select_sleep_state(&fep->pdev->dev);
 	pm_runtime_mark_last_busy(&fep->pdev->dev);
 	pm_runtime_put_autosuspend(&fep->pdev->dev);
@@ -3495,7 +3489,6 @@ fec_probe(struct platform_device *pdev)
 
 	/* Carrier starts down, phylib will bring it up */
 	netif_carrier_off(ndev);
-	fec_enet_clk_enable(ndev, false);
 	pinctrl_pm_select_sleep_state(&pdev->dev);
 
 	ret = register_netdev(ndev);
