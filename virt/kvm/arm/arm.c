@@ -1502,7 +1502,10 @@ void kvm_arch_exit(void)
 
 static int arm_init(void)
 {
-	int rc = kvm_init(NULL, sizeof(struct kvm_vcpu), 0, THIS_MODULE);
+	int rc = kvm_init_usercopy(NULL, sizeof(struct kvm_vcpu), 0,
+				   offsetof(struct kvm_vcpu_arch, ctxt),
+				   sizeof_field(struct kvm_vcpu_arch, ctxt),
+				   THIS_MODULE);
 	return rc;
 }
 
