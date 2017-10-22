@@ -231,30 +231,22 @@ static int sii9234_writebm(struct sii9234 *ctx, int id, int offset,
 		return ctx->i2c_error;
 
 	ret = i2c_smbus_write_byte(client, offset);
-	if (ret < 0) {
-		dev_err(ctx->dev, "writebm: %4s[0x%02x] <- 0x%02x\n",
-			sii9234_client_name[id], offset, value);
-		ctx->i2c_error = ret;
-		return ret;
-	}
+	if (ret)
+		goto report_failure;
 
 	ret = i2c_smbus_read_byte(client);
-	if (ret < 0) {
-		dev_err(ctx->dev, "writebm: %4s[0x%02x] <- 0x%02x\n",
-			sii9234_client_name[id], offset, value);
-		ctx->i2c_error = ret;
-		return ret;
-	}
+	if (ret)
+		goto report_failure;
 
 	value = (value & mask) | (ret & ~mask);
-
 	ret = i2c_smbus_write_byte_data(client, offset, value);
-	if (ret < 0) {
-		dev_err(ctx->dev, "writebm: %4s[0x%02x] <- 0x%02x\n",
-			sii9234_client_name[id], offset, value);
-		ctx->i2c_error = ret;
-	}
+	if (!ret)
+		return 0;
 
+report_failure:
+	dev_err(ctx->dev, "writebm: %4s[0x%02x] <- 0x%02x\n",
+		sii9234_client_name[id], offset, value);
+	ctx->i2c_error = ret;
 	return ret;
 }
 
