@@ -29,9 +29,6 @@ struct drm_printer;
 struct drm_i915_private;
 struct i915_vma;
 
-/* Home of GuC, HuC and DMC firmwares */
-#define INTEL_UC_FIRMWARE_URL "https://01.org/linuxgraphics/downloads/firmware"
-
 enum intel_uc_fw_status {
 	INTEL_UC_FIRMWARE_FAIL = -1,
 	INTEL_UC_FIRMWARE_NONE = 0,
@@ -117,5 +114,7 @@ int intel_uc_fw_upload(struct intel_uc_fw *uc_fw,
 				   struct i915_vma *vma));
 void intel_uc_fw_fini(struct intel_uc_fw *uc_fw);
 void intel_uc_fw_dump(struct intel_uc_fw *uc_fw, struct drm_printer *p);
+
+void intel_uc_fw_show_url(struct drm_i915_private *i915);
 
 #endif

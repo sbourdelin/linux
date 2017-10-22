@@ -427,8 +427,7 @@ static void csr_load_work_fn(struct work_struct *work)
 			   "Failed to load DMC firmware %s."
 			   " Disabling runtime power management.\n",
 			   csr->fw_path);
-		dev_notice(dev_priv->drm.dev, "DMC firmware homepage: %s",
-			   INTEL_UC_FIRMWARE_URL);
+		intel_uc_fw_show_url(dev_priv);
 	}
 
 	release_firmware(fw);

@@ -28,6 +28,16 @@
 #include "intel_uc_fw.h"
 #include "i915_drv.h"
 
+/* Home of GuC, HuC and DMC firmwares */
+#define INTEL_UC_FIRMWARE_URL "https://01.org/linuxgraphics/downloads/firmware"
+
+void intel_uc_fw_show_url(struct drm_i915_private *i915)
+{
+	dev_info_once(i915->drm.dev,
+		      "Firmware can be downloaded from %s\n",
+		      INTEL_UC_FIRMWARE_URL);
+}
+
 /**
  * intel_uc_fw_fetch - fetch uC firmware
  *
@@ -189,8 +199,7 @@ fail:
 
 	DRM_WARN("%s: Failed to fetch firmware %s (error %d)\n",
 		 intel_uc_fw_type_repr(uc_fw->type), uc_fw->path, err);
-	DRM_INFO("%s: Firmware can be downloaded from %s\n",
-		 intel_uc_fw_type_repr(uc_fw->type), INTEL_UC_FIRMWARE_URL);
+	intel_uc_fw_show_url(dev_priv);
 
 	release_firmware(fw);		/* OK even if fw is NULL */
 }
