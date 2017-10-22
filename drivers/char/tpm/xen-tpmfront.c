@@ -90,10 +90,8 @@ static int vtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
 
 	/* Wait for completion of any existing command or cancellation */
 	if (wait_for_tpm_stat(chip, VTPM_STATUS_IDLE, chip->timeout_c,
-			&priv->read_queue, true) < 0) {
-		vtpm_cancel(chip);
-		return -ETIME;
-	}
+			      &priv->read_queue, true) < 0)
+		goto cancel_vtpm;
 
 	memcpy(offset + (u8 *)shr, buf, count);
 	shr->length = count;
@@ -108,11 +106,14 @@ static int vtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
 	if (wait_for_tpm_stat(chip, VTPM_STATUS_IDLE, duration,
 			&priv->read_queue, true) < 0) {
 		/* got a signal or timeout, try to cancel */
-		vtpm_cancel(chip);
-		return -ETIME;
+		goto cancel_vtpm;
 	}
 
 	return count;
+
+cancel_vtpm:
+	vtpm_cancel(chip);
+	return -ETIME;
 }
 
 static int vtpm_recv(struct tpm_chip *chip, u8 *buf, size_t count)
