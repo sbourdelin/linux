@@ -82,10 +82,7 @@ static int vtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
 	u32 ordinal;
 	unsigned long duration;
 
-	if (offset > PAGE_SIZE)
-		return -EINVAL;
-
-	if (offset + count > PAGE_SIZE)
+	if (offset > PAGE_SIZE || offset + count > PAGE_SIZE)
 		return -EINVAL;
 
 	/* Wait for completion of any existing command or cancellation */
