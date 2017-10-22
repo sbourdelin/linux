@@ -671,7 +671,7 @@ static int eb_select_context(struct i915_execbuffer *eb)
 	eb->vm = ctx->ppgtt ? &ctx->ppgtt->base : &eb->i915->ggtt.base;
 
 	eb->context_flags = 0;
-	if (ctx->flags & CONTEXT_NO_ZEROMAP)
+	if (i915_gem_context_no_zeromap(ctx))
 		eb->context_flags |= __EXEC_OBJECT_NEEDS_BIAS;
 
 	return 0;

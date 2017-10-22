@@ -109,7 +109,7 @@ struct i915_gem_context {
 	 * @flags: small set of booleans
 	 */
 	unsigned long flags;
-#define CONTEXT_NO_ZEROMAP		BIT(0)
+#define CONTEXT_NO_ZEROMAP		0
 #define CONTEXT_NO_ERROR_CAPTURE	1
 #define CONTEXT_CLOSED			2
 #define CONTEXT_BANNABLE		3
@@ -203,6 +203,21 @@ static inline void i915_gem_context_set_closed(struct i915_gem_context *ctx)
 {
 	GEM_BUG_ON(i915_gem_context_is_closed(ctx));
 	__set_bit(CONTEXT_CLOSED, &ctx->flags);
+}
+
+static inline bool i915_gem_context_no_zeromap(const struct i915_gem_context *ctx)
+{
+	return test_bit(CONTEXT_NO_ZEROMAP, &ctx->flags);
+}
+
+static inline void i915_gem_context_set_no_zeromap(struct i915_gem_context *ctx)
+{
+	__set_bit(CONTEXT_NO_ZEROMAP, &ctx->flags);
+}
+
+static inline void i915_gem_context_clear_no_zeromap(struct i915_gem_context *ctx)
+{
+	__clear_bit(CONTEXT_NO_ZEROMAP, &ctx->flags);
 }
 
 static inline bool i915_gem_context_no_error_capture(const struct i915_gem_context *ctx)
