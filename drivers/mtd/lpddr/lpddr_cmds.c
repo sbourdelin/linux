@@ -237,7 +237,6 @@ static int get_chip(struct map_info *map, struct flchip *chip, int mode)
 				mutex_unlock(&contender->mutex);
 				return ret;
 			}
-			mutex_lock(&shared->lock);
 
 			/* We should not own chip if it is already in FL_SYNCING
 			 * state. Put contender and retry. */
@@ -247,6 +246,8 @@ static int get_chip(struct map_info *map, struct flchip *chip, int mode)
 				goto retry;
 			}
 			mutex_unlock(&contender->mutex);
+
+			mutex_lock(&shared->lock);
 		}
 
 		/* Check if we have suspended erase on this chip.
