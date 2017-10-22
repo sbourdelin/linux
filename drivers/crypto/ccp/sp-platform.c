@@ -78,25 +78,25 @@ static int sp_get_irqs(struct sp_device *sp)
 	sp_platform->irq_count = count;
 
 	ret = platform_get_irq(pdev, 0);
-	if (ret < 0) {
-		dev_notice(dev, "unable to get IRQ (%d)\n", ret);
-		return ret;
-	}
+	if (ret < 0)
+		goto report_failure;
 
 	sp->psp_irq = ret;
 	if (count == 1) {
 		sp->ccp_irq = ret;
 	} else {
 		ret = platform_get_irq(pdev, 1);
-		if (ret < 0) {
-			dev_notice(dev, "unable to get IRQ (%d)\n", ret);
-			return ret;
-		}
+		if (ret < 0)
+			goto report_failure;
 
 		sp->ccp_irq = ret;
 	}
 
 	return 0;
+
+report_failure:
+	dev_notice(dev, "unable to get IRQ (%d)\n", ret);
+	return ret;
 }
 
 static int sp_platform_probe(struct platform_device *pdev)
