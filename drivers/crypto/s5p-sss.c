@@ -863,16 +863,13 @@ static int s5p_aes_probe(struct platform_device *pdev)
 	pdata->irq_fc = platform_get_irq(pdev, 0);
 	if (pdata->irq_fc < 0) {
 		err = pdata->irq_fc;
-		dev_warn(dev, "feed control interrupt is not available.\n");
-		goto err_irq;
+		goto report_failure;
 	}
 	err = devm_request_threaded_irq(dev, pdata->irq_fc, NULL,
 					s5p_aes_interrupt, IRQF_ONESHOT,
 					pdev->name, pdev);
-	if (err < 0) {
-		dev_warn(dev, "feed control interrupt is not available.\n");
-		goto err_irq;
-	}
+	if (err < 0)
+		goto report_failure;
 
 	pdata->busy = false;
 	pdata->dev = dev;
@@ -906,6 +903,10 @@ err_irq:
 	s5p_dev = NULL;
 
 	return err;
+
+report_failure:
+	dev_warn(dev, "feed control interrupt is not available.\n");
+	goto err_irq;
 }
 
 static int s5p_aes_remove(struct platform_device *pdev)
