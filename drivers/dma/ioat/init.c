@@ -853,8 +853,7 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
 
 	if (!tx) {
 		dev_err(dev, "Self-test xor prep failed\n");
-		err = -ENODEV;
-		goto dma_unmap;
+		goto failure_indication;
 	}
 
 	async_tx_ack(tx);
@@ -864,8 +863,7 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
 	cookie = tx->tx_submit(tx);
 	if (cookie < 0) {
 		dev_err(dev, "Self-test xor setup failed\n");
-		err = -ENODEV;
-		goto dma_unmap;
+		goto failure_indication;
 	}
 	dma->device_issue_pending(dma_chan);
 
@@ -874,8 +872,7 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
 	if (tmo == 0 ||
 	    dma->device_tx_status(dma_chan, cookie, NULL) != DMA_COMPLETE) {
 		dev_err(dev, "Self-test xor timed out\n");
-		err = -ENODEV;
-		goto dma_unmap;
+		goto failure_indication;
 	}
 
 	for (i = 0; i < IOAT_NUM_SRC_TEST; i++)
@@ -921,8 +918,7 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
 					  &xor_val_result, DMA_PREP_INTERRUPT);
 	if (!tx) {
 		dev_err(dev, "Self-test zero prep failed\n");
-		err = -ENODEV;
-		goto dma_unmap;
+		goto failure_indication;
 	}
 
 	async_tx_ack(tx);
@@ -932,8 +928,7 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
 	cookie = tx->tx_submit(tx);
 	if (cookie < 0) {
 		dev_err(dev, "Self-test zero setup failed\n");
-		err = -ENODEV;
-		goto dma_unmap;
+		goto failure_indication;
 	}
 	dma->device_issue_pending(dma_chan);
 
@@ -942,8 +937,7 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
 	if (tmo == 0 ||
 	    dma->device_tx_status(dma_chan, cookie, NULL) != DMA_COMPLETE) {
 		dev_err(dev, "Self-test validate timed out\n");
-		err = -ENODEV;
-		goto dma_unmap;
+		goto failure_indication;
 	}
 
 	for (i = 0; i < IOAT_NUM_SRC_TEST + 1; i++)
@@ -974,8 +968,7 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
 					  &xor_val_result, DMA_PREP_INTERRUPT);
 	if (!tx) {
 		dev_err(dev, "Self-test 2nd zero prep failed\n");
-		err = -ENODEV;
-		goto dma_unmap;
+		goto failure_indication;
 	}
 
 	async_tx_ack(tx);
@@ -985,8 +978,7 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
 	cookie = tx->tx_submit(tx);
 	if (cookie < 0) {
 		dev_err(dev, "Self-test  2nd zero setup failed\n");
-		err = -ENODEV;
-		goto dma_unmap;
+		goto failure_indication;
 	}
 	dma->device_issue_pending(dma_chan);
 
@@ -995,20 +987,20 @@ static int ioat_xor_val_self_test(struct ioatdma_device *ioat_dma)
 	if (tmo == 0 ||
 	    dma->device_tx_status(dma_chan, cookie, NULL) != DMA_COMPLETE) {
 		dev_err(dev, "Self-test 2nd validate timed out\n");
-		err = -ENODEV;
-		goto dma_unmap;
+		goto failure_indication;
 	}
 
 	if (xor_val_result != SUM_CHECK_P_RESULT) {
 		dev_err(dev, "Self-test validate failed compare\n");
-		err = -ENODEV;
-		goto dma_unmap;
+		goto failure_indication;
 	}
 
 	for (i = 0; i < IOAT_NUM_SRC_TEST + 1; i++)
 		dma_unmap_page(dev, dma_srcs[i], PAGE_SIZE, DMA_TO_DEVICE);
 
 	goto free_resources;
+failure_indication:
+	err = -ENODEV;
 dma_unmap:
 	if (op == IOAT_OP_XOR) {
 		while (--i >= 0)
