@@ -16,27 +16,19 @@ virtual report
 
 @depends on patch@
 expression A, B;
+binary operator op = {==,!=,>,<,>=,<=,&&,||};
 symbol true, false;
 @@
 
 (
-  A == B
-|
-  A != B
-|
-  A > B
-|
-  A < B
-|
-  A >= B
-|
-  A <= B
-|
-  A && B
-|
-  A || B
-)
+  A op B
 - ? true : false
+|
++ !(
+  A op B
++ )
+- ? false : true
+)
 
 //----------------------------------------------------------
 //  For context mode
@@ -44,28 +36,13 @@ symbol true, false;
 
 @r depends on !patch@
 expression A, B;
+binary operator op = {==,!=,>,<,>=,<=,&&,||};
 symbol true, false;
 position p;
 @@
 
-(
-  A == B
-|
-  A != B
-|
-  A > B
-|
-  A < B
-|
-  A >= B
-|
-  A <= B
-|
-  A && B
-|
-  A || B
-)
-* ? true : false@p
+  A op B
+* ? \(true\|false\) : \(false@p\|true@p\)
 
 //----------------------------------------------------------
 //  For org mode
