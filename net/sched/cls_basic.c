@@ -24,7 +24,6 @@
 struct basic_head {
 	u32			hgenerator;
 	struct list_head	flist;
-	struct rcu_head		rcu;
 };
 
 struct basic_filter {
@@ -34,7 +33,6 @@ struct basic_filter {
 	struct tcf_result	res;
 	struct tcf_proto	*tp;
 	struct list_head	link;
-	struct rcu_head		rcu;
 };
 
 static int basic_classify(struct sk_buff *skb, const struct tcf_proto *tp,
@@ -82,10 +80,8 @@ static int basic_init(struct tcf_proto *tp)
 	return 0;
 }
 
-static void basic_delete_filter(struct rcu_head *head)
+static void basic_delete_filter(struct basic_filter *f)
 {
-	struct basic_filter *f = container_of(head, struct basic_filter, rcu);
-
 	tcf_exts_destroy(&f->exts);
 	tcf_em_tree_destroy(&f->ematches);
 	kfree(f);
@@ -95,13 +91,16 @@ static void basic_destroy(struct tcf_proto *tp)
 {
 	struct basic_head *head = rtnl_dereference(tp->root);
 	struct basic_filter *f, *n;
+	LIST_HEAD(local);
 
-	list_for_each_entry_safe(f, n, &head->flist, link) {
-		list_del_rcu(&f->link);
+	list_splice_init_rcu(&head->flist, &local, synchronize_rcu);
+
+	list_for_each_entry_safe(f, n, &local, link) {
+		list_del(&f->link);
 		tcf_unbind_filter(tp, &f->res);
-		call_rcu(&f->rcu, basic_delete_filter);
+		basic_delete_filter(f);
 	}
-	kfree_rcu(head, rcu);
+	kfree(head);
 }
 
 static int basic_delete(struct tcf_proto *tp, void *arg, bool *last)
@@ -111,7 +110,8 @@ static int basic_delete(struct tcf_proto *tp, void *arg, bool *last)
 
 	list_del_rcu(&f->link);
 	tcf_unbind_filter(tp, &f->res);
-	call_rcu(&f->rcu, basic_delete_filter);
+	synchronize_rcu();
+	basic_delete_filter(f);
 	*last = list_empty(&head->flist);
 	return 0;
 }
@@ -205,7 +205,8 @@ static int basic_change(struct net *net, struct sk_buff *in_skb,
 	if (fold) {
 		list_replace_rcu(&fold->link, &fnew->link);
 		tcf_unbind_filter(tp, &fold->res);
-		call_rcu(&fold->rcu, basic_delete_filter);
+		synchronize_rcu();
+		basic_delete_filter(fold);
 	} else {
 		list_add_rcu(&fnew->link, &head->flist);
 	}
