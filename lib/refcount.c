@@ -8,29 +8,7 @@
  * there. This avoids wrapping the counter and causing 'spurious'
  * use-after-free issues.
  *
- * Memory ordering rules are slightly relaxed wrt regular atomic_t functions
- * and provide only what is strictly required for refcounts.
- *
- * The increments are fully relaxed; these will not provide ordering. The
- * rationale is that whatever is used to obtain the object we're increasing the
- * reference count on will provide the ordering. For locked data structures,
- * its the lock acquire, for RCU/lockless data structures its the dependent
- * load.
- *
- * Do note that inc_not_zero() provides a control dependency which will order
- * future stores against the inc, this ensures we'll never modify the object
- * if we did not in fact acquire a reference.
- *
- * The decrements will provide release order, such that all the prior loads and
- * stores will be issued before, it also provides a control dependency, which
- * will order us against the subsequent free().
- *
- * The control dependency is against the load of the cmpxchg (ll/sc) that
- * succeeded. This means the stores aren't fully ordered, but this is fine
- * because the 1->0 transition indicates no concurrency.
- *
- * Note that the allocator is responsible for ordering things between free()
- * and alloc().
+ * Memory ordering rules are exactly the same as with regular atomic_t functions
  *
  */
 
@@ -45,10 +23,6 @@
  * @r: the refcount
  *
  * Will saturate at UINT_MAX and WARN.
- *
- * Provides no memory ordering, it is assumed the caller has guaranteed the
- * object memory to be stable (RCU, etc.). It does provide a control dependency
- * and thereby orders future stores. See the comment on top.
  *
  * Use of this function is not recommended for the normal reference counting
  * use case in which references are taken and released one at a time.  In these
@@ -72,7 +46,7 @@ bool refcount_add_not_zero(unsigned int i, refcount_t *r)
 		if (new < val)
 			new = UINT_MAX;
 
-	} while (!atomic_try_cmpxchg_relaxed(&r->refs, &val, new));
+	} while (!atomic_try_cmpxchg(&r->refs, &val, new));
 
 	WARN_ONCE(new == UINT_MAX, "refcount_t: saturated; leaking memory.\n");
 
@@ -86,10 +60,6 @@ EXPORT_SYMBOL(refcount_add_not_zero);
  * @r: the refcount
  *
  * Similar to atomic_add(), but will saturate at UINT_MAX and WARN.
- *
- * Provides no memory ordering, it is assumed the caller has guaranteed the
- * object memory to be stable (RCU, etc.). It does provide a control dependency
- * and thereby orders future stores. See the comment on top.
  *
  * Use of this function is not recommended for the normal reference counting
  * use case in which references are taken and released one at a time.  In these
@@ -108,10 +78,6 @@ EXPORT_SYMBOL(refcount_add);
  *
  * Similar to atomic_inc_not_zero(), but will saturate at UINT_MAX and WARN.
  *
- * Provides no memory ordering, it is assumed the caller has guaranteed the
- * object memory to be stable (RCU, etc.). It does provide a control dependency
- * and thereby orders future stores. See the comment on top.
- *
  * Return: true if the increment was successful, false otherwise
  */
 bool refcount_inc_not_zero(refcount_t *r)
@@ -127,7 +93,7 @@ bool refcount_inc_not_zero(refcount_t *r)
 		if (unlikely(!new))
 			return true;
 
-	} while (!atomic_try_cmpxchg_relaxed(&r->refs, &val, new));
+	} while (!atomic_try_cmpxchg(&r->refs, &val, new));
 
 	WARN_ONCE(new == UINT_MAX, "refcount_t: saturated; leaking memory.\n");
 
@@ -140,9 +106,6 @@ EXPORT_SYMBOL(refcount_inc_not_zero);
  * @r: the refcount to increment
  *
  * Similar to atomic_inc(), but will saturate at UINT_MAX and WARN.
- *
- * Provides no memory ordering, it is assumed the caller already has a
- * reference on the object.
  *
  * Will WARN if the refcount is 0, as this represents a possible use-after-free
  * condition.
@@ -161,10 +124,6 @@ EXPORT_SYMBOL(refcount_inc);
  * Similar to atomic_dec_and_test(), but it will WARN, return false and
  * ultimately leak on underflow and will fail to decrement when saturated
  * at UINT_MAX.
- *
- * Provides release memory ordering, such that prior loads and stores are done
- * before, and provides a control dependency such that free() must come after.
- * See the comment on top.
  *
  * Use of this function is not recommended for the normal reference counting
  * use case in which references are taken and released one at a time.  In these
@@ -187,7 +146,7 @@ bool refcount_sub_and_test(unsigned int i, refcount_t *r)
 			return false;
 		}
 
-	} while (!atomic_try_cmpxchg_release(&r->refs, &val, new));
+	} while (!atomic_try_cmpxchg(&r->refs, &val, new));
 
 	return !new;
 }
@@ -199,10 +158,6 @@ EXPORT_SYMBOL(refcount_sub_and_test);
  *
  * Similar to atomic_dec_and_test(), it will WARN on underflow and fail to
  * decrement when saturated at UINT_MAX.
- *
- * Provides release memory ordering, such that prior loads and stores are done
- * before, and provides a control dependency such that free() must come after.
- * See the comment on top.
  *
  * Return: true if the resulting refcount is 0, false otherwise
  */
@@ -218,9 +173,6 @@ EXPORT_SYMBOL(refcount_dec_and_test);
  *
  * Similar to atomic_dec(), it will WARN on underflow and fail to decrement
  * when saturated at UINT_MAX.
- *
- * Provides release memory ordering, such that prior loads and stores are done
- * before.
  */
 void refcount_dec(refcount_t *r)
 {
@@ -236,9 +188,6 @@ EXPORT_SYMBOL(refcount_dec);
  * No atomic_t counterpart, it attempts a 1 -> 0 transition and returns the
  * success thereof.
  *
- * Like all decrement operations, it provides release memory order and provides
- * a control dependency.
- *
  * It can be used like a try-delete operator; this explicit case is provided
  * and not cmpxchg in generic, because that would allow implementing unsafe
  * operations.
@@ -249,7 +198,7 @@ bool refcount_dec_if_one(refcount_t *r)
 {
 	int val = 1;
 
-	return atomic_try_cmpxchg_release(&r->refs, &val, 0);
+	return atomic_try_cmpxchg(&r->refs, &val, 0);
 }
 EXPORT_SYMBOL(refcount_dec_if_one);
 
@@ -281,7 +230,7 @@ bool refcount_dec_not_one(refcount_t *r)
 			return true;
 		}
 
-	} while (!atomic_try_cmpxchg_release(&r->refs, &val, new));
+	} while (!atomic_try_cmpxchg(&r->refs, &val, new));
 
 	return true;
 }
@@ -295,10 +244,6 @@ EXPORT_SYMBOL(refcount_dec_not_one);
  *
  * Similar to atomic_dec_and_mutex_lock(), it will WARN on underflow and fail
  * to decrement when saturated at UINT_MAX.
- *
- * Provides release memory ordering, such that prior loads and stores are done
- * before, and provides a control dependency such that free() must come after.
- * See the comment on top.
  *
  * Return: true and hold mutex if able to decrement refcount to 0, false
  *         otherwise
@@ -326,10 +271,6 @@ EXPORT_SYMBOL(refcount_dec_and_mutex_lock);
  *
  * Similar to atomic_dec_and_lock(), it will WARN on underflow and fail to
  * decrement when saturated at UINT_MAX.
- *
- * Provides release memory ordering, such that prior loads and stores are done
- * before, and provides a control dependency such that free() must come after.
- * See the comment on top.
  *
  * Return: true and hold spinlock if able to decrement refcount to 0, false
  *         otherwise
