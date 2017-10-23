@@ -1281,6 +1281,18 @@ config WW_MUTEX_SELFTEST
 	  Say M if you want these self tests to build as a module.
 	  Say N if you are unsure.
 
+# Allow 256k - 4M of lockdep stack trace entries
+config LOCKDEP_MAX_STACK_TRACE_ENTRIES
+	int "Maximum number of lockdep stack trace entries" if LOCKDEP
+	range 262144 4194304
+	default "262144" if LOCKDEP_SMALL
+	default "524288" if !LOCKDEP_SMALL
+	---help---
+	  This specifies the maximum number of lockdep stack trace
+	  entries that can be used by the locking correctness
+	  validator.  If this limit is exceeded, the validator will
+	  be turned off.
+
 endmenu # lock debugging
 
 config TRACE_IRQFLAGS
