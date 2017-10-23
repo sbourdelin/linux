@@ -131,6 +131,7 @@ struct dma_map_ops {
 #ifdef ARCH_HAS_DMA_GET_REQUIRED_MASK
 	u64 (*get_required_mask)(struct device *dev);
 #endif
+	int (*get_cache_alignment)(struct device *dev);
 	int is_phys;
 };
 
@@ -697,12 +698,18 @@ static inline void *dma_zalloc_coherent(struct device *dev, size_t size,
 }
 
 #ifdef CONFIG_HAS_DMA
-static inline int dma_get_cache_alignment(void)
-{
-#ifdef ARCH_DMA_MINALIGN
-	return ARCH_DMA_MINALIGN;
+
+#ifndef ARCH_DMA_MINALIGN
+#define ARCH_DMA_MINALIGN 1
 #endif
-	return 1;
+
+static inline int dma_get_cache_alignment(struct device *dev)
+{
+	const struct dma_map_ops *ops = get_dma_ops(dev);
+	if (dev && ops && ops->get_cache_alignment)
+		return ops->get_cache_alignment(dev);
+
+	return ARCH_DMA_MINALIGN; /* compatible behavior */
 }
 #endif
 
