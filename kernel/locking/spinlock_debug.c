@@ -49,58 +49,85 @@ void __rwlock_init(rwlock_t *lock, const char *name,
 
 EXPORT_SYMBOL(__rwlock_init);
 
-static void spin_dump(raw_spinlock_t *lock, const char *msg)
+static void spin_dump(raw_spinlock_t *lockp, raw_spinlock_t lock,
+		      const char *msg)
 {
 	struct task_struct *owner = NULL;
 
-	if (lock->owner && lock->owner != SPINLOCK_OWNER_INIT)
-		owner = lock->owner;
+	if (lock.owner && lock.owner != SPINLOCK_OWNER_INIT)
+		owner = lock.owner;
 	printk(KERN_EMERG "BUG: spinlock %s on CPU#%d, %s/%d\n",
 		msg, raw_smp_processor_id(),
 		current->comm, task_pid_nr(current));
 	printk(KERN_EMERG " lock: %pS, .magic: %08x, .owner: %s/%d, "
 			".owner_cpu: %d\n",
-		lock, lock->magic,
+		lockp, lock.magic,
 		owner ? owner->comm : "<none>",
 		owner ? task_pid_nr(owner) : -1,
-		lock->owner_cpu);
+		lock.owner_cpu);
 	dump_stack();
 }
 
-static void spin_bug(raw_spinlock_t *lock, const char *msg)
+static void spin_bug(raw_spinlock_t *lockp, raw_spinlock_t lock,
+		     const char *msg)
 {
 	if (!debug_locks_off())
 		return;
 
-	spin_dump(lock, msg);
+	spin_dump(lockp, lock, msg);
 }
 
-#define SPIN_BUG_ON(cond, lock, msg) if (unlikely(cond)) spin_bug(lock, msg)
+#define SPIN_BUG_ON(cond, lockp, lock, msg) \
+	if (unlikely(cond)) spin_bug(lockp, lock, msg)
+
+/*
+ * Copy fields from a lock, ensuring that each field is read without tearing.
+ * We cannot read the whole lock atomically, so this isn't a snapshot of the
+ * whole lock at an instant in time. However, it is a stable snapshot of each
+ * field that won't change under our feet.
+ */
+static inline raw_spinlock_t
+debug_spin_lock_snapshot(raw_spinlock_t *lockp)
+{
+	raw_spinlock_t lock;
+
+	lock.raw_lock = READ_ONCE(lockp->raw_lock);
+	lock.magic = READ_ONCE(lockp->magic);
+	lock.owner_cpu = READ_ONCE(lockp->owner_cpu);
+	lock.owner = READ_ONCE(lockp->owner);
+
+	return lock;
+}
 
 static inline void
-debug_spin_lock_before(raw_spinlock_t *lock)
+debug_spin_lock_before(raw_spinlock_t *lockp)
 {
-	SPIN_BUG_ON(lock->magic != SPINLOCK_MAGIC, lock, "bad magic");
-	SPIN_BUG_ON(lock->owner == current, lock, "recursion");
-	SPIN_BUG_ON(lock->owner_cpu == raw_smp_processor_id(),
-							lock, "cpu recursion");
+	raw_spinlock_t lock = debug_spin_lock_snapshot(lockp);
+
+	SPIN_BUG_ON(lock.magic != SPINLOCK_MAGIC, lockp, lock, "bad magic");
+	SPIN_BUG_ON(lock.owner == current, lockp, lock, "recursion");
+	SPIN_BUG_ON(lock.owner_cpu == raw_smp_processor_id(), lockp, lock,
+		    "cpu recursion");
 }
 
 static inline void debug_spin_lock_after(raw_spinlock_t *lock)
 {
-	lock->owner_cpu = raw_smp_processor_id();
-	lock->owner = current;
+	WRITE_ONCE(lock->owner_cpu, raw_smp_processor_id());
+	WRITE_ONCE(lock->owner, current);
 }
 
-static inline void debug_spin_unlock(raw_spinlock_t *lock)
+static inline void debug_spin_unlock(raw_spinlock_t *lockp)
 {
-	SPIN_BUG_ON(lock->magic != SPINLOCK_MAGIC, lock, "bad magic");
-	SPIN_BUG_ON(!raw_spin_is_locked(lock), lock, "already unlocked");
-	SPIN_BUG_ON(lock->owner != current, lock, "wrong owner");
-	SPIN_BUG_ON(lock->owner_cpu != raw_smp_processor_id(),
-							lock, "wrong CPU");
-	lock->owner = SPINLOCK_OWNER_INIT;
-	lock->owner_cpu = -1;
+	raw_spinlock_t lock = debug_spin_lock_snapshot(lockp);
+
+	SPIN_BUG_ON(lock.magic != SPINLOCK_MAGIC, lockp, lock, "bad magic");
+	SPIN_BUG_ON(arch_spin_value_unlocked(lock.raw_lock), lockp, lock,
+		    "already unlocked");
+	SPIN_BUG_ON(lock.owner != current, lockp, lock, "wrong owner");
+	SPIN_BUG_ON(lock.owner_cpu != raw_smp_processor_id(), lockp, lock,
+		    "wrong CPU");
+	WRITE_ONCE(lockp->owner, SPINLOCK_OWNER_INIT);
+	WRITE_ONCE(lockp->owner_cpu, -1);
 }
 
 /*
