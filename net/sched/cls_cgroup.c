@@ -23,7 +23,6 @@ struct cls_cgroup_head {
 	struct tcf_exts		exts;
 	struct tcf_ematch_tree	ematches;
 	struct tcf_proto	*tp;
-	struct rcu_head		rcu;
 };
 
 static int cls_cgroup_classify(struct sk_buff *skb, const struct tcf_proto *tp,
@@ -57,11 +56,8 @@ static const struct nla_policy cgroup_policy[TCA_CGROUP_MAX + 1] = {
 	[TCA_CGROUP_EMATCHES]	= { .type = NLA_NESTED },
 };
 
-static void cls_cgroup_destroy_rcu(struct rcu_head *root)
+static void __cls_cgroup_destroy(struct cls_cgroup_head *head)
 {
-	struct cls_cgroup_head *head = container_of(root,
-						    struct cls_cgroup_head,
-						    rcu);
 
 	tcf_exts_destroy(&head->exts);
 	tcf_em_tree_destroy(&head->ematches);
@@ -110,8 +106,10 @@ static int cls_cgroup_change(struct net *net, struct sk_buff *in_skb,
 		goto errout;
 
 	rcu_assign_pointer(tp->root, new);
-	if (head)
-		call_rcu(&head->rcu, cls_cgroup_destroy_rcu);
+	if (head) {
+		synchronize_rcu();
+		__cls_cgroup_destroy(head);
+	}
 	return 0;
 errout:
 	tcf_exts_destroy(&new->exts);
@@ -124,8 +122,10 @@ static void cls_cgroup_destroy(struct tcf_proto *tp)
 	struct cls_cgroup_head *head = rtnl_dereference(tp->root);
 
 	/* Head can still be NULL due to cls_cgroup_init(). */
-	if (head)
-		call_rcu(&head->rcu, cls_cgroup_destroy_rcu);
+	if (head) {
+		synchronize_rcu();
+		__cls_cgroup_destroy(head);
+	}
 }
 
 static int cls_cgroup_delete(struct tcf_proto *tp, void *arg, bool *last)
