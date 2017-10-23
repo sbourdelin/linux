@@ -46,7 +46,6 @@ struct fw_filter {
 #endif /* CONFIG_NET_CLS_IND */
 	struct tcf_exts		exts;
 	struct tcf_proto	*tp;
-	struct rcu_head		rcu;
 };
 
 static u32 fw_hash(u32 handle)
@@ -119,10 +118,8 @@ static int fw_init(struct tcf_proto *tp)
 	return 0;
 }
 
-static void fw_delete_filter(struct rcu_head *head)
+static void fw_delete_filter(struct fw_filter *f )
 {
-	struct fw_filter *f = container_of(head, struct fw_filter, rcu);
-
 	tcf_exts_destroy(&f->exts);
 	kfree(f);
 }
@@ -136,15 +133,18 @@ static void fw_destroy(struct tcf_proto *tp)
 	if (head == NULL)
 		return;
 
+	RCU_INIT_POINTER(tp->root, NULL);
+	synchronize_rcu();
+
 	for (h = 0; h < HTSIZE; h++) {
 		while ((f = rtnl_dereference(head->ht[h])) != NULL) {
 			RCU_INIT_POINTER(head->ht[h],
 					 rtnl_dereference(f->next));
 			tcf_unbind_filter(tp, &f->res);
-			call_rcu(&f->rcu, fw_delete_filter);
+			fw_delete_filter(f);
 		}
 	}
-	kfree_rcu(head, rcu);
+	kfree(head);
 }
 
 static int fw_delete(struct tcf_proto *tp, void *arg, bool *last)
@@ -166,7 +166,8 @@ static int fw_delete(struct tcf_proto *tp, void *arg, bool *last)
 		if (pfp == f) {
 			RCU_INIT_POINTER(*fp, rtnl_dereference(f->next));
 			tcf_unbind_filter(tp, &f->res);
-			call_rcu(&f->rcu, fw_delete_filter);
+			synchronize_rcu();
+			fw_delete_filter(f);
 			ret = 0;
 			break;
 		}
@@ -286,7 +287,8 @@ static int fw_change(struct net *net, struct sk_buff *in_skb,
 		RCU_INIT_POINTER(fnew->next, rtnl_dereference(pfp->next));
 		rcu_assign_pointer(*fp, fnew);
 		tcf_unbind_filter(tp, &f->res);
-		call_rcu(&f->rcu, fw_delete_filter);
+		synchronize_rcu();
+		fw_delete_filter(f);
 
 		*arg = fnew;
 		return err;
