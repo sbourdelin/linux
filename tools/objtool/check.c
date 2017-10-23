@@ -81,8 +81,7 @@ static struct instruction *next_insn_same_sec(struct objtool_file *file,
 
 /*
  * Check if the function has been manually whitelisted with the
- * STACK_FRAME_NON_STANDARD macro, or if it should be automatically whitelisted
- * due to its use of a context switching instruction.
+ * STACK_FRAME_NON_STANDARD macro.
  */
 static bool ignore_func(struct objtool_file *file, struct symbol *func)
 {
