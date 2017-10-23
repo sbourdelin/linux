@@ -649,7 +649,7 @@ static void _rtl_pci_tx_isr(struct ieee80211_hw *hw, int prio)
 				 prio, ring->idx,
 				 skb_queue_len(&ring->queue));
 
-			ieee80211_wake_queue(hw, skb_get_queue_mapping (skb));
+			ieee80211_wake_queue(hw, skb_get_queue_mapping(skb));
 		}
 tx_status_ok:
 		skb = NULL;
@@ -2230,7 +2230,7 @@ int rtl_pci_probe(struct pci_dev *pdev,
 		return err;
 	}
 
-	if (((struct rtl_hal_cfg *)(id->driver_data))->mod_params->dma64 &&
+	if (((struct rtl_hal_cfg *)id->driver_data)->mod_params->dma64 &&
 	    !pci_set_dma_mask(pdev, DMA_BIT_MASK(64))) {
 		if (pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64))) {
 			WARN_ONCE(true,
