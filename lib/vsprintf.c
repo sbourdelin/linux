@@ -33,6 +33,7 @@
 #include <linux/uuid.h>
 #include <linux/of.h>
 #include <net/addrconf.h>
+#include <linux/siphash.h>
 #ifdef CONFIG_BLOCK
 #include <linux/blkdev.h>
 #endif
@@ -1591,6 +1592,55 @@ char *device_node_string(char *buf, char *end, struct device_node *dn,
 	return widen_string(buf, buf - buf_start, end, spec);
 }
 
+static siphash_key_t ptr_secret __read_mostly;
+static DEFINE_STATIC_KEY_TRUE(no_ptr_secret);
+
+static void fill_random_ptr_key(struct random_ready_callback *rdy)
+{
+	get_random_bytes(&ptr_secret, sizeof(ptr_secret));
+	static_branch_disable(&no_ptr_secret);
+}
+
+static struct random_ready_callback random_ready = {
+	.func = fill_random_ptr_key
+};
+
+static int __init initialize_ptr_random(void)
+{
+	int ret = add_random_ready_callback(&random_ready);
+
+	if (!ret)
+		return 0;
+	else if (ret == -EALREADY) {
+		fill_random_ptr_key(&random_ready);
+		return 0;
+	}
+
+	return ret;
+}
+early_initcall(initialize_ptr_random);
+
+/* Maps a pointer to a 32 bit unique identifier. */
+static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
+{
+	unsigned int hashval;
+
+	if (static_branch_unlikely(&no_ptr_secret))
+		return "(pointer value)";
+
+#ifdef CONFIG_64BIT
+	hashval = (unsigned int)siphash_1u64((u64)ptr, &ptr_secret);
+#else
+	hashval = (unsigned int)siphash_1u32((u32)ptr, &ptr_secret);
+#endif
+
+	spec.field_width = 2 * sizeof(unsigned int);
+	spec.flags = SMALL;
+	spec.base = 16;
+
+	return number(buf, end, hashval, spec);
+}
+
 int kptr_restrict __read_mostly;
 
 /*
@@ -1703,6 +1753,9 @@ int kptr_restrict __read_mostly;
  * Note: The difference between 'S' and 'F' is that on ia64 and ppc64
  * function pointers are really function descriptors, which contain a
  * pointer to the real address.
+ *
+ * Note: The default behaviour (unadorned %p) is to hash the address,
+ * rendering it useful as a unique identifier.
  */
 static noinline_for_stack
 char *pointer(const char *fmt, char *buf, char *end, void *ptr,
@@ -1857,7 +1910,11 @@ char *pointer(const char *fmt, char *buf, char *end, void *ptr,
 		case 'F':
 			return device_node_string(buf, end, ptr, spec, fmt + 1);
 		}
+	default:  /* default is to _not_ leak addresses, hash before printing */
+		return ptr_to_id(buf, end, ptr, spec);
 	}
+
+	/* OK, let's print the address */
 	spec.flags |= SMALL;
 	if (spec.field_width == -1) {
 		spec.field_width = default_width;
