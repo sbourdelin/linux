@@ -457,8 +457,7 @@ void rxrpc_release_call(struct rxrpc_sock *rx, struct rxrpc_call *call)
 	ASSERTCMP(call->state, ==, RXRPC_CALL_COMPLETE);
 
 	spin_lock_bh(&call->lock);
-	if (test_and_set_bit(RXRPC_CALL_RELEASED, &call->flags))
-		BUG();
+	BUG_ON(test_and_set_bit(RXRPC_CALL_RELEASED, &call->flags));
 	spin_unlock_bh(&call->lock);
 
 	del_timer_sync(&call->timer);
