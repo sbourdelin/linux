@@ -3328,6 +3328,12 @@ i915_gem_idle_work_handler(struct work_struct *work)
 		goto out_unlock;
 
 	/*
+	 * Be paranoid and flush a concurrent interrupt to make sure
+	 * we don't reactivate any irq tasklets after parking.
+	 */
+	synchronize_irq(dev_priv->drm.irq);
+
+	/*
 	 * We are committed now to parking the engines, make sure there
 	 * will be no more interrupts arriving later.
 	 */
