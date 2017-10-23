@@ -25,7 +25,9 @@
 #include <drm/drm_auth.h>
 #include <drm/drm_framebuffer.h>
 #include <drm/drm_atomic.h>
+#include <drm/drm_print.h>
 
+#include "drm_internal.h"
 #include "drm_crtc_internal.h"
 
 /**
@@ -956,3 +958,52 @@ int drm_framebuffer_plane_height(int height,
 	return fb_plane_height(height, fb->format, plane);
 }
 EXPORT_SYMBOL(drm_framebuffer_plane_height);
+
+#ifdef CONFIG_DEBUG_FS
+static void drm_framebuffer_print(struct drm_framebuffer *fb,
+				  struct drm_printer *p)
+{
+	unsigned int i;
+
+	drm_printf(p, "[FB:%d] %dx%d@%4.4s refcount=%d\n", fb->base.id,
+		   fb->width, fb->height, (char *)&fb->format->format,
+		   drm_framebuffer_read_refcount(fb));
+
+	for (i = 0; i < fb->format->num_planes; i++) {
+		drm_printf(p, "\t%u: offset=%d pitch=%d",
+			   i, fb->offsets[i], fb->pitches[i]);
+		if (fb->obj[i]) {
+			drm_printf(p, " GEM: ");
+			drm_gem_print(fb->obj[i], p);
+		} else {
+			drm_printf(p, "\n");
+		}
+	}
+}
+
+static int drm_framebuffer_info(struct seq_file *m, void *data)
+{
+	struct drm_info_node *node = m->private;
+	struct drm_device *dev = node->minor->dev;
+	struct drm_printer p = drm_seq_file_printer(m);
+	struct drm_framebuffer *fb;
+
+	mutex_lock(&dev->mode_config.fb_lock);
+	drm_for_each_fb(fb, dev)
+		drm_framebuffer_print(fb, &p);
+	mutex_unlock(&dev->mode_config.fb_lock);
+
+	return 0;
+}
+
+static const struct drm_info_list drm_framebuffer_debugfs_list[] = {
+	{ "framebuffer", drm_framebuffer_info, 0 },
+};
+
+int drm_framebuffer_debugfs_init(struct drm_minor *minor)
+{
+	return drm_debugfs_create_files(drm_framebuffer_debugfs_list,
+				ARRAY_SIZE(drm_framebuffer_debugfs_list),
+				minor->debugfs_root, minor);
+}
+#endif

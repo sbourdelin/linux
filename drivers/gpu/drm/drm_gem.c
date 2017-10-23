@@ -40,6 +40,7 @@
 #include <drm/drmP.h>
 #include <drm/drm_vma_manager.h>
 #include <drm/drm_gem.h>
+#include <drm/drm_print.h>
 #include "drm_internal.h"
 
 /** @file drm_gem.c
@@ -1040,3 +1041,13 @@ int drm_gem_mmap(struct file *filp, struct vm_area_struct *vma)
 	return ret;
 }
 EXPORT_SYMBOL(drm_gem_mmap);
+
+#ifdef CONFIG_DEBUG_FS
+void drm_gem_print(const struct drm_gem_object *obj, struct drm_printer *p)
+{
+	drm_printf(p, "name=%d refcount=%d start=%08lx size=%zu%s\n",
+		   obj->name, kref_read(&obj->refcount),
+		   drm_vma_node_start(&obj->vma_node), obj->size,
+		   obj->import_attach ? " (imported)" : "");
+}
+#endif
