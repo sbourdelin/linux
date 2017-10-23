@@ -2762,6 +2762,16 @@ static int enable_msix(struct adapter *adapter)
 	return 0;
 }
 
+static netdev_features_t cxgb4vf_fix_features(struct net_device *dev,
+					      netdev_features_t features)
+{
+	/* Disable GRO, if RX_CSUM is disabled */
+	if (!(features & NETIF_F_RXCSUM))
+		features &= ~NETIF_F_GRO;
+
+	return features;
+}
+
 static const struct net_device_ops cxgb4vf_netdev_ops	= {
 	.ndo_open		= cxgb4vf_open,
 	.ndo_stop		= cxgb4vf_stop,
@@ -2777,6 +2787,7 @@ static const struct net_device_ops cxgb4vf_netdev_ops	= {
 #ifdef CONFIG_NET_POLL_CONTROLLER
 	.ndo_poll_controller	= cxgb4vf_poll_controller,
 #endif
+	.ndo_fix_features	= cxgb4vf_fix_features,
 };
 
 /*
