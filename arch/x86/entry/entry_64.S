@@ -808,7 +808,7 @@ apicinterrupt IRQ_WORK_VECTOR			irq_work_interrupt		smp_irq_work_interrupt
 
 .macro idtentry sym do_sym has_error_code:req paranoid=0 shift_ist=-1
 ENTRY(\sym)
-	UNWIND_HINT_IRET_REGS offset=8
+	UNWIND_HINT_IRET_REGS offset=\has_error_code*8
 
 	/* Sanity check */
 	.if \shift_ist != -1 && \paranoid == 0
@@ -817,7 +817,7 @@ ENTRY(\sym)
 
 	ASM_CLAC
 
-	.ifeq \has_error_code
+	.if \has_error_code == 0
 	pushq	$-1				/* ORIG_RAX: no syscall to restart */
 	.endif
 
