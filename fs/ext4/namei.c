@@ -2463,6 +2463,8 @@ retry:
 		ext4_journal_stop(handle);
 	if (err == -ENOSPC && ext4_should_retry_alloc(dir->i_sb, &retries))
 		goto retry;
+	else if (err == -ENOSPC && printk_ratelimited())
+		printk(pr_warning "ext4: No space on disk, inode usage full");
 	return err;
 }
 
