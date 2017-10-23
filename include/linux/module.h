@@ -806,4 +806,6 @@ static inline bool module_sig_ok(struct module *module)
 }
 #endif	/* CONFIG_MODULE_SIG */
 
+bool is_module_sig_enforced(void);
+
 #endif /* _LINUX_MODULE_H */
