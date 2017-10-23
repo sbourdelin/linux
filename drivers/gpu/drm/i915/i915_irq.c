@@ -1391,6 +1391,9 @@ gen8_cs_irq_handler(struct intel_engine_cs *engine, u32 iir, int test_shift)
 		if (READ_ONCE(engine->execlists.active)) {
 			__set_bit(ENGINE_IRQ_EXECLIST, &engine->irq_posted);
 			tasklet = true;
+		} else if (WARN_ON(!engine->i915->gt.awake)) {
+			struct drm_printer p = drm_info_printer(engine->i915->drm.dev);
+			intel_engine_dump(engine, &p);
 		}
 	}
 
