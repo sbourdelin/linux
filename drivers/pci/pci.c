@@ -4171,20 +4171,20 @@ int __pci_reset_function_locked(struct pci_dev *dev)
 	might_sleep();
 
 	rc = pci_dev_specific_reset(dev, 0);
-	if (rc != -ENOTTY)
+	if (!rc)
 		return rc;
 	if (pcie_has_flr(dev)) {
 		pcie_flr(dev);
 		return 0;
 	}
 	rc = pci_af_flr(dev, 0);
-	if (rc != -ENOTTY)
+	if (!rc)
 		return rc;
 	rc = pci_pm_reset(dev, 0);
-	if (rc != -ENOTTY)
+	if (!rc)
 		return rc;
 	rc = pci_dev_reset_slot_function(dev, 0);
-	if (rc != -ENOTTY)
+	if (!rc)
 		return rc;
 	return pci_parent_bus_reset(dev, 0);
 }
