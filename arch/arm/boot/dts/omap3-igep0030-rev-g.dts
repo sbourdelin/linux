@@ -8,6 +8,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/dts-v1/;
 
 #include "omap3-igep0030-common.dtsi"
 

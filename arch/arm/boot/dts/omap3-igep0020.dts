@@ -8,8 +8,9 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+/dts-v1/;
 
-#include "omap3-igep0020-common.dtsi"
+#include "omap36xx-igep0020-common.dtsi"
 
 / {
 	model = "IGEPv2 Rev. C (TI OMAP AM/DM37x)";
