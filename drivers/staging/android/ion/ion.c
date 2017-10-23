@@ -15,30 +15,34 @@
  *
  */
 
+#include <linux/anon_inodes.h>
+#include <linux/debugfs.h>
 #include <linux/device.h>
+#include <linux/dma-buf.h>
 #include <linux/err.h>
+#include <linux/export.h>
 #include <linux/file.h>
 #include <linux/freezer.h>
 #include <linux/fs.h>
-#include <linux/anon_inodes.h>
+#include <linux/idr.h>
 #include <linux/kthread.h>
 #include <linux/list.h>
 #include <linux/memblock.h>
 #include <linux/miscdevice.h>
-#include <linux/export.h>
 #include <linux/mm.h>
 #include <linux/mm_types.h>
+#include <linux/platform_device.h>
 #include <linux/rbtree.h>
-#include <linux/slab.h>
+#include <linux/sched/task.h>
 #include <linux/seq_file.h>
+#include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
-#include <linux/debugfs.h>
-#include <linux/dma-buf.h>
-#include <linux/idr.h>
-#include <linux/sched/task.h>
 
 #include "ion.h"
+
+#define ION_DEV_MAX 32
+#define ION_NAME "ion"
 
 static struct ion_device *internal_dev;
 static int heap_id;
@@ -537,14 +541,29 @@ static int debug_shrink_get(void *data, u64 *val)
 DEFINE_SIMPLE_ATTRIBUTE(debug_shrink_fops, debug_shrink_get,
 			debug_shrink_set, "%llu\n");
 
-void ion_device_add_heap(struct ion_heap *heap)
+int ion_device_add_heap(struct ion_heap *heap)
 {
 	struct dentry *debug_file;
 	struct ion_device *dev = internal_dev;
+	int ret = 0;
 
 	if (!heap->ops->allocate || !heap->ops->free)
 		pr_err("%s: can not add heap with invalid ops struct.\n",
 		       __func__);
+
+	if (heap_id >= ION_DEV_MAX)
+		return -EBUSY;
+
+	heap->ddev.parent = &platform_bus;
+	heap->ddev.bus = &platform_bus_type;
+	heap->ddev.devt = MKDEV(MAJOR(internal_dev->devt), heap_id);
+	dev_set_name(&heap->ddev, ION_NAME"%d", heap_id);
+	device_initialize(&heap->ddev);
+	cdev_init(&heap->chrdev, &ion_fops);
+	heap->chrdev.owner = THIS_MODULE;
+	ret = cdev_device_add(&heap->chrdev, &heap->ddev);
+	if (ret < 0)
+		return ret;
 
 	spin_lock_init(&heap->free_lock);
 	heap->free_list_size = 0;
@@ -583,6 +602,8 @@ void ion_device_add_heap(struct ion_heap *heap)
 
 	dev->heap_cnt++;
 	up_write(&dev->lock);
+
+	return ret;
 }
 EXPORT_SYMBOL(ion_device_add_heap);
 
@@ -595,8 +616,9 @@ static int ion_device_create(void)
 	if (!idev)
 		return -ENOMEM;
 
+#ifdef CONFIG_ION_LEGACY_DEVICE_API
 	idev->dev.minor = MISC_DYNAMIC_MINOR;
-	idev->dev.name = "ion";
+	idev->dev.name = ION_NAME;
 	idev->dev.fops = &ion_fops;
 	idev->dev.parent = NULL;
 	ret = misc_register(&idev->dev);
@@ -605,8 +627,19 @@ static int ion_device_create(void)
 		kfree(idev);
 		return ret;
 	}
+#endif
 
-	idev->debug_root = debugfs_create_dir("ion", NULL);
+	ret = alloc_chrdev_region(&idev->devt, 0, ION_DEV_MAX, ION_NAME);
+	if (ret) {
+		pr_err("ion: unable to allocate device\n");
+#ifdef CONFIG_ION_LEGACY_DEVICE_API
+		misc_deregister(&idev->dev);
+#endif
+		kfree(idev);
+		return ret;
+	}
+
+	idev->debug_root = debugfs_create_dir(ION_NAME, NULL);
 	if (!idev->debug_root) {
 		pr_err("ion: failed to create debugfs root directory.\n");
 		goto debugfs_done;
