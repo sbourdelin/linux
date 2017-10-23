@@ -33,7 +33,6 @@ MODULE_DESCRIPTION("TC BPF based classifier");
 struct cls_bpf_head {
 	struct list_head plist;
 	u32 hgen;
-	struct rcu_head rcu;
 };
 
 struct cls_bpf_prog {
@@ -49,7 +48,6 @@ struct cls_bpf_prog {
 	struct sock_filter *bpf_ops;
 	const char *bpf_name;
 	struct tcf_proto *tp;
-	struct rcu_head rcu;
 };
 
 static const struct nla_policy bpf_policy[TCA_BPF_MAX + 1] = {
@@ -257,17 +255,11 @@ static void __cls_bpf_delete_prog(struct cls_bpf_prog *prog)
 	kfree(prog);
 }
 
-static void cls_bpf_delete_prog_rcu(struct rcu_head *rcu)
-{
-	__cls_bpf_delete_prog(container_of(rcu, struct cls_bpf_prog, rcu));
-}
-
 static void __cls_bpf_delete(struct tcf_proto *tp, struct cls_bpf_prog *prog)
 {
 	cls_bpf_stop_offload(tp, prog);
 	list_del_rcu(&prog->link);
 	tcf_unbind_filter(tp, &prog->res);
-	call_rcu(&prog->rcu, cls_bpf_delete_prog_rcu);
 }
 
 static int cls_bpf_delete(struct tcf_proto *tp, void *arg, bool *last)
@@ -275,6 +267,8 @@ static int cls_bpf_delete(struct tcf_proto *tp, void *arg, bool *last)
 	struct cls_bpf_head *head = rtnl_dereference(tp->root);
 
 	__cls_bpf_delete(tp, arg);
+	synchronize_rcu();
+	__cls_bpf_delete_prog((struct cls_bpf_prog *)arg);
 	*last = list_empty(&head->plist);
 	return 0;
 }
@@ -283,11 +277,16 @@ static void cls_bpf_destroy(struct tcf_proto *tp)
 {
 	struct cls_bpf_head *head = rtnl_dereference(tp->root);
 	struct cls_bpf_prog *prog, *tmp;
+	LIST_HEAD(local);
 
-	list_for_each_entry_safe(prog, tmp, &head->plist, link)
+	list_splice_init_rcu(&head->plist, &local, synchronize_rcu);
+
+	list_for_each_entry_safe(prog, tmp, &local, link) {
 		__cls_bpf_delete(tp, prog);
+		__cls_bpf_delete_prog(prog);
+	}
 
-	kfree_rcu(head, rcu);
+	kfree(head);
 }
 
 static void *cls_bpf_get(struct tcf_proto *tp, u32 handle)
@@ -501,7 +500,8 @@ static int cls_bpf_change(struct net *net, struct sk_buff *in_skb,
 	if (oldprog) {
 		list_replace_rcu(&oldprog->link, &prog->link);
 		tcf_unbind_filter(tp, &oldprog->res);
-		call_rcu(&oldprog->rcu, cls_bpf_delete_prog_rcu);
+		synchronize_rcu();
+		__cls_bpf_delete_prog(oldprog);
 	} else {
 		list_add_rcu(&prog->link, &head->plist);
 	}
