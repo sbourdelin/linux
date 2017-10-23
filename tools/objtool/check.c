@@ -303,15 +303,64 @@ err:
 	return ret;
 }
 
+static int __add_dead_ends(struct objtool_file *file, struct section *sec,
+			   bool unreachable_sec)
+{
+	char warn_str[12] = "unreachable";
+	struct instruction *insn;
+	struct rela *rela;
+	bool found;
+
+	if (!unreachable_sec)
+		strcpy(warn_str, "reachable");
+
+	list_for_each_entry(rela, &sec->rela_list, list) {
+		if (rela->sym->type != STT_SECTION) {
+			WARN("Unexpected relocation symbol type in %s",	sec->name);
+			return -1;
+		}
+
+		insn = find_insn(file, rela->sym->sec, rela->addend);
+		if (insn)
+			insn = list_prev_entry(insn, list);
+		else if (rela->addend == rela->sym->sec->len) {
+			found = false;
+			list_for_each_entry_reverse(insn, &file->insn_list, list) {
+				if (insn->sec == rela->sym->sec) {
+					found = true;
+					break;
+				}
+			}
+
+			if (!found) {
+				WARN("can't find %s insn at %s+0x%x",
+					warn_str, rela->sym->sec->name,
+						rela->addend);
+				return -1;
+			}
+		} else {
+			WARN("can't find %s insn at %s+0x%x",
+				warn_str, rela->sym->sec->name, rela->addend);
+			return -1;
+		}
+
+		/*
+		 * reachable section's insn->dead_end are false.
+		 */
+		insn->dead_end = unreachable_sec;
+	}
+
+	return 0;
+}
+
 /*
  * Mark "ud2" instructions and manually annotated dead ends.
  */
 static int add_dead_ends(struct objtool_file *file)
 {
 	struct section *sec;
-	struct rela *rela;
 	struct instruction *insn;
-	bool found;
+	int ret;
 
 	/*
 	 * By default, "ud2" is a dead end unless otherwise annotated, because
@@ -328,36 +377,9 @@ static int add_dead_ends(struct objtool_file *file)
 	if (!sec)
 		goto reachable;
 
-	list_for_each_entry(rela, &sec->rela_list, list) {
-		if (rela->sym->type != STT_SECTION) {
-			WARN("unexpected relocation symbol type in %s", sec->name);
-			return -1;
-		}
-		insn = find_insn(file, rela->sym->sec, rela->addend);
-		if (insn)
-			insn = list_prev_entry(insn, list);
-		else if (rela->addend == rela->sym->sec->len) {
-			found = false;
-			list_for_each_entry_reverse(insn, &file->insn_list, list) {
-				if (insn->sec == rela->sym->sec) {
-					found = true;
-					break;
-				}
-			}
-
-			if (!found) {
-				WARN("can't find unreachable insn at %s+0x%x",
-				     rela->sym->sec->name, rela->addend);
-				return -1;
-			}
-		} else {
-			WARN("can't find unreachable insn at %s+0x%x",
-			     rela->sym->sec->name, rela->addend);
-			return -1;
-		}
-
-		insn->dead_end = true;
-	}
+	ret = __add_dead_ends(file, sec, true);
+	if (ret == -1)
+		return ret;
 
 reachable:
 	/*
@@ -370,38 +392,8 @@ reachable:
 	if (!sec)
 		return 0;
 
-	list_for_each_entry(rela, &sec->rela_list, list) {
-		if (rela->sym->type != STT_SECTION) {
-			WARN("unexpected relocation symbol type in %s", sec->name);
-			return -1;
-		}
-		insn = find_insn(file, rela->sym->sec, rela->addend);
-		if (insn)
-			insn = list_prev_entry(insn, list);
-		else if (rela->addend == rela->sym->sec->len) {
-			found = false;
-			list_for_each_entry_reverse(insn, &file->insn_list, list) {
-				if (insn->sec == rela->sym->sec) {
-					found = true;
-					break;
-				}
-			}
-
-			if (!found) {
-				WARN("can't find reachable insn at %s+0x%x",
-				     rela->sym->sec->name, rela->addend);
-				return -1;
-			}
-		} else {
-			WARN("can't find reachable insn at %s+0x%x",
-			     rela->sym->sec->name, rela->addend);
-			return -1;
-		}
-
-		insn->dead_end = false;
-	}
-
-	return 0;
+	ret = __add_dead_ends(file, sec, false);
+	return ret;
 }
 
 /*
