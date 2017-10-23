@@ -50,6 +50,7 @@ static unsigned int reload;			/* the computed soft_margin */
 static bool nowayout = WATCHDOG_NOWAYOUT;
 static char expect_release;
 static unsigned long hpwdt_is_open;
+static const int pretimeout = 9;
 
 static void __iomem *pci_mem_addr;		/* the PCI-memory address */
 static unsigned long __iomem *hpwdt_nmistat;
@@ -629,6 +630,12 @@ static long hpwdt_ioctl(struct file *file, unsigned int cmd,
 			hpwdt_start();
 			hpwdt_ping();
 		}
+		break;
+
+	case WDIOC_GETPRETIMEOUT:
+		ret = copy_to_user(argp, &pretimeout, sizeof(pretimeout));
+		if (ret)
+			ret = -EFAULT;
 		break;
 
 	case WDIOC_SETTIMEOUT:
