@@ -42,6 +42,10 @@ $(obj)/Image $(obj)/zImage: FORCE
 
 else
 
+quiet_cmd_mkzimage = ZIMAGE  $@
+cmd_mkzimage = $(cmd_objcopy) && $(CONFIG_SHELL) -c \
+	'$(srctree)/$(src)/verify_zimage.sh $< $@ "$(NM)" || { rm -f $@; false; }'
+
 $(obj)/xipImage: FORCE
 	@echo 'Kernel not configured for XIP (CONFIG_XIP_KERNEL!=y)'
 	@false
@@ -53,7 +57,7 @@ $(obj)/compressed/vmlinux: $(obj)/Image FORCE
 	$(Q)$(MAKE) $(build)=$(obj)/compressed $@
 
 $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
-	$(call if_changed,objcopy)
+	$(call if_changed,mkzimage)
 
 endif
 
