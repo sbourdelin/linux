@@ -60,10 +60,6 @@ SECTIONS
   .got			: { *(.got) }
   _got_end = .;
 
-  /* ensure the zImage file size is always a multiple of 64 bits */
-  /* (without a dummy byte, ld just ignores the empty section) */
-  .pad			: { BYTE(0); . = ALIGN(8); }
-
 #ifdef CONFIG_EFI_STUB
   .data : ALIGN(4096) {
     __pecoff_data_start = .;
@@ -81,6 +77,10 @@ SECTIONS
     . = ALIGN(512);
   }
   __pecoff_data_rawsize = . - ADDR(.data);
+#else
+  /* ensure the zImage file size is always a multiple of 64 bits */
+  /* (without a dummy byte, ld just ignores the empty section) */
+  .pad			: { BYTE(0); . = ALIGN(8); }
 #endif
 
   _edata = .;
