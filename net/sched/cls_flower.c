@@ -61,7 +61,6 @@ struct fl_flow_mask_range {
 struct fl_flow_mask {
 	struct fl_flow_key key;
 	struct fl_flow_mask_range range;
-	struct rcu_head	rcu;
 };
 
 struct cls_fl_head {
@@ -71,10 +70,6 @@ struct cls_fl_head {
 	bool mask_assigned;
 	struct list_head filters;
 	struct rhashtable_params ht_params;
-	union {
-		struct work_struct work;
-		struct rcu_head	rcu;
-	};
 	struct idr handle_idr;
 };
 
@@ -87,7 +82,6 @@ struct cls_fl_filter {
 	struct list_head list;
 	u32 handle;
 	u32 flags;
-	struct rcu_head	rcu;
 	struct net_device *hw_dev;
 };
 
@@ -215,10 +209,8 @@ static int fl_init(struct tcf_proto *tp)
 	return 0;
 }
 
-static void fl_destroy_filter(struct rcu_head *head)
+static void fl_destroy_filter(struct cls_fl_filter *f)
 {
-	struct cls_fl_filter *f = container_of(head, struct cls_fl_filter, rcu);
-
 	tcf_exts_destroy(&f->exts);
 	kfree(f);
 }
@@ -305,38 +297,25 @@ static void __fl_delete(struct tcf_proto *tp, struct cls_fl_filter *f)
 	if (!tc_skip_hw(f->flags))
 		fl_hw_destroy_filter(tp, f);
 	tcf_unbind_filter(tp, &f->res);
-	call_rcu(&f->rcu, fl_destroy_filter);
-}
-
-static void fl_destroy_sleepable(struct work_struct *work)
-{
-	struct cls_fl_head *head = container_of(work, struct cls_fl_head,
-						work);
-	if (head->mask_assigned)
-		rhashtable_destroy(&head->ht);
-	kfree(head);
-	module_put(THIS_MODULE);
-}
-
-static void fl_destroy_rcu(struct rcu_head *rcu)
-{
-	struct cls_fl_head *head = container_of(rcu, struct cls_fl_head, rcu);
-
-	INIT_WORK(&head->work, fl_destroy_sleepable);
-	schedule_work(&head->work);
 }
 
 static void fl_destroy(struct tcf_proto *tp)
 {
 	struct cls_fl_head *head = rtnl_dereference(tp->root);
 	struct cls_fl_filter *f, *next;
+	LIST_HEAD(local);
 
-	list_for_each_entry_safe(f, next, &head->filters, list)
+	list_splice_init_rcu(&head->filters, &local, synchronize_rcu);
+
+	list_for_each_entry_safe(f, next, &local, list) {
 		__fl_delete(tp, f);
+		fl_destroy_filter(f);
+	}
 	idr_destroy(&head->handle_idr);
 
-	__module_get(THIS_MODULE);
-	call_rcu(&head->rcu, fl_destroy_rcu);
+	if (head->mask_assigned)
+		rhashtable_destroy(&head->ht);
+	kfree(head);
 }
 
 static void *fl_get(struct tcf_proto *tp, u32 handle)
@@ -975,7 +954,8 @@ static int fl_change(struct net *net, struct sk_buff *in_skb,
 		idr_replace_ext(&head->handle_idr, fnew, fnew->handle);
 		list_replace_rcu(&fold->list, &fnew->list);
 		tcf_unbind_filter(tp, &fold->res);
-		call_rcu(&fold->rcu, fl_destroy_filter);
+		synchronize_rcu();
+		fl_destroy_filter(fold);
 	} else {
 		list_add_tail_rcu(&fnew->list, &head->filters);
 	}
@@ -1003,6 +983,8 @@ static int fl_delete(struct tcf_proto *tp, void *arg, bool *last)
 		rhashtable_remove_fast(&head->ht, &f->ht_node,
 				       head->ht_params);
 	__fl_delete(tp, f);
+	synchronize_rcu();
+	fl_destroy_filter(f);
 	*last = list_empty(&head->filters);
 	return 0;
 }
