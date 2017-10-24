@@ -1256,6 +1256,7 @@ static void vfio_pci_remove(struct pci_dev *pdev)
 	if (!vdev)
 		return;
 
+	pci_disable_sriov(pdev);
 	vfio_iommu_group_put(pdev->dev.iommu_group, &pdev->dev);
 	kfree(vdev->region);
 	kfree(vdev);
@@ -1303,12 +1304,23 @@ static const struct pci_error_handlers vfio_err_handlers = {
 	.error_detected = vfio_pci_aer_err_detected,
 };
 
+static int vfio_sriov_configure(struct pci_dev *pdev, int num_vfs)
+{
+	if (!num_vfs) {
+		pci_disable_sriov(pdev);
+		return 0;
+	}
+
+	return pci_enable_sriov(pdev, num_vfs);
+}
+
 static struct pci_driver vfio_pci_driver = {
 	.name		= "vfio-pci",
 	.id_table	= NULL, /* only dynamic ids */
 	.probe		= vfio_pci_probe,
 	.remove		= vfio_pci_remove,
 	.err_handler	= &vfio_err_handlers,
+	.sriov_configure = vfio_sriov_configure,
 };
 
 struct vfio_devices {
