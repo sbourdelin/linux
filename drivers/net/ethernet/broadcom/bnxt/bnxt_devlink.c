@@ -22,6 +22,8 @@
  *   # of VFs per PF in SR-IOV mode
  * DEVLINK_PERM_CONFIG_MAX_NUM_PF_MSIX_VECT:
  *   Max # of MSI-X vectors per PF
+ * DEVLINK_PERM_CONFIG_MSIX_VECTORS_PER_VF:
+ *   # of MSI-X vectors per VF
  */
 struct bnxt_drv_cfgparam bnxt_drv_cfgparam_list[] = {
 	{DEVLINK_PERM_CONFIG_SRIOV_ENABLED, BNXT_DRV_PF,
@@ -30,6 +32,8 @@ struct bnxt_drv_cfgparam bnxt_drv_cfgparam_list[] = {
 		BNXT_DRV_APPL_FUNCTION, 8, 404},
 	{DEVLINK_PERM_CONFIG_MAX_NUM_PF_MSIX_VECT, BNXT_DRV_PF,
 		BNXT_DRV_APPL_SHARED, 10, 108},
+	{DEVLINK_PERM_CONFIG_MSIX_VECTORS_PER_VF, BNXT_DRV_PF,
+		BNXT_DRV_APPL_FUNCTION, 10, 406},
 };
 
 #define BNXT_NUM_DRV_CFGPARAM ARRAY_SIZE(bnxt_drv_cfgparam_list)
