@@ -269,10 +269,9 @@ static int hidraw_open(struct inode *inode, struct file *file)
 	unsigned long flags;
 	int err = 0;
 
-	if (!(list = kzalloc(sizeof(struct hidraw_list), GFP_KERNEL))) {
-		err = -ENOMEM;
-		goto out;
-	}
+	list = kzalloc(sizeof(*list), GFP_KERNEL);
+	if (!list)
+		return -ENOMEM;
 
 	mutex_lock(&minors_lock);
 	if (!hidraw_table[minor] || !hidraw_table[minor]->exist) {
@@ -304,7 +303,6 @@ static int hidraw_open(struct inode *inode, struct file *file)
 	file->private_data = list;
 out_unlock:
 	mutex_unlock(&minors_lock);
-out:
 	if (err < 0)
 		kfree(list);
 	return err;
@@ -513,7 +511,7 @@ int hidraw_connect(struct hid_device *hid)
 
 	/* we accept any HID device, all applications */
 
-	dev = kzalloc(sizeof(struct hidraw), GFP_KERNEL);
+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
 	if (!dev)
 		return -ENOMEM;
 
