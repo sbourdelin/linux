@@ -286,10 +286,14 @@ static ssize_t show_kb_wake_angle(struct device *dev,
 	msg->insize = sizeof(*resp);
 	ret = cros_ec_cmd_xfer_status(ec->ec_dev, msg);
 	if (ret < 0)
-		return ret;
+		goto exit;
+
 	resp = (struct ec_response_motion_sense *)msg->data;
-	return scnprintf(buf, PAGE_SIZE, "%d\n",
-			 resp->kb_wake_angle.ret);
+	ret = scnprintf(buf, PAGE_SIZE, "%d\n", resp->kb_wake_angle.ret);
+
+exit:
+	kfree(msg);
+	return ret;
 }
 
 static ssize_t store_kb_wake_angle(struct device *dev,
@@ -319,6 +323,7 @@ static ssize_t store_kb_wake_angle(struct device *dev,
 	msg->outsize = sizeof(*param);
 	msg->insize = sizeof(struct ec_response_motion_sense);
 	ret = cros_ec_cmd_xfer_status(ec->ec_dev, msg);
+	kfree(msg);
 	if (ret < 0)
 		return ret;
 	return count;
