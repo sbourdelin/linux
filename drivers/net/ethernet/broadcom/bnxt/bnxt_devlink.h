@@ -10,6 +10,23 @@
 #ifndef BNXT_DEVLINK_H
 #define BNXT_DEVLINK_H
 
+#define BNXT_DRV_PF 1
+#define BNXT_DRV_VF 2
+
+enum bnxt_drv_appl {
+	BNXT_DRV_APPL_SHARED,
+	BNXT_DRV_APPL_PORT,
+	BNXT_DRV_APPL_FUNCTION
+};
+
+struct bnxt_drv_cfgparam {
+	enum devlink_perm_config_param	param;
+	u8			func; /* BNXT_DRV_PF | BNXT_DRV_VF */
+	enum bnxt_drv_appl	appl; /* applicability (shared, func, port) */
+	u32			bitlength; /* length, in bits */
+	u32			nvm_param;
+};
+
 /* Struct to hold housekeeping info needed by devlink interface */
 struct bnxt_dl {
 	struct bnxt *bp;	/* back ptr to the controlling dev */

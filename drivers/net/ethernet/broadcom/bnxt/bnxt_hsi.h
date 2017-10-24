@@ -5676,6 +5676,106 @@ struct hwrm_nvm_install_update_cmd_err {
 	u8 unused_0[7];
 };
 
+/* hwrm_nvm_get_variable */
+/* Input (40 bytes) */
+struct hwrm_nvm_get_variable_input {
+	__le16 req_type;
+	__le16 cmpl_ring;
+	__le16 seq_id;
+	__le16 target_id;
+	__le64 resp_addr;
+	__le64 dest_data_addr;
+	__le16 data_len;
+	__le16 option_num;
+	#define NVM_GET_VARIABLE_REQ_OPTION_NUM_RSVD_0		   0x0UL
+	#define NVM_GET_VARIABLE_REQ_OPTION_NUM_RSVD_FFFF	   0xffffUL
+	__le16 dimensions;
+	__le16 index_0;
+	__le16 index_1;
+	__le16 index_2;
+	__le16 index_3;
+	u8 flags;
+	#define NVM_GET_VARIABLE_REQ_FLAGS_FACTORY_DFLT	    0x1UL
+	u8 unused_0;
+};
+
+/* Output (16 bytes) */
+struct hwrm_nvm_get_variable_output {
+	__le16 error_code;
+	__le16 req_type;
+	__le16 seq_id;
+	__le16 resp_len;
+	__le16 data_len;
+	__le16 option_num;
+	#define NVM_GET_VARIABLE_RESP_OPTION_NUM_RSVD_0	   0x0UL
+	#define NVM_GET_VARIABLE_RESP_OPTION_NUM_RSVD_FFFF	   0xffffUL
+	u8 unused_0;
+	u8 unused_1;
+	u8 unused_2;
+	u8 valid;
+};
+
+/* Command specific Error Codes (8 bytes) */
+struct hwrm_nvm_get_variable_cmd_err {
+	u8 code;
+	#define NVM_GET_VARIABLE_CMD_ERR_CODE_UNKNOWN		   0x0UL
+	#define NVM_GET_VARIABLE_CMD_ERR_CODE_VAR_NOT_EXIST       0x1UL
+	#define NVM_GET_VARIABLE_CMD_ERR_CODE_CORRUPT_VAR	   0x2UL
+	#define NVM_GET_VARIABLE_CMD_ERR_CODE_LEN_TOO_SHORT       0x3UL
+	u8 unused_0[7];
+};
+
+/* hwrm_nvm_set_variable */
+/* Input (40 bytes) */
+struct hwrm_nvm_set_variable_input {
+	__le16 req_type;
+	__le16 cmpl_ring;
+	__le16 seq_id;
+	__le16 target_id;
+	__le64 resp_addr;
+	__le64 src_data_addr;
+	__le16 data_len;
+	__le16 option_num;
+	#define NVM_SET_VARIABLE_REQ_OPTION_NUM_RSVD_0		   0x0UL
+	#define NVM_SET_VARIABLE_REQ_OPTION_NUM_RSVD_FFFF	   0xffffUL
+	__le16 dimensions;
+	__le16 index_0;
+	__le16 index_1;
+	__le16 index_2;
+	__le16 index_3;
+	u8 flags;
+	#define NVM_SET_VARIABLE_REQ_FLAGS_FORCE_FLUSH		    0x1UL
+	#define NVM_SET_VARIABLE_REQ_FLAGS_ENCRYPT_MODE_MASK       0xeUL
+	#define NVM_SET_VARIABLE_REQ_FLAGS_ENCRYPT_MODE_SFT	    1
+	#define NVM_SET_VARIABLE_REQ_FLAGS_ENCRYPT_MODE_NONE      (0x0UL << 1)
+	#define NVM_SET_VARIABLE_REQ_FLAGS_ENCRYPT_MODE_HMAC_SHA1 (0x1UL << 1)
+	#define NVM_SET_VARIABLE_REQ_FLAGS_ENCRYPT_MODE_LAST \
+		NVM_SET_VARIABLE_REQ_FLAGS_ENCRYPT_MODE_HMAC_SHA1
+	u8 unused_0;
+};
+
+/* Output (16 bytes) */
+struct hwrm_nvm_set_variable_output {
+	__le16 error_code;
+	__le16 req_type;
+	__le16 seq_id;
+	__le16 resp_len;
+	__le32 unused_0;
+	u8 unused_1;
+	u8 unused_2;
+	u8 unused_3;
+	u8 valid;
+};
+
+/* Command specific Error Codes (8 bytes) */
+struct hwrm_nvm_set_variable_cmd_err {
+	u8 code;
+	#define NVM_SET_VARIABLE_CMD_ERR_CODE_UNKNOWN		   0x0UL
+	#define NVM_SET_VARIABLE_CMD_ERR_CODE_VAR_NOT_EXIST       0x1UL
+	#define NVM_SET_VARIABLE_CMD_ERR_CODE_CORRUPT_VAR	   0x2UL
+	u8 unused_0[7];
+};
+
 /* hwrm_selftest_qlist */
 /* Input (16 bytes) */
 struct hwrm_selftest_qlist_input {
