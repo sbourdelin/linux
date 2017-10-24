@@ -260,9 +260,12 @@ enum devlink_dpipe_header_id {
  * DEVLINK_PERM_CONFIG_SRIOV_ENABLED:
  *   0 = disable SR-IOV
  *   1 = enable SR-IOV
+ * DEVLINK_PERM_CONFIG_NUM_VF_PER_PF:
+ *   # of VFs per PF in SR-IOV mode
  */
 enum devlink_perm_config_param {
 	DEVLINK_PERM_CONFIG_SRIOV_ENABLED,
+	DEVLINK_PERM_CONFIG_NUM_VF_PER_PF,
 
 	__DEVLINK_PERM_CONFIG_MAX,
 	DEVLINK_PERM_CONFIG_MAX = __DEVLINK_PERM_CONFIG_MAX - 1
