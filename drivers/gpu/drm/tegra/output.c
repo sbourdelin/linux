@@ -139,8 +139,7 @@ int tegra_output_probe(struct tegra_output *output)
 		err = gpio_to_irq(output->hpd_gpio);
 		if (err < 0) {
 			dev_err(output->dev, "gpio_to_irq(): %d\n", err);
-			gpio_free(output->hpd_gpio);
-			return err;
+			goto free_gpio;
 		}
 
 		output->hpd_irq = err;
@@ -153,8 +152,7 @@ int tegra_output_probe(struct tegra_output *output)
 		if (err < 0) {
 			dev_err(output->dev, "failed to request IRQ#%u: %d\n",
 				output->hpd_irq, err);
-			gpio_free(output->hpd_gpio);
-			return err;
+			goto free_gpio;
 		}
 
 		output->connector.polled = DRM_CONNECTOR_POLL_HPD;
@@ -168,6 +166,10 @@ int tegra_output_probe(struct tegra_output *output)
 	}
 
 	return 0;
+
+free_gpio:
+	gpio_free(output->hpd_gpio);
+	return err;
 }
 
 void tegra_output_remove(struct tegra_output *output)
