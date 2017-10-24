@@ -70,6 +70,10 @@ enum devlink_command {
 	DEVLINK_CMD_DPIPE_HEADERS_GET,
 	DEVLINK_CMD_DPIPE_TABLE_COUNTERS_SET,
 
+	/* Permanent device config get/set */
+	DEVLINK_CMD_PERM_CONFIG_GET,
+	DEVLINK_CMD_PERM_CONFIG_SET,
+
 	/* add new commands above here */
 	__DEVLINK_CMD_MAX,
 	DEVLINK_CMD_MAX = __DEVLINK_CMD_MAX - 1
@@ -202,6 +206,14 @@ enum devlink_attr {
 
 	DEVLINK_ATTR_ESWITCH_ENCAP_MODE,	/* u8 */
 
+	/* Permanent Configuration Parameters */
+	DEVLINK_ATTR_PERM_CONFIGS,			/* nested */
+	DEVLINK_ATTR_PERM_CONFIG,			/* nested */
+	DEVLINK_ATTR_PERM_CONFIG_PARAMETER,		/* u32 */
+	DEVLINK_ATTR_PERM_CONFIG_TYPE,			/* u8 */
+	DEVLINK_ATTR_PERM_CONFIG_VALUE,			/* dynamic */
+	DEVLINK_ATTR_PERM_CONFIG_RESTART_REQUIRED,	/* u8 */
+
 	/* add new attributes above here, update the policy in devlink.c */
 
 	__DEVLINK_ATTR_MAX,
@@ -242,6 +254,12 @@ enum devlink_dpipe_header_id {
 	DEVLINK_DPIPE_HEADER_ETHERNET,
 	DEVLINK_DPIPE_HEADER_IPV4,
 	DEVLINK_DPIPE_HEADER_IPV6,
+};
+
+/* Permanent config parameters */
+enum devlink_perm_config_param {
+	__DEVLINK_PERM_CONFIG_MAX,
+	DEVLINK_PERM_CONFIG_MAX = __DEVLINK_PERM_CONFIG_MAX - 1
 };
 
 #endif /* _UAPI_LINUX_DEVLINK_H_ */
