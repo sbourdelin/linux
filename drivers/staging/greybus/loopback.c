@@ -472,6 +472,26 @@ static void gb_loopback_async_operation_put(struct gb_loopback_async_operation
 	spin_unlock_irqrestore(&gb_dev.lock, flags);
 }
 
+static struct gb_loopback_async_operation *gb_loopback_async_operation_valid(
+	struct gb_loopback_async_operation *op_async)
+{
+	struct gb_loopback_async_operation *op_async_tmp;
+	bool found = false;
+	unsigned long flags;
+
+	spin_lock_irqsave(&gb_dev.lock, flags);
+	list_for_each_entry(op_async_tmp, &gb_dev.list_op_async, entry) {
+		if (op_async_tmp == op_async) {
+			gb_loopback_async_operation_get(op_async);
+			found = true;
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&gb_dev.lock, flags);
+
+	return found ? op_async : NULL;
+}
+
 static struct gb_loopback_async_operation *
 	gb_loopback_operation_find(u16 id)
 {
@@ -572,17 +592,14 @@ static void gb_loopback_async_operation_work(struct work_struct *work)
 	gb_loopback_async_operation_put(op_async);
 }
 
-static void gb_loopback_async_operation_timeout(unsigned long data)
+static void gb_loopback_async_operation_timeout(struct timer_list *t)
 {
-	struct gb_loopback_async_operation *op_async;
-	u16 id = data;
+	struct gb_loopback_async_operation *op_async =
+		from_timer(op_async, t, timer);
 
-	op_async = gb_loopback_operation_find(id);
-	if (!op_async) {
-		pr_err("operation %d not found - time out ?\n", id);
-		return;
-	}
-	schedule_work(&op_async->work);
+	op_async = gb_loopback_async_operation_valid(op_async);
+	if (op_async)
+		schedule_work(&op_async->work);
 }
 
 static int gb_loopback_async_operation(struct gb_loopback *gb, int type,
@@ -631,8 +648,7 @@ static int gb_loopback_async_operation(struct gb_loopback *gb, int type,
 	if (ret)
 		goto error;
 
-	setup_timer(&op_async->timer, gb_loopback_async_operation_timeout,
-			(unsigned long)operation->id);
+	timer_setup(&op_async->timer, gb_loopback_async_operation_timeout, 0);
 	op_async->timer.expires = jiffies + gb->jiffy_timeout;
 	add_timer(&op_async->timer);
 
