@@ -1569,6 +1569,7 @@ static int devlink_nl_cmd_eswitch_set_doit(struct sk_buff *skb,
 static const struct nla_policy devlink_nl_policy[DEVLINK_ATTR_MAX + 1];
 
 static const u8 devlink_perm_cfg_param_types[DEVLINK_PERM_CONFIG_MAX + 1] = {
+	[DEVLINK_PERM_CONFIG_SRIOV_ENABLED] = NLA_U8,
 };
 
 static int devlink_nl_single_param_get(struct sk_buff *msg,

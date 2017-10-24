@@ -256,8 +256,14 @@ enum devlink_dpipe_header_id {
 	DEVLINK_DPIPE_HEADER_IPV6,
 };
 
-/* Permanent config parameters */
+/* Permanent config parameters:
+ * DEVLINK_PERM_CONFIG_SRIOV_ENABLED:
+ *   0 = disable SR-IOV
+ *   1 = enable SR-IOV
+ */
 enum devlink_perm_config_param {
+	DEVLINK_PERM_CONFIG_SRIOV_ENABLED,
+
 	__DEVLINK_PERM_CONFIG_MAX,
 	DEVLINK_PERM_CONFIG_MAX = __DEVLINK_PERM_CONFIG_MAX - 1
 };
