@@ -40,7 +40,7 @@
 #include <linux/tcp.h>
 #include <linux/net_tstamp.h>
 #include <linux/ptp_clock_kernel.h>
-#include <linux/tick.h>
+#include <linux/housekeeping.h>
 
 #include <asm/checksum.h>
 #include <asm/homecache.h>
