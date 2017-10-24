@@ -1246,9 +1246,9 @@ static void mt_release_contacts(struct hid_device *hid)
 	td->num_received = 0;
 }
 
-static void mt_expired_timeout(unsigned long arg)
+static void mt_expired_timeout(struct timer_list *t)
 {
-	struct hid_device *hdev = (void *)arg;
+	struct hid_device *hdev = from_timer(hdev, t, release_timer);
 	struct mt_device *td = hid_get_drvdata(hdev);
 
 	/*
@@ -1331,7 +1331,7 @@ static int mt_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	 */
 	hdev->quirks |= HID_QUIRK_NO_INIT_REPORTS;
 
-	setup_timer(&td->release_timer, mt_expired_timeout, (long)hdev);
+	timer_setup(&td->release_timer, mt_expired_timeout, 0);
 
 	ret = hid_parse(hdev);
 	if (ret != 0)
