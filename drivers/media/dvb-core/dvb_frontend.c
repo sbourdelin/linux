@@ -147,9 +147,9 @@ static void dvb_frontend_free(struct kref *ref)
 		container_of(ref, struct dvb_frontend, refcount);
 	struct dvb_frontend_private *fepriv = fe->frontend_priv;
 
-	dvb_free_device(fepriv->dvbdev);
-
 	dvb_frontend_invoke_release(fe, fe->ops.release);
+
+	dvb_free_device(fepriv->dvbdev);
 
 	kfree(fepriv);
 }
