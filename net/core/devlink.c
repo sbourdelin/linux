@@ -1572,6 +1572,7 @@ static const u8 devlink_perm_cfg_param_types[DEVLINK_PERM_CONFIG_MAX + 1] = {
 	[DEVLINK_PERM_CONFIG_SRIOV_ENABLED] = NLA_U8,
 	[DEVLINK_PERM_CONFIG_NUM_VF_PER_PF] = NLA_U32,
 	[DEVLINK_PERM_CONFIG_MAX_NUM_PF_MSIX_VECT] = NLA_U32,
+	[DEVLINK_PERM_CONFIG_MSIX_VECTORS_PER_VF] = NLA_U32,
 };
 
 static int devlink_nl_single_param_get(struct sk_buff *msg,
