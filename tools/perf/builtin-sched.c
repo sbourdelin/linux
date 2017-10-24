@@ -3248,7 +3248,6 @@ static int __cmd_record(int argc, const char **argv)
 	const char **rec_argv;
 	const char * const record_args[] = {
 		"record",
-		"-a",
 		"-R",
 		"-m", "1024",
 		"-c", "1",
