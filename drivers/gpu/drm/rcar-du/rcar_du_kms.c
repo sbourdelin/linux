@@ -377,10 +377,8 @@ static int rcar_du_encoders_init(struct rcar_du_device *rcdu)
 		int ret;
 
 		ret = of_graph_parse_endpoint(ep_node, &ep);
-		if (ret < 0) {
-			of_node_put(ep_node);
-			return ret;
-		}
+		if (ret < 0)
+			goto put_node;
 
 		/* Find the output route corresponding to the port number. */
 		for (i = 0; i < RCAR_DU_OUTPUT_MAX; ++i) {
@@ -401,10 +399,8 @@ static int rcar_du_encoders_init(struct rcar_du_device *rcdu)
 		/* Process the output pipeline. */
 		ret = rcar_du_encoders_init_one(rcdu, output, &ep);
 		if (ret < 0) {
-			if (ret == -EPROBE_DEFER) {
-				of_node_put(ep_node);
-				return ret;
-			}
+			if (ret == -EPROBE_DEFER)
+				goto put_node;
 
 			continue;
 		}
@@ -413,6 +409,10 @@ static int rcar_du_encoders_init(struct rcar_du_device *rcdu)
 	}
 
 	return num_encoders;
+
+put_node:
+	of_node_put(ep_node);
+	return ret;
 }
 
 static int rcar_du_properties_init(struct rcar_du_device *rcdu)
