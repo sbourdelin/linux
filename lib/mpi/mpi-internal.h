@@ -37,6 +37,9 @@
 #include <linux/mpi.h>
 #include <linux/errno.h>
 
+#define MPI_LSHIFT(val, shift) (shift >= BITS_PER_MPI_LIMB ? 0 : (val << shift))
+#define MPI_RSHIFT(val, shift) (shift >= BITS_PER_MPI_LIMB ? 0 : (val >> shift))
+
 #define log_debug printk
 #define log_bug printk
 
