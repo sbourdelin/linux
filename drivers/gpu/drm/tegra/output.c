@@ -115,9 +115,8 @@ int tegra_output_probe(struct tegra_output *output)
 	if (ddc) {
 		output->ddc = of_find_i2c_adapter_by_node(ddc);
 		if (!output->ddc) {
-			err = -EPROBE_DEFER;
 			of_node_put(ddc);
-			return err;
+			return -EPROBE_DEFER;
 		}
 
 		of_node_put(ddc);
