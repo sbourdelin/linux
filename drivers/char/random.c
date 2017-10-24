@@ -691,6 +691,11 @@ retry:
 	if (cmpxchg(&r->entropy_count, orig, entropy_count) != orig)
 		goto retry;
 
+	if (INT_MAX - nbits < r->entropy_total) {
+		WARN_ON(1);
+		return;
+	}
+
 	r->entropy_total += nbits;
 	if (!r->initialized && r->entropy_total > 128) {
 		r->initialized = 1;
