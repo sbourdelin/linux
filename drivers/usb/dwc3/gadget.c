@@ -34,6 +34,7 @@
 #include "core.h"
 #include "gadget.h"
 #include "io.h"
+#include "dwc3-hisi.h"
 
 /**
  * dwc3_gadget_set_test_mode - enables usb2 test modes
@@ -267,7 +268,7 @@ int dwc3_send_gadget_ep_cmd(struct dwc3_ep *dep, unsigned cmd,
 {
 	const struct usb_endpoint_descriptor *desc = dep->endpoint.desc;
 	struct dwc3		*dwc = dep->dwc;
-	u32			timeout = 500;
+	u32			timeout = 3000;
 	u32			reg;
 
 	int			cmd_status = 0;
@@ -1476,6 +1477,9 @@ static int dwc3_gadget_ep_dequeue(struct usb_ep *ep,
 
 out1:
 	/* giveback the request */
+	if (!dep->queued_requests)
+		goto out0;
+
 	dep->queued_requests--;
 	dwc3_gadget_giveback(dep, req, -ECONNRESET);
 
@@ -2710,6 +2714,18 @@ static void dwc3_gadget_reset_interrupt(struct dwc3 *dwc)
 	dwc3_writel(dwc->regs, DWC3_DCFG, reg);
 }
 
+ATOMIC_NOTIFIER_HEAD(conndone_nh);
+
+int dwc3_conndone_notifier_register(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_register(&conndone_nh, nb);
+}
+
+int dwc3_conndone_notifier_unregister(struct notifier_block *nb)
+{
+	return atomic_notifier_chain_unregister(&conndone_nh, nb);
+}
+
 static void dwc3_gadget_conndone_interrupt(struct dwc3 *dwc)
 {
 	struct dwc3_ep		*dep;
@@ -3236,7 +3252,9 @@ int dwc3_gadget_init(struct dwc3 *dwc)
 	dwc->gadget.speed		= USB_SPEED_UNKNOWN;
 	dwc->gadget.sg_supported	= true;
 	dwc->gadget.name		= "dwc3-gadget";
+#ifndef CONFIG_USB_DWC3_HISI
 	dwc->gadget.is_otg		= dwc->dr_mode == USB_DR_MODE_OTG;
+#endif
 
 	/*
 	 * FIXME We might be setting max_speed to <SUPER, however versions
