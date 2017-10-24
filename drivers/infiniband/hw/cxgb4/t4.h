@@ -234,7 +234,7 @@ struct t4_cqe {
 
 /* used for SQ completion processing */
 #define CQE_WRID_SQ_IDX(x)	((x)->u.scqe.cidx)
-#define CQE_WRID_FR_STAG(x)     (be32_to_cpu((x)->u.scqe.stag))
+#define CQE_WRID_FR_STAG(x)     ((x)->u.scqe.stag)
 
 /* generic accessor macros */
 #define CQE_WRID_HI(x)		(be32_to_cpu((x)->u.gen.wrid_hi))
