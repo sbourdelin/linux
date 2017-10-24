@@ -4423,12 +4423,12 @@ sub process {
 
 # closing brace should have a space following it when it has anything
 # on the line
-		if ($line =~ /}(?!(?:,|;|\)))\S/) {
+		if ($line =~ /}(?![,;})])\S/) {
 			if (ERROR("SPACING",
 				  "space required after that close brace '}'\n" . $herecurr) &&
 			    $fix) {
 				$fixed[$fixlinenr] =~
-				    s/}((?!(?:,|;|\)))\S)/} $1/;
+				    s/}((?![,;})])\S)/} $1/;
 			}
 		}
 
