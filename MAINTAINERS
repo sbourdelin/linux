@@ -9416,6 +9416,7 @@ S:	Maintained
 F:	net/dsa/
 F:	include/net/dsa.h
 F:	drivers/net/dsa/
+F:	include/linux/lan9303.h
 
 NETWORKING [GENERAL]
 M:	"David S. Miller" <davem@davemloft.net>
