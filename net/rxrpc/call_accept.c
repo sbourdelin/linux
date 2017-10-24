@@ -387,8 +387,7 @@ found_service:
 	 * event and userspace is prevented from doing so until the state is
 	 * appropriate.
 	 */
-	if (!mutex_trylock(&call->user_mutex))
-		BUG();
+	BUG_ON(!mutex_trylock(&call->user_mutex));
 
 	/* Make the call live. */
 	rxrpc_incoming_call(rx, call, skb);
@@ -543,8 +542,7 @@ struct rxrpc_call *rxrpc_accept_call(struct rxrpc_sock *rx,
 	rxrpc_get_call(call, rxrpc_call_got_userid);
 	rb_link_node(&call->sock_node, parent, pp);
 	rb_insert_color(&call->sock_node, &rx->calls);
-	if (test_and_set_bit(RXRPC_CALL_HAS_USERID, &call->flags))
-		BUG();
+	BUG_ON(test_and_set_bit(RXRPC_CALL_HAS_USERID, &call->flags));
 
 	write_unlock_bh(&call->state_lock);
 	write_unlock(&rx->call_lock);
