@@ -125,15 +125,26 @@ static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
 		val = readl(usbmisc->base);
 		val &= ~(MX25_OTG_SIC_MASK | MX25_OTG_PP_BIT);
 		val |= (MX25_EHCI_INTERFACE_DIFF_UNI & MX25_EHCI_INTERFACE_MASK) << MX25_OTG_SIC_SHIFT;
-		val |= (MX25_OTG_PM_BIT | MX25_OTG_OCPOL_BIT);
+		val |= MX25_OTG_PM_BIT;
+
+		if (data->oc_polarity)
+			val |= MX25_OTG_OCPOL_BIT;
+		else
+			val &= ~MX25_OTG_OCPOL_BIT;
+
 		writel(val, usbmisc->base);
 		break;
 	case 1:
 		val = readl(usbmisc->base);
 		val &= ~(MX25_H1_SIC_MASK | MX25_H1_PP_BIT |  MX25_H1_IPPUE_UP_BIT);
 		val |= (MX25_EHCI_INTERFACE_SINGLE_UNI & MX25_EHCI_INTERFACE_MASK) << MX25_H1_SIC_SHIFT;
-		val |= (MX25_H1_PM_BIT | MX25_H1_OCPOL_BIT | MX25_H1_TLL_BIT |
+		val |= (MX25_H1_PM_BIT | MX25_H1_TLL_BIT |
 			MX25_H1_USBTE_BIT | MX25_H1_IPPUE_DOWN_BIT);
+
+		if (data->oc_polarity)
+			val |= MX25_H1_OCPOL_BIT;
+		else
+			val &= ~MX25_H1_OCPOL_BIT;
 
 		writel(val, usbmisc->base);
 
