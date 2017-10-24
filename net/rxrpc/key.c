@@ -851,8 +851,7 @@ static int rxrpc_preparse_s(struct key_preparsed_payload *prep)
 		return PTR_ERR(ci);
 	}
 
-	if (crypto_skcipher_setkey(ci, prep->data, 8) < 0)
-		BUG();
+	BUG_ON(crypto_skcipher_setkey(ci, prep->data, 8) < 0);
 
 	prep->payload.data[0] = ci;
 	_leave(" = 0");
