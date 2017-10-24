@@ -531,7 +531,10 @@ static void smaps_pte_entry(pte_t *pte, unsigned long addr,
 	struct page *page = NULL;
 
 	if (pte_present(*pte)) {
-		page = vm_normal_page(vma, addr, *pte);
+		if (!vma_is_dax(vma))
+			page = vm_normal_page(vma, addr, *pte);
+		else if (pte_devmap(*pte))
+			page = pte_page(*pte);
 		mss->rss_pte += PAGE_SIZE;
 	} else if (is_swap_pte(*pte)) {
 		swp_entry_t swpent = pte_to_swp_entry(*pte);
@@ -583,7 +586,11 @@ static void smaps_pmd_entry(pmd_t *pmd, unsigned long addr,
 	struct page *page;
 
 	/* FOLL_DUMP will return -EFAULT on huge zero page */
-	page = follow_trans_huge_pmd(vma, addr, pmd, FOLL_DUMP);
+	if (!vma_is_dax(vma))
+		page = follow_trans_huge_pmd(vma, addr, pmd, FOLL_DUMP);
+	else if (pmd_devmap(*pmd))
+		page = pmd_page(*pmd);
+
 	if (IS_ERR_OR_NULL(page))
 		return;
 	if (PageAnon(page))
@@ -1770,13 +1777,15 @@ static int gather_pte_stats(pmd_t *pmd, unsigned long addr,
 	spinlock_t *ptl;
 	pte_t *orig_pte;
 	pte_t *pte;
+	struct page *page;
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 	ptl = pmd_trans_huge_lock(pmd, vma);
 	if (ptl) {
-		struct page *page;
-
-		page = can_gather_numa_stats_pmd(*pmd, vma, addr);
+		if (!vma_is_dax(vma))
+			page = can_gather_numa_stats_pmd(*pmd, vma, addr);
+		else if (pmd_devmap(*pmd))
+			page = pmd_page(*pmd);
 		if (page)
 			gather_stats(page, md, pmd_dirty(*pmd),
 				     HPAGE_PMD_SIZE/PAGE_SIZE);
@@ -1789,7 +1798,10 @@ static int gather_pte_stats(pmd_t *pmd, unsigned long addr,
 #endif
 	orig_pte = pte = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);
 	do {
-		struct page *page = can_gather_numa_stats(*pte, vma, addr);
+		if (!vma_is_dax(vma))
+			page = can_gather_numa_stats(*pte, vma, addr);
+		else if (pte_devmap(*pte))
+			page = pte_page(*pte);
 		if (!page)
 			continue;
 		gather_stats(page, md, pte_dirty(*pte), 1);
