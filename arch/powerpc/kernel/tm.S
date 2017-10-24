@@ -83,10 +83,10 @@ _GLOBAL(tm_abort)
  *		   uint8_t cause)
  *
  *	- Performs a full reclaim.  This destroys outstanding
- *	  transactions and updates thread->regs.tm_ckpt_* with the
+ *	  transactions and updates thread->regs.ckpt_regs with the
  *	  original checkpointed state.  Note that thread->regs is
  *	  unchanged.
- *	- FP regs are written back to thread->transact_fpr before
+ *	- FP regs are written back to thread->ckfp_state before
  *	  reclaiming.  These are the transactional (current) versions.
  *
  * Purpose is to both abort transactions of, and preserve the state of,
@@ -258,7 +258,7 @@ _GLOBAL(tm_reclaim)
 	beq	dont_backup_vec
 
 	addi	r7, r3, THREAD_CKVRSTATE
-	SAVE_32VRS(0, r6, r7)	/* r6 scratch, r7 transact vr state */
+	SAVE_32VRS(0, r6, r7)	/* r6 scratch, r7 ckvr_state */
 	mfvscr	v0
 	li	r6, VRSTATE_VSCR
 	stvx	v0, r7, r6
@@ -270,7 +270,7 @@ dont_backup_vec:
 	beq	dont_backup_fp
 
 	addi	r7, r3, THREAD_CKFPSTATE
-	SAVE_32FPRS_VSRS(0, R6, R7)	/* r6 scratch, r7 transact fp state */
+	SAVE_32FPRS_VSRS(0, R6, R7)	/* r6 scratch, r7 ckfp_state */
 
 	mffs    fr0
 	stfd    fr0,FPSTATE_FPSCR(r7)
