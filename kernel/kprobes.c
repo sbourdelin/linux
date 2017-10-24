@@ -1948,6 +1948,10 @@ int register_kretprobe(struct kretprobe *rp)
 #endif
 	}
 	raw_spin_lock_init(&rp->lock);
+
+	if (!hlist_empty(&rp->free_instances))
+		return -EBUSY;
+
 	INIT_HLIST_HEAD(&rp->free_instances);
 	for (i = 0; i < rp->maxactive; i++) {
 		inst = kmalloc(sizeof(struct kretprobe_instance) +
