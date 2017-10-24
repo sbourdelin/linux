@@ -1939,6 +1939,7 @@ static struct dst_entry *rt6_check(struct rt6_info *rt, u32 cookie)
 	if (rt6_check_expired(rt))
 		return NULL;
 
+	dst_use_noref(&rt->dst, jiffies);
 	return &rt->dst;
 }
 
