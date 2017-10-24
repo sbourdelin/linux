@@ -18,10 +18,14 @@
  * DEVLINK_PERM_CONFIG_SRIOV_ENABLED:
  *   0 = disable SR-IOV
  *   1 = enable SR-IOV
+ * DEVLINK_PERM_CONFIG_NUM_VF_PER_PF:
+ *   # of VFs per PF in SR-IOV mode
  */
 struct bnxt_drv_cfgparam bnxt_drv_cfgparam_list[] = {
 	{DEVLINK_PERM_CONFIG_SRIOV_ENABLED, BNXT_DRV_PF,
 		BNXT_DRV_APPL_SHARED, 1, 401},
+	{DEVLINK_PERM_CONFIG_NUM_VF_PER_PF, BNXT_DRV_PF,
+		BNXT_DRV_APPL_FUNCTION, 8, 404},
 };
 
 #define BNXT_NUM_DRV_CFGPARAM ARRAY_SIZE(bnxt_drv_cfgparam_list)
