@@ -208,20 +208,22 @@ static struct exynos_drm_gem *exynos_drm_gem_init(struct drm_device *dev,
 	ret = drm_gem_object_init(dev, obj, size);
 	if (ret < 0) {
 		DRM_ERROR("failed to initialize gem object\n");
-		kfree(exynos_gem);
-		return ERR_PTR(ret);
+		goto free_gem;
 	}
 
 	ret = drm_gem_create_mmap_offset(obj);
-	if (ret < 0) {
-		drm_gem_object_release(obj);
-		kfree(exynos_gem);
-		return ERR_PTR(ret);
-	}
+	if (ret < 0)
+		goto release_object;
 
 	DRM_DEBUG_KMS("created file object = %pK\n", obj->filp);
 
 	return exynos_gem;
+
+release_object:
+	drm_gem_object_release(obj);
+free_gem:
+	kfree(exynos_gem);
+	return ERR_PTR(ret);
 }
 
 struct exynos_drm_gem *exynos_drm_gem_create(struct drm_device *dev,
