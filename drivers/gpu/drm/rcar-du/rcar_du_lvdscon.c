@@ -63,7 +63,7 @@ int rcar_du_lvds_connector_init(struct rcar_du_device *rcdu,
 	int ret;
 
 	rcon = devm_kzalloc(rcdu->dev, sizeof(*rcon), GFP_KERNEL);
-	if (rcon == NULL)
+	if (!rcon)
 		return -ENOMEM;
 
 	connector = &rcon->connector;

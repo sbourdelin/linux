@@ -410,7 +410,7 @@ void rcar_du_crtc_finish_page_flip(struct rcar_du_crtc *rcrtc)
 	rcrtc->event = NULL;
 	spin_unlock_irqrestore(&dev->event_lock, flags);
 
-	if (event == NULL)
+	if (!event)
 		return;
 
 	spin_lock_irqsave(&dev->event_lock, flags);

@@ -253,7 +253,7 @@ int rcar_du_lvdsenc_init(struct rcar_du_device *rcdu)
 
 	for (i = 0; i < rcdu->info->num_lvds; ++i) {
 		lvds = devm_kzalloc(&pdev->dev, sizeof(*lvds), GFP_KERNEL);
-		if (lvds == NULL)
+		if (!lvds)
 			return -ENOMEM;
 
 		lvds->dev = rcdu;

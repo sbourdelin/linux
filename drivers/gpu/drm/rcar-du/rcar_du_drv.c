@@ -318,7 +318,7 @@ static int rcar_du_probe(struct platform_device *pdev)
 
 	/* Allocate and initialize the R-Car device structure. */
 	rcdu = devm_kzalloc(&pdev->dev, sizeof(*rcdu), GFP_KERNEL);
-	if (rcdu == NULL)
+	if (!rcdu)
 		return -ENOMEM;
 
 	rcdu->dev = &pdev->dev;

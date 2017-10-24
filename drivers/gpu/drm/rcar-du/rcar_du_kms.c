@@ -181,7 +181,7 @@ rcar_du_fb_create(struct drm_device *dev, struct drm_file *file_priv,
 	unsigned int i;
 
 	format = rcar_du_format_info(mode_cmd->pixel_format);
-	if (format == NULL) {
+	if (!format) {
 		dev_dbg(dev->dev, "unsupported pixel format %08x\n",
 			mode_cmd->pixel_format);
 		return ERR_PTR(-EINVAL);
@@ -419,7 +419,7 @@ static int rcar_du_properties_init(struct rcar_du_device *rcdu)
 {
 	rcdu->props.alpha =
 		drm_property_create_range(rcdu->ddev, 0, "alpha", 0, 255);
-	if (rcdu->props.alpha == NULL)
+	if (!rcdu->props.alpha)
 		return -ENOMEM;
 
 	/*
@@ -430,7 +430,7 @@ static int rcar_du_properties_init(struct rcar_du_device *rcdu)
 	rcdu->props.colorkey =
 		drm_property_create_range(rcdu->ddev, 0, "colorkey",
 					  0, 0x01ffffff);
-	if (rcdu->props.colorkey == NULL)
+	if (!rcdu->props.colorkey)
 		return -ENOMEM;
 
 	return 0;

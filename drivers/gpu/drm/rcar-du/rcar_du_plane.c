@@ -584,7 +584,7 @@ static int rcar_du_plane_atomic_check(struct drm_plane *plane,
 	}
 
 	rstate->format = rcar_du_format_info(state->fb->format->format);
-	if (rstate->format == NULL) {
+	if (!rstate->format) {
 		dev_dbg(rcdu->dev, "%s: unsupported format %08x\n", __func__,
 			state->fb->format->format);
 		return -EINVAL;
@@ -637,7 +637,7 @@ rcar_du_plane_atomic_duplicate_state(struct drm_plane *plane)
 
 	state = to_rcar_plane_state(plane->state);
 	copy = kmemdup(state, sizeof(*state), GFP_KERNEL);
-	if (copy == NULL)
+	if (!copy)
 		return NULL;
 
 	__drm_atomic_helper_plane_duplicate_state(plane, &copy->state);
@@ -662,7 +662,7 @@ static void rcar_du_plane_reset(struct drm_plane *plane)
 	}
 
 	state = kzalloc(sizeof(*state), GFP_KERNEL);
-	if (state == NULL)
+	if (!state)
 		return;
 
 	state->hwindex = -1;

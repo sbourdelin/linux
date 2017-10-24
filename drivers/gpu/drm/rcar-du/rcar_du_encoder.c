@@ -166,7 +166,7 @@ int rcar_du_encoder_init(struct rcar_du_device *rcdu,
 	int ret;
 
 	renc = devm_kzalloc(rcdu->dev, sizeof(*renc), GFP_KERNEL);
-	if (renc == NULL)
+	if (!renc)
 		return -ENOMEM;
 
 	renc->output = output;
