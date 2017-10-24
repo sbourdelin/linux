@@ -98,6 +98,10 @@ static inline void crash_post_resume(void) {}
 
 struct kimage_arch {
 	void *dtb_buf;
+	/* Core ELF header buffer */
+	void *elf_headers;
+	unsigned long elf_headers_sz;
+	unsigned long elf_load_addr;
 };
 
 struct kimage;
@@ -113,6 +117,7 @@ extern int load_other_segments(struct kimage *image,
 		unsigned long kernel_load_addr,
 		char *initrd, unsigned long initrd_len,
 		char *cmdline, unsigned long cmdline_len);
+extern int load_crashdump_segments(struct kimage *image);
 #endif
 
 #endif /* __ASSEMBLY__ */
