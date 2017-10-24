@@ -14,7 +14,14 @@
 #include "bnxt_vfr.h"
 #include "bnxt_devlink.h"
 
+/* Permanent config parameters from devlink.h:
+ * DEVLINK_PERM_CONFIG_SRIOV_ENABLED:
+ *   0 = disable SR-IOV
+ *   1 = enable SR-IOV
+ */
 struct bnxt_drv_cfgparam bnxt_drv_cfgparam_list[] = {
+	{DEVLINK_PERM_CONFIG_SRIOV_ENABLED, BNXT_DRV_PF,
+		BNXT_DRV_APPL_SHARED, 1, 401},
 };
 
 #define BNXT_NUM_DRV_CFGPARAM ARRAY_SIZE(bnxt_drv_cfgparam_list)
