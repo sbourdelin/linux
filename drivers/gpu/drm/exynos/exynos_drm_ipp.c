@@ -1747,7 +1747,7 @@ static int ipp_probe(struct platform_device *pdev)
 		goto err_event_workq;
 	}
 
-	/* set sub driver informations */
+	/* set sub driver information */
 	subdrv = &ctx->subdrv;
 	subdrv->dev = dev;
 	subdrv->probe = ipp_subdrv_probe;

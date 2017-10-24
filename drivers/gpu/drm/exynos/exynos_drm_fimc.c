@@ -1437,7 +1437,7 @@ static int fimc_ippdrv_start(struct device *dev, enum drm_exynos_ipp_cmd cmd)
 		return ret;
 	}
 
-	/* If set ture, we can save jpeg about screen */
+	/* If set true, we can save jpeg about screen */
 	fimc_handle_jpeg(ctx, false);
 	fimc_set_scaler(ctx, &ctx->sc);
 
