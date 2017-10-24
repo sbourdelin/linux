@@ -2640,10 +2640,9 @@ static int shadow_workload_ring_buffer(struct intel_vgpu_workload *workload)
 	if (gma_head > gma_tail) {
 		ret = copy_gma_to_hva(vgpu, vgpu->gtt.ggtt_mm,
 				      gma_head, gma_top, shadow_ring_buffer_va);
-		if (ret < 0) {
-			gvt_vgpu_err("fail to copy guest ring buffer\n");
-			return ret;
-		}
+		if (ret < 0)
+			goto report_failure;
+
 		shadow_ring_buffer_va += ret;
 		gma_head = workload->rb_start;
 	}
@@ -2651,11 +2650,14 @@ static int shadow_workload_ring_buffer(struct intel_vgpu_workload *workload)
 	/* copy head or start <-> tail */
 	ret = copy_gma_to_hva(vgpu, vgpu->gtt.ggtt_mm, gma_head, gma_tail,
 				shadow_ring_buffer_va);
-	if (ret < 0) {
-		gvt_vgpu_err("fail to copy guest ring buffer\n");
-		return ret;
-	}
+	if (ret < 0)
+		goto report_failure;
+
 	return 0;
+
+report_failure:
+	gvt_vgpu_err("fail to copy guest ring buffer\n");
+	return ret;
 }
 
 int intel_gvt_scan_and_shadow_ringbuffer(struct intel_vgpu_workload *workload)
