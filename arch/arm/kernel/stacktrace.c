@@ -82,6 +82,9 @@ static int save_trace(struct stackframe *frame, void *d)
 		return 0;
 	}
 
+	if (!__kernel_text_address(addr))
+		return 1;
+
 	trace->entries[trace->nr_entries++] = addr;
 
 	if (trace->nr_entries >= trace->max_entries)
@@ -98,12 +101,8 @@ static int save_trace(struct stackframe *frame, void *d)
 	data->last_pc = frame->pc;
 	if (!in_exception_text(addr))
 		return 0;
-
-	regs = (struct pt_regs *)frame->sp;
-
-	trace->entries[trace->nr_entries++] = regs->ARM_pc;
-
-	return trace->nr_entries >= trace->max_entries;
+	else
+		return 1;
 }
 
 /* This must be noinline to so that our skip calculation works correctly */
