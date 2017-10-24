@@ -125,7 +125,7 @@ struct xfrm_state_walk {
 
 struct xfrm_state_offload {
 	struct net_device	*dev;
-	unsigned long		offload_handle;
+	atomic64_t		offload_handle;
 	unsigned int		num_exthdrs;
 	u8			flags;
 };
@@ -1862,6 +1862,17 @@ int xfrm_dev_state_add(struct net *net, struct xfrm_state *x,
 		       struct xfrm_user_offload *xuo);
 bool xfrm_dev_offload_ok(struct sk_buff *skb, struct xfrm_state *x);
 
+static inline void xfrm_dev_set_offload_handle(struct xfrm_state *x,
+					       u64 offload_handle)
+{
+	atomic64_set(&x->xso.offload_handle, offload_handle);
+}
+
+static inline u64 xfrm_dev_offload_handle(struct xfrm_state *x)
+{
+	return atomic64_read(&x->xso.offload_handle);
+}
+
 static inline bool xfrm_dst_offload_ok(struct dst_entry *dst)
 {
 	struct xfrm_state *x = dst->xfrm;
@@ -1869,7 +1880,7 @@ static inline bool xfrm_dst_offload_ok(struct dst_entry *dst)
 	if (!x || !x->type_offload)
 		return false;
 
-	if (x->xso.offload_handle && (x->xso.dev == dst->path->dev) &&
+	if (xfrm_dev_offload_handle(x) && (x->xso.dev == dst->path->dev) &&
 	    !dst->child->xfrm)
 		return true;
 
@@ -1917,6 +1928,16 @@ static inline void xfrm_dev_state_free(struct xfrm_state *x)
 static inline bool xfrm_dev_offload_ok(struct sk_buff *skb, struct xfrm_state *x)
 {
 	return false;
+}
+
+static inline void xfrm_dev_set_offload_handle(struct xfrm_state *x,
+					       u64 offload_handle)
+{
+}
+
+static inline u64 xfrm_dev_offload_handle(struct xfrm_state *x)
+{
+	return 0;
 }
 
 static inline bool xfrm_dst_offload_ok(struct dst_entry *dst)

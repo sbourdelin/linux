@@ -243,7 +243,7 @@ struct sk_buff *mlx5e_ipsec_handle_tx_skb(struct net_device *netdev,
 		goto drop;
 	}
 
-	if (unlikely(!x->xso.offload_handle ||
+	if (unlikely(!xfrm_dev_offload_handle(x) ||
 		     (skb->protocol != htons(ETH_P_IP) &&
 		      skb->protocol != htons(ETH_P_IPV6)))) {
 		atomic64_inc(&priv->ipsec->sw_stats.ipsec_tx_drop_not_ip);
@@ -353,7 +353,7 @@ bool mlx5e_ipsec_feature_check(struct sk_buff *skb, struct net_device *netdev,
 
 	if (skb->sp && skb->sp->len) {
 		x = skb->sp->xvec[0];
-		if (x && x->xso.offload_handle)
+		if (x && xfrm_dev_offload_handle(x))
 			return true;
 	}
 	return false;

@@ -741,7 +741,7 @@ static int esp_init_aead(struct xfrm_state *x)
 		     x->geniv, x->aead->alg_name) >= CRYPTO_MAX_ALG_NAME)
 		goto error;
 
-	if (x->xso.offload_handle)
+	if (xfrm_dev_offload_handle(x))
 		mask |= CRYPTO_ALG_ASYNC;
 
 	aead = crypto_alloc_aead(aead_name, 0, mask);
@@ -800,7 +800,7 @@ static int esp_init_authenc(struct xfrm_state *x)
 			goto error;
 	}
 
-	if (x->xso.offload_handle)
+	if (xfrm_dev_offload_handle(x))
 		mask |= CRYPTO_ALG_ASYNC;
 
 	aead = crypto_alloc_aead(authenc_name, 0, mask);

@@ -238,7 +238,7 @@ static int esp6_xmit(struct xfrm_state *x, struct sk_buff *skb,  netdev_features
 	if (!xo)
 		return -EINVAL;
 
-	if (!(features & NETIF_F_HW_ESP) || !x->xso.offload_handle ||
+	if (!(features & NETIF_F_HW_ESP) || !xfrm_dev_offload_handle(x) ||
 	    (x->xso.dev != skb->dev)) {
 		xo->flags |= CRYPTO_FALLBACK;
 		hw_offload = false;

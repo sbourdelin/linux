@@ -304,7 +304,7 @@ static int mlx5e_xfrm_add_state(struct xfrm_state *x)
 	if (err)
 		goto err_sadb_rx;
 
-	x->xso.offload_handle = (unsigned long)sa_entry;
+	xfrm_dev_set_offload_handle(x, (u64)sa_entry);
 	goto out;
 
 err_sadb_rx:
@@ -320,14 +320,13 @@ out:
 
 static void mlx5e_xfrm_del_state(struct xfrm_state *x)
 {
-	struct mlx5e_ipsec_sa_entry *sa_entry;
+	struct mlx5e_ipsec_sa_entry *sa_entry = (void *)xfrm_dev_offload_handle(x);
 	struct mlx5_accel_ipsec_sa hw_sa;
 	void *context;
 
-	if (!x->xso.offload_handle)
+	if (!sa_entry)
 		return;
 
-	sa_entry = (struct mlx5e_ipsec_sa_entry *)x->xso.offload_handle;
 	WARN_ON(sa_entry->x != x);
 
 	if (x->xso.flags & XFRM_OFFLOAD_INBOUND)
@@ -343,13 +342,12 @@ static void mlx5e_xfrm_del_state(struct xfrm_state *x)
 
 static void mlx5e_xfrm_free_state(struct xfrm_state *x)
 {
-	struct mlx5e_ipsec_sa_entry *sa_entry;
+	struct mlx5e_ipsec_sa_entry *sa_entry = (void *)xfrm_dev_offload_handle(x);
 	int res;
 
-	if (!x->xso.offload_handle)
+	if (!sa_entry)
 		return;
 
-	sa_entry = (struct mlx5e_ipsec_sa_entry *)x->xso.offload_handle;
 	WARN_ON(sa_entry->x != x);
 
 	res = mlx5_accel_ipsec_sa_cmd_wait(sa_entry->context);
