@@ -80,10 +80,11 @@ struct av7110;
 
 /* infrared remote control */
 struct infrared {
-	u16	key_map[256];
+	u16			key_map[256];
 	struct input_dev	*input_dev;
 	char			input_phys[32];
 	struct timer_list	keyup_timer;
+	unsigned long		keydown_time;
 	struct tasklet_struct	ir_tasklet;
 	void			(*ir_handler)(struct av7110 *av7110, u32 ircom);
 	u32			ir_command;
@@ -93,7 +94,6 @@ struct infrared {
 	u8			inversion;
 	u16			last_key;
 	u16			last_toggle;
-	u8			delay_timer_finished;
 };
 
 

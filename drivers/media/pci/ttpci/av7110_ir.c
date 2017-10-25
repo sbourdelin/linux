@@ -84,9 +84,9 @@ static u16 default_key_map [256] = {
 
 
 /* key-up timer */
-static void av7110_emit_keyup(unsigned long parm)
+static void av7110_emit_keyup(struct timer_list *t)
 {
-	struct infrared *ir = (struct infrared *) parm;
+	struct infrared *ir = from_timer(ir, keyup_timer, t);
 
 	if (!ir || !test_bit(ir->last_key, ir->input_dev->key))
 		return;
@@ -152,19 +152,20 @@ static void av7110_emit_key(unsigned long parm)
 		return;
 	}
 
-	if (timer_pending(&ir->keyup_timer)) {
-		del_timer(&ir->keyup_timer);
+	if (del_timer(&ir->keyup_timer)) {
 		if (ir->last_key != keycode || toggle != ir->last_toggle) {
-			ir->delay_timer_finished = 0;
+			ir->keydown_time = jiffies;
 			input_event(ir->input_dev, EV_KEY, ir->last_key, 0);
 			input_event(ir->input_dev, EV_KEY, keycode, 1);
 			input_sync(ir->input_dev);
-		} else if (ir->delay_timer_finished) {
+		} else if (time_after(jiffies, ir->keydown_time +
+				msecs_to_jiffies(
+					ir->input_dev->rep[REP_PERIOD]))) {
 			input_event(ir->input_dev, EV_KEY, keycode, 2);
 			input_sync(ir->input_dev);
 		}
 	} else {
-		ir->delay_timer_finished = 0;
+		ir->keydown_time = jiffies;
 		input_event(ir->input_dev, EV_KEY, keycode, 1);
 		input_sync(ir->input_dev);
 	}
@@ -172,9 +173,7 @@ static void av7110_emit_key(unsigned long parm)
 	ir->last_key = keycode;
 	ir->last_toggle = toggle;
 
-	ir->keyup_timer.expires = jiffies + UP_TIMEOUT;
-	add_timer(&ir->keyup_timer);
-
+	mod_timer(&ir->keyup_timer, jiffies + UP_TIMEOUT);
 }
 
 
@@ -184,11 +183,18 @@ static void input_register_keys(struct infrared *ir)
 	int i;
 
 	set_bit(EV_KEY, ir->input_dev->evbit);
-	set_bit(EV_REP, ir->input_dev->evbit);
 	set_bit(EV_MSC, ir->input_dev->evbit);
 
 	set_bit(MSC_RAW, ir->input_dev->mscbit);
 	set_bit(MSC_SCAN, ir->input_dev->mscbit);
+
+	set_bit(EV_REP, ir->input_dev->evbit);
+	/*
+	 * By setting the delay before registering input device we
+	 * indicate that we will be implementing the autorepeat
+	 * ourselves.
+	 */
+	ir->input_dev->rep[REP_DELAY] = 250;
 
 	memset(ir->input_dev->keybit, 0, sizeof(ir->input_dev->keybit));
 
@@ -202,15 +208,6 @@ static void input_register_keys(struct infrared *ir)
 	ir->input_dev->keycode = ir->key_map;
 	ir->input_dev->keycodesize = sizeof(ir->key_map[0]);
 	ir->input_dev->keycodemax = ARRAY_SIZE(ir->key_map);
-}
-
-
-/* called by the input driver after rep[REP_DELAY] ms */
-static void input_repeat_key(unsigned long parm)
-{
-	struct infrared *ir = (struct infrared *) parm;
-
-	ir->delay_timer_finished = 1;
 }
 
 
@@ -333,8 +330,7 @@ int av7110_ir_init(struct av7110 *av7110)
 	av_list[av_cnt++] = av7110;
 	av7110_check_ir_config(av7110, true);
 
-	setup_timer(&av7110->ir.keyup_timer, av7110_emit_keyup,
-		    (unsigned long)&av7110->ir);
+	timer_setup(&av7110->ir.keyup_timer, av7110_emit_keyup, 0);
 
 	input_dev = input_allocate_device();
 	if (!input_dev)
