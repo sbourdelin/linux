@@ -34,6 +34,11 @@ static int tty_port_default_receive_buf(struct tty_port *port,
 	if (!disc)
 		return 0;
 
+	if (test_bit(TTY_HUPPED, &tty->flags)) {
+		tty_ldisc_deref(disc);
+		return 0;
+	}
+
 	ret = tty_ldisc_receive_buf(disc, p, (char *)f, count);
 
 	tty_ldisc_deref(disc);

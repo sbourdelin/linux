@@ -859,6 +859,7 @@ static int ptmx_open(struct inode *inode, struct file *filp)
 
 	tty_debug_hangup(tty, "opening (count=%d)\n", tty->count);
 
+	clear_bit(TTY_HUPPED, &tty->flags);
 	tty_unlock(tty);
 	return 0;
 err_release:

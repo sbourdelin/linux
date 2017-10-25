@@ -1324,6 +1324,9 @@ struct tty_struct *tty_init_dev(struct tty_driver *driver, int idx)
 
 	tty->port->itty = tty;
 
+	set_bit(TTY_HUPPED, &tty->flags);
+	barrier();
+
 	/*
 	 * Structures all installed ... call the ldisc open routines.
 	 * If we fail here just call release_tty to clean up.  No need
