@@ -276,9 +276,10 @@ DEFINE_EVENT(ata_qc_complete_template, ata_qc_complete_done,
 
 TRACE_EVENT(ata_eh_link_autopsy,
 
-	TP_PROTO(struct ata_device *dev, unsigned int eh_action, unsigned int eh_err_mask),
+	TP_PROTO(struct ata_link *link, unsigned int eh_action,
+		 unsigned int eh_err_mask),
 
-	TP_ARGS(dev, eh_action, eh_err_mask),
+	TP_ARGS(link, eh_action, eh_err_mask),
 
 	TP_STRUCT__entry(
 		__field( unsigned int,	ata_port )
@@ -288,8 +289,8 @@ TRACE_EVENT(ata_eh_link_autopsy,
 	),
 
 	TP_fast_assign(
-		__entry->ata_port	= dev->link->ap->print_id;
-		__entry->ata_dev	= dev->link->pmp + dev->devno;
+		__entry->ata_port	= link->ap->print_id;
+		__entry->ata_dev	= link->pmp + link->device->devno;
 		__entry->eh_action	= eh_action;
 		__entry->eh_err_mask	= eh_err_mask;
 	),
