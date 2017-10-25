@@ -1015,7 +1015,8 @@ static int ch9_postconfig(struct usbtest_dev *dev)
 	/* FIXME fetch strings from at least the device descriptor */
 
 	/* [9.4.5] get_status always works */
-	retval = usb_get_status(udev, USB_RECIP_DEVICE, 0, dev->buf);
+	retval = usb_get_status(udev, USB_RECIP_DEVICE,
+			USB_STATUS_TYPE_STANDARD, 0, dev->buf);
 	if (retval) {
 		dev_err(&iface->dev, "get dev status --> %d\n", retval);
 		return retval;
@@ -1026,6 +1027,7 @@ static int ch9_postconfig(struct usbtest_dev *dev)
 	 */
 
 	retval = usb_get_status(udev, USB_RECIP_INTERFACE,
+			USB_STATUS_TYPE_STANDARD,
 			iface->altsetting[0].desc.bInterfaceNumber, dev->buf);
 	if (retval) {
 		dev_err(&iface->dev, "get interface status --> %d\n", retval);
@@ -1614,7 +1616,8 @@ static int verify_not_halted(struct usbtest_dev *tdev, int ep, struct urb *urb)
 	u16	status;
 
 	/* shouldn't look or act halted */
-	retval = usb_get_status(urb->dev, USB_RECIP_ENDPOINT, ep, &status);
+	retval = usb_get_status(urb->dev, USB_RECIP_ENDPOINT,
+			USB_STATUS_TYPE_STANDARD, ep, &status);
 	if (retval < 0) {
 		ERROR(tdev, "ep %02x couldn't get no-halt status, %d\n",
 				ep, retval);
@@ -1636,7 +1639,8 @@ static int verify_halted(struct usbtest_dev *tdev, int ep, struct urb *urb)
 	u16	status;
 
 	/* should look and act halted */
-	retval = usb_get_status(urb->dev, USB_RECIP_ENDPOINT, ep, &status);
+	retval = usb_get_status(urb->dev, USB_RECIP_ENDPOINT,
+			USB_STATUS_TYPE_STANDARD, ep, &status);
 	if (retval < 0) {
 		ERROR(tdev, "ep %02x couldn't get halt status, %d\n",
 				ep, retval);

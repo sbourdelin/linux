@@ -2459,8 +2459,8 @@ int hfa384x_drvr_start(struct hfa384x *hw)
 	 * badly if a clear_halt is called when the endpoint is already
 	 * ok
 	 */
-	result =
-	    usb_get_status(hw->usb, USB_RECIP_ENDPOINT, hw->endp_in, &status);
+	result = usb_get_status(hw->usb, USB_RECIP_ENDPOINT, USB_STATUS_TYPE_STANDARD,
+				hw->endp_in, &status);
 	if (result < 0) {
 		netdev_err(hw->wlandev->netdev, "Cannot get bulk in endpoint status.\n");
 		goto done;
@@ -2468,8 +2468,8 @@ int hfa384x_drvr_start(struct hfa384x *hw)
 	if ((status == 1) && usb_clear_halt(hw->usb, hw->endp_in))
 		netdev_err(hw->wlandev->netdev, "Failed to reset bulk in endpoint.\n");
 
-	result =
-	    usb_get_status(hw->usb, USB_RECIP_ENDPOINT, hw->endp_out, &status);
+	result = usb_get_status(hw->usb, USB_RECIP_ENDPOINT, USB_STATUS_TYPE_STANDARD,
+				hw->endp_out, &status);
 	if (result < 0) {
 		netdev_err(hw->wlandev->netdev, "Cannot get bulk out endpoint status.\n");
 		goto done;
