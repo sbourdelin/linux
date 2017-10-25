@@ -313,6 +313,10 @@ struct dwc2_hs_transfer_time {
  *                      descriptor and indicates original XferSize value for the
  *                      descriptor
  * @unreserve_timer:    Timer for releasing periodic reservation.
+ * @wait_timer:         Timer used to wait before re-queuing.
+ * @want_wait:          We should wait before re-queuing; only matters for non-
+ *                      periodic transfers and is ignored for periodic ones.
+ * @wait_timer_cancel:  Set to true to cancel the wait_timer.
  * @dwc2_tt:            Pointer to our tt info (or NULL if no tt).
  * @ttport:             Port number within our tt.
  * @tt_buffer_dirty     True if clear_tt_buffer_complete is pending
@@ -353,6 +357,9 @@ struct dwc2_qh {
 	u32 desc_list_sz;
 	u32 *n_bytes;
 	struct timer_list unreserve_timer;
+	struct timer_list wait_timer;
+	bool want_wait;
+	bool wait_timer_cancel;
 	struct dwc2_tt *dwc_tt;
 	int ttport;
 	unsigned tt_buffer_dirty:1;
@@ -388,6 +395,7 @@ struct dwc2_qh {
  * @n_desc:             Number of DMA descriptors for this QTD
  * @isoc_frame_index_last: Last activated frame (packet) index, used in
  *                      descriptor DMA mode only
+ * @num_naks:           Number of NAKs received on this QTD.
  * @urb:                URB for this transfer
  * @qh:                 Queue head for this QTD
  * @qtd_list_entry:     For linking to the QH's list of QTDs
@@ -418,6 +426,7 @@ struct dwc2_qtd {
 	u8 error_count;
 	u8 n_desc;
 	u16 isoc_frame_index_last;
+	u16 num_naks;
 	struct dwc2_hcd_urb *urb;
 	struct dwc2_qh *qh;
 	struct list_head qtd_list_entry;
