@@ -993,6 +993,21 @@ int usb_get_status(struct usb_device *dev, int recip, int type, int target,
 }
 EXPORT_SYMBOL_GPL(usb_get_status);
 
+int usb_get_std_status(struct usb_device *dev, int recip, int target,
+	void *data)
+{
+	return usb_get_status(dev, recip, USB_STATUS_TYPE_STANDARD, target,
+		data);
+}
+EXPORT_SYMBOL_GPL(usb_get_std_status);
+
+int usb_get_ptm_status(struct usb_device *dev, int type, void *data)
+{
+	return usb_get_status(dev, USB_RECIP_DEVICE, USB_STATUS_TYPE_PTM, 0,
+		data);
+}
+EXPORT_SYMBOL_GPL(usb_get_ptm_status);
+
 /**
  * usb_clear_halt - tells device to clear endpoint halt/stall condition
  * @dev: device whose endpoint is halted
