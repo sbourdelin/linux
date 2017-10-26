@@ -225,6 +225,7 @@ struct dw_mipi_dsi {
 	void __iomem *base;
 
 	struct clk *pclk;
+	struct clk *px_clk;
 
 	unsigned int lane_mbps; /* per lane */
 	u32 channel;
@@ -753,24 +754,28 @@ void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
 	struct dw_mipi_dsi *dsi = bridge_to_dsi(bridge);
 	const struct dw_mipi_dsi_phy_ops *phy_ops = dsi->plat_data->phy_ops;
 	void *priv_data = dsi->plat_data->priv_data;
+	struct drm_display_mode px_clk_mode = *mode;
 	int ret;
 
 	clk_prepare_enable(dsi->pclk);
 
-	ret = phy_ops->get_lane_mbps(priv_data, mode, dsi->mode_flags,
+	if (dsi->px_clk)
+		px_clk_mode.clock = clk_get_rate(dsi->px_clk) / 1000;
+
+	ret = phy_ops->get_lane_mbps(priv_data, &px_clk_mode, dsi->mode_flags,
 				     dsi->lanes, dsi->format, &dsi->lane_mbps);
 	if (ret)
 		DRM_DEBUG_DRIVER("Phy get_lane_mbps() failed\n");
 
 	pm_runtime_get_sync(dsi->dev);
 	dw_mipi_dsi_init(dsi);
-	dw_mipi_dsi_dpi_config(dsi, mode);
+	dw_mipi_dsi_dpi_config(dsi, &px_clk_mode);
 	dw_mipi_dsi_packet_handler_config(dsi);
 	dw_mipi_dsi_video_mode_config(dsi);
-	dw_mipi_dsi_video_packet_config(dsi, mode);
+	dw_mipi_dsi_video_packet_config(dsi, &px_clk_mode);
 	dw_mipi_dsi_command_mode_config(dsi);
-	dw_mipi_dsi_line_timer_config(dsi, mode);
-	dw_mipi_dsi_vertical_timing_config(dsi, mode);
+	dw_mipi_dsi_line_timer_config(dsi, &px_clk_mode);
+	dw_mipi_dsi_vertical_timing_config(dsi, &px_clk_mode);
 
 	dw_mipi_dsi_dphy_init(dsi);
 	dw_mipi_dsi_dphy_timing_config(dsi);
@@ -784,7 +789,7 @@ void dw_mipi_dsi_bridge_mode_set(struct drm_bridge *bridge,
 
 	dw_mipi_dsi_dphy_enable(dsi);
 
-	dw_mipi_dsi_wait_for_two_frames(mode);
+	dw_mipi_dsi_wait_for_two_frames(&px_clk_mode);
 
 	/* Switch to cmd mode for panel-bridge pre_enable & panel prepare */
 	dw_mipi_dsi_set_mode(dsi, 0);
@@ -876,6 +881,13 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
 		ret = PTR_ERR(dsi->pclk);
 		dev_err(dev, "Unable to get pclk: %d\n", ret);
 		return ERR_PTR(ret);
+	}
+
+	dsi->px_clk = devm_clk_get(dev, "px_clk");
+	if (IS_ERR(dsi->px_clk)) {
+		ret = PTR_ERR(dsi->px_clk);
+		dev_dbg(dev, "Unable to get optional px_clk: %d\n", ret);
+		dsi->px_clk = NULL;
 	}
 
 	/*
