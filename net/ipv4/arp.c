@@ -750,6 +750,16 @@ static int arp_process(struct net *net, struct sock *sk, struct sk_buff *skb)
 	case ARPHRD_IEEE1394:
 		break;
 #endif
+	case ARPHRD_ETHER:
+	case ARPHRD_FDDI:
+	case ARPHRD_IEEE802:
+		/*
+		 * Check for bad sender hardware addresses. An all zero MAC
+		 * address is not valid for Ethernet, FDDI or IEEE802.
+		 */
+		if (is_zero_ether_addr(sha))
+			goto out_free_skb;
+		break;
 	default:
 		tha = arp_ptr;
 		arp_ptr += dev->addr_len;
