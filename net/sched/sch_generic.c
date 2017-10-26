@@ -605,6 +605,14 @@ struct Qdisc *qdisc_alloc(struct netdev_queue *dev_queue,
 	int err = -ENOBUFS;
 	struct net_device *dev = dev_queue->dev;
 
+	/* dev_queue->dev can be NULL, if device has been registered but not
+	 * (yet) set administratively up: test it to avoid NULL dereference.
+	 */
+	if (!dev) {
+		err = -ENOENT;
+		goto errout;
+	}
+
 	p = kzalloc_node(size, GFP_KERNEL,
 			 netdev_queue_numa_node_read(dev_queue));
 
