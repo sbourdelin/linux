@@ -36,9 +36,12 @@ struct workqueue_struct *bdi_wq;
 
 static struct dentry *bdi_debug_root;
 
-static void bdi_debug_init(void)
+static int bdi_debug_init(void)
 {
 	bdi_debug_root = debugfs_create_dir("bdi", NULL);
+	if (!bdi_debug_root)
+		return -ENOMEM;
+	return 0;
 }
 
 static int bdi_debug_stats_show(struct seq_file *m, void *v)
@@ -126,8 +129,9 @@ static void bdi_debug_unregister(struct backing_dev_info *bdi)
 	debugfs_remove(bdi->debug_dir);
 }
 #else
-static inline void bdi_debug_init(void)
+static inline int bdi_debug_init(void)
 {
+	return 0;
 }
 static inline void bdi_debug_register(struct backing_dev_info *bdi,
 				      const char *name)
@@ -264,12 +268,19 @@ ATTRIBUTE_GROUPS(bdi_dev);
 
 static __init int bdi_class_init(void)
 {
+	int ret;
+
 	bdi_class = class_create(THIS_MODULE, "bdi");
 	if (IS_ERR(bdi_class))
 		return PTR_ERR(bdi_class);
 
 	bdi_class->dev_groups = bdi_dev_groups;
-	bdi_debug_init();
+	ret = bdi_debug_init();
+	if (ret) {
+		class_destroy(bdi_class);
+		bdi_class = NULL;
+		return ret;
+	}
 
 	return 0;
 }
