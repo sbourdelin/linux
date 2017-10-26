@@ -859,7 +859,7 @@ static int qdisc_notify(struct net *net, struct sk_buff *oskb,
 	}
 	if (new && !tc_qdisc_dump_ignore(new, false)) {
 		if (tc_fill_qdisc(skb, new, clid, portid, n->nlmsg_seq,
-				  old ? NLM_F_REPLACE : 0, RTM_NEWQDISC) < 0)
+				  n->nlmsg_flags, RTM_NEWQDISC) < 0)
 			goto err_out;
 	}
 
