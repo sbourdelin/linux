@@ -367,8 +367,6 @@ static struct fpga_manager *__fpga_mgr_get(struct device *dev)
 	int ret = -ENODEV;
 
 	mgr = to_fpga_manager(dev);
-	if (!mgr)
-		goto err_dev;
 
 	/* Get exclusive use of fpga manager */
 	if (!mutex_trylock(&mgr->ref_mutex)) {
