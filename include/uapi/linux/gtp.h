@@ -28,6 +28,7 @@ enum gtp_attrs {
 	GTPA_O_TEI,	/* for GTPv1 only */
 	GTPA_PAD,
 	GTPA_PORT,
+	GTPA_MS6_ADDRESS,
 	__GTPA_MAX,
 };
 #define GTPA_MAX (__GTPA_MAX + 1)
