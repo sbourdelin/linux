@@ -24,6 +24,7 @@ Mandatory properties specific to STM32 DSI:
 - #size-cells: Should be <0>.
 - compatible: "st,stm32-dsi".
 - clock-names:
+  - DPI/RGB input pixel clock string name, must be "px_clk".
   - phy pll reference clock string name, must be "ref".
 - resets: see [5].
 - reset-names: see [5].
@@ -93,8 +94,9 @@ Example 2: DSI panel
 			#size-cells = <0>;
 			compatible = "st,stm32-dsi";
 			reg = <0x40016c00 0x800>;
-			clocks = <&rcc 1 CLK_F469_DSI>, <&clk_hse>;
-			clock-names = "ref", "pclk";
+			clocks = <&rcc 1 CLK_F469_DSI>, <&rcc 1 CLK_LCD>,
+				 <&clk_hse>;
+			clock-names = "pclk", "px_clk", "ref";
 			resets = <&rcc STM32F4_APB2_RESET(DSI)>;
 			reset-names = "apb";
 
