@@ -417,35 +417,34 @@ static enum lru_status shadow_lru_isolate(struct list_head *item,
 					  spinlock_t *lru_lock,
 					  void *arg)
 {
+	struct list_head *list = arg;
+
+	list_lru_isolate(lru, item);
+	list_add(item, list);
+
+	return LRU_REMOVED;
+}
+
+static void free_shadow_node(struct list_head *item, spinlock_t **lock)
+{
+	unsigned int i;
 	struct address_space *mapping;
 	struct radix_tree_node *node;
-	unsigned int i;
-	int ret;
-
-	/*
-	 * Page cache insertions and deletions synchroneously maintain
-	 * the shadow node LRU under the mapping->tree_lock and the
-	 * lru_lock.  Because the page cache tree is emptied before
-	 * the inode can be destroyed, holding the lru_lock pins any
-	 * address_space that has radix tree nodes on the LRU.
-	 *
-	 * We can then safely transition to the mapping->tree_lock to
-	 * pin only the address_space of the particular node we want
-	 * to reclaim, take the node off-LRU, and drop the lru_lock.
-	 */
 
 	node = container_of(item, struct radix_tree_node, private_list);
 	mapping = container_of(node->root, struct address_space, page_tree);
 
-	/* Coming from the list, invert the lock order */
-	if (!spin_trylock(&mapping->tree_lock)) {
-		spin_unlock(lru_lock);
-		ret = LRU_RETRY;
-		goto out;
-	}
+	list_del_init(item);
 
-	list_lru_isolate(lru, item);
-	spin_unlock(lru_lock);
+	/*
+	 * Batch the locks if they are for the same mapping.
+	 */
+	if (*lock != &mapping->tree_lock) {
+		if (*lock)
+			spin_unlock(*lock);
+		*lock = &mapping->tree_lock;
+		spin_lock(*lock);
+	}
 
 	/*
 	 * The nodes should only contain one or more shadow entries,
@@ -453,17 +452,17 @@ static enum lru_status shadow_lru_isolate(struct list_head *item,
 	 * delete and free the empty node afterwards.
 	 */
 	if (WARN_ON_ONCE(!node->exceptional))
-		goto out_invalid;
+		return;
 	if (WARN_ON_ONCE(node->count != node->exceptional))
-		goto out_invalid;
+		return;
 	for (i = 0; i < RADIX_TREE_MAP_SIZE; i++) {
 		if (node->slots[i]) {
 			if (WARN_ON_ONCE(!radix_tree_exceptional_entry(node->slots[i])))
-				goto out_invalid;
+				return;
 			if (WARN_ON_ONCE(!node->exceptional))
-				goto out_invalid;
+				return;
 			if (WARN_ON_ONCE(!mapping->nrexceptional))
-				goto out_invalid;
+				return;
 			node->slots[i] = NULL;
 			node->exceptional--;
 			node->count--;
@@ -471,30 +470,26 @@ static enum lru_status shadow_lru_isolate(struct list_head *item,
 		}
 	}
 	if (WARN_ON_ONCE(node->exceptional))
-		goto out_invalid;
+		return;
 	inc_lruvec_page_state(virt_to_page(node), WORKINGSET_NODERECLAIM);
 	__radix_tree_delete_node(&mapping->page_tree, node,
 				 workingset_update_node, mapping);
-
-out_invalid:
-	spin_unlock(&mapping->tree_lock);
-	ret = LRU_REMOVED_RETRY;
-out:
-	local_irq_enable();
-	cond_resched();
-	local_irq_disable();
-	spin_lock(lru_lock);
-	return ret;
 }
 
 static unsigned long scan_shadow_nodes(struct shrinker *shrinker,
 				       struct shrink_control *sc)
 {
+	struct list_head *tmp, *pos;
 	unsigned long ret;
+	LIST_HEAD(nodes);
+	spinlock_t *lock = NULL;
 
-	/* list_lru lock nests inside IRQ-safe mapping->tree_lock */
+	ret = list_lru_shrink_walk(&shadow_nodes, sc, shadow_lru_isolate, &nodes);
 	local_irq_disable();
-	ret = list_lru_shrink_walk(&shadow_nodes, sc, shadow_lru_isolate, NULL);
+	list_for_each_safe (pos, tmp, &nodes)
+		free_shadow_node(pos, &lock);
+	if (lock)
+		spin_unlock(lock);
 	local_irq_enable();
 	return ret;
 }
