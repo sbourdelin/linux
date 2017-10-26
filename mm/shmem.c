@@ -2722,10 +2722,10 @@ continue_resched:
 		     F_SEAL_GROW | \
 		     F_SEAL_WRITE)
 
-int shmem_add_seals(struct file *file, unsigned int seals)
+static int memfd_add_seals(struct file *file, unsigned int seals)
 {
 	struct inode *inode = file_inode(file);
-	struct shmem_inode_info *info = SHMEM_I(inode);
+	unsigned int *info_seals;
 	int error;
 
 	/*
@@ -2758,8 +2758,13 @@ int shmem_add_seals(struct file *file, unsigned int seals)
 	 * other file types.
 	 */
 
-	if (file->f_op != &shmem_file_operations)
+	if (file->f_op == &shmem_file_operations)
+		info_seals = &SHMEM_I(inode)->seals;
+	else if (file->f_op == &hugetlbfs_file_operations)
+		info_seals = &HUGETLBFS_I(inode)->seals;
+	else
 		return -EINVAL;
+
 	if (!(file->f_mode & FMODE_WRITE))
 		return -EPERM;
 	if (seals & ~(unsigned int)F_ALL_SEALS)
@@ -2767,12 +2772,12 @@ int shmem_add_seals(struct file *file, unsigned int seals)
 
 	inode_lock(inode);
 
-	if (info->seals & F_SEAL_SEAL) {
+	if (*info_seals & F_SEAL_SEAL) {
 		error = -EPERM;
 		goto unlock;
 	}
 
-	if ((seals & F_SEAL_WRITE) && !(info->seals & F_SEAL_WRITE)) {
+	if ((seals & F_SEAL_WRITE) && !(*info_seals & F_SEAL_WRITE)) {
 		error = mapping_deny_writable(file->f_mapping);
 		if (error)
 			goto unlock;
@@ -2784,23 +2789,24 @@ int shmem_add_seals(struct file *file, unsigned int seals)
 		}
 	}
 
-	info->seals |= seals;
+	*info_seals |= seals;
 	error = 0;
 
 unlock:
 	inode_unlock(inode);
 	return error;
 }
-EXPORT_SYMBOL_GPL(shmem_add_seals);
 
-int shmem_get_seals(struct file *file)
+static int memfd_get_seals(struct file *file)
 {
-	if (file->f_op != &shmem_file_operations)
-		return -EINVAL;
+	if (file->f_op == &shmem_file_operations)
+		return SHMEM_I(file_inode(file))->seals;
 
-	return SHMEM_I(file_inode(file))->seals;
+	if (file->f_op == &hugetlbfs_file_operations)
+		return HUGETLBFS_I(file_inode(file))->seals;
+
+	return -EINVAL;
 }
-EXPORT_SYMBOL_GPL(shmem_get_seals);
 
 long shmem_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -2812,10 +2818,10 @@ long shmem_fcntl(struct file *file, unsigned int cmd, unsigned long arg)
 		if (arg > UINT_MAX)
 			return -EINVAL;
 
-		error = shmem_add_seals(file, arg);
+		error = memfd_add_seals(file, arg);
 		break;
 	case F_GET_SEALS:
-		error = shmem_get_seals(file);
+		error = memfd_get_seals(file);
 		break;
 	default:
 		error = -EINVAL;
@@ -3659,19 +3665,16 @@ SYSCALL_DEFINE2(memfd_create,
 		const char __user *, uname,
 		unsigned int, flags)
 {
-	struct shmem_inode_info *info;
 	struct file *file;
 	int fd, error;
 	char *name;
 	long len;
+	unsigned int *info_seals;
 
 	if (!(flags & MFD_HUGETLB)) {
 		if (flags & ~(unsigned int)MFD_ALL_FLAGS)
 			return -EINVAL;
 	} else {
-		/* Sealing not supported in hugetlbfs (MFD_HUGETLB) */
-		if (flags & MFD_ALLOW_SEALING)
-			return -EINVAL;
 		/* Allow huge page size encoding in flags. */
 		if (flags & ~(unsigned int)(MFD_ALL_FLAGS |
 				(MFD_HUGE_MASK << MFD_HUGE_SHIFT)))
@@ -3723,13 +3726,13 @@ SYSCALL_DEFINE2(memfd_create,
 	file->f_mode |= FMODE_LSEEK | FMODE_PREAD | FMODE_PWRITE;
 	file->f_flags |= O_RDWR | O_LARGEFILE;
 
+	if (flags & MFD_HUGETLB)
+		info_seals = &HUGETLBFS_I(file_inode(file))->seals;
+	else
+		info_seals = &SHMEM_I(file_inode(file))->seals;
+
 	if (flags & MFD_ALLOW_SEALING) {
-		/*
-		 * flags check at beginning of function ensures
-		 * this is not a hugetlbfs (MFD_HUGETLB) file.
-		 */
-		info = SHMEM_I(file_inode(file));
-		info->seals &= ~F_SEAL_SEAL;
+		*info_seals &= ~F_SEAL_SEAL;
 	}
 
 	fd_install(fd, file);

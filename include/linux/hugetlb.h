@@ -44,6 +44,17 @@ extern int gup_huge_pd(hugepd_t hugepd, unsigned long addr,
 #include <linux/shm.h>
 #include <asm/tlbflush.h>
 
+struct hugetlbfs_inode_info {
+    struct shared_policy policy;
+    struct inode vfs_inode;
+    unsigned int seals;
+};
+
+static inline struct hugetlbfs_inode_info *HUGETLBFS_I(struct inode *inode)
+{
+    return container_of(inode, struct hugetlbfs_inode_info, vfs_inode);
+}
+
 struct hugepage_subpool {
 	spinlock_t lock;
 	long count;
