@@ -506,17 +506,16 @@ int ip_tunnel_encap_setup(struct ip_tunnel *t,
 }
 EXPORT_SYMBOL_GPL(ip_tunnel_encap_setup);
 
-static int tnl_update_pmtu(struct net_device *dev, struct sk_buff *skb,
-			    struct rtable *rt, __be16 df,
-			    const struct iphdr *inner_iph)
+int __iptunnel_update_pmtu(struct net_device *dev, struct sk_buff *skb,
+			   struct dst_entry *dst, __be16 df,
+			   const struct iphdr *inner_iph, int hlen, u32 daddr)
 {
-	struct ip_tunnel *tunnel = netdev_priv(dev);
-	int pkt_size = skb->len - tunnel->hlen - dev->hard_header_len;
+	int pkt_size = skb->len - hlen - dev->hard_header_len;
 	int mtu;
 
 	if (df)
-		mtu = dst_mtu(&rt->dst) - dev->hard_header_len
-					- sizeof(struct iphdr) - tunnel->hlen;
+		mtu = dst_mtu(dst) - dev->hard_header_len
+				   - sizeof(struct iphdr) - hlen;
 	else
 		mtu = skb_dst(skb) ? dst_mtu(skb_dst(skb)) : dev->mtu;
 
@@ -538,8 +537,7 @@ static int tnl_update_pmtu(struct net_device *dev, struct sk_buff *skb,
 
 		if (rt6 && mtu < dst_mtu(skb_dst(skb)) &&
 			   mtu >= IPV6_MIN_MTU) {
-			if ((tunnel->parms.iph.daddr &&
-			    !ipv4_is_multicast(tunnel->parms.iph.daddr)) ||
+			if ((daddr && !ipv4_is_multicast(daddr)) ||
 			    rt6->rt6i_dst.plen == 128) {
 				rt6->rt6i_flags |= RTF_MODIFIED;
 				dst_metric_set(skb_dst(skb), RTAX_MTU, mtu);
@@ -554,6 +552,17 @@ static int tnl_update_pmtu(struct net_device *dev, struct sk_buff *skb,
 	}
 #endif
 	return 0;
+}
+EXPORT_SYMBOL(__iptunnel_update_pmtu);
+
+static int iptunnel_update_pmtu(struct net_device *dev, struct sk_buff *skb,
+				struct rtable *rt, __be16 df,
+				const struct iphdr *inner_iph)
+{
+	struct ip_tunnel *tunnel = netdev_priv(dev);
+
+	return __iptunnel_update_pmtu(dev, skb, &rt->dst, df, inner_iph,
+				      tunnel->hlen, tunnel->parms.iph.daddr);
 }
 
 void ip_md_tunnel_xmit(struct sk_buff *skb, struct net_device *dev, u8 proto)
@@ -739,7 +748,8 @@ void ip_tunnel_xmit(struct sk_buff *skb, struct net_device *dev,
 		goto tx_error;
 	}
 
-	if (tnl_update_pmtu(dev, skb, rt, tnl_params->frag_off, inner_iph)) {
+	if (iptunnel_update_pmtu(dev, skb, rt, tnl_params->frag_off,
+				 inner_iph)) {
 		ip_rt_put(rt);
 		goto tx_error;
 	}
