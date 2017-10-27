@@ -388,6 +388,7 @@ struct i915_ggtt {
 	u32 stolen_reserved_size;
 
 	/** "Graphics Stolen Memory" holds the global PTEs */
+	phys_addr_t gsm_paddr;
 	void __iomem *gsm;
 	void (*invalidate)(struct drm_i915_private *dev_priv);
 
