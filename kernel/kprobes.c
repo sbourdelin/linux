@@ -1443,19 +1443,6 @@ valid:
 	return ap;
 }
 
-/* Return error if the kprobe is being re-registered */
-static inline int check_kprobe_rereg(struct kprobe *p)
-{
-	int ret = 0;
-
-	mutex_lock(&kprobe_mutex);
-	if (__get_valid_kprobe(p))
-		ret = -EINVAL;
-	mutex_unlock(&kprobe_mutex);
-
-	return ret;
-}
-
 int __weak arch_check_ftrace_location(struct kprobe *p)
 {
 	unsigned long ftrace_addr;
@@ -1536,9 +1523,13 @@ int register_kprobe(struct kprobe *p)
 		return PTR_ERR(addr);
 	p->addr = addr;
 
-	ret = check_kprobe_rereg(p);
-	if (ret)
-		return ret;
+	mutex_lock(&kprobe_mutex);
+
+	/* Return error if the kprobe is being re-registered */
+	if (__get_valid_kprobe(p)) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	/* User can pass only KPROBE_FLAG_DISABLED to register_kprobe */
 	p->flags &= KPROBE_FLAG_DISABLED;
@@ -1547,9 +1538,7 @@ int register_kprobe(struct kprobe *p)
 
 	ret = check_kprobe_address_safe(p, &probed_mod);
 	if (ret)
-		return ret;
-
-	mutex_lock(&kprobe_mutex);
+		goto out;
 
 	old_p = get_kprobe(p->addr);
 	if (old_p) {
