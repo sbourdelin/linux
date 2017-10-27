@@ -94,8 +94,6 @@ struct fpga_bridge *of_fpga_bridge_get(struct device_node *np,
 		goto err_dev;
 
 	bridge = to_fpga_bridge(dev);
-	if (!bridge)
-		goto err_dev;
 
 	bridge->info = info;
 
