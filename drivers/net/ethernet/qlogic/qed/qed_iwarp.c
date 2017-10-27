@@ -2585,7 +2585,7 @@ qed_iwarp_ll2_start(struct qed_hwfn *p_hwfn,
 	struct qed_ll2_cbs cbs;
 	u32 mpa_buff_size;
 	u16 n_ooo_bufs;
-	int rc = 0;
+	int rc;
 	int i;
 
 	iwarp_info = &p_hwfn->p_rdma_info->iwarp;
@@ -2696,6 +2696,7 @@ qed_iwarp_ll2_start(struct qed_hwfn *p_hwfn,
 	if (rc)
 		goto err;
 
+	rc = -ENOMEM;
 	iwarp_info->partial_fpdus = kcalloc((u16)p_hwfn->p_rdma_info->num_qps,
 					    sizeof(*iwarp_info->partial_fpdus),
 					    GFP_KERNEL);
@@ -2724,7 +2725,7 @@ qed_iwarp_ll2_start(struct qed_hwfn *p_hwfn,
 	for (i = 0; i < data.input.rx_num_desc; i++)
 		list_add_tail(&iwarp_info->mpa_bufs[i].list_entry,
 			      &iwarp_info->mpa_buf_list);
-	return rc;
+	return 0;
 err:
 	qed_iwarp_ll2_stop(p_hwfn, p_ptt);
 
