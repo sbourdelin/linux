@@ -22,6 +22,7 @@
 #include <linux/vmalloc.h>
 #include <linux/sched/mm.h>
 #include <linux/sched/signal.h>
+#include <trace/events/iommu.h>
 
 #include <asm/iommu.h>
 #include <asm/tce.h>
@@ -502,16 +503,18 @@ static int tce_iommu_clear(struct tce_container *container,
 		struct iommu_table *tbl,
 		unsigned long entry, unsigned long pages)
 {
-	unsigned long oldhpa;
+	unsigned long oldhpa, unmapped, firstentry = entry, totalpages = pages;
 	long ret;
 	enum dma_data_direction direction;
 
-	for ( ; pages; --pages, ++entry) {
+	for (unmapped = 0; pages; --pages, ++entry) {
 		direction = DMA_NONE;
 		oldhpa = 0;
 		ret = iommu_tce_xchg(tbl, entry, &oldhpa, &direction);
 		if (ret)
 			continue;
+
+		++unmapped;
 
 		if (direction == DMA_NONE)
 			continue;
@@ -523,6 +526,9 @@ static int tce_iommu_clear(struct tce_container *container,
 
 		tce_iommu_unuse_page(container, oldhpa);
 	}
+	trace_unmap(firstentry << tbl->it_page_shift,
+			totalpages << tbl->it_page_shift,
+			unmapped << tbl->it_page_shift);
 
 	return 0;
 }
@@ -965,6 +971,8 @@ static long tce_iommu_ioctl(void *iommu_data,
 					direction);
 
 		iommu_flush_tce(tbl);
+		if (!ret)
+			trace_map(param.iova, param.vaddr, param.size);
 
 		return ret;
 	}
