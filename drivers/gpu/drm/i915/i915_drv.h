@@ -3937,6 +3937,8 @@ static inline void intel_display_crc_init(struct drm_i915_private *dev_priv) {}
 
 __printf(2, 3)
 void i915_error_printf(struct drm_i915_error_state_buf *e, const char *f, ...);
+void i915_error_binary_write(struct drm_i915_error_state_buf *e,
+			     const void *data, size_t len);
 int i915_error_state_to_str(struct drm_i915_error_state_buf *estr,
 			    const struct i915_gpu_state *gpu);
 int i915_error_state_buf_init(struct drm_i915_error_state_buf *eb,
