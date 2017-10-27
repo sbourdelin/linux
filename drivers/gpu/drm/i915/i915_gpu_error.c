@@ -31,6 +31,7 @@
 #include <linux/stop_machine.h>
 #include <linux/zlib.h>
 #include "i915_drv.h"
+#include "i915_aubcrash.h"
 
 static const char *engine_str(int engine)
 {
@@ -866,6 +867,9 @@ void __i915_gpu_state_free(struct kref *error_ref)
 	i915_error_object_free(error->semaphore);
 	i915_error_object_free(error->guc_log);
 
+	for (i = 0; i < ARRAY_SIZE(error->ppgtt_pml4); i++)
+		i915_error_free_ppgtt(error, i);
+
 	for (i = 0; i < ARRAY_SIZE(error->active_bo); i++)
 		kfree(error->active_bo[i]);
 	kfree(error->pinned_bo);
@@ -1520,6 +1524,9 @@ static void i915_gem_capture_vm(struct drm_i915_private *dev_priv,
 	else
 		count = 0;
 
+	if (INTEL_GEN(dev_priv) >= 8)
+		i915_error_record_ppgtt(error, vm, idx);
+
 	error->active_vm[idx] = vm;
 	error->active_bo[idx] = active_bo;
 	error->active_bo_count[idx] = count;
@@ -1533,6 +1540,7 @@ static void i915_capture_active_buffers(struct drm_i915_private *dev_priv,
 	BUILD_BUG_ON(ARRAY_SIZE(error->engine) > ARRAY_SIZE(error->active_bo));
 	BUILD_BUG_ON(ARRAY_SIZE(error->active_bo) != ARRAY_SIZE(error->active_vm));
 	BUILD_BUG_ON(ARRAY_SIZE(error->active_bo) != ARRAY_SIZE(error->active_bo_count));
+	BUILD_BUG_ON(ARRAY_SIZE(error->active_bo) != ARRAY_SIZE(error->ppgtt_pml4));
 
 	/* Scan each engine looking for unique active contexts/vm */
 	for (i = 0; i < ARRAY_SIZE(error->engine); i++) {
