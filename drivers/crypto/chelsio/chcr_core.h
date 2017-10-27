@@ -39,6 +39,7 @@
 #include <crypto/algapi.h>
 #include "t4_hw.h"
 #include "cxgb4.h"
+#include "t4_msg.h"
 #include "cxgb4_uld.h"
 
 #define DRV_MODULE_NAME "chcr"
@@ -46,6 +47,7 @@
 
 #define MAX_PENDING_REQ_TO_HW 20
 #define CHCR_TEST_RESPONSE_TIMEOUT 1000
+#define CRYPTO_MAX_IMM_TX_PKT_LEN 256
 
 #define PAD_ERROR_BIT		1
 #define CHK_PAD_ERR_BIT(x)	(((x) >> PAD_ERROR_BIT) & 1)
@@ -76,6 +78,28 @@ struct chcr_wr {
 	struct _key_ctx key_ctx;
 };
 
+struct chcr_ipsec_req {
+	struct ulp_txpkt ulptx;
+	struct ulptx_idata sc_imm;
+	struct cpl_tx_sec_pdu sec_cpl;
+	struct _key_ctx key_ctx;
+};
+
+struct chcr_ipsec_wr {
+	struct fw_ulptx_wr wreq;
+	struct chcr_ipsec_req req;
+};
+
+struct ipsec_sa_entry {
+	int hmac_ctrl;
+	unsigned int enckey_len;
+	unsigned int kctx_len;
+	unsigned int authsize;
+	__be32 key_ctx_hdr;
+	char salt[MAX_SALT];
+	char key[2 * AES_MAX_KEY_SIZE];
+};
+
 struct chcr_dev {
 	spinlock_t lock_chcr_dev;
 	struct uld_ctx *u_ctx;
@@ -89,12 +113,27 @@ struct uld_ctx {
 	struct chcr_dev *dev;
 };
 
+/*
+ *	sgl_len - calculates the size of an SGL of the given capacity
+ *	@n: the number of SGL entries
+ *	Calculates the number of flits needed for a scatter/gather list that
+ *	can hold the given number of entries.
+ */
+static inline unsigned int sgl_len(unsigned int n)
+{
+	n--;
+	return (3 * n) / 2 + (n & 1) + 2;
+}
+
 struct uld_ctx * assign_chcr_device(void);
 int chcr_send_wr(struct sk_buff *skb);
 int start_crypto(void);
 int stop_crypto(void);
 int chcr_uld_rx_handler(void *handle, const __be64 *rsp,
 			const struct pkt_gl *pgl);
+int chcr_uld_tx_handler(struct sk_buff *skb, struct net_device *dev);
 int chcr_handle_resp(struct crypto_async_request *req, unsigned char *input,
 		     int err);
+int chcr_ipsec_xmit(struct sk_buff *skb, struct net_device *dev);
+void chcr_add_xfrmops(const struct cxgb4_lld_info *lld);
 #endif /* __CHCR_CORE_H__ */

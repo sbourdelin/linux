@@ -70,6 +70,29 @@
 #include "chcr_algo.h"
 #include "chcr_crypto.h"
 
+unsigned int sgl_ent_len[] = {0, 0, 16, 24, 40,
+			      48, 64, 72, 88,
+			      96, 112, 120, 136,
+			      144, 160, 168, 184, 192};
+
+unsigned int dsgl_ent_len[] = {0, 32, 32, 48, 48, 64, 64, 80, 80,
+			       112, 112, 128, 128, 144, 144, 160, 160,
+			       192, 192, 208, 208, 224, 224, 240, 240,
+			       272, 272, 288, 288, 304, 304, 320, 320};
+
+static u32 round_constant[11] = {
+	0x01000000, 0x02000000, 0x04000000, 0x08000000,
+	0x10000000, 0x20000000, 0x40000000, 0x80000000,
+	0x1B000000, 0x36000000, 0x6C000000
+};
+
+static int is_newsg(struct scatterlist *sgl, unsigned int *newents);
+static struct scatterlist *alloc_new_sg(struct scatterlist *sgl,
+					unsigned int nents);
+static inline void free_new_sg(struct scatterlist *sgl);
+static int chcr_handle_cipher_resp(struct ablkcipher_request *req,
+				   unsigned char *input, int err);
+
 static inline  struct chcr_aead_ctx *AEAD_CTX(struct chcr_context *ctx)
 {
 	return ctx->crypto_ctx->aeadctx;
@@ -103,18 +126,6 @@ static inline struct uld_ctx *ULD_CTX(struct chcr_context *ctx)
 static inline int is_ofld_imm(const struct sk_buff *skb)
 {
 	return (skb->len <= CRYPTO_MAX_IMM_TX_PKT_LEN);
-}
-
-/*
- *	sgl_len - calculates the size of an SGL of the given capacity
- *	@n: the number of SGL entries
- *	Calculates the number of flits needed for a scatter/gather list that
- *	can hold the given number of entries.
- */
-static inline unsigned int sgl_len(unsigned int n)
-{
-	n--;
-	return (3 * n) / 2 + (n & 1) + 2;
 }
 
 static void chcr_verify_tag(struct aead_request *req, u8 *input, int *err)
@@ -432,7 +443,7 @@ static inline int map_writesg_phys_cpl(struct device *dev,
 	return 0;
 }
 
-static inline int get_aead_subtype(struct crypto_aead *aead)
+inline int get_aead_subtype(struct crypto_aead *aead)
 {
 	struct aead_alg *alg = crypto_aead_alg(aead);
 	struct chcr_alg_template *chcr_crypto_alg =
@@ -3134,10 +3145,10 @@ static int chcr_aead_decrypt(struct aead_request *req)
 	}
 }
 
-static int chcr_aead_op(struct aead_request *req,
-			  unsigned short op_type,
-			  int size,
-			  create_wr_t create_wr_fn)
+int chcr_aead_op(struct aead_request *req,
+		 unsigned short op_type,
+		 int size,
+		 create_wr_t create_wr_fn)
 {
 	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
 	struct chcr_context *ctx = crypto_aead_ctx(tfm);
