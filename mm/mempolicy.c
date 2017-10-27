@@ -1266,7 +1266,6 @@ static int get_nodes(nodemask_t *nodes, const unsigned long __user *nmask,
 	unsigned long nlongs;
 	unsigned long endmask;
 
-	--maxnode;
 	nodes_clear(*nodes);
 	if (maxnode == 0 || !nmask)
 		return 0;
