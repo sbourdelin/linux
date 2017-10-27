@@ -103,8 +103,9 @@
 #define AFI_MSI_EN_VEC6		0xa4
 #define AFI_MSI_EN_VEC7		0xa8
 
-#define AFI_CONFIGURATION		0xac
-#define  AFI_CONFIGURATION_EN_FPCI	(1 << 0)
+#define AFI_CONFIGURATION			0xac
+#define  AFI_CONFIGURATION_EN_FPCI		(1 << 0)
+#define  AFI_CONFIGURATION_CLKEN_OVERRIDE	(1 << 31)
 
 #define AFI_FPCI_ERROR_MASKS	0xb0
 
@@ -1077,9 +1078,10 @@ static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
 		}
 	}
 
-	/* finally enable PCIe */
+	/* Disable AFI dynamic clock gating and enable PCIe */
 	value = afi_readl(pcie, AFI_CONFIGURATION);
-	value |= AFI_CONFIGURATION_EN_FPCI;
+	value |= (AFI_CONFIGURATION_EN_FPCI |
+			AFI_CONFIGURATION_CLKEN_OVERRIDE);
 	afi_writel(pcie, value, AFI_CONFIGURATION);
 
 	value = AFI_INTR_EN_INI_SLVERR | AFI_INTR_EN_INI_DECERR |
