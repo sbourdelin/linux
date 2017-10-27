@@ -1,0 +1,43 @@
+* Omnivision OV7740 CMOS image sensor
+
+The Omnivision OV7740 image sensor supports multiple output image
+size, such as VGA, and QVGA, CIF and any size smaller. It also
+supports the RAW RGB and YUV output formats.
+
+Required Properties:
+- compatible: should be "ovti,ov7740"
+- clocks: reference to the xvclk input clock.
+- clock-names: should be "xvclk".
+
+Optional Properties:
+- reset-gpios: reference to the GPIO connected to the reset_b pin,
+  if any. Active low with pull-ip resistor.
+- powerdown-gpios: reference to the GPIO connected to the pwdn pin,
+  if any. Active high with pull-down resistor.
+
+The device node must contain one 'port' child node for its digital
+output video port, in accordance with the video interface bindings
+defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
+
+Example:
+
+	i2c1: i2c@fc028000 {
+		ov7740: camera@21 {
+			compatible = "ovti,ov7740";
+			reg = <0x21>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&pinctrl_sensor_power &pinctrl_sensor_reset>;
+			clocks = <&isc>;
+			clock-names = "xvclk";
+			assigned-clocks = <&isc>;
+			assigned-clock-rates = <24000000>;
+			reset-gpios = <&pioA 43 GPIO_ACTIVE_LOW>;
+			powerdown-gpios = <&pioA 44 GPIO_ACTIVE_HIGH>;
+
+			port {
+				ov7740_0: endpoint {
+					remote-endpoint = <&isc_0>;
+				};
+			};
+		};
+	};
