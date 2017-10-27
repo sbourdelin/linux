@@ -1402,6 +1402,11 @@ SYSCALL_DEFINE4(migrate_pages, pid_t, pid, unsigned long, maxnode,
 	if (err)
 		goto out;
 
+	if (nodes_empty(*new)) {
+		err = -EINVAL;
+		goto out;
+	}
+
 	/* Find the mm_struct */
 	rcu_read_lock();
 	task = pid ? find_task_by_vpid(pid) : current;
