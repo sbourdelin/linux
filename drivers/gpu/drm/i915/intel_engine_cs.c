@@ -1680,7 +1680,9 @@ void intel_engine_dump(struct intel_engine_cs *engine, struct drm_printer *m)
 	struct rb_node *rb;
 	u64 addr;
 
-	drm_printf(m, "%s\n", engine->name);
+	drm_printf(m, "%s%s\n", engine->name,
+		   i915_terminally_wedged(&engine->i915->gpu_error) ?
+		   " (wedged)" : "");
 	drm_printf(m, "\tcurrent seqno %x, last %x, hangcheck %x [%d ms], inflight %d\n",
 		   intel_engine_get_seqno(engine),
 		   intel_engine_last_submit(engine),
