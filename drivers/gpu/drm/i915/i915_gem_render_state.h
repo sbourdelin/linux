@@ -28,6 +28,7 @@ struct drm_i915_gem_request;
 
 int i915_gem_render_state_init(struct intel_engine_cs *engine);
 int i915_gem_render_state_emit(struct drm_i915_gem_request *req);
+struct i915_vma *i915_gem_render_state_get(struct intel_engine_cs *engine);
 void i915_gem_render_state_fini(struct intel_engine_cs *engine);
 
 #endif /* _I915_GEM_RENDER_STATE_H_ */

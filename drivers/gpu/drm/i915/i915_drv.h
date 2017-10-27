@@ -996,7 +996,8 @@ struct i915_gpu_state {
 			int page_count;
 			int unused;
 			u32 *pages[0];
-		} *ringbuffer, *batchbuffer, *wa_batchbuffer, *ctx, *hws_page;
+		} *ringbuffer, *batchbuffer, *wa_batchbuffer,
+		  *renderstate, *ctx, *hws_page;
 
 		struct drm_i915_error_object **user_bo;
 		long user_bo_count;

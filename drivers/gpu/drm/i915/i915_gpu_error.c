@@ -755,6 +755,9 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 				"HW context", ee->ctx);
 
 		print_error_obj(m, dev_priv->engine[i],
+				"Renderstate", ee->renderstate);
+
+		print_error_obj(m, dev_priv->engine[i],
 				"WA context", ee->wa_ctx);
 
 		print_error_obj(m, dev_priv->engine[i],
@@ -850,6 +853,7 @@ void __i915_gpu_state_free(struct kref *error_ref)
 		i915_error_object_free(ee->hws_page);
 		i915_error_object_free(ee->ctx);
 		i915_error_object_free(ee->wa_ctx);
+		i915_error_object_free(ee->renderstate);
 
 		kfree(ee->requests);
 		if (!IS_ERR_OR_NULL(ee->waiters))
@@ -1434,6 +1438,7 @@ static void i915_gem_record_rings(struct drm_i915_private *dev_priv,
 		request = i915_gem_find_active_request(engine);
 		if (request) {
 			struct intel_ring *ring;
+			struct i915_vma *renderstate_vma;
 
 			ee->vm = request->ctx->ppgtt ?
 				&request->ctx->ppgtt->base : &ggtt->base;
@@ -1453,6 +1458,14 @@ static void i915_gem_record_rings(struct drm_i915_private *dev_priv,
 							 engine->scratch);
 
 			request_record_user_bo(request, ee);
+
+			renderstate_vma = i915_gem_render_state_get(engine);
+			if (renderstate_vma &&
+			    i915_vma_is_active(renderstate_vma)) {
+				ee->renderstate =
+					i915_error_object_create(dev_priv,
+								 renderstate_vma);
+			}
 
 			ee->ctx =
 				i915_error_object_create(dev_priv,

@@ -266,6 +266,17 @@ err_unpin:
 	return ret;
 }
 
+struct i915_vma *i915_gem_render_state_get(struct intel_engine_cs *engine)
+{
+	struct intel_render_state *so;
+
+	so = engine->render_state;
+	if (!so)
+		return NULL;
+
+	return so->vma;
+}
+
 void i915_gem_render_state_fini(struct intel_engine_cs *engine)
 {
 	struct intel_render_state *so;
