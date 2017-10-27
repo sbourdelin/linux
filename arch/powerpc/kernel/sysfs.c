@@ -466,6 +466,7 @@ static ssize_t __used \
 #ifdef HAS_PPC_PMC_CLASSIC
 SYSFS_PMCSETUP(mmcr0, SPRN_MMCR0);
 SYSFS_PMCSETUP(mmcr1, SPRN_MMCR1);
+SYSFS_PMCSETUP(ldbar, SPRN_LDBAR);
 SYSFS_PMCSETUP(pmc1, SPRN_PMC1);
 SYSFS_PMCSETUP(pmc2, SPRN_PMC2);
 SYSFS_PMCSETUP(pmc3, SPRN_PMC3);
@@ -492,6 +493,7 @@ SYSFS_SPRSETUP(pir, SPRN_PIR);
   Lets be conservative and default to pseries.
 */
 static DEVICE_ATTR(mmcra, 0600, show_mmcra, store_mmcra);
+static DEVICE_ATTR(ldbar, 0600, show_ldbar, store_ldbar);
 static DEVICE_ATTR(spurr, 0400, show_spurr, NULL);
 static DEVICE_ATTR(purr, 0400, show_purr, store_purr);
 static DEVICE_ATTR(pir, 0400, show_pir, NULL);
@@ -757,6 +759,9 @@ static int register_cpu_online(unsigned int cpu)
 			device_create_file(s, &pmc_attrs[i]);
 
 #ifdef CONFIG_PPC64
+	if (cpu_has_feature(CPU_FTR_ARCH_300))
+		device_create_file(s, &dev_attr_ldbar);
+
 	if (cpu_has_feature(CPU_FTR_MMCRA))
 		device_create_file(s, &dev_attr_mmcra);
 
@@ -842,6 +847,9 @@ static int unregister_cpu_online(unsigned int cpu)
 			device_remove_file(s, &pmc_attrs[i]);
 
 #ifdef CONFIG_PPC64
+	if (cpu_has_feature(CPU_FTR_ARCH_300))
+		device_remove_file(s, &dev_attr_ldbar);
+
 	if (cpu_has_feature(CPU_FTR_MMCRA))
 		device_remove_file(s, &dev_attr_mmcra);
 
