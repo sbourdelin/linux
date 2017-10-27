@@ -817,6 +817,9 @@ int __init_or_module do_one_initcall(initcall_t fn)
 	int ret;
 	char msgbuf[64];
 
+	if (unlikely(!fn))
+		return -EFAULT;
+
 	if (initcall_blacklisted(fn))
 		return -EPERM;
 
