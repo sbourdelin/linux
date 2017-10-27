@@ -1083,7 +1083,6 @@ struct intel_fbc {
 
 	bool false_color;
 
-	bool enabled;
 	bool active;
 
 	bool underrun_detected;

@@ -472,7 +472,7 @@ static void intel_fbc_schedule_activation(struct intel_crtc *crtc)
 	struct intel_fbc_work *work = &fbc->work;
 
 	WARN_ON(!mutex_is_locked(&fbc->lock));
-	if (WARN_ON(!fbc->enabled))
+	if (WARN_ON(fbc->crtc != crtc))
 		return;
 
 	if (drm_crtc_vblank_get(&crtc->base)) {
@@ -927,7 +927,7 @@ void intel_fbc_pre_update(struct intel_crtc *crtc,
 		goto deactivate;
 	}
 
-	if (!fbc->enabled || fbc->crtc != crtc)
+	if (fbc->crtc != crtc)
 		goto unlock;
 
 	intel_fbc_update_state_cache(crtc, crtc_state, plane_state);
@@ -946,7 +946,7 @@ static void __intel_fbc_post_update(struct intel_crtc *crtc)
 
 	WARN_ON(!mutex_is_locked(&fbc->lock));
 
-	if (!fbc->enabled || fbc->crtc != crtc)
+	if (fbc->crtc != crtc)
 		return;
 
 	if (!intel_fbc_can_activate(crtc)) {
@@ -986,7 +986,7 @@ void intel_fbc_post_update(struct intel_crtc *crtc)
 
 static unsigned int intel_fbc_get_frontbuffer_bit(struct intel_fbc *fbc)
 {
-	if (fbc->enabled)
+	if (fbc->crtc)
 		return to_intel_plane(fbc->crtc->base.primary)->frontbuffer_bit;
 	else
 		return fbc->possible_framebuffer_bits;
@@ -1008,7 +1008,7 @@ void intel_fbc_invalidate(struct drm_i915_private *dev_priv,
 
 	fbc->busy_bits |= intel_fbc_get_frontbuffer_bit(fbc) & frontbuffer_bits;
 
-	if (fbc->enabled && fbc->busy_bits)
+	if (fbc->crtc && fbc->busy_bits)
 		intel_fbc_deactivate(dev_priv);
 
 	mutex_unlock(&fbc->lock);
@@ -1029,7 +1029,7 @@ void intel_fbc_flush(struct drm_i915_private *dev_priv,
 	if (origin == ORIGIN_GTT || origin == ORIGIN_FLIP)
 		goto out;
 
-	if (!fbc->busy_bits && fbc->enabled &&
+	if (!fbc->busy_bits && fbc->crtc &&
 	    (frontbuffer_bits & intel_fbc_get_frontbuffer_bit(fbc))) {
 		if (fbc->active)
 			intel_fbc_recompress(dev_priv);
@@ -1129,20 +1129,17 @@ void intel_fbc_enable(struct intel_crtc *crtc,
 
 	mutex_lock(&fbc->lock);
 
-	if (fbc->enabled) {
-		WARN_ON(fbc->crtc == NULL);
-		if (fbc->crtc == crtc) {
-			WARN_ON(!crtc_state->enable_fbc);
-			WARN_ON(fbc->active);
-		}
-		goto out;
+	if (fbc->crtc == crtc) {
+		WARN_ON(!crtc_state->enable_fbc);
+		WARN_ON(fbc->active);
 	}
+	if (fbc->crtc)
+		goto out;
 
 	if (!crtc_state->enable_fbc)
 		goto out;
 
 	WARN_ON(fbc->active);
-	WARN_ON(fbc->crtc != NULL);
 
 	intel_fbc_update_state_cache(crtc, crtc_state, plane_state);
 	if (intel_fbc_alloc_cfb(crtc)) {
@@ -1153,7 +1150,6 @@ void intel_fbc_enable(struct intel_crtc *crtc,
 	DRM_DEBUG_KMS("Enabling FBC on pipe %c\n", pipe_name(crtc->pipe));
 	fbc->no_fbc_reason = "FBC enabled but not active yet\n";
 
-	fbc->enabled = true;
 	fbc->crtc = crtc;
 out:
 	mutex_unlock(&fbc->lock);
@@ -1172,7 +1168,6 @@ static void __intel_fbc_disable(struct drm_i915_private *dev_priv)
 	struct intel_crtc *crtc = fbc->crtc;
 
 	WARN_ON(!mutex_is_locked(&fbc->lock));
-	WARN_ON(!fbc->enabled);
 	WARN_ON(fbc->active);
 	WARN_ON(crtc->active);
 
@@ -1180,7 +1175,6 @@ static void __intel_fbc_disable(struct drm_i915_private *dev_priv)
 
 	__intel_fbc_cleanup_cfb(dev_priv);
 
-	fbc->enabled = false;
 	fbc->crtc = NULL;
 }
 
@@ -1220,7 +1214,7 @@ void intel_fbc_global_disable(struct drm_i915_private *dev_priv)
 		return;
 
 	mutex_lock(&fbc->lock);
-	if (fbc->enabled)
+	if (fbc->crtc)
 		__intel_fbc_disable(dev_priv);
 	mutex_unlock(&fbc->lock);
 
@@ -1236,7 +1230,7 @@ static void intel_fbc_underrun_work_fn(struct work_struct *work)
 	mutex_lock(&fbc->lock);
 
 	/* Maybe we were scheduled twice. */
-	if (fbc->underrun_detected || !fbc->enabled)
+	if (fbc->underrun_detected || !fbc->crtc)
 		goto out;
 
 	DRM_DEBUG_KMS("Disabling FBC due to FIFO underrun.\n");
@@ -1351,7 +1345,6 @@ void intel_fbc_init(struct drm_i915_private *dev_priv)
 	INIT_WORK(&fbc->work.work, intel_fbc_work_fn);
 	INIT_WORK(&fbc->underrun_work, intel_fbc_underrun_work_fn);
 	mutex_init(&fbc->lock);
-	fbc->enabled = false;
 	fbc->active = false;
 	fbc->work.scheduled = false;
 
