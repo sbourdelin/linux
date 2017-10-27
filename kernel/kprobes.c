@@ -1488,6 +1488,7 @@ static int check_kprobe_address_safe(struct kprobe *p,
 		 * its code to prohibit unexpected unloading.
 		 */
 		if (unlikely(!try_module_get(*probed_mod))) {
+			*probed_mod = NULL;
 			ret = -ENOENT;
 			goto out;
 		}
@@ -1514,7 +1515,7 @@ int register_kprobe(struct kprobe *p)
 {
 	int ret;
 	struct kprobe *old_p;
-	struct module *probed_mod;
+	struct module *probed_mod = NULL;
 	kprobe_opcode_t *addr;
 
 	/* Adjust probe address from symbol */
