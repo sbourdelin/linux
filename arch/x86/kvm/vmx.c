@@ -10805,6 +10805,13 @@ static int check_vmentry_postreqs(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 			return 1;
 	}
 
+	if (kvm_mpx_supported() &&
+		(vmcs12->vm_entry_controls & VM_ENTRY_LOAD_BNDCFGS)) {
+		if (is_noncanonical_address(vmcs12->guest_bndcfgs & PAGE_MASK, vcpu) ||
+		    (vmcs12->guest_bndcfgs & MSR_IA32_BNDCFGS_RSVD))
+			return 1;
+	}
+
 	return 0;
 }
 
