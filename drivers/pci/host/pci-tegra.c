@@ -221,6 +221,7 @@
 #define  RP_VEND_XP_OPPORTUNISTIC_ACK		(1 << 27)
 #define  RP_VEND_XP_OPPORTUNISTIC_UPDATEFC	(1 << 28)
 #define  RP_VEND_XP_UPDATE_FC_THRESHOLD_MASK	(0xff << 18)
+#define  RP_VEND_XP_UPDATE_FC_THRESHOLD_T210	(0x60 << 18)
 
 #define RP_VEND_CTL0	0xf44
 #define  RP_VEND_CTL0_DSK_RST_PULSE_WIDTH_MASK	(0xf << 12)
@@ -321,6 +322,7 @@ struct tegra_pcie_soc {
 	bool update_clamp_threshold;
 	bool RAW_violation_fixup;
 	bool program_deskew_time;
+	bool updateFC_threshold;
 };
 
 static inline struct tegra_msi *to_tegra_msi(struct msi_controller *chip)
@@ -2249,6 +2251,13 @@ static void tegra_pcie_apply_sw_fixup(struct tegra_pcie_port *port)
 		value |= RP_VEND_CTL0_DSK_RST_PULSE_WIDTH;
 		writel(value, port->base + RP_VEND_CTL0);
 	}
+
+	if (soc->updateFC_threshold) {
+		value = readl(port->base + RP_VEND_XP);
+		value &= ~RP_VEND_XP_UPDATE_FC_THRESHOLD_MASK;
+		value |= RP_VEND_XP_UPDATE_FC_THRESHOLD_T210;
+		writel(value, port->base + RP_VEND_XP);
+	}
 }
 /*
  * FIXME: If there are no PCIe cards attached, then calling this function
@@ -2388,6 +2397,7 @@ static const struct tegra_pcie_soc tegra20_pcie = {
 	.update_clamp_threshold = false,
 	.RAW_violation_fixup = false,
 	.program_deskew_time = false,
+	.updateFC_threshold = false,
 };
 
 static const struct tegra_pcie_soc tegra30_pcie = {
@@ -2408,6 +2418,7 @@ static const struct tegra_pcie_soc tegra30_pcie = {
 	.update_clamp_threshold = false,
 	.RAW_violation_fixup = false,
 	.program_deskew_time = false,
+	.updateFC_threshold = false,
 };
 
 static const struct tegra_pcie_soc tegra124_pcie = {
@@ -2427,6 +2438,7 @@ static const struct tegra_pcie_soc tegra124_pcie = {
 	.update_clamp_threshold = true,
 	.RAW_violation_fixup = true,
 	.program_deskew_time = false,
+	.updateFC_threshold = false,
 };
 
 static const struct tegra_pcie_soc tegra210_pcie = {
@@ -2454,6 +2466,7 @@ static const struct tegra_pcie_soc tegra210_pcie = {
 	.update_clamp_threshold = true,
 	.RAW_violation_fixup = false,
 	.program_deskew_time = true,
+	.updateFC_threshold = true,
 };
 
 static const struct tegra_pcie_soc tegra186_pcie = {
@@ -2474,6 +2487,7 @@ static const struct tegra_pcie_soc tegra186_pcie = {
 	.update_clamp_threshold = false,
 	.RAW_violation_fixup = false,
 	.program_deskew_time = false,
+	.updateFC_threshold = false,
 };
 
 static const struct of_device_id tegra_pcie_of_match[] = {
