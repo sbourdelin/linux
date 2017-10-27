@@ -660,15 +660,14 @@ static ssize_t bh1770_power_state_store(struct device *dev,
 		pm_runtime_get_sync(dev);
 
 		ret = bh1770_lux_rate(chip, chip->lux_rate_index);
-		if (ret < 0) {
-			pm_runtime_put(dev);
-			goto leave;
-		}
+		if (ret < 0)
+			goto put_runtime;
 
 		ret = bh1770_lux_interrupt_control(chip, BH1770_ENABLE);
 		if (ret < 0) {
+put_runtime:
 			pm_runtime_put(dev);
-			goto leave;
+			goto unlock;
 		}
 
 		/* This causes interrupt after the next measurement cycle */
@@ -681,7 +680,7 @@ static ssize_t bh1770_power_state_store(struct device *dev,
 		pm_runtime_put(dev);
 	}
 	ret = count;
-leave:
+unlock:
 	mutex_unlock(&chip->mutex);
 	return ret;
 }
