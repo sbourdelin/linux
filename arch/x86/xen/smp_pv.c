@@ -236,6 +236,8 @@ static void __init xen_pv_smp_prepare_cpus(unsigned int max_cpus)
 		xen_raw_printk(m);
 		panic(m);
 	}
+	native_pv_lock_init();
+
 	xen_init_lock_cpu(0);
 
 	smp_store_boot_cpu_info();
