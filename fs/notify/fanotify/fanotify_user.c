@@ -947,11 +947,11 @@ COMPAT_SYSCALL_DEFINE6(fanotify_mark,
  */
 static int __init fanotify_user_setup(void)
 {
-	fanotify_mark_cache = KMEM_CACHE(fsnotify_mark, SLAB_PANIC);
-	fanotify_event_cachep = KMEM_CACHE(fanotify_event_info, SLAB_PANIC);
+	fanotify_mark_cache = KMEM_CACHE(fsnotify_mark, SLAB_PANIC|SLAB_ACCOUNT);
+	fanotify_event_cachep = KMEM_CACHE(fanotify_event_info, SLAB_PANIC|SLAB_ACCOUNT);
 #ifdef CONFIG_FANOTIFY_ACCESS_PERMISSIONS
 	fanotify_perm_event_cachep = KMEM_CACHE(fanotify_perm_event_info,
-						SLAB_PANIC);
+						SLAB_PANIC|SLAB_ACCOUNT);
 #endif
 
 	return 0;
