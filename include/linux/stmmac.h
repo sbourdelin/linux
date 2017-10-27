@@ -144,6 +144,14 @@ struct stmmac_txq_cfg {
 	u32 prio;
 };
 
+struct stmmac_est_cfg {
+	u32 btr[2];
+	u32 ctr[2];
+	u32 ter;
+	u32 llr;
+	u32 *gcl;
+};
+
 struct plat_stmmacenet_data {
 	int bus_id;
 	int phy_addr;
@@ -190,5 +198,8 @@ struct plat_stmmacenet_data {
 	bool tso_en;
 	int mac_port_sel_speed;
 	bool en_tx_lpi_clockgating;
+	bool est_en;
+	struct stmmac_est_cfg est_cfg;
+	bool fp_en;
 };
 #endif

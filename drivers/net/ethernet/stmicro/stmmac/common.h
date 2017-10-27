@@ -38,6 +38,7 @@
 #define	DWMAC_CORE_3_40	0x34
 #define	DWMAC_CORE_3_50	0x35
 #define	DWMAC_CORE_4_00	0x40
+#define DWMAC_CORE_5_00 0x50
 #define STMMAC_CHAN0	0	/* Always supported and default for all chips */
 
 /* These need to be power of two, and >= 4 */
@@ -501,6 +502,9 @@ struct stmmac_ops {
 	void (*config_cbs)(struct mac_device_info *hw, u32 send_slope,
 			   u32 idle_slope, u32 high_credit, u32 low_credit,
 			   u32 queue);
+	/* Configure TSN features */
+	void (*config_tsn)(struct mac_device_info *hw,
+			   struct plat_stmmacenet_data *plat);
 	/* Dump MAC registers */
 	void (*dump_regs)(struct mac_device_info *hw, u32 *reg_space);
 	/* Handle extra events on specific interrupts hw dependent */

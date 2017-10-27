@@ -2418,6 +2418,10 @@ static void stmmac_mtl_configuration(struct stmmac_priv *priv)
 	if (tx_queues_count > 1 && priv->hw->mac->config_cbs)
 		stmmac_configure_cbs(priv);
 
+	/* Configure TSN features */
+	if (tx_queues_count > 1 && priv->hw->mac->config_tsn)
+		priv->hw->mac->config_tsn(priv->hw, priv->plat);
+
 	/* Map RX MTL to DMA channels */
 	if (priv->hw->mac->map_mtl_to_dma)
 		stmmac_rx_queue_dma_chan_map(priv);
