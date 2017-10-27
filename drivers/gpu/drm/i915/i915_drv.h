@@ -992,6 +992,7 @@ struct i915_gpu_state {
 		struct drm_i915_error_object {
 			u64 gtt_offset;
 			u64 gtt_size;
+			u32 tiling:2;
 			int page_count;
 			int unused;
 			u32 *pages[0];
@@ -1006,6 +1007,7 @@ struct i915_gpu_state {
 			long jiffies;
 			pid_t pid;
 			u32 context;
+			u64 lrc_desc;
 			int priority;
 			int ban_score;
 			u32 seqno;
