@@ -82,10 +82,7 @@
  */
 #define DPAA2_ETH_BUFS_PER_CMD		7
 
-/* Hardware requires alignment for ingress/egress buffer addresses
- * and ingress buffer lengths.
- */
-#define DPAA2_ETH_RX_BUF_SIZE		2048
+/* Hardware requires alignment for ingress/egress buffer addresses */
 #define DPAA2_ETH_TX_BUF_ALIGN		64
 /* Due to a limitation in WRIOP 1.0.0, the RX buffer data must be aligned
  * to 256B. For newer revisions, the requirement is only for 64B alignment
@@ -94,22 +91,33 @@
 #define DPAA2_ETH_RX_BUF_ALIGN		64
 
 #define DPAA2_ETH_NEEDED_HEADROOM(p_priv) \
-	((p_priv)->tx_data_offset + DPAA2_ETH_TX_BUF_ALIGN)
+	((p_priv)->tx_data_offset + DPAA2_ETH_TX_BUF_ALIGN - HH_DATA_MOD)
 
-/* Hardware only sees DPAA2_ETH_RX_BUF_SIZE, but we need to allocate ingress
- * buffers large enough to allow building an skb around them and also account
- * for alignment restrictions
+/* Hardware only sees DPAA2_ETH_RX_BUF_SIZE, but the skb built around
+ * the buffer also needs space for its shared info struct, and we need
+ * to allocate enough to accommodate hardware alignment restrictions
  */
+#define DPAA2_ETH_RX_BUF_SIZE		2048
+#define DPAA2_ETH_SKB_SIZE \
+	(DPAA2_ETH_RX_BUF_SIZE + SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
 #define DPAA2_ETH_BUF_RAW_SIZE(priv) \
-	(DPAA2_ETH_RX_BUF_SIZE + \
-	SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) + \
-	(priv)->rx_buf_align)
+	(DPAA2_ETH_SKB_SIZE + (priv)->rx_buf_align)
+
+/* Hardware annotation area in RX  buffers */
+#define DPAA2_ETH_RX_HWA_SIZE		64
 
 /* We are accommodating a skb backpointer and some S/G info
  * in the frame's software annotation. The hardware
  * options are either 0 or 64, so we choose the latter.
  */
 #define DPAA2_ETH_SWA_SIZE		64
+
+/* Extra headroom space requested to hardware, in order to make sure there's
+ * no realloc'ing in forwarding scenarios
+ */
+#define DPAA2_ETH_RX_HEAD_ROOM(priv) \
+	(DPAA2_ETH_NEEDED_HEADROOM(priv) -	\
+	 DPAA2_ETH_RX_HWA_SIZE)
 
 /* Must keep this struct smaller than DPAA2_ETH_SWA_SIZE */
 struct dpaa2_eth_swa {
@@ -141,7 +149,7 @@ struct dpaa2_eth_swa {
 					 DPAA2_FD_CTRL_FAERR)
 
 /* Annotation bits in FD CTRL */
-#define DPAA2_FD_CTRL_ASAL		0x00020000	/* ASAL = 128 */
+#define DPAA2_FD_CTRL_ASAL		0x00010000	/* ASAL = 64 */
 #define DPAA2_FD_CTRL_PTA		0x00800000
 #define DPAA2_FD_CTRL_PTV1		0x00400000
 

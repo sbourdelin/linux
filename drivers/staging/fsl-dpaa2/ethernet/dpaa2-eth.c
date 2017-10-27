@@ -135,8 +135,7 @@ static struct sk_buff *build_linear_skb(struct dpaa2_eth_priv *priv,
 
 	ch->buf_count--;
 
-	skb = build_skb(fd_vaddr, DPAA2_ETH_RX_BUF_SIZE +
-			SKB_DATA_ALIGN(sizeof(struct skb_shared_info)));
+	skb = build_skb(fd_vaddr, DPAA2_ETH_SKB_SIZE);
 	if (unlikely(!skb))
 		return NULL;
 
@@ -178,8 +177,7 @@ static struct sk_buff *build_frag_skb(struct dpaa2_eth_priv *priv,
 
 		if (i == 0) {
 			/* We build the skb around the first data buffer */
-			skb = build_skb(sg_vaddr, DPAA2_ETH_RX_BUF_SIZE +
-				SKB_DATA_ALIGN(sizeof(struct skb_shared_info)));
+			skb = build_skb(sg_vaddr, DPAA2_ETH_SKB_SIZE);
 			if (unlikely(!skb)) {
 				/* Free the first SG entry now, since we already
 				 * unmapped it and obtained the virtual address
@@ -1792,23 +1790,9 @@ static int set_buffer_layout(struct dpaa2_eth_priv *priv)
 	else
 		priv->rx_buf_align = DPAA2_ETH_RX_BUF_ALIGN;
 
-	/* rx buffer */
-	buf_layout.pass_parser_result = true;
+	/* tx buffer */
 	buf_layout.pass_frame_status = true;
 	buf_layout.private_data_size = DPAA2_ETH_SWA_SIZE;
-	buf_layout.data_align = priv->rx_buf_align;
-	buf_layout.options = DPNI_BUF_LAYOUT_OPT_PARSER_RESULT |
-			     DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
-			     DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE |
-			     DPNI_BUF_LAYOUT_OPT_DATA_ALIGN;
-	err = dpni_set_buffer_layout(priv->mc_io, 0, priv->mc_token,
-				     DPNI_QUEUE_RX, &buf_layout);
-	if (err) {
-		dev_err(dev, "dpni_set_buffer_layout(RX) failed\n");
-		return err;
-	}
-
-	/* tx buffer */
 	buf_layout.options = DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
 			     DPNI_BUF_LAYOUT_OPT_PRIVATE_DATA_SIZE;
 	err = dpni_set_buffer_layout(priv->mc_io, 0, priv->mc_token,
@@ -1824,6 +1808,36 @@ static int set_buffer_layout(struct dpaa2_eth_priv *priv)
 				     DPNI_QUEUE_TX_CONFIRM, &buf_layout);
 	if (err) {
 		dev_err(dev, "dpni_set_buffer_layout(TX_CONF) failed\n");
+		return err;
+	}
+
+	/* Now that we've set our tx buffer layout, retrieve the minimum
+	 * required tx data offset.
+	 */
+	err = dpni_get_tx_data_offset(priv->mc_io, 0, priv->mc_token,
+				      &priv->tx_data_offset);
+	if (err) {
+		dev_err(dev, "dpni_get_tx_data_offset() failed\n");
+		return err;
+	}
+
+	if ((priv->tx_data_offset % 64) != 0)
+		dev_warn(dev, "Tx data offset (%d) not a multiple of 64B\n",
+			 priv->tx_data_offset);
+
+	/* rx buffer */
+	buf_layout.pass_parser_result = true;
+	buf_layout.data_align = priv->rx_buf_align;
+	buf_layout.data_head_room = DPAA2_ETH_RX_HEAD_ROOM(priv);
+	buf_layout.private_data_size = 0;
+	buf_layout.options = DPNI_BUF_LAYOUT_OPT_PARSER_RESULT |
+			     DPNI_BUF_LAYOUT_OPT_FRAME_STATUS |
+			     DPNI_BUF_LAYOUT_OPT_DATA_ALIGN |
+			     DPNI_BUF_LAYOUT_OPT_DATA_HEAD_ROOM;
+	err = dpni_set_buffer_layout(priv->mc_io, 0, priv->mc_token,
+				     DPNI_QUEUE_RX, &buf_layout);
+	if (err) {
+		dev_err(dev, "dpni_set_buffer_layout(RX) failed\n");
 		return err;
 	}
 
@@ -1868,19 +1882,6 @@ static int setup_dpni(struct fsl_mc_device *ls_dev)
 	if (err)
 		goto close;
 
-	/* Now that we've set our tx buffer layout, retrieve the minimum
-	 * required tx data offset.
-	 */
-	err = dpni_get_tx_data_offset(priv->mc_io, 0, priv->mc_token,
-				      &priv->tx_data_offset);
-	if (err) {
-		dev_err(dev, "dpni_get_tx_data_offset() failed\n");
-		goto close;
-	}
-
-	if ((priv->tx_data_offset % 64) != 0)
-		dev_warn(dev, "Tx data offset (%d) not a multiple of 64B\n",
-			 priv->tx_data_offset);
 
 	return 0;
 
@@ -2272,6 +2273,7 @@ static int netdev_init(struct net_device *net_dev)
 {
 	struct device *dev = net_dev->dev.parent;
 	struct dpaa2_eth_priv *priv = netdev_priv(net_dev);
+	u16 rx_headroom, req_headroom;
 	u8 bcast_addr[ETH_ALEN];
 	u8 num_queues;
 	int err;
@@ -2294,6 +2296,19 @@ static int netdev_init(struct net_device *net_dev)
 	 * NOTE: priv->tx_data_offset MUST be initialized at this point.
 	 */
 	net_dev->needed_headroom = DPAA2_ETH_NEEDED_HEADROOM(priv);
+
+	/* If headroom guaranteed by hardware in the Rx frame buffer is
+	 * smaller than the Tx headroom required by the stack, issue a
+	 * one time warning. This will most likely mean skbs forwarded to
+	 * another DPAA2 network interface will get reallocated, with a
+	 * significant performance impact.
+	 */
+	req_headroom = LL_RESERVED_SPACE(net_dev) - ETH_HLEN;
+	rx_headroom = ALIGN(DPAA2_ETH_RX_HWA_SIZE +
+			    DPAA2_ETH_RX_HEAD_ROOM(priv), priv->rx_buf_align);
+	if (req_headroom > rx_headroom)
+		dev_info_once(dev, "Required headroom (%d) greater than available (%d)\n",
+			      req_headroom, rx_headroom);
 
 	/* Set MTU limits */
 	net_dev->min_mtu = 68;
