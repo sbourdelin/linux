@@ -1325,7 +1325,7 @@ static void kbd_keycode(unsigned int keycode, int down, int hw_raw)
 
 	tty = vc->port.tty;
 
-	if (tty && (!tty->driver_data)) {
+	if (WARN_ON(tty && (!tty->driver_data))) {
 		/* No driver data? Strange. Okay we fix it then. */
 		tty->driver_data = vc;
 	}

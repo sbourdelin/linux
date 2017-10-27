@@ -445,6 +445,7 @@ err:
 
 static void pty_cleanup(struct tty_struct *tty)
 {
+	tty->port->itty = ERR_PTR(-2);
 	tty_port_put(tty->port);
 }
 

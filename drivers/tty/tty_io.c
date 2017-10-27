@@ -1471,9 +1471,9 @@ static void release_tty(struct tty_struct *tty, int idx)
 		tty->ops->shutdown(tty);
 	tty_free_termios(tty);
 	tty_driver_remove_tty(tty->driver, tty);
-	tty->port->itty = NULL;
+	tty->port->itty = ERR_PTR(-1);
 	if (tty->link)
-		tty->link->port->itty = NULL;
+		tty->link->port->itty = ERR_PTR(-1);
 	tty_buffer_cancel_work(tty->port);
 
 	tty_kref_put(tty->link);

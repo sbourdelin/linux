@@ -27,7 +27,7 @@ static int tty_port_default_receive_buf(struct tty_port *port,
 	struct tty_ldisc *disc;
 
 	tty = READ_ONCE(port->itty);
-	if (!tty)
+	if (IS_ERR_OR_NULL(tty))
 		return 0;
 
 	disc = tty_ldisc_ref(tty);
@@ -253,7 +253,7 @@ static void tty_port_destructor(struct kref *kref)
 	struct tty_port *port = container_of(kref, struct tty_port, kref);
 
 	/* check if last port ref was dropped before tty release */
-	if (WARN_ON(port->itty))
+	if (WARN_ON(!IS_ERR_OR_NULL(port->itty)))
 		return;
 	if (port->xmit_buf)
 		free_page((unsigned long)port->xmit_buf);

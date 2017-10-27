@@ -615,6 +615,7 @@ out:
 
 	/* Restart the work queue in case no characters kick it off. Safe if
 	   already running */
+	WARN_ON(IS_ERR_OR_NULL(tty->port->itty));
 	tty_buffer_restart_work(tty->port);
 err:
 	tty_ldisc_put(new_ldisc);	/* drop the extra reference */
