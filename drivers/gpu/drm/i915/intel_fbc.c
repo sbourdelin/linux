@@ -927,14 +927,11 @@ void intel_fbc_pre_update(struct intel_crtc *crtc,
 		goto deactivate;
 	}
 
-	if (fbc->crtc != crtc)
-		goto unlock;
-
-	intel_fbc_update_state_cache(crtc, crtc_state, plane_state);
+	if (fbc->crtc == crtc)
+		intel_fbc_update_state_cache(crtc, crtc_state, plane_state);
 
 deactivate:
 	intel_fbc_deactivate(dev_priv);
-unlock:
 	mutex_unlock(&fbc->lock);
 }
 
