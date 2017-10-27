@@ -110,6 +110,8 @@ enum octeon_tag_type {
 #define MAX_IOQ_INTERRUPTS_PER_PF   (64 * 2)
 #define MAX_IOQ_INTERRUPTS_PER_VF   (8 * 2)
 
+#define LIQUIDIO_SWITCHDEV_CAP 0x2
+
 #define SCR2_BIT_FW_LOADED	    63
 
 /* App specific capabilities from firmware to pf driver */
