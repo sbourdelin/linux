@@ -1704,7 +1704,8 @@ max3421_hub_control(struct usb_hcd *hcd, u16 type_req, u16 value, u16 index,
 	pdata = spi->dev.platform_data;
 	if (!pdata) {
 		dev_err(&spi->dev, "Device platform data is missing\n");
-		return -EFAULT;
+		retval = -EFAULT;
+		goto unlock;
 	}
 
 	switch (type_req) {
@@ -1787,6 +1788,7 @@ error:		/* "protocol stall" on error */
 		retval = -EPIPE;
 	}
 
+unlock:
 	spin_unlock_irqrestore(&max3421_hcd->lock, flags);
 	return retval;
 }
