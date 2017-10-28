@@ -533,26 +533,24 @@ struct phylink *phylink_create(struct net_device *ndev, struct device_node *np,
 	phylink_validate(pl, pl->supported, &pl->link_config);
 
 	ret = phylink_parse_mode(pl, np);
-	if (ret < 0) {
-		kfree(pl);
-		return ERR_PTR(ret);
-	}
+	if (ret)
+		goto free_link;
 
 	if (pl->link_an_mode == MLO_AN_FIXED) {
 		ret = phylink_parse_fixedlink(pl, np);
-		if (ret < 0) {
-			kfree(pl);
-			return ERR_PTR(ret);
-		}
+		if (ret)
+			goto free_link;
 	}
 
 	ret = phylink_register_sfp(pl, np);
-	if (ret < 0) {
-		kfree(pl);
-		return ERR_PTR(ret);
-	}
+	if (ret)
+		goto free_link;
 
 	return pl;
+
+free_link:
+	kfree(pl);
+	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL_GPL(phylink_create);
 
