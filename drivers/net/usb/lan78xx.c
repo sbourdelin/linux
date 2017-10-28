@@ -2030,17 +2030,15 @@ static int lan78xx_phy_init(struct lan78xx_net *dev)
 		/* external PHY fixup for KSZ9031RNX */
 		ret = phy_register_fixup_for_uid(PHY_KSZ9031RNX, 0xfffffff0,
 						 ksz9031rnx_fixup);
-		if (ret < 0) {
-			netdev_err(dev->net, "fail to register fixup\n");
-			return ret;
-		}
+		if (ret)
+			goto report_fixup_failure;
+
 		/* external PHY fixup for LAN8835 */
 		ret = phy_register_fixup_for_uid(PHY_LAN8835, 0xfffffff0,
 						 lan8835_fixup);
-		if (ret < 0) {
-			netdev_err(dev->net, "fail to register fixup\n");
-			return ret;
-		}
+		if (ret)
+			goto report_fixup_failure;
+
 		/* add more external PHY fixup here if needed */
 
 		phydev->is_internal = false;
@@ -2092,6 +2090,10 @@ error:
 	phy_unregister_fixup_for_uid(PHY_KSZ9031RNX, 0xfffffff0);
 	phy_unregister_fixup_for_uid(PHY_LAN8835, 0xfffffff0);
 
+	return ret;
+
+report_fixup_failure:
+	netdev_err(dev->net, "fail to register fixup\n");
 	return ret;
 }
 
