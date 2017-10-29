@@ -1273,23 +1273,14 @@ void rtl_get_tcb_desc(struct ieee80211_hw *hw,
 			 * and N rate will all be controlled by FW
 			 * when tcb_desc->use_driver_rate = false
 			 */
-			if (sta && sta->vht_cap.vht_supported) {
-				tcb_desc->hw_rate =
-				_rtl_get_vht_highest_n_rate(hw, sta);
-			} else {
-				if (sta && (sta->ht_cap.ht_supported)) {
-					tcb_desc->hw_rate =
-					    _rtl_get_highest_n_rate(hw, sta);
-				} else {
-					if (rtlmac->mode == WIRELESS_MODE_B) {
-						tcb_desc->hw_rate =
-						    rtlpriv->cfg->maps[RTL_RC_CCK_RATE11M];
-					} else {
-						tcb_desc->hw_rate =
-						    rtlpriv->cfg->maps[RTL_RC_OFDM_RATE54M];
-					}
-				}
-			}
+			tcb_desc->hw_rate =
+				sta && sta->vht_cap.vht_supported ?
+					rtl_get_vht_highest_n_rate(hw, sta) :
+				sta && sta->ht_cap.ht_supported ?
+					_rtl_get_highest_n_rate(hw, sta) :
+				rtlmac->mode == WIRELESS_MODE_B ?
+					rtlpriv->cfg->maps[RTL_RC_CCK_RATE11M] :
+					rtlpriv->cfg->maps[RTL_RC_OFDM_RATE54M];
 		}
 
 		if (is_multicast_ether_addr(hdr->addr1))
