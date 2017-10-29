@@ -181,8 +181,7 @@ void i2400m_wake_tx_work(struct work_struct *ws)
 	if (result < 0) {
 		dev_err(dev, "WAKE&TX: device didn't get out of idle: "
 			"%d - resetting\n", result);
-		i2400m_reset(i2400m, I2400M_RT_BUS);
-		goto error;
+		goto reset_i2400m;
 	}
 	result = wait_event_timeout(i2400m->state_wq,
 				    i2400m->state != I2400M_SS_IDLE,
@@ -192,12 +191,11 @@ void i2400m_wake_tx_work(struct work_struct *ws)
 	if (result < 0) {
 		dev_err(dev, "WAKE&TX: error waiting for device to exit IDLE: "
 			"%d - resetting\n", result);
-		i2400m_reset(i2400m, I2400M_RT_BUS);
-		goto error;
+		goto reset_i2400m;
 	}
 	msleep(20);	/* device still needs some time or it drops it */
 	result = i2400m_tx(i2400m, skb->data, skb->len, I2400M_PT_DATA);
-error:
+wake_queue:
 	netif_wake_queue(net_dev);
 out_kfree:
 	kfree_skb(skb);	/* refcount transferred by _hard_start_xmit() */
@@ -205,6 +203,11 @@ out_put:
 	i2400m_put(i2400m);
 	d_fnend(3, dev, "(ws %p i2400m %p skb %p) = void [%d]\n",
 		ws, i2400m, skb, result);
+	return;
+
+reset_i2400m:
+	i2400m_reset(i2400m, I2400M_RT_BUS);
+	goto wake_queue;
 }
 
 
