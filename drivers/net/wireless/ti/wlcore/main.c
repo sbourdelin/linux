@@ -4024,10 +4024,9 @@ static int wlcore_set_beacon_template(struct wl1271 *wl,
 	wl1271_debug(DEBUG_MASTER, "beacon updated");
 
 	ret = wl1271_ssid_set(wlvif, beacon, ieoffset);
-	if (ret < 0) {
-		dev_kfree_skb(beacon);
-		goto out;
-	}
+	if (ret < 0)
+		goto free_skb;
+
 	min_rate = wl1271_tx_min_rate_get(wl, wlvif->basic_rate_set);
 	tmpl_id = is_ap ? CMD_TEMPL_AP_BEACON :
 		CMD_TEMPL_BEACON;
@@ -4035,10 +4034,8 @@ static int wlcore_set_beacon_template(struct wl1271 *wl,
 				      beacon->data,
 				      beacon->len, 0,
 				      min_rate);
-	if (ret < 0) {
-		dev_kfree_skb(beacon);
-		goto out;
-	}
+	if (ret < 0)
+		goto free_skb;
 
 	wlvif->wmm_enabled =
 		cfg80211_find_vendor_ie(WLAN_OUI_MICROSOFT,
@@ -4051,7 +4048,7 @@ static int wlcore_set_beacon_template(struct wl1271 *wl,
 	 * by usermode, don't use the beacon data.
 	 */
 	if (test_bit(WLVIF_FLAG_AP_PROBE_RESP_SET, &wlvif->flags))
-		goto end_bcn;
+		goto free_skb;
 
 	/* remove TIM ie from probe response */
 	wl12xx_remove_ie(beacon, WLAN_EID_TIM, ieoffset);
@@ -4081,9 +4078,8 @@ static int wlcore_set_beacon_template(struct wl1271 *wl,
 					      beacon->data,
 					      beacon->len, 0,
 					      min_rate);
-end_bcn:
+free_skb:
 	dev_kfree_skb(beacon);
-out:
 	return ret;
 }
 
