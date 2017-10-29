@@ -6071,6 +6071,10 @@ lpfc_rscn_recovery_check(struct lpfc_vport *vport)
 		if (vport->phba->nvmet_support)
 			continue;
 
+		/* Check to see if we need to NVME rescan this remoteport. */
+		if (ndlp->nlp_fc4_type & NLP_FC4_NVME)
+			lpfc_nvme_rescan_port(vport, ndlp);
+
 		lpfc_disc_state_machine(vport, ndlp, NULL,
 					NLP_EVT_DEVICE_RECOVERY);
 		lpfc_cancel_retry_delay_tmo(vport, ndlp);
