@@ -1732,8 +1732,7 @@ static int wl1271_op_suspend(struct ieee80211_hw *hw,
 		ret = wl1271_configure_suspend(wl, wlvif, wow);
 		if (ret < 0) {
 			mutex_unlock(&wl->mutex);
-			wl1271_warning("couldn't prepare device to suspend");
-			return ret;
+			goto report_preparation_failure;
 		}
 	}
 
@@ -1752,10 +1751,8 @@ out_sleep:
 	wl1271_ps_elp_sleep(wl);
 	mutex_unlock(&wl->mutex);
 
-	if (ret < 0) {
-		wl1271_warning("couldn't prepare device to suspend");
-		return ret;
-	}
+	if (ret < 0)
+		goto report_preparation_failure;
 
 	/* flush any remaining work */
 	wl1271_debug(DEBUG_MAC80211, "flushing remaining works");
@@ -1783,6 +1780,10 @@ out_sleep:
 	cancel_delayed_work(&wl->tx_watchdog_work);
 
 	return 0;
+
+report_preparation_failure:
+	wl1271_warning("couldn't prepare device to suspend");
+	return ret;
 }
 
 static int wl1271_op_resume(struct ieee80211_hw *hw)
