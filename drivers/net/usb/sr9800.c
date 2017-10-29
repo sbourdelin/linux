@@ -700,10 +700,9 @@ static int sr9800_phy_powerup(struct usbnet *dev)
 
 	/* set the embedded Ethernet PHY in power-up state */
 	ret = sr_sw_reset(dev, SR_SWRESET_IPRL);
-	if (ret < 0) {
-		netdev_err(dev->net, "Failed to reset PHY: %d\n", ret);
-		return ret;
-	}
+	if (ret < 0)
+		goto report_reset_failure;
+
 	msleep(600);
 
 	/* set the embedded Ethernet PHY in reset state */
@@ -716,12 +715,14 @@ static int sr9800_phy_powerup(struct usbnet *dev)
 
 	/* set the embedded Ethernet PHY in power-up state */
 	ret = sr_sw_reset(dev, SR_SWRESET_IPRL);
-	if (ret < 0) {
-		netdev_err(dev->net, "Failed to reset PHY: %d\n", ret);
-		return ret;
-	}
+	if (ret < 0)
+		goto report_reset_failure;
 
 	return 0;
+
+report_reset_failure:
+	netdev_err(dev->net, "Failed to reset PHY: %d\n", ret);
+	return ret;
 }
 
 static int sr9800_bind(struct usbnet *dev, struct usb_interface *intf)
