@@ -195,6 +195,16 @@ void nvmet_disable_port(struct nvmet_port *port)
 	module_put(ops->owner);
 }
 
+void nvmet_port_subsystem_chg(struct nvmet_port *port)
+{
+	struct nvmet_fabrics_ops *ops;
+
+	ops = nvmet_transports[port->disc_addr.trtype];
+
+	if (ops->discov_chg)
+		ops->discov_chg(port);
+}
+
 static void nvmet_keep_alive_timer(struct work_struct *work)
 {
 	struct nvmet_ctrl *ctrl = container_of(to_delayed_work(work),

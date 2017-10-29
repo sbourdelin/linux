@@ -503,6 +503,7 @@ static int nvmet_port_subsys_allow_link(struct config_item *parent,
 	list_add_tail(&link->entry, &port->subsystems);
 	nvmet_genctr++;
 	up_write(&nvmet_config_sem);
+	nvmet_port_subsystem_chg(port);
 	return 0;
 
 out_free_link:
@@ -529,6 +530,7 @@ static void nvmet_port_subsys_drop_link(struct config_item *parent,
 found:
 	list_del(&p->entry);
 	nvmet_genctr++;
+	nvmet_port_subsystem_chg(port);
 	if (list_empty(&port->subsystems))
 		nvmet_disable_port(port);
 	up_write(&nvmet_config_sem);
