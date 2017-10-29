@@ -561,6 +561,8 @@ struct fc_vft_header {
 
 /*
  *  Extended Link Service LS_COMMAND codes (Payload Word 0)
+ *  The supported payload size is also hard-coded into this word
+ *  when necessary.
  */
 #ifdef __BIG_ENDIAN_BITFIELD
 #define ELS_CMD_MASK      0xffff0000
@@ -597,6 +599,7 @@ struct fc_vft_header {
 #define ELS_CMD_RPS       0x56000000
 #define ELS_CMD_RPL       0x57000000
 #define ELS_CMD_FAN       0x60000000
+#define ELS_CMD_RSCN_XMT  0x61040008
 #define ELS_CMD_RSCN      0x61040000
 #define ELS_CMD_SCR       0x62000000
 #define ELS_CMD_RNID      0x78000000
@@ -637,6 +640,7 @@ struct fc_vft_header {
 #define ELS_CMD_RPS       0x56
 #define ELS_CMD_RPL       0x57
 #define ELS_CMD_FAN       0x60
+#define ELS_CMD_RSCN_XMT  0x08000461
 #define ELS_CMD_RSCN      0x0461
 #define ELS_CMD_SCR       0x62
 #define ELS_CMD_RNID      0x78
@@ -1086,6 +1090,11 @@ struct fc_lcb_res_frame {
 	uint8_t       lcb_type; /* LCB Payload Word 2, bit 24:31 */
 	uint8_t       lcb_frequency;    /* LCB Payload Word 2, bit 16:23 */
 	uint16_t      lcb_duration;     /* LCB Payload Word 2, bit 15:0  */
+};
+
+struct fc_RSCN {	/* RSCN ELS frame */
+#define RSCN_EQ_PORT_ATTRIBUTE	2
+	uint32_t NPort_ID;
 };
 
 /*
