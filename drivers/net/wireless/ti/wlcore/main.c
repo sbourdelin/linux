@@ -4085,9 +4085,6 @@ static int wlcore_set_beacon_template(struct wl1271 *wl,
 					      min_rate);
 end_bcn:
 	dev_kfree_skb(beacon);
-	if (ret < 0)
-		goto out;
-
 out:
 	return ret;
 }
