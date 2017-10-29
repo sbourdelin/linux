@@ -11678,8 +11678,8 @@ static int advansys_eisa_probe(struct device *dev)
 	return 0;
 
  free_data:
-	kfree(data->host[0]);
-	kfree(data->host[1]);
+	scsi_host_put(data->host[0]);
+	scsi_host_put(data->host[1]);
 	kfree(data);
  fail:
 	return err;
