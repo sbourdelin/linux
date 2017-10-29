@@ -146,6 +146,11 @@ module_param(register_always, bool, 0444);
 MODULE_PARM_DESC(register_always,
 	 "Use memory registration even for contiguous memory regions");
 
+static bool remote_invalidation = true;
+module_param(remote_invalidation, bool, 0444);
+MODULE_PARM_DESC(remote_invalidation,
+	 "request remote invalidation from subsystem (default: true)");
+
 static int nvme_rdma_cm_handler(struct rdma_cm_id *cm_id,
 		struct rdma_cm_event *event);
 static void nvme_rdma_recv_done(struct ib_cq *cq, struct ib_wc *wc);
@@ -1152,8 +1157,9 @@ static int nvme_rdma_map_sg_fr(struct nvme_rdma_queue *queue,
 	sg->addr = cpu_to_le64(req->mr->iova);
 	put_unaligned_le24(req->mr->length, sg->length);
 	put_unaligned_le32(req->mr->rkey, sg->key);
-	sg->type = (NVME_KEY_SGL_FMT_DATA_DESC << 4) |
-			NVME_SGL_FMT_INVALIDATE;
+	sg->type = NVME_KEY_SGL_FMT_DATA_DESC << 4;
+	if (remote_invalidation)
+		sg->type |= NVME_SGL_FMT_INVALIDATE;
 
 	return 0;
 }
