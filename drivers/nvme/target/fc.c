@@ -2546,6 +2546,15 @@ nvmet_fc_remove_port(struct nvmet_port *port)
 		nvmet_fc_tgtport_put(tgtport);
 }
 
+static void
+nvmet_fc_port_subsys_event(struct nvmet_port *port)
+{
+	struct nvmet_fc_tgtport *tgtport = port->priv;
+
+	if (tgtport && tgtport->ops->nvme_subsystem_change)
+		tgtport->ops->nvme_subsystem_change(&tgtport->fc_target_port);
+}
+
 static struct nvmet_fabrics_ops nvmet_fc_tgt_fcp_ops = {
 	.owner			= THIS_MODULE,
 	.type			= NVMF_TRTYPE_FC,
@@ -2554,6 +2563,7 @@ static struct nvmet_fabrics_ops nvmet_fc_tgt_fcp_ops = {
 	.remove_port		= nvmet_fc_remove_port,
 	.queue_response		= nvmet_fc_fcp_nvme_cmd_done,
 	.delete_ctrl		= nvmet_fc_delete_ctrl,
+	.discov_chg		= nvmet_fc_port_subsys_event,
 };
 
 static int __init nvmet_fc_init_module(void)
