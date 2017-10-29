@@ -1283,7 +1283,8 @@ void rtl_get_tcb_desc(struct ieee80211_hw *hw,
 				} else {
 					if (rtlmac->mode == WIRELESS_MODE_B) {
 						tcb_desc->hw_rate =
-						    rtlpriv->cfg->maps[RTL_RC_CCK_RATE11M];
+						    rtlpriv->cfg->maps[
+						    RTL_RC_CCK_RATE11M];
 					} else {
 						tcb_desc->hw_rate =
 						    rtlpriv->cfg->maps[RTL_RC_OFDM_RATE54M];
