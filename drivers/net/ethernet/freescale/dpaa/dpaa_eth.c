@@ -2814,10 +2814,6 @@ static int dpaa_eth_probe(struct platform_device *pdev)
 		err = -ENOMEM;
 		goto free_dpaa_fqs;
 	}
-	for_each_possible_cpu(i) {
-		percpu_priv = per_cpu_ptr(priv->percpu_priv, i);
-		memset(percpu_priv, 0, sizeof(*percpu_priv));
-	}
 
 	priv->num_tc = 1;
 	netif_set_real_num_tx_queues(net_dev, priv->num_tc * DPAA_TC_TXQ_NUM);
