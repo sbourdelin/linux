@@ -4018,10 +4018,8 @@ static int wlcore_set_beacon_template(struct wl1271 *wl,
 	struct sk_buff *beacon = ieee80211_beacon_get(wl->hw, vif);
 	u16 tmpl_id;
 
-	if (!beacon) {
-		ret = -EINVAL;
-		goto out;
-	}
+	if (!beacon)
+		return -EINVAL;
 
 	wl1271_debug(DEBUG_MASTER, "beacon updated");
 
