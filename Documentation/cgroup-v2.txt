@@ -1287,6 +1287,17 @@ IO Interface Files
 	  8:16 200
 	  8:0 50
 
+  io.leaf_weight
+	A read-write flat-keyed file which exists only on the root cgroup.
+	It operates the same way as io.weight but controls the weight of an
+	implicit leaf child node.
+	This implicit leaf child node hosts all the processes that are in
+	the root cgroup.
+	When distributing IO time this implicit child node is taken into
+	account as if it was a normal child cgroup of the root cgroup.
+
+	The default is "default 200".
+
   io.max
 	A read-write nested-keyed file which exists on non-root
 	cgroups.

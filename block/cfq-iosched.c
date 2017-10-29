@@ -2136,6 +2136,17 @@ static struct cftype cfq_blkcg_legacy_files[] = {
 	{ }	/* terminate */
 };
 
+static int cfq_print_leaf_weight_on_dfl(struct seq_file *sf, void *v)
+{
+	struct blkcg *blkcg = css_to_blkcg(seq_css(sf));
+	struct cfq_group_data *cgd = blkcg_to_cfqgd(blkcg);
+
+	seq_printf(sf, "default %u\n", cgd->leaf_weight);
+	blkcg_print_blkgs(sf, blkcg, cfqg_prfill_leaf_weight_device,
+			  &blkcg_policy_cfq, 0, false);
+	return 0;
+}
+
 static int cfq_print_weight_on_dfl(struct seq_file *sf, void *v)
 {
 	struct blkcg *blkcg = css_to_blkcg(seq_css(sf));
@@ -2147,8 +2158,9 @@ static int cfq_print_weight_on_dfl(struct seq_file *sf, void *v)
 	return 0;
 }
 
-static ssize_t cfq_set_weight_on_dfl(struct kernfs_open_file *of,
-				     char *buf, size_t nbytes, loff_t off)
+static ssize_t cfq_set_weight_on_dfl_common(struct kernfs_open_file *of,
+					    char *buf, size_t nbytes,
+					    loff_t off, bool is_leaf_weight)
 {
 	char *endp;
 	int ret;
@@ -2159,15 +2171,35 @@ static ssize_t cfq_set_weight_on_dfl(struct kernfs_open_file *of,
 	/* "WEIGHT" or "default WEIGHT" sets the default weight */
 	v = simple_strtoull(buf, &endp, 0);
 	if (*endp == '\0' || sscanf(buf, "default %llu", &v) == 1) {
-		ret = __cfq_set_weight(of_css(of), v, true, false, false);
+		ret = __cfq_set_weight(of_css(of), v, true, false,
+				       is_leaf_weight);
 		return ret ?: nbytes;
 	}
 
 	/* "MAJ:MIN WEIGHT" */
-	return __cfqg_set_weight_device(of, buf, nbytes, off, true, false);
+	return __cfqg_set_weight_device(of, buf, nbytes, off, true,
+					is_leaf_weight);
+}
+
+static ssize_t cfq_set_leaf_weight_on_dfl(struct kernfs_open_file *of,
+					  char *buf, size_t nbytes, loff_t off)
+{
+	return cfq_set_weight_on_dfl_common(of, buf, nbytes, off, true);
+}
+
+static ssize_t cfq_set_weight_on_dfl(struct kernfs_open_file *of,
+				     char *buf, size_t nbytes, loff_t off)
+{
+	return cfq_set_weight_on_dfl_common(of, buf, nbytes, off, false);
 }
 
 static struct cftype cfq_blkcg_files[] = {
+	{
+		.name = "leaf_weight",
+		.flags = CFTYPE_ONLY_ON_ROOT,
+		.seq_show = cfq_print_leaf_weight_on_dfl,
+		.write = cfq_set_leaf_weight_on_dfl,
+	},
 	{
 		.name = "weight",
 		.flags = CFTYPE_NOT_ON_ROOT,
