@@ -6496,16 +6496,14 @@ static void wlcore_nvs_cb(const struct firmware *fw, void *context)
 	ret = wl12xx_get_hw_info(wl);
 	if (ret < 0) {
 		wl1271_error("couldn't get hw info");
-		wl1271_power_off(wl);
-		goto out_free_nvs;
+		goto power_off;
 	}
 
 	ret = request_threaded_irq(wl->irq, hardirq_fn, wlcore_irq,
 				   wl->irq_flags, pdev->name, wl);
 	if (ret < 0) {
 		wl1271_error("interrupt configuration failed");
-		wl1271_power_off(wl);
-		goto out_free_nvs;
+		goto power_off;
 	}
 
 #ifdef CONFIG_PM
@@ -6551,6 +6549,11 @@ out_free_nvs:
 out:
 	release_firmware(fw);
 	complete_all(&wl->nvs_loading_complete);
+	return;
+
+power_off:
+	wl1271_power_off(wl);
+	goto out_free_nvs;
 }
 
 int wlcore_probe(struct wl1271 *wl, struct platform_device *pdev)
