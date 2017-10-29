@@ -355,7 +355,7 @@ static void slic_xmit_complete(struct slic_device *sdev)
 {
 	struct slic_tx_queue *txq = &sdev->txq;
 	struct net_device *dev = sdev->netdev;
-	unsigned int idx = txq->done_idx;
+	unsigned int idx;
 	struct slic_tx_buffer *buff;
 	unsigned int frames = 0;
 	unsigned int bytes = 0;
