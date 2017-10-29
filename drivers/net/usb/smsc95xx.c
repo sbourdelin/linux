@@ -399,10 +399,8 @@ static int smsc95xx_write_eeprom(struct usbnet *dev, u32 offset, u32 length,
 	/* Issue write/erase enable command */
 	val = E2P_CMD_BUSY_ | E2P_CMD_EWEN_;
 	ret = smsc95xx_write_reg(dev, E2P_CMD, val);
-	if (ret < 0) {
-		netdev_warn(dev->net, "Error writing E2P_DATA\n");
-		return ret;
-	}
+	if (ret < 0)
+		goto report_write_failure;
 
 	ret = smsc95xx_wait_eeprom(dev);
 	if (ret < 0)
@@ -413,10 +411,8 @@ static int smsc95xx_write_eeprom(struct usbnet *dev, u32 offset, u32 length,
 		/* Fill data register */
 		val = data[i];
 		ret = smsc95xx_write_reg(dev, E2P_DATA, val);
-		if (ret < 0) {
-			netdev_warn(dev->net, "Error writing E2P_DATA\n");
-			return ret;
-		}
+		if (ret < 0)
+			goto report_write_failure;
 
 		/* Send "write" command */
 		val = E2P_CMD_BUSY_ | E2P_CMD_WRITE_ | (offset & E2P_CMD_ADDR_);
@@ -434,6 +430,10 @@ static int smsc95xx_write_eeprom(struct usbnet *dev, u32 offset, u32 length,
 	}
 
 	return 0;
+
+report_write_failure:
+	netdev_warn(dev->net, "Error writing E2P_DATA\n");
+	return ret;
 }
 
 static int __must_check smsc95xx_write_reg_async(struct usbnet *dev, u16 index,
