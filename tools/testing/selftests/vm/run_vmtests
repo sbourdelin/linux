@@ -176,4 +176,14 @@ else
 	echo "[PASS]"
 fi
 
+echo "-----------------------------"
+echo "mremap_mirror"
+echo "-----------------------------"
+./mremap_mirror
+if [ $? -ne 0 ]; then
+	echo "[FAIL]"
+	exitcode=1
+else
+	echo "[PASS]"
+fi
 exit $exitcode
