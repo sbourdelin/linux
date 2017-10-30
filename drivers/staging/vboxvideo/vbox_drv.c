@@ -229,7 +229,7 @@ static struct drm_driver driver = {
 
 	.load = vbox_driver_load,
 	.unload = vbox_driver_unload,
-	.lastclose = vbox_driver_lastclose,
+	.lastclose = drm_fb_helper_lastclose,
 	.master_set = vbox_master_set,
 	.master_drop = vbox_master_drop,
 
