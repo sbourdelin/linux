@@ -1489,6 +1489,16 @@ void intel_ddi_clock_get(struct intel_encoder *encoder,
 			 struct intel_crtc_state *pipe_config)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct intel_crtc *crtc = to_intel_crtc(pipe_config->base.crtc);
+
+	/*
+	 * For DDI ports we always use a shared PLL.
+	 * But the shared PLL will not be set when crtc is not active.
+	 */
+	if (crtc->active == false) {
+		DRM_DEBUG_KMS("Trying to get clock, but pipe is not active.\n");
+		return;
+	}
 
 	if (INTEL_GEN(dev_priv) <= 8)
 		hsw_ddi_clock_get(encoder, pipe_config);
