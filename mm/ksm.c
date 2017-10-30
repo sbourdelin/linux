@@ -150,6 +150,7 @@ struct stable_node {
 	struct hlist_head hlist;
 	union {
 		unsigned long kpfn;
+		u32 oldchecksum;
 		unsigned long chain_prune_time;
 	};
 	/*
@@ -1522,7 +1523,7 @@ static __always_inline struct page *chain(struct stable_node **s_n_d,
  * This function returns the stable tree node of identical content if found,
  * NULL otherwise.
  */
-static struct page *stable_tree_search(struct page *page)
+static struct page *stable_tree_search(struct page *page, u32 checksum)
 {
 	int nid;
 	struct rb_root *root;
@@ -1540,6 +1541,8 @@ static struct page *stable_tree_search(struct page *page)
 
 	nid = get_kpfn_nid(page_to_pfn(page));
 	root = root_stable_tree + nid;
+	if (!checksum)
+		return NULL;
 again:
 	new = &root->rb_node;
 	parent = NULL;
@@ -1550,6 +1553,18 @@ again:
 
 		cond_resched();
 		stable_node = rb_entry(*new, struct stable_node, node);
+
+		/* first make rb_tree by checksum */
+		if (checksum < stable_node->oldchecksum) {
+			parent = *new;
+			new = &parent->rb_left;
+			continue;
+		} else if (checksum > stable_node->oldchecksum) {
+			parent = *new;
+			new = &parent->rb_right;
+			continue;
+		}
+
 		stable_node_any = NULL;
 		tree_page = chain_prune(&stable_node_dup, &stable_node,	root);
 		/*
@@ -1768,7 +1783,7 @@ chain_append:
  * This function returns the stable tree node just allocated on success,
  * NULL otherwise.
  */
-static struct stable_node *stable_tree_insert(struct page *kpage)
+static struct stable_node *stable_tree_insert(struct page *kpage, u32 checksum)
 {
 	int nid;
 	unsigned long kpfn;
@@ -1792,6 +1807,18 @@ again:
 		cond_resched();
 		stable_node = rb_entry(*new, struct stable_node, node);
 		stable_node_any = NULL;
+
+		/* first make rb_tree by checksum */
+		if (checksum < stable_node->oldchecksum) {
+			parent = *new;
+			new = &parent->rb_left;
+			continue;
+		} else if (checksum > stable_node->oldchecksum) {
+			parent = *new;
+			new = &parent->rb_right;
+			continue;
+		}
+
 		tree_page = chain(&stable_node_dup, stable_node, root);
 		if (!stable_node_dup) {
 			/*
@@ -1850,6 +1877,7 @@ again:
 
 	INIT_HLIST_HEAD(&stable_node_dup->hlist);
 	stable_node_dup->kpfn = kpfn;
+	stable_node_dup->oldchecksum = checksum;
 	set_page_stable_node(kpage, stable_node_dup);
 	stable_node_dup->rmap_hlist_len = 0;
 	DO_NUMA(stable_node_dup->nid = nid);
@@ -1907,6 +1935,19 @@ struct rmap_item *unstable_tree_search_insert(struct rmap_item *rmap_item,
 
 		cond_resched();
 		tree_rmap_item = rb_entry(*new, struct rmap_item, node);
+
+		/* first make rb_tree by checksum */
+		if (rmap_item->oldchecksum < tree_rmap_item->oldchecksum) {
+			parent = *new;
+			new = &parent->rb_left;
+			continue;
+		} else if (rmap_item->oldchecksum
+					> tree_rmap_item->oldchecksum) {
+			parent = *new;
+			new = &parent->rb_right;
+			continue;
+		}
+
 		tree_page = get_mergeable_page(tree_rmap_item);
 		if (!tree_page)
 			return NULL;
@@ -2031,7 +2072,7 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 	}
 
 	/* We first start with searching the page inside the stable tree */
-	kpage = stable_tree_search(page);
+	kpage = stable_tree_search(page, rmap_item->oldchecksum);
 	if (kpage == page && rmap_item->head == stable_node) {
 		put_page(kpage);
 		return;
@@ -2098,7 +2139,7 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 			 * node in the stable tree and add both rmap_items.
 			 */
 			lock_page(kpage);
-			stable_node = stable_tree_insert(kpage);
+			stable_node = stable_tree_insert(kpage, checksum);
 			if (stable_node) {
 				stable_tree_append(tree_rmap_item, stable_node,
 						   false);
