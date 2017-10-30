@@ -124,6 +124,16 @@ static void restart_grace(void)
 	}
 }
 
+static void stop_grace(struct net *net)
+{
+	struct lockd_net *ln = net_generic(net, lockd_net_id);
+
+	if (ln->nlmsvc_users == 0) {
+		cancel_delayed_work_sync(&ln->grace_period_end);
+		locks_end_grace(&ln->lockd_manager);
+	}
+}
+
 /*
  * This is the lockd kernel thread
  */
@@ -132,8 +142,6 @@ lockd(void *vrqstp)
 {
 	int		err = 0;
 	struct svc_rqst *rqstp = vrqstp;
-	struct net *net = &init_net;
-	struct lockd_net *ln = net_generic(net, lockd_net_id);
 
 	/* try_to_freeze() is called from svc_recv() */
 	set_freezable();
@@ -178,8 +186,6 @@ lockd(void *vrqstp)
 	if (nlmsvc_ops)
 		nlmsvc_invalidate_all();
 	nlm_shutdown_hosts();
-	cancel_delayed_work_sync(&ln->grace_period_end);
-	locks_end_grace(&ln->lockd_manager);
 	return 0;
 }
 
@@ -468,6 +474,7 @@ int lockd_up(struct net *net)
 	error = lockd_start_svc(serv);
 	if (error < 0) {
 		lockd_down_net(serv, net);
+		stop_grace(net);
 		goto err_put;
 	}
 	nlmsvc_users++;
@@ -492,8 +499,10 @@ lockd_down(struct net *net)
 	mutex_lock(&nlmsvc_mutex);
 	lockd_down_net(nlmsvc_rqst->rq_server, net);
 	if (nlmsvc_users) {
-		if (--nlmsvc_users)
+		if (--nlmsvc_users) {
+			stop_grace(net);
 			goto out;
+		}
 	} else {
 		printk(KERN_ERR "lockd_down: no users! task=%p\n",
 			nlmsvc_task);
@@ -505,6 +514,7 @@ lockd_down(struct net *net)
 		BUG();
 	}
 	kthread_stop(nlmsvc_task);
+	stop_grace(net);
 	dprintk("lockd_down: service stopped\n");
 	lockd_svc_exit_thread();
 	dprintk("lockd_down: service destroyed\n");
