@@ -150,10 +150,11 @@ static void __dvb_frontend_free(struct dvb_frontend *fe)
 
 	dvb_free_device(fepriv->dvbdev);
 
+	fe->frontend_priv = NULL;
+
 	dvb_frontend_invoke_release(fe, fe->ops.release);
 
 	kfree(fepriv);
-	fe->frontend_priv = NULL;
 }
 
 static void dvb_frontend_free(struct kref *ref)
