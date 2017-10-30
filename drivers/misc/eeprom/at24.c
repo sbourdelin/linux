@@ -192,26 +192,22 @@ MODULE_DEVICE_TABLE(acpi, at24_acpi_ids);
  * set the byte address; on a multi-master board, another master
  * may have changed the chip's "current" address pointer.
  *
- * REVISIT some multi-address chips don't rollover page reads to
- * the next slave address, so we may need to truncate the count.
- * Those chips might need another quirk flag.
- *
- * If the real hardware used four adjacent 24c02 chips and that
- * were misconfigured as one 24c08, that would be a similar effect:
- * one "eeprom" file not four, but larger reads would fail when
- * they crossed certain pages.
+ * In case of chips that don't rollover page reads, truncate the count
+ * to the nearest page boundary. This might result in the
+ * at24_eeprom_read_XXX functions reading fewer bytes than requested,
+ * but this is compensated for in at24_read().
  */
 static struct i2c_client *at24_translate_offset(struct at24_data *at24,
-						unsigned int *offset)
+		unsigned int *offset, size_t *count)
 {
-	unsigned i;
+	unsigned int i, bits, remainder;
 
-	if (at24->chip.flags & AT24_FLAG_ADDR16) {
-		i = *offset >> 16;
-		*offset &= 0xffff;
-	} else {
-		i = *offset >> 8;
-		*offset &= 0xff;
+	bits = (at24->chip.flags & AT24_FLAG_ADDR16) ? 16 : 8;
+	i = *offset >> bits;
+	*offset &= AT24_BITMASK(bits);
+	if ((at24->chip.flags & AT24_FLAG_NO_RDROL) && count) {
+		remainder = BIT(bits) - *offset;
+		*count = min(*count, remainder);
 	}
 
 	return at24->client[i];
@@ -224,7 +220,7 @@ static ssize_t at24_eeprom_read_smbus(struct at24_data *at24, char *buf,
 	struct i2c_client *client;
 	int status;
 
-	client = at24_translate_offset(at24, &offset);
+	client = at24_translate_offset(at24, &offset, &count);
 
 	if (count > io_limit)
 		count = io_limit;
@@ -258,7 +254,7 @@ static ssize_t at24_eeprom_read_i2c(struct at24_data *at24, char *buf,
 	u8 msgbuf[2];
 
 	memset(msg, 0, sizeof(msg));
-	client = at24_translate_offset(at24, &offset);
+	client = at24_translate_offset(at24, &offset, &count);
 
 	if (count > io_limit)
 		count = io_limit;
@@ -307,7 +303,7 @@ static ssize_t at24_eeprom_read_serial(struct at24_data *at24, char *buf,
 	u8 addrbuf[2];
 	int status;
 
-	client = at24_translate_offset(at24, &offset);
+	client = at24_translate_offset(at24, &offset, &count);
 
 	memset(msg, 0, sizeof(msg));
 	msg[0].addr = client->addr;
@@ -360,7 +356,7 @@ static ssize_t at24_eeprom_read_mac(struct at24_data *at24, char *buf,
 	u8 addrbuf[2];
 	int status;
 
-	client = at24_translate_offset(at24, &offset);
+	client = at24_translate_offset(at24, &offset, &count);
 
 	memset(msg, 0, sizeof(msg));
 	msg[0].addr = client->addr;
@@ -415,7 +411,7 @@ static ssize_t at24_eeprom_write_smbus_block(struct at24_data *at24,
 	struct i2c_client *client;
 	ssize_t status = 0;
 
-	client = at24_translate_offset(at24, &offset);
+	client = at24_translate_offset(at24, &offset, NULL);
 	count = at24_adjust_write_count(at24, offset, count);
 
 	loop_until_timeout(timeout, write_time) {
@@ -442,7 +438,7 @@ static ssize_t at24_eeprom_write_smbus_byte(struct at24_data *at24,
 	struct i2c_client *client;
 	ssize_t status = 0;
 
-	client = at24_translate_offset(at24, &offset);
+	client = at24_translate_offset(at24, &offset, &count);
 
 	loop_until_timeout(timeout, write_time) {
 		status = i2c_smbus_write_byte_data(client, offset, buf[0]);
@@ -468,7 +464,7 @@ static ssize_t at24_eeprom_write_i2c(struct at24_data *at24, const char *buf,
 	ssize_t status = 0;
 	int i = 0;
 
-	client = at24_translate_offset(at24, &offset);
+	client = at24_translate_offset(at24, &offset, NULL);
 	count = at24_adjust_write_count(at24, offset, count);
 
 	msg.addr = client->addr;
@@ -569,6 +565,8 @@ static void at24_get_pdata(struct device *dev, struct at24_platform_data *chip)
 
 	if (device_property_present(dev, "read-only"))
 		chip->flags |= AT24_FLAG_READONLY;
+	if (device_property_present(dev, "no-read-rollover"))
+		chip->flags |= AT24_FLAG_NO_RDROL;
 
 	err = device_property_read_u32(dev, "pagesize", &val);
 	if (!err) {
