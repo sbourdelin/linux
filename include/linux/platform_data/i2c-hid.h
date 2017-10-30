@@ -14,6 +14,7 @@
 
 #include <linux/types.h>
 
+struct gpio_desc;
 struct regulator;
 
 /**
@@ -37,6 +38,9 @@ struct i2c_hid_platform_data {
 	u16 hid_descriptor_address;
 	struct regulator *supply;
 	int post_power_delay_ms;
+	struct gpio_desc *reset_gpio;
+	int assert_reset_us;
+	int deassert_reset_us;
 };
 
 #endif /* __LINUX_I2C_HID_H */
