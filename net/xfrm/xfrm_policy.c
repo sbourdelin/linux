@@ -1820,6 +1820,11 @@ xfrm_resolve_and_create_bundle(struct xfrm_policy **pols, int num_pols,
 	    !xfrm_pol_dead(xdst) &&
 	    memcmp(xdst->pols, pols,
 		   sizeof(struct xfrm_policy *) * num_pols) == 0 &&
+	    (!xdst->u.dst.xfrm->sel.family ||
+	     xfrm_selector_match(&xdst->u.dst.xfrm->sel, fl,
+				 xdst->u.dst.xfrm->sel.family)) &&
+	    security_xfrm_state_pol_flow_match(xdst->u.dst.xfrm,
+					       xdst->pols[0], fl) &&
 	    xfrm_bundle_ok(xdst)) {
 		dst_hold(&xdst->u.dst);
 		return xdst;
