@@ -2802,8 +2802,13 @@ static int panic_nand_write(struct mtd_info *mtd, loff_t to, size_t len,
 	struct mtd_oob_ops ops;
 	int ret;
 
+	int chipnr = (int)(to >> chip->chip_shift);
+	chip->select_chip(mtd, chipnr);
+
 	/* Wait for the device to get ready */
 	panic_nand_wait(mtd, chip, 400);
+
+	chip->select_chip(mtd, -1);
 
 	/* Grab the device */
 	panic_nand_get_device(chip, mtd, FL_WRITING);
