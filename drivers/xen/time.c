@@ -19,6 +19,9 @@
 /* runstate info updated by Xen */
 static DEFINE_PER_CPU(struct vcpu_runstate_info, xen_runstate);
 
+static DEFINE_PER_CPU(u64[RUNSTATE_max], old_runstate_time);
+static u64 **runstate_time_delta;
+
 /* return an consistent snapshot of 64-bit time/counter value */
 static u64 get64(const u64 *p)
 {
@@ -47,8 +50,8 @@ static u64 get64(const u64 *p)
 	return ret;
 }
 
-static void xen_get_runstate_snapshot_cpu(struct vcpu_runstate_info *res,
-					  unsigned int cpu)
+static void xen_get_runstate_snapshot_cpu_delta(
+			struct vcpu_runstate_info *res, unsigned int cpu)
 {
 	u64 state_time;
 	struct vcpu_runstate_info *state;
@@ -64,6 +67,82 @@ static void xen_get_runstate_snapshot_cpu(struct vcpu_runstate_info *res,
 		rmb();	/* Hypervisor might update data. */
 	} while (get64(&state->state_entry_time) != state_time ||
 		 (state_time & XEN_RUNSTATE_UPDATE));
+}
+
+static void xen_get_runstate_snapshot_cpu(struct vcpu_runstate_info *res,
+					  unsigned int cpu)
+{
+	int i;
+
+	xen_get_runstate_snapshot_cpu_delta(res, cpu);
+
+	for (i = 0; i < RUNSTATE_max; i++)
+		res->time[i] += per_cpu(old_runstate_time, cpu)[i];
+}
+
+void xen_accumulate_runstate_time(int action)
+{
+	struct vcpu_runstate_info state;
+	int cpu, i;
+
+	switch (action) {
+	case -1: /* backup runstate time before suspend */
+		WARN_ON_ONCE(unlikely(runstate_time_delta));
+
+		runstate_time_delta = kcalloc(num_possible_cpus(),
+						  sizeof(*runstate_time_delta),
+						  GFP_KERNEL);
+		if (unlikely(!runstate_time_delta)) {
+			pr_alert("%s: failed to allocate runstate_time_delta\n",
+					__func__);
+			return;
+		}
+
+		for_each_possible_cpu(cpu) {
+			runstate_time_delta[cpu] = kmalloc_array(RUNSTATE_max,
+						  sizeof(**runstate_time_delta),
+						  GFP_KERNEL);
+			if (unlikely(!runstate_time_delta[cpu])) {
+				pr_alert("%s: failed to allocate runstate_time_delta[%d]\n",
+						__func__, cpu);
+				action = 0;
+				goto reclaim_mem;
+			}
+
+			xen_get_runstate_snapshot_cpu_delta(&state, cpu);
+			memcpy(runstate_time_delta[cpu],
+				state.time,
+				RUNSTATE_max * sizeof(**runstate_time_delta));
+		}
+		break;
+
+	case 0: /* backup runstate time after resume */
+		if (unlikely(!runstate_time_delta)) {
+			pr_alert("%s: cannot accumulate runstate time as runstate_time_delta is NULL\n",
+					__func__);
+			return;
+		}
+
+		for_each_possible_cpu(cpu) {
+			for (i = 0; i < RUNSTATE_max; i++)
+				per_cpu(old_runstate_time, cpu)[i] +=
+						runstate_time_delta[cpu][i];
+		}
+		break;
+
+	default: /* do not accumulate runstate time for checkpointing */
+		break;
+	}
+
+reclaim_mem:
+	if (action != -1 && runstate_time_delta) {
+		for_each_possible_cpu(cpu) {
+			if (likely(runstate_time_delta[cpu]))
+				kfree(runstate_time_delta[cpu]);
+		}
+		kfree(runstate_time_delta);
+		runstate_time_delta = NULL;
+	}
 }
 
 /*
