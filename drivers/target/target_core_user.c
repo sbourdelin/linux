@@ -1763,8 +1763,7 @@ static ssize_t tcmu_cmd_time_out_show(struct config_item *item, char *page)
 {
 	struct se_dev_attrib *da = container_of(to_config_group(item),
 					struct se_dev_attrib, da_group);
-	struct tcmu_dev *udev = container_of(da->da_dev,
-					struct tcmu_dev, se_dev);
+	struct tcmu_dev *udev = TCMU_DEV(da->da_dev);
 
 	return snprintf(page, PAGE_SIZE, "%lu\n", udev->cmd_time_out / MSEC_PER_SEC);
 }
@@ -1774,8 +1773,7 @@ static ssize_t tcmu_cmd_time_out_store(struct config_item *item, const char *pag
 {
 	struct se_dev_attrib *da = container_of(to_config_group(item),
 					struct se_dev_attrib, da_group);
-	struct tcmu_dev *udev = container_of(da->da_dev,
-					struct tcmu_dev, se_dev);
+	struct tcmu_dev *udev = TCMU_DEV(da->da_dev);
 	u32 val;
 	int ret;
 
