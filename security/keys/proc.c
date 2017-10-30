@@ -178,8 +178,8 @@ static int proc_keys_show(struct seq_file *m, void *v)
 {
 	struct rb_node *_p = v;
 	struct key *key = rb_entry(_p, struct key, serial_node);
-	struct timespec now;
-	unsigned long timo;
+	time64_t now;
+	u64 timo;
 	key_ref_t key_ref, skey_ref;
 	char xbuf[16];
 	int rc;
@@ -212,28 +212,28 @@ static int proc_keys_show(struct seq_file *m, void *v)
 	if (rc < 0)
 		return 0;
 
-	now = current_kernel_time();
+	now = ktime_get_real_seconds();
 
 	rcu_read_lock();
 
 	/* come up with a suitable timeout value */
 	if (key->expiry == 0) {
 		memcpy(xbuf, "perm", 5);
-	} else if (now.tv_sec >= key->expiry) {
+	} else if (now >= key->expiry) {
 		memcpy(xbuf, "expd", 5);
 	} else {
-		timo = key->expiry - now.tv_sec;
+		timo = key->expiry - now;
 
 		if (timo < 60)
-			sprintf(xbuf, "%lus", timo);
+			sprintf(xbuf, "%llus", timo);
 		else if (timo < 60*60)
-			sprintf(xbuf, "%lum", timo / 60);
+			sprintf(xbuf, "%llum", div_u64(timo, 60));
 		else if (timo < 60*60*24)
-			sprintf(xbuf, "%luh", timo / (60*60));
+			sprintf(xbuf, "%lluh", div_u64(timo, 60 * 60));
 		else if (timo < 60*60*24*7)
-			sprintf(xbuf, "%lud", timo / (60*60*24));
+			sprintf(xbuf, "%llud", div_u64(timo, 60 * 60 * 24));
 		else
-			sprintf(xbuf, "%luw", timo / (60*60*24*7));
+			sprintf(xbuf, "%lluw", div_u64(timo, 60 * 60 * 24 * 7));
 	}
 
 #define showflag(KEY, LETTER, FLAG) \

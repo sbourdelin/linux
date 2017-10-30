@@ -558,7 +558,6 @@ int key_reject_and_link(struct key *key,
 			struct key *authkey)
 {
 	struct assoc_array_edit *edit;
-	struct timespec now;
 	int ret, awaken, link_ret = 0;
 
 	key_check(key);
@@ -584,8 +583,7 @@ int key_reject_and_link(struct key *key,
 		smp_wmb();
 		set_bit(KEY_FLAG_NEGATIVE, &key->flags);
 		set_bit(KEY_FLAG_INSTANTIATED, &key->flags);
-		now = current_kernel_time();
-		key->expiry = now.tv_sec + timeout;
+		key->expiry = ktime_get_real_seconds() + timeout;
 		key_schedule_gc(key->expiry + key_gc_delay);
 
 		if (test_and_clear_bit(KEY_FLAG_USER_CONSTRUCT, &key->flags))
@@ -701,16 +699,13 @@ found_kernel_type:
 
 void key_set_timeout(struct key *key, unsigned timeout)
 {
-	struct timespec now;
-	time_t expiry = 0;
+	time64_t expiry = 0;
 
 	/* make the changes with the locks held to prevent races */
 	down_write(&key->sem);
 
-	if (timeout > 0) {
-		now = current_kernel_time();
-		expiry = now.tv_sec + timeout;
-	}
+	if (timeout > 0)
+		expiry = ktime_get_real_seconds() + timeout;
 
 	key->expiry = expiry;
 	key_schedule_gc(key->expiry + key_gc_delay);
@@ -1009,8 +1004,7 @@ EXPORT_SYMBOL(key_update);
  */
 void key_revoke(struct key *key)
 {
-	struct timespec now;
-	time_t time;
+	time64_t time;
 
 	key_check(key);
 
@@ -1025,8 +1019,7 @@ void key_revoke(struct key *key)
 		key->type->revoke(key);
 
 	/* set the death time to no more than the expiry time */
-	now = current_kernel_time();
-	time = now.tv_sec;
+	time = ktime_get_real_seconds();
 	if (key->revoked_at == 0 || key->revoked_at > time) {
 		key->revoked_at = time;
 		key_schedule_gc(key->revoked_at + key_gc_delay);

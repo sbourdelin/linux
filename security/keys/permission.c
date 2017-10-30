@@ -100,8 +100,7 @@ int key_validate(const struct key *key)
 
 	/* check it hasn't expired */
 	if (key->expiry) {
-		struct timespec now = current_kernel_time();
-		if (now.tv_sec >= key->expiry)
+		if (ktime_get_real_seconds() >= key->expiry)
 			return -EKEYEXPIRED;
 	}
 
