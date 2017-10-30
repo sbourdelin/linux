@@ -185,6 +185,13 @@
 
 #define AFI_PEXBIAS_CTRL_0		0x168
 
+#define RP_PRIV_XP_DL	0x494
+#define  RP_PRIV_XP_DL_GEN2_UPD_FC_TSHOLD	(0x1ff << 1)
+
+#define RP_RX_HDR_LIMIT	0xe00
+#define  RP_RX_HDR_LIMIT_PW_MASK	(0xff << 8)
+#define  RP_RX_HDR_LIMIT_PW		(0x0e << 8)
+
 #define RP_ECTL_2_R1	0xe84
 #define  RP_ECTL_2_R1_RX_CTLE_1C_MASK		0xffff
 
@@ -215,6 +222,7 @@
 #define  RP_VEND_XP_DL_UP			(1 << 30)
 #define  RP_VEND_XP_OPPORTUNISTIC_ACK		(1 << 27)
 #define  RP_VEND_XP_OPPORTUNISTIC_UPDATEFC	(1 << 28)
+#define  RP_VEND_XP_UPDATE_FC_THRESHOLD_MASK	(0xff << 18)
 
 #define RP_VEND_CTL1	0xf48
 #define  RP_VEND_CTL1_ERPT	(1 << 13)
@@ -309,6 +317,7 @@ struct tegra_pcie_soc {
 	bool program_uphy;
 	bool program_ectl_settings;
 	bool update_clamp_threshold;
+	bool raw_violation_fixup;
 };
 
 static inline struct tegra_msi *to_tegra_msi(struct msi_controller *chip)
@@ -2211,6 +2220,22 @@ static void tegra_pcie_apply_sw_fixup(struct tegra_pcie_port *port)
 				RP_PRIV_MISC_TMS_CLK_CLAMP_THRESHOLD;
 	}
 	writel(value, port->base + RP_PRIV_MISC);
+
+	/* Fixup for read after write violation in T124 & T132 platforms */
+	if (soc->raw_violation_fixup) {
+		value = readl(port->base + RP_RX_HDR_LIMIT);
+		value &= ~RP_RX_HDR_LIMIT_PW_MASK;
+		value |= RP_RX_HDR_LIMIT_PW;
+		writel(value, port->base + RP_RX_HDR_LIMIT);
+
+		value = readl(port->base + RP_PRIV_XP_DL);
+		value |= RP_PRIV_XP_DL_GEN2_UPD_FC_TSHOLD;
+		writel(value, port->base + RP_PRIV_XP_DL);
+
+		value = readl(port->base + RP_VEND_XP);
+		value |= RP_VEND_XP_UPDATE_FC_THRESHOLD_MASK;
+		writel(value, port->base + RP_VEND_XP);
+	}
 }
 /*
  * FIXME: If there are no PCIe cards attached, then calling this function
@@ -2349,6 +2374,7 @@ static const struct tegra_pcie_soc tegra20_pcie = {
 	.program_uphy = true,
 	.program_ectl_settings = false,
 	.update_clamp_threshold = false,
+	.raw_violation_fixup = false,
 };
 
 static const struct tegra_pcie_soc tegra30_pcie = {
@@ -2367,6 +2393,7 @@ static const struct tegra_pcie_soc tegra30_pcie = {
 	.program_uphy = true,
 	.program_ectl_settings = false,
 	.update_clamp_threshold = false,
+	.raw_violation_fixup = false,
 };
 
 static const struct tegra_pcie_soc tegra124_pcie = {
@@ -2384,6 +2411,7 @@ static const struct tegra_pcie_soc tegra124_pcie = {
 	.program_uphy = true,
 	.program_ectl_settings = false,
 	.update_clamp_threshold = true,
+	.raw_violation_fixup = true,
 };
 
 static const struct tegra_pcie_soc tegra210_pcie = {
@@ -2409,6 +2437,7 @@ static const struct tegra_pcie_soc tegra210_pcie = {
 	.program_uphy = true,
 	.program_ectl_settings = true,
 	.update_clamp_threshold = true,
+	.raw_violation_fixup = false,
 };
 
 static const struct tegra_pcie_soc tegra186_pcie = {
@@ -2427,6 +2456,7 @@ static const struct tegra_pcie_soc tegra186_pcie = {
 	.program_uphy = false,
 	.program_ectl_settings = false,
 	.update_clamp_threshold = false,
+	.raw_violation_fixup = false,
 };
 
 static const struct of_device_id tegra_pcie_of_match[] = {
