@@ -1362,21 +1362,21 @@ static int pistachio_gpio_register(struct pistachio_pinctrl *pctl)
 		if (!child) {
 			dev_err(pctl->dev, "No node for bank %u\n", i);
 			ret = -ENODEV;
-			goto err;
+			goto remove_chips;
 		}
 
 		if (!of_find_property(child, "gpio-controller", NULL)) {
 			dev_err(pctl->dev,
 				"No gpio-controller property for bank %u\n", i);
 			ret = -ENODEV;
-			goto err;
+			goto remove_chips;
 		}
 
 		irq = irq_of_parse_and_map(child, 0);
 		if (irq < 0) {
 			dev_err(pctl->dev, "No IRQ for bank %u: %d\n", i, irq);
 			ret = irq;
-			goto err;
+			goto remove_chips;
 		}
 
 		bank = &pctl->gpio_banks[i];
@@ -1389,7 +1389,7 @@ static int pistachio_gpio_register(struct pistachio_pinctrl *pctl)
 		if (ret < 0) {
 			dev_err(pctl->dev, "Failed to add GPIO chip %u: %d\n",
 				i, ret);
-			goto err;
+			goto remove_chips;
 		}
 
 		ret = gpiochip_irqchip_add(&bank->gpio_chip, &bank->irq_chip,
@@ -1397,8 +1397,7 @@ static int pistachio_gpio_register(struct pistachio_pinctrl *pctl)
 		if (ret < 0) {
 			dev_err(pctl->dev, "Failed to add IRQ chip %u: %d\n",
 				i, ret);
-			gpiochip_remove(&bank->gpio_chip);
-			goto err;
+			goto remove_chip;
 		}
 		gpiochip_set_chained_irqchip(&bank->gpio_chip, &bank->irq_chip,
 					     irq, pistachio_gpio_irq_handler);
@@ -1409,13 +1408,15 @@ static int pistachio_gpio_register(struct pistachio_pinctrl *pctl)
 		if (ret < 0) {
 			dev_err(pctl->dev, "Failed to add GPIO range %u: %d\n",
 				i, ret);
-			gpiochip_remove(&bank->gpio_chip);
-			goto err;
+			goto remove_chip;
 		}
 	}
 
 	return 0;
-err:
+
+remove_chip:
+	gpiochip_remove(&bank->gpio_chip);
+remove_chips:
 	for (; i > 0; i--) {
 		bank = &pctl->gpio_banks[i - 1];
 		gpiochip_remove(&bank->gpio_chip);
