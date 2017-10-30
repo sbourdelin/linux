@@ -721,10 +721,8 @@ static int vrc4171_card_init(void)
 		return retval;
 
 	retval = platform_device_register(&vrc4171_card_device);
-	if (retval < 0) {
-		platform_driver_unregister(&vrc4171_card_driver);
-		return retval;
-	}
+	if (retval < 0)
+		goto unregister_driver;
 
 	vrc4171_set_multifunction_pin(vrc4171_slotb);
 
@@ -736,14 +734,17 @@ static int vrc4171_card_init(void)
 	if (retval < 0) {
 		vrc4171_remove_sockets();
 		platform_device_unregister(&vrc4171_card_device);
-		platform_driver_unregister(&vrc4171_card_driver);
-		return retval;
+		goto unregister_driver;
 	}
 
 	printk(KERN_INFO "%s, connected to IRQ %d\n",
 		vrc4171_card_driver.driver.name, vrc4171_irq);
 
 	return 0;
+
+unregister_driver:
+	platform_driver_unregister(&vrc4171_card_driver);
+	return retval;
 }
 
 static void vrc4171_card_exit(void)
