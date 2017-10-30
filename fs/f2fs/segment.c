@@ -210,6 +210,7 @@ void register_inmem_page(struct inode *inode, struct page *page)
 		list_add_tail(&fi->inmem_ilist, &sbi->inode_list[ATOMIC_FILE]);
 	spin_unlock(&sbi->inode_lock[ATOMIC_FILE]);
 	inc_page_count(F2FS_I_SB(inode), F2FS_INMEM_PAGES);
+	fi->inmem_blocks++;
 	mutex_unlock(&fi->inmem_lock);
 
 	trace_f2fs_register_inmem_page(page, INMEM);
@@ -221,6 +222,7 @@ static int __revoke_inmem_pages(struct inode *inode,
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	struct inmem_pages *cur, *tmp;
 	int err = 0;
+	struct f2fs_inode_info *fi = F2FS_I(inode);
 
 	list_for_each_entry_safe(cur, tmp, head, list) {
 		struct page *page = cur->page;
@@ -263,6 +265,7 @@ next:
 		list_del(&cur->list);
 		kmem_cache_free(inmem_entry_slab, cur);
 		dec_page_count(F2FS_I_SB(inode), F2FS_INMEM_PAGES);
+		fi->inmem_blocks--;
 	}
 	return err;
 }
@@ -302,6 +305,10 @@ void drop_inmem_pages(struct inode *inode)
 	if (!list_empty(&fi->inmem_ilist))
 		list_del_init(&fi->inmem_ilist);
 	spin_unlock(&sbi->inode_lock[ATOMIC_FILE]);
+	if (fi->inmem_blocks) {
+		f2fs_bug_on(sbi, 1);
+		fi->inmem_blocks = 0;
+	}
 	mutex_unlock(&fi->inmem_lock);
 
 	clear_inode_flag(inode, FI_ATOMIC_FILE);
@@ -326,6 +333,7 @@ void drop_inmem_page(struct inode *inode, struct page *page)
 
 	f2fs_bug_on(sbi, !cur || cur->page != page);
 	list_del(&cur->list);
+	fi->inmem_blocks--;
 	mutex_unlock(&fi->inmem_lock);
 
 	dec_page_count(sbi, F2FS_INMEM_PAGES);
@@ -410,11 +418,26 @@ int commit_inmem_pages(struct inode *inode)
 
 	INIT_LIST_HEAD(&revoke_list);
 	f2fs_balance_fs(sbi, true);
+	if (prefree_segments(sbi)
+		&& has_not_enough_free_secs(sbi, 0,
+		fi->inmem_blocks / BLKS_PER_SEC(sbi))) {
+		struct cp_control cpc;
+
+		cpc.reason = __get_cp_reason(sbi);
+		err = write_checkpoint(sbi, &cpc);
+		if (err)
+			goto drop;
+	}
 	f2fs_lock_op(sbi);
 
 	set_inode_flag(inode, FI_ATOMIC_COMMIT);
 
 	mutex_lock(&fi->inmem_lock);
+	if ((sbi->user_block_count - valid_user_blocks(sbi)) <
+		fi->inmem_blocks) {
+		err = -ENOSPC;
+		goto drop;
+	}
 	err = __commit_inmem_pages(inode, &revoke_list);
 	if (err) {
 		int ret;
@@ -429,7 +452,7 @@ int commit_inmem_pages(struct inode *inode)
 		ret = __revoke_inmem_pages(inode, &revoke_list, false, true);
 		if (ret)
 			err = ret;
-
+drop:
 		/* drop all uncommitted pages */
 		__revoke_inmem_pages(inode, &fi->inmem_pages, true, false);
 	}
@@ -437,6 +460,10 @@ int commit_inmem_pages(struct inode *inode)
 	if (!list_empty(&fi->inmem_ilist))
 		list_del_init(&fi->inmem_ilist);
 	spin_unlock(&sbi->inode_lock[ATOMIC_FILE]);
+	if (fi->inmem_blocks) {
+		f2fs_bug_on(sbi, 1);
+		fi->inmem_blocks = 0;
+	}
 	mutex_unlock(&fi->inmem_lock);
 
 	clear_inode_flag(inode, FI_ATOMIC_COMMIT);
