@@ -110,6 +110,8 @@ DEFINE_GUEST_HANDLE_STRUCT(vcpu_runstate_info);
  */
 #define RUNSTATE_offline  3
 
+#define RUNSTATE_max      4
+
 /*
  * Register a shared memory area from which the guest may obtain its own
  * runstate information without needing to execute a hypercall.

@@ -72,6 +72,7 @@ static int xen_suspend(void *data)
 	}
 
 	gnttab_suspend();
+	xen_accumulate_runstate_time(-1);
 	xen_arch_pre_suspend();
 
 	/*
@@ -84,6 +85,7 @@ static int xen_suspend(void *data)
                                            : 0);
 
 	xen_arch_post_suspend(si->cancelled);
+	xen_accumulate_runstate_time(si->cancelled);
 	gnttab_resume();
 
 	if (!si->cancelled) {
