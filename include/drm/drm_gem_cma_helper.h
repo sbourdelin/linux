@@ -21,7 +21,7 @@ struct drm_gem_cma_object {
 };
 
 static inline struct drm_gem_cma_object *
-to_drm_gem_cma_obj(struct drm_gem_object *gem_obj)
+to_drm_gem_cma_obj(const struct drm_gem_object *gem_obj)
 {
 	return container_of(gem_obj, struct drm_gem_cma_object, base);
 }
@@ -93,6 +93,9 @@ unsigned long drm_gem_cma_get_unmapped_area(struct file *filp,
 #ifdef CONFIG_DEBUG_FS
 void drm_gem_cma_describe(struct drm_gem_cma_object *obj, struct seq_file *m);
 #endif
+
+void drm_gem_cma_print_info(struct drm_printer *p, unsigned int indent,
+			    const struct drm_gem_object *obj);
 
 struct sg_table *drm_gem_cma_prime_get_sg_table(struct drm_gem_object *obj);
 struct drm_gem_object *
