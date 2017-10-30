@@ -2368,15 +2368,10 @@ static int btrfs_init_workqueues(struct btrfs_fs_info *fs_info,
 	fs_info->caching_workers =
 		btrfs_alloc_workqueue(fs_info, "cache", flags, max_active, 0);
 
-	/*
-	 * a higher idle thresh on the submit workers makes it much more
-	 * likely that bios will be send down in a sane order to the
-	 * devices
-	 */
 	fs_info->submit_workers =
 		btrfs_alloc_workqueue(fs_info, "submit", flags,
 				      min_t(u64, fs_devices->num_devices,
-					    max_active), 64);
+					    max_active), 1);
 
 	fs_info->fixup_workers =
 		btrfs_alloc_workqueue(fs_info, "fixup", flags, 1, 0);
