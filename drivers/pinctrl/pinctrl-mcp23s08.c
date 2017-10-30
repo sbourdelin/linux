@@ -721,25 +721,20 @@ static void mcp23s08_dbg_show(struct seq_file *s, struct gpio_chip *chip)
 	mutex_lock(&mcp->lock);
 
 	t = __check_mcp23s08_reg_cache(mcp);
-	if (t) {
-		seq_printf(s, " I/O Error\n");
-		goto done;
-	}
+	if (t)
+		goto report_failure;
+
 	t = mcp_read(mcp, MCP_IODIR, &iodir);
-	if (t) {
-		seq_printf(s, " I/O Error\n");
-		goto done;
-	}
+	if (t)
+		goto report_failure;
+
 	t = mcp_read(mcp, MCP_GPIO, &gpio);
-	if (t) {
-		seq_printf(s, " I/O Error\n");
-		goto done;
-	}
+	if (t)
+		goto report_failure;
+
 	t = mcp_read(mcp, MCP_GPPU, &gppu);
-	if (t) {
-		seq_printf(s, " I/O Error\n");
-		goto done;
-	}
+	if (t)
+		goto report_failure;
 
 	for (t = 0, mask = BIT(0); t < chip->ngpio; t++, mask <<= 1) {
 		const char *label;
@@ -756,8 +751,13 @@ static void mcp23s08_dbg_show(struct seq_file *s, struct gpio_chip *chip)
 		/* NOTE:  ignoring the irq-related registers */
 		seq_puts(s, "\n");
 	}
-done:
+unlock:
 	mutex_unlock(&mcp->lock);
+	return;
+
+report_failure:
+	seq_puts(s, " I/O Error\n");
+	goto unlock;
 }
 
 #else
