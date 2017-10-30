@@ -14123,7 +14123,7 @@ static void intel_atomic_state_free(struct drm_atomic_state *state)
 static const struct drm_mode_config_funcs intel_mode_funcs = {
 	.fb_create = intel_user_framebuffer_create,
 	.get_format_info = intel_get_format_info,
-	.output_poll_changed = intel_fbdev_output_poll_changed,
+	.output_poll_changed = drm_fb_helper_output_poll_changed,
 	.atomic_check = intel_atomic_check,
 	.atomic_commit = intel_atomic_commit,
 	.atomic_state_alloc = intel_atomic_state_alloc,
