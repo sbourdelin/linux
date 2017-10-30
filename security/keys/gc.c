@@ -32,7 +32,6 @@ DECLARE_WORK(key_gc_work, key_garbage_collector);
 static void key_gc_timer_func(unsigned long);
 static DEFINE_TIMER(key_gc_timer, key_gc_timer_func, 0, 0);
 
-static time64_t key_gc_next_run = TIME64_MAX;
 static struct key_type *key_gc_dead_keytype;
 
 static unsigned long key_gc_flags;
@@ -63,11 +62,10 @@ void key_schedule_gc(time64_t gc_at)
 	if (gc_at <= now || test_bit(KEY_GC_REAP_KEYTYPE, &key_gc_flags)) {
 		kdebug("IMMEDIATE");
 		schedule_work(&key_gc_work);
-	} else if (gc_at < key_gc_next_run) {
+	} else {
 		kdebug("DEFERRED");
-		key_gc_next_run = gc_at;
 		expires = jiffies + (gc_at - now) * HZ;
-		mod_timer(&key_gc_timer, expires);
+		reduce_timer(&key_gc_timer, expires);
 	}
 }
 
@@ -87,7 +85,6 @@ void key_schedule_gc_links(void)
 static void key_gc_timer_func(unsigned long data)
 {
 	kenter("");
-	key_gc_next_run = TIME64_MAX;
 	key_schedule_gc_links();
 }
 
