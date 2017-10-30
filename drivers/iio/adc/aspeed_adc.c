@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
+#include <linux/reset.h>
 #include <linux/spinlock.h>
 #include <linux/types.h>
 
@@ -53,11 +54,12 @@ struct aspeed_adc_model_data {
 };
 
 struct aspeed_adc_data {
-	struct device	*dev;
-	void __iomem	*base;
-	spinlock_t	clk_lock;
-	struct clk_hw	*clk_prescaler;
-	struct clk_hw	*clk_scaler;
+	struct device		*dev;
+	void __iomem		*base;
+	spinlock_t		clk_lock;
+	struct clk_hw		*clk_prescaler;
+	struct clk_hw		*clk_scaler;
+	struct reset_control	*rst;
 };
 
 #define ASPEED_CHAN(_idx, _data_reg_addr) {			\
@@ -217,6 +219,13 @@ static int aspeed_adc_probe(struct platform_device *pdev)
 		goto scaler_error;
 	}
 
+	data->rst = devm_reset_control_get_optional_exclusive(&pdev->dev, NULL);
+	if (IS_ERR(data->rst)) {
+		dev_err(&pdev->dev, "invalid reset controller in device tree");
+		data->rst = NULL;
+	} else
+		reset_control_deassert(data->rst);
+
 	model_data = of_device_get_match_data(&pdev->dev);
 
 	if (model_data->wait_init_sequence) {
@@ -268,6 +277,7 @@ clk_enable_error:
 
 scaler_error:
 	clk_hw_unregister_divider(data->clk_prescaler);
+	reset_control_assert(data->rst);
 	return ret;
 }
 
@@ -282,6 +292,7 @@ static int aspeed_adc_remove(struct platform_device *pdev)
 	clk_disable_unprepare(data->clk_scaler->clk);
 	clk_hw_unregister_divider(data->clk_scaler);
 	clk_hw_unregister_divider(data->clk_prescaler);
+	reset_control_assert(data->rst);
 
 	return 0;
 }
