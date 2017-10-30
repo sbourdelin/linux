@@ -405,10 +405,12 @@ int fib_validate_source(struct sk_buff *skb, __be32 src, __be32 dst,
 	    (dev->ifindex != oif || !IN_DEV_TX_REDIRECTS(idev))) {
 		if (IN_DEV_ACCEPT_LOCAL(idev))
 			goto ok;
-		/* if no local routes are added from user space we can check
-		 * for local addresses looking-up the ifaddr table
+		/* with custom local routes in place, checking local addresses
+		 * only will be too optimistic, with custom rules, checking
+		 * local addresses only can be too strict, e.g. due to vrf
 		 */
-		if (net->ipv4.fib_has_custom_local_routes)
+		if (net->ipv4.fib_has_custom_local_routes ||
+		    net->ipv4.fib_has_custom_rules)
 			goto full_check;
 		if (inet_lookup_ifaddr_rcu(net, src))
 			return -EINVAL;
