@@ -89,16 +89,12 @@ static int sirfsoc_dt_node_to_map(struct pinctrl_dev *pctldev,
 	/* calculate number of maps required */
 	for_each_child_of_node(np_config, np) {
 		ret = of_property_read_string(np, "sirf,function", &function);
-		if (ret < 0) {
-			of_node_put(np);
-			return ret;
-		}
+		if (ret < 0)
+			goto put_node;
 
 		ret = of_property_count_strings(np, "sirf,pins");
-		if (ret < 0) {
-			of_node_put(np);
-			return ret;
-		}
+		if (ret < 0)
+			goto put_node;
 
 		count += ret;
 	}
@@ -125,6 +121,10 @@ static int sirfsoc_dt_node_to_map(struct pinctrl_dev *pctldev,
 	*num_maps = count;
 
 	return 0;
+
+put_node:
+	of_node_put(np);
+	return ret;
 }
 
 static void sirfsoc_dt_free_map(struct pinctrl_dev *pctldev,
