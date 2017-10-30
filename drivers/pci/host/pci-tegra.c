@@ -232,6 +232,8 @@
 #define PADS_REFCLK_CFG_PREDI_SHIFT		8  /* 11:8 */
 #define PADS_REFCLK_CFG_DRVI_SHIFT		12 /* 15:12 */
 
+#define LINK_RETRAIN_TIMEOUT 100000
+
 struct tegra_msi {
 	struct msi_controller chip;
 	DECLARE_BITMAP(used, INT_PCI_MSI_NR);
@@ -2154,6 +2156,42 @@ static void tegra_pcie_enable_ports(struct tegra_pcie *pcie)
 	}
 }
 
+static void tegra_pcie_change_link_speed(struct tegra_pcie *pcie,
+					 struct pci_dev *pci_dev)
+{
+	struct device *dev = pcie->dev;
+	ktime_t deadline;
+	unsigned short val;
+
+	/* Skip if the current device is not a root port */
+	if (pci_pcie_type(pci_dev) != PCI_EXP_TYPE_ROOT_PORT)
+		return;
+
+	pcie_capability_read_word(pci_dev, PCI_EXP_LNKCTL2, &val);
+	val &= ~PCI_EXP_LNKSTA_CLS;
+	val |= PCI_EXP_LNKSTA_CLS_5_0GB;
+	pcie_capability_write_word(pci_dev, PCI_EXP_LNKCTL2, val);
+
+	/* Retrain the link */
+	pcie_capability_read_word(pci_dev, PCI_EXP_LNKCTL, &val);
+	val |= PCI_EXP_LNKCTL_RL;
+	pcie_capability_write_word(pci_dev, PCI_EXP_LNKCTL, val);
+
+	deadline = ktime_add_us(ktime_get(), LINK_RETRAIN_TIMEOUT);
+	for (;;) {
+		pcie_capability_read_word(pci_dev, PCI_EXP_LNKSTA, &val);
+		if (!(val & PCI_EXP_LNKSTA_LT))
+			break;
+		if (ktime_after(ktime_get(), deadline))
+			break;
+		usleep_range(2000, 3000);
+	}
+
+	if (val & PCI_EXP_LNKSTA_LT)
+		dev_err(dev, "link retrain of PCIe slot %u failed\n",
+			PCI_SLOT(pci_dev->devfn));
+}
+
 static const struct tegra_pcie_soc tegra20_pcie = {
 	.num_ports = 2,
 	.msi_base_shift = 0,
@@ -2355,6 +2393,7 @@ static int tegra_pcie_probe(struct platform_device *pdev)
 	struct pci_host_bridge *host;
 	struct tegra_pcie *pcie;
 	struct pci_bus *child;
+	struct pci_dev *pci_dev = NULL;
 	int err;
 
 	host = devm_pci_alloc_host_bridge(dev, sizeof(*pcie));
@@ -2419,6 +2458,9 @@ static int tegra_pcie_probe(struct platform_device *pdev)
 		pcie_bus_configure_settings(child);
 
 	pci_bus_add_devices(host->bus);
+
+	for_each_pci_dev(pci_dev)
+		tegra_pcie_change_link_speed(pcie, pci_dev);
 
 	if (IS_ENABLED(CONFIG_DEBUG_FS)) {
 		err = tegra_pcie_debugfs_init(pcie);
