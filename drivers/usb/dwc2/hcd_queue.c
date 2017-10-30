@@ -1275,11 +1275,11 @@ static void dwc2_do_unreserve(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh)
  * release the reservation.  This worker is called after the appropriate
  * delay.
  *
- * @work: Pointer to a qh unreserve_work.
+ * @t: Pointer to unreserve_timer in a qh.
  */
-static void dwc2_unreserve_timer_fn(unsigned long data)
+static void dwc2_unreserve_timer_fn(struct timer_list *t)
 {
-	struct dwc2_qh *qh = (struct dwc2_qh *)data;
+	struct dwc2_qh *qh = from_timer(qh, t, unreserve_timer);
 	struct dwc2_hsotg *hsotg = qh->hsotg;
 	unsigned long flags;
 
@@ -1461,11 +1461,11 @@ static void dwc2_deschedule_periodic(struct dwc2_hsotg *hsotg,
  * to retry some time later.  This function handles that timer and moves the
  * qh back to the "inactive" list, then queues transactions.
  *
- * @data: Pointer to a qh to re-schedule.
+ * @t: Pointer to wait_timer in a qh.
  */
-static void dwc2_wait_timer_fn(unsigned long data)
+static void dwc2_wait_timer_fn(struct timer_list *t)
 {
-	struct dwc2_qh *qh = (struct dwc2_qh *)data;
+	struct dwc2_qh *qh = from_timer(qh, t, wait_timer);
 	struct dwc2_hsotg *hsotg = qh->hsotg;
 	unsigned long flags;
 
@@ -1518,9 +1518,8 @@ static void dwc2_qh_init(struct dwc2_hsotg *hsotg, struct dwc2_qh *qh,
 
 	/* Initialize QH */
 	qh->hsotg = hsotg;
-	setup_timer(&qh->unreserve_timer, dwc2_unreserve_timer_fn,
-		    (unsigned long)qh);
-	setup_timer(&qh->wait_timer, dwc2_wait_timer_fn, (unsigned long)qh);
+	timer_setup(&qh->unreserve_timer, dwc2_unreserve_timer_fn, 0);
+	timer_setup(&qh->wait_timer, dwc2_wait_timer_fn, 0);
 	qh->ep_type = ep_type;
 	qh->ep_is_in = ep_is_in;
 
