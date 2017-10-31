@@ -56,6 +56,8 @@ struct sockaddr_ll {
 #define PACKET_QDISC_BYPASS		20
 #define PACKET_ROLLOVER_STATS		21
 #define PACKET_FANOUT_DATA		22
+#define PACKET_MEMREG			23
+#define PACKET_ZEROCOPY			24
 
 #define PACKET_FANOUT_HASH		0
 #define PACKET_FANOUT_LB		1
@@ -243,13 +245,35 @@ struct tpacket_block_desc {
 	union tpacket_bd_header_u hdr;
 };
 
+#define TP4_DESC_KERNEL	0x0080 /* The descriptor is owned by the kernel */
+#define TP4_PKT_CONT	1 /* The packet continues in the next descriptor */
+
+struct tpacket4_desc {
+	__u32 idx;
+	__u32 len;
+	__u16 offset;
+	__u8  error; /* an errno */
+	__u8  flags;
+	__u8  padding[4];
+};
+
+struct tpacket4_queue {
+	struct tpacket4_desc *ring;
+
+	unsigned int avail_idx;
+	unsigned int last_used_idx;
+	unsigned int num_free;
+	unsigned int ring_mask;
+};
+
 #define TPACKET2_HDRLEN		(TPACKET_ALIGN(sizeof(struct tpacket2_hdr)) + sizeof(struct sockaddr_ll))
 #define TPACKET3_HDRLEN		(TPACKET_ALIGN(sizeof(struct tpacket3_hdr)) + sizeof(struct sockaddr_ll))
 
 enum tpacket_versions {
 	TPACKET_V1,
 	TPACKET_V2,
-	TPACKET_V3
+	TPACKET_V3,
+	TPACKET_V4
 };
 
 /*
@@ -282,9 +306,26 @@ struct tpacket_req3 {
 	unsigned int	tp_feature_req_word;
 };
 
+/* V4 frame structure
+ *
+ * The v4 frame is contained within a frame defined by
+ * PACKET_MEMREG/struct tpacket_memreg_req. Each frame is frame_size
+ * bytes, and laid out as following:
+ *
+ * - Start.
+ * - Gap, at least data_headroom (from struct tpacket_memreg_req),
+ *   chosen so that packet data (Start+data) is at least 64B aligned.
+ */
+
+struct tpacket_req4 {
+	int		mr_fd;	 /* File descriptor for registered buffers */
+	unsigned int	desc_nr; /* Number of entries in descriptor ring */
+};
+
 union tpacket_req_u {
 	struct tpacket_req	req;
 	struct tpacket_req3	req3;
+	struct tpacket_req4	req4;
 };
 
 struct packet_mreq {
@@ -292,6 +333,28 @@ struct packet_mreq {
 	unsigned short	mr_type;
 	unsigned short	mr_alen;
 	unsigned char	mr_address[8];
+};
+
+/*
+ * struct tpacket_memreg_req is used in conjunction with PACKET_MEMREG
+ * to register user memory which should be used to store the packet
+ * data.
+ *
+ * There are some constraints for the memory being registered:
+ * - The memory area has to be memory page size aligned.
+ * - The frame size has to be a power of 2.
+ * - The frame size cannot be smaller than 2048B.
+ * - The frame size cannot be larger than the memory page size.
+ *
+ * Corollary: The number of frames that can be stored is
+ * len / frame_size.
+ *
+ */
+struct tpacket_memreg_req {
+	unsigned long	addr;		/* Start of packet data area */
+	unsigned long	len;		/* Length of packet data area */
+	unsigned int	frame_size;	/* Frame size */
+	unsigned int	data_headroom;	/* Frame head room */
 };
 
 #define PACKET_MR_MULTICAST	0
