@@ -400,13 +400,15 @@ static int veth_tp4_enable(struct net_device *netdev,
 	netif_napi_add(netdev, priv->napi, veth_napi_poll,
 		       NAPI_POLL_WEIGHT);
 
-	priv->tp4a_rx = tp4a_rx_new(params->rx_opaque, NAPI_POLL_WEIGHT, NULL);
+	priv->tp4a_rx = tp4a_rx_new(params->rx_opaque, NAPI_POLL_WEIGHT, NULL,
+				    NULL);
 	if (!priv->tp4a_rx) {
 		err = -ENOMEM;
 		goto rxa_err;
 	}
 
-	priv->tp4a_tx = tp4a_tx_new(params->tx_opaque, NAPI_POLL_WEIGHT, NULL);
+	priv->tp4a_tx = tp4a_tx_new(params->tx_opaque, NAPI_POLL_WEIGHT, NULL,
+				    NULL);
 	if (!priv->tp4a_tx) {
 		err = -ENOMEM;
 		goto txa_err;

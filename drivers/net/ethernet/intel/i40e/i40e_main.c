@@ -11398,7 +11398,7 @@ static int i40e_tp4_enable_rx(struct i40e_ring *rxr,
 	size_t elems = __roundup_pow_of_two(rxr->count * 8);
 	struct tp4_packet_array *arr;
 
-	arr = tp4a_rx_new(params->rx_opaque, elems, rxr->dev);
+	arr = tp4a_rx_new(params->rx_opaque, elems, rxr->netdev, rxr->dev);
 	if (!arr)
 		return -ENOMEM;
 
@@ -11428,7 +11428,7 @@ static int i40e_tp4_enable_tx(struct i40e_ring *txr,
 	size_t elems = __roundup_pow_of_two(txr->count * 8);
 	struct tp4_packet_array *arr;
 
-	arr = tp4a_tx_new(params->tx_opaque, elems, txr->dev);
+	arr = tp4a_tx_new(params->tx_opaque, elems, txr->netdev, txr->dev);
 	if (!arr)
 		return -ENOMEM;
 

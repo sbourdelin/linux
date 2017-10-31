@@ -15,6 +15,8 @@
 #ifndef _LINUX_TPACKET4_H
 #define _LINUX_TPACKET4_H
 
+#include <linux/bpf_trace.h>
+
 #define TP4_UMEM_MIN_FRAME_SIZE 2048
 #define TP4_KERNEL_HEADROOM 256 /* Headrom for XDP */
 
@@ -73,6 +75,7 @@ struct tp4_queue {
  **/
 struct tp4_packet_array {
 	struct tp4_queue *tp4q;
+	struct net_device *netdev;
 	struct device *dev;
 	enum dma_data_direction direction;
 	enum tp4_validation validation;
@@ -890,6 +893,7 @@ static inline void tp4f_packet_completed(struct tp4_frame_set *p)
 
 static inline struct tp4_packet_array *__tp4a_new(
 	struct tp4_queue *tp4q,
+	struct net_device *netdev,
 	struct device *dev,
 	enum dma_data_direction direction,
 	enum tp4_validation validation,
@@ -913,6 +917,7 @@ static inline struct tp4_packet_array *__tp4a_new(
 	}
 
 	arr->tp4q = tp4q;
+	arr->netdev = netdev;
 	arr->dev = dev;
 	arr->direction = direction;
 	arr->validation = validation;
@@ -930,11 +935,12 @@ static inline struct tp4_packet_array *__tp4a_new(
  **/
 static inline struct tp4_packet_array *tp4a_rx_new(void *rx_opaque,
 						   size_t elems,
+						   struct net_device *netdev,
 						   struct device *dev)
 {
 	enum dma_data_direction direction = dev ? DMA_FROM_DEVICE : DMA_NONE;
 
-	return __tp4a_new(rx_opaque, dev, direction, TP4_VALIDATION_IDX,
+	return __tp4a_new(rx_opaque, netdev, dev, direction, TP4_VALIDATION_IDX,
 			  elems);
 }
 
@@ -948,12 +954,13 @@ static inline struct tp4_packet_array *tp4a_rx_new(void *rx_opaque,
  **/
 static inline struct tp4_packet_array *tp4a_tx_new(void *tx_opaque,
 						   size_t elems,
+						   struct net_device *netdev,
 						   struct device *dev)
 {
 	enum dma_data_direction direction = dev ? DMA_TO_DEVICE : DMA_NONE;
 
-	return __tp4a_new(tx_opaque, dev, direction, TP4_VALIDATION_DESC,
-			  elems);
+	return __tp4a_new(tx_opaque, netdev, dev, direction,
+			  TP4_VALIDATION_DESC, elems);
 }
 
 /**
@@ -1328,6 +1335,153 @@ static inline void tp4a_return_packet(struct tp4_packet_array *a,
 				      struct tp4_frame_set *p)
 {
 	a->curr = p->start;
+}
+
+static inline struct tpacket4_desc __tp4a_swap_out(struct tp4_packet_array *a,
+						   u32 idx)
+{
+	struct tpacket4_desc tmp, *d;
+
+	/* NB! idx is already masked, so 0 <= idx < size holds! */
+	d = &a->items[a->start & a->mask];
+	tmp = *d;
+	*d = a->items[idx];
+	a->items[idx] = tmp;
+	a->start++;
+
+	return tmp;
+}
+
+static inline void  __tp4a_recycle(struct tp4_packet_array *a,
+				   struct tpacket4_desc *d)
+{
+	/* NB! No bound checking, assume paired with __tp4a_swap_out
+	 * to guarantee space.
+	 */
+	d->offset = tp4q_get_data_headroom(a->tp4q);
+	a->items[a->end++ & a->mask] = *d;
+}
+
+static inline void __tp4a_fill_xdp_buff(struct tp4_packet_array *a,
+					struct xdp_buff *xdp,
+					struct tpacket4_desc *d)
+{
+	xdp->data = tp4q_get_data(a->tp4q, d);
+	xdp->data_end = xdp->data + d->len;
+	xdp->data_meta = xdp->data;
+	xdp->data_hard_start = xdp->data - TP4_KERNEL_HEADROOM;
+}
+
+#define TP4_XDP_PASS 0
+#define TP4_XDP_CONSUMED 1
+#define TP4_XDP_TX 2
+
+/**
+ * tp4a_run_xdp - Execute an XDP program on the flushable range
+ * @a: pointer to frame set
+ * @recycled: the element was removed from flushable range
+ * @xdp_prog: XDP program
+ * @xdp_tx_handler: XDP xmit handler
+ * @xdp_tx_ctx: XDP xmit handler ctx
+ * @xdp_tx_flush_handler: XDP xmit flush handler
+ * @xdp_tx_flush_ctx: XDP xmit flush ctx
+ **/
+static inline void tp4a_run_xdp(struct tp4_frame_set *f,
+				bool *recycled,
+				struct bpf_prog *xdp_prog,
+				int (*xdp_tx_handler)(void *ctx,
+						      struct xdp_buff *xdp),
+				void *xdp_tx_ctx,
+				void (*xdp_tx_flush_handler)(void *ctx),
+				void *xdp_tx_flush_ctx)
+{
+	struct tp4_packet_array *a = f->pkt_arr;
+	struct tpacket4_desc *d, tmp;
+	bool xdp_xmit = false;
+	struct xdp_buff xdp;
+	ptrdiff_t diff, len;
+	struct page *page;
+	u32 act, idx;
+	void *data;
+	int err;
+
+	*recycled = false;
+
+	idx = f->curr & a->mask;
+	d = &a->items[idx];
+	__tp4a_fill_xdp_buff(a, &xdp, d);
+	data = xdp.data;
+
+	act = bpf_prog_run_xdp(xdp_prog, &xdp);
+	switch (act) {
+	case XDP_PASS:
+		if (data != xdp.data) {
+			diff = data - xdp.data;
+			d->offset += diff;
+		}
+		break;
+	case XDP_TX:
+	case XDP_REDIRECT:
+		*recycled = true;
+		tmp = __tp4a_swap_out(a, idx);
+		__tp4a_recycle(a, &tmp);
+
+		/* Ick! ndo_xdp_xmit is missing a destructor,
+		 * meaning that we cannot do proper completion
+		 * to userland, so we need to resort to
+		 * copying. Also, we need to rethink XDP Tx to
+		 * unify it with the existing patch, so we'll
+		 * do a copy here as well. So much for
+		 * "fast-path"...
+		 */
+		page = dev_alloc_pages(0);
+		if (!page)
+			break;
+
+		len = xdp.data_end - xdp.data;
+		if (len > PAGE_SIZE) {
+			put_page(page);
+			break;
+		}
+		data = page_address(page);
+		memcpy(data, xdp.data, len);
+
+		xdp.data = data;
+		xdp.data_end = data + len;
+		xdp_set_data_meta_invalid(&xdp);
+		xdp.data_hard_start = xdp.data;
+		if (act == XDP_TX) {
+			err = xdp_tx_handler(xdp_tx_ctx, &xdp);
+			/* XXX Clean this return value ugliness up... */
+			if (err != TP4_XDP_TX) {
+				put_page(page);
+				break;
+			}
+		} else {
+			err = xdp_do_redirect(a->netdev, &xdp, xdp_prog);
+			if (err) {
+				put_page(page);
+				break;
+			}
+		}
+		xdp_xmit = true;
+		break;
+	default:
+		bpf_warn_invalid_xdp_action(act);
+		/* fallthrough */
+	case XDP_ABORTED:
+		trace_xdp_exception(a->netdev, xdp_prog, act);
+		/* fallthrough -- handle aborts by dropping packet */
+	case XDP_DROP:
+		*recycled = true;
+		tmp = __tp4a_swap_out(a, idx);
+		__tp4a_recycle(a, &tmp);
+	}
+
+	if (xdp_xmit) {
+		xdp_tx_flush_handler(xdp_tx_ctx);
+		xdp_do_flush_map();
+	}
 }
 
 #endif /* _LINUX_TPACKET4_H */

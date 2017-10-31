@@ -5038,8 +5038,8 @@ packet_v4_ring_new(struct sock *sk, struct tpacket_req4 *req, int tx_ring)
 		  (struct tpacket4_desc *)rb->pg_vec->buffer);
 	spin_unlock_bh(&rb_queue->lock);
 
-	rb->tp4a = tx_ring ? tp4a_tx_new(&rb->tp4q, TP4_ARRAY_SIZE, NULL)
-		   : tp4a_rx_new(&rb->tp4q, TP4_ARRAY_SIZE, NULL);
+	rb->tp4a = tx_ring ? tp4a_tx_new(&rb->tp4q, TP4_ARRAY_SIZE, NULL, NULL)
+		   : tp4a_rx_new(&rb->tp4q, TP4_ARRAY_SIZE, NULL, NULL);
 
 	if (!rb->tp4a) {
 		err = -ENOMEM;

@@ -2276,6 +2276,9 @@ static inline unsigned int i40e_get_rx_desc_size(union i40e_rx_desc *rxd)
 	return size;
 }
 
+static void i40e_run_xdp_tp4(struct tp4_frame_set *f, bool *recycled,
+			     struct bpf_prog *xdp_prog, struct i40e_ring *xdpr);
+
 /**
  * i40e_clean_rx_tp4_irq - Pulls received packets of the descriptor ring
  * @rxr: ingress ring
@@ -2285,14 +2288,18 @@ static inline unsigned int i40e_get_rx_desc_size(union i40e_rx_desc *rxd)
  **/
 int i40e_clean_rx_tp4_irq(struct i40e_ring *rxr, int budget)
 {
-	int total_rx_bytes = 0, total_rx_packets = 0;
+	int total_rx_bytes = 0, total_rx_packets = 0, nflush = 0;
 	u16 cleaned_count = I40E_DESC_UNUSED(rxr);
 	struct tp4_frame_set frame_set;
+	struct bpf_prog *xdp_prog;
+	struct i40e_ring *xdpr;
 	bool failure;
 
 	if (!tp4a_get_flushable_frame_set(rxr->tp4.arr, &frame_set))
 		goto out;
 
+	rcu_read_lock();
+	xdp_prog = READ_ONCE(rxr->xdp_prog);
 	while (total_rx_packets < budget) {
 		union i40e_rx_desc *rxd = I40E_RX_DESC(rxr, rxr->next_to_clean);
 		unsigned int size = i40e_get_rx_desc_size(rxd);
@@ -2309,6 +2316,19 @@ int i40e_clean_rx_tp4_irq(struct i40e_ring *rxr, int budget)
 		tp4f_set_frame_no_offset(&frame_set, size,
 					 i40e_is_rx_desc_eof(rxd));
 
+		if (xdp_prog) {
+			bool recycled;
+
+			xdpr = rxr->vsi->xdp_rings[rxr->queue_index];
+			i40e_run_xdp_tp4(&frame_set, &recycled,
+					 xdp_prog, xdpr);
+
+			if (!recycled)
+				nflush++;
+		} else {
+			nflush++;
+		}
+
 		total_rx_bytes += size;
 		total_rx_packets++;
 
@@ -2316,8 +2336,9 @@ int i40e_clean_rx_tp4_irq(struct i40e_ring *rxr, int budget)
 
 		WARN_ON(!tp4f_next_frame(&frame_set));
 	}
+	rcu_read_unlock();
 
-	WARN_ON(tp4a_flush_n(rxr->tp4.arr, total_rx_packets));
+	WARN_ON(tp4a_flush_n(rxr->tp4.arr, nflush));
 
 	rxr->tp4.ev_handler(rxr->tp4.ev_opaque);
 
@@ -3798,4 +3819,49 @@ xmit:
 	xmit_done = i40e_tp4_xmit_irq(txr);
 
 	return clean_done && xmit_done;
+}
+
+/**
+ * i40e_tp4_xdp_tx_handler - XDP xmit
+ * @ctx: context
+ * @xdp: XDP buff
+ *
+ * Returns >=0 on success, <0 on failure.
+ **/
+static int i40e_tp4_xdp_tx_handler(void *ctx, struct xdp_buff *xdp)
+{
+	struct i40e_ring *xdpr = ctx;
+
+	return i40e_xmit_xdp_ring(xdp, xdpr);
+}
+
+/**
+ * i40e_tp4_xdp_tx_flush_handler - XDP flush
+ * @ctx: context
+ **/
+static void i40e_tp4_xdp_tx_flush_handler(void *ctx)
+{
+	struct i40e_ring *xdpr = ctx;
+
+	/* Force memory writes to complete before letting h/w
+	 * know there are new descriptors to fetch.
+	 */
+	wmb();
+
+	writel(xdpr->next_to_use, xdpr->tail);
+}
+
+/**
+ * i40e_run_xdp_tp4 - Runs an XDP program on a the flushable range of packets
+ * @a: pointer to frame set
+ * @recycled: true if element was removed from flushable range
+ * @xdp_prog: XDP program
+ * @xdpr: XDP Tx ring
+ **/
+static void i40e_run_xdp_tp4(struct tp4_frame_set *f, bool *recycled,
+			     struct bpf_prog *xdp_prog, struct i40e_ring *xdpr)
+{
+	tp4a_run_xdp(f, recycled, xdp_prog,
+		     i40e_tp4_xdp_tx_handler, xdpr,
+		     i40e_tp4_xdp_tx_flush_handler, xdpr);
 }
