@@ -757,6 +757,28 @@ static inline void tp4f_set_error(struct tp4_frame_set *p, int errno)
 }
 
 /**
+ * tp4f_is_last_frame - Is this the last frame of the frame set
+ * @p: pointer to frame set
+ *
+ * Returns true if this is the last frame of the frame set, otherwise 0
+ **/
+static inline bool tp4f_is_last_frame(struct tp4_frame_set *p)
+{
+	return p->curr + 1 == p->end;
+}
+
+/**
+ * tp4f_num_frames - Number of frames in a frame set
+ * @p: pointer to frame set
+ *
+ * Returns the number of frames this frame set consists of
+ **/
+static inline u32 tp4f_num_frames(struct tp4_frame_set *p)
+{
+	return p->end - p->start;
+}
+
+/**
  * tp4f_get_data - Gets a pointer to the frame the frame set is on
  * @p: pointer to the frame set
  *
@@ -1163,6 +1185,18 @@ static inline bool tp4a_next_frame_populate(struct tp4_packet_array *a,
 	}
 
 	return more_frames;
+}
+
+/**
+ * tp4a_return_packet - Return packet to the packet array
+ *
+ * @a: pointer to packet array
+ * @p: pointer to the packet to return
+ **/
+static inline void tp4a_return_packet(struct tp4_packet_array *a,
+				      struct tp4_frame_set *p)
+{
+	a->curr = p->start;
 }
 
 #endif /* _LINUX_TPACKET4_H */

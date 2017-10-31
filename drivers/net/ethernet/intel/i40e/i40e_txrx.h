@@ -430,6 +430,7 @@ struct i40e_ring {
 
 	struct rcu_head rcu;		/* to avoid race on free */
 	u16 next_to_alloc;
+	int tp4_xmit;
 	struct sk_buff *skb;		/* When i40e_clean_rx_ring_irq() must
 					 * return before it sees the EOP for
 					 * the current packet, we save that skb
@@ -520,9 +521,12 @@ static inline unsigned int i40e_rx_pg_order(struct i40e_ring *ring)
 
 bool i40e_alloc_rx_buffers(struct i40e_ring *rxr, u16 cleaned_count);
 int i40e_clean_rx_irq(struct i40e_ring *rxr, int budget);
+int i40e_clean_tx_irq(struct i40e_ring *tx_ring, int napi_budget);
 bool i40e_alloc_rx_buffers_tp4(struct i40e_ring *rxr, u16 cleaned_count);
 int i40e_clean_rx_tp4_irq(struct i40e_ring *rxr, int budget);
+int i40e_clean_tx_tp4_irq(struct i40e_ring *txr, int napi_budget);
 netdev_tx_t i40e_lan_xmit_frame(struct sk_buff *skb, struct net_device *netdev);
+int i40e_tp4_xmit(struct net_device *dev, int queue_pair);
 void i40e_clean_tx_ring(struct i40e_ring *tx_ring);
 void i40e_clean_rx_ring(struct i40e_ring *rx_ring);
 int i40e_setup_tx_descriptors(struct i40e_ring *tx_ring);

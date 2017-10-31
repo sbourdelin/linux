@@ -745,7 +745,7 @@ struct i40e_vsi {
 	/* VSI specific handlers */
 	irqreturn_t (*irq_handler)(int irq, void *data);
 
-	struct i40e_tp4_ctx **tp4_ctxs; /* Rx context */
+	struct i40e_tp4_ctx **tp4_ctxs; /* Rx, Tx context */
 	u16 num_tp4_ctxs;
 } ____cacheline_internodealigned_in_smp;
 

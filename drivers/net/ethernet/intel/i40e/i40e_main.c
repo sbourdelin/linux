@@ -4830,12 +4830,14 @@ static void i40e_vsi_save_tp4_ctxs(struct i40e_vsi *vsi)
 				vsi->num_tp4_ctxs = vsi->num_queue_pairs;
 			}
 
-			vsi->tp4_ctxs[i] = kzalloc(sizeof(struct i40e_tp4_ctx),
+			vsi->tp4_ctxs[i] = kcalloc(2, /* rx, tx */
+						   sizeof(struct i40e_tp4_ctx),
 						   GFP_KERNEL);
 			if (!vsi->tp4_ctxs[i])
 				goto out_elmn;
 
-			*vsi->tp4_ctxs[i] = vsi->rx_rings[i]->tp4;
+			vsi->tp4_ctxs[i][0] = vsi->rx_rings[i]->tp4;
+			vsi->tp4_ctxs[i][1] = vsi->tx_rings[i]->tp4;
 		}
 	}
 
@@ -4897,15 +4899,22 @@ static void i40e_tp4_flush_all(struct tp4_packet_array *a)
  * @rx_ctx: the Rx TP4 context
  **/
 static void i40e_tp4_restore(struct i40e_vsi *vsi, int queue_pair,
-			     struct i40e_tp4_ctx *rx_ctx)
+			     struct i40e_tp4_ctx *rx_ctx,
+			     struct i40e_tp4_ctx *tx_ctx)
 {
 	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+	struct i40e_ring *txr = vsi->tx_rings[queue_pair];
 
 	rxr->tp4 = *rx_ctx;
 	i40e_tp4_flush_all(rxr->tp4.arr);
 	i40e_tp4_set_rx_handler(rxr);
 
+	txr->tp4 = *tx_ctx;
+	i40e_tp4_flush_all(txr->tp4.arr);
+	txr->clean_irq = i40e_clean_tx_tp4_irq;
+
 	set_ring_tp4(rxr);
+	set_ring_tp4(txr);
 }
 
 /**
@@ -4923,7 +4932,8 @@ static void i40e_vsi_restore_tp4_ctxs(struct i40e_vsi *vsi)
 	for (i = 0; i < elms; i++) {
 		if (!vsi->tp4_ctxs[i])
 			continue;
-		i40e_tp4_restore(vsi, i, vsi->tp4_ctxs[i]);
+		i40e_tp4_restore(vsi, i, &vsi->tp4_ctxs[i][0],
+				 &vsi->tp4_ctxs[i][1]);
 	}
 
 	i40e_vsi_free_tp4_ctxs(vsi);
@@ -9337,6 +9347,7 @@ static int i40e_alloc_rings(struct i40e_vsi *vsi)
 		ring->netdev = vsi->netdev;
 		ring->dev = &pf->pdev->dev;
 		ring->count = vsi->num_desc;
+		ring->clean_irq = i40e_clean_tx_irq;
 		ring->size = 0;
 		ring->dcb_tc = 0;
 		if (vsi->back->hw_features & I40E_HW_WB_ON_ITR_CAPABLE)
@@ -9354,6 +9365,7 @@ static int i40e_alloc_rings(struct i40e_vsi *vsi)
 		ring->netdev = NULL;
 		ring->dev = &pf->pdev->dev;
 		ring->count = vsi->num_desc;
+		ring->clean_irq = i40e_clean_tx_irq;
 		ring->size = 0;
 		ring->dcb_tc = 0;
 		if (vsi->back->hw_features & I40E_HW_WB_ON_ITR_CAPABLE)
@@ -11246,7 +11258,23 @@ static struct i40e_tp4_ctx *i40e_vsi_get_tp4_rx_ctx(struct i40e_vsi *vsi,
 	if (!vsi->tp4_ctxs)
 		return NULL;
 
-	return vsi->tp4_ctxs[queue_pair];
+	return &vsi->tp4_ctxs[queue_pair][0];
+}
+
+/**
+ * i40e_vsi_get_tp4_tx_ctx - Retrieves the Tx TP4 context, if any.
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ *
+ * Returns NULL if there's no context available.
+ **/
+static struct i40e_tp4_ctx *i40e_vsi_get_tp4_tx_ctx(struct i40e_vsi *vsi,
+						    int queue_pair)
+{
+	if (!vsi->tp4_ctxs)
+		return NULL;
+
+	return &vsi->tp4_ctxs[queue_pair][1];
 }
 
 /**
@@ -11271,6 +11299,24 @@ static void i40e_tp4_disable_rx(struct i40e_ring *rxr)
 }
 
 /**
+ * i40e_tp4_disable_tx - Disables TP4 Rx mode
+ * @txr: egress ring
+ **/
+static void i40e_tp4_disable_tx(struct i40e_ring *txr)
+{
+	/* Don't free, if the context is saved! */
+	if (i40e_vsi_get_tp4_tx_ctx(txr->vsi, txr->queue_index))
+		txr->tp4.arr = NULL;
+	else
+		tp4a_free(txr->tp4.arr);
+
+	memset(&txr->tp4, 0, sizeof(txr->tp4));
+	clear_ring_tp4(txr);
+
+	txr->clean_irq = i40e_clean_tx_irq;
+}
+
+/**
  * __i40e_tp4_disable - Disables TP4 for a queue pair
  * @vsi: vsi
  * @queue_pair: queue pair
@@ -11278,11 +11324,13 @@ static void i40e_tp4_disable_rx(struct i40e_ring *rxr)
 static void __i40e_tp4_disable(struct i40e_vsi *vsi, int queue_pair)
 {
 	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+	struct i40e_ring *txr = vsi->tx_rings[queue_pair];
 
 	if (!i40e_qp_uses_tp4(vsi, queue_pair))
 		return;
 
 	i40e_tp4_disable_rx(rxr);
+	i40e_tp4_disable_tx(txr);
 }
 
 /**
@@ -11368,6 +11416,36 @@ static int i40e_tp4_enable_rx(struct i40e_ring *rxr,
 }
 
 /**
+ * i40e_tp4_enable_tx - Enables TP4 Tx
+ * @txr: egress ring
+ * @params: tp4 params
+ *
+ * Returns 0 on success, <0 on failure.
+ **/
+static int i40e_tp4_enable_tx(struct i40e_ring *txr,
+			      struct tp4_netdev_parms *params)
+{
+	size_t elems = __roundup_pow_of_two(txr->count * 8);
+	struct tp4_packet_array *arr;
+
+	arr = tp4a_tx_new(params->tx_opaque, elems, txr->dev);
+	if (!arr)
+		return -ENOMEM;
+
+	txr->tp4.arr = arr;
+	txr->tp4.ev_handler = params->write_space;
+	txr->tp4.ev_opaque = params->write_space_opaque;
+	txr->tp4.err_handler = params->error_report;
+	txr->tp4.err_opaque = params->error_report_opaque;
+
+	txr->clean_irq = i40e_clean_tx_tp4_irq;
+
+	set_ring_tp4(txr);
+
+	return 0;
+}
+
+/**
  * __i40e_tp4_enable - Enables TP4
  * @vsi: vsi
  * @params: tp4 params
@@ -11378,11 +11456,18 @@ static int __i40e_tp4_enable(struct i40e_vsi *vsi,
 			     struct tp4_netdev_parms *params)
 {
 	struct i40e_ring *rxr = vsi->rx_rings[params->queue_pair];
+	struct i40e_ring *txr = vsi->tx_rings[params->queue_pair];
 	int err;
 
 	err = i40e_tp4_enable_rx(rxr, params);
 	if (err)
 		return err;
+
+	err = i40e_tp4_enable_tx(txr, params);
+	if (err) {
+		i40e_tp4_disable_rx(rxr);
+		return err;
+	}
 
 	return 0;
 }
@@ -11414,7 +11499,7 @@ static int i40e_tp4_enable(struct net_device *netdev,
 	if (i40e_qp_uses_tp4(vsi, params->queue_pair))
 		return -EBUSY;
 
-	if (!params->rx_opaque)
+	if (!params->rx_opaque || !params->tx_opaque)
 		return -EINVAL;
 
 	err =  i40e_qp_disable(vsi, params->queue_pair);
@@ -11503,6 +11588,7 @@ static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_bridge_setlink	= i40e_ndo_bridge_setlink,
 	.ndo_xdp		= i40e_xdp,
 	.ndo_tp4_zerocopy	= i40e_tp4_zerocopy,
+	.ndo_tp4_xmit		= i40e_tp4_xmit,
 };
 
 /**

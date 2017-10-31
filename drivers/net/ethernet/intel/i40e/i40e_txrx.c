@@ -728,16 +728,50 @@ u32 i40e_get_tx_pending(struct i40e_ring *ring)
 #define WB_STRIDE 4
 
 /**
+ * i40e_update_tx_stats_and_arm_wb - Update Tx stats and possibly arm writeback
+ * @txr: egress ring
+ * @tx_bytes: numbers of bytes sent
+ * @tx_packets: number of packets sent
+ * @done: true if writeback should be armed
+ **/
+static inline void i40e_update_tx_stats_and_arm_wb(struct i40e_ring *txr,
+						   unsigned int tx_bytes,
+						   unsigned int tx_packets,
+						   bool done)
+{
+	u64_stats_update_begin(&txr->syncp);
+	txr->stats.bytes += tx_bytes;
+	txr->stats.packets += tx_packets;
+	u64_stats_update_end(&txr->syncp);
+	txr->q_vector->tx.total_bytes += tx_bytes;
+	txr->q_vector->tx.total_packets += tx_packets;
+
+	if (txr->flags & I40E_TXR_FLAGS_WB_ON_ITR) {
+		/* check to see if there are < 4 descriptors
+		 * waiting to be written back, then kick the hardware to force
+		 * them to be written back in case we stay in NAPI.
+		 * In this mode on X722 we do not enable interrupts.
+		 */
+		unsigned int j = i40e_get_tx_pending(txr);
+
+		if (done &&
+		    ((j / WB_STRIDE) == 0) && j > 0 &&
+		    !test_bit(__I40E_VSI_DOWN, txr->vsi->state) &&
+		    (I40E_DESC_UNUSED(txr) != txr->count))
+			txr->arm_wb = true;
+	}
+}
+
+/**
  * i40e_clean_tx_irq - Reclaim resources after transmit completes
- * @vsi: the VSI we care about
  * @tx_ring: Tx ring to clean
  * @napi_budget: Used to determine if we are in netpoll
  *
  * Returns true if there's any budget left (e.g. the clean is finished)
  **/
-static bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
-			      struct i40e_ring *tx_ring, int napi_budget)
+int i40e_clean_tx_irq(struct i40e_ring *tx_ring, int napi_budget)
 {
+	struct i40e_vsi *vsi = tx_ring->vsi;
 	u16 i = tx_ring->next_to_clean;
 	struct i40e_tx_buffer *tx_buf;
 	struct i40e_tx_desc *tx_head;
@@ -831,27 +865,9 @@ static bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
 
 	i += tx_ring->count;
 	tx_ring->next_to_clean = i;
-	u64_stats_update_begin(&tx_ring->syncp);
-	tx_ring->stats.bytes += total_bytes;
-	tx_ring->stats.packets += total_packets;
-	u64_stats_update_end(&tx_ring->syncp);
-	tx_ring->q_vector->tx.total_bytes += total_bytes;
-	tx_ring->q_vector->tx.total_packets += total_packets;
 
-	if (tx_ring->flags & I40E_TXR_FLAGS_WB_ON_ITR) {
-		/* check to see if there are < 4 descriptors
-		 * waiting to be written back, then kick the hardware to force
-		 * them to be written back in case we stay in NAPI.
-		 * In this mode on X722 we do not enable Interrupt.
-		 */
-		unsigned int j = i40e_get_tx_pending(tx_ring);
-
-		if (budget &&
-		    ((j / WB_STRIDE) == 0) && (j > 0) &&
-		    !test_bit(__I40E_VSI_DOWN, vsi->state) &&
-		    (I40E_DESC_UNUSED(tx_ring) != tx_ring->count))
-			tx_ring->arm_wb = true;
-	}
+	i40e_update_tx_stats_and_arm_wb(tx_ring, total_bytes, total_packets,
+					budget);
 
 	if (ring_is_xdp(tx_ring))
 		return !!budget;
@@ -2453,10 +2469,11 @@ int i40e_napi_poll(struct napi_struct *napi, int budget)
 	 * budget and be more aggressive about cleaning up the Tx descriptors.
 	 */
 	i40e_for_each_ring(ring, q_vector->tx) {
-		if (!i40e_clean_tx_irq(vsi, ring, budget)) {
+		if (!ring->clean_irq(ring, budget)) {
 			clean_complete = false;
 			continue;
 		}
+
 		arm_wb |= ring->arm_wb;
 		ring->arm_wb = false;
 	}
@@ -3523,6 +3540,7 @@ netdev_tx_t i40e_lan_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_vsi *vsi = np->vsi;
+	struct i40e_pf *pf = vsi->back;
 	struct i40e_ring *tx_ring = vsi->tx_rings[skb->queue_mapping];
 
 	/* hardware can't handle really short frames, hardware padding works
@@ -3530,6 +3548,18 @@ netdev_tx_t i40e_lan_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	 */
 	if (skb_put_padto(skb, I40E_MIN_TX_LEN))
 		return NETDEV_TX_OK;
+
+	if (unlikely(ring_uses_tp4(tx_ring) ||
+		     test_bit(__I40E_CONFIG_BUSY, pf->state))) {
+		/* XXX ndo_select_queue is being deprecated, so we
+		 * need another method for routing stack originated
+		 * packets away from the TP4 ring.
+		 *
+		 * For now, silently drop the skbuff.
+		 */
+		kfree_skb(skb);
+		return NETDEV_TX_OK;
+	}
 
 	return i40e_xmit_frame_ring(skb, tx_ring);
 }
@@ -3581,3 +3611,191 @@ bool i40e_alloc_rx_buffers_tp4(struct i40e_ring *rxr, u16 cleaned_count)
 	return ret;
 }
 
+/**
+ * i40e_napi_is_scheduled - If napi is running, set the NAPIF_STATE_MISSED
+ * @n: napi context
+ *
+ * Returns true if NAPI is scheduled.
+ **/
+static bool i40e_napi_is_scheduled(struct napi_struct *n)
+{
+	unsigned long val, new;
+
+	do {
+		val = READ_ONCE(n->state);
+		if (val & NAPIF_STATE_DISABLE)
+			return true;
+
+		if (!(val & NAPIF_STATE_SCHED))
+			return false;
+
+		new = val | NAPIF_STATE_MISSED;
+	} while (cmpxchg(&n->state, val, new) != val);
+
+	return true;
+}
+
+/**
+ * i40e_tp4_xmit - ndo_tp4_xmit implementation
+ * @netdev: netdev
+ * @queue_pair: queue_pair
+ *
+ * Returns >=0 on success, <0 on failure.
+ **/
+int i40e_tp4_xmit(struct net_device *netdev, int queue_pair)
+{
+	struct i40e_netdev_priv *np = netdev_priv(netdev);
+	struct i40e_vsi *vsi = np->vsi;
+	struct i40e_ring *txr;
+
+	if (test_bit(__I40E_VSI_DOWN, vsi->state))
+		return -EAGAIN;
+
+	txr = vsi->tx_rings[queue_pair];
+	if (!ring_uses_tp4(txr))
+		return -EINVAL;
+
+	WRITE_ONCE(txr->tp4_xmit, 1);
+	if (!i40e_napi_is_scheduled(&txr->q_vector->napi))
+		i40e_force_wb(vsi, txr->q_vector);
+
+	return 0;
+}
+
+/**
+ * i40e_tp4_xmit_irq - Pull packets from userland, post them to the HW ring
+ * @txr: ingress ring
+ *
+ * Returns true if there no more work to be done.
+ **/
+static bool i40e_tp4_xmit_irq(struct i40e_ring *txr)
+{
+	struct i40e_tx_desc *txd;
+	struct tp4_frame_set pkt;
+	u32 size, td_cmd;
+	bool done = true;
+	int cleaned = 0;
+	dma_addr_t dma;
+	u16 unused;
+
+	if (READ_ONCE(txr->tp4_xmit)) {
+		tp4a_populate(txr->tp4.arr);
+		WRITE_ONCE(txr->tp4_xmit, 0);
+	}
+
+	for (;;) {
+		if (!tp4a_next_packet(txr->tp4.arr, &pkt)) {
+			if (cleaned == 0)
+				return true;
+			break;
+		}
+
+		unused = I40E_DESC_UNUSED(txr);
+		if (unused < tp4f_num_frames(&pkt)) {
+			tp4a_return_packet(txr->tp4.arr, &pkt);
+			done = false;
+			break;
+		}
+
+		do {
+			dma = tp4f_get_dma(&pkt);
+			size = tp4f_get_frame_len(&pkt);
+			dma_sync_single_for_device(txr->dev, dma, size,
+						   DMA_TO_DEVICE);
+
+			txd = I40E_TX_DESC(txr, txr->next_to_use);
+			txd->buffer_addr = cpu_to_le64(dma);
+
+			td_cmd = I40E_TX_DESC_CMD_ICRC | I40E_TX_DESC_CMD_RS;
+			if (tp4f_is_last_frame(&pkt))
+				td_cmd |= I40E_TX_DESC_CMD_EOP;
+
+			txd->cmd_type_offset_bsz = build_ctob(td_cmd, 0,
+							      size, 0);
+
+			cleaned++;
+			txr->next_to_use++;
+			if (txr->next_to_use == txr->count)
+				txr->next_to_use = 0;
+
+		} while (tp4f_next_frame(&pkt));
+	}
+
+	/* Force memory writes to complete before letting h/w know
+	 * there are new descriptors to fetch.
+	 */
+	wmb();
+	writel(txr->next_to_use, txr->tail);
+
+	return done;
+}
+
+/**
+ * i40e_inc_tx_next_to_clean - Bumps the next to clean
+ * @ring: egress ring
+ **/
+static inline void i40e_inc_tx_next_to_clean(struct i40e_ring *ring)
+{
+	u32 ntc;
+
+	ntc = ring->next_to_clean + 1;
+	ntc = (ntc < ring->count) ? ntc : 0;
+	ring->next_to_clean = ntc;
+
+	prefetch(I40E_TX_DESC(ring, ntc));
+}
+
+/**
+ * i40e_clean_tx_tp4_irq - Cleans the egress ring for completed packets
+ * @txr: egress ring
+ * @budget: napi budget
+ *
+ * Returns >0 if there's no more work to be done.
+ **/
+int i40e_clean_tx_tp4_irq(struct i40e_ring *txr, int budget)
+{
+	int total_tx_bytes = 0, total_tx_packets = 0;
+	struct i40e_tx_desc *txd, *txdh;
+	struct tp4_frame_set frame_set;
+	bool clean_done, xmit_done;
+
+	budget = txr->vsi->work_limit;
+
+	if (!tp4a_get_flushable_frame_set(txr->tp4.arr, &frame_set)) {
+		clean_done = true;
+		goto xmit;
+	}
+
+	txdh = I40E_TX_DESC(txr, i40e_get_head(txr));
+
+	while (total_tx_packets < budget) {
+		txd = I40E_TX_DESC(txr, txr->next_to_clean);
+		if (txdh == txd)
+			break;
+
+		txd->buffer_addr = 0;
+		txd->cmd_type_offset_bsz = 0;
+
+		total_tx_packets++;
+		total_tx_bytes += tp4f_get_frame_len(&frame_set);
+
+		i40e_inc_tx_next_to_clean(txr);
+
+		if (!tp4f_next_frame(&frame_set))
+			break;
+	}
+
+	WARN_ON(tp4a_flush_n(txr->tp4.arr, total_tx_packets));
+	clean_done = (total_tx_packets < budget);
+
+	txr->tp4.ev_handler(txr->tp4.ev_opaque);
+
+	i40e_update_tx_stats_and_arm_wb(txr,
+					total_tx_bytes,
+					total_tx_packets,
+					clean_done);
+xmit:
+	xmit_done = i40e_tp4_xmit_irq(txr);
+
+	return clean_done && xmit_done;
+}
