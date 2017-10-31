@@ -2050,6 +2050,7 @@ static struct sk_buff *i40e_run_xdp(struct i40e_ring *rx_ring,
 	act = bpf_prog_run_xdp(xdp_prog, xdp);
 	switch (act) {
 	case XDP_PASS:
+	case XDP_PASS_TO_KERNEL:
 		break;
 	case XDP_TX:
 		xdp_ring = rx_ring->vsi->xdp_rings[rx_ring->queue_index];
@@ -2277,7 +2278,8 @@ static inline unsigned int i40e_get_rx_desc_size(union i40e_rx_desc *rxd)
 }
 
 static void i40e_run_xdp_tp4(struct tp4_frame_set *f, bool *recycled,
-			     struct bpf_prog *xdp_prog, struct i40e_ring *xdpr);
+			     struct bpf_prog *xdp_prog, struct i40e_ring *xdpr,
+			     struct i40e_ring *rxr);
 
 /**
  * i40e_clean_rx_tp4_irq - Pulls received packets of the descriptor ring
@@ -2321,7 +2323,7 @@ int i40e_clean_rx_tp4_irq(struct i40e_ring *rxr, int budget)
 
 			xdpr = rxr->vsi->xdp_rings[rxr->queue_index];
 			i40e_run_xdp_tp4(&frame_set, &recycled,
-					 xdp_prog, xdpr);
+					 xdp_prog, xdpr, rxr);
 
 			if (!recycled)
 				nflush++;
@@ -3852,16 +3854,68 @@ static void i40e_tp4_xdp_tx_flush_handler(void *ctx)
 }
 
 /**
+ * i40e_tp4_xdp_tx_flush_handler - XDP pass to kernel callback
+ * @ctx: context. A pointer to the RX ring.
+ * @xdp: XDP buff
+ *
+ * Returns 0 for success and <0 on failure.
+ **/
+static int i40e_tp4_xdp_to_kernel_handler(void *ctx, struct xdp_buff *xdp)
+{
+	struct i40e_ring *rx_ring = ctx;
+	union i40e_rx_desc *rx_desc;
+	struct sk_buff *skb;
+	unsigned int len;
+	u16 vlan_tag;
+	u8 rx_ptype;
+	u64 qword;
+	int err;
+
+	len = xdp->data_end - xdp->data;
+	skb = __napi_alloc_skb(&rx_ring->q_vector->napi, len,
+			       GFP_ATOMIC | __GFP_NOWARN);
+	if (unlikely(!skb))
+		return -ENOMEM;
+
+	/* XXX Use fragments for the data here */
+	skb_put(skb, len);
+	err = skb_store_bits(skb, 0, xdp->data, len);
+	if (unlikely(err)) {
+		kfree_skb(skb);
+		return err;
+	}
+
+	rx_desc = I40E_RX_DESC(rx_ring, rx_ring->next_to_clean);
+	qword = le64_to_cpu(rx_desc->wb.qword1.status_error_len);
+	rx_ptype = (qword & I40E_RXD_QW1_PTYPE_MASK) >>
+		I40E_RXD_QW1_PTYPE_SHIFT;
+
+	/* populate checksum, VLAN, and protocol */
+	i40e_process_skb_fields(rx_ring, rx_desc, skb, rx_ptype);
+
+	vlan_tag = (qword & BIT(I40E_RX_DESC_STATUS_L2TAG1P_SHIFT)) ?
+		le16_to_cpu(rx_desc->wb.qword0.lo_dword.l2tag1) : 0;
+
+	i40e_trace(clean_rx_irq_rx, rx_ring, rx_desc, skb);
+	i40e_receive_skb(rx_ring, skb, vlan_tag);
+
+	return 0;
+}
+
+/**
  * i40e_run_xdp_tp4 - Runs an XDP program on a the flushable range of packets
  * @a: pointer to frame set
  * @recycled: true if element was removed from flushable range
  * @xdp_prog: XDP program
  * @xdpr: XDP Tx ring
+ * @rxr: pointer to RX ring
  **/
 static void i40e_run_xdp_tp4(struct tp4_frame_set *f, bool *recycled,
-			     struct bpf_prog *xdp_prog, struct i40e_ring *xdpr)
+			     struct bpf_prog *xdp_prog, struct i40e_ring *xdpr,
+			     struct i40e_ring *rxr)
 {
 	tp4a_run_xdp(f, recycled, xdp_prog,
 		     i40e_tp4_xdp_tx_handler, xdpr,
-		     i40e_tp4_xdp_tx_flush_handler, xdpr);
+		     i40e_tp4_xdp_tx_flush_handler, xdpr,
+		     i40e_tp4_xdp_to_kernel_handler, rxr);
 }

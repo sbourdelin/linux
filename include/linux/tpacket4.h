@@ -1385,6 +1385,8 @@ static inline void __tp4a_fill_xdp_buff(struct tp4_packet_array *a,
  * @xdp_tx_ctx: XDP xmit handler ctx
  * @xdp_tx_flush_handler: XDP xmit flush handler
  * @xdp_tx_flush_ctx: XDP xmit flush ctx
+ * @xdp_to_kernel_handler: XDP pass to kernel handler
+ * @xdp_to_kernel_ctx: XDP pass to kernel ctx
  **/
 static inline void tp4a_run_xdp(struct tp4_frame_set *f,
 				bool *recycled,
@@ -1393,7 +1395,10 @@ static inline void tp4a_run_xdp(struct tp4_frame_set *f,
 						      struct xdp_buff *xdp),
 				void *xdp_tx_ctx,
 				void (*xdp_tx_flush_handler)(void *ctx),
-				void *xdp_tx_flush_ctx)
+				void *xdp_tx_flush_ctx,
+				int (*xdp_to_kernel_handler)(void *ctx,
+							 struct xdp_buff *xdp),
+				void *xdp_to_kernel_ctx)
 {
 	struct tp4_packet_array *a = f->pkt_arr;
 	struct tpacket4_desc *d, tmp;
@@ -1415,10 +1420,20 @@ static inline void tp4a_run_xdp(struct tp4_frame_set *f,
 	act = bpf_prog_run_xdp(xdp_prog, &xdp);
 	switch (act) {
 	case XDP_PASS:
+	case XDP_PASS_TO_KERNEL:
 		if (data != xdp.data) {
 			diff = data - xdp.data;
 			d->offset += diff;
 		}
+
+		if (act == XDP_PASS_TO_KERNEL) {
+			*recycled = true;
+			tmp = __tp4a_swap_out(a, idx);
+			__tp4a_recycle(a, &tmp);
+
+			err = xdp_to_kernel_handler(xdp_to_kernel_ctx, &xdp);
+		}
+
 		break;
 	case XDP_TX:
 	case XDP_REDIRECT:
