@@ -71,6 +71,10 @@ struct packet_ring_buffer {
 	unsigned int __percpu	*pending_refcnt;
 
 	struct tpacket_kbdq_core	prb_bdqc;
+
+	struct tp4_packet_array	*tp4a;
+	struct tp4_queue	tp4q;
+	struct socket		*mrsock;
 };
 
 extern struct mutex fanout_mutex;

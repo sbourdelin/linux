@@ -18,6 +18,12 @@
 #define TP4_UMEM_MIN_FRAME_SIZE 2048
 #define TP4_KERNEL_HEADROOM 256 /* Headrom for XDP */
 
+enum tp4_validation {
+	TP4_VALIDATION_NONE,	/* No validation is performed */
+	TP4_VALIDATION_IDX,	/* Only address to packet buffer is validated */
+	TP4_VALIDATION_DESC	/* Full descriptor is validated */
+};
+
 struct tp4_umem {
 	struct pid *pid;
 	struct page **pgs;
@@ -31,7 +37,93 @@ struct tp4_umem {
 	unsigned int data_headroom;
 };
 
+struct tp4_dma_info {
+	dma_addr_t dma;
+	struct page *page;
+};
+
+struct tp4_queue {
+	struct tpacket4_desc *ring;
+
+	unsigned int used_idx;
+	unsigned int last_avail_idx;
+	unsigned int ring_mask;
+	unsigned int num_free;
+
+	struct tp4_umem *umem;
+	struct tp4_dma_info *dma_info;
+	enum dma_data_direction direction;
+};
+
+/**
+ * struct tp4_packet_array - An array of packets/frames
+ *
+ * @tp4q: the tp4q associated with this packet array. Flushes and
+ *	  populates will operate on this.
+ * @dev: pointer to the netdevice the queue should be associated with
+ * @direction: the direction of the DMA channel that is set up.
+ * @validation: type of validation performed on populate
+ * @start: the first packet that has not been processed
+ * @curr: the packet that is currently being processed
+ * @end: the last packet in the array
+ * @mask: convenience variable for internal operations on the array
+ * @items: the actual descriptors to frames/packets that are in the array
+ **/
+struct tp4_packet_array {
+	struct tp4_queue *tp4q;
+	struct device *dev;
+	enum dma_data_direction direction;
+	enum tp4_validation validation;
+	u32 start;
+	u32 curr;
+	u32 end;
+	u32 mask;
+	struct tpacket4_desc items[0];
+};
+
+/**
+ * struct tp4_frame_set - A view of a packet array consisting of
+ *                        one or more frames
+ *
+ * @pkt_arr: the packet array this frame set is located in
+ * @start: the first frame that has not been processed
+ * @curr: the frame that is currently being processed
+ * @end: the last frame in the frame set
+ *
+ * This frame set can either be one or more frames or a single packet
+ * consisting of one or more frames. tp4f_ functions with packet in the
+ * name return a frame set representing a packet, while the other
+ * tp4f_ functions return one or more frames not taking into account if
+ * they consitute a packet or not.
+ **/
+struct tp4_frame_set {
+	struct tp4_packet_array *pkt_arr;
+	u32 start;
+	u32 curr;
+	u32 end;
+};
+
 /*************** V4 QUEUE OPERATIONS *******************************/
+
+/**
+ * tp4q_init - Initializas a tp4 queue
+ *
+ * @q: Pointer to the tp4 queue structure to be initialized
+ * @nentries: Number of descriptor entries in the queue
+ * @umem: Pointer to the umem / packet buffer associated with this queue
+ * @buffer: Pointer to the memory region where the descriptors will reside
+ **/
+static inline void tp4q_init(struct tp4_queue *q, unsigned int nentries,
+			     struct tp4_umem *umem,
+			     struct tpacket4_desc *buffer)
+{
+	q->ring = buffer;
+	q->used_idx = 0;
+	q->last_avail_idx = 0;
+	q->ring_mask = nentries - 1;
+	q->num_free = 0;
+	q->umem = umem;
+}
 
 /**
  * tp4q_umem_new - Creates a new umem (packet buffer)
@@ -96,6 +188,305 @@ static inline struct tp4_umem *tp4q_umem_new(unsigned long addr, size_t size,
 	umem->data_headroom = data_headroom;
 
 	return umem;
+}
+
+/**
+ * tp4q_enqueue_from_array - Enqueue entries from packet array to tp4 queue
+ *
+ * @a: Pointer to the packet array to enqueue from
+ * @dcnt: Max number of entries to enqueue
+ *
+ * Returns 0 for success or an errno at failure
+ **/
+static inline int tp4q_enqueue_from_array(struct tp4_packet_array *a,
+					  u32 dcnt)
+{
+	struct tp4_queue *q = a->tp4q;
+	unsigned int used_idx = q->used_idx;
+	struct tpacket4_desc *d = a->items;
+	int i;
+
+	if (q->num_free < dcnt)
+		return -ENOSPC;
+
+	q->num_free -= dcnt;
+
+	for (i = 0; i < dcnt; i++) {
+		unsigned int idx = (used_idx++) & q->ring_mask;
+		unsigned int didx = (a->start + i) & a->mask;
+
+		q->ring[idx].idx = d[didx].idx;
+		q->ring[idx].len = d[didx].len;
+		q->ring[idx].offset = d[didx].offset;
+		q->ring[idx].error = d[didx].error;
+	}
+
+	/* Order flags and data */
+	smp_wmb();
+
+	for (i = dcnt - 1; i >= 0; i--) {
+		unsigned int idx = (q->used_idx + i) & q->ring_mask;
+		unsigned int didx = (a->start + i) & a->mask;
+
+		q->ring[idx].flags = d[didx].flags & ~TP4_DESC_KERNEL;
+	}
+	q->used_idx += dcnt;
+
+	return 0;
+}
+
+/**
+ * tp4q_disable - Disable a tp4 queue
+ *
+ * @dev: Pointer to the netdevice the queue is connected to
+ * @q: Pointer to the tp4 queue to disable
+ **/
+static inline void tp4q_disable(struct device *dev,
+				struct tp4_queue *q)
+{
+	int i;
+
+	if (q->dma_info) {
+		/* Unmap DMA */
+		for (i = 0; i < q->umem->npgs; i++)
+			dma_unmap_page(dev, q->dma_info[i].dma, PAGE_SIZE,
+				       q->direction);
+
+		kfree(q->dma_info);
+		q->dma_info = NULL;
+	}
+}
+
+/**
+ * tp4q_enable - Enable a tp4 queue
+ *
+ * @dev: Pointer to the netdevice the queue should be associated with
+ * @q: Pointer to the tp4 queue to enable
+ * @direction: The direction of the DMA channel that is set up.
+ *
+ * Returns 0 for success or a negative errno for failure
+ **/
+static inline int tp4q_enable(struct device *dev,
+			      struct tp4_queue *q,
+			      enum dma_data_direction direction)
+{
+	int i, j;
+
+	/* DMA map all the buffers in bufs up front, and sync prior
+	 * kicking userspace. Is this sane? Strictly user land owns
+	 * the buffer until they show up on the avail queue. However,
+	 * mapping should be ok.
+	 */
+	if (direction != DMA_NONE) {
+		q->dma_info = kcalloc(q->umem->npgs, sizeof(*q->dma_info),
+				      GFP_KERNEL);
+		if (!q->dma_info)
+			return -ENOMEM;
+
+		for (i = 0; i < q->umem->npgs; i++) {
+			dma_addr_t dma;
+
+			dma = dma_map_page(dev, q->umem->pgs[i], 0,
+					   PAGE_SIZE, direction);
+			if (dma_mapping_error(dev, dma)) {
+				for (j = 0; j < i; j++)
+					dma_unmap_page(dev,
+						       q->dma_info[j].dma,
+						       PAGE_SIZE, direction);
+				kfree(q->dma_info);
+				q->dma_info = NULL;
+				return -EBUSY;
+			}
+
+			q->dma_info[i].page = q->umem->pgs[i];
+			q->dma_info[i].dma = dma;
+		}
+	} else {
+		q->dma_info = NULL;
+	}
+
+	q->direction = direction;
+	return 0;
+}
+
+/*************** FRAME OPERATIONS *******************************/
+/* A frame is always just one frame of size frame_size.
+ * A frame set is one or more frames.
+ **/
+
+/**
+ * tp4f_next_frame - Go to next frame in frame set
+ * @p: pointer to frame set
+ *
+ * Returns true if there is another frame in the frame set.
+ * Advances curr pointer.
+ **/
+static inline bool tp4f_next_frame(struct tp4_frame_set *p)
+{
+	if (p->curr + 1 == p->end)
+		return false;
+
+	p->curr++;
+	return true;
+}
+
+/**
+ * tp4f_set_frame - Sets the properties of a frame
+ * @p: pointer to frame
+ * @len: the length in bytes of the data in the frame
+ * @offset: offset to start of data in frame
+ * @is_eop: Set if this is the last frame of the packet
+ **/
+static inline void tp4f_set_frame(struct tp4_frame_set *p, u32 len, u16 offset,
+				  bool is_eop)
+{
+	struct tpacket4_desc *d =
+		&p->pkt_arr->items[p->curr & p->pkt_arr->mask];
+
+	d->len = len;
+	d->offset = offset;
+	if (!is_eop)
+		d->flags |= TP4_PKT_CONT;
+}
+
+/**************** PACKET_ARRAY FUNCTIONS ********************************/
+
+static inline struct tp4_packet_array *__tp4a_new(
+	struct tp4_queue *tp4q,
+	struct device *dev,
+	enum dma_data_direction direction,
+	enum tp4_validation validation,
+	size_t elems)
+{
+	struct tp4_packet_array *arr;
+	int err;
+
+	if (!is_power_of_2(elems))
+		return NULL;
+
+	arr = kzalloc(sizeof(*arr) + elems * sizeof(struct tpacket4_desc),
+		      GFP_KERNEL);
+	if (!arr)
+		return NULL;
+
+	err = tp4q_enable(dev, tp4q, direction);
+	if (err) {
+		kfree(arr);
+		return NULL;
+	}
+
+	arr->tp4q = tp4q;
+	arr->dev = dev;
+	arr->direction = direction;
+	arr->validation = validation;
+	arr->mask = elems - 1;
+	return arr;
+}
+
+/**
+ * tp4a_rx_new - Create new packet array for ingress
+ * @rx_opaque: opaque from tp4_netdev_params
+ * @elems: number of elements in the packet array
+ * @dev: device or NULL
+ *
+ * Returns a reference to the new packet array or NULL for failure
+ **/
+static inline struct tp4_packet_array *tp4a_rx_new(void *rx_opaque,
+						   size_t elems,
+						   struct device *dev)
+{
+	enum dma_data_direction direction = dev ? DMA_FROM_DEVICE : DMA_NONE;
+
+	return __tp4a_new(rx_opaque, dev, direction, TP4_VALIDATION_IDX,
+			  elems);
+}
+
+/**
+ * tp4a_tx_new - Create new packet array for egress
+ * @tx_opaque: opaque from tp4_netdev_params
+ * @elems: number of elements in the packet array
+ * @dev: device or NULL
+ *
+ * Returns a reference to the new packet array or NULL for failure
+ **/
+static inline struct tp4_packet_array *tp4a_tx_new(void *tx_opaque,
+						   size_t elems,
+						   struct device *dev)
+{
+	enum dma_data_direction direction = dev ? DMA_TO_DEVICE : DMA_NONE;
+
+	return __tp4a_new(tx_opaque, dev, direction, TP4_VALIDATION_DESC,
+			  elems);
+}
+
+/**
+ * tp4a_get_flushable_frame_set - Create a frame set of the flushable region
+ * @a: pointer to packet array
+ * @p: frame set
+ *
+ * Returns true for success and false for failure
+ **/
+static inline bool tp4a_get_flushable_frame_set(struct tp4_packet_array *a,
+						struct tp4_frame_set *p)
+{
+	u32 avail = a->curr - a->start;
+
+	if (avail == 0)
+		return false; /* empty */
+
+	p->pkt_arr = a;
+	p->start = a->start;
+	p->curr = a->start;
+	p->end = a->curr;
+
+	return true;
+}
+
+/**
+ * tp4a_flush - Flush processed packets to associated tp4q
+ * @a: pointer to packet array
+ *
+ * Returns 0 for success and -1 for failure
+ **/
+static inline int tp4a_flush(struct tp4_packet_array *a)
+{
+	u32 avail = a->curr - a->start;
+	int ret;
+
+	if (avail == 0)
+		return 0; /* nothing to flush */
+
+	ret = tp4q_enqueue_from_array(a, avail);
+	if (ret < 0)
+		return -1;
+
+	a->start = a->curr;
+
+	return 0;
+}
+
+/**
+ * tp4a_free - Destroy packet array
+ * @a: pointer to packet array
+ **/
+static inline void tp4a_free(struct tp4_packet_array *a)
+{
+	struct tp4_frame_set f;
+
+	if (a) {
+		/* Flush all outstanding requests. */
+		if (tp4a_get_flushable_frame_set(a, &f)) {
+			do {
+				tp4f_set_frame(&f, 0, 0, true);
+			} while (tp4f_next_frame(&f));
+		}
+
+		WARN_ON_ONCE(tp4a_flush(a));
+
+		tp4q_disable(a->dev, a->tp4q);
+	}
+
+	kfree(a);
 }
 
 #endif /* _LINUX_TPACKET4_H */
