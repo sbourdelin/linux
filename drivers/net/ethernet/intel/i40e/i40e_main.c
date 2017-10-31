@@ -3187,8 +3187,6 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	/* clear the context structure first */
 	memset(&rx_ctx, 0, sizeof(rx_ctx));
 
-	ring->rx_buf_len = vsi->rx_buf_len;
-
 	rx_ctx.dbuff = DIV_ROUND_UP(ring->rx_buf_len,
 				    BIT_ULL(I40E_RXQ_CTX_DBUFF_SHIFT));
 
@@ -3203,7 +3201,8 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	 */
 	rx_ctx.hsplit_0 = 0;
 
-	rx_ctx.rxmax = min_t(u16, vsi->max_frame, chain_len * ring->rx_buf_len);
+	rx_ctx.rxmax = min_t(u16, ring->rx_max_frame,
+			     chain_len * ring->rx_buf_len);
 	if (hw->revision_id == 0)
 		rx_ctx.lrxqthresh = 0;
 	else
@@ -3243,7 +3242,7 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	ring->tail = hw->hw_addr + I40E_QRX_TAIL(pf_q);
 	writel(0, ring->tail);
 
-	i40e_alloc_rx_buffers(ring, I40E_DESC_UNUSED(ring));
+	ring->rx_alloc_fn(ring, I40E_DESC_UNUSED(ring));
 
 	return 0;
 }
@@ -3281,21 +3280,6 @@ static int i40e_vsi_configure_rx(struct i40e_vsi *vsi)
 {
 	int err = 0;
 	u16 i;
-
-	if (!vsi->netdev || (vsi->back->flags & I40E_FLAG_LEGACY_RX)) {
-		vsi->max_frame = I40E_MAX_RXBUFFER;
-		vsi->rx_buf_len = I40E_RXBUFFER_2048;
-#if (PAGE_SIZE < 8192)
-	} else if (!I40E_2K_TOO_SMALL_WITH_PADDING &&
-		   (vsi->netdev->mtu <= ETH_DATA_LEN)) {
-		vsi->max_frame = I40E_RXBUFFER_1536 - NET_IP_ALIGN;
-		vsi->rx_buf_len = I40E_RXBUFFER_1536 - NET_IP_ALIGN;
-#endif
-	} else {
-		vsi->max_frame = I40E_MAX_RXBUFFER;
-		vsi->rx_buf_len = (PAGE_SIZE < 8192) ? I40E_RXBUFFER_3072 :
-						       I40E_RXBUFFER_2048;
-	}
 
 	/* set up individual rings */
 	for (i = 0; i < vsi->num_queue_pairs && !err; i++)
@@ -4774,6 +4758,193 @@ static void i40e_pf_unquiesce_all_vsi(struct i40e_pf *pf)
 	for (v = 0; v < pf->num_alloc_vsi; v++) {
 		if (pf->vsi[v])
 			i40e_unquiesce_vsi(pf->vsi[v]);
+	}
+}
+
+/**
+ * i40e_vsi_free_tp4_ctxs - Free TP4 contexts
+ * @vsi: vsi
+ */
+static void i40e_vsi_free_tp4_ctxs(struct i40e_vsi *vsi)
+{
+	int i;
+
+	if (!vsi->tp4_ctxs)
+		return;
+
+	for (i = 0; i < vsi->num_tp4_ctxs; i++)
+		kfree(vsi->tp4_ctxs[i]);
+
+	kfree(vsi->tp4_ctxs);
+	vsi->tp4_ctxs = NULL;
+}
+
+/**
+ * i40e_qp_error_report_tp4 - Trigger the TP4 error handler
+ * @vsi: vsi
+ * @queue_pair: queue_pair to report
+ * @errno: the error code
+ **/
+static void i40e_qp_error_report_tp4(struct i40e_vsi *vsi, int queue_pair,
+				     int errno)
+{
+	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+
+	rxr->tp4.err_handler(rxr->tp4.err_opaque, errno);
+}
+
+/**
+ * i40e_qp_uses_tp4 - Check for TP4 usage
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ *
+ * Returns true if TP4 is enabled, else false.
+ **/
+static bool i40e_qp_uses_tp4(struct i40e_vsi *vsi, int queue_pair)
+{
+	return ring_uses_tp4(vsi->rx_rings[queue_pair]);
+}
+
+/**
+ * i40e_vsi_save_tp4_ctxs - Save TP4 context to a vsi
+ * @vsi: vsi
+ */
+static void i40e_vsi_save_tp4_ctxs(struct i40e_vsi *vsi)
+{
+	int i = 0;
+
+	if (test_bit(__I40E_VSI_DOWN, vsi->state))
+		return;
+
+	kfree(vsi->tp4_ctxs); /* Let's be cautious */
+
+	for (i = 0; i < vsi->num_queue_pairs; i++) {
+		if (i40e_qp_uses_tp4(vsi, i)) {
+			if (!vsi->tp4_ctxs) {
+				vsi->tp4_ctxs = kcalloc(vsi->num_queue_pairs,
+							sizeof(*vsi->tp4_ctxs),
+							GFP_KERNEL);
+				if (!vsi->tp4_ctxs)
+					goto out;
+
+				vsi->num_tp4_ctxs = vsi->num_queue_pairs;
+			}
+
+			vsi->tp4_ctxs[i] = kzalloc(sizeof(struct i40e_tp4_ctx),
+						   GFP_KERNEL);
+			if (!vsi->tp4_ctxs[i])
+				goto out_elmn;
+
+			*vsi->tp4_ctxs[i] = vsi->rx_rings[i]->tp4;
+		}
+	}
+
+	return;
+
+out_elmn:
+	i40e_vsi_free_tp4_ctxs(vsi);
+out:
+	for (i = 0; i < vsi->num_queue_pairs; i++) {
+		if (i40e_qp_uses_tp4(vsi, i))
+			i40e_qp_error_report_tp4(vsi, i, ENOMEM);
+	}
+}
+
+/**
+ * i40e_tp4_set_rx_handler - Sets the Rx clean_irq function for TP4
+ * @rxr: ingress ring
+ **/
+static void i40e_tp4_set_rx_handler(struct i40e_ring *rxr)
+{
+	unsigned int buf_len;
+
+	buf_len = min_t(unsigned int,
+			tp4a_max_data_size(rxr->tp4.arr),
+			I40E_MAX_RXBUFFER) &
+		  ~(BIT(I40E_RXQ_CTX_DBUFF_SHIFT) - 1);
+
+	/* Currently we don't allow packets spanning multiple
+	 * buffers.
+	 */
+	rxr->rx_buf_len = buf_len;
+	rxr->rx_max_frame = buf_len;
+	rxr->rx_alloc_fn = i40e_alloc_rx_buffers_tp4;
+	rxr->clean_irq = i40e_clean_rx_tp4_irq;
+}
+
+/**
+ * i40e_tp4_flush_all - Flush all outstanding descriptors to userland
+ * @a: pointer to the packet array
+ **/
+static void i40e_tp4_flush_all(struct tp4_packet_array *a)
+{
+	struct tp4_frame_set f;
+
+	/* Flush all outstanding requests. */
+	if (tp4a_get_flushable_frame_set(a, &f)) {
+		do {
+			tp4f_set_frame(&f, 0, 0, true);
+		} while (tp4f_next_frame(&f));
+	}
+
+	WARN_ON(tp4a_flush(a));
+}
+
+/**
+ * i40e_tp4_restore - Restores to a previous TP4 state
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ * @rx_ctx: the Rx TP4 context
+ **/
+static void i40e_tp4_restore(struct i40e_vsi *vsi, int queue_pair,
+			     struct i40e_tp4_ctx *rx_ctx)
+{
+	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+
+	rxr->tp4 = *rx_ctx;
+	i40e_tp4_flush_all(rxr->tp4.arr);
+	i40e_tp4_set_rx_handler(rxr);
+
+	set_ring_tp4(rxr);
+}
+
+/**
+ * i40e_vsi_restore_tp4_ctxs - Restores all contexts
+ * @vsi: vsi
+ **/
+static void i40e_vsi_restore_tp4_ctxs(struct i40e_vsi *vsi)
+{
+	u16 i, elms;
+
+	if (!vsi->tp4_ctxs)
+		return;
+
+	elms = min(vsi->num_queue_pairs, vsi->num_tp4_ctxs);
+	for (i = 0; i < elms; i++) {
+		if (!vsi->tp4_ctxs[i])
+			continue;
+		i40e_tp4_restore(vsi, i, vsi->tp4_ctxs[i]);
+	}
+
+	i40e_vsi_free_tp4_ctxs(vsi);
+}
+
+/**
+ * i40e_pf_save_tp4_ctx_all_vsi - Saves all TP4 contexts
+ ' @pf: pf
+ */
+static void i40e_pf_save_tp4_ctx_all_vsi(struct i40e_pf *pf)
+{
+	struct i40e_vsi *vsi;
+	int v;
+
+	/* The rings are about to be removed at reset; Saving the TP4
+	 * context in the vsi temporarily
+	 */
+	for (v = 0; v < pf->num_alloc_vsi; v++) {
+		vsi = pf->vsi[v];
+		if (vsi && vsi->netdev)
+			i40e_vsi_save_tp4_ctxs(vsi);
 	}
 }
 
@@ -6511,6 +6682,8 @@ int i40e_up(struct i40e_vsi *vsi)
 	return err;
 }
 
+static void __i40e_tp4_disable(struct i40e_vsi *vsi, int queue_pair);
+
 /**
  * i40e_down - Shutdown the connection processing
  * @vsi: the VSI being stopped
@@ -6531,6 +6704,7 @@ void i40e_down(struct i40e_vsi *vsi)
 	i40e_napi_disable_all(vsi);
 
 	for (i = 0; i < vsi->num_queue_pairs; i++) {
+		__i40e_tp4_disable(vsi, i);
 		i40e_clean_tx_ring(vsi->tx_rings[i]);
 		if (i40e_enabled_xdp_vsi(vsi))
 			i40e_clean_tx_ring(vsi->xdp_rings[i]);
@@ -8224,6 +8398,7 @@ static void i40e_prep_for_reset(struct i40e_pf *pf, bool lock_acquired)
 	/* pf_quiesce_all_vsi modifies netdev structures -rtnl_lock needed */
 	if (!lock_acquired)
 		rtnl_lock();
+	i40e_pf_save_tp4_ctx_all_vsi(pf);
 	i40e_pf_quiesce_all_vsi(pf);
 	if (!lock_acquired)
 		rtnl_unlock();
@@ -9082,7 +9257,7 @@ static int i40e_vsi_clear(struct i40e_vsi *vsi)
 
 	i40e_vsi_free_arrays(vsi, true);
 	i40e_clear_rss_config_user(vsi);
-
+	i40e_vsi_free_tp4_ctxs(vsi);
 	pf->vsi[vsi->idx] = NULL;
 	if (vsi->idx < pf->next_vsi)
 		pf->next_vsi = vsi->idx;
@@ -9115,6 +9290,28 @@ static void i40e_vsi_clear_rings(struct i40e_vsi *vsi)
 }
 
 /**
+ * i40e_vsi_setup_rx_size - Setup Rx buffer sizes
+ * @vsi: vsi
+ **/
+static void i40e_vsi_setup_rx_size(struct i40e_vsi *vsi)
+{
+	if (!vsi->netdev || (vsi->back->flags & I40E_FLAG_LEGACY_RX)) {
+		vsi->max_frame = I40E_MAX_RXBUFFER;
+		vsi->rx_buf_len = I40E_RXBUFFER_2048;
+#if (PAGE_SIZE < 8192)
+	} else if (!I40E_2K_TOO_SMALL_WITH_PADDING &&
+		   (vsi->netdev->mtu <= ETH_DATA_LEN)) {
+		vsi->max_frame = I40E_RXBUFFER_1536 - NET_IP_ALIGN;
+		vsi->rx_buf_len = I40E_RXBUFFER_1536 - NET_IP_ALIGN;
+#endif
+	} else {
+		vsi->max_frame = I40E_MAX_RXBUFFER;
+		vsi->rx_buf_len = (PAGE_SIZE < 8192) ? I40E_RXBUFFER_3072 :
+				  I40E_RXBUFFER_2048;
+	}
+}
+
+/**
  * i40e_alloc_rings - Allocates the Rx and Tx rings for the provided VSI
  * @vsi: the VSI being configured
  **/
@@ -9123,6 +9320,8 @@ static int i40e_alloc_rings(struct i40e_vsi *vsi)
 	int i, qpv = i40e_enabled_xdp_vsi(vsi) ? 3 : 2;
 	struct i40e_pf *pf = vsi->back;
 	struct i40e_ring *ring;
+
+	i40e_vsi_setup_rx_size(vsi);
 
 	/* Set basic values in the rings to be used later during open() */
 	for (i = 0; i < vsi->alloc_queue_pairs; i++) {
@@ -9171,6 +9370,10 @@ setup_rx:
 		ring->netdev = vsi->netdev;
 		ring->dev = &pf->pdev->dev;
 		ring->count = vsi->num_desc;
+		ring->rx_buf_len = vsi->rx_buf_len;
+		ring->rx_max_frame = vsi->max_frame;
+		ring->rx_alloc_fn = i40e_alloc_rx_buffers;
+		ring->clean_irq = i40e_clean_rx_irq;
 		ring->size = 0;
 		ring->dcb_tc = 0;
 		ring->rx_itr_setting = pf->rx_itr_default;
@@ -9909,7 +10112,7 @@ static int i40e_pf_config_rss(struct i40e_pf *pf)
 int i40e_reconfig_rss_queues(struct i40e_pf *pf, int queue_count)
 {
 	struct i40e_vsi *vsi = pf->vsi[pf->lan_vsi];
-	int new_rss_size;
+	int i, new_rss_size;
 
 	if (!(pf->flags & I40E_FLAG_RSS_ENABLED))
 		return 0;
@@ -9918,6 +10121,11 @@ int i40e_reconfig_rss_queues(struct i40e_pf *pf, int queue_count)
 
 	if (queue_count != vsi->num_queue_pairs) {
 		u16 qcount;
+
+		for (i = queue_count; i < vsi->num_queue_pairs; i++) {
+			if (i40e_qp_uses_tp4(vsi, i))
+				i40e_qp_error_report_tp4(vsi, i, ENOENT);
+		}
 
 		vsi->req_queue_pairs = queue_count;
 		i40e_prep_for_reset(pf, true);
@@ -10762,6 +10970,505 @@ static int i40e_xdp(struct net_device *dev,
 	}
 }
 
+/**
+ * i40e_enter_busy_conf - Enters busy config state
+ * @vsi: vsi
+ *
+ * Returns 0 on success, <0 for failure.
+ **/
+static int i40e_enter_busy_conf(struct i40e_vsi *vsi)
+{
+	struct i40e_pf *pf = vsi->back;
+	int timeout = 50;
+
+	while (test_and_set_bit(__I40E_CONFIG_BUSY, pf->state)) {
+		timeout--;
+		if (!timeout)
+			return -EBUSY;
+		usleep_range(1000, 2000);
+	}
+
+	return 0;
+}
+
+/**
+ * i40e_exit_busy_conf - Exits busy config state
+ * @vsi: vsi
+ **/
+static void i40e_exit_busy_conf(struct i40e_vsi *vsi)
+{
+	struct i40e_pf *pf = vsi->back;
+
+	clear_bit(__I40E_CONFIG_BUSY, pf->state);
+}
+
+/**
+ * i40e_qp_reset_stats - Resets all statistics for a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ **/
+static void i40e_qp_reset_stats(struct i40e_vsi *vsi, int queue_pair)
+{
+	memset(&vsi->rx_rings[queue_pair]->rx_stats, 0,
+	       sizeof(vsi->rx_rings[queue_pair]->rx_stats));
+	memset(&vsi->tx_rings[queue_pair]->stats, 0,
+	       sizeof(vsi->tx_rings[queue_pair]->stats));
+	if (i40e_enabled_xdp_vsi(vsi)) {
+		memset(&vsi->xdp_rings[queue_pair]->stats, 0,
+		       sizeof(vsi->xdp_rings[queue_pair]->stats));
+	}
+}
+
+/**
+ * i40e_qp_clean_rings - Cleans all the rings of a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ **/
+static void i40e_qp_clean_rings(struct i40e_vsi *vsi, int queue_pair)
+{
+	i40e_clean_tx_ring(vsi->tx_rings[queue_pair]);
+	if (i40e_enabled_xdp_vsi(vsi))
+		i40e_clean_tx_ring(vsi->xdp_rings[queue_pair]);
+	i40e_clean_rx_ring(vsi->rx_rings[queue_pair]);
+}
+
+/**
+ * i40e_qp_control_napi - Enables/disables NAPI for a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ * @enable: true for enable, false for disable
+ **/
+static void i40e_qp_control_napi(struct i40e_vsi *vsi, int queue_pair,
+				 bool enable)
+{
+	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+	struct i40e_q_vector *q_vector = rxr->q_vector;
+
+	if (!vsi->netdev)
+		return;
+
+	/* All rings in a qp belong to the same qvector. */
+	if (q_vector->rx.ring || q_vector->tx.ring) {
+		if (enable)
+			napi_enable(&q_vector->napi);
+		else
+			napi_disable(&q_vector->napi);
+	}
+}
+
+/**
+ * i40e_qp_control_rings - Enables/disables all rings for a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ * @enable: true for enable, false for disable
+ *
+ * Returns 0 on success, <0 on failure.
+ **/
+static int i40e_qp_control_rings(struct i40e_vsi *vsi, int queue_pair,
+				 bool enable)
+{
+	struct i40e_pf *pf = vsi->back;
+	int pf_q, ret = 0;
+
+	pf_q = vsi->base_queue + queue_pair;
+	ret = i40e_control_wait_tx_q(vsi->seid, pf, pf_q,
+				     false /*is xdp*/, enable);
+	if (ret) {
+		dev_info(&pf->pdev->dev,
+			 "VSI seid %d Tx ring %d %sable timeout\n",
+			 vsi->seid, pf_q, (enable ? "en" : "dis"));
+		return ret;
+	}
+
+	i40e_control_rx_q(pf, pf_q, enable);
+	ret = i40e_pf_rxq_wait(pf, pf_q, enable);
+	if (ret) {
+		dev_info(&pf->pdev->dev,
+			 "VSI seid %d Rx ring %d %sable timeout\n",
+			 vsi->seid, pf_q, (enable ? "en" : "dis"));
+		return ret;
+	}
+
+	/* Due to HW errata, on Rx disable only, the register can
+	 * indicate done before it really is. Needs 50ms to be sure
+	 */
+	if (!enable)
+		mdelay(50);
+
+	if (!i40e_enabled_xdp_vsi(vsi))
+		return ret;
+
+	ret = i40e_control_wait_tx_q(vsi->seid, pf,
+				     pf_q + vsi->alloc_queue_pairs,
+				     true /*is xdp*/, enable);
+	if (ret) {
+		dev_info(&pf->pdev->dev,
+			 "VSI seid %d XDP Tx ring %d %sable timeout\n",
+			 vsi->seid, pf_q, (enable ? "en" : "dis"));
+	}
+
+	return ret;
+}
+
+/**
+ * i40e_qp_enable_irq - Enables interrupts for a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue_pair
+ **/
+static void i40e_qp_enable_irq(struct i40e_vsi *vsi, int queue_pair)
+{
+	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+	struct i40e_pf *pf = vsi->back;
+	struct i40e_hw *hw = &pf->hw;
+
+	/* All rings in a qp belong to the same qvector. */
+	if (pf->flags & I40E_FLAG_MSIX_ENABLED)
+		i40e_irq_dynamic_enable(vsi, rxr->q_vector->v_idx);
+	else
+		i40e_irq_dynamic_enable_icr0(pf);
+
+	i40e_flush(hw);
+}
+
+/**
+ * i40e_qp_disable_irq - Disables interrupts for a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue_pair
+ **/
+static void i40e_qp_disable_irq(struct i40e_vsi *vsi, int queue_pair)
+{
+	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+	struct i40e_pf *pf = vsi->back;
+	struct i40e_hw *hw = &pf->hw;
+
+	/* For simplicity, instead of removing the qp interrupt causes
+	 * from the interrupt linked list, we simply disable the interrupt, and
+	 * leave the list intact.
+	 *
+	 * All rings in a qp belong to the same qvector.
+	 */
+
+	if (pf->flags & I40E_FLAG_MSIX_ENABLED) {
+		u32 intpf = vsi->base_vector + rxr->q_vector->v_idx;
+
+		wr32(hw, I40E_PFINT_DYN_CTLN(intpf - 1), 0);
+		i40e_flush(hw);
+		synchronize_irq(pf->msix_entries[intpf].vector);
+	} else {
+		/* Legacy and MSI mode - this stops all interrupt handling */
+		wr32(hw, I40E_PFINT_ICR0_ENA, 0);
+		wr32(hw, I40E_PFINT_DYN_CTL0, 0);
+		i40e_flush(hw);
+		synchronize_irq(pf->pdev->irq);
+	}
+}
+
+/**
+ * i40e_qp_disable - Disables a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ *
+ * Returns 0 on success, <0 on failure.
+ **/
+static int i40e_qp_disable(struct i40e_vsi *vsi, int queue_pair)
+{
+	int err;
+
+	err = i40e_enter_busy_conf(vsi);
+	if (err)
+		return err;
+
+	i40e_qp_disable_irq(vsi, queue_pair);
+	err = i40e_qp_control_rings(vsi, queue_pair, false /* disable */);
+	i40e_qp_control_napi(vsi, queue_pair, false /* disable */);
+	i40e_qp_clean_rings(vsi, queue_pair);
+	i40e_qp_reset_stats(vsi, queue_pair);
+
+	return err;
+}
+
+/**
+ * i40e_qp_enable - Enables a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ *
+ * Returns 0 on success, <0 on failure.
+ **/
+static int i40e_qp_enable(struct i40e_vsi *vsi, int queue_pair)
+{
+	int err;
+
+	err = i40e_configure_tx_ring(vsi->tx_rings[queue_pair]);
+	if (err)
+		return err;
+
+	if (i40e_enabled_xdp_vsi(vsi)) {
+		err = i40e_configure_tx_ring(vsi->xdp_rings[queue_pair]);
+		if (err)
+			return err;
+	}
+
+	err = i40e_configure_rx_ring(vsi->rx_rings[queue_pair]);
+	if (err)
+		return err;
+
+	err = i40e_qp_control_rings(vsi, queue_pair, true /* enable */);
+	i40e_qp_control_napi(vsi, queue_pair, true /* enable */);
+	i40e_qp_enable_irq(vsi, queue_pair);
+
+	i40e_exit_busy_conf(vsi);
+
+	return err;
+}
+
+/**
+ * i40e_qp_kick_napi - Schedules a NAPI run
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ **/
+static void i40e_qp_kick_napi(struct i40e_vsi *vsi, int queue_pair)
+{
+	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+
+	napi_schedule(&rxr->q_vector->napi);
+}
+
+/**
+ * i40e_vsi_get_tp4_rx_ctx - Retrieves the Rx TP4 context, if any.
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ *
+ * Returns NULL if there's no context available.
+ **/
+static struct i40e_tp4_ctx *i40e_vsi_get_tp4_rx_ctx(struct i40e_vsi *vsi,
+						    int queue_pair)
+{
+	if (!vsi->tp4_ctxs)
+		return NULL;
+
+	return vsi->tp4_ctxs[queue_pair];
+}
+
+/**
+ * i40e_tp4_disable_rx - Disables TP4 Rx mode
+ * @rxr: ingress ring
+ **/
+static void i40e_tp4_disable_rx(struct i40e_ring *rxr)
+{
+	/* Don't free, if the context is saved! */
+	if (i40e_vsi_get_tp4_rx_ctx(rxr->vsi, rxr->queue_index))
+		rxr->tp4.arr = NULL;
+	else
+		tp4a_free(rxr->tp4.arr);
+
+	memset(&rxr->tp4, 0, sizeof(rxr->tp4));
+	clear_ring_tp4(rxr);
+
+	rxr->rx_buf_len = rxr->vsi->rx_buf_len;
+	rxr->rx_max_frame = rxr->vsi->max_frame;
+	rxr->rx_alloc_fn = i40e_alloc_rx_buffers;
+	rxr->clean_irq = i40e_clean_rx_irq;
+}
+
+/**
+ * __i40e_tp4_disable - Disables TP4 for a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ **/
+static void __i40e_tp4_disable(struct i40e_vsi *vsi, int queue_pair)
+{
+	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+
+	if (!i40e_qp_uses_tp4(vsi, queue_pair))
+		return;
+
+	i40e_tp4_disable_rx(rxr);
+}
+
+/**
+ * i40e_tp4_disable - Disables zerocopy
+ * @netdev: netdevice
+ * @params: tp4 params
+ *
+ * Returns 0 on success, <0 on failure.
+ **/
+static int i40e_tp4_disable(struct net_device *netdev,
+			    struct tp4_netdev_parms *params)
+{
+	struct i40e_netdev_priv *np = netdev_priv(netdev);
+	struct i40e_vsi *vsi = np->vsi;
+	int err;
+
+	if (params->queue_pair < 0 ||
+	    params->queue_pair >= vsi->num_queue_pairs)
+		return -EINVAL;
+
+	if (!i40e_qp_uses_tp4(vsi, params->queue_pair))
+		return 0;
+
+	netdev_info(
+		netdev,
+		"disabling TP4 zerocopy qp=%d, failed Rx allocations: %llu\n",
+		params->queue_pair,
+		vsi->rx_rings[params->queue_pair]->rx_stats.alloc_page_failed);
+
+	err =  i40e_qp_disable(vsi, params->queue_pair);
+	if (err) {
+		netdev_warn(
+			netdev,
+			"could not disable qp=%d err=%d, failed disabling TP4 zerocopy\n",
+			params->queue_pair,
+			err);
+		return err;
+	}
+
+	__i40e_tp4_disable(vsi, params->queue_pair);
+
+	err =  i40e_qp_enable(vsi, params->queue_pair);
+	if (err) {
+		netdev_warn(
+			netdev,
+			"could not re-enable qp=%d err=%d, failed disabling TP4 zerocopy\n",
+			params->queue_pair,
+			err);
+		return err;
+	}
+
+	return 0;
+}
+
+/**
+ * i40e_tp4_enable_rx - Enables TP4 Tx
+ * @rxr: ingress ring
+ * @params: tp4 params
+ *
+ * Returns 0 on success, <0 on failure.
+ **/
+static int i40e_tp4_enable_rx(struct i40e_ring *rxr,
+			      struct tp4_netdev_parms *params)
+{
+	size_t elems = __roundup_pow_of_two(rxr->count * 8);
+	struct tp4_packet_array *arr;
+
+	arr = tp4a_rx_new(params->rx_opaque, elems, rxr->dev);
+	if (!arr)
+		return -ENOMEM;
+
+	rxr->tp4.arr = arr;
+	rxr->tp4.ev_handler = params->data_ready;
+	rxr->tp4.ev_opaque = params->data_ready_opaque;
+	rxr->tp4.err_handler = params->error_report;
+	rxr->tp4.err_opaque = params->error_report_opaque;
+
+	i40e_tp4_set_rx_handler(rxr);
+
+	set_ring_tp4(rxr);
+
+	return 0;
+}
+
+/**
+ * __i40e_tp4_enable - Enables TP4
+ * @vsi: vsi
+ * @params: tp4 params
+ *
+ * Returns 0 on success, <0 on failure.
+ **/
+static int __i40e_tp4_enable(struct i40e_vsi *vsi,
+			     struct tp4_netdev_parms *params)
+{
+	struct i40e_ring *rxr = vsi->rx_rings[params->queue_pair];
+	int err;
+
+	err = i40e_tp4_enable_rx(rxr, params);
+	if (err)
+		return err;
+
+	return 0;
+}
+
+/**
+ * i40e_tp4_enable - Enables zerocopy
+ * @netdev: netdevice
+ * @params: tp4 params
+ *
+ * Returns 0 on success, <0 on failure.
+ **/
+static int i40e_tp4_enable(struct net_device *netdev,
+			   struct tp4_netdev_parms *params)
+{
+	struct i40e_netdev_priv *np = netdev_priv(netdev);
+	struct i40e_vsi *vsi = np->vsi;
+	int err;
+
+	if (vsi->type != I40E_VSI_MAIN)
+		return -EINVAL;
+
+	if (params->queue_pair < 0 ||
+	    params->queue_pair >= vsi->num_queue_pairs)
+		return -EINVAL;
+
+	if (!netif_running(netdev))
+		return -ENETDOWN;
+
+	if (i40e_qp_uses_tp4(vsi, params->queue_pair))
+		return -EBUSY;
+
+	if (!params->rx_opaque)
+		return -EINVAL;
+
+	err =  i40e_qp_disable(vsi, params->queue_pair);
+	if (err) {
+		netdev_warn(netdev, "could not disable qp=%d err=%d, failed enabling TP4 zerocopy\n",
+			    params->queue_pair, err);
+		return err;
+	}
+
+	err =  __i40e_tp4_enable(vsi, params);
+	if (err) {
+		netdev_warn(netdev, "__i40e_tp4_enable qp=%d err=%d, failed enabling TP4 zerocopy\n",
+			    params->queue_pair, err);
+		return err;
+	}
+
+	err = i40e_qp_enable(vsi, params->queue_pair);
+	if (err) {
+		netdev_warn(netdev, "could not re-enable qp=%d err=%d, failed enabling TP4 zerocopy\n",
+			    params->queue_pair, err);
+		return err;
+	}
+
+	/* Kick NAPI to make sure that alloction from userland
+	 * acctually worked.
+	 */
+	i40e_qp_kick_napi(vsi, params->queue_pair);
+
+	netdev_info(netdev, "enabled TP4 zerocopy\n");
+	return 0;
+}
+
+/**
+ * i40e_tp4_zerocopy - enables/disables zerocopy
+ * @netdev: netdevice
+ * @params: tp4 params
+ *
+ * Returns zero on success
+ **/
+static int i40e_tp4_zerocopy(struct net_device *netdev,
+			     struct tp4_netdev_parms *params)
+{
+	switch (params->command) {
+	case TP4_ENABLE:
+		return i40e_tp4_enable(netdev, params);
+
+	case TP4_DISABLE:
+		return i40e_tp4_disable(netdev, params);
+
+	default:
+		return -ENOTSUPP;
+	}
+}
+
 static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_open		= i40e_open,
 	.ndo_stop		= i40e_close,
@@ -10795,6 +11502,7 @@ static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_bridge_getlink	= i40e_ndo_bridge_getlink,
 	.ndo_bridge_setlink	= i40e_ndo_bridge_setlink,
 	.ndo_xdp		= i40e_xdp,
+	.ndo_tp4_zerocopy	= i40e_tp4_zerocopy,
 };
 
 /**
@@ -11439,6 +12147,7 @@ static struct i40e_vsi *i40e_vsi_reinit_setup(struct i40e_vsi *vsi)
 	ret = i40e_alloc_rings(vsi);
 	if (ret)
 		goto err_rings;
+	i40e_vsi_restore_tp4_ctxs(vsi);
 
 	/* map all of the rings to the q_vectors */
 	i40e_vsi_map_rings_to_vectors(vsi);

@@ -1515,6 +1515,15 @@ static int i40e_set_ringparam(struct net_device *netdev,
 		goto done;
 	}
 
+	for (i = 0; i < vsi->num_queue_pairs; i++) {
+		if (ring_uses_tp4(vsi->rx_rings[i])) {
+			netdev_warn(netdev,
+				    "FIXME TP4 zerocopy does not support changing descriptors. Take down the interface first\n");
+			err = -ENOTSUPP;
+			goto done;
+		}
+	}
+
 	/* We can't just free everything and then setup again,
 	 * because the ISRs in MSI-X mode get passed pointers
 	 * to the Tx and Rx ring structs.

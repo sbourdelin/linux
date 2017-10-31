@@ -1083,6 +1083,21 @@ static inline bool i40e_rx_is_programming_status(u64 qw)
 }
 
 /**
+ * i40e_inc_rx_next_to_clean - Bumps the next to clean
+ * @ring: ingress ring
+ */
+static inline void i40e_inc_rx_next_to_clean(struct i40e_ring *ring)
+{
+	u32 ntc;
+
+	ntc = ring->next_to_clean + 1;
+	ntc = (ntc < ring->count) ? ntc : 0;
+	ring->next_to_clean = ntc;
+
+	prefetch(I40E_RX_DESC(ring, ntc));
+}
+
+/**
  * i40e_clean_programming_status - clean the programming status descriptor
  * @rx_ring: the rx ring that has this descriptor
  * @rx_desc: the rx descriptor written back by HW
@@ -1098,15 +1113,10 @@ static void i40e_clean_programming_status(struct i40e_ring *rx_ring,
 					  u64 qw)
 {
 	struct i40e_rx_buffer *rx_buffer;
-	u32 ntc = rx_ring->next_to_clean;
 	u8 id;
 
-	/* fetch, update, and store next to clean */
-	rx_buffer = &rx_ring->rx_bi[ntc++];
-	ntc = (ntc < rx_ring->count) ? ntc : 0;
-	rx_ring->next_to_clean = ntc;
-
-	prefetch(I40E_RX_DESC(rx_ring, ntc));
+	rx_buffer = &rx_ring->rx_bi[rx_ring->next_to_clean];
+	i40e_inc_rx_next_to_clean(rx_ring);
 
 	/* place unused page back on the ring */
 	i40e_reuse_rx_page(rx_ring, rx_buffer);
@@ -1958,6 +1968,18 @@ static void i40e_put_rx_buffer(struct i40e_ring *rx_ring,
 }
 
 /**
+ * i40e_is_rx_desc_eof - Checks if Rx descriptor is end of frame
+ * @rx_desc: rx_desc
+ *
+ * Returns true if EOF, false otherwise.
+ **/
+static inline bool i40e_is_rx_desc_eof(union i40e_rx_desc *rx_desc)
+{
+#define I40E_RXD_EOF BIT(I40E_RX_DESC_STATUS_EOF_SHIFT)
+	return i40e_test_staterr(rx_desc, I40E_RXD_EOF);
+}
+
+/**
  * i40e_is_non_eop - process handling of non-EOP buffers
  * @rx_ring: Rx ring being processed
  * @rx_desc: Rx descriptor for current buffer
@@ -1972,17 +1994,10 @@ static bool i40e_is_non_eop(struct i40e_ring *rx_ring,
 			    union i40e_rx_desc *rx_desc,
 			    struct sk_buff *skb)
 {
-	u32 ntc = rx_ring->next_to_clean + 1;
-
-	/* fetch, update, and store next to clean */
-	ntc = (ntc < rx_ring->count) ? ntc : 0;
-	rx_ring->next_to_clean = ntc;
-
-	prefetch(I40E_RX_DESC(rx_ring, ntc));
+	i40e_inc_rx_next_to_clean(rx_ring);
 
 	/* if we are the last buffer then there is nothing else to do */
-#define I40E_RXD_EOF BIT(I40E_RX_DESC_STATUS_EOF_SHIFT)
-	if (likely(i40e_test_staterr(rx_desc, I40E_RXD_EOF)))
+	if (likely(i40e_is_rx_desc_eof(rx_desc)))
 		return false;
 
 	rx_ring->rx_stats.non_eop_descs++;
@@ -2060,6 +2075,24 @@ static void i40e_rx_buffer_flip(struct i40e_ring *rx_ring,
 }
 
 /**
+ * i40e_update_rx_stats - Updates the Rx statistics
+ * @rxr: ingress ring
+ * @rx_bytes: number of bytes
+ * @rx_packets: number of packets
+ **/
+static inline void i40e_update_rx_stats(struct i40e_ring *rxr,
+					unsigned int rx_bytes,
+					unsigned int rx_packets)
+{
+	u64_stats_update_begin(&rxr->syncp);
+	rxr->stats.packets += rx_packets;
+	rxr->stats.bytes += rx_bytes;
+	u64_stats_update_end(&rxr->syncp);
+	rxr->q_vector->rx.total_packets += rx_packets;
+	rxr->q_vector->rx.total_bytes += rx_bytes;
+}
+
+/**
  * i40e_clean_rx_irq - Clean completed descriptors from Rx ring - bounce buf
  * @rx_ring: rx descriptor ring to transact packets on
  * @budget: Total limit on number of packets to process
@@ -2071,7 +2104,7 @@ static void i40e_rx_buffer_flip(struct i40e_ring *rx_ring,
  *
  * Returns amount of work completed
  **/
-static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
+int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
 {
 	unsigned int total_rx_bytes = 0, total_rx_packets = 0;
 	struct sk_buff *skb = rx_ring->skb;
@@ -2204,15 +2237,82 @@ static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
 
 	rx_ring->skb = skb;
 
-	u64_stats_update_begin(&rx_ring->syncp);
-	rx_ring->stats.packets += total_rx_packets;
-	rx_ring->stats.bytes += total_rx_bytes;
-	u64_stats_update_end(&rx_ring->syncp);
-	rx_ring->q_vector->rx.total_packets += total_rx_packets;
-	rx_ring->q_vector->rx.total_bytes += total_rx_bytes;
+	i40e_update_rx_stats(rx_ring, total_rx_bytes, total_rx_packets);
 
 	/* guarantee a trip back through this routine if there was a failure */
 	return failure ? budget : (int)total_rx_packets;
+}
+
+/**
+ * i40e_get_rx_desc_size - Returns the size of a received frame
+ * @rxd: rx descriptor
+ *
+ * Returns numbers of bytes received.
+ **/
+static inline unsigned int i40e_get_rx_desc_size(union i40e_rx_desc *rxd)
+{
+	u64 qword = le64_to_cpu(rxd->wb.qword1.status_error_len);
+	unsigned int size;
+
+	size = (qword & I40E_RXD_QW1_LENGTH_PBUF_MASK) >>
+	       I40E_RXD_QW1_LENGTH_PBUF_SHIFT;
+
+	return size;
+}
+
+/**
+ * i40e_clean_rx_tp4_irq - Pulls received packets of the descriptor ring
+ * @rxr: ingress ring
+ * @budget: NAPI budget
+ *
+ * Returns number of received packets.
+ **/
+int i40e_clean_rx_tp4_irq(struct i40e_ring *rxr, int budget)
+{
+	int total_rx_bytes = 0, total_rx_packets = 0;
+	u16 cleaned_count = I40E_DESC_UNUSED(rxr);
+	struct tp4_frame_set frame_set;
+	bool failure;
+
+	if (!tp4a_get_flushable_frame_set(rxr->tp4.arr, &frame_set))
+		goto out;
+
+	while (total_rx_packets < budget) {
+		union i40e_rx_desc *rxd = I40E_RX_DESC(rxr, rxr->next_to_clean);
+		unsigned int size = i40e_get_rx_desc_size(rxd);
+
+		if (!size)
+			break;
+
+		/* This memory barrier is needed to keep us from
+		 * reading any other fields out of the rxd until we
+		 * have verified the descriptor has been written back.
+		 */
+		dma_rmb();
+
+		tp4f_set_frame_no_offset(&frame_set, size,
+					 i40e_is_rx_desc_eof(rxd));
+
+		total_rx_bytes += size;
+		total_rx_packets++;
+
+		i40e_inc_rx_next_to_clean(rxr);
+
+		WARN_ON(!tp4f_next_frame(&frame_set));
+	}
+
+	WARN_ON(tp4a_flush_n(rxr->tp4.arr, total_rx_packets));
+
+	rxr->tp4.ev_handler(rxr->tp4.ev_opaque);
+
+	i40e_update_rx_stats(rxr, total_rx_bytes, total_rx_packets);
+
+	cleaned_count += total_rx_packets;
+out:
+	failure = (cleaned_count >= I40E_RX_BUFFER_WRITE) ?
+		  i40e_alloc_rx_buffers_tp4(rxr, cleaned_count) : false;
+
+	return failure ? budget : total_rx_packets;
 }
 
 static u32 i40e_buildreg_itr(const int type, const u16 itr)
@@ -2371,7 +2471,7 @@ int i40e_napi_poll(struct napi_struct *napi, int budget)
 	budget_per_ring = max(budget/q_vector->num_ringpairs, 1);
 
 	i40e_for_each_ring(ring, q_vector->rx) {
-		int cleaned = i40e_clean_rx_irq(ring, budget_per_ring);
+		int cleaned = ring->clean_irq(ring, budget_per_ring);
 
 		work_done += cleaned;
 		/* if we clean as many as budgeted, we must not be done */
@@ -3433,3 +3533,51 @@ netdev_tx_t i40e_lan_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 
 	return i40e_xmit_frame_ring(skb, tx_ring);
 }
+
+/**
+ * i40e_alloc_rx_buffers_tp4 - Allocate buffers from the TP4 userland ring
+ * @rxr: ingress ring
+ * @cleaned_count: number of buffers to allocate
+ *
+ * Returns true on failure, false on success.
+ **/
+bool i40e_alloc_rx_buffers_tp4(struct i40e_ring *rxr, u16 cleaned_count)
+{
+	u16 i, ntu = rxr->next_to_use;
+	union i40e_rx_desc *rx_desc;
+	struct tp4_frame_set frame;
+	bool ret = false;
+	dma_addr_t dma;
+
+	rx_desc = I40E_RX_DESC(rxr, ntu);
+
+	for (i = 0; i < cleaned_count; i++) {
+		if (unlikely(!tp4a_next_frame_populate(rxr->tp4.arr, &frame))) {
+			rxr->rx_stats.alloc_page_failed++;
+			ret = true;
+			break;
+		}
+
+		dma = tp4f_get_dma(&frame);
+		dma_sync_single_for_device(rxr->dev, dma, rxr->rx_buf_len,
+					   DMA_FROM_DEVICE);
+
+		rx_desc->read.pkt_addr = cpu_to_le64(dma);
+
+		rx_desc++;
+		ntu++;
+		if (unlikely(ntu == rxr->count)) {
+			rx_desc = I40E_RX_DESC(rxr, 0);
+			ntu = 0;
+		}
+
+		/* clear the status bits for the next_to_use descriptor */
+		rx_desc->wb.qword1.status_error_len = 0;
+	}
+
+	if (rxr->next_to_use != ntu)
+		i40e_release_rx_desc(rxr, ntu);
+
+	return ret;
+}
+

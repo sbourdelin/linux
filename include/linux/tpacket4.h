@@ -658,6 +658,19 @@ static inline void *tp4q_get_data(struct tp4_queue *q,
 }
 
 /**
+ * tp4q_get_dma_addr - Get kernel dma address of page
+ *
+ * @q: Pointer to the tp4 queue that this frame resides in
+ * @pg: Pointer to the page of this frame
+ *
+ * Returns the dma address associated with the page
+ **/
+static inline dma_addr_t tp4q_get_dma_addr(struct tp4_queue *q, u64 pg)
+{
+	return q->dma_info[pg].dma;
+}
+
+/**
  * tp4q_get_desc - Get descriptor associated with frame
  *
  * @p: Pointer to the packet to examine
@@ -722,6 +735,18 @@ static inline u32 tp4f_get_frame_len(struct tp4_frame_set *p)
 }
 
 /**
+ * tp4f_get_data_offset - Get offset of packet data in packet buffer
+ * @p: pointer to frame set
+ *
+ * Returns the offset to the data in the packet buffer of the current
+ * frame
+ **/
+static inline u32 tp4f_get_data_offset(struct tp4_frame_set *p)
+{
+	return p->pkt_arr->items[p->curr & p->pkt_arr->mask].offset;
+}
+
+/**
  * tp4f_set_error - Set an error on the current frame
  * @p: pointer to frame set
  * @errno: the errno to be assigned
@@ -760,6 +785,41 @@ static inline void tp4f_set_frame(struct tp4_frame_set *p, u32 len, u16 offset,
 	d->offset = offset;
 	if (!is_eop)
 		d->flags |= TP4_PKT_CONT;
+}
+
+/**
+ * tp4f_set_frame_no_offset - Sets the properties of a frame
+ * @p: pointer to frame
+ * @len: the length in bytes of the data in the frame
+ * @is_eop: Set if this is the last frame of the packet
+ **/
+static inline void tp4f_set_frame_no_offset(struct tp4_frame_set *p,
+					    u32 len, bool is_eop)
+{
+	struct tpacket4_desc *d =
+		&p->pkt_arr->items[p->curr & p->pkt_arr->mask];
+
+	d->len = len;
+	if (!is_eop)
+		d->flags |= TP4_PKT_CONT;
+}
+
+/**
+ * tp4f_get_dma - Returns DMA address of the frame
+ * @f: pointer to frame
+ *
+ * Returns the DMA address of the frame
+ **/
+static inline dma_addr_t tp4f_get_dma(struct tp4_frame_set *f)
+{
+	struct tp4_queue *tp4q = f->pkt_arr->tp4q;
+	dma_addr_t dma;
+	u64 pg, off;
+
+	tp4q_get_page_offset(tp4q, tp4f_get_frame_id(f), &pg, &off);
+	dma = tp4q_get_dma_addr(tp4q, pg);
+
+	return dma + off + tp4f_get_data_offset(f);
 }
 
 /*************** PACKET OPERATIONS *******************************/
@@ -1020,6 +1080,31 @@ static inline bool tp4a_next_packet(struct tp4_packet_array *a,
 
 	a->curr += (p->end - p->start);
 	return true;
+}
+
+/**
+ * tp4a_flush_n - Flush n processed packets to associated tp4q
+ * @a: pointer to packet array
+ * @n: number of items to flush
+ *
+ * Returns 0 for success and -1 for failure
+ **/
+static inline int tp4a_flush_n(struct tp4_packet_array *a, unsigned int n)
+{
+	u32 avail = a->curr - a->start;
+	int ret;
+
+	if (avail == 0 || n == 0)
+		return 0; /* nothing to flush */
+
+	avail = (n > avail) ? avail : n; /* XXX trust user? remove? */
+
+	ret = tp4q_enqueue_from_array(a, avail);
+	if (ret < 0)
+		return -1;
+
+	a->start += avail;
+	return 0;
 }
 
 /**

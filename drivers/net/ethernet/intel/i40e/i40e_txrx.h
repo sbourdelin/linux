@@ -27,6 +27,8 @@
 #ifndef _I40E_TXRX_H_
 #define _I40E_TXRX_H_
 
+#include <linux/tpacket4.h>
+
 /* Interrupt Throttling and Rate Limiting Goodies */
 
 #define I40E_MAX_ITR               0x0FF0  /* reg uses 2 usec resolution */
@@ -347,6 +349,14 @@ enum i40e_ring_state_t {
 	__I40E_RING_STATE_NBITS /* must be last */
 };
 
+struct i40e_tp4_ctx {
+	struct tp4_packet_array *arr;
+	void (*ev_handler)(void *);
+	void *ev_opaque;
+	void (*err_handler)(void *, int);
+	void *err_opaque;
+};
+
 /* some useful defines for virtchannel interface, which
  * is the only remaining user of header split
  */
@@ -385,6 +395,7 @@ struct i40e_ring {
 	u16 count;			/* Number of descriptors */
 	u16 reg_idx;			/* HW register index of the ring */
 	u16 rx_buf_len;
+	u16 rx_max_frame;
 
 	/* used in interrupt processing */
 	u16 next_to_use;
@@ -401,6 +412,7 @@ struct i40e_ring {
 #define I40E_TXR_FLAGS_WB_ON_ITR		BIT(0)
 #define I40E_RXR_FLAGS_BUILD_SKB_ENABLED	BIT(1)
 #define I40E_TXR_FLAGS_XDP			BIT(2)
+#define I40E_R_FLAGS_TP4			BIT(3)
 
 	/* stats structs */
 	struct i40e_queue_stats	stats;
@@ -428,6 +440,10 @@ struct i40e_ring {
 					 */
 
 	struct i40e_channel *ch;
+
+	bool (*rx_alloc_fn)(struct i40e_ring *rxr, u16 cleaned_count);
+	int (*clean_irq)(struct i40e_ring *ring, int budget);
+	struct i40e_tp4_ctx tp4;
 } ____cacheline_internodealigned_in_smp;
 
 static inline bool ring_uses_build_skb(struct i40e_ring *ring)
@@ -453,6 +469,21 @@ static inline bool ring_is_xdp(struct i40e_ring *ring)
 static inline void set_ring_xdp(struct i40e_ring *ring)
 {
 	ring->flags |= I40E_TXR_FLAGS_XDP;
+}
+
+static inline bool ring_uses_tp4(struct i40e_ring *ring)
+{
+	return !!(ring->flags & I40E_R_FLAGS_TP4);
+}
+
+static inline void set_ring_tp4(struct i40e_ring *ring)
+{
+	ring->flags |= I40E_R_FLAGS_TP4;
+}
+
+static inline void clear_ring_tp4(struct i40e_ring *ring)
+{
+	ring->flags &= ~I40E_R_FLAGS_TP4;
 }
 
 enum i40e_latency_range {
@@ -488,6 +519,9 @@ static inline unsigned int i40e_rx_pg_order(struct i40e_ring *ring)
 #define i40e_rx_pg_size(_ring) (PAGE_SIZE << i40e_rx_pg_order(_ring))
 
 bool i40e_alloc_rx_buffers(struct i40e_ring *rxr, u16 cleaned_count);
+int i40e_clean_rx_irq(struct i40e_ring *rxr, int budget);
+bool i40e_alloc_rx_buffers_tp4(struct i40e_ring *rxr, u16 cleaned_count);
+int i40e_clean_rx_tp4_irq(struct i40e_ring *rxr, int budget);
 netdev_tx_t i40e_lan_xmit_frame(struct sk_buff *skb, struct net_device *netdev);
 void i40e_clean_tx_ring(struct i40e_ring *tx_ring);
 void i40e_clean_rx_ring(struct i40e_ring *rx_ring);
