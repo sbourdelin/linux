@@ -2192,7 +2192,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 	int skb_len = skb->len;
 	unsigned int snaplen, res;
 	unsigned long status = TP_STATUS_USER;
-	unsigned short macoff, netoff, hdrlen;
+	unsigned short macoff = 0, netoff = 0, hdrlen;
 	struct sk_buff *copy_skb = NULL;
 	struct timespec ts;
 	__u32 ts_status;
@@ -2211,9 +2211,6 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	sk = pt->af_packet_priv;
 	po = pkt_sk(sk);
-
-	if (po->tp_version == TPACKET_V4)
-		goto drop;
 
 	if (!net_eq(dev_net(dev), sock_net(sk)))
 		goto drop;
@@ -2246,7 +2243,7 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (sk->sk_type == SOCK_DGRAM) {
 		macoff = netoff = TPACKET_ALIGN(po->tp_hdrlen) + 16 +
 				  po->tp_reserve;
-	} else {
+	} else if (po->tp_version != TPACKET_V4) {
 		unsigned int maclen = skb_network_offset(skb);
 		netoff = TPACKET_ALIGN(po->tp_hdrlen +
 				       (maclen < 16 ? 16 : maclen)) +
@@ -2276,6 +2273,12 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 				do_vnet = false;
 			}
 		}
+	} else if (po->tp_version == TPACKET_V4) {
+		if (snaplen > tp4a_max_data_size(po->rx_ring.tp4a)) {
+			pr_err_once("%s: packet too big, %u, dropping.",
+				    __func__, snaplen);
+			goto drop_n_restore;
+		}
 	} else if (unlikely(macoff + snaplen >
 			    GET_PBDQC_FROM_RB(&po->rx_ring)->max_frame_len)) {
 		u32 nval;
@@ -2291,8 +2294,22 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 		}
 	}
 	spin_lock(&sk->sk_receive_queue.lock);
-	h.raw = packet_current_rx_frame(po, skb,
-					TP_STATUS_KERNEL, (macoff+snaplen));
+	if (po->tp_version != TPACKET_V4) {
+		h.raw = packet_current_rx_frame(po, skb,
+						TP_STATUS_KERNEL,
+						(macoff + snaplen));
+	} else {
+		struct tp4_frame_set p;
+
+		if (tp4a_next_frame_populate(po->rx_ring.tp4a, &p)) {
+			u16 offset = tp4a_get_data_headroom(po->rx_ring.tp4a);
+
+			tp4f_set_frame(&p, snaplen, offset, true);
+			h.raw = tp4f_get_data(&p);
+		} else {
+			h.raw = NULL;
+		}
+	}
 	if (!h.raw)
 		goto drop_n_account;
 	if (po->tp_version <= TPACKET_V2) {
@@ -2371,20 +2388,25 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 		memset(h.h3->tp_padding, 0, sizeof(h.h3->tp_padding));
 		hdrlen = sizeof(*h.h3);
 		break;
+	case TPACKET_V4:
+		hdrlen = 0;
+		break;
 	default:
 		BUG();
 	}
 
-	sll = h.raw + TPACKET_ALIGN(hdrlen);
-	sll->sll_halen = dev_parse_header(skb, sll->sll_addr);
-	sll->sll_family = AF_PACKET;
-	sll->sll_hatype = dev->type;
-	sll->sll_protocol = skb->protocol;
-	sll->sll_pkttype = skb->pkt_type;
-	if (unlikely(po->origdev))
-		sll->sll_ifindex = orig_dev->ifindex;
-	else
-		sll->sll_ifindex = dev->ifindex;
+	if (po->tp_version != TPACKET_V4) {
+		sll = h.raw + TPACKET_ALIGN(hdrlen);
+		sll->sll_halen = dev_parse_header(skb, sll->sll_addr);
+		sll->sll_family = AF_PACKET;
+		sll->sll_hatype = dev->type;
+		sll->sll_protocol = skb->protocol;
+		sll->sll_pkttype = skb->pkt_type;
+		if (unlikely(po->origdev))
+			sll->sll_ifindex = orig_dev->ifindex;
+		else
+			sll->sll_ifindex = dev->ifindex;
+	}
 
 	smp_mb();
 
@@ -2401,11 +2423,21 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 	smp_wmb();
 #endif
 
-	if (po->tp_version <= TPACKET_V2) {
+	switch (po->tp_version) {
+	case TPACKET_V1:
+	case TPACKET_V2:
 		__packet_set_status(po, h.raw, status);
 		sk->sk_data_ready(sk);
-	} else {
+		break;
+	case TPACKET_V3:
 		prb_clear_blk_fill_status(&po->rx_ring);
+		break;
+	case TPACKET_V4:
+		spin_lock(&sk->sk_receive_queue.lock);
+		WARN_ON_ONCE(tp4a_flush(po->rx_ring.tp4a));
+		spin_unlock(&sk->sk_receive_queue.lock);
+		sk->sk_data_ready(sk);
+		break;
 	}
 
 drop_n_restore:
@@ -4283,20 +4315,21 @@ static unsigned int packet_poll(struct file *file, struct socket *sock,
 	struct packet_sock *po = pkt_sk(sk);
 	unsigned int mask = datagram_poll(file, sock, wait);
 
-	if (po->tp_version == TPACKET_V4)
-		return mask;
-
 	spin_lock_bh(&sk->sk_receive_queue.lock);
 	if (po->rx_ring.pg_vec) {
-		if (!packet_previous_rx_frame(po, &po->rx_ring,
-			TP_STATUS_KERNEL))
+		if (po->tp_version == TPACKET_V4) {
+			if (!tp4q_is_free(&po->rx_ring.tp4q))
+				mask |= POLLIN | POLLRDNORM;
+		} else if (!packet_previous_rx_frame(po, &po->rx_ring,
+					TP_STATUS_KERNEL)) {
 			mask |= POLLIN | POLLRDNORM;
+		}
 	}
 	if (po->pressure && __packet_rcv_has_room(po, NULL) == ROOM_NORMAL)
 		po->pressure = 0;
 	spin_unlock_bh(&sk->sk_receive_queue.lock);
 	spin_lock_bh(&sk->sk_write_queue.lock);
-	if (po->tx_ring.pg_vec) {
+	if (po->tx_ring.pg_vec && po->tp_version != TPACKET_V4) {
 		if (packet_current_frame(po, &po->tx_ring, TP_STATUS_AVAILABLE))
 			mask |= POLLOUT | POLLWRNORM;
 	}
