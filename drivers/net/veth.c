@@ -19,6 +19,7 @@
 #include <net/xfrm.h>
 #include <linux/veth.h>
 #include <linux/module.h>
+#include <linux/tpacket4.h>
 
 #define DRV_NAME	"veth"
 #define DRV_VERSION	"1.0"
@@ -33,6 +34,10 @@ struct veth_priv {
 	struct net_device __rcu	*peer;
 	atomic64_t		dropped;
 	unsigned		requested_headroom;
+	struct tp4_packet_array *tp4a_rx;
+	struct tp4_packet_array *tp4a_tx;
+	struct napi_struct      *napi;
+	bool                    tp4_zerocopy;
 };
 
 /*
@@ -104,6 +109,12 @@ static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct net_device *rcv;
 	int length = skb->len;
 
+	/* Drop packets from stack if we are in zerocopy mode. */
+	if (unlikely(priv->tp4_zerocopy)) {
+		consume_skb(skb);
+		return NETDEV_TX_OK;
+	}
+
 	rcu_read_lock();
 	rcv = rcu_dereference(priv->peer);
 	if (unlikely(!rcv)) {
@@ -124,6 +135,64 @@ drop:
 	}
 	rcu_read_unlock();
 	return NETDEV_TX_OK;
+}
+
+static int veth_tp4_xmit(struct net_device *netdev, int queue_pair)
+{
+	struct veth_priv *priv = netdev_priv(netdev);
+
+	local_bh_disable();
+	napi_schedule(priv->napi);
+	local_bh_enable();
+
+	return NETDEV_TX_OK;
+}
+
+static int veth_napi_poll(struct napi_struct *napi, int budget)
+{
+	struct net_device *netdev = napi->dev;
+	struct pcpu_vstats *stats = this_cpu_ptr(netdev->vstats);
+	struct veth_priv *priv_rcv, *priv = netdev_priv(netdev);
+	struct tp4_packet_array *tp4a_tx = priv->tp4a_tx;
+	struct tp4_packet_array *tp4a_rx;
+	struct net_device *rcv;
+	int npackets = 0;
+	int length = 0;
+
+	rcu_read_lock();
+	rcv = rcu_dereference(priv->peer);
+	if (unlikely(!rcv))
+		goto exit;
+
+	priv_rcv = netdev_priv(rcv);
+	if (unlikely(!priv_rcv->tp4_zerocopy))
+		goto exit;
+
+	/* To make sure we do not read the tp4_queue pointers
+	 * before the other process has enabled zerocopy
+	 */
+	smp_rmb();
+
+	tp4a_rx = priv_rcv->tp4a_rx;
+
+	tp4a_populate(tp4a_tx);
+	tp4a_populate(tp4a_rx);
+
+	npackets = tp4a_copy(tp4a_rx, tp4a_tx, &length);
+
+	WARN_ON_ONCE(tp4a_flush(tp4a_tx));
+	WARN_ON_ONCE(tp4a_flush(tp4a_rx));
+
+	u64_stats_update_begin(&stats->syncp);
+	stats->bytes += length;
+	stats->packets += npackets;
+	u64_stats_update_end(&stats->syncp);
+
+exit:
+	rcu_read_unlock();
+	if (npackets < NAPI_POLL_WEIGHT)
+		napi_complete_done(priv->napi, 0);
+	return npackets;
 }
 
 /*
@@ -276,6 +345,105 @@ out:
 	rcu_read_unlock();
 }
 
+static int veth_tp4_disable(struct net_device *netdev,
+			    struct tp4_netdev_parms *params)
+{
+	struct veth_priv *priv_rcv, *priv = netdev_priv(netdev);
+	struct net_device *rcv;
+
+	if (!priv->tp4_zerocopy)
+		return 0;
+	priv->tp4_zerocopy = false;
+
+	/* Make sure other process sees zero copy as off before starting
+	 * to turn things off
+	 */
+	smp_wmb();
+
+	napi_disable(priv->napi);
+	netif_napi_del(priv->napi);
+
+	rcu_read_lock();
+	rcv = rcu_dereference(priv->peer);
+	if (!rcv) {
+		WARN_ON(!rcv);
+		goto exit;
+	}
+	priv_rcv = netdev_priv(rcv);
+
+	if (priv_rcv->tp4_zerocopy) {
+		/* Wait for other thread to complete
+		 * before removing tp4 queues
+		 */
+		napi_synchronize(priv_rcv->napi);
+	}
+exit:
+	rcu_read_unlock();
+
+	tp4a_free(priv->tp4a_rx);
+	tp4a_free(priv->tp4a_tx);
+	kfree(priv->napi);
+
+	return 0;
+}
+
+static int veth_tp4_enable(struct net_device *netdev,
+			   struct tp4_netdev_parms *params)
+{
+	struct veth_priv *priv = netdev_priv(netdev);
+	int err;
+
+	priv->napi = kzalloc(sizeof(*priv->napi), GFP_KERNEL);
+	if (!priv->napi)
+		return -ENOMEM;
+
+	netif_napi_add(netdev, priv->napi, veth_napi_poll,
+		       NAPI_POLL_WEIGHT);
+
+	priv->tp4a_rx = tp4a_rx_new(params->rx_opaque, NAPI_POLL_WEIGHT, NULL);
+	if (!priv->tp4a_rx) {
+		err = -ENOMEM;
+		goto rxa_err;
+	}
+
+	priv->tp4a_tx = tp4a_tx_new(params->tx_opaque, NAPI_POLL_WEIGHT, NULL);
+	if (!priv->tp4a_tx) {
+		err = -ENOMEM;
+		goto txa_err;
+	}
+
+	/* Make sure other process sees queues initialized before enabling
+	 * zerocopy mode
+	 */
+	smp_wmb();
+	priv->tp4_zerocopy = true;
+	napi_enable(priv->napi);
+
+	return 0;
+
+txa_err:
+	tp4a_free(priv->tp4a_rx);
+rxa_err:
+	netif_napi_del(priv->napi);
+	kfree(priv->napi);
+	return err;
+}
+
+static int veth_tp4_zerocopy(struct net_device *netdev,
+			     struct tp4_netdev_parms *params)
+{
+	switch (params->command) {
+	case TP4_ENABLE:
+		return veth_tp4_enable(netdev, params);
+
+	case TP4_DISABLE:
+		return veth_tp4_disable(netdev, params);
+
+	default:
+		return -ENOTSUPP;
+	}
+}
+
 static const struct net_device_ops veth_netdev_ops = {
 	.ndo_init            = veth_dev_init,
 	.ndo_open            = veth_open,
@@ -290,6 +458,8 @@ static const struct net_device_ops veth_netdev_ops = {
 	.ndo_get_iflink		= veth_get_iflink,
 	.ndo_features_check	= passthru_features_check,
 	.ndo_set_rx_headroom	= veth_set_rx_headroom,
+	.ndo_tp4_zerocopy	= veth_tp4_zerocopy,
+	.ndo_tp4_xmit           = veth_tp4_xmit,
 };
 
 #define VETH_FEATURES (NETIF_F_SG | NETIF_F_FRAGLIST | NETIF_F_HW_CSUM | \
@@ -449,9 +619,11 @@ static int veth_newlink(struct net *src_net, struct net_device *dev,
 
 	priv = netdev_priv(dev);
 	rcu_assign_pointer(priv->peer, peer);
+	priv->tp4_zerocopy = false;
 
 	priv = netdev_priv(peer);
 	rcu_assign_pointer(priv->peer, dev);
+	priv->tp4_zerocopy = false;
 	return 0;
 
 err_register_dev:

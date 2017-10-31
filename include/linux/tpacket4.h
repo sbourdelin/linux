@@ -1074,6 +1074,19 @@ static inline unsigned int tp4a_max_data_size(struct tp4_packet_array *a)
 }
 
 /**
+ * tp4a_has_same_umem - Checks if two packet arrays have the same umem
+ * @a1: pointer to packet array
+ * @a2: pointer to packet array
+ *
+ * Returns true if arrays have the same umem, false otherwise
+ **/
+static inline bool tp4a_has_same_umem(struct tp4_packet_array *a1,
+				      struct tp4_packet_array *a2)
+{
+	return (a1->tp4q->umem == a2->tp4q->umem) ? true : false;
+}
+
+/**
  * tp4a_next_packet - Get next packet in array and advance curr pointer
  * @a: pointer to packet array
  * @p: supplied pointer to packet structure that is filled in by function
@@ -1185,6 +1198,124 @@ static inline bool tp4a_next_frame_populate(struct tp4_packet_array *a,
 	}
 
 	return more_frames;
+}
+
+/**
+ * tp4a_add_packet - Adds a packet into a packet array without copying data
+ * @a: pointer to packet array to insert the packet into
+ * @pkt: pointer to packet to insert
+ * @len: returns the length in bytes of data added according to descriptor
+ *
+ * Note that this function does not copy the data. Instead it copies
+ * the address that points to the packet buffer.
+ *
+ * Returns 0 for success and -1 for failure
+ **/
+static inline int tp4a_add_packet(struct tp4_packet_array *a,
+				  struct tp4_frame_set *p, u32 *len)
+{
+	u32 free = a->end - a->curr;
+	u32 nframes = p->end - p->start;
+
+	if (nframes > free)
+		return -1;
+
+	tp4f_reset(p);
+	*len = 0;
+
+	do {
+		int frame_len = tp4f_get_frame_len(p);
+		int idx = a->curr & a->mask;
+
+		a->items[idx].idx = tp4f_get_frame_id(p);
+		a->items[idx].len = frame_len;
+		a->items[idx].offset = tp4f_get_data_offset(p);
+		a->items[idx].flags = tp4f_is_last_frame(p) ?
+						   0 : TP4_PKT_CONT;
+		a->items[idx].error = 0;
+
+		a->curr++;
+		*len += frame_len;
+	} while (tp4f_next_frame(p));
+
+	return 0;
+}
+
+/**
+ * tp4a_copy_packet - Copies a packet with data into a packet array
+ * @a: pointer to packet array to insert the packet into
+ * @pkt: pointer to packet to insert and copy
+ * @len: returns the length in bytes of data copied
+ *
+ * Puts the packet where curr is pointing
+ *
+ * Returns 0 for success and -1 for failure
+ **/
+static inline int tp4a_copy_packet(struct tp4_packet_array *a,
+				   struct tp4_frame_set *p, int *len)
+{
+	u32 free = a->end - a->curr;
+	u32 nframes = p->end - p->start;
+
+	if (nframes > free)
+		return -1;
+
+	tp4f_reset(p);
+	*len = 0;
+
+	do {
+		int frame_len = tp4f_get_frame_len(p);
+		int idx = a->curr & a->mask;
+
+		a->items[idx].len = frame_len;
+		a->items[idx].offset = tp4f_get_data_offset(p);
+		a->items[idx].flags = tp4f_is_last_frame(p) ?
+						   0 : TP4_PKT_CONT;
+		a->items[idx].error = 0;
+
+		memcpy(tp4q_get_data(a->tp4q, &a->items[idx]),
+		       tp4f_get_data(p), frame_len);
+		a->curr++;
+		*len += frame_len;
+	} while (tp4f_next_frame(p));
+
+	return 0;
+}
+
+/**
+ * tp4a_copy - Copy a packet array
+ * @dst: pointer to destination packet array
+ * @src: pointer to source packet array
+ * @len: returns the length in bytes of all packets copied
+ *
+ * Returns number of packets copied
+ **/
+static inline int tp4a_copy(struct tp4_packet_array *dst,
+			    struct tp4_packet_array *src, int *len)
+{
+	int npackets = 0;
+
+	*len = 0;
+	for (;;) {
+		struct tp4_frame_set src_pkt;
+		int pkt_len;
+
+		if (!tp4a_next_packet(src, &src_pkt))
+			break;
+
+		if (tp4a_has_same_umem(src, dst)) {
+			if (tp4a_add_packet(dst, &src_pkt, &pkt_len))
+				break;
+		} else {
+			if (tp4a_copy_packet(dst, &src_pkt, &pkt_len))
+				break;
+		}
+
+		npackets++;
+		*len += pkt_len;
+	}
+
+	return npackets;
 }
 
 /**
