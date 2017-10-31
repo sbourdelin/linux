@@ -18,6 +18,8 @@
 #define TP4_UMEM_MIN_FRAME_SIZE 2048
 #define TP4_KERNEL_HEADROOM 256 /* Headrom for XDP */
 
+#define TP4A_FRAME_COMPLETED TP4_DESC_KERNEL
+
 enum tp4_validation {
 	TP4_VALIDATION_NONE,	/* No validation is performed */
 	TP4_VALIDATION_IDX,	/* Only address to packet buffer is validated */
@@ -402,6 +404,60 @@ static inline int tp4q_enqueue_from_array(struct tp4_packet_array *a,
 }
 
 /**
+ * tp4q_enqueue_completed_from_array - Enqueue only completed entries
+ *				       from packet array
+ *
+ * @a: Pointer to the packet array to enqueue from
+ * @dcnt: Max number of entries to enqueue
+ *
+ * Returns the number of entries successfully enqueued or a negative errno
+ * at failure.
+ **/
+static inline int tp4q_enqueue_completed_from_array(struct tp4_packet_array *a,
+						    u32 dcnt)
+{
+	struct tp4_queue *q = a->tp4q;
+	unsigned int used_idx = q->used_idx;
+	struct tpacket4_desc *d = a->items;
+	int i, j;
+
+	if (q->num_free < dcnt)
+		return -ENOSPC;
+
+	for (i = 0; i < dcnt; i++) {
+		unsigned int didx = (a->start + i) & a->mask;
+
+		if (d[didx].flags & TP4A_FRAME_COMPLETED) {
+			unsigned int idx = (used_idx++) & q->ring_mask;
+
+			q->ring[idx].idx = d[didx].idx;
+			q->ring[idx].len = d[didx].len;
+			q->ring[idx].offset = d[didx].offset;
+			q->ring[idx].error = d[didx].error;
+		} else {
+			break;
+		}
+	}
+
+	if (i == 0)
+		return 0;
+
+	/* Order flags and data */
+	smp_wmb();
+
+	for (j = i - 1; j >= 0; j--) {
+		unsigned int idx = (q->used_idx + j) & q->ring_mask;
+		unsigned int didx = (a->start + j) & a->mask;
+
+		q->ring[idx].flags = d[didx].flags & ~TP4_DESC_KERNEL;
+	}
+	q->num_free -= i;
+	q->used_idx += i;
+
+	return i;
+}
+
+/**
  * tp4q_dequeue_to_array - Dequeue entries from tp4 queue to packet array
  *
  * @a: Pointer to the packet array to dequeue from
@@ -581,6 +637,15 @@ static inline struct tpacket4_desc *tp4q_get_desc(struct tp4_frame_set *p)
  **/
 
 /**
+ * tp4f_reset - Start to traverse the frames in the set from the beginning
+ * @p: pointer to frame set
+ **/
+static inline void tp4f_reset(struct tp4_frame_set *p)
+{
+	p->curr = p->start;
+}
+
+/**
  * tp4f_next_frame - Go to next frame in frame set
  * @p: pointer to frame set
  *
@@ -594,6 +659,38 @@ static inline bool tp4f_next_frame(struct tp4_frame_set *p)
 
 	p->curr++;
 	return true;
+}
+
+/**
+ * tp4f_get_frame_id - Get packet buffer id of frame
+ * @p: pointer to frame set
+ *
+ * Returns the id of the packet buffer of the current frame
+ **/
+static inline u64 tp4f_get_frame_id(struct tp4_frame_set *p)
+{
+	return p->pkt_arr->items[p->curr & p->pkt_arr->mask].idx;
+}
+
+/**
+ * tp4f_get_frame_len - Get length of data in current frame
+ * @p: pointer to frame set
+ *
+ * Returns the length of data in the packet buffer of the current frame
+ **/
+static inline u32 tp4f_get_frame_len(struct tp4_frame_set *p)
+{
+	return p->pkt_arr->items[p->curr & p->pkt_arr->mask].len;
+}
+
+/**
+ * tp4f_set_error - Set an error on the current frame
+ * @p: pointer to frame set
+ * @errno: the errno to be assigned
+ **/
+static inline void tp4f_set_error(struct tp4_frame_set *p, int errno)
+{
+	p->pkt_arr->items[p->curr & p->pkt_arr->mask].error = errno;
 }
 
 /**
@@ -625,6 +722,48 @@ static inline void tp4f_set_frame(struct tp4_frame_set *p, u32 len, u16 offset,
 	d->offset = offset;
 	if (!is_eop)
 		d->flags |= TP4_PKT_CONT;
+}
+
+/*************** PACKET OPERATIONS *******************************/
+/* A packet consists of one or more frames. Both frames and packets
+ * are represented by a tp4_frame_set. The only difference is that
+ * packet functions look at the EOP flag.
+ **/
+
+/**
+ * tp4f_get_packet_len - Length of packet
+ * @p: pointer to packet
+ *
+ * Returns the length of the packet in bytes.
+ * Resets curr pointer of packet.
+ **/
+static inline u32 tp4f_get_packet_len(struct tp4_frame_set *p)
+{
+	u32 len = 0;
+
+	tp4f_reset(p);
+
+	do {
+		len += tp4f_get_frame_len(p);
+	} while (tp4f_next_frame(p));
+
+	return len;
+}
+
+/**
+ * tp4f_packet_completed - Mark packet as completed
+ * @p: pointer to packet
+ *
+ * Resets curr pointer of packet.
+ **/
+static inline void tp4f_packet_completed(struct tp4_frame_set *p)
+{
+	tp4f_reset(p);
+
+	do {
+		p->pkt_arr->items[p->curr & p->pkt_arr->mask].flags |=
+			TP4A_FRAME_COMPLETED;
+	} while (tp4f_next_frame(p));
 }
 
 /**************** PACKET_ARRAY FUNCTIONS ********************************/
@@ -812,6 +951,59 @@ static inline unsigned int tp4a_max_data_size(struct tp4_packet_array *a)
 {
 	return tp4q_max_data_size(a->tp4q);
 
+}
+
+/**
+ * tp4a_next_packet - Get next packet in array and advance curr pointer
+ * @a: pointer to packet array
+ * @p: supplied pointer to packet structure that is filled in by function
+ *
+ * Returns true if there is a packet, false otherwise. Packet returned in *p.
+ **/
+static inline bool tp4a_next_packet(struct tp4_packet_array *a,
+				    struct tp4_frame_set *p)
+{
+	u32 avail = a->end - a->curr;
+
+	if (avail == 0)
+		return false; /* empty */
+
+	p->pkt_arr = a;
+	p->start = a->curr;
+	p->curr = a->curr;
+	p->end = a->curr;
+
+	/* XXX Sanity check for too-many-frames packets? */
+	while (a->items[p->end++ & a->mask].flags & TP4_PKT_CONT) {
+		avail--;
+		if (avail == 0)
+			return false;
+	}
+
+	a->curr += (p->end - p->start);
+	return true;
+}
+
+/**
+ * tp4a_flush_completed - Flushes only frames marked as completed
+ * @a: pointer to packet array
+ *
+ * Returns 0 for success and -1 for failure
+ **/
+static inline int tp4a_flush_completed(struct tp4_packet_array *a)
+{
+	u32 avail = a->curr - a->start;
+	int ret;
+
+	if (avail == 0)
+		return 0; /* nothing to flush */
+
+	ret = tp4q_enqueue_completed_from_array(a, avail);
+	if (ret < 0)
+		return -1;
+
+	a->start += ret;
+	return 0;
 }
 
 /**

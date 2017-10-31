@@ -2462,6 +2462,28 @@ drop_n_account:
 	goto drop_n_restore;
 }
 
+static void packet_v4_destruct_skb(struct sk_buff *skb)
+{
+	struct packet_sock *po = pkt_sk(skb->sk);
+
+	if (likely(po->tx_ring.pg_vec)) {
+		u64 idx = (u64)skb_shinfo(skb)->destructor_arg;
+		struct tp4_frame_set p = {.start = idx,
+					  .curr = idx,
+					  .end = idx + 1,
+					  .pkt_arr = po->tx_ring.tp4a};
+
+		spin_lock(&po->sk.sk_write_queue.lock);
+		tp4f_packet_completed(&p);
+		WARN_ON_ONCE(tp4a_flush_completed(po->tx_ring.tp4a));
+		spin_unlock(&po->sk.sk_write_queue.lock);
+
+		packet_dec_pending(&po->tx_ring);
+	}
+
+	sock_wfree(skb);
+}
+
 static void tpacket_destruct_skb(struct sk_buff *skb)
 {
 	struct packet_sock *po = pkt_sk(skb->sk);
@@ -2519,24 +2541,24 @@ static int packet_snd_vnet_parse(struct msghdr *msg, size_t *len,
 }
 
 static int tpacket_fill_skb(struct packet_sock *po, struct sk_buff *skb,
-		void *frame, struct net_device *dev, void *data, int tp_len,
+		void *dtor_arg, struct net_device *dev, void *data, int tp_len,
 		__be16 proto, unsigned char *addr, int hlen, int copylen,
 		const struct sockcm_cookie *sockc)
 {
-	union tpacket_uhdr ph;
 	int to_write, offset, len, nr_frags, len_max;
 	struct socket *sock = po->sk.sk_socket;
 	struct page *page;
 	int err;
 
-	ph.raw = frame;
-
 	skb->protocol = proto;
 	skb->dev = dev;
 	skb->priority = po->sk.sk_priority;
 	skb->mark = po->sk.sk_mark;
-	sock_tx_timestamp(&po->sk, sockc->tsflags, &skb_shinfo(skb)->tx_flags);
-	skb_shinfo(skb)->destructor_arg = ph.raw;
+	if (sockc) {
+		sock_tx_timestamp(&po->sk, sockc->tsflags,
+				  &skb_shinfo(skb)->tx_flags);
+	}
+	skb_shinfo(skb)->destructor_arg = dtor_arg;
 
 	skb_reserve(skb, hlen);
 	skb_reset_network_header(skb);
@@ -2840,6 +2862,126 @@ out:
 	return err;
 }
 
+static int packet_v4_snd(struct packet_sock *po, struct msghdr *msg)
+{
+	DECLARE_SOCKADDR(struct sockaddr_ll *, saddr, msg->msg_name);
+	bool need_wait = !(msg->msg_flags & MSG_DONTWAIT);
+	struct packet_ring_buffer *rb = &po->tx_ring;
+	int err = 0, dlen, size_max, hlen, tlen;
+	struct tp4_frame_set p;
+	struct net_device *dev;
+	struct sk_buff *skb;
+	unsigned char *addr;
+	bool has_packet;
+	__be16 proto;
+	void *data;
+
+	mutex_lock(&po->pg_vec_lock);
+
+	if (likely(!saddr)) {
+		dev = packet_cached_dev_get(po);
+		proto = po->num;
+		addr = NULL;
+	} else {
+		pr_warn("packet v4 not implemented!\n");
+		return -EINVAL;
+	}
+
+	err = -ENXIO;
+	if (unlikely(!dev))
+		goto out;
+	err = -ENETDOWN;
+	if (unlikely(!(dev->flags & IFF_UP)))
+		goto out_put;
+
+	size_max = tp4a_max_data_size(rb->tp4a);
+
+	if (size_max > dev->mtu + dev->hard_header_len + VLAN_HLEN)
+		size_max = dev->mtu + dev->hard_header_len + VLAN_HLEN;
+
+	spin_lock_bh(&po->sk.sk_write_queue.lock);
+	tp4a_populate(rb->tp4a);
+	spin_unlock_bh(&po->sk.sk_write_queue.lock);
+
+	do {
+		spin_lock_bh(&po->sk.sk_write_queue.lock);
+		has_packet = tp4a_next_packet(rb->tp4a, &p);
+		spin_unlock_bh(&po->sk.sk_write_queue.lock);
+
+		if (!has_packet) {
+			if (need_wait && need_resched()) {
+				schedule();
+				continue;
+			}
+			break;
+		}
+
+		dlen = tp4f_get_packet_len(&p);
+		data = tp4f_get_data(&p);
+		hlen = LL_RESERVED_SPACE(dev);
+		tlen = dev->needed_tailroom;
+		skb = sock_alloc_send_skb(&po->sk,
+					  hlen + tlen +
+					  sizeof(struct sockaddr_ll),
+					  !need_wait, &err);
+
+		if (unlikely(!skb)) {
+			err = -EAGAIN;
+			goto out_err;
+		}
+
+		dlen = tpacket_fill_skb(po, skb,
+					(void *)(long)tp4f_get_frame_id(&p),
+					dev,
+					data, dlen, proto, addr, hlen,
+					dev->hard_header_len, NULL);
+		if (likely(dlen >= 0) &&
+		    dlen > dev->mtu + dev->hard_header_len &&
+		    !packet_extra_vlan_len_allowed(dev, skb)) {
+			dlen = -EMSGSIZE;
+		}
+
+		if (unlikely(dlen < 0)) {
+			err = dlen;
+			goto out_err;
+		}
+
+		skb->destructor = packet_v4_destruct_skb;
+		packet_inc_pending(&po->tx_ring);
+
+		err = po->xmit(skb);
+		/* Ignore NET_XMIT_CN as packet might have been sent */
+		if (err == NET_XMIT_DROP || err == NETDEV_TX_BUSY) {
+			err = -EAGAIN;
+			packet_dec_pending(&po->tx_ring);
+			skb = NULL;
+			goto out_err;
+		}
+	} while (!err ||
+		/* Note: packet_read_pending() might be slow if we have
+		 * to call it as it's per_cpu variable, but in fast-path
+		 * we already short-circuit the loop with the first
+		 * condition, and luckily don't have to go that path
+		 * anyway.
+		 */
+		 (need_wait && packet_read_pending(&po->tx_ring)));
+
+	goto out_put;
+
+out_err:
+	spin_lock_bh(&po->sk.sk_write_queue.lock);
+	tp4f_set_error(&p, -err);
+	tp4f_packet_completed(&p);
+	WARN_ON_ONCE(tp4a_flush_completed(rb->tp4a));
+	spin_unlock_bh(&po->sk.sk_write_queue.lock);
+	kfree_skb(skb);
+out_put:
+	dev_put(dev);
+out:
+	mutex_unlock(&po->pg_vec_lock);
+	return 0;
+}
+
 static struct sk_buff *packet_alloc_skb(struct sock *sk, size_t prepad,
 				        size_t reserve, size_t len,
 				        size_t linear, int noblock,
@@ -3015,10 +3157,10 @@ static int packet_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 	struct packet_sock *po = pkt_sk(sk);
 
 	if (po->tx_ring.pg_vec) {
-		if (po->tp_version == TPACKET_V4)
-			return -EINVAL;
+		if (po->tp_version != TPACKET_V4)
+			return tpacket_snd(po, msg);
 
-		return tpacket_snd(po, msg);
+		return packet_v4_snd(po, msg);
 	}
 
 	return packet_snd(sock, msg, len);
@@ -4329,9 +4471,14 @@ static unsigned int packet_poll(struct file *file, struct socket *sock,
 		po->pressure = 0;
 	spin_unlock_bh(&sk->sk_receive_queue.lock);
 	spin_lock_bh(&sk->sk_write_queue.lock);
-	if (po->tx_ring.pg_vec && po->tp_version != TPACKET_V4) {
-		if (packet_current_frame(po, &po->tx_ring, TP_STATUS_AVAILABLE))
+	if (po->tx_ring.pg_vec) {
+		if (po->tp_version == TPACKET_V4) {
+			if (tp4q_nb_avail(&po->tx_ring.tp4q, 1))
+				mask |= POLLOUT | POLLWRNORM;
+		} else if (packet_current_frame(po, &po->tx_ring,
+					 TP_STATUS_AVAILABLE)) {
 			mask |= POLLOUT | POLLWRNORM;
+		}
 	}
 	spin_unlock_bh(&sk->sk_write_queue.lock);
 	return mask;
