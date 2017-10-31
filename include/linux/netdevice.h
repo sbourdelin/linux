@@ -832,6 +832,8 @@ struct dev_ifalias {
 	char ifalias[];
 };
 
+struct tp4_netdev_parms;
+
 /*
  * This structure defines the management hooks for network devices.
  * The following hooks can be defined; unless noted otherwise, they are
@@ -1132,6 +1134,15 @@ struct dev_ifalias {
  * void (*ndo_xdp_flush)(struct net_device *dev);
  *	This function is used to inform the driver to flush a particular
  *	xdp tx queue. Must be called on same CPU as xdp_xmit.
+ * int (*ndo_tp4_zerocopy)(struct net_device *dev,
+ *			   struct tp4_netdev_parms *parms);
+ *	This function is used to enable and disable the AF_PACKET V4
+ *	PACKET_ZEROCOPY support. See definition of enum tp4_netdev_command
+ *	in tpacket4.h for details.
+ * int (*ndo_tp4_xmit)(struct net_device *dev, int queue_pair);
+ *	This function is used to send packets when the PACKET_ZEROCOPY
+ *	option is set. The rtnl lock is not held when entering this
+ *	function.
  */
 struct net_device_ops {
 	int			(*ndo_init)(struct net_device *dev);
@@ -1319,6 +1330,11 @@ struct net_device_ops {
 	int			(*ndo_xdp_xmit)(struct net_device *dev,
 						struct xdp_buff *xdp);
 	void			(*ndo_xdp_flush)(struct net_device *dev);
+	int                     (*ndo_tp4_zerocopy)(
+					struct net_device *dev,
+					struct tp4_netdev_parms *parms);
+	int                     (*ndo_tp4_xmit)(struct net_device *dev,
+						int queue_pair);
 };
 
 /**
