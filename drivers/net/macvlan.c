@@ -1189,6 +1189,9 @@ static void macvlan_port_destroy(struct net_device *dev)
 	struct macvlan_port *port = macvlan_port_get_rtnl(dev);
 	struct sk_buff *skb;
 
+	if (!port)
+		return;
+
 	dev->priv_flags &= ~IFF_MACVLAN_PORT;
 	netdev_rx_handler_unregister(dev);
 
@@ -1444,7 +1447,7 @@ unregister_netdev:
 	unregister_netdevice(dev);
 destroy_macvlan_port:
 	if (create)
-		macvlan_port_destroy(port->dev);
+		macvlan_port_destroy(lowerdev);
 	return err;
 }
 EXPORT_SYMBOL_GPL(macvlan_common_newlink);
