@@ -602,6 +602,12 @@ unlink_netdev:
 unregister_netdev:
 	unregister_netdevice(dev);
 remove_ida:
+	/* Through the call to ipvlan_uninit (ndo_uninit callback) IPvlan port
+	 * might be already destroyed in failure path in register_netdevice()
+	 * or the above call in unregister_netdevice().
+	 */
+	if (!ipvlan_port_get_rtnl(phy_dev))
+		return err;
 	ida_simple_remove(&port->ida, dev->dev_id);
 destroy_ipvlan_port:
 	if (create)
