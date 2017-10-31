@@ -1996,6 +1996,8 @@ static void dwc3_gadget_set_speed(struct usb_gadget *g,
 	unsigned long		flags;
 	u32			reg;
 
+	speed = min(g->max_speed, speed);
+
 	spin_lock_irqsave(&dwc->lock, flags);
 	reg = dwc3_readl(dwc->regs, DWC3_DCFG);
 	reg &= ~(DWC3_DCFG_SPEED_MASK);
