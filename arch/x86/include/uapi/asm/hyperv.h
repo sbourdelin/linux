@@ -112,6 +112,22 @@
 #define HV_X64_GUEST_IDLE_STATE_AVAILABLE		(1 << 5)
 /* Guest crash data handler available */
 #define HV_X64_GUEST_CRASH_MSR_AVAILABLE		(1 << 10)
+/* Debug MSRs available */
+#define HV_X64_DEBUG_MSR_AVAILABLE			(1 << 11)
+/* Support for Non-Privileged Instruction Execution Prevention is available */
+#define HV_X64_NPIEP_AVAILABLE				(1 << 12)
+/* Support for DisableHypervisor is available */
+#define HV_X64_DISABLE_HYPERVISOR_AVAILABLE		(1 << 13)
+/* Extended GVA Ranges for Flush Virtual Address list is available */
+#define HV_X64_EXTENDED_GVA_RANGE_AVAILABLE		(1 << 14)
+/* Return Hypercall output via XMM registers is available */
+#define HV_X64_HYPERCALL_XMM_OUTPUT_AVAILABLE		(1 << 15)
+/* SINT polling mode available */
+#define HV_X64_SINT_POLLING_MODE_AVAILABLE		(1 << 17)
+/* Hypercall MSR lock is available */
+#define HV_X64_HYPERCALL_MSR_LOCK_AVAILABLE		(1 << 18)
+/* stimer direct mode is available */
+#define HV_X64_STIMER_DIRECT_MODE_AVAILABLE		(1 << 19)
 
 /*
  * Implementation recommendations. Indicates which behaviors the hypervisor
@@ -299,6 +315,16 @@ typedef struct _HV_REFERENCE_TSC_PAGE {
 #define HV_SYNIC_SINT_VECTOR_MASK	(0xFF)
 
 #define HV_SYNIC_STIMER_COUNT		(4)
+
+/* Hardware IRQ number to use for stimer0 in Direct Mode.  This IRQ is a fake
+ * because stimer's in Direct Mode simply interrupt on the specified vector,
+ * without using a particular IOAPIC pin. But we use the IRQ allocation
+ * machinery, so we need a hardware IRQ #.  This value is somewhat arbitrary,
+ * but it should not be a legacy IRQ (0 to 15), and should fit within the
+ * single IOAPIC (0 to 23) that Hyper-V provides to a guest VM. So any value
+ * between 16 and 23 should be good.
+ */
+#define HV_STIMER0_IRQNR		18
 
 /* Define synthetic interrupt controller message constants. */
 #define HV_MESSAGE_SIZE			(256)

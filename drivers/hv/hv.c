@@ -27,8 +27,12 @@
 #include <linux/vmalloc.h>
 #include <linux/hyperv.h>
 #include <linux/version.h>
-#include <linux/interrupt.h>
+#include <linux/irq.h>
+#include <linux/irqdesc.h>
+#include <linux/random.h>
+#include <linux/kernel_stat.h>
 #include <linux/clockchips.h>
+#include <linux/module.h>
 #include <asm/hyperv.h>
 #include <asm/mshyperv.h>
 #include "hyperv_vmbus.h"
@@ -37,6 +41,21 @@
 struct hv_context hv_context = {
 	.synic_initialized	= false,
 };
+
+/* If true, we're using Direct Mode for stimer0, and the timer will do it own
+ * interrupt when it expires. If false, stimer0 is not using Direct Mode and
+ * will send a VMbus message when it expires. We prefer to use Direct Mode,
+ * but not all versions of Hyper-V support Direct Mode.
+ *
+ * While Hyper-V provides a total of four stimer's per CPU, Linux use only
+ * stimer0.
+ */
+static bool	stimer_direct_mode;
+static int	stimer0_irq;
+static int	stimer0_vector;
+static bool	direct_mode_disable;
+module_param(direct_mode_disable, bool, 0444);
+MODULE_PARM_DESC(direct_mode_disable, "Set to Y to disable Direct Mode.");
 
 #define HV_TIMER_FREQUENCY (10 * 1000 * 1000) /* 100ns period */
 #define HV_MAX_MAX_DELTA_TICKS 0xffffffff
@@ -55,7 +74,12 @@ int hv_init(void)
 	hv_context.cpu_context = alloc_percpu(struct hv_per_cpu_context);
 	if (!hv_context.cpu_context)
 		return -ENOMEM;
+	stimer_direct_mode = (ms_hyperv.misc_features &
+		HV_X64_STIMER_DIRECT_MODE_AVAILABLE) ? true : false;
 
+	/* Apply boot command line override to the Direct Mode setting */
+	if (direct_mode_disable)
+		stimer_direct_mode = false;
 	return 0;
 }
 
@@ -94,6 +118,23 @@ int hv_post_message(union hv_connection_id connection_id,
 	return status & 0xFFFF;
 }
 
+/* ISR for when stimer0 is operating in Direct Mode.  Direct Mode does
+ * not use VMBus or any VMBus messages, so process here and not in the
+ * VMBus driver code.
+ */
+
+static void hv_stimer0_isr(struct irq_desc *desc)
+{
+	struct hv_per_cpu_context *hv_cpu;
+
+	__this_cpu_inc(*desc->kstat_irqs);
+	__this_cpu_inc(kstat.irqs_sum);
+	hv_ack_stimer0_interrupt(desc);
+	hv_cpu = this_cpu_ptr(hv_context.cpu_context);
+	hv_cpu->clk_evt->event_handler(hv_cpu->clk_evt);
+	add_interrupt_randomness(desc->irq_data.irq, 0);
+}
+
 static int hv_ce_set_next_event(unsigned long delta,
 				struct clock_event_device *evt)
 {
@@ -111,6 +152,8 @@ static int hv_ce_shutdown(struct clock_event_device *evt)
 {
 	hv_init_timer(HV_X64_MSR_STIMER0_COUNT, 0);
 	hv_init_timer_config(HV_X64_MSR_STIMER0_CONFIG, 0);
+	if (stimer_direct_mode)
+		hv_disable_stimer0_percpu_irq(stimer0_irq);
 
 	return 0;
 }
@@ -119,9 +162,24 @@ static int hv_ce_set_oneshot(struct clock_event_device *evt)
 {
 	union hv_timer_config timer_cfg;
 
+	timer_cfg.as_uint64 = 0; /* Zero everything */
 	timer_cfg.enable = 1;
 	timer_cfg.auto_enable = 1;
-	timer_cfg.sintx = VMBUS_MESSAGE_SINT;
+	if (stimer_direct_mode) {
+
+		/* When it expires, the timer will directly interrupt
+		 * on the specific hardware vector.
+		 */
+		timer_cfg.direct_mode = 1;
+		timer_cfg.apic_vector = stimer0_vector;
+		hv_enable_stimer0_percpu_irq(stimer0_irq);
+	} else {
+		/* When it expires, the timer will generate a VMbus message,
+		 * to be handled by the normal VMbus interrupt handler.
+		 */
+		timer_cfg.direct_mode = 0;
+		timer_cfg.sintx = VMBUS_MESSAGE_SINT;
+	}
 	hv_init_timer_config(HV_X64_MSR_STIMER0_CONFIG, timer_cfg.as_uint64);
 
 	return 0;
@@ -192,6 +250,12 @@ int hv_synic_alloc(void)
 		}
 
 		INIT_LIST_HEAD(&hv_cpu->chan_list);
+	}
+
+	if (stimer_direct_mode) {
+		if (hv_allocate_stimer0_irq(&stimer0_irq, &stimer0_vector))
+			goto err;
+		irq_set_handler(stimer0_irq, hv_stimer0_isr);
 	}
 
 	return 0;
@@ -294,6 +358,9 @@ void hv_synic_clockevents_cleanup(void)
 
 	if (!(ms_hyperv.features & HV_X64_MSR_SYNTIMER_AVAILABLE))
 		return;
+
+	if (stimer_direct_mode)
+		hv_deallocate_stimer0_irq(stimer0_irq);
 
 	for_each_present_cpu(cpu) {
 		struct hv_per_cpu_context *hv_cpu

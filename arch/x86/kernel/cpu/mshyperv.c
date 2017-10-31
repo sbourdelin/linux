@@ -19,7 +19,10 @@
 #include <linux/efi.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
+#include <linux/irqdomain.h>
+#include <linux/irqdesc.h>
 #include <linux/kexec.h>
+#include <linux/acpi.h>
 #include <asm/processor.h>
 #include <asm/hypervisor.h>
 #include <asm/hyperv.h>
@@ -27,6 +30,7 @@
 #include <asm/desc.h>
 #include <asm/irq_regs.h>
 #include <asm/i8259.h>
+#include <asm/irqdomain.h>
 #include <asm/apic.h>
 #include <asm/timer.h>
 #include <asm/reboot.h>
@@ -68,6 +72,64 @@ void hv_remove_vmbus_irq(void)
 }
 EXPORT_SYMBOL_GPL(hv_setup_vmbus_irq);
 EXPORT_SYMBOL_GPL(hv_remove_vmbus_irq);
+
+
+/* Routines to do per-architecture handling of stimer0 when in Direct Mode */
+
+void hv_ack_stimer0_interrupt(struct irq_desc *desc)
+{
+	ack_APIC_irq();
+}
+
+static void allonline_vector_allocation_domain(int cpu, struct cpumask *retmask,
+				const struct cpumask *mask)
+{
+	cpumask_copy(retmask, cpu_online_mask);
+}
+
+int hv_allocate_stimer0_irq(int *irq, int *vector)
+{
+	int		localirq;
+	int		result;
+	struct irq_data *irq_data;
+
+	/* The normal APIC vector allocation domain allows allocation of vectors
+	 * only for the calling CPU.  So we change the allocation domain to one
+	 * that allows vectors to be allocated in all online CPUs.  This
+	 * change is fine in a Hyper-V VM because VMs don't have the usual
+	 * complement of interrupting devices.
+	 */
+	apic->vector_allocation_domain = allonline_vector_allocation_domain;
+	localirq = acpi_register_gsi(NULL, HV_STIMER0_IRQNR,
+				ACPI_LEVEL_SENSITIVE, ACPI_ACTIVE_HIGH);
+	if (localirq < 0) {
+		pr_err("Cannot register stimer0 gsi. Error %d", localirq);
+		return -1;
+	}
+
+	/* We pass in a dummy IRQ handler because architecture independent code
+	 * will later override the IRQ domain interrupt handler and set it to a
+	 * Hyper-V specific handler.
+	 */
+	result = request_irq(localirq, (irq_handler_t)(-1), 0,
+					"Hyper-V stimer0", NULL);
+	if (result) {
+		pr_err("Cannot request stimer0 irq. Error %d", result);
+		acpi_unregister_gsi(localirq);
+		return -1;
+	}
+	irq_data = irq_domain_get_irq_data(x86_vector_domain, localirq);
+	*vector = irqd_cfg(irq_data)->vector;
+	*irq = localirq;
+	return 0;
+}
+
+void hv_deallocate_stimer0_irq(int irq)
+{
+	free_irq(irq, NULL);
+	acpi_unregister_gsi(irq);
+}
+
 
 void hv_setup_kexec_handler(void (*handler)(void))
 {
@@ -195,7 +257,7 @@ static void __init ms_hyperv_init_platform(void)
 		hv_host_info_ecx = cpuid_ecx(HVCPUID_VERSION);
 		hv_host_info_edx = cpuid_edx(HVCPUID_VERSION);
 
-		pr_info("Hyper-V Host Build:%d-%d.%d-%d-%d.%d\n",
+		pr_info("Hyper-V: Host Build %d-%d.%d-%d-%d.%d\n",
 			hv_host_info_eax, hv_host_info_ebx >> 16,
 			hv_host_info_ebx & 0xFFFF, hv_host_info_ecx,
 			hv_host_info_edx >> 24, hv_host_info_edx & 0xFFFFFF);

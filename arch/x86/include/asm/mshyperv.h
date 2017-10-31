@@ -4,6 +4,8 @@
 #include <linux/types.h>
 #include <linux/atomic.h>
 #include <linux/nmi.h>
+#include <linux/irq.h>
+#include <linux/irqdesc.h>
 #include <asm/io.h>
 #include <asm/hyperv.h>
 
@@ -374,4 +376,16 @@ static inline struct ms_hyperv_tsc_page *hv_get_tsc_page(void)
 	return NULL;
 }
 #endif
+
+/* Per architecture routines for stimer0 Direct Mode handling.  On x86/x64
+ * there are no percpu actions to take.
+ */
+#if IS_ENABLED(CONFIG_HYPERV)
+static inline void hv_enable_stimer0_percpu_irq(int irq) { }
+static inline void hv_disable_stimer0_percpu_irq(int irq) { }
+extern int hv_allocate_stimer0_irq(int *irq, int *vector);
+extern void hv_deallocate_stimer0_irq(int irq);
+extern void hv_ack_stimer0_interrupt(struct irq_desc *desc);
+#endif
+
 #endif
