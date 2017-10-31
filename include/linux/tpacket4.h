@@ -105,6 +105,44 @@ struct tp4_frame_set {
 	u32 end;
 };
 
+enum tp4_netdev_command {
+	/* Enable the AF_PACKET V4 zerocopy support. When this is enabled,
+	 * packets will arrive to the socket without being copied resulting
+	 * in better performance. Note that this also means that no packets
+	 * are sent to the kernel stack after this feature has been enabled.
+	 */
+	TP4_ENABLE,
+	/* Disables the PACKET_ZEROCOPY support. */
+	TP4_DISABLE,
+};
+
+/**
+ * struct tp4_netdev_parms - TP4 netdev parameters for configuration
+ *
+ * @command: netdev command, currently enable or disable
+ * @rx_opaque: an opaque pointer to the rx queue
+ * @tx_opaque: an opaque pointer to the tx queue
+ * @data_ready: function to be called when data is ready in poll mode
+ * @data_ready_opauqe: opaque parameter returned with data_ready
+ * @write_space: called when data needs to be transmitted in poll mode
+ * @write_space_opaque: opaque parameter returned with write_space
+ * @error_report: called when there is an error
+ * @error_report_opaque: opaque parameter returned in error_report
+ * @queue_pair: the queue_pair associated with this zero-copy operation
+ **/
+struct tp4_netdev_parms {
+	enum tp4_netdev_command command;
+	void *rx_opaque;
+	void *tx_opaque;
+	void (*data_ready)(void *);
+	void *data_ready_opaque;
+	void (*write_space)(void *);
+	void *write_space_opaque;
+	void (*error_report)(void *, int);
+	void *error_report_opaque;
+	int queue_pair;
+};
+
 /*************** V4 QUEUE OPERATIONS *******************************/
 
 /**

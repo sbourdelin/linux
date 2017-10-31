@@ -116,6 +116,7 @@ struct packet_sock {
 	struct packet_ring_buffer	tx_ring;
 
 	struct tp4_umem			*umem;
+	struct tp4_netdev_parms __rcu	*zc;
 
 	int			copy_thresh;
 	spinlock_t		bind_lock;
