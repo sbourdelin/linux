@@ -205,8 +205,8 @@ def set_args(parser):
                         help='Run tests from the specified file')
     parser.add_argument('-l', '--list', type=str, nargs='?', const="++", metavar='CATEGORY',
                         help='List all test cases, or those only within the specified category')
-    parser.add_argument('-s', '--show', type=str, nargs=1, metavar='ID', dest='showID',
-                        help='Display the test case with specified id')
+    parser.add_argument('-s', '--show', action='store_true', dest='showID',
+                        help='Display the selected test cases')
     parser.add_argument('-e', '--execute', type=str, nargs=1, metavar='ID',
                         help='Execute the single test case with specified ID')
     parser.add_argument('-i', '--id', action='store_true', dest='gen_id',
@@ -335,7 +335,8 @@ def set_operation_mode(args):
     ucat = get_test_categories(alltests)
 
     if args.showID:
-        show_test_case_by_id(alltests, args.showID[0])
+        for atest in alltests:
+            print_test_case(atest)
         exit(0)
 
     if args.execute:
