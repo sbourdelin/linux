@@ -193,6 +193,10 @@ static int hdlcd_crtc_atomic_check(struct drm_crtc *crtc,
 	struct drm_display_mode *mode = &state->adjusted_mode;
 	long rate, clk_rate = mode->clock * 1000;
 
+	/* if the crtc is disabled, skip the clock check */
+	if (!state->enable)
+		return 0;
+
 	rate = clk_round_rate(hdlcd->clk, clk_rate);
 	if (rate != clk_rate) {
 		/* clock required by mode not supported by hardware */
