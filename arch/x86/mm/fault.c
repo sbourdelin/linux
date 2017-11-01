@@ -1440,7 +1440,13 @@ good_area:
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.  Since we never set FAULT_FLAG_RETRY_NOWAIT, if
 	 * we get VM_FAULT_RETRY back, the mmap_sem has been unlocked.
+	 *
+	 * Since handle_userfault() may also release and reacquire mmap_sem
+	 * in some scenario (and not return VM_FAULT_RETRY), we have to be
+	 * careful about not touching vma after handling the fault. So we
+	 * read the pkey beforehand.
 	 */
+	pkey = vma_pkey(vma);
 	fault = handle_mm_fault(vma, address, flags);
 	major |= fault & VM_FAULT_MAJOR;
 
@@ -1467,7 +1473,6 @@ good_area:
 		return;
 	}
 
-	pkey = vma_pkey(vma);
 	up_read(&mm->mmap_sem);
 	if (unlikely(fault & VM_FAULT_ERROR)) {
 		mm_fault_error(regs, error_code, address, &pkey, fault);
