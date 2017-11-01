@@ -36,6 +36,11 @@ Optional properties:
 
   - read-only: this parameterless property disables writes to the eeprom
 
+  - no-read-rollover: supported on the at24 eeprom family only.
+			This parameterless property indicates that the
+			eeprom does not support auto read rollover. Please consult
+			the manual of your device.
+
 Example:
 
 eeprom@52 {
