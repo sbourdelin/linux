@@ -84,6 +84,8 @@ ENTRY(__guest_enter)
 	// Restore guest reg x18
 	ldr	x18,      [x18, #CPU_XREG_OFFSET(18)]
 
+	// synchronize host pending asynchronous error
+	error_synchronize
 	// Do not touch any register after this!
 	eret
 ENDPROC(__guest_enter)
