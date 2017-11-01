@@ -310,6 +310,113 @@ free_user:
 	vm_munmap(user_addr, PAGE_SIZE);
 }
 
+void lkdtm_PUT_USER(void)
+{
+	unsigned long user_addr;
+	void *kbuf;
+
+	kbuf = kmalloc(cache_size, GFP_KERNEL);
+	if (!kbuf) {
+		pr_warn("failed to allocate kernel buffer\n");
+		return;
+	}
+
+	user_addr = vm_mmap(NULL, 0, PAGE_SIZE,
+			    PROT_READ | PROT_WRITE | PROT_EXEC,
+			    MAP_ANONYMOUS | MAP_PRIVATE, 0);
+	if (user_addr >= TASK_SIZE) {
+		pr_warn("Failed to allocate user memory\n");
+		goto free_kernel;
+	}
+
+	pr_info("attempting valid put_user\n");
+	if (put_user(0x1234567, (unsigned long __user *)user_addr)) {
+		pr_warn("put_user failed unexpectedly?!\n");
+		goto free_user;
+	}
+
+
+	pr_info("attempting valid __put_user\n");
+	if (__put_user(0x1234567, (unsigned long __user *)user_addr)) {
+		pr_warn("__put_user failed unexpectedly?!\n");
+		goto free_user;
+	}
+
+	pr_info("attempting invalid put_user which should fail");
+	if (put_user(0x1234567, (unsigned long *)kbuf)) {
+		pr_warn("put_user failed correctly\n");
+	} else {
+		pr_warn("put_user succeeded unexpectedly\n");
+		goto free_user;
+	}
+
+
+	pr_info("attempting invalid __put_user which should succeed\n");
+	if (__put_user(0x1234567, (unsigned long *)kbuf)) {
+		pr_warn("__put_user failed unexpectedly\n");
+	} else {
+		pr_warn("__put_user succeeded\n");
+	}
+
+free_user:
+	vm_munmap(user_addr, PAGE_SIZE);
+free_kernel:
+	kfree(kbuf);
+}
+
+void lkdtm_GET_USER(void)
+{
+	unsigned long user_addr;
+	unsigned long a;
+	void *kbuf;
+
+	kbuf = kmalloc(cache_size, GFP_KERNEL);
+	if (!kbuf) {
+		pr_warn("failed to allocate kernel buffer\n");
+		return;
+	}
+
+	user_addr = vm_mmap(NULL, 0, PAGE_SIZE,
+			    PROT_READ | PROT_WRITE | PROT_EXEC,
+			    MAP_ANONYMOUS | MAP_PRIVATE, 0);
+	if (user_addr >= TASK_SIZE) {
+		pr_warn("Failed to allocate user memory\n");
+		goto free_kernel;
+	}
+
+	pr_info("attempting valid get_user\n");
+	if (get_user(a, (unsigned long __user *)user_addr)) {
+		pr_warn("get_user failed unexpectedly?!\n");
+		goto free_user;
+	}
+
+	pr_info("attempting valid __get_user\n");
+	if (__get_user(a, (unsigned long __user *)user_addr)) {
+		pr_warn("__get_user failed unexpectedly?!\n");
+		goto free_user;
+	}
+
+	pr_info("attempting an invalid get_user which should fail\n");
+	if (get_user(a, (unsigned long *)kbuf)) {
+		pr_warn("get_user failed correctly\n");
+	} else {
+		pr_warn("get_user succeeded unexpectedly\n");
+		goto free_user;
+	}
+
+	pr_info("attempting an invalid __get_user which should succeed\n");
+	if (__get_user(a, (unsigned long *)kbuf)) {
+		pr_warn("get_user failed unexpectedly\n");
+	} else {
+		pr_warn("get_user succeeded\n");
+	}
+
+free_user:
+	vm_munmap(user_addr, PAGE_SIZE);
+free_kernel:
+	kfree(kbuf);
+}
+
 void __init lkdtm_usercopy_init(void)
 {
 	/* Prepare cache that lacks SLAB_USERCOPY flag. */
