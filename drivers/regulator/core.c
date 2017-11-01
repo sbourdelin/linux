@@ -1554,23 +1554,19 @@ static int regulator_resolve_supply(struct regulator_dev *rdev)
 	 */
 	if (r->dev.parent && r->dev.parent != rdev->dev.parent) {
 		if (!device_is_bound(r->dev.parent)) {
-			put_device(&r->dev);
-			return -EPROBE_DEFER;
+			ret = -EPROBE_DEFER;
+			goto put_device;
 		}
 	}
 
 	/* Recursively resolve the supply of the supply */
 	ret = regulator_resolve_supply(r);
-	if (ret < 0) {
-		put_device(&r->dev);
-		return ret;
-	}
+	if (ret)
+		goto put_device;
 
 	ret = set_supply(rdev, r);
-	if (ret < 0) {
-		put_device(&r->dev);
-		return ret;
-	}
+	if (ret)
+		goto put_device;
 
 	/* Cascade always-on state to supply */
 	if (_regulator_is_enabled(rdev)) {
@@ -1583,6 +1579,10 @@ static int regulator_resolve_supply(struct regulator_dev *rdev)
 	}
 
 	return 0;
+
+put_device:
+	put_device(&r->dev);
+	return ret;
 }
 
 /* Internal regulator request function */
