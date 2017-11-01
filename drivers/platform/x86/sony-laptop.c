@@ -1661,30 +1661,31 @@ static int sony_nc_setup_rfkill(struct acpi_device *device,
 		return -ENOMEM;
 
 	err = sony_call_snc_handle(sony_rfkill_handle, 0x200, &result);
-	if (err < 0) {
-		rfkill_destroy(rfk);
-		return err;
-	}
+	if (err < 0)
+		goto destroy_rfk;
+
 	hwblock = !(result & 0x1);
 
 	err = sony_call_snc_handle(sony_rfkill_handle,
 				   sony_rfkill_address[nc_type],
 				   &result);
-	if (err < 0) {
-		rfkill_destroy(rfk);
-		return err;
-	}
+	if (err < 0)
+		goto destroy_rfk;
+
 	swblock = !(result & 0x2);
 
 	rfkill_init_sw_state(rfk, swblock);
 	rfkill_set_hw_state(rfk, hwblock);
 
 	err = rfkill_register(rfk);
-	if (err) {
-		rfkill_destroy(rfk);
-		return err;
-	}
+	if (err)
+		goto destroy_rfk;
+
 	sony_rfkill_devices[nc_type] = rfk;
+	return err;
+
+destroy_rfk:
+	rfkill_destroy(rfk);
 	return err;
 }
 
