@@ -1550,22 +1550,27 @@ static int page_trans_huge_map_swapcount(struct page *page, int *total_mapcount,
 bool reuse_swap_page(struct page *page, int *total_map_swapcount)
 {
 	int count, total_mapcount, total_swapcount;
+	int dirty;
 
 	VM_BUG_ON_PAGE(!PageLocked(page), page);
 	if (unlikely(PageKsm(page)))
 		return false;
+	dirty = PageDirty(page);
 	count = page_trans_huge_map_swapcount(page, &total_mapcount,
 					      &total_swapcount);
 	if (total_map_swapcount)
 		*total_map_swapcount = total_mapcount + total_swapcount;
-	if (count == 1 && PageSwapCache(page) &&
+	if ((total_mapcount <= 1 && !dirty) ||
+		(count == 1 && PageSwapCache(page) &&
 	    (likely(!PageTransCompound(page)) ||
 	     /* The remaining swap count will be freed soon */
-	     total_swapcount == page_swapcount(page))) {
+	     total_swapcount == page_swapcount(page)))) {
 		if (!PageWriteback(page)) {
 			page = compound_head(page);
 			delete_from_swap_cache(page);
 			SetPageDirty(page);
+			if (!dirty)
+				return true;
 		} else {
 			swp_entry_t entry;
 			struct swap_info_struct *p;
