@@ -264,30 +264,29 @@ static void twl6030_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 	val &= ~TWL6030_PWM_TOGGLE(pwm->hwpwm, TWL6030_PWMXS | TWL6030_PWMXEN);
 
 	ret = twl_i2c_write_u8(TWL6030_MODULE_ID1, val, TWL6030_TOGGLE3_REG);
-	if (ret < 0) {
-		dev_err(chip->dev, "%s: Failed to disable PWM\n", pwm->label);
-		goto out;
-	}
+	if (ret)
+		goto report_failure;
 
 	val |= TWL6030_PWM_TOGGLE(pwm->hwpwm, TWL6030_PWMXEN);
 
 	ret = twl_i2c_write_u8(TWL6030_MODULE_ID1, val, TWL6030_TOGGLE3_REG);
-	if (ret < 0) {
-		dev_err(chip->dev, "%s: Failed to disable PWM\n", pwm->label);
-		goto out;
-	}
+	if (ret)
+		goto report_failure;
 
 	val &= ~TWL6030_PWM_TOGGLE(pwm->hwpwm, TWL6030_PWMXEN);
 
 	ret = twl_i2c_write_u8(TWL6030_MODULE_ID1, val, TWL6030_TOGGLE3_REG);
-	if (ret < 0) {
-		dev_err(chip->dev, "%s: Failed to disable PWM\n", pwm->label);
-		goto out;
-	}
+	if (ret)
+		goto report_failure;
 
 	twl->twl6030_toggle3 = val;
-out:
+unlock:
 	mutex_unlock(&twl->mutex);
+	return;
+
+report_failure:
+	dev_err(chip->dev, "%s: Failed to disable PWM\n", pwm->label);
+	goto unlock;
 }
 
 static const struct pwm_ops twl4030_pwm_ops = {
