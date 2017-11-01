@@ -499,4 +499,13 @@ alternative_else_nop_endif
 #endif
 	.endm
 
+	.macro	error_synchronize
+alternative_if ARM64_HAS_IESB
+	b	1f
+alternative_else_nop_endif
+alternative_if ARM64_HAS_RAS_EXTN
+	esb
+alternative_else_nop_endif
+1:
+	.endm
 #endif	/* __ASM_ASSEMBLER_H */
