@@ -138,6 +138,7 @@
 	stp	x28, x29, [sp, #16 * 14]
 
 	.if	\el == 0
+	error_synchronize
 	mrs	x21, sp_el0
 	ldr_this_cpu	tsk, __entry_task, x20	// Ensure MDSCR_EL1.SS is clear,
 	ldr	x19, [tsk, #TSK_TI_FLAGS]	// since we can unmask debug
@@ -279,6 +280,7 @@ alternative_if ARM64_WORKAROUND_845719
 1:
 alternative_else_nop_endif
 #endif
+	error_synchronize
 	.endif
 
 	msr	elr_el1, x21			// set up the return data
