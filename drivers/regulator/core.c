@@ -1223,7 +1223,7 @@ static int set_consumer_device_supply(struct regulator_dev *rdev,
 		return -EBUSY;
 	}
 
-	node = kzalloc(sizeof(struct regulator_map), GFP_KERNEL);
+	node = kzalloc(sizeof(*node), GFP_KERNEL);
 	if (node == NULL)
 		return -ENOMEM;
 
@@ -1833,7 +1833,7 @@ int regulator_register_supply_alias(struct device *dev, const char *id,
 	if (map)
 		return -EEXIST;
 
-	map = kzalloc(sizeof(struct regulator_supply_alias), GFP_KERNEL);
+	map = kzalloc(sizeof(*map), GFP_KERNEL);
 	if (!map)
 		return -ENOMEM;
 
@@ -1964,7 +1964,7 @@ static int regulator_ena_gpio_request(struct regulator_dev *rdev,
 	if (ret)
 		return ret;
 
-	pin = kzalloc(sizeof(struct regulator_enable_gpio), GFP_KERNEL);
+	pin = kzalloc(sizeof(*pin), GFP_KERNEL);
 	if (pin == NULL) {
 		gpio_free(config->ena_gpio);
 		return -ENOMEM;
@@ -4011,7 +4011,7 @@ regulator_register(const struct regulator_desc *regulator_desc,
 		return ERR_PTR(-EINVAL);
 	}
 
-	rdev = kzalloc(sizeof(struct regulator_dev), GFP_KERNEL);
+	rdev = kzalloc(sizeof(*rdev), GFP_KERNEL);
 	if (rdev == NULL)
 		return ERR_PTR(-ENOMEM);
 
