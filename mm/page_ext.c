@@ -124,7 +124,6 @@ struct page_ext *lookup_page_ext(struct page *page)
 	struct page_ext *base;
 
 	base = NODE_DATA(page_to_nid(page))->node_page_ext;
-#if defined(CONFIG_DEBUG_VM)
 	/*
 	 * The sanity checks the page allocator does upon freeing a
 	 * page can reach here before the page_ext arrays are
@@ -133,7 +132,6 @@ struct page_ext *lookup_page_ext(struct page *page)
 	 */
 	if (unlikely(!base))
 		return NULL;
-#endif
 	index = pfn - round_down(node_start_pfn(page_to_nid(page)),
 					MAX_ORDER_NR_PAGES);
 	return get_entry(base, index);
@@ -198,7 +196,6 @@ struct page_ext *lookup_page_ext(struct page *page)
 {
 	unsigned long pfn = page_to_pfn(page);
 	struct mem_section *section = __pfn_to_section(pfn);
-#if defined(CONFIG_DEBUG_VM)
 	/*
 	 * The sanity checks the page allocator does upon freeing a
 	 * page can reach here before the page_ext arrays are
@@ -207,7 +204,6 @@ struct page_ext *lookup_page_ext(struct page *page)
 	 */
 	if (!section->page_ext)
 		return NULL;
-#endif
 	return get_entry(section->page_ext, pfn);
 }
 
@@ -312,7 +308,17 @@ static int __meminit online_page_ext(unsigned long start_pfn,
 	}
 
 	for (pfn = start; !fail && pfn < end; pfn += PAGES_PER_SECTION) {
-		if (!pfn_present(pfn))
+		unsigned long t_pfn = pfn;
+		bool present = false;
+
+		while (t_pfn <	ALIGN(pfn + 1, PAGES_PER_SECTION)) {
+			if (pfn_present(t_pfn)) {
+				present = true;
+				break;
+			}
+			t_pfn = ALIGN(pfn + 1, PAGES_PER_SECTION >> 4);
+		}
+		if (!present)
 			continue;
 		fail = init_section_page_ext(pfn, nid);
 	}
@@ -391,8 +397,17 @@ void __init page_ext_init(void)
 		 */
 		for (pfn = start_pfn; pfn < end_pfn;
 			pfn = ALIGN(pfn + 1, PAGES_PER_SECTION)) {
+			unsigned long t_pfn = pfn;
+			bool valid = false;
 
-			if (!pfn_valid(pfn))
+			while (t_pfn <	ALIGN(pfn + 1, PAGES_PER_SECTION)) {
+				if (pfn_valid(t_pfn)) {
+					valid = true;
+					break;
+				}
+				t_pfn = ALIGN(pfn + 1, PAGES_PER_SECTION >> 4);
+			}
+			if (!valid)
 				continue;
 			/*
 			 * Nodes's pfns can be overlapping.
