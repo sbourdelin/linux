@@ -1,0 +1,59 @@
+* Common Ethernet Interface (BGX) block
+
+Properties:
+
+- compatible: "cavium,octeon-7890-bgx": Compatibility with all cn7xxx SOCs.
+
+- reg: The base address of the BGX block.
+
+- #address-cells: Must be <1>.
+
+- #size-cells: Must be <0>.  BGX addresses have no size component.
+
+Typically a BGX block has several children each representing an
+Ethernet interface.
+
+Example:
+
+	ethernet-mac-nexus@11800e0000000 {
+		compatible = "cavium,octeon-7890-bgx";
+		reg = <0x00011800 0xe0000000 0x00000000 0x01000000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		ethernet-mac@0 {
+			...
+			reg = <0>;
+		};
+	};
+
+
+* Ethernet Interface (BGX port) connects to PKI/PKO
+
+Properties:
+
+- compatible: "cavium,octeon-7890-bgx-port": Compatibility with all cn7xxx
+  SOCs.
+
+- reg: The index of the interface within the BGX block.
+
+- local-mac-address: Mac address for the interface.
+
+- phy-handle: phandle to the phy node connected to the interface.
+
+
+* Ethernet Interface (BGX port) connects to XCV
+
+
+Properties:
+
+- compatible: "cavium,octeon-7360-xcv": Compatibility with cn73xx SOCs.
+
+- reg: The index of the interface within the BGX block.
+
+- local-mac-address: Mac address for the interface.
+
+- phy-handle: phandle to the phy node connected to the interface.
+
+- cavium,rx-clk-delay-bypass: Set to <1> to bypass the rx clock delay setting.
+  Needed by the Micrel PHY.
