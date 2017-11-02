@@ -6850,8 +6850,12 @@ void __init free_area_init(unsigned long *zones_size)
 
 static int page_alloc_cpu_dead(unsigned int cpu)
 {
+	unsigned long flags;
 
+	local_irq_save(flags);
 	lru_add_drain_cpu(cpu);
+	local_irq_restore(flags);
+
 	drain_pages(cpu);
 
 	/*
