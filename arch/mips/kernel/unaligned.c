@@ -2281,6 +2281,9 @@ sigill:
 	force_sig(SIGILL, current);
 }
 
+#ifdef CONFIG_CPU_CAVIUM_OCTEON
+#include <asm/octeon/octeon.h>
+#endif
 asmlinkage void do_ade(struct pt_regs *regs)
 {
 	enum ctx_state prev_state;
