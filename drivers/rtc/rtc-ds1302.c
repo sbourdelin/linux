@@ -132,19 +132,13 @@ static int ds1302_probe(struct spi_device *spi)
 
 	addr = RTC_ADDR_CTRL << 1 | RTC_CMD_READ;
 	status = spi_write_then_read(spi, &addr, sizeof(addr), buf, 1);
-	if (status < 0) {
-		dev_err(&spi->dev, "control register read error %d\n",
-				status);
-		return status;
-	}
+	if (status)
+		goto report_read_failure;
 
 	if ((buf[0] & ~RTC_CMD_WRITE_DISABLE) != 0) {
 		status = spi_write_then_read(spi, &addr, sizeof(addr), buf, 1);
-		if (status < 0) {
-			dev_err(&spi->dev, "control register read error %d\n",
-					status);
-			return status;
-		}
+		if (status)
+			goto report_read_failure;
 
 		if ((buf[0] & ~RTC_CMD_WRITE_DISABLE) != 0) {
 			dev_err(&spi->dev, "junk in control register\n");
@@ -189,6 +183,10 @@ static int ds1302_probe(struct spi_device *spi)
 	}
 
 	return 0;
+
+report_read_failure:
+	dev_err(&spi->dev, "control register read error %d\n", status);
+	return status;
 }
 
 static int ds1302_remove(struct spi_device *spi)
