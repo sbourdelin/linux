@@ -2668,9 +2668,7 @@ static int shmem_wait_for_pins(struct address_space *mapping)
 		if (!radix_tree_tagged(&mapping->page_tree, SHMEM_TAG_PINNED))
 			break;
 
-		if (!scan)
-			lru_add_drain_all();
-		else if (schedule_timeout_killable((HZ << scan) / 200))
+		if (scan && schedule_timeout_killable((HZ << scan) / 200))
 			scan = LAST_SCAN;
 
 		start = 0;
