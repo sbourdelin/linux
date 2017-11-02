@@ -1,0 +1,55 @@
+Spreadtrum Clock Binding
+------------------------
+
+Required properties:
+- compatible: should contain the following compatible strings:
+	- "sprd,sc9860-pmu-gate"
+	- "sprd,sc9860-pll"
+	- "sprd,sc9860-ap-clk"
+	- "sprd,sc9860-aon-prediv"
+	- "sprd,sc9860-apahb-gate"
+	- "sprd,sc9860-aon-gate"
+	- "sprd,sc9860-aonsecure-clk"
+	- "sprd,sc9860-agcp-gate"
+	- "sprd,sc9860-gpu-clk"
+	- "sprd,sc9860-vsp-clk"
+	- "sprd,sc9860-vsp-gate"
+	- "sprd,sc9860-cam-clk"
+	- "sprd,sc9860-cam-gate"
+	- "sprd,sc9860-disp-clk"
+	- "sprd,sc9860-disp-gate"
+	- "sprd,sc9860-apapb-gate"
+
+- #clock-cells: must be 1
+
+- clocks : shall be the input parent clock(s) phandle for the clock.
+
+Optional properties:
+
+- reg:	Contain the registers base address and length. It must be configured only if no 'sprd,syscon' under the node.
+
+- sprd,syscon: phandle to the syscon which is in the same address area with the clock.
+
+Example:
+
+	pmu_gate: pmu-gate {
+		compatible = "sprd,sc9860-pmu-gate";
+		sprd,syscon = <&pmu_apb>;
+		clocks = <&ext_26m>;
+		#clock-cells = <1>;
+	};
+
+	pll: pll {
+		compatible = "sprd,sc9860-pll";
+		sprd,syscon = <&ana_apb>;
+		clocks = <&pmu_gate 0>;
+		#clock-cells = <1>;
+	};
+
+	ap_clk: clock-controller@20000000 {
+		compatible = "sprd,sc9860-ap-clk";
+		reg = <0 0x20000000 0 0x400>;
+		clocks = <&ext_26m>, <&pll 0>,
+			 <&pmu_gate 0>;
+		#clock-cells = <1>;
+	};
