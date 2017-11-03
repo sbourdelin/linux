@@ -187,19 +187,6 @@ static inline void exit_tasks_rcu_start(void) { }
 static inline void exit_tasks_rcu_finish(void) { }
 #endif /* #else #ifdef CONFIG_TASKS_RCU */
 
-/**
- * cond_resched_rcu_qs - Report potential quiescent states to RCU
- *
- * This macro resembles cond_resched(), except that it is defined to
- * report potential quiescent states to RCU-tasks even if the cond_resched()
- * machinery were to be shut off, as some advocate for PREEMPT kernels.
- */
-#define cond_resched_rcu_qs() \
-do { \
-	if (!cond_resched()) \
-		rcu_note_voluntary_context_switch(current); \
-} while (0)
-
 /*
  * Infrastructure to implement the synchronize_() primitives in
  * TREE_RCU and rcu_barrier_() primitives in TINY_RCU.
@@ -346,7 +333,7 @@ static inline void rcu_preempt_sleep_check(void) { }
 #define __rcu_dereference_check(p, c, space) \
 ({ \
 	/* Dependency order vs. p above. */ \
-	typeof(*p) *________p1 = (typeof(*p) *__force)lockless_dereference(p); \
+	typeof(*p) *________p1 = (typeof(*p) *__force)READ_ONCE(p); \
 	RCU_LOCKDEP_WARN(!(c), "suspicious rcu_dereference_check() usage"); \
 	rcu_dereference_sparse(p, space); \
 	((typeof(*p) __force __kernel *)(________p1)); \
@@ -360,7 +347,7 @@ static inline void rcu_preempt_sleep_check(void) { }
 #define rcu_dereference_raw(p) \
 ({ \
 	/* Dependency order vs. p above. */ \
-	typeof(p) ________p1 = lockless_dereference(p); \
+	typeof(p) ________p1 = READ_ONCE(p); \
 	((typeof(*p) __force __kernel *)(________p1)); \
 })
 
