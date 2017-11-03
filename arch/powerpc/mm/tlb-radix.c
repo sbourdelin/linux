@@ -359,11 +359,7 @@ void radix__flush_tlb_collapsed_pmd(struct mm_struct *mm, unsigned long addr)
 	unsigned long pid, end;
 
 
-<<<<<<< HEAD
-	pid = mm ? mm->context.id : 0;
-=======
 	pid = mm->context.id;
->>>>>>> linux-next/akpm-base
 	preempt_disable();
 	if (unlikely(pid == MMU_NO_CONTEXT))
 		goto no_context;

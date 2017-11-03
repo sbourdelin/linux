@@ -1957,24 +1957,6 @@ static void dw_mci_set_drto(struct dw_mci *host)
 	spin_unlock_irqrestore(&host->irq_lock, irqflags);
 }
 
-static bool dw_mci_clear_pending_cmd_complete(struct dw_mci *host)
-{
-	if (!test_bit(EVENT_CMD_COMPLETE, &host->pending_events))
-		return false;
-
-	/*
-	 * Really be certain that the timer has stopped.  This is a bit of
-	 * paranoia and could only really happen if we had really bad
-	 * interrupt latency and the interrupt routine and timeout were
-	 * running concurrently so that the del_timer() in the interrupt
-	 * handler couldn't run.
-	 */
-	WARN_ON(del_timer_sync(&host->cto_timer));
-	clear_bit(EVENT_CMD_COMPLETE, &host->pending_events);
-
-	return true;
-}
-
 static bool dw_mci_clear_pending_data_complete(struct dw_mci *host)
 {
 	if (!test_bit(EVENT_DATA_COMPLETE, &host->pending_events))
@@ -3025,34 +3007,6 @@ static void dw_mci_cmd11_timer(struct timer_list *t)
 
 static void dw_mci_cto_timer(struct timer_list *t)
 {
-<<<<<<< HEAD
-	struct dw_mci *host = (struct dw_mci *)arg;
-	unsigned long irqflags;
-	u32 pending;
-
-	spin_lock_irqsave(&host->irq_lock, irqflags);
-
-	/*
-	 * If somehow we have very bad interrupt latency it's remotely possible
-	 * that the timer could fire while the interrupt is still pending or
-	 * while the interrupt is midway through running.  Let's be paranoid
-	 * and detect those two cases.  Note that this is paranoia is somewhat
-	 * justified because in this function we don't actually cancel the
-	 * pending command in the controller--we just assume it will never come.
-	 */
-	pending = mci_readl(host, MINTSTS); /* read-only mask reg */
-	if (pending & (DW_MCI_CMD_ERROR_FLAGS | SDMMC_INT_CMD_DONE)) {
-		/* The interrupt should fire; no need to act but we can warn */
-		dev_warn(host->dev, "Unexpected interrupt latency\n");
-		goto exit;
-	}
-	if (test_bit(EVENT_CMD_COMPLETE, &host->pending_events)) {
-		/* Presumably interrupt handler couldn't delete the timer */
-		dev_warn(host->dev, "CTO timeout when already completed\n");
-		goto exit;
-	}
-
-=======
 	struct dw_mci *host = from_timer(host, t, cto_timer);
 	unsigned long irqflags;
 	u32 pending;
@@ -3079,7 +3033,6 @@ static void dw_mci_cto_timer(struct timer_list *t)
 		goto exit;
 	}
 
->>>>>>> linux-next/akpm-base
 	/*
 	 * Continued paranoia to make sure we're in the state we expect.
 	 * This paranoia isn't really justified but it seems good to be safe.
