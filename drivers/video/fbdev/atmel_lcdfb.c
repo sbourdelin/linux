@@ -1047,10 +1047,8 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
 	}
 
 	ret = of_property_read_u32(display_np, "bits-per-pixel", &var->bits_per_pixel);
-	if (ret < 0) {
-		dev_err(dev, "failed to get property bits-per-pixel\n");
-		goto put_display_node;
-	}
+	if (ret < 0)
+		goto report_bits_failure;
 
 	ret = of_property_read_u32(display_np, "atmel,guard-time", &pdata->guard_time);
 	if (ret < 0) {
@@ -1065,10 +1063,8 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
 	}
 
 	ret = of_property_read_u32(display_np, "atmel,dmacon", &pdata->default_dmacon);
-	if (ret < 0) {
-		dev_err(dev, "failed to get property bits-per-pixel\n");
-		goto put_display_node;
-	}
+	if (ret < 0)
+		goto report_bits_failure;
 
 	INIT_LIST_HEAD(&pdata->pwr_gpios);
 	ret = -ENOMEM;
@@ -1147,6 +1143,10 @@ put_timings_node:
 put_display_node:
 	of_node_put(display_np);
 	return ret;
+
+report_bits_failure:
+	dev_err(dev, "failed to get property bits-per-pixel\n");
+	goto put_display_node;
 }
 #else
 static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
