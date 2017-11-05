@@ -2963,6 +2963,8 @@ int i915_gem_reset_prepare(struct drm_i915_private *dev_priv)
 
 	i915_gem_revoke_fences(dev_priv);
 
+	i915_guc_clients_reset_prepare(&dev_priv->guc);
+
 	return err;
 }
 

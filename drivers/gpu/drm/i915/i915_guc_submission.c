@@ -1113,6 +1113,20 @@ void i915_guc_clients_release_doorbells(struct intel_guc *guc)
 	destroy_doorbell(guc->execbuf_client, true);
 }
 
+void i915_guc_clients_reset_prepare(struct intel_guc *guc)
+{
+	if (!i915_modparams.enable_guc_submission)
+		return;
+
+	/*
+	 * We are only deactivating doorbell unit monitoring. GuC might
+	 * be in bad state and will be reset hence don't execute GuC
+	 * doorbell deallocation flow.
+	 */
+	destroy_doorbell(guc->preempt_client, false);
+	destroy_doorbell(guc->execbuf_client, false);
+}
+
 static void guc_policy_init(struct guc_policy *policy)
 {
 	policy->execution_quantum = POLICY_DEFAULT_EXECUTION_QUANTUM_US;
