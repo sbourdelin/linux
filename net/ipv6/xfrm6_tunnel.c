@@ -338,6 +338,18 @@ static int __net_init xfrm6_tunnel_net_init(struct net *net)
 
 static void __net_exit xfrm6_tunnel_net_exit(struct net *net)
 {
+	struct xfrm6_tunnel_net *xfrm6_tn = xfrm6_tunnel_pernet(net);
+	unsigned int i;
+
+	for (i = 0; i < XFRM6_TUNNEL_SPI_BYADDR_HSIZE; i++)
+		if (WARN(!hlist_empty(&xfrm6_tn->spi_byaddr[i]),
+			 "net %p exit: xfrm6 spi_byaddr is not empty\n", net))
+			break;
+
+	for (i = 0; i < XFRM6_TUNNEL_SPI_BYSPI_HSIZE; i++)
+		if (WARN(!hlist_empty(&xfrm6_tn->spi_byspi[i]),
+			 "net %p exit: xfrm6 spi_byspi is not empty\n", net))
+			break;
 }
 
 static struct pernet_operations xfrm6_tunnel_net_ops = {
