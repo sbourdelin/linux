@@ -30,9 +30,9 @@ $(TEST_CUSTOM_PROGS): $(TESTS) $(OBJS)
 	$(CC) -o $(TEST_CUSTOM_PROGS) $(OBJS) $(TESTS) $(CFLAGS) $(LDFLAGS)
 
 $(OBJS): $(OUTPUT)/%.o: %.c
-	$(CC) -c $^ -o $@
+	$(CC) -c $^ -o $@ $(CFLAGS) $(LDFLAGS)
 
 $(TESTS): $(OUTPUT)/%.o: %.c
-	$(CC) -c $^ -o $@
+	$(CC) -c $^ -o $@ $(CFLAGS) $(LDFLAGS)
 
 EXTRA_CLEAN := $(TEST_CUSTOM_PROGS) $(OBJS) $(TESTS)
