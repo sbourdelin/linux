@@ -29,6 +29,9 @@
 #define RTL8211F_PAGE_SELECT	0x1f
 #define RTL8211F_TX_DELAY	0x100
 
+#define RTL8366RB_POWER_SAVE	0x21
+#define RTL8366RB_POWER_SAVE_ON 0x1000
+
 MODULE_DESCRIPTION("Realtek PHY driver");
 MODULE_AUTHOR("Johnson Leung");
 MODULE_LICENSE("GPL");
@@ -119,6 +122,22 @@ static int rtl8211f_config_init(struct phy_device *phydev)
 	return 0;
 }
 
+static int rtl8366rb_config_init(struct phy_device *phydev)
+{
+	int ret;
+	u16 reg;
+
+	ret = genphy_config_init(phydev);
+	if (ret < 0)
+		return ret;
+
+	reg = phy_read(phydev, RTL8366RB_POWER_SAVE);
+	reg |= RTL8366RB_POWER_SAVE_ON;
+	phy_write(phydev, RTL8366RB_POWER_SAVE, reg);
+
+	return 0;
+}
+
 static struct phy_driver realtek_drvs[] = {
 	{
 		.phy_id         = 0x00008201,
@@ -175,6 +194,18 @@ static struct phy_driver realtek_drvs[] = {
 		.config_intr	= &rtl8211f_config_intr,
 		.suspend	= genphy_suspend,
 		.resume		= genphy_resume,
+	}, {
+		/* The main part of this DSA is in drivers/net/dsa */
+		.phy_id		= 0x001cc961,
+		.name		= "RTL8366RB Gigabit Ethernet",
+		.phy_id_mask	= 0x001fffff,
+		.features	= PHY_GBIT_FEATURES,
+		.flags		= PHY_HAS_INTERRUPT,
+		.config_aneg	= &genphy_config_aneg,
+		.config_init	= &rtl8366rb_config_init,
+		.read_status	= &genphy_read_status,
+		.suspend	= genphy_suspend,
+		.resume		= genphy_resume,
 	},
 };
 
@@ -185,6 +216,7 @@ static struct mdio_device_id __maybe_unused realtek_tbl[] = {
 	{ 0x001cc914, 0x001fffff },
 	{ 0x001cc915, 0x001fffff },
 	{ 0x001cc916, 0x001fffff },
+	{ 0x001cc961, 0x001fffff },
 	{ }
 };
 
