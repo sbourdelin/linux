@@ -3237,7 +3237,7 @@ u32 bond_xmit_hash(struct bonding *bond, struct sk_buff *skb)
 
 	if (bond->params.xmit_policy == BOND_XMIT_POLICY_ENCAP34 &&
 	    skb->l4_hash)
-		return skb->hash;
+		return skb->hash >> 1;
 
 	if (bond->params.xmit_policy == BOND_XMIT_POLICY_LAYER2 ||
 	    !bond_flow_dissect(bond, skb, &flow))
@@ -3253,7 +3253,7 @@ u32 bond_xmit_hash(struct bonding *bond, struct sk_buff *skb)
 	hash ^= (hash >> 16);
 	hash ^= (hash >> 8);
 
-	return hash;
+	return hash >> 1;
 }
 
 /*-------------------------- Device entry points ----------------------------*/
