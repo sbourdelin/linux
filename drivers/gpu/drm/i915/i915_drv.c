@@ -406,6 +406,17 @@ static int i915_getparam(struct drm_device *dev, void *data,
 		 */
 		value = 1;
 		break;
+	case I915_PARAM_HAS_CONTEXT_ISOLATION:
+		{
+			struct intel_engine_cs *engine;
+			enum intel_engine_id id;
+
+			value = 0;
+			for_each_engine(engine, dev_priv, id)
+				if (engine->default_state)
+					value |= BIT(engine->uabi_class);
+		}
+		break;
 	case I915_PARAM_SLICE_MASK:
 		value = INTEL_INFO(dev_priv)->sseu.slice_mask;
 		if (!value)
