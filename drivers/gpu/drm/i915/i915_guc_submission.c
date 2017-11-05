@@ -207,7 +207,7 @@ static int __create_doorbell(struct i915_guc_client *client)
 	return err;
 }
 
-static int __destroy_doorbell(struct i915_guc_client *client)
+static int __destroy_doorbell(struct i915_guc_client *client, bool notify_guc)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(client->guc);
 	struct guc_doorbell_info *doorbell;
@@ -225,7 +225,10 @@ static int __destroy_doorbell(struct i915_guc_client *client)
 	if (wait_for_us(!(I915_READ(GEN8_DRBREGL(db_id)) & GEN8_DRB_VALID), 10))
 		WARN_ONCE(true, "Doorbell never became invalid after disable\n");
 
-	return __guc_deallocate_doorbell(client->guc, client->stage_id);
+	if (notify_guc)
+		return __guc_deallocate_doorbell(client->guc, client->stage_id);
+
+	return 0;
 }
 
 static int create_doorbell(struct i915_guc_client *client)
@@ -250,7 +253,11 @@ err:
 	return ret;
 }
 
-static int destroy_doorbell(struct i915_guc_client *client)
+/*
+ * This function deactivates doorbell monitoring through doorbell unit and
+ * optionally notifies GuC to deallocate the doorbell.
+ */
+static int destroy_doorbell(struct i915_guc_client *client, bool notify_guc)
 {
 	int err;
 
@@ -259,7 +266,7 @@ static int destroy_doorbell(struct i915_guc_client *client)
 	/* XXX: wait for any interrupts */
 	/* XXX: wait for workqueue to drain */
 
-	err = __destroy_doorbell(client);
+	err = __destroy_doorbell(client, notify_guc);
 	if (err)
 		return err;
 
@@ -873,7 +880,7 @@ static int __reset_doorbell(struct i915_guc_client* client, u16 db_id)
 	__update_doorbell_desc(client, db_id);
 	err = __create_doorbell(client);
 	if (!err)
-		err = __destroy_doorbell(client);
+		err = __destroy_doorbell(client, true);
 
 	return err;
 }
@@ -899,7 +906,7 @@ static int guc_init_doorbell_hw(struct intel_guc *guc)
 
 		if (has_doorbell(client)) {
 			/* Borrow execbuf_client (we will recreate it later) */
-			destroy_doorbell(client);
+			destroy_doorbell(client, true);
 			recreate_first_client = true;
 		}
 
@@ -925,7 +932,7 @@ static int guc_init_doorbell_hw(struct intel_guc *guc)
 
 	ret = __create_doorbell(guc->preempt_client);
 	if (ret) {
-		__destroy_doorbell(guc->execbuf_client);
+		__destroy_doorbell(guc->execbuf_client, true);
 		return ret;
 	}
 
@@ -1043,7 +1050,7 @@ static void guc_client_free(struct i915_guc_client *client)
 	/* FIXME: in many cases, by the time we get here the GuC has been
 	 * reset, so we cannot destroy the doorbell properly. Ignore the
 	 * error message for now */
-	destroy_doorbell(client);
+	destroy_doorbell(client, true);
 	guc_stage_desc_fini(client->guc, client);
 	i915_gem_object_unpin_map(client->vma->obj);
 	i915_vma_unpin_and_release(&client->vma);
