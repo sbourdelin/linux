@@ -1667,6 +1667,8 @@ static void __net_exit geneve_exit_net(struct net *net)
 	/* unregister the devices gathered above */
 	unregister_netdevice_many(&list);
 	rtnl_unlock();
+	WARN(!list_empty(&gn->sock_list),
+	     "net %p exit: geneve sock_list is not empty\n", net);
 }
 
 static struct pernet_operations geneve_net_ops = {
