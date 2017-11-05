@@ -11024,6 +11024,8 @@ static int vmx_check_nested_events(struct kvm_vcpu *vcpu, bool external_intr)
 	bool block_nested_events =
 	    vmx->nested.nested_run_pending || kvm_event_needs_reinjection(vcpu);
 
+	vmx_complete_nested_posted_interrupt(vcpu);
+
 	if (vcpu->arch.exception.pending &&
 		nested_vmx_check_exception(vcpu, &exit_qual)) {
 		if (block_nested_events)
@@ -11064,7 +11066,6 @@ static int vmx_check_nested_events(struct kvm_vcpu *vcpu, bool external_intr)
 		return 0;
 	}
 
-	vmx_complete_nested_posted_interrupt(vcpu);
 	return 0;
 }
 
