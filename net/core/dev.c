@@ -8562,6 +8562,9 @@ static void __net_exit netdev_exit(struct net *net)
 {
 	kfree(net->dev_name_head);
 	kfree(net->dev_index_head);
+	if (net != &init_net)
+		WARN(!list_empty(&net->dev_base_head),
+		     "net %p exit: netdev dev_base_head is not empty\n", net);
 }
 
 static struct pernet_operations __net_initdata netdev_net_ops = {
