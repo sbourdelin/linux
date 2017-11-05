@@ -1093,10 +1093,17 @@ static int __net_init nfnl_log_net_init(struct net *net)
 
 static void __net_exit nfnl_log_net_exit(struct net *net)
 {
+	unsigned int i;
+	struct nfnl_log_net *log = nfnl_log_pernet(net);
 #ifdef CONFIG_PROC_FS
 	remove_proc_entry("nfnetlink_log", net->nf.proc_netfilter);
 #endif
 	nf_log_unset(net, &nfulnl_logger);
+	for (i = 0; i < INSTANCE_BUCKETS; i++)
+		if (WARN(!hlist_empty(&log->instance_table[i]),
+			 "net %p exit: nfnl_log instance_table is not empty\n",
+			 net))
+			break;
 }
 
 static struct pernet_operations nfnl_log_net_ops = {
