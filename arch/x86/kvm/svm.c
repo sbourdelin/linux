@@ -1218,7 +1218,8 @@ static void init_vmcb(struct vcpu_svm *svm)
 	set_dr_intercepts(svm);
 
 	set_exception_intercept(svm, PF_VECTOR);
-	set_exception_intercept(svm, UD_VECTOR);
+	if (!is_guest_mode(&svm->vcpu))
+		set_exception_intercept(svm, UD_VECTOR);
 	set_exception_intercept(svm, MC_VECTOR);
 	set_exception_intercept(svm, AC_VECTOR);
 	set_exception_intercept(svm, DB_VECTOR);
@@ -2196,6 +2197,7 @@ static int ud_interception(struct vcpu_svm *svm)
 {
 	int er;
 
+	BUG_ON(is_guest_mode(&svm->vcpu));
 	er = emulate_instruction(&svm->vcpu, EMULTYPE_TRAP_UD);
 	if (er != EMULATE_DONE)
 		kvm_queue_exception(&svm->vcpu, UD_VECTOR);
