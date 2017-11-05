@@ -256,6 +256,8 @@ static void nfs4blocklayout_net_exit(struct net *net)
 	nfs4blocklayout_unregister_net(net, nn->bl_device_pipe);
 	rpc_destroy_pipe_data(nn->bl_device_pipe);
 	nn->bl_device_pipe = NULL;
+	WARN(!list_empty(&nn->bl_wq.head),
+	     "net %p exit: nfs bl_wq head is not empty\n", net);
 }
 
 static struct pernet_operations nfs4blocklayout_net_ops = {
