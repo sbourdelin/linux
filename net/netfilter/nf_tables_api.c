@@ -5778,6 +5778,14 @@ static int __net_init nf_tables_init_net(struct net *net)
 	return 0;
 }
 
+static void __net_exit nf_tables_exit_net(struct net *net)
+{
+	WARN(!list_empty(&net->nft.af_info),
+	     "%s: af_info list is not empty\n", __func__);
+	WARN(!list_empty(&net->nft.commit_list),
+	     "%s: commit_list is not empty\n", __func__);
+}
+
 int __nft_release_basechain(struct nft_ctx *ctx)
 {
 	struct nft_rule *rule, *nr;
@@ -5848,6 +5856,7 @@ static void __nft_release_afinfo(struct net *net, struct nft_af_info *afi)
 
 static struct pernet_operations nf_tables_net_ops = {
 	.init	= nf_tables_init_net,
+	.exit	= nf_tables_exit_net,
 };
 
 static int __init nf_tables_module_init(void)
