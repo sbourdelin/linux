@@ -204,6 +204,10 @@ void nfs_cleanup_cb_ident_idr(struct net *net)
 	struct nfs_net *nn = net_generic(net, nfs_net_id);
 
 	idr_destroy(&nn->cb_ident_idr);
+	WARN(!list_empty(&nn->nfs_client_list),
+	     "nfs net_exit: nfs_client_list is not empty\n");
+	WARN(!list_empty(&nn->nfs_volume_list),
+	     "nfs net_exit: nfs_volume_list is not empty\n");
 }
 
 /* nfs_client_lock held */
