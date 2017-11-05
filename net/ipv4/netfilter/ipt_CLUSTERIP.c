@@ -819,6 +819,8 @@ static void clusterip_net_exit(struct net *net)
 	cn->procdir = NULL;
 #endif
 	nf_unregister_net_hook(net, &cip_arp_ops);
+	WARN(!list_empty(&cn->configs),
+	     "%s: configs list is not empty\n"i, __func__);
 }
 
 static struct pernet_operations clusterip_net_ops = {
