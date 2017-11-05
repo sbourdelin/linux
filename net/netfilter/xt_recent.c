@@ -681,7 +681,11 @@ static int __net_init recent_net_init(struct net *net)
 
 static void __net_exit recent_net_exit(struct net *net)
 {
+	struct recent_net *recent_net = recent_pernet(net);
+
 	recent_proc_net_exit(net);
+	WARN(!list_empty(&recent_net->tables),
+	     "net %p exit: recent tables list is not empty\n", net);
 }
 
 static struct pernet_operations recent_net_ops = {
