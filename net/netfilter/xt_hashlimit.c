@@ -1338,7 +1338,11 @@ static int __net_init hashlimit_net_init(struct net *net)
 
 static void __net_exit hashlimit_net_exit(struct net *net)
 {
+	struct hashlimit_net *hashlimit_net = hashlimit_pernet(net);
+
 	hashlimit_proc_net_exit(net);
+	WARN(!hlist_empty(&hashlimit_net->htables),
+	     "net %p exit: hashlimit htables hlist is not empty\n", net);
 }
 
 static struct pernet_operations hashlimit_net_ops = {
