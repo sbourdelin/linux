@@ -3704,6 +3704,7 @@ static void __net_exit vxlan_exit_net(struct net *net)
 	struct vxlan_net *vn = net_generic(net, vxlan_net_id);
 	struct vxlan_dev *vxlan, *next;
 	struct net_device *dev, *aux;
+	unsigned int h;
 	LIST_HEAD(list);
 
 	rtnl_lock();
@@ -3723,6 +3724,11 @@ static void __net_exit vxlan_exit_net(struct net *net)
 
 	unregister_netdevice_many(&list);
 	rtnl_unlock();
+
+	for (h = 0; h < PORT_HASH_SIZE; ++h)
+		if (WARN(!hlist_empty(&vn->sock_list[h]),
+			 "%s: sock_list is not empty\n", __func__))
+			break;
 }
 
 static struct pernet_operations vxlan_net_ops = {
