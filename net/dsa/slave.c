@@ -15,6 +15,7 @@
 #include <linux/phy_fixed.h>
 #include <linux/of_net.h>
 #include <linux/of_mdio.h>
+#include <linux/of_irq.h>
 #include <linux/mdio.h>
 #include <linux/list.h>
 #include <net/rtnetlink.h>
@@ -1118,6 +1119,13 @@ static int dsa_slave_phy_connect(struct dsa_slave_priv *p,
 		netdev_err(slave_dev, "no phy at %d\n", addr);
 		return -ENODEV;
 	}
+
+	/*
+	 * If the PHY has a link IRQ associated with it in the device tree,
+	 * then assign it so it can be claimed by the core.
+	 */
+	if (of_irq_count(p->dp->dn))
+		p->phy->irq = irq_of_parse_and_map(p->dp->dn, 0);
 
 	/* Use already configured phy mode */
 	if (p->phy_interface == PHY_INTERFACE_MODE_NA)
