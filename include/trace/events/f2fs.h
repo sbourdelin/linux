@@ -210,14 +210,14 @@ DEFINE_EVENT(f2fs__inode, f2fs_sync_file_enter,
 
 TRACE_EVENT(f2fs_sync_file_exit,
 
-	TP_PROTO(struct inode *inode, int need_cp, int datasync, int ret),
+	TP_PROTO(struct inode *inode, int cp_reason, int datasync, int ret),
 
-	TP_ARGS(inode, need_cp, datasync, ret),
+	TP_ARGS(inode, cp_reason, datasync, ret),
 
 	TP_STRUCT__entry(
 		__field(dev_t,	dev)
 		__field(ino_t,	ino)
-		__field(int,	need_cp)
+		__field(int,	cp_reason)
 		__field(int,	datasync)
 		__field(int,	ret)
 	),
@@ -225,15 +225,15 @@ TRACE_EVENT(f2fs_sync_file_exit,
 	TP_fast_assign(
 		__entry->dev		= inode->i_sb->s_dev;
 		__entry->ino		= inode->i_ino;
-		__entry->need_cp	= need_cp;
+		__entry->cp_reason	= cp_reason;
 		__entry->datasync	= datasync;
 		__entry->ret		= ret;
 	),
 
-	TP_printk("dev = (%d,%d), ino = %lu, checkpoint is %s, "
+	TP_printk("dev = (%d,%d), ino = %lu, cp_reason:%d, "
 		"datasync = %d, ret = %d",
 		show_dev_ino(__entry),
-		__entry->need_cp ? "needed" : "not needed",
+		__entry->cp_reason,
 		__entry->datasync,
 		__entry->ret)
 );

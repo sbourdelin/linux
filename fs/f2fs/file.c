@@ -141,27 +141,29 @@ static int get_parent_ino(struct inode *inode, nid_t *pino)
 	return 1;
 }
 
-static inline bool need_do_checkpoint(struct inode *inode)
+static inline int need_do_checkpoint(struct inode *inode)
 {
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
-	bool need_cp = false;
+	int cp_reason = 0;
 
-	if (!S_ISREG(inode->i_mode) || inode->i_nlink != 1)
-		need_cp = true;
+	if (!S_ISREG(inode->i_mode))
+		cp_reason = 1;
+	else if (inode->i_nlink != 1)
+		cp_reason = 2;
 	else if (is_sbi_flag_set(sbi, SBI_NEED_CP))
-		need_cp = true;
+		cp_reason = 3;
 	else if (file_wrong_pino(inode))
-		need_cp = true;
+		cp_reason = 4;
 	else if (!space_for_roll_forward(sbi))
-		need_cp = true;
+		cp_reason = 5;
 	else if (!is_checkpointed_node(sbi, F2FS_I(inode)->i_pino))
-		need_cp = true;
+		cp_reason = 6;
 	else if (test_opt(sbi, FASTBOOT))
-		need_cp = true;
+		cp_reason = 7;
 	else if (sbi->active_logs == 2)
-		need_cp = true;
+		cp_reason = 8;
 
-	return need_cp;
+	return cp_reason;
 }
 
 static bool need_inode_page_update(struct f2fs_sb_info *sbi, nid_t ino)
@@ -196,7 +198,7 @@ static int f2fs_do_sync_file(struct file *file, loff_t start, loff_t end,
 	struct f2fs_sb_info *sbi = F2FS_I_SB(inode);
 	nid_t ino = inode->i_ino;
 	int ret = 0;
-	bool need_cp = false;
+	bool cp_reason = 0;
 	struct writeback_control wbc = {
 		.sync_mode = WB_SYNC_ALL,
 		.nr_to_write = LONG_MAX,
@@ -215,7 +217,7 @@ static int f2fs_do_sync_file(struct file *file, loff_t start, loff_t end,
 	clear_inode_flag(inode, FI_NEED_IPU);
 
 	if (ret) {
-		trace_f2fs_sync_file_exit(inode, need_cp, datasync, ret);
+		trace_f2fs_sync_file_exit(inode, cp_reason, datasync, ret);
 		return ret;
 	}
 
@@ -246,10 +248,10 @@ go_write:
 	 * sudden-power-off.
 	 */
 	down_read(&F2FS_I(inode)->i_sem);
-	need_cp = need_do_checkpoint(inode);
+	cp_reason = need_do_checkpoint(inode);
 	up_read(&F2FS_I(inode)->i_sem);
 
-	if (need_cp) {
+	if (cp_reason) {
 		/* all the dirty node pages should be flushed for POR */
 		ret = f2fs_sync_fs(inode->i_sb, 1);
 
@@ -306,7 +308,7 @@ flush_out:
 	}
 	f2fs_update_time(sbi, REQ_TIME);
 out:
-	trace_f2fs_sync_file_exit(inode, need_cp, datasync, ret);
+	trace_f2fs_sync_file_exit(inode, cp_reason, datasync, ret);
 	f2fs_trace_ios(NULL, 1);
 	return ret;
 }
