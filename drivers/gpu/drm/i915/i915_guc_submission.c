@@ -222,7 +222,8 @@ static int __destroy_doorbell(struct i915_guc_client *client, bool notify_guc)
 	/* Doorbell release flow requires that we wait for GEN8_DRB_VALID bit
 	 * to go to zero after updating db_status before we call the GuC to
 	 * release the doorbell */
-	if (wait_for_us(!(I915_READ(GEN8_DRBREGL(db_id)) & GEN8_DRB_VALID), 10))
+	if (wait_for_us(!(I915_READ(GEN8_DRBREGL(db_id)) & GEN8_DRB_VALID),
+			50))
 		WARN_ONCE(true, "Doorbell never became invalid after disable\n");
 
 	if (notify_guc)
