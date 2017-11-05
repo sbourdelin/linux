@@ -405,10 +405,11 @@ static void __add_ino_entry(struct f2fs_sb_info *sbi, nid_t ino,
 {
 	struct inode_management *im = &sbi->im[type];
 	struct ino_entry *e, *tmp;
+	bool preloaded;
 
 	tmp = f2fs_kmem_cache_alloc(ino_entry_slab, GFP_NOFS);
 retry:
-	radix_tree_preload(GFP_NOFS | __GFP_NOFAIL);
+	preloaded = !radix_tree_preload(GFP_NOFS);
 
 	spin_lock(&im->ino_lock);
 	e = radix_tree_lookup(&im->ino_root, ino);
@@ -416,7 +417,8 @@ retry:
 		e = tmp;
 		if (radix_tree_insert(&im->ino_root, ino, e)) {
 			spin_unlock(&im->ino_lock);
-			radix_tree_preload_end();
+			if (preloaded)
+				radix_tree_preload_end();
 			goto retry;
 		}
 		memset(e, 0, sizeof(struct ino_entry));
@@ -431,7 +433,9 @@ retry:
 		f2fs_set_bit(devidx, (char *)&e->dirty_device);
 
 	spin_unlock(&im->ino_lock);
-	radix_tree_preload_end();
+
+	if (preloaded)
+		radix_tree_preload_end();
 
 	if (e != tmp)
 		kmem_cache_free(ino_entry_slab, tmp);
