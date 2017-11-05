@@ -306,6 +306,7 @@ struct intel_engine_cs {
 	struct intel_ring *buffer;
 	struct intel_timeline *timeline;
 
+	struct drm_i915_gem_object *default_state;
 	struct intel_render_state *render_state;
 
 	atomic_t irq_count;

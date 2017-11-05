@@ -687,6 +687,9 @@ void intel_engine_cleanup_common(struct intel_engine_cs *engine)
 	intel_engine_cleanup_cmd_parser(engine);
 	i915_gem_batch_pool_fini(&engine->batch_pool);
 
+	if (engine->default_state)
+		i915_gem_object_put(engine->default_state);
+
 	if (HAS_LOGICAL_RING_PREEMPTION(engine->i915))
 		engine->context_unpin(engine, engine->i915->preempt_context);
 	engine->context_unpin(engine, engine->i915->kernel_context);
