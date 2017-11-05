@@ -960,6 +960,10 @@ static __net_exit void ppp_exit_net(struct net *net)
 	rtnl_unlock();
 
 	idr_destroy(&pn->units_idr);
+	WARN(!list_empty(&pn->all_channels),
+	     "net %p exit: ppp all_channels list is not empty\n", net);
+	WARN(!list_empty(&pn->new_channels),
+	     "net %p exit: ppp new_channels list is not empty\n", net);
 }
 
 static struct pernet_operations ppp_net_ops = {
