@@ -1,0 +1,104 @@
+Realtek SMI-based Switches
+==========================
+
+The SMI "Simple Management Interface" is a two-wire protocol using
+bit-banged GPIO that while it reuses the MDIO lines MCK and MDIO does
+not use the MDIO protocol. This binding defines how to specify the
+SMI-based Realtek devices.
+
+Required properties:
+
+- compatible: must be exactly one of:
+      "realtek,rtl8366"
+      "realtek,rtl8369"
+      "realtek,rtl8366rb"
+      "realtek,rtl8366s"
+      "realtek,rtl8367"
+      "realtek,rtl8367b"
+
+Required subnode:
+
+- interrupt-controller
+
+  This defines an interrupt controller with an IRQ line (typically
+  a GPIO) that will demultiplex and handle the interrupt from the single
+  interrupt line coming out of one of the SMI-based chips. It most
+  importantly provides link up/down interrupts to the PHY blocks inside
+  the ASIC.
+
+Required properties of interrupt-controller:
+
+- interrupt: parent interrupt, see interrupt-controller/interrupts.txt
+- interrupt-controller: see interrupt-controller/interrupts.txt
+- #address-cells: should be <0>
+- #interrupt-cells: should be <1>
+
+See net/dsa/dsa.txt for a list of additional required and optional properties
+and subnodes.
+
+
+Examples:
+
+switch {
+	compatible = "realtek,rtl8366rb";
+	reg = <0>;
+	/* 22 = MDIO (has input reads), 21 = MDC (clock, output only) */
+	mdc-gpios = <&gpio0 21 GPIO_ACTIVE_HIGH>;
+	mdio-gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>;
+	reset-gpios = <&gpio0 14 GPIO_ACTIVE_LOW>;
+
+	switch_intc: interrupt-controller {
+		/* GPIO 15 provides the interrupt */
+		interrupt-parent = <&gpio0>;
+		interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-controller;
+		#address-cells = <0>;
+		#interrupt-cells = <1>;
+	};
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		reg = <0>;
+		port@0 {
+			reg = <0>;
+			label = "lan0";
+			interrupt-parent = <&switch_intc>;
+			interrupts = <0>;
+		};
+		port@1 {
+			reg = <1>;
+			label = "lan1";
+			interrupt-parent = <&switch_intc>;
+			interrupts = <1>;
+		};
+		port@2 {
+			reg = <2>;
+			label = "lan2";
+			interrupt-parent = <&switch_intc>;
+			interrupts = <2>;
+		};
+		port@3 {
+			reg = <3>;
+			label = "lan3";
+			interrupt-parent = <&switch_intc>;
+			interrupts = <3>;
+		};
+		port@4 {
+			reg = <4>;
+			label = "wan";
+			interrupt-parent = <&switch_intc>;
+			interrupts = <4>;
+		};
+		phy0: port@5 {
+			reg = <5>;
+			label = "cpu";
+			ethernet = <&gmac0>;
+			phy-mode = "rgmii";
+			fixed-link {
+				speed = <1000>;
+				full-duplex;
+			};
+		};
+	};
+};
