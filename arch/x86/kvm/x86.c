@@ -6396,32 +6396,37 @@ static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 	int r;
 
 	/* try to reinject previous events if any */
-	if (vcpu->arch.exception.injected) {
+	if (vcpu->arch.exception.injected)
 		kvm_x86_ops->queue_exception(vcpu);
-		return 0;
-	}
-
 	/*
 	 * Exceptions must be injected immediately, or the exception
 	 * frame will have the address of the NMI or interrupt handler.
 	 */
-	if (!vcpu->arch.exception.pending) {
-		if (vcpu->arch.nmi_injected) {
+	else if (!vcpu->arch.exception.pending) {
+		if (vcpu->arch.nmi_injected)
 			kvm_x86_ops->set_nmi(vcpu);
-			return 0;
-		}
-
-		if (vcpu->arch.interrupt.pending) {
+		else if (vcpu->arch.interrupt.pending)
 			kvm_x86_ops->set_irq(vcpu);
-			return 0;
-		}
 	}
 
+	/*
+	 * Call check_nested_events() even if we reinjected a previous event
+	 * in order for caller to determine if it should require immediate-exit
+	 * from L2 to L1 due to pending L1 events which require exit
+	 * from L2 to L1.
+	 */
 	if (is_guest_mode(vcpu) && kvm_x86_ops->check_nested_events) {
 		r = kvm_x86_ops->check_nested_events(vcpu, req_int_win);
 		if (r != 0)
 			return r;
 	}
+
+	/*
+	 * If we reinjected a previous event,
+	 * don't consider a new pending event
+	 */
+	if (kvm_event_needs_reinjection(vcpu))
+		return 0;
 
 	/* try to inject new event if pending */
 	if (vcpu->arch.exception.pending) {
