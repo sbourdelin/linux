@@ -47,6 +47,7 @@
 #include <drm/i915_drm.h>
 
 #include "i915_drv.h"
+#include "i915_guc_submission.h"
 #include "i915_trace.h"
 #include "i915_vgpu.h"
 #include "intel_drv.h"
@@ -2614,6 +2615,8 @@ static int intel_runtime_resume(struct device *kdev)
 		DRM_DEBUG_DRIVER("Unclaimed access during suspend, bios?\n");
 
 	intel_guc_resume(dev_priv);
+
+	i915_guc_clients_acquire_doorbells(&dev_priv->guc);
 
 	if (IS_GEN9_LP(dev_priv)) {
 		bxt_disable_dc9(dev_priv);

@@ -1047,10 +1047,6 @@ static void guc_client_free(struct i915_guc_client *client)
 	 * Be sure to drop any locks
 	 */
 
-	/* FIXME: in many cases, by the time we get here the GuC has been
-	 * reset, so we cannot destroy the doorbell properly. Ignore the
-	 * error message for now */
-	destroy_doorbell(client, true);
 	guc_stage_desc_fini(client->guc, client);
 	i915_gem_object_unpin_map(client->vma->obj);
 	i915_vma_unpin_and_release(&client->vma);
@@ -1100,6 +1096,21 @@ static void guc_clients_destroy(struct intel_guc *guc)
 
 	client = fetch_and_zero(&guc->preempt_client);
 	guc_client_free(client);
+}
+
+void i915_guc_clients_acquire_doorbells(struct intel_guc *guc)
+{
+	if (guc->fw.load_status != INTEL_UC_FIRMWARE_SUCCESS)
+		return;
+
+	create_doorbell(guc->execbuf_client);
+	create_doorbell(guc->preempt_client);
+}
+
+void i915_guc_clients_release_doorbells(struct intel_guc *guc)
+{
+	destroy_doorbell(guc->preempt_client, true);
+	destroy_doorbell(guc->execbuf_client, true);
 }
 
 static void guc_policy_init(struct guc_policy *policy)
@@ -1423,6 +1434,7 @@ int i915_guc_submission_enable(struct drm_i915_private *dev_priv)
 	} else {
 		guc_reset_wq(guc->execbuf_client);
 		guc_reset_wq(guc->preempt_client);
+		i915_guc_clients_acquire_doorbells(guc);
 	}
 
 	err = intel_guc_sample_forcewake(guc);

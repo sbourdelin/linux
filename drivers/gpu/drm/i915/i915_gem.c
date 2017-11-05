@@ -29,13 +29,14 @@
 #include <drm/drm_vma_manager.h>
 #include <drm/i915_drm.h>
 #include "i915_drv.h"
+#include "i915_gemfs.h"
 #include "i915_gem_clflush.h"
-#include "i915_vgpu.h"
+#include "i915_guc_submission.h"
 #include "i915_trace.h"
+#include "i915_vgpu.h"
 #include "intel_drv.h"
 #include "intel_frontbuffer.h"
 #include "intel_mocs.h"
-#include "i915_gemfs.h"
 #include <linux/dma-fence-array.h>
 #include <linux/kthread.h>
 #include <linux/reservation.h>

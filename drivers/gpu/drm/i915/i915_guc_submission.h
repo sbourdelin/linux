@@ -72,6 +72,8 @@ struct i915_guc_client {
 	u64 submissions[I915_NUM_ENGINES];
 };
 
+void i915_guc_clients_acquire_doorbells(struct intel_guc *guc);
+void i915_guc_clients_release_doorbells(struct intel_guc *guc);
 int i915_guc_submission_init(struct drm_i915_private *dev_priv);
 int i915_guc_submission_enable(struct drm_i915_private *dev_priv);
 void i915_guc_submission_disable(struct drm_i915_private *dev_priv);

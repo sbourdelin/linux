@@ -274,6 +274,8 @@ int intel_guc_suspend(struct drm_i915_private *dev_priv)
 	if (guc->fw.load_status != INTEL_UC_FIRMWARE_SUCCESS)
 		return 0;
 
+	i915_guc_clients_release_doorbells(&dev_priv->guc);
+
 	gen9_disable_guc_interrupts(dev_priv);
 
 	data[0] = INTEL_GUC_ACTION_ENTER_S_STATE;
