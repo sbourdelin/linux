@@ -220,7 +220,7 @@ intel_fdi_link_freq(struct drm_i915_private *dev_priv,
 	if (HAS_DDI(dev_priv))
 		return pipe_config->port_clock; /* SPLL */
 	else if (IS_GEN5(dev_priv))
-		return ((I915_READ(FDI_PLL_BIOS_0) & FDI_PLL_FB_CLOCK_MASK) + 2) * 10000;
+		return dev_priv->fdi_pll_freq;
 	else
 		return 270000;
 }
@@ -14541,6 +14541,11 @@ int intel_modeset_init(struct drm_device *dev)
 	}
 
 	intel_shared_dpll_init(dev);
+
+	if (IS_GEN5(dev_priv)) {
+		dev_priv->fdi_pll_freq = ((I915_READ(FDI_PLL_BIOS_0) & FDI_PLL_FB_CLOCK_MASK) + 2) * 10000;
+		DRM_DEBUG_DRIVER("FDI PLL freq=%d\n", dev_priv->fdi_pll_freq);
+	}
 
 	intel_update_czclk(dev_priv);
 	intel_modeset_init_hw(dev);
