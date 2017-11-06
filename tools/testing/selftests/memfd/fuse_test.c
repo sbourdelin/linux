@@ -38,6 +38,8 @@
 #define MFD_DEF_SIZE 8192
 #define STACK_SIZE 65536
 
+static size_t mfd_def_size = MFD_DEF_SIZE;
+
 static int mfd_assert_new(const char *name, loff_t sz, unsigned int flags)
 {
 	int r, fd;
@@ -123,7 +125,7 @@ static void *mfd_assert_mmap_shared(int fd)
 	void *p;
 
 	p = mmap(NULL,
-		 MFD_DEF_SIZE,
+		 mfd_def_size,
 		 PROT_READ | PROT_WRITE,
 		 MAP_SHARED,
 		 fd,
@@ -141,7 +143,7 @@ static void *mfd_assert_mmap_private(int fd)
 	void *p;
 
 	p = mmap(NULL,
-		 MFD_DEF_SIZE,
+		 mfd_def_size,
 		 PROT_READ | PROT_WRITE,
 		 MAP_PRIVATE,
 		 fd,
@@ -174,7 +176,7 @@ static int sealing_thread_fn(void *arg)
 	usleep(200000);
 
 	/* unmount mapping before sealing to avoid i_mmap_writable failures */
-	munmap(global_p, MFD_DEF_SIZE);
+	munmap(global_p, mfd_def_size);
 
 	/* Try sealing the global file; expect EBUSY or success. Current
 	 * kernels will never succeed, but in the future, kernels might
@@ -224,7 +226,7 @@ static void join_sealing_thread(pid_t pid)
 
 int main(int argc, char **argv)
 {
-	static const char zero[MFD_DEF_SIZE];
+	char *zero;
 	int fd, mfd, r;
 	void *p;
 	int was_sealed;
@@ -234,6 +236,25 @@ int main(int argc, char **argv)
 		printf("error: please pass path to file in fuse_mnt mount-point\n");
 		abort();
 	}
+
+	if (argc >= 3) {
+		if (!strcmp(argv[2], "hugetlbfs")) {
+			unsigned long hpage_size = default_huge_page_size();
+
+			if (!hpage_size) {
+				printf("Unable to determine huge page size\n");
+				abort();
+			}
+
+			hugetlbfs_test = 1;
+			mfd_def_size = hpage_size * 2;
+		} else {
+			printf("Unknown option: %s\n", argv[2]);
+			abort();
+		}
+	}
+
+	zero = calloc(sizeof(*zero), mfd_def_size);
 
 	/* open FUSE memfd file for GUP testing */
 	printf("opening: %s\n", argv[1]);
@@ -303,6 +324,7 @@ int main(int argc, char **argv)
 	close(fd);
 
 	printf("fuse: DONE\n");
+	free(zero);
 
 	return 0;
 }
