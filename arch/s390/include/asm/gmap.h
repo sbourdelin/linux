@@ -8,6 +8,10 @@
 #ifndef _ASM_S390_GMAP_H
 #define _ASM_S390_GMAP_H
 
+/* Generic bits for GMAP notification on DAT table entry changes. */
+#define GMAP_ENTRY_VSIE	0x2
+#define GMAP_ENTRY_IN	0x1
+
 /**
  * struct gmap_struct - guest address space
  * @list: list head for the mm->context gmap list
