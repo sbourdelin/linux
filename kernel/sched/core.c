@@ -795,6 +795,18 @@ void deactivate_task(struct rq *rq, struct task_struct *p, int flags)
 	dequeue_task(rq, p, flags);
 }
 
+static void task_iowait_start(struct rq *rq, struct task_struct *p)
+{
+	atomic_inc(&rq->nr_iowait);
+	delayacct_blkio_start();
+}
+
+static void task_iowait_end(struct rq *rq, struct task_struct *p)
+{
+	delayacct_blkio_end();
+	atomic_dec(&rq->nr_iowait);
+}
+
 /*
  * __normal_prio - return the priority that is based on the static prio
  */
@@ -2052,10 +2064,8 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 	p->sched_contributes_to_load = !!task_contributes_to_load(p);
 	p->state = TASK_WAKING;
 
-	if (p->in_iowait) {
-		delayacct_blkio_end();
-		atomic_dec(&task_rq(p)->nr_iowait);
-	}
+	if (p->in_iowait)
+		task_iowait_end(task_rq(p), p);
 
 	cpu = select_task_rq(p, p->wake_cpu, SD_BALANCE_WAKE, wake_flags);
 	if (task_cpu(p) != cpu) {
@@ -2065,10 +2075,8 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
 
 #else /* CONFIG_SMP */
 
-	if (p->in_iowait) {
-		delayacct_blkio_end();
-		atomic_dec(&task_rq(p)->nr_iowait);
-	}
+	if (p->in_iowait)
+		task_iowait_end(task_rq(p), p);
 
 #endif /* CONFIG_SMP */
 
@@ -2118,10 +2126,8 @@ static void try_to_wake_up_local(struct task_struct *p, struct rq_flags *rf)
 	trace_sched_waking(p);
 
 	if (!task_on_rq_queued(p)) {
-		if (p->in_iowait) {
-			delayacct_blkio_end();
-			atomic_dec(&rq->nr_iowait);
-		}
+		if (p->in_iowait)
+			task_iowait_end(rq, p);
 		ttwu_activate(rq, p, ENQUEUE_WAKEUP | ENQUEUE_NOCLOCK);
 	}
 
@@ -3321,10 +3327,8 @@ static void __sched notrace __schedule(bool preempt)
 			deactivate_task(rq, prev, DEQUEUE_SLEEP | DEQUEUE_NOCLOCK);
 			prev->on_rq = 0;
 
-			if (prev->in_iowait) {
-				atomic_inc(&rq->nr_iowait);
-				delayacct_blkio_start();
-			}
+			if (prev->in_iowait)
+				task_iowait_start(rq, prev);
 
 			/*
 			 * If a worker went to sleep, notify and ask workqueue
