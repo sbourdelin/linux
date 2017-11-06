@@ -12,8 +12,10 @@
 #define GMAP_ENTRY_VSIE	0x2
 #define GMAP_ENTRY_IN	0x1
 
-/* Status bits in the gmap segment entry. */
+/* Status bits in huge and non-huge gmap segment entries. */
 #define _SEGMENT_ENTRY_GMAP_IN		0x0001	/* invalidation notify bit */
+/* Status bits only for huge segment entries */
+#define _SEGMENT_ENTRY_GMAP_UC		0x4000	/* user dirty (migration) */
 
 /**
  * struct gmap_struct - guest address space
@@ -138,4 +140,6 @@ void gmap_pte_notify(struct mm_struct *, unsigned long addr, pte_t *,
 int gmap_mprotect_notify(struct gmap *, unsigned long start,
 			 unsigned long len, int prot);
 
+void gmap_sync_dirty_log_pmd(struct gmap *gmap, unsigned long dirty_bitmap[4],
+			     unsigned long gaddr, unsigned long vmaddr);
 #endif /* _ASM_S390_GMAP_H */
