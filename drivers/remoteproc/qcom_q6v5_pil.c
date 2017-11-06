@@ -333,9 +333,9 @@ static int q6v5_xfer_mem_ownership(struct q6v5 *qproc, int *current_perm,
 	ret = qcom_scm_assign_mem(addr, ALIGN(size, SZ_4K),
 				  current_perm, &next, 1);
 	if (ret < 0) {
-		pr_err("Failed to assign memory access in range %p to %p to %s ret = %d\n",
-		       (void *)addr, (void *)(addr + size),
-		       remote_owner ? "mss" : "hlos", ret);
+		phys_addr_t end = addr + size;
+		pr_err("Failed to assign memory access in range %pap to %pap to %s ret = %d\n",
+		       &addr, &end, remote_owner ? "mss" : "hlos", ret);
 		return ret;
 	}
 
