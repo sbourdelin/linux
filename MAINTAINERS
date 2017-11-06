@@ -1086,6 +1086,14 @@ F:	arch/arm/mach-*/
 F:	arch/arm/plat-*/
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
 
+ARM/ACTIONS SEMI SoC CLOCK SUPPORT
+M:	Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+R:	Andreas Färber <afaerber@suse.de>
+S:	Maintained
+F:	drivers/clk/actions/
+F:	include/dt-bindings/clock/actions,s900-cmu.h
+F:	Documentation/devicetree/bindings/clock/actions,s900-cmu.txt
+
 ARM/ACTIONS SEMI ARCHITECTURE
 M:	Andreas Färber <afaerber@suse.de>
 L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
