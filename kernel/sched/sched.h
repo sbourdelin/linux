@@ -289,6 +289,10 @@ struct cfs_bandwidth {
 #endif
 };
 
+struct tg_stat {
+	atomic_t nr_iowait;
+};
+
 /* task group related information */
 struct task_group {
 	struct cgroup_subsys_state css;
@@ -329,6 +333,7 @@ struct task_group {
 #endif
 
 	struct cfs_bandwidth cfs_bandwidth;
+	struct tg_stat *stat;
 };
 
 #ifdef CONFIG_FAIR_GROUP_SCHED

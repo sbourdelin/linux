@@ -797,12 +797,32 @@ void deactivate_task(struct rq *rq, struct task_struct *p, int flags)
 
 static void task_iowait_start(struct rq *rq, struct task_struct *p)
 {
+#ifdef CONFIG_CGROUP_SCHED
+	struct task_group *tg = task_group(p);
+
+	/* Task's sched_task_group is changed under both of the below locks */
+	BUG_ON(!raw_spin_is_locked(&p->pi_lock) && !raw_spin_is_locked(&rq->lock));
+	while (task_group_is_autogroup(tg))
+		tg = tg->parent;
+	atomic_inc(&tg->stat[rq->cpu].nr_iowait);
+#endif
+
 	atomic_inc(&rq->nr_iowait);
 	delayacct_blkio_start();
 }
 
 static void task_iowait_end(struct rq *rq, struct task_struct *p)
 {
+#ifdef CONFIG_CGROUP_SCHED
+	struct task_group *tg = task_group(p);
+
+	/* Task's sched_task_group is changed under both of the below locks */
+	BUG_ON(!raw_spin_is_locked(&p->pi_lock) && !raw_spin_is_locked(&rq->lock));
+	while (task_group_is_autogroup(tg))
+		tg = tg->parent;
+	atomic_dec(&tg->stat[rq->cpu].nr_iowait);
+#endif
+
 	delayacct_blkio_end();
 	atomic_dec(&rq->nr_iowait);
 }
@@ -5804,6 +5824,9 @@ void __init sched_init(void)
 	sched_clock_init();
 	wait_bit_init();
 
+#ifdef CONFIG_CGROUP_SCHED
+	alloc_size += nr_cpu_ids * sizeof(struct tg_stat);
+#endif
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	alloc_size += 2 * nr_cpu_ids * sizeof(void **);
 #endif
@@ -5813,6 +5836,10 @@ void __init sched_init(void)
 	if (alloc_size) {
 		ptr = (unsigned long)kzalloc(alloc_size, GFP_NOWAIT);
 
+#ifdef CONFIG_CGROUP_SCHED
+		root_task_group.stat = (struct tg_stat *)ptr;
+		ptr += nr_cpu_ids * sizeof(struct tg_stat);
+#endif
 #ifdef CONFIG_FAIR_GROUP_SCHED
 		root_task_group.se = (struct sched_entity **)ptr;
 		ptr += nr_cpu_ids * sizeof(void **);
@@ -6132,6 +6159,8 @@ static DEFINE_SPINLOCK(task_group_lock);
 
 static void sched_free_group(struct task_group *tg)
 {
+	if (tg->stat)
+		kfree(tg->stat);
 	free_fair_sched_group(tg);
 	free_rt_sched_group(tg);
 	autogroup_free(tg);
@@ -6151,6 +6180,10 @@ struct task_group *sched_create_group(struct task_group *parent)
 		goto err;
 
 	if (!alloc_rt_sched_group(tg, parent))
+		goto err;
+
+	tg->stat = kzalloc(sizeof(struct tg_stat) * nr_cpu_ids, 0);
+	if (!tg->stat)
 		goto err;
 
 	return tg;
@@ -6206,8 +6239,16 @@ void sched_offline_group(struct task_group *tg)
 
 static void sched_change_group(struct task_struct *tsk, int type)
 {
+	int cpu = 0, queued = task_on_rq_queued(tsk);
 	struct task_group *tg;
 
+	if (!queued && tsk->in_iowait && type == TASK_MOVE_GROUP) {
+		cpu = task_cpu(tsk);
+		tg = task_group(tsk);
+		while (task_group_is_autogroup(tg))
+			tg = tg->parent;
+		atomic_dec(&tg->stat[cpu].nr_iowait);
+	}
 	/*
 	 * All callers are synchronized by task_rq_lock(); we do not use RCU
 	 * which is pointless here. Thus, we pass "true" to task_css_check()
@@ -6215,6 +6256,10 @@ static void sched_change_group(struct task_struct *tsk, int type)
 	 */
 	tg = container_of(task_css_check(tsk, cpu_cgrp_id, true),
 			  struct task_group, css);
+
+	if (!queued && tsk->in_iowait && type == TASK_MOVE_GROUP)
+		atomic_inc(&tg->stat[cpu].nr_iowait);
+
 	tg = autogroup_task_group(tsk, tg);
 	tsk->sched_task_group = tg;
 
