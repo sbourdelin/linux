@@ -1259,6 +1259,9 @@ static void kvm_get_time_scale(uint64_t scaled_hz, uint64_t base_hz,
 	uint64_t tps64;
 	uint32_t tps32;
 
+	if (unlikely(base_hz == 0))
+		return;
+
 	tps64 = base_hz;
 	scaled64 = scaled_hz;
 	while (tps64 > scaled64*2 || tps64 & 0xffffffff00000000ULL) {
