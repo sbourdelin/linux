@@ -321,6 +321,7 @@ int neigh_update(struct neighbour *neigh, const u8 *lladdr, u8 new, u32 flags,
 void __neigh_set_probe_once(struct neighbour *neigh);
 bool neigh_remove_one(struct neighbour *ndel, struct neigh_table *tbl);
 void neigh_changeaddr(struct neigh_table *tbl, struct net_device *dev);
+int neigh_carrier_down(struct neigh_table *tbl, struct net_device *dev);
 int neigh_ifdown(struct neigh_table *tbl, struct net_device *dev);
 int neigh_resolve_output(struct neighbour *neigh, struct sk_buff *skb);
 int neigh_connected_output(struct neighbour *neigh, struct sk_buff *skb);
