@@ -642,6 +642,8 @@ void __init kvm_spinlock_init(void)
 {
 	if (!kvm_para_available())
 		return;
+	if (kvm_para_has_feature(KVM_FEATURE_PV_DEDICATED))
+		return;
 	/* Does host kernel support KVM_FEATURE_PV_UNHALT? */
 	if (!kvm_para_has_feature(KVM_FEATURE_PV_UNHALT))
 		return;

@@ -54,6 +54,12 @@ KVM_FEATURE_PV_UNHALT              ||     7 || guest checks this feature bit
                                    ||       || before enabling paravirtualized
                                    ||       || spinlock support.
 ------------------------------------------------------------------------------
+KVM_FEATURE_PV_DEDICATED           ||     8 || guest checks this feature bit
+                                   ||       || to determine if they run on
+                                   ||       || dedicated vCPUs, allowing opti-
+                                   ||       || mizations such as usage of
+                                   ||       || qspinlocks.
+------------------------------------------------------------------------------
 KVM_FEATURE_CLOCKSOURCE_STABLE_BIT ||    24 || host will warn if no guest-side
                                    ||       || per-cpu warps are expected in
                                    ||       || kvmclock.

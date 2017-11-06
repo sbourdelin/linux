@@ -3,6 +3,8 @@
 #define _ASM_X86_QSPINLOCK_H
 
 #include <linux/jump_label.h>
+#include <linux/kvm_para.h>
+
 #include <asm/cpufeature.h>
 #include <asm-generic/qspinlock_types.h>
 #include <asm/paravirt.h>
@@ -58,6 +60,8 @@ static inline bool virt_spin_lock(struct qspinlock *lock)
 	if (!static_branch_likely(&virt_spin_lock_key))
 		return false;
 
+	if (kvm_para_has_feature(KVM_FEATURE_PV_DEDICATED))
+		return false;
 	/*
 	 * On hypervisors without PARAVIRT_SPINLOCKS support we fall
 	 * back to a Test-and-Set spinlock, because fair locks have
