@@ -636,6 +636,19 @@ DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2031, quirk_no_aersid);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2032, quirk_no_aersid);
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, 0x2033, quirk_no_aersid);
 
+/*
+ * The BYT and CHT ISP advertises PCI runtime PM but it doesn't work and crashes
+ * the device. Disable so the kernel framework doesn't hang the device trying.
+ * The device itself has to be managed by the PUNIT directly.
+ */
+static void isp_pm_cap_fixup(struct pci_dev *dev)
+{
+	dev_info(&dev->dev, "Disabling PCI power management on camera ISP\n");
+	dev->pm_cap = 0;
+}
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x0f38, isp_pm_cap_fixup);
+DECLARE_PCI_FIXUP_FINAL(PCI_VENDOR_ID_INTEL, 0x22b8, isp_pm_cap_fixup);
+
 #ifdef CONFIG_PHYS_ADDR_T_64BIT
 
 #define AMD_141b_MMIO_BASE(x)	(0x80 + (x) * 0x8)
