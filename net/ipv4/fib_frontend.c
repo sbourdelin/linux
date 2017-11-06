@@ -1238,10 +1238,13 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 		break;
 	case NETDEV_CHANGE:
 		flags = dev_get_flags(dev);
-		if (flags & (IFF_RUNNING | IFF_LOWER_UP))
+		if (flags & (IFF_RUNNING | IFF_LOWER_UP)) {
 			fib_sync_up(dev, RTNH_F_LINKDOWN);
-		else
+		} else {
 			fib_sync_down_dev(dev, event, false);
+			if (IN_DEV_IGNORE_ROUTES_WITH_LINKDOWN(in_dev))
+				neigh_carrier_down(&arp_tbl, dev);
+		}
 		/* fall through */
 	case NETDEV_CHANGEMTU:
 		rt_cache_flush(net);
