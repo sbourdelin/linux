@@ -128,7 +128,6 @@ EXPORT_SYMBOL(lockdep_rtnl_is_held);
 #endif /* #ifdef CONFIG_PROVE_LOCKING */
 
 static struct rtnl_link __rcu *rtnl_msg_handlers[RTNL_FAMILY_MAX + 1];
-static refcount_t rtnl_msg_handlers_ref[RTNL_FAMILY_MAX + 1];
 
 static inline int rtm_msgindex(int msgtype)
 {
@@ -262,8 +261,6 @@ void rtnl_unregister_all(int protocol)
 
 	synchronize_net();
 
-	while (refcount_read(&rtnl_msg_handlers_ref[protocol]) > 1)
-		schedule();
 	kfree(handlers);
 }
 EXPORT_SYMBOL_GPL(rtnl_unregister_all);
@@ -4365,8 +4362,6 @@ static int rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 				goto err_unlock;
 		}
 
-		refcount_inc(&rtnl_msg_handlers_ref[family]);
-
 		if (type == RTM_GETLINK - RTM_BASE)
 			min_dump_alloc = rtnl_calcit(skb, nlh);
 
@@ -4380,7 +4375,6 @@ static int rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 			};
 			err = netlink_dump_start(rtnl, skb, nlh, &c);
 		}
-		refcount_dec(&rtnl_msg_handlers_ref[family]);
 		return err;
 	}
 
@@ -4392,12 +4386,10 @@ static int rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 	flags = READ_ONCE(handlers[type].flags);
 	if (flags & RTNL_FLAG_DOIT_UNLOCKED) {
-		refcount_inc(&rtnl_msg_handlers_ref[family]);
 		doit = READ_ONCE(handlers[type].doit);
 		rcu_read_unlock();
 		if (doit)
 			err = doit(skb, nlh, extack);
-		refcount_dec(&rtnl_msg_handlers_ref[family]);
 		return err;
 	}
 
@@ -4498,11 +4490,6 @@ static struct pernet_operations rtnetlink_net_ops = {
 
 void __init rtnetlink_init(void)
 {
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(rtnl_msg_handlers_ref); i++)
-		refcount_set(&rtnl_msg_handlers_ref[i], 1);
-
 	if (register_pernet_subsys(&rtnetlink_net_ops))
 		panic("rtnetlink_init: cannot initialize rtnetlink\n");
 
