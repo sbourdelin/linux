@@ -6670,7 +6670,7 @@ static int __cfs_schedulable(struct task_group *tg, u64 period, u64 quota)
 static int cpu_stats_show(struct seq_file *sf, void *v)
 {
 	struct task_group *tg = css_tg(seq_css(sf));
-	int i, nr_iowait = 0;
+	int i, nr_running = 0, nr_iowait = 0;
 #ifdef CONFIG_CFS_BANDWIDTH
 	struct cfs_bandwidth *cfs_b = &tg->cfs_bandwidth;
 
@@ -6679,8 +6679,15 @@ static int cpu_stats_show(struct seq_file *sf, void *v)
 	seq_printf(sf, "throttled_time %llu\n", cfs_b->throttled_time);
 #endif
 	for_each_possible_cpu(i) {
+#ifdef CONFIG_FAIR_GROUP_SCHED
+		nr_running += tg->cfs_rq[i]->nr_running;
+#endif
+#ifdef CONFIG_RT_GROUP_SCHED
+		nr_running += tg->rt_rq[i]->rt_nr_running;
+#endif
 		nr_iowait += atomic_read(&tg->stat[i].nr_iowait);
 	}
+	seq_printf(sf, "nr_running %d\n", nr_running);
 	seq_printf(sf, "nr_iowait %d\n", nr_iowait);
 
 	return 0;
