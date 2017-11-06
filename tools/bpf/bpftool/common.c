@@ -45,6 +45,8 @@
 #include <sys/mount.h>
 #include <sys/types.h>
 #include <sys/vfs.h>
+#include <mntent.h>
+#include <fts.h>
 
 #include <bpf.h>
 
@@ -289,4 +291,87 @@ void print_hex_data_json(uint8_t *data, size_t len)
 	for (i = 0; i < len; i++)
 		jsonw_printf(json_wtr, "\"0x%02hhx\"", data[i]);
 	jsonw_end_array(json_wtr);
+}
+
+int build_pinned_obj_table(struct pinned_obj_table *tab,
+			   enum bpf_obj_type type)
+{
+	struct bpf_prog_info pinned_info = {};
+	__u32 len = sizeof(pinned_info);
+	struct pinned_obj *obj_node = NULL;
+	enum bpf_obj_type objtype;
+	struct mntent *mntent = NULL;
+	FILE *mntfile = NULL;
+	FTSENT *ftse = NULL;
+	FTS *fts = NULL;
+	int fd, err;
+
+	mntfile = setmntent("/proc/mounts", "r");
+	if (!mntfile)
+		return -1;
+
+	while ((mntent = getmntent(mntfile)) != NULL) {
+		char *path[] = {mntent->mnt_dir, 0};
+
+		if (strncmp(mntent->mnt_type, "bpf", 3) != 0)
+			continue;
+
+		fts = fts_open(path, 0, NULL);
+		if (!fts)
+			continue;
+
+		while ((ftse = fts_read(fts)) != NULL) {
+			if (!(ftse->fts_info & FTS_F))
+				continue;
+			fd = open_obj_pinned(ftse->fts_path);
+			if (fd < 0)
+				continue;
+
+			objtype = get_fd_type(fd);
+			if (objtype != type) {
+				close(fd);
+				continue;
+			}
+			memset(&pinned_info, 0, sizeof(pinned_info));
+			err = bpf_obj_get_info_by_fd(fd, &pinned_info, &len);
+			if (err) {
+				close(fd);
+				continue;
+			}
+
+			obj_node = malloc(sizeof(*obj_node));
+			if (!obj_node) {
+				close(fd);
+				fts_close(fts);
+				fclose(mntfile);
+				return -1;
+			}
+
+			memset(obj_node, 0, sizeof(*obj_node));
+			obj_node->id = pinned_info.id;
+			obj_node->path = strdup(ftse->fts_path);
+			hash_add(tab->table, &obj_node->hash, obj_node->id);
+
+			close(fd);
+		}
+		fts_close(fts);
+	}
+	fclose(mntfile);
+	return 0;
+}
+
+void delete_pinned_obj_table(struct pinned_obj_table *tab)
+{
+	struct pinned_obj *obj;
+	struct hlist_node *tmp;
+	unsigned int bkt;
+
+	if (hash_empty(tab->table))
+		return;
+
+	hash_for_each_safe(tab->table, bkt, tmp, obj, hash) {
+		hash_del(&obj->hash);
+		free(obj->path);
+		free(obj);
+	}
 }
