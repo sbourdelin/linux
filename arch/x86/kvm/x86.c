@@ -1781,6 +1781,7 @@ u64 get_kvmclock_ns(struct kvm *kvm)
 	struct kvm_arch *ka = &kvm->arch;
 	struct pvclock_vcpu_time_info hv_clock;
 	u64 ret;
+	unsigned long this_tsc_khz, host_tsc;
 
 	spin_lock(&ka->pvclock_gtod_sync_lock);
 	if (!ka->use_master_clock) {
@@ -1795,12 +1796,16 @@ u64 get_kvmclock_ns(struct kvm *kvm)
 	/* both __this_cpu_read() and rdtsc() should be on the same cpu */
 	get_cpu();
 
-	kvm_get_time_scale(NSEC_PER_SEC, __this_cpu_read(cpu_tsc_khz) * 1000LL,
-			   &hv_clock.tsc_shift,
-			   &hv_clock.tsc_to_system_mul);
-	ret = __pvclock_read_cycles(&hv_clock, rdtsc());
+	this_tsc_khz = __this_cpu_read(cpu_tsc_khz);
+	host_tsc = rdtsc();
 
 	put_cpu();
+
+	/* With all the info we got, fill in the values */
+	kvm_get_time_scale(NSEC_PER_SEC, this_tsc_khz * 1000LL,
+			   &hv_clock.tsc_shift,
+			   &hv_clock.tsc_to_system_mul);
+	ret = __pvclock_read_cycles(&hv_clock, host_tsc);
 
 	return ret;
 }
