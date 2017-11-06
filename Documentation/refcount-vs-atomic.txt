@@ -1,0 +1,234 @@
+==================================
+refcount_t API compare to atomic_t
+==================================
+
+The goal of refcount_t API is to provide a minimal API for implementing
+object's reference counters. While a generic architecture-independent
+implementation from lib/refcount.c uses atomic operations underneath,
+there is a number of differences between some of the refcount_*() and
+atomic_*() functions with regards to the memory ordering guarantees.
+This document outlines the differences and provides respective examples
+in order to help maintainers validate their code against the change in
+these memory ordering guarantees.
+
+memory-barriers.txt and atomic_t.txt provide more background to the
+memory ordering in general and for atomic operations specifically.
+
+Summary of the differences
+==========================
+
+ 1) There is no difference between respective non-RMW ops, i.e.
+   refcount_set() & refcount_read() have exactly the same ordering
+   guarantees (meaning fully unordered) as atomic_set() and atomic_read().
+ 2) For the increment-based ops that return no value (namely
+   refcount_inc() & refcount_add()) memory ordering guarantees are
+   exactly the same (meaning fully unordered) as respective atomic
+   functions (atomic_inc() & atomic_add()).
+ 3) For the decrement-based ops that return no value (namely
+   refcount_dec()) memory ordering guarantees are slightly
+   stronger than respective atomic counterpart (atomic_dec()).
+   While atomic_dec() is fully unordered, refcount_dec() does
+   provide a RELEASE memory ordering guarantee (see next section).
+ 4) For the rest of increment-based RMW ops (refcount_inc_not_zero(),
+   refcount_add_not_zero()) the memory ordering guarantees are relaxed
+   compare to their atomic counterparts (atomic_inc_not_zero()).
+   Refcount variants provide no memory ordering guarantees apart from
+   control dependency on success, while atomics provide a full memory
+   ordering guarantees (see next section).
+ 5) The rest of decrement-based RMW ops (refcount_dec_and_test(),
+   refcount_sub_and_test(), refcount_dec_if_one(), refcount_dec_not_one())
+   provide only RELEASE memory ordering and control dependency on success
+   (see next section). The respective atomic counterparts
+   (atomic_dec_and_test(), atomic_sub_and_test()) provide full memory ordering.
+ 6) The lock-based RMW ops (refcount_dec_and_lock() &
+   refcount_dec_and_mutex_lock()) alway provide RELEASE memory ordering
+   and ACQUIRE memory ordering & control dependency on success
+   (see next section). The respective atomic counterparts
+   (atomic_dec_and_lock() & atomic_dec_and_mutex_lock())
+   provide full memory ordering.
+    
+
+
+Details and examples
+====================
+
+Here we consider the cases 3)-6) that do present differences together
+with respective examples.
+
+case 3) - decrement-based RMW ops that return no value
+------------------------------------------------------
+
+Function changes:
+                atomic_dec() --> refcount_dec()
+
+Memory ordering guarantee changes:
+                fully unordered --> RELEASE ordering
+
+RELEASE ordering guarantees that prior loads and stores are
+completed before the operation. Implemented using smp_store_release().
+
+Examples:
+~~~~~~~~~
+
+For fully unordered operations stores to a, b and c can
+happen in any sequence:
+
+P0(int *a, int *b, int *c)
+  {
+	  WRITE_ONCE(*a, 1);
+	  WRITE_ONCE(*b, 1);
+	  WRITE_ONCE(*c, 1);
+  }
+
+
+For a RELEASE ordered operation, read and write from/to @a
+is guaranteed to happen before store to @b. There are no
+guarantees on the order of store/read to/from @c:
+
+P0(int *a, int *b, int *c)
+  {
+      READ_ONCE(*a);
+      WRITE_ONCE(*a, 1);
+      smp_store_release(b, 1);
+      WRITE_ONCE(*c, 1);
+      READ_ONCE(*c);
+  }
+
+
+case 4) - increment-based RMW ops that return a value
+-----------------------------------------------------
+
+Function changes:
+                atomic_inc_not_zero() --> refcount_inc_not_zero()
+                no atomic counterpart --> refcount_add_not_zero()
+
+Memory ordering guarantees changes:
+                fully ordered --> control dependency on success for stores
+
+Control dependency on success guarantees that if a reference for an
+object was successfully obtained (reference counter increment or
+addition happened, functions returned true), then further stores are ordered
+against this operation. Control dependency on stores are not implemented
+using any explicit barriers, but we rely on CPU not to speculate on stores.
+
+*Note*: we really assume here that necessary ordering is provided as a result
+of obtaining pointer to the object!
+
+Examples:
+~~~~~~~~~
+
+For a fully ordered atomic operation smp_mb() barriers are inserted before
+and after the actual operation:
+
+P0(int *a, int *b, int *c)
+  {
+	  WRITE_ONCE(*b, 2);
+      READ_ONCE(*c);
+      if ( ({ smp_mb(); ret = do_atomic_inc_not_zero(*a); smp_mb(); ret }) ) {
+         safely_perform_operation_on_object_protected_by_@a();
+         ...
+      }
+	  WRITE_ONCE(*c, 2);
+      READ_ONCE(*b);
+  }
+
+These barriers guarantee that all prior loads and stores (@b and @c)
+are completed before the operation, as well as all later loads and
+stores (@b and @c) are completed after the operation.
+
+For a fully unordered refcount operation smp_mb() barriers are absent
+and only control dependency on stores is guaranteed:
+
+P0(int *a, int *b, int *c)
+  {
+	  WRITE_ONCE(*b, 2);
+      READ_ONCE(*c);
+      if ( ({ ret = do_refcount_inc_not_zero(*a); ret }) ) {
+         perform_store_operation_on_object_protected_by_@a();
+         /* here we assume that necessary ordering is provided
+          * using other means, such as locks etc. */
+         ...
+      }
+	  WRITE_ONCE(*c, 2);
+      READ_ONCE(*b);
+   }
+
+No guarantees on order of stores and loads to/from @b and @c.
+
+
+case 5) - decrement-based RMW ops that return a value
+-----------------------------------------------------
+
+Function changes:
+                atomic_dec_and_test() --> refcount_dec_and_test()
+                atomic_sub_and_test() --> refcount_sub_and_test()
+                no atomic counterpart --> refcount_dec_if_one()
+                atomic_add_unless(&var, -1, 1) --> refcount_dec_not_one(&var)
+
+Memory ordering guarantees changes:
+                fully ordered --> RELEASE ordering + control dependency on success for stores
+
+Note: atomic_add_unless() only provides full order on success.
+
+Examples:
+~~~~~~~~~
+
+For a fully ordered atomic operation smp_mb() barriers are inserted before
+and after the actual operation:
+
+P0(int *a, int *b, int *c)
+  {
+	  WRITE_ONCE(*b, 2);
+      READ_ONCE(*c);
+      if ( ({ smp_mb(); ret = do_atomic_dec_and_test(*a); smp_mb(); ret }) ) {
+         safely_free_the_object_protected_by_@a();
+         ...
+      }
+	  WRITE_ONCE(*c, 2);
+      READ_ONCE(*b);
+  }
+
+These barriers guarantee that all prior loads and stores (@b and @c)
+are completed before the operation, as well as all later loads and
+stores (@b and @c) are completed after the operation.
+
+
+P0(int *a, int *b, int *c)
+  {
+	  WRITE_ONCE(*b, 2);
+      READ_ONCE(*c);
+      if ( ({ smp_store_release(*a); ret = do_refcount_dec_and_test(*a); ret }) ) {
+         safely_free_the_object_protected_by_@a();
+         /* here we know that this is 1 --> 0 transition
+          * and therefore we are the last user of this object
+          * so no concurrency issues are present */
+         ...
+      }
+	  WRITE_ONCE(*c, 2);
+      READ_ONCE(*b);
+  }
+
+Here smp_store_release() guarantees that a store to @b and read
+from @c happens before the operation. However, there is no
+guarantee on the order of store to @c and read to @b following
+the if cause.
+
+
+case 6) - lock-based RMW
+------------------------
+
+Function changes:
+
+                atomic_dec_and_lock() --> refcount_dec_and_lock()
+                atomic_dec_and_mutex_lock() --> refcount_dec_and_mutex_lock()
+
+Memory ordering guarantees changes:
+                fully ordered --> RELEASE ordering always, and on success ACQUIRE
+                                  ordering & control dependency for stores
+
+
+ACQUIRE ordering guarantees that loads and stores issued after the ACQUIRE
+operation are completed after the operation. In this case implemented
+using spin_lock().
+
+
