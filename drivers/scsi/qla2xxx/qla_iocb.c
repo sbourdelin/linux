@@ -2152,7 +2152,7 @@ __qla2x00_alloc_iocbs(struct qla_qpair *qpair, srb_t *sp)
 	sp->handle = handle;
 
 	/* Adjust entry-counts as needed. */
-	if (sp->type != SRB_SCSI_CMD)
+	if ((sp->type != SRB_SCSI_CMD) && (sp->type != SRB_NVMET_FCP))
 		req_cnt = sp->iocbs;
 
 skip_cmd_array:
@@ -3381,6 +3381,40 @@ qla_nvme_ls(srb_t *sp, struct pt_ls4_request *cmd_pkt)
 	return rval;
 }
 
+/*
+ * Build NVMET LS response
+ */
+static int
+qla_nvmet_ls(srb_t *sp, struct pt_ls4_request *rsp_pkt)
+{
+	struct srb_iocb *nvme;
+	int     rval = QLA_SUCCESS;
+
+	nvme = &sp->u.iocb_cmd;
+
+	rsp_pkt->entry_type = PT_LS4_REQUEST;
+	rsp_pkt->entry_count = 1;
+	rsp_pkt->control_flags = cpu_to_le16(CF_LS4_RESPONDER << CF_LS4_SHIFT);
+	rsp_pkt->handle = sp->handle;
+
+	rsp_pkt->nport_handle = sp->fcport->loop_id;
+	rsp_pkt->vp_index = nvme->u.nvme.vp_index;
+	rsp_pkt->exchange_address = cpu_to_le32(nvme->u.nvme.exchange_address);
+
+	rsp_pkt->tx_dseg_count = 1;
+	rsp_pkt->tx_byte_count = cpu_to_le16(nvme->u.nvme.rsp_len);
+	rsp_pkt->dseg0_len = cpu_to_le16(nvme->u.nvme.rsp_len);
+	rsp_pkt->dseg0_address[0] = cpu_to_le32(LSD(nvme->u.nvme.rsp_dma));
+	rsp_pkt->dseg0_address[1] = cpu_to_le32(MSD(nvme->u.nvme.rsp_dma));
+
+	ql_log(ql_log_info, sp->vha, 0xffff,
+		"Dumping the NVME-LS response IOCB\n");
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, sp->vha, 0x2075,
+		(uint8_t *)rsp_pkt, sizeof(*rsp_pkt));
+
+	return rval;
+}
+
 int
 qla2x00_start_sp(srb_t *sp)
 {
@@ -3440,6 +3474,9 @@ qla2x00_start_sp(srb_t *sp)
 	case SRB_NVME_LS:
 		qla_nvme_ls(sp, pkt);
 		break;
+	case SRB_NVMET_LS:
+		qla_nvmet_ls(sp, pkt);
+		break;
 	case SRB_ABT_CMD:
 		IS_QLAFX00(ha) ?
 			qlafx00_abort_iocb(sp, pkt) :
@@ -3458,6 +3495,9 @@ qla2x00_start_sp(srb_t *sp)
 	case SRB_NACK_PRLI:
 	case SRB_NACK_LOGO:
 		qla2x00_send_notify_ack_iocb(sp, pkt);
+		break;
+	case SRB_NVME_ELS_RSP:
+		qlt_send_els_resp(sp, pkt);
 		break;
 	default:
 		break;
