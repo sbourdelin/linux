@@ -259,7 +259,7 @@ endef
 
 define do_generate_dynamic_list_file
 	symbol_type=`$(NM) -u -D $1 | awk 'NF>1 {print $$1}' | \
-	xargs echo "U W w" | tr ' ' '\n' | sort -u | xargs echo`;\
+	xargs echo "U W w" | tr ' ' '\n' | env LC_ALL=C sort -u | xargs echo`;\
 	if [ "$$symbol_type" = "U W w" ];then				\
 		(echo '{';						\
 		$(NM) -u -D $1 | awk 'NF>1 {print "\t"$$2";"}' | sort -u;\
@@ -289,7 +289,8 @@ install: install_lib
 
 clean:
 	$(call QUIET_CLEAN, libtraceevent) \
-		$(RM) *.o *~ $(TARGETS) *.a *.so $(VERSION_FILES) .*.d .*.cmd \
+		$(RM) $(OUTPUT)*.o *~ $(TARGETS) $(OUTPUT)*.a $(OUTPUT)*.so* 	\
+		$(RM) $(VERSION_FILES) $(OUTPUT).*.d $(OUTPUT).*.cmd 		\
 		$(RM) TRACEEVENT-CFLAGS tags TAGS
 
 PHONY += force plugins
