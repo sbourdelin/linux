@@ -25,7 +25,8 @@ union ion_ioctl_arg {
 	struct ion_heap_query query;
 };
 
-static int validate_ioctl_arg(unsigned int cmd, union ion_ioctl_arg *arg)
+static int validate_ioctl_arg(struct file *filp,
+			      unsigned int cmd, union ion_ioctl_arg *arg)
 {
 	switch (cmd) {
 	case ION_IOC_HEAP_QUERY:
@@ -34,6 +35,19 @@ static int validate_ioctl_arg(unsigned int cmd, union ion_ioctl_arg *arg)
 		    arg->query.reserved2 )
 			return -EINVAL;
 		break;
+
+	case ION_IOC_ALLOC:
+	{
+		int mask = 1 << iminor(filp->f_inode);
+
+#ifdef CONFIG_ION_LEGACY_DEVICE_API
+		if (imajor(filp->f_inode) == MISC_MAJOR)
+			return 0;
+#endif
+		if (!(arg->allocation.heap_id_mask & mask))
+			return -EINVAL;
+		break;
+	}
 	default:
 		break;
 	}
@@ -69,7 +83,7 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	if (copy_from_user(&data, (void __user *)arg, _IOC_SIZE(cmd)))
 		return -EFAULT;
 
-	ret = validate_ioctl_arg(cmd, &data);
+	ret = validate_ioctl_arg(filp, cmd, &data);
 	if (WARN_ON_ONCE(ret))
 		return ret;
 

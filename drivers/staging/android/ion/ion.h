@@ -17,16 +17,19 @@
 #ifndef _ION_H
 #define _ION_H
 
+#include <linux/cdev.h>
 #include <linux/device.h>
 #include <linux/dma-direction.h>
 #include <linux/kref.h>
+#ifdef CONFIG_ION_LEGACY_DEVICE_API
+#include <linux/miscdevice.h>
+#endif
 #include <linux/mm_types.h>
 #include <linux/mutex.h>
 #include <linux/rbtree.h>
 #include <linux/sched.h>
 #include <linux/shrinker.h>
 #include <linux/types.h>
-#include <linux/miscdevice.h>
 
 #include "../uapi/ion.h"
 
@@ -92,12 +95,16 @@ void ion_buffer_destroy(struct ion_buffer *buffer);
 /**
  * struct ion_device - the metadata of the ion device node
  * @dev:		the actual misc device
+ * @devt:		Ion device
  * @buffers:		an rb tree of all the existing buffers
  * @buffer_lock:	lock protecting the tree of buffers
  * @lock:		rwsem protecting the tree of heaps and clients
  */
 struct ion_device {
+#ifdef CONFIG_ION_LEGACY_DEVICE_API
 	struct miscdevice dev;
+#endif
+	dev_t devt;
 	struct rb_root buffers;
 	struct mutex buffer_lock;
 	struct rw_semaphore lock;
@@ -153,6 +160,8 @@ struct ion_heap_ops {
  * struct ion_heap - represents a heap in the system
  * @node:		rb node to put the heap on the device's tree of heaps
  * @dev:		back pointer to the ion_device
+ * @ddev:		device structure
+ * @chrdev:		associated character device
  * @type:		type of heap
  * @ops:		ops struct as above
  * @flags:		flags
@@ -177,6 +186,8 @@ struct ion_heap_ops {
 struct ion_heap {
 	struct plist_node node;
 	struct ion_device *dev;
+	struct device ddev;
+	struct cdev chrdev;
 	enum ion_heap_type type;
 	struct ion_heap_ops *ops;
 	unsigned long flags;
@@ -213,7 +224,7 @@ bool ion_buffer_fault_user_mappings(struct ion_buffer *buffer);
  * ion_device_add_heap - adds a heap to the ion device
  * @heap:		the heap to add
  */
-void ion_device_add_heap(struct ion_heap *heap);
+int ion_device_add_heap(struct ion_heap *heap);
 
 /**
  * some helpers for common operations on buffers using the sg_table

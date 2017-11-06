@@ -10,6 +10,13 @@ menuconfig ION
 	  If you're not using Android its probably safe to
 	  say N here.
 
+config ION_LEGACY_DEVICE_API
+	bool "Keep using Ion legacy misc device API"
+	depends on ION
+	help
+	  Choose this option to keep using Ion legacy misc device API
+	  i.e. /dev/ion
+
 config ION_SYSTEM_HEAP
 	bool "Ion system heap"
 	depends on ION
