@@ -65,7 +65,7 @@ static const struct pmc_clk byt_clks[] = {
 	{
 		.name = "pll",
 		.freq = 19200000,
-		.parent_name = "xtal",
+		.parent_name = NULL,
 	},
 	{},
 };
@@ -73,6 +73,11 @@ static const struct pmc_clk byt_clks[] = {
 static const struct pmc_clk cht_clks[] = {
 	{
 		.name = "xtal",
+		.freq = 19200000,
+		.parent_name = NULL,
+	},
+	{
+		.name = "pll",
 		.freq = 19200000,
 		.parent_name = NULL,
 	},
