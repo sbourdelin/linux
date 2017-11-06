@@ -6664,20 +6664,27 @@ static int __cfs_schedulable(struct task_group *tg, u64 period, u64 quota)
 
 	return ret;
 }
+#endif /* CONFIG_CFS_BANDWIDTH */
+#endif /* CONFIG_FAIR_GROUP_SCHED */
 
 static int cpu_stats_show(struct seq_file *sf, void *v)
 {
 	struct task_group *tg = css_tg(seq_css(sf));
+	int i, nr_iowait = 0;
+#ifdef CONFIG_CFS_BANDWIDTH
 	struct cfs_bandwidth *cfs_b = &tg->cfs_bandwidth;
 
 	seq_printf(sf, "nr_periods %d\n", cfs_b->nr_periods);
 	seq_printf(sf, "nr_throttled %d\n", cfs_b->nr_throttled);
 	seq_printf(sf, "throttled_time %llu\n", cfs_b->throttled_time);
+#endif
+	for_each_possible_cpu(i) {
+		nr_iowait += atomic_read(&tg->stat[i].nr_iowait);
+	}
+	seq_printf(sf, "nr_iowait %d\n", nr_iowait);
 
 	return 0;
 }
-#endif /* CONFIG_CFS_BANDWIDTH */
-#endif /* CONFIG_FAIR_GROUP_SCHED */
 
 #ifdef CONFIG_RT_GROUP_SCHED
 static int cpu_rt_runtime_write(struct cgroup_subsys_state *css,
@@ -6706,6 +6713,10 @@ static u64 cpu_rt_period_read_uint(struct cgroup_subsys_state *css,
 #endif /* CONFIG_RT_GROUP_SCHED */
 
 static struct cftype cpu_files[] = {
+	{
+		.name = "stat",
+		.seq_show = cpu_stats_show,
+	},
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	{
 		.name = "shares",
@@ -6723,10 +6734,6 @@ static struct cftype cpu_files[] = {
 		.name = "cfs_period_us",
 		.read_u64 = cpu_cfs_period_read_u64,
 		.write_u64 = cpu_cfs_period_write_u64,
-	},
-	{
-		.name = "stat",
-		.seq_show = cpu_stats_show,
 	},
 #endif
 #ifdef CONFIG_RT_GROUP_SCHED
