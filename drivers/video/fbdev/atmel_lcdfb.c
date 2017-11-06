@@ -1021,6 +1021,8 @@ static void atmel_lcdfb_power_control_gpio(struct atmel_lcdfb_pdata *pdata, int 
 		gpio_set_value(og->gpio, on);
 }
 
+static char const property_failure[] = "failed to get property %s\n";
+
 static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
 {
 	struct fb_info *info = sinfo->info;
@@ -1048,25 +1050,25 @@ static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
 
 	ret = of_property_read_u32(display_np, "bits-per-pixel", &var->bits_per_pixel);
 	if (ret < 0) {
-		dev_err(dev, "failed to get property bits-per-pixel\n");
+		dev_err(dev, property_failure, "bits-per-pixel");
 		goto put_display_node;
 	}
 
 	ret = of_property_read_u32(display_np, "atmel,guard-time", &pdata->guard_time);
 	if (ret < 0) {
-		dev_err(dev, "failed to get property atmel,guard-time\n");
+		dev_err(dev, property_failure, "atmel,guard-time");
 		goto put_display_node;
 	}
 
 	ret = of_property_read_u32(display_np, "atmel,lcdcon2", &pdata->default_lcdcon2);
 	if (ret < 0) {
-		dev_err(dev, "failed to get property atmel,lcdcon2\n");
+		dev_err(dev, property_failure, "atmel,lcdcon2");
 		goto put_display_node;
 	}
 
 	ret = of_property_read_u32(display_np, "atmel,dmacon", &pdata->default_dmacon);
 	if (ret < 0) {
-		dev_err(dev, "failed to get property bits-per-pixel\n");
+		dev_err(dev, property_failure, "atmel,dmacon");
 		goto put_display_node;
 	}
 
