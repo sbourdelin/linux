@@ -548,9 +548,10 @@ qla2x00_rft_id(scsi_qla_host_t *vha)
 	ct_req->req.rft_id.port_id[1] = vha->d_id.b.area;
 	ct_req->req.rft_id.port_id[2] = vha->d_id.b.al_pa;
 
-	ct_req->req.rft_id.fc4_types[2] = 0x01;		/* FCP-3 */
+	if (!vha->flags.nvmet_enabled)
+		ct_req->req.rft_id.fc4_types[2] = 0x01;		/* FCP-3 */
 
-	if (vha->flags.nvme_enabled)
+	if (vha->flags.nvme_enabled || vha->flags.nvmet_enabled)
 		ct_req->req.rft_id.fc4_types[6] = 1;    /* NVMe type 28h */
 	/* Execute MS IOCB */
 	rval = qla2x00_issue_iocb(vha, ha->ms_iocb, ha->ms_iocb_dma,
@@ -592,6 +593,10 @@ qla2x00_rff_id(scsi_qla_host_t *vha, u8 type)
 		return (QLA_SUCCESS);
 	}
 
+	/* only single mode for now */
+	if ((vha->flags.nvmet_enabled) && (type == FC4_TYPE_FCP_SCSI))
+		return (QLA_SUCCESS);
+
 	arg.iocb = ha->ms_iocb;
 	arg.req_dma = ha->ct_sns_dma;
 	arg.rsp_dma = ha->ct_sns_dma;
@@ -613,7 +618,7 @@ qla2x00_rff_id(scsi_qla_host_t *vha, u8 type)
 	ct_req->req.rff_id.port_id[1] = vha->d_id.b.area;
 	ct_req->req.rff_id.port_id[2] = vha->d_id.b.al_pa;
 
-	qlt_rff_id(vha, ct_req);
+	qlt_rff_id(vha, ct_req, type);
 
 	ct_req->req.rff_id.fc4_type = type;		/* SCSI - FCP */
 
@@ -2166,7 +2171,7 @@ qla2x00_fdmiv2_rpa(scsi_qla_host_t *vha)
 	    eiter->a.fc4_types[2],
 	    eiter->a.fc4_types[1]);
 
-	if (vha->flags.nvme_enabled) {
+	if (vha->flags.nvme_enabled || vha->flags.nvmet_enabled) {
 		eiter->a.fc4_types[6] = 1;	/* NVMe type 28h */
 		ql_dbg(ql_dbg_disc, vha, 0x211f,
 		    "NVME FC4 Type = %02x 0x0 0x0 0x0 0x0 0x0.\n",
@@ -2370,7 +2375,7 @@ qla2x00_fdmiv2_rpa(scsi_qla_host_t *vha)
 	    "Port Active FC4 Type = %02x %02x.\n",
 	    eiter->a.port_fc4_type[2], eiter->a.port_fc4_type[1]);
 
-	if (vha->flags.nvme_enabled) {
+	if (vha->flags.nvme_enabled || vha->flags.nvmet_enabled) {
 		eiter->a.port_fc4_type[4] = 0;
 		eiter->a.port_fc4_type[5] = 0;
 		eiter->a.port_fc4_type[6] = 1;	/* NVMe type 28h */

@@ -723,6 +723,269 @@ struct ct_entry_24xx {
 	uint32_t dseg_1_len;		/* Data segment 1 length. */
 };
 
+/* NVME-T changes */
+/*
+ * Fibre Channel Header
+ * Little Endian format.  As received in PUREX and PURLS
+ */
+struct __fc_hdr {
+	uint16_t	did_lo;
+	uint8_t		did_hi;
+	uint8_t		r_ctl;
+	uint16_t	sid_lo;
+	uint8_t		sid_hi;
+	uint8_t		cs_ctl;
+	uint16_t	f_ctl_lo;
+	uint8_t		f_ctl_hi;
+	uint8_t		type;
+	uint16_t	seq_cnt;
+	uint8_t		df_ctl;
+	uint8_t		seq_id;
+	uint16_t	rx_id;
+	uint16_t	ox_id;
+	uint32_t	param;
+};
+
+/*
+ * Fibre Channel LOGO acc
+ * In big endian format
+ */
+struct __fc_logo_acc {
+	uint8_t	op_code;
+	uint8_t	reserved[3];
+};
+
+struct __fc_lsrjt {
+	uint8_t	op_code;
+	uint8_t	reserved[3];
+	uint8_t	reserved2;
+	uint8_t	reason;
+	uint8_t	exp;
+	uint8_t	vendor;
+};
+
+/*
+ * Fibre Channel LOGO Frame
+ * Little Endian format. As received in PUREX
+ */
+struct __fc_logo {
+	struct __fc_hdr	hdr;
+	uint16_t	reserved;
+	uint8_t		reserved1;
+	uint8_t		op_code;
+	uint16_t	sid_lo;
+	uint8_t		sid_hi;
+	uint8_t		reserved2;
+	uint8_t		pname[8];
+};
+
+/*
+ * Fibre Channel PRLI Frame
+ * Little Endian format. As received in PUREX
+ */
+struct __fc_prli {
+	struct  __fc_hdr	hdr;
+	uint16_t		pyld_length;  /* word 0 of prli */
+	uint8_t		page_length;
+	uint8_t		op_code;
+	uint16_t	common;/* word 1.  1st word of SP page */
+	uint8_t		type_ext;
+	uint8_t		prli_type;
+#define PRLI_TYPE_FCP  0x8
+#define PRLI_TYPE_NVME 0x28
+	union {
+		struct {
+			uint32_t	reserved[2];
+			uint32_t	sp_info;
+		} fcp;
+		struct {
+			uint32_t	reserved[2];
+			uint32_t	sp_info;
+#define NVME_PRLI_DISC BIT_3
+#define NVME_PRLI_TRGT BIT_4
+#define NVME_PRLI_INIT BIT_5
+#define NVME_PRLI_CONFIRMATION BIT_7
+			uint32_t	reserved1;
+		} nvme;
+	};
+};
+
+/*
+ * Fibre Channel PLOGI Frame
+ * Little Endian format.  As received in PUREX
+ */
+struct __fc_plogi {
+	uint16_t        did_lo;
+	uint8_t         did_hi;
+	uint8_t         r_ctl;
+	uint16_t        sid_lo;
+	uint8_t         sid_hi;
+	uint8_t         cs_ctl;
+	uint16_t        f_ctl_lo;
+	uint8_t         f_ctl_hi;
+	uint8_t         type;
+	uint16_t        seq_cnt;
+	uint8_t         df_ctl;
+	uint8_t         seq_id;
+	uint16_t        rx_id;
+	uint16_t        ox_id;
+	uint32_t        param;
+	uint8_t         rsvd[3];
+	uint8_t         op_code;
+	uint32_t        cs_params[4]; /* common service params */
+	uint8_t         pname[8];     /* port name */
+	uint8_t         nname[8];     /* node name */
+	uint32_t        class1[4];    /* class 1 service params */
+	uint32_t        class2[4];    /* class 2 service params */
+	uint32_t        class3[4];    /* class 3 service params */
+	uint32_t        class4[4];
+	uint32_t        vndr_vers[4];
+};
+
+#define IOCB_TYPE_ELS_PASSTHRU 0x53
+
+/* ELS Pass-Through IOCB (IOCB_TYPE_ELS_PASSTHRU = 0x53)
+ */
+struct __els_pt {
+	uint8_t	entry_type;		/* Entry type. */
+	uint8_t	entry_count;		/* Entry count. */
+	uint8_t	sys_define;		/* System defined. */
+	uint8_t	entry_status;		/* Entry Status. */
+	uint32_t	handle;
+	uint16_t	status;       /* when returned from fw */
+	uint16_t	nphdl;
+	uint16_t	tx_dsd_cnt;
+	uint8_t	vp_index;
+	uint8_t	sof;          /* bits 7:4 */
+	uint32_t	rcv_exchg_id;
+	uint16_t	rx_dsd_cnt;
+	uint8_t	op_code;
+	uint8_t	rsvd1;
+	uint16_t	did_lo;
+	uint8_t	did_hi;
+	uint8_t	sid_hi;
+	uint16_t	sid_lo;
+	uint16_t	cntl_flags;
+#define ELS_PT_RESPONDER_ACC   (1 << 13)
+	uint32_t	rx_bc;
+	uint32_t	tx_bc;
+	uint32_t	tx_dsd[2];	/* Data segment 0 address. */
+	uint32_t	tx_dsd_len;		/* Data segment 0 length. */
+	uint32_t	rx_dsd[2];	/* Data segment 1 address. */
+	uint32_t	rx_dsd_len;		/* Data segment 1 length. */
+};
+
+/*
+ * Reject a FCP PRLI
+ *
+ */
+struct __fc_prli_rjt {
+	uint8_t op_code;	/* word 0 of prli rjt */
+	uint8_t rsvd1[3];
+	uint8_t rsvd2;		/* word 1 of prli rjt */
+	uint8_t	reason;
+#define PRLI_RJT_REASON 0x3	/* logical error */
+	uint8_t	expl;
+	uint8_t vendor;
+#define PRLI_RJT_FCP_RESP_LEN 8
+};
+
+/*
+ * Fibre Channel PRLI ACC
+ * Payload only
+ */
+struct __fc_prli_acc {
+/* payload only.  In big-endian format */
+	uint8_t         op_code;      /* word 0 of prli acc */
+	uint8_t         page_length;
+#define PRLI_FCP_PAGE_LENGTH  16
+#define PRLI_NVME_PAGE_LENGTH 20
+	uint16_t        pyld_length;
+	uint8_t         type;         /* word 1 of prli acc */
+	uint8_t         type_ext;
+	uint16_t        common;
+#define PRLI_EST_FCP_PAIR 0x2000
+#define PRLI_REQ_EXEC     0x0100
+#define PRLI_REQ_DOES_NOT_EXIST 0x0400
+	union {
+		struct {
+			uint32_t	reserved[2];
+			uint32_t	sp_info;
+			/* hard coding resp.  target, rdxfr disabled.*/
+#define FCP_PRLI_SP 0x12
+		} fcp;
+		struct {
+			uint32_t	reserved[2];
+			uint32_t	sp_info;
+			uint16_t	reserved2;
+			uint16_t	first_burst;
+		} nvme;
+	};
+#define PRLI_ACC_FCP_RESP_LEN  20
+#define PRLI_ACC_NVME_RESP_LEN 24
+
+};
+
+/*
+ * ISP queue - PUREX IOCB entry structure definition
+ */
+#define PUREX_IOCB_TYPE		0x51 /* CT Pass Through IOCB entry */
+struct purex_entry_24xx {
+	uint8_t entry_type;		/* Entry type. */
+	uint8_t entry_count;		/* Entry count. */
+	uint8_t sys_define;		/* System defined. */
+	uint8_t entry_status;		/* Entry Status. */
+
+	uint16_t reserved1;
+	uint8_t vp_idx;
+	uint8_t reserved2;
+
+	uint16_t status_flags;
+	uint16_t nport_handle;
+
+	uint16_t frame_size;
+	uint16_t trunc_frame_size;
+
+	uint32_t rx_xchg_addr;
+
+	uint8_t d_id[3];
+	uint8_t r_ctl;
+
+	uint8_t s_id[3];
+	uint8_t cs_ctl;
+
+	uint8_t f_ctl[3];
+	uint8_t type;
+
+	uint16_t seq_cnt;
+	uint8_t df_ctl;
+	uint8_t seq_id;
+
+	uint16_t rx_id;
+	uint16_t ox_id;
+	uint32_t param;
+
+	uint8_t pyld[20];
+#define PUREX_PYLD_SIZE 44 /* Number of bytes (hdr+pyld) in this IOCB */
+};
+
+#define PUREX_ENTRY_SIZE	(sizeof(purex_entry_24xx_t))
+
+#define CONT_SENSE_DATA 60
+/*
+ * Continuation Status Type 0 (IOCB_TYPE_STATUS_CONT = 0x10)
+ * Section 5.6 FW Interface Spec
+ */
+struct __status_cont {
+	uint8_t entry_type;		/* Entry type. - 0x10 */
+	uint8_t entry_count;		/* Entry count. */
+	uint8_t entry_status;		/* Entry Status. */
+	uint8_t reserved;
+
+	uint8_t data[CONT_SENSE_DATA];
+} __packed;
+
+
 /*
  * ISP queue - ELS Pass-Through entry structure definition.
  */
