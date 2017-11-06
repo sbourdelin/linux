@@ -1204,7 +1204,8 @@ EXPORT_SYMBOL_GPL(gmap_mprotect_notify);
  *
  * Called with gmap->mm->mmap_sem in read.
  */
-int gmap_read_table(struct gmap *gmap, unsigned long gaddr, unsigned long *val)
+int gmap_read_table(struct gmap *gmap, unsigned long gaddr, unsigned long *val,
+		    int *fc)
 {
 	unsigned long address, vmaddr;
 	spinlock_t *ptl;
@@ -1243,6 +1244,7 @@ int gmap_read_table(struct gmap *gmap, unsigned long gaddr, unsigned long *val)
 					address = pmd_val(pmd) & HPAGE_MASK;
 					address += gaddr & ~HPAGE_MASK;
 					*val = *(unsigned long *) address;
+					*fc = 1;
 					rc = 0;
 				}
 			}
