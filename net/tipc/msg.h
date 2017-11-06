@@ -226,6 +226,16 @@ static inline void msg_set_dest_droppable(struct tipc_msg *m, u32 d)
 	msg_set_bits(m, 0, 19, 1, d);
 }
 
+static inline int msg_is_monitor(struct tipc_msg *m)
+{
+	return msg_bits(m, 0, 19, 1);
+}
+
+static inline void msg_set_is_monitor(struct tipc_msg *m, u32 d)
+{
+	msg_set_bits(m, 0, 19, 1, d);
+}
+
 static inline int msg_src_droppable(struct tipc_msg *m)
 {
 	return msg_bits(m, 0, 18, 1);
@@ -694,6 +704,7 @@ static inline u32 msg_probe(struct tipc_msg *m)
 
 static inline void msg_set_probe(struct tipc_msg *m, u32 val)
 {
+	msg_set_is_monitor(m, val);
 	msg_set_bits(m, 5, 0, 1, val);
 }
 
