@@ -24,7 +24,7 @@
 
 #include "timer-of.h"
 
-static __init void timer_irq_exit(struct of_timer_irq *of_irq)
+static void timer_irq_exit(struct of_timer_irq *of_irq)
 {
 	struct timer_of *to = container_of(of_irq, struct timer_of, of_irq);
 
@@ -72,7 +72,7 @@ static __init int timer_irq_init(struct device_node *np,
 	return 0;
 }
 
-static __init void timer_clk_exit(struct of_timer_clk *of_clk)
+static void timer_clk_exit(struct of_timer_clk *of_clk)
 {
 	of_clk->rate = 0;
 	clk_disable_unprepare(of_clk->clk);
@@ -116,7 +116,7 @@ out_clk_put:
 	goto out;
 }
 
-static __init void timer_base_exit(struct of_timer_base *of_base)
+static void timer_base_exit(struct of_timer_base *of_base)
 {
 	iounmap(of_base->base);
 }
