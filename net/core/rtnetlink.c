@@ -62,6 +62,7 @@
 struct rtnl_link {
 	rtnl_doit_func		doit;
 	rtnl_dumpit_func	dumpit;
+	struct module		*owner;
 	unsigned int		flags;
 };
 
@@ -143,6 +144,69 @@ static inline int rtm_msgindex(int msgtype)
 	return msgindex;
 }
 
+static int rtnl_register_internal(struct module *owner,
+				  int protocol, int msgtype,
+				  rtnl_doit_func doit, rtnl_dumpit_func dumpit,
+				  unsigned int flags)
+{
+	struct rtnl_link *tab;
+	int msgindex;
+
+	BUG_ON(protocol < 0 || protocol > RTNL_FAMILY_MAX);
+	msgindex = rtm_msgindex(msgtype);
+
+	tab = rcu_dereference_raw(rtnl_msg_handlers[protocol]);
+	if (tab == NULL) {
+		tab = kcalloc(RTM_NR_MSGTYPES, sizeof(*tab), GFP_KERNEL);
+		if (tab == NULL)
+			return -ENOBUFS;
+
+		rcu_assign_pointer(rtnl_msg_handlers[protocol], tab);
+	}
+
+	WARN_ON(tab[msgindex].owner && tab[msgindex].owner != owner);
+
+	tab[msgindex].owner = owner;
+	/* make sure owner is always visible first */
+	smp_wmb();
+
+	if (doit)
+		tab[msgindex].doit = doit;
+	if (dumpit)
+		tab[msgindex].dumpit = dumpit;
+	tab[msgindex].flags |= flags;
+
+	return 0;
+}
+
+/**
+ * rtnl_register_module - Register a rtnetlink message type
+ *
+ * @owner: module registering the hook (THIS_MODULE)
+ * @protocol: Protocol family or PF_UNSPEC
+ * @msgtype: rtnetlink message type
+ * @doit: Function pointer called for each request message
+ * @dumpit: Function pointer called for each dump request (NLM_F_DUMP) message
+ * @flags: rtnl_link_flags to modifiy behaviour of doit/dumpit functions
+ *
+ * Like rtnl_register, but for use by removable modules.
+ */
+int rtnl_register_module(struct module *owner,
+			 int protocol, int msgtype,
+			 rtnl_doit_func doit, rtnl_dumpit_func dumpit,
+			 unsigned int flags)
+{
+	int ret;
+
+	rtnl_lock();
+	ret = rtnl_register_internal(owner, protocol, msgtype,
+				     doit, dumpit, flags);
+	rtnl_unlock();
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(rtnl_register_module);
+
 /**
  * __rtnl_register - Register a rtnetlink message type
  * @protocol: Protocol family or PF_UNSPEC
@@ -165,28 +229,8 @@ int __rtnl_register(int protocol, int msgtype,
 		    rtnl_doit_func doit, rtnl_dumpit_func dumpit,
 		    unsigned int flags)
 {
-	struct rtnl_link *tab;
-	int msgindex;
-
-	BUG_ON(protocol < 0 || protocol > RTNL_FAMILY_MAX);
-	msgindex = rtm_msgindex(msgtype);
-
-	tab = rcu_dereference_raw(rtnl_msg_handlers[protocol]);
-	if (tab == NULL) {
-		tab = kcalloc(RTM_NR_MSGTYPES, sizeof(*tab), GFP_KERNEL);
-		if (tab == NULL)
-			return -ENOBUFS;
-
-		rcu_assign_pointer(rtnl_msg_handlers[protocol], tab);
-	}
-
-	if (doit)
-		tab[msgindex].doit = doit;
-	if (dumpit)
-		tab[msgindex].dumpit = dumpit;
-	tab[msgindex].flags |= flags;
-
-	return 0;
+	return rtnl_register_internal(NULL, protocol, msgtype,
+				      doit, dumpit, flags);
 }
 EXPORT_SYMBOL_GPL(__rtnl_register);
 
@@ -235,6 +279,9 @@ int rtnl_unregister(int protocol, int msgtype)
 	handlers[msgindex].doit = NULL;
 	handlers[msgindex].dumpit = NULL;
 	handlers[msgindex].flags = 0;
+	/* make sure we clear owner last */
+	smp_wmb();
+	handlers[msgindex].owner = NULL;
 	rtnl_unlock();
 
 	return 0;
@@ -4346,6 +4393,7 @@ static int rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 	}
 
 	if (kind == 2 && nlh->nlmsg_flags&NLM_F_DUMP) {
+		struct module *owner = NULL;
 		struct sock *rtnl;
 		rtnl_dumpit_func dumpit;
 		u16 min_dump_alloc = 0;
@@ -4360,20 +4408,31 @@ static int rtnetlink_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh,
 			dumpit = READ_ONCE(handlers[type].dumpit);
 			if (!dumpit)
 				goto err_unlock;
+			owner = READ_ONCE(handlers[type].owner);
 		}
 
 		if (type == RTM_GETLINK - RTM_BASE)
 			min_dump_alloc = rtnl_calcit(skb, nlh);
 
+		err = 0;
+		/* need to do this before rcu_read_unlock() */
+		if (!try_module_get(owner))
+			err = -EPROTONOSUPPORT;
+
 		rcu_read_unlock();
 
 		rtnl = net->rtnl;
-		{
+		if (err == 0) {
 			struct netlink_dump_control c = {
 				.dump		= dumpit,
 				.min_dump_alloc	= min_dump_alloc,
+				.module		= owner,
 			};
 			err = netlink_dump_start(rtnl, skb, nlh, &c);
+			/* netlink_dump_start() will keep a reference on
+			 * module if dump is still in progress.
+			 */
+			module_put(owner);
 		}
 		return err;
 	}
