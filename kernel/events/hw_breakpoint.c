@@ -367,7 +367,7 @@ int dbg_release_bp_slot(struct perf_event *bp)
 	return 0;
 }
 
-static int validate_hw_breakpoint(struct perf_event *bp)
+int validate_hw_breakpoint(struct perf_event *bp)
 {
 	int ret;
 

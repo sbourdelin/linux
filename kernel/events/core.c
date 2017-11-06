@@ -2642,6 +2642,41 @@ int perf_event_refresh(struct perf_event *event, int refresh)
 }
 EXPORT_SYMBOL_GPL(perf_event_refresh);
 
+static int _perf_event_modify_breakpoint(struct perf_event *bp,
+					 struct perf_event_attr *attr)
+{
+	u64 old_addr = bp->attr.bp_addr;
+	u64 old_len = bp->attr.bp_len;
+	int old_type = bp->attr.bp_type;
+	int err = 0;
+
+	_perf_event_disable(bp);
+
+	bp->attr.bp_addr = attr->bp_addr;
+	bp->attr.bp_type = attr->bp_type;
+	bp->attr.bp_len = attr->bp_len;
+
+	if (attr->disabled)
+		goto end;
+
+	err = validate_hw_breakpoint(bp);
+	if (!err) {
+		_perf_event_enable(bp);
+	} else {
+		bp->attr.bp_addr = old_addr;
+		bp->attr.bp_type = old_type;
+		bp->attr.bp_len = old_len;
+		if (!bp->attr.disabled)
+			_perf_event_enable(bp);
+
+		return err;
+	}
+end:
+	bp->attr.disabled = attr->disabled;
+	return 0;
+}
+
+
 static void ctx_sched_out(struct perf_event_context *ctx,
 			  struct perf_cpu_context *cpuctx,
 			  enum event_type_t event_type)
@@ -4653,6 +4688,8 @@ static int perf_event_set_output(struct perf_event *event,
 				 struct perf_event *output_event);
 static int perf_event_set_filter(struct perf_event *event, void __user *arg);
 static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd);
+static int perf_copy_attr(struct perf_event_attr __user *uattr,
+			  struct perf_event_attr *attr);
 
 static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned long arg)
 {
@@ -4721,6 +4758,15 @@ static long _perf_ioctl(struct perf_event *event, unsigned int cmd, unsigned lon
 		rb_toggle_paused(rb, !!arg);
 		rcu_read_unlock();
 		return 0;
+	}
+	case PERF_EVENT_IOC_MODIFY_BREAKPOINT: {
+		struct perf_event_attr new_attr;
+		int err = perf_copy_attr((struct perf_event_attr __user *)arg,
+					 &new_attr);
+
+		if (err)
+			return err;
+		return _perf_event_modify_breakpoint(event,  &new_attr);
 	}
 	default:
 		return -ENOTTY;
