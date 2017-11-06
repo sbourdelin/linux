@@ -77,6 +77,7 @@
 #include <asm/i8259.h>
 #include <asm/realmode.h>
 #include <asm/misc.h>
+#include <asm/intel-family.h>
 
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
@@ -454,15 +455,50 @@ static bool match_smt(struct cpuinfo_x86 *c, struct cpuinfo_x86 *o)
 	return false;
 }
 
+/*
+ * Set if a package/die has multiple NUMA nodes inside.
+ * AMD Magny-Cours, Intel Cluster-on-Die, and Intel
+ * Sub-NUMA Clustering have this.
+ */
+static bool x86_has_numa_in_package;
+
 static bool match_llc(struct cpuinfo_x86 *c, struct cpuinfo_x86 *o)
 {
 	int cpu1 = c->cpu_index, cpu2 = o->cpu_index;
 
-	if (per_cpu(cpu_llc_id, cpu1) != BAD_APICID &&
-	    per_cpu(cpu_llc_id, cpu1) == per_cpu(cpu_llc_id, cpu2))
-		return topology_sane(c, o, "llc");
+	/* Do not match if we do not have a valid APICID for cpu: */
+	if (per_cpu(cpu_llc_id, cpu1) == BAD_APICID)
+		return false;
 
-	return false;
+	/* Do not match if LLC id does not match: */
+	if (per_cpu(cpu_llc_id, cpu1) != per_cpu(cpu_llc_id, cpu2))
+		return false;
+
+	/*
+	 * Some Intel CPUs enumerate an LLC that is shared by
+	 * multiple NUMA nodes.  The LLC on these systems is
+	 * shared for off-package data acccess but private to the
+	 * NUMA node (half of the package) for on-package access.
+	 *
+	 * CPUID can only enumerate the cache as being shared *or*
+	 * unshared, but not this particular configuration.  The
+	 * CPU in this case enumerates the cache to be shared
+	 * across the entire package (spanning both NUMA nodes).
+	 */
+	if (!topology_same_node(c, o) &&
+	    (c->x86_model == INTEL_FAM6_SKYLAKE_X)) {
+		/* Use NUMA instead of coregroups for scheduling: */
+		x86_has_numa_in_package = true;
+
+		/*
+		 * Now, tell the truth, that the LLC matches. But,
+		 * note that throwing away coregroups for
+		 * scheduling means this will have no actual effect.
+		 */
+		return true;
+	}
+
+	return topology_sane(c, o, "llc");
 }
 
 /*
@@ -518,12 +554,6 @@ static struct sched_domain_topology_level x86_topology[] = {
 	{ NULL, },
 };
 
-/*
- * Set if a package/die has multiple NUMA nodes inside.
- * AMD Magny-Cours and Intel Cluster-on-Die have this.
- */
-static bool x86_has_numa_in_package;
-
 void set_cpu_sibling_map(int cpu)
 {
 	bool has_smt = smp_num_siblings > 1;
@@ -550,7 +580,6 @@ void set_cpu_sibling_map(int cpu)
 
 		if ((i == cpu) || (has_mp && match_llc(c, o)))
 			link_mask(cpu_llc_shared_mask, cpu, i);
-
 	}
 
 	/*
