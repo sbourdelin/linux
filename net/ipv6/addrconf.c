@@ -3435,6 +3435,9 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 				run_pending = 1;
 			}
 		} else if (event == NETDEV_CHANGE) {
+			if (idev && idev->cnf.ignore_routes_with_linkdown)
+				neigh_carrier_down(&nd_tbl, dev);
+
 			if (!addrconf_link_ready(dev)) {
 				/* device is still not ready. */
 				break;
