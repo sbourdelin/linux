@@ -57,7 +57,8 @@ config USB_AUDIO
 	select USB_F_UAC1 if (GADGET_UAC1 && !GADGET_UAC1_LEGACY)
 	select USB_F_UAC1_LEGACY if (GADGET_UAC1 && GADGET_UAC1_LEGACY)
 	select USB_F_UAC2 if !GADGET_UAC1
-	select USB_U_AUDIO if (USB_F_UAC2 || USB_F_UAC1)
+	select USB_F_UAC3 if !GADGET_UAC1_LEGACY
+	select USB_U_AUDIO if (USB_F_UAC3 || USB_F_UAC2 || USB_F_UAC1)
 	help
 	  This Gadget Audio driver is compatible with USB Audio Class
 	  specification 2.0. It implements 1 AudioControl interface,

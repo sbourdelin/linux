@@ -200,6 +200,9 @@ config USB_F_UAC1_LEGACY
 config USB_F_UAC2
 	tristate
 
+config USB_F_UAC3
+	tristate
+
 config USB_F_UVC
 	tristate
 
@@ -410,6 +413,25 @@ config USB_CONFIGFS_F_UAC2
 	help
 	  This Audio function is compatible with USB Audio Class
 	  specification 2.0. It implements 1 AudioControl interface,
+	  1 AudioStreaming Interface each for USB-OUT and USB-IN.
+	  This driver doesn't expect any real Audio codec to be present
+	  on the device - the audio streams are simply sinked to and
+	  sourced from a virtual ALSA sound card created. The user-space
+	  application may choose to do whatever it wants with the data
+	  received from the USB Host and choose to provide whatever it
+	  wants as audio data to the USB Host.
+
+config USB_CONFIGFS_F_UAC3
+	bool "Audio Class 3.0"
+	depends on USB_CONFIGFS
+	depends on SND
+	select USB_LIBCOMPOSITE
+	select SND_PCM
+	select USB_U_AUDIO
+	select USB_F_UAC3
+	help
+	  This Audio function is compatible with USB Audio Class
+	  specification 3.0. It implements 1 AudioControl interface,
 	  1 AudioStreaming Interface each for USB-OUT and USB-IN.
 	  This driver doesn't expect any real Audio codec to be present
 	  on the device - the audio streams are simply sinked to and
