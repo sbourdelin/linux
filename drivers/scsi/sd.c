@@ -3243,11 +3243,13 @@ static void sd_probe_async(void *data, async_cookie_t cookie)
 {
 	struct scsi_disk *sdkp = data;
 	struct scsi_device *sdp;
+	struct Scsi_Host *host;
 	struct gendisk *gd;
 	u32 index;
 	struct device *dev;
 
 	sdp = sdkp->device;
+	host = sdp->host;
 	gd = sdkp->disk;
 	index = sdkp->index;
 	dev = &sdp->sdev_gendev;
@@ -3270,6 +3272,13 @@ static void sd_probe_async(void *data, async_cookie_t cookie)
 	sdkp->ATO = 0;
 	sdkp->first_scan = 1;
 	sdkp->max_medium_access_timeouts = SD_MAX_MEDIUM_TIMEOUTS;
+
+	mutex_lock(&host->scan_mutex);
+	if (!scsi_host_scan_allowed(host)) {
+		sd_printk(KERN_NOTICE, sdkp, "%s: host being removed\n",
+			  __func__);
+		goto unlock;
+	}
 
 	sd_revalidate_disk(gd);
 
@@ -3294,8 +3303,12 @@ static void sd_probe_async(void *data, async_cookie_t cookie)
 
 	sd_printk(KERN_NOTICE, sdkp, "Attached SCSI %sdisk\n",
 		  sdp->removable ? "removable " : "");
+unlock:
+	mutex_unlock(&host->scan_mutex);
+	scsi_host_put(host);
 	scsi_autopm_put_device(sdp);
 	put_device(&sdkp->dev);
+	return;
 }
 
 /**
@@ -3395,7 +3408,15 @@ static int sd_probe(struct device *dev)
 	get_device(dev);
 	dev_set_drvdata(dev, sdkp);
 
-	get_device(&sdkp->dev);	/* prevent release before async_schedule */
+	/* prevent release before async_schedule */
+	error = -ENODEV;
+	if (scsi_host_get(sdp->host) == NULL) {
+		sd_printk(KERN_NOTICE, sdkp, "%s: host being removed\n",
+			  __func__);
+		put_device(&sdkp->dev);
+		goto out;
+	}
+	get_device(&sdkp->dev);
 	async_schedule_domain(sd_probe_async, sdkp, &scsi_sd_probe_domain);
 
 	return 0;
