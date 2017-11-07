@@ -861,7 +861,8 @@ unsigned long btrfs_async_submit_limit(struct btrfs_fs_info *info)
 	unsigned long limit = min_t(unsigned long,
 				    info->thread_pool_size,
 				    info->fs_devices->open_devices);
-	return 256 * limit;
+
+	return (256 * 2/3) * limit;
 }
 
 static void run_one_async_start(struct btrfs_work *work)
@@ -887,7 +888,6 @@ static void run_one_async_done(struct btrfs_work *work)
 	fs_info = async->fs_info;
 
 	limit = btrfs_async_submit_limit(fs_info);
-	limit = limit * 2 / 3;
 
 	/*
 	 * atomic_dec_return implies a barrier for waitqueue_active

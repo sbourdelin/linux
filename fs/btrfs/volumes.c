@@ -383,7 +383,6 @@ static noinline void run_scheduled_bios(struct btrfs_device *device)
 
 	bdi = device->bdev->bd_bdi;
 	limit = btrfs_async_submit_limit(fs_info);
-	limit = limit * 2 / 3;
 
 loop:
 	spin_lock(&device->io_lock);
