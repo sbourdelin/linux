@@ -9,7 +9,10 @@ void scsi_show_rq(struct seq_file *m, struct request *rq)
 	int msecs = jiffies_to_msecs(jiffies - cmd->jiffies_at_alloc);
 	char buf[80];
 
-	__scsi_format_command(buf, sizeof(buf), cmd->cmnd, cmd->cmd_len);
+	if (cmd->cmnd == scsi_req(rq)->cmd)
+		__scsi_format_command(buf, sizeof(buf), cmd->cmnd, cmd->cmd_len);
+	else
+		strcpy(buf, "unknown");
 	seq_printf(m, ", .cmd=%s, .retries=%d, allocated %d.%03d s ago", buf,
 		   cmd->retries, msecs / 1000, msecs % 1000);
 }
