@@ -33,6 +33,7 @@ enum perf_type_id {
 	PERF_TYPE_HW_CACHE			= 3,
 	PERF_TYPE_RAW				= 4,
 	PERF_TYPE_BREAKPOINT			= 5,
+	PERF_TYPE_PROBE				= 6,
 
 	PERF_TYPE_MAX,				/* non-ABI */
 };
@@ -299,6 +300,29 @@ enum perf_event_read_format {
 #define PERF_ATTR_SIZE_VER4	104	/* add: sample_regs_intr */
 #define PERF_ATTR_SIZE_VER5	112	/* add: aux_watermark */
 
+#define MAX_PROBE_FUNC_NAME_LEN	64
+/*
+ * Describe a kprobe or uprobe for PERF_TYPE_PROBE.
+ * perf_event_attr.probe_desc will point to this structure. is_uprobe
+ * and is_return are used to differentiate different types of probe
+ * (k/u, probe/retprobe).
+ *
+ * The two unions should be used as follows:
+ * For uprobe: use path and offset;
+ * For kprobe: if func is empty, use addr
+ *             if func is not emtpy, use func and offset
+ */
+struct probe_desc {
+	union {
+		__aligned_u64	func;
+		__aligned_u64	path;
+	};
+	union {
+		__aligned_u64	addr;
+		__u64		offset;
+	};
+};
+
 /*
  * Hardware event_id to monitor via a performance monitoring event:
  *
@@ -320,7 +344,10 @@ struct perf_event_attr {
 	/*
 	 * Type specific configuration information.
 	 */
-	__u64			config;
+	union {
+		__u64		config;
+		__u64		probe_desc; /* ptr to struct probe_desc */
+	};
 
 	union {
 		__u64		sample_period;
@@ -370,7 +397,11 @@ struct perf_event_attr {
 				context_switch :  1, /* context switch data */
 				write_backward :  1, /* Write ring buffer from end to beginning */
 				namespaces     :  1, /* include namespaces data */
-				__reserved_1   : 35;
+
+				/* For PERF_TYPE_PROBE */
+				is_uprobe      :  1, /* 0: kprobe, 1: uprobe */
+				is_return      :  1, /* 0: probe, 1: retprobe */
+				__reserved_1   : 33;
 
 	union {
 		__u32		wakeup_events;	  /* wakeup every n events */
