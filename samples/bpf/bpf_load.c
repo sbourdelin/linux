@@ -8,7 +8,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <linux/bpf.h>
 #include <linux/filter.h>
@@ -42,6 +41,7 @@ int prog_array_fd = -1;
 
 struct bpf_map_data map_data[MAX_MAPS];
 int map_data_count = 0;
+bool use_perf_type_probe = true;
 
 static int populate_prog_array(const char *event, int prog_fd)
 {
@@ -70,8 +70,9 @@ static int load_and_attach(const char *event, struct bpf_insn *prog, int size)
 	size_t insns_cnt = size / sizeof(struct bpf_insn);
 	enum bpf_prog_type prog_type;
 	char buf[256];
-	int fd, efd, err, id;
+	int fd, efd, err, id = -1;
 	struct perf_event_attr attr = {};
+	struct probe_desc pd;
 
 	attr.type = PERF_TYPE_TRACEPOINT;
 	attr.sample_type = PERF_SAMPLE_RAW;
@@ -128,7 +129,7 @@ static int load_and_attach(const char *event, struct bpf_insn *prog, int size)
 		return populate_prog_array(event, fd);
 	}
 
-	if (is_kprobe || is_kretprobe) {
+	if (!use_perf_type_probe && (is_kprobe || is_kretprobe)) {
 		if (is_kprobe)
 			event += 7;
 		else
@@ -169,27 +170,42 @@ static int load_and_attach(const char *event, struct bpf_insn *prog, int size)
 		strcat(buf, "/id");
 	}
 
-	efd = open(buf, O_RDONLY, 0);
-	if (efd < 0) {
-		printf("failed to open event %s\n", event);
-		return -1;
+	if (use_perf_type_probe && (is_kprobe || is_kretprobe)) {
+		attr.type = PERF_TYPE_PROBE;
+		pd.func = ptr_to_u64(event + strlen(is_kprobe ? "kprobe/"
+						    : "kretprobe/"));
+		pd.offset = 0;
+		attr.is_return  = !!is_kretprobe;
+		attr.probe_desc = ptr_to_u64(&pd);
+	} else {
+		efd = open(buf, O_RDONLY, 0);
+		if (efd < 0) {
+			printf("failed to open event %s\n", event);
+			return -1;
+		}
+		err = read(efd, buf, sizeof(buf));
+		if (err < 0 || err >= sizeof(buf)) {
+			printf("read from '%s' failed '%s'\n", event,
+			       strerror(errno));
+			return -1;
+		}
+		close(efd);
+		buf[err] = 0;
+		id = atoi(buf);
+		attr.config = id;
 	}
-
-	err = read(efd, buf, sizeof(buf));
-	if (err < 0 || err >= sizeof(buf)) {
-		printf("read from '%s' failed '%s'\n", event, strerror(errno));
-		return -1;
-	}
-
-	close(efd);
-
-	buf[err] = 0;
-	id = atoi(buf);
-	attr.config = id;
 
 	efd = sys_perf_event_open(&attr, -1/*pid*/, 0/*cpu*/, -1/*group_fd*/, 0);
 	if (efd < 0) {
-		printf("event %d fd %d err %s\n", id, efd, strerror(errno));
+		if (use_perf_type_probe && (is_kprobe || is_kretprobe))
+			printf("k%sprobe %s fd %d err %s\n",
+			       is_kprobe ? "" : "ret",
+			       event + strlen(is_kprobe ? "kprobe/"
+					      : "kretprobe/"),
+			       efd, strerror(errno));
+		else
+			printf("event %d fd %d err %s\n", id, efd,
+			       strerror(errno));
 		return -1;
 	}
 	event_fd[prog_cnt - 1] = efd;

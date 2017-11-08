@@ -2,6 +2,7 @@
 #ifndef __BPF_LOAD_H
 #define __BPF_LOAD_H
 
+#include <stdbool.h>
 #include "libbpf.h"
 
 #define MAX_MAPS 32
@@ -38,6 +39,8 @@ extern int map_fd[MAX_MAPS];
 extern struct bpf_map_data map_data[MAX_MAPS];
 extern int map_data_count;
 
+extern bool use_perf_type_probe;
+
 /* parses elf file compiled by llvm .c->.o
  * . parses 'maps' section and creates maps via BPF syscall
  * . parses 'license' section and passes it to syscall
@@ -58,6 +61,11 @@ struct ksym {
 	long addr;
 	char *name;
 };
+
+static inline __u64 ptr_to_u64(const void *ptr)
+{
+	return (__u64) (unsigned long) ptr;
+}
 
 int load_kallsyms(void);
 struct ksym *ksym_search(long key);
