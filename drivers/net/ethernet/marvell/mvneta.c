@@ -816,11 +816,14 @@ static void mvneta_txq_pend_desc_add(struct mvneta_port *pp,
 {
 	u32 val;
 
-	/* Only 255 descriptors can be added at once ; Assume caller
-	 * process TX desriptors in quanta less than 256
-	 */
-	val = pend_desc + txq->pending;
-	mvreg_write(pp, MVNETA_TXQ_UPDATE_REG(txq->id), val);
+	pend_desc += txq->pending;
+
+	/* Only 255 Tx descriptors can be added at once */
+	while (pend_desc > 0) {
+		val = min(pend_desc, 255);
+		mvreg_write(pp, MVNETA_TXQ_UPDATE_REG(txq->id), val);
+		pend_desc -= val;
+	}
 	txq->pending = 0;
 }
 
@@ -2413,8 +2416,7 @@ out:
 		if (txq->count >= txq->tx_stop_threshold)
 			netif_tx_stop_queue(nq);
 
-		if (!skb->xmit_more || netif_xmit_stopped(nq) ||
-		    txq->pending + frags > MVNETA_TXQ_DEC_SENT_MASK)
+		if (!skb->xmit_more || netif_xmit_stopped(nq))
 			mvneta_txq_pend_desc_add(pp, txq, frags);
 		else
 			txq->pending += frags;
