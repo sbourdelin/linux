@@ -275,8 +275,26 @@ int perf_probe_init(struct perf_event *p_event)
 		ret = perf_trace_event_init(tp_event, p_event);
 		if (ret)
 			destroy_local_trace_kprobe(tp_event);
-	} else
-		ret = -EOPNOTSUPP;
+	} else {
+		if (!name)
+			return -EINVAL;
+		tp_event = create_local_trace_uprobe(
+			name, pd.offset, p_event->attr.is_return);
+		if (IS_ERR(tp_event)) {
+			ret = PTR_ERR(tp_event);
+			goto out;
+		}
+		/*
+		 * local trace_uprobe need to hold event_mutex to call
+		 * uprobe_buffer_enable() and uprobe_buffer_disable().
+		 * event_mutex is not required for local trace_kprobes.
+		 */
+		mutex_lock(&event_mutex);
+		ret = perf_trace_event_init(tp_event, p_event);
+		if (ret)
+			destroy_local_trace_uprobe(tp_event);
+		mutex_unlock(&event_mutex);
+	}
 out:
 	kfree(name);
 	return ret;
@@ -292,11 +310,22 @@ void perf_trace_destroy(struct perf_event *p_event)
 
 void perf_probe_destroy(struct perf_event *p_event)
 {
+	/*
+	 * local trace_uprobe need to hold event_mutex to call
+	 * uprobe_buffer_enable() and uprobe_buffer_disable().
+	 * event_mutex is not required for local trace_kprobes.
+	 */
+	if (p_event->attr.is_uprobe)
+		mutex_lock(&event_mutex);
 	perf_trace_event_close(p_event);
 	perf_trace_event_unreg(p_event);
+	if (p_event->attr.is_uprobe)
+		mutex_unlock(&event_mutex);
 
 	if (!p_event->attr.is_uprobe)
 		destroy_local_trace_kprobe(p_event->tp_event);
+	else
+		destroy_local_trace_uprobe(p_event->tp_event);
 }
 
 int perf_trace_add(struct perf_event *p_event, int flags)
