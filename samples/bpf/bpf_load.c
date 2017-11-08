@@ -639,9 +639,8 @@ void read_trace_pipe(void)
 	}
 }
 
-#define MAX_SYMS 300000
-static struct ksym syms[MAX_SYMS];
-static int sym_cnt;
+struct ksym syms[MAX_SYMS];
+int sym_cnt;
 
 static int ksym_cmp(const void *p1, const void *p2)
 {

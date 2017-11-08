@@ -67,6 +67,10 @@ static inline __u64 ptr_to_u64(const void *ptr)
 	return (__u64) (unsigned long) ptr;
 }
 
+#define MAX_SYMS 300000
+extern struct ksym syms[MAX_SYMS];
+extern int sym_cnt;
+
 int load_kallsyms(void);
 struct ksym *ksym_search(long key);
 int set_link_xdp_fd(int ifindex, int fd, __u32 flags);

@@ -43,6 +43,7 @@ hostprogs-y += xdp_redirect_map
 hostprogs-y += xdp_redirect_cpu
 hostprogs-y += xdp_monitor
 hostprogs-y += syscall_tp
+hostprogs-y += test_many_kprobe
 
 # Libbpf dependencies
 LIBBPF := ../../tools/lib/bpf/bpf.o
@@ -89,6 +90,7 @@ xdp_redirect_map-objs := bpf_load.o $(LIBBPF) xdp_redirect_map_user.o
 xdp_redirect_cpu-objs := bpf_load.o $(LIBBPF) xdp_redirect_cpu_user.o
 xdp_monitor-objs := bpf_load.o $(LIBBPF) xdp_monitor_user.o
 syscall_tp-objs := bpf_load.o $(LIBBPF) syscall_tp_user.o
+test_many_kprobe-objs := bpf_load.o $(LIBBPF) test_many_kprobe_user.o
 
 # Tell kbuild to always build the programs
 always := $(hostprogs-y)
@@ -177,6 +179,7 @@ HOSTLOADLIBES_xdp_redirect_map += -lelf
 HOSTLOADLIBES_xdp_redirect_cpu += -lelf
 HOSTLOADLIBES_xdp_monitor += -lelf
 HOSTLOADLIBES_syscall_tp += -lelf
+HOSTLOADLIBES_test_many_kprobe += -lelf
 
 # Allows pointing LLC/CLANG to a LLVM backend with bpf support, redefine on cmdline:
 #  make samples/bpf/ LLC=~/git/llvm/build/bin/llc CLANG=~/git/llvm/build/bin/clang
