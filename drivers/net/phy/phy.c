@@ -619,8 +619,8 @@ static void phy_error(struct phy_device *phydev)
  * @irq: interrupt line
  * @phy_dat: phy_device pointer
  *
- * Description: When a PHY interrupt occurs, the handler disables
- * interrupts, and uses phy_change to handle the interrupt.
+ * Description: When a PHY interrupt occurs, the handler invokes
+ *              phy_change to handle the interrupt.
  */
 static irqreturn_t phy_interrupt(int irq, void *phy_dat)
 {
@@ -628,9 +628,6 @@ static irqreturn_t phy_interrupt(int irq, void *phy_dat)
 
 	if (PHY_HALTED == phydev->state)
 		return IRQ_NONE;		/* It can't be ours.  */
-
-	disable_irq_nosync(irq);
-	atomic_inc(&phydev->irq_disable);
 
 	phy_change(phydev);
 
@@ -736,10 +733,10 @@ void phy_change(struct phy_device *phydev)
 	if (phy_interrupt_is_valid(phydev)) {
 		if (phydev->drv->did_interrupt &&
 		    !phydev->drv->did_interrupt(phydev))
-			goto ignore;
+			return;
 
 		if (phy_disable_interrupts(phydev))
-			goto phy_err;
+			goto irq_enable_err;
 	}
 
 	mutex_lock(&phydev->lock);
@@ -748,9 +745,6 @@ void phy_change(struct phy_device *phydev)
 	mutex_unlock(&phydev->lock);
 
 	if (phy_interrupt_is_valid(phydev)) {
-		atomic_dec(&phydev->irq_disable);
-		enable_irq(phydev->irq);
-
 		/* Reenable interrupts */
 		if (PHY_HALTED != phydev->state &&
 		    phy_config_interrupt(phydev, PHY_INTERRUPT_ENABLED))
@@ -761,15 +755,9 @@ void phy_change(struct phy_device *phydev)
 	phy_trigger_machine(phydev, true);
 	return;
 
-ignore:
-	atomic_dec(&phydev->irq_disable);
-	enable_irq(phydev->irq);
-	return;
-
 irq_enable_err:
 	disable_irq(phydev->irq);
 	atomic_inc(&phydev->irq_disable);
-phy_err:
 	phy_error(phydev);
 }
 
