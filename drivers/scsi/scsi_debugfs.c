@@ -9,7 +9,17 @@ void scsi_show_rq(struct seq_file *m, struct request *rq)
 	int msecs = jiffies_to_msecs(jiffies - cmd->jiffies_at_alloc);
 	char buf[80];
 
-	__scsi_format_command(buf, sizeof(buf), cmd->cmnd, cmd->cmd_len);
+	/*
+	 * This rq may have been freed, so don't be surprised if
+	 * read-after-free is reported.
+	 *
+	 * __scsi_format_command() should be written as not being broken
+	 * with gargabe 'cdb' input.
+	 */
+	if (cmd->cmnd && cmd->cmd_len)
+		__scsi_format_command(buf, sizeof(buf), cmd->cmnd, cmd->cmd_len);
+	else
+		strcpy(buf, "");
 	seq_printf(m, ", .cmd=%s, .retries=%d, allocated %d.%03d s ago", buf,
 		   cmd->retries, msecs / 1000, msecs % 1000);
 }
