@@ -632,29 +632,29 @@ static int sd_zbc_setup(struct scsi_disk *sdkp)
 		round_up(sdkp->capacity, sdkp->zone_blocks) >> sdkp->zone_shift;
 
 	/*
-	 * Wait for the disk capacity to stabilize before
-	 * initializing zone related information.
+	 * Initialize the device request queue information if the number
+	 * of zones changed.
 	 */
-	if (sdkp->first_scan)
-		return 0;
+	if (sdkp->nr_zones != q->nr_zones) {
 
-	if (!q->seq_zones_wlock) {
-		q->seq_zones_wlock = sd_zbc_alloc_zone_bitmap(sdkp);
-		if (!q->seq_zones_wlock) {
-			ret = -ENOMEM;
-			goto err;
+		sd_zbc_cleanup(sdkp);
+
+		q->nr_zones = sdkp->nr_zones;
+		if (sdkp->nr_zones) {
+			q->seq_zones_wlock = sd_zbc_alloc_zone_bitmap(sdkp);
+			if (!q->seq_zones_wlock) {
+				ret = -ENOMEM;
+				goto err;
+			}
+
+			ret = sd_zbc_setup_seq_zones_bitmap(sdkp);
+			if (ret) {
+				sd_zbc_cleanup(sdkp);
+				goto err;
+			}
 		}
-	}
 
-	if (!q->seq_zones_bitmap) {
-		ret = sd_zbc_setup_seq_zones_bitmap(sdkp);
-		if (ret) {
-			sd_zbc_cleanup(sdkp);
-			goto err;
-		}
 	}
-
-	q->nr_zones = sdkp->nr_zones;
 
 	return 0;
 
