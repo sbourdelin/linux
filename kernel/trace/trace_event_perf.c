@@ -8,6 +8,7 @@
 #include <linux/module.h>
 #include <linux/kprobes.h>
 #include "trace.h"
+#include "trace_probe.h"
 
 static char __percpu *perf_trace_buf[PERF_NR_CONTEXTS];
 
@@ -229,12 +230,73 @@ int perf_trace_init(struct perf_event *p_event)
 	return ret;
 }
 
+int perf_probe_init(struct perf_event *p_event)
+{
+	struct probe_desc pd;
+	int ret;
+	struct trace_event_call *tp_event;
+	char *name = NULL;
+	__aligned_u64 aligned_probe_desc;
+
+	/*
+	 * attr.probe_desc may not be 64-bit aligned on 32-bit systems.
+	 * Make an aligned copy of it to before u64_to_user_ptr().
+	 */
+	memcpy(&aligned_probe_desc, &p_event->attr.probe_desc,
+	       sizeof(__aligned_u64));
+
+	if (copy_from_user(&pd, u64_to_user_ptr(aligned_probe_desc),
+			   sizeof(struct probe_desc)))
+		return -EFAULT;
+
+	if (pd.func) {
+		name = kzalloc(MAX_PROBE_FUNC_NAME_LEN, GFP_KERNEL);
+		if (!name)
+			return -ENOMEM;
+		ret = strncpy_from_user(name, u64_to_user_ptr(pd.func),
+					MAX_PROBE_FUNC_NAME_LEN);
+		if (ret < 0)
+			goto out;
+
+		if (name[0] == '\0') {
+			kfree(name);
+			name = NULL;
+		}
+	}
+
+	if (!p_event->attr.is_uprobe) {
+		tp_event = create_local_trace_kprobe(
+			name, (void *)pd.addr, pd.offset,
+			p_event->attr.is_return);
+		if (IS_ERR(tp_event)) {
+			ret = PTR_ERR(tp_event);
+			goto out;
+		}
+		ret = perf_trace_event_init(tp_event, p_event);
+		if (ret)
+			destroy_local_trace_kprobe(tp_event);
+	} else
+		ret = -EOPNOTSUPP;
+out:
+	kfree(name);
+	return ret;
+}
+
 void perf_trace_destroy(struct perf_event *p_event)
 {
 	mutex_lock(&event_mutex);
 	perf_trace_event_close(p_event);
 	perf_trace_event_unreg(p_event);
 	mutex_unlock(&event_mutex);
+}
+
+void perf_probe_destroy(struct perf_event *p_event)
+{
+	perf_trace_event_close(p_event);
+	perf_trace_event_unreg(p_event);
+
+	if (!p_event->attr.is_uprobe)
+		destroy_local_trace_kprobe(p_event->tp_event);
 }
 
 int perf_trace_add(struct perf_event *p_event, int flags)

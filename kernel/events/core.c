@@ -7959,6 +7959,28 @@ static int perf_tp_event_init(struct perf_event *event)
 	return 0;
 }
 
+static int perf_probe_event_init(struct perf_event *event)
+{
+	int err;
+
+	if (event->attr.type != PERF_TYPE_PROBE)
+		return -ENOENT;
+
+	/*
+	 * no branch sampling for probe events
+	 */
+	if (has_branch_stack(event))
+		return -EOPNOTSUPP;
+
+	err = perf_probe_init(event);
+	if (err)
+		return err;
+
+	event->destroy = perf_probe_destroy;
+
+	return 0;
+}
+
 static struct pmu perf_tracepoint = {
 	.task_ctx_nr	= perf_sw_context,
 
@@ -7970,9 +7992,20 @@ static struct pmu perf_tracepoint = {
 	.read		= perf_swevent_read,
 };
 
+static struct pmu perf_probe = {
+	.task_ctx_nr	= perf_sw_context,
+	.event_init	= perf_probe_event_init,
+	.add		= perf_trace_add,
+	.del		= perf_trace_del,
+	.start		= perf_swevent_start,
+	.stop		= perf_swevent_stop,
+	.read		= perf_swevent_read,
+};
+
 static inline void perf_tp_register(void)
 {
 	perf_pmu_register(&perf_tracepoint, "tracepoint", PERF_TYPE_TRACEPOINT);
+	perf_pmu_register(&perf_probe, "probe", PERF_TYPE_PROBE);
 }
 
 static void perf_event_free_filter(struct perf_event *event)
@@ -8055,7 +8088,8 @@ static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd)
 	struct bpf_prog *prog;
 	int ret;
 
-	if (event->attr.type != PERF_TYPE_TRACEPOINT)
+	if (event->attr.type != PERF_TYPE_TRACEPOINT &&
+	    event->attr.type != PERF_TYPE_PROBE)
 		return perf_event_set_bpf_handler(event, prog_fd);
 
 	is_kprobe = event->tp_event->flags & TRACE_EVENT_FL_UKPROBE;
@@ -8094,7 +8128,8 @@ static int perf_event_set_bpf_prog(struct perf_event *event, u32 prog_fd)
 
 static void perf_event_free_bpf_prog(struct perf_event *event)
 {
-	if (event->attr.type != PERF_TYPE_TRACEPOINT) {
+	if (event->attr.type != PERF_TYPE_TRACEPOINT &&
+	    event->attr.type != PERF_TYPE_PROBE) {
 		perf_event_free_bpf_handler(event);
 		return;
 	}
