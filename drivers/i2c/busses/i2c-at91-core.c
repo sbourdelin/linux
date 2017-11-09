@@ -60,13 +60,16 @@ void at91_init_twi_bus(struct at91_twi_dev *dev)
 {
 	at91_disable_twi_interrupts(dev);
 	at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_SWRST);
-
-	at91_init_twi_bus_master(dev);
+	if (dev->slave_detected)
+		at91_init_twi_bus_slave(dev);
+	else
+		at91_init_twi_bus_master(dev);
 }
 
 static struct at91_twi_pdata at91rm9200_config = {
 	.clk_max_div = 5,
 	.clk_offset = 3,
+	.slave_mode_features = 0,
 	.has_unre_flag = true,
 	.has_alt_cmd = false,
 	.has_hold_field = false,
@@ -75,6 +78,7 @@ static struct at91_twi_pdata at91rm9200_config = {
 static struct at91_twi_pdata at91sam9261_config = {
 	.clk_max_div = 5,
 	.clk_offset = 4,
+	.slave_mode_features = AT91_TWI_SM_AVAILABLE,
 	.has_unre_flag = false,
 	.has_alt_cmd = false,
 	.has_hold_field = false,
@@ -83,6 +87,7 @@ static struct at91_twi_pdata at91sam9261_config = {
 static struct at91_twi_pdata at91sam9260_config = {
 	.clk_max_div = 7,
 	.clk_offset = 4,
+	.slave_mode_features = AT91_TWI_SM_AVAILABLE,
 	.has_unre_flag = false,
 	.has_alt_cmd = false,
 	.has_hold_field = false,
@@ -91,6 +96,7 @@ static struct at91_twi_pdata at91sam9260_config = {
 static struct at91_twi_pdata at91sam9g20_config = {
 	.clk_max_div = 7,
 	.clk_offset = 4,
+	.slave_mode_features = AT91_TWI_SM_AVAILABLE,
 	.has_unre_flag = false,
 	.has_alt_cmd = false,
 	.has_hold_field = false,
@@ -99,6 +105,7 @@ static struct at91_twi_pdata at91sam9g20_config = {
 static struct at91_twi_pdata at91sam9g10_config = {
 	.clk_max_div = 7,
 	.clk_offset = 4,
+	.slave_mode_features = AT91_TWI_SM_AVAILABLE,
 	.has_unre_flag = false,
 	.has_alt_cmd = false,
 	.has_hold_field = false,
@@ -129,6 +136,7 @@ static const struct platform_device_id at91_twi_devtypes[] = {
 static struct at91_twi_pdata at91sam9x5_config = {
 	.clk_max_div = 7,
 	.clk_offset = 4,
+	.slave_mode_features = AT91_TWI_SM_AVAILABLE,
 	.has_unre_flag = false,
 	.has_alt_cmd = false,
 	.has_hold_field = false,
@@ -137,6 +145,7 @@ static struct at91_twi_pdata at91sam9x5_config = {
 static struct at91_twi_pdata sama5d4_config = {
 	.clk_max_div = 7,
 	.clk_offset = 4,
+	.slave_mode_features = AT91_TWI_SM_AVAILABLE,
 	.has_unre_flag = false,
 	.has_alt_cmd = false,
 	.has_hold_field = true,
@@ -145,6 +154,7 @@ static struct at91_twi_pdata sama5d4_config = {
 static struct at91_twi_pdata sama5d2_config = {
 	.clk_max_div = 7,
 	.clk_offset = 4,
+	.slave_mode_features = AT91_TWI_SM_AVAILABLE | AT91_TWI_SM_CAN_NACK,
 	.has_unre_flag = true,
 	.has_alt_cmd = true,
 	.has_hold_field = true,
@@ -217,6 +227,10 @@ static int at91_twi_probe(struct platform_device *pdev)
 	if (!dev->pdata)
 		return -ENODEV;
 
+	dev->slave_detected = i2c_detect_slave_mode(&pdev->dev);
+	if (dev->slave_detected && dev->pdata->slave_mode_features == 0)
+		return -EPFNOSUPPORT;
+
 	dev->base = devm_ioremap_resource(&pdev->dev, mem);
 	if (IS_ERR(dev->base))
 		return PTR_ERR(dev->base);
@@ -243,7 +257,10 @@ static int at91_twi_probe(struct platform_device *pdev)
 	dev->adapter.timeout = AT91_I2C_TIMEOUT;
 	dev->adapter.dev.of_node = pdev->dev.of_node;
 
-	rc = at91_twi_probe_master(pdev, phy_addr, dev);
+	if (dev->slave_detected)
+		rc = at91_twi_probe_slave(pdev, phy_addr, dev);
+	else
+		rc = at91_twi_probe_master(pdev, phy_addr, dev);
 	if (rc)
 		return rc;
 

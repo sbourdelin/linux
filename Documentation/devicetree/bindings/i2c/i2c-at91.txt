@@ -61,3 +61,17 @@ i2c0: i2c@f8034600 {
 		reg = <0x1a>;
 	};
 };
+
+i2c0: i2c@f8028000 {
+	compatible = "atmel,sama5d2-i2c";
+	reg = <0xf8028000 0x100>;
+	interrupts = <29 4 7>;
+	#address-cells = <1>;
+	#size-cells = <0>;
+	clocks = <&twi0_clk>;
+
+	eeprom@64 {
+		compatible = "linux,slave-24c02";
+		reg = <0x40000064>;
+	};
+};
