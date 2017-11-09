@@ -184,8 +184,10 @@ ufshcd_pci_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 
 	pci_set_drvdata(pdev, hba);
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 3000);
+	pm_runtime_use_autosuspend(&pdev->dev);
 	pm_runtime_put_noidle(&pdev->dev);
-	pm_runtime_allow(&pdev->dev);
+	pm_runtime_forbid(&pdev->dev);
 
 	return 0;
 }
