@@ -125,6 +125,7 @@ enum {
 	Opt_jqfmt_vfsold,
 	Opt_jqfmt_vfsv0,
 	Opt_jqfmt_vfsv1,
+	Opt_per_dev_sb,
 	Opt_err,
 };
 
@@ -175,6 +176,7 @@ static match_table_t f2fs_tokens = {
 	{Opt_jqfmt_vfsold, "jqfmt=vfsold"},
 	{Opt_jqfmt_vfsv0, "jqfmt=vfsv0"},
 	{Opt_jqfmt_vfsv1, "jqfmt=vfsv1"},
+	{Opt_per_dev_sb, "per_dev_sb"},
 	{Opt_err, NULL},
 };
 
@@ -614,6 +616,9 @@ static int parse_options(struct super_block *sb, char *options)
 					"quota operations not supported");
 			break;
 #endif
+		case Opt_per_dev_sb:
+			set_opt(sbi, PER_DEV_SB);
+			break;
 		default:
 			f2fs_msg(sb, KERN_ERR,
 				"Unrecognized mount option \"%s\" or missing value",
@@ -1152,6 +1157,8 @@ static int f2fs_show_options(struct seq_file *seq, struct dentry *root)
 		seq_puts(seq, ",prjquota");
 #endif
 	f2fs_show_quota_options(seq, sbi->sb);
+	if (test_opt(sbi, PER_DEV_SB))
+		seq_puts(seq, ",per_dev_sb");
 
 	return 0;
 }
@@ -2252,10 +2259,49 @@ static int read_raw_super_block(struct f2fs_sb_info *sbi,
 	return err;
 }
 
+static void check_device_super_blocks(struct f2fs_sb_info *sbi, int *recovery)
+{
+	struct buffer_head *bh;
+	int i, block;
+
+	for (i = 0; i < sbi->s_ndevs; i++) {
+		if (sbi->sb->s_bdev == FDEV(i).bdev) {
+			FDEV(i).sb_valid[sbi->valid_super_block] = true;
+			FDEV(i).sb_valid[1 - sbi->valid_super_block] =
+								!*recovery;
+			continue;
+		}
+
+		for (block = 0; block < 2; block++) {
+			bh = __bread_gfp(FDEV(i).bdev, block,
+				sbi->sb->s_blocksize, __GFP_MOVABLE);
+			if (!bh) {
+				f2fs_msg(sbi->sb, KERN_ERR,
+					"Unable to read %dth superblock on "
+					"device %s", block + 1, FDEV(i).path);
+				*recovery = 1;
+				continue;
+			}
+
+			if (sanity_check_raw_super(sbi, bh)) {
+				f2fs_msg(sbi->sb, KERN_ERR, "Can't find valid "
+					"%dth superblock on device %s",
+					block + 1, FDEV(i).path);
+				*recovery = 1;
+			} else {
+				FDEV(i).sb_valid[block] = true;
+			}
+			brelse(bh);
+		}
+	}
+}
+
 int f2fs_commit_super(struct f2fs_sb_info *sbi, bool recover)
 {
 	struct buffer_head *bh;
-	int err;
+	int err, i, block;
+	bool dev_sb = sbi->s_ndevs > 1 && f2fs_sb_has_per_device_sb(sbi->sb);
+	bool committed[MAX_DEVICES][2];
 
 	if ((recover && f2fs_readonly(sbi->sb)) ||
 				bdev_read_only(sbi->sb->s_bdev)) {
@@ -2270,6 +2316,32 @@ int f2fs_commit_super(struct f2fs_sb_info *sbi, bool recover)
 	err = __f2fs_commit_super(bh, F2FS_RAW_SUPER(sbi));
 	brelse(bh);
 
+	if (!dev_sb)
+		goto skip;
+
+	for (i = 0; i < sbi->s_ndevs; i++) {
+		if (FDEV(i).bdev == sbi->sb->s_bdev)
+			continue;
+
+		for (block = 0; block < 2; block++) {
+			committed[i][block] = false;
+			if (FDEV(i).sb_valid[block])
+				continue;
+
+			bh = __getblk_gfp(FDEV(i).bdev, block,
+					sbi->sb->s_blocksize, __GFP_MOVABLE);
+			if (!bh)
+				return -EIO;
+
+			err = __f2fs_commit_super(bh, F2FS_RAW_SUPER(sbi));
+			brelse(bh);
+			if (err)
+				return err;
+			FDEV(i).sb_valid[block] = true;
+			committed[i][block] = true;
+		}
+	}
+skip:
 	/* if we are in recovery path, skip writing valid superblock */
 	if (recover || err)
 		return err;
@@ -2280,6 +2352,29 @@ int f2fs_commit_super(struct f2fs_sb_info *sbi, bool recover)
 		return -EIO;
 	err = __f2fs_commit_super(bh, F2FS_RAW_SUPER(sbi));
 	brelse(bh);
+
+	if (!dev_sb)
+		return err;
+
+	for (i = 0; i < sbi->s_ndevs; i++) {
+		if (FDEV(i).bdev == sbi->sb->s_bdev)
+			continue;
+
+		for (block = 0; block < 2; block++) {
+			if (committed[i][block])
+				continue;
+
+			bh = __getblk_gfp(FDEV(i).bdev, block,
+					sbi->sb->s_blocksize, __GFP_MOVABLE);
+			if (!bh)
+				return -EIO;
+
+			err = __f2fs_commit_super(bh, F2FS_RAW_SUPER(sbi));
+			brelse(bh);
+			if (err)
+				return err;
+		}
+	}
 	return err;
 }
 
@@ -2338,6 +2433,7 @@ static int f2fs_scan_devices(struct f2fs_sb_info *sbi)
 		if (IS_ERR(FDEV(i).bdev))
 			return PTR_ERR(FDEV(i).bdev);
 
+		FDEV(i).sb_valid[0] = FDEV(i).sb_valid[1] = false;
 		/* to release errored devices */
 		sbi->s_ndevs = i + 1;
 
@@ -2539,16 +2635,19 @@ try_onemore:
 		goto free_io_dummy;
 	}
 
-	err = get_valid_checkpoint(sbi);
-	if (err) {
-		f2fs_msg(sb, KERN_ERR, "Failed to get valid F2FS checkpoint");
-		goto free_meta_inode;
-	}
-
 	/* Initialize device list */
 	err = f2fs_scan_devices(sbi);
 	if (err) {
 		f2fs_msg(sb, KERN_ERR, "Failed to find devices");
+		goto free_devices;
+	}
+
+	if (f2fs_sb_has_per_device_sb(sb))
+		check_device_super_blocks(sbi, &recovery);
+
+	err = get_valid_checkpoint(sbi);
+	if (err) {
+		f2fs_msg(sb, KERN_ERR, "Failed to get valid F2FS checkpoint");
 		goto free_devices;
 	}
 
@@ -2710,9 +2809,22 @@ skip_recovery:
 	if (recovery) {
 		err = f2fs_commit_super(sbi, true);
 		f2fs_msg(sb, KERN_INFO,
-			"Try to recover %dth superblock, ret: %d",
-			sbi->valid_super_block ? 1 : 2, err);
+			"Try to recover all invalid superblocks, ret: %d", err);
 	}
+
+	if (test_opt(sbi, PER_DEV_SB) && !f2fs_sb_has_per_device_sb(sb)
+							&& sbi->s_ndevs > 1) {
+		err = build_device_sb_sections(sbi);
+		if (err) {
+			stop_gc_thread(sbi);
+			goto free_meta;
+		}
+		f2fs_msg(sb, KERN_INFO,
+			"Per-device superblock sections created");
+	}
+
+	if (sbi->s_ndevs > 1 && f2fs_sb_has_per_device_sb(sb))
+		set_per_device_sb_sentries(sbi);
 
 	f2fs_msg(sbi->sb, KERN_NOTICE, "Mounted with checkpoint version = %llx",
 				cur_cp_version(F2FS_CKPT(sbi)));
@@ -2752,10 +2864,9 @@ free_nm:
 	destroy_node_manager(sbi);
 free_sm:
 	destroy_segment_manager(sbi);
+	kfree(sbi->ckpt);
 free_devices:
 	destroy_device_list(sbi);
-	kfree(sbi->ckpt);
-free_meta_inode:
 	make_bad_inode(sbi->meta_inode);
 	iput(sbi->meta_inode);
 free_io_dummy:

@@ -39,11 +39,6 @@ struct f2fs_gc_kthread {
 	unsigned int gc_wake;
 };
 
-struct gc_inode_list {
-	struct list_head ilist;
-	struct radix_tree_root iroot;
-};
-
 /*
  * inline functions
  */

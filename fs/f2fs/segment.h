@@ -187,6 +187,7 @@ struct seg_entry {
 	unsigned char *ckpt_valid_map;	/* validity bitmap of blocks last cp */
 	unsigned char *discard_map;
 	unsigned long long mtime;	/* modification time of the segment */
+	bool per_dev_sb;
 };
 
 struct sec_entry {

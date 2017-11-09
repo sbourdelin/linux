@@ -438,7 +438,7 @@ static void add_gc_inode(struct gc_inode_list *gc_list, struct inode *inode)
 	list_add_tail(&new_ie->list, &gc_list->ilist);
 }
 
-static void put_gc_inode(struct gc_inode_list *gc_list)
+void put_gc_inode(struct gc_inode_list *gc_list)
 {
 	struct inode_entry *ie, *next_ie;
 	list_for_each_entry_safe(ie, next_ie, &gc_list->ilist, list) {
@@ -907,7 +907,7 @@ static int __get_victim(struct f2fs_sb_info *sbi, unsigned int *victim,
 	return ret;
 }
 
-static int do_garbage_collect(struct f2fs_sb_info *sbi,
+int do_garbage_collect(struct f2fs_sb_info *sbi,
 				unsigned int start_segno,
 				struct gc_inode_list *gc_list, int gc_type)
 {
@@ -919,6 +919,9 @@ static int do_garbage_collect(struct f2fs_sb_info *sbi,
 	int seg_freed = 0;
 	unsigned char type = IS_DATASEG(get_seg_entry(sbi, segno)->type) ?
 						SUM_TYPE_DATA : SUM_TYPE_NODE;
+
+	if (get_seg_entry(sbi, segno)->per_dev_sb)
+		return 0;
 
 	/* readahead multi ssa blocks those have contiguous address */
 	if (sbi->segs_per_sec > 1)

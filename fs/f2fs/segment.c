@@ -2135,6 +2135,8 @@ static void reset_curseg(struct f2fs_sb_info *sbi, int type, int modified)
 	struct curseg_info *curseg = CURSEG_I(sbi, type);
 	struct summary_footer *sum_footer;
 
+	f2fs_bug_on(sbi, get_seg_entry(sbi, curseg->next_segno)->per_dev_sb);
+
 	curseg->segno = curseg->next_segno;
 	curseg->zone = GET_ZONE_FROM_SEG(sbi, curseg->segno);
 	curseg->next_blkoff = 0;
@@ -3883,4 +3885,104 @@ void destroy_segment_manager_caches(void)
 	kmem_cache_destroy(discard_cmd_slab);
 	kmem_cache_destroy(discard_entry_slab);
 	kmem_cache_destroy(inmem_entry_slab);
+}
+
+int build_device_sb_sections(struct f2fs_sb_info *sbi)
+{
+	struct gc_inode_list gc_list;
+	unsigned int segoff, segno, dev_sb_segno[MAX_DEVICES];
+	int sb_secs, i, type, err = 0, ret;
+	block_t blkaddr;
+	struct cp_control cpc;
+
+	sb_secs = sbi->s_ndevs - 1;
+	if (has_not_enough_free_secs(sbi, 0, sb_secs) ||
+			valid_user_blocks(sbi) + BLKS_PER_SEC(sbi) * sb_secs >
+			sbi->user_block_count) {
+		f2fs_msg(sbi->sb, KERN_WARNING,
+			"Not eough space for building per-device SB sections!");
+		return -ENOSPC;
+	}
+
+	for (i = 1; i < sbi->s_ndevs; i++) {
+		dev_sb_segno[i] = GET_SEGNO(sbi, FDEV(i).start_blk);
+		for (segoff = 0; segoff < sbi->segs_per_sec; segoff++)
+			__set_test_and_inuse(sbi, dev_sb_segno[i] + segoff);
+	}
+
+	for (i = 1; i < sbi->s_ndevs; i++)
+		for (segoff = 0; segoff < sbi->segs_per_sec; segoff++)
+			for (type = 0; type < NO_CHECK_TYPE; type++)
+				if (CURSEG_I(sbi, type)->segno ==
+						dev_sb_segno[i] + segoff)
+					SIT_I(sbi)->s_ops->allocate_segment
+							(sbi, type, true);
+
+	for (i = 1; i < sbi->s_ndevs; i++) {
+		if (!get_valid_blocks(sbi, dev_sb_segno[i], true))
+			continue;
+
+		mutex_lock(&sbi->gc_mutex);
+		INIT_LIST_HEAD(&gc_list.ilist);
+		INIT_RADIX_TREE(&gc_list.iroot, GFP_NOFS);
+		do_garbage_collect(sbi, dev_sb_segno[i], &gc_list, FG_GC);
+		mutex_unlock(&sbi->gc_mutex);
+		put_gc_inode(&gc_list);
+
+		if (get_valid_blocks(sbi, dev_sb_segno[i], true)) {
+			f2fs_msg(sbi->sb, KERN_WARNING,
+				"Cannot write superblocks on %s; GC failed.",
+				FDEV(i).path);
+			err = -ENOSPC;
+			goto out;
+		}
+	}
+
+	for (i = 1; i < sbi->s_ndevs; i++) {
+		f2fs_bug_on(sbi, get_valid_blocks(sbi, dev_sb_segno[i], true));
+
+		blkaddr = FDEV(i).start_blk;
+		while (blkaddr < FDEV(i).start_blk + BLKS_PER_SEC(sbi)) {
+			update_sit_entry(sbi, blkaddr, 1);
+			blkaddr++;
+		}
+
+		for (segoff = 0; segoff < sbi->segs_per_sec; segoff++) {
+			segno = dev_sb_segno[i] + segoff;
+			mutex_lock(&DIRTY_I(sbi)->seglist_lock);
+			__remove_dirty_segment(sbi, segno, PRE);
+			__remove_dirty_segment(sbi, segno, DIRTY);
+			mutex_unlock(&DIRTY_I(sbi)->seglist_lock);
+
+			sbi->total_valid_block_count += sbi->blocks_per_seg;
+		}
+	}
+out:
+	cpc.reason = __get_cp_reason(sbi);
+	mutex_lock(&sbi->gc_mutex);
+	ret = write_checkpoint(sbi, &cpc);
+	mutex_unlock(&sbi->gc_mutex);
+	if (err || ret)
+		return err ? err : ret;
+
+	F2FS_SET_FEATURE(sbi->sb, F2FS_FEATURE_PER_DEV_SB);
+	return f2fs_commit_super(sbi, false);
+}
+
+void set_per_device_sb_sentries(struct f2fs_sb_info *sbi)
+{
+	int i;
+	unsigned int segno, start_segno;
+	struct seg_entry *sentry;
+
+	for (i = 1; i < sbi->s_ndevs; i++) {
+		start_segno = GET_SEGNO(sbi, FDEV(i).start_blk);
+		sentry = get_seg_entry(sbi, start_segno);
+		segno = start_segno;
+
+		while (segno++ < start_segno + sbi->segs_per_sec) {
+			sentry->per_dev_sb = true;
+			sentry++;
+		}
+	}
 }

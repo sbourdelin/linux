@@ -96,6 +96,7 @@ extern char *fault_name[FAULT_MAX];
 #define F2FS_MOUNT_PRJQUOTA		0x00200000
 #define F2FS_MOUNT_QUOTA		0x00400000
 #define F2FS_MOUNT_INLINE_XATTR_SIZE	0x00800000
+#define F2FS_MOUNT_PER_DEV_SB		0x01000000
 
 #define clear_opt(sbi, option)	((sbi)->mount_opt.opt &= ~F2FS_MOUNT_##option)
 #define set_opt(sbi, option)	((sbi)->mount_opt.opt |= F2FS_MOUNT_##option)
@@ -123,6 +124,7 @@ struct f2fs_mount_info {
 #define F2FS_FEATURE_INODE_CHKSUM	0x0020
 #define F2FS_FEATURE_FLEXIBLE_INLINE_XATTR	0x0040
 #define F2FS_FEATURE_QUOTA_INO		0x0080
+#define F2FS_FEATURE_PER_DEV_SB		0x0100
 
 #define F2FS_HAS_FEATURE(sb, mask)					\
 	((F2FS_SB(sb)->raw_super->feature & cpu_to_le32(mask)) != 0)
@@ -971,6 +973,7 @@ struct f2fs_dev_info {
 	unsigned int nr_blkz;			/* Total number of zones */
 	u8 *blkz_type;				/* Array of zones type */
 #endif
+	bool sb_valid[2];	/* Validity of two per-device superblocks */
 };
 
 enum inode_type {
@@ -2650,6 +2653,8 @@ int build_segment_manager(struct f2fs_sb_info *sbi);
 void destroy_segment_manager(struct f2fs_sb_info *sbi);
 int __init create_segment_manager_caches(void);
 void destroy_segment_manager_caches(void);
+int build_device_sb_sections(struct f2fs_sb_info *sbi);
+void set_per_device_sb_sentries(struct f2fs_sb_info *sbi);
 
 /*
  * checkpoint.c
@@ -2734,12 +2739,20 @@ int f2fs_migrate_page(struct address_space *mapping, struct page *newpage,
 /*
  * gc.c
  */
+struct gc_inode_list {
+	struct list_head ilist;
+	struct radix_tree_root iroot;
+};
+
 int start_gc_thread(struct f2fs_sb_info *sbi);
 void stop_gc_thread(struct f2fs_sb_info *sbi);
 block_t start_bidx_of_node(unsigned int node_ofs, struct inode *inode);
 int f2fs_gc(struct f2fs_sb_info *sbi, bool sync, bool background,
 			unsigned int segno);
 void build_gc_manager(struct f2fs_sb_info *sbi);
+void put_gc_inode(struct gc_inode_list *gc_list);
+int do_garbage_collect(struct f2fs_sb_info *sbi, unsigned int start_segno,
+				struct gc_inode_list *gc_list, int gc_type);
 
 /*
  * recovery.c
@@ -3083,6 +3096,11 @@ static inline int f2fs_sb_has_flexible_inline_xattr(struct super_block *sb)
 static inline int f2fs_sb_has_quota_ino(struct super_block *sb)
 {
 	return F2FS_HAS_FEATURE(sb, F2FS_FEATURE_QUOTA_INO);
+}
+
+static inline int f2fs_sb_has_per_device_sb(struct super_block *sb)
+{
+	return F2FS_HAS_FEATURE(sb, F2FS_FEATURE_PER_DEV_SB);
 }
 
 #ifdef CONFIG_BLK_DEV_ZONED
