@@ -39,7 +39,7 @@
 #include "../bpf/bpf_util.h"
 #include "../bpf/libbpf.h"
 
-int running;
+static sig_atomic_t running;
 void running_handler(int a);
 
 /* randomly selected ports for testing on lo */
