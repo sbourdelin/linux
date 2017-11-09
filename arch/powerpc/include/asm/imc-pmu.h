@@ -23,7 +23,7 @@
 /*
  * For static allocation of some of the structures.
  */
-#define IMC_MAX_PMUS			32
+#define IMC_MAX_PMUS			64
 
 /*
  * Compatibility macros for IMC devices
