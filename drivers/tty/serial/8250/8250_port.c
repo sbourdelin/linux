@@ -1849,13 +1849,12 @@ static bool handle_rx_dma(struct uart_8250_port *up, unsigned int iir)
 int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
 {
 	unsigned char status;
-	unsigned long flags;
 	struct uart_8250_port *up = up_to_u8250p(port);
 
 	if (iir & UART_IIR_NO_INT)
 		return 0;
 
-	spin_lock_irqsave(&port->lock, flags);
+	spin_lock(&port->lock);
 
 	status = serial_port_in(port, UART_LSR);
 
@@ -1867,7 +1866,7 @@ int serial8250_handle_irq(struct uart_port *port, unsigned int iir)
 	if ((!up->dma || up->dma->tx_err) && (status & UART_LSR_THRE))
 		serial8250_tx_chars(up);
 
-	spin_unlock_irqrestore(&port->lock, flags);
+	spin_unlock(&port->lock);
 	return 1;
 }
 EXPORT_SYMBOL_GPL(serial8250_handle_irq);

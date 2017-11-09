@@ -58,7 +58,7 @@ static struct uart_driver serial8250_reg;
 
 static unsigned int skip_txen_test; /* force skip of txen test at init time */
 
-#define PASS_LIMIT	512
+#define PASS_LIMIT	32
 
 #include <asm/serial.h>
 /*
@@ -135,10 +135,8 @@ static irqreturn_t serial8250_interrupt(int irq, void *dev_id)
 		l = l->next;
 
 		if (l == i->head && pass_counter++ > PASS_LIMIT) {
-			/* If we hit this, we're dead. */
-			printk_ratelimited(KERN_ERR
-				"serial8250: too much work for irq%d\n", irq);
-			break;
+			cond_resched();
+			pass_counter = 0;
 		}
 	} while (l != end);
 
@@ -146,7 +144,18 @@ static irqreturn_t serial8250_interrupt(int irq, void *dev_id)
 
 	pr_debug("%s(%d): end\n", __func__, irq);
 
+	enable_irq(i->irq);
+
 	return IRQ_RETVAL(handled);
+}
+
+static irqreturn_t serial8250_hard_irq(int irq, void *dev_id)
+{
+	struct irq_info *i = dev_id;
+
+	disable_irq_nosync(i->irq);
+
+	return IRQ_WAKE_THREAD;
 }
 
 /*
@@ -217,8 +226,8 @@ static int serial_link_irq_chain(struct uart_8250_port *up)
 		i->head = &up->list;
 		spin_unlock_irq(&i->lock);
 		irq_flags |= up->port.irqflags;
-		ret = request_irq(up->port.irq, serial8250_interrupt,
-				  irq_flags, up->port.name, i);
+		ret = request_threaded_irq(up->port.irq, serial8250_hard_irq,
+						serial8250_interrupt, irq_flags, up->port.name, i);
 		if (ret < 0)
 			serial_do_unlink(i, up);
 	}
