@@ -117,7 +117,7 @@ static int sockmap_test_sockets(int rate, int dot)
 	addr.sin_port = htons(S2_PORT);
 	err = listen(s2, 32);
 	if (err < 0) {
-		perror("listen s1 failed()\n");
+		perror("listen s2 failed()\n");
 		goto out;
 	}
 
@@ -145,7 +145,7 @@ static int sockmap_test_sockets(int rate, int dot)
 
 	p2 = accept(s2, NULL, NULL);
 	if (p2 < 0) {
-		perror("accept s1 failed()\n");
+		perror("accept s2 failed()\n");
 		goto out;
 	}
 
