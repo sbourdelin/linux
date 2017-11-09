@@ -7279,9 +7279,8 @@ int hashdist = HASHDIST_DEFAULT;
 
 static int __init set_hashdist(char *str)
 {
-	if (!str)
+	if (!str || kstrtoul(str, 0, (unsigned long *)&hashdist))
 		return 0;
-	hashdist = simple_strtoul(str, &str, 0);
 	return 1;
 }
 __setup("hashdist=", set_hashdist);
