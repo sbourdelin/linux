@@ -196,7 +196,6 @@ TRACE_EVENT(tcp_set_state,
 	),
 
 	TP_fast_assign(
-		struct inet_sock *inet = inet_sk(sk);
 		struct in6_addr *pin6;
 		__be32 *p32;
 
@@ -204,14 +203,34 @@ TRACE_EVENT(tcp_set_state,
 		__entry->oldstate = oldstate;
 		__entry->newstate = newstate;
 
-		__entry->sport = ntohs(inet->inet_sport);
-		__entry->dport = ntohs(inet->inet_dport);
+		if (oldstate == TCP_TIME_WAIT) {
+			__entry->sport = ntohs(inet_twsk(sk)->tw_sport);
+			__entry->dport = ntohs(inet_twsk(sk)->tw_dport);
 
-		p32 = (__be32 *) __entry->saddr;
-		*p32 = inet->inet_saddr;
+			p32 = (__be32 *) __entry->saddr;
+			*p32 = inet_twsk(sk)->tw_rcv_saddr;
 
-		p32 = (__be32 *) __entry->daddr;
-		*p32 =  inet->inet_daddr;
+			p32 = (__be32 *) __entry->daddr;
+			*p32 = inet_twsk(sk)->tw_daddr;
+		} else if (oldstate == TCP_NEW_SYN_RECV) {
+			__entry->sport = inet_rsk(inet_reqsk(sk))->ir_num;
+			__entry->dport = ntohs(inet_rsk(inet_reqsk(sk))->ir_rmt_port);
+
+			p32 = (__be32 *) __entry->saddr;
+			*p32 = inet_rsk(inet_reqsk(sk))->ir_loc_addr;
+
+			p32 = (__be32 *) __entry->daddr;
+			*p32 = inet_rsk(inet_reqsk(sk))->ir_rmt_addr;
+		} else {
+			__entry->sport = ntohs(inet_sk(sk)->inet_sport);
+			__entry->dport = ntohs(inet_sk(sk)->inet_dport);
+
+			p32 = (__be32 *) __entry->saddr;
+			*p32 = inet_sk(sk)->inet_saddr;
+
+			p32 = (__be32 *) __entry->daddr;
+			*p32 =  inet_sk(sk)->inet_daddr;
+		}
 
 #if IS_ENABLED(CONFIG_IPV6)
 		if (sk->sk_family == AF_INET6) {
