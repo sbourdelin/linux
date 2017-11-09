@@ -447,13 +447,21 @@ struct srb_iocb {
 			uint32_t dl;
 			uint32_t timeout_sec;
 			struct	list_head   entry;
+			uint32_t exchange_address;
+			uint16_t nport_handle;
+			uint8_t vp_index;
+			void *cmd;
 		} nvme;
 	} u;
 
 	struct timer_list timer;
 	void (*timeout)(void *);
 };
-
+struct srb_nvme_els_rsp {
+		dma_addr_t dma_addr;
+		void *dma_ptr;
+		void *ptr;
+};
 /* Values for srb_ctx type */
 #define SRB_LOGIN_CMD	1
 #define SRB_LOGOUT_CMD	2
@@ -476,6 +484,11 @@ struct srb_iocb {
 #define SRB_NVME_CMD	19
 #define SRB_NVME_LS	20
 #define SRB_PRLI_CMD	21
+#define SRB_NVME_ELS_RSP 22
+#define SRB_NVMET_LS	23
+#define SRB_NVMET_FCP	24
+#define SRB_NVMET_ABTS	25
+#define SRB_NVMET_SEND_ABTS	26
 
 enum {
 	TYPE_SRB,
@@ -505,6 +518,7 @@ typedef struct srb {
 		struct srb_iocb iocb_cmd;
 		struct bsg_job *bsg_job;
 		struct srb_cmd scmd;
+		struct srb_nvme_els_rsp snvme_els;
 	} u;
 	void (*done)(void *, int);
 	void (*free)(void *);
@@ -2250,6 +2264,15 @@ struct qlt_plogi_ack_t {
 	void		*fcport;
 };
 
+/* NVMET */
+struct qlt_purex_plogi_ack_t {
+	struct list_head	list;
+	struct __fc_plogi rcvd_plogi;
+	port_id_t	id;
+	int		ref_count;
+	void		*fcport;
+};
+
 struct ct_sns_desc {
 	struct ct_sns_pkt	*ct_sns;
 	dma_addr_t		ct_sns_dma;
@@ -2346,6 +2369,8 @@ typedef struct fc_port {
 	struct work_struct free_work;
 
 	struct qlt_plogi_ack_t *plogi_link[QLT_PLOGI_LINK_MAX];
+	/* NVMET */
+	struct qlt_purex_plogi_ack_t *purex_plogi_link[QLT_PLOGI_LINK_MAX];
 
 	uint16_t tgt_id;
 	uint16_t old_tgt_id;
@@ -3125,6 +3150,7 @@ enum qla_work_type {
 	QLA_EVT_UPD_FCPORT,
 	QLA_EVT_GNL,
 	QLA_EVT_NACK,
+	QLA_EVT_NEW_NVMET_SESS,
 };
 
 
@@ -4097,6 +4123,7 @@ typedef struct scsi_qla_host {
 		uint32_t	qpairs_req_created:1;
 		uint32_t	qpairs_rsp_created:1;
 		uint32_t	nvme_enabled:1;
+		uint32_t	nvmet_enabled:1;
 	} flags;
 
 	atomic_t	loop_state;
@@ -4139,6 +4166,7 @@ typedef struct scsi_qla_host {
 #define SET_ZIO_THRESHOLD_NEEDED	28
 #define DETECT_SFP_CHANGE	29
 #define N2N_LOGIN_NEEDED	30
+#define NVMET_PUREX		31
 
 	unsigned long	pci_flags;
 #define PFLG_DISCONNECTED	0	/* PCI device removed */
@@ -4179,6 +4207,7 @@ typedef struct scsi_qla_host {
 	uint8_t		fabric_node_name[WWN_SIZE];
 
 	struct		nvme_fc_local_port *nvme_local_port;
+	struct		nvmet_fc_target_port *targetport;
 	struct completion nvme_del_done;
 	struct list_head nvme_rport_list;
 	atomic_t 	nvme_active_aen_cnt;
@@ -4252,6 +4281,9 @@ typedef struct scsi_qla_host {
 	uint8_t n2n_node_name[WWN_SIZE];
 	uint8_t n2n_port_name[WWN_SIZE];
 	uint16_t	n2n_id;
+	/*NVMET*/
+	struct list_head	purex_atio_list;
+	struct completion	purex_plogi_sess;
 } scsi_qla_host_t;
 
 struct qla27xx_image_status {
@@ -4512,6 +4544,7 @@ struct sff_8247_a0 {
 	(IS_QLA27XX(_ha) || IS_QLA83XX(_ha)))
 
 #include "qla_target.h"
+#include "qla_nvmet.h"
 #include "qla_gbl.h"
 #include "qla_dbg.h"
 #include "qla_inline.h"

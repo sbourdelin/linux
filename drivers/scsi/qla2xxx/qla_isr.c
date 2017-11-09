@@ -1579,6 +1579,12 @@ qla24xx_els_ct_entry(scsi_qla_host_t *vha, struct req_que *req,
 			sp->name);
 		sp->done(sp, res);
 		return;
+	case SRB_NVME_ELS_RSP:
+		type = "nvme els";
+		ql_log(ql_log_info, vha, 0xffff,
+			"Completing %s: (%p) type=%d.\n", type, sp, sp->type);
+		sp->done(sp, 0);
+		return;
 	default:
 		ql_dbg(ql_dbg_user, vha, 0x503e,
 		    "Unrecognized SRB: (%p) type=%d.\n", sp, sp->type);
@@ -2432,6 +2438,13 @@ qla2x00_status_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, void *pkt)
 		return;
 	}
 
+	if (sp->type == SRB_NVMET_LS) {
+		ql_log(ql_log_info, vha, 0xffff,
+			"Dump NVME-LS response pkt\n");
+		ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0x2075,
+			(uint8_t *)pkt, 64);
+	}
+
 	if (unlikely((state_flags & BIT_1) && (sp->type == SRB_BIDI_CMD))) {
 		qla25xx_process_bidir_status_iocb(vha, pkt, req, handle);
 		return;
@@ -2800,6 +2813,12 @@ qla2x00_error_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, sts_entry_t *pkt)
 	    "iocb type %xh with error status %xh, handle %xh, rspq id %d\n",
 	    pkt->entry_type, pkt->entry_status, pkt->handle, rsp->id);
 
+	ql_log(ql_log_info, vha, 0xffff,
+		"(%s-%d)Dumping the NVMET-ERROR pkt IOCB\n",
+		__func__, __LINE__);
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0x2075,
+		(uint8_t *)pkt, 64);
+
 	if (que >= ha->max_req_queues || !ha->req_q_map[que])
 		goto fatal;
 
@@ -2903,10 +2922,56 @@ void qla24xx_nvme_ls4_iocb(struct scsi_qla_host *vha,
 	if (!sp)
 		return;
 
+	ql_log(ql_log_info, vha, 0xc01f,
+		"Dumping response pkt for SRB type: %#x\n", sp->type);
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0x2075,
+		(uint8_t *)pkt, 16);
+
 	comp_status = le16_to_cpu(pkt->status);
 	sp->done(sp, comp_status);
 }
 
+static void qla24xx_nvmet_fcp_iocb(struct scsi_qla_host *vha,
+	struct ctio_nvme_from_27xx *pkt, struct req_que *req)
+{
+	srb_t *sp;
+	const char func[] = "NVMET_FCP_IOCB";
+	uint16_t comp_status;
+
+	sp = qla2x00_get_sp_from_handle(vha, func, req, pkt);
+	if (!sp)
+		return;
+
+	if ((pkt->entry_status) || (pkt->status != 1)) {
+		ql_log(ql_log_info, vha, 0xc01f,
+			"Dumping response pkt for SRB type: %#x\n", sp->type);
+		ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0x2075,
+			(uint8_t *)pkt, 16);
+	}
+
+	comp_status = le16_to_cpu(pkt->status);
+	sp->done(sp, comp_status);
+}
+
+void qla24xx_nvmet_abts_resp_iocb(struct scsi_qla_host *vha,
+	struct abts_resp_to_24xx *pkt, struct req_que *req)
+{
+	srb_t *sp;
+	const char func[] = "NVMET_ABTS_RESP_IOCB";
+	uint16_t comp_status;
+
+	sp = qla2x00_get_sp_from_handle(vha, func, req, pkt);
+	if (!sp)
+		return;
+
+	ql_log(ql_log_info, vha, 0xc01f,
+		"Dumping response pkt for SRB type: %#x\n", sp->type);
+	ql_dump_buffer(ql_dbg_disc + ql_dbg_buffer, vha, 0x2075,
+		(uint8_t *)pkt, 16);
+
+	comp_status = le16_to_cpu(pkt->entry_status);
+	sp->done(sp, comp_status);
+}
 /**
  * qla24xx_process_response_queue() - Process response queue entries.
  * @ha: SCSI driver HA context
@@ -2982,6 +3047,11 @@ process_err:
 			break;
 		case PT_LS4_REQUEST:
 			qla24xx_nvme_ls4_iocb(vha, (struct pt_ls4_request *)pkt,
+			    rsp->req);
+			break;
+		case CTIO_NVME:
+			qla24xx_nvmet_fcp_iocb(vha,
+			    (struct ctio_nvme_from_27xx *)pkt,
 			    rsp->req);
 			break;
 		case NOTIFY_ACK_TYPE:
