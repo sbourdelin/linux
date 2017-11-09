@@ -2598,7 +2598,7 @@ int nobh_write_begin(struct address_space *mapping,
 	struct inode *inode = mapping->host;
 	const unsigned blkbits = inode->i_blkbits;
 	const unsigned blocksize = 1 << blkbits;
-	struct buffer_head *head, *bh;
+	struct buffer_head *head, *bh, *tail;
 	struct page *page;
 	pgoff_t index;
 	unsigned from, to;
@@ -2643,6 +2643,13 @@ int nobh_write_begin(struct address_space *mapping,
 		ret = -ENOMEM;
 		goto out_release;
 	}
+	/* We need to make buffer_head list circular to avoid NULL SEGFAULT */
+	bh = head;
+	do {
+		tail = bh;
+		bh = bh->b_this_page;
+	} while (bh);
+	tail->b_this_page = head;
 
 	block_in_file = (sector_t)page->index << (PAGE_SHIFT - blkbits);
 
