@@ -399,7 +399,8 @@ struct sk_buff *__netdev_alloc_skb(struct net_device *dev, unsigned int len,
 	len += NET_SKB_PAD;
 
 	if ((len > SKB_WITH_OVERHEAD(PAGE_SIZE)) ||
-	    (gfp_mask & (__GFP_DIRECT_RECLAIM | GFP_DMA))) {
+	    (gfp_mask & (__GFP_DIRECT_RECLAIM | GFP_DMA)) ||
+	    !netdev_pagefrag_enabled) {
 		skb = __alloc_skb(len, gfp_mask, SKB_ALLOC_RX, NUMA_NO_NODE);
 		if (!skb)
 			goto skb_fail;
@@ -466,7 +467,8 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi, unsigned int len,
 	len += NET_SKB_PAD + NET_IP_ALIGN;
 
 	if ((len > SKB_WITH_OVERHEAD(PAGE_SIZE)) ||
-	    (gfp_mask & (__GFP_DIRECT_RECLAIM | GFP_DMA))) {
+	    (gfp_mask & (__GFP_DIRECT_RECLAIM | GFP_DMA)) ||
+	    !netdev_pagefrag_enabled) {
 		skb = __alloc_skb(len, gfp_mask, SKB_ALLOC_RX, NUMA_NO_NODE);
 		if (!skb)
 			goto skb_fail;
