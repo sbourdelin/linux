@@ -59,13 +59,16 @@ static bool assert_no_holes(const struct drm_mm *mm)
 	drm_mm_for_each_hole(hole, mm, hole_start, hole_end)
 		count++;
 	if (count) {
-		pr_err("Expected to find no holes (after reserve), found %lu instead\n", count);
+		pr_err("%pS: Expected to find no holes (after reserve), found %lu instead\n",
+		       __builtin_return_address(0),
+		       count);
 		return false;
 	}
 
 	drm_mm_for_each_node(hole, mm) {
 		if (drm_mm_hole_follows(hole)) {
-			pr_err("Hole follows node, expected none!\n");
+			pr_err("%pS: Hole follows node, expected none!\n",
+			       __builtin_return_address(0));
 			return false;
 		}
 	}
@@ -87,7 +90,8 @@ static bool assert_one_hole(const struct drm_mm *mm, u64 start, u64 end)
 	drm_mm_for_each_hole(hole, mm, hole_start, hole_end) {
 		if (start != hole_start || end != hole_end) {
 			if (ok)
-				pr_err("empty mm has incorrect hole, found (%llx, %llx), expect (%llx, %llx)\n",
+				pr_err("%pS: empty mm has incorrect hole, found (%llx, %llx), expect (%llx, %llx)\n",
+				       __builtin_return_address(0),
 				       hole_start, hole_end,
 				       start, end);
 			ok = false;
@@ -95,7 +99,9 @@ static bool assert_one_hole(const struct drm_mm *mm, u64 start, u64 end)
 		count++;
 	}
 	if (count != 1) {
-		pr_err("Expected to find one hole, found %lu instead\n", count);
+		pr_err("%pS: Expected to find one hole, found %lu instead\n",
+		       __builtin_return_address(0),
+		       count);
 		ok = false;
 	}
 
@@ -108,40 +114,48 @@ static bool assert_continuous(const struct drm_mm *mm, u64 size)
 	unsigned long n;
 	u64 addr;
 
-	if (!assert_no_holes(mm))
+	if (!assert_no_holes(mm)) {
+		pr_err("%pS: expected no holes!\n",
+		       __builtin_return_address(0));
 		return false;
+	}
 
 	n = 0;
 	addr = 0;
 	drm_mm_for_each_node(node, mm) {
 		if (node->start != addr) {
-			pr_err("node[%ld] list out of order, expected %llx found %llx\n",
+			pr_err("%pS: node[%ld] list out of order, expected %llx found %llx\n",
+			       __builtin_return_address(0),
 			       n, addr, node->start);
 			return false;
 		}
 
 		if (node->size != size) {
-			pr_err("node[%ld].size incorrect, expected %llx, found %llx\n",
+			pr_err("%pS: node[%ld].size incorrect, expected %llx, found %llx\n",
+			       __builtin_return_address(0),
 			       n, size, node->size);
 			return false;
 		}
 
 		if (drm_mm_hole_follows(node)) {
-			pr_err("node[%ld] is followed by a hole!\n", n);
+			pr_err("%pS: node[%ld] is followed by a hole!\n",
+			       __builtin_return_address(0), n);
 			return false;
 		}
 
 		found = NULL;
 		drm_mm_for_each_node_in_range(check, mm, addr, addr + size) {
 			if (node != check) {
-				pr_err("lookup return wrong node, expected start %llx, found %llx\n",
+				pr_err("%pS: lookup return wrong node, expected start %llx, found %llx\n",
+				       __builtin_return_address(0),
 				       node->start, check->start);
 				return false;
 			}
 			found = check;
 		}
 		if (!found) {
-			pr_err("lookup failed for node %llx + %llx\n",
+			pr_err("%pS: lookup failed for node %llx + %llx\n",
+			       __builtin_return_address(0),
 			       addr, size);
 			return false;
 		}
@@ -170,24 +184,28 @@ static bool assert_node(struct drm_mm_node *node, struct drm_mm *mm,
 	bool ok = true;
 
 	if (!drm_mm_node_allocated(node) || node->mm != mm) {
-		pr_err("node not allocated\n");
+		pr_err("%pS: node not allocated\n",
+		       __builtin_return_address(0));
 		ok = false;
 	}
 
 	if (node->size != size) {
-		pr_err("node has wrong size, found %llu, expected %llu\n",
+		pr_err("%pS: node has wrong size, found %llu, expected %llu\n",
+		       __builtin_return_address(0),
 		       node->size, size);
 		ok = false;
 	}
 
 	if (misalignment(node, alignment)) {
-		pr_err("node is misaligned, start %llx rem %llu, expected alignment %llu\n",
+		pr_err("%pS: node is misaligned, start %llx rem %llu, expected alignment %llu\n",
+		       __builtin_return_address(0),
 		       node->start, misalignment(node, alignment), alignment);
 		ok = false;
 	}
 
 	if (node->color != color) {
-		pr_err("node has wrong color, found %lu, expected %lu\n",
+		pr_err("%pS: node has wrong color, found %lu, expected %lu\n",
+		       __builtin_return_address(0),
 		       node->color, color);
 		ok = false;
 	}
