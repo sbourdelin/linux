@@ -53,6 +53,7 @@
 	compatible = "sinovoip,bpi-m3", "allwinner,sun8i-a83t";
 
 	aliases {
+		ethernet0 = &emac;
 		serial0 = &uart0;
 	};
 
@@ -66,6 +67,23 @@
 	status = "okay";
 
 	/* TODO GL830 USB-to-SATA bridge downstream w/ GPIO power controls */
+};
+
+&emac {
+	pinctrl-names = "default";
+	pinctrl-0 = <&emac_rgmii_pins>;
+	phy-handle = <&ext_rgmii_phy>;
+	phy-mode = "rgmii";
+	allwinner,rx-delay-ps = <700>;
+	allwinner,tx-delay-ps = <700>;
+
+	status = "okay";
+};
+
+&mdio {
+	ext_rgmii_phy: ethernet-phy@1 {
+		reg = <1>;
+	};
 };
 
 &mmc0 {
