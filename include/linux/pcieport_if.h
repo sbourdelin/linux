@@ -67,5 +67,5 @@ struct pcie_port_service_driver {
 
 int pcie_port_service_register(struct pcie_port_service_driver *new);
 void pcie_port_service_unregister(struct pcie_port_service_driver *new);
-
+int pcie_port_query_service(struct pci_dev *dev, u32 port_service);
 #endif /* _PCIEPORT_IF_H_ */

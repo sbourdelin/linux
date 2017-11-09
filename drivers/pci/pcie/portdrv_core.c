@@ -489,6 +489,30 @@ static int pcie_port_remove_service(struct device *dev)
 }
 
 /**
+ * pcie_port_service_query - query if particula port service is enabled.
+ * dev: pcie device
+ * @port service: PCI express port service
+ */
+int pcie_port_query_service(struct pci_dev *dev, u32 port_service)
+{
+	struct pcie_device *pdev;
+	struct pci_dev *parent, *this = dev;
+
+	do {
+		list_for_each_entry(pdev, &this->service_list, slist) {
+			if (pdev->service == port_service)
+				return 1;
+		}
+		parent = pci_upstream_bridge(this);
+		this = parent;
+	} while (parent && pci_is_pcie(parent));
+
+	return 0;
+}
+EXPORT_SYMBOL(pcie_port_query_service);
+
+
+/**
  * pcie_port_shutdown_service - shut down given PCI Express port service
  * @dev: PCI Express port service device to handle
  *
