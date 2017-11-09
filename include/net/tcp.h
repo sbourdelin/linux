@@ -46,6 +46,7 @@
 #include <linux/seq_file.h>
 #include <linux/memcontrol.h>
 #include <linux/bpf-cgroup.h>
+#include <trace/events/tcp.h>
 
 extern struct inet_hashinfo tcp_hashinfo;
 
@@ -1262,6 +1263,21 @@ static const char *statename[]={
 };
 #endif
 void tcp_set_state(struct sock *sk, int state);
+
+/*
+ * To trace TCP/IP state transition.
+ */
+static inline void __tcp_set_state(struct sock *sk, int state)
+{
+	trace_tcp_set_state(sk, sk->sk_state, state);
+	sk->sk_state = state;
+}
+
+static inline void __sk_state_store(struct sock *sk, int newstate)
+{
+	trace_tcp_set_state(sk, sk->sk_state, newstate);
+	sk_state_store(sk, newstate);
+}
 
 void tcp_done(struct sock *sk);
 
