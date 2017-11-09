@@ -453,6 +453,8 @@ static int pcie_port_probe_service(struct device *dev)
 	if (status)
 		return status;
 
+	list_add_tail(&pciedev->slist, &pciedev->port->service_list);
+
 	get_device(dev);
 	return 0;
 }
@@ -476,6 +478,9 @@ static int pcie_port_remove_service(struct device *dev)
 
 	pciedev = to_pcie_device(dev);
 	driver = to_service_driver(dev->driver);
+
+	list_del(&pciedev->slist);
+
 	if (driver && driver->remove) {
 		driver->remove(pciedev);
 		put_device(dev);

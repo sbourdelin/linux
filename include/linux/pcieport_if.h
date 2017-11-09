@@ -30,6 +30,7 @@ struct pcie_device {
 	u32		service;    /* Port service this device represents */
 	void		*priv_data; /* Service Private Data */
 	struct device	device;     /* Generic Device Interface */
+	struct list_head slist;     /* List of services */
 };
 #define to_pcie_device(d) container_of(d, struct pcie_device, device)
 
