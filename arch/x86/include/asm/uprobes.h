@@ -33,6 +33,11 @@ typedef u8 uprobe_opcode_t;
 #define UPROBE_SWBP_INSN		0xcc
 #define UPROBE_SWBP_INSN_SIZE		   1
 
+enum uprobe_insn_t {
+	UPROBE_BRANCH_INSN	= 0,
+	UPROBE_PUSH_INSN	= 1,
+};
+
 struct uprobe_xol_ops;
 
 struct arch_uprobe {
@@ -42,6 +47,7 @@ struct arch_uprobe {
 	};
 
 	const struct uprobe_xol_ops	*ops;
+	enum uprobe_insn_t		insn_class;
 
 	union {
 		struct {
@@ -53,6 +59,10 @@ struct arch_uprobe {
 			u8	fixups;
 			u8	ilen;
 		} 			defparam;
+		struct {
+			u8	rex_prefix;
+			u8	opc1;
+		}			push;
 	};
 };
 

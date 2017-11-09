@@ -640,11 +640,71 @@ static bool check_jmp_cond(struct arch_uprobe *auprobe, struct pt_regs *regs)
 #undef	COND
 #undef	CASE_COND
 
-static bool branch_emulate_op(struct arch_uprobe *auprobe, struct pt_regs *regs)
+static unsigned long *get_push_reg_ptr(struct arch_uprobe *auprobe,
+				       struct pt_regs *regs)
 {
-	unsigned long new_ip = regs->ip += auprobe->branch.ilen;
-	unsigned long offs = (long)auprobe->branch.offs;
+#if defined(CONFIG_X86_64)
+	switch (auprobe->push.opc1) {
+	case 0x50:
+		return auprobe->push.rex_prefix ? &regs->r8 : &regs->ax;
+	case 0x51:
+		return auprobe->push.rex_prefix ? &regs->r9 : &regs->cx;
+	case 0x52:
+		return auprobe->push.rex_prefix ? &regs->r10 : &regs->dx;
+	case 0x53:
+		return auprobe->push.rex_prefix ? &regs->r11 : &regs->bx;
+	case 0x54:
+		return auprobe->push.rex_prefix ? &regs->r12 : &regs->sp;
+	case 0x55:
+		return auprobe->push.rex_prefix ? &regs->r13 : &regs->bp;
+	case 0x56:
+		return auprobe->push.rex_prefix ? &regs->r14 : &regs->si;
+	}
 
+	/* opc1 0x57 */
+	return auprobe->push.rex_prefix ? &regs->r15 : &regs->di;
+#else
+	switch (auprobe->push.opc1) {
+	case 0x50:
+		return &regs->ax;
+	case 0x51:
+		return &regs->cx;
+	case 0x52:
+		return &regs->dx;
+	case 0x53:
+		return &regs->bx;
+	case 0x54:
+		return &regs->sp;
+	case 0x55:
+		return &regs->bp;
+	case 0x56:
+		return &regs->si;
+	}
+
+	/* opc1 0x57 */
+	return &regs->di;
+#endif
+}
+
+static bool sstep_emulate_op(struct arch_uprobe *auprobe, struct pt_regs *regs)
+{
+	int reg_width, insn_class = auprobe->insn_class;
+	unsigned long *src_ptr, new_ip, offs, sp;
+
+	if (insn_class == UPROBE_PUSH_INSN) {
+		src_ptr = get_push_reg_ptr(auprobe, regs);
+		reg_width = sizeof_long();
+		sp = regs->sp;
+		if (copy_to_user((void __user *)(sp - reg_width), src_ptr, reg_width))
+			return false;
+
+		regs->sp = sp - reg_width;
+		regs->ip += 1 + (auprobe->push.rex_prefix != 0);
+		return true;
+	}
+
+	new_ip = regs->ip += auprobe->branch.ilen;
+	offs = (long)auprobe->branch.offs;
 	if (branch_is_call(auprobe)) {
 		/*
 		 * If it fails we execute this (mangled, see the comment in
@@ -665,14 +725,18 @@ static bool branch_emulate_op(struct arch_uprobe *auprobe, struct pt_regs *regs)
 	return true;
 }
 
-static int branch_post_xol_op(struct arch_uprobe *auprobe, struct pt_regs *regs)
+static int sstep_post_xol_op(struct arch_uprobe *auprobe, struct pt_regs *regs)
 {
-	BUG_ON(!branch_is_call(auprobe));
+	BUG_ON(auprobe->insn_class != UPROBE_PUSH_INSN &&
+	       !branch_is_call(auprobe));
 	/*
-	 * We can only get here if branch_emulate_op() failed to push the ret
-	 * address _and_ another thread expanded our stack before the (mangled)
-	 * "call" insn was executed out-of-line. Just restore ->sp and restart.
-	 * We could also restore ->ip and try to call branch_emulate_op() again.
+	 * We can only get here if
+	 * - for push operation, sstep_emulate_op() failed to push the stack, or
+	 * - for branch operation, sstep_emulate_op() failed to push the ret address
+	 *   _and_ another thread expanded our stack before the (mangled)
+	 *   "call" insn was executed out-of-line.
+	 * Just restore ->sp and restart. We could also restore ->ip and try to
+	 * call sstep_emulate_op() again.
 	 */
 	regs->sp += sizeof_long();
 	return -ERESTART;
@@ -698,17 +762,18 @@ static void branch_clear_offset(struct arch_uprobe *auprobe, struct insn *insn)
 		0, insn->immediate.nbytes);
 }
 
-static const struct uprobe_xol_ops branch_xol_ops = {
-	.emulate  = branch_emulate_op,
-	.post_xol = branch_post_xol_op,
+static const struct uprobe_xol_ops sstep_xol_ops = {
+	.emulate  = sstep_emulate_op,
+	.post_xol = sstep_post_xol_op,
 };
 
-/* Returns -ENOSYS if branch_xol_ops doesn't handle this insn */
-static int branch_setup_xol_ops(struct arch_uprobe *auprobe, struct insn *insn)
+/* Returns -ENOSYS if sstep_xol_ops doesn't handle this insn */
+static int sstep_setup_xol_ops(struct arch_uprobe *auprobe, struct insn *insn)
 {
 	u8 opc1 = OPCODE1(insn);
 	int i;
 
+	auprobe->insn_class = UPROBE_BRANCH_INSN;
 	switch (opc1) {
 	case 0xeb:	/* jmp 8 */
 	case 0xe9:	/* jmp 32 */
@@ -718,6 +783,23 @@ static int branch_setup_xol_ops(struct arch_uprobe *auprobe, struct insn *insn)
 	case 0xe8:	/* call relative */
 		branch_clear_offset(auprobe, insn);
 		break;
+
+	case 0x50 ... 0x57:
+		if (insn->length > 2)
+			return -ENOSYS;
+		if (insn->length == 2) {
+			/* only support rex_prefix 0x41 (x64 only) */
+			if (insn->rex_prefix.nbytes != 1 ||
+			    insn->rex_prefix.bytes[0] != 0x41)
+				return -ENOSYS;
+			auprobe->push.rex_prefix = 0x41;
+		} else {
+			auprobe->push.rex_prefix = 0;
+		}
+
+		auprobe->insn_class = UPROBE_PUSH_INSN;
+		auprobe->push.opc1 = opc1;
+		goto set_ops;
 
 	case 0x0f:
 		if (insn->opcode.nbytes != 2)
@@ -746,7 +828,8 @@ static int branch_setup_xol_ops(struct arch_uprobe *auprobe, struct insn *insn)
 	auprobe->branch.ilen = insn->length;
 	auprobe->branch.offs = insn->immediate.value;
 
-	auprobe->ops = &branch_xol_ops;
+set_ops:
+	auprobe->ops = &sstep_xol_ops;
 	return 0;
 }
 
@@ -767,7 +850,7 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm, 
 	if (ret)
 		return ret;
 
-	ret = branch_setup_xol_ops(auprobe, &insn);
+	ret = sstep_setup_xol_ops(auprobe, &insn);
 	if (ret != -ENOSYS)
 		return ret;
 
