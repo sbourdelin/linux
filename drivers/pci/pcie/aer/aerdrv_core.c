@@ -495,6 +495,18 @@ static void do_recovery(struct pci_dev *dev, int severity)
 	pci_ers_result_t status, result = PCI_ERS_RESULT_RECOVERED;
 	enum pci_channel_state state;
 
+	/*
+	 * If DPC is enabled, there is no need to attempt recovery.
+	 * Since DPC disables its Link by directing the LTSSM to
+	 * the Disabled state.
+	 * DPC driver will take care of the recovery, there is no need
+	 * for AER driver to race.
+	 */
+	if (pcie_port_query_service(dev, PCIE_PORT_SERVICE_DPC)) {
+		dev_info(&dev->dev, "AER: Device recovery to be done by DPC\n");
+		return;
+	}
+
 	if (severity == AER_FATAL)
 		state = pci_channel_io_frozen;
 	else
