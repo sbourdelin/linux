@@ -370,6 +370,7 @@ static struct dentry *sockfs_mount(struct file_system_type *fs_type,
 static struct vfsmount *sock_mnt __read_mostly;
 
 static struct file_system_type sock_fs_type = {
+	.owner =	THIS_MODULE,
 	.name =		"sockfs",
 	.mount =	sockfs_mount,
 	.kill_sb =	kill_anon_super,
