@@ -96,6 +96,11 @@ unsigned int xenvif_hash_cache_size = XENVIF_HASH_CACHE_SIZE_DEFAULT;
 module_param_named(hash_cache_size, xenvif_hash_cache_size, uint, 0644);
 MODULE_PARM_DESC(hash_cache_size, "Number of flows in the hash cache");
 
+/* This is the maximum batch of grant copies on Rx */
+unsigned int xenvif_copy_batch_size = COPY_BATCH_SIZE;
+module_param_named(copy_batch_size, xenvif_copy_batch_size, uint, 0644);
+MODULE_PARM_DESC(copy_batch_size, "Maximum batch of grant copies on Rx");
+
 static void xenvif_idx_release(struct xenvif_queue *queue, u16 pending_idx,
 			       u8 status);
 

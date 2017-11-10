@@ -516,7 +516,20 @@ struct xenvif *xenvif_alloc(struct device *parent, domid_t domid,
 
 int xenvif_init_queue(struct xenvif_queue *queue)
 {
+	int size = xenvif_copy_batch_size;
 	int err, i;
+	void *addr;
+
+	addr = vzalloc(size * sizeof(struct gnttab_copy));
+	if (!addr)
+		goto err;
+	queue->rx_copy.op = addr;
+
+	addr = vzalloc(size * sizeof(RING_IDX));
+	if (!addr)
+		goto err;
+	queue->rx_copy.idx = addr;
+	queue->rx_copy.size = size;
 
 	queue->credit_bytes = queue->remaining_credit = ~0UL;
 	queue->credit_usec  = 0UL;
@@ -544,7 +557,7 @@ int xenvif_init_queue(struct xenvif_queue *queue)
 				 queue->mmap_pages);
 	if (err) {
 		netdev_err(queue->vif->dev, "Could not reserve mmap_pages\n");
-		return -ENOMEM;
+		goto err;
 	}
 
 	for (i = 0; i < MAX_PENDING_REQS; i++) {
@@ -556,6 +569,13 @@ int xenvif_init_queue(struct xenvif_queue *queue)
 	}
 
 	return 0;
+
+err:
+	if (queue->rx_copy.op)
+		vfree(queue->rx_copy.op);
+	if (queue->rx_copy.idx)
+		vfree(queue->rx_copy.idx);
+	return -ENOMEM;
 }
 
 void xenvif_carrier_on(struct xenvif *vif)
@@ -788,6 +808,9 @@ void xenvif_disconnect_ctrl(struct xenvif *vif)
  */
 void xenvif_deinit_queue(struct xenvif_queue *queue)
 {
+	vfree(queue->rx_copy.op);
+	vfree(queue->rx_copy.idx);
+	queue->rx_copy.size = 0;
 	gnttab_free_pages(MAX_PENDING_REQS, queue->mmap_pages);
 }
 

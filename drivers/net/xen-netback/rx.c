@@ -168,11 +168,14 @@ static void xenvif_rx_copy_add(struct xenvif_queue *queue,
 			       struct xen_netif_rx_request *req,
 			       unsigned int offset, void *data, size_t len)
 {
+	unsigned int batch_size;
 	struct gnttab_copy *op;
 	struct page *page;
 	struct xen_page_foreign *foreign;
 
-	if (queue->rx_copy.num == COPY_BATCH_SIZE)
+	batch_size = min(xenvif_copy_batch_size, queue->rx_copy.size);
+
+	if (queue->rx_copy.num == batch_size)
 		xenvif_rx_copy_flush(queue);
 
 	op = &queue->rx_copy.op[queue->rx_copy.num];

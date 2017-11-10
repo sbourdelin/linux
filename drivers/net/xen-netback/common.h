@@ -129,8 +129,9 @@ struct xenvif_stats {
 #define COPY_BATCH_SIZE 64
 
 struct xenvif_copy_state {
-	struct gnttab_copy op[COPY_BATCH_SIZE];
-	RING_IDX idx[COPY_BATCH_SIZE];
+	struct gnttab_copy *op;
+	RING_IDX *idx;
+	unsigned int size;
 	unsigned int num;
 	struct sk_buff_head *completed;
 };
@@ -381,6 +382,7 @@ extern unsigned int rx_drain_timeout_msecs;
 extern unsigned int rx_stall_timeout_msecs;
 extern unsigned int xenvif_max_queues;
 extern unsigned int xenvif_hash_cache_size;
+extern unsigned int xenvif_copy_batch_size;
 
 #ifdef CONFIG_DEBUG_FS
 extern struct dentry *xen_netback_dbg_root;
