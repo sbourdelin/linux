@@ -231,7 +231,14 @@ vc4_irq_uninstall(struct drm_device *dev)
 	/* Finish any interrupt handler still in flight. */
 	disable_irq(dev->irq);
 
-	cancel_work_sync(&vc4->overflow_mem_work);
+	if (cancel_work_sync(&vc4->overflow_mem_work)) {
+		/*
+		 * Work was still pending. The overflow mem work's
+		 * callback reenables the OUTOMEM interrupt upon
+		 * completion, so ensure it is disabled here.
+		 */
+		V3D_WRITE(V3D_INTDIS, V3D_INT_OUTOMEM);
+	}
 }
 
 /** Reinitializes interrupt registers when a GPU reset is performed. */
