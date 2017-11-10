@@ -1054,7 +1054,7 @@ typedef struct ips_ha {
    uint8_t            active;
    int                ioctl_reset;        /* IOCTL Requested Reset Flag */
    uint16_t           reset_count;        /* number of resets           */
-   time_t             last_ffdc;          /* last time we sent ffdc info*/
+   time64_t           last_ffdc;          /* last time we sent ffdc info*/
    uint8_t            slot_num;           /* PCI Slot Number            */
    int                ioctl_len;          /* size of ioctl buffer       */
    dma_addr_t         ioctl_busaddr;      /* dma address of ioctl buffer*/
