@@ -4437,6 +4437,17 @@ static u32 sock_ops_convert_ctx_access(enum bpf_access_type type,
 		*insn++ = BPF_LDX_MEM(BPF_H, si->dst_reg, si->dst_reg,
 				      offsetof(struct sock_common, skc_num));
 		break;
+
+	case offsetof(struct bpf_sock_ops, priority):
+		BUILD_BUG_ON(FIELD_SIZEOF(struct sock, sk_priority) != 4);
+
+		*insn++ = BPF_LDX_MEM(BPF_FIELD_SIZEOF(
+						struct bpf_sock_ops_kern, sk),
+				      si->dst_reg, si->src_reg,
+				      offsetof(struct bpf_sock_ops_kern, sk));
+		*insn++ = BPF_LDX_MEM(BPF_W, si->dst_reg, si->dst_reg,
+				      offsetof(struct sock, sk_priority));
+		break;
 	}
 	return insn - insn_buf;
 }

@@ -947,6 +947,7 @@ struct bpf_sock_ops {
 	__u32 local_ip6[4];	/* Stored in network byte order */
 	__u32 remote_port;	/* Stored in network byte order */
 	__u32 local_port;	/* stored in host byte order */
+	__u32 priority;
 };
 
 /* List of known BPF sock_ops operators.
