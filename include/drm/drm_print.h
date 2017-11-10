@@ -80,6 +80,20 @@ void __drm_printfn_debug(struct drm_printer *p, struct va_format *vaf);
 __printf(2, 3)
 void drm_printf(struct drm_printer *p, const char *f, ...);
 
+/**
+ * drm_vprintf - print to a &drm_printer stream
+ * @p: the &drm_printer
+ * @f: format string
+ * @args: the va_list
+ */
+__printf(2, 0)
+static inline void
+drm_vprintf(struct drm_printer *p, const char *fmt, va_list *va)
+{
+	struct va_format vaf = { .fmt = fmt, .va = va };
+
+	p->printfn(p, &vaf);
+}
 
 /**
  * drm_seq_file_printer - construct a &drm_printer that outputs to &seq_file
