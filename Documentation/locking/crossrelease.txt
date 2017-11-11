@@ -281,6 +281,29 @@ causes a deadlock. The more lockdep adds dependencies, the more it
 thoroughly works. Thus, lockdep has to do its best to detect and add as
 many true dependencies to the graph as possible.
 
+For example:
+
+   CONTEXT X			   CONTEXT Y
+   ---------			   ---------
+				   acquire A
+   acquire B /* A dependency 'A -> B' exists */
+   release B
+   release A held by Y
+
+   where A and B are different lock classes.
+
+In this case, a dependency 'A -> B' exists since:
+
+   1. A waiter for A and a waiter for B might exist when acquiring B.
+   2. The only way to wake up each is to release what it waits for.
+   3. Whether the waiter for A can be woken up depends on whether the
+      other can. In other words, CONTEXT X cannot release A if it fails
+      to acquire B.
+
+Considering only typical locks, lockdep builds nothing. However,
+relaxing the limitation, a dependency 'A -> B' can be added, giving us
+more chances to check circular dependencies.
+
 However, it might suffer performance degradation since
 relaxing the limitation, with which design and implementation of lockdep
 can be efficient, might introduce inefficiency inevitably. So lockdep
