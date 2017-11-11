@@ -281,31 +281,7 @@ causes a deadlock. The more lockdep adds dependencies, the more it
 thoroughly works. Thus Lockdep has to do its best to detect and add as
 many true dependencies into a graph as possible.
 
-For example, considering only typical locks, lockdep builds a graph like:
-
-   A -> B -
-           \
-            -> E
-           /
-   C -> D -
-
-   where A, B,..., E are different lock classes.
-
-On the other hand, under the relaxation, additional dependencies might
-be created and added. Assuming additional 'FX -> C' and 'E -> GX' are
-added thanks to the relaxation, the graph will be:
-
-         A -> B -
-                 \
-                  -> E -> GX
-                 /
-   FX -> C -> D -
-
-   where A, B,..., E, FX and GX are different lock classes, and a suffix
-   'X' is added on non-typical locks.
-
-The latter graph gives us more chances to check circular dependencies
-than the former. However, it might suffer performance degradation since
+However, it might suffer performance degradation since
 relaxing the limitation, with which design and implementation of lockdep
 can be efficient, might introduce inefficiency inevitably. So lockdep
 should provide two options, strong detection and efficient detection.
@@ -468,12 +444,6 @@ works without crossrelease for typical locks.
    release A /* Pop A from held_locks */
 
    where A, B and C are different lock classes.
-
-   NOTE: This document assumes that readers already understand how
-   lockdep works without crossrelease thus omits details. But there's
-   one thing to note. Lockdep pretends to pop a lock from held_locks
-   when releasing it. But it's subtly different from the original pop
-   operation because lockdep allows other than the top to be poped.
 
 In this case, lockdep adds 'the top of held_locks -> the lock to acquire'
 dependency every time acquiring a lock.
@@ -804,22 +774,6 @@ Remind what a dependency is. A dependency exists if:
    3. Whether one can be woken up depends on whether the other can.
 
 For example:
-
-   acquire A
-   acquire B /* A dependency 'A -> B' exists */
-   release B
-   release A
-
-   where A and B are different lock classes.
-
-A depedency 'A -> B' exists since:
-
-   1. A waiter for A and a waiter for B might exist when acquiring B.
-   2. Only way to wake up each is to release what it waits for.
-   3. Whether the waiter for A can be woken up depends on whether the
-      other can. IOW, TASK X cannot release A if it fails to acquire B.
-
-For another example:
 
    TASK X			   TASK Y
    ------			   ------
