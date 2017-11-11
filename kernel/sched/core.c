@@ -933,6 +933,7 @@ static struct rq *move_queued_task(struct rq *rq, struct rq_flags *rf,
 
 	rq_lock(rq, rf);
 	BUG_ON(task_cpu(p) != new_cpu);
+	rq->need_sync_core = 1;
 	enqueue_task(rq, p, 0);
 	p->on_rq = TASK_ON_RQ_QUEUED;
 	check_preempt_curr(rq, p, 0);
@@ -2660,6 +2661,12 @@ static struct rq *finish_task_switch(struct task_struct *prev)
 	 * to use.
 	 */
 	smp_mb__after_unlock_lock();
+#ifdef CONFIG_SMP
+	if (unlikely(rq->need_sync_core)) {
+		sync_core_before_usermode();
+		rq->need_sync_core = 0;
+	}
+#endif
 	finish_lock_switch(rq, prev);
 	finish_arch_post_lock_switch();
 
