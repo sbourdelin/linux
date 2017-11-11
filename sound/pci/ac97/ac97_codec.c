@@ -2103,8 +2103,8 @@ int snd_ac97_mixer(struct snd_ac97_bus *bus, struct snd_ac97_template *template,
 		ac97_err(ac97,
 			 "AC'97 %d access is not valid [0x%x], removing mixer.\n",
 			 ac97->num, ac97->id);
-		snd_ac97_free(ac97);
-		return -EIO;
+		err = -EIO;
+		goto free_ac;
 	}
 	pid = look_for_codec_id(snd_ac97_codec_ids, ac97->id);
 	if (pid)
@@ -2138,8 +2138,8 @@ int snd_ac97_mixer(struct snd_ac97_bus *bus, struct snd_ac97_template *template,
 			ac97_err(ac97,
 				 "AC'97 %d access error (not audio or modem codec)\n",
 				 ac97->num);
-		snd_ac97_free(ac97);
-		return -EACCES;
+		err = -EACCES;
+		goto free_ac;
 	}
 
 	if (bus->ops->reset) // FIXME: always skipping?
@@ -2267,14 +2267,12 @@ int snd_ac97_mixer(struct snd_ac97_bus *bus, struct snd_ac97_template *template,
 			}
 		}
 		sprintf(comp, "AC97a:%08x", ac97->id);
-		if ((err = snd_component_add(card, comp)) < 0) {
-			snd_ac97_free(ac97);
-			return err;
-		}
-		if (snd_ac97_mixer_build(ac97) < 0) {
-			snd_ac97_free(ac97);
-			return -ENOMEM;
-		}
+		err = snd_component_add(card, comp);
+		if (err < 0)
+			goto free_ac;
+
+		if (snd_ac97_mixer_build(ac97) < 0)
+			goto e_nomem;
 	}
 	if (ac97_is_modem(ac97)) {
 		char comp[16];
@@ -2287,24 +2285,28 @@ int snd_ac97_mixer(struct snd_ac97_bus *bus, struct snd_ac97_template *template,
 			}
 		}
 		sprintf(comp, "AC97m:%08x", ac97->id);
-		if ((err = snd_component_add(card, comp)) < 0) {
-			snd_ac97_free(ac97);
-			return err;
-		}
-		if (snd_ac97_modem_build(card, ac97) < 0) {
-			snd_ac97_free(ac97);
-			return -ENOMEM;
-		}
+		err = snd_component_add(card, comp);
+		if (err < 0)
+			goto free_ac;
+
+		if (snd_ac97_modem_build(card, ac97) < 0)
+			goto e_nomem;
 	}
 	if (ac97_is_audio(ac97))
 		update_power_regs(ac97);
 	snd_ac97_proc_init(ac97);
-	if ((err = snd_device_new(card, SNDRV_DEV_CODEC, ac97, &ops)) < 0) {
-		snd_ac97_free(ac97);
-		return err;
-	}
+	err = snd_device_new(card, SNDRV_DEV_CODEC, ac97, &ops);
+	if (err < 0)
+		goto free_ac;
+
 	*rac97 = ac97;
 	return 0;
+
+e_nomem:
+	err = -ENOMEM;
+free_ac:
+	snd_ac97_free(ac97);
+	return err;
 }
 
 EXPORT_SYMBOL(snd_ac97_mixer);
