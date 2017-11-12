@@ -709,8 +709,47 @@ static noinline int device_list_add(const char *path,
 		rcu_string_free(device->name);
 		rcu_assign_pointer(device->name, name);
 		if (device->missing) {
-			fs_devices->missing_devices--;
-			device->missing = 0;
+			int ret;
+			struct btrfs_fs_info *fs_info = fs_devices->fs_info;
+			fmode_t fmode = FMODE_READ | FMODE_WRITE | FMODE_EXCL;
+
+			if (btrfs_super_flags(disk_super) & BTRFS_SUPER_FLAG_SEEDING)
+				fmode &= ~FMODE_WRITE;
+
+			/*
+			 * Missing can be set only when FS is mounted.
+			 * So here its always fs_devices->opened > 0 and most
+			 * of the struct device members are already updated by
+			 * the mount process even if this device was missing, so
+			 * now follow the normal open device procedure for this
+			 * device. The scrub will take care of filling the
+			 * missing stripes for raid56 and balance for raid1 and
+			 * raid10.
+			 */
+			ASSERT(fs_devices->opened);
+			mutex_lock(&fs_devices->device_list_mutex);
+			mutex_lock(&fs_info->chunk_mutex);
+			ret = btrfs_open_one_device(fs_devices, device, fmode,
+							fs_info->bdev_holder);
+			if (!ret) {
+				fs_devices->missing_devices--;
+				device->missing = 0;
+				btrfs_clear_opt(fs_info->mount_opt, DEGRADED);
+				btrfs_warn(fs_info,
+					"BTRFS: device %s devid %llu uuid %pU joined\n",
+					path, devid, device->uuid);
+			}
+
+			if (device->writeable &&
+					!device->is_tgtdev_for_dev_replace) {
+				fs_devices->total_rw_bytes += device->total_bytes;
+				atomic64_add(device->total_bytes -
+						device->bytes_used,
+						&fs_info->free_chunk_space);
+			}
+			device->in_fs_metadata = 1;
+			mutex_unlock(&fs_devices->fs_info->chunk_mutex);
+			mutex_unlock(&fs_devices->device_list_mutex);
 		}
 	}
 
