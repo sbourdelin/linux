@@ -894,21 +894,23 @@ snd_ad1889_create(struct snd_card *card,
 
 	*rchip = NULL;
 
-	if ((err = pci_enable_device(pci)) < 0)
+	err = pci_enable_device(pci);
+	if (err < 0)
 		return err;
 
 	/* check PCI availability (32bit DMA) */
 	if (dma_set_mask(&pci->dev, DMA_BIT_MASK(32)) < 0 ||
 	    dma_set_coherent_mask(&pci->dev, DMA_BIT_MASK(32)) < 0) {
 		dev_err(card->dev, "error setting 32-bit DMA mask.\n");
-		pci_disable_device(pci);
-		return -ENXIO;
+		err = -ENXIO;
+		goto disable_device;
 	}
 
 	/* allocate chip specific data with zero-filled memory */
-	if ((chip = kzalloc(sizeof(*chip), GFP_KERNEL)) == NULL) {
-		pci_disable_device(pci);
-		return -ENOMEM;
+	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
+	if (!chip) {
+		err = -ENOMEM;
+		goto disable_device;
 	}
 
 	chip->card = card;
@@ -917,15 +919,16 @@ snd_ad1889_create(struct snd_card *card,
 	chip->irq = -1;
 
 	/* (1) PCI resource allocation */
-	if ((err = pci_request_regions(pci, card->driver)) < 0)
-		goto free_and_ret;
+	err = pci_request_regions(pci, card->driver);
+	if (err < 0)
+		goto free_data;
 
 	chip->bar = pci_resource_start(pci, 0);
 	chip->iobase = pci_ioremap_bar(pci, 0);
 	if (chip->iobase == NULL) {
 		dev_err(card->dev, "unable to reserve region.\n");
 		err = -EBUSY;
-		goto free_and_ret;
+		goto free_data;
 	}
 	
 	pci_set_master(pci);
@@ -935,32 +938,34 @@ snd_ad1889_create(struct snd_card *card,
 	if (request_irq(pci->irq, snd_ad1889_interrupt,
 			IRQF_SHARED, KBUILD_MODNAME, chip)) {
 		dev_err(card->dev, "cannot obtain IRQ %d\n", pci->irq);
-		snd_ad1889_free(chip);
-		return -EBUSY;
+		err = -EBUSY;
+		goto free_sound_chip;
 	}
 
 	chip->irq = pci->irq;
 	synchronize_irq(chip->irq);
 
 	/* (2) initialization of the chip hardware */
-	if ((err = snd_ad1889_init(chip)) < 0) {
-		snd_ad1889_free(chip);
-		return err;
-	}
+	err = snd_ad1889_init(chip);
+	if (err < 0)
+		goto free_sound_chip;
 
-	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
-		snd_ad1889_free(chip);
-		return err;
-	}
+	err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops);
+	if (err < 0)
+		goto free_sound_chip;
 
 	*rchip = chip;
 
 	return 0;
 
-free_and_ret:
+free_data:
 	kfree(chip);
+disable_device:
 	pci_disable_device(pci);
+	return err;
 
+free_sound_chip:
+	snd_ad1889_free(chip);
 	return err;
 }
 
