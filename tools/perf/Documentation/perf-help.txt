@@ -7,7 +7,7 @@ perf-help - display help information about perf
 
 SYNOPSIS
 --------
-'perf help' [-a|--all] [COMMAND]
+'perf help' [--all] [--man|--web|--info] [COMMAND]
 
 DESCRIPTION
 -----------
@@ -32,6 +32,18 @@ OPTIONS
 --all::
 	Prints all the available commands on the standard output. This
 	option supersedes any other option.
+
+-i::
+--info::
+	Shows info page.
+
+-m::
+--man::
+	Shows man page.
+
+-w::
+--web::
+	Shows manual in web browser.
 
 PERF
 ----
