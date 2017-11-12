@@ -611,8 +611,7 @@ err_init:
 
 	device_unregister(&devfreq->dev);
 err_dev:
-	if (devfreq)
-		kfree(devfreq);
+	kfree(devfreq);
 err_out:
 	return ERR_PTR(err);
 }
