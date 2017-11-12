@@ -123,6 +123,13 @@ static int (*bpf_skb_change_head)(void *, int len, int flags) =
 #define PT_REGS_SP(x) ((x)->sp)
 #define PT_REGS_IP(x) ((x)->ip)
 
+#define FTRACE_REGS_PARAM1(x) ((x)->rdi)
+#define FTRACE_REGS_PARAM2(x) ((x)->rsi)
+#define FTRACE_REGS_PARAM3(x) ((x)->rdx)
+#define FTRACE_REGS_PARAM4(x) ((x)->rcx)
+#define FTRACE_REGS_PARAM5(x) ((x)->r8)
+#define FTRACE_REGS_PARAM6(x) ((x)->r9)
+
 #elif defined(__s390x__)
 
 #define PT_REGS_PARM1(x) ((x)->gprs[2])

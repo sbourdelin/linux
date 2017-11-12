@@ -61,6 +61,7 @@ static int load_and_attach(const char *event, struct bpf_insn *prog, int size)
 	bool is_kprobe = strncmp(event, "kprobe/", 7) == 0;
 	bool is_kretprobe = strncmp(event, "kretprobe/", 10) == 0;
 	bool is_tracepoint = strncmp(event, "tracepoint/", 11) == 0;
+	bool is_ftrace = strncmp(event, "ftrace", 6) == 0;
 	bool is_xdp = strncmp(event, "xdp", 3) == 0;
 	bool is_perf_event = strncmp(event, "perf_event", 10) == 0;
 	bool is_cgroup_skb = strncmp(event, "cgroup/skb", 10) == 0;
@@ -71,6 +72,7 @@ static int load_and_attach(const char *event, struct bpf_insn *prog, int size)
 	enum bpf_prog_type prog_type;
 	char buf[256];
 	int fd, efd, err, id;
+	int cnt;
 	struct perf_event_attr attr = {};
 
 	attr.type = PERF_TYPE_TRACEPOINT;
@@ -84,6 +86,8 @@ static int load_and_attach(const char *event, struct bpf_insn *prog, int size)
 		prog_type = BPF_PROG_TYPE_KPROBE;
 	} else if (is_tracepoint) {
 		prog_type = BPF_PROG_TYPE_TRACEPOINT;
+	} else if (is_ftrace) {
+		prog_type = BPF_PROG_TYPE_FTRACE;
 	} else if (is_xdp) {
 		prog_type = BPF_PROG_TYPE_XDP;
 	} else if (is_perf_event) {
@@ -126,6 +130,25 @@ static int load_and_attach(const char *event, struct bpf_insn *prog, int size)
 			return -1;
 		}
 		return populate_prog_array(event, fd);
+	}
+
+	if (is_ftrace) {
+		cnt = snprintf(buf, sizeof(buf), "%d", fd);
+		efd = open("/sys/kernel/debug/tracing/set_ftrace_bpf",
+				   O_WRONLY, 0);
+		if (efd < 0) {
+			printf("open set_ftrace_bpf failed %s\n",
+				   strerror(errno));
+			return -1;
+		}
+		err = write(efd, buf, cnt);
+		if (err < 0 || err > cnt) {
+			printf("write set_ftrace_bpf failed %s\n",
+				   strerror(errno));
+			return -1;
+		}
+		close(efd);
+		return 0;
 	}
 
 	if (is_kprobe || is_kretprobe) {
@@ -572,6 +595,7 @@ static int do_load_bpf_file(const char *path, fixup_map_cb fixup_map)
 		if (memcmp(shname, "kprobe/", 7) == 0 ||
 		    memcmp(shname, "kretprobe/", 10) == 0 ||
 		    memcmp(shname, "tracepoint/", 11) == 0 ||
+			memcmp(shname, "ftrace", 6) == 0 ||
 		    memcmp(shname, "xdp", 3) == 0 ||
 		    memcmp(shname, "perf_event", 10) == 0 ||
 		    memcmp(shname, "socket", 6) == 0 ||
