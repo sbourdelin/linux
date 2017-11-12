@@ -702,6 +702,13 @@ config TRACING_EVENTS_GPIO
 	help
 	  Enable tracing events for gpio subsystem
 
+config FTRACE_BPF_FILTER
+	bool "filter function trace by bpf"
+	depends on FUNCTION_GRAPH_TRACER
+	default y
+	help
+	  Enable the kernel to triger ftrace by a bpf program
+
 endif # FTRACE
 
 endif # TRACING_SUPPORT

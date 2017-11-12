@@ -1001,9 +1001,11 @@ static int bpf_prog_load(union bpf_attr *attr)
 	if (attr->insn_cnt == 0 || attr->insn_cnt > BPF_MAXINSNS)
 		return -E2BIG;
 
-	if (type == BPF_PROG_TYPE_KPROBE &&
-	    attr->kern_version != LINUX_VERSION_CODE)
-		return -EINVAL;
+	if (type == BPF_PROG_TYPE_KPROBE || type == BPF_PROG_TYPE_FTRACE) {
+		if (attr->kern_version != LINUX_VERSION_CODE) {
+			return -EINVAL;
+		}
+	}
 
 	if (type != BPF_PROG_TYPE_SOCKET_FILTER &&
 	    type != BPF_PROG_TYPE_CGROUP_SKB &&

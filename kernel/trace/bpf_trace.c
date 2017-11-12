@@ -667,3 +667,45 @@ const struct bpf_verifier_ops perf_event_prog_ops = {
 	.is_valid_access	= pe_prog_is_valid_access,
 	.convert_ctx_access	= pe_prog_convert_ctx_access,
 };
+
+#ifdef FTRACE_BPF_FILTER
+static const struct bpf_func_proto *ftrace_prog_func_proto(
+	enum bpf_func_id func_id)
+{
+	switch (func_id) {
+	case BPF_FUNC_perf_event_output:
+		return &bpf_perf_event_output_proto;
+	case BPF_FUNC_get_stackid:
+		return &bpf_get_stackid_proto;
+	default:
+		return tracing_func_proto(func_id);
+	}
+}
+
+static bool ftrace_prog_is_valid_access(int off, int size,
+					enum bpf_access_type type,
+					struct bpf_insn_access_aux *info)
+{
+	if (off < 0 || off >= sizeof(struct ftrace_regs))
+		return false;
+	if (type != BPF_READ)
+		return false;
+	if (off % size != 0)
+		return false;
+	/*
+	 * Assertion for 32 bit to make sure last 8 byte access
+	 * (BPF_DW) to the last 4 byte member is disallowed.
+	 */
+	if (off + size > sizeof(struct ftrace_regs))
+		return false;
+
+	return true;
+}
+
+const struct bpf_verifier_ops ftrace_prog_ops = {
+	.get_func_proto  = ftrace_prog_func_proto,
+	.is_valid_access = ftrace_prog_is_valid_access,
+};
+#else
+const struct bpf_verifier_ops ftrace_prog_ops;
+#endif	/* FTRACE_BPF_FILTER */
