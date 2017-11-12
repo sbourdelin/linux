@@ -27,7 +27,7 @@
 #include <linux/soc/qcom/wcnss_ctrl.h>
 #include "wcn36xx.h"
 
-unsigned int wcn36xx_dbg_mask;
+unsigned int wcn36xx_dbg_mask = WCN36XX_DBG_NONE;
 module_param_named(debug_mask, wcn36xx_dbg_mask, uint, 0644);
 MODULE_PARM_DESC(debug_mask, "Debugging mask");
 
