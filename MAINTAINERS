@@ -3969,7 +3969,7 @@ W:	http://linux-decnet.sourceforge.net
 L:	linux-decnet-user@lists.sourceforge.net
 S:	Orphan
 F:	Documentation/networking/decnet.txt
-F:	net/decnet/
+F:	drivers/staging/decnet/
 
 DECSTATION PLATFORM SUPPORT
 M:	"Maciej W. Rozycki" <macro@linux-mips.org>

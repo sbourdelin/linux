@@ -30,6 +30,11 @@ source "drivers/staging/wlan-ng/Kconfig"
 
 source "drivers/staging/comedi/Kconfig"
 
+if NETFILTER
+source "drivers/staging/decnet/netfilter/Kconfig"
+endif
+source "drivers/staging/decnet/Kconfig"
+
 source "drivers/staging/olpc_dcon/Kconfig"
 
 source "drivers/staging/rtl8192u/Kconfig"
