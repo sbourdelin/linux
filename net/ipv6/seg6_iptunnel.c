@@ -133,7 +133,7 @@ int seg6_do_srh_encap(struct sk_buff *skb, struct ipv6_sr_hdr *osrh, int proto)
 
 	isrh->nexthdr = proto;
 
-	hdr->daddr = isrh->segments[isrh->first_segment];
+	hdr->daddr = isrh->segments[isrh->last_entry];
 	set_tun_src(net, skb->dev, &hdr->daddr, &hdr->saddr);
 
 #ifdef CONFIG_IPV6_SEG6_HMAC
@@ -184,7 +184,7 @@ int seg6_do_srh_inline(struct sk_buff *skb, struct ipv6_sr_hdr *osrh)
 	hdr->nexthdr = NEXTHDR_ROUTING;
 
 	isrh->segments[0] = hdr->daddr;
-	hdr->daddr = isrh->segments[isrh->first_segment];
+	hdr->daddr = isrh->segments[isrh->last_entry];
 
 #ifdef CONFIG_IPV6_SEG6_HMAC
 	if (sr_has_hmac(isrh)) {

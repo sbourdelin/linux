@@ -40,10 +40,10 @@ bool seg6_validate_srh(struct ipv6_sr_hdr *srh, int len)
 	if (((srh->hdrlen + 1) << 3) != len)
 		return false;
 
-	if (srh->segments_left > srh->first_segment)
+	if (srh->segments_left > srh->last_entry)
 		return false;
 
-	tlv_offset = sizeof(*srh) + ((srh->first_segment + 1) << 4);
+	tlv_offset = sizeof(*srh) + ((srh->last_entry + 1) << 4);
 
 	trailing = len - tlv_offset;
 	if (trailing < 0)

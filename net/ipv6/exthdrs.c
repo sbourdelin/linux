@@ -877,7 +877,7 @@ static void ipv6_push_rthdr4(struct sk_buff *skb, u8 *proto,
 	sr_phdr = skb_push(skb, plen);
 	memcpy(sr_phdr, sr_ihdr, sizeof(struct ipv6_sr_hdr));
 
-	hops = sr_ihdr->first_segment + 1;
+	hops = sr_ihdr->last_entry + 1;
 	memcpy(sr_phdr->segments + 1, sr_ihdr->segments + 1,
 	       (hops - 1) * sizeof(struct in6_addr));
 

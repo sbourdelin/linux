@@ -91,7 +91,7 @@ static struct sr6_tlv_hmac *seg6_get_tlv_hmac(struct ipv6_sr_hdr *srh)
 {
 	struct sr6_tlv_hmac *tlv;
 
-	if (srh->hdrlen < (srh->first_segment + 1) * 2 + 5)
+	if (srh->hdrlen < (srh->last_entry + 1) * 2 + 5)
 		return NULL;
 
 	if (!sr_has_hmac(srh))
@@ -175,8 +175,8 @@ int seg6_hmac_compute(struct seg6_hmac_info *hinfo, struct ipv6_sr_hdr *hdr,
 	 * hash function (RadioGatun) with up to 1216 bits
 	 */
 
-	/* saddr(16) + first_seg(1) + flags(1) + keyid(4) + seglist(16n) */
-	plen = 16 + 1 + 1 + 4 + (hdr->first_segment + 1) * 16;
+	/* saddr(16) + last_entry(1) + flags(1) + keyid(4) + seglist(16n) */
+	plen = 16 + 1 + 1 + 4 + (hdr->last_entry + 1) * 16;
 
 	/* this limit allows for 14 segments */
 	if (plen >= SEG6_HMAC_RING_SIZE)
@@ -186,7 +186,7 @@ int seg6_hmac_compute(struct seg6_hmac_info *hinfo, struct ipv6_sr_hdr *hdr,
 	 * as follows, in order:
 	 *
 	 * 1. Source IPv6 address (128 bits)
-	 * 2. first_segment value (8 bits)
+	 * 2. last_entry value (8 bits)
 	 * 3. Flags (8 bits)
 	 * 4. HMAC Key ID (32 bits)
 	 * 5. All segments in the segments list (n * 128 bits)
@@ -200,8 +200,8 @@ int seg6_hmac_compute(struct seg6_hmac_info *hinfo, struct ipv6_sr_hdr *hdr,
 	memcpy(off, saddr, 16);
 	off += 16;
 
-	/* first_segment value */
-	*off++ = hdr->first_segment;
+	/* last_entry value */
+	*off++ = hdr->last_entry;
 
 	/* flags */
 	*off++ = hdr->flags;
@@ -211,7 +211,7 @@ int seg6_hmac_compute(struct seg6_hmac_info *hinfo, struct ipv6_sr_hdr *hdr,
 	off += 4;
 
 	/* all segments in the list */
-	for (i = 0; i < hdr->first_segment + 1; i++) {
+	for (i = 0; i < hdr->last_entry + 1; i++) {
 		memcpy(off, hdr->segments + i, 16);
 		off += 16;
 	}
