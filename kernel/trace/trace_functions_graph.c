@@ -372,6 +372,24 @@ static inline int ftrace_graph_ignore_irqs(void)
 	return in_irq();
 }
 
+#ifdef FTRACE_BPF_FILTER
+static inline int ftrace_graph_bpf_filter(
+	struct trace_array *tr, struct ftrace_graph_ent *trace)
+{
+	struct bpf_prog *prog;
+	int ret = 1;
+
+	if (!ftrace_graph_addr(trace->func))
+		return ret;
+	rcu_read_lock();
+	prog = rcu_dereference(tr->prog);
+	if (prog)
+		ret = trace_call_bpf(prog, trace->ctx);
+	rcu_read_unlock();
+	return ret;
+}
+#endif
+
 int trace_graph_entry(struct ftrace_graph_ent *trace)
 {
 	struct trace_array *tr = graph_array;
@@ -390,6 +408,11 @@ int trace_graph_entry(struct ftrace_graph_ent *trace)
 
 	if (ftrace_graph_ignore_irqs())
 		return 0;
+
+#ifdef FTRACE_BPF_FILTER
+	if (!ftrace_graph_bpf_filter(tr, trace))
+		return 0;
+#endif
 
 	/*
 	 * Do not trace a function if it's filtered by set_graph_notrace.
