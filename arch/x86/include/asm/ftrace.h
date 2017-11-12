@@ -11,6 +11,28 @@
 #endif
 #define MCOUNT_INSN_SIZE	5 /* sizeof mcount call */
 
+#ifndef __i386__
+#ifdef CONFIG_FTRACE_BPF_FILTER
+#define FTRACE_BPF_FILTER
+#ifndef __ASSEMBLY__
+/*
+ * The order is exactly same as
+ * arch/x86/entry/calling.h
+ */
+struct ftrace_regs {
+	unsigned long r9;
+	unsigned long r8;
+	unsigned long rax;
+	unsigned long rcx;
+	unsigned long rdx;
+	unsigned long rsi;
+	unsigned long rdi;
+};
+#endif
+#endif	/* CONFIG_FTRACE_BPF_FILTER */
+
+#endif
+
 #ifdef CONFIG_DYNAMIC_FTRACE
 #define ARCH_SUPPORTS_FTRACE_OPS 1
 #endif

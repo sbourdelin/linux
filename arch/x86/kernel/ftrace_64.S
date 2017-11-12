@@ -108,6 +108,7 @@ EXPORT_SYMBOL(mcount)
 	movq MCOUNT_REG_SIZE-8(%rsp), %rdx
 	movq %rdx, RBP(%rsp)
 
+	leaq R9(%rsp), %rcx
 	/* Copy the parent address into %rsi (second parameter) */
 #ifdef CC_USING_FENTRY
 	movq MCOUNT_REG_SIZE+8+\added(%rsp), %rsi

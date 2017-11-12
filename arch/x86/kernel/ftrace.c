@@ -896,8 +896,14 @@ static void *addr_from_call(void *ptr)
 	return ptr + MCOUNT_INSN_SIZE + calc.offset;
 }
 
+#ifdef FTRACE_BPF_FILTER
+void prepare_ftrace_return(unsigned long self_addr, unsigned long *parent,
+			   unsigned long frame_pointer,
+			   struct ftrace_regs *ctx);
+#else
 void prepare_ftrace_return(unsigned long self_addr, unsigned long *parent,
 			   unsigned long frame_pointer);
+#endif
 
 /*
  * If the ops->trampoline was not allocated, then it probably
@@ -989,8 +995,14 @@ int ftrace_disable_ftrace_graph_caller(void)
  * Hook the return address and push it in the stack of return addrs
  * in current thread info.
  */
+#ifdef FTRACE_BPF_FILTER
+void prepare_ftrace_return(unsigned long self_addr, unsigned long *parent,
+			   unsigned long frame_pointer,
+			   struct ftrace_regs *ctx)
+#else
 void prepare_ftrace_return(unsigned long self_addr, unsigned long *parent,
 			   unsigned long frame_pointer)
+#endif
 {
 	unsigned long old;
 	int faulted;
@@ -1048,6 +1060,9 @@ void prepare_ftrace_return(unsigned long self_addr, unsigned long *parent,
 
 	trace.func = self_addr;
 	trace.depth = current->curr_ret_stack + 1;
+#ifdef FTRACE_BPF_FILTER
+	trace.ctx = ctx;
+#endif
 
 	/* Only trace if the calling function expects to */
 	if (!ftrace_graph_entry(&trace)) {
