@@ -33,6 +33,7 @@
 #include <linux/list.h>
 #include <linux/hash.h>
 #include <linux/rcupdate.h>
+#include <linux/bpf.h>
 
 #include <trace/events/sched.h>
 
@@ -6415,10 +6416,83 @@ static const struct file_operations ftrace_pid_fops = {
 	.release	= ftrace_pid_release,
 };
 
+#ifdef FTRACE_BPF_FILTER
+static int
+ftrace_bpf_open(struct inode *inode, struct file *file)
+{
+	struct trace_array *tr = inode->i_private;
+
+	if (trace_array_get(tr) < 0)
+		return -ENODEV;
+
+	file->private_data = tr;
+
+	return 0;
+}
+
+static int
+ftrace_bpf_release(struct inode *inode, struct file *file)
+{
+	struct trace_array *tr = inode->i_private;
+
+	trace_array_put(tr);
+	return 0;
+}
+
+static ssize_t
+ftrace_bpf_write(struct file *filp, const char __user *ubuf,
+		   size_t cnt, loff_t *ppos)
+{
+	struct trace_array *tr = filp->private_data;
+	unsigned long prog_fd;
+	struct bpf_prog *prog, *old_prog;
+	ssize_t ret = 0;
+
+	old_prog = NULL;
+	mutex_lock(&ftrace_lock);
+	if (!cnt) {
+		old_prog = tr->prog;
+		goto out;
+	}
+	ret = kstrtoul_from_user(ubuf, cnt, 10, &prog_fd);
+	if (ret)
+		goto out;
+
+	prog = bpf_prog_get(prog_fd);
+	if (IS_ERR(prog)) {
+		ret = PTR_ERR(prog);
+		goto out;
+	}
+
+	old_prog = tr->prog;
+	rcu_assign_pointer(tr->prog, prog);
+
+ out:
+	mutex_unlock(&ftrace_lock);
+	if (old_prog) {
+		synchronize_rcu();
+		bpf_prog_put(old_prog);
+	}
+	if (ret)
+		return ret;
+
+	return cnt;
+}
+
+static const struct file_operations ftrace_bpf_fops = {
+	.open		= ftrace_bpf_open,
+	.write		= ftrace_bpf_write,
+	.release	= ftrace_bpf_release,
+};
+#endif	/* FTRACE_BPF_FILTER */
 void ftrace_init_tracefs(struct trace_array *tr, struct dentry *d_tracer)
 {
 	trace_create_file("set_ftrace_pid", 0644, d_tracer,
 			    tr, &ftrace_pid_fops);
+#ifdef FTRACE_BPF_FILTER
+	trace_create_file("set_ftrace_bpf", 0644, d_tracer,
+				tr, &ftrace_bpf_fops);
+#endif
 }
 
 void __init ftrace_init_tracefs_toplevel(struct trace_array *tr,

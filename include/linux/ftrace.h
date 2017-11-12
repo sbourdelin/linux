@@ -769,6 +769,9 @@ static inline void ftrace_init(void) { }
 struct ftrace_graph_ent {
 	unsigned long func; /* Current function */
 	int depth;
+#ifdef FTRACE_BPF_FILTER
+	struct ftrace_regs *ctx;
+#endif
 } __packed;
 
 /*

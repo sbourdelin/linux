@@ -7714,6 +7714,9 @@ static int instance_mkdir(const char *name)
 	raw_spin_lock_init(&tr->start_lock);
 
 	tr->max_lock = (arch_spinlock_t)__ARCH_SPIN_LOCK_UNLOCKED;
+#ifdef FTRACE_BPF_FILTER
+	tr->prog = NULL;
+#endif
 
 	tr->current_trace = &nop_trace;
 
@@ -8354,6 +8357,9 @@ __init static int tracer_alloc_buffers(void)
 	global_trace.current_trace = &nop_trace;
 
 	global_trace.max_lock = (arch_spinlock_t)__ARCH_SPIN_LOCK_UNLOCKED;
+#ifdef FTRACE_BPF_FILTER
+	global_trace.prog = NULL;
+#endif
 
 	ftrace_init_global_array_ops(&global_trace);
 
