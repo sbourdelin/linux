@@ -163,12 +163,6 @@ static DEFINE_SPINLOCK(net_family_lock);
 static const struct net_proto_family __rcu *net_families[NPROTO] __read_mostly;
 
 /*
- *	Statistics counters of the socket lists
- */
-
-static DEFINE_PER_CPU(int, sockets_in_use);
-
-/*
  * Support routines.
  * Move socket addresses back and forth across the kernel/user
  * divide and look after the messy bits.
@@ -549,6 +543,50 @@ static const struct inode_operations sockfs_inode_ops = {
 	.setattr = sockfs_setattr,
 };
 
+#ifdef CONFIG_PROC_FS
+static void socket_inuse_add(struct net *net, int val)
+{
+	__this_cpu_add(*net->core.socket_inuse, val);
+}
+
+static int socket_inuse_get(struct net *net)
+{
+	int cpu, res = 0;
+
+	for_each_possible_cpu(cpu)
+		res += *per_cpu_ptr(net->core.socket_inuse, cpu);
+
+	return res >= 0 ? res : 0;
+}
+
+static int __net_init socket_inuse_init_net(struct net *net)
+{
+	net->core.socket_inuse = alloc_percpu(int);
+	return net->core.socket_inuse ? 0 : -ENOMEM;
+}
+
+static void __net_exit socket_inuse_exit_net(struct net *net)
+{
+	free_percpu(net->core.socket_inuse);
+}
+
+static struct pernet_operations socket_inuse_ops = {
+	.init = socket_inuse_init_net,
+	.exit = socket_inuse_exit_net,
+};
+
+static __init int socket_inuse_init(void)
+{
+	if (register_pernet_subsys(&socket_inuse_ops))
+		panic("Cannot initialize socket inuse counters");
+
+	return 0;
+}
+
+core_initcall(socket_inuse_init);
+#endif	/* CONFIG_PROC_FS */
+
+
 /**
  *	sock_alloc	-	allocate a socket
  *
@@ -561,6 +599,7 @@ struct socket *sock_alloc(void)
 {
 	struct inode *inode;
 	struct socket *sock;
+	struct net *net;
 
 	inode = new_inode_pseudo(sock_mnt->mnt_sb);
 	if (!inode)
@@ -575,7 +614,15 @@ struct socket *sock_alloc(void)
 	inode->i_gid = current_fsgid();
 	inode->i_op = &sockfs_inode_ops;
 
-	this_cpu_add(sockets_in_use, 1);
+	net = current->nsproxy->net_ns;
+	/*
+	 * Save the _net_ to private data of inode. When we destroy the
+	 * socket, we can use it to access the _net_ and dec socket_inuse
+	 * counter.
+	 */
+	inode->i_private = get_net(net);
+	socket_inuse_add(net, 1);
+
 	return sock;
 }
 EXPORT_SYMBOL(sock_alloc);
@@ -602,7 +649,10 @@ void sock_release(struct socket *sock)
 	if (rcu_dereference_protected(sock->wq, 1)->fasync_list)
 		pr_err("%s: fasync list not empty!\n", __func__);
 
-	this_cpu_sub(sockets_in_use, 1);
+	/* inode->i_private saves the _net_ address. */
+	socket_inuse_add(SOCK_INODE(sock)->i_private, -1);
+	put_net(SOCK_INODE(sock)->i_private);
+
 	if (!sock->file) {
 		iput(SOCK_INODE(sock));
 		return;
@@ -2645,17 +2695,8 @@ core_initcall(sock_init);	/* early initcall */
 #ifdef CONFIG_PROC_FS
 void socket_seq_show(struct seq_file *seq)
 {
-	int cpu;
-	int counter = 0;
-
-	for_each_possible_cpu(cpu)
-	    counter += per_cpu(sockets_in_use, cpu);
-
-	/* It can be negative, by the way. 8) */
-	if (counter < 0)
-		counter = 0;
-
-	seq_printf(seq, "sockets: used %d\n", counter);
+	seq_printf(seq, "sockets: used %d\n",
+		   socket_inuse_get(seq->private));
 }
 #endif				/* CONFIG_PROC_FS */
 
