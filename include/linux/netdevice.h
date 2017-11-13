@@ -1898,6 +1898,7 @@ struct net_device {
 	struct lock_class_key	*qdisc_tx_busylock;
 	struct lock_class_key	*qdisc_running_key;
 	bool			proto_down;
+	unsigned int		netns_blocker_count;
 };
 #define to_net_dev(d) container_of(d, struct net_device, dev)
 
@@ -3343,6 +3344,49 @@ static inline void dev_put(struct net_device *dev)
 static inline void dev_hold(struct net_device *dev)
 {
 	this_cpu_inc(*dev->pcpu_refcnt);
+}
+
+static inline void dev_netns_blocker_inc(struct net_device *dev)
+{
+	dev->netns_blocker_count++;
+}
+
+static inline void dev_netns_blocker_dec(struct net_device *dev)
+{
+	WARN_ON(dev->netns_blocker_count-- == 0);
+}
+
+/**
+ *	dev_put - release reference to device, allow netns change
+ *	@dev: network device
+ *
+ * Release reference to device to allow it to be freed.
+ * Also, release netns blocker reference and allow it
+ * to be moved to another network namespace.
+ */
+static inline void dev_put_netns(struct net_device *dev)
+{
+	dev_netns_blocker_dec(dev);
+	dev_put(dev);
+}
+
+/**
+ *	dev_hold_netns - get reference to device, disallow netns change
+ *	@dev: network device
+ *
+ * Hold reference to device to keep it from being freed.
+ * Also, hold netns blocker reference to keep it from
+ * being moved to another network namespace.
+ */
+static inline void dev_hold_netns(struct net_device *dev)
+{
+	dev_hold(dev);
+	dev_netns_blocker_inc(dev);
+}
+
+static inline bool dev_netns_blocked(struct net_device *dev)
+{
+	return dev->netns_blocker_count;
 }
 
 /* Carrier loss detection, dial on demand. The functions netif_carrier_on

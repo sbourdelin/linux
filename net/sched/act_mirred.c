@@ -60,7 +60,7 @@ static void tcf_mirred_release(struct tc_action *a, int bind)
 	list_del(&m->tcfm_list);
 	dev = rcu_dereference_protected(m->tcfm_dev, 1);
 	if (dev)
-		dev_put(dev);
+		dev_put_netns(dev);
 	spin_unlock_bh(&mirred_list_lock);
 }
 
@@ -141,8 +141,8 @@ static int tcf_mirred_init(struct net *net, struct nlattr *nla,
 	if (dev != NULL) {
 		m->tcfm_ifindex = parm->ifindex;
 		if (ret != ACT_P_CREATED)
-			dev_put(rcu_dereference_protected(m->tcfm_dev, 1));
-		dev_hold(dev);
+			dev_put_netns(rcu_dereference_protected(m->tcfm_dev, 1));
+		dev_hold_netns(dev);
 		rcu_assign_pointer(m->tcfm_dev, dev);
 		m->tcfm_mac_header_xmit = mac_header_xmit;
 	}
@@ -296,7 +296,7 @@ static int mirred_device_event(struct notifier_block *unused,
 		spin_lock_bh(&mirred_list_lock);
 		list_for_each_entry(m, &mirred_list, tcfm_list) {
 			if (rcu_access_pointer(m->tcfm_dev) == dev) {
-				dev_put(dev);
+				dev_put_netns(dev);
 				/* Note : no rcu grace period necessary, as
 				 * net_device are already rcu protected.
 				 */
