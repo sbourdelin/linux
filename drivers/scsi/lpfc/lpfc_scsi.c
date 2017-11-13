@@ -3938,6 +3938,8 @@ lpfc_scsi_cmd_iocb_cmpl(struct lpfc_hba *phba, struct lpfc_iocbq *pIocbIn,
 	cmd = lpfc_cmd->pCmd;
 	if (!cmd)
 		return;
+	if (cmd->host_scribble != lpfc_cmd)
+		return;
 	shost = cmd->device->host;
 
 	lpfc_cmd->result = (pIocbOut->iocb.un.ulpWord[4] & IOERR_PARAM_MASK);
