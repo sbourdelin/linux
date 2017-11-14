@@ -633,7 +633,6 @@ static void nb8800_pause_config(struct net_device *dev)
 {
 	struct nb8800_priv *priv = netdev_priv(dev);
 	struct phy_device *phydev = dev->phydev;
-	u32 rxcr;
 
 	if (priv->pause_aneg) {
 		if (!phydev || !phydev->link)
@@ -644,22 +643,7 @@ static void nb8800_pause_config(struct net_device *dev)
 	}
 
 	nb8800_modb(priv, NB8800_RX_CTL, RX_PAUSE_EN, priv->pause_rx);
-
-	rxcr = nb8800_readl(priv, NB8800_RXC_CR);
-	if (!!(rxcr & RCR_FL) == priv->pause_tx)
-		return;
-
-	if (netif_running(dev)) {
-		napi_disable(&priv->napi);
-		netif_tx_lock_bh(dev);
-		nb8800_dma_stop(dev);
-		nb8800_modl(priv, NB8800_RXC_CR, RCR_FL, priv->pause_tx);
-		nb8800_start_rx(dev);
-		netif_tx_unlock_bh(dev);
-		napi_enable(&priv->napi);
-	} else {
-		nb8800_modl(priv, NB8800_RXC_CR, RCR_FL, priv->pause_tx);
-	}
+	nb8800_modl(priv, NB8800_RXC_CR, RCR_FL, priv->pause_tx);
 }
 
 static void nb8800_link_reconfigure(struct net_device *dev)
