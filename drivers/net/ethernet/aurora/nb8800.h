@@ -306,11 +306,13 @@ struct nb8800_priv {
 	dma_addr_t			tx_desc_dma;
 
 	struct clk			*clk;
+	const struct nb8800_ops		*ops;
 };
 
 struct nb8800_ops {
 	int				(*init)(struct net_device *dev);
-	int				(*reset)(struct net_device *dev);
+	void				(*power_down)(struct net_device *dev);
+	void				(*power_up)(struct net_device *dev);
 };
 
 #endif /* _NB8800_H_ */
