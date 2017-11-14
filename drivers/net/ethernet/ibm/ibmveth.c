@@ -1092,8 +1092,14 @@ retry_bounce:
 	 */
 	if (force_bounce || (!skb_is_nonlinear(skb) &&
 				(skb->len < tx_copybreak))) {
-		skb_copy_from_linear_data(skb, adapter->bounce_buffer,
-					  skb->len);
+		if (adapter->bounce_buffer) {
+			skb_copy_from_linear_data(skb, adapter->bounce_buffer,
+						  skb->len);
+		} else {
+			adapter->tx_send_failed++;
+			netdev->stats.tx_dropped++;
+			goto out;
+		}
 
 		descs[0].fields.flags_len = desc_flags | skb->len;
 		descs[0].fields.address = adapter->bounce_buffer_dma;
