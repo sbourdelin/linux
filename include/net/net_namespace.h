@@ -60,7 +60,7 @@ struct net {
 
 	struct list_head	list;		/* list of network namespaces */
 	struct list_head	cleanup_list;	/* namespaces on death row */
-	struct list_head	exit_list;	/* Use only net_mutex */
+	struct list_head	exit_list;	/* Use only net_sem */
 
 	struct user_namespace   *user_ns;	/* Owning user namespace */
 	struct ucounts		*ucounts;
@@ -89,7 +89,12 @@ struct net {
 	/* core fib_rules */
 	struct list_head	rules_ops;
 
-	struct list_head	fib_notifier_ops;  /* protected by net_mutex */
+	/*
+	 * RCU-protected list, modifiable by pernet-init and -exit methods.
+	 * When net namespace is alive (net::count > 0), all the changes
+	 * are made under rw_sem held on write.
+	 */
+	struct list_head	fib_notifier_ops;
 
 	struct net_device       *loopback_dev;          /* The loopback */
 	struct netns_core	core;
