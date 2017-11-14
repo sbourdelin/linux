@@ -1437,6 +1437,26 @@ static int nb8800_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int nb8800_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct net_device *dev = platform_get_drvdata(pdev);
+
+	if (netif_running(dev))
+		return nb8800_stop(dev);
+
+	return 0;
+}
+
+static int nb8800_resume(struct platform_device *pdev)
+{
+	struct net_device *dev = platform_get_drvdata(pdev);
+
+	if (netif_running(dev))
+		return nb8800_open(dev);
+
+	return 0;
+}
+
 static struct platform_driver nb8800_driver = {
 	.driver = {
 		.name		= "nb8800",
@@ -1444,6 +1464,8 @@ static struct platform_driver nb8800_driver = {
 	},
 	.probe	= nb8800_probe,
 	.remove	= nb8800_remove,
+	.suspend = nb8800_suspend,
+	.resume = nb8800_resume,
 };
 
 module_platform_driver(nb8800_driver);
