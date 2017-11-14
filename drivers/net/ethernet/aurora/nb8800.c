@@ -1336,9 +1336,6 @@ static const struct nb8800_ops nb8800_tango4_ops = {
 
 static const struct of_device_id nb8800_dt_ids[] = {
 	{
-		.compatible = "aurora,nb8800",
-	},
-	{
 		.compatible = "sigma,smp8642-ethernet",
 		.data = &nb8800_tangox_ops,
 	},
