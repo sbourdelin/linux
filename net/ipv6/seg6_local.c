@@ -31,6 +31,7 @@
 #include <net/seg6_hmac.h>
 #endif
 #include <linux/etherdevice.h>
+#include <linux/kernel.h>
 
 struct seg6_local_lwt;
 
@@ -499,10 +500,9 @@ static struct seg6_action_desc seg6_action_table[] = {
 static struct seg6_action_desc *__get_action_desc(int action)
 {
 	struct seg6_action_desc *desc;
-	int i, count;
+	int i;
 
-	count = sizeof(seg6_action_table) / sizeof(struct seg6_action_desc);
-	for (i = 0; i < count; i++) {
+	for (i = 0; i < ARRAY_SIZE(seg6_action_table); i++) {
 		desc = &seg6_action_table[i];
 		if (desc->action == action)
 			return desc;

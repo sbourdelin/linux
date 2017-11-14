@@ -15,6 +15,7 @@
  * Costa Mesa, CA 92626
  */
 
+#include <linux/kernel.h>
 #include <linux/module.h>
 #include "be.h"
 #include "be_cmds.h"
@@ -103,10 +104,9 @@ static struct be_cmd_priv_map cmd_priv_map[] = {
 static bool be_cmd_allowed(struct be_adapter *adapter, u8 opcode, u8 subsystem)
 {
 	int i;
-	int num_entries = sizeof(cmd_priv_map)/sizeof(struct be_cmd_priv_map);
 	u32 cmd_privileges = adapter->cmd_privileges;
 
-	for (i = 0; i < num_entries; i++)
+	for (i = 0; i < ARRAY_SIZE(cmd_priv_map); i++)
 		if (opcode == cmd_priv_map[i].opcode &&
 		    subsystem == cmd_priv_map[i].subsystem)
 			if (!(cmd_privileges & cmd_priv_map[i].priv_mask))
