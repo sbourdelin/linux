@@ -2974,6 +2974,8 @@ out:
 void hugetlb_report_meminfo(struct seq_file *m)
 {
 	struct hstate *h = &default_hstate;
+	unsigned long total = 0;
+
 	if (!hugepages_supported())
 		return;
 	seq_printf(m,
@@ -2987,6 +2989,11 @@ void hugetlb_report_meminfo(struct seq_file *m)
 			h->resv_huge_pages,
 			h->surplus_huge_pages,
 			1UL << (huge_page_order(h) + PAGE_SHIFT - 10));
+
+	for_each_hstate(h)
+		total += (PAGE_SIZE << huge_page_order(h)) * h->nr_huge_pages;
+
+	seq_printf(m, "Hugetlb:        %8lu kB\n", total / 1024);
 }
 
 int hugetlb_report_node_meminfo(int nid, char *buf)
