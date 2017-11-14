@@ -144,7 +144,7 @@ static struct device_node * __init tilcdc_get_overlay(struct kfree_table *kft)
 	const int size = __dtb_tilcdc_slave_compat_end -
 		__dtb_tilcdc_slave_compat_begin;
 	static void *overlay_data;
-	struct device_node *overlay;
+	struct device_node *overlay = NULL;
 
 	if (!size) {
 		pr_warn("%s: No overlay data\n", __func__);
