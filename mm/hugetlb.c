@@ -1279,6 +1279,8 @@ void free_huge_page(struct page *page)
 	clear_page_huge_active(page);
 	hugetlb_cgroup_uncharge_page(hstate_index(h),
 				     pages_per_huge_page(h), page);
+	mem_cgroup_remove_hugetlb_page(page, pages_per_huge_page(h));
+
 	if (restore_reserve)
 		h->resv_huge_pages++;
 
@@ -1301,6 +1303,7 @@ static void prep_new_huge_page(struct hstate *h, struct page *page, int nid)
 	set_compound_page_dtor(page, HUGETLB_PAGE_DTOR);
 	spin_lock(&hugetlb_lock);
 	set_hugetlb_cgroup(page, NULL);
+	mem_cgroup_reset_hugetlb_page(page);
 	h->nr_huge_pages++;
 	h->nr_huge_pages_node[nid]++;
 	spin_unlock(&hugetlb_lock);
@@ -1584,6 +1587,7 @@ static struct page *__alloc_buddy_huge_page(struct hstate *h, gfp_t gfp_mask,
 		r_nid = page_to_nid(page);
 		set_compound_page_dtor(page, HUGETLB_PAGE_DTOR);
 		set_hugetlb_cgroup(page, NULL);
+		mem_cgroup_reset_hugetlb_page(page);
 		/*
 		 * We incremented the global counters already
 		 */
@@ -2041,6 +2045,7 @@ struct page *alloc_huge_page(struct vm_area_struct *vma,
 		/* Fall through */
 	}
 	hugetlb_cgroup_commit_charge(idx, pages_per_huge_page(h), h_cg, page);
+	mem_cgroup_add_hugetlb_page(page, pages_per_huge_page(h));
 	spin_unlock(&hugetlb_lock);
 
 	set_page_private(page, (unsigned long)spool);

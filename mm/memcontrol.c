@@ -5338,6 +5338,9 @@ static int memory_stat_show(struct seq_file *m, void *v)
 	seq_printf(m, "slab_unreclaimable %llu\n",
 		   (u64)stat[NR_SLAB_UNRECLAIMABLE] * PAGE_SIZE);
 
+	seq_printf(m, "hugetlb %llu\n",
+		   (u64)stat[MEMCG_HUGETLB] * PAGE_SIZE);
+
 	/* Accumulated memory events */
 
 	seq_printf(m, "pgfault %lu\n", events[PGFAULT]);

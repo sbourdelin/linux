@@ -45,6 +45,7 @@ enum memcg_stat_item {
 	MEMCG_SOCK,
 	/* XXX: why are these zone and not node counters? */
 	MEMCG_KERNEL_STACK_KB,
+	MEMCG_HUGETLB,
 	MEMCG_NR_STAT,
 };
 
@@ -664,6 +665,39 @@ static inline void count_memcg_event_mm(struct mm_struct *mm,
 void mem_cgroup_split_huge_fixup(struct page *head);
 #endif
 
+#ifdef CONFIG_HUGETLBFS
+static inline void mem_cgroup_add_hugetlb_page(struct page *page,
+					       unsigned int count)
+{
+	if (mem_cgroup_disabled())
+		return;
+
+	rcu_read_lock();
+	page->mem_cgroup = mem_cgroup_from_task(current);
+	css_get(&page->mem_cgroup->css);
+	rcu_read_unlock();
+
+	mod_memcg_page_state(page, MEMCG_HUGETLB, count);
+}
+
+static inline void mem_cgroup_remove_hugetlb_page(struct page *page,
+						  unsigned int count)
+{
+	if (mem_cgroup_disabled() || !page->mem_cgroup)
+		return;
+
+	mod_memcg_page_state(page, MEMCG_HUGETLB, -count);
+
+	css_put(&page->mem_cgroup->css);
+	page->mem_cgroup = NULL;
+}
+
+static inline void mem_cgroup_reset_hugetlb_page(struct page *page)
+{
+	page->mem_cgroup = NULL;
+}
+#endif
+
 #else /* CONFIG_MEMCG */
 
 #define MEM_CGROUP_ID_SHIFT	0
@@ -934,6 +968,20 @@ static inline void count_memcg_page_event(struct page *page,
 
 static inline
 void count_memcg_event_mm(struct mm_struct *mm, enum vm_event_item idx)
+{
+}
+
+static inline void mem_cgroup_add_hugetlb_page(struct page *page,
+					       unsigned int count)
+{
+}
+
+static inline void mem_cgroup_remove_hugetlb_page(struct page *page,
+						  unsigned int count)
+{
+}
+
+static inline void mem_cgroup_reset_hugetlb_page(struct page *page)
 {
 }
 #endif /* CONFIG_MEMCG */
