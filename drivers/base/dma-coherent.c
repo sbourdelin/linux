@@ -162,7 +162,7 @@ EXPORT_SYMBOL(dma_mark_declared_memory_occupied);
 static void *__dma_alloc_from_coherent(struct dma_coherent_mem *mem,
 		ssize_t size, dma_addr_t *dma_handle)
 {
-	int order = get_order(size);
+	int nr_page = PAGE_ALIGN(size) >> PAGE_SHIFT;
 	unsigned long flags;
 	int pageno;
 	void *ret;
@@ -172,9 +172,11 @@ static void *__dma_alloc_from_coherent(struct dma_coherent_mem *mem,
 	if (unlikely(size > (mem->size << PAGE_SHIFT)))
 		goto err;
 
-	pageno = bitmap_find_free_region(mem->bitmap, mem->size, order);
-	if (unlikely(pageno < 0))
+	pageno = bitmap_find_next_zero_area(mem->bitmap, mem->size, 0,
+					    nr_page, 0);
+	if (unlikely(pageno >= mem->size)) {
 		goto err;
+	bitmap_set(mem->bitmap, pageno, nr_page);
 
 	/*
 	 * Memory was found in the coherent area.
