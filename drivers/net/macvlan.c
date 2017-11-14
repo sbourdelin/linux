@@ -534,6 +534,10 @@ static int macvlan_queue_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 xmit_world:
+	/* verify MTU */
+	if (!is_skb_forwardable(vlan->lowerdev, skb))
+		return NET_XMIT_DROP;
+
 	skb->dev = vlan->lowerdev;
 	return dev_queue_xmit(skb);
 }
