@@ -2075,7 +2075,7 @@ static int do_setlink(const struct sk_buff *skb,
 		      struct nlattr **tb, char *ifname, int status)
 {
 	const struct net_device_ops *ops = dev->netdev_ops;
-	int err;
+	int err = 0;
 
 	if (tb[IFLA_NET_NS_PID] || tb[IFLA_NET_NS_FD]) {
 		struct net *net = rtnl_link_get_net(dev_net(dev), tb);
@@ -2253,7 +2253,6 @@ static int do_setlink(const struct sk_buff *skb,
 			status |= DO_SETLINK_NOTIFY;
 		}
 	}
-	err = 0;
 
 	if (tb[IFLA_VF_PORTS]) {
 		struct nlattr *port[IFLA_PORT_MAX+1];
@@ -2286,7 +2285,6 @@ static int do_setlink(const struct sk_buff *skb,
 			status |= DO_SETLINK_NOTIFY;
 		}
 	}
-	err = 0;
 
 	if (tb[IFLA_PORT_SELF]) {
 		struct nlattr *port[IFLA_PORT_MAX+1];
@@ -2326,7 +2324,6 @@ static int do_setlink(const struct sk_buff *skb,
 			status |= DO_SETLINK_NOTIFY;
 		}
 	}
-	err = 0;
 
 	if (tb[IFLA_PROTO_DOWN]) {
 		err = dev_change_proto_down(dev,
