@@ -582,5 +582,5 @@ static struct pernet_operations nf_log_net_ops = {
 
 int __init netfilter_log_init(void)
 {
-	return register_pernet_subsys(&nf_log_net_ops);
+	return register_pernet_sys(&nf_log_net_ops);
 }
