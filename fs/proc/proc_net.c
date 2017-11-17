@@ -243,5 +243,5 @@ int __init proc_net_init(void)
 {
 	proc_symlink("net", NULL, "self/net");
 
-	return register_pernet_subsys(&proc_net_ns_ops);
+	return register_pernet_sys(&proc_net_ns_ops);
 }
