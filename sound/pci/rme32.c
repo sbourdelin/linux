@@ -1972,10 +1972,8 @@ snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 		rme32->fullduplex_mode = 1;
 
 	err = snd_rme32_create(rme32);
-	if (err < 0) {
-		snd_card_free(card);
-		return err;
-	}
+	if (err < 0)
+		goto free_card;
 
 	strcpy(card->driver, "Digi32");
 	switch (rme32->pci->device) {
@@ -1993,13 +1991,16 @@ snd_rme32_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 		card->shortname, rme32->rev, rme32->port, rme32->irq);
 
 	err = snd_card_register(card);
-	if (err < 0) {
-		snd_card_free(card);
-		return err;
-	}
+	if (err < 0)
+		goto free_card;
+
 	pci_set_drvdata(pci, card);
 	dev++;
 	return 0;
+
+free_card:
+	snd_card_free(card);
+	return err;
 }
 
 static void snd_rme32_remove(struct pci_dev *pci)
