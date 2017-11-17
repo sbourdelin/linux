@@ -413,8 +413,8 @@ static struct pernet_operations __net_initdata dev_mc_net_ops = {
 
 int __init dev_proc_init(void)
 {
-	int ret = register_pernet_subsys(&dev_proc_ops);
+	int ret = register_pernet_sys(&dev_proc_ops);
 	if (!ret)
-		return register_pernet_subsys(&dev_mc_net_ops);
+		return register_pernet_sys(&dev_mc_net_ops);
 	return ret;
 }

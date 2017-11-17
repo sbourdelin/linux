@@ -8787,7 +8787,7 @@ static int __init net_dev_init(void)
 
 	INIT_LIST_HEAD(&offload_base);
 
-	if (register_pernet_subsys(&netdev_net_ops))
+	if (register_pernet_sys(&netdev_net_ops))
 		goto out;
 
 	/*
