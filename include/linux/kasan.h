@@ -16,6 +16,7 @@ struct task_struct;
 #include <asm/kasan.h>
 #include <asm/pgtable.h>
 
+#define KASAN_OWNER_MAX	32
 /* advanced check type */
 enum kasan_adv_chk_type {
 	/* write access is allowed only for the owner */
@@ -31,6 +32,11 @@ extern p4d_t kasan_zero_p4d[PTRS_PER_P4D];
 
 void kasan_populate_zero_shadow(const void *shadow_start,
 				const void *shadow_end);
+
+struct kasan_owner_set {
+	unsigned int	s_nr;	/* # of function pointers in the following */
+	void		*s_ptrs[KASAN_OWNER_MAX];
+};
 
 static inline void *kasan_mem_to_shadow(const void *addr)
 {
@@ -86,6 +92,9 @@ size_t kasan_metadata_size(struct kmem_cache *cache);
 
 bool kasan_save_enable_multi_shot(void);
 void kasan_restore_multi_shot(bool enabled);
+
+extern int kasan_register_adv_check(unsigned int ac_type, void *p);
+extern int kasan_bind_adv_addr(void *addr, size_t size, u8 check);
 
 #else /* CONFIG_KASAN */
 
