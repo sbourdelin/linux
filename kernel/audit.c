@@ -1549,7 +1549,7 @@ static int __init audit_init(void)
 
 	pr_info("initializing netlink subsys (%s)\n",
 		audit_default ? "enabled" : "disabled");
-	register_pernet_subsys(&audit_net_ops);
+	register_pernet_sys(&audit_net_ops);
 
 	audit_initialized = AUDIT_INITIALIZED;
 
