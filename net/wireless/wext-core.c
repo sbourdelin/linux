@@ -394,7 +394,7 @@ static struct pernet_operations wext_pernet_ops = {
 
 static int __init wireless_nlevent_init(void)
 {
-	int err = register_pernet_subsys(&wext_pernet_ops);
+	int err = register_pernet_sys(&wext_pernet_ops);
 
 	if (err)
 		return err;
