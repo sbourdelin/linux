@@ -2369,6 +2369,10 @@ static int set_offload(struct tun_struct *tun, unsigned long arg)
 				features |= NETIF_F_TSO6;
 			arg &= ~(TUN_F_TSO4|TUN_F_TSO6);
 		}
+
+		if (arg & TUN_F_UFO) {
+			arg &= ~TUN_F_UFO;
+		}
 	}
 
 	/* This gives the user a way to test for new features in future by
