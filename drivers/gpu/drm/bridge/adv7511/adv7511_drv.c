@@ -1202,9 +1202,7 @@ static int adv7511_probe(struct i2c_client *i2c, const struct i2c_device_id *id)
 	offset = adv7511->type == ADV7533 ? ADV7533_REG_CEC_OFFSET : 0;
 
 #ifdef CONFIG_DRM_I2C_ADV7511_CEC
-	ret = adv7511_cec_init(dev, adv7511, offset);
-	if (ret)
-		goto err_unregister_cec;
+	adv7511_cec_init(dev, adv7511, offset);
 #else
 	regmap_write(adv7511->regmap, ADV7511_REG_CEC_CTRL + offset,
 		     ADV7511_CEC_CTRL_POWER_DOWN);

@@ -372,8 +372,8 @@ struct adv7511 {
 };
 
 #ifdef CONFIG_DRM_I2C_ADV7511_CEC
-int adv7511_cec_init(struct device *dev, struct adv7511 *adv7511,
-		     unsigned int offset);
+void adv7511_cec_init(struct device *dev, struct adv7511 *adv7511,
+		      unsigned int offset);
 void adv7511_cec_irq_process(struct adv7511 *adv7511, unsigned int irq1);
 #endif
 
