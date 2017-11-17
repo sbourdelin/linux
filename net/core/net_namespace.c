@@ -84,11 +84,11 @@ static int net_assign_generic(struct net *net, unsigned int id, void *data)
 {
 	struct net_generic *ng, *old_ng;
 
-	BUG_ON(!mutex_is_locked(&net_mutex));
+	BUG_ON(!rwsem_is_locked(&net_sem));
 	BUG_ON(id < MIN_PERNET_OPS_ID);
 
 	old_ng = rcu_dereference_protected(net->gen,
-					   lockdep_is_held(&net_mutex));
+					   lockdep_is_held(&net_sem));
 	if (old_ng->s.len > id) {
 		old_ng->ptr[id] = data;
 		return 0;
@@ -300,6 +300,7 @@ static __net_init int setup_net(struct net *net, struct user_namespace *user_ns)
 {
 	/* Must be called with net_mutex held */
 	const struct pernet_operations *ops, *saved_ops;
+	bool locked = false;
 	int error = 0;
 	LIST_HEAD(net_exit_list);
 
@@ -311,14 +312,34 @@ static __net_init int setup_net(struct net *net, struct user_namespace *user_ns)
 	spin_lock_init(&net->nsid_lock);
 
 	list_for_each_entry(ops, &pernet_list, list) {
+		if (&ops->list == first_subsys) {
+			BUG_ON(locked);
+			error = mutex_lock_killable(&net_mutex);
+			if (error)
+				goto out_undo;
+			locked = true;
+		}
+
 		error = ops_init(ops, net);
 		if (error < 0)
 			goto out_undo;
 	}
+
+	if (!locked) {
+		/*
+		 * This may happen only on early boot, so we don't
+		 * care about possibility to interrupt the locking.
+		 */
+		mutex_lock(&net_mutex);
+		locked = true;
+	}
+
 	rtnl_lock();
 	list_add_tail_rcu(&net->list, &net_namespace_list);
 	rtnl_unlock();
 out:
+	if (locked)
+		mutex_unlock(&net_mutex);
 	return error;
 
 out_undo:
@@ -433,12 +454,7 @@ struct net *copy_net_ns(unsigned long flags,
 	rv = down_read_killable(&net_sem);
 	if (rv < 0)
 		goto put_userns;
-	rv = mutex_lock_killable(&net_mutex);
-	if (rv < 0)
-		goto up_read;
 	rv = setup_net(net, user_ns);
-	mutex_unlock(&net_mutex);
-up_read:
 	up_read(&net_sem);
 	if (rv < 0) {
 put_userns:
@@ -460,6 +476,7 @@ static void cleanup_net(struct work_struct *work)
 	struct net *net, *tmp;
 	struct list_head net_kill_list;
 	LIST_HEAD(net_exit_list);
+	bool locked;
 
 	/* Atomically snapshot the list of namespaces to cleanup */
 	spin_lock_irq(&cleanup_list_lock);
@@ -468,6 +485,7 @@ static void cleanup_net(struct work_struct *work)
 
 	down_read(&net_sem);
 	mutex_lock(&net_mutex);
+	locked = true;
 
 	/* Don't let anyone else find us. */
 	rtnl_lock();
@@ -500,10 +518,18 @@ static void cleanup_net(struct work_struct *work)
 	synchronize_rcu();
 
 	/* Run all of the network namespace exit methods */
-	list_for_each_entry_reverse(ops, &pernet_list, list)
+	list_for_each_entry_reverse(ops, &pernet_list, list) {
 		ops_exit_list(ops, &net_exit_list);
 
-	mutex_unlock(&net_mutex);
+		if (&ops->list == first_subsys) {
+			BUG_ON(!locked);
+			mutex_unlock(&net_mutex);
+			locked = false;
+		}
+	}
+
+	if (locked)
+		mutex_unlock(&net_mutex);
 
 	/* Free the net generic variables */
 	list_for_each_entry_reverse(ops, &pernet_list, list)
