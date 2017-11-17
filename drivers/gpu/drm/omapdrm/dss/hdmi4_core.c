@@ -902,9 +902,20 @@ static const struct hdmi4_features hdmi4_es3_features = {
 };
 
 static const struct soc_device_attribute hdmi4_soc_devices[] = {
-	{ .family = "OMAP4", .revision = "ES1.?", .data = &hdmi4_es1_features },
-	{ .family = "OMAP4", .revision = "ES2.?", .data = &hdmi4_es2_features },
-	{ .family = "OMAP4",			  .data = &hdmi4_es3_features },
+	{
+		.machine = "OMAP4430",
+		.revision = "ES1.?",
+		.data = &hdmi4_es1_features,
+	},
+	{
+		.machine = "OMAP4430",
+		.revision = "ES2.?",
+		.data = &hdmi4_es2_features,
+	},
+	{
+		.family = "OMAP4",
+		.data = &hdmi4_es3_features,
+	},
 	{ /* sentinel */ }
 };
 
