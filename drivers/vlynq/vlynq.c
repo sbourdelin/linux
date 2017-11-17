@@ -722,13 +722,19 @@ static int vlynq_probe(struct platform_device *pdev)
 					    VLYNQ_REMOTE_OFFSET);
 
 	dev->irq = platform_get_irq_byname(pdev, "irq");
+	if (dev->irq < 0) {
+		result = dev->irq;
+		goto fail_register;
+	}
 	dev->irq_start = irq_res->start;
 	dev->irq_end = irq_res->end;
 	dev->local_irq = dev->irq_end - dev->irq_start;
 	dev->remote_irq = dev->local_irq - 1;
 
-	if (device_register(&dev->dev))
+	if (device_register(&dev->dev)) {
+		result = -ENXIO;
 		goto fail_register;
+	}
 	platform_set_drvdata(pdev, dev);
 
 	printk(KERN_INFO "%s: regs 0x%p, irq %d, mem 0x%p\n",
