@@ -2489,8 +2489,6 @@ static int __init early_amd_iommu_init(void)
 	 */
 	__set_bit(0, amd_iommu_pd_alloc_bitmap);
 
-	spin_lock_init(&amd_iommu_pd_lock);
-
 	/*
 	 * now the data structures are allocated and basically initialized
 	 * start the real acpi table scan

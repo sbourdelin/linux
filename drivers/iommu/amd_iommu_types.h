@@ -462,9 +462,11 @@ struct amd_irte_ops;
 struct protection_domain {
 	struct list_head list;  /* for list of all protection domains */
 	struct list_head dev_list; /* List of all devices in this domain */
+	struct list_head iotlb_flush_list; /* store iovas for iotlb sync */
 	struct iommu_domain domain; /* generic domain handle used by
 				       iommu core code */
 	spinlock_t lock;	/* mostly used to lock the page table*/
+	spinlock_t iotlb_flush_list_lock; /* protect iova flush list */
 	struct mutex api_lock;	/* protect page tables in the iommu-api path */
 	u16 id;			/* the domain id written to the device table */
 	int mode;		/* paging mode (0-6 levels) */
