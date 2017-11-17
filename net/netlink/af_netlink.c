@@ -2735,7 +2735,7 @@ static int __init netlink_proto_init(void)
 	netlink_add_usersock_entry();
 
 	sock_register(&netlink_family_ops);
-	register_pernet_subsys(&netlink_net_ops);
+	register_pernet_sys(&netlink_net_ops);
 	/* The netlink device handler may be needed early. */
 	rtnetlink_init();
 out:
