@@ -19,6 +19,7 @@
 #include <linux/slab.h>
 #include <linux/hash.h>
 #include <linux/kmemleak.h>
+#include <linux/nmi.h>
 
 #define ODEBUG_HASH_BITS	14
 #define ODEBUG_HASH_SIZE	(1 << ODEBUG_HASH_BITS)
@@ -768,6 +769,9 @@ repeat:
 			debug_objects_maxchain = cnt;
 
 		max_loops += cnt;
+
+		if (max_loops > 10000 && ((max_loops % 10000) == 0))
+			touch_softlockup_watchdog();
 	}
 
 	if (max_loops > debug_objects_maxloops)
