@@ -606,7 +606,7 @@ int __init netfilter_init(void)
 {
 	int ret;
 
-	ret = register_pernet_subsys(&netfilter_net_ops);
+	ret = register_pernet_sys(&netfilter_net_ops);
 	if (ret < 0)
 		goto err;
 
