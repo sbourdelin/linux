@@ -150,6 +150,7 @@ int __ip6_datagram_connect(struct sock *sk, struct sockaddr *uaddr,
 	int			addr_type;
 	int			err;
 	__be32			fl6_flowlabel = 0;
+	struct flowi6		fl6;
 
 	if (usin->sin6_family == AF_INET) {
 		if (__ipv6_only_sock(sk))
@@ -260,7 +261,8 @@ ipv4_connected:
 	}
 
 	sk->sk_state = TCP_ESTABLISHED;
-	sk_set_txhash(sk);
+	ip6_datagram_flow_key_init(&fl6, sk);
+	sk->sk_txhash = get_hash_from_flowi6(&fl6);
 out:
 	return err;
 }
