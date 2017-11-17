@@ -698,9 +698,11 @@ static long vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma,
 				break;
 		}
 
-		unmapped = iommu_unmap(domain->domain, iova, len);
+		unmapped = iommu_unmap_fast(domain->domain, iova, len);
 		if (WARN_ON(!unmapped))
 			break;
+
+		iommu_tlb_range_add(domain->domain, iova, len);
 
 		unlocked += vfio_unpin_pages_remote(dma, iova,
 						    phys >> PAGE_SHIFT,
@@ -710,6 +712,7 @@ static long vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma,
 
 		cond_resched();
 	}
+	iommu_tlb_sync(domain->domain);
 
 	dma->iommu_mapped = false;
 	if (do_accounting) {
@@ -884,8 +887,11 @@ static int map_try_harder(struct vfio_domain *domain, dma_addr_t iova,
 			break;
 	}
 
-	for (; i < npage && i > 0; i--, iova -= PAGE_SIZE)
-		iommu_unmap(domain->domain, iova, PAGE_SIZE);
+	for (; i < npage && i > 0; i--, iova -= PAGE_SIZE) {
+		iommu_unmap_fast(domain->domain, iova, PAGE_SIZE);
+		iommu_tlb_range_add(domain->domain, iova, PAGE_SIZE);
+	}
+	iommu_tlb_sync(domain->domain);
 
 	return ret;
 }
