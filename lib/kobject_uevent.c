@@ -647,7 +647,7 @@ static struct pernet_operations uevent_net_ops = {
 
 static int __init kobject_uevent_init(void)
 {
-	return register_pernet_subsys(&uevent_net_ops);
+	return register_pernet_sys(&uevent_net_ops);
 }
 
 
