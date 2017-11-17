@@ -939,6 +939,18 @@ static void __unregister_pernet_operations(struct pernet_operations *ops)
 
 static DEFINE_IDA(net_generic_ids);
 
+#define update_first_on_add(first, delim, added) 	\
+	do {						\
+		if (first == delim)			\
+			first = added;			\
+	} while (0)
+
+#define update_first_on_del(first, to_delete)		\
+	do {						\
+		if (first == to_delete)			\
+			first = (to_delete)->next;	\
+	} while (0)
+
 static int register_pernet_operations(struct list_head *list,
 				      struct pernet_operations *ops)
 {
@@ -1045,8 +1057,8 @@ int register_pernet_device(struct pernet_operations *ops)
 	int error;
 	down_write(&net_sem);
 	error = register_pernet_operations(&pernet_list, ops);
-	if (!error && (first_device == &pernet_list))
-		first_device = &ops->list;
+	if (!error)
+		update_first_on_add(first_device, &pernet_list, &ops->list);
 	up_write(&net_sem);
 	return error;
 }
@@ -1064,8 +1076,7 @@ EXPORT_SYMBOL_GPL(register_pernet_device);
 void unregister_pernet_device(struct pernet_operations *ops)
 {
 	down_write(&net_sem);
-	if (&ops->list == first_device)
-		first_device = first_device->next;
+	update_first_on_del(first_device, &ops->list);
 	unregister_pernet_operations(ops);
 	up_write(&net_sem);
 }
