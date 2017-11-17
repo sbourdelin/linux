@@ -103,7 +103,7 @@ __init int net_sysctl_init(void)
 	net_header = register_sysctl("net", empty);
 	if (!net_header)
 		goto out;
-	ret = register_pernet_subsys(&sysctl_pernet_ops);
+	ret = register_pernet_sys(&sysctl_pernet_ops);
 	if (ret)
 		goto out1;
 out:
