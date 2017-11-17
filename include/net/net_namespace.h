@@ -324,6 +324,8 @@ struct pernet_operations {
  * device which caused kernel oops, and panics during network
  * namespace cleanup.   So please don't get this wrong.
  */
+int register_pernet_sys(struct pernet_operations *);
+void unregister_pernet_sys(struct pernet_operations *);
 int register_pernet_subsys(struct pernet_operations *);
 void unregister_pernet_subsys(struct pernet_operations *);
 int register_pernet_device(struct pernet_operations *);

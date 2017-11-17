@@ -24,10 +24,24 @@
 #include <net/netns/generic.h>
 
 /*
- *	Our network namespace constructor/destructor lists
+ * Our network namespace constructor/destructor lists
+ * one by one linked in pernet_list. They are (in order
+ * of linking): sys, subsys, device.
+ *
+ * The methods from sys for a network namespace may be
+ * called in parallel with any method from any list
+ * for another net namespace.
+ *
+ * The methods from subsys and device can't be called
+ * in parallel with a method from subsys or device.
+ *
+ * When all subsys pernet_operations are moved to sys
+ * sublist, we'll kill subsys sublist, and create dev
+ * ahead of device sublist, and repeat the cycle.
  */
 
 static LIST_HEAD(pernet_list);
+static struct list_head *first_subsys = &pernet_list;
 static struct list_head *first_device = &pernet_list;
 DEFINE_MUTEX(net_mutex);
 
@@ -988,6 +1002,57 @@ static void unregister_pernet_operations(struct pernet_operations *ops)
 }
 
 /**
+ *      register_pernet_sys - register a network namespace system
+ *	@ops:  pernet operations structure for the system
+ *
+ *	Register a subsystem which has init and exit functions
+ *	that are called when network namespaces are created and
+ *	destroyed respectively.
+ *
+ *	When registered all network namespace init functions are
+ *	called for every existing network namespace.  Allowing kernel
+ *	modules to have a race free view of the set of network namespaces.
+ *
+ *	When a new network namespace is created all of the init
+ *	methods are called in the order in which they were registered.
+ *
+ *	When a network namespace is destroyed all of the exit methods
+ *	are called in the reverse of the order with which they were
+ *	registered.
+ */
+int register_pernet_sys(struct pernet_operations *ops)
+{
+	int error;
+	down_write(&net_sem);
+	if (first_subsys != first_device) {
+		panic("Pernet %ps registered out of order.\n"
+		      "There is already %ps.\n", ops,
+		      list_entry(first_subsys, struct pernet_operations, list));
+	}
+	error =  register_pernet_operations(first_subsys, ops);
+	up_write(&net_sem);
+	return error;
+}
+EXPORT_SYMBOL_GPL(register_pernet_sys);
+
+/**
+ *      unregister_pernet_sys - unregister a network namespace system
+ *	@ops: pernet operations structure to manipulate
+ *
+ *	Remove the pernet operations structure from the list to be
+ *	used when network namespaces are created or destroyed.  In
+ *	addition run the exit method for all existing network
+ *	namespaces.
+ */
+void unregister_pernet_sys(struct pernet_operations *ops)
+{
+	down_write(&net_sem);
+	unregister_pernet_operations(ops);
+	up_write(&net_sem);
+}
+EXPORT_SYMBOL_GPL(unregister_pernet_sys);
+
+/**
  *      register_pernet_subsys - register a network namespace subsystem
  *	@ops:  pernet operations structure for the subsystem
  *
@@ -1011,6 +1076,8 @@ int register_pernet_subsys(struct pernet_operations *ops)
 	int error;
 	down_write(&net_sem);
 	error =  register_pernet_operations(first_device, ops);
+	if (!error)
+		update_first_on_add(first_subsys, first_device, &ops->list);
 	up_write(&net_sem);
 	return error;
 }
@@ -1028,6 +1095,7 @@ EXPORT_SYMBOL_GPL(register_pernet_subsys);
 void unregister_pernet_subsys(struct pernet_operations *ops)
 {
 	down_write(&net_sem);
+	update_first_on_del(first_subsys, &ops->list);
 	unregister_pernet_operations(ops);
 	up_write(&net_sem);
 }
@@ -1057,8 +1125,10 @@ int register_pernet_device(struct pernet_operations *ops)
 	int error;
 	down_write(&net_sem);
 	error = register_pernet_operations(&pernet_list, ops);
-	if (!error)
+	if (!error) {
+		update_first_on_add(first_subsys, &pernet_list, &ops->list);
 		update_first_on_add(first_device, &pernet_list, &ops->list);
+	}
 	up_write(&net_sem);
 	return error;
 }
@@ -1076,6 +1146,7 @@ EXPORT_SYMBOL_GPL(register_pernet_device);
 void unregister_pernet_device(struct pernet_operations *ops)
 {
 	down_write(&net_sem);
+	update_first_on_del(first_subsys, &ops->list);
 	update_first_on_del(first_device, &ops->list);
 	unregister_pernet_operations(ops);
 	up_write(&net_sem);
