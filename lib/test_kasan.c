@@ -472,6 +472,78 @@ static noinline void __init use_after_scope_test(void)
 	p[1023] = 1;
 }
 
+static noinline void funcA(char *addr)
+{
+	*addr = 'A';
+}
+
+static noinline void funcB(char *addr)
+{
+	*addr = 'B';
+}
+
+static noinline void funcC(char *addr)
+{
+	*addr = 'C';
+}
+
+static noinline void __init kasan_adv(void)
+{
+	struct kasan_owner_set set;
+	int check, ret;
+	char *p;
+
+	pr_info("kasan: advanced check\n");
+
+	set.s_nr = 2;
+	set.s_ptrs[0] = (void *)funcA;
+	set.s_ptrs[1] = (void *)funcC;
+	check = kasan_register_adv_check(KASAN_ADVCHK_OWNER, &set);
+	if (check <= 0) {
+		pr_err("kasan_register_adv_check failedd with %d\n", check);
+		return;
+	}
+
+	p = kmalloc(62, GFP_KERNEL);
+	if (!p) {
+		pr_err("kmalloc failed with 62 bytes request\n");
+		return;
+	}
+
+	ret = kasan_bind_adv_addr(p, 32, check);
+	if (ret < 0) {
+		pr_err("kasan_bind_adv_addr failed with %d\n", ret);
+		kfree(p);
+		return;
+	}
+
+	funcA(&p[12]);
+	funcB(&p[12]);
+	funcC(&p[12]);
+
+	set.s_nr = 1;
+	set.s_ptrs[0] = (void *)funcA;
+
+	check = kasan_register_adv_check(KASAN_ADVCHK_OWNER, &set);
+	if (check <= 0) {
+		pr_err("kasan_register_adv_check failed with %d\n", check);
+		kfree(p);
+		return;
+	}
+
+	ret = kasan_bind_adv_addr(p+32, 30, check);
+	if (ret < 0) {
+		pr_err("kasan_bind_adv_addr failed with %d\n", ret);
+		kfree(p);
+		return;
+	}
+
+	funcA(&p[42]);
+	funcB(&p[42]);
+	funcC(&p[42]);
+
+	kfree(p);
+}
 static int __init kmalloc_tests_init(void)
 {
 	/*
@@ -505,6 +577,7 @@ static int __init kmalloc_tests_init(void)
 	ksize_unpoisons_memory();
 	copy_user_test();
 	use_after_scope_test();
+	kasan_adv();
 
 	kasan_restore_multi_shot(multishot);
 
