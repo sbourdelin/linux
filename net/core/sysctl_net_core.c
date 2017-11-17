@@ -525,7 +525,7 @@ static __net_initdata struct pernet_operations sysctl_core_ops = {
 static __init int sysctl_core_init(void)
 {
 	register_net_sysctl(&init_net, "net/core", net_core_table);
-	return register_pernet_subsys(&sysctl_core_ops);
+	return register_pernet_sys(&sysctl_core_ops);
 }
 
 fs_initcall(sysctl_core_init);
