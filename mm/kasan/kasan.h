@@ -111,6 +111,16 @@ struct kasan_free_meta {
 	struct qlist_node quarantine_link;
 };
 
+struct kasan_adv_check {
+	enum kasan_adv_chk_type	ac_type;
+	bool			(*ac_check_func)(bool, void *);
+	void			*ac_data;
+	char			*ac_msg;
+	bool			ac_violation;
+};
+
+extern struct kasan_adv_check *get_check_by_nr(int nr);
+
 struct kasan_alloc_meta *get_alloc_info(struct kmem_cache *cache,
 					const void *object);
 struct kasan_free_meta *get_free_info(struct kmem_cache *cache,

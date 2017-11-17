@@ -57,10 +57,26 @@ static bool addr_has_shadow(struct kasan_access_info *info)
 		kasan_shadow_to_mem((void *)KASAN_SHADOW_START));
 }
 
+static bool is_clean_byte(u8 shadow_val)
+{
+	u8 poison = KASAN_GET_POISON(shadow_val);
+	u8 check = kasan_get_check(shadow_val);
+
+	if (poison > 0 && poison <= KASAN_SHADOW_SCALE_SIZE - 1) {
+		struct kasan_adv_check *chk = get_check_by_nr(check);
+
+		if (chk && chk->ac_violation)
+			return false;
+		return true;
+	}
+
+	return false;
+}
+
 static const char *get_shadow_bug_type(struct kasan_access_info *info)
 {
 	const char *bug_type = "unknown-crash";
-	u8 *shadow_addr;
+	u8 *shadow_addr, check;
 	s8 poison;
 
 	info->first_bad_addr = find_first_bad_addr(info->access_addr,
@@ -68,12 +84,15 @@ static const char *get_shadow_bug_type(struct kasan_access_info *info)
 
 	shadow_addr = (u8 *)kasan_mem_to_shadow(info->first_bad_addr);
 	poison = KASAN_GET_POISON(*shadow_addr);
+	check = kasan_get_check(*shadow_addr);
 	/*
 	 * If shadow byte value is in [0, KASAN_SHADOW_SCALE_SIZE) we can look
 	 * at the next shadow byte to determine the type of the bad access.
 	 */
-	if (poison > 0 && poison <= KASAN_SHADOW_SCALE_SIZE - 1)
+	if (is_clean_byte(*shadow_addr)) {
 		poison = KASAN_GET_POISON(*(shadow_addr + 1));
+		check = check = kasan_get_check(*(shadow_addr + 1));
+	}
 
 	if (poison < 0)
 		poison |= KASAN_CHECK_MASK;
@@ -106,6 +125,15 @@ static const char *get_shadow_bug_type(struct kasan_access_info *info)
 	case KASAN_USE_AFTER_SCOPE:
 		bug_type = "use-after-scope";
 		break;
+	}
+
+	if (check) {
+		struct kasan_adv_check *chk = get_check_by_nr(check);
+
+		if (chk && chk->ac_violation) {
+			bug_type = chk->ac_msg;
+			chk->ac_violation = false;
+		}
 	}
 
 	return bug_type;

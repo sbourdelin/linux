@@ -40,6 +40,51 @@
 #include "kasan.h"
 #include "../slab.h"
 
+struct kasan_adv_check kasan_adv_checks[(1 << KASAN_CHECK_BITS)-2];
+static int kasan_adv_nr_checks;
+static DEFINE_SPINLOCK(kasan_adv_lock);
+
+/* we don't take lock kasan_adv_lock. Locking can either cause deadload
+ * or kill the performance further.
+ * We are still safe without lock since kasan_adv_nr_checks increases only.
+ * The worst and rare case is kasan_adv_nr_checks is stale (smaller than it
+ * really is) and we miss a check.
+ */
+struct kasan_adv_check *get_check_by_nr(int nr)
+{
+	if (nr > kasan_adv_nr_checks || nr <= 0)
+		return NULL;
+	return &kasan_adv_checks[nr-1];
+}
+
+static __always_inline bool adv_check(bool write, s8 check)
+{
+	struct kasan_adv_check *chk = get_check_by_nr(check);
+
+	if (likely(chk)) {
+		bool violation = chk->ac_check_func(write, chk->ac_data);
+
+		if (unlikely(violation))
+			chk->ac_violation = violation;
+		return violation;
+	}
+	return false;
+}
+
+static __always_inline unsigned long adv_check_shadow(const s8 *shadow_addr,
+					     size_t shadow_size, bool write)
+{
+	s8 check;
+	int i;
+
+	for (i = 0; i < shadow_size; i++) {
+		check = kasan_get_check(*(shadow_addr + i));
+		if (unlikely(check && adv_check(write, check)))
+			return (unsigned long)(shadow_addr + i);
+	}
+	return 0;
+}
+
 void kasan_enable_current(void)
 {
 	current->kasan_depth++;
@@ -128,8 +173,11 @@ static __always_inline bool memory_is_poisoned_1(unsigned long addr, bool write)
 
 	if (unlikely(shadow_value)) {
 		s8 last_accessible_byte = addr & KASAN_SHADOW_MASK;
-		return unlikely(last_accessible_byte >=
-				KASAN_GET_POISON(shadow_value));
+		if (unlikely(KASAN_GET_POISON(shadow_value) &&
+			last_accessible_byte >= KASAN_GET_POISON(shadow_value)))
+			return true;
+		if (unlikely(kasan_get_check(shadow_value)))
+			return adv_check(write, kasan_get_check(shadow_value));
 	}
 
 	return false;
@@ -145,9 +193,14 @@ static __always_inline bool memory_is_poisoned_2_4_8(unsigned long addr,
 	 * Access crosses 8(shadow size)-byte boundary. Such access maps
 	 * into 2 shadow bytes, so we need to check them both.
 	 */
-	if (unlikely(((addr + size - 1) & KASAN_SHADOW_MASK) < size - 1))
-		return KASAN_GET_POISON(*shadow_addr) ||
-		       memory_is_poisoned_1(addr + size - 1, write);
+	if (unlikely(((addr + size - 1) & KASAN_SHADOW_MASK) < size - 1)) {
+		u8 check = kasan_get_check(*shadow_addr);
+
+		if (unlikely(KASAN_GET_POISON(*shadow_addr)))
+			return true;
+		if (unlikely(check && adv_check(write, check)))
+			return true;
+	}
 
 	return memory_is_poisoned_1(addr + size - 1, write);
 }
@@ -157,20 +210,30 @@ static __always_inline bool memory_is_poisoned_16(unsigned long addr,
 {
 	u16 *shadow_addr = (u16 *)kasan_mem_to_shadow((void *)addr);
 
-	/* Unaligned 16-bytes access maps into 3 shadow bytes. */
-	if (unlikely(!IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
-		return KASAN_GET_POISON_16(*shadow_addr) ||
-		       memory_is_poisoned_1(addr + 15, write);
+	if (unlikely(KASAN_GET_POISON_16(*shadow_addr)))
+		return true;
 
-	return *shadow_addr;
+	if (unlikely(adv_check_shadow((s8 *)shadow_addr, 2, write)))
+		return true;
+
+	if (likely(IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
+		return false;
+
+	/* Unaligned 16-bytes access maps into 3 shadow bytes. */
+	return memory_is_poisoned_1(addr + 15, write);
 }
 
 static __always_inline unsigned long bytes_is_nonzero(const u8 *start,
 						      size_t size,
 						      bool write)
 {
+	int check;
+
 	while (size) {
 		if (unlikely(KASAN_GET_POISON(*start)))
+			return (unsigned long)start;
+		check = kasan_get_check(*start);
+		if (unlikely(check && adv_check(write, check)))
 			return (unsigned long)start;
 		start++;
 		size--;
@@ -202,6 +265,9 @@ static __always_inline unsigned long memory_is_nonzero(const void *start,
 	while (words) {
 		if (unlikely(KASAN_GET_POISON_64(*(u64 *)start)))
 			return bytes_is_nonzero(start, 8, write);
+		ret = adv_check_shadow(start, sizeof(u64), write);
+		if (unlikely(ret))
+			return (unsigned long)ret;
 		start += 8;
 		words--;
 	}
@@ -227,6 +293,11 @@ static __always_inline bool memory_is_poisoned_n(unsigned long addr,
 			((long)(last_byte & KASAN_SHADOW_MASK) >=
 			KASAN_GET_POISON(*last_shadow))))
 			return true;
+		else {
+			s8 check = kasan_get_check(*last_shadow);
+
+			return unlikely(check && adv_check(write, check));
+		}
 	}
 	return false;
 }

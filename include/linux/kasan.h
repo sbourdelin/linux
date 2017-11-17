@@ -16,6 +16,13 @@ struct task_struct;
 #include <asm/kasan.h>
 #include <asm/pgtable.h>
 
+/* advanced check type */
+enum kasan_adv_chk_type {
+	/* write access is allowed only for the owner */
+	KASAN_ADVCHK_OWNER,
+	__KASAN_ADVCHK_TYPE_COUNT,
+};
+
 extern unsigned char kasan_zero_page[PAGE_SIZE];
 extern pte_t kasan_zero_pte[PTRS_PER_PTE];
 extern pmd_t kasan_zero_pmd[PTRS_PER_PMD];
