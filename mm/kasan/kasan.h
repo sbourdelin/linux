@@ -8,6 +8,18 @@
 #define KASAN_SHADOW_SCALE_SIZE (1UL << KASAN_SHADOW_SCALE_SHIFT)
 #define KASAN_SHADOW_MASK       (KASAN_SHADOW_SCALE_SIZE - 1)
 
+/* We devide one shadow byte into two parts: "check" and "poison".
+ * "check" is a used for advanced check.
+ * "poison" is used to store the foot print of the tracked memory,
+ * For a paticular address, one extra check is enough. So we can have up to
+ * (1 << (KASAN_CHECK_BITS) - 1) - 1 checks. That's 0b001 to 0b110 (0b111 is
+ * reserved for poison values)
+ *
+ * The bits occupition in shadow bytes (P for poison, C for check):
+ *
+ * |P|C|C|C|P|P|P|P|
+ *
+ */
 #define KASAN_FREE_PAGE         0xFF  /* page was freed */
 #define KASAN_PAGE_REDZONE      0xFE  /* redzone for kmalloc_large allocations */
 #define KASAN_KMALLOC_REDZONE   0xFC  /* redzone inside slub object */
@@ -28,6 +40,19 @@
 #ifndef KASAN_ABI_VERSION
 #define KASAN_ABI_VERSION 1
 #endif
+
+#define KASAN_POISON_MASK	0x8F
+#define KASAN_POISON_MASK_16	0x8F8F
+#define KASAN_POISON_MASK_64	0x8F8F8F8F8F8F8F8F
+#define KASAN_CHECK_MASK	0x70
+#define KASAN_CHECK_SHIFT	4
+#define KASAN_CHECK_BITS	3
+
+#define KASAN_GET_POISON(val) ((s8)((val) & KASAN_POISON_MASK))
+#define KASAN_CHECK_LOWMASK (KASAN_CHECK_MASK >> KASAN_CHECK_SHIFT)
+/* 16 bits and 64 bits version */
+#define KASAN_GET_POISON_16(val) ((val) & KASAN_POISON_MASK_16)
+#define KASAN_GET_POISON_64(val) ((val) & KASAN_POISON_MASK_64)
 
 struct kasan_access_info {
 	const void *access_addr;
@@ -113,4 +138,11 @@ static inline void quarantine_reduce(void) { }
 static inline void quarantine_remove_cache(struct kmem_cache *cache) { }
 #endif
 
+static inline u8 kasan_get_check(u8 val)
+{
+	val &= KASAN_CHECK_MASK;
+	val >>= KASAN_CHECK_SHIFT;
+
+	return (val ^ KASAN_CHECK_LOWMASK) ?  val : 0;
+}
 #endif

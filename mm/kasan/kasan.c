@@ -128,7 +128,8 @@ static __always_inline bool memory_is_poisoned_1(unsigned long addr)
 
 	if (unlikely(shadow_value)) {
 		s8 last_accessible_byte = addr & KASAN_SHADOW_MASK;
-		return unlikely(last_accessible_byte >= shadow_value);
+		return unlikely(last_accessible_byte >=
+				KASAN_GET_POISON(shadow_value));
 	}
 
 	return false;
@@ -144,7 +145,8 @@ static __always_inline bool memory_is_poisoned_2_4_8(unsigned long addr,
 	 * into 2 shadow bytes, so we need to check them both.
 	 */
 	if (unlikely(((addr + size - 1) & KASAN_SHADOW_MASK) < size - 1))
-		return *shadow_addr || memory_is_poisoned_1(addr + size - 1);
+		return KASAN_GET_POISON(*shadow_addr) ||
+		       memory_is_poisoned_1(addr + size - 1);
 
 	return memory_is_poisoned_1(addr + size - 1);
 }
@@ -155,7 +157,8 @@ static __always_inline bool memory_is_poisoned_16(unsigned long addr)
 
 	/* Unaligned 16-bytes access maps into 3 shadow bytes. */
 	if (unlikely(!IS_ALIGNED(addr, KASAN_SHADOW_SCALE_SIZE)))
-		return *shadow_addr || memory_is_poisoned_1(addr + 15);
+		return KASAN_GET_POISON_16(*shadow_addr) ||
+		       memory_is_poisoned_1(addr + 15);
 
 	return *shadow_addr;
 }
@@ -164,7 +167,7 @@ static __always_inline unsigned long bytes_is_nonzero(const u8 *start,
 					size_t size)
 {
 	while (size) {
-		if (unlikely(*start))
+		if (unlikely(KASAN_GET_POISON(*start)))
 			return (unsigned long)start;
 		start++;
 		size--;
@@ -193,7 +196,7 @@ static __always_inline unsigned long memory_is_nonzero(const void *start,
 
 	words = (end - start) / 8;
 	while (words) {
-		if (unlikely(*(u64 *)start))
+		if (unlikely(KASAN_GET_POISON_64(*(u64 *)start)))
 			return bytes_is_nonzero(start, 8);
 		start += 8;
 		words--;
@@ -215,7 +218,8 @@ static __always_inline bool memory_is_poisoned_n(unsigned long addr,
 		s8 *last_shadow = (s8 *)kasan_mem_to_shadow((void *)last_byte);
 
 		if (unlikely(ret != (unsigned long)last_shadow ||
-			((long)(last_byte & KASAN_SHADOW_MASK) >= *last_shadow)))
+			((long)(last_byte & KASAN_SHADOW_MASK) >=
+			KASAN_GET_POISON(*last_shadow))))
 			return true;
 	}
 	return false;
@@ -504,13 +508,15 @@ static void kasan_poison_slab_free(struct kmem_cache *cache, void *object)
 bool kasan_slab_free(struct kmem_cache *cache, void *object)
 {
 	s8 shadow_byte;
+	s8 poison;
 
 	/* RCU slabs could be legally used after free within the RCU period */
 	if (unlikely(cache->flags & SLAB_TYPESAFE_BY_RCU))
 		return false;
 
 	shadow_byte = READ_ONCE(*(s8 *)kasan_mem_to_shadow(object));
-	if (shadow_byte < 0 || shadow_byte >= KASAN_SHADOW_SCALE_SIZE) {
+	poison = KASAN_GET_POISON(shadow_byte);
+	if (poison < 0 || poison >= KASAN_SHADOW_SCALE_SIZE) {
 		kasan_report_double_free(cache, object,
 				__builtin_return_address(1));
 		return true;
