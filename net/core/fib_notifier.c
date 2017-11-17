@@ -175,7 +175,7 @@ static struct pernet_operations fib_notifier_net_ops = {
 
 static int __init fib_notifier_init(void)
 {
-	return register_pernet_subsys(&fib_notifier_net_ops);
+	return register_pernet_sys(&fib_notifier_net_ops);
 }
 
 subsys_initcall(fib_notifier_init);
