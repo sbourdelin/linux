@@ -688,28 +688,24 @@ snd_rme32_playback_hw_params(struct snd_pcm_substream *substream,
 	    (rate = snd_rme32_capture_getrate(rme32, &dummy)) > 0) {
 		/* AutoSync */
 		if ((int)params_rate(params) != rate) {
-			spin_unlock_irq(&rme32->lock);
-			return -EIO;
+			err = -EIO;
+			goto unlock;
 		}
 	} else {
 		err = snd_rme32_playback_setrate(rme32, params_rate(params));
-		if (err < 0) {
-			spin_unlock_irq(&rme32->lock);
-			return err;
-		}
+		if (err < 0)
+			goto unlock;
 	}
 
 	err = snd_rme32_setformat(rme32, params_format(params));
-	if (err < 0) {
-		spin_unlock_irq(&rme32->lock);
-		return err;
-	}
+	if (err < 0)
+		goto unlock;
 
 	snd_rme32_setframelog(rme32, params_channels(params), 1);
 	if (rme32->capture_periodsize != 0) {
 		if (params_period_size(params) << rme32->playback_frlog != rme32->capture_periodsize) {
-			spin_unlock_irq(&rme32->lock);
-			return -EBUSY;
+			err = -EBUSY;
+			goto unlock;
 		}
 	}
 	rme32->playback_periodsize = params_period_size(params) << rme32->playback_frlog;
@@ -722,6 +718,10 @@ snd_rme32_playback_hw_params(struct snd_pcm_substream *substream,
 	spin_unlock_irq(&rme32->lock);
 
 	return 0;
+
+unlock:
+	spin_unlock_irq(&rme32->lock);
+	return err;
 }
 
 static int
@@ -749,27 +749,20 @@ snd_rme32_capture_hw_params(struct snd_pcm_substream *substream,
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
 
 	err = snd_rme32_setformat(rme32, params_format(params));
-	if (err < 0) {
-		spin_unlock_irq(&rme32->lock);
-		return err;
-	}
+	if (err < 0)
+		goto unlock;
+
 	err = snd_rme32_playback_setrate(rme32, params_rate(params));
-	if (err < 0) {
-		spin_unlock_irq(&rme32->lock);
-		return err;
-	}
+	if (err < 0)
+		goto unlock;
+
 	rate = snd_rme32_capture_getrate(rme32, &isadat);
-	if (rate > 0) {
-                if ((int)params_rate(params) != rate) {
-			spin_unlock_irq(&rme32->lock);
-                        return -EIO;                    
-                }
-                if ((isadat && runtime->hw.channels_min == 2) ||
-                    (!isadat && runtime->hw.channels_min == 8)) {
-			spin_unlock_irq(&rme32->lock);
-                        return -EIO;
-                }
-	}
+	if (rate > 0 &&
+	    ((int)params_rate(params) != rate ||
+	     (isadat && runtime->hw.channels_min == 2) ||
+	     (!isadat && runtime->hw.channels_min == 8)))
+		goto e_io;
+
 	/* AutoSync off for recording */
 	rme32->wcreg &= ~RME32_WCR_AUTOSYNC;
 	writel(rme32->wcreg, rme32->iobase + RME32_IO_CONTROL_REGISTER);
@@ -778,8 +771,8 @@ snd_rme32_capture_hw_params(struct snd_pcm_substream *substream,
 	if (rme32->playback_periodsize != 0) {
 		if (params_period_size(params) << rme32->capture_frlog !=
 		    rme32->playback_periodsize) {
-			spin_unlock_irq(&rme32->lock);
-			return -EBUSY;
+			err = -EBUSY;
+			goto unlock;
 		}
 	}
 	rme32->capture_periodsize =
@@ -787,6 +780,12 @@ snd_rme32_capture_hw_params(struct snd_pcm_substream *substream,
 	spin_unlock_irq(&rme32->lock);
 
 	return 0;
+
+e_io:
+	err = -EIO;
+unlock:
+	spin_unlock_irq(&rme32->lock);
+	return err;
 }
 
 static int snd_rme32_pcm_hw_free(struct snd_pcm_substream *substream)
