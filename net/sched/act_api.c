@@ -1470,7 +1470,7 @@ static int __init tc_action_init(void)
 {
 	int err;
 
-	err = register_pernet_subsys(&tcf_action_net_ops);
+	err = register_pernet_sys(&tcf_action_net_ops);
 	if (err)
 		return err;
 

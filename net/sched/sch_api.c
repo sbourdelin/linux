@@ -2008,7 +2008,7 @@ static int __init pktsched_init(void)
 {
 	int err;
 
-	err = register_pernet_subsys(&psched_net_ops);
+	err = register_pernet_sys(&psched_net_ops);
 	if (err) {
 		pr_err("pktsched_init: "
 		       "cannot initialize per netns operations\n");
