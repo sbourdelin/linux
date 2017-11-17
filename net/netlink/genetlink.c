@@ -1045,7 +1045,7 @@ static int __init genl_init(void)
 	if (err < 0)
 		goto problem;
 
-	err = register_pernet_subsys(&genl_pernet_ops);
+	err = register_pernet_sys(&genl_pernet_ops);
 	if (err)
 		goto problem;
 
