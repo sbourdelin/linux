@@ -4503,7 +4503,7 @@ void __init rtnetlink_init(void)
 	for (i = 0; i < ARRAY_SIZE(rtnl_msg_handlers_ref); i++)
 		refcount_set(&rtnl_msg_handlers_ref[i], 1);
 
-	if (register_pernet_subsys(&rtnetlink_net_ops))
+	if (register_pernet_sys(&rtnetlink_net_ops))
 		panic("rtnetlink_init: cannot initialize rtnetlink\n");
 
 	register_netdevice_notifier(&rtnetlink_dev_notifier);
