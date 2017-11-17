@@ -43,6 +43,7 @@ static void pentium_machine_check(struct pt_regs *regs, long error_code)
 /* Set up machine check reporting for processors with Intel style MCE: */
 void intel_p5_mcheck_init(struct cpuinfo_x86 *c)
 {
+	unsigned long flags;
 	u32 l, h;
 
 	/* Default P5 to off as its often misconnected: */
@@ -63,7 +64,10 @@ void intel_p5_mcheck_init(struct cpuinfo_x86 *c)
 	pr_info("Intel old style machine check architecture supported.\n");
 
 	/* Enable MCE: */
-	cr4_set_bits(X86_CR4_MCE);
+	local_irq_save(flags);
+	cr4_set_bits_irqs_off(X86_CR4_MCE);
+	local_irq_restore(flags);
+
 	pr_info("Intel old style machine check reporting enabled on CPU#%d.\n",
 		smp_processor_id());
 }

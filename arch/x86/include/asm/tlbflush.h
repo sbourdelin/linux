@@ -173,40 +173,46 @@ static inline void cr4_init_shadow(void)
 	this_cpu_write(cpu_tlbstate.cr4, __read_cr4());
 }
 
+static inline void update_cr4(unsigned long cr4)
+{
+#ifdef CONFIG_LOCKDEP
+	WARN_ON(!irqs_disabled());
+#endif
+	this_cpu_write(cpu_tlbstate.cr4, cr4);
+	__write_cr4(cr4);
+}
+
 /* Set in this cpu's CR4. */
-static inline void cr4_set_bits(unsigned long mask)
+static inline void cr4_set_bits_irqs_off(unsigned long mask)
 {
 	unsigned long cr4;
 
 	cr4 = this_cpu_read(cpu_tlbstate.cr4);
 	if ((cr4 | mask) != cr4) {
 		cr4 |= mask;
-		this_cpu_write(cpu_tlbstate.cr4, cr4);
-		__write_cr4(cr4);
+		update_cr4(cr4);
 	}
 }
 
 /* Clear in this cpu's CR4. */
-static inline void cr4_clear_bits(unsigned long mask)
+static inline void cr4_clear_bits_irqs_off(unsigned long mask)
 {
 	unsigned long cr4;
 
 	cr4 = this_cpu_read(cpu_tlbstate.cr4);
 	if ((cr4 & ~mask) != cr4) {
 		cr4 &= ~mask;
-		this_cpu_write(cpu_tlbstate.cr4, cr4);
-		__write_cr4(cr4);
+		update_cr4(cr4);
 	}
 }
 
-static inline void cr4_toggle_bits(unsigned long mask)
+static inline void cr4_toggle_bits_irqs_off(unsigned long mask)
 {
 	unsigned long cr4;
 
 	cr4 = this_cpu_read(cpu_tlbstate.cr4);
 	cr4 ^= mask;
-	this_cpu_write(cpu_tlbstate.cr4, cr4);
-	__write_cr4(cr4);
+	update_cr4(cr4);
 }
 
 /* Read the CR4 shadow. */
@@ -226,10 +232,15 @@ extern u32 *trampoline_cr4_features;
 
 static inline void cr4_set_bits_and_update_boot(unsigned long mask)
 {
+	unsigned long flags;
+
 	mmu_cr4_features |= mask;
 	if (trampoline_cr4_features)
 		*trampoline_cr4_features = mmu_cr4_features;
-	cr4_set_bits(mask);
+
+	local_irq_save(flags);
+	cr4_set_bits_irqs_off(mask);
+	local_irq_restore(flags);
 }
 
 extern void initialize_tlbstate_and_flush(void);

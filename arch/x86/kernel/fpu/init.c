@@ -23,7 +23,7 @@ static void fpu__init_cpu_generic(void)
 	if (boot_cpu_has(X86_FEATURE_XMM))
 		cr4_mask |= X86_CR4_OSXMMEXCPT;
 	if (cr4_mask)
-		cr4_set_bits(cr4_mask);
+		cr4_set_bits_irqs_off(cr4_mask);
 
 	cr0 = read_cr0();
 	cr0 &= ~(X86_CR0_TS|X86_CR0_EM); /* clear TS and EM */

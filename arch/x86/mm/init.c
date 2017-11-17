@@ -199,6 +199,8 @@ static void setup_pcid(void)
 #ifdef CONFIG_X86_64
 	if (boot_cpu_has(X86_FEATURE_PCID)) {
 		if (boot_cpu_has(X86_FEATURE_PGE)) {
+			unsigned long flags;
+
 			/*
 			 * This can't be cr4_set_bits_and_update_boot() --
 			 * the trampoline code can't handle CR4.PCIDE and
@@ -210,7 +212,9 @@ static void setup_pcid(void)
 			 * Instead, we brute-force it and set CR4.PCIDE
 			 * manually in start_secondary().
 			 */
-			cr4_set_bits(X86_CR4_PCIDE);
+			local_irq_save(flags);
+			cr4_set_bits_irqs_off(X86_CR4_PCIDE);
+			local_irq_restore(flags);
 		} else {
 			/*
 			 * flush_tlb_all(), as currently implemented, won't
