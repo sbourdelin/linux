@@ -104,17 +104,14 @@ static int rk_aif1_hw_params(struct snd_pcm_substream *substream,
 
 	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk,
 				     SND_SOC_CLOCK_OUT);
-	if (ret < 0) {
-		dev_err(codec_dai->dev, "Can't set codec clock %d\n", ret);
-		return ret;
-	}
+	if (ret < 0)
+		goto report_failure;
 
 	ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
 				     SND_SOC_CLOCK_IN);
-	if (ret < 0) {
+	if (ret < 0)
+report_failure:
 		dev_err(codec_dai->dev, "Can't set codec clock %d\n", ret);
-		return ret;
-	}
 
 	return ret;
 }
