@@ -32,3 +32,5 @@ Order by the overhead of source file name and line number: perf report -s srclin
 System-wide collection from all CPUs: perf record -a
 Show current config key-value pairs: perf config --list
 Show user configuration overrides: perf config --user --list
+Show system events including syscalls: perf trace 
+To generate perf.data files including raw_syscalls events, try: perf trace record
