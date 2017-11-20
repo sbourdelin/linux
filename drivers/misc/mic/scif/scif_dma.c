@@ -1571,7 +1571,6 @@ static int scif_rma_list_dma_copy_wrapper(struct scif_endpt *epd,
 	src_local = work->src_window->type == SCIF_WINDOW_SELF;
 	dst_local = work->dst_window->type == SCIF_WINDOW_SELF;
 
-	dst_local = dst_local;
 	/* Allocate dma_completion cb */
 	comp_cb = kzalloc(sizeof(*comp_cb), GFP_KERNEL);
 	if (!comp_cb)
