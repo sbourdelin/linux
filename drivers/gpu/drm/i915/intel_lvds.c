@@ -317,7 +317,10 @@ static void intel_enable_lvds(struct intel_encoder *encoder,
 
 	I915_WRITE(PP_CONTROL(0), I915_READ(PP_CONTROL(0)) | PANEL_POWER_ON);
 	POSTING_READ(lvds_encoder->reg);
-	if (intel_wait_for_register(dev_priv, PP_STATUS(0), PP_ON, PP_ON, 1000))
+
+	/* Toshiba Satellite Z930 laptops LCD screens need more than 1
+	 * second to power on. */
+	if (intel_wait_for_register(dev_priv, PP_STATUS(0), PP_ON, PP_ON, 2000))
 		DRM_ERROR("timed out waiting for panel to power on\n");
 
 	intel_panel_enable_backlight(pipe_config, conn_state);
