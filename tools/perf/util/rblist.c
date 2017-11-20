@@ -101,18 +101,28 @@ void rblist__init(struct rblist *rblist)
 	return;
 }
 
+static void remove_nodes(struct rblist *rblist)
+{
+	struct rb_node *pos, *next = rb_first(&rblist->entries);
+
+	while (next) {
+		pos = next;
+		next = rb_next(pos);
+		rblist__remove_node(rblist, pos);
+	}
+}
+
 void rblist__delete(struct rblist *rblist)
 {
 	if (rblist != NULL) {
-		struct rb_node *pos, *next = rb_first(&rblist->entries);
-
-		while (next) {
-			pos = next;
-			next = rb_next(pos);
-			rblist__remove_node(rblist, pos);
-		}
+		remove_nodes(rblist);
 		free(rblist);
 	}
+}
+
+void rblist__reset(struct rblist *rblist)
+{
+	remove_nodes(rblist);
 }
 
 struct rb_node *rblist__entry(const struct rblist *rblist, unsigned int idx)
