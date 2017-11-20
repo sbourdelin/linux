@@ -2904,6 +2904,11 @@ sub process {
 			} elsif ($line =~ /^\+.*\bEFI_GUID\s*\(/) {
 				$msg_type = "";
 
+			# URL (w/ minimal padding e.g. "// ")
+			} elsif ($rawline =~ /^\+.*?\b([a-z][\w\.\+\-]*:\/\/\S+[^\s\)\]\.">;,]).*$/i &&
+				 length($rawline) - length($1) <= 4) {
+				$msg_type = "";
+
 			# Otherwise set the alternate message types
 
 			# a comment starts before $max_line_length
