@@ -667,3 +667,8 @@ int renesas_sdhi_remove(struct platform_device *pdev)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(renesas_sdhi_remove);
+
+MODULE_DESCRIPTION("Renesas SDHI driver");
+MODULE_AUTHOR("Phil Blundell <pb@handhelds.org>");
+MODULE_AUTHOR("Samuel Ortiz <sameo@openedhand.com>");
+MODULE_LICENSE("GPL v2");
