@@ -68,6 +68,7 @@
 
 static void set_multicast_list(struct net_device *ndev);
 static void fec_enet_itr_coal_init(struct net_device *ndev);
+static int fec_reset_phy(struct net_device *ndev);
 
 #define DRIVER_NAME	"fec"
 
@@ -1833,6 +1834,32 @@ static int fec_enet_mdio_write(struct mii_bus *bus, int mii_id, int regnum,
 	return ret;
 }
 
+static int fec_enet_clk_ref_enable_reset_phy_quirk(struct net_device *ndev)
+{
+	struct phy_device *phy_dev = ndev->phydev;
+	u32 real_phy_id;
+	int ret;
+
+	/* some PHYs need a reset after the refclk was enabled, so we
+	 * reset them here
+	 */
+	if (!phy_dev)
+		return 0;
+	if (!phy_dev->drv)
+		return 0;
+	real_phy_id = phy_dev->drv->phy_id & phy_dev->drv->phy_id_mask;
+	switch (real_phy_id) {
+	case 0x0007c0f0: /* SMSC LAN8710/LAN8720 */
+		ret = fec_reset_phy(ndev);
+		if (ret)
+			return ret;
+		ret = phy_init_hw(phy_dev);
+		if (ret)
+			return ret;
+	}
+	return 0;
+}
+
 static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
 {
 	struct fec_enet_private *fep = netdev_priv(ndev);
@@ -1862,6 +1889,10 @@ static int fec_enet_clk_enable(struct net_device *ndev, bool enable)
 		ret = clk_prepare_enable(fep->clk_ref);
 		if (ret)
 			goto failed_clk_ref;
+
+		ret = fec_enet_clk_ref_enable_reset_phy_quirk(ndev);
+		if (ret)
+			netdev_warn(ndev, "Resetting PHY failed, connection may be unstable\n");
 	} else {
 		clk_disable_unprepare(fep->clk_ahb);
 		clk_disable_unprepare(fep->clk_enet_out);
@@ -2860,11 +2891,17 @@ fec_enet_open(struct net_device *ndev)
 	if (ret)
 		goto err_enet_mii_probe;
 
+	/* as the PHY is connected now, trigger the reset quirk again */
+	ret = fec_enet_clk_ref_enable_reset_phy_quirk(ndev);
+	if (ret)
+		netdev_warn(ndev, "Resetting PHY failed, connection may be unstable\n");
+
 	if (fep->quirks & FEC_QUIRK_ERR006687)
 		imx6q_cpuidle_fec_irqs_used();
 
 	napi_enable(&fep->napi);
 	phy_start(ndev->phydev);
+
 	netif_tx_start_all_queues(ndev);
 
 	device_set_wakeup_enable(&ndev->dev, fep->wol_flag &
