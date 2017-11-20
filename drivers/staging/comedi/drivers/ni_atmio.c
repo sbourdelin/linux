@@ -361,3 +361,6 @@ static struct comedi_driver ni_atmio_driver = {
 	.detach		= ni_atmio_detach,
 };
 module_comedi_driver(ni_atmio_driver);
+
+MODULE_DESCRIPTION("Comedi low-level driver");
+MODULE_LICENSE("GPL");
