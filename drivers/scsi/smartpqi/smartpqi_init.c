@@ -6699,7 +6699,12 @@ static void pqi_shutdown(struct pci_dev *pci_dev)
 	 * storage.
 	 */
 	rc = pqi_flush_cache(ctrl_info, SHUTDOWN);
-	pqi_reset(ctrl_info);
+
+	if (ctrl_info->pqi_mode_enabled)
+		pqi_revert_to_sis_mode(ctrl_info);
+	else
+		pqi_reset(ctrl_info);
+
 	if (rc == 0)
 		return;
 
