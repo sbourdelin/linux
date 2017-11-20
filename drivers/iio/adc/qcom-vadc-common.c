@@ -228,3 +228,6 @@ int qcom_vadc_decimation_from_dt(u32 value)
 	return __ffs64(value / VADC_DECIMATION_MIN);
 }
 EXPORT_SYMBOL(qcom_vadc_decimation_from_dt);
+
+MODULE_DESCRIPTION("Qualcomm voltage ADC driver");
+MODULE_LICENSE("GPL v2");
