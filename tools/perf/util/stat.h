@@ -130,6 +130,7 @@ void perf_stat__init_runtime_stat(struct runtime_stat *stat);
 void perf_stat__free_runtime_stat(struct runtime_stat *stat);
 void perf_stat__init_shadow_stats(void);
 void perf_stat__reset_shadow_stats(void);
+void perf_stat__reset_shadow_per_stat(struct runtime_stat *stat);
 void perf_stat__update_shadow_stats(struct perf_evsel *counter, u64 count,
 				    int cpu, struct runtime_stat *stat);
 struct perf_stat_output_ctx {

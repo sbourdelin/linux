@@ -16,28 +16,6 @@
  * AGGR_NONE: Use matching CPU
  * AGGR_THREAD: Not supported?
  */
-static struct stats runtime_nsecs_stats[MAX_NR_CPUS];
-static struct stats runtime_cycles_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_stalled_cycles_front_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_stalled_cycles_back_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_branches_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_cacherefs_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_l1_dcache_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_l1_icache_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_ll_cache_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_itlb_cache_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_dtlb_cache_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_cycles_in_tx_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_transaction_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_elision_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_topdown_total_slots[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_topdown_slots_issued[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_topdown_slots_retired[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_topdown_fetch_bubbles[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_topdown_recovery_bubbles[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_smi_num_stats[NUM_CTX][MAX_NR_CPUS];
-static struct stats runtime_aperf_stats[NUM_CTX][MAX_NR_CPUS];
-static struct rblist runtime_saved_values;
 static bool have_frontend_stalled;
 
 static struct runtime_stat rt_stat;
@@ -191,36 +169,13 @@ static int evsel_context(struct perf_evsel *evsel)
 	return ctx;
 }
 
-void perf_stat__reset_shadow_stats(void)
+static void reset_stat(struct runtime_stat *stat)
 {
+	struct rblist *rblist;
 	struct rb_node *pos, *next;
 
-	memset(runtime_nsecs_stats, 0, sizeof(runtime_nsecs_stats));
-	memset(runtime_cycles_stats, 0, sizeof(runtime_cycles_stats));
-	memset(runtime_stalled_cycles_front_stats, 0, sizeof(runtime_stalled_cycles_front_stats));
-	memset(runtime_stalled_cycles_back_stats, 0, sizeof(runtime_stalled_cycles_back_stats));
-	memset(runtime_branches_stats, 0, sizeof(runtime_branches_stats));
-	memset(runtime_cacherefs_stats, 0, sizeof(runtime_cacherefs_stats));
-	memset(runtime_l1_dcache_stats, 0, sizeof(runtime_l1_dcache_stats));
-	memset(runtime_l1_icache_stats, 0, sizeof(runtime_l1_icache_stats));
-	memset(runtime_ll_cache_stats, 0, sizeof(runtime_ll_cache_stats));
-	memset(runtime_itlb_cache_stats, 0, sizeof(runtime_itlb_cache_stats));
-	memset(runtime_dtlb_cache_stats, 0, sizeof(runtime_dtlb_cache_stats));
-	memset(runtime_cycles_in_tx_stats, 0,
-			sizeof(runtime_cycles_in_tx_stats));
-	memset(runtime_transaction_stats, 0,
-		sizeof(runtime_transaction_stats));
-	memset(runtime_elision_stats, 0, sizeof(runtime_elision_stats));
-	memset(&walltime_nsecs_stats, 0, sizeof(walltime_nsecs_stats));
-	memset(runtime_topdown_total_slots, 0, sizeof(runtime_topdown_total_slots));
-	memset(runtime_topdown_slots_retired, 0, sizeof(runtime_topdown_slots_retired));
-	memset(runtime_topdown_slots_issued, 0, sizeof(runtime_topdown_slots_issued));
-	memset(runtime_topdown_fetch_bubbles, 0, sizeof(runtime_topdown_fetch_bubbles));
-	memset(runtime_topdown_recovery_bubbles, 0, sizeof(runtime_topdown_recovery_bubbles));
-	memset(runtime_smi_num_stats, 0, sizeof(runtime_smi_num_stats));
-	memset(runtime_aperf_stats, 0, sizeof(runtime_aperf_stats));
-
-	next = rb_first(&runtime_saved_values.entries);
+	rblist = &stat->value_list;
+	next = rb_first(&rblist->entries);
 	while (next) {
 		pos = next;
 		next = rb_next(pos);
@@ -228,6 +183,17 @@ void perf_stat__reset_shadow_stats(void)
 		       0,
 		       sizeof(struct stats));
 	}
+}
+
+void perf_stat__reset_shadow_stats(void)
+{
+	reset_stat(&rt_stat);
+	memset(&walltime_nsecs_stats, 0, sizeof(walltime_nsecs_stats));
+}
+
+void perf_stat__reset_shadow_per_stat(struct runtime_stat *stat)
+{
+	reset_stat(stat);
 }
 
 static void update_runtime_stat(struct runtime_stat *stat,
