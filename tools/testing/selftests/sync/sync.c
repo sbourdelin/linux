@@ -92,10 +92,8 @@ static struct sync_file_info *sync_file_info(int fd)
 		return NULL;
 
 	err = ioctl(fd, SYNC_IOC_FILE_INFO, info);
-	if (err < 0) {
-		free(info);
-		return NULL;
-	}
+	if (err < 0)
+		goto free_info;
 
 	num_fences = info->num_fences;
 
@@ -104,22 +102,23 @@ static struct sync_file_info *sync_file_info(int fd)
 		info->num_fences = num_fences;
 
 		fence_info = calloc(num_fences, sizeof(*fence_info));
-		if (!fence_info) {
-			free(info);
-			return NULL;
-		}
+		if (!fence_info)
+			goto free_info;
 
 		info->sync_fence_info = (uint64_t)fence_info;
 
 		err = ioctl(fd, SYNC_IOC_FILE_INFO, info);
 		if (err < 0) {
 			free(fence_info);
-			free(info);
-			return NULL;
+			goto free_info;
 		}
 	}
 
 	return info;
+
+free_info:
+	free(info);
+	return NULL;
 }
 
 static void sync_file_info_free(struct sync_file_info *info)
