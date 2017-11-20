@@ -60,6 +60,7 @@ static DECLARE_WAIT_QUEUE_HEAD(nfs_client_active_wq);
 static DEFINE_SPINLOCK(nfs_version_lock);
 static DEFINE_MUTEX(nfs_version_mutex);
 static LIST_HEAD(nfs_versions);
+static DEFINE_MUTEX(nfs_clid_init_mutex);
 
 /*
  * RPC cruft for NFS
@@ -386,7 +387,7 @@ nfs_found_client(const struct nfs_client_initdata *cl_init,
  */
 struct nfs_client *nfs_get_client(const struct nfs_client_initdata *cl_init)
 {
-	struct nfs_client *clp, *new = NULL;
+	struct nfs_client *clp, *new = NULL, *result = NULL;
 	struct nfs_net *nn = net_generic(cl_init->net, nfs_net_id);
 	const struct nfs_rpc_ops *rpc_ops = cl_init->nfs_mod->rpc_ops;
 
@@ -407,11 +408,27 @@ struct nfs_client *nfs_get_client(const struct nfs_client_initdata *cl_init)
 			return nfs_found_client(cl_init, clp);
 		}
 		if (new) {
+			/* add and initialize the client with the
+			 * nfs_clid_init_mutex held to prevent a deadlock
+			 * with the server trunking detection
+			 */
+			spin_unlock(&nn->nfs_client_lock);
+			mutex_lock(&nfs_clid_init_mutex);
+			spin_lock(&nn->nfs_client_lock);
+			clp = nfs_match_client(cl_init);
+			if (clp) {
+				spin_unlock(&nn->nfs_client_lock);
+				mutex_unlock(&nfs_clid_init_mutex);
+				new->rpc_ops->free_client(new);
+				return nfs_found_client(cl_init, clp);
+			}
 			list_add_tail(&new->cl_share_link,
 					&nn->nfs_client_list);
 			spin_unlock(&nn->nfs_client_lock);
 			new->cl_flags = cl_init->init_flags;
-			return rpc_ops->init_client(new, cl_init);
+			result = rpc_ops->init_client(new, cl_init);
+			mutex_unlock(&nfs_clid_init_mutex);
+			return result;
 		}
 
 		spin_unlock(&nn->nfs_client_lock);

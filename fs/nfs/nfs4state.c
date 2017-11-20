@@ -77,8 +77,6 @@ const nfs4_stateid invalid_stateid = {
 	.type = NFS4_INVALID_STATEID_TYPE,
 };
 
-static DEFINE_MUTEX(nfs_clid_init_mutex);
-
 int nfs4_init_clientid(struct nfs_client *clp, struct rpc_cred *cred)
 {
 	struct nfs4_setclientid_res clid = {
@@ -2164,7 +2162,6 @@ int nfs4_discover_server_trunking(struct nfs_client *clp,
 	clnt = clp->cl_rpcclient;
 	i = 0;
 
-	mutex_lock(&nfs_clid_init_mutex);
 again:
 	status  = -ENOENT;
 	cred = nfs4_get_clid_cred(clp);
@@ -2232,7 +2229,6 @@ again:
 	}
 
 out_unlock:
-	mutex_unlock(&nfs_clid_init_mutex);
 	dprintk("NFS: %s: status = %d\n", __func__, status);
 	return status;
 }
