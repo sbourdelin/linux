@@ -512,7 +512,7 @@ static int perf_stat_synthesize_config(bool is_pipe)
 		if (counter->own_cpus) {
 			err = perf_event__synthesize_event_update_cpus(NULL, counter, process_synthesized_event);
 			if (err < 0) {
-				pr_err("Couldn't synthesize evsel scale.\n");
+				pr_err("Couldn't synthesize evsel CPUs.\n");
 				return err;
 			}
 		}
@@ -541,7 +541,7 @@ static int perf_stat_synthesize_config(bool is_pipe)
 	err = perf_event__synthesize_cpu_map(NULL, evsel_list->cpus,
 					     process_synthesized_event, NULL);
 	if (err < 0) {
-		pr_err("Couldn't synthesize thread map.\n");
+		pr_err("Couldn't synthesize CPU map.\n");
 		return err;
 	}
 
