@@ -632,12 +632,6 @@ static void fsl_ssi_setup_ac97(struct fsl_ssi_private *ssi_private)
 	regmap_write(regs, CCSR_SSI_SACNT,
 			CCSR_SSI_SACNT_AC97EN | CCSR_SSI_SACNT_FV);
 
-	/* no SACC{ST,EN,DIS} regs on imx21-class SSI */
-	if (!ssi_private->soc->imx21regs) {
-		regmap_write(regs, CCSR_SSI_SACCDIS, 0xff);
-		regmap_write(regs, CCSR_SSI_SACCEN, 0x300);
-	}
-
 	/*
 	 * Enable SSI, Transmit and Receive. AC97 has to communicate with the
 	 * codec before a stream is started.
@@ -1078,6 +1072,9 @@ static int fsl_ssi_set_dai_fmt(struct snd_soc_dai *cpu_dai, unsigned int fmt)
 {
 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(cpu_dai);
 
+	if (fsl_ssi_is_ac97(ssi_private))
+		return 0;
+
 	return _fsl_ssi_set_dai_fmt(cpu_dai->dev, ssi_private, fmt);
 }
 
@@ -1151,9 +1148,16 @@ static int fsl_ssi_trigger(struct snd_pcm_substream *substream, int cmd,
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			/* no SACC{ST,EN,DIS} regs on imx21-class SSI */
+			if (fsl_ssi_is_ac97(ssi_private) &&
+				!ssi_private->soc->imx21regs) {
+				regmap_write(regs, CCSR_SSI_SACCDIS, 0xff);
+				regmap_write(regs, CCSR_SSI_SACCEN, 0x300);
+			}
+
 			fsl_ssi_tx_config(ssi_private, true);
-		else
+		} else
 			fsl_ssi_rx_config(ssi_private, true);
 		break;
 
