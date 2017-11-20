@@ -53,7 +53,7 @@ void apic_send_IPI_self(int vector)
 	__default_send_IPI_shortcut(APIC_DEST_SELF, vector, APIC_DEST_PHYSICAL);
 }
 
-int __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
+void __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 {
 	struct apic **drv;
 
@@ -64,8 +64,7 @@ int __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 				pr_info("Setting APIC routing to %s.\n",
 					apic->name);
 			}
-			return 1;
+			return;
 		}
 	}
-	return 0;
 }

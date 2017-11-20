@@ -228,7 +228,7 @@ void __init generic_apic_probe(void)
 }
 
 /* This function can switch the APIC even after the initial ->probe() */
-int __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
+void __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 {
 	struct apic **drv;
 
@@ -243,7 +243,6 @@ int __init default_acpi_madt_oem_check(char *oem_id, char *oem_table_id)
 			printk(KERN_INFO "Switched to APIC driver `%s'.\n",
 			       apic->name);
 		}
-		return 1;
+		return;
 	}
-	return 0;
 }

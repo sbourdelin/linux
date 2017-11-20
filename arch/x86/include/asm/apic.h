@@ -492,7 +492,7 @@ static inline unsigned int read_apic_id(void)
 }
 
 extern int default_apic_id_valid(int apicid);
-extern int default_acpi_madt_oem_check(char *, char *);
+extern void default_acpi_madt_oem_check(char *oem_id, char *oem_table_id);
 extern void default_setup_apic_routing(void);
 
 extern u32 apic_default_calc_apicid(unsigned int cpu);
