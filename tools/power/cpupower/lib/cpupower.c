@@ -140,18 +140,12 @@ int get_cpu_topology(struct cpupower_topology *cpu_top)
 	for (cpu = 0; cpu < cpus; cpu++) {
 		cpu_top->core_info[cpu].cpu = cpu;
 		cpu_top->core_info[cpu].is_online = cpupower_is_cpu_online(cpu);
-		if(sysfs_topology_read_file(
-			cpu,
-			"physical_package_id",
-			&(cpu_top->core_info[cpu].pkg)) < 0) {
-			cpu_top->core_info[cpu].pkg = -1;
-			cpu_top->core_info[cpu].core = -1;
-			continue;
-		}
-		if(sysfs_topology_read_file(
-			cpu,
-			"core_id",
-			&(cpu_top->core_info[cpu].core)) < 0) {
+		if (sysfs_topology_read_file(cpu, "physical_package_id",
+					     &(cpu_top->core_info[cpu].pkg))
+		    < 0 ||
+		    sysfs_topology_read_file(cpu, "core_id",
+					     &(cpu_top->core_info[cpu].core))
+		    < 0) {
 			cpu_top->core_info[cpu].pkg = -1;
 			cpu_top->core_info[cpu].core = -1;
 			continue;
