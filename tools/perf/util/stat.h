@@ -126,6 +126,8 @@ typedef void (*print_metric_t)(void *ctx, const char *color, const char *unit,
 			       const char *fmt, double val);
 typedef void (*new_line_t )(void *ctx);
 
+void perf_stat__init_runtime_stat(struct runtime_stat *stat);
+void perf_stat__free_runtime_stat(struct runtime_stat *stat);
 void perf_stat__init_shadow_stats(void);
 void perf_stat__reset_shadow_stats(void);
 void perf_stat__update_shadow_stats(struct perf_evsel *counter, u64 count,

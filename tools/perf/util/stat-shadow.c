@@ -40,12 +40,16 @@ static struct stats runtime_aperf_stats[NUM_CTX][MAX_NR_CPUS];
 static struct rblist runtime_saved_values;
 static bool have_frontend_stalled;
 
+static struct runtime_stat rt_stat;
 struct stats walltime_nsecs_stats;
 
 struct saved_value {
 	struct rb_node rb_node;
 	struct perf_evsel *evsel;
+	enum stat_type type;
+	int ctx;
 	int cpu;
+	struct runtime_stat *stat;
 	struct stats stats;
 };
 
@@ -58,6 +62,23 @@ static int saved_value_cmp(struct rb_node *rb_node, const void *entry)
 
 	if (a->cpu != b->cpu)
 		return a->cpu - b->cpu;
+
+	if (a->type != b->type)
+		return a->type - b->type;
+
+	if (a->ctx != b->ctx)
+		return a->ctx - b->ctx;
+
+	if (a->evsel == NULL && b->evsel == NULL) {
+		if (a->stat == b->stat)
+			return 0;
+
+		if ((char *)a->stat < (char *)b->stat)
+			return -1;
+
+		return 1;
+	}
+
 	if (a->evsel == b->evsel)
 		return 0;
 	if ((char *)a->evsel < (char *)b->evsel)
@@ -74,6 +95,17 @@ static struct rb_node *saved_value_new(struct rblist *rblist __maybe_unused,
 		return NULL;
 	memcpy(nd, entry, sizeof(struct saved_value));
 	return &nd->rb_node;
+}
+
+static void saved_value_delete(struct rblist *rblist __maybe_unused,
+			       struct rb_node *rb_node)
+{
+	struct saved_value *v = container_of(rb_node,
+					     struct saved_value,
+					     rb_node);
+
+	if (v)
+		free(v);
 }
 
 static struct saved_value *saved_value_lookup(struct perf_evsel *evsel,
@@ -97,13 +129,35 @@ static struct saved_value *saved_value_lookup(struct perf_evsel *evsel,
 	return NULL;
 }
 
+static void init_saved_rblist(struct rblist *rblist)
+{
+	rblist__init(rblist);
+	rblist->node_cmp = saved_value_cmp;
+	rblist->node_new = saved_value_new;
+	rblist->node_delete = saved_value_delete;
+}
+
+static void free_saved_rblist(struct rblist *rblist)
+{
+	rblist__reset(rblist);
+}
+
+void perf_stat__init_runtime_stat(struct runtime_stat *stat)
+{
+	memset(stat, 0, sizeof(struct runtime_stat));
+	init_saved_rblist(&stat->value_list);
+}
+
+void perf_stat__free_runtime_stat(struct runtime_stat *stat)
+{
+	free_saved_rblist(&stat->value_list);
+}
+
 void perf_stat__init_shadow_stats(void)
 {
 	have_frontend_stalled = pmu_have_event("cpu", "stalled-cycles-frontend");
-	rblist__init(&runtime_saved_values);
-	runtime_saved_values.node_cmp = saved_value_cmp;
-	runtime_saved_values.node_new = saved_value_new;
-	/* No delete for now */
+	memset(&walltime_nsecs_stats, 0, sizeof(walltime_nsecs_stats));
+	perf_stat__init_runtime_stat(&rt_stat);
 }
 
 static int evsel_context(struct perf_evsel *evsel)
