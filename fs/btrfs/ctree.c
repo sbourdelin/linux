@@ -2654,17 +2654,30 @@ int btrfs_find_item(struct btrfs_root *fs_root, struct btrfs_path *path,
 }
 
 /*
- * look for key in the tree.  path is filled in with nodes along the way
- * if key is found, we return zero and you can find the item in the leaf
- * level of the path (level 0)
+ * Search a btree for a specific key. Optionally update the btree for
+ * item insertion or removal.
  *
- * If the key isn't found, the path points to the slot where it should
- * be inserted, and 1 is returned.  If there are other errors during the
- * search a negative error number is returned.
+ *   @trans - Transaction handle (NULL for none, requires @cow == 0).
+ *   @root - The btree to be searched.
+ *   @key - key for search.
+ *   @p - Points to a btrfs_path to be populated with btree node and index
+ *      values encountered during traversal. (See also struct btrfs_path.)
+ *   @ins_len - byte length of item as follows:
+ *      >0: byte length of item for insertion.  Btree nodes/leaves are
+ *          split as required.
+ *      <0: byte length of item for deletion.  Btree nodes/leaves are
+ *          merged as required.
+ *       0: Do not modify the btree (search only).
+ *   @cow - 0 to nocow, or !0 to cow for btree update.
  *
- * if ins_len > 0, nodes and leaves will be split as we walk down the
- * tree.  if ins_len < 0, nodes will be merged as we walk down the tree (if
- * possible)
+ * Return values:
+ *   0: @key was found and @p was updated to indicate the leaf and item
+ *       slot where the item may be accessed.
+ *   1: @key was not found and @p was updated to indicate the leaf and
+ *       item slot where the item may be inserted.
+ *  <0: an error occurred.
+ *
+ * Note, insertion/removal updates will re-balance the btree as needed.
  */
 int btrfs_search_slot(struct btrfs_trans_handle *trans, struct btrfs_root *root,
 		      const struct btrfs_key *key, struct btrfs_path *p,

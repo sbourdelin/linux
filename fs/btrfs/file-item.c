@@ -929,6 +929,9 @@ fail_unlock:
 	goto out;
 }
 
+/*
+ * Populate an extent_map from the btrfs_file_extent_item contents.
+ */
 void btrfs_extent_item_to_extent_map(struct btrfs_inode *inode,
 				     const struct btrfs_path *path,
 				     struct btrfs_file_extent_item *fi,

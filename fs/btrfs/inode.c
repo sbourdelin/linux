@@ -6896,17 +6896,28 @@ static noinline int uncompress_inline(struct btrfs_path *path,
 }
 
 /*
- * a bit scary, this does extent mapping from logical file offset to the disk.
- * the ugly parts come from merging extents from the disk with the in-ram
+ * btrfs_get_extent - find or create an extent_map for the (@start, @len) range.
+ *
+ *  @inode - inode containing the desired extent.
+ *  @page - page for inlined extent (NULL if none)
+ *  @page_offset - byte offset within @page
+ *  @start - logical byte offset in the file.
+ *  @len - byte length of the range.
+ *  @create - for inlined extents: 0 to update @page with extent data from
+ *            the item; 1 to bypass the update.
+ *
+ * A bit scary, this does extent mapping from logical file offset to the disk.
+ * The ugly parts come from merging extents from the disk with the in-ram
  * representation.  This gets more complex because of the data=ordered code,
  * where the in-ram extents might be locked pending data=ordered completion.
  *
  * This also copies inline extents directly into the page.
+ *
+ * Returns the extent_map, or error code.
  */
 struct extent_map *btrfs_get_extent(struct btrfs_inode *inode,
-		struct page *page,
-	    size_t pg_offset, u64 start, u64 len,
-		int create)
+				    struct page *page, size_t pg_offset,
+				    u64 start, u64 len, int create)
 {
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->vfs_inode.i_sb);
 	int ret;

@@ -318,20 +318,36 @@ struct btrfs_node {
 } __attribute__ ((__packed__));
 
 /*
- * btrfs_paths remember the path taken from the root down to the leaf.
- * level 0 is always the leaf, and nodes[1...BTRFS_MAX_LEVEL] will point
- * to any other levels that are present.
- *
- * The slots array records the index of the item or block pointer
- * used while walking the tree.
+ * Used with btrfs_search_slot() to record a btree search path traversed from a
+ * root down to a leaf.
  */
 enum { READA_NONE = 0, READA_BACK, READA_FORWARD };
 struct btrfs_path {
+	/*
+	 * The nodes[] and slots[] arrays are indexed according to btree
+	 * levels. Index 0 corresponds to the lowest (leaf) level. Increasing
+	 * indexes correspond to interior btree nodes at subsequently higher
+	 * levels.
+	 *
+	 * nodes[0] always points to a leaf. nodes[1] points to a btree node
+	 * which contains a block pointer referencing that leaf. For higher
+	 * indexes, node[n] points to a btree node which contains a block
+	 * pointer referencing node[n-1].
+	 */
 	struct extent_buffer *nodes[BTRFS_MAX_LEVEL];
+
+	/*
+	 * The slots[0] value identifies an item index in the leaf at nodes[0].
+	 * Each slots[n] value identifies a block pointer index in the
+	 * corresponding tree node at nodes[n].
+	 */
 	int slots[BTRFS_MAX_LEVEL];
+
 	/* if there is real range locking, this locks field will change */
 	u8 locks[BTRFS_MAX_LEVEL];
+
 	u8 reada;
+
 	/* keep some upper locks as we walk down */
 	u8 lowest_level;
 

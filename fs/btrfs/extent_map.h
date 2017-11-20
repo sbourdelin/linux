@@ -5,35 +5,57 @@
 #include <linux/rbtree.h>
 #include <linux/refcount.h>
 
-#define EXTENT_MAP_LAST_BYTE ((u64)-4)
-#define EXTENT_MAP_HOLE ((u64)-3)
-#define EXTENT_MAP_INLINE ((u64)-2)
-#define EXTENT_MAP_DELALLOC ((u64)-1)
+/*
+ * Reserve some special-case values for the extent_map .start, .block_start,
+ *: and .orig_start fields.
+ */
+#define EXTENT_MAP_LAST_BYTE	((u64)-4)	/* Lowest reserved value */
+#define EXTENT_MAP_HOLE		((u64)-3)	/* Unwritten extent */
+#define EXTENT_MAP_INLINE	((u64)-2)	/* Inlined file data */
+#define EXTENT_MAP_DELALLOC	((u64)-1)	/* Delayed block allocation */
 
-/* bits for the flags field */
-#define EXTENT_FLAG_PINNED 0 /* this entry not yet on disk, don't free it */
-#define EXTENT_FLAG_COMPRESSED 1
-#define EXTENT_FLAG_VACANCY 2 /* no file extent item found */
-#define EXTENT_FLAG_PREALLOC 3 /* pre-allocated extent */
-#define EXTENT_FLAG_LOGGING 4 /* Logging this extent */
-#define EXTENT_FLAG_FILLING 5 /* Filling in a preallocated extent */
-#define EXTENT_FLAG_FS_MAPPING 6 /* filesystem extent mapping type */
+/*
+ * Bit flags for the extent_map .flags field.
+ */
+#define EXTENT_FLAG_PINNED	0 /* entry not yet on disk, don't free it */
+#define EXTENT_FLAG_COMPRESSED	1
+#define EXTENT_FLAG_VACANCY	2 /* no file extent item found */
+#define EXTENT_FLAG_PREALLOC	3 /* pre-allocated extent */
+#define EXTENT_FLAG_LOGGING	4 /* Logging this extent */
+#define EXTENT_FLAG_FILLING	5 /* Filling in a preallocated extent */
+#define EXTENT_FLAG_FS_MAPPING	6 /* filesystem extent mapping type */
 
+/*
+ * In-memory representation of a file extent (regular/prealloc/inline).
+ */
 struct extent_map {
 	struct rb_node rb_node;
 
 	/* all of these are in bytes */
-	u64 start;
-	u64 len;
+	u64 start;	/* logical byte offset in the file */
+	u64 len;	/* byte length of extent in the file */
 	u64 mod_start;
 	u64 mod_len;
 	u64 orig_start;
 	u64 orig_block_len;
+
+	/* max. bytes needed to hold the (uncompressed) extent in memory. */
 	u64 ram_bytes;
+
+	/*
+	 * For regular/prealloc, block_start is a logical address denoting the
+	 * start of the extent data, and block_len is the on-disk byte length
+	 * of the extent (which may be comressed). block_start may be
+	 * EXTENT_MAP_HOLE if the extent is unwritten.  For inline, block_start
+	 * is EXTENT_MAP_INLINE and block_len is (u64)-1.  See also
+	 * btrfs_extent_item_to_extent_map() and btrfs_get_extent().
+	 */
 	u64 block_start;
 	u64 block_len;
-	u64 generation;
-	unsigned long flags;
+
+	u64 generation;		/* transaction id */
+	unsigned long flags;	/* EXTENT_FLAG_* bit flags as above */
+
 	union {
 		struct block_device *bdev;
 
@@ -44,7 +66,7 @@ struct extent_map {
 		struct map_lookup *map_lookup;
 	};
 	refcount_t refs;
-	unsigned int compress_type;
+	unsigned int compress_type;	/* BTRFS_COMPRESS_* */
 	struct list_head list;
 };
 
