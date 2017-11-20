@@ -2130,6 +2130,17 @@ static int xennet_remove(struct xenbus_device *dev)
 
 	dev_dbg(&dev->dev, "%s\n", dev->nodename);
 
+	xenbus_switch_state(dev, XenbusStateClosing);
+	while (xenbus_read_driver_state(dev->otherend) != XenbusStateClosing){
+		cpu_relax();
+		schedule();
+	}
+	xenbus_switch_state(dev, XenbusStateClosed);
+	while (dev->xenbus_state != XenbusStateClosed){
+		cpu_relax();
+		schedule();
+	}
+
 	xennet_disconnect_backend(info);
 
 	unregister_netdev(info->netdev);
