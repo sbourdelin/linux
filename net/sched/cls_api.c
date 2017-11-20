@@ -343,16 +343,26 @@ static void tcf_block_put_final(struct work_struct *work)
 }
 
 /* XXX: Standalone actions are not allowed to jump to any chain, and bound
- * actions should be all removed after flushing. However, filters are now
- * destroyed in tc filter workqueue with RTNL lock, they can not race here.
+ * actions should be all removed after flushing.
  */
 void tcf_block_put_ext(struct tcf_block *block, struct Qdisc *q,
 		       struct tcf_block_ext_info *ei)
 {
-	struct tcf_chain *chain, *tmp;
+	struct tcf_chain *chain, *last = NULL;
 
-	list_for_each_entry_safe(chain, tmp, &block->chain_list, list)
+	list_for_each_entry(chain, &block->chain_list, list) {
+		if (last)
+			tcf_chain_put(last);
+		/* Flushing a chain may release any other chain in this block,
+		 * so we have to hold on to the chain across flush to known
+		 * which one comes next.
+		 */
+		tcf_chain_hold(chain);
 		tcf_chain_flush(chain);
+		last = chain;
+	}
+	if (last)
+		tcf_chain_put(last);
 
 	tcf_block_offload_unbind(block, q, ei);
 
