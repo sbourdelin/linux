@@ -152,7 +152,18 @@ struct inet_hashinfo {
 	 */
 	struct inet_listen_hashbucket	listening_hash[INET_LHTABLE_SIZE]
 					____cacheline_aligned_in_smp;
+	struct inet_listen_hashbucket	*lhash2;
+	unsigned int			lhash2_mask;
 };
+
+#define inet_lhash2_for_each_icsk_rcu(__icsk, list) \
+	hlist_for_each_entry_rcu(__icsk, list, icsk_listen_portaddr_node)
+
+static inline struct inet_listen_hashbucket *
+inet_lhash2_bucket(struct inet_hashinfo *h, u32 hash)
+{
+	return &h->lhash2[hash & h->lhash2_mask];
+}
 
 static inline struct inet_ehash_bucket *inet_ehash_bucket(
 	struct inet_hashinfo *hashinfo,
@@ -209,6 +220,10 @@ int __inet_inherit_port(const struct sock *sk, struct sock *child);
 void inet_put_port(struct sock *sk);
 
 void inet_hashinfo_init(struct inet_hashinfo *h);
+void inet_hashinfo2_init(struct inet_hashinfo *h, const char *name,
+			 unsigned long numentries, int scale,
+			 unsigned long low_limit,
+			 unsigned long high_limit);
 
 bool inet_ehash_insert(struct sock *sk, struct sock *osk);
 bool inet_ehash_nolisten(struct sock *sk, struct sock *osk);
