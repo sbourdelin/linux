@@ -42,7 +42,7 @@ struct omap_drm_usergart;
  */
 struct omap_irq_wait;
 struct omap_irq_wait * omap_irq_wait_init(struct drm_device *dev,
-		uint32_t irqmask, int count);
+		struct dss_irq *irqmask, int count);
 int omap_irq_wait(struct drm_device *dev, struct omap_irq_wait *wait,
 		unsigned long timeout);
 
@@ -82,7 +82,7 @@ struct omap_drm_private {
 	/* irq handling: */
 	spinlock_t wait_lock;		/* protects the wait_list */
 	struct list_head wait_list;	/* list of omap_irq_wait */
-	uint32_t irq_mask;		/* enabled irqs in addition to wait_list */
+	struct dss_irq irq_mask;		/* enabled irqs in addition to wait_list */
 };
 
 
@@ -130,6 +130,7 @@ struct drm_plane *omap_plane_init(struct drm_device *dev,
 		u32 possible_crtcs);
 void omap_plane_install_properties(struct drm_plane *plane,
 		struct drm_mode_object *obj);
+enum omap_plane_id omap_plane_get_id(struct drm_plane *plane);
 
 struct drm_encoder *omap_encoder_init(struct drm_device *dev,
 		struct omap_dss_device *dssdev);

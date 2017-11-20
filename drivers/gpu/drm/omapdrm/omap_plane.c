@@ -241,12 +241,12 @@ static const struct drm_plane_funcs omap_plane_funcs = {
 	.atomic_get_property = omap_plane_atomic_get_property,
 };
 
-static const char *plane_id_to_name[] = {
-	[OMAP_DSS_GFX] = "gfx",
-	[OMAP_DSS_VIDEO1] = "vid1",
-	[OMAP_DSS_VIDEO2] = "vid2",
-	[OMAP_DSS_VIDEO3] = "vid3",
-};
+enum omap_plane_id omap_plane_get_id(struct drm_plane *plane)
+{
+	struct omap_plane *omap_plane = to_omap_plane(plane);
+
+	return omap_plane->id;
+}
 
 static const enum omap_plane_id plane_idx_to_id[] = {
 	OMAP_DSS_GFX,
@@ -274,7 +274,7 @@ struct drm_plane *omap_plane_init(struct drm_device *dev,
 
 	id = plane_idx_to_id[idx];
 
-	DBG("%s: type=%d", plane_id_to_name[id], type);
+	DBG("%s: type=%d", priv->dispc_ops->get_ovl_name(id), type);
 
 	omap_plane = kzalloc(sizeof(*omap_plane), GFP_KERNEL);
 	if (!omap_plane)
@@ -284,7 +284,7 @@ struct drm_plane *omap_plane_init(struct drm_device *dev,
 	for (nformats = 0; formats[nformats]; ++nformats)
 		;
 	omap_plane->id = id;
-	omap_plane->name = plane_id_to_name[id];
+	omap_plane->name = priv->dispc_ops->get_ovl_name(id);
 
 	plane = &omap_plane->base;
 
@@ -303,7 +303,7 @@ struct drm_plane *omap_plane_init(struct drm_device *dev,
 
 error:
 	dev_err(dev->dev, "%s(): could not create plane: %s\n",
-		__func__, plane_id_to_name[id]);
+		__func__, priv->dispc_ops->get_ovl_name(id));
 
 	kfree(omap_plane);
 	return NULL;
