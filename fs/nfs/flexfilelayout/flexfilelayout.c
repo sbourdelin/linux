@@ -1088,7 +1088,7 @@ static int ff_layout_async_handle_error_v4(struct rpc_task *task,
 		 * i/o and all i/o waiting on the slot table to the MDS until
 		 * layout is destroyed and a new valid layout is obtained.
 		 */
-		pnfs_destroy_layout(NFS_I(inode));
+		pnfs_destroy_layout(NFS_I(inode), 0);
 		rpc_wake_up(&tbl->slot_tbl_waitq);
 		goto reset;
 	/* RPC connection errors */

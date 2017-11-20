@@ -678,7 +678,7 @@ pnfs_free_lseg_list(struct list_head *free_me)
 }
 
 void
-pnfs_destroy_layout(struct nfs_inode *nfsi)
+pnfs_destroy_layout(struct nfs_inode *nfsi, int how)
 {
 	struct pnfs_layout_hdr *lo;
 	LIST_HEAD(tmp_list);
@@ -692,7 +692,7 @@ pnfs_destroy_layout(struct nfs_inode *nfsi)
 		pnfs_layout_clear_fail_bit(lo, NFS_LAYOUT_RW_FAILED);
 		spin_unlock(&nfsi->vfs_inode.i_lock);
 		pnfs_free_lseg_list(&tmp_list);
-		nfs_commit_inode(&nfsi->vfs_inode, 0);
+		nfs_commit_inode(&nfsi->vfs_inode, how);
 		pnfs_put_layout_hdr(lo);
 	} else
 		spin_unlock(&nfsi->vfs_inode.i_lock);
@@ -1831,7 +1831,7 @@ lookup_again:
 			}
 			/* Destroy the existing layout and start over */
 			if (time_after(jiffies, giveup))
-				pnfs_destroy_layout(NFS_I(ino));
+				pnfs_destroy_layout(NFS_I(ino), 0);
 			/* Fallthrough */
 		case -EAGAIN:
 			break;
