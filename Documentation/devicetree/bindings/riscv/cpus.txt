@@ -82,6 +82,11 @@ described below.
                 Value type: <string>
                 Definition: Contains the RISC-V ISA string of this hart.  These
                             ISA strings are defined by the RISC-V ISA manual.
+        - cpu-enable-method:
+		Usage: required
+		Value type: <stringlist>
+		Definition: Must be one of
+			"none": This CPU's state cannot be changed.
 
 Example: SiFive Freedom U540G Development Kit
 ---------------------------------------------
@@ -105,6 +110,7 @@ Linux is allowed to run on.
                         reg = <0>;
                         riscv,isa = "rv64imac";
                         status = "disabled";
+                        enable-method = "none";
                         L10: interrupt-controller {
                                 #interrupt-cells = <1>;
                                 compatible = "riscv,cpu-intc";
@@ -130,6 +136,7 @@ Linux is allowed to run on.
                         reg = <1>;
                         riscv,isa = "rv64imafdc";
                         status = "okay";
+                        enable-method = "none";
                         tlb-split;
                         L13: interrupt-controller {
                                 #interrupt-cells = <1>;
