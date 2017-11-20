@@ -35,6 +35,14 @@ PHONY += build_unifdef
 build_unifdef: $(obj)/unifdef
 	@:
 
+ifdef CONFIG_SYSTEM_TRUSTED_KEYRING
+  has_libssl := $(call try-run,\
+		echo "int main() {}" | $(HOSTCC) -xc -o /dev/null -lssl -,1,0)
+  ifneq ($(has_libssl),1)
+    $(error "Cannot use CONFIG_SYSTEM_TRUSTED_KEYRING=y, please install libssl-dev or libssl-devel")
+  endif
+endif
+
 subdir-$(CONFIG_MODVERSIONS) += genksyms
 subdir-y                     += mod
 subdir-$(CONFIG_SECURITY_SELINUX) += selinux
