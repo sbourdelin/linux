@@ -131,7 +131,7 @@ void perf_stat__free_runtime_stat(struct runtime_stat *stat);
 void perf_stat__init_shadow_stats(void);
 void perf_stat__reset_shadow_stats(void);
 void perf_stat__update_shadow_stats(struct perf_evsel *counter, u64 count,
-				    int cpu);
+				    int cpu, struct runtime_stat *stat);
 struct perf_stat_output_ctx {
 	void *ctx;
 	print_metric_t print_metric;
@@ -142,7 +142,8 @@ struct perf_stat_output_ctx {
 void perf_stat__print_shadow_stats(struct perf_evsel *evsel,
 				   double avg, int cpu,
 				   struct perf_stat_output_ctx *out,
-				   struct rblist *metric_events);
+				   struct rblist *metric_events,
+				   struct runtime_stat *stat);
 void perf_stat__collect_metric_expr(struct perf_evlist *);
 
 int perf_evlist__alloc_stats(struct perf_evlist *evlist, bool alloc_raw);
