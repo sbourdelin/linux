@@ -325,6 +325,15 @@ void scsi_device_unbusy(struct scsi_device *sdev)
 	unsigned long flags;
 
 	atomic_dec(&shost->host_busy);
+	
+	/* This function changes host_busy and looks at host_failed, while
+	 * scsi_eh_scmd_add() updates host_failed and looks at host_busy (in
+	 * scsi_eh_wakeup())... if these happen simultaneously without the smp
+	 * memory barrier, each can see the old value, such that neither will
+	 * wake up the error handler, which can cause the host controller to
+	 * be hung forever.
+	 */
+	smp_mb();
 	if (starget->can_queue > 0)
 		atomic_dec(&starget->target_busy);
 

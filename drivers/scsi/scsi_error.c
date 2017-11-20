@@ -243,6 +243,10 @@ void scsi_eh_scmd_add(struct scsi_cmnd *scmd)
 	scsi_eh_reset(scmd);
 	list_add_tail(&scmd->eh_entry, &shost->eh_cmd_q);
 	shost->host_failed++;
+	/*
+	 * See scsi_device_unbusy() for explanation of smp_mb().
+	 */
+	smp_mb();
 	scsi_eh_wakeup(shost);
 	spin_unlock_irqrestore(shost->host_lock, flags);
 }
