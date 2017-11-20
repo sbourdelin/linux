@@ -1018,8 +1018,18 @@ static void nvme_rdma_memreg_done(struct ib_cq *cq, struct ib_wc *wc)
 
 static void nvme_rdma_inv_rkey_done(struct ib_cq *cq, struct ib_wc *wc)
 {
-	if (unlikely(wc->status != IB_WC_SUCCESS))
+	struct nvme_rdma_request *req =
+		container_of(wc->wr_cqe, struct nvme_rdma_request, reg_cqe);
+	struct request *rq = blk_mq_rq_from_pdu(req);
+
+	if (unlikely(wc->status != IB_WC_SUCCESS)) {
 		nvme_rdma_wr_error(cq, wc, "LOCAL_INV");
+		return;
+	}
+
+	if (refcount_dec_and_test(&req->ref))
+		nvme_end_request(rq, req->cqe.status, req->cqe.result);
+
 }
 
 static int nvme_rdma_inv_rkey(struct nvme_rdma_queue *queue,
@@ -1030,7 +1040,7 @@ static int nvme_rdma_inv_rkey(struct nvme_rdma_queue *queue,
 		.opcode		    = IB_WR_LOCAL_INV,
 		.next		    = NULL,
 		.num_sge	    = 0,
-		.send_flags	    = 0,
+		.send_flags	    = IB_SEND_SIGNALED,
 		.ex.invalidate_rkey = req->mr->rkey,
 	};
 
@@ -1044,23 +1054,11 @@ static void nvme_rdma_unmap_data(struct nvme_rdma_queue *queue,
 		struct request *rq)
 {
 	struct nvme_rdma_request *req = blk_mq_rq_to_pdu(rq);
-	struct nvme_rdma_ctrl *ctrl = queue->ctrl;
 	struct nvme_rdma_device *dev = queue->device;
 	struct ib_device *ibdev = dev->dev;
-	int res;
 
 	if (!blk_rq_bytes(rq))
 		return;
-
-	if (req->mr->need_inval && test_bit(NVME_RDMA_Q_LIVE, &req->queue->flags)) {
-		res = nvme_rdma_inv_rkey(queue, req);
-		if (unlikely(res < 0)) {
-			dev_err(ctrl->ctrl.device,
-				"Queueing INV WR for rkey %#x failed (%d)\n",
-				req->mr->rkey, res);
-			nvme_rdma_error_recovery(queue->ctrl);
-		}
-	}
 
 	ib_dma_unmap_sg(ibdev, req->sg_table.sgl,
 			req->nents, rq_data_dir(rq) ==
@@ -1149,6 +1147,8 @@ static int nvme_rdma_map_sg_fr(struct nvme_rdma_queue *queue,
 	put_unaligned_le32(req->mr->rkey, sg->key);
 	sg->type = (NVME_KEY_SGL_FMT_DATA_DESC << 4) |
 			NVME_SGL_FMT_INVALIDATE;
+
+	refcount_inc(&req->ref);
 
 	return 0;
 }
@@ -1336,8 +1336,18 @@ static int nvme_rdma_process_nvme_rsp(struct nvme_rdma_queue *queue,
 	req->cqe.result = cqe->result;
 
 	if ((wc->wc_flags & IB_WC_WITH_INVALIDATE) &&
-	    wc->ex.invalidate_rkey == req->mr->rkey)
+	    wc->ex.invalidate_rkey == req->mr->rkey) {
 		req->mr->need_inval = false;
+		refcount_dec(&req->ref);
+	} else if (req->mr->need_inval) {
+		ret = nvme_rdma_inv_rkey(queue, req);
+		if (unlikely(ret < 0)) {
+			dev_err(queue->ctrl->ctrl.device,
+				"Queueing INV WR for rkey %#x failed (%d)\n",
+				req->mr->rkey, ret);
+			nvme_rdma_error_recovery(queue->ctrl);
+		}
+	}
 
 	if (refcount_dec_and_test(&req->ref)) {
 		if (rq->tag == tag)
