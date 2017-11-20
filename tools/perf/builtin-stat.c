@@ -214,8 +214,13 @@ static inline void diff_timespec(struct timespec *r, struct timespec *a,
 
 static void perf_stat__reset_stats(void)
 {
+	int i;
+
 	perf_evlist__reset_stats(evsel_list);
 	perf_stat__reset_shadow_stats();
+
+	for (i = 0; i < stat_config.stat_num; i++)
+		perf_stat__reset_shadow_per_stat(&stat_config.stats[i]);
 }
 
 static int create_perf_stat_counter(struct perf_evsel *evsel)
@@ -2548,6 +2553,35 @@ int process_cpu_map_event(struct perf_tool *tool,
 	return set_maps(st);
 }
 
+static int runtime_stat_alloc(struct perf_stat_config *config, int nthreads)
+{
+	int i;
+
+	config->stats = calloc(nthreads, sizeof(struct runtime_stat));
+	if (!config->stats)
+		return -1;
+
+	config->stat_num = nthreads;
+
+	for (i = 0; i < nthreads; i++)
+		perf_stat__init_runtime_stat(&config->stats[i]);
+
+	return 0;
+}
+
+static void runtime_stat_free(struct perf_stat_config *config)
+{
+	int i;
+
+	if (!config->stats)
+		return;
+
+	for (i = 0; i < config->stat_num; i++)
+		perf_stat__free_runtime_stat(&config->stats[i]);
+
+	free(config->stats);
+}
+
 static const char * const stat_report_usage[] = {
 	"perf stat report [<options>]",
 	NULL,
@@ -2803,8 +2837,15 @@ int cmd_stat(int argc, const char **argv)
 	 * Initialize thread_map with comm names,
 	 * so we could print it out on output.
 	 */
-	if (stat_config.aggr_mode == AGGR_THREAD)
+	if (stat_config.aggr_mode == AGGR_THREAD) {
 		thread_map__read_comms(evsel_list->threads);
+		if (target.system_wide) {
+			if (runtime_stat_alloc(&stat_config,
+				thread_map__nr(evsel_list->threads))) {
+				goto out;
+			}
+		}
+	}
 
 	if (interval && interval < 100) {
 		if (interval < 10) {
@@ -2894,5 +2935,8 @@ out:
 		sysfs__write_int(FREEZE_ON_SMI_PATH, 0);
 
 	perf_evlist__delete(evsel_list);
+
+	runtime_stat_free(&stat_config);
+
 	return status;
 }
