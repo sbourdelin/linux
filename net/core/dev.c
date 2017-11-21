@@ -1109,9 +1109,9 @@ static int __dev_alloc_name(struct net *net, const char *name, char *buf)
 	return p ? -ENFILE : -EEXIST;
 }
 
-static int dev_alloc_name_ns(struct net *net,
-			     struct net_device *dev,
-			     const char *name)
+int dev_alloc_name_ns(struct net *net,
+		      struct net_device *dev,
+		      const char *name)
 {
 	char buf[IFNAMSIZ];
 	int ret;
@@ -1122,6 +1122,7 @@ static int dev_alloc_name_ns(struct net *net,
 		strlcpy(dev->name, buf, IFNAMSIZ);
 	return ret;
 }
+EXPORT_SYMBOL(dev_alloc_name_ns);
 
 /**
  *	dev_alloc_name - allocate a name for a device
