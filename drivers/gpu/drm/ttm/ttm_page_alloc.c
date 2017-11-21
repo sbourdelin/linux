@@ -285,13 +285,39 @@ static struct ttm_page_pool *ttm_get_pool(int flags, bool huge,
 }
 
 /* set memory back to wb and free the pages. */
-static void ttm_pages_put(struct page *pages[], unsigned npages)
+static void ttm_pages_put(struct page *pages[], unsigned npages,
+		unsigned int order)
 {
-	unsigned i;
-	if (set_pages_array_wb(pages, npages))
-		pr_err("Failed to set %d pages to wb!\n", npages);
-	for (i = 0; i < npages; ++i)
-		__free_page(pages[i]);
+	struct page **pages_to_free = NULL;
+	struct page **pages_array = NULL;
+	struct page *p = NULL;
+	unsigned int i, j, pages_nr = 1 << order;
+
+	if (order > 0) {
+		pages_to_free = kmalloc_array(pages_nr, sizeof(struct page *),
+					GFP_KERNEL);
+		if (!pages_to_free) {
+			pr_err("Failed to allocate memory for ttm pages put operation\n");
+			return;
+		}
+	}
+
+	for (i = 0; i < npages; ++i) {
+		if (order) {
+			p = pages[i];
+			for (j = 0; j < pages_nr; ++j)
+				pages_to_free[j] = p++;
+
+			pages_array = pages_to_free;
+		} else
+			pages_array = pages;
+
+		if (set_pages_array_wb(pages_array, pages_nr))
+			pr_err("Failed to set %d pages to wb!\n", pages_nr);
+		__free_pages(pages[i], order);
+	}
+
+	kfree(pages_to_free);
 }
 
 static void ttm_pool_update_free_locked(struct ttm_page_pool *pool,
@@ -354,7 +380,7 @@ restart:
 			 */
 			spin_unlock_irqrestore(&pool->lock, irq_flags);
 
-			ttm_pages_put(pages_to_free, freed_pages);
+			ttm_pages_put(pages_to_free, freed_pages, pool->order);
 			if (likely(nr_free != FREE_ALL_PAGES))
 				nr_free -= freed_pages;
 
@@ -389,7 +415,7 @@ restart:
 	spin_unlock_irqrestore(&pool->lock, irq_flags);
 
 	if (freed_pages)
-		ttm_pages_put(pages_to_free, freed_pages);
+		ttm_pages_put(pages_to_free, freed_pages, pool->order);
 out:
 	if (pages_to_free != static_buf)
 		kfree(pages_to_free);
