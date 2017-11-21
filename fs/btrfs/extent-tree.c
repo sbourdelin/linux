@@ -10977,12 +10977,31 @@ int btrfs_trim_fs(struct btrfs_fs_info *fs_info, struct fstrim_range *range)
 	int ret = 0;
 
 	/*
-	 * try to trim all FS space, our block group may start from non-zero.
+	 * NOTE: Btrfs uses its own logical address space, where its first
+	 * chunk can start anywhere if it wants.
+	 * If we follow common start = 0 and len = fs_size from @range, we
+	 * can end up without trimming any block groups, since it's highly
+	 * possible all chunks start beyond that range.
+	 *
+	 * So if we want to trim the whole fs, extent the len to (u64)-1 to trim
+	 * all block groups.
+	 *
+	 * Also, since @range will always be truncated to fs size, manually
+	 * passing range to trim specified range doesn't make much sense.
+	 * (No mean to trim any block group whose bytenr starts beyond
+	 *  @total_bytes)
+	 * So in that case, return -ENOTTY directly to prevent any custom trim
+	 * request.
 	 */
-	if (range->len == total_bytes)
-		cache = btrfs_lookup_first_block_group(fs_info, range->start);
-	else
-		cache = btrfs_lookup_block_group(fs_info, range->start);
+	if (range->start == 0 && range->len == total_bytes) {
+		range->len = (u64)-1;
+	} else {
+		btrfs_info(fs_info,
+		"trimming custom range is not supported due to the limitation of fstrim_range");
+		return -ENOTTY;
+	}
+
+	cache = btrfs_lookup_first_block_group(fs_info, range->start);
 
 	for (; cache; cache = next_block_group(fs_info, cache)) {
 		if (cache->key.objectid >= (range->start + range->len)) {
