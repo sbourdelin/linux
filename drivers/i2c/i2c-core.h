@@ -69,3 +69,16 @@ static inline int of_i2c_setup_smbus_alert(struct i2c_adapter *adap)
 	return 0;
 }
 #endif
+
+#if IS_ENABLED(CONFIG_I2C_SMBUS_ALERT)
+int i2c_smbus_alert_add_driver(void);
+void i2c_smbus_alert_del_driver(void);
+#else
+static inline int i2c_smbus_alert_add_driver(void)
+{
+	return 0;
+}
+static inline void i2c_smbus_alert_del_driver(void)
+{
+}
+#endif

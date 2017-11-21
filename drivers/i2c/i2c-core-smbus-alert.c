@@ -191,6 +191,25 @@ static struct i2c_driver smbalert_driver = {
 	.id_table	= smbalert_ids,
 };
 
+int of_i2c_setup_smbus_alert(struct i2c_adapter *adapter)
+{
+	struct i2c_client *client;
+	int irq;
+
+	irq = of_property_match_string(adapter->dev.of_node, "interrupt-names",
+				       "smbus_alert");
+	if (irq == -EINVAL || irq == -ENODATA)
+		return 0;
+	else if (irq < 0)
+		return irq;
+
+	client = i2c_setup_smbus_alert(adapter, NULL);
+	if (!client)
+		return -ENODEV;
+
+	return 0;
+}
+
 /**
  * i2c_handle_smbus_alert - Handle an SMBus alert
  * @ara: the ARA client on the relevant adapter
@@ -211,8 +230,12 @@ int i2c_handle_smbus_alert(struct i2c_client *ara)
 }
 EXPORT_SYMBOL_GPL(i2c_handle_smbus_alert);
 
-module_i2c_driver(smbalert_driver);
+int i2c_smbus_alert_add_driver(void)
+{
+	return i2c_add_driver(&smbalert_driver);
+}
 
-MODULE_AUTHOR("Jean Delvare <jdelvare@suse.de>");
-MODULE_DESCRIPTION("SMBus protocol extensions support");
-MODULE_LICENSE("GPL");
+void i2c_smbus_alert_del_driver(void)
+{
+	i2c_del_driver(&smbalert_driver);
+}

@@ -1751,6 +1751,10 @@ static int __init i2c_init(void)
 	if (retval)
 		goto class_err;
 
+	retval = i2c_smbus_alert_add_driver();
+	if (retval)
+		goto dummy_err;
+
 	if (IS_ENABLED(CONFIG_OF_DYNAMIC))
 		WARN_ON(of_reconfig_notifier_register(&i2c_of_notifier));
 	if (IS_ENABLED(CONFIG_ACPI))
@@ -1758,6 +1762,8 @@ static int __init i2c_init(void)
 
 	return 0;
 
+dummy_err:
+	i2c_del_driver(&dummy_driver);
 class_err:
 #ifdef CONFIG_I2C_COMPAT
 	class_compat_unregister(i2c_adapter_compat_class);
@@ -1774,6 +1780,7 @@ static void __exit i2c_exit(void)
 		WARN_ON(acpi_reconfig_notifier_unregister(&i2c_acpi_notifier));
 	if (IS_ENABLED(CONFIG_OF_DYNAMIC))
 		WARN_ON(of_reconfig_notifier_unregister(&i2c_of_notifier));
+	i2c_smbus_alert_del_driver();
 	i2c_del_driver(&dummy_driver);
 #ifdef CONFIG_I2C_COMPAT
 	class_compat_unregister(i2c_adapter_compat_class);
