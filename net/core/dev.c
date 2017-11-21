@@ -1144,13 +1144,6 @@ int dev_alloc_name(struct net_device *dev, const char *name)
 }
 EXPORT_SYMBOL(dev_alloc_name);
 
-int dev_get_valid_name(struct net *net, struct net_device *dev,
-		       const char *name)
-{
-	return dev_alloc_name_ns(net, dev, name);
-}
-EXPORT_SYMBOL(dev_get_valid_name);
-
 /**
  *	dev_change_name - change name of a device
  *	@dev: device
