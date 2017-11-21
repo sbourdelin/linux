@@ -1181,6 +1181,12 @@ mwifiex_cfg80211_change_virtual_intf(struct wiphy *wiphy,
 		switch (type) {
 		case NL80211_IFTYPE_ADHOC:
 		case NL80211_IFTYPE_STATION:
+			if (mwifiex_get_priv_by_id(priv->adapter, priv->bss_num,
+						   MWIFIEX_BSS_TYPE_STA)){
+				mwifiex_dbg(priv->adapter, INFO,
+					    "Skip change virtual interface\n");
+				return 0;
+			}
 			return mwifiex_change_vif_to_sta_adhoc(dev, curr_iftype,
 							       type, params);
 			break;
