@@ -6424,8 +6424,9 @@ static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 	}
 
 	/*
-	 * Exceptions must be injected immediately, or the exception
-	 * frame will have the address of the NMI or interrupt handler.
+	 * NMI/interrupt must not be injected if an exception is
+	 * pending, because the latter may have been queued by
+	 * handling exit due to NMI/interrupt delivery.
 	 */
 	if (!vcpu->arch.exception.pending) {
 		if (vcpu->arch.nmi_injected) {
@@ -6446,6 +6447,12 @@ static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 	}
 
 	/* try to inject new event if pending */
+
+	/*
+	 * Exception must be injected before NMI/interrupt,
+	 * otherwise the exception frame will have the address of the
+	 * NMI or interrupt handler.
+	 */
 	if (vcpu->arch.exception.pending) {
 		trace_kvm_inj_exception(vcpu->arch.exception.nr,
 					vcpu->arch.exception.has_error_code,
