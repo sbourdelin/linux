@@ -3114,14 +3114,9 @@ static void kvm_vcpu_ioctl_x86_get_vcpu_events(struct kvm_vcpu *vcpu,
 					       struct kvm_vcpu_events *events)
 {
 	process_nmi(vcpu);
-	/*
-	 * FIXME: pass injected and pending separately.  This is only
-	 * needed for nested virtualization, whose state cannot be
-	 * migrated yet.  For now we can combine them.
-	 */
+
 	events->exception.injected =
-		(vcpu->arch.exception.pending ||
-		 vcpu->arch.exception.injected) &&
+		vcpu->arch.exception.injected &&
 		!kvm_exception_is_soft(vcpu->arch.exception.nr);
 	events->exception.nr = vcpu->arch.exception.nr;
 	events->exception.has_error_code = vcpu->arch.exception.has_error_code;
@@ -3176,8 +3171,8 @@ static int kvm_vcpu_ioctl_x86_set_vcpu_events(struct kvm_vcpu *vcpu,
 		return -EINVAL;
 
 	process_nmi(vcpu);
-	vcpu->arch.exception.injected = false;
-	vcpu->arch.exception.pending = events->exception.injected;
+	vcpu->arch.exception.injected = events->exception.injected;
+	vcpu->arch.exception.pending = false;
 	vcpu->arch.exception.nr = events->exception.nr;
 	vcpu->arch.exception.has_error_code = events->exception.has_error_code;
 	vcpu->arch.exception.error_code = events->exception.error_code;
