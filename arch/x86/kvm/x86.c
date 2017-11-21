@@ -3171,12 +3171,25 @@ static int kvm_vcpu_ioctl_x86_set_vcpu_events(struct kvm_vcpu *vcpu,
 		return -EINVAL;
 
 	process_nmi(vcpu);
+
+	/*
+	 * Warn if userspace is overriding existing
+	 * injected exception
+	 */
+	WARN_ON_ONCE(vcpu->arch.exception.injected &&
+		     events->exception.injected);
 	vcpu->arch.exception.injected = events->exception.injected;
 	vcpu->arch.exception.pending = false;
 	vcpu->arch.exception.nr = events->exception.nr;
 	vcpu->arch.exception.has_error_code = events->exception.has_error_code;
 	vcpu->arch.exception.error_code = events->exception.error_code;
 
+	/*
+	 * Warn if userspace is overriding existing
+	 * injected interrupt
+	 */
+	WARN_ON_ONCE(vcpu->arch.interrupt.injected &&
+		     events->interrupt.injected);
 	vcpu->arch.interrupt.injected = events->interrupt.injected;
 	vcpu->arch.interrupt.nr = events->interrupt.nr;
 	vcpu->arch.interrupt.soft = events->interrupt.soft;
