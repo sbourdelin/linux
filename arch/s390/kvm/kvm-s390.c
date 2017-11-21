@@ -3811,6 +3811,16 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 			r = -EINVAL;
 			break;
 		}
+		if (irq_state.flags) {
+			/*
+			 * This is a placeholder to make sure that nobody uses
+			 * flags and pad. Old kernels did not check for zero
+			 * and old QEMUs did not zero the flag field.
+			 * That means that we cannot use the flags field for
+			 * any possible extension.
+			 */
+			irq_state.flags = 0;
+		}
 		r = kvm_s390_set_irq_state(vcpu,
 					   (void __user *) irq_state.buf,
 					   irq_state.len);
@@ -3825,6 +3835,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
 		if (irq_state.len == 0) {
 			r = -EINVAL;
 			break;
+		}
+		if (irq_state.flags) {
+			/* see above */
+			irq_state.flags = 0;
 		}
 		r = kvm_s390_get_irq_state(vcpu,
 					   (__u8 __user *)  irq_state.buf,
