@@ -74,7 +74,7 @@ static int kvm_cpu_has_extint(struct kvm_vcpu *v)
 int kvm_cpu_has_injectable_intr(struct kvm_vcpu *v)
 {
 	if (!lapic_in_kernel(v))
-		return v->arch.interrupt.pending;
+		return v->arch.interrupt.injected;
 
 	if (kvm_cpu_has_extint(v))
 		return 1;
@@ -92,7 +92,7 @@ int kvm_cpu_has_injectable_intr(struct kvm_vcpu *v)
 int kvm_cpu_has_interrupt(struct kvm_vcpu *v)
 {
 	if (!lapic_in_kernel(v))
-		return v->arch.interrupt.pending;
+		return v->arch.interrupt.injected;
 
 	if (kvm_cpu_has_extint(v))
 		return 1;
