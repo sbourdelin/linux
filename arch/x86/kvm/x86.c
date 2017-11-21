@@ -6418,28 +6418,27 @@ static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 	int r;
 
 	/* try to reinject previous events if any */
-	if (vcpu->arch.exception.injected) {
-		kvm_x86_ops->queue_exception(vcpu);
-		return 0;
-	}
 
+	if (vcpu->arch.exception.injected)
+		kvm_x86_ops->queue_exception(vcpu);
 	/*
 	 * NMI/interrupt must not be injected if an exception is
 	 * pending, because the latter may have been queued by
 	 * handling exit due to NMI/interrupt delivery.
 	 */
-	if (!vcpu->arch.exception.pending) {
-		if (vcpu->arch.nmi_injected) {
+	else if (!vcpu->arch.exception.pending) {
+		if (vcpu->arch.nmi_injected)
 			kvm_x86_ops->set_nmi(vcpu);
-			return 0;
-		}
-
-		if (vcpu->arch.interrupt.injected) {
+		else if (vcpu->arch.interrupt.injected)
 			kvm_x86_ops->set_irq(vcpu);
-			return 0;
-		}
 	}
 
+	/*
+	 * Call check_nested_events() even if we reinjected a previous event
+	 * in order for caller to determine if it should require immediate-exit
+	 * from L2 to L1 due to pending L1 events which require exit
+	 * from L2 to L1.
+	 */
 	if (is_guest_mode(vcpu) && kvm_x86_ops->check_nested_events) {
 		r = kvm_x86_ops->check_nested_events(vcpu, req_int_win);
 		if (r != 0)
@@ -6458,6 +6457,7 @@ static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 					vcpu->arch.exception.has_error_code,
 					vcpu->arch.exception.error_code);
 
+		WARN_ON_ONCE(vcpu->arch.exception.injected);
 		vcpu->arch.exception.pending = false;
 		vcpu->arch.exception.injected = true;
 
@@ -6472,7 +6472,14 @@ static int inject_pending_event(struct kvm_vcpu *vcpu, bool req_int_win)
 		}
 
 		kvm_x86_ops->queue_exception(vcpu);
-	} else if (vcpu->arch.smi_pending && !is_smm(vcpu) && kvm_x86_ops->smi_allowed(vcpu)) {
+	}
+
+	/* Don't consider new event if we re-injected an event */
+	if (kvm_event_needs_reinjection(vcpu))
+		return 0;
+
+	if (vcpu->arch.smi_pending && !is_smm(vcpu) &&
+	    kvm_x86_ops->smi_allowed(vcpu)) {
 		vcpu->arch.smi_pending = false;
 		enter_smm(vcpu);
 	} else if (vcpu->arch.nmi_pending && kvm_x86_ops->nmi_allowed(vcpu)) {
