@@ -442,11 +442,8 @@ void __init arm64_memblock_init(void)
 		 * margin, the size of the region that the available physical
 		 * memory spans, randomize the linear region as well.
 		 */
-		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
-			range = range / ARM64_MEMSTART_ALIGN + 1;
-			memstart_addr -= ARM64_MEMSTART_ALIGN *
-					 ((range * memstart_offset_seed) >> 16);
-		}
+		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN)
+			memstart_addr -= (range * memstart_offset_seed) >> 16;
 	}
 
 	/*
