@@ -33,6 +33,11 @@
 #define VEC_UNA_EXCEPTION	1
 #define VSX_UNA_EXCEPTION	2
 
+#define ERR_RETRY 1
+#define ERR_ADJUST 2
+
+#define COUNTER_INCREMENT (0x1000000)
+
 #define NUM_EXCEPTIONS		3
 #define err_at_line(status, errnum, format, ...) \
 	error_at_line(status, errnum,  __FILE__, __LINE__, format ##__VA_ARGS__)
@@ -45,6 +50,7 @@ struct Flags {
 	int touch_vec;
 	int result;
 	int exception;
+	uint64_t counter;
 } flags;
 
 bool expecting_failure(void)
@@ -87,13 +93,11 @@ void *ping(void *input)
 	 * Expected values for vs0 and vs32 after a TM failure. They must never
 	 * change, otherwise they got corrupted.
 	 */
+	long rc = 0;
 	uint64_t high_vs0 = 0x5555555555555555;
 	uint64_t low_vs0 = 0xffffffffffffffff;
 	uint64_t high_vs32 = 0x5555555555555555;
 	uint64_t low_vs32 = 0xffffffffffffffff;
-
-	/* Counter for busy wait */
-	uint64_t counter = 0x1ff000000;
 
 	/*
 	 * Variable to keep a copy of CR register content taken just after we
@@ -217,7 +221,7 @@ void *ping(void *input)
 		  [ex_fp]     "i"  (FP_UNA_EXCEPTION),
 		  [ex_vec]    "i"  (VEC_UNA_EXCEPTION),
 		  [ex_vsx]    "i"  (VSX_UNA_EXCEPTION),
-		  [counter]   "r"  (counter)
+		  [counter]   "r"  (flags.counter)
 
 		: "cr0", "ctr", "v10", "vs0", "vs10", "vs3", "vs32", "vs33",
 		  "vs34", "fr10"
@@ -232,14 +236,14 @@ void *ping(void *input)
 	if (expecting_failure() && !is_failure(cr_)) {
 		printf("\n\tExpecting the transaction to fail, %s",
 			"but it didn't\n\t");
-		flags.result++;
+		rc = ERR_ADJUST;
 	}
 
 	/* Check if we were not expecting a failure and a it occurred. */
 	if (!expecting_failure() && is_failure(cr_)) {
 		printf("\n\tUnexpected transaction failure 0x%02lx\n\t",
 			failure_code());
-		return (void *) -1;
+		rc = ERR_RETRY;
 	}
 
 	/*
@@ -249,7 +253,7 @@ void *ping(void *input)
 	if (is_failure(cr_) && !failure_is_unavailable()) {
 		printf("\n\tUnexpected failure cause 0x%02lx\n\t",
 			failure_code());
-		return (void *) -1;
+		rc = ERR_RETRY;
 	}
 
 	/* 0x4 is a success and 0xa is a fail. See comment in is_failure(). */
@@ -276,7 +280,7 @@ void *ping(void *input)
 
 	putchar('\n');
 
-	return NULL;
+	return (void *)rc;
 }
 
 /* Thread to force context switch */
@@ -289,6 +293,55 @@ void *pong(void *not_used)
 	/* Classed as an interactive-like thread. */
 	while (1)
 		sched_yield();
+}
+
+static void flags_set_counter(struct Flags *flags)
+{
+	uint64_t cr_;
+	int count = 0;
+
+	do {
+		if (count == 0)
+			printf("\tTrying 0x%08" PRIx64 "... ", flags->counter);
+		else
+			printf("%d, ", count);
+		fflush(stdout);
+		asm (
+			/*
+			 * Wait an amount of context switches so
+			 * load_fp and load_vec overflow and MSR.FP,
+			 * MSR.VEC, and MSR.VSX become zero (off).
+			 */
+			"	mtctr		%[counter]		;"
+
+			/* Decrement CTR branch if CTR non zero. */
+			"1:	bdnz 1b					;"
+			"	tbegin.					;"
+			"	beq		tfail			;"
+
+			/* Get a facility unavailable */
+			"	fadd		10, 10, 10		;"
+			"	tend.                                   ;"
+			"tfail:                                         ;"
+
+			/*
+			 * Give CR back to C so that it can check what
+			 * happened.
+			 */
+			"	mfcr		%[cr_]			;"
+
+			: [cr_]       "+r" (cr_)
+			: [counter]   "r"  (flags->counter)
+			: "cr0", "ctr", "fr10"
+			);
+		count++;
+		if (!is_failure(cr_) || !failure_is_unavailable()) {
+			count = 0;
+			flags->counter += COUNTER_INCREMENT;
+			putchar('\n');
+		}
+	} while (count < 3);
+	printf("3\n");
 }
 
 /* Function that creates a thread and launches the "ping" task. */
@@ -322,6 +375,17 @@ void test_fp_vec(int fp, int vec, pthread_attr_t *attr)
 		if (rc)
 			pr_err(rc, "pthread_join");
 
+		if ((long)ret_value == ERR_ADJUST) {
+			printf("Adjusting the facility unavailable spin time...\n");
+			/*
+			 * Be a bit more agressive just now - we'd
+			 * really like to have it work
+			 */
+			flags.counter += (2 * COUNTER_INCREMENT);
+			flags_set_counter(&flags);
+			printf("Now using 0x%08" PRIx64 "\n", flags.counter);
+		}
+
 		retries--;
 	} while (ret_value != NULL && retries);
 
@@ -340,6 +404,18 @@ int main(int argc, char **argv)
 	pthread_attr_t attr;
 	cpu_set_t cpuset;
 
+	/*
+	 * Default counter for busy wait.
+	 * 0x18000000 is a good baseline determined by experimentation
+	 * on a POWER8
+	 * The autodetecting code will bump it up if it too low.
+	 */
+	flags.counter = 0x18000000;
+
+	printf("Testing required spin time required for facility unavailable...\n");
+	flags_set_counter(&flags);
+	printf("Spin time required for a reliable facility unavailable TM failure: 0x%" PRIx64 "\n",
+			flags.counter);
 	/* Set only CPU 0 in the mask. Both threads will be bound to CPU 0. */
 	CPU_ZERO(&cpuset);
 	CPU_SET(0, &cpuset);
