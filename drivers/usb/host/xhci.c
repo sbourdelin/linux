@@ -582,16 +582,25 @@ int xhci_run(struct usb_hcd *hcd)
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"ERST deq = 64'h%0lx", (long unsigned int) temp_64);
 
-	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
-			"// Set the interrupt modulation register");
-	temp = readl(&xhci->ir_set->irq_control);
-	temp &= ~ER_IRQ_INTERVAL_MASK;
 	/*
-	 * the increment interval is 8 times as much as that defined
-	 * in xHCI spec on MTK's controller
+	 * Systems with slow CPUs may not be able to tolerate
+	 * agressive interrupt timing that silicon can tolerate. The
+	 * XHCI_RELAXED_TIMING will allow firmware to set the IRQ
+	 * Control field.
 	 */
-	temp |= (u32) ((xhci->quirks & XHCI_MTK_HOST) ? 20 : 160);
-	writel(temp, &xhci->ir_set->irq_control);
+	if (!(xhci->quirks & XHCI_RELAXED_TIMING_QUIRK)) {
+		xhci_dbg_trace(xhci, trace_xhci_dbg_init,
+				"// Set the interrupt modulation register");
+		temp = readl(&xhci->ir_set->irq_control);
+		temp &= ~ER_IRQ_INTERVAL_MASK;
+
+		/*
+		 * the increment interval is 8 times as much as that defined
+		 * in xHCI spec on MTK's controller
+		 */
+		temp |= (u32) ((xhci->quirks & XHCI_MTK_HOST) ? 20 : 160);
+		writel(temp, &xhci->ir_set->irq_control);
+	}
 
 	/* Set the HCD state before we enable the irqs */
 	temp = readl(&xhci->op_regs->command);
