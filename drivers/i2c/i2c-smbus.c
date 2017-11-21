@@ -25,6 +25,8 @@
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 
+#include "i2c-core.h"
+
 struct i2c_smbus_alert {
 	struct work_struct	alert;
 	struct i2c_client	*ara;		/* Alert response address */
@@ -123,7 +125,6 @@ static void smbalert_work(struct work_struct *work)
 	alert = container_of(work, struct i2c_smbus_alert, alert);
 
 	smbus_alert(0, alert);
-
 }
 
 /* Setup SMBALERT# infrastructure */

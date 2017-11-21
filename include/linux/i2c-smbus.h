@@ -26,7 +26,6 @@
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
 
-
 /**
  * i2c_smbus_alert_setup - platform data for the smbus_alert i2c client
  * @alert_edge_triggered: whether the alert interrupt is edge (1) or level (0)
@@ -48,14 +47,5 @@ struct i2c_smbus_alert_setup {
 struct i2c_client *i2c_setup_smbus_alert(struct i2c_adapter *adapter,
 					 struct i2c_smbus_alert_setup *setup);
 int i2c_handle_smbus_alert(struct i2c_client *ara);
-
-#if IS_ENABLED(CONFIG_I2C_SMBUS) && IS_ENABLED(CONFIG_OF)
-int of_i2c_setup_smbus_alert(struct i2c_adapter *adap);
-#else
-static inline int of_i2c_setup_smbus_alert(struct i2c_adapter *adap)
-{
-	return 0;
-}
-#endif
 
 #endif /* _LINUX_I2C_SMBUS_H */
