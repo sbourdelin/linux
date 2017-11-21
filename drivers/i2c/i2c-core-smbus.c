@@ -626,7 +626,7 @@ struct i2c_client *i2c_setup_smbus_alert(struct i2c_adapter *adapter,
 }
 EXPORT_SYMBOL_GPL(i2c_setup_smbus_alert);
 
-#if IS_ENABLED(CONFIG_I2C_SMBUS) && IS_ENABLED(CONFIG_OF)
+#if IS_ENABLED(CONFIG_I2C_SMBUS_ALERT) && IS_ENABLED(CONFIG_OF)
 int of_i2c_setup_smbus_alert(struct i2c_adapter *adapter)
 {
 	struct i2c_client *client;

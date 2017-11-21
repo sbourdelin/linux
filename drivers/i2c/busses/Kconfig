@@ -91,7 +91,7 @@ config I2C_I801
 	tristate "Intel 82801 (ICH/PCH)"
 	depends on PCI
 	select CHECK_SIGNATURE if X86 && DMI
-	select I2C_SMBUS
+	select I2C_SMBUS_ALERT
 	help
 	  If you say yes to this option, support will be included for the Intel
 	  801 family of mainboard I2C interfaces.  Specifically, the following
@@ -1056,7 +1056,7 @@ config I2C_OCTEON
 config I2C_THUNDERX
 	tristate "Cavium ThunderX I2C bus support"
 	depends on 64BIT && PCI && (ARM64 || COMPILE_TEST)
-	select I2C_SMBUS
+	select I2C_SMBUS_ALERT
 	help
 	  Say yes if you want to support the I2C serial bus on Cavium
 	  ThunderX SOC.
@@ -1132,7 +1132,7 @@ config I2C_PARPORT
 	tristate "Parallel port adapter"
 	depends on PARPORT
 	select I2C_ALGOBIT
-	select I2C_SMBUS
+	select I2C_SMBUS_ALERT
 	help
 	  This supports parallel port I2C adapters such as the ones made by
 	  Philips or Velleman, Analog Devices evaluation boards, and more.
@@ -1156,7 +1156,7 @@ config I2C_PARPORT
 config I2C_PARPORT_LIGHT
 	tristate "Parallel port adapter (light)"
 	select I2C_ALGOBIT
-	select I2C_SMBUS
+	select I2C_SMBUS_ALERT
 	help
 	  This supports parallel port I2C adapters such as the ones made by
 	  Philips or Velleman, Analog Devices evaluation boards, and more.
