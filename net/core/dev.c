@@ -1183,7 +1183,7 @@ int dev_change_name(struct net_device *dev, const char *newname)
 
 	memcpy(oldname, dev->name, IFNAMSIZ);
 
-	err = dev_get_valid_name(net, dev, newname);
+	err = dev_alloc_name_ns(net, dev, newname);
 	if (err < 0) {
 		write_seqcount_end(&devnet_rename_seq);
 		return err;
@@ -7615,7 +7615,7 @@ int register_netdevice(struct net_device *dev)
 	spin_lock_init(&dev->addr_list_lock);
 	netdev_set_addr_lockdep_class(dev);
 
-	ret = dev_get_valid_name(net, dev, dev->name);
+	ret = dev_alloc_name_ns(net, dev, dev->name);
 	if (ret < 0)
 		goto out;
 
@@ -8354,7 +8354,7 @@ int dev_change_net_namespace(struct net_device *dev, struct net *net, const char
 		/* We get here if we can't use the current device name */
 		if (!pat)
 			goto out;
-		if (dev_get_valid_name(net, dev, pat) < 0)
+		if (dev_alloc_name_ns(net, dev, pat) < 0)
 			goto out;
 	}
 
