@@ -191,19 +191,19 @@ static struct __coeff lm25066_coeff[6][PSC_NUM_CLASSES + 2] = {
 			.R = -2,
 		},
 		[PSC_CURRENT_IN] = {
-			.m = 10753,
-			.R = -2,
-		},
-		[PSC_CURRENT_IN_L] = {
 			.m = 5405,
 			.R = -2,
 		},
+		[PSC_CURRENT_IN_L] = {
+			.m = 10753,
+			.R = -2,
+		},
 		[PSC_POWER] = {
-			.m = 1204,
+			.m = 605,
 			.R = -3,
 		},
 		[PSC_POWER_L] = {
-			.m = 605,
+			.m = 1204,
 			.R = -3,
 		},
 		[PSC_TEMPERATURE] = {
@@ -222,23 +222,23 @@ static struct __coeff lm25066_coeff[6][PSC_NUM_CLASSES + 2] = {
 			.R = -2,
 		},
 		[PSC_CURRENT_IN] = {
-			.m = 15076,
-			.b = -504,
-			.R = -2,
-		},
-		[PSC_CURRENT_IN_L] = {
 			.m = 7645,
 			.b = 100,
 			.R = -2,
 		},
+		[PSC_CURRENT_IN_L] = {
+			.m = 15076,
+			.b = -504,
+			.R = -2,
+		},
 		[PSC_POWER] = {
-			.m = 1701,
-			.b = -4000,
+			.m = 861,
+			.b = -965,
 			.R = -3,
 		},
 		[PSC_POWER_L] = {
-			.m = 861,
-			.b = -965,
+			.m = 1701,
+			.b = -4000,
 			.R = -3,
 		},
 		[PSC_TEMPERATURE] = {
