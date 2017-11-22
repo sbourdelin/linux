@@ -499,8 +499,8 @@ static long pmbus_reg2data_linear(struct pmbus_data *data,
 static long pmbus_reg2data_direct(struct pmbus_data *data,
 				  struct pmbus_sensor *sensor)
 {
-	long val = (s16) sensor->data;
-	long m, b, R;
+	s64 val = (s16) sensor->data;
+	s64 m, b, R;
 
 	m = data->info->m[sensor->class];
 	b = data->info->b[sensor->class];
@@ -528,11 +528,13 @@ static long pmbus_reg2data_direct(struct pmbus_data *data,
 		R--;
 	}
 	while (R < 0) {
-		val = DIV_ROUND_CLOSEST(val, 10);
+		do_div(val, 10);
 		R++;
 	}
 
-	return (val - b) / m;
+	val = val - b;
+	do_div(val, m);
+	return val;
 }
 
 /*
@@ -656,7 +658,8 @@ static u16 pmbus_data2reg_linear(struct pmbus_data *data,
 static u16 pmbus_data2reg_direct(struct pmbus_data *data,
 				 struct pmbus_sensor *sensor, long val)
 {
-	long m, b, R;
+	s64 m, b, R;
+	s64 val64 = val;
 
 	m = data->info->m[sensor->class];
 	b = data->info->b[sensor->class];
@@ -673,18 +676,18 @@ static u16 pmbus_data2reg_direct(struct pmbus_data *data,
 		R -= 3;		/* Adjust R and b for data in milli-units */
 		b *= 1000;
 	}
-	val = val * m + b;
+	val64 = val64 * m + b;
 
 	while (R > 0) {
-		val *= 10;
+		val64 *= 10;
 		R--;
 	}
 	while (R < 0) {
-		val = DIV_ROUND_CLOSEST(val, 10);
+		do_div(val64, 10);
 		R++;
 	}
 
-	return val;
+	return (u16) val64;
 }
 
 static u16 pmbus_data2reg_vid(struct pmbus_data *data,
