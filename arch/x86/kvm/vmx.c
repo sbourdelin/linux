@@ -7436,7 +7436,7 @@ static inline void nested_release_vmcs12(struct vcpu_vmx *vmx)
  */
 static void free_nested(struct vcpu_vmx *vmx)
 {
-	if (!vmx->nested.vmxon)
+	if (!vmx->nested.vmxon && !vmx->nested.smm.vmxon)
 		return;
 
 	vmx->nested.vmxon = false;
