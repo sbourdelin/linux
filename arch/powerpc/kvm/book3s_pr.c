@@ -557,6 +557,7 @@ int kvmppc_handle_pagefault(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		pte.eaddr = eaddr;
 		pte.vpage = eaddr >> 12;
 		pte.page_size = MMU_PAGE_64K;
+		pte.wimg = HPTE_R_M;
 	}
 
 	switch (kvmppc_get_msr(vcpu) & (MSR_DR|MSR_IR)) {
