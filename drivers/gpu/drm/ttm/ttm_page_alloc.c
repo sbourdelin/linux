@@ -234,17 +234,6 @@ static int set_pages_wb(struct page *page, int numpages)
 	return 0;
 }
 
-static int set_pages_array_wb(struct page **pages, int addrinarray)
-{
-#if IS_ENABLED(CONFIG_AGP)
-	int i;
-
-	for (i = 0; i < addrinarray; i++)
-		unmap_page_from_agp(pages[i]);
-#endif
-	return 0;
-}
-
 static int set_pages_array_wc(struct page **pages, int addrinarray)
 {
 #if IS_ENABLED(CONFIG_AGP)
