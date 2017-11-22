@@ -441,11 +441,13 @@ ttm_pool_shrink_scan(struct shrinker *shrink, struct shrink_control *sc)
 		pool = &_manager->pools[(i + pool_offset)%NUM_POOLS];
 		/* OK to use static buffer since global mutex is held. */
 		nr_free_pool = (nr_free >> pool->order);
-		if (nr_free_pool == 0)
-			continue;
+		if (!nr_free_pool && pool->order)
+			nr_free_pool = 1;
 
 		shrink_pages = ttm_page_pool_free(pool, nr_free_pool, true);
 		freed += ((nr_free_pool - shrink_pages) << pool->order);
+		if (freed >= sc->nr_to_scan)
+			break;
 	}
 	mutex_unlock(&lock);
 	return freed;
