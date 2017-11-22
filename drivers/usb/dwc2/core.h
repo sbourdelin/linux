@@ -591,6 +591,7 @@ struct dwc2_hw_params {
 	unsigned utmi_phy_data_width:2;
 	u32 snpsid;
 	u32 dev_ep_dirs;
+	u32 g_tx_fifo_size[MAX_EPS_CHANNELS];
 };
 
 /* Size of control and EP0 buffers */

@@ -483,8 +483,7 @@ static void dwc2_check_param_tx_fifo_sizes(struct dwc2_hsotg *hsotg)
 	}
 
 	for (fifo = 1; fifo <= fifo_count; fifo++) {
-		dptxfszn = (dwc2_readl(hsotg->regs + DPTXFSIZN(fifo)) &
-			FIFOSIZE_DEPTH_MASK) >> FIFOSIZE_DEPTH_SHIFT;
+		dptxfszn = hsotg->hw_params.g_tx_fifo_size[fifo];
 
 		if (hsotg->params.g_tx_fifo_size[fifo] < min ||
 		    hsotg->params.g_tx_fifo_size[fifo] >  dptxfszn) {
@@ -631,6 +630,7 @@ int dwc2_get_hwparams(struct dwc2_hsotg *hsotg)
 {
 	struct dwc2_hw_params *hw = &hsotg->hw_params;
 	unsigned int width;
+	int fifo, fifo_count;
 	u32 hwcfg1, hwcfg2, hwcfg3, hwcfg4;
 	u32 grxfsiz;
 
@@ -719,6 +719,13 @@ int dwc2_get_hwparams(struct dwc2_hsotg *hsotg)
 	hw->rx_fifo_size = (grxfsiz & GRXFSIZ_DEPTH_MASK) >>
 				GRXFSIZ_DEPTH_SHIFT;
 
+	fifo_count = dwc2_hsotg_tx_fifo_count(hsotg);
+
+	for (fifo = 1; fifo <= fifo_count; fifo++) {
+		u32 val = dwc2_readl(hsotg->regs + DPTXFSIZN(fifo));
+		hw->g_tx_fifo_size[fifo] = (val & FIFOSIZE_DEPTH_MASK) >>
+					   FIFOSIZE_DEPTH_SHIFT;
+	}
 	return 0;
 }
 
