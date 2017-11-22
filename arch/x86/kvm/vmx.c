@@ -5275,6 +5275,8 @@ static void vmx_refresh_apicv_exec_ctrl(struct kvm_vcpu *vcpu)
 
 	if (cpu_has_vmx_msr_bitmap())
 		vmx_set_msr_bitmap(vcpu);
+
+	nested_vmx_setup_ctls_msrs(vmx);
 }
 
 static u32 vmx_exec_control(struct vcpu_vmx *vmx)
