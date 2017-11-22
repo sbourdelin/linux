@@ -188,6 +188,8 @@ enum smb_version {
 #ifdef CONFIG_CIFS_SMB311
 	Smb_311,
 #endif /* SMB311 */
+	Smb_3any,
+	Smb_default,
 	Smb_version_err
 };
 
@@ -421,7 +423,7 @@ struct smb_version_operations {
 			size_t, struct cifs_sb_info *);
 	int (*set_EA)(const unsigned int, struct cifs_tcon *, const char *,
 			const char *, const void *, const __u16,
-			const struct nls_table *, int);
+			const struct nls_table *, struct cifs_sb_info *);
 	struct cifs_ntsd * (*get_acl)(struct cifs_sb_info *, struct inode *,
 			const char *, u32 *);
 	struct cifs_ntsd * (*get_acl_by_fid)(struct cifs_sb_info *,
@@ -530,6 +532,7 @@ struct smb_vol {
 	bool nopersistent:1;
 	bool resilient:1; /* noresilient not required since not fored for CA */
 	bool domainauto:1;
+	bool rdma:1;
 	unsigned int rsize;
 	unsigned int wsize;
 	bool sockopt_tcp_nodelay:1;
@@ -557,8 +560,8 @@ struct smb_vol {
 			 CIFS_MOUNT_MULTIUSER | CIFS_MOUNT_STRICT_IO | \
 			 CIFS_MOUNT_CIFS_BACKUPUID | CIFS_MOUNT_CIFS_BACKUPGID)
 
-#define CIFS_MS_MASK (MS_RDONLY | MS_MANDLOCK | MS_NOEXEC | MS_NOSUID | \
-		      MS_NODEV | MS_SYNCHRONOUS)
+#define CIFS_MS_MASK (SB_RDONLY | SB_MANDLOCK | SB_SYNCHRONOUS | \
+		      SB_NOEXEC | SB_NOSUID | SB_NODEV)
 
 struct cifs_mnt_data {
 	struct cifs_sb_info *cifs_sb;
@@ -646,6 +649,10 @@ struct TCP_Server_Info {
 	bool	sec_kerberos;		/* supports plain Kerberos */
 	bool	sec_mskerberos;		/* supports legacy MS Kerberos */
 	bool	large_buf;		/* is current buffer large? */
+	/* use SMBD connection instead of socket */
+	bool	rdma;
+	/* point to the SMBD connection if RDMA is used instead of socket */
+	struct smbd_connection *smbd_conn;
 	struct delayed_work	echo; /* echo ping workqueue job */
 	char	*smallbuf;	/* pointer to current "small" buffer */
 	char	*bigbuf;	/* pointer to current "big" buffer */
@@ -659,7 +666,9 @@ struct TCP_Server_Info {
 #endif
 	unsigned int	max_read;
 	unsigned int	max_write;
-	__u8		preauth_hash[512];
+#ifdef CONFIG_CIFS_SMB311
+	__u8	preauth_sha_hash[64]; /* save initital negprot hash */
+#endif /* 3.1.1 */
 	struct delayed_work reconnect; /* reconnect workqueue job */
 	struct mutex reconnect_mutex; /* prevent simultaneous reconnects */
 	unsigned long echo_interval;
@@ -847,7 +856,9 @@ struct cifs_ses {
 	__u8 smb3signingkey[SMB3_SIGN_KEY_SIZE];
 	__u8 smb3encryptionkey[SMB3_SIGN_KEY_SIZE];
 	__u8 smb3decryptionkey[SMB3_SIGN_KEY_SIZE];
-	__u8 preauth_hash[512];
+#ifdef CONFIG_CIFS_SMB311
+	__u8 preauth_sha_hash[64];
+#endif /* 3.1.1 */
 };
 
 static inline bool
@@ -1701,6 +1712,10 @@ extern struct smb_version_values smb20_values;
 #define SMB21_VERSION_STRING	"2.1"
 extern struct smb_version_operations smb21_operations;
 extern struct smb_version_values smb21_values;
+#define SMBDEFAULT_VERSION_STRING "default"
+extern struct smb_version_values smbdefault_values;
+#define SMB3ANY_VERSION_STRING "3"
+extern struct smb_version_values smb3any_values;
 #define SMB30_VERSION_STRING	"3.0"
 extern struct smb_version_operations smb30_operations;
 extern struct smb_version_values smb30_values;

@@ -47,6 +47,80 @@
  *  - check all ioctl parameters
  */
 
+/*
+ * Helpers to access qgroup reservation
+ *
+ * Callers should ensure the lock context and type are valid
+ */
+
+static u64 qgroup_rsv_total(const struct btrfs_qgroup *qgroup)
+{
+	u64 ret = 0;
+	int i;
+
+	for (i = 0; i < BTRFS_QGROUP_RSV_LAST; i++)
+		ret += qgroup->rsv.values[i];
+
+	return ret;
+}
+
+#ifdef CONFIG_BTRFS_DEBUG
+static const char *qgroup_rsv_type_str(enum btrfs_qgroup_rsv_type type)
+{
+	if (type == BTRFS_QGROUP_RSV_DATA)
+		return "data";
+	if (type == BTRFS_QGROUP_RSV_META)
+		return "meta";
+	return NULL;
+}
+#endif
+
+static void qgroup_rsv_add(struct btrfs_fs_info *fs_info,
+			   struct btrfs_qgroup *qgroup, u64 num_bytes,
+			   enum btrfs_qgroup_rsv_type type)
+{
+	trace_qgroup_update_reserve(fs_info, qgroup, num_bytes, type);
+	qgroup->rsv.values[type] += num_bytes;
+}
+
+static void qgroup_rsv_release(struct btrfs_fs_info *fs_info,
+			       struct btrfs_qgroup *qgroup, u64 num_bytes,
+			       enum btrfs_qgroup_rsv_type type)
+{
+	trace_qgroup_update_reserve(fs_info, qgroup, -(s64)num_bytes, type);
+	if (qgroup->rsv.values[type] >= num_bytes) {
+		qgroup->rsv.values[type] -= num_bytes;
+		return;
+	}
+#ifdef CONFIG_BTRFS_DEBUG
+	WARN_RATELIMIT(1,
+		"qgroup %llu %s reserved space underflow, have %llu to free %llu",
+		qgroup->qgroupid, qgroup_rsv_type_str(type),
+		qgroup->rsv.values[type], num_bytes);
+#endif
+	qgroup->rsv.values[type] = 0;
+}
+
+static void qgroup_rsv_add_by_qgroup(struct btrfs_fs_info *fs_info,
+				     struct btrfs_qgroup *dest,
+				     struct btrfs_qgroup *src)
+{
+	int i;
+
+	for (i = 0; i < BTRFS_QGROUP_RSV_LAST; i++)
+		qgroup_rsv_add(fs_info, dest, src->rsv.values[i], i);
+}
+
+static void qgroup_rsv_release_by_qgroup(struct btrfs_fs_info *fs_info,
+					 struct btrfs_qgroup *dest,
+					  struct btrfs_qgroup *src)
+{
+	int i;
+
+	for (i = 0; i < BTRFS_QGROUP_RSV_LAST; i++)
+		qgroup_rsv_release(fs_info, dest, src->rsv.values[i], i);
+}
+
 static void btrfs_qgroup_update_old_refcnt(struct btrfs_qgroup *qg, u64 seq,
 					   int mod)
 {
@@ -807,7 +881,6 @@ static int btrfs_clean_quota_tree(struct btrfs_trans_handle *trans,
 	}
 	ret = 0;
 out:
-	set_bit(BTRFS_FS_QUOTA_DISABLING, &root->fs_info->flags);
 	btrfs_free_path(path);
 	return ret;
 }
@@ -946,7 +1019,6 @@ out:
 int btrfs_quota_disable(struct btrfs_trans_handle *trans,
 			struct btrfs_fs_info *fs_info)
 {
-	struct btrfs_root *tree_root = fs_info->tree_root;
 	struct btrfs_root *quota_root;
 	int ret = 0;
 
@@ -954,7 +1026,6 @@ int btrfs_quota_disable(struct btrfs_trans_handle *trans,
 	if (!fs_info->quota_root)
 		goto out;
 	clear_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags);
-	set_bit(BTRFS_FS_QUOTA_DISABLING, &fs_info->flags);
 	btrfs_qgroup_wait_for_completion(fs_info, false);
 	spin_lock(&fs_info->qgroup_lock);
 	quota_root = fs_info->quota_root;
@@ -968,7 +1039,7 @@ int btrfs_quota_disable(struct btrfs_trans_handle *trans,
 	if (ret)
 		goto out;
 
-	ret = btrfs_del_root(trans, tree_root, &quota_root->root_key);
+	ret = btrfs_del_root(trans, fs_info, &quota_root->root_key);
 	if (ret)
 		goto out;
 
@@ -994,33 +1065,29 @@ static void qgroup_dirty(struct btrfs_fs_info *fs_info,
 		list_add(&qgroup->dirty, &fs_info->dirty_qgroups);
 }
 
-static void report_reserved_underflow(struct btrfs_fs_info *fs_info,
-				      struct btrfs_qgroup *qgroup,
-				      u64 num_bytes)
-{
-#ifdef CONFIG_BTRFS_DEBUG
-	WARN_ON(qgroup->reserved < num_bytes);
-	btrfs_debug(fs_info,
-		"qgroup %llu reserved space underflow, have: %llu, to free: %llu",
-		qgroup->qgroupid, qgroup->reserved, num_bytes);
-#endif
-	qgroup->reserved = 0;
-}
 /*
- * The easy accounting, if we are adding/removing the only ref for an extent
- * then this qgroup and all of the parent qgroups get their reference and
- * exclusive counts adjusted.
+ * The easy accounting, we're updating qgroup relationship whose child qgroup
+ * only has exclusive extents.
+ *
+ * In this case, all exclsuive extents will also be exlusive for parent, so
+ * excl/rfer just get added/removed.
+ *
+ * So is qgroup reservation space, which should also be added/removed to
+ * parent.
+ * Or when child tries to release reservation space, parent will underflow its
+ * reservation (for relationship adding case).
  *
  * Caller should hold fs_info->qgroup_lock.
  */
 static int __qgroup_excl_accounting(struct btrfs_fs_info *fs_info,
 				    struct ulist *tmp, u64 ref_root,
-				    u64 num_bytes, int sign)
+				    struct btrfs_qgroup *src, int sign)
 {
 	struct btrfs_qgroup *qgroup;
 	struct btrfs_qgroup_list *glist;
 	struct ulist_node *unode;
 	struct ulist_iterator uiter;
+	u64 num_bytes = src->excl;
 	int ret = 0;
 
 	qgroup = find_qgroup_rb(fs_info, ref_root);
@@ -1033,13 +1100,11 @@ static int __qgroup_excl_accounting(struct btrfs_fs_info *fs_info,
 	WARN_ON(sign < 0 && qgroup->excl < num_bytes);
 	qgroup->excl += sign * num_bytes;
 	qgroup->excl_cmpr += sign * num_bytes;
-	if (sign > 0) {
-		trace_qgroup_update_reserve(fs_info, qgroup, -(s64)num_bytes);
-		if (qgroup->reserved < num_bytes)
-			report_reserved_underflow(fs_info, qgroup, num_bytes);
-		else
-			qgroup->reserved -= num_bytes;
-	}
+
+	if (sign > 0)
+		qgroup_rsv_add_by_qgroup(fs_info, qgroup, src);
+	else
+		qgroup_rsv_release_by_qgroup(fs_info, qgroup, src);
 
 	qgroup_dirty(fs_info, qgroup);
 
@@ -1059,15 +1124,10 @@ static int __qgroup_excl_accounting(struct btrfs_fs_info *fs_info,
 		qgroup->rfer_cmpr += sign * num_bytes;
 		WARN_ON(sign < 0 && qgroup->excl < num_bytes);
 		qgroup->excl += sign * num_bytes;
-		if (sign > 0) {
-			trace_qgroup_update_reserve(fs_info, qgroup,
-						    -(s64)num_bytes);
-			if (qgroup->reserved < num_bytes)
-				report_reserved_underflow(fs_info, qgroup,
-							  num_bytes);
-			else
-				qgroup->reserved -= num_bytes;
-		}
+		if (sign > 0)
+			qgroup_rsv_add_by_qgroup(fs_info, qgroup, src);
+		else
+			qgroup_rsv_release_by_qgroup(fs_info, qgroup, src);
 		qgroup->excl_cmpr += sign * num_bytes;
 		qgroup_dirty(fs_info, qgroup);
 
@@ -1110,7 +1170,7 @@ static int quick_update_accounting(struct btrfs_fs_info *fs_info,
 	if (qgroup->excl == qgroup->rfer) {
 		ret = 0;
 		err = __qgroup_excl_accounting(fs_info, tmp, dst,
-					       qgroup->excl, sign);
+					       qgroup, sign);
 		if (err < 0) {
 			ret = err;
 			goto out;
@@ -1308,6 +1368,8 @@ int btrfs_remove_qgroup(struct btrfs_trans_handle *trans,
 		}
 	}
 	ret = del_qgroup_item(trans, quota_root, qgroupid);
+	if (ret && ret != -ENOENT)
+		goto out;
 
 	while (!list_empty(&qgroup->groups)) {
 		list = list_first_entry(&qgroup->groups,
@@ -1442,7 +1504,7 @@ int btrfs_qgroup_trace_extent_post(struct btrfs_fs_info *fs_info,
 	u64 bytenr = qrecord->bytenr;
 	int ret;
 
-	ret = btrfs_find_all_roots(NULL, fs_info, bytenr, 0, &old_root);
+	ret = btrfs_find_all_roots(NULL, fs_info, bytenr, 0, &old_root, false);
 	if (ret < 0)
 		return ret;
 
@@ -1603,7 +1665,7 @@ int btrfs_qgroup_trace_subtree(struct btrfs_trans_handle *trans,
 	struct extent_buffer *eb = root_eb;
 	struct btrfs_path *path = NULL;
 
-	BUG_ON(root_level < 0 || root_level > BTRFS_MAX_LEVEL);
+	BUG_ON(root_level < 0 || root_level >= BTRFS_MAX_LEVEL);
 	BUG_ON(root_eb == NULL);
 
 	if (!test_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags))
@@ -2032,7 +2094,7 @@ int btrfs_qgroup_account_extents(struct btrfs_trans_handle *trans,
 				/* Search commit root to find old_roots */
 				ret = btrfs_find_all_roots(NULL, fs_info,
 						record->bytenr, 0,
-						&record->old_roots);
+						&record->old_roots, false);
 				if (ret < 0)
 					goto cleanup;
 			}
@@ -2043,7 +2105,7 @@ int btrfs_qgroup_account_extents(struct btrfs_trans_handle *trans,
 			 * root. It's safe inside commit_transaction().
 			 */
 			ret = btrfs_find_all_roots(trans, fs_info,
-					record->bytenr, SEQ_LAST, &new_roots);
+				record->bytenr, SEQ_LAST, &new_roots, false);
 			if (ret < 0)
 				goto cleanup;
 			if (qgroup_to_skip) {
@@ -2087,8 +2149,6 @@ int btrfs_run_qgroups(struct btrfs_trans_handle *trans,
 
 	if (test_and_clear_bit(BTRFS_FS_QUOTA_ENABLING, &fs_info->flags))
 		set_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags);
-	if (test_and_clear_bit(BTRFS_FS_QUOTA_DISABLING, &fs_info->flags))
-		clear_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags);
 
 	spin_lock(&fs_info->qgroup_lock);
 	while (!list_empty(&fs_info->dirty_qgroups)) {
@@ -2336,17 +2396,18 @@ out:
 static bool qgroup_check_limits(const struct btrfs_qgroup *qg, u64 num_bytes)
 {
 	if ((qg->lim_flags & BTRFS_QGROUP_LIMIT_MAX_RFER) &&
-	    qg->reserved + (s64)qg->rfer + num_bytes > qg->max_rfer)
+	    qgroup_rsv_total(qg) + (s64)qg->rfer + num_bytes > qg->max_rfer)
 		return false;
 
 	if ((qg->lim_flags & BTRFS_QGROUP_LIMIT_MAX_EXCL) &&
-	    qg->reserved + (s64)qg->excl + num_bytes > qg->max_excl)
+	    qgroup_rsv_total(qg) + (s64)qg->excl + num_bytes > qg->max_excl)
 		return false;
 
 	return true;
 }
 
-static int qgroup_reserve(struct btrfs_root *root, u64 num_bytes, bool enforce)
+static int qgroup_reserve(struct btrfs_root *root, u64 num_bytes, bool enforce,
+			  enum btrfs_qgroup_rsv_type type)
 {
 	struct btrfs_root *quota_root;
 	struct btrfs_qgroup *qgroup;
@@ -2398,7 +2459,7 @@ retry:
 			 * Commit the tree and retry, since we may have
 			 * deletions which would free up space.
 			 */
-			if (!retried && qg->reserved > 0) {
+			if (!retried && qgroup_rsv_total(qg) > 0) {
 				struct btrfs_trans_handle *trans;
 
 				spin_unlock(&fs_info->qgroup_lock);
@@ -2437,8 +2498,8 @@ retry:
 
 		qg = unode_aux_to_qgroup(unode);
 
-		trace_qgroup_update_reserve(fs_info, qg, num_bytes);
-		qg->reserved += num_bytes;
+		trace_qgroup_update_reserve(fs_info, qg, num_bytes, type);
+		qgroup_rsv_add(fs_info, qg, num_bytes, type);
 	}
 
 out:
@@ -2447,7 +2508,8 @@ out:
 }
 
 void btrfs_qgroup_free_refroot(struct btrfs_fs_info *fs_info,
-			       u64 ref_root, u64 num_bytes)
+			       u64 ref_root, u64 num_bytes,
+			       enum btrfs_qgroup_rsv_type type)
 {
 	struct btrfs_root *quota_root;
 	struct btrfs_qgroup *qgroup;
@@ -2483,11 +2545,8 @@ void btrfs_qgroup_free_refroot(struct btrfs_fs_info *fs_info,
 
 		qg = unode_aux_to_qgroup(unode);
 
-		trace_qgroup_update_reserve(fs_info, qg, -(s64)num_bytes);
-		if (qg->reserved < num_bytes)
-			report_reserved_underflow(fs_info, qg, num_bytes);
-		else
-			qg->reserved -= num_bytes;
+		trace_qgroup_update_reserve(fs_info, qg, -(s64)num_bytes, type);
+		qgroup_rsv_release(fs_info, qg, num_bytes, type);
 
 		list_for_each_entry(glist, &qg->groups, next_group) {
 			ret = ulist_add(fs_info->qgroup_ulist,
@@ -2573,7 +2632,7 @@ qgroup_rescan_leaf(struct btrfs_fs_info *fs_info, struct btrfs_path *path,
 			num_bytes = found.offset;
 
 		ret = btrfs_find_all_roots(NULL, fs_info, found.objectid, 0,
-					   &roots);
+					   &roots, false);
 		if (ret < 0)
 			goto out;
 		/* For rescan, just pass old_roots as NULL */
@@ -2646,7 +2705,7 @@ out:
 	if (IS_ERR(trans)) {
 		err = PTR_ERR(trans);
 		btrfs_err(fs_info,
-			  "fail to start transaction for status update: %d\n",
+			  "fail to start transaction for status update: %d",
 			  err);
 		goto done;
 	}
@@ -2875,7 +2934,7 @@ int btrfs_qgroup_reserve_data(struct inode *inode,
 					to_reserve, QGROUP_RESERVE);
 	if (ret < 0)
 		goto cleanup;
-	ret = qgroup_reserve(root, to_reserve, true);
+	ret = qgroup_reserve(root, to_reserve, true, BTRFS_QGROUP_RSV_DATA);
 	if (ret < 0)
 		goto cleanup;
 
@@ -2886,8 +2945,7 @@ cleanup:
 	ULIST_ITER_INIT(&uiter);
 	while ((unode = ulist_next(&reserved->range_changed, &uiter)))
 		clear_extent_bit(&BTRFS_I(inode)->io_tree, unode->val,
-				 unode->aux, EXTENT_QGROUP_RESERVED, 0, 0, NULL,
-				 GFP_NOFS);
+				 unode->aux, EXTENT_QGROUP_RESERVED, 0, 0, NULL);
 	extent_changeset_release(reserved);
 	return ret;
 }
@@ -2939,7 +2997,8 @@ static int qgroup_free_reserved_data(struct inode *inode,
 			goto out;
 		freed += changeset.bytes_changed;
 	}
-	btrfs_qgroup_free_refroot(root->fs_info, root->objectid, freed);
+	btrfs_qgroup_free_refroot(root->fs_info, root->objectid, freed,
+				  BTRFS_QGROUP_RSV_DATA);
 	ret = freed;
 out:
 	extent_changeset_release(&changeset);
@@ -2971,7 +3030,7 @@ static int __btrfs_qgroup_release_data(struct inode *inode,
 	if (free)
 		btrfs_qgroup_free_refroot(BTRFS_I(inode)->root->fs_info,
 				BTRFS_I(inode)->root->objectid,
-				changeset.bytes_changed);
+				changeset.bytes_changed, BTRFS_QGROUP_RSV_DATA);
 	ret = changeset.bytes_changed;
 out:
 	extent_changeset_release(&changeset);
@@ -3028,7 +3087,7 @@ int btrfs_qgroup_reserve_meta(struct btrfs_root *root, int num_bytes,
 
 	BUG_ON(num_bytes != round_down(num_bytes, fs_info->nodesize));
 	trace_qgroup_meta_reserve(root, (s64)num_bytes);
-	ret = qgroup_reserve(root, num_bytes, enforce);
+	ret = qgroup_reserve(root, num_bytes, enforce, BTRFS_QGROUP_RSV_META);
 	if (ret < 0)
 		return ret;
 	atomic64_add(num_bytes, &root->qgroup_meta_rsv);
@@ -3048,7 +3107,8 @@ void btrfs_qgroup_free_meta_all(struct btrfs_root *root)
 	if (reserved == 0)
 		return;
 	trace_qgroup_meta_reserve(root, -(s64)reserved);
-	btrfs_qgroup_free_refroot(fs_info, root->objectid, reserved);
+	btrfs_qgroup_free_refroot(fs_info, root->objectid, reserved,
+				  BTRFS_QGROUP_RSV_META);
 }
 
 void btrfs_qgroup_free_meta(struct btrfs_root *root, int num_bytes)
@@ -3063,7 +3123,8 @@ void btrfs_qgroup_free_meta(struct btrfs_root *root, int num_bytes)
 	WARN_ON(atomic64_read(&root->qgroup_meta_rsv) < num_bytes);
 	atomic64_sub(num_bytes, &root->qgroup_meta_rsv);
 	trace_qgroup_meta_reserve(root, -(s64)num_bytes);
-	btrfs_qgroup_free_refroot(fs_info, root->objectid, num_bytes);
+	btrfs_qgroup_free_refroot(fs_info, root->objectid, num_bytes,
+				  BTRFS_QGROUP_RSV_META);
 }
 
 /*
@@ -3091,7 +3152,7 @@ void btrfs_qgroup_check_reserved_leak(struct inode *inode)
 		}
 		btrfs_qgroup_free_refroot(BTRFS_I(inode)->root->fs_info,
 				BTRFS_I(inode)->root->objectid,
-				changeset.bytes_changed);
+				changeset.bytes_changed, BTRFS_QGROUP_RSV_DATA);
 
 	}
 	extent_changeset_release(&changeset);

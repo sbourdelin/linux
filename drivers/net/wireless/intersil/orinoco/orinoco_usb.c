@@ -210,7 +210,7 @@ struct ezusb_packet {
 } __packed;
 
 /* Table of devices that work or may work with this driver */
-static struct usb_device_id ezusb_table[] = {
+static const struct usb_device_id ezusb_table[] = {
 	{USB_DEVICE(USB_COMPAQ_VENDOR_ID, USB_COMPAQ_WL215_ID)},
 	{USB_DEVICE(USB_COMPAQ_VENDOR_ID, USB_HP_WL215_ID)},
 	{USB_DEVICE(USB_COMPAQ_VENDOR_ID, USB_COMPAQ_W200_ID)},
@@ -1457,7 +1457,6 @@ static void ezusb_bulk_in_callback(struct urb *urb)
 
 static inline void ezusb_delete(struct ezusb_priv *upriv)
 {
-	struct net_device *dev;
 	struct list_head *item;
 	struct list_head *tmp_item;
 	unsigned long flags;
@@ -1465,7 +1464,6 @@ static inline void ezusb_delete(struct ezusb_priv *upriv)
 	BUG_ON(in_interrupt());
 	BUG_ON(!upriv);
 
-	dev = upriv->dev;
 	mutex_lock(&upriv->mtx);
 
 	upriv->udev = NULL;	/* No timer will be rearmed from here */

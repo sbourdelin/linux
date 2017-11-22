@@ -84,8 +84,8 @@
 
 #define NUMBER_OF_SMB2_COMMANDS	0x0013
 
-/* BB FIXME - analyze following length BB */
-#define MAX_SMB2_HDR_SIZE 0x78 /* 4 len + 64 hdr + (2*24 wct) + 2 bct + 2 pad */
+/* 4 len + 52 transform hdr + 64 hdr + 56 create rsp */
+#define MAX_SMB2_HDR_SIZE 0x00b0
 
 #define SMB2_PROTO_NUMBER cpu_to_le32(0x424d53fe)
 #define SMB2_TRANSFORM_PROTO_NUM cpu_to_le32(0x424d53fd)
@@ -195,7 +195,7 @@ struct smb2_symlink_err_rsp {
 #define SMB2_CLIENT_GUID_SIZE 16
 
 struct smb2_negotiate_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize; /* Must be 36 */
 	__le16 DialectCount;
 	__le16 SecurityMode;
@@ -282,7 +282,7 @@ struct smb2_negotiate_rsp {
 #define SMB2_SESSION_REQ_FLAG_ENCRYPT_DATA	0x04
 
 struct smb2_sess_setup_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize; /* Must be 25 */
 	__u8   Flags;
 	__u8   SecurityMode;
@@ -308,7 +308,7 @@ struct smb2_sess_setup_rsp {
 } __packed;
 
 struct smb2_logoff_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize;	/* Must be 4 */
 	__le16 Reserved;
 } __packed;
@@ -323,7 +323,7 @@ struct smb2_logoff_rsp {
 #define SMB2_SHAREFLAG_CLUSTER_RECONNECT	0x0001
 
 struct smb2_tree_connect_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize;	/* Must be 9 */
 	__le16 Reserved; /* Flags in SMB3.1.1 */
 	__le16 PathOffset;
@@ -375,7 +375,7 @@ struct smb2_tree_connect_rsp {
 #define SMB2_SHARE_CAP_ASYMMETRIC cpu_to_le32(0x00000080) /* 3.02 */
 
 struct smb2_tree_disconnect_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize;	/* Must be 4 */
 	__le16 Reserved;
 } __packed;
@@ -496,7 +496,7 @@ struct smb2_tree_disconnect_rsp {
 #define SVHDX_OPEN_DEVICE_CONTEXT	0x83CE6F1AD851E0986E34401CC9BCFCE9
 
 struct smb2_create_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize;	/* Must be 57 */
 	__u8   SecurityFlags;
 	__u8   RequestedOplockLevel;
@@ -716,7 +716,7 @@ struct validate_negotiate_info_req {
 	__u8   Guid[SMB2_CLIENT_GUID_SIZE];
 	__le16 SecurityMode;
 	__le16 DialectCount;
-	__le16 Dialects[1]; /* dialect (someday maybe list) client asked for */
+	__le16 Dialects[3]; /* BB expand this if autonegotiate > 3 dialects */
 } __packed;
 
 struct validate_negotiate_info_rsp {
@@ -753,7 +753,7 @@ struct duplicate_extents_to_file {
 } __packed;
 
 struct smb2_ioctl_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize;	/* Must be 57 */
 	__u16 Reserved;
 	__le32 CtlCode;
@@ -789,7 +789,7 @@ struct smb2_ioctl_rsp {
 /* Currently defined values for close flags */
 #define SMB2_CLOSE_FLAG_POSTQUERY_ATTRIB	cpu_to_le16(0x0001)
 struct smb2_close_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize;	/* Must be 24 */
 	__le16 Flags;
 	__le32 Reserved;
@@ -812,7 +812,7 @@ struct smb2_close_rsp {
 } __packed;
 
 struct smb2_flush_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize;	/* Must be 24 */
 	__le16 Reserved1;
 	__le32 Reserved2;
@@ -832,7 +832,7 @@ struct smb2_flush_rsp {
 /* Channel field for read and write: exactly one of following flags can be set*/
 #define SMB2_CHANNEL_NONE		0x00000000
 #define SMB2_CHANNEL_RDMA_V1		0x00000001 /* SMB3 or later */
-#define SMB2_CHANNEL_RDMA_V1_INVALIDATE 0x00000001 /* SMB3.02 or later */
+#define SMB2_CHANNEL_RDMA_V1_INVALIDATE 0x00000002 /* SMB3.02 or later */
 
 /* SMB2 read request without RFC1001 length at the beginning */
 struct smb2_read_plain_req {
@@ -868,7 +868,7 @@ struct smb2_read_rsp {
 #define SMB2_WRITEFLAG_WRITE_UNBUFFERED	0x00000002	/* SMB3.02 or later */
 
 struct smb2_write_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize; /* Must be 49 */
 	__le16 DataOffset; /* offset from start of SMB2 header to write data */
 	__le32 Length;
@@ -907,7 +907,7 @@ struct smb2_lock_element {
 } __packed;
 
 struct smb2_lock_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize; /* Must be 48 */
 	__le16 LockCount;
 	__le32 Reserved;
@@ -924,7 +924,7 @@ struct smb2_lock_rsp {
 } __packed;
 
 struct smb2_echo_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize;	/* Must be 4 */
 	__u16  Reserved;
 } __packed;
@@ -942,7 +942,7 @@ struct smb2_echo_rsp {
 #define SMB2_REOPEN			0x10
 
 struct smb2_query_directory_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize; /* Must be 33 */
 	__u8   FileInformationClass;
 	__u8   Flags;
@@ -989,7 +989,7 @@ struct smb2_query_directory_rsp {
 #define SL_INDEX_SPECIFIED	0x00000004
 
 struct smb2_query_info_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize; /* Must be 41 */
 	__u8   InfoType;
 	__u8   FileInfoClass;
@@ -1013,7 +1013,7 @@ struct smb2_query_info_rsp {
 } __packed;
 
 struct smb2_set_info_req {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize; /* Must be 33 */
 	__u8   InfoType;
 	__u8   FileInfoClass;
@@ -1031,7 +1031,19 @@ struct smb2_set_info_rsp {
 	__le16 StructureSize; /* Must be 2 */
 } __packed;
 
-struct smb2_oplock_break {
+/* oplock break without an rfc1002 header */
+struct smb2_oplock_break_req {
+	struct smb2_sync_hdr sync_hdr;
+	__le16 StructureSize; /* Must be 24 */
+	__u8   OplockLevel;
+	__u8   Reserved;
+	__le32 Reserved2;
+	__u64  PersistentFid;
+	__u64  VolatileFid;
+} __packed;
+
+/* oplock break with an rfc1002 header */
+struct smb2_oplock_break_rsp {
 	struct smb2_hdr hdr;
 	__le16 StructureSize; /* Must be 24 */
 	__u8   OplockLevel;
@@ -1057,7 +1069,7 @@ struct smb2_lease_break {
 } __packed;
 
 struct smb2_lease_ack {
-	struct smb2_hdr hdr;
+	struct smb2_sync_hdr sync_hdr;
 	__le16 StructureSize; /* Must be 36 */
 	__le16 Reserved;
 	__le32 Flags;
@@ -1177,6 +1189,17 @@ struct smb2_file_link_info { /* encoding of request for level 11 */
 	__le32 FileNameLength;
 	char   FileName[0];     /* Name to be assigned to new link */
 } __packed; /* level 11 Set */
+
+#define SMB2_MIN_EA_BUF  2048
+#define SMB2_MAX_EA_BUF 65536
+
+struct smb2_file_full_ea_info { /* encoding of response for level 15 */
+	__le32 next_entry_offset;
+	__u8   flags;
+	__u8   ea_name_length;
+	__le16 ea_value_length;
+	char   ea_data[0]; /* \0 terminated name plus value */
+} __packed; /* level 15 Set */
 
 /*
  * This level 18, although with struct with same name is different from cifs

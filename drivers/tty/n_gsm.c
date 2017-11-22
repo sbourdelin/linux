@@ -1,19 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * n_gsm.c GSM 0710 tty multiplexor
  * Copyright (c) 2009/10 Intel Corporation
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  *	* THIS IS A DEVELOPMENT SNAPSHOT IT IS NOT A FINAL RELEASE *
  *
@@ -1646,9 +1634,7 @@ static struct gsm_dlci *gsm_dlci_alloc(struct gsm_mux *gsm, int addr)
 	}
 
 	skb_queue_head_init(&dlci->skb_list);
-	init_timer(&dlci->t1);
-	dlci->t1.function = gsm_dlci_t1;
-	dlci->t1.data = (unsigned long)dlci;
+	setup_timer(&dlci->t1, gsm_dlci_t1, (unsigned long)dlci);
 	tty_port_init(&dlci->port);
 	dlci->port.ops = &gsm_port_ops;
 	dlci->gsm = gsm;
@@ -2607,6 +2593,14 @@ static int gsmld_ioctl(struct tty_struct *tty, struct file *file,
 	}
 }
 
+#ifdef CONFIG_COMPAT
+static long gsmld_compat_ioctl(struct tty_struct *tty, struct file *file,
+		       unsigned int cmd, unsigned long arg)
+{
+	return gsmld_ioctl(tty, file, cmd, arg);
+}
+#endif
+
 /*
  *	Network interface
  *
@@ -2818,6 +2812,9 @@ static struct tty_ldisc_ops tty_ldisc_packet = {
 	.flush_buffer    = gsmld_flush_buffer,
 	.read            = gsmld_read,
 	.write           = gsmld_write,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl    = gsmld_compat_ioctl,
+#endif
 	.ioctl           = gsmld_ioctl,
 	.poll            = gsmld_poll,
 	.receive_buf     = gsmld_receive_buf,

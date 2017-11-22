@@ -1237,7 +1237,7 @@ struct airo_info {
 
 	int			wep_capable;
 	int			max_wep_idx;
-	int			last_auth;
+	__le16			last_auth;
 
 	/* WPA-related stuff */
 	unsigned int bssListFirst;
@@ -3785,7 +3785,7 @@ badrx:
 	}
 }
 
-static inline void set_auth_type(struct airo_info *local, int auth_type)
+static inline void set_auth_type(struct airo_info *local, __le16 auth_type)
 {
 	local->config.authType = auth_type;
 	/* Cache the last auth type used (of AUTH_OPEN and AUTH_ENCRYPT).
@@ -7837,7 +7837,7 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 	struct airo_info *ai = dev->ml_priv;
 	int  ridcode;
         int  enabled;
-	static int (* writer)(struct airo_info *, u16 rid, const void *, int, int);
+	int (*writer)(struct airo_info *, u16 rid, const void *, int, int);
 	unsigned char *iobuf;
 
 	/* Only super-user can write RIDs */

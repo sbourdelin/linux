@@ -5,9 +5,14 @@ config CIFS
 	select CRYPTO
 	select CRYPTO_MD4
 	select CRYPTO_MD5
+	select CRYPTO_SHA256
+	select CRYPTO_CMAC
 	select CRYPTO_HMAC
 	select CRYPTO_ARC4
+	select CRYPTO_AEAD2
+	select CRYPTO_CCM
 	select CRYPTO_ECB
+	select CRYPTO_AES
 	select CRYPTO_DES
 	help
 	  This is the client VFS module for the SMB3 family of NAS protocols,
@@ -190,6 +195,14 @@ config CIFS_SMB311
 	  This enables experimental support for the newest, SMB3.1.1, dialect.
 	  This dialect includes improved security negotiation features.
 	  If unsure, say N
+
+config CIFS_SMB_DIRECT
+	bool "SMB Direct support (Experimental)"
+	depends on CIFS && INFINIBAND
+	help
+	  Enables SMB Direct experimental support for SMB 3.0, 3.02 and 3.1.1.
+	  SMB Direct allows transferring SMB packets over RDMA. If unsure,
+	  say N.
 
 config CIFS_FSCACHE
 	  bool "Provide CIFS client caching support"

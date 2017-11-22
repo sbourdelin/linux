@@ -919,21 +919,10 @@ struct ieee80211_tx_info {
 				unsigned long jiffies;
 			};
 			/* NB: vif can be NULL for injected frames */
-			union {
-				/* NB: vif can be NULL for injected frames */
-				struct ieee80211_vif *vif;
-
-				/* When packets are enqueued on txq it's easy
-				 * to re-construct the vif pointer. There's no
-				 * more space in tx_info so it can be used to
-				 * store the necessary enqueue time for packet
-				 * sojourn time computation.
-				 */
-				codel_time_t enqueue_time;
-			};
+			struct ieee80211_vif *vif;
 			struct ieee80211_key_conf *hw_key;
 			u32 flags;
-			/* 4 bytes free */
+			codel_time_t enqueue_time;
 		} control;
 		struct {
 			u64 cookie;
@@ -2067,6 +2056,9 @@ struct ieee80211_txq {
  *	The stack will not do fragmentation.
  *	The callback for @set_frag_threshold should be set as well.
  *
+ * @IEEE80211_HW_SUPPORTS_TDLS_BUFFER_STA: Hardware supports buffer STA on
+ *	TDLS links.
+ *
  * @NUM_IEEE80211_HW_FLAGS: number of hardware flags, used for sizing arrays
  */
 enum ieee80211_hw_flags {
@@ -2109,6 +2101,7 @@ enum ieee80211_hw_flags {
 	IEEE80211_HW_TX_FRAG_LIST,
 	IEEE80211_HW_REPORTS_LOW_ACK,
 	IEEE80211_HW_SUPPORTS_TX_FRAG,
+	IEEE80211_HW_SUPPORTS_TDLS_BUFFER_STA,
 
 	/* keep last, obviously */
 	NUM_IEEE80211_HW_FLAGS
@@ -5452,8 +5445,14 @@ void ieee80211_mark_rx_ba_filtered_frames(struct ieee80211_sta *pubsta, u8 tid,
  */
 void ieee80211_send_bar(struct ieee80211_vif *vif, u8 *ra, u16 tid, u16 ssn);
 
+/**
+ * ieee80211_manage_rx_ba_offl - helper to queue an RX BA work
+ * @vif: &struct ieee80211_vif pointer from the add_interface callback
+ * @addr: station mac address
+ * @tid: the rx tid
+ */
 void ieee80211_manage_rx_ba_offl(struct ieee80211_vif *vif, const u8 *addr,
-				 unsigned int bit);
+				 unsigned int tid);
 
 /**
  * ieee80211_start_rx_ba_session_offl - start a Rx BA session
@@ -5498,6 +5497,21 @@ static inline void ieee80211_stop_rx_ba_session_offl(struct ieee80211_vif *vif,
 		return;
 	ieee80211_manage_rx_ba_offl(vif, addr, tid + IEEE80211_NUM_TIDS);
 }
+
+/**
+ * ieee80211_rx_ba_timer_expired - stop a Rx BA session due to timeout
+ *
+ * Some device drivers do not offload AddBa/DelBa negotiation, but handle rx
+ * buffer reording internally, and therefore also handle the session timer.
+ *
+ * Trigger the timeout flow, which sends a DelBa.
+ *
+ * @vif: &struct ieee80211_vif pointer from the add_interface callback
+ * @addr: station mac address
+ * @tid: the rx tid
+ */
+void ieee80211_rx_ba_timer_expired(struct ieee80211_vif *vif,
+				   const u8 *addr, unsigned int tid);
 
 /* Rate control API */
 
