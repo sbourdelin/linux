@@ -342,7 +342,7 @@ static int metag_dma_mmap(struct device *dev, struct vm_area_struct *vma,
 	else
 		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 
-	user_size = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+	user_size = vma_pages(vma);
 
 	spin_lock_irqsave(&consistent_lock, flags);
 	c = metag_vm_region_find(&consistent_head, (unsigned long)cpu_addr);
