@@ -2820,9 +2820,13 @@ static void nested_vmx_setup_ctls_msrs(struct vcpu_vmx *vmx)
 		SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
 		SECONDARY_EXEC_DESC |
 		SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE |
-		SECONDARY_EXEC_APIC_REGISTER_VIRT |
-		SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
 		SECONDARY_EXEC_WBINVD_EXITING;
+
+	if (kvm_vcpu_apicv_active(&vmx->vcpu)) {
+		vmx->nested.nested_vmx_secondary_ctls_high |=
+			(SECONDARY_EXEC_APIC_REGISTER_VIRT |
+			SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY);
+	}
 
 	if (enable_ept) {
 		/* nested EPT: emulate EPT also to L1 */
