@@ -502,6 +502,21 @@ struct vfio_pci_hot_reset {
 
 #define VFIO_DEVICE_PCI_HOT_RESET	_IO(VFIO_TYPE, VFIO_BASE + 13)
 
+/**
+ * VFIO_DEVICE_PCI_ALLOW_MSIX_MMAP - _IOW(VFIO_TYPE, VFIO_BASE + 14,
+ *				    struct vfio_pci_allow_msix_mmap)
+ *
+ * Return: 0 on success, -errno on failure.
+ */
+#define VFIO_PCI_ALLOW_MSIX_MMAP	(1 << 0) /* mmap of entire MSIX BAR */
+
+struct vfio_pci_allow_msix_mmap {
+	__u32	argsz;
+	__u32	flags;
+};
+
+#define VFIO_DEVICE_PCI_ALLOW_MSIX_MMAP	_IO(VFIO_TYPE, VFIO_BASE + 14)
+
 /* -------- API for Type1 VFIO IOMMU -------- */
 
 /**

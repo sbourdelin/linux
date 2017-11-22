@@ -691,7 +691,8 @@ static long vfio_pci_ioctl(void *device_data,
 				     VFIO_REGION_INFO_FLAG_WRITE;
 			if (vdev->bar_mmap_supported[info.index]) {
 				info.flags |= VFIO_REGION_INFO_FLAG_MMAP;
-				if (info.index == vdev->msix_bar) {
+				if (info.index == vdev->msix_bar &&
+						!vdev->msix_mmap) {
 					ret = msix_sparse_mmap_cap(vdev, &caps);
 					if (ret)
 						return ret;
@@ -1039,6 +1040,20 @@ hot_reset_release:
 
 		kfree(groups);
 		return ret;
+	} else if (cmd == VFIO_DEVICE_PCI_ALLOW_MSIX_MMAP) {
+		struct vfio_pci_allow_msix_mmap hdr;
+
+		minsz = offsetofend(struct vfio_pci_allow_msix_mmap, flags);
+
+		if (copy_from_user(&hdr, (void __user *)arg, minsz))
+			return -EFAULT;
+
+		if (hdr.argsz < minsz || hdr.flags & ~VFIO_PCI_ALLOW_MSIX_MMAP)
+			return -EINVAL;
+
+		vdev->msix_mmap = !!(hdr.flags & VFIO_PCI_ALLOW_MSIX_MMAP);
+
+		return 0;
 	}
 
 	return -ENOTTY;
@@ -1122,7 +1137,7 @@ static int vfio_pci_mmap(void *device_data, struct vm_area_struct *vma)
 	if (req_start + req_len > phys_len)
 		return -EINVAL;
 
-	if (index == vdev->msix_bar) {
+	if (!vdev->msix_mmap && index == vdev->msix_bar) {
 		/*
 		 * Disallow mmaps overlapping the MSI-X table; users don't
 		 * get to touch this directly.  We could find somewhere

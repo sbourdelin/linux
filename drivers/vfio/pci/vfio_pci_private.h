@@ -90,6 +90,7 @@ struct vfio_pci_device {
 	bool			has_vga;
 	bool			needs_reset;
 	bool			nointx;
+	bool			msix_mmap;
 	struct pci_saved_state	*pci_saved_state;
 	int			refcnt;
 	struct eventfd_ctx	*err_trigger;
