@@ -744,7 +744,6 @@ static int vmci_host_do_ctx_set_cpt_state(struct vmci_host_dev *vmci_host_dev,
 	struct vmci_ctx_chkpt_buf_info set_info;
 	u32 cid;
 	void *cpt_buf;
-	int retval;
 
 	if (vmci_host_dev->ct_type != VMCIOBJ_CONTEXT) {
 		vmci_ioctl_err("only valid for contexts\n");
@@ -754,29 +753,21 @@ static int vmci_host_do_ctx_set_cpt_state(struct vmci_host_dev *vmci_host_dev,
 	if (copy_from_user(&set_info, uptr, sizeof(set_info)))
 		return -EFAULT;
 
-	cpt_buf = kmalloc(set_info.buf_size, GFP_KERNEL);
-	if (!cpt_buf) {
-		vmci_ioctl_err(
-			"cannot allocate memory to set cpt state (type=%d)\n",
-			set_info.cpt_type);
-		return -ENOMEM;
-	}
-
-	if (copy_from_user(cpt_buf, (void __user *)(uintptr_t)set_info.cpt_buf,
-			   set_info.buf_size)) {
-		retval = -EFAULT;
-		goto out;
+	cpt_buf = memdup_user((void __user *)(uintptr_t)set_info.cpt_buf,
+			set_info.buf_size);
+	if (IS_ERR(cpt_buf)) {
+		vmci_ioctl_err("cannot allocate memory to set cpt state (type=%d)\n",
+				set_info.cpt_type);
+		return PTR_ERR(cpt_buf);
 	}
 
 	cid = vmci_ctx_get_id(vmci_host_dev->context);
 	set_info.result = vmci_ctx_set_chkpt_state(cid, set_info.cpt_type,
 						   set_info.buf_size, cpt_buf);
 
-	retval = copy_to_user(uptr, &set_info, sizeof(set_info)) ? -EFAULT : 0;
-
-out:
 	kfree(cpt_buf);
-	return retval;
+
+	return copy_to_user(uptr, &set_info, sizeof(set_info)) ? -EFAULT : 0;
 }
 
 static int vmci_host_do_get_context_id(struct vmci_host_dev *vmci_host_dev,
