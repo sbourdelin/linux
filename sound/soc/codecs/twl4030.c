@@ -239,11 +239,11 @@ static struct twl4030_codec_data *twl4030_get_pdata(struct snd_soc_codec *codec)
 		pdata = devm_kzalloc(codec->dev,
 				     sizeof(struct twl4030_codec_data),
 				     GFP_KERNEL);
-		if (!pdata) {
-			of_node_put(twl4030_codec_node);
-			return NULL;
-		}
+		if (!pdata)
+			goto put_node;
+
 		twl4030_setup_pdata_of(pdata, twl4030_codec_node);
+put_node:
 		of_node_put(twl4030_codec_node);
 	}
 
