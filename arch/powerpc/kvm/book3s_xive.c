@@ -584,10 +584,14 @@ int kvmppc_xive_set_xive(struct kvm *kvm, u32 irq, u32 server,
 	 *       we could initialize interrupts with valid default
 	 */
 
-	if (new_act_prio != MASKED &&
-	    (state->act_server != server ||
-	     state->act_priority != new_act_prio))
-		rc = xive_target_interrupt(kvm, state, server, new_act_prio);
+	if (state->act_server != server ||
+	    state->act_priority != new_act_prio) {
+		if (new_act_prio != MASKED)
+			rc = xive_target_interrupt(kvm, state, server,
+						   new_act_prio);
+		if (!rc)
+			state->act_server = server;
+	}
 
 	/*
 	 * Perform the final unmasking of the interrupt source
@@ -645,14 +649,6 @@ int kvmppc_xive_int_on(struct kvm *kvm, u32 irq)
 	state = &sb->irq_state[idx];
 
 	pr_devel("int_on(irq=0x%x)\n", irq);
-
-	/*
-	 * Check if interrupt was not targetted
-	 */
-	if (state->act_priority == MASKED) {
-		pr_devel("int_on on untargetted interrupt\n");
-		return -EINVAL;
-	}
 
 	/* If saved_priority is 0xff, do nothing */
 	if (state->saved_priority == MASKED)
