@@ -1577,6 +1577,9 @@ int set_thread_tidr(struct task_struct *t)
 	if (t != current)
 		return -EINVAL;
 
+	if (t->thread.tidr)
+		return t->thread.tidr;
+
 	rc = assign_thread_tidr();
 	if (rc > 0) {
 		t->thread.tidr = assign_thread_tidr();
