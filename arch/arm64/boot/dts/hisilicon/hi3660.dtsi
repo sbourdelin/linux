@@ -146,7 +146,7 @@
 
 			CPU_NAP: cpu-nap {
 				compatible = "arm,idle-state";
-				arm,psci-suspend-param = <0x0000001>;
+				arm,psci-suspend-param = <0x0000000>;
 				entry-latency-us = <7>;
 				exit-latency-us = <2>;
 				min-residency-us = <15>;
