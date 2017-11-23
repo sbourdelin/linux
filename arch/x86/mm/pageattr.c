@@ -585,9 +585,9 @@ try_preserve_large_page(pte_t *kpte, unsigned long address,
 	 * for the ancient hardware that doesn't support it.
 	 */
 	if (pgprot_val(req_prot) & _PAGE_PRESENT)
-		pgprot_val(req_prot) |= _PAGE_PSE | _PAGE_GLOBAL;
+		pgprot_val(req_prot) |= _PAGE_PSE | __PAGE_KERNEL_GLOBAL;
 	else
-		pgprot_val(req_prot) &= ~(_PAGE_PSE | _PAGE_GLOBAL);
+		pgprot_val(req_prot) &= ~(_PAGE_PSE | __PAGE_KERNEL_GLOBAL);
 
 	req_prot = canon_pgprot(req_prot);
 
@@ -705,9 +705,9 @@ __split_large_page(struct cpa_data *cpa, pte_t *kpte, unsigned long address,
 	 * for the ancient hardware that doesn't support it.
 	 */
 	if (pgprot_val(ref_prot) & _PAGE_PRESENT)
-		pgprot_val(ref_prot) |= _PAGE_GLOBAL;
+		pgprot_val(ref_prot) |= __PAGE_KERNEL_GLOBAL;
 	else
-		pgprot_val(ref_prot) &= ~_PAGE_GLOBAL;
+		pgprot_val(ref_prot) &= ~__PAGE_KERNEL_GLOBAL;
 
 	/*
 	 * Get the target pfn from the original entry:
@@ -938,9 +938,9 @@ static void populate_pte(struct cpa_data *cpa,
 	 * support it.
 	 */
 	if (pgprot_val(pgprot) & _PAGE_PRESENT)
-		pgprot_val(pgprot) |= _PAGE_GLOBAL;
+		pgprot_val(pgprot) |= __PAGE_KERNEL_GLOBAL;
 	else
-		pgprot_val(pgprot) &= ~_PAGE_GLOBAL;
+		pgprot_val(pgprot) &= ~__PAGE_KERNEL_GLOBAL;
 
 	pgprot = canon_pgprot(pgprot);
 
@@ -1242,9 +1242,9 @@ repeat:
 		 * support it.
 		 */
 		if (pgprot_val(new_prot) & _PAGE_PRESENT)
-			pgprot_val(new_prot) |= _PAGE_GLOBAL;
+			pgprot_val(new_prot) |= __PAGE_KERNEL_GLOBAL;
 		else
-			pgprot_val(new_prot) &= ~_PAGE_GLOBAL;
+			pgprot_val(new_prot) &= ~__PAGE_KERNEL_GLOBAL;
 
 		/*
 		 * We need to keep the pfn from the existing PTE,
