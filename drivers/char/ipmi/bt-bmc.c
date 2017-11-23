@@ -410,7 +410,7 @@ static int bt_bmc_config_irq(struct bt_bmc *bt_bmc,
 	int rc;
 
 	bt_bmc->irq = platform_get_irq(pdev, 0);
-	if (!bt_bmc->irq)
+	if (bt_bmc->irq < 0)
 		return -ENODEV;
 
 	rc = devm_request_irq(dev, bt_bmc->irq, bt_bmc_irq, IRQF_SHARED,
