@@ -376,6 +376,35 @@ static ssize_t gro_flush_timeout_store(struct device *dev,
 }
 NETDEVICE_SHOW_RW(gro_flush_timeout, fmt_ulong);
 
+static int change_gso_max_size(struct net_device *dev, unsigned long new_size)
+{
+	unsigned int orig_size = dev->gso_max_size;
+
+	if (new_size != (unsigned int)new_size)
+		return -ERANGE;
+
+	if (new_size == orig_size)
+		return 0;
+
+	if (new_size <= 0 || new_size > GSO_MAX_SIZE)
+		return -ERANGE;
+
+	dev->gso_max_size = new_size;
+	return 0;
+}
+
+static ssize_t gso_max_size_store(struct device *dev,
+				  struct device_attribute *attr,
+				  const char *buf, size_t len)
+{
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	return netdev_store(dev, attr, buf, len, change_gso_max_size);
+}
+
+NETDEVICE_SHOW_RW(gso_max_size, fmt_dec);
+
 static ssize_t ifalias_store(struct device *dev, struct device_attribute *attr,
 			     const char *buf, size_t len)
 {
@@ -543,6 +572,7 @@ static struct attribute *net_class_attrs[] __ro_after_init = {
 	&dev_attr_flags.attr,
 	&dev_attr_tx_queue_len.attr,
 	&dev_attr_gro_flush_timeout.attr,
+	&dev_attr_gso_max_size.attr,
 	&dev_attr_phys_port_id.attr,
 	&dev_attr_phys_port_name.attr,
 	&dev_attr_phys_switch_id.attr,
