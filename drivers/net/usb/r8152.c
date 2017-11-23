@@ -27,6 +27,8 @@
 #include <linux/usb/cdc.h>
 #include <linux/suspend.h>
 #include <linux/acpi.h>
+#include <linux/pci.h>
+#include <linux/usb/hcd.h>
 
 /* Information for net-next */
 #define NETNEXT_VERSION		"09"
@@ -5135,6 +5137,35 @@ static u8 rtl_get_version(struct usb_interface *intf)
 	return version;
 }
 
+/* Ethernet on Dell TB 15/16 dock is connected this way:
+ * Realtek r8153 <-> SMSC hub <-> ASMedia XHCI controller
+ * We use this connection to make sure r8153 is on the Dell TB dock.
+ */
+static bool check_dell_tb_dock(struct usb_device *udev)
+{
+	struct usb_device *hub = udev->parent;
+	struct usb_device *root_hub;
+	struct pci_dev *controller;
+
+	if (!hub)
+		return false;
+
+	if (!(le16_to_cpu(hub->descriptor.idVendor) == 0x0424 &&
+	      le16_to_cpu(hub->descriptor.idProduct) == 0x5537))
+		return false;
+
+	root_hub = hub->parent;
+	if (!root_hub || root_hub->parent)
+		return false;
+
+	controller = to_pci_dev(bus_to_hcd(root_hub->bus)->self.controller);
+
+	if (controller->vendor == 0x1b21 && controller->device == 0x1142)
+		return true;
+
+	return false;
+}
+
 static int rtl8152_probe(struct usb_interface *intf,
 			 const struct usb_device_id *id)
 {
@@ -5202,7 +5233,7 @@ static int rtl8152_probe(struct usb_interface *intf,
 				NETIF_F_HIGHDMA | NETIF_F_FRAGLIST |
 				NETIF_F_IPV6_CSUM | NETIF_F_TSO6;
 
-	if (tp->version == RTL_VER_01) {
+	if (tp->version == RTL_VER_01 || check_dell_tb_dock(udev)) {
 		netdev->features &= ~NETIF_F_RXCSUM;
 		netdev->hw_features &= ~NETIF_F_RXCSUM;
 	}
