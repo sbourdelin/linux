@@ -315,6 +315,74 @@ TRACE_EVENT(mm_page_alloc_extfrag,
 		__entry->change_ownership)
 );
 
+TRACE_EVENT(mm_page_alloc_slowpath_enter,
+
+	TP_PROTO(int alloc_order,
+		nodemask_t *nodemask,
+		gfp_t gfp_flags),
+
+	TP_ARGS(alloc_order, nodemask, gfp_flags),
+
+	TP_STRUCT__entry(
+		__field(int, alloc_order)
+		__field(nodemask_t *, nodemask)
+		__field(gfp_t, gfp_flags)
+	 ),
+
+	 TP_fast_assign(
+		__entry->alloc_order		= alloc_order;
+		__entry->nodemask		= nodemask;
+		__entry->gfp_flags		= gfp_flags;
+	 ),
+
+	 TP_printk("alloc_order=%d nodemask=%*pbl gfp_flags=%s",
+		__entry->alloc_order,
+		nodemask_pr_args(__entry->nodemask),
+		show_gfp_flags(__entry->gfp_flags))
+);
+
+TRACE_EVENT(mm_page_alloc_slowpath_exit,
+
+	TP_PROTO(struct page *page,
+		int alloc_order,
+		nodemask_t *nodemask,
+		u64 alloc_start,
+		gfp_t gfp_flags,
+		int retrys,
+		int exit),
+
+	TP_ARGS(page, alloc_order, nodemask, alloc_start, gfp_flags,
+		retrys, exit),
+
+	TP_STRUCT__entry(__field(struct page *, page)
+		__field(int, alloc_order)
+		__field(nodemask_t *, nodemask)
+		__field(u64, msdelay)
+		__field(gfp_t, gfp_flags)
+		__field(int, retrys)
+		__field(int, exit)
+	),
+
+	TP_fast_assign(
+		__entry->page	     = page;
+		__entry->alloc_order = alloc_order;
+		__entry->nodemask    = nodemask;
+		__entry->msdelay     = jiffies_to_msecs(jiffies-alloc_start);
+		__entry->gfp_flags   = gfp_flags;
+		__entry->retrys	     = retrys;
+		__entry->exit	     = exit;
+	),
+
+	TP_printk("page=%p alloc_order=%d nodemask=%*pbl msdelay=%llu gfp_flags=%s retrys=%d exit=%d",
+		__entry->page,
+		__entry->alloc_order,
+		nodemask_pr_args(__entry->nodemask),
+		__entry->msdelay,
+		show_gfp_flags(__entry->gfp_flags),
+		__entry->retrys,
+		__entry->exit)
+);
+
 #endif /* _TRACE_KMEM_H */
 
 /* This part must be outside protection */

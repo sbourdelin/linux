@@ -104,6 +104,17 @@ DEFINE_PER_CPU(struct work_struct, pcpu_drain);
 volatile unsigned long latent_entropy __latent_entropy;
 EXPORT_SYMBOL(latent_entropy);
 #endif
+enum slowpath_exit {
+	SLOWPATH_NOZONE = -16,
+	SLOWPATH_COMPACT_DEFERRED,
+	SLOWPATH_CAN_NOT_DIRECT_RECLAIM,
+	SLOWPATH_RECURSION,
+	SLOWPATH_NO_RETRY,
+	SLOWPATH_COSTLY_ORDER,
+	SLOWPATH_OOM_VICTIM,
+	SLOWPATH_NO_DIRECT_RECLAIM,
+	SLOWPATH_ORDER
+};
 
 /*
  * Array of node states.
@@ -3908,8 +3919,15 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	enum compact_result compact_result;
 	int compaction_retries;
 	int no_progress_loops;
+	unsigned long alloc_start = jiffies;
 	unsigned int cpuset_mems_cookie;
 	int reserve_flags;
+	enum slowpath_exit slowpath_exit;
+	int retry_count = 0;
+
+	trace_mm_page_alloc_slowpath_enter(order,
+		ac->nodemask,
+		gfp_mask);
 
 	/*
 	 * In the slowpath, we sanity check order to avoid ever trying to
@@ -3919,7 +3937,8 @@ __alloc_pages_slowpath(gfp_t gfp_mask, unsigned int order,
 	 */
 	if (order >= MAX_ORDER) {
 		WARN_ON_ONCE(!(gfp_mask & __GFP_NOWARN));
-		return NULL;
+		slowpath_exit = SLOWPATH_ORDER;
+		goto fail;
 	}
 
 	/*
@@ -3951,8 +3970,10 @@ retry_cpuset:
 	 */
 	ac->preferred_zoneref = first_zones_zonelist(ac->zonelist,
 					ac->high_zoneidx, ac->nodemask);
-	if (!ac->preferred_zoneref->zone)
+	if (!ac->preferred_zoneref->zone) {
+		slowpath_exit = SLOWPATH_NOZONE;
 		goto nopage;
+	}
 
 	if (gfp_mask & __GFP_KSWAPD_RECLAIM)
 		wake_all_kswapds(order, ac);
@@ -3998,8 +4019,10 @@ retry_cpuset:
 			 * system, so we fail the allocation instead of entering
 			 * direct reclaim.
 			 */
-			if (compact_result == COMPACT_DEFERRED)
+			if (compact_result == COMPACT_DEFERRED) {
+				slowpath_exit = SLOWPATH_COMPACT_DEFERRED;
 				goto nopage;
+			}
 
 			/*
 			 * Looks like reclaim/compaction is worth trying, but
@@ -4011,6 +4034,7 @@ retry_cpuset:
 	}
 
 retry:
+	retry_count++;
 	/* Ensure kswapd doesn't accidentally go to sleep as long as we loop */
 	if (gfp_mask & __GFP_KSWAPD_RECLAIM)
 		wake_all_kswapds(order, ac);
@@ -4036,13 +4060,16 @@ retry:
 		goto got_pg;
 
 	/* Caller is not willing to reclaim, we can't balance anything */
-	if (!can_direct_reclaim)
+	if (!can_direct_reclaim) {
+		slowpath_exit = SLOWPATH_CAN_NOT_DIRECT_RECLAIM;
 		goto nopage;
+	}
 
 	/* Avoid recursion of direct reclaim */
-	if (current->flags & PF_MEMALLOC)
+	if (current->flags & PF_MEMALLOC) {
+		slowpath_exit = SLOWPATH_RECURSION;
 		goto nopage;
-
+	}
 	/* Try direct reclaim and then allocating */
 	page = __alloc_pages_direct_reclaim(gfp_mask, order, alloc_flags, ac,
 							&did_some_progress);
@@ -4056,16 +4083,18 @@ retry:
 		goto got_pg;
 
 	/* Do not loop if specifically requested */
-	if (gfp_mask & __GFP_NORETRY)
+	if (gfp_mask & __GFP_NORETRY) {
+		slowpath_exit = SLOWPATH_NO_RETRY;
 		goto nopage;
-
+	}
 	/*
 	 * Do not retry costly high order allocations unless they are
 	 * __GFP_RETRY_MAYFAIL
 	 */
-	if (costly_order && !(gfp_mask & __GFP_RETRY_MAYFAIL))
+	if (costly_order && !(gfp_mask & __GFP_RETRY_MAYFAIL)) {
+		slowpath_exit = SLOWPATH_COSTLY_ORDER;
 		goto nopage;
-
+	}
 	if (should_reclaim_retry(gfp_mask, order, ac, alloc_flags,
 				 did_some_progress > 0, &no_progress_loops))
 		goto retry;
@@ -4095,9 +4124,10 @@ retry:
 	/* Avoid allocations with no watermarks from looping endlessly */
 	if (tsk_is_oom_victim(current) &&
 	    (alloc_flags == ALLOC_OOM ||
-	     (gfp_mask & __GFP_NOMEMALLOC)))
+	     (gfp_mask & __GFP_NOMEMALLOC))) {
+		slowpath_exit = SLOWPATH_OOM_VICTIM;
 		goto nopage;
-
+	}
 	/* Retry as long as the OOM killer is making progress */
 	if (did_some_progress) {
 		no_progress_loops = 0;
@@ -4118,9 +4148,10 @@ nopage:
 		 * All existing users of the __GFP_NOFAIL are blockable, so warn
 		 * of any new users that actually require GFP_NOWAIT
 		 */
-		if (WARN_ON_ONCE(!can_direct_reclaim))
+		if (WARN_ON_ONCE(!can_direct_reclaim)) {
+			slowpath_exit = SLOWPATH_NO_DIRECT_RECLAIM;
 			goto fail;
-
+		}
 		/*
 		 * PF_MEMALLOC request from this context is rather bizarre
 		 * because we cannot reclaim anything and only can loop waiting
@@ -4153,6 +4184,9 @@ fail:
 	warn_alloc(gfp_mask, ac->nodemask,
 			"page allocation failure: order:%u", order);
 got_pg:
+	trace_mm_page_alloc_slowpath_exit(page, order, ac->nodemask,
+		alloc_start, gfp_mask, retry_count, slowpath_exit);
+
 	return page;
 }
 
