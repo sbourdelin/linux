@@ -684,3 +684,12 @@ void _cxl_cx4_teardown_msi_irqs(struct pci_dev *pdev)
 	}
 }
 /* Exported via cxl_base */
+
+int cxl_thread_tidr(struct cxl_context *ctx, int assign)
+{
+	if (!ctx)
+		return -EINVAL;
+
+	return cxl_context_thread_tidr(ctx, assign);
+}
+EXPORT_SYMBOL_GPL(cxl_thread_tidr);

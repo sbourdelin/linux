@@ -1557,6 +1557,7 @@ void clear_thread_tidr(struct task_struct *t)
 	free_thread_tidr(t->thread.tidr);
 	t->thread.tidr = 0;
 }
+EXPORT_SYMBOL_GPL(clear_thread_tidr);
 
 void arch_release_task_struct(struct task_struct *t)
 {
@@ -1583,6 +1584,7 @@ int set_thread_tidr(struct task_struct *t)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(set_thread_tidr);
 
 #endif /* CONFIG_PPC64 */
 

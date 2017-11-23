@@ -300,6 +300,17 @@ static long afu_ioctl_get_afu_id(struct cxl_context *ctx,
 	return 0;
 }
 
+static long afu_ioctl_thread_tidr(struct cxl_context *ctx,
+				  int __user *uassign)
+{
+	int assign;
+
+	if (copy_from_user(&assign, uassign, sizeof(assign)))
+		return -EFAULT;
+
+	return cxl_context_thread_tidr(ctx, assign);
+}
+
 long afu_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
 	struct cxl_context *ctx = file->private_data;
@@ -319,6 +330,8 @@ long afu_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case CXL_IOCTL_GET_AFU_ID:
 		return afu_ioctl_get_afu_id(ctx, (struct cxl_afu_id __user *)
 					    arg);
+	case CXL_IOCTL_THREAD_TIDR:
+		return afu_ioctl_thread_tidr(ctx, (int __user *)arg);
 	}
 	return -EINVAL;
 }

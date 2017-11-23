@@ -673,7 +673,7 @@ static int process_element_entry_psl9(struct cxl_context *ctx, u64 wed, u64 amr)
 		pid = ctx->mm->context.id;
 	}
 
-	ctx->elem->common.tid = 0;
+	ctx->elem->common.tid = cpu_to_be32(ctx->tid);
 	ctx->elem->common.pid = cpu_to_be32(pid);
 
 	ctx->elem->sr = cpu_to_be64(calculate_sr(ctx));

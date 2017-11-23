@@ -22,6 +22,7 @@
 #include <asm/cputable.h>
 #include <asm/current.h>
 #include <asm/copro.h>
+#include <asm/switch_to.h>
 
 #include "cxl.h"
 
@@ -42,6 +43,7 @@ int cxl_context_init(struct cxl_context *ctx, struct cxl_afu *afu, bool master)
 
 	ctx->afu = afu;
 	ctx->master = master;
+	ctx->tid = 0;
 	ctx->pid = NULL; /* Set in start work ioctl */
 	mutex_init(&ctx->mapping_lock);
 	ctx->mapping = NULL;
@@ -361,4 +363,23 @@ void cxl_context_mm_count_put(struct cxl_context *ctx)
 {
 	if (ctx->mm)
 		mmdrop(ctx->mm);
+}
+
+int cxl_context_thread_tidr(struct cxl_context *ctx, int assign)
+{
+	int rc = 0;
+
+	/* Clear any TIDR value assigned to the current thread */
+	if (!assign) {
+		clear_thread_tidr(current);
+		ctx->tid = 0;
+	} else {
+		/* Assign a unique TIDR (thread id) for the current thread */
+		rc = set_thread_tidr(current);
+		if (!rc)
+			ctx->tid = current->thread.tidr;
+	}
+	pr_devel("%s: current tidr: %d\n", __func__, ctx->tid);
+
+	return rc;
 }
