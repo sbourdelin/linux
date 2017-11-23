@@ -597,6 +597,10 @@ static int msix_sparse_mmap_cap(struct vfio_pci_device *vdev,
 		i++;
 	}
 
+	/* With all alignments, there are no gaps left to mmap */
+	if (i == 0)
+		sparse->nr_areas = 0;
+
 	ret = vfio_info_add_capability(caps, VFIO_REGION_INFO_CAP_SPARSE_MMAP,
 				       sparse);
 	kfree(sparse);
