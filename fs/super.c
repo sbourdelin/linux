@@ -489,6 +489,7 @@ retry:
 				continue;
 			if (user_ns != old->s_user_ns) {
 				spin_unlock(&sb_lock);
+				unregister_shrinker(&s->s_shrink);
 				destroy_unused_super(s);
 				return ERR_PTR(-EBUSY);
 			}
@@ -503,12 +504,18 @@ retry:
 		s = alloc_super(type, (flags & ~SB_SUBMOUNT), user_ns);
 		if (!s)
 			return ERR_PTR(-ENOMEM);
+		if (register_shrinker(&s->s_shrink)) {
+			spin_unlock(&sb_lock);
+			destroy_unused_super(s);
+			return ERR_PTR(-ENOMEM);
+		}
 		goto retry;
 	}
 
 	err = set(s, data);
 	if (err) {
 		spin_unlock(&sb_lock);
+		unregister_shrinker(&s->s_shrink);
 		destroy_unused_super(s);
 		return ERR_PTR(err);
 	}
@@ -518,7 +525,6 @@ retry:
 	hlist_add_head(&s->s_instances, &type->fs_supers);
 	spin_unlock(&sb_lock);
 	get_filesystem(type);
-	register_shrinker(&s->s_shrink);
 	return s;
 }
 
