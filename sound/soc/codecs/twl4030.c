@@ -236,9 +236,7 @@ static struct twl4030_codec_data *twl4030_get_pdata(struct snd_soc_codec *codec)
 						  "codec");
 
 	if (!pdata && twl4030_codec_node) {
-		pdata = devm_kzalloc(codec->dev,
-				     sizeof(struct twl4030_codec_data),
-				     GFP_KERNEL);
+		pdata = devm_kzalloc(codec->dev, sizeof(*pdata), GFP_KERNEL);
 		if (!pdata)
 			goto put_node;
 
@@ -2168,8 +2166,7 @@ static int twl4030_soc_probe(struct snd_soc_codec *codec)
 {
 	struct twl4030_priv *twl4030;
 
-	twl4030 = devm_kzalloc(codec->dev, sizeof(struct twl4030_priv),
-			       GFP_KERNEL);
+	twl4030 = devm_kzalloc(codec->dev, sizeof(*twl4030), GFP_KERNEL);
 	if (!twl4030)
 		return -ENOMEM;
 	snd_soc_codec_set_drvdata(codec, twl4030);
