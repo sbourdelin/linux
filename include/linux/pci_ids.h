@@ -139,6 +139,9 @@
 #define PCI_CLASS_SP_DPIO		0x1100
 #define PCI_CLASS_SP_OTHER		0x1180
 
+#define PCI_BASE_CLASS_PROCESSING_ACCELERATOR	0x12
+#define PCI_CLASS_PA_VENDOR_SPECIFIC		0x1200
+
 #define PCI_CLASS_OTHERS		0xff
 
 /* Vendors and devices.  Sort key: vendor first, device next. */
