@@ -965,6 +965,8 @@ void __init txx9_sramc_init(struct resource *r)
 	}
 	return;
 exit_put:
+	if (dev->base)
+		iounmap(dev->base);
 	put_device(&dev->dev);
 	return;
 }
