@@ -980,7 +980,7 @@ ALT_FTR_SECTION_END_IFCLR(CPU_FTR_ARCH_300)
 	/* We are entering the guest on that thread, push VCPU to XIVE */
 	ld	r10, HSTATE_XIVE_TIMA_PHYS(r13)
 	cmpldi	cr0, r10, 0
-	beq	no_xive
+	beq	.Lno_xive
 	ld	r11, VCPU_XIVE_SAVED_STATE(r4)
 	li	r9, TM_QW1_OS
 	eieio
@@ -1036,7 +1036,7 @@ ALT_FTR_SECTION_END_IFCLR(CPU_FTR_ARCH_300)
 	li	r0, 0
 	stb	r0, VCPU_XIVE_ESC_ON(r4)
 1:
-no_xive:
+.Lno_xive:
 #endif /* CONFIG_KVM_XICS */
 
 deliver_guest_interrupt:
