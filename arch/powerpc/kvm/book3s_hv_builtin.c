@@ -209,8 +209,7 @@ long kvmppc_h_random(struct kvm_vcpu *vcpu)
 {
 	int r;
 
-	/* Only need to do the expensive mfmsr() on radix */
-	if (kvm_is_radix(vcpu->kvm) && (mfmsr() & MSR_IR))
+	if (local_paca->kvm_hstate.exit_virt)
 		r = powernv_get_random_long(&vcpu->arch.gpr[4]);
 	else
 		r = powernv_get_random_real_mode(&vcpu->arch.gpr[4]);
@@ -524,7 +523,7 @@ static long kvmppc_read_one_intr(bool *again)
 #ifdef CONFIG_KVM_XICS
 static inline bool is_rm(void)
 {
-	return !(mfmsr() & MSR_DR);
+	return !local_paca->kvm_hstate.exit_virt;
 }
 
 unsigned long kvmppc_rm_h_xirr(struct kvm_vcpu *vcpu)

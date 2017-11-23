@@ -81,6 +81,8 @@ _GLOBAL_TOC(kvmppc_hv_entry_trampoline)
 	RFI
 
 kvmppc_call_hv_entry:
+	li	r0,0
+	stb	r0,HSTATE_EXIT_VIRT(r13)
 	ld	r4, HSTATE_KVM_VCPU(r13)
 	bl	kvmppc_hv_entry
 
@@ -174,8 +176,8 @@ END_FTR_SECTION_IFSET(CPU_FTR_ARCH_207S)
 	 * we will be in virtual mode at this point, which makes it a
 	 * little easier to get back to the caller.
 	 */
-	mfmsr	r0
-	andi.	r0, r0, MSR_IR		/* in real mode? */
+	lbz	r0,HSTATE_EXIT_VIRT(r13)
+	cmpwi	r0,0
 	bne	.Lvirt_return
 
 	/* RFI into the highmem handler */
@@ -1434,8 +1436,9 @@ guest_exit_cont:		/* r9 = vcpu, r12 = trap, r13 = paca */
 	beq	1f
 	li	r7, TM_SPC_PULL_OS_CTX
 	li	r6, TM_QW1_OS
-	mfmsr	r0
-	andi.	r0, r0, MSR_DR		/* in real mode? */
+	/* Are we in virtual or real mode ? */
+	lbz	r0,HSTATE_EXIT_VIRT(r13)
+	cmpwi	r0,0
 	beq	2f
 	ld	r10, HSTATE_XIVE_TIMA_VIRT(r13)
 	cmpldi	cr0, r10, 0
@@ -2741,8 +2744,9 @@ kvm_cede_exit:
 	stb	r0, VCPU_CEDED(r9)
 1:	/* Enable XIVE escalation */
 	li	r5, XIVE_ESB_SET_PQ_00
-	mfmsr	r0
-	andi.	r0, r0, MSR_DR		/* in real mode? */
+	/* Are we in virtual or real mode ? */
+	lbz	r0,HSTATE_EXIT_VIRT(r13)
+	cmpwi	r0,0
 	beq	1f
 	ld	r10, VCPU_XIVE_ESC_VADDR(r9)
 	cmpdi	r10, 0
