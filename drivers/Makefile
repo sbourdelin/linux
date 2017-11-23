@@ -18,6 +18,7 @@ obj-y				+= pwm/
 
 obj-$(CONFIG_PCI)		+= pci/
 obj-$(CONFIG_PCI_ENDPOINT)	+= pci/endpoint/
+obj-$(CONFIG_PCI_CADENCE)	+= pci/cadence/
 # PCI dwc controller drivers
 obj-y				+= pci/dwc/
 
