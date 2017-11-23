@@ -21,6 +21,7 @@
 #include <errno.h>
 #include "bench.h"
 #include "futex.h"
+#include "cpu-online-map.h"
 
 #include <err.h>
 #include <stdlib.h>
@@ -119,7 +120,8 @@ static void *blocked_workerfn(void *arg __maybe_unused)
 	return NULL;
 }
 
-static void block_threads(pthread_t *w, pthread_attr_t thread_attr)
+static void block_threads(pthread_t *w, pthread_attr_t thread_attr,
+			  int *cpu_map)
 {
 	cpu_set_t cpu;
 	unsigned int i;
@@ -129,7 +131,7 @@ static void block_threads(pthread_t *w, pthread_attr_t thread_attr)
 	/* create and block all threads */
 	for (i = 0; i < nblocked_threads; i++) {
 		CPU_ZERO(&cpu);
-		CPU_SET(i % ncpus, &cpu);
+		CPU_SET(cpu_map[i % ncpus], &cpu);
 
 		if (pthread_attr_setaffinity_np(&thread_attr, sizeof(cpu_set_t), &cpu))
 			err(EXIT_FAILURE, "pthread_attr_setaffinity_np");
@@ -205,6 +207,7 @@ int bench_futex_wake_parallel(int argc, const char **argv)
 	struct sigaction act;
 	pthread_attr_t thread_attr;
 	struct thread_data *waking_worker;
+	int *cpu_map;
 
 	argc = parse_options(argc, argv, options,
 			     bench_futex_wake_parallel_usage, 0);
@@ -218,6 +221,13 @@ int bench_futex_wake_parallel(int argc, const char **argv)
 	sigaction(SIGINT, &act, NULL);
 
 	ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+
+	cpu_map = calloc(ncpus, sizeof(int));
+	if (!cpu_map)
+		err(EXIT_FAILURE, "calloc");
+
+	compute_cpu_online_map(cpu_map);
+
 	if (!nblocked_threads)
 		nblocked_threads = ncpus;
 
@@ -259,7 +269,7 @@ int bench_futex_wake_parallel(int argc, const char **argv)
 			err(EXIT_FAILURE, "calloc");
 
 		/* create, launch & block all threads */
-		block_threads(blocked_worker, thread_attr);
+		block_threads(blocked_worker, thread_attr, cpu_map);
 
 		/* make sure all threads are already blocked */
 		pthread_mutex_lock(&thread_lock);
@@ -295,5 +305,6 @@ int bench_futex_wake_parallel(int argc, const char **argv)
 	print_summary();
 
 	free(blocked_worker);
+	free(cpu_map);
 	return ret;
 }

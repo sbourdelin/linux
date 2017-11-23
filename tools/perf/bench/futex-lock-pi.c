@@ -15,6 +15,7 @@
 #include <errno.h>
 #include "bench.h"
 #include "futex.h"
+#include "cpu-online-map.h"
 
 #include <err.h>
 #include <stdlib.h>
@@ -113,7 +114,8 @@ static void *workerfn(void *arg)
 	return NULL;
 }
 
-static void create_threads(struct worker *w, pthread_attr_t thread_attr)
+static void create_threads(struct worker *w, pthread_attr_t thread_attr,
+			   int *cpu_map)
 {
 	cpu_set_t cpu;
 	unsigned int i;
@@ -131,7 +133,7 @@ static void create_threads(struct worker *w, pthread_attr_t thread_attr)
 			worker[i].futex = &global_futex;
 
 		CPU_ZERO(&cpu);
-		CPU_SET(i % ncpus, &cpu);
+		CPU_SET(cpu_map[i % ncpus], &cpu);
 
 		if (pthread_attr_setaffinity_np(&thread_attr, sizeof(cpu_set_t), &cpu))
 			err(EXIT_FAILURE, "pthread_attr_setaffinity_np");
@@ -147,12 +149,18 @@ int bench_futex_lock_pi(int argc, const char **argv)
 	unsigned int i;
 	struct sigaction act;
 	pthread_attr_t thread_attr;
+	int *cpu_map;
 
 	argc = parse_options(argc, argv, options, bench_futex_lock_pi_usage, 0);
 	if (argc)
 		goto err;
 
 	ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+	cpu_map = calloc(ncpus, sizeof(int));
+	if (!cpu_map)
+		err(EXIT_FAILURE, "calloc");
+
+	compute_cpu_online_map(cpu_map);
 
 	sigfillset(&act.sa_mask);
 	act.sa_sigaction = toggle_done;
@@ -180,7 +188,7 @@ int bench_futex_lock_pi(int argc, const char **argv)
 	pthread_attr_init(&thread_attr);
 	gettimeofday(&start, NULL);
 
-	create_threads(worker, thread_attr);
+	create_threads(worker, thread_attr, cpu_map);
 	pthread_attr_destroy(&thread_attr);
 
 	pthread_mutex_lock(&thread_lock);
@@ -218,6 +226,7 @@ int bench_futex_lock_pi(int argc, const char **argv)
 	print_summary();
 
 	free(worker);
+	free(cpu_map);
 	return ret;
 err:
 	usage_with_options(bench_futex_lock_pi_usage, options);

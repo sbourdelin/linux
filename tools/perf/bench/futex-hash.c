@@ -24,6 +24,7 @@
 #include <subcmd/parse-options.h>
 #include "bench.h"
 #include "futex.h"
+#include "cpu-online-map.h"
 
 #include <err.h>
 #include <sys/time.h>
@@ -120,9 +121,11 @@ int bench_futex_hash(int argc, const char **argv)
 	int ret = 0;
 	cpu_set_t cpu;
 	struct sigaction act;
-	unsigned int i, ncpus;
+	unsigned int i;
+	long ncpus;
 	pthread_attr_t thread_attr;
 	struct worker *worker = NULL;
+	int *cpu_map;
 
 	argc = parse_options(argc, argv, options, bench_futex_hash_usage, 0);
 	if (argc) {
@@ -131,6 +134,12 @@ int bench_futex_hash(int argc, const char **argv)
 	}
 
 	ncpus = sysconf(_SC_NPROCESSORS_ONLN);
+
+	cpu_map = calloc(ncpus, sizeof(int));
+	if (!cpu_map)
+		goto errmem;
+
+	compute_cpu_online_map(cpu_map);
 
 	sigfillset(&act.sa_mask);
 	act.sa_sigaction = toggle_done;
@@ -164,7 +173,7 @@ int bench_futex_hash(int argc, const char **argv)
 			goto errmem;
 
 		CPU_ZERO(&cpu);
-		CPU_SET(i % ncpus, &cpu);
+		CPU_SET(cpu_map[i % ncpus], &cpu);
 
 		ret = pthread_attr_setaffinity_np(&thread_attr, sizeof(cpu_set_t), &cpu);
 		if (ret)
@@ -217,6 +226,7 @@ int bench_futex_hash(int argc, const char **argv)
 	print_summary();
 
 	free(worker);
+	free(cpu_map);
 	return ret;
 errmem:
 	err(EXIT_FAILURE, "calloc");
