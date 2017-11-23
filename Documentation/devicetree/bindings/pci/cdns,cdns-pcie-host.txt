@@ -1,0 +1,54 @@
+* Cadence PCIe host controller
+
+This PCIe controller inherits the base properties defined in
+host-generic-pci.txt.
+
+Required properties:
+- compatible: should contain "cdns,cdns-pcie-host" to identify the IP used.
+- reg: Should contain the PCIe configuration window base address, controller
+  register base address, and AXI interface region base address respectively.
+- reg-names: Must be "cfg", "reg" and "mem" respectively.
+- #address-cells: set to <3>
+- #size-cells: set to <2>
+- device_type: set to "pci"
+- ranges: ranges for the PCI memory and I/O regions
+- #interrupt-cells: set to <1>
+- interrupt-map-mask and interrupt-map: standard PCI
+	properties to define the mapping of the PCIe interface to interrupt
+	numbers.
+
+Example:
+
+	pci@fb000000 {
+		compatible = "cdns,cdns-pcie-host";
+		device_type = "pci";
+		#address-cells = <3>;
+		#size-cells = <2>;
+		bus-range = <0x0 0xff>;
+		linux,pci-domain = <0>;
+
+		// CPU_PHYSICAL(2)  SIZE(2)
+		reg = <0x0 0x41000000  0x0 0x00001000>, /* Config space */
+		      <0x0 0xfb000000  0x0 0x01000000>, /* Base Address */
+		      <0x0 0x40000000  0x0 0x04000000>; /* AXI region */
+		reg-names = "cfg", "reg", "mem";
+
+		// BUS_ADDRESS(3)  CPU_PHYSICAL(1)  SIZE(2)
+		ranges =
+			<0x02000000 0x0 0x42000000  0x0 0x42000000  0x0 0x1000000>,
+			<0x01000000 0x0 0x43000000  0x0 0x43000000  0x0 0x0010000>;
+
+
+		#interrupt-cells = <0x1>;
+
+		// PCI_DEVICE(3)  INT#(1)  CONTROLLER(PHANDLE)  CONTROLLER_DATA(5)
+		interrupt-map = <0x0 0x0 0x0  0x1  &gic  0x0 0x0 0x0 14 0x1
+				 0x0 0x0 0x0  0x2  &gic  0x0 0x0 0x0 15 0x1
+				 0x0 0x0 0x0  0x3  &gic  0x0 0x0 0x0 16 0x1
+				 0x0 0x0 0x0  0x4  &gic  0x0 0x0 0x0 17 0x1>;
+
+		// PCI_DEVICE(3)  INT#(1)
+		interrupt-map-mask = <0x0000 0x0 0x0  0x7>;
+
+		msi-parent = <&its_pci>;
+	};
