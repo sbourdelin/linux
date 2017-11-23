@@ -336,11 +336,11 @@ static size_t optimal_redzone(size_t object_size)
 	return rz;
 }
 
-void kasan_cache_create(struct kmem_cache *cache, size_t *size,
+void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
 			slab_flags_t *flags)
 {
+	unsigned int orig_size = *size;
 	int redzone_adjust;
-	int orig_size = *size;
 
 	/* Add alloc meta. */
 	cache->kasan_info.alloc_meta_offset = *size;
