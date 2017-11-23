@@ -243,7 +243,9 @@ END_FTR_SECTION_NESTED(ftr,ftr,943)
 	EXCEPTION_PROLOG_1(area, extra, vec);				\
 	EXCEPTION_PROLOG_PSERIES_1(label, h);
 
-#define __KVMTEST(h, n)							\
+#define __KVMTEST(h, n, v)						\
+	li	r10,v;							\
+	stb	r10,HSTATE_EXIT_VIRT(r13);				\
 	lbz	r10,HSTATE_IN_GUEST(r13);				\
 	cmpwi	r10,0;							\
 	bne	do_kvm_##h##n
@@ -353,12 +355,12 @@ END_FTR_SECTION_NESTED(ftr,ftr,943)
 	b	kvmppc_skip_##h##interrupt
 
 #ifdef CONFIG_KVM_BOOK3S_64_HANDLER
-#define KVMTEST(h, n)			__KVMTEST(h, n)
+#define KVMTEST(h, n, v)		__KVMTEST(h, n, v)
 #define KVM_HANDLER(area, h, n)		__KVM_HANDLER(area, h, n)
 #define KVM_HANDLER_SKIP(area, h, n)	__KVM_HANDLER_SKIP(area, h, n)
 
 #else
-#define KVMTEST(h, n)
+#define KVMTEST(h, n, v)
 #define KVM_HANDLER(area, h, n)
 #define KVM_HANDLER_SKIP(area, h, n)
 #endif
@@ -482,10 +484,10 @@ END_FTR_SECTION_NESTED(ftr,ftr,943)
 #define STD_RELON_EXCEPTION_HV(loc, vec, label)		\
 	SET_SCRATCH0(r13);	/* save r13 */		\
 	EXCEPTION_RELON_PROLOG_PSERIES(PACA_EXGEN, label,	\
-				       EXC_HV, KVMTEST_HV, vec);
+				       EXC_HV, KVMTEST_RELON_HV, vec);
 
 #define STD_RELON_EXCEPTION_HV_OOL(vec, label)			\
-	EXCEPTION_PROLOG_1(PACA_EXGEN, KVMTEST_HV, vec);	\
+	EXCEPTION_PROLOG_1(PACA_EXGEN, KVMTEST_RELON_HV, vec);	\
 	EXCEPTION_RELON_PROLOG_PSERIES_1(label, EXC_HV)
 
 /* This associate vector numbers with bits in paca->irq_happened */
@@ -506,18 +508,32 @@ END_FTR_SECTION_NESTED(ftr,ftr,943)
 #define _SOFTEN_TEST(h, vec)	__SOFTEN_TEST(h, vec)
 
 #define SOFTEN_TEST_PR(vec)						\
-	KVMTEST(EXC_STD, vec);						\
+	KVMTEST(EXC_STD, vec, 0);					\
 	_SOFTEN_TEST(EXC_STD, vec)
 
 #define SOFTEN_TEST_HV(vec)						\
-	KVMTEST(EXC_HV, vec);						\
+	KVMTEST(EXC_HV, vec, 0);					\
+	_SOFTEN_TEST(EXC_HV, vec)
+
+#define SOFTEN_TEST_RELON_PR(vec)					\
+	KVMTEST(EXC_STD, vec, 1);					\
+	_SOFTEN_TEST(EXC_STD, vec)
+
+#define SOFTEN_TEST_RELON_HV(vec)					\
+	KVMTEST(EXC_HV, vec, 1);					\
 	_SOFTEN_TEST(EXC_HV, vec)
 
 #define KVMTEST_PR(vec)							\
-	KVMTEST(EXC_STD, vec)
+	KVMTEST(EXC_STD, vec, 0)
 
 #define KVMTEST_HV(vec)							\
-	KVMTEST(EXC_HV, vec)
+	KVMTEST(EXC_HV, vec, 0)
+
+#define KVMTEST_RELON_PR(vec)						\
+	KVMTEST(EXC_STD, vec, 1)
+
+#define KVMTEST_RELON_HV(vec)						\
+	KVMTEST(EXC_HV, vec, 1)
 
 #define SOFTEN_NOTEST_PR(vec)		_SOFTEN_TEST(EXC_STD, vec)
 #define SOFTEN_NOTEST_HV(vec)		_SOFTEN_TEST(EXC_HV, vec)
@@ -562,10 +578,10 @@ END_FTR_SECTION_NESTED(ftr,ftr,943)
 
 #define MASKABLE_RELON_EXCEPTION_HV(loc, vec, label)			\
 	_MASKABLE_RELON_EXCEPTION_PSERIES(vec, label,			\
-					  EXC_HV, SOFTEN_TEST_HV)
+					  EXC_HV, SOFTEN_TEST_RELON_HV)
 
 #define MASKABLE_RELON_EXCEPTION_HV_OOL(vec, label)			\
-	EXCEPTION_PROLOG_1(PACA_EXGEN, SOFTEN_TEST_HV, vec);		\
+	EXCEPTION_PROLOG_1(PACA_EXGEN, SOFTEN_TEST_RELON_HV, vec);	\
 	EXCEPTION_RELON_PROLOG_PSERIES_1(label, EXC_HV)
 
 /*

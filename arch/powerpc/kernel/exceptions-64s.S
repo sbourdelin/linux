@@ -702,9 +702,9 @@ EXC_VIRT_BEGIN(hardware_interrupt, 0x4500, 0x100)
 	.globl hardware_interrupt_relon_hv;
 hardware_interrupt_relon_hv:
 	BEGIN_FTR_SECTION
-		_MASKABLE_RELON_EXCEPTION_PSERIES(0x500, hardware_interrupt_common, EXC_HV, SOFTEN_TEST_HV)
+		_MASKABLE_RELON_EXCEPTION_PSERIES(0x500, hardware_interrupt_common, EXC_HV, SOFTEN_TEST_RELON_HV)
 	FTR_SECTION_ELSE
-		_MASKABLE_RELON_EXCEPTION_PSERIES(0x500, hardware_interrupt_common, EXC_STD, SOFTEN_TEST_PR)
+		_MASKABLE_RELON_EXCEPTION_PSERIES(0x500, hardware_interrupt_common, EXC_STD, SOFTEN_TEST_RELON_PR)
 	ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE)
 EXC_VIRT_END(hardware_interrupt, 0x4500, 0x100)
 
@@ -872,21 +872,24 @@ EXC_COMMON(trap_0b_common, 0xb00, unknown_exception)
 	 * Userspace syscalls have already saved the PPR, hcalls must save
 	 * it before setting HMT_MEDIUM.
 	 */
-#define SYSCALL_KVMTEST							\
+#define __SYSCALL_KVMTEST(test)						\
 	mtctr	r13;							\
 	GET_PACA(r13);							\
 	std	r10,PACA_EXGEN+EX_R10(r13);				\
-	KVMTEST_PR(0xc00); /* uses r10, branch to do_kvm_0xc00_system_call */ \
+	test;	/* uses r10, branch to do_kvm_0xc00_system_call */	\
 	HMT_MEDIUM;							\
 	mfctr	r9;
+#define SYSCALL_KVMTEST		__SYSCALL_KVMTEST(KVMTEST_PR(0xc00))
+#define SYSCALL_KVMTEST_RELON	__SYSCALL_KVMTEST(KVMTEST_RELON_PR(0xc00))
 
 #else
 #define SYSCALL_KVMTEST							\
 	HMT_MEDIUM;							\
 	mr	r9,r13;							\
 	GET_PACA(r13);
+#define SYSCALL_KVMTEST_RELON SYSCALL_KVMTEST
 #endif
-	
+
 #define LOAD_SYSCALL_HANDLER(reg)					\
 	__LOAD_HANDLER(reg, system_call_common)
 
@@ -955,7 +958,7 @@ EXC_REAL_BEGIN(system_call, 0xc00, 0x100)
 EXC_REAL_END(system_call, 0xc00, 0x100)
 
 EXC_VIRT_BEGIN(system_call, 0x4c00, 0x100)
-	SYSCALL_KVMTEST /* loads PACA into r13, and saves r13 to r9 */
+	SYSCALL_KVMTEST_RELON /* loads PACA into r13, and saves r13 to r9 */
 	SYSCALL_FASTENDIAN_TEST
 	SYSCALL_VIRT
 	SYSCALL_FASTENDIAN
