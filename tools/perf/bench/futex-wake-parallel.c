@@ -8,6 +8,8 @@
  * it can be used to measure futex_wake() changes.
  */
 
+#include "debug.h"
+
 /* For the CLR_() macros */
 #include <string.h>
 #include <pthread.h>
@@ -31,6 +33,8 @@ struct thread_data {
 	pthread_t worker;
 	unsigned int nwoken;
 	struct timeval runtime;
+	struct timeval start;
+	struct timeval end;
 };
 
 static unsigned int nwakes = 1;
@@ -39,10 +43,11 @@ static unsigned int nwakes = 1;
 static u_int32_t futex = 0;
 
 static pthread_t *blocked_worker;
-static bool done = false, silent = false, fshared = false;
+static bool done = false, silent = false, fshared = false, affine_wakers = false;
 static unsigned int nblocked_threads = 0, nwaking_threads = 0;
 static pthread_mutex_t thread_lock;
 static pthread_cond_t thread_parent, thread_worker;
+static pthread_barrier_t barrier;
 static struct stats waketime_stats, wakeup_stats;
 static unsigned int ncpus, threads_starting;
 static int futex_flag = 0;
@@ -52,6 +57,7 @@ static const struct option options[] = {
 	OPT_UINTEGER('w', "nwakers", &nwaking_threads, "Specify amount of waking threads"),
 	OPT_BOOLEAN( 's', "silent",  &silent,   "Silent mode: do not display data/details"),
 	OPT_BOOLEAN( 'S', "shared",  &fshared,  "Use shared futexes instead of private ones"),
+	OPT_BOOLEAN( 'W', "affine-wakers", &affine_wakers, "Stripe affinity of waker threads across CPUs"),
 	OPT_END()
 };
 
@@ -65,6 +71,8 @@ static void *waking_workerfn(void *arg)
 	struct thread_data *waker = (struct thread_data *) arg;
 	struct timeval start, end;
 
+	pthread_barrier_wait(&barrier);
+
 	gettimeofday(&start, NULL);
 
 	waker->nwoken = futex_wake(&futex, nwakes, futex_flag);
@@ -75,31 +83,59 @@ static void *waking_workerfn(void *arg)
 	gettimeofday(&end, NULL);
 	timersub(&end, &start, &waker->runtime);
 
+	waker->start = start;
+	waker->end   = end;
+
 	pthread_exit(NULL);
 	return NULL;
 }
 
-static void wakeup_threads(struct thread_data *td, pthread_attr_t thread_attr)
+static void wakeup_threads(struct thread_data *td, pthread_attr_t thread_attr,
+			   int *cpu_map)
 {
 	unsigned int i;
 
 	pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_JOINABLE);
+
+	pthread_barrier_init(&barrier, NULL, nwaking_threads + 1);
 
 	/* create and block all threads */
 	for (i = 0; i < nwaking_threads; i++) {
 		/*
 		 * Thread creation order will impact per-thread latency
 		 * as it will affect the order to acquire the hb spinlock.
-		 * For now let the scheduler decide.
 		 */
+
+		if (affine_wakers) {
+			cpu_set_t cpu;
+			CPU_ZERO(&cpu);
+			CPU_SET(cpu_map[(i + 1) % ncpus], &cpu);
+
+			if (pthread_attr_setaffinity_np(&thread_attr,
+							sizeof(cpu_set_t),
+							&cpu))
+				err(EXIT_FAILURE, "pthread_attr_setaffinity_np");
+		}
+
 		if (pthread_create(&td[i].worker, &thread_attr,
 				   waking_workerfn, (void *)&td[i]))
 			err(EXIT_FAILURE, "pthread_create");
 	}
 
+	pthread_barrier_wait(&barrier);
+
 	for (i = 0; i < nwaking_threads; i++)
 		if (pthread_join(td[i].worker, NULL))
 			err(EXIT_FAILURE, "pthread_join");
+
+	pthread_barrier_destroy(&barrier);
+
+	for (i = 0; i < nwaking_threads; i++) {
+		pr_debug("%6ld.%06ld\t"
+			 "%6ld.%06ld\n",
+			 td[i].start.tv_sec, td[i].start.tv_usec,
+			 td[i].end.tv_sec, td[i].end.tv_usec);
+	}
 }
 
 static void *blocked_workerfn(void *arg __maybe_unused)
@@ -281,7 +317,7 @@ int bench_futex_wake_parallel(int argc, const char **argv)
 		usleep(100000);
 
 		/* Ok, all threads are patiently blocked, start waking folks up */
-		wakeup_threads(waking_worker, thread_attr);
+		wakeup_threads(waking_worker, thread_attr, cpu_map);
 
 		for (i = 0; i < nblocked_threads; i++) {
 			ret = pthread_join(blocked_worker[i], NULL);
