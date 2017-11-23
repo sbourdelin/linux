@@ -2524,10 +2524,9 @@ static struct da7218_pdata *da7218_of_to_pdata(struct snd_soc_codec *codec)
 
 		hpldet_pdata = devm_kzalloc(codec->dev, sizeof(*hpldet_pdata),
 					    GFP_KERNEL);
-		if (!hpldet_pdata) {
-			of_node_put(hpldet_np);
-			return pdata;
-		}
+		if (!hpldet_pdata)
+			goto put_node;
+
 		pdata->hpldet_pdata = hpldet_pdata;
 
 		if (of_property_read_u32(hpldet_np, "dlg,jack-rate-us",
@@ -2561,6 +2560,7 @@ static struct da7218_pdata *da7218_of_to_pdata(struct snd_soc_codec *codec)
 		if (of_property_read_bool(hpldet_np, "dlg,discharge"))
 			hpldet_pdata->discharge = true;
 
+put_node:
 		of_node_put(hpldet_np);
 	}
 
