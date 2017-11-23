@@ -78,8 +78,8 @@ extern const struct kmalloc_info_struct {
 	unsigned int size;
 } kmalloc_info[];
 
-unsigned long calculate_alignment(slab_flags_t flags,
-		unsigned long align, unsigned long size);
+unsigned int calculate_alignment(slab_flags_t flags,
+		unsigned int align, unsigned int size);
 
 #ifndef CONFIG_SLOB
 /* Kmalloc array related functions */
@@ -100,11 +100,11 @@ extern void create_boot_cache(struct kmem_cache *, const char *name,
 			unsigned int size, slab_flags_t flags);
 
 int slab_unmergeable(struct kmem_cache *s);
-struct kmem_cache *find_mergeable(size_t size, size_t align,
+struct kmem_cache *find_mergeable(unsigned int size, unsigned int align,
 		slab_flags_t flags, const char *name, void (*ctor)(void *));
 #ifndef CONFIG_SLOB
 struct kmem_cache *
-__kmem_cache_alias(const char *name, size_t size, size_t align,
+__kmem_cache_alias(const char *name, unsigned int size, unsigned int align,
 		   slab_flags_t flags, void (*ctor)(void *));
 
 slab_flags_t kmem_cache_flags(unsigned long object_size,
@@ -112,7 +112,7 @@ slab_flags_t kmem_cache_flags(unsigned long object_size,
 	void (*ctor)(void *));
 #else
 static inline struct kmem_cache *
-__kmem_cache_alias(const char *name, size_t size, size_t align,
+__kmem_cache_alias(const char *name, unsigned int size, unsigned int align,
 		   slab_flags_t flags, void (*ctor)(void *))
 { return NULL; }
 

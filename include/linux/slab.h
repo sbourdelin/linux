@@ -135,7 +135,7 @@ struct mem_cgroup;
 void __init kmem_cache_init(void);
 bool slab_is_available(void);
 
-struct kmem_cache *kmem_cache_create(const char *, size_t, size_t,
+struct kmem_cache *kmem_cache_create(const char *, unsigned int, unsigned int,
 			slab_flags_t,
 			void (*)(void *));
 void kmem_cache_destroy(struct kmem_cache *);
