@@ -230,7 +230,7 @@ static void twl4030_setup_pdata_of(struct twl4030_codec_data *pdata,
 static struct twl4030_codec_data *twl4030_get_pdata(struct snd_soc_codec *codec)
 {
 	struct twl4030_codec_data *pdata = dev_get_platdata(codec->dev);
-	struct device_node *twl4030_codec_node = NULL;
+	struct device_node *twl4030_codec_node;
 
 	twl4030_codec_node = of_get_child_by_name(codec->dev->parent->of_node,
 						  "codec");
