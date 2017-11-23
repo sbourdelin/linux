@@ -1266,6 +1266,7 @@ proto_memory_pressure(struct proto *prot)
 /* Called with local bh disabled */
 void sock_prot_inuse_add(struct net *net, struct proto *prot, int inc);
 int sock_prot_inuse_get(struct net *net, struct proto *proto);
+int sock_inuse_get(struct net *net);
 #else
 static inline void sock_prot_inuse_add(struct net *net, struct proto *prot,
 		int inc)

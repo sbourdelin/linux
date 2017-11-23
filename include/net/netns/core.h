@@ -12,6 +12,7 @@ struct netns_core {
 	int	sysctl_somaxconn;
 
 	struct prot_inuse __percpu *prot_inuse;
+	int __percpu *sock_inuse;
 };
 
 #endif

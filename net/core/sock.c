@@ -145,6 +145,8 @@
 static DEFINE_MUTEX(proto_list_mutex);
 static LIST_HEAD(proto_list);
 
+static void sock_inuse_add(struct net *net, int val);
+
 /**
  * sk_ns_capable - General socket capability test
  * @sk: Socket to use a capability on or through
@@ -1534,6 +1536,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 		if (likely(sk->sk_net_refcnt))
 			get_net(net);
 		sock_net_set(sk, net);
+		sock_inuse_add(net, 1);
 		refcount_set(&sk->sk_wmem_alloc, 1);
 
 		mem_cgroup_sk_alloc(sk);
@@ -1595,6 +1598,8 @@ void sk_destruct(struct sock *sk)
 
 static void __sk_free(struct sock *sk)
 {
+	sock_inuse_add(sock_net(sk), -1);
+
 	if (unlikely(sock_diag_has_destroy_listeners(sk) && sk->sk_net_refcnt))
 		sock_diag_broadcast_destroy(sk);
 	else
@@ -1663,6 +1668,7 @@ struct sock *sk_clone_lock(const struct sock *sk, const gfp_t priority)
 		newsk->sk_backlog.head	= newsk->sk_backlog.tail = NULL;
 		newsk->sk_backlog.len = 0;
 
+		sock_inuse_add(sock_net(newsk), 1);
 		atomic_set(&newsk->sk_rmem_alloc, 0);
 		/*
 		 * sk_wmem_alloc set to one (see sk_free() and sock_wfree())
@@ -3061,15 +3067,43 @@ int sock_prot_inuse_get(struct net *net, struct proto *prot)
 }
 EXPORT_SYMBOL_GPL(sock_prot_inuse_get);
 
+static void sock_inuse_add(struct net *net, int val)
+{
+	this_cpu_add(*net->core.sock_inuse, val);
+}
+
+int sock_inuse_get(struct net *net)
+{
+	int cpu, res = 0;
+
+	for_each_possible_cpu(cpu)
+		res += *per_cpu_ptr(net->core.sock_inuse, cpu);
+
+	return res >= 0 ? res : 0;
+}
+
+EXPORT_SYMBOL_GPL(sock_inuse_get);
+
 static int __net_init sock_inuse_init_net(struct net *net)
 {
 	net->core.prot_inuse = alloc_percpu(struct prot_inuse);
-	return net->core.prot_inuse ? 0 : -ENOMEM;
+	if (!net->core.prot_inuse)
+		return -ENOMEM;
+
+	net->core.sock_inuse = alloc_percpu(int);
+	if (!net->core.sock_inuse)
+		goto out;
+
+	return 0;
+out:
+	free_percpu(net->core.prot_inuse);
+	return -ENOMEM;
 }
 
 static void __net_exit sock_inuse_exit_net(struct net *net)
 {
 	free_percpu(net->core.prot_inuse);
+	free_percpu(net->core.sock_inuse);
 }
 
 static struct pernet_operations net_inuse_ops = {
@@ -3110,6 +3144,10 @@ static inline void assign_proto_idx(struct proto *prot)
 }
 
 static inline void release_proto_idx(struct proto *prot)
+{
+}
+
+static void sock_inuse_add(struct net *net, int val)
 {
 }
 #endif
