@@ -155,11 +155,19 @@ static void destroy_super_rcu(struct rcu_head *head)
 	schedule_work(&s->destroy_work);
 }
 
-/* Free a superblock that has never been seen by anyone */
+/*
+ * Free a superblock that has never been seen by anyone. Note that shrinkers
+ * could have been invoked already but we rely on s_umount to not actually
+ * touch it.
+ */
 static void destroy_unused_super(struct super_block *s)
 {
 	if (!s)
 		return;
+
+	if (!list_empty(&s->s_shrink.list))
+		unregister_shrinker(&s->s_shrink);
+
 	up_write(&s->s_umount);
 	list_lru_destroy(&s->s_dentry_lru);
 	list_lru_destroy(&s->s_inode_lru);
@@ -252,6 +260,7 @@ static struct super_block *alloc_super(struct file_system_type *type, int flags,
 	s->s_shrink.count_objects = super_cache_count;
 	s->s_shrink.batch = 1024;
 	s->s_shrink.flags = SHRINKER_NUMA_AWARE | SHRINKER_MEMCG_AWARE;
+	INIT_LIST_HEAD(&s->s_shrink.list);
 	return s;
 
 fail:
@@ -503,6 +512,10 @@ retry:
 		s = alloc_super(type, (flags & ~SB_SUBMOUNT), user_ns);
 		if (!s)
 			return ERR_PTR(-ENOMEM);
+		if (register_shrinker(&s->s_shrink)) {
+			destroy_unused_super(s);
+			return ERR_PTR(-ENOMEM);
+		}
 		goto retry;
 	}
 
@@ -518,7 +531,6 @@ retry:
 	hlist_add_head(&s->s_instances, &type->fs_supers);
 	spin_unlock(&sb_lock);
 	get_filesystem(type);
-	register_shrinker(&s->s_shrink);
 	return s;
 }
 
