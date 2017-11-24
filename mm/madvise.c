@@ -295,6 +295,7 @@ static long madvise_willneed(struct vm_area_struct *vma,
 #endif
 
 	if (IS_DAX(file_inode(file))) {
+		*prev = vma;
 		/* no bad return value, but ignore advice */
 		return 0;
 	}
