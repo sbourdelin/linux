@@ -3734,4 +3734,17 @@ static inline int btrfs_is_testing(struct btrfs_fs_info *fs_info)
 #endif
 	return 0;
 }
+
+#define BI_SECTOR_SHIFT		(9)
+#define BI_SECTOR_SIZE		(1 << BI_SECTOR_SHIFT)
+
+static inline u64 to_bytes(sector_t n)
+{
+	return ((u64)n << BI_SECTOR_SHIFT);
+}
+
+static inline sector_t to_sector(u64 n)
+{
+	return (n >> BI_SECTOR_SHIFT);
+}
 #endif
