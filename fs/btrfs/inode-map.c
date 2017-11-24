@@ -313,7 +313,7 @@ static void recalculate_thresholds(struct btrfs_free_space_ctl *ctl)
 	 */
 	max_ino = info->bytes - 1;
 
-	max_bitmaps = ALIGN(max_ino, INODES_PER_BITMAP) / INODES_PER_BITMAP;
+	max_bitmaps = round_up(max_ino, INODES_PER_BITMAP) / INODES_PER_BITMAP;
 	if (max_bitmaps <= ctl->total_bitmaps) {
 		ctl->extents_thresh = 0;
 		return;
@@ -486,7 +486,7 @@ again:
 
 	spin_lock(&ctl->tree_lock);
 	prealloc = sizeof(struct btrfs_free_space) * ctl->free_extents;
-	prealloc = ALIGN(prealloc, PAGE_SIZE);
+	prealloc = round_up(prealloc, PAGE_SIZE);
 	prealloc += ctl->total_bitmaps * PAGE_SIZE;
 	spin_unlock(&ctl->tree_lock);
 

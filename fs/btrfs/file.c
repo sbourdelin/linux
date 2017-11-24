@@ -937,8 +937,8 @@ delete_extent_item:
 			    extent_type == BTRFS_FILE_EXTENT_INLINE) {
 				inode_sub_bytes(inode,
 						extent_end - key.offset);
-				extent_end = ALIGN(extent_end,
-						   fs_info->sectorsize);
+				extent_end = round_up(extent_end,
+						      fs_info->sectorsize);
 			} else if (update_refs && disk_bytenr > 0) {
 				ret = btrfs_free_extent(trans, fs_info,
 						disk_bytenr, num_bytes, 0,
@@ -2929,7 +2929,7 @@ static long btrfs_fallocate(struct file *file, int mode,
 		}
 		last_byte = min(extent_map_end(em), alloc_end);
 		actual_end = min_t(u64, extent_map_end(em), offset + len);
-		last_byte = ALIGN(last_byte, blocksize);
+		last_byte = round_up(last_byte, blocksize);
 		if (em->block_start == EXTENT_MAP_HOLE ||
 		    (cur_offset >= inode->i_size &&
 		     !test_bit(EXTENT_FLAG_PREALLOC, &em->flags))) {

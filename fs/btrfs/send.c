@@ -5403,8 +5403,8 @@ static int get_last_extent(struct send_ctx *sctx, u64 offset)
 	if (type == BTRFS_FILE_EXTENT_INLINE) {
 		u64 size = btrfs_file_extent_inline_len(path->nodes[0],
 							path->slots[0], fi);
-		extent_end = ALIGN(key.offset + size,
-				   sctx->send_root->fs_info->sectorsize);
+		extent_end = round_up(key.offset + size,
+				      sctx->send_root->fs_info->sectorsize);
 	} else {
 		extent_end = key.offset +
 			btrfs_file_extent_num_bytes(path->nodes[0], fi);
@@ -5467,8 +5467,8 @@ static int range_is_hole_in_parent(struct send_ctx *sctx,
 		    BTRFS_FILE_EXTENT_INLINE) {
 			u64 size = btrfs_file_extent_inline_len(leaf, slot, fi);
 
-			extent_end = ALIGN(key.offset + size,
-					   root->fs_info->sectorsize);
+			extent_end = round_up(key.offset + size,
+					      root->fs_info->sectorsize);
 		} else {
 			extent_end = key.offset +
 				btrfs_file_extent_num_bytes(leaf, fi);
@@ -5513,8 +5513,8 @@ static int maybe_send_hole(struct send_ctx *sctx, struct btrfs_path *path,
 	if (type == BTRFS_FILE_EXTENT_INLINE) {
 		u64 size = btrfs_file_extent_inline_len(path->nodes[0],
 							path->slots[0], fi);
-		extent_end = ALIGN(key->offset + size,
-				   sctx->send_root->fs_info->sectorsize);
+		extent_end = round_up(key->offset + size,
+				      sctx->send_root->fs_info->sectorsize);
 	} else {
 		extent_end = key->offset +
 			btrfs_file_extent_num_bytes(path->nodes[0], fi);

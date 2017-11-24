@@ -978,7 +978,7 @@ int btrfs_ordered_update_i_size(struct inode *inode, u64 offset,
 				     ordered->file_offset +
 				     ordered->truncated_len);
 	} else {
-		offset = ALIGN(offset, btrfs_inode_sectorsize(inode));
+		offset = round_up(offset, btrfs_inode_sectorsize(inode));
 	}
 	disk_i_size = BTRFS_I(inode)->disk_i_size;
 

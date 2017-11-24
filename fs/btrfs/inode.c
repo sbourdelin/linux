@@ -287,7 +287,7 @@ static noinline int cow_file_range_inline(struct btrfs_root *root,
 	u64 isize = i_size_read(inode);
 	u64 actual_end = min(end + 1, isize);
 	u64 inline_len = actual_end - start;
-	u64 aligned_end = ALIGN(end, fs_info->sectorsize);
+	u64 aligned_end = round_up(end, fs_info->sectorsize);
 	u64 data_len = inline_len;
 	int ret;
 	struct btrfs_path *path;
@@ -508,7 +508,7 @@ again:
 
 	total_compressed = min_t(unsigned long, total_compressed,
 			BTRFS_MAX_UNCOMPRESSED);
-	num_bytes = ALIGN(end - start + 1, blocksize);
+	num_bytes = round_up(end - start + 1, blocksize);
 	num_bytes = max(blocksize,  num_bytes);
 	total_in = 0;
 	ret = 0;
@@ -616,14 +616,14 @@ cont:
 		 * up to a block size boundary so the allocator does sane
 		 * things
 		 */
-		total_compressed = ALIGN(total_compressed, blocksize);
+		total_compressed = round_up(total_compressed, blocksize);
 
 		/*
 		 * one last check to make sure the compression is really a
 		 * win, compare the page count read with the blocks on disk,
 		 * compression must free at least one sector size
 		 */
-		total_in = ALIGN(total_in, PAGE_SIZE);
+		total_in = round_up(total_in, PAGE_SIZE);
 		if (total_compressed + blocksize <= total_in) {
 			num_bytes = total_in;
 			*num_added += 1;
@@ -971,7 +971,7 @@ static noinline int cow_file_range(struct inode *inode,
 		goto out_unlock;
 	}
 
-	num_bytes = ALIGN(end - start + 1, blocksize);
+	num_bytes = round_up(end - start + 1, blocksize);
 	num_bytes = max(blocksize,  num_bytes);
 	disk_num_bytes = num_bytes;
 
@@ -1423,8 +1423,8 @@ next_slot:
 			extent_end = found_key.offset +
 				btrfs_file_extent_inline_len(leaf,
 						     path->slots[0], fi);
-			extent_end = ALIGN(extent_end,
-					   fs_info->sectorsize);
+			extent_end = round_up(extent_end,
+					      fs_info->sectorsize);
 		} else {
 			BUG_ON(1);
 		}
@@ -4388,7 +4388,7 @@ static int truncate_inline_extent(struct inode *inode,
 
 	if (btrfs_file_extent_compression(leaf, fi) != BTRFS_COMPRESS_NONE) {
 		loff_t offset = new_size;
-		loff_t page_end = ALIGN(offset, PAGE_SIZE);
+		loff_t page_end = round_up(offset, PAGE_SIZE);
 
 		/*
 		 * Zero out the remaining of the last page of our inline extent,
@@ -4477,8 +4477,8 @@ int btrfs_truncate_inode_items(struct btrfs_trans_handle *trans,
 	 */
 	if (test_bit(BTRFS_ROOT_REF_COWS, &root->state) ||
 	    root == fs_info->tree_root)
-		btrfs_drop_extent_cache(BTRFS_I(inode), ALIGN(new_size,
-					fs_info->sectorsize),
+		btrfs_drop_extent_cache(BTRFS_I(inode),
+					round_up(new_size, fs_info->sectorsize),
 					(u64)-1, 0);
 
 	/*
@@ -4584,7 +4584,7 @@ search_again:
 			if (!del_item) {
 				u64 orig_num_bytes =
 					btrfs_file_extent_num_bytes(leaf, fi);
-				extent_num_bytes = ALIGN(new_size -
+				extent_num_bytes = round_up(new_size -
 						found_key.offset,
 						fs_info->sectorsize);
 				btrfs_set_file_extent_num_bytes(leaf, fi,
@@ -4948,8 +4948,8 @@ int btrfs_cont_expand(struct inode *inode, loff_t oldsize, loff_t size)
 	struct extent_map *em = NULL;
 	struct extent_state *cached_state = NULL;
 	struct extent_map_tree *em_tree = &BTRFS_I(inode)->extent_tree;
-	u64 hole_start = ALIGN(oldsize, fs_info->sectorsize);
-	u64 block_end = ALIGN(size, fs_info->sectorsize);
+	u64 hole_start = round_up(oldsize, fs_info->sectorsize);
+	u64 block_end = round_up(size, fs_info->sectorsize);
 	u64 last_byte;
 	u64 cur_offset;
 	u64 hole_size;
@@ -4992,7 +4992,7 @@ int btrfs_cont_expand(struct inode *inode, loff_t oldsize, loff_t size)
 			break;
 		}
 		last_byte = min(extent_map_end(em), block_end);
-		last_byte = ALIGN(last_byte, fs_info->sectorsize);
+		last_byte = round_up(last_byte, fs_info->sectorsize);
 		if (!test_bit(EXTENT_FLAG_PREALLOC, &em->flags)) {
 			struct extent_map *hole_em;
 			hole_size = last_byte - cur_offset;
@@ -7070,8 +7070,8 @@ again:
 	} else if (found_type == BTRFS_FILE_EXTENT_INLINE) {
 		size_t size;
 		size = btrfs_file_extent_inline_len(leaf, path->slots[0], item);
-		extent_end = ALIGN(extent_start + size,
-				   fs_info->sectorsize);
+		extent_end = round_up(extent_start + size,
+				      fs_info->sectorsize);
 
 		trace_btrfs_get_extent_show_fi_inline(inode, leaf, item,
 						      path->slots[0],
@@ -7125,7 +7125,7 @@ next:
 		copy_size = min_t(u64, PAGE_SIZE - pg_offset,
 				  size - extent_offset);
 		em->start = extent_start + extent_offset;
-		em->len = ALIGN(copy_size, fs_info->sectorsize);
+		em->len = round_up(copy_size, fs_info->sectorsize);
 		em->orig_block_len = em->len;
 		em->orig_start = em->start;
 		ptr = btrfs_file_extent_inline_start(item) + extent_offset;
@@ -9697,8 +9697,8 @@ static int btrfs_getattr(const struct path *path, struct kstat *stat,
 	spin_lock(&BTRFS_I(inode)->lock);
 	delalloc_bytes = BTRFS_I(inode)->new_delalloc_bytes;
 	spin_unlock(&BTRFS_I(inode)->lock);
-	stat->blocks = to_sector(ALIGN(inode_get_bytes(inode), blocksize) +
-				 ALIGN(delalloc_bytes, blocksize));
+	stat->blocks = to_sector(round_up(inode_get_bytes(inode), blocksize) +
+				 round_up(delalloc_bytes, blocksize));
 	return 0;
 }
 

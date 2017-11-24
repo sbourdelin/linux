@@ -956,8 +956,8 @@ void btrfs_extent_item_to_extent_map(struct btrfs_inode *inode,
 	} else if (type == BTRFS_FILE_EXTENT_INLINE) {
 		size_t size;
 		size = btrfs_file_extent_inline_len(leaf, slot, fi);
-		extent_end = ALIGN(extent_start + size,
-				   fs_info->sectorsize);
+		extent_end = round_up(extent_start + size,
+				      fs_info->sectorsize);
 	}
 
 	em->ram_bytes = btrfs_file_extent_ram_bytes(leaf, fi);

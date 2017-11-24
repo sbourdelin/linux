@@ -3088,7 +3088,7 @@ static int extent_same_check_offsets(struct inode *inode, u64 off, u64 *plen,
 
 	/* if we extend to eof, continue to block boundary */
 	if (off + len == inode->i_size)
-		*plen = len = ALIGN(inode->i_size, bs) - off;
+		*plen = len = round_up(inode->i_size, bs) - off;
 
 	/* Check that we are block aligned - btrfs_clone() requires this */
 	if (!IS_ALIGNED(off, bs) || !IS_ALIGNED(off + len, bs))
@@ -3375,8 +3375,8 @@ static int clone_copy_inline_extent(struct inode *dst,
 {
 	struct btrfs_fs_info *fs_info = btrfs_sb(dst->i_sb);
 	struct btrfs_root *root = BTRFS_I(dst)->root;
-	const u64 aligned_end = ALIGN(new_key->offset + datal,
-				      fs_info->sectorsize);
+	const u64 aligned_end = round_up(new_key->offset + datal,
+					 fs_info->sectorsize);
 	int ret;
 	struct btrfs_key key;
 
@@ -3768,8 +3768,8 @@ process_slot:
 			btrfs_mark_buffer_dirty(leaf);
 			btrfs_release_path(path);
 
-			last_dest_end = ALIGN(new_key.offset + datal,
-					      fs_info->sectorsize);
+			last_dest_end = round_up(new_key.offset + datal,
+						 fs_info->sectorsize);
 			ret = clone_finish_inode_update(trans, inode,
 							last_dest_end,
 							destoff, olen,
@@ -3878,7 +3878,7 @@ static noinline int btrfs_clone_files(struct file *file, struct file *file_src,
 		olen = len = src->i_size - off;
 	/* if we extend to eof, continue to block boundary */
 	if (off + len == src->i_size)
-		len = ALIGN(src->i_size, bs) - off;
+		len = round_up(src->i_size, bs) - off;
 
 	if (len == 0) {
 		ret = 0;

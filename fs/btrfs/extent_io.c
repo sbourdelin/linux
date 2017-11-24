@@ -2965,7 +2965,7 @@ static int __do_readpage(struct extent_io_tree *tree,
 
 		iosize = min(extent_map_end(em) - cur, end - cur + 1);
 		cur_end = min(extent_map_end(em) - 1, end);
-		iosize = ALIGN(iosize, blocksize);
+		iosize = round_up(iosize, blocksize);
 		if (this_bio_flag & EXTENT_BIO_COMPRESSED) {
 			disk_io_size = em->block_len;
 			sector = to_sector(em->block_start);
@@ -3388,7 +3388,7 @@ static noinline_for_stack int __extent_writepage_io(struct inode *inode,
 		BUG_ON(em_end <= cur);
 		BUG_ON(end < cur);
 		iosize = min(em_end - cur, end - cur + 1);
-		iosize = ALIGN(iosize, blocksize);
+		iosize = round_up(iosize, blocksize);
 		sector = to_sector(em->block_start + extent_offset);
 		bdev = em->bdev;
 		block_start = em->block_start;
@@ -4219,7 +4219,7 @@ int extent_invalidatepage(struct extent_io_tree *tree,
 	u64 end = start + PAGE_SIZE - 1;
 	size_t blocksize = page->mapping->host->i_sb->s_blocksize;
 
-	start += ALIGN(offset, blocksize);
+	start += round_up(offset, blocksize);
 	if (start > end)
 		return 0;
 
@@ -4336,7 +4336,7 @@ static struct extent_map *get_extent_skip_holes(struct inode *inode,
 		len = last - offset;
 		if (len == 0)
 			break;
-		len = ALIGN(len, sectorsize);
+		len = round_up(len, sectorsize);
 		em = get_extent(BTRFS_I(inode), NULL, 0, offset, len, 0);
 		if (IS_ERR_OR_NULL(em))
 			return em;

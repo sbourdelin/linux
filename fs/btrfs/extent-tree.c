@@ -2064,7 +2064,7 @@ static int btrfs_issue_discard(struct block_device *bdev, u64 start, u64 len,
 {
 	int j, ret = 0;
 	u64 bytes_left, end;
-	u64 aligned_start = ALIGN(start, BI_SECTOR_SIZE);
+	u64 aligned_start = round_up(start, BI_SECTOR_SIZE);
 
 	if (WARN_ON(start != aligned_start)) {
 		len -= aligned_start - start;
@@ -4290,7 +4290,7 @@ int btrfs_alloc_data_chunk_ondemand(struct btrfs_inode *inode, u64 bytes)
 	int have_pinned_space;
 
 	/* make sure bytes are sectorsize aligned */
-	bytes = ALIGN(bytes, fs_info->sectorsize);
+	bytes = round_up(bytes, fs_info->sectorsize);
 
 	if (btrfs_is_free_space_inode(inode)) {
 		need_commit = 0;
@@ -6089,7 +6089,7 @@ int btrfs_delalloc_reserve_metadata(struct btrfs_inode *inode, u64 num_bytes)
 	if (delalloc_lock)
 		mutex_lock(&inode->delalloc_mutex);
 
-	num_bytes = ALIGN(num_bytes, fs_info->sectorsize);
+	num_bytes = round_up(num_bytes, fs_info->sectorsize);
 
 	spin_lock(&inode->lock);
 	nr_extents = count_max_extents(num_bytes);
@@ -6219,7 +6219,7 @@ void btrfs_delalloc_release_metadata(struct btrfs_inode *inode, u64 num_bytes)
 	u64 to_free = 0;
 	unsigned dropped;
 
-	num_bytes = ALIGN(num_bytes, fs_info->sectorsize);
+	num_bytes = round_up(num_bytes, fs_info->sectorsize);
 	spin_lock(&inode->lock);
 	dropped = drop_outstanding_extent(inode, num_bytes);
 
@@ -7875,7 +7875,7 @@ unclustered_alloc:
 			goto loop;
 		}
 checks:
-		search_start = ALIGN(offset, fs_info->stripesize);
+		search_start = round_up(offset, fs_info->stripesize);
 
 		/* move on to the next group */
 		if (search_start + num_bytes >
