@@ -263,6 +263,7 @@ compound_page_dtor * const compound_page_dtors[] = {
 int min_free_kbytes = 1024;
 int user_min_free_kbytes = -1;
 int watermark_scale_factor = 10;
+int watermark_high_factor_slope = 200;
 
 static unsigned long __meminitdata nr_kernel_pages;
 static unsigned long __meminitdata nr_all_pages;
@@ -6989,6 +6990,7 @@ static void __setup_per_zone_wmarks(void)
 
 	for_each_zone(zone) {
 		u64 tmp;
+		u64 tmp_high;
 
 		spin_lock_irqsave(&zone->lock, flags);
 		tmp = (u64)pages_min * zone->managed_pages;
@@ -7026,7 +7028,9 @@ static void __setup_per_zone_wmarks(void)
 				      watermark_scale_factor, 10000));
 
 		zone->watermark[WMARK_LOW]  = min_wmark_pages(zone) + tmp;
-		zone->watermark[WMARK_HIGH] = min_wmark_pages(zone) + tmp * 2;
+		tmp_high = mult_frac(tmp, watermark_high_factor_slope, 100);
+		zone->watermark[WMARK_HIGH] = min_wmark_pages(zone) + tmp_high;
+
 
 		spin_unlock_irqrestore(&zone->lock, flags);
 	}
