@@ -845,7 +845,7 @@ static void scrub_print_warning(const char *errstr, struct scrub_block *sblock)
 	if (!path)
 		return;
 
-	swarn.sector = (sblock->pagev[0]->physical) >> 9;
+	swarn.sector = to_sector(sblock->pagev[0]->physical);
 	swarn.logical = sblock->pagev[0]->logical;
 	swarn.errstr = errstr;
 	swarn.dev = NULL;
@@ -1694,7 +1694,7 @@ static int scrub_submit_raid56_bio_wait(struct btrfs_fs_info *fs_info,
 
 	init_completion(&done.event);
 	done.status = 0;
-	bio->bi_iter.bi_sector = page->logical >> 9;
+	bio->bi_iter.bi_sector = to_sector(page->logical);
 	bio->bi_private = &done;
 	bio->bi_end_io = scrub_bio_wait_endio;
 
@@ -1747,7 +1747,7 @@ static void scrub_recheck_block(struct btrfs_fs_info *fs_info,
 				sblock->no_io_error_seen = 0;
 			}
 		} else {
-			bio->bi_iter.bi_sector = page->physical >> 9;
+			bio->bi_iter.bi_sector = to_sector(page->physical);
 			bio_set_op_attrs(bio, REQ_OP_READ, 0);
 
 			if (btrfsic_submit_bio_wait(bio)) {
@@ -1827,7 +1827,7 @@ static int scrub_repair_page_from_good_copy(struct scrub_block *sblock_bad,
 
 		bio = btrfs_io_bio_alloc(1);
 		bio_set_dev(bio, page_bad->dev->bdev);
-		bio->bi_iter.bi_sector = page_bad->physical >> 9;
+		bio->bi_iter.bi_sector = to_sector(page_bad->physical);
 		bio_set_op_attrs(bio, REQ_OP_WRITE, 0);
 
 		ret = bio_add_page(bio, page_good->page, PAGE_SIZE, 0);
@@ -1922,7 +1922,7 @@ again:
 		bio->bi_private = sbio;
 		bio->bi_end_io = scrub_wr_bio_end_io;
 		bio_set_dev(bio, sbio->dev->bdev);
-		bio->bi_iter.bi_sector = sbio->physical >> 9;
+		bio->bi_iter.bi_sector = to_sector(sbio->physical);
 		bio_set_op_attrs(bio, REQ_OP_WRITE, 0);
 		sbio->status = 0;
 	} else if (sbio->physical + sbio->page_count * PAGE_SIZE !=
@@ -2322,7 +2322,7 @@ again:
 		bio->bi_private = sbio;
 		bio->bi_end_io = scrub_bio_end_io;
 		bio_set_dev(bio, sbio->dev->bdev);
-		bio->bi_iter.bi_sector = sbio->physical >> 9;
+		bio->bi_iter.bi_sector = to_sector(sbio->physical);
 		bio_set_op_attrs(bio, REQ_OP_READ, 0);
 		sbio->status = 0;
 	} else if (sbio->physical + sbio->page_count * PAGE_SIZE !=
@@ -2441,7 +2441,7 @@ static void scrub_missing_raid56_pages(struct scrub_block *sblock)
 	}
 
 	bio = btrfs_io_bio_alloc(0);
-	bio->bi_iter.bi_sector = logical >> 9;
+	bio->bi_iter.bi_sector = to_sector(logical);
 	bio->bi_private = sblock;
 	bio->bi_end_io = scrub_missing_raid56_end_io;
 
@@ -3022,7 +3022,7 @@ static void scrub_parity_check_and_repair(struct scrub_parity *sparity)
 		goto bbio_out;
 
 	bio = btrfs_io_bio_alloc(0);
-	bio->bi_iter.bi_sector = sparity->logic_start >> 9;
+	bio->bi_iter.bi_sector = to_sector(sparity->logic_start);
 	bio->bi_private = sparity;
 	bio->bi_end_io = scrub_parity_bio_endio;
 
@@ -4623,7 +4623,7 @@ static int write_page_nocow(struct scrub_ctx *sctx,
 	}
 	bio = btrfs_io_bio_alloc(1);
 	bio->bi_iter.bi_size = 0;
-	bio->bi_iter.bi_sector = physical_for_dev_replace >> 9;
+	bio->bi_iter.bi_sector = to_sector(physical_for_dev_replace);
 	bio_set_dev(bio, dev->bdev);
 	bio->bi_opf = REQ_OP_WRITE | REQ_SYNC;
 	ret = bio_add_page(bio, page, PAGE_SIZE, 0);

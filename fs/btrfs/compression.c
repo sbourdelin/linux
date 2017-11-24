@@ -136,7 +136,7 @@ static void end_compressed_bio_read(struct bio *bio)
 
 	inode = cb->inode;
 	ret = check_compressed_csum(BTRFS_I(inode), cb,
-				    (u64)bio->bi_iter.bi_sector << 9);
+				    to_bytes(bio->bi_iter.bi_sector));
 	if (ret)
 		goto csum_failed;
 
@@ -480,7 +480,8 @@ static noinline int add_ra_bio_pages(struct inode *inode,
 
 		if (!em || last_offset < em->start ||
 		    (last_offset + PAGE_SIZE > extent_map_end(em)) ||
-		    (em->block_start >> 9) != cb->orig_bio->bi_iter.bi_sector) {
+		    (to_sector(em->block_start)) !=
+				cb->orig_bio->bi_iter.bi_sector) {
 			free_extent_map(em);
 			unlock_extent(tree, last_offset, end);
 			unlock_page(page);
@@ -545,7 +546,7 @@ blk_status_t btrfs_submit_compressed_read(struct inode *inode, struct bio *bio,
 	struct page *page;
 	struct block_device *bdev;
 	struct bio *comp_bio;
-	u64 cur_disk_byte = (u64)bio->bi_iter.bi_sector << 9;
+	u64 cur_disk_byte = to_bytes(bio->bi_iter.bi_sector);
 	u64 em_len;
 	u64 em_start;
 	struct extent_map *em;

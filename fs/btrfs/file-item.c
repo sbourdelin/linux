@@ -218,7 +218,7 @@ static blk_status_t __btrfs_lookup_bio_sums(struct inode *inode, struct bio *bio
 		path->skip_locking = 1;
 	}
 
-	disk_bytenr = (u64)bio->bi_iter.bi_sector << 9;
+	disk_bytenr = to_bytes(bio->bi_iter.bi_sector);
 	if (dio)
 		offset = logical_offset;
 
@@ -461,7 +461,7 @@ blk_status_t btrfs_csum_one_bio(struct inode *inode, struct bio *bio,
 	else
 		offset = 0; /* shut up gcc */
 
-	sums->bytenr = (u64)bio->bi_iter.bi_sector << 9;
+	sums->bytenr = to_bytes(bio->bi_iter.bi_sector);
 	index = 0;
 
 	bio_for_each_segment(bvec, bio, iter) {
@@ -499,7 +499,7 @@ blk_status_t btrfs_csum_one_bio(struct inode *inode, struct bio *bio,
 				ordered = btrfs_lookup_ordered_extent(inode,
 								offset);
 				ASSERT(ordered); /* Logic error */
-				sums->bytenr = ((u64)bio->bi_iter.bi_sector << 9)
+				sums->bytenr = to_bytes(bio->bi_iter.bi_sector)
 					+ total_bytes;
 				index = 0;
 

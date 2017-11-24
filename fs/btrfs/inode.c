@@ -1890,7 +1890,7 @@ int btrfs_merge_bio_hook(struct page *page, unsigned long offset,
 {
 	struct inode *inode = page->mapping->host;
 	struct btrfs_fs_info *fs_info = btrfs_sb(inode->i_sb);
-	u64 logical = (u64)bio->bi_iter.bi_sector << 9;
+	u64 logical = to_bytes(bio->bi_iter.bi_sector);
 	u64 length = 0;
 	u64 map_length;
 	int ret;
@@ -8601,8 +8601,8 @@ static int btrfs_submit_direct_hook(struct btrfs_dio_private *dip)
 
 	map_length = orig_bio->bi_iter.bi_size;
 	submit_len = map_length;
-	ret = btrfs_map_block(fs_info, btrfs_op(orig_bio), start_sector << 9,
-			      &map_length, NULL, 0);
+	ret = btrfs_map_block(fs_info, btrfs_op(orig_bio),
+			      to_bytes(start_sector), &map_length, NULL, 0);
 	if (ret)
 		return -EIO;
 
@@ -8656,12 +8656,12 @@ static int btrfs_submit_direct_hook(struct btrfs_dio_private *dip)
 		}
 
 		clone_offset += clone_len;
-		start_sector += clone_len >> 9;
+		start_sector += to_sector(clone_len);
 		file_offset += clone_len;
 
 		map_length = submit_len;
 		ret = btrfs_map_block(fs_info, btrfs_op(orig_bio),
-				      start_sector << 9, &map_length, NULL, 0);
+				to_bytes(start_sector), &map_length, NULL, 0);
 		if (ret)
 			goto out_err;
 	} while (submit_len > 0);
@@ -8707,7 +8707,7 @@ static void btrfs_submit_direct(struct bio *dio_bio, struct inode *inode,
 	dip->inode = inode;
 	dip->logical_offset = file_offset;
 	dip->bytes = dio_bio->bi_iter.bi_size;
-	dip->disk_bytenr = (u64)dio_bio->bi_iter.bi_sector << 9;
+	dip->disk_bytenr = to_bytes(dio_bio->bi_iter.bi_sector);
 	bio->bi_private = dip;
 	dip->orig_bio = bio;
 	dip->dio_bio = dio_bio;
@@ -9697,8 +9697,8 @@ static int btrfs_getattr(const struct path *path, struct kstat *stat,
 	spin_lock(&BTRFS_I(inode)->lock);
 	delalloc_bytes = BTRFS_I(inode)->new_delalloc_bytes;
 	spin_unlock(&BTRFS_I(inode)->lock);
-	stat->blocks = (ALIGN(inode_get_bytes(inode), blocksize) +
-			ALIGN(delalloc_bytes, blocksize)) >> 9;
+	stat->blocks = to_sector(ALIGN(inode_get_bytes(inode), blocksize) +
+				 ALIGN(delalloc_bytes, blocksize));
 	return 0;
 }
 

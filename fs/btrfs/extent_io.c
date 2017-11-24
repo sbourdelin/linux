@@ -2024,7 +2024,7 @@ int repair_io_failure(struct btrfs_fs_info *fs_info, u64 ino, u64 start,
 		BUG_ON(mirror_num != bbio->mirror_num);
 	}
 
-	sector = bbio->stripes[bbio->mirror_num - 1].physical >> 9;
+	sector = to_sector(bbio->stripes[bbio->mirror_num - 1].physical);
 	bio->bi_iter.bi_sector = sector;
 	dev = bbio->stripes[bbio->mirror_num - 1].dev;
 	btrfs_put_bbio(bbio);
@@ -2334,7 +2334,7 @@ struct bio *btrfs_create_repair_bio(struct inode *inode, struct bio *failed_bio,
 
 	bio = btrfs_io_bio_alloc(1);
 	bio->bi_end_io = endio_func;
-	bio->bi_iter.bi_sector = failrec->logical >> 9;
+	bio->bi_iter.bi_sector = to_sector(failrec->logical);
 	bio_set_dev(bio, fs_info->fs_devices->latest_bdev);
 	bio->bi_iter.bi_size = 0;
 	bio->bi_private = data;
@@ -2676,7 +2676,7 @@ struct bio *btrfs_bio_alloc(struct block_device *bdev, u64 first_byte)
 
 	bio = bio_alloc_bioset(GFP_NOFS, BIO_MAX_PAGES, btrfs_bioset);
 	bio_set_dev(bio, bdev);
-	bio->bi_iter.bi_sector = first_byte >> 9;
+	bio->bi_iter.bi_sector = to_sector(first_byte);
 	btrfs_io_bio_init(btrfs_io_bio(bio));
 	return bio;
 }
@@ -2716,7 +2716,7 @@ struct bio *btrfs_bio_clone_partial(struct bio *orig, int offset, int size)
 	btrfs_bio = btrfs_io_bio(bio);
 	btrfs_io_bio_init(btrfs_bio);
 
-	bio_trim(bio, offset >> 9, size >> 9);
+	bio_trim(bio, to_sector(offset), to_sector(size));
 	btrfs_bio->iter = bio->bi_iter;
 	return bio;
 }
@@ -2802,7 +2802,7 @@ static int submit_extent_page(unsigned int opf, struct extent_io_tree *tree,
 		}
 	}
 
-	bio = btrfs_bio_alloc(bdev, (u64)sector << 9);
+	bio = btrfs_bio_alloc(bdev, to_bytes(sector));
 	bio_add_page(bio, page, page_size, offset);
 	bio->bi_end_io = end_io_func;
 	bio->bi_private = tree;
@@ -2968,9 +2968,9 @@ static int __do_readpage(struct extent_io_tree *tree,
 		iosize = ALIGN(iosize, blocksize);
 		if (this_bio_flag & EXTENT_BIO_COMPRESSED) {
 			disk_io_size = em->block_len;
-			sector = em->block_start >> 9;
+			sector = to_sector(em->block_start);
 		} else {
-			sector = (em->block_start + extent_offset) >> 9;
+			sector = to_sector(em->block_start + extent_offset);
 			disk_io_size = iosize;
 		}
 		bdev = em->bdev;
@@ -3389,7 +3389,7 @@ static noinline_for_stack int __extent_writepage_io(struct inode *inode,
 		BUG_ON(end < cur);
 		iosize = min(em_end - cur, end - cur + 1);
 		iosize = ALIGN(iosize, blocksize);
-		sector = (em->block_start + extent_offset) >> 9;
+		sector = to_sector(em->block_start + extent_offset);
 		bdev = em->bdev;
 		block_start = em->block_start;
 		compressed = test_bit(EXTENT_FLAG_COMPRESSED, &em->flags);
@@ -3749,8 +3749,8 @@ static noinline_for_stack int write_one_eb(struct extent_buffer *eb,
 		clear_page_dirty_for_io(p);
 		set_page_writeback(p);
 		ret = submit_extent_page(REQ_OP_WRITE | write_flags, tree, wbc,
-					 p, offset >> 9, PAGE_SIZE, 0, bdev,
-					 &epd->bio,
+					 p, to_sector(offset), PAGE_SIZE, 0,
+					 bdev, &epd->bio,
 					 end_bio_extent_buffer_writepage,
 					 0, epd->bio_flags, bio_flags, false);
 		epd->bio_flags = bio_flags;

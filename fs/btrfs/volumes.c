@@ -6109,7 +6109,7 @@ static void submit_stripe_bio(struct btrfs_bio *bbio, struct bio *bio,
 	bio->bi_private = bbio;
 	btrfs_io_bio(bio)->stripe_index = dev_nr;
 	bio->bi_end_io = btrfs_end_bio;
-	bio->bi_iter.bi_sector = physical >> 9;
+	bio->bi_iter.bi_sector = to_sector(physical);
 #ifdef DEBUG
 	{
 		struct rcu_string *name;
@@ -6143,7 +6143,7 @@ static void bbio_error(struct btrfs_bio *bbio, struct bio *bio, u64 logical)
 		WARN_ON(bio != bbio->orig_bio);
 
 		btrfs_io_bio(bio)->mirror_num = bbio->mirror_num;
-		bio->bi_iter.bi_sector = logical >> 9;
+		bio->bi_iter.bi_sector = to_sector(logical);
 		bio->bi_status = BLK_STS_IOERR;
 		btrfs_end_bbio(bbio, bio);
 	}
@@ -6154,7 +6154,7 @@ blk_status_t btrfs_map_bio(struct btrfs_fs_info *fs_info, struct bio *bio,
 {
 	struct btrfs_device *dev;
 	struct bio *first_bio = bio;
-	u64 logical = (u64)bio->bi_iter.bi_sector << 9;
+	u64 logical = to_bytes(bio->bi_iter.bi_sector);
 	u64 length = 0;
 	u64 map_length;
 	int ret;

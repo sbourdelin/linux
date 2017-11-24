@@ -2064,11 +2064,11 @@ static int btrfs_issue_discard(struct block_device *bdev, u64 start, u64 len,
 {
 	int j, ret = 0;
 	u64 bytes_left, end;
-	u64 aligned_start = ALIGN(start, 1 << 9);
+	u64 aligned_start = ALIGN(start, BI_SECTOR_SIZE);
 
 	if (WARN_ON(start != aligned_start)) {
 		len -= aligned_start - start;
-		len = round_down(len, 1 << 9);
+		len = round_down(len, BI_SECTOR_SIZE);
 		start = aligned_start;
 	}
 
@@ -2106,8 +2106,8 @@ static int btrfs_issue_discard(struct block_device *bdev, u64 start, u64 len,
 		}
 
 		if (size) {
-			ret = blkdev_issue_discard(bdev, start >> 9, size >> 9,
-						   GFP_NOFS, 0);
+			ret = blkdev_issue_discard(bdev, to_sector(start),
+						to_sector(size), GFP_NOFS, 0);
 			if (!ret)
 				*discarded_bytes += size;
 			else if (ret != -EOPNOTSUPP)
@@ -2123,8 +2123,8 @@ static int btrfs_issue_discard(struct block_device *bdev, u64 start, u64 len,
 	}
 
 	if (bytes_left) {
-		ret = blkdev_issue_discard(bdev, start >> 9, bytes_left >> 9,
-					   GFP_NOFS, 0);
+		ret = blkdev_issue_discard(bdev, to_sector(start),
+					   to_sector(bytes_left), GFP_NOFS, 0);
 		if (!ret)
 			*discarded_bytes += bytes_left;
 	}
