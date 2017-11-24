@@ -1175,10 +1175,8 @@ static int dlfb_realloc_framebuffer(struct dlfb_data *dev, struct fb_info *info)
 		 * Alloc system memory for virtual framebuffer
 		 */
 		new_fb = vmalloc(new_len);
-		if (!new_fb) {
-			pr_err("Virtual framebuffer alloc failed\n");
+		if (!new_fb)
 			goto error;
-		}
 
 		if (info->screen_base) {
 			memcpy(new_fb, old_fb, old_len);
@@ -1599,10 +1597,8 @@ static int dlfb_usb_probe(struct usb_interface *interface,
 	usbdev = interface_to_usbdev(interface);
 
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-	if (dev == NULL) {
-		dev_err(&interface->dev, "dlfb_usb_probe: failed alloc of dev struct\n");
+	if (!dev)
 		goto error;
-	}
 
 	kref_init(&dev->kref); /* matching kref_put in usb .disconnect fn */
 
