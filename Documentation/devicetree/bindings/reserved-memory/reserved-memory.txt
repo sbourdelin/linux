@@ -63,6 +63,12 @@ reusable (optional) - empty property
       able to reclaim it back. Typically that means that the operating
       system can use that region to store volatile or cached data that
       can be otherwise regenerated or migrated elsewhere.
+no-align (optional) - empty property
+    - Depending on a device or its usage pattern, tring to do aligning is not
+      useful. Because of aligning, allocation can be failed and that leads to
+      increasing total memory size to avoid the allocation failure. This
+      property indicates allocator will not try to do aligning on size nor
+      offset.
 
 Linux implementation note:
 - If a "linux,cma-default" property is present, then Linux will use the

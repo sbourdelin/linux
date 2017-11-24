@@ -75,8 +75,7 @@ static void arm_nommu_dma_free(struct device *dev, size_t size,
 	if (attrs & DMA_ATTR_NON_CONSISTENT) {
 		ops->free(dev, size, cpu_addr, dma_addr, attrs);
 	} else {
-		int ret = dma_release_from_global_coherent(get_order(size),
-							   cpu_addr);
+		int ret = dma_release_from_global_coherent(size, cpu_addr);
 
 		WARN_ON_ONCE(ret == 0);
 	}
