@@ -333,6 +333,7 @@ static bool a3700_spi_wait_completion(struct spi_device *spi)
 {
 	struct a3700_spi *a3700_spi;
 	unsigned int timeout;
+	bool completed = true;
 	unsigned int ctrl_reg;
 	unsigned long timeout_jiffies;
 
@@ -357,10 +358,9 @@ static bool a3700_spi_wait_completion(struct spi_device *spi)
 	timeout = wait_for_completion_timeout(&a3700_spi->done,
 					      timeout_jiffies);
 
-	a3700_spi->wait_mask = 0;
 
 	if (timeout)
-		return true;
+		goto done;
 
 	/* there might be the case that right after we checked the
 	 * status bits in this routine and before start to wait for
@@ -372,12 +372,16 @@ static bool a3700_spi_wait_completion(struct spi_device *spi)
 	 */
 	ctrl_reg = spireg_read(a3700_spi, A3700_SPI_IF_CTRL_REG);
 	if (a3700_spi->wait_mask & ctrl_reg)
-		return true;
-
-	spireg_write(a3700_spi, A3700_SPI_INT_MASK_REG, 0);
+		goto done;
 
 	/* Timeout was reached */
-	return false;
+	completed = false;
+done:
+	spireg_write(a3700_spi, A3700_SPI_INT_MASK_REG, 0);
+
+	a3700_spi->wait_mask = 0;
+
+	return completed;
 }
 
 static bool a3700_spi_transfer_wait(struct spi_device *spi,
