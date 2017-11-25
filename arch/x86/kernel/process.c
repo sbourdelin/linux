@@ -128,25 +128,35 @@ void flush_thread(void)
 
 void disable_TSC(void)
 {
+	unsigned long flags;
+
 	preempt_disable();
-	if (!test_and_set_thread_flag(TIF_NOTSC))
+	if (!test_and_set_thread_flag(TIF_NOTSC)) {
 		/*
 		 * Must flip the CPU state synchronously with
 		 * TIF_NOTSC in the current running context.
 		 */
-		cr4_set_bits(X86_CR4_TSD);
+		local_irq_save(flags);
+		cr4_set_bits_irqs_off(X86_CR4_TSD);
+		local_irq_restore(flags);
+	}
 	preempt_enable();
 }
 
 static void enable_TSC(void)
 {
+	unsigned long flags;
+
 	preempt_disable();
-	if (test_and_clear_thread_flag(TIF_NOTSC))
+	if (test_and_clear_thread_flag(TIF_NOTSC)) {
 		/*
 		 * Must flip the CPU state synchronously with
 		 * TIF_NOTSC in the current running context.
 		 */
-		cr4_clear_bits(X86_CR4_TSD);
+		local_irq_save(flags);
+		cr4_clear_bits_irqs_off(X86_CR4_TSD);
+		local_irq_restore(flags);
+	}
 	preempt_enable();
 }
 
@@ -293,7 +303,7 @@ void __switch_to_xtra(struct task_struct *prev_p, struct task_struct *next_p,
 	}
 
 	if ((tifp ^ tifn) & _TIF_NOTSC)
-		cr4_toggle_bits(X86_CR4_TSD);
+		cr4_toggle_bits_irqs_off(X86_CR4_TSD);
 
 	if ((tifp ^ tifn) & _TIF_NOCPUID)
 		set_cpuid_faulting(!!(tifn & _TIF_NOCPUID));

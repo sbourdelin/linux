@@ -302,8 +302,14 @@ __setup("nosmep", setup_disable_smep);
 
 static __always_inline void setup_smep(struct cpuinfo_x86 *c)
 {
-	if (cpu_has(c, X86_FEATURE_SMEP))
-		cr4_set_bits(X86_CR4_SMEP);
+	unsigned long flags;
+
+	if (!cpu_has(c, X86_FEATURE_SMEP))
+		return;
+
+	local_irq_save(flags);
+	cr4_set_bits_irqs_off(X86_CR4_SMEP);
+	local_irq_restore(flags);
 }
 
 static __init int setup_disable_smap(char *arg)
@@ -320,13 +326,16 @@ static __always_inline void setup_smap(struct cpuinfo_x86 *c)
 	/* This should have been cleared long ago */
 	BUG_ON(eflags & X86_EFLAGS_AC);
 
-	if (cpu_has(c, X86_FEATURE_SMAP)) {
+	if (!cpu_has(c, X86_FEATURE_SMAP))
+		return;
+
+	local_irq_save(eflags);
 #ifdef CONFIG_X86_SMAP
-		cr4_set_bits(X86_CR4_SMAP);
+	cr4_set_bits_irqs_off(X86_CR4_SMAP);
 #else
-		cr4_clear_bits(X86_CR4_SMAP);
+	cr4_clear_bits_irqs_off(X86_CR4_SMAP);
 #endif
-	}
+	local_irq_restore(eflags);
 }
 
 /*
@@ -336,6 +345,8 @@ static bool pku_disabled;
 
 static __always_inline void setup_pku(struct cpuinfo_x86 *c)
 {
+	unsigned long flags;
+
 	/* check the boot processor, plus compile options for PKU: */
 	if (!cpu_feature_enabled(X86_FEATURE_PKU))
 		return;
@@ -345,7 +356,10 @@ static __always_inline void setup_pku(struct cpuinfo_x86 *c)
 	if (pku_disabled)
 		return;
 
-	cr4_set_bits(X86_CR4_PKE);
+	local_irq_save(flags);
+	cr4_set_bits_irqs_off(X86_CR4_PKE);
+	local_irq_restore(flags);
+
 	/*
 	 * Seting X86_CR4_PKE will cause the X86_FEATURE_OSPKE
 	 * cpuid bit to be set.  We need to ensure that we
@@ -1147,7 +1161,10 @@ static void identify_cpu(struct cpuinfo_x86 *c)
 	/* Disable the PN if appropriate */
 	squash_the_stupid_serial_number(c);
 
-	/* Set up SMEP/SMAP */
+	/*
+	 * Set up SMEP/SMAP. Disable interrupts to prevent triggering a warning
+	 * as CR4 changes must be done with disabled interrupts.
+	 */
 	setup_smep(c);
 	setup_smap(c);
 
@@ -1520,7 +1537,7 @@ void cpu_init(void)
 
 	pr_debug("Initializing CPU#%d\n", cpu);
 
-	cr4_clear_bits(X86_CR4_VME|X86_CR4_PVI|X86_CR4_TSD|X86_CR4_DE);
+	cr4_clear_bits_irqs_off(X86_CR4_VME|X86_CR4_PVI|X86_CR4_TSD|X86_CR4_DE);
 
 	/*
 	 * Initialize the per-CPU GDT with the boot GDT,
@@ -1613,7 +1630,8 @@ void cpu_init(void)
 	if (cpu_feature_enabled(X86_FEATURE_VME) ||
 	    boot_cpu_has(X86_FEATURE_TSC) ||
 	    boot_cpu_has(X86_FEATURE_DE))
-		cr4_clear_bits(X86_CR4_VME|X86_CR4_PVI|X86_CR4_TSD|X86_CR4_DE);
+		cr4_clear_bits_irqs_off(X86_CR4_VME|X86_CR4_PVI|X86_CR4_TSD|
+					X86_CR4_DE);
 
 	load_current_idt();
 	switch_to_new_gdt(cpu);

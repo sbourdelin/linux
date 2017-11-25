@@ -3500,7 +3500,12 @@ static __init int vmx_disabled_by_bios(void)
 
 static void kvm_cpu_vmxon(u64 addr)
 {
-	cr4_set_bits(X86_CR4_VMXE);
+	unsigned long flags;
+
+	local_irq_save(flags);
+	cr4_set_bits_irqs_off(X86_CR4_VMXE);
+	local_irq_restore(flags);
+
 	intel_pt_handle_vmx(1);
 
 	asm volatile (ASM_VMX_VMXON_RAX
@@ -3565,10 +3570,14 @@ static void vmclear_local_loaded_vmcss(void)
  */
 static void kvm_cpu_vmxoff(void)
 {
+	unsigned long flags;
+
 	asm volatile (__ex(ASM_VMX_VMXOFF) : : : "cc");
 
 	intel_pt_handle_vmx(0);
-	cr4_clear_bits(X86_CR4_VMXE);
+	local_irq_save(flags);
+	cr4_clear_bits_irqs_off(X86_CR4_VMXE);
+	local_irq_restore(flags);
 }
 
 static void hardware_disable(void)

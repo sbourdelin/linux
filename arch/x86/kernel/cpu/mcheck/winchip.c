@@ -27,6 +27,7 @@ static void winchip_machine_check(struct pt_regs *regs, long error_code)
 /* Set up machine check reporting on the Winchip C6 series */
 void winchip_mcheck_init(struct cpuinfo_x86 *c)
 {
+	unsigned long flags;
 	u32 lo, hi;
 
 	machine_check_vector = winchip_machine_check;
@@ -38,7 +39,9 @@ void winchip_mcheck_init(struct cpuinfo_x86 *c)
 	lo &= ~(1<<4);	/* Enable MCE */
 	wrmsr(MSR_IDT_FCR1, lo, hi);
 
-	cr4_set_bits(X86_CR4_MCE);
+	local_irq_save(flags);
+	cr4_set_bits_irqs_off(X86_CR4_MCE);
+	local_irq_restore(flags);
 
 	pr_info("Winchip machine check reporting enabled on CPU#0.\n");
 }

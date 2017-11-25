@@ -1508,6 +1508,7 @@ static void __mcheck_cpu_init_generic(void)
 {
 	enum mcp_flags m_fl = 0;
 	mce_banks_t all_banks;
+	unsigned long flags;
 	u64 cap;
 
 	if (!mca_cfg.bootlog)
@@ -1519,7 +1520,9 @@ static void __mcheck_cpu_init_generic(void)
 	bitmap_fill(all_banks, MAX_NR_BANKS);
 	machine_check_poll(MCP_UC | m_fl, &all_banks);
 
-	cr4_set_bits(X86_CR4_MCE);
+	local_irq_save(flags);
+	cr4_set_bits_irqs_off(X86_CR4_MCE);
+	local_irq_restore(flags);
 
 	rdmsrl(MSR_IA32_MCG_CAP, cap);
 	if (cap & MCG_CTL_P)

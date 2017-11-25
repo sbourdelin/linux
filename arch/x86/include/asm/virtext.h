@@ -41,7 +41,7 @@ static inline int cpu_has_vmx(void)
 static inline void cpu_vmxoff(void)
 {
 	asm volatile (ASM_VMX_VMXOFF : : : "cc");
-	cr4_clear_bits(X86_CR4_VMXE);
+	cr4_clear_bits_irqs_off(X86_CR4_VMXE);
 }
 
 static inline int cpu_vmx_enabled(void)

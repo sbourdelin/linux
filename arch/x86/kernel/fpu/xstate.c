@@ -237,7 +237,7 @@ void fpu__init_cpu_xstate(void)
 
 	xfeatures_mask &= ~XFEATURE_MASK_SUPERVISOR;
 
-	cr4_set_bits(X86_CR4_OSXSAVE);
+	cr4_set_bits_irqs_off(X86_CR4_OSXSAVE);
 	xsetbv(XCR_XFEATURE_ENABLED_MASK, xfeatures_mask);
 }
 
@@ -713,7 +713,7 @@ static int init_xstate_size(void)
 static void fpu__init_disable_system_xstate(void)
 {
 	xfeatures_mask = 0;
-	cr4_clear_bits(X86_CR4_OSXSAVE);
+	cr4_clear_bits_irqs_off(X86_CR4_OSXSAVE);
 	fpu__xstate_clear_all_cpu_caps();
 }
 
