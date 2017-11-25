@@ -266,4 +266,9 @@ static inline bool kvm_mwait_in_guest(struct kvm *kvm)
 	return kvm->arch.mwait_in_guest;
 }
 
+static inline bool kvm_hlt_in_guest(struct kvm *kvm)
+{
+	return kvm->arch.hlt_in_guest;
+}
+
 #endif

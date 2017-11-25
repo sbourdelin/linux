@@ -4172,7 +4172,17 @@ Returns: 0 on success
 This capability indicates that a guest using memory monitoring instructions
 (MWAIT/MWAITX) to stop a virtual CPU will not cause a VM exit. As such, time
 spent while a virtual CPU is halted in this way will then be accounted for as
-guest running time on the host (as opposed to e.g. HLT).
+guest running time on the host.
+
+7.14 KVM_CAP_X86_GUEST_HLT
+
+Architectures: x86
+Parameters: none
+Returns: 0 on success
+
+This capability indicates that a guest using HLT to stop a virtual CPU will not
+cause a VM exit. As such, time spent while a virtual CPU is halted in this way
+will then be accounted for as guest running time on the host.
 
 8. Other capabilities.
 ----------------------

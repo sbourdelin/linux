@@ -2446,6 +2446,25 @@ static void skip_emulated_instruction(struct kvm_vcpu *vcpu)
 	vmx_set_interrupt_shadow(vcpu, 0);
 }
 
+static void vmx_set_intr_info(struct kvm_vcpu *vcpu, u32 intr)
+{
+	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, intr);
+
+	/*
+	 * Ensure that we clear the HLT state in the VMCS.  We don't need to
+	 * explicitly skip the instruction because if the HLT state is set, then
+	 * the instruction is already executing and RIP has already been
+	 * advanced.
+	 */
+	if (!kvm_hlt_in_guest(vcpu->kvm) || !(intr & INTR_INFO_VALID_MASK))
+		return;
+	if (is_external_interrupt(intr) || is_nmi(intr))
+		return;
+	if (vmcs_read32(GUEST_ACTIVITY_STATE) != GUEST_ACTIVITY_HLT)
+		return;
+	vmcs_write32(GUEST_ACTIVITY_STATE, GUEST_ACTIVITY_ACTIVE);
+}
+
 static void nested_vmx_inject_exception_vmexit(struct kvm_vcpu *vcpu,
 					       unsigned long exit_qual)
 {
@@ -2540,7 +2559,7 @@ static void vmx_queue_exception(struct kvm_vcpu *vcpu)
 	} else
 		intr_info |= INTR_TYPE_HARD_EXCEPTION;
 
-	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, intr_info);
+	vmx_set_intr_info(vcpu, intr_info);
 }
 
 static bool vmx_rdtscp_supported(void)
@@ -5298,6 +5317,8 @@ static u32 vmx_exec_control(struct vcpu_vmx *vmx)
 	if (kvm_mwait_in_guest(vmx->vcpu.kvm))
 		exec_control &= ~(CPU_BASED_MWAIT_EXITING |
 				  CPU_BASED_MONITOR_EXITING);
+	if (kvm_hlt_in_guest(vmx->vcpu.kvm))
+		exec_control &= ~CPU_BASED_HLT_EXITING;
 	return exec_control;
 }
 
@@ -5635,7 +5656,7 @@ static void vmx_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 
 	setup_msrs(vmx);
 
-	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);  /* 22.2.1 */
+	vmx_set_intr_info(vcpu, 0);  /* 22.2.1 */
 
 	if (cpu_has_vmx_tpr_shadow() && !init_event) {
 		vmcs_write64(VIRTUAL_APIC_PAGE_ADDR, 0);
@@ -5729,7 +5750,7 @@ static void vmx_inject_irq(struct kvm_vcpu *vcpu)
 			     vmx->vcpu.arch.event_exit_inst_len);
 	} else
 		intr |= INTR_TYPE_EXT_INTR;
-	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, intr);
+	vmx_set_intr_info(vcpu, intr);
 }
 
 static void vmx_inject_nmi(struct kvm_vcpu *vcpu)
@@ -5758,8 +5779,8 @@ static void vmx_inject_nmi(struct kvm_vcpu *vcpu)
 		return;
 	}
 
-	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD,
-			INTR_TYPE_NMI_INTR | INTR_INFO_VALID_MASK | NMI_VECTOR);
+	vmx_set_intr_info(vcpu, INTR_TYPE_NMI_INTR | INTR_INFO_VALID_MASK |
+				NMI_VECTOR);
 }
 
 static bool vmx_get_nmi_mask(struct kvm_vcpu *vcpu)
@@ -9301,7 +9322,7 @@ static void vmx_cancel_injection(struct kvm_vcpu *vcpu)
 				  VM_ENTRY_INSTRUCTION_LEN,
 				  VM_ENTRY_EXCEPTION_ERROR_CODE);
 
-	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);
+	vmx_set_intr_info(vcpu, 0);
 }
 
 static void atomic_switch_perf_msrs(struct vcpu_vmx *vmx)
