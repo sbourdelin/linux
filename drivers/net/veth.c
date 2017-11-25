@@ -298,6 +298,34 @@ static const struct net_device_ops veth_netdev_ops = {
 		       NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX | \
 		       NETIF_F_HW_VLAN_STAG_TX | NETIF_F_HW_VLAN_STAG_RX )
 
+static void veth_set_gso(struct net_device *dev)
+{
+	struct net_device *nd;
+	unsigned int size = GSO_MAX_SIZE;
+	u16 segs = GSO_MAX_SEGS;
+	unsigned int count = 0;
+	const unsigned int limit = 10;
+
+	/* Set default gso based on available physical/synthetic devices,
+	 * ignore virtual interfaces, and limit looping through dev_list
+	 * as the total number of interfaces can be large.
+	 */
+	read_lock(&dev_base_lock);
+	for_each_netdev(&init_net, nd) {
+		if (count >= limit)
+			break;
+		if (nd->dev.parent && nd->flags & IFF_UP) {
+			size = min(size, nd->gso_max_size);
+			segs = min(segs, nd->gso_max_segs);
+		}
+		count++;
+	}
+
+	read_unlock(&dev_base_lock);
+	netif_set_gso_max_size(dev, size);
+	dev->gso_max_segs = size ? size - 1 : 0;
+}
+
 static void veth_setup(struct net_device *dev)
 {
 	ether_setup(dev);
@@ -323,6 +351,8 @@ static void veth_setup(struct net_device *dev)
 	dev->hw_features = VETH_FEATURES;
 	dev->hw_enc_features = VETH_FEATURES;
 	dev->mpls_features = NETIF_F_HW_CSUM | NETIF_F_GSO_SOFTWARE;
+
+	veth_set_gso(dev);
 }
 
 /*
