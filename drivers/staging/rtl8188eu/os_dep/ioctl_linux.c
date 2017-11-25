@@ -3061,6 +3061,1081 @@ static iw_handler rtw_handlers[] = {
 	NULL,					/*---hole---*/
 };
 
+static int get_private_handler_ieee_param(struct adapter *padapter,
+					  union iwreq_data *wrqu,
+					  void *param)
+{
+	/*
+	 * This function is expected to be called in master mode, which allows no
+	 * power saving. So we just check hw_init_completed.
+	 */
+	if (!padapter->hw_init_completed)
+		return -EPERM;
+
+	if (copy_from_user(param, wrqu->data.pointer, wrqu->data.length))
+		return -EFAULT;
+
+	return 0;
+}
+
+static int rtw_hostapd_sta_flush_pvt(struct net_device *dev,
+				     struct iw_request_info *info,
+				     union iwreq_data *wrqu,
+				     char *extra)
+{
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	flush_all_cam_entry(padapter); /* Clear CAM. */
+	return rtw_sta_flush(padapter);
+}
+
+static int rtw_add_sta_pvt(struct net_device *dev,
+			   struct iw_request_info *info,
+			   union iwreq_data *wrqu,
+			   char *extra)
+{
+	int ret;
+	int flags;
+	struct sta_info *psta;
+	struct ieee_param *param;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct sta_priv *pstapriv = &padapter->stapriv;
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (ret)
+		goto err_free_param;
+
+	DBG_88E("rtw_add_sta(aid =%d) =%pM\n",
+		param->u.add_sta.aid,
+		(param->sta_addr));
+
+	if (!check_fwstate(pmlmepriv, (_FW_LINKED|WIFI_AP_STATE))) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	if (param->sta_addr[0] == 0xff && param->sta_addr[1] == 0xff &&
+	    param->sta_addr[2] == 0xff && param->sta_addr[3] == 0xff &&
+	    param->sta_addr[4] == 0xff && param->sta_addr[5] == 0xff) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	psta = rtw_get_stainfo(pstapriv, param->sta_addr);
+	if (!psta) {
+		ret = -ENOMEM;
+		goto err_free_param;
+	}
+
+	flags = param->u.add_sta.flags;
+	psta->aid = param->u.add_sta.aid; /* aid = 1~2007. */
+
+	memcpy(psta->bssrateset, param->u.add_sta.tx_supp_rates, 16);
+
+	/* Check WMM cap. */
+	if (WLAN_STA_WME&flags)
+		psta->qos_option = 1;
+	else
+		psta->qos_option = 0;
+
+	if (pmlmepriv->qospriv.qos_option == 0)
+		psta->qos_option = 0;
+
+	/* Check 802.11n HT cap. */
+	if (WLAN_STA_HT&flags) {
+		psta->htpriv.ht_option = true;
+		psta->qos_option = 1;
+		memcpy(&psta->htpriv.ht_cap,
+		       &param->u.add_sta.ht_cap,
+		       sizeof(struct ieee80211_ht_cap));
+	} else {
+		psta->htpriv.ht_option = false;
+	}
+
+	if (pmlmepriv->htpriv.ht_option == false)
+		psta->htpriv.ht_option = false;
+
+	update_sta_info_apmode(padapter, psta);
+
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_param;
+	}
+
+	kfree(param);
+	return 0;
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static int rtw_del_sta_pvt(struct net_device *dev,
+			   struct iw_request_info *info,
+			   union iwreq_data *wrqu,
+			   char *extra)
+{
+	int ret;
+	int updated;
+	struct sta_info *psta;
+	struct ieee_param *param;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct sta_priv *pstapriv = &padapter->stapriv;
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (ret)
+		goto err_free_param;
+
+	DBG_88E("rtw_del_sta =%pM\n", (param->sta_addr));
+
+	if (check_fwstate(pmlmepriv, (_FW_LINKED|WIFI_AP_STATE)) != true) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	if (param->sta_addr[0] == 0xff && param->sta_addr[1] == 0xff &&
+	    param->sta_addr[2] == 0xff && param->sta_addr[3] == 0xff &&
+	    param->sta_addr[4] == 0xff && param->sta_addr[5] == 0xff) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	psta = rtw_get_stainfo(pstapriv, param->sta_addr);
+	if (!psta) {
+		DBG_88E("rtw_del_sta(), sta has already been removed or never been added\n");
+		ret = -ENOMEM;
+		goto err_free_param;
+	}
+
+	spin_lock_bh(&pstapriv->asoc_list_lock);
+
+	updated = 0;
+
+	if (!list_empty(&psta->asoc_list)) {
+		list_del_init(&psta->asoc_list);
+		pstapriv->asoc_list_cnt--;
+		updated = ap_free_sta(padapter, psta, true, WLAN_REASON_DEAUTH_LEAVING);
+	}
+
+	spin_unlock_bh(&pstapriv->asoc_list_lock);
+	associated_clients_update(padapter, updated);
+
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_param;
+	}
+
+	kfree(param);
+	return 0;
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static int rtw_set_beacon_pvt(struct net_device *dev,
+			      struct iw_request_info *info,
+			      union iwreq_data *wrqu,
+			      char *extra)
+{
+	int ret;
+	int len;
+	unsigned char *pbuf;
+	struct ieee_param *param;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct sta_priv *pstapriv = &padapter->stapriv;
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (ret)
+		goto err_free_param;
+
+	len = wrqu->data.length;
+	pbuf = param->u.bcn_ie.buf;
+
+	DBG_88E("%s, len =%d\n", __func__, len);
+
+	if (check_fwstate(pmlmepriv, WIFI_AP_STATE) != true) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	memcpy(&pstapriv->max_num_sta, param->u.bcn_ie.reserved, 2);
+
+	if ((pstapriv->max_num_sta > NUM_STA) || (pstapriv->max_num_sta <= 0))
+		pstapriv->max_num_sta = NUM_STA;
+
+	if (rtw_check_beacon_data(padapter, pbuf,  (len-12-2)) != _SUCCESS) { /*  12 = Param header, 2 = Not packed. */
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_param;
+	}
+
+	kfree(param);
+	return 0;
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static int rtw_set_encryption_pvt(struct net_device *dev,
+				  struct iw_request_info *info,
+				  union iwreq_data *wrqu,
+				  char *extra)
+{
+	int ret;
+	int param_len;
+	u32 wep_key_idx;
+	u32 wep_key_len;
+	u32 wep_total_len;
+	struct ieee_param *param;
+	struct sta_info *pbcmc_sta;
+	struct ndis_802_11_wep *pwep;
+	struct sta_info *psta = NULL;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct sta_priv *pstapriv = &padapter->stapriv;
+	struct mlme_priv *pmlmepriv = &padapter->mlmepriv;
+	struct security_priv *psecuritypriv = &(padapter->securitypriv);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (ret)
+		goto err_free_param;
+
+	param_len = wrqu->data.length;
+	param->u.crypt.err = 0;
+	param->u.crypt.alg[IEEE_CRYPT_ALG_NAME_LEN - 1] = '\0';
+
+	if (param_len !=  sizeof(struct ieee_param) + param->u.crypt.key_len) {
+		ret =  -EINVAL;
+		goto err_free_param;
+	}
+
+	if (param->sta_addr[0] == 0xff && param->sta_addr[1] == 0xff &&
+	    param->sta_addr[2] == 0xff && param->sta_addr[3] == 0xff &&
+	    param->sta_addr[4] == 0xff && param->sta_addr[5] == 0xff) {
+		if (param->u.crypt.idx >= WEP_KEYS) {
+			ret = -EINVAL;
+			goto err_free_param;
+		}
+	} else {
+		psta = rtw_get_stainfo(pstapriv, param->sta_addr);
+		if (!psta) {
+			DBG_88E("rtw_set_encryption(), sta has already been removed or never been added\n");
+			ret = -ENOMEM;
+			goto err_free_param;
+		}
+	}
+
+	if (strcmp(param->u.crypt.alg, "none") == 0 && (!psta)) {
+		/* TODO: Clear default encryption keys. */
+		DBG_88E("clear default encryption keys, keyid =%d\n",
+			param->u.crypt.idx);
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	if (strcmp(param->u.crypt.alg, "WEP") == 0 && (!psta)) {
+		DBG_88E("r871x_set_encryption, crypt.alg = WEP\n");
+
+		pwep = NULL;
+		wep_key_idx = param->u.crypt.idx;
+		wep_key_len = param->u.crypt.key_len;
+
+		DBG_88E("r871x_set_encryption, wep_key_idx=%d, len=%d\n",
+			wep_key_idx,
+			wep_key_len);
+
+		if ((wep_key_idx >= WEP_KEYS) || (wep_key_len <= 0)) {
+			ret = -EINVAL;
+			goto err_free_param;
+		}
+
+		if (wep_key_len > 0) {
+			wep_key_len = wep_key_len <= 5 ? 5 : 13;
+			wep_total_len = wep_key_len + offsetof(struct ndis_802_11_wep, KeyMaterial);
+
+			pwep = (struct ndis_802_11_wep *)kmalloc(wep_total_len, GFP_KERNEL);
+			if (!pwep) {
+				DBG_88E(" r871x_set_encryption: pwep allocate fail !!!\n");
+				ret = -ENOMEM;
+				goto err_free_param;
+			}
+
+			memset(pwep, 0, wep_total_len);
+			pwep->KeyLength = wep_key_len;
+			pwep->Length = wep_total_len;
+		}
+
+		pwep->KeyIndex = wep_key_idx;
+		memcpy(pwep->KeyMaterial,  param->u.crypt.key, pwep->KeyLength);
+
+		if (param->u.crypt.set_tx) {
+			DBG_88E("wep, set_tx = 1\n");
+
+			psecuritypriv->ndisencryptstatus = Ndis802_11Encryption1Enabled;
+			psecuritypriv->dot11PrivacyAlgrthm = _WEP40_;
+			psecuritypriv->dot118021XGrpPrivacy = _WEP40_;
+
+			if (pwep->KeyLength == 13) {
+				psecuritypriv->dot11PrivacyAlgrthm = _WEP104_;
+				psecuritypriv->dot118021XGrpPrivacy = _WEP104_;
+			}
+
+			psecuritypriv->dot11PrivacyKeyIndex = wep_key_idx;
+			memcpy(&(psecuritypriv->dot11DefKey[wep_key_idx].skey[0]),
+			       pwep->KeyMaterial,
+			       pwep->KeyLength);
+			psecuritypriv->dot11DefKeylen[wep_key_idx] = pwep->KeyLength;
+			set_wep_key(padapter, pwep->KeyMaterial, pwep->KeyLength, wep_key_idx);
+		} else {
+			DBG_88E("wep, set_tx = 0\n");
+
+			/*
+			 * Don't update "psecuritypriv->dot11PrivacyAlgrthm" and
+			 * "psecuritypriv->dot11PrivacyKeyIndex = keyid", but rtw_set_key()
+			 * can to cam.
+			 */
+
+			memcpy(&(psecuritypriv->dot11DefKey[wep_key_idx].skey[0]),
+			       pwep->KeyMaterial,
+			       pwep->KeyLength);
+			psecuritypriv->dot11DefKeylen[wep_key_idx] = pwep->KeyLength;
+			set_wep_key(padapter, pwep->KeyMaterial, pwep->KeyLength, wep_key_idx);
+		}
+
+		kfree(pwep);
+		goto free_param;
+	}
+
+	if (!psta && check_fwstate(pmlmepriv, WIFI_AP_STATE)) { /*  Group key. */
+		if (param->u.crypt.set_tx == 1) {
+			if (strcmp(param->u.crypt.alg, "WEP") == 0) {
+				DBG_88E("%s, set group_key, WEP\n", __func__);
+
+				memcpy(psecuritypriv->dot118021XGrpKey[param->u.crypt.idx].skey,
+				       param->u.crypt.key,
+				       min_t(u16, param->u.crypt.key_len,
+				       16));
+				psecuritypriv->dot118021XGrpPrivacy = _WEP40_;
+
+				if (param->u.crypt.key_len == 13)
+					psecuritypriv->dot118021XGrpPrivacy = _WEP104_;
+			} else if (strcmp(param->u.crypt.alg, "TKIP") == 0) {
+				DBG_88E("%s, set group_key, TKIP\n", __func__);
+
+				psecuritypriv->dot118021XGrpPrivacy = _TKIP_;
+				memcpy(psecuritypriv->dot118021XGrpKey[param->u.crypt.idx].skey,
+				       param->u.crypt.key,
+				       min_t(u16, param->u.crypt.key_len,
+				       16));
+				/* Set mic key. */
+				memcpy(psecuritypriv->dot118021XGrptxmickey[param->u.crypt.idx].skey,
+				       &(param->u.crypt.key[16]),
+				       8);
+				memcpy(psecuritypriv->dot118021XGrprxmickey[param->u.crypt.idx].skey,
+				       &(param->u.crypt.key[24]),
+				       8);
+				psecuritypriv->busetkipkey = true;
+			} else if (strcmp(param->u.crypt.alg, "CCMP") == 0) {
+				DBG_88E("%s, set group_key, CCMP\n", __func__);
+
+				psecuritypriv->dot118021XGrpPrivacy = _AES_;
+				memcpy(psecuritypriv->dot118021XGrpKey[param->u.crypt.idx].skey,
+				       param->u.crypt.key,
+				       min_t(u16, param->u.crypt.key_len, 16));
+			} else {
+				DBG_88E("%s, set group_key, none\n", __func__);
+
+				psecuritypriv->dot118021XGrpPrivacy = _NO_PRIVACY_;
+			}
+
+			psecuritypriv->dot118021XGrpKeyid = param->u.crypt.idx;
+			psecuritypriv->binstallGrpkey = true;
+			psecuritypriv->dot11PrivacyAlgrthm = psecuritypriv->dot118021XGrpPrivacy;
+			set_group_key(padapter, param->u.crypt.key, psecuritypriv->dot118021XGrpPrivacy, param->u.crypt.idx);
+
+			pbcmc_sta = rtw_get_bcmc_stainfo(padapter);
+			if (pbcmc_sta) {
+				pbcmc_sta->ieee8021x_blocked = false;
+				pbcmc_sta->dot118021XPrivacy = psecuritypriv->dot118021XGrpPrivacy; /* rx will use bmc_sta's dot118021XPrivacy. */
+			}
+		}
+
+		goto free_param;
+	}
+
+	if (psecuritypriv->dot11AuthAlgrthm == dot11AuthAlgrthm_8021X && psta) { /* psk/802_1x. */
+		if (check_fwstate(pmlmepriv, WIFI_AP_STATE)) {
+			if (param->u.crypt.set_tx == 1) {
+				memcpy(psta->dot118021x_UncstKey.skey,
+				       param->u.crypt.key,
+				       min_t(u16, param->u.crypt.key_len, 16));
+
+				if (strcmp(param->u.crypt.alg, "WEP") == 0) {
+					DBG_88E("%s, set pairwise key, WEP\n", __func__);
+
+					psta->dot118021XPrivacy = _WEP40_;
+
+					if (param->u.crypt.key_len == 13)
+						psta->dot118021XPrivacy = _WEP104_;
+				} else if (strcmp(param->u.crypt.alg, "TKIP") == 0) {
+					DBG_88E("%s, set pairwise key, TKIP\n", __func__);
+
+					psta->dot118021XPrivacy = _TKIP_;
+					/* Set mic key. */
+					memcpy(psta->dot11tkiptxmickey.skey, &(param->u.crypt.key[16]), 8);
+					memcpy(psta->dot11tkiprxmickey.skey, &(param->u.crypt.key[24]), 8);
+					psecuritypriv->busetkipkey = true;
+				} else if (strcmp(param->u.crypt.alg, "CCMP") == 0) {
+					DBG_88E("%s, set pairwise key, CCMP\n", __func__);
+
+					psta->dot118021XPrivacy = _AES_;
+				} else {
+					DBG_88E("%s, set pairwise key, none\n", __func__);
+
+					psta->dot118021XPrivacy = _NO_PRIVACY_;
+				}
+
+				set_pairwise_key(padapter, psta);
+
+				psta->ieee8021x_blocked = false;
+			} else { /* Group key ? */
+				if (strcmp(param->u.crypt.alg, "WEP") == 0) {
+					memcpy(psecuritypriv->dot118021XGrpKey[param->u.crypt.idx].skey,
+					       param->u.crypt.key,
+					       min_t(u16, param->u.crypt.key_len, 16));
+					psecuritypriv->dot118021XGrpPrivacy = _WEP40_;
+
+					if (param->u.crypt.key_len == 13)
+						psecuritypriv->dot118021XGrpPrivacy = _WEP104_;
+				} else if (strcmp(param->u.crypt.alg, "TKIP") == 0) {
+					psecuritypriv->dot118021XGrpPrivacy = _TKIP_;
+					memcpy(psecuritypriv->dot118021XGrpKey[param->u.crypt.idx].skey,
+					       param->u.crypt.key,
+					       min_t(u16, param->u.crypt.key_len, 16));
+					/* Set mic key. */
+					memcpy(psecuritypriv->dot118021XGrptxmickey[param->u.crypt.idx].skey,
+					       &(param->u.crypt.key[16]), 8);
+					memcpy(psecuritypriv->dot118021XGrprxmickey[param->u.crypt.idx].skey,
+					       &(param->u.crypt.key[24]), 8);
+					psecuritypriv->busetkipkey = true;
+				} else if (strcmp(param->u.crypt.alg, "CCMP") == 0) {
+					psecuritypriv->dot118021XGrpPrivacy = _AES_;
+					memcpy(psecuritypriv->dot118021XGrpKey[param->u.crypt.idx].skey,
+					       param->u.crypt.key,
+					       min_t(u16, param->u.crypt.key_len, 16));
+				} else {
+					psecuritypriv->dot118021XGrpPrivacy = _NO_PRIVACY_;
+				}
+
+				psecuritypriv->dot118021XGrpKeyid = param->u.crypt.idx;
+				psecuritypriv->binstallGrpkey = true;
+				psecuritypriv->dot11PrivacyAlgrthm = psecuritypriv->dot118021XGrpPrivacy;
+				set_group_key(padapter,
+					      param->u.crypt.key,
+					      psecuritypriv->dot118021XGrpPrivacy,
+					      param->u.crypt.idx);
+
+				pbcmc_sta = rtw_get_bcmc_stainfo(padapter);
+				if (pbcmc_sta) {
+					pbcmc_sta->ieee8021x_blocked = false;
+					pbcmc_sta->dot118021XPrivacy = psecuritypriv->dot118021XGrpPrivacy; /* rx will use bmc_sta's dot118021XPrivacy. */
+				}
+			}
+		}
+	}
+
+free_param:
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_param;
+	}
+
+	kfree(param);
+	return 0;
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static int rtw_get_sta_wpaie_pvt(struct net_device *dev,
+				 struct iw_request_info *info,
+				 union iwreq_data *wrqu,
+				 char *extra)
+{
+	int ret;
+	struct sta_info *psta;
+	struct ieee_param *param;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct sta_priv *pstapriv = &padapter->stapriv;
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (!ret)
+		goto err_free_param;
+
+	DBG_88E("rtw_get_sta_wpaie, sta_addr: %pM\n", (param->sta_addr));
+
+	if (check_fwstate(pmlmepriv, (_FW_LINKED|WIFI_AP_STATE)) != true) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	if (param->sta_addr[0] == 0xff && param->sta_addr[1] == 0xff &&
+	    param->sta_addr[2] == 0xff && param->sta_addr[3] == 0xff &&
+	    param->sta_addr[4] == 0xff && param->sta_addr[5] == 0xff) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	psta = rtw_get_stainfo(pstapriv, param->sta_addr);
+	if (!psta) {
+		ret = -ENOMEM;
+		goto err_free_param;
+	}
+
+	if (psta->wpa_ie[0] == WLAN_EID_RSN ||
+	    psta->wpa_ie[0] == WLAN_EID_VENDOR_SPECIFIC) {
+		int copy_len;
+		int wpa_ie_len;
+
+		wpa_ie_len = psta->wpa_ie[1];
+		copy_len = min_t(int, wpa_ie_len + 2, sizeof(psta->wpa_ie));
+		param->u.wpa_ie.len = copy_len;
+		memcpy(param->u.wpa_ie.reserved, psta->wpa_ie, copy_len);
+	} else {
+		DBG_88E("sta's wpa_ie is NONE\n");
+	}
+
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_param;
+	}
+
+	kfree(param);
+	return 0;
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static int rtw_set_wps_beacon_pvt(struct net_device *dev,
+				  struct iw_request_info *info,
+				  union iwreq_data *wrqu,
+				  char *extra)
+{
+	int ret;
+	int len;
+	int ie_len;
+	struct ieee_param *param;
+	unsigned char wps_oui[4] = {0x0, 0x50, 0xf2, 0x04};
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+	struct mlme_ext_priv *pmlmeext = &(padapter->mlmeextpriv);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return  -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (ret)
+		goto err_free_param;
+
+	len = wrqu->data.length;
+
+	DBG_88E("%s, len =%d\n", __func__, len);
+
+	if (check_fwstate(pmlmepriv, WIFI_AP_STATE) != true) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	kfree(pmlmepriv->wps_beacon_ie);
+	pmlmepriv->wps_beacon_ie = NULL;
+
+	ie_len = len-12-2; /* 12 = Param header, 2 = Not packed. */
+	if (ie_len > 0) {
+		pmlmepriv->wps_beacon_ie = kmalloc(ie_len, GFP_KERNEL);
+		if (!pmlmepriv->wps_beacon_ie) {
+			DBG_88E("%s()-%d: kmalloc() ERROR!\n", __func__, __LINE__);
+			ret = -EINVAL;
+			goto err_free_param;
+		}
+
+		pmlmepriv->wps_beacon_ie_len = ie_len;
+		memcpy(pmlmepriv->wps_beacon_ie, param->u.bcn_ie.buf, ie_len);
+		update_beacon(padapter, _VENDOR_SPECIFIC_IE_, wps_oui, true);
+		pmlmeext->bstart_bss = true;
+	}
+
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_wps_beacon_ie;
+	}
+
+	kfree(pmlmepriv->wps_beacon_ie);
+	kfree(param);
+	return 0;
+
+err_free_wps_beacon_ie:
+	kfree(pmlmepriv->wps_beacon_ie);
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static int rtw_set_wps_probe_resp_pvt(struct net_device *dev,
+				      struct iw_request_info *info,
+				      union iwreq_data *wrqu,
+				      char *extra)
+{
+	int ret;
+	int len;
+	int ie_len;
+	struct ieee_param *param;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (ret)
+		goto err_free_param;
+
+	len = wrqu->data.length;
+
+	DBG_88E("%s, len =%d\n", __func__, len);
+
+	if (check_fwstate(pmlmepriv, WIFI_AP_STATE) != true) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	kfree(pmlmepriv->wps_probe_resp_ie);
+	pmlmepriv->wps_probe_resp_ie = NULL;
+
+	ie_len = len-12-2; /* 12 = Param header, 2 = Not packed. */
+	if (ie_len > 0) {
+		pmlmepriv->wps_probe_resp_ie = kmalloc(ie_len, GFP_KERNEL);
+		if (!pmlmepriv->wps_probe_resp_ie) {
+			DBG_88E("%s()-%d: kmalloc() ERROR!\n", __func__, __LINE__);
+			ret = -EINVAL;
+			goto err_free_param;
+		}
+
+		pmlmepriv->wps_probe_resp_ie_len = ie_len;
+		memcpy(pmlmepriv->wps_probe_resp_ie, param->u.bcn_ie.buf, ie_len);
+	}
+
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_wps_probe_resp_ie;
+	}
+
+	kfree(pmlmepriv->wps_probe_resp_ie);
+	kfree(param);
+	return 0;
+
+err_free_wps_probe_resp_ie:
+	kfree(pmlmepriv->wps_probe_resp_ie);
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static int rtw_set_wps_assoc_resp_pvt(struct net_device *dev,
+				      struct iw_request_info *info,
+				      union iwreq_data *wrqu,
+				      char *extra)
+{
+	int ret;
+	int len;
+	int ie_len;
+	struct ieee_param *param;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (ret)
+		goto err_free_param;
+
+	len = wrqu->data.length;
+
+	DBG_88E("%s, len =%d\n", __func__, len);
+
+	if (check_fwstate(pmlmepriv, WIFI_AP_STATE) != true) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	kfree(pmlmepriv->wps_assoc_resp_ie);
+	pmlmepriv->wps_assoc_resp_ie = NULL;
+
+	ie_len = len-12-2; /* 12 = Param header, 2 = Not packed. */
+	if (ie_len > 0) {
+		pmlmepriv->wps_assoc_resp_ie = kmalloc(ie_len, GFP_KERNEL);
+		if (!pmlmepriv->wps_assoc_resp_ie) {
+			DBG_88E("%s()-%d: kmalloc() ERROR!\n", __func__, __LINE__);
+			ret = -EINVAL;
+			goto err_free_param;
+		}
+
+		pmlmepriv->wps_assoc_resp_ie_len = ie_len;
+		memcpy(pmlmepriv->wps_assoc_resp_ie, param->u.bcn_ie.buf, ie_len);
+	}
+
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_wps_assoc_resp_ie;
+	}
+
+	kfree(pmlmepriv->wps_assoc_resp_ie);
+	kfree(param);
+	return 0;
+
+err_free_wps_assoc_resp_ie:
+	kfree(pmlmepriv->wps_assoc_resp_ie);
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static int rtw_set_hidden_ssid_pvt(struct net_device *dev,
+				   struct iw_request_info *info,
+				   union iwreq_data *wrqu,
+				   char *extra)
+{
+	int ret;
+	u8 value;
+	struct ieee_param *param;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+	struct mlme_ext_priv *pmlmeext = &(padapter->mlmeextpriv);
+	struct mlme_ext_info *pmlmeinfo = &(pmlmeext->mlmext_info);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (ret)
+		goto err_free_param;
+
+	if (check_fwstate(pmlmepriv, WIFI_AP_STATE) != true) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	if (param->u.wpa_param.name != 0) /* Dummy test. */
+		DBG_88E("%s name(%u) != 0\n", __func__, param->u.wpa_param.name);
+
+	value = param->u.wpa_param.value;
+
+	/* Use the same definition of hostapd's ignore_broadcast_ssid. */
+	if (value != 1 && value != 2)
+		value = 0;
+
+	DBG_88E("%s value(%u)\n", __func__, value);
+
+	pmlmeinfo->hidden_ssid_mode = value;
+
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_param;
+	}
+
+	kfree(param);
+	return 0;
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static int rtw_ioctl_get_sta_data_pvt(struct net_device *dev,
+				      struct iw_request_info *info,
+				      union iwreq_data *wrqu,
+				      char *extra)
+{
+	int ret;
+	struct sta_info *psta;
+	struct sta_data *psta_data;
+	struct ieee_param_ex *param_ex;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+	struct sta_priv *pstapriv = &padapter->stapriv;
+
+	param_ex = (struct ieee_param_ex *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param_ex)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param_ex);
+	if (ret)
+		goto err_free_param_ex;
+
+	psta_data = (struct sta_data *)param_ex->data;
+
+	DBG_88E("rtw_ioctl_get_sta_info, sta_addr: %pM\n", (param_ex->sta_addr));
+
+	if (check_fwstate(pmlmepriv, (_FW_LINKED|WIFI_AP_STATE)) != true) {
+		ret = -EINVAL;
+		goto err_free_param_ex;
+	}
+
+	if (param_ex->sta_addr[0] == 0xff && param_ex->sta_addr[1] == 0xff &&
+	    param_ex->sta_addr[2] == 0xff && param_ex->sta_addr[3] == 0xff &&
+	    param_ex->sta_addr[4] == 0xff && param_ex->sta_addr[5] == 0xff) {
+		ret = -EINVAL;
+		goto err_free_param_ex;
+	}
+
+	psta = rtw_get_stainfo(pstapriv, param_ex->sta_addr);
+	if (!psta) {
+		ret = -ENOMEM;
+		goto err_free_param_ex;
+	}
+
+	psta_data->aid = (u16)psta->aid;
+	psta_data->capability = psta->capability;
+	psta_data->flags = psta->flags;
+
+	/*
+	nonerp_set : BIT(0)
+	no_short_slot_time_set : BIT(1)
+	no_short_preamble_set : BIT(2)
+	no_ht_gf_set : BIT(3)
+	no_ht_set : BIT(4)
+	ht_20mhz_set : BIT(5)
+	*/
+
+	psta_data->sta_set = \
+		((psta->nonerp_set) |
+		(psta->no_short_slot_time_set << 1) |
+		(psta->no_short_preamble_set << 2) |
+		(psta->no_ht_gf_set << 3) |
+		(psta->no_ht_set << 4) |
+		(psta->ht_20mhz_set << 5));
+	psta_data->tx_supp_rates_len =  psta->bssratelen;
+	memcpy(psta_data->tx_supp_rates, psta->bssrateset, psta->bssratelen);
+	memcpy(&psta_data->ht_cap,
+	       &psta->htpriv.ht_cap,
+	       sizeof(struct ieee80211_ht_cap));
+	psta_data->rx_pkts = psta->sta_stats.rx_data_pkts;
+	psta_data->rx_bytes = psta->sta_stats.rx_bytes;
+	psta_data->rx_drops = psta->sta_stats.rx_drops;
+	psta_data->tx_pkts = psta->sta_stats.tx_pkts;
+	psta_data->tx_bytes = psta->sta_stats.tx_bytes;
+	psta_data->tx_drops = psta->sta_stats.tx_drops;
+
+	if (copy_to_user(wrqu->data.pointer, param_ex, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_param_ex;
+	}
+
+	kfree(param_ex);
+	return 0;
+
+err_free_param_ex:
+	kfree(param_ex);
+	return ret;
+}
+
+static int rtw_ioctl_set_macaddr_acl_pvt(struct net_device *dev,
+					 struct iw_request_info *info,
+					 union iwreq_data *wrqu,
+					 char *extra)
+{
+	int ret;
+	struct ieee_param *param;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (ret)
+		goto err_free_param;
+
+	if (check_fwstate(pmlmepriv, WIFI_AP_STATE) != true) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	rtw_set_macaddr_acl(padapter, param->u.mlme.command);
+
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_param;
+	}
+
+	kfree(param);
+	return 0;
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static int rtw_ioctl_acl_add_sta_pvt(struct net_device *dev,
+				     struct iw_request_info *info,
+				     union iwreq_data *wrqu,
+				     char *extra)
+{
+	int ret;
+	struct ieee_param *param;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (ret)
+		goto err_free_param;
+
+	if (check_fwstate(pmlmepriv, WIFI_AP_STATE) != true) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	if (param->sta_addr[0] == 0xff && param->sta_addr[1] == 0xff &&
+	    param->sta_addr[2] == 0xff && param->sta_addr[3] == 0xff &&
+	    param->sta_addr[4] == 0xff && param->sta_addr[5] == 0xff) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	ret = rtw_acl_add_sta(padapter, param->sta_addr);
+	if (ret)
+		goto err_free_param;
+
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_param;
+	}
+
+	kfree(param);
+	return 0;
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static int rtw_ioctl_acl_remove_sta_pvt(struct net_device *dev,
+					struct iw_request_info *info,
+					union iwreq_data *wrqu,
+					char *extra)
+{
+	int ret;
+	struct ieee_param *param;
+	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
+	struct mlme_priv *pmlmepriv = &(padapter->mlmepriv);
+
+	param = (struct ieee_param *)kmalloc(wrqu->data.length, GFP_KERNEL);
+	if (!param)
+		return -ENOMEM;
+
+	ret = get_private_handler_ieee_param(padapter, wrqu, param);
+	if (ret)
+		goto err_free_param;
+
+	if (check_fwstate(pmlmepriv, WIFI_AP_STATE) != true) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	if (param->sta_addr[0] == 0xff && param->sta_addr[1] == 0xff &&
+	    param->sta_addr[2] == 0xff && param->sta_addr[3] == 0xff &&
+	    param->sta_addr[4] == 0xff && param->sta_addr[5] == 0xff) {
+		ret = -EINVAL;
+		goto err_free_param;
+	}
+
+	ret = rtw_acl_remove_sta(padapter, param->sta_addr);
+	if (ret)
+		goto err_free_param;
+
+	if (copy_to_user(wrqu->data.pointer, param, wrqu->data.length)) {
+		ret = -EFAULT;
+		goto err_free_param;
+	}
+
+	kfree(param);
+	return 0;
+
+err_free_param:
+	kfree(param);
+	return ret;
+}
+
+static iw_handler rtw_handlers_private[] = {
+	NULL,                          /* Empty */
+	rtw_hostapd_sta_flush_pvt,     /* RTL871X_HOSTAPD_FLUSH */
+	rtw_add_sta_pvt,               /* RTL871X_HOSTAPD_ADD_STA */
+	rtw_del_sta_pvt,               /* RTL871X_HOSTAPD_REMOVE_STA */
+	rtw_ioctl_get_sta_data_pvt,    /* RTL871X_HOSTAPD_GET_INFO_STA */
+	rtw_get_sta_wpaie_pvt,         /* RTL871X_HOSTAPD_GET_WPAIE_STA */
+	rtw_set_encryption_pvt,        /* RTL871X_SET_ENCRYPTION */
+	NULL,                          /* RTL871X_GET_ENCRYPTION */
+	NULL,                          /* RTL871X_HOSTAPD_SET_FLAGS_STA */
+	NULL,                          /* RTL871X_HOSTAPD_GET_RID */
+	NULL,                          /* RTL871X_HOSTAPD_SET_RID */
+	NULL,                          /* RTL871X_HOSTAPD_SET_ASSOC_AP_ADDR */
+	NULL,                          /* RTL871X_HOSTAPD_SET_GENERIC_ELEMENT */
+	NULL,                          /* RTL871X_HOSTAPD_MLME */
+	NULL,                          /* RTL871X_HOSTAPD_SCAN_REQ */
+	NULL,                          /* RTL871X_HOSTAPD_STA_CLEAR_STATS */
+	rtw_set_beacon_pvt,            /* RTL871X_HOSTAPD_SET_BEACON */
+	rtw_set_wps_beacon_pvt,        /* RTL871X_HOSTAPD_SET_WPS_BEACON */
+	rtw_set_wps_probe_resp_pvt,    /* RTL871X_HOSTAPD_SET_WPS_PROBE_RESP */
+	rtw_set_wps_assoc_resp_pvt,    /* RTL871X_HOSTAPD_SET_WPS_ASSOC_RESP */
+	rtw_set_hidden_ssid_pvt,       /* RTL871X_HOSTAPD_SET_HIDDEN_SSID */
+	rtw_ioctl_set_macaddr_acl_pvt, /* RTL871X_HOSTAPD_SET_MACADDR_ACL */
+	rtw_ioctl_acl_add_sta_pvt,     /* RTL871X_HOSTAPD_ACL_ADD_STA */
+	rtw_ioctl_acl_remove_sta_pvt,  /* RTL871X_HOSTAPD_ACL_REMOVE_STA */
+};
+
 static struct iw_statistics *rtw_get_wireless_stats(struct net_device *dev)
 {
 	struct adapter *padapter = (struct adapter *)rtw_netdev_priv(dev);
@@ -3089,6 +4164,8 @@ static struct iw_statistics *rtw_get_wireless_stats(struct net_device *dev)
 struct iw_handler_def rtw_handlers_def = {
 	.standard = rtw_handlers,
 	.num_standard = ARRAY_SIZE(rtw_handlers),
+	.private = rtw_handlers_private,
+	.num_private = ARRAY_SIZE(rtw_handlers_private),
 	.get_wireless_stats = rtw_get_wireless_stats,
 };
 
