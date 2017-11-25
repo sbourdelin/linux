@@ -2756,6 +2756,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
  	case KVM_CAP_SPLIT_IRQCHIP:
 	case KVM_CAP_IMMEDIATE_EXIT:
 	case KVM_CAP_X86_GUEST_HLT:
+	case KVM_CAP_X86_GUEST_PAUSE:
 		r = 1;
 		break;
 	case KVM_CAP_ADJUST_CLOCK:
@@ -4071,6 +4072,10 @@ split_irqchip_unlock:
 		break;
 	case KVM_CAP_X86_GUEST_HLT:
 		kvm->arch.hlt_in_guest = true;
+		r = 0;
+		break;
+	case KVM_CAP_X86_GUEST_PAUSE:
+		kvm->arch.pause_in_guest = true;
 		r = 0;
 		break;
 	default:

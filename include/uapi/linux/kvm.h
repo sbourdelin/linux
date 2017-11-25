@@ -933,6 +933,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_HYPERV_VP_INDEX 149
 #define KVM_CAP_S390_AIS_MIGRATION 150
 #define KVM_CAP_X86_GUEST_HLT 151
+#define KVM_CAP_X86_GUEST_PAUSE 152
 
 #ifdef KVM_CAP_IRQ_ROUTING
 

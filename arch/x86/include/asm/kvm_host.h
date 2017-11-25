@@ -782,6 +782,7 @@ struct kvm_arch {
 	gpa_t wall_clock;
 
 	bool hlt_in_guest;
+	bool pause_in_guest;
 	bool mwait_in_guest;
 
 	bool ept_identity_pagetable_done;
