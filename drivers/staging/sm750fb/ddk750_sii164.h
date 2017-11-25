@@ -4,14 +4,19 @@
 
 #define USE_DVICHIP
 
-/* Hot Plug detection mode structure */
+/*
+ * Hot Plug detection mode structure:
+ *      Disable Hot Plug output bit (always high).
+ *      Use Monitor Detect Interrupt bit.
+ *      Use Receiver Sense detect bit.
+ *      Use Hot Plug detect bit.
+ */
 enum sii164_hot_plug_mode {
-	SII164_HOTPLUG_DISABLE = 0,         /* Disable Hot Plug output bit (always high). */
-	SII164_HOTPLUG_USE_MDI,             /* Use Monitor Detect Interrupt bit. */
-	SII164_HOTPLUG_USE_RSEN,            /* Use Receiver Sense detect bit. */
-	SII164_HOTPLUG_USE_HTPLG            /* Use Hot Plug detect bit. */
+	SII164_HOTPLUG_DISABLE = 0,
+	SII164_HOTPLUG_USE_MDI,
+	SII164_HOTPLUG_USE_RSEN,
+	SII164_HOTPLUG_USE_HTPLG
 };
-
 
 /* Silicon Image SiI164 chip prototype */
 long sii164InitChip(unsigned char edgeSelect,
@@ -28,7 +33,6 @@ long sii164InitChip(unsigned char edgeSelect,
 unsigned short sii164GetVendorID(void);
 unsigned short sii164GetDeviceID(void);
 
-
 #ifdef SII164_FULL_FUNCTIONS
 void sii164ResetChip(void);
 char *sii164GetChipString(void);
@@ -39,35 +43,26 @@ unsigned char sii164CheckInterrupt(void);
 void sii164ClearInterrupt(void);
 #endif
 /*
- * below register definition is used for
+ * The below register definition is used for the
  * Silicon Image SiI164 DVI controller chip
  */
-/*
- * Vendor ID registers
- */
+
+/* Vendor ID registers */
 #define SII164_VENDOR_ID_LOW                        0x00
 #define SII164_VENDOR_ID_HIGH                       0x01
 
-/*
- * Device ID registers
- */
+/* Device ID registers */
 #define SII164_DEVICE_ID_LOW                        0x02
 #define SII164_DEVICE_ID_HIGH                       0x03
 
-/*
- * Device Revision
- */
+/* Device Revision */
 #define SII164_DEVICE_REVISION                      0x04
 
-/*
- * Frequency Limitation registers
- */
+/* Frequency Limitation registers */
 #define SII164_FREQUENCY_LIMIT_LOW                  0x06
 #define SII164_FREQUENCY_LIMIT_HIGH                 0x07
 
-/*
- * Power Down and Input Signal Configuration registers
- */
+/* Power Down and Input Signal Configuration registers */
 #define SII164_CONFIGURATION                        0x08
 
 /* Power down (PD) */
@@ -95,9 +90,7 @@ void sii164ClearInterrupt(void);
 #define SII164_CONFIGURATION_VSYNC_FORCE_LOW        0x00
 #define SII164_CONFIGURATION_VSYNC_AS_IS            0x20
 
-/*
- * Detection registers
- */
+/* Detection registers */
 #define SII164_DETECT                               0x09
 
 /* Monitor Detect Interrupt (MDI) */
@@ -127,9 +120,7 @@ void sii164ClearInterrupt(void);
 #define SII164_DETECT_MONITOR_SENSE_OUTPUT_HTPLG    0x30
 #define SII164_DETECT_MONITOR_SENSE_OUTPUT_FLAG     0x30
 
-/*
- * Skewing registers
- */
+/* Skewing registers */
 #define SII164_DESKEW                               0x0A
 
 /* General Purpose Input (CTL[3:1]) */
@@ -149,14 +140,10 @@ void sii164ClearInterrupt(void);
 #define SII164_DESKEW_7_STEP                        0xC0
 #define SII164_DESKEW_8_STEP                        0xE0
 
-/*
- * User Configuration Data registers (CFG 7:0)
- */
+/* User Configuration Data registers (CFG 7:0) */
 #define SII164_USER_CONFIGURATION                   0x0B
 
-/*
- * PLL registers
- */
+/* PLL registers */
 #define SII164_PLL                                  0x0C
 
 /* PLL Filter Value (PLLF) */
