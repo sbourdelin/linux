@@ -1081,7 +1081,7 @@ static int ufx_ops_open(struct fb_info *info, int user)
 
 	kref_get(&dev->kref);
 
-	if (fb_defio && (info->fbdefio == NULL)) {
+	if (fb_defio && !info->fbdefio) {
 		/* enable defio at last moment if not disabled by client */
 
 		struct fb_deferred_io *fbdefio;
@@ -1556,8 +1556,7 @@ static int ufx_setup_modes(struct ufx_data *dev, struct fb_info *info,
 	}
 
 	/* If everything else has failed, fall back to safe default mode */
-	if (default_vmode == NULL) {
-
+	if (!default_vmode) {
 		struct fb_videomode fb_vmode = {0};
 
 		/* Add the standard VESA modes to our modelist
@@ -1583,8 +1582,7 @@ static int ufx_setup_modes(struct ufx_data *dev, struct fb_info *info,
 	}
 
 	/* If we have good mode and no active clients */
-	if ((default_vmode != NULL) && (dev->fb_count == 0)) {
-
+	if (default_vmode && dev->fb_count == 0) {
 		fb_videomode_to_var(&info->var, default_vmode);
 		ufx_var_color_format(&info->var);
 
@@ -1594,10 +1592,9 @@ static int ufx_setup_modes(struct ufx_data *dev, struct fb_info *info,
 			(info->var.bits_per_pixel / 8);
 
 		result = ufx_realloc_framebuffer(dev, info);
-
-	} else
+	} else {
 		result = -EINVAL;
-
+	}
 error:
 	if (edid && (dev->edid != edid))
 		kfree(edid);
