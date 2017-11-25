@@ -67,6 +67,7 @@
 #include <asm/pvclock.h>
 #include <asm/div64.h>
 #include <asm/irq_remapping.h>
+#include <asm/mwait.h>
 
 #define CREATE_TRACE_POINTS
 #include "trace.h"
@@ -2672,6 +2673,40 @@ out:
 	return r;
 }
 
+static bool kvm_mwait_in_guest_possible(void)
+{
+	unsigned int eax, ebx, ecx, edx;
+
+	if (!cpu_has(&boot_cpu_data, X86_FEATURE_MWAIT))
+		return false;
+
+	switch (boot_cpu_data.x86_vendor) {
+	case X86_VENDOR_AMD:
+		/* All AMD CPUs have a working MWAIT implementation */
+		return true;
+	case X86_VENDOR_INTEL:
+		/* Handle Intel below */
+		break;
+	default:
+		return false;
+	}
+
+	/*
+	 * Intel CPUs without CPUID5_ECX_INTERRUPT_BREAK are problematic as
+	 * they would allow guest to stop the CPU completely by disabling
+	 * interrupts then invoking MWAIT.
+	 */
+	if (boot_cpu_data.cpuid_level < CPUID_MWAIT_LEAF)
+		return false;
+
+	cpuid(CPUID_MWAIT_LEAF, &eax, &ebx, &ecx, &edx);
+
+	if (!(ecx & CPUID5_ECX_INTERRUPT_BREAK))
+		return false;
+
+	return true;
+}
+
 int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 {
 	int r;
@@ -2726,7 +2761,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 		r = KVM_CLOCK_TSC_STABLE;
 		break;
 	case KVM_CAP_X86_GUEST_MWAIT:
-		r = kvm_mwait_in_guest();
+		r = kvm_mwait_in_guest_possible();
 		break;
 	case KVM_CAP_X86_SMM:
 		/* SMBASE is usually relocated above 1M on modern chipsets,
@@ -4025,6 +4060,13 @@ split_irqchip_unlock:
 			kvm->arch.x2apic_broadcast_quirk_disabled = true;
 
 		r = 0;
+		break;
+	case KVM_CAP_X86_GUEST_MWAIT:
+		r = -EINVAL;
+		if (kvm_mwait_in_guest_possible()) {
+			kvm->arch.mwait_in_guest = true;
+			r = 0;
+		}
 		break;
 	default:
 		r = -EINVAL;

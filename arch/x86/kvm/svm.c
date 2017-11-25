@@ -1253,7 +1253,7 @@ static void init_vmcb(struct vcpu_svm *svm)
 	set_intercept(svm, INTERCEPT_WBINVD);
 	set_intercept(svm, INTERCEPT_XSETBV);
 
-	if (!kvm_mwait_in_guest()) {
+	if (!kvm_mwait_in_guest(svm->vcpu.kvm)) {
 		set_intercept(svm, INTERCEPT_MONITOR);
 		set_intercept(svm, INTERCEPT_MWAIT);
 	}
