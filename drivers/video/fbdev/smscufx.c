@@ -1309,10 +1309,8 @@ static int ufx_realloc_framebuffer(struct ufx_data *dev, struct fb_info *info)
 		 * Alloc system memory for virtual framebuffer
 		 */
 		new_fb = vmalloc(new_len);
-		if (!new_fb) {
-			pr_err("Virtual framebuffer alloc failed");
+		if (!new_fb)
 			goto error;
-		}
 
 		if (info->screen_base) {
 			memcpy(new_fb, old_fb, old_len);
@@ -1630,10 +1628,8 @@ static int ufx_usb_probe(struct usb_interface *interface,
 	BUG_ON(!usbdev);
 
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-	if (dev == NULL) {
-		dev_err(&usbdev->dev, "ufx_usb_probe: failed alloc of dev struct\n");
+	if (!dev)
 		goto error;
-	}
 
 	/* we need to wait for both usb and fbdev to spin down on disconnect */
 	kref_init(&dev->kref); /* matching kref_put in usb .disconnect fn */
