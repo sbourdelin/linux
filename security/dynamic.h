@@ -13,6 +13,9 @@ struct dynamic_hook {
 	struct percpu_counter	invocation;
 	struct percpu_counter	deny;
 	const char		*name;
+#ifdef CONFIG_SECURITY_DYNAMIC_HOOKS_FS
+	struct dentry		*dentry;
+#endif
 	struct list_head	head;
 	struct srcu_struct	srcu;
 };
@@ -21,4 +24,10 @@ extern struct dynamic_hook dynamic_hooks[];
 extern void security_init_dynamic_hooks(void);
 #else
 static void security_init_dynamic_hooks(void) {}
+#endif
+
+#ifdef CONFIG_SECURITY_DYNAMIC_HOOKS_FS
+extern void securityfs_init_dynamic_hooks(void);
+#else
+static void securityfs_init_dynamic_hooks(void) {}
 #endif
