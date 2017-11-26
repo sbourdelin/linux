@@ -510,10 +510,10 @@ static int sm501fb_set_par_common(struct fb_info *info,
 	/* update fb layer with actual clock used */
 	var->pixclock = sm501fb_hz_to_ps(sm501pixclock);
 
-	dev_dbg(fbi->dev, "%s: pixclock(ps) = %u, pixclock(Hz)  = %lu, "
-	       "sm501pixclock = %lu,  error = %ld%%\n",
-	       __func__, var->pixclock, pixclock, sm501pixclock,
-	       ((pixclock - sm501pixclock)*100)/pixclock);
+	dev_dbg(fbi->dev,
+		"%s: pixclock(ps) = %u, pixclock(Hz)  = %lu, sm501pixclock = %lu,  error = %ld%%\n",
+		__func__, var->pixclock, pixclock, sm501pixclock,
+		((pixclock - sm501pixclock) * 100) / pixclock);
 
 	return 0;
 }
@@ -1789,16 +1789,16 @@ static int sm501fb_init_fb(struct fb_info *fb, enum sm501_controller head,
 
 			switch (ret) {
 			case 1:
-				dev_info(info->dev, "using mode specified in "
-						"@mode\n");
+				dev_info(info->dev,
+					 "using mode specified in @mode\n");
 				break;
 			case 2:
-				dev_info(info->dev, "using mode specified in "
-					"@mode with ignored refresh rate\n");
+				dev_info(info->dev,
+					 "using mode specified in @mode with ignored refresh rate\n");
 				break;
 			case 3:
-				dev_info(info->dev, "using mode default "
-					"mode\n");
+				dev_info(info->dev,
+					 "using mode default mode\n");
 				break;
 			case 4:
 				dev_info(info->dev, "using mode from list\n");
