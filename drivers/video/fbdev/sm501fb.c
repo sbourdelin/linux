@@ -1484,7 +1484,7 @@ static int sm501_init_cursor(struct fb_info *fbi, unsigned int reg_base)
 	struct sm501fb_info *info;
 	int ret;
 
-	if (fbi == NULL)
+	if (!fbi)
 		return 0;
 
 	par = fbi->par;
@@ -1532,7 +1532,7 @@ static int sm501fb_start(struct sm501fb_info *info,
 	/* allocate, reserve and remap resources for display
 	 * controller registers */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (res == NULL) {
+	if (!res) {
 		dev_err(dev, "no resource definition for registers\n");
 		ret = -ENOENT;
 		goto err_release;
@@ -1541,15 +1541,14 @@ static int sm501fb_start(struct sm501fb_info *info,
 	info->regs_res = request_mem_region(res->start,
 					    resource_size(res),
 					    pdev->name);
-
-	if (info->regs_res == NULL) {
+	if (!info->regs_res) {
 		dev_err(dev, "cannot claim registers\n");
 		ret = -ENXIO;
 		goto err_release;
 	}
 
 	info->regs = ioremap(res->start, resource_size(res));
-	if (info->regs == NULL) {
+	if (!info->regs) {
 		dev_err(dev, "cannot remap registers\n");
 		ret = -ENXIO;
 		goto err_regs_res;
@@ -1558,7 +1557,7 @@ static int sm501fb_start(struct sm501fb_info *info,
 	/* allocate, reserve and remap resources for 2d
 	 * controller registers */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	if (res == NULL) {
+	if (!res) {
 		dev_err(dev, "no resource definition for 2d registers\n");
 		ret = -ENOENT;
 		goto err_regs_map;
@@ -1567,15 +1566,14 @@ static int sm501fb_start(struct sm501fb_info *info,
 	info->regs2d_res = request_mem_region(res->start,
 					      resource_size(res),
 					      pdev->name);
-
-	if (info->regs2d_res == NULL) {
+	if (!info->regs2d_res) {
 		dev_err(dev, "cannot claim registers\n");
 		ret = -ENXIO;
 		goto err_regs_map;
 	}
 
 	info->regs2d = ioremap(res->start, resource_size(res));
-	if (info->regs2d == NULL) {
+	if (!info->regs2d) {
 		dev_err(dev, "cannot remap registers\n");
 		ret = -ENXIO;
 		goto err_regs2d_res;
@@ -1583,7 +1581,7 @@ static int sm501fb_start(struct sm501fb_info *info,
 
 	/* allocate, reserve resources for framebuffer */
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 2);
-	if (res == NULL) {
+	if (!res) {
 		dev_err(dev, "no memory resource defined\n");
 		ret = -ENXIO;
 		goto err_regs2d_map;
@@ -1592,14 +1590,14 @@ static int sm501fb_start(struct sm501fb_info *info,
 	info->fbmem_res = request_mem_region(res->start,
 					     resource_size(res),
 					     pdev->name);
-	if (info->fbmem_res == NULL) {
+	if (!info->fbmem_res) {
 		dev_err(dev, "cannot claim framebuffer\n");
 		ret = -ENXIO;
 		goto err_regs2d_map;
 	}
 
 	info->fbmem = ioremap(res->start, resource_size(res));
-	if (info->fbmem == NULL) {
+	if (!info->fbmem) {
 		dev_err(dev, "cannot remap framebuffer\n");
 		ret = -ENXIO;
 		goto err_mem_res;
@@ -1862,13 +1860,13 @@ static int sm501fb_probe_one(struct sm501fb_info *info,
 	pd = (head == HEAD_CRT) ? info->pdata->fb_crt : info->pdata->fb_pnl;
 
 	/* Do not initialise if we've not been given any platform data */
-	if (pd == NULL) {
+	if (!pd) {
 		dev_info(info->dev, "no data for fb %s (disabled)\n", name);
 		return 0;
 	}
 
 	fbi = framebuffer_alloc(sizeof(struct sm501fb_par), info->dev);
-	if (fbi == NULL) {
+	if (!fbi) {
 		dev_err(info->dev, "cannot allocate %s framebuffer\n", name);
 		return -ENOMEM;
 	}
@@ -1944,7 +1942,7 @@ static int sm501fb_probe(struct platform_device *pdev)
 		info->pdata = pd->fb;
 	}
 
-	if (info->pdata == NULL) {
+	if (!info->pdata) {
 		int found = 0;
 #if defined(CONFIG_OF)
 		struct device_node *np = pdev->dev.parent->of_node;
@@ -1987,8 +1985,7 @@ static int sm501fb_probe(struct platform_device *pdev)
 		goto err_probed_crt;
 	}
 
-	if (info->fb[HEAD_PANEL] == NULL &&
-	    info->fb[HEAD_CRT] == NULL) {
+	if (!info->fb[HEAD_PANEL] && !info->fb[HEAD_CRT]) {
 		dev_err(dev, "no framebuffers found\n");
 		ret = -ENODEV;
 		goto err_alloc;
