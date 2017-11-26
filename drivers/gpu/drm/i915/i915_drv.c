@@ -1396,6 +1396,8 @@ void i915_driver_unload(struct drm_device *dev)
 
 	i915_driver_unregister(dev_priv);
 
+	synchronize_rcu();
+
 	if (i915_gem_suspend(dev_priv))
 		DRM_ERROR("failed to idle hardware; continuing to unload!\n");
 
