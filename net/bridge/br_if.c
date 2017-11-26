@@ -453,8 +453,15 @@ static void br_set_gso_limits(struct net_bridge *br)
 		gso_max_size = min(gso_max_size, p->dev->gso_max_size);
 		gso_max_segs = min(gso_max_segs, p->dev->gso_max_segs);
 	}
+
+	if (br->dev->gso_max_size == gso_max_size &&
+	    br->dev->gso_max_segs == gso_max_segs)
+		return;
+
 	br->dev->gso_max_size = gso_max_size;
 	br->dev->gso_max_segs = gso_max_segs;
+
+	call_netdevice_notifiers(NETDEV_CHANGE_GSO_MAX, br->dev);
 }
 
 /*
