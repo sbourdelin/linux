@@ -11,7 +11,7 @@ config DRM_I915_SPIN_REQUEST_IRQ
 
 config DRM_I915_SPIN_REQUEST_CS
 	int
-	default 2 # microseconds
+	default 20 # microseconds
 	help
 	  After sleeping for a request (GPU operation) to complete, we will
 	  be woken up on the completion of every request prior to the one
