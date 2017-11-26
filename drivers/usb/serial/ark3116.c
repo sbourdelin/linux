@@ -101,11 +101,9 @@ static int ark3116_read_reg(struct usb_serial *serial,
 				reg, result);
 		if (result >= 0)
 			result = -EIO;
-
-		return result;
 	}
 
-	return buf[0];
+	return result;
 }
 
 static inline int calc_divisor(int bps)
