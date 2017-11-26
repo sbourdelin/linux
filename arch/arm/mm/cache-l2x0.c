@@ -879,6 +879,10 @@ static int __init __l2c_init(const struct l2c_init_data *data,
 		l2x0_saved_regs.aux_ctrl = aux;
 
 		data->enable(l2x0_base, data->num_lock);
+	} else {
+		pr_info("%s: unlock cache controller\n", data->type);
+
+		data->unlock(l2x0_base, data->num_lock);
 	}
 
 	outer_cache = fns;
