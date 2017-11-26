@@ -248,6 +248,8 @@ struct mlx5_ib_create_qp {
 	__u32	uidx;
 	__u32	reserved0;
 	__u64	sq_buf_addr;
+	__u32	vendor_qp_type;
+	__u32	reserved1;
 };
 
 /* RX Hash function flags */

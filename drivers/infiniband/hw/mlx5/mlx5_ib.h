@@ -209,6 +209,11 @@ struct mlx5_ib_flow_db {
 #define MLX5_IB_UPD_XLT_ACCESS	      BIT(5)
 #define MLX5_IB_UPD_XLT_INDIRECT      BIT(6)
 
+enum {
+	MLX5_VENDOR_QPT_DCT	= 1,
+	MLX5_VENDOR_QPT_DCI,
+};
+
 /* Private QP creation flags to be passed in ib_qp_init_attr.create_flags.
  *
  * These flags are intended for internal use by the mlx5_ib driver, and they
@@ -389,6 +394,7 @@ struct mlx5_ib_qp {
 	struct list_head	cq_send_list;
 	u32			rate_limit;
 	u32                     underlay_qpn;
+	u32			vendor_qp_type;
 };
 
 struct mlx5_ib_cq_buf {

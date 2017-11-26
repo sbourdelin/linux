@@ -1527,6 +1527,11 @@ static int create_qp_common(struct mlx5_ib_dev *dev, struct ib_pd *pd,
 	spin_lock_init(&qp->sq.lock);
 	spin_lock_init(&qp->rq.lock);
 
+	if (init_attr->qp_type == IB_QPT_VENDOR) {
+		if (!udata)
+			return -ENOSYS;
+	}
+
 	if (init_attr->rwq_ind_tbl) {
 		if (!udata)
 			return -ENOSYS;
@@ -1596,6 +1601,7 @@ static int create_qp_common(struct mlx5_ib_dev *dev, struct ib_pd *pd,
 			mlx5_ib_dbg(dev, "copy failed\n");
 			return -EFAULT;
 		}
+		qp->vendor_qp_type = ucmd.vendor_qp_type;
 
 		err = get_qp_user_index(to_mucontext(pd->uobject->context),
 					&ucmd, udata->inlen, &uidx);
@@ -2086,6 +2092,7 @@ struct ib_qp *mlx5_ib_create_qp(struct ib_pd *pd,
 	case IB_QPT_RC:
 	case IB_QPT_UC:
 	case IB_QPT_UD:
+	case IB_QPT_VENDOR:
 	case IB_QPT_SMI:
 	case MLX5_IB_QPT_HW_GSI:
 	case MLX5_IB_QPT_REG_UMR:
@@ -2934,6 +2941,15 @@ out:
 	return err;
 }
 
+int mlx5_ib_modify_qp_is_ok(struct ib_qp *ibqp, struct ib_qp_attr *attr,
+			    int attr_mask, struct ib_udata *udata)
+{
+	struct mlx5_ib_qp *qp = to_mqp(ibqp);
+
+	/* put some real logic here based on value of qp->vendor_qp_type */
+	return 1;
+}
+
 int mlx5_ib_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 		      int attr_mask, struct ib_udata *udata)
 {
@@ -2971,10 +2987,16 @@ int mlx5_ib_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 			goto out;
 		}
 	} else if (qp_type != MLX5_IB_QPT_REG_UMR &&
-	    !ib_modify_qp_is_ok(cur_state, new_state, qp_type, attr_mask, ll)) {
+		   qp_type != IB_QPT_VENDOR &&
+		   !ib_modify_qp_is_ok(cur_state, new_state, qp_type, attr_mask, ll)) {
 		mlx5_ib_dbg(dev, "invalid QP state transition from %d to %d, qp_type %d, attr_mask 0x%x\n",
 			    cur_state, new_state, ibqp->qp_type, attr_mask);
 		goto out;
+	} else if ((qp_type == IB_QPT_VENDOR) &&
+		    !mlx5_ib_modify_qp_is_ok(ibqp, attr, attr_mask, udata)) {
+			mlx5_ib_dbg(dev, "invalid QP state transition from %d to %d, qp_type %d, attr_mask 0x%x\n",
+			    cur_state, new_state, ibqp->qp_type, attr_mask);
+			goto out;
 	}
 
 	if ((attr_mask & IB_QP_PORT) &&
