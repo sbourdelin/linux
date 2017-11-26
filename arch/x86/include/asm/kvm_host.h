@@ -776,6 +776,8 @@ struct kvm_arch {
 	struct mutex apic_map_lock;
 	struct kvm_apic_map *apic_map;
 
+	u32 microcode_version;
+
 	unsigned int tss_addr;
 	bool apic_access_page_done;
 

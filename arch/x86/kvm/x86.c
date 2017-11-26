@@ -2447,7 +2447,7 @@ int kvm_get_msr_common(struct kvm_vcpu *vcpu, struct msr_data *msr_info)
 		msr_info->data = 0;
 		break;
 	case MSR_IA32_UCODE_REV:
-		msr_info->data = 0x100000000ULL;
+		msr_info->data = (u64)vcpu->kvm->arch.microcode_version << 32;
 		break;
 	case MSR_MTRRcap:
 	case 0x200 ... 0x2ff:
@@ -8120,6 +8120,8 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 {
 	if (type)
 		return -EINVAL;
+
+	kvm->arch.microcode_version = 0x1;
 
 	INIT_HLIST_HEAD(&kvm->arch.mask_notifier_list);
 	INIT_LIST_HEAD(&kvm->arch.active_mmu_pages);
