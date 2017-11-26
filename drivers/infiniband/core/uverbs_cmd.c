@@ -1374,6 +1374,7 @@ static int create_qp(struct ib_uverbs_file *file,
 	int				ret;
 	struct ib_rwq_ind_table *ind_tbl = NULL;
 	bool has_sq = true;
+	bool has_rq = true;
 
 	if (cmd->qp_type == IB_QPT_RAW_PACKET && !capable(CAP_NET_RAW))
 		return -EPERM;
@@ -1412,8 +1413,10 @@ static int create_qp(struct ib_uverbs_file *file,
 		goto err_put;
 	}
 
-	if (ind_tbl && !cmd->max_send_wr)
+	if ((ind_tbl || cmd->qp_type == IB_QPT_VENDOR) && !cmd->max_send_wr)
 		has_sq = false;
+	if (cmd->qp_type == IB_QPT_VENDOR && !cmd->max_recv_wr)
+		has_rq = false;
 
 	if (cmd->qp_type == IB_QPT_XRC_TGT) {
 		xrcd_uobj = uobj_get_read(uobj_get_type(xrcd), cmd->pd_handle,
@@ -1445,7 +1448,7 @@ static int create_qp(struct ib_uverbs_file *file,
 			}
 
 			if (!ind_tbl) {
-				if (cmd->recv_cq_handle != cmd->send_cq_handle) {
+				if (cmd->recv_cq_handle != cmd->send_cq_handle && has_rq) {
 					rcq = uobj_get_obj_read(cq, cmd->recv_cq_handle,
 								file->ucontext);
 					if (!rcq) {
@@ -1459,7 +1462,7 @@ static int create_qp(struct ib_uverbs_file *file,
 		if (has_sq)
 			scq = uobj_get_obj_read(cq, cmd->send_cq_handle,
 						file->ucontext);
-		if (!ind_tbl)
+		if (!ind_tbl && has_rq)
 			rcq = rcq ?: scq;
 		pd  = uobj_get_obj_read(pd, cmd->pd_handle, file->ucontext);
 		if (!pd || (!scq && has_sq)) {

@@ -1069,7 +1069,9 @@ enum ib_qp_type {
 	IB_QPT_RAW_PACKET = 8,
 	IB_QPT_XRC_INI = 9,
 	IB_QPT_XRC_TGT,
+	/* IB_QPT_MAX is the higher value for QP types that the InfiniBand spec describes */
 	IB_QPT_MAX,
+	IB_QPT_VENDOR =0xFFF,
 	/* Reserve a range for qp types internal to the low level driver.
 	 * These qp types will not be visible at the IB core layer, so the
 	 * IB_QPT_MAX usages should not be affected in the core layer
