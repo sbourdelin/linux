@@ -93,12 +93,20 @@ enum tpm2_structures {
 	TPM2_ST_SESSIONS	= 0x8002,
 };
 
+/* Indicates from what level of the software stack the error comes from */
+#define TPM2_RC_LEVEL_SHIFT	16
+
+#define TPM2_RESMGRTPM_ERROR_LEVEL (11 << TPM2_RC_LEVEL_SHIFT)
+#define TPM2_RESMGR_ERROR_LEVEL    (12 << TPM2_RC_LEVEL_SHIFT)
+#define TPM2_DRIVER_ERROR_LEVEL    (13 << TPM2_RC_LEVEL_SHIFT)
+
 enum tpm2_return_codes {
 	TPM2_RC_SUCCESS		= 0x0000,
 	TPM2_RC_HASH		= 0x0083, /* RC_FMT1 */
 	TPM2_RC_HANDLE		= 0x008B,
 	TPM2_RC_INITIALIZE	= 0x0100, /* RC_VER1 */
 	TPM2_RC_DISABLED	= 0x0120,
+	TPM2_RC_COMMAND_CODE    = 0x0143,
 	TPM2_RC_TESTING		= 0x090A, /* RC_WARN */
 	TPM2_RC_REFERENCE_H0	= 0x0910,
 };
