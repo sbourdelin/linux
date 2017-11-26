@@ -1192,6 +1192,9 @@ struct kvm_s390_ucas_mapping {
 #define KVM_S390_UCAS_UNMAP      _IOW(KVMIO, 0x51, struct kvm_s390_ucas_mapping)
 #define KVM_S390_VCPU_FAULT	 _IOW(KVMIO, 0x52, unsigned long)
 
+#define KVM_GET_MICROCODE_VERSION _IOR(KVMIO, 0x5e, __u32)
+#define KVM_SET_MICROCODE_VERSION _IOW(KVMIO, 0x5f, __u32)
+
 /* Device model IOC */
 #define KVM_CREATE_IRQCHIP        _IO(KVMIO,   0x60)
 #define KVM_IRQ_LINE              _IOW(KVMIO,  0x61, struct kvm_irq_level)

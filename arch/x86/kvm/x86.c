@@ -4033,6 +4033,29 @@ long kvm_arch_vm_ioctl(struct file *filp,
 	} u;
 
 	switch (ioctl) {
+	case KVM_GET_MICROCODE_VERSION: {
+		r = -EFAULT;
+		if (copy_to_user(argp,
+				 &kvm->arch.microcode_version,
+				 sizeof(kvm->arch.microcode_version)))
+			goto out;
+		break;
+	}
+	case KVM_SET_MICROCODE_VERSION: {
+		u32 microcode_version;
+
+		r = -EFAULT;
+		if (copy_from_user(&microcode_version,
+				   argp,
+				   sizeof(microcode_version)))
+			goto out;
+		r = -EINVAL;
+		if (!microcode_version)
+			goto out;
+		kvm->arch.microcode_version = microcode_version;
+		r = 0;
+		break;
+	}
 	case KVM_SET_TSS_ADDR:
 		r = kvm_vm_ioctl_set_tss_addr(kvm, arg);
 		break;
