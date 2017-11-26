@@ -3982,10 +3982,8 @@ static int dispc_init_features(struct platform_device *pdev)
 	struct dispc_features *dst;
 
 	dst = devm_kzalloc(&pdev->dev, sizeof(*dst), GFP_KERNEL);
-	if (!dst) {
-		dev_err(&pdev->dev, "Failed to allocate DISPC Features\n");
+	if (!dst)
 		return -ENOMEM;
-	}
 
 	switch (omapdss_get_version()) {
 	case OMAPDSS_VER_OMAP24xx:

@@ -893,10 +893,8 @@ static int dss_init_features(struct platform_device *pdev)
 	struct dss_features *dst;
 
 	dst = devm_kzalloc(&pdev->dev, sizeof(*dst), GFP_KERNEL);
-	if (!dst) {
-		dev_err(&pdev->dev, "Failed to allocate local DSS Features\n");
+	if (!dst)
 		return -ENOMEM;
-	}
 
 	switch (omapdss_get_version()) {
 	case OMAPDSS_VER_OMAP24xx:

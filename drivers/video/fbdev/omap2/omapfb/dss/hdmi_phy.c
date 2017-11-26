@@ -195,10 +195,8 @@ static int hdmi_phy_init_features(struct platform_device *pdev)
 	const struct hdmi_phy_features *src;
 
 	dst = devm_kzalloc(&pdev->dev, sizeof(*dst), GFP_KERNEL);
-	if (!dst) {
-		dev_err(&pdev->dev, "Failed to allocate HDMI PHY Features\n");
+	if (!dst)
 		return -ENOMEM;
-	}
 
 	switch (omapdss_get_version()) {
 	case OMAPDSS_VER_OMAP4430_ES1:
