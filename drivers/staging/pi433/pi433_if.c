@@ -927,8 +927,7 @@ static int setup_GPIOs(struct pi433_device *device)
 		{
 			retval = PTR_ERR(device->gpiod[i]);
 			/* release already allocated gpios */
-			for (i--; i>=0; i--)
-			{
+			for (i--; i >= 0; i--) {
 				free_irq(device->irq_num[i], device);
 				gpiod_put(device->gpiod[i]);
 			}
@@ -967,7 +966,7 @@ static void free_GPIOs(struct pi433_device *device)
 {
 	int i;
 
-	for (i=0; i<NUM_DIO; i++)
+	for (i = 0; i < NUM_DIO; i++)
 	{
 		/* check if gpiod is valid */
 		if ( IS_ERR(device->gpiod[i]) )
