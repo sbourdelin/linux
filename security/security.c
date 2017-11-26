@@ -28,12 +28,14 @@
 #include <linux/backing-dev.h>
 #include <linux/string.h>
 #include <net/flow.h>
+#include <linux/percpu_counter.h>
+#include <linux/percpu.h>
+#include "dynamic.h"
 
 #define MAX_LSM_EVM_XATTR	2
 
 /* Maximum number of letters for an LSM name string */
 #define SECURITY_NAME_MAX	10
-
 struct security_hook_heads security_hook_heads __lsm_ro_after_init;
 static ATOMIC_NOTIFIER_HEAD(lsm_notifier_chain);
 
@@ -65,6 +67,8 @@ int __init security_init(void)
 	for (i = 0; i < sizeof(security_hook_heads) / sizeof(struct list_head);
 	     i++)
 		INIT_LIST_HEAD(&list[i]);
+
+	security_init_dynamic_hooks();
 	pr_info("Security Framework initialized\n");
 
 	/*
@@ -196,6 +200,64 @@ EXPORT_SYMBOL(unregister_lsm_notifier);
  *	This is a hook that returns a value.
  */
 
+#ifdef CONFIG_SECURITY_DYNAMIC_HOOKS
+#define call_void_hook(FUNC, ...)				\
+	do {							\
+		struct dynamic_security_hook *dsh;		\
+		struct security_hook_list *P;			\
+		struct dynamic_hook *dh;			\
+		int srcu_idx;					\
+		list_for_each_entry(P,				\
+				    &security_hook_heads.FUNC,	\
+				    list)			\
+			P->hook.FUNC(__VA_ARGS__);		\
+		if (static_branch_unlikely(&dynamic_hooks_keys[DYNAMIC_SECURITY_HOOK_##FUNC])) { \
+			dh = &dynamic_hooks[DYNAMIC_SECURITY_HOOK_##FUNC]; \
+			percpu_counter_inc(&dh->invocation);		\
+			srcu_idx = srcu_read_lock(&dh->srcu);		\
+			list_for_each_entry_rcu(dsh, &dh->head, list) {	\
+				dsh->hook.FUNC(__VA_ARGS__);		\
+				percpu_counter_inc(&dsh->invocation);	\
+			}						\
+			srcu_read_unlock(&dh->srcu, srcu_idx);		\
+		}							\
+	} while (0)
+
+#define call_int_hook(FUNC, IRC, ...) ({				\
+	int RC = IRC;							\
+	do {								\
+		struct dynamic_security_hook *dsh;			\
+		bool continue_iteration = true;				\
+		struct security_hook_list *P;				\
+		struct dynamic_hook *dh;				\
+		int srcu_idx;						\
+		list_for_each_entry(P, &security_hook_heads.FUNC, list) { \
+			RC = P->hook.FUNC(__VA_ARGS__);			\
+			if (RC != 0) {					\
+				continue_iteration = false;		\
+				break;					\
+			}						\
+		}							\
+		if (static_branch_unlikely(&dynamic_hooks_keys[DYNAMIC_SECURITY_HOOK_##FUNC]) && \
+		    continue_iteration) {				\
+			dh = &dynamic_hooks[DYNAMIC_SECURITY_HOOK_##FUNC]; \
+			percpu_counter_inc(&dh->invocation);		\
+			srcu_idx = srcu_read_lock(&dh->srcu);		\
+			list_for_each_entry_rcu(dsh, &dh->head, list) {	\
+				RC = dsh->hook.FUNC(__VA_ARGS__);	\
+				percpu_counter_inc(&dsh->invocation);	\
+				if (RC != 0) {				\
+					percpu_counter_inc(&dsh->deny);	\
+					percpu_counter_inc(&dh->deny);	\
+					break;				\
+				}					\
+			}						\
+			srcu_read_unlock(&dh->srcu, srcu_idx);		\
+		}							\
+	} while (0);							\
+	RC;								\
+})
+#else
 #define call_void_hook(FUNC, ...)				\
 	do {							\
 		struct security_hook_list *P;			\
@@ -217,6 +279,8 @@ EXPORT_SYMBOL(unregister_lsm_notifier);
 	} while (0);						\
 	RC;							\
 })
+#endif
+
 
 /* Security operations */
 
