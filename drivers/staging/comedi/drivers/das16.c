@@ -967,7 +967,7 @@ static const struct comedi_lrange *das16_ai_range(struct comedi_device *dev,
 
 	/* get any user-defined input range */
 	if (pg_type == das16_pg_none && (min || max)) {
-		struct comedi_lrange *lrange;
+		const struct comedi_lrange *lrange;
 		struct comedi_krange *krange;
 
 		/* allocate single-range range table */
@@ -1001,7 +1001,7 @@ static const struct comedi_lrange *das16_ao_range(struct comedi_device *dev,
 
 	/* get any user-defined output range */
 	if (min || max) {
-		struct comedi_lrange *lrange;
+		const struct comedi_lrange *lrange;
 		struct comedi_krange *krange;
 
 		/* allocate single-range range table */
