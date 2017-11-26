@@ -1934,10 +1934,8 @@ static int sm501fb_probe(struct platform_device *pdev)
 	/* allocate our framebuffers */
 
 	info = kzalloc(sizeof(struct sm501fb_info), GFP_KERNEL);
-	if (!info) {
-		dev_err(dev, "failed to allocate state\n");
+	if (!info)
 		return -ENOMEM;
-	}
 
 	info->dev = dev = &pdev->dev;
 	platform_set_drvdata(pdev, info);
@@ -2121,16 +2119,12 @@ static int sm501fb_suspend_fb(struct sm501fb_info *info,
 	/* backup copies in case chip is powered down over suspend */
 
 	par->store_fb = vmalloc(par->screen.size);
-	if (par->store_fb == NULL) {
-		dev_err(info->dev, "no memory to store screen\n");
+	if (!par->store_fb)
 		return -ENOMEM;
-	}
 
 	par->store_cursor = vmalloc(par->cursor.size);
-	if (par->store_cursor == NULL) {
-		dev_err(info->dev, "no memory to store cursor\n");
+	if (!par->store_cursor)
 		goto err_nocursor;
-	}
 
 	dev_dbg(info->dev, "suspending screen to %p\n", par->store_fb);
 	dev_dbg(info->dev, "suspending cursor to %p\n", par->store_cursor);
