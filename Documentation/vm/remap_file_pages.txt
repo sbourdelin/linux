@@ -21,7 +21,3 @@ systems are widely available.
 The syscall is deprecated and replaced it with an emulation now. The
 emulation creates new VMAs instead of nonlinear mappings. It's going to
 work slower for rare users of remap_file_pages() but ABI is preserved.
-
-One side effect of emulation (apart from performance) is that user can hit
-vm.max_map_count limit more easily due to additional VMAs. See comment for
-DEFAULT_MAX_MAP_COUNT for more details on the limit.

@@ -278,13 +278,6 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	bool need_rmap_locks;
 
 	/*
-	 * We'd prefer to avoid failure later on in do_munmap:
-	 * which may split one vma into three before unmapping.
-	 */
-	if (mm->map_count >= sysctl_max_map_count - 3)
-		return -ENOMEM;
-
-	/*
 	 * Advise KSM to break any KSM pages in the area to be moved:
 	 * it would be confusing if they were to turn up at the new
 	 * location, where they happen to coincide with different KSM

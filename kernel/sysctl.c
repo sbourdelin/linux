@@ -110,6 +110,9 @@ extern int pid_max_min, pid_max_max;
 extern int percpu_pagelist_fraction;
 extern int latencytop_enabled;
 extern unsigned int sysctl_nr_open_min, sysctl_nr_open_max;
+#ifdef CONFIG_MMU
+static int sysctl_max_map_count = 65530; /* obsolete, kept for backwards compatibility */
+#endif
 #ifndef CONFIG_MMU
 extern int sysctl_nr_trim_pages;
 #endif

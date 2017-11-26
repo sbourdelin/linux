@@ -35,7 +35,7 @@ Currently, these files are in /proc/sys/vm:
 - laptop_mode
 - legacy_va_layout
 - lowmem_reserve_ratio
-- max_map_count
+- max_map_count (unused, kept for backwards compatibility)
 - memory_failure_early_kill
 - memory_failure_recovery
 - min_free_kbytes
@@ -399,21 +399,6 @@ If you would like to protect more pages, smaller values are effective.
 The minimum value is 1 (1/1 -> 100%).
 
 ==============================================================
-
-max_map_count:
-
-This file contains the maximum number of memory map areas a process
-may have. Memory map areas are used as a side-effect of calling
-malloc, directly by mmap, mprotect, and madvise, and also when loading
-shared libraries.
-
-While most applications need less than a thousand maps, certain
-programs, particularly malloc debuggers, may consume lots of them,
-e.g., up to one or two maps per allocation.
-
-The default value is 65536.
-
-=============================================================
 
 memory_failure_early_kill:
 

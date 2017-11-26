@@ -2227,10 +2227,6 @@ static int elf_core_dump(struct coredump_params *cprm)
 	elf = kmalloc(sizeof(*elf), GFP_KERNEL);
 	if (!elf)
 		goto out;
-	/*
-	 * The number of segs are recored into ELF header as 16bit value.
-	 * Please check DEFAULT_MAX_MAP_COUNT definition when you modify here.
-	 */
 	segs = current->mm->map_count;
 	segs += elf_core_extra_phdrs();
 

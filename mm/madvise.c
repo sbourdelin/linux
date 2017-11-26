@@ -147,11 +147,7 @@ static long madvise_behavior(struct vm_area_struct *vma,
 	*prev = vma;
 
 	if (start != vma->vm_start) {
-		if (unlikely(mm->map_count >= sysctl_max_map_count)) {
-			error = -ENOMEM;
-			goto out;
-		}
-		error = __split_vma(mm, vma, start, 1);
+		error = split_vma(mm, vma, start, 1);
 		if (error) {
 			/*
 			 * madvise() returns EAGAIN if kernel resources, such as
@@ -164,11 +160,7 @@ static long madvise_behavior(struct vm_area_struct *vma,
 	}
 
 	if (end != vma->vm_end) {
-		if (unlikely(mm->map_count >= sysctl_max_map_count)) {
-			error = -ENOMEM;
-			goto out;
-		}
-		error = __split_vma(mm, vma, end, 0);
+		error = split_vma(mm, vma, end, 0);
 		if (error) {
 			/*
 			 * madvise() returns EAGAIN if kernel resources, such as

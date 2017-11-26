@@ -1354,10 +1354,6 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 	if ((pgoff + (len >> PAGE_SHIFT)) < pgoff)
 		return -EOVERFLOW;
 
-	/* Too many mappings? */
-	if (mm->map_count > sysctl_max_map_count)
-		return -ENOMEM;
-
 	/* Obtain the address to map to. we verify (or select) it and ensure
 	 * that it represents a valid section of the address space.
 	 */
@@ -2546,11 +2542,11 @@ detach_vmas_to_be_unmapped(struct mm_struct *mm, struct vm_area_struct *vma,
 }
 
 /*
- * __split_vma() bypasses sysctl_max_map_count checking.  We use this where it
- * has already been checked or doesn't make sense to fail.
+ * Split a vma into two pieces at address 'addr', a new vma is allocated
+ * either for the first part or the tail.
  */
-int __split_vma(struct mm_struct *mm, struct vm_area_struct *vma,
-		unsigned long addr, int new_below)
+int split_vma(struct mm_struct *mm, struct vm_area_struct *vma,
+	      unsigned long addr, int new_below)
 {
 	struct vm_area_struct *new;
 	int err;
@@ -2612,19 +2608,6 @@ int __split_vma(struct mm_struct *mm, struct vm_area_struct *vma,
 	return err;
 }
 
-/*
- * Split a vma into two pieces at address 'addr', a new vma is allocated
- * either for the first part or the tail.
- */
-int split_vma(struct mm_struct *mm, struct vm_area_struct *vma,
-	      unsigned long addr, int new_below)
-{
-	if (mm->map_count >= sysctl_max_map_count)
-		return -ENOMEM;
-
-	return __split_vma(mm, vma, addr, new_below);
-}
-
 /* Munmap is split into 2 main parts -- this part which finds
  * what needs doing, and the areas themselves, which do the
  * work.  This now handles partial unmappings.
@@ -2665,15 +2648,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len,
 	if (start > vma->vm_start) {
 		int error;
 
-		/*
-		 * Make sure that map_count on return from munmap() will
-		 * not exceed its limit; but let map_count go just above
-		 * its limit temporarily, to help free resources as expected.
-		 */
-		if (end < vma->vm_end && mm->map_count >= sysctl_max_map_count)
-			return -ENOMEM;
-
-		error = __split_vma(mm, vma, start, 0);
+		error = split_vma(mm, vma, start, 0);
 		if (error)
 			return error;
 		prev = vma;
@@ -2682,7 +2657,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len,
 	/* Does it split the last one? */
 	last = find_vma(mm, end);
 	if (last && end > last->vm_start) {
-		int error = __split_vma(mm, last, end, 1);
+		int error = split_vma(mm, last, end, 1);
 		if (error)
 			return error;
 	}
@@ -2694,7 +2669,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len,
 		 * will remain splitted, but userland will get a
 		 * highly unexpected error anyway. This is no
 		 * different than the case where the first of the two
-		 * __split_vma fails, but we don't undo the first
+		 * split_vma fails, but we don't undo the first
 		 * split, despite we could. This is unlikely enough
 		 * failure that it's not worth optimizing it for.
 		 */
@@ -2913,9 +2888,6 @@ static int do_brk_flags(unsigned long addr, unsigned long request, unsigned long
 
 	/* Check against address space limits *after* clearing old maps... */
 	if (!may_expand_vm(mm, flags, len >> PAGE_SHIFT))
-		return -ENOMEM;
-
-	if (mm->map_count > sysctl_max_map_count)
 		return -ENOMEM;
 
 	if (security_vm_enough_memory_mm(mm, len >> PAGE_SHIFT))
