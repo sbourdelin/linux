@@ -357,9 +357,12 @@ int of_reserved_mem_device_init_by_idx(struct device *dev,
 		/* ensure that dma_ops is set for virtual devices
 		 * using reserved memory
 		 */
-		of_dma_configure(dev, np);
-
-		dev_info(dev, "assigned reserved memory node %s\n", rmem->name);
+		ret = of_dma_configure(dev, np);
+		if (ret)
+			of_reserved_mem_device_release(dev);
+		else
+			dev_info(dev, "assigned reserved memory node %s\n",
+				 rmem->name);
 	} else {
 		kfree(rd);
 	}
