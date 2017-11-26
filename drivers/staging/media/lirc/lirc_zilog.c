@@ -888,9 +888,9 @@ static ssize_t read(struct file *filep, char __user *outbuf, size_t n,
 	unsigned int m;
 	DECLARE_WAITQUEUE(wait, current);
 
-	dev_dbg(ir->dev, "read called\n");
+	dev_dbg(ir->dev, "%s called\n", __func__);
 	if (n % rbuf->chunk_size) {
-		dev_dbg(ir->dev, "read result = -EINVAL\n");
+		dev_dbg(ir->dev, "%s result = -EINVAL\n", __func__);
 		return -EINVAL;
 	}
 
@@ -949,7 +949,7 @@ static ssize_t read(struct file *filep, char __user *outbuf, size_t n,
 				retries++;
 			}
 			if (retries >= 5) {
-				dev_err(ir->dev, "Buffer read failed!\n");
+				dev_err(ir->dev, "%s failed!\n", __func__);
 				ret = -EIO;
 			}
 		}
@@ -959,7 +959,7 @@ static ssize_t read(struct file *filep, char __user *outbuf, size_t n,
 	put_ir_rx(rx, false);
 	set_current_state(TASK_RUNNING);
 
-	dev_dbg(ir->dev, "read result = %d (%s)\n", ret,
+	dev_dbg(ir->dev, "%s result = %d (%s)\n", __func__, ret,
 		ret ? "Error" : "OK");
 
 	return ret ? ret : written;
