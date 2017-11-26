@@ -511,17 +511,89 @@ static struct rtnl_link_ops veth_link_ops = {
 	.get_link_net	= veth_get_link_net,
 };
 
+/* When veth device is added to a bridge or other master device
+ * then reflect the GSO max values from the upper device
+ * to the other end of veth pair.
+ */
+static void veth_change_upper(struct net_device *dev,
+		      const struct netdev_notifier_changeupper_info *info)
+{
+	struct net_device *upper = info->upper_dev;
+	struct net_device *peer;
+	struct veth_priv *priv;
+
+	if (dev->netdev_ops != &veth_netdev_ops)
+		return;
+
+	priv = netdev_priv(dev);
+	peer = rtnl_dereference(priv->peer);
+	if (!peer)
+		return;
+
+	if (upper) {
+		peer->gso_max_segs = upper->gso_max_segs;
+		peer->gso_max_size = upper->gso_max_size;
+	} else {
+		peer->gso_max_segs = GSO_MAX_SEGS;
+		peer->gso_max_size = GSO_MAX_SIZE;
+	}
+}
+
+static void veth_change_upper_gso(struct net_device *upper)
+{
+	struct net_device *peer, *dev;
+	struct veth_priv *priv;
+
+	for_each_netdev(dev_net(upper), dev) {
+		if (dev->netdev_ops != &veth_netdev_ops)
+			continue;
+		if (!netdev_has_upper_dev(dev, upper))
+			continue;
+
+		priv = netdev_priv(dev);
+		peer = rtnl_dereference(priv->peer);
+		if (!peer)
+			continue;
+		peer->gso_max_segs = upper->gso_max_segs;
+		peer->gso_max_size = upper->gso_max_size;
+	}
+}
+
+static int veth_netdev_event(struct notifier_block *this,
+			     unsigned long event, void *ptr)
+{
+	struct net_device *event_dev = netdev_notifier_info_to_dev(ptr);
+
+	/* Propagate the upper (bridge) device settings to peer */
+	switch (event) {
+	case NETDEV_CHANGEUPPER:
+		veth_change_upper(event_dev, ptr);
+		break;
+	case NETDEV_CHANGE_GSO_MAX:
+		veth_change_upper_gso(event_dev);
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block veth_netdev_notifier = {
+	.notifier_call = veth_netdev_event,
+};
+
 /*
  * init/fini
  */
 
 static __init int veth_init(void)
 {
+	register_netdevice_notifier(&veth_netdev_notifier);
 	return rtnl_link_register(&veth_link_ops);
 }
 
 static __exit void veth_exit(void)
 {
+	unregister_netdevice_notifier(&veth_netdev_notifier);
 	rtnl_link_unregister(&veth_link_ops);
 }
 
