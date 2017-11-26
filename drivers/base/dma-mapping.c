@@ -12,6 +12,7 @@
 #include <linux/export.h>
 #include <linux/gfp.h>
 #include <linux/of_device.h>
+#include <linux/of_reserved_mem.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 
@@ -351,7 +352,9 @@ int dma_configure(struct device *dev)
 	}
 
 	if (dma_dev->of_node) {
-		ret = of_dma_configure(dev, dma_dev->of_node);
+		ret = of_reserved_mem_device_init(dev);
+		if (ret)
+			ret = of_dma_configure(dev, dma_dev->of_node);
 	} else if (has_acpi_companion(dma_dev)) {
 		attr = acpi_get_dma_attr(to_acpi_device_node(dma_dev->fwnode));
 		if (attr != DEV_DMA_NOT_SUPPORTED)
@@ -367,5 +370,6 @@ int dma_configure(struct device *dev)
 void dma_deconfigure(struct device *dev)
 {
 	of_dma_deconfigure(dev);
+	of_reserved_mem_device_release(dev);
 	acpi_dma_deconfigure(dev);
 }
