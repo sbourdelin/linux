@@ -77,7 +77,7 @@ void mlx5e_fill_hwstamp(struct mlx5e_tstamp *tstamp, u64 timestamp,
 static u64 mlx5e_read_internal_timer(const struct cyclecounter *cc)
 {
 	struct mlx5e_tstamp *tstamp = container_of(cc, struct mlx5e_tstamp,
-						   cycles);
+						   clock.cc);
 
 	return mlx5_read_internal_timer(tstamp->mdev) & cc->mask;
 }
@@ -207,7 +207,7 @@ static int mlx5e_ptp_settime(struct ptp_clock_info *ptp,
 	unsigned long flags;
 
 	write_lock_irqsave(&tstamp->lock, flags);
-	timecounter_init(&tstamp->clock, &tstamp->cycles, ns);
+	timecounter_init(&tstamp->clock, ns);
 	write_unlock_irqrestore(&tstamp->lock, flags);
 
 	return 0;
@@ -263,8 +263,8 @@ static int mlx5e_ptp_adjfreq(struct ptp_clock_info *ptp, s32 delta)
 
 	write_lock_irqsave(&tstamp->lock, flags);
 	timecounter_read(&tstamp->clock);
-	tstamp->cycles.mult = neg_adj ? tstamp->nominal_c_mult - diff :
-					tstamp->nominal_c_mult + diff;
+	tstamp->clock.cc.mult = neg_adj ? tstamp->nominal_c_mult - diff :
+					  tstamp->nominal_c_mult + diff;
 	write_unlock_irqrestore(&tstamp->lock, flags);
 
 	return 0;
@@ -367,8 +367,8 @@ static int mlx5e_perout_configure(struct ptp_clock_info *ptp,
 		write_lock_irqsave(&tstamp->lock, flags);
 		nsec_now = timecounter_cyc2time(&tstamp->clock, cycles_now);
 		nsec_delta = ns - nsec_now;
-		cycles_delta = div64_u64(nsec_delta << tstamp->cycles.shift,
-					 tstamp->cycles.mult);
+		cycles_delta = div64_u64(nsec_delta << tstamp->clock.cc.shift,
+					 tstamp->clock.cc.mult);
 		write_unlock_irqrestore(&tstamp->lock, flags);
 		time_stamp = cycles_now + cycles_delta;
 		field_select = MLX5E_MTPPS_FS_PIN_MODE |
@@ -531,8 +531,8 @@ void mlx5e_pps_event_handler(struct mlx5e_priv *priv,
 		write_lock_irqsave(&tstamp->lock, flags);
 		nsec_now = timecounter_cyc2time(&tstamp->clock, cycles_now);
 		nsec_delta = ns - nsec_now;
-		cycles_delta = div64_u64(nsec_delta << tstamp->cycles.shift,
-					 tstamp->cycles.mult);
+		cycles_delta = div64_u64(nsec_delta << tstamp->clock.cc.shift,
+					 tstamp->clock.cc.mult);
 		tstamp->pps_info.start[pin] = cycles_now + cycles_delta;
 		queue_work(priv->wq, &tstamp->pps_info.out_work);
 		write_unlock_irqrestore(&tstamp->lock, flags);
@@ -556,21 +556,20 @@ void mlx5e_timestamp_init(struct mlx5e_priv *priv)
 		return;
 	}
 	rwlock_init(&tstamp->lock);
-	tstamp->cycles.read = mlx5e_read_internal_timer;
-	tstamp->cycles.shift = MLX5E_CYCLES_SHIFT;
-	tstamp->cycles.mult = clocksource_khz2mult(dev_freq,
-						   tstamp->cycles.shift);
-	tstamp->nominal_c_mult = tstamp->cycles.mult;
-	tstamp->cycles.mask = CLOCKSOURCE_MASK(41);
+	tstamp->clock.cc.read = mlx5e_read_internal_timer;
+	tstamp->clock.cc.shift = MLX5E_CYCLES_SHIFT;
+	tstamp->clock.cc.mult = clocksource_khz2mult(dev_freq,
+						     tstamp->clock.cc.shift);
+	tstamp->nominal_c_mult = tstamp->clock.cc.mult;
+	tstamp->clock.cc.mask = CLOCKSOURCE_MASK(41);
 	tstamp->mdev = priv->mdev;
 
-	timecounter_init(&tstamp->clock, &tstamp->cycles,
-			 ktime_to_ns(ktime_get_real()));
+	timecounter_init(&tstamp->clock, ktime_to_ns(ktime_get_real()));
 
 	/* Calculate period in seconds to call the overflow watchdog - to make
 	 * sure counter is checked at least once every wrap around.
 	 */
-	ns = cyclecounter_cyc2ns(&tstamp->cycles, tstamp->cycles.mask,
+	ns = cyclecounter_cyc2ns(&tstamp->clock.cc, tstamp->clock.cc.mask,
 				 frac, &frac);
 	do_div(ns, NSEC_PER_SEC / 2 / HZ);
 	tstamp->overflow_period = ns;

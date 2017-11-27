@@ -222,7 +222,7 @@ static int e1000e_phc_settime(struct ptp_clock_info *ptp,
 
 	/* reset the timecounter */
 	spin_lock_irqsave(&adapter->systim_lock, flags);
-	timecounter_init(&adapter->tc, &adapter->cc, ns);
+	timecounter_init(&adapter->tc, ns);
 	spin_unlock_irqrestore(&adapter->systim_lock, flags);
 
 	return 0;

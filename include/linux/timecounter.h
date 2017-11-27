@@ -62,7 +62,7 @@ struct cyclecounter {
  * @frac:		accumulated fractional nanoseconds
  */
 struct timecounter {
-	const struct cyclecounter *cc;
+	struct cyclecounter cc;
 	u64 cycle_last;
 	u64 nsec;
 	u64 mask;
@@ -98,7 +98,6 @@ static inline void timecounter_adjtime(struct timecounter *tc, s64 delta)
 /**
  * timecounter_init - initialize a time counter
  * @tc:			Pointer to time counter which is to be initialized/reset
- * @cc:			A cycle counter, ready to be used.
  * @start_tstamp:	Arbitrary initial time stamp.
  *
  * After this call the current cycle register (roughly) corresponds to
@@ -106,7 +105,6 @@ static inline void timecounter_adjtime(struct timecounter *tc, s64 delta)
  * the time stamp counter by the number of elapsed nanoseconds.
  */
 extern void timecounter_init(struct timecounter *tc,
-			     const struct cyclecounter *cc,
 			     u64 start_tstamp);
 
 /**

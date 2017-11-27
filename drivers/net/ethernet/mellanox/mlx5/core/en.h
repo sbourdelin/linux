@@ -277,7 +277,6 @@ struct mlx5e_pps {
 
 struct mlx5e_tstamp {
 	rwlock_t                   lock;
-	struct cyclecounter        cycles;
 	struct timecounter         clock;
 	struct hwtstamp_config     hwtstamp_config;
 	u32                        nominal_c_mult;

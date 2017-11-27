@@ -126,7 +126,7 @@ static u64 xgbe_cc_read(const struct cyclecounter *cc)
 {
 	struct xgbe_prv_data *pdata = container_of(cc,
 						   struct xgbe_prv_data,
-						   tstamp_cc);
+						   tstamp_tc.cc);
 	u64 nsec;
 
 	nsec = pdata->hw_if.get_tstamp_time(pdata);
@@ -211,7 +211,7 @@ static int xgbe_settime(struct ptp_clock_info *info,
 
 	spin_lock_irqsave(&pdata->tstamp_lock, flags);
 
-	timecounter_init(&pdata->tstamp_tc, &pdata->tstamp_cc, nsec);
+	timecounter_init(&pdata->tstamp_tc, nsec);
 
 	spin_unlock_irqrestore(&pdata->tstamp_lock, flags);
 
@@ -228,7 +228,7 @@ void xgbe_ptp_register(struct xgbe_prv_data *pdata)
 {
 	struct ptp_clock_info *info = &pdata->ptp_clock_info;
 	struct ptp_clock *clock;
-	struct cyclecounter *cc = &pdata->tstamp_cc;
+	struct cyclecounter *cc = &pdata->tstamp_tc.cc;
 	u64 dividend;
 
 	snprintf(info->name, sizeof(info->name), "%s",
@@ -263,8 +263,7 @@ void xgbe_ptp_register(struct xgbe_prv_data *pdata)
 	cc->mult = 1;
 	cc->shift = 0;
 
-	timecounter_init(&pdata->tstamp_tc, &pdata->tstamp_cc,
-			 ktime_to_ns(ktime_get_real()));
+	timecounter_init(&pdata->tstamp_tc, ktime_to_ns(ktime_get_real()));
 
 	/* Disable all timestamping to start */
 	XGMAC_IOWRITE(pdata, MAC_TSCR, 0);

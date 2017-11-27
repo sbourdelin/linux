@@ -199,27 +199,25 @@ static u64 xilinx_read(struct clocksource *cs)
 	return (u64)xilinx_clock_read();
 }
 
-static struct timecounter xilinx_tc = {
-	.cc = NULL,
-};
-
 static u64 xilinx_cc_read(const struct cyclecounter *cc)
 {
 	return xilinx_read(NULL);
 }
 
-static struct cyclecounter xilinx_cc = {
-	.read = xilinx_cc_read,
-	.mask = CLOCKSOURCE_MASK(32),
-	.shift = 8,
+static struct timecounter xilinx_tc = {
+	.cc.read = xilinx_cc_read,
+	.cc.mask = CLOCKSOURCE_MASK(32),
+	.cc.mult = 0,
+	.cc.shift = 8,
 };
 
 static int __init init_xilinx_timecounter(void)
 {
-	xilinx_cc.mult = div_sc(timer_clock_freq, NSEC_PER_SEC,
-				xilinx_cc.shift);
+	struct cyclecounter *cc = &xilinx_tc.cc;
 
-	timecounter_init(&xilinx_tc, &xilinx_cc, sched_clock());
+	cc->mult = div_sc(timer_clock_freq, NSEC_PER_SEC, cc->shift);
+
+	timecounter_init(&xilinx_tc, sched_clock());
 
 	return 0;
 }

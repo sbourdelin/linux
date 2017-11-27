@@ -549,7 +549,6 @@ struct fec_enet_private {
 	struct ptp_clock_info ptp_caps;
 	unsigned long last_overflow_check;
 	spinlock_t tmreg_lock;
-	struct cyclecounter cc;
 	struct timecounter tc;
 	int rx_hwtstamp_filter;
 	u32 base_incval;

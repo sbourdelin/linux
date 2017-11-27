@@ -18,11 +18,10 @@
 #include <linux/export.h>
 #include <linux/timecounter.h>
 
-void timecounter_init(struct timecounter *tc,
-		      const struct cyclecounter *cc,
-		      u64 start_tstamp)
+void timecounter_init(struct timecounter *tc, u64 start_tstamp)
 {
-	tc->cc = cc;
+	struct cyclecounter *cc = &tc->cc;
+
 	tc->cycle_last = cc->read(cc);
 	tc->nsec = start_tstamp;
 	tc->mask = (1ULL << cc->shift) - 1;
@@ -43,17 +42,18 @@ EXPORT_SYMBOL_GPL(timecounter_init);
  */
 static u64 timecounter_read_delta(struct timecounter *tc)
 {
+	struct cyclecounter *cc = &tc->cc;
 	u64 cycle_now, cycle_delta;
 	u64 ns_offset;
 
 	/* read cycle counter: */
-	cycle_now = tc->cc->read(tc->cc);
+	cycle_now = cc->read(cc);
 
 	/* calculate the delta since the last timecounter_read_delta(): */
-	cycle_delta = (cycle_now - tc->cycle_last) & tc->cc->mask;
+	cycle_delta = (cycle_now - tc->cycle_last) & cc->mask;
 
 	/* convert to nanoseconds: */
-	ns_offset = cyclecounter_cyc2ns(tc->cc, cycle_delta,
+	ns_offset = cyclecounter_cyc2ns(cc, cycle_delta,
 					tc->mask, &tc->frac);
 
 	/* update time stamp of timecounter_read_delta() call: */
@@ -89,10 +89,10 @@ static u64 cc_cyc2ns_backwards(const struct cyclecounter *cc,
 	return ns;
 }
 
-u64 timecounter_cyc2time(struct timecounter *tc,
-			 u64 cycle_tstamp)
+u64 timecounter_cyc2time(struct timecounter *tc, u64 cycle_tstamp)
 {
-	u64 delta = (cycle_tstamp - tc->cycle_last) & tc->cc->mask;
+	struct cyclecounter *cc = &tc->cc;
+	u64 delta = (cycle_tstamp - tc->cycle_last) & cc->mask;
 	u64 nsec = tc->nsec, frac = tc->frac;
 
 	/*
@@ -100,11 +100,11 @@ u64 timecounter_cyc2time(struct timecounter *tc,
 	 * than tc->cycle_last, detect when it is too far in the
 	 * future and treat it as old time stamp instead.
 	 */
-	if (delta > tc->cc->mask / 2) {
-		delta = (tc->cycle_last - cycle_tstamp) & tc->cc->mask;
-		nsec -= cc_cyc2ns_backwards(tc->cc, delta, tc->mask, frac);
+	if (delta > cc->mask / 2) {
+		delta = (tc->cycle_last - cycle_tstamp) & cc->mask;
+		nsec -= cc_cyc2ns_backwards(cc, delta, tc->mask, frac);
 	} else {
-		nsec += cyclecounter_cyc2ns(tc->cc, delta, tc->mask, &frac);
+		nsec += cyclecounter_cyc2ns(cc, delta, tc->mask, &frac);
 	}
 
 	return nsec;

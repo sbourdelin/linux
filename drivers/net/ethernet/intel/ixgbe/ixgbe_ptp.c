@@ -179,7 +179,7 @@
 static void ixgbe_ptp_setup_sdp_x540(struct ixgbe_adapter *adapter)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
-	int shift = adapter->hw_cc.shift;
+	int shift = adapter->hw_tc.cc.shift;
 	u32 esdp, tsauxc, clktiml, clktimh, trgttiml, trgttimh, rem;
 	u64 ns = 0, clock_edge = 0;
 
@@ -237,7 +237,7 @@ static void ixgbe_ptp_setup_sdp_x540(struct ixgbe_adapter *adapter)
 
 /**
  * ixgbe_ptp_read_X550 - read cycle counter value
- * @hw_cc: cyclecounter structure
+ * @cc: cyclecounter structure
  *
  * This function reads SYSTIME registers. It is called by the cyclecounter
  * structure to convert from internal representation into nanoseconds. We need
@@ -245,10 +245,10 @@ static void ixgbe_ptp_setup_sdp_x540(struct ixgbe_adapter *adapter)
  * result of SYSTIME is 32bits of "billions of cycles" and 32 bits of
  * "cycles", rather than seconds and nanoseconds.
  */
-static u64 ixgbe_ptp_read_X550(const struct cyclecounter *hw_cc)
+static u64 ixgbe_ptp_read_X550(const struct cyclecounter *cc)
 {
 	struct ixgbe_adapter *adapter =
-			container_of(hw_cc, struct ixgbe_adapter, hw_cc);
+			container_of(cc, struct ixgbe_adapter, hw_tc.cc);
 	struct ixgbe_hw *hw = &adapter->hw;
 	struct timespec64 ts;
 
@@ -285,7 +285,7 @@ static u64 ixgbe_ptp_read_X550(const struct cyclecounter *hw_cc)
 static u64 ixgbe_ptp_read_82599(const struct cyclecounter *cc)
 {
 	struct ixgbe_adapter *adapter =
-		container_of(cc, struct ixgbe_adapter, hw_cc);
+		container_of(cc, struct ixgbe_adapter, hw_tc.cc);
 	struct ixgbe_hw *hw = &adapter->hw;
 	u64 stamp = 0;
 
@@ -508,7 +508,7 @@ static int ixgbe_ptp_settime(struct ptp_clock_info *ptp,
 
 	/* reset the timecounter */
 	spin_lock_irqsave(&adapter->tmreg_lock, flags);
-	timecounter_init(&adapter->hw_tc, &adapter->hw_cc, ns);
+	timecounter_init(&adapter->hw_tc, ns);
 	spin_unlock_irqrestore(&adapter->tmreg_lock, flags);
 
 	if (adapter->ptp_setup_sdp)
@@ -1164,7 +1164,7 @@ void ixgbe_ptp_start_cyclecounter(struct ixgbe_adapter *adapter)
 
 	/* need lock to prevent incorrect read while modifying cyclecounter */
 	spin_lock_irqsave(&adapter->tmreg_lock, flags);
-	memcpy(&adapter->hw_cc, &cc, sizeof(adapter->hw_cc));
+	memcpy(&adapter->hw_tc.cc, &cc, sizeof(adapter->hw_tc.cc));
 	spin_unlock_irqrestore(&adapter->tmreg_lock, flags);
 }
 
@@ -1195,8 +1195,7 @@ void ixgbe_ptp_reset(struct ixgbe_adapter *adapter)
 	ixgbe_ptp_start_cyclecounter(adapter);
 
 	spin_lock_irqsave(&adapter->tmreg_lock, flags);
-	timecounter_init(&adapter->hw_tc, &adapter->hw_cc,
-			 ktime_to_ns(ktime_get_real()));
+	timecounter_init(&adapter->hw_tc, ktime_to_ns(ktime_get_real()));
 	spin_unlock_irqrestore(&adapter->tmreg_lock, flags);
 
 	adapter->last_overflow_check = jiffies;

@@ -79,7 +79,7 @@ static void igb_ptp_tx_hwtstamp(struct igb_adapter *adapter);
 /* SYSTIM read access for the 82576 */
 static u64 igb_ptp_read_82576(const struct cyclecounter *cc)
 {
-	struct igb_adapter *igb = container_of(cc, struct igb_adapter, cc);
+	struct igb_adapter *igb = container_of(cc, struct igb_adapter, tc.cc);
 	struct e1000_hw *hw = &igb->hw;
 	u64 val;
 	u32 lo, hi;
@@ -96,7 +96,7 @@ static u64 igb_ptp_read_82576(const struct cyclecounter *cc)
 /* SYSTIM read access for the 82580 */
 static u64 igb_ptp_read_82580(const struct cyclecounter *cc)
 {
-	struct igb_adapter *igb = container_of(cc, struct igb_adapter, cc);
+	struct igb_adapter *igb = container_of(cc, struct igb_adapter, tc.cc);
 	struct e1000_hw *hw = &igb->hw;
 	u32 lo, hi;
 	u64 val;
@@ -330,7 +330,7 @@ static int igb_ptp_settime_82576(struct ptp_clock_info *ptp,
 
 	spin_lock_irqsave(&igb->tmreg_lock, flags);
 
-	timecounter_init(&igb->tc, &igb->cc, ns);
+	timecounter_init(&igb->tc, ns);
 
 	spin_unlock_irqrestore(&igb->tmreg_lock, flags);
 
@@ -1126,10 +1126,10 @@ void igb_ptp_init(struct igb_adapter *adapter)
 		adapter->ptp_caps.gettime64 = igb_ptp_gettime_82576;
 		adapter->ptp_caps.settime64 = igb_ptp_settime_82576;
 		adapter->ptp_caps.enable = igb_ptp_feature_enable;
-		adapter->cc.read = igb_ptp_read_82576;
-		adapter->cc.mask = CYCLECOUNTER_MASK(64);
-		adapter->cc.mult = 1;
-		adapter->cc.shift = IGB_82576_TSYNC_SHIFT;
+		adapter->tc.cc.read = igb_ptp_read_82576;
+		adapter->tc.cc.mask = CYCLECOUNTER_MASK(64);
+		adapter->tc.cc.mult = 1;
+		adapter->tc.cc.shift = IGB_82576_TSYNC_SHIFT;
 		adapter->ptp_flags |= IGB_PTP_OVERFLOW_CHECK;
 		break;
 	case e1000_82580:
@@ -1145,10 +1145,10 @@ void igb_ptp_init(struct igb_adapter *adapter)
 		adapter->ptp_caps.gettime64 = igb_ptp_gettime_82576;
 		adapter->ptp_caps.settime64 = igb_ptp_settime_82576;
 		adapter->ptp_caps.enable = igb_ptp_feature_enable;
-		adapter->cc.read = igb_ptp_read_82580;
-		adapter->cc.mask = CYCLECOUNTER_MASK(IGB_NBITS_82580);
-		adapter->cc.mult = 1;
-		adapter->cc.shift = 0;
+		adapter->tc.cc.read = igb_ptp_read_82580;
+		adapter->tc.cc.mask = CYCLECOUNTER_MASK(IGB_NBITS_82580);
+		adapter->tc.cc.mult = 1;
+		adapter->tc.cc.shift = 0;
 		adapter->ptp_flags |= IGB_PTP_OVERFLOW_CHECK;
 		break;
 	case e1000_i210:
@@ -1289,8 +1289,7 @@ void igb_ptp_reset(struct igb_adapter *adapter)
 
 		igb_ptp_write_i210(adapter, &ts);
 	} else {
-		timecounter_init(&adapter->tc, &adapter->cc,
-				 ktime_to_ns(ktime_get_real()));
+		timecounter_init(&adapter->tc, ktime_to_ns(ktime_get_real()));
 	}
 out:
 	spin_unlock_irqrestore(&adapter->tmreg_lock, flags);
