@@ -171,17 +171,19 @@ found:
 
 bool need_SSR(struct f2fs_sb_info *sbi)
 {
-	int node_secs = get_blocktype_secs(sbi, F2FS_DIRTY_NODES);
-	int dent_secs = get_blocktype_secs(sbi, F2FS_DIRTY_DENTS);
-	int imeta_secs = get_blocktype_secs(sbi, F2FS_DIRTY_IMETA);
+	s64 node_pages = get_pages(sbi, F2FS_DIRTY_NODES);
+	s64 dent_pages = get_pages(sbi, F2FS_DIRTY_DENTS);
+	s64 imeta_pages = get_pages(sbi, F2FS_DIRTY_IMETA);
 
 	if (test_opt(sbi, LFS))
 		return false;
 	if (sbi->gc_thread && sbi->gc_thread->gc_urgent)
 		return true;
 
-	return free_sections(sbi) <= (node_secs + 2 * dent_secs + imeta_secs +
-			SM_I(sbi)->min_ssr_sections + reserved_sections(sbi));
+	return free_sections(sbi) <=
+		(PAGE2SEC(sbi, node_pages + imeta_pages) +
+		PAGE2SEC(sbi, 2 * dent_pages) +
+		SM_I(sbi)->min_ssr_sections + reserved_sections(sbi));
 }
 
 void register_inmem_page(struct inode *inode, struct page *page)

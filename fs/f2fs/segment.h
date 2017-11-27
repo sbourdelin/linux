@@ -115,6 +115,10 @@
 #define SECTOR_TO_BLOCK(sectors)					\
 	((sectors) >> F2FS_LOG_SECTORS_PER_BLOCK)
 
+#define PAGE2SEC(sbi, pages)				\
+	((((pages) + BLKS_PER_SEC(sbi) - 1)		\
+	>> sbi->log_blocks_per_seg) / sbi->segs_per_sec)
+
 /*
  * indicate a block allocation direction: RIGHT and LEFT.
  * RIGHT means allocating new sections towards the end of volume.
@@ -527,9 +531,9 @@ static inline bool has_curseg_enough_space(struct f2fs_sb_info *sbi)
 static inline bool has_not_enough_free_secs(struct f2fs_sb_info *sbi,
 					int freed, int needed)
 {
-	int node_secs = get_blocktype_secs(sbi, F2FS_DIRTY_NODES);
-	int dent_secs = get_blocktype_secs(sbi, F2FS_DIRTY_DENTS);
-	int imeta_secs = get_blocktype_secs(sbi, F2FS_DIRTY_IMETA);
+	s64 node_pages = get_pages(sbi, F2FS_DIRTY_NODES);
+	s64 dent_pages = get_pages(sbi, F2FS_DIRTY_DENTS);
+	s64 imeta_pages = get_pages(sbi, F2FS_DIRTY_IMETA);
 
 	if (unlikely(is_sbi_flag_set(sbi, SBI_POR_DOING)))
 		return false;
@@ -538,7 +542,8 @@ static inline bool has_not_enough_free_secs(struct f2fs_sb_info *sbi,
 			has_curseg_enough_space(sbi))
 		return false;
 	return (free_sections(sbi) + freed) <=
-		(node_secs + 2 * dent_secs + imeta_secs +
+		(PAGE2SEC(sbi, node_pages + imeta_pages) +
+		PAGE2SEC(sbi, 2 * dent_pages) +
 		reserved_sections(sbi) + needed);
 }
 
