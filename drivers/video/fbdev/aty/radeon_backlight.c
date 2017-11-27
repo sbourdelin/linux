@@ -143,7 +143,7 @@ void radeonfb_bl_init(struct radeonfb_info *rinfo)
 		return;
 #endif
 
-	pdata = kmalloc(sizeof(struct radeon_bl_privdata), GFP_KERNEL);
+	pdata = kmalloc(sizeof(*pdata), GFP_KERNEL);
 	if (!pdata)
 		goto error;
 
