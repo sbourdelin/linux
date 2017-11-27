@@ -389,10 +389,8 @@ static int bfin_adv7393_fb_probe(struct i2c_client *client,
 	}
 
 	fbdev = kzalloc(sizeof(*fbdev), GFP_KERNEL);
-	if (!fbdev) {
-		dev_err(&client->dev, "failed to allocate device private record");
+	if (!fbdev)
 		return -ENOMEM;
-	}
 
 	i2c_set_clientdata(client, fbdev);
 
@@ -461,7 +459,6 @@ static int bfin_adv7393_fb_probe(struct i2c_client *client,
 
 	fbdev->info.pseudo_palette = kzalloc(sizeof(u32) * 16, GFP_KERNEL);
 	if (!fbdev->info.pseudo_palette) {
-		dev_err(&client->dev, "failed to allocate pseudo_palette\n");
 		ret = -ENOMEM;
 		goto free_fb_mem;
 	}
