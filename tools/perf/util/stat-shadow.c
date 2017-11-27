@@ -164,7 +164,7 @@ void perf_stat__reset_shadow_stats(void)
 	memset(runtime_smi_num_stats, 0, sizeof(runtime_smi_num_stats));
 	memset(runtime_aperf_stats, 0, sizeof(runtime_aperf_stats));
 
-	next = rb_first(&runtime_saved_values.entries);
+	next = rb_first_cached(&runtime_saved_values.entries);
 	while (next) {
 		pos = next;
 		next = rb_next(pos);
