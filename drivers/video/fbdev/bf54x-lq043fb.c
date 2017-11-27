@@ -605,9 +605,6 @@ static int bfin_bf54x_probe(struct platform_device *pdev)
 	fbinfo->pseudo_palette = devm_kzalloc(&pdev->dev, sizeof(u32) * 16,
 					      GFP_KERNEL);
 	if (!fbinfo->pseudo_palette) {
-		printk(KERN_ERR DRIVER_NAME
-		       "Fail to allocate pseudo_palette\n");
-
 		ret = -ENOMEM;
 		goto out4;
 	}
