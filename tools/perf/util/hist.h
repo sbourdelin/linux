@@ -68,10 +68,10 @@ struct thread;
 struct dso;
 
 struct hists {
-	struct rb_root		entries_in_array[2];
-	struct rb_root		*entries_in;
-	struct rb_root		entries;
-	struct rb_root		entries_collapsed;
+	struct rb_root_cached	entries_in_array[2];
+	struct rb_root_cached	*entries_in;
+	struct rb_root_cached	entries;
+	struct rb_root_cached	entries_collapsed;
 	u64			nr_entries;
 	u64			nr_non_filtered_entries;
 	u64			callchain_period;
@@ -223,7 +223,7 @@ static inline struct hists *evsel__hists(struct perf_evsel *evsel)
 int hists__init(void);
 int __hists__init(struct hists *hists, struct perf_hpp_list *hpp_list);
 
-struct rb_root *hists__get_rotate_entries_in(struct hists *hists);
+struct rb_root_cached *hists__get_rotate_entries_in(struct hists *hists);
 
 struct perf_hpp {
 	char *buf;
