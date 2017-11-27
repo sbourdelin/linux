@@ -1150,6 +1150,7 @@ enc_to_dig_port(struct drm_encoder *encoder)
 	switch (intel_encoder->type) {
 	case INTEL_OUTPUT_UNKNOWN:
 		WARN_ON(!HAS_DDI(to_i915(encoder->dev)));
+		/* fall through */
 	case INTEL_OUTPUT_DP:
 	case INTEL_OUTPUT_EDP:
 	case INTEL_OUTPUT_HDMI:

@@ -316,6 +316,7 @@ static void pnv_get_cdclk(struct drm_i915_private *dev_priv,
 		break;
 	default:
 		DRM_ERROR("Unknown pnv display core clock 0x%04x\n", gcfgc);
+		/* fall through */
 	case GC_DISPLAY_CLOCK_133_MHZ_PNV:
 		cdclk_state->cdclk = 133333;
 		break;
@@ -1110,6 +1111,7 @@ static int bxt_de_pll_vco(struct drm_i915_private *dev_priv, int cdclk)
 	switch (cdclk) {
 	default:
 		MISSING_CASE(cdclk);
+		/* fall through */
 	case 144000:
 	case 288000:
 	case 384000:
@@ -1134,6 +1136,7 @@ static int glk_de_pll_vco(struct drm_i915_private *dev_priv, int cdclk)
 	switch (cdclk) {
 	default:
 		MISSING_CASE(cdclk);
+		/* fall through */
 	case  79200:
 	case 158400:
 	case 316800:
@@ -1592,6 +1595,7 @@ static int cnl_cdclk_pll_vco(struct drm_i915_private *dev_priv, int cdclk)
 	switch (cdclk) {
 	default:
 		MISSING_CASE(cdclk);
+		/* fall through */
 	case 168000:
 	case 336000:
 		ratio = dev_priv->cdclk.hw.ref == 19200 ? 35 : 28;
