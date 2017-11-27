@@ -34,6 +34,7 @@
 #include <linux/socket.h>
 #include <linux/compat.h>
 #include <linux/sched/signal.h>
+#include <linux/sched/mm.h>
 
 #include "internal.h"
 
@@ -1372,6 +1373,210 @@ SYSCALL_DEFINE4(vmsplice, int, fd, const struct iovec __user *, iov,
 
 	return error;
 }
+
+#ifdef CONFIG_CROSS_MEMORY_ATTACH
+/*
+ * Map pages from a specified task into a pipe
+ */
+static int remote_single_vec_to_pipe(struct task_struct *task,
+			struct mm_struct *mm,
+			const struct iovec *rvec,
+			struct pipe_inode_info *pipe,
+			unsigned int flags,
+			size_t *total)
+{
+	struct pipe_buffer buf = {
+		.ops = &user_page_pipe_buf_ops,
+		.flags = flags
+	};
+	unsigned long addr = (unsigned long) rvec->iov_base;
+	unsigned long pa = addr & PAGE_MASK;
+	unsigned long start_offset = addr - pa;
+	unsigned long nr_pages;
+	ssize_t len = rvec->iov_len;
+	struct page *process_pages[16];
+	bool failed = false;
+	int ret = 0;
+
+	nr_pages = (addr + len - 1) / PAGE_SIZE - addr / PAGE_SIZE + 1;
+	while (nr_pages) {
+		long pages = min(nr_pages, 16UL);
+		int locked = 1;
+		ssize_t copied;
+
+		/*
+		 * Get the pages we're interested in.  We must
+		 * access remotely because task/mm might not
+		 * current/current->mm
+		 */
+		down_read(&mm->mmap_sem);
+		pages = get_user_pages_remote(task, mm, pa, pages, 0,
+					      process_pages, NULL, &locked);
+		if (locked)
+			up_read(&mm->mmap_sem);
+		if (pages <= 0) {
+			failed = true;
+			ret = -EFAULT;
+			break;
+		}
+
+		copied = pages * PAGE_SIZE - start_offset;
+		if (copied > len)
+			copied = len;
+		len -= copied;
+
+		ret = pages_to_pipe(process_pages, pipe, &buf, total, copied,
+				    start_offset);
+		if (unlikely(ret < 0))
+			break;
+
+		start_offset = 0;
+		nr_pages -= pages;
+		pa += pages * PAGE_SIZE;
+	}
+	return ret < 0 ? ret : 0;
+}
+
+static ssize_t remote_iovec_to_pipe(struct task_struct *task,
+			struct mm_struct *mm,
+			const struct iovec *rvec,
+			unsigned long riovcnt,
+			struct pipe_inode_info *pipe,
+			unsigned int flags)
+{
+	size_t total = 0;
+	int ret = 0, i;
+
+	for (i = 0; i < riovcnt; i++) {
+		/* Work out address and page range required */
+		if (rvec[i].iov_len == 0)
+			continue;
+
+		ret = remote_single_vec_to_pipe(
+				task, mm, &rvec[i], pipe, flags, &total);
+		if (ret < 0)
+			break;
+	}
+	return total ? total : ret;
+}
+
+static long process_vmsplice_to_pipe(struct task_struct *task,
+				struct mm_struct *mm, struct file *file,
+				const struct iovec __user *uiov,
+				unsigned long nr_segs, unsigned int flags)
+{
+	struct pipe_inode_info *pipe;
+	struct iovec iovstack[UIO_FASTIOV];
+	struct iovec *iov = iovstack;
+	unsigned int buf_flag = 0;
+	long ret;
+
+	if (flags & SPLICE_F_GIFT)
+		buf_flag = PIPE_BUF_FLAG_GIFT;
+
+	pipe = get_pipe_info(file);
+	if (!pipe)
+		return -EBADF;
+
+	ret = rw_copy_check_uvector(CHECK_IOVEC_ONLY, uiov, nr_segs,
+					UIO_FASTIOV, iovstack, &iov);
+	if (ret < 0)
+		return ret;
+
+	pipe_lock(pipe);
+	ret = wait_for_space(pipe, flags);
+	if (!ret)
+		ret = remote_iovec_to_pipe(task, mm, iov,
+						nr_segs, pipe, buf_flag);
+	pipe_unlock(pipe);
+	if (ret > 0)
+		wakeup_pipe_readers(pipe);
+
+	if (iov != iovstack)
+		kfree(iov);
+	return ret;
+}
+
+/* process_vmsplice splices a process address range into a pipe. */
+SYSCALL_DEFINE5(process_vmsplice, int, pid, int, fd,
+		const struct iovec __user *, iov,
+		unsigned long, nr_segs, unsigned int, flags)
+{
+	struct task_struct *task;
+	struct mm_struct *mm;
+	struct fd f;
+	long ret;
+
+	if (unlikely(flags & ~SPLICE_F_ALL))
+		return -EINVAL;
+	if (unlikely(nr_segs > UIO_MAXIOV))
+		return -EINVAL;
+	else if (unlikely(!nr_segs))
+		return 0;
+
+	f = fdget(fd);
+	if (!f.file)
+		return -EBADF;
+
+	/* Get process information */
+	task = find_get_task_by_vpid(pid);
+	if (!task) {
+		ret = -ESRCH;
+		goto out_fput;
+	}
+
+	mm = mm_access(task, PTRACE_MODE_ATTACH_REALCREDS);
+	if (!mm || IS_ERR(mm)) {
+		ret = IS_ERR(mm) ? PTR_ERR(mm) : -ESRCH;
+		/*
+		 * Explicitly map EACCES to EPERM as EPERM is a more a
+		 * appropriate error code for process_vw_readv/writev
+		 */
+		if (ret == -EACCES)
+			ret = -EPERM;
+		goto put_task_struct;
+	}
+
+	ret = -EBADF;
+	if (f.file->f_mode & FMODE_WRITE)
+		ret = process_vmsplice_to_pipe(task, mm, f.file,
+						iov, nr_segs, flags);
+	mmput(mm);
+
+put_task_struct:
+	put_task_struct(task);
+
+out_fput:
+	fdput(f);
+
+	return ret;
+}
+
+#ifdef CONFIG_COMPAT
+COMPAT_SYSCALL_DEFINE5(process_vmsplice, pid_t, pid, int, fd,
+			const struct compat_iovec __user *, iov32,
+			unsigned int, nr_segs, unsigned int, flags)
+{
+	struct iovec __user *iov;
+	unsigned int i;
+
+	if (nr_segs > UIO_MAXIOV)
+		return -EINVAL;
+
+	iov = compat_alloc_user_space(nr_segs * sizeof(struct iovec));
+	for (i = 0; i < nr_segs; i++) {
+		struct compat_iovec v;
+
+		if (get_user(v.iov_base, &iov32[i].iov_base) ||
+		    get_user(v.iov_len, &iov32[i].iov_len) ||
+		    put_user(compat_ptr(v.iov_base), &iov[i].iov_base) ||
+		    put_user(v.iov_len, &iov[i].iov_len))
+			return -EFAULT;
+	}
+	return sys_process_vmsplice(pid, fd, iov, nr_segs, flags);
+}
+#endif
+#endif /* CONFIG_CROSS_MEMORY_ATTACH */
 
 #ifdef CONFIG_COMPAT
 COMPAT_SYSCALL_DEFINE4(vmsplice, int, fd, const struct compat_iovec __user *, iov32,
