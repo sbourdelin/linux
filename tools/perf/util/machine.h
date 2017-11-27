@@ -29,7 +29,7 @@ struct vdso_info;
 #define THREADS__TABLE_SIZE	(1 << THREADS__TABLE_BITS)
 
 struct threads {
-	struct rb_root	  entries;
+	struct rb_root_cached  entries;
 	struct rw_semaphore lock;
 	unsigned int	  nr;
 	struct list_head  dead;
@@ -126,7 +126,7 @@ typedef void (*machine__process_t)(struct machine *machine, void *data);
 
 struct machines {
 	struct machine host;
-	struct rb_root guests;
+	struct rb_root_cached guests;
 };
 
 void machines__init(struct machines *machines);
