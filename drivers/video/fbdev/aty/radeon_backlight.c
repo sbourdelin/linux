@@ -157,7 +157,8 @@ void radeonfb_bl_init(struct radeonfb_info *rinfo)
 	if (IS_ERR(bd)) {
 		rinfo->info->bl_dev = NULL;
 		printk("radeonfb: Backlight registration failed\n");
-		goto error;
+		kfree(pdata);
+		return;
 	}
 
 	pdata->rinfo = rinfo;
@@ -188,11 +189,6 @@ void radeonfb_bl_init(struct radeonfb_info *rinfo)
 	backlight_update_status(bd);
 
 	printk("radeonfb: Backlight initialized (%s)\n", name);
-
-	return;
-
-error:
-	kfree(pdata);
 }
 
 void radeonfb_bl_exit(struct radeonfb_info *rinfo)
