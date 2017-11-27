@@ -127,7 +127,7 @@ __setup("pcie_port_pm=", pcie_port_pm_setup);
 
 /* time to wait after a reset for device to become responsive */
 #define PCIE_RESET_READY_POLL_MS 60000
-
+static unsigned long pci_reset_polltime = PCIE_RESET_READY_POLL_MS;
 /**
  * pci_bus_max_busnr - returns maximum PCI bus number of given bus' children
  * @bus: pointer to PCI bus structure to search
@@ -3904,7 +3904,7 @@ int pcie_flr(struct pci_dev *dev)
 	 */
 	msleep(100);
 
-	return pci_dev_wait(dev, "FLR", PCIE_RESET_READY_POLL_MS);
+	return pci_dev_wait(dev, "FLR", pci_reset_polltime);
 }
 EXPORT_SYMBOL_GPL(pcie_flr);
 
@@ -3945,7 +3945,7 @@ static int pci_af_flr(struct pci_dev *dev, int probe)
 	 */
 	msleep(100);
 
-	return pci_dev_wait(dev, "AF_FLR", PCIE_RESET_READY_POLL_MS);
+	return pci_dev_wait(dev, "AF_FLR", pci_reset_polltime);
 }
 
 /**
@@ -3990,7 +3990,7 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
 	pci_write_config_word(dev, dev->pm_cap + PCI_PM_CTRL, csr);
 	pci_dev_d3_sleep(dev);
 
-	return pci_dev_wait(dev, "PM D3->D0", PCIE_RESET_READY_POLL_MS);
+	return pci_dev_wait(dev, "PM D3->D0", pci_reset_polltime);
 }
 
 void pci_reset_secondary_bus(struct pci_dev *dev)
@@ -4035,7 +4035,7 @@ int pci_reset_bridge_secondary_bus(struct pci_dev *dev)
 {
 	pcibios_reset_secondary_bus(dev);
 
-	return pci_dev_wait(dev, "bus reset", PCIE_RESET_READY_POLL_MS);
+	return pci_dev_wait(dev, "bus reset", pci_reset_polltime);
 }
 EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
 
@@ -5528,6 +5528,9 @@ static int __init pci_setup(char *str)
 				pcie_bus_config = PCIE_BUS_PEER2PEER;
 			} else if (!strncmp(str, "pcie_scan_all", 13)) {
 				pci_add_flags(PCI_SCAN_ALL_PCIE_DEVS);
+			} else if (!strncmp(str, "resetpolltime=", 14)) {
+				pci_reset_polltime =
+					simple_strtoul(str + 14, &str, 0);
 			} else {
 				printk(KERN_ERR "PCI: Unknown option `%s'\n",
 						str);

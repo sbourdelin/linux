@@ -3071,6 +3071,8 @@
 		pcie_scan_all	Scan all possible PCIe devices.  Otherwise we
 				only look for one device below a PCIe downstream
 				port.
+		resetpolltime=	Adjusts the default poll time following hot reset
+				and D3->D0 transition.
 
 	pcie_aspm=	[PCIE] Forcibly enable or disable PCIe Active State Power
 			Management.
