@@ -23,6 +23,7 @@ static struct kobject *sg_kobj;
 
 struct sg_attr {
 	u32 handle;
+	u32 opal_no;
 	struct kobj_attribute attr;
 };
 
@@ -32,34 +33,17 @@ static struct sensor_group {
 	struct sg_attr *sgattrs;
 } *sgs;
 
-static ssize_t sg_store(struct kobject *kobj, struct kobj_attribute *attr,
-			const char *buf, size_t count)
+static int sensor_group_clear(u32 handle)
 {
-	struct sg_attr *sattr = container_of(attr, struct sg_attr, attr);
 	struct opal_msg msg;
-	u32 data;
-	int ret, token;
-
-	ret = kstrtoint(buf, 0, &data);
-	if (ret)
-		return ret;
-
-	if (data != 1)
-		return -EINVAL;
+	int token, ret;
 
 	token = opal_async_get_token_interruptible();
-	if (token < 0) {
-		pr_devel("Failed to get token\n");
+	if (token < 0)
 		return token;
-	}
 
-	ret = mutex_lock_interruptible(&sg_mutex);
-	if (ret)
-		goto out_token;
-
-	ret = opal_sensor_group_clear(sattr->handle, token);
-	switch (ret) {
-	case OPAL_ASYNC_COMPLETION:
+	ret = opal_sensor_group_clear(handle, token);
+	if (ret == OPAL_ASYNC_COMPLETION) {
 		ret = opal_async_wait_response(token, &msg);
 		if (ret) {
 			pr_devel("Failed to wait for the async response\n");
@@ -67,20 +51,75 @@ static ssize_t sg_store(struct kobject *kobj, struct kobj_attribute *attr,
 			goto out;
 		}
 		ret = opal_error_code(opal_get_async_rc(msg));
-		if (!ret)
-			ret = count;
-		break;
-	case OPAL_SUCCESS:
-		ret = count;
-		break;
-	default:
+	} else {
 		ret = opal_error_code(ret);
 	}
 
 out:
-	mutex_unlock(&sg_mutex);
-out_token:
 	opal_async_release_token(token);
+	return ret;
+}
+
+static int sensor_group_enable(u32 handle, int enable)
+{
+	struct opal_msg msg;
+	int token, ret;
+
+	token = opal_async_get_token_interruptible();
+	if (token < 0)
+		return token;
+
+	ret = opal_sensor_group_enable(handle, token, enable);
+	if (ret == OPAL_ASYNC_COMPLETION) {
+		ret = opal_async_wait_response(token, &msg);
+		if (ret) {
+			pr_devel("Failed to wait for the async response\n");
+			ret = -EIO;
+			goto out;
+		}
+		ret = opal_error_code(opal_get_async_rc(msg));
+	} else {
+		ret = opal_error_code(ret);
+	}
+
+out:
+	opal_async_release_token(token);
+	return ret;
+}
+
+static ssize_t sg_store(struct kobject *kobj, struct kobj_attribute *attr,
+			const char *buf, size_t count)
+{
+	struct sg_attr *sattr = container_of(attr, struct sg_attr, attr);
+	u32 data;
+	int ret;
+
+	ret = kstrtoint(buf, 0, &data);
+	if (ret)
+		return ret;
+
+	ret = mutex_lock_interruptible(&sg_mutex);
+	if (ret)
+		return ret;
+
+	ret = -EINVAL;
+	switch (sattr->opal_no) {
+	case OPAL_SENSOR_GROUP_CLEAR:
+		if (data == 1)
+			ret = sensor_group_clear(sattr->handle);
+		break;
+	case OPAL_SENSOR_GROUP_ENABLE:
+		if (data == 0 || data == 1)
+			ret = sensor_group_enable(sattr->handle, data);
+		break;
+	default:
+		break;
+	}
+
+	if (!ret)
+		ret = count;
+
+	mutex_unlock(&sg_mutex);
 	return ret;
 }
 
@@ -91,11 +130,13 @@ static struct sg_ops_info {
 			const char *buf, size_t count);
 } ops_info[] = {
 	{ OPAL_SENSOR_GROUP_CLEAR, "clear", sg_store },
+	{ OPAL_SENSOR_GROUP_ENABLE, "enable", sg_store },
 };
 
 static void add_attr(int handle, struct sg_attr *attr, int index)
 {
 	attr->handle = handle;
+	attr->opal_no = ops_info[index].opal_no;
 	sysfs_attr_init(&attr->attr.attr);
 	attr->attr.attr.name = ops_info[index].attr_name;
 	attr->attr.attr.mode = 0220;
