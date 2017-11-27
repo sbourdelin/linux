@@ -908,6 +908,32 @@
  *	associated with the TUN device's security structure.
  *	@security pointer to the TUN devices's security structure.
  *
+ * Security hooks for SCTP
+ *
+ * @sctp_assoc_request:
+ *	If first association, then set the peer sid to that in @skb. If
+ *	@sctp_cid is from an INIT chunk, then set the sctp endpoint sid to
+ *	socket's sid (ep->base.sk) with MLS portion taken from peer sid.
+ *	@ep pointer to sctp endpoint structure.
+ *	@skb pointer to skbuff of association packet.
+ *	Return 0 on success, error on failure.
+ * @sctp_bind_connect:
+ *	Validiate permissions required for each address associated with sock
+ *	@sk. Depending on @optname, the addresses will be treated as either
+ *	for a connect or bind service. The @addrlen is calculated on each
+ *	ipv4 and ipv6 address using sizeof(struct sockaddr_in) or
+ *	sizeof(struct sockaddr_in6).
+ *	@sk pointer to sock structure.
+ *	@optname name of the option to validate.
+ *	@address list containing one or more ipv4/ipv6 addresses.
+ *	@addrlen total length of address(s).
+ *	Return 0 on success, error on failure.
+ * @sctp_sk_clone:
+ *	Sets the new child socket's sid to the old endpoint sid.
+ *	@ep pointer to old sctp endpoint structure.
+ *	@sk pointer to old sock structure.
+ *	@sk pointer to new sock structure.
+ *
  * Security hooks for Infiniband
  *
  * @ib_pkey_access:
@@ -1634,6 +1660,12 @@ union security_list_options {
 	int (*tun_dev_attach_queue)(void *security);
 	int (*tun_dev_attach)(struct sock *sk, void *security);
 	int (*tun_dev_open)(void *security);
+	int (*sctp_assoc_request)(struct sctp_endpoint *ep,
+				  struct sk_buff *skb);
+	int (*sctp_bind_connect)(struct sock *sk, int optname,
+				 struct sockaddr *address, int addrlen);
+	void (*sctp_sk_clone)(struct sctp_endpoint *ep, struct sock *sk,
+			      struct sock *newsk);
 #endif	/* CONFIG_SECURITY_NETWORK */
 
 #ifdef CONFIG_SECURITY_INFINIBAND
@@ -1873,6 +1905,9 @@ struct security_hook_heads {
 	struct list_head tun_dev_attach_queue;
 	struct list_head tun_dev_attach;
 	struct list_head tun_dev_open;
+	struct list_head sctp_assoc_request;
+	struct list_head sctp_bind_connect;
+	struct list_head sctp_sk_clone;
 #endif	/* CONFIG_SECURITY_NETWORK */
 #ifdef CONFIG_SECURITY_INFINIBAND
 	struct list_head ib_pkey_access;
