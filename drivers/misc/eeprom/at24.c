@@ -141,8 +141,17 @@ static const struct i2c_device_id at24_ids[] = {
 	{ "24c02",	AT24_DEVICE_MAGIC(2048 / 8,	0) },
 	{ "24cs02",	AT24_DEVICE_MAGIC(16,
 				AT24_FLAG_SERIAL | AT24_FLAG_READONLY) },
-	{ "24mac402",	AT24_DEVICE_MAGIC(48 / 8,
-				AT24_FLAG_MAC | AT24_FLAG_READONLY) },
+	/*
+	 * REVISIT: the size of the EUI-48 byte array is 6 in at24mac402, while
+	 * the call to ilog2() in AT24_DEVICE_MAGIC() rounds it down to 4. We
+	 * might want to eventually remove it altogether or maybe even convert
+	 * the magic values to real structs.
+	 *
+	 * For now just create the magic value manually with the right size.
+	 */
+	{ "24mac402",	((1 << AT24_SIZE_FLAGS |
+			 (AT24_FLAG_MAC | AT24_FLAG_READONLY))
+			 << AT24_SIZE_BYTELEN | (48 / 8)) },
 	{ "24mac602",	AT24_DEVICE_MAGIC(64 / 8,
 				AT24_FLAG_MAC | AT24_FLAG_READONLY) },
 	/* spd is a 24c02 in memory DIMMs */
