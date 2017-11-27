@@ -17,11 +17,11 @@ char *__get_srcline(struct dso *dso, u64 addr, struct symbol *sym,
 void free_srcline(char *srcline);
 
 /* insert the srcline into the DSO, which will take ownership */
-void srcline__tree_insert(struct rb_root *tree, u64 addr, char *srcline);
+void srcline__tree_insert(struct rb_root_cached *tree, u64 addr, char *srcline);
 /* find previously inserted srcline */
-char *srcline__tree_find(struct rb_root *tree, u64 addr);
+char *srcline__tree_find(struct rb_root_cached *tree, u64 addr);
 /* delete all srclines within the tree */
-void srcline__tree_delete(struct rb_root *tree);
+void srcline__tree_delete(struct rb_root_cached *tree);
 
 #define SRCLINE_UNKNOWN  ((char *) "??:0")
 
