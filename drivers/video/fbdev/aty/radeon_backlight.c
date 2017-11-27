@@ -144,10 +144,8 @@ void radeonfb_bl_init(struct radeonfb_info *rinfo)
 #endif
 
 	pdata = kmalloc(sizeof(struct radeon_bl_privdata), GFP_KERNEL);
-	if (!pdata) {
-		printk("radeonfb: Memory allocation failed\n");
+	if (!pdata)
 		goto error;
-	}
 
 	snprintf(name, sizeof(name), "radeonbl%d", rinfo->info->node);
 
