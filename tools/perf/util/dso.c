@@ -1201,7 +1201,8 @@ struct dso *dso__new(const char *name)
 		dso__set_long_name(dso, dso->name, false);
 		dso__set_short_name(dso, dso->name, false);
 		for (i = 0; i < MAP__NR_TYPES; ++i)
-			dso->symbols[i] = dso->symbol_names[i] = RB_ROOT;
+			dso->symbols[i] = dso->symbol_names[i] = RB_ROOT_CACHED;
+
 		dso->data.cache = RB_ROOT;
 		dso->inlined_nodes = RB_ROOT;
 		dso->srclines = RB_ROOT_CACHED;
@@ -1478,7 +1479,7 @@ size_t dso__fprintf(struct dso *dso, enum map_type type, FILE *fp)
 		       dso__loaded(dso, type) ? "" : "NOT ");
 	ret += dso__fprintf_buildid(dso, fp);
 	ret += fprintf(fp, ")\n");
-	for (nd = rb_first(&dso->symbols[type]); nd; nd = rb_next(nd)) {
+	for (nd = rb_first_cached(&dso->symbols[type]); nd; nd = rb_next(nd)) {
 		struct symbol *pos = rb_entry(nd, struct symbol, rb_node);
 		ret += symbol__fprintf(pos, fp);
 	}

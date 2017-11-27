@@ -454,7 +454,7 @@ static void report__warn_kptr_restrict(const struct report *rep)
 
 		if (kernel_map) {
 			const struct dso *kdso = kernel_map->dso;
-			if (!RB_EMPTY_ROOT(&kdso->symbols[MAP__FUNCTION])) {
+			if (!RB_EMPTY_ROOT(&kdso->symbols[MAP__FUNCTION].rb_root)) {
 				desc = "If some relocation was applied (e.g. "
 				       "kexec) symbols may be misresolved.";
 			}

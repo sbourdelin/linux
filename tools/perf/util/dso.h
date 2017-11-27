@@ -140,8 +140,8 @@ struct dso {
 	struct list_head node;
 	struct rb_node	 rb_node;	/* rbtree node sorted by long name */
 	struct rb_root	 *root;		/* root of rbtree that rb_node is in */
-	struct rb_root	 symbols[MAP__NR_TYPES];
-	struct rb_root	 symbol_names[MAP__NR_TYPES];
+	struct rb_root_cached symbols[MAP__NR_TYPES];
+	struct rb_root_cached symbol_names[MAP__NR_TYPES];
 	struct rb_root	 inlined_nodes;
 	struct rb_root_cached srclines;
 	struct {
