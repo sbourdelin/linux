@@ -168,10 +168,11 @@ mwifiex_device_dump_read(struct file *file, char __user *ubuf,
 {
 	struct mwifiex_private *priv = file->private_data;
 
-	if (!priv->adapter->if_ops.device_dump)
-		return -EIO;
-
-	priv->adapter->if_ops.device_dump(priv->adapter);
+	if (priv->adapter->iface_type == MWIFIEX_USB)
+		mwifiex_send_cmd(priv, HostCmd_CMD_FW_DUMP_EVENT,
+				 HostCmd_ACT_GEN_SET, 0, NULL, true);
+	else
+		priv->adapter->if_ops.device_dump(priv->adapter);
 
 	return 0;
 }
