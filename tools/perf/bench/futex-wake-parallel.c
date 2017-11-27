@@ -40,6 +40,7 @@ static u_int32_t futex = 0;
 
 static pthread_t *blocked_worker;
 static bool done = false, silent = false, fshared = false;
+static bool affine_wakers = false;
 static unsigned int nblocked_threads = 0, nwaking_threads = 0;
 static pthread_mutex_t thread_lock;
 static pthread_cond_t thread_parent, thread_worker;
@@ -52,6 +53,7 @@ static const struct option options[] = {
 	OPT_UINTEGER('w', "nwakers", &nwaking_threads, "Specify amount of waking threads"),
 	OPT_BOOLEAN( 's', "silent",  &silent,   "Silent mode: do not display data/details"),
 	OPT_BOOLEAN( 'S', "shared",  &fshared,  "Use shared futexes instead of private ones"),
+	OPT_BOOLEAN( 'W', "affine-wakers", &affine_wakers, "Stripe affinity of waker threads across CPUs"),
 	OPT_END()
 };
 
@@ -79,7 +81,8 @@ static void *waking_workerfn(void *arg)
 	return NULL;
 }
 
-static void wakeup_threads(struct thread_data *td, pthread_attr_t thread_attr)
+static void wakeup_threads(struct thread_data *td, pthread_attr_t thread_attr,
+			   struct cpu_map *cpu)
 {
 	unsigned int i;
 
@@ -92,6 +95,17 @@ static void wakeup_threads(struct thread_data *td, pthread_attr_t thread_attr)
 		 * as it will affect the order to acquire the hb spinlock.
 		 * For now let the scheduler decide.
 		 */
+		if (affine_wakers) {
+			cpu_set_t cpuset;
+			CPU_ZERO(&cpuset);
+			CPU_SET(cpu->map[(i + 1) % cpu->nr], &cpuset);
+
+			if (pthread_attr_setaffinity_np(&thread_attr,
+							sizeof(cpu_set_t),
+							&cpuset))
+				err(EXIT_FAILURE, "pthread_attr_setaffinity_np");
+		}
+
 		if (pthread_create(&td[i].worker, &thread_attr,
 				   waking_workerfn, (void *)&td[i]))
 			err(EXIT_FAILURE, "pthread_create");
@@ -277,7 +291,7 @@ int bench_futex_wake_parallel(int argc, const char **argv)
 		usleep(100000);
 
 		/* Ok, all threads are patiently blocked, start waking folks up */
-		wakeup_threads(waking_worker, thread_attr);
+		wakeup_threads(waking_worker, thread_attr, cpu);
 
 		for (i = 0; i < nblocked_threads; i++) {
 			ret = pthread_join(blocked_worker[i], NULL);
