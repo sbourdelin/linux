@@ -151,7 +151,10 @@ void sctp_packet_init(struct sctp_packet *packet,
 	INIT_LIST_HEAD(&packet->chunk_list);
 	if (asoc) {
 		struct sctp_sock *sp = sctp_sk(asoc->base.sk);
-		overhead = sp->pf->af->net_header_len;
+		struct sctp_af *af = sp->pf->af;
+
+		overhead = af->net_header_len +
+			   af->ip_options_len(asoc->base.sk);
 	} else {
 		overhead = sizeof(struct ipv6hdr);
 	}

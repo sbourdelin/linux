@@ -3123,8 +3123,10 @@ static int sctp_setsockopt_maxseg(struct sock *sk, char __user *optval, unsigned
 
 	if (asoc) {
 		if (val == 0) {
+			struct sctp_af *af = sp->pf->af;
 			val = asoc->pathmtu;
-			val -= sp->pf->af->net_header_len;
+			val -= af->ip_options_len(asoc->base.sk);
+			val -= af->net_header_len;
 			val -= sizeof(struct sctphdr) +
 					sizeof(struct sctp_data_chunk);
 		}
@@ -4918,9 +4920,11 @@ int sctp_do_peeloff(struct sock *sk, sctp_assoc_t id, struct socket **sockp)
 	sctp_copy_sock(sock->sk, sk, asoc);
 
 	/* Make peeled-off sockets more like 1-1 accepted sockets.
-	 * Set the daddr and initialize id to something more random
+	 * Set the daddr and initialize id to something more random and also
+	 * copy over any ip options.
 	 */
 	sp->pf->to_sk_daddr(&asoc->peer.primary_addr, sk);
+	sp->pf->copy_ip_options(sk, sock->sk);
 
 	/* Populate the fields of the newsk from the oldsk and migrate the
 	 * asoc to the newsk.

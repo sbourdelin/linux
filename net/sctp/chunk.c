@@ -153,7 +153,6 @@ static void sctp_datamsg_assign(struct sctp_datamsg *msg, struct sctp_chunk *chu
 	chunk->msg = msg;
 }
 
-
 /* A data chunk can have a maximum payload of (2^16 - 20).  Break
  * down any such message into smaller chunks.  Opportunistically, fragment
  * the chunks down to the current MTU constraints.  We may get refragmented
@@ -170,6 +169,8 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 	struct list_head *pos, *temp;
 	struct sctp_chunk *chunk;
 	struct sctp_datamsg *msg;
+	struct sctp_sock *sp;
+	struct sctp_af *af;
 	int err;
 
 	msg = sctp_datamsg_new(GFP_KERNEL);
@@ -188,9 +189,12 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 	/* This is the biggest possible DATA chunk that can fit into
 	 * the packet
 	 */
-	max_data = asoc->pathmtu -
-		   sctp_sk(asoc->base.sk)->pf->af->net_header_len -
-		   sizeof(struct sctphdr) - sizeof(struct sctp_data_chunk);
+	sp = sctp_sk(asoc->base.sk);
+	af = sp->pf->af;
+	max_data = asoc->pathmtu - af->net_header_len -
+		   sizeof(struct sctphdr) - sizeof(struct sctp_data_chunk) -
+		   af->ip_options_len(asoc->base.sk);
+
 	max_data = SCTP_TRUNC4(max_data);
 
 	/* If the the peer requested that we authenticate DATA chunks
@@ -210,7 +214,6 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 
 	/* Set first_len and then account for possible bundles on first frag */
 	first_len = max_data;
-
 	/* Check to see if we have a pending SACK and try to let it be bundled
 	 * with this message.  Do this if we don't have any data queued already.
 	 * To check that, look at out_qlen and retransmit list.
