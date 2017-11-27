@@ -250,6 +250,7 @@ int selinux_netlbl_skbuff_setsid(struct sk_buff *skb,
 	sk = skb_to_full_sk(skb);
 	if (sk != NULL) {
 		struct sk_security_struct *sksec = sk->sk_security;
+
 		if (sksec->nlbl_state != NLBL_REQSKB)
 			return 0;
 		secattr = selinux_netlbl_sock_getattr(sk, sid);
@@ -267,6 +268,61 @@ int selinux_netlbl_skbuff_setsid(struct sk_buff *skb,
 skbuff_setsid_return:
 	if (secattr == &secattr_storage)
 		netlbl_secattr_destroy(secattr);
+	return rc;
+}
+
+/**
+ * selinux_netlbl_sctp_assoc_request - Label an incoming sctp association.
+ * @ep: incoming association endpoint.
+ * @skb: the packet.
+ *
+ * Description:
+ * A new incoming connection is represented by @ep, ......
+ * Returns zero on success, negative values on failure.
+ *
+ */
+int selinux_netlbl_sctp_assoc_request(struct sctp_endpoint *ep,
+				     struct sk_buff *skb)
+{
+	int rc;
+	struct netlbl_lsm_secattr secattr;
+	struct sk_security_struct *sksec = ep->base.sk->sk_security;
+	struct sockaddr *addr;
+	struct sockaddr_in addr4;
+#if IS_ENABLED(CONFIG_IPV6)
+	struct sockaddr_in6 addr6;
+#endif
+
+	if (ep->base.sk->sk_family != PF_INET &&
+				ep->base.sk->sk_family != PF_INET6)
+		return 0;
+
+	netlbl_secattr_init(&secattr);
+	rc = security_netlbl_sid_to_secattr(ep->secid, &secattr);
+	if (rc != 0)
+		goto assoc_request_return;
+
+	/* Move skb hdr address info to a struct sockaddr and then call
+	 * netlbl_conn_setattr().
+	 */
+	if (ip_hdr(skb)->version == 4) {
+		addr4.sin_family = AF_INET;
+		addr4.sin_addr.s_addr = ip_hdr(skb)->saddr;
+		addr = (struct sockaddr *)&addr4;
+#if IS_ENABLED(CONFIG_IPV6)
+	} else {
+		addr6.sin6_family = AF_INET6;
+		addr6.sin6_addr = ipv6_hdr(skb)->saddr;
+		addr = (struct sockaddr *)&addr6;
+#endif
+	}
+
+	rc = netlbl_conn_setattr(ep->base.sk, addr, &secattr);
+	if (rc == 0)
+		sksec->nlbl_state = NLBL_LABELED;
+
+assoc_request_return:
+	netlbl_secattr_destroy(&secattr);
 	return rc;
 }
 
@@ -470,6 +526,45 @@ int selinux_netlbl_socket_setsockopt(struct socket *sock,
 }
 
 /**
+ * selinux_netlbl_socket_connect_helper - Help label a client-side socket on
+ * connect
+ * @sk: the socket to label
+ * @addr: the destination address
+ *
+ * Description:
+ * Attempt to label a connected socket with NetLabel using the given address.
+ * Returns zero values on success, negative values on failure.
+ *
+ */
+static int selinux_netlbl_socket_connect_helper(struct sock *sk,
+						struct sockaddr *addr)
+{
+	int rc;
+	struct sk_security_struct *sksec = sk->sk_security;
+	struct netlbl_lsm_secattr *secattr;
+
+	/* connected sockets are allowed to disconnect when the address family
+	 * is set to AF_UNSPEC, if that is what is happening we want to reset
+	 * the socket */
+	if (addr->sa_family == AF_UNSPEC) {
+		netlbl_sock_delattr(sk);
+		sksec->nlbl_state = NLBL_REQSKB;
+		rc = 0;
+		return rc;
+	}
+	secattr = selinux_netlbl_sock_genattr(sk);
+	if (secattr == NULL) {
+		rc = -ENOMEM;
+		return rc;
+	}
+	rc = netlbl_conn_setattr(sk, addr, secattr);
+	if (rc == 0)
+		sksec->nlbl_state = NLBL_CONNLABELED;
+
+	return rc;
+}
+
+/**
  * selinux_netlbl_socket_connect - Label a client-side socket on connect
  * @sk: the socket to label
  * @addr: the destination address
@@ -483,33 +578,44 @@ int selinux_netlbl_socket_connect(struct sock *sk, struct sockaddr *addr)
 {
 	int rc;
 	struct sk_security_struct *sksec = sk->sk_security;
-	struct netlbl_lsm_secattr *secattr;
 
 	if (sksec->nlbl_state != NLBL_REQSKB &&
 	    sksec->nlbl_state != NLBL_CONNLABELED)
 		return 0;
 
 	lock_sock(sk);
-
-	/* connected sockets are allowed to disconnect when the address family
-	 * is set to AF_UNSPEC, if that is what is happening we want to reset
-	 * the socket */
-	if (addr->sa_family == AF_UNSPEC) {
-		netlbl_sock_delattr(sk);
-		sksec->nlbl_state = NLBL_REQSKB;
-		rc = 0;
-		goto socket_connect_return;
-	}
-	secattr = selinux_netlbl_sock_genattr(sk);
-	if (secattr == NULL) {
-		rc = -ENOMEM;
-		goto socket_connect_return;
-	}
-	rc = netlbl_conn_setattr(sk, addr, secattr);
-	if (rc == 0)
-		sksec->nlbl_state = NLBL_CONNLABELED;
-
-socket_connect_return:
+	rc = selinux_netlbl_socket_connect_helper(sk, addr);
 	release_sock(sk);
+
+	return rc;
+}
+
+/**
+ * selinux_netlbl_sctp_socket_connect - Label an SCTP client-side socket on a
+ * connect
+ * @sk: the socket to label
+ * @addr: the destination address
+ *
+ * Description:
+ * Attempt to label a connected socket with NetLabel using the given address
+ * when called by the SCTP protocol layer. The situations handled are:
+ * sctp_connectx(3), sctp_sendmsg(3), sendmsg(2), whenever a new IP address
+ * is added or when a new primary address is selected. Note that an SCTP
+ * connect(2) call happens before the SCTP protocol layer and is handled via
+ * selinux_netlbl_socket_connect()
+ * Returns zero values on success, negative values on failure.
+ *
+ */
+int selinux_netlbl_sctp_socket_connect(struct sock *sk, struct sockaddr *addr)
+{
+	int rc;
+	struct sk_security_struct *sksec = sk->sk_security;
+
+	if (sksec->nlbl_state != NLBL_REQSKB &&
+	    sksec->nlbl_state != NLBL_CONNLABELED)
+		return 0;
+
+	rc = selinux_netlbl_socket_connect_helper(sk, addr);
+
 	return rc;
 }
