@@ -1477,8 +1477,8 @@ static void bxt_ddi_clock_get(struct intel_encoder *encoder,
 				struct intel_crtc_state *pipe_config)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
-	enum port port = intel_ddi_get_encoder_port(encoder);
-	enum intel_dpll_id pll_id = port;
+	enum intel_dpll_id pll_id =
+		(enum intel_dpll_id)intel_ddi_get_encoder_port(encoder);
 
 	pipe_config->port_clock = bxt_calc_pll_link(dev_priv, pll_id);
 
