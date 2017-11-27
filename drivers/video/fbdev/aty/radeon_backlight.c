@@ -145,7 +145,7 @@ void radeonfb_bl_init(struct radeonfb_info *rinfo)
 
 	pdata = kmalloc(sizeof(*pdata), GFP_KERNEL);
 	if (!pdata)
-		goto error;
+		return;
 
 	snprintf(name, sizeof(name), "radeonbl%d", rinfo->info->node);
 
