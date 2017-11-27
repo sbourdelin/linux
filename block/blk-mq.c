@@ -1629,6 +1629,12 @@ static blk_status_t __blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
 	blk_qc_t new_cookie;
 	blk_status_t ret = BLK_STS_OK;
 	bool run_queue = true;
+	/*
+	 * This function is called from blk_insert_cloned_request() if
+	 * 'cookie' is NULL, and for dispatching this request only.
+	 */
+	bool dispatch_only = !cookie;
+	bool need_insert;
 
 	/* RCU or SRCU read lock is needed before checking quiesced flag */
 	if (blk_mq_hctx_stopped(hctx) || blk_queue_quiesced(q)) {
@@ -1636,10 +1642,19 @@ static blk_status_t __blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
 		goto insert;
 	}
 
-	if (q->elevator)
+	if (q->elevator && !dispatch_only)
 		goto insert;
 
-	if (__blk_mq_issue_req(hctx, rq, &new_cookie, &ret))
+	need_insert = __blk_mq_issue_req(hctx, rq, &new_cookie, &ret);
+	if (dispatch_only) {
+		if (need_insert)
+			return BLK_STS_RESOURCE;
+		if (ret == BLK_STS_RESOURCE)
+			__blk_mq_requeue_request(rq);
+		return ret;
+	}
+
+	if (need_insert)
 		goto insert;
 
 	/*
@@ -1661,7 +1676,10 @@ static blk_status_t __blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
 	}
 
 insert:
-	blk_mq_sched_insert_request(rq, false, run_queue, false, may_sleep);
+	if (!dispatch_only)
+		blk_mq_sched_insert_request(rq, false, run_queue, false, may_sleep);
+	else
+		blk_mq_request_bypass_insert(rq, run_queue);
 	return ret;
 }
 
@@ -1686,6 +1704,14 @@ static blk_status_t blk_mq_try_issue_directly(struct blk_mq_hw_ctx *hctx,
 	}
 
 	return ret;
+}
+
+blk_status_t blk_mq_request_direct_issue(struct request *rq)
+{
+	struct blk_mq_ctx *ctx = rq->mq_ctx;
+	struct blk_mq_hw_ctx *hctx = blk_mq_map_queue(rq->q, ctx->cpu);
+
+	return blk_mq_try_issue_directly(hctx, rq, NULL);
 }
 
 static blk_qc_t blk_mq_make_request(struct request_queue *q, struct bio *bio)
