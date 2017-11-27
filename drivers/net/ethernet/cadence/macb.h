@@ -1060,6 +1060,8 @@ struct macb {
 	struct ptp_clock_info ptp_clock_info;
 	struct tsu_incr tsu_incr;
 	struct hwtstamp_config tstamp_config;
+
+	struct tasklet_struct   hresp_err_tasklet;
 };
 
 #ifdef CONFIG_MACB_USE_HWSTAMP
