@@ -193,7 +193,6 @@ void radeonfb_bl_init(struct radeonfb_info *rinfo)
 
 error:
 	kfree(pdata);
-	return;
 }
 
 void radeonfb_bl_exit(struct radeonfb_info *rinfo)
