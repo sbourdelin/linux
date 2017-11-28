@@ -9062,6 +9062,13 @@ S:	Maintained
 F:	drivers/usb/misc/usb251xb.c
 F:	Documentation/devicetree/bindings/usb/usb251xb.txt
 
+MICROSEMI MIPS SOCS
+M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
+L:	linux-mips@linux-mips.org
+S:	Maintained
+F:	arch/mips/mscc/*
+F:	arch/mips/boot/dts/mscc/*
+
 MICROSEMI SMART ARRAY SMARTPQI DRIVER (smartpqi)
 M:	Don Brace <don.brace@microsemi.com>
 L:	esc.storagedev@microsemi.com
