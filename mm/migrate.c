@@ -1326,6 +1326,19 @@ put_anon:
 		hugetlb_cgroup_migrate(hpage, new_hpage);
 		put_new_page = NULL;
 		set_page_owner_migrate_reason(new_hpage, reason);
+
+		/*
+		 * transfer temporary state of the new huge page. This is
+		 * reverse to other transitions because the newpage is going to
+		 * be final while the old one will be freed so it takes over
+		 * the temporary status.
+		 * No need for any locking here because destructor cannot race
+		 * with us.
+		 */
+		if (PageHugeTemporary(new_hpage)) {
+			SetPageHugeTemporary(hpage);
+			ClearPageHugeTemporary(new_hpage);
+		}
 	}
 
 	unlock_page(hpage);

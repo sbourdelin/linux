@@ -157,7 +157,42 @@ unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
 		unsigned long address, unsigned long end, pgprot_t newprot);
 
 bool is_hugetlb_entry_migration(pte_t pte);
+
+/*
+ * Internal hugetlb specific page flag. Do not use outside of the hugetlb
+ * code
+ */
+static inline bool PageHugeTemporary(struct page *page)
+{
+	if (!PageHuge(page))
+		return false;
+
+	return page[2].flags == -1U;
+}
+
+static inline void SetPageHugeTemporary(struct page *page)
+{
+	page[2].flags = -1U;
+}
+
+static inline void ClearPageHugeTemporary(struct page *page)
+{
+	page[2].flags = 0;
+}
 #else /* !CONFIG_HUGETLB_PAGE */
+
+static inline bool PageHugeTemporary(struct page *page)
+{
+	return false;
+}
+
+static inline void SetPageHugeTemporary(struct page *page)
+{
+}
+
+static inline void ClearPageHugeTemporary(struct page *page)
+{
+}
 
 static inline void reset_vma_resv_huge_pages(struct vm_area_struct *vma)
 {
