@@ -7,6 +7,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/clock/axg-clkc.h>
 
 / {
 	compatible = "amlogic,meson-axg";
@@ -146,6 +147,20 @@
 				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_HIGH)>;
 			#interrupt-cells = <3>;
 			#address-cells = <0>;
+		};
+
+		hiubus: hiubus@ff63c000 {
+			compatible = "simple-bus";
+			reg = <0x0 0xff63c000 0x0 0x1c00>;
+			#address-cells = <2>;
+			#size-cells = <2>;
+			ranges = <0x0 0x0 0x0 0xff63c000 0x0 0x1c00>;
+
+			clkc: clock-controller@0 {
+				compatible = "amlogic,axg-clkc";
+				#clock-cells = <1>;
+				reg = <0x0 0x0 0x0 0x320>;
+			};
 		};
 
 		mailbox: mailbox@ff63dc00 {
