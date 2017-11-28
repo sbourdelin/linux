@@ -110,6 +110,7 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
 	size_t outlen = 0;		/* [out] RX bufs produced by kernel */
 	size_t usedpages = 0;		/* [in]  RX bufs to be used from user */
 	size_t processed = 0;		/* [in]  TX bufs to be consumed */
+	bool enc = ctx->enc;		/* prevent race if sock lock dropped */
 
 	/*
 	 * Data length provided by caller via sendmsg/sendpage that has not
@@ -137,7 +138,7 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
 	 * buffer provides the tag which is consumed resulting in only the
 	 * plaintext without a buffer for the tag returned to the caller.
 	 */
-	if (ctx->enc)
+	if (enc)
 		outlen = used + as;
 	else
 		outlen = used - as;
@@ -211,7 +212,7 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
 	/* Use the RX SGL as source (and destination) for crypto op. */
 	rsgl_src = areq->first_rsgl.sgl.sg;
 
-	if (ctx->enc) {
+	if (enc) {
 		/*
 		 * Encryption operation - The in-place cipher operation is
 		 * achieved by the following operation:
@@ -288,7 +289,7 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
 		aead_request_set_callback(&areq->cra_u.aead_req,
 					  CRYPTO_TFM_REQ_MAY_BACKLOG,
 					  af_alg_async_cb, areq);
-		err = ctx->enc ? crypto_aead_encrypt(&areq->cra_u.aead_req) :
+		err = enc ? crypto_aead_encrypt(&areq->cra_u.aead_req) :
 				 crypto_aead_decrypt(&areq->cra_u.aead_req);
 
 		/* AIO operation in progress */
@@ -305,7 +306,7 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
 		aead_request_set_callback(&areq->cra_u.aead_req,
 					  CRYPTO_TFM_REQ_MAY_BACKLOG,
 					  crypto_req_done, &ctx->wait);
-		err = crypto_wait_req(ctx->enc ?
+		err = crypto_wait_req(enc ?
 				crypto_aead_encrypt(&areq->cra_u.aead_req) :
 				crypto_aead_decrypt(&areq->cra_u.aead_req),
 				&ctx->wait);
