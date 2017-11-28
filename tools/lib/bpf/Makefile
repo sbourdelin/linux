@@ -54,7 +54,7 @@ man_dir_SQ = '$(subst ','\'',$(man_dir))'
 export man_dir man_dir_SQ INSTALL
 export DESTDIR DESTDIR_SQ
 
-include ../../scripts/Makefile.include
+include $(srctree)/tools/scripts/Makefile.include
 
 # copy a bit from Linux kbuild
 
