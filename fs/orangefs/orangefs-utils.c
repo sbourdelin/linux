@@ -437,10 +437,6 @@ int orangefs_inode_setattr(struct inode *inode, struct iattr *iattr)
 	}
 
 	op_release(new_op);
-
-	if (ret == 0)
-		orangefs_inode->getattr_time = jiffies - 1;
-
 	return ret;
 }
 
