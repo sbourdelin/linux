@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: (GPL-2.0 OR MIT)
+#
+# Microsemi MIPS SoC support
+#
+# License: Dual MIT/GPL
+# Copyright (c) 2017 Microsemi Corporation
+
+#
+# Microsemi Ocelot board(s)
+#
+platform-$(CONFIG_MSCC_OCELOT) += mscc/
+load-$(CONFIG_MSCC_OCELOT)	 += 0x80100000

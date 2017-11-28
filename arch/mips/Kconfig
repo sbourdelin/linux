@@ -527,6 +527,30 @@ config MIPS_MALTA
 	  This enables support for the MIPS Technologies Malta evaluation
 	  board.
 
+config MSCC_OCELOT
+	bool "Microsemi Ocelot architecture"
+	select BOOT_RAW
+	select CEVT_R4K
+	select CSRC_R4K
+	select IRQ_MIPS_CPU
+	select DMA_NONCOHERENT
+	select SYS_HAS_CPU_MIPS32_R2
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select SYS_SUPPORTS_BIG_ENDIAN
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select SYS_HAS_EARLY_PRINTK
+	select USE_GENERIC_EARLY_PRINTK_8250
+	select MSCC_OCELOT_IRQ
+	select PINCTRL
+	select GPIOLIB
+	select COMMON_CLK
+	select USE_OF
+	select BUILTIN_DTB
+	select LIBFDT
+	help
+	  This enables support for the Microsemi Ocelot architecture.
+	  It builds a generic DT-based kernel image.
+
 config MACH_PIC32
 	bool "Microchip PIC32 Family"
 	help

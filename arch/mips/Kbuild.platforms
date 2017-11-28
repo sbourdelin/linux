@@ -18,6 +18,7 @@ platforms += lantiq
 platforms += lasat
 platforms += loongson32
 platforms += loongson64
+platforms += mscc
 platforms += mti-malta
 platforms += netlogic
 platforms += paravirt
