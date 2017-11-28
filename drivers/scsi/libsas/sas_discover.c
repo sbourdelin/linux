@@ -388,6 +388,11 @@ void sas_unregister_dev(struct asd_sas_port *port, struct domain_device *dev)
 	}
 }
 
+static void sas_flush_work(struct asd_sas_port *port)
+{
+	scsi_flush_work(port->ha->core.shost);
+}
+
 void sas_unregister_domain_devices(struct asd_sas_port *port, int gone)
 {
 	struct domain_device *dev, *n;
@@ -401,8 +406,8 @@ void sas_unregister_domain_devices(struct asd_sas_port *port, int gone)
 	list_for_each_entry_safe(dev, n, &port->disco_list, disco_list_node)
 		sas_unregister_dev(port, dev);
 
+	sas_flush_work(port);
 	port->port->rphy = NULL;
-
 }
 
 void sas_device_set_phy(struct domain_device *dev, struct sas_port *port)
