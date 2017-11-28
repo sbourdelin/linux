@@ -19,6 +19,7 @@
 #include <linux/slab.h>
 #include <linux/hash.h>
 #include <linux/kmemleak.h>
+#include <linux/nmi.h>
 
 #define ODEBUG_HASH_BITS	14
 #define ODEBUG_HASH_SIZE	(1 << ODEBUG_HASH_BITS)
@@ -66,6 +67,8 @@ static struct debug_obj_descr	*descr_test  __read_mostly;
  */
 static int			debug_objects_allocated;
 static int			debug_objects_freed;
+
+static int			suppress_lockup;
 
 static void free_obj_work(struct work_struct *work);
 static DECLARE_WORK(debug_obj_work, free_obj_work);
@@ -768,6 +771,10 @@ repeat:
 			debug_objects_maxchain = cnt;
 
 		max_loops += cnt;
+
+		if (max_loops > 10000 && ((max_loops % 10000) == 0)
+		    && suppress_lockup != 0)
+			touch_softlockup_watchdog();
 	}
 
 	if (max_loops > debug_objects_maxloops)
@@ -812,7 +819,7 @@ static const struct file_operations debug_stats_fops = {
 
 static int __init debug_objects_init_debugfs(void)
 {
-	struct dentry *dbgdir, *dbgstats;
+	struct dentry *dbgdir, *dbgstats, *dbglockup;
 
 	if (!debug_objects_enabled)
 		return 0;
@@ -826,10 +833,15 @@ static int __init debug_objects_init_debugfs(void)
 	if (!dbgstats)
 		goto err;
 
+	dbglockup = debugfs_create_u32("suppress_lockup", 0644, dbgdir,
+					&suppress_lockup);
+	if (!dbglockup)
+		goto err;
+
 	return 0;
 
 err:
-	debugfs_remove(dbgdir);
+	debugfs_remove_recursive(dbgdir);
 
 	return -ENOMEM;
 }
