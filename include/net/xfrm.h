@@ -1877,6 +1877,14 @@ static inline bool xfrm_dst_offload_ok(struct dst_entry *dst)
 	return false;
 }
 
+static inline void xfrm_dev_state_activate(struct xfrm_state *x)
+{
+	struct xfrm_state_offload *xso = &x->xso;
+
+	if (xso->dev && xso->dev->xfrmdev_ops->xdo_dev_state_activate)
+		xso->dev->xfrmdev_ops->xdo_dev_state_activate(x);
+}
+
 static inline void xfrm_dev_state_delete(struct xfrm_state *x)
 {
 	struct xfrm_state_offload *xso = &x->xso;
@@ -1905,6 +1913,10 @@ static inline int validate_xmit_xfrm(struct sk_buff *skb, netdev_features_t feat
 static inline int xfrm_dev_state_add(struct net *net, struct xfrm_state *x, struct xfrm_user_offload *xuo)
 {
 	return 0;
+}
+
+static inline void xfrm_dev_state_activate(struct xfrm_state *x)
+{
 }
 
 static inline void xfrm_dev_state_delete(struct xfrm_state *x)

@@ -662,6 +662,11 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh,
 		goto out;
 	}
 
+	spin_lock_bh(&x->lock);
+	if (x->km.state == XFRM_STATE_VALID)
+		xfrm_dev_state_activate(x);
+	spin_unlock_bh(&x->lock);
+
 	c.seq = nlh->nlmsg_seq;
 	c.portid = nlh->nlmsg_pid;
 	c.event = nlh->nlmsg_type;
