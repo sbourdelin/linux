@@ -127,15 +127,6 @@ static void flush_user_asid(pgd_t *pgd, u16 kern_asid)
 		invpcid_flush_single_context(user_asid(kern_asid));
 	} else {
 		/*
-		 * On systems with PCIDs, but no INVPCID, the only
-		 * way to flush a PCID is a CR3 write.  Note that
-		 * we use the kernel page tables with the *user*
-		 * ASID here.
-		 */
-		unsigned long user_asid_flush_cr3;
-		user_asid_flush_cr3 = build_cr3(pgd, user_asid(kern_asid));
-		write_cr3(user_asid_flush_cr3);
-		/*
 		 * We do not use PCIDs with KAISER unless we also
 		 * have INVPCID.  Getting here is unexpected.
 		 */
