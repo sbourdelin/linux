@@ -970,7 +970,7 @@ static void free_GPIOs(struct pi433_device *device)
 	for (i = 0; i < NUM_DIO; i++)
 	{
 		/* check if gpiod is valid */
-		if ( IS_ERR(device->gpiod[i]) )
+		if (IS_ERR(device->gpiod[i]))
 			continue;
 
 		free_irq(device->irq_num[i], device);
