@@ -160,6 +160,8 @@ extern void arch_jump_label_transform_static(struct jump_entry *entry,
 extern int jump_label_text_reserved(void *start, void *end);
 extern void static_key_slow_inc(struct static_key *key);
 extern void static_key_slow_dec(struct static_key *key);
+extern void static_key_slow_incr_cpuslocked(struct static_key *key);
+extern void static_key_slow_decr_cpuslocked(struct static_key *key);
 extern void jump_label_apply_nops(struct module *mod);
 extern int static_key_count(struct static_key *key);
 extern void static_key_enable(struct static_key *key);
@@ -259,6 +261,8 @@ static inline void static_key_disable(struct static_key *key)
 
 #define static_key_enable_cpuslocked(k)		static_key_enable((k))
 #define static_key_disable_cpuslocked(k)	static_key_disable((k))
+#define static_key_slow_incr_cpuslocked(k)	static_key_slow_inc((k))
+#define static_key_slow_decr_cpuslocked(k)	static_key_slow_dec((k))
 
 #define STATIC_KEY_INIT_TRUE	{ .enabled = ATOMIC_INIT(1) }
 #define STATIC_KEY_INIT_FALSE	{ .enabled = ATOMIC_INIT(0) }
@@ -414,8 +418,10 @@ extern bool ____wrong_branch_error(void);
  * Advanced usage; refcount, branch is enabled when: count != 0
  */
 
-#define static_branch_inc(x)		static_key_slow_inc(&(x)->key)
-#define static_branch_dec(x)		static_key_slow_dec(&(x)->key)
+#define static_branch_inc(x)			static_key_slow_inc(&(x)->key)
+#define static_branch_dec(x)			static_key_slow_dec(&(x)->key)
+#define static_branch_inc_cpuslocked(x)		static_key_slow_incr_cpuslocked(&(x)->key)
+#define static_branch_dec_cpuslocked(x)		static_key_slow_decr_cpuslocked(&(x)->key)
 
 /*
  * Normal usage; boolean enable/disable.
