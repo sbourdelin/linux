@@ -344,41 +344,26 @@ static int tipc_udp_recv(struct sock *sk, struct sk_buff *skb)
 	struct udp_bearer *ub;
 	struct tipc_bearer *b;
 	struct tipc_msg *hdr;
-	int err;
 
 	ub = rcu_dereference_sk_user_data(sk);
 	if (!ub) {
 		pr_err_ratelimited("Failed to get UDP bearer reference");
-		goto out;
+		kfree_skb(skb);
+		return 0;
 	}
 	skb_pull(skb, sizeof(struct udphdr));
 	hdr = buf_msg(skb);
 
 	rcu_read_lock();
 	b = rcu_dereference_rtnl(ub->bearer);
-	if (!b)
-		goto rcu_out;
-
-	if (b && test_bit(0, &b->up)) {
+	if (likely(b && test_bit(0, &b->up))) {
 		tipc_rcv(sock_net(sk), skb, b);
-		rcu_read_unlock();
-		return 0;
+	} else {
+		if (unlikely(b && msg_user(hdr) == LINK_CONFIG))
+			tipc_udp_rcast_disc(b, skb);
+		kfree_skb(skb);
 	}
-
-	if (unlikely(msg_user(hdr) == LINK_CONFIG)) {
-		err = tipc_udp_rcast_disc(b, skb);
-		if (err)
-			goto rcu_out;
-	}
-
-	tipc_rcv(sock_net(sk), skb, b);
 	rcu_read_unlock();
-	return 0;
-
-rcu_out:
-	rcu_read_unlock();
-out:
-	kfree_skb(skb);
 	return 0;
 }
 
