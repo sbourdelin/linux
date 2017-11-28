@@ -1090,6 +1090,7 @@ int irlan_extract_param(__u8 *buf, char *name, char *value, __u16 *len)
  *	or NULL if end of file
  */
 static void *irlan_seq_start(struct seq_file *seq, loff_t *pos)
+	__acquires(RCU)
 {
 	rcu_read_lock();
 	return seq_list_start_head(&irlans, *pos);
@@ -1103,6 +1104,7 @@ static void *irlan_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 /* End of reading /proc file */
 static void irlan_seq_stop(struct seq_file *seq, void *v)
+	__releases(RCU)
 {
 	rcu_read_unlock();
 }
