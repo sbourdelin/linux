@@ -36,16 +36,25 @@ struct drm_mode_fb_cmd2;
  *	use in new code and set to 0 for new formats.
  * @num_planes: Number of color planes (1 to 3)
  * @cpp: Number of bytes per pixel (per plane)
+ * @cpp_scale: { numerator, denominator }. Scaling factor for
+ *	non 8bit aligned formats. For instance, { 10, 8 } can be used for
+ *	10 bit component / pixel formats.
  * @hsub: Horizontal chroma subsampling factor
  * @vsub: Vertical chroma subsampling factor
+ * @padding_scale: { numerator, denominator }. Scaling factor for
+ *	padding. This can be used for formats with padding bits after
+ *	multiple pixels / components. For instance, if there are 2 bit
+ *	padding after 3 10bit components, the value should be { 32, 30 }.
  */
 struct drm_format_info {
 	u32 format;
 	u8 depth;
 	u8 num_planes;
 	u8 cpp[3];
+	u8 cpp_scale[2];
 	u8 hsub;
 	u8 vsub;
+	u8 padding_scale[2];
 };
 
 /**
