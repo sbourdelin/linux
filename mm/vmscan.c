@@ -338,7 +338,7 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 	delta *= freeable;
 	do_div(delta, nr_eligible + 1);
 	total_scan += delta;
-	if (total_scan < 0) {
+	if (unlikely(total_scan < 0)) {
 		pr_err("shrink_slab: %pF negative objects to delete nr=%ld\n",
 		       shrinker->scan_objects, total_scan);
 		total_scan = freeable;
@@ -407,18 +407,16 @@ static unsigned long do_shrink_slab(struct shrink_control *shrinkctl,
 		cond_resched();
 	}
 
-	if (next_deferred >= scanned)
-		next_deferred -= scanned;
-	else
-		next_deferred = 0;
 	/*
 	 * move the unused scan count back into the shrinker in a
 	 * manner that handles concurrent updates. If we exhausted the
 	 * scan, there is no need to do an update.
 	 */
-	if (next_deferred > 0)
+	if (next_deferred > scanned) {
+		next_deferred -= scanned;
 		new_nr = atomic_long_add_return(next_deferred,
 						&shrinker->nr_deferred[nid]);
+	}
 	else
 		new_nr = atomic_long_read(&shrinker->nr_deferred[nid]);
 
