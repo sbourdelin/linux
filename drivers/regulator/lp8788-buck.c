@@ -426,8 +426,10 @@ static int lp8788_dvs_gpio_request(struct platform_device *pdev,
 				enum lp8788_buck_id id)
 {
 	struct lp8788_platform_data *pdata = buck->lp->pdata;
-	char *b1_name = "LP8788_B1_DVS";
-	char *b2_name[] = { "LP8788_B2_DVS1", "LP8788_B2_DVS2" };
+	static const char * const b1_name = "LP8788_B1_DVS";
+	static const char * const b2_name[] = {
+		"LP8788_B2_DVS1", "LP8788_B2_DVS2"
+	};
 	int i, gpio, ret;
 
 	switch (id) {
