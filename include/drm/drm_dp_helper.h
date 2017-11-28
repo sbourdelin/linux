@@ -284,6 +284,35 @@
 # define DP_DSC_BITS_PER_PIXEL_1_2          0x3
 # define DP_DSC_BITS_PER_PIXEL_1            0x4
 
+/* DP Forward error Correction Registers */
+#define DP_FEC_CAPABILITY		    0x090
+# define DP_FEC_CAPABLE			    (1 << 0)
+# define DP_FEC_UNCORR_BLK_ERROR_COUNT_CAP  (1 << 1)
+# define DP_FEC_CORR_BLK_ERROR_COUNT_CAP    (1 << 2)
+# define DP_FEC_BIT_ERROR_COUNT_CAP	    (1 << 3)
+
+#define DP_FEC_CONFIGURATION		    0x120
+# define DP_FEC_READY			    (1 << 0)
+# define DP_FEC_ERR_COUNT_DIS		    (0 << 1)
+# define DP_FEC_UNCORR_BLK_ERROR_COUNT	    (1 << 1)
+# define DP_FEC_CORR_BLK_ERROR_COUNT	    (2 << 1)
+# define DP_FEC_BIT_ERROR_COUNT		    (3 << 1)
+# define DP_FEC_LANE_0_SELECT		    (0 << 4)
+# define DP_FEC_LANE_1_SELECT		    (1 << 4)
+# define DP_FEC_LANE_2_SELECT		    (2 << 4)
+# define DP_FEC_LANE_3_SELECT		    (3 << 4)
+
+#define DP_FEC_STATUS			    0x280
+# define DP_FEC_EN_DETECTED		    (1 << 0)
+# define DP_FEC_DEC_DETECTED		    (1 << 1)
+
+#define DP_FEC_ERROR_COUNT_1		    0x0281
+# define DP_FEC_ERR_COUNT_7_0(err_count)    (err_count << 0)
+
+#define DP_FEC_ERROR_COUNT_2		    0x0282
+# define DP_FEC_ERR_COUNT_14_8(err_count)   (err_count << 0)
+# define DP_FEC_ERR_COUNT_VALID		    (1 << 7)
+
 #define DP_PSR_SUPPORT                      0x070   /* XXX 1.2? */
 # define DP_PSR_IS_SUPPORTED                1
 # define DP_PSR2_IS_SUPPORTED		    2	    /* eDP 1.4 */
