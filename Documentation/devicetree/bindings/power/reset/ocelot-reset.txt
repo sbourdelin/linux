@@ -1,0 +1,24 @@
+Microsemi Ocelot reset driver
+
+The DEVCPU_GCB:CHIP_REGS have a SOFT_RST register that can be used to reset the
+SoC MIPS core.
+
+Required Properties:
+ - compatible: "mscc,ocelot-chip-reset"
+ - mscc,cpucontrol: phandle to the CPU system control syscon block
+
+Example:
+		cpu_ctrl: syscon@70000000 {
+			compatible = "syscon";
+			reg = <0x70000000 0x2c>;
+		};
+
+		syscon@71070000 {
+			compatible = "simple-mfd", "syscon";
+			reg = <0x71070000 0x1c>;
+
+			reset {
+				compatible = "mscc,ocelot-chip-reset";
+				mscc,cpucontrol = <&cpu_ctrl>;
+			};
+		};
