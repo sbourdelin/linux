@@ -59,6 +59,7 @@ my $conststructsfile = "$D/const_structs.checkpatch";
 my $typedefsfile = "";
 my $color = "auto";
 my $allow_c99_comments = 1;
+my $is_dos_line;
 
 sub help {
 	my ($exitcode) = @_;
@@ -2731,7 +2732,9 @@ sub process {
 		next if (!$hunk_line || $line =~ /^-/);
 
 #trailing whitespace
+		$is_dos_line = 0;
 		if ($line =~ /^\+.*\015/) {
+			$is_dos_line = 1 if (!$fix_inplace);
 			my $herevet = "$here\n" . cat_vet($rawline) . "\n";
 			if (ERROR("DOS_LINE_ENDINGS",
 				  "DOS line endings\n" . $herevet) &&
@@ -2884,7 +2887,12 @@ sub process {
 # if LONG_LINE is ignored, the other 2 types are also ignored
 #
 
-		if ($line =~ /^\+/ && $length > $max_line_length) {
+		# If DOS line detected, additional ^M symbol at the end of
+		# line increases line length, so increase max_line_length
+		# accordingly.
+		my $__max_line_length = $max_line_length + $is_dos_line;
+
+		if ($line =~ /^\+/ && $length > $__max_line_length) {
 			my $msg_type = "LONG_LINE";
 
 			# Check the allowed long line types first
@@ -2892,7 +2900,7 @@ sub process {
 			# logging functions that end in a string that starts
 			# before $max_line_length
 			if ($line =~ /^\+\s*$logFunctions\s*\(\s*(?:(?:KERN_\S+\s*|[^"]*))?($String\s*(?:|,|\)\s*;)\s*)$/ &&
-			    length(expand_tabs(substr($line, 1, length($line) - length($1) - 1))) <= $max_line_length) {
+			    length(expand_tabs(substr($line, 1, length($line) - length($1) - 1))) <= $__max_line_length) {
 				$msg_type = "";
 
 			# lines with only strings (w/ possible termination)
@@ -2910,12 +2918,12 @@ sub process {
 
 			# a comment starts before $max_line_length
 			} elsif ($line =~ /($;[\s$;]*)$/ &&
-				 length(expand_tabs(substr($line, 1, length($line) - length($1) - 1))) <= $max_line_length) {
+				 length(expand_tabs(substr($line, 1, length($line) - length($1) - 1))) <= $__max_line_length) {
 				$msg_type = "LONG_LINE_COMMENT"
 
 			# a quoted string starts before $max_line_length
 			} elsif ($sline =~ /\s*($String(?:\s*(?:\\|,\s*|\)\s*;\s*))?)$/ &&
-				 length(expand_tabs(substr($line, 1, length($line) - length($1) - 1))) <= $max_line_length) {
+				 length(expand_tabs(substr($line, 1, length($line) - length($1) - 1))) <= $__max_line_length) {
 				$msg_type = "LONG_LINE_STRING"
 			}
 
