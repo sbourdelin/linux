@@ -336,7 +336,7 @@ static void register_prot_hook(struct sock *sk)
 {
 	struct packet_sock *po = pkt_sk(sk);
 
-	if (!po->running) {
+	if (!po->running && !po->frozen) {
 		if (po->fanout)
 			__fanout_link(sk, po);
 		else
@@ -368,9 +368,11 @@ static void __unregister_prot_hook(struct sock *sk, bool sync)
 	__sock_put(sk);
 
 	if (sync) {
+		po->frozen = 1;
 		spin_unlock(&po->bind_lock);
 		synchronize_net();
 		spin_lock(&po->bind_lock);
+		po->frozen = 0;
 	}
 }
 
@@ -3105,6 +3107,7 @@ static int packet_do_bind(struct sock *sk, const char *name, int ifindex,
 								 dev->ifindex);
 		}
 
+		BUG_ON(po->running);
 		po->num = proto;
 		po->prot_hook.type = proto;
 

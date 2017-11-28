@@ -114,6 +114,7 @@ struct packet_sock {
 	spinlock_t		bind_lock;
 	struct mutex		pg_vec_lock;
 	unsigned int		running:1,	/* prot_hook is attached*/
+				frozen:1,
 				auxdata:1,
 				origdev:1,
 				has_vnet_hdr:1;
