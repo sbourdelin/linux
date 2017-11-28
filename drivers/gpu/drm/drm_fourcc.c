@@ -168,11 +168,18 @@ const struct drm_format_info *__drm_format_info(u32 format)
 		{ .format = DRM_FORMAT_NV61,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .cpp_scale = { 1, 1 }, .hsub = 2, .vsub = 1, .padding_scale = { 1, 1 } },
 		{ .format = DRM_FORMAT_NV24,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .cpp_scale = { 1, 1 }, .hsub = 1, .vsub = 1, .padding_scale = { 1, 1 } },
 		{ .format = DRM_FORMAT_NV42,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .cpp_scale = { 1, 1 }, .hsub = 1, .vsub = 1, .padding_scale = { 1, 1 } },
+		{ .format = DRM_FORMAT_XV15,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .cpp_scale = { 10, 8 }, .hsub = 2, .vsub = 2,  .padding_scale = { 32, 30 } },
+		{ .format = DRM_FORMAT_XV20,		.depth = 0,  .num_planes = 2, .cpp = { 1, 2, 0 }, .cpp_scale = { 10, 8 }, .hsub = 2, .vsub = 1,  .padding_scale = { 32, 30 } },
 		{ .format = DRM_FORMAT_YUYV,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .cpp_scale = { 1, 1 }, .hsub = 2, .vsub = 1, .padding_scale = { 1, 1 } },
 		{ .format = DRM_FORMAT_YVYU,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .cpp_scale = { 1, 1 }, .hsub = 2, .vsub = 1, .padding_scale = { 1, 1 } },
 		{ .format = DRM_FORMAT_UYVY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .cpp_scale = { 1, 1 }, .hsub = 2, .vsub = 1, .padding_scale = { 1, 1 } },
 		{ .format = DRM_FORMAT_VYUY,		.depth = 0,  .num_planes = 1, .cpp = { 2, 0, 0 }, .cpp_scale = { 1, 1 }, .hsub = 2, .vsub = 1, .padding_scale = { 1, 1 } },
 		{ .format = DRM_FORMAT_AYUV,		.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .cpp_scale = { 1, 1 }, .hsub = 1, .vsub = 1, .padding_scale = { 1, 1 } },
+		{ .format = DRM_FORMAT_VUY888,		.depth = 0,  .num_planes = 1, .cpp = { 3, 0, 0 }, .cpp_scale = { 1, 1 }, .hsub = 1, .vsub = 1,  .padding_scale = { 1, 1 } },
+		{ .format = DRM_FORMAT_XVUY8888,	.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .cpp_scale = { 1, 1 }, .hsub = 1, .vsub = 1,  .padding_scale = { 1, 1 } },
+		{ .format = DRM_FORMAT_XVUY2101010,	.depth = 0,  .num_planes = 1, .cpp = { 4, 0, 0 }, .cpp_scale = { 1, 1 }, .hsub = 1, .vsub = 1,  .padding_scale = { 1, 1 } },
+		{ .format = DRM_FORMAT_Y8,		.depth = 0,  .num_planes = 1, .cpp = { 1, 0, 0 }, .cpp_scale = { 1, 1 }, .hsub = 1, .vsub = 1,  .padding_scale = { 1, 1 } },
+		{ .format = DRM_FORMAT_Y10,		.depth = 0,  .num_planes = 1, .cpp = { 1, 0, 0 }, .cpp_scale = { 10, 8 }, .hsub = 1, .vsub = 1,  .padding_scale = { 32, 30 } },
 	};
 
 	unsigned int i;
