@@ -1,0 +1,6 @@
+* Microsemi MIPS CPUs
+
+Required properties:
+- compatible: "brcm,ocelot"
+
+- mips-hpt-frequency: CPU counter frequency.
