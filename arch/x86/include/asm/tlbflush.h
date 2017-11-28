@@ -77,6 +77,8 @@ static inline u64 inc_mm_tlb_gen(struct mm_struct *mm)
 
 /* There are 12 bits of space for ASIDS in CR3 */
 #define CR3_HW_ASID_BITS 12
+#define CR3_NR_HW_ASIDS	(1<<CR3_HW_ASID_BITS)
+#define INVALID_HW_ASID	(CR3_NR_HW_ASIDS+1)
 /* When enabled, KAISER consumes a single bit for user/kernel switches */
 #ifdef CONFIG_KAISER
 #define X86_CR3_KAISER_SWITCH_BIT 11
@@ -425,19 +427,40 @@ static inline void __native_flush_tlb_global(void)
 	raw_local_irq_restore(flags);
 }
 
+static inline void __invlpg(unsigned long addr)
+{
+	asm volatile("invlpg (%0)" ::"r" (addr) : "memory");
+}
+
+static inline u16 cr3_asid(void)
+{
+	return __read_cr3() & ((1<<CR3_HW_ASID_BITS)-1);
+}
+
 static inline void __native_flush_tlb_single(unsigned long addr)
 {
-	u32 loaded_mm_asid = this_cpu_read(cpu_tlbstate.loaded_mm_asid);
+	u16 loaded_mm_asid = this_cpu_read(cpu_tlbstate.loaded_mm_asid);
 
 	/*
-	 * Some platforms #GP if we call invpcid(type=1/2) before
-	 * CR4.PCIDE=1.  Just call invpcid in the case we are called
-	 * early.
+	 * Handle systems that do not support PCIDs.  This will also
+	 * get used in cases where this is called before PCID detection
+	 * is done.
 	 */
 	if (!this_cpu_has(X86_FEATURE_INVPCID_SINGLE)) {
-		asm volatile("invlpg (%0)" ::"r" (addr) : "memory");
+		__invlpg(addr);
 		return;
 	}
+
+	/*
+	 * An "invalid" loaded_mm_asid means that we have not
+	 * initialized 'cpu_tlbstate' and are not using PCIDs.
+	 * Just flush the TLB as if PCIDs were not present.
+	 */
+	if (loaded_mm_asid == INVALID_HW_ASID) {
+		__invlpg(addr);
+		return;
+	}
+
 	/* Flush the address out of both PCIDs. */
 	/*
 	 * An optimization here might be to determine addresses
@@ -451,6 +474,9 @@ static inline void __native_flush_tlb_single(unsigned long addr)
 	if (kern_asid(loaded_mm_asid) != user_asid(loaded_mm_asid))
 		invpcid_flush_one(user_asid(loaded_mm_asid), addr);
 	invpcid_flush_one(kern_asid(loaded_mm_asid), addr);
+
+	/* Check that we are flushing the active ASID: */
+	VM_WARN_ON_ONCE(kern_asid(loaded_mm_asid) != cr3_asid());
 }
 
 static inline void __flush_tlb_all(void)
