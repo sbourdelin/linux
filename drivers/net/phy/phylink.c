@@ -621,6 +621,16 @@ static int phylink_bringup_phy(struct phylink *pl, struct phy_device *phy)
 	if (ret)
 		return ret;
 
+	/* On _disconnect, the phy state machine and phylink resolve
+	 * are stopped before executing full gracefull down/reset state.
+	 * The further _connect starts with incorrect init state. Let's set
+	 * init values here.
+	 */
+	pl->phy_state.link = false;
+	pl->link_config.pause = MLO_PAUSE_AN;
+	pl->link_config.speed = SPEED_UNKNOWN;
+	pl->link_config.duplex = DUPLEX_UNKNOWN;
+
 	phy->phylink = pl;
 	phy->phy_link_change = phylink_phy_change;
 
