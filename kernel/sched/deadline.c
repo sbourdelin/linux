@@ -1876,7 +1876,7 @@ static int find_later_rq(struct task_struct *task)
 /* Locks the rq it finds */
 static struct rq *find_lock_later_rq(struct task_struct *task, struct rq *rq)
 {
-	struct rq *later_rq = NULL;
+	struct rq *later_rq;
 	int tries;
 	int cpu;
 
@@ -1890,15 +1890,13 @@ static struct rq *find_lock_later_rq(struct task_struct *task, struct rq *rq)
 
 		if (later_rq->dl.dl_nr_running &&
 		    !dl_time_before(task->dl.deadline,
-					later_rq->dl.earliest_dl.curr)) {
+					later_rq->dl.earliest_dl.curr))
 			/*
 			 * Target rq has tasks of equal or earlier deadline,
 			 * retrying does not release any lock and is unlikely
 			 * to yield a different result.
 			 */
-			later_rq = NULL;
 			break;
-		}
 
 		/* Retry if something changed. */
 		if (double_lock_balance(rq, later_rq)) {
@@ -1908,7 +1906,6 @@ static struct rq *find_lock_later_rq(struct task_struct *task, struct rq *rq)
 				     !dl_task(task) ||
 				     !task_on_rq_queued(task))) {
 				double_unlock_balance(rq, later_rq);
-				later_rq = NULL;
 				break;
 			}
 		}
@@ -1921,14 +1918,13 @@ static struct rq *find_lock_later_rq(struct task_struct *task, struct rq *rq)
 		if (!later_rq->dl.dl_nr_running ||
 		    dl_time_before(task->dl.deadline,
 				   later_rq->dl.earliest_dl.curr))
-			break;
+			return later_rq;
 
 		/* Otherwise we try again. */
 		double_unlock_balance(rq, later_rq);
-		later_rq = NULL;
 	}
 
-	return later_rq;
+	return NULL;
 }
 
 static struct task_struct *pick_next_pushable_dl_task(struct rq *rq)
