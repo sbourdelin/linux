@@ -814,6 +814,64 @@ static bool task_will_free_mem(struct task_struct *task)
 	return ret;
 }
 
+static void __oom_kill_process(struct task_struct *victim)
+{
+	bool can_oom_reap = true;
+	struct task_struct *p;
+	struct task_struct *t;
+	struct mm_struct *mm;
+
+	victim = find_lock_task_mm(victim);
+	if (!victim)
+		return;
+	get_task_struct(victim);
+	/* Get a reference to safely compare mm after task_unlock(victim) */
+	mm = victim->mm;
+	mmgrab(mm);
+	task_unlock(victim);
+
+	/*
+	 * Kill all user processes sharing victim's mm and then grant them
+	 * access to memory reserves.
+	 */
+	rcu_read_lock();
+	for_each_process(p) {
+		if (!process_shares_mm(p, mm))
+			continue;
+		if (is_global_init(p)) {
+			can_oom_reap = false;
+			set_bit(MMF_OOM_SKIP, &mm->flags);
+			pr_info("oom killer %d (%s) has mm pinned by %d (%s)\n",
+				task_pid_nr(victim), victim->comm,
+				task_pid_nr(p), p->comm);
+			continue;
+		}
+		/*
+		 * No use_mm() user needs to read from the userspace so we are
+		 * ok to reap it.
+		 */
+		if (unlikely(p->flags & PF_KTHREAD))
+			continue;
+		/*
+		 * We should send SIGKILL before granting access to memory
+		 * reserves in order to prevent the OOM victim from depleting
+		 * the memory reserves from the user space under its control.
+		 */
+		do_send_sig_info(SIGKILL, SEND_SIG_FORCED, p, true);
+		t = find_lock_task_mm(p);
+		if (!t)
+			continue;
+		mark_oom_victim(t);
+		task_unlock(t);
+	}
+	rcu_read_unlock();
+
+	if (can_oom_reap)
+		wake_oom_reaper(victim);
+	mmdrop(mm);
+	put_task_struct(victim);
+}
+
 static void oom_kill_process(struct oom_control *oc, const char *message)
 {
 	struct task_struct *p = oc->chosen;
@@ -825,7 +883,6 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 	unsigned int victim_points = 0;
 	static DEFINE_RATELIMIT_STATE(oom_rs, DEFAULT_RATELIMIT_INTERVAL,
 					      DEFAULT_RATELIMIT_BURST);
-	bool can_oom_reap = true;
 
 	/*
 	 * If the task is already exiting, don't alarm the sysadmin or kill
@@ -833,13 +890,8 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 	 * so it can die quickly
 	 */
 	task_lock(p);
-	if (task_will_free_mem(p)) {
-		mark_oom_victim(p);
-		wake_oom_reaper(p);
-		task_unlock(p);
-		put_task_struct(p);
-		return;
-	}
+	if (task_will_free_mem(p))
+		goto kill_victims;
 	task_unlock(p);
 
 	if (__ratelimit(&oom_rs))
@@ -885,66 +937,20 @@ static void oom_kill_process(struct oom_control *oc, const char *message)
 		put_task_struct(victim);
 		victim = p;
 	}
-
-	/* Get a reference to safely compare mm after task_unlock(victim) */
 	mm = victim->mm;
-	mmgrab(mm);
 
 	/* Raise event before sending signal: task reaper must see this */
 	count_vm_event(OOM_KILL);
 	count_memcg_event_mm(mm, OOM_KILL);
 
-	/*
-	 * We should send SIGKILL before granting access to memory reserves
-	 * in order to prevent the OOM victim from depleting the memory
-	 * reserves from the user space under its control.
-	 */
-	do_send_sig_info(SIGKILL, SEND_SIG_FORCED, victim, true);
-	mark_oom_victim(victim);
 	pr_err("Killed process %d (%s) total-vm:%lukB, anon-rss:%lukB, file-rss:%lukB, shmem-rss:%lukB\n",
-		task_pid_nr(victim), victim->comm, K(victim->mm->total_vm),
-		K(get_mm_counter(victim->mm, MM_ANONPAGES)),
-		K(get_mm_counter(victim->mm, MM_FILEPAGES)),
-		K(get_mm_counter(victim->mm, MM_SHMEMPAGES)));
+	       task_pid_nr(victim), victim->comm, K(mm->total_vm),
+	       K(get_mm_counter(mm, MM_ANONPAGES)),
+	       K(get_mm_counter(mm, MM_FILEPAGES)),
+	       K(get_mm_counter(mm, MM_SHMEMPAGES)));
+kill_victims:
 	task_unlock(victim);
-
-	/*
-	 * Kill all user processes sharing victim->mm in other thread groups, if
-	 * any.  They don't get access to memory reserves, though, to avoid
-	 * depletion of all memory.  This prevents mm->mmap_sem livelock when an
-	 * oom killed thread cannot exit because it requires the semaphore and
-	 * its contended by another thread trying to allocate memory itself.
-	 * That thread will now get access to memory reserves since it has a
-	 * pending fatal signal.
-	 */
-	rcu_read_lock();
-	for_each_process(p) {
-		if (!process_shares_mm(p, mm))
-			continue;
-		if (same_thread_group(p, victim))
-			continue;
-		if (is_global_init(p)) {
-			can_oom_reap = false;
-			set_bit(MMF_OOM_SKIP, &mm->flags);
-			pr_info("oom killer %d (%s) has mm pinned by %d (%s)\n",
-					task_pid_nr(victim), victim->comm,
-					task_pid_nr(p), p->comm);
-			continue;
-		}
-		/*
-		 * No use_mm() user needs to read from the userspace so we are
-		 * ok to reap it.
-		 */
-		if (unlikely(p->flags & PF_KTHREAD))
-			continue;
-		do_send_sig_info(SIGKILL, SEND_SIG_FORCED, p, true);
-	}
-	rcu_read_unlock();
-
-	if (can_oom_reap)
-		wake_oom_reaper(victim);
-
-	mmdrop(mm);
+	__oom_kill_process(victim);
 	put_task_struct(victim);
 }
 #undef K
@@ -1018,8 +1024,7 @@ bool out_of_memory(struct oom_control *oc)
 	 * quickly exit and free its memory.
 	 */
 	if (task_will_free_mem(current)) {
-		mark_oom_victim(current);
-		wake_oom_reaper(current);
+		__oom_kill_process(current);
 		return true;
 	}
 
