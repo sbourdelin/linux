@@ -201,6 +201,7 @@ static int clsact_init(struct Qdisc *sch, struct nlattr *opt)
 
 err_egress_block_get:
 	tcf_block_put_ext(q->ingress_block, sch, &q->ingress_block_info);
+	tcf_flush_blocks();
 	return err;
 }
 

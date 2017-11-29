@@ -1645,6 +1645,7 @@ static int tclass_del_notify(struct net *net,
 		kfree_skb(skb);
 		return err;
 	}
+	tcf_flush_blocks();
 
 	return rtnetlink_send(skb, net, portid, RTNLGRP_TC,
 			      n->nlmsg_flags & NLM_F_ECHO);

@@ -45,6 +45,7 @@ int tcf_block_get_ext(struct tcf_block **p_block, struct Qdisc *q,
 void tcf_block_put(struct tcf_block *block);
 void tcf_block_put_ext(struct tcf_block *block, struct Qdisc *q,
 		       struct tcf_block_ext_info *ei);
+void tcf_flush_blocks(void);
 
 static inline struct Qdisc *tcf_block_q(struct tcf_block *block)
 {

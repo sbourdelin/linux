@@ -71,6 +71,7 @@ struct Qdisc {
 				      * qdisc_tree_decrease_qlen() should stop.
 				      */
 #define TCQ_F_INVISIBLE		0x80 /* invisible by default in dump */
+#define TCQ_F_DELETING		0x100
 	u32			limit;
 	const struct Qdisc_ops	*ops;
 	struct qdisc_size_table	__rcu *stab;
@@ -279,6 +280,10 @@ struct tcf_block {
 	struct Qdisc *q;
 	struct list_head cb_list;
 	struct work_struct work;
+
+	/* TODO: use a single list, do avoid wasting too much memory */
+	struct list_head del_list;
+	struct list_head del_head;
 };
 
 static inline void qdisc_cb_private_validate(const struct sk_buff *skb, int sz)

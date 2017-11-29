@@ -37,6 +37,61 @@ static LIST_HEAD(tcf_proto_base);
 /* Protects list of registered TC modules. It is pure SMP lock. */
 static DEFINE_RWLOCK(cls_mod_lock);
 
+/* List of tcf_blocks queued for deletion. Bulk freeing them we avoid the
+ * rcu_barrier() storm at root_qdisc->destroy() time
+ */
+static LIST_HEAD(queued_blocks);
+
+static void queue_for_deletion(struct tcf_block *block)
+{
+	if (WARN_ON(!list_empty(&block->del_list)))
+		return;
+
+	ASSERT_RTNL();
+	list_add(&block->del_list, &queued_blocks);
+}
+
+static void flush_blocks(struct work_struct *work)
+{
+	struct tcf_block *block, *tmp_block;
+	struct tcf_chain *chain, *tmp;
+	struct list_head *head;
+
+	head = &container_of(work, struct tcf_block, work)->del_head;
+	rtnl_lock();
+	list_for_each_entry(block, head, del_list)
+		/* Only chain 0 should be still here. */
+		list_for_each_entry_safe(chain, tmp, &block->chain_list, list)
+			tcf_chain_put(chain);
+	rtnl_unlock();
+
+	list_for_each_entry_safe(block, tmp_block, head, del_list)
+		kfree(block);
+}
+
+void tcf_flush_blocks(void)
+{
+	struct tcf_block *head;
+	LIST_HEAD(flush_burst);
+
+	ASSERT_RTNL();
+	if (list_empty(&queued_blocks))
+		return;
+
+	head = list_first_entry(&queued_blocks, struct tcf_block, del_list);
+	INIT_LIST_HEAD(&head->del_head);
+	list_splice_init(&queued_blocks, &head->del_head);
+	INIT_WORK(&head->work, flush_blocks);
+
+	/* Wait for existing RCU callbacks to cool down, make sure their works
+	 * have been queued before this. We can not flush pending works here
+	 * because we are holding the RTNL lock.
+	 */
+	rcu_barrier();
+	schedule_work(&head->work);
+}
+EXPORT_SYMBOL_GPL(tcf_flush_blocks);
+
 /* Find classifier type by string name */
 
 static const struct tcf_proto_ops *tcf_proto_lookup_ops(const char *kind)
@@ -288,6 +343,7 @@ int tcf_block_get_ext(struct tcf_block **p_block, struct Qdisc *q,
 		return -ENOMEM;
 	INIT_LIST_HEAD(&block->chain_list);
 	INIT_LIST_HEAD(&block->cb_list);
+	INIT_LIST_HEAD(&block->del_list);
 
 	/* Create chain 0 by default, it has to be always present. */
 	chain = tcf_chain_create(block, 0);
@@ -330,19 +386,6 @@ int tcf_block_get(struct tcf_block **p_block,
 }
 EXPORT_SYMBOL(tcf_block_get);
 
-static void tcf_block_put_final(struct work_struct *work)
-{
-	struct tcf_block *block = container_of(work, struct tcf_block, work);
-	struct tcf_chain *chain, *tmp;
-
-	rtnl_lock();
-	/* Only chain 0 should be still here. */
-	list_for_each_entry_safe(chain, tmp, &block->chain_list, list)
-		tcf_chain_put(chain);
-	rtnl_unlock();
-	kfree(block);
-}
-
 /* XXX: Standalone actions are not allowed to jump to any chain, and bound
  * actions should be all removed after flushing. However, filters are now
  * destroyed in tc filter workqueue with RTNL lock, they can not race here.
@@ -357,13 +400,7 @@ void tcf_block_put_ext(struct tcf_block *block, struct Qdisc *q,
 
 	tcf_block_offload_unbind(block, q, ei);
 
-	INIT_WORK(&block->work, tcf_block_put_final);
-	/* Wait for existing RCU callbacks to cool down, make sure their works
-	 * have been queued before this. We can not flush pending works here
-	 * because we are holding the RTNL lock.
-	 */
-	rcu_barrier();
-	tcf_queue_work(&block->work);
+	queue_for_deletion(block);
 }
 EXPORT_SYMBOL(tcf_block_put_ext);
 
@@ -920,6 +957,7 @@ replay:
 		if (tp_created)
 			tcf_proto_destroy(tp);
 	}
+	tcf_flush_blocks();
 
 errout:
 	if (chain)

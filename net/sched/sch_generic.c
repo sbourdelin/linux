@@ -28,6 +28,7 @@
 #include <linux/if_vlan.h>
 #include <net/sch_generic.h>
 #include <net/pkt_sched.h>
+#include <net/pkt_cls.h>
 #include <net/dst.h>
 #include <trace/events/qdisc.h>
 
@@ -708,10 +709,24 @@ static void qdisc_free(struct Qdisc *qdisc)
 void qdisc_destroy(struct Qdisc *qdisc)
 {
 	const struct Qdisc_ops  *ops = qdisc->ops;
+	struct Qdisc *p;
+	bool flush;
 
 	if (qdisc->flags & TCQ_F_BUILTIN ||
 	    !refcount_dec_and_test(&qdisc->refcnt))
 		return;
+
+	/* we can avoid flush the pending blocks if this qdisc is a child
+	 * deleted a recursive destroy() call and the parent qdisc is already
+	 * removed.
+	 */
+	qdisc->flags |= TCQ_F_DELETING;
+	if (qdisc->parent != TC_H_ROOT) {
+		p = qdisc_lookup(qdisc_dev(qdisc), TC_H_MAJ(qdisc->parent));
+		flush = p && !(p->flags & TCQ_F_DELETING);
+	} else {
+		flush = true;
+	}
 
 #ifdef CONFIG_NET_SCHED
 	qdisc_hash_del(qdisc);
@@ -723,6 +738,8 @@ void qdisc_destroy(struct Qdisc *qdisc)
 		ops->reset(qdisc);
 	if (ops->destroy)
 		ops->destroy(qdisc);
+	if (flush)
+		tcf_flush_blocks();
 
 	module_put(ops->owner);
 	dev_put(qdisc_dev(qdisc));
