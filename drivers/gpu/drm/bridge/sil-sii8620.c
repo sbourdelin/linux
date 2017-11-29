@@ -78,6 +78,7 @@ struct sii8620 {
 	u8 devcap[MHL_DCAP_SIZE];
 	u8 xdevcap[MHL_XDC_SIZE];
 	u8 avif[HDMI_INFOFRAME_SIZE(AVI)];
+	bool feature_complete;
 	struct edid *edid;
 	unsigned int gen2_write_burst:1;
 	enum sii8620_mt_state mt_state;
@@ -470,7 +471,7 @@ static void sii8620_update_array(u8 *dst, u8 *src, int count)
 	}
 }
 
-static void sii8620_sink_detected(struct sii8620 *ctx, int ret)
+static void sii8620_hpd_plugged(struct sii8620 *ctx)
 {
 	static const char * const sink_str[] = {
 		[SINK_NONE] = "NONE",
@@ -481,15 +482,13 @@ static void sii8620_sink_detected(struct sii8620 *ctx, int ret)
 	char sink_name[20];
 	struct device *dev = ctx->dev;
 
-	if (ret < 0)
-		return;
-
 	sii8620_fetch_edid(ctx);
 	if (!ctx->edid) {
 		dev_err(ctx->dev, "Cannot fetch EDID\n");
 		sii8620_mhl_disconnected(ctx);
 		return;
 	}
+	sii8620_set_upstream_edid(ctx);
 
 	if (drm_detect_hdmi_monitor(ctx->edid))
 		ctx->sink_type = SINK_HDMI;
@@ -500,15 +499,6 @@ static void sii8620_sink_detected(struct sii8620 *ctx, int ret)
 
 	dev_info(dev, "detected sink(type: %s): %s\n",
 		 sink_str[ctx->sink_type], sink_name);
-}
-
-static void sii8620_edid_read(struct sii8620 *ctx, int ret)
-{
-	if (ret < 0)
-		return;
-
-	sii8620_set_upstream_edid(ctx);
-	sii8620_enable_hpd(ctx);
 }
 
 static void sii8620_mr_devcap(struct sii8620 *ctx)
@@ -1495,6 +1485,15 @@ static void sii8620_set_mode(struct sii8620 *ctx, enum sii8620_mode mode)
 	);
 }
 
+static void sii8620_hpd_unplugged(struct sii8620 *ctx)
+{
+	sii8620_disable_hpd(ctx);
+	ctx->sink_type = SINK_NONE;
+	ctx->feature_complete = false;
+	kfree(ctx->edid);
+	ctx->edid = NULL;
+}
+
 static void sii8620_disconnect(struct sii8620 *ctx)
 {
 	sii8620_disable_gen2_write_burst(ctx);
@@ -1522,7 +1521,7 @@ static void sii8620_disconnect(struct sii8620 *ctx)
 		REG_MHL_DP_CTL6, 0x2A,
 		REG_MHL_DP_CTL7, 0x03
 	);
-	sii8620_disable_hpd(ctx);
+	sii8620_hpd_unplugged(ctx);
 	sii8620_write_seq_static(ctx,
 		REG_M3_CTRL, VAL_M3_CTRL_MHL3_VALUE,
 		REG_MHL_COC_CTL1, 0x07,
@@ -1571,9 +1570,6 @@ static void sii8620_disconnect(struct sii8620 *ctx)
 	memset(ctx->devcap, 0, sizeof(ctx->devcap));
 	memset(ctx->xdevcap, 0, sizeof(ctx->xdevcap));
 	ctx->cbus_status = 0;
-	ctx->sink_type = SINK_NONE;
-	kfree(ctx->edid);
-	ctx->edid = NULL;
 	sii8620_mt_cleanup(ctx);
 }
 
@@ -1666,7 +1662,6 @@ static void sii8620_status_changed_path(struct sii8620 *ctx)
 				      | MHL_DST_LM_PATH_ENABLED);
 		if (!sii8620_is_mhl3(ctx))
 			sii8620_mt_read_devcap(ctx, false);
-		sii8620_mt_set_cont(ctx, sii8620_sink_detected);
 	} else {
 		sii8620_mt_write_stat(ctx, MHL_DST_REG(LINK_MODE),
 				      MHL_DST_LM_CLK_MODE_NORMAL);
@@ -1769,8 +1764,11 @@ static void sii8620_msc_mr_set_int(struct sii8620 *ctx)
 	}
 	if (ints[MHL_INT_RCHANGE] & MHL_INT_RC_FEAT_REQ)
 		sii8620_send_features(ctx);
-	if (ints[MHL_INT_RCHANGE] & MHL_INT_RC_FEAT_COMPLETE)
-		sii8620_edid_read(ctx, 0);
+	if (ints[MHL_INT_RCHANGE] & MHL_INT_RC_FEAT_COMPLETE) {
+		ctx->feature_complete = true;
+		if (ctx->edid)
+			sii8620_enable_hpd(ctx);
+	}
 }
 
 static struct sii8620_mt_msg *sii8620_msc_msg_first(struct sii8620 *ctx)
@@ -1844,6 +1842,13 @@ static void sii8620_irq_msc(struct sii8620 *ctx)
 
 	if (stat & BIT_CBUS_MSC_MR_WRITE_STAT)
 		sii8620_msc_mr_write_stat(ctx);
+
+	if (stat & BIT_CBUS_HPD_CHG) {
+		if (ctx->cbus_status & BIT_CBUS_STATUS_CBUS_HPD)
+			sii8620_hpd_plugged(ctx);
+		else
+			sii8620_hpd_unplugged(ctx);
+	}
 
 	if (stat & BIT_CBUS_MSC_MR_SET_INT)
 		sii8620_msc_mr_set_int(ctx);
@@ -1999,11 +2004,11 @@ static void sii8620_irq_ddc(struct sii8620 *ctx)
 
 	if (stat & BIT_DDC_CMD_DONE) {
 		sii8620_write(ctx, REG_INTR3_MASK, 0);
-		if (sii8620_is_mhl3(ctx))
+		if (sii8620_is_mhl3(ctx) && !ctx->feature_complete)
 			sii8620_mt_set_int(ctx, MHL_INT_REG(RCHANGE),
 					   MHL_INT_RC_FEAT_REQ);
 		else
-			sii8620_edid_read(ctx, 0);
+			sii8620_enable_hpd(ctx);
 	}
 	sii8620_write(ctx, REG_INTR3, stat);
 }
