@@ -23,6 +23,7 @@
 #include "xhci-plat.h"
 #include "xhci-mvebu.h"
 #include "xhci-rcar.h"
+#include "xhci-mtk.h"
 
 static struct hc_driver __read_mostly xhci_plat_hc_driver;
 
@@ -268,6 +269,18 @@ static int xhci_plat_probe(struct platform_device *pdev)
 
 	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
 		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+
+	/*
+	 * imod_interval is the interrupt modulation value in nanoseconds.
+	 * The increment interval is 8 times as much as that defined in
+	 * the xHCI spec on MTK's controller. This quirk check exists to provide
+	 * backwards compatibility, however, this should be pushed into
+	 * the device tree files at some point in the future and
+	 * checking the quirk should be removed from xhci_plat_probe.
+	 */
+	xhci->imod_interval = xhci->quirks & XHCI_MTK_HOST ? 5000 : 40000;
+
+	device_property_read_u32(sysdev, "imod-interval", &xhci->imod_interval);
 
 	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
 	if (IS_ERR(hcd->usb_phy)) {
