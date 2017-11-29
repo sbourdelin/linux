@@ -5482,7 +5482,10 @@ int kvm_mmu_module_init(void)
 	if (percpu_counter_init(&kvm_total_used_mmu_pages, 0, GFP_KERNEL))
 		goto nomem;
 
-	register_shrinker(&mmu_shrinker);
+	if (register_shrinker(&mmu_shrinker)) {
+		percpu_counter_destroy(&kvm_total_used_mmu_pages);
+		goto nomem;
+	}
 
 	return 0;
 
