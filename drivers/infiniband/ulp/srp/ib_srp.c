@@ -3819,5 +3819,5 @@ static void __exit srp_cleanup_module(void)
 	destroy_workqueue(srp_remove_wq);
 }
 
-module_init(srp_init_module);
+subsys_initcall(srp_init_module);
 module_exit(srp_cleanup_module);

@@ -4372,6 +4372,6 @@ static void __exit ib_cm_cleanup(void)
 	idr_destroy(&cm.local_id_table);
 }
 
-module_init(ib_cm_init);
+subsys_initcall(ib_cm_init);
 module_exit(ib_cm_cleanup);
 
