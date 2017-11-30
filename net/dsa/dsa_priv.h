@@ -97,6 +97,7 @@ const struct dsa_device_ops *dsa_resolve_tag_protocol(int tag_protocol);
 bool dsa_schedule_work(struct work_struct *work);
 
 /* legacy.c */
+#if IS_ENABLED(CONFIG_NET_DSA_LEGACY)
 int dsa_legacy_register(void);
 void dsa_legacy_unregister(void);
 int dsa_legacy_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
@@ -106,6 +107,28 @@ int dsa_legacy_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 int dsa_legacy_fdb_del(struct ndmsg *ndm, struct nlattr *tb[],
 		       struct net_device *dev,
 		       const unsigned char *addr, u16 vid);
+#else
+static inline int dsa_legacy_register(void)
+{
+	return -ENODEV;
+}
+
+static inline void dsa_legacy_unregister(void) { }
+static inline int dsa_legacy_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
+				     struct net_device *dev,
+				     const unsigned char *addr, u16 vid,
+				     u16 flags)
+{
+	return 0;
+}
+
+static inline int dsa_legacy_fdb_del(struct ndmsg *ndm, struct nlattr *tb[],
+				     struct net_device *dev,
+				     const unsigned char *addr, u16 vid)
+{
+	return 0;
+}
+#endif
 
 /* master.c */
 int dsa_master_setup(struct net_device *dev, struct dsa_port *cpu_dp);
