@@ -20,6 +20,7 @@
 
 
 #include "netns.h"
+void groups_sort(struct group_info *group_info);
 
 /*
  * AUTHUNIX and AUTHNULL credentials are both handled here.
@@ -520,6 +521,12 @@ static int unix_gid_parse(struct cache_detail *cd,
 		ug.gi->gid[i] = kgid;
 	}
 
+	/* Sort the groups before inserting this entry
+	 * into the cache to avoid future corrutpions
+	 * by multiple simultaneous attempts to sort this
+	 * entry.
+	 */
+	groups_sort(ug.gi);
 	ugp = unix_gid_lookup(cd, uid);
 	if (ugp) {
 		struct cache_head *ch;
