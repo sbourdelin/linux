@@ -140,7 +140,6 @@ static int tcf_mirred_init(struct net *net, struct nlattr *nla,
 	m->tcfm_eaction = parm->eaction;
 	if (dev != NULL) {
 		m->tcfm_ifindex = parm->ifindex;
-		m->net = net;
 		if (ret != ACT_P_CREATED)
 			dev_put(rcu_dereference_protected(m->tcfm_dev, 1));
 		dev_hold(dev);
@@ -318,7 +317,7 @@ static struct net_device *tcf_mirred_get_dev(const struct tc_action *a)
 {
 	struct tcf_mirred *m = to_mirred(a);
 
-	return __dev_get_by_index(m->net, m->tcfm_ifindex);
+	return rtnl_dereference(m->tcfm_dev);
 }
 
 static struct tc_action_ops act_mirred_ops = {
