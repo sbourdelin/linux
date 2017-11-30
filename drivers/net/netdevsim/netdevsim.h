@@ -13,6 +13,7 @@
  * THE COST OF ALL NECESSARY SERVICING, REPAIR OR CORRECTION.
  */
 
+#include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
 #include <linux/netdevice.h>
@@ -26,6 +27,9 @@
 
 struct bpf_prog;
 struct dentry;
+struct nsim_vf_config;
+
+#define to_nsim(ptr)	container_of(ptr, struct netdevsim, dev)
 
 struct netdevsim {
 	struct net_device *netdev;
@@ -34,7 +38,12 @@ struct netdevsim {
 	u64 tx_bytes;
 	struct u64_stats_sync syncp;
 
+	struct device dev;
+
 	struct dentry *ddir;
+
+	unsigned int num_vfs;
+	struct nsim_vf_config *vfconfigs;
 
 	struct bpf_prog	*bpf_offloaded;
 	u32 bpf_offloaded_id;
