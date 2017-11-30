@@ -208,8 +208,17 @@ static int sun4i_hdmi_get_modes(struct drm_connector *connector)
 	return ret;
 }
 
+static int sun4i_hdmi_mode_valid(struct drm_connector *connector,
+				 struct drm_display_mode *mode)
+{
+	if (mode->clock > 170000)
+		return MODE_CLOCK_HIGH;
+	return MODE_OK;
+}
+
 static const struct drm_connector_helper_funcs sun4i_hdmi_connector_helper_funcs = {
 	.get_modes	= sun4i_hdmi_get_modes,
+	.mode_valid	= sun4i_hdmi_mode_valid,
 };
 
 static enum drm_connector_status
