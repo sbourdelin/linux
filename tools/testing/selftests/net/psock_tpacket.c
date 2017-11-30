@@ -36,6 +36,7 @@
  * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -57,6 +58,7 @@
 #include <net/if.h>
 #include <inttypes.h>
 #include <poll.h>
+#include <sys/time.h>
 
 #include "psock_lib.h"
 
@@ -74,6 +76,19 @@
 
 #define NUM_PACKETS		100
 #define ALIGN_8(x)		(((x) + 8 - 1) & ~(8 - 1))
+
+const uint64_t tstamp_bound_ns64 = 1000UL * 1000 * 1000;
+
+enum cfg_tstamp_type {
+	tstype_none,
+	tstype_default,
+	tstype_skip,
+	tstype_ns64
+};
+
+static enum cfg_tstamp_type cfg_tstamp;
+
+static uint64_t tstamp_start_ns64;
 
 struct ring {
 	struct iovec *rd;
@@ -146,6 +161,43 @@ static void test_payload(void *pay, size_t len)
 	if (eth->h_proto != htons(ETH_P_IP)) {
 		fprintf(stderr, "test_payload: wrong ethernet "
 			"type: 0x%x!\n", ntohs(eth->h_proto));
+		exit(1);
+	}
+}
+
+static void test_tstamp(uint32_t sec, uint32_t nsec)
+{
+	uint64_t tstamp_ns64;
+
+	if (!cfg_tstamp)
+		return;
+
+	if (cfg_tstamp == tstype_skip) {
+		if (sec || nsec) {
+			fprintf(stderr, "%s: unexpected tstamp %u:%u\n",
+				__func__, sec, nsec);
+			exit(1);
+		}
+		return;
+	}
+
+	if (cfg_tstamp == tstype_ns64)
+		tstamp_ns64 = (((uint64_t) sec) << 32) | nsec;
+	else
+		tstamp_ns64 = (sec * 1000UL * 1000 * 1000) + nsec;
+
+	if (tstamp_ns64 < tstamp_start_ns64) {
+		fprintf(stderr, "tstamp: %lu lowerbound=%lu under=%lu\n",
+				tstamp_ns64, tstamp_start_ns64,
+				tstamp_start_ns64 - tstamp_ns64);
+		exit(1);
+	}
+	if (tstamp_ns64 > tstamp_start_ns64 + tstamp_bound_ns64) {
+		fprintf(stderr, "tstamp: %lu upperbound=%lu over=%lu\n",
+				tstamp_ns64,
+				tstamp_start_ns64 + tstamp_bound_ns64,
+				tstamp_ns64 - (tstamp_start_ns64 +
+					       tstamp_bound_ns64));
 		exit(1);
 	}
 }
@@ -256,12 +308,18 @@ static void walk_v1_v2_rx(int sock, struct ring *ring)
 			case TPACKET_V1:
 				test_payload((uint8_t *) ppd.raw + ppd.v1->tp_h.tp_mac,
 					     ppd.v1->tp_h.tp_snaplen);
+				test_tstamp(ppd.v1->tp_h.tp_sec,
+					    cfg_tstamp == tstype_ns64 ?
+					    ppd.v1->tp_h.tp_usec :
+					    ppd.v1->tp_h.tp_usec * 1000);
 				total_bytes += ppd.v1->tp_h.tp_snaplen;
 				break;
 
 			case TPACKET_V2:
 				test_payload((uint8_t *) ppd.raw + ppd.v2->tp_h.tp_mac,
 					     ppd.v2->tp_h.tp_snaplen);
+				test_tstamp(ppd.v2->tp_h.tp_sec,
+					    ppd.v2->tp_h.tp_nsec);
 				total_bytes += ppd.v2->tp_h.tp_snaplen;
 				break;
 			}
@@ -572,6 +630,7 @@ static void __v3_walk_block(struct block_desc *pbd, const int block_num)
 			bytes_with_padding += ALIGN_8(ppd->tp_snaplen + ppd->tp_mac);
 
 		test_payload((uint8_t *) ppd + ppd->tp_mac, ppd->tp_snaplen);
+		test_tstamp(ppd->tp_sec, ppd->tp_nsec);
 
 		status_bar_update();
 		total_packets++;
@@ -766,6 +825,38 @@ static void unmap_ring(int sock, struct ring *ring)
 	free(ring->rd);
 }
 
+static void setup_tstamp(int sock)
+{
+	struct timeval tv;
+	int one = 1;
+
+	gettimeofday(&tv, NULL);
+	tstamp_start_ns64 = (tv.tv_sec * 1000UL * 1000 * 1000) +
+			    (tv.tv_usec * 1000UL);
+
+/* TODO: remove before submit: temporary */
+#ifndef PACKET_SKIPTIMESTAMP
+#define PACKET_SKIPTIMESTAMP	23
+#endif
+#ifndef PACKET_TIMESTAMP_NS64
+#define PACKET_TIMESTAMP_NS64	24
+#endif
+
+	if (cfg_tstamp == tstype_skip) {
+		if (setsockopt(sock, SOL_PACKET, PACKET_SKIPTIMESTAMP,
+			       &one, sizeof(one))) {
+			perror("setsockopt skiptimestamp");
+			exit(1);
+		}
+	} else if (cfg_tstamp == tstype_ns64) {
+		if (setsockopt(sock, SOL_PACKET, PACKET_TIMESTAMP_NS64,
+			       &one, sizeof(one))) {
+			perror("setsockopt timestamp ns64");
+			exit(1);
+		}
+	}
+}
+
 static int test_kernel_bit_width(void)
 {
 	char in[512], *ptr;
@@ -829,6 +920,8 @@ static int test_tpacket(int version, int type)
 	}
 
 	sock = pfsocket(version);
+	if (cfg_tstamp)
+		setup_tstamp(sock);
 	memset(&ring, 0, sizeof(ring));
 	setup_ring(sock, &ring, version, type);
 	mmap_ring(sock, &ring);
@@ -841,9 +934,39 @@ static int test_tpacket(int version, int type)
 	return 0;
 }
 
-int main(void)
+static void usage(const char *filepath)
+{
+	fprintf(stderr, "Usage: %s [-t <default|skip|ns64>]\n", filepath);
+	exit(1);
+}
+
+static void parse_opts(int argc, char **argv)
+{
+	int c;
+
+	while ((c = getopt(argc, argv, "t:")) != -1) {
+		switch (c) {
+		case 't':
+			if (!strcmp(optarg, "default"))
+				cfg_tstamp = tstype_default;
+			else if (!strcmp(optarg, "skip"))
+				cfg_tstamp = tstype_skip;
+			else if (!strcmp(optarg, "ns64"))
+				cfg_tstamp = tstype_ns64;
+			else
+				usage(argv[0]);
+			break;
+		default:
+			usage(argv[0]);
+		}
+	}
+}
+
+int main(int argc, char **argv)
 {
 	int ret = 0;
+
+	parse_opts(argc, argv);
 
 	ret |= test_tpacket(TPACKET_V1, PACKET_RX_RING);
 	ret |= test_tpacket(TPACKET_V1, PACKET_TX_RING);
