@@ -183,15 +183,20 @@ rf69_set_rx_cfg(struct pi433_device *dev, struct pi433_rx_cfg *rx_cfg)
 	int payload_length;
 
 	/* receiver config */
-	SET_CHECKED(rf69_set_frequency	(dev->spi, rx_cfg->frequency));
-	SET_CHECKED(rf69_set_bit_rate	(dev->spi, rx_cfg->bit_rate));
-	SET_CHECKED(rf69_set_modulation	(dev->spi, rx_cfg->modulation));
-	SET_CHECKED(rf69_set_antenna_impedance	 (dev->spi, rx_cfg->antenna_impedance));
-	SET_CHECKED(rf69_set_rssi_threshold	 (dev->spi, rx_cfg->rssi_threshold));
-	SET_CHECKED(rf69_set_ook_threshold_dec	 (dev->spi, rx_cfg->thresholdDecrement));
-	SET_CHECKED(rf69_set_bandwidth 		 (dev->spi, rx_cfg->bw_mantisse, rx_cfg->bw_exponent));
-	SET_CHECKED(rf69_set_bandwidth_during_afc(dev->spi, rx_cfg->bw_mantisse, rx_cfg->bw_exponent));
-	SET_CHECKED(rf69_set_dagc 		 (dev->spi, rx_cfg->dagc));
+	SET_CHECKED(rf69_set_frequency(dev->spi, rx_cfg->frequency));
+	SET_CHECKED(rf69_set_bit_rate(dev->spi, rx_cfg->bit_rate));
+	SET_CHECKED(rf69_set_modulation(dev->spi, rx_cfg->modulation));
+	SET_CHECKED(rf69_set_antenna_impedance(dev->spi,
+					       rx_cfg->antenna_impedance));
+	SET_CHECKED(rf69_set_rssi_threshold(dev->spi, rx_cfg->rssi_threshold));
+	SET_CHECKED(rf69_set_ook_threshold_dec(dev->spi,
+					       rx_cfg->thresholdDecrement));
+	SET_CHECKED(rf69_set_bandwidth(dev->spi, rx_cfg->bw_mantisse,
+				       rx_cfg->bw_exponent));
+	SET_CHECKED(rf69_set_bandwidth_during_afc(dev->spi,
+						  rx_cfg->bw_mantisse,
+						  rx_cfg->bw_exponent));
+	SET_CHECKED(rf69_set_dagc(dev->spi, rx_cfg->dagc));
 
 	dev->rx_bytes_to_drop = rx_cfg->bytes_to_drop;
 
@@ -199,13 +204,11 @@ rf69_set_rx_cfg(struct pi433_device *dev, struct pi433_rx_cfg *rx_cfg)
 	/* enable */
 	SET_CHECKED(rf69_set_sync_enable(dev->spi, rx_cfg->enable_sync));
 	if (rx_cfg->enable_sync == optionOn)
-	{
-		SET_CHECKED(rf69_set_fifo_fill_condition(dev->spi, afterSyncInterrupt));
-	}
+		SET_CHECKED(rf69_set_fifo_fill_condition(dev->spi,
+							 afterSyncInterrupt));
 	else
-	{
 		SET_CHECKED(rf69_set_fifo_fill_condition(dev->spi, always));
-	}
+
 	if (rx_cfg->enable_length_byte == optionOn) {
 		ret = rf69_set_packet_format(dev->spi, packetLengthVar);
 		if (ret < 0)
@@ -215,34 +218,31 @@ rf69_set_rx_cfg(struct pi433_device *dev, struct pi433_rx_cfg *rx_cfg)
 		if (ret < 0)
 			return ret;
 	}
-	SET_CHECKED(rf69_set_adressFiltering(dev->spi, rx_cfg->enable_address_filtering));
-	SET_CHECKED(rf69_set_crc_enable	    (dev->spi, rx_cfg->enable_crc));
+
+	SET_CHECKED(rf69_set_adressFiltering
+			(dev->spi, rx_cfg->enable_address_filtering));
+	SET_CHECKED(rf69_set_crc_enable(dev->spi, rx_cfg->enable_crc));
 
 	/* lengths */
 	SET_CHECKED(rf69_set_sync_size(dev->spi, rx_cfg->sync_length));
-	if (rx_cfg->enable_length_byte == optionOn)
-	{
+	if (rx_cfg->enable_length_byte == optionOn) {
 		SET_CHECKED(rf69_set_payload_length(dev->spi, 0xff));
-	}
-	else if (rx_cfg->fixed_message_length != 0)
-	{
+	} else if (rx_cfg->fixed_message_length != 0) {
 		payload_length = rx_cfg->fixed_message_length;
-		if (rx_cfg->enable_length_byte  == optionOn) payload_length++;
-		if (rx_cfg->enable_address_filtering != filteringOff) payload_length++;
+		if (rx_cfg->enable_length_byte  == optionOn)
+			payload_length++;
+		if (rx_cfg->enable_address_filtering != filteringOff)
+			payload_length++;
 		SET_CHECKED(rf69_set_payload_length(dev->spi, payload_length));
-	}
-	else
-	{
+	} else {
 		SET_CHECKED(rf69_set_payload_length(dev->spi, 0));
 	}
 
 	/* values */
 	if (rx_cfg->enable_sync == optionOn)
-	{
 		SET_CHECKED(rf69_set_sync_values(dev->spi, rx_cfg->sync_pattern));
-	}
-	if (rx_cfg->enable_address_filtering != filteringOff)
-	{
+
+	if (rx_cfg->enable_address_filtering != filteringOff) {
 		SET_CHECKED(rf69_set_node_address     (dev->spi, rx_cfg->node_address));
 		SET_CHECKED(rf69_set_broadcast_address(dev->spi, rx_cfg->broadcast_address));
 	}
