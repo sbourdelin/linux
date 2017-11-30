@@ -34,16 +34,16 @@ static void dumpVGAReg(struct xgifb_video_info *xgifb_info)
 {
 	u8 i, reg;
 
-	xgifb_reg_set(XGISR, 0x05, 0x86);
+	xgifb_reg_set(xgifb_info->dev_info.P3c4, 0x05, 0x86);
 
 	for (i = 0; i < 0x4f; i++) {
-		reg = xgifb_reg_get(XGISR, i);
+		reg = xgifb_reg_get(xgifb_info->dev_info.P3c4, i);
 		pr_debug("o 3c4 %x\n", i);
 		pr_debug("i 3c5 => %x\n", reg);
 	}
 
 	for (i = 0; i < 0xF0; i++) {
-		reg = xgifb_reg_get(XGICR, i);
+		reg = xgifb_reg_get(xgifb_info->dev_info.P3d4, i);
 		pr_debug("o 3d4 %x\n", i);
 		pr_debug("i 3d5 => %x\n", reg);
 	}
@@ -647,7 +647,7 @@ static void XGIfb_pre_setmode(struct xgifb_video_info *xgifb_info)
 {
 	u8 cr30 = 0, cr31 = 0;
 
-	cr31 = xgifb_reg_get(XGICR, 0x31);
+	cr31 = xgifb_reg_get(xgifb_info->dev_info.P3d4, 0x31);
 	cr31 &= ~0x60;
 
 	switch (xgifb_info->display2) {
@@ -684,9 +684,12 @@ static void XGIfb_pre_setmode(struct xgifb_video_info *xgifb_info)
 		cr31 |= (SIS_DRIVER_MODE | SIS_VB_OUTPUT_DISABLE);
 	}
 
-	xgifb_reg_set(XGICR, IND_XGI_SCRATCH_REG_CR30, cr30);
-	xgifb_reg_set(XGICR, IND_XGI_SCRATCH_REG_CR31, cr31);
-	xgifb_reg_set(XGICR, IND_XGI_SCRATCH_REG_CR33,
+	xgifb_reg_set(xgifb_info->dev_info.P3d4,
+		      IND_XGI_SCRATCH_REG_CR30, cr30);
+	xgifb_reg_set(xgifb_info->dev_info.P3d4,
+		      IND_XGI_SCRATCH_REG_CR31, cr31);
+	xgifb_reg_set(xgifb_info->dev_info.P3d4,
+		      IND_XGI_SCRATCH_REG_CR33,
 		      (xgifb_info->rate_idx & 0x0F));
 }
 
@@ -714,7 +717,7 @@ static void XGIfb_post_setmode(struct xgifb_video_info *xgifb_info)
 
 	/* We can't switch off CRT1 if bridge is in slave mode */
 	if (xgifb_info->hasVB != HASVB_NONE) {
-		reg = xgifb_reg_get(XGIPART1, 0x00);
+		reg = xgifb_reg_get(xgifb_info->dev_info.Part1Port, 0x00);
 
 		if ((reg & 0x50) == 0x10)
 			doit = 0;
@@ -723,18 +726,18 @@ static void XGIfb_post_setmode(struct xgifb_video_info *xgifb_info)
 		XGIfb_crt1off = 0;
 	}
 
-	reg = xgifb_reg_get(XGICR, 0x17);
+	reg = xgifb_reg_get(xgifb_info->dev_info.P3d4, 0x17);
 	if ((XGIfb_crt1off) && (doit))
 		reg &= ~0x80;
 	else
 		reg |= 0x80;
-	xgifb_reg_set(XGICR, 0x17, reg);
+	xgifb_reg_set(xgifb_info->dev_info.P3d4, 0x17, reg);
 
-	xgifb_reg_and(XGISR, IND_SIS_RAMDAC_CONTROL, ~0x04);
+	xgifb_reg_and(xgifb_info->dev_info.P3c4, IND_SIS_RAMDAC_CONTROL, ~0x04);
 
 	if (xgifb_info->display2 == XGIFB_DISP_TV &&
 	    xgifb_info->hasVB == HASVB_301) {
-		reg = xgifb_reg_get(XGIPART4, 0x01);
+		reg = xgifb_reg_get(xgifb_info->dev_info.Part4Port, 0x01);
 
 		if (reg < 0xB0) { /* Set filter for XGI301 */
 			int filter_tb;
@@ -761,60 +764,68 @@ static void XGIfb_post_setmode(struct xgifb_video_info *xgifb_info)
 				filter = -1;
 				break;
 			}
-			xgifb_reg_or(XGIPART1,
+			xgifb_reg_or(xgifb_info->dev_info.Part1Port,
 				     SIS_CRT2_WENABLE_315,
 				     0x01);
 
 			if (xgifb_info->TV_type == TVMODE_NTSC) {
-				xgifb_reg_and(XGIPART2, 0x3a, 0x1f);
+				xgifb_reg_and(xgifb_info->dev_info.Part2Port,
+					      0x3a,
+					      0x1f);
 
 				if (xgifb_info->TV_plug == TVPLUG_SVIDEO) {
-					xgifb_reg_and(XGIPART2, 0x30, 0xdf);
+					xgifb_reg_and(
+					    xgifb_info->dev_info.Part2Port,
+					    0x30,
+					    0xdf);
 
 				} else if (xgifb_info->TV_plug
 						== TVPLUG_COMPOSITE) {
-					xgifb_reg_or(XGIPART2, 0x30, 0x20);
+					xgifb_reg_or(
+					    xgifb_info->dev_info.Part2Port,
+					    0x30,
+					    0x20);
 
 					switch (xgifb_info->video_width) {
 					case 640:
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x35,
 							      0xEB);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x36,
 							      0x04);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x37,
 							      0x25);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x38,
 							      0x18);
 						break;
 					case 720:
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x35,
 							      0xEE);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x36,
 							      0x0C);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x37,
 							      0x22);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x38,
 							      0x08);
 						break;
 					case 800:
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x35,
 							      0xEB);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x36,
 							      0x15);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x37,
 							      0x25);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x38,
 							      0xF6);
 						break;
@@ -822,55 +833,58 @@ static void XGIfb_post_setmode(struct xgifb_video_info *xgifb_info)
 				}
 
 			} else if (xgifb_info->TV_type == TVMODE_PAL) {
-				xgifb_reg_and(XGIPART2, 0x3A, 0x1F);
+				xgifb_reg_and(xgifb_info->dev_info.Part2Port,
+					      0x3A, 0x1F);
 
 				if (xgifb_info->TV_plug == TVPLUG_SVIDEO) {
-					xgifb_reg_and(XGIPART2, 0x30, 0xDF);
+					xgifb_reg_and(xgifb_info->dev_info.Part2Port,
+						      0x30, 0xDF);
 
 				} else if (xgifb_info->TV_plug
 						== TVPLUG_COMPOSITE) {
-					xgifb_reg_or(XGIPART2, 0x30, 0x20);
+					xgifb_reg_or(xgifb_info->dev_info.Part2Port,
+						     0x30, 0x20);
 
 					switch (xgifb_info->video_width) {
 					case 640:
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x35,
 							      0xF1);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x36,
 							      0xF7);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x37,
 							      0x1F);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x38,
 							      0x32);
 						break;
 					case 720:
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x35,
 							      0xF3);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x36,
 							      0x00);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x37,
 							      0x1D);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x38,
 							      0x20);
 						break;
 					case 800:
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x35,
 							      0xFC);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x36,
 							      0xFB);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x37,
 							      0x14);
-						xgifb_reg_set(XGIPART2,
+						xgifb_reg_set(xgifb_info->dev_info.Part2Port,
 							      0x38,
 							      0x2A);
 						break;
@@ -883,10 +897,18 @@ static void XGIfb_post_setmode(struct xgifb_video_info *xgifb_info)
 
 				pr_debug("FilterTable[%d]-%d: %*ph\n",
 					 filter_tb, filter, 4, f);
-				xgifb_reg_set(XGIPART2, 0x35, f[0]);
-				xgifb_reg_set(XGIPART2, 0x36, f[1]);
-				xgifb_reg_set(XGIPART2, 0x37, f[2]);
-				xgifb_reg_set(XGIPART2, 0x38, f[3]);
+				xgifb_reg_set(xgifb_info->dev_info.Part2Port,
+					      0x35,
+					      f[0]);
+				xgifb_reg_set(xgifb_info->dev_info.Part2Port,
+					      0x36,
+					      f[1]);
+				xgifb_reg_set(xgifb_info->dev_info.Part2Port,
+					      0x37,
+					      f[2]);
+				xgifb_reg_set(xgifb_info->dev_info.Part2Port,
+					      0x38,
+					      f[3]);
 			}
 		}
 	}
@@ -982,10 +1004,12 @@ static int XGIfb_do_set_var(struct fb_var_screeninfo *var, int isactive,
 		info->fix.line_length = (info->var.xres_virtual
 				* info->var.bits_per_pixel) >> 6;
 
-		xgifb_reg_set(XGISR, IND_SIS_PASSWORD, SIS_PASSWORD);
+		xgifb_reg_set(xgifb_info->dev_info.P3c4,
+			      IND_SIS_PASSWORD, SIS_PASSWORD);
 
-		xgifb_reg_set(XGICR, 0x13, (info->fix.line_length & 0x00ff));
-		xgifb_reg_set(XGISR,
+		xgifb_reg_set(xgifb_info->dev_info.P3d4,
+			      0x13, (info->fix.line_length & 0x00ff));
+		xgifb_reg_set(xgifb_info->dev_info.P3c4,
 			      0x0E,
 			      (info->fix.line_length & 0xff00) >> 8);
 
@@ -1014,16 +1038,18 @@ static int XGIfb_do_set_var(struct fb_var_screeninfo *var, int isactive,
 			xgifb_info->XGI310_AccelDepth = 0x00000000;
 			xgifb_info->video_cmap_len = 256;
 #if defined(__BIG_ENDIAN)
-			cr_data = xgifb_reg_get(XGICR, 0x4D);
-			xgifb_reg_set(XGICR, 0x4D, (cr_data & 0xE0));
+			cr_data = xgifb_reg_get(xgifb_info->dev_info.P3d4,
+						0x4D);
+			xgifb_reg_set(xgifb_info->dev_info.P3d4,
+				      0x4D, (cr_data & 0xE0));
 #endif
 			break;
 		case 16:
 			xgifb_info->DstColor = 0x8000;
 			xgifb_info->XGI310_AccelDepth = 0x00010000;
 #if defined(__BIG_ENDIAN)
-			cr_data = xgifb_reg_get(XGICR, 0x4D);
-			xgifb_reg_set(XGICR, 0x4D, ((cr_data & 0xE0) | 0x0B));
+			cr_data = xgifb_reg_get(xgifb_info->dev_info.P3d4, 0x4D);
+			xgifb_reg_set(xgifb_info->dev_info.P3d4, 0x4D, ((cr_data & 0xE0) | 0x0B));
 #endif
 			xgifb_info->video_cmap_len = 16;
 			break;
@@ -1032,8 +1058,8 @@ static int XGIfb_do_set_var(struct fb_var_screeninfo *var, int isactive,
 			xgifb_info->XGI310_AccelDepth = 0x00020000;
 			xgifb_info->video_cmap_len = 16;
 #if defined(__BIG_ENDIAN)
-			cr_data = xgifb_reg_get(XGICR, 0x4D);
-			xgifb_reg_set(XGICR, 0x4D, ((cr_data & 0xE0) | 0x15));
+			cr_data = xgifb_reg_get(xgifb_info->dev_info.P3d4, 0x4D);
+			xgifb_reg_set(xgifb_info->dev_info.P3d4, 0x4D, ((cr_data & 0xE0) | 0x15));
 #endif
 			break;
 		default:
@@ -1069,20 +1095,20 @@ static int XGIfb_pan_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		break;
 	}
 
-	xgifb_reg_set(XGISR, IND_SIS_PASSWORD, SIS_PASSWORD);
+	xgifb_reg_set(xgifb_info->dev_info.P3c4, IND_SIS_PASSWORD, SIS_PASSWORD);
 
-	xgifb_reg_set(XGICR, 0x0D, base & 0xFF);
-	xgifb_reg_set(XGICR, 0x0C, (base >> 8) & 0xFF);
-	xgifb_reg_set(XGISR, 0x0D, (base >> 16) & 0xFF);
-	xgifb_reg_set(XGISR, 0x37, (base >> 24) & 0x03);
-	xgifb_reg_and_or(XGISR, 0x37, 0xDF, (base >> 21) & 0x04);
+	xgifb_reg_set(xgifb_info->dev_info.P3d4, 0x0D, base & 0xFF);
+	xgifb_reg_set(xgifb_info->dev_info.P3d4, 0x0C, (base >> 8) & 0xFF);
+	xgifb_reg_set(xgifb_info->dev_info.P3c4, 0x0D, (base >> 16) & 0xFF);
+	xgifb_reg_set(xgifb_info->dev_info.P3c4, 0x37, (base >> 24) & 0x03);
+	xgifb_reg_and_or(xgifb_info->dev_info.P3c4, 0x37, 0xDF, (base >> 21) & 0x04);
 
 	if (xgifb_info->display2 != XGIFB_DISP_NONE) {
-		xgifb_reg_or(XGIPART1, SIS_CRT2_WENABLE_315, 0x01);
-		xgifb_reg_set(XGIPART1, 0x06, (base & 0xFF));
-		xgifb_reg_set(XGIPART1, 0x05, ((base >> 8) & 0xFF));
-		xgifb_reg_set(XGIPART1, 0x04, ((base >> 16) & 0xFF));
-		xgifb_reg_and_or(XGIPART1,
+		xgifb_reg_or(xgifb_info->dev_info.Part1Port, SIS_CRT2_WENABLE_315, 0x01);
+		xgifb_reg_set(xgifb_info->dev_info.Part1Port, 0x06, (base & 0xFF));
+		xgifb_reg_set(xgifb_info->dev_info.Part1Port, 0x05, ((base >> 8) & 0xFF));
+		xgifb_reg_set(xgifb_info->dev_info.Part1Port, 0x04, ((base >> 16) & 0xFF));
+		xgifb_reg_and_or(xgifb_info->dev_info.Part1Port,
 				 0x02,
 				 0x7F,
 				 ((base >> 24) & 0x01) << 7);
@@ -1117,15 +1143,15 @@ static int XGIfb_setcolreg(unsigned int regno, unsigned int red,
 
 	switch (info->var.bits_per_pixel) {
 	case 8:
-		outb(regno, XGIDACA);
-		outb((red >> 10), XGIDACD);
-		outb((green >> 10), XGIDACD);
-		outb((blue >> 10), XGIDACD);
+		outb(regno, xgifb_info->dev_info.P3c8);
+		outb((red >> 10), xgifb_info->dev_info.P3c9);
+		outb((green >> 10), xgifb_info->dev_info.P3c9);
+		outb((blue >> 10), xgifb_info->dev_info.P3c9);
 		if (xgifb_info->display2 != XGIFB_DISP_NONE) {
-			outb(regno, XGIDAC2A);
-			outb((red >> 8), XGIDAC2D);
-			outb((green >> 8), XGIDAC2D);
-			outb((blue >> 8), XGIDAC2D);
+			outb(regno, xgifb_info->dev_info.Part5Port);
+			outb((red >> 8), (xgifb_info->dev_info.Part5Port + 1));
+			outb((green >> 8), (xgifb_info->dev_info.Part5Port + 1));
+			outb((blue >> 8), (xgifb_info->dev_info.Part5Port + 1));
 		}
 		break;
 	case 16:
@@ -1347,16 +1373,16 @@ static int XGIfb_blank(int blank, struct fb_info *info)
 	struct xgifb_video_info *xgifb_info = info->par;
 	u8 reg;
 
-	reg = xgifb_reg_get(XGICR, 0x17);
+	reg = xgifb_reg_get(xgifb_info->dev_info.P3d4, 0x17);
 
 	if (blank > 0)
 		reg &= 0x7f;
 	else
 		reg |= 0x80;
 
-	xgifb_reg_set(XGICR, 0x17, reg);
-	xgifb_reg_set(XGISR, 0x00, 0x01); /* Synchronous Reset */
-	xgifb_reg_set(XGISR, 0x00, 0x03); /* End Reset */
+	xgifb_reg_set(xgifb_info->dev_info.P3d4, 0x17, reg);
+	xgifb_reg_set(xgifb_info->dev_info.P3c4, 0x00, 0x01); /* Synchronous Reset */
+	xgifb_reg_set(xgifb_info->dev_info.P3c4, 0x00, 0x03); /* End Reset */
 	return 0;
 }
 
@@ -1385,9 +1411,10 @@ static int XGIfb_get_dram_size(struct xgifb_video_info *xgifb_info)
 
 	/* xorg driver sets 32MB * 1 channel */
 	if (xgifb_info->chip == XG27)
-		xgifb_reg_set(XGISR, IND_SIS_DRAM_SIZE, 0x51);
+		xgifb_reg_set(xgifb_info->dev_info.P3c4,
+			      IND_SIS_DRAM_SIZE, 0x51);
 
-	reg = xgifb_reg_get(XGISR, IND_SIS_DRAM_SIZE);
+	reg = xgifb_reg_get(xgifb_info->dev_info.P3c4, IND_SIS_DRAM_SIZE);
 	if (!reg)
 		return -1;
 
@@ -1463,7 +1490,8 @@ static void XGIfb_detect_VB(struct xgifb_video_info *xgifb_info)
 	xgifb_info->TV_plug = 0;
 	xgifb_info->TV_type = 0;
 
-	cr32 = xgifb_reg_get(XGICR, IND_XGI_SCRATCH_REG_CR32);
+	cr32 = xgifb_reg_get(xgifb_info->dev_info.P3d4,
+			     IND_XGI_SCRATCH_REG_CR32);
 
 	if ((cr32 & SIS_CRT1) && !XGIfb_crt1off) {
 		XGIfb_crt1off = 0;
@@ -1500,7 +1528,7 @@ static void XGIfb_detect_VB(struct xgifb_video_info *xgifb_info)
 	}
 
 	if (xgifb_info->TV_type == 0) {
-		temp = xgifb_reg_get(XGICR, 0x38);
+		temp = xgifb_reg_get(xgifb_info->dev_info.P3d4, 0x38);
 		if (temp & 0x10)
 			xgifb_info->TV_type = TVMODE_PAL;
 		else
@@ -1520,7 +1548,7 @@ static bool XGIfb_has_VB(struct xgifb_video_info *xgifb_info)
 {
 	u8 vb_chipid;
 
-	vb_chipid = xgifb_reg_get(XGIPART4, 0x00);
+	vb_chipid = xgifb_reg_get(xgifb_info->dev_info.Part4Port, 0x00);
 	switch (vb_chipid) {
 	case 0x01:
 		xgifb_info->hasVB = HASVB_301;
@@ -1540,7 +1568,8 @@ static void XGIfb_get_VB_type(struct xgifb_video_info *xgifb_info)
 	u8 reg;
 
 	if (!XGIfb_has_VB(xgifb_info)) {
-		reg = xgifb_reg_get(XGICR, IND_XGI_SCRATCH_REG_CR37);
+		reg = xgifb_reg_get(xgifb_info->dev_info.P3d4,
+				    IND_XGI_SCRATCH_REG_CR37);
 		switch ((reg & SIS_EXTERNAL_CHIP_MASK) >> 1) {
 		case SIS_EXTERNAL_CHIP_LVDS:
 			xgifb_info->hasVB = HASVB_LVDS;
@@ -1661,8 +1690,9 @@ static int xgifb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	XGIRegInit(&xgifb_info->dev_info, xgifb_info->vga_base);
 
-	xgifb_reg_set(XGISR, IND_SIS_PASSWORD, SIS_PASSWORD);
-	reg1 = xgifb_reg_get(XGISR, IND_SIS_PASSWORD);
+	xgifb_reg_set(xgifb_info->dev_info.P3c4,
+		      IND_SIS_PASSWORD, SIS_PASSWORD);
+	reg1 = xgifb_reg_get(xgifb_info->dev_info.P3c4, IND_SIS_PASSWORD);
 
 	if (reg1 != 0xa1) { /* I/O error */
 		dev_err(&pdev->dev, "I/O error\n");
@@ -1672,8 +1702,10 @@ static int xgifb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	switch (xgifb_info->chip_id) {
 	case PCI_DEVICE_ID_XGI_20:
-		xgifb_reg_or(XGICR, Index_CR_GPIO_Reg3, GPIOG_EN);
-		CR48 = xgifb_reg_get(XGICR, Index_CR_GPIO_Reg1);
+		xgifb_reg_or(xgifb_info->dev_info.P3d4,
+			     Index_CR_GPIO_Reg3, GPIOG_EN);
+		CR48 = xgifb_reg_get(xgifb_info->dev_info.P3d4,
+				     Index_CR_GPIO_Reg1);
 		if (CR48 & GPIOG_READ)
 			xgifb_info->chip = XG21;
 		else
@@ -1704,11 +1736,12 @@ static int xgifb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	/* Enable PCI_LINEAR_ADDRESSING and MMIO_ENABLE */
-	xgifb_reg_or(XGISR,
+	xgifb_reg_or(xgifb_info->dev_info.P3c4,
 		     IND_SIS_PCI_ADDRESS_SET,
 		     (SIS_PCI_ADDR_ENABLE | SIS_MEM_MAP_IO_ENABLE));
 	/* Enable 2D accelerator engine */
-	xgifb_reg_or(XGISR, IND_SIS_MODULE_ENABLE, SIS_ENABLE_2D);
+	xgifb_reg_or(xgifb_info->dev_info.P3c4,
+		     IND_SIS_MODULE_ENABLE, SIS_ENABLE_2D);
 
 	hw_info->ulVideoMemorySize = xgifb_info->video_size;
 
@@ -1761,7 +1794,7 @@ static int xgifb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	    (xgifb_info->chip == XG27)) {
 		xgifb_info->hasVB = HASVB_NONE;
 	} else if (xgifb_info->chip == XG21) {
-		CR38 = xgifb_reg_get(XGICR, 0x38);
+		CR38 = xgifb_reg_get(xgifb_info->dev_info.P3d4, 0x38);
 		if ((CR38 & 0xE0) == 0xC0)
 			xgifb_info->display2 = XGIFB_DISP_LCD;
 		else if ((CR38 & 0xE0) == 0x60)
@@ -1778,7 +1811,7 @@ static int xgifb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	switch (xgifb_info->hasVB) {
 	case HASVB_301:
-		reg = xgifb_reg_get(XGIPART4, 0x01);
+		reg = xgifb_reg_get(xgifb_info->dev_info.Part4Port, 0x01);
 		if (reg >= 0xE0) {
 			hw_info->ujVBChipID = VB_CHIP_302LV;
 			dev_info(&pdev->dev,
@@ -1795,7 +1828,7 @@ static int xgifb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		}
 		break;
 	case HASVB_302:
-		reg = xgifb_reg_get(XGIPART4, 0x01);
+		reg = xgifb_reg_get(xgifb_info->dev_info.Part4Port, 0x01);
 		if (reg >= 0xE0) {
 			hw_info->ujVBChipID = VB_CHIP_302LV;
 			dev_info(&pdev->dev,
@@ -1807,7 +1840,8 @@ static int xgifb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 				 "XGI302LV bridge detected (revision 0x%02x)\n",
 				 reg);
 		} else if (reg >= 0xB0) {
-			reg1 = xgifb_reg_get(XGIPART4, 0x23);
+			reg1 = xgifb_reg_get(xgifb_info->dev_info.Part4Port,
+					     0x23);
 
 			hw_info->ujVBChipID = VB_CHIP_302B;
 
@@ -1845,7 +1879,8 @@ static int xgifb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	if (xgifb_info->display2 == XGIFB_DISP_LCD) {
 		if (!enable_dstn) {
-			reg = xgifb_reg_get(XGICR, IND_XGI_LCD_PANEL);
+			reg = xgifb_reg_get(xgifb_info->dev_info.P3d4,
+					    IND_XGI_LCD_PANEL);
 			reg &= 0x0f;
 			hw_info->ulCRT2LCDType = XGI310paneltype[reg];
 		}
