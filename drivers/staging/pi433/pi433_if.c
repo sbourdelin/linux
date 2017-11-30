@@ -122,9 +122,12 @@ struct pi433_instance {
 /*-------------------------------------------------------------------------*/
 
 /* macro for checked access of registers of radio module */
-#define SET_CHECKED(retval) \
-	if (retval < 0) \
-		return retval;
+#define SET_CHECKED(func)		\
+	do {				\
+		int retval = func;	\
+		if (retval < 0)		\
+			return retval;	\
+	} while (0)
 
 /*-------------------------------------------------------------------------*/
 
