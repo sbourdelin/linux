@@ -25,7 +25,6 @@ MODULE_DEVICE_TABLE(pci, xgifb_pci_table);
 #define XGIDACD			  (xgifb_info->dev_info.P3c9)
 #define XGIPART1		  (xgifb_info->dev_info.Part1Port)
 #define XGIPART2		  (xgifb_info->dev_info.Part2Port)
-#define XGIPART3		  (xgifb_info->dev_info.Part3Port)
 #define XGIPART4		  (xgifb_info->dev_info.Part4Port)
 #define XGIPART5		  (xgifb_info->dev_info.Part5Port)
 #define XGIDAC2A                  XGIPART5
