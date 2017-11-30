@@ -525,7 +525,10 @@ struct phylink *phylink_create(struct net_device *ndev, struct device_node *np,
 	pl->netdev = ndev;
 	pl->phy_state.interface = iface;
 	pl->link_interface = iface;
-	pl->link_port = PORT_MII;
+	if (iface == PHY_INTERFACE_MODE_MOCA)
+		pl->link_port = PORT_BNC;
+	else
+		pl->link_port = PORT_MII;
 	pl->link_config.interface = iface;
 	pl->link_config.pause = MLO_PAUSE_AN;
 	pl->link_config.speed = SPEED_UNKNOWN;
