@@ -1,12 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Driver for STM32 DMA controller
  *
  * Inspired by dma-jz4740.c and tegra20-apb-dma.c
  *
  * Copyright (C) M'boumba Cedric Madianga 2015
+ * Copyright (C) STMicroelectronics 2017
  * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
  *
- * License terms:  GNU General Public License (GPL), version 2
  */
 
 #include <linux/clk.h>
