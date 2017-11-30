@@ -14,7 +14,6 @@
 #include <linux/netdevice.h>
 #include <linux/slab.h>
 #include <linux/export.h>
-#include <net/net_namespace.h>
 #include <net/llc.h>
 #include <net/llc_pdu.h>
 #include <net/llc_sap.h>
@@ -161,9 +160,6 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		   struct packet_type *, struct net_device *);
 	void (*sta_handler)(struct sk_buff *skb);
 	void (*sap_handler)(struct llc_sap *sap, struct sk_buff *skb);
-
-	if (!net_eq(dev_net(dev), &init_net))
-		goto drop;
 
 	/*
 	 * When the interface is in promisc. mode, drop all the crap that it
