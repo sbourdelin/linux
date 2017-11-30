@@ -227,19 +227,25 @@ static void scsi_eh_reset(struct scsi_cmnd *scmd)
 void scsi_eh_scmd_add(struct scsi_cmnd *scmd)
 {
 	struct Scsi_Host *shost = scmd->device->host;
+	enum scsi_host_state shost_state;
 	unsigned long flags;
 	int ret;
 
 	WARN_ON_ONCE(!shost->ehandler);
 
 	spin_lock_irqsave(shost->host_lock, flags);
+	shost_state = shost->shost_state;
 	if (scsi_host_set_state(shost, SHOST_RECOVERY)) {
 		ret = scsi_host_set_state(shost, SHOST_CANCEL_RECOVERY);
 		WARN_ON_ONCE(ret);
 	}
 	if (shost->eh_deadline != -1 && !shost->last_reset)
 		shost->last_reset = jiffies;
-
+	if (shost_state != shost->shost_state) {
+		spin_unlock_irqrestore(shost->host_lock, flags);
+		synchronize_rcu();
+		spin_lock_irqsave(shost->host_lock, flags);
+	}
 	scsi_eh_reset(scmd);
 	list_add_tail(&scmd->eh_entry, &shost->eh_cmd_q);
 	shost->host_failed++;
