@@ -910,7 +910,7 @@ static int setup_GPIOs(struct pi433_device *device)
 		DIO1_irq_handler
 	};
 
-	for (i=0; i<NUM_DIO; i++)
+	for (i = 0; i < NUM_DIO; i++)
 	{
 		/* "construct" name and get the gpio descriptor */
 		snprintf(name, sizeof(name), "DIO%d", i);
