@@ -3328,15 +3328,19 @@ nvme_fc_create_ctrl(struct device *dev, struct nvmf_ctrl_options *opts)
 	if (ret || !raddr.nn || !raddr.pn)
 		return ERR_PTR(-EINVAL);
 
-	ret = nvme_fc_parse_traddr(&laddr, opts->host_traddr, NVMF_TRADDR_SIZE);
-	if (ret || !laddr.nn || !laddr.pn)
-		return ERR_PTR(-EINVAL);
+	if (opts->mask & NVMF_OPT_HOST_TRADDR) {
+		ret = nvme_fc_parse_traddr(&laddr, opts->host_traddr,
+					   NVMF_TRADDR_SIZE);
+		if (ret || !laddr.nn || !laddr.pn)
+			return ERR_PTR(-EINVAL);
+	}
 
 	/* find the host and remote ports to connect together */
 	spin_lock_irqsave(&nvme_fc_lock, flags);
 	list_for_each_entry(lport, &nvme_fc_lport_list, port_list) {
-		if (lport->localport.node_name != laddr.nn ||
-		    lport->localport.port_name != laddr.pn)
+		if (!(laddr.nn && laddr.pn) &&
+		    (lport->localport.node_name != laddr.nn ||
+		     lport->localport.port_name != laddr.pn))
 			continue;
 
 		list_for_each_entry(rport, &lport->endp_list, endp_list) {
@@ -3364,8 +3368,9 @@ nvme_fc_create_ctrl(struct device *dev, struct nvmf_ctrl_options *opts)
 
 static struct nvmf_transport_ops nvme_fc_transport = {
 	.name		= "fc",
-	.required_opts	= NVMF_OPT_TRADDR | NVMF_OPT_HOST_TRADDR,
-	.allowed_opts	= NVMF_OPT_RECONNECT_DELAY | NVMF_OPT_CTRL_LOSS_TMO,
+	.required_opts	= NVMF_OPT_TRADDR,
+	.allowed_opts	= NVMF_OPT_RECONNECT_DELAY | NVMF_OPT_CTRL_LOSS_TMO
+				| NVMF_OPT_HOST_TRADDR,
 	.create_ctrl	= nvme_fc_create_ctrl,
 };
 
