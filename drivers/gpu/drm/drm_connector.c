@@ -759,10 +759,11 @@ DRM_ENUM_NAME_FN(drm_get_tv_subconnector_name,
  * 	should update this value using drm_mode_connector_set_tile_property().
  * 	Userspace cannot change this property.
  * link-status:
- *      Connector link-status property to indicate the status of link. The default
- *      value of link-status is "GOOD". If something fails during or after modeset,
- *      the kernel driver may set this to "BAD" and issue a hotplug uevent. Drivers
- *      should update this value using drm_mode_connector_set_link_status_property().
+ *      Connector link-status property to indicate the status of link. The
+ *      default value of link-status is "GOOD". If something fails during or
+ *      after modeset, the kernel driver may set this to "BAD" and issue a
+ *      hotplug uevent. Drivers should update this value using
+ *      drm_mode_connector_set_link_status_property().
  *
  * Connectors also have one standardized atomic property:
  *
