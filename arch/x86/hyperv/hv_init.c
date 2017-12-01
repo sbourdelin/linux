@@ -101,6 +101,76 @@ static int hv_cpu_init(unsigned int cpu)
 	return 0;
 }
 
+static void (*hv_reenlightenment_cb)(void);
+
+static void hv_reenlightenment_notify(struct work_struct *dummy)
+{
+	if (hv_reenlightenment_cb)
+		hv_reenlightenment_cb();
+}
+static DECLARE_WORK(hv_reenlightenment_work, hv_reenlightenment_notify);
+
+void hyperv_stop_tsc_emulation(void)
+{
+	u64 freq;
+	struct hv_tsc_emulation_status emu_status;
+
+	rdmsrl(HV_X64_MSR_TSC_EMULATION_STATUS, *(u64 *)&emu_status);
+	emu_status.inprogress = 0;
+	wrmsrl(HV_X64_MSR_TSC_EMULATION_STATUS, *(u64 *)&emu_status);
+
+	rdmsrl(HV_X64_MSR_TSC_FREQUENCY, freq);
+	tsc_khz = freq/1000;
+}
+EXPORT_SYMBOL_GPL(hyperv_stop_tsc_emulation);
+
+void register_hv_tsc_update(void (*cb)(void))
+{
+	struct hv_reenlightenment_control re_ctrl = {
+		.vector = HYPERV_REENLIGHTENMENT_VECTOR,
+		.enabled = 1,
+		.target_vp = hv_vp_index[smp_processor_id()]
+	};
+	struct hv_tsc_emulation_control emu_ctrl = {.enabled = 1};
+
+	if (!(ms_hyperv.features & HV_X64_ACCESS_REENLIGHTENMENT))
+		return;
+
+	hv_reenlightenment_cb = cb;
+
+	/* Make sure callback is registered before we write to MSRs */
+	wmb();
+
+	wrmsrl(HV_X64_MSR_REENLIGHTENMENT_CONTROL, *((u64 *)&re_ctrl));
+	wrmsrl(HV_X64_MSR_TSC_EMULATION_CONTROL, *((u64 *)&emu_ctrl));
+}
+EXPORT_SYMBOL_GPL(register_hv_tsc_update);
+
+void unregister_hv_tsc_update(void)
+{
+	struct hv_reenlightenment_control re_ctrl;
+
+	if (!(ms_hyperv.features & HV_X64_ACCESS_REENLIGHTENMENT))
+		return;
+
+	rdmsrl(HV_X64_MSR_REENLIGHTENMENT_CONTROL, *(u64 *)&re_ctrl);
+	re_ctrl.enabled = 0;
+	wrmsrl(HV_X64_MSR_REENLIGHTENMENT_CONTROL, *(u64 *)&re_ctrl);
+
+	hv_reenlightenment_cb = NULL;
+}
+EXPORT_SYMBOL_GPL(unregister_hv_tsc_update);
+
+asmlinkage __visible void
+__irq_entry smp_hyperv_reenlightenment_intr(struct pt_regs *regs)
+{
+	entering_ack_irq();
+
+	schedule_work(&hv_reenlightenment_work);
+
+	exiting_irq();
+}
+
 /*
  * This function is to be invoked early in the boot sequence after the
  * hypervisor has been detected.

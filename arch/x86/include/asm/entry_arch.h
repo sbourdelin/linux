@@ -54,3 +54,7 @@ BUILD_INTERRUPT(threshold_interrupt,THRESHOLD_APIC_VECTOR)
 BUILD_INTERRUPT(deferred_error_interrupt, DEFERRED_ERROR_VECTOR)
 #endif
 #endif
+
+#if IS_ENABLED(CONFIG_HYPERV)
+BUILD_INTERRUPT(hyperv_reenlightenment_intr, HYPERV_REENLIGHTENMENT_VECTOR)
+#endif

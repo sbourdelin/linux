@@ -314,11 +314,19 @@ void hyper_alloc_mmu(void);
 void hyperv_report_panic(struct pt_regs *regs, long err);
 bool hv_is_hypercall_page_setup(void);
 void hyperv_cleanup(void);
+
+asmlinkage void smp_hyperv_reenlightenment_intr(struct pt_regs *regs);
+void register_hv_tsc_update(void (*cb)(void));
+void unregister_hv_tsc_update(void);
+void hyperv_stop_tsc_emulation(void);
 #else /* CONFIG_HYPERV */
 static inline void hyperv_init(void) {}
 static inline bool hv_is_hypercall_page_setup(void) { return false; }
 static inline void hyperv_cleanup(void) {}
 static inline void hyperv_setup_mmu_ops(void) {}
+static inline void register_hv_tsc_update(void (*cb)(void)) {}
+static inline void unregister_hv_tsc_update(void) {}
+static inline void hyperv_stop_tsc_emulation(void) {};
 #endif /* CONFIG_HYPERV */
 
 #ifdef CONFIG_HYPERV_TSCPAGE

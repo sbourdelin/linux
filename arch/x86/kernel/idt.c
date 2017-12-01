@@ -140,6 +140,9 @@ static const __initdata struct idt_data apic_idts[] = {
 # ifdef CONFIG_IRQ_WORK
 	INTG(IRQ_WORK_VECTOR,		irq_work_interrupt),
 # endif
+#if IS_ENABLED(CONFIG_HYPERV)
+	INTG(HYPERV_REENLIGHTENMENT_VECTOR, hyperv_reenlightenment_intr),
+#endif
 	INTG(SPURIOUS_APIC_VECTOR,	spurious_interrupt),
 	INTG(ERROR_APIC_VECTOR,		error_interrupt),
 #endif

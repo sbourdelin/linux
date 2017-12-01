@@ -826,6 +826,10 @@ apicinterrupt SPURIOUS_APIC_VECTOR		spurious_interrupt		smp_spurious_interrupt
 apicinterrupt IRQ_WORK_VECTOR			irq_work_interrupt		smp_irq_work_interrupt
 #endif
 
+#if IS_ENABLED(CONFIG_HYPERV)
+apicinterrupt HYPERV_REENLIGHTENMENT_VECTOR	hyperv_reenlightenment_intr	smp_hyperv_reenlightenment_intr
+#endif
+
 /*
  * Exception entry points.
  */
