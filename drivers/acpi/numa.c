@@ -294,7 +294,9 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 		goto out_err_bad_srat;
 	}
 
-	node_set(node, numa_nodes_parsed);
+	/* some architecture is likely to ignore a unreasonable node */
+	if (!node_isset(node, numa_nodes_parsed))
+		goto out;
 
 	pr_info("SRAT: Node %u PXM %u [mem %#010Lx-%#010Lx]%s%s\n",
 		node, pxm,
@@ -309,6 +311,7 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
 
 	max_possible_pfn = max(max_possible_pfn, PFN_UP(end - 1));
 
+out:
 	return 0;
 out_err_bad_srat:
 	bad_srat();
