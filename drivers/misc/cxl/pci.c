@@ -409,7 +409,36 @@ int cxl_calc_capp_routing(struct pci_dev *dev, u64 *chipid,
 	return 0;
 }
 
-int cxl_get_xsl9_dsnctl(u64 capp_unit_id, u64 *reg)
+static u64 nbwind = 0;
+static u64 asnind = 0;
+static u64 capiind = 0;
+
+static int get_phb_indications(struct pci_dev *dev)
+{
+	struct device_node *np;
+	const __be32 *prop;
+
+	if (capiind)
+		return 0;
+
+	if (!(np = pnv_pci_get_phb_node(dev)))
+		return -1;
+
+	prop = of_get_property(np, "ibm,phb-indications", NULL);
+	if (!prop) {
+		nbwind = 0x0300UL; /* legacy values */
+		asnind = 0x0400UL;
+		capiind = 0x0200UL;
+	} else {
+		nbwind = (u64)be32_to_cpu(prop[2]);
+		asnind = (u64)be32_to_cpu(prop[1]);
+		capiind = (u64)be32_to_cpu(prop[0]);
+	}
+	of_node_put(np);
+	return 0;
+}
+
+int cxl_get_xsl9_dsnctl(struct pci_dev *dev, u64 capp_unit_id, u64 *reg)
 {
 	u64 xsl_dsnctl;
 
@@ -423,10 +452,11 @@ int cxl_get_xsl9_dsnctl(u64 capp_unit_id, u64 *reg)
 	 * Tell XSL where to route data to.
 	 * The field chipid should match the PHB CAPI_CMPM register
 	 */
-	xsl_dsnctl = ((u64)0x2 << (63-7)); /* Bit 57 */
+	get_phb_indications(dev);
+	xsl_dsnctl = (capiind << (63-15)); /* Bit 57 */
 	xsl_dsnctl |= (capp_unit_id << (63-15));
 
-	/* nMMU_ID Defaults to: b’000001001’*/
+	/* nMMU_ID Defaults to: b'000001001'*/
 	xsl_dsnctl |= ((u64)0x09 << (63-28));
 
 	if (!(cxl_is_power9_dd1())) {
@@ -437,14 +467,14 @@ int cxl_get_xsl9_dsnctl(u64 capp_unit_id, u64 *reg)
 		 * nbwind=0x03, bits [57:58], must include capi indicator.
 		 * Not supported on P9 DD1.
 		 */
-		xsl_dsnctl |= ((u64)0x03 << (63-47));
+		xsl_dsnctl |= (nbwind << (63-55));
 
 		/*
 		 * Upper 16b address bits of ASB_Notify messages sent to the
-		 * system. Need to match the PHB’s ASN Compare/Mask Register.
+		 * system. Need to match the PHB's ASN Compare/Mask Register.
 		 * Not supported on P9 DD1.
 		 */
-		xsl_dsnctl |= ((u64)0x04 << (63-55));
+		xsl_dsnctl |= asnind;
 	}
 
 	*reg = xsl_dsnctl;
@@ -464,7 +494,7 @@ static int init_implementation_adapter_regs_psl9(struct cxl *adapter,
 	if (rc)
 		return rc;
 
-	rc = cxl_get_xsl9_dsnctl(capp_unit_id, &xsl_dsnctl);
+	rc = cxl_get_xsl9_dsnctl(dev, capp_unit_id, &xsl_dsnctl);
 	if (rc)
 		return rc;
 
