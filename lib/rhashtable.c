@@ -736,16 +736,9 @@ EXPORT_SYMBOL_GPL(rhashtable_walk_exit);
  * @iter:	Hash table iterator
  *
  * Start a hash table walk at the current iterator position.  Note that we take
- * the RCU lock in all cases including when we return an error.  So you must
- * always call rhashtable_walk_stop to clean up.
- *
- * Returns zero if successful.
- *
- * Returns -EAGAIN if resize event occured.  Note that the iterator
- * will rewind back to the beginning and you may use it immediately
- * by calling rhashtable_walk_next.
+ * the RCU lock so you must always call rhashtable_walk_stop to clean up.
  */
-int rhashtable_walk_start(struct rhashtable_iter *iter)
+void rhashtable_walk_start(struct rhashtable_iter *iter)
 	__acquires(RCU)
 {
 	struct rhashtable *ht = iter->ht;
@@ -756,13 +749,6 @@ int rhashtable_walk_start(struct rhashtable_iter *iter)
 	if (iter->walker.tbl)
 		list_del(&iter->walker.list);
 	spin_unlock(&ht->lock);
-
-	if (!iter->walker.tbl) {
-		iter->walker.tbl = rht_dereference_rcu(ht->tbl, ht);
-		return -EAGAIN;
-	}
-
-	return 0;
 }
 EXPORT_SYMBOL_GPL(rhashtable_walk_start);
 
