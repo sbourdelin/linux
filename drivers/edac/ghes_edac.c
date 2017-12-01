@@ -1,13 +1,9 @@
-/*
- * GHES/EDAC Linux driver
- *
- * This file may be distributed under the terms of the GNU General Public
- * License version 2.
- *
- * Copyright (c) 2013 by Mauro Carvalho Chehab
- *
- * Red Hat Inc. http://www.redhat.com
- */
+// SPDX-License-Identifier: GPL-2.0
+// GHES/EDAC Linux driver
+//
+// Copyright (c) 2013 by Mauro Carvalho Chehab
+//
+// Red Hat Inc. http://www.redhat.com
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 

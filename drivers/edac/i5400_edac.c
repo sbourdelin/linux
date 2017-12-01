@@ -1,28 +1,26 @@
-/*
- * Intel 5400 class Memory Controllers kernel module (Seaburg)
- *
- * This file may be distributed under the terms of the
- * GNU General Public License.
- *
- * Copyright (c) 2008 by:
- *	 Ben Woodard <woodard@redhat.com>
- *	 Mauro Carvalho Chehab
- *
- * Red Hat Inc. http://www.redhat.com
- *
- * Forked and adapted from the i5000_edac driver which was
- * written by Douglas Thompson Linux Networx <norsk5@xmission.com>
- *
- * This module is based on the following document:
- *
- * Intel 5400 Chipset Memory Controller Hub (MCH) - Datasheet
- * 	http://developer.intel.com/design/chipsets/datashts/313070.htm
- *
- * This Memory Controller manages DDR2 FB-DIMMs. It has 2 branches, each with
- * 2 channels operating in lockstep no-mirror mode. Each channel can have up to
- * 4 dimm's, each with up to 8GB.
- *
- */
+// SPDX-License-Identifier: GPL-2.0
+// Intel 5400 class Memory Controllers kernel module (Seaburg)
+//
+// This file may be distributed under the terms of the
+// GNU General Public License.
+//
+// Copyright (c) 2008 by:
+//	 Ben Woodard <woodard@redhat.com>
+//	 Mauro Carvalho Chehab
+//
+// Red Hat Inc. http://www.redhat.com
+//
+// Forked and adapted from the i5000_edac driver which was
+// written by Douglas Thompson Linux Networx <norsk5@xmission.com>
+//
+// This module is based on the following document:
+//
+// Intel 5400 Chipset Memory Controller Hub (MCH) - Datasheet
+// 	http://developer.intel.com/design/chipsets/datashts/313070.htm
+//
+// This Memory Controller manages DDR2 FB-DIMMs. It has 2 branches, each with
+// 2 channels operating in lockstep no-mirror mode. Each channel can have up to
+// 4 dimm's, each with up to 8GB.
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -1467,7 +1465,7 @@ static void __exit i5400_exit(void)
 module_init(i5400_init);
 module_exit(i5400_exit);
 
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Ben Woodard <woodard@redhat.com>");
 MODULE_AUTHOR("Mauro Carvalho Chehab");
 MODULE_AUTHOR("Red Hat Inc. (http://www.redhat.com)");

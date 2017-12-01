@@ -1,22 +1,18 @@
-/*
- * Intel 7300 class Memory Controllers kernel module (Clarksboro)
- *
- * This file may be distributed under the terms of the
- * GNU General Public License version 2 only.
- *
- * Copyright (c) 2010 by:
- *	 Mauro Carvalho Chehab
- *
- * Red Hat Inc. http://www.redhat.com
- *
- * Intel 7300 Chipset Memory Controller Hub (MCH) - Datasheet
- *	http://www.intel.com/Assets/PDF/datasheet/318082.pdf
- *
- * TODO: The chipset allow checking for PCI Express errors also. Currently,
- *	 the driver covers only memory error errors
- *
- * This driver uses "csrows" EDAC attribute to represent DIMM slot#
- */
+// SPDX-License-Identifier: GPL-2.0
+// Intel 7300 class Memory Controllers kernel module (Clarksboro)
+//
+// Copyright (c) 2010 by:
+//	 Mauro Carvalho Chehab
+//
+// Red Hat Inc. http://www.redhat.com
+//
+// Intel 7300 Chipset Memory Controller Hub (MCH) - Datasheet
+//	http://www.intel.com/Assets/PDF/datasheet/318082.pdf
+//
+// TODO: The chipset allow checking for PCI Express errors also. Currently,
+//	 the driver covers only memory error errors
+//
+// This driver uses "csrows" EDAC attribute to represent DIMM slot#
 
 #include <linux/module.h>
 #include <linux/init.h>
@@ -1207,7 +1203,7 @@ static void __exit i7300_exit(void)
 module_init(i7300_init);
 module_exit(i7300_exit);
 
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Mauro Carvalho Chehab");
 MODULE_AUTHOR("Red Hat Inc. (http://www.redhat.com)");
 MODULE_DESCRIPTION("MC Driver for Intel I7300 memory controllers - "
