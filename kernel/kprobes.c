@@ -67,6 +67,7 @@ static bool kprobes_all_disarmed;
 
 /* This protects kprobe_table and optimizing_list */
 static DEFINE_MUTEX(kprobe_mutex);
+static DEFINE_MUTEX(kretprobe_mutex);
 static DEFINE_PER_CPU(struct kprobe *, kprobe_instance) = NULL;
 static struct {
 	raw_spinlock_t lock ____cacheline_aligned_in_smp;
@@ -1923,6 +1924,7 @@ int register_kretprobe(struct kretprobe *rp)
 	struct kretprobe_instance *inst;
 	int i;
 	void *addr;
+	struct kprobe *kp;
 
 	if (!kprobe_on_func_entry(rp->kp.addr, rp->kp.symbol_name, rp->kp.offset))
 		return -EINVAL;
@@ -1951,6 +1953,15 @@ int register_kretprobe(struct kretprobe *rp)
 		rp->maxactive = num_possible_cpus();
 #endif
 	}
+
+	mutex_lock(&kretprobe_mutex);
+	rcu_read_lock();
+	kp = __get_valid_kprobe(&rp->kp);
+	rcu_read_unlock();
+	if (kp) {
+		ret = -EINVAL;
+		goto out;
+	}
 	raw_spin_lock_init(&rp->lock);
 	INIT_HLIST_HEAD(&rp->free_instances);
 	for (i = 0; i < rp->maxactive; i++) {
@@ -1958,7 +1969,8 @@ int register_kretprobe(struct kretprobe *rp)
 			       rp->data_size, GFP_KERNEL);
 		if (inst == NULL) {
 			free_rp_inst(rp);
-			return -ENOMEM;
+			ret = -ENOMEM;
+			goto out;
 		}
 		INIT_HLIST_NODE(&inst->hlist);
 		hlist_add_head(&inst->hlist, &rp->free_instances);
@@ -1969,6 +1981,8 @@ int register_kretprobe(struct kretprobe *rp)
 	ret = register_kprobe(&rp->kp);
 	if (ret != 0)
 		free_rp_inst(rp);
+out:
+	mutex_unlock(&kretprobe_mutex);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(register_kretprobe);
