@@ -1827,7 +1827,6 @@ struct bnx2x {
 	struct ptp_clock *ptp_clock;
 	struct ptp_clock_info ptp_clock_info;
 	struct work_struct ptp_task;
-	struct cyclecounter cyclecounter;
 	struct timecounter timecounter;
 	bool timecounter_init_done;
 	struct sk_buff *ptp_tx_skb;

@@ -117,7 +117,6 @@ struct cpts {
 	struct ptp_clock *clock;
 	spinlock_t lock; /* protects time registers */
 	u32 cc_mult; /* for the nominal frequency */
-	struct cyclecounter cc;
 	struct timecounter tc;
 	int phc_index;
 	struct clk *refclk;

@@ -565,7 +565,6 @@ struct igb_adapter {
 	unsigned long last_rx_timestamp;
 	unsigned int ptp_flags;
 	spinlock_t tmreg_lock;
-	struct cyclecounter cc;
 	struct timecounter tc;
 	u32 tx_hwtstamp_timeouts;
 	u32 tx_hwtstamp_skipped;

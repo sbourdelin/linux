@@ -13850,7 +13850,7 @@ static int bnx2x_ptp_settime(struct ptp_clock_info *ptp,
 	DP(BNX2X_MSG_PTP, "PTP settime called, ns = %llu\n", ns);
 
 	/* Re-init the timecounter */
-	timecounter_init(&bp->timecounter, &bp->cyclecounter, ns);
+	timecounter_init(&bp->timecounter, ns);
 
 	return 0;
 }
@@ -15254,7 +15254,7 @@ void bnx2x_set_rx_ts(struct bnx2x *bp, struct sk_buff *skb)
 /* Read the PHC */
 static u64 bnx2x_cyclecounter_read(const struct cyclecounter *cc)
 {
-	struct bnx2x *bp = container_of(cc, struct bnx2x, cyclecounter);
+	struct bnx2x *bp = container_of(cc, struct bnx2x, timecounter.cc);
 	int port = BP_PORT(bp);
 	u32 wb_data[2];
 	u64 phc_cycles;
@@ -15269,13 +15269,13 @@ static u64 bnx2x_cyclecounter_read(const struct cyclecounter *cc)
 	return phc_cycles;
 }
 
-static void bnx2x_init_cyclecounter(struct bnx2x *bp)
+static void bnx2x_init_cyclecounter(struct cyclecounter *cc)
 {
-	memset(&bp->cyclecounter, 0, sizeof(bp->cyclecounter));
-	bp->cyclecounter.read = bnx2x_cyclecounter_read;
-	bp->cyclecounter.mask = CYCLECOUNTER_MASK(64);
-	bp->cyclecounter.shift = 0;
-	bp->cyclecounter.mult = 1;
+	memset(cc, 0, sizeof(*cc));
+	cc->read = bnx2x_cyclecounter_read;
+	cc->mask = CYCLECOUNTER_MASK(64);
+	cc->shift = 0;
+	cc->mult = 1;
 }
 
 static int bnx2x_send_reset_timesync_ramrod(struct bnx2x *bp)
@@ -15511,8 +15511,8 @@ void bnx2x_init_ptp(struct bnx2x *bp)
 	 * unload / load (e.g. MTU change) while it is running.
 	 */
 	if (!bp->timecounter_init_done) {
-		bnx2x_init_cyclecounter(bp);
-		timecounter_init(&bp->timecounter, &bp->cyclecounter,
+		bnx2x_init_cyclecounter(&bp->timecounter.cc);
+		timecounter_init(&bp->timecounter,
 				 ktime_to_ns(ktime_get_real()));
 		bp->timecounter_init_done = 1;
 	}

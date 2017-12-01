@@ -738,7 +738,6 @@ struct ixgbe_adapter {
 	unsigned long last_rx_ptp_check;
 	unsigned long last_rx_timestamp;
 	spinlock_t tmreg_lock;
-	struct cyclecounter hw_cc;
 	struct timecounter hw_tc;
 	u32 base_incval;
 	u32 tx_hwtstamp_timeouts;

@@ -467,7 +467,8 @@ EXPORT_SYMBOL_GPL(snd_hdac_stream_set_params);
 
 static u64 azx_cc_read(const struct cyclecounter *cc)
 {
-	struct hdac_stream *azx_dev = container_of(cc, struct hdac_stream, cc);
+	struct hdac_stream *azx_dev = container_of(cc, struct hdac_stream,
+						   tc.cc);
 
 	return snd_hdac_chip_readl(azx_dev->bus, WALLCLK);
 }
@@ -476,7 +477,7 @@ static void azx_timecounter_init(struct hdac_stream *azx_dev,
 				 bool force, u64 last)
 {
 	struct timecounter *tc = &azx_dev->tc;
-	struct cyclecounter *cc = &azx_dev->cc;
+	struct cyclecounter *cc = &azx_dev->tc.cc;
 	u64 nsec;
 
 	cc->read = azx_cc_read;
@@ -496,7 +497,7 @@ static void azx_timecounter_init(struct hdac_stream *azx_dev,
 	cc->shift = 0;
 
 	nsec = 0; /* audio time is elapsed time since trigger */
-	timecounter_init(tc, cc, nsec);
+	timecounter_init(tc, nsec);
 	if (force) {
 		/*
 		 * force timecounter to use predefined value,

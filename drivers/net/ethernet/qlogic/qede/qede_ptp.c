@@ -34,7 +34,6 @@
 struct qede_ptp {
 	const struct qed_eth_ptp_ops	*ops;
 	struct ptp_clock_info		clock_info;
-	struct cyclecounter		cc;
 	struct timecounter		tc;
 	struct ptp_clock		*clock;
 	struct work_struct		work;
@@ -132,7 +131,7 @@ static int qede_ptp_settime(struct ptp_clock_info *info,
 
 	/* Re-init the timecounter */
 	spin_lock_bh(&ptp->lock);
-	timecounter_init(&ptp->tc, &ptp->cc, ns);
+	timecounter_init(&ptp->tc, ns);
 	spin_unlock_bh(&ptp->lock);
 
 	return 0;
@@ -196,7 +195,7 @@ static u64 qede_ptp_read_cc(const struct cyclecounter *cc)
 	u64 phc_cycles;
 	int rc;
 
-	ptp = container_of(cc, struct qede_ptp, cc);
+	ptp = container_of(cc, struct qede_ptp, tc.cc);
 	edev = ptp->edev;
 	rc = ptp->ops->read_cc(edev->cdev, &phc_cycles);
 	if (rc)
@@ -428,14 +427,13 @@ static int qede_ptp_init(struct qede_dev *edev, bool init_tc)
 	 * unload / load (e.g. MTU change) while it is running.
 	 */
 	if (init_tc) {
-		memset(&ptp->cc, 0, sizeof(ptp->cc));
-		ptp->cc.read = qede_ptp_read_cc;
-		ptp->cc.mask = CYCLECOUNTER_MASK(64);
-		ptp->cc.shift = 0;
-		ptp->cc.mult = 1;
+		memset(&ptp->tc.cc, 0, sizeof(ptp->tc.cc));
+		ptp->tc.cc.read = qede_ptp_read_cc;
+		ptp->tc.cc.mask = CYCLECOUNTER_MASK(64);
+		ptp->tc.cc.shift = 0;
+		ptp->tc.cc.mult = 1;
 
-		timecounter_init(&ptp->tc, &ptp->cc,
-				 ktime_to_ns(ktime_get_real()));
+		timecounter_init(&ptp->tc, ktime_to_ns(ktime_get_real()));
 	}
 
 	return rc;

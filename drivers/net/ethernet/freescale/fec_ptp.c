@@ -186,13 +186,14 @@ static int fec_ptp_enable_pps(struct fec_enet_private *fep, uint enable)
 		 * ptp counter, which maybe cause 32-bit wrap. Since the
 		 * (NSEC_PER_SEC - (u32)ts.tv_nsec) is less than 2 second.
 		 * We can ensure the wrap will not cause issue. If the offset
-		 * is bigger than fep->cc.mask would be a error.
+		 * is bigger than fep->tc.cc.mask would be a error.
 		 */
-		val &= fep->cc.mask;
+		val &= fep->tc.cc.mask;
 		writel(val, fep->hwp + FEC_TCCR(fep->pps_channel));
 
 		/* Calculate the second the compare event timestamp */
-		fep->next_counter = (val + fep->reload_period) & fep->cc.mask;
+		fep->next_counter = (val + fep->reload_period) &
+				    fep->tc.cc.mask;
 
 		/* * Enable compare event when overflow */
 		val = readl(fep->hwp + FEC_ATIME_CTRL);
@@ -211,7 +212,8 @@ static int fec_ptp_enable_pps(struct fec_enet_private *fep, uint enable)
 		 * the third timestamp. Refer the TCCR register detail in the spec.
 		 */
 		writel(fep->next_counter, fep->hwp + FEC_TCCR(fep->pps_channel));
-		fep->next_counter = (fep->next_counter + fep->reload_period) & fep->cc.mask;
+		fep->next_counter = (fep->next_counter + fep->reload_period) &
+				    fep->tc.cc.mask;
 	} else {
 		writel(0, fep->hwp + FEC_TCSR(fep->pps_channel));
 	}
@@ -233,7 +235,7 @@ static int fec_ptp_enable_pps(struct fec_enet_private *fep, uint enable)
 static u64 fec_ptp_read(const struct cyclecounter *cc)
 {
 	struct fec_enet_private *fep =
-		container_of(cc, struct fec_enet_private, cc);
+		container_of(cc, struct fec_enet_private, tc.cc);
 	const struct platform_device_id *id_entry =
 		platform_get_device_id(fep->pdev);
 	u32 tempval;
@@ -276,14 +278,14 @@ void fec_ptp_start_cyclecounter(struct net_device *ndev)
 	writel(FEC_T_CTRL_ENABLE | FEC_T_CTRL_PERIOD_RST,
 		fep->hwp + FEC_ATIME_CTRL);
 
-	memset(&fep->cc, 0, sizeof(fep->cc));
-	fep->cc.read = fec_ptp_read;
-	fep->cc.mask = CLOCKSOURCE_MASK(31);
-	fep->cc.shift = 31;
-	fep->cc.mult = FEC_CC_MULT;
+	memset(&fep->tc.cc, 0, sizeof(fep->tc.cc));
+	fep->tc.cc.read = fec_ptp_read;
+	fep->tc.cc.mask = CLOCKSOURCE_MASK(31);
+	fep->tc.cc.shift = 31;
+	fep->tc.cc.mult = FEC_CC_MULT;
 
 	/* reset the ns time counter */
-	timecounter_init(&fep->tc, &fep->cc, ktime_to_ns(ktime_get_real()));
+	timecounter_init(&fep->tc, ktime_to_ns(ktime_get_real()));
 
 	spin_unlock_irqrestore(&fep->tmreg_lock, flags);
 }
@@ -434,11 +436,11 @@ static int fec_ptp_settime(struct ptp_clock_info *ptp,
 	/* Get the timer value based on timestamp.
 	 * Update the counter with the masked value.
 	 */
-	counter = ns & fep->cc.mask;
+	counter = ns & fep->tc.cc.mask;
 
 	spin_lock_irqsave(&fep->tmreg_lock, flags);
 	writel(counter, fep->hwp + FEC_ATIME);
-	timecounter_init(&fep->tc, &fep->cc, ns);
+	timecounter_init(&fep->tc, ns);
 	spin_unlock_irqrestore(&fep->tmreg_lock, flags);
 	mutex_unlock(&fep->ptp_clk_mutex);
 	return 0;
@@ -570,7 +572,7 @@ static irqreturn_t fec_pps_interrupt(int irq, void *dev_id)
 
 		/* Update the counter; */
 		fep->next_counter = (fep->next_counter + fep->reload_period) &
-				fep->cc.mask;
+				    fep->tc.cc.mask;
 
 		event.type = PTP_CLOCK_PPS;
 		ptp_clock_event(fep->ptp_clock, &event);

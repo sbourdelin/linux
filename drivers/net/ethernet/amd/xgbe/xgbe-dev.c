@@ -1622,8 +1622,7 @@ static int xgbe_config_tstamp(struct xgbe_prv_data *pdata,
 	xgbe_set_tstamp_time(pdata, 0, 0);
 
 	/* Initialize the timecounter */
-	timecounter_init(&pdata->tstamp_tc, &pdata->tstamp_cc,
-			 ktime_to_ns(ktime_get_real()));
+	timecounter_init(&pdata->tstamp_tc, ktime_to_ns(ktime_get_real()));
 
 	return 0;
 }

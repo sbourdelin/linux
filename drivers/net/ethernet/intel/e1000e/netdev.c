@@ -3533,7 +3533,7 @@ s32 e1000e_get_base_timinca(struct e1000_adapter *adapter, u32 *timinca)
 		incperiod = INCPERIOD_96MHZ;
 		incvalue = INCVALUE_96MHZ;
 		shift = INCVALUE_SHIFT_96MHZ;
-		adapter->cc.shift = shift + INCPERIOD_SHIFT_96MHZ;
+		adapter->tc.cc.shift = shift + INCPERIOD_SHIFT_96MHZ;
 		break;
 	case e1000_pch_lpt:
 		if (er32(TSYNCRXCTL) & E1000_TSYNCRXCTL_SYSCFI) {
@@ -3541,13 +3541,13 @@ s32 e1000e_get_base_timinca(struct e1000_adapter *adapter, u32 *timinca)
 			incperiod = INCPERIOD_96MHZ;
 			incvalue = INCVALUE_96MHZ;
 			shift = INCVALUE_SHIFT_96MHZ;
-			adapter->cc.shift = shift + INCPERIOD_SHIFT_96MHZ;
+			adapter->tc.cc.shift = shift + INCPERIOD_SHIFT_96MHZ;
 		} else {
 			/* Stable 25MHz frequency */
 			incperiod = INCPERIOD_25MHZ;
 			incvalue = INCVALUE_25MHZ;
 			shift = INCVALUE_SHIFT_25MHZ;
-			adapter->cc.shift = shift;
+			adapter->tc.cc.shift = shift;
 		}
 		break;
 	case e1000_pch_spt:
@@ -3556,7 +3556,7 @@ s32 e1000e_get_base_timinca(struct e1000_adapter *adapter, u32 *timinca)
 			incperiod = INCPERIOD_24MHZ;
 			incvalue = INCVALUE_24MHZ;
 			shift = INCVALUE_SHIFT_24MHZ;
-			adapter->cc.shift = shift;
+			adapter->tc.cc.shift = shift;
 			break;
 		}
 		return -EINVAL;
@@ -3566,13 +3566,13 @@ s32 e1000e_get_base_timinca(struct e1000_adapter *adapter, u32 *timinca)
 			incperiod = INCPERIOD_24MHZ;
 			incvalue = INCVALUE_24MHZ;
 			shift = INCVALUE_SHIFT_24MHZ;
-			adapter->cc.shift = shift;
+			adapter->tc.cc.shift = shift;
 		} else {
 			/* Stable 38400KHz frequency */
 			incperiod = INCPERIOD_38400KHZ;
 			incvalue = INCVALUE_38400KHZ;
 			shift = INCVALUE_SHIFT_38400KHZ;
-			adapter->cc.shift = shift;
+			adapter->tc.cc.shift = shift;
 		}
 		break;
 	case e1000_82574:
@@ -3581,7 +3581,7 @@ s32 e1000e_get_base_timinca(struct e1000_adapter *adapter, u32 *timinca)
 		incperiod = INCPERIOD_25MHZ;
 		incvalue = INCVALUE_25MHZ;
 		shift = INCVALUE_SHIFT_25MHZ;
-		adapter->cc.shift = shift;
+		adapter->tc.cc.shift = shift;
 		break;
 	default:
 		return -EINVAL;
@@ -3952,8 +3952,7 @@ static void e1000e_systim_reset(struct e1000_adapter *adapter)
 
 	/* reset the systim ns time counter */
 	spin_lock_irqsave(&adapter->systim_lock, flags);
-	timecounter_init(&adapter->tc, &adapter->cc,
-			 ktime_to_ns(ktime_get_real()));
+	timecounter_init(&adapter->tc, ktime_to_ns(ktime_get_real()));
 	spin_unlock_irqrestore(&adapter->systim_lock, flags);
 
 	/* restore the previous hwtstamp configuration settings */
@@ -4386,7 +4385,7 @@ static u64 e1000e_sanitize_systim(struct e1000_hw *hw, u64 systim)
 static u64 e1000e_cyclecounter_read(const struct cyclecounter *cc)
 {
 	struct e1000_adapter *adapter = container_of(cc, struct e1000_adapter,
-						     cc);
+						     tc.cc);
 	struct e1000_hw *hw = &adapter->hw;
 	u32 systimel, systimeh;
 	u64 systim;
@@ -4446,10 +4445,10 @@ static int e1000_sw_init(struct e1000_adapter *adapter)
 
 	/* Setup hardware time stamping cyclecounter */
 	if (adapter->flags & FLAG_HAS_HW_TIMESTAMP) {
-		adapter->cc.read = e1000e_cyclecounter_read;
-		adapter->cc.mask = CYCLECOUNTER_MASK(64);
-		adapter->cc.mult = 1;
-		/* cc.shift set in e1000e_get_base_tininca() */
+		adapter->tc.cc.read = e1000e_cyclecounter_read;
+		adapter->tc.cc.mask = CYCLECOUNTER_MASK(64);
+		adapter->tc.cc.mult = 1;
+		/* tc.cc.shift set in e1000e_get_base_tininca() */
 
 		spin_lock_init(&adapter->systim_lock);
 		INIT_WORK(&adapter->tx_hwtstamp_work, e1000e_tx_hwtstamp_work);

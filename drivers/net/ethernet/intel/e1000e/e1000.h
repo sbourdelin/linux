@@ -340,7 +340,6 @@ struct e1000_adapter {
 	unsigned long tx_hwtstamp_start;
 	struct work_struct tx_hwtstamp_work;
 	spinlock_t systim_lock;	/* protects SYSTIML/H regsters */
-	struct cyclecounter cc;
 	struct timecounter tc;
 	struct ptp_clock *ptp_clock;
 	struct ptp_clock_info ptp_clock_info;

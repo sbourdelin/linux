@@ -445,7 +445,6 @@ struct hdac_stream {
 	unsigned long start_wallclk;	/* start + minimum wallclk */
 	unsigned long period_wallclk;	/* wallclk for period */
 	struct timecounter  tc;
-	struct cyclecounter cc;
 	int delay_negative_threshold;
 
 	struct list_head list;

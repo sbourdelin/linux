@@ -182,7 +182,7 @@ static u64 cpts_systim_read(const struct cyclecounter *cc)
 	u64 val = 0;
 	struct cpts_event *event;
 	struct list_head *this, *next;
-	struct cpts *cpts = container_of(cc, struct cpts, cc);
+	struct cpts *cpts = container_of(cc, struct cpts, tc.cc);
 
 	cpts_write32(cpts, TS_PUSH, ts_push);
 	if (cpts_fifo_read(cpts, CPTS_EV_PUSH))
@@ -224,7 +224,7 @@ static int cpts_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
 
 	timecounter_read(&cpts->tc);
 
-	cpts->cc.mult = neg_adj ? mult - diff : mult + diff;
+	cpts->tc.cc.mult = neg_adj ? mult - diff : mult + diff;
 
 	spin_unlock_irqrestore(&cpts->lock, flags);
 
@@ -268,7 +268,7 @@ static int cpts_ptp_settime(struct ptp_clock_info *ptp,
 	ns = timespec64_to_ns(ts);
 
 	spin_lock_irqsave(&cpts->lock, flags);
-	timecounter_init(&cpts->tc, &cpts->cc, ns);
+	timecounter_init(&cpts->tc, ns);
 	spin_unlock_irqrestore(&cpts->lock, flags);
 
 	return 0;
@@ -447,7 +447,7 @@ int cpts_register(struct cpts *cpts)
 	cpts_write32(cpts, CPTS_EN, control);
 	cpts_write32(cpts, TS_PEND_EN, int_enable);
 
-	timecounter_init(&cpts->tc, &cpts->cc, ktime_to_ns(ktime_get_real()));
+	timecounter_init(&cpts->tc, ktime_to_ns(ktime_get_real()));
 
 	cpts->clock = ptp_clock_register(&cpts->info, cpts->dev);
 	if (IS_ERR(cpts->clock)) {
@@ -486,6 +486,7 @@ EXPORT_SYMBOL_GPL(cpts_unregister);
 
 static void cpts_calc_mult_shift(struct cpts *cpts)
 {
+	struct cyclecounter *cc = &cpts->tc.cc;
 	u64 frac, maxsec, ns;
 	u32 freq;
 
@@ -494,7 +495,7 @@ static void cpts_calc_mult_shift(struct cpts *cpts)
 	/* Calc the maximum number of seconds which we can run before
 	 * wrapping around.
 	 */
-	maxsec = cpts->cc.mask;
+	maxsec = cc->mask;
 	do_div(maxsec, freq);
 	/* limit conversation rate to 10 sec as higher values will produce
 	 * too small mult factors and so reduce the conversion accuracy
@@ -507,18 +508,19 @@ static void cpts_calc_mult_shift(struct cpts *cpts)
 	dev_info(cpts->dev, "cpts: overflow check period %lu (jiffies)\n",
 		 cpts->ov_check_period);
 
-	if (cpts->cc.mult || cpts->cc.shift)
+	if (cc->mult || cc->shift)
 		return;
 
-	clocks_calc_mult_shift(&cpts->cc.mult, &cpts->cc.shift,
+	clocks_calc_mult_shift(&cc->mult, &cc->shift,
 			       freq, NSEC_PER_SEC, maxsec);
 
 	frac = 0;
-	ns = cyclecounter_cyc2ns(&cpts->cc, freq, cpts->cc.mask, &frac);
+	ns = cyclecounter_cyc2ns(cc, freq, cc->mask, &frac);
 
 	dev_info(cpts->dev,
 		 "CPTS: ref_clk_freq:%u calc_mult:%u calc_shift:%u error:%lld nsec/sec\n",
-		 freq, cpts->cc.mult, cpts->cc.shift, (ns - NSEC_PER_SEC));
+		 freq, cc->mult, cc->shift,
+		 (ns - NSEC_PER_SEC));
 }
 
 static int cpts_of_parse(struct cpts *cpts, struct device_node *node)
@@ -527,13 +529,13 @@ static int cpts_of_parse(struct cpts *cpts, struct device_node *node)
 	u32 prop;
 
 	if (!of_property_read_u32(node, "cpts_clock_mult", &prop))
-		cpts->cc.mult = prop;
+		cpts->tc.cc.mult = prop;
 
 	if (!of_property_read_u32(node, "cpts_clock_shift", &prop))
-		cpts->cc.shift = prop;
+		cpts->tc.cc.shift = prop;
 
-	if ((cpts->cc.mult && !cpts->cc.shift) ||
-	    (!cpts->cc.mult && cpts->cc.shift))
+	if ((cpts->tc.cc.mult && !cpts->tc.cc.shift) ||
+	    (!cpts->tc.cc.mult && cpts->tc.cc.shift))
 		goto of_error;
 
 	return 0;
@@ -569,15 +571,15 @@ struct cpts *cpts_create(struct device *dev, void __iomem *regs,
 
 	clk_prepare(cpts->refclk);
 
-	cpts->cc.read = cpts_systim_read;
-	cpts->cc.mask = CLOCKSOURCE_MASK(32);
+	cpts->tc.cc.read = cpts_systim_read;
+	cpts->tc.cc.mask = CLOCKSOURCE_MASK(32);
 	cpts->info = cpts_info;
 
 	cpts_calc_mult_shift(cpts);
-	/* save cc.mult original value as it can be modified
+	/* save tc.cc.mult original value as it can be modified
 	 * by cpts_ptp_adjfreq().
 	 */
-	cpts->cc_mult = cpts->cc.mult;
+	cpts->cc_mult = cpts->tc.cc.mult;
 
 	return cpts;
 }

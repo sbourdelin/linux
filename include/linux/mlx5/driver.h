@@ -780,7 +780,6 @@ struct mlx5_pps {
 
 struct mlx5_clock {
 	rwlock_t                   lock;
-	struct cyclecounter        cycles;
 	struct timecounter         tc;
 	struct hwtstamp_config     hwtstamp_config;
 	u32                        nominal_c_mult;

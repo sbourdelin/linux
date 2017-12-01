@@ -53,7 +53,7 @@ static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
 
 u64 kvm_phys_timer_read(void)
 {
-	return timecounter->cc->read(timecounter->cc);
+	return timecounter->cc.read(&timecounter->cc);
 }
 
 static void soft_timer_start(struct hrtimer *hrt, u64 ns)
@@ -138,7 +138,7 @@ static u64 kvm_timer_compute_delta(struct arch_timer_context *timer_ctx)
 	if (now < cval) {
 		u64 ns;
 
-		ns = cyclecounter_cyc2ns(timecounter->cc,
+		ns = cyclecounter_cyc2ns(&timecounter->cc,
 					 cval - now,
 					 timecounter->mask,
 					 &timecounter->frac);
@@ -734,7 +734,7 @@ int kvm_timer_hyp_init(void)
 	info = arch_timer_get_kvm_info();
 	timecounter = &info->timecounter;
 
-	if (!timecounter->cc) {
+	if (!timecounter->cc.mask) {
 		kvm_err("kvm_arch_timer: uninitialized timecounter\n");
 		return -ENODEV;
 	}

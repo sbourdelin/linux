@@ -179,11 +179,6 @@ static struct clocksource clocksource_counter = {
 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
 };
 
-static struct cyclecounter cyclecounter __ro_after_init = {
-	.read	= arch_counter_read_cc,
-	.mask	= CLOCKSOURCE_MASK(56),
-};
-
 struct ate_acpi_oem_info {
 	char oem_id[ACPI_OEM_ID_SIZE + 1];
 	char oem_table_id[ACPI_OEM_TABLE_ID_SIZE + 1];
@@ -915,7 +910,10 @@ static u64 arch_counter_get_cntvct_mem(void)
 	return ((u64) vct_hi << 32) | vct_lo;
 }
 
-static struct arch_timer_kvm_info arch_timer_kvm_info;
+static struct arch_timer_kvm_info arch_timer_kvm_info = {
+	.timecounter.cc.read = arch_counter_read_cc,
+	.timecounter.cc.mask = CLOCKSOURCE_MASK(56),
+};
 
 struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
 {
@@ -925,6 +923,7 @@ struct arch_timer_kvm_info *arch_timer_get_kvm_info(void)
 static void __init arch_counter_register(unsigned type)
 {
 	u64 start_count;
+	struct cyclecounter *cc = &arch_timer_kvm_info.timecounter.cc;
 
 	/* Register the CP15 based counter if we have one */
 	if (type & ARCH_TIMER_TYPE_CP15) {
@@ -943,10 +942,10 @@ static void __init arch_counter_register(unsigned type)
 		clocksource_counter.flags |= CLOCK_SOURCE_SUSPEND_NONSTOP;
 	start_count = arch_timer_read_counter();
 	clocksource_register_hz(&clocksource_counter, arch_timer_rate);
-	cyclecounter.mult = clocksource_counter.mult;
-	cyclecounter.shift = clocksource_counter.shift;
-	timecounter_init(&arch_timer_kvm_info.timecounter,
-			 &cyclecounter, start_count);
+
+	cc->mult = clocksource_counter.mult;
+	cc->shift = clocksource_counter.shift;
+	timecounter_init(&arch_timer_kvm_info.timecounter, start_count);
 
 	/* 56 bits minimum, so we assume worst case rollover */
 	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
