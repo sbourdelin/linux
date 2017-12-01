@@ -20,6 +20,8 @@
 #include "sun8i_mixer.h"
 #include "sun8i_vi_scaler.h"
 
+static int lmap[] = {1, 0, 2, 3, 4};
+
 static void sun8i_vi_layer_enable(struct sun8i_mixer *mixer, int channel,
 				  int overlay, bool enable)
 {
@@ -38,13 +40,13 @@ static void sun8i_vi_layer_enable(struct sun8i_mixer *mixer, int channel,
 			   SUN8I_MIXER_CHAN_VI_LAYER_ATTR_EN, val);
 
 	if (enable)
-		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(channel);
+		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(lmap[channel]);
 	else
 		val = 0;
 
 	regmap_update_bits(mixer->engine.regs,
 			   SUN8I_MIXER_BLEND_PIPE_CTL,
-			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(channel), val);
+			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(lmap[channel]), val);
 }
 
 static int sun8i_vi_layer_update_coord(struct sun8i_mixer *mixer, int channel,
@@ -130,10 +132,10 @@ static int sun8i_vi_layer_update_coord(struct sun8i_mixer *mixer, int channel,
 			 state->dst.x1, state->dst.y1);
 	DRM_DEBUG_DRIVER("Layer destination size W: %d H: %d\n", dst_w, dst_h);
 	regmap_write(mixer->engine.regs,
-		     SUN8I_MIXER_BLEND_ATTR_COORD(channel),
+		     SUN8I_MIXER_BLEND_ATTR_COORD(lmap[channel]),
 		     SUN8I_MIXER_COORD(state->dst.x1, state->dst.y1));
 	regmap_write(mixer->engine.regs,
-		     SUN8I_MIXER_BLEND_ATTR_INSIZE(channel),
+		     SUN8I_MIXER_BLEND_ATTR_INSIZE(lmap[channel]),
 		     outsize);
 
 	return 0;
