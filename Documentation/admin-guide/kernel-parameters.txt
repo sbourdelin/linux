@@ -640,6 +640,16 @@
 			console=brl,ttyS0
 		For now, only VisioBraille is supported.
 
+	console_msg_format=
+			[KNL] Control message format
+			By default we print messages in "[time stamp] text\n"
+			format (time stamp may not be printed, depending on
+			CONFIG_PRINTK_TIME or `printk_time' param).
+		syslog
+			Switch to syslog format (similar to "dmesg --raw" or
+			reading from /proc/kmsg): "<%u>[time stamp] text\n"
+			IOW, each message has a facility and loglevel prefix.
+
 	consoleblank=	[KNL] The console blank (screen saver) timeout in
 			seconds. A value of 0 disables the blank timer.
                        Defaults to 0.
