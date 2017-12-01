@@ -323,9 +323,10 @@ static inline void hyperv_setup_mmu_ops(void) {}
 
 #ifdef CONFIG_HYPERV_TSCPAGE
 struct ms_hyperv_tsc_page *hv_get_tsc_page(void);
-static inline u64 hv_read_tsc_page(const struct ms_hyperv_tsc_page *tsc_pg)
+static inline u64 hv_read_tsc_page_tsc(const struct ms_hyperv_tsc_page *tsc_pg,
+				       u64 *cur_tsc)
 {
-	u64 scale, offset, cur_tsc;
+	u64 scale, offset;
 	u32 sequence;
 
 	/*
@@ -356,7 +357,7 @@ static inline u64 hv_read_tsc_page(const struct ms_hyperv_tsc_page *tsc_pg)
 
 		scale = READ_ONCE(tsc_pg->tsc_scale);
 		offset = READ_ONCE(tsc_pg->tsc_offset);
-		cur_tsc = rdtsc_ordered();
+		*cur_tsc = rdtsc_ordered();
 
 		/*
 		 * Make sure we read sequence after we read all other values
@@ -366,13 +367,28 @@ static inline u64 hv_read_tsc_page(const struct ms_hyperv_tsc_page *tsc_pg)
 
 	} while (READ_ONCE(tsc_pg->tsc_sequence) != sequence);
 
-	return mul_u64_u64_shr(cur_tsc, scale, 64) + offset;
+	return mul_u64_u64_shr(*cur_tsc, scale, 64) + offset;
+}
+
+static inline u64 hv_read_tsc_page(const struct ms_hyperv_tsc_page *tsc_pg)
+{
+	u64 cur_tsc;
+
+	return hv_read_tsc_page_tsc(tsc_pg, &cur_tsc);
 }
 
 #else
 static inline struct ms_hyperv_tsc_page *hv_get_tsc_page(void)
 {
 	return NULL;
+}
+
+static inline u64 hv_read_tsc_page_tsc(const struct ms_hyperv_tsc_page *tsc_pg,
+				       u64 *cur_tsc)
+{
+	*cur_tsc = rdtsc();
+
+	return cur_tsc;
 }
 #endif
 #endif
