@@ -1114,6 +1114,10 @@ static int cxgb4vf_change_mtu(struct net_device *dev, int new_mtu)
 static netdev_features_t cxgb4vf_fix_features(struct net_device *dev,
 	netdev_features_t features)
 {
+	/* Disable GRO, if RX_CSUM is disabled */
+	if (!(features & NETIF_F_RXCSUM))
+		features &= ~NETIF_F_GRO;
+
 	/*
 	 * Since there is no support for separate rx/tx vlan accel
 	 * enable/disable make sure tx flag is always in same state as rx.
