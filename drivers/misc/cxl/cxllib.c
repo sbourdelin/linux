@@ -202,7 +202,7 @@ int cxllib_get_PE_attributes(struct task_struct *task,
 	} else {
 		attr->pid = 0;
 	}
-	attr->tid = 0;
+	attr->tid = current->thread.tidr;
 	return 0;
 }
 EXPORT_SYMBOL_GPL(cxllib_get_PE_attributes);

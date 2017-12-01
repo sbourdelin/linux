@@ -76,12 +76,27 @@ struct cxl_adapter_image {
 	__u64 reserved4;
 };
 
+struct cxl_ttid {
+	__u64 flags;
+	__u64 tid;
+	__u64 reserved1;
+	__u64 reserved2;
+	__u64 reserved3;
+	__u64 reserved4;
+	__u64 reserved5;
+	__u64 reserved6;
+};
+
+#define CXL_THREAD_TID_CLEAN		0x0000000000000001ULL
+#define CXL_THREAD_TID_ASSIGN		0x0000000000000002ULL
+
 /* ioctl numbers */
 #define CXL_MAGIC 0xCA
 /* AFU devices */
 #define CXL_IOCTL_START_WORK		_IOW(CXL_MAGIC, 0x00, struct cxl_ioctl_start_work)
 #define CXL_IOCTL_GET_PROCESS_ELEMENT	_IOR(CXL_MAGIC, 0x01, __u32)
-#define CXL_IOCTL_GET_AFU_ID            _IOR(CXL_MAGIC, 0x02, struct cxl_afu_id)
+#define CXL_IOCTL_GET_AFU_ID		_IOR(CXL_MAGIC, 0x02, struct cxl_afu_id)
+#define CXL_IOCTL_THREAD_TID		_IOW(CXL_MAGIC, 0x03, struct cxl_ttid)
 /* adapter devices */
 #define CXL_IOCTL_DOWNLOAD_IMAGE        _IOW(CXL_MAGIC, 0x0A, struct cxl_adapter_image)
 #define CXL_IOCTL_VALIDATE_IMAGE        _IOW(CXL_MAGIC, 0x0B, struct cxl_adapter_image)

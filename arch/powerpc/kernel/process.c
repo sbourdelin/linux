@@ -1738,6 +1738,7 @@ int copy_thread(unsigned long clone_flags, unsigned long usp,
 	kregs->nip = ppc_function_entry(f);
 	return 0;
 }
+EXPORT_SYMBOL_GPL(clear_thread_tidr);
 
 /*
  * Set up a thread for executing a new program
@@ -1913,6 +1914,7 @@ int set_fpexc_mode(struct task_struct *tsk, unsigned int val)
 			| tsk->thread.fpexc_mode;
 	return 0;
 }
+EXPORT_SYMBOL_GPL(set_thread_tidr);
 
 int get_fpexc_mode(struct task_struct *tsk, unsigned long adr)
 {

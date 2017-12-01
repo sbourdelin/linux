@@ -561,6 +561,7 @@ struct cxl_context {
 	unsigned int sst_size, sst_lru;
 
 	wait_queue_head_t wq;
+	u32 tid;
 	/* use mm context associated with this pid for ds faults */
 	struct pid *pid;
 	spinlock_t lock; /* Protects pending_irq_mask, pending_fault and fault_addr */
@@ -1168,5 +1169,8 @@ void cxl_context_mm_count_get(struct cxl_context *ctx);
 
 /* Decrements the reference count to "struct mm_struct" */
 void cxl_context_mm_count_put(struct cxl_context *ctx);
+
+/* Handles an unique TIDR (thread id) for the current thread */
+int cxl_context_thread_tidr(struct cxl_context *ctx, u64 flags);
 
 #endif
