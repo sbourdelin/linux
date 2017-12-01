@@ -26,8 +26,8 @@
 
 #include <linux/rbtree.h>
 #include <linux/idr.h>
+#include <drm/gpu_scheduler.h>
 
-#include "gpu_scheduler.h"
 #include "amdgpu_sync.h"
 #include "amdgpu_ring.h"
 
@@ -162,7 +162,7 @@ struct amdgpu_vm {
 	spinlock_t		freed_lock;
 
 	/* Scheduler entity for page table updates */
-	struct amd_sched_entity	entity;
+	struct drm_sched_entity	entity;
 
 	/* client id and PASID (TODO: replace client_id with PASID) */
 	u64                     client_id;

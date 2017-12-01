@@ -2868,11 +2868,11 @@ int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, struct amdgpu_job *job)
 			goto give_up_reset;
 		}
 
-		if (amd_sched_invalidate_job(&job->base, amdgpu_job_hang_limit))
-			amd_sched_job_kickout(&job->base);
+		if (drm_sched_invalidate_job(&job->base, amdgpu_job_hang_limit))
+			drm_sched_job_kickout(&job->base);
 
 		/* only do job_reset on the hang ring if @job not NULL */
-		amd_sched_hw_job_reset(&ring->sched);
+		drm_sched_hw_job_reset(&ring->sched);
 
 		/* after all hw jobs are reset, hw fence is meaningless, so force_completion */
 		amdgpu_fence_driver_force_completion_ring(ring);
@@ -2939,7 +2939,7 @@ int amdgpu_sriov_gpu_reset(struct amdgpu_device *adev, struct amdgpu_job *job)
 			continue;
 		}
 
-		amd_sched_job_recovery(&ring->sched);
+		drm_sched_job_recovery(&ring->sched);
 		kthread_unpark(ring->sched.thread);
 	}
 
@@ -2993,7 +2993,7 @@ int amdgpu_gpu_reset(struct amdgpu_device *adev)
 		if (!ring || !ring->sched.thread)
 			continue;
 		kthread_park(ring->sched.thread);
-		amd_sched_hw_job_reset(&ring->sched);
+		drm_sched_hw_job_reset(&ring->sched);
 	}
 	/* after all hw jobs are reset, hw fence is meaningless, so force_completion */
 	amdgpu_fence_driver_force_completion(adev);
@@ -3089,7 +3089,7 @@ out:
 			if (!ring || !ring->sched.thread)
 				continue;
 
-			amd_sched_job_recovery(&ring->sched);
+			drm_sched_job_recovery(&ring->sched);
 			kthread_unpark(ring->sched.thread);
 		}
 	} else {
