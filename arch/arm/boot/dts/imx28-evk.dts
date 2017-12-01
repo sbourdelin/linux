@@ -20,8 +20,6 @@
 		reg = <0x40000000 0x08000000>;
 	};
 
-	apb@80000000 {
-		apbh@80000000 {
 			&gpmi {
 				pinctrl-names = "default";
 				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg
@@ -165,9 +163,7 @@
 				xceiver-supply = <&reg_can_3v3>;
 				status = "okay";
 			};
-		};
 
-		apbx@80040000 {
 			&saif0 {
 				pinctrl-names = "default";
 				pinctrl-0 = <&saif0_pins_a>;
@@ -241,10 +237,7 @@
 			&usbphy1 {
 				status = "okay";
 			};
-		};
-	};
 
-	ahb@80080000 {
 		&usb0 {
 			pinctrl-names = "default";
 			pinctrl-0 = <&usb0_id_pins_a>;
@@ -273,7 +266,6 @@
 			pinctrl-0 = <&mac1_pins_a>;
 			status = "okay";
 		};
-	};
 
 	regulators {
 		compatible = "simple-bus";
