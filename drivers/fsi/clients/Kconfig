@@ -1,0 +1,5 @@
+config FSI_SBEFIFO
+	tristate "Self Boot Engine FIFO"
+	---help---
+	The Self Boot Engine FIFO manages communication between a service
+	processor and the Self Boot Engine on POWER processors.

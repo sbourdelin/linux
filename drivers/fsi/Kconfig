@@ -33,6 +33,8 @@ config FSI_SCOM
 	---help---
 	This option enables an FSI based SCOM device driver.
 
+source "drivers/fsi/clients/Kconfig"
+
 endif
 
 endmenu
