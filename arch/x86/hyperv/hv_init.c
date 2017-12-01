@@ -171,6 +171,33 @@ __irq_entry smp_hyperv_reenlightenment_intr(struct pt_regs *regs)
 	exiting_irq();
 }
 
+static int hv_cpu_die(unsigned int cpu)
+{
+	struct hv_reenlightenment_control re_ctrl;
+	int i;
+
+	if ((ms_hyperv.features & HV_X64_ACCESS_REENLIGHTENMENT) &&
+	    hv_reenlightenment_cb != NULL) {
+		rdmsrl(HV_X64_MSR_REENLIGHTENMENT_CONTROL, *((u64 *)&re_ctrl));
+		if (re_ctrl.target_vp != hv_vp_index[cpu])
+			return 0;
+
+		/* Find some other online CPU */
+		for_each_online_cpu(i) {
+			if (i == cpu)
+				continue;
+
+			re_ctrl.target_vp = hv_vp_index[i];
+			wrmsrl(HV_X64_MSR_REENLIGHTENMENT_CONTROL,
+			       *((u64 *)&re_ctrl));
+
+			break;
+		}
+	}
+
+	return 0;
+}
+
 /*
  * This function is to be invoked early in the boot sequence after the
  * hypervisor has been detected.
@@ -200,7 +227,7 @@ void hyperv_init(void)
 		return;
 
 	if (cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "x86/hyperv_init:online",
-			      hv_cpu_init, NULL) < 0)
+			      hv_cpu_init, hv_cpu_die) < 0)
 		goto free_vp_index;
 
 	/*
