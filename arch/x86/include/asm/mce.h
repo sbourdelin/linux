@@ -376,6 +376,7 @@ struct smca_bank {
 extern struct smca_bank smca_banks[MAX_NR_BANKS];
 
 extern const char *smca_get_long_name(enum smca_bank_types t);
+extern unsigned int smca_get_bank_type(struct mce *m);
 
 extern int mce_threshold_create_device(unsigned int cpu);
 extern int mce_threshold_remove_device(unsigned int cpu);
