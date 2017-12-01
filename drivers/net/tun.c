@@ -2067,14 +2067,17 @@ static int tun_recvmsg(struct socket *sock, struct msghdr *m, size_t total_len,
 {
 	struct tun_file *tfile = container_of(sock, struct tun_file, socket);
 	struct tun_struct *tun = tun_get(tfile);
+	struct sk_buff *skb = m->msg_control;
 	int ret;
 
-	if (!tun)
-		return -EBADFD;
+	if (!tun) {
+		ret = -EBADFD;
+		goto out_free_skb;
+	}
 
 	if (flags & ~(MSG_DONTWAIT|MSG_TRUNC|MSG_ERRQUEUE)) {
 		ret = -EINVAL;
-		goto out;
+		goto out_free_skb;
 	}
 	if (flags & MSG_ERRQUEUE) {
 		ret = sock_recv_errqueue(sock->sk, m, total_len,
@@ -2087,6 +2090,11 @@ static int tun_recvmsg(struct socket *sock, struct msghdr *m, size_t total_len,
 		m->msg_flags |= MSG_TRUNC;
 		ret = flags & MSG_TRUNC ? ret : total_len;
 	}
+	goto out;
+
+out_free_skb:
+	if (skb)
+		kfree_skb(skb);
 out:
 	tun_put(tun);
 	return ret;
