@@ -52,6 +52,8 @@ struct pg_state {
 	unsigned long start_address;
 	unsigned level;
 	u64 current_prot;
+	bool check_wx;
+	unsigned long wx_pages;
 	const char *current_domain;
 };
 
@@ -226,6 +228,60 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits, size_t 
 	}
 }
 
+static inline bool is_prot_ro(struct pg_state *st)
+{
+	if (st->level < 4) {
+	#ifdef CONFIG_ARM_LPAE
+		if ((st->current_prot &
+		(L_PMD_SECT_RDONLY | PMD_SECT_AP2)) ==
+		(L_PMD_SECT_RDONLY | PMD_SECT_AP2))
+			return true;
+	#elif __LINUX_ARM_ARCH__ >= 6
+		if ((st->current_prot &
+		(PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE)) ==
+		(PMD_SECT_APX | PMD_SECT_AP_WRITE))
+			return true;
+	#else
+		if ((st->current_prot &
+		(PMD_SECT_AP_READ | PMD_SECT_AP_WRITE)) == 0)
+			return true;
+	#endif
+	} else {
+		if ((st->current_prot & L_PTE_RDONLY) == L_PTE_RDONLY)
+			return true;
+	}
+
+	return false;
+}
+
+static inline bool is_prot_nx(struct pg_state *st)
+{
+	if (st->level < 4) {
+		if ((st->current_prot & PMD_SECT_XN) == PMD_SECT_XN)
+			return true;
+	} else {
+		if ((st->current_prot & L_PTE_XN) == L_PTE_XN)
+			return true;
+	}
+
+	return false;
+}
+
+static void note_prot_wx(struct pg_state *st, unsigned long addr)
+{
+	if (!st->check_wx)
+		return;
+	if (is_prot_ro(st))
+		return;
+	if (is_prot_nx(st))
+		return;
+
+	WARN_ONCE(1, "arm/mm: Found insecure W+X mapping at address %p/%pS\n",
+		(void *)st->start_address, (void *)st->start_address);
+
+	st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
+}
+
 static void note_page(struct pg_state *st, unsigned long addr,
 		      unsigned int level, u64 val, const char *domain)
 {
@@ -244,6 +300,7 @@ static void note_page(struct pg_state *st, unsigned long addr,
 		unsigned long delta;
 
 		if (st->current_prot) {
+			note_prot_wx(st, addr);
 			pt_dump_seq_printf(st->seq, "0x%08lx-0x%08lx   ",
 				   st->start_address, addr);
 
@@ -367,6 +424,7 @@ void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
 	struct pg_state st = {
 		.seq = m,
 		.marker = info->markers,
+		.check_wx = false,
 	};
 
 	walk_pgd(&st, info->mm, info->base_addr);
@@ -390,6 +448,26 @@ static struct ptdump_info kernel_ptdump_info = {
 	.markers = address_markers,
 	.base_addr = 0,
 };
+
+void ptdump_check_wx(void)
+{
+	struct pg_state st = {
+		.seq = NULL,
+		.marker = (struct addr_marker[]) {
+			{ 0, NULL},
+			{ -1, NULL},
+		},
+		.check_wx = true,
+	};
+
+	walk_pgd(&st, &init_mm, 0);
+	note_page(&st, 0, 0, 0, NULL);
+	if (st.wx_pages)
+		pr_warn("Checked W+X mappings: FAILED, %lu W+X pages found\n",
+			st.wx_pages);
+	else
+		pr_info("Checked W+X mappings: passed, no W+X pages found\n");
+}
 
 static int ptdump_init(void)
 {
