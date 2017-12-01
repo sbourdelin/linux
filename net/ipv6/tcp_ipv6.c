@@ -286,7 +286,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	if (err)
 		goto late_failure;
 
-	sk_set_txhash(sk);
+	sk->sk_txhash = get_hash_from_flowi6(&fl6);
 
 	if (likely(!tp->repair)) {
 		if (!tp->write_seq)
@@ -470,9 +470,13 @@ static int tcp_v6_send_synack(const struct sock *sk, struct dst_entry *dst,
 	int err = -ENOMEM;
 
 	/* First, grab a route. */
-	if (!dst && (dst = inet6_csk_route_req(sk, fl6, req,
+	if (!dst) {
+		if ((dst = inet6_csk_route_req(sk, fl6, req,
 					       IPPROTO_TCP)) == NULL)
-		goto done;
+			goto done;
+
+		tcp_rsk(req)->txhash = get_hash_from_flowi6(fl6);
+	}
 
 	skb = tcp_make_synack(sk, dst, req, foc, synack_type);
 
@@ -743,9 +747,13 @@ static void tcp_v6_init_req(struct request_sock *req,
 
 static struct dst_entry *tcp_v6_route_req(const struct sock *sk,
 					  struct flowi *fl,
-					  const struct request_sock *req)
+					  struct request_sock *req)
 {
-	return inet6_csk_route_req(sk, &fl->u.ip6, req, IPPROTO_TCP);
+	struct dst_entry *dst;
+	dst = inet6_csk_route_req(sk, &fl->u.ip6, req, IPPROTO_TCP);
+	if (dst)
+		tcp_rsk(req)->txhash = get_hash_from_flowi6(&fl->u.ip6);
+	return dst;
 }
 
 struct request_sock_ops tcp6_request_sock_ops __read_mostly = {

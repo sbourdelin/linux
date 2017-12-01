@@ -1729,22 +1729,12 @@ static inline kuid_t sock_net_uid(const struct net *net, const struct sock *sk)
 	return sk ? sk->sk_uid : make_kuid(net->user_ns, 0);
 }
 
-static inline u32 net_tx_rndhash(void)
-{
-	u32 v = prandom_u32();
-
-	return v ?: 1;
-}
-
-static inline void sk_set_txhash(struct sock *sk)
-{
-	sk->sk_txhash = net_tx_rndhash();
-}
-
 static inline void sk_rethink_txhash(struct sock *sk)
 {
-	if (sk->sk_txhash)
-		sk_set_txhash(sk);
+	if (sk->sk_txhash) {
+		u32 v = prandom_u32();
+		sk->sk_txhash = v ?: 1;
+	}
 }
 
 static inline struct dst_entry *
