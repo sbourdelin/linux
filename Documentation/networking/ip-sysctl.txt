@@ -1345,6 +1345,13 @@ auto_flowlabels - INTEGER
 	   be disabled by the socket option
 	Default: 1
 
+consistent_auto_flowlabel - BOOLEAN
+	When auto_flowlabels is enabled, this option makes socket flowlabel
+	consistent in the lifetime.
+	TRUE: enabled
+	FALSE: disabled
+	Default: TRUE
+
 flowlabel_state_ranges - BOOLEAN
 	Split the flow label number space into two ranges. 0-0x7FFFF is
 	reserved for the IPv6 flow manager facility, 0x80000-0xFFFFF

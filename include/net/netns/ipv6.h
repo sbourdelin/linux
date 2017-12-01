@@ -30,6 +30,7 @@ struct netns_sysctl_ipv6 {
 	int ip6_rt_min_advmss;
 	int flowlabel_consistency;
 	int auto_flowlabels;
+	int consistent_auto_flowlabel;
 	int icmpv6_time;
 	int anycast_src_echo_reply;
 	int ip_nonlocal_bind;

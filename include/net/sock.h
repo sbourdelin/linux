@@ -1729,6 +1729,18 @@ static inline kuid_t sock_net_uid(const struct net *net, const struct sock *sk)
 	return sk ? sk->sk_uid : make_kuid(net->user_ns, 0);
 }
 
+static inline
+struct net *sock_net(const struct sock *sk)
+{
+	return read_pnet(&sk->sk_net);
+}
+
+static inline
+void sock_net_set(struct sock *sk, struct net *net)
+{
+	write_pnet(&sk->sk_net, net);
+}
+
 static inline void sk_set_txhash(struct sock *sk, u32 hash)
 {
 	sk->sk_txhash = hash;
@@ -1736,7 +1748,9 @@ static inline void sk_set_txhash(struct sock *sk, u32 hash)
 
 static inline void sk_rethink_txhash(struct sock *sk)
 {
-	if (sk->sk_txhash) {
+	struct net *net = sock_net(sk);
+
+	if (sk->sk_txhash && !net->ipv6.sysctl.consistent_auto_flowlabel) {
 		u32 v = prandom_u32();
 		sk->sk_txhash = v ?: 1;
 	}
@@ -2289,18 +2303,6 @@ static inline void sk_eat_skb(struct sock *sk, struct sk_buff *skb)
 {
 	__skb_unlink(skb, &sk->sk_receive_queue);
 	__kfree_skb(skb);
-}
-
-static inline
-struct net *sock_net(const struct sock *sk)
-{
-	return read_pnet(&sk->sk_net);
-}
-
-static inline
-void sock_net_set(struct sock *sk, struct net *net)
-{
-	write_pnet(&sk->sk_net, net);
 }
 
 static inline struct sock *skb_steal_sock(struct sk_buff *skb)
