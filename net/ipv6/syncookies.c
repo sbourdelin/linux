@@ -216,7 +216,6 @@ struct sock *cookie_v6_check(struct sock *sk, struct sk_buff *skb)
 	treq->rcv_isn = ntohl(th->seq) - 1;
 	treq->snt_isn = cookie;
 	treq->ts_off = 0;
-	treq->txhash = net_tx_rndhash();
 
 	/*
 	 * We need to lookup the dst_entry to get the correct window size.
@@ -237,6 +236,8 @@ struct sock *cookie_v6_check(struct sock *sk, struct sk_buff *skb)
 		fl6.fl6_sport = inet_sk(sk)->inet_sport;
 		fl6.flowi6_uid = sk->sk_uid;
 		security_req_classify_flow(req, flowi6_to_flowi(&fl6));
+
+		tcp_rsk_set_txhash(treq, get_hash_from_flowi6(&fl6));
 
 		dst = ip6_dst_lookup_flow(sk, &fl6, final_p);
 		if (IS_ERR(dst))

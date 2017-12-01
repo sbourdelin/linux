@@ -139,6 +139,11 @@ struct tcp_request_sock {
 						  */
 };
 
+static inline void tcp_rsk_set_txhash(struct tcp_request_sock *rsk, u32 hash)
+{
+	rsk->txhash = hash;
+}
+
 static inline struct tcp_request_sock *tcp_rsk(const struct request_sock *req)
 {
 	return (struct tcp_request_sock *)req;

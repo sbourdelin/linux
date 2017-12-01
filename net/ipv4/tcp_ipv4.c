@@ -222,7 +222,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (err)
 		goto failure;
 
-	sk_set_txhash(sk);
+	sk_set_txhash(sk, get_hash_from_flowi4(fl4));
 
 	rt = ip_route_newports(fl4, rt, orig_sport, orig_dport,
 			       inet->inet_sport, inet->inet_dport, sk);
@@ -871,8 +871,12 @@ static int tcp_v4_send_synack(const struct sock *sk, struct dst_entry *dst,
 	struct sk_buff *skb;
 
 	/* First, grab a route. */
-	if (!dst && (dst = inet_csk_route_req(sk, &fl4, req)) == NULL)
-		return -1;
+	if (!dst) {
+		if ((dst = inet_csk_route_req(sk, &fl4, req)) == NULL)
+			return -1;
+
+		tcp_rsk_set_txhash(tcp_rsk(req), get_hash_from_flowi4(&fl4));
+	}
 
 	skb = tcp_make_synack(sk, dst, req, foc, synack_type);
 
@@ -1278,9 +1282,13 @@ static void tcp_v4_init_req(struct request_sock *req,
 
 static struct dst_entry *tcp_v4_route_req(const struct sock *sk,
 					  struct flowi *fl,
-					  const struct request_sock *req)
+					  struct request_sock *req)
 {
-	return inet_csk_route_req(sk, &fl->u.ip4, req);
+	struct dst_entry *dst = inet_csk_route_req(sk, &fl->u.ip4, req);
+	if (dst)
+		tcp_rsk_set_txhash(tcp_rsk(req),
+				   get_hash_from_flowi4(&fl->u.ip4));
+	return dst;
 }
 
 struct request_sock_ops tcp_request_sock_ops __read_mostly = {
