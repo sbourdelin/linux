@@ -901,6 +901,8 @@ static void tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb)
 	struct sock *sk1 = NULL;
 #endif
 	int oif = 0;
+	u8 tclass = 0;
+	__be32 flowlabel = 0;
 
 	if (th->rst)
 		return;
@@ -954,7 +956,21 @@ static void tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb)
 		trace_tcp_send_reset(sk, skb);
 	}
 
-	tcp_v6_send_response(sk, skb, seq, ack_seq, 0, 0, 0, oif, key, 1, 0, 0);
+	if (sk) {
+		if (sk_fullsock(sk)) {
+			struct ipv6_pinfo *np = inet6_sk(sk);
+
+			tclass = np->tclass;
+			flowlabel = np->flow_label & IPV6_FLOWLABEL_MASK;
+		} else {
+			struct inet_timewait_sock *tw = inet_twsk(sk);
+
+			tclass = tw->tw_tclass;
+			flowlabel = cpu_to_be32(tw->tw_flowlabel);
+		}
+	}
+	tcp_v6_send_response(sk, skb, seq, ack_seq, 0, 0, 0, oif, key, 1,
+		tclass, flowlabel);
 
 #ifdef CONFIG_TCP_MD5SIG
 out:
