@@ -943,8 +943,7 @@ static DEFINE_PER_CPU(struct list_head, blocked_vcpu_on_cpu);
 static DEFINE_PER_CPU(spinlock_t, blocked_vcpu_on_cpu_lock);
 
 enum {
-	VMX_IO_BITMAP_A,
-	VMX_IO_BITMAP_B,
+	VMX_IO_BITMAP,
 	VMX_MSR_BITMAP_LEGACY,
 	VMX_MSR_BITMAP_LONGMODE,
 	VMX_MSR_BITMAP_LEGACY_X2APIC_APICV,
@@ -958,8 +957,7 @@ enum {
 
 static unsigned long *vmx_bitmap[VMX_BITMAP_NR];
 
-#define vmx_io_bitmap_a                      (vmx_bitmap[VMX_IO_BITMAP_A])
-#define vmx_io_bitmap_b                      (vmx_bitmap[VMX_IO_BITMAP_B])
+#define vmx_io_bitmap                        (vmx_bitmap[VMX_IO_BITMAP])
 #define vmx_msr_bitmap_legacy                (vmx_bitmap[VMX_MSR_BITMAP_LEGACY])
 #define vmx_msr_bitmap_longmode              (vmx_bitmap[VMX_MSR_BITMAP_LONGMODE])
 #define vmx_msr_bitmap_legacy_x2apic_apicv   (vmx_bitmap[VMX_MSR_BITMAP_LEGACY_X2APIC_APICV])
@@ -5444,8 +5442,8 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 	int i;
 
 	/* I/O */
-	vmcs_write64(IO_BITMAP_A, __pa(vmx_io_bitmap_a));
-	vmcs_write64(IO_BITMAP_B, __pa(vmx_io_bitmap_b));
+	vmcs_write64(IO_BITMAP_A, __pa(vmx_io_bitmap));
+	vmcs_write64(IO_BITMAP_B, __pa(vmx_io_bitmap));
 
 	if (enable_shadow_vmcs) {
 		vmcs_write64(VMREAD_BITMAP, __pa(vmx_vmread_bitmap));
@@ -6754,9 +6752,7 @@ static __init int hardware_setup(void)
 	memset(vmx_vmread_bitmap, 0xff, PAGE_SIZE);
 	memset(vmx_vmwrite_bitmap, 0xff, PAGE_SIZE);
 
-	memset(vmx_io_bitmap_a, 0xff, PAGE_SIZE);
-
-	memset(vmx_io_bitmap_b, 0xff, PAGE_SIZE);
+	memset(vmx_io_bitmap, 0xff, PAGE_SIZE);
 
 	memset(vmx_msr_bitmap_legacy, 0xff, PAGE_SIZE);
 	memset(vmx_msr_bitmap_longmode, 0xff, PAGE_SIZE);
