@@ -190,6 +190,7 @@ static struct tcf_chain *tcf_chain_create(struct tcf_block *block,
 		return NULL;
 	list_add_tail(&chain->list, &block->chain_list);
 	chain->block = block;
+	block->nr_chains++;
 	chain->index = chain_index;
 	chain->refcnt = 1;
 	return chain;
@@ -218,8 +219,12 @@ static void tcf_chain_flush(struct tcf_chain *chain)
 
 static void tcf_chain_destroy(struct tcf_chain *chain)
 {
+	struct tcf_block *block = chain->block;
+
 	list_del(&chain->list);
 	kfree(chain);
+	if (!--block->nr_chains)
+		kfree(block);
 }
 
 static void tcf_chain_hold(struct tcf_chain *chain)
@@ -330,27 +335,13 @@ int tcf_block_get(struct tcf_block **p_block,
 }
 EXPORT_SYMBOL(tcf_block_get);
 
-static void tcf_block_put_final(struct work_struct *work)
-{
-	struct tcf_block *block = container_of(work, struct tcf_block, work);
-	struct tcf_chain *chain, *tmp;
-
-	rtnl_lock();
-
-	/* At this point, all the chains should have refcnt == 1. */
-	list_for_each_entry_safe(chain, tmp, &block->chain_list, list)
-		tcf_chain_put(chain);
-	rtnl_unlock();
-	kfree(block);
-}
-
 /* XXX: Standalone actions are not allowed to jump to any chain, and bound
  * actions should be all removed after flushing.
  */
 void tcf_block_put_ext(struct tcf_block *block, struct Qdisc *q,
 		       struct tcf_block_ext_info *ei)
 {
-	struct tcf_chain *chain;
+	struct tcf_chain *chain, *tmp;
 
 	/* Hold a refcnt for all chains, except 0, so that they don't disappear
 	 * while we are iterating.
@@ -364,13 +355,9 @@ void tcf_block_put_ext(struct tcf_block *block, struct Qdisc *q,
 
 	tcf_block_offload_unbind(block, q, ei);
 
-	INIT_WORK(&block->work, tcf_block_put_final);
-	/* Wait for existing RCU callbacks to cool down, make sure their works
-	 * have been queued before this. We can not flush pending works here
-	 * because we are holding the RTNL lock.
-	 */
-	rcu_barrier();
-	tcf_queue_work(&block->work);
+	/* At this point, all the chains should have refcnt >= 1. */
+	list_for_each_entry_safe(chain, tmp, &block->chain_list, list)
+		tcf_chain_put(chain);
 }
 EXPORT_SYMBOL(tcf_block_put_ext);
 
