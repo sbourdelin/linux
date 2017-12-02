@@ -1387,6 +1387,15 @@ static void scsi_unprep_fn(struct request_queue *q, struct request *req)
 	scsi_uninit_cmd(blk_mq_rq_to_pdu(req));
 }
 
+static void scsi_mq_delay_queue(struct request_queue *q, unsigned long msecs)
+{
+	struct blk_mq_hw_ctx *hctx;
+	int i;
+
+	queue_for_each_hw_ctx(q, hctx, i)
+		blk_mq_delay_run_hw_queue(hctx, msecs);
+}
+
 /*
  * scsi_dev_queue_ready: if we can send requests to sdev, return 1 else
  * return 0.
@@ -1407,11 +1416,10 @@ static inline int scsi_dev_queue_ready(struct request_queue *q,
 		 * unblock after device_blocked iterates to zero
 		 */
 		if (atomic_dec_return(&sdev->device_blocked) > 0) {
-			/*
-			 * For the MQ case we take care of this in the caller.
-			 */
 			if (!q->mq_ops)
 				blk_delay_queue(q, SCSI_QUEUE_DELAY);
+			else
+				scsi_mq_delay_queue(q, SCSI_QUEUE_DELAY);
 			goto out_dec;
 		}
 		SCSI_LOG_MLQUEUE(3, sdev_printk(KERN_INFO, sdev,
