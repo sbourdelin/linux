@@ -396,6 +396,8 @@ static struct shrinker pools_shrinker = {
 
 int sptlrpc_enc_pool_init(void)
 {
+	int rc = -ENOMEM;
+
 	/*
 	 * maximum capacity is 1/8 of total physical memory.
 	 * is the 1/8 a good number?
@@ -429,12 +431,13 @@ int sptlrpc_enc_pool_init(void)
 	page_pools.epp_st_outofmem = 0;
 
 	enc_pools_alloc();
-	if (!page_pools.epp_pools)
-		return -ENOMEM;
+	if (page_pools.epp_pools) {
+		rc = register_shrinker(&pools_shrinker);
+		if (rc)
+			enc_pools_free();
+	}
 
-	register_shrinker(&pools_shrinker);
-
-	return 0;
+	return rc;
 }
 
 void sptlrpc_enc_pool_fini(void)

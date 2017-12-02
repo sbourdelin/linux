@@ -1951,7 +1951,7 @@ int lu_global_init(void)
 	 * inode, one for ea. Unfortunately setting this high value results in
 	 * lu_object/inode cache consuming all the memory.
 	 */
-	register_shrinker(&lu_site_shrinker);
+	result = register_shrinker(&lu_site_shrinker);
 
 	return result;
 }
@@ -1961,7 +1961,8 @@ int lu_global_init(void)
  */
 void lu_global_fini(void)
 {
-	unregister_shrinker(&lu_site_shrinker);
+	if (lu_site_shrinker.nr_deferred)
+		unregister_shrinker(&lu_site_shrinker);
 	lu_context_key_degister(&lu_global_key);
 
 	/*

@@ -1086,8 +1086,11 @@ int ldlm_pools_init(void)
 	int rc;
 
 	rc = ldlm_pools_thread_start();
-	if (rc == 0)
-		register_shrinker(&ldlm_pools_cli_shrinker);
+	if (rc == 0) {
+		rc = register_shrinker(&ldlm_pools_cli_shrinker);
+		if (rc)
+			ldlm_pools_thread_stop();
+	}
 
 	return rc;
 }
