@@ -1,4 +1,7 @@
-menu "Intel MIC & related support"
+menuconfig INTEL_MISC_BUS
+	bool "Intel MIC & related support"
+
+if INTEL_MISC_BUS
 
 comment "Intel MIC Bus Driver"
 
@@ -153,4 +156,4 @@ if VOP
 source "drivers/vhost/Kconfig.vringh"
 endif
 
-endmenu
+endif # INTEL_MISC_BUS
