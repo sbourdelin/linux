@@ -34,7 +34,7 @@
  * necessary invalidation by clearing out the 'ctx_id' which
  * forces a TLB flush when the context is loaded.
  */
-void clear_non_loaded_ctxs(void)
+static void clear_non_loaded_ctxs(void)
 {
 	u16 asid;
 
