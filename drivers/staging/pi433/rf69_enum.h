@@ -31,10 +31,10 @@ enum mode {
 	receive
 };
 
-enum dataMode {
-	packet,
-	continuous,
-	continuousNoSync
+enum data_mode {
+	PACKET,
+	CONTINUOUS,
+	CONTINUOUS_NO_SYNC,
 };
 
 enum modulation {

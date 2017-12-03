@@ -61,16 +61,16 @@ int rf69_set_mode(struct spi_device *spi, enum mode mode)
 
 }
 
-int rf69_set_data_mode(struct spi_device *spi, enum dataMode dataMode)
+int rf69_set_data_mode(struct spi_device *spi, enum data_mode data_mode)
 {
 	#ifdef DEBUG
 		dev_dbg(&spi->dev, "set: data mode");
 	#endif
 
-	switch (dataMode) {
-	case packet:		return WRITE_REG(REG_DATAMODUL, (READ_REG(REG_DATAMODUL) & ~MASK_DATAMODUL_MODE) | DATAMODUL_MODE_PACKET);
-	case continuous:	return WRITE_REG(REG_DATAMODUL, (READ_REG(REG_DATAMODUL) & ~MASK_DATAMODUL_MODE) | DATAMODUL_MODE_CONTINUOUS);
-	case continuousNoSync:  return WRITE_REG(REG_DATAMODUL, (READ_REG(REG_DATAMODUL) & ~MASK_DATAMODUL_MODE) | DATAMODUL_MODE_CONTINUOUS_NOSYNC);
+	switch (data_mode) {
+	case PACKET:		 return WRITE_REG(REG_DATAMODUL, (READ_REG(REG_DATAMODUL) & ~MASK_DATAMODUL_MODE) | DATAMODUL_MODE_PACKET);
+	case CONTINUOUS:	 return WRITE_REG(REG_DATAMODUL, (READ_REG(REG_DATAMODUL) & ~MASK_DATAMODUL_MODE) | DATAMODUL_MODE_CONTINUOUS);
+	case CONTINUOUS_NO_SYNC: return WRITE_REG(REG_DATAMODUL, (READ_REG(REG_DATAMODUL) & ~MASK_DATAMODUL_MODE) | DATAMODUL_MODE_CONTINUOUS_NOSYNC);
 	default:
 		dev_dbg(&spi->dev, "set: illegal input param");
 		return -EINVAL;
