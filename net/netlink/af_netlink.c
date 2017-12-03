@@ -533,14 +533,16 @@ static int netlink_insert(struct sock *sk, u32 portid)
 
 	lock_sock(sk);
 
-	err = nlk_sk(sk)->portid == portid ? 0 : -EBUSY;
-	if (nlk_sk(sk)->bound)
+	if (nlk_sk(sk)->bound) {
+		err = nlk_sk(sk)->portid == portid ? 0 : -EBUSY;
 		goto err;
+	}
 
-	err = -ENOMEM;
 	if (BITS_PER_LONG > 32 &&
-	    unlikely(atomic_read(&table->hash.nelems) >= UINT_MAX))
+	    unlikely(atomic_read(&table->hash.nelems) >= UINT_MAX)) {
+		err = -ENOMEM;
 		goto err;
+	}
 
 	nlk_sk(sk)->portid = portid;
 	sock_hold(sk);
@@ -1586,7 +1588,7 @@ static int netlink_setsockopt(struct socket *sock, int level, int optname,
 	struct sock *sk = sock->sk;
 	struct netlink_sock *nlk = nlk_sk(sk);
 	unsigned int val = 0;
-	int err;
+	int err = 0;
 
 	if (level != SOL_NETLINK)
 		return -ENOPROTOOPT;
@@ -1601,7 +1603,6 @@ static int netlink_setsockopt(struct socket *sock, int level, int optname,
 			nlk->flags |= NETLINK_F_RECV_PKTINFO;
 		else
 			nlk->flags &= ~NETLINK_F_RECV_PKTINFO;
-		err = 0;
 		break;
 	case NETLINK_ADD_MEMBERSHIP:
 	case NETLINK_DROP_MEMBERSHIP: {
@@ -1623,8 +1624,6 @@ static int netlink_setsockopt(struct socket *sock, int level, int optname,
 		netlink_table_ungrab();
 		if (optname == NETLINK_DROP_MEMBERSHIP && nlk->netlink_unbind)
 			nlk->netlink_unbind(sock_net(sk), val);
-
-		err = 0;
 		break;
 	}
 	case NETLINK_BROADCAST_ERROR:
@@ -1632,7 +1631,6 @@ static int netlink_setsockopt(struct socket *sock, int level, int optname,
 			nlk->flags |= NETLINK_F_BROADCAST_SEND_ERROR;
 		else
 			nlk->flags &= ~NETLINK_F_BROADCAST_SEND_ERROR;
-		err = 0;
 		break;
 	case NETLINK_NO_ENOBUFS:
 		if (val) {
@@ -1642,7 +1640,6 @@ static int netlink_setsockopt(struct socket *sock, int level, int optname,
 		} else {
 			nlk->flags &= ~NETLINK_F_RECV_NO_ENOBUFS;
 		}
-		err = 0;
 		break;
 	case NETLINK_LISTEN_ALL_NSID:
 		if (!ns_capable(sock_net(sk)->user_ns, CAP_NET_BROADCAST))
@@ -1652,21 +1649,18 @@ static int netlink_setsockopt(struct socket *sock, int level, int optname,
 			nlk->flags |= NETLINK_F_LISTEN_ALL_NSID;
 		else
 			nlk->flags &= ~NETLINK_F_LISTEN_ALL_NSID;
-		err = 0;
 		break;
 	case NETLINK_CAP_ACK:
 		if (val)
 			nlk->flags |= NETLINK_F_CAP_ACK;
 		else
 			nlk->flags &= ~NETLINK_F_CAP_ACK;
-		err = 0;
 		break;
 	case NETLINK_EXT_ACK:
 		if (val)
 			nlk->flags |= NETLINK_F_EXT_ACK;
 		else
 			nlk->flags &= ~NETLINK_F_EXT_ACK;
-		err = 0;
 		break;
 	default:
 		err = -ENOPROTOOPT;
@@ -1679,7 +1673,7 @@ static int netlink_getsockopt(struct socket *sock, int level, int optname,
 {
 	struct sock *sk = sock->sk;
 	struct netlink_sock *nlk = nlk_sk(sk);
-	int len, val, err;
+	int len, val, err = 0;
 
 	if (level != SOL_NETLINK)
 		return -ENOPROTOOPT;
@@ -1698,7 +1692,6 @@ static int netlink_getsockopt(struct socket *sock, int level, int optname,
 		if (put_user(len, optlen) ||
 		    put_user(val, optval))
 			return -EFAULT;
-		err = 0;
 		break;
 	case NETLINK_BROADCAST_ERROR:
 		if (len < sizeof(int))
@@ -1708,7 +1701,6 @@ static int netlink_getsockopt(struct socket *sock, int level, int optname,
 		if (put_user(len, optlen) ||
 		    put_user(val, optval))
 			return -EFAULT;
-		err = 0;
 		break;
 	case NETLINK_NO_ENOBUFS:
 		if (len < sizeof(int))
@@ -1718,12 +1710,10 @@ static int netlink_getsockopt(struct socket *sock, int level, int optname,
 		if (put_user(len, optlen) ||
 		    put_user(val, optval))
 			return -EFAULT;
-		err = 0;
 		break;
 	case NETLINK_LIST_MEMBERSHIPS: {
 		int pos, idx, shift;
 
-		err = 0;
 		netlink_lock_table();
 		for (pos = 0; pos * 8 < nlk->ngroups; pos += sizeof(u32)) {
 			if (len - pos < sizeof(u32))
@@ -1750,7 +1740,6 @@ static int netlink_getsockopt(struct socket *sock, int level, int optname,
 		if (put_user(len, optlen) ||
 		    put_user(val, optval))
 			return -EFAULT;
-		err = 0;
 		break;
 	case NETLINK_EXT_ACK:
 		if (len < sizeof(int))
@@ -1759,7 +1748,6 @@ static int netlink_getsockopt(struct socket *sock, int level, int optname,
 		val = nlk->flags & NETLINK_F_EXT_ACK ? 1 : 0;
 		if (put_user(len, optlen) || put_user(val, optval))
 			return -EFAULT;
-		err = 0;
 		break;
 	default:
 		err = -ENOPROTOOPT;
@@ -1805,15 +1793,17 @@ static int netlink_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 		return err;
 
 	if (msg->msg_namelen) {
-		err = -EINVAL;
-		if (addr->nl_family != AF_NETLINK)
+		if (addr->nl_family != AF_NETLINK) {
+			err = -EINVAL;
 			goto out;
+		}
 		dst_portid = addr->nl_pid;
 		dst_group = ffs(addr->nl_groups);
-		err =  -EPERM;
 		if ((dst_group || dst_portid) &&
-		    !netlink_allowed(sock, NL_CFG_F_NONROOT_SEND))
+		    !netlink_allowed(sock, NL_CFG_F_NONROOT_SEND)) {
+			err =  -EPERM;
 			goto out;
+		}
 		netlink_skb_flags |= NETLINK_SKB_DST;
 	} else {
 		dst_portid = nlk->dst_portid;
@@ -1829,22 +1819,24 @@ static int netlink_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 		smp_rmb();
 	}
 
-	err = -EMSGSIZE;
-	if (len > sk->sk_sndbuf - 32)
+	if (len > sk->sk_sndbuf - 32) {
+		err = -EMSGSIZE;
 		goto out;
-	err = -ENOBUFS;
+	}
 	skb = netlink_alloc_large_skb(len, dst_group);
-	if (skb == NULL)
+	if (skb == NULL) {
+		err = -ENOBUFS;
 		goto out;
+	}
 
 	NETLINK_CB(skb).portid	= nlk->portid;
 	NETLINK_CB(skb).dst_group = dst_group;
 	NETLINK_CB(skb).creds	= scm.creds;
 	NETLINK_CB(skb).flags	= netlink_skb_flags;
 
-	err = -EFAULT;
 	if (memcpy_from_msg(skb_put(skb, len), msg, len)) {
 		kfree_skb(skb);
+		err = -EFAULT;
 		goto out;
 	}
 
@@ -2711,7 +2703,7 @@ static int __init netlink_proto_init(void)
 	int i;
 	int err = proto_register(&netlink_proto, 0);
 
-	if (err != 0)
+	if (err)
 		goto out;
 
 	BUILD_BUG_ON(sizeof(struct netlink_skb_parms) > FIELD_SIZEOF(struct sk_buff, cb));
