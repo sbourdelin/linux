@@ -1417,7 +1417,9 @@ static int security_context_to_sid_core(const char *scontext, u32 scontext_len,
 		int i;
 
 		for (i = 1; i < SECINITSID_NUM; i++) {
-			if (!strcmp(initial_sid_to_string[i], scontext)) {
+			if (!strncmp(initial_sid_to_string[i], scontext,
+				     scontext_len) &&
+			    !initial_sid_to_string[i][scontext_len]) {
 				*sid = i;
 				return 0;
 			}
