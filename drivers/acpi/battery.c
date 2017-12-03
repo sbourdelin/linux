@@ -41,6 +41,7 @@
 
 #include <linux/acpi.h>
 #include <linux/power_supply.h>
+#include <linux/thinkpad_acpi.h>
 
 #include "battery.h"
 
@@ -70,6 +71,7 @@ static async_cookie_t async_cookie;
 static bool battery_driver_registered;
 static int battery_bix_broken_package;
 static int battery_notification_delay_ms;
+static int has_thinkpad_extension = 0;
 static unsigned int cache_time = 1000;
 module_param(cache_time, uint, 0644);
 MODULE_PARM_DESC(cache_time, "cache time in milliseconds");
@@ -626,6 +628,189 @@ static const struct device_attribute alarm_attr = {
 	.store = acpi_battery_alarm_store,
 };
 
+/* --------------------------------------------------------------------------
+                ThinkPad Battery Wear Control ACPI Extension
+   -------------------------------------------------------------------------- */
+
+#ifdef CONFIG_THINKPAD_ACPI_BWC
+
+/*
+ * Because the thinkpad_acpi module usually is loaded right after
+ * the disk is mounted, we will lazy-load it on demand when any of the
+ * sysfs methods is read or written if it is not loaded.
+ */
+static int thinkpad_acpi_lazyload(void)
+{
+    void* func;
+
+    func = symbol_get(tpacpi_battery_get_functionality);
+
+    if (func) {
+	// thinkpad_acpi is loaded
+	return 0;
+    }
+
+    pr_warning("battery: Lazy-loading thinkpad_acpi");
+
+    // thinkpad_acpi is not loaded, do lazy load
+    if (request_module("thinkpad_acpi")) {
+	return 1;
+    }
+
+    return 0;
+}
+
+static int battery_thinkpad_get_id(struct device *dev)
+{
+    struct acpi_battery *battery = to_acpi_battery(dev_get_drvdata(dev));
+    const char *battery_name = acpi_device_bid(battery->device);
+
+    // Which battery are we configuring?
+    if (strcmp(battery_name, "BAT0") == 0) {
+	return TPACPI_BATTERY_PRIMARY;
+    } else if (strcmp(battery_name, "BAT1") == 0) {
+	return TPACPI_BATTERY_SECONDARY;
+    } else {
+	// the primary nor secondary battery were not found,
+	// but it's safe to assume the primary battery for
+	// most calls
+	return TPACPI_BATTERY_PRIMARY;
+    }
+
+}
+
+static ssize_t battery_thinkpad_start_charge_show(struct device *dev,
+						  struct device_attribute *attr,
+						  char *buf)
+{
+    int ret = -1;
+    int (*func)(int battery, int* res);
+    int batteryid = battery_thinkpad_get_id(dev);
+
+    if (thinkpad_acpi_lazyload()) {
+	pr_err("battery: thinkpad_acpi not available");
+	return -ENODEV;
+    }
+
+    func = symbol_get(tpacpi_get_start_threshold);
+
+    if (func(batteryid, &ret)) {
+	pr_err("battery: error reading charge start threshold");
+	return -ENODEV;
+    }
+
+    return sprintf(buf, "%d\n", ret);
+}
+
+static ssize_t battery_thinkpad_start_charge_store(struct device *dev,
+						  struct device_attribute *attr,
+						  const char *buf,
+						  size_t count)
+{
+    long res = -1, ret = -1;
+    int (*func)(int battery, int value);
+    int batteryid = battery_thinkpad_get_id(dev);
+
+    if (kstrtol(buf, 10, &res)) {
+	return -EINVAL;
+    }
+
+    if (res > 100 || res < 0) {
+	return -EINVAL;
+    }
+
+    if (thinkpad_acpi_lazyload()) {
+	pr_err("battery: thinkpad_acpi not available");
+	return -ENODEV;
+    }
+
+    func = symbol_get(tpacpi_set_start_threshold);
+
+    if ((ret = func(batteryid, (int) res))) {
+	pr_err("battery: error setting charge start threshold");
+	return ret;
+    }
+
+    return count;
+
+}
+
+static ssize_t battery_thinkpad_stop_charge_show(struct device *dev,
+						 struct device_attribute *attr,
+						 char *buf)
+{
+    int ret = -1;
+    int (*func)(int, int*);
+    int batteryid = battery_thinkpad_get_id(dev);
+
+    if (thinkpad_acpi_lazyload()) {
+	pr_err("battery: thinkpad_acpi not available");
+	return -ENODEV;
+    }
+
+    func = symbol_get(tpacpi_get_stop_threshold);
+
+    if (func(batteryid, &ret)) {
+	pr_err("battery: error reading charge stop threshold");
+	return -ENODEV;
+    }
+
+    return sprintf(buf, "%d\n", ret);
+
+}
+
+static ssize_t battery_thinkpad_stop_charge_store(struct device *dev,
+					          struct device_attribute *attr,
+						  const char *buf,
+						  size_t count)
+{
+    long res = -1, ret = -1;
+    int (*func)(int battery, int value);
+    int batteryid = battery_thinkpad_get_id(dev);
+
+    if (kstrtol(buf, 10, &res)) {
+	return -EINVAL;
+    }
+
+    if (res > 100 || res < 0) {
+	return -EINVAL;
+    }
+
+    if (thinkpad_acpi_lazyload()) {
+	pr_err("battery: thinkpad_acpi not available");
+	return -ENODEV;
+    }
+
+    func = symbol_get(tpacpi_set_stop_threshold);
+
+    if ((ret = func(batteryid, (int) res))) {
+	pr_err("battery: error setting battery charge stop threshold");
+	return ret;
+    }
+
+    return count;
+}
+
+static const struct device_attribute charge_start_attr = {
+	.attr = {
+	    .name = "charge_start_threshold",
+	    .mode = 0644,
+	},
+	.show = battery_thinkpad_start_charge_show,
+	.store = battery_thinkpad_start_charge_store,
+};
+
+static const struct device_attribute charge_stop_attr = {
+	.attr = {
+	    .name = "charge_stop_threshold",
+	    .mode = 0644,
+	},
+	.show = battery_thinkpad_stop_charge_show,
+	.store = battery_thinkpad_stop_charge_store,
+};
+
+#endif
+
 static int sysfs_add_battery(struct acpi_battery *battery)
 {
 	struct power_supply_config psy_cfg = { .drv_data = battery, };
@@ -653,6 +838,22 @@ static int sysfs_add_battery(struct acpi_battery *battery)
 		battery->bat = NULL;
 		return result;
 	}
+
+#ifdef CONFIG_THINKPAD_ACPI_BWC
+
+	if (has_thinkpad_extension) {
+
+	    if (device_create_file(&battery->bat->dev, &charge_start_attr)) {
+		return -ENODEV;
+	    }
+
+	    if (device_create_file(&battery->bat->dev, &charge_stop_attr)) {
+		return -ENODEV;
+	    }
+	}
+
+#endif
+
 	return device_create_file(&battery->bat->dev, &alarm_attr);
 }
 
@@ -665,6 +866,16 @@ static void sysfs_remove_battery(struct acpi_battery *battery)
 	}
 
 	device_remove_file(&battery->bat->dev, &alarm_attr);
+
+#ifdef CONFIG_THINKPAD_ACPI_BWC
+
+	if (has_thinkpad_extension) {
+	    device_remove_file(&battery->bat->dev, &charge_start_attr);
+	    device_remove_file(&battery->bat->dev, &charge_stop_attr);
+	}
+
+#endif
+
 	power_supply_unregister(battery->bat);
 	battery->bat = NULL;
 	mutex_unlock(&battery->sysfs_lock);
@@ -1166,6 +1377,14 @@ battery_notification_delay_quirk(const struct dmi_system_id *d)
 	return 0;
 }
 
+static int __init
+battery_thinkpad_acpi(const struct dmi_system_id *d)
+{
+    pr_info("Found ThinkPad ACPI Battery extension");
+    has_thinkpad_extension = 1;
+    return 0;
+}
+
 static const struct dmi_system_id bat_dmi_table[] __initconst = {
 	{
 		.callback = battery_bix_broken_package_quirk,
@@ -1181,6 +1400,14 @@ static const struct dmi_system_id bat_dmi_table[] __initconst = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
 			DMI_MATCH(DMI_PRODUCT_NAME, "Aspire V5-573G"),
+		},
+	},
+	{
+		.callback = battery_thinkpad_acpi,
+		.ident = "Lenovo ThinkPad ACPI Battery",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "LENOVO"),
+			DMI_MATCH(DMI_PRODUCT_VERSION, "ThinkPad"),
 		},
 	},
 	{},

@@ -532,6 +532,17 @@ config THINKPAD_ACPI_HOTKEY_POLL
 	  If you are not sure, say Y here.  The driver enables polling only if
 	  it is strictly necessary to do so.
 
+config THINKPAD_ACPI_BWC
+	bool "Support for the ThinkPad Battery Wear Control (BWC)"
+	depends on THINKPAD_ACPI
+	depends on ACPI_BATTERY
+	default y
+	---help---
+	  Most ThinkPad models have support for the wear leveling system
+	  designed by Lenovo. This system enables battery recalibration
+	  and setting of the start and stop charge thresholds. This add
+	  attributes under /sys/class/power_supply/BAT*.
+
 config SENSORS_HDAPS
 	tristate "Thinkpad Hard Drive Active Protection System (hdaps)"
 	depends on INPUT

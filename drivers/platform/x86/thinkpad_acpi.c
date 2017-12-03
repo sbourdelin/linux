@@ -331,6 +331,7 @@ static struct {
 	u32 sensors_pdev_attrs_registered:1;
 	u32 hotkey_poll_active:1;
 	u32 has_adaptive_kbd:1;
+	u32 battery;
 } tp_features;
 
 static struct {
@@ -9201,6 +9202,375 @@ static struct ibm_struct mute_led_driver_data = {
 	.resume = mute_led_resume,
 };
 
+/*************************************************************************
+ * Battery ACPI Wear Control (BWC)
+ */
+
+#ifdef CONFIG_THINKPAD_ACPI_BWC
+
+#define START_SUPPORT      1
+#define STOP_SUPPORT	  (1 << 1)
+#define START_INDIVIDUAL  (1 << 2)
+#define STOP_INDIVIDUAL   (1 << 3)
+#define TPACPI_BAT_ERR	  (1 << 31)
+
+struct thinkpad_battery_info {
+    int charge_start_primary;
+    int charge_stop_primary;
+    int charge_start_secondary;
+    int charge_stop_secondary;
+};
+
+static struct thinkpad_battery_info tpacpi_bat_info;
+
+static int tpacpi_invalid_stop(int battery, int stop)
+{
+    int start = battery == TPACPI_BATTERY_PRIMARY ?
+			  tpacpi_bat_info.charge_start_primary :
+			  tpacpi_bat_info.charge_start_secondary;
+
+    return start > stop; // 1 if not valid
+
+}
+
+static int tpacpi_invalid_start(int battery, int start)
+{
+    int stop = battery == TPACPI_BATTERY_PRIMARY ?
+			  tpacpi_bat_info.charge_stop_primary :
+			  tpacpi_bat_info.charge_start_secondary;
+
+    return start > stop; // 1 if not valid
+
+}
+
+static int tpacpi_battery_evaluate(const int battery, char *method, int *ret, int param)
+{
+
+    if (!acpi_evalf(hkey_handle, ret, method, "dd", param)) {
+	pr_err("%s: evaluation failed", method);
+	return AE_ERROR;
+    }
+
+    if ((*ret & TPACPI_BAT_ERR)) {
+	pr_err("%s: succeeded but flagged as error", method);
+	return AE_ERROR;
+    }
+
+    return AE_OK;
+
+}
+
+static struct ibm_struct battery_driver_data = {
+    .name = "battery"
+};
+
+/*
+ * BCTG
+ * GetBatteryCharge Capacity Threshold
+ */
+int tpacpi_get_start_threshold(int battery, int* res)
+{
+    int value;
+
+    // this feature is not supported, see tpacpi_battery_init
+    if (!(tp_features.battery & START_SUPPORT)) {
+	return -ENODEV;
+    }
+
+    // individual battery addressing is not supported, use primary
+    if (!(tp_features.battery & START_INDIVIDUAL)) {
+	battery = TPACPI_BATTERY_PRIMARY;
+    }
+
+    if (tpacpi_battery_evaluate(battery, "BCTG", res, battery)) {
+	pr_err("error evaluating start threshold on battery %d", battery);
+	return -ENODEV;
+    }
+
+    // the value is in the lower 8 bits
+    value = *res & 0xFF;
+
+    /*
+     * when the value is 0, that means controller default, which
+     * means that the controller will charge to 100
+     */
+    *res = value == 0 ? 100 : value;
+
+    return 0;
+
+}
+EXPORT_SYMBOL_GPL(tpacpi_get_start_threshold);
+
+int tpacpi_get_stop_threshold(int battery, int* res)
+{
+
+    int value;
+
+    if (!(tp_features.battery & STOP_SUPPORT)) {
+	return -ENODEV;
+    }
+
+    // individual battery addressing is not supported, use primary
+    if (!(tp_features.battery & STOP_INDIVIDUAL)) {
+	battery = TPACPI_BATTERY_PRIMARY;
+    }
+
+    if (tpacpi_battery_evaluate(battery, "BCSG", res, battery)) {
+	pr_err("error evaluating stop threshold of battery %d", battery);
+	return -ENODEV;
+    }
+
+    value = *res & 0xFF;
+
+    /*
+     * when the value is 0, that means controller default, which
+     * means that the controller will charge to 100
+     */
+    *res = value == 0 ? 100 : value;
+
+    return 0;
+
+}
+EXPORT_SYMBOL_GPL(tpacpi_get_stop_threshold);
+
+int tpacpi_set_start_threshold(int battery, int value)
+{
+
+    int param = 0x0, ret = -1;
+
+    if (value > 100 || value < 0) {
+	return -EINVAL;
+    }
+
+    // this feature is not supported, see tpacpi_battery_init
+    if (!(tp_features.battery & START_SUPPORT)) {
+	return -ENODEV;
+    }
+
+    // per-battery set not supported
+    if (!(tp_features.battery & START_INDIVIDUAL)) {
+	battery = TPACPI_BATTERY_PRIMARY;
+    }
+
+    if (tpacpi_invalid_start(battery, value)) {
+	return -EINVAL;
+    }
+
+    /*
+     * Bit 7-0: Charge start capacity (Unit:%)
+     * =0: Use battery default setting
+     * =1-99: Threshold to start charging battery (Relative capacity)
+     */
+    param |= value;
+
+
+    /*
+     * Bit 9-8:BatteryID
+     * = 0: Any battery
+     * = 1: Primary battery
+     * = 2: Secondary battery
+     * = Others: Reserved (0)
+     */
+    param |= (battery << 8);
+
+    if (tpacpi_battery_evaluate(battery, "BCCS", &ret, param)) {
+	pr_err("error setting battery start threshold: %d\n", ret);
+	return -ENODEV;
+    }
+
+    if (battery == TPACPI_BATTERY_PRIMARY) {
+	tpacpi_bat_info.charge_start_primary = value;
+    } else {
+	tpacpi_bat_info.charge_start_secondary = value;
+    }
+
+    return 0;
+
+}
+EXPORT_SYMBOL_GPL(tpacpi_set_start_threshold);
+
+int tpacpi_set_stop_threshold(int battery, int value)
+{
+
+    int param = 0, ret = -1;
+
+    if (value > 100 || value < 0) {
+	return -EINVAL;
+    }
+
+    // this feature is not supported, see tpacpi_battery_init
+    if (!(tp_features.battery & STOP_SUPPORT)) {
+	return -ENODEV;
+    }
+
+    // per-battery set not supported
+    if (!(tp_features.battery & STOP_INDIVIDUAL)) {
+	battery = TPACPI_BATTERY_PRIMARY;
+    }
+
+    if (tpacpi_invalid_stop(battery, value)) {
+	return -EINVAL;
+    }
+
+    /*
+     * Bit 7-0: Charge start capacity (Unit:%)
+     * =0: Use battery default setting
+     * =1-99: Threshold to start charging battery (Relative capacity)
+     */
+    param |= value;
+
+
+    /*
+     * Bit 9-8:BatteryID
+     * = 0: Any battery
+     * = 1: Primary battery
+     * = 2: Secondary battery
+     * = Others: Reserved (0)
+     */
+    param |= (battery << 8);
+
+
+    if (tpacpi_battery_evaluate(battery, "BCSS", &ret, param)) {
+	pr_err("error setting battery stop threshold: %d\n", ret);
+	return -ENODEV;
+    }
+
+    if (battery == TPACPI_BATTERY_PRIMARY) {
+	tpacpi_bat_info.charge_stop_primary = value;
+    } else {
+	tpacpi_bat_info.charge_stop_secondary = value;
+    }
+
+    return 0;
+
+}
+EXPORT_SYMBOL_GPL(tpacpi_set_stop_threshold);
+
+int tpacpi_battery_get_functionality(void)
+{
+    return tp_features.battery;
+}
+EXPORT_SYMBOL_GPL(tpacpi_battery_get_functionality);
+
+/**
+ * The field battery inside tp_features is a multi-bit
+ * boolean system. If battery is 0, the system is not supported.
+ *
+ * Bit 0-2: Support status
+ *
+ * Bit 0: Start support
+ * Bit 1: Stop support
+ *
+ * Bit 2-4: Individual battery support
+ *
+ * Bit 3: Start individual support
+ * Bit 4: Stop individual support
+ *
+ */
+static int __init tpacpi_battery_init(struct ibm_init_struct *ibm)
+{
+
+    int ret;
+
+    // First, reset all features
+
+    tp_features.battery = 0;
+    /*
+     * BCTG
+     * GetBatteryCharge Capacity Threshold
+     */
+    if (acpi_has_method(hkey_handle, "BCTG")) {
+	// evaluate first battery, thus 1
+	if (!tpacpi_battery_evaluate(1, "BCTG", &ret, 1)) {
+
+	    /*
+	     * Bit 8:Batterycharge capacity threshold
+	     * (0:Not support   1:Support)
+	     */
+
+	    if (ret & (1 << 8)) {
+		tp_features.battery |= START_SUPPORT;
+	    }
+
+	    /*
+	     * Bit 9: Specify every battery parameter
+	     * (0:Not support(apply parameter for all battery)
+	     * 1:Support(apply parameter for all battery))
+	     */
+
+	    if (ret & (1 << 9)) {
+		tp_features.battery |= START_INDIVIDUAL;
+	    }
+
+	}
+    } else {
+	pr_warning("setting charge start threshold not supported");
+    }
+
+    /*
+     * BCSG
+     * GetBatteryCharge Stop Capacity Threshold
+     */
+
+    if (acpi_has_method(hkey_handle, "BCSG")) {
+	if (!tpacpi_battery_evaluate(1, "BCSG", &ret, 1)) {
+
+	    /*
+	     * Bit 8:Batterycharge stop capacity threshold
+	     * (0:Not support   1:Support)
+	     */
+
+	    if (ret & (1 << 8)) {
+		tp_features.battery |= STOP_SUPPORT;
+	    }
+
+	    /*
+	     * Bit 9: Specify every battery parameter
+	     * (0:Not support(apply parameter for all battery)
+	     * 1:Support(apply parameter for all battery))
+	     */
+
+	    if (ret & (1 << 9)) {
+		tp_features.battery |= STOP_INDIVIDUAL;
+	    }
+
+	}
+    } else {
+	pr_warning("setting charge start threshold not supported");
+    }
+
+    pr_info("Battery subdriver initialized (%#010x)", tp_features.battery);
+
+    // check the driver for sanity
+    tpacpi_get_start_threshold(TPACPI_BATTERY_PRIMARY,
+			       &tpacpi_bat_info.charge_start_primary);
+
+    tpacpi_get_stop_threshold(TPACPI_BATTERY_PRIMARY,
+			      &tpacpi_bat_info.charge_stop_primary);
+
+    pr_info("battery info: start %d, stop %d",
+	    tpacpi_bat_info.charge_start_primary,
+	    tpacpi_bat_info.charge_stop_primary);
+
+    // this will fail if there is no secondary battery
+    if (tpacpi_get_start_threshold(TPACPI_BATTERY_SECONDARY,
+				   &tpacpi_bat_info.charge_start_secondary))
+    {
+	// there is no secondary battery, wrap up init
+	pr_info("secondary battery not installed/present");
+	return 0;
+    } else {
+	// there IS a secondary battery, read the stop capacity
+	tpacpi_get_stop_threshold(TPACPI_BATTERY_SECONDARY,
+				 &tpacpi_bat_info.charge_stop_secondary);
+    }
+
+    return 0;
+
+}
+
+#endif // CONFIG_THINKPAD_ACPI_BWC
+
 /****************************************************************************
  ****************************************************************************
  *
@@ -9647,6 +10017,12 @@ static struct ibm_init_struct ibms_init[] __initdata = {
 		.init = mute_led_init,
 		.data = &mute_led_driver_data,
 	},
+#ifdef CONFIG_THINKPAD_ACPI_BWC
+	{
+		.init = tpacpi_battery_init,
+		.data = &battery_driver_data,
+	},
+#endif
 };
 
 static int __init set_ibm_param(const char *val, const struct kernel_param *kp)

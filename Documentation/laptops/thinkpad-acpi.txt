@@ -46,6 +46,7 @@ detailed description):
 	- Fan control and monitoring: fan speed, fan enable/disable
 	- WAN enable and disable
 	- UWB enable and disable
+	- Battery Wear Control (BWC)
 
 A compatibility table by model and feature is maintained on the web
 site, http://ibm-acpi.sf.net/. I appreciate any success or failure
@@ -1375,6 +1376,21 @@ and set.
 For more details about which buttons will appear depending on the mode, please
 review the laptop's user guide:
 http://www.lenovo.com/shop/americas/content/user_guides/x1carbon_2_ug_en.pdf
+
+Battey Wear Control (BWC)
+-------------------------
+
+The driver supports control for the embedded controller ACPI battery configuration.
+This means that you can set start and stop charge thresholds for batteries in
+ThinkPads that have a processor newer than Sandy Bridge.
+
+The actual sysfs interface is an extension of the standard ACPI battery interface.
+The interface is usually in:
+
+Start thresholds:	/sys/class/power_supply/BATN/charge_start_threshold
+Stop threshold:		/sys/class/power_supply/BATN/charge_stop_threshold
+
+These attributes support reading and writing.
 
 Multiple Commands, Module Parameters
 ------------------------------------
