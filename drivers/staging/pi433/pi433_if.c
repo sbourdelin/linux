@@ -119,12 +119,6 @@ struct pi433_instance {
 	struct pi433_tx_cfg	tx_cfg;
 };
 
-/*-------------------------------------------------------------------------*/
-
-/* macro for checked access of registers of radio module */
-#define SET_CHECKED(retval) \
-	if (retval < 0) \
-		return retval;
 
 /*-------------------------------------------------------------------------*/
 
@@ -183,28 +177,53 @@ rf69_set_rx_cfg(struct pi433_device *dev, struct pi433_rx_cfg *rx_cfg)
 	int payload_length;
 
 	/* receiver config */
-	SET_CHECKED(rf69_set_frequency	(dev->spi, rx_cfg->frequency));
-	SET_CHECKED(rf69_set_bit_rate	(dev->spi, rx_cfg->bit_rate));
-	SET_CHECKED(rf69_set_modulation	(dev->spi, rx_cfg->modulation));
-	SET_CHECKED(rf69_set_antenna_impedance	 (dev->spi, rx_cfg->antenna_impedance));
-	SET_CHECKED(rf69_set_rssi_threshold	 (dev->spi, rx_cfg->rssi_threshold));
-	SET_CHECKED(rf69_set_ook_threshold_dec	 (dev->spi, rx_cfg->thresholdDecrement));
-	SET_CHECKED(rf69_set_bandwidth 		 (dev->spi, rx_cfg->bw_mantisse, rx_cfg->bw_exponent));
-	SET_CHECKED(rf69_set_bandwidth_during_afc(dev->spi, rx_cfg->bw_mantisse, rx_cfg->bw_exponent));
-	SET_CHECKED(rf69_set_dagc 		 (dev->spi, rx_cfg->dagc));
+	ret = rf69_set_frequency(dev->spi, rx_cfg->frequency);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_bit_rate(dev->spi, rx_cfg->bit_rate);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_modulation(dev->spi, rx_cfg->modulation);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_antenna_impedance(dev->spi, rx_cfg->antenna_impedance);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_rssi_threshold(dev->spi, rx_cfg->rssi_threshold);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_ook_threshold_dec(dev->spi, rx_cfg->thresholdDecrement);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_bandwidth(dev->spi, rx_cfg->bw_mantisse, rx_cfg->bw_exponent);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_bandwidth_during_afc(dev->spi, rx_cfg->bw_mantisse,
+					    rx_cfg->bw_exponent);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_dagc(dev->spi, rx_cfg->dagc);
+	if (ret < 0)
+		return ret;
 
 	dev->rx_bytes_to_drop = rx_cfg->bytes_to_drop;
 
 	/* packet config */
 	/* enable */
-	SET_CHECKED(rf69_set_sync_enable(dev->spi, rx_cfg->enable_sync));
+	ret = rf69_set_sync_enable(dev->spi, rx_cfg->enable_sync);
+	if (ret < 0)
+		return ret;
 	if (rx_cfg->enable_sync == optionOn)
 	{
-		SET_CHECKED(rf69_set_fifo_fill_condition(dev->spi, afterSyncInterrupt));
+		ret = rf69_set_fifo_fill_condition(dev->spi, afterSyncInterrupt);
+		if (ret < 0)
+			return ret;
 	}
 	else
 	{
-		SET_CHECKED(rf69_set_fifo_fill_condition(dev->spi, always));
+		ret = rf69_set_fifo_fill_condition(dev->spi, always);
+		if (ret < 0)
+			return ret;
 	}
 	if (rx_cfg->enable_length_byte == optionOn) {
 		ret = rf69_set_packet_format(dev->spi, packetLengthVar);
@@ -215,36 +234,54 @@ rf69_set_rx_cfg(struct pi433_device *dev, struct pi433_rx_cfg *rx_cfg)
 		if (ret < 0)
 			return ret;
 	}
-	SET_CHECKED(rf69_set_adressFiltering(dev->spi, rx_cfg->enable_address_filtering));
-	SET_CHECKED(rf69_set_crc_enable	    (dev->spi, rx_cfg->enable_crc));
+	ret = rf69_set_adressFiltering(dev->spi, rx_cfg->enable_address_filtering);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_crc_enable(dev->spi, rx_cfg->enable_crc);
+	if (ret < 0)
+		return ret;
 
 	/* lengths */
-	SET_CHECKED(rf69_set_sync_size(dev->spi, rx_cfg->sync_length));
+	ret = rf69_set_sync_size(dev->spi, rx_cfg->sync_length);
+	if (ret < 0)
+		return ret;
 	if (rx_cfg->enable_length_byte == optionOn)
 	{
-		SET_CHECKED(rf69_set_payload_length(dev->spi, 0xff));
+		ret = rf69_set_payload_length(dev->spi, 0xff);
+		if (ret < 0)
+			return ret;
 	}
 	else if (rx_cfg->fixed_message_length != 0)
 	{
 		payload_length = rx_cfg->fixed_message_length;
 		if (rx_cfg->enable_length_byte  == optionOn) payload_length++;
 		if (rx_cfg->enable_address_filtering != filteringOff) payload_length++;
-		SET_CHECKED(rf69_set_payload_length(dev->spi, payload_length));
+		ret = rf69_set_payload_length(dev->spi, payload_length);
+		if (ret < 0)
+			return ret;
 	}
 	else
 	{
-		SET_CHECKED(rf69_set_payload_length(dev->spi, 0));
+		ret = rf69_set_payload_length(dev->spi, 0);
+		if (ret < 0)
+			return ret;
 	}
 
 	/* values */
 	if (rx_cfg->enable_sync == optionOn)
 	{
-		SET_CHECKED(rf69_set_sync_values(dev->spi, rx_cfg->sync_pattern));
+		ret = rf69_set_sync_values(dev->spi, rx_cfg->sync_pattern);
+		if (ret < 0)
+			return ret;
 	}
 	if (rx_cfg->enable_address_filtering != filteringOff)
 	{
-		SET_CHECKED(rf69_set_node_address     (dev->spi, rx_cfg->node_address));
-		SET_CHECKED(rf69_set_broadcast_address(dev->spi, rx_cfg->broadcast_address));
+		ret = rf69_set_node_address(dev->spi, rx_cfg->node_address);
+		if (ret < 0)
+			return ret;
+		ret = rf69_set_broadcast_address(dev->spi, rx_cfg->broadcast_address);
+		if (ret < 0)
+			return ret;
 	}
 
 	return 0;
@@ -255,24 +292,44 @@ rf69_set_tx_cfg(struct pi433_device *dev, struct pi433_tx_cfg *tx_cfg)
 {
 	int ret;
 
-	SET_CHECKED(rf69_set_frequency	(dev->spi, tx_cfg->frequency));
-	SET_CHECKED(rf69_set_bit_rate	(dev->spi, tx_cfg->bit_rate));
-	SET_CHECKED(rf69_set_modulation	(dev->spi, tx_cfg->modulation));
-	SET_CHECKED(rf69_set_deviation	(dev->spi, tx_cfg->dev_frequency));
-	SET_CHECKED(rf69_set_pa_ramp	(dev->spi, tx_cfg->pa_ramp));
-	SET_CHECKED(rf69_set_modulation_shaping(dev->spi, tx_cfg->modShaping));
-	SET_CHECKED(rf69_set_tx_start_condition(dev->spi, tx_cfg->tx_start_condition));
+	ret = rf69_set_frequency(dev->spi, tx_cfg->frequency);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_bit_rate(dev->spi, tx_cfg->bit_rate);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_modulation(dev->spi, tx_cfg->modulation);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_deviation(dev->spi, tx_cfg->dev_frequency);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_pa_ramp(dev->spi, tx_cfg->pa_ramp);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_modulation_shaping(dev->spi, tx_cfg->modShaping);
+	if (ret < 0)
+		return ret;
+	ret = rf69_set_tx_start_condition(dev->spi, tx_cfg->tx_start_condition);
+	if (ret < 0)
+		return ret;
 
 	/* packet format enable */
 	if (tx_cfg->enable_preamble == optionOn)
 	{
-		SET_CHECKED(rf69_set_preamble_length(dev->spi, tx_cfg->preamble_length));
+		ret = rf69_set_preamble_length(dev->spi, tx_cfg->preamble_length);
+		if (ret < 0)
+			return ret;
 	}
 	else
 	{
-		SET_CHECKED(rf69_set_preamble_length(dev->spi, 0));
+		ret = rf69_set_preamble_length(dev->spi, 0);
+		if (ret < 0)
+			return ret;
 	}
-	SET_CHECKED(rf69_set_sync_enable  (dev->spi, tx_cfg->enable_sync));
+	ret = rf69_set_sync_enable (dev->spi, tx_cfg->enable_sync);
+	if (ret < 0)
+		return ret;
 	if (tx_cfg->enable_length_byte == optionOn) {
 		ret = rf69_set_packet_format(dev->spi, packetLengthVar);
 		if (ret < 0)
@@ -282,12 +339,18 @@ rf69_set_tx_cfg(struct pi433_device *dev, struct pi433_tx_cfg *tx_cfg)
 		if (ret < 0)
 			return ret;
 	}
-	SET_CHECKED(rf69_set_crc_enable	  (dev->spi, tx_cfg->enable_crc));
+	ret = rf69_set_crc_enable(dev->spi, tx_cfg->enable_crc);
+	if (ret < 0)
+		return ret;
 
 	/* configure sync, if enabled */
 	if (tx_cfg->enable_sync == optionOn) {
-		SET_CHECKED(rf69_set_sync_size(dev->spi, tx_cfg->sync_length));
-		SET_CHECKED(rf69_set_sync_values(dev->spi, tx_cfg->sync_pattern));
+		ret = rf69_set_sync_size(dev->spi, tx_cfg->sync_length);
+		if (ret < 0)
+			return ret;
+		ret = rf69_set_sync_values(dev->spi, tx_cfg->sync_pattern);
+		if (ret < 0)
+			return ret;
 	}
 
 	return 0;
@@ -309,18 +372,26 @@ pi433_start_rx(struct pi433_device *dev)
 	if (retval) return retval;
 
 	/* setup rssi irq */
-	SET_CHECKED(rf69_set_dio_mapping(dev->spi, DIO0, DIO_Rssi_DIO0));
+	retval = rf69_set_dio_mapping(dev->spi, DIO0, DIO_Rssi_DIO0);
+	if (retval < 0)
+		return retval;
 	dev->irq_state[DIO0] = DIO_Rssi_DIO0;
 	irq_set_irq_type(dev->irq_num[DIO0], IRQ_TYPE_EDGE_RISING);
 
 	/* setup fifo level interrupt */
-	SET_CHECKED(rf69_set_fifo_threshold(dev->spi, FIFO_SIZE - FIFO_THRESHOLD));
-	SET_CHECKED(rf69_set_dio_mapping(dev->spi, DIO1, DIO_FifoLevel));
+	retval = rf69_set_fifo_threshold(dev->spi, FIFO_SIZE - FIFO_THRESHOLD);
+	if (retval < 0)
+		return retval;
+	retval = rf69_set_dio_mapping(dev->spi, DIO1, DIO_FifoLevel);
+	if (retval < 0)
+		return retval;
 	dev->irq_state[DIO1] = DIO_FifoLevel;
 	irq_set_irq_type(dev->irq_num[DIO1], IRQ_TYPE_EDGE_RISING);
 
 	/* set module to receiving mode */
-	SET_CHECKED(rf69_set_mode(dev->spi, receive));
+	retval = rf69_set_mode(dev->spi, receive);
+	if (retval < 0)
+		return retval;
 
 	return 0;
 }
@@ -335,6 +406,7 @@ pi433_receive(void *data)
 	struct spi_device *spi = dev->spi; /* needed for SET_CHECKED */
 	int bytes_to_read, bytes_total;
 	int retval;
+	int ret;
 
 	dev->interrupt_rx_allowed = false;
 
@@ -378,7 +450,9 @@ pi433_receive(void *data)
 	}
 
 	/* configure payload ready irq */
-	SET_CHECKED(rf69_set_dio_mapping(spi, DIO0, DIO_PayloadReady));
+	retval = rf69_set_dio_mapping(spi, DIO0, DIO_PayloadReady);
+	if (retval < 0)
+		goto abort;
 	dev->irq_state[DIO0] = DIO_PayloadReady;
 	irq_set_irq_type(dev->irq_num[DIO0], IRQ_TYPE_EDGE_RISING);
 
@@ -468,7 +542,9 @@ pi433_receive(void *data)
 	/* rx done, wait was interrupted or error occurred */
 abort:
 	dev->interrupt_rx_allowed = true;
-	SET_CHECKED(rf69_set_mode(dev->spi, standby));
+	ret = rf69_set_mode(dev->spi, standby);
+	if (ret < 0)
+		return ret;
 	wake_up_interruptible(&dev->tx_wait_queue);
 
 	if (retval)
@@ -570,38 +646,56 @@ pi433_tx_thread(void *data)
 			/* rx is currently waiting for a telegram;
 			 * we need to set the radio module to standby
 			 */
-			SET_CHECKED(rf69_set_mode(device->spi, standby));
+			retval = rf69_set_mode(device->spi, standby);
+			if (retval < 0)
+				return retval;
 			rx_interrupted = true;
 		}
 
 		/* clear fifo, set fifo threshold, set payload length */
-		SET_CHECKED(rf69_set_mode(spi, standby)); /* this clears the fifo */
-		SET_CHECKED(rf69_set_fifo_threshold(spi, FIFO_THRESHOLD));
+		retval = rf69_set_mode(spi, standby); /* this clears the fifo */
+		if (retval < 0)
+			return retval;
+		retval = rf69_set_fifo_threshold(spi, FIFO_THRESHOLD);
+		if (retval < 0)
+			return retval;
 		if (tx_cfg.enable_length_byte == optionOn)
 		{
-			SET_CHECKED(rf69_set_payload_length(spi, size * tx_cfg.repetitions));
+			retval = rf69_set_payload_length(spi, size * tx_cfg.repetitions);
+			if (retval < 0)
+				return retval;
 		}
 		else
 		{
-			SET_CHECKED(rf69_set_payload_length(spi, 0));
+			retval = rf69_set_payload_length(spi, 0);
+			if (retval < 0)
+				return retval;
 		}
 
 		/* configure the rf chip */
-		rf69_set_tx_cfg(device, &tx_cfg);
+		retval = rf69_set_tx_cfg(device, &tx_cfg);
+		if (retval < 0)
+			return retval;
 
 		/* enable fifo level interrupt */
-		SET_CHECKED(rf69_set_dio_mapping(spi, DIO1, DIO_FifoLevel));
+		retval = rf69_set_dio_mapping(spi, DIO1, DIO_FifoLevel);
+		if (retval < 0)
+			return retval;
 		device->irq_state[DIO1] = DIO_FifoLevel;
 		irq_set_irq_type(device->irq_num[DIO1], IRQ_TYPE_EDGE_FALLING);
 
 		/* enable packet sent interrupt */
-		SET_CHECKED(rf69_set_dio_mapping(spi, DIO0, DIO_PacketSent));
+		retval = rf69_set_dio_mapping(spi, DIO0, DIO_PacketSent);
+		if (retval < 0)
+			return retval;
 		device->irq_state[DIO0] = DIO_PacketSent;
 		irq_set_irq_type(device->irq_num[DIO0], IRQ_TYPE_EDGE_RISING);
 		enable_irq(device->irq_num[DIO0]); /* was disabled by rx active check */
 
 		/* enable transmission */
-		SET_CHECKED(rf69_set_mode(spi, transmit));
+		retval = rf69_set_mode(spi, transmit);
+		if (retval < 0)
+			return retval;
 
 		/* transfer this msg (and repetitions) to chip fifo */
 		device->free_in_fifo = FIFO_SIZE;
@@ -643,7 +737,9 @@ pi433_tx_thread(void *data)
 
 		/* STOP_TRANSMISSION */
 		dev_dbg(device->dev, "thread: Packet sent. Set mode to stby.");
-		SET_CHECKED(rf69_set_mode(spi, standby));
+		retval = rf69_set_mode(spi, standby);
+		if (retval < 0)
+			return retval;
 
 		/* everything sent? */
 		if (kfifo_is_empty(&device->tx_fifo)) {
@@ -1089,13 +1185,27 @@ static int pi433_probe(struct spi_device *spi)
 	}
 
 	/* setup the radio module */
-	SET_CHECKED(rf69_set_mode		(spi, standby));
-	SET_CHECKED(rf69_set_data_mode		(spi, packet));
-	SET_CHECKED(rf69_set_amplifier_0	(spi, optionOn));
-	SET_CHECKED(rf69_set_amplifier_1	(spi, optionOff));
-	SET_CHECKED(rf69_set_amplifier_2	(spi, optionOff));
-	SET_CHECKED(rf69_set_output_power_level	(spi, 13));
-	SET_CHECKED(rf69_set_antenna_impedance	(spi, fiftyOhm));
+	retval = rf69_set_mode(spi, standby);
+	if (retval < 0)
+		goto radio_failed;
+	retval = rf69_set_data_mode(spi, packet);
+	if (retval < 0)
+		goto radio_failed;
+	retval = rf69_set_amplifier_0(spi, optionOn);
+	if (retval < 0)
+		goto radio_failed;
+	retval = rf69_set_amplifier_1(spi, optionOff);
+	if (retval < 0)
+		goto radio_failed;
+	retval = rf69_set_amplifier_2(spi, optionOff);
+	if (retval < 0)
+		goto radio_failed;
+	retval = rf69_set_output_power_level(spi, 13);
+	if (retval < 0)
+		goto radio_failed;
+	retval = rf69_set_antenna_impedance(spi, fiftyOhm);
+	if (retval < 0)
+		goto radio_failed;
 
 	/* determ minor number */
 	retval = pi433_get_minor(device);
@@ -1156,6 +1266,7 @@ send_thread_failed:
 device_create_failed:
 	pi433_free_minor(device);
 minor_failed:
+radio_failed:
 	free_GPIOs(device);
 GPIO_failed:
 	kfree(device);
