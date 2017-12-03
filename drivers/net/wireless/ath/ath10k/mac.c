@@ -24,7 +24,6 @@
 #include "hif.h"
 #include "core.h"
 #include "debug.h"
-#include "wmi.h"
 #include "htt.h"
 #include "txrx.h"
 #include "testmode.h"

@@ -31,7 +31,6 @@
  */
 
 #include <linux/types.h>
-#include <linux/bitops.h>
 #include <linux/dma-mapping.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>

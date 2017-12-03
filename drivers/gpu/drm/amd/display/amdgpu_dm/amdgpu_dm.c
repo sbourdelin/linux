@@ -23,7 +23,6 @@
  *
  */
 
-#include "dm_services_types.h"
 #include "dc.h"
 #include "dc/inc/core_types.h"
 
@@ -65,8 +64,6 @@
 
 #include "soc15_common.h"
 #endif
-
-#include "modules/inc/mod_freesync.h"
 
 #include "i2caux_interface.h"
 

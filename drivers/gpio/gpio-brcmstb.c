@@ -11,7 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/bitops.h>
 #include <linux/gpio/driver.h>
 #include <linux/of_device.h>
 #include <linux/of_irq.h>

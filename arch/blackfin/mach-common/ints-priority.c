@@ -26,7 +26,6 @@
 #include <asm/blackfin.h>
 #include <asm/irq_handler.h>
 #include <asm/dpmc.h>
-#include <asm/traps.h>
 #include <asm/gpio.h>
 
 /*

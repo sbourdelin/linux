@@ -29,7 +29,6 @@
 #include "rv_ppsmc.h"
 #include "smu10_driver_if.h"
 #include "smu10.h"
-#include "ppatomctrl.h"
 #include "pp_debug.h"
 #include "smu_ucode_xfer_vi.h"
 #include "smu7_smumgr.h"

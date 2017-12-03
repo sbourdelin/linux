@@ -26,7 +26,6 @@
 #include <asm/iommu.h>
 #include <asm/pnv-pci.h>
 #include <asm/msi_bitmap.h>
-#include <asm/opal.h>
 
 #include "powernv.h"
 #include "pci.h"

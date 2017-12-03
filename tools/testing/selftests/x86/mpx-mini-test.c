@@ -722,10 +722,6 @@ void mpx_cleanup(void)
 }
 
 /*-------------- the following is test case ---------------*/
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <time.h>
 
 uint64_t num_lower_brs;
