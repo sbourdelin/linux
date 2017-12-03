@@ -2,10 +2,12 @@
 # TI's shared transport line discipline and the protocol
 # drivers (BT, FM and GPS)
 #
-menu "Texas Instruments shared transport line discipline"
+menuconfig TIST
+	bool "Texas Instruments shared transport line discipline"
+
 config TI_ST
 	tristate "Shared transport core driver"
-	depends on NET && GPIOLIB && TTY
+	depends on TIST && NET && GPIOLIB && TTY
 	select FW_LOADER
 	help
 	  This enables the shared transport core driver for TI
@@ -13,5 +15,3 @@ config TI_ST
 	  to register themselves with core and send data, the responses
 	  are returned to relevant protocol drivers based on their
 	  packet types.
-
-endmenu
