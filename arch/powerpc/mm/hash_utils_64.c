@@ -1029,13 +1029,24 @@ void __init hash__early_init_mmu(void)
 	pci_io_base = ISA_IO_BASE;
 #endif
 
+	/*
+	 * kexec kernels can boot into the new kernel with PID and LPID
+	 * registers non-zero. Zero them to prevent speculative accesses
+	 * setting up cached translations when we turn the MMU on and
+	 * process/partition table entries start being added.
+	 */
+	if (cpu_has_feature(CPU_FTR_ARCH_300))
+		mtspr(SPRN_PID, 0);
+
 	/* Select appropriate backend */
 	if (firmware_has_feature(FW_FEATURE_PS3_LV1))
 		ps3_early_mm_init();
 	else if (firmware_has_feature(FW_FEATURE_LPAR))
 		hpte_init_pseries();
-	else if (IS_ENABLED(CONFIG_PPC_NATIVE))
+	else if (IS_ENABLED(CONFIG_PPC_NATIVE)) {
+		mtspr(SPRN_LPID, 0);
 		hpte_init_native();
+	}
 
 	if (!mmu_hash_ops.hpte_insert)
 		panic("hash__early_init_mmu: No MMU hash ops defined!\n");
@@ -1055,10 +1066,14 @@ void __init hash__early_init_mmu(void)
 void hash__early_init_mmu_secondary(void)
 {
 	/* Initialize hash table for that CPU */
-	if (!firmware_has_feature(FW_FEATURE_LPAR)) {
+	if (cpu_has_feature(CPU_FTR_ARCH_300))
+		mtspr(SPRN_PID, 0);
 
+	if (!firmware_has_feature(FW_FEATURE_LPAR)) {
 		if (cpu_has_feature(CPU_FTR_POWER9_DD1))
 			update_hid_for_hash();
+
+		mtspr(SPRN_LPID, 0);
 
 		if (!cpu_has_feature(CPU_FTR_ARCH_300))
 			mtspr(SPRN_SDR1, _SDR1);

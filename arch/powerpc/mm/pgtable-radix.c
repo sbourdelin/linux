@@ -563,10 +563,18 @@ void __init radix__early_init_mmu(void)
 	__pte_frag_nr = H_PTE_FRAG_NR;
 	__pte_frag_size_shift = H_PTE_FRAG_SIZE_SHIFT;
 
+	/*
+	 * kexec kernels can boot into the new kernel with PID and LPID
+	 * registers non-zero. Zero them to prevent speculative accesses
+	 * setting up cached translations when we turn the MMU on and
+	 * process/partition table entries start being added.
+	 */
+	mtspr(SPRN_PID, 0);
 	if (!firmware_has_feature(FW_FEATURE_LPAR)) {
 		radix_init_native();
 		if (cpu_has_feature(CPU_FTR_POWER9_DD1))
 			update_hid_for_radix();
+		mtspr(SPRN_LPID, 0);
 		lpcr = mfspr(SPRN_LPCR);
 		mtspr(SPRN_LPCR, lpcr | LPCR_UPRT | LPCR_HR);
 		radix_init_partition_table();
@@ -587,10 +595,12 @@ void radix__early_init_mmu_secondary(void)
 	/*
 	 * update partition table control register and UPRT
 	 */
+	mtspr(SPRN_PID, 0);
 	if (!firmware_has_feature(FW_FEATURE_LPAR)) {
 
 		if (cpu_has_feature(CPU_FTR_POWER9_DD1))
 			update_hid_for_radix();
+		mtspr(SPRN_LPID, 0);
 
 		lpcr = mfspr(SPRN_LPCR);
 		mtspr(SPRN_LPCR, lpcr | LPCR_UPRT | LPCR_HR);
