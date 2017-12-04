@@ -53,10 +53,12 @@
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h>
 #include <linux/gpio/consumer.h>
+#include <linux/nvmem-consumer.h>
 
 #include "hci_uart.h"
 
 /* Vendor-specific HCI commands */
+#define HCI_VS_WRITE_BD_ADDR			0xfc06
 #define HCI_VS_UPDATE_UART_HCI_BAUDRATE		0xff36
 
 /* HCILL commands */
@@ -89,6 +91,7 @@ struct ll_device {
 	struct serdev_device *serdev;
 	struct gpio_desc *enable_gpio;
 	struct clk *ext_clk;
+	u8 *bdaddr;
 };
 
 struct ll_struct {
@@ -694,6 +697,19 @@ static int ll_setup(struct hci_uart *hu)
 	if (err)
 		return err;
 
+	/* Set MAC address, if any */
+	if (lldev->bdaddr) {
+		struct sk_buff *skb;
+
+		skb = __hci_cmd_sync(hu->hdev, HCI_VS_WRITE_BD_ADDR, 6,
+				     lldev->bdaddr, HCI_INIT_TIMEOUT);
+		if (IS_ERR(skb))
+			bt_dev_err(hu->hdev, "Failed to set MAC address (%ld)",
+				   PTR_ERR(skb));
+		else
+			kfree_skb(skb);
+	}
+
 	/* Operational speed if any */
 	if (hu->oper_speed)
 		speed = hu->oper_speed;
@@ -722,6 +738,7 @@ static int hci_ti_probe(struct serdev_device *serdev)
 {
 	struct hci_uart *hu;
 	struct ll_device *lldev;
+	struct nvmem_cell *bdaddr_cell;
 	u32 max_speed = 3000000;
 
 	lldev = devm_kzalloc(&serdev->dev, sizeof(struct ll_device), GFP_KERNEL);
@@ -742,6 +759,22 @@ static int hci_ti_probe(struct serdev_device *serdev)
 
 	of_property_read_u32(serdev->dev.of_node, "max-speed", &max_speed);
 	hci_uart_set_speeds(hu, 115200, max_speed);
+
+	/* optional MAC address from nvram */
+	bdaddr_cell = nvmem_cell_get(&serdev->dev, "mac-address");
+	if (IS_ERR(bdaddr_cell)) {
+		int err = PTR_ERR(bdaddr_cell);
+
+		if (err != -ENOENT) {
+			if (err != -EPROBE_DEFER)
+				dev_err(&serdev->dev,
+					"Failed to get \"mac-address\" nvmem cell\n");
+			return err;
+		}
+	} else {
+		lldev->bdaddr = nvmem_cell_read(bdaddr_cell, NULL);
+		nvmem_cell_put(bdaddr_cell);
+	}
 
 	return hci_uart_register_device(hu, &llp);
 }
