@@ -252,7 +252,7 @@ void ipu_prg_channel_disable(struct ipuv3_channel *ipu_chan)
 	struct ipu_prg_channel *chan = &prg->chan[prg_chan];
 	u32 val;
 
-	if (!chan->enabled || prg_chan < 0)
+	if (prg_chan < 0 || !chan->enabled)
 		return;
 
 	clk_prepare_enable(prg->clk_ipg);
