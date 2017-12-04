@@ -2751,7 +2751,7 @@ void bnxt_set_tpa_flags(struct bnxt *bp)
 		return;
 	if (bp->dev->features & NETIF_F_LRO)
 		bp->flags |= BNXT_FLAG_LRO;
-	if (bp->dev->features & NETIF_F_GRO)
+	if (bp->dev->features & NETIF_F_GRO_HW)
 		bp->flags |= BNXT_FLAG_GRO;
 }
 
@@ -6817,7 +6817,7 @@ static int bnxt_set_features(struct net_device *dev, netdev_features_t features)
 	bool update_tpa = false;
 
 	flags &= ~BNXT_FLAG_ALL_CONFIG_FEATS;
-	if ((features & NETIF_F_GRO) && !BNXT_CHIP_TYPE_NITRO_A0(bp))
+	if (features & NETIF_F_GRO_HW)
 		flags |= BNXT_FLAG_GRO;
 	if (features & NETIF_F_LRO)
 		flags |= BNXT_FLAG_LRO;
@@ -8093,7 +8093,7 @@ static int bnxt_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 			   NETIF_F_RXCSUM | NETIF_F_GRO;
 
 	if (!BNXT_CHIP_TYPE_NITRO_A0(bp))
-		dev->hw_features |= NETIF_F_LRO;
+		dev->hw_features |= NETIF_F_LRO | NETIF_F_GRO_HW;
 
 	dev->hw_enc_features =
 			NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_SG |
@@ -8107,6 +8107,8 @@ static int bnxt_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->hw_features |= NETIF_F_HW_VLAN_CTAG_RX | NETIF_F_HW_VLAN_CTAG_TX |
 			    NETIF_F_HW_VLAN_STAG_RX | NETIF_F_HW_VLAN_STAG_TX;
 	dev->features |= dev->hw_features | NETIF_F_HIGHDMA;
+	if (dev->features & NETIF_F_GRO_HW)
+		dev->features &= ~NETIF_F_LRO;
 	dev->priv_flags |= IFF_UNICAST_FLT;
 
 #ifdef CONFIG_BNXT_SRIOV
