@@ -134,6 +134,9 @@ struct uinput_abs_setup {
  */
 #define UI_ABS_SETUP _IOW(UINPUT_IOCTL_BASE, 4, struct uinput_abs_setup)
 
+/* Set clockid to be used for timestamps */
+#define UI_SET_CLOCKID _IOW(UINPUT_IOCTL_BASE, 5, int)
+
 #define UI_SET_EVBIT		_IOW(UINPUT_IOCTL_BASE, 100, int)
 #define UI_SET_KEYBIT		_IOW(UINPUT_IOCTL_BASE, 101, int)
 #define UI_SET_RELBIT		_IOW(UINPUT_IOCTL_BASE, 102, int)
