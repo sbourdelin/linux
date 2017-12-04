@@ -608,21 +608,6 @@ static inline int nand_standard_page_accessors(struct nand_ecc_ctrl *ecc)
 }
 
 /**
- * struct nand_buffers - buffer structure for read/write
- * @ecccalc:	buffer pointer for calculated ECC, size is oobsize.
- * @ecccode:	buffer pointer for ECC read from flash, size is oobsize.
- * @databuf:	buffer pointer for data, size is (page size + oobsize).
- *
- * Do not change the order of buffers. databuf and oobrbuf must be in
- * consecutive order.
- */
-struct nand_buffers {
-	uint8_t	*ecccalc;
-	uint8_t	*ecccode;
-	uint8_t *databuf;
-};
-
-/**
  * struct nand_sdr_timings - SDR NAND chip timings
  *
  * This struct defines the timing requirements of a SDR NAND chip.
@@ -790,7 +775,9 @@ struct nand_manufacturer_ops {
  * @setup_read_retry:	[FLASHSPECIFIC] flash (vendor) specific function for
  *			setting the read-retry mode. Mostly needed for MLC NAND.
  * @ecc:		[BOARDSPECIFIC] ECC control structure
- * @buffers:		buffer structure for read/write
+ * @ecccalc:		buffer pointer for calculated ECC, size is oobsize.
+ * @ecccode:		buffer pointer for ECC read from flash, size is oobsize.
+ * @databuf:		buffer pointer for data, size is (page size + oobsize).
  * @buf_align:		minimum buffer alignment required by a platform
  * @hwcontrol:		platform-specific hardware control structure
  * @erase:		[REPLACEABLE] erase function
@@ -938,7 +925,9 @@ struct nand_chip {
 	struct nand_hw_control *controller;
 
 	struct nand_ecc_ctrl ecc;
-	struct nand_buffers *buffers;
+	u8 *ecccalc;
+	u8 *ecccode;
+	u8 *databuf;
 	unsigned long buf_align;
 	struct nand_hw_control hwcontrol;
 

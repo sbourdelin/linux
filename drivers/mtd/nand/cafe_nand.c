@@ -613,7 +613,6 @@ static int cafe_nand_probe(struct pci_dev *pdev,
 	uint32_t ctrl;
 	int err = 0;
 	int old_dma;
-	struct nand_buffers *nbuf;
 
 	/* Very old versions shared the same PCI ident for all three
 	   functions on the chip. Verify the class too... */
@@ -732,14 +731,12 @@ static int cafe_nand_probe(struct pci_dev *pdev,
 		goto out_irq;
 
 	cafe->dmabuf = dma_alloc_coherent(&cafe->pdev->dev,
-				2112 + sizeof(struct nand_buffers) +
-				mtd->writesize + mtd->oobsize,
+				2112 + mtd->writesize + mtd->oobsize,
 				&cafe->dmaaddr, GFP_KERNEL);
 	if (!cafe->dmabuf) {
 		err = -ENOMEM;
 		goto out_irq;
 	}
-	cafe->nand.buffers = nbuf = (void *)cafe->dmabuf + 2112;
 
 	/* Set up DMA address */
 	cafe_writel(cafe, cafe->dmaaddr & 0xffffffff, NAND_DMA_ADDR0);
@@ -753,9 +750,7 @@ static int cafe_nand_probe(struct pci_dev *pdev,
 		cafe_readl(cafe, NAND_DMA_ADDR0), cafe->dmabuf);
 
 	/* this driver does not need the @ecccalc and @ecccode */
-	nbuf->ecccalc = NULL;
-	nbuf->ecccode = NULL;
-	nbuf->databuf = (uint8_t *)(nbuf + 1);
+	cafe->nand.databuf = (void *)cafe->dmabuf + 2112;
 
 	/* Restore the DMA flag */
 	usedma = old_dma;
@@ -802,8 +797,7 @@ static int cafe_nand_probe(struct pci_dev *pdev,
 
  out_free_dma:
 	dma_free_coherent(&cafe->pdev->dev,
-			2112 + sizeof(struct nand_buffers) +
-			mtd->writesize + mtd->oobsize,
+			2112 + mtd->writesize + mtd->oobsize,
 			cafe->dmabuf, cafe->dmaaddr);
  out_irq:
 	/* Disable NAND IRQ in global IRQ mask register */
@@ -830,8 +824,7 @@ static void cafe_nand_remove(struct pci_dev *pdev)
 	free_rs(cafe->rs);
 	pci_iounmap(pdev, cafe->mmio);
 	dma_free_coherent(&cafe->pdev->dev,
-			2112 + sizeof(struct nand_buffers) +
-			mtd->writesize + mtd->oobsize,
+			2112 + mtd->writesize + mtd->oobsize,
 			cafe->dmabuf, cafe->dmaaddr);
 	kfree(cafe);
 }
