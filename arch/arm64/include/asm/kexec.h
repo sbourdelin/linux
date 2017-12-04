@@ -131,6 +131,7 @@ struct arm64_image_header {
 };
 
 static const u8 arm64_image_magic[4] = {'A', 'R', 'M', 0x64U};
+static const u8 arm64_image_pe_sig[2] = {'M', 'Z'};
 
 /**
  * arm64_header_check_magic - Helper to check the arm64 image header.
@@ -150,6 +151,21 @@ static inline int arm64_header_check_magic(const struct arm64_image_header *h)
 		&& h->magic[1] == arm64_image_magic[1]
 		&& h->magic[2] == arm64_image_magic[2]
 		&& h->magic[3] == arm64_image_magic[3]);
+}
+
+/**
+ * arm64_header_check_pe_sig - Helper to check the arm64 image header.
+ *
+ * Returns non-zero if 'MZ' signature is found.
+ */
+
+static inline int arm64_header_check_pe_sig(const struct arm64_image_header *h)
+{
+	if (!h)
+		return 0;
+
+	return (h->pe_sig[0] == arm64_image_pe_sig[0]
+		&& h->pe_sig[1] == arm64_image_pe_sig[1]);
 }
 
 extern const struct kexec_file_ops kexec_image_ops;
