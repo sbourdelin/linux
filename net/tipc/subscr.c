@@ -235,6 +235,8 @@ static struct tipc_subscriber *tipc_subscrb_create(int conid)
 
 static void tipc_subscrb_delete(struct tipc_subscriber *subscriber)
 {
+	if (!subscriber)
+		return;
 	tipc_subscrb_subscrp_delete(subscriber, NULL);
 	tipc_subscrb_put(subscriber);
 }
