@@ -382,10 +382,8 @@ int scsi_dev_info_list_add_keyed(int compatible, char *vendor, char *model,
 			    model, compatible);
 
 	if (strflags)
-		devinfo->flags = simple_strtoul(strflags, NULL, 0);
-	else
-		devinfo->flags = flags;
-
+		flags = (__force blist_flags_t)simple_strtoul(strflags, NULL, 0);
+	devinfo->flags = flags;
 	devinfo->compatible = compatible;
 
 	if (compatible)
@@ -612,7 +610,7 @@ blist_flags_t scsi_get_device_flags_keyed(struct scsi_device *sdev,
 	if (sdev->sdev_bflags)
 		return sdev->sdev_bflags;
 
-	return scsi_default_dev_flags;
+	return (__force blist_flags_t)scsi_default_dev_flags;
 }
 EXPORT_SYMBOL(scsi_get_device_flags_keyed);
 
