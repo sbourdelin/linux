@@ -167,6 +167,9 @@ static const struct edid_quirk {
 	{ "OVR", 0x0001, EDID_QUIRK_NON_DESKTOP },
 	{ "OVR", 0x0003, EDID_QUIRK_NON_DESKTOP },
 	{ "OVR", 0x0004, EDID_QUIRK_NON_DESKTOP },
+
+	/* Lenovo Explorer VR Headset */
+	{ "LEN", 0xb800, EDID_QUIRK_NON_DESKTOP },
 };
 
 /*
