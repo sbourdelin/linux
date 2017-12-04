@@ -848,8 +848,7 @@ inline void print_irqtrace_events(struct task_struct *curr)
 }
 #endif
 
-#if defined(CONFIG_PREEMPT_TRACER) || \
-	(defined(CONFIG_DEBUG_PREEMPT) && defined(CONFIG_PREEMPTIRQ_EVENTS))
+#ifdef CONFIG_PREEMPT_TRACER
 void trace_preempt_on(unsigned long a0, unsigned long a1)
 {
 	trace_preempt_enable_rcuidle(a0, a1);
