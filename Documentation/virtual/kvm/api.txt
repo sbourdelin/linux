@@ -3394,6 +3394,29 @@ invalid, if invalid pages are written to (e.g. after the end of memory)
 or if no page table is present for the addresses (e.g. when using
 hugepages).
 
+4.109 KVM_HYPERV_EVENTFD
+
+Capability: KVM_CAP_HYPERV_EVENTFD
+Architectures: x86
+Type: vm ioctl
+Parameters: struct kvm_hyperv_eventfd (in)
+Returns: 0 on success, !0 on error
+
+This ioctl (un)registers an eventfd to receive notifications from the guest on
+the specified Hyper-V connection id through the SIGNAL_EVENT hypercall, without
+causing a user exit.
+
+struct kvm_hyperv_eventfd {
+	__u32 conn_id;
+	__s32 fd;
+	__u32 flags;
+	__u32 padding[3];
+};
+
+The acceptable values for the flags field:
+
+#define KVM_HYPERV_EVENTFD_DEASSIGN	(1 << 0)
+
 5. The kvm_run structure
 ------------------------
 
