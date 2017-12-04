@@ -47,9 +47,9 @@
 #endif
 
 
-/* No 4X status reads take longer than this (in usec).
+/* No 4X status reads take longer than this (in nsec).
  */
-#define HP_SDC_MAX_REG_DELAY 20000
+#define HP_SDC_MAX_REG_DELAY 20000000
 
 typedef void (hp_sdc_irqhook) (int irq, void *dev_id, 
 			       uint8_t status, uint8_t data);
@@ -281,7 +281,7 @@ typedef struct {
 	hp_sdc_transaction *tq[HP_SDC_QUEUE_LEN]; /* All pending read/writes */
 
 	int		rcurr, rqty;	/* Current read transact in process */
-	struct timeval	rtv;		/* Time when current read started */
+	struct timespec64 rtv;		/* Monotonic time when current read started */
 	int		wcurr;		/* Current write transact in process */
 
 	int		dev_err;	/* carries status from registration */
