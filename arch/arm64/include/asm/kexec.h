@@ -104,6 +104,56 @@ struct kimage_arch {
 	unsigned long elf_load_addr;
 };
 
+/**
+ * struct arm64_image_header - arm64 kernel image header
+ *
+ * @pe_sig: Optional PE format 'MZ' signature
+ * @branch_code: Instruction to branch to stext
+ * @text_offset: Image load offset, little endian
+ * @image_size: Effective image size, little endian
+ * @flags:
+ *	Bit 0: Kernel endianness. 0=little endian, 1=big endian
+ * @reserved: Reserved
+ * @magic: Magic number, "ARM\x64"
+ * @pe_header: Optional offset to a PE format header
+ **/
+
+struct arm64_image_header {
+	u8 pe_sig[2];
+	u8 pad[2];
+	u32 branch_code;
+	u64 text_offset;
+	u64 image_size;
+	u64 flags;
+	u64 reserved[3];
+	u8 magic[4];
+	u32 pe_header;
+};
+
+static const u8 arm64_image_magic[4] = {'A', 'R', 'M', 0x64U};
+
+/**
+ * arm64_header_check_magic - Helper to check the arm64 image header.
+ *
+ * Returns non-zero if header is OK.
+ */
+
+static inline int arm64_header_check_magic(const struct arm64_image_header *h)
+{
+	if (!h)
+		return 0;
+
+	if (!h->text_offset)
+		return 0;
+
+	return (h->magic[0] == arm64_image_magic[0]
+		&& h->magic[1] == arm64_image_magic[1]
+		&& h->magic[2] == arm64_image_magic[2]
+		&& h->magic[3] == arm64_image_magic[3]);
+}
+
+extern const struct kexec_file_ops kexec_image_ops;
+
 struct kimage;
 
 #define arch_kimage_file_post_load_cleanup arch_kimage_file_post_load_cleanup
