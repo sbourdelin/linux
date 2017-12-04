@@ -901,13 +901,8 @@ int qede_set_features(struct net_device *dev, netdev_features_t features)
 	netdev_features_t changes = features ^ dev->features;
 	bool need_reload = false;
 
-	/* No action needed if hardware GRO is disabled during driver load */
-	if (changes & NETIF_F_GRO) {
-		if (dev->features & NETIF_F_GRO)
-			need_reload = !edev->gro_disable;
-		else
-			need_reload = edev->gro_disable;
-	}
+	if (changes & NETIF_F_GRO_HW)
+		need_reload = true;
 
 	if (need_reload) {
 		struct qede_reload_args args;

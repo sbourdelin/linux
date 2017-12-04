@@ -676,7 +676,7 @@ static void qede_init_ndev(struct qede_dev *edev)
 	ndev->priv_flags |= IFF_UNICAST_FLT;
 
 	/* user-changeble features */
-	hw_features = NETIF_F_GRO | NETIF_F_SG |
+	hw_features = NETIF_F_GRO | NETIF_F_GRO_HW | NETIF_F_SG |
 		      NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
 		      NETIF_F_TSO | NETIF_F_TSO6;
 
@@ -1515,7 +1515,7 @@ static void qede_init_fp(struct qede_dev *edev)
 			 edev->ndev->name, queue_id);
 	}
 
-	edev->gro_disable = !(edev->ndev->features & NETIF_F_GRO);
+	edev->gro_disable = !(edev->ndev->features & NETIF_F_GRO_HW);
 }
 
 static int qede_set_real_num_queues(struct qede_dev *edev)
