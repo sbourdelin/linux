@@ -328,11 +328,9 @@ static void buffer_cb(struct vchiq_mmal_instance *instance,
 				pr_debug("Grab another frame");
 				vchiq_mmal_port_parameter_set(
 					instance,
-					dev->capture.
-					camera_port,
+					dev->capture.camera_port,
 					MMAL_PARAMETER_CAPTURE,
-					&dev->capture.
-					frame_count,
+					&dev->capture.frame_count,
 					sizeof(dev->capture.frame_count));
 			}
 		} else {
@@ -349,8 +347,7 @@ static void buffer_cb(struct vchiq_mmal_instance *instance,
 				timestamp = ktime_add_us(dev->capture.kernel_start_ts,
 							 runtime_us);
 				v4l2_dbg(1, bcm2835_v4l2_debug, &dev->v4l2_dev,
-					 "Convert start time %llu and %llu "
-					 "with offset %llu to %llu\n",
+					 "Convert start time %llu and %llu with offset %llu to %llu\n",
 					 ktime_to_ns(dev->capture.kernel_start_ts),
 					 dev->capture.vc_start_timestamp, pts,
 					 ktime_to_ns(timestamp));
@@ -368,11 +365,9 @@ static void buffer_cb(struct vchiq_mmal_instance *instance,
 					 "Grab another frame as buffer has EOS");
 				vchiq_mmal_port_parameter_set(
 					instance,
-					dev->capture.
-					camera_port,
+					dev->capture.camera_port,
 					MMAL_PARAMETER_CAPTURE,
-					&dev->capture.
-					frame_count,
+					&dev->capture.frame_count,
 					sizeof(dev->capture.frame_count));
 			}
 		} else {
@@ -536,8 +531,8 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
 	    vchiq_mmal_port_enable(dev->instance, dev->capture.port, buffer_cb);
 	if (ret) {
 		v4l2_err(&dev->v4l2_dev,
-			"Failed to enable capture port - error %d. "
-			"Disabling camera port again\n", ret);
+			"Failed to enable capture port - error %d. Disabling camera port again\n",
+			ret);
 
 		vchiq_mmal_port_disable(dev->instance,
 					dev->capture.camera_port);
@@ -1194,8 +1189,8 @@ static int mmal_setup_components(struct bm2835_mmal_dev *dev,
 					port->current_buffer.size =
 					    (f->fmt.pix.sizeimage <
 					     (100 << 10))
-					    ? (100 << 10) : f->fmt.pix.
-					    sizeimage;
+					    ? (100 << 10)
+					    : f->fmt.pix.sizeimage;
 				}
 				v4l2_dbg(1, bcm2835_v4l2_debug,
 					 &dev->v4l2_dev,
