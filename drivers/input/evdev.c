@@ -135,7 +135,8 @@ static void __evdev_flush_queue(struct evdev_client *client, unsigned int type)
 			continue;
 		} else if (head != i) {
 			/* move entry to fill the gap */
-			client->buffer[head].time = ev->time;
+			client->buffer[head].input_event_sec = ev->input_event_sec;
+			client->buffer[head].input_event_usec = ev->input_event_usec;
 			client->buffer[head].type = ev->type;
 			client->buffer[head].code = ev->code;
 			client->buffer[head].value = ev->value;
@@ -170,8 +171,8 @@ static void __evdev_queue_syn_dropped(struct evdev_client *client)
 		break;
 	}
 
-	ev.time.tv_sec = ts.tv_sec;
-	ev.time.tv_usec = ts.tv_nsec / NSEC_PER_USEC;
+	ev.input_event_sec = ts.tv_sec;
+	ev.input_event_usec = ts.tv_nsec / NSEC_PER_USEC;
 	ev.type = EV_SYN;
 	ev.code = SYN_DROPPED;
 	ev.value = 0;
@@ -248,7 +249,8 @@ static void __pass_event(struct evdev_client *client,
 		 */
 		client->tail = (client->head - 2) & (client->bufsize - 1);
 
-		client->buffer[client->tail].time = event->time;
+		client->buffer[client->tail].input_event_sec = event->input_event_sec;
+		client->buffer[client->tail].input_event_usec = event->input_event_usec;
 		client->buffer[client->tail].type = EV_SYN;
 		client->buffer[client->tail].code = SYN_DROPPED;
 		client->buffer[client->tail].value = 0;
@@ -276,8 +278,8 @@ static void evdev_pass_values(struct evdev_client *client,
 		return;
 
 	ts = ev_time[client->clk_type];
-	event.time.tv_sec = ts.tv_sec;
-	event.time.tv_usec = ts.tv_nsec / NSEC_PER_USEC;
+	event.input_event_sec = ts.tv_sec;
+	event.input_event_usec = ts.tv_nsec / NSEC_PER_USEC;
 
 	/* Interrupts are disabled, just acquire the lock. */
 	spin_lock(&client->buffer_lock);
