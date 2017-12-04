@@ -2482,7 +2482,7 @@ static void bnx2x_bz_fp(struct bnx2x *bp, int index)
 	 */
 	if (bp->dev->features & NETIF_F_LRO)
 		fp->mode = TPA_MODE_LRO;
-	else if (bp->dev->features & NETIF_F_GRO &&
+	else if (bp->dev->features & NETIF_F_GRO_HW &&
 		 bnx2x_mtu_allows_gro(bp->dev->mtu))
 		fp->mode = TPA_MODE_GRO;
 	else
@@ -4933,13 +4933,9 @@ int bnx2x_set_features(struct net_device *dev, netdev_features_t features)
 		}
 	}
 
-	/* if GRO is changed while LRO is enabled, don't force a reload */
-	if ((changes & NETIF_F_GRO) && (features & NETIF_F_LRO))
-		changes &= ~NETIF_F_GRO;
-
 	/* if GRO is changed while HW TPA is off, don't force a reload */
-	if ((changes & NETIF_F_GRO) && bp->disable_tpa)
-		changes &= ~NETIF_F_GRO;
+	if ((changes & NETIF_F_GRO_HW) && bp->disable_tpa)
+		changes &= ~NETIF_F_GRO_HW;
 
 	if (changes)
 		bnx2x_reload = true;
