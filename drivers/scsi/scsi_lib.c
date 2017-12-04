@@ -1978,9 +1978,11 @@ static blk_status_t scsi_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct scsi_device *sdev = q->queuedata;
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_cmnd *cmd = blk_mq_rq_to_pdu(req);
-	blk_status_t ret;
+	blk_status_t ret = BLK_STS_RESOURCE;
 	int reason;
 
+	if (!scsi_mq_get_budget(hctx))
+		goto out;
 	ret = prep_to_mq(scsi_prep_state_check(sdev, req));
 	if (ret != BLK_STS_OK)
 		goto out_put_budget;
@@ -2024,6 +2026,7 @@ out_dec_target_busy:
 		atomic_dec(&scsi_target(sdev)->target_busy);
 out_put_budget:
 	scsi_mq_put_budget(hctx);
+out:
 	switch (ret) {
 	case BLK_STS_OK:
 		break;
@@ -2227,8 +2230,6 @@ struct request_queue *scsi_old_alloc_queue(struct scsi_device *sdev)
 }
 
 static const struct blk_mq_ops scsi_mq_ops = {
-	.get_budget	= scsi_mq_get_budget,
-	.put_budget	= scsi_mq_put_budget,
 	.queue_rq	= scsi_queue_rq,
 	.complete	= scsi_softirq_done,
 	.timeout	= scsi_timeout,
