@@ -893,6 +893,14 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 				return -ENOMEM;
 			}
 
+			/* Swap the pages if we detect consecutive order */
+			if (i && pages[i - 1] == p - 1) {
+				struct page *tmp = p;
+
+				p = pages[i - 1];
+				pages[i - 1] = tmp;
+			}
+
 			pages[i++] = p;
 			--npages;
 		}
