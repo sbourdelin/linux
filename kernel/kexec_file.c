@@ -26,30 +26,79 @@
 #include <linux/vmalloc.h>
 #include "kexec_internal.h"
 
+const __weak struct kexec_file_ops * const kexec_file_loaders[] = {NULL};
+
 static int kexec_calculate_store_digests(struct kimage *image);
+
+int _kexec_kernel_image_probe(struct kimage *image, void *buf,
+			     unsigned long buf_len)
+{
+	const struct kexec_file_ops * const *fops;
+	int ret = -ENOEXEC;
+
+	for (fops = &kexec_file_loaders[0]; *fops && (*fops)->probe; ++fops) {
+		ret = (*fops)->probe(buf, buf_len);
+		if (!ret) {
+			image->fops = *fops;
+			return ret;
+		}
+	}
+
+	return ret;
+}
 
 /* Architectures can provide this probe function */
 int __weak arch_kexec_kernel_image_probe(struct kimage *image, void *buf,
 					 unsigned long buf_len)
 {
-	return -ENOEXEC;
+	return _kexec_kernel_image_probe(image, buf, buf_len);
+}
+
+void *_kexec_kernel_image_load(struct kimage *image)
+{
+	if (!image->fops || !image->fops->load)
+		return ERR_PTR(-ENOEXEC);
+
+	return image->fops->load(image, image->kernel_buf,
+				 image->kernel_buf_len, image->initrd_buf,
+				 image->initrd_buf_len, image->cmdline_buf,
+				 image->cmdline_buf_len);
 }
 
 void * __weak arch_kexec_kernel_image_load(struct kimage *image)
 {
-	return ERR_PTR(-ENOEXEC);
+	return _kexec_kernel_image_load(image);
+}
+
+int _kimage_file_post_load_cleanup(struct kimage *image)
+{
+	if (!image->fops || !image->fops->cleanup)
+		return 0;
+
+	return image->fops->cleanup(image->image_loader_data);
 }
 
 int __weak arch_kimage_file_post_load_cleanup(struct kimage *image)
 {
-	return -EINVAL;
+	return _kimage_file_post_load_cleanup(image);
 }
 
 #ifdef CONFIG_KEXEC_VERIFY_SIG
+int _kexec_kernel_verify_sig(struct kimage *image, void *buf,
+			    unsigned long buf_len)
+{
+	if (!image->fops || !image->fops->verify_sig) {
+		pr_debug("kernel loader does not support signature verification.\n");
+		return -EKEYREJECTED;
+	}
+
+	return image->fops->verify_sig(buf, buf_len);
+}
+
 int __weak arch_kexec_kernel_verify_sig(struct kimage *image, void *buf,
 					unsigned long buf_len)
 {
-	return -EKEYREJECTED;
+	return _kexec_kernel_verify_sig(image, buf, buf_len);
 }
 #endif
 
