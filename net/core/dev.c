@@ -7379,6 +7379,19 @@ static netdev_features_t netdev_fix_features(struct net_device *dev,
 		features &= ~dev->gso_partial_features;
 	}
 
+	if (features & NETIF_F_GRO_HW) {
+		/* Hardware GRO depends on GRO. */
+		if (!(features & NETIF_F_GRO)) {
+			netdev_dbg(dev, "Dropping NETIF_F_GSO_HW since no GRO feature.\n");
+			features &= ~NETIF_F_GRO_HW;
+		}
+		/* Hardware GRO and LRO are mutually exclusive. */
+		if (features & NETIF_F_LRO) {
+			netdev_dbg(dev, "Dropping NETIF_F_LRO since GRO_HW is set.\n");
+			features &= ~NETIF_F_LRO;
+		}
+	}
+
 	return features;
 }
 
