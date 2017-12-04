@@ -116,6 +116,7 @@ core-$(CONFIG_XEN) += arch/arm64/xen/
 core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
 libs-y		:= arch/arm64/lib/ $(libs-y)
 core-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
+core-$(CONFIG_KEXEC_FILE) += arch/arm64/purgatory/
 
 # Default target when executing plain make
 boot		:= arch/arm64/boot
