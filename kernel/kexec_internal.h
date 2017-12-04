@@ -17,6 +17,26 @@ extern struct mutex kexec_mutex;
 
 #ifdef CONFIG_KEXEC_FILE
 #include <linux/purgatory.h>
+
+/* Alignment required for elf header segment */
+#define ELF_CORE_HEADER_ALIGN   4096
+
+/* Misc data about ram ranges needed to prepare elf headers */
+struct crash_elf_data {
+	struct kimage *image;
+	/*
+	 * Total number of ram ranges we have after various adjustments for
+	 * crash reserved region, etc.
+	 */
+	unsigned int max_nr_ranges;
+
+	/* Pointer to elf header */
+	void *ehdr;
+	/* Pointer to next phdr */
+	void *bufp;
+	struct crash_mem mem;
+};
+
 void kimage_file_post_load_cleanup(struct kimage *image);
 extern char kexec_purgatory[];
 extern size_t kexec_purgatory_size;
