@@ -929,8 +929,16 @@ static int ttm_get_pages(struct page **pages, unsigned npages, int flags,
 	r = ttm_page_pool_get_pages(pool, &plist, flags, cstate,
 				    npages - count, 0);
 
-	list_for_each_entry(p, &plist, lru)
+	list_for_each_entry(p, &plist, lru) {
+		/* Swap the pages if we detect consecutive order */
+		if (count && pages[count - 1] == p - 1) {
+			struct page *tmp = p;
+
+			p = pages[count - 1];
+			pages[count - 1] = tmp;
+		}
 		pages[count++] = p;
+	}
 
 	if (r) {
 		/* If there is any pages in the list put them back to
