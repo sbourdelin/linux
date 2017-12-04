@@ -30,6 +30,8 @@ config DRM_AMD_DC_FBC
 config DRM_AMD_DC_DCN1_0
 	bool "DCN 1.0 Raven family"
 	depends on DRM_AMD_DC && X86
+	# x86 floating point math here breaks with KCOV:
+	depends on !(KCOV_INSTRUMENT_ALL && KCOV_ENABLE_COMPARISONS) || BROKEN
 	help
 	  Choose this option if you want to have
 	  RV family for display engine
