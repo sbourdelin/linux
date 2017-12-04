@@ -1337,7 +1337,7 @@ static int prepare_elf64_headers(struct crash_elf_data *ced,
 	phdr->p_filesz = phdr->p_memsz = VMCOREINFO_NOTE_SIZE;
 	(ehdr->e_phnum)++;
 
-#ifdef CONFIG_X86_64
+#if defined(CONFIG_X86_64) || defined(CONFIG_ARM64)
 	/* Prepare PT_LOAD type program header for kernel text region */
 	phdr = (Elf64_Phdr *)bufp;
 	bufp += sizeof(Elf64_Phdr);
