@@ -601,6 +601,45 @@ static struct bpf_align_test tests[] = {
 			{20, "R5=pkt(id=2,off=0,r=4,umin_value=2,umax_value=1082,var_off=(0x2; 0x7fc))"},
 		},
 	},
+	{
+		.descr = "unknown shift negative",
+		/* This isn't really a test of the alignment code, rather of the
+		 * signed min/max value handling, but it makes use of the
+		 * register-state-extracting code in do_test_single(), which
+		 * test_verifier.c doesn't have.
+		 */
+		.insns = {
+			LOAD_UNKNOWN(BPF_REG_3),
+			BPF_ALU64_IMM(BPF_SUB, BPF_REG_3, 0xff),
+			BPF_ALU64_IMM(BPF_LSH, BPF_REG_3, 1),
+			LOAD_UNKNOWN(BPF_REG_4),
+			BPF_ALU64_IMM(BPF_SUB, BPF_REG_4, 0xff),
+			BPF_MOV64_REG(BPF_REG_5, BPF_REG_4),
+			BPF_ALU64_IMM(BPF_RSH, BPF_REG_4, 1),
+			BPF_ALU64_IMM(BPF_SUB, BPF_REG_5, 1),
+			BPF_ALU64_IMM(BPF_RSH, BPF_REG_5, 1),
+			BPF_MOV64_IMM(BPF_REG_0, 0),
+			BPF_EXIT_INSN(),
+		},
+		.prog_type = BPF_PROG_TYPE_SCHED_CLS,
+		.matches = {
+			{7, "R0=pkt(id=0,off=8,r=8,imm=0)"},
+			{7, "R3=inv(id=0,umax_value=255,var_off=(0x0; 0xff))"},
+			{8, "R3=inv(id=0,smin_value=-255,smax_value=0)"},
+			/* All the verifier knows is, it's even.  While we could
+			 * conclude something tighter (the sign bit does not
+			 * change), the verifier doesn't bother right now.
+			 */
+			{9, "R3=inv(id=0,smax_value=9223372036854775806,umax_value=18446744073709551614,var_off=(0x0; 0xfffffffffffffffe))"},
+			{16, "R3=pkt_end(id=0,off=0,imm=0)"},
+			{16, "R4=inv(id=0,umax_value=255,var_off=(0x0; 0xff))"},
+			{17, "R4=inv(id=0,smin_value=-255,smax_value=0)"},
+			/* both 0 and 0x7f...fff are possible */
+			{19, "R4=inv(id=0,umax_value=9223372036854775807,var_off=(0x0; 0x7fffffffffffffff))"},
+			{20, "R5=inv(id=0,umin_value=18446744073709551360,var_off=(0xffffffffffffff00; 0xff))"},
+			{21, "R5=inv(id=0,umin_value=9223372036854775680,umax_value=9223372036854775807,var_off=(0x7fffffffffffff80; 0x7f))"},
+		},
+	},
 };
 
 static int probe_filter_length(const struct bpf_insn *fp)
