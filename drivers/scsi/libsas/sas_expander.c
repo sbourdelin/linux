@@ -2179,9 +2179,9 @@ void sas_smp_handler(struct bsg_job *job, struct Scsi_Host *shost,
 
 	ret = smp_execute_task_sg(dev, job->request_payload.sg_list,
 			job->reply_payload.sg_list);
-	if (ret > 0) {
+	if (ret >= 0) {
 		/* positive number is the untransferred residual */
-		reslen = ret;
+		reslen = job->reply_payload.payload_len - ret;
 		ret = 0;
 	}
 
