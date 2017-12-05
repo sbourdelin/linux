@@ -376,8 +376,7 @@ pi433_receive(void *data)
 	/* wait for any tx to finish */
 	dev_dbg(dev->dev,"rx: going to wait for any tx to finish");
 	retval = wait_event_interruptible(dev->rx_wait_queue, !dev->tx_active);
-	if(retval) /* wait was interrupted */
-	{
+	if (retval) {
 		dev->interrupt_rx_allowed = true;
 		wake_up_interruptible(&dev->tx_wait_queue);
 		return retval;
