@@ -1328,7 +1328,7 @@ static inline int task_on_rq_migrating(struct task_struct *p)
 # define finish_arch_post_lock_switch()	do { } while (0)
 #endif
 
-static inline void prepare_lock_switch(struct rq *rq, struct task_struct *next)
+static inline void prepare_lock_switch(struct task_struct *next)
 {
 #ifdef CONFIG_SMP
 	/*
