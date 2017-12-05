@@ -6962,12 +6962,18 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	smp_mb__after_srcu_read_unlock();
 
 	/*
-	 * This handles the case where a posted interrupt was
-	 * notified with kvm_vcpu_kick.
+	 * In case guest got the posted-interrupt notification
+	 * vector while running in host, we need to make sure
+	 * it arrives to guest.
+	 * For L1 posted-interrupts, we manually sync PIR to IRR.
+	 * For L2 posted-interrupts, we send notification-vector
+	 * again by self IPI such that it will now be received in guest.
 	 */
-	if (kvm_lapic_enabled(vcpu)) {
-		if (kvm_x86_ops->sync_pir_to_irr && vcpu->arch.apicv_active)
+	if (kvm_lapic_enabled(vcpu) && vcpu->arch.apicv_active) {
+		if (kvm_x86_ops->sync_pir_to_irr)
 			kvm_x86_ops->sync_pir_to_irr(vcpu);
+		if (kvm_x86_ops->complete_nested_posted_interrupt)
+			kvm_x86_ops->complete_nested_posted_interrupt(vcpu);
 	}
 
 	if (vcpu->mode == EXITING_GUEST_MODE || kvm_request_pending(vcpu)

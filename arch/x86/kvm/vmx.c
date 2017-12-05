@@ -534,12 +534,6 @@ static bool pi_test_and_set_on(struct pi_desc *pi_desc)
 			(unsigned long *)&pi_desc->control);
 }
 
-static bool pi_test_and_clear_on(struct pi_desc *pi_desc)
-{
-	return test_and_clear_bit(POSTED_INTR_ON,
-			(unsigned long *)&pi_desc->control);
-}
-
 static int pi_test_and_set_pir(int vector, struct pi_desc *pi_desc)
 {
 	return test_and_set_bit(vector, (unsigned long *)pi_desc->pir);
@@ -5041,37 +5035,6 @@ static void nested_mark_vmcs12_pages_dirty(struct kvm_vcpu *vcpu)
 	}
 }
 
-
-static void vmx_complete_nested_posted_interrupt(struct kvm_vcpu *vcpu)
-{
-	struct vcpu_vmx *vmx = to_vmx(vcpu);
-	int max_irr;
-	void *vapic_page;
-	u16 status;
-
-	if (!vmx->nested.pi_desc)
-		return;
-
-	if (!pi_test_and_clear_on(vmx->nested.pi_desc))
-		return;
-
-	max_irr = find_last_bit((unsigned long *)vmx->nested.pi_desc->pir, 256);
-	if (max_irr != 256) {
-		vapic_page = kmap(vmx->nested.virtual_apic_page);
-		__kvm_apic_update_irr(vmx->nested.pi_desc->pir, vapic_page);
-		kunmap(vmx->nested.virtual_apic_page);
-
-		status = vmcs_read16(GUEST_INTR_STATUS);
-		if ((u8)max_irr > ((u8)status & 0xff)) {
-			status &= ~0xff;
-			status |= (u8)max_irr;
-			vmcs_write16(GUEST_INTR_STATUS, status);
-		}
-	}
-
-	nested_mark_vmcs12_pages_dirty(vcpu);
-}
-
 static inline bool kvm_vcpu_trigger_posted_interrupt(struct kvm_vcpu *vcpu,
 						     bool nested)
 {
@@ -5120,11 +5083,6 @@ static int vmx_deliver_nested_posted_interrupt(struct kvm_vcpu *vcpu,
 	    vector == vmx->nested.posted_intr_nv) {
 		/* the PIR and ON have been set by L1. */
 		kvm_vcpu_trigger_posted_interrupt(vcpu, true);
-		/*
-		 * If a posted intr is not recognized by hardware,
-		 * we will accomplish it in the next vmentry.
-		 */
-		kvm_make_request(KVM_REQ_EVENT, vcpu);
 		return 0;
 	}
 	return -1;
@@ -5154,6 +5112,17 @@ static void vmx_deliver_posted_interrupt(struct kvm_vcpu *vcpu, int vector)
 
 	if (!kvm_vcpu_trigger_posted_interrupt(vcpu, false))
 		kvm_vcpu_kick(vcpu);
+}
+
+static void vmx_complete_nested_posted_interrupt(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	WARN_ON(!vcpu->arch.apicv_active);
+
+	if (is_guest_mode(vcpu) && vmx->nested.pi_desc &&
+	    pi_test_on(vmx->nested.pi_desc))
+		kvm_vcpu_trigger_posted_interrupt(vcpu, true);
 }
 
 /*
@@ -6823,6 +6792,7 @@ static __init int hardware_setup(void)
 	if (!cpu_has_vmx_apicv()) {
 		enable_apicv = 0;
 		kvm_x86_ops->sync_pir_to_irr = NULL;
+		kvm_x86_ops->complete_nested_posted_interrupt = NULL;
 	}
 
 	if (cpu_has_vmx_tsc_scaling()) {
@@ -11144,7 +11114,6 @@ static int vmx_check_nested_events(struct kvm_vcpu *vcpu, bool external_intr)
 		return 0;
 	}
 
-	vmx_complete_nested_posted_interrupt(vcpu);
 	return 0;
 }
 
@@ -12136,6 +12105,8 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.hwapic_isr_update = vmx_hwapic_isr_update,
 	.sync_pir_to_irr = vmx_sync_pir_to_irr,
 	.deliver_posted_interrupt = vmx_deliver_posted_interrupt,
+	.complete_nested_posted_interrupt =
+		vmx_complete_nested_posted_interrupt,
 
 	.set_tss_addr = vmx_set_tss_addr,
 	.get_tdp_level = get_ept_level,
