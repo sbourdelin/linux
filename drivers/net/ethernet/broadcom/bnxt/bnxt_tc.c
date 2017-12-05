@@ -157,9 +157,6 @@ static int bnxt_tc_parse_actions(struct bnxt *bp,
 		}
 	}
 
-	if (rc)
-		return rc;
-
 	/* Tunnel encap/decap action must be accompanied by a redirect action */
 	if ((actions->flags & BNXT_TC_ACTION_FLAG_TUNNEL_ENCAP ||
 	     actions->flags & BNXT_TC_ACTION_FLAG_TUNNEL_DECAP) &&
@@ -169,7 +166,7 @@ static int bnxt_tc_parse_actions(struct bnxt *bp,
 		return -EINVAL;
 	}
 
-	return rc;
+	return 0;
 }
 
 #define GET_KEY(flow_cmd, key_type)					\
