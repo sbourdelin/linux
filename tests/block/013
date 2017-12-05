@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# Regression test for patch "SCSI: delay run queue if device is
+# blocked in scsi_dev_queue_ready()"
+#
+# Copyright (C) 2017 Johannes Thumshirn
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+. common/scsi_debug
+
+DESCRIPTION="Test if a SCSI device's queue can be run if it isn't ready but the device is idle"
+TIMED=1
+
+requires() {
+	_have_scsi_debug && _have_module sd_mod && \
+		grep -q Y /sys/module/scsi_mod/parameters/use_blk_mq
+}
+
+test_one_device()
+{
+    local device=$1
+
+    echo "-1" > /sys/bus/pseudo/drivers/scsi_debug/every_nth
+    echo "temporary write through" > \
+	/sys/block/"${device}"/device/scsi_disk/"$(basename $(readlink /sys/block/${device}/device))"/cache_type
+    echo "128" > /sys/bus/pseudo/drivers/scsi_debug/opts
+    echo "none" > /sys/block/${device}/queue/scheduler
+    dd if=/dev/"${device}" of=/dev/null bs=1M iflag=direct \
+	count=1 2> /dev/null &
+    sleep 5
+    echo 0 > /sys/bus/pseudo/drivers/scsi_debug/opts
+    wait
+}
+
+test() {
+	echo "Running ${TEST_NAME}"
+
+	if ! _init_scsi_debug statistics=1 max_queue=1; then
+		return
+	fi
+
+	local device
+	for device in "${SCSI_DEBUG_DEVICES[@]}"; do
+	    test_one_device ${device}	    
+	done
+
+	sleep 5 # to free up all scsi_debug refcnts
+	_exit_scsi_debug
+
+	echo "Test complete"
+}
