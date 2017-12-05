@@ -496,6 +496,12 @@ config PCI_ENDPOINT_TEST
            Enable this configuration option to enable the host side test driver
            for PCI Endpoint.
 
+config XILINX_VCU
+       tristate "Xilinx VCU Init"
+       default n
+       help
+          Driver for the Xilinx VCU Init based on the logicoreIP.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
