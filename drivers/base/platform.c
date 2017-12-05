@@ -127,7 +127,7 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
 		irqd_set_trigger_type(irqd, r->flags & IORESOURCE_BITS);
 	}
 
-	return r ? r->start : -ENXIO;
+	return r && r->start ? r->start : -ENXIO;
 #endif
 }
 EXPORT_SYMBOL_GPL(platform_get_irq);
