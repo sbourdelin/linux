@@ -2669,5 +2669,11 @@ void __init setup_nr_node_ids(void);
 static inline void setup_nr_node_ids(void) {}
 #endif
 
+/*
+ * The minimum chunk size for a task that uses base page units.  For now, say
+ * 1G's worth of pages.
+ */
+#define	KTASK_BPGS_MINCHUNK		((1ul << 30) / PAGE_SIZE)
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

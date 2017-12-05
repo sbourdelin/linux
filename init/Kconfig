@@ -319,6 +319,18 @@ config AUDIT_TREE
 	depends on AUDITSYSCALL
 	select FSNOTIFY
 
+config KTASK
+	bool "Multithread cpu-intensive kernel tasks"
+	depends on SMP
+	depends on NR_CPUS > 16
+	default n
+	help
+	  Parallelize expensive kernel tasks such as zeroing huge pages.  This
+          feature is designed for big machines that can take advantage of their
+          cpu count to speed up large kernel tasks.
+
+          If unsure, say 'N'.
+
 source "kernel/irq/Kconfig"
 source "kernel/time/Kconfig"
 
