@@ -9002,30 +9002,18 @@ static void vmx_set_rvi(int vector)
 
 static void vmx_hwapic_irr_update(struct kvm_vcpu *vcpu, int max_irr)
 {
-	if (!is_guest_mode(vcpu)) {
-		vmx_set_rvi(max_irr);
-		return;
-	}
-
-	if (max_irr == -1)
-		return;
-
 	/*
-	 * In guest mode.  If a vmexit is needed, vmx_check_nested_events
-	 * handles it.
+	 * When running L2, updating RVI is only relevant when
+	 * vmcs12 virtual-interrupt-delivery enabled.
+	 * However, it can be enabled only when L1 also
+	 * intercepts external-interrupts and in that case
+	 * we should not update vmcs02 RVI but instead intercept
+	 * interrupt. Therefore, do nothing when running L2.
 	 */
-	if (nested_exit_on_intr(vcpu))
+	if ((max_irr == -1) || is_guest_mode(vcpu))
 		return;
 
-	/*
-	 * Else, fall back to pre-APICv interrupt injection since L2
-	 * is run without virtual interrupt delivery.
-	 */
-	if (!kvm_event_needs_reinjection(vcpu) &&
-	    vmx_interrupt_allowed(vcpu)) {
-		kvm_queue_interrupt(vcpu, max_irr, false);
-		vmx_inject_irq(vcpu);
-	}
+	vmx_set_rvi(max_irr);
 }
 
 static int vmx_sync_pir_to_irr(struct kvm_vcpu *vcpu)
@@ -9051,6 +9039,10 @@ static int vmx_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 		 * If we are running L2 and L1 has a new pending interrupt
 		 * which can be injected, we should re-evaluate
 		 * what should be done with this new L1 interrupt.
+		 * If L1 intercepts external-interrupts, we should
+		 * exit from L2 to L1. Otherwise, interrupt should be
+		 * delivered directly to L2.
+		 * These cases are handled correctly by KVM_REQ_EVENT.
 		 */
 		if (is_guest_mode(vcpu) && (max_irr > prev_max_irr))
 			kvm_make_request(KVM_REQ_EVENT, vcpu);
