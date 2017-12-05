@@ -218,13 +218,15 @@ static bool tlb_next_batch(struct mmu_gather *tlb)
 }
 
 void arch_tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm,
-				unsigned long start, unsigned long end)
+				unsigned long start, unsigned long end,
+				bool exit)
 {
 	tlb->mm = mm;
 
 	/* Is it from 0 to ~0? */
 	tlb->fullmm     = !(start | (end+1));
 	tlb->need_flush_all = 0;
+	tlb->exit	= exit;
 	tlb->local.next = NULL;
 	tlb->local.nr   = 0;
 	tlb->local.max  = ARRAY_SIZE(tlb->__pages);
@@ -408,7 +410,17 @@ void tlb_remove_table(struct mmu_gather *tlb, void *table)
 void tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm,
 			unsigned long start, unsigned long end)
 {
-	arch_tlb_gather_mmu(tlb, mm, start, end);
+	arch_tlb_gather_mmu(tlb, mm, start, end, false);
+	inc_tlb_flush_pending(tlb->mm);
+}
+
+/* tlb_gather_mmu_exit
+ * 	Basically same as tlb_gather_mmu except it allows architectures to
+ * 	skip tlb flushing if they can ensure that nobody will reuse tlb entries
+ */
+void tlb_gather_mmu_exit(struct mmu_gather *tlb, struct mm_struct *mm)
+{
+	arch_tlb_gather_mmu(tlb, mm, 0, -1, true);
 	inc_tlb_flush_pending(tlb->mm);
 }
 

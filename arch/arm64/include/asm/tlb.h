@@ -43,7 +43,7 @@ static inline void tlb_flush(struct mmu_gather *tlb)
 	 * The ASID allocator will either invalidate the ASID or mark
 	 * it as used.
 	 */
-	if (tlb->fullmm)
+	if (tlb->fullmm && tlb->exit)
 		return;
 
 	/*
