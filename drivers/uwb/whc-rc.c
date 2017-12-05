@@ -374,10 +374,9 @@ int whcrc_probe(struct umc_dev *umc_dev)
 		goto error_rc_alloc;
 	}
 	whcrc = kzalloc(sizeof(*whcrc), GFP_KERNEL);
-	if (whcrc == NULL) {
-		dev_err(dev, "unable to allocate WHC-RC instance\n");
+	if (!whcrc)
 		goto error_alloc;
-	}
+
 	whcrc_init(whcrc);
 	whcrc->umc_dev = umc_dev;
 
