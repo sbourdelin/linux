@@ -445,29 +445,23 @@ static void stub_recv_cmd_submit(struct stub_device *sdev,
 	else
 		priv->urb = usb_alloc_urb(0, GFP_KERNEL);
 
-	if (!priv->urb) {
-		usbip_event_add(ud, SDEV_EVENT_ERROR_MALLOC);
-		return;
-	}
+	if (!priv->urb)
+		goto add_event_malloc_failure;
 
 	/* allocate urb transfer buffer, if needed */
 	if (pdu->u.cmd_submit.transfer_buffer_length > 0) {
 		priv->urb->transfer_buffer =
 			kzalloc(pdu->u.cmd_submit.transfer_buffer_length,
 				GFP_KERNEL);
-		if (!priv->urb->transfer_buffer) {
-			usbip_event_add(ud, SDEV_EVENT_ERROR_MALLOC);
-			return;
-		}
+		if (!priv->urb->transfer_buffer)
+			goto add_event_malloc_failure;
 	}
 
 	/* copy urb setup packet */
 	priv->urb->setup_packet = kmemdup(&pdu->u.cmd_submit.setup, 8,
 					  GFP_KERNEL);
-	if (!priv->urb->setup_packet) {
-		usbip_event_add(ud, SDEV_EVENT_ERROR_MALLOC);
-		return;
-	}
+	if (!priv->urb->setup_packet)
+		goto add_event_malloc_failure;
 
 	/* set other members from the base header of pdu */
 	priv->urb->context                = (void *) priv;
@@ -507,6 +501,10 @@ static void stub_recv_cmd_submit(struct stub_device *sdev,
 	}
 
 	usbip_dbg_stub_rx("Leave\n");
+	return;
+
+add_event_malloc_failure:
+	usbip_event_add(ud, SDEV_EVENT_ERROR_MALLOC);
 }
 
 /* recv a pdu */
