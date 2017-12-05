@@ -198,12 +198,10 @@ rf69_set_rx_cfg(struct pi433_device *dev, struct pi433_rx_cfg *rx_cfg)
 	/* packet config */
 	/* enable */
 	SET_CHECKED(rf69_set_sync_enable(dev->spi, rx_cfg->enable_sync));
-	if (rx_cfg->enable_sync == optionOn)
-	{
-		SET_CHECKED(rf69_set_fifo_fill_condition(dev->spi, afterSyncInterrupt));
-	}
-	else
-	{
+	if (rx_cfg->enable_sync == optionOn) {
+		SET_CHECKED(rf69_set_fifo_fill_condition(dev->spi,
+							 afterSyncInterrupt));
+	} else {
 		SET_CHECKED(rf69_set_fifo_fill_condition(dev->spi, always));
 	}
 	if (rx_cfg->enable_length_byte == optionOn) {
