@@ -28,8 +28,16 @@ static const u8 nla_attr_len[NLA_TYPE_MAX+1] = {
 };
 
 static const u8 nla_attr_minlen[NLA_TYPE_MAX+1] = {
+	[NLA_U8]	= sizeof(u8),
+	[NLA_U16]	= sizeof(u16),
+	[NLA_U32]	= sizeof(u32),
+	[NLA_U64]	= sizeof(u64),
 	[NLA_MSECS]	= sizeof(u64),
 	[NLA_NESTED]	= NLA_HDRLEN,
+	[NLA_S8]	= sizeof(s8),
+	[NLA_S16]	= sizeof(s16),
+	[NLA_S32]	= sizeof(s32),
+	[NLA_S64]	= sizeof(s64),
 };
 
 static int validate_nla_bitfield32(const struct nlattr *nla,
@@ -70,10 +78,9 @@ static int validate_nla(const struct nlattr *nla, int maxtype,
 	BUG_ON(pt->type > NLA_TYPE_MAX);
 
 	/* for data types NLA_U* and NLA_S* require exact length */
-	if (nla_attr_len[pt->type]) {
-		if (attrlen != nla_attr_len[pt->type])
-			return -ERANGE;
-		return 0;
+	if (nla_attr_len[pt->type] && attrlen != nla_attr_len[pt->type]) {
+		pr_warn_ratelimited("netlink: '%s': attribute type %d has an invalid length.\n",
+				    current->comm, type);
 	}
 
 	switch (pt->type) {
