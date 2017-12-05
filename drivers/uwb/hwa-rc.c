@@ -835,10 +835,9 @@ static int hwarc_probe(struct usb_interface *iface,
 		goto error_rc_alloc;
 	}
 	hwarc = kzalloc(sizeof(*hwarc), GFP_KERNEL);
-	if (hwarc == NULL) {
-		dev_err(dev, "unable to allocate HWA RC instance\n");
+	if (!hwarc)
 		goto error_alloc;
-	}
+
 	hwarc_init(hwarc);
 	hwarc->usb_dev = usb_get_dev(interface_to_usbdev(iface));
 	hwarc->usb_iface = usb_get_intf(iface);
