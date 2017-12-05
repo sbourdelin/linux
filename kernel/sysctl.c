@@ -1217,6 +1217,11 @@ static struct ctl_table kern_table[] = {
 		.extra2		= &one,
 	},
 #endif
+	{
+		.procname	= "controlled_userns_caps_whitelist",
+		.mode		= 0644,
+		.proc_handler	= proc_douserns_caps_whitelist,
+	},
 	{ }
 };
 

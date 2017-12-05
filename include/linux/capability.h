@@ -14,6 +14,7 @@
 #define _LINUX_CAPABILITY_H
 
 #include <uapi/linux/capability.h>
+#include <linux/sysctl.h>
 
 
 #define _KERNEL_CAPABILITY_VERSION _LINUX_CAPABILITY_VERSION_3
@@ -248,6 +249,8 @@ extern bool ptracer_capable(struct task_struct *tsk, struct user_namespace *ns);
 
 /* audit system wants to get cap info from files as well */
 extern int get_vfs_caps_from_disk(const struct dentry *dentry, struct cpu_vfs_cap_data *cpu_caps);
+int proc_douserns_caps_whitelist(struct ctl_table *table, int write,
+				 void __user *buff, size_t *lenp, loff_t *ppos);
 
 extern int cap_convert_nscap(struct dentry *dentry, void **ivalue, size_t size);
 

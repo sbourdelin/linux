@@ -25,6 +25,7 @@ show up in /proc/sys/kernel:
 - bootloader_version	     [ X86 only ]
 - callhome		     [ S390 only ]
 - cap_last_cap
+- controlled_userns_caps_whitelist
 - core_pattern
 - core_pipe_limit
 - core_uses_pid
@@ -184,6 +185,26 @@ cap_last_cap
 
 Highest valid capability of the running kernel.  Exports
 CAP_LAST_CAP from the kernel.
+
+==============================================================
+
+controlled_userns_caps_whitelist
+
+Capability mask that is whitelisted for "controlled" user namespaces.
+Any capability that is missing from this mask will not be allowed to
+any process that is attached to a controlled-userns. e.g. if CAP_NET_RAW
+is not part of this mask, then processes running inside any controlled
+userns's will not be allowed to perform action that needs CAP_NET_RAW
+capability. However, processes that are attached to a parent user-ns
+hierarchy that is *not* controlled and has CAP_NET_RAW can continue
+performing those actions. User-namespaces are marked "controlled" at
+the time of their creation based on the capabilities of the creator.
+A process that does not have CAP_SYS_ADMIN will create user-namespaces
+that are controlled.
+
+The value is expressed as two comma separated hex words (u32). This
+sysctl is avaialble in init-ns and users with CAP_SYS_ADMIN in init-ns
+are allowed to make changes.
 
 ==============================================================
 

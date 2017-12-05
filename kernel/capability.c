@@ -29,6 +29,8 @@ EXPORT_SYMBOL(__cap_empty_set);
 
 int file_caps_enabled = 1;
 
+kernel_cap_t controlled_userns_caps_whitelist = CAP_FULL_SET;
+
 static int __init file_caps_disable(char *str)
 {
 	file_caps_enabled = 0;
@@ -507,3 +509,48 @@ bool ptracer_capable(struct task_struct *tsk, struct user_namespace *ns)
 	rcu_read_unlock();
 	return (ret == 0);
 }
+
+/* Controlled-userns capabilities routines */
+#ifdef CONFIG_SYSCTL
+int proc_douserns_caps_whitelist(struct ctl_table *table, int write,
+				 void __user *buff, size_t *lenp, loff_t *ppos)
+{
+	DECLARE_BITMAP(caps_bitmap, CAP_LAST_CAP);
+	struct ctl_table caps_table;
+	char tbuf[NAME_MAX];
+	int ret;
+
+	ret = bitmap_from_u32array(caps_bitmap, CAP_LAST_CAP,
+				   controlled_userns_caps_whitelist.cap,
+				   _KERNEL_CAPABILITY_U32S);
+	if (ret != CAP_LAST_CAP)
+		return -1;
+
+	scnprintf(tbuf, NAME_MAX, "%*pb", CAP_LAST_CAP, caps_bitmap);
+
+	caps_table.data = tbuf;
+	caps_table.maxlen = NAME_MAX;
+	caps_table.mode = table->mode;
+	ret = proc_dostring(&caps_table, write, buff, lenp, ppos);
+	if (ret)
+		return ret;
+	if (write) {
+		kernel_cap_t tmp;
+
+		if (!capable(CAP_SYS_ADMIN))
+			return -EPERM;
+
+		ret = bitmap_parse_user(buff, *lenp, caps_bitmap, CAP_LAST_CAP);
+		if (ret)
+			return ret;
+
+		ret = bitmap_to_u32array(tmp.cap, _KERNEL_CAPABILITY_U32S,
+					 caps_bitmap, CAP_LAST_CAP);
+		if (ret != CAP_LAST_CAP)
+			return -1;
+
+		controlled_userns_caps_whitelist = tmp;
+	}
+	return 0;
+}
+#endif /* CONFIG_SYSCTL */
