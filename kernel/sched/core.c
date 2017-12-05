@@ -3897,6 +3897,7 @@ int task_prio(const struct task_struct *p)
 	return p->prio - MAX_RT_PRIO;
 }
 
+DEFINE_PER_CPU(int, claim_wakeup);
 /**
  * idle_cpu - is a given CPU idle currently?
  * @cpu: the processor in question.
@@ -3917,6 +3918,9 @@ int idle_cpu(int cpu)
 	if (!llist_empty(&rq->wake_list))
 		return 0;
 #endif
+
+	if (per_cpu(claim_wakeup, cpu))
+		return 0;
 
 	return 1;
 }

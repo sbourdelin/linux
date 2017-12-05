@@ -6085,8 +6085,10 @@ static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int 
 				idle = false;
 		}
 
-		if (idle)
+		if (idle) {
+			per_cpu(claim_wakeup, core) = 1;
 			return core;
+		}
 	}
 
 	/*
@@ -6110,8 +6112,10 @@ static int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int t
 	for_each_cpu(cpu, cpu_smt_mask(target)) {
 		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
 			continue;
-		if (idle_cpu(cpu))
+		if (idle_cpu(cpu)) {
+			per_cpu(claim_wakeup, cpu) = 1;
 			return cpu;
+		}
 	}
 
 	return -1;
@@ -6173,8 +6177,10 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 			return -1;
 		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
 			continue;
-		if (idle_cpu(cpu))
+		if (idle_cpu(cpu)) {
+			per_cpu(claim_wakeup, cpu) = 1;
 			break;
+		}
 	}
 
 	time = local_clock() - time;

@@ -29,6 +29,7 @@ pick_next_task_idle(struct rq *rq, struct task_struct *prev, struct rq_flags *rf
 {
 	put_prev_task(rq, prev);
 	update_idle_core(rq);
+	this_cpu_write(claim_wakeup, 0);
 	schedstat_inc(rq->sched_goidle);
 	return rq->idle;
 }
