@@ -108,7 +108,7 @@ EXPORT_SYMBOL(__max_logical_packages);
 static unsigned int logical_packages __read_mostly;
 
 /* Maximum number of SMT threads on any online core */
-int __max_smt_threads __read_mostly;
+int __read_mostly __max_smt_threads = 1;
 
 /* Flag to indicate if a complete sched domain rebuild is required */
 bool x86_topology_update;
