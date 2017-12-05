@@ -5082,7 +5082,8 @@ static int vmx_deliver_nested_posted_interrupt(struct kvm_vcpu *vcpu,
 	if (is_guest_mode(vcpu) &&
 	    vector == vmx->nested.posted_intr_nv) {
 		/* the PIR and ON have been set by L1. */
-		kvm_vcpu_trigger_posted_interrupt(vcpu, true);
+		if (!kvm_vcpu_trigger_posted_interrupt(vcpu, true))
+			kvm_vcpu_kick(vcpu);
 		return 0;
 	}
 	return -1;
@@ -6680,9 +6681,11 @@ static void wakeup_handler(void)
 	spin_lock(&per_cpu(blocked_vcpu_on_cpu_lock, cpu));
 	list_for_each_entry(vcpu, &per_cpu(blocked_vcpu_on_cpu, cpu),
 			blocked_vcpu_list) {
-		struct pi_desc *pi_desc = vcpu_to_pi_desc(vcpu);
+		struct vcpu_vmx *vmx = to_vmx(vcpu);
 
-		if (pi_test_on(pi_desc) == 1)
+		if ((pi_test_on(&vmx->pi_desc) == 1) ||
+		    (is_guest_mode(vcpu) && vmx->nested.pi_desc &&
+		     (pi_test_on(vmx->nested.pi_desc) == 1)))
 			kvm_vcpu_kick(vcpu);
 	}
 	spin_unlock(&per_cpu(blocked_vcpu_on_cpu_lock, cpu));

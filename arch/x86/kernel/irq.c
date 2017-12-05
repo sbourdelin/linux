@@ -326,6 +326,7 @@ __visible void smp_kvm_posted_intr_nested_ipi(struct pt_regs *regs)
 
 	entering_ack_irq();
 	inc_irq_stat(kvm_posted_intr_nested_ipis);
+	kvm_posted_intr_wakeup_handler();
 	exiting_irq();
 	set_irq_regs(old_regs);
 }
