@@ -67,7 +67,7 @@ void nf_nat_l4proto_unique_tuple(const struct nf_nat_l3proto *l3proto,
 			}
 		} else {
 			min = 1024;
-			range_size = 65535 - 1024 + 1;
+			range_size = 65535 - min + 1;
 		}
 	} else {
 		min = ntohs(range->min_proto.all);
