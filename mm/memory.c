@@ -70,6 +70,7 @@
 #include <linux/userfaultfd_k.h>
 #include <linux/dax.h>
 #include <linux/oom.h>
+#include <linux/ktask.h>
 
 #include <asm/io.h>
 #include <asm/mmu_context.h>
@@ -4520,20 +4521,31 @@ EXPORT_SYMBOL(__might_fault);
 #endif
 
 #if defined(CONFIG_TRANSPARENT_HUGEPAGE) || defined(CONFIG_HUGETLBFS)
-static void clear_gigantic_page(struct page *page,
-				unsigned long addr,
-				unsigned int pages_per_huge_page)
+
+struct cgp_args {
+	struct page	*base_page;
+	unsigned long	addr;
+};
+
+static int clear_gigantic_page_chunk(unsigned long start, unsigned long end,
+				     struct cgp_args *args)
 {
-	int i;
-	struct page *p = page;
+	struct page *base_page = args->base_page;
+	struct page *p = base_page;
+	unsigned long addr = args->addr;
+	unsigned long i;
 
 	might_sleep();
-	for (i = 0; i < pages_per_huge_page;
-	     i++, p = mem_map_next(p, page, i)) {
+	for (i = start; i < end; ++i) {
 		cond_resched();
 		clear_user_highpage(p, addr + i * PAGE_SIZE);
+
+		p = mem_map_next(p, base_page, i);
 	}
+
+	return KTASK_RETURN_SUCCESS;
 }
+
 void clear_huge_page(struct page *page,
 		     unsigned long addr_hint, unsigned int pages_per_huge_page)
 {
@@ -4542,7 +4554,14 @@ void clear_huge_page(struct page *page,
 		~(((unsigned long)pages_per_huge_page << PAGE_SHIFT) - 1);
 
 	if (unlikely(pages_per_huge_page > MAX_ORDER_NR_PAGES)) {
-		clear_gigantic_page(page, addr, pages_per_huge_page);
+		struct cgp_args args = {page, addr};
+		struct ktask_node node = {0, pages_per_huge_page,
+					  page_to_nid(page)};
+		DEFINE_KTASK_CTL(ctl, clear_gigantic_page_chunk, &args,
+				 KTASK_BPGS_MINCHUNK);
+
+		ktask_run_numa(&node, 1, &ctl);
+
 		return;
 	}
 
