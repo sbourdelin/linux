@@ -9031,20 +9031,33 @@ static void vmx_hwapic_irr_update(struct kvm_vcpu *vcpu, int max_irr)
 static int vmx_sync_pir_to_irr(struct kvm_vcpu *vcpu)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	int prev_max_irr;
 	int max_irr;
 
 	WARN_ON(!vcpu->arch.apicv_active);
+
+	prev_max_irr = kvm_lapic_find_highest_irr(vcpu);
 	if (pi_test_on(&vmx->pi_desc)) {
 		pi_clear_on(&vmx->pi_desc);
+
 		/*
 		 * IOMMU can write to PIR.ON, so the barrier matters even on UP.
 		 * But on x86 this is just a compiler barrier anyway.
 		 */
 		smp_mb__after_atomic();
 		max_irr = kvm_apic_update_irr(vcpu, vmx->pi_desc.pir);
+
+		/*
+		 * If we are running L2 and L1 has a new pending interrupt
+		 * which can be injected, we should re-evaluate
+		 * what should be done with this new L1 interrupt.
+		 */
+		if (is_guest_mode(vcpu) && (max_irr > prev_max_irr))
+			kvm_make_request(KVM_REQ_EVENT, vcpu);
 	} else {
-		max_irr = kvm_lapic_find_highest_irr(vcpu);
+		max_irr = prev_max_irr;
 	}
+
 	vmx_hwapic_irr_update(vcpu, max_irr);
 	return max_irr;
 }
