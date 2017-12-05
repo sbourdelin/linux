@@ -1882,6 +1882,7 @@ found:
 	VM_BUG_ON(gap_start + info->length > gap_end);
 	return gap_start;
 }
+EXPORT_SYMBOL(unmapped_area);
 
 unsigned long unmapped_area_topdown(struct vm_unmapped_area_info *info)
 {
@@ -1981,6 +1982,7 @@ found_highest:
 	VM_BUG_ON(gap_end < gap_start);
 	return gap_end;
 }
+EXPORT_SYMBOL(unmapped_area_topdown);
 
 /* Get an address range which is currently unmapped.
  * For shmat() with addr=0.
