@@ -2349,17 +2349,20 @@ static inline int sk_state_load(const struct sock *sk)
 }
 
 /**
- * sk_state_store - update sk->sk_state
+ * __sk_state_store - update sk->sk_state
  * @sk: socket pointer
  * @newstate: new state
  *
  * Paired with sk_state_load(). Should be used in contexts where
  * state change might impact lockless readers.
  */
-static inline void sk_state_store(struct sock *sk, int newstate)
+static inline void __sk_state_store(struct sock *sk, int newstate)
 {
 	smp_store_release(&sk->sk_state, newstate);
 }
+
+/* For tcp_set_state tracepoint */
+void sk_state_store(struct sock *sk, int newstate);
 
 void sock_enable_timestamp(struct sock *sk, int flag);
 int sock_get_timestamp(struct sock *, struct timeval __user *);

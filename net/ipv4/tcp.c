@@ -2036,6 +2036,18 @@ recv_sndq:
 }
 EXPORT_SYMBOL(tcp_recvmsg);
 
+void sk_state_store(struct sock *sk, int newstate)
+{
+	trace_tcp_set_state(sk, sk->sk_state, newstate);
+	__sk_state_store(sk, newstate);
+}
+
+void __tcp_set_state(struct sock *sk, int state)
+{
+	trace_tcp_set_state(sk, sk->sk_state, state);
+	sk->sk_state = state;
+}
+
 void tcp_set_state(struct sock *sk, int state)
 {
 	int oldstate = sk->sk_state;
@@ -2065,7 +2077,7 @@ void tcp_set_state(struct sock *sk, int state)
 	/* Change state AFTER socket is unhashed to avoid closed
 	 * socket sitting in hash tables.
 	 */
-	sk_state_store(sk, state);
+	__sk_state_store(sk, state);
 
 #ifdef STATE_TRACE
 	SOCK_DEBUG(sk, "TCP sk=%p, State %s -> %s\n", sk, statename[oldstate], statename[state]);

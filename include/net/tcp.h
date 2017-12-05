@@ -1246,6 +1246,7 @@ static const char *statename[]={
 	"Close Wait","Last ACK","Listen","Closing"
 };
 #endif
+void __tcp_set_state(struct sock *sk, int state);
 void tcp_set_state(struct sock *sk, int state);
 
 void tcp_done(struct sock *sk);
