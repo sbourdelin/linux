@@ -123,11 +123,9 @@ int fw_hdrs_load(struct i1480 *i1480, struct fw_hdr **phdr,
 	data_itr = data;
 	data_top = (u32 *) (_data + data_size);
 	while (data_itr < data_top) {
-		result = -ENOMEM;
 		hdr = kmalloc(sizeof(*hdr), GFP_KERNEL);
 		if (hdr == NULL) {
-			dev_err(i1480->dev, "Cannot allocate fw header "
-			       "for chunk #%u\n", hdr_cnt);
+			result = -ENOMEM;
 			goto error_alloc;
 		}
 		result = fw_hdr_load(i1480, hdr, hdr_cnt,
