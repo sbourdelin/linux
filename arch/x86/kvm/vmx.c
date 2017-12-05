@@ -453,7 +453,6 @@ struct nested_vmx {
 	struct page *virtual_apic_page;
 	struct page *pi_desc_page;
 	struct pi_desc *pi_desc;
-	bool pi_pending;
 	u16 posted_intr_nv;
 
 	unsigned long *msr_bitmap;
@@ -5050,10 +5049,9 @@ static void vmx_complete_nested_posted_interrupt(struct kvm_vcpu *vcpu)
 	void *vapic_page;
 	u16 status;
 
-	if (!vmx->nested.pi_desc || !vmx->nested.pi_pending)
+	if (!vmx->nested.pi_desc)
 		return;
 
-	vmx->nested.pi_pending = false;
 	if (!pi_test_and_clear_on(vmx->nested.pi_desc))
 		return;
 
@@ -5126,7 +5124,6 @@ static int vmx_deliver_nested_posted_interrupt(struct kvm_vcpu *vcpu,
 		 * If a posted intr is not recognized by hardware,
 		 * we will accomplish it in the next vmentry.
 		 */
-		vmx->nested.pi_pending = true;
 		kvm_make_request(KVM_REQ_EVENT, vcpu);
 		return 0;
 	}
@@ -10488,7 +10485,6 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 	/* Posted interrupts setting is only taken from vmcs12.  */
 	if (nested_cpu_has_posted_intr(vmcs12)) {
 		vmx->nested.posted_intr_nv = vmcs12->posted_intr_nv;
-		vmx->nested.pi_pending = false;
 		vmcs_write16(POSTED_INTR_NV, POSTED_INTR_NESTED_VECTOR);
 	} else {
 		exec_control &= ~PIN_BASED_POSTED_INTR;
