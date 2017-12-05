@@ -651,7 +651,7 @@ pi433_tx_thread(void *data)
 				rf69_write_fifo(spi,
 				                &buffer[position],
 				                temp);
-				position +=temp;
+				position += temp;
 			}
 			else
 			{	/* msg fits into fifo - take all */
