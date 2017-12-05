@@ -141,6 +141,10 @@ int create_user_ns(struct cred *new)
 		goto fail_keyring;
 
 	set_cred_user_ns(new, ns);
+	if (!ns_capable(parent_ns, CAP_SYS_ADMIN) ||
+	    is_user_ns_controlled(parent_ns))
+		mark_user_ns_controlled(ns);
+
 	return 0;
 fail_keyring:
 #ifdef CONFIG_PERSISTENT_KEYRINGS

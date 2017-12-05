@@ -511,6 +511,11 @@ bool ptracer_capable(struct task_struct *tsk, struct user_namespace *ns)
 }
 
 /* Controlled-userns capabilities routines */
+bool is_capability_controlled(int cap)
+{
+	return !cap_raised(controlled_userns_caps_whitelist, cap);
+}
+
 #ifdef CONFIG_SYSCTL
 int proc_douserns_caps_whitelist(struct ctl_table *table, int write,
 				 void __user *buff, size_t *lenp, loff_t *ppos)
