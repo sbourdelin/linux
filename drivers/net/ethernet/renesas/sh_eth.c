@@ -1859,6 +1859,7 @@ static int sh_eth_phy_init(struct net_device *ndev)
 	struct device_node *np = ndev->dev.parent->of_node;
 	struct sh_eth_private *mdp = netdev_priv(ndev);
 	struct phy_device *phydev;
+	int err;
 
 	mdp->link = 0;
 	mdp->speed = 0;
@@ -1891,9 +1892,22 @@ static int sh_eth_phy_init(struct net_device *ndev)
 		return PTR_ERR(phydev);
 	}
 
+	/* mask with MAC supported features */
+	if (mdp->cd->register_type != SH_ETH_REG_GIGABIT) {
+		err = phy_set_max_speed(phydev, SPEED_100);
+		if (err) {
+			netdev_err(ndev, "failed to limit PHY to 100 Mbit/s\n");
+			goto err_phy_disconnect;
+		}
+	}
+
 	phy_attached_info(phydev);
 
 	return 0;
+
+err_phy_disconnect:
+	phy_disconnect(phydev);
+	return err;
 }
 
 /* PHY control start function */
