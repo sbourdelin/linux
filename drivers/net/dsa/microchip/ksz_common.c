@@ -69,6 +69,25 @@ int ksz_phy_write16(struct dsa_switch *ds, int addr, int reg, u16 val)
 	return 0;
 }
 
+void ksz_adjust_link(struct dsa_switch *ds, int port,
+		     struct phy_device *phydev)
+{
+	struct ksz_device *dev = ds->priv;
+	struct ksz_port *p = &dev->ports[port];
+
+	if (phydev->link) {
+		p->speed = phydev->speed;
+		p->duplex = phydev->duplex;
+		p->flow_ctrl = phydev->pause;
+		p->link_up = 1;
+		dev->live_ports |= (1 << port) & dev->on_ports;
+	} else if (p->link_up) {
+		p->link_up = 0;
+		p->link_down = 1;
+		dev->live_ports &= ~(1 << port);
+	}
+}
+
 int ksz_sset_count(struct dsa_switch *ds)
 {
 	struct ksz_device *dev = ds->priv;
@@ -235,6 +254,7 @@ int ksz_enable_port(struct dsa_switch *ds, int port, struct phy_device *phy)
 
 	/* setup slave port */
 	dev->dev_ops->port_setup(dev, port, false);
+	dev->dev_ops->phy_setup(dev, port, phy);
 
 	/* port_stp_state_set() will be called after to enable the port so
 	 * there is no need to do anything.

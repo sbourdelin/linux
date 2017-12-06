@@ -26,6 +26,8 @@ void ksz_update_port_member(struct ksz_device *dev, int port);
 
 int ksz_phy_read16(struct dsa_switch *ds, int addr, int reg);
 int ksz_phy_write16(struct dsa_switch *ds, int addr, int reg, u16 val);
+void ksz_adjust_link(struct dsa_switch *ds, int port,
+		     struct phy_device *phydev);
 int ksz_sset_count(struct dsa_switch *ds);
 int ksz_port_bridge_join(struct dsa_switch *ds, int port,
 			 struct net_device *br);
