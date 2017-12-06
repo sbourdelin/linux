@@ -1102,7 +1102,6 @@ static int ksz_switch_init(struct ksz_device *dev)
 {
 	int i;
 
-	mutex_init(&dev->reg_mutex);
 	mutex_init(&dev->stats_mutex);
 	mutex_init(&dev->alu_mutex);
 	mutex_init(&dev->vlan_mutex);
@@ -1190,6 +1189,9 @@ int ksz_switch_register(struct ksz_device *dev)
 
 	if (dev->pdata)
 		dev->chip_id = dev->pdata->chip_id;
+
+	/* mutex is used in next function call. */
+	mutex_init(&dev->reg_mutex);
 
 	if (ksz_switch_detect(dev))
 		return -EINVAL;
