@@ -410,6 +410,26 @@ static int veth_newlink(struct net *src_net, struct net_device *dev,
 	if (ifmp && (dev->ifindex != 0))
 		peer->ifindex = ifmp->ifi_index;
 
+	if (tbp[IFLA_GSO_MAX_SIZE]) {
+		u32 max_size = nla_get_u32(tbp[IFLA_GSO_MAX_SIZE]);
+
+		if (max_size > GSO_MAX_SIZE)
+			return -EINVAL;
+
+		peer->gso_max_size = max_size;
+		dev->gso_max_size = max_size;
+	}
+
+	if (tbp[IFLA_GSO_MAX_SEGS]) {
+		u32 max_segs = nla_get_u32(tbp[IFLA_GSO_MAX_SEGS]);
+
+		if (max_segs > GSO_MAX_SEGS)
+			return -EINVAL;
+
+		peer->gso_max_segs = max_segs;
+		dev->gso_max_segs = max_segs;
+	}
+
 	err = register_netdevice(peer);
 	put_net(net);
 	net = NULL;
