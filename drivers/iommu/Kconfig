@@ -152,6 +152,16 @@ config INTEL_IOMMU
 	  and include PCI device scope covered by these DMA
 	  remapping devices.
 
+config INTEL_IOMMU_DEBUG
+	bool "Export Intel IOMMU internals in DebugFS"
+	depends on INTEL_IOMMU && DEBUG_FS
+	default n
+	help
+	  IOMMU internal states such as context, PASID tables can be seen via
+	  debugfs. Select this option if you want to export these internals.
+
+	  Say Y if you need this.
+
 config INTEL_IOMMU_SVM
 	bool "Support for Shared Virtual Memory with Intel IOMMU"
 	depends on INTEL_IOMMU && X86
