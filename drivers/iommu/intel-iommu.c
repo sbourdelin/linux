@@ -4806,6 +4806,10 @@ int __init intel_iommu_init(void)
 			  intel_iommu_cpu_dead);
 	intel_iommu_enabled = 1;
 
+#ifdef CONFIG_INTEL_IOMMU_DEBUG
+	intel_iommu_debugfs_init();
+#endif
+
 	return 0;
 
 out_free_reserved_range:
