@@ -1,6 +1,6 @@
-=========================================
-How to get printk format specifiers right
-=========================================
+=============================================
+How to Get ``printk`` Format Specifiers Right
+=============================================
 
 :Author: Randy Dunlap <rdunlap@infradead.org>
 :Author: Andrew Murray <amurray@mpc-data.co.uk>
@@ -8,56 +8,91 @@ How to get printk format specifiers right
 Integer types
 =============
 
-::
+For printing integer types, we have the following format specifiers:
+		
+   .. flat-table:: 
+      :widths: 2 2
 
-	If variable is of Type,		use printk format specifier:
-	------------------------------------------------------------
-		int			%d or %x
-		unsigned int		%u or %x
-		long			%ld or %lx
-		unsigned long		%lu or %lx
-		long long		%lld or %llx
-		unsigned long long	%llu or %llx
-		size_t			%zu or %zx
-		ssize_t			%zd or %zx
-		s32			%d or %x
-		u32			%u or %x
-		s64			%lld or %llx
-		u64			%llu or %llx
+      * - **Type**
+	- **Specifier**
 
-If <type> is dependent on a config option for its size (e.g., ``sector_t``,
+      * - ``int``
+        - ``%d`` or ``%x``
+
+      * - ``unsigned int``
+	- ``%u`` or ``%x``
+
+      * - ``long``
+	- ``%ld`` or ``%lx``
+
+      * - ``unsigned long``
+	- ``%lu`` or ``%lx``
+
+      * - ``long long``
+	- ``%lld`` or ``%llx``
+
+      * - ``unsigned long long``
+	- ``%llu`` or ``%llx``
+
+      * - ``size_t``
+	- ``%zu`` or ``%zx``
+
+      * - ``ssize_t``
+	- ``%zd`` or ``%zx``
+
+      * - ``s32``
+	- ``%d`` or ``%x``
+
+      * - ``u32``
+	- ``%u`` or ``%x``
+
+      * - ``s64``
+	- ``%lld`` or ``%llx``
+
+      * - ``u64``
+	- ``%llu`` or ``%llx``
+
+
+If ``<type>`` is dependent on a config option for its size (e.g., ``sector_t``,
 ``blkcnt_t``) or is architecture-dependent for its size (e.g., ``tcflag_t``),
 use a format specifier of its largest possible type and explicitly cast to it.
 
 Example::
 
-	printk("test: sector number/total blocks: %llu/%llu\n",
-		(unsigned long long)sector, (unsigned long long)blockcount);
+	printk("test: total blocks: %llu\n", (unsigned long long)blockcount);
 
-Reminder: ``sizeof()`` result is of type ``size_t``.
+Reminder: ``sizeof()`` returns type ``size_t``.
 
-The kernel's printf does not support ``%n``. For obvious reasons, floating
+The kernel's printf does not support ``%n``. For obvious reasons floating
 point formats (``%e, %f, %g, %a``) are also not recognized. Use of any
 unsupported specifier or length qualifier results in a WARN and early
-return from vsnprintf.
-
-Raw pointer value SHOULD be printed with %p. The kernel supports
-the following extended format specifiers for pointer types:
+return from ``vsnprintf()``.
 
 Pointer Types
 =============
 
-Pointers printed without a specifier extension (i.e unadorned %p) are
-hashed to give a unique identifier without leaking kernel addresses to user
-space. On 64 bit machines the first 32 bits are zeroed. If you _really_
-want the address see %px below.
+A raw pointer value may be printed with ``%p`` which will hash the address
+before printing. The Kernel also supports extended specifiers for printing
+pointers of different types.
+
+.. kernel-doc:: lib/vsprintf.c
+     :doc: Extended Format Pointer Specifiers
+
+
+Plain Pointers
+--------------
 
 ::
 
 	%p	abcdef12 or 00000000abcdef12
 
+Pointers printed without a specifier extension (i.e unadorned ``%p``) are
+hashed to give a unique identifier without leaking kernel addresses to user
+space. On 64 bit machines the first 32 bits are zeroed. If you *really*
+want the address see ``%px`` below.
+
 Symbols/Function Pointers
-=========================
+-------------------------
 
 ::
 
@@ -69,61 +104,60 @@ Symbols/Function Pointers
 	%ps	versatile_init
 	%pB	prev_fn_of_versatile_init+0x88/0x88
 
-The ``F`` and ``f`` specifiers are for printing function pointers,
-for example, f->func, &gettimeofday. They have the same result as
-``S`` and ``s`` specifiers. But they do an extra conversion on
-ia64, ppc64 and parisc64 architectures where the function pointers
-are actually function descriptors.
+The ``F`` and ``f`` specifiers are for printing function pointers, for
+example, ``f->func``, ``&gettimeofday``. They have the same result as ``S``
+and ``s`` specifiers. But they do an extra conversion on ia64, ppc64 and
+parisc64 architectures where the function pointers are actually function
+descriptors.
 
 The ``S`` and ``s`` specifiers can be used for printing symbols
-from direct addresses, for example, __builtin_return_address(0),
-(void *)regs->ip. They result in the symbol name with (``S``) or
+from direct addresses, for example, ``__builtin_return_address(0)``,
+``(void *)regs->ip``. They result in the symbol name with (``S``) or
 without (``s``) offsets. If KALLSYMS are disabled then the symbol
 address is printed instead.
 
 The ``B`` specifier results in the symbol name with offsets and should be
 used when printing stack backtraces. The specifier takes into
 consideration the effect of compiler optimisations which may occur
-when tail-call``s are used and marked with the noreturn GCC attribute.
+when tail-call's are used and marked with the ``noreturn`` GCC attribute.
 
 Examples::
 
 	printk("Going to call: %pF\n", gettimeofday);
 	printk("Going to call: %pF\n", p->func);
 	printk("%s: called from %pS\n", __func__, (void *)_RET_IP_);
-	printk("%s: called from %pS\n", __func__,
-				(void *)__builtin_return_address(0));
+	printk("%s: called from %pS\n", __func__, (void *)__builtin_return_address(0));
 	printk("Faulted at %pS\n", (void *)regs->ip);
 	printk(" %s%pB\n", (reliable ? "" : "? "), (void *)*stack);
 
 Kernel Pointers
-===============
+---------------
 
 ::
 
 	%pK	01234567 or 0123456789abcdef
 
 For printing kernel pointers which should be hidden from unprivileged
-users. The behaviour of ``%pK`` depends on the ``kptr_restrict sysctl`` - see
-Documentation/sysctl/kernel.txt for more details.
+users. The behaviour of ``%pK`` depends on the ``kptr_restrict`` sysctl -
+see ``Documentation/sysctl/kernel.txt`` for more details.
 
 Unmodified Addresses
-====================
+--------------------
 
 ::
 
 	%px	01234567 or 0123456789abcdef
 
-For printing pointers when you _really_ want to print the address. Please
+For printing pointers when you *really* want to print the address. Please
 consider whether or not you are leaking sensitive information about the
-Kernel layout in memory before printing pointers with %px. %px is
-functionally equivalent to %lx. %px is preferred to %lx because it is more
-uniquely grep'able. If, in the future, we need to modify the way the Kernel
-handles printing pointers it will be nice to be able to find the call
-sites.
+kernel memory layout before printing pointers with ``%px``. ``%px`` is
+functionally equivalent to ``%lx`` (or ``%lu``). ``%px``, however, is
+preferable because it is more uniquely grep'able. If, in the future, we need
+to modify the way the Kernel handles printing pointers we will be better
+equipped to find the call sites.
 
 Struct Resources
-================
+----------------
 
 ::
 
@@ -132,12 +166,13 @@ Struct Resources
 	%pR	[mem 0x60000000-0x6fffffff pref] or
 		[mem 0x0000000060000000-0x000000006fffffff pref]
 
-For printing struct resources. The ``R`` and ``r`` specifiers result in a
+For printing ``struct resources``. The ``R`` and ``r`` specifiers result in a
 printed resource with (``R``) or without (``r``) a decoded flags member.
+
 Passed by reference.
 
-Physical addresses types ``phys_addr_t``
-========================================
+Physical Address Types ``phys_addr_t``
+--------------------------------------
 
 ::
 
@@ -145,20 +180,24 @@ Physical addresses types ``phys_addr_t``
 
 For printing a ``phys_addr_t`` type (and its derivatives, such as
 ``resource_size_t``) which can vary based on build options, regardless of
-the width of the CPU data path. Passed by reference.
+the width of the CPU data path.
 
-DMA addresses types ``dma_addr_t``
-==================================
+Passed by reference.
+
+DMA Address Types ``dma_addr_t``
+--------------------------------
 
 ::
 
 	%pad	0x01234567 or 0x0123456789abcdef
 
 For printing a ``dma_addr_t`` type which can vary based on build options,
-regardless of the width of the CPU data path. Passed by reference.
+regardless of the width of the CPU data path.
 
-Raw buffer as an escaped string
-===============================
+Passed by reference.
+
+Raw Buffer as an Escaped String
+-------------------------------
 
 ::
 
@@ -168,7 +207,7 @@ For printing raw buffer as an escaped string. For the following buffer::
 
 		1b 62 20 5c 43 07 22 90 0d 5d
 
-few examples show how the conversion would be done (the result string
+A few examples show how the conversion would be done (the result string
 without surrounding quotes)::
 
 		%*pE		"\eb \C\a"\220\r]"
@@ -194,8 +233,8 @@ printing SSIDs.
 
 If field width is omitted the 1 byte only will be escaped.
 
-Raw buffer as a hex string
-==========================
+Raw Buffer as a Hex String
+--------------------------
 
 ::
 
@@ -205,11 +244,11 @@ Raw buffer as a hex string
 	%*phN	000102 ... 3f
 
 For printing a small buffers (up to 64 bytes long) as a hex string with
-certain separator. For the larger buffers consider to use
+certain separator. For the larger buffers consider using
 :c:func:`print_hex_dump`.
 
-MAC/FDDI addresses
-==================
+MAC/FDDI Addresses
+------------------
 
 ::
 
@@ -233,8 +272,8 @@ of Bluetooth addresses which are in the little endian order.
 
 Passed by reference.
 
-IPv4 addresses
-==============
+IPv4 Addresses
+--------------
 
 ::
 
@@ -252,8 +291,8 @@ no specifier is provided the default network/big endian order is used.
 
 Passed by reference.
 
-IPv6 addresses
-==============
+IPv6 Addresses
+--------------
 
 ::
 
@@ -271,8 +310,8 @@ http://tools.ietf.org/html/rfc5952
 
 Passed by reference.
 
-IPv4/IPv6 addresses (generic, with port, flowinfo, scope)
-=========================================================
+IPv4/IPv6 Addresses (generic, with port, flowinfo or scope)
+---------------------------------------------------------------
 
 ::
 
@@ -282,8 +321,8 @@ IPv4/IPv6 addresses (generic, with port, flowinfo, scope)
 	%pISpc	1.2.3.4:12345	or [1:2:3:4:5:6:7:8]:12345
 	%p[Ii]S[pfschnbl]
 
-For printing an IP address without the need to distinguish whether it``s
-of type AF_INET or AF_INET6, a pointer to a valid ``struct sockaddr``,
+For printing an IP address without the need to distinguish whether it's
+of type AF_INET or AF_INET6. A pointer to a valid ``struct sockaddr``,
 specified through ``IS`` or ``iS``, can be passed to this format specifier.
 
 The additional ``p``, ``f``, and ``s`` specifiers are used to specify port
@@ -308,8 +347,8 @@ Further examples::
 	%pISsc		1.2.3.4		or [1:2:3:4:5:6:7:8]%1234567890
 	%pISpfc		1.2.3.4:12345	or [1:2:3:4:5:6:7:8]:12345/123456789
 
-UUID/GUID addresses
-===================
+UUID/GUID Addresses
+-------------------
 
 ::
 
@@ -318,18 +357,18 @@ UUID/GUID addresses
 	%pUl	03020100-0504-0706-0809-0a0b0c0e0e0f
 	%pUL	03020100-0504-0706-0809-0A0B0C0E0E0F
 
-For printing 16-byte UUID/GUIDs addresses. The additional 'l', 'L',
-'b' and 'B' specifiers are used to specify a little endian order in
-lower ('l') or upper case ('L') hex characters - and big endian order
-in lower ('b') or upper case ('B') hex characters.
+For printing 16-byte UUID/GUIDs addresses. The additional ``l``, ``L``,
+``b`` and ``B`` specifiers are used to specify a little endian order in
+lower (``l``) or upper case (``L``) hex digits - and big endian order
+in lower (``b``) or upper case (``B``) hex digits.
 
 Where no additional specifiers are used the default big endian
-order with lower case hex characters will be printed.
+order with lower case hex digits will be printed.
 
 Passed by reference.
 
-dentry names
-============
+Dentry Names
+------------
 
 ::
 
@@ -343,24 +382,24 @@ equivalent of ``%s`` ``dentry->d_name.name`` we used to use, ``%pd<n>`` prints
 
 Passed by reference.
 
-block_device names
-==================
+block_device Names
+------------------
 
 ::
 
 	%pg	sda, sda1 or loop0p1
 
-For printing name of block_device pointers.
+For printing name of ``block_device`` pointers.
 
 struct va_format
-================
+----------------
 
 ::
 
 	%pV
 
-For printing struct va_format structures. These contain a format string
-and va_list as follows::
+For printing ``struct va_format`` structures. These contain a format string
+and ``va_list`` as follows::
 
 	struct va_format {
 		const char *fmt;
@@ -370,36 +409,33 @@ and va_list as follows::
 Implements a "recursive vsnprintf".
 
 Do not use this feature without some mechanism to verify the
-correctness of the format string and va_list arguments.
+correctness of the format string and ``va_list`` arguments.
 
 Passed by reference.
 
 kobjects
-========
-
+--------
+	
 ::
-
-	%pO
-
-	Base specifier for kobject based structs. Must be followed with
-	character for specific type of kobject as listed below:
-
-	Device tree nodes:
 
 	%pOF[fnpPcCF]
 
-	For printing device tree nodes. The optional arguments are:
-	    f device node full_name
-	    n device node name
-	    p device node phandle
-	    P device node path spec (name + @unit)
-	    F device node flags
-	    c major compatible string
-	    C full compatible string
-	Without any arguments prints full_name (same as %pOFf)
-	The separator when using multiple arguments is ':'
 
-	Examples:
+For printing kobject based structs (device nodes). Default behaviour is
+equivalent to ``%pOFf``.
+
+	- ``f`` device node full_name
+	- ``n`` device node name
+	- ``p`` device node phandle
+	- ``P`` device node path spec (name + @unit)
+	- ``F`` device node flags
+	- ``c`` major compatible string
+	- ``C`` full compatible string
+
+The separator when using multiple arguments is ``:``
+
+Examples:
+::
 
 	%pOF	/foo/bar@0			- Node full name
 	%pOFf	/foo/bar@0			- Same as above
@@ -412,11 +448,10 @@ kobjects
 							P - Populated
 							B - Populated bus
 
-	Passed by reference.
-
+Passed by reference.
 
 struct clk
-==========
+----------
 
 ::
 
@@ -424,14 +459,14 @@ struct clk
 	%pCn	pll1
 	%pCr	1560000000
 
-For printing struct clk structures. ``%pC`` and ``%pCn`` print the name
+For printing ``struct clk structures``. ``%pC`` and ``%pCn`` print the name
 (Common Clock Framework) or address (legacy clock framework) of the
 structure; ``%pCr`` prints the current clock rate.
 
 Passed by reference.
 
-bitmap and its derivatives such as cpumask and nodemask
-=======================================================
+Bitmap and its Derivatives (such as cpumask and nodemask)
+---------------------------------------------------------
 
 ::
 
@@ -439,13 +474,13 @@ bitmap and its derivatives such as cpumask and nodemask
 	%*pbl	0,3-6,8-10
 
 For printing bitmap and its derivatives such as cpumask and nodemask,
-``%*pb`` output the bitmap with field width as the number of bits and ``%*pbl``
-output the bitmap as range list with field width as the number of bits.
+``%*pb`` outputs the bitmap with field width as the number of bits and ``%*pbl``
+outputs the bitmap as range list with field width as the number of bits.
 
 Passed by reference.
 
-Flags bitfields such as page flags, gfp_flags
-=============================================
+Flags Bitfields (such as page flags, gfp_flags)
+-----------------------------------------------
 
 ::
 
@@ -459,25 +494,27 @@ character. Currently supported are [p]age flags, [v]ma_flags (both
 expect ``unsigned long *``) and [g]fp_flags (expects ``gfp_t *``). The flag
 names and print order depends on the particular	type.
 
-Note that this format should not be used directly in :c:func:`TP_printk()` part
-of a tracepoint. Instead, use the ``show_*_flags()`` functions from
-<trace/events/mmflags.h>.
+Note that this format should not be used directly in the
+:c:func:`TP_printk()` part of a tracepoint. Instead, use the
+``show_*_flags()`` functions from ``<trace/events/mmflags.h>``. 
 
 Passed by reference.
 
-Network device features
-=======================
+Network Device Features
+-----------------------
 
 ::
 
 	%pNF	0x000000000000c000
 
-For printing netdev_features_t.
+For printing ``netdev_features_t``.
 
 Passed by reference.
 
-If you add other ``%p`` extensions, please extend lib/test_printf.c with
-one or more test cases, if at all feasible.
+Thanks
+======
 
+If you add other ``%p`` extensions, please extend ``lib/test_printf.c``
+with one or more test cases, if at all feasible.
 
 Thank you for your cooperation and attention.

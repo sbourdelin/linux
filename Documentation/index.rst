@@ -87,6 +87,16 @@ implementation.
 
    sh/index
 
+Miscellaneous documentation
+---------------------------
+
+These guides contain general information useful when writing kernel code.
+
+.. toctree::
+   :maxdepth: 1
+
+   printk-formats
+
 Korean translations
 -------------------
 

@@ -1727,114 +1727,72 @@ static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
 	return number(buf, end, hashval, spec);
 }
 
+/**
+ * DOC: Extended Format Pointer Specifiers
+ *
+ * Briefly we handle the following extensions:
+ *
+ * - ``F`` - For symbolic function descriptor pointers with offset.
+ * - ``f`` - For simple symbolic function names without offset.
+ *
+ * - ``S`` - For symbolic direct pointers with offset.
+ * - ``s`` - For symbolic direct pointers without offset.
+ * - ``[FfSs]R`` - As above with ``__builtin_extract_return_addr()`` translation.
+ * - ``B`` - For backtraced symbolic direct pointers with offset.
+ * - ``R`` - For decoded struct resource, e.g., [mem 0x0-0x1f 64bit pref].
+ * - ``r`` - For raw struct resource, e.g., [mem 0x0-0x1f flags 0x201].
+ * - ``b[l]`` - For a bitmap, the number of bits is determined by the field
+ *   width which must be explicitly specified either as part of the format
+ *   string ``32b[l]`` or through ``*b[l]``, ``[l]`` selects range-list format
+ *   instead of hex format.
+ * - ``M`` - For a 6-byte MAC address, it prints the address in the usual
+ *   colon-separated hex notation.
+ * - ``m`` - For a 6-byte MAC address, it prints the hex address without colons.
+ * - ``MF`` - For a 6-byte MAC FDDI address, it prints the address with a
+ *   dash-separated hex notation.
+ * - ``[mM]R`` - For a 6-byte MAC address, Reverse order (Bluetooth).
+ * - ``I[46]`` - For IPv4/IPv6 addresses printed in the usual way.
+ * - ``I[S][pfs]`` - For generic IPv4/IPv6 address (struct sockaddr *) that falls
+ *   back to ``[4]`` or ``[6]`` and is able to print port ``[p]``,
+ *   flowinfo ``[f]``, scope ``[s]``.
+ * - ``i[46]`` - For 'raw' IPv4/IPv6 addresses IPv6 omits the colons (01020304...0f)
+ *   IPv4 uses dot-separated decimal with leading 0's (010.123.045.006).
+ * - ``i[S][pfs]`` - For generic IPv4/IPv6 address (struct sockaddr *) that falls back
+ *   to ``[4]`` or ``[6]`` (``[pfs]`` as above).
+ * - ``[Ii][4S][hnbl]`` - For IPv4 addresses in host, network, big or little endian order.
+ * - ``I[6S]c`` - For IPv6 addresses printed as per http://tools.ietf.org/html/rfc5952.
+ * - ``E[achnops]`` - For an escaped buffer.
+ * - ``U`` - For a 16 byte UUID/GUID.
+ * - ``V`` - For a ``struct va_format`` which contains a format ``string *``
+ *   and ``va_list *``.
+ * - ``K`` -  For a kernel pointer that should be hidden from unprivileged users.
+ * - ``NF`` - For a ``netdev_features_t``.
+ * - ``h[CDN]`` - For a variable-length buffer.
+ * - ``a[pd]`` - For address types ``[p] phys_addr_t``, ``[d] dma_addr_t`` and
+ *   derivatives.
+ * - ``d[234]`` - For a dentry name (optionally 2-4 last components).
+ * - ``D[234]`` - Same as 'd' but for a struct file.
+ * - ``g`` - For ``block_device`` name (gendisk + partition number).
+ * - ``C[n]`` - For a clock, it prints the name (Common Clock Framework) or
+ *   address (legacy clock framework) of the clock. ``[n]`` is optional.
+ * - ``Cr`` - For a clock, it prints the current rate of the clock.
+ * - ``G`` - For flags to be printed as a collection of symbolic strings that
+ *   would construct the specific value.
+ * - ``O`` - For a kobject based struct (device node).
+ * - ``x`` - For printing the address. Equivalent to ``%lx``.
+ */
+
 /*
  * Show a '%p' thing.  A kernel extension is that the '%p' is followed
  * by an extra set of alphanumeric characters that are extended format
  * specifiers.
  *
+ * Please see Documentation/printk-formats.rst for fuller description
+ * of specifier extensions. Also please update this file when making
+ * changes.
+ *
  * Please update scripts/checkpatch.pl when adding/removing conversion
  * characters.  (Search for "check for vsprintf extension").
- *
- * Right now we handle:
- *
- * - 'F' For symbolic function descriptor pointers with offset
- * - 'f' For simple symbolic function names without offset
- * - 'S' For symbolic direct pointers with offset
- * - 's' For symbolic direct pointers without offset
- * - '[FfSs]R' as above with __builtin_extract_return_addr() translation
- * - 'B' For backtraced symbolic direct pointers with offset
- * - 'R' For decoded struct resource, e.g., [mem 0x0-0x1f 64bit pref]
- * - 'r' For raw struct resource, e.g., [mem 0x0-0x1f flags 0x201]
- * - 'b[l]' For a bitmap, the number of bits is determined by the field
- *       width which must be explicitly specified either as part of the
- *       format string '%32b[l]' or through '%*b[l]', [l] selects
- *       range-list format instead of hex format
- * - 'M' For a 6-byte MAC address, it prints the address in the
- *       usual colon-separated hex notation
- * - 'm' For a 6-byte MAC address, it prints the hex address without colons
- * - 'MF' For a 6-byte MAC FDDI address, it prints the address
- *       with a dash-separated hex notation
- * - '[mM]R' For a 6-byte MAC address, Reverse order (Bluetooth)
- * - 'I' [46] for IPv4/IPv6 addresses printed in the usual way
- *       IPv4 uses dot-separated decimal without leading 0's (1.2.3.4)
- *       IPv6 uses colon separated network-order 16 bit hex with leading 0's
- *       [S][pfs]
- *       Generic IPv4/IPv6 address (struct sockaddr *) that falls back to
- *       [4] or [6] and is able to print port [p], flowinfo [f], scope [s]
- * - 'i' [46] for 'raw' IPv4/IPv6 addresses
- *       IPv6 omits the colons (01020304...0f)
- *       IPv4 uses dot-separated decimal with leading 0's (010.123.045.006)
- *       [S][pfs]
- *       Generic IPv4/IPv6 address (struct sockaddr *) that falls back to
- *       [4] or [6] and is able to print port [p], flowinfo [f], scope [s]
- * - '[Ii][4S][hnbl]' IPv4 addresses in host, network, big or little endian order
- * - 'I[6S]c' for IPv6 addresses printed as specified by
- *       http://tools.ietf.org/html/rfc5952
- * - 'E[achnops]' For an escaped buffer, where rules are defined by combination
- *                of the following flags (see string_escape_mem() for the
- *                details):
- *                  a - ESCAPE_ANY
- *                  c - ESCAPE_SPECIAL
- *                  h - ESCAPE_HEX
- *                  n - ESCAPE_NULL
- *                  o - ESCAPE_OCTAL
- *                  p - ESCAPE_NP
- *                  s - ESCAPE_SPACE
- *                By default ESCAPE_ANY_NP is used.
- * - 'U' For a 16 byte UUID/GUID, it prints the UUID/GUID in the form
- *       "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
- *       Options for %pU are:
- *         b big endian lower case hex (default)
- *         B big endian UPPER case hex
- *         l little endian lower case hex
- *         L little endian UPPER case hex
- *           big endian output byte order is:
- *             [0][1][2][3]-[4][5]-[6][7]-[8][9]-[10][11][12][13][14][15]
- *           little endian output byte order is:
- *             [3][2][1][0]-[5][4]-[7][6]-[8][9]-[10][11][12][13][14][15]
- * - 'V' For a struct va_format which contains a format string * and va_list *,
- *       call vsnprintf(->format, *->va_list).
- *       Implements a "recursive vsnprintf".
- *       Do not use this feature without some mechanism to verify the
- *       correctness of the format string and va_list arguments.
- * - 'K' For a kernel pointer that should be hidden from unprivileged users
- * - 'NF' For a netdev_features_t
- * - 'h[CDN]' For a variable-length buffer, it prints it as a hex string with
- *            a certain separator (' ' by default):
- *              C colon
- *              D dash
- *              N no separator
- *            The maximum supported length is 64 bytes of the input. Consider
- *            to use print_hex_dump() for the larger input.
- * - 'a[pd]' For address types [p] phys_addr_t, [d] dma_addr_t and derivatives
- *           (default assumed to be phys_addr_t, passed by reference)
- * - 'd[234]' For a dentry name (optionally 2-4 last components)
- * - 'D[234]' Same as 'd' but for a struct file
- * - 'g' For block_device name (gendisk + partition number)
- * - 'C' For a clock, it prints the name (Common Clock Framework) or address
- *       (legacy clock framework) of the clock
- * - 'Cn' For a clock, it prints the name (Common Clock Framework) or address
- *        (legacy clock framework) of the clock
- * - 'Cr' For a clock, it prints the current rate of the clock
- * - 'G' For flags to be printed as a collection of symbolic strings that would
- *       construct the specific value. Supported flags given by option:
- *       p page flags (see struct page) given as pointer to unsigned long
- *       g gfp flags (GFP_* and __GFP_*) given as pointer to gfp_t
- *       v vma flags (VM_*) given as pointer to unsigned long
- * - 'O' For a kobject based struct. Must be one of the following:
- *       - 'OF[fnpPcCF]'  For a device tree object
- *                        Without any optional arguments prints the full_name
- *                        f device node full_name
- *                        n device node name
- *                        p device node phandle
- *                        P device node path spec (name + @unit)
- *                        F device node flags
- *                        c major compatible string
- *                        C full compatible string
- *
- * - 'x' For printing the address. Equivalent to "%lx".
- *
- * ** Please update also Documentation/printk-formats.txt when making changes **
  *
  * Note: The difference between 'S' and 'F' is that on ia64 and ppc64
  * function pointers are really function descriptors, which contain a
