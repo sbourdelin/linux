@@ -47,6 +47,31 @@ static const struct file_operations __name ## _fops =			\
 }
 
 #ifdef CONFIG_INTEL_IOMMU_SVM
+static void pasid_tbl_entry_show(struct seq_file *m, void *unused,
+				 struct intel_iommu *iommu)
+{
+	int pasid_size = 0, i;
+
+	if (ecap_pasid(iommu->ecap)) {
+		pasid_size = intel_iommu_get_pts(iommu);
+		seq_printf(m, "Pasid Table Addr : %p\n", iommu->pasid_table);
+
+		if (iommu->pasid_table) {
+			seq_printf(m, "Pasid table entries for domain %d:\n",
+				   iommu->segment);
+			seq_printf(m, "[Entry]\t\tContents\n");
+
+			/* Publish the pasid table entries here */
+			for (i = 0; i < pasid_size; i++) {
+				if (!iommu->pasid_table[i].val)
+					continue;
+				seq_printf(m, "[%d]\t\t%04llx\n", i,
+					   iommu->pasid_table[i].val);
+			}
+		}
+	}
+}
+
 static void ext_ctx_tbl_entry_show(struct seq_file *m, void *unused,
 				   struct intel_iommu *iommu, int bus, int ctx,
 				   struct context_entry *context, bool new_ext)
@@ -70,6 +95,12 @@ static void ext_ctx_tbl_entry_show(struct seq_file *m, void *unused,
 	}
 }
 #else /* CONFIG_INTEL_IOMMU_SVM */
+static void pasid_tbl_entry_show(struct seq_file *m, void *unused,
+				 struct intel_iommu *iommu)
+{
+	return;
+}
+
 static void ext_ctx_tbl_entry_show(struct seq_file *m, void *unused,
 				   struct intel_iommu *iommu, int bus, int ctx,
 				   struct context_entry *context, bool new_ext)
@@ -106,6 +137,7 @@ static void ctx_tbl_entry_show(struct seq_file *m, void *unused,
 					       context, new_ext);
 		}
 	}
+	pasid_tbl_entry_show(m, unused, iommu);
 out:
 	spin_unlock_irqrestore(&iommu->lock, flags);
 }
