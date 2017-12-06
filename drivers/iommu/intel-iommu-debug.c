@@ -46,6 +46,38 @@ static const struct file_operations __name ## _fops =			\
 	.owner		= THIS_MODULE,					\
 }
 
+#ifdef CONFIG_INTEL_IOMMU_SVM
+static void ext_ctx_tbl_entry_show(struct seq_file *m, void *unused,
+				   struct intel_iommu *iommu, int bus, int ctx,
+				   struct context_entry *context, bool new_ext)
+{
+	u64 ctx_lo;
+
+	if (new_ext) {
+		seq_printf(m, "Higher Context tbl entries for Bus: %d\n", bus);
+		ctx_lo = context[0].lo;
+
+		if (!(ctx_lo & CONTEXT_PASIDE)) {
+			context[1].hi = (u64)virt_to_phys(
+					iommu->pasid_state_table);
+			context[1].lo = (u64)virt_to_phys(iommu->pasid_table) |
+					intel_iommu_get_pts(iommu);
+		}
+
+		seq_printf(m, "[%d]\t%04x:%02x:%02x.%02x\t%llx\t%llx\n", ctx,
+			   iommu->segment, bus, PCI_SLOT(ctx), PCI_FUNC(ctx),
+			   context[1].lo, context[1].hi);
+	}
+}
+#else /* CONFIG_INTEL_IOMMU_SVM */
+static void ext_ctx_tbl_entry_show(struct seq_file *m, void *unused,
+				   struct intel_iommu *iommu, int bus, int ctx,
+				   struct context_entry *context, bool new_ext)
+{
+	return;
+}
+#endif /* CONFIG_INTEL_IOMMU_SVM */
+
 static void ctx_tbl_entry_show(struct seq_file *m, void *unused,
 			       struct intel_iommu *iommu, int bus, bool ext,
 			       bool new_ext)
@@ -69,6 +101,9 @@ static void ctx_tbl_entry_show(struct seq_file *m, void *unused,
 			seq_printf(m, "[%d]\t%04x:%02x:%02x.%02x\t%llx\t%llx\n",
 				   ctx, iommu->segment, bus, PCI_SLOT(ctx),
 				   PCI_FUNC(ctx), context[0].lo, context[0].hi);
+
+			ext_ctx_tbl_entry_show(m, unused, iommu, bus, ctx,
+					       context, new_ext);
 		}
 	}
 out:
