@@ -163,6 +163,84 @@ static int dmar_translation_struct_show(struct seq_file *m, void *unused)
 
 DEFINE_SHOW_ATTRIBUTE(dmar_translation_struct);
 
+static int iommu_regset_show(struct seq_file *m, void *unused)
+{
+	struct dmar_drhd_unit *drhd;
+	struct intel_iommu *iommu;
+	unsigned long long base;
+	int i;
+	struct regset {
+		int offset;
+		char *regs;
+	};
+
+	static const struct regset regstr[] = {{DMAR_VER_REG, "VER"},
+					       {DMAR_CAP_REG, "CAP"},
+					       {DMAR_ECAP_REG, "ECAP"},
+					       {DMAR_GCMD_REG, "GCMD"},
+					       {DMAR_GSTS_REG, "GSTS"},
+					       {DMAR_RTADDR_REG, "RTADDR"},
+					       {DMAR_CCMD_REG, "CCMD"},
+					       {DMAR_FSTS_REG, "FSTS"},
+					       {DMAR_FECTL_REG, "FECTL"},
+					       {DMAR_FEDATA_REG, "FEDATA"},
+					       {DMAR_FEADDR_REG, "FEADDR"},
+					       {DMAR_FEUADDR_REG, "FEUADDR"},
+					       {DMAR_AFLOG_REG, "AFLOG"},
+					       {DMAR_PMEN_REG, "PMEN"},
+					       {DMAR_PLMBASE_REG, "PLMBASE"},
+					       {DMAR_PLMLIMIT_REG, "PLMLIMIT"},
+					       {DMAR_PHMBASE_REG, "PHMBASE"},
+					       {DMAR_PHMLIMIT_REG,  "PHMLIMIT"},
+					       {DMAR_IQH_REG, "IQH"},
+					       {DMAR_IQT_REG, "IQT"},
+					       {DMAR_IQ_SHIFT, "IQ"},
+					       {DMAR_IQA_REG, "IQA"},
+					       {DMAR_ICS_REG, "ICS"},
+					       {DMAR_IRTA_REG, "IRTA"},
+					       {DMAR_PQH_REG, "PQH"},
+					       {DMAR_PQT_REG, "PQT"},
+					       {DMAR_PQA_REG, "PQA"},
+					       {DMAR_PRS_REG, "PRS"},
+					       {DMAR_PECTL_REG, "PECTL"},
+					       {DMAR_PEDATA_REG, "PEDATA"},
+					       {DMAR_PEADDR_REG, "PEADDR"},
+					       {DMAR_PEUADDR_REG, "PEUADDR"},
+					       {DMAR_MTRRCAP_REG, "MTRRCAP"},
+					       {DMAR_MTRRDEF_REG, "MTRRDEF"} };
+
+	rcu_read_lock();
+	for_each_active_iommu(iommu, drhd) {
+		if (iommu) {
+			if (!drhd->reg_base_addr) {
+				seq_printf(m, "IOMMU: Invalid base address\n");
+				rcu_read_unlock();
+				return -EINVAL;
+			}
+
+			base = drhd->reg_base_addr;
+			seq_printf(m, "\nDMAR: %s: reg_base_addr %llx\n",
+				   iommu->name, base);
+			seq_printf(m, "Name\t\t\tOffset\t\tContents\n");
+			/*
+			 * Publish the contents of the 64-bit hardware registers
+			 * by adding the offset to the pointer(virtual addr)
+			 */
+			for (i = 0 ; i < ARRAY_SIZE(regstr); i++) {
+				seq_printf(m, "%-8s\t\t0x%02x\t\t0x%016lx\n",
+					   regstr[i].regs, regstr[i].offset,
+					   readq(iommu->reg + regstr[i].offset)
+					  );
+			}
+		}
+	}
+
+	rcu_read_unlock();
+	return 0;
+}
+
+DEFINE_SHOW_ATTRIBUTE(iommu_regset);
+
 void __init intel_iommu_debugfs_init(void)
 {
 	struct dentry *iommu_debug_root;
@@ -180,6 +258,14 @@ void __init intel_iommu_debugfs_init(void)
 		pr_err("Can't create dmar_translation_struct file\n");
 		goto err;
 	}
+
+	if (!debugfs_create_file("iommu_regset", S_IRUGO,
+				 iommu_debug_root, NULL, &iommu_regset_fops)) {
+		pr_err("Can't create iommu_regset file\n");
+		goto err;
+	}
+
+	return;
 
 err:
 	debugfs_remove_recursive(iommu_debug_root);
