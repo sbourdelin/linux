@@ -39,6 +39,7 @@
 #include "power.h"
 
 typedef int (*pm_callback_t)(struct device *);
+ASYNC_DOMAIN(domain_pm);
 
 /*
  * The entries in the dpm_list list are in a depth first order, simply
@@ -640,7 +641,7 @@ void dpm_noirq_resume_devices(pm_message_t state)
 		reinit_completion(&dev->power.completion);
 		if (is_async(dev)) {
 			get_device(dev);
-			async_schedule(async_resume_noirq, dev);
+			async_schedule_domain(async_resume_noirq, dev, &domain_pm);
 		}
 	}
 
@@ -666,7 +667,7 @@ void dpm_noirq_resume_devices(pm_message_t state)
 		put_device(dev);
 	}
 	mutex_unlock(&dpm_list_mtx);
-	async_synchronize_full();
+	async_synchronize_full_domain(&domain_pm);
 	dpm_show_time(starttime, state, 0, "noirq");
 	trace_suspend_resume(TPS("dpm_resume_noirq"), state.event, false);
 }
@@ -780,7 +781,7 @@ void dpm_resume_early(pm_message_t state)
 		reinit_completion(&dev->power.completion);
 		if (is_async(dev)) {
 			get_device(dev);
-			async_schedule(async_resume_early, dev);
+			async_schedule_domain(async_resume_early, dev, &domain_pm);
 		}
 	}
 
@@ -805,7 +806,7 @@ void dpm_resume_early(pm_message_t state)
 		put_device(dev);
 	}
 	mutex_unlock(&dpm_list_mtx);
-	async_synchronize_full();
+	async_synchronize_full_domain(&domain_pm);
 	dpm_show_time(starttime, state, 0, "early");
 	trace_suspend_resume(TPS("dpm_resume_early"), state.event, false);
 }
@@ -944,7 +945,7 @@ void dpm_resume(pm_message_t state)
 		reinit_completion(&dev->power.completion);
 		if (is_async(dev)) {
 			get_device(dev);
-			async_schedule(async_resume, dev);
+			async_schedule_domain(async_resume, dev, &domain_pm);
 		}
 	}
 
@@ -971,7 +972,7 @@ void dpm_resume(pm_message_t state)
 		put_device(dev);
 	}
 	mutex_unlock(&dpm_list_mtx);
-	async_synchronize_full();
+	async_synchronize_full_domain(&domain_pm);
 	dpm_show_time(starttime, state, 0, NULL);
 
 	cpufreq_resume();
@@ -1215,7 +1216,7 @@ static int device_suspend_noirq(struct device *dev)
 
 	if (is_async(dev)) {
 		get_device(dev);
-		async_schedule(async_suspend_noirq, dev);
+		async_schedule_domain(async_suspend_noirq, dev, &domain_pm);
 		return 0;
 	}
 	return __device_suspend_noirq(dev, pm_transition, false);
@@ -1261,7 +1262,7 @@ int dpm_noirq_suspend_devices(pm_message_t state)
 			break;
 	}
 	mutex_unlock(&dpm_list_mtx);
-	async_synchronize_full();
+	async_synchronize_full_domain(&domain_pm);
 	if (!error)
 		error = async_error;
 
@@ -1375,7 +1376,7 @@ static int device_suspend_late(struct device *dev)
 
 	if (is_async(dev)) {
 		get_device(dev);
-		async_schedule(async_suspend_late, dev);
+		async_schedule_domain(async_suspend_late, dev, &domain_pm);
 		return 0;
 	}
 
@@ -1420,7 +1421,7 @@ int dpm_suspend_late(pm_message_t state)
 			break;
 	}
 	mutex_unlock(&dpm_list_mtx);
-	async_synchronize_full();
+	async_synchronize_full_domain(&domain_pm);
 	if (!error)
 		error = async_error;
 	if (error) {
@@ -1643,7 +1644,7 @@ static int device_suspend(struct device *dev)
 
 	if (is_async(dev)) {
 		get_device(dev);
-		async_schedule(async_suspend, dev);
+		async_schedule_domain(async_suspend, dev, &domain_pm);
 		return 0;
 	}
 
@@ -1689,7 +1690,7 @@ int dpm_suspend(pm_message_t state)
 			break;
 	}
 	mutex_unlock(&dpm_list_mtx);
-	async_synchronize_full();
+	async_synchronize_full_domain(&domain_pm);
 	if (!error)
 		error = async_error;
 	if (error) {
