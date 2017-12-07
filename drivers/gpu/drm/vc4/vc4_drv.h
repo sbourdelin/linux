@@ -11,6 +11,8 @@
 #include <drm/drm_encoder.h>
 #include <drm/drm_gem_cma_helper.h>
 
+#include "uapi/drm/vc4_drm.h"
+
 /* Don't forget to update vc4_bo.c: bo_type_names[] when adding to
  * this.
  */
@@ -27,6 +29,13 @@ enum vc4_kernel_bo_type {
 	VC4_BO_TYPE_BCL,
 	VC4_BO_TYPE_KERNEL_CACHE,
 	VC4_BO_TYPE_COUNT
+};
+
+struct vc4_perfmon {
+	refcount_t refcnt;
+	u8 ncounters;
+	u8 events[DRM_VC4_MAX_PERF_COUNTERS];
+	u64 counters[0];
 };
 
 struct vc4_dev {
@@ -158,6 +167,8 @@ struct vc4_dev {
 	} hangcheck;
 
 	struct semaphore async_modeset;
+
+	bool perfmon_active;
 };
 
 static inline struct vc4_dev *
@@ -410,6 +421,22 @@ struct vc4_exec_info {
 	void *uniforms_v;
 	uint32_t uniforms_p;
 	uint32_t uniforms_size;
+
+	/* Pointer to a performance monitor object if the user requested it,
+	 * NULL otherwise.
+	 */
+	struct vc4_perfmon *perfmon;
+};
+
+/*
+ * Per-open file private data. Any driver-specific resource that has to be
+ * released when the DRM file is closed should be placed here.
+ */
+struct vc4_file {
+	struct {
+		struct idr idr;
+		struct mutex lock;
+	} perfmon;
 };
 
 static inline struct vc4_exec_info *
@@ -650,3 +677,19 @@ bool vc4_check_tex_size(struct vc4_exec_info *exec,
 /* vc4_validate_shader.c */
 struct vc4_validated_shader_info *
 vc4_validate_shader(struct drm_gem_cma_object *shader_obj);
+
+/* vc4_perfmon.c */
+void vc4_perfmon_get(struct vc4_perfmon *perfmon);
+void vc4_perfmon_put(struct vc4_perfmon *perfmon);
+void vc4_perfmon_start(struct vc4_dev *vc4, struct vc4_perfmon *perfmon);
+void vc4_perfmon_stop(struct vc4_dev *vc4, struct vc4_perfmon *perfmon,
+		      bool capture);
+struct vc4_perfmon *vc4_perfmon_find(struct vc4_file *vc4file, int id);
+void vc4_perfmon_open_file(struct vc4_file *vc4file);
+void vc4_perfmon_close_file(struct vc4_file *vc4file);
+int vc4_perfmon_create_ioctl(struct drm_device *dev, void *data,
+			     struct drm_file *file_priv);
+int vc4_perfmon_destroy_ioctl(struct drm_device *dev, void *data,
+			      struct drm_file *file_priv);
+int vc4_perfmon_get_values_ioctl(struct drm_device *dev, void *data,
+				 struct drm_file *file_priv);

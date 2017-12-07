@@ -454,6 +454,8 @@ again:
 
 	vc4_flush_caches(dev);
 
+	vc4_perfmon_start(vc4, exec->perfmon);
+
 	/* Either put the job in the binner if it uses the binner, or
 	 * immediately move it to the to-be-rendered queue.
 	 */
@@ -646,11 +648,11 @@ vc4_queue_submit(struct drm_device *dev, struct vc4_exec_info *exec,
 
 	list_add_tail(&exec->head, &vc4->bin_job_list);
 
-	/* If no job was executing, kick ours off.  Otherwise, it'll
-	 * get started when the previous job's flush done interrupt
-	 * occurs.
+	/* If no job was executing and the previous job did not activate
+	 * the performance monitor, kick ours off.  Otherwise, it'll get
+	 * started when the previous job's flush/render done interrupt occurs.
 	 */
-	if (vc4_first_bin_job(vc4) == exec) {
+	if (vc4_first_bin_job(vc4) == exec && !vc4->perfmon_active) {
 		vc4_submit_next_bin_job(dev);
 		vc4_queue_hangcheck(dev);
 	}
@@ -913,6 +915,9 @@ vc4_complete_exec(struct drm_device *dev, struct vc4_exec_info *exec)
 	vc4->bin_alloc_used &= ~exec->bin_slots;
 	spin_unlock_irqrestore(&vc4->job_lock, irqflags);
 
+	/* Release the reference we had on the perf monitor. */
+	vc4_perfmon_put(exec->perfmon);
+
 	mutex_lock(&vc4->power_lock);
 	if (--vc4->power_refcount == 0) {
 		pm_runtime_mark_last_busy(&vc4->v3d->pdev->dev);
@@ -1050,7 +1055,8 @@ vc4_wait_bo_ioctl(struct drm_device *dev, void *data,
 }
 
 static int
-vc4_parse_cl_chunk(struct vc4_dev *vc4, struct vc4_exec_info *exec,
+vc4_parse_cl_chunk(struct vc4_dev *vc4, struct vc4_file *vc4file,
+		   struct vc4_exec_info *exec,
 		   const union drm_vc4_submit_cl_chunk *chunk)
 {
 	switch(chunk->dummy.type) {
@@ -1061,6 +1067,20 @@ vc4_parse_cl_chunk(struct vc4_dev *vc4, struct vc4_exec_info *exec,
 		 */
 		exec->args->bin_cl = chunk->bin.ptr;
 		exec->args->bin_cl_size = chunk->bin.size;
+		break;
+
+	case VC4_PERFMON_CHUNK:
+		if (chunk->perfmon.pad)
+			return -EINVAL;
+
+		if (exec->perfmon)
+			return -EINVAL;
+
+		exec->perfmon = vc4_perfmon_find(vc4file,
+						 chunk->perfmon.id);
+		if (!exec->perfmon)
+			return -EINVAL;
+
 		break;
 
 	default:
@@ -1087,6 +1107,7 @@ vc4_submit_cl_ioctl(struct drm_device *dev, void *data,
 		    struct drm_file *file_priv)
 {
 	struct vc4_dev *vc4 = to_vc4_dev(dev);
+	struct vc4_file *vc4file = file_priv->driver_priv;
 	struct drm_vc4_submit_cl *args = data;
 	struct vc4_exec_info *exec;
 	struct ww_acquire_ctx acquire_ctx;
@@ -1154,7 +1175,7 @@ vc4_submit_cl_ioctl(struct drm_device *dev, void *data,
 		exec->args->bin_cl = 0;
 		exec->args->bin_cl_size = 0;
 		for (i = 0; i < exec->nchunks; i++) {
-			ret = vc4_parse_cl_chunk(vc4, exec,
+			ret = vc4_parse_cl_chunk(vc4, vc4file, exec,
 						 &exec->chunks[i]);
 			if (ret)
 				goto fail;

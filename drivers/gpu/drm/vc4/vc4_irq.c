@@ -110,7 +110,9 @@ vc4_irq_finish_bin_job(struct drm_device *dev)
 		return;
 
 	vc4_move_job_to_render(dev, exec);
-	vc4_submit_next_bin_job(dev);
+
+	if (!exec->perfmon)
+		vc4_submit_next_bin_job(dev);
 }
 
 static void
@@ -122,6 +124,7 @@ vc4_cancel_bin_job(struct drm_device *dev)
 	if (!exec)
 		return;
 
+	vc4_perfmon_stop(vc4, exec->perfmon, false);
 	list_move_tail(&exec->head, &vc4->bin_job_list);
 	vc4_submit_next_bin_job(dev);
 }
@@ -134,6 +137,14 @@ vc4_irq_finish_render_job(struct drm_device *dev)
 
 	if (!exec)
 		return;
+
+	vc4_perfmon_stop(vc4, exec->perfmon, true);
+
+	/* perfmon may have stalled the binner, re-arm the dequeuing
+	 * logic.
+	 */
+	if (exec->perfmon)
+		vc4_submit_next_bin_job(dev);
 
 	vc4->finished_seqno++;
 	list_move_tail(&exec->head, &vc4->job_done_list);
