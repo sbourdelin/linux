@@ -153,7 +153,8 @@ int drm_mode_getconnector(struct drm_device *dev,
 struct drm_framebuffer *
 drm_internal_framebuffer_create(struct drm_device *dev,
 				const struct drm_mode_fb_cmd2 *r,
-				struct drm_file *file_priv);
+				struct drm_file *file_priv,
+				bool internal);
 void drm_framebuffer_free(struct kref *kref);
 int drm_framebuffer_check_src_coords(uint32_t src_x, uint32_t src_y,
 				     uint32_t src_w, uint32_t src_h,

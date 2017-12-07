@@ -262,7 +262,8 @@ static int framebuffer_check(struct drm_device *dev,
 struct drm_framebuffer *
 drm_internal_framebuffer_create(struct drm_device *dev,
 				const struct drm_mode_fb_cmd2 *r,
-				struct drm_file *file_priv)
+				struct drm_file *file_priv,
+				bool internal)
 {
 	struct drm_mode_config *config = &dev->mode_config;
 	struct drm_framebuffer *fb;
@@ -300,6 +301,8 @@ drm_internal_framebuffer_create(struct drm_device *dev,
 		return fb;
 	}
 
+	fb->internal = internal;
+
 	return fb;
 }
 
@@ -327,7 +330,7 @@ int drm_mode_addfb2(struct drm_device *dev,
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EINVAL;
 
-	fb = drm_internal_framebuffer_create(dev, r, file_priv);
+	fb = drm_internal_framebuffer_create(dev, r, file_priv, false);
 	if (IS_ERR(fb))
 		return PTR_ERR(fb);
 

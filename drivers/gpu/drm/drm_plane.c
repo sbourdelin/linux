@@ -757,7 +757,9 @@ static int drm_mode_cursor_universal(struct drm_crtc *crtc,
 	 */
 	if (req->flags & DRM_MODE_CURSOR_BO) {
 		if (req->handle) {
-			fb = drm_internal_framebuffer_create(dev, &fbreq, file_priv);
+			fb = drm_internal_framebuffer_create(dev, &fbreq,
+							     file_priv,
+							     true);
 			if (IS_ERR(fb)) {
 				DRM_DEBUG_KMS("failed to wrap cursor buffer in drm framebuffer\n");
 				return PTR_ERR(fb);

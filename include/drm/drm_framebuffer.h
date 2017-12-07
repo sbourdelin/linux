@@ -187,6 +187,11 @@ struct drm_framebuffer {
 	 */
 	int hot_y;
 	/**
+	 * @internal: Indicates the framebuffer was created internally and not
+	 * as the result of the drm_mode_fb_cmd* ioctl.
+	 */
+	bool internal;
+	/**
 	 * @filp_head: Placed on &drm_file.fbs, protected by &drm_file.fbs_lock.
 	 */
 	struct list_head filp_head;
