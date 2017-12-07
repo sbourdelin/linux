@@ -101,11 +101,18 @@ EXPORT_SYMBOL(drm_crtc_from_index);
  */
 int drm_crtc_force_disable(struct drm_crtc *crtc)
 {
+	struct drm_framebuffer *fb;
 	struct drm_mode_set set = {
 		.crtc = crtc,
 	};
 
 	WARN_ON(drm_drv_uses_atomic_modeset(crtc->dev));
+
+	if (crtc->cursor && crtc->cursor->fb && crtc->cursor->fb->internal) {
+		fb = crtc->cursor->fb;
+		drm_plane_force_disable(crtc->cursor);
+		drm_framebuffer_unreference(fb);
+	}
 
 	return drm_mode_set_config_internal(&set);
 }
