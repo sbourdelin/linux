@@ -18,6 +18,7 @@ config DRM_I915_WERROR
 config DRM_I915_DEBUG
         bool "Enable additional driver debugging"
         depends on DRM_I915
+	depends on FTRACE # for DRM_I915_TRACE_GEM
         select DEBUG_FS
         select PREEMPT_COUNT
         select I2C_CHARDEV
@@ -53,6 +54,7 @@ config DRM_I915_DEBUG_GEM
 
 config DRM_I915_TRACE_GEM
 	bool "Insert extra ftrace output from the GEM internals"
+	depends on FTRACE
 	select TRACING
 	default n
 	help
