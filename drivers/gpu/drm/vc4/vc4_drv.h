@@ -318,6 +318,8 @@ struct vc4_exec_info {
 
 	/* Kernel-space copy of the ioctl arguments */
 	struct drm_vc4_submit_cl *args;
+	uint32_t nchunks;
+	union drm_vc4_submit_cl_chunk *chunks;
 
 	/* This is the array of BOs that were looked up at the start of exec.
 	 * Command validation will use indices into this array.

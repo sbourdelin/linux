@@ -920,6 +920,7 @@ vc4_complete_exec(struct drm_device *dev, struct vc4_exec_info *exec)
 	}
 	mutex_unlock(&vc4->power_lock);
 
+	kfree(exec->chunks);
 	kfree(exec);
 }
 
@@ -1048,6 +1049,27 @@ vc4_wait_bo_ioctl(struct drm_device *dev, void *data,
 	return ret;
 }
 
+static int
+vc4_parse_cl_chunk(struct vc4_dev *vc4, struct vc4_exec_info *exec,
+		   const union drm_vc4_submit_cl_chunk *chunk)
+{
+	switch(chunk->dummy.type) {
+	case VC4_BIN_CL_CHUNK:
+		/* Update bin_cl related fields so that we don't have to patch
+		 * existing vc4_get_bcl() logic to support the BIN_CL
+		 * chunk.
+		 */
+		exec->args->bin_cl = chunk->bin.ptr;
+		exec->args->bin_cl_size = chunk->bin.size;
+		break;
+
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 /**
  * vc4_submit_cl_ioctl() - Submits a job (frame) to the VC4.
  * @dev: DRM device
@@ -1073,8 +1095,15 @@ vc4_submit_cl_ioctl(struct drm_device *dev, void *data,
 	if ((args->flags & ~(VC4_SUBMIT_CL_USE_CLEAR_COLOR |
 			     VC4_SUBMIT_CL_FIXED_RCL_ORDER |
 			     VC4_SUBMIT_CL_RCL_ORDER_INCREASING_X |
-			     VC4_SUBMIT_CL_RCL_ORDER_INCREASING_Y)) != 0) {
+			     VC4_SUBMIT_CL_RCL_ORDER_INCREASING_Y |
+			     VC4_SUBMIT_CL_EXTENDED)) != 0) {
 		DRM_DEBUG("Unknown flags: 0x%02x\n", args->flags);
+		return -EINVAL;
+	}
+
+	if ((args->flags & VC4_SUBMIT_CL_EXTENDED) &&
+	    !args->num_cl_chunks) {
+		DRM_DEBUG("CL_EXTENDED flag set but no chunks provided\n");
 		return -EINVAL;
 	}
 
@@ -1102,6 +1131,35 @@ vc4_submit_cl_ioctl(struct drm_device *dev, void *data,
 	ret = vc4_cl_lookup_bos(dev, file_priv, exec);
 	if (ret)
 		goto fail;
+
+	if (args->flags & VC4_SUBMIT_CL_EXTENDED) {
+		uint32_t i;
+
+		ret = -ENOMEM;
+		exec->nchunks = args->num_cl_chunks;
+		exec->chunks = kcalloc(exec->nchunks, sizeof(*exec->chunks),
+				       GFP_KERNEL);
+		if (!exec->chunks)
+			goto fail;
+
+		if (copy_from_user(exec->chunks,
+				   u64_to_user_ptr(args->cl_chunks),
+				   exec->nchunks *
+				   sizeof(*exec->chunks)))
+			goto fail;
+
+		/* Reset ->bin_cl fields so that if no BIN_CL chunk is
+		 * passed, vc4_get_bcl() is skipped.
+		 */
+		exec->args->bin_cl = 0;
+		exec->args->bin_cl_size = 0;
+		for (i = 0; i < exec->nchunks; i++) {
+			ret = vc4_parse_cl_chunk(vc4, exec,
+						 &exec->chunks[i]);
+			if (ret)
+				goto fail;
+		}
+	}
 
 	if (exec->args->bin_cl_size != 0) {
 		ret = vc4_get_bcl(dev, exec);

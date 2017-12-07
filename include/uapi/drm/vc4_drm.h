@@ -70,6 +70,50 @@ struct drm_vc4_submit_rcl_surface {
 };
 
 /**
+ * @VC4_BIN_CL_CHUNK: binner CL chunk
+ */
+enum {
+	VC4_BIN_CL_CHUNK,
+};
+
+/**
+ * struct drm_vc4_submit_cl_chunk - dummy chunk
+ * @type: extension type
+ * @pad: unused, should be set to zero
+ *
+ * Meant to be used for chunks that do not require extra parameters.
+ */
+struct drm_vc4_submit_cl_dummy_chunk {
+	__u32 type;
+	__u32 pad[3];
+};
+
+/**
+ * struct drm_vc4_submit_cl_bin_chunk - binner CL chunk
+ *
+ * @type: extention type, should be set to %VC4_BIN_CL_CHUNK
+ * @size: size in bytes of the binner CL
+ * @ptr: userspace pointer to the binner CL
+ */
+struct drm_vc4_submit_cl_bin_chunk {
+	__u32 type;
+	__u32 size;
+	__u64 ptr;
+};
+
+/**
+ * union drm_vc4_submit_cl_chunk - CL chunk
+ *
+ * CL chunks allow us to easily extend the set of arguments one can pass
+ * to the submit CL ioctl without having to add new ioctls/struct everytime
+ * we run out of free fields in the drm_vc4_submit_cl struct.
+ */
+union drm_vc4_submit_cl_chunk {
+	struct drm_vc4_submit_cl_dummy_chunk dummy;
+	struct drm_vc4_submit_cl_bin_chunk bin;
+};
+
+/**
  * struct drm_vc4_submit_cl - ioctl argument for submitting commands to the 3D
  * engine.
  *
@@ -83,14 +127,23 @@ struct drm_vc4_submit_rcl_surface {
  * BO.
  */
 struct drm_vc4_submit_cl {
-	/* Pointer to the binner command list.
-	 *
-	 * This is the first set of commands executed, which runs the
-	 * coordinate shader to determine where primitives land on the screen,
-	 * then writes out the state updates and draw calls necessary per tile
-	 * to the tile allocation BO.
-	 */
-	__u64 bin_cl;
+	union {
+		/* Pointer to the binner command list.
+		 *
+		 * This is the first set of commands executed, which runs the
+		 * coordinate shader to determine where primitives land on
+		 * the screen, then writes out the state updates and draw calls
+		 * necessary per tile to the tile allocation BO.
+		 */
+		__u64 bin_cl;
+
+		/* Pointer to an array of CL chunks.
+		 *
+		 * This is now the preferred way of passing optional attributes
+		 * when submitting a job.
+		 */
+		__u64 cl_chunks;
+	};
 
 	/* Pointer to the shader records.
 	 *
@@ -120,8 +173,14 @@ struct drm_vc4_submit_cl {
 	__u64 uniforms;
 	__u64 bo_handles;
 
-	/* Size in bytes of the binner command list. */
-	__u32 bin_cl_size;
+	union {
+		/* Size in bytes of the binner command list. */
+		__u32 bin_cl_size;
+
+		/* Number of entries in the CL extension array. */
+		__u32 num_cl_chunks;
+	};
+
 	/* Size in bytes of the set of shader records. */
 	__u32 shader_rec_size;
 	/* Number of shader records.
@@ -167,6 +226,7 @@ struct drm_vc4_submit_cl {
 #define VC4_SUBMIT_CL_FIXED_RCL_ORDER			(1 << 1)
 #define VC4_SUBMIT_CL_RCL_ORDER_INCREASING_X		(1 << 2)
 #define VC4_SUBMIT_CL_RCL_ORDER_INCREASING_Y		(1 << 3)
+#define VC4_SUBMIT_CL_EXTENDED				(1 << 4)
 	__u32 flags;
 
 	/* Returned value of the seqno of this render job (for the
@@ -308,6 +368,7 @@ struct drm_vc4_get_hang_state {
 #define DRM_VC4_PARAM_SUPPORTS_THREADED_FS	5
 #define DRM_VC4_PARAM_SUPPORTS_FIXED_RCL_ORDER	6
 #define DRM_VC4_PARAM_SUPPORTS_MADVISE		7
+#define DRM_VC4_PARAM_SUPPORTS_EXTENDED_CL	8
 
 struct drm_vc4_get_param {
 	__u32 param;
