@@ -208,8 +208,27 @@ static int sun4i_hdmi_get_modes(struct drm_connector *connector)
 	return ret;
 }
 
+static int sun4i_hdmi_mode_valid(struct drm_connector *connector,
+				 struct drm_display_mode *mode)
+{
+	struct sun4i_hdmi *hdmi = drm_connector_to_sun4i_hdmi(connector);
+	unsigned long rate = mode->clock * 1000;
+	long rounded_rate;
+
+	/* 165 MHz is the typical max pixelclock frequency for HDMI <= 1.2 */
+	if (rate > 165000000)
+		return MODE_CLOCK_HIGH;
+	rounded_rate = clk_round_rate(hdmi->tmds_clk, rate);
+	if (rounded_rate < rate)
+		return MODE_CLOCK_LOW;
+	if (rounded_rate > rate)
+		return MODE_CLOCK_HIGH;
+	return MODE_OK;
+}
+
 static const struct drm_connector_helper_funcs sun4i_hdmi_connector_helper_funcs = {
 	.get_modes	= sun4i_hdmi_get_modes,
+	.mode_valid	= sun4i_hdmi_mode_valid,
 };
 
 static enum drm_connector_status
