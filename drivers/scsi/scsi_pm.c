@@ -171,9 +171,11 @@ static int scsi_bus_resume_common(struct device *dev,
 static int scsi_bus_prepare(struct device *dev)
 {
 	if (scsi_is_sdev_device(dev)) {
-		/* sd probing uses async_schedule.  Wait until it finishes. */
-		async_synchronize_full_domain(&scsi_sd_probe_domain);
+		struct scsi_driver *drv = to_scsi_driver(dev->driver);
 
+		/* sd probing happens asynchronously. Wait until it finishes. */
+		if (drv->sync)
+			drv->sync(dev);
 	} else if (scsi_is_host_device(dev)) {
 		/* Wait until async scanning is finished */
 		scsi_complete_async_scans();

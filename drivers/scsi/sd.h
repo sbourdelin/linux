@@ -82,6 +82,7 @@ struct scsi_disk {
 	unsigned int	zones_optimal_nonseq;
 	unsigned int	zones_max_open;
 #endif
+	struct work_struct probe_work;
 	atomic_t	openers;
 	sector_t	capacity;	/* size in logical blocks */
 	u32		max_xfer_blocks;

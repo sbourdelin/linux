@@ -12,6 +12,7 @@ struct scsi_device;
 struct scsi_driver {
 	struct device_driver	gendrv;
 
+	void (*sync)(struct device *);
 	void (*rescan)(struct device *);
 	int (*init_command)(struct scsi_cmnd *);
 	void (*uninit_command)(struct scsi_cmnd *);

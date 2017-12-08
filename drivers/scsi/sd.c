@@ -112,6 +112,7 @@ static void sd_shutdown(struct device *);
 static int sd_suspend_system(struct device *);
 static int sd_suspend_runtime(struct device *);
 static int sd_resume(struct device *);
+static void sd_sync_probe_domain(struct device *dev);
 static void sd_rescan(struct device *);
 static int sd_init_command(struct scsi_cmnd *SCpnt);
 static void sd_uninit_command(struct scsi_cmnd *SCpnt);
@@ -564,6 +565,7 @@ static struct scsi_driver sd_template = {
 		.shutdown	= sd_shutdown,
 		.pm		= &sd_pm_ops,
 	},
+	.sync			= sd_sync_probe_domain,
 	.rescan			= sd_rescan,
 	.init_command		= sd_init_command,
 	.uninit_command		= sd_uninit_command,
@@ -3254,9 +3256,9 @@ static int sd_format_disk_name(char *prefix, int index, char *buf, int buflen)
 /*
  * The asynchronous part of sd_probe
  */
-static void sd_probe_async(void *data, async_cookie_t cookie)
+static void sd_probe_async(struct work_struct *work)
 {
-	struct scsi_disk *sdkp = data;
+	struct scsi_disk *sdkp = container_of(work, typeof(*sdkp), probe_work);
 	struct scsi_device *sdp;
 	struct gendisk *gd;
 	u32 index;
@@ -3359,6 +3361,8 @@ static int sd_probe(struct device *dev)
 	if (!sdkp)
 		goto out;
 
+	INIT_WORK(&sdkp->probe_work, sd_probe_async);
+
 	gd = alloc_disk(SD_MINORS);
 	if (!gd)
 		goto out_free;
@@ -3410,8 +3414,8 @@ static int sd_probe(struct device *dev)
 	get_device(dev);
 	dev_set_drvdata(dev, sdkp);
 
-	get_device(&sdkp->dev);	/* prevent release before async_schedule */
-	async_schedule_domain(sd_probe_async, sdkp, &scsi_sd_probe_domain);
+	get_device(&sdkp->dev);	/* prevent release before sd_probe_async() */
+	WARN_ON_ONCE(!queue_work(system_unbound_wq, &sdkp->probe_work));
 
 	return 0;
 
@@ -3426,6 +3430,18 @@ static int sd_probe(struct device *dev)
  out:
 	scsi_autopm_put_device(sdp);
 	return error;
+}
+
+static void sd_wait_for_probing(struct scsi_disk *sdkp)
+{
+	flush_work(&sdkp->probe_work);
+}
+
+static void sd_sync_probe_domain(struct device *dev)
+{
+	struct scsi_disk *sdkp = dev_get_drvdata(dev);
+
+	sd_wait_for_probing(sdkp);
 }
 
 /**
@@ -3449,7 +3465,7 @@ static int sd_remove(struct device *dev)
 	scsi_autopm_get_device(sdkp->device);
 
 	async_synchronize_full_domain(&scsi_sd_pm_domain);
-	async_synchronize_full_domain(&scsi_sd_probe_domain);
+	sd_wait_for_probing(sdkp);
 	device_del(&sdkp->dev);
 	del_gendisk(sdkp->disk);
 	sd_shutdown(dev);
