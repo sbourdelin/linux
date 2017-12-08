@@ -375,6 +375,8 @@ static inline bool __has_cursum_space(struct f2fs_journal *journal,
 #define F2FS_IOC_FSGETXATTR		FS_IOC_FSGETXATTR
 #define F2FS_IOC_FSSETXATTR		FS_IOC_FSSETXATTR
 
+#define F2FS_IOC_SET_DONTMOVE		_IO(F2FS_IOCTL_MAGIC, 13)
+
 struct f2fs_gc_range {
 	u32 sync;
 	u64 start;
@@ -1128,6 +1130,9 @@ struct f2fs_sb_info {
 
 	/* threshold for converting bg victims for fg */
 	u64 fggc_threshold;
+
+	/* threshold for dontmove gc trials */
+	u64 gc_dontmove;
 
 	/* maximum # of trials to find a victim segment for SSR and GC */
 	unsigned int max_victim_search;
@@ -2104,6 +2109,7 @@ enum {
 	FI_HOT_DATA,		/* indicate file is hot */
 	FI_EXTRA_ATTR,		/* indicate file has extra attribute */
 	FI_PROJ_INHERIT,	/* indicate file inherits projectid */
+	FI_DONTMOVE,		/* indicate file should not be gced */
 };
 
 static inline void __mark_inode_dirty_flag(struct inode *inode,
@@ -2117,6 +2123,7 @@ static inline void __mark_inode_dirty_flag(struct inode *inode,
 			return;
 	case FI_DATA_EXIST:
 	case FI_INLINE_DOTS:
+	case FI_DONTMOVE:
 		f2fs_mark_inode_dirty_sync(inode, true);
 	}
 }
@@ -2225,6 +2232,8 @@ static inline void get_inline_info(struct inode *inode, struct f2fs_inode *ri)
 		set_bit(FI_INLINE_DOTS, &fi->flags);
 	if (ri->i_inline & F2FS_EXTRA_ATTR)
 		set_bit(FI_EXTRA_ATTR, &fi->flags);
+	if (ri->i_inline & F2FS_DONTMOVE)
+		set_bit(FI_DONTMOVE, &fi->flags);
 }
 
 static inline void set_raw_inline(struct inode *inode, struct f2fs_inode *ri)
@@ -2243,6 +2252,8 @@ static inline void set_raw_inline(struct inode *inode, struct f2fs_inode *ri)
 		ri->i_inline |= F2FS_INLINE_DOTS;
 	if (is_inode_flag_set(inode, FI_EXTRA_ATTR))
 		ri->i_inline |= F2FS_EXTRA_ATTR;
+	if (is_inode_flag_set(inode, FI_DONTMOVE))
+		ri->i_inline |= F2FS_DONTMOVE;
 }
 
 static inline int f2fs_has_extra_attr(struct inode *inode)
@@ -2286,6 +2297,11 @@ static inline int f2fs_exist_data(struct inode *inode)
 static inline int f2fs_has_inline_dots(struct inode *inode)
 {
 	return is_inode_flag_set(inode, FI_INLINE_DOTS);
+}
+
+static inline bool f2fs_is_dontmove_file(struct inode *inode)
+{
+	return is_inode_flag_set(inode, FI_DONTMOVE);
 }
 
 static inline bool f2fs_is_atomic_file(struct inode *inode)
@@ -2503,6 +2519,7 @@ int truncate_hole(struct inode *inode, pgoff_t pg_start, pgoff_t pg_end);
 void truncate_data_blocks_range(struct dnode_of_data *dn, int count);
 long f2fs_ioctl(struct file *filp, unsigned int cmd, unsigned long arg);
 long f2fs_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+int f2fs_dontmove_control(struct inode *inode, bool inc);
 
 /*
  * inode.c
