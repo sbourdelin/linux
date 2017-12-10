@@ -1219,29 +1219,10 @@ static void ti_bulk_in_callback(struct urb *urb)
 
 	switch (status) {
 	case 0:
-		break;
-	case -ECONNRESET:
-	case -ENOENT:
-	case -ESHUTDOWN:
-		dev_dbg(dev, "%s - urb shutting down, %d\n", __func__, status);
-		return;
-	default:
-		dev_err(dev, "%s - nonzero urb status, %d\n",
-			__func__, status);
-	}
-
-	if (status == -EPIPE)
-		goto exit;
-
-	if (status) {
-		dev_err(dev, "%s - stopping read!\n", __func__);
-		return;
-	}
-
-	if (urb->actual_length) {
+		if (!urb->actual_length)
+			break;
 		usb_serial_debug_data(dev, __func__, urb->actual_length,
 				      urb->transfer_buffer);
-
 		if (!tport->tp_is_open)
 			dev_dbg(dev, "%s - port closed, dropping data\n",
 				__func__);
@@ -1250,9 +1231,20 @@ static void ti_bulk_in_callback(struct urb *urb)
 		spin_lock(&tport->tp_lock);
 		port->icount.rx += urb->actual_length;
 		spin_unlock(&tport->tp_lock);
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		dev_dbg(dev, "%s - urb shutting down, %d\n", __func__, status);
+		return;
+	case -EPIPE:
+		break;
+	default:
+		dev_err(dev, "%s - nonzero urb status, %d\n",
+			__func__, status);
+		return;
 	}
 
-exit:
 	/* continue to read unless stopping */
 	spin_lock(&tport->tp_lock);
 	if (tport->tp_read_urb_state == TI_READ_URB_RUNNING)
