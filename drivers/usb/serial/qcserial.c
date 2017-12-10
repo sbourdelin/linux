@@ -26,6 +26,7 @@ enum qcserial_layouts {
 	QCSERIAL_G1K = 1,	/* Gobi 1000 */
 	QCSERIAL_SWI = 2,	/* Sierra Wireless */
 	QCSERIAL_HWI = 3,	/* Huawei */
+	QCSERIAL_SW2 = 4,	/* SWI with sendsetup for GPS port */
 };
 
 #define DEVICE_G1K(v, p) \
@@ -34,6 +35,8 @@ enum qcserial_layouts {
 	USB_DEVICE(v, p), .driver_info = QCSERIAL_SWI
 #define DEVICE_HWI(v, p) \
 	USB_DEVICE(v, p), .driver_info = QCSERIAL_HWI
+#define DEVICE_SW2(v, p) \
+	USB_DEVICE(v, p), .driver_info = QCSERIAL_SW2
 
 static const struct usb_device_id id_table[] = {
 	/* Gobi 1000 devices */
@@ -162,6 +165,8 @@ static const struct usb_device_id id_table[] = {
 	{DEVICE_SWI(0x1199, 0x9079)},	/* Sierra Wireless EM74xx */
 	{DEVICE_SWI(0x1199, 0x907a)},	/* Sierra Wireless EM74xx QDL */
 	{DEVICE_SWI(0x1199, 0x907b)},	/* Sierra Wireless EM74xx */
+	{DEVICE_SWI(0x1199, 0x9090)},	/* Sierra Wireless EM7565 QDL */
+	{DEVICE_SW2(0x1199, 0x9091)},	/* Sierra Wireless EM7565 */
 	{DEVICE_SWI(0x413c, 0x81a2)},	/* Dell Wireless 5806 Gobi(TM) 4G LTE Mobile Broadband Card */
 	{DEVICE_SWI(0x413c, 0x81a3)},	/* Dell Wireless 5570 HSPA+ (42Mbps) Mobile Broadband Card */
 	{DEVICE_SWI(0x413c, 0x81a4)},	/* Dell Wireless 5570e HSPA+ (42Mbps) Mobile Broadband Card */
@@ -329,6 +334,7 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 		}
 		break;
 	case QCSERIAL_SWI:
+	case QCSERIAL_SW2:
 		/*
 		 * Sierra Wireless layout:
 		 * 0: DM/DIAG (use libqcdm from ModemManager for communication)
@@ -342,6 +348,8 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 			break;
 		case 2:
 			dev_dbg(dev, "NMEA GPS interface found\n");
+			if (id->driver_info == QCSERIAL_SW2)
+				sendsetup = true;
 			break;
 		case 3:
 			dev_dbg(dev, "Modem port found\n");
