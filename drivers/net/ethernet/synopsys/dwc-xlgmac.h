@@ -106,7 +106,7 @@
 #define XLGMAC_GET_REG_BITS_LE(var, pos, len) ({			\
 	typeof(pos) _pos = (pos);					\
 	typeof(len) _len = (len);					\
-	typeof(var) _var = le32_to_cpu((var));				\
+	u32 _var = le32_to_cpu((var));				\
 	((_var) & GENMASK(_pos + _len - 1, _pos)) >> (_pos);		\
 })
 
@@ -125,8 +125,8 @@
 	typeof(len) _len = (len);					\
 	typeof(val) _val = (val);					\
 	_val = (_val << _pos) & GENMASK(_pos + _len - 1, _pos);		\
-	_var = (_var & ~GENMASK(_pos + _len - 1, _pos)) | _val;		\
-	cpu_to_le32(_var);						\
+	(_var & ~cpu_to_le32(GENMASK(_pos + _len - 1, _pos))) | 	\
+		cpu_to_le32(_val);					\
 })
 
 struct xlgmac_pdata;
