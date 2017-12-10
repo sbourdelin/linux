@@ -7265,10 +7265,13 @@ static int complete_emulated_mmio(struct kvm_vcpu *vcpu)
 
 int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 {
-	struct fpu *fpu = &current->thread.fpu;
+	struct fpu *fpu = &vcpu->arch.user_fpu;
 	int r;
 
-	fpu__initialize(fpu);
+	if (!fpu->initialized) {
+		fpstate_init(&vcpu->arch.user_fpu.state);
+		fpu->initialized = 1;
+	}
 
 	kvm_sigset_activate(vcpu);
 
