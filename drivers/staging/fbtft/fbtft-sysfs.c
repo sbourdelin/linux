@@ -197,19 +197,18 @@ static ssize_t show_debug(struct device *device,
 	return snprintf(buf, PAGE_SIZE, "%lu\n", par->debug);
 }
 
-static struct device_attribute debug_device_attr =
-	__ATTR(debug, 0660, show_debug, store_debug);
+static DEVICE_ATTR(debug, 0660, show_debug, store_debug);
 
 void fbtft_sysfs_init(struct fbtft_par *par)
 {
-	device_create_file(par->info->dev, &debug_device_attr);
+	device_create_file(par->info->dev, &dev_attr_debug);
 	if (par->gamma.curves && par->fbtftops.set_gamma)
 		device_create_file(par->info->dev, &gamma_device_attrs[0]);
 }
 
 void fbtft_sysfs_exit(struct fbtft_par *par)
 {
-	device_remove_file(par->info->dev, &debug_device_attr);
+	device_remove_file(par->info->dev, &dev_attr_debug);
 	if (par->gamma.curves && par->fbtftops.set_gamma)
 		device_remove_file(par->info->dev, &gamma_device_attrs[0]);
 }
