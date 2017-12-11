@@ -144,11 +144,21 @@ EXPORT_SYMBOL_GPL(xfrm_dev_offload_ok);
 
 static int xfrm_dev_register(struct net_device *dev)
 {
-	if ((dev->features & NETIF_F_HW_ESP) && !dev->xfrmdev_ops)
+	if (!(dev->features & NETIF_F_HW_ESP)) {
+		if (dev->features & NETIF_F_HW_ESP_TX_CSUM) {
+			netdev_err(dev, "NETIF_F_HW_ESP_TX_CSUM without NETIF_F_HW_ESP\n");
+			return NOTIFY_BAD;
+		} else {
+			return NOTIFY_DONE;
+		}
+	}
+
+	if (!(dev->xfrmdev_ops &&
+	      dev->xfrmdev_ops->xdo_dev_state_add &&
+	      dev->xfrmdev_ops->xdo_dev_state_delete)) {
+		netdev_err(dev, "add or delete function missing from xfrmdev_ops\n");
 		return NOTIFY_BAD;
-	if ((dev->features & NETIF_F_HW_ESP_TX_CSUM) &&
-	    !(dev->features & NETIF_F_HW_ESP))
-		return NOTIFY_BAD;
+	}
 
 	return NOTIFY_DONE;
 }
