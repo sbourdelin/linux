@@ -19,6 +19,8 @@ enum {
 	ILA_ATTR_CSUM_MODE,			/* u8 */
 	ILA_ATTR_IDENT_TYPE,			/* u8 */
 	ILA_ATTR_HOOK_TYPE,			/* u8 */
+	ILA_RSLV_ATTR_DST,			/* IPv6 address */
+	ILA_RSLV_ATTR_TIMEOUT,			/* u32 */
 
 	__ILA_ATTR_MAX,
 };
@@ -31,6 +33,10 @@ enum {
 	ILA_CMD_DEL,
 	ILA_CMD_GET,
 	ILA_CMD_FLUSH,
+	ILA_RSLV_CMD_ADD,
+	ILA_RSLV_CMD_DEL,
+	ILA_RSLV_CMD_GET,
+	ILA_RSLV_CMD_FLUSH,
 
 	__ILA_CMD_MAX,
 };
@@ -68,10 +74,15 @@ enum {
 enum {
 	ILA_NOTIFY_ATTR_UNSPEC,
 	ILA_NOTIFY_ATTR_TIMEOUT,		/* u32 */
+	ILA_NOTIFY_ATTR_DST,			/* Binary address */
 
 	__ILA_NOTIFY_ATTR_MAX,
 };
 
 #define ILA_NOTIFY_ATTR_MAX	(__ILA_NOTIFY_ATTR_MAX - 1)
+
+/* NETLINK_GENERIC related info */
+#define ILA_RSLV_GENL_NAME	"ila-rslv"
+#define ILA_RSLV_GENL_VERSION	0x1
 
 #endif /* _UAPI_LINUX_ILA_H */

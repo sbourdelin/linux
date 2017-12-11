@@ -40,6 +40,32 @@ static const struct genl_ops ila_nl_ops[] = {
 		.done = ila_xlat_nl_dump_done,
 		.policy = ila_nl_policy,
 	},
+	{
+		.cmd = ILA_RSLV_CMD_ADD,
+		.doit = ila_rslv_nl_cmd_add,
+		.policy = ila_nl_policy,
+		.flags = GENL_ADMIN_PERM,
+	},
+	{
+		.cmd = ILA_RSLV_CMD_DEL,
+		.doit = ila_rslv_nl_cmd_del,
+		.policy = ila_nl_policy,
+		.flags = GENL_ADMIN_PERM,
+	},
+	{
+		.cmd = ILA_RSLV_CMD_FLUSH,
+		.doit = ila_rslv_nl_cmd_flush,
+		.policy = ila_nl_policy,
+		.flags = GENL_ADMIN_PERM,
+	},
+	{
+		.cmd = ILA_RSLV_CMD_GET,
+		.doit = ila_rslv_nl_cmd_get,
+		.start = ila_rslv_nl_dump_start,
+		.dumpit = ila_rslv_nl_dump,
+		.done = ila_rslv_nl_dump_done,
+		.policy = ila_nl_policy,
+	},
 };
 
 unsigned int ila_net_id;

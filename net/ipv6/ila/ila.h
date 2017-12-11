@@ -137,6 +137,14 @@ int ila_xlat_nl_dump_start(struct netlink_callback *cb);
 int ila_xlat_nl_dump_done(struct netlink_callback *cb);
 int ila_xlat_nl_dump(struct sk_buff *skb, struct netlink_callback *cb);
 
+int ila_rslv_nl_cmd_add(struct sk_buff *skb, struct genl_info *info);
+int ila_rslv_nl_cmd_del(struct sk_buff *skb, struct genl_info *info);
+int ila_rslv_nl_cmd_get(struct sk_buff *skb, struct genl_info *info);
+int ila_rslv_nl_cmd_flush(struct sk_buff *skb, struct genl_info *info);
+int ila_rslv_nl_dump_start(struct netlink_callback *cb);
+int ila_rslv_nl_dump_done(struct netlink_callback *cb);
+int ila_rslv_nl_dump(struct sk_buff *skb, struct netlink_callback *cb);
+
 extern unsigned int ila_net_id;
 
 extern struct genl_family ila_nl_family;

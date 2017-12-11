@@ -209,6 +209,13 @@ static const struct lwtunnel_encap_ops ila_rslv_ops = {
 
 #define ILA_MAX_SIZE 8192
 
+static struct net_rslv_netlink_map ila_netlink_map = {
+	.dst_attr = ILA_RSLV_ATTR_DST,
+	.timo_attr = ILA_RSLV_ATTR_TIMEOUT,
+	.get_cmd = ILA_RSLV_CMD_GET,
+	.genl_family = &ila_nl_family,
+};
+
 int ila_rslv_init_net(struct net *net)
 {
 	struct ila_net *ilan = net_generic(net, ila_net_id);
@@ -216,7 +223,7 @@ int ila_rslv_init_net(struct net *net)
 
 	nrslv = net_rslv_create(sizeof(struct ila_addr),
 				sizeof(struct ila_addr), ILA_MAX_SIZE, NULL,
-				NULL);
+				&ila_netlink_map);
 
 	if (IS_ERR(nrslv))
 		return PTR_ERR(nrslv);
@@ -232,6 +239,64 @@ void ila_rslv_exit_net(struct net *net)
 
 	if (ilan->rslv.nrslv)
 		net_rslv_destroy(ilan->rslv.nrslv);
+}
+
+/* Netlink access */
+
+int ila_rslv_nl_cmd_add(struct sk_buff *skb, struct genl_info *info)
+{
+	struct net *net = sock_net(skb->sk);
+	struct ila_net *ilan = net_generic(net, ila_net_id);
+
+	return net_rslv_nl_cmd_add(ilan->rslv.nrslv, skb, info);
+}
+
+int ila_rslv_nl_cmd_del(struct sk_buff *skb, struct genl_info *info)
+{
+	struct net *net = sock_net(skb->sk);
+	struct ila_net *ilan = net_generic(net, ila_net_id);
+
+	return net_rslv_nl_cmd_del(ilan->rslv.nrslv, skb, info);
+}
+
+int ila_rslv_nl_cmd_get(struct sk_buff *skb, struct genl_info *info)
+{
+	struct net *net = sock_net(skb->sk);
+	struct ila_net *ilan = net_generic(net, ila_net_id);
+
+	return net_rslv_nl_cmd_get(ilan->rslv.nrslv, skb, info);
+}
+
+int ila_rslv_nl_cmd_flush(struct sk_buff *skb, struct genl_info *info)
+{
+	struct net *net = sock_net(skb->sk);
+	struct ila_net *ilan = net_generic(net, ila_net_id);
+
+	return net_rslv_nl_cmd_flush(ilan->rslv.nrslv, skb, info);
+}
+
+int ila_rslv_nl_dump_start(struct netlink_callback *cb)
+{
+	struct net *net = sock_net(cb->skb->sk);
+	struct ila_net *ilan = net_generic(net, ila_net_id);
+
+	return net_rslv_nl_dump_start(ilan->rslv.nrslv, cb);
+}
+
+int ila_rslv_nl_dump_done(struct netlink_callback *cb)
+{
+	struct net *net = sock_net(cb->skb->sk);
+	struct ila_net *ilan = net_generic(net, ila_net_id);
+
+	return net_rslv_nl_dump_done(ilan->rslv.nrslv, cb);
+}
+
+int ila_rslv_nl_dump(struct sk_buff *skb, struct netlink_callback *cb)
+{
+	struct net *net = sock_net(cb->skb->sk);
+	struct ila_net *ilan = net_generic(net, ila_net_id);
+
+	return net_rslv_nl_dump(ilan->rslv.nrslv, skb, cb);
 }
 
 int ila_rslv_init(void)
