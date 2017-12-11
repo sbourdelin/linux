@@ -275,11 +275,7 @@ static struct tap_queue *tap_get_queue(struct tap_dev *tap,
 
 	if (likely(skb_rx_queue_recorded(skb))) {
 		rxq = skb_get_rx_queue(skb);
-
-		while (unlikely(rxq >= numvtaps))
-			rxq -= numvtaps;
-
-		queue = rcu_dereference(tap->taps[rxq]);
+		queue = rcu_dereference(tap->taps[rxq % numvtaps]);
 		goto out;
 	}
 
