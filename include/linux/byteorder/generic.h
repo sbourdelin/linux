@@ -187,4 +187,26 @@ static inline void be32_to_cpu_array(u32 *dst, const __be32 *src, size_t len)
 		dst[i] = be32_to_cpu(src[i]);
 }
 
+#define ____MASK(bit, nbits) ((((1ULL << ((nbits) - 1)) << 1) - 1) << (bit))
+#define ____MAKE_OP(type,base)						\
+static inline __##type type##_replace_bits(__##type old,		\
+					base val, int bit, int nbits)	\
+{									\
+	__##type mask = cpu_to_##type(____MASK(bit, nbits));		\
+	return (old & ~mask) | (cpu_to_##type(val << bit) & mask);	\
+}									\
+static inline base type##_get_bits(__##type val, int bit, int nbits)	\
+{									\
+	return (type##_to_cpu(val) >> bit) & ____MASK(0, nbits);	\
+}
+
+____MAKE_OP(le16,u16)
+____MAKE_OP(le32,u32)
+____MAKE_OP(le64,u64)
+____MAKE_OP(be16,u16)
+____MAKE_OP(be32,u32)
+____MAKE_OP(be64,u64)
+#undef ____MAKE_OP
+#undef ____MASK
+
 #endif /* _LINUX_BYTEORDER_GENERIC_H */
