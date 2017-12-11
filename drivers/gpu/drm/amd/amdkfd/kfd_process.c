@@ -282,6 +282,7 @@ static struct kfd_process *create_process(const struct task_struct *thread)
 	process->mm = thread->mm;
 
 	/* register notifier */
+	process->mmu_notifier.flags = 0;
 	process->mmu_notifier.ops = &kfd_process_mmu_notifier_ops;
 	err = __mmu_notifier_register(&process->mmu_notifier, process->mm);
 	if (err)

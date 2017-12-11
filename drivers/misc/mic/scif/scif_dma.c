@@ -249,6 +249,7 @@ static void scif_init_mmu_notifier(struct scif_mmu_notif *mmn,
 {
 	mmn->ep = ep;
 	mmn->mm = mm;
+	mmn->ep_mmu_notifier.flags = MMU_INVALIDATE_MAY_BLOCK;
 	mmn->ep_mmu_notifier.ops = &scif_mmu_notifier_ops;
 	INIT_LIST_HEAD(&mmn->list);
 	INIT_LIST_HEAD(&mmn->tc_reg_list);

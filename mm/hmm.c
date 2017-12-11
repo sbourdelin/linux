@@ -104,6 +104,7 @@ static struct hmm *hmm_register(struct mm_struct *mm)
 	 * We should only get here if hold the mmap_sem in write mode ie on
 	 * registration of first mirror through hmm_mirror_register()
 	 */
+	hmm->mmu_notifier.flags = MMU_INVALIDATE_MAY_BLOCK;
 	hmm->mmu_notifier.ops = &hmm_mmu_notifier_ops;
 	if (__mmu_notifier_register(&hmm->mmu_notifier, mm)) {
 		kfree(hmm);

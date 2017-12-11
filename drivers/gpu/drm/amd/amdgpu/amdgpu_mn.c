@@ -276,6 +276,7 @@ struct amdgpu_mn *amdgpu_mn_get(struct amdgpu_device *adev)
 
 	rmn->adev = adev;
 	rmn->mm = mm;
+	rmn->mn.flags = MMU_INVALIDATE_MAY_BLOCK;
 	rmn->mn.ops = &amdgpu_mn_ops;
 	init_rwsem(&rmn->lock);
 	rmn->objects = RB_ROOT_CACHED;

@@ -170,6 +170,7 @@ i915_mmu_notifier_create(struct mm_struct *mm)
 		return ERR_PTR(-ENOMEM);
 
 	spin_lock_init(&mn->lock);
+	mn->mn.flags = MMU_INVALIDATE_MAY_BLOCK;
 	mn->mn.ops = &i915_gem_userptr_notifier;
 	mn->objects = RB_ROOT_CACHED;
 	mn->wq = alloc_workqueue("i915-userptr-release",

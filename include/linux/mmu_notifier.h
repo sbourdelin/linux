@@ -10,6 +10,9 @@
 struct mmu_notifier;
 struct mmu_notifier_ops;
 
+/* This mmu notifier's invalidate_{start,end}() callbacks may block */
+#define MMU_INVALIDATE_MAY_BLOCK	(0x01)
+
 #ifdef CONFIG_MMU_NOTIFIER
 
 /*
@@ -137,6 +140,9 @@ struct mmu_notifier_ops {
 	 * page. Pages will no longer be referenced by the linux
 	 * address space but may still be referenced by sptes until
 	 * the last refcount is dropped.
+	 *
+	 * If either of these callbacks can block, the mmu_notifier.flags
+	 * must have MMU_INVALIDATE_MAY_BLOCK set.
 	 */
 	void (*invalidate_range_start)(struct mmu_notifier *mn,
 				       struct mm_struct *mm,
@@ -182,6 +188,7 @@ struct mmu_notifier_ops {
  * 3. No other concurrent thread can access the list (release)
  */
 struct mmu_notifier {
+	int flags;
 	struct hlist_node hlist;
 	const struct mmu_notifier_ops *ops;
 };
@@ -218,6 +225,7 @@ extern void __mmu_notifier_invalidate_range_end(struct mm_struct *mm,
 				  bool only_end);
 extern void __mmu_notifier_invalidate_range(struct mm_struct *mm,
 				  unsigned long start, unsigned long end);
+extern int mm_has_blockable_invalidate_notifiers(struct mm_struct *mm);
 
 static inline void mmu_notifier_release(struct mm_struct *mm)
 {
@@ -455,6 +463,11 @@ static inline void mmu_notifier_invalidate_range_only_end(struct mm_struct *mm,
 static inline void mmu_notifier_invalidate_range(struct mm_struct *mm,
 				  unsigned long start, unsigned long end)
 {
+}
+
+static inline int mm_has_blockable_invalidate_notifiers(struct mm_struct *mm)
+{
+	return 0;
 }
 
 static inline void mmu_notifier_mm_init(struct mm_struct *mm)

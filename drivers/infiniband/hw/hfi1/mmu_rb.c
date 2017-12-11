@@ -110,6 +110,7 @@ int hfi1_mmu_rb_register(void *ops_arg, struct mm_struct *mm,
 	handlr->ops_arg = ops_arg;
 	INIT_HLIST_NODE(&handlr->mn.hlist);
 	spin_lock_init(&handlr->lock);
+	handlr->mn.flags = 0;
 	handlr->mn.ops = &mn_opts;
 	handlr->mm = mm;
 	INIT_WORK(&handlr->del_work, handle_remove);

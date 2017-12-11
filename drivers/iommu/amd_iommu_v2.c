@@ -671,6 +671,7 @@ int amd_iommu_bind_pasid(struct pci_dev *pdev, int pasid,
 	pasid_state->pasid        = pasid;
 	pasid_state->invalid      = true; /* Mark as valid only if we are
 					     done with setting up the pasid */
+	pasid_state->mn.flags     = 0;
 	pasid_state->mn.ops       = &iommu_mn;
 
 	if (pasid_state->mm == NULL)

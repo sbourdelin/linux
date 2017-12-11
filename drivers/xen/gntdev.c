@@ -539,6 +539,7 @@ static int gntdev_open(struct inode *inode, struct file *flip)
 			kfree(priv);
 			return -ENOMEM;
 		}
+		priv->mn.flags = MMU_INVALIDATE_MAY_BLOCK;
 		priv->mn.ops = &gntdev_mmu_ops;
 		ret = mmu_notifier_register(&priv->mn, priv->mm);
 		mmput(priv->mm);

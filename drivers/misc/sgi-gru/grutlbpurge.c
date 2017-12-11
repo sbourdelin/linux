@@ -298,6 +298,7 @@ struct gru_mm_struct *gru_register_mmu_notifier(void)
 			return ERR_PTR(-ENOMEM);
 		STAT(gms_alloc);
 		spin_lock_init(&gms->ms_asid_lock);
+		gms->ms_notifier.flags = 0;
 		gms->ms_notifier.ops = &gru_mmuops;
 		atomic_set(&gms->ms_refcnt, 1);
 		init_waitqueue_head(&gms->ms_wait_queue);

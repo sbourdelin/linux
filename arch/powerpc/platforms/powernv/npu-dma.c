@@ -710,6 +710,7 @@ struct npu_context *pnv_npu2_init_context(struct pci_dev *gpdev,
 
 		mm->context.npu_context = npu_context;
 		npu_context->mm = mm;
+		npu_content->mn.flags = MMU_INVALIDATE_MAY_BLOCK;
 		npu_context->mn.ops = &nv_nmmu_notifier_ops;
 		__mmu_notifier_register(&npu_context->mn, mm);
 		kref_init(&npu_context->kref);

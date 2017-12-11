@@ -411,6 +411,7 @@ int ib_umem_odp_get(struct ib_ucontext *context, struct ib_umem *umem,
 		 */
 		atomic_set(&context->notifier_count, 0);
 		INIT_HLIST_NODE(&context->mn.hlist);
+		context->mn.flags = MMU_INVALIDATE_MAY_BLOCK;
 		context->mn.ops = &ib_umem_notifiers;
 		/*
 		 * Lock-dep detects a false positive for mmap_sem vs.
