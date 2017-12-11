@@ -15,6 +15,7 @@
 #include <linux/ip.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/rhashtable.h>
 #include <linux/socket.h>
 #include <linux/skbuff.h>
 #include <linux/types.h>
@@ -112,6 +113,9 @@ struct ila_net {
 		unsigned int locks_mask;
 		bool hooks_registered;
 	} xlat;
+	struct {
+		struct net_rslv *nrslv;
+	} rslv;
 };
 
 int ila_lwt_init(void);
@@ -119,6 +123,11 @@ void ila_lwt_fini(void);
 
 int ila_xlat_init_net(struct net *net);
 void ila_xlat_exit_net(struct net *net);
+
+int ila_rslv_init(void);
+void ila_rslv_fini(void);
+int ila_rslv_init_net(struct net *net);
+void ila_rslv_exit_net(struct net *net);
 
 int ila_xlat_nl_cmd_add_mapping(struct sk_buff *skb, struct genl_info *info);
 int ila_xlat_nl_cmd_del_mapping(struct sk_buff *skb, struct genl_info *info);
@@ -131,5 +140,7 @@ int ila_xlat_nl_dump(struct sk_buff *skb, struct netlink_callback *cb);
 extern unsigned int ila_net_id;
 
 extern struct genl_family ila_nl_family;
+
+void ila_rslv_resolved(struct ila_net *ilan, struct ila_addr *iaddr);
 
 #endif /* __ILA_H */

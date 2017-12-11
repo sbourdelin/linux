@@ -64,14 +64,21 @@ static __net_init int ila_init_net(struct net *net)
 	if (err)
 		goto ila_xlat_init_fail;
 
+	err = ila_rslv_init_net(net);
+	if (err)
+		goto resolver_init_fail;
+
 	return 0;
 
 ila_xlat_init_fail:
+	ila_xlat_exit_net(net);
+resolver_init_fail:
 	return err;
 }
 
 static __net_exit void ila_exit_net(struct net *net)
 {
+	ila_rslv_exit_net(net);
 	ila_xlat_exit_net(net);
 }
 
@@ -98,8 +105,14 @@ static int __init ila_init(void)
 	if (ret)
 		goto fail_lwt;
 
+	ret = ila_rslv_init();
+	if (ret)
+		goto fail_rslv;
+
 	return 0;
 
+fail_rslv:
+	ila_lwt_fini();
 fail_lwt:
 	genl_unregister_family(&ila_nl_family);
 register_family_fail:
@@ -110,6 +123,7 @@ register_device_fail:
 
 static void __exit ila_fini(void)
 {
+	ila_rslv_fini();
 	ila_lwt_fini();
 	genl_unregister_family(&ila_nl_family);
 	unregister_pernet_device(&ila_net_ops);

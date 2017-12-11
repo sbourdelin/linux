@@ -46,6 +46,8 @@ static const char *lwtunnel_encap_str(enum lwtunnel_encap_types encap_type)
 		return "BPF";
 	case LWTUNNEL_ENCAP_SEG6_LOCAL:
 		return "SEG6LOCAL";
+	case LWTUNNEL_ENCAP_ILA_NOTIFY:
+		return "ILA-NOTIFY";
 	case LWTUNNEL_ENCAP_IP6:
 	case LWTUNNEL_ENCAP_IP:
 	case LWTUNNEL_ENCAP_NONE:
