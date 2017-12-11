@@ -1,0 +1,7 @@
+#
+# Net resolver configuration
+#
+
+menuconfig NET_RESOLVER
+        tristate
+	default n
