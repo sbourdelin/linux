@@ -3339,6 +3339,16 @@ static void igb_remove(struct pci_dev *pdev)
 
 	unregister_netdev(netdev);
 
+	/* If the PCI device has already been physically removed (e.g. user
+	 * unplugged a thunderbolt dock containing our hw) then the netif will
+	 * already be down, so unregistering the netdev won't free the IRQs
+	 */
+	if (!pci_device_is_present(pdev)) {
+		igb_free_irq(adapter);
+		igb_free_all_tx_resources(adapter);
+		igb_free_all_rx_resources(adapter);
+	}
+
 	igb_clear_interrupt_scheme(adapter);
 
 	pci_iounmap(pdev, adapter->io_addr);
