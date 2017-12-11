@@ -344,6 +344,13 @@ static int hw_atl_a0_hw_init(struct aq_hw_s *self,
 	hw_atl_a0_hw_rss_set(self, &aq_nic_cfg->aq_rss);
 	hw_atl_a0_hw_rss_hash_set(self, &aq_nic_cfg->aq_rss);
 
+	/* Read initial hardware counters
+	 * and reset current in-driver statistics
+	 */
+	hw_atl_utils_update_stats(self);
+	memset(&PHAL_ATLANTIC_A0->curr_stats, 0,
+	       sizeof(PHAL_ATLANTIC_A0->curr_stats));
+
 	err = aq_hw_err_from_flags(self);
 	if (err < 0)
 		goto err_exit;

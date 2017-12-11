@@ -397,6 +397,13 @@ static int hw_atl_b0_hw_init(struct aq_hw_s *self,
 	 */
 	aq_hw_write_reg(self, tx_dma_total_req_limit_adr, 24);
 
+	/* Read initial hardware counters
+	 * and reset current in-driver statistics
+	 */
+	hw_atl_utils_update_stats(self);
+	memset(&PHAL_ATLANTIC_B0->curr_stats, 0,
+	       sizeof(PHAL_ATLANTIC_B0->curr_stats));
+
 	err = aq_hw_err_from_flags(self);
 	if (err < 0)
 		goto err_exit;
