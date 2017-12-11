@@ -215,7 +215,8 @@ int ila_rslv_init_net(struct net *net)
 	struct net_rslv *nrslv;
 
 	nrslv = net_rslv_create(sizeof(struct ila_addr),
-				sizeof(struct ila_addr), ILA_MAX_SIZE, NULL);
+				sizeof(struct ila_addr), ILA_MAX_SIZE, NULL,
+				NULL);
 
 	if (IS_ERR(nrslv))
 		return PTR_ERR(nrslv);
