@@ -566,7 +566,7 @@ int iscsi_copy_param_list(
 {
 	struct iscsi_param *param = NULL;
 	struct iscsi_param *new_param = NULL;
-	struct iscsi_param_list *param_list = NULL;
+	struct iscsi_param_list *param_list;
 
 	param_list = kzalloc(sizeof(struct iscsi_param_list), GFP_KERNEL);
 	if (!param_list)
