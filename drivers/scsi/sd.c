@@ -619,10 +619,12 @@ static struct scsi_disk *scsi_disk_get(struct gendisk *disk)
 
 	if (disk->private_data) {
 		sdkp = scsi_disk(disk);
-		if (scsi_device_get(sdkp->device) == 0)
-			get_device(&sdkp->dev);
-		else
+		if (scsi_device_get(sdkp->device))
 			sdkp = NULL;
+		else if (!get_device(&sdkp->dev)) {
+			scsi_device_put(sdkp->device);
+			sdkp = NULL;
+		}
 	}
 	mutex_unlock(&sd_ref_mutex);
 	return sdkp;

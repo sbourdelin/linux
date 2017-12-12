@@ -245,6 +245,10 @@ static struct scsi_device *scsi_alloc_sdev(struct scsi_target *starget,
 	INIT_WORK(&sdev->requeue_work, scsi_requeue_run_queue);
 
 	sdev->sdev_gendev.parent = get_device(&starget->dev);
+	if (!sdev->sdev_gendev.parent) {
+		kfree(sdev);
+		return NULL;
+	}
 	sdev->sdev_target = starget;
 
 	/* usually NULL and set by ->slave_alloc instead */
@@ -366,7 +370,8 @@ static struct scsi_target *__scsi_find_target(struct device *parent,
 		}
 	}
 	if (found_starget)
-		get_device(&found_starget->dev);
+		if (!get_device(&found_starget->dev))
+			found_starget = NULL;
 
 	return found_starget;
 }
@@ -436,6 +441,10 @@ static struct scsi_target *scsi_alloc_target(struct device *parent,
 	device_initialize(dev);
 	kref_init(&starget->reap_ref);
 	dev->parent = get_device(parent);
+	if (!dev->parent) {
+		kfree(starget);
+		return NULL;
+	}
 	dev_set_name(dev, "target%d:%d:%d", shost->host_no, channel, id);
 	dev->bus = &scsi_bus_type;
 	dev->type = &scsi_target_type;
@@ -469,7 +478,8 @@ static struct scsi_target *scsi_alloc_target(struct device *parent,
 			return NULL;
 		}
 	}
-	get_device(dev);
+	/* No good way to recover here; keep fingers crossed */
+	WARN_ON(!get_device(dev));
 
 	return starget;
 
