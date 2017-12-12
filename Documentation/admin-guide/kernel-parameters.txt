@@ -2352,6 +2352,16 @@
 			allocations which rules out almost all kernel
 			allocations. Use with caution!
 
+	immovable_mem=nn[KMG][@ss[KMG]]
+			[KNL] Force usage of a specific region of memory.
+			Make memory hotplug work well with KASLR.
+			Region of memory in immovable node is from ss to ss+nn.
+			If ss is omitted, it defaults to 0.
+			Multiple regions can be specified, comma delimited.
+			Notice: we support 4 regions at most now.
+			Example:
+			immovable_mem=1G,500M@2G,1G@4G
+
 	MTD_Partition=	[MTD]
 			Format: <name>,<region-number>,<size>,<offset>
 
