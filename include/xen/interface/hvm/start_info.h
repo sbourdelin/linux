@@ -33,7 +33,7 @@
  *    | magic          | Contains the magic value XEN_HVM_START_MAGIC_VALUE
  *    |                | ("xEn3" with the 0x80 bit of the "E" set).
  *  4 +----------------+
- *    | version        | Version of this structure. Current version is 0. New
+ *    | version        | Version of this structure. Current version is 1. New
  *    |                | versions are guaranteed to be backwards-compatible.
  *  8 +----------------+
  *    | flags          | SIF_xxx flags.
@@ -48,6 +48,15 @@
  * 32 +----------------+
  *    | rsdp_paddr     | Physical address of the RSDP ACPI data structure.
  * 40 +----------------+
+ *    | memmap_paddr   | Physical address of the (optional) memory map. Only
+ *    |                | present in version 1 and newer of the structure.
+ * 48 +----------------+
+ *    | memmap_entries | Number of entries in the memory map table. Only
+ *    |                | present in version 1 and newer of the structure.
+ *    |                | Zero if there is no memory map being provided.
+ * 52 +----------------+
+ *    | reserved       | Version 1 and newer only.
+ * 56 +----------------+
  *
  * The layout of each entry in the module structure is the following:
  *
@@ -62,10 +71,34 @@
  *    | reserved       |
  * 32 +----------------+
  *
+ * The layout of each entry in the memory map table is as follows:
+ *
+ *  0 +----------------+
+ *    | addr           | Base address
+ *  8 +----------------+
+ *    | size           | Size of mapping in bytes
+ * 16 +----------------+
+ *    | type           | Type of mapping as defined between the hypervisor
+ *    |                | and guest it's starting. E820_TYPE_xxx, for example.
+ * 20 +----------------|
+ *    | reserved       |
+ * 24 +----------------+
+ *
  * The address and sizes are always a 64bit little endian unsigned integer.
  *
  * NB: Xen on x86 will always try to place all the data below the 4GiB
  * boundary.
+ *
+ * Version numbers of the hvm_start_info structure have evolved like this:
+ *
+ * Version 0:
+ *
+ * Version 1:	Added the memmap_paddr/memmap_entries fields (plus 4 bytes of
+ *		padding) to the end of the hvm_start_info struct. These new
+ *		fields can be used to pass a memory map to the guest. The
+ *		memory map is optional and so guests that understand version 1
+ *		of the structure must check that memmap_entries is non-zero
+ *		before trying to read the memory map.
  */
 #define XEN_HVM_START_MAGIC_VALUE 0x336ec578
 
@@ -86,6 +119,14 @@ struct hvm_start_info {
     uint64_t cmdline_paddr;     /* Physical address of the command line.     */
     uint64_t rsdp_paddr;        /* Physical address of the RSDP ACPI data    */
                                 /* structure.                                */
+    uint64_t memmap_paddr;	/* Physical address of an array of           */
+				/* hvm_memmap_table_entry. Only present in   */
+				/* version 1 and newer of the structure      */
+    uint32_t memmap_entries;	/* Number of entries in the memmap table.    */
+				/* Only present in version 1 and newer of    */
+				/* the structure. Value will be zero if      */
+				/* there is no memory map being provided.    */
+    uint32_t reserved;
 };
 
 struct hvm_modlist_entry {
@@ -93,6 +134,13 @@ struct hvm_modlist_entry {
     uint64_t size;              /* Size of the module in bytes.              */
     uint64_t cmdline_paddr;     /* Physical address of the command line.     */
     uint64_t reserved;
+};
+
+struct hvm_memmap_table_entry {
+    uint64_t addr;		/* Base address of the memory region         */
+    uint64_t size;		/* Size of the memory region in bytes        */
+    uint32_t type;		/* Mapping type                              */
+    uint32_t reserved;
 };
 
 #endif /* __XEN_PUBLIC_ARCH_X86_HVM_START_INFO_H__ */
