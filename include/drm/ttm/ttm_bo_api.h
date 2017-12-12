@@ -263,6 +263,8 @@ struct ttm_bo_kmap_obj {
  *
  * @interruptible: Sleep interruptible if sleeping.
  * @no_wait_gpu: Return immediately if the GPU is busy.
+ * @on_alloc_stage: is this operation on allocation stage
+ * @resv: resvation bo used
  *
  * Context for TTM operations like changing buffer placement or general memory
  * allocation.
@@ -270,6 +272,8 @@ struct ttm_bo_kmap_obj {
 struct ttm_operation_ctx {
 	bool interruptible;
 	bool no_wait_gpu;
+	bool on_alloc_stage;
+	struct reservation_object *resv;
 	uint64_t bytes_moved;
 };
 
