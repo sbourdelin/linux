@@ -1126,8 +1126,6 @@ static int cxgbit_handle_nop_out(struct cxgbit_sock *csk, struct iscsi_cmd *cmd)
 	if (payload_length && hdr->ttt == cpu_to_be32(0xFFFFFFFF)) {
 		ping_data = kzalloc(payload_length + 1, GFP_KERNEL);
 		if (!ping_data) {
-			pr_err("Unable to allocate memory for"
-				" NOPOUT ping data.\n");
 			ret = -1;
 			goto out;
 		}
@@ -1188,11 +1186,9 @@ cxgbit_handle_text_cmd(struct cxgbit_sock *csk, struct iscsi_cmd *cmd)
 
 	if (payload_length) {
 		text_in = kzalloc(payload_length, GFP_KERNEL);
-		if (!text_in) {
-			pr_err("Unable to allocate text_in of payload_length: %u\n",
-			       payload_length);
+		if (!text_in)
 			return -ENOMEM;
-		}
+
 		skb_copy_bits(csk->skb, pdu_cb->doffset,
 			      text_in, payload_length);
 
