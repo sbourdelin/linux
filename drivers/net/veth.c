@@ -111,6 +111,12 @@ static netdev_tx_t veth_xmit(struct sk_buff *skb, struct net_device *dev)
 		goto drop;
 	}
 
+	if (unlikely(dev->flags & IFF_AUTOMEDIA)) {
+		/* if eth_skb_pad returns an error the skb was freed */
+		if (eth_skb_pad(skb))
+			goto drop;
+	}
+
 	if (likely(dev_forward_skb(rcv, skb) == NET_RX_SUCCESS)) {
 		struct pcpu_vstats *stats = this_cpu_ptr(dev->vstats);
 
