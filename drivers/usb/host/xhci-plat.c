@@ -269,6 +269,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
 		xhci->quirks |= XHCI_BROKEN_PORT_PED;
 
+	if (device_property_read_bool(sysdev, "usb3-resume-missing-cas"))
+		xhci->quirks |= XHCI_MISSING_CAS;
+
 	/* imod_interval is the interrupt moderation value in nanoseconds. */
 	xhci->imod_interval = 40000;
 	device_property_read_u32(sysdev, "imod-interval-ns",
