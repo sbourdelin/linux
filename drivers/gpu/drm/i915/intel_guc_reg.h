@@ -76,9 +76,6 @@
 
 /* Defines WOPCM space available to GuC firmware */
 #define GUC_WOPCM_SIZE			_MMIO(0xc050)
-/* GuC addresses below GUC_WOPCM_TOP don't map through the GTT */
-#define   GUC_WOPCM_TOP			  (0x80 << 12)	/* 512KB */
-#define   BXT_GUC_WOPCM_RC6_RESERVED	  (0x10 << 12)	/* 64KB  */
 
 /* GuC addresses above GUC_GGTT_TOP also don't map through the GTT */
 #define GUC_GGTT_TOP			0xFEE00000

@@ -97,7 +97,7 @@ void intel_uc_fw_fetch(struct drm_i915_private *dev_priv,
 
 	/* Header and uCode will be loaded to WOPCM */
 	size = uc_fw->header_size + uc_fw->ucode_size;
-	if (size > intel_guc_wopcm_size(dev_priv)) {
+	if (size > intel_guc_wopcm_size(&dev_priv->guc)) {
 		DRM_WARN("%s: Firmware is too large to fit in WOPCM\n",
 			 intel_uc_fw_type_repr(uc_fw->type));
 		err = -E2BIG;
