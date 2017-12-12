@@ -221,7 +221,7 @@ static void pciehp_queue_power_work(struct slot *p_slot, int req)
 	info->p_slot = p_slot;
 	INIT_WORK(&info->work, pciehp_power_thread);
 	info->req = req;
-	queue_work(p_slot->wq, &info->work);
+	schedule_work(&info->work);
 }
 
 void pciehp_queue_pushbutton_work(struct work_struct *work)
