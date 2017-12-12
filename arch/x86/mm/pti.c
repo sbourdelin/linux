@@ -51,15 +51,33 @@
 void __init pti_check_boottime_disable(void)
 {
 	bool enable = true;
+	char arg[5];
+
+	if (cmdline_find_option(boot_command_line, "pti", arg, sizeof(arg))) {
+		if (!strncmp(arg, "on", 2))
+			goto enable;
+
+		if (!strncmp(arg, "off", 3)) {
+			pr_info("disabled on command line.\n");
+			return;
+		}
+
+		if (!strncmp(arg, "auto", 4))
+			goto skip;
+	}
 
 	if (cmdline_find_option_bool(boot_command_line, "nopti")) {
 		pr_info("disabled on command line.\n");
 		enable = false;
 	}
+
+skip:
 	if (hypervisor_is_type(X86_HYPER_XEN_PV)) {
 		pr_info("disabled on XEN_PV.\n");
 		enable = false;
 	}
+
+enable:
 	if (enable)
 		setup_force_cpu_bug(X86_BUG_CPU_SECURE_MODE_PTI);
 }
