@@ -137,7 +137,8 @@ redo:
 			seq_count++;
 			continue;
 		}
-		array = kcalloc(seq_count, sizeof(u32), GFP_KERNEL);
+
+		array = kcalloc(seq_count, sizeof(*array), GFP_KERNEL);
 		if (!array)
 			return -ENOMEM;
 
@@ -155,7 +156,7 @@ redo:
 	}
 
 	if (seq_count) {
-		array = kcalloc(seq_count, sizeof(u32), GFP_KERNEL);
+		array = kcalloc(seq_count, sizeof(*array), GFP_KERNEL);
 		if (!array)
 			return -ENOMEM;
 
@@ -185,7 +186,7 @@ static int iscsit_randomize_seq_lists(
 	if (!seq_count)
 		return 0;
 
-	array = kcalloc(seq_count, sizeof(u32), GFP_KERNEL);
+	array = kcalloc(seq_count, sizeof(*array), GFP_KERNEL);
 	if (!array)
 		return -ENOMEM;
 
@@ -538,7 +539,7 @@ int iscsit_build_pdu_and_seq_lists(
 	iscsit_determine_counts_for_list(cmd, &bl, &seq_count, &pdu_count);
 
 	if (!conn->sess->sess_ops->DataSequenceInOrder) {
-		seq = kcalloc(seq_count, sizeof(struct iscsi_seq), GFP_ATOMIC);
+		seq = kcalloc(seq_count, sizeof(*seq), GFP_ATOMIC);
 		if (!seq)
 			return -ENOMEM;
 
@@ -547,7 +548,7 @@ int iscsit_build_pdu_and_seq_lists(
 	}
 
 	if (!conn->sess->sess_ops->DataPDUInOrder) {
-		pdu = kcalloc(pdu_count, sizeof(struct iscsi_pdu), GFP_ATOMIC);
+		pdu = kcalloc(pdu_count, sizeof(*pdu), GFP_ATOMIC);
 		if (!pdu) {
 			kfree(seq);
 			return -ENOMEM;

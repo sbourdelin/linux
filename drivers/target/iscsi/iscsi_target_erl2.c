@@ -324,7 +324,7 @@ int iscsit_prepare_cmds_for_reallegiance(struct iscsi_conn *conn)
 	 * (struct iscsi_cmd->cr) so we need to allocate this before preparing the
 	 * connection's command list for connection recovery.
 	 */
-	cr = kzalloc(sizeof(struct iscsi_conn_recovery), GFP_KERNEL);
+	cr = kzalloc(sizeof(*cr), GFP_KERNEL);
 	if (!cr)
 		return -1;
 

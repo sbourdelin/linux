@@ -129,7 +129,7 @@ static struct iscsi_param *iscsi_set_default_param(struct iscsi_param_list *para
 {
 	struct iscsi_param *param;
 
-	param = kzalloc(sizeof(struct iscsi_param), GFP_KERNEL);
+	param = kzalloc(sizeof(*param), GFP_KERNEL);
 	if (!param)
 		goto out;
 
@@ -199,7 +199,7 @@ int iscsi_create_default_params(struct iscsi_param_list **param_list_ptr)
 	struct iscsi_param *param;
 	struct iscsi_param_list *pl;
 
-	pl = kzalloc(sizeof(struct iscsi_param_list), GFP_KERNEL);
+	pl = kzalloc(sizeof(*pl), GFP_KERNEL);
 	if (!pl)
 		return -ENOMEM;
 
@@ -568,7 +568,7 @@ int iscsi_copy_param_list(
 	struct iscsi_param *new_param = NULL;
 	struct iscsi_param_list *param_list;
 
-	param_list = kzalloc(sizeof(struct iscsi_param_list), GFP_KERNEL);
+	param_list = kzalloc(sizeof(*param_list), GFP_KERNEL);
 	if (!param_list)
 		return -ENOMEM;
 
@@ -583,7 +583,7 @@ int iscsi_copy_param_list(
 				continue;
 		}
 
-		new_param = kzalloc(sizeof(struct iscsi_param), GFP_KERNEL);
+		new_param = kzalloc(sizeof(*new_param), GFP_KERNEL);
 		if (!new_param)
 			goto err_out;
 
@@ -714,7 +714,7 @@ static int iscsi_add_notunderstood_response(
 		return -1;
 	}
 
-	extra_response = kzalloc(sizeof(struct iscsi_extra_response), GFP_KERNEL);
+	extra_response = kzalloc(sizeof(*extra_response), GFP_KERNEL);
 	if (!extra_response)
 		return -ENOMEM;
 

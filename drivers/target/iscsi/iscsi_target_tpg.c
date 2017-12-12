@@ -34,7 +34,7 @@ struct iscsi_portal_group *iscsit_alloc_portal_group(struct iscsi_tiqn *tiqn, u1
 {
 	struct iscsi_portal_group *tpg;
 
-	tpg = kzalloc(sizeof(struct iscsi_portal_group), GFP_KERNEL);
+	tpg = kzalloc(sizeof(*tpg), GFP_KERNEL);
 	if (!tpg)
 		return NULL;
 
@@ -474,7 +474,7 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 		}
 	}
 
-	tpg_np = kzalloc(sizeof(struct iscsi_tpg_np), GFP_KERNEL);
+	tpg_np = kzalloc(sizeof(*tpg_np), GFP_KERNEL);
 	if (!tpg_np)
 		return ERR_PTR(-ENOMEM);
 

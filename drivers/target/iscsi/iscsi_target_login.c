@@ -46,7 +46,7 @@ static struct iscsi_login *iscsi_login_init_conn(struct iscsi_conn *conn)
 {
 	struct iscsi_login *login;
 
-	login = kzalloc(sizeof(struct iscsi_login), GFP_KERNEL);
+	login = kzalloc(sizeof(*login), GFP_KERNEL);
 	if (!login)
 		return NULL;
 
@@ -294,7 +294,7 @@ static int iscsi_login_zero_tsih_s1(
 	struct iscsi_login_req *pdu = (struct iscsi_login_req *)buf;
 	int ret;
 
-	sess = kzalloc(sizeof(struct iscsi_session), GFP_KERNEL);
+	sess = kzalloc(sizeof(*sess), GFP_KERNEL);
 	if (!sess) {
 		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
@@ -1245,7 +1245,7 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 	}
 	spin_unlock_bh(&np->np_thread_lock);
 
-	conn = kzalloc(sizeof(struct iscsi_conn), GFP_KERNEL);
+	conn = kzalloc(sizeof(*conn), GFP_KERNEL);
 	if (!conn) {
 		/* Get another socket */
 		return 1;
