@@ -67,7 +67,6 @@ struct ceph_file_layout {
 	struct ceph_string __rcu *pool_ns; /* rados pool namespace */
 };
 
-extern int ceph_file_layout_is_valid(const struct ceph_file_layout *layout);
 extern void ceph_file_layout_from_legacy(struct ceph_file_layout *fl,
 				struct ceph_file_layout_legacy *legacy);
 extern void ceph_file_layout_to_legacy(struct ceph_file_layout *fl,
