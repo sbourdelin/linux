@@ -401,8 +401,8 @@ static void guc_stage_desc_init(struct intel_guc *guc,
 		lrc->context_desc = lower_32_bits(ce->lrc_desc);
 
 		/* The state page is after PPHWSP */
-		lrc->ring_lrca =
-			guc_ggtt_offset(ce->state) + LRC_STATE_PN * PAGE_SIZE;
+		lrc->ring_lrca = intel_guc_ggtt_offset(guc, ce->state) +
+				 LRC_STATE_PN * PAGE_SIZE;
 
 		/* XXX: In direct submission, the GuC wants the HW context id
 		 * here. In proxy submission, it wants the stage id
@@ -410,7 +410,7 @@ static void guc_stage_desc_init(struct intel_guc *guc,
 		lrc->context_id = (client->stage_id << GUC_ELC_CTXID_OFFSET) |
 				(guc_engine_id << GUC_ELC_ENGINE_OFFSET);
 
-		lrc->ring_begin = guc_ggtt_offset(ce->ring->vma);
+		lrc->ring_begin = intel_guc_ggtt_offset(guc, ce->ring->vma);
 		lrc->ring_end = lrc->ring_begin + ce->ring->size - 1;
 		lrc->ring_next_free_location = lrc->ring_begin;
 		lrc->ring_current_tail_pointer_value = 0;
@@ -426,7 +426,7 @@ static void guc_stage_desc_init(struct intel_guc *guc,
 	 * The doorbell, process descriptor, and workqueue are all parts
 	 * of the client object, which the GuC will reference via the GGTT
 	 */
-	gfx_addr = guc_ggtt_offset(client->vma);
+	gfx_addr = intel_guc_ggtt_offset(guc, client->vma);
 	desc->db_trigger_phy = sg_dma_address(client->vma->pages->sgl) +
 				client->doorbell_offset;
 	desc->db_trigger_cpu = ptr_to_u64(__get_doorbell(client));
@@ -649,7 +649,7 @@ static void inject_preempt_context(struct work_struct *work)
 	data[3] = engine->guc_id;
 	data[4] = guc->execbuf_client->priority;
 	data[5] = guc->execbuf_client->stage_id;
-	data[6] = guc_ggtt_offset(guc->shared_data);
+	data[6] = intel_guc_ggtt_offset(guc, guc->shared_data);
 
 	if (WARN_ON(intel_guc_send(guc, data, ARRAY_SIZE(data)))) {
 		execlists_clear_active(&engine->execlists,
@@ -1139,7 +1139,7 @@ static void guc_policies_init(struct guc_policies *policies)
 static int guc_ads_create(struct intel_guc *guc)
 {
 	struct drm_i915_private *dev_priv = guc_to_i915(guc);
-	struct i915_vma *vma;
+	struct i915_vma *vma, *rcs_state;
 	struct page *page;
 	/* The ads obj includes the struct itself and buffers passed to GuC */
 	struct {
@@ -1185,9 +1185,9 @@ static int guc_ads_create(struct intel_guc *guc)
 	 * to find it. Note that we have to skip our header (1 page),
 	 * because our GuC shared data is there.
 	 */
-	blob->ads.golden_context_lrca =
-		guc_ggtt_offset(dev_priv->kernel_context->engine[RCS].state) +
-		skipped_offset;
+	rcs_state = dev_priv->kernel_context->engine[RCS].state;
+	blob->ads.golden_context_lrca = intel_guc_ggtt_offset(guc, rcs_state) +
+					skipped_offset;
 
 	/*
 	 * The GuC expects us to exclude the portion of the context image that
@@ -1199,7 +1199,7 @@ static int guc_ads_create(struct intel_guc *guc)
 		blob->ads.eng_state_size[engine->guc_id] =
 			engine->context_size - skipped_size;
 
-	base = guc_ggtt_offset(vma);
+	base = intel_guc_ggtt_offset(guc, vma);
 	blob->ads.scheduler_policies = base + ptr_offset(blob, policies);
 	blob->ads.reg_state_buffer = base + ptr_offset(blob, reg_state_buffer);
 	blob->ads.reg_state_addr = base + ptr_offset(blob, reg_state);
