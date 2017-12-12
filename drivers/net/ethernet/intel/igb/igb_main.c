@@ -3685,7 +3685,9 @@ static int __igb_close(struct net_device *netdev, bool suspending)
 	if (!suspending)
 		pm_runtime_get_sync(&pdev->dev);
 
-	igb_down(adapter);
+	if (!test_bit(__IGB_DOWN, &adapter->state))
+		igb_down(adapter);
+
 	igb_free_irq(adapter);
 
 	igb_free_all_tx_resources(adapter);
@@ -3698,7 +3700,7 @@ static int __igb_close(struct net_device *netdev, bool suspending)
 
 int igb_close(struct net_device *netdev)
 {
-	if (netif_device_present(netdev))
+	if (netif_device_present(netdev) || netdev->dismantle)
 		return __igb_close(netdev, false);
 	return 0;
 }
