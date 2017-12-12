@@ -162,7 +162,7 @@ static void clk_enable_unlock(unsigned long flags)
 	WARN_ON_ONCE(enable_owner != current);
 	WARN_ON_ONCE(enable_refcnt == 0);
 
-	if (--enable_refcnt) {
+	if (--enable_refcnt > 0) {
 		__release(enable_lock);
 		return;
 	}
