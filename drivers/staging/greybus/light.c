@@ -965,10 +965,12 @@ static int gb_lights_channel_config(struct gb_light *light,
 	channel->mode = le32_to_cpu(conf.mode);
 	channel->flags = le32_to_cpu(conf.flags);
 	channel->color = le32_to_cpu(conf.color);
-	channel->color_name = kstrndup(conf.color_name, NAMES_MAX, GFP_KERNEL);
+	channel->color_name = kstrndup(conf.color_name,
+				       NAMES_MAX - 1, GFP_KERNEL);
 	if (!channel->color_name)
 		return -ENOMEM;
-	channel->mode_name = kstrndup(conf.mode_name, NAMES_MAX, GFP_KERNEL);
+	channel->mode_name = kstrndup(conf.mode_name,
+				      NAMES_MAX - 1, GFP_KERNEL);
 	if (!channel->mode_name)
 		return -ENOMEM;
 
@@ -1027,7 +1029,8 @@ static int gb_lights_light_config(struct gb_lights *glights, u8 id)
 		return -EINVAL;
 
 	light->channels_count = conf.channel_count;
-	light->name = kstrndup(conf.name, NAMES_MAX, GFP_KERNEL);
+	light->name = kstrndup(conf.name,
+			       NAMES_MAX - 1, GFP_KERNEL);
 
 	light->channels = kcalloc(light->channels_count,
 				  sizeof(struct gb_channel), GFP_KERNEL);

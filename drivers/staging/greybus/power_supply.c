@@ -487,14 +487,16 @@ static int gb_power_supply_description_get(struct gb_power_supply *gbpsy)
 	if (ret < 0)
 		return ret;
 
-	gbpsy->manufacturer = kstrndup(resp.manufacturer, PROP_MAX, GFP_KERNEL);
+	gbpsy->manufacturer = kstrndup(resp.manufacturer,
+				       PROP_MAX - 1, GFP_KERNEL);
 	if (!gbpsy->manufacturer)
 		return -ENOMEM;
-	gbpsy->model_name = kstrndup(resp.model, PROP_MAX, GFP_KERNEL);
+	gbpsy->model_name = kstrndup(resp.model,
+				     PROP_MAX - 1, GFP_KERNEL);
 	if (!gbpsy->model_name)
 		return -ENOMEM;
-	gbpsy->serial_number = kstrndup(resp.serial_number, PROP_MAX,
-				       GFP_KERNEL);
+	gbpsy->serial_number = kstrndup(resp.serial_number,
+					PROP_MAX - 1, GFP_KERNEL);
 	if (!gbpsy->serial_number)
 		return -ENOMEM;
 
