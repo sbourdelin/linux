@@ -38,6 +38,7 @@
 
 /* TLS socket options */
 #define TLS_TX			1	/* Set transmit parameters */
+#define TLS_RX			2       /* Set receive parameters */
 
 /* Supported versions */
 #define TLS_VERSION_MINOR(ver)	((ver) & 0xFF)
