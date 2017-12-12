@@ -3399,6 +3399,10 @@ static int sd_probe(struct device *dev)
 	}
 
 	device_initialize(&sdkp->dev);
+
+	if (!get_device(dev))
+		goto out_free_index;
+
 	sdkp->dev.parent = dev;
 	sdkp->dev.class = &sd_disk_class;
 	dev_set_name(&sdkp->dev, "%s", dev_name(dev));
@@ -3407,7 +3411,6 @@ static int sd_probe(struct device *dev)
 	if (error)
 		goto out_free_index;
 
-	get_device(dev);
 	dev_set_drvdata(dev, sdkp);
 
 	get_device(&sdkp->dev);	/* prevent release before async_schedule */
