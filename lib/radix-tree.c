@@ -77,9 +77,6 @@ static struct kmem_cache *radix_tree_node_cachep;
 						RADIX_TREE_MAP_SHIFT))
 #define IDA_PRELOAD_SIZE	(IDA_MAX_PATH * 2 - 1)
 
-/*
- * The XB can go up to unsigned long, but also uses a bitmap.
- */
 #define XB_INDEX_BITS		(BITS_PER_LONG - ilog2(IDA_BITMAP_BITS))
 #define XB_MAX_PATH		(DIV_ROUND_UP(XB_INDEX_BITS, \
 						RADIX_TREE_MAP_SHIFT))
@@ -2145,17 +2142,35 @@ int ida_pre_get(struct ida *ida, gfp_t gfp)
 }
 EXPORT_SYMBOL(ida_pre_get);
 
-void xb_preload(gfp_t gfp)
+/**
+ *  xb_preload - preload for xb_set_bit()
+ *  @gfp_mask: allocation mask to use for preloading
+ *
+ * Preallocate memory to use for the next call to xb_set_bit(). On success,
+ * return true, with preemption disabled. On error, return false with
+ * preemption not disabled.
+ */
+__must_check bool xb_preload(gfp_t gfp)
 {
-	__radix_tree_preload(gfp, XB_PRELOAD_SIZE);
 	if (!this_cpu_read(ida_bitmap)) {
 		struct ida_bitmap *bitmap = kmalloc(sizeof(*bitmap), gfp);
 
 		if (!bitmap)
-			return;
+			return false;
+		/*
+		 * The per-CPU variable is updated with preemption enabled.
+		 * If the calling task is unlucky to be scheduled to another
+		 * CPU which has no ida_bitmap allocation, it will be detected
+		 * when setting a bit (i.e. __xb_set_bit()).
+		 */
 		bitmap = this_cpu_cmpxchg(ida_bitmap, NULL, bitmap);
 		kfree(bitmap);
 	}
+
+	if (__radix_tree_preload(gfp, XB_PRELOAD_SIZE) < 0)
+		return false;
+
+	return true;
 }
 EXPORT_SYMBOL(xb_preload);
 

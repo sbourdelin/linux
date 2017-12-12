@@ -36,15 +36,12 @@ int xb_set_bit(struct xb *xb, unsigned long bit);
 bool xb_test_bit(const struct xb *xb, unsigned long bit);
 int xb_clear_bit(struct xb *xb, unsigned long bit);
 
-int xb_zero(struct xb *xb, unsigned long start, unsigned long nbits);
-int xb_fill(struct xb *xb, unsigned long start, unsigned long nbits);
-
 static inline bool xb_empty(const struct xb *xb)
 {
 	return radix_tree_empty(&xb->xbrt);
 }
 
-void xb_preload(gfp_t);
+bool xb_preload(gfp_t);
 
 static inline void xb_preload_end(void)
 {

@@ -39,8 +39,10 @@ int xb_set_bit(struct xb *xb, unsigned long bit)
 			return 0;
 		}
 		bitmap = this_cpu_xchg(ida_bitmap, NULL);
-		if (!bitmap)
+		if (!bitmap) {
+			__radix_tree_delete(root, node, slot);
 			return -EAGAIN;
+		}
 		memset(bitmap, 0, sizeof(*bitmap));
 		bitmap->bitmap[0] = tmp >> RADIX_TREE_EXCEPTIONAL_SHIFT;
 		rcu_assign_pointer(*slot, bitmap);
@@ -54,8 +56,10 @@ int xb_set_bit(struct xb *xb, unsigned long bit)
 			return 0;
 		}
 		bitmap = this_cpu_xchg(ida_bitmap, NULL);
-		if (!bitmap)
+		if (!bitmap) {
+			__radix_tree_delete(root, node, slot);
 			return -EAGAIN;
+		}
 		memset(bitmap, 0, sizeof(*bitmap));
 		__radix_tree_replace(root, node, slot, bitmap, NULL);
 	}
@@ -73,7 +77,7 @@ EXPORT_SYMBOL(xb_set_bit);
  * This function is used to clear a bit in the xbitmap. If all the bits of the
  * bitmap are 0, the bitmap will be freed.
  */
-int xb_clear_bit(struct xb *xb, unsigned long bit)
+void xb_clear_bit(struct xb *xb, unsigned long bit)
 {
 	unsigned long index = bit / IDA_BITMAP_BITS;
 	struct radix_tree_root *root = &xb->xbrt;
@@ -90,25 +94,23 @@ int xb_clear_bit(struct xb *xb, unsigned long bit)
 		unsigned long tmp = (unsigned long)bitmap;
 
 		if (ebit >= BITS_PER_LONG)
-			return 0;
+			return;
 		tmp &= ~(1UL << ebit);
 		if (tmp == RADIX_TREE_EXCEPTIONAL_ENTRY)
 			__radix_tree_delete(root, node, slot);
 		else
 			rcu_assign_pointer(*slot, (void *)tmp);
-		return 0;
+		return;
 	}
 
 	if (!bitmap)
-		return 0;
+		return;
 
 	__clear_bit(bit, bitmap->bitmap);
 	if (bitmap_empty(bitmap->bitmap, IDA_BITMAP_BITS)) {
 		kfree(bitmap);
 		__radix_tree_delete(root, node, slot);
 	}
-
-	return 0;
 }
 EXPORT_SYMBOL(xb_clear_bit);
 
@@ -133,7 +135,7 @@ bool xb_test_bit(const struct xb *xb, unsigned long bit)
 		return false;
 	if (radix_tree_exception(bitmap)) {
 		bit += RADIX_TREE_EXCEPTIONAL_SHIFT;
-		if (bit > BITS_PER_LONG)
+		if (bit >= BITS_PER_LONG)
 			return false;
 		return (unsigned long)bitmap & (1UL << bit);
 	}
@@ -151,9 +153,9 @@ void xbitmap_check_bit(unsigned long bit)
 	assert(!xb_test_bit(&xb1, bit));
 	assert(xb_set_bit(&xb1, bit) == 0);
 	assert(xb_test_bit(&xb1, bit));
-	assert(xb_clear_bit(&xb1, bit) == 0);
+	xb_clear_bit(&xb1, bit);
 	assert(xb_empty(&xb1));
-	assert(xb_clear_bit(&xb1, bit) == 0);
+	xb_clear_bit(&xb1, bit);
 	assert(xb_empty(&xb1));
 	xb_preload_end();
 }
