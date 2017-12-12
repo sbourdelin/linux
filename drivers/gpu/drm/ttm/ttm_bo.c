@@ -722,10 +722,9 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 	spin_lock(&glob->lru_lock);
 	for (i = 0; i < TTM_MAX_BO_PRIORITY; ++i) {
 		list_for_each_entry(bo, &man->lru[i], lru) {
-			if (bo->resv == resv) {
-				if (list_empty(&bo->ddestroy))
-					continue;
-			} else {
+			if (!ctx ||
+				!(ctx->on_alloc_stage &&
+				bo->resv == ctx->resv)) {
 				locked = reservation_object_trylock(bo->resv);
 				if (!locked)
 					continue;
