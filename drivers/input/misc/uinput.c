@@ -468,7 +468,7 @@ static int uinput_dev_setup(struct uinput_device *udev,
 	udev->ff_effects_max = setup.ff_effects_max;
 
 	kfree(dev->name);
-	dev->name = kstrndup(setup.name, UINPUT_MAX_NAME_SIZE, GFP_KERNEL);
+	dev->name = kstrndup(setup.name, UINPUT_MAX_NAME_SIZE - 1, GFP_KERNEL);
 	if (!dev->name)
 		return -ENOMEM;
 
@@ -543,7 +543,7 @@ static int uinput_setup_device_legacy(struct uinput_device *udev,
 	}
 
 	kfree(dev->name);
-	dev->name = kstrndup(user_dev->name, UINPUT_MAX_NAME_SIZE,
+	dev->name = kstrndup(user_dev->name, UINPUT_MAX_NAME_SIZE - 1,
 			     GFP_KERNEL);
 	if (!dev->name) {
 		retval = -ENOMEM;
