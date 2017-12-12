@@ -4665,7 +4665,10 @@ static int write_emulate(struct kvm_vcpu *vcpu, gpa_t gpa,
 
 static int write_mmio(struct kvm_vcpu *vcpu, gpa_t gpa, int bytes, void *val)
 {
-	trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, bytes, gpa, *(u64 *)val);
+	u64 data = 0;
+
+	memcpy(&data, val, bytes);
+	trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, bytes, gpa, data);
 	return vcpu_mmio_write(vcpu, gpa, bytes, val);
 }
 
