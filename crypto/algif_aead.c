@@ -463,6 +463,8 @@ static void *aead_bind(const char *name, u32 type, u32 mask)
 	if (!tfm)
 		return ERR_PTR(-ENOMEM);
 
+	af_alg_restrict_type_mask(&type, &mask);
+
 	aead = crypto_alloc_aead(name, type, mask);
 	if (IS_ERR(aead)) {
 		kfree(tfm);

@@ -1172,6 +1172,13 @@ int af_alg_get_rsgl(struct sock *sk, struct msghdr *msg, int flags,
 }
 EXPORT_SYMBOL_GPL(af_alg_get_rsgl);
 
+void af_alg_restrict_type_mask(u32 *type, u32 *mask)
+{
+	*type &= CRYPTO_AF_ALG_ALLOWED_TYPE;
+	*mask &= CRYPTO_AF_ALG_ALLOWED_MASK;
+}
+EXPORT_SYMBOL_GPL(af_alg_restrict_type_mask);
+
 static int __init af_alg_init(void)
 {
 	int err = proto_register(&alg_proto, 0);

@@ -250,5 +250,6 @@ struct af_alg_async_req *af_alg_alloc_areq(struct sock *sk,
 int af_alg_get_rsgl(struct sock *sk, struct msghdr *msg, int flags,
 		    struct af_alg_async_req *areq, size_t maxsize,
 		    size_t *outlen);
+void af_alg_restrict_type_mask(u32 *type, u32 *mask);
 
 #endif	/* _CRYPTO_IF_ALG_H */

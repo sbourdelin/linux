@@ -116,6 +116,8 @@ static struct proto_ops algif_rng_ops = {
 
 static void *rng_bind(const char *name, u32 type, u32 mask)
 {
+	af_alg_restrict_type_mask(&type, &mask);
+
 	return crypto_alloc_rng(name, type, mask);
 }
 

@@ -419,6 +419,8 @@ static void *hash_bind(const char *name, u32 type, u32 mask)
 	if (!tfm)
 		return ERR_PTR(-ENOMEM);
 
+	af_alg_restrict_type_mask(&type, &mask);
+
 	hash = crypto_alloc_ahash(name, type, mask);
 	if (IS_ERR(hash)) {
 		kfree(tfm);

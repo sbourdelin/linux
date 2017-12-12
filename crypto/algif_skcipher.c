@@ -314,6 +314,8 @@ static void *skcipher_bind(const char *name, u32 type, u32 mask)
 	if (!tfm)
 		return ERR_PTR(-ENOMEM);
 
+	af_alg_restrict_type_mask(&type, &mask);
+
 	skcipher = crypto_alloc_skcipher(name, type, mask);
 	if (IS_ERR(skcipher)) {
 		kfree(tfm);

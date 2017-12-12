@@ -70,6 +70,9 @@
 #define CRYPTO_ALG_DYING		0x00000040
 #define CRYPTO_ALG_ASYNC		0x00000080
 
+#define CRYPTO_AF_ALG_ALLOWED_MASK	0x000000ff
+#define CRYPTO_AF_ALG_ALLOWED_TYPE	0x000000ff
+
 /*
  * Set this bit if and only if the algorithm requires another algorithm of
  * the same type to handle corner cases.
