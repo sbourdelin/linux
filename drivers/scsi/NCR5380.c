@@ -202,7 +202,7 @@ static int NCR5380_poll_politely2(struct NCR5380_hostdata *hostdata,
 
 	/* Repeatedly sleep for 1 ms until deadline */
 	while (time_is_after_jiffies(deadline)) {
-		schedule_timeout_uninterruptible(1);
+		mdelay(1);
 		if ((NCR5380_read(reg1) & bit1) == val1)
 			return 0;
 		if ((NCR5380_read(reg2) & bit2) == val2)
