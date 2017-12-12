@@ -108,6 +108,19 @@ enum mem_avoid_index {
 
 static struct mem_vector mem_avoid[MEM_AVOID_MAX];
 
+#ifdef CONFIG_MEMORY_HOTPLUG
+/* Only supporting at most 4 immovable memory regions with kaslr */
+#define MAX_IMMOVABLE_MEM	4
+
+static bool lack_immovable_mem;
+
+/* Store the memory regions in immovable node */
+static struct mem_vector immovable_mem[MAX_IMMOVABLE_MEM];
+
+/* The immovable regions user specify, not more than 4 */
+static int num_immovable_region;
+#endif
+
 static bool mem_overlaps(struct mem_vector *one, struct mem_vector *two)
 {
 	/* Item one is entirely before item two. */
@@ -206,16 +219,98 @@ static void mem_avoid_memmap(char *str)
 		memmap_too_large = true;
 }
 
-static int handle_mem_memmap(void)
+#ifdef CONFIG_MEMORY_HOTPLUG
+static int parse_immovable_mem(char *p,
+			       unsigned long long *start,
+			       unsigned long long *size)
+{
+	char *oldp;
+
+	if (!p)
+		return -EINVAL;
+
+	oldp = p;
+	*size = memparse(p, &p);
+	if (p == oldp)
+		return -EINVAL;
+
+	switch (*p) {
+	case '@':
+		*start = memparse(p + 1, &p);
+		return 0;
+	default:
+		/*
+		 * If w/o offset, only size specified, immovable_mem=nn[KMG]
+		 * has the same behaviour as immovable_mem=nn[KMG]@0. It means
+		 * the region starts from 0.
+		 */
+		*start = 0;
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+static void parse_immovable_mem_regions(char *str)
+{
+	static int i;
+
+	while (str && (i < MAX_IMMOVABLE_MEM)) {
+		int rc;
+		unsigned long long start, size;
+		char *k = strchr(str, ',');
+
+		if (k)
+			*k++ = 0;
+
+		rc = parse_immovable_mem(str, &start, &size);
+		if (rc < 0)
+			break;
+		str = k;
+
+		immovable_mem[i].start = start;
+		immovable_mem[i].size = size;
+		i++;
+	}
+	num_immovable_region = i;
+}
+#else
+static inline void parse_immovable_mem_regions(char *str)
+{
+}
+#endif
+
+static int handle_mem_filter(void)
 {
 	char *args = (char *)get_cmd_line_ptr();
 	size_t len = strlen((char *)args);
+	bool exist_movable_node = false;
 	char *tmp_cmdline;
 	char *param, *val;
 	u64 mem_size;
 
-	if (!strstr(args, "memmap=") && !strstr(args, "mem="))
+	if (!strstr(args, "memmap=") && !strstr(args, "mem=") &&
+	    !strstr(args, "movable_node"))
 		return 0;
+
+#ifdef CONFIG_MEMORY_HOTPLUG
+	if (strstr(args, "movable_node")) {
+		/*
+		 * Confirm "movable_node" specified, otherwise
+		 * "immovable_mem=" doesn't work.
+		 */
+		exist_movable_node = true;
+
+		/*
+		 * If only specify "movable_node" without "immovable_mem=",
+		 * disable KASLR.
+		 */
+		if (!strstr(args, "immovable_mem=")) {
+			lack_immovable_mem = true;
+			return 0;
+		}
+	}
+#endif
 
 	tmp_cmdline = malloc(len + 1);
 	if (!tmp_cmdline)
@@ -239,6 +334,9 @@ static int handle_mem_memmap(void)
 
 		if (!strcmp(param, "memmap")) {
 			mem_avoid_memmap(val);
+		} else if (!strcmp(param, "immovable_mem=") &&
+			   exist_movable_node) {
+			parse_immovable_mem_regions(val);
 		} else if (!strcmp(param, "mem")) {
 			char *p = val;
 
@@ -378,7 +476,7 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 	/* We don't need to set a mapping for setup_data. */
 
 	/* Mark the memmap regions we need to avoid */
-	handle_mem_memmap();
+	handle_mem_filter();
 
 #ifdef CONFIG_X86_VERBOSE_BOOTUP
 	/* Make sure video RAM can be used. */
@@ -672,6 +770,14 @@ static unsigned long find_random_phys_addr(unsigned long minimum,
 		debug_putstr("Aborted memory entries scan (more than 4 memmap= args)!\n");
 		return 0;
 	}
+
+#ifdef CONFIG_MEMORY_HOTPLUG
+	/* Check if specify "movable_node" without "immovable_mem=". */
+	if (lack_immovable_mem) {
+		debug_putstr("Fail KASLR when movable_node specified without immovable_mem=.\n");
+		return 0;
+	}
+#endif
 
 	/* Make sure minimum is aligned. */
 	minimum = ALIGN(minimum, CONFIG_PHYSICAL_ALIGN);
