@@ -992,7 +992,8 @@ static const struct sctp_sm_table_entry *sctp_chunk_event_lookup(
 		return &chunk_event_table[cid][state];
 
 	if (net->sctp.prsctp_enable) {
-		if (cid == SCTP_CID_FWD_TSN)
+		if (cid == SCTP_CID_FWD_TSN ||
+		    (net->sctp.intl_enable && cid == SCTP_CID_I_FWD_TSN))
 			return &prsctp_chunk_event_table[0][state];
 	}
 
