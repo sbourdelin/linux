@@ -3,6 +3,7 @@
 
 #include <xen/features.h>
 #include <xen/page.h>
+#include <xen/interface/memory.h>
 
 #include <asm/xen/hypercall.h>
 #include <asm/xen/hypervisor.h>
@@ -331,3 +332,71 @@ void xen_arch_unregister_cpu(int num)
 }
 EXPORT_SYMBOL(xen_arch_unregister_cpu);
 #endif
+
+#ifdef CONFIG_XEN_BALLOON_MEMORY_HOTPLUG
+void __init arch_xen_balloon_init(struct resource *hostmem_resource)
+{
+	struct xen_memory_map memmap;
+	int rc, i, last_guest_ram;
+	unsigned long max_addr = max_pfn << PAGE_SHIFT;
+	struct e820_table *xen_e820_table;
+	struct e820_entry *entry;
+	struct resource *res = NULL;
+
+	if (!xen_initial_domain())
+		return;
+
+	xen_e820_table = kzalloc(sizeof(*xen_e820_table), GFP_KERNEL);
+	if (!xen_e820_table) {
+		pr_warn("%s: Out of memory\n", __func__);
+		return;
+	}
+
+	memmap.nr_entries = ARRAY_SIZE(xen_e820_table->entries);
+	set_xen_guest_handle(memmap.buffer, xen_e820_table->entries);
+	rc = HYPERVISOR_memory_op(XENMEM_machine_memory_map, &memmap);
+	if (rc) {
+		pr_warn("%s: Can't read host e820 (%d)\n", __func__, rc);
+		goto out;
+	}
+
+	last_guest_ram = i = 0;
+	while (xen_e820_table->entries[i].addr < max_addr) {
+		if (xen_e820_table->entries[i].type == E820_TYPE_RAM)
+			last_guest_ram = i;
+		i++;
+	}
+
+	entry = &xen_e820_table->entries[last_guest_ram];
+	if (max_addr >= entry->addr + entry->size)
+		goto out; /* No unallocated host RAM. */
+
+	hostmem_resource->start = max_addr;
+	hostmem_resource->end = entry->addr + entry->size;
+	for (; i < memmap.nr_entries; i++) {
+		entry = &xen_e820_table->entries[i];
+		if (entry->type == E820_TYPE_RAM)
+			continue;
+
+		res = kzalloc(sizeof(*res), GFP_KERNEL);
+		if (!res) {
+			pr_warn("%s: Out of memory\n", __func__);
+			goto out;
+		}
+
+		res->name = "Host memory";
+		res->end = entry->addr + entry->size;
+		res->start = entry->addr;
+		rc = insert_resource(hostmem_resource, res);
+		if (rc) {
+			pr_warn("%s: Can't insert hostmem resource [%llu - %llu] (%d)\n",
+				__func__, res->start, res->end, rc);
+			kfree(res);
+			goto  out;
+		}
+	}
+
+ out:
+	kfree(xen_e820_table);
+}
+#endif /* CONFIG_XEN_BALLOON_MEMORY_HOTPLUG */
