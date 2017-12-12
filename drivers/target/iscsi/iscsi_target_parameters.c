@@ -127,7 +127,7 @@ static struct iscsi_param *iscsi_set_default_param(struct iscsi_param_list *para
 		char *name, char *value, u8 phase, u8 scope, u8 sender,
 		u16 type_range, u8 use)
 {
-	struct iscsi_param *param = NULL;
+	struct iscsi_param *param;
 
 	param = kzalloc(sizeof(struct iscsi_param), GFP_KERNEL);
 	if (!param)
