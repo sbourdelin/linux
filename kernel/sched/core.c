@@ -4041,7 +4041,8 @@ recheck:
 	}
 
 	if (attr->sched_flags &
-		~(SCHED_FLAG_RESET_ON_FORK | SCHED_FLAG_RECLAIM))
+		~(SCHED_FLAG_RESET_ON_FORK | SCHED_FLAG_RECLAIM |
+			SCHED_FLAG_DL_OVERRUN))
 		return -EINVAL;
 
 	/*
