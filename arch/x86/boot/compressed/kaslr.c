@@ -579,9 +579,9 @@ static unsigned long slots_fetch_random(void)
 	return 0;
 }
 
-static void process_mem_region(struct mem_vector *entry,
-			       unsigned long minimum,
-			       unsigned long image_size)
+static void slots_count(struct mem_vector *entry,
+			unsigned long minimum,
+			unsigned long image_size)
 {
 	struct mem_vector region, overlap;
 	struct slot_area slot_area;
@@ -658,6 +658,53 @@ static void process_mem_region(struct mem_vector *entry,
 	}
 }
 
+static bool process_mem_region(struct mem_vector region,
+			       unsigned long long minimum,
+			       unsigned long long image_size)
+{
+#ifdef CONFIG_MEMORY_HOTPLUG
+	/*
+	 * If immovable_mem= specified, walk all immovable regions, and
+	 * filter the intersection to slots_count.
+	 */
+	if (num_immovable_region > 0) {
+		for (int i = 0; i < num_immovable_region; i++) {
+			struct mem_vector entry;
+			unsigned long long start, end, entry_end, region_end;
+
+			start = immovable_mem[i].start;
+			end = start + immovable_mem[i].size;
+			region_end = region.start + region.size;
+
+			entry.start = clamp(region.start, start, end);
+			entry_end = clamp(region_end, start, end);
+
+			if (entry.start < entry_end) {
+				entry.size = entry_end - entry.start;
+				slots_count(&entry, minimum, image_size);
+			}
+
+			if (slot_area_index == MAX_SLOT_AREA) {
+				debug_putstr("Aborted memmap scan (slot_areas full)!\n");
+				return 1;
+			}
+		}
+		return 0;
+	}
+#endif
+
+	/*
+	 * If no immovable_mem stored, or CONFIG_MEMORY_HOTPLUG not specified,
+	 * use region directly
+	 */
+	slots_count(&region, minimum, image_size);
+	if (slot_area_index == MAX_SLOT_AREA) {
+		debug_putstr("Aborted memmap scan (slot_areas full)!\n");
+		return 1;
+	}
+	return 0;
+}
+
 #ifdef CONFIG_EFI
 /*
  * Returns true if mirror region found (and must have been processed
@@ -723,11 +770,9 @@ process_efi_entries(unsigned long minimum, unsigned long image_size)
 
 		region.start = md->phys_addr;
 		region.size = md->num_pages << EFI_PAGE_SHIFT;
-		process_mem_region(&region, minimum, image_size);
-		if (slot_area_index == MAX_SLOT_AREA) {
-			debug_putstr("Aborted EFI scan (slot_areas full)!\n");
+
+		if (process_mem_region(region, minimum, image_size))
 			break;
-		}
 	}
 	return true;
 }
@@ -754,11 +799,9 @@ static void process_e820_entries(unsigned long minimum,
 			continue;
 		region.start = entry->addr;
 		region.size = entry->size;
-		process_mem_region(&region, minimum, image_size);
-		if (slot_area_index == MAX_SLOT_AREA) {
-			debug_putstr("Aborted e820 scan (slot_areas full)!\n");
+
+		if (process_mem_region(region, minimum, image_size))
 			break;
-		}
 	}
 }
 
