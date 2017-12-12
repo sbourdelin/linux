@@ -197,14 +197,6 @@ static int chap_server_compute_md5(
 	struct shash_desc *desc;
 	int auth_ret = -1, ret, challenge_len;
 
-	memset(identifier, 0, 10);
-	memset(chap_n, 0, MAX_CHAP_N_SIZE);
-	memset(chap_r, 0, MAX_RESPONSE_LENGTH);
-	memset(digest, 0, MD5_SIGNATURE_SIZE);
-	memset(response, 0, MD5_SIGNATURE_SIZE * 2 + 2);
-	memset(client_digest, 0, MD5_SIGNATURE_SIZE);
-	memset(server_digest, 0, MD5_SIGNATURE_SIZE);
-
 	challenge = kzalloc(CHAP_CHALLENGE_STR_LEN, GFP_KERNEL);
 	if (!challenge) {
 		pr_err("Unable to allocate challenge buffer\n");
@@ -216,6 +208,9 @@ static int chap_server_compute_md5(
 		pr_err("Unable to allocate challenge_binhex buffer\n");
 		goto free_challenge;
 	}
+
+	memset(chap_n, 0, MAX_CHAP_N_SIZE);
+
 	/*
 	 * Extract CHAP_N.
 	 */
@@ -236,6 +231,8 @@ static int chap_server_compute_md5(
 		goto free_challenge_binhex;
 	}
 	pr_debug("[server] Got CHAP_N=%s\n", chap_n);
+	memset(chap_r, 0, MAX_RESPONSE_LENGTH);
+
 	/*
 	 * Extract CHAP_R.
 	 */
@@ -250,6 +247,7 @@ static int chap_server_compute_md5(
 	}
 
 	pr_debug("[server] Got CHAP_R=%s\n", chap_r);
+	memset(client_digest, 0, MD5_SIGNATURE_SIZE);
 	chap_string_to_hex(client_digest, chap_r, strlen(chap_r));
 
 	tfm = crypto_alloc_shash("md5", 0, 0);
@@ -286,6 +284,7 @@ static int chap_server_compute_md5(
 		goto free_desc;
 	}
 
+	memset(server_digest, 0, MD5_SIGNATURE_SIZE);
 	ret = crypto_shash_finup(desc, chap->challenge,
 				 CHAP_CHALLENGE_LENGTH, server_digest);
 	if (ret < 0) {
@@ -293,6 +292,7 @@ static int chap_server_compute_md5(
 		goto free_desc;
 	}
 
+	memset(response, 0, MD5_SIGNATURE_SIZE * 2 + 2);
 	chap_binaryhex_to_asciihex(response, server_digest, MD5_SIGNATURE_SIZE);
 	pr_debug("[server] MD5 Server Digest: %s\n", response);
 
@@ -310,6 +310,9 @@ static int chap_server_compute_md5(
 		auth_ret = 0;
 		goto free_desc;
 	}
+
+	memset(identifier, 0, ARRAY_SIZE(identifier));
+
 	/*
 	 * Get CHAP_I.
 	 */
@@ -393,6 +396,9 @@ static int chap_server_compute_md5(
 				" password_mutual\n");
 		goto free_desc;
 	}
+
+	memset(digest, 0, MD5_SIGNATURE_SIZE);
+
 	/*
 	 * Convert received challenge to binary hex.
 	 */
