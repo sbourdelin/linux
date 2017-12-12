@@ -33,8 +33,14 @@ static inline void xb_init(struct xb *xb)
 }
 
 int xb_set_bit(struct xb *xb, unsigned long bit);
+int xb_preload_and_set_bit(struct xb *xb, unsigned long bit, gfp_t gfp);
 bool xb_test_bit(const struct xb *xb, unsigned long bit);
-int xb_clear_bit(struct xb *xb, unsigned long bit);
+void xb_clear_bit(struct xb *xb, unsigned long bit);
+unsigned long xb_find_next_set_bit(struct xb *xb, unsigned long start,
+				   unsigned long end);
+unsigned long xb_find_next_zero_bit(struct xb *xb, unsigned long start,
+				    unsigned long end);
+void xb_clear_bit_range(struct xb *xb, unsigned long start, unsigned long end);
 
 static inline bool xb_empty(const struct xb *xb)
 {
