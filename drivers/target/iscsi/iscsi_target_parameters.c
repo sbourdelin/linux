@@ -196,7 +196,7 @@ out:
 /* #warning Add extension keys */
 int iscsi_create_default_params(struct iscsi_param_list **param_list_ptr)
 {
-	struct iscsi_param *param = NULL;
+	struct iscsi_param *param;
 	struct iscsi_param_list *pl;
 
 	pl = kzalloc(sizeof(struct iscsi_param_list), GFP_KERNEL);
