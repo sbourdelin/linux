@@ -1068,7 +1068,7 @@ bool esas2r_check_adapter(struct esas2r_adapter *a)
 			break;
 		}
 
-		schedule_timeout_interruptible(msecs_to_jiffies(100));
+		mdelay(100);
 
 		if ((jiffies_to_msecs(jiffies) - starttime) > 180000) {
 			esas2r_hdebug("FW ready TMO");
@@ -1091,7 +1091,7 @@ bool esas2r_check_adapter(struct esas2r_adapter *a)
 			break;
 		}
 
-		schedule_timeout_interruptible(msecs_to_jiffies(50));
+		mdelay(50);
 
 		if ((jiffies_to_msecs(jiffies) - starttime) > 3000) {
 			esas2r_hdebug("timeout waiting for interface down");
@@ -1180,7 +1180,7 @@ skip_chip_reset:
 			break;
 		}
 
-		schedule_timeout_interruptible(msecs_to_jiffies(100));
+		mdelay(100);
 
 		if ((jiffies_to_msecs(jiffies) - starttime) > 3000) {
 			esas2r_hdebug(
