@@ -119,10 +119,11 @@ static const struct pmc_reg_map spt_reg_map = {
 	.pm_read_disable_bit = SPT_PMC_READ_DISABLE_BIT,
 };
 
+#define PMC_DEVICE(id, data)	PCI_VDEVICE(INTEL, id), (kernel_ulong_t)data }
+
 static const struct pci_device_id pmc_pci_ids[] = {
-	{ PCI_VDEVICE(INTEL, SPT_PMC_PCI_DEVICE_ID),
-					(kernel_ulong_t)&spt_reg_map },
-	{ 0, },
+	PMC_DEVICE(SPT_PMC_PCI_DEVICE_ID, &spt_reg_map),
+	{}
 };
 
 static inline u8 pmc_core_reg_read_byte(struct pmc_dev *pmcdev, int offset)
