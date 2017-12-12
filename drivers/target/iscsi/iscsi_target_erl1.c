@@ -782,7 +782,7 @@ int iscsit_recover_dataout_sequence(
 
 static struct iscsi_ooo_cmdsn *iscsit_allocate_ooo_cmdsn(void)
 {
-	struct iscsi_ooo_cmdsn *ooo_cmdsn = NULL;
+	struct iscsi_ooo_cmdsn *ooo_cmdsn;
 
 	ooo_cmdsn = kmem_cache_zalloc(lio_ooo_cache, GFP_ATOMIC);
 	if (!ooo_cmdsn)
