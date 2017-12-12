@@ -9977,6 +9977,10 @@ ixgbe_features_check(struct sk_buff *skb, struct net_device *dev,
 	if (skb->encapsulation && !(features & NETIF_F_TSO_MANGLEID))
 		features &= ~NETIF_F_TSO;
 
+	/* IPsec offload doesn't get along well with others *yet* */
+	if (skb->sp)
+		features &= ~(NETIF_F_TSO | NETIF_F_HW_CSUM);
+
 	return features;
 }
 
