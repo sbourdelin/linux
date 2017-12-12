@@ -30,11 +30,9 @@ struct iscsi_datain_req *iscsit_allocate_datain_req(void)
 	struct iscsi_datain_req *dr;
 
 	dr = kmem_cache_zalloc(lio_dr_cache, GFP_ATOMIC);
-	if (!dr) {
-		pr_err("Unable to allocate memory for"
-				" struct iscsi_datain_req\n");
+	if (!dr)
 		return NULL;
-	}
+
 	INIT_LIST_HEAD(&dr->cmd_datain_node);
 
 	return dr;

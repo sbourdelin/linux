@@ -810,7 +810,6 @@ int iscsit_add_reject(
 
 	cmd->buf_ptr = kmemdup(buf, ISCSI_HDR_LEN, GFP_KERNEL);
 	if (!cmd->buf_ptr) {
-		pr_err("Unable to allocate memory for cmd->buf_ptr\n");
 		iscsit_free_cmd(cmd, false);
 		return -1;
 	}
@@ -847,7 +846,6 @@ static int iscsit_add_reject_from_cmd(
 
 	cmd->buf_ptr = kmemdup(buf, ISCSI_HDR_LEN, GFP_KERNEL);
 	if (!cmd->buf_ptr) {
-		pr_err("Unable to allocate memory for cmd->buf_ptr\n");
 		iscsit_free_cmd(cmd, false);
 		return -1;
 	}

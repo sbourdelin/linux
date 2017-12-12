@@ -325,11 +325,9 @@ int iscsit_prepare_cmds_for_reallegiance(struct iscsi_conn *conn)
 	 * connection's command list for connection recovery.
 	 */
 	cr = kzalloc(sizeof(struct iscsi_conn_recovery), GFP_KERNEL);
-	if (!cr) {
-		pr_err("Unable to allocate memory for"
-			" struct iscsi_conn_recovery.\n");
+	if (!cr)
 		return -1;
-	}
+
 	INIT_LIST_HEAD(&cr->cr_list);
 	INIT_LIST_HEAD(&cr->conn_recovery_cmd_list);
 	spin_lock_init(&cr->conn_recovery_cmd_lock);

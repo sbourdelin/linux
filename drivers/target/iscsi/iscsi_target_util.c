@@ -69,10 +69,9 @@ int iscsit_add_r2t_to_list(
 	struct iscsi_r2t *r2t;
 
 	r2t = kmem_cache_zalloc(lio_r2t_cache, GFP_ATOMIC);
-	if (!r2t) {
-		pr_err("Unable to allocate memory for struct iscsi_r2t.\n");
+	if (!r2t)
 		return -1;
-	}
+
 	INIT_LIST_HEAD(&r2t->r2t_list);
 
 	r2t->recovery_r2t = recovery;
@@ -576,11 +575,9 @@ int iscsit_add_cmd_to_response_queue(
 	struct iscsi_queue_req *qr;
 
 	qr = kmem_cache_zalloc(lio_qr_cache, GFP_ATOMIC);
-	if (!qr) {
-		pr_err("Unable to allocate memory for"
-			" struct iscsi_queue_req\n");
+	if (!qr)
 		return -ENOMEM;
-	}
+
 	INIT_LIST_HEAD(&qr->qr_list);
 	qr->cmd = cmd;
 	qr->state = state;

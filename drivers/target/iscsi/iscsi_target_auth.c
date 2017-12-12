@@ -80,10 +80,9 @@ static int chap_check_algorithm(const char *a_str)
 	char *tmp, *orig, *token;
 
 	tmp = kstrdup(a_str, GFP_KERNEL);
-	if (!tmp) {
-		pr_err("Memory allocation failed for CHAP_A temporary buffer\n");
+	if (!tmp)
 		return CHAP_DIGEST_UNKNOWN;
-	}
+
 	orig = tmp;
 
 	token = strsep(&tmp, "=");
@@ -198,16 +197,12 @@ static int chap_server_compute_md5(
 	int auth_ret = -1, ret, challenge_len;
 
 	challenge = kzalloc(CHAP_CHALLENGE_STR_LEN, GFP_KERNEL);
-	if (!challenge) {
-		pr_err("Unable to allocate challenge buffer\n");
+	if (!challenge)
 		goto exit;
-	}
 
 	challenge_binhex = kzalloc(CHAP_CHALLENGE_STR_LEN, GFP_KERNEL);
-	if (!challenge_binhex) {
-		pr_err("Unable to allocate challenge_binhex buffer\n");
+	if (!challenge_binhex)
 		goto free_challenge;
-	}
 
 	memset(chap_n, 0, MAX_CHAP_N_SIZE);
 
@@ -257,10 +252,8 @@ static int chap_server_compute_md5(
 	}
 
 	desc = kmalloc(sizeof(*desc) + crypto_shash_descsize(tfm), GFP_KERNEL);
-	if (!desc) {
-		pr_err("Unable to allocate struct shash_desc\n");
+	if (!desc)
 		goto free_shash;
-	}
 
 	desc->tfm = tfm;
 	desc->flags = 0;

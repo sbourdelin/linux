@@ -35,10 +35,8 @@ struct iscsi_portal_group *iscsit_alloc_portal_group(struct iscsi_tiqn *tiqn, u1
 	struct iscsi_portal_group *tpg;
 
 	tpg = kzalloc(sizeof(struct iscsi_portal_group), GFP_KERNEL);
-	if (!tpg) {
-		pr_err("Unable to allocate struct iscsi_portal_group\n");
+	if (!tpg)
 		return NULL;
-	}
 
 	tpg->tpgt = tpgt;
 	tpg->tpg_state = TPG_STATE_FREE;
@@ -477,11 +475,8 @@ struct iscsi_tpg_np *iscsit_tpg_add_network_portal(
 	}
 
 	tpg_np = kzalloc(sizeof(struct iscsi_tpg_np), GFP_KERNEL);
-	if (!tpg_np) {
-		pr_err("Unable to allocate memory for"
-				" struct iscsi_tpg_np.\n");
+	if (!tpg_np)
 		return ERR_PTR(-ENOMEM);
-	}
 
 	np = iscsit_add_np(sockaddr, network_transport);
 	if (IS_ERR(np)) {

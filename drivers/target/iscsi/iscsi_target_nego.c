@@ -1070,10 +1070,8 @@ int iscsi_target_locate_portal(
 	payload_length = ntoh24(login_req->dlength);
 
 	tmpbuf = kzalloc(payload_length + 1, GFP_KERNEL);
-	if (!tmpbuf) {
-		pr_err("Unable to allocate memory for tmpbuf.\n");
+	if (!tmpbuf)
 		return -1;
-	}
 
 	memcpy(tmpbuf, login->req_buf, payload_length);
 	tmpbuf[payload_length] = '\0';

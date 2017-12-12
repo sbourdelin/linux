@@ -59,11 +59,9 @@ int iscsit_dump_data_payload(
 	length = min(buf_len, OFFLOAD_BUF_SIZE);
 
 	buf = kzalloc(length, GFP_ATOMIC);
-	if (!buf) {
-		pr_err("Unable to allocate %u bytes for offload"
-				" buffer.\n", length);
+	if (!buf)
 		return -1;
-	}
+
 	memset(&iov, 0, sizeof(struct kvec));
 
 	while (offset < buf_len) {
@@ -787,11 +785,9 @@ static struct iscsi_ooo_cmdsn *iscsit_allocate_ooo_cmdsn(void)
 	struct iscsi_ooo_cmdsn *ooo_cmdsn = NULL;
 
 	ooo_cmdsn = kmem_cache_zalloc(lio_ooo_cache, GFP_ATOMIC);
-	if (!ooo_cmdsn) {
-		pr_err("Unable to allocate memory for"
-			" struct iscsi_ooo_cmdsn.\n");
+	if (!ooo_cmdsn)
 		return NULL;
-	}
+
 	INIT_LIST_HEAD(&ooo_cmdsn->ooo_list);
 
 	return ooo_cmdsn;

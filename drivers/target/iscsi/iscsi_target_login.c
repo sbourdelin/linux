@@ -47,32 +47,24 @@ static struct iscsi_login *iscsi_login_init_conn(struct iscsi_conn *conn)
 	struct iscsi_login *login;
 
 	login = kzalloc(sizeof(struct iscsi_login), GFP_KERNEL);
-	if (!login) {
-		pr_err("Unable to allocate memory for struct iscsi_login.\n");
+	if (!login)
 		return NULL;
-	}
+
 	conn->login = login;
 	login->conn = conn;
 	login->first_request = 1;
 
 	login->req_buf = kzalloc(MAX_KEY_VALUE_PAIRS, GFP_KERNEL);
-	if (!login->req_buf) {
-		pr_err("Unable to allocate memory for response buffer.\n");
+	if (!login->req_buf)
 		goto out_login;
-	}
 
 	login->rsp_buf = kzalloc(MAX_KEY_VALUE_PAIRS, GFP_KERNEL);
-	if (!login->rsp_buf) {
-		pr_err("Unable to allocate memory for request buffer.\n");
+	if (!login->rsp_buf)
 		goto out_req_buf;
-	}
 
 	conn->conn_ops = kzalloc(sizeof(struct iscsi_conn_ops), GFP_KERNEL);
-	if (!conn->conn_ops) {
-		pr_err("Unable to allocate memory for"
-			" struct iscsi_conn_ops.\n");
+	if (!conn->conn_ops)
 		goto out_rsp_buf;
-	}
 
 	init_waitqueue_head(&conn->queues_wq);
 	INIT_LIST_HEAD(&conn->conn_list);
@@ -306,7 +298,6 @@ static int iscsi_login_zero_tsih_s1(
 	if (!sess) {
 		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
-		pr_err("Could not allocate memory for session\n");
 		return -ENOMEM;
 	}
 
@@ -360,8 +351,6 @@ static int iscsi_login_zero_tsih_s1(
 	if (!sess->sess_ops) {
 		iscsit_tx_login_rsp(conn, ISCSI_STATUS_CLS_TARGET_ERR,
 				ISCSI_LOGIN_STATUS_NO_RESOURCES);
-		pr_err("Unable to allocate memory for"
-				" struct iscsi_sess_ops.\n");
 		kfree(sess);
 		return -ENOMEM;
 	}
@@ -1258,8 +1247,6 @@ static int __iscsi_target_login_thread(struct iscsi_np *np)
 
 	conn = kzalloc(sizeof(struct iscsi_conn), GFP_KERNEL);
 	if (!conn) {
-		pr_err("Could not allocate memory for"
-			" new connection\n");
 		/* Get another socket */
 		return 1;
 	}
