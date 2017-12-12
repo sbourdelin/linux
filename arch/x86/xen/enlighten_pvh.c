@@ -31,21 +31,38 @@ static void xen_pvh_arch_setup(void)
 		acpi_irq_model = ACPI_IRQ_MODEL_PLATFORM;
 }
 
-static void __init init_pvh_bootparams(void)
+static void __init init_pvh_bootparams(bool xen_guest)
 {
 	struct xen_memory_map memmap;
 	int rc;
 
 	memset(&pvh_bootparams, 0, sizeof(pvh_bootparams));
 
-	memmap.nr_entries = ARRAY_SIZE(pvh_bootparams.e820_table);
-	set_xen_guest_handle(memmap.buffer, pvh_bootparams.e820_table);
-	rc = HYPERVISOR_memory_op(XENMEM_memory_map, &memmap);
-	if (rc) {
-		xen_raw_printk("XENMEM_memory_map failed (%d)\n", rc);
+	if ((pvh_start_info.version > 0) && (pvh_start_info.memmap_entries)) {
+		struct hvm_memmap_table_entry *ep;
+		int i;
+
+		ep = __va(pvh_start_info.memmap_paddr);
+		pvh_bootparams.e820_entries = pvh_start_info.memmap_entries;
+
+		for (i = 0; i < pvh_bootparams.e820_entries ; i++, ep++) {
+			pvh_bootparams.e820_table[i].addr = ep->addr;
+			pvh_bootparams.e820_table[i].size = ep->size;
+			pvh_bootparams.e820_table[i].type = ep->type;
+		}
+	} else if (xen_guest) {
+		memmap.nr_entries = ARRAY_SIZE(pvh_bootparams.e820_table);
+		set_xen_guest_handle(memmap.buffer, pvh_bootparams.e820_table);
+		rc = HYPERVISOR_memory_op(XENMEM_memory_map, &memmap);
+		if (rc) {
+			xen_raw_printk("XENMEM_memory_map failed (%d)\n", rc);
+			BUG();
+		}
+		pvh_bootparams.e820_entries = memmap.nr_entries;
+	} else {
+		xen_raw_printk("Error: Could not find memory map\n");
 		BUG();
 	}
-	pvh_bootparams.e820_entries = memmap.nr_entries;
 
 	if (pvh_bootparams.e820_entries < E820_MAX_ENTRIES_ZEROPAGE - 1) {
 		pvh_bootparams.e820_table[pvh_bootparams.e820_entries].addr =
@@ -76,7 +93,7 @@ static void __init init_pvh_bootparams(void)
 	 * environment (i.e. hardware_subarch 0).
 	 */
 	pvh_bootparams.hdr.version = 0x212;
-	pvh_bootparams.hdr.type_of_loader = (9 << 4) | 0; /* Xen loader */
+	pvh_bootparams.hdr.type_of_loader = ((xen_guest ? 0x9 : 0xb) << 4) | 0;
 }
 
 /*
@@ -85,8 +102,10 @@ static void __init init_pvh_bootparams(void)
  */
 void __init xen_prepare_pvh(void)
 {
-	u32 msr;
+
+	u32 msr = xen_cpuid_base();
 	u64 pfn;
+	bool xen_guest = !!msr;
 
 	if (pvh_start_info.magic != XEN_HVM_START_MAGIC_VALUE) {
 		xen_raw_printk("Error: Unexpected magic value (0x%08x)\n",
@@ -94,13 +113,15 @@ void __init xen_prepare_pvh(void)
 		BUG();
 	}
 
-	xen_pvh = 1;
+	if (xen_guest) {
+		xen_pvh = 1;
 
-	msr = cpuid_ebx(xen_cpuid_base() + 2);
-	pfn = __pa(hypercall_page);
-	wrmsr_safe(msr, (u32)pfn, (u32)(pfn >> 32));
+		msr = cpuid_ebx(msr + 2);
+		pfn = __pa(hypercall_page);
+		wrmsr_safe(msr, (u32)pfn, (u32)(pfn >> 32));
 
-	init_pvh_bootparams();
+		x86_init.oem.arch_setup = xen_pvh_arch_setup;
+	}
 
-	x86_init.oem.arch_setup = xen_pvh_arch_setup;
+	init_pvh_bootparams(xen_guest);
 }
