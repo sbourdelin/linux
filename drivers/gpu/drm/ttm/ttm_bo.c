@@ -1208,6 +1208,7 @@ int ttm_bo_init_reserved(struct ttm_bo_device *bdev,
 		WARN_ON(!locked);
 	}
 
+	ctx->resv = resv;
 	if (likely(!ret))
 		ret = ttm_bo_validate(bo, placement, ctx);
 

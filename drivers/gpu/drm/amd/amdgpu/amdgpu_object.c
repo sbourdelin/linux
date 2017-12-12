@@ -327,7 +327,7 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 			       uint64_t init_value,
 			       struct amdgpu_bo **bo_ptr)
 {
-	struct ttm_operation_ctx ctx = { !kernel, false };
+	struct ttm_operation_ctx ctx = { !kernel, false, true };
 	struct amdgpu_bo *bo;
 	enum ttm_bo_type type;
 	unsigned long page_align;
