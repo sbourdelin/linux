@@ -95,9 +95,13 @@ void intel_uc_fw_fetch(struct drm_i915_private *dev_priv,
 	uc_fw->ucode_offset = uc_fw->header_offset + uc_fw->header_size;
 	uc_fw->ucode_size = (css->size_dw - css->header_size_dw) * sizeof(u32);
 
-	/* Header and uCode will be loaded to WOPCM */
+	/*
+	 * Header and uCode will be loaded to WOPCM
+	 * Only check the size against the overall available WOPCM here. Will
+	 * continue to check the size during WOPCM partition calculation.
+	 */
 	size = uc_fw->header_size + uc_fw->ucode_size;
-	if (size > intel_guc_wopcm_size(&dev_priv->guc)) {
+	if (size > WOPCM_DEFAULT_SIZE) {
 		DRM_WARN("%s: Firmware is too large to fit in WOPCM\n",
 			 intel_uc_fw_type_repr(uc_fw->type));
 		err = -E2BIG;
@@ -207,6 +211,7 @@ int intel_uc_fw_upload(struct intel_uc_fw *uc_fw,
 		       int (*xfer)(struct intel_uc_fw *uc_fw,
 				   struct i915_vma *vma))
 {
+	struct drm_i915_private *i915 = to_i915(uc_fw->obj->base.dev);
 	struct i915_vma *vma;
 	int err;
 
@@ -230,7 +235,7 @@ int intel_uc_fw_upload(struct intel_uc_fw *uc_fw,
 	}
 
 	vma = i915_gem_object_ggtt_pin(uc_fw->obj, NULL, 0, 0,
-				       PIN_OFFSET_BIAS | GUC_WOPCM_TOP);
+				       PIN_OFFSET_BIAS | i915->guc.wopcm.top);
 	if (IS_ERR(vma)) {
 		err = PTR_ERR(vma);
 		DRM_DEBUG_DRIVER("%s fw ggtt-pin err=%d\n",
