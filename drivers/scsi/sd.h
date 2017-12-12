@@ -2,6 +2,8 @@
 #ifndef _SCSI_DISK_H
 #define _SCSI_DISK_H
 
+#include <linux/async.h>
+
 /*
  * More than enough for everybody ;)  The huge number of majors
  * is a leftover from 16bit dev_t days, we don't really need that
@@ -73,6 +75,7 @@ struct scsi_disk {
 	struct device	dev;
 	struct gendisk	*disk;
 	struct opal_dev *opal_dev;
+	async_cookie_t  async_probe;
 #ifdef CONFIG_BLK_DEV_ZONED
 	unsigned int	nr_zones;
 	unsigned int	zone_blocks;
