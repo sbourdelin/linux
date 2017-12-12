@@ -201,31 +201,30 @@ static struct sock *run_bpf(struct sock_reuseport *reuse, u16 socks,
 }
 
 /**
- *  reuseport_select_sock - Select a socket from an SO_REUSEPORT group.
+ *  __reuseport_get_info - Retrieve information for reuseport socket selection
  *  @sk: First socket in the group.
- *  @hash: When no BPF filter is available, use this hash to select.
  *  @skb: skb to run through BPF filter.
  *  @hdr_len: BPF filter expects skb data pointer at payload data.  If
  *    the skb does not yet point at the payload, this parameter represents
  *    how far the pointer needs to advance to reach the payload.
- *  Returns a socket that should receive the packet (or NULL on error).
+ *  @info: reuseport information, filled only if return value is true
+ *  Returns true if @sk is a reuseport socket, and fill @info accordingly.
+ *  if @info.sk is NULL, the caller must retrieve the selected reuseport socket
+ *  calling __reuseport_select_sock(). The caller must hold the RCU lock.
  */
-struct sock *reuseport_select_sock(struct sock *sk,
-				   u32 hash,
-				   struct sk_buff *skb,
-				   int hdr_len)
+bool __reuseport_get_info(struct sock *sk, struct sk_buff *skb, int hdr_len,
+			  struct reuseport_info *info)
 {
 	struct sock_reuseport *reuse;
 	struct bpf_prog *prog;
-	struct sock *sk2 = NULL;
 	u16 socks;
 
-	rcu_read_lock();
+	info->sk = NULL;
 	reuse = rcu_dereference(sk->sk_reuseport_cb);
 
 	/* if memory allocation failed or add call is not yet complete */
 	if (!reuse)
-		goto out;
+		return false;
 
 	prog = rcu_dereference(reuse->prog);
 	socks = READ_ONCE(reuse->num_socks);
@@ -234,18 +233,15 @@ struct sock *reuseport_select_sock(struct sock *sk,
 		smp_rmb();
 
 		if (prog && skb)
-			sk2 = run_bpf(reuse, socks, prog, skb, hdr_len);
+			info->sk = run_bpf(reuse, socks, prog, skb, hdr_len);
 
-		/* no bpf or invalid bpf result: fall back to hash usage */
-		if (!sk2)
-			sk2 = reuse->socks[reciprocal_scale(hash, socks)];
+		info->reuse = reuse;
+		info->socks = socks;
+		return true;
 	}
-
-out:
-	rcu_read_unlock();
-	return sk2;
+	return false;
 }
-EXPORT_SYMBOL(reuseport_select_sock);
+EXPORT_SYMBOL(__reuseport_get_info);
 
 struct bpf_prog *
 reuseport_attach_prog(struct sock *sk, struct bpf_prog *prog)

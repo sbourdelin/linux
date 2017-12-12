@@ -440,7 +440,6 @@ static struct sock *udp4_lib_lookup2(struct net *net,
 {
 	struct sock *sk, *result;
 	int score, badness;
-	u32 hash = 0;
 
 	result = NULL;
 	badness = 0;
@@ -448,14 +447,12 @@ static struct sock *udp4_lib_lookup2(struct net *net,
 		score = compute_score(sk, net, saddr, sport,
 				      daddr, hnum, dif, sdif, exact_dif);
 		if (score > badness) {
-			if (sk->sk_reuseport) {
-				hash = udp_ehashfn(net, daddr, hnum,
-						   saddr, sport);
-				result = reuseport_select_sock(sk, hash, skb,
-							sizeof(struct udphdr));
-				if (result)
-					return result;
-			}
+			result = reuseport_select_sock(sk, skb, net,
+						       sizeof(struct udphdr),
+						       udp_ehashfn, saddr,
+						       sport, daddr, hnum);
+			if (result)
+				return result;
 			badness = score;
 			result = sk;
 		}
@@ -476,7 +473,6 @@ struct sock *__udp4_lib_lookup(struct net *net, __be32 saddr,
 	struct udp_hslot *hslot2, *hslot = &udptable->hash[slot];
 	bool exact_dif = udp_lib_exact_dif_match(net, skb);
 	int score, badness;
-	u32 hash = 0;
 
 	if (hslot->count > 10) {
 		hash2 = ipv4_portaddr_hash(net, daddr, hnum);
@@ -513,14 +509,12 @@ begin:
 		score = compute_score(sk, net, saddr, sport,
 				      daddr, hnum, dif, sdif, exact_dif);
 		if (score > badness) {
-			if (sk->sk_reuseport) {
-				hash = udp_ehashfn(net, daddr, hnum,
-						   saddr, sport);
-				result = reuseport_select_sock(sk, hash, skb,
-							sizeof(struct udphdr));
-				if (result)
-					return result;
-			}
+			result = reuseport_select_sock(sk, skb, net,
+						       sizeof(struct udphdr),
+						       udp_ehashfn, saddr,
+						       sport, daddr, hnum);
+			if (result)
+				return result;
 			result = sk;
 			badness = score;
 		}

@@ -273,21 +273,17 @@ static struct sock *inet_lhash2_lookup(struct net *net,
 	struct inet_connection_sock *icsk;
 	struct sock *sk, *result = NULL;
 	int score, hiscore = 0;
-	u32 phash = 0;
 
 	inet_lhash2_for_each_icsk_rcu(icsk, &ilb2->head) {
 		sk = (struct sock *)icsk;
 		score = compute_score(sk, net, hnum, daddr,
 				      dif, sdif, exact_dif);
 		if (score > hiscore) {
-			if (sk->sk_reuseport) {
-				phash = inet_ehashfn(net, daddr, hnum,
-						     saddr, sport);
-				result = reuseport_select_sock(sk, phash,
-							       skb, doff);
-				if (result)
-					return result;
-			}
+			result = reuseport_select_sock(sk, skb, net, doff,
+						       inet_ehashfn, saddr,
+						       sport, daddr, hnum);
+			if (result)
+				return result;
 			result = sk;
 			hiscore = score;
 		}
@@ -310,7 +306,6 @@ struct sock *__inet_lookup_listener(struct net *net,
 	struct sock *sk, *result = NULL;
 	int score, hiscore = 0;
 	unsigned int hash2;
-	u32 phash = 0;
 
 	if (ilb->count <= 10 || !hashinfo->lhash2)
 		goto port_lookup;
@@ -346,14 +341,11 @@ port_lookup:
 		score = compute_score(sk, net, hnum, daddr,
 				      dif, sdif, exact_dif);
 		if (score > hiscore) {
-			if (sk->sk_reuseport) {
-				phash = inet_ehashfn(net, daddr, hnum,
-						     saddr, sport);
-				result = reuseport_select_sock(sk, phash,
-							       skb, doff);
-				if (result)
-					return result;
-			}
+			result = reuseport_select_sock(sk, skb, net, doff,
+						       inet_ehashfn, saddr,
+						       sport, daddr, hnum);
+			if (result)
+				return result;
 			result = sk;
 			hiscore = score;
 		}
