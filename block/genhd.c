@@ -697,6 +697,9 @@ void del_gendisk(struct gendisk *disk)
 	struct disk_part_iter piter;
 	struct hd_struct *part;
 
+	if (!(disk->flags & GENHD_FL_UP))
+		return;
+
 	blk_integrity_del(disk);
 	disk_del_events(disk);
 
