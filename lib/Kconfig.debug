@@ -1099,8 +1099,6 @@ config PROVE_LOCKING
 	select DEBUG_MUTEXES
 	select DEBUG_RT_MUTEXES if RT_MUTEXES
 	select DEBUG_LOCK_ALLOC
-	select LOCKDEP_CROSSRELEASE
-	select LOCKDEP_COMPLETIONS
 	select TRACE_IRQFLAGS
 	default n
 	help
@@ -1171,7 +1169,9 @@ config LOCK_STAT
 	 (CONFIG_LOCKDEP defines "acquire" and "release" events.)
 
 config LOCKDEP_CROSSRELEASE
-	bool
+	bool "Lock debugging: enable cross-locking checks in lockdep"
+	depends on PROVE_LOCKING
+	default n
 	help
 	 This makes lockdep work for crosslock which is a lock allowed to
 	 be released in a different context from the acquisition context.
@@ -1181,7 +1181,10 @@ config LOCKDEP_CROSSRELEASE
 	 detector, lockdep.
 
 config LOCKDEP_COMPLETIONS
-	bool
+	bool "Lock debugging: allow completions to use deadlock detector"
+	depends on PROVE_LOCKING
+	select LOCKDEP_CROSSRELEASE
+	default n
 	help
 	 A deadlock caused by wait_for_completion() and complete() can be
 	 detected by lockdep using crossrelease feature.
