@@ -1894,21 +1894,48 @@ static int region_type_cap(struct vfio_info_cap *caps, void *cap_type)
 	return 0;
 }
 
+static int header_cap(struct vfio_info_cap *caps, int cap_type_id,
+		int cap_type_ver)
+{
+	struct vfio_info_cap_header *header;
+
+	header = vfio_info_cap_add(caps, sizeof(*header), cap_type_id,
+			cap_type_ver);
+
+	if (IS_ERR(header))
+		return PTR_ERR(header);
+
+	return 0;
+}
+
 int vfio_info_add_capability(struct vfio_info_cap *caps, int cap_type_id,
 			     void *cap_type)
 {
 	int ret = -EINVAL;
 
-	if (!cap_type)
-		return 0;
-
 	switch (cap_type_id) {
 	case VFIO_REGION_INFO_CAP_SPARSE_MMAP:
-		ret = sparse_mmap_cap(caps, cap_type);
+		if (!cap_type)
+			ret = 0;
+		else
+			ret = sparse_mmap_cap(caps, cap_type);
 		break;
 
 	case VFIO_REGION_INFO_CAP_TYPE:
-		ret = region_type_cap(caps, cap_type);
+		if (!cap_type)
+			ret = 0;
+		else
+			ret = region_type_cap(caps, cap_type);
+		break;
+
+	case VFIO_REGION_INFO_CAP_MSIX_MAPPABLE:
+		if (!cap_type)
+			ret = header_cap(caps, cap_type_id, 1);
+		break;
+
+	default:
+		if (!cap_type)
+			ret = 0;
 		break;
 	}
 
