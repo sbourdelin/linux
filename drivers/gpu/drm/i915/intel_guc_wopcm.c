@@ -33,6 +33,9 @@ static inline u32 guc_reserved_wopcm_size(struct intel_guc *guc)
 	if (IS_GEN9_LP(i915))
 		return BXT_WOPCM_RC6_RESERVED;
 
+	if (IS_GEN10(i915))
+		return CNL_WOPCM_RESERVED;
+
 	return 0;
 }
 
@@ -58,12 +61,30 @@ static inline int gen9_wocpm_size_check(struct drm_i915_private *i915)
 	return 0;
 }
 
+static inline int cnl_a0_wopcm_size_check(struct drm_i915_private *i915)
+{
+	struct intel_guc_wopcm *wopcm = &i915->guc.wopcm;
+	u32 huc_size = intel_uc_fw_get_size(&i915->huc.fw);
+
+	/*
+	 * On CNL A0, hardware requires guc size to be larger than or equal to
+	 * HuC kernel size.
+	 */
+	if (unlikely(wopcm->size - GEN10_GUC_WOPCM_OFFSET < huc_size))
+		return -E2BIG;
+
+	return 0;
+}
+
 static inline int guc_wopcm_size_check(struct intel_guc *guc)
 {
 	struct drm_i915_private *i915 = guc_to_i915(guc);
 
 	if (IS_GEN9(i915))
 		return gen9_wocpm_size_check(i915);
+
+	if (IS_CNL_REVID(i915, CNL_REVID_A0, CNL_REVID_A0))
+		return cnl_a0_wopcm_size_check(i915);
 
 	return 0;
 }

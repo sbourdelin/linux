@@ -39,9 +39,12 @@ struct intel_guc;
 #define GUC_WOPCM_STACK_RESERVED	(0x2000)
 /* 24KB WOPCM reserved for RC6 CTX on BXT */
 #define BXT_WOPCM_RC6_RESERVED		(0x6000)
+/* 36KB WOPCM reserved on CNL */
+#define CNL_WOPCM_RESERVED		(0x9000)
 
 #define GEN9_GUC_WOPCM_DELTA		4
 #define GEN9_GUC_WOPCM_OFFSET		(0x24000)
+#define GEN10_GUC_WOPCM_OFFSET		(0x4000)
 
 struct intel_guc_wopcm {
 	u32 offset;
