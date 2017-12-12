@@ -78,6 +78,14 @@ static struct kmem_cache *radix_tree_node_cachep;
 #define IDA_PRELOAD_SIZE	(IDA_MAX_PATH * 2 - 1)
 
 /*
+ * The XB can go up to unsigned long, but also uses a bitmap.
+ */
+#define XB_INDEX_BITS		(BITS_PER_LONG - ilog2(IDA_BITMAP_BITS))
+#define XB_MAX_PATH		(DIV_ROUND_UP(XB_INDEX_BITS, \
+						RADIX_TREE_MAP_SHIFT))
+#define XB_PRELOAD_SIZE		(XB_MAX_PATH * 2 - 1)
+
+/*
  * Per-cpu pool of preloaded nodes
  */
 struct radix_tree_preload {
@@ -839,6 +847,8 @@ int __radix_tree_create(struct radix_tree_root *root, unsigned long index,
 							offset, 0, 0);
 			if (!child)
 				return -ENOMEM;
+			if (is_idr(root))
+				all_tag_set(child, IDR_FREE);
 			rcu_assign_pointer(*slot, node_to_entry(child));
 			if (node)
 				node->count++;
@@ -1982,7 +1992,7 @@ void __radix_tree_delete_node(struct radix_tree_root *root,
 	delete_node(root, node, update_node);
 }
 
-static bool __radix_tree_delete(struct radix_tree_root *root,
+bool __radix_tree_delete(struct radix_tree_root *root,
 				struct radix_tree_node *node, void __rcu **slot)
 {
 	void *old = rcu_dereference_raw(*slot);
@@ -2134,6 +2144,20 @@ int ida_pre_get(struct ida *ida, gfp_t gfp)
 	return 1;
 }
 EXPORT_SYMBOL(ida_pre_get);
+
+void xb_preload(gfp_t gfp)
+{
+	__radix_tree_preload(gfp, XB_PRELOAD_SIZE);
+	if (!this_cpu_read(ida_bitmap)) {
+		struct ida_bitmap *bitmap = kmalloc(sizeof(*bitmap), gfp);
+
+		if (!bitmap)
+			return;
+		bitmap = this_cpu_cmpxchg(ida_bitmap, NULL, bitmap);
+		kfree(bitmap);
+	}
+}
+EXPORT_SYMBOL(xb_preload);
 
 void __rcu **idr_get_free_cmn(struct radix_tree_root *root,
 			      struct radix_tree_iter *iter, gfp_t gfp,

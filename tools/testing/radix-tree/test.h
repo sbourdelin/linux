@@ -38,6 +38,7 @@ void benchmark(void);
 void idr_checks(void);
 void ida_checks(void);
 void ida_thread_tests(void);
+void xbitmap_checks(void);
 
 struct item *
 item_tag_set(struct radix_tree_root *root, unsigned long index, int tag);
