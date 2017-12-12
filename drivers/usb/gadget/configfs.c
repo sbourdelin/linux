@@ -549,6 +549,11 @@ static struct config_group *function_make(
 	*instance_name = '\0';
 	instance_name++;
 
+	if (*instance_name == '\0') {
+		pr_err("Instance name (after .) should not be empty\n");
+		return ERR_PTR(-EINVAL);
+	}
+
 	fi = usb_get_function_instance(func_name);
 	if (IS_ERR(fi))
 		return ERR_CAST(fi);
