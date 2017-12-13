@@ -414,6 +414,19 @@ struct drm_mode_config {
 	 */
 	struct list_head connector_list;
 	/**
+	 * @pending_connector_free_works:
+	 *
+	 * Number of scheduled connector->free_work instances, see
+	 * drm_connector_put_safe().
+	 */
+	atomic_t connector_free_works;
+	/**
+	 * @pending_connector_free_queue:
+	 *
+	 * Wait queue for waiting until connector->free_work is finished.
+	 */
+	wait_queue_head_t connector_free_queue;
+	/**
 	 * @num_encoder:
 	 *
 	 * Number of encoders on this device. This is invariant over the

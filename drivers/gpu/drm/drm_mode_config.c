@@ -381,6 +381,7 @@ void drm_mode_config_init(struct drm_device *dev)
 	idr_init(&dev->mode_config.tile_idr);
 	ida_init(&dev->mode_config.connector_ida);
 	spin_lock_init(&dev->mode_config.connector_list_lock);
+	init_waitqueue_head(&dev->mode_config.connector_free_queue);
 
 	drm_mode_create_standard_properties(dev);
 
@@ -431,8 +432,11 @@ void drm_mode_config_cleanup(struct drm_device *dev)
 		drm_connector_put(connector);
 	}
 	drm_connector_list_iter_end(&conn_iter);
+
 	/* connector_iter drops references in a work item. */
-	flush_scheduled_work();
+	wait_event(dev->mode_config.connector_free_queue,
+		   !atomic_read(&dev->mode_config.connector_free_works));
+
 	if (WARN_ON(!list_empty(&dev->mode_config.connector_list))) {
 		drm_connector_list_iter_begin(dev, &conn_iter);
 		drm_for_each_connector_iter(connector, &conn_iter)

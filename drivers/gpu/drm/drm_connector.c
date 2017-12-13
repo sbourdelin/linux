@@ -160,6 +160,8 @@ static void drm_connector_free_work_fn(struct work_struct *work)
 
 	drm_mode_object_unregister(dev, &connector->base);
 	connector->funcs->destroy(connector);
+	atomic_dec(&dev->mode_config.connector_free_works);
+	wake_up_all(&dev->mode_config.connector_free_queue);
 }
 
 /**
@@ -549,8 +551,10 @@ EXPORT_SYMBOL(drm_connector_list_iter_begin);
 static void
 drm_connector_put_safe(struct drm_connector *conn)
 {
-	if (refcount_dec_and_test(&conn->base.refcount.refcount))
+	if (refcount_dec_and_test(&conn->base.refcount.refcount)) {
+		atomic_inc(&conn->dev->mode_config.connector_free_works);
 		schedule_work(&conn->free_work);
+	}
 }
 
 /**
