@@ -15,6 +15,7 @@
 #include <drm/drmP.h>
 
 #include "sun4i_backend.h"
+#include "sun4i_frontend.h"
 #include "sun4i_layer.h"
 #include "sunxi_engine.h"
 
@@ -70,21 +71,41 @@ static void sun4i_backend_layer_destroy_state(struct drm_plane *plane,
 static void sun4i_backend_layer_atomic_disable(struct drm_plane *plane,
 					       struct drm_plane_state *old_state)
 {
+	struct sun4i_layer_state *layer_state = state_to_sun4i_layer_state(old_state);
 	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
 	struct sun4i_backend *backend = layer->backend;
+	struct sun4i_frontend *frontend = backend->frontend;
 
 	sun4i_backend_layer_enable(backend, layer->id, false);
+
+	if (layer_state->uses_frontend)
+		sun4i_frontend_exit(frontend);
 }
 
 static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
 					      struct drm_plane_state *old_state)
 {
+	struct sun4i_layer_state *layer_state = state_to_sun4i_layer_state(plane->state);
 	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
 	struct sun4i_backend *backend = layer->backend;
+	struct sun4i_frontend *frontend = backend->frontend;
 
-	sun4i_backend_update_layer_coord(backend, layer->id, plane);
-	sun4i_backend_update_layer_formats(backend, layer->id, plane);
-	sun4i_backend_update_layer_buffer(backend, layer->id, plane);
+	if (layer_state->uses_frontend) {
+		sun4i_frontend_init(frontend);
+		sun4i_frontend_update_coord(frontend, plane);
+		sun4i_frontend_update_buffer(frontend, plane);
+		sun4i_frontend_update_formats(frontend, plane,
+					      DRM_FORMAT_ARGB8888);
+		sun4i_backend_update_layer_frontend(backend, layer->id,
+						    DRM_FORMAT_ARGB8888);
+		sun4i_backend_update_layer_coord(backend, layer->id, plane);
+		sun4i_frontend_enable(frontend);
+	} else {
+		sun4i_backend_update_layer_coord(backend, layer->id, plane);
+		sun4i_backend_update_layer_formats(backend, layer->id, plane);
+		sun4i_backend_update_layer_buffer(backend, layer->id, plane);
+	}
+
 	sun4i_backend_layer_enable(backend, layer->id, true);
 }
 

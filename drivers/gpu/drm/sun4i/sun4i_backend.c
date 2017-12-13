@@ -26,6 +26,7 @@
 
 #include "sun4i_backend.h"
 #include "sun4i_drv.h"
+#include "sun4i_frontend.h"
 #include "sun4i_layer.h"
 #include "sunxi_engine.h"
 
@@ -203,6 +204,30 @@ int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
 	return 0;
 }
 
+int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
+					int layer, uint32_t fmt)
+{
+	u32 val;
+	int ret;
+
+	ret = sun4i_backend_drm_format_to_layer(NULL, fmt, &val);
+	if (ret) {
+		DRM_DEBUG_DRIVER("Invalid format\n");
+		return ret;
+	}
+
+	regmap_update_bits(backend->engine.regs,
+			   SUN4I_BACKEND_ATTCTL_REG0(layer),
+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN,
+			   SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN);
+
+	regmap_update_bits(backend->engine.regs,
+			   SUN4I_BACKEND_ATTCTL_REG1(layer),
+			   SUN4I_BACKEND_ATTCTL_REG1_LAY_FBFMT, val);
+
+	return 0;
+}
+
 int sun4i_backend_update_layer_buffer(struct sun4i_backend *backend,
 				      int layer, struct drm_plane *plane)
 {
@@ -328,6 +353,34 @@ static int sun4i_backend_of_get_id(struct device_node *node)
 	of_node_put(port);
 
 	return ret;
+}
+
+static struct sun4i_frontend *sun4i_backend_find_frontend(struct sun4i_drv *drv,
+							  struct device_node *node)
+{
+	struct device_node *port, *ep, *remote;
+	struct sun4i_frontend *frontend;
+
+	port = of_graph_get_port_by_id(node, 0);
+	if (!port)
+		return ERR_PTR(-EINVAL);
+
+	for_each_available_child_of_node(port, ep) {
+		remote = of_graph_get_remote_port_parent(ep);
+		if (!remote)
+			continue;
+
+		/* does this node match any registered engines? */
+		list_for_each_entry(frontend, &drv->frontend_list, list) {
+			if (remote == frontend->node) {
+				of_node_put(remote);
+				of_node_put(port);
+				return frontend;
+			}
+		}
+	}
+
+	return ERR_PTR(-EINVAL);
 }
 
 static const struct sunxi_engine_ops sun4i_backend_engine_ops = {
