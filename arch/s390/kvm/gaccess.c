@@ -1144,10 +1144,22 @@ shadow_sgt:
 				*lvl = 1;
 				*pgt = ptr;
 				return 0;
+			} else {
+				/*
+				 * Reverse fake case.
+				 * We map a huge parent to a small guest, i.e.
+				 * we need fake shadow pagetables.
+				 *
+				 * We need pagetables here, because
+				 * guests not aligned on 1M could
+				 * read/write from/to the parent or
+				 * host.
+				 */
+				*lvl = 0;
 			}
 		}
 		/* Small to small and small to huge case */
-		if (ste.fc && sg->edat_level >= 1) {
+		if (!fc && ste.fc && sg->edat_level >= 1) {
 			*fake = 1;
 			ptr = ste.fc1.sfaa * _SEGMENT_SIZE;
 			ste.val = ptr;
@@ -1185,7 +1197,7 @@ int kvm_s390_shadow_fault(struct kvm_vcpu *vcpu, struct gmap *sg,
 	union page_table_entry pte;
 	union segment_table_entry ste;
 	unsigned long pgt;
-	int dat_protection, fake, lvl, fc;
+	int dat_protection, fake, lvl = 0, fc;
 	int rc;
 
 	down_read(&sg->mm->mmap_sem);
@@ -1196,7 +1208,7 @@ int kvm_s390_shadow_fault(struct kvm_vcpu *vcpu, struct gmap *sg,
 	 */
 	ipte_lock(vcpu);
 
-	rc = gmap_shadow_sgt_lookup(sg, saddr, &pgt, &dat_protection, &fake);
+	rc = gmap_shadow_sgt_lookup(sg, saddr, &pgt, &dat_protection, &fake, &lvl);
 	if (rc)
 		rc = kvm_s390_shadow_tables(sg, saddr, &pgt, &dat_protection,
 					    &fake, &lvl);
@@ -1204,7 +1216,7 @@ int kvm_s390_shadow_fault(struct kvm_vcpu *vcpu, struct gmap *sg,
 	vaddr.addr = saddr;
 
 	/* Shadow stopped at segment level, we map pmd to pmd */
-	if (lvl) {
+	if (!rc && lvl) {
 		if (!rc)
 			rc = gmap_read_table(sg->parent, pgt + vaddr.sx * 8,
 					     &ste.val, &fc);

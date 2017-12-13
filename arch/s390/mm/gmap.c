@@ -1506,7 +1506,7 @@ static void __gmap_unshadow_sgt(struct gmap *sg, unsigned long raddr,
 
 	BUG_ON(!gmap_is_shadow(sg));
 	for (i = 0; i < _CRST_ENTRIES; i++, raddr += _SEGMENT_SIZE) {
-		if (!(sgt[i] & _SEGMENT_ENTRY_ORIGIN))
+		if (sgt[i] ==  _SEGMENT_ENTRY_EMPTY)
 			continue;
 
 		if (!(sgt[i] & _SEGMENT_ENTRY_LARGE)) {
@@ -2148,7 +2148,7 @@ EXPORT_SYMBOL_GPL(gmap_shadow_pgt_lookup);
 
 int gmap_shadow_sgt_lookup(struct gmap *sg, unsigned long saddr,
 			   unsigned long *pgt, int *dat_protection,
-			   int *fake)
+			   int *fake, int *lvl)
 {
 	unsigned long *sge, *r3e = NULL;
 	struct page *page;
@@ -2179,9 +2179,11 @@ int gmap_shadow_sgt_lookup(struct gmap *sg, unsigned long saddr,
 			*dat_protection = 0;
 			*fake = 0;
 		}
+		*lvl = 1;
 	} else {
 		gmap_shadow_pgt_lookup(sg, sge, saddr, pgt,
 				       dat_protection, fake);
+		*lvl = 0;
 	}
 out:
 	spin_unlock(&sg->guest_table_lock);
@@ -2370,6 +2372,7 @@ int gmap_shadow_page(struct gmap *sg, unsigned long saddr, pte_t pte)
 	struct gmap_rmap *rmap;
 	unsigned long vmaddr, paddr;
 	spinlock_t *ptl;
+	pmd_t *spmdp;
 	pte_t *sptep, *tptep;
 	int prot;
 	int rc;
@@ -2394,26 +2397,43 @@ int gmap_shadow_page(struct gmap *sg, unsigned long saddr, pte_t pte)
 		if (rc)
 			break;
 		rc = -EAGAIN;
-		sptep = gmap_pte_op_walk(parent, paddr, &ptl);
-		if (sptep) {
+		spmdp = gmap_pmd_op_walk(parent, paddr);
+		if (spmdp && !(pmd_val(*spmdp) & _SEGMENT_ENTRY_INVALID)) {
 			spin_lock(&sg->guest_table_lock);
 			/* Get page table pointer */
 			tptep = (pte_t *) gmap_table_walk(sg, saddr, 0);
 			if (!tptep) {
 				spin_unlock(&sg->guest_table_lock);
-				gmap_pte_op_end(ptl);
 				radix_tree_preload_end();
+				gmap_pmd_op_end(parent, spmdp);
 				break;
 			}
-			rc = ptep_shadow_pte(sg->mm, saddr, sptep, tptep, pte);
-			if (rc > 0) {
-				/* Success and a new mapping */
-				gmap_insert_rmap(sg, vmaddr, rmap);
+
+			if (pmd_large(*spmdp)) {
+				/* TODO: Bits and pgstes */
+				*tptep = __pte(((pmd_val(*spmdp) &
+						_SEGMENT_ENTRY_ORIGIN_LARGE)
+					       + (pte_index(paddr) << 12))
+					       | (pte_val(pte) & _PAGE_PROTECT));
+				pmd_val(*spmdp) |= _SEGMENT_ENTRY_GMAP_VSIE;
+				gmap_insert_rmap(sg, vmaddr & HPAGE_MASK, rmap);
 				rmap = NULL;
 				rc = 0;
+			} else {
+				sptep = pte_alloc_map_lock(parent->mm, spmdp, paddr, &ptl);
+				if (sptep) {
+					rc = ptep_shadow_pte(sg->mm, saddr, sptep, tptep, pte);
+					if (rc > 0) {
+						/* Success and a new mapping */
+						gmap_insert_rmap(sg, vmaddr, rmap);
+						rmap = NULL;
+						rc = 0;
+					}
+					gmap_pte_op_end(ptl);
+				}
 			}
-			gmap_pte_op_end(ptl);
 			spin_unlock(&sg->guest_table_lock);
+			gmap_pmd_op_end(parent, spmdp);
 		}
 		radix_tree_preload_end();
 		if (!rc)
@@ -2491,6 +2511,12 @@ static void gmap_shadow_notify_pmd(struct gmap *sg, unsigned long vmaddr,
 			break;
 		case _SHADOW_RMAP_SEGMENT_LP:
 			gmap_unshadow_segment(sg, raddr);
+			break;
+		case _SHADOW_RMAP_SEGMENT:
+			gmap_unshadow_pgt(sg, raddr);
+			break;
+		case _SHADOW_RMAP_PGTABLE:
+			gmap_unshadow_page(sg, raddr);
 			break;
 		}
 		kfree(rmap);
