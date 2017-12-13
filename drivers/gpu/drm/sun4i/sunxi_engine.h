@@ -16,6 +16,8 @@ struct drm_device;
 struct sunxi_engine;
 
 struct sunxi_engine_ops {
+	int (*atomic_check)(struct sunxi_engine *engine,
+			    struct drm_crtc_state *state);
 	void (*commit)(struct sunxi_engine *engine);
 	struct drm_plane **(*layers_init)(struct drm_device *drm,
 					  struct sunxi_engine *engine);
