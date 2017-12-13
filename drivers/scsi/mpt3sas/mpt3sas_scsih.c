@@ -4758,6 +4758,16 @@ scsih_qcmd(struct Scsi_Host *shost, struct scsi_cmnd *scmd)
 		return 0;
 	}
 
+	sas_target_priv_data = sas_device_priv_data->sas_target;
+
+	/* invalid device handle */
+	handle = sas_target_priv_data->handle;
+	if (handle == MPT3SAS_INVALID_DEVICE_HANDLE) {
+		scmd->result = DID_NO_CONNECT << 16;
+		scmd->scsi_done(scmd);
+		return 0;
+	}
+
 	/*
 	 * Bug work around for firmware SATL handling.  The loop
 	 * is based on atomic operations and ensures consistency
@@ -4770,17 +4780,6 @@ scsih_qcmd(struct Scsi_Host *shost, struct scsi_cmnd *scmd)
 			return 0;
 		}
 	} while (_scsih_set_satl_pending(scmd, true));
-
-	sas_target_priv_data = sas_device_priv_data->sas_target;
-
-	/* invalid device handle */
-	handle = sas_target_priv_data->handle;
-	if (handle == MPT3SAS_INVALID_DEVICE_HANDLE) {
-		scmd->result = DID_NO_CONNECT << 16;
-		scmd->scsi_done(scmd);
-		return 0;
-	}
-
 
 	/* host recovery or link resets sent via IOCTLs */
 	if (ioc->shost_recovery || ioc->ioc_link_reset_in_progress)
