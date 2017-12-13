@@ -2118,6 +2118,12 @@ static void kvmclock_reset(struct kvm_vcpu *vcpu)
 	vcpu->arch.pv_time_enabled = false;
 }
 
+static void kvm_vcpu_flush_tlb(struct kvm_vcpu *vcpu, bool invalidate_gpa)
+{
+	++vcpu->stat.tlb_flush;
+	kvm_x86_ops->tlb_flush(vcpu, invalidate_gpa);
+}
+
 static void record_steal_time(struct kvm_vcpu *vcpu)
 {
 	if (!(vcpu->arch.st.msr_val & KVM_MSR_ENABLED))
@@ -2127,7 +2133,14 @@ static void record_steal_time(struct kvm_vcpu *vcpu)
 		&vcpu->arch.st.steal, sizeof(struct kvm_steal_time))))
 		return;
 
-	vcpu->arch.st.steal.preempted = KVM_VCPU_NOT_PREEMPTED;
+	if (xchg(&vcpu->arch.st.steal.preempted, KVM_VCPU_NOT_PREEMPTED) ==
+			(KVM_VCPU_SHOULD_FLUSH | KVM_VCPU_PREEMPTED)) {
+		/*
+		 * Do TLB_FLUSH before entering the guest, its passed
+		 * the stage of request checking
+		 */
+		kvm_vcpu_flush_tlb(vcpu, false);
+	}
 
 	if (vcpu->arch.st.steal.version & 1)
 		vcpu->arch.st.steal.version += 1;  /* first time write, random junk */
@@ -6756,12 +6769,6 @@ static void vcpu_scan_ioapic(struct kvm_vcpu *vcpu)
 	bitmap_or((ulong *)eoi_exit_bitmap, vcpu->arch.ioapic_handled_vectors,
 		  vcpu_to_synic(vcpu)->vec_bitmap, 256);
 	kvm_x86_ops->load_eoi_exitmap(vcpu, eoi_exit_bitmap);
-}
-
-static void kvm_vcpu_flush_tlb(struct kvm_vcpu *vcpu, bool invalidate_gpa)
-{
-	++vcpu->stat.tlb_flush;
-	kvm_x86_ops->tlb_flush(vcpu, invalidate_gpa);
 }
 
 void kvm_arch_mmu_notifier_invalidate_range(struct kvm *kvm,
