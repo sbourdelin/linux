@@ -367,6 +367,11 @@ static int sun4i_backend_bind(struct device *dev, struct device *master,
 	if (backend->engine.id < 0)
 		return backend->engine.id;
 
+	backend->frontend = sun4i_backend_find_frontend(drv, dev->of_node);
+	if (IS_ERR(backend->frontend)) {
+		dev_err(dev, "Couldn't find matching frontend, frontend features disabled\n");
+	}
+
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	regs = devm_ioremap_resource(dev, res);
 	if (IS_ERR(regs))

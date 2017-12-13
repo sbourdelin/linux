@@ -98,6 +98,7 @@ static int sun4i_drv_bind(struct device *dev)
 		goto free_drm;
 	}
 	drm->dev_private = drv;
+	INIT_LIST_HEAD(&drv->frontend_list);
 	INIT_LIST_HEAD(&drv->engine_list);
 	INIT_LIST_HEAD(&drv->tcon_list);
 
@@ -239,9 +240,11 @@ static int sun4i_drv_add_endpoints(struct device *dev,
 	int count = 0;
 
 	/*
-	 * We don't support the frontend for now, so we will never
-	 * have a device bound. Just skip over it, but we still want
-	 * the rest our pipeline to be added.
+	 * The frontend has been disabled in all of our old device
+	 * trees. If we find a node that is the frontend and is
+	 * disabled, we should just follow through and parse its
+	 * child, but without adding it to the component list.
+	 * Otherwise, we obviously want to add it to the list.
 	 */
 	if (!sun4i_drv_node_is_frontend(node) &&
 	    !of_device_is_available(node))
@@ -254,7 +257,12 @@ static int sun4i_drv_add_endpoints(struct device *dev,
 	if (sun4i_drv_node_is_connector(node))
 		return 0;
 
-	if (!sun4i_drv_node_is_frontend(node)) {
+	/*
+	 * If the device is either just a regular device, or an
+	 * enabled frontend, we add it to our component list.
+	 */
+	if (!sun4i_drv_node_is_frontend(node) ||
+	    (sun4i_drv_node_is_frontend(node) && of_device_is_available(node))) {
 		/* Add current component */
 		DRM_DEBUG_DRIVER("Adding component %pOF\n", node);
 		drm_of_component_match_add(dev, match, compare_of, node);

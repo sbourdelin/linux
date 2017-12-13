@@ -145,6 +145,7 @@
 
 struct sun4i_backend {
 	struct sunxi_engine	engine;
+	struct sun4i_frontend	*frontend;
 
 	struct reset_control	*reset;
 
