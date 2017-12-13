@@ -2350,12 +2350,22 @@ static int do_page_mkwrite(struct vm_fault *vmf)
 {
 	int ret;
 	struct page *page = vmf->page;
+	void *old_journal_info = current->journal_info;
 	unsigned int old_flags = vmf->flags;
 
+	/*
+	 * If the fault happens during read_iter() copies data to
+	 * userspace, filesystem may have set current->journal_info.
+	 * If the userspace memory is mapped to a file on another
+	 * filesystem, page_mkwrite() of the later filesystem may
+	 * want to access/modify current->journal_info.
+	 */
+	current->journal_info = NULL;
 	vmf->flags = FAULT_FLAG_WRITE|FAULT_FLAG_MKWRITE;
 
 	ret = vmf->vma->vm_ops->page_mkwrite(vmf);
-	/* Restore original flags so that caller is not surprised */
+	/* Restore original journal_info and flags */
+	current->journal_info = old_journal_info;
 	vmf->flags = old_flags;
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE)))
 		return ret;
@@ -3201,9 +3211,20 @@ oom:
 static int __do_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
+	void *old_journal_info = current->journal_info;
 	int ret;
 
+	/*
+	 * If the fault happens during write_iter() copies data from
+	 * userspace, filesystem may have set current->journal_info.
+	 * If the userspace memory is mapped to a file on another
+	 * filesystem, fault handler of the later filesystem may want
+	 * to access/modify current->journal_info.
+	 */
+	current->journal_info = NULL;
 	ret = vma->vm_ops->fault(vmf);
+	/* Restore original journal_info */
+	current->journal_info = old_journal_info;
 	if (unlikely(ret & (VM_FAULT_ERROR | VM_FAULT_NOPAGE | VM_FAULT_RETRY |
 			    VM_FAULT_DONE_COW)))
 		return ret;
