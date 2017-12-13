@@ -93,6 +93,100 @@ struct rcar_gen3_chan {
 	bool has_otg_pins;
 };
 
+static void rcar_gen3_set_linectrl(struct rcar_gen3_chan *ch, int dp, int dm)
+{
+	void __iomem *usb2_base = ch->base;
+	u32 val = readl(usb2_base + USB2_LINECTRL1);
+
+	dev_vdbg(&ch->phy->dev, "%s: %08x, %d, %d\n", __func__, val, dp, dm);
+	val &= ~(USB2_LINECTRL1_DP_RPD | USB2_LINECTRL1_DM_RPD);
+	if (dp)
+		val |= USB2_LINECTRL1_DP_RPD;
+	if (dm)
+		val |= USB2_LINECTRL1_DM_RPD;
+	writel(val, usb2_base + USB2_LINECTRL1);
+}
+
+static void has_otg_pins_set_host(struct rcar_gen3_chan *ch, int host)
+{
+	void __iomem *usb2_base = ch->base;
+	u32 val = readl(usb2_base + USB2_COMMCTRL);
+
+	dev_vdbg(&ch->phy->dev, "%s: %08x, %d\n", __func__, val, host);
+	if (host)
+		val &= ~USB2_COMMCTRL_OTG_PERI;
+	else
+		val |= USB2_COMMCTRL_OTG_PERI;
+	writel(val, usb2_base + USB2_COMMCTRL);
+}
+
+static bool has_otg_pins_is_host(struct rcar_gen3_chan *ch)
+{
+	return !(readl(ch->base + USB2_COMMCTRL) & USB2_COMMCTRL_OTG_PERI);
+}
+
+static irqreturn_t has_otg_pins_irq_handler(struct rcar_gen3_chan *ch)
+{
+	void __iomem *usb2_base = ch->base;
+	u32 status = readl(usb2_base + USB2_OBINTSTA);
+	irqreturn_t ret = IRQ_NONE;
+
+	if (status & USB2_OBINT_BITS) {
+		dev_vdbg(&ch->phy->dev, "%s: %08x\n", __func__, status);
+		writel(USB2_OBINT_BITS, usb2_base + USB2_OBINTSTA);
+		ret = IRQ_HANDLED;
+	}
+
+	return ret;
+}
+
+static void has_otg_pins_enable_vbus(struct rcar_gen3_chan *ch, int vbus)
+{
+	void __iomem *usb2_base = ch->base;
+	u32 val = readl(usb2_base + USB2_ADPCTRL);
+
+	dev_vdbg(&ch->phy->dev, "%s: %08x, %d\n", __func__, val, vbus);
+	if (vbus)
+		val |= USB2_ADPCTRL_DRVVBUS;
+	else
+		val &= ~USB2_ADPCTRL_DRVVBUS;
+	writel(val, usb2_base + USB2_ADPCTRL);
+}
+
+static void has_otg_pins_enable_irq(struct rcar_gen3_chan *ch, int enable)
+{
+	void __iomem *usb2_base = ch->base;
+	u32 val = readl(usb2_base + USB2_OBINTEN);
+
+	if (enable)
+		val |= USB2_OBINT_BITS;
+	else
+		val &= ~USB2_OBINT_BITS;
+	writel(val, usb2_base + USB2_OBINTEN);
+}
+
+static bool has_otg_pins_check_id(struct rcar_gen3_chan *ch)
+{
+	return !!(readl(ch->base + USB2_ADPCTRL) & USB2_ADPCTRL_IDDIG);
+}
+
+static void has_otg_pins_init(struct rcar_gen3_chan *ch)
+{
+	void __iomem *usb2_base = ch->base;
+	u32 val;
+
+	val = readl(usb2_base + USB2_VBCTRL);
+	writel(val | USB2_VBCTRL_DRVVBUSSEL, usb2_base + USB2_VBCTRL);
+	writel(USB2_OBINT_BITS, usb2_base + USB2_OBINTSTA);
+	has_otg_pins_enable_irq(ch, 1);
+	val = readl(usb2_base + USB2_ADPCTRL);
+	writel(val | USB2_ADPCTRL_IDPULLUP, usb2_base + USB2_ADPCTRL);
+	val = readl(usb2_base + USB2_LINECTRL1);
+	rcar_gen3_set_linectrl(ch, 0, 0);
+	writel(val | USB2_LINECTRL1_DPRPD_EN | USB2_LINECTRL1_DMRPD_EN,
+	       usb2_base + USB2_LINECTRL1);
+}
+
 static void rcar_gen3_phy_usb2_work(struct work_struct *work)
 {
 	struct rcar_gen3_chan *ch = container_of(work, struct rcar_gen3_chan,
@@ -109,54 +203,17 @@ static void rcar_gen3_phy_usb2_work(struct work_struct *work)
 
 static void rcar_gen3_set_host_mode(struct rcar_gen3_chan *ch, int host)
 {
-	void __iomem *usb2_base = ch->base;
-	u32 val = readl(usb2_base + USB2_COMMCTRL);
-
-	dev_vdbg(&ch->phy->dev, "%s: %08x, %d\n", __func__, val, host);
-	if (host)
-		val &= ~USB2_COMMCTRL_OTG_PERI;
-	else
-		val |= USB2_COMMCTRL_OTG_PERI;
-	writel(val, usb2_base + USB2_COMMCTRL);
-}
-
-static void rcar_gen3_set_linectrl(struct rcar_gen3_chan *ch, int dp, int dm)
-{
-	void __iomem *usb2_base = ch->base;
-	u32 val = readl(usb2_base + USB2_LINECTRL1);
-
-	dev_vdbg(&ch->phy->dev, "%s: %08x, %d, %d\n", __func__, val, dp, dm);
-	val &= ~(USB2_LINECTRL1_DP_RPD | USB2_LINECTRL1_DM_RPD);
-	if (dp)
-		val |= USB2_LINECTRL1_DP_RPD;
-	if (dm)
-		val |= USB2_LINECTRL1_DM_RPD;
-	writel(val, usb2_base + USB2_LINECTRL1);
+	has_otg_pins_set_host(ch, host);
 }
 
 static void rcar_gen3_enable_vbus_ctrl(struct rcar_gen3_chan *ch, int vbus)
 {
-	void __iomem *usb2_base = ch->base;
-	u32 val = readl(usb2_base + USB2_ADPCTRL);
-
-	dev_vdbg(&ch->phy->dev, "%s: %08x, %d\n", __func__, val, vbus);
-	if (vbus)
-		val |= USB2_ADPCTRL_DRVVBUS;
-	else
-		val &= ~USB2_ADPCTRL_DRVVBUS;
-	writel(val, usb2_base + USB2_ADPCTRL);
+	has_otg_pins_enable_vbus(ch, vbus);
 }
 
 static void rcar_gen3_enable_otg_irq(struct rcar_gen3_chan *ch, int enable)
 {
-	void __iomem *usb2_base = ch->base;
-	u32 val = readl(usb2_base + USB2_OBINTEN);
-
-	if (enable)
-		val |= USB2_OBINT_BITS;
-	else
-		val &= ~USB2_OBINT_BITS;
-	writel(val, usb2_base + USB2_OBINTEN);
+	has_otg_pins_enable_irq(ch, enable);
 }
 
 static void rcar_gen3_init_for_host(struct rcar_gen3_chan *ch)
@@ -214,7 +271,7 @@ static void rcar_gen3_init_from_a_peri_to_a_host(struct rcar_gen3_chan *ch)
 
 static bool rcar_gen3_check_id(struct rcar_gen3_chan *ch)
 {
-	return !!(readl(ch->base + USB2_ADPCTRL) & USB2_ADPCTRL_IDDIG);
+	return has_otg_pins_check_id(ch);
 }
 
 static void rcar_gen3_device_recognition(struct rcar_gen3_chan *ch)
@@ -227,7 +284,7 @@ static void rcar_gen3_device_recognition(struct rcar_gen3_chan *ch)
 
 static bool rcar_gen3_is_host(struct rcar_gen3_chan *ch)
 {
-	return !(readl(ch->base + USB2_COMMCTRL) & USB2_COMMCTRL_OTG_PERI);
+	return has_otg_pins_is_host(ch);
 }
 
 static enum phy_mode rcar_gen3_get_phy_mode(struct rcar_gen3_chan *ch)
@@ -293,19 +350,7 @@ static DEVICE_ATTR_RW(role);
 
 static void rcar_gen3_init_otg(struct rcar_gen3_chan *ch)
 {
-	void __iomem *usb2_base = ch->base;
-	u32 val;
-
-	val = readl(usb2_base + USB2_VBCTRL);
-	writel(val | USB2_VBCTRL_DRVVBUSSEL, usb2_base + USB2_VBCTRL);
-	writel(USB2_OBINT_BITS, usb2_base + USB2_OBINTSTA);
-	rcar_gen3_enable_otg_irq(ch, 1);
-	val = readl(usb2_base + USB2_ADPCTRL);
-	writel(val | USB2_ADPCTRL_IDPULLUP, usb2_base + USB2_ADPCTRL);
-	val = readl(usb2_base + USB2_LINECTRL1);
-	rcar_gen3_set_linectrl(ch, 0, 0);
-	writel(val | USB2_LINECTRL1_DPRPD_EN | USB2_LINECTRL1_DMRPD_EN,
-	       usb2_base + USB2_LINECTRL1);
+	has_otg_pins_init(ch);
 
 	rcar_gen3_device_recognition(ch);
 }
@@ -380,16 +425,11 @@ static const struct phy_ops rcar_gen3_phy_usb2_ops = {
 static irqreturn_t rcar_gen3_phy_usb2_irq(int irq, void *_ch)
 {
 	struct rcar_gen3_chan *ch = _ch;
-	void __iomem *usb2_base = ch->base;
-	u32 status = readl(usb2_base + USB2_OBINTSTA);
-	irqreturn_t ret = IRQ_NONE;
+	irqreturn_t ret;
 
-	if (status & USB2_OBINT_BITS) {
-		dev_vdbg(&ch->phy->dev, "%s: %08x\n", __func__, status);
-		writel(USB2_OBINT_BITS, usb2_base + USB2_OBINTSTA);
+	ret = has_otg_pins_irq_handler(ch);
+	if (ret == IRQ_HANDLED)
 		rcar_gen3_device_recognition(ch);
-		ret = IRQ_HANDLED;
-	}
 
 	return ret;
 }
