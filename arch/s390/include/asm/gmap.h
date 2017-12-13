@@ -13,6 +13,9 @@
 #define GMAP_NOTIFY_SHADOW	0x2
 #define GMAP_NOTIFY_MPROT	0x1
 
+/* Status bits in the gmap segment entry. */
+#define _SEGMENT_ENTRY_GMAP_IN		0x0001	/* invalidation notify bit */
+
 /**
  * struct gmap_struct - guest address space
  * @list: list head for the mm->context gmap list

@@ -405,6 +405,8 @@ pmd_t pmdp_xchg_direct(struct mm_struct *mm, unsigned long addr,
 	pmd_t old;
 
 	preempt_disable();
+	if (mm_has_pgste(mm))
+		pmdp_notify(mm, addr);
 	old = pmdp_flush_direct(mm, addr, pmdp);
 	*pmdp = new;
 	preempt_enable();
@@ -418,6 +420,8 @@ pmd_t pmdp_xchg_lazy(struct mm_struct *mm, unsigned long addr,
 	pmd_t old;
 
 	preempt_disable();
+	if (mm_has_pgste(mm))
+		pmdp_notify(mm, addr);
 	old = pmdp_flush_lazy(mm, addr, pmdp);
 	*pmdp = new;
 	preempt_enable();
