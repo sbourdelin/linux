@@ -83,11 +83,23 @@
 
 #define RCAR_GEN3_PHY_HAS_DEDICATED_PINS	1
 
+struct rcar_gen3_chan;
+struct rcar_gen3_role_swap_ops {
+	void (*init)(struct rcar_gen3_chan *ch);
+	void (*set_host)(struct rcar_gen3_chan *ch, int host);
+	bool (*is_host)(struct rcar_gen3_chan *ch);
+	void (*enable_vbus)(struct rcar_gen3_chan *ch, int vbus);
+	bool (*check_id)(struct rcar_gen3_chan *ch);
+	void (*enable_irq)(struct rcar_gen3_chan *ch, int enable);
+	irqreturn_t (*irq_handler)(struct rcar_gen3_chan *ch);
+};
+
 struct rcar_gen3_chan {
 	void __iomem *base;
 	struct extcon_dev *extcon;
 	struct phy *phy;
 	struct regulator *vbus;
+	const struct rcar_gen3_role_swap_ops *rs_ops;
 	struct work_struct work;
 	bool extcon_host;
 	bool has_otg_pins;
@@ -203,17 +215,20 @@ static void rcar_gen3_phy_usb2_work(struct work_struct *work)
 
 static void rcar_gen3_set_host_mode(struct rcar_gen3_chan *ch, int host)
 {
-	has_otg_pins_set_host(ch, host);
+	if (ch->rs_ops && ch->rs_ops->set_host)
+		ch->rs_ops->set_host(ch, host);
 }
 
 static void rcar_gen3_enable_vbus_ctrl(struct rcar_gen3_chan *ch, int vbus)
 {
-	has_otg_pins_enable_vbus(ch, vbus);
+	if (ch->rs_ops && ch->rs_ops->enable_vbus)
+		ch->rs_ops->enable_vbus(ch, vbus);
 }
 
 static void rcar_gen3_enable_otg_irq(struct rcar_gen3_chan *ch, int enable)
 {
-	has_otg_pins_enable_irq(ch, enable);
+	if (ch->rs_ops && ch->rs_ops->enable_irq)
+		ch->rs_ops->enable_irq(ch, enable);
 }
 
 static void rcar_gen3_init_for_host(struct rcar_gen3_chan *ch)
@@ -271,7 +286,10 @@ static void rcar_gen3_init_from_a_peri_to_a_host(struct rcar_gen3_chan *ch)
 
 static bool rcar_gen3_check_id(struct rcar_gen3_chan *ch)
 {
-	return has_otg_pins_check_id(ch);
+	if (ch->rs_ops && ch->rs_ops->check_id)
+		return ch->rs_ops->check_id(ch);
+
+	return false;
 }
 
 static void rcar_gen3_device_recognition(struct rcar_gen3_chan *ch)
@@ -284,7 +302,10 @@ static void rcar_gen3_device_recognition(struct rcar_gen3_chan *ch)
 
 static bool rcar_gen3_is_host(struct rcar_gen3_chan *ch)
 {
-	return has_otg_pins_is_host(ch);
+	if (ch->rs_ops && ch->rs_ops->is_host)
+		return ch->rs_ops->is_host(ch);
+
+	return false;
 }
 
 static enum phy_mode rcar_gen3_get_phy_mode(struct rcar_gen3_chan *ch)
@@ -350,7 +371,8 @@ static DEVICE_ATTR_RW(role);
 
 static void rcar_gen3_init_otg(struct rcar_gen3_chan *ch)
 {
-	has_otg_pins_init(ch);
+	if (ch->rs_ops && ch->rs_ops->init)
+		ch->rs_ops->init(ch);
 
 	rcar_gen3_device_recognition(ch);
 }
@@ -425,9 +447,10 @@ static const struct phy_ops rcar_gen3_phy_usb2_ops = {
 static irqreturn_t rcar_gen3_phy_usb2_irq(int irq, void *_ch)
 {
 	struct rcar_gen3_chan *ch = _ch;
-	irqreturn_t ret;
+	irqreturn_t ret = IRQ_NONE;
 
-	ret = has_otg_pins_irq_handler(ch);
+	if (ch->rs_ops && ch->rs_ops->irq_handler)
+		ret = ch->rs_ops->irq_handler(ch);
 	if (ret == IRQ_HANDLED)
 		rcar_gen3_device_recognition(ch);
 
@@ -454,6 +477,16 @@ static const unsigned int rcar_gen3_phy_cable[] = {
 	EXTCON_USB,
 	EXTCON_USB_HOST,
 	EXTCON_NONE,
+};
+
+static const struct rcar_gen3_role_swap_ops has_otg_pins_ops = {
+	.init		= has_otg_pins_init,
+	.set_host	= has_otg_pins_set_host,
+	.is_host	= has_otg_pins_is_host,
+	.enable_vbus	= has_otg_pins_enable_vbus,
+	.check_id	= has_otg_pins_check_id,
+	.enable_irq	= has_otg_pins_enable_irq,
+	.irq_handler	= has_otg_pins_irq_handler,
 };
 
 static int rcar_gen3_phy_usb2_probe(struct platform_device *pdev)
@@ -493,6 +526,8 @@ static int rcar_gen3_phy_usb2_probe(struct platform_device *pdev)
 		int ret;
 
 		channel->has_otg_pins = (uintptr_t)of_device_get_match_data(dev);
+		if (channel->has_otg_pins)
+			channel->rs_ops = &has_otg_pins_ops;
 		channel->extcon = devm_extcon_dev_allocate(dev,
 							rcar_gen3_phy_cable);
 		if (IS_ERR(channel->extcon))
