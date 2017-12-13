@@ -373,6 +373,7 @@ void drm_mode_config_init(struct drm_device *dev)
 	INIT_LIST_HEAD(&dev->mode_config.fb_list);
 	INIT_LIST_HEAD(&dev->mode_config.crtc_list);
 	INIT_LIST_HEAD(&dev->mode_config.connector_list);
+	INIT_LIST_HEAD(&dev->mode_config.connector_free_list);
 	INIT_LIST_HEAD(&dev->mode_config.encoder_list);
 	INIT_LIST_HEAD(&dev->mode_config.property_list);
 	INIT_LIST_HEAD(&dev->mode_config.property_blob_list);
@@ -381,6 +382,8 @@ void drm_mode_config_init(struct drm_device *dev)
 	idr_init(&dev->mode_config.tile_idr);
 	ida_init(&dev->mode_config.connector_ida);
 	spin_lock_init(&dev->mode_config.connector_list_lock);
+
+	INIT_WORK(&dev->mode_config.connector_free_work, drm_connector_free_work_fn);
 
 	drm_mode_create_standard_properties(dev);
 
@@ -432,7 +435,7 @@ void drm_mode_config_cleanup(struct drm_device *dev)
 	}
 	drm_connector_list_iter_end(&conn_iter);
 	/* connector_iter drops references in a work item. */
-	flush_scheduled_work();
+	flush_work(&dev->mode_config.connector_free_work);
 	if (WARN_ON(!list_empty(&dev->mode_config.connector_list))) {
 		drm_connector_list_iter_begin(dev, &conn_iter);
 		drm_for_each_connector_iter(connector, &conn_iter)
