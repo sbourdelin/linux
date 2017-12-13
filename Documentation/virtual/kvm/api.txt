@@ -4369,3 +4369,13 @@ Parameters: none
 This capability indicates if the flic device will be able to get/set the
 AIS states for migration via the KVM_DEV_FLIC_AISM_ALL attribute and allows
 to discover this without having to create a flic device.
+
+8.14 KVM_CAP_S390_HPAGE
+
+Architectures: s390
+This capability, if KVM_CHECK_EXTENSION indicates that it is
+available, means that KVM supports VMs that are memory backed through
+hugetlbfs with 1 megabyte pages.
+
+While it is generally possible to create and start a VM without this
+support, the VM will not be functional.
