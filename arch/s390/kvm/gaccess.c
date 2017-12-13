@@ -987,7 +987,7 @@ static int kvm_s390_shadow_tables(struct gmap *sg, unsigned long saddr,
 	union asce asce;
 	union vaddress vaddr;
 	unsigned long ptr;
-	int rc;
+	int rc, fc = 0;
 
 	*fake = 0;
 	*dat_protection = 0;
@@ -1034,7 +1034,8 @@ static int kvm_s390_shadow_tables(struct gmap *sg, unsigned long saddr,
 			rfte.val = ptr;
 			goto shadow_r2t;
 		}
-		rc = gmap_read_table(parent, ptr + vaddr.rfx * 8, &rfte.val);
+		rc = gmap_read_table(parent, ptr + vaddr.rfx * 8, &rfte.val,
+				     &fc);
 		if (rc)
 			return rc;
 		if (rfte.i)
@@ -1060,7 +1061,8 @@ shadow_r2t:
 			rste.val = ptr;
 			goto shadow_r3t;
 		}
-		rc = gmap_read_table(parent, ptr + vaddr.rsx * 8, &rste.val);
+		rc = gmap_read_table(parent, ptr + vaddr.rsx * 8, &rste.val,
+				     &fc);
 		if (rc)
 			return rc;
 		if (rste.i)
@@ -1087,7 +1089,8 @@ shadow_r3t:
 			rtte.val = ptr;
 			goto shadow_sgt;
 		}
-		rc = gmap_read_table(parent, ptr + vaddr.rtx * 8, &rtte.val);
+		rc = gmap_read_table(parent, ptr + vaddr.rtx * 8, &rtte.val,
+				     &fc);
 		if (rc)
 			return rc;
 		if (rtte.i)
@@ -1123,7 +1126,7 @@ shadow_sgt:
 			ste.val = ptr;
 			goto shadow_pgt;
 		}
-		rc = gmap_read_table(parent, ptr + vaddr.sx * 8, &ste.val);
+		rc = gmap_read_table(parent, ptr + vaddr.sx * 8, &ste.val, &fc);
 		if (rc)
 			return rc;
 		if (ste.i)
@@ -1192,7 +1195,7 @@ int kvm_s390_shadow_fault(struct kvm_vcpu *vcpu, struct gmap *sg,
 		goto shadow_page;
 	}
 	if (!rc)
-		rc = gmap_read_table(sg->parent, pgt + vaddr.px * 8, &pte.val);
+		rc = gmap_read_table(sg->parent, pgt + vaddr.px * 8, &pte.val, &fc);
 	if (!rc && pte.i)
 		rc = PGM_PAGE_TRANSLATION;
 	if (!rc && pte.z)
