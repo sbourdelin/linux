@@ -3085,6 +3085,9 @@ static void vxlan_config_apply(struct net_device *dev,
 
 		if (conf->mtu)
 			dev->mtu = conf->mtu;
+		else if (lowerdev)
+			dev->mtu = lowerdev->mtu - (use_ipv6 ? VXLAN6_HEADROOM :
+							       VXLAN_HEADROOM);
 
 		vxlan->net = src_net;
 	}
