@@ -23,6 +23,9 @@
 
 #define GMAP_SHADOW_FAKE_TABLE 1ULL
 
+static void gmap_pmdp_xchg(struct gmap *gmap, pmd_t *old, pmd_t new,
+			   unsigned long gaddr);
+
 /**
  * gmap_alloc - allocate and initialize a guest address space
  * @mm: pointer to the parent mm_struct
@@ -2231,6 +2234,26 @@ void ptep_notify(struct mm_struct *mm, unsigned long vmaddr,
 EXPORT_SYMBOL_GPL(ptep_notify);
 
 /**
+ * pmdp_notify_gmap - call all invalidation callbacks for a specific pmd
+ * @gmap: pointer to the guest address space structure
+ * @gaddr: guest address which is affected
+ *
+ * This function is expected to be called with a locked
+ * guest_table_lock.
+ */
+static void pmdp_notify_gmap(struct gmap *gmap, unsigned long gaddr)
+{
+	unsigned long *table;
+
+	gaddr &= HPAGE_MASK;
+	table = gmap_table_walk(gmap, gaddr, 1);
+	if (!table || !(*table & _SEGMENT_ENTRY_GMAP_IN))
+		return;
+	*table &= ~_SEGMENT_ENTRY_GMAP_IN;
+	gmap_call_notifier(gmap, gaddr, gaddr + HPAGE_SIZE - 1);
+}
+
+/**
  * pmdp_notify - call all invalidation callbacks for a specific pmd
  * @mm: pointer to the process mm_struct
  * @vmaddr: virtual address in the process address space
@@ -2373,6 +2396,32 @@ void gmap_pmdp_idte_global(struct mm_struct *mm, unsigned long vmaddr)
 	rcu_read_unlock();
 }
 EXPORT_SYMBOL_GPL(gmap_pmdp_idte_global);
+
+/**
+ * gmap_pmdp_xchg - exchange a gmap pmd with another and notify
+ * @gmap: pointer to the guest address space structure
+ * @pmdp: pointer to the pmd entry
+ * @new: replacement entry
+ * @gaddr: the affected guest address
+ *
+ * This function is assumed to be called with the guest_table_lock
+ * held.
+ */
+static void gmap_pmdp_xchg(struct gmap *gmap, pmd_t *pmdp, pmd_t new,
+			   unsigned long gaddr)
+{
+	pmdp_notify_gmap(gmap, gaddr);
+	if (MACHINE_HAS_TLB_GUEST)
+		__pmdp_idte(gaddr, (pmd_t *)pmdp,
+			    IDTE_GUEST_ASCE, gmap->asce,
+			    IDTE_GLOBAL);
+	if (MACHINE_HAS_IDTE)
+		__pmdp_idte(gaddr, (pmd_t *)pmdp,
+			    0, 0, IDTE_GLOBAL);
+	else
+		__pmdp_csp(pmdp);
+	*pmdp = new;
+}
 
 static inline void thp_split_mm(struct mm_struct *mm)
 {
