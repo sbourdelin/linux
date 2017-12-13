@@ -1095,6 +1095,8 @@ void ptep_set_pte_at(struct mm_struct *mm, unsigned long addr,
 void ptep_set_notify(struct mm_struct *mm, unsigned long addr, pte_t *ptep);
 void ptep_notify(struct mm_struct *mm, unsigned long addr,
 		 pte_t *ptep, unsigned long bits);
+void ptep_notify_gmap(struct mm_struct *mm, unsigned long vmaddr,
+		      pte_t *pte, unsigned long bits);
 void pmdp_notify(struct mm_struct *mm, unsigned long addr);
 int ptep_force_prot(struct mm_struct *mm, unsigned long gaddr,
 		    pte_t *ptep, int prot, unsigned long bit);
@@ -1104,8 +1106,11 @@ void ptep_zap_key(struct mm_struct *mm, unsigned long addr, pte_t *ptep);
 int ptep_shadow_pte(struct mm_struct *mm, unsigned long saddr,
 		    pte_t *sptep, pte_t *tptep, pte_t pte);
 void ptep_unshadow_pte(struct mm_struct *mm, unsigned long saddr, pte_t *ptep);
-
+void ptep_remove_dirty_protection_split(struct mm_struct *mm, pte_t *ptep,
+					unsigned long vmaddr);
 bool test_and_clear_guest_dirty(struct mm_struct *mm, unsigned long address);
+bool test_and_clear_guest_dirty_split(struct mm_struct *mm, pmd_t *pmdp,
+				      unsigned long vmaddr);
 int set_guest_storage_key(struct mm_struct *mm, unsigned long addr,
 			  unsigned char key, bool nq);
 int cond_set_guest_storage_key(struct mm_struct *mm, unsigned long addr,

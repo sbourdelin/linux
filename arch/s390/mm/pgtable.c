@@ -763,6 +763,57 @@ bool test_and_clear_guest_dirty(struct mm_struct *mm, unsigned long addr)
 }
 EXPORT_SYMBOL_GPL(test_and_clear_guest_dirty);
 
+void ptep_remove_dirty_protection_split(struct mm_struct *mm,
+					pte_t *ptep, unsigned long vmaddr)
+{
+	pte_t unprot = __pte(pte_val(*ptep) & ~_PAGE_PROTECT);
+	pgste_t pgste;
+	unsigned long bits;
+
+	pgste = pgste_get_lock(ptep);
+	pgste_val(pgste) |= PGSTE_UC_BIT;
+
+	bits = pgste_val(pgste) & (PGSTE_IN_BIT | PGSTE_VSIE_BIT);
+	pgste_val(pgste) ^= bits;
+	ptep_notify_gmap(mm, vmaddr, ptep, bits);
+	ptep_ipte_global(mm, vmaddr, ptep, 0);
+
+	*ptep = unprot;
+	pgste_set_unlock(ptep, pgste);
+}
+EXPORT_SYMBOL_GPL(ptep_remove_dirty_protection_split);
+
+bool test_and_clear_guest_dirty_split(struct mm_struct *mm, pmd_t *pmdp,
+				      unsigned long vmaddr)
+{
+	bool dirty;
+	pte_t *ptep, pte;
+	pgste_t pgste;
+	unsigned long bits;
+
+	ptep = pte_offset_map(pmdp, vmaddr);
+	pgste = pgste_get_lock(ptep);
+	dirty = !!(pgste_val(pgste) & PGSTE_UC_BIT);
+	pgste_val(pgste) &= ~PGSTE_UC_BIT;
+	pte = *ptep;
+	if (dirty) {
+		bits = pgste_val(pgste) & (PGSTE_IN_BIT | PGSTE_VSIE_BIT);
+		if (bits) {
+			pgste_val(pgste) ^= bits;
+			ptep_notify_gmap(mm, vmaddr, ptep, bits);
+		}
+		ptep_ipte_global(mm, vmaddr, ptep, 0);
+		if (MACHINE_HAS_ESOP || !(pte_val(pte) & _PAGE_WRITE))
+			pte_val(pte) |= _PAGE_PROTECT;
+		else
+			pte_val(pte) |= _PAGE_INVALID;
+		*ptep = pte;
+	}
+	pgste_set_unlock(ptep, pgste);
+	return dirty;
+}
+EXPORT_SYMBOL_GPL(test_and_clear_guest_dirty_split);
+
 int set_guest_storage_key(struct mm_struct *mm, unsigned long addr,
 			  unsigned char key, bool nq)
 {

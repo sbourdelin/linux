@@ -418,7 +418,7 @@ static inline int do_exception(struct pt_regs *regs, int access)
 	struct vm_area_struct *vma;
 	enum fault_type type;
 	unsigned long trans_exc_code;
-	unsigned long address;
+	unsigned long address, gaddress = 0;
 	unsigned int flags;
 	int fault;
 
@@ -475,6 +475,12 @@ static inline int do_exception(struct pt_regs *regs, int access)
 			fault = VM_FAULT_BADMAP;
 			goto out_up;
 		}
+		/*
+		 * The GMAP code needs the full fault address even
+		 * when using large pages. Hence we take an unmasked
+		 * copy to feed to __gmap_link.
+		 */
+		gaddress = address;
 		if (gmap->pfault_enabled)
 			flags |= FAULT_FLAG_RETRY_NOWAIT;
 	}
@@ -551,7 +557,7 @@ retry:
 	}
 	if (IS_ENABLED(CONFIG_PGSTE) && gmap) {
 		address =  __gmap_link(gmap, current->thread.gmap_addr,
-				       address);
+				       gaddress);
 		if (address == -EFAULT) {
 			fault = VM_FAULT_BADMAP;
 			goto out_up;
