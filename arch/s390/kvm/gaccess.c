@@ -981,7 +981,7 @@ int kvm_s390_check_low_addr_prot_real(struct kvm_vcpu *vcpu, unsigned long gra)
  */
 static int kvm_s390_shadow_tables(struct gmap *sg, unsigned long saddr,
 				  unsigned long *pgt, int *dat_protection,
-				  int *fake)
+				  int *fake, int *lvl)
 {
 	struct gmap *parent;
 	union asce asce;
@@ -1136,6 +1136,17 @@ shadow_sgt:
 		if (ste.cs && asce.p)
 			return PGM_TRANSLATION_SPEC;
 		*dat_protection |= ste.fc0.p;
+
+		/* Parent is mapped by huge pages. */
+		if (fc) {
+			/* Guest is also huge, easy case. */
+			if (ste.fc && sg->edat_level >= 1) {
+				*lvl = 1;
+				*pgt = ptr;
+				return 0;
+			}
+		}
+		/* Small to small and small to huge case */
 		if (ste.fc && sg->edat_level >= 1) {
 			*fake = 1;
 			ptr = ste.fc1.sfaa * _SEGMENT_SIZE;
@@ -1172,8 +1183,9 @@ int kvm_s390_shadow_fault(struct kvm_vcpu *vcpu, struct gmap *sg,
 {
 	union vaddress vaddr;
 	union page_table_entry pte;
+	union segment_table_entry ste;
 	unsigned long pgt;
-	int dat_protection, fake;
+	int dat_protection, fake, lvl, fc;
 	int rc;
 
 	down_read(&sg->mm->mmap_sem);
@@ -1184,12 +1196,26 @@ int kvm_s390_shadow_fault(struct kvm_vcpu *vcpu, struct gmap *sg,
 	 */
 	ipte_lock(vcpu);
 
-	rc = gmap_shadow_pgt_lookup(sg, saddr, &pgt, &dat_protection, &fake);
+	rc = gmap_shadow_sgt_lookup(sg, saddr, &pgt, &dat_protection, &fake);
 	if (rc)
 		rc = kvm_s390_shadow_tables(sg, saddr, &pgt, &dat_protection,
-					    &fake);
+					    &fake, &lvl);
 
 	vaddr.addr = saddr;
+
+	/* Shadow stopped at segment level, we map pmd to pmd */
+	if (lvl) {
+		if (!rc)
+			rc = gmap_read_table(sg->parent, pgt + vaddr.sx * 8,
+					     &ste.val, &fc);
+		if (!rc && ste.i)
+			rc = PGM_PAGE_TRANSLATION;
+		ste.fc1.p |= dat_protection;
+		if (!rc)
+			rc = gmap_shadow_segment(sg, saddr, __pmd(ste.val));
+		goto out;
+	}
+
 	if (fake) {
 		pte.val = pgt + vaddr.px * PAGE_SIZE;
 		goto shadow_page;
@@ -1204,6 +1230,7 @@ shadow_page:
 	pte.p |= dat_protection;
 	if (!rc)
 		rc = gmap_shadow_page(sg, saddr, __pte(pte.val));
+out:
 	ipte_unlock(vcpu);
 	up_read(&sg->mm->mmap_sem);
 	return rc;
