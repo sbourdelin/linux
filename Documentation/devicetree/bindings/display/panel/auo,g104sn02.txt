@@ -1,0 +1,7 @@
+AU Optronics Corporation 10.4" (800x600) color TFT LCD panel
+
+Required properties:
+- compatible: should be "auo,g104sn02"
+
+This binding is compatible with the simple-panel binding, which is specified
+in simple-panel.txt in this directory.
