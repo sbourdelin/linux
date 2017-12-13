@@ -27,6 +27,8 @@ channel as USB OTG:
 - interrupts: interrupt specifier for the PHY.
 - vbus-supply: Phandle to a regulator that provides power to the VBUS. This
 	       regulator will be managed during the PHY power on/off sequence.
+- renesas,vbus-gpios: use gpio to control vbus instead of dedicated pin.
+- renesas,id-gpios: use gpio to detect id instead of dedicated pin.
 
 Example (R-Car H3):
 
