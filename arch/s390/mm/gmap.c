@@ -1201,23 +1201,38 @@ int gmap_read_table(struct gmap *gmap, unsigned long gaddr, unsigned long *val)
 {
 	unsigned long address, vmaddr;
 	spinlock_t *ptl;
+	pmd_t *pmdp, pmd;
 	pte_t *ptep, pte;
 	int rc;
 
 	while (1) {
 		rc = -EAGAIN;
-		ptep = gmap_pte_op_walk(gmap, gaddr, &ptl);
-		if (ptep) {
-			pte = *ptep;
-			if (pte_present(pte) && (pte_val(pte) & _PAGE_READ)) {
-				address = pte_val(pte) & PAGE_MASK;
-				address += gaddr & ~PAGE_MASK;
-				*val = *(unsigned long *) address;
-				pte_val(*ptep) |= _PAGE_YOUNG;
-				/* Do *NOT* clear the _PAGE_INVALID bit! */
-				rc = 0;
+		pmdp = gmap_pmd_op_walk(gmap, gaddr);
+		if (pmdp) {
+			if (!pmd_large(*pmdp)) {
+				ptep = pte_alloc_map_lock(gmap->mm, pmdp, gaddr, &ptl);
+				if (ptep) {
+					pte = *ptep;
+					if (pte_present(pte) && (pte_val(pte) & _PAGE_READ)) {
+						address = pte_val(pte) & PAGE_MASK;
+						address += gaddr & ~PAGE_MASK;
+						*val = *(unsigned long *) address;
+						pte_val(*ptep) |= _PAGE_YOUNG;
+						/* Do *NOT* clear the _PAGE_INVALID bit! */
+						rc = 0;
+					}
+					gmap_pte_op_end(ptl);
+				}
+			} else {
+				pmd = *pmdp;
+				if (!(pmd_val(pmd) & _SEGMENT_ENTRY_INVALID)) {
+					address = pmd_val(pmd) & HPAGE_MASK;
+					address += gaddr & ~HPAGE_MASK;
+					*val = *(unsigned long *) address;
+					rc = 0;
+				}
 			}
-			gmap_pte_op_end(ptl);
+			gmap_pmd_op_end(gmap, pmdp);
 		}
 		if (!rc)
 			break;
