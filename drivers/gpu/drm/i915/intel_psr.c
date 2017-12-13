@@ -358,6 +358,8 @@ void intel_psr_compute_config(struct intel_dp *intel_dp,
 		&crtc_state->base.adjusted_mode;
 	int psr_setup_time;
 
+	dev_priv->psr.source_ok = false;
+
 	if (!HAS_PSR(dev_priv))
 		return;
 
@@ -420,7 +422,7 @@ void intel_psr_compute_config(struct intel_dp *intel_dp,
 	 * caps during eDP detection.
 	 */
 	if (!dev_priv->psr.psr2_support) {
-		crtc_state->has_psr = true;
+		dev_priv->psr.source_ok = (crtc_state->has_psr = true);
 		return;
 	}
 
@@ -440,7 +442,7 @@ void intel_psr_compute_config(struct intel_dp *intel_dp,
 		return;
 	}
 
-	crtc_state->has_psr = true;
+	dev_priv->psr.source_ok = (crtc_state->has_psr = true);
 	crtc_state->has_psr2 = true;
 }
 
@@ -522,8 +524,6 @@ void intel_psr_enable(struct intel_dp *intel_dp,
 	}
 
 	dev_priv->psr.psr2_support = crtc_state->has_psr2;
-	dev_priv->psr.source_ok = true;
-
 	dev_priv->psr.busy_frontbuffer_bits = 0;
 
 	dev_priv->psr.setup_vsc(intel_dp, crtc_state);
@@ -657,7 +657,7 @@ void intel_psr_disable(struct intel_dp *intel_dp,
 	/* Disable PSR on Sink */
 	drm_dp_dpcd_writeb(&intel_dp->aux, DP_PSR_EN_CFG, 0);
 
-	dev_priv->psr.enabled = NULL;
+	dev_priv->psr.source_ok = (dev_priv->psr.enabled = NULL);
 	mutex_unlock(&dev_priv->psr.lock);
 
 	cancel_delayed_work_sync(&dev_priv->psr.work);
