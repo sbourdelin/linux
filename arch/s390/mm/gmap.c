@@ -545,6 +545,7 @@ int __gmap_link(struct gmap *gmap, unsigned long gaddr, unsigned long vmaddr)
 	p4d_t *p4d;
 	pud_t *pud;
 	pmd_t *pmd;
+	pmd_t unprot;
 	int rc;
 
 	BUG_ON(gmap_is_shadow(gmap));
@@ -602,12 +603,19 @@ int __gmap_link(struct gmap *gmap, unsigned long gaddr, unsigned long vmaddr)
 				       vmaddr >> PMD_SHIFT, table);
 		if (!rc) {
 			if (pmd_large(*pmd)) {
-				*table = pmd_val(*pmd) &
-					_SEGMENT_ENTRY_HARDWARE_BITS_LARGE;
+				*table = (pmd_val(*pmd) &
+					  _SEGMENT_ENTRY_HARDWARE_BITS_LARGE)
+					| _SEGMENT_ENTRY_GMAP_UC;
 			} else
 				*table = pmd_val(*pmd) &
 					_SEGMENT_ENTRY_HARDWARE_BITS;
 		}
+	} else if (*table & _SEGMENT_ENTRY_PROTECT &&
+		   !(pmd_val(*pmd) & _SEGMENT_ENTRY_PROTECT)) {
+		unprot = __pmd((*table & (_SEGMENT_ENTRY_HARDWARE_BITS_LARGE
+					  & ~_SEGMENT_ENTRY_PROTECT))
+			       | _SEGMENT_ENTRY_GMAP_UC);
+		gmap_pmdp_xchg(gmap, (pmd_t *)table, unprot, gaddr);
 	}
 	spin_unlock(&gmap->guest_table_lock);
 	spin_unlock(ptl);
@@ -2512,6 +2520,74 @@ static void gmap_pmdp_xchg(struct gmap *gmap, pmd_t *pmdp, pmd_t new,
 	else
 		__pmdp_csp(pmdp);
 	*pmdp = new;
+}
+
+/**
+ * gmap_test_and_clear_dirty_segment - test and reset segment dirty status
+ * @gmap: pointer to guest address space
+ * @pmdp: pointer to the pmd to be tested
+ * @gaddr: virtual address in the guest address space
+ *
+ * This function is assumed to be called with the guest_table_lock
+ * held.
+ */
+bool gmap_test_and_clear_dirty_segment(struct gmap *gmap, pmd_t *pmdp,
+				       pmd_t *hpmdp, unsigned long gaddr,
+				       unsigned long vmaddr)
+{
+	if (pmd_val(*pmdp) & _SEGMENT_ENTRY_INVALID)
+		return false;
+
+	/* Already protected memory, which did not change is clean */
+	if (pmd_val(*pmdp) & _SEGMENT_ENTRY_PROTECT &&
+	    !(pmd_val(*pmdp) & _SEGMENT_ENTRY_GMAP_UC))
+		return false;
+
+	/* Clear UC indication and reset protection */
+	pmd_val(*pmdp) &= ~_SEGMENT_ENTRY_GMAP_UC;
+	gmap_protect_pmd(gmap, gaddr, vmaddr, pmdp, hpmdp, PROT_READ, 0);
+	return true;
+}
+
+/**
+ * gmap_sync_dirty_log_pmd - set bitmap based on dirty status of segment
+ * @gmap: pointer to guest address space
+ * @bitmap: dirty bitmap for this pmd
+ * @gaddr: virtual address in the guest address space
+ * @vmaddr: virtual address in the host address space
+ *
+ * This function is assumed to be called with the guest_table_lock
+ * held.
+ */
+void gmap_sync_dirty_log_pmd(struct gmap *gmap, unsigned long bitmap[4],
+			     unsigned long gaddr, unsigned long vmaddr)
+{
+	int i = 0;
+	pmd_t *pmdp, *hpmdp;
+	spinlock_t *ptl;
+
+	hpmdp = (pmd_t *)huge_pte_offset(gmap->mm, vmaddr, HPAGE_SIZE);
+	if (!hpmdp)
+		return;
+	ptl = pmd_lock(gmap->mm, hpmdp);
+	pmdp = gmap_pmd_op_walk(gmap, gaddr);
+	if (!pmdp) {
+		spin_unlock(ptl);
+		return;
+	}
+
+	if (pmd_large(*pmdp)) {
+		if (gmap_test_and_clear_dirty_segment(gmap, pmdp, hpmdp,
+						      gaddr, vmaddr))
+			memset(bitmap, 0xFF, 32);
+	} else {
+		for (; i < _PAGE_ENTRIES; i++, vmaddr += PAGE_SIZE) {
+			if (test_and_clear_guest_dirty(gmap->mm, vmaddr))
+				set_bit_le(i, bitmap);
+		}
+	}
+	gmap_pmd_op_end(gmap, pmdp);
+	spin_unlock(ptl);
 }
 
 static inline void thp_split_mm(struct mm_struct *mm)
