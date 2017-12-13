@@ -2938,6 +2938,8 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
 	pagefault_enable();
 	kvm_x86_ops->vcpu_put(vcpu);
 	vcpu->arch.last_host_tsc = rdtsc();
+	if (!hw_breakpoint_active())
+		set_debugreg(current->thread.debugreg6, 6);
 }
 
 static int kvm_vcpu_ioctl_get_lapic(struct kvm_vcpu *vcpu,
