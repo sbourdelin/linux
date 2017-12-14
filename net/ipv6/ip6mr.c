@@ -2074,6 +2074,14 @@ static int ip6mr_forward2(struct net *net, struct mr6_table *mrt,
 	ipv6h = ipv6_hdr(skb);
 	ipv6h->hop_limit--;
 
+	if (ipv6h->nexthdr == NEXTHDR_UDP &&
+	    skb->pkt_type == PACKET_LOOPBACK) {
+		struct udphdr *uh = udp_hdr(skb);
+
+		udp6_set_csum(false, skb, &ipv6_hdr(skb)->saddr,
+			      &ipv6_hdr(skb)->daddr, ntohs(uh->len));
+	}
+
 	IP6CB(skb)->flags |= IP6SKB_FORWARDED;
 
 	return NF_HOOK(NFPROTO_IPV6, NF_INET_FORWARD,
