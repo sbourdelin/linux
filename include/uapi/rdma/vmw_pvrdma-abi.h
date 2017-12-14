@@ -58,6 +58,8 @@
 #define PVRDMA_UAR_CQ_ARM_SOL		(1 << 29)	/* Arm solicited bit. */
 #define PVRDMA_UAR_CQ_ARM		(1 << 30)	/* Arm bit. */
 #define PVRDMA_UAR_CQ_POLL		(1 << 31)	/* Poll bit. */
+#define PVRDMA_UAR_SRQ_OFFSET		8		/* SRQ doorbell. */
+#define PVRDMA_UAR_SRQ_RECV		(1 << 30)	/* Recv bit. */
 
 enum pvrdma_wr_opcode {
 	PVRDMA_WR_RDMA_WRITE,
