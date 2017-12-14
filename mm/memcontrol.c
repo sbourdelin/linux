@@ -5526,8 +5526,9 @@ static int memory_events_show(struct seq_file *m, void *v)
 static int memory_stat_show(struct seq_file *m, void *v)
 {
 	struct mem_cgroup *memcg = mem_cgroup_from_css(seq_css(m));
-	unsigned long stat[MEMCG_NR_STAT];
-	unsigned long events[MEMCG_NR_EVENTS];
+	static unsigned long stat[MEMCG_NR_STAT];
+	static unsigned long events[MEMCG_NR_EVENTS];
+	static DEFINE_MUTEX(stat_lock);
 	int i;
 
 	/*
@@ -5540,7 +5541,7 @@ static int memory_stat_show(struct seq_file *m, void *v)
 	 *
 	 * Current memory state:
 	 */
-
+	mutex_lock(&stat_lock);
 	tree_stat(memcg, stat);
 	tree_events(memcg, events);
 
@@ -5601,6 +5602,7 @@ static int memory_stat_show(struct seq_file *m, void *v)
 		   stat[WORKINGSET_ACTIVATE]);
 	seq_printf(m, "workingset_nodereclaim %lu\n",
 		   stat[WORKINGSET_NODERECLAIM]);
+	mutex_unlock(&stat_lock);
 
 	return 0;
 }
