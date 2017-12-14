@@ -31,7 +31,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* ---- Include Files ---------------------------------------------------- */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -41,9 +40,6 @@
 #include "vchiq_arm.h"
 #include "vchiq_killable.h"
 
-/* ---- Public Variables ------------------------------------------------- */
-
-/* ---- Private Constants and Types -------------------------------------- */
 
 struct bulk_waiter_node {
 	struct bulk_waiter bulk_waiter;
@@ -64,11 +60,7 @@ static VCHIQ_STATUS_T
 vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
 	unsigned int size, VCHIQ_BULK_DIR_T dir);
 
-/****************************************************************************
-*
-*   vchiq_initialise
-*
-***************************************************************************/
+
 #define VCHIQ_INIT_RETRIES 10
 VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
 {
@@ -120,11 +112,6 @@ failed:
 }
 EXPORT_SYMBOL(vchiq_initialise);
 
-/****************************************************************************
-*
-*   vchiq_shutdown
-*
-***************************************************************************/
 
 VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
 {
@@ -168,22 +155,12 @@ VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
 }
 EXPORT_SYMBOL(vchiq_shutdown);
 
-/****************************************************************************
-*
-*   vchiq_is_connected
-*
-***************************************************************************/
 
 static int vchiq_is_connected(VCHIQ_INSTANCE_T instance)
 {
 	return instance->connected;
 }
 
-/****************************************************************************
-*
-*   vchiq_connect
-*
-***************************************************************************/
 
 VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance)
 {
@@ -214,11 +191,6 @@ failed:
 }
 EXPORT_SYMBOL(vchiq_connect);
 
-/****************************************************************************
-*
-*   vchiq_add_service
-*
-***************************************************************************/
 
 VCHIQ_STATUS_T vchiq_add_service(
 	VCHIQ_INSTANCE_T              instance,
@@ -259,11 +231,6 @@ VCHIQ_STATUS_T vchiq_add_service(
 }
 EXPORT_SYMBOL(vchiq_add_service);
 
-/****************************************************************************
-*
-*   vchiq_open_service
-*
-***************************************************************************/
 
 VCHIQ_STATUS_T vchiq_open_service(
 	VCHIQ_INSTANCE_T              instance,
