@@ -274,6 +274,47 @@ static inline void ufshcd_remove_non_printable(char *val)
 		*val = ' ';
 }
 
+static void ufshcd_add_upiu_trace(struct ufs_hba *hba, unsigned int tag,
+	const char *str)
+{
+	struct utp_task_req_desc *descp;
+	struct utp_upiu_task_req *task_req;
+	struct utp_upiu_req *rq;
+	u8 tx_code, *hdr, *tsf;
+	int off;
+
+	if (!trace_ufshcd_upiu_enabled())
+		return;
+
+	off = (int)tag - hba->nutrs;
+	if (off < 0) {
+		rq = hba->lrb[tag].ucd_req_ptr;
+		hdr = (u8 *)&rq->header;
+	} else {
+		descp = &hba->utmrdl_base_addr[off];
+		task_req = (struct utp_upiu_task_req *)descp->task_req_upiu;
+		hdr = (u8 *)&task_req->header;
+	}
+
+	tx_code = hdr[0] & 0x3f;
+	switch (hdr[0] & 0x3f) {
+	case UPIU_TRANSACTION_COMMAND:
+		tsf = (u8 *)&rq->sc.cdb;
+		break;
+	case UPIU_TRANSACTION_TASK_REQ:
+		tsf = (u8 *)&task_req->input_param1;
+		break;
+	case UPIU_TRANSACTION_QUERY_REQ:
+		tsf = (u8 *)&rq->qr;
+		break;
+	default:
+		return;
+	}
+
+	/* trace UPIU header and Transaction Specific Fields (TSF) */
+	trace_ufshcd_upiu(dev_name(hba->dev), str, hdr, tsf);
+}
+
 static void ufshcd_add_command_trace(struct ufs_hba *hba,
 		unsigned int tag, const char *str)
 {
@@ -282,6 +323,9 @@ static void ufshcd_add_command_trace(struct ufs_hba *hba,
 	u32 intr, doorbell;
 	struct ufshcd_lrb *lrbp;
 	int transfer_len = -1;
+
+	/* trace UPIU also */
+	ufshcd_add_upiu_trace(hba, tag, str);
 
 	if (!trace_ufshcd_command_enabled())
 		return;
@@ -5462,11 +5506,14 @@ static int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
 
 	spin_unlock_irqrestore(host->host_lock, flags);
 
+	ufshcd_add_upiu_trace(hba, task_tag, "tm_send");
+
 	/* wait until the task management command is completed */
 	err = wait_event_timeout(hba->tm_wq,
 			test_bit(free_slot, &hba->tm_condition),
 			msecs_to_jiffies(TM_CMD_TIMEOUT));
 	if (!err) {
+		ufshcd_add_upiu_trace(hba, task_tag, "tm_complete_err");
 		dev_err(hba->dev, "%s: task management cmd 0x%.2x timed-out\n",
 				__func__, tm_function);
 		if (ufshcd_clear_tm_cmd(hba, free_slot))
@@ -5475,6 +5522,7 @@ static int ufshcd_issue_tm_cmd(struct ufs_hba *hba, int lun_id, int task_id,
 		err = -ETIMEDOUT;
 	} else {
 		err = ufshcd_task_req_compl(hba, free_slot, tm_response);
+		ufshcd_add_upiu_trace(hba, task_tag, "tm_complete");
 	}
 
 	clear_bit(free_slot, &hba->tm_condition);
