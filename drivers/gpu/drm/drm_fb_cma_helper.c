@@ -26,8 +26,6 @@
 #include <drm/drm_print.h>
 #include <linux/module.h>
 
-#define DEFAULT_FBDEFIO_DELAY_MS 50
-
 struct drm_fbdev_cma {
 	struct drm_fb_helper	fb_helper;
 	const struct drm_framebuffer_funcs *fb_funcs;
@@ -149,56 +147,12 @@ static struct fb_ops drm_fbdev_cma_ops = {
 static int drm_fbdev_cma_deferred_io_mmap(struct fb_info *info,
 					  struct vm_area_struct *vma)
 {
+#ifdef CONFIG_FB_DEFERRED_IO
 	fb_deferred_io_mmap(info, vma);
+#endif
 	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 
 	return 0;
-}
-
-static int drm_fbdev_cma_defio_init(struct fb_info *fbi,
-				    struct drm_gem_cma_object *cma_obj)
-{
-	struct fb_deferred_io *fbdefio;
-	struct fb_ops *fbops;
-
-	/*
-	 * Per device structures are needed because:
-	 * fbops: fb_deferred_io_cleanup() clears fbops.fb_mmap
-	 * fbdefio: individual delays
-	 */
-	fbdefio = kzalloc(sizeof(*fbdefio), GFP_KERNEL);
-	fbops = kzalloc(sizeof(*fbops), GFP_KERNEL);
-	if (!fbdefio || !fbops) {
-		kfree(fbdefio);
-		kfree(fbops);
-		return -ENOMEM;
-	}
-
-	/* can't be offset from vaddr since dirty() uses cma_obj */
-	fbi->screen_buffer = cma_obj->vaddr;
-	/* fb_deferred_io_fault() needs a physical address */
-	fbi->fix.smem_start = page_to_phys(virt_to_page(fbi->screen_buffer));
-
-	*fbops = *fbi->fbops;
-	fbi->fbops = fbops;
-
-	fbdefio->delay = msecs_to_jiffies(DEFAULT_FBDEFIO_DELAY_MS);
-	fbdefio->deferred_io = drm_fb_helper_deferred_io;
-	fbi->fbdefio = fbdefio;
-	fb_deferred_io_init(fbi);
-	fbi->fbops->fb_mmap = drm_fbdev_cma_deferred_io_mmap;
-
-	return 0;
-}
-
-static void drm_fbdev_cma_defio_fini(struct fb_info *fbi)
-{
-	if (!fbi->fbdefio)
-		return;
-
-	fb_deferred_io_cleanup(fbi);
-	kfree(fbi->fbdefio);
-	kfree(fbi->fbops);
 }
 
 static int
@@ -258,9 +212,15 @@ drm_fbdev_cma_create(struct drm_fb_helper *helper,
 	fbi->fix.smem_len = size;
 
 	if (fb->funcs->dirty) {
-		ret = drm_fbdev_cma_defio_init(fbi, obj);
+		ret = drm_fb_helper_defio_init(helper);
 		if (ret)
 			goto err_cma_destroy;
+
+		/* can't be offset from vaddr since dirty() uses cma obj */
+		fbi->screen_buffer = obj->vaddr;
+		/* fb_deferred_io_fault() needs a physical address */
+		fbi->fix.smem_start = page_to_phys(virt_to_page(obj->vaddr));
+		fbi->fbops->fb_mmap = drm_fbdev_cma_deferred_io_mmap;
 	}
 
 	return 0;
@@ -296,52 +256,23 @@ int drm_fb_cma_fbdev_init_with_funcs(struct drm_device *dev,
 	const struct drm_framebuffer_funcs *funcs)
 {
 	struct drm_fbdev_cma *fbdev_cma;
-	struct drm_fb_helper *fb_helper;
 	int ret;
-
-	if (!preferred_bpp)
-		preferred_bpp = dev->mode_config.preferred_depth;
-	if (!preferred_bpp)
-		preferred_bpp = 32;
-
-	if (!max_conn_count)
-		max_conn_count = dev->mode_config.num_connector;
 
 	fbdev_cma = kzalloc(sizeof(*fbdev_cma), GFP_KERNEL);
 	if (!fbdev_cma)
 		return -ENOMEM;
 
 	fbdev_cma->fb_funcs = funcs;
-	fb_helper = &fbdev_cma->fb_helper;
 
-	drm_fb_helper_prepare(dev, fb_helper, &drm_fb_cma_helper_funcs);
-
-	ret = drm_fb_helper_init(dev, fb_helper, max_conn_count);
+	ret = drm_fb_helper_fbdev_setup(dev, &fbdev_cma->fb_helper,
+					&drm_fb_cma_helper_funcs,
+					preferred_bpp, max_conn_count);
 	if (ret < 0) {
-		DRM_DEV_ERROR(dev->dev, "Failed to initialize fbdev helper.\n");
-		goto err_free;
-	}
-
-	ret = drm_fb_helper_single_add_all_connectors(fb_helper);
-	if (ret < 0) {
-		DRM_DEV_ERROR(dev->dev, "Failed to add connectors.\n");
-		goto err_drm_fb_helper_fini;
-	}
-
-	ret = drm_fb_helper_initial_config(fb_helper, preferred_bpp);
-	if (ret < 0) {
-		DRM_DEV_ERROR(dev->dev, "Failed to set fbdev configuration.\n");
-		goto err_drm_fb_helper_fini;
+		kfree(fbdev_cma);
+		return ret;
 	}
 
 	return 0;
-
-err_drm_fb_helper_fini:
-	drm_fb_helper_fini(fb_helper);
-err_free:
-	kfree(fbdev_cma);
-
-	return ret;
 }
 EXPORT_SYMBOL_GPL(drm_fb_cma_fbdev_init_with_funcs);
 
@@ -375,17 +306,7 @@ void drm_fb_cma_fbdev_fini(struct drm_device *dev)
 	if (!fb_helper)
 		return;
 
-	/* Unregister if it hasn't been done already */
-	if (fb_helper->fbdev && fb_helper->fbdev->dev)
-		drm_fb_helper_unregister_fbi(fb_helper);
-
-	if (fb_helper->fbdev)
-		drm_fbdev_cma_defio_fini(fb_helper->fbdev);
-
-	if (fb_helper->fb)
-		drm_framebuffer_remove(fb_helper->fb);
-
-	drm_fb_helper_fini(fb_helper);
+	drm_fb_helper_fbdev_teardown(dev);
 	kfree(to_fbdev_cma(fb_helper));
 }
 EXPORT_SYMBOL_GPL(drm_fb_cma_fbdev_fini);
@@ -477,8 +398,6 @@ EXPORT_SYMBOL_GPL(drm_fbdev_cma_init);
 void drm_fbdev_cma_fini(struct drm_fbdev_cma *fbdev_cma)
 {
 	drm_fb_helper_unregister_fbi(&fbdev_cma->fb_helper);
-	if (fbdev_cma->fb_helper.fbdev)
-		drm_fbdev_cma_defio_fini(fbdev_cma->fb_helper.fbdev);
 
 	if (fbdev_cma->fb_helper.fb)
 		drm_framebuffer_remove(fbdev_cma->fb_helper.fb);
