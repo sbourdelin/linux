@@ -1128,6 +1128,7 @@ print_circular_lock_scenario(struct held_lock *src,
 	struct lock_class *source = hlock_class(src);
 	struct lock_class *target = hlock_class(tgt);
 	struct lock_class *parent = prt->class;
+	const char *spaces = "";
 
 	/*
 	 * A direct locking problem where unsafe_class lock is taken
@@ -1154,31 +1155,61 @@ print_circular_lock_scenario(struct held_lock *src,
 
 	if (cross_lock(tgt->instance)) {
 		printk(" Possible unsafe locking scenario by crosslock:\n\n");
-		printk("       CPU0                    CPU1\n");
-		printk("       ----                    ----\n");
+		printk("       CPU0                    CPU1");
+		if (parent != source)
+			printk(KERN_CONT "                    CPU2");
+		printk(KERN_CONT "\n");
+		printk("       ----                    ----");
+		if (parent != source)
+			printk(KERN_CONT "                    ----");
+		printk(KERN_CONT "\n");
 		printk("  lock(");
 		__print_lock_name(parent);
 		printk(KERN_CONT ");\n");
 		printk("  lock(");
 		__print_lock_name(target);
 		printk(KERN_CONT ");\n");
-		printk("                               lock(");
+		if (parent != source) {
+			printk("                               lock(");
+			__print_lock_name(source);
+			printk(KERN_CONT ");\n");
+			printk("                               lock(");
+			__print_lock_name(parent);
+			printk(KERN_CONT ");\n");
+			spaces = "                       ";
+		}
+		printk("%s                               lock(", spaces);
 		__print_lock_name(source);
 		printk(KERN_CONT ");\n");
-		printk("                               unlock(");
+		printk("%s                               unlock(",spaces);
 		__print_lock_name(target);
 		printk(KERN_CONT ");\n");
 		printk("\n *** DEADLOCK ***\n\n");
 	} else {
 		printk(" Possible unsafe locking scenario:\n\n");
-		printk("       CPU0                    CPU1\n");
-		printk("       ----                    ----\n");
+		printk("       CPU0                    CPU1");
+		if (parent != source)
+			printk(KERN_CONT "                    CPU2");
+		printk(KERN_CONT "\n");
+		printk("       ----                    ----");
+		if (parent != source)
+			printk(KERN_CONT "                    ----");
+		printk(KERN_CONT "\n");
 		printk("  lock(");
 		__print_lock_name(target);
 		printk(KERN_CONT ");\n");
 		printk("                               lock(");
 		__print_lock_name(parent);
 		printk(KERN_CONT ");\n");
+		if (parent != source) {
+			spaces = "                       ";
+			printk("%s                               lock(", spaces);
+			__print_lock_name(source);
+			printk(KERN_CONT ");\n");
+			printk("%s                               lock(", spaces);
+			__print_lock_name(parent);
+			printk(KERN_CONT ");\n");
+		}
 		printk("                               lock(");
 		__print_lock_name(target);
 		printk(KERN_CONT ");\n");
@@ -1500,6 +1531,7 @@ print_irq_lock_scenario(struct lock_list *safe_entry,
 	struct lock_class *safe_class = safe_entry->class;
 	struct lock_class *unsafe_class = unsafe_entry->class;
 	struct lock_class *middle_class = prev_class;
+	const char *spaces = "";
 
 	if (middle_class == safe_class)
 		middle_class = next_class;
@@ -1528,18 +1560,36 @@ print_irq_lock_scenario(struct lock_list *safe_entry,
 	}
 
 	printk(" Possible interrupt unsafe locking scenario:\n\n");
-	printk("       CPU0                    CPU1\n");
-	printk("       ----                    ----\n");
+	printk("       CPU0                    CPU1");
+	if (middle_class != unsafe_class)
+		printk(KERN_CONT "                    CPU2");
+	printk(KERN_CONT "\n");
+	printk("       ----                    ----");
+	if (middle_class != unsafe_class)
+		printk(KERN_CONT "                    ----");
+	printk(KERN_CONT "\n");
 	printk("  lock(");
 	__print_lock_name(unsafe_class);
 	printk(KERN_CONT ");\n");
-	printk("                               local_irq_disable();\n");
-	printk("                               lock(");
+	if (middle_class != unsafe_class) {
+		spaces = "                       ";
+		printk("                               local_irq_disable();\n");
+		printk("                               lock(");
+		__print_lock_name(middle_class);
+		printk(KERN_CONT ");\n");
+	}
+	printk("%s                               local_irq_disable();\n", spaces);
+	printk("%s                               lock(", spaces);
 	__print_lock_name(safe_class);
 	printk(KERN_CONT ");\n");
-	printk("                               lock(");
+	printk("%s                               lock(", spaces);
 	__print_lock_name(middle_class);
 	printk(KERN_CONT ");\n");
+	if (middle_class != unsafe_class) {
+		printk("                               lock(");
+		__print_lock_name(unsafe_class);
+		printk(KERN_CONT ");\n");
+	}
 	printk("  <Interrupt>\n");
 	printk("    lock(");
 	__print_lock_name(safe_class);
