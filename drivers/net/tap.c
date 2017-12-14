@@ -587,8 +587,7 @@ static unsigned int tap_poll(struct file *file, poll_table *wait)
 		mask |= POLLIN | POLLRDNORM;
 
 	if (sock_writeable(&q->sk) ||
-	    (!test_and_set_bit(SOCKWQ_ASYNC_NOSPACE, &q->sock.flags) &&
-	     sock_writeable(&q->sk)))
+	    !test_and_set_bit(SOCKWQ_ASYNC_NOSPACE, &q->sock.flags))
 		mask |= POLLOUT | POLLWRNORM;
 
 out:
