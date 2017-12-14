@@ -10,8 +10,6 @@
 #include <linux/mmu_context.h>
 #include <linux/export.h>
 
-#include <asm/mmu_context.h>
-
 /*
  * use_mm
  *	Makes the calling kernel thread take on the specified
