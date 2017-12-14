@@ -178,6 +178,8 @@ struct virtio_gpu_device {
 
 	struct virtio_gpu_queue ctrlq;
 	struct virtio_gpu_queue cursorq;
+	struct virtio_gpu_queue winsrv_rxq;
+	struct virtio_gpu_queue winsrv_txq;
 	struct kmem_cache *vbufs;
 	bool vqs_ready;
 
@@ -205,10 +207,32 @@ struct virtio_gpu_device {
 
 struct virtio_gpu_fpriv {
 	uint32_t ctx_id;
+
+	struct list_head winsrv_conns; /* list of virtio_gpu_winsrv_conn */
+	spinlock_t winsrv_lock;
+};
+
+struct virtio_gpu_winsrv_rx_qentry {
+	struct virtio_gpu_winsrv_rx *cmd;
+	struct list_head next;
+};
+
+struct virtio_gpu_winsrv_conn {
+	struct virtio_gpu_device *vgdev;
+
+	spinlock_t lock;
+
+	int fd;
+	struct drm_file *drm_file;
+
+	struct list_head cmdq; /* queue of virtio_gpu_winsrv_rx_qentry */
+	wait_queue_head_t cmdwq;
+
+	struct list_head next;
 };
 
 /* virtio_ioctl.c */
-#define DRM_VIRTIO_NUM_IOCTLS 10
+#define DRM_VIRTIO_NUM_IOCTLS 11
 extern struct drm_ioctl_desc virtio_gpu_ioctls[DRM_VIRTIO_NUM_IOCTLS];
 
 /* virtio_kms.c */
@@ -318,9 +342,22 @@ virtio_gpu_cmd_resource_create_3d(struct virtio_gpu_device *vgdev,
 void virtio_gpu_ctrl_ack(struct virtqueue *vq);
 void virtio_gpu_cursor_ack(struct virtqueue *vq);
 void virtio_gpu_fence_ack(struct virtqueue *vq);
+void virtio_gpu_winsrv_tx_ack(struct virtqueue *vq);
+void virtio_gpu_winsrv_rx_read(struct virtqueue *vq);
 void virtio_gpu_dequeue_ctrl_func(struct work_struct *work);
 void virtio_gpu_dequeue_cursor_func(struct work_struct *work);
+void virtio_gpu_dequeue_winsrv_rx_func(struct work_struct *work);
+void virtio_gpu_dequeue_winsrv_tx_func(struct work_struct *work);
 void virtio_gpu_dequeue_fence_func(struct work_struct *work);
+void virtio_gpu_fill_winsrv_rx(struct virtio_gpu_device *vgdev);
+void virtio_gpu_queue_winsrv_rx_in(struct virtio_gpu_device *vgdev,
+				   struct virtio_gpu_winsrv_rx *cmd);
+int virtio_gpu_cmd_winsrv_connect(struct virtio_gpu_device *vgdev, int fd);
+void virtio_gpu_cmd_winsrv_disconnect(struct virtio_gpu_device *vgdev, int fd);
+int virtio_gpu_cmd_winsrv_tx(struct virtio_gpu_device *vgdev,
+			     const char __user *buffer, u32 len,
+			     int *fds, struct virtio_gpu_winsrv_conn *conn,
+			     bool nonblock);
 
 /* virtio_gpu_display.c */
 int virtio_gpu_framebuffer_init(struct drm_device *dev,

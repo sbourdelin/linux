@@ -71,6 +71,12 @@ enum virtio_gpu_ctrl_type {
 	VIRTIO_GPU_CMD_UPDATE_CURSOR = 0x0300,
 	VIRTIO_GPU_CMD_MOVE_CURSOR,
 
+	/* window server commands */
+	VIRTIO_GPU_CMD_WINSRV_CONNECT = 0x0400,
+	VIRTIO_GPU_CMD_WINSRV_DISCONNECT,
+	VIRTIO_GPU_CMD_WINSRV_TX,
+	VIRTIO_GPU_CMD_WINSRV_RX,
+
 	/* success responses */
 	VIRTIO_GPU_RESP_OK_NODATA = 0x1100,
 	VIRTIO_GPU_RESP_OK_DISPLAY_INFO,
@@ -288,6 +294,39 @@ struct virtio_gpu_get_capset {
 struct virtio_gpu_resp_capset {
 	struct virtio_gpu_ctrl_hdr hdr;
 	__u8 capset_data[];
+};
+
+/* VIRTIO_GPU_CMD_WINSRV_CONNECT */
+struct virtio_gpu_winsrv_connect {
+	struct virtio_gpu_ctrl_hdr hdr;
+	__le32 client_fd;
+};
+
+/* VIRTIO_GPU_CMD_WINSRV_DISCONNECT */
+struct virtio_gpu_winsrv_disconnect {
+	struct virtio_gpu_ctrl_hdr hdr;
+	__le32 client_fd;
+};
+
+#define VIRTIO_GPU_WINSRV_MAX_ALLOCS 28
+#define VIRTIO_GPU_WINSRV_TX_MAX_DATA 4096
+
+/* VIRTIO_GPU_CMD_WINSRV_TX */
+/* these commands are followed in the queue descriptor by protocol buffers */
+struct virtio_gpu_winsrv_tx {
+	struct virtio_gpu_ctrl_hdr hdr;
+	__le32 client_fd;
+	__le32 len;
+	__le32 resource_ids[VIRTIO_GPU_WINSRV_MAX_ALLOCS];
+};
+
+/* VIRTIO_GPU_CMD_WINSRV_RX */
+struct virtio_gpu_winsrv_rx {
+	struct virtio_gpu_ctrl_hdr hdr;
+	__le32 client_fd;
+	__u8 data[VIRTIO_GPU_WINSRV_TX_MAX_DATA];
+	__le32 len;
+	__le32 resource_ids[VIRTIO_GPU_WINSRV_MAX_ALLOCS];
 };
 
 #define VIRTIO_GPU_EVENT_DISPLAY (1 << 0)

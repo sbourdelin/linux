@@ -72,6 +72,67 @@ void virtio_gpu_cursor_ack(struct virtqueue *vq)
 	schedule_work(&vgdev->cursorq.dequeue_work);
 }
 
+void virtio_gpu_winsrv_rx_read(struct virtqueue *vq)
+{
+	struct drm_device *dev = vq->vdev->priv;
+	struct virtio_gpu_device *vgdev = dev->dev_private;
+
+	schedule_work(&vgdev->winsrv_rxq.dequeue_work);
+}
+
+void virtio_gpu_winsrv_tx_ack(struct virtqueue *vq)
+{
+	struct drm_device *dev = vq->vdev->priv;
+	struct virtio_gpu_device *vgdev = dev->dev_private;
+
+	schedule_work(&vgdev->winsrv_txq.dequeue_work);
+}
+
+void virtio_gpu_queue_winsrv_rx_in(struct virtio_gpu_device *vgdev,
+				   struct virtio_gpu_winsrv_rx *cmd)
+{
+	struct virtqueue *vq = vgdev->winsrv_rxq.vq;
+	struct scatterlist sg[1];
+	int ret;
+
+	sg_init_one(sg, cmd, sizeof(*cmd));
+
+	spin_lock(&vgdev->winsrv_rxq.qlock);
+retry:
+	ret = virtqueue_add_inbuf(vq, sg, 1, cmd, GFP_KERNEL);
+	if (ret == -ENOSPC) {
+		spin_unlock(&vgdev->winsrv_rxq.qlock);
+		wait_event(vgdev->winsrv_rxq.ack_queue, vq->num_free);
+		spin_lock(&vgdev->winsrv_rxq.qlock);
+		goto retry;
+	}
+	virtqueue_kick(vq);
+	spin_unlock(&vgdev->winsrv_rxq.qlock);
+}
+
+void virtio_gpu_fill_winsrv_rx(struct virtio_gpu_device *vgdev)
+{
+	struct virtqueue *vq = vgdev->winsrv_rxq.vq;
+	struct virtio_gpu_winsrv_rx *cmd;
+	int ret = 0;
+
+	while (vq->num_free > 0) {
+		cmd = kmalloc(sizeof(*cmd), GFP_KERNEL);
+		if (!cmd) {
+			ret = -ENOMEM;
+			goto clear_queue;
+		}
+
+		virtio_gpu_queue_winsrv_rx_in(vgdev, cmd);
+	}
+
+	return;
+
+clear_queue:
+	while ((cmd = virtqueue_detach_unused_buf(vq)))
+		kfree(cmd);
+}
+
 int virtio_gpu_alloc_vbufs(struct virtio_gpu_device *vgdev)
 {
 	vgdev->vbufs = kmem_cache_create("virtio-gpu-vbufs",
@@ -258,6 +319,96 @@ void virtio_gpu_dequeue_cursor_func(struct work_struct *work)
 	wake_up(&vgdev->cursorq.ack_queue);
 }
 
+void virtio_gpu_dequeue_winsrv_tx_func(struct work_struct *work)
+{
+	struct virtio_gpu_device *vgdev =
+		container_of(work, struct virtio_gpu_device,
+			     winsrv_txq.dequeue_work);
+	struct virtio_gpu_vbuffer *vbuf;
+	int len;
+
+	spin_lock(&vgdev->winsrv_txq.qlock);
+	do {
+		while ((vbuf = virtqueue_get_buf(vgdev->winsrv_txq.vq, &len)))
+			free_vbuf(vgdev, vbuf);
+	} while (!virtqueue_enable_cb(vgdev->winsrv_txq.vq));
+	spin_unlock(&vgdev->winsrv_txq.qlock);
+
+	wake_up(&vgdev->winsrv_txq.ack_queue);
+}
+
+static struct virtio_gpu_winsrv_conn *find_conn(struct virtio_gpu_device *vgdev,
+						int fd)
+{
+	struct virtio_gpu_winsrv_conn *conn;
+	struct drm_device *ddev = vgdev->ddev;
+	struct drm_file *file;
+	struct virtio_gpu_fpriv *vfpriv;
+
+	mutex_lock(&ddev->filelist_mutex);
+	list_for_each_entry(file, &ddev->filelist, lhead) {
+		vfpriv = file->driver_priv;
+		spin_lock(&vfpriv->winsrv_lock);
+		list_for_each_entry(conn, &vfpriv->winsrv_conns, next) {
+			if (conn->fd == fd) {
+				spin_lock(&conn->lock);
+				spin_unlock(&vfpriv->winsrv_lock);
+				mutex_unlock(&ddev->filelist_mutex);
+				return conn;
+			}
+		}
+		spin_unlock(&vfpriv->winsrv_lock);
+	}
+	mutex_unlock(&ddev->filelist_mutex);
+
+	return NULL;
+}
+
+static void handle_rx_cmd(struct virtio_gpu_device *vgdev,
+			  struct virtio_gpu_winsrv_rx *cmd)
+{
+	struct virtio_gpu_winsrv_conn *conn;
+	struct virtio_gpu_winsrv_rx_qentry *qentry;
+
+	conn = find_conn(vgdev, cmd->client_fd);
+	if (!conn) {
+		DRM_DEBUG("recv for unknown client fd %u\n", cmd->client_fd);
+		return;
+	}
+
+	qentry = kzalloc(sizeof(*qentry), GFP_KERNEL);
+	if (!qentry) {
+		spin_unlock(&conn->lock);
+		DRM_DEBUG("failed to allocate qentry for winsrv connection\n");
+		return;
+	}
+
+	qentry->cmd = cmd;
+
+	list_add_tail(&qentry->next, &conn->cmdq);
+	wake_up_interruptible(&conn->cmdwq);
+	spin_unlock(&conn->lock);
+}
+
+void virtio_gpu_dequeue_winsrv_rx_func(struct work_struct *work)
+{
+	struct virtio_gpu_device *vgdev =
+		container_of(work, struct virtio_gpu_device,
+			     winsrv_rxq.dequeue_work);
+	struct virtio_gpu_winsrv_rx *cmd;
+	unsigned int len;
+
+	spin_lock(&vgdev->winsrv_rxq.qlock);
+	while ((cmd = virtqueue_get_buf(vgdev->winsrv_rxq.vq, &len)) != NULL) {
+		spin_unlock(&vgdev->winsrv_rxq.qlock);
+		handle_rx_cmd(vgdev, cmd);
+		spin_lock(&vgdev->winsrv_rxq.qlock);
+	}
+	spin_unlock(&vgdev->winsrv_rxq.qlock);
+
+	virtqueue_kick(vgdev->winsrv_rxq.vq);
+}
+
 static int virtio_gpu_queue_ctrl_buffer_locked(struct virtio_gpu_device *vgdev,
 					       struct virtio_gpu_vbuffer *vbuf)
 		__releases(&vgdev->ctrlq.qlock)
@@ -374,6 +525,41 @@ retry:
 	}
 
 	spin_unlock(&vgdev->cursorq.qlock);
+
+	if (!ret)
+		ret = vq->num_free;
+	return ret;
+}
+
+static int virtio_gpu_queue_winsrv_tx(struct virtio_gpu_device *vgdev,
+				      struct virtio_gpu_vbuffer *vbuf)
+{
+	struct virtqueue *vq = vgdev->winsrv_txq.vq;
+	struct scatterlist *sgs[2], vcmd, vout;
+	int ret;
+
+	if (!vgdev->vqs_ready)
+		return -ENODEV;
+
+	sg_init_one(&vcmd, vbuf->buf, vbuf->size);
+	sgs[0] = &vcmd;
+
+	sg_init_one(&vout, vbuf->data_buf, vbuf->data_size);
+	sgs[1] = &vout;
+
+	spin_lock(&vgdev->winsrv_txq.qlock);
+retry:
+	ret = virtqueue_add_sgs(vq, sgs, 2, 0, vbuf, GFP_ATOMIC);
+	if (ret == -ENOSPC) {
+		spin_unlock(&vgdev->winsrv_txq.qlock);
+		wait_event(vgdev->winsrv_txq.ack_queue, vq->num_free);
+		spin_lock(&vgdev->winsrv_txq.qlock);
+		goto retry;
+	}
+
+	virtqueue_kick(vq);
+
+	spin_unlock(&vgdev->winsrv_txq.qlock);
 
 	if (!ret)
 		ret = vq->num_free;
@@ -889,4 +1075,101 @@ void virtio_gpu_cursor_ping(struct virtio_gpu_device *vgdev,
 	cur_p = virtio_gpu_alloc_cursor(vgdev, &vbuf);
 	memcpy(cur_p, &output->cursor, sizeof(output->cursor));
 	virtio_gpu_queue_cursor(vgdev, vbuf);
+}
+
+int virtio_gpu_cmd_winsrv_connect(struct virtio_gpu_device *vgdev, int fd)
+{
+	struct virtio_gpu_winsrv_connect *cmd_p;
+	struct virtio_gpu_vbuffer *vbuf;
+
+	cmd_p = virtio_gpu_alloc_cmd(vgdev, &vbuf, sizeof(*cmd_p));
+	memset(cmd_p, 0, sizeof(*cmd_p));
+
+	cmd_p->hdr.type = cpu_to_le32(VIRTIO_GPU_CMD_WINSRV_CONNECT);
+	cmd_p->client_fd = cpu_to_le32(fd);
+	return virtio_gpu_queue_ctrl_buffer(vgdev, vbuf);
+}
+
+void virtio_gpu_cmd_winsrv_disconnect(struct virtio_gpu_device *vgdev, int fd)
+{
+	struct virtio_gpu_winsrv_disconnect *cmd_p;
+	struct virtio_gpu_vbuffer *vbuf;
+
+	cmd_p = virtio_gpu_alloc_cmd(vgdev, &vbuf, sizeof(*cmd_p));
+	memset(cmd_p, 0, sizeof(*cmd_p));
+
+	cmd_p->hdr.type = cpu_to_le32(VIRTIO_GPU_CMD_WINSRV_DISCONNECT);
+	cmd_p->client_fd = cpu_to_le32(fd);
+	virtio_gpu_queue_ctrl_buffer(vgdev, vbuf);
+}
+
+int virtio_gpu_cmd_winsrv_tx(struct virtio_gpu_device *vgdev,
+			     const char __user *buffer, u32 len,
+			     int *fds, struct virtio_gpu_winsrv_conn *conn,
+			     bool nonblock)
+{
+	int client_fd = conn->fd;
+	struct drm_file *file = conn->drm_file;
+	struct virtio_gpu_winsrv_tx *cmd_p;
+	struct virtio_gpu_vbuffer *vbuf;
+	uint32_t gem_handle;
+	struct drm_gem_object *gobj = NULL;
+	struct virtio_gpu_object *qobj = NULL;
+	int ret, i, fd;
+
+	cmd_p = virtio_gpu_alloc_cmd(vgdev, &vbuf, sizeof(*cmd_p));
+	memset(cmd_p, 0, sizeof(*cmd_p));
+
+	cmd_p->hdr.type = cpu_to_le32(VIRTIO_GPU_CMD_WINSRV_TX);
+
+	for (i = 0; i < VIRTIO_GPU_WINSRV_MAX_ALLOCS; i++) {
+		cmd_p->resource_ids[i] = -1;
+
+		fd = fds[i];
+		if (fd < 0)
+			break;
+
+		ret = drm_gem_prime_fd_to_handle(vgdev->ddev, file, fd,
+						 &gem_handle);
+		if (ret != 0)
+			goto err_free_vbuf;
+
+		gobj = drm_gem_object_lookup(file, gem_handle);
+		if (gobj == NULL) {
+			ret = -ENOENT;
+			goto err_free_vbuf;
+		}
+
+		qobj = gem_to_virtio_gpu_obj(gobj);
+		cmd_p->resource_ids[i] = qobj->hw_res_handle;
+	}
+
+	cmd_p->client_fd = client_fd;
+	cmd_p->len = cpu_to_le32(len);
+
+	/* gets freed when the ring has consumed it */
+	vbuf->data_buf = kmalloc(cmd_p->len, GFP_KERNEL);
+	if (!vbuf->data_buf) {
+		DRM_ERROR("failed to allocate winsrv tx buffer\n");
+		ret = -ENOMEM;
+		goto err_free_vbuf;
+	}
+
+	vbuf->data_size = cmd_p->len;
+
+	if (copy_from_user(vbuf->data_buf, buffer, cmd_p->len)) {
+		ret = -EFAULT;
+		goto err_free_databuf;
+	}
+
+	virtio_gpu_queue_winsrv_tx(vgdev, vbuf);
+
+	return 0;
+
+err_free_databuf:
+	kfree(vbuf->data_buf);
+err_free_vbuf:
+	free_vbuf(vgdev, vbuf);
+
+	return ret;
 }

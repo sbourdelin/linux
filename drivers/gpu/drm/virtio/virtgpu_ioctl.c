@@ -25,6 +25,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <linux/anon_inodes.h>
+#include <linux/syscalls.h>
+
 #include <drm/drmP.h>
 #include <drm/virtgpu_drm.h>
 #include <drm/ttm/ttm_execbuf_util.h>
@@ -527,6 +530,168 @@ copy_exit:
 	return 0;
 }
 
+static unsigned int winsrv_poll(struct file *filp,
+				struct poll_table_struct *wait)
+{
+	struct virtio_gpu_winsrv_conn *conn = filp->private_data;
+	unsigned int mask = 0;
+
+	spin_lock(&conn->lock);
+	poll_wait(filp, &conn->cmdwq, wait);
+	if (!list_empty(&conn->cmdq))
+		mask |= POLLIN | POLLRDNORM;
+	spin_unlock(&conn->lock);
+
+	return mask;
+}
+
+static int winsrv_ioctl_rx(struct virtio_gpu_device *vgdev,
+			   struct virtio_gpu_winsrv_conn *conn,
+			   struct drm_virtgpu_winsrv *cmd)
+{
+	struct virtio_gpu_winsrv_rx_qentry *qentry, *tmp;
+	struct virtio_gpu_winsrv_rx *virtio_cmd;
+	int available_len = cmd->len;
+	int read_count = 0;
+
+	list_for_each_entry_safe(qentry, tmp, &conn->cmdq, next) {
+		virtio_cmd = qentry->cmd;
+		if (virtio_cmd->len > available_len)
+			return 0;
+
+		if (copy_to_user((void *)cmd->data + read_count,
+				 virtio_cmd->data,
+				 virtio_cmd->len)) {
+			/* return error unless we have some data to return */
+			if (read_count == 0)
+				return -EFAULT;
+		}
+
+		/*
+		 * here we could export resource IDs to FDs, but no protocol
+		 * as of today requires it
+		 */
+
+		available_len -= virtio_cmd->len;
+		read_count += virtio_cmd->len;
+
+		virtio_gpu_queue_winsrv_rx_in(vgdev, virtio_cmd);
+
+		list_del(&qentry->next);
+		kfree(qentry);
+	}
+
+	cmd->len = read_count;
+
+	return 0;
+}
+
+static long winsrv_ioctl(struct file *filp, unsigned int cmd,
+			 unsigned long arg)
+{
+	struct virtio_gpu_winsrv_conn *conn = filp->private_data;
+	struct virtio_gpu_device *vgdev = conn->vgdev;
+	struct drm_virtgpu_winsrv winsrv_cmd;
+	int ret;
+
+	if (_IOC_SIZE(cmd) > sizeof(winsrv_cmd))
+		return -EINVAL;
+
+	if (copy_from_user(&winsrv_cmd, (void __user *)arg,
+			   _IOC_SIZE(cmd)) != 0)
+		return -EFAULT;
+
+	switch (cmd) {
+	case DRM_IOCTL_VIRTGPU_WINSRV_RX:
+		ret = winsrv_ioctl_rx(vgdev, conn, &winsrv_cmd);
+		if (copy_to_user((void __user *)arg, &winsrv_cmd,
+				 _IOC_SIZE(cmd)) != 0)
+			return -EFAULT;
+
+		break;
+
+	case DRM_IOCTL_VIRTGPU_WINSRV_TX:
+		ret = virtio_gpu_cmd_winsrv_tx(vgdev,
+				(const char __user *) winsrv_cmd.data,
+				winsrv_cmd.len,
+				winsrv_cmd.fds,
+				conn,
+				filp->f_flags & O_NONBLOCK);
+		break;
+	default:
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+static int winsrv_release(struct inode *inodep, struct file *filp)
+{
+	struct virtio_gpu_winsrv_conn *conn = filp->private_data;
+	struct virtio_gpu_device *vgdev = conn->vgdev;
+
+	virtio_gpu_cmd_winsrv_disconnect(vgdev, conn->fd);
+
+	list_del(&conn->next);
+	kfree(conn);
+
+	return 0;
+}
+
+static const struct file_operations winsrv_fops = {
+
+	.poll = winsrv_poll,
+	.unlocked_ioctl = winsrv_ioctl,
+	.release = winsrv_release,
+};
+
+static int virtio_gpu_winsrv_connect(struct drm_device *dev, void *data,
+				     struct drm_file *file)
+{
+	struct virtio_gpu_device *vgdev = dev->dev_private;
+	struct virtio_gpu_fpriv *vfpriv = file->driver_priv;
+	struct drm_virtgpu_winsrv_connect *args = data;
+	struct virtio_gpu_winsrv_conn *conn;
+	int ret;
+
+	conn = kzalloc(sizeof(*conn), GFP_KERNEL);
+	if (!conn)
+		return -ENOMEM;
+
+	conn->vgdev = vgdev;
+	conn->drm_file = file;
+	spin_lock_init(&conn->lock);
+	INIT_LIST_HEAD(&conn->cmdq);
+	init_waitqueue_head(&conn->cmdwq);
+
+	ret = anon_inode_getfd("[virtgpu_winsrv]", &winsrv_fops, conn,
+			       O_CLOEXEC | O_RDWR);
+	if (ret < 0)
+		goto free_conn;
+
+	conn->fd = ret;
+
+	ret = virtio_gpu_cmd_winsrv_connect(vgdev, conn->fd);
+	if (ret < 0)
+		goto close_fd;
+
+	spin_lock(&vfpriv->winsrv_lock);
+	list_add_tail(&conn->next, &vfpriv->winsrv_conns);
+	spin_unlock(&vfpriv->winsrv_lock);
+
+	args->fd = conn->fd;
+
+	return 0;
+
+close_fd:
+	sys_close(conn->fd);
+
+free_conn:
+	kfree(conn);
+
+	return ret;
+}
+
 struct drm_ioctl_desc virtio_gpu_ioctls[DRM_VIRTIO_NUM_IOCTLS] = {
 	DRM_IOCTL_DEF_DRV(VIRTGPU_MAP, virtio_gpu_map_ioctl,
 			  DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
@@ -557,5 +722,8 @@ struct drm_ioctl_desc virtio_gpu_ioctls[DRM_VIRTIO_NUM_IOCTLS] = {
 			  DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
 
 	DRM_IOCTL_DEF_DRV(VIRTGPU_GET_CAPS, virtio_gpu_get_caps_ioctl,
+			  DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
+
+	DRM_IOCTL_DEF_DRV(VIRTGPU_WINSRV_CONNECT, virtio_gpu_winsrv_connect,
 			  DRM_AUTH|DRM_UNLOCKED|DRM_RENDER_ALLOW),
 };
