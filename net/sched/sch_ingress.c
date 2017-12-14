@@ -76,7 +76,7 @@ static int ingress_init(struct Qdisc *sch, struct nlattr *opt,
 	q->block_info.chain_head_change = clsact_chain_head_change;
 	q->block_info.chain_head_change_priv = &q->miniqp;
 
-	err = tcf_block_get_ext(&q->block, sch, &q->block_info);
+	err = tcf_block_get_ext(&q->block, sch, &q->block_info, extack);
 	if (err)
 		return err;
 
@@ -182,7 +182,8 @@ static int clsact_init(struct Qdisc *sch, struct nlattr *opt,
 	q->ingress_block_info.chain_head_change = clsact_chain_head_change;
 	q->ingress_block_info.chain_head_change_priv = &q->miniqp_ingress;
 
-	err = tcf_block_get_ext(&q->ingress_block, sch, &q->ingress_block_info);
+	err = tcf_block_get_ext(&q->ingress_block, sch, &q->ingress_block_info,
+				extack);
 	if (err)
 		return err;
 
@@ -192,7 +193,8 @@ static int clsact_init(struct Qdisc *sch, struct nlattr *opt,
 	q->egress_block_info.chain_head_change = clsact_chain_head_change;
 	q->egress_block_info.chain_head_change_priv = &q->miniqp_egress;
 
-	err = tcf_block_get_ext(&q->egress_block, sch, &q->egress_block_info);
+	err = tcf_block_get_ext(&q->egress_block, sch, &q->egress_block_info,
+				extack);
 	if (err)
 		goto err_egress_block_get;
 
