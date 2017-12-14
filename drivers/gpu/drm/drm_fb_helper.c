@@ -66,19 +66,17 @@ static DEFINE_MUTEX(kernel_fb_helper_lock);
  * helper functions used by many drivers to implement the kernel mode setting
  * interfaces.
  *
- * Initialization is done as a four-step process with drm_fb_helper_prepare(),
- * drm_fb_helper_init(), drm_fb_helper_single_add_all_connectors() and
- * drm_fb_helper_initial_config(). Drivers with fancier requirements than the
- * default behaviour can override the third step with their own code.
- * Teardown is done with drm_fb_helper_fini() after the fbdev device is
- * unregisters using drm_fb_helper_unregister_fbi().
+ * Setup fbdev emulation by calling drm_fb_helper_fbdev_setup() and tear it
+ * down by calling drm_fb_helper_fbdev_teardown().
  *
- * At runtime drivers should restore the fbdev console by calling
- * drm_fb_helper_restore_fbdev_mode_unlocked() from their &drm_driver.lastclose
- * callback.  They should also notify the fb helper code from updates to the
- * output configuration by calling drm_fb_helper_hotplug_event(). For easier
- * integration with the output polling code in drm_crtc_helper.c the modeset
- * code provides a &drm_mode_config_funcs.output_poll_changed callback.
+ * At runtime drivers should restore the fbdev console by using
+ * drm_fb_helper_lastclose() as their &drm_driver.lastclose callback.
+ * They should also notify the fb helper code from updates to the output
+ * configuration by using drm_fb_helper_output_poll_changed() as their
+ * &drm_mode_config_funcs.output_poll_changed callback.
+ *
+ * For suspend/resume consider using drm_mode_config_helper_suspend() and
+ * drm_mode_config_helper_resume() which takes care of fbdev as well.
  *
  * All other functions exported by the fb helper library can be used to
  * implement the fbdev driver interface by the driver.
