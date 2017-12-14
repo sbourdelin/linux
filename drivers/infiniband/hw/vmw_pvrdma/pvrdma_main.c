@@ -347,7 +347,7 @@ static void pvrdma_qp_event(struct pvrdma_dev *dev, u32 qpn, int type)
 	}
 	if (qp) {
 		if (refcount_dec_and_test(&qp->refcnt))
-			wake_up(&qp->wait);
+			complete(&qp->free);
 	}
 }
 
@@ -373,7 +373,7 @@ static void pvrdma_cq_event(struct pvrdma_dev *dev, u32 cqn, int type)
 	}
 	if (cq) {
 		if (refcount_dec_and_test(&cq->refcnt))
-			wake_up(&cq->wait);
+			complete(&cq->free);
 	}
 }
 
@@ -402,7 +402,7 @@ static void pvrdma_srq_event(struct pvrdma_dev *dev, u32 srqn, int type)
 	}
 	if (srq) {
 		if (refcount_dec_and_test(&srq->refcnt))
-			wake_up(&srq->wait);
+			complete(&srq->free);
 	}
 }
 
@@ -538,7 +538,7 @@ static irqreturn_t pvrdma_intrx_handler(int irq, void *dev_id)
 			cq->ibcq.comp_handler(&cq->ibcq, cq->ibcq.cq_context);
 		if (cq) {
 			if (refcount_dec_and_test(&cq->refcnt))
-				wake_up(&cq->wait);
+				complete(&cq->free);
 		}
 		pvrdma_idx_ring_inc(&ring->cons_head, ring_slots);
 	}
