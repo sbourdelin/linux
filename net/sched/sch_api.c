@@ -1050,10 +1050,11 @@ static struct Qdisc *qdisc_create(struct net_device *dev,
 		goto err_out;
 	}
 
-	sch = qdisc_alloc(dev_queue, ops);
-	if (IS_ERR(sch))
+	sch = qdisc_alloc(dev_queue, ops, extack);
+	if (IS_ERR(sch)) {
 		err = PTR_ERR(sch);
 		goto err_out2;
+	}
 
 	sch->parent = parent;
 
