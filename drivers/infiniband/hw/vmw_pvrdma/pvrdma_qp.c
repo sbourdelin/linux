@@ -245,7 +245,7 @@ struct ib_qp *pvrdma_create_qp(struct ib_pd *pd,
 		spin_lock_init(&qp->sq.lock);
 		spin_lock_init(&qp->rq.lock);
 		mutex_init(&qp->mutex);
-		atomic_set(&qp->refcnt, 1);
+		refcount_set(&qp->refcnt, 1);
 		init_waitqueue_head(&qp->wait);
 
 		qp->state = IB_QPS_RESET;
@@ -427,8 +427,8 @@ static void pvrdma_free_qp(struct pvrdma_qp *qp)
 
 	pvrdma_unlock_cqs(scq, rcq, &scq_flags, &rcq_flags);
 
-	atomic_dec(&qp->refcnt);
-	wait_event(qp->wait, !atomic_read(&qp->refcnt));
+	if (!refcount_dec_and_test(&qp->refcnt))
+		wait_event(qp->wait, !refcount_read(&qp->refcnt));
 
 	if (!qp->is_kernel) {
 		if (qp->rumem)
