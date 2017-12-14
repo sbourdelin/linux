@@ -1914,7 +1914,7 @@ EXPORT_SYMBOL_GPL(device_register);
  */
 struct device *get_device(struct device *dev)
 {
-	return dev ? kobj_to_dev(kobject_get(&dev->kobj)) : NULL;
+	return dev && kobject_get_unless_zero(&dev->kobj) ? dev : NULL;
 }
 EXPORT_SYMBOL_GPL(get_device);
 
