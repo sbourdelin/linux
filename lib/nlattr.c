@@ -253,8 +253,10 @@ int nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
 			if (policy) {
 				err = validate_nla(nla, maxtype, policy);
 				if (err < 0) {
-					if (extack)
+					if (extack) {
+						NL_SET_ERR_MSG(extack, "Failed to validate netlink attribute");
 						extack->bad_attr = nla;
+					}
 					goto errout;
 				}
 			}
