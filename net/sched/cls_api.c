@@ -794,7 +794,7 @@ replay:
 	}
 
 	/* And the last stroke */
-	block = cops->tcf_block(q, cl);
+	block = cops->tcf_block(q, cl, extack);
 	if (!block) {
 		err = -EINVAL;
 		goto errout;
@@ -1041,7 +1041,7 @@ static int tc_dump_tfilter(struct sk_buff *skb, struct netlink_callback *cb)
 		if (cl == 0)
 			goto out;
 	}
-	block = cops->tcf_block(q, cl);
+	block = cops->tcf_block(q, cl, NULL);
 	if (!block)
 		goto out;
 
