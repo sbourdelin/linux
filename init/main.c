@@ -243,15 +243,10 @@ static int __init repair_env_string(char *param, char *val,
 				    const char *unused, void *arg)
 {
 	if (val) {
-		/* param=val or param="val"? */
-		if (val == param+strlen(param)+1)
-			val[-1] = '=';
-		else if (val == param+strlen(param)+2) {
-			val[-2] = '=';
-			memmove(val-1, val, strlen(val)+1);
-			val--;
-		} else
-			BUG();
+		int parm_len = strlen(param);
+
+		param[parm_len] = '=';
+		BUG_ON(val != param + parm_len + 1);
 	}
 	return 0;
 }
