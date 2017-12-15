@@ -620,6 +620,7 @@ TRACE_EVENT(i915_gem_request_queue,
 			     __field(u32, ctx)
 			     __field(u32, seqno)
 			     __field(u32, flags)
+			     __field(u32, hw_id)
 			     ),
 
 	    TP_fast_assign(
@@ -628,11 +629,12 @@ TRACE_EVENT(i915_gem_request_queue,
 			   __entry->ctx = req->fence.context;
 			   __entry->seqno = req->fence.seqno;
 			   __entry->flags = flags;
+			   __entry->hw_id = req->ctx->hw_id;
 			   ),
 
-	    TP_printk("dev=%u, ring=%u, ctx=%u, seqno=%u, flags=0x%x",
+	    TP_printk("dev=%u, ring=%u, ctx=%u, seqno=%u, flags=0x%x, hw_id=%u",
 		      __entry->dev, __entry->ring, __entry->ctx, __entry->seqno,
-		      __entry->flags)
+		      __entry->flags, __entry->hw_id)
 );
 
 DECLARE_EVENT_CLASS(i915_gem_request,
@@ -645,6 +647,7 @@ DECLARE_EVENT_CLASS(i915_gem_request,
 			     __field(u32, ring)
 			     __field(u32, seqno)
 			     __field(u32, global)
+			     __field(u32, hw_id)
 			     ),
 
 	    TP_fast_assign(
@@ -653,11 +656,12 @@ DECLARE_EVENT_CLASS(i915_gem_request,
 			   __entry->ctx = req->fence.context;
 			   __entry->seqno = req->fence.seqno;
 			   __entry->global = req->global_seqno;
+			   __entry->hw_id = req->ctx->hw_id;
 			   ),
 
-	    TP_printk("dev=%u, ring=%u, ctx=%u, seqno=%u, global=%u",
+	    TP_printk("dev=%u, ring=%u, ctx=%u, seqno=%u, global=%u, hw_id=%u",
 		      __entry->dev, __entry->ring, __entry->ctx, __entry->seqno,
-		      __entry->global)
+		      __entry->global, __entry->hw_id)
 );
 
 DEFINE_EVENT(i915_gem_request, i915_gem_request_add,
@@ -688,6 +692,7 @@ DECLARE_EVENT_CLASS(i915_gem_request_hw,
 				     __field(u32, global_seqno)
 				     __field(u32, ctx)
 				     __field(u32, port)
+				     __field(u32, hw_id)
 				    ),
 
 		    TP_fast_assign(
@@ -697,12 +702,13 @@ DECLARE_EVENT_CLASS(i915_gem_request_hw,
 			           __entry->seqno = req->fence.seqno;
 			           __entry->global_seqno = req->global_seqno;
 			           __entry->port = port;
+			           __entry->hw_id = req->ctx->hw_id;
 			          ),
 
-		    TP_printk("dev=%u, ring=%u, ctx=%u, seqno=%u, global=%u, port=%u",
+		    TP_printk("dev=%u, ring=%u, ctx=%u, seqno=%u, global=%u, port=%u, hw_id=%u",
 			      __entry->dev, __entry->ring, __entry->ctx,
 			      __entry->seqno, __entry->global_seqno,
-			      __entry->port)
+			      __entry->port, __entry->hw_id)
 );
 
 DEFINE_EVENT(i915_gem_request_hw, i915_gem_request_in,
