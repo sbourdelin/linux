@@ -11,6 +11,7 @@
 #include <linux/cpuhotplug.h>
 #include <linux/init.h>
 #include <linux/percpu.h>
+#include <linux/ratelimit.h>
 #include <linux/slab.h>
 
 #include <asm/asm-offsets.h>
@@ -143,6 +144,18 @@ int cps_pm_enter_state(enum cps_pm_state state)
 
 	/* Setup the VPE to run mips_cps_pm_restore when started again */
 	if (IS_ENABLED(CONFIG_CPU_PM) && state == CPS_PM_POWER_GATED) {
+		unsigned int stat = read_cpc_cl_stat_conf();
+
+		if (stat & CPC_Cx_STAT_CONF_EJTAG_PROBE) {
+			/*
+			 * If we're attempting to gate power to the core, the
+			 * JTAG detect bit indicates that the CPC will instead
+			 * put the core into clock-off state. Emit a warning.
+			 */
+			pr_warn_ratelimited("JTAG probe present - core%d will clock off instead of powering down\n",
+					    core);
+		}
+
 		/* Power gating relies upon CPS SMP */
 		if (!mips_cps_smp_in_use())
 			return -EINVAL;
