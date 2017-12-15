@@ -201,7 +201,9 @@
 #define OPAL_SET_POWER_SHIFT_RATIO		155
 #define OPAL_SENSOR_GROUP_CLEAR			156
 #define OPAL_PCI_SET_P2P			157
-#define OPAL_LAST				157
+#define OPAL_PCI_GET_PBCQ_TUNNEL_BAR		159
+#define OPAL_PCI_SET_PBCQ_TUNNEL_BAR		160
+#define OPAL_LAST				160
 
 /* Device tree flags */
 
