@@ -2596,6 +2596,16 @@
 			noexec=on: enable non-executable mappings (default)
 			noexec=off: disable non-executable mappings
 
+	noexec	[MIPS]
+			Force setting up stack and heap as non-executable or
+			executable regardless of PT_GNU_STACK entry or CPU XI
+			support. Valid arguments: on, off.
+			noexec=on:	Force non-executable stack and heap
+			noexec=off:	Force executable stack and heap
+			If omitted, stack and heap will or will not be set
+			up as non-executable depending on PT_GNU_STACK
+			entry and possibly other factors (like CPU XI support).
+
 	nosmap		[X86]
 			Disable SMAP (Supervisor Mode Access Prevention)
 			even if it is supported by processor.

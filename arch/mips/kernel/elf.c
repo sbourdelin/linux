@@ -326,8 +326,46 @@ void mips_set_personality_nan(struct arch_elf_state *state)
 	}
 }
 
+static int noexec = EXSTACK_DEFAULT;
+
+/*
+ * kernel parameter: noexec=on|off
+ *
+ * Force setting up stack and heap as non-executable or
+ * executable regardless of PT_GNU_STACK entry or CPU RIXI
+ * support. Valid arguments: on, off.
+ *
+ *     noexec=on:	Force non-executable stack and heap
+ *     noexec=off:	Force executable stack and heap
+ *
+ * If omitted, stack and heap will or will not be set
+ * up as non-executable depending on PT_GNU_STACK
+ * entry and possibly other factors (CPU RIXI support).
+ */
+static int __init noexec_setup(char *str)
+{
+	if (!strcmp(str, "on"))
+		noexec = EXSTACK_DISABLE_X;
+	else if (!strcmp(str, "off"))
+		noexec = EXSTACK_ENABLE_X;
+	else
+		pr_err("Malformed noexec format! noexec=on|off\n");
+
+	return 1;
+}
+__setup("noexec=", noexec_setup);
+
 int mips_elf_read_implies_exec(void *elf_ex, int exstack)
 {
+	switch (noexec) {
+	case EXSTACK_DISABLE_X:
+		return 0;
+	case EXSTACK_ENABLE_X:
+		return 1;
+	default:
+		break;
+	}
+
 	if (exstack != EXSTACK_DISABLE_X) {
 		/* The binary doesn't request a non-executable stack */
 		return 1;
