@@ -319,6 +319,7 @@ int hugepage_madvise(struct vm_area_struct *vma,
 #endif
 		*vm_flags &= ~VM_NOHUGEPAGE;
 		*vm_flags |= VM_HUGEPAGE;
+		vma->space_efficient = false;
 		/*
 		 * If the vma become good for khugepaged to scan,
 		 * register it here without waiting a page fault that
