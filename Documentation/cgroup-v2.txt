@@ -905,6 +905,13 @@ have placed RT processes into nonroot cgroups during the system boot
 process, and these processes may need to be moved to the root cgroup
 before the cpu controller can be enabled.
 
+When distributing CPU cycles in the root cgroup each thread in this
+cgroup is treated as if it was hosted in a separate child cgroup of the
+root cgroup. This child cgroup weight is dependent on its thread nice
+level.
+For details of this mapping see sched_prio_to_weight array in
+kernel/sched/core.c file (values from this array should be scaled
+appropriately so the neutral - nice 0 - value is 100 instead of 1024).
 
 CPU Interface Files
 ~~~~~~~~~~~~~~~~~~~
@@ -1246,6 +1253,10 @@ limit distribution; however, weight based distribution is available
 only if cfq-iosched is in use and neither scheme is available for
 blk-mq devices.
 
+Root cgroup processes are hosted in an implicit leaf child node.
+When distributing IO resources this implicit child node is taken into
+account as if it was a normal child cgroup of the root cgroup with a
+weight value of 200.
 
 IO Interface Files
 ~~~~~~~~~~~~~~~~~~
