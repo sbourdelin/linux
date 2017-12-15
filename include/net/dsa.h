@@ -25,6 +25,7 @@
 struct tc_action;
 struct phy_device;
 struct fixed_phy_status;
+struct phylink_link_state;
 
 enum dsa_tag_protocol {
 	DSA_TAG_PROTO_NONE = 0,
@@ -197,6 +198,7 @@ struct dsa_port {
 	u8			stp_state;
 	struct net_device	*bridge_dev;
 	struct devlink_port	devlink_port;
+	struct phylink		*pl;
 	/*
 	 * Original copy of the master netdev ethtool_ops
 	 */
@@ -348,8 +350,25 @@ struct dsa_switch_ops {
 	 */
 	void	(*adjust_link)(struct dsa_switch *ds, int port,
 				struct phy_device *phydev);
+	/*
+	 * PHYLINK integration
+	 */
+	void	(*phylink_validate)(struct dsa_switch *ds, int port,
+				    unsigned long *supported,
+				    struct phylink_link_state *state);
+	int	(*phylink_mac_link_state)(struct dsa_switch *ds, int port,
+					  struct phylink_link_state *state);
+	void	(*phylink_mac_config)(struct dsa_switch *ds, int port,
+				      unsigned int mode,
+				      const struct phylink_link_state *state);
+	void	(*phylink_mac_an_restart)(struct dsa_switch *ds, int port);
+	void	(*phylink_mac_link_down)(struct dsa_switch *ds, int port,
+					 unsigned int mode);
+	void	(*phylink_mac_link_up)(struct dsa_switch *ds, int port,
+				       unsigned int mode,
+				       struct phy_device *phydev);
 	void	(*fixed_link_update)(struct dsa_switch *ds, int port,
-				struct fixed_phy_status *st);
+				struct phylink_link_state *st);
 
 	/*
 	 * ethtool hardware statistics.
@@ -567,5 +586,7 @@ static inline int call_dsa_notifiers(unsigned long val, struct net_device *dev,
 #define BRCM_TAG_SET_PORT_QUEUE(p, q)	((p) << 8 | q)
 #define BRCM_TAG_GET_PORT(v)		((v) >> 8)
 #define BRCM_TAG_GET_QUEUE(v)		((v) & 0xff)
+
+void dsa_port_phylink_mac_change(struct dsa_switch *ds, int port, bool up);
 
 #endif

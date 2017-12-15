@@ -16,6 +16,7 @@
 #include <linux/platform_device.h>
 #include <linux/phy.h>
 #include <linux/phy_fixed.h>
+#include <linux/phylink.h>
 #include <linux/mii.h>
 #include <linux/of.h>
 #include <linux/of_irq.h>
@@ -563,7 +564,7 @@ force_link:
 }
 
 static void bcm_sf2_sw_fixed_link_update(struct dsa_switch *ds, int port,
-					 struct fixed_phy_status *status)
+					 struct phylink_link_state *status)
 {
 	struct bcm_sf2_priv *priv = bcm_sf2_to_priv(ds);
 	u32 duplex, pause, offset;
@@ -611,13 +612,11 @@ static void bcm_sf2_sw_fixed_link_update(struct dsa_switch *ds, int port,
 	core_writel(priv, reg, offset);
 
 	if ((pause & (1 << port)) &&
-	    (pause & (1 << (port + PAUSESTS_TX_PAUSE_SHIFT)))) {
-		status->asym_pause = 1;
-		status->pause = 1;
-	}
+	    (pause & (1 << (port + PAUSESTS_TX_PAUSE_SHIFT))))
+		status->pause |= MLO_PAUSE_TXRX_MASK;
 
 	if (pause & (1 << port))
-		status->pause = 1;
+		status->pause |= MLO_PAUSE_RX;
 }
 
 static void bcm_sf2_enable_acb(struct dsa_switch *ds)

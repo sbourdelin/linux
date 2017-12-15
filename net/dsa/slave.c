@@ -13,6 +13,7 @@
 #include <linux/netdevice.h>
 #include <linux/phy.h>
 #include <linux/phy_fixed.h>
+#include <linux/phylink.h>
 #include <linux/of_net.h>
 #include <linux/of_mdio.h>
 #include <linux/mdio.h>
@@ -97,8 +98,7 @@ static int dsa_slave_open(struct net_device *dev)
 	if (err)
 		goto clear_promisc;
 
-	if (dev->phydev)
-		phy_start(dev->phydev);
+	phylink_start(dp->pl);
 
 	return 0;
 
@@ -120,8 +120,7 @@ static int dsa_slave_close(struct net_device *dev)
 	struct net_device *master = dsa_slave_to_master(dev);
 	struct dsa_port *dp = dsa_slave_to_port(dev);
 
-	if (dev->phydev)
-		phy_stop(dev->phydev);
+	phylink_stop(dp->pl);
 
 	dsa_port_disable(dp, dev->phydev);
 
@@ -256,10 +255,9 @@ dsa_slave_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
 
 static int dsa_slave_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
-	if (!dev->phydev)
-		return -ENODEV;
+	struct dsa_port *dp = dsa_slave_to_port(dev);
 
-	return phy_mii_ioctl(dev->phydev, ifr, cmd);
+	return phylink_mii_ioctl(dp->pl, ifr, cmd);
 }
 
 static int dsa_slave_port_attr_set(struct net_device *dev,
@@ -453,14 +451,11 @@ dsa_slave_get_regs(struct net_device *dev, struct ethtool_regs *regs, void *_p)
 		ds->ops->get_regs(ds, dp->index, regs, _p);
 }
 
-static u32 dsa_slave_get_link(struct net_device *dev)
+static int dsa_slave_nway_reset(struct net_device *dev)
 {
-	if (!dev->phydev)
-		return -ENODEV;
+	struct dsa_port *dp = dsa_slave_to_port(dev);
 
-	genphy_update_link(dev->phydev);
-
-	return dev->phydev->link;
+	return phylink_ethtool_nway_reset(dp->pl);
 }
 
 static int dsa_slave_get_eeprom_len(struct net_device *dev)
@@ -499,6 +494,22 @@ static int dsa_slave_set_eeprom(struct net_device *dev,
 		return ds->ops->set_eeprom(ds, eeprom, data);
 
 	return -EOPNOTSUPP;
+}
+
+static int dsa_slave_get_module_info(struct net_device *dev,
+				     struct ethtool_modinfo *modinfo)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+
+	return phylink_ethtool_get_module_info(dp->pl, modinfo);
+}
+
+static int dsa_slave_get_module_eeprom(struct net_device *dev,
+				       struct ethtool_eeprom *ee, u8 *buf)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+
+	return phylink_ethtool_get_module_eeprom(dp->pl, ee, buf);
 }
 
 static void dsa_slave_get_strings(struct net_device *dev,
@@ -573,6 +584,8 @@ static void dsa_slave_get_wol(struct net_device *dev, struct ethtool_wolinfo *w)
 	struct dsa_port *dp = dsa_slave_to_port(dev);
 	struct dsa_switch *ds = dp->ds;
 
+	phylink_ethtool_get_wol(dp->pl, w);
+
 	if (ds->ops->get_wol)
 		ds->ops->get_wol(ds, dp->index, w);
 }
@@ -582,6 +595,8 @@ static int dsa_slave_set_wol(struct net_device *dev, struct ethtool_wolinfo *w)
 	struct dsa_port *dp = dsa_slave_to_port(dev);
 	struct dsa_switch *ds = dp->ds;
 	int ret = -EOPNOTSUPP;
+
+	phylink_ethtool_set_wol(dp->pl, w);
 
 	if (ds->ops->set_wol)
 		ret = ds->ops->set_wol(ds, dp->index, w);
@@ -606,13 +621,7 @@ static int dsa_slave_set_eee(struct net_device *dev, struct ethtool_eee *e)
 	if (ret)
 		return ret;
 
-	if (e->eee_enabled) {
-		ret = phy_init_eee(dev->phydev, 0);
-		if (ret)
-			return ret;
-	}
-
-	return phy_ethtool_set_eee(dev->phydev, e);
+	return phylink_ethtool_set_eee(dp->pl, e);
 }
 
 static int dsa_slave_get_eee(struct net_device *dev, struct ethtool_eee *e)
@@ -632,7 +641,23 @@ static int dsa_slave_get_eee(struct net_device *dev, struct ethtool_eee *e)
 	if (ret)
 		return ret;
 
-	return phy_ethtool_get_eee(dev->phydev, e);
+	return phylink_ethtool_get_eee(dp->pl, e);
+}
+
+static int dsa_slave_get_link_ksettings(struct net_device *dev,
+					struct ethtool_link_ksettings *cmd)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+
+	return phylink_ethtool_ksettings_get(dp->pl, cmd);
+}
+
+static int dsa_slave_set_link_ksettings(struct net_device *dev,
+					const struct ethtool_link_ksettings *cmd)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+
+	return phylink_ethtool_ksettings_set(dp->pl, cmd);
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER
@@ -923,11 +948,13 @@ static const struct ethtool_ops dsa_slave_ethtool_ops = {
 	.get_drvinfo		= dsa_slave_get_drvinfo,
 	.get_regs_len		= dsa_slave_get_regs_len,
 	.get_regs		= dsa_slave_get_regs,
-	.nway_reset		= phy_ethtool_nway_reset,
-	.get_link		= dsa_slave_get_link,
+	.nway_reset		= dsa_slave_nway_reset,
+	.get_link		= ethtool_op_get_link,
 	.get_eeprom_len		= dsa_slave_get_eeprom_len,
 	.get_eeprom		= dsa_slave_get_eeprom,
 	.set_eeprom		= dsa_slave_set_eeprom,
+	.get_module_info	= dsa_slave_get_module_info,
+	.get_module_eeprom	= dsa_slave_get_module_eeprom,
 	.get_strings		= dsa_slave_get_strings,
 	.get_ethtool_stats	= dsa_slave_get_ethtool_stats,
 	.get_sset_count		= dsa_slave_get_sset_count,
@@ -935,8 +962,8 @@ static const struct ethtool_ops dsa_slave_ethtool_ops = {
 	.get_wol		= dsa_slave_get_wol,
 	.set_eee		= dsa_slave_set_eee,
 	.get_eee		= dsa_slave_get_eee,
-	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
-	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
+	.get_link_ksettings	= dsa_slave_get_link_ksettings,
+	.set_link_ksettings	= dsa_slave_set_link_ksettings,
 	.get_rxnfc		= dsa_slave_get_rxnfc,
 	.set_rxnfc		= dsa_slave_set_rxnfc,
 };
@@ -994,56 +1021,118 @@ static struct device_type dsa_type = {
 	.name	= "dsa",
 };
 
-static void dsa_slave_adjust_link(struct net_device *dev)
+static void dsa_slave_phylink_validate(struct net_device *dev,
+				       unsigned long *supported,
+				       struct phylink_link_state *state)
 {
 	struct dsa_port *dp = dsa_slave_to_port(dev);
-	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_switch *ds = dp->ds;
-	unsigned int status_changed = 0;
 
-	if (p->old_link != dev->phydev->link) {
-		status_changed = 1;
-		p->old_link = dev->phydev->link;
-	}
+	if (!ds->ops->phylink_validate)
+		return;
 
-	if (p->old_duplex != dev->phydev->duplex) {
-		status_changed = 1;
-		p->old_duplex = dev->phydev->duplex;
-	}
-
-	if (p->old_pause != dev->phydev->pause) {
-		status_changed = 1;
-		p->old_pause = dev->phydev->pause;
-	}
-
-	if (ds->ops->adjust_link && status_changed)
-		ds->ops->adjust_link(ds, dp->index, dev->phydev);
-
-	if (status_changed)
-		phy_print_status(dev->phydev);
+	ds->ops->phylink_validate(ds, dp->index, supported, state);
 }
 
-static int dsa_slave_fixed_link_update(struct net_device *dev,
-				       struct fixed_phy_status *status)
+static int dsa_slave_phylink_mac_link_state(struct net_device *dev,
+					    struct phylink_link_state *state)
 {
-	struct dsa_switch *ds;
-	struct dsa_port *dp;
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_switch *ds = dp->ds;
 
-	if (dev) {
-		dp = dsa_slave_to_port(dev);
-		ds = dp->ds;
-		if (ds->ops->fixed_link_update)
-			ds->ops->fixed_link_update(ds, dp->index, status);
+	/* Only called for SGMII and 802.3z */
+	if (!ds->ops->phylink_mac_link_state)
+		return -EOPNOTSUPP;
+
+	return ds->ops->phylink_mac_link_state(ds, dp->index, state);
+}
+
+static void dsa_slave_phylink_mac_config(struct net_device *dev,
+					 unsigned int mode,
+					 const struct phylink_link_state *state)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_switch *ds = dp->ds;
+
+	if (!ds->ops->phylink_mac_config)
+		return;
+
+	ds->ops->phylink_mac_config(ds, dp->index, mode, state);
+}
+
+static void dsa_slave_phylink_mac_an_restart(struct net_device *dev)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_switch *ds = dp->ds;
+
+	if (!ds->ops->phylink_mac_an_restart)
+		return;
+
+	ds->ops->phylink_mac_an_restart(ds, dp->index);
+}
+
+static void dsa_slave_phylink_mac_link_down(struct net_device *dev,
+					    unsigned int mode)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_switch *ds = dp->ds;
+
+	if (!ds->ops->phylink_mac_link_down) {
+		if (ds->ops->adjust_link && dev->phydev)
+			ds->ops->adjust_link(ds, dp->index, dev->phydev);
+		return;
 	}
 
-	return 0;
+	ds->ops->phylink_mac_link_down(ds, dp->index, mode);
+}
+
+static void dsa_slave_phylink_mac_link_up(struct net_device *dev,
+					  unsigned int mode,
+					  struct phy_device *phydev)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_switch *ds = dp->ds;
+
+	if (!ds->ops->phylink_mac_link_up) {
+		if (ds->ops->adjust_link && dev->phydev)
+			ds->ops->adjust_link(ds, dp->index, dev->phydev);
+		return;
+	}
+
+	ds->ops->phylink_mac_link_up(ds, dp->index, mode, phydev);
+}
+
+static const struct phylink_mac_ops dsa_slave_phylink_mac_ops = {
+	.validate = dsa_slave_phylink_validate,
+	.mac_link_state = dsa_slave_phylink_mac_link_state,
+	.mac_config = dsa_slave_phylink_mac_config,
+	.mac_an_restart = dsa_slave_phylink_mac_an_restart,
+	.mac_link_down = dsa_slave_phylink_mac_link_down,
+	.mac_link_up = dsa_slave_phylink_mac_link_up,
+};
+
+void dsa_port_phylink_mac_change(struct dsa_switch *ds, int port, bool up)
+{
+	const struct dsa_port *dp = dsa_to_port(ds, port);
+
+	phylink_mac_change(dp->pl, up);
+}
+EXPORT_SYMBOL_GPL(dsa_port_phylink_mac_change);
+
+static void dsa_slave_phylink_fixed_state(struct net_device *dev,
+					  struct phylink_link_state *state)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+	struct dsa_switch *ds = dp->ds;
+
+	if (ds->ops->fixed_link_update)
+		ds->ops->fixed_link_update(ds, dp->index, state);
 }
 
 /* slave device setup *******************************************************/
 static int dsa_slave_phy_connect(struct net_device *slave_dev, int addr)
 {
 	struct dsa_port *dp = dsa_slave_to_port(slave_dev);
-	struct dsa_slave_priv *p = netdev_priv(slave_dev);
 	struct dsa_switch *ds = dp->ds;
 
 	slave_dev->phydev = mdiobus_get_phy(ds->slave_mii_bus, addr);
@@ -1052,74 +1141,48 @@ static int dsa_slave_phy_connect(struct net_device *slave_dev, int addr)
 		return -ENODEV;
 	}
 
-	/* Use already configured phy mode */
-	if (p->phy_interface == PHY_INTERFACE_MODE_NA)
-		p->phy_interface = slave_dev->phydev->interface;
-
-	return phy_connect_direct(slave_dev, slave_dev->phydev,
-				  dsa_slave_adjust_link, p->phy_interface);
+	return phylink_connect_phy(dp->pl, slave_dev->phydev);
 }
 
 static int dsa_slave_phy_setup(struct net_device *slave_dev)
 {
 	struct dsa_port *dp = dsa_slave_to_port(slave_dev);
-	struct dsa_slave_priv *p = netdev_priv(slave_dev);
 	struct device_node *port_dn = dp->dn;
 	struct dsa_switch *ds = dp->ds;
-	struct device_node *phy_dn;
-	bool phy_is_fixed = false;
 	u32 phy_flags = 0;
 	int mode, ret;
 
 	mode = of_get_phy_mode(port_dn);
 	if (mode < 0)
 		mode = PHY_INTERFACE_MODE_NA;
-	p->phy_interface = mode;
 
-	phy_dn = of_parse_phandle(port_dn, "phy-handle", 0);
-	if (!phy_dn && of_phy_is_fixed_link(port_dn)) {
-		/* In the case of a fixed PHY, the DT node associated
-		 * to the fixed PHY is the Port DT node
-		 */
-		ret = of_phy_register_fixed_link(port_dn);
-		if (ret) {
-			netdev_err(slave_dev, "failed to register fixed PHY: %d\n", ret);
-			return ret;
-		}
-		phy_is_fixed = true;
-		phy_dn = of_node_get(port_dn);
+	dp->pl = phylink_create(slave_dev, of_fwnode_handle(port_dn), mode,
+				&dsa_slave_phylink_mac_ops);
+	if (IS_ERR(dp->pl)) {
+		netdev_err(slave_dev,
+			   "error creating PHYLINK: %ld\n", PTR_ERR(dp->pl));
+		return PTR_ERR(dp->pl);
 	}
+
+	phylink_fixed_state_cb(dp->pl, dsa_slave_phylink_fixed_state);
 
 	if (ds->ops->get_phy_flags)
 		phy_flags = ds->ops->get_phy_flags(ds, dp->index);
 
-	if (phy_dn) {
-		slave_dev->phydev = of_phy_connect(slave_dev, phy_dn,
-						   dsa_slave_adjust_link,
-						   phy_flags,
-						   p->phy_interface);
-		of_node_put(phy_dn);
-	}
-
-	if (slave_dev->phydev && phy_is_fixed)
-		fixed_phy_set_link_update(slave_dev->phydev,
-					  dsa_slave_fixed_link_update);
-
-	/* We could not connect to a designated PHY, so use the switch internal
-	 * MDIO bus instead
-	 */
-	if (!slave_dev->phydev) {
+	ret = phylink_of_phy_connect(dp->pl, port_dn, phy_flags);
+	if (ret == -ENODEV) {
+		/* We could not connect to a designated PHY or SFP, so use the
+		 * switch internal MDIO bus instead
+		 */
 		ret = dsa_slave_phy_connect(slave_dev, dp->index);
 		if (ret) {
-			netdev_err(slave_dev, "failed to connect to port %d: %d\n",
+			netdev_err(slave_dev,
+				   "failed to connect to port %d: %d\n",
 				   dp->index, ret);
-			if (phy_is_fixed)
-				of_phy_deregister_fixed_link(port_dn);
+			phylink_destroy(dp->pl);
 			return ret;
 		}
 	}
-
-	phy_attached_info(slave_dev->phydev);
 
 	return 0;
 }
@@ -1135,29 +1198,22 @@ static void dsa_slave_set_lockdep_class_one(struct net_device *dev,
 
 int dsa_slave_suspend(struct net_device *slave_dev)
 {
-	struct dsa_slave_priv *p = netdev_priv(slave_dev);
+	struct dsa_port *dp = dsa_slave_to_port(slave_dev);
 
 	netif_device_detach(slave_dev);
 
-	if (slave_dev->phydev) {
-		phy_stop(slave_dev->phydev);
-		p->old_pause = -1;
-		p->old_link = -1;
-		p->old_duplex = -1;
-		phy_suspend(slave_dev->phydev);
-	}
+	phylink_stop(dp->pl);
 
 	return 0;
 }
 
 int dsa_slave_resume(struct net_device *slave_dev)
 {
+	struct dsa_port *dp = dsa_slave_to_port(slave_dev);
+
 	netif_device_attach(slave_dev);
 
-	if (slave_dev->phydev) {
-		phy_resume(slave_dev->phydev);
-		phy_start(slave_dev->phydev);
-	}
+	phylink_start(dp->pl);
 
 	return 0;
 }
@@ -1222,11 +1278,6 @@ int dsa_slave_create(struct dsa_port *port)
 	p->dp = port;
 	INIT_LIST_HEAD(&p->mall_tc_list);
 	p->xmit = cpu_dp->tag_ops->xmit;
-
-	p->old_pause = -1;
-	p->old_link = -1;
-	p->old_duplex = -1;
-
 	port->slave = slave_dev;
 
 	netif_carrier_off(slave_dev);
@@ -1249,9 +1300,8 @@ int dsa_slave_create(struct dsa_port *port)
 	return 0;
 
 out_phy:
-	phy_disconnect(slave_dev->phydev);
-	if (of_phy_is_fixed_link(port->dn))
-		of_phy_deregister_fixed_link(port->dn);
+	phylink_disconnect_phy(p->dp->pl);
+	phylink_destroy(p->dp->pl);
 out_free:
 	free_percpu(p->stats64);
 	free_netdev(slave_dev);
@@ -1263,15 +1313,11 @@ void dsa_slave_destroy(struct net_device *slave_dev)
 {
 	struct dsa_port *dp = dsa_slave_to_port(slave_dev);
 	struct dsa_slave_priv *p = netdev_priv(slave_dev);
-	struct device_node *port_dn = dp->dn;
 
 	netif_carrier_off(slave_dev);
-	if (slave_dev->phydev) {
-		phy_disconnect(slave_dev->phydev);
+	phylink_disconnect_phy(dp->pl);
+	phylink_destroy(dp->pl);
 
-		if (of_phy_is_fixed_link(port_dn))
-			of_phy_deregister_fixed_link(port_dn);
-	}
 	dsa_slave_notify(slave_dev, DSA_PORT_UNREGISTER);
 	unregister_netdev(slave_dev);
 	free_percpu(p->stats64);
