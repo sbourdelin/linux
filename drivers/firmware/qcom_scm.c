@@ -632,16 +632,12 @@ static int __init qcom_scm_init(void)
 
 	np = of_find_matching_node(fw_np, qcom_scm_dt_match);
 
-	if (!np) {
-		of_node_put(fw_np);
+	if (!np)
 		return -ENODEV;
-	}
 
 	of_node_put(np);
 
 	ret = of_platform_populate(fw_np, qcom_scm_dt_match, NULL, NULL);
-
-	of_node_put(fw_np);
 
 	if (ret)
 		return ret;
