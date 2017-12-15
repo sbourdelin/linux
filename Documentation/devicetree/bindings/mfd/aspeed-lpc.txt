@@ -62,11 +62,23 @@ BMC Node
 --------
 
 - compatible:	One of:
-		"aspeed,ast2400-lpc-bmc"
-		"aspeed,ast2500-lpc-bmc"
+		"aspeed,ast2400-lpc-bmc", "simple-mfd", "syscon"
+		"aspeed,ast2500-lpc-bmc", "simple-mfd", "syscon"
 
 - reg:		contains the physical address and length values of the
                 H8S/2168-compatible LPC controller memory region
+
+BMC KCS Node
+------------
+
+- compatible:	One of:
+		"aspeed,ast2400-kcs-bmc"
+		"aspeed,ast2500-kcs-bmc"
+
+- kcs_chan: The LPC channel number
+
+- kcs_addr: The host CPU IO map address
+
 
 Host Node
 ---------
@@ -94,8 +106,21 @@ lpc: lpc@1e789000 {
 	ranges = <0x0 0x1e789000 0x1000>;
 
 	lpc_bmc: lpc-bmc@0 {
-		compatible = "aspeed,ast2500-lpc-bmc";
+		compatible = "aspeed,ast2500-lpc-bmc", "simple-mfd", "syscon";
 		reg = <0x0 0x80>;
+		reg-io-width = <4>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x0 0x0 0x80>;
+
+		kcs3: kcs3@0 {
+			compatible = "aspeed,ast2500-kcs-bmc";
+			interrupts = <8>;
+			kcs_chan = <3>;
+			kcs_addr = <0xCA2>;
+			status = "okay";
+		};
 	};
 
 	lpc_host: lpc-host@80 {
