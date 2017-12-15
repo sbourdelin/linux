@@ -19,6 +19,8 @@ enum {
 	ILA_ATTR_CSUM_MODE,			/* u8 */
 	ILA_ATTR_IDENT_TYPE,			/* u8 */
 	ILA_ATTR_HOOK_TYPE,			/* u8 */
+	ILA_ATTR_NOTIFY_DST,			/* flag */
+	ILA_ATTR_NOTIFY_SRC,			/* flag */
 
 	__ILA_ATTR_MAX,
 };

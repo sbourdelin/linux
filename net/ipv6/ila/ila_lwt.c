@@ -19,9 +19,14 @@
 struct ila_lwt {
 	struct ila_params p;
 	struct dst_cache dst_cache;
+	u8 hook_type;
 	u32 connected : 1;
-	u32 lwt_output : 1;
+	u32 xlat : 1;
+	u32 notify : 2;
 };
+
+#define ILA_NOTIFY_DST 1
+#define ILA_NOTIFY_SRC 2
 
 static inline struct ila_lwt *ila_lwt_lwtunnel(
 	struct lwtunnel_state *lwt)
@@ -35,6 +40,67 @@ static inline struct ila_params *ila_params_lwtunnel(
 	return &ila_lwt_lwtunnel(lwt)->p;
 }
 
+static size_t ila_rslv_msgsize(void)
+{
+	size_t len =
+		NLMSG_ALIGN(sizeof(struct rtmsg))
+		+ nla_total_size(16)     /* RTA_DST */
+		+ nla_total_size(16)     /* RTA_SRC */
+		;
+
+	return len;
+}
+
+void ila_notify(struct net *net, struct sk_buff *skb, struct ila_lwt *lwt)
+{
+	struct ipv6hdr *ip6h = ipv6_hdr(skb);
+	int flags = NLM_F_MULTI;
+	struct sk_buff *nlskb;
+	struct nlmsghdr *nlh;
+	struct rtmsg *rtm;
+	int err = 0;
+
+	/* Send ILA notification to user */
+	nlskb = nlmsg_new(ila_rslv_msgsize(), GFP_KERNEL);
+	if (!nlskb)
+		return;
+
+	nlh = nlmsg_put(nlskb, 0, 0, RTM_ADDR_RESOLVE, sizeof(*rtm), flags);
+	if (!nlh) {
+		err = -EMSGSIZE;
+		goto errout;
+	}
+
+	rtm = nlmsg_data(nlh);
+	rtm->rtm_family   = AF_INET6;
+	rtm->rtm_dst_len  = 128;
+	rtm->rtm_src_len  = 0;
+	rtm->rtm_tos      = 0;
+	rtm->rtm_table    = RT6_TABLE_UNSPEC;
+	rtm->rtm_type     = RTN_UNICAST;
+	rtm->rtm_scope    = RT_SCOPE_UNIVERSE;
+
+	if (((lwt->notify & ILA_NOTIFY_DST) &&
+	     nla_put_in6_addr(nlskb, RTA_DST, &ip6h->daddr)) ||
+	    ((lwt->notify & ILA_NOTIFY_SRC) &&
+	     nla_put_in6_addr(nlskb, RTA_SRC, &ip6h->saddr))) {
+		nlmsg_cancel(nlskb, nlh);
+		err = -EMSGSIZE;
+		goto errout;
+	}
+
+	nlmsg_end(nlskb, nlh);
+
+	rtnl_notify(nlskb, net, 0, RTNLGRP_ILA_NOTIFY, NULL, GFP_ATOMIC);
+
+	return;
+
+errout:
+	kfree_skb(nlskb);
+	WARN_ON(err == -EMSGSIZE);
+	rtnl_set_sk_err(net, RTNLGRP_ILA_NOTIFY, err);
+}
+
 static int ila_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct dst_entry *orig_dst = skb_dst(skb);
@@ -46,10 +112,13 @@ static int ila_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 	if (skb->protocol != htons(ETH_P_IPV6))
 		goto drop;
 
-	if (ilwt->lwt_output)
+	if (ilwt->xlat)
 		ila_update_ipv6_locator(skb,
 					ila_params_lwtunnel(orig_dst->lwtstate),
 					true);
+
+	if (ilwt->notify)
+		ila_notify(net, skb, ilwt);
 
 	if (rt->rt6i_flags & (RTF_GATEWAY | RTF_CACHE)) {
 		/* Already have a next hop address in route, no need for
@@ -106,10 +175,13 @@ static int ila_input(struct sk_buff *skb)
 	if (skb->protocol != htons(ETH_P_IPV6))
 		goto drop;
 
-	if (!ilwt->lwt_output)
+	if (ilwt->xlat)
 		ila_update_ipv6_locator(skb,
 					ila_params_lwtunnel(dst->lwtstate),
 					false);
+
+	if (ilwt->notify)
+		ila_notify(dev_net(dst->dev), skb, ilwt);
 
 	return dst->lwtstate->orig_input(skb);
 
@@ -123,6 +195,8 @@ static const struct nla_policy ila_nl_policy[ILA_ATTR_MAX + 1] = {
 	[ILA_ATTR_CSUM_MODE] = { .type = NLA_U8, },
 	[ILA_ATTR_IDENT_TYPE] = { .type = NLA_U8, },
 	[ILA_ATTR_HOOK_TYPE] = { .type = NLA_U8, },
+	[ILA_ATTR_NOTIFY_DST] = { .type = NLA_FLAG },
+	[ILA_ATTR_NOTIFY_SRC] = { .type = NLA_FLAG },
 };
 
 static int ila_build_state(struct net *net, struct nlattr *nla,
@@ -130,64 +204,73 @@ static int ila_build_state(struct net *net, struct nlattr *nla,
 			   struct lwtunnel_state **ts,
 			   struct netlink_ext_ack *extack)
 {
-	struct ila_lwt *ilwt;
-	struct ila_params *p;
-	struct nlattr *tb[ILA_ATTR_MAX + 1];
-	struct lwtunnel_state *newts;
 	const struct fib6_config *cfg6 = cfg;
-	struct ila_addr *iaddr;
+	struct ila_addr *iaddr = (struct ila_addr *)&cfg6->fc_dst;
 	u8 ident_type = ILA_ATYPE_USE_FORMAT;
 	u8 hook_type = ILA_HOOK_ROUTE_OUTPUT;
+	struct nlattr *tb[ILA_ATTR_MAX + 1];
 	u8 csum_mode = ILA_CSUM_NO_ACTION;
-	bool lwt_output = true;
+	struct lwtunnel_state *newts;
+	struct ila_lwt *ilwt;
+	struct ila_params *p;
 	u8 eff_ident_type;
-	int ret;
+	int err;
 
 	if (family != AF_INET6)
 		return -EINVAL;
 
-	ret = nla_parse_nested(tb, ILA_ATTR_MAX, nla, ila_nl_policy, extack);
-	if (ret < 0)
-		return ret;
+	err = nla_parse_nested(tb, ILA_ATTR_MAX, nla, ila_nl_policy, extack);
+	if (err < 0)
+		return err;
 
-	if (!tb[ILA_ATTR_LOCATOR])
-		return -EINVAL;
+	if (tb[ILA_ATTR_LOCATOR]) {
+		/* Doing ILA translation */
 
-	iaddr = (struct ila_addr *)&cfg6->fc_dst;
+		if (tb[ILA_ATTR_IDENT_TYPE])
+			ident_type = nla_get_u8(tb[ILA_ATTR_IDENT_TYPE]);
 
-	if (tb[ILA_ATTR_IDENT_TYPE])
-		ident_type = nla_get_u8(tb[ILA_ATTR_IDENT_TYPE]);
-
-	if (ident_type == ILA_ATYPE_USE_FORMAT) {
-		/* Infer identifier type from type field in formatted
-		 * identifier.
-		 */
-
-		if (cfg6->fc_dst_len < 8 * sizeof(struct ila_locator) + 3) {
-			/* Need to have full locator and at least type field
-			 * included in destination
+		if (ident_type == ILA_ATYPE_USE_FORMAT) {
+			/* Infer identifier type from type field in formatted
+			 * identifier.
 			 */
+
+			if (cfg6->fc_dst_len < 8 *
+			    sizeof(struct ila_locator) + 3) {
+				/* Need to have full locator and at least type
+				 * field included in destination
+				 */
+				return -EINVAL;
+			}
+
+			eff_ident_type = iaddr->ident.type;
+		} else {
+			eff_ident_type = ident_type;
+		}
+
+		switch (eff_ident_type) {
+		case ILA_ATYPE_IID:
+			/* Don't allow ILA for IID type */
+			return -EINVAL;
+		case ILA_ATYPE_LUID:
+			break;
+		case ILA_ATYPE_VIRT_V4:
+		case ILA_ATYPE_VIRT_UNI_V6:
+		case ILA_ATYPE_VIRT_MULTI_V6:
+		case ILA_ATYPE_NONLOCAL_ADDR:
+			/* These ILA formats are not supported yet. */
+		default:
 			return -EINVAL;
 		}
 
-		eff_ident_type = iaddr->ident.type;
-	} else {
-		eff_ident_type = ident_type;
-	}
+		csum_mode = nla_get_u8(tb[ILA_ATTR_CSUM_MODE]);
 
-	switch (eff_ident_type) {
-	case ILA_ATYPE_IID:
-		/* Don't allow ILA for IID type */
-		return -EINVAL;
-	case ILA_ATYPE_LUID:
-		break;
-	case ILA_ATYPE_VIRT_V4:
-	case ILA_ATYPE_VIRT_UNI_V6:
-	case ILA_ATYPE_VIRT_MULTI_V6:
-	case ILA_ATYPE_NONLOCAL_ADDR:
-		/* These ILA formats are not supported yet. */
-	default:
-		return -EINVAL;
+		if (csum_mode == ILA_CSUM_NEUTRAL_MAP &&
+		    ila_csum_neutral_set(iaddr->ident)) {
+			/* Don't allow translation if checksum neutral bit is
+			 * configured and it's set in the SIR address.
+			 */
+			return -EINVAL;
+		}
 	}
 
 	if (tb[ILA_ATTR_HOOK_TYPE])
@@ -195,23 +278,9 @@ static int ila_build_state(struct net *net, struct nlattr *nla,
 
 	switch (hook_type) {
 	case ILA_HOOK_ROUTE_OUTPUT:
-		lwt_output = true;
-		break;
 	case ILA_HOOK_ROUTE_INPUT:
-		lwt_output = false;
 		break;
 	default:
-		return -EINVAL;
-	}
-
-	if (tb[ILA_ATTR_CSUM_MODE])
-		csum_mode = nla_get_u8(tb[ILA_ATTR_CSUM_MODE]);
-
-	if (csum_mode == ILA_CSUM_NEUTRAL_MAP &&
-	    ila_csum_neutral_set(iaddr->ident)) {
-		/* Don't allow translation if checksum neutral bit is
-		 * configured and it's set in the SIR address.
-		 */
 		return -EINVAL;
 	}
 
@@ -220,33 +289,51 @@ static int ila_build_state(struct net *net, struct nlattr *nla,
 		return -ENOMEM;
 
 	ilwt = ila_lwt_lwtunnel(newts);
-	ret = dst_cache_init(&ilwt->dst_cache, GFP_ATOMIC);
-	if (ret) {
+
+	err = dst_cache_init(&ilwt->dst_cache, GFP_ATOMIC);
+	if (err) {
 		kfree(newts);
-		return ret;
+		return err;
 	}
 
-	ilwt->lwt_output = !!lwt_output;
+	newts->type = LWTUNNEL_ENCAP_ILA;
+
+	switch (hook_type) {
+	case ILA_HOOK_ROUTE_OUTPUT:
+		newts->flags |= LWTUNNEL_STATE_OUTPUT_REDIRECT;
+		break;
+	case ILA_HOOK_ROUTE_INPUT:
+		newts->flags |= LWTUNNEL_STATE_INPUT_REDIRECT;
+		break;
+	}
+
+	ilwt->hook_type = hook_type;
+
+	if (tb[ILA_ATTR_NOTIFY_DST])
+		ilwt->notify |= ILA_NOTIFY_DST;
+
+	if (tb[ILA_ATTR_NOTIFY_SRC])
+		ilwt->notify |= ILA_NOTIFY_SRC;
 
 	p = ila_params_lwtunnel(newts);
 
-	p->csum_mode = csum_mode;
-	p->ident_type = ident_type;
-	p->locator.v64 = (__force __be64)nla_get_u64(tb[ILA_ATTR_LOCATOR]);
+	if (tb[ILA_ATTR_LOCATOR]) {
+		ilwt->xlat = true;
+		p->csum_mode = csum_mode;
+		p->ident_type = ident_type;
+		p->locator.v64 = (__force __be64)nla_get_u64(
+							tb[ILA_ATTR_LOCATOR]);
 
-	/* Precompute checksum difference for translation since we
-	 * know both the old locator and the new one.
-	 */
-	p->locator_match = iaddr->loc;
+		/* Precompute checksum difference for translation since we
+		 * know both the old locator and the new one.
+		 */
+		p->locator_match = iaddr->loc;
 
-	ila_init_saved_csum(p);
+		ila_init_saved_csum(p);
 
-	newts->type = LWTUNNEL_ENCAP_ILA;
-	newts->flags |= LWTUNNEL_STATE_OUTPUT_REDIRECT |
-			LWTUNNEL_STATE_INPUT_REDIRECT;
-
-	if (cfg6->fc_dst_len == 8 * sizeof(struct in6_addr))
-		ilwt->connected = 1;
+		if (cfg6->fc_dst_len == 8 * sizeof(struct in6_addr))
+			ilwt->connected = 1;
+	}
 
 	*ts = newts;
 
@@ -264,20 +351,31 @@ static int ila_fill_encap_info(struct sk_buff *skb,
 	struct ila_params *p = ila_params_lwtunnel(lwtstate);
 	struct ila_lwt *ilwt = ila_lwt_lwtunnel(lwtstate);
 
-	if (nla_put_u64_64bit(skb, ILA_ATTR_LOCATOR, (__force u64)p->locator.v64,
-			      ILA_ATTR_PAD))
+	if (ilwt->xlat) {
+		if (nla_put_u64_64bit(skb, ILA_ATTR_LOCATOR,
+				      (__force u64)p->locator.v64,
+				      ILA_ATTR_PAD))
 		goto nla_put_failure;
 
-	if (nla_put_u8(skb, ILA_ATTR_CSUM_MODE, (__force u8)p->csum_mode))
+		if (nla_put_u8(skb, ILA_ATTR_CSUM_MODE,
+			       (__force u8)p->csum_mode))
+			goto nla_put_failure;
+
+		if (nla_put_u8(skb, ILA_ATTR_IDENT_TYPE,
+			       (__force u8)p->ident_type))
+			goto nla_put_failure;
+	}
+
+	if (nla_put_u8(skb, ILA_ATTR_HOOK_TYPE, ilwt->hook_type))
 		goto nla_put_failure;
 
-	if (nla_put_u8(skb, ILA_ATTR_IDENT_TYPE, (__force u8)p->ident_type))
-		goto nla_put_failure;
+	if (ilwt->notify & ILA_NOTIFY_DST)
+		if (nla_put_flag(skb, ILA_ATTR_NOTIFY_DST))
+			goto nla_put_failure;
 
-	if (nla_put_u8(skb, ILA_ATTR_HOOK_TYPE,
-		       ilwt->lwt_output ? ILA_HOOK_ROUTE_OUTPUT :
-					  ILA_HOOK_ROUTE_INPUT))
-		goto nla_put_failure;
+	if (ilwt->notify & ILA_NOTIFY_SRC)
+		if (nla_put_flag(skb, ILA_ATTR_NOTIFY_SRC))
+			goto nla_put_failure;
 
 	return 0;
 
@@ -291,6 +389,8 @@ static int ila_encap_nlsize(struct lwtunnel_state *lwtstate)
 	       nla_total_size(sizeof(u8)) +        /* ILA_ATTR_CSUM_MODE */
 	       nla_total_size(sizeof(u8)) +        /* ILA_ATTR_IDENT_TYPE */
 	       nla_total_size(sizeof(u8)) +        /* ILA_ATTR_HOOK_TYPE */
+	       nla_total_size(0) +		   /* ILA_ATTR_NOTIFY_DST */
+	       nla_total_size(0) +		   /* ILA_ATTR_NOTIFY_SRC */
 	       0;
 }
 
