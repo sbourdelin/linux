@@ -104,3 +104,12 @@ config ASPEED_BT_IPMI_BMC
 	  Provides a driver for the BT (Block Transfer) IPMI interface
 	  found on Aspeed SOCs (AST2400 and AST2500). The driver
 	  implements the BMC side of the BT interface.
+
+config ASPEED_KCS_IPMI_BMC
+	depends on ARCH_ASPEED || COMPILE_TEST
+        depends on REGMAP && REGMAP_MMIO && MFD_SYSCON
+	tristate "KCS IPMI bmc driver"
+	help
+	  Provides a driver for the KCS (Keyboard Controller Style) IPMI
+	  interface found on Aspeed SOCs (AST2400 and AST2500). The driver
+	  implements the BMC side of the KCS interface.
