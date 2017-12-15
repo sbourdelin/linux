@@ -283,8 +283,6 @@
 #include <asm/ioctls.h>
 #include <net/busy_poll.h>
 
-#include <trace/events/tcp.h>
-
 struct percpu_counter tcp_orphan_count;
 EXPORT_SYMBOL_GPL(tcp_orphan_count);
 
@@ -2039,8 +2037,6 @@ EXPORT_SYMBOL(tcp_recvmsg);
 void tcp_set_state(struct sock *sk, int state)
 {
 	int oldstate = sk->sk_state;
-
-	trace_tcp_set_state(sk, oldstate, state);
 
 	switch (state) {
 	case TCP_ESTABLISHED:
