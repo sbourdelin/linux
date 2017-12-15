@@ -93,12 +93,12 @@ static void groups_sort(struct group_info *group_info)
 }
 
 /* a simple bsearch */
-int groups_search(const struct group_info *group_info, kgid_t grp)
+bool groups_search(const struct group_info *group_info, kgid_t grp)
 {
 	unsigned int left, right;
 
 	if (!group_info)
-		return 0;
+		return false;
 
 	left = 0;
 	right = group_info->ngroups;
@@ -109,9 +109,9 @@ int groups_search(const struct group_info *group_info, kgid_t grp)
 		else if (gid_lt(grp, group_info->gid[mid]))
 			right = mid;
 		else
-			return 1;
+			return true;
 	}
-	return 0;
+	return false;
 }
 
 /**
