@@ -293,10 +293,6 @@ static void rockchip_pcie_update_txcredit_mui(struct rockchip_pcie *rockchip)
 static int rockchip_pcie_valid_device(struct rockchip_pcie *rockchip,
 				      struct pci_bus *bus, int dev)
 {
-	/* access only one slot on each root port */
-	if (bus->number == rockchip->root_bus_nr && dev > 0)
-		return 0;
-
 	/*
 	 * do not read more than one device on the bus directly attached
 	 * to RC's downstream side.
