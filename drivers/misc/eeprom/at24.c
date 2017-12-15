@@ -645,20 +645,19 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	/* use dummy devices for multiple-address chips */
 	for (i = 1; i < num_addresses; i++) {
-		at24->client[i].client = i2c_new_dummy(client->adapter,
-						       client->addr + i);
-		if (!at24->client[i].client) {
+		struct at24_client *cl;
+
+		cl = &at24->client[i];
+		cl->client = devm_i2c_new_dummy(&client->dev, client->adapter,
+						client->addr + i);
+		if (IS_ERR(cl->client)) {
 			dev_err(&client->dev, "address 0x%02x unavailable\n",
-					client->addr + i);
-			err = -EADDRINUSE;
-			goto err_clients;
+				client->addr + i);
+			return PTR_ERR(cl->client);
 		}
-		at24->client[i].regmap = devm_regmap_init_i2c(
-					at24->client[i].client, config);
-		if (IS_ERR(at24->client[i].regmap)) {
-			err = PTR_ERR(at24->client[i].regmap);
-			goto err_clients;
-		}
+		cl->regmap = devm_regmap_init_i2c(cl->client, config);
+		if (IS_ERR(cl->regmap))
+			return PTR_ERR(cl->regmap);
 	}
 
 	i2c_set_clientdata(client, at24);
@@ -710,10 +709,6 @@ static int at24_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	return 0;
 
 err_clients:
-	for (i = 1; i < num_addresses; i++)
-		if (at24->client[i].client)
-			i2c_unregister_device(at24->client[i].client);
-
 	pm_runtime_disable(&client->dev);
 
 	return err;
@@ -722,14 +717,10 @@ err_clients:
 static int at24_remove(struct i2c_client *client)
 {
 	struct at24_data *at24;
-	int i;
 
 	at24 = i2c_get_clientdata(client);
 
 	nvmem_unregister(at24->nvmem);
-
-	for (i = 1; i < at24->num_addresses; i++)
-		i2c_unregister_device(at24->client[i].client);
 
 	pm_runtime_disable(&client->dev);
 	pm_runtime_set_suspended(&client->dev);
