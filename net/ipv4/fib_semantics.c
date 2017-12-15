@@ -523,6 +523,7 @@ static int fib_get_nhs(struct fib_info *fi, struct rtnexthop *rtnh,
 			if (nla) {
 				struct lwtunnel_state *lwtstate;
 				struct nlattr *nla_entype;
+				struct net *net = cfg->fc_nlinfo.nl_net;
 
 				nla_entype = nla_find(attrs, attrlen,
 						      RTA_ENCAP_TYPE);
@@ -533,7 +534,7 @@ static int fib_get_nhs(struct fib_info *fi, struct rtnexthop *rtnh,
 					goto err_inval;
 				}
 
-				ret = lwtunnel_build_state(nla_get_u16(
+				ret = lwtunnel_build_state(net, nla_get_u16(
 							   nla_entype),
 							   nla,  AF_INET, cfg,
 							   &lwtstate, extack);
@@ -607,7 +608,7 @@ static void fib_rebalance(struct fib_info *fi)
 
 #endif /* CONFIG_IP_ROUTE_MULTIPATH */
 
-static int fib_encap_match(u16 encap_type,
+static int fib_encap_match(struct net *net, u16 encap_type,
 			   struct nlattr *encap,
 			   const struct fib_nh *nh,
 			   const struct fib_config *cfg,
@@ -619,7 +620,7 @@ static int fib_encap_match(u16 encap_type,
 	if (encap_type == LWTUNNEL_ENCAP_NONE)
 		return 0;
 
-	ret = lwtunnel_build_state(encap_type, encap, AF_INET,
+	ret = lwtunnel_build_state(net, encap_type, encap, AF_INET,
 				   cfg, &lwtstate, extack);
 	if (!ret) {
 		result = lwtunnel_cmp_encap(lwtstate, nh->nh_lwtstate);
@@ -632,6 +633,7 @@ static int fib_encap_match(u16 encap_type,
 int fib_nh_match(struct fib_config *cfg, struct fib_info *fi,
 		 struct netlink_ext_ack *extack)
 {
+	struct net *net = cfg->fc_nlinfo.nl_net;
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 	struct rtnexthop *rtnh;
 	int remaining;
@@ -642,7 +644,8 @@ int fib_nh_match(struct fib_config *cfg, struct fib_info *fi,
 
 	if (cfg->fc_oif || cfg->fc_gw) {
 		if (cfg->fc_encap) {
-			if (fib_encap_match(cfg->fc_encap_type, cfg->fc_encap,
+			if (fib_encap_match(net, cfg->fc_encap_type,
+					    cfg->fc_encap,
 					    fi->fib_nh, cfg, extack))
 				return 1;
 		}
@@ -1180,7 +1183,7 @@ struct fib_info *fib_create_info(struct fib_config *cfg,
 					       "LWT encap type not specified");
 				goto err_inval;
 			}
-			err = lwtunnel_build_state(cfg->fc_encap_type,
+			err = lwtunnel_build_state(net, cfg->fc_encap_type,
 						   cfg->fc_encap, AF_INET, cfg,
 						   &lwtstate, extack);
 			if (err)
