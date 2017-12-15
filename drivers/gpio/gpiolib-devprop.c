@@ -30,20 +30,24 @@ void devprop_gpiochip_set_names(struct gpio_chip *chip)
 	struct gpio_device *gdev = chip->gpiodev;
 	const char **names;
 	int ret, i;
+	struct device *dev;
 
-	if (!chip->parent) {
+	if (chip->parent) {
+		dev = chip->parent;
+	} else if (gdev->dev.of_node) {
+		dev = &gdev->dev;
+	} else {
 		dev_warn(&gdev->dev, "GPIO chip parent is NULL\n");
 		return;
 	}
 
-	ret = device_property_read_string_array(chip->parent, "gpio-line-names",
+	ret = device_property_read_string_array(dev, "gpio-line-names",
 						NULL, 0);
 	if (ret < 0)
 		return;
 
 	if (ret != gdev->ngpio) {
-		dev_warn(chip->parent,
-			 "names %d do not match number of GPIOs %d\n", ret,
+		dev_warn(dev, "names %d do not match number of GPIOs %d\n", ret,
 			 gdev->ngpio);
 		return;
 	}
@@ -52,10 +56,10 @@ void devprop_gpiochip_set_names(struct gpio_chip *chip)
 	if (!names)
 		return;
 
-	ret = device_property_read_string_array(chip->parent, "gpio-line-names",
+	ret = device_property_read_string_array(dev, "gpio-line-names",
 						names, gdev->ngpio);
 	if (ret < 0) {
-		dev_warn(chip->parent, "failed to read GPIO line names\n");
+		dev_warn(dev, "failed to read GPIO line names\n");
 		kfree(names);
 		return;
 	}
