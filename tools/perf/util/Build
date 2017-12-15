@@ -89,6 +89,7 @@ libperf-$(CONFIG_AUXTRACE) += intel-bts.o
 
 ifdef CONFIG_LIBOPENCSD
 libperf-$(CONFIG_AUXTRACE) += cs-etm.o
+libperf-$(CONFIG_AUXTRACE) += cs-etm-decoder/
 endif
 
 libperf-y += parse-branch-options.o
