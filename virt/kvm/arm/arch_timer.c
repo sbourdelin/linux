@@ -92,16 +92,21 @@ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
 {
 	struct kvm_vcpu *vcpu = *(struct kvm_vcpu **)dev_id;
 	struct arch_timer_context *vtimer;
+	u32 cnt_ctl;
 
-	if (!vcpu) {
-		pr_warn_once("Spurious arch timer IRQ on non-VCPU thread\n");
-		return IRQ_NONE;
-	}
+	/*
+	 * We may see a timer interrupt after vcpu_put() has been called which
+	 * sets the CPU's vcpu pointer to NULL, because even though the timer
+	 * has been disabled in vtimer_save_state(), the singal may not have
+	 * been retired from the interrupt controller yet.
+	 */
+	if (!vcpu)
+		return IRQ_HANDLED;
+
 	vtimer = vcpu_vtimer(vcpu);
-
 	if (!vtimer->irq.level) {
-		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
-		if (kvm_timer_irq_can_fire(vtimer))
+		cnt_ctl = read_sysreg_el0(cntv_ctl);
+		if (cnt_ctl & ARCH_TIMER_CTRL_IT_STAT)
 			kvm_timer_update_irq(vcpu, true, vtimer);
 	}
 
@@ -835,10 +840,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
 no_vgic:
 	preempt_disable();
 	timer->enabled = 1;
-	if (!irqchip_in_kernel(vcpu->kvm))
-		kvm_timer_vcpu_load_user(vcpu);
-	else
-		kvm_timer_vcpu_load_vgic(vcpu);
+	kvm_timer_vcpu_load(vcpu);
 	preempt_enable();
 
 	return 0;
