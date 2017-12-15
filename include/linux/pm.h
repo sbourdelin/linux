@@ -560,6 +560,7 @@ struct pm_subsys_data {
  * SMART_PREPARE: Check the return value of the driver's ->prepare callback.
  * SMART_SUSPEND: No need to resume the device from runtime suspend.
  * LEAVE_SUSPENDED: Avoid resuming the device during system resume if possible.
+ * WAKEUP_PATH: The device is used in the wakeup path from system suspend.
  *
  * Setting SMART_PREPARE instructs bus types and PM domains which may want
  * system suspend/resume callbacks to be skipped for the device to return 0 from
@@ -576,11 +577,17 @@ struct pm_subsys_data {
  *
  * Setting LEAVE_SUSPENDED informs the PM core and middle-layer code that the
  * driver prefers the device to be left in suspend after system resume.
+ *
+ * Setting WAKEUP_PATH informs the PM core and the PM domain, that the device is
+ * a part of the wakeup path at system suspend. The PM core detects this flag
+ * and sets the wakeup_path status flag immeditaley after the ->suspend()
+ * callback has been invoked for the the device.
  */
 #define DPM_FLAG_NEVER_SKIP		BIT(0)
 #define DPM_FLAG_SMART_PREPARE		BIT(1)
 #define DPM_FLAG_SMART_SUSPEND		BIT(2)
 #define DPM_FLAG_LEAVE_SUSPENDED	BIT(3)
+#define DPM_FLAG_WAKEUP_PATH		BIT(4)
 
 struct dev_pm_info {
 	pm_message_t		power_state;

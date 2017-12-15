@@ -1622,7 +1622,8 @@ static int __device_suspend(struct device *dev, pm_message_t state, bool async)
  End:
 	if (!error) {
 		dev->power.is_suspended = true;
-		if (device_may_wakeup(dev))
+		if (device_may_wakeup(dev) ||
+		    dev_pm_test_driver_flags(dev, DPM_FLAG_WAKEUP_PATH))
 			dev->power.wakeup_path = true;
 		dpm_propagate_to_parent(dev);
 		dpm_clear_suppliers_direct_complete(dev);
