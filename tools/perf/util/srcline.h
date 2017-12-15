@@ -10,6 +10,7 @@ struct dso;
 struct symbol;
 
 extern bool srcline_full_filename;
+extern bool show_hex_offset;
 char *get_srcline(struct dso *dso, u64 addr, struct symbol *sym,
 		  bool show_sym, bool show_addr);
 char *__get_srcline(struct dso *dso, u64 addr, struct symbol *sym,

@@ -386,6 +386,10 @@ OPTIONS
 	sum of shown entries will be always 100%.  "absolute" means it retains
 	the original value before and after the filter is applied.
 
+--hex::
+	When address is specified as a sort_key, show the offset in
+	hexidecimal form. (Default: decimal)
+
 --header::
 	Show header information in the perf.data file.  This includes
 	various information like hostname, OS and perf version, cpu/mem

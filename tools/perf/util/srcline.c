@@ -15,6 +15,7 @@
 #include "symbol.h"
 
 bool srcline_full_filename;
+bool show_hex_offset;
 
 static const char *dso__name(struct dso *dso)
 {
@@ -535,8 +536,9 @@ out:
 			    strndup(sym->name, sym->namelen) : NULL;
 
 	if (sym) {
-		if (asprintf(&srcline, "%s+%" PRIu64, show_sym ? sym->name : "",
-					addr - sym->start) < 0)
+		if (asprintf(&srcline,
+			show_hex_offset ? "%s+%#" PRIx64 : "%s+%" PRIu64,
+			show_sym ? sym->name : "", addr - sym->start) < 0)
 			return SRCLINE_UNKNOWN;
 	} else if (asprintf(&srcline, "%s[%" PRIx64 "]", dso->short_name, addr) < 0)
 		return SRCLINE_UNKNOWN;

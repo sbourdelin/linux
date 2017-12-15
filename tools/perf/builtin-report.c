@@ -866,6 +866,8 @@ int cmd_report(int argc, const char **argv)
 			    itrace_parse_synth_opts),
 	OPT_BOOLEAN(0, "full-source-path", &srcline_full_filename,
 			"Show full source file name path for source lines"),
+	OPT_BOOLEAN(0, "hex", &show_hex_offset,
+			"When address is specified as a sort_key, show the offset in hexidecimal form"),
 	OPT_BOOLEAN(0, "show-ref-call-graph", &symbol_conf.show_ref_callgraph,
 		    "Show callgraph from reference event"),
 	OPT_INTEGER(0, "socket-filter", &report.socket_filter,
