@@ -2859,6 +2859,19 @@ int sock_get_timestampns(struct sock *sk, struct timespec __user *userstamp)
 }
 EXPORT_SYMBOL(sock_get_timestampns);
 
+void sk_state_store(struct sock *sk, int state)
+{
+	trace_sock_set_state(sk, sk->sk_state, state);
+	smp_store_release(&sk->sk_state, state);
+}
+
+void sk_set_state(struct sock *sk, int state)
+{
+	trace_sock_set_state(sk, sk->sk_state, state);
+	 sk->sk_state = state;
+}
+EXPORT_SYMBOL(sk_set_state);
+
 void sock_enable_timestamp(struct sock *sk, int flag)
 {
 	if (!sock_flag(sk, flag)) {
