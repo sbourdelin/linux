@@ -348,6 +348,18 @@ void drm_gem_dmabuf_release(struct dma_buf *dma_buf)
 }
 EXPORT_SYMBOL(drm_gem_dmabuf_release);
 
+static int drm_gem_dmabuf_begin_cpu_access(struct dma_buf *dma_buf,
+					    enum dma_data_direction direction)
+{
+	struct drm_gem_object *obj = dma_buf->priv;
+	struct drm_device *dev = obj->dev;
+
+	if (!dev->driver->gem_prime_begin_cpu_access)
+		return 0;
+
+	return dev->driver->gem_prime_begin_cpu_access(obj, direction);
+}
+
 static void *drm_gem_dmabuf_vmap(struct dma_buf *dma_buf)
 {
 	struct drm_gem_object *obj = dma_buf->priv;
@@ -405,6 +417,7 @@ static const struct dma_buf_ops drm_gem_prime_dmabuf_ops =  {
 	.map_dma_buf = drm_gem_map_dma_buf,
 	.unmap_dma_buf = drm_gem_unmap_dma_buf,
 	.release = drm_gem_dmabuf_release,
+	.begin_cpu_access = drm_gem_dmabuf_begin_cpu_access,
 	.map = drm_gem_dmabuf_kmap,
 	.map_atomic = drm_gem_dmabuf_kmap_atomic,
 	.unmap = drm_gem_dmabuf_kunmap,
