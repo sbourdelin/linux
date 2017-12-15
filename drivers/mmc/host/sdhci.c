@@ -1933,6 +1933,9 @@ int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
 		if (host->ops->voltage_switch)
 			host->ops->voltage_switch(host);
 
+		/* Wait for 5ms */
+		usleep_range(5000, 5500);
+
 		/* 1.8V regulator output should be stable within 5 ms */
 		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
 		if (ctrl & SDHCI_CTRL_VDD_180)
