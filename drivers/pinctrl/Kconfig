@@ -65,7 +65,7 @@ config PINCTRL_AS3722
 
 config PINCTRL_AXP209
 	tristate "X-Powers AXP209 PMIC pinctrl and GPIO Support"
-	depends on MFD_AXP20X
+	depends on MFD_AXP20X && OF
 	help
 	  AXP PMICs provides multiple GPIOs that can be muxed for different
 	  functions. This driver bundles a pinctrl driver to select the function
