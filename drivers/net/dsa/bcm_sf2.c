@@ -307,7 +307,8 @@ static int bcm_sf2_sw_mdio_write(struct mii_bus *bus, int addr, int regnum,
 
 static irqreturn_t bcm_sf2_switch_0_isr(int irq, void *dev_id)
 {
-	struct bcm_sf2_priv *priv = dev_id;
+	struct dsa_switch *ds = dev_id;
+	struct bcm_sf2_priv *priv = bcm_sf2_to_priv(ds);
 
 	priv->irq0_stat = intrl2_0_readl(priv, INTRL2_CPU_STATUS) &
 				~priv->irq0_mask;
@@ -318,16 +319,21 @@ static irqreturn_t bcm_sf2_switch_0_isr(int irq, void *dev_id)
 
 static irqreturn_t bcm_sf2_switch_1_isr(int irq, void *dev_id)
 {
-	struct bcm_sf2_priv *priv = dev_id;
+	struct dsa_switch *ds = dev_id;
+	struct bcm_sf2_priv *priv = bcm_sf2_to_priv(ds);
 
 	priv->irq1_stat = intrl2_1_readl(priv, INTRL2_CPU_STATUS) &
 				~priv->irq1_mask;
 	intrl2_1_writel(priv, priv->irq1_stat, INTRL2_CPU_CLEAR);
 
-	if (priv->irq1_stat & P_LINK_UP_IRQ(P7_IRQ_OFF))
+	if (priv->irq1_stat & P_LINK_UP_IRQ(P7_IRQ_OFF)) {
 		priv->port_sts[7].link = 1;
-	if (priv->irq1_stat & P_LINK_DOWN_IRQ(P7_IRQ_OFF))
+		dsa_port_phylink_mac_change(ds, 7, true);
+	}
+	if (priv->irq1_stat & P_LINK_DOWN_IRQ(P7_IRQ_OFF)) {
 		priv->port_sts[7].link = 0;
+		dsa_port_phylink_mac_change(ds, 7, false);
+	}
 
 	return IRQ_HANDLED;
 }
@@ -1060,14 +1066,14 @@ static int bcm_sf2_sw_probe(struct platform_device *pdev)
 	bcm_sf2_intr_disable(priv);
 
 	ret = devm_request_irq(&pdev->dev, priv->irq0, bcm_sf2_switch_0_isr, 0,
-			       "switch_0", priv);
+			       "switch_0", ds);
 	if (ret < 0) {
 		pr_err("failed to request switch_0 IRQ\n");
 		goto out_mdio;
 	}
 
 	ret = devm_request_irq(&pdev->dev, priv->irq1, bcm_sf2_switch_1_isr, 0,
-			       "switch_1", priv);
+			       "switch_1", ds);
 	if (ret < 0) {
 		pr_err("failed to request switch_1 IRQ\n");
 		goto out_mdio;
