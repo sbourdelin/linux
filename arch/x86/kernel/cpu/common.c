@@ -606,12 +606,16 @@ static void __init setup_cpu_entry_area(int cpu)
 
 #ifdef CONFIG_CPU_SUP_INTEL
 	BUILD_BUG_ON(sizeof(struct debug_store) % PAGE_SIZE != 0);
-	set_percpu_fixmap_pages(get_cpu_entry_area_index(cpu, cpu_debug_store),
-				&per_cpu(cpu_debug_store, cpu),
-				sizeof(struct debug_store) / PAGE_SIZE,
-				PAGE_KERNEL);
-	set_percpu_fixmap_ptes(get_cpu_entry_area_index(cpu, cpu_debug_buffers),
-			       sizeof(struct debug_store_buffers) / PAGE_SIZE);
+
+	if (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL) {
+		set_percpu_fixmap_pages(get_cpu_entry_area_index(cpu, cpu_debug_store),
+					&per_cpu(cpu_debug_store, cpu),
+					sizeof(struct debug_store) / PAGE_SIZE,
+					PAGE_KERNEL);
+
+		set_percpu_fixmap_ptes(get_cpu_entry_area_index(cpu, cpu_debug_buffers),
+				       sizeof(struct debug_store_buffers) / PAGE_SIZE);
+	}
 #endif
 	set_percpu_fixmap_ptes(get_cpu_entry_area_index(cpu, ldt_entries),
 			       (LDT_ENTRIES * LDT_ENTRY_SIZE) / PAGE_SIZE);
