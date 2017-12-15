@@ -506,11 +506,11 @@ static int ip6erspan_rcv(struct sk_buff *skb, int gre_hdr_len,
 	struct ip6_tnl *tunnel;
 	__be32 index;
 
-	ipv6h = ipv6_hdr(skb);
-	ershdr = (struct erspanhdr *)skb->data;
-
 	if (unlikely(!pskb_may_pull(skb, sizeof(*ershdr))))
 		return PACKET_REJECT;
+
+	ipv6h = ipv6_hdr(skb);
+	ershdr = (struct erspanhdr *)skb->data;
 
 	tpi->key = cpu_to_be32(ntohs(ershdr->session_id) & ID_MASK);
 	index = ershdr->md.index;
