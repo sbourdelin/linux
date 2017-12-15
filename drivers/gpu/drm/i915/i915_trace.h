@@ -618,6 +618,7 @@ TRACE_EVENT(i915_gem_request_queue,
 			     __field(u32, dev)
 			     __field(u32, ring)
 			     __field(u32, ctx)
+			     __field(u32, hw_id)
 			     __field(u32, seqno)
 			     __field(u32, flags)
 			     ),
@@ -626,13 +627,14 @@ TRACE_EVENT(i915_gem_request_queue,
 			   __entry->dev = req->i915->drm.primary->index;
 			   __entry->ring = req->engine->id;
 			   __entry->ctx = req->fence.context;
+			   __entry->hw_id = req->ctx->hw_id;
 			   __entry->seqno = req->fence.seqno;
 			   __entry->flags = flags;
 			   ),
 
-	    TP_printk("dev=%u, ring=%u, ctx=%u, seqno=%u, flags=0x%x",
-		      __entry->dev, __entry->ring, __entry->ctx, __entry->seqno,
-		      __entry->flags)
+	    TP_printk("dev=%u, ring=%u, ctx=%u, hw_id=%u, seqno=%u, flags=0x%x",
+		      __entry->dev, __entry->ring, __entry->ctx, __entry->hw_id,
+		      __entry->seqno, __entry->flags)
 );
 
 DECLARE_EVENT_CLASS(i915_gem_request,
@@ -642,6 +644,7 @@ DECLARE_EVENT_CLASS(i915_gem_request,
 	    TP_STRUCT__entry(
 			     __field(u32, dev)
 			     __field(u32, ctx)
+			     __field(u32, hw_id)
 			     __field(u32, ring)
 			     __field(u32, seqno)
 			     __field(u32, global)
@@ -651,13 +654,14 @@ DECLARE_EVENT_CLASS(i915_gem_request,
 			   __entry->dev = req->i915->drm.primary->index;
 			   __entry->ring = req->engine->id;
 			   __entry->ctx = req->fence.context;
+			   __entry->hw_id = req->ctx->hw_id;
 			   __entry->seqno = req->fence.seqno;
 			   __entry->global = req->global_seqno;
 			   ),
 
-	    TP_printk("dev=%u, ring=%u, ctx=%u, seqno=%u, global=%u",
-		      __entry->dev, __entry->ring, __entry->ctx, __entry->seqno,
-		      __entry->global)
+	    TP_printk("dev=%u, ring=%u, ctx=%u, hw_id=%u, seqno=%u, global=%u",
+		      __entry->dev, __entry->ring, __entry->ctx, __entry->hw_id,
+		      __entry->seqno, __entry->global)
 );
 
 DEFINE_EVENT(i915_gem_request, i915_gem_request_add,
@@ -687,6 +691,7 @@ DECLARE_EVENT_CLASS(i915_gem_request_hw,
 				     __field(u32, seqno)
 				     __field(u32, global_seqno)
 				     __field(u32, ctx)
+				     __field(u32, hw_id)
 				     __field(u32, port)
 				    ),
 
@@ -694,15 +699,16 @@ DECLARE_EVENT_CLASS(i915_gem_request_hw,
 			           __entry->dev = req->i915->drm.primary->index;
 			           __entry->ring = req->engine->id;
 			           __entry->ctx = req->fence.context;
+			           __entry->hw_id = req->ctx->hw_id;
 			           __entry->seqno = req->fence.seqno;
 			           __entry->global_seqno = req->global_seqno;
 			           __entry->port = port;
 			          ),
 
-		    TP_printk("dev=%u, ring=%u, ctx=%u, seqno=%u, global=%u, port=%u",
+		    TP_printk("dev=%u, ring=%u, ctx=%u, hw_id=%u, seqno=%u, global=%u, port=%u",
 			      __entry->dev, __entry->ring, __entry->ctx,
-			      __entry->seqno, __entry->global_seqno,
-			      __entry->port)
+			      __entry->hw_id, __entry->seqno,
+			      __entry->global_seqno, __entry->port)
 );
 
 DEFINE_EVENT(i915_gem_request_hw, i915_gem_request_in,
