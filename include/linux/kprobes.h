@@ -219,9 +219,9 @@ DECLARE_PER_CPU(struct kprobe_ctlblk, kprobe_ctlblk);
 /*
  * For #ifdef avoidance:
  */
-static inline int kprobes_built_in(void)
+static inline bool kprobes_built_in(void)
 {
-	return 1;
+	return true;
 }
 
 #ifdef CONFIG_KRETPROBES
@@ -409,9 +409,9 @@ void dump_kprobe(struct kprobe *kp);
 
 #else /* !CONFIG_KPROBES: */
 
-static inline int kprobes_built_in(void)
+static inline bool kprobes_built_in(void)
 {
-	return 0;
+	return false;
 }
 static inline int kprobe_fault_handler(struct pt_regs *regs, int trapnr)
 {
