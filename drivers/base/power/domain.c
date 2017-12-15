@@ -1038,7 +1038,9 @@ static int genpd_finish_suspend(struct device *dev, bool poweroff)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	if (dev->power.wakeup_path && genpd_is_active_wakeup(genpd))
+	if ((dev->power.wakeup_path ||
+	    dev_pm_test_driver_flags(dev, DPM_FLAG_WAKEUP_PATH)) &&
+	    genpd_is_active_wakeup(genpd))
 		return 0;
 
 	if (poweroff)
@@ -1093,7 +1095,9 @@ static int genpd_resume_noirq(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	if (dev->power.wakeup_path && genpd_is_active_wakeup(genpd))
+	if ((dev->power.wakeup_path ||
+	    dev_pm_test_driver_flags(dev, DPM_FLAG_WAKEUP_PATH)) &&
+	    genpd_is_active_wakeup(genpd))
 		return 0;
 
 	genpd_lock(genpd);
