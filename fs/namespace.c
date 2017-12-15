@@ -271,13 +271,13 @@ out_free_cache:
  * mnt_want/drop_write() will _keep_ the filesystem
  * r/w.
  */
-int __mnt_is_readonly(struct vfsmount *mnt)
+bool __mnt_is_readonly(struct vfsmount *mnt)
 {
 	if (mnt->mnt_flags & MNT_READONLY)
-		return 1;
+		return true;
 	if (sb_rdonly(mnt->mnt_sb))
-		return 1;
-	return 0;
+		return true;
+	return false;
 }
 EXPORT_SYMBOL_GPL(__mnt_is_readonly);
 
