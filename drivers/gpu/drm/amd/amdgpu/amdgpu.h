@@ -420,6 +420,7 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 int amdgpu_gem_prime_pin(struct drm_gem_object *obj);
 void amdgpu_gem_prime_unpin(struct drm_gem_object *obj);
 struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *);
+int amdgpu_gem_prime_begin_cpu_access(struct drm_gem_object *obj, enum dma_data_direction direction);
 void *amdgpu_gem_prime_vmap(struct drm_gem_object *obj);
 void amdgpu_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
 int amdgpu_gem_prime_mmap(struct drm_gem_object *obj, struct vm_area_struct *vma);

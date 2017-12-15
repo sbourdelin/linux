@@ -26,6 +26,7 @@
 #include <drm/drmP.h>
 
 #include "amdgpu.h"
+#include "amdgpu_display.h"
 #include <drm/amdgpu_drm.h>
 #include <linux/dma-buf.h>
 
@@ -164,6 +165,30 @@ struct reservation_object *amdgpu_gem_prime_res_obj(struct drm_gem_object *obj)
 	return bo->tbo.resv;
 }
 
+int amdgpu_gem_prime_begin_cpu_access(struct drm_gem_object *obj, enum dma_data_direction direction)
+{
+	struct amdgpu_bo *bo = gem_to_amdgpu_bo(obj);
+	struct amdgpu_device *adev = amdgpu_ttm_adev(bo->tbo.bdev);
+	struct ttm_operation_ctx ctx = { true, false };
+	u32 domain = amdgpu_framebuffer_domains(adev);
+	long ret = 0;
+	bool reads = (direction == DMA_BIDIRECTIONAL || direction == DMA_FROM_DEVICE);
+
+	if (!reads || !(domain & AMDGPU_GEM_DOMAIN_GTT) || bo->pin_count)
+		return 0;
+
+	/* move to gtt */
+	ret = amdgpu_bo_reserve(bo, false);
+	if (unlikely(ret != 0))
+		return ret;
+
+	amdgpu_ttm_placement_from_domain(bo, AMDGPU_GEM_DOMAIN_GTT);
+	ret = ttm_bo_validate(&bo->tbo, &bo->placement, &ctx);
+
+	amdgpu_bo_unreserve(bo);
+	return ret;
+}
+
 struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 					struct drm_gem_object *gobj,
 					int flags)
@@ -178,5 +203,6 @@ struct dma_buf *amdgpu_gem_prime_export(struct drm_device *dev,
 	buf = drm_gem_prime_export(dev, gobj, flags);
 	if (!IS_ERR(buf))
 		buf->file->f_mapping = dev->anon_inode->i_mapping;
+
 	return buf;
 }
