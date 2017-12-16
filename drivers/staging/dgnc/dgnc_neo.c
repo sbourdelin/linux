@@ -651,7 +651,7 @@ static void neo_param(struct tty_struct *tty)
 		 * is NOT open
 		 */
 		if (!(ch->ch_tun.un_flags & UN_ISOPEN) &&
-		    (un->un_type == DGNC_PRINT))
+		    un->un_type == DGNC_PRINT)
 			baud = C_BAUD(ch->ch_pun.un_tty) & 0xff;
 		else
 			baud = C_BAUD(ch->ch_tun.un_tty) & 0xff;
@@ -664,8 +664,8 @@ static void neo_param(struct tty_struct *tty)
 
 		jindex = baud;
 
-		if ((iindex >= 0) && (iindex < 4) &&
-		    (jindex >= 0) && (jindex < 16))
+		if (iindex >= 0 && iindex < 4 &&
+		    jindex >= 0 && jindex < 16)
 			baud = bauds[iindex][jindex];
 		else
 			baud = 0;
@@ -767,8 +767,8 @@ static void neo_param(struct tty_struct *tty)
 	if (ch->ch_digi.digi_flags & CTSPACE || ch->ch_c_cflag & CRTSCTS) {
 		neo_set_cts_flow_control(ch);
 	} else if (ch->ch_c_iflag & IXON) {
-		if ((ch->ch_startc == _POSIX_VDISABLE) ||
-		    (ch->ch_stopc == _POSIX_VDISABLE))
+		if (ch->ch_startc == _POSIX_VDISABLE ||
+		    ch->ch_stopc == _POSIX_VDISABLE)
 			neo_set_no_output_flow_control(ch);
 		else
 			neo_set_ixon_flow_control(ch);
@@ -779,8 +779,8 @@ static void neo_param(struct tty_struct *tty)
 	if (ch->ch_digi.digi_flags & RTSPACE || ch->ch_c_cflag & CRTSCTS) {
 		neo_set_rts_flow_control(ch);
 	} else if (ch->ch_c_iflag & IXOFF) {
-		if ((ch->ch_startc == _POSIX_VDISABLE) ||
-		    (ch->ch_stopc == _POSIX_VDISABLE))
+		if (ch->ch_startc == _POSIX_VDISABLE ||
+		    ch->ch_stopc == _POSIX_VDISABLE)
 			neo_set_no_input_flow_control(ch);
 		else
 			neo_set_ixoff_flow_control(ch);
@@ -827,7 +827,7 @@ static void neo_tasklet(unsigned long data)
 	 */
 	spin_lock_irqsave(&bd->bd_intr_lock, flags);
 
-	if ((state == BOARD_READY) && (ports > 0)) {
+	if (state == BOARD_READY && ports > 0) {
 		for (i = 0; i < ports; i++) {
 			ch = bd->channels[i];
 			if (!ch)
@@ -1677,9 +1677,9 @@ static void neo_vpd(struct dgnc_board *brd)
 	 * 0x10 : long resource name tage (PCI-66 files)
 	 * 0x7F : small resource end tag
 	 */
-	if  (((brd->vpd[0x08] != 0x82) &&
-	      (brd->vpd[0x10] != 0x82)) ||
-	     (brd->vpd[0x7F] != 0x78)) {
+	if  ((brd->vpd[0x08] != 0x82 &&
+	      brd->vpd[0x10] != 0x82) ||
+	     brd->vpd[0x7F] != 0x78) {
 		memset(brd->vpd, '\0', NEO_VPD_IMAGESIZE);
 	} else {
 		/* Search for the serial number */
