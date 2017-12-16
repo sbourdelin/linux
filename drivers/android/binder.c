@@ -141,7 +141,7 @@ enum {
 };
 static uint32_t binder_debug_mask = BINDER_DEBUG_USER_ERROR |
 	BINDER_DEBUG_FAILED_TRANSACTION | BINDER_DEBUG_DEAD_TRANSACTION;
-module_param_named(debug_mask, binder_debug_mask, uint, S_IWUSR | S_IRUGO);
+module_param_named(debug_mask, binder_debug_mask, uint, 0644);
 
 static char *binder_devices_param = CONFIG_ANDROID_BINDER_DEVICES;
 module_param_named(devices, binder_devices_param, charp, 0444);
@@ -160,7 +160,7 @@ static int binder_set_stop_on_user_error(const char *val,
 	return ret;
 }
 module_param_call(stop_on_user_error, binder_set_stop_on_user_error,
-	param_get_int, &binder_stop_on_user_error, S_IWUSR | S_IRUGO);
+	param_get_int, &binder_stop_on_user_error, 0644);
 
 #define binder_debug(mask, x...) \
 	do { \
@@ -3230,6 +3230,7 @@ static int binder_thread_write(struct binder_proc *proc,
 			ret = -1;
 			if (increment && !target) {
 				struct binder_node *ctx_mgr_node;
+
 				mutex_lock(&context->context_mgr_node_lock);
 				ctx_mgr_node = context->binder_context_mgr_node;
 				if (ctx_mgr_node)
@@ -3336,7 +3337,8 @@ static int binder_thread_write(struct binder_proc *proc,
 			binder_debug(BINDER_DEBUG_USER_REFS,
 				     "%d:%d %s node %d ls %d lw %d tr %d\n",
 				     proc->pid, thread->pid,
-				     cmd == BC_INCREFS_DONE ? "BC_INCREFS_DONE" : "BC_ACQUIRE_DONE",
+				     cmd == BC_INCREFS_DONE ? "BC_INCREFS_DONE" :
+				     "BC_ACQUIRE_DONE",
 				     node->debug_id, node->local_strong_refs,
 				     node->local_weak_refs, node->tmp_refs);
 			binder_node_inner_unlock(node);
@@ -3374,7 +3376,8 @@ static int binder_thread_write(struct binder_proc *proc,
 				     "%d:%d BC_FREE_BUFFER u%016llx found buffer %d for %s transaction\n",
 				     proc->pid, thread->pid, (u64)data_ptr,
 				     buffer->debug_id,
-				     buffer->transaction ? "active" : "finished");
+				     buffer->transaction ? "active" :
+				     "finished");
 
 			if (buffer->transaction) {
 				buffer->transaction->buffer = NULL;
@@ -3838,7 +3841,8 @@ retry:
 			binder_stats_deleted(BINDER_STAT_TRANSACTION_COMPLETE);
 		} break;
 		case BINDER_WORK_NODE: {
-			struct binder_node *node = container_of(w, struct binder_node, work);
+			struct binder_node *node =
+				container_of(w, struct binder_node, work);
 			int strong, weak;
 			binder_uintptr_t node_ptr = node->ptr;
 			binder_uintptr_t node_cookie = node->cookie;
@@ -4445,8 +4449,8 @@ static long binder_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 	unsigned int size = _IOC_SIZE(cmd);
 	void __user *ubuf = (void __user *)arg;
 
-	/*pr_info("binder_ioctl: %d:%d %x %lx\n",
-			proc->pid, current->pid, cmd, arg);*/
+	// pr_info("%s: %d:%d %x %lx\n",
+	//		__func__, proc->pid, current->pid, cmd, arg);
 
 	binder_selftest_alloc(&proc->alloc);
 
@@ -4609,8 +4613,9 @@ static int binder_mmap(struct file *filp, struct vm_area_struct *vma)
 	return 0;
 
 err_bad_arg:
-	pr_err("binder_mmap: %d %lx-%lx %s failed %d\n",
-	       proc->pid, vma->vm_start, vma->vm_end, failure_string, ret);
+	pr_err("%s: %d %lx-%lx %s failed %d\n",
+		__func__, proc->pid, vma->vm_start, vma->vm_end,
+		failure_string, ret);
 	return ret;
 }
 
@@ -4619,8 +4624,8 @@ static int binder_open(struct inode *nodp, struct file *filp)
 	struct binder_proc *proc;
 	struct binder_device *binder_dev;
 
-	binder_debug(BINDER_DEBUG_OPEN_CLOSE, "binder_open: %d:%d\n",
-		     current->group_leader->pid, current->pid);
+	binder_debug(BINDER_DEBUG_OPEN_CLOSE, "%s: %d:%d\n",
+			__func__, current->group_leader->pid, current->pid);
 
 	proc = kzalloc(sizeof(*proc), GFP_KERNEL);
 	if (proc == NULL)
@@ -4657,7 +4662,7 @@ static int binder_open(struct inode *nodp, struct file *filp)
 		 * anyway print all contexts that a given PID has, so this
 		 * is not a problem.
 		 */
-		proc->debugfs_entry = debugfs_create_file(strbuf, S_IRUGO,
+		proc->debugfs_entry = debugfs_create_file(strbuf, 0444,
 			binder_debugfs_dir_entry_proc,
 			(void *)(unsigned long)proc->pid,
 			&binder_proc_fops);
@@ -5496,27 +5501,27 @@ static int __init binder_init(void)
 
 	if (binder_debugfs_dir_entry_root) {
 		debugfs_create_file("state",
-				    S_IRUGO,
+				    0444,
 				    binder_debugfs_dir_entry_root,
 				    NULL,
 				    &binder_state_fops);
 		debugfs_create_file("stats",
-				    S_IRUGO,
+				    0444,
 				    binder_debugfs_dir_entry_root,
 				    NULL,
 				    &binder_stats_fops);
 		debugfs_create_file("transactions",
-				    S_IRUGO,
+				    0444,
 				    binder_debugfs_dir_entry_root,
 				    NULL,
 				    &binder_transactions_fops);
 		debugfs_create_file("transaction_log",
-				    S_IRUGO,
+				    0444,
 				    binder_debugfs_dir_entry_root,
 				    &binder_transaction_log,
 				    &binder_transaction_log_fops);
 		debugfs_create_file("failed_transaction_log",
-				    S_IRUGO,
+				    0444,
 				    binder_debugfs_dir_entry_root,
 				    &binder_transaction_log_failed,
 				    &binder_transaction_log_fops);
