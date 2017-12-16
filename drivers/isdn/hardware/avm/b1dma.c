@@ -375,6 +375,8 @@ static void b1dma_dispatch_tx(avmcard *card)
 	void *p;
 
 	skb = skb_dequeue(&dma->send_queue);
+	if (!skb)
+		return;
 
 	len = CAPIMSG_LEN(skb->data);
 
