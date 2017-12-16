@@ -525,7 +525,7 @@ void dgnc_carrier(struct channel_t *ch)
 
 	/* Test for a VIRTUAL carrier transition to HIGH. */
 
-	if (((ch->ch_flags & CH_FCAR) == 0) && (virt_carrier == 1)) {
+	if (((ch->ch_flags & CH_FCAR) == 0) && virt_carrier == 1) {
 		/*
 		 * When carrier rises, wake any threads waiting
 		 * for carrier in the open routine.
@@ -536,7 +536,7 @@ void dgnc_carrier(struct channel_t *ch)
 
 	/* Test for a PHYSICAL carrier transition to HIGH. */
 
-	if (((ch->ch_flags & CH_CD) == 0) && (phys_carrier == 1)) {
+	if (((ch->ch_flags & CH_CD) == 0) && phys_carrier == 1) {
 		/*
 		 * When carrier rises, wake any threads waiting
 		 * for carrier in the open routine.
@@ -554,8 +554,8 @@ void dgnc_carrier(struct channel_t *ch)
 	 *  matter... it really only means "ignore carrier state", not
 	 *  "make pretend that carrier is there".
 	 */
-	if ((virt_carrier == 0) && ((ch->ch_flags & CH_CD) != 0) &&
-	    (phys_carrier == 0)) {
+	if (virt_carrier == 0 && ((ch->ch_flags & CH_CD) != 0) &&
+	    phys_carrier == 0) {
 		/*
 		 *   When carrier drops:
 		 *
@@ -759,8 +759,8 @@ void dgnc_wakeup_writes(struct channel_t *ch)
 		 * the queue AND FIFO are both empty.
 		 */
 		if (ch->ch_tun.un_flags & UN_EMPTY) {
-			if ((qlen == 0) &&
-			    (ch->ch_bd->bd_ops->get_uart_bytes_left(ch) == 0)) {
+			if (qlen == 0 &&
+			    ch->ch_bd->bd_ops->get_uart_bytes_left(ch) == 0) {
 				ch->ch_tun.un_flags &= ~(UN_EMPTY);
 
 				/*
@@ -790,8 +790,8 @@ void dgnc_wakeup_writes(struct channel_t *ch)
 		 * the queue AND FIFO are both empty.
 		 */
 		if (ch->ch_pun.un_flags & UN_EMPTY) {
-			if ((qlen == 0) &&
-			    (ch->ch_bd->bd_ops->get_uart_bytes_left(ch) == 0))
+			if (qlen == 0 &&
+			    ch->ch_bd->bd_ops->get_uart_bytes_left(ch) == 0)
 				ch->ch_pun.un_flags &= ~(UN_EMPTY);
 		}
 
@@ -1162,7 +1162,7 @@ static void dgnc_tty_close(struct tty_struct *tty, struct file *file)
 	 * Determine if this is the last close or not - and if we agree about
 	 * which type of close it is with the Line Discipline
 	 */
-	if ((tty->count == 1) && (un->un_open_count != 1)) {
+	if (tty->count == 1 && un->un_open_count != 1) {
 		/*
 		 * Uh, oh.  tty->count is 1, which means that the tty
 		 * structure will be freed.  un_open_count should always
@@ -1199,13 +1199,13 @@ static void dgnc_tty_close(struct tty_struct *tty, struct file *file)
 	 * Only officially close channel if count is 0 and
 	 * DIGI_PRINTER bit is not set.
 	 */
-	if ((ch->ch_open_count == 0) &&
+	if (ch->ch_open_count == 0 &&
 	    !(ch->ch_digi.digi_flags & DIGI_PRINTER)) {
 		ch->ch_flags &= ~(CH_STOPI | CH_FORCED_STOPI);
 
 		/* turn off print device when closing print device. */
 
-		if ((un->un_type == DGNC_PRINT) && (ch->ch_flags & CH_PRON)) {
+		if (un->un_type == DGNC_PRINT && (ch->ch_flags & CH_PRON)) {
 			dgnc_wmove(ch, ch->ch_digi.digi_offstr,
 				   (int)ch->ch_digi.digi_offlen);
 			ch->ch_flags &= ~CH_PRON;
@@ -1250,7 +1250,7 @@ static void dgnc_tty_close(struct tty_struct *tty, struct file *file)
 	} else {
 		/* turn off print device when closing print device. */
 
-		if ((un->un_type == DGNC_PRINT) && (ch->ch_flags & CH_PRON)) {
+		if (un->un_type == DGNC_PRINT && (ch->ch_flags & CH_PRON)) {
 			dgnc_wmove(ch, ch->ch_digi.digi_offstr,
 				   (int)ch->ch_digi.digi_offlen);
 			ch->ch_flags &= ~CH_PRON;
@@ -1474,7 +1474,7 @@ static int dgnc_tty_write(struct tty_struct *tty,
 	 * Output the printer ON string, if we are in terminal mode, but
 	 * need to be in printer mode.
 	 */
-	if ((un->un_type == DGNC_PRINT) && !(ch->ch_flags & CH_PRON)) {
+	if (un->un_type == DGNC_PRINT && !(ch->ch_flags & CH_PRON)) {
 		dgnc_wmove(ch, ch->ch_digi.digi_onstr,
 			   (int)ch->ch_digi.digi_onlen);
 		head = (ch->ch_w_head) & tmask;
@@ -1485,7 +1485,7 @@ static int dgnc_tty_write(struct tty_struct *tty,
 	 * On the other hand, output the printer OFF string, if we are
 	 * currently in printer mode, but need to output to the terminal.
 	 */
-	if ((un->un_type != DGNC_PRINT) && (ch->ch_flags & CH_PRON)) {
+	if (un->un_type != DGNC_PRINT && (ch->ch_flags & CH_PRON)) {
 		dgnc_wmove(ch, ch->ch_digi.digi_offstr,
 			   (int)ch->ch_digi.digi_offlen);
 		head = (ch->ch_w_head) & tmask;
@@ -1521,8 +1521,8 @@ static int dgnc_tty_write(struct tty_struct *tty,
 	}
 
 	/* Update printer buffer empty time. */
-	if ((un->un_type == DGNC_PRINT) && (ch->ch_digi.digi_maxcps > 0) &&
-	    (ch->ch_digi.digi_bufsize > 0)) {
+	if (un->un_type == DGNC_PRINT && ch->ch_digi.digi_maxcps > 0 &&
+	    ch->ch_digi.digi_bufsize > 0) {
 		ch->ch_cpstime += (HZ * count) / ch->ch_digi.digi_maxcps;
 	}
 
@@ -2221,7 +2221,7 @@ static int dgnc_tty_ioctl(struct tty_struct *tty, unsigned int cmd,
 
 		spin_lock_irqsave(&ch->ch_lock, flags);
 
-		if (((cmd == TCSBRK) && (!arg)) || (cmd == TCSBRKP))
+		if ((cmd == TCSBRK && !arg) || cmd == TCSBRKP)
 			ch_bd_ops->send_break(ch, 250);
 
 		spin_unlock_irqrestore(&ch->ch_lock, flags);
@@ -2323,14 +2323,14 @@ static int dgnc_tty_ioctl(struct tty_struct *tty, unsigned int cmd,
 		if (rc)
 			goto err_unlock;
 
-		if ((arg == TCIFLUSH) || (arg == TCIOFLUSH)) {
+		if (arg == TCIFLUSH || arg == TCIOFLUSH) {
 			ch->ch_r_head = ch->ch_r_tail;
 			ch_bd_ops->flush_uart_read(ch);
 			/* Force queue flow control to be released, if needed */
 			dgnc_check_queue_flow_control(ch);
 		}
 
-		if ((arg == TCOFLUSH) || (arg == TCIOFLUSH)) {
+		if (arg == TCOFLUSH || arg == TCIOFLUSH) {
 			if (!(un->un_type == DGNC_PRINT)) {
 				ch->ch_w_head = ch->ch_w_tail;
 				ch_bd_ops->flush_uart_write(ch);
