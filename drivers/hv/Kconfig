@@ -1,4 +1,8 @@
-menu "Microsoft Hyper-V guest support"
+menuconfig HYPERV_MENU
+	bool "Microsoft Hyper-V guest support"
+	default y
+
+if HYPERV_MENU
 
 config HYPERV
 	tristate "Microsoft Hyper-V client drivers"
@@ -23,4 +27,4 @@ config HYPERV_BALLOON
 	help
 	  Select this option to enable Hyper-V Balloon driver.
 
-endmenu
+endif # HYPERV_MENU
