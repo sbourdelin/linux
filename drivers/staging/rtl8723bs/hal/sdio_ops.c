@@ -460,7 +460,7 @@ static u32 sdio_read_port(
 		if (mem == NULL) {
 			DBG_8192C(KERN_WARNING "%s: allocate memory %d bytes fail!\n", __func__, cnt);
 			mem = oldmem;
-			oldmem == NULL;
+			oldmem = NULL;
 		}
 #else
 		/*  in this case, caller should gurante the buffer is big enough */
