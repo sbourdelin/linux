@@ -201,6 +201,9 @@ static inline int emac_phy_supports_gige(int phy_mode)
 {
 	return  phy_mode == PHY_MODE_GMII ||
 		phy_mode == PHY_MODE_RGMII ||
+		phy_mode == PHY_MODE_RGMII_ID ||
+		phy_mode == PHY_MODE_RGMII_RXID ||
+		phy_mode == PHY_MODE_RGMII_TXID ||
 		phy_mode == PHY_MODE_SGMII ||
 		phy_mode == PHY_MODE_TBI ||
 		phy_mode == PHY_MODE_RTBI;

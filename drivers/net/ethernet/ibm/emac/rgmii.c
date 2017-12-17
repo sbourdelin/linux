@@ -55,6 +55,9 @@ static inline int rgmii_valid_mode(int phy_mode)
 	return  phy_mode == PHY_MODE_GMII ||
 		phy_mode == PHY_MODE_MII ||
 		phy_mode == PHY_MODE_RGMII ||
+		phy_mode == PHY_MODE_RGMII_ID ||
+		phy_mode == PHY_MODE_RGMII_RXID ||
+		phy_mode == PHY_MODE_RGMII_TXID ||
 		phy_mode == PHY_MODE_TBI ||
 		phy_mode == PHY_MODE_RTBI;
 }
@@ -63,6 +66,9 @@ static inline const char *rgmii_mode_name(int mode)
 {
 	switch (mode) {
 	case PHY_MODE_RGMII:
+	case PHY_MODE_RGMII_ID:
+	case PHY_MODE_RGMII_RXID:
+	case PHY_MODE_RGMII_TXID:
 		return "RGMII";
 	case PHY_MODE_TBI:
 		return "TBI";
@@ -81,6 +87,9 @@ static inline u32 rgmii_mode_mask(int mode, int input)
 {
 	switch (mode) {
 	case PHY_MODE_RGMII:
+	case PHY_MODE_RGMII_ID:
+	case PHY_MODE_RGMII_RXID:
+	case PHY_MODE_RGMII_TXID:
 		return RGMII_FER_RGMII(input);
 	case PHY_MODE_TBI:
 		return RGMII_FER_TBI(input);
