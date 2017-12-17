@@ -254,10 +254,8 @@ static int jz_battery_probe(struct platform_device *pdev)
 	}
 
 	jz_battery = devm_kzalloc(&pdev->dev, sizeof(*jz_battery), GFP_KERNEL);
-	if (!jz_battery) {
-		dev_err(&pdev->dev, "Failed to allocate driver structure\n");
+	if (!jz_battery)
 		return -ENOMEM;
-	}
 
 	jz_battery->cell = mfd_get_cell(pdev);
 
