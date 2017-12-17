@@ -1,0 +1,22 @@
+/*
+ * Copyright 2017 Toradex AG
+ *
+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ */
+
+#include "imx7d.dtsi"
+#include "imx7-colibri.dtsi"
+
+/ {
+	memory {
+		reg = <0x80000000 0x40000000>;
+	};
+};
+
+&usbotg2 {
+	dr_mode = "host";
+};
+
+&usdhc3 {
+	status = "okay";
+};
