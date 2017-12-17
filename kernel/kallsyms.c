@@ -394,8 +394,10 @@ static int __sprint_symbol(char *buffer, unsigned long address,
 
 	address += symbol_offset;
 	name = kallsyms_lookup(address, &size, &offset, &modname, buffer);
-	if (!name)
-		return sprintf(buffer, "0x%lx", address - symbol_offset);
+	if (!name) {
+		buffer[0] = '\0';
+		return -1;
+	}
 
 	if (name != buffer)
 		strcpy(buffer, name);
