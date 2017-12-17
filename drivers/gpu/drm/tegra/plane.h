@@ -55,7 +55,7 @@ extern const struct drm_plane_funcs tegra_plane_funcs;
 int tegra_plane_state_add(struct tegra_plane *plane,
 			  struct drm_plane_state *state);
 
-int tegra_plane_format(u32 fourcc, u32 *format, u32 *swap);
+int tegra_plane_format(u32 fourcc, u32 *format, u32 *swap, bool opaque_fmt);
 bool tegra_plane_format_is_yuv(unsigned int format, bool *planar);
 
 #endif /* TEGRA_PLANE_H */

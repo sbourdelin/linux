@@ -103,7 +103,7 @@ int tegra_plane_state_add(struct tegra_plane *plane,
 	return 0;
 }
 
-int tegra_plane_format(u32 fourcc, u32 *format, u32 *swap)
+int tegra_plane_format(u32 fourcc, u32 *format, u32 *swap, bool opaque_fmt)
 {
 	/* assume no swapping of fetched data */
 	if (swap)
@@ -147,11 +147,17 @@ int tegra_plane_format(u32 fourcc, u32 *format, u32 *swap)
 		break;
 
 	case DRM_FORMAT_XRGB1555:
-		*format = WIN_COLOR_DEPTH_B5G5R5X1;
+		if (opaque_fmt)
+			*format = WIN_COLOR_DEPTH_B5G5R5X1;
+		else
+			*format = WIN_COLOR_DEPTH_B5G5R5A;
 		break;
 
 	case DRM_FORMAT_RGBX5551:
-		*format = WIN_COLOR_DEPTH_X1B5G5R5;
+		if (opaque_fmt)
+			*format = WIN_COLOR_DEPTH_X1B5G5R5;
+		else
+			*format = WIN_COLOR_DEPTH_AB5G5R5;
 		break;
 
 	case DRM_FORMAT_XBGR1555:
@@ -175,11 +181,17 @@ int tegra_plane_format(u32 fourcc, u32 *format, u32 *swap)
 		break;
 
 	case DRM_FORMAT_XRGB8888:
-		*format = WIN_COLOR_DEPTH_B8G8R8X8;
+		if (opaque_fmt)
+			*format = WIN_COLOR_DEPTH_B8G8R8X8;
+		else
+			*format = WIN_COLOR_DEPTH_B8G8R8A8;
 		break;
 
 	case DRM_FORMAT_XBGR8888:
-		*format = WIN_COLOR_DEPTH_R8G8B8X8;
+		if (opaque_fmt)
+			*format = WIN_COLOR_DEPTH_R8G8B8X8;
+		else
+			*format = WIN_COLOR_DEPTH_R8G8B8A8;
 		break;
 
 	case DRM_FORMAT_UYVY:

@@ -305,6 +305,11 @@ static const u32 tegra20_primary_formats[] = {
 	DRM_FORMAT_RGBA5551,
 	DRM_FORMAT_ABGR8888,
 	DRM_FORMAT_ARGB8888,
+	/* non-native formats */
+	DRM_FORMAT_XRGB1555,
+	DRM_FORMAT_RGBX5551,
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_XBGR8888,
 };
 
 static const u32 tegra114_primary_formats[] = {
@@ -369,7 +374,8 @@ static int tegra_plane_atomic_check(struct drm_plane *plane,
 
 	err = tegra_plane_format(state->fb->format->format,
 				 &plane_state->format,
-				 &plane_state->swap);
+				 &plane_state->swap,
+				 dc->soc->supports_opaque_formats);
 	if (err < 0)
 		return err;
 
@@ -698,6 +704,11 @@ static const u32 tegra20_overlay_formats[] = {
 	DRM_FORMAT_RGBA5551,
 	DRM_FORMAT_ABGR8888,
 	DRM_FORMAT_ARGB8888,
+	/* non-native formats */
+	DRM_FORMAT_XRGB1555,
+	DRM_FORMAT_RGBX5551,
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_XBGR8888,
 	/* planar formats */
 	DRM_FORMAT_UYVY,
 	DRM_FORMAT_YUYV,
@@ -1841,6 +1852,7 @@ static const struct tegra_dc_soc_info tegra20_dc_soc_info = {
 	.primary_formats = tegra20_primary_formats,
 	.num_overlay_formats = ARRAY_SIZE(tegra20_overlay_formats),
 	.overlay_formats = tegra20_overlay_formats,
+	.supports_opaque_formats = false,
 };
 
 static const struct tegra_dc_soc_info tegra30_dc_soc_info = {
@@ -1856,6 +1868,7 @@ static const struct tegra_dc_soc_info tegra30_dc_soc_info = {
 	.primary_formats = tegra20_primary_formats,
 	.num_overlay_formats = ARRAY_SIZE(tegra20_overlay_formats),
 	.overlay_formats = tegra20_overlay_formats,
+	.supports_opaque_formats = false,
 };
 
 static const struct tegra_dc_soc_info tegra114_dc_soc_info = {
@@ -1871,6 +1884,7 @@ static const struct tegra_dc_soc_info tegra114_dc_soc_info = {
 	.primary_formats = tegra114_primary_formats,
 	.num_overlay_formats = ARRAY_SIZE(tegra114_overlay_formats),
 	.overlay_formats = tegra114_overlay_formats,
+	.supports_opaque_formats = true,
 };
 
 static const struct tegra_dc_soc_info tegra124_dc_soc_info = {
@@ -1886,6 +1900,7 @@ static const struct tegra_dc_soc_info tegra124_dc_soc_info = {
 	.primary_formats = tegra114_primary_formats,
 	.num_overlay_formats = ARRAY_SIZE(tegra124_overlay_formats),
 	.overlay_formats = tegra114_overlay_formats,
+	.supports_opaque_formats = true,
 };
 
 static const struct tegra_dc_soc_info tegra210_dc_soc_info = {
@@ -1901,6 +1916,7 @@ static const struct tegra_dc_soc_info tegra210_dc_soc_info = {
 	.primary_formats = tegra114_primary_formats,
 	.num_overlay_formats = ARRAY_SIZE(tegra114_overlay_formats),
 	.overlay_formats = tegra114_overlay_formats,
+	.supports_opaque_formats = true,
 };
 
 static const struct tegra_windowgroup_soc tegra186_dc_wgrps[] = {
@@ -1948,6 +1964,7 @@ static const struct tegra_dc_soc_info tegra186_dc_soc_info = {
 	.has_nvdisplay = true,
 	.wgrps = tegra186_dc_wgrps,
 	.num_wgrps = ARRAY_SIZE(tegra186_dc_wgrps),
+	.supports_opaque_formats = true,
 };
 
 static const struct of_device_id tegra_dc_of_match[] = {
