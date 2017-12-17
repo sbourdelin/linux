@@ -421,6 +421,7 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd *args)
 	}
 #endif
 
+	irqfd->initialized = 1;
 	return 0;
 
 fail:
@@ -525,6 +526,7 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
 {
 	struct kvm_kernel_irqfd *irqfd, *tmp;
 	struct eventfd_ctx *eventfd;
+	int ret = 0;
 
 	eventfd = eventfd_ctx_fdget(args->fd);
 	if (IS_ERR(eventfd))
@@ -543,7 +545,12 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
 			write_seqcount_begin(&irqfd->irq_entry_sc);
 			irqfd->irq_entry.type = 0;
 			write_seqcount_end(&irqfd->irq_entry_sc);
-			irqfd_deactivate(irqfd);
+
+			if (irqfd->initialized)
+				irqfd_deactivate(irqfd);
+			else
+				ret = -EFAULT;
+
 		}
 	}
 
@@ -557,7 +564,7 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd *args)
 	 */
 	flush_workqueue(irqfd_cleanup_wq);
 
-	return 0;
+	return ret;
 }
 
 int
