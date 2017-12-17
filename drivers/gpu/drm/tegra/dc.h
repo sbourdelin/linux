@@ -57,7 +57,7 @@ struct tegra_dc_soc_info {
 	bool supports_block_linear;
 	unsigned int pitch_align;
 	bool has_powergate;
-	bool broken_reset;
+	bool coupled_pm;
 	bool has_nvdisplay;
 	const struct tegra_windowgroup_soc *wgrps;
 	unsigned int num_wgrps;

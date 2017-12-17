@@ -1835,7 +1835,7 @@ static const struct tegra_dc_soc_info tegra20_dc_soc_info = {
 	.supports_block_linear = false,
 	.pitch_align = 8,
 	.has_powergate = false,
-	.broken_reset = true,
+	.coupled_pm = true,
 	.has_nvdisplay = false,
 	.num_primary_formats = ARRAY_SIZE(tegra20_primary_formats),
 	.primary_formats = tegra20_primary_formats,
@@ -1850,7 +1850,7 @@ static const struct tegra_dc_soc_info tegra30_dc_soc_info = {
 	.supports_block_linear = false,
 	.pitch_align = 8,
 	.has_powergate = false,
-	.broken_reset = false,
+	.coupled_pm = false,
 	.has_nvdisplay = false,
 	.num_primary_formats = ARRAY_SIZE(tegra20_primary_formats),
 	.primary_formats = tegra20_primary_formats,
@@ -1865,7 +1865,7 @@ static const struct tegra_dc_soc_info tegra114_dc_soc_info = {
 	.supports_block_linear = false,
 	.pitch_align = 64,
 	.has_powergate = true,
-	.broken_reset = false,
+	.coupled_pm = false,
 	.has_nvdisplay = false,
 	.num_primary_formats = ARRAY_SIZE(tegra114_primary_formats),
 	.primary_formats = tegra114_primary_formats,
@@ -1880,7 +1880,7 @@ static const struct tegra_dc_soc_info tegra124_dc_soc_info = {
 	.supports_block_linear = true,
 	.pitch_align = 64,
 	.has_powergate = true,
-	.broken_reset = false,
+	.coupled_pm = false,
 	.has_nvdisplay = false,
 	.num_primary_formats = ARRAY_SIZE(tegra124_primary_formats),
 	.primary_formats = tegra114_primary_formats,
@@ -1895,7 +1895,7 @@ static const struct tegra_dc_soc_info tegra210_dc_soc_info = {
 	.supports_block_linear = true,
 	.pitch_align = 64,
 	.has_powergate = true,
-	.broken_reset = false,
+	.coupled_pm = false,
 	.has_nvdisplay = false,
 	.num_primary_formats = ARRAY_SIZE(tegra114_primary_formats),
 	.primary_formats = tegra114_primary_formats,
@@ -1944,7 +1944,7 @@ static const struct tegra_dc_soc_info tegra186_dc_soc_info = {
 	.supports_block_linear = true,
 	.pitch_align = 64,
 	.has_powergate = false,
-	.broken_reset = false,
+	.coupled_pm = false,
 	.has_nvdisplay = true,
 	.wgrps = tegra186_dc_wgrps,
 	.num_wgrps = ARRAY_SIZE(tegra186_dc_wgrps),
@@ -2012,6 +2012,11 @@ static int tegra_dc_parse_dt(struct tegra_dc *dc)
 	return 0;
 }
 
+static int tegra_dc_match(struct device *dev, void *data)
+{
+	return of_device_is_compatible(dev->of_node, "nvidia,tegra20-dc");
+}
+
 static int tegra_dc_probe(struct platform_device *pdev)
 {
 	struct resource *regs;
@@ -2032,6 +2037,28 @@ static int tegra_dc_probe(struct platform_device *pdev)
 	if (err < 0)
 		return err;
 
+	/*
+	 * On Tegra20 DC1 requires DC0 to be taken out of reset in order to
+	 * be enabled, otherwise CPU hangs on writing to CMD_DISPLAY_COMMAND /
+	 * POWER_CONTROL registers during CRTC enabling.
+	 */
+	if (dc->pipe == 1 && dc->soc->coupled_pm) {
+		struct device_link *link;
+		struct device *dc0_dev;
+
+		dc0_dev = driver_find_device(pdev->dev.driver, NULL, NULL,
+					     tegra_dc_match);
+		if (!dc0_dev)
+			return -EPROBE_DEFER;
+
+		link = device_link_add(&pdev->dev, dc0_dev,
+				       DL_FLAG_PM_RUNTIME | DL_FLAG_AUTOREMOVE);
+		if (!link) {
+			dev_err(&pdev->dev, "failed to link to DC0\n");
+			return -EINVAL;
+		}
+	}
+
 	dc->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(dc->clk)) {
 		dev_err(&pdev->dev, "failed to get clock\n");
@@ -2045,21 +2072,19 @@ static int tegra_dc_probe(struct platform_device *pdev)
 	}
 
 	/* assert reset and disable clock */
-	if (!dc->soc->broken_reset) {
-		err = clk_prepare_enable(dc->clk);
-		if (err < 0)
-			return err;
+	err = clk_prepare_enable(dc->clk);
+	if (err < 0)
+		return err;
 
-		usleep_range(2000, 4000);
+	usleep_range(2000, 4000);
 
-		err = reset_control_assert(dc->rst);
-		if (err < 0)
-			return err;
+	err = reset_control_assert(dc->rst);
+	if (err < 0)
+		return err;
 
-		usleep_range(2000, 4000);
+	usleep_range(2000, 4000);
 
-		clk_disable_unprepare(dc->clk);
-	}
+	clk_disable_unprepare(dc->clk);
 
 	if (dc->soc->has_powergate) {
 		if (dc->pipe == 0)
@@ -2133,12 +2158,10 @@ static int tegra_dc_suspend(struct device *dev)
 	struct tegra_dc *dc = dev_get_drvdata(dev);
 	int err;
 
-	if (!dc->soc->broken_reset) {
-		err = reset_control_assert(dc->rst);
-		if (err < 0) {
-			dev_err(dev, "failed to assert reset: %d\n", err);
-			return err;
-		}
+	err = reset_control_assert(dc->rst);
+	if (err < 0) {
+		dev_err(dev, "failed to assert reset: %d\n", err);
+		return err;
 	}
 
 	if (dc->soc->has_powergate)
@@ -2168,13 +2191,10 @@ static int tegra_dc_resume(struct device *dev)
 			return err;
 		}
 
-		if (!dc->soc->broken_reset) {
-			err = reset_control_deassert(dc->rst);
-			if (err < 0) {
-				dev_err(dev,
-					"failed to deassert reset: %d\n", err);
-				return err;
-			}
+		err = reset_control_deassert(dc->rst);
+		if (err < 0) {
+			dev_err(dev, "failed to deassert reset: %d\n", err);
+			return err;
 		}
 	}
 
