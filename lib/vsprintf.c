@@ -667,6 +667,8 @@ char *bdev_name(char *buf, char *end, struct block_device *bdev,
 }
 #endif
 
+#define PRINTK_NO_SYMBOL_STR "<no-symbol>"
+
 static noinline_for_stack
 char *symbol_string(char *buf, char *end, void *ptr,
 		    struct printf_spec spec, const char *fmt)
@@ -674,6 +676,7 @@ char *symbol_string(char *buf, char *end, void *ptr,
 	unsigned long value;
 #ifdef CONFIG_KALLSYMS
 	char sym[KSYM_SYMBOL_LEN];
+	int ret;
 #endif
 
 	if (fmt[1] == 'R')
@@ -682,17 +685,26 @@ char *symbol_string(char *buf, char *end, void *ptr,
 
 #ifdef CONFIG_KALLSYMS
 	if (*fmt == 'B')
-		sprint_backtrace(sym, value);
+		ret = sprint_backtrace(sym, value);
 	else if (*fmt != 'f' && *fmt != 's')
-		sprint_symbol(sym, value);
+		ret = sprint_symbol(sym, value);
 	else
-		sprint_symbol_no_offset(sym, value);
+		ret = sprint_symbol_no_offset(sym, value);
+
+	if (ret == -1)
+		strcpy(sym, PRINTK_NO_SYMBOL_STR);
 
 	return string(buf, end, sym, spec);
 #else
 	return special_hex_number(buf, end, value, sizeof(void *));
 #endif
 }
+
+int string_is_no_symbol(const char *s)
+{
+	return !!strstr(s, PRINTK_NO_SYMBOL_STR);
+}
+EXPORT_SYMBOL(string_is_no_symbol);
 
 static noinline_for_stack
 char *resource_string(char *buf, char *end, struct resource *res,
