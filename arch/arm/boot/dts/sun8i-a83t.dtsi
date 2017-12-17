@@ -521,6 +521,11 @@
 				drive-strength = <20>;
 				bias-pull-up;
 			};
+
+			ir_pins_a: ir@0 {
+				pins = "PL12";
+				function = "s_cir_rx";
+			};
 		};
 
 		r_rsb: rsb@1f03400 {
