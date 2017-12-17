@@ -2054,10 +2054,8 @@ static int abx500_chargalg_probe(struct platform_device *pdev)
 	int ret = 0;
 
 	di = devm_kzalloc(&pdev->dev, sizeof(*di), GFP_KERNEL);
-	if (!di) {
-		dev_err(&pdev->dev, "%s no mem for ab8500_chargalg\n", __func__);
+	if (!di)
 		return -ENOMEM;
-	}
 
 	if (!plat) {
 		dev_err(&pdev->dev, "no battery management data supplied\n");
