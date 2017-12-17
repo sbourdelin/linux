@@ -13,11 +13,12 @@ static int __init cmpint(const void *a, const void *b)
 
 static int __init test_sort_init(void)
 {
-	int *a, i, r = 1, err = -ENOMEM;
+	int *a, i, r = 1;
+	int err = -EAGAIN; /* Fail will directly unload the module */
 
 	a = kmalloc_array(TEST_LEN, sizeof(*a), GFP_KERNEL);
 	if (!a)
-		return err;
+		return -ENOMEM;
 
 	for (i = 0; i < TEST_LEN; i++) {
 		r = (r * 725861) % 6599;
@@ -26,13 +27,12 @@ static int __init test_sort_init(void)
 
 	sort(a, TEST_LEN, sizeof(*a), cmpint, NULL);
 
-	err = -EINVAL;
 	for (i = 0; i < TEST_LEN-1; i++)
 		if (a[i] > a[i+1]) {
 			pr_err("test has failed\n");
+			err = -EINVAL;
 			goto exit;
 		}
-	err = 0;
 	pr_info("test passed\n");
 exit:
 	kfree(a);
