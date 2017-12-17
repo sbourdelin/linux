@@ -326,11 +326,8 @@ static struct bq24735_platform *bq24735_parse_dt_data(struct i2c_client *client)
 	int ret;
 
 	pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
-	if (!pdata) {
-		dev_err(&client->dev,
-			"Memory alloc for bq24735 pdata failed\n");
+	if (!pdata)
 		return NULL;
-	}
 
 	ret = of_property_read_u32(np, "ti,charge-current", &val);
 	if (!ret)
@@ -379,10 +376,8 @@ static int bq24735_charger_probe(struct i2c_client *client,
 		name = devm_kasprintf(&client->dev, GFP_KERNEL,
 				      "bq24735@%s",
 				      dev_name(&client->dev));
-		if (!name) {
-			dev_err(&client->dev, "Failed to alloc device name\n");
+		if (!name)
 			return -ENOMEM;
-		}
 	}
 
 	charger->client = client;
