@@ -86,25 +86,6 @@ do {									    \
 } while (0)
 
 /**
- * default allocator
- */
-#define LIBCFS_ALLOC(ptr, size)						    \
-do {									    \
-	LASSERT(!in_interrupt());					    \
-	(ptr) = kvmalloc((size), GFP_NOFS);				    \
-	LIBCFS_ALLOC_POST((ptr), (size));				    \
-} while (0)
-
-/**
- * non-sleeping allocator
- */
-#define LIBCFS_ALLOC_ATOMIC(ptr, size)					\
-do {									\
-	(ptr) = kmalloc((size), GFP_ATOMIC);				\
-	LIBCFS_ALLOC_POST(ptr, size);					\
-} while (0)
-
-/**
  * allocate memory for specified CPU partition
  *   \a cptab != NULL, \a cpt is CPU partition id of \a cptab
  *   \a cptab == NULL, \a cpt is HW NUMA node id
