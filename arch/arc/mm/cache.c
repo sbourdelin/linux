@@ -1187,6 +1187,40 @@ noinline void __init arc_ioc_setup(void)
 }
 
 /*
+ * Disabling of IOC is quite a tricky action because
+ * nobody knows what happens if there're IOC-ahndled tarnsactions in flight
+ * when we're disabling IOC.
+ *
+ * And the problem is external DMA masters [that were initialized and set in a
+ * bootlaoder that was executed before we got here] might continue to send data
+ * to memory even at this point and we have no way to prevent that.
+ *
+ * That said it's much safer to not enable IOC at all anywhere before
+ * in boot-ROM, bootloader etc but if we do need to disable it in Linux kernel
+ * it should be done as early as possible and made by master core while all
+ * slaves aren't active.
+ *
+ */
+noinline void __init arc_ioc_disable(void)
+{
+	/* Exit if IOC was never enabled */
+	if (!read_aux_reg(ARC_REG_IO_COH_ENABLE))
+		return;
+
+	/* Flush + invalidate + disable L1 dcache */
+	__dc_disable();
+
+	/* Flush + invalidate SLC */
+	if (read_aux_reg(ARC_REG_SLC_BCR))
+		slc_entire_op(OP_FLUSH_N_INV);
+
+	write_aux_reg(ARC_REG_IO_COH_ENABLE, 0);
+
+	/* Re-enable L1 dcache */
+	__dc_enable();
+}
+
+/*
  * Cache related boot time checks/setups only needed on master CPU:
  *  - Geometry checks (kernel build and hardware agree: e.g. L1_CACHE_BYTES)
  *    Assume SMP only, so all cores will have same cache config. A check on
@@ -1247,8 +1281,12 @@ void __init arc_cache_init_master(void)
 	if (is_isa_arcv2() && l2_line_sz && !slc_enable)
 		arc_slc_disable();
 
-	if (is_isa_arcv2() && ioc_enable)
-		arc_ioc_setup();
+	if (is_isa_arcv2()) {
+		if (ioc_enable)
+			arc_ioc_setup();
+		else if (ioc_exists)
+			arc_ioc_disable();
+	}
 
 	if (is_isa_arcv2() && ioc_enable) {
 		__dma_cache_wback_inv = __dma_cache_wback_inv_ioc;
