@@ -742,7 +742,7 @@ static void tpm_tis_clkrun_enable(struct tpm_chip *chip, bool value)
 	struct tpm_tis_data *data = dev_get_drvdata(&chip->dev);
 	u32 clkrun_val;
 
-	if (!IS_ENABLED(CONFIG_X86) || !is_bsw())
+	if (!IS_ENABLED(TCG_TIS_ENABLE_CLKRUN_QUIRK) || !is_bsw())
 		return;
 
 	if (value) {

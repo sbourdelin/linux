@@ -54,6 +54,16 @@ config TCG_TIS
 	  within Linux. To compile this driver as a module, choose  M here;
 	  the module will be called tpm_tis.
 
+config TCG_TIS_ENABLE_CLKRUN_QUIRK
+	bool "Enable LPC CLKRUN workaround for Braswell systems TPM" if EXPERT
+	depends on TCG_TIS_CORE && X86
+	default n
+	---help---
+	  On Intel Braswell systems, the Low Pin Count bus CLKRUN signal has to
+	  be disabled during TPM devices transactions to operate correctly. This
+	  could break other devices attached to the LPC bus (i.e: PS/2 mouse and
+	  keyboards) so only enable if the TPM is the only device in the LPC bus.
+
 config TCG_TIS_SPI
 	tristate "TPM Interface Specification 1.3 Interface / TPM 2.0 FIFO Interface - (SPI)"
 	depends on SPI
