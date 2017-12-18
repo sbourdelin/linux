@@ -81,6 +81,13 @@
 	};
 };
 
+&cir {
+	pinctrl-names = "default";
+	pinctrl-0 = <&cir_pins>;
+	clock-frequency = <3000000>;
+	status = "okay";
+};
+
 &ehci0 {
 	/* Terminus Tech FE 1.1s 4-port USB 2.0 hub here */
 	status = "okay";
