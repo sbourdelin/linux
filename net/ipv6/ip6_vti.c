@@ -391,7 +391,7 @@ static int vti6_rcv(struct sk_buff *skb)
 	int nexthdr = skb_network_header(skb)[IP6CB(skb)->nhoff];
 
 	XFRM_TUNNEL_SKB_CB(skb)->tunnel.lookup = vti6_lookup;
-	return xfrm6_rcv_spi(skb, nexthdr, 0, NULL);
+	return xfrm6_rcv_spi(skb, nexthdr, 0);
 }
 
 static int vti6_rcv_cb(struct sk_buff *skb, int err)

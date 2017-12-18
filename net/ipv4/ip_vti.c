@@ -384,12 +384,12 @@ out:
 
 static __be16 vti_flags_to_tnl_flags(__be16 i_flags)
 {
-	return VTI_ISVTI | ((i_flags & VTI_KEYED) ? GRE_KEY : 0);
+	return VTI_ISVTI | ((i_flags & VTI_KEYED) ? TUNNEL_KEY : 0);
 }
 
 static __be16 tnl_flags_to_vti_flags(__be16 i_flags)
 {
-	return VTI_ISVTI | ((i_flags & GRE_KEY) ? VTI_KEYED : 0);
+	return VTI_ISVTI | ((i_flags & TUNNEL_KEY) ? VTI_KEYED : 0);
 }
 
 static int
