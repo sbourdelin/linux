@@ -144,6 +144,8 @@ enum {
 
 /* VTI-mode i_flags */
 #define VTI_ISVTI ((__force __be16)0x0001)
+#define VTI_KEYED ((__force __be16)0x0002)
+#define VTI_IFLAG_MASK ((__force __be16)0x0003)
 
 enum {
 	IFLA_VTI_UNSPEC,
@@ -153,6 +155,7 @@ enum {
 	IFLA_VTI_LOCAL,
 	IFLA_VTI_REMOTE,
 	IFLA_VTI_FWMARK,
+	IFLA_VTI_IFLAGS,
 	__IFLA_VTI_MAX,
 };
 
