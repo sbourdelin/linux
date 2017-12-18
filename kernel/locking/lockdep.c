@@ -4576,8 +4576,15 @@ retry:
 		 * if it's not sleeping (or if it's not the current
 		 * task):
 		 */
-		if (p->state == TASK_RUNNING && p != current)
+		if (p->state == TASK_RUNNING && p != current) {
+			const int depth = p->lockdep_depth;
+
+			if (depth)
+				printk("%d lock%s held by %s/%d:\n",
+				       depth, depth > 1 ? "s" : "", p->comm,
+				       task_pid_nr(p));
 			continue;
+		}
 		if (p->lockdep_depth)
 			lockdep_print_held_locks(p);
 		if (!unlock)
