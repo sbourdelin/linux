@@ -1490,7 +1490,7 @@ struct i915_power_domains {
 	int power_well_count;
 
 	struct mutex lock;
-	int domain_use_count[POWER_DOMAIN_NUM];
+	atomic_t domain_use_count[POWER_DOMAIN_NUM];
 	struct i915_power_well *power_wells;
 };
 

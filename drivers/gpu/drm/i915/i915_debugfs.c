@@ -2772,7 +2772,7 @@ static int i915_power_domain_info(struct seq_file *m, void *unused)
 		for_each_power_domain(power_domain, power_well->domains)
 			seq_printf(m, "  %-23s %d\n",
 				 intel_display_power_domain_str(power_domain),
-				 power_domains->domain_use_count[power_domain]);
+				 atomic_read(&power_domains->domain_use_count[power_domain]));
 	}
 
 	mutex_unlock(&power_domains->lock);

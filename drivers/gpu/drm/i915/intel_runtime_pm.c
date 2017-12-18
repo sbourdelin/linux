@@ -1453,7 +1453,7 @@ __intel_display_power_get_domain(struct drm_i915_private *dev_priv,
 	for_each_power_domain_well(dev_priv, power_well, BIT_ULL(domain))
 		intel_power_well_get(dev_priv, power_well);
 
-	power_domains->domain_use_count[domain]++;
+	atomic_inc(&power_domains->domain_use_count[domain]);
 }
 
 /**
@@ -1539,10 +1539,9 @@ void intel_display_power_put(struct drm_i915_private *dev_priv,
 
 	mutex_lock(&power_domains->lock);
 
-	WARN(!power_domains->domain_use_count[domain],
-	     "Use count on domain %s is already zero\n",
+	WARN(atomic_dec_return(&power_domains->domain_use_count[domain]) < 0,
+	     "Use count on domain %s was already zero\n",
 	     intel_display_power_domain_str(domain));
-	power_domains->domain_use_count[domain]--;
 
 	for_each_power_domain_well_rev(dev_priv, power_well, BIT_ULL(domain))
 		intel_power_well_put(dev_priv, power_well);
@@ -3049,7 +3048,7 @@ static void intel_power_domains_dump_info(struct drm_i915_private *dev_priv)
 		for_each_power_domain(domain, power_well->domains)
 			DRM_DEBUG_DRIVER("  %-23s %d\n",
 					 intel_display_power_domain_str(domain),
-					 power_domains->domain_use_count[domain]);
+					 atomic_read(&power_domains->domain_use_count[domain]));
 	}
 }
 
@@ -3092,7 +3091,7 @@ void intel_power_domains_verify_state(struct drm_i915_private *dev_priv)
 
 		domains_count = 0;
 		for_each_power_domain(domain, power_well->domains)
-			domains_count += power_domains->domain_use_count[domain];
+			domains_count += atomic_read(&power_domains->domain_use_count[domain]);
 
 		if (power_well->count != domains_count) {
 			DRM_ERROR("power well %s refcount/domain refcount mismatch "
