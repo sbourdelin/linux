@@ -1079,6 +1079,9 @@ struct kvm_x86_ops {
 	int (*pre_enter_smm)(struct kvm_vcpu *vcpu, char *smstate);
 	int (*pre_leave_smm)(struct kvm_vcpu *vcpu, u64 smbase);
 	int (*enable_smi_window)(struct kvm_vcpu *vcpu);
+
+	int (*enable_enlightened_vmcs)(struct kvm_vcpu *vcpu,
+				       uint16_t *vmcs_version);
 };
 
 struct kvm_arch_async_pf {

@@ -464,6 +464,8 @@ struct __packed vmcs12 {
  */
 #define VMCS12_SIZE 0x1000
 
+#define ENLIGHTENED_VMCS_VERSION (1 | (1u << 8))
+
 /* Used to remember the last vmcs02 used for some recently used vmcs12s */
 struct vmcs02_list {
 	struct list_head list;
@@ -494,6 +496,13 @@ struct nested_vmx {
 	 * data hold by vmcs12
 	 */
 	bool sync_shadow_vmcs;
+
+	/*
+	 * Enlightened VMCS has been enabled. It does not mean that L1 has to
+	 * use it. However, VMX features available to L1 will be limited based
+	 * on what the enlightened VMCS supports.
+	 */
+	bool enlightened_vmcs_enabled;
 
 	/* vmcs02_list cache of VMCSs recently used to run L2 guests */
 	struct list_head vmcs02_pool;
@@ -12129,6 +12138,46 @@ static int enable_smi_window(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+static int enable_enlightened_vmcs(struct kvm_vcpu *vcpu,
+				   uint16_t *vmcs_version)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	/* We don't support disabling the feature for simplicity. */
+	if (vmx->nested.enlightened_vmcs_enabled)
+		return 0;
+	vmx->nested.enlightened_vmcs_enabled = true;
+	*vmcs_version = ENLIGHTENED_VMCS_VERSION;
+
+	/*
+	 * Enlightened VMCS doesn't have the POSTED_INTR_DESC_ADDR,
+	 * POSTED_INTR_NV, VMX_PREEMPTION_TIMER_VALUE,
+	 * GUEST_IA32_PERF_GLOBAL_CTRL, and HOST_IA32_PERF_GLOBAL_CTRL
+	 * fields.
+	 */
+	vmx->nested.nested_vmx_pinbased_ctls_high &=
+		~(PIN_BASED_POSTED_INTR |
+		  PIN_BASED_VMX_PREEMPTION_TIMER);
+	vmx->nested.nested_vmx_entry_ctls_high &=
+		~VM_ENTRY_LOAD_IA32_PERF_GLOBAL_CTRL;
+	vmx->nested.nested_vmx_exit_ctls_high &=
+		~VM_EXIT_LOAD_IA32_PERF_GLOBAL_CTRL;
+
+	/*
+	 * Enlightened VMCS doesn't have the APIC_ACCESS_ADDR,
+	 * EOI_EXIT_BITMAP*, GUEST_INTR_STATUS, VM_FUNCTION_CONTROL,
+	 * EPTP_LIST_ADDRESS, PML_ADDRESS, and GUEST_PML_INDEX fields.
+	 */
+	vmx->nested.nested_vmx_secondary_ctls_high &=
+		~(SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
+		  SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
+		  SECONDARY_EXEC_ENABLE_VMFUNC |
+		  SECONDARY_EXEC_ENABLE_PML);
+	vmx->nested.nested_vmx_vmfunc_controls &=
+		~VMX_VMFUNC_EPTP_SWITCHING;
+	return 0;
+}
+
 static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.cpu_has_kvm_support = cpu_has_kvm_support,
 	.disabled_by_bios = vmx_disabled_by_bios,
@@ -12259,6 +12308,8 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.pre_enter_smm = vmx_pre_enter_smm,
 	.pre_leave_smm = vmx_pre_leave_smm,
 	.enable_smi_window = enable_smi_window,
+
+	.enable_enlightened_vmcs = enable_enlightened_vmcs,
 };
 
 static int __init vmx_init(void)

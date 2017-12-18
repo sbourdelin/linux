@@ -5505,6 +5505,13 @@ static int enable_smi_window(struct kvm_vcpu *vcpu)
 	return 0;
 }
 
+static int enable_enlightened_vmcs(struct kvm_vcpu *vcpu,
+				   uint16_t *vmcs_version)
+{
+	/* Intel-only feature */
+	return -ENODEV;
+}
+
 static struct kvm_x86_ops svm_x86_ops __ro_after_init = {
 	.cpu_has_kvm_support = has_svm,
 	.disabled_by_bios = is_disabled,
@@ -5620,6 +5627,8 @@ static struct kvm_x86_ops svm_x86_ops __ro_after_init = {
 	.pre_enter_smm = svm_pre_enter_smm,
 	.pre_leave_smm = svm_pre_leave_smm,
 	.enable_smi_window = enable_smi_window,
+
+	.enable_enlightened_vmcs = enable_enlightened_vmcs,
 };
 
 static int __init svm_init(void)
