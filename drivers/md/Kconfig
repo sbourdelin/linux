@@ -269,6 +269,16 @@ config DM_BIO_PRISON
 
 source "drivers/md/persistent-data/Kconfig"
 
+config DM_UN_STRIPE
+       tristate "Transpose IO to individual drives on a raid device"
+       depends on BLK_DEV_DM
+       ---help---
+	  Enable this feature if you with to unstripe I/O on a RAID 0
+	  device to the respective drive. If your hardware has physical
+	  RAID 0 this module can unstripe the I/O to respective sides.
+
+	  If unsure say N.
+
 config DM_CRYPT
 	tristate "Crypt target support"
 	depends on BLK_DEV_DM
