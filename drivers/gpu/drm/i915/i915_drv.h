@@ -397,6 +397,7 @@ enum intel_display_power_domain {
 	POWER_DOMAIN_AUX_C,
 	POWER_DOMAIN_AUX_D,
 	POWER_DOMAIN_GMBUS,
+	POWER_DOMAIN_VBLANK,
 	POWER_DOMAIN_MODESET,
 	POWER_DOMAIN_GT_IRQ,
 	POWER_DOMAIN_INIT,
@@ -1476,7 +1477,14 @@ struct i915_power_well {
 			bool has_vga:1;
 			bool has_fuses:1;
 		} hsw;
+		struct {
+			bool was_disabled;
+		} dc_off;
 	};
+
+	spinlock_t lock;
+	bool supports_atomic_ctx;
+
 	const struct i915_power_well_ops *ops;
 };
 
