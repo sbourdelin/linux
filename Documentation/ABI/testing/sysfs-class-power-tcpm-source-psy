@@ -1,0 +1,92 @@
+What: 		/sys/class/power_supply/tcpm-source-psy/type
+Date:		December 2017
+Contact:	Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
+Description:
+	This read-only property describes the main type of source supply.
+	Type-C is a USB standard so this property always returns "USB".
+
+What: 		/sys/class/power_supply/tcpm-source-psy/connected_type
+Date:		December 2017
+Contact:	Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
+Description:
+	This read-only property describes the type of source supply that is
+	connected, if the supply is online. The value is always Type C
+	unless a source has been attached which is identified as USB-PD capable.
+
+	Valid values:
+		- "USB_TYPE_C"	: Type C connected supply, not UBS-PD capable
+				  (default value)
+		- "USB_PD"	: USB-PD capable source supply connected
+		- "USB_PD_PPS"	: USB-PD PPS capable source supply connected
+
+What: 		/sys/class/power_supply/tcpm-source-psy/online
+Date:		December 2017
+Contact:	Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
+Description:
+	This read-write property describes the online state of the source
+	supply. When the value of this property is not 0, and the supply allows
+	it, then it's possible to switch between online states (i.e. 1 -> 2,
+	2 -> 1)
+
+	Valid values:
+		- 0	: Offline, no source supply attached
+		- 1	: Fixed Online, Type-C or USB-PD capable supply
+			  attached, non-configurable current and voltage
+			  properties in this state.
+		- 2	: PPS Online, USB-PD PPS feature enabled, 'current_now'
+			  and 'voltage_now' properties can be modified in this
+			  state. Re-writing of this value again, once already
+			  set, will re-request the same configured voltage and
+			  current values. This can be used as a keep-alive for
+			  the PPS connection.
+			  [NOTE: This is value only selectable if
+			   'connected_type' reports a value of "USB_PD_PPS"]
+
+What: 		/sys/class/power_supply/tcpm-source-psy/voltage_min
+Date:		December 2017
+Contact:	Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
+Description:
+	This read-only property describes the minimum voltage the source supply
+	can provide.
+
+	Value in microvolts.
+
+What: 		/sys/class/power_supply/tcpm-source-psy/voltage_max
+Date:		December 2017
+Contact:	Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
+Description:
+	This read-only property describes the maximum voltage the source supply
+	can provide.
+
+	Value in microvolts.
+
+What: 		/sys/class/power_supply/tcpm-source-psy/voltage_now
+Date:		December 2017
+Contact:	Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
+Description:
+	This read-write property describes the voltage the source supply is
+	providing now. This property can only be written to if the source supply
+	is in online state '2' (PPS enabled), otherwise it's read-only
+	information.
+
+	Value in microvolts.
+
+What: 		/sys/class/power_supply/tcpm-source-psy/current_max
+Date:		December 2017
+Contact:	Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
+Description:
+	This read-only property describes the maximum current the source supply
+	can provide.
+
+	Value in microamps.
+
+What: 		/sys/class/power_supply/tcpm-source-psy/current_now
+Date:		December 2017
+Contact:	Adam Thomson <Adam.Thomson.Opensource@diasemi.com>
+Description:
+	This read-write property describes the current the source supply can
+	provide now. This property can only be written to if the source supply
+	is in online state '2' (PPS enabled), otherwise it's read-only
+	information.
+
+	Value in microamps.
