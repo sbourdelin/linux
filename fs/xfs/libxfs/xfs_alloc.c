@@ -2401,7 +2401,7 @@ static bool
 xfs_agf_verify(
 	struct xfs_mount *mp,
 	struct xfs_buf	*bp)
- {
+{
 	struct xfs_agf	*agf = XFS_BUF_TO_AGF(bp);
 
 	if (xfs_sb_version_hascrc(&mp->m_sb)) {
@@ -2449,8 +2449,7 @@ xfs_agf_verify(
 	     be32_to_cpu(agf->agf_refcount_level) > XFS_BTREE_MAXLEVELS))
 		return false;
 
-	return true;;
-
+	return true;
 }
 
 static void

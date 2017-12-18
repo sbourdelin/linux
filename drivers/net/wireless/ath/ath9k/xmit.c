@@ -196,7 +196,7 @@ ath_tid_pull(struct ath_atx_tid *tid)
 	}
 
 	return skb;
- }
+}
 
 static struct sk_buff *ath_tid_dequeue(struct ath_atx_tid *tid)
 {
