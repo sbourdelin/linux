@@ -1073,8 +1073,9 @@ ksocknal_create_conn(struct lnet_ni *ni, struct ksock_route *route,
 	conn->ksnc_tx_carrier = NULL;
 	atomic_set(&conn->ksnc_tx_nob, 0);
 
-	LIBCFS_ALLOC(hello, offsetof(struct ksock_hello_msg,
-				     kshm_ips[LNET_MAX_INTERFACES]));
+	hello = kvzalloc(offsetof(struct ksock_hello_msg,
+				  kshm_ips[LNET_MAX_INTERFACES]),
+			 GFP_KERNEL);
 	if (!hello) {
 		rc = -ENOMEM;
 		goto failed_1;
@@ -1337,8 +1338,7 @@ ksocknal_create_conn(struct lnet_ni *ni, struct ksock_route *route,
 		rc = ksocknal_send_hello(ni, conn, peerid.nid, hello);
 	}
 
-	LIBCFS_FREE(hello, offsetof(struct ksock_hello_msg,
-				    kshm_ips[LNET_MAX_INTERFACES]));
+	kvfree(hello);
 
 	/*
 	 * setup the socket AFTER I've received hello (it disables
@@ -1418,9 +1418,7 @@ ksocknal_create_conn(struct lnet_ni *ni, struct ksock_route *route,
 	ksocknal_peer_decref(peer);
 
 failed_1:
-	if (hello)
-		LIBCFS_FREE(hello, offsetof(struct ksock_hello_msg,
-					    kshm_ips[LNET_MAX_INTERFACES]));
+	kvfree(hello);
 
 	kfree(conn);
 
@@ -2272,9 +2270,7 @@ ksocknal_free_buffers(void)
 		cfs_percpt_free(ksocknal_data.ksnd_sched_info);
 	}
 
-	LIBCFS_FREE(ksocknal_data.ksnd_peers,
-		    sizeof(struct list_head) *
-		    ksocknal_data.ksnd_peer_hash_size);
+	kvfree(ksocknal_data.ksnd_peers);
 
 	spin_lock(&ksocknal_data.ksnd_tx_lock);
 
@@ -2404,9 +2400,9 @@ ksocknal_base_startup(void)
 	memset(&ksocknal_data, 0, sizeof(ksocknal_data)); /* zero pointers */
 
 	ksocknal_data.ksnd_peer_hash_size = SOCKNAL_PEER_HASH_SIZE;
-	LIBCFS_ALLOC(ksocknal_data.ksnd_peers,
-		     sizeof(struct list_head) *
-		     ksocknal_data.ksnd_peer_hash_size);
+	ksocknal_data.ksnd_peers = kvmalloc_array(ksocknal_data.ksnd_peer_hash_size,
+						  sizeof(struct list_head),
+						  GFP_KERNEL);
 	if (!ksocknal_data.ksnd_peers)
 		return -ENOMEM;
 
