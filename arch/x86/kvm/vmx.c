@@ -391,7 +391,10 @@ struct __packed vmcs12 {
 			u32 vmx_instruction_info;
 
 			natural_width exit_qualification;
-			natural_width padding64_3[4];
+			natural_width exit_io_instr_ecx;
+			natural_width exit_io_instr_esi;
+			natural_width exit_io_instr_edi;
+			natural_width exit_io_instr_eip;
 
 			natural_width guest_linear_address;
 			natural_width guest_rsp;
@@ -913,6 +916,10 @@ static const unsigned short vmcs_field_to_offset_table[] = {
 	FIELD(CR3_TARGET_VALUE2, cr3_target_value2),
 	FIELD(CR3_TARGET_VALUE3, cr3_target_value3),
 	FIELD(EXIT_QUALIFICATION, exit_qualification),
+	FIELD(EXIT_IO_INSTR_ECX, exit_io_instr_ecx),
+	FIELD(EXIT_IO_INSTR_ESI, exit_io_instr_esi),
+	FIELD(EXIT_IO_INSTR_EDI, exit_io_instr_edi),
+	FIELD(EXIT_IO_INSTR_EIP, exit_io_instr_eip),
 	FIELD(GUEST_LINEAR_ADDRESS, guest_linear_address),
 	FIELD(GUEST_CR0, guest_cr0),
 	FIELD(GUEST_CR3, guest_cr3),
