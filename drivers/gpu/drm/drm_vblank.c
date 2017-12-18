@@ -347,23 +347,14 @@ void drm_vblank_disable_and_save(struct drm_device *dev, unsigned int pipe)
 	spin_lock_irqsave(&dev->vblank_time_lock, irqflags);
 
 	/*
-	 * Only disable vblank interrupts if they're enabled. This avoids
-	 * calling the ->disable_vblank() operation in atomic context with the
-	 * hardware potentially runtime suspended.
-	 */
-	if (vblank->enabled) {
-		__disable_vblank(dev, pipe);
-		vblank->enabled = false;
-	}
-
-	/*
-	 * Always update the count and timestamp to maintain the
+	 * Update the count and timestamp to maintain the
 	 * appearance that the counter has been ticking all along until
 	 * this time. This makes the count account for the entire time
 	 * between drm_crtc_vblank_on() and drm_crtc_vblank_off().
 	 */
 	drm_update_vblank_count(dev, pipe, false);
-
+	__disable_vblank(dev, pipe);
+	vblank->enabled = false;
 	spin_unlock_irqrestore(&dev->vblank_time_lock, irqflags);
 }
 
@@ -1122,8 +1113,12 @@ void drm_crtc_vblank_off(struct drm_crtc *crtc)
 		      pipe, vblank->enabled, vblank->inmodeset);
 
 	/* Avoid redundant vblank disables without previous
-	 * drm_crtc_vblank_on(). */
-	if (drm_core_check_feature(dev, DRIVER_ATOMIC) || !vblank->inmodeset)
+	 * drm_crtc_vblank_on() and only disable them if they're enabled. This
+	 * avoids calling the ->disable_vblank() operation in atomic context
+	 * with the hardware potentially runtime suspended.
+	 */
+	if ((drm_core_check_feature(dev, DRIVER_ATOMIC) || !vblank->inmodeset) &&
+	    vblank->enabled)
 		drm_vblank_disable_and_save(dev, pipe);
 
 	wake_up(&vblank->queue);
