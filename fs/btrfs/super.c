@@ -1656,7 +1656,11 @@ static struct dentry *btrfs_mount(struct file_system_type *fs_type, int flags,
 		goto error_sec_opts;
 	}
 
-	fs_info = btrfs_sb(s);
+	if (btrfs_sb(s) != fs_info) {
+		free_fs_info(fs_info);
+		fs_info = btrfs_sb(s);
+	}
+
 	error = setup_security_options(fs_info, s, &new_sec_opts);
 	if (error) {
 		deactivate_locked_super(s);
