@@ -621,6 +621,40 @@ static void err_print_uc(struct drm_i915_error_state_buf *m,
 	print_error_obj(m, NULL, "GuC log buffer", error_uc->guc_log);
 }
 
+static void err_print_rcs_topology(struct drm_i915_error_state_buf *m,
+				   const struct sseu_dev_info *sseu)
+{
+	int s, ss;
+	int subslice_stride = ALIGN(sseu->max_eus_per_subslice, 8) / 8;
+	int slice_stride = sseu->max_subslices * subslice_stride;
+
+	/* Unavailable prior to Gen 8. */
+	if (sseu->max_slices == 0)
+		return;
+
+	err_printf(m, "RCS topology:\n");
+
+	for (s = 0; s < sseu->max_slices; s++) {
+		err_printf(m, "  slice%i (subslice_mask=0x%x):\n",
+			   s, sseu->subslices_mask[s]);
+
+		for (ss = 0; ss < slice_stride / subslice_stride; ss++) {
+			int eu, n_subslice_eus = 0;
+
+			err_printf(m, "    subslice%i:\n", ss);
+
+			err_printf(m, "      eu_mask:");
+			for (eu = 0; eu < subslice_stride; eu++) {
+				u8 val = sseu->eu_mask[s * slice_stride +
+						       ss * subslice_stride + eu];
+				err_printf(m, " 0x%x", val);
+				n_subslice_eus += hweight8(val);
+			}
+			err_printf(m, " (%i)\n", n_subslice_eus);
+		}
+	}
+}
+
 int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 			    const struct i915_gpu_state *error)
 {
@@ -657,6 +691,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 	err_printf(m, "Suspend count: %u\n", error->suspend_count);
 	err_printf(m, "Platform: %s\n", intel_platform_name(error->device_info.platform));
 	err_print_pciid(m, error->i915);
+	err_print_rcs_topology(m, &INTEL_INFO(dev_priv)->sseu);
 
 	err_printf(m, "IOMMU enabled?: %d\n", error->iommu);
 
