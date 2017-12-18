@@ -86,6 +86,18 @@ struct sunxi_engine_ops {
 	struct drm_plane **(*layers_init)(struct drm_device *drm,
 					  struct sunxi_engine *engine);
 
+	/**
+	 * @vblank_quirk:
+	 *
+	 * This callback is used to implement backend-specific
+	 * behaviour part of the VBLANK event. It is run with all the
+	 * constraints of an interrupt (can't sleep, all local
+	 * interrupts disabled) and therefore should be as fast as
+	 * possible.
+	 *
+	 * This function is optional.
+	 */
+	void (*vblank_quirk)(struct sunxi_engine *engine);
 };
 
 /**
