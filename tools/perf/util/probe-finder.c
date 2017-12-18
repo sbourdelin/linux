@@ -119,12 +119,20 @@ enum dso_binary_type distro_dwarf_types[] = {
 
 struct debuginfo *debuginfo__new(const char *path)
 {
+	static struct strlist *no_debuginfo_files;
+
 	u8 bid[BUILD_ID_SIZE], bid2[BUILD_ID_SIZE];
 	enum dso_binary_type *type;
 	char buf[PATH_MAX], nil = '\0';
 	struct dso *dso;
 	bool have_build_id = false;
 	struct debuginfo *dinfo = NULL;
+
+	/* Skip if we already know it has no debuginfo */
+	if (!no_debuginfo_files)
+		no_debuginfo_files = strlist__new(NULL, NULL);
+	else if (strlist__find(no_debuginfo_files, path))
+		return NULL;
 
 	/* Try to open distro debuginfo files */
 	dso = dso__new(path);
@@ -159,7 +167,13 @@ struct debuginfo *debuginfo__new(const char *path)
 
 out:
 	/* if failed to open all distro debuginfo, open given binary */
-	return dinfo ? : __debuginfo__new(path);
+	if (!dinfo) {
+		dinfo = __debuginfo__new(path);
+		if (!dinfo)
+			strlist__add(no_debuginfo_files, path);
+	}
+
+	return dinfo;
 }
 
 void debuginfo__delete(struct debuginfo *dbg)
