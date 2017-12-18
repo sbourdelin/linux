@@ -458,7 +458,7 @@ With this multipage bio design:
 - A linked list of bios is used as before for unrelated merges (*) - this
   avoids reallocs and makes independent completions easier to handle.
 - Code that traverses the req list can find all the segments of a bio
-  by using rq_for_each_segment.  This handles the fact that a request
+  by using rq_for_each_page.  This handles the fact that a request
   has multiple bios, each of which can have multiple segments.
 - Drivers which can't process a large bio in one shot can use the bi_iter
   field to keep track of the next bio_vec entry to process.
@@ -640,13 +640,13 @@ in lvm or md.
 
 3.2.1 Traversing segments and completion units in a request
 
-The macro rq_for_each_segment() should be used for traversing the bios
+The macro rq_for_each_page() should be used for traversing the bios
 in the request list (drivers should avoid directly trying to do it
 themselves). Using these helpers should also make it easier to cope
 with block changes in the future.
 
 	struct req_iterator iter;
-	rq_for_each_segment(bio_vec, rq, iter)
+	rq_for_each_page(bio_vec, rq, iter)
 		/* bio_vec is now current segment */
 
 I/O completion callbacks are per-bio rather than per-segment, so drivers

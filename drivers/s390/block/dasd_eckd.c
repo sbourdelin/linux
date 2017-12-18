@@ -3064,7 +3064,7 @@ static struct dasd_ccw_req *dasd_eckd_build_cp_cmd_single(
 	/* Check struct bio and count the number of blocks for the request. */
 	count = 0;
 	cidaw = 0;
-	rq_for_each_segment(bv, req, iter) {
+	rq_for_each_page(bv, req, iter) {
 		if (bv.bv_len & (blksize - 1))
 			/* Eckd can only do full blocks. */
 			return ERR_PTR(-EINVAL);
@@ -3139,7 +3139,7 @@ static struct dasd_ccw_req *dasd_eckd_build_cp_cmd_single(
 		locate_record(ccw++, LO_data++, first_trk, first_offs + 1,
 			      last_rec - recid + 1, cmd, basedev, blksize);
 	}
-	rq_for_each_segment(bv, req, iter) {
+	rq_for_each_page(bv, req, iter) {
 		dst = page_address(bv.bv_page) + bv.bv_offset;
 		if (dasd_page_cache) {
 			char *copy = kmem_cache_alloc(dasd_page_cache,
@@ -3298,7 +3298,7 @@ static struct dasd_ccw_req *dasd_eckd_build_cp_cmd_track(
 	len_to_track_end = 0;
 	idaw_dst = NULL;
 	idaw_len = 0;
-	rq_for_each_segment(bv, req, iter) {
+	rq_for_each_page(bv, req, iter) {
 		dst = page_address(bv.bv_page) + bv.bv_offset;
 		seg_len = bv.bv_len;
 		while (seg_len) {
@@ -3586,7 +3586,7 @@ static struct dasd_ccw_req *dasd_eckd_build_cp_tpm_track(
 	 */
 	trkcount = last_trk - first_trk + 1;
 	ctidaw = 0;
-	rq_for_each_segment(bv, req, iter) {
+	rq_for_each_page(bv, req, iter) {
 		++ctidaw;
 	}
 	if (rq_data_dir(req) == WRITE)
@@ -3635,7 +3635,7 @@ static struct dasd_ccw_req *dasd_eckd_build_cp_tpm_track(
 	if (rq_data_dir(req) == WRITE) {
 		new_track = 1;
 		recid = first_rec;
-		rq_for_each_segment(bv, req, iter) {
+		rq_for_each_page(bv, req, iter) {
 			dst = page_address(bv.bv_page) + bv.bv_offset;
 			seg_len = bv.bv_len;
 			while (seg_len) {
@@ -3668,7 +3668,7 @@ static struct dasd_ccw_req *dasd_eckd_build_cp_tpm_track(
 			}
 		}
 	} else {
-		rq_for_each_segment(bv, req, iter) {
+		rq_for_each_page(bv, req, iter) {
 			dst = page_address(bv.bv_page) + bv.bv_offset;
 			last_tidaw = itcw_add_tidaw(itcw, 0x00,
 						    dst, bv.bv_len);
@@ -3896,7 +3896,7 @@ static struct dasd_ccw_req *dasd_eckd_build_cp_raw(struct dasd_device *startdev,
 		for (sectors = 0; sectors < start_padding_sectors; sectors += 8)
 			idaws = idal_create_words(idaws, rawpadpage, PAGE_SIZE);
 	}
-	rq_for_each_segment(bv, req, iter) {
+	rq_for_each_page(bv, req, iter) {
 		dst = page_address(bv.bv_page) + bv.bv_offset;
 		seg_len = bv.bv_len;
 		if (cmd == DASD_ECKD_CCW_READ_TRACK)
@@ -3957,7 +3957,7 @@ dasd_eckd_free_cp(struct dasd_ccw_req *cqr, struct request *req)
 	ccw++;
 	if (private->uses_cdl == 0 || recid > 2*blk_per_trk)
 		ccw++;
-	rq_for_each_segment(bv, req, iter) {
+	rq_for_each_page(bv, req, iter) {
 		dst = page_address(bv.bv_page) + bv.bv_offset;
 		for (off = 0; off < bv.bv_len; off += blksize) {
 			/* Skip locate record. */

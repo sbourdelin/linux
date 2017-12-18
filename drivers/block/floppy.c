@@ -2382,7 +2382,7 @@ static int buffer_chain_size(void)
 	base = bio_data(current_req->bio);
 	size = 0;
 
-	rq_for_each_segment(bv, current_req, iter) {
+	rq_for_each_page(bv, current_req, iter) {
 		if (page_address(bv.bv_page) + bv.bv_offset != base + size)
 			break;
 
@@ -2446,7 +2446,7 @@ static void copy_buffer(int ssize, int max_sector, int max_sector_2)
 
 	size = blk_rq_cur_bytes(current_req);
 
-	rq_for_each_segment(bv, current_req, iter) {
+	rq_for_each_page(bv, current_req, iter) {
 		if (!remaining)
 			break;
 
