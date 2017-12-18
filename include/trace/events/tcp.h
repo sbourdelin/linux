@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 #undef TRACE_SYSTEM
 #define TRACE_SYSTEM tcp
 
@@ -291,6 +292,91 @@ TRACE_EVENT(tcp_retransmit_synack,
 		  __entry->sport, __entry->dport,
 		  __entry->saddr, __entry->daddr,
 		  __entry->saddr_v6, __entry->daddr_v6)
+);
+
+#include <net/tcp.h>
+#include <linux/tcp.h>
+#include <linux/ipv6.h>
+#include <uapi/linux/in.h>
+#include <uapi/linux/in6.h>
+#include <linux/tracepoint.h>
+
+TRACE_EVENT(tcp_probe,
+
+	TP_PROTO(struct sock *sk, struct sk_buff *skb),
+
+	TP_ARGS(sk, skb),
+
+	TP_STRUCT__entry(
+		/* sockaddr_in6 is always bigger than sockaddr_in */
+		__array(__u8, saddr, sizeof(struct sockaddr_in6))
+		__array(__u8, daddr, sizeof(struct sockaddr_in6))
+		__field(__u16, sport)
+		__field(__u16, dport)
+		__field(__u32, mark)
+		__field(__u16, length)
+		__field(__u32, snd_nxt)
+		__field(__u32, snd_una)
+		__field(__u32, snd_cwnd)
+		__field(__u32, ssthresh)
+		__field(__u32, snd_wnd)
+		__field(__u32, srtt)
+		__field(__u32, rcv_wnd)
+	),
+
+	TP_fast_assign(
+		const struct tcp_sock *tp = tcp_sk(sk);
+		const struct inet_sock *inet = inet_sk(sk);
+
+		memset(__entry->saddr, 0, sizeof(struct sockaddr_in6));
+		memset(__entry->daddr, 0, sizeof(struct sockaddr_in6));
+
+		if (sk->sk_family == AF_INET) {
+			struct sockaddr_in *v4 = (void *)__entry->saddr;
+
+			v4->sin_family = AF_INET;
+			v4->sin_port = inet->inet_sport;
+			v4->sin_addr.s_addr = inet->inet_saddr;
+			v4 = (void *)__entry->daddr;
+			v4->sin_family = AF_INET;
+			v4->sin_port = inet->inet_dport;
+			v4->sin_addr.s_addr = inet->inet_daddr;
+#if IS_ENABLED(CONFIG_IPV6)
+		} else if (sk->sk_family == AF_INET6) {
+			struct sockaddr_in6 *v6 = (void *)__entry->saddr;
+
+			v6->sin6_family = AF_INET6;
+			v6->sin6_port = inet->inet_sport;
+			v6->sin6_addr = inet6_sk(sk)->saddr;
+			v6 = (void *)__entry->daddr;
+			v6->sin6_family = AF_INET6;
+			v6->sin6_port = inet->inet_dport;
+			v6->sin6_addr = sk->sk_v6_daddr;
+#endif
+		}
+
+		/* For filtering use */
+		__entry->sport = ntohs(inet->inet_sport);
+		__entry->dport = ntohs(inet->inet_dport);
+		__entry->mark = skb->mark;
+
+		__entry->length = skb->len;
+		__entry->snd_nxt = tp->snd_nxt;
+		__entry->snd_una = tp->snd_una;
+		__entry->snd_cwnd = tp->snd_cwnd;
+		__entry->snd_wnd = tp->snd_wnd;
+		__entry->rcv_wnd = tp->rcv_wnd;
+		__entry->ssthresh = tcp_current_ssthresh(sk);
+		__entry->srtt = tp->srtt_us >> 3;
+	),
+
+	TP_printk("src=%pISpc dest=%pISpc mark=%#x length=%d snd_nxt=%#x "
+		  "snd_una=%#x snd_cwnd=%u ssthresh=%u snd_wnd=%u srtt=%u "
+		  "rcv_wnd=%u",
+		  __entry->saddr, __entry->daddr, __entry->mark,
+		  __entry->length, __entry->snd_nxt, __entry->snd_una,
+		  __entry->snd_cwnd, __entry->ssthresh, __entry->snd_wnd,
+		  __entry->srtt, __entry->rcv_wnd)
 );
 
 #endif /* _TRACE_TCP_H */
