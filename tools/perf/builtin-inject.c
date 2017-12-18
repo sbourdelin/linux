@@ -856,6 +856,9 @@ int cmd_inject(int argc, const char **argv)
 	}
 #ifdef HAVE_JITDUMP
 	if (inject.jit_mode) {
+#ifndef HAVE_DWARF_SUPPORT
+		pr_warning("perf tool compiled without dwarf, no source line information will be generated\n");
+#endif
 		inject.tool.mmap2	   = perf_event__jit_repipe_mmap2;
 		inject.tool.mmap	   = perf_event__jit_repipe_mmap;
 		inject.tool.ordered_events = true;

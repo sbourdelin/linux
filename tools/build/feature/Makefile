@@ -104,9 +104,14 @@ $(OUTPUT)test-sched_getcpu.bin:
 $(OUTPUT)test-setns.bin:
 	$(BUILD)
 
-DWARFLIBS := -ldw
+#
+# there may be a dependency between libdw and libelf such as
+# /usr/lib/gcc/x86_64-linux-gnu/5/../../../x86_64-linux-gnu/libdw.so: undefined reference to `elf_compress@ELFUTILS_1.7'
+# so force linking with libelf
+#
+DWARFLIBS := -ldw -lelf
 ifeq ($(findstring -static,${LDFLAGS}),-static)
-DWARFLIBS += -lelf -lebl -lz -llzma -lbz2
+DWARFLIBS += -lebl -lz -llzma -lbz2
 endif
 
 $(OUTPUT)test-dwarf.bin:
