@@ -225,6 +225,13 @@ static inline bool bvec_iter_seg_advance(const struct bio_vec *bv,
 	.bi_bvec_done	= 0,						\
 }
 
+#define segment_for_each_page_all(pg_bvl, seg_bvec, iter)		\
+	for (iter = BVEC_ITER_ALL_INIT,					\
+	     (iter).bi_size = (seg_bvec)->bv_len  - (iter).bi_bvec_done;\
+	     (iter).bi_size &&						\
+		((pg_bvl = bvec_iter_bvec((seg_bvec), (iter))), 1);	\
+	     bvec_iter_advance((seg_bvec), &(iter), (pg_bvl).bv_len))
+
 /* get the last page from the multipage bvec and store it in @pg */
 static inline void segment_last_page(const struct bio_vec *seg,
 		struct bio_vec *pg)
