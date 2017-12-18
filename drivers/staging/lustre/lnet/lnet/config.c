@@ -109,10 +109,8 @@ lnet_ni_free(struct lnet_ni *ni)
 	if (ni->ni_lnd_tunables)
 		kfree(ni->ni_lnd_tunables);
 
-	for (i = 0; i < LNET_MAX_INTERFACES && ni->ni_interfaces[i]; i++) {
-		LIBCFS_FREE(ni->ni_interfaces[i],
-			    strlen(ni->ni_interfaces[i]) + 1);
-	}
+	for (i = 0; i < LNET_MAX_INTERFACES && ni->ni_interfaces[i]; i++)
+		kfree(ni->ni_interfaces[i]);
 
 	/* release reference to net namespace */
 	if (ni->ni_net_ns)
@@ -198,7 +196,6 @@ int
 lnet_parse_networks(struct list_head *nilist, char *networks)
 {
 	struct cfs_expr_list *el = NULL;
-	int tokensize;
 	char *tokens;
 	char *str;
 	char *tmp;
@@ -219,15 +216,12 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
 		return -EINVAL;
 	}
 
-	tokensize = strlen(networks) + 1;
-
-	LIBCFS_ALLOC(tokens, tokensize);
+	tokens = kstrdup(networks, GFP_KERNEL);
 	if (!tokens) {
 		CERROR("Can't allocate net tokens\n");
 		return -ENOMEM;
 	}
 
-	memcpy(tokens, networks, tokensize);
 	tmp = tokens;
 	str = tokens;
 
@@ -349,14 +343,11 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
 			 * The newly allocated ni_interfaces[] can be
 			 * freed when freeing the NI
 			 */
-			LIBCFS_ALLOC(ni->ni_interfaces[niface],
-				     strlen(iface) + 1);
+			ni->ni_interfaces[niface] = kstrdup(iface, GFP_KERNEL);
 			if (!ni->ni_interfaces[niface]) {
 				CERROR("Can't allocate net interface name\n");
 				goto failed;
 			}
-			strncpy(ni->ni_interfaces[niface], iface,
-				strlen(iface));
 			niface++;
 			iface = comma;
 		} while (iface);
@@ -384,7 +375,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
 	list_for_each(temp_node, nilist)
 		nnets++;
 
-	LIBCFS_FREE(tokens, tokensize);
+	kfree(tokens);
 	return nnets;
 
  failed_syntax:
@@ -400,7 +391,7 @@ lnet_parse_networks(struct list_head *nilist, char *networks)
 	if (el)
 		cfs_expr_list_free(el);
 
-	LIBCFS_FREE(tokens, tokensize);
+	kfree(tokens);
 
 	return -EINVAL;
 }
@@ -424,7 +415,7 @@ lnet_new_text_buf(int str_len)
 		return NULL;
 	}
 
-	LIBCFS_ALLOC(ltb, nob);
+	ltb = kmalloc(nob, GFP_KERNEL);
 	if (!ltb)
 		return NULL;
 
@@ -438,7 +429,7 @@ static void
 lnet_free_text_buf(struct lnet_text_buf *ltb)
 {
 	lnet_tbnob -= ltb->ltb_size;
-	LIBCFS_FREE(ltb, ltb->ltb_size);
+	kfree(ltb);
 }
 
 static void
@@ -1156,7 +1147,7 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
 	if (nif <= 0)
 		return nif;
 
-	LIBCFS_ALLOC(ipaddrs, nif * sizeof(*ipaddrs));
+	ipaddrs = kzalloc(nif * sizeof(*ipaddrs), GFP_KERNEL);
 	if (!ipaddrs) {
 		CERROR("Can't allocate ipaddrs[%d]\n", nif);
 		lnet_ipif_free_enumeration(ifnames, nif);
@@ -1189,7 +1180,8 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
 		*ipaddrsp = ipaddrs;
 	} else {
 		if (nip > 0) {
-			LIBCFS_ALLOC(ipaddrs2, nip * sizeof(*ipaddrs2));
+			ipaddrs2 = kzalloc(nip * sizeof(*ipaddrs2),
+					   GFP_KERNEL);
 			if (!ipaddrs2) {
 				CERROR("Can't allocate ipaddrs[%d]\n", nip);
 				nip = -ENOMEM;
@@ -1200,7 +1192,7 @@ lnet_ipaddr_enumerate(__u32 **ipaddrsp)
 				rc = nip;
 			}
 		}
-		LIBCFS_FREE(ipaddrs, nip * sizeof(*ipaddrs));
+		kfree(ipaddrs);
 	}
 	return nip;
 }
@@ -1226,7 +1218,7 @@ lnet_parse_ip2nets(char **networksp, char *ip2nets)
 	}
 
 	rc = lnet_match_networks(networksp, ip2nets, ipaddrs, nip);
-	LIBCFS_FREE(ipaddrs, nip * sizeof(*ipaddrs));
+	kfree(ipaddrs);
 
 	if (rc < 0) {
 		LCONSOLE_ERROR_MSG(0x119, "Error %d parsing ip2nets\n", rc);
