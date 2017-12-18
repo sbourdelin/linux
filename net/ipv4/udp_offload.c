@@ -10,9 +10,13 @@
  *	UDPv4 GSO support
  */
 
+#include <linux/static_key.h>
 #include <linux/skbuff.h>
 #include <net/udp.h>
 #include <net/protocol.h>
+
+DEFINE_STATIC_KEY_FALSE(udp_gro_needed);
+EXPORT_SYMBOL_GPL(udp_gro_needed);
 
 static struct sk_buff *__skb_udp_tunnel_segment(struct sk_buff *skb,
 	netdev_features_t features,
@@ -249,6 +253,9 @@ struct sk_buff **udp_gro_receive(struct sk_buff **head, struct sk_buff *skb,
 	unsigned int off = skb_gro_offset(skb);
 	int flush = 1;
 	struct sock *sk;
+
+	if (!static_branch_unlikely(&udp_gro_needed))
+		goto out;
 
 	if (NAPI_GRO_CB(skb)->encap_mark ||
 	    (skb->ip_summed != CHECKSUM_PARTIAL &&

@@ -1,4 +1,5 @@
 #include <linux/module.h>
+#include <linux/static_key.h>
 #include <linux/errno.h>
 #include <linux/socket.h>
 #include <linux/udp.h>
@@ -73,6 +74,9 @@ void setup_udp_tunnel_sock(struct net *net, struct socket *sock,
 	udp_sk(sk)->gro_complete = cfg->gro_complete;
 
 	udp_tunnel_encap_enable(sock);
+
+	if (udp_sk(sk)->gro_receive)
+		static_branch_inc(&udp_gro_needed);
 }
 EXPORT_SYMBOL_GPL(setup_udp_tunnel_sock);
 
@@ -185,7 +189,12 @@ EXPORT_SYMBOL_GPL(udp_tunnel_xmit_skb);
 
 void udp_tunnel_sock_release(struct socket *sock)
 {
-	rcu_assign_sk_user_data(sock->sk, NULL);
+	struct sock *sk = sock->sk;
+
+	if (udp_sk(sk)->gro_receive)
+		static_branch_dec(&udp_gro_needed);
+
+	rcu_assign_sk_user_data(sk, NULL);
 	kernel_sock_shutdown(sock, SHUT_RDWR);
 	sock_release(sock);
 }

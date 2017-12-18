@@ -188,6 +188,8 @@ static inline struct udphdr *udp_gro_udphdr(struct sk_buff *skb)
 	return uh;
 }
 
+extern struct static_key_false udp_gro_needed;
+
 /* hash routines shared between UDPv4/6 and UDP-Litev4/6 */
 static inline int udp_lib_hash(struct sock *sk)
 {
