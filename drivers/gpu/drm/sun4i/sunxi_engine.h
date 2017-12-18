@@ -33,6 +33,19 @@ struct sunxi_engine_ops {
 	void (*apply_color_correction)(struct sunxi_engine *engine);
 
 	/**
+	 * @atomic_begin:
+	 *
+	 * This callback allows to prepare our backend for an atomic
+	 * update. This is mirroring the
+	 * &drm_crtc_helper_funcs.atomic_begin callback, so any
+	 * documentation there applies.
+	 *
+	 * This function is optional.
+	 */
+	void (*atomic_begin)(struct sunxi_engine *engine,
+			     struct drm_crtc_state *old_state);
+
+	/**
 	 * @atomic_check:
 	 *
 	 * This callback allows to validate plane-update related CRTC
