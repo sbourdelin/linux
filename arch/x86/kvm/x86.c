@@ -5498,7 +5498,7 @@ int kvm_inject_realmode_interrupt(struct kvm_vcpu *vcpu, int irq, int inc_eip)
 }
 EXPORT_SYMBOL_GPL(kvm_inject_realmode_interrupt);
 
-static int handle_emulation_failure(struct kvm_vcpu *vcpu)
+static int handle_emulation_failure(struct kvm_vcpu *vcpu, int emulation_type)
 {
 	int r = EMULATE_DONE;
 
@@ -5510,7 +5510,11 @@ static int handle_emulation_failure(struct kvm_vcpu *vcpu)
 		vcpu->run->internal.ndata = 0;
 		r = EMULATE_USER_EXIT;
 	}
-	kvm_queue_exception(vcpu, UD_VECTOR);
+
+	if (emulation_type & EMULTYPE_NO_UD_ON_FAIL)
+		r = EMULATE_FAIL;
+	else
+		kvm_queue_exception(vcpu, UD_VECTOR);
 
 	return r;
 }
@@ -5804,7 +5808,7 @@ int x86_emulate_instruction(struct kvm_vcpu *vcpu,
 				return EMULATE_DONE;
 			if (emulation_type & EMULTYPE_SKIP)
 				return EMULATE_FAIL;
-			return handle_emulation_failure(vcpu);
+			return handle_emulation_failure(vcpu, emulation_type);
 		}
 	}
 
@@ -5839,7 +5843,7 @@ restart:
 					emulation_type))
 			return EMULATE_DONE;
 
-		return handle_emulation_failure(vcpu);
+		return handle_emulation_failure(vcpu, emulation_type);
 	}
 
 	if (ctxt->have_exception) {
