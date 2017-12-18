@@ -119,9 +119,11 @@ enum dso_binary_type distro_dwarf_types[] = {
 
 struct debuginfo *debuginfo__new(const char *path)
 {
+	u8 bid[BUILD_ID_SIZE], bid2[BUILD_ID_SIZE];
 	enum dso_binary_type *type;
 	char buf[PATH_MAX], nil = '\0';
 	struct dso *dso;
+	bool have_build_id = false;
 	struct debuginfo *dinfo = NULL;
 
 	/* Try to open distro debuginfo files */
@@ -129,12 +131,28 @@ struct debuginfo *debuginfo__new(const char *path)
 	if (!dso)
 		goto out;
 
+	if (filename__read_build_id(path, bid, BUILD_ID_SIZE) > 0)
+		have_build_id = true;
+
 	for (type = distro_dwarf_types;
 	     !dinfo && *type != DSO_BINARY_TYPE__NOT_FOUND;
 	     type++) {
 		if (dso__read_binary_type_filename(dso, *type, &nil,
 						   buf, PATH_MAX) < 0)
 			continue;
+
+		if (have_build_id) {
+			/* This can be fail because the file doesn't exist */
+			if (filename__read_build_id(buf, bid2,
+						    BUILD_ID_SIZE) < 0)
+				continue;
+			if (memcmp(bid, bid2, BUILD_ID_SIZE)) {
+				pr_warning("WARN: There is a build-id mismatch between\n %s\n and\n %s\n"
+					"Please check your system's debuginfo files for mismatches, e.g. check the "
+					"versions for the target package and debuginfo package.\n", buf, path);
+				continue;
+			}
+		}
 		dinfo = __debuginfo__new(buf);
 	}
 	dso__put(dso);
