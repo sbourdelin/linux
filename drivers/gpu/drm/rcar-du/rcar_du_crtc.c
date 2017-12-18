@@ -125,13 +125,63 @@ static void rcar_du_dpll_divider(struct rcar_du_crtc *rcrtc,
 	unsigned int m;
 	unsigned int n;
 
-	for (n = 39; n < 120; n++) {
-		for (m = 0; m < 4; m++) {
+	/*
+	 *   fin                                 fvco        fout       fclkout
+	 * in --> [1/M] --> |PD| -> [LPF] -> [VCO] -> [1/P] -+-> [1/FDPLL] -> out
+	 *              +-> |  |                             |
+	 *              |                                    |
+	 *              +-----------------[1/N]<-------------+
+	 *
+	 *	fclkout = fvco / P / FDPLL -- (1)
+	 *
+	 * fin/M = fvco/P/N
+	 *
+	 *	fvco = fin * P *  N / M -- (2)
+	 *
+	 * (1) + (2) indicates
+	 *
+	 *	fclkout = fin * N / M / FDPLL
+	 *
+	 * NOTES
+	 *	N	: (n + 1)
+	 *	M	: (m + 1)
+	 *	FDPLL	: (fdpll + 1)
+	 *	P	: 2
+	 *	2kHz < fvco < 4096MHz
+	 *
+	 * To be small jitter,
+	 * N : as large as possible
+	 * M : as small as possible
+	 */
+	for (m = 0; m < 4; m++) {
+		for (n = 119; n > 38; n--) {
+			/*
+			 * NOTE:
+			 *
+			 * This code is assuming "used" from 64bit CPU only,
+			 * not from 32bit CPU. But both can compile correctly
+			 */
+
+			/*
+			 *	fvco	= fin * P *  N / M
+			 *	fclkout	= fin      * N / M / FDPLL
+			 *
+			 * To avoid duplicate calculation, let's use below
+			 *
+			 *	finnm	= fin * N / M
+			 *	fvco	= finnm * P
+			 *	fclkout	= finnm / FDPLL
+			 */
+			unsigned long finnm = input * (n + 1) / (m + 1);
+			unsigned long fvco  = finnm * 2;
+
+			if (fvco < 2000 || fvco > 4096 * 1000 * 1000U)
+				continue;
+
 			for (fdpll = 1; fdpll < 32; fdpll++) {
 				unsigned long output;
 
-				output = input * (n + 1) / (m + 1)
-				       / (fdpll + 1);
+				output = finnm / (fdpll + 1);
 				if (output >= 400 * 1000 * 1000)
 					continue;
 
