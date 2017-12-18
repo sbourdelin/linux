@@ -203,7 +203,7 @@ static blk_qc_t xpram_make_request(struct request_queue *q, struct bio *bio)
 	if ((bio->bi_iter.bi_sector >> 3) > 0xffffffffU - xdev->offset)
 		goto fail;
 	index = (bio->bi_iter.bi_sector >> 3) + xdev->offset;
-	bio_for_each_segment(bvec, bio, iter) {
+	bio_for_each_page(bvec, bio, iter) {
 		page_addr = (unsigned long)
 			kmap(bvec.bv_page) + bvec.bv_offset;
 		bytes = bvec.bv_len;

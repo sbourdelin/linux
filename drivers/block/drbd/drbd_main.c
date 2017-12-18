@@ -1601,7 +1601,7 @@ static int _drbd_send_bio(struct drbd_peer_device *peer_device, struct bio *bio)
 	struct bvec_iter iter;
 
 	/* hint all but last page with MSG_MORE */
-	bio_for_each_segment(bvec, bio, iter) {
+	bio_for_each_page(bvec, bio, iter) {
 		int err;
 
 		err = _drbd_no_send_page(peer_device, bvec.bv_page,
@@ -1623,7 +1623,7 @@ static int _drbd_send_zc_bio(struct drbd_peer_device *peer_device, struct bio *b
 	struct bvec_iter iter;
 
 	/* hint all but last page with MSG_MORE */
-	bio_for_each_segment(bvec, bio, iter) {
+	bio_for_each_page(bvec, bio, iter) {
 		int err;
 
 		err = _drbd_send_page(peer_device, bvec.bv_page,

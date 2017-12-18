@@ -69,7 +69,7 @@ static blk_qc_t nfhd_make_request(struct request_queue *queue, struct bio *bio)
 
 	dir = bio_data_dir(bio);
 	shift = dev->bshift;
-	bio_for_each_segment(bvec, bio, iter) {
+	bio_for_each_page(bvec, bio, iter) {
 		len = bvec.bv_len;
 		len >>= 9;
 		nfhd_read_write(dev->id, 0, dir, sec >> shift, len >> shift,

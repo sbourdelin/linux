@@ -121,7 +121,7 @@ axon_ram_make_request(struct request_queue *queue, struct bio *bio)
 				    AXON_RAM_SECTOR_SHIFT);
 	phys_end = bank->io_addr + bank->size;
 	transfered = 0;
-	bio_for_each_segment(vec, bio, iter) {
+	bio_for_each_page(vec, bio, iter) {
 		if (unlikely(phys_mem + vec.bv_len > phys_end)) {
 			bio_io_error(bio);
 			return BLK_QC_T_NONE;

@@ -1256,7 +1256,7 @@ static void integrity_metadata(struct work_struct *w)
 		if (!checksums)
 			checksums = checksums_onstack;
 
-		__bio_for_each_segment(bv, bio, iter, dio->orig_bi_iter) {
+		__bio_for_each_page(bv, bio, iter, dio->orig_bi_iter) {
 			unsigned pos;
 			char *mem, *checksums_ptr;
 
@@ -1376,7 +1376,7 @@ static int dm_integrity_map(struct dm_target *ti, struct bio *bio)
 	if (ic->sectors_per_block > 1) {
 		struct bvec_iter iter;
 		struct bio_vec bv;
-		bio_for_each_segment(bv, bio, iter) {
+		bio_for_each_page(bv, bio, iter) {
 			if (unlikely(bv.bv_len & ((ic->sectors_per_block << SECTOR_SHIFT) - 1))) {
 				DMERR("Bio vector (%u,%u) is not aligned on %u-sector boundary",
 					bv.bv_offset, bv.bv_len, ic->sectors_per_block);

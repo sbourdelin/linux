@@ -1279,7 +1279,7 @@ static void zero_bio_chain(struct bio *chain, int start_ofs)
 	int pos = 0;
 
 	while (chain) {
-		bio_for_each_segment(bv, chain, iter) {
+		bio_for_each_page(bv, chain, iter) {
 			if (pos + bv.bv_len > start_ofs) {
 				int remainder = max(start_ofs - pos, 0);
 				buf = bvec_kmap_irq(&bv, &flags);

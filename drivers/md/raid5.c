@@ -1247,7 +1247,7 @@ async_copy_data(int frombio, struct bio *bio, struct page **page,
 		flags |= ASYNC_TX_FENCE;
 	init_async_submit(&submit, flags, tx, NULL, NULL, NULL);
 
-	bio_for_each_segment(bvl, bio, iter) {
+	bio_for_each_page(bvl, bio, iter) {
 		int len = bvl.bv_len;
 		int clen;
 		int b_offset = 0;

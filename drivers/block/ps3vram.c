@@ -557,7 +557,7 @@ static struct bio *ps3vram_do_bio(struct ps3_system_bus_device *dev,
 	struct bvec_iter iter;
 	struct bio *next;
 
-	bio_for_each_segment(bvec, bio, iter) {
+	bio_for_each_page(bvec, bio, iter) {
 		/* PS3 is ppc64, so we don't handle highmem */
 		char *ptr = page_address(bvec.bv_page) + bvec.bv_offset;
 		size_t len = bvec.bv_len, retlen;

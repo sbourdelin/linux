@@ -180,7 +180,7 @@ xfs_destroy_ioend(
 			next = bio->bi_private;
 
 		/* walk each page on bio, ending page IO on them */
-		bio_for_each_segment_all(bvec, bio, i)
+		bio_for_each_page_all(bvec, bio, i)
 			xfs_finish_page_writeback(inode, bvec, error);
 
 		bio_put(bio);

@@ -723,7 +723,7 @@ blk_status_t rsxx_dma_queue_bio(struct rsxx_cardinfo *card,
 			bv_len -= RSXX_HW_BLK_SIZE;
 		}
 	} else {
-		bio_for_each_segment(bvec, bio, iter) {
+		bio_for_each_page(bvec, bio, iter) {
 			bv_len = bvec.bv_len;
 			bv_off = bvec.bv_offset;
 

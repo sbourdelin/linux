@@ -81,7 +81,7 @@ static void mpage_end_io(struct bio *bio)
 			return;
 		}
 	}
-	bio_for_each_segment_all(bv, bio, i) {
+	bio_for_each_page_all(bv, bio, i) {
 		struct page *page = bv->bv_page;
 
 		if (!bio->bi_status) {
