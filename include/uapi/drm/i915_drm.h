@@ -1618,6 +1618,9 @@ struct drm_i915_perf_oa_config {
 
 struct drm_i915_query_item {
 	__u32 query_id;
+#define DRM_I915_QUERY_ID_SLICES_MASK    0x01
+#define DRM_I915_QUERY_ID_SUBSLICES_MASK 0x02
+#define DRM_I915_QUERY_ID_EUS_MASK       0x03
 
 	/*
 	 * When left to 0 by userspace, this is filled with the size the data
@@ -1642,6 +1645,48 @@ struct drm_i915_query {
 	 * num_items.
 	 */
 	__u64 items_ptr;
+};
+
+/* Data written by the kernel with query DRM_I915_QUERY_ID_SLICES_MASK :
+ *
+ * data: each bit indicates whether a slice is available (1) or fused off
+ * (0). Formula to tell if slice X is available :
+ *
+ *         (data[X / 8] >> (X % 8)) & 1
+ */
+struct drm_i915_query_slices_mask {
+	__u32 n_slices;
+
+	__u8 data[];
+};
+
+/* Data written by the kernel with query DRM_I915_QUERY_ID_SUBSLICES_MASK :
+ *
+ * data: each bit indicates whether a subslice is available (1) or fused off
+ * (0). Formula to tell if slice X subslice Y is available :
+ *
+ *         (data[(X * slice_stride) + Y / 8] >> (Y % 8)) & 1
+ */
+struct drm_i915_query_subslices_mask {
+	__u32 n_slices;
+	__u32 slice_stride;
+
+	__u8 data[];
+};
+
+/* Data written by the kernel with query DRM_I915_QUERY_ID_EUS_MASK :
+ *
+ * data: Each bit indicates whether a subslice is available (1) or fused off
+ * (0). Formula to tell if slice X subslice Y eu Z is available :
+ *
+ *         (data[X * slice_stride + Y * subslice_stride + Z / 8] >> (Z % 8)) & 1
+ */
+struct drm_i915_query_eus_mask {
+	__u32 n_slices;
+	__u32 slice_stride;
+	__u32 subslice_stride;
+
+	__u8 data[];
 };
 
 #if defined(__cplusplus)
