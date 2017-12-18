@@ -20,6 +20,7 @@
 #include "mmu.h"
 #include "cpuid.h"
 #include "lapic.h"
+#include "hyperv.h"
 
 #include <linux/kvm_host.h>
 #include <linux/module.h>
@@ -7935,6 +7936,30 @@ static int handle_vmptrld(struct kvm_vcpu *vcpu)
 	return kvm_skip_emulated_instruction(vcpu);
 }
 
+static int nested_vmx_handle_enlightened_vmptrld(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	struct hv_vp_assist_page assist_page;
+
+	if (!vmx->nested.enlightened_vmcs_enabled)
+		return 1;
+
+	vmx->nested.enlightened_vmcs_active =
+		kvm_hv_get_assist_page(vcpu, &assist_page) &&
+		assist_page.enlighten_vmentry;
+
+	if (vmx->nested.enlightened_vmcs_active &&
+	    assist_page.current_nested_vmcs != vmx->nested.current_vmptr) {
+		/*
+		 * This is an equivalent of the nested hypervisor executing
+		 * the vmptrld instruction.
+		 */
+		set_current_vmptr(vmx, assist_page.current_nested_vmcs);
+		copy_enlightened_to_vmcs12(vmx);
+	}
+	return 1;
+}
+
 /* Emulate the VMPTRST instruction */
 static int handle_vmptrst(struct kvm_vcpu *vcpu)
 {
@@ -11043,6 +11068,9 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 	int ret;
 
 	if (!nested_vmx_check_permission(vcpu))
+		return 1;
+
+	if (!nested_vmx_handle_enlightened_vmptrld(vcpu))
 		return 1;
 
 	if (!nested_vmx_check_vmcs12(vcpu))
