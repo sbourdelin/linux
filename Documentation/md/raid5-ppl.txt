@@ -38,7 +38,3 @@ case the behavior is the same as in plain raid5.
 
 PPL is available for md version-1 metadata and external (specifically IMSM)
 metadata arrays. It can be enabled using mdadm option --consistency-policy=ppl.
-
-Currently, volatile write-back cache should be disabled on all member drives
-when using PPL. Otherwise it cannot guarantee consistency in case of power
-failure.
