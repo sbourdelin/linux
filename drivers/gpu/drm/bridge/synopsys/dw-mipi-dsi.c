@@ -860,9 +860,6 @@ __dw_mipi_dsi_probe(struct platform_device *pdev,
 
 	if (!plat_data->base) {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-		if (!res)
-			return ERR_PTR(-ENODEV);
-
 		dsi->base = devm_ioremap_resource(dev, res);
 		if (IS_ERR(dsi->base))
 			return ERR_PTR(-ENODEV);
