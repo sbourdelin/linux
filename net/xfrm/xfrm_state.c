@@ -839,6 +839,38 @@ static struct xfrm_state *__xfrm_state_lookup(struct net *net, u32 mark,
 	return NULL;
 }
 
+struct xfrm_state *xfrm_state_lookup_loose(struct net *net, u32 mark,
+					   const xfrm_address_t *daddr,
+					   __be32 spi, u8 proto,
+					   unsigned short family)
+{
+	unsigned int h = xfrm_spi_hash(net, daddr, spi, proto, family);
+	struct xfrm_state *x, *cand = NULL;
+
+	rcu_read_lock();
+	hlist_for_each_entry_rcu(x, net->xfrm.state_byspi + h, byspi) {
+		if (x->props.family != family ||
+		    x->id.spi       != spi ||
+		    x->id.proto     != proto ||
+		    !xfrm_addr_equal(&x->id.daddr, daddr, family))
+			continue;
+
+		if (((mark & x->mark.m) == x->mark.v) &&
+		    xfrm_state_hold_rcu(x)) {
+			if (cand)
+				xfrm_state_put(cand);
+			rcu_read_unlock();
+			return x;
+		}
+
+		if (!cand && xfrm_state_hold_rcu(x))
+			cand = x;
+	}
+
+	rcu_read_unlock();
+	return cand;
+}
+
 static struct xfrm_state *__xfrm_state_lookup_byaddr(struct net *net, u32 mark,
 						     const xfrm_address_t *daddr,
 						     const xfrm_address_t *saddr,
