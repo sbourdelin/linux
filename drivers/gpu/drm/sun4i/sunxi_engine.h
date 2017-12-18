@@ -15,13 +15,60 @@ struct drm_device;
 
 struct sunxi_engine;
 
+/**
+ * struct sunxi_engine_ops - helper operations for sunXi engines
+ *
+ * These hooks are used by the common part of the DRM driver to
+ * implement the proper behaviour.
+ */
 struct sunxi_engine_ops {
+	/**
+	 * @apply_color_correction:
+	 *
+	 * This callback will enable the color correction in the
+	 * backend. This is useful only for the composite output.
+	 *
+	 * This function is optional.
+	 */
+	void (*apply_color_correction)(struct sunxi_engine *engine);
+
+	/**
+	 * @commit:
+	 *
+	 * This callback will trigger the hardware switch to commit
+	 * the new configuration that has been setup during the next
+	 * vblank period.
+	 *
+	 * This function is optional.
+	 */
 	void (*commit)(struct sunxi_engine *engine);
+
+	/**
+	 * @disable_color_correction:
+	 *
+	 * This callback will stop the color correction in the
+	 * backend. This is useful only for the composite output.
+	 *
+	 * This function is optional.
+	 */
+	void (*disable_color_correction)(struct sunxi_engine *engine);
+
+	/**
+	 * @layers_init:
+	 *
+	 * This callback is used to allocate, initialize and register
+	 * the layers supported by that backend.
+	 *
+	 * This function is mandatory.
+	 *
+	 * RETURNS:
+	 *
+	 * The array of struct drm_plane backing the layers, or an
+	 * error pointer on failure.
+	 */
 	struct drm_plane **(*layers_init)(struct drm_device *drm,
 					  struct sunxi_engine *engine);
 
-	void (*apply_color_correction)(struct sunxi_engine *engine);
-	void (*disable_color_correction)(struct sunxi_engine *engine);
 };
 
 /**
