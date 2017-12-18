@@ -102,3 +102,32 @@ struct llist_node *llist_reverse_order(struct llist_node *head)
 	return new_head;
 }
 EXPORT_SYMBOL_GPL(llist_reverse_order);
+
+/**
+ * llist_add_exclusive - add a node only if its ->next is NULL
+ * @node:	the node to be added
+ * @head:	the head for your lock-less list
+ *
+ * Return true if the node was added, or false otherwise.
+ */
+bool llist_add_exclusive(struct llist_node *node, struct llist_head *head)
+{
+	struct llist_node *next = LLIST_NODE_UNLISTED;
+	struct llist_node *entry, *new_next;
+
+	/*
+	 * if new_next is next (== LLIST_NODE_UNLISTED) on the first run, we
+	 * get exclusive access to this node as long as others use
+	 * llist_add_safe too.
+	 * Then false can be returned no more and we'll loop until we get the
+	 * stuff right.
+	 */
+	do {
+		entry = READ_ONCE(head->first);
+		if ((new_next = cmpxchg(&node->next, next, entry)) != next)
+			return false;
+		next = entry;
+	} while (cmpxchg(&head->first, entry, node) != entry);
+	return true;
+}
+EXPORT_SYMBOL_GPL(llist_add_exclusive);

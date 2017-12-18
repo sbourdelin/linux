@@ -74,6 +74,10 @@ struct llist_node {
 #define LLIST_HEAD_INIT(name)	{ NULL }
 #define LLIST_HEAD(name)	struct llist_head name = LLIST_HEAD_INIT(name)
 
+#define LLIST_NODE_UNLISTED	((void *)(-1L))
+#define LLIST_NODE_INIT(name)	{ LLIST_NODE_UNLISTED }
+#define LLIST_NODE(name)	struct llist_node name = LLIST_NODE_INIT(name)
+
 /**
  * init_llist_head - initialize lock-less list head
  * @head:	the head for your lock-less list
@@ -237,5 +241,26 @@ static inline struct llist_node *llist_del_all(struct llist_head *head)
 extern struct llist_node *llist_del_first(struct llist_head *head);
 
 struct llist_node *llist_reverse_order(struct llist_node *head);
+
+/**
+ * llist_del_first_exclusive - delete the first entry of lock-less list
+ * 			       and make sure its ->next is NULL
+ * @head:	the head for your lock-less list
+ *
+ * If list is empty, return NULL, otherwise, return the first entry
+ * deleted, this is the newest added one.
+ *
+ */
+static inline struct llist_node *llist_del_first_exclusive(
+				struct llist_head *head)
+{
+	struct llist_node *node = llist_del_first(head);
+
+	if (READ_ONCE(node))
+		smp_store_release(&node->next, LLIST_NODE_UNLISTED);
+	return node;
+}
+
+extern bool llist_add_exclusive(struct llist_node *, struct llist_head *);
 
 #endif /* LLIST_H */
