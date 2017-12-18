@@ -503,6 +503,16 @@ struct nested_vmx {
 	 * on what the enlightened VMCS supports.
 	 */
 	bool enlightened_vmcs_enabled;
+	/*
+	 * Indicates that the nested hypervisor performed the last vmentry with
+	 * a Hyper-V enlightened VMCS.
+	 */
+	bool enlightened_vmcs_active;
+
+	/*
+	 * Indicates that the enlightened VMCS must be synced with vmcs12
+	 */
+	bool sync_enlightened_vmcs;
 
 	/* vmcs02_list cache of VMCSs recently used to run L2 guests */
 	struct list_head vmcs02_pool;
@@ -991,6 +1001,7 @@ static void vmx_get_segment(struct kvm_vcpu *vcpu,
 static bool guest_state_valid(struct kvm_vcpu *vcpu);
 static u32 vmx_segment_access_rights(struct kvm_segment *var);
 static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx);
+static void copy_enlightened_to_vmcs12(struct vcpu_vmx *vmx);
 static bool vmx_get_nmi_mask(struct kvm_vcpu *vcpu);
 static void vmx_set_nmi_mask(struct kvm_vcpu *vcpu, bool masked);
 static bool nested_vmx_is_page_fault_vmexit(struct vmcs12 *vmcs12,
@@ -7455,7 +7466,10 @@ static inline void nested_release_vmcs12(struct vcpu_vmx *vmx)
 	if (vmx->nested.current_vmptr == -1ull)
 		return;
 
-	if (enable_shadow_vmcs) {
+	if (vmx->nested.enlightened_vmcs_active) {
+		copy_enlightened_to_vmcs12(vmx);
+		vmx->nested.sync_enlightened_vmcs = false;
+	} else if (enable_shadow_vmcs) {
 		/* copy to memory all shadowed fields in case
 		   they were modified */
 		copy_shadow_to_vmcs12(vmx);
@@ -7640,6 +7654,20 @@ static inline int vmcs12_write_any(struct kvm_vcpu *vcpu,
 		return -ENOENT;
 	}
 
+}
+
+static void copy_enlightened_to_vmcs12(struct vcpu_vmx *vmx)
+{
+	kvm_vcpu_read_guest_page(&vmx->vcpu,
+				 vmx->nested.current_vmptr >> PAGE_SHIFT,
+				 vmx->nested.cached_vmcs12, 0, VMCS12_SIZE);
+}
+
+static void copy_vmcs12_to_enlightened(struct vcpu_vmx *vmx)
+{
+	kvm_vcpu_write_guest_page(&vmx->vcpu,
+				  vmx->nested.current_vmptr >> PAGE_SHIFT,
+				  vmx->nested.cached_vmcs12, 0, VMCS12_SIZE);
 }
 
 static void copy_shadow_to_vmcs12(struct vcpu_vmx *vmx)
@@ -7841,7 +7869,9 @@ static int handle_vmwrite(struct kvm_vcpu *vcpu)
 static void set_current_vmptr(struct vcpu_vmx *vmx, gpa_t vmptr)
 {
 	vmx->nested.current_vmptr = vmptr;
-	if (enable_shadow_vmcs) {
+	if (vmx->nested.enlightened_vmcs_active) {
+		vmx->nested.sync_enlightened_vmcs = true;
+	} else if (enable_shadow_vmcs) {
 		vmcs_set_bits(SECONDARY_VM_EXEC_CONTROL,
 			      SECONDARY_EXEC_SHADOW_VMCS);
 		vmcs_write64(VMCS_LINK_POINTER,
@@ -9396,7 +9426,10 @@ static void __noclone vmx_vcpu_run(struct kvm_vcpu *vcpu)
 		vmcs_write32(PLE_WINDOW, vmx->ple_window);
 	}
 
-	if (vmx->nested.sync_shadow_vmcs) {
+	if (vmx->nested.sync_enlightened_vmcs) {
+		copy_vmcs12_to_enlightened(vmx);
+		vmx->nested.sync_enlightened_vmcs = false;
+	} else if (vmx->nested.sync_shadow_vmcs) {
 		copy_vmcs12_to_shadow(vmx);
 		vmx->nested.sync_shadow_vmcs = false;
 	}
@@ -11017,7 +11050,9 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 
 	vmcs12 = get_vmcs12(vcpu);
 
-	if (enable_shadow_vmcs)
+	if (vmx->nested.enlightened_vmcs_active)
+		copy_enlightened_to_vmcs12(vmx);
+	else if (enable_shadow_vmcs)
 		copy_shadow_to_vmcs12(vmx);
 
 	/*
@@ -11634,8 +11669,12 @@ static void nested_vmx_vmexit(struct kvm_vcpu *vcpu, u32 exit_reason,
 	 */
 	kvm_make_request(KVM_REQ_APIC_PAGE_RELOAD, vcpu);
 
-	if (enable_shadow_vmcs && exit_reason != -1)
-		vmx->nested.sync_shadow_vmcs = true;
+	if (exit_reason != -1) {
+		if (vmx->nested.enlightened_vmcs_active)
+			vmx->nested.sync_enlightened_vmcs = true;
+		else if (enable_shadow_vmcs)
+			vmx->nested.sync_shadow_vmcs = true;
+	}
 
 	/* in case we halted in L2 */
 	vcpu->arch.mp_state = KVM_MP_STATE_RUNNABLE;
@@ -11714,12 +11753,17 @@ static void nested_vmx_entry_failure(struct kvm_vcpu *vcpu,
 			struct vmcs12 *vmcs12,
 			u32 reason, unsigned long qualification)
 {
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
 	load_vmcs12_host_state(vcpu, vmcs12);
 	vmcs12->vm_exit_reason = reason | VMX_EXIT_REASONS_FAILED_VMENTRY;
 	vmcs12->exit_qualification = qualification;
 	nested_vmx_succeed(vcpu);
-	if (enable_shadow_vmcs)
-		to_vmx(vcpu)->nested.sync_shadow_vmcs = true;
+
+	if (vmx->nested.enlightened_vmcs_active)
+		vmx->nested.sync_enlightened_vmcs = true;
+	else if (enable_shadow_vmcs)
+		vmx->nested.sync_shadow_vmcs = true;
 }
 
 static int vmx_check_intercept(struct kvm_vcpu *vcpu,
