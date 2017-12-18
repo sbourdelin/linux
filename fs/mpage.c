@@ -50,7 +50,7 @@ static void mpage_end_io(struct bio *bio)
 	int i;
 	struct bvec_iter_all bia;
 
-	bio_for_each_page_all2(bv, bio, i, bia) {
+	bio_for_each_page_all(bv, bio, i, bia) {
 		struct page *page = bv->bv_page;
 		page_endio(page, op_is_write(bio_op(bio)),
 				blk_status_to_errno(bio->bi_status));

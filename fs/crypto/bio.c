@@ -39,7 +39,7 @@ static void completion_pages(struct work_struct *work)
 	int i;
 	struct bvec_iter_all bia;
 
-	bio_for_each_page_all2(bv, bio, i, bia) {
+	bio_for_each_page_all(bv, bio, i, bia) {
 		struct page *page = bv->bv_page;
 		int ret = fscrypt_decrypt_page(page->mapping->host, page,
 				PAGE_SIZE, 0, page->index);
