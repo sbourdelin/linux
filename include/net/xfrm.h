@@ -653,6 +653,8 @@ struct xfrm_tunnel_skb_cb {
 	} header;
 
 	union {
+		int (*lookup)(struct sk_buff *skb, int nexthdr, __be32 spi,
+			      __be32 seq, struct xfrm_state **x);
 		struct ip_tunnel *ip4;
 		struct ip6_tnl *ip6;
 	} tunnel;

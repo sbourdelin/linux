@@ -297,13 +297,33 @@ static void vti6_dev_uninit(struct net_device *dev)
 	dev_put(dev);
 }
 
-static int vti6_rcv(struct sk_buff *skb)
+static struct ip6_tnl *
+vti6_find_tunnel(struct sk_buff *skb, __be32 spi, struct xfrm_state **x)
 {
-	struct ip6_tnl *t;
 	const struct ipv6hdr *ipv6h = ipv6_hdr(skb);
+	struct net *net = dev_net(skb->dev);
+	struct ip6_tnl *t;
+
+	t = vti6_tnl_lookup(net, &ipv6h->saddr, &ipv6h->daddr);
+	if (t) {
+		*x = xfrm_state_lookup(net, be32_to_cpu(t->parms.i_key),
+				       (xfrm_address_t *)&ipv6h->daddr,
+				       spi, ipv6h->nexthdr, AF_INET6);
+	}
+
+	return t;
+}
+
+int
+vti6_lookup(struct sk_buff *skb, int nexthdr, __be32 spi, __be32 seq,
+	    struct xfrm_state **x)
+{
+	const struct ipv6hdr *ipv6h = ipv6_hdr(skb);
+	struct net *net = dev_net(skb->dev);
+	struct ip6_tnl *t;
 
 	rcu_read_lock();
-	t = vti6_tnl_lookup(dev_net(skb->dev), &ipv6h->saddr, &ipv6h->daddr);
+	t = vti6_find_tunnel(skb, spi, x);
 	if (t) {
 		if (t->parms.proto != IPPROTO_IPV6 && t->parms.proto != 0) {
 			rcu_read_unlock();
@@ -312,7 +332,7 @@ static int vti6_rcv(struct sk_buff *skb)
 
 		if (!xfrm6_policy_check(NULL, XFRM_POLICY_IN, skb)) {
 			rcu_read_unlock();
-			return 0;
+			goto discard;
 		}
 
 		if (!ip6_tnl_rcv_ctl(t, &ipv6h->daddr, &ipv6h->saddr)) {
@@ -321,15 +341,36 @@ static int vti6_rcv(struct sk_buff *skb)
 			goto discard;
 		}
 
+		if (!*x) {
+			XFRM_INC_STATS(net, LINUX_MIB_XFRMINNOSTATES);
+			xfrm_audit_state_notfound(skb, AF_INET6, spi, seq);
+			t->dev->stats.rx_errors++;
+			t->dev->stats.rx_dropped++;
+			rcu_read_unlock();
+			goto discard;
+		}
+
 		rcu_read_unlock();
 
-		return xfrm6_rcv_tnl(skb, t);
+		XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip6 = t;
+
+		return 0;
 	}
 	rcu_read_unlock();
 	return -EINVAL;
 discard:
+	if (*x)
+		xfrm_state_put(*x);
 	kfree_skb(skb);
-	return 0;
+	return -ESRCH;
+}
+
+static int vti6_rcv(struct sk_buff *skb)
+{
+	int nexthdr = skb_network_header(skb)[IP6CB(skb)->nhoff];
+
+	XFRM_TUNNEL_SKB_CB(skb)->tunnel.lookup = vti6_lookup;
+	return xfrm6_rcv_spi(skb, nexthdr, 0, NULL);
 }
 
 static int vti6_rcv_cb(struct sk_buff *skb, int err)
@@ -342,6 +383,8 @@ static int vti6_rcv_cb(struct sk_buff *skb, int err)
 	struct ip6_tnl *t = XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip6;
 	u32 orig_mark = skb->mark;
 	int ret;
+
+	XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip6 = NULL;
 
 	if (!t)
 		return 1;

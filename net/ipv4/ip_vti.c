@@ -49,8 +49,8 @@ static struct rtnl_link_ops vti_link_ops __read_mostly;
 static unsigned int vti_net_id __read_mostly;
 static int vti_tunnel_init(struct net_device *dev);
 
-static int vti_input(struct sk_buff *skb, int nexthdr, __be32 spi,
-		     int encap_type)
+static struct ip_tunnel *
+vti4_find_tunnel(struct sk_buff *skb, __be32 spi, struct xfrm_state **x)
 {
 	struct ip_tunnel *tunnel;
 	const struct iphdr *iph = ip_hdr(skb);
@@ -60,18 +60,51 @@ static int vti_input(struct sk_buff *skb, int nexthdr, __be32 spi,
 	tunnel = ip_tunnel_lookup(itn, skb->dev->ifindex, TUNNEL_NO_KEY,
 				  iph->saddr, iph->daddr, 0);
 	if (tunnel) {
+		*x = xfrm_state_lookup(net, be32_to_cpu(tunnel->parms.i_key),
+				       (xfrm_address_t *)&iph->daddr,
+				       spi, iph->protocol, AF_INET);
+	}
+
+	return tunnel;
+}
+
+static int vti_lookup(struct sk_buff *skb, int nexthdr, __be32 spi, __be32 seq,
+		      struct xfrm_state **x)
+{
+	struct net *net = dev_net(skb->dev);
+	struct ip_tunnel *tunnel;
+
+	tunnel = vti4_find_tunnel(skb, spi, x);
+	if (tunnel) {
 		if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb))
 			goto drop;
 
+		if (!*x) {
+			XFRM_INC_STATS(net, LINUX_MIB_XFRMINNOSTATES);
+			xfrm_audit_state_notfound(skb, AF_INET, spi, seq);
+			tunnel->dev->stats.rx_errors++;
+			tunnel->dev->stats.rx_dropped++;
+			goto drop;
+		}
+
 		XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip4 = tunnel;
 
-		return xfrm_input(skb, nexthdr, spi, encap_type);
+		return 0;
 	}
 
 	return -EINVAL;
 drop:
+	if (*x)
+		xfrm_state_put(*x);
 	kfree_skb(skb);
-	return 0;
+	return -ESRCH;
+}
+
+static int vti_input(struct sk_buff *skb, int nexthdr, __be32 spi,
+		     int encap_type)
+{
+	XFRM_TUNNEL_SKB_CB(skb)->tunnel.lookup = vti_lookup;
+	return xfrm_input(skb, nexthdr, spi, encap_type);
 }
 
 static int vti_rcv(struct sk_buff *skb)
@@ -92,6 +125,8 @@ static int vti_rcv_cb(struct sk_buff *skb, int err)
 	struct ip_tunnel *tunnel = XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip4;
 	u32 orig_mark = skb->mark;
 	int ret;
+
+	XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip4 = NULL;
 
 	if (!tunnel)
 		return 1;

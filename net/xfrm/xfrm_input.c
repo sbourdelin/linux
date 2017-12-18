@@ -267,18 +267,6 @@ int xfrm_input(struct sk_buff *skb, int nexthdr, __be32 spi, int encap_type)
 
 	family = XFRM_SPI_SKB_CB(skb)->family;
 
-	/* if tunnel is present override skb->mark value with tunnel i_key */
-	switch (family) {
-	case AF_INET:
-		if (XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip4)
-			mark = be32_to_cpu(XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip4->parms.i_key);
-		break;
-	case AF_INET6:
-		if (XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip6)
-			mark = be32_to_cpu(XFRM_TUNNEL_SKB_CB(skb)->tunnel.ip6->parms.i_key);
-		break;
-	}
-
 	err = secpath_set(skb);
 	if (err) {
 		XFRM_INC_STATS(net, LINUX_MIB_XFRMINERROR);
@@ -293,14 +281,29 @@ int xfrm_input(struct sk_buff *skb, int nexthdr, __be32 spi, int encap_type)
 
 	daddr = (xfrm_address_t *)(skb_network_header(skb) +
 				   XFRM_SPI_SKB_CB(skb)->daddroff);
+
+	if (XFRM_TUNNEL_SKB_CB(skb)->tunnel.lookup) {
+		err = XFRM_TUNNEL_SKB_CB(skb)->tunnel.lookup(skb, nexthdr,
+							     spi, seq, &x);
+		if (err) {
+			XFRM_TUNNEL_SKB_CB(skb)->tunnel.lookup = NULL;
+			return err;
+		}
+	}
+
 	do {
 		if (skb->sp->len == XFRM_MAX_DEPTH) {
 			XFRM_INC_STATS(net, LINUX_MIB_XFRMINBUFFERERROR);
+			if (x)
+				xfrm_state_put(x);
 			goto drop;
 		}
 
-		x = xfrm_state_lookup(net, mark, daddr, spi, nexthdr, family);
-		if (x == NULL) {
+		if (!x)
+			x = xfrm_state_lookup(net, mark, daddr, spi, nexthdr,
+					      family);
+
+		if (!x) {
 			XFRM_INC_STATS(net, LINUX_MIB_XFRMINNOSTATES);
 			xfrm_audit_state_notfound(skb, family, spi, seq);
 			goto drop;
@@ -420,6 +423,9 @@ resume:
 			XFRM_INC_STATS(net, LINUX_MIB_XFRMINHDRERROR);
 			goto drop;
 		}
+
+		if (!err)
+			x = NULL;
 	} while (!err);
 
 	err = xfrm_rcv_cb(skb, family, x->type->proto, 0);
