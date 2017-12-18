@@ -488,6 +488,11 @@
 				drive-strength = <20>;
 				bias-pull-up;
 			};
+
+			cir_pins: cir-pins@0 {
+				pins = "PL12";
+				function = "s_cir_rx";
+			};
 		};
 
 		r_rsb: rsb@1f03400 {
