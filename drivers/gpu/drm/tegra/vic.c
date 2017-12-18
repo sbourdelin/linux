@@ -302,11 +302,6 @@ static int vic_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	if (!regs) {
-		dev_err(&pdev->dev, "failed to get registers\n");
-		return -ENXIO;
-	}
-
 	vic->regs = devm_ioremap_resource(dev, regs);
 	if (IS_ERR(vic->regs))
 		return PTR_ERR(vic->regs);
