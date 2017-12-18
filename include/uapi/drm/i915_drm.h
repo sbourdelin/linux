@@ -318,6 +318,7 @@ typedef struct _drm_i915_sarea {
 #define DRM_I915_PERF_OPEN		0x36
 #define DRM_I915_PERF_ADD_CONFIG	0x37
 #define DRM_I915_PERF_REMOVE_CONFIG	0x38
+#define DRM_I915_QUERY			0x39
 
 #define DRM_IOCTL_I915_INIT		DRM_IOW( DRM_COMMAND_BASE + DRM_I915_INIT, drm_i915_init_t)
 #define DRM_IOCTL_I915_FLUSH		DRM_IO ( DRM_COMMAND_BASE + DRM_I915_FLUSH)
@@ -375,6 +376,7 @@ typedef struct _drm_i915_sarea {
 #define DRM_IOCTL_I915_PERF_OPEN	DRM_IOW(DRM_COMMAND_BASE + DRM_I915_PERF_OPEN, struct drm_i915_perf_open_param)
 #define DRM_IOCTL_I915_PERF_ADD_CONFIG	DRM_IOW(DRM_COMMAND_BASE + DRM_I915_PERF_ADD_CONFIG, struct drm_i915_perf_oa_config)
 #define DRM_IOCTL_I915_PERF_REMOVE_CONFIG	DRM_IOW(DRM_COMMAND_BASE + DRM_I915_PERF_REMOVE_CONFIG, __u64)
+#define DRM_IOCTL_I915_QUERY			DRM_IOW(DRM_COMMAND_BASE + DRM_I915_QUERY, struct drm_i915_query)
 
 /* Allow drivers to submit batchbuffers directly to hardware, relying
  * on the security mechanisms provided by hardware.
@@ -1611,6 +1613,35 @@ struct drm_i915_perf_oa_config {
 	__u64 mux_regs_ptr;
 	__u64 boolean_regs_ptr;
 	__u64 flex_regs_ptr;
+};
+
+
+struct drm_i915_query_item {
+	__u32 query_id;
+
+	/*
+	 * When left to 0 by userspace, this is filled with the size the data
+	 * to be written at the query_data pointer.
+	 */
+	__u32 length;
+
+	/*
+	 * Data will be written at the location pointed by data_ptr when the
+	 * value of length matches the length of the data to be written by the
+	 * kernel.
+	 */
+	__u64 data_ptr;
+};
+
+struct drm_i915_query {
+	__u32 num_items;
+	__u32 _pad;
+
+	/*
+	 * This points an array of struct drm_i915_query_item of length
+	 * num_items.
+	 */
+	__u64 items_ptr;
 };
 
 #if defined(__cplusplus)
