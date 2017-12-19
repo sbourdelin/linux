@@ -3567,8 +3567,8 @@ int c4iw_ep_disconnect(struct c4iw_ep *ep, int abrupt, gfp_t gfp)
 	case MORIBUND:
 	case ABORTING:
 	case DEAD:
-		pr_info("%s ignoring disconnect ep %p state %u\n",
-			__func__, ep, ep->com.state);
+		pr_debug("ignoring disconnect ep %p state %u\n",
+			 ep, ep->com.state);
 		break;
 	default:
 		WARN_ONCE(1, "Bad endpoint state %u\n", ep->com.state);
