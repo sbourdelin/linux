@@ -363,6 +363,7 @@ static int drm_syncobj_file_release(struct inode *inode, struct file *file)
 {
 	struct drm_syncobj *syncobj = file->private_data;
 
+	syncobj->file = NULL;
 	drm_syncobj_put(syncobj);
 	return 0;
 }
