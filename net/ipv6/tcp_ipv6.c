@@ -787,9 +787,11 @@ static void tcp_v6_send_response(const struct sock *sk, struct sk_buff *skb, u32
 	struct net *net = sk ? sock_net(sk) : dev_net(skb_dst(skb)->dev);
 	struct sock *ctl_sk = net->ipv6.tcp_sk;
 	unsigned int tot_len = sizeof(struct tcphdr);
+	struct ipv6_pinfo *np = inet6_sk(ctl_sk);
 	struct dst_entry *dst;
 	__be32 *topt;
 
+	np->autoflowlabel = ip6_default_np_autolabel(net);
 	if (tsecr)
 		tot_len += TCPOLEN_TSTAMP_ALIGNED;
 #ifdef CONFIG_TCP_MD5SIG
