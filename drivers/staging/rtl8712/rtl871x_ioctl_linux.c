@@ -1953,7 +1953,7 @@ static int r871x_get_ap_info(struct net_device *dev,
 	struct list_head *plist, *phead;
 	unsigned char *pbuf;
 	u8 bssid[ETH_ALEN];
-	char data[33];
+	int ret;
 
 	if (padapter->bDriverStopped || (pdata == NULL))
 		return -EINVAL;
@@ -1967,9 +1967,11 @@ static int r871x_get_ap_info(struct net_device *dev,
 	pdata->flags = 0;
 	if (pdata->length < 32)
 		return -EINVAL;
-	if (copy_from_user(data, pdata->pointer, 32))
-		return -EINVAL;
-	data[32] = 0;
+	ret = mac_pton_from_user(pdata->pointer, 32, bssid);
+	if (ret)
+		return ret;
+
+	netdev_info(dev, "r8712u: BSSID:%pM\n", bssid);
 
 	spin_lock_irqsave(&(pmlmepriv->scanned_queue.lock), irqL);
 	phead = &queue->queue;
@@ -1978,14 +1980,6 @@ static int r871x_get_ap_info(struct net_device *dev,
 		if (end_of_queue_search(phead, plist))
 			break;
 		pnetwork = container_of(plist, struct wlan_network, list);
-		if (!mac_pton(data, bssid)) {
-			netdev_info(dev, "r8712u: Invalid BSSID '%s'.\n",
-				    (u8 *)data);
-			spin_unlock_irqrestore(&(pmlmepriv->scanned_queue.lock),
-					       irqL);
-			return -EINVAL;
-		}
-		netdev_info(dev, "r8712u: BSSID:%pM\n", bssid);
 		if (ether_addr_equal(bssid, pnetwork->network.MacAddress)) {
 			/* BSSID match, then check if supporting wpa/wpa2 */
 			pbuf = r8712_get_wpa_ie(&pnetwork->network.IEs[12],
