@@ -587,6 +587,7 @@ extern int __must_check hex2bin(u8 *dst, const char *src, size_t count);
 extern char *bin2hex(char *dst, const void *src, size_t count);
 
 bool mac_pton(const char *s, u8 *mac);
+int __must_check mac_pton_from_user(const char __user *s, size_t count, u8 *mac);
 
 /*
  * General tracing related utility functions - trace_printk(),
