@@ -559,8 +559,9 @@ static int parse_nsh(struct sk_buff *skb, struct sw_flow_key *key)
  *      of a correct length, otherwise the same as skb->network_header.
  *      For other key->eth.type values it is left untouched.
  *
- *    - skb->protocol: the type of the data starting at skb->network_header.
- *      Equals to key->eth.type.
+ *    - skb->protocol: For Ethernet, the ethertype or VLAN TPID.
+ *      For non-Ethernet, the type of the data starting at skb->network_header
+ *      (also equal to key->eth.type).
  */
 static int key_extract(struct sk_buff *skb, struct sw_flow_key *key)
 {
@@ -579,6 +580,7 @@ static int key_extract(struct sk_buff *skb, struct sw_flow_key *key)
 			return -EINVAL;
 
 		skb_reset_network_header(skb);
+		key->eth.type = skb->protocol;
 	} else {
 		eth = eth_hdr(skb);
 		ether_addr_copy(key->eth.src, eth->h_source);
@@ -592,15 +594,14 @@ static int key_extract(struct sk_buff *skb, struct sw_flow_key *key)
 		if (unlikely(parse_vlan(skb, key)))
 			return -ENOMEM;
 
-		skb->protocol = parse_ethertype(skb);
-		if (unlikely(skb->protocol == htons(0)))
+		key->eth.type = parse_ethertype(skb);
+		if (unlikely(key->eth.type == htons(0)))
 			return -ENOMEM;
 
 		skb_reset_network_header(skb);
 		__skb_push(skb, skb->data - skb_mac_header(skb));
 	}
 	skb_reset_mac_len(skb);
-	key->eth.type = skb->protocol;
 
 	/* Network layer. */
 	if (key->eth.type == htons(ETH_P_IP)) {
