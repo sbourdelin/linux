@@ -82,6 +82,16 @@ config JUMP_LABEL
 	 ( On 32-bit x86, the necessary options added to the compiler
 	   flags may increase the size of the kernel slightly. )
 
+config IPI_BENCHMARK
+	tristate "Test IPI performance on SMP systems"
+	depends on SMP
+	help
+	  Test IPI performance on SMP systems. If system has only one online
+	  CPU, sending IPI to other CPU is obviously not possible, and ENOENT
+	  is returned for corresponding test.
+
+	  If unsure, say N.
+
 config STATIC_KEYS_SELFTEST
 	bool "Static key selftest"
 	depends on JUMP_LABEL
