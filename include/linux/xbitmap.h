@@ -35,6 +35,12 @@ static inline void xb_init(struct xb *xb)
 int xb_set_bit(struct xb *xb, unsigned long bit);
 bool xb_test_bit(const struct xb *xb, unsigned long bit);
 void xb_clear_bit(struct xb *xb, unsigned long bit);
+void xb_clear_bit_range(struct xb *xb, unsigned long start,
+			unsigned long nbits);
+unsigned long xb_find_set(struct xb *xb, unsigned long size,
+			  unsigned long offset);
+unsigned long xb_find_zero(struct xb *xb, unsigned long size,
+			   unsigned long offset);
 
 static inline bool xb_empty(const struct xb *xb)
 {
