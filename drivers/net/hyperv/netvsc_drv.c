@@ -49,7 +49,6 @@
 #define RING_SIZE_MIN		64
 
 #define LINKCHANGE_INT (2 * HZ)
-#define VF_TAKEOVER_INT (HZ / 10)
 
 static unsigned int ring_size __ro_after_init = 128;
 module_param(ring_size, uint, S_IRUGO);
@@ -1757,10 +1756,19 @@ static rx_handler_result_t netvsc_vf_handle_frame(struct sk_buff **pskb)
 	return RX_HANDLER_ANOTHER;
 }
 
+/* set the name of VF device based on upper device name */
+static int netvsc_vf_rename(const struct net_device *ndev,
+			    struct net_device *vf_netdev)
+{
+	char vf_name[IFNAMSIZ];
+
+	snprintf(vf_name, IFNAMSIZ, "%s_vf", ndev->name);
+	return dev_change_name(vf_netdev, vf_name);
+}
+
 static int netvsc_vf_join(struct net_device *vf_netdev,
 			  struct net_device *ndev)
 {
-	struct net_device_context *ndev_ctx = netdev_priv(ndev);
 	int ret;
 
 	ret = netdev_rx_handler_register(vf_netdev,
@@ -1783,23 +1791,12 @@ static int netvsc_vf_join(struct net_device *vf_netdev,
 	/* set slave flag before open to prevent IPv6 addrconf */
 	vf_netdev->flags |= IFF_SLAVE;
 
-	schedule_delayed_work(&ndev_ctx->vf_takeover, VF_TAKEOVER_INT);
-
 	call_netdevice_notifiers(NETDEV_JOIN, vf_netdev);
 
-	netdev_info(vf_netdev, "joined to %s\n", ndev->name);
-	return 0;
-
-upper_link_failed:
-	netdev_rx_handler_unregister(vf_netdev);
-rx_handler_failed:
-	return ret;
-}
-
-static void __netvsc_vf_setup(struct net_device *ndev,
-			      struct net_device *vf_netdev)
-{
-	int ret;
+	ret = netvsc_vf_rename(ndev, vf_netdev);
+	if (ret != 0)
+		netdev_warn(vf_netdev,
+			    "can not rename device: (%d)\n", ret);
 
 	/* Align MTU of VF with master */
 	ret = dev_set_mtu(vf_netdev, ndev->mtu);
@@ -1807,34 +1804,21 @@ static void __netvsc_vf_setup(struct net_device *ndev,
 		netdev_warn(vf_netdev,
 			    "unable to change mtu to %u\n", ndev->mtu);
 
+	/* If upper device is already up, bring up slave */
 	if (netif_running(ndev)) {
 		ret = dev_open(vf_netdev);
 		if (ret)
 			netdev_warn(vf_netdev,
 				    "unable to open: %d\n", ret);
 	}
-}
 
-/* Setup VF as slave of the synthetic device.
- * Runs in workqueue to avoid recursion in netlink callbacks.
- */
-static void netvsc_vf_setup(struct work_struct *w)
-{
-	struct net_device_context *ndev_ctx
-		= container_of(w, struct net_device_context, vf_takeover.work);
-	struct net_device *ndev = hv_get_drvdata(ndev_ctx->device_ctx);
-	struct net_device *vf_netdev;
+	netdev_info(vf_netdev, "joined to %s\n", ndev->name);
+	return 0;
 
-	if (!rtnl_trylock()) {
-		schedule_delayed_work(&ndev_ctx->vf_takeover, 0);
-		return;
-	}
-
-	vf_netdev = rtnl_dereference(ndev_ctx->vf_netdev);
-	if (vf_netdev)
-		__netvsc_vf_setup(ndev, vf_netdev);
-
-	rtnl_unlock();
+ upper_link_failed:
+	netdev_rx_handler_unregister(vf_netdev);
+ rx_handler_failed:
+	return ret;
 }
 
 static int netvsc_register_vf(struct net_device *vf_netdev)
@@ -1894,6 +1878,22 @@ static int netvsc_vf_changed(struct net_device *vf_netdev)
 	return NOTIFY_OK;
 }
 
+/* Synthetic device name changed, rename VF */
+static int netvsc_name_change(struct net_device *ndev)
+{
+	struct net_device_context *ndev_ctx = netdev_priv(ndev);
+	struct net_device *vf_netdev = rtnl_dereference(ndev_ctx->vf_netdev);
+	int err;
+
+	if (vf_netdev) {
+		err = netvsc_vf_rename(ndev, vf_netdev);
+
+		return err ? notifier_from_errno(err) : NOTIFY_OK;
+	}
+
+	return NOTIFY_DONE;
+}
+
 static int netvsc_unregister_vf(struct net_device *vf_netdev)
 {
 	struct net_device *ndev;
@@ -1904,7 +1904,6 @@ static int netvsc_unregister_vf(struct net_device *vf_netdev)
 		return NOTIFY_DONE;
 
 	net_device_ctx = netdev_priv(ndev);
-	cancel_delayed_work_sync(&net_device_ctx->vf_takeover);
 
 	netdev_info(ndev, "VF unregistering: %s\n", vf_netdev->name);
 
@@ -1947,7 +1946,6 @@ static int netvsc_probe(struct hv_device *dev,
 
 	spin_lock_init(&net_device_ctx->lock);
 	INIT_LIST_HEAD(&net_device_ctx->reconfig_events);
-	INIT_DELAYED_WORK(&net_device_ctx->vf_takeover, netvsc_vf_setup);
 
 	net_device_ctx->vf_stats
 		= netdev_alloc_pcpu_stats(struct netvsc_vf_pcpu_stats);
@@ -2085,9 +2083,13 @@ static int netvsc_netdev_event(struct notifier_block *this,
 {
 	struct net_device *event_dev = netdev_notifier_info_to_dev(ptr);
 
-	/* Skip our own events */
-	if (event_dev->netdev_ops == &device_ops)
+	/* Events on synthetic device? */
+	if (event_dev->netdev_ops == &device_ops) {
+		if (event == NETDEV_CHANGENAME)
+			return netvsc_name_change(event_dev);
+
 		return NOTIFY_DONE;
+	}
 
 	/* Avoid non-Ethernet type devices */
 	if (event_dev->type != ARPHRD_ETHER)
