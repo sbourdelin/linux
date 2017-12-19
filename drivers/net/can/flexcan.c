@@ -5,6 +5,7 @@
  * Copyright (c) 2009 Sascha Hauer, Pengutronix
  * Copyright (c) 2010-2017 Pengutronix, Marc Kleine-Budde <kernel@pengutronix.de>
  * Copyright (c) 2014 David Jander, Protonic Holland
+ * Copyright 2017 NXP
  *
  * Based on code originally by Andrey Volkov <avolkov@varma-el.com>
  *
@@ -526,7 +527,7 @@ static int flexcan_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		data = be32_to_cpup((__be32 *)&cf->data[0]);
 		flexcan_write(data, &priv->tx_mb->data[0]);
 	}
-	if (cf->can_dlc > 3) {
+	if (cf->can_dlc > 4) {
 		data = be32_to_cpup((__be32 *)&cf->data[4]);
 		flexcan_write(data, &priv->tx_mb->data[1]);
 	}
