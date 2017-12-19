@@ -128,6 +128,23 @@ struct qed_hw_sriov_info {
 	u32 first_vf_in_pf;
 };
 
+/**
+ * @brief Check if given VF ID @vfid is valid
+ *        w.r.t. @b_enabled_only value
+ *        if b_enabled_only = true - only enabled VF id is valid
+ *        else any VF id less than max_vfs is valid
+ *
+ * @param p_hwfn
+ * @param rel_vf_id - Relative VF ID
+ * @param b_enabled_only - consider only enabled VF
+ * @param b_non_malicious - true iff we want to validate vf isn't malicious.
+ *
+ * @return bool - true for valid VF ID
+ */
+bool qed_iov_is_valid_vfid(struct qed_hwfn *p_hwfn,
+			   int rel_vf_id,
+			   bool b_enabled_only, bool b_non_malicious);
+
 /* This mailbox is maintained per VF in its PF contains all information
  * required for sending / receiving a message.
  */
@@ -441,6 +458,13 @@ static inline int qed_sriov_disable(struct qed_dev *cdev, bool pci_enabled)
 
 static inline void qed_inform_vf_link_state(struct qed_hwfn *hwfn)
 {
+}
+
+static inline bool
+qed_iov_is_valid_vfid(struct qed_hwfn *p_hwfn,
+		      int rel_vf_id, bool b_enabled_only, bool b_non_malicious)
+{
+	return false;
 }
 #endif
 
