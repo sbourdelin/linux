@@ -517,7 +517,10 @@ retry:
 	hlist_add_head(&s->s_instances, &type->fs_supers);
 	spin_unlock(&sb_lock);
 	get_filesystem(type);
-	register_shrinker(&s->s_shrink);
+	if (unlikely(register_shrinker(&s->s_shrink) != 0)) {
+		deactivate_locked_super(s);
+		s = ERR_PTR(-ENOMEM);
+	}
 	return s;
 }
 
