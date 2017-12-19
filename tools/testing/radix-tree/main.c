@@ -326,6 +326,10 @@ static void single_thread_tests(bool long_run)
 	rcu_barrier();
 	printv(2, "after idr_checks: %d allocated, preempt %d\n",
 		nr_allocated, preempt_count);
+	xbitmap_checks();
+	rcu_barrier();
+	printv(2, "after xbitmap_checks: %d allocated, preempt %d\n",
+			nr_allocated, preempt_count);
 	big_gang_check(long_run);
 	rcu_barrier();
 	printv(2, "after big_gang_check: %d allocated, preempt %d\n",
