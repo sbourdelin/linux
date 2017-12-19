@@ -380,21 +380,15 @@ ssize_t proc_set_roam_tgt_addr(struct file *file, const char __user *buffer, siz
 {
 	struct net_device *dev = data;
 	struct adapter *adapter = (struct adapter *)rtw_netdev_priv(dev);
-
-	char tmp[32];
 	u8 addr[ETH_ALEN];
+	int ret;
 
-	if (count < 1)
-		return -EFAULT;
+	ret = mac_pton_from_user(buffer, count, addr);
+	if (ret)
+		return ret;
 
-	if (buffer && !copy_from_user(tmp, buffer, sizeof(tmp))) {
-
-		int num = sscanf(tmp, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx", addr, addr+1, addr+2, addr+3, addr+4, addr+5);
-		if (num == 6)
-			memcpy(adapter->mlmepriv.roam_tgt_addr, addr, ETH_ALEN);
-
-		DBG_871X("set roam_tgt_addr to "MAC_FMT"\n", MAC_ARG(adapter->mlmepriv.roam_tgt_addr));
-	}
+	ether_addr_copy(adapter->mlmepriv.roam_tgt_addr, addr);
+	DBG_871X("set roam_tgt_addr to "MAC_FMT"\n", MAC_ARG(adapter->mlmepriv.roam_tgt_addr));
 
 	return count;
 }
