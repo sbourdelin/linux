@@ -4,12 +4,14 @@
 #include <linux/ctype.h>
 #include <linux/kernel.h>
 
+#define MAC_PTON_MINLEN		(3 * ETH_ALEN - 1)
+
 bool mac_pton(const char *s, u8 *mac)
 {
 	int i;
 
 	/* XX:XX:XX:XX:XX:XX */
-	if (strlen(s) < 3 * ETH_ALEN - 1)
+	if (strnlen(s, MAC_PTON_MINLEN) < MAC_PTON_MINLEN)
 		return false;
 
 	/* Don't dirty result unless string is valid MAC. */
