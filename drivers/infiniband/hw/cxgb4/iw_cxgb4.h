@@ -64,12 +64,6 @@
 #define DRV_NAME "iw_cxgb4"
 #define MOD DRV_NAME ":"
 
-#ifdef pr_fmt
-#undef pr_fmt
-#endif
-
-#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-
 #include "t4.h"
 
 #define PBL_OFF(rdev_p, a) ((a) - (rdev_p)->lldi.vr->pbl.start)
