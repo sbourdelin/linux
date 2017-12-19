@@ -41,7 +41,7 @@ static inline bool xb_empty(const struct xb *xb)
 	return radix_tree_empty(&xb->xbrt);
 }
 
-void xb_preload(gfp_t);
+int xb_preload(gfp_t);
 
 static inline void xb_preload_end(void)
 {

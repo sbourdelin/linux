@@ -29,8 +29,10 @@ int xb_set_bit(struct xb *xb, unsigned long bit)
 	bitmap = rcu_dereference_raw(*slot);
 	if (!bitmap) {
 		bitmap = this_cpu_xchg(ida_bitmap, NULL);
-		if (!bitmap)
+		if (!bitmap) {
+			__radix_tree_delete(root, node, slot);
 			return -EAGAIN;
+		}
 		memset(bitmap, 0, sizeof(*bitmap));
 		__radix_tree_replace(root, node, slot, bitmap, NULL);
 	}
