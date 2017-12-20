@@ -35,7 +35,7 @@
 #include "common.h"
 #include "mach-smartq.h"
 
-static struct gpio_led smartq5_leds[] = {
+static const struct gpio_led smartq5_leds[] __initconst = {
 	{
 		.name			= "smartq5:green",
 		.active_low		= 1,

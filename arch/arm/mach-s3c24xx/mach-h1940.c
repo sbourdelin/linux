@@ -413,7 +413,7 @@ int h1940_led_blink_set(struct gpio_desc *desc, int state,
 }
 EXPORT_SYMBOL(h1940_led_blink_set);
 
-static struct gpio_led h1940_leds_desc[] = {
+static const struct gpio_led h1940_leds_desc[] __initconst = {
 	{
 		.name			= "Green",
 		.default_trigger	= "main-battery-full",

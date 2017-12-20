@@ -207,7 +207,7 @@ static struct s3c2410_platform_nand hmt_nand_info = {
 	.ecc_mode       = NAND_ECC_SOFT,
 };
 
-static struct gpio_led hmt_leds[] = {
+static const struct gpio_led hmt_leds[] __initconst = {
 	{ /* left function keys */
 		.name			= "left:blue",
 		.gpio			= S3C64XX_GPO(12),

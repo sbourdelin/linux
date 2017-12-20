@@ -295,7 +295,7 @@ static int rx1950_led_blink_set(struct gpio_desc *desc, int state,
 	return 0;
 }
 
-static struct gpio_led rx1950_leds_desc[] = {
+static const struct gpio_led rx1950_leds_desc[] __initconst = {
 	{
 		.name			= "Green",
 		.default_trigger	= "main-battery-full",
