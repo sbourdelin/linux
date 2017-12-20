@@ -152,7 +152,7 @@ static struct platform_device omixp_uart = {
 	.resource		= omixp_uart_resources,
 };
 
-static struct gpio_led mic256_led_pins[] = {
+static const struct gpio_led mic256_led_pins[] __initconst = {
 	{
 		.name		= "LED-A",
 		.gpio		= 7,
