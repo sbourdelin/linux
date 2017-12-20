@@ -71,7 +71,7 @@ static struct platform_device alix_buttons_dev = {
 	}
 };
 
-static struct gpio_led alix_leds[] = {
+static const struct gpio_led alix_leds[] __initconst = {
 	{
 		.name = "alix:1",
 		.gpio = 6,

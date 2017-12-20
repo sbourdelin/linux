@@ -57,7 +57,7 @@ static struct platform_device net5501_buttons_dev = {
 	}
 };
 
-static struct gpio_led net5501_leds[] = {
+static const struct gpio_led net5501_leds[] __initconst = {
 	{
 		.name = "net5501:1",
 		.gpio = 6,
