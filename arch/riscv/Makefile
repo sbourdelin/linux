@@ -57,6 +57,12 @@ ifeq ($(CONFIG_CMODEL_MEDANY),y)
 	KBUILD_CFLAGS += -mcmodel=medany
 endif
 
+ifneq '$(CONFIG_RISCV_BUILTIN_DTB)' '""'
+BUILTIN_DTB := y
+else
+BUILTIN_DTB := n
+endif
+
 # GCC versions that support the "-mstrict-align" option default to allowing
 # unaligned accesses.  While unaligned accesses are explicitly allowed in the
 # RISC-V ISA, they're emulated by machine mode traps on all extant
@@ -68,5 +74,8 @@ head-y := arch/riscv/kernel/head.o
 core-y += arch/riscv/kernel/ arch/riscv/mm/
 
 libs-y += arch/riscv/lib/
+
+boot := arch/riscv/boot
+core-$(BUILTIN_DTB) += $(boot)/dts/
 
 all: vmlinux
