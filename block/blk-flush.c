@@ -299,7 +299,8 @@ static bool blk_kick_flush(struct request_queue *q, struct blk_flush_queue *fq)
 	struct request *flush_rq = fq->flush_rq;
 
 	/* C1 described at the top of this file */
-	if (fq->flush_pending_idx != fq->flush_running_idx || list_empty(pending))
+	if (fq->flush_pending_idx != fq->flush_running_idx ||
+		list_empty(pending))
 		return false;
 
 	/* C2 and C3
