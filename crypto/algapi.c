@@ -208,6 +208,11 @@ static struct crypto_larval *__crypto_register_alg(struct crypto_alg *alg)
 				goto err;
 			continue;
 		}
+		if (!strcmp(q->cra_driver_name, alg->cra_driver_name)) {
+			pr_err("Cannot register since cra_driver_name %s is already used\n",
+			       alg->cra_driver_name);
+			goto err;
+		}
 
 		if (!strcmp(q->cra_driver_name, alg->cra_name) ||
 		    !strcmp(q->cra_name, alg->cra_driver_name))
