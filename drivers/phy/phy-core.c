@@ -153,12 +153,12 @@ int phy_pm_runtime_get(struct phy *phy)
 {
 	int ret;
 
-	if (!pm_runtime_enabled(&phy->dev))
+	if (!phy->use_runtime_pm)
 		return -ENOTSUPP;
 
-	ret = pm_runtime_get(&phy->dev);
+	ret = pm_runtime_get(phy->dev.parent);
 	if (ret < 0 && ret != -EINPROGRESS)
-		pm_runtime_put_noidle(&phy->dev);
+		pm_runtime_put_noidle(phy->dev.parent);
 
 	return ret;
 }
@@ -168,12 +168,12 @@ int phy_pm_runtime_get_sync(struct phy *phy)
 {
 	int ret;
 
-	if (!pm_runtime_enabled(&phy->dev))
+	if (!phy->use_runtime_pm)
 		return -ENOTSUPP;
 
-	ret = pm_runtime_get_sync(&phy->dev);
+	ret = pm_runtime_get_sync(phy->dev.parent);
 	if (ret < 0)
-		pm_runtime_put_sync(&phy->dev);
+		pm_runtime_put_sync(phy->dev.parent);
 
 	return ret;
 }
@@ -181,37 +181,37 @@ EXPORT_SYMBOL_GPL(phy_pm_runtime_get_sync);
 
 int phy_pm_runtime_put(struct phy *phy)
 {
-	if (!pm_runtime_enabled(&phy->dev))
+	if (!phy->use_runtime_pm)
 		return -ENOTSUPP;
 
-	return pm_runtime_put(&phy->dev);
+	return pm_runtime_put(phy->dev.parent);
 }
 EXPORT_SYMBOL_GPL(phy_pm_runtime_put);
 
 int phy_pm_runtime_put_sync(struct phy *phy)
 {
-	if (!pm_runtime_enabled(&phy->dev))
+	if (!phy->use_runtime_pm)
 		return -ENOTSUPP;
 
-	return pm_runtime_put_sync(&phy->dev);
+	return pm_runtime_put_sync(phy->dev.parent);
 }
 EXPORT_SYMBOL_GPL(phy_pm_runtime_put_sync);
 
 void phy_pm_runtime_allow(struct phy *phy)
 {
-	if (!pm_runtime_enabled(&phy->dev))
+	if (!phy->use_runtime_pm)
 		return;
 
-	pm_runtime_allow(&phy->dev);
+	pm_runtime_allow(phy->dev.parent);
 }
 EXPORT_SYMBOL_GPL(phy_pm_runtime_allow);
 
 void phy_pm_runtime_forbid(struct phy *phy)
 {
-	if (!pm_runtime_enabled(&phy->dev))
+	if (!phy->use_runtime_pm)
 		return;
 
-	pm_runtime_forbid(&phy->dev);
+	pm_runtime_forbid(phy->dev.parent);
 }
 EXPORT_SYMBOL_GPL(phy_pm_runtime_forbid);
 
@@ -774,10 +774,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
 	if (ret)
 		goto put_dev;
 
-	if (pm_runtime_enabled(dev)) {
-		pm_runtime_enable(&phy->dev);
-		pm_runtime_no_callbacks(&phy->dev);
-	}
+	phy->use_runtime_pm = pm_runtime_enabled(dev);
 
 	return phy;
 

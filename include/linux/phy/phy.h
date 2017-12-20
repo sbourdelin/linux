@@ -83,6 +83,7 @@ struct phy {
 	int			power_count;
 	struct phy_attrs	attrs;
 	struct regulator	*pwr;
+	bool			use_runtime_pm;
 };
 
 /**
