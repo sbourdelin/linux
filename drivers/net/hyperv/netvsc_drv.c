@@ -49,7 +49,7 @@
 #define RING_SIZE_MIN		64
 
 #define LINKCHANGE_INT (2 * HZ)
-#define VF_TAKEOVER_INT (HZ / 10)
+#define VF_TAKEOVER_INT (HZ / 4)
 
 static unsigned int ring_size __ro_after_init = 128;
 module_param(ring_size, uint, S_IRUGO);
@@ -1894,6 +1894,26 @@ static int netvsc_vf_changed(struct net_device *vf_netdev)
 	return NOTIFY_OK;
 }
 
+/* If VF was renamed, then udev (or other tool) has done its
+ * work and the VF can be brought up.
+ */
+static int netvsc_vf_renamed(struct net_device *vf_netdev)
+{
+	struct net_device_context *ndev_ctx;
+	struct net_device *ndev;
+
+	ndev = get_netvsc_byref(vf_netdev);
+	if (!ndev)
+		return NOTIFY_DONE;
+
+	ndev_ctx = netdev_priv(ndev);
+
+	if (cancel_delayed_work(&ndev_ctx->vf_takeover))
+		__netvsc_vf_setup(ndev, vf_netdev);
+
+	return NOTIFY_OK;
+}
+
 static int netvsc_unregister_vf(struct net_device *vf_netdev)
 {
 	struct net_device *ndev;
@@ -2110,6 +2130,8 @@ static int netvsc_netdev_event(struct notifier_block *this,
 	case NETDEV_UP:
 	case NETDEV_DOWN:
 		return netvsc_vf_changed(event_dev);
+	case NETDEV_CHANGENAME:
+		return netvsc_vf_renamed(event_dev);
 	default:
 		return NOTIFY_DONE;
 	}
