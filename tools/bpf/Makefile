@@ -9,6 +9,24 @@ MAKE = make
 CFLAGS += -Wall -O2
 CFLAGS += -D__EXPORTED_HEADERS__ -I../../include/uapi -I../../include
 
+ifeq ($(srctree),)
+srctree := $(patsubst %/,%,$(dir $(CURDIR)))
+srctree := $(patsubst %/,%,$(dir $(srctree)))
+endif
+
+FEATURE_TESTS = disassembler
+FEATURE_DISPLAY = disassembler
+
+ifeq ($(FEATURES_DUMP),)
+include $(srctree)/tools/build/Makefile.feature
+else
+include $(FEATURES_DUMP)
+endif
+
+ifeq ($(feature-disassembler), 1)
+CFLAGS += -DNEW_DISSASSEMBLER_SIGNATURE
+endif
+
 %.yacc.c: %.y
 	$(YACC) -o $@ -d $<
 

@@ -107,7 +107,14 @@ void disasm_print_insn(unsigned char *image, ssize_t len, int opcodes)
 
 	disassemble_init_for_target(&info);
 
+#ifdef NEW_DISSASSEMBLER_SIGNATURE
+	disassemble = disassembler(bfd_get_arch(bfdf),
+				   bfd_big_endian(bfdf),
+				   bfd_get_mach(bfdf),
+				   bfdf);
+#else
 	disassemble = disassembler(bfdf);
+#endif
 	assert(disassemble);
 
 	if (json_output)

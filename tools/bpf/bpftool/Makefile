@@ -43,6 +43,19 @@ LIBS = -lelf -lbfd -lopcodes $(LIBBPF)
 INSTALL ?= install
 RM ?= rm -f
 
+FEATURE_TESTS = disassembler
+FEATURE_DISPLAY = disassembler
+
+ifeq ($(FEATURES_DUMP),)
+include $(srctree)/tools/build/Makefile.feature
+else
+include $(FEATURES_DUMP)
+endif
+
+ifeq ($(feature-disassembler), 1)
+CFLAGS += -DNEW_DISSASSEMBLER_SIGNATURE
+endif
+
 include $(wildcard *.d)
 
 all: $(OUTPUT)bpftool
