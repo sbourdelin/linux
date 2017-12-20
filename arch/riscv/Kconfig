@@ -184,6 +184,10 @@ config RISCV_ISA_C
 config RISCV_ISA_A
 	def_bool y
 
+config RISCV_BUILTIN_DTB
+        string "Builtin DTB"
+        default ""
+
 endmenu
 
 menu "Kernel type"

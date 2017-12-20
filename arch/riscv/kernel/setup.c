@@ -150,7 +150,7 @@ asmlinkage void __init setup_vm(void)
 
 void __init sbi_save(unsigned int hartid, void *dtb)
 {
-	early_init_dt_scan(__va(dtb));
+	early_init_dt_scan(dtb ? __va(dtb) : __dtb_start);
 }
 
 /*
