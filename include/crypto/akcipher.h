@@ -286,6 +286,9 @@ static inline int crypto_akcipher_encrypt(struct akcipher_request *req)
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
 	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
 
+#ifdef CONFIG_CRYPTO_STATS
+	tfm->base.__crt_alg->enc_cnt++;
+#endif
 	return alg->encrypt(req);
 }
 
@@ -304,6 +307,9 @@ static inline int crypto_akcipher_decrypt(struct akcipher_request *req)
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
 	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
 
+#ifdef CONFIG_CRYPTO_STATS
+	tfm->base.__crt_alg->dec_cnt++;
+#endif
 	return alg->decrypt(req);
 }
 
@@ -322,6 +328,9 @@ static inline int crypto_akcipher_sign(struct akcipher_request *req)
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
 	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
 
+#ifdef CONFIG_CRYPTO_STATS
+	tfm->base.__crt_alg->sign_cnt++;
+#endif
 	return alg->sign(req);
 }
 
@@ -340,6 +349,9 @@ static inline int crypto_akcipher_verify(struct akcipher_request *req)
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
 	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
 
+#ifdef CONFIG_CRYPTO_STATS
+	tfm->base.__crt_alg->verify_cnt++;
+#endif
 	return alg->verify(req);
 }
 

@@ -442,6 +442,10 @@ static inline int crypto_skcipher_encrypt(struct skcipher_request *req)
 {
 	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
 
+#ifdef CONFIG_CRYPTO_STATS
+	tfm->base.__crt_alg->enc_cnt++;
+	tfm->base.__crt_alg->enc_tlen += req->cryptlen;
+#endif
 	return tfm->encrypt(req);
 }
 
@@ -460,6 +464,10 @@ static inline int crypto_skcipher_decrypt(struct skcipher_request *req)
 {
 	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
 
+#ifdef CONFIG_CRYPTO_STATS
+	tfm->base.__crt_alg->dec_cnt++;
+	tfm->base.__crt_alg->dec_tlen += req->cryptlen;
+#endif
 	return tfm->decrypt(req);
 }
 

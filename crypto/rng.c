@@ -49,6 +49,9 @@ int crypto_rng_reset(struct crypto_rng *tfm, const u8 *seed, unsigned int slen)
 		seed = buf;
 	}
 
+#ifdef CONFIG_CRYPTO_STATS
+	tfm->base.__crt_alg->dec_cnt++;
+#endif
 	err = crypto_rng_alg(tfm)->seed(tfm, seed, slen);
 out:
 	kzfree(buf);

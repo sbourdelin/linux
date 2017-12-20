@@ -20,10 +20,157 @@
 #include <linux/rtnetlink.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/kobject.h>
 
 #include "internal.h"
 
 static LIST_HEAD(crypto_template_list);
+
+#ifdef CONFIG_CRYPTO_STATS
+static struct kobject *crypto_root_kobj;
+
+static struct kobj_type dynamic_kobj_ktype = {
+	.sysfs_ops      = &kobj_sysfs_ops,
+};
+
+static ssize_t fcrypto_priority(struct kobject *kobj,
+				struct kobj_attribute *attr, char *buf)
+{
+	struct crypto_alg *alg;
+
+	alg = container_of(kobj, struct crypto_alg, cra_stat_obj);
+	return snprintf(buf, 9, "%d\n", alg->cra_priority);
+}
+
+static ssize_t fcrypto_stat_enc_cnt(struct kobject *kobj,
+				    struct kobj_attribute *attr, char *buf)
+{
+	struct crypto_alg *alg;
+
+	alg = container_of(kobj, struct crypto_alg, cra_stat_obj);
+	return snprintf(buf, 9, "%lu\n", alg->enc_cnt);
+}
+
+static ssize_t fcrypto_stat_enc_tlen(struct kobject *kobj,
+				     struct kobj_attribute *attr, char *buf)
+{
+	struct crypto_alg *alg;
+
+	alg = container_of(kobj, struct crypto_alg, cra_stat_obj);
+	return snprintf(buf, 9, "%lu\n", alg->enc_tlen);
+}
+
+static ssize_t fcrypto_stat_dec_cnt(struct kobject *kobj,
+				    struct kobj_attribute *attr, char *buf)
+{
+	struct crypto_alg *alg;
+
+	alg = container_of(kobj, struct crypto_alg, cra_stat_obj);
+	return snprintf(buf, 9, "%lu\n", alg->dec_cnt);
+}
+
+static ssize_t fcrypto_stat_dec_tlen(struct kobject *kobj,
+				     struct kobj_attribute *attr, char *buf)
+{
+	struct crypto_alg *alg;
+
+	alg = container_of(kobj, struct crypto_alg, cra_stat_obj);
+	return snprintf(buf, 9, "%lu\n", alg->dec_tlen);
+}
+
+static ssize_t fcrypto_stat_verify_cnt(struct kobject *kobj,
+				       struct kobj_attribute *attr, char *buf)
+{
+	struct crypto_alg *alg;
+
+	alg = container_of(kobj, struct crypto_alg, cra_stat_obj);
+	return snprintf(buf, 9, "%lu\n", alg->verify_cnt);
+}
+
+static ssize_t fcrypto_stat_sign_cnt(struct kobject *kobj,
+				     struct kobj_attribute *attr, char *buf)
+{
+	struct crypto_alg *alg;
+
+	alg = container_of(kobj, struct crypto_alg, cra_stat_obj);
+	return snprintf(buf, 9, "%lu\n", alg->sign_cnt);
+}
+
+static ssize_t fcrypto_stat_type(struct kobject *kobj,
+				 struct kobj_attribute *attr, char *buf)
+{
+	struct crypto_alg *alg;
+	u32 type;
+
+	alg = container_of(kobj, struct crypto_alg, cra_stat_obj);
+	type = (alg->cra_flags & CRYPTO_ALG_TYPE_MASK);
+	if (type == CRYPTO_ALG_TYPE_ABLKCIPHER ||
+	    type == CRYPTO_ALG_TYPE_SKCIPHER ||
+	    type == CRYPTO_ALG_TYPE_CIPHER ||
+	    type == CRYPTO_ALG_TYPE_BLKCIPHER
+		)
+		return snprintf(buf, 9, "cipher\n");
+	if (type == CRYPTO_ALG_TYPE_AHASH ||
+	    type == CRYPTO_ALG_TYPE_HASH
+		)
+		return snprintf(buf, 9, "hash\n");
+	if (type == CRYPTO_ALG_TYPE_COMPRESS ||
+	    type == CRYPTO_ALG_TYPE_SCOMPRESS)
+		return snprintf(buf, 11, "compress\n");
+	if (type == CRYPTO_ALG_TYPE_RNG)
+		return snprintf(buf, 9, "rng\n");
+	if (type == CRYPTO_ALG_TYPE_AKCIPHER)
+		return snprintf(buf, 11, "asymetric\n");
+	if (type == CRYPTO_ALG_TYPE_KPP)
+		return snprintf(buf, 4, "kpp\n");
+	return snprintf(buf, 16, "unknown %x\n", type);
+}
+
+static ssize_t fcrypto_stat_algname(struct kobject *kobj,
+				    struct kobj_attribute *attr, char *buf)
+{
+	struct crypto_alg *alg;
+
+	alg = container_of(kobj, struct crypto_alg, cra_stat_obj);
+	return snprintf(buf, 32, "%s\n", alg->cra_name);
+}
+
+static struct kobj_attribute crypto_stat_attribute_priority =
+	__ATTR(priority, 0444, fcrypto_priority, NULL);
+static struct kobj_attribute crypto_stat_attribute_enc_cnt =
+	__ATTR(enc_cnt, 0444, fcrypto_stat_enc_cnt, NULL);
+static struct kobj_attribute crypto_stat_attribute_enc_tlen =
+	__ATTR(enc_tlen, 0444, fcrypto_stat_enc_tlen, NULL);
+static struct kobj_attribute crypto_stat_attribute_dec_cnt =
+	__ATTR(dec_cnt, 0444, fcrypto_stat_dec_cnt, NULL);
+static struct kobj_attribute crypto_stat_attribute_dec_tlen =
+	__ATTR(dec_tlen, 0444, fcrypto_stat_dec_tlen, NULL);
+static struct kobj_attribute crypto_stat_attribute_verify_cnt =
+	__ATTR(verify_cnt, 0444, fcrypto_stat_verify_cnt, NULL);
+static struct kobj_attribute crypto_stat_attribute_sign_cnt =
+	__ATTR(sign_cnt, 0444, fcrypto_stat_sign_cnt, NULL);
+static struct kobj_attribute crypto_stat_attribute_algtype =
+	__ATTR(algtype, 0444, fcrypto_stat_type, NULL);
+static struct kobj_attribute crypto_stat_attribute_algname =
+	__ATTR(algname, 0444, fcrypto_stat_algname, NULL);
+
+static struct attribute *attrs[] = {
+	&crypto_stat_attribute_priority.attr,
+	&crypto_stat_attribute_enc_cnt.attr,
+	&crypto_stat_attribute_enc_tlen.attr,
+	&crypto_stat_attribute_dec_cnt.attr,
+	&crypto_stat_attribute_dec_tlen.attr,
+	&crypto_stat_attribute_verify_cnt.attr,
+	&crypto_stat_attribute_sign_cnt.attr,
+	&crypto_stat_attribute_algtype.attr,
+	&crypto_stat_attribute_algname.attr,
+	NULL,
+};
+
+static struct attribute_group attr_group = {
+	.attrs = attrs,
+};
+#endif
 
 static inline int crypto_set_driver_name(struct crypto_alg *alg)
 {
@@ -73,6 +220,9 @@ static void crypto_free_instance(struct crypto_instance *inst)
 		inst->tmpl->free(inst);
 		return;
 	}
+#ifdef CONFIG_CRYPTO_STATS
+	kobject_put(&inst->alg.cra_stat_obj);
+#endif
 
 	inst->alg.cra_type->free(inst);
 }
@@ -237,6 +387,38 @@ static struct crypto_larval *__crypto_register_alg(struct crypto_alg *alg)
 	list_add(&alg->cra_list, &crypto_alg_list);
 	list_add(&larval->alg.cra_list, &crypto_alg_list);
 
+#ifdef CONFIG_CRYPTO_STATS
+	if (!crypto_root_kobj) {
+		pr_info("crypto: register crypto sysfs\n");
+		crypto_root_kobj = kobject_create_and_add("crypto",
+							  kernel_kobj);
+		if (!crypto_root_kobj) {
+			pr_err("crypto: register crypto class failed\n");
+			ret = -ENOMEM;
+			goto err;
+		}
+		/* TODO class_destroy */
+	}
+
+	pr_debug("Register %s %s %p\n", alg->cra_name, alg->cra_driver_name,
+		 alg->cra_type);
+
+	ret = kobject_init_and_add(&alg->cra_stat_obj, &dynamic_kobj_ktype,
+				   crypto_root_kobj, "%s", alg->cra_driver_name);
+	if (ret == 0) {
+		alg->enc_cnt = 0;
+		alg->dec_cnt = 0;
+		alg->enc_tlen = 0;
+		alg->dec_tlen = 0;
+		ret = sysfs_create_group(&alg->cra_stat_obj, &attr_group);
+		if (ret) {
+			pr_err("crypto: Failed to add stats for %s\n",
+			       alg->cra_driver_name);
+			kobject_put(&alg->cra_stat_obj);
+		}
+	}
+#endif
+
 out:
 	return larval;
 
@@ -400,6 +582,10 @@ int crypto_unregister_alg(struct crypto_alg *alg)
 	down_write(&crypto_alg_sem);
 	ret = crypto_remove_alg(alg, &list);
 	up_write(&crypto_alg_sem);
+
+#ifdef CONFIG_CRYPTO_STATS
+	kobject_put(&alg->cra_stat_obj);
+#endif
 
 	if (ret)
 		return ret;

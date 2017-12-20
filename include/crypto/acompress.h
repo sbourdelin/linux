@@ -247,6 +247,11 @@ static inline int crypto_acomp_compress(struct acomp_req *req)
 {
 	struct crypto_acomp *tfm = crypto_acomp_reqtfm(req);
 
+#ifdef CONFIG_CRYPTO_STATS
+	tfm->base.__crt_alg->enc_cnt++;
+	tfm->base.__crt_alg->enc_tlen += req->slen;
+#endif
+
 	return tfm->compress(req);
 }
 
@@ -262,6 +267,11 @@ static inline int crypto_acomp_compress(struct acomp_req *req)
 static inline int crypto_acomp_decompress(struct acomp_req *req)
 {
 	struct crypto_acomp *tfm = crypto_acomp_reqtfm(req);
+
+#ifdef CONFIG_CRYPTO_STATS
+	tfm->base.__crt_alg->dec_cnt++;
+	tfm->base.__crt_alg->dec_tlen += req->slen;
+#endif
 
 	return tfm->decompress(req);
 }

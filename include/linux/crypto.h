@@ -19,6 +19,7 @@
 
 #include <linux/atomic.h>
 #include <linux/kernel.h>
+#include <linux/kobject.h>
 #include <linux/list.h>
 #include <linux/bug.h>
 #include <linux/slab.h>
@@ -466,6 +467,17 @@ struct crypto_alg {
 	void (*cra_destroy)(struct crypto_alg *alg);
 	
 	struct module *cra_module;
+
+#ifdef CONFIG_CRYPTO_STATS
+	struct kobject cra_stat_obj;
+	/* enc is for encrypt / compress/ hash / generate,
+	 * dec is decrypt / decompress / seed
+	 */
+	unsigned long enc_cnt, dec_cnt;
+	unsigned long enc_tlen, dec_tlen;
+	unsigned long verify_cnt;
+	unsigned long sign_cnt;
+#endif
 } CRYPTO_MINALIGN_ATTR;
 
 /*
@@ -901,6 +913,11 @@ static inline int crypto_ablkcipher_encrypt(struct ablkcipher_request *req)
 {
 	struct ablkcipher_tfm *crt =
 		crypto_ablkcipher_crt(crypto_ablkcipher_reqtfm(req));
+
+#ifdef CONFIG_CRYPTO_STATS
+	crt->base->base.__crt_alg->enc_cnt++;
+	crt->base->base.__crt_alg->enc_tlen += req->nbytes;
+#endif
 	return crt->encrypt(req);
 }
 
@@ -919,6 +936,11 @@ static inline int crypto_ablkcipher_decrypt(struct ablkcipher_request *req)
 {
 	struct ablkcipher_tfm *crt =
 		crypto_ablkcipher_crt(crypto_ablkcipher_reqtfm(req));
+
+#ifdef CONFIG_CRYPTO_STATS
+	crt->base->base.__crt_alg->dec_cnt++;
+	crt->base->base.__crt_alg->dec_tlen += req->nbytes;
+#endif
 	return crt->decrypt(req);
 }
 
