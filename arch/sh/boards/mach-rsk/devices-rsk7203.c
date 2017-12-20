@@ -50,7 +50,7 @@ static struct platform_device smsc911x_device = {
 	},
 };
 
-static struct gpio_led rsk7203_gpio_leds[] = {
+static const struct gpio_led rsk7203_gpio_leds[] __initconst = {
 	{
 		.name			= "green",
 		.gpio			= GPIO_PE10,
