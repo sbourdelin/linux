@@ -516,6 +516,10 @@ enum {
 	SPCN_NVME_CMD,
 	SPCN_CTRL_VP,
 	SPCN_PRLO,
+	SPCN_RFTID,
+	SPCN_RFFID,
+	SPCN_RNNID,
+	SPCN_RSNNNN,
 };
 
 struct sp_name {
@@ -581,6 +585,7 @@ typedef struct srb {
 	u32 gen1;	/* scratch */
 	u32 gen2;	/* scratch */
 	int rc;
+	int retry_count;
 	struct completion comp;
 	union {
 		struct srb_iocb iocb_cmd;
@@ -3234,7 +3239,7 @@ enum qla_work_type {
 	QLA_EVT_AENFX,
 	QLA_EVT_GIDPN,
 	QLA_EVT_GPNID,
-	QLA_EVT_GPNID_DONE,
+	QLA_EVT_UNMAP,
 	QLA_EVT_NEW_SESS,
 	QLA_EVT_GPDB,
 	QLA_EVT_PRLI,
@@ -3250,6 +3255,7 @@ enum qla_work_type {
 	QLA_EVT_GNNFT_DONE,
 	QLA_EVT_GNNID,
 	QLA_EVT_GFPNID,
+	QLA_EVT_SP_RETRY,
 };
 
 
