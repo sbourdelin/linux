@@ -923,7 +923,7 @@ int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 
 	rc = tpm_chip_register(chip);
 	if (rc && is_bsw())
-		iounmap(priv->ilb_base_addr);
+		goto out_err;
 
 	if (chip->ops->clk_enable != NULL)
 		chip->ops->clk_enable(chip, false);
@@ -931,11 +931,12 @@ int tpm_tis_core_init(struct device *dev, struct tpm_tis_data *priv, int irq,
 	return rc;
 out_err:
 	tpm_tis_remove(chip);
-	if (is_bsw())
-		iounmap(priv->ilb_base_addr);
 
 	if (chip->ops->clk_enable != NULL)
 		chip->ops->clk_enable(chip, false);
+
+	if (is_bsw())
+		iounmap(priv->ilb_base_addr);
 
 	return rc;
 }
