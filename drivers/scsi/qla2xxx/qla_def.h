@@ -3140,12 +3140,13 @@ struct scsi_qla_host;
 
 #define QLA83XX_RSPQ_MSIX_ENTRY_NUMBER 1 /* refer to qla83xx_msix_entries */
 
+#define IRQNAME_SZ 32
 struct qla_msix_entry {
 	int have_irq;
 	int in_use;
 	uint32_t vector;
 	uint16_t entry;
-	char name[30];
+	char name[IRQNAME_SZ];
 	void *handle;
 	int cpuid;
 };
@@ -4025,6 +4026,7 @@ struct qla_hw_data {
 	uint16_t        zio_timer;
 
 	struct qla_msix_entry *msix_entries;
+	u8 irqname[IRQNAME_SZ];	/* msi/intx */
 
 	struct list_head        vp_list;        /* list of VP */
 	unsigned long   vp_idx_map[(MAX_MULTI_ID_FABRIC / 8) /

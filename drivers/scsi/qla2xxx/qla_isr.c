@@ -3607,9 +3607,17 @@ skip_msi:
 	if (!ha->flags.msi_enabled && IS_QLA82XX(ha))
 		return QLA_FUNCTION_FAILED;
 
+	memset(ha->irqname, 0, IRQNAME_SZ);
+	if (ha->flags.msi_enabled)
+		scnprintf(ha->irqname, IRQNAME_SZ,
+		    "qla2xxx%lu_msi", vha->host_no);
+	else
+		scnprintf(ha->irqname, IRQNAME_SZ,
+		    "qla2xxx%lu_intx", vha->host_no);
 	ret = request_irq(ha->pdev->irq, ha->isp_ops->intr_handler,
 	    ha->flags.msi_enabled ? 0 : IRQF_SHARED,
-	    QLA2XXX_DRIVER_NAME, rsp);
+	    ha->irqname, rsp);
+
 	if (ret) {
 		ql_log(ql_log_warn, vha, 0x003a,
 		    "Failed to reserve interrupt %d already in use.\n",
