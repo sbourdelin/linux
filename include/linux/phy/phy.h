@@ -17,7 +17,6 @@
 #include <linux/err.h>
 #include <linux/of.h>
 #include <linux/device.h>
-#include <linux/pm_runtime.h>
 #include <linux/regulator/consumer.h>
 
 struct phy;
@@ -134,12 +133,6 @@ static inline void *phy_get_drvdata(struct phy *phy)
 }
 
 #if IS_ENABLED(CONFIG_GENERIC_PHY)
-int phy_pm_runtime_get(struct phy *phy);
-int phy_pm_runtime_get_sync(struct phy *phy);
-int phy_pm_runtime_put(struct phy *phy);
-int phy_pm_runtime_put_sync(struct phy *phy);
-void phy_pm_runtime_allow(struct phy *phy);
-void phy_pm_runtime_forbid(struct phy *phy);
 int phy_init(struct phy *phy);
 int phy_exit(struct phy *phy);
 int phy_power_on(struct phy *phy);
@@ -188,44 +181,6 @@ void devm_of_phy_provider_unregister(struct device *dev,
 int phy_create_lookup(struct phy *phy, const char *con_id, const char *dev_id);
 void phy_remove_lookup(struct phy *phy, const char *con_id, const char *dev_id);
 #else
-static inline int phy_pm_runtime_get(struct phy *phy)
-{
-	if (!phy)
-		return 0;
-	return -ENOSYS;
-}
-
-static inline int phy_pm_runtime_get_sync(struct phy *phy)
-{
-	if (!phy)
-		return 0;
-	return -ENOSYS;
-}
-
-static inline int phy_pm_runtime_put(struct phy *phy)
-{
-	if (!phy)
-		return 0;
-	return -ENOSYS;
-}
-
-static inline int phy_pm_runtime_put_sync(struct phy *phy)
-{
-	if (!phy)
-		return 0;
-	return -ENOSYS;
-}
-
-static inline void phy_pm_runtime_allow(struct phy *phy)
-{
-	return;
-}
-
-static inline void phy_pm_runtime_forbid(struct phy *phy)
-{
-	return;
-}
-
 static inline int phy_init(struct phy *phy)
 {
 	if (!phy)

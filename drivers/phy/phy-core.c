@@ -149,22 +149,7 @@ static struct phy_provider *of_phy_provider_lookup(struct device_node *node)
 	return ERR_PTR(-EPROBE_DEFER);
 }
 
-int phy_pm_runtime_get(struct phy *phy)
-{
-	int ret;
-
-	if (!phy->use_runtime_pm)
-		return -ENOTSUPP;
-
-	ret = pm_runtime_get(phy->dev.parent);
-	if (ret < 0 && ret != -EINPROGRESS)
-		pm_runtime_put_noidle(phy->dev.parent);
-
-	return ret;
-}
-EXPORT_SYMBOL_GPL(phy_pm_runtime_get);
-
-int phy_pm_runtime_get_sync(struct phy *phy)
+static int phy_pm_runtime_get_sync(struct phy *phy)
 {
 	int ret;
 
@@ -177,43 +162,14 @@ int phy_pm_runtime_get_sync(struct phy *phy)
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(phy_pm_runtime_get_sync);
 
-int phy_pm_runtime_put(struct phy *phy)
+static int phy_pm_runtime_put(struct phy *phy)
 {
 	if (!phy->use_runtime_pm)
 		return -ENOTSUPP;
 
 	return pm_runtime_put(phy->dev.parent);
 }
-EXPORT_SYMBOL_GPL(phy_pm_runtime_put);
-
-int phy_pm_runtime_put_sync(struct phy *phy)
-{
-	if (!phy->use_runtime_pm)
-		return -ENOTSUPP;
-
-	return pm_runtime_put_sync(phy->dev.parent);
-}
-EXPORT_SYMBOL_GPL(phy_pm_runtime_put_sync);
-
-void phy_pm_runtime_allow(struct phy *phy)
-{
-	if (!phy->use_runtime_pm)
-		return;
-
-	pm_runtime_allow(phy->dev.parent);
-}
-EXPORT_SYMBOL_GPL(phy_pm_runtime_allow);
-
-void phy_pm_runtime_forbid(struct phy *phy)
-{
-	if (!phy->use_runtime_pm)
-		return;
-
-	pm_runtime_forbid(phy->dev.parent);
-}
-EXPORT_SYMBOL_GPL(phy_pm_runtime_forbid);
 
 int phy_init(struct phy *phy)
 {
@@ -306,7 +262,7 @@ int phy_power_on(struct phy *phy)
 
 err_pwr_on:
 	mutex_unlock(&phy->mutex);
-	phy_pm_runtime_put_sync(phy);
+	phy_pm_runtime_put(phy);
 err_pm_sync:
 	if (phy->pwr)
 		regulator_disable(phy->pwr);
