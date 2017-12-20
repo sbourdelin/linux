@@ -16,7 +16,6 @@
  * more details.
  */
 
-#include <linux/export.h>
 #include <linux/cpumask.h>
 #include <linux/err.h>
 #include <linux/cpu.h>
