@@ -1093,7 +1093,7 @@ void qla24xx_handle_gpdb_event(scsi_qla_host_t *vha, struct event_arg *ea)
 	default:
 		ql_dbg(ql_dbg_disc, vha, 0x20d5, "%s %d %8phC post del sess\n",
 		    __func__, __LINE__, fcport->port_name);
-		qlt_schedule_sess_for_deletion_lock(fcport);
+		qlt_schedule_sess_for_deletion(fcport);
 		return;
 	}
 	__qla24xx_handle_gpdb_event(vha, ea);
@@ -5002,8 +5002,7 @@ qla2x00_configure_local_loop(scsi_qla_host_t *vha)
 					    __func__, __LINE__,
 					    fcport->port_name);
 
-					qlt_schedule_sess_for_deletion_lock
-						(fcport);
+					qlt_schedule_sess_for_deletion(fcport);
 					continue;
 				}
 			}
@@ -5590,9 +5589,7 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *vha)
 					    "%s %d %8phC post del sess\n",
 					    __func__, __LINE__,
 					    fcport->port_name);
-
-					qlt_schedule_sess_for_deletion_lock
-						(fcport);
+					qlt_schedule_sess_for_deletion(fcport);
 					continue;
 				}
 			}

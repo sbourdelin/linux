@@ -3096,7 +3096,7 @@ void qla24xx_handle_gidpn_event(scsi_qla_host_t *vha, struct event_arg *ea)
 					ql_dbg(ql_dbg_disc, vha, 0x2021,
 					    "%s %d %8phC post del sess\n",
 					    __func__, __LINE__, fcport->port_name);
-					qlt_schedule_sess_for_deletion_lock(fcport);
+					qlt_schedule_sess_for_deletion(fcport);
 				}
 			}
 		} else { /* ea->sp->gen1 != fcport->rscn_gen */
@@ -3113,7 +3113,7 @@ void qla24xx_handle_gidpn_event(scsi_qla_host_t *vha, struct event_arg *ea)
 				ql_dbg(ql_dbg_disc, vha, 0x2042,
 				    "%s %d %8phC post del sess\n", __func__,
 				    __LINE__, fcport->port_name);
-				qlt_schedule_sess_for_deletion_lock(fcport);
+				qlt_schedule_sess_for_deletion(fcport);
 			} else {
 				ql_dbg(ql_dbg_disc, vha, 0x2045,
 				    "%s %d %8phC login\n", __func__, __LINE__,
@@ -3485,8 +3485,7 @@ void qla24xx_handle_gpnid_event(scsi_qla_host_t *vha, struct event_arg *ea)
 					    "%s %d %8phC post del sess\n",
 					    __func__, __LINE__,
 					    fcport->port_name);
-					qlt_schedule_sess_for_deletion_lock
-						(fcport);
+					qlt_schedule_sess_for_deletion(fcport);
 					break;
 				}
 			}
@@ -3519,7 +3518,7 @@ void qla24xx_handle_gpnid_event(scsi_qla_host_t *vha, struct event_arg *ea)
 						    "%s %d %8phC post del sess\n",
 						    __func__, __LINE__,
 						    conflict->port_name);
-						qlt_schedule_sess_for_deletion_lock
+						qlt_schedule_sess_for_deletion
 							(conflict);
 						break;
 					}
@@ -3577,7 +3576,7 @@ void qla24xx_handle_gpnid_event(scsi_qla_host_t *vha, struct event_arg *ea)
 						    "%s %d %8phC post del sess\n",
 						    __func__, __LINE__,
 						    conflict->port_name);
-						qlt_schedule_sess_for_deletion_lock
+						qlt_schedule_sess_for_deletion
 							(conflict);
 						break;
 					}
@@ -4008,8 +4007,7 @@ void qla24xx_async_gnnft_done(scsi_qla_host_t *vha, srb_t *sp)
 					    __func__, __LINE__,
 					    fcport->port_name);
 
-					qlt_schedule_sess_for_deletion_lock
-						(fcport);
+					qlt_schedule_sess_for_deletion(fcport);
 					continue;
 				}
 			}
