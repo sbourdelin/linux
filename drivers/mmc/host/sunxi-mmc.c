@@ -35,6 +35,7 @@
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
+#include <linux/pm_runtime.h>
 #include <linux/regulator/consumer.h>
 #include <linux/reset.h>
 #include <linux/scatterlist.h>
@@ -1217,29 +1218,11 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
 		return ret;
 	}
 
-	ret = clk_prepare_enable(host->clk_mmc);
-	if (ret) {
-		dev_err(&pdev->dev, "Enable mmc clk err %d\n", ret);
-		goto error_disable_clk_ahb;
-	}
-
-	ret = clk_prepare_enable(host->clk_output);
-	if (ret) {
-		dev_err(&pdev->dev, "Enable output clk err %d\n", ret);
-		goto error_disable_clk_mmc;
-	}
-
-	ret = clk_prepare_enable(host->clk_sample);
-	if (ret) {
-		dev_err(&pdev->dev, "Enable sample clk err %d\n", ret);
-		goto error_disable_clk_output;
-	}
-
 	if (!IS_ERR(host->reset)) {
 		ret = reset_control_reset(host->reset);
 		if (ret) {
 			dev_err(&pdev->dev, "reset err %d\n", ret);
-			goto error_disable_clk_sample;
+			goto error_disable_clk_ahb;
 		}
 	}
 
@@ -1258,12 +1241,6 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
 error_assert_reset:
 	if (!IS_ERR(host->reset))
 		reset_control_assert(host->reset);
-error_disable_clk_sample:
-	clk_disable_unprepare(host->clk_sample);
-error_disable_clk_output:
-	clk_disable_unprepare(host->clk_output);
-error_disable_clk_mmc:
-	clk_disable_unprepare(host->clk_mmc);
 error_disable_clk_ahb:
 	clk_disable_unprepare(host->clk_ahb);
 	return ret;
@@ -1280,6 +1257,7 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "mmc alloc host failed\n");
 		return -ENOMEM;
 	}
+	platform_set_drvdata(pdev, mmc);
 
 	host = mmc_priv(mmc);
 	host->mmc = mmc;
@@ -1340,12 +1318,16 @@ static int sunxi_mmc_probe(struct platform_device *pdev)
 	if (ret)
 		goto error_free_dma;
 
+	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+	pm_runtime_use_autosuspend(&pdev->dev);
+	pm_runtime_enable(&pdev->dev);
+
 	ret = mmc_add_host(mmc);
 	if (ret)
 		goto error_free_dma;
 
 	dev_info(&pdev->dev, "base:0x%p irq:%u\n", host->reg_base, host->irq);
-	platform_set_drvdata(pdev, mmc);
+
 	return 0;
 
 error_free_dma:
@@ -1361,16 +1343,12 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
 	struct sunxi_mmc_host *host = mmc_priv(mmc);
 
 	mmc_remove_host(mmc);
+	pm_runtime_force_suspend(&pdev->dev);
 	disable_irq(host->irq);
 	sunxi_mmc_reset_host(host);
 
 	if (!IS_ERR(host->reset))
 		reset_control_assert(host->reset);
-
-	clk_disable_unprepare(host->clk_sample);
-	clk_disable_unprepare(host->clk_output);
-	clk_disable_unprepare(host->clk_mmc);
-	clk_disable_unprepare(host->clk_ahb);
 
 	dma_free_coherent(&pdev->dev, PAGE_SIZE, host->sg_cpu, host->sg_dma);
 	mmc_free_host(mmc);
@@ -1378,10 +1356,62 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
 	return 0;
 }
 
+static int sunxi_mmc_runtime_resume(struct device *dev)
+{
+	struct mmc_host	*mmc = dev_get_drvdata(dev);
+	struct sunxi_mmc_host *host = mmc_priv(mmc);
+	int ret;
+
+	ret = clk_prepare_enable(host->clk_mmc);
+	if (ret) {
+		dev_err(dev, "Enable mmc clk err %d\n", ret);
+		return ret;
+	}
+
+	ret = clk_prepare_enable(host->clk_output);
+	if (ret) {
+		dev_err(dev, "Enable output clk err %d\n", ret);
+		goto error_disable_clk_mmc;
+	}
+
+	ret = clk_prepare_enable(host->clk_sample);
+	if (ret) {
+		dev_err(dev, "Enable sample clk err %d\n", ret);
+		goto error_disable_clk_output;
+	}
+
+	return 0;
+
+error_disable_clk_output:
+	clk_disable_unprepare(host->clk_output);
+error_disable_clk_mmc:
+	clk_disable_unprepare(host->clk_mmc);
+	return ret;
+}
+
+static int sunxi_mmc_runtime_suspend(struct device *dev)
+{
+	struct mmc_host	*mmc = dev_get_drvdata(dev);
+	struct sunxi_mmc_host *host = mmc_priv(mmc);
+
+	clk_disable_unprepare(host->clk_sample);
+	clk_disable_unprepare(host->clk_output);
+	clk_disable_unprepare(host->clk_mmc);
+
+	return 0;
+}
+
+static const struct dev_pm_ops sunxi_mmc_pm_ops = {
+	SET_RUNTIME_PM_OPS(sunxi_mmc_runtime_suspend,
+			   sunxi_mmc_runtime_resume,
+			   NULL)
+};
+
 static struct platform_driver sunxi_mmc_driver = {
 	.driver = {
 		.name	= "sunxi-mmc",
 		.of_match_table = of_match_ptr(sunxi_mmc_of_match),
+		.pm = &sunxi_mmc_pm_ops,
 	},
 	.probe		= sunxi_mmc_probe,
 	.remove		= sunxi_mmc_remove,
