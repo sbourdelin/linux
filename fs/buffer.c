@@ -2618,7 +2618,6 @@ int nobh_write_begin(struct address_space *mapping,
 		int create;
 
 		block_end = block_start + blocksize;
-		bh->b_state = 0;
 		create = 1;
 		if (block_start >= to)
 			create = 0;
