@@ -274,7 +274,7 @@ static struct gpio_keys_platform_data mioa701_gpio_keys_data = {
  */
 #define ONE_LED(_gpio, _name) \
 { .gpio = (_gpio), .name = (_name), .active_low = true }
-static struct gpio_led gpio_leds[] = {
+static const struct gpio_led gpio_leds[] __initconst = {
 	ONE_LED(GPIO10_LED_nCharging, "mioa701:charging"),
 	ONE_LED(GPIO97_LED_nBlue, "mioa701:blue"),
 	ONE_LED(GPIO98_LED_nOrange, "mioa701:orange"),

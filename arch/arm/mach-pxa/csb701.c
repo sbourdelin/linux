@@ -24,7 +24,7 @@ static struct gpio_keys_platform_data csb701_gpio_keys_data = {
 	.nbuttons = ARRAY_SIZE(csb701_buttons),
 };
 
-static struct gpio_led csb701_leds[] = {
+static const struct gpio_led csb701_leds[] __initconst = {
 	{
 		.name	= "csb701:yellow:heartbeat",
 		.default_trigger = "heartbeat",

@@ -438,7 +438,7 @@ static struct spi_board_info zeus_spi_board_info[] = {
 };
 
 /* Leds */
-static struct gpio_led zeus_leds[] = {
+static const struct gpio_led zeus_leds[] __initconst = {
 	[0] = {
 		.name		 = "zeus:yellow:1",
 		.default_trigger = "heartbeat",

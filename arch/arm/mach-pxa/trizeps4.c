@@ -235,7 +235,7 @@ static struct platform_device dm9000_device = {
 /****************************************************************************
  * LED's on GPIO pins of PXA
  ****************************************************************************/
-static struct gpio_led trizeps4_led[] = {
+static const struct gpio_led trizeps4_led[] __initconst = {
 #ifdef STATUS_LEDS_ON_STUART_PINS
 	{
 		.name = "led0:orange:heartbeat",	/* */

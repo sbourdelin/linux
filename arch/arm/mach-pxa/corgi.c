@@ -450,7 +450,7 @@ static struct platform_device corgi_gpio_keys_device = {
 /*
  * Corgi LEDs
  */
-static struct gpio_led corgi_gpio_leds[] = {
+static const struct gpio_led corgi_gpio_leds[] __initconst = {
 	{
 		.name			= "corgi:amber:charge",
 		.default_trigger	= "sharpsl-charge",

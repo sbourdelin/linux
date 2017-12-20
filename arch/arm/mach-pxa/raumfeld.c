@@ -468,7 +468,7 @@ static struct platform_device raumfeld_gpio_keys_device = {
  * GPIO LEDs
  */
 
-static struct gpio_led raumfeld_leds[] = {
+static const struct gpio_led raumfeld_leds[] __initconst = {
 	{
 		.name		= "raumfeld:1",
 		.gpio		= GPIO_LED1,
@@ -558,7 +558,7 @@ static struct platform_device raumfeld_pwm_backlight_device = {
 };
 
 /* LT3593 controlled backlight */
-static struct gpio_led raumfeld_lt3593_led = {
+static const struct gpio_led raumfeld_lt3593_led __initconst = {
 	.name		= "backlight",
 	.gpio		= mfp_to_gpio(MFP_PIN_GPIO17),
 	.default_state	= LEDS_GPIO_DEFSTATE_ON,

@@ -441,7 +441,7 @@ static struct pxamci_platform_data imote2_mci_platform_data = {
 	.gpio_power = -1,
 };
 
-static struct gpio_led imote2_led_pins[] = {
+static const struct gpio_led imote2_led_pins[] __initconst = {
 	{
 		.name       =  "imote2:red",
 		.gpio       = 103,

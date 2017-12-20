@@ -182,7 +182,7 @@ static inline void palmz72_kpc_init(void) {}
  * LEDs
  ******************************************************************************/
 #if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
-static struct gpio_led gpio_leds[] = {
+static const struct gpio_led gpio_leds[] __initconst = {
 	{
 		.name			= "palmz72:green:led",
 		.default_trigger	= "none",
