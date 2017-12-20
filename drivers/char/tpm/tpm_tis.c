@@ -314,7 +314,7 @@ static int tpm_tis_plat_remove(struct platform_device *pdev)
 	tpm_chip_unregister(chip);
 	tpm_tis_remove(chip);
 
-	if (is_bsw())
+	if (is_bsw() && priv->ilb_base_addr)
 		iounmap(priv->ilb_base_addr);
 
 	return 0;
