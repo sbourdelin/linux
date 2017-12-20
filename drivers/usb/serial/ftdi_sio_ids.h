@@ -1496,6 +1496,12 @@
 #define FTDI_EKEY_CONV_USB_PID		0xCB08	/* Converter USB */
 
 /*
+ * Airbus Defence and Space
+ */
+#define AIRBUS_DS_VID			0x1e8e  /* Vendor ID */
+#define AIRBUS_DS_P8GR			0x6001  /* Tetra P8GR */
+
+/*
  * GE Healthcare devices
  */
 #define GE_HEALTHCARE_VID		0x1901

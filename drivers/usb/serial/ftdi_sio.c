@@ -985,6 +985,8 @@ static const struct usb_device_id id_table_combined[] = {
 	/* Infineon Devices */
 	{ USB_DEVICE_INTERFACE_NUMBER(INFINEON_VID, INFINEON_TRIBOARD_TC1798_PID, 1) },
 	{ USB_DEVICE_INTERFACE_NUMBER(INFINEON_VID, INFINEON_TRIBOARD_TC2X7_PID, 1) },
+	/* Airbus Defence and Space devices */
+	{ USB_DEVICE(AIRBUS_DS_VID, AIRBUS_DS_P8GR) },
 	/* GE Healthcare devices */
 	{ USB_DEVICE(GE_HEALTHCARE_VID, GE_HEALTHCARE_NEMO_TRACKER_PID) },
 	/* Active Research (Actisense) devices */
