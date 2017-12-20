@@ -15,6 +15,49 @@ static int qla2x00_sns_gnn_id(scsi_qla_host_t *, sw_info_t *);
 static int qla2x00_sns_rft_id(scsi_qla_host_t *);
 static int qla2x00_sns_rnn_id(scsi_qla_host_t *);
 
+struct sp_name sp_str[] = {
+	{ SPCN_UNKNOWN, "unknown" },
+	{ SPCN_GIDPN, "gidpn" },
+	{ SPCN_GPSC, "gpsc" },
+	{ SPCN_GPNID, "gpnid" },
+	{ SPCN_GPNFT, "gpnft" },
+	{ SPCN_GNNID, "gnnid" },
+	{ SPCN_GFPNID, "gfpnid" },
+	{ SPCN_GFFID, "gffid" },
+	{ SPCN_LOGIN, "login" },
+	{ SPCN_LOGOUT, "logout" },
+	{ SPCN_ADISC, "adisc" },
+	{ SPCN_GNLIST, "gnlist" },
+	{ SPCN_GPDB, "gpdb" },
+	{ SPCN_TMF, "tmf" },
+	{ SPCN_ABORT, "abort" },
+	{ SPCN_NACK, "nack" },
+	{ SPCN_BSG_RPT, "bsg_els_rpt" },
+	{ SPCN_BSG_HST, "bsg_els_hst" },
+	{ SPCN_BSG_CT, "bsg_ct" },
+	{ SPCN_BSG_FX_MGMT, "bsg_fx_mgmt" },
+	{ SPCN_ELS_DCMD, "ELS_DCMD" },
+	{ SPCN_FXDISC, "fxdisc" },
+	{ SPCN_PRLI, "prli" },
+	{ SPCN_NVME_LS, "nvme_ls" },
+	{ SPCN_NVME_CMD, "nvme_cmd" },
+};
+
+const char *sp_to_str(uint16_t cmd)
+{
+	int i;
+	struct sp_name *e;
+
+	for (i = 1; i < ARRAY_SIZE(sp_str); i++) {
+		e = sp_str + i;
+		if (cmd == e->cmd)
+			return e->str;
+	}
+
+	return sp_str[0].str;
+}
+
+
 /**
  * qla2x00_prep_ms_iocb() - Prepare common MS/CT IOCB fields for SNS CT query.
  * @ha: HA context
@@ -2931,7 +2974,7 @@ int qla24xx_async_gidpn(scsi_qla_host_t *vha, fc_port_t *fcport)
 		goto done;
 
 	sp->type = SRB_CT_PTHRU_CMD;
-	sp->name = "gidpn";
+	sp->name = sp_to_str(SPCN_GIDPN);
 	sp->gen1 = fcport->rscn_gen;
 	sp->gen2 = fcport->login_gen;
 
@@ -3091,7 +3134,7 @@ int qla24xx_async_gpsc(scsi_qla_host_t *vha, fc_port_t *fcport)
 		goto done;
 
 	sp->type = SRB_CT_PTHRU_CMD;
-	sp->name = "gpsc";
+	sp->name = sp_to_str(SPCN_GPSC);
 	sp->gen1 = fcport->rscn_gen;
 	sp->gen2 = fcport->login_gen;
 
@@ -3398,7 +3441,7 @@ int qla24xx_async_gpnid(scsi_qla_host_t *vha, port_id_t *id)
 		goto done;
 
 	sp->type = SRB_CT_PTHRU_CMD;
-	sp->name = "gpnid";
+	sp->name = sp_to_str(SPCN_GPNID);
 	sp->u.iocb_cmd.u.ctarg.id = *id;
 	sp->gen1 = 0;
 	qla2x00_init_timer(sp, qla2x00_get_async_timeout(vha) + 2);
@@ -3550,7 +3593,7 @@ int qla24xx_async_gffid(scsi_qla_host_t *vha, fc_port_t *fcport)
 
 	fcport->flags |= FCF_ASYNC_SENT;
 	sp->type = SRB_CT_PTHRU_CMD;
-	sp->name = "gffid";
+	sp->name = sp_to_str(SPCN_GFFID);
 	sp->gen1 = fcport->rscn_gen;
 	sp->gen2 = fcport->login_gen;
 

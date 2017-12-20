@@ -376,7 +376,8 @@ qla2x00_process_els(struct bsg_job *bsg_job)
 		 SRB_ELS_CMD_RPT : SRB_ELS_CMD_HST);
 	sp->name =
 		(bsg_request->msgcode == FC_BSG_RPT_ELS ?
-		 "bsg_els_rpt" : "bsg_els_hst");
+		 sp_to_str(SPCN_BSG_RPT) : sp_to_str(SPCN_BSG_HST));
+
 	sp->u.bsg_job = bsg_job;
 	sp->free = qla2x00_bsg_sp_free;
 	sp->done = qla2x00_bsg_job_done;
@@ -522,7 +523,7 @@ qla2x00_process_ct(struct bsg_job *bsg_job)
 	}
 
 	sp->type = SRB_CT_CMD;
-	sp->name = "bsg_ct";
+	sp->name = sp_to_str(SPCN_BSG_CT);
 	sp->iocbs = qla24xx_calc_ct_iocbs(req_sg_cnt + rsp_sg_cnt);
 	sp->u.bsg_job = bsg_job;
 	sp->free = qla2x00_bsg_sp_free;
@@ -2028,7 +2029,7 @@ qlafx00_mgmt_cmd(struct bsg_job *bsg_job)
 	fcport->loop_id = piocb_rqst->dataword;
 
 	sp->type = SRB_FXIOCB_BCMD;
-	sp->name = "bsg_fx_mgmt";
+	sp->name = sp_to_str(SPCN_BSG_FX_MGMT);
 	sp->iocbs = qla24xx_calc_ct_iocbs(req_sg_cnt + rsp_sg_cnt);
 	sp->u.bsg_job = bsg_job;
 	sp->free = qla2x00_bsg_sp_free;

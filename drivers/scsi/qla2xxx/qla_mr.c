@@ -1820,7 +1820,7 @@ qlafx00_fx_disc(scsi_qla_host_t *vha, fc_port_t *fcport, uint16_t fx_type)
 		goto done;
 
 	sp->type = SRB_FXIOCB_DCMD;
-	sp->name = "fxdisc";
+	sp->name = sp_to_str(SPCN_FXDISC);
 	qla2x00_init_timer(sp, FXDISC_TIMEOUT);
 
 	fdisc = &sp->u.iocb_cmd;

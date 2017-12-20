@@ -239,7 +239,7 @@ static int qla_nvme_ls_req(struct nvme_fc_local_port *lport,
 		return rval;
 
 	sp->type = SRB_NVME_LS;
-	sp->name = "nvme_ls";
+	sp->name = sp_to_str(SPCN_NVME_LS);
 	sp->done = qla_nvme_sp_ls_done;
 	atomic_set(&sp->ref_count, 1);
 	nvme = &sp->u.iocb_cmd;
@@ -526,7 +526,7 @@ static int qla_nvme_post_cmd(struct nvme_fc_local_port *lport,
 	init_waitqueue_head(&sp->nvme_ls_waitq);
 	priv->sp = sp;
 	sp->type = SRB_NVME_CMD;
-	sp->name = "nvme_cmd";
+	sp->name = sp_to_str(SPCN_NVME_CMD);
 	sp->done = qla_nvme_sp_done;
 	sp->qpair = qpair;
 	nvme = &sp->u.iocb_cmd;
