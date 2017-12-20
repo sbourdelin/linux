@@ -255,7 +255,7 @@ static int tegra_sor_set_parent_clock(struct tegra_sor *sor, struct clk *parent)
 
 	clk_disable_unprepare(sor->clk);
 
-	err = clk_set_parent(sor->clk_out, parent);
+	err = clk_set_parent(sor->clk_out ? sor->clk_out : sor->clk, parent);
 	if (err < 0)
 		return err;
 
