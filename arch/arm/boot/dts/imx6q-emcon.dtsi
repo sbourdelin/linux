@@ -1,0 +1,37 @@
+/*
+ * Copyright (C) 2017 emtrion GmbH
+ * Author: Jan Tuerk  <jan.tuerk@emtrion.com>
+ *
+ * The code contained herein is licensed under the GNU General Public
+ * License. You may obtain a copy of the GNU General Public License
+ * Version 2 or later at the following locations:
+ *
+ * http://www.opensource.org/licenses/gpl-license.html
+ * http://www.gnu.org/copyleft/gpl.html
+ *
+ * SPDX-License-Identifier: GPL-2.0
+ *
+ */
+
+/ {
+	model = "emtrion SoM emCON-MX6 Dual/Quad";
+	compatible = "emtrion,emcon-mx6","fsl,imx6q";
+};
+
+&iomuxc {
+	pinctrl_cpi2: csi1grp {
+		fsl,pins = <
+			MX6QDL_PAD_EIM_D17__IPU2_CSI1_PIXCLK	0x0b0b1
+			MX6QDL_PAD_EIM_EB3__IPU2_CSI1_HSYNC		0x1b0b1
+			MX6QDL_PAD_EIM_D29__IPU2_CSI1_VSYNC		0x1b0b1
+			MX6QDL_PAD_EIM_A17__IPU2_CSI1_DATA12	0x1b0b1
+			MX6QDL_PAD_EIM_D27__IPU2_CSI1_DATA13	0x1b0b1
+			MX6QDL_PAD_EIM_D26__IPU2_CSI1_DATA14	0x1b0b1
+			MX6QDL_PAD_EIM_D20__IPU2_CSI1_DATA15	0x1b0b1
+			MX6QDL_PAD_EIM_D19__IPU2_CSI1_DATA16	0x1b0b1
+			MX6QDL_PAD_EIM_D18__IPU2_CSI1_DATA17	0x1b0b1
+			MX6QDL_PAD_EIM_D16__IPU2_CSI1_DATA18	0x1b0b1
+			MX6QDL_PAD_EIM_EB2__IPU2_CSI1_DATA19	0x1b0b1
+		>;
+	};
+};
