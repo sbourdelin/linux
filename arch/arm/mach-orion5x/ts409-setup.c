@@ -169,7 +169,7 @@ static struct i2c_board_info __initdata qnap_ts409_i2c_rtc = {
  * LEDs attached to GPIO
  ****************************************************************************/
 
-static struct gpio_led ts409_led_pins[] = {
+static const struct gpio_led ts409_led_pins[] __initconst = {
 	{
 		.name		= "ts409:red:sata1",
 		.gpio		= 4,

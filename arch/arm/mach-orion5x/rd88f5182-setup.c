@@ -83,7 +83,7 @@ static struct platform_device rd88f5182_nor_flash = {
 
 #define RD88F5182_GPIO_LED		0
 
-static struct gpio_led rd88f5182_gpio_led_pins[] = {
+static const struct gpio_led rd88f5182_gpio_led_pins[] __initconst = {
 	{
 		.name		= "rd88f5182:cpu",
 		.default_trigger = "cpu0",

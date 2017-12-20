@@ -29,7 +29,7 @@
 /*
  * LEDs attached to GPIO
  */
-static struct gpio_led wrt350n_v2_led_pins[] = {
+static const struct gpio_led wrt350n_v2_led_pins[] __initconst = {
 	{
 		.name		= "wrt350nv2:green:power",
 		.gpio		= 0,

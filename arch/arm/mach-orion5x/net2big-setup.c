@@ -214,7 +214,7 @@ err_free_1:
 #define NET2BIG_GPIO_SATA0_BLUE_LED	17
 #define NET2BIG_GPIO_SATA1_BLUE_LED	13
 
-static struct gpio_led net2big_leds[] = {
+static const struct gpio_led net2big_leds[] __initconst = {
 	{
 		.name = "net2big:red:power",
 		.gpio = NET2BIG_GPIO_PWR_RED_LED,

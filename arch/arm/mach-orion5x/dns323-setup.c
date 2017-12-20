@@ -221,7 +221,7 @@ static struct gpio_led dns323ab_leds[] = {
 };
 
 
-static struct gpio_led dns323c_leds[] = {
+static const struct gpio_led dns323c_leds[] __initconst = {
 	{
 		.name = "power:blue",
 		.gpio = DNS323C_GPIO_LED_POWER,
