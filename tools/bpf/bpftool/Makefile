@@ -37,7 +37,9 @@ CC = gcc
 
 CFLAGS += -O2
 CFLAGS += -W -Wall -Wextra -Wno-unused-parameter -Wshadow
-CFLAGS += -D__EXPORTED_HEADERS__ -I$(srctree)/tools/include/uapi -I$(srctree)/tools/include -I$(srctree)/tools/lib/bpf -I$(srctree)/kernel/bpf/
+CFLAGS += -D__EXPORTED_HEADERS__ -I$(srctree)/tools/include/uapi
+CFLAGS += -I$(srctree)/tools/include -I$(srctree)/tools/lib/bpf
+CFLAGS += -I$(srctree)/kernel/bpf/ -I$(srctree)/usr/include
 LIBS = -lelf -lbfd -lopcodes $(LIBBPF)
 
 INSTALL ?= install
