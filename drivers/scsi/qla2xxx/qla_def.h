@@ -472,6 +472,10 @@ struct srb_iocb {
 			uint32_t timeout_sec;
 			struct	list_head   entry;
 		} nvme;
+		struct {
+			u16 cmd;
+			u16 vp_index;
+		} ctrlvp;
 	} u;
 
 	struct timer_list timer;
@@ -507,6 +511,7 @@ enum {
 	SPCN_PRLI,
 	SPCN_NVME_LS,
 	SPCN_NVME_CMD,
+	SPCN_CTRL_VP,
 };
 
 struct sp_name {
@@ -536,7 +541,7 @@ struct sp_name {
 #define SRB_NVME_CMD	19
 #define SRB_NVME_LS	20
 #define SRB_PRLI_CMD	21
-
+#define SRB_CTRL_VP	22
 enum {
 	TYPE_SRB,
 	TYPE_TGT_CMD,
@@ -562,6 +567,8 @@ typedef struct srb {
 	struct list_head elem;
 	u32 gen1;	/* scratch */
 	u32 gen2;	/* scratch */
+	int rc;
+	struct completion comp;
 	union {
 		struct srb_iocb iocb_cmd;
 		struct bsg_job *bsg_job;

@@ -41,6 +41,7 @@ struct sp_name sp_str[] = {
 	{ SPCN_PRLI, "prli" },
 	{ SPCN_NVME_LS, "nvme_ls" },
 	{ SPCN_NVME_CMD, "nvme_cmd" },
+	{ SPCN_CTRL_VP, "ctrl_vp" },
 };
 
 const char *sp_to_str(uint16_t cmd)
