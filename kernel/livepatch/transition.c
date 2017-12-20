@@ -625,6 +625,8 @@ void klp_send_signals(void)
 
 	pr_notice("signaling remaining tasks\n");
 
+	mutex_lock(&klp_mutex);
+
 	read_lock(&tasklist_lock);
 	for_each_process_thread(g, task) {
 		if (!klp_patch_pending(task))
@@ -653,6 +655,8 @@ void klp_send_signals(void)
 		}
 	}
 	read_unlock(&tasklist_lock);
+
+	mutex_unlock(&klp_mutex);
 }
 
 /*
@@ -671,6 +675,8 @@ void klp_force_transition(void)
 
 	pr_warn("forcing remaining tasks to the patched state\n");
 
+	mutex_lock(&klp_mutex);
+
 	read_lock(&tasklist_lock);
 	for_each_process_thread(g, task)
 		klp_update_patch_state(task);
@@ -680,4 +686,6 @@ void klp_force_transition(void)
 		klp_update_patch_state(idle_task(cpu));
 
 	klp_forced = true;
+
+	mutex_unlock(&klp_mutex);
 }
