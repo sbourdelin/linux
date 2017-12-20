@@ -206,6 +206,23 @@ static int p9_virtio_cancel(struct p9_client *client, struct p9_req_t *req)
 	return 1;
 }
 
+static int p9_virtio_cancelled(struct p9_client *client, struct p9_req_t *req)
+{
+	struct virtio_chan *chan = client->trans;
+	unsigned long flags;
+
+	spin_lock_irqsave(&chan->lock, flags);
+	if (virtqueue_detach_buf(chan->vq, req) != req) {
+		spin_unlock_irqrestore(&chan->lock, flags);
+		return 0;
+	}
+	chan->ring_bufs_avail = 1;
+	spin_unlock_irqrestore(&chan->lock, flags);
+	/* Wakeup if anyone waiting for VirtIO ring space. */
+	wake_up(chan->vc_wq);
+	return 0;
+}
+
 /**
  * pack_sg_list_p - Just like pack_sg_list. Instead of taking a buffer,
  * this takes a list of pages.
@@ -737,6 +754,7 @@ static struct p9_trans_module p9_virtio_trans = {
 	.request = p9_virtio_request,
 	.zc_request = p9_virtio_zc_request,
 	.cancel = p9_virtio_cancel,
+	.cancelled = p9_virtio_cancelled,
 	/*
 	 * We leave one entry for input and one entry for response
 	 * headers. We also skip one more entry to accomodate, address
