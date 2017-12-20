@@ -1331,6 +1331,20 @@ EXPORT_SYMBOL_GPL(crypto_aes_set_key);
 	f_rl(bo, bi, 3, k);	\
 } while (0)
 
+#if __GNUC__ >= 7
+/*
+ * Newer compilers try to optimize integer arithmetic more aggressively,
+ * which generally improves code quality a lot, but in this specific case
+ * ends up hurting more than it helps, in some configurations drastically
+ * so. This turns off two optimization steps that have been shown to
+ * lead to rather badly optimized code with gcc-7.
+ *
+ * See also https://gcc.gnu.org/bugzilla/show_bug.cgi?id=83356
+ */
+#pragma GCC optimize("-fno-tree-pre")
+#pragma GCC optimize("-fno-tree-sra")
+#endif
+
 static void aes_encrypt(struct crypto_tfm *tfm, u8 *out, const u8 *in)
 {
 	const struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
