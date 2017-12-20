@@ -22,6 +22,7 @@
 #include <asm/cputable.h>
 #include <asm/current.h>
 #include <asm/copro.h>
+#include <asm/switch_to.h>
 
 #include "cxl.h"
 
@@ -361,4 +362,18 @@ void cxl_context_mm_count_put(struct cxl_context *ctx)
 {
 	if (ctx->mm)
 		mmdrop(ctx->mm);
+}
+
+int cxl_context_thread_tidr(struct cxl_context *ctx)
+{
+	int rc = 0;
+
+	if (!cxl_is_power9())
+		return -ENODEV;
+
+	rc = set_thread_tidr(current);
+	pr_devel("%s: current tidr: %ld\n", __func__,
+		 current->thread.tidr);
+
+	return rc;
 }

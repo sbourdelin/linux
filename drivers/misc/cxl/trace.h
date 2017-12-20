@@ -90,9 +90,10 @@ DECLARE_EVENT_CLASS(cxl_pe_class,
 
 
 TRACE_EVENT(cxl_attach,
-	TP_PROTO(struct cxl_context *ctx, u64 wed, s16 num_interrupts, u64 amr),
+	TP_PROTO(struct cxl_context *ctx, u64 wed, s16 num_interrupts,
+		 u64 amr, s16 tidr),
 
-	TP_ARGS(ctx, wed, num_interrupts, amr),
+	TP_ARGS(ctx, wed, num_interrupts, amr, tidr),
 
 	TP_STRUCT__entry(
 		__field(u8, card)
@@ -102,6 +103,7 @@ TRACE_EVENT(cxl_attach,
 		__field(u64, wed)
 		__field(u64, amr)
 		__field(s16, num_interrupts)
+		__field(s16, tidr)
 	),
 
 	TP_fast_assign(
@@ -112,16 +114,18 @@ TRACE_EVENT(cxl_attach,
 		__entry->wed = wed;
 		__entry->amr = amr;
 		__entry->num_interrupts = num_interrupts;
+		__entry->tidr = tidr;
 	),
 
-	TP_printk("afu%i.%i pid=%i pe=%i wed=0x%016llx irqs=%i amr=0x%llx",
+	TP_printk("afu%i.%i pid=%i pe=%i wed=0x%016llx irqs=%i amr=0x%llx tidr=%i",
 		__entry->card,
 		__entry->afu,
 		__entry->pid,
 		__entry->pe,
 		__entry->wed,
 		__entry->num_interrupts,
-		__entry->amr
+		__entry->amr,
+		__entry->tidr
 	)
 );
 

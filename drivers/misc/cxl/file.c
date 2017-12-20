@@ -173,7 +173,7 @@ static long afu_ioctl_start_work(struct cxl_context *ctx,
 	 * flags are set it's invalid
 	 */
 	if (work.reserved1 || work.reserved2 || work.reserved3 ||
-	    work.reserved4 || work.reserved5 || work.reserved6 ||
+	    work.reserved4 || work.reserved5 ||
 	    (work.flags & ~CXL_START_WORK_ALL)) {
 		rc = -EINVAL;
 		goto out;
@@ -248,7 +248,19 @@ static long afu_ioctl_start_work(struct cxl_context *ctx,
 	 */
 	smp_mb();
 
-	trace_cxl_attach(ctx, work.work_element_descriptor, work.num_interrupts, amr);
+	/* Assign a unique TIDR (thread id) for the current thread */
+	if (work.flags & CXL_START_WORK_TID) {
+		rc = cxl_context_thread_tidr(ctx);
+		if (rc)
+			goto out;
+	}
+	work.tid = current->thread.tidr;
+
+	trace_cxl_attach(ctx,
+			 work.work_element_descriptor,
+			 work.num_interrupts,
+			 amr,
+			 work.tid);
 
 	if ((rc = cxl_ops->attach_process(ctx, false, work.work_element_descriptor,
 							amr))) {
@@ -262,6 +274,9 @@ static long afu_ioctl_start_work(struct cxl_context *ctx,
 			mm_context_remove_copro(ctx->mm);
 		goto out;
 	}
+
+	if (copy_to_user(uwork, &work, sizeof(work)))
+		return -EFAULT;
 
 	ctx->status = STARTED;
 	rc = 0;

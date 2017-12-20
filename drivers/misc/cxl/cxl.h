@@ -1169,4 +1169,7 @@ void cxl_context_mm_count_get(struct cxl_context *ctx);
 /* Decrements the reference count to "struct mm_struct" */
 void cxl_context_mm_count_put(struct cxl_context *ctx);
 
+/* Handles an unique TIDR (thread id) for the current thread */
+int cxl_context_thread_tidr(struct cxl_context *ctx);
+
 #endif
