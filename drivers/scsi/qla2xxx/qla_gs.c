@@ -3176,16 +3176,16 @@ int qla24xx_async_gidpn(scsi_qla_host_t *vha, fc_port_t *fcport)
 	struct ct_sns_req       *ct_req;
 	srb_t *sp;
 
-	if (!vha->flags.online)
+	if (!vha->flags.online || (fcport->flags & FCF_ASYNC_SENT))
 		goto done;
 
-	fcport->flags |= FCF_ASYNC_SENT;
 	fcport->disc_state = DSC_GID_PN;
 	fcport->scan_state = QLA_FCPORT_SCAN;
 	sp = qla2x00_get_sp(vha, fcport, GFP_ATOMIC);
 	if (!sp)
 		goto done;
 
+	fcport->flags |= FCF_ASYNC_SENT;
 	sp->type = SRB_CT_PTHRU_CMD;
 	sp->name = sp_to_str(SPCN_GIDPN);
 	sp->gen1 = fcport->rscn_gen;
@@ -3226,8 +3226,8 @@ int qla24xx_async_gidpn(scsi_qla_host_t *vha, fc_port_t *fcport)
 
 done_free_sp:
 	sp->free(sp);
-done:
 	fcport->flags &= ~FCF_ASYNC_SENT;
+done:
 	return rval;
 }
 
@@ -3368,14 +3368,14 @@ int qla24xx_async_gpsc(scsi_qla_host_t *vha, fc_port_t *fcport)
 	struct ct_sns_req       *ct_req;
 	srb_t *sp;
 
-	if (!vha->flags.online)
+	if (!vha->flags.online || (fcport->flags & FCF_ASYNC_SENT))
 		goto done;
 
-	fcport->flags |= FCF_ASYNC_SENT;
 	sp = qla2x00_get_sp(vha, fcport, GFP_KERNEL);
 	if (!sp)
 		goto done;
 
+	fcport->flags |= FCF_ASYNC_SENT;
 	sp->type = SRB_CT_PTHRU_CMD;
 	sp->name = sp_to_str(SPCN_GPSC);
 	sp->gen1 = fcport->rscn_gen;
@@ -3415,8 +3415,8 @@ int qla24xx_async_gpsc(scsi_qla_host_t *vha, fc_port_t *fcport)
 
 done_free_sp:
 	sp->free(sp);
-done:
 	fcport->flags &= ~FCF_ASYNC_SENT;
+done:
 	return rval;
 }
 
@@ -3829,7 +3829,7 @@ int qla24xx_async_gffid(scsi_qla_host_t *vha, fc_port_t *fcport)
 	struct ct_sns_req       *ct_req;
 	srb_t *sp;
 
-	if (!vha->flags.online)
+	if (!vha->flags.online || (fcport->flags & FCF_ASYNC_SENT))
 		return rval;
 
 	sp = qla2x00_get_sp(vha, fcport, GFP_KERNEL);
@@ -4525,12 +4525,12 @@ int qla24xx_async_gfpnid(scsi_qla_host_t *vha, fc_port_t *fcport)
 	if (!vha->flags.online)
 		goto done;
 
-	fcport->flags |= FCF_ASYNC_SENT;
 	fcport->disc_state = DSC_GFPN_ID;
 	sp = qla2x00_get_sp(vha, fcport, GFP_ATOMIC);
 	if (!sp)
 		goto done;
 
+	fcport->flags |= FCF_ASYNC_SENT;
 	sp->type = SRB_CT_PTHRU_CMD;
 	sp->name = sp_to_str(SPCN_GFPNID);
 	sp->gen1 = fcport->rscn_gen;

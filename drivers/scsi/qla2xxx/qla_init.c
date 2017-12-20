@@ -206,7 +206,6 @@ qla2x00_async_login(struct scsi_qla_host *vha, fc_port_t *fcport,
 		lio->u.logio.flags |= SRB_LOGIN_RETRIED;
 	rval = qla2x00_start_sp(sp);
 	if (rval != QLA_SUCCESS) {
-		fcport->flags &= ~FCF_ASYNC_SENT;
 		fcport->flags |= FCF_LOGIN_NEEDED;
 		set_bit(RELOGIN_NEEDED, &vha->dpc_flags);
 		goto done_free_sp;
@@ -221,8 +220,8 @@ qla2x00_async_login(struct scsi_qla_host *vha, fc_port_t *fcport,
 
 done_free_sp:
 	sp->free(sp);
-done:
 	fcport->flags &= ~FCF_ASYNC_SENT;
+done:
 	return rval;
 }
 
@@ -244,9 +243,11 @@ qla2x00_async_logout(struct scsi_qla_host *vha, fc_port_t *fcport)
 {
 	srb_t *sp;
 	struct srb_iocb *lio;
-	int rval;
+	int rval = QLA_FUNCTION_FAILED;
 
-	rval = QLA_FUNCTION_FAILED;
+	if (!vha->flags.online || (fcport->flags & FCF_ASYNC_SENT))
+		return rval;
+
 	fcport->flags |= FCF_ASYNC_SENT;
 	sp = qla2x00_get_sp(vha, fcport, GFP_KERNEL);
 	if (!sp)
@@ -717,7 +718,7 @@ int qla24xx_async_gnl(struct scsi_qla_host *vha, fc_port_t *fcport)
 	unsigned long flags;
 	u16 *mb;
 
-	if (!vha->flags.online)
+	if (!vha->flags.online || (fcport->flags & FCF_ASYNC_SENT))
 		goto done;
 
 	ql_dbg(ql_dbg_disc, vha, 0x20d9,
