@@ -147,10 +147,12 @@ struct device_type nsim_dev_type = {
 static int nsim_init(struct net_device *dev)
 {
 	struct netdevsim *ns = netdev_priv(dev);
-	int err;
+	int err = -ENOMEM;
 
 	ns->netdev = dev;
 	ns->ddir = debugfs_create_dir(netdev_name(dev), nsim_ddir);
+	if (IS_ERR_OR_NULL(ns->ddir))
+		goto err;
 
 	err = nsim_bpf_init(ns);
 	if (err)
@@ -171,6 +173,7 @@ err_bpf_uninit:
 	nsim_bpf_uninit(ns);
 err_debugfs_destroy:
 	debugfs_remove_recursive(ns->ddir);
+err:
 	return err;
 }
 
@@ -466,11 +469,11 @@ struct dentry *nsim_ddir;
 
 static int __init nsim_module_init(void)
 {
-	int err;
+	int err = -ENOMEM;
 
 	nsim_ddir = debugfs_create_dir(DRV_NAME, NULL);
-	if (IS_ERR(nsim_ddir))
-		return PTR_ERR(nsim_ddir);
+	if (IS_ERR_OR_NULL(nsim_ddir))
+		goto err;
 
 	err = bus_register(&nsim_bus);
 	if (err)
@@ -486,6 +489,7 @@ err_unreg_bus:
 	bus_unregister(&nsim_bus);
 err_debugfs_destroy:
 	debugfs_remove_recursive(nsim_ddir);
+err:
 	return err;
 }
 
