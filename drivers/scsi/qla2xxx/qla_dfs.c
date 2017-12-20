@@ -418,6 +418,278 @@ static const struct file_operations dfs_naqp_ops = {
 	.write		= qla_dfs_naqp_write,
 };
 
+static int
+qla_dfs_ini_iocbs_show(struct seq_file *s, void *unused)
+{
+	struct scsi_qla_host *vha = s->private;
+	struct qla_hw_data *ha = vha->hw;
+
+	if (!qla_dual_mode_enabled(vha)) {
+		seq_puts(s,
+		    "This field requires Dual Mode to be enabled\n");
+		return 0;
+	}
+
+	seq_printf(s, "%d\n", ha->fwres.ini_iocbs_reserve);
+
+	return 0;
+}
+
+static int
+qla_dfs_ini_iocbs_open(struct inode *inode, struct file *file)
+{
+	struct scsi_qla_host *vha = inode->i_private;
+
+	return single_open(file, qla_dfs_ini_iocbs_show, vha);
+}
+
+static ssize_t qla_dfs_ini_iocbs_write(struct file *file,
+    const char __user *buffer, size_t count, loff_t *pos)
+{
+	struct seq_file *s = file->private_data;
+	struct scsi_qla_host *vha = s->private;
+	struct qla_hw_data *ha = vha->hw;
+	char *buf;
+	int rc = 0;
+	u32 v = 0;
+
+	buf = memdup_user_nul(buffer, count);
+	if (IS_ERR(buf)) {
+		pr_err("host%ld: fail to copy user buffer",
+		    vha->host_no);
+		return PTR_ERR(buf);
+	}
+
+	rc = kstrtouint(buf, 0, &v);
+	if (rc < 0) {
+		ql_log(ql_log_info, vha, 0x707b,
+		    "Unable to set initiator reserve iocbs\n");
+		goto out_free;
+	}
+
+	if (qla_dual_mode_enabled(vha)) {
+		if ((v < ha->orig_fw_iocb_count) &&
+			(ha->fwres.ini_iocbs_reserve != v)) {
+			ha->fwres.ini_iocbs_reserve = v;
+			ql_log(ql_log_info, vha, 0x7024,
+			    "Resetting. User change initiator reserve iocbs (%d/%d)\n",
+			    v, ha->orig_fw_iocb_count);
+
+			set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
+			qla2xxx_wake_dpc(vha);
+			qla2x00_wait_for_chip_reset(vha);
+		} else {
+			ql_log(ql_log_warn, vha, 0x702e,
+			    "Unable to set initiator reserve iocbs (%d/%d)\n",
+			    v, ha->orig_fw_iocb_count);
+		}
+	} else {
+		if (v < (ha->orig_fw_iocb_count - ha->fwres.tgt_iocbs_reserve -
+			ha->fwres.busy_iocbs_reserve))
+			ha->fwres.ini_iocbs_reserve = v;
+		else
+			ql_log(ql_log_warn, vha, 0x7039,
+			    "Unable to set initiator reserve iocbs (%d/%d/%d/%d)\n",
+			    v, ha->orig_fw_iocb_count,
+			    ha->fwres.tgt_iocbs_reserve,
+			    ha->fwres.busy_iocbs_reserve);
+	}
+
+	rc = count;
+out_free:
+	kfree(buf);
+	return rc;
+}
+
+static const struct file_operations dfs_ini_iocbs_ops = {
+	.open		= qla_dfs_ini_iocbs_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.write		= qla_dfs_ini_iocbs_write,
+};
+
+
+static int
+qla_dfs_tgt_iocbs_show(struct seq_file *s, void *unused)
+{
+	struct scsi_qla_host *vha = s->private;
+	struct qla_hw_data *ha = vha->hw;
+
+	if (!qla_dual_mode_enabled(vha)) {
+		seq_puts(s,
+		    "This field requires Dual Mode to be enabled\n");
+		return 0;
+	}
+
+	seq_printf(s, "%d\n", ha->fwres.tgt_iocbs_reserve);
+
+	return 0;
+}
+
+static int
+qla_dfs_tgt_iocbs_open(struct inode *inode, struct file *file)
+{
+	struct scsi_qla_host *vha = inode->i_private;
+
+	return single_open(file, qla_dfs_tgt_iocbs_show, vha);
+}
+
+static ssize_t
+qla_dfs_tgt_iocbs_write(struct file *file, const char __user *buffer,
+    size_t count, loff_t *pos)
+{
+	struct seq_file *s = file->private_data;
+	struct scsi_qla_host *vha = s->private;
+	struct qla_hw_data *ha = vha->hw;
+	char *buf;
+	int rc = 0;
+	u32 v = 0;
+
+	buf = memdup_user_nul(buffer, count);
+	if (IS_ERR(buf)) {
+		pr_err("host%ld: fail to copy user buffer.",
+		    vha->host_no);
+		return PTR_ERR(buf);
+	}
+	rc = kstrtouint(buf, 0, &v);
+	if (rc < 0) {
+		ql_log(ql_log_info, vha, 0x70a5,
+		    "Unable to set initiator reserve iocbs.\n");
+		goto out_free;
+	}
+
+	if (qla_dual_mode_enabled(vha)) {
+		if ((v < ha->orig_fw_iocb_count) &&
+			(ha->fwres.ini_iocbs_reserve != v)) {
+			ha->fwres.ini_iocbs_reserve = v;
+			ql_log(ql_log_info, vha, 0x703b,
+			    "Resetting. User changed target reserve iocbs (%d/%d).\n",
+			    v, ha->orig_fw_iocb_count);
+			set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
+			qla2xxx_wake_dpc(vha);
+			qla2x00_wait_for_chip_reset(vha);
+		} else
+			ql_log(ql_log_warn, vha, 0x7045,
+			    "Unable to set target reserve iocbs (%d/%d).\n",
+			    v, ha->orig_fw_iocb_count);
+	} else {
+		if (v < (ha->orig_fw_iocb_count - ha->fwres.ini_iocbs_reserve -
+			ha->fwres.busy_iocbs_reserve))
+			ha->fwres.tgt_iocbs_reserve = v;
+		else
+			ql_log(ql_log_warn, vha, 0x7047,
+			    "Unable to set target reserve iocbs (%d/%d/%d/%d).\n",
+			    v, ha->orig_fw_iocb_count,
+			    ha->fwres.ini_iocbs_reserve,
+			    ha->fwres.busy_iocbs_reserve);
+	}
+
+	rc = count;
+out_free:
+	kfree(buf);
+	return rc;
+}
+
+static const struct file_operations dfs_tgt_iocbs_ops = {
+	.open		= qla_dfs_tgt_iocbs_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.write		= qla_dfs_tgt_iocbs_write,
+};
+
+static int
+qla_dfs_busy_iocbs_show(struct seq_file *s, void *unused)
+{
+	struct scsi_qla_host *vha = s->private;
+	struct qla_hw_data *ha = vha->hw;
+
+	if (!qla_dual_mode_enabled(vha)) {
+		seq_puts(s,
+		    "This field requires Dual Mode to be enabled\n");
+		return 0;
+	}
+
+	seq_printf(s, "%d\n", ha->fwres.busy_iocbs_reserve);
+
+	return 0;
+}
+
+static int
+qla_dfs_busy_iocbs_open(struct inode *inode, struct file *file)
+{
+	struct scsi_qla_host *vha = inode->i_private;
+
+	return single_open(file, qla_dfs_busy_iocbs_show, vha);
+}
+
+static ssize_t
+qla_dfs_busy_iocbs_write(struct file *file, const char __user *buffer,
+    size_t count, loff_t *pos)
+{
+	struct seq_file *s = file->private_data;
+	struct scsi_qla_host *vha = s->private;
+	struct qla_hw_data *ha = vha->hw;
+	char *buf;
+	int rc = 0;
+	u32 v = 0;
+
+	buf = memdup_user_nul(buffer, count);
+	if (IS_ERR(buf)) {
+		pr_err("host%ld: fail to copy user buffer.",
+		    vha->host_no);
+		return PTR_ERR(buf);
+	}
+
+	rc = kstrtouint(buf, 0, &v);
+	if (rc < 0) {
+		ql_log(ql_log_info, vha, 0x70a6,
+		    "Unable to set initiator reserve iocbs.\n");
+		goto out_free;
+	}
+
+	if (qla_dual_mode_enabled(vha)) {
+		if ((v < ha->orig_fw_iocb_count) &&
+			(ha->fwres.busy_iocbs_reserve != v)) {
+			ha->fwres.busy_iocbs_reserve = v;
+			ql_log(ql_log_info, vha, 0x7073,
+			    "Resetting. User change Busy reserve iocbs (%d/%d).\n",
+			    v, ha->orig_fw_iocb_count);
+			set_bit(ISP_ABORT_NEEDED, &vha->dpc_flags);
+			qla2xxx_wake_dpc(vha);
+			qla2x00_wait_for_chip_reset(vha);
+		} else {
+			ql_log(ql_log_warn, vha, 0x7074,
+			    "Unable to set busy reserve iocbs (%d/%d).\n",
+			    v, ha->orig_fw_iocb_count);
+		}
+	} else {
+		if (v < (ha->orig_fw_iocb_count - ha->fwres.ini_iocbs_reserve -
+			ha->fwres.tgt_iocbs_reserve))
+			ha->fwres.busy_iocbs_reserve = v;
+		else
+			ql_log(ql_log_warn, vha, 0x7075,
+			    "Unable to set busy reserve iocbs (%d/%d/%d/%d).\n",
+			    v, ha->orig_fw_iocb_count,
+			    ha->fwres.ini_iocbs_reserve,
+			    ha->fwres.tgt_iocbs_reserve);
+	}
+
+	rc = count;
+out_free:
+	kfree(buf);
+	return rc;
+}
+
+static const struct file_operations dfs_busy_iocbs_ops = {
+	.open		= qla_dfs_busy_iocbs_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+	.write		= qla_dfs_busy_iocbs_write,
+};
+
 
 int
 qla2x00_dfs_setup(scsi_qla_host_t *vha)
@@ -504,6 +776,33 @@ create_nodes:
 			    "Unable to create debugFS naqp node.\n");
 			goto out;
 		}
+
+		if (ql2xtrackfwres) {
+			ha->tgt.dfs_ini_iocbs =
+				debugfs_create_file("reserve_ini_iocbs",
+				0400, ha->dfs_dir, vha, &dfs_ini_iocbs_ops);
+			if (!ha->tgt.dfs_ini_iocbs) {
+				ql_log(ql_log_warn, vha, 0xd011,
+				    "Unable to create debugFS reserve_ini_iocbs node.\n");
+				goto out;
+			}
+			ha->tgt.dfs_tgt_iocbs =
+				debugfs_create_file("reserve_tgt_iocbs",
+				0400, ha->dfs_dir, vha, &dfs_tgt_iocbs_ops);
+			if (!ha->tgt.dfs_tgt_iocbs) {
+				ql_log(ql_log_warn, vha, 0xd011,
+				    "Unable to create debugFS reserve_tgt_iocbs node.\n");
+				goto out;
+			}
+			ha->tgt.dfs_busy_iocbs =
+				debugfs_create_file("reserve_busy_iocbs",
+				0400, ha->dfs_dir, vha, &dfs_busy_iocbs_ops);
+			if (!ha->tgt.dfs_busy_iocbs) {
+				ql_log(ql_log_warn, vha, 0xd011,
+				    "Unable to create debugFS reserve_busy_iocbs node.\n");
+				goto out;
+			}
+		}
 	}
 out:
 	return 0;
@@ -513,6 +812,22 @@ int
 qla2x00_dfs_remove(scsi_qla_host_t *vha)
 {
 	struct qla_hw_data *ha = vha->hw;
+
+
+	if (ha->tgt.dfs_ini_iocbs) {
+		debugfs_remove(ha->tgt.dfs_ini_iocbs);
+		ha->tgt.dfs_ini_iocbs = NULL;
+	}
+
+	if (ha->tgt.dfs_tgt_iocbs) {
+		debugfs_remove(ha->tgt.dfs_tgt_iocbs);
+		ha->tgt.dfs_tgt_iocbs = NULL;
+	}
+
+	if (ha->tgt.dfs_busy_iocbs) {
+		debugfs_remove(ha->tgt.dfs_busy_iocbs);
+		ha->tgt.dfs_busy_iocbs = NULL;
+	}
 
 	if (ha->tgt.dfs_naqp) {
 		debugfs_remove(ha->tgt.dfs_naqp);

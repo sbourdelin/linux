@@ -277,6 +277,11 @@ MODULE_PARM_DESC(ql2xenablemsix,
 		 " 1 -- enable MSI-X interrupt mechanism.\n"
 		 " 2 -- enable MSI interrupt mechanism.\n");
 
+int ql2xtrackfwres;
+module_param(ql2xtrackfwres, int, 0444);
+MODULE_PARM_DESC(ql2xtrackfwres,
+		 "Track FW resource.  0(default): disabled");
+
 /*
  * SCSI host template entry points
  */
@@ -1772,6 +1777,7 @@ qla2x00_abort_all_cmds(scsi_qla_host_t *vha, int res)
 							atomic_dec(
 							    &sp->ref_count);
 					}
+					qla_put_iocbs(sp->qpair, &sp->iores);
 					sp->done(sp, res);
 				} else {
 					if (!vha->hw->tgt.tgt_ops || !tgt ||
@@ -2790,6 +2796,10 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	ha->link_data_rate = PORT_SPEED_UNKNOWN;
 	ha->optrom_size = OPTROM_SIZE_2300;
 	ha->max_exchg = FW_MAX_EXCHANGES_CNT;
+	ha->fwres.ini_iocbs_reserve = DEF_RES_INI_IOCBS;
+	ha->fwres.tgt_iocbs_reserve = DEF_RES_TGT_IOCBS;
+	ha->fwres.busy_iocbs_reserve = DEF_RES_BUSY_IOCBS;
+	spin_lock_init(&ha->fwres.rescnt_lock);
 
 	/* Assign ISP specific operations. */
 	if (IS_QLA2100(ha)) {

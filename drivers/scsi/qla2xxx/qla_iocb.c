@@ -1460,6 +1460,14 @@ qla24xx_start_scsi(srb_t *sp)
 
 	tot_dsds = nseg;
 	req_cnt = qla24xx_calc_iocbs(vha, tot_dsds);
+
+	if (ha->base_qpair->fw_res_tracking) {
+		sp->iores.iocb_cnt = req_cnt;
+		sp->iores.res_type = RESOURCE_INI;
+		if (qla_get_iocbs(ha, &sp->iores))
+			goto queuing_error;
+	}
+
 	if (req->cnt < (req_cnt + 2)) {
 		cnt = IS_SHADOW_REG_CAPABLE(ha) ? *req->out_ptr :
 		    RD_REG_DWORD_RELAXED(req->req_q_out);
@@ -1538,6 +1546,7 @@ queuing_error:
 	if (tot_dsds)
 		scsi_dma_unmap(cmd);
 
+	qla_put_iocbs(ha->base_qpair, &sp->iores);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	return QLA_FUNCTION_FAILED;
@@ -1661,6 +1670,13 @@ qla24xx_dif_start_scsi(srb_t *sp)
 	/* Total Data and protection sg segment(s) */
 	tot_prot_dsds = nseg;
 	tot_dsds += nseg;
+	if (ha->base_qpair->fw_res_tracking) {
+		sp->iores.iocb_cnt = qla24xx_calc_iocbs(vha, tot_dsds);
+		sp->iores.res_type = RESOURCE_INI;
+		if (qla_get_iocbs(ha, &sp->iores))
+			goto queuing_error;
+	}
+
 	if (req->cnt < (req_cnt + 2)) {
 		cnt = IS_SHADOW_REG_CAPABLE(ha) ? *req->out_ptr :
 		    RD_REG_DWORD_RELAXED(req->req_q_out);
@@ -1739,6 +1755,7 @@ queuing_error:
 		req->outstanding_cmds[handle] = NULL;
 		req->cnt += req_cnt;
 	}
+	qla_put_iocbs(ha->base_qpair, &sp->iores);
 	/* Cleanup will be performed by the caller (queuecommand) */
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
@@ -1813,6 +1830,13 @@ qla2xxx_start_scsi_mq(srb_t *sp)
 
 	tot_dsds = nseg;
 	req_cnt = qla24xx_calc_iocbs(vha, tot_dsds);
+	if (qpair->fw_res_tracking) {
+		sp->iores.iocb_cnt = req_cnt;
+		sp->iores.res_type = RESOURCE_INI;
+		if (qla_get_iocbs(ha, &sp->iores))
+			goto queuing_error;
+	}
+
 	if (req->cnt < (req_cnt + 2)) {
 		cnt = IS_SHADOW_REG_CAPABLE(ha) ? *req->out_ptr :
 		    RD_REG_DWORD_RELAXED(req->req_q_out);
@@ -1890,6 +1914,7 @@ queuing_error:
 	if (tot_dsds)
 		scsi_dma_unmap(cmd);
 
+	qla_put_iocbs(qpair, &sp->iores);
 	spin_unlock_irqrestore(&qpair->qp_lock, flags);
 
 	return QLA_FUNCTION_FAILED;
@@ -2028,6 +2053,14 @@ qla2xxx_dif_start_scsi_mq(srb_t *sp)
 	/* Total Data and protection sg segment(s) */
 	tot_prot_dsds = nseg;
 	tot_dsds += nseg;
+
+	if (qpair->fw_res_tracking) {
+		sp->iores.iocb_cnt = qla24xx_calc_iocbs(vha, tot_dsds);
+		sp->iores.res_type = RESOURCE_INI;
+		if (qla_get_iocbs(ha, &sp->iores))
+			goto queuing_error;
+	}
+
 	if (req->cnt < (req_cnt + 2)) {
 		cnt = IS_SHADOW_REG_CAPABLE(ha) ? *req->out_ptr :
 		    RD_REG_DWORD_RELAXED(req->req_q_out);
@@ -2103,6 +2136,7 @@ queuing_error:
 		req->outstanding_cmds[handle] = NULL;
 		req->cnt += req_cnt;
 	}
+	qla_put_iocbs(qpair, &sp->iores);
 	/* Cleanup will be performed by the caller (queuecommand) */
 
 	spin_unlock_irqrestore(&qpair->qp_lock, flags);
@@ -3625,6 +3659,14 @@ qla2x00_start_bidir(srb_t *sp, struct scsi_qla_host *vha, uint32_t tot_dsds)
 
 	/* Calculate number of IOCB required */
 	req_cnt = qla24xx_calc_iocbs(vha, tot_dsds);
+	if (ha->base_qpair->fw_res_tracking) {
+		sp->iores.iocb_cnt = req_cnt;
+		sp->iores.res_type = RESOURCE_INI;
+		if (qla_get_iocbs(ha, &sp->iores)) {
+			rval = EXT_STATUS_BUSY;
+			goto queuing_error;
+		}
+	}
 
 	/* Check for room on request queue. */
 	if (req->cnt < req_cnt + 2) {
@@ -3667,6 +3709,9 @@ qla2x00_start_bidir(srb_t *sp, struct scsi_qla_host *vha, uint32_t tot_dsds)
 	wmb();
 	qla2x00_start_iocbs(vha, req);
 queuing_error:
+	if (rval)
+		qla_put_iocbs(ha->base_qpair, &sp->iores);
+
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 	return rval;
 }

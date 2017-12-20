@@ -877,7 +877,8 @@ struct qla_tgt_cmd {
 	 * Do not move cmd_type field. it needs to line up with srb->cmd_type
 	 */
 	uint8_t cmd_type;
-	uint8_t pad[7];
+	uint8_t pad[3];
+	struct iocb_resource iores;
 	struct se_cmd se_cmd;
 	struct fc_port *sess;
 	struct qla_qpair *qpair;

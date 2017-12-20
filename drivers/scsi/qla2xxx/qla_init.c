@@ -3108,6 +3108,42 @@ enable_82xx_npiv:
 						    MIN_MULTI_ID_FABRIC - 1;
 				}
 				qla2x00_get_resource_cnts(vha);
+				if (ql2xtrackfwres) {
+					if (qla_dual_mode_enabled(vha)) {
+						ha->fwres.tgt_iocbs_max =
+						  ha->orig_fw_iocb_count -
+						  ha->fwres.ini_iocbs_reserve -
+						  ha->fwres.busy_iocbs_reserve;
+						ha->fwres.ini_iocbs_max =
+						  ha->orig_fw_iocb_count -
+						  ha->fwres.tgt_iocbs_reserve -
+						  ha->fwres.busy_iocbs_reserve;
+						ha->fwres.share_iocbs_max =
+						  ha->orig_fw_iocb_count -
+						  ha->fwres.ini_iocbs_reserve -
+						  ha->fwres.tgt_iocbs_reserve -
+						  ha->fwres.busy_iocbs_reserve;
+
+					} else if (qla_tgt_mode_enabled(vha)) {
+						ha->fwres.tgt_iocbs_max =
+						  ha->orig_fw_iocb_count -
+						  ha->fwres.busy_iocbs_reserve;
+						ha->fwres.ini_iocbs_max = 0;
+						ha->fwres.share_iocbs_max =
+						  ha->orig_fw_iocb_count -
+						  ha->fwres.ini_iocbs_reserve -
+						  ha->fwres.tgt_iocbs_reserve -
+						  ha->fwres.busy_iocbs_reserve;
+					} else
+						QLA_DIS_FW_RES_TRACKING(ha);
+
+					atomic_set(&ha->fwres.ini_iocbs_used,
+						ha->fwres.ini_iocbs_max);
+					atomic_set(&ha->fwres.tgt_iocbs_used,
+						ha->fwres.tgt_iocbs_max);
+					atomic_set(&ha->fwres.share_iocbs_used,
+						ha->fwres.share_iocbs_max);
+				}
 
 				/*
 				 * Allocate the array of outstanding commands

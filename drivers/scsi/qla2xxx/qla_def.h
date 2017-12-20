@@ -549,6 +549,12 @@ enum {
 	TYPE_TGT_CMD,
 };
 
+struct iocb_resource {
+	u8 res_type;
+	u8 pad;
+	u16 iocb_cnt;
+};
+
 typedef struct srb {
 	/*
 	 * Do not move cmd_type field, it needs to
@@ -556,6 +562,7 @@ typedef struct srb {
 	 */
 	uint8_t cmd_type;
 	uint8_t pad[3];
+	struct iocb_resource iores;
 	atomic_t ref_count;
 	wait_queue_head_t nvme_ls_waitq;
 	struct fc_port *fcport;
@@ -3396,6 +3403,7 @@ struct qla_qpair {
 	uint32_t fw_started:1;
 	uint32_t enable_class_2:1;
 	uint32_t enable_explicit_conf:1;
+	uint32_t fw_res_tracking:1;
 	uint32_t use_shadow_reg:1;
 
 	uint16_t id;			/* qp number used with FW */
@@ -3433,6 +3441,24 @@ struct scsi_qlt_host {
 	struct qla_tgt *qla_tgt;
 };
 
+struct qla_fw_resources {
+	spinlock_t rescnt_lock;
+#define DEF_RES_INI_IOCBS 256
+#define DEF_RES_TGT_IOCBS 256
+#define DEF_RES_BUSY_IOCBS 32
+	u32 tgt_iocbs_reserve;
+	u32 ini_iocbs_reserve;
+	u32 busy_iocbs_reserve;
+	u32 tgt_iocbs_max;
+	u32 ini_iocbs_max;
+	u32 share_iocbs_max;
+
+	/* these fields start high */
+	atomic_t share_iocbs_used;
+	atomic_t tgt_iocbs_used;
+	atomic_t ini_iocbs_used;
+};
+
 struct qlt_hw_data {
 	/* Protected by hw lock */
 	uint32_t node_name_set:1;
@@ -3461,6 +3487,9 @@ struct qlt_hw_data {
 	struct dentry *dfs_tgt_sess;
 	struct dentry *dfs_tgt_port_database;
 	struct dentry *dfs_naqp;
+	struct dentry *dfs_ini_iocbs;
+	struct dentry *dfs_tgt_iocbs;
+	struct dentry *dfs_busy_iocbs;
 
 	struct list_head q_full_list;
 	uint32_t num_pend_cmds;
@@ -3540,7 +3569,6 @@ struct qla_hw_data {
 		uint32_t	n2n_ae:1;
 		uint32_t	fw_started:1;
 		uint32_t	fw_init_done:1;
-
 		uint32_t	detected_lr_sfp:1;
 		uint32_t	using_lr_setting:1;
 	} flags;
@@ -4103,6 +4131,7 @@ struct qla_hw_data {
 
 	struct qlt_hw_data tgt;
 	int	allow_cna_fw_dump;
+	struct qla_fw_resources fwres;
 	uint32_t fw_ability_mask;
 	uint16_t min_link_speed;
 	uint16_t max_speed_sup;
@@ -4406,7 +4435,6 @@ struct qla2_sgx {
 #define QLA_QPAIR_MARK_NOT_BUSY(__qpair)		\
 	atomic_dec(&__qpair->ref_count);		\
 
-
 #define QLA_ENA_CONF(_ha) {\
     int i;\
     _ha->base_qpair->enable_explicit_conf = 1;	\
@@ -4423,6 +4451,24 @@ struct qla2_sgx {
 	if (_ha->queue_pair_map[i])		\
 	    _ha->queue_pair_map[i]->enable_explicit_conf = 0; \
     }						\
+}
+
+#define QLA_ENA_FW_RES_TRACKING(_ha) { \
+	int i; \
+	_ha->base_qpair->fw_res_tracking = 1; \
+	for (i = 0; i < _ha->max_qpairs; i++) { \
+		if (_ha->queue_pair_map[i]) \
+		_ha->queue_pair_map[i]->fw_res_tracking = 1; \
+	} \
+}
+
+#define QLA_DIS_FW_RES_TRACKING(_ha) { \
+	int i; \
+	_ha->base_qpair->fw_res_tracking = 0; \
+	for (i = 0; i < _ha->max_qpairs; i++) { \
+		if (_ha->queue_pair_map[i]) \
+		_ha->queue_pair_map[i]->fw_res_tracking = 0; \
+	} \
 }
 
 /*

@@ -2628,6 +2628,14 @@ static int qlt_pre_xmit_response(struct qla_tgt_cmd *cmd,
 		}
 	}
 
+	if (cmd->qpair->fw_res_tracking) {
+		cmd->iores.iocb_cnt = *full_req_cnt;
+		cmd->iores.res_type = RESOURCE_TGT;
+		if (qla_get_iocbs(cmd->vha->hw, &cmd->iores)) {
+			qlt_unmap_sg(cmd->vha, cmd);
+			return -EAGAIN;
+		}
+	}
 	return 0;
 }
 
@@ -3202,6 +3210,7 @@ int qlt_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 out_unmap_unlock:
 	qlt_unmap_sg(vha, cmd);
 	spin_unlock_irqrestore(qpair->qp_lock_ptr, flags);
+	qla_put_iocbs(qpair, &cmd->iores);
 
 	return res;
 }
@@ -3243,6 +3252,14 @@ int qlt_rdy_to_xfer(struct qla_tgt_cmd *cmd)
 	}
 
 	spin_lock_irqsave(qpair->qp_lock_ptr, flags);
+
+	if (cmd->qpair->fw_res_tracking) {
+		cmd->iores.iocb_cnt = prm.req_cnt;
+		cmd->iores.res_type = RESOURCE_TGT;
+		if (qla_get_iocbs(cmd->vha->hw, &cmd->iores))
+			goto out_unlock_free_unmap;
+	}
+
 	/* Does F/W have an IOCBs for this request */
 	res = qlt_check_reserve_free_req(qpair, prm.req_cnt);
 	if (res != 0)
@@ -3281,6 +3298,7 @@ out_unlock_free_unmap:
 	qlt_unmap_sg(vha, cmd);
 	spin_unlock_irqrestore(qpair->qp_lock_ptr, flags);
 
+	qla_put_iocbs(qpair, &cmd->iores);
 	return res;
 }
 EXPORT_SYMBOL(qlt_rdy_to_xfer);
@@ -3810,6 +3828,8 @@ qlt_abort_cmd_on_host_reset(struct scsi_qla_host *vha, struct qla_tgt_cmd *cmd)
 		dump_stack();
 	}
 
+	qla_put_iocbs(cmd->qpair, &cmd->iores);
+
 	cmd->trc_flags |= TRC_FLUSH;
 	ha->tgt.tgt_ops->free_cmd(cmd);
 }
@@ -3841,6 +3861,7 @@ static void qlt_do_ctio_completion(struct scsi_qla_host *vha,
 
 	se_cmd = &cmd->se_cmd;
 	cmd->cmd_sent_to_fw = 0;
+	qla_put_iocbs(cmd->qpair, &cmd->iores);
 
 	qlt_unmap_sg(vha, cmd);
 
@@ -6412,6 +6433,9 @@ qlt_enable_vha(struct scsi_qla_host *vha)
 		qla24xx_disable_vp(vha);
 		qla24xx_enable_vp(vha);
 	} else {
+		if (ql2xtrackfwres && (IS_QLA83XX(ha) || IS_QLA27XX(ha)))
+			QLA_ENA_FW_RES_TRACKING(ha);
+
 		set_bit(ISP_ABORT_NEEDED, &base_vha->dpc_flags);
 		qla2xxx_wake_dpc(base_vha);
 		qla2x00_wait_for_hba_online(base_vha);

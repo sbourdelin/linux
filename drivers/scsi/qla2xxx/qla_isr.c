@@ -1283,6 +1283,8 @@ qla2x00_process_completed_request(struct scsi_qla_host *vha,
 		/* Free outstanding command slot. */
 		req->outstanding_cmds[index] = NULL;
 
+		qla_put_iocbs(sp->qpair, &sp->iores);
+
 		/* Save ISP completion status */
 		sp->done(sp, DID_OK << 16);
 	} else {
@@ -2368,6 +2370,9 @@ done:
 	bsg_job->reply_len = sizeof(struct fc_bsg_reply);
 	/* Always return DID_OK, bsg will send the vendor specific response
 	 * in this case only */
+
+	qla_put_iocbs(sp->qpair, &sp->iores);
+
 	sp->done(sp, DID_OK << 6);
 
 }
@@ -2745,8 +2750,10 @@ out:
 		    cp->cmnd, scsi_bufflen(cp), rsp_info_len,
 		    resid_len, fw_resid_len, sp, cp);
 
-	if (rsp->status_srb == NULL)
+	if (rsp->status_srb == NULL) {
+		qla_put_iocbs(sp->qpair, &sp->iores);
 		sp->done(sp, res);
+	}
 }
 
 /**
@@ -2849,6 +2856,7 @@ qla2x00_error_entry(scsi_qla_host_t *vha, struct rsp_que *rsp, sts_entry_t *pkt)
 	case MBX_IOCB_TYPE:
 		sp = qla2x00_get_sp_from_handle(vha, func, req, pkt);
 		if (sp) {
+			qla_put_iocbs(sp->qpair, &sp->iores);
 			sp->done(sp, res);
 			return 0;
 		}

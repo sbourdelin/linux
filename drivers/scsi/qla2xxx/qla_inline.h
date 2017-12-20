@@ -221,6 +221,7 @@ qla2xxx_get_qpair_sp(struct qla_qpair *qpair, fc_port_t *fcport, gfp_t flag)
 	sp->fcport = fcport;
 	sp->iocbs = 1;
 	sp->vha = qpair->vha;
+	sp->qpair = qpair;
 done:
 	if (!sp)
 		QLA_QPAIR_MARK_NOT_BUSY(qpair);
@@ -253,6 +254,7 @@ qla2x00_get_sp(scsi_qla_host_t *vha, fc_port_t *fcport, gfp_t flag)
 	sp->cmd_type = TYPE_SRB;
 	sp->iocbs = 1;
 	sp->vha = vha;
+	sp->qpair = vha->hw->base_qpair;
 done:
 	if (!sp)
 		QLA_VHA_MARK_NOT_BUSY(vha);
@@ -365,4 +367,104 @@ qla_83xx_start_iocbs(struct qla_qpair *qpair)
 		req->ring_ptr++;
 
 	WRT_REG_DWORD(req->req_q_in, req->ring_index);
+}
+
+enum {
+	RESOURCE_NONE,
+	RESOURCE_INI,
+	RESOURCE_TGT,
+	RESOURCE_SHR,
+};
+
+static inline int
+qla_get_iocbs(struct qla_hw_data *ha, struct iocb_resource *iores)
+{
+	unsigned long flags;
+
+	switch (iores->res_type) {
+	case RESOURCE_TGT:
+		/* spin lock is required here because atomic lib is unable
+		 * to do "check 1st and sub" under 1 atomic operaton.
+		 */
+		spin_lock_irqsave(&ha->fwres.rescnt_lock, flags);
+		if (atomic_read(&ha->fwres.share_iocbs_used) <
+		    iores->iocb_cnt) {
+			/* share pool is emptied */
+			if (atomic_read(&ha->fwres.tgt_iocbs_used) <
+			    iores->iocb_cnt) {
+				iores->res_type = RESOURCE_NONE;
+				spin_unlock_irqrestore(&ha->fwres.rescnt_lock,
+				    flags);
+				return -EAGAIN;
+			}
+
+			atomic_sub(iores->iocb_cnt, &ha->fwres.tgt_iocbs_used);
+			iores->res_type = RESOURCE_TGT;
+			spin_unlock_irqrestore(&ha->fwres.rescnt_lock, flags);
+			return 0;
+		}
+
+		atomic_sub(iores->iocb_cnt, &ha->fwres.share_iocbs_used);
+		iores->res_type = RESOURCE_SHR;
+		spin_unlock_irqrestore(&ha->fwres.rescnt_lock, flags);
+
+		return 0;
+
+	case RESOURCE_INI:
+		spin_lock_irqsave(&ha->fwres.rescnt_lock, flags);
+		if (atomic_read(&ha->fwres.share_iocbs_used) <
+		    iores->iocb_cnt) {
+			if (atomic_read(&ha->fwres.ini_iocbs_used) <
+			    iores->iocb_cnt) {
+				/* fail to get resource */
+				iores->res_type = RESOURCE_NONE;
+				spin_unlock_irqrestore(&ha->fwres.rescnt_lock,
+				    flags);
+				return -EAGAIN;
+			} else {
+				atomic_sub(iores->iocb_cnt,
+				    &ha->fwres.ini_iocbs_used);
+				iores->res_type = RESOURCE_INI;
+				spin_unlock_irqrestore(&ha->fwres.rescnt_lock,
+				    flags);
+				return 0;
+			}
+		}
+		atomic_sub(iores->iocb_cnt, &ha->fwres.share_iocbs_used);
+		iores->res_type = RESOURCE_SHR;
+		spin_unlock_irqrestore(&ha->fwres.rescnt_lock, flags);
+		return 0;
+
+	default:
+		break;
+	}
+
+	return -EIO;
+}
+
+static inline void
+qla_put_iocbs(struct qla_qpair *qpair, struct iocb_resource *iores)
+{
+	struct scsi_qla_host *vha;
+
+	if (!qpair || !qpair->fw_res_tracking)
+		return;
+
+	vha = qpair->vha;
+
+	switch (iores->res_type) {
+	case RESOURCE_TGT:
+		atomic_add(iores->iocb_cnt, &vha->hw->fwres.tgt_iocbs_used);
+		break;
+	case RESOURCE_INI:
+		atomic_add(iores->iocb_cnt, &vha->hw->fwres.ini_iocbs_used);
+		break;
+	case RESOURCE_SHR:
+		atomic_add(iores->iocb_cnt, &vha->hw->fwres.share_iocbs_used);
+		break;
+	default:
+		break;
+	}
+
+	iores->res_type = RESOURCE_NONE;
 }
