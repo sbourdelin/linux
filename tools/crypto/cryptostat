@@ -1,0 +1,40 @@
+#!/bin/bash
+
+for dn in `ls /sys/kernel/crypto/`
+do
+	dnpath=/sys/kernel/crypto/$dn/
+	algtype=$(cat $dnpath/algtype)
+	algname=$(cat $dnpath/algname)
+	echo "$dn ($algtype) $algname"
+	case $algtype in
+	hash)
+	echo -e "\tHash: $(cat $dnpath/enc_cnt)\tbytes $(cat $dnpath/enc_tlen)"
+	;;
+	cipher)
+	echo -e "\tEncrypt: $(cat $dnpath/enc_cnt)\tbytes $(cat $dnpath/enc_tlen)"
+	echo -e "\tDecrypt: $(cat $dnpath/dec_cnt)\tbytes $(cat $dnpath/dec_tlen)"
+	;;
+	compress)
+	echo -e "\tCompress: $(cat $dnpath/enc_cnt)\tbytes $(cat $dnpath/enc_tlen)"
+	echo -e "\tDecompress: $(cat $dnpath/dec_cnt)\tbytes $(cat $dnpath/dec_tlen)"
+	;;
+	asymetric)
+	echo -e "\tEncrypt: $(cat $dnpath/enc_cnt)\tbytes $(cat $dnpath/enc_tlen)"
+	echo -e "\tDecrypt: $(cat $dnpath/dec_cnt)\tbytes $(cat $dnpath/dec_tlen)"
+	echo -e "\tVerify: $(cat $dnpath/verify_cnt)"
+	echo -e "\tSign: $(cat $dnpath/sign_cnt)"
+	;;
+	rng)
+	echo -e "\tGenerate: $(cat $dnpath/enc_cnt)\tbytes $(cat $dnpath/enc_tlen)"
+	echo -e "\tSeed: $(cat $dnpath/dec_cnt)"
+	;;
+	kpp)
+	echo -e "\tSet_secret: $(cat $dnpath/dec_cnt)"
+	echo -e "\tGenerate_public_key: $(cat $dnpath/enc_cnt)"
+	echo -e "\tCompute_shared_secret: $(cat $dnpath/verify_cnt)"
+	;;
+	*)
+	echo -e "\t$(cat $dnpath/enc_cnt)\tbytes $(cat $dnpath/enc_tlen)"
+	;;
+	esac
+done
