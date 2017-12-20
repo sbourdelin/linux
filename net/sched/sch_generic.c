@@ -867,31 +867,15 @@ void qdisc_reset(struct Qdisc *qdisc)
 }
 EXPORT_SYMBOL(qdisc_reset);
 
-static void qdisc_free(struct Qdisc *qdisc)
+static void qdisc_rcu_free(struct rcu_head *head)
 {
-	if (qdisc_is_percpu_stats(qdisc)) {
-		free_percpu(qdisc->cpu_bstats);
-		free_percpu(qdisc->cpu_qstats);
-	}
-
-	kfree((char *) qdisc - qdisc->padded);
-}
-
-void qdisc_destroy(struct Qdisc *qdisc)
-{
-	const struct Qdisc_ops  *ops = qdisc->ops;
+	struct Qdisc *qdisc = container_of(head, struct Qdisc, rcu_head);
+	const struct Qdisc_ops *ops = qdisc->ops;
 	struct sk_buff *skb, *tmp;
 
-	if (qdisc->flags & TCQ_F_BUILTIN ||
-	    !refcount_dec_and_test(&qdisc->refcnt))
-		return;
-
-#ifdef CONFIG_NET_SCHED
-	qdisc_hash_del(qdisc);
-
-	qdisc_put_stab(rtnl_dereference(qdisc->stab));
-#endif
-	gen_kill_estimator(&qdisc->rate_est);
+	/* At this point no outstanding references to this Qdisc should
+	 * exist in the datapath so its safe to clean up skb lists, etc.
+	 */
 	if (ops->reset)
 		ops->reset(qdisc);
 	if (ops->destroy)
@@ -910,7 +894,27 @@ void qdisc_destroy(struct Qdisc *qdisc)
 		kfree_skb_list(skb);
 	}
 
-	qdisc_free(qdisc);
+	if (qdisc_is_percpu_stats(qdisc)) {
+		free_percpu(qdisc->cpu_bstats);
+		free_percpu(qdisc->cpu_qstats);
+	}
+
+	kfree((char *) qdisc - qdisc->padded);
+}
+
+void qdisc_destroy(struct Qdisc *qdisc)
+{
+	if (qdisc->flags & TCQ_F_BUILTIN ||
+	    !refcount_dec_and_test(&qdisc->refcnt))
+		return;
+
+#ifdef CONFIG_NET_SCHED
+	qdisc_hash_del(qdisc);
+
+	qdisc_put_stab(rtnl_dereference(qdisc->stab));
+#endif
+	gen_kill_estimator(&qdisc->rate_est);
+	call_rcu(&qdisc->rcu_head, qdisc_rcu_free);
 }
 EXPORT_SYMBOL(qdisc_destroy);
 
