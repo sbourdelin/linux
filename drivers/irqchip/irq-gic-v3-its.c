@@ -1119,6 +1119,12 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 	if (cpu != its_dev->event_map.col_map[id]) {
 		target_col = &its_dev->its->collections[cpu];
 		its_send_movi(its_dev, target_col, id);
+		/* Issue INV for cross node collection move on
+		 * multi socket systems.
+		 */
+		if (cpu_to_node(cpu) !=
+				cpu_to_node(its_dev->event_map.col_map[id]))
+			its_send_inv(its_dev, id);
 		its_dev->event_map.col_map[id] = cpu;
 		irq_data_update_effective_affinity(d, cpumask_of(cpu));
 	}
