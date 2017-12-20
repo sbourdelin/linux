@@ -3124,13 +3124,8 @@ static int packet_do_bind(struct sock *sk, const char *name, int ifindex,
 	if (proto == 0 || !need_rehook)
 		goto out_unlock;
 
-	if (!unlisted && (!dev || (dev->flags & IFF_UP))) {
+	if (!unlisted)
 		register_prot_hook(sk);
-	} else {
-		sk->sk_err = ENETDOWN;
-		if (!sock_flag(sk, SOCK_DEAD))
-			sk->sk_error_report(sk);
-	}
 
 out_unlock:
 	rcu_read_unlock();
