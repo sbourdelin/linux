@@ -282,6 +282,12 @@ module_param(ql2xtrackfwres, int, 0444);
 MODULE_PARM_DESC(ql2xtrackfwres,
 		 "Track FW resource.  0(default): disabled");
 
+int qla2xuseresexchforels;
+module_param(qla2xuseresexchforels, int, 0444);
+MODULE_PARM_DESC(qla2xuseresexchforels,
+		 "Reserve 1/2 of emergency exchanges for ELS.\n"
+		 " 0 (default): disabled");
+
 /*
  * SCSI host template entry points
  */
