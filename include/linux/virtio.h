@@ -80,6 +80,7 @@ bool virtqueue_poll(struct virtqueue *vq, unsigned);
 bool virtqueue_enable_cb_delayed(struct virtqueue *vq);
 
 void *virtqueue_detach_unused_buf(struct virtqueue *vq);
+void *virtqueue_detach_buf(struct virtqueue *vq, void *buf);
 
 unsigned int virtqueue_get_vring_size(struct virtqueue *vq);
 

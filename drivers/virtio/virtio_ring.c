@@ -936,6 +936,34 @@ void *virtqueue_detach_unused_buf(struct virtqueue *_vq)
 }
 EXPORT_SYMBOL_GPL(virtqueue_detach_unused_buf);
 
+/**
+ * virtqueue_detach_buf - detach specific buffer
+ * @vq: the struct virtqueue we're talking about.
+ *
+ * Returns NULL or the "data" token handed to virtqueue_add_*().
+ * This should only be used if the driver really knows the buffer
+ * isn't needed anymore by the device.
+ */
+void *virtqueue_detach_buf(struct virtqueue *_vq, void *buf)
+{
+	struct vring_virtqueue *vq = to_vvq(_vq);
+	unsigned int i;
+
+	START_USE(vq);
+
+	for (i = 0; i < vq->vring.num; i++) {
+		if (vq->desc_state[i].data != buf)
+			continue;
+		detach_buf(vq, i, NULL);
+		END_USE(vq);
+		return buf;
+	}
+
+	END_USE(vq);
+	return NULL;
+}
+EXPORT_SYMBOL_GPL(virtqueue_detach_buf);
+
 irqreturn_t vring_interrupt(int irq, void *_vq)
 {
 	struct vring_virtqueue *vq = to_vvq(_vq);
