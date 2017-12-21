@@ -591,6 +591,11 @@ struct drm_mode_config {
 	 */
 	struct drm_property *prop_crtc_id;
 	/**
+	 * @dirty_rects_property: Optional plane property to mark damaged
+	 * regions on the plane framebuffer.
+	 */
+	struct drm_property *dirty_rects_property;
+	/**
 	 * @prop_active: Default atomic CRTC property to control the active
 	 * state, which is the simplified implementation for DPMS in atomic
 	 * drivers.

@@ -293,6 +293,12 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
 		return -ENOMEM;
 	dev->mode_config.prop_crtc_id = prop;
 
+	prop = drm_property_create(dev, DRM_MODE_PROP_BLOB,
+			"DIRTY_RECTS", 0);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.dirty_rects_property = prop;
+
 	prop = drm_property_create_bool(dev, DRM_MODE_PROP_ATOMIC,
 			"ACTIVE");
 	if (!prop)

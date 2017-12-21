@@ -131,6 +131,9 @@ struct drm_plane_state {
 	 */
 	struct drm_crtc_commit *commit;
 
+	/* Optional blob property with damaged regions. */
+	struct drm_property_blob *dirty_blob;
+
 	struct drm_atomic_state *state;
 };
 

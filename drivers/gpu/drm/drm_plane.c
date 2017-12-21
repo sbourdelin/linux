@@ -258,6 +258,7 @@ int drm_universal_plane_init(struct drm_device *dev, struct drm_plane *plane,
 		drm_object_attach_property(&plane->base, config->prop_src_y, 0);
 		drm_object_attach_property(&plane->base, config->prop_src_w, 0);
 		drm_object_attach_property(&plane->base, config->prop_src_h, 0);
+		drm_object_attach_property(&plane->base, config->dirty_rects_property, 0);
 	}
 
 	if (config->allow_fb_modifiers)

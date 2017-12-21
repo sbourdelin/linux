@@ -756,6 +756,14 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
 		state->rotation = val;
 	} else if (property == plane->zpos_property) {
 		state->zpos = val;
+	} else if (property == config->dirty_rects_property) {
+		bool replaced = false;
+		int ret = drm_atomic_replace_property_blob_from_id(dev,
+					&state->dirty_blob,
+					val,
+					-1,
+					&replaced);
+		return ret;
 	} else if (plane->funcs->atomic_set_property) {
 		return plane->funcs->atomic_set_property(plane, state,
 				property, val);
@@ -815,6 +823,8 @@ drm_atomic_plane_get_property(struct drm_plane *plane,
 		*val = state->rotation;
 	} else if (property == plane->zpos_property) {
 		*val = state->zpos;
+	} else if (property == config->dirty_rects_property) {
+		*val = (state->dirty_blob) ? state->dirty_blob->base.id : 0;
 	} else if (plane->funcs->atomic_get_property) {
 		return plane->funcs->atomic_get_property(plane, state, property, val);
 	} else {
