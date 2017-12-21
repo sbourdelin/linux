@@ -185,7 +185,7 @@ void scsi_log_completion(struct scsi_cmnd *cmd, int disposition)
 void scsi_cmd_get_serial(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 {
 	cmd->serial_number = host->cmd_serial_number++;
-	if (cmd->serial_number == 0) 
+	if (cmd->serial_number == 0)
 		cmd->serial_number = host->cmd_serial_number++;
 }
 EXPORT_SYMBOL(scsi_cmd_get_serial);
