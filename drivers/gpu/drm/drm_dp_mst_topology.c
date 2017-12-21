@@ -1596,8 +1596,9 @@ static void drm_dp_send_link_address(struct drm_dp_mst_topology_mgr *mgr,
 	int len;
 	struct drm_dp_sideband_msg_tx *txmsg;
 	int ret;
+	int attempts = 5;
 
-	txmsg = kzalloc(sizeof(*txmsg), GFP_KERNEL);
+retry:	txmsg = kzalloc(sizeof(*txmsg), GFP_KERNEL);
 	if (!txmsg)
 		return;
 
@@ -1635,9 +1636,17 @@ static void drm_dp_send_link_address(struct drm_dp_mst_topology_mgr *mgr,
 			}
 			(*mgr->cbs->hotplug)(mgr);
 		}
+	} else if (attempts--) {
+		kfree(txmsg);
+		drm_dp_send_power_updown_phy(mstb->mgr, mstb->port_parent,
+					     false);
+		drm_dp_send_power_updown_phy(mstb->mgr, mstb->port_parent,
+					     true);
+		DRM_DEBUG_KMS("link address failed %d, retrying\n", ret);
+		goto retry;
 	} else {
 		mstb->link_address_sent = false;
-		DRM_DEBUG_KMS("link address failed %d\n", ret);
+		DRM_DEBUG_KMS("link address failed %d, giving up\n", ret);
 	}
 
 	kfree(txmsg);
