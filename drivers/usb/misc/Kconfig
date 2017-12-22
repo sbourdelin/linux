@@ -275,3 +275,5 @@ config USB_CHAOSKEY
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called chaoskey.
+
+source "drivers/usb/misc/xapea00x/Kconfig"

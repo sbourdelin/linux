@@ -30,4 +30,5 @@ obj-$(CONFIG_USB_HSIC_USB4604)		+= usb4604.o
 obj-$(CONFIG_USB_CHAOSKEY)		+= chaoskey.o
 
 obj-$(CONFIG_USB_SISUSBVGA)		+= sisusbvga/
+obj-$(CONFIG_USB_XAPEA00X)		+= xapea00x/
 obj-$(CONFIG_USB_LINK_LAYER_TEST)	+= lvstest.o
