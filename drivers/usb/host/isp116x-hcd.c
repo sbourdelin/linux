@@ -1319,6 +1319,11 @@ static int isp116x_start(struct usb_hcd *hcd)
 	u32 val;
 	unsigned long flags;
 
+	if (board->remote_wakeup_enable) {
+		if (!device_can_wakeup(hcd->self.controller))
+			device_init_wakeup(hcd->self.controller, 1);
+	}
+
 	spin_lock_irqsave(&isp116x->lock, flags);
 
 	/* clear interrupt status and disable all interrupt sources */
@@ -1369,11 +1374,8 @@ static int isp116x_start(struct usb_hcd *hcd)
 	isp116x->rhdescb = isp116x_read_reg32(isp116x, HCRHDESCB);
 
 	val = 0;
-	if (board->remote_wakeup_enable) {
-		if (!device_can_wakeup(hcd->self.controller))
-			device_init_wakeup(hcd->self.controller, 1);
+	if (board->remote_wakeup_enable)
 		val |= RH_HS_DRWE;
-	}
 	isp116x_write_reg32(isp116x, HCRHSTATUS, val);
 	isp116x->rhstatus = isp116x_read_reg32(isp116x, HCRHSTATUS);
 
