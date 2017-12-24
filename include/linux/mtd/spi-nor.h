@@ -229,6 +229,8 @@ enum spi_nor_option_flags {
 	SNOR_F_S3AN_ADDR_DEFAULT = BIT(3),
 	SNOR_F_READY_XSR_RDY	= BIT(4),
 	SNOR_F_USE_CLSR		= BIT(5),
+	SNOR_F_USE_RD_BOUNCE	= BIT(6),
+	SNOR_F_USE_WR_BOUNCE	= BIT(7),
 };
 
 /**
@@ -255,6 +257,7 @@ struct flash_info;
  * @write_proto:	the SPI protocol for write operations
  * @reg_proto		the SPI protocol for read_reg/write_reg/erase operations
  * @cmd_buf:		used by the write_reg
+ * @bounce_buffer:	an optional kmalloc'ed buffer as DMA transfer helper
  * @prepare:		[OPTIONAL] do some preparations for the
  *			read/write/erase/lock/unlock operations
  * @unprepare:		[OPTIONAL] do some post work after the
@@ -290,6 +293,7 @@ struct spi_nor {
 	bool			sst_write_second;
 	u32			flags;
 	u8			cmd_buf[SPI_NOR_MAX_CMD_SIZE];
+	void			*bounce_buffer;
 
 	int (*prepare)(struct spi_nor *nor, enum spi_nor_ops ops);
 	void (*unprepare)(struct spi_nor *nor, enum spi_nor_ops ops);
@@ -381,6 +385,10 @@ struct spi_nor_hwcaps {
 #define SNOR_HWCAPS_PP_1_1_8	BIT(20)
 #define SNOR_HWCAPS_PP_1_8_8	BIT(21)
 #define SNOR_HWCAPS_PP_8_8_8	BIT(22)
+
+/* Bounce buffer helper, for DMA transfer for instance. */
+#define SNOR_HWCAPS_WR_BOUNCE	BIT(30)
+#define SNOR_HWCAPS_RD_BOUNCE	BIT(31)
 
 /**
  * spi_nor_scan() - scan the SPI NOR

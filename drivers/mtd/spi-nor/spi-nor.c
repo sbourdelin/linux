@@ -14,8 +14,10 @@
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/device.h>
+#include <linux/highmem.h>
 #include <linux/mutex.h>
 #include <linux/math64.h>
+#include <linux/mm.h>
 #include <linux/sizes.h>
 #include <linux/slab.h>
 
@@ -1203,6 +1205,56 @@ static const struct flash_info spi_nor_ids[] = {
 	{ },
 };
 
+static bool spi_nor_is_dma_safe(const void *buf)
+{
+	if (is_vmalloc_addr(buf))
+		return false;
+
+#ifdef CONFIG_HIGHMEM
+	if ((unsigned long)buf >= PKMAP_BASE &&
+	    (unsigned long)buf < (PKMAP_BASE + (LAST_PKMAP * PAGE_SIZE)))
+		return false;
+#endif
+
+	return true;
+}
+
+static int spi_nor_get_bounce_buffer(struct spi_nor *nor,
+				     u_char **buffer,
+				     size_t *buffer_size)
+{
+	const struct flash_info *info = nor->info;
+	/*
+	 * Limit the size of the bounce buffer to 256KB: this is currently
+	 * the largest known erase sector size (> page size) and should be
+	 * enough to still reach good performances if some day new memory
+	 * parts use even larger erase sector sizes.
+	 */
+	size_t size = min_t(size_t, info->sector_size, SZ_256K);
+
+	/*
+	 * Allocate the bounce buffer once for all at the first time it is
+	 * actually needed. This prevents wasting some precious memory
+	 * in cases where it would never be needed.
+	 */
+	if (unlikely(!nor->bounce_buffer)) {
+		nor->bounce_buffer = devm_kmalloc(nor->dev, size, GFP_KERNEL);
+
+		/*
+		 * The SPI flash controller driver has required and expects to
+		 * use the DMA-safe bounce buffer, so we can't recover from
+		 * this allocation failure.
+		 */
+		if (!nor->bounce_buffer)
+			return -ENOMEM;
+	}
+
+	*buffer = nor->bounce_buffer;
+	*buffer_size = size;
+
+	return 0;
+}
+
 static const struct flash_info *spi_nor_read_id(struct spi_nor *nor)
 {
 	int			tmp;
@@ -1231,6 +1283,10 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
 			size_t *retlen, u_char *buf)
 {
 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
+	bool use_bounce = (nor->flags & SNOR_F_USE_RD_BOUNCE) &&
+			  !spi_nor_is_dma_safe(buf);
+	u_char *buffer = buf;
+	size_t buffer_size = 0;
 	int ret;
 
 	dev_dbg(nor->dev, "from 0x%08x, len %zd\n", (u32)from, len);
@@ -1239,13 +1295,23 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
 	if (ret)
 		return ret;
 
+	if (use_bounce) {
+		ret = spi_nor_get_bounce_buffer(nor, &buffer, &buffer_size);
+		if (ret < 0)
+			goto read_err;
+	}
+
 	while (len) {
 		loff_t addr = from;
+		size_t length = len;
 
 		if (nor->flags & SNOR_F_S3AN_ADDR_DEFAULT)
 			addr = spi_nor_s3an_addr_convert(nor, addr);
 
-		ret = nor->read(nor, addr, len, buf);
+		if (use_bounce && length > buffer_size)
+			length = buffer_size;
+
+		ret = nor->read(nor, addr, length, buffer);
 		if (ret == 0) {
 			/* We shouldn't see 0-length reads */
 			ret = -EIO;
@@ -1254,7 +1320,11 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
 		if (ret < 0)
 			goto read_err;
 
-		WARN_ON(ret > len);
+		WARN_ON(ret > length);
+		if (use_bounce)
+			memcpy(buf, nor->bounce_buffer, ret);
+		else
+			buffer += ret;
 		*retlen += ret;
 		buf += ret;
 		from += ret;
@@ -1271,7 +1341,10 @@ static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
 		size_t *retlen, const u_char *buf)
 {
 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
-	size_t actual;
+	bool use_bounce = (nor->flags & SNOR_F_USE_WR_BOUNCE) &&
+			  !spi_nor_is_dma_safe(buf);
+	u_char *buffer = NULL;
+	size_t actual = 0, buffer_size = 0;
 	int ret;
 
 	dev_dbg(nor->dev, "to 0x%08x, len %zd\n", (u32)to, len);
@@ -1279,6 +1352,12 @@ static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
 	ret = spi_nor_lock_and_prep(nor, SPI_NOR_OPS_WRITE);
 	if (ret)
 		return ret;
+
+	if (use_bounce) {
+		ret = spi_nor_get_bounce_buffer(nor, &buffer, &buffer_size);
+		if (ret < 0)
+			goto sst_write_err;
+	}
 
 	write_enable(nor);
 
@@ -1289,8 +1368,13 @@ static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
 	if (actual) {
 		nor->program_opcode = SPINOR_OP_BP;
 
+		if (use_bounce)
+			buffer[0] = buf[0];
+		else
+			buffer = (u_char *)buf;
+
 		/* write one byte. */
-		ret = nor->write(nor, to, 1, buf);
+		ret = nor->write(nor, to, 1, buffer);
 		if (ret < 0)
 			goto sst_write_err;
 		WARN(ret != 1, "While writing 1 byte written %i bytes\n",
@@ -1305,8 +1389,15 @@ static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
 	for (; actual < len - 1; actual += 2) {
 		nor->program_opcode = SPINOR_OP_AAI_WP;
 
+		if (use_bounce) {
+			buffer[0] = buf[actual];
+			buffer[1] = buf[actual + 1];
+		} else {
+			buffer = (u_char *)buf + actual;
+		}
+
 		/* write two bytes. */
-		ret = nor->write(nor, to, 2, buf + actual);
+		ret = nor->write(nor, to, 2, buffer);
 		if (ret < 0)
 			goto sst_write_err;
 		WARN(ret != 2, "While writing 2 bytes written %i bytes\n",
@@ -1329,7 +1420,13 @@ static int sst_write(struct mtd_info *mtd, loff_t to, size_t len,
 		write_enable(nor);
 
 		nor->program_opcode = SPINOR_OP_BP;
-		ret = nor->write(nor, to, 1, buf + actual);
+
+		if (use_bounce)
+			buffer[0] = buf[actual];
+		else
+			buffer = (u_char *)buf + actual;
+
+		ret = nor->write(nor, to, 1, buffer);
 		if (ret < 0)
 			goto sst_write_err;
 		WARN(ret != 1, "While writing 1 byte written %i bytes\n",
@@ -1355,7 +1452,10 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 	size_t *retlen, const u_char *buf)
 {
 	struct spi_nor *nor = mtd_to_spi_nor(mtd);
-	size_t page_offset, page_remain, i;
+	bool use_bounce = (nor->flags & SNOR_F_USE_WR_BOUNCE) &&
+			  !spi_nor_is_dma_safe(buf);
+	u_char *buffer = NULL;
+	size_t page_offset, page_remain, i, buffer_size = 0;
 	ssize_t ret;
 
 	dev_dbg(nor->dev, "to 0x%08x, len %zd\n", (u32)to, len);
@@ -1363,6 +1463,12 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 	ret = spi_nor_lock_and_prep(nor, SPI_NOR_OPS_WRITE);
 	if (ret)
 		return ret;
+
+	if (use_bounce) {
+		ret = spi_nor_get_bounce_buffer(nor, &buffer, &buffer_size);
+		if (ret < 0)
+			goto write_err;
+	}
 
 	for (i = 0; i < len; ) {
 		ssize_t written;
@@ -1390,8 +1496,17 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 		if (nor->flags & SNOR_F_S3AN_ADDR_DEFAULT)
 			addr = spi_nor_s3an_addr_convert(nor, addr);
 
+		if (use_bounce) {
+			if (page_remain > buffer_size)
+				page_remain = buffer_size;
+
+			memcpy(nor->bounce_buffer, buf + i, page_remain);
+		} else {
+			buffer = (u_char *)buf + i;
+		}
+
 		write_enable(nor);
-		ret = nor->write(nor, addr, page_remain, buf + i);
+		ret = nor->write(nor, addr, page_remain, buffer);
 		if (ret < 0)
 			goto write_err;
 		written = ret;
@@ -2774,6 +2889,11 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
 	 */
 	if (info->flags & SPI_S3AN)
 		nor->flags |=  SNOR_F_READY_XSR_RDY;
+
+	if (hwcaps->mask & SNOR_HWCAPS_RD_BOUNCE)
+		nor->flags |= SNOR_F_USE_RD_BOUNCE;
+	if (hwcaps->mask & SNOR_HWCAPS_WR_BOUNCE)
+		nor->flags |= SNOR_F_USE_WR_BOUNCE;
 
 	/* Parse the Serial Flash Discoverable Parameters table. */
 	ret = spi_nor_init_params(nor, info, &params);

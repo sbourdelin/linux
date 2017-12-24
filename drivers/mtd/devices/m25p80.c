@@ -239,7 +239,9 @@ static int m25p_probe(struct spi_device *spi)
 	struct spi_nor_hwcaps hwcaps = {
 		.mask = SNOR_HWCAPS_READ |
 			SNOR_HWCAPS_READ_FAST |
-			SNOR_HWCAPS_PP,
+			SNOR_HWCAPS_PP |
+			SNOR_HWCAPS_RD_BOUNCE |
+			SNOR_HWCAPS_WR_BOUNCE,
 	};
 	char *flash_name;
 	int ret;
