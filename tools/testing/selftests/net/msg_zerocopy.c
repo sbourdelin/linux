@@ -259,6 +259,27 @@ static int setup_ip6h(struct ipv6hdr *ip6h, uint16_t payload_len)
 	return sizeof(*ip6h);
 }
 
+static void init_sockaddr_port(sa_family_t af,
+			       struct sockaddr_storage *sockaddr)
+{
+	struct sockaddr_in6 *addr6 = (struct sockaddr_in6 *) sockaddr;
+	struct sockaddr_in *addr4 = (struct sockaddr_in *) sockaddr;
+
+	switch (af) {
+	case PF_INET:
+		addr4->sin_family = PF_INET;
+		addr4->sin_port = htons(cfg_port);
+		break;
+	case PF_INET6:
+		addr4->sin_family = PF_INET6;
+		addr6->sin6_port = htons(cfg_port);
+		break;
+	default:
+		error(1, 0, "illegal domain");
+		break;
+	}
+}
+
 static void setup_sockaddr(int domain, const char *str_addr, void *sockaddr)
 {
 	struct sockaddr_in6 *addr6 = (void *) sockaddr;
@@ -638,7 +659,7 @@ static void parse_opts(int argc, char **argv)
 			cfg_cork_mixed = true;
 			break;
 		case 'p':
-			cfg_port = htons(strtoul(optarg, NULL, 0));
+			cfg_port = strtoul(optarg, NULL, 0);
 			break;
 		case 'r':
 			cfg_rx = true;
@@ -660,6 +681,8 @@ static void parse_opts(int argc, char **argv)
 			break;
 		}
 	}
+	init_sockaddr_port(cfg_family, &cfg_dst_addr);
+	init_sockaddr_port(cfg_family, &cfg_src_addr);
 
 	if (cfg_payload_len > max_payload_len)
 		error(1, 0, "-s: payload exceeds max (%d)", max_payload_len);
