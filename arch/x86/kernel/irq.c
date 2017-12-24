@@ -279,16 +279,25 @@ __visible void __irq_entry smp_x86_platform_ipi(struct pt_regs *regs)
 
 #ifdef CONFIG_HAVE_KVM
 static void dummy_handler(void) {}
-static void (*kvm_posted_intr_wakeup_handler)(void) = dummy_handler;
+static void (*kvm_posted_intr_handler)(void) = dummy_handler;
+static void (*kvm_nested_posted_intr_handler)(void) = dummy_handler;
 
-void kvm_set_posted_intr_wakeup_handler(void (*handler)(void))
+void kvm_set_posted_intr_handlers(
+	void (*handler)(void),
+	void (*nested_handler)(void))
 {
 	if (handler)
-		kvm_posted_intr_wakeup_handler = handler;
+		kvm_posted_intr_handler = handler;
 	else
-		kvm_posted_intr_wakeup_handler = dummy_handler;
+		kvm_posted_intr_handler = dummy_handler;
+
+	if (nested_handler)
+		kvm_nested_posted_intr_handler = nested_handler;
+	else
+		kvm_nested_posted_intr_handler = dummy_handler;
+
 }
-EXPORT_SYMBOL_GPL(kvm_set_posted_intr_wakeup_handler);
+EXPORT_SYMBOL_GPL(kvm_set_posted_intr_handlers);
 
 /*
  * Handler for POSTED_INTERRUPT_VECTOR.
@@ -304,7 +313,7 @@ __visible void smp_kvm_posted_intr_ipi(struct pt_regs *regs)
 }
 
 /*
- * Handler for POSTED_INTERRUPT_WAKEUP_VECTOR.
+ * Handler for POSTED_INTR_VECTOR.
  */
 __visible void smp_kvm_posted_intr_wakeup_ipi(struct pt_regs *regs)
 {
@@ -312,13 +321,13 @@ __visible void smp_kvm_posted_intr_wakeup_ipi(struct pt_regs *regs)
 
 	entering_ack_irq();
 	inc_irq_stat(kvm_posted_intr_wakeup_ipis);
-	kvm_posted_intr_wakeup_handler();
+	kvm_posted_intr_handler();
 	exiting_irq();
 	set_irq_regs(old_regs);
 }
 
 /*
- * Handler for POSTED_INTERRUPT_NESTED_VECTOR.
+ * Handler for POSTED_INTR_NESTED_VECTOR.
  */
 __visible void smp_kvm_posted_intr_nested_ipi(struct pt_regs *regs)
 {
@@ -326,6 +335,7 @@ __visible void smp_kvm_posted_intr_nested_ipi(struct pt_regs *regs)
 
 	entering_ack_irq();
 	inc_irq_stat(kvm_posted_intr_nested_ipis);
+	kvm_nested_posted_intr_handler();
 	exiting_irq();
 	set_irq_regs(old_regs);
 }

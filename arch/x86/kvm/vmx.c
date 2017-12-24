@@ -7006,7 +7006,8 @@ static void update_ple_window_actual_max(void)
 }
 
 /*
- * Handler for POSTED_INTERRUPT_WAKEUP_VECTOR.
+ * Wake-up sleeping vCPUs on current physical CPU as a result
+ * of handling POSTED_INTR_VECTOR at host-side.
  */
 static void wakeup_handler(void)
 {
@@ -7022,6 +7023,13 @@ static void wakeup_handler(void)
 			kvm_vcpu_kick(vcpu);
 	}
 	spin_unlock(&per_cpu(blocked_vcpu_on_cpu_lock, cpu));
+}
+
+/*
+ * Handler for POSTED_INTR_NESTED_VECTOR.
+ */
+static void nested_posted_intr_handler(void)
+{
 }
 
 void vmx_enable_tdp(void)
@@ -7194,7 +7202,8 @@ static __init int hardware_setup(void)
 		kvm_x86_ops->cancel_hv_timer = NULL;
 	}
 
-	kvm_set_posted_intr_wakeup_handler(wakeup_handler);
+	kvm_set_posted_intr_handlers(
+			wakeup_handler, nested_posted_intr_handler);
 
 	kvm_mce_cap_supported |= MCG_LMCE_P;
 
