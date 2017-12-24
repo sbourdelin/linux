@@ -733,6 +733,7 @@ xfs_qm_destroy_quotainfo(
 		qi->qi_pquotaip = NULL;
 	}
 	mutex_destroy(&qi->qi_quotaofflock);
+	mutex_destroy(&qi->qi_tree_lock);
 	kmem_free(qi);
 	mp->m_quotainfo = NULL;
 }
