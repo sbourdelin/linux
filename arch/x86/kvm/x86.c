@@ -7056,7 +7056,9 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	    || need_resched() || signal_pending(current)) {
 		vcpu->mode = OUTSIDE_GUEST_MODE;
 		smp_wmb();
+		kvm_before_handle_host_interrupts(vcpu);
 		local_irq_enable();
+		kvm_after_handle_host_interrupts(vcpu);
 		preempt_enable();
 		vcpu->srcu_idx = srcu_read_lock(&vcpu->kvm->srcu);
 		r = 1;
@@ -7125,7 +7127,9 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 
 	guest_exit_irqoff();
 
+	kvm_before_handle_host_interrupts(vcpu);
 	local_irq_enable();
+	kvm_after_handle_host_interrupts(vcpu);
 	preempt_enable();
 
 	vcpu->srcu_idx = srcu_read_lock(&vcpu->kvm->srcu);
