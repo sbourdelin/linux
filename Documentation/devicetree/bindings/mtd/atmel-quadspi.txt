@@ -12,6 +12,10 @@ Required properties:
 - #address-cells: Should be <1>.
 - #size-cells:    Should be <0>.
 
+Optional properties:
+- dmacap,memcpy:  Reserve a DMA channel to perform DMA memcpy() between the
+                  system memory and the QSPI mapped memory.
+
 Example:
 
 spi@f0020000 {
@@ -24,6 +28,7 @@ spi@f0020000 {
 	#size-cells = <0>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_spi0_default>;
+	dmacap,memcpy;
 
 	m25p80@0 {
 		...
