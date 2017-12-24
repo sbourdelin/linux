@@ -6083,6 +6083,12 @@ static void kvm_timer_init(void)
 
 static DEFINE_PER_CPU(struct kvm_vcpu *, current_vcpu);
 
+struct kvm_vcpu *kvm_get_current_vcpu(void)
+{
+	return __this_cpu_read(current_vcpu);
+}
+EXPORT_SYMBOL_GPL(kvm_get_current_vcpu);
+
 int kvm_is_in_guest(void)
 {
 	return __this_cpu_read(current_vcpu) != NULL;
