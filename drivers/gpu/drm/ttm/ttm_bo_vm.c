@@ -92,6 +92,21 @@ out_unlock:
 	return ret;
 }
 
+/**
+ * ttm_bo_default_iomem_pfn - get a pfn for a page offset
+ *
+ * @bo: the BO we need to look up the pfn for
+ * @page_offset: offset inside the BO to look up.
+ *
+ * Calculate the PFN for iomem based mappings during page fault
+ */
+static unsigned long ttm_bo_default_io_mem_pfn(struct ttm_buffer_object *bo,
+					       unsigned long page_offset)
+{
+	return ((bo->mem.bus.base + bo->mem.bus.offset) >> PAGE_SHIFT)
+		+ page_offset;
+}
+
 static int ttm_bo_vm_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
@@ -406,14 +421,6 @@ static struct ttm_buffer_object *ttm_bo_vm_lookup(struct ttm_bo_device *bdev,
 
 	return bo;
 }
-
-unsigned long ttm_bo_default_io_mem_pfn(struct ttm_buffer_object *bo,
-					unsigned long page_offset)
-{
-	return ((bo->mem.bus.base + bo->mem.bus.offset) >> PAGE_SHIFT)
-		+ page_offset;
-}
-EXPORT_SYMBOL(ttm_bo_default_io_mem_pfn);
 
 int ttm_bo_mmap(struct file *filp, struct vm_area_struct *vma,
 		struct ttm_bo_device *bdev)
