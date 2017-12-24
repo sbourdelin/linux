@@ -9317,9 +9317,9 @@ static void vmx_complete_atomic_exit(struct vcpu_vmx *vmx)
 
 	/* We need to handle NMIs before interrupts are enabled */
 	if (is_nmi(exit_intr_info)) {
-		kvm_before_handle_nmi(&vmx->vcpu);
+		kvm_before_handle_host_interrupts(&vmx->vcpu);
 		asm("int $2");
-		kvm_after_handle_nmi(&vmx->vcpu);
+		kvm_after_handle_host_interrupts(&vmx->vcpu);
 	}
 }
 
