@@ -364,8 +364,10 @@ static u8 count_vectors(void *bitmap)
 	return count;
 }
 
-bool __kvm_apic_update_irr(u32 *pir, void *regs, int *max_irr)
+bool kvm_apic_update_irr(struct kvm_vcpu *vcpu, u32 *pir, int *max_irr)
 {
+	struct kvm_lapic *apic = vcpu->arch.apic;
+	void *regs = apic->regs;
 	u32 i, vec;
 	u32 pir_val, irr_val, prev_irr_val;
 	int max_updated_irr;
@@ -391,14 +393,6 @@ bool __kvm_apic_update_irr(u32 *pir, void *regs, int *max_irr)
 
 	return ((max_updated_irr != -1) &&
 		(max_updated_irr == *max_irr));
-}
-EXPORT_SYMBOL_GPL(__kvm_apic_update_irr);
-
-bool kvm_apic_update_irr(struct kvm_vcpu *vcpu, u32 *pir, int *max_irr)
-{
-	struct kvm_lapic *apic = vcpu->arch.apic;
-
-	return __kvm_apic_update_irr(pir, apic->regs, max_irr);
 }
 EXPORT_SYMBOL_GPL(kvm_apic_update_irr);
 
