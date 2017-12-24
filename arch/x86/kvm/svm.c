@@ -4458,6 +4458,11 @@ static void svm_complete_nested_posted_interrupt(struct kvm_vcpu *vcpu)
 {
 }
 
+static bool svm_cpu_has_nested_posted_interrupt(struct kvm_vcpu *vcpu)
+{
+	return false;
+}
+
 /* Note: Currently only used by Hyper-V. */
 static void svm_refresh_apicv_exec_ctrl(struct kvm_vcpu *vcpu)
 {
@@ -5603,6 +5608,8 @@ static struct kvm_x86_ops svm_x86_ops __ro_after_init = {
 	.sync_pir_to_irr = svm_sync_pir_to_irr,
 	.complete_nested_posted_interrupt =
 		svm_complete_nested_posted_interrupt,
+	.cpu_has_nested_posted_interrupt =
+		svm_cpu_has_nested_posted_interrupt,
 	.apicv_post_state_restore = avic_post_state_restore,
 
 	.set_tss_addr = svm_set_tss_addr,

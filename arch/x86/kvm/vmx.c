@@ -5399,6 +5399,17 @@ static void vmx_complete_nested_posted_interrupt(struct kvm_vcpu *vcpu)
 	}
 }
 
+static bool vmx_cpu_has_nested_posted_interrupt(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+
+	return (vcpu->arch.apicv_active &&
+		is_guest_mode(vcpu) &&
+		vmx->nested.pi_pending &&
+		vmx->nested.pi_desc &&
+		pi_test_on(vmx->nested.pi_desc));
+}
+
 /*
  * Set up the vmcs's constant host-state fields, i.e., host-state fields that
  * will not change in the lifetime of the guest.
@@ -12383,6 +12394,8 @@ static struct kvm_x86_ops vmx_x86_ops __ro_after_init = {
 	.deliver_posted_interrupt = vmx_deliver_posted_interrupt,
 	.complete_nested_posted_interrupt =
 		vmx_complete_nested_posted_interrupt,
+	.cpu_has_nested_posted_interrupt =
+		vmx_cpu_has_nested_posted_interrupt,
 
 	.set_tss_addr = vmx_set_tss_addr,
 	.get_tdp_level = get_ept_level,
