@@ -448,7 +448,7 @@ void dwc2_force_mode(struct dwc2_hsotg *hsotg, bool host)
  * the force mode. We only need to call this once during probe if
  * dr_mode == OTG.
  */
-void dwc2_clear_force_mode(struct dwc2_hsotg *hsotg)
+static void dwc2_clear_force_mode(struct dwc2_hsotg *hsotg)
 {
 	u32 gusbcfg;
 
