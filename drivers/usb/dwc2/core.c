@@ -492,6 +492,20 @@ void dwc2_force_dr_mode(struct dwc2_hsotg *hsotg)
 	}
 }
 
+/*
+ * dwc2_enable_acg - enable active clock gating feature
+ */
+void dwc2_enable_acg(struct dwc2_hsotg *hsotg)
+{
+	if (hsotg->params.acg_enable) {
+		u32 pcgcctl1 = dwc2_readl(hsotg->regs + PCGCCTL1);
+
+		dev_dbg(hsotg->dev, "Enabling Active Clock Gating\n");
+		pcgcctl1 |= PCGCCTL1_GATEEN;
+		dwc2_writel(pcgcctl1, hsotg->regs + PCGCCTL1);
+	}
+}
+
 /**
  * dwc2_dump_host_registers() - Prints the host registers
  *

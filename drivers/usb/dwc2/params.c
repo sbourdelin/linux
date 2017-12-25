@@ -272,6 +272,7 @@ static void dwc2_set_default_params(struct dwc2_hsotg *hsotg)
 	p->enable_dynamic_fifo = hw->enable_dynamic_fifo;
 	p->en_multiple_tx_fifo = hw->en_multiple_tx_fifo;
 	p->i2c_enable = hw->i2c_enable;
+	p->acg_enable = hw->acg_enable;
 	p->ulpi_fs_ls = false;
 	p->ts_dline = false;
 	p->reload_ctl = (hw->snpsid >= DWC2_CORE_REV_2_92a);
@@ -703,6 +704,7 @@ int dwc2_get_hwparams(struct dwc2_hsotg *hsotg)
 	hw->num_dev_perio_in_ep = (hwcfg4 & GHWCFG4_NUM_DEV_PERIO_IN_EP_MASK) >>
 				  GHWCFG4_NUM_DEV_PERIO_IN_EP_SHIFT;
 	hw->dma_desc_enable = !!(hwcfg4 & GHWCFG4_DESC_DMA);
+	hw->acg_enable = !!(hwcfg4 & GHWCFG4_ACG_SUPPORTED);
 	hw->power_optimized = !!(hwcfg4 & GHWCFG4_POWER_OPTIMIZ);
 	hw->utmi_phy_data_width = (hwcfg4 & GHWCFG4_UTMI_PHY_DATA_WIDTH_MASK) >>
 				  GHWCFG4_UTMI_PHY_DATA_WIDTH_SHIFT;

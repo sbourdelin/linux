@@ -4384,6 +4384,8 @@ static int dwc2_hsotg_pullup(struct usb_gadget *gadget, int is_on)
 	if (is_on) {
 		hsotg->enabled = 1;
 		dwc2_hsotg_core_init_disconnected(hsotg, false);
+		/* Enable ACG feature in device mode,if supported */
+		dwc2_enable_acg(hsotg);
 		dwc2_hsotg_core_connect(hsotg);
 	} else {
 		dwc2_hsotg_core_disconnect(hsotg);
@@ -4416,8 +4418,11 @@ static int dwc2_hsotg_vbus_session(struct usb_gadget *gadget, int is_active)
 		hsotg->op_state = OTG_STATE_B_PERIPHERAL;
 
 		dwc2_hsotg_core_init_disconnected(hsotg, false);
-		if (hsotg->enabled)
+		if (hsotg->enabled) {
+			/* Enable ACG feature in device mode,if supported */
+			dwc2_enable_acg(hsotg);
 			dwc2_hsotg_core_connect(hsotg);
+		}
 	} else {
 		dwc2_hsotg_core_disconnect(hsotg);
 		dwc2_hsotg_disconnect(hsotg);
@@ -4782,8 +4787,11 @@ int dwc2_hsotg_resume(struct dwc2_hsotg *hsotg)
 
 		spin_lock_irqsave(&hsotg->lock, flags);
 		dwc2_hsotg_core_init_disconnected(hsotg, false);
-		if (hsotg->enabled)
+		if (hsotg->enabled) {
+			/* Enable ACG feature in device mode,if supported */
+			dwc2_enable_acg(hsotg);
 			dwc2_hsotg_core_connect(hsotg);
+		}
 		spin_unlock_irqrestore(&hsotg->lock, flags);
 	}
 
