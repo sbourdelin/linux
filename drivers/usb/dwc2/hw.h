@@ -645,6 +645,10 @@
 #define PCGCTL_GATEHCLK			BIT(1)
 #define PCGCTL_STOPPCLK			BIT(0)
 
+#define PCGCCTL1                        HSOTG_REG(0xe04)
+#define PCGCCTL1_TIMER                  (0x3 << 1)
+#define PCGCCTL1_GATEEN                 BIT(0)
+
 #define EPFIFO(_a)			HSOTG_REG(0x1000 + ((_a) * 0x1000))
 
 /* Host Mode Registers */
