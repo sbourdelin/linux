@@ -58,4 +58,19 @@ static inline int of_i2c_setup_smbus_alert(struct i2c_adapter *adap)
 }
 #endif
 
+#if IS_ENABLED(CONFIG_I2C_SMBUS)
+int i2c_require_smbus_alert(struct i2c_client *client);
+int i2c_smbus_alert_event(struct i2c_client *client);
+#else
+static inline int i2c_require_smbus_alert(struct i2c_client *client)
+{
+	return NULL;
+}
+
+static inline int i2c_smbus_alert_event(struct i2c_client *client)
+{
+	return NULL;
+}
+#endif
+
 #endif /* _LINUX_I2C_SMBUS_H */

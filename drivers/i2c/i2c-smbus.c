@@ -161,6 +161,9 @@ static int smbalert_probe(struct i2c_client *ara,
 	}
 
 	i2c_set_clientdata(ara, alert);
+
+	ara->adapter->smbus_ara = ara;
+
 	dev_info(&adapter->dev, "supports SMBALERT#\n");
 
 	return 0;
@@ -172,6 +175,9 @@ static int smbalert_remove(struct i2c_client *ara)
 	struct i2c_smbus_alert *alert = i2c_get_clientdata(ara);
 
 	cancel_work_sync(&alert->alert);
+
+	ara->adapter->smbus_ara = NULL;
+
 	return 0;
 }
 
@@ -209,6 +215,83 @@ int i2c_handle_smbus_alert(struct i2c_client *ara)
 	return schedule_work(&alert->alert);
 }
 EXPORT_SYMBOL_GPL(i2c_handle_smbus_alert);
+
+/*
+ * i2c_require_smbus_alert - Client discovered SMBus alert
+ * @c: client requiring ARA
+ *
+ * When a client needs an ARA it calls this method. If the bus adapter
+ * supports ARA and already knows how to do so then it will already have
+ * configured for ARA and this is a no-op. If not then we set up an ARA
+ * on the adapter.
+ *
+ * We *cannot* simply register a new IRQ handler for this because we might
+ * have multiple GPIO interrupts to devices all of which trigger an ARA.
+ *
+ * Return:
+ *	0 if ara support already registered
+ *	1 if call register a new smbus_alert device
+ *	<0 on error
+ */
+int i2c_require_smbus_alert(struct i2c_client *client)
+{
+	struct i2c_adapter *adapter = client->adapter;
+	struct i2c_smbus_alert_setup setup;
+	struct i2c_client *ara;
+
+	/* ARA is already known and handled by the adapter (ideal case)
+	 * or another client has specified ARA is needed
+	 */
+	if (adapter->smbus_ara)
+		return 0;
+
+	/* Client driven, do not set up a new IRQ handler */
+	setup.irq = 0;
+
+	ara = i2c_setup_smbus_alert(adapter, &setup);
+	if (!ara)
+		return -ENODEV;
+
+	return 1;
+}
+EXPORT_SYMBOL_GPL(i2c_require_smbus_alert);
+
+/*
+ * i2c_smbus_alert_event
+ * @client: the client who known of a probable ara event
+ * Context: can't sleep
+ *
+ * Helper function to be called from an I2C device driver's interrupt
+ * handler. It will schedule the alert work, in turn calling the
+ * corresponding I2C device driver's alert function.
+ *
+ * It is assumed that client is an i2c client who previously call
+ * i2c_require_smbus_alert().
+ */
+int i2c_smbus_alert_event(struct i2c_client *client)
+{
+	struct i2c_adapter *adapter;
+	struct i2c_client *ara;
+	struct i2c_smbus_alert *alert;
+
+	if (!client)
+		return -EINVAL;
+
+	adapter = client->adapter;
+	if (!adapter)
+		return -EINVAL;
+
+	ara = adapter->smbus_ara;
+	if (!ara)
+		return -EINVAL;
+
+	alert = i2c_get_clientdata(ara);
+	if (!alert)
+		return -EINVAL;
+
+	return schedule_work(&alert->alert);
+}
+EXPORT_SYMBOL_GPL(i2c_smbus_alert_event);
 
 module_i2c_driver(smbalert_driver);
 
