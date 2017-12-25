@@ -421,6 +421,56 @@ struct i2c_client *i2c_acpi_new_device(struct device *dev, int index,
 }
 EXPORT_SYMBOL_GPL(i2c_acpi_new_device);
 
+int i2c_acpi_set_connection(struct i2c_client *client, int index)
+{
+	struct i2c_acpi_lookup lookup;
+	struct i2c_adapter *adapter;
+	struct acpi_device *adev;
+	struct i2c_board_info info;
+	LIST_HEAD(resource_list);
+	int ret;
+
+	if (!client)
+		return -ENODEV;
+
+	adev = ACPI_COMPANION(&client->dev);
+	if (!adev)
+		return -ENODEV;
+
+	memset(&info,  0, sizeof(info));
+	memset(&lookup, 0, sizeof(lookup));
+	lookup.info = &info;
+	lookup.device_handle = acpi_device_handle(adev);
+	lookup.index = index;
+
+	ret = acpi_dev_get_resources(adev, &resource_list,
+				     i2c_acpi_fill_info, &lookup);
+	acpi_dev_free_resource_list(&resource_list);
+
+	adapter = i2c_acpi_find_adapter_by_handle(lookup.adapter_handle);
+
+	if (ret < 0 || !info.addr)
+		return -EINVAL;
+
+	/* Only accept connection on same adapter */
+	if (adapter != client->adapter)
+		return -EINVAL;
+
+	ret = i2c_check_addr_validity(info.addr, info.flags);
+	if (ret) {
+		dev_err(&client->dev, "Invalid %d-bit I2C address 0x%02hx\n",
+			info.flags & I2C_CLIENT_TEN ? 10 : 7, info.addr);
+		return -EINVAL;
+	}
+
+	/* Set new address and flags */
+	client->addr = info.addr;
+	client->flags = info.flags;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(i2c_acpi_set_connection);
+
 #ifdef CONFIG_ACPI_I2C_OPREGION
 static int acpi_gsb_i2c_read_bytes(struct i2c_client *client,
 		u8 cmd, u8 *data, u8 data_len)

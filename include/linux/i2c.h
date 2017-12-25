@@ -652,6 +652,8 @@ struct i2c_adapter {
 	const struct i2c_adapter_quirks *quirks;
 
 	struct irq_domain *host_notify_domain;
+
+	struct i2c_client *smbus_ara;	/* ARA for SMBUS if present */
 };
 #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
 
@@ -899,15 +901,23 @@ static inline const struct of_device_id
 u32 i2c_acpi_find_bus_speed(struct device *dev);
 struct i2c_client *i2c_acpi_new_device(struct device *dev, int index,
 				       struct i2c_board_info *info);
+
+int i2c_acpi_set_connection(struct i2c_client *client, int index);
 #else
 static inline u32 i2c_acpi_find_bus_speed(struct device *dev)
 {
 	return 0;
 }
+
 static inline struct i2c_client *i2c_acpi_new_device(struct device *dev,
 					int index, struct i2c_board_info *info)
 {
 	return NULL;
+}
+
+static inline int i2c_acpi_set_connection(struct i2c_client *client, int index)
+{
+	return -EINVAL;
 }
 #endif /* CONFIG_ACPI */
 
