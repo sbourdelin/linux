@@ -48,6 +48,8 @@
 #include <linux/nodemask.h>
 #include <linux/moduleparam.h>
 #include <linux/uaccess.h>
+#include <uapi/linux/sched/types.h>
+#include <linux/sched/prio.h>
 
 #include "workqueue_internal.h"
 
@@ -104,6 +106,14 @@ enum {
 	HIGHPRI_NICE_LEVEL	= MIN_NICE,
 
 	WQ_NAME_LEN		= 24,
+};
+
+#define SCHED_POLICY_NAME_SIZE 16
+
+static const char * const wq_sched_policys[] = {
+	[SCHED_NORMAL]	= "SCHED_OTHER",
+	[SCHED_FIFO]	= "SCHED_FIFO",
+	[SCHED_RR]		= "SCHED_RR",
 };
 
 /*
@@ -174,6 +184,8 @@ struct worker_pool {
 	struct ida		worker_ida;	/* worker IDs for task name */
 
 	struct workqueue_attrs	*attrs;		/* I: worker attributes */
+	struct device		dev;
+	struct sched_attr	sched;
 	struct hlist_node	hash_node;	/* PL: unbound_pool_hash node */
 	int			refcnt;		/* PL: refcnt for unbound pools */
 
@@ -1679,6 +1691,16 @@ static struct worker *alloc_worker(int node)
 	return worker;
 }
 
+static int wq_set_worker_scheduler(struct worker *worker,
+		const struct sched_attr *sched)
+{
+	struct sched_param param;
+
+	param.sched_priority = sched->sched_priority;
+	return sched_setscheduler_nocheck(worker->task,
+			sched->sched_policy, &param);
+}
+
 /**
  * worker_attach_to_pool() - attach a worker to a pool
  * @worker: worker to be attached
@@ -1698,6 +1720,7 @@ static void worker_attach_to_pool(struct worker *worker,
 	 * online CPUs.  It'll be re-applied when any of the CPUs come up.
 	 */
 	set_cpus_allowed_ptr(worker->task, pool->attrs->cpumask);
+	wq_set_worker_scheduler(worker, &pool->sched);
 
 	/*
 	 * The pool->attach_mutex ensures %POOL_DISASSOCIATED remains
@@ -5242,15 +5265,139 @@ static struct device_attribute wq_sysfs_cpumask_attr =
 	__ATTR(cpumask, 0644, wq_unbound_cpumask_show,
 	       wq_unbound_cpumask_store);
 
+static ssize_t percpu_worker_pool_sched_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	unsigned int policy;
+	struct worker_pool *pool;
+
+	pool = container_of(dev, struct worker_pool, dev);
+	policy = pool->sched.sched_policy;
+	if (WARN_ON_ONCE(policy > ARRAY_SIZE(wq_sched_policys)))
+		policy = SCHED_NORMAL;
+	return scnprintf(buf, PAGE_SIZE, "%s:%u\n", wq_sched_policys[policy],
+			pool->sched.sched_priority);
+}
+
+
+static int wq_parse_scheduler(const char *buf, size_t count,
+		struct sched_attr *sched)
+{
+	char *token;
+	unsigned int len;
+	unsigned int policy, prio;
+	char policy_name[SCHED_POLICY_NAME_SIZE] = {0};
+
+	if (!buf)
+		return -EINVAL;
+	token = strchr(buf, ':');
+	if (!token)
+		return -EINVAL;
+
+	len = token - buf;
+	if (len >= sizeof(policy_name))
+		return -EINVAL;
+	strncpy(policy_name, buf, len);
+	policy_name[len] = '\0';
+
+	for (policy = 0; policy < ARRAY_SIZE(wq_sched_policys); policy++)
+		if (!strcmp(wq_sched_policys[policy], policy_name))
+			break;
+	if (policy >= ARRAY_SIZE(wq_sched_policys))
+		return -EINVAL;
+	sched->sched_policy = policy;
+	if (sscanf(++token, "%d", &prio) != 1)
+		return -EINVAL;
+	sched->sched_priority = prio;
+	return 0;
+}
+
+static void wq_apply_pool_scheduler(struct worker_pool *pool,
+		const struct sched_attr *new)
+{
+	struct worker *worker;
+	int ret;
+
+	mutex_lock(&pool->attach_mutex);
+	pool->sched.sched_policy = new->sched_policy;
+	pool->sched.sched_priority = new->sched_priority;
+	for_each_pool_worker(worker, pool) {
+		ret = wq_set_worker_scheduler(worker, new);
+		if (ret)
+			pr_err("%s:%d  err[%d], worker[%s], policy[%d], prio[%d]\n",
+					__func__, __LINE__, ret, worker->task->comm,
+					new->sched_policy, new->sched_priority);
+	}
+	mutex_unlock(&pool->attach_mutex);
+}
+
+static ssize_t percpu_worker_pool_sched_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct worker_pool *pool;
+	struct sched_attr new;
+	int ret;
+
+	ret = wq_parse_scheduler(buf, count,  &new);
+	if (ret)
+		return ret;
+
+	pool = container_of(dev, struct worker_pool, dev);
+	if (pool->sched.sched_policy == new.sched_policy &&
+		pool->sched.sched_priority == new.sched_priority)
+		return count;
+
+	get_online_cpus();
+	wq_apply_pool_scheduler(pool, &new);
+	put_online_cpus();
+	return ret ? ret : count;
+}
+
+static struct device_attribute wq_sysfs_percpu_sched_attr =
+	__ATTR(scheduler, 0644, percpu_worker_pool_sched_show,
+	       percpu_worker_pool_sched_store);
+
 static int __init wq_sysfs_init(void)
 {
 	int err;
+	int cpu;
 
 	err = subsys_virtual_register(&wq_subsys, NULL);
 	if (err)
 		return err;
 
-	return device_create_file(wq_subsys.dev_root, &wq_sysfs_cpumask_attr);
+	err = device_create_file(wq_subsys.dev_root, &wq_sysfs_cpumask_attr);
+	if (err)
+		return err;
+
+	for_each_possible_cpu(cpu) {
+		struct worker_pool *pool;
+		char name[20];
+
+		for_each_cpu_worker_pool(pool, cpu) {
+			memset(&pool->dev, 0, sizeof(struct device));
+			memset(&name, 0, sizeof(name));
+			snprintf(name, sizeof(name), "%d%s", cpu,
+					pool->attrs->nice < 0  ? "H" : "");
+			dev_set_name(&pool->dev, "worker_pool@%s", name);
+			pool->dev.parent = wq_subsys.dev_root;
+			err = device_register(&pool->dev);
+			if (err) {
+				pr_err("%s:%d failed, error:%d\n",
+						__func__, __LINE__, err);
+				return err;
+			}
+
+			err = device_create_file(&pool->dev,
+					&wq_sysfs_percpu_sched_attr);
+			if (err) {
+				pr_err("%s:%d failed, error:%d\n",
+						__func__, __LINE__, err);
+				return err;
+			}
+		}
+	}
+	return 0;
 }
 core_initcall(wq_sysfs_init);
 
@@ -5570,6 +5717,9 @@ int __init workqueue_init_early(void)
 			cpumask_copy(pool->attrs->cpumask, cpumask_of(cpu));
 			pool->attrs->nice = std_nice[i++];
 			pool->node = cpu_to_node(cpu);
+			pool->sched.sched_policy = SCHED_NORMAL;
+			pool->sched.sched_priority =
+				NICE_TO_PRIO(pool->attrs->nice);
 
 			/* alloc pool ID */
 			mutex_lock(&wq_pool_mutex);
