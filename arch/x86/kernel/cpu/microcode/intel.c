@@ -910,8 +910,15 @@ static bool is_blacklisted(unsigned int cpu)
 {
 	struct cpuinfo_x86 *c = &cpu_data(cpu);
 
-	if (c->x86 == 6 && c->x86_model == INTEL_FAM6_BROADWELL_X) {
-		pr_err_once("late loading on model 79 is disabled.\n");
+	/*
+	 * The Broadwell-EP processor with the microcode version less
+	 * then 0x0b000021 may reault in system hang when running a late
+	 * loading. This behavior is documented in item BDF90, #334165
+	 * (Intel Xeon Processor E7-8800/4800 v4 Product Family).
+	 */
+	if (c->x86 == 6 && c->x86_model == INTEL_FAM6_BROADWELL_X &&
+	    c->x86_mask == 0x01 && intel_get_microcode_revision() < 0x0b000021U) {
+		pr_err_once("late loading on model 79 (sig 64f1) is disabled.\n");
 		return true;
 	}
 
