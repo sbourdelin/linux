@@ -55,4 +55,31 @@ struct jump_entry {
 	jump_label_t key;
 };
 
+static inline jump_label_t jump_entry_code(const struct jump_entry *entry)
+{
+	return entry->code;
+}
+
+static inline struct static_key *jump_entry_key(const struct jump_entry *entry)
+{
+	return (struct static_key *)((unsigned long)entry->key & ~1UL);
+}
+
+static inline bool jump_entry_is_branch(const struct jump_entry *entry)
+{
+	return (unsigned long)entry->key & 1UL;
+}
+
+static inline bool jump_entry_is_module_init(const struct jump_entry *entry)
+{
+	return entry->code == 0;
+}
+
+static inline void jump_entry_set_module_init(struct jump_entry *entry)
+{
+	entry->code = 0;
+}
+
+#define jump_label_swap		NULL
+
 #endif /* _ASM_TILE_JUMP_LABEL_H */
