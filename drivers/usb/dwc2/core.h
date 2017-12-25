@@ -1151,6 +1151,8 @@ void dwc2_disable_global_interrupts(struct dwc2_hsotg *hcd);
 
 void dwc2_hib_restore_common(struct dwc2_hsotg *hsotg, int rem_wakeup,
 			     int is_host);
+int dwc2_backup_global_registers(struct dwc2_hsotg *hsotg);
+int dwc2_restore_global_registers(struct dwc2_hsotg *hsotg);
 
 void dwc2_enable_acg(struct dwc2_hsotg *hsotg);
 
@@ -1215,6 +1217,9 @@ int dwc2_hsotg_set_test_mode(struct dwc2_hsotg *hsotg, int testmode);
 #define dwc2_is_device_connected(hsotg) (hsotg->connected)
 int dwc2_backup_device_registers(struct dwc2_hsotg *hsotg);
 int dwc2_restore_device_registers(struct dwc2_hsotg *hsotg, int remote_wakeup);
+int dwc2_gadget_enter_hibernation(struct dwc2_hsotg *hsotg);
+int dwc2_gadget_exit_hibernation(struct dwc2_hsotg *hsotg,
+				 int rem_wakeup, int reset);
 int dwc2_hsotg_tx_fifo_count(struct dwc2_hsotg *hsotg);
 int dwc2_hsotg_tx_fifo_total_depth(struct dwc2_hsotg *hsotg);
 int dwc2_hsotg_tx_fifo_average_depth(struct dwc2_hsotg *hsotg);
@@ -1241,6 +1246,11 @@ static inline int dwc2_backup_device_registers(struct dwc2_hsotg *hsotg)
 static inline int dwc2_restore_device_registers(struct dwc2_hsotg *hsotg,
 						int remote_wakeup)
 { return 0; }
+static inline int dwc2_gadget_enter_hibernation(struct dwc2_hsotg *hsotg)
+{ return 0; }
+static inline int dwc2_gadget_exit_hibernation(struct dwc2_hsotg *hsotg,
+					       int rem_wakeup, int reset)
+{ return 0; }
 static inline int dwc2_hsotg_tx_fifo_count(struct dwc2_hsotg *hsotg)
 { return 0; }
 static inline int dwc2_hsotg_tx_fifo_total_depth(struct dwc2_hsotg *hsotg)
@@ -1258,6 +1268,9 @@ void dwc2_hcd_disconnect(struct dwc2_hsotg *hsotg, bool force);
 void dwc2_hcd_start(struct dwc2_hsotg *hsotg);
 int dwc2_backup_host_registers(struct dwc2_hsotg *hsotg);
 int dwc2_restore_host_registers(struct dwc2_hsotg *hsotg);
+int dwc2_host_enter_hibernation(struct dwc2_hsotg *hsotg);
+int dwc2_host_exit_hibernation(struct dwc2_hsotg *hsotg,
+			       int rem_wakeup, int reset);
 #else
 static inline int dwc2_hcd_get_frame_number(struct dwc2_hsotg *hsotg)
 { return 0; }
@@ -1273,6 +1286,11 @@ static inline int dwc2_hcd_init(struct dwc2_hsotg *hsotg)
 static inline int dwc2_backup_host_registers(struct dwc2_hsotg *hsotg)
 { return 0; }
 static inline int dwc2_restore_host_registers(struct dwc2_hsotg *hsotg)
+{ return 0; }
+static inline int dwc2_host_enter_hibernation(struct dwc2_hsotg *hsotg)
+{ return 0; }
+static inline int dwc2_host_exit_hibernation(struct dwc2_hsotg *hsotg,
+					     int rem_wakeup, int reset)
 { return 0; }
 
 #endif
