@@ -12,7 +12,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/clk-provider.h>
 #include <linux/platform_device.h>
 
 #include "clk-mtk.h"

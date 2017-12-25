@@ -11,7 +11,6 @@
  * GNU General Public License for more details.
  */
 
-#include <linux/clk-provider.h>
 #include <linux/platform_device.h>
 #include <dt-bindings/clock/mt6797-clk.h>
 
