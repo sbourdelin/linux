@@ -14,10 +14,6 @@
  * GNU General Public License for more details.
  */
 
-#include <sound/soc.h>
-#include <linux/regmap.h>
-#include <linux/pm_runtime.h>
-
 #include "mt2701-afe-common.h"
 #include "mt2701-afe-clock-ctrl.h"
 
@@ -248,8 +244,8 @@ int mt2701_afe_enable_clock(struct mtk_base_afe *afe)
 	}
 
 	regmap_update_bits(afe->regmap, ASYS_TOP_CON,
-			   AUDIO_TOP_CON0_A1SYS_A2SYS_ON,
-			   AUDIO_TOP_CON0_A1SYS_A2SYS_ON);
+			   ASYS_TOP_CON_ASYS_TIMING_ON,
+			   ASYS_TOP_CON_ASYS_TIMING_ON);
 	regmap_update_bits(afe->regmap, AFE_DAC_CON0,
 			   AFE_DAC_CON0_AFE_ON,
 			   AFE_DAC_CON0_AFE_ON);
@@ -275,7 +271,7 @@ int mt2701_afe_disable_clock(struct mtk_base_afe *afe)
 	struct mt2701_afe_private *afe_priv = afe->platform_priv;
 
 	regmap_update_bits(afe->regmap, ASYS_TOP_CON,
-			   AUDIO_TOP_CON0_A1SYS_A2SYS_ON, 0);
+			   ASYS_TOP_CON_ASYS_TIMING_ON, 0);
 	regmap_update_bits(afe->regmap, AFE_DAC_CON0,
 			   AFE_DAC_CON0_AFE_ON, 0);
 
@@ -311,7 +307,3 @@ void mt2701_mclk_configuration(struct mtk_base_afe *afe, int id, int domain,
 	if (ret)
 		dev_err(afe->dev, "failed to set mclk divider %d\n", ret);
 }
-
-MODULE_DESCRIPTION("MT2701 afe clock control");
-MODULE_AUTHOR("Garlic Tseng <garlic.tseng@mediatek.com>");
-MODULE_LICENSE("GPL v2");
