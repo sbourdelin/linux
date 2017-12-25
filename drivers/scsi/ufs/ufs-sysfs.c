@@ -438,6 +438,63 @@ static const struct attribute_group *ufs_sysfs_groups[] = {
 	NULL,
 };
 
+#define ufs_sysfs_lun_desc_param_show(_pname, _puname, _duname, _size)        \
+static ssize_t _pname##_show(struct device *dev,                              \
+	struct device_attribute *attr, char *buf)                             \
+{                                                                             \
+	struct scsi_device *sdev = to_scsi_device(dev);                       \
+	struct ufs_hba *hba = shost_priv(sdev->host);                         \
+	u8 lun = ufshcd_scsi_to_upiu_lun(sdev->lun);                          \
+	if (!ufs_is_valid_unit_desc_lun(lun))                                 \
+		return -EINVAL;                                               \
+	return ufs_sysfs_read_desc_param(hba, QUERY_DESC_IDN_##_duname,       \
+		lun, buf, _duname##_DESC_PARAM_##_puname,                     \
+		UFS_PARAM_##_size##_SIZE);                                    \
+}
+
+#define UFS_LUN_DESC_PARAM(_pname, _puname, _duname, _size)                   \
+	ufs_sysfs_lun_desc_param_show(_pname, _puname, _duname, _size)        \
+	static DEVICE_ATTR_RO(_pname)
+
+#define UFS_UNIT_DESC_PARAM(_name, _uname, _size)                             \
+	UFS_LUN_DESC_PARAM(_name, _uname, UNIT, _size)
+
+UFS_UNIT_DESC_PARAM(boot_lun_id, BOOT_LUN_ID, BYTE);
+UFS_UNIT_DESC_PARAM(lun_write_protect, LU_WR_PROTECT, BYTE);
+UFS_UNIT_DESC_PARAM(lun_queue_depth, LU_Q_DEPTH, BYTE);
+UFS_UNIT_DESC_PARAM(psa_sensitive, PSA_SENSITIVE, BYTE);
+UFS_UNIT_DESC_PARAM(lun_memory_type, MEM_TYPE, BYTE);
+UFS_UNIT_DESC_PARAM(data_reliability, DATA_RELIABILITY, BYTE);
+UFS_UNIT_DESC_PARAM(logical_block_size, LOGICAL_BLK_SIZE, BYTE);
+UFS_UNIT_DESC_PARAM(logical_block_count, LOGICAL_BLK_COUNT, QWORD);
+UFS_UNIT_DESC_PARAM(erase_block_size, ERASE_BLK_SIZE, DWORD);
+UFS_UNIT_DESC_PARAM(provisioning_type, PROVISIONING_TYPE, BYTE);
+UFS_UNIT_DESC_PARAM(physical_memory_resourse_count, PHY_MEM_RSRC_CNT, QWORD);
+UFS_UNIT_DESC_PARAM(context_capabilities, CTX_CAPABILITIES, WORD);
+UFS_UNIT_DESC_PARAM(large_unit_granularity, LARGE_UNIT_SIZE_M1, BYTE);
+
+static struct attribute *ufs_sysfs_unit_descriptor[] = {
+	&dev_attr_boot_lun_id.attr,
+	&dev_attr_lun_write_protect.attr,
+	&dev_attr_lun_queue_depth.attr,
+	&dev_attr_psa_sensitive.attr,
+	&dev_attr_lun_memory_type.attr,
+	&dev_attr_data_reliability.attr,
+	&dev_attr_logical_block_size.attr,
+	&dev_attr_logical_block_count.attr,
+	&dev_attr_erase_block_size.attr,
+	&dev_attr_provisioning_type.attr,
+	&dev_attr_physical_memory_resourse_count.attr,
+	&dev_attr_context_capabilities.attr,
+	&dev_attr_large_unit_granularity.attr,
+	NULL,
+};
+
+struct attribute_group ufs_sysfs_unit_descriptor_group = {
+	.name = "unit_descriptor",
+	.attrs = ufs_sysfs_unit_descriptor,
+};
+
 void ufs_sysfs_add_device_management(struct ufs_hba *hba)
 {
 	int ret;
