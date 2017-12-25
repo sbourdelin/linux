@@ -1,0 +1,43 @@
+Maxim Integrated MAX98373 Speaker Amplifier
+
+This device supports I2C.
+
+Required properties:
+
+  - compatible : should be one of the following
+    - "maxim,max98373"
+
+  - reg : the I2C address of the device.
+
+Optional properties:
+
+  - maxim,vmon-slot-no : slot number used to send voltage information
+                   or in inteleave mode this will be used as
+                   interleave slot.
+                   slot range : 0 ~ 15,  Default : 0
+
+  - maxim,imon-slot-no : slot number used to send current information
+                   slot range : 0 ~ 15,  Default : 0
+
+  - maxim,spkfb-slot-no : slot number used to send speaker feedback information
+                   slot range : 0 ~ 15,  Default : 0
+
+  - maxim,interleave-mode : When using two MAX98373 in a system it is
+                   possible to create ADC data that that will
+                   overflow the frame size. Digital Audio Interleave
+                   mode provides a means to output VMON and IMON data
+                   from two devices on a single DOUT line when running
+                   smaller frames sizes such as 32 BCLKS per LRCLK or
+                   48 BCLKS per LRCLK.
+                   Range : 0 (off), 1 (on),  Default : 0
+
+Example:
+
+codec: max98373@31 {
+   compatible = "maxim,max98373";
+   reg = <0x31>;
+   maxim,vmon-slot-no = <0>;
+   maxim,imon-slot-no = <1>;
+   maxim,spkfb-slot-no = <2>;
+   maxim,interleave-mode = <0>;
+};
