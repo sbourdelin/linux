@@ -196,6 +196,7 @@ struct fsldma_chan {
 #define to_fsl_desc(lh) container_of(lh, struct fsl_desc_sw, node)
 #define tx_to_fsl_desc(tx) container_of(tx, struct fsl_desc_sw, async_tx)
 
+#ifdef CONFIG_PPC
 #ifndef __powerpc64__
 static u64 in_be64(const u64 __iomem *addr)
 {
@@ -222,13 +223,38 @@ static void out_le64(u64 __iomem *addr, u64 val)
 	out_le32((u32 __iomem *)addr, (u32)val);
 }
 #endif
+#endif
 
-#define DMA_IN(fsl_chan, addr, width)					\
-		(((fsl_chan)->feature & FSL_DMA_BIG_ENDIAN) ?		\
-			in_be##width(addr) : in_le##width(addr))
-#define DMA_OUT(fsl_chan, addr, val, width)				\
-		(((fsl_chan)->feature & FSL_DMA_BIG_ENDIAN) ?		\
-			out_be##width(addr, val) : out_le##width(addr, val))
+#ifdef CONFIG_PPC
+static void ioread32(const u32 __iomem *addr)
+{
+	return in_le32(addr);
+}
+
+static void iowrite32(u32 __iomem *addr, u32 val)
+{
+	out_le32(addr, val);
+}
+
+static void ioread32be(const u32 __iomem *addr)
+{
+	return in_be32(addr);
+}
+
+static void iowrite32be(u32 __iomem *addr, u32 val)
+{
+	out_be32(addr, val);
+}
+#endif
+
+#define FSL_DMA_IN(fsl_dma, addr, width)				\
+		(((fsl_dma)->feature & FSL_DMA_BIG_ENDIAN) ?		\
+			ioread##width##be(addr) : ioread##width(addr))
+
+#define FSL_DMA_OUT(fsl_dma, addr, val, width)				\
+		(((fsl_dma)->feature & FSL_DMA_BIG_ENDIAN) ?		\
+			iowrite##width##be(val, addr) : iowrite##width	\
+		 (val, addr))
 
 #define DMA_TO_CPU(fsl_chan, d, width)					\
 		(((fsl_chan)->feature & FSL_DMA_BIG_ENDIAN) ?		\
