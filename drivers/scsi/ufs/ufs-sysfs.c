@@ -1,0 +1,154 @@
+#include <linux/err.h>
+#include <linux/string.h>
+
+#include "ufs.h"
+#include "ufs-sysfs.h"
+/* collision between the device descriptor parameter and the definition */
+#undef DEVICE_CLASS
+
+enum ufs_desc_param_size {
+	UFS_PARAM_BYTE_SIZE	= 1,
+	UFS_PARAM_WORD_SIZE	= 2,
+	UFS_PARAM_DWORD_SIZE	= 4,
+	UFS_PARAM_QWORD_SIZE	= 8,
+};
+
+static inline ssize_t ufs_sysfs_read_desc_param(
+	struct ufs_hba *hba, u8 desc_idn, u8 index, char *buf, u8 off,
+	enum ufs_desc_param_size param_size)
+{
+	int desc_len;
+	int ret;
+	u8 *desc_buf;
+
+	if (ufshcd_map_desc_id_to_length(hba, desc_idn, &desc_len) ||
+		off >= desc_len)
+		return -EINVAL;
+	desc_buf = kzalloc(desc_len, GFP_ATOMIC);
+	if (!desc_buf)
+		return -ENOMEM;
+	ret = ufshcd_query_descriptor_retry(hba, UPIU_QUERY_OPCODE_READ_DESC,
+		desc_idn, index, 0, desc_buf, &desc_len);
+	if (ret)
+		return -EINVAL;
+	switch (param_size) {
+	case UFS_PARAM_BYTE_SIZE:
+		ret = sprintf(buf, "0x%02X\n", desc_buf[off]);
+		break;
+	case UFS_PARAM_WORD_SIZE:
+		ret = sprintf(buf, "0x%04X\n",
+			be16_to_cpu(*((u16 *)(desc_buf + off))));
+		break;
+	case UFS_PARAM_DWORD_SIZE:
+		ret = sprintf(buf, "0x%08X\n",
+			be32_to_cpu(*((u32 *)(desc_buf + off))));
+		break;
+	case UFS_PARAM_QWORD_SIZE:
+		ret = sprintf(buf, "0x%016llX\n",
+			be64_to_cpu(*((u64 *)(desc_buf + off))));
+		break;
+	}
+	kfree(desc_buf);
+
+	return ret;
+}
+
+#define ufs_sysfs_desc_param_show(_name, _puname, _duname, _size)             \
+static ssize_t _name##_show(struct device *dev,                               \
+	struct device_attribute *attr, char *buf)                             \
+{                                                                             \
+	struct ufs_hba *hba = dev_get_drvdata(dev);                           \
+	return ufs_sysfs_read_desc_param(hba, QUERY_DESC_IDN_##_duname,       \
+		0, buf, _duname##_DESC_PARAM_##_puname,                       \
+		UFS_PARAM_##_size##_SIZE);                                    \
+}
+
+#define UFS_DESC_PARAM(_pname, _puname, _duname, _size)                       \
+	ufs_sysfs_desc_param_show(_pname, _puname, _duname, _size)            \
+	static DEVICE_ATTR_RO(_pname)
+
+#define UFS_DEVICE_DESC_PARAM(_name, _uname, _size)                           \
+	UFS_DESC_PARAM(_name, _uname, DEVICE, _size)
+
+UFS_DEVICE_DESC_PARAM(device_type, DEVICE_TYPE, BYTE);
+UFS_DEVICE_DESC_PARAM(device_class, DEVICE_CLASS, BYTE);
+UFS_DEVICE_DESC_PARAM(device_sub_class, DEVICE_SUB_CLASS, BYTE);
+UFS_DEVICE_DESC_PARAM(protocol, PRTCL, BYTE);
+UFS_DEVICE_DESC_PARAM(number_of_luns, NUM_LU, BYTE);
+UFS_DEVICE_DESC_PARAM(number_of_wluns, NUM_WLU, BYTE);
+UFS_DEVICE_DESC_PARAM(boot_enable, BOOT_ENBL, BYTE);
+UFS_DEVICE_DESC_PARAM(descriptor_access_enable, DESC_ACCSS_ENBL, BYTE);
+UFS_DEVICE_DESC_PARAM(initial_power_mode, INIT_PWR_MODE, BYTE);
+UFS_DEVICE_DESC_PARAM(high_priority_lun, HIGH_PR_LUN, BYTE);
+UFS_DEVICE_DESC_PARAM(secure_removal_type, SEC_RMV_TYPE, BYTE);
+UFS_DEVICE_DESC_PARAM(support_security_lun, SEC_LU, BYTE);
+UFS_DEVICE_DESC_PARAM(bkops_termination_latency, BKOP_TERM_LT, BYTE);
+UFS_DEVICE_DESC_PARAM(initial_active_icc_level, ACTVE_ICC_LVL, BYTE);
+UFS_DEVICE_DESC_PARAM(specification_version, SPEC_VER, WORD);
+UFS_DEVICE_DESC_PARAM(manufacturing_date, MANF_DATE, WORD);
+UFS_DEVICE_DESC_PARAM(manufacturer_id, MANF_ID, WORD);
+UFS_DEVICE_DESC_PARAM(rtt_capability, RTT_CAP, BYTE);
+UFS_DEVICE_DESC_PARAM(rtc_update, FRQ_RTC, WORD);
+UFS_DEVICE_DESC_PARAM(ufs_features, UFS_FEAT, BYTE);
+UFS_DEVICE_DESC_PARAM(ffu_timeout, FFU_TMT, BYTE);
+UFS_DEVICE_DESC_PARAM(queue_depth, Q_DPTH, BYTE);
+UFS_DEVICE_DESC_PARAM(device_version, DEV_VER, WORD);
+UFS_DEVICE_DESC_PARAM(number_of_secure_wpa, NUM_SEC_WPA, BYTE);
+UFS_DEVICE_DESC_PARAM(psa_max_data_size, PSA_MAX_DATA, DWORD);
+UFS_DEVICE_DESC_PARAM(psa_state_timeout, PSA_TMT, BYTE);
+
+static struct attribute *ufs_sysfs_device_descriptor[] = {
+	&dev_attr_device_type.attr,
+	&dev_attr_device_class.attr,
+	&dev_attr_device_sub_class.attr,
+	&dev_attr_protocol.attr,
+	&dev_attr_number_of_luns.attr,
+	&dev_attr_number_of_wluns.attr,
+	&dev_attr_boot_enable.attr,
+	&dev_attr_descriptor_access_enable.attr,
+	&dev_attr_initial_power_mode.attr,
+	&dev_attr_high_priority_lun.attr,
+	&dev_attr_secure_removal_type.attr,
+	&dev_attr_support_security_lun.attr,
+	&dev_attr_bkops_termination_latency.attr,
+	&dev_attr_initial_active_icc_level.attr,
+	&dev_attr_specification_version.attr,
+	&dev_attr_manufacturing_date.attr,
+	&dev_attr_manufacturer_id.attr,
+	&dev_attr_rtt_capability.attr,
+	&dev_attr_rtc_update.attr,
+	&dev_attr_ufs_features.attr,
+	&dev_attr_ffu_timeout.attr,
+	&dev_attr_queue_depth.attr,
+	&dev_attr_device_version.attr,
+	&dev_attr_number_of_secure_wpa.attr,
+	&dev_attr_psa_max_data_size.attr,
+	&dev_attr_psa_state_timeout.attr,
+	NULL,
+};
+
+static const struct attribute_group ufs_sysfs_device_descriptor_group = {
+	.name = "device_descriptor",
+	.attrs = ufs_sysfs_device_descriptor,
+};
+
+static const struct attribute_group *ufs_sysfs_groups[] = {
+	&ufs_sysfs_device_descriptor_group,
+	NULL,
+};
+
+void ufs_sysfs_add_device_management(struct ufs_hba *hba)
+{
+	int ret;
+
+	ret = sysfs_create_groups(&hba->dev->kobj, ufs_sysfs_groups);
+	if (ret)
+		dev_err(hba->dev,
+			"%s: sysfs groups creation failed (err = %d)\n",
+			__func__, ret);
+}
+
+void ufs_sysfs_remove_device_management(struct ufs_hba *hba)
+{
+	sysfs_remove_groups(&hba->dev->kobj, ufs_sysfs_groups);
+}

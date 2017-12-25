@@ -44,6 +44,7 @@
 #include "ufshcd.h"
 #include "ufs_quirks.h"
 #include "unipro.h"
+#include "ufs-sysfs.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ufs.h>
@@ -2894,11 +2895,10 @@ out:
  * The buf_len parameter will contain, on return, the length parameter
  * received on the response.
  */
-static int ufshcd_query_descriptor_retry(struct ufs_hba *hba,
-					 enum query_opcode opcode,
-					 enum desc_idn idn, u8 index,
-					 u8 selector,
-					 u8 *desc_buf, int *buf_len)
+int ufshcd_query_descriptor_retry(struct ufs_hba *hba,
+				  enum query_opcode opcode,
+				  enum desc_idn idn, u8 index, u8 selector,
+				  u8 *desc_buf, int *buf_len)
 {
 	int err;
 	int retries;
@@ -7704,10 +7704,12 @@ static inline void ufshcd_add_sysfs_nodes(struct ufs_hba *hba)
 {
 	ufshcd_add_rpm_lvl_sysfs_nodes(hba);
 	ufshcd_add_spm_lvl_sysfs_nodes(hba);
+	ufs_sysfs_add_device_management(hba);
 }
 
 static inline void ufshcd_remove_sysfs_nodes(struct ufs_hba *hba)
 {
+	ufs_sysfs_remove_device_management(hba);
 	device_remove_file(hba->dev, &hba->rpm_lvl_attr);
 	device_remove_file(hba->dev, &hba->spm_lvl_attr);
 }
