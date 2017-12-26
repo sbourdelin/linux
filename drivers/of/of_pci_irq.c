@@ -27,9 +27,25 @@ int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq
 	 */
 	dn = pci_device_to_OF_node(pdev);
 	if (dn) {
-		rc = of_irq_parse_one(dn, 0, out_irq);
-		if (!rc)
-			return rc;
+		struct property *prop;
+		const char *name;
+		int index = 0;
+
+		of_property_for_each_string(dn, "interrupt-names", prop, name) {
+			if (!strcmp(name, "pci"))
+				break;
+			index++;
+		}
+
+		/*
+		 * Only parse from DT if we have no "interrupt-names",
+		 * or if we found an interrupt named "pci".
+		 */
+		if (index == 0 || name) {
+			rc = of_irq_parse_one(dn, index, out_irq);
+			if (!rc)
+				return rc;
+		}
 	}
 
 	/* Ok, we don't, time to have fun. Let's start by building up an
