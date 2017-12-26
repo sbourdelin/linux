@@ -136,6 +136,8 @@ static void clk_prepare_unlock(void)
 	mutex_unlock(&prepare_lock);
 }
 
+#ifdef CONFIG_SMP
+
 static unsigned long clk_enable_lock(void)
 	__acquires(enable_lock)
 {
@@ -169,6 +171,43 @@ static void clk_enable_unlock(unsigned long flags)
 	enable_owner = NULL;
 	spin_unlock_irqrestore(&enable_lock, flags);
 }
+
+#else
+
+static unsigned long clk_enable_lock(void)
+	__acquires(enable_lock)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	preempt_disable();
+	__acquire(enable_lock);
+
+	if (enable_refcnt++ == 0) {
+		WARN_ON_ONCE(enable_owner != NULL);
+		enable_owner = current;
+	} else {
+		WARN_ON_ONCE(enable_owner != current);
+	}
+
+	return flags;
+}
+
+static void clk_enable_unlock(unsigned long flags)
+	__releases(enable_lock)
+{
+	WARN_ON_ONCE(enable_owner != current);
+	WARN_ON_ONCE(enable_refcnt == 0);
+
+	if (--enable_refcnt == 0)
+		enable_owner = NULL;
+
+	__release(enable_lock);
+	local_irq_restore(flags);
+	preempt_enable();
+}
+
+#endif
 
 static bool clk_core_is_prepared(struct clk_core *core)
 {
