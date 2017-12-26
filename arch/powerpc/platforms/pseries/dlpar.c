@@ -580,5 +580,5 @@ static int __init pseries_dlpar_init(void)
 					WQ_UNBOUND, 1);
 	return sysfs_create_file(kernel_kobj, &class_attr_dlpar.attr);
 }
-machine_device_initcall(pseries, pseries_dlpar_init);
+machine_arch_initcall(pseries, pseries_dlpar_init);
 
