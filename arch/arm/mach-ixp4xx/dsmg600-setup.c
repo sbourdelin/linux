@@ -93,7 +93,7 @@ static struct i2c_board_info __initdata dsmg600_i2c_board_info [] = {
 	},
 };
 
-static struct gpio_led dsmg600_led_pins[] = {
+static const struct gpio_led dsmg600_led_pins[] = {
 	{
 		.name		= "dsmg600:green:power",
 		.gpio		= DSMG600_LED_PWR_GPIO,

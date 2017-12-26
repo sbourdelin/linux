@@ -72,7 +72,7 @@ static struct i2c_board_info __initdata nas100d_i2c_board_info [] = {
 	},
 };
 
-static struct gpio_led nas100d_led_pins[] = {
+static const struct gpio_led nas100d_led_pins[] = {
 	{
 		.name		= "nas100d:green:wlan",
 		.gpio		= NAS100D_LED_WLAN_GPIO,
