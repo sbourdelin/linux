@@ -548,7 +548,7 @@ static struct platform_device tosa_gpio_keys_device = {
 /*
  * Tosa LEDs
  */
-static struct gpio_led tosa_gpio_leds[] = {
+static const struct gpio_led tosa_gpio_leds[] = {
 	{
 		.name			= "tosa:amber:charge",
 		.default_trigger	= "main-battery-charging",

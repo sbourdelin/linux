@@ -424,7 +424,7 @@ static struct platform_device backlight = {
  * GPIO LEDs, Phone keys backlight, vibra
  */
 
-static struct gpio_led gpio_leds[] = {
+static const struct gpio_led gpio_leds[] = {
 	{
 		.name = "magician::vibra",
 		.default_trigger = "none",

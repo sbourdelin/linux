@@ -246,7 +246,7 @@ static inline void palmld_keys_init(void) {}
  * LEDs
  ******************************************************************************/
 #if defined(CONFIG_LEDS_GPIO) || defined(CONFIG_LEDS_GPIO_MODULE)
-struct gpio_led gpio_leds[] = {
+const struct gpio_led gpio_leds[] = {
 {
 	.name			= "palmld:green:led",
 	.default_trigger	= "none",

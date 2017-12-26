@@ -387,7 +387,7 @@ static unsigned long balloon3_led_pin_config[] __initdata = {
 	GPIO10_GPIO,	/* Heartbeat LED */
 };
 
-struct gpio_led balloon3_gpio_leds[] = {
+const struct gpio_led balloon3_gpio_leds[] = {
 	{
 		.name			= "balloon3:green:idle",
 		.default_trigger	= "heartbeat",
@@ -414,7 +414,7 @@ static struct platform_device balloon3_leds = {
 	}
 };
 
-struct gpio_led balloon3_pcf_gpio_leds[] = {
+const struct gpio_led balloon3_pcf_gpio_leds[] = {
 	{
 		.name			= "balloon3:green:led0",
 		.gpio			= BALLOON3_PCF_GPIO_LED0,
