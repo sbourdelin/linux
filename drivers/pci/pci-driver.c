@@ -17,6 +17,7 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/cpu.h>
+#include <linux/of_pci.h>
 #include <linux/pm_runtime.h>
 #include <linux/suspend.h>
 #include <linux/kexec.h>
@@ -421,10 +422,17 @@ static int pci_device_probe(struct device *dev)
 	if (error < 0)
 		return error;
 
+	error = of_pci_setup_wake_irq(pci_dev);
+	if (error < 0) {
+		pcibios_free_irq(pci_dev);
+		return error;
+	}
+
 	pci_dev_get(pci_dev);
 	if (pci_device_can_probe(pci_dev)) {
 		error = __pci_device_probe(drv, pci_dev);
 		if (error) {
+			of_pci_teardown_wake_irq(pci_dev);
 			pcibios_free_irq(pci_dev);
 			pci_dev_put(pci_dev);
 		}
@@ -437,6 +445,8 @@ static int pci_device_remove(struct device *dev)
 {
 	struct pci_dev *pci_dev = to_pci_dev(dev);
 	struct pci_driver *drv = pci_dev->driver;
+
+	of_pci_teardown_wake_irq(pci_dev);
 
 	if (drv) {
 		if (drv->remove) {
