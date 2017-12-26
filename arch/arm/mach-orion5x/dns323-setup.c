@@ -204,7 +204,7 @@ error_fail:
  * GPIO LEDs (simple - doesn't use hardware blinking support)
  */
 
-static struct gpio_led dns323ab_leds[] = {
+static const struct gpio_led dns323ab_leds[] = {
 	{
 		.name = "power:blue",
 		.gpio = DNS323_GPIO_LED_POWER2,

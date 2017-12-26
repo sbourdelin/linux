@@ -86,7 +86,7 @@ static struct i2c_board_info __initdata ls_hgl_i2c_rtc = {
 #define LS_HGL_GPIO_LED_PWR     0
 
 
-static struct gpio_led ls_hgl_led_pins[] = {
+static const struct gpio_led ls_hgl_led_pins[] = {
 	{
 		.name	   = "alarm:red",
 		.gpio	   = LS_HGL_GPIO_LED_ALARM,

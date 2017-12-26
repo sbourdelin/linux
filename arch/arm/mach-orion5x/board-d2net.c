@@ -54,7 +54,7 @@
 #define D2NET_GPIO_BLUE_LED_BLINK_CTRL	16
 #define D2NET_GPIO_BLUE_LED_OFF		23
 
-static struct gpio_led d2net_leds[] = {
+static const struct gpio_led d2net_leds[] = {
 	{
 		.name = "d2net:blue:sata",
 		.default_trigger = "default-on",

@@ -136,7 +136,7 @@ static struct i2c_board_info __initdata mv2120_i2c_rtc = {
 	.irq	= 0,
 };
 
-static struct gpio_led mv2120_led_pins[] = {
+static const struct gpio_led mv2120_led_pins[] = {
 	{
 		.name			= "mv2120:blue:health",
 		.gpio			= 0,
