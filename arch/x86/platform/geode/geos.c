@@ -54,7 +54,7 @@ static struct platform_device geos_buttons_dev = {
 	}
 };
 
-static struct gpio_led geos_leds[] = {
+static const struct gpio_led geos_leds[] = {
 	{
 		.name = "geos:1",
 		.gpio = 6,
