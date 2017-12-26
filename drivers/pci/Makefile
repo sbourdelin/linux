@@ -29,6 +29,7 @@ obj-$(CONFIG_PCI_IOV) += iov.o
 # ACPI _DSM provided firmware instance and string name
 #
 obj-$(CONFIG_ACPI)    += pci-acpi.o
+obj-$(CONFIG_OF)      += pci-of.o
 
 # SMBIOS provided firmware instance and labels
 obj-$(CONFIG_PCI_LABEL) += pci-label.o

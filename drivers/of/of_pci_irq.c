@@ -1,7 +1,56 @@
 #include <linux/kernel.h>
 #include <linux/of_pci.h>
 #include <linux/of_irq.h>
+#include <linux/pm_wakeirq.h>
 #include <linux/export.h>
+
+int of_pci_setup_wake_irq(struct pci_dev *pdev)
+{
+	struct pci_dev *ppdev;
+	struct device_node *dn;
+	int ret, irq;
+
+	/* Get the pci_dev of our parent. Hopefully it's a port. */
+	ppdev = pdev->bus->self;
+	/* Nope, it's a host bridge. */
+	if (!ppdev)
+		return 0;
+
+	dn = pci_device_to_OF_node(ppdev);
+	if (!dn)
+		return 0;
+
+	irq = of_irq_get_byname(dn, "wakeup");
+	if (irq == -EPROBE_DEFER) {
+		return irq;
+	} else if (irq < 0) {
+		/* Ignore other errors, since a missing wakeup is non-fatal. */
+		dev_info(&pdev->dev, "cannot get wakeup interrupt: %d\n", irq);
+		return 0;
+	}
+
+	device_init_wakeup(&pdev->dev, true);
+
+	ret = dev_pm_set_dedicated_wake_irq(&pdev->dev, irq);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "failed to set wake IRQ: %d\n", ret);
+		device_init_wakeup(&pdev->dev, false);
+		return ret;
+	}
+
+	/* Start out disabled to avoid irq storm */
+	dev_pm_disable_wake_irq(&pdev->dev);
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(of_pci_setup_wake_irq);
+
+void of_pci_teardown_wake_irq(struct pci_dev *pdev)
+{
+	dev_pm_clear_wake_irq(&pdev->dev);
+	device_init_wakeup(&pdev->dev, false);
+}
+EXPORT_SYMBOL_GPL(of_pci_teardown_wake_irq);
 
 /**
  * of_irq_parse_pci - Resolve the interrupt for a PCI device

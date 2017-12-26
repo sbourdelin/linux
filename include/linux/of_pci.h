@@ -10,6 +10,8 @@ struct of_phandle_args;
 struct device_node;
 
 #ifdef CONFIG_OF_PCI
+int of_pci_setup_wake_irq(struct pci_dev *pdev);
+void of_pci_teardown_wake_irq(struct pci_dev *pdev);
 int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq);
 struct device_node *of_pci_find_child_device(struct device_node *parent,
 					     unsigned int devfn);
@@ -23,6 +25,13 @@ int of_pci_map_rid(struct device_node *np, u32 rid,
 		   const char *map_name, const char *map_mask_name,
 		   struct device_node **target, u32 *id_out);
 #else
+static inline int of_pci_setup_wake_irq(struct pci_dev *pdev)
+{
+	return 0;
+}
+
+static void of_pci_teardown_wake_irq(struct pci_dev *pdev) { };
+
 static inline int of_irq_parse_pci(const struct pci_dev *pdev, struct of_phandle_args *out_irq)
 {
 	return 0;
