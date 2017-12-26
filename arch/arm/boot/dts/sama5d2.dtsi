@@ -999,6 +999,13 @@
 				reg = <0xf0020000 0x100>, <0xd0000000 0x08000000>;
 				reg-names = "qspi_base", "qspi_mmap";
 				interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
+				dmas = <&dma0
+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+					 AT91_XDMAC_DT_PERID(4))>,
+				       <&dma0
+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+					 AT91_XDMAC_DT_PERID(5))>;
+				dma-names = "tx", "rx";
 				clocks = <&qspi0_clk>;
 				#address-cells = <1>;
 				#size-cells = <0>;
@@ -1010,6 +1017,13 @@
 				reg = <0xf0024000 0x100>, <0xd8000000 0x08000000>;
 				reg-names = "qspi_base", "qspi_mmap";
 				interrupts = <53 IRQ_TYPE_LEVEL_HIGH 7>;
+				dmas = <&dma1
+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+					 AT91_XDMAC_DT_PERID(48))>,
+				       <&dma0
+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
+					 AT91_XDMAC_DT_PERID(49))>;
+				dma-names = "tx", "rx";
 				clocks = <&qspi1_clk>;
 				#address-cells = <1>;
 				#size-cells = <0>;
