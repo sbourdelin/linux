@@ -74,6 +74,15 @@ struct llist_node {
 #define LLIST_HEAD_INIT(name)	{ NULL }
 #define LLIST_HEAD(name)	struct llist_head name = LLIST_HEAD_INIT(name)
 
+#define LLIST_NODE_UNLISTED	((void *)(-1L))
+#define LLIST_NODE_INIT(name)	{ LLIST_NODE_UNLISTED }
+#define LLIST_NODE(name)	struct llist_node name = LLIST_NODE_INIT(name)
+
+static inline void INIT_LLIST_NODE(struct llist_node *node)
+{
+	WRITE_ONCE(node->next, LLIST_NODE_UNLISTED);
+}
+
 /**
  * init_llist_head - initialize lock-less list head
  * @head:	the head for your lock-less list
@@ -238,4 +247,42 @@ extern struct llist_node *llist_del_first(struct llist_head *head);
 
 struct llist_node *llist_reverse_order(struct llist_node *head);
 
+/**
+ * llist_del_first_exclusive - delete the first entry of lock-less list
+ * 			       and make sure it's marked as UNLISTED
+ * @head:	the head for your lock-less list
+ *
+ * If list is empty, return NULL, otherwise, return the first entry
+ * deleted, this is the newest added one.
+ *
+ */
+static inline struct llist_node *llist_del_first_exclusive(
+				struct llist_head *head)
+{
+	struct llist_node *node = llist_del_first(head);
+
+	if (READ_ONCE(node))
+		smp_store_release(&node->next, LLIST_NODE_UNLISTED);
+	return node;
+}
+
+
+/**
+ * llist_add_exclusive - add a node only if it's not on any list
+			 (i. e. marked as UNLISTED)
+ * @node:	the node to be added
+ * @head:	the head for your lock-less list
+ *
+ * Return true if the node was added, or false otherwise.
+ */
+static inline bool llist_add_exclusive(struct llist_node *node,
+					struct llist_head *head)
+{
+	if (cmpxchg(&node->next, LLIST_NODE_UNLISTED, NULL) !=
+				LLIST_NODE_UNLISTED)
+		return false;
+
+	llist_add(node, head);
+	return true;
+}
 #endif /* LLIST_H */
