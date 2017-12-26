@@ -69,7 +69,7 @@ static int __write_tracing_file(const char *name, const char *val, bool append)
 {
 	char *file;
 	int fd, ret = -1;
-	ssize_t size = strlen(val);
+	ssize_t size = strlen(val) + 1;
 	int flags = O_WRONLY;
 	char errbuf[512];
 
