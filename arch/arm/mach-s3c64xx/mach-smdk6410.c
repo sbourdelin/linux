@@ -497,7 +497,7 @@ static struct wm8350_platform_data __initdata smdk6410_wm8350_pdata = {
 #endif
 
 #ifdef CONFIG_SMDK6410_WM1192_EV1
-static struct gpio_led wm1192_pmic_leds[] = {
+static const struct gpio_led wm1192_pmic_leds[] = {
 	{
 		.name = "PMIC:red:power",
 		.gpio = GPIO_BOARD_START + 3,
