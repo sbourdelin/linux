@@ -13,13 +13,10 @@
  */
 
 #define DRIVER_VERSION "v0.0.2"
-#define DRIVER_AUTHOR "Josh Myer <josh@joshisanerd.com>"
-#define DRIVER_DESC "USB KB Gear JamStudio Tablet driver"
-#define DRIVER_LICENSE "GPL"
 
-MODULE_AUTHOR(DRIVER_AUTHOR);
-MODULE_DESCRIPTION(DRIVER_DESC);
-MODULE_LICENSE(DRIVER_LICENSE);
+MODULE_AUTHOR("Josh Myer <josh@joshisanerd.com>");
+MODULE_DESCRIPTION("USB KB Gear JamStudio Tablet driver");
+MODULE_LICENSE("GPL");
 
 #define USB_VENDOR_ID_KBGEAR	0x084e
 
