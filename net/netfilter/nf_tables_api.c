@@ -22,6 +22,7 @@
 #include <net/net_namespace.h>
 #include <net/sock.h>
 
+static u64 table_handle;
 static LIST_HEAD(nf_tables_expressions);
 static LIST_HEAD(nf_tables_objects);
 
@@ -430,6 +431,7 @@ static const struct nla_policy nft_table_policy[NFTA_TABLE_MAX + 1] = {
 	[NFTA_TABLE_NAME]	= { .type = NLA_STRING,
 				    .len = NFT_TABLE_MAXNAMELEN - 1 },
 	[NFTA_TABLE_FLAGS]	= { .type = NLA_U32 },
+	[NFTA_TABLE_HANDLE]	= { .type = NLA_U64 },
 };
 
 static int nf_tables_fill_table_info(struct sk_buff *skb, struct net *net,
@@ -451,7 +453,9 @@ static int nf_tables_fill_table_info(struct sk_buff *skb, struct net *net,
 
 	if (nla_put_string(skb, NFTA_TABLE_NAME, table->name) ||
 	    nla_put_be32(skb, NFTA_TABLE_FLAGS, htonl(table->flags)) ||
-	    nla_put_be32(skb, NFTA_TABLE_USE, htonl(table->use)))
+	    nla_put_be32(skb, NFTA_TABLE_USE, htonl(table->use)) ||
+	    nla_put_be64(skb, NFTA_TABLE_HANDLE, cpu_to_be64(table->handle),
+			 NFTA_TABLE_PAD))
 		goto nla_put_failure;
 
 	nlmsg_end(skb, nlh);
@@ -734,6 +738,7 @@ static int nf_tables_newtable(struct net *net, struct sock *nlsk,
 	INIT_LIST_HEAD(&table->sets);
 	INIT_LIST_HEAD(&table->objects);
 	table->flags = flags;
+	table->handle = ++table_handle;
 
 	nft_ctx_init(&ctx, net, skb, nlh, afi, table, NULL, nla);
 	err = nft_trans_table_add(&ctx, NFT_MSG_NEWTABLE);

@@ -949,6 +949,7 @@ unsigned int nft_do_chain(struct nft_pktinfo *pkt, void *priv);
  *	@sets: sets in the table
  *	@objects: stateful objects in the table
  *	@hgenerator: handle generator state
+ *	@handle: table handle
  *	@use: number of chain references to this table
  *	@flags: table flag (see enum nft_table_flags)
  *	@genmask: generation mask
@@ -960,6 +961,7 @@ struct nft_table {
 	struct list_head		sets;
 	struct list_head		objects;
 	u64				hgenerator;
+	u64				handle:42;
 	u32				use;
 	u16				flags:14,
 					genmask:2;
