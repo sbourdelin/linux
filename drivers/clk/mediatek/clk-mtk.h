@@ -228,7 +228,7 @@ void mtk_clk_register_plls(struct device_node *node,
 struct clk *mtk_clk_register_ref2usb_tx(const char *name,
 			const char *parent_name, void __iomem *reg);
 
-#ifdef CONFIG_RESET_CONTROLLER
+#ifdef CONFIG_RESET_MEDIATEK
 void mtk_register_reset_controller(struct device_node *np,
 			unsigned int num_regs, int regofs);
 #else

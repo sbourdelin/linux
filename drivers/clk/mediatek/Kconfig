@@ -9,6 +9,13 @@ config COMMON_CLK_MEDIATEK
 	---help---
 	  MediaTek SoCs' clock support.
 
+config RESET_MEDIATEK
+	bool "MediaTek Reset Driver"
+	depends on ARCH_MEDIATEK || COMPILE_TEST
+	depends on RESET_CONTROLLER
+	help
+	  This enables the reset controller driver used on MediaTek SoCs.
+
 config COMMON_CLK_MT2701
 	bool "Clock driver for MediaTek MT2701"
 	depends on (ARCH_MEDIATEK && ARM) || COMPILE_TEST
