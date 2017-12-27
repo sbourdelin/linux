@@ -14,12 +14,153 @@
  */
 
 #include <linux/netdevice.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
+#include <net/ip6_checksum.h>
 #include "rmnet_config.h"
 #include "rmnet_map.h"
 #include "rmnet_private.h"
 
 #define RMNET_MAP_DEAGGR_SPACING  64
 #define RMNET_MAP_DEAGGR_HEADROOM (RMNET_MAP_DEAGGR_SPACING / 2)
+
+static u16 *rmnet_map_get_csum_field(unsigned char protocol,
+				     const void *txporthdr)
+{
+	u16 *check = 0;
+
+	switch (protocol) {
+	case IPPROTO_TCP:
+		check = &(((struct tcphdr *)txporthdr)->check);
+		break;
+
+	case IPPROTO_UDP:
+		check = &(((struct udphdr *)txporthdr)->check);
+		break;
+
+	default:
+		check = 0;
+		break;
+	}
+
+	return check;
+}
+
+static int
+rmnet_map_ipv4_dl_csum_trailer(struct sk_buff *skb,
+			       struct rmnet_map_dl_csum_trailer *csum_trailer)
+{
+	u16 ip_pseudo_payload_csum, pseudo_csum, ip_hdr_csum, *csum_field;
+	u16 csum_value, ip_payload_csum, csum_value_final;
+	struct iphdr *ip4h;
+	void *txporthdr;
+
+	ip4h = (struct iphdr *)(skb->data);
+	if ((ntohs(ip4h->frag_off) & IP_MF) ||
+	    ((ntohs(ip4h->frag_off) & IP_OFFSET) > 0))
+		return -EOPNOTSUPP;
+
+	txporthdr = skb->data + ip4h->ihl * 4;
+
+	csum_field = rmnet_map_get_csum_field(ip4h->protocol, txporthdr);
+
+	if (!csum_field)
+		return -EPROTONOSUPPORT;
+
+	/* RFC 768 - Skip IPv4 UDP packets where sender checksum field is 0 */
+	if (*csum_field == 0 && ip4h->protocol == IPPROTO_UDP)
+		return 0;
+
+	csum_value = ~ntohs(csum_trailer->csum_value);
+	ip_hdr_csum = ~ip_fast_csum(ip4h, (int)ip4h->ihl);
+	ip_payload_csum = csum16_sub(csum_value, ip_hdr_csum);
+
+	pseudo_csum = ~ntohs(csum_tcpudp_magic(ip4h->saddr, ip4h->daddr,
+			     (u16)(ntohs(ip4h->tot_len) - ip4h->ihl * 4),
+			     (u16)ip4h->protocol, 0));
+	ip_pseudo_payload_csum = csum16_add(ip_payload_csum, pseudo_csum);
+
+	csum_value_final = ~csum16_sub(ip_pseudo_payload_csum,
+				       ntohs(*csum_field));
+
+	if (unlikely(csum_value_final == 0)) {
+		switch (ip4h->protocol) {
+		case IPPROTO_UDP:
+			/* RFC 768 - DL4 1's complement rule for UDP csum 0 */
+			csum_value_final = ~csum_value_final;
+			break;
+
+		case IPPROTO_TCP:
+			/* DL4 Non-RFC compliant TCP checksum found */
+			if (*csum_field == 0xFFFF)
+				csum_value_final = ~csum_value_final;
+			break;
+		}
+	}
+
+	if (csum_value_final == ntohs(*csum_field))
+		return 0;
+	else
+		return -EINVAL;
+}
+
+#if IS_ENABLED(CONFIG_IPV6)
+static int
+rmnet_map_ipv6_dl_csum_trailer(struct sk_buff *skb,
+			       struct rmnet_map_dl_csum_trailer *csum_trailer)
+{
+	u16 ip_pseudo_payload_csum, pseudo_csum, ip6_hdr_csum, *csum_field;
+	u16 csum_value, ip6_payload_csum, csum_value_final;
+	struct ipv6hdr *ip6h;
+	void *txporthdr;
+	u32 length;
+
+	ip6h = (struct ipv6hdr *)(skb->data);
+
+	txporthdr = skb->data + sizeof(struct ipv6hdr);
+	csum_field = rmnet_map_get_csum_field(ip6h->nexthdr, txporthdr);
+
+	if (!csum_field)
+		return -EPROTONOSUPPORT;
+
+	csum_value = ~ntohs(csum_trailer->csum_value);
+	ip6_hdr_csum = ~ntohs(ip_compute_csum(ip6h,
+			      (int)(txporthdr - (void *)(skb->data))));
+	ip6_payload_csum = csum16_sub(csum_value, ip6_hdr_csum);
+
+	length = (ip6h->nexthdr == IPPROTO_UDP) ?
+		 ntohs(((struct udphdr *)txporthdr)->len) :
+		 ntohs(ip6h->payload_len);
+	pseudo_csum = ~ntohs(csum_ipv6_magic(&ip6h->saddr, &ip6h->daddr,
+			     length, ip6h->nexthdr, 0));
+	ip_pseudo_payload_csum = csum16_add(ip6_payload_csum, pseudo_csum);
+
+	csum_value_final = ~csum16_sub(ip_pseudo_payload_csum,
+				       ntohs(*csum_field));
+
+	if (unlikely(csum_value_final == 0)) {
+		switch (ip6h->nexthdr) {
+		case IPPROTO_UDP:
+			/* RFC 2460 section 8.1
+			 * DL6 One's complement rule for UDP checksum 0
+			 */
+			csum_value_final = ~csum_value_final;
+			break;
+
+		case IPPROTO_TCP:
+			/* DL6 Non-RFC compliant TCP checksum found */
+			if (*csum_field == 0xFFFF)
+				csum_value_final = ~csum_value_final;
+			break;
+		}
+	}
+
+	if (csum_value_final == ntohs(*csum_field))
+		return 0;
+	else
+		return -EINVAL;
+}
+#endif
 
 /* Adds MAP header to front of skb->data
  * Padding is calculated and set appropriately in MAP header. Mux ID is
@@ -66,7 +207,8 @@ done:
  * returned, indicating that there are no more packets to deaggregate. Caller
  * is responsible for freeing the original skb.
  */
-struct sk_buff *rmnet_map_deaggregate(struct sk_buff *skb)
+struct sk_buff *rmnet_map_deaggregate(struct sk_buff *skb,
+				      struct rmnet_port *port)
 {
 	struct rmnet_map_header *maph;
 	struct sk_buff *skbn;
@@ -77,6 +219,9 @@ struct sk_buff *rmnet_map_deaggregate(struct sk_buff *skb)
 
 	maph = (struct rmnet_map_header *)skb->data;
 	packet_len = ntohs(maph->pkt_len) + sizeof(struct rmnet_map_header);
+
+	if (port->data_format & RMNET_INGRESS_FORMAT_MAP_CKSUMV4)
+		packet_len += sizeof(struct rmnet_map_dl_csum_trailer);
 
 	if (((int)skb->len - (int)packet_len) < 0)
 		return NULL;
@@ -96,4 +241,34 @@ struct sk_buff *rmnet_map_deaggregate(struct sk_buff *skb)
 	skb_pull(skb, packet_len);
 
 	return skbn;
+}
+
+/* Validates packet checksums. Function takes a pointer to
+ * the beginning of a buffer which contains the IP payload +
+ * padding + checksum trailer.
+ * Only IPv4 and IPv6 are supported along with TCP & UDP.
+ * Fragmented or tunneled packets are not supported.
+ */
+int rmnet_map_checksum_downlink_packet(struct sk_buff *skb, u16 len)
+{
+	struct rmnet_map_dl_csum_trailer *csum_trailer;
+
+	if (unlikely(!(skb->dev->features & NETIF_F_RXCSUM)))
+		return -EOPNOTSUPP;
+
+	csum_trailer = (struct rmnet_map_dl_csum_trailer *)(skb->data + len);
+
+	if (!ntohs(csum_trailer->valid))
+		return -EINVAL;
+
+	if (skb->protocol == htons(ETH_P_IP))
+		return rmnet_map_ipv4_dl_csum_trailer(skb, csum_trailer);
+	else if (skb->protocol == htons(ETH_P_IPV6))
+#if IS_ENABLED(CONFIG_IPV6)
+		return rmnet_map_ipv6_dl_csum_trailer(skb, csum_trailer);
+#else
+		return -EPROTONOSUPPORT;
+#endif
+
+	return 0;
 }
