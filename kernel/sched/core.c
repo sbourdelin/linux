@@ -6648,10 +6648,17 @@ static int cpu_cfs_stat_show(struct seq_file *sf, void *v)
 {
 	struct task_group *tg = css_tg(seq_css(sf));
 	struct cfs_bandwidth *cfs_b = &tg->cfs_bandwidth;
+	unsigned int nr_running = 0;
+	int cpu;
+
+	for_each_online_cpu(cpu)
+		if (tg->cfs_rq[cpu])
+			nr_running += tg->cfs_rq[cpu]->h_nr_running;
 
 	seq_printf(sf, "nr_periods %d\n", cfs_b->nr_periods);
 	seq_printf(sf, "nr_throttled %d\n", cfs_b->nr_throttled);
 	seq_printf(sf, "throttled_time %llu\n", cfs_b->throttled_time);
+	seq_printf(sf, "nr_running %u\n", nr_running);
 
 	return 0;
 }
