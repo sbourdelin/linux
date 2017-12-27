@@ -25,6 +25,7 @@
 
 #include <linux/atomic.h>
 #include <linux/uaccess.h>
+#include <linux/acpi.h>
 
 static DEFINE_MUTEX(mem_sysfs_mutex);
 
@@ -389,6 +390,52 @@ static ssize_t show_phys_device(struct device *dev,
 }
 
 #ifdef CONFIG_MEMORY_HOTREMOVE
+/*
+ * Immovable memory region
+ */
+
+static ssize_t
+show_immovable_mem(struct device *dev, struct device_attribute *attr,
+		   char *buf)
+{
+	struct acpi_table_header *table_header = NULL;
+	struct acpi_srat_mem_affinity *ma;
+	struct acpi_subtable_header *th;
+	unsigned long long table_size;
+	unsigned long long table_end;
+	char pbuf[35], *p = buf;
+	int len;
+
+	acpi_get_table(ACPI_SIG_SRAT, 0, &table_header);
+
+	table_size = sizeof(struct acpi_table_srat);
+	table_end = (unsigned long)table_header + table_header->length;
+	th = (struct acpi_subtable_header *)((unsigned long)
+	      table_header + table_size);
+
+	while (((unsigned long)th) +
+	       sizeof(struct acpi_subtable_header) < table_end) {
+		if (th->type == 1) {
+			ma = (struct acpi_srat_mem_affinity *)th;
+			if (ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE)
+				continue;
+			len = sprintf(pbuf, "%llx@%llx",
+			       ma->length, ma->base_address);
+			if (p != buf) {
+				*p = ',';
+				p++;
+			}
+			memcpy(p, pbuf, len);
+			p = p + len;
+		}
+		th = (struct acpi_subtable_header *)((unsigned long)
+		      th + th->length);
+	}
+	return sprintf(buf, "%s\n", buf);
+}
+
+static DEVICE_ATTR(immovable_mem, 0444, show_immovable_mem, NULL);
+
 static void print_allowed_zone(char *buf, int nid, unsigned long start_pfn,
 		unsigned long nr_pages, int online_type,
 		struct zone *default_zone)
@@ -798,6 +845,9 @@ static struct attribute *memory_root_attrs[] = {
 #endif
 
 	&dev_attr_block_size_bytes.attr,
+#ifdef CONFIG_MEMORY_HOTREMOVE
+	&dev_attr_immovable_mem.attr,
+#endif
 	&dev_attr_auto_online_blocks.attr,
 	NULL
 };
