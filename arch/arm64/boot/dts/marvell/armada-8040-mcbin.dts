@@ -279,6 +279,14 @@
 	phys = <&cps_comphy0 1>;
 };
 
+&cps_eth2 {
+	/* CPS Lane 5 */
+	status = "okay";
+	phy-mode = "2500base-x";
+	/* Generic PHY, providing serdes lanes */
+	phys = <&cps_comphy5 2>;
+};
+
 &cps_pinctrl {
 	cps_spi1_pins: spi1-pins {
 		marvell,pins = "mpp12", "mpp13", "mpp14", "mpp15", "mpp16";
