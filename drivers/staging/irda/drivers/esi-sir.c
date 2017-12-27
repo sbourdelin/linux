@@ -69,7 +69,7 @@ static int esi_open(struct sir_dev *dev)
 	/* Power up and set dongle to 9600 baud */
 	sirdev_set_dtr_rts(dev, FALSE, TRUE);
 
-	qos->baud_rate.bits &= IR_9600|IR_19200|IR_115200;
+	qos->baud_rate.bits &= IR_9600 | IR_19200 | IR_115200;
 	qos->min_turn_time.bits = 0x01; /* Needs at least 10 ms */
 	irda_qos_bits_to_value(qos);
 
