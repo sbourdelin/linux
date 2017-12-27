@@ -2267,6 +2267,23 @@ static int imx_serial_port_resume_noirq(struct device *dev)
 	return 0;
 }
 
+static int imx_serial_port_freeze_noirq(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct imx_port *sport = platform_get_drvdata(pdev);
+	int ret;
+
+	ret = clk_enable(sport->clk_ipg);
+	if (ret)
+		return ret;
+
+	serial_imx_save_context(sport);
+
+	clk_disable(sport->clk_ipg);
+
+	return 0;
+}
+
 static int imx_serial_port_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -2324,7 +2341,7 @@ static int imx_serial_port_thaw(struct device *dev)
 static const struct dev_pm_ops imx_serial_port_pm_ops = {
 	.suspend_noirq = imx_serial_port_suspend_noirq,
 	.resume_noirq = imx_serial_port_resume_noirq,
-	.freeze_noirq = imx_serial_port_suspend_noirq,
+	.freeze_noirq = imx_serial_port_freeze_noirq,
 	.restore_noirq = imx_serial_port_resume_noirq,
 	.suspend = imx_serial_port_suspend,
 	.resume = imx_serial_port_resume,
