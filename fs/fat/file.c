@@ -15,10 +15,34 @@
 #include <linux/fsnotify.h>
 #include <linux/security.h>
 #include <linux/falloc.h>
+#include <linux/ctype.h>
 #include "fat.h"
 
 static long fat_fallocate(struct file *file, int mode,
 			  loff_t offset, loff_t len);
+
+/* the characters in this field shall be d-characters, and unused byte shall be set to 0x20. */
+static int fat_format_d_characters(char *label, unsigned long len)
+{
+	int i;
+
+	for (i=0; i<len; ++i) {
+		switch (label[i]) {
+		case '0' ... '9':
+		case 'A' ... 'Z':
+		case '_':
+			continue;
+		default:
+			break;
+		}
+		break;
+	}
+
+ 	for (; i<len; ++i)
+		label[i] = 0x20;
+
+	return len;
+}
 
 static int fat_ioctl_get_attributes(struct inode *inode, u32 __user *user_attr)
 {
@@ -121,10 +145,98 @@ static int fat_ioctl_get_volume_id(struct inode *inode, u32 __user *user_attr)
 	return put_user(sbi->vol_id, user_attr);
 }
 
+static int fat_ioctl_get_volume_label(struct inode *inode,
+				      u8 __user *vol_label)
+{
+	int err = 0;
+	struct fat_slot_info sinfo;
+
+	err = fat_scan_volume_label(inode, &sinfo);
+	if (err)
+		goto out;
+
+	if (copy_to_user(vol_label, sinfo.de->name, MSDOS_NAME))
+		err = -EFAULT;
+
+	brelse(sinfo.bh);
+out:
+	return err;
+}
+
+static int fat_ioctl_set_volume_label(struct file *file,
+				      u8 __user *vol_label)
+{
+	int err = 0;
+	u8 label[MSDOS_NAME];
+	struct buffer_head *bh;
+	struct fat_boot_sector *b;
+	struct fat_slot_info sinfo;
+	struct inode *inode = file_inode(file);
+	struct super_block *sb = inode->i_sb;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+
+	if (copy_from_user(label, vol_label, sizeof(label))) {
+		err = -EFAULT;
+		goto out;
+	}
+
+	fat_format_d_characters(label, sizeof(label));
+	err = mnt_want_write_file(file);
+	if (err)
+		goto out;
+
+	/* Update sector's vol_label */
+	bh = sb_bread(sb, 0);
+	if (bh == NULL) {
+		fat_msg(sb, KERN_ERR,
+			"unable to read boot sector to write volume label");
+		err = -EIO;
+		goto out_drop_file;
+	}
+
+	b = (struct fat_boot_sector *)bh->b_data;
+
+	lock_buffer(bh);
+	if (sbi->fat_bits == 32)
+		memcpy(b->fat32.vol_label, label, sizeof(label));
+	else
+		memcpy(b->fat16.vol_label, label, sizeof(label));
+
+	mark_buffer_dirty(bh);
+	unlock_buffer(bh);
+	err = sync_dirty_buffer(bh);
+	brelse(bh);
+	if (err)
+		goto out_drop_file;
+
+	/* updates root directory's vol_label */
+	err = fat_scan_volume_label(inode, &sinfo);
+	if (err)
+		goto out_drop_file;
+
+	bh = sinfo.bh;
+	lock_buffer(bh);
+	memcpy(sinfo.de->name, label, sizeof(sinfo.de->name));
+	mark_buffer_dirty(bh);
+	unlock_buffer(bh);
+	err = sync_dirty_buffer(bh);
+	brelse(bh);
+	if (err)
+		goto out_drop_file;
+
+	memcpy(sbi->vol_label, label, sizeof(sbi->vol_label));
+
+out_drop_file:
+	mnt_drop_write_file(file);
+ out:
+	return err;
+}
+
 long fat_generic_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 {
 	struct inode *inode = file_inode(filp);
 	u32 __user *user_attr = (u32 __user *)arg;
+	u8 __user *user_vol_label = (u8 __user *)arg;
 
 	switch (cmd) {
 	case FAT_IOCTL_GET_ATTRIBUTES:
@@ -133,6 +245,10 @@ long fat_generic_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 		return fat_ioctl_set_attributes(filp, user_attr);
 	case FAT_IOCTL_GET_VOLUME_ID:
 		return fat_ioctl_get_volume_id(inode, user_attr);
+	case FAT_IOCTL_GET_VOLUME_LABEL:
+		return fat_ioctl_get_volume_label(inode, user_vol_label);
+	case FAT_IOCTL_SET_VOLUME_LABEL:
+		return fat_ioctl_set_volume_label(filp, user_vol_label);
 	default:
 		return -ENOTTY;	/* Inappropriate ioctl for device */
 	}
