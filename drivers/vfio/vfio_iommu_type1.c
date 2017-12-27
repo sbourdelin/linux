@@ -102,6 +102,13 @@ struct vfio_pfn {
 	atomic_t		ref_count;
 };
 
+struct vfio_regions{
+	struct list_head list;
+	dma_addr_t iova;
+	phys_addr_t phys;
+	size_t len;
+};
+
 #define IS_IOMMU_CAP_DOMAIN_IN_CONTAINER(iommu)	\
 					(!list_empty(&iommu->domain_list))
 
@@ -479,6 +486,40 @@ static long vfio_unpin_pages_remote(struct vfio_dma *dma, dma_addr_t iova,
 	return unlocked;
 }
 
+/*
+ * Generally, VFIO needs to unpin remote pages after each IOTLB flush.
+ * Therefore, when using IOTLB flush sync interface, VFIO need to keep track
+ * of these regions (currently using a list).
+ *
+ * This value specifies maximum number of regions for each IOTLB flush sync.
+ */
+#define VFIO_IOMMU_TLB_SYNC_MAX		512
+
+static long vfio_sync_and_unpin(struct vfio_dma *dma, struct vfio_domain *domain,
+				struct list_head *regions, bool do_accounting)
+{
+	long unlocked = 0;
+	struct vfio_regions *entry, *next;
+
+	iommu_tlb_sync(domain->domain);
+
+	list_for_each_entry_safe(entry, next, regions, list) {
+		unlocked += vfio_unpin_pages_remote(dma,
+						    entry->iova,
+						    entry->phys >> PAGE_SHIFT,
+						    entry->len >> PAGE_SHIFT,
+						    false);
+		list_del(&entry->list);
+		kfree(entry);
+	}
+
+	if (do_accounting) {
+		vfio_lock_acct(dma->task, -unlocked, NULL);
+		return 0;
+	}
+	return unlocked;
+}
+
 static int vfio_pin_page_external(struct vfio_dma *dma, unsigned long vaddr,
 				  unsigned long *pfn_base, bool do_accounting)
 {
@@ -653,13 +694,18 @@ static long vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma,
 {
 	dma_addr_t iova = dma->iova, end = dma->iova + dma->size;
 	struct vfio_domain *domain, *d;
+	struct list_head unmapped_regions;
+	struct vfio_regions *entry;
 	long unlocked = 0;
+	int cnt = 0;
 
 	if (!dma->size)
 		return 0;
 
 	if (!IS_IOMMU_CAP_DOMAIN_IN_CONTAINER(iommu))
 		return 0;
+
+	INIT_LIST_HEAD(&unmapped_regions);
 
 	/*
 	 * We use the IOMMU to track the physical addresses, otherwise we'd
@@ -698,24 +744,36 @@ static long vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma,
 				break;
 		}
 
-		unmapped = iommu_unmap(domain->domain, iova, len);
-		if (WARN_ON(!unmapped))
+		entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+		if (!entry)
 			break;
 
-		unlocked += vfio_unpin_pages_remote(dma, iova,
-						    phys >> PAGE_SHIFT,
-						    unmapped >> PAGE_SHIFT,
-						    false);
+		unmapped = iommu_unmap_fast(domain->domain, iova, len);
+		if (WARN_ON(!unmapped)) {
+			kfree(entry);
+			break;
+		}
+
+		iommu_tlb_range_add(domain->domain, iova, unmapped);
+		entry->iova = iova;
+		entry->phys = phys;
+		entry->len  = unmapped;
+		list_add_tail(&entry->list, &unmapped_regions);
+		cnt++;
 		iova += unmapped;
 
+		if (cnt >= VFIO_IOMMU_TLB_SYNC_MAX) {
+			unlocked += vfio_sync_and_unpin(dma, domain, &unmapped_regions,
+							do_accounting);
+			cnt = 0;
+		}
 		cond_resched();
 	}
 
+	if (cnt)
+		unlocked += vfio_sync_and_unpin(dma, domain, &unmapped_regions,
+						do_accounting);
 	dma->iommu_mapped = false;
-	if (do_accounting) {
-		vfio_lock_acct(dma->task, -unlocked, NULL);
-		return 0;
-	}
 	return unlocked;
 }
 
@@ -875,6 +933,7 @@ static int map_try_harder(struct vfio_domain *domain, dma_addr_t iova,
 {
 	long i;
 	int ret = 0;
+	size_t unmapped = 0;
 
 	for (i = 0; i < npage; i++, pfn++, iova += PAGE_SIZE) {
 		ret = iommu_map(domain->domain, iova,
@@ -884,8 +943,14 @@ static int map_try_harder(struct vfio_domain *domain, dma_addr_t iova,
 			break;
 	}
 
-	for (; i < npage && i > 0; i--, iova -= PAGE_SIZE)
-		iommu_unmap(domain->domain, iova, PAGE_SIZE);
+	for (; i < npage && i > 0; i--, iova -= PAGE_SIZE) {
+		unmapped = iommu_unmap_fast(domain->domain, iova, PAGE_SIZE);
+		if (WARN_ON(!unmapped))
+			break;
+		iommu_tlb_range_add(domain->domain, iova, unmapped);
+	}
+	if (unmapped)
+		iommu_tlb_sync(domain->domain);
 
 	return ret;
 }
