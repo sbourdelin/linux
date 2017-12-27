@@ -5153,13 +5153,30 @@ int btrfs_is_parity_mirror(struct btrfs_fs_info *fs_info, u64 logical, u64 len)
 	return ret;
 }
 
+static inline int bdev_get_queue_len(struct block_device *bdev)
+{
+	int sum = 0;
+	struct request_queue *rq = bdev_get_queue(bdev);
+
+	sum += rq->nr_rqs[BLK_RW_SYNC] + rq->nr_rqs[BLK_RW_ASYNC];
+	sum += rq->in_flight[BLK_RW_SYNC] + rq->in_flight[BLK_RW_ASYNC];
+
+	/*
+	 * Try prevent switch for every sneeze
+	 * By roundup output num by 2
+	 */
+	return ALIGN(sum, 2);
+}
+
 static int find_live_mirror(struct btrfs_fs_info *fs_info,
 			    struct map_lookup *map, int first, int num,
 			    int optimal, int dev_replace_is_ongoing)
 {
 	int i;
 	int tolerance;
+	struct block_device *bdev;
 	struct btrfs_device *srcdev;
+	bool all_bdev_nonrot = true;
 
 	if (dev_replace_is_ongoing &&
 	    fs_info->dev_replace.cont_reading_from_srcdev_mode ==
@@ -5167,6 +5184,48 @@ static int find_live_mirror(struct btrfs_fs_info *fs_info,
 		srcdev = fs_info->dev_replace.srcdev;
 	else
 		srcdev = NULL;
+
+	/*
+	 * Optimal expected to be pid % num
+	 * That's generaly ok for spinning rust drives
+	 * But if one of mirror are non rotating,
+	 * that bdev can show better performance
+	 *
+	 * if one of disks are non rotating:
+	 *  - set optimal to non rotating device
+	 * if both disk are non rotating
+	 *  - set optimal to bdev with least queue
+	 * If both disks are spinning rust:
+	 *  - leave old pid % nu,
+	 */
+	for (i = 0; i < num; i++) {
+		bdev = map->stripes[i].dev->bdev;
+		if (!bdev)
+			continue;
+		if (blk_queue_nonrot(bdev_get_queue(bdev)))
+			optimal = i;
+		else
+			all_bdev_nonrot = false;
+	}
+
+	if (all_bdev_nonrot) {
+		int qlen;
+		/* Forse following logic choise by init with some big number */
+		int optimal_dev_rq_count = 1 << 24;
+
+		for (i = 0; i < num; i++) {
+			bdev = map->stripes[i].dev->bdev;
+			if (!bdev)
+				continue;
+
+			qlen = bdev_get_queue_len(bdev);
+
+			if (qlen < optimal_dev_rq_count) {
+				optimal = i;
+				optimal_dev_rq_count = qlen;
+			}
+		}
+	}
 
 	/*
 	 * try to avoid the drive that is the source drive for a
