@@ -2712,8 +2712,8 @@ EXPORT_SYMBOL(ufshcd_query_flag);
  *
  * Returns 0 for success, non-zero in case of failure
 */
-static int ufshcd_query_attr(struct ufs_hba *hba, enum query_opcode opcode,
-			enum attr_idn idn, u8 index, u8 selector, u32 *attr_val)
+int ufshcd_query_attr(struct ufs_hba *hba, enum query_opcode opcode,
+		      enum attr_idn idn, u8 index, u8 selector, u32 *attr_val)
 {
 	struct ufs_query_req *request = NULL;
 	struct ufs_query_res *response = NULL;
@@ -2764,6 +2764,7 @@ out:
 	ufshcd_release(hba);
 	return err;
 }
+EXPORT_SYMBOL(ufshcd_query_attr);
 
 /**
  * ufshcd_query_attr_retry() - API function for sending query
@@ -6492,6 +6493,7 @@ static enum blk_eh_timer_return ufshcd_eh_timed_out(struct scsi_cmnd *scmd)
 
 static struct attribute_group *ufshcd_driver_groups[] = {
 	&ufs_sysfs_unit_descriptor_group,
+	&ufs_sysfs_lun_attributes_group,
 	NULL,
 };
 
