@@ -185,6 +185,12 @@ static bool amd_iommu_pc_present __read_mostly;
 bool amd_iommu_force_isolation __read_mostly;
 
 /*
+ * IOTLB flush list
+ */
+LIST_HEAD(amd_iommu_flush_list);
+spinlock_t amd_iommu_flush_list_lock;
+
+/*
  * List of protection domains - used during resume
  */
 LIST_HEAD(amd_iommu_pd_list);
@@ -2490,6 +2496,7 @@ static int __init early_amd_iommu_init(void)
 	__set_bit(0, amd_iommu_pd_alloc_bitmap);
 
 	spin_lock_init(&amd_iommu_pd_lock);
+	spin_lock_init(&amd_iommu_flush_list_lock);
 
 	/*
 	 * now the data structures are allocated and basically initialized
