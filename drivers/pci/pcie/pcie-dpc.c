@@ -161,6 +161,43 @@ static void dpc_wait_link_inactive(struct dpc_dev *dpc)
 		dev_warn(dev, "Link state not disabled for DPC event\n");
 }
 
+static bool dpc_wait_link_active(struct pci_dev *pdev)
+{
+	unsigned long timeout = jiffies + HZ;
+	u16 lnk_status;
+	bool ret = true;
+
+	pcie_capability_read_word(pdev, PCI_EXP_LNKSTA, &lnk_status);
+
+	while (!(lnk_status & PCI_EXP_LNKSTA_DLLLA) &&
+					!time_after(jiffies, timeout)) {
+		msleep(10);
+		pcie_capability_read_word(pdev, PCI_EXP_LNKSTA, &lnk_status);
+	}
+
+	if (!(lnk_status & PCI_EXP_LNKSTA_DLLLA)) {
+		dev_warn(&pdev->dev, "Link state not enabled after DPC event\n");
+		ret = false;
+	}
+
+	return ret;
+}
+
+/**
+ * dpc_error_resume - enumerate the devices beneath
+ * @dev: pointer to Root Port's pci_dev data structure
+ *
+ * Invoked by Port Bus driver during nonfatal recovery.
+ */
+static void dpc_error_resume(struct pci_dev *pdev)
+{
+	if (dpc_wait_link_active(pdev)) {
+		pci_lock_rescan_remove();
+		pci_rescan_bus(pdev->bus);
+		pci_unlock_rescan_remove();
+	}
+}
+
 /**
  * dpc_reset_link - reset link DPC  routine
  * @dev: pointer to Root Port's pci_dev data structure
@@ -419,6 +456,7 @@ static struct pcie_port_service_driver dpcdriver = {
 	.service	= PCIE_PORT_SERVICE_DPC,
 	.probe		= dpc_probe,
 	.remove		= dpc_remove,
+	.error_resume	= dpc_error_resume,
 	.reset_link     = dpc_reset_link,
 };
 

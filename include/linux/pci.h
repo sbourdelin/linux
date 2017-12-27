@@ -2010,7 +2010,8 @@ void pci_hp_remove_module_link(struct pci_slot *pci_slot);
 pci_ers_result_t pci_broadcast_error_message(struct pci_dev *dev,
 					enum pci_channel_state state,
 					char *error_mesg,
-					int (*cb)(struct pci_dev *, void *));
+					int (*cb)(struct pci_dev *, void *),
+					int severity);
 int pci_report_mmio_enabled(struct pci_dev *dev, void *data);
 int pci_report_slot_reset(struct pci_dev *dev, void *data);
 int pci_report_resume(struct pci_dev *dev, void *data);
