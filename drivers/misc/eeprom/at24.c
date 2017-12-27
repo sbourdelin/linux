@@ -684,11 +684,13 @@ err_clients:
 static int at24_remove(struct i2c_client *client)
 {
 	struct at24_data *at24;
-	int i;
+	int i, ret;
 
 	at24 = i2c_get_clientdata(client);
 
-	nvmem_unregister(at24->nvmem);
+	ret = nvmem_unregister(at24->nvmem);
+	if (ret)
+		return ret;
 
 	for (i = 1; i < at24->num_addresses; i++)
 		i2c_unregister_device(at24->client[i].client);
