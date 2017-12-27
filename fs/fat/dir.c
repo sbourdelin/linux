@@ -880,6 +880,35 @@ static int fat_get_short_entry(struct inode *dir, loff_t *pos,
 	return -ENOENT;
 }
 
+static int fat_get_volume_label_entry(struct inode *dir, loff_t *pos,
+			       struct buffer_head **bh,
+			       struct msdos_dir_entry **de)
+{
+	while (fat_get_entry(dir, pos, bh, de) >= 0)
+		if (((*de)->attr & ATTR_VOLUME) && (*de)->attr != ATTR_EXT)
+			return 0;
+	return -ENOENT;
+}
+
+int fat_scan_volume_label(struct inode *dir, struct fat_slot_info *sinfo)
+{
+	struct super_block *sb = dir->i_sb;
+
+	sinfo->slot_off = 0;
+	sinfo->bh = NULL;
+	while (fat_get_volume_label_entry(dir, &sinfo->slot_off,
+					  &sinfo->bh, &sinfo->de) >= 0) {
+		sinfo->slot_off -= sizeof(*sinfo->de);
+		sinfo->nr_slots = 1;
+		sinfo->i_pos = fat_make_i_pos(sb, sinfo->bh, sinfo->de);
+
+		return 0;
+	}
+
+	return -ENOENT;
+}
+EXPORT_SYMBOL_GPL(fat_scan_volume_label);
+
 /*
  * The ".." entry can not provide the "struct fat_slot_info" information
  * for inode, nor a usable i_pos. So, this function provides some information

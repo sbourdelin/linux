@@ -107,6 +107,8 @@ struct __fat_dirent {
 #define FAT_IOCTL_SET_ATTRIBUTES	_IOW('r', 0x11, __u32)
 /*Android kernel has used 0x12, so we use 0x13*/
 #define FAT_IOCTL_GET_VOLUME_ID		_IOR('r', 0x13, __u32)
+#define FAT_IOCTL_GET_VOLUME_LABEL	_IOR('r', 0x14, __u8[11])
+#define FAT_IOCTL_SET_VOLUME_LABEL	_IOW('r', 0x15, __u8[11])
 
 struct fat_boot_sector {
 	__u8	ignored[3];	/* Boot strap short or near jump */

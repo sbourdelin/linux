@@ -86,6 +86,7 @@ struct msdos_sb_info {
 	int dir_per_block;	      /* dir entries per block */
 	int dir_per_block_bits;	      /* log2(dir_per_block) */
 	unsigned int vol_id;		/*volume ID*/
+	char vol_label[11];		/*volume label*/
 
 	int fatent_shift;
 	const struct fatent_operations *fatent_ops;
@@ -300,6 +301,7 @@ extern int fat_dir_empty(struct inode *dir);
 extern int fat_subdirs(struct inode *dir);
 extern int fat_scan(struct inode *dir, const unsigned char *name,
 		    struct fat_slot_info *sinfo);
+extern int fat_scan_volume_label(struct inode *dir, struct fat_slot_info *sinfo);
 extern int fat_scan_logstart(struct inode *dir, int i_logstart,
 			     struct fat_slot_info *sinfo);
 extern int fat_get_dotdot_entry(struct inode *dir, struct buffer_head **bh,
