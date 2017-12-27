@@ -267,6 +267,22 @@ pci_ers_result_t pci_broadcast_error_message(struct pci_dev *dev,
 	return result_data.result;
 }
 
+/*
+ * pcie_port_upstream_bridge - returns immediate upstream bridge.
+ * dev: pcie device
+ */
+static struct pci_dev *pcie_port_upstream_bridge(struct pci_dev *dev)
+{
+	struct pci_dev *parent;
+
+	parent = pci_upstream_bridge(dev);
+
+	if (parent && pci_is_pcie(parent))
+		return parent;
+
+	return NULL;
+}
+
 /**
  * pci_do_recovery - handle nonfatal/fatal error recovery process
  * @dev: pointer to a pci_dev data structure of agent detecting an error
@@ -280,8 +296,28 @@ void pci_do_recovery(struct pci_dev *dev, int severity)
 {
 	pci_ers_result_t status, result = PCI_ERS_RESULT_RECOVERED;
 	enum pci_channel_state state;
+	struct pcie_port_service_driver *driver;
+	struct pci_dev *pdev = dev;
 
 	mutex_lock(&pci_err_recovery_lock);
+
+	if (severity != PCI_ERR_DPC_FATAL) {
+		/*
+		 * DPC service could be running in RP
+		 * or any upstream switch.
+		 */
+		do {
+			driver = pci_find_dpc_service(pdev);
+			if (driver) {
+				dev_printk(KERN_NOTICE, &dev->dev,
+				"AER: Recovery to be done by DPC %s\n",
+				pci_name(dev));
+				mutex_unlock(&pci_err_recovery_lock);
+				return;
+			}
+		pdev = pcie_port_upstream_bridge(dev);
+		} while (pdev);
+	}
 
 	if ((severity == PCI_ERR_AER_FATAL) ||
 	    (severity == PCI_ERR_DPC_FATAL))
