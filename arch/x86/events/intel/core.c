@@ -3855,6 +3855,7 @@ __init int intel_pmu_init(void)
 	struct extra_reg *er;
 	int version, i;
 	struct attribute **extra_attr = NULL;
+	bool extra_attr_allocated = false;
 	char *name;
 
 	if (!cpu_has(&boot_cpu_data, X86_FEATURE_ARCH_PERFMON)) {
@@ -4294,6 +4295,7 @@ __init int intel_pmu_init(void)
 		extra_attr = boot_cpu_has(X86_FEATURE_RTM) ?
 			hsw_format_attr : nhm_format_attr;
 		extra_attr = merge_attr(extra_attr, skl_format_attr);
+		extra_attr_allocated = true;
 		x86_pmu.cpu_events = get_hsw_events_attrs();
 		intel_pmu_pebs_data_source_skl(
 			boot_cpu_data.x86_model == INTEL_FAM6_SKYLAKE_X);
@@ -4324,6 +4326,8 @@ __init int intel_pmu_init(void)
 	if (version >= 2 && extra_attr) {
 		x86_pmu.format_attrs = merge_attr(intel_arch3_formats_attr,
 						  extra_attr);
+		if (extra_attr_allocated)
+			kfree(extra_attr);
 		WARN_ON(!x86_pmu.format_attrs);
 	}
 
