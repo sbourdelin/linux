@@ -8,6 +8,7 @@ Required properties:
                 "atmel,24c00",
                 "atmel,24c01",
                 "atmel,24c02",
+                "atmel,spd",
                 "atmel,24c04",
                 "atmel,24c08",
                 "atmel,24c16",
