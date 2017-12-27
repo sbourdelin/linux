@@ -74,24 +74,6 @@
 
 	.align 3
 
-	.macro  sync_l2_cache
-
-	/* sync L2 cache to drain L2's buffers to DRAM. */
-#ifdef CONFIG_CACHE_L2X0
-	ldr	r11, [r0, #PM_INFO_MX6Q_L2_V_OFFSET]
-	teq	r11, #0
-	beq	6f
-	mov	r6, #0x0
-	str	r6, [r11, #L2X0_CACHE_SYNC]
-1:
-	ldr	r6, [r11, #L2X0_CACHE_SYNC]
-	ands	r6, r6, #0x1
-	bne	1b
-6:
-#endif
-
-	.endm
-
 	.macro	resume_mmdc
 
 	/* restore MMDC IO */
@@ -184,9 +166,6 @@ ENTRY(imx6_suspend)
 	/* store physical resume addr and pm_info address. */
 	str	r9, [r11, #MX6Q_SRC_GPR1]
 	str	r1, [r11, #MX6Q_SRC_GPR2]
-
-	/* need to sync L2 cache before DSM. */
-	sync_l2_cache
 
 	ldr	r11, [r0, #PM_INFO_MX6Q_MMDC_V_OFFSET]
 	/*
@@ -342,8 +321,5 @@ ENDPROC(imx6_suspend)
 
 ENTRY(v7_cpu_resume)
 	bl	v7_invalidate_l1
-#ifdef CONFIG_CACHE_L2X0
-	bl	l2c310_early_resume
-#endif
 	b	cpu_resume
 ENDPROC(v7_cpu_resume)
