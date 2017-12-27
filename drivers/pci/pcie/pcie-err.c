@@ -176,7 +176,7 @@ static pci_ers_result_t pci_default_reset_link(struct pci_dev *dev)
 	return PCI_ERS_RESULT_RECOVERED;
 }
 
-pci_ers_result_t pci_reset_link(struct pci_dev *dev)
+pci_ers_result_t pci_reset_link(struct pci_dev *dev, int severity)
 {
 	struct pci_dev *udev;
 	pci_ers_result_t status;
@@ -191,7 +191,10 @@ pci_ers_result_t pci_reset_link(struct pci_dev *dev)
 	}
 
 	/* Use the aer driver of the component firstly */
-	driver = pci_find_aer_service(udev);
+	if (severity == PCI_ERR_DPC_FATAL)
+		driver = pci_find_dpc_service(udev);
+	else
+		driver = pci_find_aer_service(udev);
 
 	if (driver && driver->reset_link) {
 		status = driver->reset_link(udev);
@@ -280,7 +283,8 @@ void pci_do_recovery(struct pci_dev *dev, int severity)
 
 	mutex_lock(&pci_err_recovery_lock);
 
-	if (severity == PCI_ERR_AER_FATAL)
+	if ((severity == PCI_ERR_AER_FATAL) ||
+	    (severity == PCI_ERR_DPC_FATAL))
 		state = pci_channel_io_frozen;
 	else
 		state = pci_channel_io_normal;
@@ -290,8 +294,9 @@ void pci_do_recovery(struct pci_dev *dev, int severity)
 			"error_detected",
 			pci_report_error_detected);
 
-	if (severity == PCI_ERR_AER_FATAL) {
-		result = pci_reset_link(dev);
+	if ((severity == PCI_ERR_AER_FATAL) ||
+	    (severity == PCI_ERR_DPC_FATAL)) {
+		result = pci_reset_link(dev, severity);
 		if (result != PCI_ERS_RESULT_RECOVERED)
 			goto failed;
 	}

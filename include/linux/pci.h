@@ -2005,6 +2005,7 @@ void pci_hp_remove_module_link(struct pci_slot *pci_slot);
 #define PCI_ERR_AER_NONFATAL		0
 #define PCI_ERR_AER_FATAL		1
 #define PCI_ERR_AER_CORRECTABLE		2
+#define PCI_ERR_DPC_FATAL		4
 
 pci_ers_result_t pci_broadcast_error_message(struct pci_dev *dev,
 					enum pci_channel_state state,
@@ -2014,7 +2015,7 @@ int pci_report_mmio_enabled(struct pci_dev *dev, void *data);
 int pci_report_slot_reset(struct pci_dev *dev, void *data);
 int pci_report_resume(struct pci_dev *dev, void *data);
 int pci_report_error_detected(struct pci_dev *dev, void *data);
-pci_ers_result_t pci_reset_link(struct pci_dev *dev);
+pci_ers_result_t pci_reset_link(struct pci_dev *dev, int severity);
 pci_ers_result_t pci_merge_result(enum pci_ers_result orig,
 				enum pci_ers_result new);
 void pci_do_recovery(struct pci_dev *dev, int severity);
