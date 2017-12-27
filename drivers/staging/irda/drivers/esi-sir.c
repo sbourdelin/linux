@@ -104,7 +104,8 @@ static int esi_change_speed(struct sir_dev *dev, unsigned int speed)
 		rts = FALSE;
 		break;
 	case 115200:
-		dtr = rts = TRUE;
+		dtr = TRUE;
+		rts = TRUE;
 		break;
 	default:
 		ret = -EINVAL;
