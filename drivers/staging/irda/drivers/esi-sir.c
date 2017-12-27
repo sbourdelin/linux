@@ -39,7 +39,7 @@
 
 static int esi_open(struct sir_dev *);
 static int esi_close(struct sir_dev *);
-static int esi_change_speed(struct sir_dev *, unsigned);
+static int esi_change_speed(struct sir_dev *, unsigned int);
 static int esi_reset(struct sir_dev *);
 
 static struct dongle_driver esi = {
@@ -93,7 +93,7 @@ static int esi_close(struct sir_dev *dev)
  * Apparently (see old esi-driver) no delays are needed here...
  *
  */
-static int esi_change_speed(struct sir_dev *dev, unsigned speed)
+static int esi_change_speed(struct sir_dev *dev, unsigned int speed)
 {
 	int ret = 0;
 	int dtr, rts;
