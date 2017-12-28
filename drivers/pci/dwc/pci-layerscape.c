@@ -185,8 +185,7 @@ static int ls1021_pcie_host_init(struct pcie_port *pp)
 	return ls_pcie_host_init(pp);
 }
 
-static int ls_pcie_msi_host_init(struct dw_pcie *pci,
-				 struct msi_controller *chip)
+static int ls_pcie_msi_host_init(struct dw_pcie *pci)
 {
 	struct device *dev = pci->dev;
 	struct device_node *np = dev->of_node;
