@@ -89,7 +89,7 @@ static inline int ioremap_pmd_range(pud_t *pud, unsigned long addr,
 	do {
 		next = pmd_addr_end(addr, end);
 
-		if (ioremap_pmd_enabled() &&
+		if (ioremap_pmd_enabled() && pmd_none(*pmd) &&
 		    ((next - addr) == PMD_SIZE) &&
 		    IS_ALIGNED(phys_addr + addr, PMD_SIZE)) {
 			if (pmd_set_huge(pmd, phys_addr + addr, prot))
@@ -115,7 +115,7 @@ static inline int ioremap_pud_range(p4d_t *p4d, unsigned long addr,
 	do {
 		next = pud_addr_end(addr, end);
 
-		if (ioremap_pud_enabled() &&
+		if (ioremap_pud_enabled() && pud_none(*pud) &&
 		    ((next - addr) == PUD_SIZE) &&
 		    IS_ALIGNED(phys_addr + addr, PUD_SIZE)) {
 			if (pud_set_huge(pud, phys_addr + addr, prot))
@@ -141,7 +141,7 @@ static inline int ioremap_p4d_range(pgd_t *pgd, unsigned long addr,
 	do {
 		next = p4d_addr_end(addr, end);
 
-		if (ioremap_p4d_enabled() &&
+		if (ioremap_p4d_enabled() && p4d_none(*p4d) &&
 		    ((next - addr) == P4D_SIZE) &&
 		    IS_ALIGNED(phys_addr + addr, P4D_SIZE)) {
 			if (p4d_set_huge(p4d, phys_addr + addr, prot))
