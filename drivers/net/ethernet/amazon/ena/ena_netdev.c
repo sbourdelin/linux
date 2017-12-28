@@ -3276,13 +3276,13 @@ static int ena_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	memcpy(adapter->netdev->perm_addr, adapter->mac_addr, netdev->addr_len);
 
-	netif_carrier_off(netdev);
-
 	rc = register_netdev(netdev);
 	if (rc) {
 		dev_err(&pdev->dev, "Cannot register net device\n");
 		goto err_rss;
 	}
+
+	netif_carrier_off(netdev);
 
 	INIT_WORK(&adapter->reset_task, ena_fw_reset_device);
 
