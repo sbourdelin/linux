@@ -48,12 +48,16 @@ struct ov772x_edge_ctrl {
 	.threshold = (t & OV772X_EDGE_THRESHOLD_MASK),	\
 }
 
-/*
- * ov772x camera info
+/**
+ * ov772x_camera_info -	ov772x driver interface structure
+ * @flags:		Sensor configuration flags
+ * @edgectrl:		Sensor edge control
+ * @xclk_rate:		xclk clock frequency (in Hz)
  */
 struct ov772x_camera_info {
 	unsigned long		flags;
 	struct ov772x_edge_ctrl	edgectrl;
+	unsigned int		xclk_rate;
 };
 
 #endif /* __OV772X_H__ */
