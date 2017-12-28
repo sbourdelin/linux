@@ -48,12 +48,12 @@
 #include <net/irda/qos.h>
 
 static hashbin_t *irlap = NULL;
-int sysctl_slot_timeout = SLOT_TIMEOUT * 1000 / HZ;
+static int sysctl_slot_timeout = SLOT_TIMEOUT * 1000 / HZ;
 
 /* This is the delay of missed pf period before generating an event
  * to the application. The spec mandate 3 seconds, but in some cases
  * it's way too long. - Jean II */
-int sysctl_warn_noreply_time = 3;
+static int sysctl_warn_noreply_time = 3;
 
 extern void irlap_queue_xmit(struct irlap_cb *self, struct sk_buff *skb);
 static void __irlap_close(struct irlap_cb *self);
