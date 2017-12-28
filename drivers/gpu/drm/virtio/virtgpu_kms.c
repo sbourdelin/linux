@@ -128,13 +128,15 @@ static void virtio_gpu_get_capsets(struct virtio_gpu_device *vgdev,
 int virtio_gpu_driver_load(struct drm_device *dev, unsigned long flags)
 {
 	static vq_callback_t *callbacks[] = {
-		virtio_gpu_ctrl_ack, virtio_gpu_cursor_ack
+		virtio_gpu_ctrl_ack, virtio_gpu_cursor_ack,
+		virtio_gpu_winsrv_rx_read, virtio_gpu_winsrv_tx_ack
 	};
-	static const char * const names[] = { "control", "cursor" };
+	static const char * const names[] = { "control", "cursor",
+					      "winsrv-rx", "winsrv-tx" };
 
 	struct virtio_gpu_device *vgdev;
 	/* this will expand later */
-	struct virtqueue *vqs[2];
+	struct virtqueue *vqs[4];
 	u32 num_scanouts, num_capsets;
 	int ret;
 
@@ -158,6 +160,10 @@ int virtio_gpu_driver_load(struct drm_device *dev, unsigned long flags)
 	init_waitqueue_head(&vgdev->resp_wq);
 	virtio_gpu_init_vq(&vgdev->ctrlq, virtio_gpu_dequeue_ctrl_func);
 	virtio_gpu_init_vq(&vgdev->cursorq, virtio_gpu_dequeue_cursor_func);
+	virtio_gpu_init_vq(&vgdev->winsrv_rxq,
+			   virtio_gpu_dequeue_winsrv_rx_func);
+	virtio_gpu_init_vq(&vgdev->winsrv_txq,
+			   virtio_gpu_dequeue_winsrv_tx_func);
 
 	vgdev->fence_drv.context = dma_fence_context_alloc(1);
 	spin_lock_init(&vgdev->fence_drv.lock);
@@ -175,13 +181,15 @@ int virtio_gpu_driver_load(struct drm_device *dev, unsigned long flags)
 	DRM_INFO("virgl 3d acceleration not supported by guest\n");
 #endif
 
-	ret = virtio_find_vqs(vgdev->vdev, 2, vqs, callbacks, names, NULL);
+	ret = virtio_find_vqs(vgdev->vdev, 4, vqs, callbacks, names, NULL);
 	if (ret) {
 		DRM_ERROR("failed to find virt queues\n");
 		goto err_vqs;
 	}
 	vgdev->ctrlq.vq = vqs[0];
 	vgdev->cursorq.vq = vqs[1];
+	vgdev->winsrv_rxq.vq = vqs[2];
+	vgdev->winsrv_txq.vq = vqs[3];
 	ret = virtio_gpu_alloc_vbufs(vgdev);
 	if (ret) {
 		DRM_ERROR("failed to alloc vbufs\n");
@@ -215,6 +223,9 @@ int virtio_gpu_driver_load(struct drm_device *dev, unsigned long flags)
 		goto err_modeset;
 
 	virtio_device_ready(vgdev->vdev);
+
+	virtio_gpu_fill_winsrv_rx(vgdev);
+
 	vgdev->vqs_ready = true;
 
 	if (num_capsets)
@@ -256,6 +267,8 @@ void virtio_gpu_driver_unload(struct drm_device *dev)
 	vgdev->vqs_ready = false;
 	flush_work(&vgdev->ctrlq.dequeue_work);
 	flush_work(&vgdev->cursorq.dequeue_work);
+	flush_work(&vgdev->winsrv_rxq.dequeue_work);
+	flush_work(&vgdev->winsrv_txq.dequeue_work);
 	flush_work(&vgdev->config_changed_work);
 	vgdev->vdev->config->del_vqs(vgdev->vdev);
 
@@ -274,23 +287,41 @@ int virtio_gpu_driver_open(struct drm_device *dev, struct drm_file *file)
 	uint32_t id;
 	char dbgname[64], tmpname[TASK_COMM_LEN];
 
-	/* can't create contexts without 3d renderer */
-	if (!vgdev->has_virgl_3d)
-		return 0;
-
-	get_task_comm(tmpname, current);
-	snprintf(dbgname, sizeof(dbgname), "%s", tmpname);
-	dbgname[63] = 0;
 	/* allocate a virt GPU context for this opener */
 	vfpriv = kzalloc(sizeof(*vfpriv), GFP_KERNEL);
 	if (!vfpriv)
 		return -ENOMEM;
 
-	virtio_gpu_context_create(vgdev, strlen(dbgname), dbgname, &id);
+	/* can't create contexts without 3d renderer */
+	if (vgdev->has_virgl_3d) {
+		get_task_comm(tmpname, current);
+		snprintf(dbgname, sizeof(dbgname), "%s", tmpname);
+		dbgname[63] = 0;
 
-	vfpriv->ctx_id = id;
+		virtio_gpu_context_create(vgdev, strlen(dbgname), dbgname, &id);
+
+		vfpriv->ctx_id = id;
+	}
+
+	spin_lock_init(&vfpriv->winsrv_lock);
+	INIT_LIST_HEAD(&vfpriv->winsrv_conns);
+
 	file->driver_priv = vfpriv;
+
 	return 0;
+}
+
+static void virtio_gpu_cleanup_conns(struct virtio_gpu_fpriv *vfpriv)
+{
+	struct virtio_gpu_winsrv_conn *conn, *tmp;
+	struct virtio_gpu_winsrv_rx_qentry *qentry, *tmp2;
+
+	list_for_each_entry_safe(conn, tmp, &vfpriv->winsrv_conns, next) {
+		list_for_each_entry_safe(qentry, tmp2, &conn->cmdq, next) {
+			kfree(qentry);
+		}
+		kfree(conn);
+	}
 }
 
 void virtio_gpu_driver_postclose(struct drm_device *dev, struct drm_file *file)
@@ -303,6 +334,7 @@ void virtio_gpu_driver_postclose(struct drm_device *dev, struct drm_file *file)
 
 	vfpriv = file->driver_priv;
 
+	virtio_gpu_cleanup_conns(vfpriv);
 	virtio_gpu_context_destroy(vgdev, vfpriv->ctx_id);
 	kfree(vfpriv);
 	file->driver_priv = NULL;

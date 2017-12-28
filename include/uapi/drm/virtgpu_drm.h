@@ -46,6 +46,11 @@ extern "C" {
 #define DRM_VIRTGPU_TRANSFER_TO_HOST 0x07
 #define DRM_VIRTGPU_WAIT     0x08
 #define DRM_VIRTGPU_GET_CAPS  0x09
+#define DRM_VIRTGPU_WINSRV_CONNECT  0x0a
+#define DRM_VIRTGPU_WINSRV_TX  0x0b
+#define DRM_VIRTGPU_WINSRV_RX  0x0c
+
+#define VIRTGPU_WINSRV_MAX_ALLOCS 28
 
 struct drm_virtgpu_map {
 	__u64 offset; /* use for mmap system call */
@@ -132,6 +137,18 @@ struct drm_virtgpu_get_caps {
 	__u32 pad;
 };
 
+struct drm_virtgpu_winsrv {
+	__s32 fds[VIRTGPU_WINSRV_MAX_ALLOCS];
+	__u64 data;
+	__u32 len;
+	__u32 pad;
+};
+
+struct drm_virtgpu_winsrv_connect {
+	__u32 fd;   /* returned by kernel */
+	__u32 pad;
+};
+
 #define DRM_IOCTL_VIRTGPU_MAP \
 	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_MAP, struct drm_virtgpu_map)
 
@@ -166,6 +183,18 @@ struct drm_virtgpu_get_caps {
 #define DRM_IOCTL_VIRTGPU_GET_CAPS \
 	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_GET_CAPS, \
 	struct drm_virtgpu_get_caps)
+
+#define DRM_IOCTL_VIRTGPU_WINSRV_CONNECT \
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_WINSRV_CONNECT, \
+		struct drm_virtgpu_winsrv_connect)
+
+#define DRM_IOCTL_VIRTGPU_WINSRV_TX \
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_WINSRV_TX, \
+		struct drm_virtgpu_winsrv)
+
+#define DRM_IOCTL_VIRTGPU_WINSRV_RX \
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_VIRTGPU_WINSRV_RX, \
+		struct drm_virtgpu_winsrv)
 
 #if defined(__cplusplus)
 }
