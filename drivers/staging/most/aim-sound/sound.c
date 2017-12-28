@@ -166,7 +166,7 @@ static struct channel *get_channel(struct most_interface *iface,
 	struct channel *channel, *tmp;
 
 	list_for_each_entry_safe(channel, tmp, &dev_list, list) {
-		if ((channel->iface == iface) && (channel->id == channel_id))
+		if (channel->iface == iface && channel->id == channel_id)
 			return channel;
 	}
 
