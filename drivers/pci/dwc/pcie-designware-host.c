@@ -66,8 +66,20 @@ static void dw_msi_unmask_irq(struct irq_data *d)
 	irq_chip_unmask_parent(d);
 }
 
+static void dw_pci_ack_irq(struct irq_data *d)
+{
+	struct msi_desc *msi = irq_data_get_msi_desc(d);
+	struct pcie_port *pp;
+
+	pp = (struct pcie_port *) msi_desc_to_pci_sysdata(msi);
+
+	if (pp->ops->msi_irq_ack)
+		pp->ops->msi_irq_ack(d->irq, pp);
+}
+
 static struct irq_chip dw_pcie_msi_irq_chip = {
 	.name = "PCI-MSI",
+	.irq_ack = dw_pci_ack_irq,
 	.irq_mask = dw_msi_mask_irq,
 	.irq_unmask = dw_msi_unmask_irq,
 };
@@ -234,7 +246,7 @@ static int dw_pcie_irq_domain_alloc(struct irq_domain *domain,
 	for (i = 0; i < nr_irqs; i++)
 		irq_domain_set_info(domain, virq + i, bit + i,
 				    &dw_pci_msi_bottom_irq_chip,
-				    domain->host_data, handle_simple_irq,
+				    domain->host_data, handle_level_irq,
 				    NULL, NULL);
 
 	return 0;
@@ -619,11 +631,12 @@ int dw_pcie_host_init(struct pcie_port *pp)
 			if (ret)
 				goto error;
 
-			irq_set_chained_handler_and_data(pci->pp.msi_irq,
+			if (pp->msi_irq)
+				irq_set_chained_handler_and_data(pp->msi_irq,
 							 dw_chained_msi_isr,
 							 pci);
 		} else {
-			ret = pp->ops->msi_host_init(pp, &dw_pcie_msi_chip);
+			ret = pp->ops->msi_host_init(pci, &dw_pcie_msi_chip);
 			if (ret < 0)
 				goto error;
 		}
