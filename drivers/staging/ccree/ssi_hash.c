@@ -2280,8 +2280,8 @@ int ssi_hash_alloc(struct ssi_drvdata *drvdata)
 				      &hash_handle->hash_list);
 		}
 
-		if ((hw_mode == DRV_CIPHER_XCBC_MAC) ||
-		    (hw_mode == DRV_CIPHER_CMAC))
+		if (hw_mode == DRV_CIPHER_XCBC_MAC ||
+		    hw_mode == DRV_CIPHER_CMAC)
 			continue;
 
 		/* register hash version */
