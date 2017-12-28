@@ -49,7 +49,9 @@ static int imx6sx_enter_wait(struct cpuidle_device *dev,
 		cpu_pm_enter();
 		cpu_cluster_pm_enter();
 
+		outer_disable();
 		cpu_suspend(0, imx6sx_idle_finish);
+		outer_resume();
 
 		cpu_cluster_pm_exit();
 		cpu_pm_exit();
