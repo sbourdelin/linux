@@ -23,11 +23,13 @@
 #include <linux/delay.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <soc/imx/imx_sip_smc.h>
 
 #include <asm/system_misc.h>
 #include <asm/proc-fns.h>
 #include <asm/mach-types.h>
 #include <asm/hardware/cache-l2x0.h>
+#include <asm/outercache.h>
 
 #include "common.h"
 #include "hardware.h"
@@ -35,6 +37,9 @@
 static void __iomem *wdog_base;
 static struct clk *wdog_clk;
 static int wcr_enable = (1 << 2);
+#ifdef CONFIG_CACHE_L2X0
+static void __iomem *l2x0_base;
+#endif
 
 /*
  * Reset the system. It is called by machine_restart().
@@ -92,15 +97,24 @@ void __init imx1_reset_init(void __iomem *base)
 #endif
 
 #ifdef CONFIG_CACHE_L2X0
+void imx_l2c310_write_sec(unsigned long val, unsigned int reg)
+{
+	struct arm_smccc_res res;
+
+	arm_smccc_smc(IMX_SIP_SMC_L2C310, val, reg, 0, 0, 0, 0, 0, &res);
+}
+
 void __init imx_init_l2cache(void)
 {
-	void __iomem *l2x0_base;
 	struct device_node *np;
 	unsigned int val;
 
 	np = of_find_compatible_node(NULL, NULL, "arm,pl310-cache");
 	if (!np)
 		return;
+
+	if (of_find_compatible_node(NULL, NULL, "linaro,optee-tz"))
+		outer_cache.write_sec = imx_l2c310_write_sec;
 
 	l2x0_base = of_iomap(np, 0);
 	if (!l2x0_base)
@@ -117,7 +131,10 @@ void __init imx_init_l2cache(void)
 		val &= ~L310_PREFETCH_CTRL_OFFSET_MASK;
 		val |= 15;
 
-		writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
+		if (outer_cache.write_sec)
+			outer_cache.write_sec(val, L310_PREFETCH_CTRL);
+		else
+			writel_relaxed(val, l2x0_base + L310_PREFETCH_CTRL);
 	}
 
 	iounmap(l2x0_base);
