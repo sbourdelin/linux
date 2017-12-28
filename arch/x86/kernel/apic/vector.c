@@ -726,6 +726,7 @@ static int apic_set_affinity(struct irq_data *irqd,
 			     const struct cpumask *dest, bool force)
 {
 	struct apic_chip_data *apicd = apic_chip_data(irqd);
+	unsigned long flags;
 	int err;
 
 	/*
@@ -740,13 +741,13 @@ static int apic_set_affinity(struct irq_data *irqd,
 	    (apicd->is_managed || apicd->can_reserve))
 		return IRQ_SET_MASK_OK;
 
-	raw_spin_lock(&vector_lock);
+	raw_spin_lock_irqsave(&vector_lock, flags);
 	cpumask_and(vector_searchmask, dest, cpu_online_mask);
 	if (irqd_affinity_is_managed(irqd))
 		err = assign_managed_vector(irqd, vector_searchmask);
 	else
 		err = assign_vector_locked(irqd, vector_searchmask);
-	raw_spin_unlock(&vector_lock);
+	raw_spin_unlock_irqrestore(&vector_lock, flags);
 	return err ? err : IRQ_SET_MASK_OK;
 }
 
