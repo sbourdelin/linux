@@ -1310,6 +1310,14 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
 		}
 	}
 
+	if (sdev->host->hostt->sdev_groups) {
+		error = sysfs_create_groups(&sdev->sdev_gendev.kobj,
+			(const struct attribute_group **)
+			sdev->host->hostt->sdev_groups);
+			if (error)
+				return error;
+	}
+
 	scsi_autopm_put_device(sdev);
 	return error;
 }
@@ -1326,6 +1334,12 @@ void __scsi_remove_device(struct scsi_device *sdev)
 	 */
 	if (sdev->sdev_state == SDEV_DEL)
 		return;
+
+	if (sdev->host->hostt->sdev_groups) {
+		sysfs_remove_groups(&sdev->sdev_gendev.kobj,
+			(const struct attribute_group **)
+			sdev->host->hostt->sdev_groups);
+	}
 
 	if (sdev->is_visible) {
 		/*
