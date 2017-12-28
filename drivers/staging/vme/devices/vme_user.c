@@ -511,7 +511,7 @@ static int vme_user_match(struct vme_dev *vdev)
 	int cur_slot = vme_slot_num(vdev);
 
 	for (i = 0; i < bus_num; i++)
-		if ((cur_bus == bus[i]) && (cur_slot == vdev->num))
+		if (cur_bus == bus[i] && cur_slot == vdev->num)
 			return 1;
 
 	return 0;
