@@ -135,9 +135,9 @@
 			#clock-cells = <1>;
 			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
 			reg = <0xfcfe042c 4>;
-			clocks = <&p0_clk>;
-			clock-indices = <R7S72100_CLK_RTC>;
-			clock-output-names = "rtc";
+			clocks = <&b_clk>, <&p0_clk>;
+			clock-indices = <R7S72100_CLK_CEU R7S72100_CLK_RTC>;
+			clock-output-names = "ceu", "rtc";
 		};
 
 		mstp7_clks: mstp7_clks@fcfe0430 {
@@ -664,6 +664,15 @@
 		clocks = <&mstp6_clks R7S72100_CLK_RTC>, <&rtc_x1_clk>,
 			 <&rtc_x3_clk>, <&extal_clk>;
 		clock-names = "fck", "rtc_x1", "rtc_x3", "extal";
+		power-domains = <&cpg_clocks>;
+		status = "disabled";
+	};
+
+	ceu: ceu@e8210000 {
+		reg = <0xe8210000 0x209c>;
+		compatible = "renesas,r7s72100-ceu";
+		interrupts = <GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&mstp6_clks R7S72100_CLK_CEU>;
 		power-domains = <&cpg_clocks>;
 		status = "disabled";
 	};
