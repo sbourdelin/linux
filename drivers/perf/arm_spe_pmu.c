@@ -1165,10 +1165,8 @@ static int arm_spe_pmu_device_dt_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 
 	spe_pmu = devm_kzalloc(dev, sizeof(*spe_pmu), GFP_KERNEL);
-	if (!spe_pmu) {
-		dev_err(dev, "failed to allocate spe_pmu\n");
+	if (!spe_pmu)
 		return -ENOMEM;
-	}
 
 	spe_pmu->handle = alloc_percpu(typeof(*spe_pmu->handle));
 	if (!spe_pmu->handle)
