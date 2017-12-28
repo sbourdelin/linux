@@ -5195,29 +5195,24 @@ static inline int parity_smaller(u64 a, u64 b)
 	return a > b;
 }
 
-/* Bubble-sort the stripe set to put the parity/syndrome stripes last */
+/* Insertion-sort the stripe set to put the parity/syndrome stripes last */
 static void sort_parity_stripes(struct btrfs_bio *bbio, int num_stripes)
 {
 	struct btrfs_bio_stripe s;
-	int i;
+	int i, j;
 	u64 l;
-	int again = 1;
 
-	while (again) {
-		again = 0;
-		for (i = 0; i < num_stripes - 1; i++) {
-			if (parity_smaller(bbio->raid_map[i],
-					   bbio->raid_map[i+1])) {
-				s = bbio->stripes[i];
-				l = bbio->raid_map[i];
-				bbio->stripes[i] = bbio->stripes[i+1];
-				bbio->raid_map[i] = bbio->raid_map[i+1];
-				bbio->stripes[i+1] = s;
-				bbio->raid_map[i+1] = l;
-
-				again = 1;
-			}
+	for (i = 1; i < num_stripes; i++) {
+		s = bbio->stripes[i];
+		l = bbio->raid_map[i];
+		for (j = i - 1; j >= 0; j--) {
+			if (!parity_smaller(bbio->raid_map[j], l))
+				break;
+			bbio->stripes[j+1]  = bbio->stripes[j];
+			bbio->raid_map[j+1] = bbio->raid_map[j];
 		}
+		bbio->stripes[j+1]  = s;
+		bbio->raid_map[j+1] = l;
 	}
 }
 
