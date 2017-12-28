@@ -1033,7 +1033,6 @@ static void __arm_spe_pmu_dev_probe(void *info)
 		 spe_pmu->max_record_sz, spe_pmu->align, spe_pmu->features);
 
 	spe_pmu->features |= SPE_PMU_FEAT_DEV_PROBED;
-	return;
 }
 
 static void __arm_spe_pmu_reset_local(void)
