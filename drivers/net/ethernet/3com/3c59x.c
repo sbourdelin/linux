@@ -1729,6 +1729,7 @@ vortex_open(struct net_device *dev)
 	struct vortex_private *vp = netdev_priv(dev);
 	int i;
 	int retval;
+	dma_addr_t dma;
 
 	/* Use the now-standard shared IRQ implementation. */
 	if ((retval = request_irq(dev->irq, vp->full_bus_master_rx ?
@@ -1753,7 +1754,11 @@ vortex_open(struct net_device *dev)
 				break;			/* Bad news!  */
 
 			skb_reserve(skb, NET_IP_ALIGN);	/* Align IP on 16 byte boundaries */
-			vp->rx_ring[i].addr = cpu_to_le32(pci_map_single(VORTEX_PCI(vp), skb->data, PKT_BUF_SZ, PCI_DMA_FROMDEVICE));
+			dma = pci_map_single(VORTEX_PCI(vp), skb->data,
+					     PKT_BUF_SZ, PCI_DMA_FROMDEVICE);
+			if (dma_mapping_error(&VORTEX_PCI(vp)->dev, dma))
+				break;
+			vp->rx_ring[i].addr = cpu_to_le32(dma);
 		}
 		if (i != RX_RING_SIZE) {
 			pr_emerg("%s: no memory for rx ring\n", dev->name);
@@ -2067,6 +2072,9 @@ vortex_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		int len = (skb->len + 3) & ~3;
 		vp->tx_skb_dma = pci_map_single(VORTEX_PCI(vp), skb->data, len,
 						PCI_DMA_TODEVICE);
+		if (dma_mapping_error(&VORTEX_PCI(vp)->dev, vp->tx_skb_dma))
+			return NETDEV_TX_OK;
+
 		spin_lock_irq(&vp->window_lock);
 		window_set(vp, 7);
 		iowrite32(vp->tx_skb_dma, ioaddr + Wn7_MasterAddr);
@@ -2594,6 +2602,7 @@ boomerang_rx(struct net_device *dev)
 	void __iomem *ioaddr = vp->ioaddr;
 	int rx_status;
 	int rx_work_limit = vp->dirty_rx + RX_RING_SIZE - vp->cur_rx;
+	dma_addr_t dma;
 
 	if (vortex_debug > 5)
 		pr_debug("boomerang_rx(): status %4.4x\n", ioread16(ioaddr+EL3_STATUS));
@@ -2673,7 +2682,11 @@ boomerang_rx(struct net_device *dev)
 				break;			/* Bad news!  */
 			}
 
-			vp->rx_ring[entry].addr = cpu_to_le32(pci_map_single(VORTEX_PCI(vp), skb->data, PKT_BUF_SZ, PCI_DMA_FROMDEVICE));
+			dma = pci_map_single(VORTEX_PCI(vp), skb->data,
+					     PKT_BUF_SZ, PCI_DMA_FROMDEVICE);
+			if (dma_mapping_error(&VORTEX_PCI(vp)->dev, dma))
+				break;
+			vp->rx_ring[entry].addr = cpu_to_le32(dma);
 			vp->rx_skbuff[entry] = skb;
 		}
 		vp->rx_ring[entry].status = 0;	/* Clear complete bit. */
