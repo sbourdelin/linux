@@ -195,7 +195,7 @@ void __put_net(struct net *net);
 
 static inline struct net *get_net(struct net *net)
 {
-	atomic_inc(&net->count);
+	BUG_ON(atomic_inc_return(&net->count) <= 1);
 	return net;
 }
 
