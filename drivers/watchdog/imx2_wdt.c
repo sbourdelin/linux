@@ -368,6 +368,7 @@ static int imx2_wdt_suspend(struct device *dev)
 {
 	struct watchdog_device *wdog = dev_get_drvdata(dev);
 	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+	unsigned int resume_timeout = wdog->timeout;
 
 	/* The watchdog IP block is running */
 	if (imx2_wdt_is_running(wdev)) {
@@ -377,6 +378,7 @@ static int imx2_wdt_suspend(struct device *dev)
 
 	clk_disable_unprepare(wdev->clk);
 
+	wdog->timeout = resume_timeout;
 	return 0;
 }
 
