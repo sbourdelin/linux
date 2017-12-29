@@ -367,7 +367,6 @@ static int p54spi_rx(struct p54s_priv *priv)
 	skb = dev_alloc_skb(len + 4);
 	if (!skb) {
 		p54spi_sleep(priv);
-		dev_err(&priv->spi->dev, "could not alloc skb");
 		return -ENOMEM;
 	}
 
