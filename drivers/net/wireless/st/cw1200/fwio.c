@@ -153,7 +153,6 @@ static int cw1200_load_firmware_cw1200(struct cw1200_common *priv)
 
 	buf = kmalloc(DOWNLOAD_BLOCK_SIZE, GFP_KERNEL | GFP_DMA);
 	if (!buf) {
-		pr_err("Can't allocate firmware load buffer.\n");
 		ret = -ENOMEM;
 		goto firmware_release;
 	}

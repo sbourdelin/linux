@@ -289,10 +289,8 @@ static int cw1200_sdio_probe(struct sdio_func *func,
 		return -ENODEV;
 
 	self = kzalloc(sizeof(*self), GFP_KERNEL);
-	if (!self) {
-		pr_err("Can't allocate SDIO hwbus_priv.\n");
+	if (!self)
 		return -ENOMEM;
-	}
 
 	func->card->quirks |= MMC_QUIRK_LENIENT_FN0;
 
