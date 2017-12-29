@@ -46,8 +46,7 @@ extern int ncp_symlink(struct inode *, struct dentry *, const char *);
 #define ncp_symlink NULL
 #endif
 		      
-const struct file_operations ncp_dir_operations =
-{
+const struct file_operations ncp_dir_operations = {
 	.llseek		= generic_file_llseek,
 	.read		= generic_read_dir,
 	.iterate	= ncp_readdir,
@@ -57,8 +56,7 @@ const struct file_operations ncp_dir_operations =
 #endif
 };
 
-const struct inode_operations ncp_dir_inode_operations =
-{
+const struct inode_operations ncp_dir_inode_operations = {
 	.create		= ncp_create,
 	.lookup		= ncp_lookup,
 	.unlink		= ncp_unlink,
