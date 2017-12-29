@@ -1318,10 +1318,8 @@ static struct sk_buff *wl12xx_alloc_dummy_packet(struct wl1271 *wl)
 			    sizeof(struct wl1271_tx_hw_descr) - sizeof(*hdr);
 
 	skb = dev_alloc_skb(TOTAL_TX_DUMMY_PACKET_SIZE);
-	if (!skb) {
-		wl1271_warning("Failed to allocate a dummy packet skb");
+	if (!skb)
 		return NULL;
-	}
 
 	skb_reserve(skb, sizeof(struct wl1271_tx_hw_descr));
 
@@ -1437,10 +1435,8 @@ int wl1271_rx_filter_alloc_field(struct wl12xx_rx_filter *filter,
 	field = &filter->fields[filter->num_fields];
 
 	field->pattern = kzalloc(len, GFP_KERNEL);
-	if (!field->pattern) {
-		wl1271_warning("Failed to allocate RX filter pattern");
+	if (!field->pattern)
 		return -ENOMEM;
-	}
 
 	filter->num_fields++;
 
