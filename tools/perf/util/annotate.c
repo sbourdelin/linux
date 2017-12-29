@@ -1976,7 +1976,8 @@ static void annotation__calc_lines(struct annotation *notes, struct map *map,
 		if (percent_max <= 0.5)
 			continue;
 
-		al->path = get_srcline(map->dso, start + al->offset, NULL, false, true);
+		al->path = get_srcline(map->dso, start + al->offset, NULL,
+				       false, true, start + al->offset);
 		insert_source_line(&tmp_root, al);
 	}
 
