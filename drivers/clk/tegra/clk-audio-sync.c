@@ -35,7 +35,7 @@ static unsigned long clk_sync_source_round_rate(struct clk_hw *hw,
 	struct tegra_clk_sync_source *sync = to_clk_sync_source(hw);
 
 	if (rate > sync->max_rate)
-		return -EINVAL;
+		return 0;
 	else
 		return rate;
 }
