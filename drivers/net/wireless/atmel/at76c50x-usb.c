@@ -1223,8 +1223,6 @@ static int at76_submit_rx_urb(struct at76_priv *priv)
 	if (!skb) {
 		skb = dev_alloc_skb(sizeof(struct at76_rx_buffer));
 		if (!skb) {
-			wiphy_err(priv->hw->wiphy,
-				  "cannot allocate rx skbuff\n");
 			ret = -ENOMEM;
 			goto exit;
 		}
