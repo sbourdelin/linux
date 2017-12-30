@@ -247,7 +247,7 @@ static unsigned long zx_audio_round_rate(struct clk_hw *hw, unsigned long rate,
 	u32 reg;
 
 	if (rate * 2 > *prate)
-		return -EINVAL;
+		return 0;
 
 	reg = calc_reg(*prate, rate);
 	return calc_rate(reg, *prate);
