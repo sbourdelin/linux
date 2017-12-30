@@ -61,7 +61,7 @@ struct rds_sock *rds_find_bound(__be32 addr, __be16 port)
 	struct rds_sock *rs;
 
 	rs = rhashtable_lookup_fast(&bind_hash_table, &key, ht_parms);
-	if (rs && !sock_flag(rds_rs_to_sk(rs), SOCK_DEAD))
+	if (rs && rds_rs_to_sk(rs) && !sock_flag(rds_rs_to_sk(rs), SOCK_DEAD))
 		rds_sock_addref(rs);
 	else
 		rs = NULL;
