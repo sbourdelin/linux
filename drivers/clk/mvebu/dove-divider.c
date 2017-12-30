@@ -117,7 +117,7 @@ static unsigned long dove_round_rate(struct clk_hw *hw, unsigned long rate,
 
 	divider = dove_calc_divider(dc, rate, parent_rate, false);
 	if (divider < 0)
-		return divider;
+		return 0;
 
 	rate = DIV_ROUND_CLOSEST(parent_rate, divider);
 
