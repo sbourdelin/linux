@@ -119,14 +119,14 @@ static unsigned long i2s_pll_round_rate(struct clk_hw *hw, unsigned long rate,
 
 	if (!pll_cfg) {
 		dev_err(clk->dev, "invalid parent rate=%ld\n", *prate);
-		return -EINVAL;
+		return 0;
 	}
 
 	for (i = 0; pll_cfg[i].rate != 0; i++)
 		if (pll_cfg[i].rate == rate)
 			return rate;
 
-	return -EINVAL;
+	return 0;
 }
 
 static int i2s_pll_set_rate(struct clk_hw *hw, unsigned long rate,
