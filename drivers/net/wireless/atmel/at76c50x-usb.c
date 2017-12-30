@@ -383,7 +383,7 @@ static int at76_usbdfu_download(struct usb_device *udev, u8 *buf, u32 size,
 		return -EINVAL;
 	}
 
-	dfu_stat_buf = kmalloc(sizeof(struct dfu_status), GFP_KERNEL);
+	dfu_stat_buf = kmalloc(sizeof(*dfu_stat_buf), GFP_KERNEL);
 	if (!dfu_stat_buf) {
 		ret = -ENOMEM;
 		goto exit;
@@ -395,7 +395,7 @@ static int at76_usbdfu_download(struct usb_device *udev, u8 *buf, u32 size,
 		goto exit;
 	}
 
-	dfu_state = kmalloc(sizeof(u8), GFP_KERNEL);
+	dfu_state = kmalloc(sizeof(*dfu_state), GFP_KERNEL);
 	if (!dfu_state) {
 		ret = -ENOMEM;
 		goto exit;
