@@ -127,8 +127,9 @@ static int clk_composite_determine_rate(struct clk_hw *hw,
 	}
 }
 
-static long clk_composite_round_rate(struct clk_hw *hw, unsigned long rate,
-				  unsigned long *prate)
+static unsigned long clk_composite_round_rate(struct clk_hw *hw,
+					      unsigned long rate,
+					      unsigned long *prate)
 {
 	struct clk_composite *composite = to_clk_composite(hw);
 	const struct clk_ops *rate_ops = composite->rate_ops;

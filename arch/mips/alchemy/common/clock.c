@@ -204,7 +204,7 @@ static int alchemy_clk_aux_setr(struct clk_hw *hw,
 	return 0;
 }
 
-static long alchemy_clk_aux_roundr(struct clk_hw *hw,
+static unsigned long alchemy_clk_aux_roundr(struct clk_hw *hw,
 					    unsigned long rate,
 					    unsigned long *parent_rate)
 {

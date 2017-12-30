@@ -345,8 +345,9 @@ long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
 }
 EXPORT_SYMBOL_GPL(divider_round_rate_parent);
 
-static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long clk_divider_round_rate(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long *prate)
 {
 	struct clk_divider *divider = to_clk_divider(hw);
 	int bestdiv;

@@ -71,8 +71,8 @@ unsigned long omap2_table_mpu_recalc(struct clk_hw *clk,
  * Some might argue L3-DDR, others ARM, others IVA. This code is simple and
  * just uses the ARM rates.
  */
-long omap2_round_to_table_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *parent_rate)
+unsigned long omap2_round_to_table_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *parent_rate)
 {
 	const struct prcm_config *ptr;
 	long highest_rate;

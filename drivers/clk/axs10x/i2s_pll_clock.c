@@ -110,8 +110,8 @@ static unsigned long i2s_pll_recalc_rate(struct clk_hw *hw,
 	return ((parent_rate / idiv) * fbdiv) / odiv;
 }
 
-static long i2s_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-			unsigned long *prate)
+static unsigned long i2s_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *prate)
 {
 	struct i2s_pll_clk *clk = to_i2s_pll_clk(hw);
 	const struct i2s_pll_cfg *pll_cfg = i2s_pll_get_cfg(*prate);

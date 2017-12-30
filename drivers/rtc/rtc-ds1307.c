@@ -1166,8 +1166,9 @@ static unsigned long ds3231_clk_sqw_recalc_rate(struct clk_hw *hw,
 	return ds3231_clk_sqw_rates[rate_sel];
 }
 
-static long ds3231_clk_sqw_round_rate(struct clk_hw *hw, unsigned long rate,
-				      unsigned long *prate)
+static unsigned long ds3231_clk_sqw_round_rate(struct clk_hw *hw,
+					       unsigned long rate,
+					       unsigned long *prate)
 {
 	int i;
 

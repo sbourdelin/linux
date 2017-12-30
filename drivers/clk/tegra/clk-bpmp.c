@@ -167,8 +167,9 @@ static unsigned long tegra_bpmp_clk_recalc_rate(struct clk_hw *hw,
 	return response.rate;
 }
 
-static long tegra_bpmp_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-				      unsigned long *parent_rate)
+static unsigned long tegra_bpmp_clk_round_rate(struct clk_hw *hw,
+					       unsigned long rate,
+					       unsigned long *parent_rate)
 {
 	struct tegra_bpmp_clk *clk = to_tegra_bpmp_clk(hw);
 	struct cmd_clk_round_rate_response response;

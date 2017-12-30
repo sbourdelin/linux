@@ -402,8 +402,9 @@ static unsigned long clk_tve_di_recalc_rate(struct clk_hw *hw,
 	return 0;
 }
 
-static long clk_tve_di_round_rate(struct clk_hw *hw, unsigned long rate,
-				  unsigned long *prate)
+static unsigned long clk_tve_di_round_rate(struct clk_hw *hw,
+					   unsigned long rate,
+					   unsigned long *prate)
 {
 	unsigned long div;
 

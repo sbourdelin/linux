@@ -257,7 +257,7 @@ static long clk_pll_get_best_div_mul(struct clk_pll *pll, unsigned long rate,
 	return bestrate;
 }
 
-static long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+static unsigned long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
 					unsigned long *parent_rate)
 {
 	struct clk_pll *pll = to_clk_pll(hw);

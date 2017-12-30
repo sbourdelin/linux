@@ -69,8 +69,8 @@ static unsigned long cpg_z_clk_recalc_rate(struct clk_hw *hw,
 	return div_u64((u64)parent_rate * mult, 32);
 }
 
-static long cpg_z_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-				 unsigned long *parent_rate)
+static unsigned long cpg_z_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+					  unsigned long *parent_rate)
 {
 	unsigned long prate  = *parent_rate;
 	unsigned int mult;

@@ -583,8 +583,9 @@ static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 	return regmap_update_bits(clk_regmap, clk->reg, 0x1FFFF, val);
 }
 
-static long clk_hclk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-				    unsigned long *parent_rate)
+static unsigned long clk_hclk_pll_round_rate(struct clk_hw *hw,
+					     unsigned long rate,
+					     unsigned long *parent_rate)
 {
 	struct lpc32xx_pll_clk *clk = to_lpc32xx_pll_clk(hw);
 	u64 m_i, o = rate, i = *parent_rate, d = (u64)rate << 6;
@@ -646,8 +647,9 @@ static long clk_hclk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
 	return o;
 }
 
-static long clk_usb_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-				   unsigned long *parent_rate)
+static unsigned long clk_usb_pll_round_rate(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long *parent_rate)
 {
 	struct lpc32xx_pll_clk *clk = to_lpc32xx_pll_clk(hw);
 	struct clk_hw *usb_div_hw, *osc_hw;
@@ -959,8 +961,9 @@ static unsigned long clk_divider_recalc_rate(struct clk_hw *hw,
 				   divider->flags);
 }
 
-static long clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long clk_divider_round_rate(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long *prate)
 {
 	struct lpc32xx_clk_div *divider = to_lpc32xx_div(hw);
 	unsigned int bestdiv;

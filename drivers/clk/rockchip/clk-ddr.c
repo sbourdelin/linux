@@ -64,9 +64,9 @@ rockchip_ddrclk_sip_recalc_rate(struct clk_hw *hw,
 	return res.a0;
 }
 
-static long rockchip_ddrclk_sip_round_rate(struct clk_hw *hw,
-					   unsigned long rate,
-					   unsigned long *prate)
+static unsigned long rockchip_ddrclk_sip_round_rate(struct clk_hw *hw,
+						    unsigned long rate,
+						    unsigned long *prate)
 {
 	struct arm_smccc_res res;
 

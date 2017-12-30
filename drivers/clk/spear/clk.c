@@ -13,9 +13,10 @@
 #include <linux/types.h>
 #include "clk.h"
 
-long clk_round_rate_index(struct clk_hw *hw, unsigned long drate,
-		unsigned long parent_rate, clk_calc_rate calc_rate, u8 rtbl_cnt,
-		int *index)
+unsigned long clk_round_rate_index(struct clk_hw *hw, unsigned long drate,
+				   unsigned long parent_rate,
+				   clk_calc_rate calc_rate, u8 rtbl_cnt,
+				   int *index)
 {
 	unsigned long prev_rate, rate = 0;
 

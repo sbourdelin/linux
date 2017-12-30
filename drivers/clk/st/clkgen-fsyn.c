@@ -318,9 +318,9 @@ static int clk_fs660c32_vco_get_params(unsigned long input,
 	return 0;
 }
 
-static long quadfs_pll_fs660c32_round_rate(struct clk_hw *hw,
-					   unsigned long rate,
-					   unsigned long *prate)
+static unsigned long quadfs_pll_fs660c32_round_rate(struct clk_hw *hw,
+						    unsigned long rate,
+						    unsigned long *prate)
 {
 	struct stm_fs params;
 
@@ -757,8 +757,8 @@ static unsigned long quadfs_recalc_rate(struct clk_hw *hw,
 	return rate;
 }
 
-static long quadfs_round_rate(struct clk_hw *hw, unsigned long rate,
-				     unsigned long *prate)
+static unsigned long quadfs_round_rate(struct clk_hw *hw, unsigned long rate,
+				       unsigned long *prate)
 {
 	struct stm_fs params;
 

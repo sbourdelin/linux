@@ -39,8 +39,9 @@ static unsigned long vexpress_osc_recalc_rate(struct clk_hw *hw,
 	return rate;
 }
 
-static long vexpress_osc_round_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *parent_rate)
+static unsigned long vexpress_osc_round_rate(struct clk_hw *hw,
+					     unsigned long rate,
+					     unsigned long *parent_rate)
 {
 	struct vexpress_osc *osc = to_vexpress_osc(hw);
 

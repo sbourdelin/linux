@@ -110,8 +110,8 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
 	return (parent_rate * n * k >> p) / m;
 }
 
-static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
-			      unsigned long *parent_rate)
+static unsigned long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+					 unsigned long *parent_rate)
 {
 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
 	struct _ccu_nkmp _nkmp;

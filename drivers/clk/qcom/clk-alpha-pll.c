@@ -411,8 +411,9 @@ static int clk_alpha_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 	return 0;
 }
 
-static long clk_alpha_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-				     unsigned long *prate)
+static unsigned long clk_alpha_pll_round_rate(struct clk_hw *hw,
+					      unsigned long rate,
+					      unsigned long *prate)
 {
 	struct clk_alpha_pll *pll = to_clk_alpha_pll(hw);
 	u32 l;
@@ -472,7 +473,7 @@ static const struct clk_div_table clk_alpha_div_table[] = {
 	{ }
 };
 
-static long
+static unsigned long
 clk_alpha_pll_postdiv_round_rate(struct clk_hw *hw, unsigned long rate,
 				 unsigned long *prate)
 {

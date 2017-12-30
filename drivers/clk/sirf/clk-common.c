@@ -93,8 +93,8 @@ static unsigned long pll_clk_recalc_rate(struct clk_hw *hw,
 	}
 }
 
-static long pll_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-	unsigned long *parent_rate)
+static unsigned long pll_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *parent_rate)
 {
 	unsigned long fin, nf, nr, od;
 	u64 dividend;
@@ -160,8 +160,8 @@ static int pll_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	return 0;
 }
 
-static long cpu_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-	unsigned long *parent_rate)
+static unsigned long cpu_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *parent_rate)
 {
 	/*
 	 * SiRF SoC has not cpu clock control,
@@ -349,8 +349,8 @@ static unsigned long dmn_clk_recalc_rate(struct clk_hw *hw,
 	}
 }
 
-static long dmn_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-	unsigned long *parent_rate)
+static unsigned long dmn_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *parent_rate)
 {
 	unsigned long fin;
 	unsigned ratio, wait, hold;

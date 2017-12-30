@@ -23,8 +23,8 @@ static inline struct clk_regmap_div *to_clk_regmap_div(struct clk_hw *hw)
 	return container_of(to_clk_regmap(hw), struct clk_regmap_div, clkr);
 }
 
-static long div_round_rate(struct clk_hw *hw, unsigned long rate,
-			   unsigned long *prate)
+static unsigned long div_round_rate(struct clk_hw *hw, unsigned long rate,
+				    unsigned long *prate)
 {
 	struct clk_regmap_div *divider = to_clk_regmap_div(hw);
 

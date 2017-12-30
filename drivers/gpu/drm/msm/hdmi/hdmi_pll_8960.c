@@ -382,8 +382,8 @@ static unsigned long hdmi_pll_recalc_rate(struct clk_hw *hw,
 	return pll->pixclk;
 }
 
-static long hdmi_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *parent_rate)
+static unsigned long hdmi_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+					 unsigned long *parent_rate)
 {
 	const struct pll_rate *pll_rate = find_rate(rate);
 

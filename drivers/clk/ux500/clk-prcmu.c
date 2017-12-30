@@ -80,8 +80,8 @@ static unsigned long clk_prcmu_recalc_rate(struct clk_hw *hw,
 	return prcmu_clock_rate(clk->cg_sel);
 }
 
-static long clk_prcmu_round_rate(struct clk_hw *hw, unsigned long rate,
-				 unsigned long *parent_rate)
+static unsigned long clk_prcmu_round_rate(struct clk_hw *hw, unsigned long rate,
+					  unsigned long *parent_rate)
 {
 	struct clk_prcmu *clk = to_clk_prcmu(hw);
 	return prcmu_round_clock_rate(clk->cg_sel, rate);

@@ -554,8 +554,9 @@ static long bcm2835_pll_rate_from_divisors(unsigned long parent_rate,
 	return rate >> A2W_PLL_FRAC_BITS;
 }
 
-static long bcm2835_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-				   unsigned long *parent_rate)
+static unsigned long bcm2835_pll_round_rate(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long *parent_rate)
 {
 	struct bcm2835_pll *pll = container_of(hw, struct bcm2835_pll, hw);
 	const struct bcm2835_pll_data *data = pll->data;
@@ -785,9 +786,9 @@ static int bcm2835_pll_divider_is_on(struct clk_hw *hw)
 	return !(cprman_read(cprman, data->a2w_reg) & A2W_PLL_CHANNEL_DISABLE);
 }
 
-static long bcm2835_pll_divider_round_rate(struct clk_hw *hw,
-					   unsigned long rate,
-					   unsigned long *parent_rate)
+static unsigned long bcm2835_pll_divider_round_rate(struct clk_hw *hw,
+						    unsigned long rate,
+						    unsigned long *parent_rate)
 {
 	return clk_divider_ops.round_rate(hw, rate, parent_rate);
 }

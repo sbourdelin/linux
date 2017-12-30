@@ -101,8 +101,8 @@ static unsigned long ccu_nm_recalc_rate(struct clk_hw *hw,
 	return parent_rate * n / m;
 }
 
-static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
-			      unsigned long *parent_rate)
+static unsigned long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+				       unsigned long *parent_rate)
 {
 	struct ccu_nm *nm = hw_to_ccu_nm(hw);
 	struct _ccu_nm _nm;

@@ -45,8 +45,9 @@ static unsigned long clk_sama5d4_h32mx_recalc_rate(struct clk_hw *hw,
 	return parent_rate;
 }
 
-static long clk_sama5d4_h32mx_round_rate(struct clk_hw *hw, unsigned long rate,
-				       unsigned long *parent_rate)
+static unsigned long clk_sama5d4_h32mx_round_rate(struct clk_hw *hw,
+						  unsigned long rate,
+						  unsigned long *parent_rate)
 {
 	unsigned long div;
 

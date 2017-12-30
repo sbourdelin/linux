@@ -249,9 +249,9 @@ clk_sam9x5_peripheral_recalc_rate(struct clk_hw *hw,
 	return parent_rate >> periph->div;
 }
 
-static long clk_sam9x5_peripheral_round_rate(struct clk_hw *hw,
-					     unsigned long rate,
-					     unsigned long *parent_rate)
+static unsigned long clk_sam9x5_peripheral_round_rate(struct clk_hw *hw,
+						      unsigned long rate,
+						      unsigned long *parent_rate)
 {
 	int shift = 0;
 	unsigned long best_rate;

@@ -128,8 +128,8 @@ static unsigned long atl_clk_recalc_rate(struct clk_hw *hw,
 	return parent_rate / cdesc->divider;
 }
 
-static long atl_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *parent_rate)
+static unsigned long atl_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *parent_rate)
 {
 	unsigned divider;
 

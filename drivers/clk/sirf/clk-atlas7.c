@@ -535,8 +535,8 @@ static unsigned long dto_clk_recalc_rate(struct clk_hw *hw,
 	return rate;
 }
 
-static long dto_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-	unsigned long *parent_rate)
+static unsigned long dto_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *parent_rate)
 {
 	u64 dividend = rate * DTO_RESL_DOUBLE;
 

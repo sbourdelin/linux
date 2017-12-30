@@ -152,7 +152,7 @@ ingenic_pll_calc(const struct ingenic_cgu_clk_info *clk_info,
 	return div_u64((u64)parent_rate * m, n * od);
 }
 
-static long
+static unsigned long
 ingenic_pll_round_rate(struct clk_hw *hw, unsigned long req_rate,
 		       unsigned long *prate)
 {
@@ -357,7 +357,7 @@ ingenic_clk_calc_div(const struct ingenic_cgu_clk_info *clk_info,
 	return div;
 }
 
-static long
+static unsigned long
 ingenic_clk_round_rate(struct clk_hw *hw, unsigned long req_rate,
 		       unsigned long *parent_rate)
 {

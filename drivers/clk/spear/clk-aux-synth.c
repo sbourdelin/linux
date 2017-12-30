@@ -52,8 +52,8 @@ static unsigned long aux_calc_rate(struct clk_hw *hw, unsigned long prate,
 			(rtbl[index].yscale * eq)) * 10000;
 }
 
-static long clk_aux_round_rate(struct clk_hw *hw, unsigned long drate,
-		unsigned long *prate)
+static unsigned long clk_aux_round_rate(struct clk_hw *hw, unsigned long drate,
+					unsigned long *prate)
 {
 	struct clk_aux *aux = to_clk_aux(hw);
 	int unused;

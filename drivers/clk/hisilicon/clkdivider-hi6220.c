@@ -59,8 +59,9 @@ static unsigned long hi6220_clkdiv_recalc_rate(struct clk_hw *hw,
 				   CLK_DIVIDER_ROUND_CLOSEST);
 }
 
-static long hi6220_clkdiv_round_rate(struct clk_hw *hw, unsigned long rate,
-					unsigned long *prate)
+static unsigned long hi6220_clkdiv_round_rate(struct clk_hw *hw,
+					      unsigned long rate,
+					      unsigned long *prate)
 {
 	struct hi6220_clk_divider *dclk = to_hi6220_clk_divider(hw);
 

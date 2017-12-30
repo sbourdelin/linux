@@ -121,8 +121,8 @@ static unsigned long clk_pllv3_recalc_rate(struct clk_hw *hw,
 	return (div == 1) ? parent_rate * 22 : parent_rate * 20;
 }
 
-static long clk_pllv3_round_rate(struct clk_hw *hw, unsigned long rate,
-				 unsigned long *prate)
+static unsigned long clk_pllv3_round_rate(struct clk_hw *hw, unsigned long rate,
+					  unsigned long *prate)
 {
 	unsigned long parent_rate = *prate;
 
@@ -169,8 +169,9 @@ static unsigned long clk_pllv3_sys_recalc_rate(struct clk_hw *hw,
 	return parent_rate * div / 2;
 }
 
-static long clk_pllv3_sys_round_rate(struct clk_hw *hw, unsigned long rate,
-				     unsigned long *prate)
+static unsigned long clk_pllv3_sys_round_rate(struct clk_hw *hw,
+					      unsigned long rate,
+					      unsigned long *prate)
 {
 	unsigned long parent_rate = *prate;
 	unsigned long min_rate = parent_rate * 54 / 2;
@@ -230,8 +231,9 @@ static unsigned long clk_pllv3_av_recalc_rate(struct clk_hw *hw,
 	return parent_rate * div + (unsigned long)temp64;
 }
 
-static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
-				    unsigned long *prate)
+static unsigned long clk_pllv3_av_round_rate(struct clk_hw *hw,
+					     unsigned long rate,
+					     unsigned long *prate)
 {
 	unsigned long parent_rate = *prate;
 	unsigned long min_rate = parent_rate * 27;
@@ -359,8 +361,9 @@ static unsigned long clk_pllv3_vf610_recalc_rate(struct clk_hw *hw,
 	return clk_pllv3_vf610_mf_to_rate(parent_rate, mf);
 }
 
-static long clk_pllv3_vf610_round_rate(struct clk_hw *hw, unsigned long rate,
-				    unsigned long *prate)
+static unsigned long clk_pllv3_vf610_round_rate(struct clk_hw *hw,
+						unsigned long rate,
+						unsigned long *prate)
 {
 	struct clk_pllv3_vf610_mf mf = clk_pllv3_vf610_rate_to_mf(*prate, rate);
 

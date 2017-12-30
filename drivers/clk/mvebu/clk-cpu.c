@@ -58,8 +58,9 @@ static unsigned long clk_cpu_recalc_rate(struct clk_hw *hwclk,
 	return parent_rate / div;
 }
 
-static long clk_cpu_round_rate(struct clk_hw *hwclk, unsigned long rate,
-			       unsigned long *parent_rate)
+static unsigned long clk_cpu_round_rate(struct clk_hw *hwclk,
+					unsigned long rate,
+					unsigned long *parent_rate)
 {
 	/* Valid ratio are 1:1, 1:2 and 1:3 */
 	u32 div;

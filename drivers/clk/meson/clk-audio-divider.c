@@ -73,9 +73,9 @@ static unsigned long audio_divider_recalc_rate(struct clk_hw *hw,
 	return DIV_ROUND_UP_ULL((u64)parent_rate, divider);
 }
 
-static long audio_divider_round_rate(struct clk_hw *hw,
-				     unsigned long rate,
-				     unsigned long *parent_rate)
+static unsigned long audio_divider_round_rate(struct clk_hw *hw,
+					      unsigned long rate,
+					      unsigned long *parent_rate)
 {
 	struct meson_clk_audio_divider *adiv =
 		to_meson_clk_audio_divider(hw);

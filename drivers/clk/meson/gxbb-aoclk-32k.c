@@ -120,8 +120,9 @@ static const struct cec_32k_freq_table *find_cec_32k_freq(unsigned long rate,
 	return NULL;
 }
 
-static long aoclk_cec_32k_round_rate(struct clk_hw *hw, unsigned long rate,
-				     unsigned long *prate)
+static unsigned long aoclk_cec_32k_round_rate(struct clk_hw *hw,
+					      unsigned long rate,
+					      unsigned long *prate)
 {
 	const struct cec_32k_freq_table *freq = find_cec_32k_freq(rate,
 								  *prate);

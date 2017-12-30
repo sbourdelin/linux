@@ -16,8 +16,8 @@ unsigned long omap2_table_mpu_recalc(struct clk_hw *clk,
 				     unsigned long parent_rate);
 int omap2_select_table_rate(struct clk_hw *hw, unsigned long rate,
 			    unsigned long parent_rate);
-long omap2_round_to_table_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *parent_rate);
+unsigned long omap2_round_to_table_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *parent_rate);
 unsigned long omap2xxx_sys_clk_recalc(struct clk_hw *clk,
 				      unsigned long parent_rate);
 unsigned long omap2_osc_clk_recalc(struct clk_hw *clk,

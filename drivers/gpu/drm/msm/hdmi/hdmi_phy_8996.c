@@ -636,9 +636,9 @@ static int hdmi_8996_pll_prepare(struct clk_hw *hw)
 	return 0;
 }
 
-static long hdmi_8996_pll_round_rate(struct clk_hw *hw,
-				     unsigned long rate,
-				     unsigned long *parent_rate)
+static unsigned long hdmi_8996_pll_round_rate(struct clk_hw *hw,
+					      unsigned long rate,
+					      unsigned long *parent_rate)
 {
 	if (rate < HDMI_PCLK_MIN_FREQ)
 		return HDMI_PCLK_MIN_FREQ;

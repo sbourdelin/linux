@@ -46,8 +46,8 @@ static unsigned long clk_div_recalc_rate(struct clk_hw *hw,
 	return div->ops->recalc_rate(&div->divider.hw, parent_rate);
 }
 
-static long clk_div_round_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *prate)
+static unsigned long clk_div_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *prate)
 {
 	struct clk_div *div = to_clk_div(hw);
 

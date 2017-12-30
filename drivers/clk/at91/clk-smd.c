@@ -43,8 +43,9 @@ static unsigned long at91sam9x5_clk_smd_recalc_rate(struct clk_hw *hw,
 	return parent_rate / (smddiv + 1);
 }
 
-static long at91sam9x5_clk_smd_round_rate(struct clk_hw *hw, unsigned long rate,
-					  unsigned long *parent_rate)
+static unsigned long at91sam9x5_clk_smd_round_rate(struct clk_hw *hw,
+						   unsigned long rate,
+						   unsigned long *parent_rate)
 {
 	unsigned long div;
 	unsigned long bestrate;

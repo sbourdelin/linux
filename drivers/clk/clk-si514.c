@@ -209,8 +209,8 @@ static unsigned long si514_recalc_rate(struct clk_hw *hw,
 	return si514_calc_rate(&settings);
 }
 
-static long si514_round_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *parent_rate)
+static unsigned long si514_round_rate(struct clk_hw *hw, unsigned long rate,
+				      unsigned long *parent_rate)
 {
 	struct clk_si514_muldiv settings;
 	int err;

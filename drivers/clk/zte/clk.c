@@ -78,8 +78,8 @@ static unsigned long zx_pll_recalc_rate(struct clk_hw *hw,
 	return zx_pll->lookup_table[idx].rate;
 }
 
-static long zx_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-			      unsigned long *prate)
+static unsigned long zx_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+				       unsigned long *prate)
 {
 	struct clk_zx_pll *zx_pll = to_clk_zx_pll(hw);
 	int idx;
@@ -241,8 +241,8 @@ static unsigned long zx_audio_recalc_rate(struct clk_hw *hw,
 	return calc_rate(reg, parent_rate);
 }
 
-static long zx_audio_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long zx_audio_round_rate(struct clk_hw *hw, unsigned long rate,
+					 unsigned long *prate)
 {
 	u32 reg;
 
@@ -404,8 +404,9 @@ static unsigned long zx_audio_div_recalc_rate(struct clk_hw *hw,
 	return audio_calc_rate(zx_audio_div, reg_frac, reg_int, parent_rate);
 }
 
-static long zx_audio_div_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long zx_audio_div_round_rate(struct clk_hw *hw,
+					     unsigned long rate,
+					     unsigned long *prate)
 {
 	struct clk_zx_audio_divider *zx_audio_div = to_clk_zx_audio_div(hw);
 	struct zx_clk_audio_div_table divt;

@@ -178,8 +178,8 @@ static int clk_pllv2_set_rate(struct clk_hw *hw, unsigned long rate,
 	return 0;
 }
 
-static long clk_pllv2_round_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *prate)
+static unsigned long clk_pllv2_round_rate(struct clk_hw *hw, unsigned long rate,
+					  unsigned long *prate)
 {
 	u32 dp_op, dp_mfd, dp_mfn;
 

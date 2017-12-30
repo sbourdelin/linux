@@ -162,8 +162,8 @@ static unsigned long pbclk_recalc_rate(struct clk_hw *hw,
 	return parent_rate / pbclk_read_pbdiv(pb);
 }
 
-static long pbclk_round_rate(struct clk_hw *hw, unsigned long rate,
-			     unsigned long *parent_rate)
+static unsigned long pbclk_round_rate(struct clk_hw *hw, unsigned long rate,
+				      unsigned long *parent_rate)
 {
 	return calc_best_divided_rate(rate, *parent_rate,
 				      PB_DIV_MAX, PB_DIV_MIN);
@@ -377,8 +377,8 @@ static unsigned long roclk_recalc_rate(struct clk_hw *hw,
 	return roclk_calc_rate(parent_rate, rodiv, rotrim);
 }
 
-static long roclk_round_rate(struct clk_hw *hw, unsigned long rate,
-			     unsigned long *parent_rate)
+static unsigned long roclk_round_rate(struct clk_hw *hw, unsigned long rate,
+				      unsigned long *parent_rate)
 {
 	u32 rotrim, rodiv;
 
@@ -670,8 +670,8 @@ static unsigned long spll_clk_recalc_rate(struct clk_hw *hw,
 	return rate64;
 }
 
-static long spll_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *parent_rate)
+static unsigned long spll_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+					 unsigned long *parent_rate)
 {
 	struct pic32_sys_pll *pll = clkhw_to_spll(hw);
 

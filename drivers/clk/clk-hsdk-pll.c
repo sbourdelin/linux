@@ -192,8 +192,8 @@ static unsigned long hsdk_pll_recalc_rate(struct clk_hw *hw,
 	return rate;
 }
 
-static long hsdk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long hsdk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+					 unsigned long *prate)
 {
 	int i;
 	unsigned long best_rate;

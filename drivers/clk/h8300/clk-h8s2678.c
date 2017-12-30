@@ -33,8 +33,8 @@ static unsigned long pll_recalc_rate(struct clk_hw *hw,
 	return parent_rate * mul;
 }
 
-static long pll_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long pll_round_rate(struct clk_hw *hw, unsigned long rate,
+				    unsigned long *prate)
 {
 	int i, m = -1;
 	long offset[3];

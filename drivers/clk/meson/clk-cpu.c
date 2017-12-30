@@ -54,8 +54,9 @@
 #define to_meson_clk_cpu_hw(_hw) container_of(_hw, struct meson_clk_cpu, hw)
 #define to_meson_clk_cpu_nb(_nb) container_of(_nb, struct meson_clk_cpu, clk_nb)
 
-static long meson_clk_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
-				     unsigned long *prate)
+static unsigned long meson_clk_cpu_round_rate(struct clk_hw *hw,
+					      unsigned long rate,
+					      unsigned long *prate)
 {
 	struct meson_clk_cpu *clk_cpu = to_meson_clk_cpu_hw(hw);
 

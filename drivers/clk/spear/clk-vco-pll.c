@@ -81,8 +81,9 @@ static unsigned long pll_calc_rate(struct pll_rate_tbl *rtbl,
 	return rate * 10000;
 }
 
-static long clk_pll_round_rate_index(struct clk_hw *hw, unsigned long drate,
-				unsigned long *prate, int *index)
+static unsigned long clk_pll_round_rate_index(struct clk_hw *hw,
+					      unsigned long drate,
+					      unsigned long *prate, int *index)
 {
 	struct clk_pll *pll = to_clk_pll(hw);
 	unsigned long prev_rate, vco_prev_rate, rate = 0;
@@ -113,8 +114,8 @@ static long clk_pll_round_rate_index(struct clk_hw *hw, unsigned long drate,
 	return rate;
 }
 
-static long clk_pll_round_rate(struct clk_hw *hw, unsigned long drate,
-				unsigned long *prate)
+static unsigned long clk_pll_round_rate(struct clk_hw *hw, unsigned long drate,
+					unsigned long *prate)
 {
 	int unused;
 
@@ -179,8 +180,8 @@ static inline unsigned long vco_calc_rate(struct clk_hw *hw,
 	return pll_calc_rate(vco->rtbl, prate, index, NULL);
 }
 
-static long clk_vco_round_rate(struct clk_hw *hw, unsigned long drate,
-		unsigned long *prate)
+static unsigned long clk_vco_round_rate(struct clk_hw *hw, unsigned long drate,
+					unsigned long *prate)
 {
 	struct clk_vco *vco = to_clk_vco(hw);
 	int unused;

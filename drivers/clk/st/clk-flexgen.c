@@ -111,8 +111,8 @@ clk_best_div(unsigned long parent_rate, unsigned long rate)
 	return parent_rate / rate + ((rate > (2*(parent_rate % rate))) ? 0 : 1);
 }
 
-static long flexgen_round_rate(struct clk_hw *hw, unsigned long rate,
-				   unsigned long *prate)
+static unsigned long flexgen_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *prate)
 {
 	unsigned long div;
 

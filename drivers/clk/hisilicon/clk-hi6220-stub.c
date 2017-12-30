@@ -165,8 +165,9 @@ static int hi6220_stub_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	return ret;
 }
 
-static long hi6220_stub_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *parent_rate)
+static unsigned long hi6220_stub_clk_round_rate(struct clk_hw *hw,
+						unsigned long rate,
+						unsigned long *parent_rate)
 {
 	struct hi6220_stub_clk *stub_clk = to_stub_clk(hw);
 	unsigned long new_rate = rate / 1000;  /* kHz */

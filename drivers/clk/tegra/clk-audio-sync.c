@@ -28,8 +28,9 @@ static unsigned long clk_sync_source_recalc_rate(struct clk_hw *hw,
 	return sync->rate;
 }
 
-static long clk_sync_source_round_rate(struct clk_hw *hw, unsigned long rate,
-				       unsigned long *prate)
+static unsigned long clk_sync_source_round_rate(struct clk_hw *hw,
+						unsigned long rate,
+						unsigned long *prate)
 {
 	struct tegra_clk_sync_source *sync = to_clk_sync_source(hw);
 

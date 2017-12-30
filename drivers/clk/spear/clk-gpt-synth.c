@@ -42,8 +42,8 @@ static unsigned long gpt_calc_rate(struct clk_hw *hw, unsigned long prate,
 	return prate;
 }
 
-static long clk_gpt_round_rate(struct clk_hw *hw, unsigned long drate,
-		unsigned long *prate)
+static unsigned long clk_gpt_round_rate(struct clk_hw *hw, unsigned long drate,
+					unsigned long *prate)
 {
 	struct clk_gpt *gpt = to_clk_gpt(hw);
 	int unused;

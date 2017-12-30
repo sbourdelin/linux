@@ -175,8 +175,9 @@ static unsigned int cpg_sd_clock_calc_div(struct sd_clock *clock,
 	return clamp_t(unsigned int, div, clock->div_min, clock->div_max);
 }
 
-static long cpg_sd_clock_round_rate(struct clk_hw *hw, unsigned long rate,
-				      unsigned long *parent_rate)
+static unsigned long cpg_sd_clock_round_rate(struct clk_hw *hw,
+					     unsigned long rate,
+					     unsigned long *parent_rate)
 {
 	struct sd_clock *clock = to_sd_clock(hw);
 	unsigned int div = cpg_sd_clock_calc_div(clock, rate, *parent_rate);

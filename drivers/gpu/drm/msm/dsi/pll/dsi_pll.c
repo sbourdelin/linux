@@ -56,8 +56,9 @@ static void dsi_pll_disable(struct msm_dsi_pll *pll)
 /*
  * DSI PLL Helper functions
  */
-long msm_dsi_pll_helper_clk_round_rate(struct clk_hw *hw,
-		unsigned long rate, unsigned long *parent_rate)
+unsigned long msm_dsi_pll_helper_clk_round_rate(struct clk_hw *hw,
+						unsigned long rate,
+						unsigned long *parent_rate)
 {
 	struct msm_dsi_pll *pll = hw_clk_to_pll(hw);
 

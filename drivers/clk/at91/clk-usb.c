@@ -273,8 +273,9 @@ static unsigned long at91rm9200_clk_usb_recalc_rate(struct clk_hw *hw,
 	return 0;
 }
 
-static long at91rm9200_clk_usb_round_rate(struct clk_hw *hw, unsigned long rate,
-					  unsigned long *parent_rate)
+static unsigned long at91rm9200_clk_usb_round_rate(struct clk_hw *hw,
+						   unsigned long rate,
+						   unsigned long *parent_rate)
 {
 	struct at91rm9200_clk_usb *usb = to_at91rm9200_clk_usb(hw);
 	struct clk_hw *parent = clk_hw_get_parent(hw);

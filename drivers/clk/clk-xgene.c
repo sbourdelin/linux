@@ -286,8 +286,9 @@ static unsigned long xgene_clk_pmd_recalc_rate(struct clk_hw *hw,
 	return ret;
 }
 
-static long xgene_clk_pmd_round_rate(struct clk_hw *hw, unsigned long rate,
-				     unsigned long *parent_rate)
+static unsigned long xgene_clk_pmd_round_rate(struct clk_hw *hw,
+					      unsigned long rate,
+					      unsigned long *parent_rate)
 {
 	struct xgene_clk_pmd *fd = to_xgene_clk_pmd(hw);
 	u64 ret, scale;
@@ -609,8 +610,8 @@ static int xgene_clk_set_rate(struct clk_hw *hw, unsigned long rate,
 	return parent_rate / divider_save;
 }
 
-static long xgene_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long xgene_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+					  unsigned long *prate)
 {
 	struct xgene_clk *pclk = to_xgene_clk(hw);
 	unsigned long parent_rate = *prate;

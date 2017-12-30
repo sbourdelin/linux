@@ -35,8 +35,8 @@ static unsigned long clk_cpu_recalc_rate(struct clk_hw *hw,
 	return clk_get_rate(cpu->div);
 }
 
-static long clk_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *prate)
+static unsigned long clk_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *prate)
 {
 	struct clk_cpu *cpu = to_clk_cpu(hw);
 

@@ -629,7 +629,7 @@ syscon_clk_recalc_rate(struct clk_hw *hw,
 	}
 }
 
-static long
+static unsigned long
 syscon_clk_round_rate(struct clk_hw *hw, unsigned long rate,
 		      unsigned long *prate)
 {
@@ -1039,7 +1039,7 @@ mclk_clk_recalc_rate(struct clk_hw *hw,
 	return parent_rate;
 }
 
-static long
+static unsigned long
 mclk_clk_round_rate(struct clk_hw *hw, unsigned long rate,
 		    unsigned long *prate)
 {

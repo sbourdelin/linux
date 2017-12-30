@@ -126,8 +126,8 @@ const struct clk_ops tegra_clk_super_mux_ops = {
 	.set_parent = clk_super_set_parent,
 };
 
-static long clk_super_round_rate(struct clk_hw *hw, unsigned long rate,
-				 unsigned long *parent_rate)
+static unsigned long clk_super_round_rate(struct clk_hw *hw, unsigned long rate,
+					  unsigned long *parent_rate)
 {
 	struct tegra_clk_super_mux *super = to_clk_super_mux(hw);
 	struct clk_hw *div_hw = &super->frac_div.hw;

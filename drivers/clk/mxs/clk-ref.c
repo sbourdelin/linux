@@ -63,8 +63,8 @@ static unsigned long clk_ref_recalc_rate(struct clk_hw *hw,
 	return tmp;
 }
 
-static long clk_ref_round_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *prate)
+static unsigned long clk_ref_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *prate)
 {
 	unsigned long parent_rate = *prate;
 	u64 tmp = parent_rate;

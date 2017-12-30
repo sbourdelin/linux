@@ -252,8 +252,9 @@ static unsigned int get_vco_mul_factor(unsigned long byte_clk_rate)
 		return 8;
 }
 
-static long clk_bytediv_round_rate(struct clk_hw *hw, unsigned long rate,
-				   unsigned long *prate)
+static unsigned long clk_bytediv_round_rate(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long *prate)
 {
 	unsigned long best_parent;
 	unsigned int factor;

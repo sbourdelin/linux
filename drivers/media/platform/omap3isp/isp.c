@@ -243,8 +243,8 @@ static u32 isp_xclk_calc_divider(unsigned long *rate, unsigned long parent_rate)
 	return divider;
 }
 
-static long isp_xclk_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *parent_rate)
+static unsigned long isp_xclk_round_rate(struct clk_hw *hw, unsigned long rate,
+					 unsigned long *parent_rate)
 {
 	isp_xclk_calc_divider(&rate, *parent_rate);
 	return rate;

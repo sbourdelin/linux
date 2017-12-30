@@ -138,8 +138,9 @@ static unsigned long wm831x_fll_recalc_rate(struct clk_hw *hw,
 	return 0;
 }
 
-static long wm831x_fll_round_rate(struct clk_hw *hw, unsigned long rate,
-				  unsigned long *unused)
+static unsigned long wm831x_fll_round_rate(struct clk_hw *hw,
+					   unsigned long rate,
+					   unsigned long *unused)
 {
 	int best = 0;
 	int i;

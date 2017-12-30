@@ -431,8 +431,8 @@ static unsigned long iproc_pll_recalc_rate(struct clk_hw *hw,
 	return clk->rate;
 }
 
-static long iproc_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-				 unsigned long *parent_rate)
+static unsigned long iproc_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+					  unsigned long *parent_rate)
 {
 	unsigned i;
 	struct iproc_clk *clk = to_iproc_clk(hw);
@@ -535,8 +535,8 @@ static unsigned long iproc_clk_recalc_rate(struct clk_hw *hw,
 	return clk->rate;
 }
 
-static long iproc_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *parent_rate)
+static unsigned long iproc_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+					  unsigned long *parent_rate)
 {
 	unsigned int div;
 

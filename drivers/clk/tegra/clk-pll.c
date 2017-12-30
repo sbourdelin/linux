@@ -824,8 +824,8 @@ static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 	return ret;
 }
 
-static long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-			unsigned long *prate)
+static unsigned long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *prate)
 {
 	struct tegra_clk_pll *pll = to_clk_pll(hw);
 	struct tegra_clk_pll_freq_table cfg;
@@ -1307,8 +1307,9 @@ static int clk_pllxc_set_rate(struct clk_hw *hw, unsigned long rate,
 	return ret;
 }
 
-static long clk_pll_ramp_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long clk_pll_ramp_round_rate(struct clk_hw *hw,
+					     unsigned long rate,
+					     unsigned long *prate)
 {
 	struct tegra_clk_pll *pll = to_clk_pll(hw);
 	struct tegra_clk_pll_freq_table cfg;
@@ -1549,8 +1550,8 @@ static unsigned long clk_pllre_recalc_rate(struct clk_hw *hw,
 	return rate;
 }
 
-static long clk_pllre_round_rate(struct clk_hw *hw, unsigned long rate,
-				 unsigned long *prate)
+static unsigned long clk_pllre_round_rate(struct clk_hw *hw, unsigned long rate,
+					  unsigned long *prate)
 {
 	struct tegra_clk_pll *pll = to_clk_pll(hw);
 

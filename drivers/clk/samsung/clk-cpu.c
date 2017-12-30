@@ -104,8 +104,9 @@ static void wait_until_mux_stable(void __iomem *mux_reg, u32 mux_pos,
 }
 
 /* common round rate callback useable for all types of CPU clocks */
-static long exynos_cpuclk_round_rate(struct clk_hw *hw,
-			unsigned long drate, unsigned long *prate)
+static unsigned long exynos_cpuclk_round_rate(struct clk_hw *hw,
+					      unsigned long drate,
+					      unsigned long *prate)
 {
 	struct clk_hw *parent = clk_hw_get_parent(hw);
 	*prate = clk_hw_round_rate(parent, drate);

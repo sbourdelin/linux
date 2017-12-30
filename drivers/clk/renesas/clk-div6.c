@@ -105,8 +105,9 @@ static unsigned int cpg_div6_clock_calc_div(unsigned long rate,
 	return clamp_t(unsigned int, div, 1, 64);
 }
 
-static long cpg_div6_clock_round_rate(struct clk_hw *hw, unsigned long rate,
-				      unsigned long *parent_rate)
+static unsigned long cpg_div6_clock_round_rate(struct clk_hw *hw,
+					       unsigned long rate,
+					       unsigned long *parent_rate)
 {
 	unsigned int div = cpg_div6_clock_calc_div(rate, *parent_rate);
 

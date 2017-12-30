@@ -67,8 +67,8 @@ static unsigned long clk_pfd_recalc_rate(struct clk_hw *hw,
 	return tmp;
 }
 
-static long clk_pfd_round_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *prate)
+static unsigned long clk_pfd_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *prate)
 {
 	u64 tmp = *prate;
 	u8 frac;

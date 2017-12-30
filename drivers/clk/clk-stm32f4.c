@@ -354,8 +354,9 @@ static unsigned long clk_apb_mul_recalc_rate(struct clk_hw *hw,
 	return parent_rate;
 }
 
-static long clk_apb_mul_round_rate(struct clk_hw *hw, unsigned long rate,
-				   unsigned long *prate)
+static unsigned long clk_apb_mul_round_rate(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long *prate)
 {
 	struct clk_apb_mul *am = to_clk_apb_mul(hw);
 	unsigned long mult = 1;
@@ -570,8 +571,9 @@ static unsigned long stm32f4_pll_recalc(struct clk_hw *hw,
 	return parent_rate * n;
 }
 
-static long stm32f4_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *prate)
+static unsigned long stm32f4_pll_round_rate(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long *prate)
 {
 	struct clk_gate *gate = to_clk_gate(hw);
 	struct stm32f4_pll *pll = to_stm32f4_pll(gate);
@@ -636,8 +638,9 @@ static unsigned long stm32f4_pll_div_recalc_rate(struct clk_hw *hw,
 	return clk_divider_ops.recalc_rate(hw, parent_rate);
 }
 
-static long stm32f4_pll_div_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long stm32f4_pll_div_round_rate(struct clk_hw *hw,
+						unsigned long rate,
+						unsigned long *prate)
 {
 	return clk_divider_ops.round_rate(hw, rate, prate);
 }

@@ -127,8 +127,9 @@ struct clk *clk_register_vco_pll(const char *vco_name, const char *pll_name,
 		spinlock_t *lock, struct clk **pll_clk,
 		struct clk **vco_gate_clk);
 
-long clk_round_rate_index(struct clk_hw *hw, unsigned long drate,
-		unsigned long parent_rate, clk_calc_rate calc_rate, u8 rtbl_cnt,
-		int *index);
+unsigned long clk_round_rate_index(struct clk_hw *hw, unsigned long drate,
+				   unsigned long parent_rate,
+				   clk_calc_rate calc_rate, u8 rtbl_cnt,
+				   int *index);
 
 #endif /* __SPEAR_CLK_H */

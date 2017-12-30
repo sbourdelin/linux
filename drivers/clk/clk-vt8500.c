@@ -137,8 +137,9 @@ static unsigned long vt8500_dclk_recalc_rate(struct clk_hw *hw,
 	return parent_rate / div;
 }
 
-static long vt8500_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long vt8500_dclk_round_rate(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long *prate)
 {
 	struct clk_device *cdev = to_clk_device(hw);
 	u32 divisor;
@@ -603,8 +604,8 @@ static int vtwm_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 	return 0;
 }
 
-static long vtwm_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long vtwm_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+					 unsigned long *prate)
 {
 	struct clk_pll *pll = to_clk_pll(hw);
 	u32 filter, mul, div1, div2;

@@ -373,8 +373,9 @@ static unsigned long lpc18xx_pll0_recalc_rate(struct clk_hw *hw,
 	return 0;
 }
 
-static long lpc18xx_pll0_round_rate(struct clk_hw *hw, unsigned long rate,
-				    unsigned long *prate)
+static unsigned long lpc18xx_pll0_round_rate(struct clk_hw *hw,
+					     unsigned long rate,
+					     unsigned long *prate)
 {
 	unsigned long m;
 

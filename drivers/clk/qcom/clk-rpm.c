@@ -354,8 +354,8 @@ out:
 	return ret;
 }
 
-static long clk_rpm_round_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *parent_rate)
+static unsigned long clk_rpm_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *parent_rate)
 {
 	/*
 	 * RPM handles rate rounding and we don't have a way to

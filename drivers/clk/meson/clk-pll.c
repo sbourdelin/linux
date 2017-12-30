@@ -87,8 +87,9 @@ static unsigned long meson_clk_pll_recalc_rate(struct clk_hw *hw,
 	return rate_mhz * 1000000;
 }
 
-static long meson_clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-				     unsigned long *parent_rate)
+static unsigned long meson_clk_pll_round_rate(struct clk_hw *hw,
+					      unsigned long rate,
+					      unsigned long *parent_rate)
 {
 	struct meson_clk_pll *pll = to_meson_clk_pll(hw);
 	const struct pll_rate_table *rate_table = pll->rate_table;

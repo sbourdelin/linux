@@ -146,8 +146,9 @@ static unsigned long ac100_clkout_recalc_rate(struct clk_hw *hw,
 				   CLK_DIVIDER_POWER_OF_TWO);
 }
 
-static long ac100_clkout_round_rate(struct clk_hw *hw, unsigned long rate,
-				    unsigned long prate)
+static unsigned long ac100_clkout_round_rate(struct clk_hw *hw,
+					     unsigned long rate,
+					     unsigned long prate)
 {
 	unsigned long best_rate = 0, tmp_rate, tmp_prate;
 	int i;

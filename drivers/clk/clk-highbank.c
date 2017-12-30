@@ -143,8 +143,9 @@ static void clk_pll_calc(unsigned long rate, unsigned long ref_freq,
 	*pdivf = divf;
 }
 
-static long clk_pll_round_rate(struct clk_hw *hwclk, unsigned long rate,
-			       unsigned long *parent_rate)
+static unsigned long clk_pll_round_rate(struct clk_hw *hwclk,
+					unsigned long rate,
+					unsigned long *parent_rate)
 {
 	u32 divq, divf;
 	unsigned long ref_freq = *parent_rate;
@@ -240,8 +241,9 @@ static unsigned long clk_periclk_recalc_rate(struct clk_hw *hwclk,
 	return parent_rate / div;
 }
 
-static long clk_periclk_round_rate(struct clk_hw *hwclk, unsigned long rate,
-				   unsigned long *parent_rate)
+static unsigned long clk_periclk_round_rate(struct clk_hw *hwclk,
+					    unsigned long rate,
+					    unsigned long *parent_rate)
 {
 	u32 div;
 

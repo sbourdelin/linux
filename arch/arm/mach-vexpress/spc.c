@@ -505,8 +505,8 @@ static unsigned long spc_recalc_rate(struct clk_hw *hw,
 	return freq * 1000;
 }
 
-static long spc_round_rate(struct clk_hw *hw, unsigned long drate,
-		unsigned long *parent_rate)
+static unsigned long spc_round_rate(struct clk_hw *hw, unsigned long drate,
+				    unsigned long *parent_rate)
 {
 	struct clk_spc *spc = to_clk_spc(hw);
 

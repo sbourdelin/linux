@@ -425,8 +425,9 @@ static unsigned long pcf8563_clkout_recalc_rate(struct clk_hw *hw,
 	return clkout_rates[buf];
 }
 
-static long pcf8563_clkout_round_rate(struct clk_hw *hw, unsigned long rate,
-				      unsigned long *prate)
+static unsigned long pcf8563_clkout_round_rate(struct clk_hw *hw,
+					       unsigned long rate,
+					       unsigned long *prate)
 {
 	int i;
 

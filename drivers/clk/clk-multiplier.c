@@ -98,8 +98,9 @@ static unsigned long __bestmult(struct clk_hw *hw, unsigned long rate,
 	return bestmult;
 }
 
-static long clk_multiplier_round_rate(struct clk_hw *hw, unsigned long rate,
-				  unsigned long *parent_rate)
+static unsigned long clk_multiplier_round_rate(struct clk_hw *hw,
+					       unsigned long rate,
+					       unsigned long *parent_rate)
 {
 	struct clk_multiplier *mult = to_clk_multiplier(hw);
 	unsigned long factor = __bestmult(hw, rate, parent_rate,

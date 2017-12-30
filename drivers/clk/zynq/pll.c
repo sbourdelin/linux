@@ -60,8 +60,8 @@ struct zynq_pll {
  * @prate:	Clock frequency of parent clock
  * Returns frequency closest to @rate the hardware can generate.
  */
-static long zynq_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *prate)
+static unsigned long zynq_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+					 unsigned long *prate)
 {
 	u32 fbdiv;
 

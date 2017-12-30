@@ -50,8 +50,8 @@ static unsigned long clk_frac_recalc_rate(struct clk_hw *hw,
 	return tmp_rate >> frac->width;
 }
 
-static long clk_frac_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *prate)
+static unsigned long clk_frac_round_rate(struct clk_hw *hw, unsigned long rate,
+					 unsigned long *prate)
 {
 	struct clk_frac *frac = to_clk_frac(hw);
 	unsigned long parent_rate = *prate;

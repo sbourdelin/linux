@@ -108,8 +108,8 @@ static unsigned long dove_recalc_rate(struct clk_hw *hw, unsigned long parent)
 	return rate;
 }
 
-static long dove_round_rate(struct clk_hw *hw, unsigned long rate,
-			    unsigned long *parent)
+static unsigned long dove_round_rate(struct clk_hw *hw, unsigned long rate,
+				     unsigned long *parent)
 {
 	struct dove_clk *dc = to_dove_clk(hw);
 	unsigned long parent_rate = *parent;

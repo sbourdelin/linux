@@ -273,8 +273,9 @@ static int clk_audio_pll_frac_determine_rate(struct clk_hw *hw,
 	return 0;
 }
 
-static long clk_audio_pll_pad_round_rate(struct clk_hw *hw, unsigned long rate,
-					 unsigned long *parent_rate)
+static unsigned long clk_audio_pll_pad_round_rate(struct clk_hw *hw,
+						  unsigned long rate,
+						  unsigned long *parent_rate)
 {
 	struct clk_hw *pclk = clk_hw_get_parent(hw);
 	long best_rate = -EINVAL;
@@ -324,8 +325,9 @@ static long clk_audio_pll_pad_round_rate(struct clk_hw *hw, unsigned long rate,
 	return best_rate;
 }
 
-static long clk_audio_pll_pmc_round_rate(struct clk_hw *hw, unsigned long rate,
-					 unsigned long *parent_rate)
+static unsigned long clk_audio_pll_pmc_round_rate(struct clk_hw *hw,
+						  unsigned long rate,
+						  unsigned long *parent_rate)
 {
 	struct clk_hw *pclk = clk_hw_get_parent(hw);
 	long best_rate = -EINVAL;

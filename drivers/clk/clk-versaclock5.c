@@ -344,8 +344,8 @@ static unsigned long vc5_pfd_recalc_rate(struct clk_hw *hw,
 		return parent_rate / VC5_REF_DIVIDER_REF_DIV(div);
 }
 
-static long vc5_pfd_round_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *parent_rate)
+static unsigned long vc5_pfd_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *parent_rate)
 {
 	unsigned long idiv;
 
@@ -422,8 +422,8 @@ static unsigned long vc5_pll_recalc_rate(struct clk_hw *hw,
 	return (parent_rate * div_int) + ((parent_rate * div_frc) >> 24);
 }
 
-static long vc5_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *parent_rate)
+static unsigned long vc5_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *parent_rate)
 {
 	struct vc5_hw_data *hwdata = container_of(hw, struct vc5_hw_data, hw);
 	u32 div_int;
@@ -500,8 +500,8 @@ static unsigned long vc5_fod_recalc_rate(struct clk_hw *hw,
 	return div64_u64((u64)f_in << 24ULL, ((u64)div_int << 24ULL) + div_frc);
 }
 
-static long vc5_fod_round_rate(struct clk_hw *hw, unsigned long rate,
-			       unsigned long *parent_rate)
+static unsigned long vc5_fod_round_rate(struct clk_hw *hw, unsigned long rate,
+					unsigned long *parent_rate)
 {
 	struct vc5_hw_data *hwdata = container_of(hw, struct vc5_hw_data, hw);
 	/* VCO frequency is divided by two before entering FOD */

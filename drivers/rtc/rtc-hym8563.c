@@ -313,8 +313,9 @@ static unsigned long hym8563_clkout_recalc_rate(struct clk_hw *hw,
 	return clkout_rates[ret];
 }
 
-static long hym8563_clkout_round_rate(struct clk_hw *hw, unsigned long rate,
-				      unsigned long *prate)
+static unsigned long hym8563_clkout_round_rate(struct clk_hw *hw,
+					       unsigned long rate,
+					       unsigned long *prate)
 {
 	int i;
 

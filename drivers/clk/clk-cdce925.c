@@ -142,8 +142,9 @@ static void cdce925_pll_find_rate(unsigned long rate,
 	}
 }
 
-static long cdce925_pll_round_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *parent_rate)
+static unsigned long cdce925_pll_round_rate(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long *parent_rate)
 {
 	u16 n, m;
 
@@ -434,8 +435,9 @@ static unsigned long cdce925_clk_best_parent_rate(
 	return rate * pdiv_best;
 }
 
-static long cdce925_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *parent_rate)
+static unsigned long cdce925_clk_round_rate(struct clk_hw *hw,
+					    unsigned long rate,
+					    unsigned long *parent_rate)
 {
 	unsigned long l_parent_rate = *parent_rate;
 	u16 divider = cdce925_calc_divider(rate, l_parent_rate);
@@ -487,8 +489,9 @@ static u16 cdce925_y1_calc_divider(unsigned long rate,
 	return (u16)divider;
 }
 
-static long cdce925_clk_y1_round_rate(struct clk_hw *hw, unsigned long rate,
-		unsigned long *parent_rate)
+static unsigned long cdce925_clk_y1_round_rate(struct clk_hw *hw,
+					       unsigned long rate,
+					       unsigned long *parent_rate)
 {
 	unsigned long l_parent_rate = *parent_rate;
 	u16 divider = cdce925_y1_calc_divider(rate, l_parent_rate);

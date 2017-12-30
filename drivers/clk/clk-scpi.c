@@ -44,8 +44,8 @@ static unsigned long scpi_clk_recalc_rate(struct clk_hw *hw,
 	return clk->scpi_ops->clk_get_val(clk->id);
 }
 
-static long scpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *parent_rate)
+static unsigned long scpi_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+					 unsigned long *parent_rate)
 {
 	/*
 	 * We can't figure out what rate it will be, so just return the
@@ -104,8 +104,8 @@ static unsigned long scpi_dvfs_recalc_rate(struct clk_hw *hw,
 	return opp->freq;
 }
 
-static long scpi_dvfs_round_rate(struct clk_hw *hw, unsigned long rate,
-				 unsigned long *parent_rate)
+static unsigned long scpi_dvfs_round_rate(struct clk_hw *hw, unsigned long rate,
+					  unsigned long *parent_rate)
 {
 	struct scpi_clk *clk = to_scpi_clk(hw);
 

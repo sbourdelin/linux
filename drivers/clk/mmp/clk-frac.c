@@ -24,8 +24,9 @@
 
 #define to_clk_factor(hw) container_of(hw, struct mmp_clk_factor, hw)
 
-static long clk_factor_round_rate(struct clk_hw *hw, unsigned long drate,
-		unsigned long *prate)
+static unsigned long clk_factor_round_rate(struct clk_hw *hw,
+					   unsigned long drate,
+					   unsigned long *prate)
 {
 	struct mmp_clk_factor *factor = to_clk_factor(hw);
 	unsigned long rate = 0, prev_rate;

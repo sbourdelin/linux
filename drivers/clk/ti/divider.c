@@ -227,8 +227,9 @@ static int ti_clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
 	return bestdiv;
 }
 
-static long ti_clk_divider_round_rate(struct clk_hw *hw, unsigned long rate,
-				      unsigned long *prate)
+static unsigned long ti_clk_divider_round_rate(struct clk_hw *hw,
+					       unsigned long rate,
+					       unsigned long *prate)
 {
 	int div;
 	div = ti_clk_divider_bestdiv(hw, rate, prate);

@@ -51,8 +51,9 @@ static unsigned long clk_busy_divider_recalc_rate(struct clk_hw *hw,
 	return busy->div_ops->recalc_rate(&busy->div.hw, parent_rate);
 }
 
-static long clk_busy_divider_round_rate(struct clk_hw *hw, unsigned long rate,
-					unsigned long *prate)
+static unsigned long clk_busy_divider_round_rate(struct clk_hw *hw,
+						 unsigned long rate,
+						 unsigned long *prate)
 {
 	struct clk_busy_divider *busy = to_clk_busy_divider(hw);
 

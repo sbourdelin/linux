@@ -300,8 +300,8 @@ static unsigned long cs2000_recalc_rate(struct clk_hw *hw,
 	return cs2000_ratio_to_rate(ratio, parent_rate);
 }
 
-static long cs2000_round_rate(struct clk_hw *hw, unsigned long rate,
-			      unsigned long *parent_rate)
+static unsigned long cs2000_round_rate(struct clk_hw *hw, unsigned long rate,
+				       unsigned long *parent_rate)
 {
 	u32 ratio;
 

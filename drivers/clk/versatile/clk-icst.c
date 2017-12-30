@@ -248,8 +248,8 @@ static unsigned long icst_recalc_rate(struct clk_hw *hw,
 	return icst->rate;
 }
 
-static long icst_round_rate(struct clk_hw *hw, unsigned long rate,
-			    unsigned long *prate)
+static unsigned long icst_round_rate(struct clk_hw *hw, unsigned long rate,
+				     unsigned long *prate)
 {
 	struct clk_icst *icst = to_icst(hw);
 	struct icst_vco vco;

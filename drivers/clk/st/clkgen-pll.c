@@ -351,8 +351,9 @@ static unsigned long recalc_stm_pll3200c32(struct clk_hw *hw,
 	return rate;
 }
 
-static long round_rate_stm_pll3200c32(struct clk_hw *hw, unsigned long rate,
-		unsigned long *prate)
+static unsigned long round_rate_stm_pll3200c32(struct clk_hw *hw,
+					       unsigned long rate,
+					       unsigned long *prate)
 {
 	struct stm_pll params;
 
@@ -505,8 +506,9 @@ static unsigned long recalc_stm_pll4600c28(struct clk_hw *hw,
 	return rate;
 }
 
-static long round_rate_stm_pll4600c28(struct clk_hw *hw, unsigned long rate,
-				      unsigned long *prate)
+static unsigned long round_rate_stm_pll4600c28(struct clk_hw *hw,
+					       unsigned long rate,
+					       unsigned long *prate)
 {
 	struct stm_pll params;
 

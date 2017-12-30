@@ -150,8 +150,9 @@ static unsigned long jz4780_otg_phy_recalc_rate(struct clk_hw *hw,
 	return parent_rate;
 }
 
-static long jz4780_otg_phy_round_rate(struct clk_hw *hw, unsigned long req_rate,
-				      unsigned long *parent_rate)
+static unsigned long jz4780_otg_phy_round_rate(struct clk_hw *hw,
+					       unsigned long req_rate,
+					       unsigned long *parent_rate)
 {
 	if (req_rate < 15600000)
 		return 12000000;

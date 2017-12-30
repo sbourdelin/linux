@@ -220,8 +220,8 @@ static int ti_fapll_set_div_mult(unsigned long rate,
 	return 0;
 }
 
-static long ti_fapll_round_rate(struct clk_hw *hw, unsigned long rate,
-				unsigned long *parent_rate)
+static unsigned long ti_fapll_round_rate(struct clk_hw *hw, unsigned long rate,
+					 unsigned long *parent_rate)
 {
 	u32 pre_div_p, mult_n;
 	int error;
@@ -405,8 +405,9 @@ static u32 ti_fapll_synth_set_frac_rate(struct fapll_synth *synth,
 	return post_div_m;
 }
 
-static long ti_fapll_synth_round_rate(struct clk_hw *hw, unsigned long rate,
-				      unsigned long *parent_rate)
+static unsigned long ti_fapll_synth_round_rate(struct clk_hw *hw,
+					       unsigned long rate,
+					       unsigned long *parent_rate)
 {
 	struct fapll_synth *synth = to_synth(hw);
 	struct fapll_data *fd = synth->fd;
