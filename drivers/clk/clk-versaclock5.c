@@ -351,7 +351,7 @@ static unsigned long vc5_pfd_round_rate(struct clk_hw *hw, unsigned long rate,
 
 	/* PLL cannot operate with input clock above 50 MHz. */
 	if (rate > 50000000)
-		return -EINVAL;
+		return 0;
 
 	/* CLKIN within range of PLL input, feed directly to PLL. */
 	if (*parent_rate <= 50000000)
@@ -359,7 +359,7 @@ static unsigned long vc5_pfd_round_rate(struct clk_hw *hw, unsigned long rate,
 
 	idiv = DIV_ROUND_UP(*parent_rate, rate);
 	if (idiv > 127)
-		return -EINVAL;
+		return 0;
 
 	return *parent_rate / idiv;
 }
