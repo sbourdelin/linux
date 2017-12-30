@@ -805,10 +805,9 @@ static int ezusb_firmware_download(struct ezusb_priv *upriv,
 	int variant_offset;
 
 	fw_buffer = kmalloc(FW_BUF_SIZE, GFP_KERNEL);
-	if (!fw_buffer) {
-		printk(KERN_ERR PFX "Out of memory for firmware buffer.\n");
+	if (!fw_buffer)
 		return -ENOMEM;
-	}
+
 	/*
 	 * This byte is 1 and should be replaced with 0.  The offset is
 	 * 0x10AD in version 0.0.6.  The byte in question should follow

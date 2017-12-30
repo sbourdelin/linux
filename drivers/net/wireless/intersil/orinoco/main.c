@@ -785,11 +785,8 @@ static void orinoco_rx_monitor(struct net_device *dev, u16 rxfid,
 	}
 
 	skb = dev_alloc_skb(hdrlen + datalen);
-	if (!skb) {
-		printk(KERN_WARNING "%s: Cannot allocate skb for monitor frame\n",
-		       dev->name);
+	if (!skb)
 		goto update_stats;
-	}
 
 	/* Copy the 802.11 header to the skb */
 	skb_put_data(skb, &(desc->frame_ctl), hdrlen);
@@ -900,11 +897,8 @@ void __orinoco_ev_rx(struct net_device *dev, struct hermes *hw)
 	   packets from the card, which has an IO granularity of 16
 	   bits */
 	skb = dev_alloc_skb(length + ETH_HLEN + 2 + 1);
-	if (!skb) {
-		printk(KERN_WARNING "%s: Can't allocate skb for Rx\n",
-		       dev->name);
+	if (!skb)
 		goto update_stats;
-	}
 
 	/* We'll prepend the header, so reserve space for it.  The worst
 	   case is no decapsulation, when 802.3 header is prepended and
