@@ -332,10 +332,12 @@ static int clk_divider_bestdiv(struct clk_hw *hw, struct clk_hw *parent,
 	return bestdiv;
 }
 
-long divider_round_rate_parent(struct clk_hw *hw, struct clk_hw *parent,
-			       unsigned long rate, unsigned long *prate,
-			       const struct clk_div_table *table,
-			       u8 width, unsigned long flags)
+unsigned long divider_round_rate_parent(struct clk_hw *hw,
+					struct clk_hw *parent,
+					unsigned long rate,
+					unsigned long *prate,
+					const struct clk_div_table *table,
+					u8 width, unsigned long flags)
 {
 	int div;
 
