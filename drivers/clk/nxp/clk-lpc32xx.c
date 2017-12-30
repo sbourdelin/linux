@@ -595,7 +595,7 @@ static unsigned long clk_hclk_pll_round_rate(struct clk_hw *hw,
 	pr_debug("%s: %lu/%lu\n", clk_hw_get_name(hw), *parent_rate, rate);
 
 	if (rate > 266500000)
-		return -EINVAL;
+		return 0;
 
 	/* Have to check all 20 possibilities to find the minimal M */
 	for (p_i = 4; p_i >= 0; p_i--) {
@@ -622,7 +622,7 @@ static unsigned long clk_hclk_pll_round_rate(struct clk_hw *hw,
 	if (d == (u64)rate << 6) {
 		pr_err("%s: %lu: no valid PLL parameters are found\n",
 		       clk_hw_get_name(hw), rate);
-		return -EINVAL;
+		return 0;
 	}
 
 	clk->m_div = m;
