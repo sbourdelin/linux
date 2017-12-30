@@ -1082,7 +1082,6 @@ static int ucc_hdlc_probe(struct platform_device *pdev)
 		utdm = kzalloc(sizeof(*utdm), GFP_KERNEL);
 		if (!utdm) {
 			ret = -ENOMEM;
-			dev_err(&pdev->dev, "No mem to alloc ucc tdm data\n");
 			goto free_uhdlc_priv;
 		}
 		uhdlc_priv->utdm = utdm;
