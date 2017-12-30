@@ -489,7 +489,8 @@ retry_dn:
 		}
 
 		/* dest is valid block, try to recover from src to dest */
-		if (is_valid_blkaddr(sbi, dest, META_POR)) {
+		if (is_valid_blkaddr(sbi, dest, META_POR) &&
+			is_data_blkaddr(sbi, dest)) {
 
 			if (src == NULL_ADDR) {
 				err = reserve_new_block(&dn);
