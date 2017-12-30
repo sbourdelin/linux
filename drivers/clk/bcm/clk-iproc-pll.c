@@ -439,7 +439,7 @@ static unsigned long iproc_pll_round_rate(struct clk_hw *hw, unsigned long rate,
 	struct iproc_pll *pll = clk->pll;
 
 	if (rate == 0 || *parent_rate == 0 || !pll->vco_param)
-		return -EINVAL;
+		return 0;
 
 	for (i = 0; i < pll->num_vco_entries; i++) {
 		if (rate <= pll->vco_param[i].rate)
@@ -541,7 +541,7 @@ static unsigned long iproc_clk_round_rate(struct clk_hw *hw, unsigned long rate,
 	unsigned int div;
 
 	if (rate == 0 || *parent_rate == 0)
-		return -EINVAL;
+		return 0;
 
 	if (rate == *parent_rate)
 		return *parent_rate;
