@@ -541,8 +541,9 @@ static void bcm2835_pll_choose_ndiv_and_fdiv(unsigned long rate,
 	*fdiv = div & ((1 << A2W_PLL_FRAC_BITS) - 1);
 }
 
-static long bcm2835_pll_rate_from_divisors(unsigned long parent_rate,
-					   u32 ndiv, u32 fdiv, u32 pdiv)
+static unsigned long bcm2835_pll_rate_from_divisors(unsigned long parent_rate,
+						    u32 ndiv, u32 fdiv,
+						    u32 pdiv)
 {
 	u64 rate;
 
