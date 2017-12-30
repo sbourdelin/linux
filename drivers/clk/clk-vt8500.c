@@ -609,7 +609,7 @@ static unsigned long vtwm_pll_round_rate(struct clk_hw *hw, unsigned long rate,
 {
 	struct clk_pll *pll = to_clk_pll(hw);
 	u32 filter, mul, div1, div2;
-	long round_rate;
+	unsigned long round_rate;
 	int ret = 1;
 
 	switch (pll->type) {
