@@ -664,17 +664,17 @@ static unsigned long clk_usb_pll_round_rate(struct clk_hw *hw,
 	 * USB divider, USB PLL N and M parameters.
 	 */
 	if (rate != 48000000)
-		return -EINVAL;
+		return 0;
 
 	/* USB divider clock */
 	usb_div_hw = clk_hw_get_parent_by_index(hw, 0);
 	if (!usb_div_hw)
-		return -EINVAL;
+		return 0;
 
 	/* Main oscillator clock */
 	osc_hw = clk_hw_get_parent_by_index(usb_div_hw, 0);
 	if (!osc_hw)
-		return -EINVAL;
+		return 0;
 	o = clk_hw_get_rate(osc_hw);	/* must be in range 1..20 MHz */
 
 	/* Check if valid USB divider and USB PLL parameters exists */
@@ -697,7 +697,7 @@ static unsigned long clk_usb_pll_round_rate(struct clk_hw *hw,
 		}
 	}
 
-	return -EINVAL;
+	return 0;
 }
 
 #define LPC32XX_DEFINE_PLL_OPS(_name, _rc, _sr, _rr)			\
