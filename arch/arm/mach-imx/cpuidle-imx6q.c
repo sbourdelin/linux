@@ -30,6 +30,8 @@ static int imx6q_enter_wait(struct cpuidle_device *dev,
 		if (!spin_trylock(&master_lock))
 			goto idle;
 		imx6_set_lpm(WAIT_UNCLOCKED);
+		if (atomic_read(&master) != num_online_cpus())
+			imx6_set_lpm(WAIT_CLOCKED);
 		cpu_do_idle();
 		imx6_set_lpm(WAIT_CLOCKED);
 		spin_unlock(&master_lock);
@@ -41,6 +43,7 @@ idle:
 done:
 	atomic_dec(&master);
 
+	imx6_set_lpm(WAIT_CLOCKED);
 	return index;
 }
 
