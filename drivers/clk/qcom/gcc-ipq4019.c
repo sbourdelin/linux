@@ -1268,7 +1268,7 @@ static unsigned long clk_cpu_div_round_rate(struct clk_hw *hw,
 
 	f = qcom_find_freq(pll->freq_tbl, rate);
 	if (!f)
-		return -EINVAL;
+		return 0;
 
 	p_hw = clk_hw_get_parent_by_index(hw, f->src);
 	*p_rate = clk_hw_get_rate(p_hw);
