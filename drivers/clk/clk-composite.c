@@ -66,7 +66,7 @@ static int clk_composite_determine_rate(struct clk_hw *hw,
 	long tmp_rate, best_rate = 0;
 	unsigned long rate_diff;
 	unsigned long best_rate_diff = ULONG_MAX;
-	long rate;
+	unsigned long rate;
 	int i;
 
 	if (rate_hw && rate_ops && rate_ops->determine_rate) {
@@ -83,8 +83,8 @@ static int clk_composite_determine_rate(struct clk_hw *hw,
 
 			rate = rate_ops->round_rate(rate_hw, req->rate,
 						    &req->best_parent_rate);
-			if (rate < 0)
-				return rate;
+			if (!rate)
+				return -EINVAL;
 
 			req->rate = rate;
 			return 0;
@@ -99,7 +99,7 @@ static int clk_composite_determine_rate(struct clk_hw *hw,
 
 			tmp_rate = rate_ops->round_rate(rate_hw, req->rate,
 							&parent_rate);
-			if (tmp_rate < 0)
+			if (tmp_rate == 0)
 				continue;
 
 			rate_diff = abs(req->rate - tmp_rate);
