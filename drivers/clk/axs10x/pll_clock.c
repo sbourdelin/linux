@@ -162,7 +162,7 @@ static unsigned long axs10x_pll_round_rate(struct clk_hw *hw,
 	const struct axs10x_pll_cfg *pll_cfg = clk->pll_cfg;
 
 	if (pll_cfg[0].rate == 0)
-		return -EINVAL;
+		return 0;
 
 	best_rate = pll_cfg[0].rate;
 
