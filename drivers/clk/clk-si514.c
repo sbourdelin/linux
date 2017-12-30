@@ -220,7 +220,7 @@ static unsigned long si514_round_rate(struct clk_hw *hw, unsigned long rate,
 
 	err = si514_calc_muldiv(&settings, rate);
 	if (err)
-		return err;
+		return 0;
 
 	return si514_calc_rate(&settings);
 }
