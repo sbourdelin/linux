@@ -227,12 +227,12 @@ static unsigned long ti_fapll_round_rate(struct clk_hw *hw, unsigned long rate,
 	int error;
 
 	if (!rate)
-		return -EINVAL;
+		return 0;
 
 	error = ti_fapll_set_div_mult(rate, *parent_rate,
 				      &pre_div_p, &mult_n);
 	if (error)
-		return error;
+		return 0;
 
 	rate = *parent_rate / pre_div_p;
 	rate *= mult_n;
@@ -414,7 +414,7 @@ static unsigned long ti_fapll_synth_round_rate(struct clk_hw *hw,
 	unsigned long r;
 
 	if (ti_fapll_clock_is_bypass(fd) || !synth->div || !rate)
-		return -EINVAL;
+		return 0;
 
 	/* Only post divider m available with no fractional divider? */
 	if (!synth->freq) {
