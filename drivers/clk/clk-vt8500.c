@@ -610,7 +610,7 @@ static unsigned long vtwm_pll_round_rate(struct clk_hw *hw, unsigned long rate,
 	struct clk_pll *pll = to_clk_pll(hw);
 	u32 filter, mul, div1, div2;
 	long round_rate;
-	int ret;
+	int ret = 1;
 
 	switch (pll->type) {
 	case PLL_TYPE_VT8500:
@@ -634,11 +634,11 @@ static unsigned long vtwm_pll_round_rate(struct clk_hw *hw, unsigned long rate,
 			round_rate = WM8850_BITS_TO_FREQ(*prate, mul, div1, div2);
 		break;
 	default:
-		ret = -EINVAL;
+		break;
 	}
 
 	if (ret)
-		return ret;
+		return 0;
 
 	return round_rate;
 }
