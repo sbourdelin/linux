@@ -25,7 +25,6 @@
 #include <linux/pagemap.h>
 #include <linux/rmap.h>
 #include <linux/spinlock.h>
-#include <linux/jhash.h>
 #include <linux/delay.h>
 #include <linux/kthread.h>
 #include <linux/wait.h>
@@ -41,6 +40,13 @@
 #include <linux/numa.h>
 
 #include <asm/tlbflush.h>
+
+/* Support for xxhash and crc32c */
+#include <linux/crypto.h>
+#include <crypto/hash.h>
+#include <linux/xxhash.h>
+#include <linux/sizes.h>
+
 #include "internal.h"
 
 #ifdef CONFIG_NUMA
@@ -186,7 +192,7 @@ struct rmap_item {
 	};
 	struct mm_struct *mm;
 	unsigned long address;		/* + low bits used for flags below */
-	unsigned int oldchecksum;	/* when unstable */
+	unsigned long oldchecksum;	/* when unstable */
 	union {
 		struct rb_node node;	/* when node of unstable tree */
 		struct {		/* when listed from stable tree */
@@ -255,7 +261,7 @@ static unsigned int ksm_thread_pages_to_scan = 100;
 static unsigned int ksm_thread_sleep_millisecs = 20;
 
 /* Checksum of an empty (zeroed) page */
-static unsigned int zero_checksum __read_mostly;
+static unsigned long zero_checksum __read_mostly;
 
 /* Whether to merge empty (zeroed) pages with actual zero pages */
 static bool ksm_use_zero_pages __read_mostly;
@@ -283,6 +289,98 @@ static DEFINE_SPINLOCK(ksm_mmlist_lock);
 #define KSM_KMEM_CACHE(__struct, __flags) kmem_cache_create("ksm_"#__struct,\
 		sizeof(struct __struct), __alignof__(struct __struct),\
 		(__flags), NULL)
+
+#define TIME_125MS  (HZ >> 3)
+#define PERF_TO_MBS(X) (X*PAGE_SIZE*(1 << 3)/(SZ_1M))
+
+#define HASH_NONE   0
+#define HASH_CRC32C 1
+#define HASH_XXHASH 2
+
+static struct shash_desc desc;
+
+static int fastest_hash = 0;
+
+static void __init choice_fastest_hash(void)
+{
+	void *page = ZERO_PAGE(0);
+	unsigned long checksum, perf, je;
+	unsigned long best_perf = 0;
+
+	desc.tfm = crypto_alloc_shash("crc32c", 0, 0);
+	desc.flags = 0;
+
+	if (IS_ERR(desc.tfm)) {
+		pr_warn("ksm: alloc crc32c shash error %ld\n",
+			-PTR_ERR(desc.tfm));
+		fastest_hash = HASH_XXHASH;
+		goto out;
+	}
+
+	perf = 0;
+	preempt_disable();
+	je = jiffies + TIME_125MS;
+	while (time_before(jiffies, je)) {
+		crypto_shash_digest(&desc, page, PAGE_SIZE, (u8 *)&checksum);
+		perf++;
+	}
+	preempt_enable();
+
+	if (best_perf < perf) {
+		best_perf = perf;
+		fastest_hash = HASH_CRC32C;
+	}
+
+	pr_info("ksm: crc32c hash() %5ld MB/s\n", PERF_TO_MBS(perf));
+
+	perf = 0;
+	preempt_disable();
+	je = jiffies + TIME_125MS;
+	while (time_before(jiffies, je)) {
+		checksum = xxhash(page, PAGE_SIZE, 0);
+		perf++;
+	}
+	preempt_enable();
+
+	if (best_perf < perf) {
+		best_perf = perf;
+		fastest_hash = HASH_XXHASH;
+	}
+
+	pr_info("ksm: xxhash hash() %5ld MB/s\n", PERF_TO_MBS(perf));
+
+	if (fastest_hash != HASH_CRC32C)
+		crypto_free_shash(desc.tfm);
+
+out:
+	if (fastest_hash == HASH_CRC32C)
+		pr_info("ksm: choice crc32c as hash function\n");
+	else
+		pr_info("ksm: choice xxhash as hash function\n");
+}
+
+unsigned long fasthash(const void *input, size_t length)
+{
+	unsigned long checksum = 0;
+
+	switch (fastest_hash) {
+	case 0:
+		choice_fastest_hash();
+		checksum = fasthash(input, length);
+		/* The correct value depends on page size and endianness */
+		zero_checksum = fasthash(ZERO_PAGE(0), PAGE_SIZE);
+		break;
+	case HASH_CRC32C:
+		crypto_shash_digest(&desc, input, length,
+			    (u8 *)&checksum);
+		break;
+	case HASH_XXHASH:
+		checksum = xxhash(input, length, 0);
+		break;
+	}
+
+	return checksum;
+}
 
 static int __init ksm_slab_init(void)
 {
@@ -982,11 +1080,11 @@ error:
 }
 #endif /* CONFIG_SYSFS */
 
-static u32 calc_checksum(struct page *page)
+static unsigned long calc_checksum(struct page *page)
 {
-	u32 checksum;
+	unsigned long checksum;
 	void *addr = kmap_atomic(page);
-	checksum = jhash2(addr, PAGE_SIZE / 4, 17);
+	checksum = fasthash(addr, PAGE_SIZE);
 	kunmap_atomic(addr);
 	return checksum;
 }
@@ -2006,7 +2104,7 @@ static void cmp_and_merge_page(struct page *page, struct rmap_item *rmap_item)
 	struct page *tree_page = NULL;
 	struct stable_node *stable_node;
 	struct page *kpage;
-	unsigned int checksum;
+	unsigned long checksum;
 	int err;
 	bool max_page_sharing_bypass = false;
 
@@ -3068,8 +3166,6 @@ static int __init ksm_init(void)
 	struct task_struct *ksm_thread;
 	int err;
 
-	/* The correct value depends on page size and endianness */
-	zero_checksum = calc_checksum(ZERO_PAGE(0));
 	/* Default to false for backwards compatibility */
 	ksm_use_zero_pages = false;
 
