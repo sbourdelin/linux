@@ -59,7 +59,7 @@ static unsigned long clk_frac_round_rate(struct clk_hw *hw, unsigned long rate,
 	u64 tmp, tmp_rate, result;
 
 	if (rate > parent_rate)
-		return -EINVAL;
+		return 0;
 
 	tmp = rate;
 	tmp <<= frac->width;
@@ -67,7 +67,7 @@ static unsigned long clk_frac_round_rate(struct clk_hw *hw, unsigned long rate,
 	div = tmp;
 
 	if (!div)
-		return -EINVAL;
+		return 0;
 
 	tmp_rate = (u64)parent_rate * div;
 	result = tmp_rate >> frac->width;
