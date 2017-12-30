@@ -201,7 +201,7 @@ static unsigned long hsdk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
 	const struct hsdk_pll_cfg *pll_cfg = clk->pll_devdata->pll_cfg;
 
 	if (pll_cfg[0].rate == 0)
-		return -EINVAL;
+		return 0;
 
 	best_rate = pll_cfg[0].rate;
 
