@@ -909,7 +909,6 @@ static int clk_core_round_rate_nolock(struct clk_core *core,
 				      struct clk_rate_request *req)
 {
 	struct clk_core *parent;
-	long rate;
 
 	lockdep_assert_held(&prepare_lock);
 
@@ -928,12 +927,8 @@ static int clk_core_round_rate_nolock(struct clk_core *core,
 	if (core->ops->determine_rate) {
 		return core->ops->determine_rate(core->hw, req);
 	} else if (core->ops->round_rate) {
-		rate = core->ops->round_rate(core->hw, req->rate,
+		req->rate = core->ops->round_rate(core->hw, req->rate,
 					     &req->best_parent_rate);
-		if (rate < 0)
-			return rate;
-
-		req->rate = rate;
 	} else if (core->flags & CLK_SET_RATE_PARENT) {
 		return clk_core_round_rate_nolock(parent, req);
 	} else {
@@ -1454,12 +1449,8 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
 		new_rate = req.rate;
 		parent = req.best_parent_hw ? req.best_parent_hw->core : NULL;
 	} else if (core->ops->round_rate) {
-		ret = core->ops->round_rate(core->hw, rate,
-					    &best_parent_rate);
-		if (ret < 0)
-			return NULL;
-
-		new_rate = ret;
+		new_rate = core->ops->round_rate(core->hw, rate,
+						 &best_parent_rate);
 		if (new_rate < min_rate || new_rate > max_rate)
 			return NULL;
 	} else if (!parent || !(core->flags & CLK_SET_RATE_PARENT)) {
