@@ -839,7 +839,7 @@ static unsigned long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
 
 	if (_get_table_rate(hw, &cfg, rate, *prate) &&
 	    pll->params->calc_rate(hw, &cfg, rate, *prate))
-		return -EINVAL;
+		return 0;
 
 	return cfg.output_rate;
 }
