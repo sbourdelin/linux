@@ -38,7 +38,7 @@ static unsigned long ti_composite_round_rate(struct clk_hw *hw,
 					     unsigned long rate,
 					     unsigned long *prate)
 {
-	return -EINVAL;
+	return 0;
 }
 
 static int ti_composite_set_rate(struct clk_hw *hw, unsigned long rate,
