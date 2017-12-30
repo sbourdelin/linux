@@ -115,7 +115,7 @@ static unsigned long iproc_asiu_clk_round_rate(struct clk_hw *hw,
 	unsigned int div;
 
 	if (rate == 0 || *parent_rate == 0)
-		return -EINVAL;
+		return 0;
 
 	if (rate == *parent_rate)
 		return *parent_rate;
