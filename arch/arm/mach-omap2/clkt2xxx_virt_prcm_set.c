@@ -75,9 +75,9 @@ unsigned long omap2_round_to_table_rate(struct clk_hw *hw, unsigned long rate,
 					unsigned long *parent_rate)
 {
 	const struct prcm_config *ptr;
-	long highest_rate;
+	unsigned long highest_rate;
 
-	highest_rate = -EINVAL;
+	highest_rate = 0;
 
 	for (ptr = rate_table; ptr->mpu_speed; ptr++) {
 		if (!(ptr->flags & cpu_mask))
