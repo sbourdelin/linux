@@ -278,7 +278,7 @@ static unsigned long clk_audio_pll_pad_round_rate(struct clk_hw *hw,
 						  unsigned long *parent_rate)
 {
 	struct clk_hw *pclk = clk_hw_get_parent(hw);
-	long best_rate = -EINVAL;
+	unsigned long best_rate = 0;
 	unsigned long best_parent_rate;
 	unsigned long tmp_qd;
 	u32 div;
@@ -330,7 +330,7 @@ static unsigned long clk_audio_pll_pmc_round_rate(struct clk_hw *hw,
 						  unsigned long *parent_rate)
 {
 	struct clk_hw *pclk = clk_hw_get_parent(hw);
-	long best_rate = -EINVAL;
+	unsigned long best_rate = 0;
 	unsigned long best_parent_rate = 0;
 	u32 tmp_qd = 0, div;
 	long tmp_rate;
