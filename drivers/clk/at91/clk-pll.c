@@ -157,14 +157,14 @@ static unsigned long clk_pll_get_best_div_mul(struct clk_pll *pll,
 							pll->characteristics;
 	unsigned long bestremainder = ULONG_MAX;
 	unsigned long maxdiv, mindiv, tmpdiv;
-	long bestrate = -ERANGE;
+	unsigned long bestrate = 0;
 	unsigned long bestdiv;
 	unsigned long bestmul;
 	int i = 0;
 
 	/* Check if parent_rate is a valid input rate */
 	if (parent_rate < characteristics->input.min)
-		return -ERANGE;
+		return 0;
 
 	/*
 	 * Calculate minimum divider based on the minimum multiplier, the
@@ -179,7 +179,7 @@ static unsigned long clk_pll_get_best_div_mul(struct clk_pll *pll,
 	if (parent_rate > characteristics->input.max) {
 		tmpdiv = DIV_ROUND_UP(parent_rate, characteristics->input.max);
 		if (tmpdiv > PLL_DIV_MAX)
-			return -ERANGE;
+			return 0;
 
 		if (tmpdiv > mindiv)
 			mindiv = tmpdiv;
@@ -234,8 +234,8 @@ static unsigned long clk_pll_get_best_div_mul(struct clk_pll *pll,
 			break;
 	}
 
-	/* We haven't found any multiplier/divider pair => return -ERANGE */
-	if (bestrate < 0)
+	/* We haven't found any multiplier/divider pair => return 0 */
+	if (bestrate == 0)
 		return bestrate;
 
 	/* Check if bestrate is a valid output rate  */
@@ -246,7 +246,7 @@ static unsigned long clk_pll_get_best_div_mul(struct clk_pll *pll,
 	}
 
 	if (i >= characteristics->num_output)
-		return -ERANGE;
+		return 0;
 
 	if (div)
 		*div = bestdiv;
@@ -271,15 +271,15 @@ static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
 			    unsigned long parent_rate)
 {
 	struct clk_pll *pll = to_clk_pll(hw);
-	long ret;
+	unsigned long ret;
 	u32 div;
 	u32 mul;
 	u32 index;
 
 	ret = clk_pll_get_best_div_mul(pll, rate, parent_rate,
 				       &div, &mul, &index);
-	if (ret < 0)
-		return ret;
+	if (ret == 0)
+		return -ERANGE;
 
 	pll->range = index;
 	pll->div = div;
