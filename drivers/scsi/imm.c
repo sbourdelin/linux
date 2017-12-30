@@ -591,9 +591,9 @@ static int imm_init(imm_struct *dev)
 	if (imm_connect(dev, 0) != 1)
 		return -EIO;
 	imm_reset_pulse(dev->base);
-	mdelay(1);	/* Delay to allow devices to settle */
+	msleep(1);	/* Delay to allow devices to settle */
 	imm_disconnect(dev);
-	mdelay(1);	/* Another delay to allow devices to settle */
+	msleep(1);	/* Another delay to allow devices to settle */
 	return device_check(dev);
 }
 
