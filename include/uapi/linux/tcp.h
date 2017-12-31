@@ -259,6 +259,9 @@ struct tcp_md5sig {
 	__u8	tcpm_key[TCP_MD5SIG_MAXKEYLEN];		/* key (binary) */
 };
 
+/* Definitions for bpf_sock_ops_flags */
+#define BPF_SOCK_OPS_RTO_CB_FLAG	(1<<0)
+
 /* INET_DIAG_MD5SIG */
 struct tcp_diag_md5sig {
 	__u8	tcpm_family;

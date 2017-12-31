@@ -995,6 +995,11 @@ enum {
 					 * a congestion threshold. RTTs above
 					 * this indicate congestion
 					 */
+	BPF_SOCK_OPS_RTO_CB,		/* Called when an RTO has triggered.
+					 * Arg1: value of icsk_retransmits
+					 * Arg2: value of icsk_rto
+					 * Arg3: whether RTO has expired
+					 */
 };
 
 #define TCP_BPF_IW		1001	/* Set TCP initial congestion window */
