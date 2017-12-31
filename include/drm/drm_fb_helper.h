@@ -241,6 +241,8 @@ struct drm_fb_helper {
  * functions. To be used in struct fb_ops of drm drivers.
  */
 #define DRM_FB_HELPER_DEFAULT_OPS \
+	.fb_open	= drm_fb_helper_fb_open, \
+	.fb_release	= drm_fb_helper_fb_release, \
 	.fb_check_var	= drm_fb_helper_check_var, \
 	.fb_set_par	= drm_fb_helper_set_par, \
 	.fb_setcmap	= drm_fb_helper_setcmap, \
@@ -296,6 +298,9 @@ void drm_fb_helper_cfb_copyarea(struct fb_info *info,
 				const struct fb_copyarea *area);
 void drm_fb_helper_cfb_imageblit(struct fb_info *info,
 				 const struct fb_image *image);
+
+int drm_fb_helper_fb_open(struct fb_info *info, int user);
+int drm_fb_helper_fb_release(struct fb_info *info, int user);
 
 void drm_fb_helper_set_suspend(struct drm_fb_helper *fb_helper, bool suspend);
 void drm_fb_helper_set_suspend_unlocked(struct drm_fb_helper *fb_helper,
@@ -471,6 +476,16 @@ static inline void drm_fb_helper_cfb_copyarea(struct fb_info *info,
 static inline void drm_fb_helper_cfb_imageblit(struct fb_info *info,
 					       const struct fb_image *image)
 {
+}
+
+static inline int drm_fb_helper_fb_open(struct fb_info *info, int user)
+{
+	return -ENODEV;
+}
+
+static inline int drm_fb_helper_fb_release(struct fb_info *info, int user)
+{
+	return -ENODEV;
 }
 
 static inline void drm_fb_helper_set_suspend(struct drm_fb_helper *fb_helper,
