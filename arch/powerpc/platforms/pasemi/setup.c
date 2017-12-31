@@ -34,6 +34,7 @@
 #include <asm/prom.h>
 #include <asm/iommu.h>
 #include <asm/machdep.h>
+#include <asm/i8259.h>
 #include <asm/mpic.h>
 #include <asm/smp.h>
 #include <asm/time.h>
@@ -182,6 +183,99 @@ static int __init pas_setup_mce_regs(void)
 	return 0;
 }
 machine_device_initcall(pasemi, pas_setup_mce_regs);
+
+#ifdef CONFIG_PPC_PASEMI_NEMO
+static void sb600_8259_cascade(struct irq_desc *desc)
+{
+	struct irq_chip *chip = irq_desc_get_chip(desc);
+	unsigned int cascade_irq = i8259_irq();
+
+	if (cascade_irq)
+               generic_handle_irq(cascade_irq);
+
+	chip->irq_eoi(&desc->irq_data);
+}
+
+static __init void nemo_init_IRQ(void)
+{
+	struct device_node *np;
+	struct device_node *root, *mpic_node, *i8259_node;
+	unsigned long openpic_addr;
+	const unsigned int *opprop;
+	int naddr, opplen;
+	int mpic_flags;
+	const unsigned int *nmiprop;
+	struct mpic *mpic;
+	int gpio_virq;
+
+	mpic_node = NULL;
+
+	for_each_node_by_type(np, "interrupt-controller")
+		if (of_device_is_compatible(np, "open-pic")) {
+			mpic_node = np;
+			break;
+		}
+	if (!mpic_node)
+		for_each_node_by_type(np, "open-pic") {
+			mpic_node = np;
+			break;
+		}
+	if (!mpic_node) {
+		printk(KERN_ERR
+			"Failed to locate the MPIC interrupt controller\n");
+		return;
+	}
+
+	/* Find address list in /platform-open-pic */
+	root = of_find_node_by_path("/");
+	naddr = of_n_addr_cells(root);
+	opprop = of_get_property(root, "platform-open-pic", &opplen);
+	if (!opprop) {
+		printk(KERN_ERR "No platform-open-pic property.\n");
+		of_node_put(root);
+		return;
+	}
+	openpic_addr = of_read_number(opprop, naddr);
+	printk(KERN_DEBUG "OpenPIC addr: %lx\n", openpic_addr);
+
+	mpic_flags = MPIC_LARGE_VECTORS | MPIC_NO_BIAS | MPIC_NO_RESET;
+
+	nmiprop = of_get_property(mpic_node, "nmi-source", NULL);
+	if (nmiprop)
+		mpic_flags |= MPIC_ENABLE_MCK;
+
+	mpic = mpic_alloc(mpic_node, openpic_addr,
+			  mpic_flags, 0, 0, "PASEMI-OPIC");
+	BUG_ON(!mpic);
+
+	mpic_assign_isu(mpic, 0, mpic->paddr + 0x10000);
+	mpic_init(mpic);
+	/* The NMI/MCK source needs to be prio 15 */
+	if (nmiprop) {
+		nmi_virq = irq_create_mapping(NULL, *nmiprop);
+		mpic_irq_set_priority(nmi_virq, 15);
+		irq_set_irq_type(nmi_virq, IRQ_TYPE_EDGE_RISING);
+		mpic_unmask_irq(irq_get_irq_data(nmi_virq));
+	}
+
+
+	/* Connect the SB600's legacy i8259 controller */
+	i8259_node = of_find_node_by_path("/pxp@0,e0000000");
+	i8259_init(i8259_node, 0);
+	of_node_put(i8259_node);
+
+	gpio_virq = irq_create_mapping(NULL, 3);
+	irq_set_irq_type(gpio_virq, IRQ_TYPE_LEVEL_HIGH);
+	irq_set_chained_handler(gpio_virq, sb600_8259_cascade);
+	mpic_unmask_irq(irq_get_irq_data(gpio_virq));
+
+	irq_set_default_host(mpic->irqhost);
+
+	of_node_put(mpic_node);
+	of_node_put(root);
+
+}
+#endif
 
 static __init void pas_init_IRQ(void)
 {
