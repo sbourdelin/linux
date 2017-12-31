@@ -2907,6 +2907,9 @@ int __tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb, int segs)
 	if (likely(!err)) {
 		TCP_SKB_CB(skb)->sacked |= TCPCB_EVER_RETRANS;
 		trace_tcp_retransmit_skb(sk, skb);
+		if (BPF_SOCK_OPS_TEST_FLAG(tp, BPF_SOCK_OPS_RETRANS_CB_FLAG))
+			tcp_call_bpf_2arg(sk, BPF_SOCK_OPS_RETRANS_CB,
+					  TCP_SKB_CB(skb)->seq, segs);
 	} else if (err != -EBUSY) {
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPRETRANSFAIL);
 	}

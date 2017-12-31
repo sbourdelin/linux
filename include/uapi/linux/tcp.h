@@ -261,6 +261,7 @@ struct tcp_md5sig {
 
 /* Definitions for bpf_sock_ops_flags */
 #define BPF_SOCK_OPS_RTO_CB_FLAG	(1<<0)
+#define BPF_SOCK_OPS_RETRANS_CB_FLAG	(1<<1)
 
 /* INET_DIAG_MD5SIG */
 struct tcp_diag_md5sig {

@@ -1020,6 +1020,10 @@ enum {
 					 * Arg2: value of icsk_rto
 					 * Arg3: whether RTO has expired
 					 */
+	BPF_SOCK_OPS_RETRANS_CB,	/* Called when skb is retransmitted.
+					 * Arg1: sequence number of 1st byte
+					 * Arg2: # segments
+					 */
 };
 
 #define TCP_BPF_IW		1001	/* Set TCP initial congestion window */
