@@ -1671,7 +1671,6 @@ static int smsc95xx_suspend(struct usb_interface *intf, pm_message_t message)
 		int i, filter = 0;
 
 		if (!filter_mask) {
-			netdev_warn(dev->net, "Unable to allocate filter_mask\n");
 			ret = -ENOMEM;
 			goto done;
 		}
