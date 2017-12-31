@@ -979,6 +979,7 @@ struct bpf_sock_ops {
 	__u32 data_segs_out;
 	__u64 bytes_received;
 	__u64 bytes_acked;
+	__u32 sk_txhash;
 };
 
 /* List of known BPF sock_ops operators.
