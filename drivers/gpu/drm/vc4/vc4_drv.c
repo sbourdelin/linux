@@ -152,7 +152,6 @@ static struct drm_driver vc4_drm_driver = {
 			    DRIVER_HAVE_IRQ |
 			    DRIVER_RENDER |
 			    DRIVER_PRIME),
-	.lastclose = drm_fb_helper_lastclose,
 	.irq_handler = vc4_irq,
 	.irq_preinstall = vc4_irq_preinstall,
 	.irq_postinstall = vc4_irq_postinstall,
@@ -296,8 +295,6 @@ static void vc4_drm_unbind(struct device *dev)
 	struct drm_device *drm = platform_get_drvdata(pdev);
 
 	drm_dev_unregister(drm);
-
-	drm_fb_cma_fbdev_fini(drm);
 
 	drm_mode_config_cleanup(drm);
 

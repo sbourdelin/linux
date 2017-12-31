@@ -188,7 +188,6 @@ static struct drm_framebuffer *vc4_fb_create(struct drm_device *dev,
 }
 
 static const struct drm_mode_config_funcs vc4_mode_funcs = {
-	.output_poll_changed = drm_fb_helper_output_poll_changed,
 	.atomic_check = drm_atomic_helper_check,
 	.atomic_commit = vc4_atomic_commit,
 	.fb_create = vc4_fb_create,
@@ -219,7 +218,7 @@ int vc4_kms_load(struct drm_device *dev)
 	drm_mode_config_reset(dev);
 
 	if (dev->mode_config.num_connector)
-		drm_fb_cma_fbdev_init(dev, 32, 0);
+		drm_fb_helper_generic_fbdev_setup(dev, 32, 0);
 
 	drm_kms_helper_poll_init(dev);
 
