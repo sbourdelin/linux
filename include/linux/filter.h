@@ -996,6 +996,9 @@ struct bpf_sock_ops_kern {
 		u32 replylong[4];
 	};
 	u32	is_fullsock;
+	u64	temp;			/* Used by sock_ops_convert_ctx_access
+					 * as temporary storaage of a register
+					 */
 };
 
 #endif /* __LINUX_FILTER_H__ */
