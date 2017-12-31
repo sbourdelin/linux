@@ -35,6 +35,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 
+#include <drm/drm_fb_helper.h>
 #include <drm/drm_file.h>
 #include <drm/drmP.h>
 
@@ -439,10 +440,19 @@ static void drm_legacy_dev_reinit(struct drm_device *dev)
 
 void drm_lastclose(struct drm_device * dev)
 {
+	struct drm_fb_helper *fb_helper = dev->fb_helper;
+	int ret;
+
 	DRM_DEBUG("\n");
 
-	if (dev->driver->lastclose)
+	if (dev->driver->lastclose) {
 		dev->driver->lastclose(dev);
+	} else if (fb_helper && fb_helper->funcs && fb_helper->funcs->restore) {
+		ret = fb_helper->funcs->restore(fb_helper);
+		if (ret)
+			DRM_ERROR("Failed to restore fbdev: %d\n", ret);
+	}
+
 	DRM_DEBUG("driver lastclose completed\n");
 
 	if (drm_core_check_feature(dev, DRIVER_LEGACY))

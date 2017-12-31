@@ -21,6 +21,7 @@
  */
 
 #include <drm/drm_encoder.h>
+#include <drm/drm_fb_helper.h>
 #include <drm/drm_mode_config.h>
 #include <drm/drmP.h>
 
@@ -61,6 +62,11 @@ err_plane:
 
 void drm_modeset_unregister_all(struct drm_device *dev)
 {
+	struct drm_fb_helper *fb_helper = dev->fb_helper;
+
+	if (fb_helper && fb_helper->funcs && fb_helper->funcs->unregister)
+		fb_helper->funcs->unregister(fb_helper);
+
 	drm_connector_unregister_all(dev);
 	drm_encoder_unregister_all(dev);
 	drm_crtc_unregister_all(dev);
@@ -411,6 +417,7 @@ EXPORT_SYMBOL(drm_mode_config_init);
  */
 void drm_mode_config_cleanup(struct drm_device *dev)
 {
+	struct drm_fb_helper *fb_helper = dev->fb_helper;
 	struct drm_connector *connector;
 	struct drm_connector_list_iter conn_iter;
 	struct drm_crtc *crtc, *ct;
@@ -419,6 +426,9 @@ void drm_mode_config_cleanup(struct drm_device *dev)
 	struct drm_property *property, *pt;
 	struct drm_property_blob *blob, *bt;
 	struct drm_plane *plane, *plt;
+
+	if (fb_helper && fb_helper->funcs && fb_helper->funcs->release)
+		fb_helper->funcs->release(fb_helper);
 
 	list_for_each_entry_safe(encoder, enct, &dev->mode_config.encoder_list,
 				 head) {

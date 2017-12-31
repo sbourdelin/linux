@@ -125,6 +125,39 @@ struct drm_fb_helper_funcs {
 			       struct drm_display_mode **modes,
 			       struct drm_fb_offset *offsets,
 			       bool *enabled, int width, int height);
+
+	/**
+	 * @restore:
+	 *
+	 * Optional callback for restoring fbdev emulation.
+	 * Called by drm_lastclose() if &drm_driver->lastclose is not set.
+	 */
+	int (*restore)(struct drm_fb_helper *fb_helper);
+
+	/**
+	 * @hotplug_event:
+	 *
+	 * Optional callback for hotplug events.
+	 * Called by drm_kms_helper_hotplug_event() if
+	 * &drm_mode_config_funcs->output_poll_changed  is not set.
+	 */
+	int (*hotplug_event)(struct drm_fb_helper *fb_helper);
+
+	/**
+	 * @unregister:
+	 *
+	 * Optional callback for unregistrering fbdev emulation.
+	 * Called by drm_dev_unregister().
+	 */
+	void (*unregister)(struct drm_fb_helper *fb_helper);
+
+	/**
+	 * @release:
+	 *
+	 * Optional callback for releasing fbdev emulation resources.
+	 * Called by drm_mode_config_cleanup().
+	 */
+	void (*release)(struct drm_fb_helper *fb_helper);
 };
 
 struct drm_fb_helper_connector {

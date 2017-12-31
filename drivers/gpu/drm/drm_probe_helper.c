@@ -559,10 +559,14 @@ EXPORT_SYMBOL(drm_helper_probe_single_connector_modes);
  */
 void drm_kms_helper_hotplug_event(struct drm_device *dev)
 {
+	struct drm_fb_helper *fb_helper = dev->fb_helper;
+
 	/* send a uevent + call fbdev */
 	drm_sysfs_hotplug_event(dev);
 	if (dev->mode_config.funcs->output_poll_changed)
 		dev->mode_config.funcs->output_poll_changed(dev);
+	else if (fb_helper && fb_helper->funcs && fb_helper->funcs->hotplug_event)
+		fb_helper->funcs->hotplug_event(fb_helper);
 }
 EXPORT_SYMBOL(drm_kms_helper_hotplug_event);
 
