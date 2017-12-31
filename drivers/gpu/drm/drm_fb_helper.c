@@ -30,6 +30,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/console.h>
+#include <linux/dma-buf.h>
 #include <linux/kernel.h>
 #include <linux/sysrq.h>
 #include <linux/slab.h>
@@ -43,6 +44,7 @@
 
 #include "drm_crtc_internal.h"
 #include "drm_crtc_helper_internal.h"
+#include "drm_internal.h"
 
 static bool drm_fbdev_emulation = true;
 module_param_named(fbdev_emulation, drm_fbdev_emulation, bool, 0600);
@@ -2974,6 +2976,293 @@ void drm_fb_helper_output_poll_changed(struct drm_device *dev)
 	drm_fb_helper_hotplug_event(dev->fb_helper);
 }
 EXPORT_SYMBOL(drm_fb_helper_output_poll_changed);
+
+static int drm_fb_helper_generic_vmap(struct drm_fb_helper *fb_helper)
+{
+	struct drm_prime_handle prime_args = {
+		.handle = fb_helper->dumb_handle,
+	};
+	struct dma_buf *dma_buf;
+	void *vaddr;
+	int ret;
+
+	ret = drm_prime_handle_to_fd_ioctl(fb_helper->dev, &prime_args,
+					   fb_helper->file);
+	if (ret)
+		return ret;
+
+	dma_buf = dma_buf_get(prime_args.fd);
+	if (WARN_ON(IS_ERR(dma_buf)))
+		return PTR_ERR(dma_buf);
+
+	/* drop the ref we picked up in handle_to_fd */
+	dma_buf_put(dma_buf);
+
+	vaddr = dma_buf_vmap(dma_buf);
+	if (!vaddr) {
+		ret = -ENOMEM;
+		goto err_remove_handle;
+	}
+
+	if (fb_helper->fbdev->fbdefio)
+		fb_deferred_io_init(fb_helper->fbdev);
+
+	fb_helper->fbdev->screen_buffer = vaddr;
+	fb_helper->dma_buf = dma_buf;
+
+	return 0;
+
+err_remove_handle:
+	drm_prime_remove_buf_handle_locked(&fb_helper->file->prime,
+					   fb_helper->dma_buf);
+	dma_buf_put(dma_buf);
+
+	return ret;
+}
+
+static void drm_fb_helper_generic_vunmap(struct drm_fb_helper *fb_helper)
+{
+	if (fb_helper->fbdev->fbdefio) {
+		cancel_delayed_work_sync(&fb_helper->fbdev->deferred_work);
+		cancel_work_sync(&fb_helper->dirty_work);
+		fb_deferred_io_cleanup(fb_helper->fbdev);
+	}
+
+	dma_buf_vunmap(fb_helper->dma_buf, fb_helper->fbdev->screen_buffer);
+	fb_helper->fbdev->screen_buffer = NULL;
+
+	drm_prime_remove_buf_handle_locked(&fb_helper->file->prime,
+					   fb_helper->dma_buf);
+	dma_buf_put(fb_helper->dma_buf);
+	fb_helper->dma_buf = NULL;
+}
+
+static int drm_fb_helper_generic_fb_open(struct fb_info *info, int user)
+{
+	struct drm_fb_helper *fb_helper = info->par;
+	int ret;
+
+	ret = drm_fb_helper_fb_open(info, user);
+	if (ret)
+		return ret;
+
+	if (!fb_helper->fbdev->screen_buffer) {
+		/*
+		 * Exporting a buffer to get a virtual address results in
+		 * dma-buf pinning the driver module. This means that we have
+		 * to vmap/vunmap in open/close to be able to unload the driver
+		 * module.
+		 */
+		ret = drm_fb_helper_generic_vmap(fb_helper);
+		if (ret) {
+			DRM_ERROR("fbdev: Failed to vmap buffer: %d\n", ret);
+			drm_fb_helper_fb_release(info, user);
+			return ret;
+		}
+	}
+
+	return 0;
+}
+
+static int drm_fb_helper_generic_fb_release(struct fb_info *info, int user)
+{
+	struct drm_fb_helper *fb_helper = info->par;
+
+	drm_fb_helper_fb_release(info, user);
+
+	if (!atomic_read(&fb_helper->open_count))
+		drm_fb_helper_generic_vunmap(fb_helper);
+
+	return 0;
+}
+
+static int drm_fb_helper_generic_fb_mmap(struct fb_info *info,
+					 struct vm_area_struct *vma)
+{
+	struct drm_fb_helper *fb_helper = info->par;
+
+	return dma_buf_mmap(fb_helper->dma_buf, vma, 0);
+}
+
+static struct fb_ops drm_fb_helper_generic_fbdev_ops = {
+	.owner		= THIS_MODULE,
+	DRM_FB_HELPER_DEFAULT_OPS,
+	.fb_open	= drm_fb_helper_generic_fb_open,
+	.fb_release	= drm_fb_helper_generic_fb_release,
+	.fb_mmap	= drm_fb_helper_generic_fb_mmap,
+	.fb_read	= drm_fb_helper_sys_read,
+	.fb_write	= drm_fb_helper_sys_write,
+	.fb_fillrect	= drm_fb_helper_sys_fillrect,
+	.fb_copyarea	= drm_fb_helper_sys_copyarea,
+	.fb_imageblit	= drm_fb_helper_sys_imageblit,
+};
+
+static struct fb_deferred_io drm_fb_helper_generic_defio = {
+	.delay		= HZ / 20,
+	.deferred_io	= drm_fb_helper_deferred_io,
+};
+
+static int drm_fb_helper_generic_probe(struct drm_fb_helper *fb_helper,
+				       struct drm_fb_helper_surface_size *sizes)
+{
+	struct drm_mode_create_dumb dumb_args = { 0 };
+	struct drm_mode_fb_cmd2 fb_args = { 0 };
+	struct drm_device *dev = fb_helper->dev;
+	struct drm_framebuffer *fb;
+	struct drm_file *file;
+	struct fb_info *fbi;
+	int ret;
+
+	DRM_DEBUG_KMS("surface width(%d), height(%d) and bpp(%d)\n",
+		      sizes->surface_width, sizes->surface_height,
+		      sizes->surface_bpp);
+
+	file = drm_file_alloc(dev->primary);
+	if (IS_ERR(file))
+		return PTR_ERR(file);
+
+	drm_dropmaster_ioctl(dev, NULL, file);
+
+	dumb_args.width = sizes->surface_width;
+	dumb_args.height = sizes->surface_height;
+	dumb_args.bpp = sizes->surface_bpp;
+
+	ret = drm_mode_create_dumb_ioctl(dev, &dumb_args, file);
+	if (ret)
+		goto err_free_file;
+
+	fb_args.width = dumb_args.width;
+	fb_args.height = dumb_args.height;
+	fb_args.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
+							 sizes->surface_depth);
+	fb_args.handles[0] = dumb_args.handle;
+	fb_args.pitches[0] = dumb_args.pitch;
+
+	ret = drm_mode_addfb2(dev, &fb_args, file);
+	if (ret)
+		goto err_free_file;
+
+	fb = drm_framebuffer_lookup(dev, file, fb_args.fb_id);
+	if (!fb) {
+		ret = -ENOENT;
+		goto err_free_file;
+	}
+
+	/* drop the reference we picked up in framebuffer lookup */
+	drm_framebuffer_put(fb);
+
+	fb_helper->dumb_handle = dumb_args.handle;
+	fb_helper->file = file;
+	fb_helper->fb = fb;
+
+	fbi = drm_fb_helper_alloc_fbi(fb_helper);
+	if (IS_ERR(fbi)) {
+		ret = PTR_ERR(fbi);
+		goto err_free_file;
+	}
+
+	fbi->par = fb_helper;
+	fbi->fbops = &drm_fb_helper_generic_fbdev_ops;
+	fbi->screen_size = fb->height * fb->pitches[0];
+	fbi->fix.smem_len = fbi->screen_size;
+	strcpy(fbi->fix.id, "generic");
+
+	drm_fb_helper_fill_fix(fbi, fb->pitches[0], fb->format->depth);
+	drm_fb_helper_fill_var(fbi, fb_helper, sizes->fb_width, sizes->fb_height);
+
+	if (fb->funcs->dirty) {
+		struct fb_ops *fbops;
+
+		/*
+		 * fb_deferred_io_cleanup() clears &fbops->fb_mmap so a per
+		 * instance version is necessary.
+		 */
+		fbops = kzalloc(sizeof(*fbops), GFP_KERNEL);
+		if (!fbops) {
+			ret = -ENOMEM;
+			goto err_fb_info_destroy;
+		}
+
+		*fbops = *fbi->fbops;
+		fbi->fbops = fbops;
+		fbi->fbdefio = &drm_fb_helper_generic_defio;
+	}
+
+	atomic_set(&fb_helper->open_count, 0);
+
+	return 0;
+
+err_fb_info_destroy:
+	drm_fb_helper_fini(fb_helper);
+err_free_file:
+	drm_file_free(file);
+
+	return ret;
+}
+
+static void drm_fb_helper_generic_release(struct drm_fb_helper *fb_helper)
+{
+	struct fb_ops *fbops = NULL;
+
+	if (fb_helper->fbdev->fbdefio)
+		fbops = fb_helper->fbdev->fbops;
+
+	drm_fb_helper_fini(fb_helper);
+	drm_file_free(fb_helper->file);
+
+	kfree(fb_helper);
+	kfree(fbops);
+}
+
+static const struct drm_fb_helper_funcs drm_fb_helper_generic_funcs = {
+	.fb_probe	= drm_fb_helper_generic_probe,
+	.restore	= drm_fb_helper_restore_fbdev_mode_unlocked,
+	.hotplug_event	= drm_fb_helper_hotplug_event,
+	.unregister	= drm_fb_helper_unregister_fbi,
+	.release	= drm_fb_helper_generic_release,
+};
+
+/**
+ * drm_fb_helper_generic_fbdev_setup() - Setup generic fbdev emulation
+ * @dev: DRM device
+ * @preferred_bpp: Preferred bits per pixel for the device.
+ *                 @dev->mode_config.preferred_depth is used if this is zero.
+ * @max_conn_count: Maximum number of connectors.
+ *                  @dev->mode_config.num_connector is used if this is zero.
+ *
+ * This function sets up generic fbdev emulation for drivers that supports
+ * dumb buffers and provides exported buffers with a virtual address.
+ * The driver doesn't have to anything else than to call this function,
+ * restore, hotplug events and teardown are all taken care of.
+ *
+ * Returns:
+ * Zero on success or negative error code on failure.
+ */
+int drm_fb_helper_generic_fbdev_setup(struct drm_device *dev,
+				      unsigned int preferred_bpp,
+				      unsigned int max_conn_count)
+{
+	struct drm_fb_helper *fb_helper;
+	int ret;
+
+	if (!drm_fbdev_emulation)
+		return 0;
+
+	fb_helper = kzalloc(sizeof(*fb_helper), GFP_KERNEL);
+	if (!fb_helper)
+		return -ENOMEM;
+
+	ret = drm_fb_helper_fbdev_setup(dev, fb_helper,
+					&drm_fb_helper_generic_funcs,
+					preferred_bpp, max_conn_count);
+	if (ret) {
+		kfree(fb_helper);
+		return ret;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_fb_helper_generic_fbdev_setup);
 
 /* The Kconfig DRM_KMS_HELPER selects FRAMEBUFFER_CONSOLE (if !EXPERT)
  * but the module doesn't depend on any fb console symbols.  At least

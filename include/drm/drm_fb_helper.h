@@ -279,6 +279,28 @@ struct drm_fb_helper {
 	 * initial value to 0 themselves.
 	 */
 	atomic_t open_count;
+
+	/**
+	 * @file:
+	 *
+	 * Optional DRM file. Used by the generic fbdev code.
+	 */
+	struct drm_file *file;
+
+	/**
+	 * @dumb_handle:
+	 *
+	 * Optional dumb buffer handle. Used by the generic fbdev code.
+	 */
+	u32 dumb_handle;
+
+	/**
+	 * @dma_buf:
+	 *
+	 * Optional pointer to a DMA buffer object.
+	 * Used by the generic fbdev code.
+	 */
+	struct dma_buf *dma_buf;
 };
 
 /**
@@ -382,6 +404,10 @@ void drm_fb_helper_fbdev_teardown(struct drm_device *dev);
 
 void drm_fb_helper_lastclose(struct drm_device *dev);
 void drm_fb_helper_output_poll_changed(struct drm_device *dev);
+
+int drm_fb_helper_generic_fbdev_setup(struct drm_device *dev,
+				      unsigned int preferred_bpp,
+				      unsigned int max_conn_count);
 #else
 static inline void drm_fb_helper_prepare(struct drm_device *dev,
 					struct drm_fb_helper *helper,
@@ -626,6 +652,13 @@ static inline void drm_fb_helper_output_poll_changed(struct drm_device *dev)
 {
 }
 
+static inline int
+drm_fb_helper_generic_fbdev_setup(struct drm_device *dev,
+				  unsigned int preferred_bpp,
+				  unsigned int max_conn_count)
+{
+	return 0;
+}
 #endif
 
 static inline int
