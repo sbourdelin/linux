@@ -2098,11 +2098,9 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		if (skb_tailroom(skb) < 124 || skb_cloned(skb)) {
 			/* copy to a new sk_buff with more tailroom */
 			ns = dev_alloc_skb(skb->len + 128);
-			if (!ns) {
-				netdev_err(ppp->dev, "PPP: no memory "
-					   "(VJ decomp)\n");
+			if (!ns)
 				goto err;
-			}
+
 			skb_reserve(ns, 2);
 			skb_copy_bits(skb, 0, skb_put(ns, skb->len), skb->len);
 			consume_skb(skb);
@@ -2237,11 +2235,9 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 		}
 
 		ns = dev_alloc_skb(obuff_size);
-		if (!ns) {
-			netdev_err(ppp->dev, "ppp_decompress_frame: "
-				   "no memory\n");
+		if (!ns)
 			goto err;
-		}
+
 		/* the decompressor still expects the A/C bytes in the hdr */
 		len = ppp->rcomp->decompress(ppp->rc_state, skb->data - 2,
 				skb->len + 2, ns->data, obuff_size);

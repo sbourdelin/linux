@@ -682,10 +682,9 @@ ppp_sync_input(struct syncppp *ap, const unsigned char *buf,
 
 	/* stuff the chars in the skb */
 	skb = dev_alloc_skb(ap->mru + PPP_HDRLEN + 2);
-	if (!skb) {
-		printk(KERN_ERR "PPPsync: no memory (input pkt)\n");
+	if (!skb)
 		goto err;
-	}
+
 	/* Try to get the payload 4-byte aligned */
 	if (buf[0] != PPP_ALLSTATIONS)
 		skb_reserve(skb, 2 + (buf[0] & 1));
