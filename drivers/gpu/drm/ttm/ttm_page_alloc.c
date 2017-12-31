@@ -1007,6 +1007,10 @@ int ttm_page_alloc_init(struct ttm_mem_global *glob, unsigned max_pages)
 	pr_info("Initializing pool allocator\n");
 
 	_manager = kzalloc(sizeof(*_manager), GFP_KERNEL);
+	if (!_manager) {
+		ret = -ENOMEM;
+		goto out;
+	}
 
 	ttm_page_pool_init_locked(&_manager->wc_pool, GFP_HIGHUSER, "wc", 0);
 
@@ -1034,13 +1038,17 @@ int ttm_page_alloc_init(struct ttm_mem_global *glob, unsigned max_pages)
 				   &glob->kobj, "pool");
 	if (unlikely(ret != 0)) {
 		kobject_put(&_manager->kobj);
-		_manager = NULL;
-		return ret;
+		goto out_free_mgr;
 	}
 
 	ttm_pool_mm_shrink_init(_manager);
 
 	return 0;
+out_free_mgr:
+	kfree(_manager);
+	_manager = NULL;
+out:
+	return ret;
 }
 
 void ttm_page_alloc_fini(void)
@@ -1055,6 +1063,7 @@ void ttm_page_alloc_fini(void)
 		ttm_page_pool_free(&_manager->pools[i], FREE_ALL_PAGES, true);
 
 	kobject_put(&_manager->kobj);
+	kfree(_manager);
 	_manager = NULL;
 }
 
