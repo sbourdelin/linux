@@ -73,6 +73,19 @@ static void __noreturn pas_restart(char *cmd)
 		out_le32(reset_reg, 0x6000000);
 }
 
+#ifdef CONFIG_PPC_PASEMI_NEMO
+/* A flag to indicate we are running on Nemo */
+static bool nemo_board = false;
+
+void pas_shutdown(void)
+{
+	/* Set the PLD bit that makes the SB600 think the power button is being pressed */
+	void __iomem *pld_map = ioremap(0xf5000000,4096);
+	while (1)
+		out_8(pld_map+7,0x01);
+}
+#endif
+
 #ifdef CONFIG_SMP
 static arch_spinlock_t timebase_lock;
 static unsigned long timebase;
@@ -492,12 +505,34 @@ static const struct of_device_id pasemi_bus_ids[] = {
 	{},
 };
 
+#ifdef CONFIG_PPC_PASEMI_NEMO
+static struct resource rtc_resource[] = {{
+	.name = "rtc",
+	.start = 0x70,
+	.end = 0x71,
+	.flags = IORESOURCE_IO,
+}, {
+	.name = "rtc",
+	.start = 8,
+	.end = 8,
+	.flags = IORESOURCE_IRQ,
+}};
+#endif
+
 static int __init pasemi_publish_devices(void)
 {
 	pasemi_pcmcia_init();
 
 	/* Publish OF platform devices for SDC and other non-PCI devices */
 	of_platform_bus_probe(NULL, pasemi_bus_ids, NULL);
+
+#ifdef CONFIG_PPC_PASEMI_NEMO
+	/*
+	 * Activate the SB600's rtc
+	 */
+	if (nemo_board)
+		platform_device_register_simple("rtc_cmos", -1, rtc_resource, 2);
+#endif
 
 	return 0;
 }
