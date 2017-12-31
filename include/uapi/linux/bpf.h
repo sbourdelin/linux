@@ -959,6 +959,7 @@ struct bpf_sock_ops {
 				 */
 	__u32 snd_cwnd;
 	__u32 srtt_us;		/* Averaged RTT << 3 in usecs */
+	__u32 bpf_sock_ops_flags; /* flags defined in uapi/linux/tcp.h */
 };
 
 /* List of known BPF sock_ops operators.

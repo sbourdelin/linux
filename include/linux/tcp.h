@@ -373,6 +373,14 @@ struct tcp_sock {
 	 */
 	struct request_sock *fastopen_rsk;
 	u32	*saved_syn;
+
+/* Sock_ops bpf program related variables */
+#ifdef CONFIG_BPF
+	u32     bpf_sock_ops_flags;     /* values defined in uapi/linux/tcp.h */
+#define BPF_SOCK_OPS_TEST_FLAG(TP, ARG) (TP->bpf_sock_ops_flags & ARG)
+#else
+#define BPF_SOCK_OPS_TEST_FLAG(TP, ARG) 0
+#endif
 };
 
 enum tsq_enum {

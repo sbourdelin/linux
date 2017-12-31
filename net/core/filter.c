@@ -3842,6 +3842,7 @@ static bool sock_ops_is_valid_access(int off, int size,
 		switch (off) {
 		case offsetof(struct bpf_sock_ops, op) ...
 		     offsetof(struct bpf_sock_ops, replylong[3]):
+		case offsetof(struct bpf_sock_ops, bpf_sock_ops_flags):
 			break;
 		default:
 			return false;
@@ -4523,6 +4524,12 @@ static u32 sock_ops_convert_ctx_access(enum bpf_access_type type,
 
 	case offsetof(struct bpf_sock_ops, srtt_us):
 		SOCK_OPS_GET_FIELD(srtt_us, srtt_us, struct tcp_sock);
+		break;
+
+	case offsetof(struct bpf_sock_ops, bpf_sock_ops_flags):
+		SOCK_OPS_GET_OR_SET_FIELD(bpf_sock_ops_flags,
+					  bpf_sock_ops_flags,
+					  struct tcp_sock, type);
 		break;
 	}
 	return insn - insn_buf;
