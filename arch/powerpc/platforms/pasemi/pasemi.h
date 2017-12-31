@@ -3,6 +3,9 @@
 #define _PASEMI_PASEMI_H
 
 extern unsigned long pas_get_boot_time(void);
+#ifdef CONFIG_PPC_PASEMI_NEMO
+extern void nemo_pci_init(void);
+#endif
 extern void pas_pci_init(void);
 extern void pas_pci_irq_fixup(struct pci_dev *dev);
 extern void pas_pci_dma_dev_setup(struct pci_dev *dev);
