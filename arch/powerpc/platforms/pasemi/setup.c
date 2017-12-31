@@ -136,7 +136,14 @@ static void __init pas_setup_arch(void)
 	smp_ops = &pas_smp_ops;
 #endif
 	/* Lookup PCI hosts */
+#ifdef CONFIG_PPC_PASEMI_NEMO
+	if (nemo_board)
+		nemo_pci_init();
+	else
+		pas_pci_init();
+#else
 	pas_pci_init();
+#endif
 
 #ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;
@@ -547,6 +554,19 @@ static int __init pas_probe(void)
 	if (!of_machine_is_compatible("PA6T-1682M") &&
 	    !of_machine_is_compatible("pasemi,pwrficient"))
 		return 0;
+
+#ifdef CONFIG_PPC_PASEMI_NEMO
+	/*
+	 * Check for the Nemo motherboard here, if we are running on one
+	 * change the machine definition to fit
+	 */
+	if (of_machine_is_compatible("pasemi,nemo")) {
+		pm_power_off		= pas_shutdown;
+		ppc_md.name		= "A-EON Amigaone X1000";
+		ppc_md.init_IRQ		= nemo_init_IRQ;
+		nemo_board = true;
+	}
+#endif
 
 	iommu_init_early_pasemi();
 
