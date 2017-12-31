@@ -767,12 +767,7 @@ long drm_ioctl(struct file *filp,
 	struct drm_file *file_priv = filp->private_data;
 	struct drm_device *dev;
 	const struct drm_ioctl_desc *ioctl = NULL;
-	drm_ioctl_t *func;
 	unsigned int nr = DRM_IOCTL_NR(cmd);
-	int retcode = -EINVAL;
-	char stack_kdata[128];
-	char *kdata = NULL;
-	unsigned int in_size, out_size, drv_size, ksize;
 	bool is_driver_ioctl;
 
 	dev = file_priv->minor->dev;
@@ -784,15 +779,32 @@ long drm_ioctl(struct file *filp,
 
 	if (is_driver_ioctl) {
 		/* driver ioctl */
-		if (nr - DRM_COMMAND_BASE >= dev->driver->num_ioctls)
-			goto err_i1;
-		ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
+		if (nr - DRM_COMMAND_BASE < dev->driver->num_ioctls)
+			ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
 	} else {
 		/* core ioctl */
-		if (nr >= DRM_CORE_IOCTL_COUNT)
-			goto err_i1;
-		ioctl = &drm_ioctls[nr];
+		if (nr < DRM_CORE_IOCTL_COUNT)
+			ioctl = &drm_ioctls[nr];
 	}
+
+	return __drm_ioctl(filp, cmd, arg, ioctl);
+}
+EXPORT_SYMBOL(drm_ioctl);
+
+long __drm_ioctl(struct file *filp,
+		 unsigned int cmd, unsigned long arg,
+		 const struct drm_ioctl_desc *ioctl)
+{
+	struct drm_file *file_priv = filp->private_data;
+	drm_ioctl_t *func;
+	unsigned int nr = DRM_IOCTL_NR(cmd);
+	int retcode = -EINVAL;
+	char stack_kdata[128];
+	char *kdata = NULL;
+	unsigned int in_size, out_size, drv_size, ksize;
+
+	if (!ioctl)
+		goto err_i1;
 
 	drv_size = _IOC_SIZE(ioctl->cmd);
 	out_size = in_size = _IOC_SIZE(cmd);
@@ -851,7 +863,7 @@ long drm_ioctl(struct file *filp,
 		DRM_DEBUG("ret = %d\n", retcode);
 	return retcode;
 }
-EXPORT_SYMBOL(drm_ioctl);
+EXPORT_SYMBOL(__drm_ioctl);
 
 /**
  * drm_ioctl_flags - Check for core ioctl and return ioctl permission flags
