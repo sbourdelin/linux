@@ -2011,6 +2011,14 @@ free_priv:
 	return NULL;
 }
 
+void ipoib_free_rdma_netdev(struct net_device *dev)
+{
+	struct rdma_netdev *rn = netdev_priv(dev);
+
+	rn->free_rdma_netdev(dev);
+	kfree(ipoib_priv(dev));
+}
+
 static ssize_t show_pkey(struct device *dev,
 			 struct device_attribute *attr, char *buf)
 {
@@ -2192,7 +2200,6 @@ static struct net_device *ipoib_add_port(const char *format,
 {
 	struct ipoib_dev_priv *priv;
 	struct ib_port_attr attr;
-	struct rdma_netdev *rn;
 	int result = -ENOMEM;
 
 	priv = ipoib_intf_alloc(hca, port, format);
@@ -2292,9 +2299,7 @@ register_failed:
 	ipoib_dev_cleanup(priv->dev);
 
 device_init_failed:
-	rn = netdev_priv(priv->dev);
-	rn->free_rdma_netdev(priv->dev);
-	kfree(priv);
+	ipoib_free_rdma_netdev(priv->dev);
 
 alloc_mem_failed:
 	return ERR_PTR(result);
@@ -2367,13 +2372,9 @@ static void ipoib_remove_one(struct ib_device *device, void *client_data)
 
 		parent_rn->free_rdma_netdev(priv->dev);
 
-		list_for_each_entry_safe(cpriv, tcpriv, &priv->child_intfs, list) {
-			struct rdma_netdev *child_rn;
-
-			child_rn = netdev_priv(cpriv->dev);
-			child_rn->free_rdma_netdev(cpriv->dev);
-			kfree(cpriv);
-		}
+		list_for_each_entry_safe(cpriv, tcpriv,
+					 &priv->child_intfs, list)
+			ipoib_free_rdma_netdev(cpriv->dev);
 
 		kfree(priv);
 	}

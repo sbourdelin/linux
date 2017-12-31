@@ -162,29 +162,23 @@ int ipoib_vlan_add(struct net_device *pdev, unsigned short pkey)
 		result = -ENOTUNIQ;
 		goto out;
 	}
-
 	list_for_each_entry(tpriv, &ppriv->child_intfs, list) {
 		if (tpriv->pkey == pkey &&
-		    tpriv->child_type == IPOIB_LEGACY_CHILD) {
+		    (tpriv->child_type == IPOIB_LEGACY_CHILD ||
+		     tpriv->child_type == IPOIB_RTNL_CHILD)) {
 			result = -ENOTUNIQ;
 			goto out;
 		}
 	}
 
 	result = __ipoib_vlan_add(ppriv, priv, pkey, IPOIB_LEGACY_CHILD);
-
 out:
 	up_write(&ppriv->vlan_rwsem);
 	rtnl_unlock();
 	mutex_unlock(&ppriv->sysfs_mutex);
 
-	if (result && priv) {
-		struct rdma_netdev *rn;
-
-		rn = netdev_priv(priv->dev);
-		rn->free_rdma_netdev(priv->dev);
-		kfree(priv);
-	}
+	if (result && priv)
+		ipoib_free_rdma_netdev(priv->dev);
 
 	return result;
 }
@@ -235,11 +229,7 @@ int ipoib_vlan_delete(struct net_device *pdev, unsigned short pkey)
 	mutex_unlock(&ppriv->sysfs_mutex);
 
 	if (dev) {
-		struct rdma_netdev *rn;
-
-		rn = netdev_priv(dev);
-		rn->free_rdma_netdev(priv->dev);
-		kfree(priv);
+		ipoib_free_rdma_netdev(dev);
 		return 0;
 	}
 
