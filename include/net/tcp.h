@@ -2005,7 +2005,7 @@ void tcp_cleanup_ulp(struct sock *sk);
  * program loaded).
  */
 #ifdef CONFIG_BPF
-static inline int tcp_call_bpf(struct sock *sk, int op)
+static inline int tcp_call_bpf(struct sock *sk, int op, u32 nargs, u32 *args)
 {
 	struct bpf_sock_ops_kern sock_ops;
 	int ret;
@@ -2018,6 +2018,8 @@ static inline int tcp_call_bpf(struct sock *sk, int op)
 
 	sock_ops.sk = sk;
 	sock_ops.op = op;
+	if (nargs > 0)
+		memcpy(sock_ops.args, args, nargs*sizeof(u32));
 
 	ret = BPF_CGROUP_RUN_PROG_SOCK_OPS(&sock_ops);
 	if (ret == 0)
@@ -2026,18 +2028,70 @@ static inline int tcp_call_bpf(struct sock *sk, int op)
 		ret = -1;
 	return ret;
 }
+
+static inline int tcp_call_bpf_1arg(struct sock *sk, int op, u32 arg)
+{
+	return tcp_call_bpf(sk, op, 1, &arg);
+}
+
+static inline int tcp_call_bpf_2arg(struct sock *sk, int op, u32 arg1, u32 arg2)
+{
+	u32 args[2] = {arg1, arg2};
+
+	return tcp_call_bpf(sk, op, 2, args);
+}
+
+static inline int tcp_call_bpf_3arg(struct sock *sk, int op, u32 arg1, u32 arg2,
+				    u32 arg3)
+{
+	u32 args[3] = {arg1, arg2, arg3};
+
+	return tcp_call_bpf(sk, op, 3, args);
+}
+
+static inline int tcp_call_bpf_4arg(struct sock *sk, int op, u32 arg1, u32 arg2,
+				    u32 arg3, u32 arg4)
+{
+	u32 args[4] = {arg1, arg2, arg3, arg4};
+
+	return tcp_call_bpf(sk, op, 4, args);
+}
+
 #else
-static inline int tcp_call_bpf(struct sock *sk, int op)
+static inline int tcp_call_bpf(struct sock *sk, int op, u32 nargs, u32 *args)
 {
 	return -EPERM;
 }
+
+static inline int tcp_call_bpf_1arg(struct sock *sk, int op, u32 arg)
+{
+	return -EPERM;
+}
+
+static inline int tcp_call_bpf_2arg(struct sock *sk, int op, u32 arg1, u32 arg2)
+{
+	return -EPERM;
+}
+
+static inline int tcp_call_bpf_3arg(struct sock *sk, int op, u32 arg1, u32 arg2,
+	u32 arg3)
+{
+	return -EPERM;
+}
+
+static inline int tcp_call_bpf_4arg(struct sock *sk, int op, u32 arg1, u32 arg2,
+				    u32 arg3, u32 arg4)
+{
+	return -EPERM;
+}
+
 #endif
 
 static inline u32 tcp_timeout_init(struct sock *sk)
 {
 	int timeout;
 
-	timeout = tcp_call_bpf(sk, BPF_SOCK_OPS_TIMEOUT_INIT);
+	timeout = tcp_call_bpf(sk, BPF_SOCK_OPS_TIMEOUT_INIT, 0, NULL);
 
 	if (timeout <= 0)
 		timeout = TCP_TIMEOUT_INIT;
@@ -2048,7 +2102,7 @@ static inline u32 tcp_rwnd_init_bpf(struct sock *sk)
 {
 	int rwnd;
 
-	rwnd = tcp_call_bpf(sk, BPF_SOCK_OPS_RWND_INIT);
+	rwnd = tcp_call_bpf(sk, BPF_SOCK_OPS_RWND_INIT, 0, NULL);
 
 	if (rwnd < 0)
 		rwnd = 0;
@@ -2057,7 +2111,7 @@ static inline u32 tcp_rwnd_init_bpf(struct sock *sk)
 
 static inline bool tcp_bpf_ca_needs_ecn(struct sock *sk)
 {
-	return (tcp_call_bpf(sk, BPF_SOCK_OPS_NEEDS_ECN) == 1);
+	return (tcp_call_bpf(sk, BPF_SOCK_OPS_NEEDS_ECN, 0, NULL) == 1);
 }
 
 #if IS_ENABLED(CONFIG_SMC)
