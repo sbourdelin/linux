@@ -522,6 +522,9 @@ int drm_fb_helper_restore_fbdev_mode_unlocked(struct drm_fb_helper *fb_helper)
 	if (READ_ONCE(fb_helper->deferred_setup))
 		return 0;
 
+	if (!atomic_read(&fb_helper->open_count))
+		return 0;
+
 	mutex_lock(&fb_helper->lock);
 	ret = restore_fbdev_mode(fb_helper);
 
@@ -781,6 +784,7 @@ void drm_fb_helper_prepare(struct drm_device *dev, struct drm_fb_helper *helper,
 	INIT_WORK(&helper->resume_work, drm_fb_helper_resume_worker);
 	INIT_WORK(&helper->dirty_work, drm_fb_helper_dirty_work);
 	helper->dirty_clip.x1 = helper->dirty_clip.y1 = ~0;
+	atomic_set(&helper->open_count, 1);
 	mutex_init(&helper->lock);
 	helper->funcs = funcs;
 	helper->dev = dev;
@@ -1212,6 +1216,7 @@ EXPORT_SYMBOL(drm_fb_helper_cfb_imageblit);
  * @info: fbdev registered by the helper
  * @user: 1=userspace, 0=fbcon
  *
+ * Increase fbdev use count.
  * If &fb_ops is wrapped in a library, pin the driver module.
  */
 int drm_fb_helper_fb_open(struct fb_info *info, int user)
@@ -1224,6 +1229,8 @@ int drm_fb_helper_fb_open(struct fb_info *info, int user)
 			return -ENODEV;
 	}
 
+	atomic_inc(&fb_helper->open_count);
+
 	return 0;
 }
 EXPORT_SYMBOL(drm_fb_helper_fb_open);
@@ -1233,12 +1240,17 @@ EXPORT_SYMBOL(drm_fb_helper_fb_open);
  * @info: fbdev registered by the helper
  * @user: 1=userspace, 0=fbcon
  *
+ * Decrease fbdev use count and turn off if there are no users left.
  * If &fb_ops is wrapped in a library, unpin the driver module.
  */
 int drm_fb_helper_fb_release(struct fb_info *info, int user)
 {
 	struct drm_fb_helper *fb_helper = info->par;
 	struct drm_device *dev = fb_helper->dev;
+
+	if (atomic_dec_and_test(&fb_helper->open_count) &&
+	    !drm_dev_is_unplugged(fb_helper->dev))
+		drm_fb_helper_blank(FB_BLANK_POWERDOWN, info);
 
 	if (info->fbops->owner != dev->driver->fops->owner)
 		module_put(dev->driver->fops->owner);
@@ -1935,6 +1947,9 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 	ret = (*fb_helper->funcs->fb_probe)(fb_helper, &sizes);
 	if (ret < 0)
 		return ret;
+
+	if (fb_helper->fbdev->fbops->fb_open == drm_fb_helper_fb_open)
+		atomic_set(&fb_helper->open_count, 0);
 
 	strcpy(fb_helper->fb->comm, "[fbcon]");
 	return 0;

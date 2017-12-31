@@ -232,6 +232,20 @@ struct drm_fb_helper {
 	 * See also: @deferred_setup
 	 */
 	int preferred_bpp;
+
+	/**
+	 * @open_count:
+	 *
+	 * Keeps track of fbdev use to know when to not restore fbdev.
+	 *
+	 * Drivers that use DRM_FB_HELPER_DEFAULT_OPS and don't override
+	 * \.fb_open will get an initial value of 0 and get restore based on
+	 * actual use. Others will get an initial value of 1 which means that
+	 * fbdev will always be restored. Drivers that call
+	 * drm_fb_helper_fb_open() in their \.fb_open, thus needs to set the
+	 * initial value to 0 themselves.
+	 */
+	atomic_t open_count;
 };
 
 /**
