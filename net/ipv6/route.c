@@ -3503,6 +3503,29 @@ void rt6_sync_up(struct net_device *dev, unsigned int nh_flags)
 	fib6_clean_all(dev_net(dev), fib6_ifup, &arg);
 }
 
+static bool rt6_multipath_uses_dev(const struct rt6_info *rt,
+				   const struct net_device *dev)
+{
+	struct rt6_info *iter;
+
+	if (rt->dst.dev == dev)
+		return true;
+	list_for_each_entry(iter, &rt->rt6i_siblings, rt6i_siblings)
+		if (iter->dst.dev == dev)
+			return true;
+
+	return false;
+}
+
+static void rt6_multipath_flush(struct rt6_info *rt)
+{
+	struct rt6_info *iter;
+
+	rt->should_flush = 1;
+	list_for_each_entry(iter, &rt->rt6i_siblings, rt6i_siblings)
+		iter->should_flush = 1;
+}
+
 /* called with write lock held for table with rt */
 static int fib6_ifdown(struct rt6_info *rt, void *p_arg)
 {
@@ -3510,20 +3533,31 @@ static int fib6_ifdown(struct rt6_info *rt, void *p_arg)
 	const struct net_device *dev = arg->dev;
 	const struct net *net = dev_net(dev);
 
-	if (rt->dst.dev != dev || rt == net->ipv6.ip6_null_entry)
+	if (rt == net->ipv6.ip6_null_entry)
 		return 0;
 
 	switch (arg->event) {
 	case NETDEV_UNREGISTER:
-		return -1;
+		if (rt->should_flush)
+			return -1;
+		if (!rt->rt6i_nsiblings)
+			return rt->dst.dev == dev ? -1 : 0;
+		if (rt6_multipath_uses_dev(rt, dev)) {
+			rt6_multipath_flush(rt);
+			return -1;
+		}
+		return -2;
 	case NETDEV_DOWN:
+		if (rt->dst.dev != dev)
+			break;
 		if (rt->rt6i_nsiblings == 0 ||
 		    !rt->rt6i_idev->cnf.ignore_routes_with_linkdown)
 			return -1;
-		rt->rt6i_nh_flags |= RTNH_F_DEAD;
-		/* fall through */
+		rt->rt6i_nh_flags |= (RTNH_F_DEAD | RTNH_F_LINKDOWN);
+		break;
 	case NETDEV_CHANGE:
-		if (rt->rt6i_flags & (RTF_LOCAL | RTF_ANYCAST))
+		if (rt->dst.dev != dev ||
+		    rt->rt6i_flags & (RTF_LOCAL | RTF_ANYCAST))
 			break;
 		rt->rt6i_nh_flags |= RTNH_F_LINKDOWN;
 		break;
