@@ -4930,11 +4930,8 @@ static struct be_cmd_work *be_alloc_work(struct be_adapter *adapter,
 	struct be_cmd_work *work;
 
 	work = kzalloc(sizeof(*work), GFP_ATOMIC);
-	if (!work) {
-		dev_err(&adapter->pdev->dev,
-			"be_work memory allocation failed\n");
+	if (!work)
 		return NULL;
-	}
 
 	INIT_WORK(&work->work, func);
 	work->adapter = adapter;
