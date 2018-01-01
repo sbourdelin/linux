@@ -2155,7 +2155,6 @@ static int bcm_enetsw_open(struct net_device *dev)
 	priv->tx_skb = kzalloc(sizeof(struct sk_buff *) * priv->tx_ring_size,
 			       GFP_KERNEL);
 	if (!priv->tx_skb) {
-		dev_err(kdev, "cannot allocate rx skb queue\n");
 		ret = -ENOMEM;
 		goto out_free_tx_ring;
 	}
@@ -2169,7 +2168,6 @@ static int bcm_enetsw_open(struct net_device *dev)
 	priv->rx_skb = kzalloc(sizeof(struct sk_buff *) * priv->rx_ring_size,
 			       GFP_KERNEL);
 	if (!priv->rx_skb) {
-		dev_err(kdev, "cannot allocate rx skb queue\n");
 		ret = -ENOMEM;
 		goto out_free_tx_skb;
 	}
