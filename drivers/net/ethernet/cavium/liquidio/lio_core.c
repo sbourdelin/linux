@@ -915,10 +915,8 @@ int octeon_setup_interrupt(struct octeon_device *oct, u32 num_ioqs)
 		/* allocate storage for the names assigned to each irq */
 		oct->irq_name_storage =
 			kcalloc(num_interrupts, INTRNAMSIZ, GFP_KERNEL);
-		if (!oct->irq_name_storage) {
-			dev_err(&oct->pci_dev->dev, "Irq name storage alloc failed...\n");
+		if (!oct->irq_name_storage)
 			return -ENOMEM;
-		}
 
 		queue_irq_names = oct->irq_name_storage;
 
@@ -930,7 +928,6 @@ int octeon_setup_interrupt(struct octeon_device *oct, u32 num_ioqs)
 					    sizeof(struct msix_entry),
 					    GFP_KERNEL);
 		if (!oct->msix_entries) {
-			dev_err(&oct->pci_dev->dev, "Memory Alloc failed...\n");
 			kfree(oct->irq_name_storage);
 			oct->irq_name_storage = NULL;
 			return -ENOMEM;
