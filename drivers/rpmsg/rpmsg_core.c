@@ -321,11 +321,11 @@ struct device *rpmsg_find_device(struct device *parent,
 }
 EXPORT_SYMBOL(rpmsg_find_device);
 
-/* sysfs show configuration fields */
+/* sysfs configuration fields */
 #define rpmsg_show_attr(field, path, format_string)			\
 static ssize_t								\
 field##_show(struct device *dev,					\
-			struct device_attribute *attr, char *buf)	\
+	     struct device_attribute *attr, char *buf)			\
 {									\
 	struct rpmsg_device *rpdev = to_rpmsg_device(dev);		\
 									\
@@ -333,11 +333,52 @@ field##_show(struct device *dev,					\
 }									\
 static DEVICE_ATTR_RO(field);
 
+#define rpmsg_string_attr(field, path)					\
+static ssize_t								\
+field##_store(struct device *dev,					\
+	      struct device_attribute *attr, const char *buf, size_t sz)\
+{									\
+	struct rpmsg_device *rpdev = to_rpmsg_device(dev);		\
+	char *new, *old, *cp;						\
+									\
+	new = kstrndup(buf, sz, GFP_KERNEL);				\
+	if (!new)							\
+		return -ENOMEM;						\
+									\
+	cp = strchr(new, '\n');						\
+	if (cp)								\
+		*cp = '\0';						\
+									\
+	device_lock(dev);						\
+	old = rpdev->path;						\
+	if (strlen(new)) {						\
+		rpdev->path = new;					\
+	} else {							\
+		kfree(new);						\
+		rpdev->path = NULL;					\
+	}								\
+	device_unlock(dev);						\
+									\
+	kfree(old);							\
+									\
+	return sz;							\
+}									\
+static ssize_t								\
+field##_show(struct device *dev,					\
+	     struct device_attribute *attr, char *buf)			\
+{									\
+	struct rpmsg_device *rpdev = to_rpmsg_device(dev);		\
+									\
+	return sprintf(buf, "%s\n", rpdev->path);			\
+}									\
+static DEVICE_ATTR_RW(field)
+
 /* for more info, see Documentation/ABI/testing/sysfs-bus-rpmsg */
 rpmsg_show_attr(name, id.name, "%s\n");
 rpmsg_show_attr(src, src, "0x%x\n");
 rpmsg_show_attr(dst, dst, "0x%x\n");
 rpmsg_show_attr(announce, announce ? "true" : "false", "%s\n");
+rpmsg_string_attr(driver_override, driver_override);
 
 static ssize_t modalias_show(struct device *dev,
 			     struct device_attribute *attr, char *buf)
@@ -359,6 +400,7 @@ static struct attribute *rpmsg_dev_attrs[] = {
 	&dev_attr_dst.attr,
 	&dev_attr_src.attr,
 	&dev_attr_announce.attr,
+	&dev_attr_driver_override.attr,
 	NULL,
 };
 ATTRIBUTE_GROUPS(rpmsg_dev);
