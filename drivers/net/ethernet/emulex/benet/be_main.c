@@ -5001,7 +5001,6 @@ err:
 	be_disable_vxlan_offloads(adapter);
 done:
 	kfree(cmd_work);
-	return;
 }
 
 static void be_work_del_vxlan_port(struct work_struct *work)
