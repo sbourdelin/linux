@@ -720,17 +720,21 @@ static int tipc_nl_compat_link_set(struct tipc_nl_compat_cmd_doit *cmd,
 
 	lc = (struct tipc_link_config *)TLV_DATA(msg->req);
 
+	rtnl_lock();
 	media = tipc_media_find(lc->name);
 	if (media) {
 		cmd->doit = &tipc_nl_media_set;
+		rtnl_unlock();
 		return tipc_nl_compat_media_set(skb, msg);
 	}
 
 	bearer = tipc_bearer_find(msg->net, lc->name);
 	if (bearer) {
 		cmd->doit = &tipc_nl_bearer_set;
+		rtnl_unlock();
 		return tipc_nl_compat_bearer_set(skb, msg);
 	}
+	rtnl_unlock();
 
 	return __tipc_nl_compat_link_set(skb, msg);
 }
