@@ -767,10 +767,9 @@ int hns_rcb_common_get_cfg(struct dsaf_device *dsaf_dev,
 	rcb_common =
 		devm_kzalloc(dsaf_dev->dev, sizeof(*rcb_common) +
 			ring_num * sizeof(struct ring_pair_cb), GFP_KERNEL);
-	if (!rcb_common) {
-		dev_err(dsaf_dev->dev, "rcb common devm_kzalloc fail!\n");
+	if (!rcb_common)
 		return -ENOMEM;
-	}
+
 	rcb_common->comm_index = comm_index;
 	rcb_common->ring_num = ring_num;
 	rcb_common->dsaf_dev = dsaf_dev;
