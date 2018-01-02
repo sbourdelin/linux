@@ -687,7 +687,7 @@ static int __zswap_param_set(const char *val, const struct kernel_param *kp,
 	}
 
 	/* no change required */
-	if (!strcmp(s, *(char **)kp->arg) && zswap_has_pool)
+	if (zswap_has_pool && !strcmp(s, *(char **)kp->arg))
 		return 0;
 
 	/* if this is load-time (pre-init) param setting,
