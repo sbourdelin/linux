@@ -20,6 +20,46 @@
 static int rtc_timer_enqueue(struct rtc_device *rtc, struct rtc_timer *timer);
 static void rtc_timer_remove(struct rtc_device *rtc, struct rtc_timer *timer);
 
+static void rtc_add_offset(struct rtc_device *rtc, struct rtc_time *tm)
+{
+	time64_t secs;
+
+	if (!rtc->offset_secs)
+		return;
+
+	secs = rtc_tm_to_time64(tm);
+	/*
+	 * Since the reading time values from RTC device are always less than
+	 * rtc->max_hw_secs, then if the reading time values are larger than
+	 * the rtc->start_secs, which means they did not subtract the offset
+	 * when writing into RTC device, so we do not need to add the offset.
+	 */
+	if (secs >= rtc->start_secs)
+		return;
+
+	rtc_time64_to_tm(secs + rtc->offset_secs, tm);
+}
+
+static void rtc_subtract_offset(struct rtc_device *rtc, struct rtc_time *tm)
+{
+	time64_t secs;
+
+	if (!rtc->offset_secs)
+		return;
+
+	secs = rtc_tm_to_time64(tm);
+	/*
+	 * If the setting time values are in the valid range of RTC hardware
+	 * device, then no need to subtract the offset when setting time to RTC
+	 * device. Otherwise we need to subtract the offset to make the time
+	 * values are valid for RTC hardware device.
+	 */
+	if (secs <= rtc->max_hw_secs)
+		return;
+
+	rtc_time64_to_tm(secs - rtc->offset_secs, tm);
+}
+
 static int __rtc_read_time(struct rtc_device *rtc, struct rtc_time *tm)
 {
 	int err;
@@ -35,6 +75,8 @@ static int __rtc_read_time(struct rtc_device *rtc, struct rtc_time *tm)
 				err);
 			return err;
 		}
+
+		rtc_add_offset(rtc, tm);
 
 		err = rtc_valid_tm(tm);
 		if (err < 0)
@@ -68,6 +110,8 @@ int rtc_set_time(struct rtc_device *rtc, struct rtc_time *tm)
 	err = rtc_valid_range(rtc, tm);
 	if (err)
 		return err;
+
+	rtc_subtract_offset(rtc, tm);
 
 	err = mutex_lock_interruptible(&rtc->ops_lock);
 	if (err)
@@ -123,6 +167,8 @@ static int rtc_read_alarm_internal(struct rtc_device *rtc, struct rtc_wkalrm *al
 	}
 
 	mutex_unlock(&rtc->ops_lock);
+
+	rtc_add_offset(rtc, &alarm->time);
 	return err;
 }
 
@@ -338,6 +384,7 @@ static int __rtc_set_alarm(struct rtc_device *rtc, struct rtc_wkalrm *alarm)
 	if (err)
 		return err;
 
+	rtc_subtract_offset(rtc, &alarm->time);
 	scheduled = rtc_tm_to_time64(&alarm->time);
 
 	/* Make sure we're not setting alarms in the past */
@@ -1074,7 +1121,8 @@ int rtc_read_range(struct rtc_device *rtc, time64_t *max_hw_secs,
  * @ tm: time values need to valid.
  *
  * Only the rtc->max_hw_secs was set, then we can valid if the setting time
- * values are beyond the RTC range.
+ * values are beyond the RTC range. When drivers set one start time values,
+ * we need to valid if the setting time values are in the new expanded range.
  */
 int rtc_valid_range(struct rtc_device *rtc, struct rtc_time *tm)
 {
@@ -1084,7 +1132,8 @@ int rtc_valid_range(struct rtc_device *rtc, struct rtc_time *tm)
 		return 0;
 
 	secs = rtc_tm_to_time64(tm);
-	if (secs < rtc->min_hw_secs || secs > rtc->max_hw_secs)
+	if (secs < rtc->start_secs ||
+	    secs > (rtc->start_secs + rtc->max_hw_secs - rtc->min_hw_secs))
 		return -EINVAL;
 
 	return 0;

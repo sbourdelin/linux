@@ -211,6 +211,55 @@ static int rtc_device_get_id(struct device *dev)
 	return id;
 }
 
+static void rtc_device_get_offset(struct rtc_device *rtc)
+{
+	u32 start_year;
+	int ret;
+
+	rtc->offset_secs = 0;
+	rtc->start_secs = rtc->min_hw_secs;
+
+	/*
+	 * If RTC driver did not implement the range of RTC hardware device,
+	 * then we can not expand the RTC range by adding or subtracting one
+	 * offset.
+	 */
+	if (!rtc->max_hw_secs)
+		return;
+
+	ret = device_property_read_u32(rtc->dev.parent, "start-year",
+				       &start_year);
+	if (ret)
+		return;
+
+	/*
+	 * Record the start time values in seconds, which are used to valid if
+	 * the setting time values are in the new expanded range.
+	 */
+	rtc->start_secs = max_t(time64_t, mktime64(start_year, 1, 1, 0, 0, 0),
+				rtc->min_hw_secs);
+
+	/*
+	 * If the start_secs is larger than the maximum seconds (max_hw_secs)
+	 * support by RTC hardware, which means the minimum seconds
+	 * (min_hw_secs) of RTC hardware will be mapped to start_secs by adding
+	 * one offset, so the offset seconds calculation formula should be:
+	 * rtc->offset_secs = rtc->start_secs - rtc->min_hw_secs;
+	 *
+	 * If the start_secs is less than max_hw_secs, then there is one region
+	 * is overlapped between the original RTC hardware range and the new
+	 * expanded range, and this overlapped region do not need to be mapped
+	 * into the new expanded range due to it is valid for RTC device. So
+	 * the minimum seconds of RTC hardware (min_hw_secs) should be mapped to
+	 * max_hw_secs + 1, then the offset seconds formula should be:
+	 * rtc->offset_secs = rtc->max_hw_secs - rtc->min_hw_secs + 1;
+	 */
+	if (rtc->start_secs > rtc->max_hw_secs)
+		rtc->offset_secs = rtc->start_secs - rtc->min_hw_secs;
+	else
+		rtc->offset_secs = rtc->max_hw_secs - rtc->min_hw_secs + 1;
+}
+
 /**
  * rtc_device_register - register w/ RTC class
  * @dev: the device to register
@@ -252,6 +301,8 @@ struct rtc_device *rtc_device_register(const char *name, struct device *dev,
 		dev_err(&rtc->dev, "%s: failed to get RTC range\n", name);
 		goto exit_ida;
 	}
+
+	rtc_device_get_offset(rtc);
 
 	/* Check to see if there is an ALARM already set in hw */
 	err = __rtc_read_alarm(rtc, &alrm);
@@ -448,6 +499,8 @@ int __rtc_register_device(struct module *owner, struct rtc_device *rtc)
 			dev_name(&rtc->dev));
 		return err;
 	}
+
+	rtc_device_get_offset(rtc);
 
 	/* Check to see if there is an ALARM already set in hw */
 	err = __rtc_read_alarm(rtc, &alrm);
