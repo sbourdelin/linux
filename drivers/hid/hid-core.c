@@ -1481,7 +1481,7 @@ int hid_report_raw_event(struct hid_device *hid, int type, u8 *data, int size,
 	if (rsize > HID_MAX_BUFFER_SIZE)
 		rsize = HID_MAX_BUFFER_SIZE;
 
-	if (csize < rsize) {
+	if ((csize < rsize) && (csize > 0)) {
 		dbg_hid("report %d is too short, (%d < %d)\n", report->id,
 				csize, rsize);
 		memset(cdata + csize, 0, rsize - csize);
@@ -1541,7 +1541,7 @@ int hid_input_report(struct hid_device *hid, int type, u8 *data, int size, int i
 	report_enum = hid->report_enum + type;
 	hdrv = hid->driver;
 
-	if (!size) {
+	if (size <= 0) {
 		dbg_hid("empty report\n");
 		ret = -1;
 		goto unlock;
