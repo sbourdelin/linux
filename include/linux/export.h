@@ -83,6 +83,15 @@ extern struct module __this_module;
  */
 #define __EXPORT_SYMBOL(sym, sec)	=== __KSYM_##sym ===
 
+#elif defined(__DISABLE_EXPORTS)
+
+/*
+ * Allow symbol exports to be disabled completely so that C code may
+ * be reused in other execution contexts such as the UEFI stub or the
+ * decompressor.
+ */
+#define __EXPORT_SYMBOL(sym, sec)
+
 #elif defined(CONFIG_TRIM_UNUSED_KSYMS)
 
 #include <generated/autoksyms.h>
