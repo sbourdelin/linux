@@ -1685,10 +1685,13 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
 	if (!its)
 		return -ENOMEM;
 
+	dev->kvm->arch.vgic.has_its = true;
+
 	if (vgic_initialized(dev->kvm)) {
 		int ret = vgic_v4_init(dev->kvm);
 		if (ret < 0) {
 			kfree(its);
+			dev->kvm->arch.vgic.has_its = false;
 			return ret;
 		}
 	}
@@ -1702,7 +1705,6 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
 	INIT_LIST_HEAD(&its->collection_list);
 
 	dev->kvm->arch.vgic.msis_require_devid = true;
-	dev->kvm->arch.vgic.has_its = true;
 	its->enabled = false;
 	its->dev = dev;
 
