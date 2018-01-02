@@ -8,5 +8,6 @@
 #include <asm/mips_machine.h>
 
 MIPS_MACHINE(MACH_INGENIC_JZ4740, "qi,lb60", "Qi Hardware Ben Nanonote", NULL);
+MIPS_MACHINE(MACH_INGENIC_JZ4770, "gcw,zero", "GCW Zero", NULL);
 MIPS_MACHINE(MACH_INGENIC_JZ4780, "img,ci20",
 			"Imagination Technologies CI20", NULL);
