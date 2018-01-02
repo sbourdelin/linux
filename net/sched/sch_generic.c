@@ -645,7 +645,7 @@ static struct sk_buff *pfifo_fast_peek(struct Qdisc *qdisc)
 	for (band = 0; band < PFIFO_FAST_BANDS && !skb; band++) {
 		struct skb_array *q = band2list(priv, band);
 
-		skb = __skb_array_peek(q);
+		skb = skb_array_peek_bh(q);
 	}
 
 	return skb;

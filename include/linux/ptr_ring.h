@@ -236,6 +236,51 @@ static inline bool ptr_ring_empty_bh(struct ptr_ring *r)
 	return ret;
 }
 
+static inline void *ptr_ring_peek(struct ptr_ring *r)
+{
+	void *ret;
+
+	spin_lock(&r->consumer_lock);
+	ret = __ptr_ring_peek(r);
+	spin_unlock(&r->consumer_lock);
+
+	return ret;
+}
+
+static inline void *ptr_ring_peek_irq(struct ptr_ring *r)
+{
+	void *ret;
+
+	spin_lock_irq(&r->consumer_lock);
+	ret = __ptr_ring_peek(r);
+	spin_unlock_irq(&r->consumer_lock);
+
+	return ret;
+}
+
+static inline void *ptr_ring_peek_any(struct ptr_ring *r)
+{
+	unsigned long flags;
+	void *ret;
+
+	spin_lock_irqsave(&r->consumer_lock, flags);
+	ret = __ptr_ring_peek(r);
+	spin_unlock_irqrestore(&r->consumer_lock, flags);
+
+	return ret;
+}
+
+static inline void *ptr_ring_peek_bh(struct ptr_ring *r)
+{
+	void *ret;
+
+	spin_lock_bh(&r->consumer_lock);
+	ret = __ptr_ring_peek(r);
+	spin_unlock_bh(&r->consumer_lock);
+
+	return ret;
+}
+
 /* Must only be called after __ptr_ring_peek returned !NULL */
 static inline void __ptr_ring_discard_one(struct ptr_ring *r)
 {
