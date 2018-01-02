@@ -490,11 +490,11 @@ static void swiotlb_bounce(phys_addr_t orig_addr, phys_addr_t tlb_addr,
 	}
 }
 
-phys_addr_t swiotlb_tbl_map_single(struct device *hwdev,
-				   dma_addr_t tbl_dma_addr,
-				   phys_addr_t orig_addr, size_t size,
-				   enum dma_data_direction dir,
-				   unsigned long attrs)
+phys_addr_t _swiotlb_tbl_map_single(struct device *hwdev,
+				    dma_addr_t tbl_dma_addr,
+				    phys_addr_t orig_addr, size_t size,
+				    enum dma_data_direction dir,
+				    unsigned long attrs, bool warn)
 {
 	unsigned long flags;
 	phys_addr_t tlb_addr;
@@ -586,7 +586,7 @@ phys_addr_t swiotlb_tbl_map_single(struct device *hwdev,
 
 not_found:
 	spin_unlock_irqrestore(&io_tlb_lock, flags);
-	if (printk_ratelimit())
+	if (warn && printk_ratelimit())
 		dev_warn(hwdev, "swiotlb buffer is full (sz: %zd bytes)\n", size);
 	return SWIOTLB_MAP_ERROR;
 found:
@@ -605,6 +605,16 @@ found:
 
 	return tlb_addr;
 }
+
+phys_addr_t swiotlb_tbl_map_single(struct device *hwdev,
+				   dma_addr_t tbl_dma_addr,
+				   phys_addr_t orig_addr, size_t size,
+				   enum dma_data_direction dir,
+				   unsigned long attrs)
+{
+	return _swiotlb_tbl_map_single(hwdev, tbl_dma_addr, orig_addr,
+				       size, dir, attrs, true);
+}
 EXPORT_SYMBOL_GPL(swiotlb_tbl_map_single);
 
 /*
@@ -613,7 +623,7 @@ EXPORT_SYMBOL_GPL(swiotlb_tbl_map_single);
 
 static phys_addr_t
 map_single(struct device *hwdev, phys_addr_t phys, size_t size,
-	   enum dma_data_direction dir, unsigned long attrs)
+	   enum dma_data_direction dir, unsigned long attrs, bool warn)
 {
 	dma_addr_t start_dma_addr;
 
@@ -624,8 +634,8 @@ map_single(struct device *hwdev, phys_addr_t phys, size_t size,
 	}
 
 	start_dma_addr = swiotlb_phys_to_dma(hwdev, io_tlb_start);
-	return swiotlb_tbl_map_single(hwdev, start_dma_addr, phys, size,
-				      dir, attrs);
+	return _swiotlb_tbl_map_single(hwdev, start_dma_addr, phys, size,
+				       dir, attrs, warn);
 }
 
 /*
@@ -713,6 +723,7 @@ void *
 swiotlb_alloc_coherent(struct device *hwdev, size_t size,
 		       dma_addr_t *dma_handle, gfp_t flags)
 {
+	bool warn = !(flags & __GFP_NOWARN);
 	dma_addr_t dev_addr;
 	void *ret;
 	int order = get_order(size);
@@ -739,7 +750,7 @@ swiotlb_alloc_coherent(struct device *hwdev, size_t size,
 		 * will grab memory from the lowest available address range.
 		 */
 		phys_addr_t paddr = map_single(hwdev, 0, size,
-					       DMA_FROM_DEVICE, 0);
+					       DMA_FROM_DEVICE, 0, warn);
 		if (paddr == SWIOTLB_MAP_ERROR)
 			goto err_warn;
 
@@ -769,9 +780,11 @@ swiotlb_alloc_coherent(struct device *hwdev, size_t size,
 	return ret;
 
 err_warn:
-	pr_warn("swiotlb: coherent allocation failed for device %s size=%zu\n",
-		dev_name(hwdev), size);
-	dump_stack();
+	if (warn) {
+		pr_warn("swiotlb: coherent allocation failed for device %s size=%zu\n",
+			dev_name(hwdev), size);
+		dump_stack();
+	}
 
 	return NULL;
 }
@@ -851,7 +864,7 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
 	trace_swiotlb_bounced(dev, dev_addr, size, swiotlb_force);
 
 	/* Oh well, have to allocate and map a bounce buffer. */
-	map = map_single(dev, phys, size, dir, attrs);
+	map = map_single(dev, phys, size, dir, attrs, true);
 	if (map == SWIOTLB_MAP_ERROR) {
 		swiotlb_full(dev, size, dir, 1);
 		return swiotlb_phys_to_dma(dev, io_tlb_overflow_buffer);
@@ -989,7 +1002,8 @@ swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl, int nelems,
 		if (swiotlb_force == SWIOTLB_FORCE ||
 		    !dma_capable(hwdev, dev_addr, sg->length)) {
 			phys_addr_t map = map_single(hwdev, sg_phys(sg),
-						     sg->length, dir, attrs);
+						     sg->length, dir, attrs,
+						     true);
 			if (map == SWIOTLB_MAP_ERROR) {
 				/* Don't panic here, we expect map_sg users
 				   to do proper error handling. */
