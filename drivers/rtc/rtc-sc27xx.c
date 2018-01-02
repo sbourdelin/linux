@@ -536,12 +536,22 @@ static int sprd_rtc_alarm_irq_enable(struct device *dev, unsigned int enabled)
 	return ret;
 }
 
+static int sprd_rtc_read_range(struct device *dev, time64_t *max_hw_secs,
+			       time64_t *min_hw_secs)
+{
+	*min_hw_secs = 0;
+	*max_hw_secs = (((time64_t)(SPRD_RTC_DAY_MASK * 24) + 23) * 60 + 59) * 60 + 59;
+
+	return 0;
+}
+
 static const struct rtc_class_ops sprd_rtc_ops = {
 	.read_time = sprd_rtc_read_time,
 	.set_time = sprd_rtc_set_time,
 	.read_alarm = sprd_rtc_read_alarm,
 	.set_alarm = sprd_rtc_set_alarm,
 	.alarm_irq_enable = sprd_rtc_alarm_irq_enable,
+	.read_range = sprd_rtc_read_range,
 };
 
 static irqreturn_t sprd_rtc_handler(int irq, void *dev_id)
