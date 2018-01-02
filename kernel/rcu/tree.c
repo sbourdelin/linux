@@ -3102,6 +3102,16 @@ void call_rcu_sched(struct rcu_head *head, rcu_callback_t func)
 }
 EXPORT_SYMBOL_GPL(call_rcu_sched);
 
+/* Queue an RCU callback for lazy invocation after a grace period.
+ * Currently there is no way of tagging the lazy RCU callbacks in the
+ * list of pending callbacks. Until then, this function may only be
+ * called from kfree_call_rcu().
+ */
+void call_rcu_lazy(struct rcu_head *head, rcu_callback_t func)
+{
+	__call_rcu(head, func, &rcu_sched_state, -1, 1);
+}
+
 /**
  * call_rcu_bh() - Queue an RCU for invocation after a quicker grace period.
  * @head: structure to be used for queueing the RCU updates.
@@ -3129,20 +3139,6 @@ void call_rcu_bh(struct rcu_head *head, rcu_callback_t func)
 	__call_rcu(head, func, &rcu_bh_state, -1, 0);
 }
 EXPORT_SYMBOL_GPL(call_rcu_bh);
-
-/*
- * Queue an RCU callback for lazy invocation after a grace period.
- * This will likely be later named something like "call_rcu_lazy()",
- * but this change will require some way of tagging the lazy RCU
- * callbacks in the list of pending callbacks. Until then, this
- * function may only be called from __kfree_rcu().
- */
-void kfree_call_rcu(struct rcu_head *head,
-		    rcu_callback_t func)
-{
-	__call_rcu(head, func, rcu_state_p, -1, 1);
-}
-EXPORT_SYMBOL_GPL(kfree_call_rcu);
 
 /*
  * Because a context switch is a grace period for RCU-sched and RCU-bh,

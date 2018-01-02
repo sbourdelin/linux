@@ -55,6 +55,9 @@ void call_rcu(struct rcu_head *head, rcu_callback_t func);
 #define	call_rcu	call_rcu_sched
 #endif /* #else #ifdef CONFIG_PREEMPT_RCU */
 
+/* only for use by kfree_call_rcu() */
+void call_rcu_lazy(struct rcu_head *head, rcu_callback_t func);
+
 void call_rcu_bh(struct rcu_head *head, rcu_callback_t func);
 void call_rcu_sched(struct rcu_head *head, rcu_callback_t func);
 void synchronize_sched(void);
@@ -837,45 +840,6 @@ static inline notrace void rcu_read_unlock_sched_notrace(void)
 #define __is_kfree_rcu_offset(offset) ((offset) < 4096)
 
 /*
- * Helper macro for kfree_rcu() to prevent argument-expansion eyestrain.
- */
-#define __kfree_rcu(head, offset) \
-	do { \
-		BUILD_BUG_ON(!__is_kfree_rcu_offset(offset)); \
-		kfree_call_rcu(head, (rcu_callback_t)(unsigned long)(offset)); \
-	} while (0)
-
-/**
- * kfree_rcu() - kfree an object after a grace period.
- * @ptr:	pointer to kfree
- * @rcu_head:	the name of the struct rcu_head within the type of @ptr.
- *
- * Many rcu callbacks functions just call kfree() on the base structure.
- * These functions are trivial, but their size adds up, and furthermore
- * when they are used in a kernel module, that module must invoke the
- * high-latency rcu_barrier() function at module-unload time.
- *
- * The kfree_rcu() function handles this issue.  Rather than encoding a
- * function address in the embedded rcu_head structure, kfree_rcu() instead
- * encodes the offset of the rcu_head structure within the base structure.
- * Because the functions are not allowed in the low-order 4096 bytes of
- * kernel virtual memory, offsets up to 4095 bytes can be accommodated.
- * If the offset is larger than 4095 bytes, a compile-time error will
- * be generated in __kfree_rcu().  If this error is triggered, you can
- * either fall back to use of call_rcu() or rearrange the structure to
- * position the rcu_head structure into the first 4096 bytes.
- *
- * Note that the allowable offset might decrease in the future, for example,
- * to allow something like kmem_cache_free_rcu().
- *
- * The BUILD_BUG_ON check must not involve any function calls, hence the
- * checks are done in macros here.
- */
-#define kfree_rcu(ptr, rcu_head)					\
-	__kfree_rcu(&((ptr)->rcu_head), offsetof(typeof(*(ptr)), rcu_head))
-
-
-/*
  * Place this after a lock-acquisition primitive to guarantee that
  * an UNLOCK+LOCK pair acts as a full barrier.  This guarantee applies
  * if the UNLOCK and LOCK are executed by the same CPU or if the
@@ -886,6 +850,5 @@ static inline notrace void rcu_read_unlock_sched_notrace(void)
 #else /* #ifdef CONFIG_ARCH_WEAK_RELEASE_ACQUIRE */
 #define smp_mb__after_unlock_lock()	do { } while (0)
 #endif /* #else #ifdef CONFIG_ARCH_WEAK_RELEASE_ACQUIRE */
-
 
 #endif /* __LINUX_RCUPDATE_H */

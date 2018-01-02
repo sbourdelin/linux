@@ -1483,6 +1483,16 @@ void kzfree(const void *p)
 }
 EXPORT_SYMBOL(kzfree);
 
+/*
+ * Queue Memory to be freed by RCU after a grace period.
+ */
+void kfree_call_rcu(struct rcu_head *head,
+		    rcu_callback_t func)
+{
+	call_rcu_lazy(head, func);
+}
+EXPORT_SYMBOL_GPL(kfree_call_rcu);
+
 /* Tracepoints definitions. */
 EXPORT_TRACEPOINT_SYMBOL(kmalloc);
 EXPORT_TRACEPOINT_SYMBOL(kmem_cache_alloc);
