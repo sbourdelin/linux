@@ -247,6 +247,12 @@ struct rtc_device *rtc_device_register(const char *name, struct device *dev,
 
 	dev_set_name(&rtc->dev, "rtc%d", id);
 
+	err = rtc_read_range(rtc, &rtc->max_hw_secs, &rtc->min_hw_secs);
+	if (err) {
+		dev_err(&rtc->dev, "%s: failed to get RTC range\n", name);
+		goto exit_ida;
+	}
+
 	/* Check to see if there is an ALARM already set in hw */
 	err = __rtc_read_alarm(rtc, &alrm);
 
@@ -435,6 +441,13 @@ int __rtc_register_device(struct module *owner, struct rtc_device *rtc)
 		return -EINVAL;
 
 	rtc->owner = owner;
+
+	err = rtc_read_range(rtc, &rtc->max_hw_secs, &rtc->min_hw_secs);
+	if (err) {
+		dev_err(&rtc->dev, "%s: failed to get RTC range\n",
+			dev_name(&rtc->dev));
+		return err;
+	}
 
 	/* Check to see if there is an ALARM already set in hw */
 	err = __rtc_read_alarm(rtc, &alrm);

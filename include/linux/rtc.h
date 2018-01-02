@@ -85,6 +85,8 @@ struct rtc_class_ops {
 	int (*alarm_irq_enable)(struct device *, unsigned int enabled);
 	int (*read_offset)(struct device *, long *offset);
 	int (*set_offset)(struct device *, long offset);
+	int (*read_range)(struct device *, time64_t *max_hw_secs,
+			  time64_t *min_hw_secs);
 };
 
 #define RTC_DEVICE_NAME_SIZE 20
@@ -151,6 +153,9 @@ struct rtc_device {
 	/* Old ABI support */
 	bool nvram_old_abi;
 	struct bin_attribute *nvram;
+
+	time64_t max_hw_secs;
+	time64_t min_hw_secs;
 
 #ifdef CONFIG_RTC_INTF_DEV_UIE_EMUL
 	struct work_struct uie_task;
@@ -224,6 +229,10 @@ void rtc_timer_cancel(struct rtc_device *rtc, struct rtc_timer *timer);
 int rtc_read_offset(struct rtc_device *rtc, long *offset);
 int rtc_set_offset(struct rtc_device *rtc, long offset);
 void rtc_timer_do_work(struct work_struct *work);
+
+int rtc_read_range(struct rtc_device *rtc, time64_t *max_hw_secs,
+		   time64_t *min_hw_secs);
+int rtc_valid_range(struct rtc_device *rtc, struct rtc_time *tm);
 
 static inline bool is_leap_year(unsigned int year)
 {

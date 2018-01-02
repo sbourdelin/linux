@@ -65,6 +65,10 @@ int rtc_set_time(struct rtc_device *rtc, struct rtc_time *tm)
 	if (err != 0)
 		return err;
 
+	err = rtc_valid_range(rtc, tm);
+	if (err)
+		return err;
+
 	err = mutex_lock_interruptible(&rtc->ops_lock);
 	if (err)
 		return err;
@@ -329,6 +333,11 @@ static int __rtc_set_alarm(struct rtc_device *rtc, struct rtc_wkalrm *alarm)
 	err = rtc_valid_tm(&alarm->time);
 	if (err)
 		return err;
+
+	err = rtc_valid_range(rtc, &alarm->time);
+	if (err)
+		return err;
+
 	scheduled = rtc_tm_to_time64(&alarm->time);
 
 	/* Make sure we're not setting alarms in the past */
@@ -1026,4 +1035,57 @@ int rtc_set_offset(struct rtc_device *rtc, long offset)
 	ret = rtc->ops->set_offset(rtc->dev.parent, offset);
 	mutex_unlock(&rtc->ops_lock);
 	return ret;
+}
+
+/* rtc_read_range - Read the max and min hardware count supported by RTC device
+ * @ rtc: rtc device to be used.
+ * @ max_hw_secs: maximum hardware count in seconds, which can represent
+ * the maximum time values in RTC hardware.
+ * @ min_hw_secs: minimum hardware count in seconds, which can represent
+ * the minimum time values in RTC hardware.
+ *
+ * The max_hw_secs and min_hw_secs implemented by user must represent the
+ * correct hardware start time and maximum time, which means the count
+ * will wrap around to min_hw_secs after the maximum count.
+ *
+ * If user did not implement the read_range() interface, we can set max_hw_secs
+ * and min_hw_secs to 0, which avoids validing the range.
+ */
+int rtc_read_range(struct rtc_device *rtc, time64_t *max_hw_secs,
+		   time64_t *min_hw_secs)
+{
+	int ret;
+
+	if (!rtc->ops || !rtc->ops->read_range) {
+		*max_hw_secs = 0;
+		*min_hw_secs = 0;
+		return 0;
+	}
+
+	mutex_lock(&rtc->ops_lock);
+	ret = rtc->ops->read_range(rtc->dev.parent, max_hw_secs, min_hw_secs);
+	mutex_unlock(&rtc->ops_lock);
+
+	return ret;
+}
+
+/* rtc_valid_range - Valid if the setting time in the RTC range
+ * @ rtc: rtc device to be used.
+ * @ tm: time values need to valid.
+ *
+ * Only the rtc->max_hw_secs was set, then we can valid if the setting time
+ * values are beyond the RTC range.
+ */
+int rtc_valid_range(struct rtc_device *rtc, struct rtc_time *tm)
+{
+	time64_t secs;
+
+	if (!rtc->max_hw_secs)
+		return 0;
+
+	secs = rtc_tm_to_time64(tm);
+	if (secs < rtc->min_hw_secs || secs > rtc->max_hw_secs)
+		return -EINVAL;
+
+	return 0;
 }
