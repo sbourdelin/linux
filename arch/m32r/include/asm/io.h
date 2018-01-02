@@ -108,9 +108,9 @@ static inline unsigned short _readw(unsigned long addr)
 	return *(volatile unsigned short __force *)addr;
 }
 
-static inline unsigned long _readl(unsigned long addr)
+static inline unsigned int _readl(unsigned long addr)
 {
-	return *(volatile unsigned long __force *)addr;
+	return *(volatile unsigned int __force *)addr;
 }
 
 static inline void _writeb(unsigned char b, unsigned long addr)
@@ -123,9 +123,9 @@ static inline void _writew(unsigned short w, unsigned long addr)
 	*(volatile unsigned short __force *)addr = w;
 }
 
-static inline void _writel(unsigned long l, unsigned long addr)
+static inline void _writel(unsigned long l, unsigned int addr)
 {
-	*(volatile unsigned long __force *)addr = l;
+	*(volatile unsigned int __force *)addr = l;
 }
 
 #define inb     _inb
