@@ -1512,7 +1512,7 @@ static void nvme_dev_remove_admin(struct nvme_dev *dev)
 	}
 }
 
-static int nvme_alloc_admin_tags(struct nvme_dev *dev)
+static int nvme_pci_start_adminq(struct nvme_dev *dev)
 {
 	if (!dev->ctrl.admin_q) {
 		dev->admin_tagset.ops = &nvme_mq_admin_ops;
@@ -1571,7 +1571,7 @@ static int nvme_remap_bar(struct nvme_dev *dev, unsigned long size)
 	return 0;
 }
 
-static int nvme_pci_configure_admin_queue(struct nvme_dev *dev)
+static int nvme_pci_setup_adminq(struct nvme_dev *dev)
 {
 	int result;
 	u32 aqa;
@@ -2315,11 +2315,11 @@ static void nvme_reset_work(struct work_struct *work)
 	if (result)
 		goto out;
 
-	result = nvme_pci_configure_admin_queue(dev);
+	result = nvme_pci_setup_adminq(dev);
 	if (result)
 		goto out;
 
-	result = nvme_alloc_admin_tags(dev);
+	result = nvme_pci_start_adminq(dev);
 	if (result)
 		goto out;
 
