@@ -79,6 +79,9 @@
 #define PHYCTRL_IS_CALDONE(x) \
 	((((x) >> PHYCTRL_CALDONE_SHIFT) & \
 	  PHYCTRL_CALDONE_MASK) == PHYCTRL_CALDONE_DONE)
+#define PHYCTRL_IS_DLLRDY(x) \
+	((((x) >> PHYCTRL_DLLRDY_SHIFT) & \
+	  PHYCTRL_DLLRDY_MASK) == PHYCTRL_DLLRDY_DONE)
 
 struct rockchip_emmc_phy {
 	unsigned int	reg_offset;
@@ -93,7 +96,6 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
 	unsigned int dllrdy;
 	unsigned int freqsel = PHYCTRL_FREQSEL_200M;
 	unsigned long rate;
-	unsigned long timeout;
 
 	/*
 	 * Keep phyctrl_pdb and phyctrl_endll low to allow
@@ -222,19 +224,10 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
 	 *   only at boot / resume.  In both cases, eMMC is probably on the
 	 *   critical path so busy waiting a little extra time should be OK.
 	 */
-	timeout = jiffies + msecs_to_jiffies(50);
-	do {
-		udelay(1);
-
-		regmap_read(rk_phy->reg_base,
-			rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
-			&dllrdy);
-		dllrdy = (dllrdy >> PHYCTRL_DLLRDY_SHIFT) & PHYCTRL_DLLRDY_MASK;
-		if (dllrdy == PHYCTRL_DLLRDY_DONE)
-			break;
-	} while (!time_after(jiffies, timeout));
-
-	if (dllrdy != PHYCTRL_DLLRDY_DONE) {
+	if (regmap_read_poll_timeout(rk_phy->reg_base,
+				     rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+				     dllrdy, PHYCTRL_IS_DLLRDY(dllrdy),
+				     1, 50 * USEC_PER_MSEC)) {
 		pr_err("rockchip_emmc_phy_power: dllrdy timeout.\n");
 		return -ETIMEDOUT;
 	}
