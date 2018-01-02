@@ -347,7 +347,7 @@ static int qcom_xfer_msg(struct slim_controller *sctrl,
 		}
 	}
 
-	if (!retries && !pbuf)
+	if (retries < 0 && !pbuf)
 		return -ENOMEM;
 
 	puc = (u8 *)pbuf;
