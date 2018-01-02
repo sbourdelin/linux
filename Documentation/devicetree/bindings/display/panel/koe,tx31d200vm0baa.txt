@@ -1,0 +1,7 @@
+Kaohsiung Opto-Electronics. TX31D200VM0BAA 12.3" HSXGA LVDS panel
+
+Required properties:
+- compatible: should be "koe,tx31d200vm0baa"
+
+This binding is compatible with the simple-panel binding, which is specified
+in simple-panel.txt in this directory.
