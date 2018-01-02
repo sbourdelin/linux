@@ -20,6 +20,7 @@
 #include <asm/tlbflush.h>
 #include <asm/page.h>
 #include <linux/memcontrol.h>
+#include <linux/types.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/kmem.h>
@@ -1483,13 +1484,171 @@ void kzfree(const void *p)
 }
 EXPORT_SYMBOL(kzfree);
 
+static DEFINE_PER_CPU(struct rcu_bulk_free, cpu_rbf);
+
+/* drain if atleast these many objects */
+int sysctl_kfree_rcu_drain_limit __read_mostly = 10;
+
+/* time to poll if fewer than drain_limit */
+int sysctl_kfree_rcu_poll_limit __read_mostly = 5;
+
+/* num of times to check bfr exit */
+int sysctl_kfree_rcu_empty_limit __read_mostly = 2;
+
+int sysctl_kfree_rcu_caching_allowed __read_mostly = 1;
+
+/* RCU call back function. Frees the memory */
+static void __rcu_bulk_free_impl(struct rcu_head *rbfc_rcu)
+{
+	struct rcu_bulk_free *rbf = NULL;
+	struct rcu_bulk_free_container *rbfc = container_of(rbfc_rcu,
+	    struct rcu_bulk_free_container, rbfc_rcu);
+
+	kfree_bulk(rbfc->rbfc_entries, rbfc->rbfc_data);
+
+	rbf = rbfc->rbfc_rbf;
+	if (!sysctl_kfree_rcu_caching_allowed ||
+	    cmpxchg(&rbf->rbf_cached_container, NULL, rbfc)) {
+		kfree(rbfc);
+	}
+}
+
+/* processes list of rcu structures
+ * used when conatiner can not be allocated
+ */
+static void __rcu_bulk_schedule_list(struct rcu_bulk_free *rbf)
+{
+	int i;
+
+	for (i = 0; i < rbf->rbf_list_size; i++) {
+		struct rcu_head *free_head;
+
+		free_head = rbf->rbf_list_head;
+		rbf->rbf_list_head = free_head->next;
+		free_head->next = NULL;
+		call_rcu(free_head, free_head->func);
+	}
+	rbf->rbf_list_size = 0;
+}
+
+/* RCU monitoring function -- submits elements for RCU reclaim */
+static void __rcu_bulk_free_monitor(struct rcu_head *rbf_rcu)
+{
+	struct rcu_bulk_free *rbf = NULL;
+	struct rcu_bulk_free_container *rbfc = NULL;
+
+	rbf = container_of(rbf_rcu, struct rcu_bulk_free, rbf_rcu);
+
+	spin_lock(&rbf->rbf_lock);
+
+	rbfc = rbf->rbf_container;
+
+	rbf->rbf_polled++;
+	if (rbf->rbf_list_size > 0) {
+		if (rbf->rbf_list_size >= sysctl_kfree_rcu_drain_limit ||
+		    rbf->rbf_polled >= sysctl_kfree_rcu_poll_limit) {
+			rbf->rbf_polled = 0;
+			__rcu_bulk_schedule_list(rbf);
+		}
+	} else if (rbfc) {
+		if (rbfc->rbfc_entries >= sysctl_kfree_rcu_drain_limit ||
+		    rbf->rbf_polled >= sysctl_kfree_rcu_poll_limit) {
+			rbf->rbf_polled = 0;
+			call_rcu(&rbfc->rbfc_rcu, __rcu_bulk_free_impl);
+			rbf->rbf_container = NULL;
+		}
+	} else if (rbf->rbf_polled >= sysctl_kfree_rcu_empty_limit) {
+		rbf->rbf_monitor = false;
+		rbf->rbf_polled = 0;
+	}
+
+	spin_unlock(&rbf->rbf_lock);
+
+	if (rbf->rbf_monitor)
+		call_rcu(&rbf->rbf_rcu, __rcu_bulk_free_monitor);
+}
+
+/* Main RCU function that is called to free RCU structures */
+static void __rcu_bulk_free(struct rcu_head *head, rcu_callback_t func)
+{
+	unsigned long offset;
+	void *ptr;
+	struct rcu_bulk_free *rbf;
+	struct rcu_bulk_free_container *rbfc = NULL;
+
+	rbf = this_cpu_ptr(&cpu_rbf);
+
+	if (unlikely(!rbf->rbf_init)) {
+		spin_lock_init(&rbf->rbf_lock);
+		rbf->rbf_cpu = smp_processor_id();
+		rbf->rbf_init = true;
+	}
+
+	/* hold lock to protect against other cpu's */
+	spin_lock_bh(&rbf->rbf_lock);
+
+	rbfc = rbf->rbf_container;
+
+	if (!rbfc) {
+		if (!rbf->rbf_cached_container) {
+			rbf->rbf_container =
+			    kmalloc(sizeof(struct rcu_bulk_free_container),
+				    GFP_ATOMIC);
+		} else {
+			rbf->rbf_container =
+			    READ_ONCE(rbf->rbf_cached_container);
+			cmpxchg(&rbf->rbf_cached_container,
+				rbf->rbf_container, NULL);
+		}
+
+		if (unlikely(!rbf->rbf_container)) {
+			/* Memory allocation failed maintain a list */
+
+			head->func = (void *)func;
+			head->next = rbf->rbf_list_head;
+			rbf->rbf_list_head = head;
+			rbf->rbf_list_size++;
+			if (rbf->rbf_list_size == RCU_MAX_ACCUMULATE_SIZE)
+				__rcu_bulk_schedule_list(rbf);
+
+			goto done;
+		}
+
+		rbfc = rbf->rbf_container;
+		rbfc->rbfc_rbf = rbf;
+		rbfc->rbfc_entries = 0;
+
+		if (!rbf->rbf_list_head)
+			__rcu_bulk_schedule_list(rbf);
+	}
+
+	offset = (unsigned long)func;
+	ptr = (void *)head - offset;
+
+	rbfc->rbfc_data[rbfc->rbfc_entries++] = ptr;
+	if (rbfc->rbfc_entries == RCU_MAX_ACCUMULATE_SIZE) {
+		rbf->rbf_container = NULL;
+		spin_unlock_bh(&rbf->rbf_lock);
+		call_rcu_lazy(&rbfc->rbfc_rcu, __rcu_bulk_free_impl);
+		return;
+	}
+
+done:
+	if (!rbf->rbf_monitor) {
+		call_rcu_lazy(&rbf->rbf_rcu, __rcu_bulk_free_monitor);
+		rbf->rbf_monitor = true;
+	}
+
+	spin_unlock_bh(&rbf->rbf_lock);
+}
+
 /*
  * Queue Memory to be freed by RCU after a grace period.
  */
 void kfree_call_rcu(struct rcu_head *head,
 		    rcu_callback_t func)
 {
-	call_rcu_lazy(head, func);
+	__rcu_bulk_free(head, func);
 }
 EXPORT_SYMBOL_GPL(kfree_call_rcu);
 

@@ -2655,5 +2655,10 @@ void __init setup_nr_node_ids(void);
 static inline void setup_nr_node_ids(void) {}
 #endif
 
+extern int sysctl_kfree_rcu_drain_limit;
+extern int sysctl_kfree_rcu_poll_limit;
+extern int sysctl_kfree_rcu_empty_limit;
+extern int sysctl_kfree_rcu_caching_allowed;
+
 #endif /* __KERNEL__ */
 #endif /* _LINUX_MM_H */

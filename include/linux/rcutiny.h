@@ -84,10 +84,16 @@ static inline void synchronize_sched_expedited(void)
 	synchronize_sched();
 }
 
+static inline void call_rcu_lazy(struct rcu_head *head,
+				 rcu_callback_t func)
+{
+	call_rcu(head, func);
+}
+
 static inline void kfree_call_rcu(struct rcu_head *head,
 				  rcu_callback_t func)
 {
-	call_rcu(head, func);
+	call_rcu_lazy(head, func);
 }
 
 #define rcu_note_context_switch(preempt) \

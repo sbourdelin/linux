@@ -1655,6 +1655,46 @@ static struct ctl_table vm_table[] = {
 		.extra2		= (void *)&mmap_rnd_compat_bits_max,
 	},
 #endif
+	{
+		.procname	= "kfree_rcu_drain_limit",
+		.data		= &sysctl_kfree_rcu_drain_limit,
+		.maxlen		= sizeof(sysctl_kfree_rcu_drain_limit),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &one,
+		.extra2		= &one_hundred,
+	},
+
+	{
+		.procname	= "kfree_rcu_poll_limit",
+		.data		= &sysctl_kfree_rcu_poll_limit,
+		.maxlen		= sizeof(sysctl_kfree_rcu_poll_limit),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &one,
+		.extra2		= &one_hundred,
+	},
+
+	{
+		.procname	= "kfree_rcu_empty_limit",
+		.data		= &sysctl_kfree_rcu_empty_limit,
+		.maxlen		= sizeof(sysctl_kfree_rcu_empty_limit),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &four,
+	},
+
+	{
+		.procname	= "kfree_rcu_caching_allowed",
+		.data		= &sysctl_kfree_rcu_caching_allowed,
+		.maxlen		= sizeof(sysctl_kfree_rcu_caching_allowed),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &zero,
+		.extra2		= &one,
+	},
+
 	{ }
 };
 

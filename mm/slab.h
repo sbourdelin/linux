@@ -78,6 +78,29 @@ extern const struct kmalloc_info_struct {
 	unsigned long size;
 } kmalloc_info[];
 
+#define	RCU_MAX_ACCUMULATE_SIZE	25
+
+struct rcu_bulk_free_container {
+	struct	rcu_head rbfc_rcu;
+	int	rbfc_entries;
+	void	*rbfc_data[RCU_MAX_ACCUMULATE_SIZE];
+	struct	rcu_bulk_free *rbfc_rbf;
+};
+
+struct rcu_bulk_free {
+	struct	rcu_head rbf_rcu; /* used to schedule monitor process */
+	spinlock_t	rbf_lock;
+	struct		rcu_bulk_free_container *rbf_container;
+	struct		rcu_bulk_free_container *rbf_cached_container;
+	struct		rcu_head *rbf_list_head;
+	int		rbf_list_size;
+	int		rbf_cpu;
+	int		rbf_empty;
+	int		rbf_polled;
+	bool		rbf_init;
+	bool		rbf_monitor;
+};
+
 unsigned long calculate_alignment(slab_flags_t flags,
 		unsigned long align, unsigned long size);
 
