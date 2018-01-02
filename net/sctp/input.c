@@ -412,8 +412,11 @@ void sctp_icmp_frag_needed(struct sock *sk, struct sctp_association *asoc,
 	 * Needed will never be sent, but if a message was sent before
 	 * PMTU discovery was disabled that was larger than the PMTU, it
 	 * would not be fragmented, so it must be re-transmitted fragmented.
+	 * If the new PMTU is invalid, we will keep getting ICMP Frag
+	 * Needed. In this case, simply avoid the retransmit.
 	 */
-	sctp_retransmit(&asoc->outqueue, t, SCTP_RTXR_PMTUD);
+	if (pmtu >= SCTP_DEFAULT_MINSEGMENT)
+		sctp_retransmit(&asoc->outqueue, t, SCTP_RTXR_PMTUD);
 }
 
 void sctp_icmp_redirect(struct sock *sk, struct sctp_transport *t,
