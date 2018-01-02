@@ -36,6 +36,22 @@
 			};
 		};
 	};
+
+	touch@4b {
+		compatible = "atmel,maxtouch";
+		reg = <0x4b>;
+		interrupt-parent = <&gpio2>;
+		interrupts = <29 2>; /* gpio_61, IRQF_TRIGGER_FALLING*/
+		vdd-supply = <&vio>;
+		avdd-supply = <&vaux1>;
+	};
+};
+
+&i2c3 {
+	ak8975@0f {
+		compatible = "asahi-kasei,ak8975";
+		reg = <0x0f>;
+	};
 };
 
 &isp {
