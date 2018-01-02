@@ -3173,20 +3173,15 @@ static int set_xgbe_ethss10_priv(struct gbe_priv *gbe_dev,
 	gbe_dev->hw_stats = devm_kzalloc(gbe_dev->dev,
 					 gbe_dev->num_et_stats * sizeof(u64),
 					 GFP_KERNEL);
-	if (!gbe_dev->hw_stats) {
-		dev_err(gbe_dev->dev, "hw_stats memory allocation failed\n");
+	if (!gbe_dev->hw_stats)
 		return -ENOMEM;
-	}
 
 	gbe_dev->hw_stats_prev =
 		devm_kzalloc(gbe_dev->dev,
 			     gbe_dev->num_et_stats * sizeof(u32),
 			     GFP_KERNEL);
-	if (!gbe_dev->hw_stats_prev) {
-		dev_err(gbe_dev->dev,
-			"hw_stats_prev memory allocation failed\n");
+	if (!gbe_dev->hw_stats_prev)
 		return -ENOMEM;
-	}
 
 	gbe_dev->ss_version = XGBE_SS_VERSION_10;
 	gbe_dev->sgmii_port_regs = gbe_dev->ss_regs +
@@ -3293,20 +3288,15 @@ static int set_gbe_ethss14_priv(struct gbe_priv *gbe_dev,
 	gbe_dev->hw_stats = devm_kzalloc(gbe_dev->dev,
 					 gbe_dev->num_et_stats * sizeof(u64),
 					 GFP_KERNEL);
-	if (!gbe_dev->hw_stats) {
-		dev_err(gbe_dev->dev, "hw_stats memory allocation failed\n");
+	if (!gbe_dev->hw_stats)
 		return -ENOMEM;
-	}
 
 	gbe_dev->hw_stats_prev =
 		devm_kzalloc(gbe_dev->dev,
 			     gbe_dev->num_et_stats * sizeof(u32),
 			     GFP_KERNEL);
-	if (!gbe_dev->hw_stats_prev) {
-		dev_err(gbe_dev->dev,
-			"hw_stats_prev memory allocation failed\n");
+	if (!gbe_dev->hw_stats_prev)
 		return -ENOMEM;
-	}
 
 	gbe_dev->sgmii_port_regs = gbe_dev->ss_regs + GBE13_SGMII_MODULE_OFFSET;
 	gbe_dev->host_port_regs = gbe_dev->switch_regs + GBE13_HOST_PORT_OFFSET;
@@ -3365,20 +3355,15 @@ static int set_gbenu_ethss_priv(struct gbe_priv *gbe_dev,
 	gbe_dev->hw_stats = devm_kzalloc(gbe_dev->dev,
 					 gbe_dev->num_et_stats * sizeof(u64),
 					 GFP_KERNEL);
-	if (!gbe_dev->hw_stats) {
-		dev_err(gbe_dev->dev, "hw_stats memory allocation failed\n");
+	if (!gbe_dev->hw_stats)
 		return -ENOMEM;
-	}
 
 	gbe_dev->hw_stats_prev =
 		devm_kzalloc(gbe_dev->dev,
 			     gbe_dev->num_et_stats * sizeof(u32),
 			     GFP_KERNEL);
-	if (!gbe_dev->hw_stats_prev) {
-		dev_err(gbe_dev->dev,
-			"hw_stats_prev memory allocation failed\n");
+	if (!gbe_dev->hw_stats_prev)
 		return -ENOMEM;
-	}
 
 	ret = of_address_to_resource(node, GBENU_SM_REG_INDEX, &res);
 	if (ret) {
