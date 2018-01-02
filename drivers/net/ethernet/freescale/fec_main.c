@@ -3483,6 +3483,10 @@ fec_probe(struct platform_device *pdev)
 			goto failed_regulator;
 		}
 	} else {
+		if (PTR_ERR(fep->reg_phy) == -EPROBE_DEFER) {
+			ret = -EPROBE_DEFER;
+			goto failed_regulator;
+		}
 		fep->reg_phy = NULL;
 	}
 
@@ -3570,6 +3574,7 @@ failed_phy:
 	of_node_put(phy_node);
 failed_ioremap:
 	free_netdev(ndev);
+	dev_id--;
 
 	return ret;
 }
