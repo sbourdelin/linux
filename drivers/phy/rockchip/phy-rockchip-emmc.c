@@ -76,6 +76,10 @@
 #define PHYCTRL_OTAPDLYSEL_MASK		0xf
 #define PHYCTRL_OTAPDLYSEL_SHIFT	0x7
 
+#define PHYCTRL_IS_CALDONE(x) \
+	((((x) >> PHYCTRL_CALDONE_SHIFT) & \
+	  PHYCTRL_CALDONE_MASK) == PHYCTRL_CALDONE_DONE)
+
 struct rockchip_emmc_phy {
 	unsigned int	reg_offset;
 	struct regmap	*reg_base;
@@ -160,15 +164,16 @@ static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
 				   PHYCTRL_PDB_SHIFT));
 
 	/*
-	 * According to the user manual, it asks driver to
-	 * wait 5us for calpad busy trimming
+	 * According to the user manual, it asks driver to wait 5us for
+	 * calpad busy trimming. However it is documented that this value is
+	 * PVT(A.K.A process,voltage and temperature) relevant, so some
+	 * failure cases are found which indicates we should be more tolerant
+	 * to calpad busy trimming.
 	 */
-	udelay(5);
-	regmap_read(rk_phy->reg_base,
-		    rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
-		    &caldone);
-	caldone = (caldone >> PHYCTRL_CALDONE_SHIFT) & PHYCTRL_CALDONE_MASK;
-	if (caldone != PHYCTRL_CALDONE_DONE) {
+	if (regmap_read_poll_timeout(rk_phy->reg_base,
+				     rk_phy->reg_offset + GRF_EMMCPHY_STATUS,
+				     caldone, PHYCTRL_IS_CALDONE(caldone),
+				     5, 50)) {
 		pr_err("rockchip_emmc_phy_power: caldone timeout.\n");
 		return -ETIMEDOUT;
 	}
