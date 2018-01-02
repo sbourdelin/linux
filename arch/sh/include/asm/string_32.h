@@ -47,7 +47,7 @@ static inline char *strncpy(char *__dest, const char *__src, size_t __n)
 		" add	#1, %0\n"
 		"2:"
 		: "=r" (__dest), "=r" (__src), "=&z" (__dummy)
-		: "0" (__dest), "1" (__src), "r" (__src+__n)
+		: "0" (__dest), "1" (__src), "r" ((uintptr_t)__src+__n)
 		: "memory", "t");
 
 	return __xdest;
@@ -105,7 +105,7 @@ static inline int strncmp(const char *__cs, const char *__ct, size_t __n)
 		"sub	%3, %2\n"
 		"3:"
 		:"=r" (__cs), "=r" (__ct), "=&r" (__res), "=&z" (__dummy)
-		: "0" (__cs), "1" (__ct), "r" (__cs+__n)
+		: "0" (__cs), "1" (__ct), "r" ((uintptr_t)__cs+__n)
 		: "t");
 
 	return __res;
