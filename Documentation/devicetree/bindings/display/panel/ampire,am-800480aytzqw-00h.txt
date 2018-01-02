@@ -1,0 +1,7 @@
+Ampire AM-800480AYTZQW-00H 7.0" WVGA TFT LCD panel
+
+Required properties:
+- compatible: should be "ampire,am-800480aytzqw-00h"
+
+This binding is compatible with the simple-panel binding, which is specified
+in simple-panel.txt in this directory.
