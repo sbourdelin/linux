@@ -3071,7 +3071,7 @@ static void nvme_scan_work(struct work_struct *work)
 	struct nvme_id_ctrl *id;
 	unsigned nn;
 
-	if (ctrl->state != NVME_CTRL_LIVE)
+	if ((ctrl->state != NVME_CTRL_LIVE) || !ctrl->tagset)
 		return;
 
 	if (nvme_identify_ctrl(ctrl, &id))
