@@ -141,7 +141,7 @@ static void set_page_pfns(struct virtio_balloon *vb,
 					  page_to_balloon_pfn(page) + i);
 }
 
-static unsigned fill_balloon(struct virtio_balloon *vb, size_t num)
+static unsigned fill_balloon(struct virtio_balloon *vb, size_t num, bool *oom)
 {
 	unsigned num_allocated_pages;
 	unsigned num_pfns;
@@ -151,23 +151,18 @@ static unsigned fill_balloon(struct virtio_balloon *vb, size_t num)
 	/* We can only do one array worth at a time. */
 	num = min(num, ARRAY_SIZE(vb->pfns));
 
+	mutex_lock(&vb->balloon_lock);
+
 	for (num_pfns = 0; num_pfns < num;
 	     num_pfns += VIRTIO_BALLOON_PAGES_PER_PAGE) {
 		struct page *page = balloon_page_alloc();
 
 		if (!page) {
-			dev_info_ratelimited(&vb->vdev->dev,
-					     "Out of puff! Can't get %u pages\n",
-					     VIRTIO_BALLOON_PAGES_PER_PAGE);
-			/* Sleep for at least 1/5 of a second before retry. */
-			msleep(200);
+			*oom = true;
 			break;
 		}
-
 		balloon_page_push(&pages, page);
 	}
-
-	mutex_lock(&vb->balloon_lock);
 
 	vb->num_pfns = 0;
 
@@ -400,17 +395,25 @@ static void update_balloon_size_func(struct work_struct *work)
 {
 	struct virtio_balloon *vb;
 	s64 diff;
+	bool oom = false;
 
 	vb = container_of(work, struct virtio_balloon,
 			  update_balloon_size_work);
 	diff = towards_target(vb);
 
 	if (diff > 0)
-		diff -= fill_balloon(vb, diff);
+		diff -= fill_balloon(vb, diff, &oom);
 	else if (diff < 0)
 		diff += leak_balloon(vb, -diff);
 	update_balloon_size(vb);
 
+	if (oom) {
+		dev_info_ratelimited(&vb->vdev->dev,
+				     "Out of puff! Can't get %u pages\n",
+				     VIRTIO_BALLOON_PAGES_PER_PAGE);
+		/* Sleep for at least 1/5 of a second before retry. */
+		msleep(200);
+	}
 	if (diff)
 		queue_work(system_freezable_wq, work);
 }

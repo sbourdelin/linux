@@ -21,8 +21,9 @@
  */
 struct page *balloon_page_alloc(void)
 {
-	struct page *page = alloc_page(balloon_mapping_gfp_mask() |
-				       __GFP_NOMEMALLOC | __GFP_NORETRY);
+	struct page *page = alloc_page((balloon_mapping_gfp_mask() |
+					__GFP_NOMEMALLOC | __GFP_NOWARN) &
+				       ~__GFP_DIRECT_RECLAIM);
 	return page;
 }
 EXPORT_SYMBOL_GPL(balloon_page_alloc);
