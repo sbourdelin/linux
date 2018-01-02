@@ -92,7 +92,7 @@ module_param_cb(enabled, &zswap_enabled_param_ops, &zswap_enabled, 0644);
 
 /* Crypto compressor to use */
 #define ZSWAP_COMPRESSOR_DEFAULT "lzo"
-static char *zswap_compressor = ZSWAP_COMPRESSOR_DEFAULT;
+static const char *zswap_compressor = ZSWAP_COMPRESSOR_DEFAULT;
 static int zswap_compressor_param_set(const char *,
 				      const struct kernel_param *);
 static struct kernel_param_ops zswap_compressor_param_ops = {
@@ -490,7 +490,8 @@ static struct zswap_pool *zswap_pool_last_get(void)
 }
 
 /* type and compressor must be null-terminated */
-static struct zswap_pool *zswap_pool_find_get(char *type, char *compressor)
+static struct zswap_pool *zswap_pool_find_get(const char *type,
+					      const char *compressor)
 {
 	struct zswap_pool *pool;
 
@@ -510,7 +511,8 @@ static struct zswap_pool *zswap_pool_find_get(char *type, char *compressor)
 	return NULL;
 }
 
-static struct zswap_pool *zswap_pool_create(char *type, char *compressor)
+static struct zswap_pool *zswap_pool_create(const char *type,
+					    const char *compressor)
 {
 	struct zswap_pool *pool;
 	char name[38]; /* 'zswap' + 32 char (max) num + \0 */
@@ -673,7 +675,7 @@ static void zswap_pool_put(struct zswap_pool *pool)
 
 /* val must be a null-terminated string */
 static int __zswap_param_set(const char *val, const struct kernel_param *kp,
-			     char *type, char *compressor)
+			     const char *type, const char *compressor)
 {
 	struct zswap_pool *pool, *put_pool = NULL;
 	char *s = strstrip((char *)val);
