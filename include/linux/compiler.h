@@ -327,4 +327,14 @@ static __always_inline void __write_once_size(volatile void *p, void *res, int s
 	compiletime_assert(__native_word(t),				\
 		"Need native word sized stores/loads for atomicity.")
 
+/*
+ * Force the compiler to emit 'sym' as a symbol, so that we can reference
+ * it from inline assembler. Necessary in case 'sym' could be inlined
+ * otherwise, or eliminated entirely due to lack of references that are
+ * visible to the compiler.
+ */
+#define __ADDRESSABLE(sym) \
+	static void * const __attribute__((section(".discard"), used))	\
+		__PASTE(__addressable_##sym, __LINE__) = (void *)&sym;
+
 #endif /* __LINUX_COMPILER_H */
