@@ -248,6 +248,34 @@ offset_store(struct device *dev, struct device_attribute *attr,
 }
 static DEVICE_ATTR_RW(offset);
 
+static ssize_t
+range_max_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	ssize_t retval;
+	time64_t max_hw_secs, min_hw_secs;
+
+	retval = rtc_read_range(to_rtc_device(dev), &max_hw_secs, &min_hw_secs);
+	if (retval == 0)
+		retval = sprintf(buf, "%lld\n", max_hw_secs);
+
+	return retval;
+}
+static DEVICE_ATTR_RO(range_max);
+
+static ssize_t
+range_min_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	ssize_t retval;
+	time64_t max_hw_secs, min_hw_secs;
+
+	retval = rtc_read_range(to_rtc_device(dev), &max_hw_secs, &min_hw_secs);
+	if (retval == 0)
+		retval = sprintf(buf, "%lld\n", min_hw_secs);
+
+	return retval;
+}
+static DEVICE_ATTR_RO(range_min);
+
 static struct attribute *rtc_attrs[] = {
 	&dev_attr_name.attr,
 	&dev_attr_date.attr,
@@ -257,6 +285,8 @@ static struct attribute *rtc_attrs[] = {
 	&dev_attr_hctosys.attr,
 	&dev_attr_wakealarm.attr,
 	&dev_attr_offset.attr,
+	&dev_attr_range_max.attr,
+	&dev_attr_range_min.attr,
 	NULL,
 };
 
