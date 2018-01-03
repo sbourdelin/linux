@@ -374,6 +374,35 @@ static int ixgbe_ipsec_find_empty_idx(struct ixgbe_ipsec *ipsec, bool rxtable)
 }
 
 /**
+ * ixgbe_ipsec_find_rx_state - find the state that matches
+ * @ipsec: pointer to ipsec struct
+ * @daddr: inbound address to match
+ * @proto: protocol to match
+ * @spi: SPI to match
+ *
+ * Returns a pointer to the matching SA state information
+ **/
+static struct xfrm_state *ixgbe_ipsec_find_rx_state(struct ixgbe_ipsec *ipsec,
+						    __be32 daddr, u8 proto,
+						    __be32 spi)
+{
+	struct rx_sa *rsa;
+	struct xfrm_state *ret = NULL;
+
+	rcu_read_lock();
+	hash_for_each_possible_rcu(ipsec->rx_sa_list, rsa, hlist, spi)
+		if (spi == rsa->xs->id.spi &&
+		    daddr == rsa->xs->id.daddr.a4 &&
+		    proto == rsa->xs->id.proto) {
+			ret = rsa->xs;
+			xfrm_state_hold(ret);
+			break;
+		}
+	rcu_read_unlock();
+	return ret;
+}
+
+/**
  * ixgbe_ipsec_parse_proto_keys - find the key and salt based on the protocol
  * @xs: pointer to xfrm_state struct
  * @mykey: pointer to key array to populate
@@ -670,6 +699,66 @@ static const struct xfrmdev_ops ixgbe_xfrmdev_ops = {
 	.xdo_dev_state_add = ixgbe_ipsec_add_sa,
 	.xdo_dev_state_delete = ixgbe_ipsec_del_sa,
 };
+
+/**
+ * ixgbe_ipsec_rx - decode ipsec bits from Rx descriptor
+ * @rx_ring: receiving ring
+ * @rx_desc: receive data descriptor
+ * @skb: current data packet
+ *
+ * Determine if there was an ipsec encapsulation noticed, and if so set up
+ * the resulting status for later in the receive stack.
+ **/
+void ixgbe_ipsec_rx(struct ixgbe_ring *rx_ring,
+		    union ixgbe_adv_rx_desc *rx_desc,
+		    struct sk_buff *skb)
+{
+	struct ixgbe_adapter *adapter = netdev_priv(rx_ring->netdev);
+	u16 pkt_info = le16_to_cpu(rx_desc->wb.lower.lo_dword.hs_rss.pkt_info);
+	u16 ipsec_pkt_types = IXGBE_RXDADV_PKTTYPE_IPSEC_AH |
+				IXGBE_RXDADV_PKTTYPE_IPSEC_ESP;
+	struct ixgbe_ipsec *ipsec = adapter->ipsec;
+	struct xfrm_offload *xo = NULL;
+	struct xfrm_state *xs = NULL;
+	struct iphdr *iph;
+	u8 *c_hdr;
+	__be32 spi;
+	u8 proto;
+
+	/* we can assume no vlan header in the way, b/c the
+	 * hw won't recognize the IPsec packet and anyway the
+	 * currently vlan device doesn't support xfrm offload.
+	 */
+	/* TODO: not supporting IPv6 yet */
+	iph = (struct iphdr *)(skb->data + ETH_HLEN);
+	c_hdr = (u8 *)iph + iph->ihl * 4;
+	switch (pkt_info & ipsec_pkt_types) {
+	case IXGBE_RXDADV_PKTTYPE_IPSEC_AH:
+		spi = ((struct ip_auth_hdr *)c_hdr)->spi;
+		proto = IPPROTO_AH;
+		break;
+	case IXGBE_RXDADV_PKTTYPE_IPSEC_ESP:
+		spi = ((struct ip_esp_hdr *)c_hdr)->spi;
+		proto = IPPROTO_ESP;
+		break;
+	default:
+		return;
+	}
+
+	xs = ixgbe_ipsec_find_rx_state(ipsec, iph->daddr, proto, spi);
+	if (unlikely(!xs))
+		return;
+
+	skb->sp = secpath_dup(skb->sp);
+	if (unlikely(!skb->sp))
+		return;
+
+	skb->sp->xvec[skb->sp->len++] = xs;
+	skb->sp->olen++;
+	xo = xfrm_offload(skb);
+	xo->flags = CRYPTO_DONE;
+	xo->status = CRYPTO_SUCCESS;
+}
 
 /**
  * ixgbe_init_ipsec_offload - initialize security registers for IPSec operation
