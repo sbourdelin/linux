@@ -152,6 +152,8 @@ struct tcmu_dev {
 	char dev_config[TCMU_CONFIG_LEN];
 
 	int nl_reply_supported;
+
+	char dev_reconfig[TCMU_CONFIG_LEN * 2];
 };
 
 #define TCMU_DEV(_se_dev) container_of(_se_dev, struct tcmu_dev, se_dev)
@@ -1450,6 +1452,10 @@ static int tcmu_netlink_event(struct tcmu_dev *udev, enum tcmu_genl_cmd cmd,
 			ret = nla_put_u8(skb, reconfig_attr,
 					  *((u8 *)reconfig_data));
 			break;
+		case TCMU_ATTR_DEV_RECFG:
+			pr_err("Put string into netlink and send it\n");
+			ret = nla_put_string(skb, reconfig_attr, reconfig_data);
+			break;
 		default:
 			BUG();
 		}
@@ -1635,7 +1641,7 @@ static void tcmu_destroy_device(struct se_device *dev)
 
 enum {
 	Opt_dev_config, Opt_dev_size, Opt_hw_block_size, Opt_hw_max_sectors,
-	Opt_nl_reply_supported, Opt_err,
+	Opt_nl_reply_supported, Opt_dev_reconfig, Opt_err,
 };
 
 static match_table_t tokens = {
@@ -1644,6 +1650,7 @@ static match_table_t tokens = {
 	{Opt_hw_block_size, "hw_block_size=%u"},
 	{Opt_hw_max_sectors, "hw_max_sectors=%u"},
 	{Opt_nl_reply_supported, "nl_reply_supported=%d"},
+	{Opt_dev_reconfig, "dev_reconfig=%s"},
 	{Opt_err, NULL}
 };
 
@@ -1728,6 +1735,14 @@ static ssize_t tcmu_set_configfs_dev_params(struct se_device *dev,
 			kfree(arg_p);
 			if (ret < 0)
 				pr_err("kstrtoint() failed for nl_reply_supported=\n");
+			break;
+		case Opt_dev_reconfig:
+			arg_p = match_strdup(&args[0]);
+			if (!arg_p) {
+				ret = -ENOMEM;
+				break;
+			}
+			kfree(arg_p);
 			break;
 		default:
 			break;
@@ -1943,12 +1958,87 @@ static ssize_t tcmu_emulate_write_cache_store(struct config_item *item,
 }
 CONFIGFS_ATTR(tcmu_, emulate_write_cache);
 
+static ssize_t tcmu_dev_reconfig_show(struct config_item *item, char *page)
+{
+	struct se_dev_attrib *da = container_of(to_config_group(item),
+						struct se_dev_attrib, da_group);
+	struct tcmu_dev *udev = TCMU_DEV(da->da_dev);
+
+	return snprintf(page, PAGE_SIZE, "%s\n", udev->dev_reconfig);
+}
+
+static ssize_t tcmu_dev_reconfig_store(struct config_item *item,
+				       const char *page,
+				       size_t count)
+{
+	struct se_dev_attrib *da = container_of(to_config_group(item),
+						struct se_dev_attrib, da_group);
+	struct tcmu_dev *udev = TCMU_DEV(da->da_dev);
+	int token, ret;
+	char *orig, *ptr, *opts, *arg_p;
+	substring_t args[MAX_OPT_ARGS];
+
+	/* Check if device has been configured before */
+	if (tcmu_dev_configured(udev)) {
+		ret = tcmu_netlink_event(udev, TCMU_CMD_RECONFIG_DEVICE,
+					 TCMU_ATTR_DEV_RECFG, page);
+		if (ret) {
+			pr_err("Unable to reconfigure device\n");
+			return ret;
+		}
+
+		opts = kstrdup(page, GFP_KERNEL);
+		if (!opts)
+			return -ENOMEM;
+
+		orig = opts;
+		strcpy(udev->dev_reconfig, opts);
+
+		while ((ptr = strsep(&opts, ":")) != NULL) {
+			if (!*ptr)
+				continue;
+
+			token = match_token(ptr, tokens, args);
+			switch (token) {
+			case Opt_dev_config:
+				if (match_strlcpy(udev->dev_config, &args[0],
+						  TCMU_CONFIG_LEN) == 0) {
+					pr_err("Could not reconfigure dev_config");
+				}
+				ret = tcmu_update_uio_info(udev);
+				if (ret)
+					pr_err("Could not reconfigure dev_config");
+				break;
+			case Opt_dev_size:
+				arg_p = match_strdup(&args[0]);
+				if (!arg_p)
+					pr_err("Could not reconfigure dev_size");
+				ret = kstrtoul(arg_p, 0,
+					       (unsigned long *)&udev->dev_size);
+				kfree(arg_p);
+				if (ret < 0)
+					pr_err("kstrtoul() failed for dev_size=\n");
+
+				pr_err("found dev_size");
+				break;
+			default:
+				break;
+			}
+		}
+		return count;
+	}
+
+	return count;
+}
+CONFIGFS_ATTR(tcmu_, dev_reconfig);
+
 static struct configfs_attribute *tcmu_attrib_attrs[] = {
 	&tcmu_attr_cmd_time_out,
 	&tcmu_attr_dev_config,
 	&tcmu_attr_dev_size,
 	&tcmu_attr_emulate_write_cache,
 	&tcmu_attr_nl_reply_supported,
+	&tcmu_attr_dev_reconfig,
 	NULL,
 };
 
