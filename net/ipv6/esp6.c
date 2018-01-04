@@ -906,6 +906,7 @@ static int esp6_init_state(struct xfrm_state *x)
 		x->props.header_len += sizeof(struct ipv6hdr);
 		break;
 	default:
+		err = -EINVAL;
 		goto error;
 	}
 
