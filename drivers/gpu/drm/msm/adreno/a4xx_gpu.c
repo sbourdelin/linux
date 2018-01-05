@@ -298,9 +298,12 @@ static int a4xx_hw_init(struct msm_gpu *gpu)
 static void a4xx_recover(struct msm_gpu *gpu)
 {
 	struct drm_printer p = drm_info_printer(gpu->dev->dev);
+	struct msm_gpu_state *state;
 	int i;
 
-	adreno_show_info(gpu, &p);
+	state = gpu->funcs->gpu_state_get(gpu);
+
+	adreno_show_info(gpu, state, &p);
 
 	for (i = 0; i < 8; i++) {
 		drm_printf(&p, "CP_SCRATCH_REG%d: %u\n", i,
@@ -309,12 +312,14 @@ static void a4xx_recover(struct msm_gpu *gpu)
 
 	/* dump registers before resetting gpu, if enabled: */
 	if (hang_debug)
-		adreno_show_regs(gpu, &p);
+		adreno_show_regs(gpu, state, &p);
 
 	gpu_write(gpu, REG_A4XX_RBBM_SW_RESET_CMD, 1);
 	gpu_read(gpu, REG_A4XX_RBBM_SW_RESET_CMD);
 	gpu_write(gpu, REG_A4XX_RBBM_SW_RESET_CMD, 0);
 	adreno_recover(gpu);
+
+	gpu->funcs->gpu_state_put(state);
 }
 
 static void a4xx_destroy(struct msm_gpu *gpu)
@@ -454,16 +459,6 @@ static const unsigned int a4xx_registers[] = {
 	~0 /* sentinel */
 };
 
-#ifdef CONFIG_DEBUG_FS
-static void a4xx_show(struct msm_gpu *gpu, struct seq_file *m)
-{
-	seq_printf(m, "status:   %08x\n",
-			gpu_read(gpu, REG_A4XX_RBBM_STATUS));
-	adreno_show(gpu, m);
-
-}
-#endif
-
 static struct msm_gpu_state *a4xx_gpu_state_get(struct msm_gpu *gpu)
 {
 	struct msm_gpu_state *state = adreno_gpu_state_get(gpu);
@@ -543,7 +538,7 @@ static const struct adreno_gpu_funcs funcs = {
 		.irq = a4xx_irq,
 		.destroy = a4xx_destroy,
 #ifdef CONFIG_DEBUG_FS
-		.show = a4xx_show,
+		.show = adreno_show,
 #endif
 		.gpu_state_get = a4xx_gpu_state_get,
 		.gpu_state_put = adreno_gpu_state_put,
