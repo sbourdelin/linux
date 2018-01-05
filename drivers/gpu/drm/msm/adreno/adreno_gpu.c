@@ -362,90 +362,56 @@ bool adreno_idle(struct msm_gpu *gpu, struct msm_ringbuffer *ring)
 	return false;
 }
 
+void adreno_show_info(struct msm_gpu *gpu, struct drm_printer *p)
+{
+	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
+	int i;
+
+	drm_printf(p, "revision: %d (%d.%d.%d.%d)\n",
+			adreno_gpu->info->revn, adreno_gpu->rev.core,
+			adreno_gpu->rev.major, adreno_gpu->rev.minor,
+			adreno_gpu->rev.patchid);
+
+	for (i = 0; i < gpu->nr_rings; i++) {
+		struct msm_ringbuffer *ring = gpu->rb[i];
+
+		drm_printf(p, "rb %d: fence:    %d/%d\n", i,
+			ring->memptrs->fence, ring->seqno);
+
+		drm_printf(p, "      rptr:     %d\n",
+			get_rptr(adreno_gpu, ring));
+		drm_printf(p, "rb wptr:  %d\n", get_wptr(ring));
+	}
+}
+
+void adreno_show_regs(struct msm_gpu *gpu, struct drm_printer *p)
+{
+	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
+	int i;
+
+	/* dump these out in a form that can be parsed by demsm: */
+	drm_printf(p, "IO:region %s 00000000 00020000\n", gpu->name);
+	for (i = 0; adreno_gpu->registers[i] != ~0; i += 2) {
+		uint32_t start = adreno_gpu->registers[i];
+		uint32_t end   = adreno_gpu->registers[i+1];
+		uint32_t addr;
+
+		for (addr = start; addr <= end; addr++) {
+			uint32_t val = gpu_read(gpu, addr);
+			drm_printf(p, "IO:R %08x %08x\n", addr<<2, val);
+		}
+	}
+}
+
 #ifdef CONFIG_DEBUG_FS
 void adreno_show(struct msm_gpu *gpu, struct seq_file *m)
 {
-	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
-	int i;
+	struct drm_printer p = drm_seq_file_printer(m);
 
-	seq_printf(m, "revision: %d (%d.%d.%d.%d)\n",
-			adreno_gpu->info->revn, adreno_gpu->rev.core,
-			adreno_gpu->rev.major, adreno_gpu->rev.minor,
-			adreno_gpu->rev.patchid);
-
-	for (i = 0; i < gpu->nr_rings; i++) {
-		struct msm_ringbuffer *ring = gpu->rb[i];
-
-		seq_printf(m, "rb %d: fence:    %d/%d\n", i,
-			ring->memptrs->fence, ring->seqno);
-
-		seq_printf(m, "      rptr:     %d\n",
-			get_rptr(adreno_gpu, ring));
-		seq_printf(m, "rb wptr:  %d\n", get_wptr(ring));
-	}
-
-	/* dump these out in a form that can be parsed by demsm: */
-	seq_printf(m, "IO:region %s 00000000 00020000\n", gpu->name);
-	for (i = 0; adreno_gpu->registers[i] != ~0; i += 2) {
-		uint32_t start = adreno_gpu->registers[i];
-		uint32_t end   = adreno_gpu->registers[i+1];
-		uint32_t addr;
-
-		for (addr = start; addr <= end; addr++) {
-			uint32_t val = gpu_read(gpu, addr);
-			seq_printf(m, "IO:R %08x %08x\n", addr<<2, val);
-		}
-	}
+	adreno_show_info(gpu, &p);
+	adreno_show_regs(gpu, &p);
 }
 #endif
-
-/* Dump common gpu status and scratch registers on any hang, to make
- * the hangcheck logs more useful.  The scratch registers seem always
- * safe to read when GPU has hung (unlike some other regs, depending
- * on how the GPU hung), and they are useful to match up to cmdstream
- * dumps when debugging hangs:
- */
-void adreno_dump_info(struct msm_gpu *gpu)
-{
-	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
-	int i;
-
-	printk("revision: %d (%d.%d.%d.%d)\n",
-			adreno_gpu->info->revn, adreno_gpu->rev.core,
-			adreno_gpu->rev.major, adreno_gpu->rev.minor,
-			adreno_gpu->rev.patchid);
-
-	for (i = 0; i < gpu->nr_rings; i++) {
-		struct msm_ringbuffer *ring = gpu->rb[i];
-
-		printk("rb %d: fence:    %d/%d\n", i,
-			ring->memptrs->fence,
-			ring->seqno);
-
-		printk("rptr:     %d\n", get_rptr(adreno_gpu, ring));
-		printk("rb wptr:  %d\n", get_wptr(ring));
-	}
-}
-
-/* would be nice to not have to duplicate the _show() stuff with printk(): */
-void adreno_dump(struct msm_gpu *gpu)
-{
-	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
-	int i;
-
-	/* dump these out in a form that can be parsed by demsm: */
-	printk("IO:region %s 00000000 00020000\n", gpu->name);
-	for (i = 0; adreno_gpu->registers[i] != ~0; i += 2) {
-		uint32_t start = adreno_gpu->registers[i];
-		uint32_t end   = adreno_gpu->registers[i+1];
-		uint32_t addr;
-
-		for (addr = start; addr <= end; addr++) {
-			uint32_t val = gpu_read(gpu, addr);
-			printk("IO:R %08x %08x\n", addr<<2, val);
-		}
-	}
-}
 
 static uint32_t ring_freewords(struct msm_ringbuffer *ring)
 {

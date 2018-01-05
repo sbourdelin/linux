@@ -39,7 +39,6 @@
 
 extern bool hang_debug;
 
-static void a3xx_dump(struct msm_gpu *gpu);
 static bool a3xx_idle(struct msm_gpu *gpu);
 
 static bool a3xx_me_init(struct msm_gpu *gpu)
@@ -300,18 +299,18 @@ static int a3xx_hw_init(struct msm_gpu *gpu)
 
 static void a3xx_recover(struct msm_gpu *gpu)
 {
+	struct drm_printer p = drm_info_printer(gpu->dev->dev);
 	int i;
 
-	adreno_dump_info(gpu);
+	adreno_show_info(gpu, &p);
 
-	for (i = 0; i < 8; i++) {
-		printk("CP_SCRATCH_REG%d: %u\n", i,
+	for (i = 0; i < 8; i++)
+		drm_printf(&p, "CP_SCRATCH_REG%d: %u\n", i,
 			gpu_read(gpu, REG_AXXX_CP_SCRATCH_REG0 + i));
-	}
 
 	/* dump registers before resetting gpu, if enabled: */
 	if (hang_debug)
-		a3xx_dump(gpu);
+		adreno_show_regs(gpu, &p);
 
 	gpu_write(gpu, REG_A3XX_RBBM_SW_RESET_CMD, 1);
 	gpu_read(gpu, REG_A3XX_RBBM_SW_RESET_CMD);
@@ -419,13 +418,6 @@ static void a3xx_show(struct msm_gpu *gpu, struct seq_file *m)
 }
 #endif
 
-/* would be nice to not have to duplicate the _show() stuff with printk(): */
-static void a3xx_dump(struct msm_gpu *gpu)
-{
-	printk("status:   %08x\n",
-			gpu_read(gpu, REG_A3XX_RBBM_STATUS));
-	adreno_dump(gpu);
-}
 /* Register offset defines for A3XX */
 static const unsigned int a3xx_register_offsets[REG_ADRENO_REGISTER_MAX] = {
 	REG_ADRENO_DEFINE(REG_ADRENO_CP_RB_BASE, REG_AXXX_CP_RB_BASE),

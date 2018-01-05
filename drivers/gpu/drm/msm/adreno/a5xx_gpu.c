@@ -22,7 +22,6 @@
 #include "a5xx_gpu.h"
 
 extern bool hang_debug;
-static void a5xx_dump(struct msm_gpu *gpu);
 
 #define GPU_PAS_ID 13
 
@@ -755,17 +754,17 @@ static int a5xx_hw_init(struct msm_gpu *gpu)
 
 static void a5xx_recover(struct msm_gpu *gpu)
 {
+	struct drm_printer p = drm_info_printer(gpu->dev->dev);
 	int i;
 
-	adreno_dump_info(gpu);
+	adreno_show_info(gpu, &p);
 
-	for (i = 0; i < 8; i++) {
-		printk("CP_SCRATCH_REG%d: %u\n", i,
+	for (i = 0; i < 8; i++)
+		drm_printf(&p, "CP_SCRATCH_REG%d: %u\n", i,
 			gpu_read(gpu, REG_A5XX_CP_SCRATCH_REG(i)));
-	}
 
 	if (hang_debug)
-		a5xx_dump(gpu);
+		adreno_show_regs(gpu, &p);
 
 	gpu_write(gpu, REG_A5XX_RBBM_SW_RESET_CMD, 1);
 	gpu_read(gpu, REG_A5XX_RBBM_SW_RESET_CMD);
@@ -1072,13 +1071,6 @@ static const u32 a5xx_registers[] = {
 	0xEAA5, 0xEAC2, 0xA800, 0xA8FF, 0xAC60, 0xAC60, 0xB000, 0xB97F,
 	0xB9A0, 0xB9BF, ~0
 };
-
-static void a5xx_dump(struct msm_gpu *gpu)
-{
-	dev_info(gpu->dev->dev, "status:   %08x\n",
-		gpu_read(gpu, REG_A5XX_RBBM_STATUS));
-	adreno_dump(gpu);
-}
 
 static int a5xx_pm_resume(struct msm_gpu *gpu)
 {
