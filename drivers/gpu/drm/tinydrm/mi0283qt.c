@@ -47,9 +47,11 @@
 #define ILI9341_MADCTL_MX	BIT(6)
 #define ILI9341_MADCTL_MY	BIT(7)
 
-static int mi0283qt_init(struct mipi_dbi *mipi)
+static void mi0283qt_enable(struct drm_simple_display_pipe *pipe,
+			    struct drm_crtc_state *crtc_state)
 {
-	struct tinydrm_device *tdev = &mipi->tinydrm;
+	struct tinydrm_device *tdev = pipe_to_tinydrm(pipe);
+	struct mipi_dbi *mipi = mipi_dbi_from_tinydrm(tdev);
 	struct device *dev = tdev->drm->dev;
 	u8 addr_mode;
 	int ret;
@@ -59,19 +61,18 @@ static int mi0283qt_init(struct mipi_dbi *mipi)
 	ret = regulator_enable(mipi->regulator);
 	if (ret) {
 		DRM_DEV_ERROR(dev, "Failed to enable regulator: %d\n", ret);
-		return ret;
+		return;
 	}
 
-	/* Avoid flicker by skipping setup if the bootloader has done it */
 	if (mipi_dbi_display_is_on(mipi))
-		return 0;
+		goto out_enable;
 
 	mipi_dbi_hw_reset(mipi);
 	ret = mipi_dbi_command(mipi, MIPI_DCS_SOFT_RESET);
 	if (ret) {
 		DRM_DEV_ERROR(dev, "Error sending command: %d\n", ret);
 		regulator_disable(mipi->regulator);
-		return ret;
+		return;
 	}
 
 	msleep(20);
@@ -137,19 +138,12 @@ static int mi0283qt_init(struct mipi_dbi *mipi)
 	mipi_dbi_command(mipi, MIPI_DCS_SET_DISPLAY_ON);
 	msleep(100);
 
-	return 0;
-}
-
-static void mi0283qt_fini(void *data)
-{
-	struct mipi_dbi *mipi = data;
-
-	DRM_DEBUG_KMS("\n");
-	regulator_disable(mipi->regulator);
+out_enable:
+	mipi_dbi_pipe_enable(pipe, crtc_state);
 }
 
 static const struct drm_simple_display_pipe_funcs mi0283qt_pipe_funcs = {
-	.enable = mipi_dbi_pipe_enable,
+	.enable = mi0283qt_enable,
 	.disable = mipi_dbi_pipe_disable,
 	.update = tinydrm_display_pipe_update,
 	.prepare_fb = tinydrm_display_pipe_prepare_fb,
@@ -230,17 +224,6 @@ static int mi0283qt_probe(struct spi_device *spi)
 	if (ret)
 		return ret;
 
-	ret = mi0283qt_init(mipi);
-	if (ret)
-		return ret;
-
-	/* use devres to fini after drm unregister (drv->remove is before) */
-	ret = devm_add_action(dev, mi0283qt_fini, mipi);
-	if (ret) {
-		mi0283qt_fini(mipi);
-		return ret;
-	}
-
 	spi_set_drvdata(spi, mipi);
 
 	return devm_tinydrm_register(&mipi->tinydrm);
@@ -256,25 +239,13 @@ static void mi0283qt_shutdown(struct spi_device *spi)
 static int __maybe_unused mi0283qt_pm_suspend(struct device *dev)
 {
 	struct mipi_dbi *mipi = dev_get_drvdata(dev);
-	int ret;
 
-	ret = drm_mode_config_helper_suspend(mipi->tinydrm.drm);
-	if (ret)
-		return ret;
-
-	mi0283qt_fini(mipi);
-
-	return 0;
+	return drm_mode_config_helper_suspend(mipi->tinydrm.drm);
 }
 
 static int __maybe_unused mi0283qt_pm_resume(struct device *dev)
 {
 	struct mipi_dbi *mipi = dev_get_drvdata(dev);
-	int ret;
-
-	ret = mi0283qt_init(mipi);
-	if (ret)
-		return ret;
 
 	drm_mode_config_helper_resume(mipi->tinydrm.drm);
 
