@@ -18,6 +18,7 @@
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_gem_cma_helper.h>
 
+#include "xlnx_drv.h"
 #include "xlnx_fb.h"
 
 #define XLNX_MAX_PLANES	4

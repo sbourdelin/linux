@@ -11,6 +11,7 @@
 #include <drm/drmP.h>
 #include <drm/drm_gem_cma_helper.h>
 
+#include "xlnx_drv.h"
 #include "xlnx_gem.h"
 
 /*

@@ -13,6 +13,7 @@
 #include <linux/list.h>
 
 #include "xlnx_crtc.h"
+#include "xlnx_drv.h"
 
 /*
  * Overview
