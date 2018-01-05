@@ -226,6 +226,9 @@ void adreno_gpu_cleanup(struct adreno_gpu *gpu);
 void adreno_show_info(struct msm_gpu *gpu, struct drm_printer *p);
 void adreno_show_regs(struct msm_gpu *gpu, struct drm_printer *p);
 
+struct msm_gpu_state *adreno_gpu_state_get(struct msm_gpu *gpu);
+void adreno_gpu_state_put(struct msm_gpu_state *state);
+
 /* ringbuffer helpers (the parts that are adreno specific) */
 
 static inline void
