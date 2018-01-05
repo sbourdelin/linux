@@ -1,0 +1,20 @@
+Xilinx KMS Pipeline
+-------------------
+
+Xilinx display pipelines can be designed with hardened video IPs and soft video
+IPs in programmable logic. This KMS module provides the common functionality
+of individual subdevice drivers, and glue logics between them.
+
+Required properties:
+
+- compatible: Must be "xlnx,kms".
+
+- ports: phandles for CRTC ports, using the DT bindings defined in
+  Documentation/devicetree/bindings/graph.txt.
+
+Example:
+
+	xlnx_drm: xlnx_drm {
+		compatible = "xlnx,kms";
+		ports = <&crtc_port>;
+	};
