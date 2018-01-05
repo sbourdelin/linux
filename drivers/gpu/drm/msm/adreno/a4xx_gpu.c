@@ -319,6 +319,7 @@ static void a4xx_recover(struct msm_gpu *gpu)
 	gpu_write(gpu, REG_A4XX_RBBM_SW_RESET_CMD, 0);
 	adreno_recover(gpu);
 
+	msm_gpu_crashstate_set(gpu, state);
 	gpu->funcs->gpu_state_put(state);
 }
 
