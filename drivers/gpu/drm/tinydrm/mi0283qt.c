@@ -58,7 +58,7 @@ static int mi0283qt_init(struct mipi_dbi *mipi)
 
 	ret = regulator_enable(mipi->regulator);
 	if (ret) {
-		DRM_DEV_ERROR(dev, "Failed to enable regulator %d\n", ret);
+		DRM_DEV_ERROR(dev, "Failed to enable regulator: %d\n", ret);
 		return ret;
 	}
 
@@ -69,7 +69,7 @@ static int mi0283qt_init(struct mipi_dbi *mipi)
 	mipi_dbi_hw_reset(mipi);
 	ret = mipi_dbi_command(mipi, MIPI_DCS_SOFT_RESET);
 	if (ret) {
-		DRM_DEV_ERROR(dev, "Error sending command %d\n", ret);
+		DRM_DEV_ERROR(dev, "Error sending command: %d\n", ret);
 		regulator_disable(mipi->regulator);
 		return ret;
 	}
