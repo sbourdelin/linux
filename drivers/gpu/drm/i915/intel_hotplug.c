@@ -245,7 +245,8 @@ static void intel_hpd_irq_storm_reenable_work(struct work_struct *work)
 		drm_for_each_connector_iter(connector, &conn_iter) {
 			struct intel_connector *intel_connector = to_intel_connector(connector);
 
-			if (intel_connector->encoder->hpd_pin == i) {
+			if (intel_connector->encoder &&
+			    (intel_connector->encoder->hpd_pin == i)) {
 				if (connector->polled != intel_connector->polled)
 					DRM_DEBUG_DRIVER("Reenabling HPD on connector %s\n",
 							 connector->name);
@@ -546,6 +547,7 @@ static void i915_hpd_poll_init_work(struct work_struct *work)
 			continue;
 
 		if (!connector->polled && I915_HAS_HOTPLUG(dev_priv) &&
+		    intel_connector->encoder &&
 		    intel_connector->encoder->hpd_pin > HPD_NONE) {
 			connector->polled = enabled ?
 				DRM_CONNECTOR_POLL_CONNECT |
