@@ -228,9 +228,8 @@ static int apds9802als_probe(struct i2c_client *client,
 			     const struct i2c_device_id *id)
 {
 	int res;
-	struct als_data *data;
+	struct als_data *data = kzalloc(sizeof(*data), GFP_KERNEL);
 
-	data = kzalloc(sizeof(struct als_data), GFP_KERNEL);
 	if (!data)
 		return -ENOMEM;
 
