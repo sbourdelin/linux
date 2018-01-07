@@ -164,12 +164,7 @@ static p4d_t *pti_user_pagetable_walk_p4d(unsigned long address)
 		if (!new_p4d_page)
 			return NULL;
 
-		if (pgd_none(*pgd)) {
-			set_pgd(pgd, __pgd(_KERNPG_TABLE | __pa(new_p4d_page)));
-			new_p4d_page = 0;
-		}
-		if (new_p4d_page)
-			free_page(new_p4d_page);
+		set_pgd(pgd, __pgd(_KERNPG_TABLE | __pa(new_p4d_page)));
 	}
 	BUILD_BUG_ON(pgd_large(*pgd) != 0);
 
@@ -194,12 +189,7 @@ static pmd_t *pti_user_pagetable_walk_pmd(unsigned long address)
 		if (!new_pud_page)
 			return NULL;
 
-		if (p4d_none(*p4d)) {
-			set_p4d(p4d, __p4d(_KERNPG_TABLE | __pa(new_pud_page)));
-			new_pud_page = 0;
-		}
-		if (new_pud_page)
-			free_page(new_pud_page);
+		set_p4d(p4d, __p4d(_KERNPG_TABLE | __pa(new_pud_page)));
 	}
 
 	pud = pud_offset(p4d, address);
@@ -213,12 +203,7 @@ static pmd_t *pti_user_pagetable_walk_pmd(unsigned long address)
 		if (!new_pmd_page)
 			return NULL;
 
-		if (pud_none(*pud)) {
-			set_pud(pud, __pud(_KERNPG_TABLE | __pa(new_pmd_page)));
-			new_pmd_page = 0;
-		}
-		if (new_pmd_page)
-			free_page(new_pmd_page);
+		set_pud(pud, __pud(_KERNPG_TABLE | __pa(new_pmd_page)));
 	}
 
 	return pmd_offset(pud, address);
@@ -251,12 +236,7 @@ static __init pte_t *pti_user_pagetable_walk_pte(unsigned long address)
 		if (!new_pte_page)
 			return NULL;
 
-		if (pmd_none(*pmd)) {
-			set_pmd(pmd, __pmd(_KERNPG_TABLE | __pa(new_pte_page)));
-			new_pte_page = 0;
-		}
-		if (new_pte_page)
-			free_page(new_pte_page);
+		set_pmd(pmd, __pmd(_KERNPG_TABLE | __pa(new_pte_page)));
 	}
 
 	pte = pte_offset_kernel(pmd, address);
