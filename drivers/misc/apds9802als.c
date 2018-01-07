@@ -231,10 +231,9 @@ static int apds9802als_probe(struct i2c_client *client,
 	struct als_data *data;
 
 	data = kzalloc(sizeof(struct als_data), GFP_KERNEL);
-	if (data == NULL) {
-		dev_err(&client->dev, "Memory allocation failed\n");
+	if (!data)
 		return -ENOMEM;
-	}
+
 	i2c_set_clientdata(client, data);
 	res = sysfs_create_group(&client->dev.kobj, &m_als_gr);
 	if (res) {
