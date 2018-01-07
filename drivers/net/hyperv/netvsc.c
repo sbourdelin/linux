@@ -275,9 +275,6 @@ static int netvsc_init_buf(struct hv_device *device,
 
 	net_device->recv_buf = vzalloc(buf_size);
 	if (!net_device->recv_buf) {
-		netdev_err(ndev,
-			   "unable to allocate receive buffer of size %u\n",
-			   buf_size);
 		ret = -ENOMEM;
 		goto cleanup;
 	}
@@ -357,8 +354,6 @@ static int netvsc_init_buf(struct hv_device *device,
 
 	net_device->send_buf = vzalloc(buf_size);
 	if (!net_device->send_buf) {
-		netdev_err(ndev, "unable to allocate send buffer of size %u\n",
-			   buf_size);
 		ret = -ENOMEM;
 		goto cleanup;
 	}
