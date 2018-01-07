@@ -418,10 +418,8 @@ static int fsa9480_probe(struct i2c_client *client,
 		return -EIO;
 
 	usbsw = kzalloc(sizeof(struct fsa9480_usbsw), GFP_KERNEL);
-	if (!usbsw) {
-		dev_err(&client->dev, "failed to allocate driver data\n");
+	if (!usbsw)
 		return -ENOMEM;
-	}
 
 	usbsw->client = client;
 	usbsw->pdata = client->dev.platform_data;
