@@ -417,7 +417,7 @@ static int fsa9480_probe(struct i2c_client *client,
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
 		return -EIO;
 
-	usbsw = kzalloc(sizeof(struct fsa9480_usbsw), GFP_KERNEL);
+	usbsw = kzalloc(sizeof(*usbsw), GFP_KERNEL);
 	if (!usbsw)
 		return -ENOMEM;
 
