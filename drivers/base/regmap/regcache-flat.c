@@ -16,6 +16,11 @@
 
 #include "internal.h"
 
+struct regcache_flat_reg {
+	unsigned int value; /* Value of this register */
+	bool valid; /* Is value valid? */
+} __packed;
+
 static inline unsigned int regcache_flat_get_index(const struct regmap *map,
 						   unsigned int reg)
 {
@@ -25,7 +30,7 @@ static inline unsigned int regcache_flat_get_index(const struct regmap *map,
 static int regcache_flat_init(struct regmap *map)
 {
 	int i;
-	unsigned int *cache;
+	struct regcache_flat_reg *cache;
 
 	if (!map || map->reg_stride_order < 0 || !map->max_register)
 		return -EINVAL;
@@ -41,7 +46,8 @@ static int regcache_flat_init(struct regmap *map)
 		unsigned int reg = map->reg_defaults[i].reg;
 		unsigned int index = regcache_flat_get_index(map, reg);
 
-		cache[index] = map->reg_defaults[i].def;
+		cache[index].value = map->reg_defaults[i].def;
+		cache[index].valid = true;
 	}
 
 	return 0;
@@ -58,10 +64,13 @@ static int regcache_flat_exit(struct regmap *map)
 static int regcache_flat_read(struct regmap *map,
 			      unsigned int reg, unsigned int *value)
 {
-	unsigned int *cache = map->cache;
+	struct regcache_flat_reg *cache = map->cache;
 	unsigned int index = regcache_flat_get_index(map, reg);
 
-	*value = cache[index];
+	if (!cache[index].valid)
+		return -ENOENT;
+
+	*value = cache[index].value;
 
 	return 0;
 }
@@ -69,10 +78,11 @@ static int regcache_flat_read(struct regmap *map,
 static int regcache_flat_write(struct regmap *map, unsigned int reg,
 			       unsigned int value)
 {
-	unsigned int *cache = map->cache;
+	struct regcache_flat_reg *cache = map->cache;
 	unsigned int index = regcache_flat_get_index(map, reg);
 
-	cache[index] = value;
+	cache[index].value = value;
+	cache[index].valid = true;
 
 	return 0;
 }
