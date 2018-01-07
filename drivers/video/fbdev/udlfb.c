@@ -1174,10 +1174,8 @@ static int dlfb_realloc_framebuffer(struct dlfb_data *dev, struct fb_info *info)
 		 * Alloc system memory for virtual framebuffer
 		 */
 		new_fb = vmalloc(new_len);
-		if (!new_fb) {
-			pr_err("Virtual framebuffer alloc failed\n");
+		if (!new_fb)
 			return -ENOMEM;
-		}
 
 		if (info->screen_base) {
 			memcpy(new_fb, old_fb, old_len);
