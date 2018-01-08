@@ -80,4 +80,5 @@ static inline void pcie_port_platform_notify(struct pci_dev *port, int *mask){}
 #endif /* !CONFIG_ACPI */
 
 struct pcie_port_service_driver *pci_find_aer_service(struct pci_dev *dev);
+struct pcie_port_service_driver *pci_find_dpc_service(struct pci_dev *dev);
 #endif /* _PORTDRV_H_ */
