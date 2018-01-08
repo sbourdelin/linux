@@ -64,6 +64,7 @@ void intel_guc_init_early(struct intel_guc *guc)
 {
 	intel_guc_fw_init_early(guc);
 	intel_guc_ct_init_early(&guc->ct);
+	intel_guc_wopcm_init_early(&guc->wopcm);
 
 	mutex_init(&guc->send_mutex);
 	guc->send = intel_guc_send_nop;
@@ -465,7 +466,7 @@ int intel_guc_resume(struct drm_i915_private *dev_priv)
  * This is a wrapper to create an object for use with the GuC. In order to
  * use it inside the GuC, an object needs to be pinned lifetime, so we allocate
  * both some backing storage and a range inside the Global GTT. We must pin
- * it in the GGTT somewhere other than than [0, GUC_WOPCM_TOP) because that
+ * it in the GGTT somewhere other than than [0, GuC WOPCM top) because that
  * range is reserved inside GuC.
  *
  * Return:	A i915_vma if successful, otherwise an ERR_PTR.
@@ -486,7 +487,7 @@ struct i915_vma *intel_guc_allocate_vma(struct intel_guc *guc, u32 size)
 		goto err;
 
 	ret = i915_vma_pin(vma, 0, PAGE_SIZE,
-			   PIN_GLOBAL | PIN_OFFSET_BIAS | GUC_WOPCM_TOP);
+			   PIN_GLOBAL | PIN_OFFSET_BIAS | guc->wopcm.top);
 	if (ret) {
 		vma = ERR_PTR(ret);
 		goto err;

@@ -29,11 +29,41 @@
 
 struct intel_guc;
 
-#define   GUC_WOPCM_OFFSET_VALUE	0x80000	/* 512KB */
-/* GuC addresses below GUC_WOPCM_TOP don't map through the GTT */
-#define GUC_WOPCM_TOP			(0x80 << 12)	/* 512KB */
-#define BXT_GUC_WOPCM_RC6_RESERVED	(0x10 << 12)	/* 64KB  */
+/* Default WOPCM size 1MB */
+#define WOPCM_DEFAULT_SIZE		(0x1 << 20)
+/* Reserved WOPCM size 16KB */
+#define WOPCM_RESERVED_SIZE		(0x4000)
+/* GUC WOPCM Offset need to be 16KB aligned */
+#define WOPCM_OFFSET_ALIGNMENT		(0x4000)
+/* 8KB stack reserved for GuC FW*/
+#define GUC_WOPCM_STACK_RESERVED	(0x2000)
+/* 24KB WOPCM reserved for RC6 CTX on BXT */
+#define BXT_WOPCM_RC6_RESERVED		(0x6000)
 
-u32 intel_guc_wopcm_size(struct intel_guc *guc);
+#define GEN9_GUC_WOPCM_DELTA		4
+#define GEN9_GUC_WOPCM_OFFSET		(0x24000)
+
+struct intel_guc_wopcm {
+	u32 offset;
+	u32 size;
+	u32 top;
+	bool valid;
+};
+
+/*
+ * intel_guc_wopcm_init_early() - Early initialization of the GuC WOPCM.
+ * @wopcm: GuC WOPCM.
+ *
+ * Setup the GuC WOPCM top to the top of the overall WOPCM. This will guarantee
+ * that the allocation of the GuC accessible objects won't fall into WOPCM when
+ * GuC partition isn't present.
+ *
+ */
+static inline void intel_guc_wopcm_init_early(struct intel_guc_wopcm *wopcm)
+{
+	wopcm->top = WOPCM_DEFAULT_SIZE;
+}
+
+int intel_guc_wopcm_init(struct intel_guc *guc, u32 guc_size, u32 huc_size);
 
 #endif
