@@ -366,6 +366,28 @@ static struct nft_table *nft_table_lookup(const struct nft_af_info *afi,
 	return NULL;
 }
 
+static struct nft_table *__nft_table_lookup_byhandle(const struct nft_af_info *afi,
+						     u64 handle, u8 genmask)
+{
+	struct nft_table *table;
+
+	list_for_each_entry(table, &afi->tables, list) {
+		if (handle == table->handle &&
+		    nft_active_genmask(table, genmask))
+			return table;
+	}
+	return NULL;
+}
+
+static struct nft_table *nft_table_lookup_byhandle(const struct nft_af_info *afi,
+						   const struct nlattr *nla,
+						   u8 genmask)
+{
+	return __nft_table_lookup_byhandle(afi,
+					   be64_to_cpu(nla_get_be64(nla)),
+					   genmask);
+}
+
 static struct nft_table *nf_tables_table_lookup(const struct nft_af_info *afi,
 						const struct nlattr *nla,
 						u8 genmask)
@@ -376,6 +398,22 @@ static struct nft_table *nf_tables_table_lookup(const struct nft_af_info *afi,
 		return ERR_PTR(-EINVAL);
 
 	table = nft_table_lookup(afi, nla, genmask);
+	if (table != NULL)
+		return table;
+
+	return ERR_PTR(-ENOENT);
+}
+
+static struct nft_table *nf_tables_table_lookup_byhandle(const struct nft_af_info *afi,
+							 const struct nlattr *nla,
+							 u8 genmask)
+{
+	struct nft_table *table;
+
+	if (nla == NULL)
+		return ERR_PTR(-EINVAL);
+
+	table = nft_table_lookup_byhandle(afi, nla, genmask);
 	if (table != NULL)
 		return table;
 
@@ -849,14 +887,17 @@ static int nf_tables_deltable(struct net *net, struct sock *nlsk,
 	struct nft_ctx ctx;
 
 	nft_ctx_init(&ctx, net, skb, nlh, NULL, NULL, NULL, nla);
-	if (family == AF_UNSPEC || nla[NFTA_TABLE_NAME] == NULL)
+	if (family == AF_UNSPEC || (nla[NFTA_TABLE_NAME] == NULL && nla[NFTA_TABLE_HANDLE] == NULL))
 		return nft_flush(&ctx, family);
 
 	afi = nf_tables_afinfo_lookup(net, family, false);
 	if (IS_ERR(afi))
 		return PTR_ERR(afi);
+	if (nla[NFTA_TABLE_HANDLE])
+		table = nf_tables_table_lookup_byhandle(afi, nla[NFTA_TABLE_HANDLE], genmask);
+	else
+		table = nf_tables_table_lookup(afi, nla[NFTA_TABLE_NAME], genmask);
 
-	table = nf_tables_table_lookup(afi, nla[NFTA_TABLE_NAME], genmask);
 	if (IS_ERR(table))
 		return PTR_ERR(table);
 
