@@ -667,7 +667,7 @@ config VIDEO_OV7670
 
 config VIDEO_OV7740
 	tristate "OmniVision OV7740 sensor support"
-	depends on I2C && VIDEO_V4L2
+	depends on I2C && VIDEO_V4L2 && MEDIA_CONTROLLER
 	depends on MEDIA_CAMERA_SUPPORT
 	---help---
 	  This is a Video4Linux2 sensor-level driver for the OmniVision
