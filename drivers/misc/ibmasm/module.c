@@ -78,7 +78,7 @@ static int ibmasm_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	/* vnc client won't work without bus-mastering */
 	pci_set_master(pdev);
 
-	sp = kzalloc(sizeof(struct service_processor), GFP_KERNEL);
+	sp = kzalloc(sizeof(*sp), GFP_KERNEL);
 	if (sp == NULL) {
 		result = -ENOMEM;
 		goto error_kmalloc;
