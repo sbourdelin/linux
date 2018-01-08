@@ -1,0 +1,15 @@
+Xilinx Zynq MPSoC Power Management Device Tree Bindings
+
+The zynqmp-pm node describes the power management configurations.
+
+Required properties:
+ - compatible		: Must contain:  "xlnx,zynqmp-pm"
+ - interrupt-parent	: Interrupt controller the interrupt is routed through
+ - interrupts		: Interrupt specifier
+
+Examples:
+	zynqmp-firmware {
+		compatible = "xlnx,zynqmp-pm";
+		interrupt-parent = <&gic>;
+		interrupts = <0 35 4>;
+	};

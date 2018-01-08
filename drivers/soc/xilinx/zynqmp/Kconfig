@@ -1,0 +1,15 @@
+# SPDX-License-Identifier:	GPL-2.0+
+# Kconfig for Xilinx zynqmp SoC
+#
+menu "Zynq MPSoC SoC Drivers"
+	depends on ARCH_ZYNQMP
+
+
+config ZYNQMP_PM
+	bool "Enable Xilinx Zynq MPSoC Power Management"
+	depends on PM
+	help
+	  Say yes to enable power management support for
+	  ZyqnMP SoC. In doubt, say N.
+
+endmenu
