@@ -2453,6 +2453,9 @@ static irqreturn_t ibmvnic_interrupt_rx(int irq, void *instance)
 	struct ibmvnic_sub_crq_queue *scrq = instance;
 	struct ibmvnic_adapter *adapter = scrq->adapter;
 
+	if (adapter->state != VNIC_OPEN)
+		return IRQ_NONE;
+
 	adapter->rx_stats_buffers[scrq->scrq_num].interrupts++;
 
 	if (napi_schedule_prep(&adapter->napi[scrq->scrq_num])) {
