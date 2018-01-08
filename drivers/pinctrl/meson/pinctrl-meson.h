@@ -124,12 +124,14 @@ struct meson_pinctrl {
 	struct device_node *of_node;
 };
 
-#define FUNCTION(fn)							\
+#define FUNCTION_EX(fn, ex)						\
 	{								\
 		.name = #fn,						\
-		.groups = fn ## _groups,				\
-		.num_groups = ARRAY_SIZE(fn ## _groups),		\
+		.groups = fn ## ex ## _groups,				\
+		.num_groups = ARRAY_SIZE(fn ## ex ## _groups),		\
 	}
+
+#define FUNCTION(fn)	FUNCTION_EX(fn, )
 
 #define BANK(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib)	\
 	{								\
