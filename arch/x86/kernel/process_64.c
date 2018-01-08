@@ -654,6 +654,30 @@ long do_arch_prctl_64(struct task_struct *task, int option, unsigned long arg2)
 		ret = put_user(base, (unsigned long __user *)arg2);
 		break;
 	}
+	case ARCH_GET_NOPTI: {
+		unsigned long flag;
+
+		printk(KERN_DEBUG "get1: task=%p ti=%p fl=%16lx\n", task, task_thread_info(task), task_thread_info(task)->flags);
+		flag = !!(task_thread_info(task)->flags & _TIF_NOPTI);
+		ret = put_user(flag, (unsigned long __user *)arg2);
+		break;
+	}
+
+	case ARCH_SET_NOPTI:
+		if (!capable(CAP_SYS_RAWIO))
+			return -EPERM;
+
+		printk(KERN_DEBUG "set1: task=%p ti=%p fl=%16lx doit=%d arg2=%ld\n", task, task_thread_info(task), task_thread_info(task)->flags, doit, arg2);
+
+		if (doit) {
+			if (arg2)
+				task_thread_info(task)->flags |= _TIF_NOPTI;
+			else
+				task_thread_info(task)->flags &= ~_TIF_NOPTI;
+
+			printk(KERN_DEBUG "set2: task=%p ti=%p fl=%16lx\n", task, task_thread_info(task), task_thread_info(task)->flags);
+		}
+		break;
 
 #ifdef CONFIG_CHECKPOINT_RESTORE
 # ifdef CONFIG_X86_X32_ABI
