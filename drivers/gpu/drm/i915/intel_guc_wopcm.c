@@ -89,6 +89,37 @@ static inline int guc_wopcm_size_check(struct intel_guc *guc)
 	return 0;
 }
 
+static inline bool __reg_locked(struct drm_i915_private *dev_priv,
+				 i915_reg_t reg)
+{
+	return !!(I915_READ(reg) & GUC_WOPCM_REG_LOCKED);
+}
+
+static inline bool guc_wopcm_locked(struct intel_guc *guc)
+{
+	struct drm_i915_private *i915 = guc_to_i915(guc);
+	bool size_reg_locked = __reg_locked(i915, GUC_WOPCM_SIZE);
+	bool offset_reg_locked = __reg_locked(i915, DMA_GUC_WOPCM_OFFSET);
+
+	return size_reg_locked && offset_reg_locked;
+}
+
+static inline void guc_wopcm_hw_update(struct intel_guc *guc)
+{
+	struct drm_i915_private *dev_priv = guc_to_i915(guc);
+
+	/* GuC WOPCM registers should be unlocked at this point. */
+	GEM_BUG_ON(__reg_locked(dev_priv, GUC_WOPCM_SIZE));
+	GEM_BUG_ON(__reg_locked(dev_priv, DMA_GUC_WOPCM_OFFSET));
+
+	I915_WRITE(GUC_WOPCM_SIZE, guc->wopcm.size);
+	I915_WRITE(DMA_GUC_WOPCM_OFFSET,
+		   guc->wopcm.offset | HUC_LOADING_AGENT_GUC);
+
+	GEM_BUG_ON(!__reg_locked(dev_priv, GUC_WOPCM_SIZE));
+	GEM_BUG_ON(!__reg_locked(dev_priv, DMA_GUC_WOPCM_OFFSET));
+}
+
 /*
  * intel_guc_wopcm_init() - Initialize the GuC WOPCM partition.
  * @guc: intel guc.
@@ -107,8 +138,7 @@ int intel_guc_wopcm_init(struct intel_guc *guc, u32 guc_fw_size,
 	u32 offset, size, top;
 	int err;
 
-	if (guc->wopcm.valid)
-		return 0;
+	GEM_BUG_ON(guc->wopcm.flags & INTEL_GUC_WOPCM_VALID);
 
 	if (!guc_fw_size)
 		return -EINVAL;
@@ -144,10 +174,40 @@ int intel_guc_wopcm_init(struct intel_guc *guc, u32 guc_fw_size,
 	if (err)
 		return err;
 
-	guc->wopcm.valid = true;
+	guc->wopcm.flags |= INTEL_GUC_WOPCM_VALID;
 
 	DRM_DEBUG_DRIVER("GuC WOPCM offset %dKB, size %dKB, top %dKB\n",
 			 offset >> 10, size >> 10, top >> 10);
 
 	return 0;
+}
+
+/*
+ * intel_guc_wopcm_init_hw() - Setup GuC WOPCM registers.
+ * @guc: intel guc.
+ *
+ * Setup the GuC WOPCM size and offset registers with the stored values. It will
+ * also check the registers locking status to determine whether these registers
+ * are unlocked and can be updated.
+ */
+void intel_guc_wopcm_init_hw(struct intel_guc *guc)
+{
+	u32 locked = guc_wopcm_locked(guc);
+
+	GEM_BUG_ON(!(guc->wopcm.flags & INTEL_GUC_WOPCM_VALID));
+
+	/*
+	 * Bug if driver hasn't updated the HW Registers and GuC WOPCM has been
+	 * locked. Return directly if WOPCM was locked and we have updated
+	 * the registers.
+	 */
+	if (locked) {
+		GEM_BUG_ON(!(guc->wopcm.flags & INTEL_GUC_WOPCM_HW_UPDATED));
+		return;
+	}
+
+	/* Always update registers when GuC WOPCM is not locked. */
+	guc_wopcm_hw_update(guc);
+
+	guc->wopcm.flags |= INTEL_GUC_WOPCM_HW_UPDATED;
 }
