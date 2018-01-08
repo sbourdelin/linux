@@ -119,10 +119,8 @@ static void firmware_load(const struct firmware *fw, void *context)
 	dev_dbg(&spi->dev, "FPGA Status=%08x\n", status);
 
 	buffer = kzalloc(fw->size + 8, GFP_KERNEL);
-	if (!buffer) {
-		dev_err(&spi->dev, "Error: Can't allocate memory!\n");
+	if (!buffer)
 		return;
-	}
 
 	/*
 	 * Insert WRITE_INC command into stream (one SPI frame)
@@ -196,10 +194,9 @@ static int lattice_ecp3_probe(struct spi_device *spi)
 	int err;
 
 	data = devm_kzalloc(&spi->dev, sizeof(*data), GFP_KERNEL);
-	if (!data) {
-		dev_err(&spi->dev, "Memory allocation for fpga_data failed\n");
+	if (!data)
 		return -ENOMEM;
-	}
+
 	spi_set_drvdata(spi, data);
 
 	init_completion(&data->fw_loaded);
