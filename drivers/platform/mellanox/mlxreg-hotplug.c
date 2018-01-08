@@ -41,14 +41,16 @@
 #include <linux/module.h>
 #include <linux/platform_data/mlxreg.h>
 #include <linux/platform_device.h>
-#include <linux/spinlock.h>
-#include <linux/wait.h>
 #include <linux/workqueue.h>
 
 /* Offset of event and mask registers from status register */
 #define MLXREG_HOTPLUG_EVENT_OFF	1
 #define MLXREG_HOTPLUG_MASK_OFF	2
 #define MLXREG_HOTPLUG_AGGR_MASK_OFF	1
+
+#define MLXREG_HOTPLUG_PROP_OKAY	"okay"
+#define MLXREG_HOTPLUG_PROP_DISABLED	"disabled"
+#define MLXREG_HOTPLUG_PROP_STATUS	"status"
 
 #define MLXREG_HOTPLUG_ATTRS_NUM	8
 
@@ -98,6 +100,114 @@ struct mlxreg_hotplug_priv_data {
 	u8 pwr_cache;
 	u8 fan_cache;
 };
+
+#if defined(CONFIG_OF_DYNAMIC)
+/**
+ * struct mlxreg_hotplug_device_en - Open Firmware property for enabling device
+ *
+ * @name - property name;
+ * @value - property value string;
+ * @length - length of proprty value string;
+ *
+ * The structure is used for the devices, which require some dynamic
+ * selection operation allowing access to them.
+ */
+static struct property mlxreg_hotplug_device_en = {
+	.name = MLXREG_HOTPLUG_PROP_STATUS,
+	.value = MLXREG_HOTPLUG_PROP_OKAY,
+	.length = sizeof(MLXREG_HOTPLUG_PROP_OKAY),
+};
+
+/**
+ * struct mlxreg_hotplug_device_dis - Open Firmware property for disabling
+ * device
+ *
+ * @name - property name;
+ * @value - property value string;
+ * @length - length of proprty value string;
+ *
+ * The structure is used for the devices, which require some dynamic
+ * selection operation disallowing access to them.
+ */
+static struct property mlxreg_hotplug_device_dis = {
+	.name = MLXREG_HOTPLUG_PROP_STATUS,
+	.value = MLXREG_HOTPLUG_PROP_DISABLED,
+	.length = sizeof(MLXREG_HOTPLUG_PROP_DISABLED),
+};
+
+static int mlxreg_hotplug_of_device_create(struct mlxreg_hotplug_device *data)
+{
+	return of_update_property(data->np, &mlxreg_hotplug_device_en);
+}
+
+static void
+mlxreg_hotplug_of_device_destroy(struct mlxreg_hotplug_device *data)
+{
+	of_update_property(data->np, &mlxreg_hotplug_device_dis);
+	of_node_clear_flag(data->np, OF_POPULATED);
+}
+#else
+static int mlxreg_hotplug_of_device_create(struct mlxreg_hotplug_device *data)
+{
+	return 0;
+}
+
+static void
+mlxreg_hotplug_of_device_destroy(struct mlxreg_hotplug_device *data)
+{
+}
+#endif
+
+static int mlxreg_hotplug_device_create(struct mlxreg_hotplug_device *data)
+{
+	data->adapter = i2c_get_adapter(data->nr);
+	if (!data->adapter)
+		return -EFAULT;
+
+	data->client = i2c_new_device(data->adapter, &data->brdinfo);
+	if (!data->client) {
+		i2c_put_adapter(data->adapter);
+		data->adapter = NULL;
+		return -EFAULT;
+	}
+
+	return 0;
+}
+
+static void mlxreg_hotplug_device_destroy(struct mlxreg_hotplug_device *data)
+{
+	if (data->client) {
+		i2c_unregister_device(data->client);
+		data->client = NULL;
+	}
+
+	if (data->adapter) {
+		i2c_put_adapter(data->adapter);
+		data->adapter = NULL;
+	}
+}
+
+static int mlxreg_hotplug_dev_enable(struct mlxreg_hotplug_device *data)
+{
+	int err;
+
+	/* Enable and create device. */
+	if (data->np)
+		err = mlxreg_hotplug_of_device_create(data);
+	else
+		err = mlxreg_hotplug_device_create(data);
+
+	return err;
+}
+
+static void mlxreg_hotplug_dev_disable(struct mlxreg_hotplug_device *data)
+{
+	/* Disable and unregister platform device. */
+	if (data->np)
+		mlxreg_hotplug_of_device_destroy(data);
+	else
+		mlxreg_hotplug_device_destroy(data);
+}
 
 static ssize_t mlxreg_hotplug_attr_show(struct device *dev,
 					struct device_attribute *attr,
@@ -184,41 +294,6 @@ static int mlxreg_hotplug_attr_init(struct mlxreg_hotplug_priv_data *priv)
 	return 0;
 }
 
-static int mlxreg_hotplug_device_create(struct device *dev,
-					struct mlxreg_hotplug_device *item)
-{
-	item->adapter = i2c_get_adapter(item->bus);
-	if (!item->adapter) {
-		dev_err(dev, "Failed to get adapter for bus %d\n",
-			item->bus);
-		return -EFAULT;
-	}
-
-	item->client = i2c_new_device(item->adapter, &item->brdinfo);
-	if (!item->client) {
-		dev_err(dev, "Failed to create client %s at bus %d at addr 0x%02x\n",
-			item->brdinfo.type, item->bus, item->brdinfo.addr);
-		i2c_put_adapter(item->adapter);
-		item->adapter = NULL;
-		return -EFAULT;
-	}
-
-	return 0;
-}
-
-static void mlxreg_hotplug_device_destroy(struct mlxreg_hotplug_device *item)
-{
-	if (item->client) {
-		i2c_unregister_device(item->client);
-		item->client = NULL;
-	}
-
-	if (item->adapter) {
-		i2c_put_adapter(item->adapter);
-		item->adapter = NULL;
-	}
-}
-
 static inline void
 mlxreg_hotplug_work_helper(struct device *dev,
 			   struct mlxreg_hotplug_device *item, u8 is_inverse,
@@ -250,14 +325,14 @@ mlxreg_hotplug_work_helper(struct device *dev,
 	for_each_set_bit(bit, (unsigned long *)&asserted, 8) {
 		if (val & BIT(bit)) {
 			if (is_inverse)
-				mlxreg_hotplug_device_destroy(item + bit);
+				mlxreg_hotplug_dev_disable(item + bit);
 			else
-				mlxreg_hotplug_device_create(dev, item + bit);
+				mlxreg_hotplug_dev_enable(item + bit);
 		} else {
 			if (is_inverse)
-				mlxreg_hotplug_device_create(dev, item + bit);
+				mlxreg_hotplug_dev_enable(item + bit);
 			else
-				mlxreg_hotplug_device_destroy(item + bit);
+				mlxreg_hotplug_dev_disable(item + bit);
 		}
 	}
 
@@ -408,13 +483,13 @@ static void mlxreg_hotplug_unset_irq(struct mlxreg_hotplug_priv_data *priv)
 
 	/* Remove all the attached devices. */
 	for (i = 0; i < priv->plat->psu_count; i++)
-		mlxreg_hotplug_device_destroy(priv->plat->psu + i);
+		mlxreg_hotplug_dev_disable(priv->plat->psu + i);
 
 	for (i = 0; i < priv->plat->pwr_count; i++)
-		mlxreg_hotplug_device_destroy(priv->plat->pwr + i);
+		mlxreg_hotplug_dev_disable(priv->plat->pwr + i);
 
 	for (i = 0; i < priv->plat->fan_count; i++)
-		mlxreg_hotplug_device_destroy(priv->plat->fan + i);
+		mlxreg_hotplug_dev_disable(priv->plat->fan + i);
 }
 
 static irqreturn_t mlxreg_hotplug_irq_handler(int irq, void *dev)
