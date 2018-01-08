@@ -387,6 +387,24 @@ int phy_calibrate(struct phy *phy)
 }
 EXPORT_SYMBOL_GPL(phy_calibrate);
 
+static struct of_device_id __maybe_unused legacy_usbphy[] = {
+	{ .compatible = "fsl,imx23-usbphy" },
+	{ .compatible = "fsl,imx6q-usbphy" },
+	{ .compatible = "fsl,imx6sl-usbphy" },
+	{ .compatible = "fsl,imx6sx-usbphy" },
+	{ .compatible = "fsl,imx6ul-usbphy" },
+	{ .compatible = "fsl,vf610-usbphy" },
+	{ .compatible = "nvidia,tegra20-usb-phy" },
+	{ .compatible = "nvidia,tegra30-usb-phy" },
+	{ .compatible = "nxp,isp1301" },
+	{ .compatible = "ti,am335x-usb-ctrl-module" },
+	{ .compatible = "ti,am335x-usb-phy" },
+	{ .compatible = "ti,keystone-usbphy" },
+	{ .compatible = "ti,twl6030-usb" },
+	{ .compatible = "usb-nop-xceiv" },
+	{},
+};
+
 /**
  * _of_phy_get() - lookup and obtain a reference to a phy by phandle
  * @np: device_node for which to get the phy
@@ -408,6 +426,15 @@ static struct phy *_of_phy_get(struct device_node *np, int index)
 	ret = of_parse_phandle_with_args(np, "phys", "#phy-cells",
 		index, &args);
 	if (ret)
+		return ERR_PTR(-ENODEV);
+
+	/*
+	 * Some USB host controllers use a "phys" property to refer to
+	 * a device that does not have a generic phy driver but that
+	 * has a driver for the older usb-phy framework.
+	 * We must not return -EPROBE_DEFER for those, so bail out early.
+	 */
+	if (of_match_node(legacy_usbphy, args.np))
 		return ERR_PTR(-ENODEV);
 
 	mutex_lock(&phy_provider_mutex);
