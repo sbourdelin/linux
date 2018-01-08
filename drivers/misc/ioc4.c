@@ -300,7 +300,7 @@ ioc4_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id)
 		printk(KERN_WARNING
 		       "%s: Failed to allocate IOC4 data for pci_dev %s.\n",
 		       __func__, pci_name(pdev));
-		ret = -ENODEV;
+		ret = -ENOMEM;
 		goto out_idd;
 	}
 	idd->idd_pdev = pdev;
