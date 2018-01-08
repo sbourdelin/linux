@@ -1303,17 +1303,82 @@ get_next_pebs_record_by_bit(void *base, void *top, int bit)
 	return NULL;
 }
 
+/*
+ * Specific intel_pmu_save_and_restart() for auto-reload.
+ */
+static int intel_pmu_save_and_restart_reload(struct perf_event *event,
+					     u64 reload_val,
+					     int reload_times)
+{
+	struct hw_perf_event *hwc = &event->hw;
+	int shift = 64 - x86_pmu.cntval_bits;
+	u64 prev_raw_count, new_raw_count;
+	u64 delta;
+
+	if ((reload_times == 0) || (reload_val == 0))
+		return intel_pmu_save_and_restart(event);
+
+	/*
+	 * Careful: an NMI might modify the previous event value.
+	 *
+	 * Our tactic to handle this is to first atomically read and
+	 * exchange a new raw count - then add that new-prev delta
+	 * count to the generic event atomically:
+	 */
+again:
+	prev_raw_count = local64_read(&hwc->prev_count);
+	rdpmcl(hwc->event_base_rdpmc, new_raw_count);
+
+	if (local64_cmpxchg(&hwc->prev_count, prev_raw_count,
+					new_raw_count) != prev_raw_count)
+		goto again;
+
+	/*
+	 * Now we have the new raw value and have updated the prev
+	 * timestamp already. We can now calculate the elapsed delta
+	 * (event-)time and add that to the generic event.
+	 *
+	 * Careful, not all hw sign-extends above the physical width
+	 * of the count.
+	 *
+	 * event->count = period left from last time +
+	 *                (reload_times - 1) * reload_val +
+	 *                latency of PMI handler
+	 * The period left from last time can be got from -prev_count.
+	 * The start points of counting is always -reload_val.
+	 * So the real latency of PMI handler is reload_val + new_raw_count.
+	 */
+	delta = (reload_val << shift) + (new_raw_count << shift) -
+		(prev_raw_count << shift);
+	delta >>= shift;
+
+	local64_add(reload_val * (reload_times - 1), &event->count);
+	local64_add(delta, &event->count);
+	local64_sub(delta, &hwc->period_left);
+
+	return x86_perf_event_set_period(event);
+}
+
 static void __intel_pmu_pebs_event(struct perf_event *event,
 				   struct pt_regs *iregs,
 				   void *base, void *top,
 				   int bit, int count)
 {
+	struct hw_perf_event *hwc = &event->hw;
 	struct perf_sample_data data;
 	struct pt_regs regs;
 	void *at = get_next_pebs_record_by_bit(base, top, bit);
 
-	if (!intel_pmu_save_and_restart(event) &&
-	    !(event->hw.flags & PERF_X86_EVENT_AUTO_RELOAD))
+	if (hwc->flags & PERF_X86_EVENT_AUTO_RELOAD) {
+		/*
+		 * Now, auto-reload is only enabled in fixed period mode.
+		 * The reload value is always hwc->sample_period.
+		 * May need to change it, if auto-reload is enabled in
+		 * freq mode later.
+		 */
+		intel_pmu_save_and_restart_reload(event, hwc->sample_period,
+						  count);
+	} else if (!intel_pmu_save_and_restart(event))
 		return;
 
 	while (count > 1) {
