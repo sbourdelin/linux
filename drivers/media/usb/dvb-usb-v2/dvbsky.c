@@ -799,7 +799,7 @@ static struct dvb_usb_device_properties dvbsky_s960_props = {
 	.num_adapters = 1,
 	.adapter = {
 		{
-			.stream = DVB_USB_STREAM_BULK(0x82, 8, 4096),
+			.stream = DVB_USB_STREAM_BULK(0x82, 65, 4096),
 		}
 	}
 };
