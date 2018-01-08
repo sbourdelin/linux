@@ -92,6 +92,18 @@ struct of_drconf_cell {
 	u32	flags;
 };
 
+/* The of_drconf_cell_v2 struct defines the layout of the LMB array
+ * specified in the device tree property
+ * ibm,dynamic-reconfiguration-memory/ibm,dynamic-memory-v2
+ */
+struct of_drconf_cell_v2 {
+	u32 num_seq_lmbs;
+	u64 base_address;
+	u32 drc_index;
+	u32 aa_index;
+	u32 flags;
+} __attribute__((packed));
+
 #define DRCONF_MEM_ASSIGNED	0x00000008
 #define DRCONF_MEM_AI_INVALID	0x00000040
 #define DRCONF_MEM_RESERVED	0x00000080
