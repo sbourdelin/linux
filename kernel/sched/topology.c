@@ -341,8 +341,10 @@ static void free_sched_groups(struct sched_group *sg, int free_sgc)
 		if (free_sgc && atomic_dec_and_test(&sg->sgc->ref))
 			kfree(sg->sgc);
 
-		if (atomic_dec_and_test(&sg->ref))
+		if (atomic_dec_and_test(&sg->ref)) {
+			kfree(sg->cp_array);
 			kfree(sg);
+		}
 		sg = tmp;
 	} while (sg != first);
 }
@@ -358,6 +360,9 @@ static void destroy_sched_domain(struct sched_domain *sd)
 
 	if (sd->shared && atomic_dec_and_test(&sd->shared->ref))
 		kfree(sd->shared);
+
+	kfree(sd->sg_array);
+
 	kfree(sd);
 }
 
@@ -903,16 +908,28 @@ build_sched_groups(struct sched_domain *sd, int cpu)
  * group having more cpu_capacity will pickup more load compared to the
  * group having less cpu_capacity.
  */
-static void init_sched_groups_capacity(int cpu, struct sched_domain *sd)
+static void init_sched_groups_capacity(int cpu_orig, struct sched_domain *sd)
 {
 	struct sched_group *sg = sd->groups;
+	int sg_num = 0, i, cp;
 
 	WARN_ON(!sg);
 
 	do {
 		int cpu, max_cpu = -1;
 
+		sg_num++;
 		sg->group_weight = cpumask_weight(sched_group_span(sg));
+
+		/* Build the array of cpus for each group */
+		if (!sg->cp_array) {
+			sg->cp_array = kzalloc_node(sg->group_weight *
+						    sizeof(int), GFP_KERNEL,
+						    cpu_to_node(cpu_orig));
+			i = 0;
+			for_each_cpu(cp, sched_group_span(sg))
+				sg->cp_array[i++] = cp;
+		}
 
 		if (!(sd->flags & SD_ASYM_PACKING))
 			goto next;
@@ -929,10 +946,20 @@ next:
 		sg = sg->next;
 	} while (sg != sd->groups);
 
-	if (cpu != group_balance_cpu(sg))
+	/* Build the array of groups for each domain */
+	sd->sg_array = kzalloc_node(sg_num * sizeof(void *), GFP_KERNEL,
+				    cpu_to_node(cpu_orig));
+	sd->sg_num = sg_num;
+	i = 0;
+	do {
+		sd->sg_array[i++] = sg;
+		sg = sg->next;
+	} while (sg != sd->groups);
+
+	if (cpu_orig != group_balance_cpu(sg))
 		return;
 
-	update_group_capacity(sd, cpu);
+	update_group_capacity(sd, cpu_orig);
 }
 
 /*

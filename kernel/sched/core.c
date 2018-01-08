@@ -2752,6 +2752,18 @@ asmlinkage __visible void schedule_tail(struct task_struct *prev)
 		put_user(task_pid_vnr(current), current->set_child_tid);
 }
 
+static __always_inline void
+sd_context_switch(struct sched_domain *sd, struct rq *rq, int util)
+{
+	struct sched_group *sg_cpu = sd->groups;
+
+       /* atomically add/subtract the util */
+	if (util > 0)
+		atomic_inc((atomic_t *)&sg_cpu->utilization);
+	else
+		atomic_dec((atomic_t *)&sg_cpu->utilization);
+}
+
 /*
  * context_switch - switch to the new MM and the new thread's register state.
  */
@@ -2760,6 +2772,31 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	       struct task_struct *next, struct rq_flags *rf)
 {
 	struct mm_struct *mm, *oldmm;
+	int this_cpu = rq->cpu;
+	struct sched_domain *sd;
+	int prev_busy, next_busy;
+
+	if (rq->curr_util == UTIL_UNINITIALIZED)
+		prev_busy = 0;
+	else
+		prev_busy = (prev != rq->idle);
+	next_busy = (next != rq->idle);
+
+	/*
+	 * From sd_llc downward update the SMT utilization.
+	 * Skip the lowest level 0.
+	 */
+	sd = rcu_dereference_sched(per_cpu(sd_llc, this_cpu));
+	if (next_busy != prev_busy) {
+		for_each_lower_domain(sd) {
+			if (sd->level == 0)
+				break;
+			sd_context_switch(sd, rq, next_busy - prev_busy);
+		}
+	}
+
+	if (sd)
+		rq->curr_util = next_busy;
 
 	prepare_task_switch(rq, prev, next);
 
@@ -5943,6 +5980,7 @@ void __init sched_init(void)
 		rq->idle_stamp = 0;
 		rq->avg_idle = 2*sysctl_sched_migration_cost;
 		rq->max_idle_balance_cost = sysctl_sched_migration_cost;
+		rq->curr_util = UTIL_UNINITIALIZED;
 
 		INIT_LIST_HEAD(&rq->cfs_tasks);
 

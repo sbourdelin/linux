@@ -48,6 +48,11 @@
 struct rq;
 struct cpuidle_state;
 
+#define	CPU_PSEUDO_RANDOM(cpu)	(cpu_rq(cpu)->rotor++)
+
+/* uninitialized state of the rq */
+#define UTIL_UNINITIALIZED	-1
+
 /* task_struct::on_rq states: */
 #define TASK_ON_RQ_QUEUED	1
 #define TASK_ON_RQ_MIGRATING	2
@@ -752,6 +757,8 @@ struct rq {
 	/* cpu of this runqueue: */
 	int cpu;
 	int online;
+	unsigned int rotor;
+	int curr_util;
 
 	struct list_head cfs_tasks;
 
@@ -822,23 +829,6 @@ static inline int cpu_of(struct rq *rq)
 	return 0;
 #endif
 }
-
-
-#ifdef CONFIG_SCHED_SMT
-
-extern struct static_key_false sched_smt_present;
-
-extern void __update_idle_core(struct rq *rq);
-
-static inline void update_idle_core(struct rq *rq)
-{
-	if (static_branch_unlikely(&sched_smt_present))
-		__update_idle_core(rq);
-}
-
-#else
-static inline void update_idle_core(struct rq *rq) { }
-#endif
 
 DECLARE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
 
@@ -1095,6 +1085,8 @@ struct sched_group {
 	unsigned int group_weight;
 	struct sched_group_capacity *sgc;
 	int asym_prefer_cpu;		/* cpu of highest priority in group */
+	int utilization;
+	int *cp_array;
 
 	/*
 	 * The CPUs this group covers.
