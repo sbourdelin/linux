@@ -739,6 +739,10 @@ struct pci_error_handlers {
 	void (*resume)(struct pci_dev *dev);
 };
 
+struct pci_err_broadcast_data {
+	enum pci_channel_state state;
+	enum pci_ers_result result;
+};
 
 struct module;
 struct pci_driver {
@@ -1997,6 +2001,23 @@ static inline resource_size_t pci_iov_resource_size(struct pci_dev *dev, int res
 void pci_hp_create_module_link(struct pci_slot *pci_slot);
 void pci_hp_remove_module_link(struct pci_slot *pci_slot);
 #endif
+
+#define PCI_ERR_AER_NONFATAL		0
+#define PCI_ERR_AER_FATAL		1
+#define PCI_ERR_AER_CORRECTABLE		2
+
+pci_ers_result_t pci_broadcast_error_message(struct pci_dev *dev,
+					enum pci_channel_state state,
+					char *error_mesg,
+					int (*cb)(struct pci_dev *, void *));
+int pci_report_mmio_enabled(struct pci_dev *dev, void *data);
+int pci_report_slot_reset(struct pci_dev *dev, void *data);
+int pci_report_resume(struct pci_dev *dev, void *data);
+int pci_report_error_detected(struct pci_dev *dev, void *data);
+pci_ers_result_t pci_reset_link(struct pci_dev *dev);
+pci_ers_result_t pci_merge_result(enum pci_ers_result orig,
+				enum pci_ers_result new);
+void pci_do_recovery(struct pci_dev *dev, int severity);
 
 /**
  * pci_pcie_cap - get the saved PCIe capability offset

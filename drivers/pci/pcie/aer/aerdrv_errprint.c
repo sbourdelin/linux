@@ -29,11 +29,14 @@
 #define AER_AGENT_COMPLETER		2
 #define AER_AGENT_TRANSMITTER		3
 
-#define AER_AGENT_REQUESTER_MASK(t)	((t == AER_CORRECTABLE) ?	\
+#define AER_AGENT_REQUESTER_MASK(t)		\
+	((t == PCI_ERR_AER_CORRECTABLE) ?	\
 	0 : (PCI_ERR_UNC_COMP_TIME|PCI_ERR_UNC_UNSUP))
-#define AER_AGENT_COMPLETER_MASK(t)	((t == AER_CORRECTABLE) ?	\
+#define AER_AGENT_COMPLETER_MASK(t)		\
+	((t == PCI_ERR_AER_CORRECTABLE) ?	\
 	0 : PCI_ERR_UNC_COMP_ABORT)
-#define AER_AGENT_TRANSMITTER_MASK(t)	((t == AER_CORRECTABLE) ?	\
+#define AER_AGENT_TRANSMITTER_MASK(t)		\
+	((t == PCI_ERR_AER_CORRECTABLE) ?	\
 	(PCI_ERR_COR_REP_ROLL|PCI_ERR_COR_REP_TIMER) : 0)
 
 #define AER_GET_AGENT(t, e)						\
@@ -46,9 +49,11 @@
 #define AER_DATA_LINK_LAYER_ERROR	1
 #define AER_TRANSACTION_LAYER_ERROR	2
 
-#define AER_PHYSICAL_LAYER_ERROR_MASK(t) ((t == AER_CORRECTABLE) ?	\
+#define AER_PHYSICAL_LAYER_ERROR_MASK(t)	\
+	((t == PCI_ERR_AER_CORRECTABLE) ?	\
 	PCI_ERR_COR_RCVR : 0)
-#define AER_DATA_LINK_LAYER_ERROR_MASK(t) ((t == AER_CORRECTABLE) ?	\
+#define AER_DATA_LINK_LAYER_ERROR_MASK(t)	\
+	((t == PCI_ERR_AER_CORRECTABLE) ?	\
 	(PCI_ERR_COR_BAD_TLP|						\
 	PCI_ERR_COR_BAD_DLLP|						\
 	PCI_ERR_COR_REP_ROLL|						\
@@ -147,7 +152,7 @@ static void __aer_print_error(struct pci_dev *dev,
 		if (!(status & (1 << i)))
 			continue;
 
-		if (info->severity == AER_CORRECTABLE)
+		if (info->severity == PCI_ERR_AER_CORRECTABLE)
 			errmsg = i < ARRAY_SIZE(aer_correctable_error_string) ?
 				aer_correctable_error_string[i] : NULL;
 		else
@@ -210,11 +215,11 @@ int cper_severity_to_aer(int cper_severity)
 {
 	switch (cper_severity) {
 	case CPER_SEV_RECOVERABLE:
-		return AER_NONFATAL;
+		return PCI_ERR_AER_NONFATAL;
 	case CPER_SEV_FATAL:
-		return AER_FATAL;
+		return PCI_ERR_AER_FATAL;
 	default:
-		return AER_CORRECTABLE;
+		return PCI_ERR_AER_CORRECTABLE;
 	}
 }
 EXPORT_SYMBOL_GPL(cper_severity_to_aer);
@@ -226,7 +231,7 @@ void cper_print_aer(struct pci_dev *dev, int aer_severity,
 	u32 status, mask;
 	const char **status_strs;
 
-	if (aer_severity == AER_CORRECTABLE) {
+	if (aer_severity == PCI_ERR_AER_CORRECTABLE) {
 		status = aer->cor_status;
 		mask = aer->cor_mask;
 		status_strs = aer_correctable_error_string;
@@ -247,7 +252,7 @@ void cper_print_aer(struct pci_dev *dev, int aer_severity,
 	dev_err(&dev->dev, "aer_layer=%s, aer_agent=%s\n",
 		aer_error_layer[layer], aer_agent_string[agent]);
 
-	if (aer_severity != AER_CORRECTABLE)
+	if (aer_severity != PCI_ERR_AER_CORRECTABLE)
 		dev_err(&dev->dev, "aer_uncor_severity: 0x%08x\n",
 			aer->uncor_severity);
 

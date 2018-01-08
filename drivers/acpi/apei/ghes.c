@@ -462,7 +462,7 @@ static void ghes_do_proc(struct ghes *ghes,
 				 * use, so treat it as a fatal AER error.
 				 */
 				if (gdata->flags & CPER_SEC_RESET)
-					aer_severity = AER_FATAL;
+					aer_severity = PCI_ERR_AER_FATAL;
 
 				aer_recover_queue(pcie_err->device_id.segment,
 						  pcie_err->device_id.bus,

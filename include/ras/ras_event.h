@@ -316,10 +316,10 @@ TRACE_EVENT(aer_event,
 
 	TP_printk("%s PCIe Bus Error: severity=%s, %s\n",
 		__get_str(dev_name),
-		__entry->severity == AER_CORRECTABLE ? "Corrected" :
-			__entry->severity == AER_FATAL ?
+		__entry->severity == PCI_ERR_AER_CORRECTABLE ? "Corrected" :
+			__entry->severity == PCI_ERR_AER_FATAL ?
 			"Fatal" : "Uncorrected, non-fatal",
-		__entry->severity == AER_CORRECTABLE ?
+		__entry->severity == PCI_ERR_AER_CORRECTABLE ?
 		__print_flags(__entry->status, "|", aer_correctable_errors) :
 		__print_flags(__entry->status, "|", aer_uncorrectable_errors))
 );
