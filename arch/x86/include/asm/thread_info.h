@@ -126,6 +126,14 @@ struct thread_info {
 #define _TIF_X32		(1 << TIF_X32)
 #define _TIF_FSCHECK		(1 << TIF_FSCHECK)
 
+/* The following flags only exist on x86-64. We can't use the shift anymore
+ * due to C using signed ints by default and asm using unsigned longs.
+ */
+#ifdef CONFIG_X86_64
+# define  TIF_NOPTI		32	/* disable PTI for this task */
+# define _TIF_NOPTI		0x0000000100000000
+#endif
+
 /*
  * work to do in syscall_trace_enter().  Also includes TIF_NOHZ for
  * enter_from_user_mode()
