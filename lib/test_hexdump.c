@@ -81,7 +81,7 @@ static void __init test_hexdump_prepare_test(size_t len, int rowsize,
 		const char *q = *result++;
 		size_t amount = strlen(q);
 
-		strncpy(p, q, amount);
+		memcpy(p, q, amount);
 		p += amount;
 
 		*p++ = ' ';
@@ -95,7 +95,7 @@ static void __init test_hexdump_prepare_test(size_t len, int rowsize,
 			*p++ = ' ';
 		} while (p < test + rs * 2 + rs / gs + 1);
 
-		strncpy(p, data_a, l);
+		memcpy(p, data_a, l);
 		p += l;
 	}
 
