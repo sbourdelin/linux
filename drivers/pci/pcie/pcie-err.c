@@ -238,7 +238,8 @@ pci_ers_result_t pci_reset_link(struct pci_dev *dev, int severity)
 pci_ers_result_t pci_broadcast_error_message(struct pci_dev *dev,
 	enum pci_channel_state state,
 	char *error_mesg,
-	int (*cb)(struct pci_dev *, void *))
+	int (*cb)(struct pci_dev *, void *),
+	int severity)
 {
 	struct pci_err_broadcast_data result_data;
 
@@ -250,6 +251,15 @@ pci_ers_result_t pci_broadcast_error_message(struct pci_dev *dev,
 		result_data.result = PCI_ERS_RESULT_RECOVERED;
 
 	if (dev->hdr_type == PCI_HEADER_TYPE_BRIDGE) {
+		/* If DPC is triggered, call resume error hanlder
+		 * because, at this point we can safely assume that
+		 * link recovery has happened.
+		 */
+		if ((severity == PCI_ERR_DPC_FATAL) &&
+			(cb == pci_report_resume)) {
+			cb(dev, NULL);
+			return PCI_ERS_RESULT_RECOVERED;
+		}
 		/*
 		 * If the error is reported by a bridge, we think this error
 		 * is related to the downstream link of the bridge, so we
@@ -299,7 +309,8 @@ void pci_do_recovery(struct pci_dev *dev, int severity)
 	status = pci_broadcast_error_message(dev,
 			state,
 			"error_detected",
-			pci_report_error_detected);
+			pci_report_error_detected,
+			severity);
 
 	if ((severity == PCI_ERR_AER_FATAL) ||
 	    (severity == PCI_ERR_DPC_FATAL)) {
@@ -308,11 +319,15 @@ void pci_do_recovery(struct pci_dev *dev, int severity)
 			goto failed;
 	}
 
+	if (severity == PCI_ERR_DPC_FATAL)
+		goto resume;
+
 	if (status == PCI_ERS_RESULT_CAN_RECOVER)
 		status = pci_broadcast_error_message(dev,
 				state,
 				"mmio_enabled",
-				pci_report_mmio_enabled);
+				pci_report_mmio_enabled,
+				severity);
 
 	if (status == PCI_ERS_RESULT_NEED_RESET) {
 		/*
@@ -323,16 +338,19 @@ void pci_do_recovery(struct pci_dev *dev, int severity)
 		status = pci_broadcast_error_message(dev,
 				state,
 				"slot_reset",
-				pci_report_slot_reset);
+				pci_report_slot_reset,
+				severity);
 	}
 
 	if (status != PCI_ERS_RESULT_RECOVERED)
 		goto failed;
 
+resume:
 	pci_broadcast_error_message(dev,
 				state,
 				"resume",
-				pci_report_resume);
+				pci_report_resume,
+				severity);
 
 	dev_info(&dev->dev, "Device recovery successful\n");
 	mutex_unlock(&pci_err_recovery_lock);
