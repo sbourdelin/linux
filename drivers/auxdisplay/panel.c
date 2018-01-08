@@ -1506,10 +1506,10 @@ static struct logical_input *panel_bind_key(const char *name, const char *press,
 	key->rise_time = 1;
 	key->fall_time = 1;
 
-	strncpy(key->u.kbd.press_str, press, sizeof(key->u.kbd.press_str));
-	strncpy(key->u.kbd.repeat_str, repeat, sizeof(key->u.kbd.repeat_str));
+	strncpy(key->u.kbd.press_str, press, sizeof(key->u.kbd.press_str) - 1);
+	strncpy(key->u.kbd.repeat_str, repeat, sizeof(key->u.kbd.repeat_str) - 1);
 	strncpy(key->u.kbd.release_str, release,
-		sizeof(key->u.kbd.release_str));
+		sizeof(key->u.kbd.release_str - 1));
 	list_add(&key->list, &logical_inputs);
 	return key;
 }
