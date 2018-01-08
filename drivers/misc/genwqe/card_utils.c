@@ -593,7 +593,6 @@ int genwqe_user_vmap(struct genwqe_dev *cd, struct dma_mapping *m, void *uaddr,
 			       sizeof(struct page *) + sizeof(dma_addr_t),
 			       GFP_KERNEL);
 	if (!m->page_list) {
-		dev_err(&pci_dev->dev, "err: alloc page_list failed\n");
 		m->nr_pages = 0;
 		m->u_vaddr = NULL;
 		m->size = 0;	/* mark unused and not added */
