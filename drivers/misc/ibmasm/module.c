@@ -80,7 +80,6 @@ static int ibmasm_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	sp = kzalloc(sizeof(struct service_processor), GFP_KERNEL);
 	if (sp == NULL) {
-		dev_err(&pdev->dev, "Failed to allocate memory\n");
 		result = -ENOMEM;
 		goto error_kmalloc;
 	}
