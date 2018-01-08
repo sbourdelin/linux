@@ -295,7 +295,7 @@ ioc4_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id)
 	pci_set_master(pdev);
 
 	/* Set up per-IOC4 data */
-	idd = kmalloc(sizeof(struct ioc4_driver_data), GFP_KERNEL);
+	idd = kmalloc(sizeof(*idd), GFP_KERNEL);
 	if (!idd) {
 		ret = -ENOMEM;
 		goto out_idd;
