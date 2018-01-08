@@ -68,6 +68,9 @@
 #define DBG(fmt...)
 #endif
 
+cpumask_t ppc_thread_group_mask;
+EXPORT_SYMBOL(ppc_thread_group_mask);
+
 #ifdef CONFIG_PPC64
 int __initdata iommu_is_off;
 int __initdata iommu_force_on;
@@ -303,6 +306,71 @@ static void __init check_cpu_feature_properties(unsigned long node)
 	}
 }
 
+static void __init early_init_setup_thread_group_mask(unsigned long node,
+						cpumask_t *thread_group_mask)
+{
+	const __be32 *thrgrp;
+	int len, rc = 0;
+	u32 cc_type = 0, no_split = 0, thr_per_split = 0;
+	int j, k;
+
+	cpumask_clear(thread_group_mask);
+
+	thrgrp = of_get_flat_dt_prop(node, "ibm,thread-groups", &len);
+	if (!thrgrp)
+		return;
+
+	/* Process the thread groups for the Core thread mask */
+	/* Characteristic type per table */
+	cc_type = of_read_number(thrgrp++, 1);
+
+	/*
+	 * 1 : Group shares common L1, translation cache, and
+	 *     instruction data flow
+	 * >1 : Reserved
+	 */
+	if (cc_type != 1) {
+		rc = -EINVAL;
+		goto endit;
+	}
+
+	/* No. splits */
+	no_split = of_read_number(thrgrp++, 1);
+	if (no_split == 0) {
+		rc = -EINVAL;
+		goto endit;
+	}
+
+	/* Threads per split */
+	thr_per_split = of_read_number(thrgrp++, 1);
+	if (thr_per_split == 0) {
+		rc = -EINVAL;
+		goto endit;
+	}
+
+	DBG("INFO: Node %d; ibm,thread-group "
+		"(cc_t=%d, no_spl=%d, thr_p_spl=%d)\n",
+		(int)node, (int)cc_type, (int)no_split,
+		(int)thr_per_split);
+
+	for (j = 0; j < no_split; j++) {
+		for (k = 0; k < thr_per_split; k++) {
+			u32 t = of_read_number(thrgrp++, 1);
+
+			cpumask_set_cpu(t, thread_group_mask);
+			DBG("INFO: Node %d; enable thread %d\n",
+				(int)node, (int)t);
+		}
+	}
+
+endit:
+	if (rc) {
+		DBG("WARNING: Node %d; error processing "
+		    "ibm,thread-group property\n", (int)node);
+		cpumask_setall(thread_group_mask);
+	}
+}
+
 static int __init early_init_dt_scan_cpus(unsigned long node,
 					  const char *uname, int depth,
 					  void *data)
@@ -326,11 +394,17 @@ static int __init early_init_dt_scan_cpus(unsigned long node,
 
 	nthreads = len / sizeof(int);
 
+	/* Figure out the thread subset */
+	early_init_setup_thread_group_mask(node, &ppc_thread_group_mask);
+
 	/*
 	 * Now see if any of these threads match our boot cpu.
 	 * NOTE: This must match the parsing done in smp_setup_cpu_maps.
 	 */
 	for (i = 0; i < nthreads; i++) {
+		if (!cpumask_test_cpu(i % nthreads, &ppc_thread_group_mask))
+			continue;
+
 		/*
 		 * version 2 of the kexec param format adds the phys cpuid of
 		 * booted proc.

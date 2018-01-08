@@ -427,13 +427,16 @@ EXPORT_SYMBOL_GPL(threads_per_subcore);
 EXPORT_SYMBOL_GPL(threads_shift);
 EXPORT_SYMBOL_GPL(threads_core_mask);
 
-static void __init cpu_init_thread_core_maps(int tpc)
+static void __init cpu_init_thread_core_maps(int tpc,
+				cpumask_t *thread_group_mask)
 {
+	cpumask_t work_mask;
 	int i;
 
 	threads_per_core = tpc;
 	threads_per_subcore = tpc;
 	cpumask_clear(&threads_core_mask);
+	cpumask_clear(&work_mask);
 
 	/* This implementation only supports power of 2 number of threads
 	 * for simplicity and performance
@@ -442,13 +445,13 @@ static void __init cpu_init_thread_core_maps(int tpc)
 	BUG_ON(tpc != (1 << threads_shift));
 
 	for (i = 0; i < tpc; i++)
-		cpumask_set_cpu(i, &threads_core_mask);
+		cpumask_set_cpu(i, &work_mask);
+	cpumask_and(&threads_core_mask, &work_mask, thread_group_mask);
 
 	printk(KERN_INFO "CPU maps initialized for %d thread%s per core\n",
 	       tpc, tpc > 1 ? "s" : "");
 	printk(KERN_DEBUG " (thread shift is %d)\n", threads_shift);
 }
-
 
 /**
  * setup_cpu_maps - initialize the following cpu maps:
@@ -503,17 +506,24 @@ void __init smp_setup_cpu_maps(void)
 		for (j = 0; j < nthreads && cpu < nr_cpu_ids; j++) {
 			bool avail;
 
-			DBG("    thread %d -> cpu %d (hard id %d)\n",
-			    j, cpu, be32_to_cpu(intserv[j]));
-
 			avail = of_device_is_available(dn);
 			if (!avail)
 				avail = !of_property_match_string(dn,
 						"enable-method", "spin-table");
 
-			set_cpu_present(cpu, avail);
-			set_hard_smp_processor_id(cpu, be32_to_cpu(intserv[j]));
-			set_cpu_possible(cpu, true);
+			DBG("    thread %d -> cpu %d (hard id %d)\n",
+			    j, cpu, be32_to_cpu(intserv[j]));
+
+			if (cpumask_test_cpu(cpu % nthreads,
+						&ppc_thread_group_mask)) {
+				set_cpu_present(cpu, avail);
+				set_hard_smp_processor_id(cpu,
+						be32_to_cpu(intserv[j]));
+				set_cpu_possible(cpu, true);
+			} else {
+				set_cpu_present(cpu, false);
+				set_cpu_possible(cpu, false);
+			}
 			cpu++;
 		}
 	}
@@ -572,7 +582,7 @@ void __init smp_setup_cpu_maps(void)
 	 * every CPU in the system. If that is not the case, then some code
 	 * here will have to be reworked
 	 */
-	cpu_init_thread_core_maps(nthreads);
+	cpu_init_thread_core_maps(nthreads, &ppc_thread_group_mask);
 
 	/* Now that possible cpus are set, set nr_cpu_ids for later use */
 	setup_nr_cpu_ids();
