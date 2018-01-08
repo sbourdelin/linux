@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #include <linux/jump_label.h>
+#include <asm/thread_info.h>
 #include <asm/unwind_hints.h>
 #include <asm/cpufeatures.h>
 #include <asm/page_types.h>
@@ -214,6 +215,11 @@ For 32-bit we have the following conventions - kernel is built with
 .macro SWITCH_TO_KERNEL_CR3 scratch_reg:req
 	ALTERNATIVE "jmp .Lend_\@", "", X86_FEATURE_PTI
 	mov	%cr3, \scratch_reg
+
+	/* if we're already on the kernel PGD, we don't switch */
+	testq $(PTI_SWITCH_PGTABLES_MASK), \scratch_reg
+	jz .Lend_\@
+
 	ADJUST_KERNEL_CR3 \scratch_reg
 	mov	\scratch_reg, %cr3
 .Lend_\@:
@@ -224,6 +230,12 @@ For 32-bit we have the following conventions - kernel is built with
 
 .macro SWITCH_TO_USER_CR3_NOSTACK scratch_reg:req scratch_reg2:req
 	ALTERNATIVE "jmp .Lend_\@", "", X86_FEATURE_PTI
+
+	/* "NOPTI" taskflag avoids the switch */
+	movq	PER_CPU_VAR(current_task), \scratch_reg
+	btq	$TIF_NOPTI, TASK_TI_flags(\scratch_reg)
+	jc	.Lend_\@
+
 	mov	%cr3, \scratch_reg
 
 	ALTERNATIVE "jmp .Lwrcr3_\@", "", X86_FEATURE_PCID
@@ -262,6 +274,13 @@ For 32-bit we have the following conventions - kernel is built with
 	ALTERNATIVE "jmp .Ldone_\@", "", X86_FEATURE_PTI
 	movq	%cr3, \scratch_reg
 	movq	\scratch_reg, \save_reg
+
+	/* if we're already on the kernel PGD, we don't switch,
+	 * we just save the current cr3.
+	 */
+	testq $(PTI_SWITCH_PGTABLES_MASK), \scratch_reg
+	jz .Ldone_\@
+
 	/*
 	 * Is the "switch mask" all zero?  That means that both of
 	 * these are zero:
@@ -283,6 +302,10 @@ For 32-bit we have the following conventions - kernel is built with
 
 .macro RESTORE_CR3 scratch_reg:req save_reg:req
 	ALTERNATIVE "jmp .Lend_\@", "", X86_FEATURE_PTI
+
+	/* if we saved a kernel context, we didn't switch so we don't switch */
+	testq $(PTI_SWITCH_PGTABLES_MASK), \save_reg
+	jz .Lend_\@
 
 	ALTERNATIVE "jmp .Lwrcr3_\@", "", X86_FEATURE_PCID
 
