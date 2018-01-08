@@ -1408,6 +1408,26 @@ xfs_fs_remount(
 }
 
 /*
+ * First stage of a freeze.  We need to sync all the dirty data and clean up
+ * all the leftover CoW mappings to make the filesystem as tidy as possible.
+ */
+STATIC int
+xfs_fs_freeze_data(
+	struct super_block	*sb)
+{
+	struct xfs_mount	*mp = XFS_M(sb);
+	int			error;
+
+	error = sync_filesystem(sb);
+	if (error)
+		return error;
+
+	if (!xfs_sb_version_hasreflink(&mp->m_sb))
+		return 0;
+	return xfs_icache_free_cowblocks(mp, NULL);
+}
+
+/*
  * Second stage of a freeze. The data is already frozen so we only
  * need to take care of the metadata. Once that's done sync the superblock
  * to the log to dirty it in case of a crash while frozen. This ensures that we
@@ -1780,6 +1800,7 @@ static const struct super_operations xfs_super_operations = {
 	.drop_inode		= xfs_fs_drop_inode,
 	.put_super		= xfs_fs_put_super,
 	.sync_fs		= xfs_fs_sync_fs,
+	.freeze_data		= xfs_fs_freeze_data,
 	.freeze_fs		= xfs_fs_freeze,
 	.unfreeze_fs		= xfs_fs_unfreeze,
 	.statfs			= xfs_fs_statfs,

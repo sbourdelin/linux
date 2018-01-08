@@ -1457,7 +1457,16 @@ int freeze_super(struct super_block *sb)
 	sb_wait_write(sb, SB_FREEZE_PAGEFAULT);
 
 	/* All writers are done so after syncing there won't be dirty data */
-	sync_filesystem(sb);
+	if (sb->s_op->freeze_data) {
+		ret = sb->s_op->freeze_data(sb);
+		if (ret) {
+			printk(KERN_ERR
+				"VFS:Filesystem data freeze failed\n");
+			goto freeze_fail;
+		}
+	} else {
+		sync_filesystem(sb);
+	}
 
 	/* Now wait for internal filesystem counter */
 	sb->s_writers.frozen = SB_FREEZE_FS;
@@ -1468,11 +1477,7 @@ int freeze_super(struct super_block *sb)
 		if (ret) {
 			printk(KERN_ERR
 				"VFS:Filesystem freeze failed\n");
-			sb->s_writers.frozen = SB_UNFROZEN;
-			sb_freeze_unlock(sb);
-			wake_up(&sb->s_writers.wait_unfrozen);
-			deactivate_locked_super(sb);
-			return ret;
+			goto freeze_fail;
 		}
 	}
 	/*
@@ -1483,6 +1488,12 @@ int freeze_super(struct super_block *sb)
 	lockdep_sb_freeze_release(sb);
 	up_write(&sb->s_umount);
 	return 0;
+freeze_fail:
+	sb->s_writers.frozen = SB_UNFROZEN;
+	sb_freeze_unlock(sb);
+	wake_up(&sb->s_writers.wait_unfrozen);
+	deactivate_locked_super(sb);
+	return ret;
 }
 EXPORT_SYMBOL(freeze_super);
 
