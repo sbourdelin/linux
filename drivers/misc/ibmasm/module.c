@@ -64,14 +64,16 @@ MODULE_PARM_DESC(ibmasm_debug, " Set debug mode on or off");
 
 static int ibmasm_init_one(struct pci_dev *pdev, const struct pci_device_id *id)
 {
-	int result;
 	struct service_processor *sp;
+	int result = pci_enable_device(pdev);
 
-	if ((result = pci_enable_device(pdev))) {
+	if (result) {
 		dev_err(&pdev->dev, "Failed to enable PCI device\n");
 		return result;
 	}
-	if ((result = pci_request_regions(pdev, DRIVER_NAME))) {
+
+	result = pci_request_regions(pdev, DRIVER_NAME);
+	if (result) {
 		dev_err(&pdev->dev, "Failed to allocate PCI resources\n");
 		goto error_resources;
 	}
