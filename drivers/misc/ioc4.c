@@ -283,10 +283,11 @@ ioc4_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id)
 	struct ioc4_driver_data *idd;
 	struct ioc4_submodule *is;
 	uint32_t pcmd;
-	int ret;
 
 	/* Enable IOC4 and take ownership of it */
-	if ((ret = pci_enable_device(pdev))) {
+	int ret = pci_enable_device(pdev);
+
+	if (ret) {
 		printk(KERN_WARNING
 		       "%s: Failed to enable IOC4 device for pci_dev %s.\n",
 		       __func__, pci_name(pdev));
