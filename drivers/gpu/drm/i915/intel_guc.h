@@ -31,6 +31,7 @@
 #include "intel_guc_ct.h"
 #include "intel_guc_log.h"
 #include "intel_guc_reg.h"
+#include "intel_guc_wopcm.h"
 #include "intel_uc_fw.h"
 #include "i915_vma.h"
 
@@ -130,6 +131,5 @@ int intel_guc_auth_huc(struct intel_guc *guc, u32 rsa_offset);
 int intel_guc_suspend(struct drm_i915_private *dev_priv);
 int intel_guc_resume(struct drm_i915_private *dev_priv);
 struct i915_vma *intel_guc_allocate_vma(struct intel_guc *guc, u32 size);
-u32 intel_guc_wopcm_size(struct drm_i915_private *dev_priv);
 
 #endif
