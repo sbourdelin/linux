@@ -1016,6 +1016,7 @@ static int scsi_send_eh_cmnd(struct scsi_cmnd *scmd, unsigned char *cmnd,
 {
 	struct scsi_device *sdev = scmd->device;
 	struct Scsi_Host *shost = sdev->host;
+	struct request_queue *q = sdev->request_queue;
 	DECLARE_COMPLETION_ONSTACK(done);
 	unsigned long timeleft = timeout;
 	struct scsi_eh_save ses;
@@ -1028,7 +1029,9 @@ retry:
 
 	scsi_log_send(scmd);
 	scmd->scsi_done = scsi_eh_done;
+	blk_wait_if_quiesced(q);
 	rtn = shost->hostt->queuecommand(shost, scmd);
+	blk_finish_wait_if_quiesced(q);
 	if (rtn) {
 		if (timeleft > stall_for) {
 			scsi_eh_restore_cmnd(scmd, &ses);
