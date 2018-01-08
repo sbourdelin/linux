@@ -978,6 +978,16 @@ void intel_pmu_pebs_del(struct perf_event *event)
 	pebs_update_state(needed_cb, cpuc, event->ctx->pmu);
 }
 
+void intel_pmu_pebs_read(struct perf_event *event)
+{
+	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+
+	if (pebs_needs_sched_cb(cpuc))
+		return intel_pmu_drain_pebs_buffer();
+
+	x86_perf_event_update(event);
+}
+
 void intel_pmu_pebs_disable(struct perf_event *event)
 {
 	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);

@@ -913,6 +913,8 @@ void intel_pmu_pebs_add(struct perf_event *event);
 
 void intel_pmu_pebs_del(struct perf_event *event);
 
+void intel_pmu_pebs_read(struct perf_event *event);
+
 void intel_pmu_pebs_enable(struct perf_event *event);
 
 void intel_pmu_pebs_disable(struct perf_event *event);
