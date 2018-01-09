@@ -26,6 +26,7 @@
  * License. See the file "COPYING" in the main directory of this archive
  * for more details.
  */
+#include <clocksource/dmtimer.h>
 #include <linux/init.h>
 #include <linux/time.h>
 #include <linux/interrupt.h>
@@ -49,7 +50,6 @@
 #include "omap_hwmod.h"
 #include "omap_device.h"
 #include <plat/counter-32k.h>
-#include <plat/dmtimer.h>
 #include "omap-pm.h"
 
 #include "soc.h"
