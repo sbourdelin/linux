@@ -481,6 +481,11 @@ static void nvme_loop_reset_ctrl_work(struct work_struct *work)
 	nvme_stop_ctrl(&ctrl->ctrl);
 	nvme_loop_shutdown_ctrl(ctrl);
 
+	changed = nvme_change_ctrl_state(&ctrl->ctrl, NVME_CTRL_RESETTING);
+	if (!changed) {
+		WARN_ON_ONCE(ctrl->state != NVME_CTRL_DELETING);
+		return;
+	}
 	ret = nvme_loop_configure_admin_queue(ctrl);
 	if (ret)
 		goto out_disable;

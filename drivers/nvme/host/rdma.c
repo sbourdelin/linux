@@ -1753,6 +1753,14 @@ static void nvme_rdma_reset_ctrl_work(struct work_struct *work)
 	nvme_stop_ctrl(&ctrl->ctrl);
 	nvme_rdma_shutdown_ctrl(ctrl, false);
 
+	changed = nvme_change_ctrl_state(&ctrl->ctrl,
+			NVME_CTRL_RESET_PREPARE);
+	if (!changed) {
+		/* state change failure is ok if we're in DELETING state */
+		WARN_ON_ONCE(ctrl->ctrl.state != NVME_CTRL_DELETING);
+		return;
+	}
+
 	ret = nvme_rdma_configure_admin_queue(ctrl, false);
 	if (ret)
 		goto out_fail;

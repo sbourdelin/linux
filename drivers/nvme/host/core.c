@@ -87,7 +87,7 @@ static __le32 nvme_get_log_dw10(u8 lid, size_t size)
 
 int nvme_reset_ctrl(struct nvme_ctrl *ctrl)
 {
-	if (!nvme_change_ctrl_state(ctrl, NVME_CTRL_RESETTING))
+	if (!nvme_change_ctrl_state(ctrl, NVME_CTRL_RESET_PREPARE))
 		return -EBUSY;
 	if (!queue_work(nvme_wq, &ctrl->reset_work))
 		return -EBUSY;
@@ -243,10 +243,20 @@ bool nvme_change_ctrl_state(struct nvme_ctrl *ctrl,
 			break;
 		}
 		break;
-	case NVME_CTRL_RESETTING:
+	case NVME_CTRL_RESET_PREPARE:
 		switch (old_state) {
 		case NVME_CTRL_NEW:
 		case NVME_CTRL_LIVE:
+			changed = true;
+			/* FALLTHRU */
+		default:
+			break;
+		}
+		break;
+
+	case NVME_CTRL_RESETTING:
+		switch (old_state) {
+		case NVME_CTRL_RESET_PREPARE:
 			changed = true;
 			/* FALLTHRU */
 		default:
@@ -257,6 +267,7 @@ bool nvme_change_ctrl_state(struct nvme_ctrl *ctrl,
 		switch (old_state) {
 		case NVME_CTRL_LIVE:
 		case NVME_CTRL_RESETTING:
+		case NVME_CTRL_RESET_PREPARE:
 			changed = true;
 			/* FALLTHRU */
 		default:
@@ -267,6 +278,7 @@ bool nvme_change_ctrl_state(struct nvme_ctrl *ctrl,
 		switch (old_state) {
 		case NVME_CTRL_LIVE:
 		case NVME_CTRL_RESETTING:
+		case NVME_CTRL_RESET_PREPARE:
 		case NVME_CTRL_RECONNECTING:
 			changed = true;
 			/* FALLTHRU */
@@ -2603,6 +2615,7 @@ static ssize_t nvme_sysfs_show_state(struct device *dev,
 		[NVME_CTRL_NEW]		= "new",
 		[NVME_CTRL_LIVE]	= "live",
 		[NVME_CTRL_RESETTING]	= "resetting",
+		[NVME_CTRL_RESET_PREPARE]	= "reset-prepare",
 		[NVME_CTRL_RECONNECTING]= "reconnecting",
 		[NVME_CTRL_DELETING]	= "deleting",
 		[NVME_CTRL_DEAD]	= "dead",

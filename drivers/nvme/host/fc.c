@@ -547,6 +547,7 @@ nvme_fc_resume_controller(struct nvme_fc_ctrl *ctrl)
 		break;
 
 	case NVME_CTRL_RESETTING:
+	case NVME_CTRL_RESET_PREPARE:
 		/*
 		 * Controller is already in the process of terminating the
 		 * association. No need to do anything further. The reconnect
@@ -790,6 +791,7 @@ nvme_fc_ctrl_connectivity_loss(struct nvme_fc_ctrl *ctrl)
 		break;
 
 	case NVME_CTRL_RESETTING:
+	case NVME_CTRL_RESET_PREPARE:
 		/*
 		 * Controller is already in the process of terminating the
 		 * association.  No need to do anything further. The reconnect
