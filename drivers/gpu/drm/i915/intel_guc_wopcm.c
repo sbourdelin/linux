@@ -155,6 +155,9 @@ int intel_guc_wopcm_init(struct intel_guc *guc, u32 guc_fw_size,
 	u32 offset, size, top;
 	int err;
 
+	DRM_DEBUG_DRIVER("guc_fw size %u, huc_fw_size %u\n", guc_fw_size,
+	                 huc_fw_size);
+
 	GEM_BUG_ON(guc->wopcm.flags & INTEL_GUC_WOPCM_VALID);
 
 	if (!guc_fw_size)
@@ -213,6 +216,9 @@ int intel_guc_wopcm_init(struct intel_guc *guc, u32 guc_fw_size,
 void intel_guc_wopcm_init_hw(struct intel_guc *guc)
 {
 	u32 locked = guc_wopcm_locked(guc);
+
+	DRM_DEBUG_DRIVER("locked = %s, flags = %#x\n", yesno(locked),
+	                 guc->wopcm.flags);
 
 	GEM_BUG_ON(!(guc->wopcm.flags & INTEL_GUC_WOPCM_VALID));
 
