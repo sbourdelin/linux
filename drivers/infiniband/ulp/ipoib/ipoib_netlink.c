@@ -93,12 +93,38 @@ out_err:
 	return ret;
 }
 
+static struct net_device *ipoib_alloc_link(struct net *src_net,
+					   const char *dev_name,
+					   struct nlattr *tb[])
+{
+	struct net_device *pdev;
+	struct ipoib_dev_priv *ppriv, *priv;
+
+	if (!tb[IFLA_LINK])
+		return ERR_PTR(-EINVAL);
+
+	ASSERT_RTNL();
+	pdev = __dev_get_by_index(src_net, nla_get_u32(tb[IFLA_LINK]));
+	if (!pdev || pdev->type != ARPHRD_INFINIBAND)
+		return ERR_PTR(-ENODEV);
+
+	ppriv = ipoib_priv(pdev);
+
+	priv = ipoib_intf_alloc(ppriv->ca, ppriv->port, dev_name);
+	if (!priv) {
+		ipoib_warn(ppriv, "failed to allocate pkey device\n");
+		return ERR_PTR(-ENOMEM);
+	}
+
+	return priv->dev;
+}
+
 static int ipoib_new_child_link(struct net *src_net, struct net_device *dev,
 				struct nlattr *tb[], struct nlattr *data[],
 				struct netlink_ext_ack *extack)
 {
 	struct net_device *pdev;
-	struct ipoib_dev_priv *ppriv;
+	struct ipoib_dev_priv *ppriv, *priv;
 	u16 child_pkey;
 	int err;
 
@@ -131,11 +157,15 @@ static int ipoib_new_child_link(struct net *src_net, struct net_device *dev,
 	 */
 	child_pkey |= 0x8000;
 
-	err = __ipoib_vlan_add(ppriv, ipoib_priv(dev),
-			       child_pkey, IPOIB_RTNL_CHILD);
+	down_write(&ppriv->vlan_rwsem);
+
+	priv = ipoib_priv(dev);
+	err = __ipoib_vlan_add(ppriv, priv, child_pkey, IPOIB_RTNL_CHILD);
+	up_write(&ppriv->vlan_rwsem);
 
 	if (!err && data)
 		err = ipoib_changelink(dev, tb, data, extack);
+
 	return err;
 }
 
@@ -163,13 +193,14 @@ static struct rtnl_link_ops ipoib_link_ops __read_mostly = {
 	.kind		= "ipoib",
 	.maxtype	= IFLA_IPOIB_MAX,
 	.policy		= ipoib_policy,
-	.priv_size	= sizeof(struct ipoib_dev_priv),
 	.setup		= ipoib_setup_common,
 	.newlink	= ipoib_new_child_link,
 	.changelink	= ipoib_changelink,
 	.dellink	= ipoib_unregister_child_dev,
 	.get_size	= ipoib_get_size,
 	.fill_info	= ipoib_fill_info,
+	.alloc_link     = ipoib_alloc_link,
+	.free_link	= ipoib_free_rdma_netdev
 };
 
 int __init ipoib_netlink_init(void)

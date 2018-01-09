@@ -607,6 +607,8 @@ void ipoib_drain_cq(struct net_device *dev);
 void ipoib_set_ethtool_ops(struct net_device *dev);
 void ipoib_set_dev_features(struct ipoib_dev_priv *priv, struct ib_device *hca);
 
+void ipoib_free_rdma_netdev(struct net_device *dev);
+
 #define IPOIB_FLAGS_RC		0x80
 #define IPOIB_FLAGS_UC		0x40
 
