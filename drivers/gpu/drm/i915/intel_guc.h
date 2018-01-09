@@ -118,7 +118,7 @@ static inline u32 intel_guc_ggtt_offset(struct intel_guc *guc,
 {
 	u32 offset = i915_ggtt_offset(vma);
 
-	GEM_BUG_ON(!guc->wopcm.valid);
+	GEM_BUG_ON(!(guc->wopcm.flags & INTEL_GUC_WOPCM_VALID));
 	GEM_BUG_ON(offset < guc->wopcm.top);
 	GEM_BUG_ON(range_overflows_t(u64, offset, vma->size, GUC_GGTT_TOP));
 

@@ -47,11 +47,22 @@ struct intel_guc;
 #define GEN9_GUC_WOPCM_DELTA		4
 #define GEN9_GUC_WOPCM_OFFSET		(0x24000)
 
+/* GuC WOPCM flags*/
+#define INTEL_GUC_WOPCM_VALID		BIT(0)
+#define INTEL_GUC_WOPCM_HW_UPDATED	BIT(1)
+
+/*
+ * intel_guc_wopcm - GuC WOPCM related settings.
+ * @offset: GuC WOPCM offset.
+ * @size: size of GuC WOPCM for GuC firmware.
+ * @top: start of Non GuC WOPCM memory.
+ * @flags: bitmap of INTEL_GUC_WOPCM_<foo>.
+ */
 struct intel_guc_wopcm {
 	u32 offset;
 	u32 size;
 	u32 top;
-	bool valid;
+	u32 flags;
 };
 
 /*
@@ -69,5 +80,6 @@ static inline void intel_guc_wopcm_init_early(struct intel_guc_wopcm *wopcm)
 }
 
 int intel_guc_wopcm_init(struct intel_guc *guc, u32 guc_size, u32 huc_size);
+void intel_guc_wopcm_init_hw(struct intel_guc *guc);
 
 #endif

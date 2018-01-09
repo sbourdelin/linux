@@ -66,6 +66,7 @@
 #define   UOS_MOVE			  (1<<4)
 #define   START_DMA			  (1<<0)
 #define DMA_GUC_WOPCM_OFFSET		_MMIO(0xc340)
+#define   DMA_GUC_WOPCM_OFFSET_MASK	  (0xffffc000)
 #define   HUC_LOADING_AGENT_VCR		  (0<<1)
 #define   HUC_LOADING_AGENT_GUC		  (1<<1)
 #define GUC_MAX_IDLE_COUNT		_MMIO(0xC3E4)
@@ -75,7 +76,8 @@
 
 /* Defines WOPCM space available to GuC firmware */
 #define GUC_WOPCM_SIZE			_MMIO(0xc050)
-#define GUC_WOPCM_SIZE_MASK		(0xfffff000)
+#define   GUC_WOPCM_SIZE_MASK		  (0xfffff000)
+#define GUC_WOPCM_REG_LOCKED		(1<<0)
 
 /* GuC addresses above GUC_GGTT_TOP also don't map through the GTT */
 #define GUC_GGTT_TOP			0xFEE00000
