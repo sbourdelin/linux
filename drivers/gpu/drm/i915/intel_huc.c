@@ -137,7 +137,8 @@ static int huc_ucode_xfer(struct intel_uc_fw *huc_fw, struct i915_vma *vma)
 	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
 
 	/* Set the source address for the uCode */
-	offset = guc_ggtt_offset(vma) + huc_fw->header_offset;
+	offset = intel_guc_ggtt_offset(&dev_priv->guc, vma) +
+		 huc_fw->header_offset;
 	I915_WRITE(DMA_ADDR_0_LOW, lower_32_bits(offset));
 	I915_WRITE(DMA_ADDR_0_HIGH, upper_32_bits(offset) & 0xFFFF);
 
@@ -213,7 +214,8 @@ int intel_huc_auth(struct intel_huc *huc)
 	}
 
 	ret = intel_guc_auth_huc(guc,
-				 guc_ggtt_offset(vma) + huc->fw.rsa_offset);
+				 intel_guc_ggtt_offset(guc, vma) +
+				 huc->fw.rsa_offset);
 	if (ret) {
 		DRM_ERROR("HuC: GuC did not ack Auth request %d\n", ret);
 		goto out;

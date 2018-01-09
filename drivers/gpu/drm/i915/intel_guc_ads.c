@@ -113,17 +113,6 @@ int intel_guc_ads_create(struct intel_guc *guc)
 		blob->reg_state.white_list[engine->guc_id].count = 0;
 	}
 
-	/*
-	 * The GuC requires a "Golden Context" when it reinitialises
-	 * engines after a reset. Here we use the Render ring default
-	 * context, which must already exist and be pinned in the GGTT,
-	 * so its address won't change after we've told the GuC where
-	 * to find it. Note that we have to skip our header (1 page),
-	 * because our GuC shared data is there.
-	 */
-	blob->ads.golden_context_lrca =
-		guc_ggtt_offset(dev_priv->kernel_context->engine[RCS].state) +
-		skipped_offset;
 
 	/*
 	 * The GuC expects us to exclude the portion of the context image that
@@ -135,10 +124,22 @@ int intel_guc_ads_create(struct intel_guc *guc)
 		blob->ads.eng_state_size[engine->guc_id] =
 			engine->context_size - skipped_size;
 
-	base = guc_ggtt_offset(vma);
+	base = intel_guc_ggtt_offset(guc, vma);
 	blob->ads.scheduler_policies = base + ptr_offset(blob, policies);
 	blob->ads.reg_state_buffer = base + ptr_offset(blob, reg_state_buffer);
 	blob->ads.reg_state_addr = base + ptr_offset(blob, reg_state);
+
+	/*
+	 * The GuC requires a "Golden Context" when it reinitialises
+	 * engines after a reset. Here we use the Render ring default
+	 * context, which must already exist and be pinned in the GGTT,
+	 * so its address won't change after we've told the GuC where
+	 * to find it. Note that we have to skip our header (1 page),
+	 * because our GuC shared data is there.
+	 */
+	vma = dev_priv->kernel_context->engine[RCS].state;
+	blob->ads.golden_context_lrca = intel_guc_ggtt_offset(guc, vma) +
+		skipped_offset;
 
 	kunmap(page);
 
