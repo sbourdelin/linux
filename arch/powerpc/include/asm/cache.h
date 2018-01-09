@@ -82,22 +82,31 @@ extern void _set_L3CR(unsigned long);
 
 static inline void dcbz(void *addr)
 {
-	__asm__ __volatile__ ("dcbz 0, %0" : : "r"(addr) : "memory");
+	__asm__ __volatile__ ("dcbz 0, %1" :
+			      "=m"(*(char (*)[L1_CACHE_BYTES])addr) :
+			      "r"(addr) :);
 }
 
 static inline void dcbi(void *addr)
 {
-	__asm__ __volatile__ ("dcbi 0, %0" : : "r"(addr) : "memory");
+	__asm__ __volatile__ ("dcbi 0, %1" :
+			      "=m"(*(char (*)[L1_CACHE_BYTES])addr) :
+			      "r"(addr) :);
 }
 
 static inline void dcbf(void *addr)
 {
-	__asm__ __volatile__ ("dcbf 0, %0" : : "r"(addr) : "memory");
+	__asm__ __volatile__ ("dcbf 0, %1" :
+			      "=m"(*(char (*)[L1_CACHE_BYTES])addr) :
+			      "r"(addr), "m"(*(char (*)[L1_CACHE_BYTES])addr) :
+			     );
 }
 
 static inline void dcbst(void *addr)
 {
-	__asm__ __volatile__ ("dcbst 0, %0" : : "r"(addr) : "memory");
+	__asm__ __volatile__ ("dcbst 0, %0" : :
+			      "r"(addr), "m"(*(char (*)[L1_CACHE_BYTES])addr) :
+			     );
 }
 #endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */
