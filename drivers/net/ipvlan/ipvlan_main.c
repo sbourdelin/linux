@@ -380,12 +380,24 @@ static int ipvlan_get_iflink(const struct net_device *dev)
 	return ipvlan->phy_dev->ifindex;
 }
 
+static int ipvlan_change_mtu(struct net_device *dev, int new_mtu)
+{
+	struct ipvl_dev *ipvlan = netdev_priv(dev);
+
+	if (ipvlan->phy_dev->mtu < new_mtu)
+		return -EINVAL;
+
+	dev->mtu = new_mtu;
+	return 0;
+}
+
 static const struct net_device_ops ipvlan_netdev_ops = {
 	.ndo_init		= ipvlan_init,
 	.ndo_uninit		= ipvlan_uninit,
 	.ndo_open		= ipvlan_open,
 	.ndo_stop		= ipvlan_stop,
 	.ndo_start_xmit		= ipvlan_start_xmit,
+	.ndo_change_mtu		= ipvlan_change_mtu,
 	.ndo_fix_features	= ipvlan_fix_features,
 	.ndo_change_rx_flags	= ipvlan_change_rx_flags,
 	.ndo_set_rx_mode	= ipvlan_set_multicast_mac_filter,
@@ -680,6 +692,8 @@ void ipvlan_link_setup(struct net_device *dev)
 {
 	ether_setup(dev);
 
+	dev->min_mtu = 0;
+	dev->max_mtu = ETH_MAX_MTU;
 	dev->priv_flags &= ~(IFF_XMIT_DST_RELEASE | IFF_TX_SKB_SHARING);
 	dev->priv_flags |= IFF_UNICAST_FLT | IFF_NO_QUEUE;
 	dev->netdev_ops = &ipvlan_netdev_ops;
