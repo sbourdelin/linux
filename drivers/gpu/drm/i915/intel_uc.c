@@ -215,6 +215,9 @@ void intel_uc_fini_wq(struct drm_i915_private *dev_priv)
 int intel_uc_init(struct drm_i915_private *dev_priv)
 {
 	struct intel_guc *guc = &dev_priv->guc;
+	struct intel_huc *huc = &dev_priv->huc;
+	u32 guc_fw_size = intel_uc_fw_get_size(&guc->fw);
+	u32 huc_fw_size = intel_uc_fw_get_size(&huc->fw);
 	int ret;
 
 	if (!USES_GUC(dev_priv))
@@ -222,6 +225,10 @@ int intel_uc_init(struct drm_i915_private *dev_priv)
 
 	if (!HAS_GUC(dev_priv))
 		return -ENODEV;
+
+	ret = intel_guc_wopcm_init(guc, guc_fw_size, huc_fw_size);
+	if (ret)
+		return ret;
 
 	ret = intel_guc_init(guc);
 	if (ret)
@@ -272,9 +279,9 @@ int intel_uc_init_hw(struct drm_i915_private *dev_priv)
 	gen9_reset_guc_interrupts(dev_priv);
 
 	/* init WOPCM */
-	I915_WRITE(GUC_WOPCM_SIZE, intel_guc_wopcm_size(guc));
+	I915_WRITE(GUC_WOPCM_SIZE, guc->wopcm.size);
 	I915_WRITE(DMA_GUC_WOPCM_OFFSET,
-		   GUC_WOPCM_OFFSET_VALUE | HUC_LOADING_AGENT_GUC);
+		   guc->wopcm.offset | HUC_LOADING_AGENT_GUC);
 
 	/* WaEnableuKernelHeaderValidFix:skl */
 	/* WaEnableGuCBootHashCheckNotSet:skl,bxt,kbl */
