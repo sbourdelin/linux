@@ -763,10 +763,10 @@ static int complete_subctxt(struct hfi1_filedata *fd)
 	}
 
 	if (ret) {
+		__clear_bit(fd->subctxt, fd->uctxt->in_use_ctxts);
 		hfi1_rcd_put(fd->uctxt);
 		fd->uctxt = NULL;
 		spin_lock_irqsave(&fd->dd->uctxt_lock, flags);
-		__clear_bit(fd->subctxt, fd->uctxt->in_use_ctxts);
 		spin_unlock_irqrestore(&fd->dd->uctxt_lock, flags);
 	}
 
