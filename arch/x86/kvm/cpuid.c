@@ -70,6 +70,8 @@ u64 kvm_supported_xcr0(void)
 /* These are scattered features in cpufeatures.h. */
 #define KVM_CPUID_BIT_AVX512_4VNNIW     2
 #define KVM_CPUID_BIT_AVX512_4FMAPS     3
+#define KVM_CPUID_BIT_SPEC_CTRL         26
+#define KVM_CPUID_BIT_STIBP             27
 #define KF(x) bit(KVM_CPUID_BIT_##x)
 
 int kvm_update_cpuid(struct kvm_vcpu *vcpu)
@@ -108,6 +110,9 @@ int kvm_update_cpuid(struct kvm_vcpu *vcpu)
 				best->ecx |= F(OSPKE);
 		}
 	}
+
+	if (cpuid_edx(0x7) & (KF(SPEC_CTRL) | KF(STIBP)))
+		best->edx |= KF(SPEC_CTRL) | KF(STIBP);
 
 	best = kvm_find_cpuid_entry(vcpu, 0xD, 0);
 	if (!best) {
