@@ -2556,10 +2556,18 @@ struct net_device *rtnl_create_link(struct net *net,
 	else if (ops->get_num_rx_queues)
 		num_rx_queues = ops->get_num_rx_queues();
 
-	dev = alloc_netdev_mqs(ops->priv_size, ifname, name_assign_type,
-			       ops->setup, num_tx_queues, num_rx_queues);
-	if (!dev)
-		return ERR_PTR(-ENOMEM);
+	if (ops->alloc_link) {
+		dev = ops->alloc_link(net, ifname, tb);
+
+		if (IS_ERR(dev))
+			return dev;
+	} else {
+		dev = alloc_netdev_mqs(ops->priv_size, ifname,
+				       name_assign_type, ops->setup,
+				       num_tx_queues, num_rx_queues);
+		if (!dev)
+			return ERR_PTR(-ENOMEM);
+	}
 
 	dev_net_set(dev, net);
 	dev->rtnl_link_ops = ops;
@@ -2820,14 +2828,21 @@ replay:
 			 */
 			if (err < 0) {
 				/* If device is not registered at all, free it now */
-				if (dev->reg_state == NETREG_UNINITIALIZED)
-					free_netdev(dev);
+				if (dev->reg_state == NETREG_UNINITIALIZED) {
+					if (ops->free_link)
+						ops->free_link(dev);
+					else
+						free_netdev(dev);
+				}
 				goto out;
 			}
 		} else {
 			err = register_netdevice(dev);
 			if (err < 0) {
-				free_netdev(dev);
+				if (ops->free_link)
+					ops->free_link(dev);
+				else
+					free_netdev(dev);
 				goto out;
 			}
 		}

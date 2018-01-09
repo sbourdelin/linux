@@ -7967,6 +7967,8 @@ void netdev_run_todo(void)
 
 		if (dev->priv_destructor)
 			dev->priv_destructor(dev);
+		if (dev->rtnl_link_ops && dev->rtnl_link_ops->free_link)
+			dev->rtnl_link_ops->free_link(dev);
 		if (dev->needs_free_netdev)
 			free_netdev(dev);
 
