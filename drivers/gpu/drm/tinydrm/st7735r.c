@@ -46,13 +46,9 @@ static void jd_t18003_t01_pipe_enable(struct drm_simple_display_pipe *pipe,
 
 	DRM_DEBUG_KMS("\n");
 
-	mipi_dbi_hw_reset(mipi);
-
-	ret = mipi_dbi_command(mipi, MIPI_DCS_SOFT_RESET);
-	if (ret) {
-		DRM_DEV_ERROR(dev, "Error sending command %d\n", ret);
+	ret = mipi_dbi_poweron_reset(mipi);
+	if (ret)
 		return;
-	}
 
 	msleep(150);
 
