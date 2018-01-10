@@ -657,7 +657,7 @@ static void __tun_detach(struct tun_file *tfile, bool clean)
 			    tun->dev->reg_state == NETREG_REGISTERED)
 				unregister_netdevice(tun->dev);
 		}
-		if (tun)
+		if (tfile->tx_array.ring.queue)
 			skb_array_cleanup(&tfile->tx_array);
 		sock_put(&tfile->sk);
 	}
@@ -2850,6 +2850,8 @@ static int tun_chr_open(struct inode *inode, struct file * file)
 	INIT_LIST_HEAD(&tfile->next);
 
 	sock_set_flag(&tfile->sk, SOCK_ZEROCOPY);
+
+	memset(&tfile->tx_array, 0, sizeof(tfile->tx_array));
 
 	return 0;
 }
