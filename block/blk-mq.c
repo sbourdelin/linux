@@ -243,10 +243,74 @@ void blk_mq_unquiesce_queue(struct request_queue *q)
 	queue_flag_clear(QUEUE_FLAG_QUIESCED, q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 
+	wake_up_all(&q->mq_wq);
+
 	/* dispatch requests which are inserted during quiescing */
 	blk_mq_run_hw_queues(q, true);
 }
 EXPORT_SYMBOL_GPL(blk_mq_unquiesce_queue);
+
+/**
+ * blk_start_wait_if_quiesced() - wait if a queue is quiesced (blk-mq) or stopped (legacy block layer)
+ * @q: Request queue pointer.
+ *
+ * Some block drivers, e.g. the SCSI core, can bypass the block layer core
+ * request submission mechanism. Surround such code with
+ * blk_start_wait_if_quiesced() / blk_finish_wait_if_quiesced() to avoid that
+ * request submission can happen while a queue is quiesced or stopped.
+ *
+ * Returns with the RCU read lock held (blk-mq) or with q->queue_lock held
+ * (legacy block layer).
+ *
+ * Notes:
+ * - Every call of this function must be followed by a call of
+ *   blk_finish_wait_if_quiesced().
+ * - This function does not support block drivers whose .queue_rq()
+ *   implementation can sleep (BLK_MQ_F_BLOCKING).
+ */
+int blk_start_wait_if_quiesced(struct request_queue *q)
+{
+	struct blk_mq_hw_ctx *hctx;
+	unsigned int i;
+
+	might_sleep();
+
+	if (q->mq_ops) {
+		queue_for_each_hw_ctx(q, hctx, i)
+			WARN_ON(hctx->flags & BLK_MQ_F_BLOCKING);
+
+		rcu_read_lock();
+		while (!blk_queue_dying(q) && blk_queue_quiesced(q)) {
+			rcu_read_unlock();
+			wait_event(q->mq_wq, blk_queue_dying(q) ||
+				   !blk_queue_quiesced(q));
+			rcu_read_lock();
+		}
+	} else {
+		spin_lock_irq(q->queue_lock);
+		wait_event_lock_irq(q->mq_wq,
+				    blk_queue_dying(q) || !blk_queue_stopped(q),
+				    *q->queue_lock);
+		q->request_fn_active++;
+	}
+	return blk_queue_dying(q) ? -ENODEV : 0;
+}
+EXPORT_SYMBOL(blk_start_wait_if_quiesced);
+
+/**
+ * blk_finish_wait_if_quiesced() - counterpart of blk_start_wait_if_quiesced()
+ * @q: Request queue pointer.
+ */
+void blk_finish_wait_if_quiesced(struct request_queue *q)
+{
+	if (q->mq_ops) {
+		rcu_read_unlock();
+	} else {
+		q->request_fn_active--;
+		spin_unlock_irq(q->queue_lock);
+	}
+}
+EXPORT_SYMBOL(blk_finish_wait_if_quiesced);
 
 void blk_mq_wake_waiters(struct request_queue *q)
 {

@@ -286,6 +286,7 @@ void blk_start_queue(struct request_queue *q)
 	WARN_ON_ONCE(q->mq_ops);
 
 	queue_flag_clear(QUEUE_FLAG_STOPPED, q);
+	wake_up_all(&q->mq_wq);
 	__blk_run_queue(q);
 }
 EXPORT_SYMBOL(blk_start_queue);
