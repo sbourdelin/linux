@@ -698,12 +698,6 @@ static void radeon_crtc_init(struct drm_device *dev, int index)
 	radeon_crtc->mode_set.num_connectors = 0;
 #endif
 
-	for (i = 0; i < 256; i++) {
-		radeon_crtc->lut_r[i] = i << 2;
-		radeon_crtc->lut_g[i] = i << 2;
-		radeon_crtc->lut_b[i] = i << 2;
-	}
-
 	if (rdev->is_atom_bios && (ASIC_IS_AVIVO(rdev) || radeon_r4xx_atom))
 		radeon_atombios_init_crtc(dev, radeon_crtc);
 	else
