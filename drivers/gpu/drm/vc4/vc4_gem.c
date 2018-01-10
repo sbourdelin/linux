@@ -208,7 +208,7 @@ vc4_save_hang_state(struct drm_device *dev)
 			kernel_state->bo[j + prev_idx] = &bo->base.base;
 			j++;
 		}
-		prev_idx = j + 1;
+		prev_idx = j;
 	}
 
 	if (exec[0])
