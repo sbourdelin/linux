@@ -296,6 +296,31 @@ static void xapea00x_tpm_probe(struct work_struct *work)
 	struct spi_device *tpm;
 	int retval;
 
+	mutex_lock(&dev->usb_mutex);
+	if (!dev->interface) {
+		retval = -ENODEV;
+		goto out;
+	}
+	/*
+	 * This driver is the "platform" in TPM terminology. Before
+	 * passing control of the TPM to the Linux TPM subsystem, do
+	 * the TPM initialization normally done by the platform code
+	 * (e.g., BIOS).
+	 */
+	retval = xapea00x_tpm_platform_initialize(dev);
+	if (retval) {
+		dev_err(&dev->interface->dev,
+			"unable to do TPM platform initialization: %d\n",
+			retval);
+		goto err;
+	}
+
+	/*
+	 * Now register the TPM with the Linux TPM subsystem.  This
+	 * may call through to xapea00x_spi_transfer_one_message(), so
+	 * don't hold usb_mutex here.
+	 */
+	mutex_unlock(&dev->usb_mutex);
 	tpm = spi_new_device(spi_master, &tpm_board_info);
 	mutex_lock(&dev->usb_mutex);
 	if (!dev->interface) {
