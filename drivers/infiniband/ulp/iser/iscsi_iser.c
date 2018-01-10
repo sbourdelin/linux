@@ -649,8 +649,10 @@ iscsi_iser_session_create(struct iscsi_endpoint *ep,
 			u32 sig_caps = ib_conn->device->ib_device->attrs.sig_prot_cap;
 
 			scsi_host_set_prot(shost, iser_dif_prot_caps(sig_caps));
-			scsi_host_set_guard(shost, SHOST_DIX_GUARD_IP |
-						   SHOST_DIX_GUARD_CRC);
+			if (iser_pi_guard)
+				scsi_host_set_guard(shost, SHOST_DIX_GUARD_IP);
+			else
+				scsi_host_set_guard(shost, SHOST_DIX_GUARD_CRC);
 		}
 
 		if (iscsi_host_add(shost,
