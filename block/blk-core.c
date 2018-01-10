@@ -376,7 +376,7 @@ void blk_clear_preempt_only(struct request_queue *q)
 
 	spin_lock_irqsave(q->queue_lock, flags);
 	queue_flag_clear(QUEUE_FLAG_PREEMPT_ONLY, q);
-	wake_up_all(&q->mq_freeze_wq);
+	wake_up_all(&q->mq_wq);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 EXPORT_SYMBOL_GPL(blk_clear_preempt_only);
@@ -647,7 +647,7 @@ void blk_set_queue_dying(struct request_queue *q)
 	}
 
 	/* Make blk_queue_enter() reexamine the DYING flag. */
-	wake_up_all(&q->mq_freeze_wq);
+	wake_up_all(&q->mq_wq);
 }
 EXPORT_SYMBOL_GPL(blk_set_queue_dying);
 
@@ -850,7 +850,7 @@ int blk_queue_enter(struct request_queue *q, blk_mq_req_flags_t flags)
 		 */
 		smp_rmb();
 
-		ret = wait_event_interruptible(q->mq_freeze_wq,
+		ret = wait_event_interruptible(q->mq_wq,
 				(atomic_read(&q->mq_freeze_depth) == 0 &&
 				 (preempt || !blk_queue_preempt_only(q))) ||
 				blk_queue_dying(q));
@@ -871,7 +871,7 @@ static void blk_queue_usage_counter_release(struct percpu_ref *ref)
 	struct request_queue *q =
 		container_of(ref, struct request_queue, q_usage_counter);
 
-	wake_up_all(&q->mq_freeze_wq);
+	wake_up_all(&q->mq_wq);
 }
 
 static void blk_rq_timed_out_timer(struct timer_list *t)
@@ -947,7 +947,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 	q->bypass_depth = 1;
 	__set_bit(QUEUE_FLAG_BYPASS, &q->queue_flags);
 
-	init_waitqueue_head(&q->mq_freeze_wq);
+	init_waitqueue_head(&q->mq_wq);
 
 	/*
 	 * Init percpu_ref in atomic mode so that it's faster to shutdown.
