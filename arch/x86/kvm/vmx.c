@@ -111,6 +111,16 @@ static u64 __read_mostly host_xss;
 static bool __read_mostly enable_pml = 1;
 module_param_named(pml, enable_pml, bool, S_IRUGO);
 
+#define MSR_TYPE_R	1
+#define MSR_TYPE_W	2
+#define MSR_TYPE_RW	(MSR_TYPE_R | MSR_TYPE_W)
+
+#define MSR_BITMAP_MODE_LM		1
+#define MSR_BITMAP_MODE_RTIT		2
+#define MSR_BITMAP_MODE_X2APIC		4
+#define MSR_BITMAP_MODE_X2APIC_APICV	8
+#define MSR_BITMAP_MODE_INVALID		0xff
+
 #define KVM_VMX_TSC_MULTIPLIER_MAX     0xffffffffffffffffULL
 
 /* Guest_tsc -> host_tsc conversion requires 64-bit division.  */
@@ -597,6 +607,8 @@ struct pt_desc {
 struct vcpu_vmx {
 	struct kvm_vcpu       vcpu;
 	unsigned long         host_rsp;
+	unsigned long         *msr_bitmap;
+	u8                    msr_bitmap_mode;
 	u8                    fail;
 	u32                   exit_intr_info;
 	u32                   idt_vectoring_info;
@@ -948,7 +960,6 @@ static bool vmx_get_nmi_mask(struct kvm_vcpu *vcpu);
 static void vmx_set_nmi_mask(struct kvm_vcpu *vcpu, bool masked);
 static bool nested_vmx_is_page_fault_vmexit(struct vmcs12 *vmcs12,
 					    u16 error_code);
-static void pt_disable_intercept_for_msr(bool flag);
 static bool vmx_pt_supported(void);
 
 static DEFINE_PER_CPU(struct vmcs *, vmxarea);
@@ -966,28 +977,8 @@ static DEFINE_PER_CPU(struct list_head, loaded_vmcss_on_cpu);
 static DEFINE_PER_CPU(struct list_head, blocked_vcpu_on_cpu);
 static DEFINE_PER_CPU(spinlock_t, blocked_vcpu_on_cpu_lock);
 
-enum {
-	VMX_MSR_BITMAP_LEGACY,
-	VMX_MSR_BITMAP_LONGMODE,
-	VMX_MSR_BITMAP_LEGACY_X2APIC_APICV,
-	VMX_MSR_BITMAP_LONGMODE_X2APIC_APICV,
-	VMX_MSR_BITMAP_LEGACY_X2APIC,
-	VMX_MSR_BITMAP_LONGMODE_X2APIC,
-	VMX_VMREAD_BITMAP,
-	VMX_VMWRITE_BITMAP,
-	VMX_BITMAP_NR
-};
-
-static unsigned long *vmx_bitmap[VMX_BITMAP_NR];
-
-#define vmx_msr_bitmap_legacy                (vmx_bitmap[VMX_MSR_BITMAP_LEGACY])
-#define vmx_msr_bitmap_longmode              (vmx_bitmap[VMX_MSR_BITMAP_LONGMODE])
-#define vmx_msr_bitmap_legacy_x2apic_apicv   (vmx_bitmap[VMX_MSR_BITMAP_LEGACY_X2APIC_APICV])
-#define vmx_msr_bitmap_longmode_x2apic_apicv (vmx_bitmap[VMX_MSR_BITMAP_LONGMODE_X2APIC_APICV])
-#define vmx_msr_bitmap_legacy_x2apic         (vmx_bitmap[VMX_MSR_BITMAP_LEGACY_X2APIC])
-#define vmx_msr_bitmap_longmode_x2apic       (vmx_bitmap[VMX_MSR_BITMAP_LONGMODE_X2APIC])
-#define vmx_vmread_bitmap                    (vmx_bitmap[VMX_VMREAD_BITMAP])
-#define vmx_vmwrite_bitmap                   (vmx_bitmap[VMX_VMWRITE_BITMAP])
+static unsigned long *vmx_vmread_bitmap;
+static unsigned long *vmx_vmwrite_bitmap;
 
 static bool cpu_has_load_ia32_efer;
 static bool cpu_has_load_perf_global_ctrl;
@@ -2517,13 +2508,15 @@ static void vmx_set_interrupt_shadow(struct kvm_vcpu *vcpu, int mask)
 		vmcs_write32(GUEST_INTERRUPTIBILITY_INFO, interruptibility);
 }
 
+static void vmx_update_msr_bitmap(struct kvm_vcpu *vcpu);
+
 static void vmx_set_rtit_ctl(struct kvm_vcpu *vcpu, u64 data)
 {
 	struct vcpu_vmx *vmx = to_vmx(vcpu);
 
-	pt_disable_intercept_for_msr(data & RTIT_CTL_TRACEEN);
 	vmcs_write64(GUEST_IA32_RTIT_CTL, data);
 	vmx->pt_desc.guest.ctl = data;
+	vmx_update_msr_bitmap(vcpu);
 }
 
 static void skip_emulated_instruction(struct kvm_vcpu *vcpu)
@@ -2657,34 +2650,120 @@ static void move_msr_up(struct vcpu_vmx *vmx, int from, int to)
 	vmx->guest_msrs[from] = tmp;
 }
 
-static void vmx_set_msr_bitmap(struct kvm_vcpu *vcpu)
-{
-	unsigned long *msr_bitmap;
+static void vmx_disable_intercept_for_msr(unsigned long *msr_bitmap,
+					  u32 msr, int type);
+static void vmx_enable_intercept_for_msr(unsigned long *msr_bitmap,
+					 u32 msr, int type);
 
-	if (is_guest_mode(vcpu))
-		msr_bitmap = to_vmx(vcpu)->nested.msr_bitmap;
-	else if (cpu_has_secondary_exec_ctrls() &&
-		 (vmcs_read32(SECONDARY_VM_EXEC_CONTROL) &
-		  SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE)) {
-		if (enable_apicv && kvm_vcpu_apicv_active(vcpu)) {
-			if (is_long_mode(vcpu))
-				msr_bitmap = vmx_msr_bitmap_longmode_x2apic_apicv;
-			else
-				msr_bitmap = vmx_msr_bitmap_legacy_x2apic_apicv;
-		} else {
-			if (is_long_mode(vcpu))
-				msr_bitmap = vmx_msr_bitmap_longmode_x2apic;
-			else
-				msr_bitmap = vmx_msr_bitmap_legacy_x2apic;
-		}
-	} else {
-		if (is_long_mode(vcpu))
-			msr_bitmap = vmx_msr_bitmap_longmode;
-		else
-			msr_bitmap = vmx_msr_bitmap_legacy;
+static void vmx_set_intercept_for_msr(unsigned long *msr_bitmap,
+				      u32 msr, int type, bool enable)
+{
+	if (enable)
+		vmx_enable_intercept_for_msr(msr_bitmap, msr, type);
+	else
+		vmx_disable_intercept_for_msr(msr_bitmap, msr, type);
+}
+
+static u8 vmx_msr_bitmap_mode(struct kvm_vcpu *vcpu)
+{
+	u8 mode = 0;
+
+	if (is_long_mode(vcpu))
+		mode |= MSR_BITMAP_MODE_LM;
+
+	if (to_vmx(vcpu)->pt_desc.guest.ctl & RTIT_CTL_TRACEEN)
+		mode |= MSR_BITMAP_MODE_RTIT;
+
+	if (cpu_has_secondary_exec_ctrls() &&
+	    (vmcs_read32(SECONDARY_VM_EXEC_CONTROL) &
+	     SECONDARY_EXEC_VIRTUALIZE_X2APIC_MODE)) {
+		mode |= MSR_BITMAP_MODE_X2APIC;
+		if (enable_apicv && kvm_vcpu_apicv_active(vcpu))
+			mode |= MSR_BITMAP_MODE_X2APIC_APICV;
 	}
 
-	vmcs_write64(MSR_BITMAP, __pa(msr_bitmap));
+	return mode;
+}
+
+static void vmx_update_msr_bitmap_rtit(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	unsigned long *msr_bitmap = vmx->msr_bitmap;
+	bool rtit = vmx->msr_bitmap_mode & MSR_BITMAP_MODE_RTIT;
+	unsigned addr_num = kvm_get_pt_addr_cnt();
+	unsigned i;
+
+	vmx_set_intercept_for_msr(msr_bitmap, MSR_IA32_RTIT_STATUS,
+				  MSR_TYPE_RW, !rtit);
+	vmx_set_intercept_for_msr(msr_bitmap, MSR_IA32_RTIT_OUTPUT_BASE,
+				  MSR_TYPE_RW, !rtit);
+	vmx_set_intercept_for_msr(msr_bitmap, MSR_IA32_RTIT_OUTPUT_MASK,
+				  MSR_TYPE_RW, !rtit);
+	vmx_set_intercept_for_msr(msr_bitmap, MSR_IA32_RTIT_CR3_MATCH,
+				  MSR_TYPE_RW, !rtit);
+	for (i = 0; i < addr_num; i++)
+		vmx_set_intercept_for_msr(msr_bitmap, MSR_IA32_RTIT_ADDR0_A + i,
+					  MSR_TYPE_RW, !rtit);
+}
+
+#define X2APIC_MSR(r) (APIC_BASE_MSR + ((r) >> 4))
+
+static void vmx_update_msr_bitmap_x2apic_range(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	unsigned long *msr_bitmap = vmx->msr_bitmap;
+	bool x2apic = vmx->msr_bitmap_mode & MSR_BITMAP_MODE_X2APIC;
+	bool apicv = vmx->msr_bitmap_mode & MSR_BITMAP_MODE_X2APIC_APICV;
+	unsigned msr;
+
+	for (msr = 0x800; msr <= 0x8ff; msr++)
+		vmx_set_intercept_for_msr(msr_bitmap, msr, MSR_TYPE_R, !apicv);
+
+	vmx_enable_intercept_for_msr(msr_bitmap, X2APIC_MSR(APIC_TMCCT),
+				     MSR_TYPE_R);
+	vmx_set_intercept_for_msr(msr_bitmap, X2APIC_MSR(APIC_TASKPRI),
+				  MSR_TYPE_RW, !x2apic);
+	vmx_set_intercept_for_msr(msr_bitmap, X2APIC_MSR(APIC_EOI),
+				  MSR_TYPE_W, !apicv);
+	vmx_set_intercept_for_msr(msr_bitmap, X2APIC_MSR(APIC_SELF_IPI),
+				  MSR_TYPE_W, !apicv);
+}
+
+static void vmx_update_msr_bitmap(struct kvm_vcpu *vcpu)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
+	unsigned long *msr_bitmap;
+	unsigned mode;
+
+	if (!cpu_has_vmx_msr_bitmap() || is_guest_mode(vcpu))
+		return;
+
+	mode = vmx_msr_bitmap_mode(vcpu);
+
+	if (mode == vmx->msr_bitmap_mode)
+		return;
+
+	vmx->msr_bitmap_mode = mode;
+
+	msr_bitmap = vmx->msr_bitmap;
+
+	vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE, MSR_TYPE_RW);
+	vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE, MSR_TYPE_RW);
+	vmx_disable_intercept_for_msr(msr_bitmap, MSR_IA32_SYSENTER_CS,
+				      MSR_TYPE_RW);
+	vmx_disable_intercept_for_msr(msr_bitmap, MSR_IA32_SYSENTER_ESP,
+				      MSR_TYPE_RW);
+	vmx_disable_intercept_for_msr(msr_bitmap, MSR_IA32_SYSENTER_EIP,
+				      MSR_TYPE_RW);
+
+	vmx_set_intercept_for_msr(msr_bitmap, MSR_KERNEL_GS_BASE, MSR_TYPE_RW,
+				  !(mode & MSR_BITMAP_MODE_LM));
+
+	if (vmx_pt_supported())
+		vmx_update_msr_bitmap_rtit(vcpu);
+
+	if (cpu_has_vmx_virtualize_x2apic_mode())
+		vmx_update_msr_bitmap_x2apic_range(vcpu);
 }
 
 /*
@@ -2725,9 +2804,7 @@ static void setup_msrs(struct vcpu_vmx *vmx)
 		move_msr_up(vmx, index, save_nmsrs++);
 
 	vmx->save_nmsrs = save_nmsrs;
-
-	if (cpu_has_vmx_msr_bitmap())
-		vmx_set_msr_bitmap(&vmx->vcpu);
+	vmx_update_msr_bitmap(&vmx->vcpu);
 }
 
 /*
@@ -5101,15 +5178,10 @@ static void free_vpid(int vpid)
 	spin_unlock(&vmx_vpid_lock);
 }
 
-#define MSR_TYPE_R	1
-#define MSR_TYPE_W	2
-static void __vmx_disable_intercept_for_msr(unsigned long *msr_bitmap,
-						u32 msr, int type)
+static void vmx_disable_intercept_for_msr(unsigned long *msr_bitmap,
+					  u32 msr, int type)
 {
 	int f = sizeof(unsigned long);
-
-	if (!cpu_has_vmx_msr_bitmap())
-		return;
 
 	/*
 	 * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals
@@ -5138,13 +5210,10 @@ static void __vmx_disable_intercept_for_msr(unsigned long *msr_bitmap,
 	}
 }
 
-static void __vmx_enable_intercept_for_msr(unsigned long *msr_bitmap,
-						u32 msr, int type)
+static void vmx_enable_intercept_for_msr(unsigned long *msr_bitmap,
+					 u32 msr, int type)
 {
 	int f = sizeof(unsigned long);
-
-	if (!cpu_has_vmx_msr_bitmap())
-		return;
 
 	/*
 	 * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals
@@ -5216,63 +5285,6 @@ static void nested_vmx_disable_intercept_for_msr(unsigned long *msr_bitmap_l1,
 			/* write-high */
 			__clear_bit(msr, msr_bitmap_nested + 0xc00 / f);
 
-	}
-}
-
-static void vmx_disable_intercept_for_msr(u32 msr, bool longmode_only)
-{
-	if (!longmode_only)
-		__vmx_disable_intercept_for_msr(vmx_msr_bitmap_legacy,
-						msr, MSR_TYPE_R | MSR_TYPE_W);
-	__vmx_disable_intercept_for_msr(vmx_msr_bitmap_longmode,
-						msr, MSR_TYPE_R | MSR_TYPE_W);
-}
-
-static void vmx_enable_intercept_for_msr(u32 msr, bool longmode_only)
-{
-	if (!longmode_only)
-		__vmx_enable_intercept_for_msr(vmx_msr_bitmap_legacy,
-						msr, MSR_TYPE_R | MSR_TYPE_W);
-	__vmx_enable_intercept_for_msr(vmx_msr_bitmap_longmode,
-						msr, MSR_TYPE_R | MSR_TYPE_W);
-}
-
-static void pt_disable_intercept_for_msr(bool flag)
-{
-	unsigned int i;
-	unsigned int addr_num = kvm_get_pt_addr_cnt();
-
-	if (flag) {
-		vmx_disable_intercept_for_msr(MSR_IA32_RTIT_STATUS, false);
-		vmx_disable_intercept_for_msr(MSR_IA32_RTIT_OUTPUT_BASE, false);
-		vmx_disable_intercept_for_msr(MSR_IA32_RTIT_OUTPUT_MASK, false);
-		vmx_disable_intercept_for_msr(MSR_IA32_RTIT_CR3_MATCH, false);
-		for (i = 0; i < addr_num; i++)
-			vmx_disable_intercept_for_msr(MSR_IA32_RTIT_ADDR0_A + i,
-									false);
-	} else {
-		vmx_enable_intercept_for_msr(MSR_IA32_RTIT_STATUS, false);
-		vmx_enable_intercept_for_msr(MSR_IA32_RTIT_OUTPUT_BASE, false);
-		vmx_enable_intercept_for_msr(MSR_IA32_RTIT_OUTPUT_MASK, false);
-		vmx_enable_intercept_for_msr(MSR_IA32_RTIT_CR3_MATCH, false);
-		for (i = 0; i < addr_num; i++)
-			vmx_enable_intercept_for_msr(MSR_IA32_RTIT_ADDR0_A + i,
-									false);
-	}
-}
-
-static void vmx_disable_intercept_msr_x2apic(u32 msr, int type, bool apicv_active)
-{
-	if (apicv_active) {
-		__vmx_disable_intercept_for_msr(vmx_msr_bitmap_legacy_x2apic_apicv,
-				msr, type);
-		__vmx_disable_intercept_for_msr(vmx_msr_bitmap_longmode_x2apic_apicv,
-				msr, type);
-	} else {
-		__vmx_disable_intercept_for_msr(vmx_msr_bitmap_legacy_x2apic,
-				msr, type);
-		__vmx_disable_intercept_for_msr(vmx_msr_bitmap_longmode_x2apic,
-				msr, type);
 	}
 }
 
@@ -5523,9 +5535,7 @@ static void vmx_refresh_apicv_exec_ctrl(struct kvm_vcpu *vcpu)
 					SECONDARY_EXEC_APIC_REGISTER_VIRT |
 					SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY);
 	}
-
-	if (cpu_has_vmx_msr_bitmap())
-		vmx_set_msr_bitmap(vcpu);
+	vmx_update_msr_bitmap(vcpu);
 }
 
 static u32 vmx_exec_control(struct vcpu_vmx *vmx)
@@ -5740,7 +5750,7 @@ static void vmx_vcpu_setup(struct vcpu_vmx *vmx)
 		vmcs_write64(VMWRITE_BITMAP, __pa(vmx_vmwrite_bitmap));
 	}
 	if (cpu_has_vmx_msr_bitmap())
-		vmcs_write64(MSR_BITMAP, __pa(vmx_msr_bitmap_legacy));
+		vmcs_write64(MSR_BITMAP, __pa(vmx->msr_bitmap));
 
 	vmcs_write64(VMCS_LINK_POINTER, -1ull); /* 22.3.1.5 */
 
@@ -5911,6 +5921,7 @@ static void vmx_vcpu_reset(struct kvm_vcpu *vcpu, bool init_event)
 	if (kvm_mpx_supported())
 		vmcs_write64(GUEST_BNDCFGS, 0);
 
+	vmx->msr_bitmap_mode = MSR_BITMAP_MODE_INVALID;
 	setup_msrs(vmx);
 
 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);  /* 22.2.1 */
@@ -7038,28 +7049,27 @@ void vmx_enable_tdp(void)
 
 static __init int hardware_setup(void)
 {
-	int r = -ENOMEM, i, msr;
+	int r = -ENOMEM, i;
 
 	rdmsrl_safe(MSR_EFER, &host_efer);
 
 	for (i = 0; i < ARRAY_SIZE(vmx_msr_index); ++i)
 		kvm_define_shared_msr(i, vmx_msr_index[i]);
 
-	for (i = 0; i < VMX_BITMAP_NR; i++) {
-		vmx_bitmap[i] = (unsigned long *)__get_free_page(GFP_KERNEL);
-		if (!vmx_bitmap[i])
-			goto out;
-	}
+	vmx_vmread_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL);
+	if (!vmx_vmread_bitmap)
+		goto out;
+
+	vmx_vmwrite_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL);
+	if (!vmx_vmwrite_bitmap)
+		goto free_vmread_bitmap;
 
 	memset(vmx_vmread_bitmap, 0xff, PAGE_SIZE);
 	memset(vmx_vmwrite_bitmap, 0xff, PAGE_SIZE);
 
-	memset(vmx_msr_bitmap_legacy, 0xff, PAGE_SIZE);
-	memset(vmx_msr_bitmap_longmode, 0xff, PAGE_SIZE);
-
 	if (setup_vmcs_config(&vmcs_config) < 0) {
 		r = -EIO;
-		goto out;
+		goto free_vmwrite_bitmap;
 	}
 
 	if (boot_cpu_has(X86_FEATURE_NX))
@@ -7125,42 +7135,6 @@ static __init int hardware_setup(void)
 		kvm_tsc_scaling_ratio_frac_bits = 48;
 	}
 
-	vmx_disable_intercept_for_msr(MSR_FS_BASE, false);
-	vmx_disable_intercept_for_msr(MSR_GS_BASE, false);
-	vmx_disable_intercept_for_msr(MSR_KERNEL_GS_BASE, true);
-	vmx_disable_intercept_for_msr(MSR_IA32_SYSENTER_CS, false);
-	vmx_disable_intercept_for_msr(MSR_IA32_SYSENTER_ESP, false);
-	vmx_disable_intercept_for_msr(MSR_IA32_SYSENTER_EIP, false);
-
-	memcpy(vmx_msr_bitmap_legacy_x2apic_apicv,
-			vmx_msr_bitmap_legacy, PAGE_SIZE);
-	memcpy(vmx_msr_bitmap_longmode_x2apic_apicv,
-			vmx_msr_bitmap_longmode, PAGE_SIZE);
-	memcpy(vmx_msr_bitmap_legacy_x2apic,
-			vmx_msr_bitmap_legacy, PAGE_SIZE);
-	memcpy(vmx_msr_bitmap_longmode_x2apic,
-			vmx_msr_bitmap_longmode, PAGE_SIZE);
-
-	set_bit(0, vmx_vpid_bitmap); /* 0 is reserved for host */
-
-	for (msr = 0x800; msr <= 0x8ff; msr++) {
-		if (msr == 0x839 /* TMCCT */)
-			continue;
-		vmx_disable_intercept_msr_x2apic(msr, MSR_TYPE_R, true);
-	}
-
-	/*
-	 * TPR reads and writes can be virtualized even if virtual interrupt
-	 * delivery is not in use.
-	 */
-	vmx_disable_intercept_msr_x2apic(0x808, MSR_TYPE_W, true);
-	vmx_disable_intercept_msr_x2apic(0x808, MSR_TYPE_R | MSR_TYPE_W, false);
-
-	/* EOI */
-	vmx_disable_intercept_msr_x2apic(0x80b, MSR_TYPE_W, true);
-	/* SELF-IPI */
-	vmx_disable_intercept_msr_x2apic(0x83f, MSR_TYPE_W, true);
-
 	if (enable_ept)
 		vmx_enable_tdp();
 	else
@@ -7203,19 +7177,18 @@ static __init int hardware_setup(void)
 
 	return alloc_kvm_area();
 
+free_vmwrite_bitmap:
+	free_page((unsigned long)vmx_vmwrite_bitmap);
+free_vmread_bitmap:
+	free_page((unsigned long)vmx_vmread_bitmap);
 out:
-	for (i = 0; i < VMX_BITMAP_NR; i++)
-		free_page((unsigned long)vmx_bitmap[i]);
-
     return r;
 }
 
 static __exit void hardware_unsetup(void)
 {
-	int i;
-
-	for (i = 0; i < VMX_BITMAP_NR; i++)
-		free_page((unsigned long)vmx_bitmap[i]);
+	free_page((unsigned long)vmx_vmwrite_bitmap);
+	free_page((unsigned long)vmx_vmread_bitmap);
 
 	free_kvm_area();
 }
@@ -9158,8 +9131,7 @@ static void vmx_set_virtual_x2apic_mode(struct kvm_vcpu *vcpu, bool set)
 		vmx_flush_tlb_ept_only(vcpu);
 	}
 	vmcs_write32(SECONDARY_VM_EXEC_CONTROL, sec_exec_control);
-
-	vmx_set_msr_bitmap(vcpu);
+	vmx_update_msr_bitmap(vcpu);
 }
 
 static void vmx_set_apic_access_page_addr(struct kvm_vcpu *vcpu, hpa_t hpa)
@@ -9809,6 +9781,7 @@ static void vmx_free_vcpu(struct kvm_vcpu *vcpu)
 	vmx_free_vcpu_nested(vcpu);
 	free_loaded_vmcs(vmx->loaded_vmcs);
 	kfree(vmx->guest_msrs);
+	free_page((unsigned long)vmx->msr_bitmap);
 	kvm_vcpu_uninit(vcpu);
 	kmem_cache_free(kvm_vcpu_cache, vmx);
 }
@@ -9842,12 +9815,20 @@ static struct kvm_vcpu *vmx_create_vcpu(struct kvm *kvm, unsigned int id)
 			goto uninit_vcpu;
 	}
 
+	if (cpu_has_vmx_msr_bitmap()) {
+		vmx->msr_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL);
+		if (!vmx->msr_bitmap)
+			goto free_pml;
+		memset(vmx->msr_bitmap, 0xff, PAGE_SIZE);
+		vmx->msr_bitmap_mode = MSR_BITMAP_MODE_INVALID;
+	}
+
 	vmx->guest_msrs = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	BUILD_BUG_ON(ARRAY_SIZE(vmx_msr_index) * sizeof(vmx->guest_msrs[0])
 		     > PAGE_SIZE);
 
 	if (!vmx->guest_msrs)
-		goto free_pml;
+		goto free_msr_bitmap;
 
 	vmx->loaded_vmcs = &vmx->vmcs01;
 	vmx->loaded_vmcs->vmcs = alloc_vmcs();
@@ -9898,6 +9879,8 @@ free_vmcs:
 	free_loaded_vmcs(vmx->loaded_vmcs);
 free_msrs:
 	kfree(vmx->guest_msrs);
+free_msr_bitmap:
+	free_page((unsigned long)vmx->msr_bitmap);
 free_pml:
 	vmx_destroy_pml_buffer(vmx);
 uninit_vcpu:
@@ -10342,7 +10325,7 @@ static inline bool nested_vmx_merge_msr_bitmap(struct kvm_vcpu *vcpu,
 		nested_vmx_disable_intercept_for_msr(
 				msr_bitmap_l1, msr_bitmap_l0,
 				APIC_BASE_MSR + (APIC_TASKPRI >> 4),
-				MSR_TYPE_R | MSR_TYPE_W);
+				MSR_TYPE_RW);
 
 		if (nested_cpu_has_vid(vmcs12)) {
 			nested_vmx_disable_intercept_for_msr(
@@ -10851,6 +10834,9 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 	exec_control |= CPU_BASED_UNCOND_IO_EXITING;
 
 	vmcs_write32(CPU_BASED_VM_EXEC_CONTROL, exec_control);
+
+	if (nested_cpu_has(vmcs12, CPU_BASED_USE_MSR_BITMAPS))
+		vmcs_write64(MSR_BITMAP, __pa(vmx->nested.msr_bitmap));
 
 	/* EXCEPTION_BITMAP and CR0_GUEST_HOST_MASK should basically be the
 	 * bitwise-or of what L1 wants to trap for L2, and what we want to
@@ -11692,9 +11678,6 @@ static void load_vmcs12_host_state(struct kvm_vcpu *vcpu,
 
 	kvm_set_dr(vcpu, 7, 0x400);
 	vmcs_write64(GUEST_IA32_DEBUGCTL, 0);
-
-	if (cpu_has_vmx_msr_bitmap())
-		vmx_set_msr_bitmap(vcpu);
 
 	if (nested_vmx_load_msr(vcpu, vmcs12->vm_exit_msr_load_addr,
 				vmcs12->vm_exit_msr_load_count))
