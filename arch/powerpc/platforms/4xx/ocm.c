@@ -335,7 +335,7 @@ void *ppc4xx_ocm_alloc(phys_addr_t *phys, int size, int align,
 		if (IS_ERR_VALUE(offset))
 			continue;
 
-		ocm_blk = kzalloc(sizeof(struct ocm_block), GFP_KERNEL);
+		ocm_blk = kzalloc(sizeof(*ocm_blk), GFP_KERNEL);
 		if (!ocm_blk) {
 			rh_free(ocm_reg->rh, offset);
 			break;
