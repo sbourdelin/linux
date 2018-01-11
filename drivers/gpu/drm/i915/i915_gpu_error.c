@@ -605,6 +605,45 @@ static void err_print_uc(struct drm_i915_error_state_buf *m,
 	print_error_obj(m, NULL, "GuC log buffer", error_uc->guc_log);
 }
 
+static void err_print_rcs_topology(struct drm_i915_error_state_buf *m,
+				   const struct sseu_dev_info *sseu)
+{
+	int s, ss;
+	int subslice_stride =
+		DIV_ROUND_UP(sseu->max_eus_per_subslice, BITS_PER_BYTE);
+
+	/* Unavailable prior to Gen 8. */
+	if (sseu->max_slices == 0)
+		return;
+
+	err_printf(m, "RCS topology:\n");
+
+	for (s = 0; s < sseu->max_slices; s++) {
+		err_printf(m, "  slice%i %u subslice(s) (0x%hhx):\n",
+			   s, hweight8(sseu->subslice_mask[s]),
+			   sseu->subslice_mask[s]);
+
+		for (ss = 0; ss < sseu->max_subslices; ss++) {
+			int eu_group, n_subslice_eus = 0;
+
+			for (eu_group = 0; eu_group < subslice_stride; eu_group++) {
+				n_subslice_eus +=
+					hweight8(sseu_eu_mask(sseu, s, ss, eu_group));
+			}
+
+			err_printf(m, "    subslice%i: %u EUs (", ss, n_subslice_eus);
+			for (eu_group = 0;
+			     eu_group < max(0, subslice_stride - 1);
+			     eu_group++) {
+				u8 val = sseu_eu_mask(sseu, s, ss, eu_group);
+				err_printf(m, " 0x%hhx", val);
+			}
+			err_printf(m, "0x%hhx)\n",
+				   sseu_eu_mask(sseu, s, ss, subslice_stride - 1));
+		}
+	}
+}
+
 int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 			    const struct i915_gpu_state *error)
 {
@@ -787,6 +826,7 @@ int i915_error_state_to_str(struct drm_i915_error_state_buf *m,
 		intel_display_print_error_state(m, error->display);
 
 	err_print_capabilities(m, &error->device_info);
+	err_print_rcs_topology(m, &INTEL_INFO(dev_priv)->sseu);
 	err_print_params(m, &error->params);
 	err_print_uc(m, &error->uc);
 
