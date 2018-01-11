@@ -52,6 +52,7 @@
 #define OP_31_XOP_TBEGIN	654
 
 #define OP_31_XOP_TRECLAIM	942
+#define OP_31_XOP_TRCHKPT	1006
 
 /* DCBZ is actually 1014, but we patch it to 1010 so we get a trap */
 #define OP_31_XOP_DCBZ		1010
@@ -94,7 +95,7 @@ static bool spr_allowed(struct kvm_vcpu *vcpu, enum priv_level level)
 }
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
-void kvmppc_copyto_vcpu_tm(struct kvm_vcpu *vcpu)
+static void kvmppc_copyto_vcpu_tm(struct kvm_vcpu *vcpu)
 {
 	memcpy(&vcpu->arch.gpr_tm[0], &vcpu->arch.gpr[0],
 			sizeof(vcpu->arch.gpr_tm));
@@ -165,6 +166,32 @@ static void kvmppc_emulate_treclaim(struct kvm_vcpu *vcpu, int ra_val)
 	mtspr(SPRN_TFIAR, vcpu->arch.tfiar);
 	tm_disable();
 	preempt_enable();
+}
+
+static void kvmppc_emulate_trchkpt(struct kvm_vcpu *vcpu)
+{
+	unsigned long guest_msr = kvmppc_get_msr(vcpu);
+
+	preempt_disable();
+	vcpu->arch.save_msr_tm = MSR_TS_S;
+	vcpu->arch.save_msr_tm &= ~(MSR_FP | MSR_VEC | MSR_VSX);
+	vcpu->arch.save_msr_tm |= (vcpu->arch.guest_owned_ext &
+			(MSR_FP | MSR_VEC | MSR_VSX));
+	/*
+	 * need flush FP/VEC/VSX to vcpu save area before
+	 * copy.
+	 */
+	kvmppc_giveup_ext(vcpu, MSR_VSX);
+	kvmppc_copyto_vcpu_tm(vcpu);
+	kvmppc_restore_tm_pr(vcpu);
+	preempt_enable();
+
+	/*
+	 * as a result of trecheckpoint. set TS to suspended.
+	 */
+	guest_msr &= ~(MSR_TS_MASK);
+	guest_msr |= MSR_TS_S;
+	kvmppc_set_msr(vcpu, guest_msr);
 }
 #endif
 
@@ -455,6 +482,34 @@ int kvmppc_core_emulate_op_pr(struct kvm_run *run, struct kvm_vcpu *vcpu,
 			if (ra)
 				ra_val = kvmppc_get_gpr(vcpu, ra);
 			kvmppc_emulate_treclaim(vcpu, ra_val);
+			break;
+		}
+		case OP_31_XOP_TRCHKPT:
+		{
+			ulong guest_msr = kvmppc_get_msr(vcpu);
+			unsigned long texasr;
+
+			/* generate interrupt based on priorities */
+			if (guest_msr & MSR_PR) {
+				/* Privileged Instruction type Program Intr */
+				kvmppc_core_queue_program(vcpu, SRR1_PROGPRIV);
+				emulated = EMULATE_AGAIN;
+				break;
+			}
+
+			tm_enable();
+			texasr = mfspr(SPRN_TEXASR);
+			tm_disable();
+
+			if (MSR_TM_ACTIVE(guest_msr) ||
+				!(texasr & (TEXASR_FS))) {
+				/* TM bad thing interrupt */
+				kvmppc_core_queue_program(vcpu, SRR1_PROGTM);
+				emulated = EMULATE_AGAIN;
+				break;
+			}
+
+			kvmppc_emulate_trchkpt(vcpu);
 			break;
 		}
 #endif
