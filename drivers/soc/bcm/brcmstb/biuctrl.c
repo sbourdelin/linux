@@ -162,16 +162,10 @@ static void __init mcp_b53_set(void)
 	cbc_writel(reg, CPU_WRITEBACK_CTRL_REG);
 }
 
-static int __init setup_hifcpubiuctrl_regs(void)
+static int __init setup_hifcpubiuctrl_regs(struct device_node *np)
 {
-	struct device_node *np, *cpu_dn;
+	struct device_node *cpu_dn;
 	int ret = 0;
-
-	np = of_find_compatible_node(NULL, NULL, "brcm,brcmstb-cpu-biu-ctrl");
-	if (!np) {
-		pr_err("missing BIU control node\n");
-		return -ENODEV;
-	}
 
 	cpubiuctrl_base = of_iomap(np, 0);
 	if (!cpubiuctrl_base) {
@@ -243,8 +237,13 @@ static struct syscore_ops brcmstb_cpu_credit_syscore_ops = {
 static int __init brcmstb_biuctrl_init(void)
 {
 	int ret;
+	struct device_node *np;
 
-	setup_hifcpubiuctrl_regs();
+	np = of_find_compatible_node(NULL, NULL, "brcm,brcmstb-cpu-biu-ctrl");
+	if (!np)
+		return -ENODEV;
+
+	setup_hifcpubiuctrl_regs(np);
 
 	ret = mcp_write_pairing_set();
 	if (ret) {
