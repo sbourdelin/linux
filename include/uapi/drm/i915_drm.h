@@ -1618,6 +1618,9 @@ struct drm_i915_perf_oa_config {
 
 struct drm_i915_query_item {
 	__u64 query_id;
+#define DRM_I915_QUERY_ID_SLICES_INFO    0x01
+#define DRM_I915_QUERY_ID_SUBSLICES_INFO 0x02
+#define DRM_I915_QUERY_ID_EUS_INFO       0x03
 
 	/*
 	 * When set to zero by userspace, this is filled with the size of the
@@ -1642,6 +1645,54 @@ struct drm_i915_query {
 	 * This point to an array of num_items drm_i915_query_item structures.
 	 */
 	__u64 items_ptr;
+};
+
+/* Data written by the kernel with query DRM_I915_QUERY_ID_SLICES_INFO :
+ *
+ * data: each bit indicates whether a slice is available (1) or fused off (0).
+ *       Use DRM_I915_QUERY_SLICE_AVAILABLE() to query a given slice's
+ *       availability.
+ */
+struct drm_i915_query_slices_info {
+	__u32 max_slices;
+
+#define DRM_I915_QUERY_SLICE_AVAILABLE(info, slice) \
+	(((info)->data[(slice) / 8] >> ((slice) % 8)) & 1)
+	__u8 data[];
+};
+
+/* Data written by the kernel with query DRM_I915_QUERY_ID_SUBSLICES_INFO :
+ *
+ * data: each bit indicates whether a subslice is available (1) or fused off
+ *       (0). Use DRM_I915_QUERY_SUBSLICE_AVAILABLE() to query a given
+ *       subslice's availability.
+ */
+struct drm_i915_query_subslices_info {
+	__u32 max_slices;
+	__u32 max_subslices;
+
+#define DRM_I915_QUERY_SUBSLICE_AVAILABLE(info, slice, subslice) \
+	(((info)->data[(slice) * ALIGN((info)->max_subslices, 8) / 8 + \
+		       (subslice) / 8] >> ((subslice) % 8)) & 1)
+	__u8 data[];
+};
+
+/* Data written by the kernel with query DRM_I915_QUERY_ID_EUS_INFO :
+ *
+ * data: Each bit indicates whether a subslice is available (1) or fused off
+ *       (0). Use DRM_I915_QUERY_EU_AVAILABLE() to query a given EU's
+ *       availability.
+ */
+struct drm_i915_query_eus_info {
+	__u32 max_slices;
+	__u32 max_subslices;
+	__u32 max_eus_per_subslice;
+
+#define DRM_I915_QUERY_EU_AVAILABLE(info, slice, subslice, eu) \
+	(((info)->data[(slice) * ALIGN((info)->max_eus_per_subslice, 8) / 8 * (info)->max_subslices + \
+		       (subslice) * ALIGN((info)->max_eus_per_subslice, 8) / 8 + \
+		       (eu) / 8] >> ((eu) % 8)) & 1)
+	__u8 data[];
 };
 
 #if defined(__cplusplus)
