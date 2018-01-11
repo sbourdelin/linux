@@ -43,6 +43,7 @@
 #include <linux/module.h>
 #include <linux/miscdevice.h>
 #include <asm/asm-prototypes.h>
+#include <asm/tm.h>
 
 #include "book3s.h"
 
@@ -114,6 +115,9 @@ static void kvmppc_core_vcpu_load_pr(struct kvm_vcpu *vcpu, int cpu)
 
 	if (kvmppc_is_split_real(vcpu))
 		kvmppc_fixup_split_real(vcpu);
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
+	kvmppc_restore_tm_pr(vcpu);
+#endif
 }
 
 static void kvmppc_core_vcpu_put_pr(struct kvm_vcpu *vcpu)
@@ -130,6 +134,10 @@ static void kvmppc_core_vcpu_put_pr(struct kvm_vcpu *vcpu)
 
 	if (kvmppc_is_split_real(vcpu))
 		kvmppc_unfixup_split_real(vcpu);
+
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
+	kvmppc_save_tm_pr(vcpu);
+#endif
 
 	kvmppc_giveup_ext(vcpu, MSR_FP | MSR_VEC | MSR_VSX);
 	kvmppc_giveup_fac(vcpu, FSCR_TAR_LG);
@@ -255,6 +263,39 @@ static inline void kvmppc_restore_tm_sprs(struct kvm_vcpu *vcpu)
 	tm_disable();
 }
 
+void kvmppc_save_tm_pr(struct kvm_vcpu *vcpu)
+{
+	/*
+	 * When kvmppc_save_tm_pr() is invoked, whether TM context need to
+	 * be saved can be determined by current MSR TS active state.
+	 *
+	 * We save current MSR's TM TS bits into vcpu->arch.save_msr_tm.
+	 * So that kvmppc_restore_tm_pr() can decide to do TM restore or
+	 * not based on that.
+	 */
+	vcpu->arch.save_msr_tm = mfmsr();
+
+	if (!(MSR_TM_ACTIVE(vcpu->arch.save_msr_tm))) {
+		kvmppc_save_tm_sprs(vcpu);
+		return;
+	}
+
+	preempt_disable();
+	_kvmppc_save_tm_pr(vcpu, mfmsr());
+	preempt_enable();
+}
+
+void kvmppc_restore_tm_pr(struct kvm_vcpu *vcpu)
+{
+	if (!MSR_TM_ACTIVE(vcpu->arch.save_msr_tm)) {
+		kvmppc_restore_tm_sprs(vcpu);
+		return;
+	}
+
+	preempt_disable();
+	_kvmppc_restore_tm_pr(vcpu, vcpu->arch.save_msr_tm);
+	preempt_enable();
+}
 #endif
 
 static int kvmppc_core_check_requests_pr(struct kvm_vcpu *vcpu)
