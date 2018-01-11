@@ -146,6 +146,12 @@
 #define MSR_64BIT	0
 #endif
 
+/* Condition Register related */
+#define CR0_SHIFT	28
+#define CR0_MASK	0xF
+#define CR0_TBEGIN_FAILURE	(0x2 << 28) /* 0b0010 */
+
+
 /* Power Management - Processor Stop Status and Control Register Fields */
 #define PSSCR_RL_MASK		0x0000000F /* Requested Level */
 #define PSSCR_MTL_MASK		0x000000F0 /* Maximum Transition Level */
@@ -237,8 +243,21 @@
 #define SPRN_TFIAR	0x81	/* Transaction Failure Inst Addr   */
 #define SPRN_TEXASR	0x82	/* Transaction EXception & Summary */
 #define SPRN_TEXASRU	0x83	/* ''	   ''	   ''	 Upper 32  */
-#define   TEXASR_FS	__MASK(63-36) /* TEXASR Failure Summary */
+#define TEXASR_FC_LG	(63 - 7)	/* Failure Code */
+#define TEXASR_HV_LG	(63 - 34)	/* Hypervisor state*/
+#define TEXASR_PR_LG	(63 - 35)	/* Privilege level */
+#define TEXASR_FS_LG	(63 - 36)	/* failure summary */
+#define TEXASR_EX_LG	(63 - 37)	/* TFIAR exact bit */
+#define TEXASR_ROT_LG	(63 - 38)	/* ROT bit */
+#define TEXASR_FC	(ASM_CONST(0xFF) << TEXASR_FC_LG)
+#define TEXASR_HV	__MASK(TEXASR_HV_LG)
+#define TEXASR_PR	__MASK(TEXASR_PR_LG)
+#define TEXASR_FS	__MASK(TEXASR_FS_LG)
+#define TEXASR_EX	__MASK(TEXASR_EX_LG)
+#define TEXASR_ROT	__MASK(TEXASR_ROT_LG)
+
 #define SPRN_TFHAR	0x80	/* Transaction Failure Handler Addr */
+
 #define SPRN_TIDR	144	/* Thread ID register */
 #define SPRN_CTRLF	0x088
 #define SPRN_CTRLT	0x098
