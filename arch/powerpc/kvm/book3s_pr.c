@@ -56,7 +56,6 @@
 static int kvmppc_handle_ext(struct kvm_vcpu *vcpu, unsigned int exit_nr,
 			     ulong msr);
 static int kvmppc_load_ext(struct kvm_vcpu *vcpu, ulong msr);
-static void kvmppc_giveup_fac(struct kvm_vcpu *vcpu, ulong fac);
 
 /* Some compatibility defines */
 #ifdef CONFIG_PPC_BOOK3S_32
@@ -306,6 +305,7 @@ void kvmppc_save_tm_pr(struct kvm_vcpu *vcpu)
 	vcpu->arch.save_msr_tm |= (vcpu->arch.guest_owned_ext &
 			(MSR_FP | MSR_VEC | MSR_VSX));
 
+	kvmppc_giveup_fac(vcpu, FSCR_TAR_LG);
 	kvmppc_giveup_ext(vcpu, MSR_VSX);
 
 	preempt_disable();
@@ -320,8 +320,20 @@ void kvmppc_restore_tm_pr(struct kvm_vcpu *vcpu)
 		return;
 	}
 
+
 	preempt_disable();
 	_kvmppc_restore_tm_pr(vcpu, vcpu->arch.save_msr_tm);
+
+	if (!(vcpu->arch.shadow_fscr & FSCR_TAR)) {
+		/* always restore TAR in TM active state, since we don't
+		 * want to be confused at fac unavailable while TM active:
+		 * load vcpu->arch.tar or vcpu->arch.tar_tm as chkpt value?
+		 */
+		current->thread.tar = mfspr(SPRN_TAR);
+		mtspr(SPRN_TAR, vcpu->arch.tar);
+		vcpu->arch.shadow_fscr |= FSCR_TAR;
+	}
+
 	preempt_enable();
 
 	if (vcpu->arch.save_msr_tm & MSR_VSX)
@@ -333,6 +345,7 @@ void kvmppc_restore_tm_pr(struct kvm_vcpu *vcpu)
 		if (vcpu->arch.save_msr_tm & MSR_FP)
 			kvmppc_load_ext(vcpu, MSR_FP);
 	}
+
 }
 #endif
 
@@ -828,7 +841,7 @@ void kvmppc_giveup_ext(struct kvm_vcpu *vcpu, ulong msr)
 }
 
 /* Give up facility (TAR / EBB / DSCR) */
-static void kvmppc_giveup_fac(struct kvm_vcpu *vcpu, ulong fac)
+void kvmppc_giveup_fac(struct kvm_vcpu *vcpu, ulong fac)
 {
 #ifdef CONFIG_PPC_BOOK3S_64
 	if (!(vcpu->arch.shadow_fscr & (1ULL << fac))) {
@@ -1031,6 +1044,20 @@ static int kvmppc_handle_fac(struct kvm_vcpu *vcpu, ulong fac)
 
 	switch (fac) {
 	case FSCR_TAR_LG:
+		if (MSR_TM_ACTIVE(mfmsr())) {
+			/* When tbegin. was executed, the TAR in checkpoint
+			 * state might be invalid. We need treclaim., then
+			 * load correct TAR value, and perform trechkpt.,
+			 * so that valid TAR val can be checkpointed.
+			 */
+			preempt_disable();
+			kvmppc_save_tm_pr(vcpu);
+
+			vcpu->arch.tar_tm = vcpu->arch.tar;
+
+			kvmppc_restore_tm_pr(vcpu);
+			preempt_enable();
+		}
 		/* TAR switching isn't lazy in Linux yet */
 		current->thread.tar = mfspr(SPRN_TAR);
 		mtspr(SPRN_TAR, vcpu->arch.tar);

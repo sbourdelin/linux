@@ -259,6 +259,7 @@ void kvmppc_save_tm_pr(struct kvm_vcpu *vcpu);
 void kvmppc_restore_tm_pr(struct kvm_vcpu *vcpu);
 void kvmppc_restore_tm_sprs(struct kvm_vcpu *vcpu);
 void kvmppc_save_tm_sprs(struct kvm_vcpu *vcpu);
+void kvmppc_giveup_fac(struct kvm_vcpu *vcpu, ulong fac);
 #endif
 
 extern int kvm_irq_bypass;

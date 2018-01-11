@@ -167,6 +167,9 @@ static void kvmppc_emulate_treclaim(struct kvm_vcpu *vcpu, int ra_val)
 	mtspr(SPRN_TFIAR, vcpu->arch.tfiar);
 	tm_disable();
 	preempt_enable();
+
+	if (vcpu->arch.shadow_fscr & FSCR_TAR)
+		mtspr(SPRN_TAR, vcpu->arch.tar);
 }
 
 static void kvmppc_emulate_trchkpt(struct kvm_vcpu *vcpu)
@@ -183,6 +186,7 @@ static void kvmppc_emulate_trchkpt(struct kvm_vcpu *vcpu)
 	 * copy.
 	 */
 	kvmppc_giveup_ext(vcpu, MSR_VSX);
+	kvmppc_giveup_fac(vcpu, FSCR_TAR_LG);
 	kvmppc_copyto_vcpu_tm(vcpu);
 	kvmppc_restore_tm_pr(vcpu);
 	preempt_enable();

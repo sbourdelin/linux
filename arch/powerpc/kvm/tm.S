@@ -164,12 +164,15 @@ _GLOBAL(_kvmppc_save_tm_pr)
 	mfmsr	r5
 	SAVE_GPR(5, r1)
 
-	/* also save DSCR/CR so that it can be recovered later */
+	/* also save DSCR/CR/TAR so that it can be recovered later */
 	mfspr   r6, SPRN_DSCR
 	SAVE_GPR(6, r1)
 
 	mfcr    r7
 	stw     r7, _CCR(r1)
+
+	mfspr   r8, SPRN_TAR
+	SAVE_GPR(8, r1)
 
 	/* allocate stack frame for __kvmppc_save_tm since
 	 * it will save LR into its stackframe and we don't
@@ -178,6 +181,9 @@ _GLOBAL(_kvmppc_save_tm_pr)
 	stdu    r1, -PPC_MIN_STKFRM(r1)
 	bl	__kvmppc_save_tm
 	addi    r1, r1, PPC_MIN_STKFRM
+
+	REST_GPR(8, r1)
+	mtspr   SPRN_TAR, r8
 
 	ld      r7, _CCR(r1)
 	mtcr	r7
@@ -341,12 +347,15 @@ _GLOBAL(_kvmppc_restore_tm_pr)
 	mfmsr	r5
 	SAVE_GPR(5, r1)
 
-	/* also save DSCR/CR so that it can be recovered later */
+	/* also save DSCR/CR/TAR so that it can be recovered later */
 	mfspr   r6, SPRN_DSCR
 	SAVE_GPR(6, r1)
 
 	mfcr    r7
 	stw     r7, _CCR(r1)
+
+	mfspr   r8, SPRN_TAR
+	SAVE_GPR(8, r1)
 
 	/* allocate stack frame for __kvmppc_restore_tm since
 	 * it will save LR into its own stackframe.
@@ -355,6 +364,9 @@ _GLOBAL(_kvmppc_restore_tm_pr)
 
 	bl	__kvmppc_restore_tm
 	addi    r1, r1, PPC_MIN_STKFRM
+
+	REST_GPR(8, r1)
+	mtspr   SPRN_TAR, r8
 
 	ld      r7, _CCR(r1)
 	mtcr	r7
