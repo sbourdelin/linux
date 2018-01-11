@@ -10,8 +10,7 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
-
-#define FUSE_CTL_SUPER_MAGIC 0x65735543
+#include <linux/magic.h>
 
 /*
  * This is non-NULL when the single instance of the control filesystem
