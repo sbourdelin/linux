@@ -25,6 +25,7 @@
 #include <asm/time.h>
 #include <asm/tm.h>
 #include "book3s.h"
+#include <asm/asm-prototypes.h>
 
 #define OP_19_XOP_RFID		18
 #define OP_19_XOP_RFI		50
@@ -49,6 +50,8 @@
 #define OP_31_XOP_SLBMFEE	915
 
 #define OP_31_XOP_TBEGIN	654
+
+#define OP_31_XOP_TRECLAIM	942
 
 /* DCBZ is actually 1014, but we patch it to 1010 so we get a trap */
 #define OP_31_XOP_DCBZ		1010
@@ -109,7 +112,7 @@ void kvmppc_copyto_vcpu_tm(struct kvm_vcpu *vcpu)
 	vcpu->arch.vrsave_tm = vcpu->arch.vrsave;
 }
 
-void kvmppc_copyfrom_vcpu_tm(struct kvm_vcpu *vcpu)
+static void kvmppc_copyfrom_vcpu_tm(struct kvm_vcpu *vcpu)
 {
 	memcpy(&vcpu->arch.gpr[0], &vcpu->arch.gpr_tm[0],
 			sizeof(vcpu->arch.gpr));
@@ -127,6 +130,42 @@ void kvmppc_copyfrom_vcpu_tm(struct kvm_vcpu *vcpu)
 	vcpu->arch.vrsave = vcpu->arch.vrsave_tm;
 }
 
+static void kvmppc_emulate_treclaim(struct kvm_vcpu *vcpu, int ra_val)
+{
+	unsigned long guest_msr = kvmppc_get_msr(vcpu);
+	int fc_val = ra_val ? ra_val : 1;
+
+	kvmppc_save_tm_pr(vcpu);
+
+	preempt_disable();
+	kvmppc_copyfrom_vcpu_tm(vcpu);
+	preempt_enable();
+
+	/*
+	 * treclaim need quit to non-transactional state.
+	 */
+	guest_msr &= ~(MSR_TS_MASK);
+	kvmppc_set_msr(vcpu, guest_msr);
+
+	preempt_disable();
+	tm_enable();
+	vcpu->arch.texasr = mfspr(SPRN_TEXASR);
+	vcpu->arch.texasr &= ~TEXASR_FC;
+	vcpu->arch.texasr |= ((u64)fc_val << TEXASR_FC_LG);
+
+	vcpu->arch.texasr &= ~(TEXASR_PR | TEXASR_HV);
+	if (kvmppc_get_msr(vcpu) & MSR_PR)
+		vcpu->arch.texasr |= TEXASR_PR;
+
+	if (kvmppc_get_msr(vcpu) & MSR_HV)
+		vcpu->arch.texasr |= TEXASR_HV;
+
+	vcpu->arch.tfiar = kvmppc_get_pc(vcpu);
+	mtspr(SPRN_TEXASR, vcpu->arch.texasr);
+	mtspr(SPRN_TFIAR, vcpu->arch.tfiar);
+	tm_disable();
+	preempt_enable();
+}
 #endif
 
 int kvmppc_core_emulate_op_pr(struct kvm_run *run, struct kvm_vcpu *vcpu,
@@ -391,6 +430,31 @@ int kvmppc_core_emulate_op_pr(struct kvm_run *run, struct kvm_vcpu *vcpu,
 				preempt_enable();
 			} else
 				emulated = EMULATE_FAIL;
+			break;
+		}
+		case OP_31_XOP_TRECLAIM:
+		{
+			ulong guest_msr = kvmppc_get_msr(vcpu);
+			unsigned long ra_val = 0;
+
+			/* generate interrupt based on priorities */
+			if (guest_msr & MSR_PR) {
+				/* Privileged Instruction type Program Interrupt */
+				kvmppc_core_queue_program(vcpu, SRR1_PROGPRIV);
+				emulated = EMULATE_AGAIN;
+				break;
+			}
+
+			if (!MSR_TM_SUSPENDED(guest_msr)) {
+				/* TM bad thing interrupt */
+				kvmppc_core_queue_program(vcpu, SRR1_PROGTM);
+				emulated = EMULATE_AGAIN;
+				break;
+			}
+
+			if (ra)
+				ra_val = kvmppc_get_gpr(vcpu, ra);
+			kvmppc_emulate_treclaim(vcpu, ra_val);
 			break;
 		}
 #endif

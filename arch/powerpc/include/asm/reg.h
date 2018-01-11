@@ -244,12 +244,16 @@
 #define SPRN_TEXASR	0x82	/* Transaction EXception & Summary */
 #define SPRN_TEXASRU	0x83	/* ''	   ''	   ''	 Upper 32  */
 #define TEXASR_FC_LG	(63 - 7)	/* Failure Code */
+#define TEXASR_AB_LG	(63 - 31)	/* Abort */
+#define TEXASR_SU_LG	(63 - 32)	/* Suspend */
 #define TEXASR_HV_LG	(63 - 34)	/* Hypervisor state*/
 #define TEXASR_PR_LG	(63 - 35)	/* Privilege level */
 #define TEXASR_FS_LG	(63 - 36)	/* failure summary */
 #define TEXASR_EX_LG	(63 - 37)	/* TFIAR exact bit */
 #define TEXASR_ROT_LG	(63 - 38)	/* ROT bit */
 #define TEXASR_FC	(ASM_CONST(0xFF) << TEXASR_FC_LG)
+#define TEXASR_AB	__MASK(TEXASR_AB_LG)
+#define TEXASR_SU	__MASK(TEXASR_SU_LG)
 #define TEXASR_HV	__MASK(TEXASR_HV_LG)
 #define TEXASR_PR	__MASK(TEXASR_PR_LG)
 #define TEXASR_FS	__MASK(TEXASR_FS_LG)
