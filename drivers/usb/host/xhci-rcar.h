@@ -16,6 +16,8 @@
 void xhci_rcar_start(struct usb_hcd *hcd);
 int xhci_rcar_init_quirk(struct usb_hcd *hcd);
 int xhci_rcar_resume_quirk(struct usb_hcd *hcd);
+int xhci_rcar_notifier(struct notifier_block *nb, unsigned long event,
+		       void *data);
 #else
 static inline void xhci_rcar_start(struct usb_hcd *hcd)
 {
@@ -27,6 +29,11 @@ static inline int xhci_rcar_init_quirk(struct usb_hcd *hcd)
 }
 
 static inline int xhci_rcar_resume_quirk(struct usb_hcd *hcd)
+{
+	return 0;
+}
+static inline int xhci_rcar_notifier(struct notifier_block *nb,
+				     unsigned long event, void *data)
 {
 	return 0;
 }

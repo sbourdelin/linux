@@ -11,6 +11,7 @@
 #include <linux/of.h>
 #include <linux/usb/phy.h>
 #include <linux/sys_soc.h>
+#include <linux/workqueue.h>
 
 #include "xhci.h"
 #include "xhci-plat.h"
@@ -241,4 +242,40 @@ int xhci_rcar_resume_quirk(struct usb_hcd *hcd)
 		xhci_rcar_start(hcd);
 
 	return ret;
+}
+
+static void xhci_rcar_work(struct work_struct *work)
+{
+	struct xhci_plat_priv *priv = container_of(work, struct xhci_plat_priv,
+						   work);
+	struct usb_hcd *hcd = priv->hcd;
+	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+	int irq = priv->irq;
+	int ret;
+
+	if (!priv->event) {
+		xhci->xhc_state |= XHCI_STATE_REMOVING;
+		usb_remove_hcd(xhci->shared_hcd);
+		usb_phy_shutdown(hcd->usb_phy);
+		usb_remove_hcd(hcd);
+		priv->halted_by_peri = true;
+	} else if (priv->halted_by_peri) {
+		ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+		xhci->shared_hcd = priv->shared_hcd;
+		ret = usb_add_hcd(xhci->shared_hcd, irq, IRQF_SHARED);
+		priv->halted_by_peri = 0;
+	}
+}
+
+int xhci_rcar_notifier(struct notifier_block *nb, unsigned long event,
+		       void *data)
+{
+	struct xhci_plat_priv *priv = container_of(nb, struct xhci_plat_priv,
+						   nb);
+
+	priv->event = event;
+	INIT_WORK(&priv->work, xhci_rcar_work);
+	schedule_work(&priv->work);
+
+	return NOTIFY_OK;
 }

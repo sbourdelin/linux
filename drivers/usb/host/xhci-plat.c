@@ -10,6 +10,7 @@
 
 #include <linux/clk.h>
 #include <linux/dma-mapping.h>
+#include <linux/extcon.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/of.h>
@@ -108,6 +109,7 @@ static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen3 = {
 	.init_quirk = xhci_rcar_init_quirk,
 	.plat_start = xhci_rcar_start,
 	.resume_quirk = xhci_rcar_resume_quirk,
+	.notifier = xhci_rcar_notifier,
 };
 
 static const struct of_device_id usb_xhci_of_match[] = {
@@ -273,6 +275,25 @@ static int xhci_plat_probe(struct platform_device *pdev)
 	xhci->imod_interval = 40000;
 	device_property_read_u32(sysdev, "imod-interval-ns",
 				 &xhci->imod_interval);
+
+	if (of_property_read_bool(pdev->dev.of_node, "extcon")) {
+		struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
+
+		priv->edev = extcon_get_edev_by_phandle(&pdev->dev, 0);
+		if (IS_ERR(priv->edev)) {
+			ret = PTR_ERR(priv->edev);
+			goto put_usb3_hcd;
+		}
+		priv->nb.notifier_call = priv->notifier;
+		priv->hcd = hcd;
+		priv->shared_hcd = xhci->shared_hcd;
+		priv->irq = irq;
+		ret = devm_extcon_register_notifier(&pdev->dev, priv->edev,
+						    EXTCON_USB_HOST,
+						    &priv->nb);
+		if (ret < 0)
+			dev_err(&pdev->dev, "no notifier registered\n");
+	}
 
 	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
 	if (IS_ERR(hcd->usb_phy)) {
