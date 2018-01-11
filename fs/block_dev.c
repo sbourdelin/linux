@@ -2112,7 +2112,7 @@ int __invalidate_device(struct block_device *bdev, bool kill_dirty)
 }
 EXPORT_SYMBOL(__invalidate_device);
 
-void iterate_bdevs(void (*func)(struct block_device *, void *), void *arg)
+void iterate_bdevs(void (*func)(struct block_device *))
 {
 	struct inode *inode, *old_inode = NULL;
 
@@ -2144,7 +2144,7 @@ void iterate_bdevs(void (*func)(struct block_device *, void *), void *arg)
 
 		mutex_lock(&bdev->bd_mutex);
 		if (bdev->bd_openers)
-			func(bdev, arg);
+			func(bdev);
 		mutex_unlock(&bdev->bd_mutex);
 
 		spin_lock(&blockdev_superblock->s_inode_list_lock);
