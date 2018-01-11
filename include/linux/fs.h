@@ -2442,7 +2442,7 @@ extern void bd_set_size(struct block_device *, loff_t size);
 extern void bd_forget(struct inode *inode);
 extern void bdput(struct block_device *);
 extern void invalidate_bdev(struct block_device *);
-extern void iterate_bdevs(void (*)(struct block_device *, void *), void *);
+extern void iterate_bdevs(void (*)(struct block_device *));
 extern int sync_blockdev(struct block_device *bdev);
 extern void kill_bdev(struct block_device *);
 extern struct super_block *freeze_bdev(struct block_device *);
@@ -2472,7 +2472,7 @@ static inline int thaw_bdev(struct block_device *bdev, struct super_block *sb)
 	return 0;
 }
 
-static inline void iterate_bdevs(void (*f)(struct block_device *, void *), void *arg)
+static inline void iterate_bdevs(void (*f)(struct block_device *))
 {
 }
 
