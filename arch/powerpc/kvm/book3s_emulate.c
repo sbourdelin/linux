@@ -50,6 +50,7 @@
 #define OP_31_XOP_SLBMFEE	915
 
 #define OP_31_XOP_TBEGIN	654
+#define OP_31_XOP_TABORT	910
 
 #define OP_31_XOP_TRECLAIM	942
 #define OP_31_XOP_TRCHKPT	1006
@@ -193,6 +194,19 @@ static void kvmppc_emulate_trchkpt(struct kvm_vcpu *vcpu)
 	guest_msr |= MSR_TS_S;
 	kvmppc_set_msr(vcpu, guest_msr);
 }
+
+/* emulate tabort. at guest privilege state */
+static void kvmppc_emulate_tabort(struct kvm_vcpu *vcpu, int ra_val)
+{
+	/* currently we only emulate tabort. but no emulation of other
+	 * tabort variants since there is no kernel usage of them at
+	 * present.
+	 */
+	tm_enable();
+	tm_abort(ra_val);
+	tm_disable();
+}
+
 #endif
 
 int kvmppc_core_emulate_op_pr(struct kvm_run *run, struct kvm_vcpu *vcpu,
@@ -457,6 +471,23 @@ int kvmppc_core_emulate_op_pr(struct kvm_run *run, struct kvm_vcpu *vcpu,
 				preempt_enable();
 			} else
 				emulated = EMULATE_FAIL;
+			break;
+		}
+		case OP_31_XOP_TABORT:
+		{
+			ulong guest_msr = kvmppc_get_msr(vcpu);
+			unsigned long ra_val = 0;
+
+			/* only emulate for privilege guest, since problem state
+			 * guest can run with TM enabled and we don't expect to
+			 * trap at here for that case.
+			 */
+			WARN_ON(guest_msr & MSR_PR);
+
+			if (ra)
+				ra_val = kvmppc_get_gpr(vcpu, ra);
+
+			kvmppc_emulate_tabort(vcpu, ra_val);
 			break;
 		}
 		case OP_31_XOP_TRECLAIM:

@@ -258,6 +258,7 @@ extern void kvmppc_copy_from_svcpu(struct kvm_vcpu *vcpu,
 void kvmppc_save_tm_pr(struct kvm_vcpu *vcpu);
 void kvmppc_restore_tm_pr(struct kvm_vcpu *vcpu);
 void kvmppc_restore_tm_sprs(struct kvm_vcpu *vcpu);
+void kvmppc_save_tm_sprs(struct kvm_vcpu *vcpu);
 #endif
 
 extern int kvm_irq_bypass;

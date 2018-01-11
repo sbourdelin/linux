@@ -246,7 +246,7 @@ out:
 }
 
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
-static inline void kvmppc_save_tm_sprs(struct kvm_vcpu *vcpu)
+inline void kvmppc_save_tm_sprs(struct kvm_vcpu *vcpu)
 {
 	tm_enable();
 	vcpu->arch.tfhar = mfspr(SPRN_TFHAR);
