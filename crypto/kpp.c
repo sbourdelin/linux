@@ -29,8 +29,15 @@
 static int crypto_kpp_report(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_kpp rkpp;
+	u64 v;
 
 	strncpy(rkpp.type, "kpp", sizeof(rkpp.type));
+	v = atomic_read(&alg->setsecret_cnt);
+	rkpp.stat_setsecret_cnt = v;
+	v = atomic_read(&alg->generate_public_key_cnt);
+	rkpp.stat_generate_public_key_cnt = v;
+	v = atomic_read(&alg->compute_shared_secret_cnt);
+	rkpp.stat_compute_shared_secret_cnt = v;
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_KPP,
 		    sizeof(struct crypto_report_kpp), &rkpp))

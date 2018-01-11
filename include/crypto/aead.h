@@ -306,6 +306,26 @@ static inline struct crypto_aead *crypto_aead_reqtfm(struct aead_request *req)
 	return __crypto_aead_cast(req->base.tfm);
 }
 
+static inline void crypto_stat_aead_encrypt(struct aead_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
+
+	atomic_inc(&tfm->base.__crt_alg->encrypt_cnt);
+	atomic_add(req->cryptlen, &tfm->base.__crt_alg->encrypt_tlen);
+#endif
+}
+
+static inline void crypto_stat_aead_decrypt(struct aead_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_aead *tfm = crypto_aead_reqtfm(req);
+
+	atomic_inc(&tfm->base.__crt_alg->decrypt_cnt);
+	atomic_add(req->cryptlen, &tfm->base.__crt_alg->decrypt_tlen);
+#endif
+}
+
 /**
  * crypto_aead_encrypt() - encrypt plaintext
  * @req: reference to the aead_request handle that holds all information
@@ -327,6 +347,7 @@ static inline struct crypto_aead *crypto_aead_reqtfm(struct aead_request *req)
  */
 static inline int crypto_aead_encrypt(struct aead_request *req)
 {
+	crypto_stat_aead_encrypt(req);
 	return crypto_aead_alg(crypto_aead_reqtfm(req))->encrypt(req);
 }
 
@@ -359,6 +380,7 @@ static inline int crypto_aead_decrypt(struct aead_request *req)
 	if (req->cryptlen < crypto_aead_authsize(aead))
 		return -EINVAL;
 
+	crypto_stat_aead_decrypt(req);
 	return crypto_aead_alg(aead)->decrypt(req);
 }
 

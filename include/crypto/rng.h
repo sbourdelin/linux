@@ -122,6 +122,22 @@ static inline void crypto_free_rng(struct crypto_rng *tfm)
 	crypto_destroy_tfm(tfm, crypto_rng_tfm(tfm));
 }
 
+static inline void crypto_stat_rng_seed(struct crypto_rng *tfm)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	atomic_inc(&tfm->base.__crt_alg->seed_cnt);
+#endif
+}
+
+static inline void crypto_stat_rng_generate(struct crypto_rng *tfm,
+					    unsigned int dlen)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	atomic_inc(&tfm->base.__crt_alg->generate_cnt);
+	atomic_add(dlen, &tfm->base.__crt_alg->generate_tlen);
+#endif
+}
+
 /**
  * crypto_rng_generate() - get random number
  * @tfm: cipher handle
@@ -140,6 +156,7 @@ static inline int crypto_rng_generate(struct crypto_rng *tfm,
 				      const u8 *src, unsigned int slen,
 				      u8 *dst, unsigned int dlen)
 {
+	crypto_stat_rng_generate(tfm, dlen);
 	return crypto_rng_alg(tfm)->generate(tfm, src, slen, dst, dlen);
 }
 

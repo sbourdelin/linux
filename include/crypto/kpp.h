@@ -268,6 +268,31 @@ struct kpp_secret {
 	unsigned short len;
 };
 
+static inline void crypto_stat_kpp_set_secret(struct crypto_kpp *tfm)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	atomic_inc(&tfm->base.__crt_alg->setsecret_cnt);
+#endif
+}
+
+static inline void crypto_stat_kpp_generate_public_key(struct kpp_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_kpp *tfm = crypto_kpp_reqtfm(req);
+
+	atomic_inc(&tfm->base.__crt_alg->generate_public_key_cnt);
+#endif
+}
+
+static inline void crypto_stat_kpp_compute_shared_secret(struct kpp_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_kpp *tfm = crypto_kpp_reqtfm(req);
+
+	atomic_inc(&tfm->base.__crt_alg->compute_shared_secret_cnt);
+#endif
+}
+
 /**
  * crypto_kpp_set_secret() - Invoke kpp operation
  *
@@ -288,6 +313,7 @@ static inline int crypto_kpp_set_secret(struct crypto_kpp *tfm,
 {
 	struct kpp_alg *alg = crypto_kpp_alg(tfm);
 
+	crypto_stat_kpp_set_secret(tfm);
 	return alg->set_secret(tfm, buffer, len);
 }
 
@@ -309,6 +335,7 @@ static inline int crypto_kpp_generate_public_key(struct kpp_request *req)
 	struct crypto_kpp *tfm = crypto_kpp_reqtfm(req);
 	struct kpp_alg *alg = crypto_kpp_alg(tfm);
 
+	crypto_stat_kpp_generate_public_key(req);
 	return alg->generate_public_key(req);
 }
 
@@ -327,6 +354,7 @@ static inline int crypto_kpp_compute_shared_secret(struct kpp_request *req)
 	struct crypto_kpp *tfm = crypto_kpp_reqtfm(req);
 	struct kpp_alg *alg = crypto_kpp_alg(tfm);
 
+	crypto_stat_kpp_compute_shared_secret(req);
 	return alg->compute_shared_secret(req);
 }
 

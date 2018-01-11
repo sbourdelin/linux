@@ -427,6 +427,26 @@ static inline struct crypto_skcipher *crypto_skcipher_reqtfm(
 	return __crypto_skcipher_cast(req->base.tfm);
 }
 
+static inline void crypto_stat_skcipher_encrypt(struct skcipher_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+
+	atomic_inc(&tfm->base.__crt_alg->encrypt_cnt);
+	atomic_add(req->cryptlen, &tfm->base.__crt_alg->encrypt_tlen);
+#endif
+}
+
+static inline void crypto_stat_skcipher_decrypt(struct skcipher_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
+
+	atomic_inc(&tfm->base.__crt_alg->decrypt_cnt);
+	atomic_add(req->cryptlen, &tfm->base.__crt_alg->decrypt_tlen);
+#endif
+}
+
 /**
  * crypto_skcipher_encrypt() - encrypt plaintext
  * @req: reference to the skcipher_request handle that holds all information
@@ -442,6 +462,7 @@ static inline int crypto_skcipher_encrypt(struct skcipher_request *req)
 {
 	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
 
+	crypto_stat_skcipher_encrypt(req);
 	return tfm->encrypt(req);
 }
 
@@ -460,6 +481,7 @@ static inline int crypto_skcipher_decrypt(struct skcipher_request *req)
 {
 	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
 
+	crypto_stat_skcipher_decrypt(req);
 	return tfm->decrypt(req);
 }
 

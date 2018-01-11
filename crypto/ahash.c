@@ -356,18 +356,21 @@ static int crypto_ahash_op(struct ahash_request *req,
 
 int crypto_ahash_final(struct ahash_request *req)
 {
+	crypto_stat_ahash_final(req);
 	return crypto_ahash_op(req, crypto_ahash_reqtfm(req)->final);
 }
 EXPORT_SYMBOL_GPL(crypto_ahash_final);
 
 int crypto_ahash_finup(struct ahash_request *req)
 {
+	crypto_stat_ahash_final(req);
 	return crypto_ahash_op(req, crypto_ahash_reqtfm(req)->finup);
 }
 EXPORT_SYMBOL_GPL(crypto_ahash_finup);
 
 int crypto_ahash_digest(struct ahash_request *req)
 {
+	crypto_stat_ahash_final(req);
 	return crypto_ahash_op(req, crypto_ahash_reqtfm(req)->digest);
 }
 EXPORT_SYMBOL_GPL(crypto_ahash_digest);
@@ -487,11 +490,16 @@ static unsigned int crypto_ahash_extsize(struct crypto_alg *alg)
 static int crypto_ahash_report(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_hash rhash;
+	u64 v;
 
 	strncpy(rhash.type, "ahash", sizeof(rhash.type));
 
 	rhash.blocksize = alg->cra_blocksize;
 	rhash.digestsize = __crypto_hash_alg_common(alg)->digestsize;
+	v = atomic_read(&alg->hash_cnt);
+	rhash.stat_hash = v;
+	v = atomic_read(&alg->hash_tlen);
+	rhash.stat_hash_tlen = v;
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_HASH,
 		    sizeof(struct crypto_report_hash), &rhash))

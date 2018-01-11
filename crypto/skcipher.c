@@ -875,6 +875,7 @@ static int crypto_skcipher_report(struct sk_buff *skb, struct crypto_alg *alg)
 	struct crypto_report_blkcipher rblkcipher;
 	struct skcipher_alg *skcipher = container_of(alg, struct skcipher_alg,
 						     base);
+	u64 v;
 
 	strncpy(rblkcipher.type, "skcipher", sizeof(rblkcipher.type));
 	strncpy(rblkcipher.geniv, "<none>", sizeof(rblkcipher.geniv));
@@ -883,6 +884,14 @@ static int crypto_skcipher_report(struct sk_buff *skb, struct crypto_alg *alg)
 	rblkcipher.min_keysize = skcipher->min_keysize;
 	rblkcipher.max_keysize = skcipher->max_keysize;
 	rblkcipher.ivsize = skcipher->ivsize;
+	v = atomic_read(&alg->encrypt_cnt);
+	rblkcipher.stat_encrypt_cnt = v;
+	v = atomic_read(&alg->encrypt_tlen);
+	rblkcipher.stat_encrypt_tlen = v;
+	v = atomic_read(&alg->decrypt_cnt);
+	rblkcipher.stat_decrypt_cnt = v;
+	v = atomic_read(&alg->decrypt_tlen);
+	rblkcipher.stat_decrypt_tlen = v;
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_BLKCIPHER,
 		    sizeof(struct crypto_report_blkcipher), &rblkcipher))

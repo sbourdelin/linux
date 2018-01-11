@@ -271,6 +271,44 @@ static inline unsigned int crypto_akcipher_maxsize(struct crypto_akcipher *tfm)
 	return alg->max_size(tfm);
 }
 
+static inline void crypto_stat_akcipher_encrypt(struct akcipher_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
+
+	atomic_inc(&tfm->base.__crt_alg->encrypt_cnt);
+	atomic_add(req->src_len, &tfm->base.__crt_alg->encrypt_tlen);
+#endif
+}
+
+static inline void crypto_stat_akcipher_decrypt(struct akcipher_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
+
+	atomic_inc(&tfm->base.__crt_alg->decrypt_cnt);
+	atomic_add(req->src_len, &tfm->base.__crt_alg->decrypt_tlen);
+#endif
+}
+
+static inline void crypto_stat_akcipher_sign(struct akcipher_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
+
+	atomic_inc(&tfm->base.__crt_alg->sign_cnt);
+#endif
+}
+
+static inline void crypto_stat_akcipher_verify(struct akcipher_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
+
+	atomic_inc(&tfm->base.__crt_alg->verify_cnt);
+#endif
+}
+
 /**
  * crypto_akcipher_encrypt() - Invoke public key encrypt operation
  *
@@ -286,6 +324,7 @@ static inline int crypto_akcipher_encrypt(struct akcipher_request *req)
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
 	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
 
+	crypto_stat_akcipher_encrypt(req);
 	return alg->encrypt(req);
 }
 
@@ -304,6 +343,7 @@ static inline int crypto_akcipher_decrypt(struct akcipher_request *req)
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
 	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
 
+	crypto_stat_akcipher_decrypt(req);
 	return alg->decrypt(req);
 }
 
@@ -322,6 +362,7 @@ static inline int crypto_akcipher_sign(struct akcipher_request *req)
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
 	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
 
+	crypto_stat_akcipher_sign(req);
 	return alg->sign(req);
 }
 
@@ -340,6 +381,7 @@ static inline int crypto_akcipher_verify(struct akcipher_request *req)
 	struct crypto_akcipher *tfm = crypto_akcipher_reqtfm(req);
 	struct akcipher_alg *alg = crypto_akcipher_alg(tfm);
 
+	crypto_stat_akcipher_verify(req);
 	return alg->verify(req);
 }
 

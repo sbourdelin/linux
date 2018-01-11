@@ -73,6 +73,8 @@ struct crypto_report_hash {
 	char type[CRYPTO_MAX_NAME];
 	unsigned int blocksize;
 	unsigned int digestsize;
+	__u64 stat_hash;
+	__u64 stat_hash_tlen;
 };
 
 struct crypto_report_cipher {
@@ -80,6 +82,10 @@ struct crypto_report_cipher {
 	unsigned int blocksize;
 	unsigned int min_keysize;
 	unsigned int max_keysize;
+	__u64 stat_encrypt_cnt;
+	__u64 stat_encrypt_tlen;
+	__u64 stat_decrypt_cnt;
+	__u64 stat_decrypt_tlen;
 };
 
 struct crypto_report_blkcipher {
@@ -89,6 +95,10 @@ struct crypto_report_blkcipher {
 	unsigned int min_keysize;
 	unsigned int max_keysize;
 	unsigned int ivsize;
+	__u64 stat_encrypt_cnt;
+	__u64 stat_encrypt_tlen;
+	__u64 stat_decrypt_cnt;
+	__u64 stat_decrypt_tlen;
 };
 
 struct crypto_report_aead {
@@ -97,27 +107,51 @@ struct crypto_report_aead {
 	unsigned int blocksize;
 	unsigned int maxauthsize;
 	unsigned int ivsize;
+	__u64 stat_encrypt_cnt;
+	__u64 stat_encrypt_tlen;
+	__u64 stat_decrypt_cnt;
+	__u64 stat_decrypt_tlen;
 };
 
 struct crypto_report_comp {
 	char type[CRYPTO_MAX_NAME];
+	__u64 stat_compress_cnt;
+	__u64 stat_compress_tlen;
+	__u64 stat_decompress_cnt;
+	__u64 stat_decompress_tlen;
 };
 
 struct crypto_report_rng {
 	char type[CRYPTO_MAX_NAME];
 	unsigned int seedsize;
+	__u64 stat_generate_cnt;
+	__u64 stat_generate_tlen;
+	__u64 stat_seed_cnt;
 };
 
 struct crypto_report_akcipher {
 	char type[CRYPTO_MAX_NAME];
+	__u64 stat_encrypt_cnt;
+	__u64 stat_encrypt_tlen;
+	__u64 stat_decrypt_cnt;
+	__u64 stat_decrypt_tlen;
+	__u64 stat_verify_cnt;
+	__u64 stat_sign_cnt;
 };
 
 struct crypto_report_kpp {
 	char type[CRYPTO_MAX_NAME];
+	__u64 stat_setsecret_cnt;
+	__u64 stat_generate_public_key_cnt;
+	__u64 stat_compute_shared_secret_cnt;
 };
 
 struct crypto_report_acomp {
 	char type[CRYPTO_MAX_NAME];
+	__u64 stat_compress_cnt;
+	__u64 stat_compress_tlen;
+	__u64 stat_decompress_cnt;
+	__u64 stat_decompress_tlen;
 };
 
 #define CRYPTO_REPORT_MAXSIZE (sizeof(struct crypto_user_alg) + \

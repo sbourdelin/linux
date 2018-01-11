@@ -32,8 +32,17 @@ static const struct crypto_type crypto_acomp_type;
 static int crypto_acomp_report(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_acomp racomp;
+	u64 v;
 
 	strncpy(racomp.type, "acomp", sizeof(racomp.type));
+	v = atomic_read(&alg->compress_cnt);
+	racomp.stat_compress_cnt = v;
+	v = atomic_read(&alg->compress_tlen);
+	racomp.stat_compress_tlen = v;
+	v = atomic_read(&alg->decompress_cnt);
+	racomp.stat_decompress_cnt = v;
+	v = atomic_read(&alg->decompress_tlen);
+	racomp.stat_decompress_tlen = v;
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_ACOMP,
 		    sizeof(struct crypto_report_acomp), &racomp))

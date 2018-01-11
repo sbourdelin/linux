@@ -82,12 +82,21 @@ static struct crypto_alg *crypto_alg_match(struct crypto_user_alg *p, int exact)
 static int crypto_report_cipher(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_cipher rcipher;
+	u64 v;
 
 	strlcpy(rcipher.type, "cipher", sizeof(rcipher.type));
 
 	rcipher.blocksize = alg->cra_blocksize;
 	rcipher.min_keysize = alg->cra_cipher.cia_min_keysize;
 	rcipher.max_keysize = alg->cra_cipher.cia_max_keysize;
+	v = atomic_read(&alg->encrypt_cnt);
+	rcipher.stat_encrypt_cnt = v;
+	v = atomic_read(&alg->encrypt_tlen);
+	rcipher.stat_encrypt_tlen = v;
+	v = atomic_read(&alg->decrypt_cnt);
+	rcipher.stat_decrypt_cnt = v;
+	v = atomic_read(&alg->decrypt_tlen);
+	rcipher.stat_decrypt_tlen = v;
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_CIPHER,
 		    sizeof(struct crypto_report_cipher), &rcipher))
@@ -101,8 +110,18 @@ nla_put_failure:
 static int crypto_report_comp(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_comp rcomp;
+	u64 v;
 
 	strlcpy(rcomp.type, "compression", sizeof(rcomp.type));
+	v = atomic_read(&alg->compress_cnt);
+	rcomp.stat_compress_cnt = v;
+	v = atomic_read(&alg->compress_tlen);
+	rcomp.stat_compress_tlen = v;
+	v = atomic_read(&alg->decompress_cnt);
+	rcomp.stat_decompress_cnt = v;
+	v = atomic_read(&alg->decompress_tlen);
+	rcomp.stat_decompress_tlen = v;
+
 	if (nla_put(skb, CRYPTOCFGA_REPORT_COMPRESS,
 		    sizeof(struct crypto_report_comp), &rcomp))
 		goto nla_put_failure;
@@ -115,8 +134,17 @@ nla_put_failure:
 static int crypto_report_acomp(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_acomp racomp;
+	u64 v;
 
 	strlcpy(racomp.type, "acomp", sizeof(racomp.type));
+	v = atomic_read(&alg->compress_cnt);
+	racomp.stat_compress_cnt = v;
+	v = atomic_read(&alg->compress_tlen);
+	racomp.stat_compress_tlen = v;
+	v = atomic_read(&alg->decompress_cnt);
+	racomp.stat_decompress_cnt = v;
+	v = atomic_read(&alg->decompress_tlen);
+	racomp.stat_decompress_tlen = v;
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_ACOMP,
 		    sizeof(struct crypto_report_acomp), &racomp))

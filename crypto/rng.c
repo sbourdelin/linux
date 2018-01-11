@@ -49,6 +49,7 @@ int crypto_rng_reset(struct crypto_rng *tfm, const u8 *seed, unsigned int slen)
 		seed = buf;
 	}
 
+	crypto_stat_rng_seed(tfm);
 	err = crypto_rng_alg(tfm)->seed(tfm, seed, slen);
 out:
 	kzfree(buf);
@@ -72,10 +73,17 @@ static unsigned int seedsize(struct crypto_alg *alg)
 static int crypto_rng_report(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_rng rrng;
+	u64 v;
 
 	strncpy(rrng.type, "rng", sizeof(rrng.type));
 
 	rrng.seedsize = seedsize(alg);
+	v = atomic_read(&alg->generate_cnt);
+	rrng.stat_generate_cnt = v;
+	v = atomic_read(&alg->generate_tlen);
+	rrng.stat_generate_tlen = v;
+	v = atomic_read(&alg->seed_cnt);
+	rrng.stat_seed_cnt = v;
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_RNG,
 		    sizeof(struct crypto_report_rng), &rrng))

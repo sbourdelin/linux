@@ -29,8 +29,21 @@
 static int crypto_akcipher_report(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_akcipher rakcipher;
+	u64 v;
 
 	strncpy(rakcipher.type, "akcipher", sizeof(rakcipher.type));
+	v = atomic_read(&alg->encrypt_cnt);
+	rakcipher.stat_encrypt_cnt = v;
+	v = atomic_read(&alg->encrypt_tlen);
+	rakcipher.stat_encrypt_tlen = v;
+	v = atomic_read(&alg->decrypt_cnt);
+	rakcipher.stat_decrypt_cnt = v;
+	v = atomic_read(&alg->decrypt_tlen);
+	rakcipher.stat_decrypt_tlen = v;
+	v = atomic_read(&alg->sign_cnt);
+	rakcipher.stat_sign_cnt = v;
+	v = atomic_read(&alg->verify_cnt);
+	rakcipher.stat_verify_cnt = v;
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_AKCIPHER,
 		    sizeof(struct crypto_report_akcipher), &rakcipher))

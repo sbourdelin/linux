@@ -39,8 +39,17 @@ static DEFINE_MUTEX(scomp_lock);
 static int crypto_scomp_report(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_comp rscomp;
+	u64 v;
 
 	strncpy(rscomp.type, "scomp", sizeof(rscomp.type));
+	v = atomic_read(&alg->compress_cnt);
+	rscomp.stat_compress_cnt = v;
+	v = atomic_read(&alg->compress_tlen);
+	rscomp.stat_compress_tlen = v;
+	v = atomic_read(&alg->decompress_cnt);
+	rscomp.stat_decompress_cnt = v;
+	v = atomic_read(&alg->decompress_tlen);
+	rscomp.stat_decompress_tlen = v;
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_COMPRESS,
 		    sizeof(struct crypto_report_comp), &rscomp))

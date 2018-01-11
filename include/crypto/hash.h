@@ -415,6 +415,25 @@ static inline bool crypto_ahash_has_setkey(struct crypto_ahash *tfm)
 	return tfm->has_setkey;
 }
 
+static inline void crypto_stat_ahash_update(struct ahash_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+
+	atomic_add(req->nbytes, &tfm->base.__crt_alg->hash_tlen);
+#endif
+}
+
+static inline void crypto_stat_ahash_final(struct ahash_request *req)
+{
+#ifdef CONFIG_CRYPTO_STATS
+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
+
+	atomic_inc(&tfm->base.__crt_alg->hash_cnt);
+	atomic_add(req->nbytes, &tfm->base.__crt_alg->hash_tlen);
+#endif
+}
+
 /**
  * crypto_ahash_finup() - update and finalize message digest
  * @req: reference to the ahash_request handle that holds all information
@@ -519,6 +538,8 @@ static inline int crypto_ahash_init(struct ahash_request *req)
  */
 static inline int crypto_ahash_update(struct ahash_request *req)
 {
+
+	crypto_stat_ahash_update(req);
 	return crypto_ahash_reqtfm(req)->update(req);
 }
 

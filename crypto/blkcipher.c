@@ -508,6 +508,7 @@ static int crypto_init_blkcipher_ops(struct crypto_tfm *tfm, u32 type, u32 mask)
 static int crypto_blkcipher_report(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_blkcipher rblkcipher;
+	u64 v;
 
 	strncpy(rblkcipher.type, "blkcipher", sizeof(rblkcipher.type));
 	strncpy(rblkcipher.geniv, alg->cra_blkcipher.geniv ?: "<default>",
@@ -517,6 +518,14 @@ static int crypto_blkcipher_report(struct sk_buff *skb, struct crypto_alg *alg)
 	rblkcipher.min_keysize = alg->cra_blkcipher.min_keysize;
 	rblkcipher.max_keysize = alg->cra_blkcipher.max_keysize;
 	rblkcipher.ivsize = alg->cra_blkcipher.ivsize;
+	v = atomic_read(&alg->encrypt_cnt);
+	rblkcipher.stat_encrypt_cnt = v;
+	v = atomic_read(&alg->encrypt_tlen);
+	rblkcipher.stat_encrypt_tlen = v;
+	v = atomic_read(&alg->decrypt_cnt);
+	rblkcipher.stat_decrypt_cnt = v;
+	v = atomic_read(&alg->decrypt_tlen);
+	rblkcipher.stat_decrypt_tlen = v;
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_BLKCIPHER,
 		    sizeof(struct crypto_report_blkcipher), &rblkcipher))

@@ -385,11 +385,16 @@ static int crypto_shash_report(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_hash rhash;
 	struct shash_alg *salg = __crypto_shash_alg(alg);
+	u64 v;
 
 	strncpy(rhash.type, "shash", sizeof(rhash.type));
 
 	rhash.blocksize = alg->cra_blocksize;
 	rhash.digestsize = salg->digestsize;
+	v = atomic_read(&alg->hash_cnt);
+	rhash.stat_hash = v;
+	v = atomic_read(&alg->hash_tlen);
+	rhash.stat_hash_tlen = v;
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_HASH,
 		    sizeof(struct crypto_report_hash), &rhash))

@@ -109,6 +109,7 @@ static int crypto_aead_report(struct sk_buff *skb, struct crypto_alg *alg)
 {
 	struct crypto_report_aead raead;
 	struct aead_alg *aead = container_of(alg, struct aead_alg, base);
+	u64 v;
 
 	strncpy(raead.type, "aead", sizeof(raead.type));
 	strncpy(raead.geniv, "<none>", sizeof(raead.geniv));
@@ -116,6 +117,15 @@ static int crypto_aead_report(struct sk_buff *skb, struct crypto_alg *alg)
 	raead.blocksize = alg->cra_blocksize;
 	raead.maxauthsize = aead->maxauthsize;
 	raead.ivsize = aead->ivsize;
+	v = atomic_read(&alg->encrypt_cnt);
+	raead.stat_encrypt_cnt = v;
+	v = atomic_read(&alg->encrypt_tlen);
+	raead.stat_encrypt_tlen = v;
+	v = atomic_read(&alg->decrypt_cnt);
+	raead.stat_decrypt_cnt = v;
+	v = atomic_read(&alg->decrypt_tlen);
+	raead.stat_decrypt_tlen = v;
+
 
 	if (nla_put(skb, CRYPTOCFGA_REPORT_AEAD,
 		    sizeof(struct crypto_report_aead), &raead))
