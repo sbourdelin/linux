@@ -55,6 +55,7 @@
 
 static int kvmppc_handle_ext(struct kvm_vcpu *vcpu, unsigned int exit_nr,
 			     ulong msr);
+static int kvmppc_load_ext(struct kvm_vcpu *vcpu, ulong msr);
 static void kvmppc_giveup_fac(struct kvm_vcpu *vcpu, ulong fac);
 
 /* Some compatibility defines */
@@ -280,6 +281,33 @@ void kvmppc_save_tm_pr(struct kvm_vcpu *vcpu)
 		return;
 	}
 
+	/* when we are in transaction active state and switch out of CPU,
+	 * we need to be careful to not "change" guest_owned_ext bits after
+	 * kvmppc_save_tm_pr()/kvmppc_restore_tm_pr() pair. The reason is
+	 * that we need to distinguish following 2 FP/VEC/VSX unavailable
+	 * exception cases in TM active state:
+	 * 1) tbegin. is executed with guest_owned_ext FP/VEC/VSX off. Then
+	 * there comes a FP/VEC/VSX unavailable exception during transaction.
+	 * In this case, the vcpu->arch.fp/vr contents need to be loaded as
+	 * checkpoint contents.
+	 * 2) tbegin. is executed with guest_owned_ext FP/VEC/VSX on. Then
+	 * there is task switch during suspended state. If we giveup ext and
+	 * update guest_owned_ext as no FP/VEC/VSX bits during context switch,
+	 * we need to load vcpu->arch.fp_tm/vr_tm contents as checkpoint
+	 * content.
+	 *
+	 * As a result, we don't change guest_owned_ext bits during
+	 * kvmppc_save/restore_tm_pr() pair. So that we can only use
+	 * vcpu->arch.fp/vr contents as checkpoint contents.
+	 * And we need to "save" the guest_owned_ext bits here who indicates
+	 * which math bits need to be "restored" in kvmppc_restore_tm_pr().
+	 */
+	vcpu->arch.save_msr_tm &= ~(MSR_FP | MSR_VEC | MSR_VSX);
+	vcpu->arch.save_msr_tm |= (vcpu->arch.guest_owned_ext &
+			(MSR_FP | MSR_VEC | MSR_VSX));
+
+	kvmppc_giveup_ext(vcpu, MSR_VSX);
+
 	preempt_disable();
 	_kvmppc_save_tm_pr(vcpu, mfmsr());
 	preempt_enable();
@@ -295,6 +323,16 @@ void kvmppc_restore_tm_pr(struct kvm_vcpu *vcpu)
 	preempt_disable();
 	_kvmppc_restore_tm_pr(vcpu, vcpu->arch.save_msr_tm);
 	preempt_enable();
+
+	if (vcpu->arch.save_msr_tm & MSR_VSX)
+		kvmppc_load_ext(vcpu, MSR_FP | MSR_VEC | MSR_VSX);
+	else {
+		if (vcpu->arch.save_msr_tm & MSR_VEC)
+			kvmppc_load_ext(vcpu, MSR_VEC);
+
+		if (vcpu->arch.save_msr_tm & MSR_FP)
+			kvmppc_load_ext(vcpu, MSR_FP);
+	}
 }
 #endif
 
@@ -788,12 +826,41 @@ static void kvmppc_giveup_fac(struct kvm_vcpu *vcpu, ulong fac)
 #endif
 }
 
+static int kvmppc_load_ext(struct kvm_vcpu *vcpu, ulong msr)
+{
+	struct thread_struct *t = &current->thread;
+
+	if (msr & MSR_FP) {
+		preempt_disable();
+		enable_kernel_fp();
+		load_fp_state(&vcpu->arch.fp);
+		disable_kernel_fp();
+		t->fp_save_area = &vcpu->arch.fp;
+		preempt_enable();
+	}
+
+	if (msr & MSR_VEC) {
+#ifdef CONFIG_ALTIVEC
+		preempt_disable();
+		enable_kernel_altivec();
+		load_vr_state(&vcpu->arch.vr);
+		disable_kernel_altivec();
+		t->vr_save_area = &vcpu->arch.vr;
+		preempt_enable();
+#endif
+	}
+
+	t->regs->msr |= msr;
+	vcpu->arch.guest_owned_ext |= msr;
+	kvmppc_recalc_shadow_msr(vcpu);
+
+	return RESUME_GUEST;
+}
+
 /* Handle external providers (FPU, Altivec, VSX) */
 static int kvmppc_handle_ext(struct kvm_vcpu *vcpu, unsigned int exit_nr,
 			     ulong msr)
 {
-	struct thread_struct *t = &current->thread;
-
 	/* When we have paired singles, we emulate in software */
 	if (vcpu->arch.hflags & BOOK3S_HFLAG_PAIRED_SINGLE)
 		return RESUME_GUEST;
@@ -829,31 +896,34 @@ static int kvmppc_handle_ext(struct kvm_vcpu *vcpu, unsigned int exit_nr,
 	printk(KERN_INFO "Loading up ext 0x%lx\n", msr);
 #endif
 
-	if (msr & MSR_FP) {
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
+	/* if TM is active, the checkpointed math content
+	 * might be invalid. We need to reclaim current
+	 * transaction, load the correct math, and perform
+	 * rechkpoint.
+	 */
+	if (MSR_TM_ACTIVE(mfmsr())) {
 		preempt_disable();
-		enable_kernel_fp();
-		load_fp_state(&vcpu->arch.fp);
-		disable_kernel_fp();
-		t->fp_save_area = &vcpu->arch.fp;
+		kvmppc_save_tm_pr(vcpu);
+		/* need update the chkpt math reg saving content,
+		 * so that we can checkpoint with desired fp value.
+		 */
+		if (msr & MSR_FP)
+			memcpy(&vcpu->arch.fp_tm, &vcpu->arch.fp,
+					sizeof(struct thread_fp_state));
+
+		if (msr & MSR_VEC) {
+			memcpy(&vcpu->arch.vr_tm, &vcpu->arch.vr,
+					sizeof(struct thread_vr_state));
+			vcpu->arch.vrsave_tm = vcpu->arch.vrsave;
+		}
+
+		kvmppc_restore_tm_pr(vcpu);
 		preempt_enable();
 	}
-
-	if (msr & MSR_VEC) {
-#ifdef CONFIG_ALTIVEC
-		preempt_disable();
-		enable_kernel_altivec();
-		load_vr_state(&vcpu->arch.vr);
-		disable_kernel_altivec();
-		t->vr_save_area = &vcpu->arch.vr;
-		preempt_enable();
 #endif
-	}
 
-	t->regs->msr |= msr;
-	vcpu->arch.guest_owned_ext |= msr;
-	kvmppc_recalc_shadow_msr(vcpu);
-
-	return RESUME_GUEST;
+	return kvmppc_load_ext(vcpu, msr);
 }
 
 /*

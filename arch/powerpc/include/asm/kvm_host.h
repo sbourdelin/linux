@@ -627,7 +627,9 @@ struct kvm_vcpu_arch {
 	struct thread_vr_state vr_tm;
 	u32 vrsave_tm; /* also USPRG0 */
 
-	u64 save_msr_tm; /* TS bits: whether TM restore is required */
+	u64 save_msr_tm; /* TS bits: whether TM restore is required
+			  * FP/VEC/VSX bits: saved guest_owned_ext
+			  */
 #endif
 
 #ifdef CONFIG_KVM_EXIT_TIMING
