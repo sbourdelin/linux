@@ -133,4 +133,7 @@ void _kvmppc_restore_tm_pr(struct kvm_vcpu *vcpu, u64 guest_msr);
 void _kvmppc_save_tm_pr(struct kvm_vcpu *vcpu, u64 guest_msr);
 #endif
 
+void tm_enable(void);
+void tm_disable(void);
+void tm_abort(uint8_t cause);
 #endif /* _ASM_POWERPC_ASM_PROTOTYPES_H */
