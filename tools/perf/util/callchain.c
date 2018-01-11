@@ -272,6 +272,10 @@ int parse_callchain_record(const char *arg, struct callchain_param *param)
 
 				ret = get_stack_size(tok, &size);
 				param->dump_size = size;
+				if (strtok_r(NULL, ",", &saveptr)) {
+					pr_err("callchain: No more arguments "
+					       "needed for --call-graph dwarf[,xxx]\n");
+				}
 			}
 		} else if (!strncmp(name, "lbr", sizeof("lbr"))) {
 			if (!strtok_r(NULL, ",", &saveptr)) {
