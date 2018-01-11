@@ -35,7 +35,7 @@
  * This can modify all checkpointed registers, but
  * restores r1, r2 before exit.
  */
-_GLOBAL(kvmppc_save_tm)
+_GLOBAL(__kvmppc_save_tm)
 	mflr	r0
 	std	r0, PPC_LR_STKOFF(r1)
 
@@ -149,6 +149,58 @@ _GLOBAL(kvmppc_save_tm)
 	blr
 
 /*
+ * _kvmppc_save_tm() is a wrapper around __kvmppc_save_tm(), so that it can
+ * be invoked from C function by PR KVM only.
+ */
+_GLOBAL(_kvmppc_save_tm_pr)
+	mflr	r5
+	std	r5, PPC_LR_STKOFF(r1)
+	stdu    r1, -SWITCH_FRAME_SIZE(r1)
+	SAVE_NVGPRS(r1)
+
+	/* save MSR since TM/math bits might be impacted
+	 * by __kvmppc_save_tm().
+	 */
+	mfmsr	r5
+	SAVE_GPR(5, r1)
+
+	/* also save DSCR/CR so that it can be recovered later */
+	mfspr   r6, SPRN_DSCR
+	SAVE_GPR(6, r1)
+
+	mfcr    r7
+	stw     r7, _CCR(r1)
+
+	/* allocate stack frame for __kvmppc_save_tm since
+	 * it will save LR into its stackframe and we don't
+	 * want to corrupt _kvmppc_save_tm_pr's.
+	 */
+	stdu    r1, -PPC_MIN_STKFRM(r1)
+	bl	__kvmppc_save_tm
+	addi    r1, r1, PPC_MIN_STKFRM
+
+	ld      r7, _CCR(r1)
+	mtcr	r7
+
+	REST_GPR(6, r1)
+	mtspr   SPRN_DSCR, r6
+
+	/* need preserve current MSR's MSR_TS bits */
+	REST_GPR(5, r1)
+	mfmsr   r6
+	rldicl  r6, r6, 64 - MSR_TS_S_LG, 62
+	rldimi  r5, r6, MSR_TS_S_LG, 63 - MSR_TS_T_LG
+	mtmsrd  r5
+
+	REST_NVGPRS(r1)
+	addi    r1, r1, SWITCH_FRAME_SIZE
+	ld	r5, PPC_LR_STKOFF(r1)
+	mtlr	r5
+	blr
+
+EXPORT_SYMBOL_GPL(_kvmppc_save_tm_pr);
+
+/*
  * Restore transactional state and TM-related registers.
  * Called with:
  *  - r3 pointing to the vcpu struct.
@@ -158,7 +210,7 @@ _GLOBAL(kvmppc_save_tm)
  * This potentially modifies all checkpointed registers.
  * It restores r1, r2 from the PACA.
  */
-_GLOBAL(kvmppc_restore_tm)
+_GLOBAL(__kvmppc_restore_tm)
 	mflr	r0
 	std	r0, PPC_LR_STKOFF(r1)
 
@@ -186,6 +238,7 @@ _GLOBAL(kvmppc_restore_tm)
 	rldicl. r5, r5, 64 - MSR_TS_S_LG, 62
 	beqlr		/* TM not active in guest */
 	std	r1, HSTATE_SCRATCH2(r13)
+	std	r3, HSTATE_SCRATCH1(r13)
 
 	/* Make sure the failure summary is set, otherwise we'll program check
 	 * when we trechkpt.  It's possible that this might have been not set
@@ -262,6 +315,7 @@ _GLOBAL(kvmppc_restore_tm)
 	ld	r29, HSTATE_DSCR(r13)
 	mtspr	SPRN_DSCR, r29
 #endif
+	ld	r3, HSTATE_SCRATCH1(r13)
 	ld	r1, HSTATE_SCRATCH2(r13)
 	ld	r2, PACATMSCRATCH(r13)
 
@@ -273,4 +327,53 @@ _GLOBAL(kvmppc_restore_tm)
 	mtlr	r0
 	blr
 
+/*
+ * _kvmppc_restore_tm() is a wrapper around __kvmppc_restore_tm(), so that it
+ * can be invoked from C function by PR KVM only.
+ */
+_GLOBAL(_kvmppc_restore_tm_pr)
+	mflr	r5
+	std	r5, PPC_LR_STKOFF(r1)
+	stdu    r1, -SWITCH_FRAME_SIZE(r1)
+	SAVE_NVGPRS(r1)
+
+	/* save MSR to avoid TM/math bits change */
+	mfmsr	r5
+	SAVE_GPR(5, r1)
+
+	/* also save DSCR/CR so that it can be recovered later */
+	mfspr   r6, SPRN_DSCR
+	SAVE_GPR(6, r1)
+
+	mfcr    r7
+	stw     r7, _CCR(r1)
+
+	/* allocate stack frame for __kvmppc_restore_tm since
+	 * it will save LR into its own stackframe.
+	 */
+	stdu    r1, -PPC_MIN_STKFRM(r1)
+
+	bl	__kvmppc_restore_tm
+	addi    r1, r1, PPC_MIN_STKFRM
+
+	ld      r7, _CCR(r1)
+	mtcr	r7
+
+	REST_GPR(6, r1)
+	mtspr   SPRN_DSCR, r6
+
+	/* need preserve current MSR's MSR_TS bits */
+	REST_GPR(5, r1)
+	mfmsr   r6
+	rldicl  r6, r6, 64 - MSR_TS_S_LG, 62
+	rldimi  r5, r6, MSR_TS_S_LG, 63 - MSR_TS_T_LG
+	mtmsrd  r5
+
+	REST_NVGPRS(r1)
+	addi    r1, r1, SWITCH_FRAME_SIZE
+	ld	r5, PPC_LR_STKOFF(r1)
+	mtlr	r5
+	blr
+
+EXPORT_SYMBOL_GPL(_kvmppc_restore_tm_pr);
 #endif

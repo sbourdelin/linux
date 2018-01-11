@@ -126,4 +126,11 @@ extern int __ucmpdi2(u64, u64);
 void _mcount(void);
 unsigned long prepare_ftrace_return(unsigned long parent, unsigned long ip);
 
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
+/* Transaction memory related */
+struct kvm_vcpu;
+void _kvmppc_restore_tm_pr(struct kvm_vcpu *vcpu, u64 guest_msr);
+void _kvmppc_save_tm_pr(struct kvm_vcpu *vcpu, u64 guest_msr);
+#endif
+
 #endif /* _ASM_POWERPC_ASM_PROTOTYPES_H */
