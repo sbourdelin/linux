@@ -977,6 +977,9 @@ int kvmppc_handle_exit_pr(struct kvm_run *run, struct kvm_vcpu *vcpu,
 {
 	int r = RESUME_HOST;
 	int s;
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
+	ulong old_msr = kvmppc_get_msr(vcpu);
+#endif
 
 	vcpu->stat.sum_exits++;
 
@@ -987,6 +990,28 @@ int kvmppc_handle_exit_pr(struct kvm_run *run, struct kvm_vcpu *vcpu,
 
 	trace_kvm_exit(exit_nr, vcpu);
 	guest_exit();
+
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
+	/*
+	 * Unlike other MSR bits, MSR[TS]bits can be changed at guest without
+	 * notifying host:
+	 *  modified by unprivileged instructions like "tbegin"/"tend"/
+	 * "tresume"/"tsuspend" in PR KVM guest.
+	 *
+	 * It is necessary to sync here to calculate a correct shadow_msr.
+	 *
+	 * privileged guest's tbegin will be failed at present. So we
+	 * only take care of problem state guest.
+	 */
+	if (unlikely((old_msr & MSR_PR) &&
+		(vcpu->arch.shadow_srr1 & (MSR_TS_MASK)) !=
+				(old_msr & (MSR_TS_MASK)))) {
+		old_msr &= ~(MSR_TS_MASK);
+		old_msr |= (vcpu->arch.shadow_srr1 & (MSR_TS_MASK));
+		kvmppc_set_msr_fast(vcpu, old_msr);
+		kvmppc_recalc_shadow_msr(vcpu);
+	}
+#endif
 
 	switch (exit_nr) {
 	case BOOK3S_INTERRUPT_INST_STORAGE:
