@@ -255,7 +255,7 @@ static inline void kvmppc_save_tm_sprs(struct kvm_vcpu *vcpu)
 	tm_disable();
 }
 
-static inline void kvmppc_restore_tm_sprs(struct kvm_vcpu *vcpu)
+inline void kvmppc_restore_tm_sprs(struct kvm_vcpu *vcpu)
 {
 	tm_enable();
 	mtspr(SPRN_TFHAR, vcpu->arch.tfhar);
@@ -446,6 +446,15 @@ static void kvmppc_recalc_shadow_msr(struct kvm_vcpu *vcpu)
 	    (PVR_VER(guest_pvr) == PVR_970MP) ||
 	    (PVR_VER(guest_pvr) == PVR_970GX))
 		smsr |= MSR_HV;
+#endif
+#ifdef CONFIG_PPC_TRANSACTIONAL_MEM
+	/*
+	 * in guest privileged state, we want to fail all TM transactions.
+	 * So disable MSR TM bit so that all tbegin. will be able to be
+	 * trapped into host.
+	 */
+	if (!(guest_msr & MSR_PR))
+		smsr &= ~MSR_TM;
 #endif
 	vcpu->arch.shadow_msr = smsr;
 }
