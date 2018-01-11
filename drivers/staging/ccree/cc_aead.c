@@ -259,42 +259,48 @@ done:
 
 static int xcbc_setkey(struct cc_hw_desc *desc, struct cc_aead_ctx *ctx)
 {
+	int idx = 0;
+
 	/* Load the AES key */
-	hw_desc_init(&desc[0]);
+	hw_desc_init(&desc[idx]);
 	/* We are using for the source/user key the same buffer
 	 * as for the output keys, * because after this key loading it
 	 * is not needed anymore
 	 */
-	set_din_type(&desc[0], DMA_DLLI,
+	set_din_type(&desc[idx], DMA_DLLI,
 		     ctx->auth_state.xcbc.xcbc_keys_dma_addr, ctx->auth_keylen,
 		     NS_BIT);
-	set_cipher_mode(&desc[0], DRV_CIPHER_ECB);
-	set_cipher_config0(&desc[0], DRV_CRYPTO_DIRECTION_ENCRYPT);
-	set_key_size_aes(&desc[0], ctx->auth_keylen);
-	set_flow_mode(&desc[0], S_DIN_to_AES);
-	set_setup_mode(&desc[0], SETUP_LOAD_KEY0);
+	set_cipher_mode(&desc[idx], DRV_CIPHER_ECB);
+	set_cipher_config0(&desc[idx], DRV_CRYPTO_DIRECTION_ENCRYPT);
+	set_key_size_aes(&desc[idx], ctx->auth_keylen);
+	set_flow_mode(&desc[idx], S_DIN_to_AES);
+	set_setup_mode(&desc[idx], SETUP_LOAD_KEY0);
+	idx++;
 
-	hw_desc_init(&desc[1]);
-	set_din_const(&desc[1], 0x01010101, CC_AES_128_BIT_KEY_SIZE);
-	set_flow_mode(&desc[1], DIN_AES_DOUT);
-	set_dout_dlli(&desc[1], ctx->auth_state.xcbc.xcbc_keys_dma_addr,
+	hw_desc_init(&desc[idx]);
+	set_din_const(&desc[idx], 0x01010101, CC_AES_128_BIT_KEY_SIZE);
+	set_flow_mode(&desc[idx], DIN_AES_DOUT);
+	set_dout_dlli(&desc[idx], ctx->auth_state.xcbc.xcbc_keys_dma_addr,
 		      AES_KEYSIZE_128, NS_BIT, 0);
+	idx++;
 
-	hw_desc_init(&desc[2]);
-	set_din_const(&desc[2], 0x02020202, CC_AES_128_BIT_KEY_SIZE);
-	set_flow_mode(&desc[2], DIN_AES_DOUT);
-	set_dout_dlli(&desc[2], (ctx->auth_state.xcbc.xcbc_keys_dma_addr
+	hw_desc_init(&desc[idx]);
+	set_din_const(&desc[idx], 0x02020202, CC_AES_128_BIT_KEY_SIZE);
+	set_flow_mode(&desc[idx], DIN_AES_DOUT);
+	set_dout_dlli(&desc[idx], (ctx->auth_state.xcbc.xcbc_keys_dma_addr
 					 + AES_KEYSIZE_128),
 			      AES_KEYSIZE_128, NS_BIT, 0);
+	idx++;
 
-	hw_desc_init(&desc[3]);
-	set_din_const(&desc[3], 0x03030303, CC_AES_128_BIT_KEY_SIZE);
-	set_flow_mode(&desc[3], DIN_AES_DOUT);
-	set_dout_dlli(&desc[3], (ctx->auth_state.xcbc.xcbc_keys_dma_addr
+	hw_desc_init(&desc[idx]);
+	set_din_const(&desc[idx], 0x03030303, CC_AES_128_BIT_KEY_SIZE);
+	set_flow_mode(&desc[idx], DIN_AES_DOUT);
+	set_dout_dlli(&desc[idx], (ctx->auth_state.xcbc.xcbc_keys_dma_addr
 					  + 2 * AES_KEYSIZE_128),
 			      AES_KEYSIZE_128, NS_BIT, 0);
+	idx++;
 
-	return 4;
+	return idx;
 }
 
 static int hmac_setkey(struct cc_hw_desc *desc, struct cc_aead_ctx *ctx)
