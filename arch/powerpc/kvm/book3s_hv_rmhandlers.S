@@ -95,6 +95,8 @@ BEGIN_FTR_SECTION
 46:
 END_FTR_SECTION_IFSET(CPU_FTR_ARCH_300)
 
+	li	r0,0
+	stw	r0,HSTATE_EXIT_VIRT(r13)
 	ld	r4, HSTATE_KVM_VCPU(r13)
 	bl	kvmppc_hv_entry
 
@@ -1312,8 +1314,11 @@ END_FTR_SECTION_IFSET(CPU_FTR_HAS_PPR)
 	mfspr	r11, SPRN_SRR1
 	std	r10, VCPU_SRR0(r9)
 	std	r11, VCPU_SRR1(r9)
-	/* trap is in the low half of r12, clear CR from the high half */
-	clrldi	r12, r12, 32
+	/* Recover bit 0x4000 from trap (virt vs real mode) */
+	rlwinm	r0,r12,18,31,31
+	stw	r0,HSTATE_EXIT_VIRT(r13)
+	/* trap is in the low half of r12, clear CR in high half and virt mode bit */
+	clrldi	r12, r12, 50
 	andi.	r0, r12, 2		/* need to read HSRR0/1? */
 	beq	1f
 	mfspr	r10, SPRN_HSRR0

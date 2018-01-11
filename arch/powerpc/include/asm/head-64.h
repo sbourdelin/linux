@@ -404,6 +404,14 @@ name:
 	TRAMP_KVM_BEGIN(do_kvm_H##n);					\
 	KVM_HANDLER_SKIP(area, EXC_HV, n + 0x2);			\
 
+#define TRAMP_KVM_HV_VIRT(area, n)					\
+	TRAMP_KVM_BEGIN(do_kvm_H##n##_VIRT);				\
+	KVM_HANDLER(area, EXC_HV, n + 0x4002);				\
+
+#define TRAMP_KVM_HV_VIRT_SKIP(area, n)					\
+	TRAMP_KVM_BEGIN(do_kvm_H##n##_VIRT);				\
+	KVM_HANDLER_SKIP(area, EXC_HV, n + 0x4002);			\
+
 #define EXC_COMMON(name, realvec, hdlr)					\
 	EXC_COMMON_BEGIN(name);						\
 	STD_EXCEPTION_COMMON(realvec, name, hdlr);			\

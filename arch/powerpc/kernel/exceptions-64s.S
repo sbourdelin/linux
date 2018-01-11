@@ -702,7 +702,7 @@ EXC_VIRT_BEGIN(hardware_interrupt, 0x4500, 0x100)
 	.globl hardware_interrupt_relon_hv;
 hardware_interrupt_relon_hv:
 	BEGIN_FTR_SECTION
-		_MASKABLE_RELON_EXCEPTION_PSERIES(0x500, hardware_interrupt_common, EXC_HV, SOFTEN_TEST_HV)
+		_MASKABLE_RELON_EXCEPTION_PSERIES(0x500, hardware_interrupt_common, EXC_HV, SOFTEN_TEST_HV_VIRT)
 	FTR_SECTION_ELSE
 		_MASKABLE_RELON_EXCEPTION_PSERIES(0x500, hardware_interrupt_common, EXC_STD, SOFTEN_TEST_PR)
 	ALT_FTR_SECTION_END_IFSET(CPU_FTR_HVMODE)
@@ -710,6 +710,7 @@ EXC_VIRT_END(hardware_interrupt, 0x4500, 0x100)
 
 TRAMP_KVM(PACA_EXGEN, 0x500)
 TRAMP_KVM_HV(PACA_EXGEN, 0x500)
+TRAMP_KVM_HV_VIRT(PACA_EXGEN, 0x500)
 EXC_COMMON_ASYNC(hardware_interrupt_common, 0x500, do_IRQ)
 
 
@@ -809,6 +810,7 @@ EXC_COMMON_ASYNC(decrementer_common, 0x900, timer_interrupt)
 EXC_REAL_HV(hdecrementer, 0x980, 0x80)
 EXC_VIRT_HV(hdecrementer, 0x4980, 0x80, 0x980)
 TRAMP_KVM_HV(PACA_EXGEN, 0x980)
+TRAMP_KVM_HV_VIRT(PACA_EXGEN, 0x980)
 EXC_COMMON(hdecrementer_common, 0x980, hdec_interrupt)
 
 
@@ -872,21 +874,31 @@ EXC_COMMON(trap_0b_common, 0xb00, unknown_exception)
 	 * Userspace syscalls have already saved the PPR, hcalls must save
 	 * it before setting HMT_MEDIUM.
 	 */
-#define SYSCALL_KVMTEST							\
+#define __SYSCALL_KVMTEST(test)						\
 	mtctr	r13;							\
 	GET_PACA(r13);							\
 	std	r10,PACA_EXGEN+EX_R10(r13);				\
-	KVMTEST_PR(0xc00); /* uses r10, branch to do_kvm_0xc00_system_call */ \
+	test;/* uses r10, branch to do_kvm_0xc00_system_call */		\
 	HMT_MEDIUM;							\
 	mfctr	r9;
+
+/* 0xc00 is a normal real mode "PR" (uses STD SRR0/1) entry */
+#define SYSCALL_KVMTEST		__SYSCALL_KVMTEST(KVMTEST_PR(0xc00))
+
+/* 0x4c00 is special, it can come from the guest using SRR0/1 in virtual
+ * mode. It's the only to do that and only with HV KVM so we open code
+ * the specific variant of KVMTEST macro for it
+ */
+#define SYSCALL_KVMTEST_RELON  __SYSCALL_KVMTEST(KVMTEST(EXC_STD,0xc00,_VIRT))
 
 #else
 #define SYSCALL_KVMTEST							\
 	HMT_MEDIUM;							\
 	mr	r9,r13;							\
 	GET_PACA(r13);
+#define SYSCALL_KVMTEST_RELON SYSCALL_KVMTEST
 #endif
-	
+
 #define LOAD_SYSCALL_HANDLER(reg)					\
 	__LOAD_HANDLER(reg, system_call_common)
 
@@ -955,7 +967,7 @@ EXC_REAL_BEGIN(system_call, 0xc00, 0x100)
 EXC_REAL_END(system_call, 0xc00, 0x100)
 
 EXC_VIRT_BEGIN(system_call, 0x4c00, 0x100)
-	SYSCALL_KVMTEST /* loads PACA into r13, and saves r13 to r9 */
+	SYSCALL_KVMTEST_RELON /* loads PACA into r13, and saves r13 to r9 */
 	SYSCALL_FASTENDIAN_TEST
 	SYSCALL_VIRT
 	SYSCALL_FASTENDIAN
@@ -983,6 +995,21 @@ TRAMP_KVM_BEGIN(do_kvm_0xc00)
 	std	r9,PACA_EXGEN+EX_R9(r13)
 	mfcr	r9
 	KVM_HANDLER(PACA_EXGEN, EXC_STD, 0xc00)
+
+TRAMP_KVM_BEGIN(do_kvm_0xc00_VIRT)
+	 /*
+	  * Save the PPR (on systems that support it) before changing to
+	  * HMT_MEDIUM. That allows the KVM code to save that value into the
+	  * guest state (it is the guest's PPR value).
+	  */
+	OPT_GET_SPR(r10, SPRN_PPR, CPU_FTR_HAS_PPR)
+	HMT_MEDIUM
+	OPT_SAVE_REG_TO_PACA(PACA_EXGEN+EX_PPR, r10, CPU_FTR_HAS_PPR)
+	mfctr	r10
+	SET_SCRATCH0(r10)
+	std	r9,PACA_EXGEN+EX_R9(r13)
+	mfcr	r9
+	KVM_HANDLER(PACA_EXGEN, EXC_STD, 0x4c00)
 #endif
 
 
@@ -994,6 +1021,7 @@ EXC_COMMON(single_step_common, 0xd00, single_step_exception)
 EXC_REAL_OOL_HV(h_data_storage, 0xe00, 0x20)
 EXC_VIRT_OOL_HV(h_data_storage, 0x4e00, 0x20, 0xe00)
 TRAMP_KVM_HV_SKIP(PACA_EXGEN, 0xe00)
+TRAMP_KVM_HV_VIRT_SKIP(PACA_EXGEN, 0xe00)
 EXC_COMMON_BEGIN(h_data_storage_common)
 	mfspr   r10,SPRN_HDAR
 	std     r10,PACA_EXGEN+EX_DAR(r13)
@@ -1010,12 +1038,14 @@ EXC_COMMON_BEGIN(h_data_storage_common)
 EXC_REAL_OOL_HV(h_instr_storage, 0xe20, 0x20)
 EXC_VIRT_OOL_HV(h_instr_storage, 0x4e20, 0x20, 0xe20)
 TRAMP_KVM_HV(PACA_EXGEN, 0xe20)
+TRAMP_KVM_HV_VIRT(PACA_EXGEN, 0xe20)
 EXC_COMMON(h_instr_storage_common, 0xe20, unknown_exception)
 
 
 EXC_REAL_OOL_HV(emulation_assist, 0xe40, 0x20)
 EXC_VIRT_OOL_HV(emulation_assist, 0x4e40, 0x20, 0xe40)
 TRAMP_KVM_HV(PACA_EXGEN, 0xe40)
+TRAMP_KVM_HV_VIRT(PACA_EXGEN, 0xe40)
 EXC_COMMON(emulation_assist_common, 0xe40, emulation_assist_interrupt)
 
 
@@ -1086,6 +1116,7 @@ EXCEPTION_COMMON(PACA_EXGEN, 0xe60, hmi_exception_common, handle_hmi_exception,
 EXC_REAL_OOL_MASKABLE_HV(h_doorbell, 0xe80, 0x20)
 EXC_VIRT_OOL_MASKABLE_HV(h_doorbell, 0x4e80, 0x20, 0xe80)
 TRAMP_KVM_HV(PACA_EXGEN, 0xe80)
+TRAMP_KVM_HV_VIRT(PACA_EXGEN, 0xe80)
 #ifdef CONFIG_PPC_DOORBELL
 EXC_COMMON_ASYNC(h_doorbell_common, 0xe80, doorbell_exception)
 #else
@@ -1096,6 +1127,7 @@ EXC_COMMON_ASYNC(h_doorbell_common, 0xe80, unknown_exception)
 EXC_REAL_OOL_MASKABLE_HV(h_virt_irq, 0xea0, 0x20)
 EXC_VIRT_OOL_MASKABLE_HV(h_virt_irq, 0x4ea0, 0x20, 0xea0)
 TRAMP_KVM_HV(PACA_EXGEN, 0xea0)
+TRAMP_KVM_HV_VIRT(PACA_EXGEN, 0xea0)
 EXC_COMMON_ASYNC(h_virt_irq_common, 0xea0, do_IRQ)
 
 
@@ -1193,6 +1225,7 @@ EXC_COMMON(facility_unavailable_common, 0xf60, facility_unavailable_exception)
 EXC_REAL_OOL_HV(h_facility_unavailable, 0xf80, 0x20)
 EXC_VIRT_OOL_HV(h_facility_unavailable, 0x4f80, 0x20, 0xf80)
 TRAMP_KVM_HV(PACA_EXGEN, 0xf80)
+TRAMP_KVM_HV_VIRT(PACA_EXGEN, 0xf80)
 EXC_COMMON(h_facility_unavailable_common, 0xf80, facility_unavailable_exception)
 
 
