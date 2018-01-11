@@ -267,7 +267,13 @@ static void dw8250_set_termios(struct uart_port *p, struct ktermios *termios,
 
 	for (i = 1; i <= UART_DIV_MAX; i++) {
 		rate = clk_round_rate(d->clk, i * target_rate);
-		if (rate >= i * min_rate && rate <= i * max_rate)
+
+		if (rate < i * min_rate) {
+			i = UART_DIV_MAX + 1;
+			break;
+		}
+
+		if (rate <= i * max_rate)
 			break;
 	}
 	if (i <= UART_DIV_MAX) {
