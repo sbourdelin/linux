@@ -73,6 +73,9 @@ int thermal_build_list_of_policies(char *buf);
 int thermal_zone_create_device_groups(struct thermal_zone_device *, int);
 void thermal_zone_destroy_device_groups(struct thermal_zone_device *);
 void thermal_cooling_device_setup_sysfs(struct thermal_cooling_device *);
+void thermal_cooling_device_remove_sysfs(struct thermal_cooling_device *cdev);
+void thermal_cooling_device_stats_update(struct thermal_cooling_device *cdev,
+					 unsigned long new_state);
 /* used only at binding time */
 ssize_t
 thermal_cooling_device_trip_point_show(struct device *,
