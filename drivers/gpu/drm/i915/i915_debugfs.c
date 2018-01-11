@@ -3162,6 +3162,47 @@ static int i915_engine_info(struct seq_file *m, void *unused)
 	return 0;
 }
 
+static int i915_rcs_topology(struct seq_file *m, void *unused)
+{
+	struct drm_i915_private *dev_priv = node_to_i915(m->private);
+	const struct sseu_dev_info *sseu = &INTEL_INFO(dev_priv)->sseu;
+	int s, ss;
+	int subslice_stride =
+		DIV_ROUND_UP(sseu->max_eus_per_subslice, BITS_PER_BYTE);
+
+	if (sseu->max_slices == 0) {
+		seq_printf(m, "Unavailable\n");
+		return 0;
+	}
+
+	for (s = 0; s < sseu->max_slices; s++) {
+		seq_printf(m, "slice%i: %u subslice(s) (0x%hhx):\n",
+			   s, hweight8(sseu->subslice_mask[s]),
+			   sseu->subslice_mask[s]);
+
+		for (ss = 0; ss < sseu->max_subslices; ss++) {
+			int eu_group, n_subslice_eus = 0;
+
+			for (eu_group = 0; eu_group < subslice_stride; eu_group++) {
+				n_subslice_eus +=
+					hweight8(sseu_eu_mask(sseu, s, ss, eu_group));
+			}
+
+			seq_printf(m, "\tsubslice%i: %u EUs (", ss, n_subslice_eus);
+			for (eu_group = 0;
+			     eu_group < max(0, subslice_stride - 1);
+			     eu_group++) {
+				u8 val = sseu_eu_mask(sseu, s, ss, eu_group);
+				seq_printf(m, "0x%hhx, ", val);
+			}
+			seq_printf(m, "0x%hhx)\n",
+				   sseu_eu_mask(sseu, s, ss, subslice_stride - 1));
+		}
+	}
+
+	return 0;
+}
+
 static int i915_shrinker_info(struct seq_file *m, void *unused)
 {
 	struct drm_i915_private *i915 = node_to_i915(m->private);
@@ -4692,6 +4733,7 @@ static const struct drm_info_list i915_debugfs_list[] = {
 	{"i915_dmc_info", i915_dmc_info, 0},
 	{"i915_display_info", i915_display_info, 0},
 	{"i915_engine_info", i915_engine_info, 0},
+	{"i915_rcs_topology", i915_rcs_topology, 0},
 	{"i915_shrinker_info", i915_shrinker_info, 0},
 	{"i915_shared_dplls_info", i915_shared_dplls_info, 0},
 	{"i915_dp_mst_info", i915_dp_mst_info, 0},
