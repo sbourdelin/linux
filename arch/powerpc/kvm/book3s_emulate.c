@@ -521,13 +521,26 @@ int kvmppc_core_emulate_mtspr_pr(struct kvm_vcpu *vcpu, int sprn, ulong spr_val)
 		break;
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	case SPRN_TFHAR:
-		vcpu->arch.tfhar = spr_val;
-		break;
 	case SPRN_TEXASR:
-		vcpu->arch.texasr = spr_val;
-		break;
 	case SPRN_TFIAR:
-		vcpu->arch.tfiar = spr_val;
+		if (MSR_TM_ACTIVE(kvmppc_get_msr(vcpu))) {
+			/* it is illegal to mtspr() TM regs in
+			 * other than non-transactional state.
+			 */
+			kvmppc_core_queue_program(vcpu, SRR1_PROGTM);
+			emulated = EMULATE_AGAIN;
+			break;
+		}
+
+		tm_enable();
+		if (sprn == SPRN_TFHAR)
+			mtspr(SPRN_TFHAR, spr_val);
+		else if (sprn == SPRN_TEXASR)
+			mtspr(SPRN_TEXASR, spr_val);
+		else
+			mtspr(SPRN_TFIAR, spr_val);
+		tm_disable();
+
 		break;
 #endif
 #endif
@@ -674,13 +687,19 @@ int kvmppc_core_emulate_mfspr_pr(struct kvm_vcpu *vcpu, int sprn, ulong *spr_val
 		break;
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
 	case SPRN_TFHAR:
-		*spr_val = vcpu->arch.tfhar;
+		tm_enable();
+		*spr_val = mfspr(SPRN_TFHAR);
+		tm_disable();
 		break;
 	case SPRN_TEXASR:
-		*spr_val = vcpu->arch.texasr;
+		tm_enable();
+		*spr_val = mfspr(SPRN_TEXASR);
+		tm_disable();
 		break;
 	case SPRN_TFIAR:
-		*spr_val = vcpu->arch.tfiar;
+		tm_enable();
+		*spr_val = mfspr(SPRN_TFIAR);
+		tm_disable();
 		break;
 #endif
 #endif
