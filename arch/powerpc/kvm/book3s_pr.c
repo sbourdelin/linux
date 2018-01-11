@@ -320,6 +320,7 @@ static void kvmppc_recalc_shadow_msr(struct kvm_vcpu *vcpu)
 {
 	ulong guest_msr = kvmppc_get_msr(vcpu);
 	ulong smsr = guest_msr;
+	u32 guest_pvr = vcpu->arch.pvr;
 
 	/* Guest MSR values */
 #ifdef CONFIG_PPC_TRANSACTIONAL_MEM
@@ -334,7 +335,16 @@ static void kvmppc_recalc_shadow_msr(struct kvm_vcpu *vcpu)
 	smsr |= (guest_msr & vcpu->arch.guest_owned_ext);
 	/* 64-bit Process MSR values */
 #ifdef CONFIG_PPC_BOOK3S_64
-	smsr |= MSR_ISF | MSR_HV;
+	smsr |= MSR_ISF;
+
+	/* for PPC970 chip, its HV bit is hard-wired to 1. For others,
+	 * we should clear HV bit.
+	 */
+	if ((PVR_VER(guest_pvr) == PVR_970) ||
+	    (PVR_VER(guest_pvr) == PVR_970FX) ||
+	    (PVR_VER(guest_pvr) == PVR_970MP) ||
+	    (PVR_VER(guest_pvr) == PVR_970GX))
+		smsr |= MSR_HV;
 #endif
 	vcpu->arch.shadow_msr = smsr;
 }
