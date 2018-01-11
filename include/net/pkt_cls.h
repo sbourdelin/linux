@@ -755,7 +755,10 @@ struct tc_red_qopt_offload {
 	u32 handle;
 	u32 parent;
 	union {
-		struct tc_red_qopt_offload_params set;
+		struct {
+			struct tc_red_qopt_offload_params set;
+			struct gnet_stats_queue *qstats;
+		};
 		struct tc_qopt_offload_stats stats;
 		struct red_stats *xstats;
 	};

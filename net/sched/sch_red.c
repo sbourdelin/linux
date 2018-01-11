@@ -167,8 +167,10 @@ static int red_offload(struct Qdisc *sch, bool enable)
 		opt.set.max = q->parms.qth_max >> q->parms.Wlog;
 		opt.set.probability = q->parms.max_P;
 		opt.set.is_ecn = red_use_ecn(q);
+		opt.qstats = &sch->qstats;
 	} else {
 		opt.command = TC_RED_DESTROY;
+		opt.qstats = &sch->qstats;
 	}
 
 	return dev->netdev_ops->ndo_setup_tc(dev, TC_SETUP_QDISC_RED, &opt);
@@ -322,7 +324,6 @@ static int red_dump(struct Qdisc *sch, struct sk_buff *skb)
 	};
 	int err;
 
-	sch->qstats.backlog = q->qdisc->qstats.backlog;
 	err = red_dump_offload_stats(sch, &opt);
 	if (err)
 		goto nla_put_failure;

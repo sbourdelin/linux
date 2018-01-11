@@ -54,7 +54,8 @@ struct mlxsw_sp_qdisc_ops {
 	int (*replace)(struct mlxsw_sp_port *mlxsw_sp_port,
 		       struct mlxsw_sp_qdisc *mlxsw_sp_qdisc, void *params);
 	int (*destroy)(struct mlxsw_sp_port *mlxsw_sp_port,
-		       struct mlxsw_sp_qdisc *mlxsw_sp_qdisc);
+		       struct mlxsw_sp_qdisc *mlxsw_sp_qdisc,
+		       struct gnet_stats_queue *qstats);
 	int (*get_stats)(struct mlxsw_sp_port *mlxsw_sp_port,
 			 struct mlxsw_sp_qdisc *mlxsw_sp_qdisc,
 			 struct tc_qopt_offload_stats *stats_ptr);
@@ -76,6 +77,7 @@ struct mlxsw_sp_qdisc {
 		u64 tx_packets;
 		u64 drops;
 		u64 overlimits;
+		u64 backlog;
 	} stats_base;
 
 	struct mlxsw_sp_qdisc_ops *ops;
@@ -92,7 +94,8 @@ mlxsw_sp_qdisc_compare(struct mlxsw_sp_qdisc *mlxsw_sp_qdisc, u32 handle,
 
 static int
 mlxsw_sp_qdisc_destroy(struct mlxsw_sp_port *mlxsw_sp_port,
-		       struct mlxsw_sp_qdisc *mlxsw_sp_qdisc)
+		       struct mlxsw_sp_qdisc *mlxsw_sp_qdisc,
+		       struct gnet_stats_queue *qstats)
 {
 	int err = 0;
 
@@ -101,7 +104,8 @@ mlxsw_sp_qdisc_destroy(struct mlxsw_sp_port *mlxsw_sp_port,
 
 	if (mlxsw_sp_qdisc->ops && mlxsw_sp_qdisc->ops->destroy)
 		err = mlxsw_sp_qdisc->ops->destroy(mlxsw_sp_port,
-						   mlxsw_sp_qdisc);
+						   mlxsw_sp_qdisc,
+						   qstats);
 
 	mlxsw_sp_qdisc->handle = TC_H_UNSPEC;
 	mlxsw_sp_qdisc->ops = NULL;
@@ -111,7 +115,8 @@ mlxsw_sp_qdisc_destroy(struct mlxsw_sp_port *mlxsw_sp_port,
 static int
 mlxsw_sp_qdisc_replace(struct mlxsw_sp_port *mlxsw_sp_port, u32 handle,
 		       struct mlxsw_sp_qdisc *mlxsw_sp_qdisc,
-		       struct mlxsw_sp_qdisc_ops *ops, void *params)
+		       struct mlxsw_sp_qdisc_ops *ops, void *params,
+		       struct gnet_stats_queue *qstats)
 {
 	int err;
 
@@ -121,7 +126,7 @@ mlxsw_sp_qdisc_replace(struct mlxsw_sp_port *mlxsw_sp_port, u32 handle,
 		 * Otherwise, we need to remove the old qdisc before setting the
 		 * new one.
 		 */
-		mlxsw_sp_qdisc_destroy(mlxsw_sp_port, mlxsw_sp_qdisc);
+		mlxsw_sp_qdisc_destroy(mlxsw_sp_port, mlxsw_sp_qdisc, qstats);
 	err = ops->check_params(mlxsw_sp_port, mlxsw_sp_qdisc, params);
 	if (err)
 		goto err_bad_param;
@@ -141,7 +146,7 @@ mlxsw_sp_qdisc_replace(struct mlxsw_sp_port *mlxsw_sp_port, u32 handle,
 
 err_bad_param:
 err_config:
-	mlxsw_sp_qdisc_destroy(mlxsw_sp_port, mlxsw_sp_qdisc);
+	mlxsw_sp_qdisc_destroy(mlxsw_sp_port, mlxsw_sp_qdisc, qstats);
 	return err;
 }
 
@@ -238,8 +243,10 @@ mlxsw_sp_setup_tc_qdisc_red_clean_stats(struct mlxsw_sp_port *mlxsw_sp_port,
 
 static int
 mlxsw_sp_qdisc_red_destroy(struct mlxsw_sp_port *mlxsw_sp_port,
-			   struct mlxsw_sp_qdisc *mlxsw_sp_qdisc)
+			   struct mlxsw_sp_qdisc *mlxsw_sp_qdisc,
+			   struct gnet_stats_queue *qstats)
 {
+	qstats->backlog -= mlxsw_sp_qdisc->stats_base.backlog;
 	return mlxsw_sp_tclass_congestion_disable(mlxsw_sp_port,
 						  mlxsw_sp_qdisc->tclass_num);
 }
@@ -330,6 +337,7 @@ mlxsw_sp_qdisc_get_red_stats(struct mlxsw_sp_port *mlxsw_sp_port,
 	struct mlxsw_sp_qdisc_stats *stats_base;
 	struct mlxsw_sp_port_xstats *xstats;
 	struct rtnl_link_stats64 *stats;
+	s64 backlog;
 
 	xstats = &mlxsw_sp_port->periodic_hw_stats.xstats;
 	stats = &mlxsw_sp_port->periodic_hw_stats.stats;
@@ -341,18 +349,20 @@ mlxsw_sp_qdisc_get_red_stats(struct mlxsw_sp_port *mlxsw_sp_port,
 		     stats_base->overlimits;
 	drops = xstats->wred_drop[tclass_num] + xstats->tail_drop[tclass_num] -
 		stats_base->drops;
+	backlog = mlxsw_sp_cells_bytes(mlxsw_sp_port->mlxsw_sp,
+				       xstats->backlog[tclass_num]) -
+		stats_base->backlog;
 
 	_bstats_update(stats_ptr->bstats, tx_bytes, tx_packets);
 	stats_ptr->qstats->overlimits += overlimits;
 	stats_ptr->qstats->drops += drops;
-	stats_ptr->qstats->backlog +=
-			mlxsw_sp_cells_bytes(mlxsw_sp_port->mlxsw_sp,
-					     xstats->backlog[tclass_num]);
+	stats_ptr->qstats->backlog += backlog;
 
 	stats_base->drops +=  drops;
 	stats_base->overlimits += overlimits;
 	stats_base->tx_bytes += tx_bytes;
 	stats_base->tx_packets += tx_packets;
+	stats_base->backlog += backlog;
 	return 0;
 }
 
@@ -382,7 +392,7 @@ int mlxsw_sp_setup_tc_red(struct mlxsw_sp_port *mlxsw_sp_port,
 		return mlxsw_sp_qdisc_replace(mlxsw_sp_port, p->handle,
 					      mlxsw_sp_qdisc,
 					      &mlxsw_sp_qdisc_ops_red,
-					      &p->set);
+					      &p->set, p->qstats);
 
 	if (!mlxsw_sp_qdisc_compare(mlxsw_sp_qdisc, p->handle,
 				    MLXSW_SP_QDISC_RED))
@@ -390,7 +400,8 @@ int mlxsw_sp_setup_tc_red(struct mlxsw_sp_port *mlxsw_sp_port,
 
 	switch (p->command) {
 	case TC_RED_DESTROY:
-		return mlxsw_sp_qdisc_destroy(mlxsw_sp_port, mlxsw_sp_qdisc);
+		return mlxsw_sp_qdisc_destroy(mlxsw_sp_port, mlxsw_sp_qdisc,
+					      p->qstats);
 	case TC_RED_XSTATS:
 		return mlxsw_sp_qdisc_get_xstats(mlxsw_sp_port, mlxsw_sp_qdisc,
 						 p->xstats);
