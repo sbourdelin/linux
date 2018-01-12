@@ -127,6 +127,7 @@ extern int amdgpu_job_hang_limit;
 extern int amdgpu_lbpw;
 extern int amdgpu_compute_multipipe;
 extern int amdgpu_gpu_recovery;
+extern int amdgpu_alloc_no_oom;
 
 #ifdef CONFIG_DRM_AMDGPU_SI
 extern int amdgpu_si_support;

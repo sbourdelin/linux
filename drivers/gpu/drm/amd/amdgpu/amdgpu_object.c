@@ -420,6 +420,10 @@ static int amdgpu_bo_do_create(struct amdgpu_device *adev,
 #endif
 
 	bo->tbo.bdev = &adev->mman.bdev;
+
+	if (amdgpu_alloc_no_oom == 1)
+		bo->tbo.bdev->no_retry = true;
+
 	amdgpu_ttm_placement_from_domain(bo, domain);
 
 	r = ttm_bo_init_reserved(&adev->mman.bdev, &bo->tbo, size, type,
