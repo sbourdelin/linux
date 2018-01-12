@@ -1632,7 +1632,7 @@ nouveau_ttm_tt_unpopulate(struct ttm_tt *ttm)
 
 #if IS_ENABLED(CONFIG_SWIOTLB) && IS_ENABLED(CONFIG_X86)
 	if (swiotlb_nr_tbl()) {
-		ttm_dma_unpopulate((void *)ttm, dev);
+		ttm_dma_unpopulate((void *)ttm, dev, true);
 		return;
 	}
 #endif

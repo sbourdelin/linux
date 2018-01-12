@@ -681,7 +681,7 @@ static void vmw_ttm_unpopulate(struct ttm_tt *ttm)
 		size_t size =
 			ttm_round_pot(ttm->num_pages * sizeof(dma_addr_t));
 
-		ttm_dma_unpopulate(&vmw_tt->dma_ttm, dev_priv->dev->dev);
+		ttm_dma_unpopulate(&vmw_tt->dma_ttm, dev_priv->dev->dev, true);
 		ttm_mem_global_free(glob, size);
 	} else
 		ttm_pool_unpopulate(ttm);

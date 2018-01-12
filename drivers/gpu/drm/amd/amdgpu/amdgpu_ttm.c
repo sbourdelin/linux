@@ -1046,7 +1046,7 @@ static void amdgpu_ttm_tt_unpopulate(struct ttm_tt *ttm)
 
 #ifdef CONFIG_SWIOTLB
 	if (swiotlb_nr_tbl()) {
-		ttm_dma_unpopulate(&gtt->ttm, adev->dev);
+		ttm_dma_unpopulate(&gtt->ttm, adev->dev, true);
 		return;
 	}
 #endif

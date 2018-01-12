@@ -965,7 +965,7 @@ int ttm_dma_populate(struct ttm_dma_tt *ttm_dma, struct device *dev,
 		ret = ttm_mem_global_alloc_page(mem_glob, ttm->pages[i],
 						pool->size, ctx);
 		if (unlikely(ret != 0)) {
-			ttm_dma_unpopulate(ttm_dma, dev);
+			ttm_dma_unpopulate(ttm_dma, dev, false);
 			return -ENOMEM;
 		}
 
@@ -994,14 +994,14 @@ skip_huge:
 	while (num_pages) {
 		ret = ttm_dma_pool_get_pages(pool, ttm_dma, i);
 		if (ret != 0) {
-			ttm_dma_unpopulate(ttm_dma, dev);
+			ttm_dma_unpopulate(ttm_dma, dev, false);
 			return -ENOMEM;
 		}
 
 		ret = ttm_mem_global_alloc_page(mem_glob, ttm->pages[i],
 						pool->size, ctx);
 		if (unlikely(ret != 0)) {
-			ttm_dma_unpopulate(ttm_dma, dev);
+			ttm_dma_unpopulate(ttm_dma, dev, false);
 			return -ENOMEM;
 		}
 
@@ -1012,7 +1012,7 @@ skip_huge:
 	if (unlikely(ttm->page_flags & TTM_PAGE_FLAG_SWAPPED)) {
 		ret = ttm_tt_swapin(ttm);
 		if (unlikely(ret != 0)) {
-			ttm_dma_unpopulate(ttm_dma, dev);
+			ttm_dma_unpopulate(ttm_dma, dev, true);
 			return ret;
 		}
 	}
@@ -1023,7 +1023,8 @@ skip_huge:
 EXPORT_SYMBOL_GPL(ttm_dma_populate);
 
 /* Put all pages in pages list to correct pool to wait for reuse */
-void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma, struct device *dev)
+void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma, struct device *dev,
+			bool update_glob_count)
 {
 	struct ttm_tt *ttm = &ttm_dma->ttm;
 	struct dma_pool *pool;
@@ -1045,7 +1046,8 @@ void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma, struct device *dev)
 				continue;
 
 			count++;
-			ttm_mem_global_free_page(ttm->glob->mem_glob,
+			if (update_glob_count)
+				ttm_mem_global_free_page(ttm->glob->mem_glob,
 						 d_page->p, pool->size);
 			ttm_dma_page_put(pool, d_page);
 		}
@@ -1090,11 +1092,12 @@ void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma, struct device *dev)
 
 	if (is_cached) {
 		list_for_each_entry_safe(d_page, next, &ttm_dma->pages_list, page_list) {
-			ttm_mem_global_free_page(ttm->glob->mem_glob,
+			if (update_glob_count)
+				ttm_mem_global_free_page(ttm->glob->mem_glob,
 						 d_page->p, pool->size);
 			ttm_dma_page_put(pool, d_page);
 		}
-	} else {
+	} else if (update_glob_count) {
 		for (i = 0; i < count; i++) {
 			ttm_mem_global_free_page(ttm->glob->mem_glob,
 						 ttm->pages[i], pool->size);

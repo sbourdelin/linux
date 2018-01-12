@@ -92,7 +92,8 @@ int ttm_dma_page_alloc_debugfs(struct seq_file *m, void *data);
 
 int ttm_dma_populate(struct ttm_dma_tt *ttm_dma, struct device *dev,
 			struct ttm_operation_ctx *ctx);
-void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma, struct device *dev);
+void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma, struct device *dev,
+			bool update_glob_count);
 
 #else
 static inline int ttm_dma_page_alloc_init(struct ttm_mem_global *glob,
@@ -114,7 +115,7 @@ static inline int ttm_dma_populate(struct ttm_dma_tt *ttm_dma,
 	return -ENOMEM;
 }
 static inline void ttm_dma_unpopulate(struct ttm_dma_tt *ttm_dma,
-				      struct device *dev)
+		struct device *dev, bool update_glob_count);
 {
 }
 #endif

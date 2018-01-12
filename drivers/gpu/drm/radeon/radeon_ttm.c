@@ -789,7 +789,7 @@ static void radeon_ttm_tt_unpopulate(struct ttm_tt *ttm)
 
 #ifdef CONFIG_SWIOTLB
 	if (swiotlb_nr_tbl()) {
-		ttm_dma_unpopulate(&gtt->ttm, rdev->dev);
+		ttm_dma_unpopulate(&gtt->ttm, rdev->dev, true);
 		return;
 	}
 #endif
