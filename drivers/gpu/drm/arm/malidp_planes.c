@@ -35,6 +35,9 @@
 #define   LAYER_COMP_MASK		(0x3 << 12)
 #define   LAYER_COMP_PIXEL		(0x3 << 12)
 #define   LAYER_COMP_PLANE		(0x2 << 12)
+#define   LAYER_ALPHA_OFFSET	(16)
+#define   LAYER_ALPHA_MASK		(0xff)
+#define	  LAYER_ALPHA(x)		(((x) & LAYER_ALPHA_MASK) << LAYER_ALPHA_OFFSET)
 #define MALIDP_LAYER_COMPOSE		0x008
 #define MALIDP_LAYER_SIZE		0x00c
 #define   LAYER_H_VAL(x)		(((x) & 0x1fff) << 0)
@@ -269,6 +272,7 @@ static void malidp_de_plane_update(struct drm_plane *plane,
 	struct malidp_plane_state *ms = to_malidp_plane_state(plane->state);
 	u32 src_w, src_h, dest_w, dest_h, val;
 	int i;
+	u8 alpha_bits = plane->state->fb->format->alpha;
 
 	mp = to_malidp_plane(plane);
 
@@ -320,12 +324,25 @@ static void malidp_de_plane_update(struct drm_plane *plane,
 	if (plane->state->rotation & DRM_MODE_REFLECT_Y)
 		val |= LAYER_V_FLIP;
 
-	/*
-	 * always enable pixel alpha blending until we have a way to change
-	 * blend modes
-	 */
 	val &= ~LAYER_COMP_MASK;
-	val |= LAYER_COMP_PIXEL;
+	if (alpha_bits > 0) {
+
+		/*
+		 * always enable pixel alpha blending until we have a way to change
+		 * blend modes
+		 */
+		val |= LAYER_COMP_PIXEL;
+	} else {
+
+		/*
+		 * do not enable pixel alpha blending as the color channel does not
+		 * have any alpha information
+		 */
+		val |= LAYER_COMP_PLANE;
+
+		/* Set layer alpha coefficient to 0xff ie fully opaque */
+		val |= LAYER_ALPHA(0xff);
+	}
 
 	val &= ~LAYER_FLOWCFG(LAYER_FLOWCFG_MASK);
 	if (plane->state->crtc) {
