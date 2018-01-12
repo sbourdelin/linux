@@ -1353,8 +1353,7 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 
 	/* Set the Version Strings.
 	 */
-	strncpy (karg->driverVersion, MPT_LINUX_PACKAGE_NAME, MPT_IOCTL_VERSION_LENGTH);
-	karg->driverVersion[MPT_IOCTL_VERSION_LENGTH-1]='\0';
+	strlcpy (karg->driverVersion, MPT_LINUX_PACKAGE_NAME, MPT_IOCTL_VERSION_LENGTH);
 
 	karg->busChangeEvent = 0;
 	karg->hostId = ioc->pfacts[port].PortSCSIID;
@@ -1542,10 +1541,8 @@ mptctl_readtest (unsigned long arg)
 #else
 	karg.chip_type = ioc->pcidev->device;
 #endif
-	strncpy (karg.name, ioc->name, MPT_MAX_NAME);
-	karg.name[MPT_MAX_NAME-1]='\0';
-	strncpy (karg.product, ioc->prod_name, MPT_PRODUCT_LENGTH);
-	karg.product[MPT_PRODUCT_LENGTH-1]='\0';
+	strlcpy (karg.name, ioc->name, MPT_MAX_NAME);
+	strlcpy (karg.product, ioc->prod_name, MPT_PRODUCT_LENGTH);
 
 	/* Copy the data from kernel memory to user memory
 	 */
@@ -2513,7 +2510,7 @@ mptctl_hp_hostinfo(unsigned long arg, unsigned int data_size)
 	cfg.dir = 0;	/* read */
 	cfg.timeout = 10;
 
-	strncpy(karg.serial_number, " ", 24);
+	strlcpy(karg.serial_number, " ", 24);
 	if (mpt_config(ioc, &cfg) == 0) {
 		if (cfg.cfghdr.hdr->PageLength > 0) {
 			/* Issue the second config page request */
@@ -2525,8 +2522,8 @@ mptctl_hp_hostinfo(unsigned long arg, unsigned int data_size)
 				if (mpt_config(ioc, &cfg) == 0) {
 					ManufacturingPage0_t *pdata = (ManufacturingPage0_t *) pbuf;
 					if (strlen(pdata->BoardTracerNumber) > 1) {
-						strncpy(karg.serial_number, 									    pdata->BoardTracerNumber, 24);
-						karg.serial_number[24-1]='\0';
+						strlcpy(karg.serial_number,
+							pdata->BoardTracerNumber, 24);
 					}
 				}
 				pci_free_consistent(ioc->pcidev, hdr.PageLength * 4, pbuf, buf_dma);
