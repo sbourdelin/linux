@@ -38,6 +38,7 @@ struct drm_mode_fb_cmd2;
  * @cpp: Number of bytes per pixel (per plane)
  * @hsub: Horizontal chroma subsampling factor
  * @vsub: Vertical chroma subsampling factor
+ * @alpha: Number of bits per pixel representing alpha
  */
 struct drm_format_info {
 	u32 format;
@@ -46,6 +47,7 @@ struct drm_format_info {
 	u8 cpp[3];
 	u8 hsub;
 	u8 vsub;
+	u8 alpha;
 };
 
 /**
@@ -57,6 +59,7 @@ struct drm_format_name_buf {
 };
 
 const struct drm_format_info *__drm_format_info(u32 format);
+int drm_format_alpha_bits(u32 format);
 const struct drm_format_info *drm_format_info(u32 format);
 const struct drm_format_info *
 drm_get_format_info(struct drm_device *dev,
