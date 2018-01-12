@@ -1295,7 +1295,7 @@ static int setcmap_pseudo_palette(struct fb_cmap *cmap, struct fb_info *info)
 			mask <<= info->var.transp.offset;
 			value |= mask;
 		}
-		palette[cmap->start + i] = value;
+		palette[cmap->start] = value;
 	}
 
 	return 0;
