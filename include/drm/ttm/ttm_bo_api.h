@@ -176,6 +176,7 @@ struct ttm_buffer_object {
 	unsigned long num_pages;
 	size_t acc_size;
 
+
 	/**
 	* Members not needing protection.
 	*/
