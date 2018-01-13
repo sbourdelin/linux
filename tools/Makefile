@@ -18,6 +18,7 @@ help:
 	@echo '  hv                     - tools used when in Hyper-V clients'
 	@echo '  iio                    - IIO tools'
 	@echo '  kvm_stat               - top-like utility for displaying kvm statistics'
+	@echo '  kmsg                   - A tool for decrypting a dmesg using a private key'
 	@echo '  leds                   - LEDs  tools'
 	@echo '  liblockdep             - user-space wrapper for kernel locking-validator'
 	@echo '  bpf                    - misc BPF tools'
@@ -90,6 +91,9 @@ freefall: FORCE
 
 kvm_stat: FORCE
 	$(call descend,kvm/$@)
+
+kmsg: FORCE
+	$(call descend,kmsg)
 
 all: acpi cgroup cpupower gpio hv firewire liblockdep \
 		perf selftests spi turbostat usb \
@@ -167,6 +171,9 @@ tmon_clean:
 freefall_clean:
 	$(call descend,laptop/freefall,clean)
 
+kmsg_clean:
+	$(call descend,kmsg,clean)
+
 build_clean:
 	$(call descend,build,clean)
 
@@ -174,6 +181,6 @@ clean: acpi_clean cgroup_clean cpupower_clean hv_clean firewire_clean \
 		perf_clean selftests_clean turbostat_clean spi_clean usb_clean virtio_clean \
 		vm_clean bpf_clean iio_clean x86_energy_perf_policy_clean tmon_clean \
 		freefall_clean build_clean libbpf_clean libsubcmd_clean liblockdep_clean \
-		gpio_clean objtool_clean leds_clean wmi_clean
+		gpio_clean objtool_clean leds_clean wmi_clean kmsg_clean
 
 .PHONY: FORCE
