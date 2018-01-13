@@ -1319,14 +1319,16 @@ static int lmv_process_config(struct obd_device *obd, u32 len, void *buf)
 
 		obd_str2uuid(&obd_uuid,  lustre_cfg_buf(lcfg, 1));
 
-		if (sscanf(lustre_cfg_buf(lcfg, 2), "%u", &index) != 1) {
-			rc = -EINVAL;
+		rc = kstrtou32(lustre_cfg_buf(lcfg, 2), 0, &index);
+
+		if (rc)
 			goto out;
-		}
-		if (sscanf(lustre_cfg_buf(lcfg, 3), "%d", &gen) != 1) {
-			rc = -EINVAL;
+
+		rc = kstrtoint(lustre_cfg_buf(lcfg, 3), 0, &gen);
+
+		if (rc)
 			goto out;
-		}
+
 		rc = lmv_add_target(obd, &obd_uuid, index, gen);
 		goto out;
 	default:
