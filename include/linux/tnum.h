@@ -13,6 +13,8 @@ struct tnum {
 };
 
 /* Constructors */
+/* Statically tnum constant */
+#define TNUM(_v, _m)	(struct tnum){.value = _v, .mask = _m}
 /* Represent a known constant as a tnum. */
 struct tnum tnum_const(u64 value);
 /* A completely unknown value */
@@ -26,7 +28,7 @@ struct tnum tnum_lshift(struct tnum a, u8 shift);
 /* Shift a tnum right (by a fixed shift) */
 struct tnum tnum_rshift(struct tnum a, u8 shift);
 /* Add two tnums, return @a + @b */
-struct tnum tnum_add(struct tnum a, struct tnum b);
+void tnum_add(struct tnum *res, struct tnum *a, struct tnum *b);
 /* Subtract two tnums, return @a - @b */
 struct tnum tnum_sub(struct tnum a, struct tnum b);
 /* Bitwise-AND, return @a & @b */
