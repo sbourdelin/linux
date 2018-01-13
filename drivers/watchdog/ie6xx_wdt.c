@@ -205,10 +205,8 @@ static int ie6xx_wdt_dbg_show(struct seq_file *s, void *unused)
 		inw(ie6xx_wdt_data.sch_wdtba + WDTCR));
 	seq_printf(s, "DCR   = 0x%08x\n",
 		inl(ie6xx_wdt_data.sch_wdtba + DCR));
-	seq_printf(s, "WDTLR = 0x%08x\n",
-		inw(ie6xx_wdt_data.sch_wdtba + WDTLR));
-
-	seq_printf(s, "\n");
+	seq_printf(s, "WDTLR = 0x%08x\n\n",
+		   inw(ie6xx_wdt_data.sch_wdtba + WDTLR));
 	return 0;
 }
 
