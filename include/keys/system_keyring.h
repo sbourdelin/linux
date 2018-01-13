@@ -13,6 +13,7 @@
 #define _KEYS_SYSTEM_KEYRING_H
 
 #include <linux/key.h>
+#include <keys/asymmetric-type.h>
 
 #ifdef CONFIG_SYSTEM_TRUSTED_KEYRING
 
@@ -61,5 +62,7 @@ static inline struct key *get_ima_blacklist_keyring(void)
 }
 #endif /* CONFIG_IMA_BLACKLIST_KEYRING */
 
+struct key *find_trusted_asymmetric_key(const struct asymmetric_key_id *id_0,
+					const struct asymmetric_key_id *id_1);
 
 #endif /* _KEYS_SYSTEM_KEYRING_H */

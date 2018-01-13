@@ -131,6 +131,8 @@ static __init int system_trusted_keyring_init(void)
  */
 device_initcall(system_trusted_keyring_init);
 
+static char *first_asymmetric_key_description;
+
 /*
  * Load the compiled-in list of X.509 certificates.
  */
@@ -172,8 +174,11 @@ static __init int load_system_certificate_list(void)
 			pr_err("Problem loading in-kernel X.509 certificate (%ld)\n",
 			       PTR_ERR(key));
 		} else {
+			first_asymmetric_key_description =
+				kstrdup(key_ref_to_ptr(key)->description,
+					GFP_KERNEL);
 			pr_notice("Loaded X.509 cert '%s'\n",
-				  key_ref_to_ptr(key)->description);
+				  first_asymmetric_key_description);
 			key_ref_put(key);
 		}
 		p += plen;
@@ -265,3 +270,52 @@ error:
 EXPORT_SYMBOL_GPL(verify_pkcs7_signature);
 
 #endif /* CONFIG_SYSTEM_DATA_VERIFICATION */
+
+/**
+ * get_first_asymmetric_key - Find a key by ID.
+ * @keyring: The keys to search.
+ *
+ * Return the first asymmetric key in a keyring.
+ */
+static struct key *get_first_asymmetric_key(struct key *keyring)
+{
+	key_ref_t ref;
+
+	ref = keyring_search(make_key_ref(keyring, 1),
+			     &key_type_asymmetric,
+			     first_asymmetric_key_description);
+	if (IS_ERR(ref)) {
+		switch (PTR_ERR(ref)) {
+		case -EACCES:
+		case -ENOTDIR:
+		case -EAGAIN:
+			return ERR_PTR(-ENOKEY);
+		default:
+			return ERR_CAST(ref);
+		}
+	}
+
+	return key_ref_to_ptr(ref);
+}
+
+/**
+ * find_trusted_asymmetric_key - Find a key by ID in the builtin trusted
+ * keys keyring, or return the first key in that keyring.
+ *
+ * @id_0: The first ID to look for or NULL.
+ * @id_1: The second ID to look for or NULL.
+ *
+ * The preferred identifier is the id_0 and the fallback identifier is
+ * the id_1. If both are given, the lookup is by the former, but the
+ * latter must also match. If none are given, the first key is returned.
+ */
+struct key *find_trusted_asymmetric_key(const struct asymmetric_key_id *id_0,
+					const struct asymmetric_key_id *id_1)
+{
+	struct key *keyring = builtin_trusted_keys;
+
+	if (!id_0 && !id_1)
+		return get_first_asymmetric_key(keyring);
+
+	return find_asymmetric_key(keyring, id_0, id_1, false);
+}
