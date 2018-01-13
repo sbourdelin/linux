@@ -116,7 +116,7 @@ int ceph_crypto_key_unarmor(struct ceph_crypto_key *key, const char *inkey)
 	buf = kmalloc(blen, GFP_NOFS);
 	if (!buf)
 		return -ENOMEM;
-	blen = base64_unarmor(buf, inkey, inkey+inlen);
+	blen = base64_unarmor(buf, blen, inkey, inkey+inlen);
 	if (blen < 0) {
 		kfree(buf);
 		return blen;

@@ -33,7 +33,7 @@ static int decode_bits(char c)
 	return -EINVAL;
 }
 
-int base64_armor(char *dst, const char *src, const char *end)
+int base64_armor(char *dst, int dst_max, const char *src, const char *end)
 {
 	int olen = 0;
 	int line = 0;
@@ -42,6 +42,8 @@ int base64_armor(char *dst, const char *src, const char *end)
 		unsigned char a, b, c;
 
 		a = *src++;
+		if (dst_max < 4)
+			return -ENOSPC;
 		*dst++ = encode_bits(a >> 2);
 		if (src < end) {
 			b = *src++;
@@ -62,17 +64,22 @@ int base64_armor(char *dst, const char *src, const char *end)
 		}
 		olen += 4;
 		line += 4;
+		dst_max -= 4;
+
 		if (line == 64) {
 			line = 0;
+			if (dst_max < 1)
+				return -ENOSPC;
 			*(dst++) = '\n';
 			olen++;
+			dst_max--;
 		}
 	}
 	return olen;
 }
 EXPORT_SYMBOL(base64_unarmor);
 
-int base64_unarmor(char *dst, const char *src, const char *end)
+int base64_unarmor(char *dst, int dst_max, const char *src, const char *end)
 {
 	int olen = 0;
 
@@ -92,13 +99,22 @@ int base64_unarmor(char *dst, const char *src, const char *end)
 		if (a < 0 || b < 0 || c < 0 || d < 0)
 			return -EINVAL;
 
+		if (dst_max < 1)
+			return -ENOSPC;
 		*dst++ = (a << 2) | (b >> 4);
+		dst_max--;
 		if (src[2] == '=')
 			return olen + 1;
+		if (dst_max < 1)
+			return -ENOSPC;
 		*dst++ = ((b & 15) << 4) | (c >> 2);
+		dst_max--;
 		if (src[3] == '=')
 			return olen + 2;
+		if (dst_max < 1)
+			return -ENOSPC;
 		*dst++ = ((c & 3) << 6) | d;
+		dst_max--;
 		olen += 3;
 		src += 4;
 	}

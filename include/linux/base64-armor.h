@@ -8,11 +8,13 @@
  * not contain newlines, depending on input length.
  *
  * @dst: Beginning of the destination buffer.
+ * @dst_max: Maximum amount of bytes to write to the destination buffer.
  * @src: Beginning of the source buffer.
  * @end: Sentinel for the source buffer, pointing one byte after the
  *       last byte to be encoded.
  *
- * Returns the number of bytes written to the destination buffer.
+ * Returns the number of bytes written to the destination buffer, or
+ * an error of the output buffer is insufficient in size.
  *
  * _Neither_ the input or output are expected to be NULL-terminated.
  *
@@ -22,19 +24,21 @@
  *
  * See base64_encode_buffer_bound below.
  */
-
-extern int base64_armor(char *dst, const char *src, const char *end);
+extern int base64_armor(char *dst, int dst_max, const char *src,
+			const char *end);
 
 /**
  * base64_unarmor: Perform armored base64 decoding.
  *
  * @dst: Beginning of the destination buffer.
+ * @dst_max: Maximum amount of bytes to write to the destination buffer.
  * @src: Beginning of the source buffer
  * @end: Sentinel for the source buffer, pointing one byte after the
  *       last byte to be encoded.
  *
- * Returns the number of bytes written to the destination buffer, or
- * -EINVAL if the source buffer contains invalid bytes.
+ * Returns the number of bytes written to the destination buffer,
+ * -EINVAL if the source buffer contains invalid bytes, or -ENOSPC
+ * if the output buffer is insufficient in size.
  *
  * _Neither_ the input or output are expected to be NULL-terminated.
  *
@@ -43,7 +47,8 @@ extern int base64_armor(char *dst, const char *src, const char *end);
  *
  * See base64_decode_buffer_bound below.
  */
-extern int base64_unarmor(char *dst, const char *src, const char *end);
+extern int base64_unarmor(char *dst, int dst_max, const char *src,
+			  const char *end);
 
 
 /*
