@@ -48,6 +48,14 @@
 #include <linux/sched/clock.h>
 #include <linux/sched/debug.h>
 #include <linux/sched/task_stack.h>
+#include <linux/scatterlist.h>
+#include <linux/random.h>
+#include <linux/base64-armor.h>
+#include <crypto/akcipher.h>
+#include <crypto/public_key.h>
+#include <crypto/aead.h>
+#include <uapi/linux/kmsg.h>
+#include <keys/system_keyring.h>
 
 #include <linux/uaccess.h>
 #include <asm/sections.h>
@@ -99,6 +107,10 @@ enum devkmsg_log_masks {
 	DEVKMSG_LOG_MASK_OFF            = BIT(__DEVKMSG_LOG_BIT_OFF),
 	DEVKMSG_LOG_MASK_LOCK           = BIT(__DEVKMSG_LOG_BIT_LOCK),
 };
+
+#define CRYPT_KMSG_KEY_LEN         16
+#define CRYPT_KMSG_AUTH_LEN        16
+#define CRYPT_KMSG_TEXT_META_MAX   32
 
 /* Keep both the 'on' and 'off' bits clear, i.e. ratelimit by default: */
 #define DEVKMSG_LOG_MASK_DEFAULT	0
@@ -744,12 +756,33 @@ static ssize_t msg_print_ext_body(char *buf, size_t size,
 	return p - buf;
 }
 
+#ifdef CONFIG_KMSG_ENCRYPTION
+static int __ro_after_init kmsg_encrypt = 1;
+static int __init control_kmsg_encrypt(char *str)
+{
+	get_option(&str, &kmsg_encrypt);
+	return 0;
+}
+__setup("kmsg_encrypt=", control_kmsg_encrypt);
+
+struct devkmsg_crypt {
+	u8 key[CRYPT_KMSG_KEY_LEN];
+	u8 *encrypted_key;
+	size_t encrypted_key_len;
+	bool encrypted_key_read;
+	struct crypto_aead *sk_tfm;
+};
+#else
+struct devkmsg_crypt {};
+#endif
+
 /* /dev/kmsg - userspace message inject/listen interface */
 struct devkmsg_user {
 	u64 seq;
 	u32 idx;
 	struct ratelimit_state rs;
 	struct mutex lock;
+	struct devkmsg_crypt crypt;
 	char buf[CONSOLE_EXT_LOG_MAX];
 };
 
@@ -816,6 +849,358 @@ static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
 	return ret;
 }
 
+#ifdef CONFIG_KMSG_ENCRYPTION
+
+static int devkmsg_encrypt_key(struct devkmsg_crypt *crypt,
+			       struct crypto_akcipher *ak_tfm)
+{
+	const struct public_key *pkey;
+	struct akcipher_request *req;
+	unsigned int out_len_max;
+	struct scatterlist src, dst;
+	void *outbuf_enc = NULL;
+	struct crypto_wait wait;
+	struct key *key;
+	int err;
+
+	if (!kmsg_encrypt)
+		return 0;
+
+	key = find_trusted_asymmetric_key(NULL, NULL);
+	if (IS_ERR(key))
+		return PTR_ERR(key);
+
+	pkey = key->payload.data[asym_crypto];
+	BUG_ON(!pkey);
+
+	err = -ENOMEM;
+	req = akcipher_request_alloc(ak_tfm, GFP_KERNEL);
+	if (!req)
+		goto exit2;
+
+	err = crypto_akcipher_set_pub_key(ak_tfm,
+					  pkey->key, pkey->keylen);
+	if (err)
+		goto exit;
+
+	err = -ENOMEM;
+	out_len_max = crypto_akcipher_maxsize(ak_tfm);
+	outbuf_enc = kzalloc(out_len_max, GFP_KERNEL);
+	if (!outbuf_enc)
+		goto exit;
+
+	crypto_init_wait(&wait);
+	sg_init_one(&src, crypt->key, sizeof(crypt->key));
+	sg_init_one(&dst, outbuf_enc, out_len_max);
+	akcipher_request_set_crypt(req, &src, &dst, sizeof(crypt->key),
+				   out_len_max);
+	akcipher_request_set_callback(req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+				      crypto_req_done, &wait);
+
+	err = crypto_wait_req(crypto_akcipher_encrypt(req), &wait);
+	if (err) {
+		kfree(outbuf_enc);
+		goto exit;
+	}
+
+	crypt->encrypted_key_len = req->dst_len;
+	crypt->encrypted_key = outbuf_enc;
+
+exit:
+	akcipher_request_free(req);
+exit2:
+	key_put(key);
+	return err;
+}
+
+static int devkmsg_crypt_init(struct devkmsg_crypt *crypt)
+{
+	struct crypto_akcipher *ak_tfm;
+	struct crypto_aead *sk_tfm;
+	int err;
+
+	if (!kmsg_encrypt)
+		return 0;
+
+	crypt->encrypted_key = NULL;
+	crypt->encrypted_key_len = 0;
+	crypt->encrypted_key_read = false;
+
+	sk_tfm = crypto_alloc_aead("gcm(aes)", 0, 0);
+	if (IS_ERR(sk_tfm))
+		return PTR_ERR(sk_tfm);
+
+	get_random_bytes(crypt->key, sizeof(crypt->key));
+
+	err = crypto_aead_setkey(sk_tfm, crypt->key, sizeof(crypt->key));
+	if (err < 0)
+		goto fail;
+
+	err = crypto_aead_setauthsize(sk_tfm, CRYPT_KMSG_AUTH_LEN);
+	if (err < 0)
+		goto fail;
+
+	ak_tfm = crypto_alloc_akcipher("pkcs1pad(rsa,sha256)", 0, 0);
+	if (IS_ERR(ak_tfm)) {
+		err = PTR_ERR(ak_tfm);
+		goto fail;
+	}
+
+	err = devkmsg_encrypt_key(crypt, ak_tfm);
+	crypto_free_akcipher(ak_tfm);
+
+	if (err < 0)
+		goto fail;
+
+	crypt->sk_tfm = sk_tfm;
+	return 0;
+
+fail:
+	crypto_free_aead(sk_tfm);
+	return err;
+}
+
+static void devkmsg_crypt_free(struct devkmsg_crypt *crypt)
+{
+	if (!kmsg_encrypt)
+		return;
+
+	crypto_free_aead(crypt->sk_tfm);
+	kfree(crypt->encrypted_key);
+}
+
+static int devkmsg_encrypt_inplace(struct devkmsg_user *user,
+				   size_t hdr_len, size_t len,
+				   size_t *out_len)
+{
+	DECLARE_CRYPTO_WAIT(wait);
+	const char *newline_pos;
+	const char *prefix = "M:";
+	char suffix[CRYPT_KMSG_TEXT_META_MAX], *ciphertext_start;
+	int all_cryptmsg_encoded_len;
+	int ciphertext_len;
+	int ciphertext_with_auth;
+	int ciphertext_with_auth_iv;
+	int armored_ciphertext_with_auth_iv;
+	int dict_len;
+	int prefix_len = strlen(prefix);
+	int suffix_size;
+	int i;
+	size_t len_no_newline;
+	ssize_t ret;
+	struct aead_request *aead_req;
+	struct scatterlist sgio_in;
+	struct scatterlist sgio_out;
+	u8 *iv;
+	unsigned int iv_len;
+
+	if (!kmsg_encrypt)
+		return 0;
+
+	newline_pos = strnchr(user->buf, len, '\n');
+	if (!newline_pos)
+		return -EINVAL;
+
+	/* We do not encrypt the dict, but only the free-form text. */
+	len_no_newline = newline_pos - user->buf;
+
+	/* If dict_len == 1 it's an empty dict, only a '\n' */
+	dict_len = len - len_no_newline;
+
+	aead_req = aead_request_alloc(user->crypt.sk_tfm, GFP_KERNEL);
+	if (!aead_req)
+		return -ENOMEM;
+
+	iv_len = crypto_aead_ivsize(user->crypt.sk_tfm);
+
+	ciphertext_len = len_no_newline - hdr_len;
+	ciphertext_with_auth = ciphertext_len + CRYPT_KMSG_AUTH_LEN;
+	ciphertext_with_auth_iv = ciphertext_with_auth + iv_len;
+
+	armored_ciphertext_with_auth_iv =
+	    base64_encode_buffer_bound(ciphertext_with_auth_iv);
+
+	all_cryptmsg_encoded_len = hdr_len + prefix_len +
+	    armored_ciphertext_with_auth_iv;
+
+	suffix_size =
+		scnprintf(suffix, sizeof(suffix), ",%u,%u",
+			  CRYPT_KMSG_AUTH_LEN, iv_len);
+
+	/*
+	 * Check that we are not overflowing with the rearrangement
+	 * of the encrypted message.
+	 */
+	ret = -EINVAL;
+	if (all_cryptmsg_encoded_len + suffix_size + dict_len +
+	    CRYPT_KMSG_TEXT_META_MAX + ciphertext_with_auth
+	    > sizeof(user->buf))
+		goto out;
+
+	/* Move away the dict farther down so we don't overwrite it */
+	if (dict_len > 0)
+		memmove(&user->buf[all_cryptmsg_encoded_len + suffix_size],
+			&user->buf[len_no_newline],
+			dict_len);
+
+	/*
+	 * We are using the end of user->buf as a staging area for the
+	 * ciphertext + auth + iv, before we do base64-encoding of it,
+	 * writing the encoded output to its original place, right
+	 * after the prefix.
+	 */
+
+	/* Initialize IV */
+	iv = &user->buf[sizeof(user->buf) - iv_len];
+
+	get_random_bytes(iv, iv_len);
+
+	/* Do the encryption */
+	sg_init_one(&sgio_in, user->buf + hdr_len, ciphertext_with_auth);
+	sg_init_one(&sgio_out, iv - ciphertext_with_auth, ciphertext_with_auth);
+	aead_request_set_crypt(aead_req, &sgio_in, &sgio_out,
+			       ciphertext_len, iv);
+	aead_request_set_ad(aead_req, 0);
+	aead_request_set_callback(aead_req, CRYPTO_TFM_REQ_MAY_BACKLOG,
+				  crypto_req_done, &wait);
+
+	ret = crypto_wait_req(crypto_aead_encrypt(aead_req), &wait);
+
+	if (ret)
+		goto out;
+
+	/* Base64-encode the ciphertext + auth code + IV */
+
+	BUG_ON(hdr_len <= 1);
+
+	ciphertext_start = &user->buf[hdr_len + prefix_len];
+	ret = base64_armor(ciphertext_start,
+			   armored_ciphertext_with_auth_iv,
+			   iv - ciphertext_with_auth,
+			   &user->buf[sizeof(user->buf)]);
+
+	BUG_ON(ret < 0); /* Should indicate a real bug buffer bounds */
+
+	/* Convert newlines to '~' */
+
+	for (i = 0; i < ret; i++)
+		if (ciphertext_start[i] == '\n')
+			ciphertext_start[i] = '~';
+
+	/* Add prefixes and suffixes */
+
+	memcpy(&user->buf[hdr_len], prefix, prefix_len);
+	memcpy(&user->buf[all_cryptmsg_encoded_len], suffix, suffix_size);
+
+	len = all_cryptmsg_encoded_len + suffix_size + dict_len;
+	BUG_ON(len > sizeof(user->buf));
+
+	*out_len = len;
+	ret = 0;
+
+out:
+	aead_request_free(aead_req);
+	return ret;
+}
+
+static ssize_t devkmsg_encrypt_onetime_piggyback_key(struct devkmsg_user *user,
+						     char __user *buf,
+						     size_t count)
+{
+	/*
+	 * Send down the encryted session key as the first message. We identify
+	 * it using the 'K:' prefix.
+	 */
+	const char *prefix = "7,0,0,-;K:";
+	size_t prefix_len;
+	size_t base64_len, i;
+	size_t len = 0;
+	char newline = '\n';
+
+	if (user->crypt.encrypted_key_len == 0 ||
+	    user->crypt.encrypted_key_read)
+		return 0;
+
+	prefix_len = strlen(prefix);
+
+	if (prefix_len > count)
+		return -EINVAL;
+
+	if (copy_to_user(buf, prefix, prefix_len))
+		return -EFAULT;
+
+	/* Hex-encode and copy to userspace */
+
+	len += prefix_len;
+
+	/* Base64-encode the ciphertext + auth code + IV */
+
+	base64_len = base64_armor(user->buf, sizeof(user->buf),
+		  user->crypt.encrypted_key,
+		  &user->crypt.encrypted_key[user->crypt.encrypted_key_len]);
+
+	BUG_ON(base64_len < 0); /* Should indicate a real bug buffer bounds */
+
+	/* Convert newlines to '~' */
+
+	for (i = 0; i < base64_len; i++)
+		if (user->buf[i] == '\n')
+			user->buf[i] = '~';
+
+	if (len + base64_len > count)
+		return -EINVAL;
+
+	if (copy_to_user(buf + len, user->buf, base64_len))
+		return -EFAULT;
+
+	len += base64_len;
+
+	if (len + 1 > count)
+		return -EINVAL;
+
+	if (copy_to_user(buf + len, &newline, 1))
+		return -EFAULT;
+
+	len += 1;
+
+	user->crypt.encrypted_key_read = true;
+	return len;
+}
+
+static bool devkmsg_crypt_allow_syslog(void)
+{
+	return kmsg_encrypt != 0;
+}
+
+#else
+
+static void devkmsg_crypt_free(struct devkmsg_crypt *crypt) {}
+static int devkmsg_crypt_init(struct devkmsg_crypt *crypt)
+{
+	return 0;
+}
+
+static int devkmsg_encrypt_inplace(struct devkmsg_user *user,
+				   size_t hdr_len, size_t len,
+				   size_t *out_len)
+{
+	return 0;
+}
+
+static ssize_t devkmsg_encrypt_onetime_piggyback_key(struct devkmsg_user *user,
+						     char __user *buf,
+						     size_t count)
+{
+	return 0;
+}
+
+static bool devkmsg_crypt_allow_syslog(void)
+{
+	return true;
+}
+
+#endif
+
 static ssize_t devkmsg_read(struct file *file, char __user *buf,
 			    size_t count, loff_t *ppos)
 {
@@ -823,6 +1208,7 @@ static ssize_t devkmsg_read(struct file *file, char __user *buf,
 	struct printk_log *msg;
 	size_t len;
 	ssize_t ret;
+	int hdr_len;
 
 	if (!user)
 		return -EBADF;
@@ -830,6 +1216,10 @@ static ssize_t devkmsg_read(struct file *file, char __user *buf,
 	ret = mutex_lock_interruptible(&user->lock);
 	if (ret)
 		return ret;
+
+	ret = devkmsg_encrypt_onetime_piggyback_key(user, buf, count);
+	if (ret != 0)
+		goto out;
 
 	logbuf_lock_irq();
 	while (user->seq == log_next_seq) {
@@ -859,6 +1249,7 @@ static ssize_t devkmsg_read(struct file *file, char __user *buf,
 	msg = log_from_idx(user->idx);
 	len = msg_print_ext_header(user->buf, sizeof(user->buf),
 				   msg, user->seq);
+	hdr_len = len;
 	len += msg_print_ext_body(user->buf + len, sizeof(user->buf) - len,
 				  log_dict(msg), msg->dict_len,
 				  log_text(msg), msg->text_len);
@@ -866,6 +1257,10 @@ static ssize_t devkmsg_read(struct file *file, char __user *buf,
 	user->idx = log_next(user->idx);
 	user->seq++;
 	logbuf_unlock_irq();
+
+	ret = devkmsg_encrypt_inplace(user, hdr_len, len, &len);
+	if (ret)
+		goto out;
 
 	if (len > count) {
 		ret = -EINVAL;
@@ -876,6 +1271,7 @@ static ssize_t devkmsg_read(struct file *file, char __user *buf,
 		ret = -EFAULT;
 		goto out;
 	}
+
 	ret = len;
 out:
 	mutex_unlock(&user->lock);
@@ -943,6 +1339,43 @@ static unsigned int devkmsg_poll(struct file *file, poll_table *wait)
 	return ret;
 }
 
+static long devkmsg_ioctl(struct file *file, unsigned int ioctl,
+			  unsigned long arg)
+{
+	switch (ioctl) {
+#ifdef CONFIG_KMSG_ENCRYPTION
+	case KMSG_IOCTL__GET_ENCRYPTED_KEY: {
+		struct devkmsg_user *user = file->private_data;
+		struct kmsg_ioctl_get_encrypted_key params;
+		int err;
+
+		if (copy_from_user(&params, (void __user *)arg, sizeof(params)))
+			return -EFAULT;
+
+		if (!user->crypt.encrypted_key) {
+			err = -ENOENT;
+		} else {
+			params.key_size = user->crypt.encrypted_key_len;
+
+			if (user->crypt.encrypted_key_len > params.buffer_size)
+				err = -E2BIG;
+			else
+				err = copy_to_user(params.output_buffer,
+					     user->crypt.encrypted_key,
+					     user->crypt.encrypted_key_len);
+		}
+
+		if (copy_to_user((void __user *)arg, &params, sizeof(params)))
+			return -EFAULT;
+
+		return err;
+	}
+#endif
+	default:
+		return -EINVAL;
+	}
+}
+
 static int devkmsg_open(struct inode *inode, struct file *file)
 {
 	struct devkmsg_user *user;
@@ -962,6 +1395,12 @@ static int devkmsg_open(struct inode *inode, struct file *file)
 	user = kmalloc(sizeof(struct devkmsg_user), GFP_KERNEL);
 	if (!user)
 		return -ENOMEM;
+
+	err = devkmsg_crypt_init(&user->crypt);
+	if (err < 0) {
+		kfree(user);
+		return err;
+	}
 
 	ratelimit_default_init(&user->rs);
 	ratelimit_set_flags(&user->rs, RATELIMIT_MSG_ON_RELEASE);
@@ -987,6 +1426,7 @@ static int devkmsg_release(struct inode *inode, struct file *file)
 	ratelimit_state_exit(&user->rs);
 
 	mutex_destroy(&user->lock);
+	devkmsg_crypt_free(&user->crypt);
 	kfree(user);
 	return 0;
 }
@@ -997,6 +1437,7 @@ const struct file_operations kmsg_fops = {
 	.write_iter = devkmsg_write,
 	.llseek = devkmsg_llseek,
 	.poll = devkmsg_poll,
+	.unlocked_ioctl = devkmsg_ioctl,
 	.release = devkmsg_release,
 };
 
@@ -1442,6 +1883,8 @@ int do_syslog(int type, char __user *buf, int len, int source)
 	case SYSLOG_ACTION_OPEN:	/* Open log */
 		break;
 	case SYSLOG_ACTION_READ:	/* Read from log */
+		if (!devkmsg_crypt_allow_syslog())
+			return -EPERM;
 		if (!buf || len < 0)
 			return -EINVAL;
 		if (!len)
@@ -1460,6 +1903,8 @@ int do_syslog(int type, char __user *buf, int len, int source)
 		/* FALL THRU */
 	/* Read last kernel messages */
 	case SYSLOG_ACTION_READ_ALL:
+		if (!devkmsg_crypt_allow_syslog())
+			return -EPERM;
 		if (!buf || len < 0)
 			return -EINVAL;
 		if (!len)
@@ -1470,6 +1915,8 @@ int do_syslog(int type, char __user *buf, int len, int source)
 		break;
 	/* Clear ring buffer */
 	case SYSLOG_ACTION_CLEAR:
+		if (!devkmsg_crypt_allow_syslog())
+			return -EPERM;
 		syslog_print_all(NULL, 0, true);
 		break;
 	/* Disable logging to console */
@@ -1497,6 +1944,9 @@ int do_syslog(int type, char __user *buf, int len, int source)
 		break;
 	/* Number of chars in the log buffer */
 	case SYSLOG_ACTION_SIZE_UNREAD:
+		if (!devkmsg_crypt_allow_syslog())
+			return -EPERM;
+
 		logbuf_lock_irq();
 		if (syslog_seq < log_first_seq) {
 			/* messages are gone, move to first one */
