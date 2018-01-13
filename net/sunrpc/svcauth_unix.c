@@ -566,7 +566,7 @@ static int unix_gid_show(struct seq_file *m,
 	seq_printf(m, "%u %d:", from_kuid_munged(user_ns, ug->uid), glen);
 	for (i = 0; i < glen; i++)
 		seq_printf(m, " %d", from_kgid_munged(user_ns, ug->gi->gid[i]));
-	seq_printf(m, "\n");
+	seq_putc(m, '\n');
 	return 0;
 }
 
