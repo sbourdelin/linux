@@ -931,7 +931,7 @@ static void dpaa_fq_setup(struct dpaa_priv *priv,
 	}
 
 	 /* Make sure all CPUs receive a corresponding Tx queue. */
-	while (egress_cnt < DPAA_ETH_TXQ_NUM) {
+	if (egress_cnt < DPAA_ETH_TXQ_NUM) {
 		list_for_each_entry(fq, &priv->dpaa_fq_list, list) {
 			if (fq->fq_type != FQ_TYPE_TX)
 				continue;
