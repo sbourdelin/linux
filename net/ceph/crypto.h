@@ -29,8 +29,4 @@ int ceph_crypt(const struct ceph_crypto_key *key, bool encrypt,
 int ceph_crypto_init(void);
 void ceph_crypto_shutdown(void);
 
-/* armor.c */
-int ceph_armor(char *dst, const char *src, const char *end);
-int ceph_unarmor(char *dst, const char *src, const char *end);
-
 #endif

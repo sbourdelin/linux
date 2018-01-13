@@ -188,6 +188,13 @@ config CRC8
 	  when they need to do cyclic redundancy check according CRC8
 	  algorithm. Module will be called crc8.
 
+config BASE64_ARMOR
+	tristate "BASE64 encoding/decoding functions"
+	help
+	  This option provides BASE64 encoding and decoding functions.
+	  Module name will be base64-armor if this code is built as a
+	  module.
+
 config XXHASH
 	tristate
 

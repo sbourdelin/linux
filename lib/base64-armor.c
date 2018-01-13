@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
 
 #include <linux/errno.h>
-
-int ceph_armor(char *dst, const char *src, const char *end);
-int ceph_unarmor(char *dst, const char *src, const char *end);
+#include <linux/module.h>
+#include <linux/base64-armor.h>
 
 /*
  * base64 encode/decode.
@@ -34,7 +33,7 @@ static int decode_bits(char c)
 	return -EINVAL;
 }
 
-int ceph_armor(char *dst, const char *src, const char *end)
+int base64_armor(char *dst, const char *src, const char *end)
 {
 	int olen = 0;
 	int line = 0;
@@ -71,8 +70,9 @@ int ceph_armor(char *dst, const char *src, const char *end)
 	}
 	return olen;
 }
+EXPORT_SYMBOL(base64_unarmor);
 
-int ceph_unarmor(char *dst, const char *src, const char *end)
+int base64_unarmor(char *dst, const char *src, const char *end)
 {
 	int olen = 0;
 
@@ -104,3 +104,6 @@ int ceph_unarmor(char *dst, const char *src, const char *end)
 	}
 	return olen;
 }
+EXPORT_SYMBOL(base64_armor);
+
+MODULE_LICENSE("GPL v2");

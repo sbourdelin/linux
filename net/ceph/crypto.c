@@ -10,6 +10,7 @@
 #include <crypto/skcipher.h>
 #include <linux/key-type.h>
 #include <linux/sched/mm.h>
+#include <linux/base64-armor.h>
 
 #include <keys/ceph-type.h>
 #include <keys/user-type.h>
@@ -115,7 +116,7 @@ int ceph_crypto_key_unarmor(struct ceph_crypto_key *key, const char *inkey)
 	buf = kmalloc(blen, GFP_NOFS);
 	if (!buf)
 		return -ENOMEM;
-	blen = ceph_unarmor(buf, inkey, inkey+inlen);
+	blen = base64_unarmor(buf, inkey, inkey+inlen);
 	if (blen < 0) {
 		kfree(buf);
 		return blen;
