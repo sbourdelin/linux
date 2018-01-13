@@ -179,7 +179,7 @@ static int debug_seq_show(struct seq_file *f, void *data)
 			seq_printf(f, " W %pF\n",
 				   (void *) cl->waiting_on);
 
-		seq_printf(f, "\n");
+		seq_putc(f, '\n');
 	}
 
 	spin_unlock_irq(&closure_list_lock);
