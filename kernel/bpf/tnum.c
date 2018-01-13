@@ -43,16 +43,17 @@ struct tnum tnum_rshift(struct tnum a, u8 shift)
 	return TNUM(a.value >> shift, a.mask >> shift);
 }
 
-struct tnum tnum_add(struct tnum a, struct tnum b)
+void tnum_add(struct tnum *res, struct tnum *a, struct tnum *b)
 {
 	u64 sm, sv, sigma, chi, mu;
 
-	sm = a.mask + b.mask;
-	sv = a.value + b.value;
+	sm = a->mask + b->mask;
+	sv = a->value + b->value;
 	sigma = sm + sv;
 	chi = sigma ^ sv;
-	mu = chi | a.mask | b.mask;
-	return TNUM(sv & ~mu, mu);
+	mu = chi | a->mask | b->mask;
+	res->value = (sv & ~mu);
+	res->mask = mu;
 }
 
 struct tnum tnum_sub(struct tnum a, struct tnum b)
@@ -102,7 +103,7 @@ static struct tnum hma(struct tnum acc, u64 value, u64 mask)
 {
 	while (mask) {
 		if (mask & 1)
-			acc = tnum_add(acc, TNUM(0, value));
+			tnum_add(&acc, &acc, &TNUM(0, value));
 		mask >>= 1;
 		value <<= 1;
 	}

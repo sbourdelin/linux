@@ -999,7 +999,8 @@ static int check_pkt_ptr_alignment(struct bpf_verifier_env *env,
 	 */
 	ip_align = 2;
 
-	reg_off = tnum_add(reg->var_off, tnum_const(ip_align + reg->off + off));
+	tnum_add(&reg_off, &reg->var_off,
+		&tnum_const(ip_align + reg->off + off));
 	if (!tnum_is_aligned(reg_off, size)) {
 		char tn_buf[48];
 
@@ -1024,7 +1025,8 @@ static int check_generic_ptr_alignment(struct bpf_verifier_env *env,
 	if (!strict || size == 1)
 		return 0;
 
-	reg_off = tnum_add(reg->var_off, tnum_const(reg->off + off));
+	tnum_add(&reg_off, &reg->var_off,
+		&tnum_const(reg->off + off));
 	if (!tnum_is_aligned(reg_off, size)) {
 		char tn_buf[48];
 
@@ -1964,7 +1966,8 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
 			dst_reg->umin_value = umin_ptr + umin_val;
 			dst_reg->umax_value = umax_ptr + umax_val;
 		}
-		dst_reg->var_off = tnum_add(ptr_reg->var_off, off_reg->var_off);
+		tnum_add(&dst_reg->var_off, &ptr_reg->var_off,
+			&off_reg->var_off);
 		dst_reg->off = ptr_reg->off;
 		if (reg_is_pkt_pointer(ptr_reg)) {
 			dst_reg->id = ++env->id_gen;
@@ -2101,7 +2104,8 @@ static int adjust_scalar_min_max_vals(struct bpf_verifier_env *env,
 			dst_reg->umin_value += umin_val;
 			dst_reg->umax_value += umax_val;
 		}
-		dst_reg->var_off = tnum_add(dst_reg->var_off, src_reg.var_off);
+		tnum_add(&dst_reg->var_off, &dst_reg->var_off,
+			&src_reg.var_off);
 		break;
 	case BPF_SUB:
 		if (signed_sub_overflows(dst_reg->smin_value, smax_val) ||
