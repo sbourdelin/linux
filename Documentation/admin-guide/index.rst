@@ -63,6 +63,7 @@ configure specific aspects of kernel behavior to your liking.
    pm/index
    thunderbolt
    LSM/index
+   dmesg-encryption
 
 .. only::  subproject and html
 
