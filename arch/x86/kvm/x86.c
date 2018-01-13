@@ -100,6 +100,8 @@ static void update_cr8_intercept(struct kvm_vcpu *vcpu);
 static void process_nmi(struct kvm_vcpu *vcpu);
 static void enter_smm(struct kvm_vcpu *vcpu);
 static void __kvm_set_rflags(struct kvm_vcpu *vcpu, unsigned long rflags);
+static void sync_regs_store_to_kvmrun(struct kvm_vcpu *vcpu);
+static int sync_regs_load_from_kvmrun(struct kvm_vcpu *vcpu);
 
 struct kvm_x86_ops *kvm_x86_ops __read_mostly;
 EXPORT_SYMBOL_GPL(kvm_x86_ops);
@@ -2761,6 +2763,9 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
  	case KVM_CAP_SPLIT_IRQCHIP:
 	case KVM_CAP_IMMEDIATE_EXIT:
 		r = 1;
+		break;
+	case KVM_CAP_SYNC_REGS:
+		r = KVM_SYNC_X86_VALID_FIELDS;
 		break;
 	case KVM_CAP_ADJUST_CLOCK:
 		r = KVM_CLOCK_TSC_STABLE;
@@ -7356,6 +7361,12 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 		goto out;
 	}
 
+	if (vcpu->run->kvm_dirty_regs) {
+		r = sync_regs_load_from_kvmrun(vcpu);
+		if (r != 0)
+			goto out;
+	}
+
 	/* re-sync apic's tpr */
 	if (!lapic_in_kernel(vcpu)) {
 		if (kvm_set_cr8(vcpu, kvm_run->cr8) != 0) {
@@ -7380,6 +7391,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 
 out:
 	kvm_put_guest_fpu(vcpu);
+	if (vcpu->run->kvm_valid_regs)
+		sync_regs_store_to_kvmrun(vcpu);
 	post_kvm_run_save(vcpu);
 	kvm_sigset_deactivate(vcpu);
 
@@ -7794,6 +7807,55 @@ int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
 
 	vcpu_put(vcpu);
 	return 0;
+}
+
+static void sync_regs_store_to_kvmrun(struct kvm_vcpu *vcpu)
+{
+	BUILD_BUG_ON(sizeof(struct kvm_sync_regs) > SYNC_REGS_UNION_SIZE_BYTES);
+
+	if (vcpu->run->kvm_valid_regs & KVM_SYNC_X86_REGS) {
+		kvm_arch_vcpu_ioctl_get_regs(vcpu, &vcpu->run->s.regs.regs);
+	}
+	if (vcpu->run->kvm_valid_regs & KVM_SYNC_X86_SREGS) {
+		kvm_arch_vcpu_ioctl_get_sregs(vcpu, &vcpu->run->s.regs.sregs);
+	}
+	if (vcpu->run->kvm_valid_regs & KVM_SYNC_X86_EVENTS) {
+		kvm_vcpu_ioctl_x86_get_vcpu_events(
+				vcpu, &vcpu->run->s.regs.events);
+	}
+}
+
+static int sync_regs_load_from_kvmrun(struct kvm_vcpu *vcpu)
+{
+	int r = -EINVAL;
+
+	if (unlikely(vcpu->run->kvm_dirty_regs == 0))
+		goto out;
+
+	if (vcpu->run->kvm_dirty_regs & ~KVM_SYNC_X86_VALID_FIELDS)
+		goto out;
+
+	if (vcpu->run->kvm_dirty_regs & KVM_SYNC_X86_REGS) {
+		if (kvm_arch_vcpu_ioctl_set_regs(
+				vcpu, &vcpu->run->s.regs.regs))
+			goto out;
+		vcpu->run->kvm_dirty_regs &= ~KVM_SYNC_X86_REGS;
+	}
+	if (vcpu->run->kvm_dirty_regs & KVM_SYNC_X86_SREGS) {
+		if (kvm_arch_vcpu_ioctl_set_sregs(
+				vcpu, &vcpu->run->s.regs.sregs))
+			goto out;
+		vcpu->run->kvm_dirty_regs &= ~KVM_SYNC_X86_SREGS;
+	}
+	if (vcpu->run->kvm_dirty_regs & KVM_SYNC_X86_EVENTS) {
+		if (kvm_vcpu_ioctl_x86_set_vcpu_events(
+				vcpu, &vcpu->run->s.regs.events))
+			goto out;
+		vcpu->run->kvm_dirty_regs &= ~KVM_SYNC_X86_EVENTS;
+	}
+	r = 0;
+out:
+	return r;
 }
 
 static void fx_init(struct kvm_vcpu *vcpu)
