@@ -34,5 +34,10 @@ unsigned int cudbg_mem_read_def(struct cudbg_init *pdbg_init,
 
 void cudbg_set_intrinsic_callback(struct cudbg_init *pdbg_init)
 {
-	pdbg_init->intrinsic_cb = cudbg_mem_read_def;
+#ifdef CONFIG_X86
+	if (cudbg_intrinsic_avx_supported())
+		pdbg_init->intrinsic_cb = cudbg_mem_read_avx;
+	else
+#endif
+		pdbg_init->intrinsic_cb = cudbg_mem_read_def;
 }

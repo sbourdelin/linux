@@ -428,12 +428,15 @@ int cxgb4_cudbg_collect(struct adapter *adap, void *buf, u32 *buf_size,
 					   buf,
 					   &total_size);
 
-	if (flag & CXGB4_ETH_DUMP_MEM)
+	if (flag & CXGB4_ETH_DUMP_MEM) {
+		dbg_buff.offset = roundup(dbg_buff.offset, CUDBG_MEM_ALIGN);
+		total_size = roundup(total_size, CUDBG_MEM_ALIGN);
 		cxgb4_cudbg_collect_entity(&cudbg_init, &dbg_buff,
 					   cxgb4_collect_mem_dump,
 					   ARRAY_SIZE(cxgb4_collect_mem_dump),
 					   buf,
 					   &total_size);
+	}
 
 	cudbg_hdr->data_len = total_size;
 	*buf_size = total_size;

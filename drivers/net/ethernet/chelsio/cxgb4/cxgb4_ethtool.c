@@ -1362,6 +1362,7 @@ static int set_dump(struct net_device *dev, struct ethtool_dump *eth_dump)
 	len = sizeof(struct cudbg_hdr) +
 	      sizeof(struct cudbg_entity_hdr) * CUDBG_MAX_ENTITY;
 	len += cxgb4_get_dump_length(adapter, eth_dump->flag);
+	len = roundup(len, CUDBG_MEM_ALIGN);
 
 	adapter->eth_dump.flag = eth_dump->flag;
 	adapter->eth_dump.len = len;
@@ -1391,6 +1392,7 @@ static int get_dump_data(struct net_device *dev, struct ethtool_dump *eth_dump,
 	len = sizeof(struct cudbg_hdr) +
 	      sizeof(struct cudbg_entity_hdr) * CUDBG_MAX_ENTITY;
 	len += cxgb4_get_dump_length(adapter, adapter->eth_dump.flag);
+	len = roundup(len, CUDBG_MEM_ALIGN);
 	if (eth_dump->len < len)
 		return -ENOMEM;
 

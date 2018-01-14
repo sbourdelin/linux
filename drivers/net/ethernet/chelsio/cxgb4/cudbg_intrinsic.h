@@ -21,5 +21,13 @@
 unsigned int cudbg_mem_read_def(struct cudbg_init *pdbg_init,
 				u32 start, u32 offset, u32 size,
 				u32 mem_aperture, u8 *outbuf);
+
+#ifdef CONFIG_X86
+int cudbg_intrinsic_avx_supported(void);
+unsigned int cudbg_mem_read_avx(struct cudbg_init *pdbg_init, u32 start,
+				u32 offset, u32 size, u32 mem_aperture,
+				u8 *outbuf);
+#endif
+
 void cudbg_set_intrinsic_callback(struct cudbg_init *pdbg_init);
 #endif /* __CUDBG_INTRINSIC_H__ */

@@ -25,6 +25,8 @@
 #define MC1_FLAG 4
 #define HMA_FLAG 5
 
+#define CUDBG_MEM_ALIGN 32
+
 #define CUDBG_ENTITY_SIGNATURE 0xCCEDB001
 
 struct cudbg_mbox_log {
