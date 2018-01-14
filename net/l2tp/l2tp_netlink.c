@@ -635,7 +635,7 @@ static int l2tp_nl_cmd_session_create(struct sk_buff *skb, struct genl_info *inf
 	case L2TP_PWTYPE_IP:
 	default:
 		ret = -EPROTONOSUPPORT;
-		break;
+		goto out_tunnel;
 	}
 
 	ret = l2tp_nl_cmd_ops[cfg.pw_type]->session_create(net, tunnel,
