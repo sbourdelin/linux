@@ -305,6 +305,7 @@ enum nft_set_desc_attributes {
  *
  * @NFTA_SET_TABLE: table name (NLA_STRING)
  * @NFTA_SET_NAME: set name (NLA_STRING)
+ * @NFTA_SET_HANDLE: set handle (NLA_U64)
  * @NFTA_SET_FLAGS: bitmask of enum nft_set_flags (NLA_U32)
  * @NFTA_SET_KEY_TYPE: key data type, informational purpose only (NLA_U32)
  * @NFTA_SET_KEY_LEN: key data length (NLA_U32)
@@ -322,6 +323,7 @@ enum nft_set_attributes {
 	NFTA_SET_UNSPEC,
 	NFTA_SET_TABLE,
 	NFTA_SET_NAME,
+	NFTA_SET_HANDLE,
 	NFTA_SET_FLAGS,
 	NFTA_SET_KEY_TYPE,
 	NFTA_SET_KEY_LEN,

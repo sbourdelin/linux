@@ -374,6 +374,7 @@ void nft_unregister_set(struct nft_set_type *type);
  *	@list: table set list node
  *	@bindings: list of set bindings
  * 	@name: name of the set
+ *	@handle: unique handle  of the set
  * 	@ktype: key type (numeric type defined by userspace, not used in the kernel)
  * 	@dtype: data type (verdict or numeric type defined by userspace)
  * 	@objtype: object type (see NFT_OBJECT_* definitions)
@@ -396,6 +397,7 @@ struct nft_set {
 	struct list_head		list;
 	struct list_head		bindings;
 	char				*name;
+	u64				handle;
 	u32				ktype;
 	u32				dtype;
 	u32				objtype;

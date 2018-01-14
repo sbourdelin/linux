@@ -2490,6 +2490,7 @@ static const struct nla_policy nft_set_policy[NFTA_SET_MAX + 1] = {
 					    .len = NFT_TABLE_MAXNAMELEN - 1 },
 	[NFTA_SET_NAME]			= { .type = NLA_STRING,
 					    .len = NFT_SET_MAXNAMELEN - 1 },
+	[NFTA_SET_HANDLE]		= { .type = NLA_U64 },
 	[NFTA_SET_FLAGS]		= { .type = NLA_U32 },
 	[NFTA_SET_KEY_TYPE]		= { .type = NLA_U32 },
 	[NFTA_SET_KEY_LEN]		= { .type = NLA_U32 },
@@ -2540,6 +2541,22 @@ static struct nft_set *nf_tables_set_lookup(const struct nft_table *table,
 
 	list_for_each_entry(set, &table->sets, list) {
 		if (!nla_strcmp(nla, set->name) &&
+		    nft_active_genmask(set, genmask))
+			return set;
+	}
+	return ERR_PTR(-ENOENT);
+}
+
+static struct nft_set *nf_tables_set_lookup_byhandle(const struct nft_table *table,
+						     const struct nlattr *nla, u8 genmask)
+{
+	struct nft_set *set;
+
+	if (nla == NULL)
+		return ERR_PTR(-EINVAL);
+
+	list_for_each_entry(set, &table->sets, list) {
+		if (be64_to_cpu(nla_get_be64(nla)) == set->handle &&
 		    nft_active_genmask(set, genmask))
 			return set;
 	}
@@ -2660,6 +2677,9 @@ static int nf_tables_fill_set(struct sk_buff *skb, const struct nft_ctx *ctx,
 	if (nla_put_string(skb, NFTA_SET_TABLE, ctx->table->name))
 		goto nla_put_failure;
 	if (nla_put_string(skb, NFTA_SET_NAME, set->name))
+		goto nla_put_failure;
+	if (nla_put_be64(skb, NFTA_SET_HANDLE, cpu_to_be64(set->handle),
+			 NFTA_SET_PAD))
 		goto nla_put_failure;
 	if (set->flags != 0)
 		if (nla_put_be32(skb, NFTA_SET_FLAGS, htonl(set->flags)))
@@ -3069,6 +3089,7 @@ static int nf_tables_newset(struct net *net, struct sock *nlsk,
 	set->udata  = udata;
 	set->timeout = timeout;
 	set->gc_int = gc_int;
+	set->handle = nf_tables_alloc_handle(table);
 
 	err = ops->init(set, &desc, nla);
 	if (err < 0)
@@ -3126,7 +3147,10 @@ static int nf_tables_delset(struct net *net, struct sock *nlsk,
 	if (err < 0)
 		return err;
 
-	set = nf_tables_set_lookup(ctx.table, nla[NFTA_SET_NAME], genmask);
+	if (nla[NFTA_SET_HANDLE])
+		set = nf_tables_set_lookup_byhandle(ctx.table, nla[NFTA_SET_HANDLE], genmask);
+	else
+		set = nf_tables_set_lookup(ctx.table, nla[NFTA_SET_NAME], genmask);
 	if (IS_ERR(set))
 		return PTR_ERR(set);
 
