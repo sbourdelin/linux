@@ -22,7 +22,7 @@
 
 #define DEFAULT_BAUD 9600
 
-static void early_serial_init(int port, int baud)
+static void early_serial_init(unsigned long port, int baud)
 {
 	unsigned char c;
 	unsigned divisor;
@@ -47,7 +47,7 @@ static void parse_earlyprintk(void)
 	int baud = DEFAULT_BAUD;
 	char arg[32];
 	int pos = 0;
-	int port = 0;
+	unsigned long port = 0;
 
 	if (cmdline_find_option("earlyprintk", arg, sizeof arg) > 0) {
 		char *e;
@@ -117,7 +117,7 @@ static void parse_console_uart8250(void)
 {
 	char optstr[64], *options;
 	int baud = DEFAULT_BAUD;
-	int port = 0;
+	unsigned long port = 0;
 
 	/*
 	 * console=uart8250,io,0x3f8,115200n8
