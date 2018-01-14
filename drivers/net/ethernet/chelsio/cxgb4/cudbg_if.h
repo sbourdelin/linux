@@ -83,10 +83,16 @@ enum cudbg_dbg_entity_type {
 	CUDBG_MAX_ENTITY = 70,
 };
 
+struct cudbg_init;
+typedef unsigned int (*cudbg_intrinsic_t)(struct cudbg_init *pdbg_init,
+					  u32 start, u32 offset, u32 size,
+					  u32 max_size, u8 *buf);
+
 struct cudbg_init {
 	struct adapter *adap; /* Pointer to adapter structure */
 	void *outbuf; /* Output buffer */
 	u32 outbuf_size;  /* Output buffer size */
+	cudbg_intrinsic_t intrinsic_cb; /* CPU intrinsic callback */
 };
 
 static inline unsigned int cudbg_mbytes_to_bytes(unsigned int size)

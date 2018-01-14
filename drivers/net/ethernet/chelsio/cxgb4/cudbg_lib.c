@@ -18,6 +18,7 @@
 #include <linux/sort.h>
 
 #include "t4_regs.h"
+#include "t4_values.h"
 #include "cxgb4.h"
 #include "cudbg_if.h"
 #include "cudbg_lib_common.h"
@@ -840,6 +841,69 @@ static int cudbg_get_payload_range(struct adapter *padap, u8 mem_type,
 				      &payload->start, &payload->end);
 }
 
+static int cudbg_memory_read(struct cudbg_init *pdbg_init, int win,
+			     int mtype, u32 addr, u32 len, void *hbuf)
+{
+	u32 win_pf, memoffset, mem_aperture, mem_base;
+	struct adapter *adap = pdbg_init->adap;
+	u32 pos, offset, resid, read_len;
+	u8 *buf;
+	int ret;
+
+	/* Argument sanity checks ...
+	 */
+	if (addr & 0x3 || (uintptr_t)hbuf & 0x3)
+		return -EINVAL;
+
+	buf = (u8 *)hbuf;
+
+	/* Try to do 32-bit reads.  Residual will be handled later. */
+	resid = len & 0x3;
+	len -= resid;
+
+	ret = t4_memory_rw_init(adap, win, mtype, &memoffset, &mem_base,
+				&mem_aperture);
+	if (ret)
+		return ret;
+
+	addr = addr + memoffset;
+	win_pf = is_t4(adap->params.chip) ? 0 : PFNUM_V(adap->pf);
+
+	pos = addr & ~(mem_aperture - 1);
+	offset = addr - pos;
+
+	/* Set up initial PCI-E Memory Window to cover the start of our
+	 * transfer.
+	 */
+	t4_memory_update_win(adap, win, pos | win_pf);
+
+	/* Transfer data from the adapter */
+	while (len > 0) {
+		read_len = pdbg_init->intrinsic_cb(pdbg_init, mem_base,
+						   offset, len, mem_aperture,
+						   buf);
+		buf += read_len;
+		offset += read_len;
+		len -= read_len;
+
+		/* If we've reached the end of our current window aperture,
+		 * move the PCI-E Memory Window on to the next.
+		 */
+		if (offset == mem_aperture) {
+			pos += mem_aperture;
+			offset = 0;
+			t4_memory_update_win(adap, win, pos | win_pf);
+		}
+	}
+
+	/* Transfer residual */
+	if (resid)
+		t4_memory_rw_residual(adap, resid, mem_base + offset, buf,
+				      T4_MEMORY_READ);
+
+	return 0;
+}
+
 #define CUDBG_YIELD_ITERATION 256
 
 static int cudbg_read_fw_mem(struct cudbg_init *pdbg_init,
@@ -899,10 +963,8 @@ static int cudbg_read_fw_mem(struct cudbg_init *pdbg_init,
 				goto skip_read;
 
 		spin_lock(&padap->win0_lock);
-		rc = t4_memory_rw(padap, MEMWIN_NIC, mem_type,
-				  bytes_read, bytes,
-				  (__be32 *)temp_buff.data,
-				  1);
+		rc = cudbg_memory_read(pdbg_init, MEMWIN_NIC, mem_type,
+				       bytes_read, bytes, temp_buff.data);
 		spin_unlock(&padap->win0_lock);
 		if (rc) {
 			cudbg_err->sys_err = rc;

@@ -18,6 +18,7 @@
 #include "t4_regs.h"
 #include "cxgb4.h"
 #include "cxgb4_cudbg.h"
+#include "cudbg_intrinsic.h"
 
 static const struct cxgb4_collect_entity cxgb4_collect_mem_dump[] = {
 	{ CUDBG_EDC0, cudbg_collect_edc0_meminfo },
@@ -395,6 +396,7 @@ int cxgb4_cudbg_collect(struct adapter *adap, void *buf, u32 *buf_size,
 	cudbg_init.adap = adap;
 	cudbg_init.outbuf = buf;
 	cudbg_init.outbuf_size = size;
+	cudbg_set_intrinsic_callback(&cudbg_init);
 
 	dbg_buff.data = buf;
 	dbg_buff.size = size;
