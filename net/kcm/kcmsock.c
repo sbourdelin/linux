@@ -1391,6 +1391,10 @@ static int kcm_attach(struct socket *sock, struct socket *csock,
 	if (csk->sk_family == PF_KCM)
 		return -EOPNOTSUPP;
 
+	/* Cannot proceed if connected socket already uses sk_user_data */
+	if (csk->sk_user_data)
+		return -EOPNOTSUPP;
+
 	psock = kmem_cache_zalloc(kcm_psockp, GFP_KERNEL);
 	if (!psock)
 		return -ENOMEM;
