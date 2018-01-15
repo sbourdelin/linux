@@ -64,7 +64,6 @@ config FB_DDC
        tristate
        depends on FB
        select I2C_ALGOBIT
-       select I2C
        default n
 
 config FB_BOOT_VESA_SUPPORT
@@ -390,6 +389,7 @@ config FB_CYBER2000
 config FB_CYBER2000_DDC
 	bool "DDC for CyberPro support"
 	depends on FB_CYBER2000
+	depends on I2C=y || I2C=FB_CYBER2000
 	select FB_DDC
 	default y
 	help
@@ -634,7 +634,7 @@ config FB_BF537_LQ035
 config FB_BFIN_7393
 	tristate "Blackfin ADV7393 Video encoder"
 	depends on FB && BLACKFIN
-	select I2C
+	depends on I2C
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
@@ -1026,6 +1026,7 @@ config FB_NVIDIA
 config FB_NVIDIA_I2C
        bool "Enable DDC Support"
        depends on FB_NVIDIA
+       depends on I2C=y || I2C=FB_NVIDIA
        select FB_DDC
        help
 	  This enables I2C support for nVidia Chipsets.  This is used
@@ -1073,6 +1074,7 @@ config FB_RIVA
 config FB_RIVA_I2C
        bool "Enable DDC Support"
        depends on FB_RIVA
+       depends on I2C=y || I2C=FB_RIVA
        select FB_DDC
        help
 	  This enables I2C support for nVidia Chipsets.  This is used
@@ -1102,6 +1104,7 @@ config FB_RIVA_BACKLIGHT
 config FB_I740
 	tristate "Intel740 support"
 	depends on FB && PCI
+	depends on I2C
 	select FB_MODE_HELPERS
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
@@ -1155,6 +1158,7 @@ config FB_I810_GTF
 config FB_I810_I2C
 	bool "Enable DDC Support"
 	depends on FB_I810 && FB_I810_GTF
+	depends on I2C=y || I2C=FB_I810
 	select FB_DDC
 	help
 
@@ -1206,6 +1210,7 @@ config FB_INTEL_DEBUG
 config FB_INTEL_I2C
 	bool "DDC/I2C for Intel framebuffer support"
 	depends on FB_INTEL
+	depends on I2C=y || I2C=FB_INTEL
 	select FB_DDC
 	default y
 	help
@@ -1285,6 +1290,7 @@ config FB_MATROX_G
 config FB_MATROX_I2C
 	tristate "Matrox I2C support"
 	depends on FB_MATROX
+	depends on I2C
 	select FB_DDC
 	---help---
 	  This drivers creates I2C buses which are needed for accessing the
@@ -1350,6 +1356,7 @@ config FB_RADEON
 config FB_RADEON_I2C
 	bool "DDC/I2C for ATI Radeon support"
 	depends on FB_RADEON
+	depends on I2C=y || I2C=FB_RADEON
 	select FB_DDC
 	default y
 	help
@@ -1460,6 +1467,7 @@ config FB_S3
 config FB_S3_DDC
 	bool "DDC for S3 support"
 	depends on FB_S3
+	depends on I2C=y || I2C=FB_S3
 	select FB_DDC
 	default y
 	help
@@ -1485,6 +1493,7 @@ config FB_SAVAGE
 config FB_SAVAGE_I2C
        bool "Enable DDC2 Support"
        depends on FB_SAVAGE
+       depends on I2C=y || I2C=FB_SAVAGE
        select FB_DDC
        help
 	  This enables I2C support for S3 Savage Chipsets.  This is used
@@ -1629,6 +1638,7 @@ config FB_3DFX_ACCEL
 config FB_3DFX_I2C
 	bool "Enable DDC/I2C support"
 	depends on FB_3DFX
+	depends on I2C=y || I2C=FB_3DFX
 	select FB_DDC
 	default y
 	help
@@ -1669,6 +1679,7 @@ config FB_VT8623
 config FB_TRIDENT
 	tristate "Trident/CyberXXX/CyberBlade support"
 	depends on FB && PCI
+	depends on I2C
 	select FB_CFB_FILLRECT
 	select FB_CFB_COPYAREA
 	select FB_CFB_IMAGEBLIT
@@ -2299,8 +2310,8 @@ endchoice
 
 config FB_MB862XX_I2C
 	bool "Support I2C bus on MB862XX GDC"
-	depends on FB_MB862XX && I2C
-	depends on FB_MB862XX=m || I2C=y
+	depends on FB_MB862XX
+	depends on I2C=y || I2C=FB_MB862XX
 	default y
 	help
 	  Selecting this option adds Coral-P(A)/Lime GDC I2C bus adapter
