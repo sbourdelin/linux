@@ -58,7 +58,6 @@ qla2x00_sp_timeout(struct timer_list *t)
 	req->outstanding_cmds[sp->handle] = NULL;
 	iocb = &sp->u.iocb_cmd;
 	iocb->timeout(sp);
-	sp->free(sp);
 	spin_unlock_irqrestore(&vha->hw->hardware_lock, flags);
 }
 
@@ -121,9 +120,11 @@ qla2x00_async_iocb_timeout(void *data)
 		ea.data[1] = lio->u.logio.data[1];
 		ea.sp = sp;
 		qla24xx_handle_plogi_done_event(fcport->vha, &ea);
+		sp->free(sp);
 		break;
 	case SRB_LOGOUT_CMD:
 		qlt_logo_completion_handler(fcport, QLA_FUNCTION_TIMEOUT);
+		sp->free(sp);
 		break;
 	case SRB_CT_PTHRU_CMD:
 	case SRB_MB_IOCB:
