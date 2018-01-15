@@ -978,6 +978,8 @@ static int sii8620_hw_off(struct sii8620 *ctx)
 
 static void sii8620_hw_reset(struct sii8620 *ctx)
 {
+	struct i2c_client *i2c = to_i2c_client(ctx->dev);
+
 	usleep_range(10000, 20000);
 	gpiod_set_value(ctx->gpio_reset, 0);
 	usleep_range(5000, 20000);
@@ -985,6 +987,9 @@ static void sii8620_hw_reset(struct sii8620 *ctx)
 	usleep_range(10000, 20000);
 	gpiod_set_value(ctx->gpio_reset, 0);
 	msleep(300);
+
+	/* I2C bus recovery prevents I2C errors due to known bug in the chip */
+	i2c_recover_bus(i2c->adapter);
 }
 
 static void sii8620_cbus_reset(struct sii8620 *ctx)
