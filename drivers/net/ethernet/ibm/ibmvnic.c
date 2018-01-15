@@ -411,13 +411,25 @@ static int reset_rx_pools(struct ibmvnic_adapter *adapter)
 	int rx_scrqs;
 	int i, j, rc;
 
+	size_array = (u64 *)((u8 *)(adapter->login_rsp_buf) +
+		be32_to_cpu(adapter->login_rsp_buf->off_rxadd_buff_size));
+
 	rx_scrqs = be32_to_cpu(adapter->login_rsp_buf->num_rxadd_subcrqs);
 	for (i = 0; i < rx_scrqs; i++) {
 		rx_pool = &adapter->rx_pool[i];
 
 		netdev_dbg(adapter->netdev, "Re-setting rx_pool[%d]\n", i);
 
-		rc = reset_long_term_buff(adapter, &rx_pool->long_term_buff);
+		if (rx_pool->buff_size != be64_to_cpu(size_array[i])) {
+			rx_pool->buff_size = be64_to_cpu(size_array[i]);
+			rc = alloc_long_term_buff(adapter,
+						  &rx_pool->long_term_buff,
+						  rx_pool->size *
+						  rx_pool->buff_size);
+		} else {
+			rc = reset_long_term_buff(adapter,
+						  &rx_pool->long_term_buff);
+		}
 		if (rc)
 			return rc;
 
