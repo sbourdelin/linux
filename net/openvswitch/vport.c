@@ -464,21 +464,36 @@ int ovs_vport_receive(struct vport *vport, struct sk_buff *skb,
 	return 0;
 }
 
-static unsigned int packet_length(const struct sk_buff *skb,
-				  struct net_device *dev)
+static unsigned int packet_length_offset(const struct sk_buff *skb,
+					 const struct net_device *dev)
 {
-	unsigned int length = skb->len - dev->hard_header_len;
+	unsigned int length = dev->hard_header_len;
 
 	if (!skb_vlan_tag_present(skb) &&
 	    eth_type_vlan(skb->protocol))
-		length -= VLAN_HLEN;
+		length += VLAN_HLEN;
 
-	/* Don't subtract for multiple VLAN tags. Most (all?) drivers allow
+	/* Don't adjust for multiple VLAN tags. Most (all?) drivers allow
 	 * (ETH_LEN + VLAN_HLEN) in addition to the mtu value, but almost none
 	 * account for 802.1ad. e.g. is_skb_forwardable().
 	 */
 
 	return length;
+}
+
+static inline unsigned int packet_length(const struct sk_buff *skb,
+					 const struct net_device *dev)
+{
+	return skb->len - packet_length_offset(skb, dev);
+}
+
+static inline bool vport_gso_validate_len(const struct sk_buff *skb,
+					  const struct net_device *dev,
+					  unsigned int mtu)
+{
+	unsigned int len = mtu + packet_length_offset(skb, dev);
+	
+	return skb_gso_validate_len(skb, len);
 }
 
 void ovs_vport_send(struct vport *vport, struct sk_buff *skb, u8 mac_proto)
@@ -504,11 +519,19 @@ void ovs_vport_send(struct vport *vport, struct sk_buff *skb, u8 mac_proto)
 		goto drop;
 	}
 
-	if (unlikely(packet_length(skb, vport->dev) > mtu &&
-		     !skb_is_gso(skb))) {
+	if (!skb_is_gso(skb) &&
+	    unlikely(packet_length(skb, vport->dev) > mtu)) {
 		net_warn_ratelimited("%s: dropped over-mtu packet: %d > %d\n",
 				     vport->dev->name,
 				     packet_length(skb, vport->dev), mtu);
+		vport->dev->stats.tx_errors++;
+		goto drop;
+	} else if (skb_is_gso(skb) &&
+		   unlikely(!vport_gso_validate_len(skb, vport->dev, mtu))) {
+		net_warn_ratelimited("%s: dropped over-mtu GSO packet: "
+				     "gso_size = %d, mtu = %d\n",
+				     vport->dev->name,
+				     skb_shinfo(skb)->gso_size, mtu);
 		vport->dev->stats.tx_errors++;
 		goto drop;
 	}
