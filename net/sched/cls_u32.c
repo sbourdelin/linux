@@ -524,8 +524,10 @@ static int u32_replace_hw_hnode(struct tcf_proto *tp, struct tc_u_hnode *h,
 		offloaded = true;
 	}
 
-	if (skip_sw && !offloaded)
+	if (skip_sw && !offloaded) {
+		NL_SET_ERR_MSG(extack, "Failed to offload filter requested with skip sw");
 		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -575,8 +577,10 @@ static int u32_replace_hw_knode(struct tcf_proto *tp, struct tc_u_knode *n,
 		n->flags |= TCA_CLS_FLAGS_IN_HW;
 	}
 
-	if (skip_sw && !(n->flags & TCA_CLS_FLAGS_IN_HW))
+	if (skip_sw && !(n->flags & TCA_CLS_FLAGS_IN_HW)) {
+		NL_SET_ERR_MSG(extack, "Failed to offload filter requested with skip sw");
 		return -EINVAL;
+	}
 
 	return 0;
 }
@@ -690,13 +694,16 @@ static int u32_delete(struct tcf_proto *tp, void *arg, bool *last,
 		goto out;
 	}
 
-	if (root_ht == ht)
+	if (root_ht == ht) {
+		NL_SET_ERR_MSG(extack, "Not allowd to delete root node");
 		return -EINVAL;
+	}
 
 	if (ht->refcnt == 1) {
 		ht->refcnt--;
 		u32_destroy_hnode(tp, ht);
 	} else {
+		NL_SET_ERR_MSG(extack, "Can not delete in-use filter");
 		return -EBUSY;
 	}
 
@@ -780,14 +787,18 @@ static int u32_set_parms(struct net *net, struct tcf_proto *tp,
 		u32 handle = nla_get_u32(tb[TCA_U32_LINK]);
 		struct tc_u_hnode *ht_down = NULL, *ht_old;
 
-		if (TC_U32_KEY(handle))
+		if (TC_U32_KEY(handle)) {
+			NL_SET_ERR_MSG(extack, "u32 Link handle must be a hash table");
 			return -EINVAL;
+		}
 
 		if (handle) {
 			ht_down = u32_lookup_ht(ht->tp_c, handle);
 
-			if (!ht_down)
+			if (!ht_down) {
+				NL_SET_ERR_MSG(extack, "Link hash table not found");
 				return -EINVAL;
+			}
 			ht_down->refcnt++;
 		}
 
@@ -911,28 +922,40 @@ static int u32_change(struct net *net, struct sk_buff *in_skb,
 	size_t size;
 #endif
 
-	if (!opt)
-		return handle ? -EINVAL : 0;
+	if (!opt) {
+		if (handle) {
+			NL_SET_ERR_MSG(extack, "Filter handle requires options");
+			return -EINVAL;
+		} else {
+			return 0;
+		}
+	}
 
-	err = nla_parse_nested(tb, TCA_U32_MAX, opt, u32_policy, NULL);
+	err = nla_parse_nested(tb, TCA_U32_MAX, opt, u32_policy, extack);
 	if (err < 0)
 		return err;
 
 	if (tb[TCA_U32_FLAGS]) {
 		flags = nla_get_u32(tb[TCA_U32_FLAGS]);
-		if (!tc_flags_valid(flags))
+		if (!tc_flags_valid(flags)) {
+			NL_SET_ERR_MSG(extack, "Invalid filter flags");
 			return -EINVAL;
+		}
 	}
 
 	n = *arg;
 	if (n) {
 		struct tc_u_knode *new;
 
-		if (TC_U32_KEY(n->handle) == 0)
+		if (TC_U32_KEY(n->handle) == 0) {
+			NL_SET_ERR_MSG(extack, "Key node id cannot be zero");
 			return -EINVAL;
+		}
 
-		if (n->flags != flags)
+		if (n->flags != flags) {
+			NL_SET_ERR_MSG(extack, "Key node flags do not match passed flags");
 			return -EINVAL;
+		}
 
 		new = u32_init_knode(tp, n);
 		if (!new)
@@ -966,10 +989,14 @@ static int u32_change(struct net *net, struct sk_buff *in_skb,
 	if (tb[TCA_U32_DIVISOR]) {
 		unsigned int divisor = nla_get_u32(tb[TCA_U32_DIVISOR]);
 
-		if (--divisor > 0x100)
+		if (--divisor > 0x100) {
+			NL_SET_ERR_MSG(extack, "Exceeded maximum 256 hash buckets");
 			return -EINVAL;
-		if (TC_U32_KEY(handle))
+		}
+		if (TC_U32_KEY(handle)) {
+			NL_SET_ERR_MSG(extack, "Divisor can only be used on a hash table");
 			return -EINVAL;
+		}
 		ht = kzalloc(sizeof(*ht) + divisor*sizeof(void *), GFP_KERNEL);
 		if (ht == NULL)
 			return -ENOBUFS;
@@ -1015,20 +1042,26 @@ static int u32_change(struct net *net, struct sk_buff *in_skb,
 			htid = ht->handle;
 		} else {
 			ht = u32_lookup_ht(tp->data, TC_U32_HTID(htid));
-			if (!ht)
+			if (!ht) {
+				NL_SET_ERR_MSG(extack, "Specified hash table not found");
 				return -EINVAL;
+			}
 		}
 	} else {
 		ht = rtnl_dereference(tp->root);
 		htid = ht->handle;
 	}
 
-	if (ht->divisor < TC_U32_HASH(htid))
+	if (ht->divisor < TC_U32_HASH(htid)) {
+		NL_SET_ERR_MSG(extack, "Specified hash table buckets exceed configured value");
 		return -EINVAL;
+	}
 
 	if (handle) {
-		if (TC_U32_HTID(handle) && TC_U32_HTID(handle ^ htid))
+		if (TC_U32_HTID(handle) && TC_U32_HTID(handle ^ htid)) {
+			NL_SET_ERR_MSG(extack, "Handle specified hash table address mismatch");
 			return -EINVAL;
+		}
 		handle = htid | TC_U32_NODE(handle);
 		err = idr_alloc_ext(&ht->handle_idr, NULL, NULL,
 				    handle, handle + 1,
@@ -1039,6 +1072,7 @@ static int u32_change(struct net *net, struct sk_buff *in_skb,
 		handle = gen_new_kid(ht, htid);
 
 	if (tb[TCA_U32_SEL] == NULL) {
+		NL_SET_ERR_MSG(extack, "Selector not specified");
 		err = -EINVAL;
 		goto erridr;
 	}
