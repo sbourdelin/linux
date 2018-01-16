@@ -393,21 +393,24 @@ vmw_du_cursor_plane_atomic_update(struct drm_plane *plane,
 	du->cursor_surface = vps->surf;
 	du->cursor_dmabuf = vps->dmabuf;
 
-	/* setup new image */
-	if (vps->surf) {
-		du->cursor_age = du->cursor_surface->snooper.age;
+	/* Do we have a new image? */
+	if (!old_state || !old_state->fb || plane->state->fb != old_state->fb) {
+		if (vps->surf) {
+			du->cursor_age = du->cursor_surface->snooper.age;
 
-		ret = vmw_cursor_update_image(dev_priv,
-					      vps->surf->snooper.image,
-					      64, 64, hotspot_x, hotspot_y);
-	} else if (vps->dmabuf) {
-		ret = vmw_cursor_update_dmabuf(dev_priv, vps->dmabuf,
-					       plane->state->crtc_w,
-					       plane->state->crtc_h,
-					       hotspot_x, hotspot_y);
-	} else {
-		vmw_cursor_update_position(dev_priv, false, 0, 0);
-		return;
+			ret = vmw_cursor_update_image(dev_priv,
+						      vps->surf->snooper.image,
+						      64, 64, hotspot_x,
+						      hotspot_y);
+		} else if (vps->dmabuf) {
+			ret = vmw_cursor_update_dmabuf(dev_priv, vps->dmabuf,
+						       plane->state->crtc_w,
+						       plane->state->crtc_h,
+						       hotspot_x, hotspot_y);
+		} else {
+			vmw_cursor_update_position(dev_priv, false, 0, 0);
+			return;
+		}
 	}
 
 	if (!ret) {
@@ -503,9 +506,21 @@ int vmw_du_cursor_plane_atomic_check(struct drm_plane *plane,
 	struct vmw_surface *surface = NULL;
 	struct drm_framebuffer *fb = new_state->fb;
 
+	struct drm_rect src = drm_plane_state_src(new_state);
+	struct drm_rect dest = drm_plane_state_dest(new_state);
+	struct drm_rect clip = dest;
 
 	/* Turning off */
 	if (!fb)
+		return ret;
+
+	ret = drm_plane_helper_check_update(plane, new_state->crtc, fb,
+					    &src, &dest, &clip,
+					    DRM_MODE_ROTATE_0,
+					    DRM_PLANE_HELPER_NO_SCALING,
+					    DRM_PLANE_HELPER_NO_SCALING,
+					    true, true, &new_state->visible);
+	if (!ret)
 		return ret;
 
 	/* A lot of the code assumes this */
