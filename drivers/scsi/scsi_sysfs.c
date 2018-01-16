@@ -439,7 +439,11 @@ static void scsi_device_dev_release_usercontext(struct work_struct *work)
 	parent = sdev->sdev_gendev.parent;
 
 	spin_lock_irqsave(sdev->host->host_lock, flags);
-	list_del(&sdev->siblings);
+	if (list_empty(&sdev->siblings)) {
+		spin_unlock_irqrestore(sdev->host->host_lock, flags);
+		return;
+	}
+	list_del_init(&sdev->siblings);
 	list_del(&sdev->same_target_siblings);
 	list_del(&sdev->starved_entry);
 	spin_unlock_irqrestore(sdev->host->host_lock, flags);
