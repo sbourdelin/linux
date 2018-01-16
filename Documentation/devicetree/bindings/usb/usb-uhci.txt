@@ -3,8 +3,14 @@ Generic Platform UHCI Controller
 
 Required properties:
 - compatible : "generic-uhci" (deprecated: "platform-uhci")
+  supports additional Aspeed specific workarounds by also
+  including the "aspeed,ast2400-uhci" or "aspeed,ast2500-uhci"
+  string.
 - reg : Should contain 1 register ranges(address and length)
 - interrupts : UHCI controller interrupt
+- #ports: (optional) 1 cell, number of ports (overrides
+  auto-detection which is needed among others on some Aspeed
+  parts).
 
 Example:
 
