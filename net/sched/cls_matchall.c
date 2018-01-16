@@ -80,12 +80,14 @@ static void mall_destroy_hw_filter(struct tcf_proto *tp,
 	cls_mall.command = TC_CLSMATCHALL_DESTROY;
 	cls_mall.cookie = cookie;
 
-	tc_setup_cb_call(block, NULL, TC_SETUP_CLSMATCHALL, &cls_mall, false);
+	tc_setup_cb_call(block, NULL, TC_SETUP_CLSMATCHALL, &cls_mall, false,
+			 NULL);
 }
 
 static int mall_replace_hw_filter(struct tcf_proto *tp,
 				  struct cls_mall_head *head,
-				  unsigned long cookie)
+				  unsigned long cookie,
+				  struct netlink_ext_ack *extack)
 {
 	struct tc_cls_matchall_offload cls_mall = {};
 	struct tcf_block *block = tp->chain->block;
@@ -98,7 +100,7 @@ static int mall_replace_hw_filter(struct tcf_proto *tp,
 	cls_mall.cookie = cookie;
 
 	err = tc_setup_cb_call(block, NULL, TC_SETUP_CLSMATCHALL,
-			       &cls_mall, skip_sw);
+			       &cls_mall, skip_sw, extack);
 	if (err < 0) {
 		mall_destroy_hw_filter(tp, head, cookie);
 		return err;
@@ -204,7 +206,8 @@ static int mall_change(struct net *net, struct sk_buff *in_skb,
 		goto err_set_parms;
 
 	if (!tc_skip_hw(new->flags)) {
-		err = mall_replace_hw_filter(tp, new, (unsigned long)new);
+		err = mall_replace_hw_filter(tp, new, (unsigned long)new,
+					     extack);
 		if (err)
 			goto err_replace_hw_filter;
 	}

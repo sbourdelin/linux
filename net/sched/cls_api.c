@@ -1264,21 +1264,26 @@ static int tc_exts_setup_cb_egdev_call(struct tcf_exts *exts,
 }
 
 int tc_setup_cb_call(struct tcf_block *block, struct tcf_exts *exts,
-		     enum tc_setup_type type, void *type_data, bool err_stop)
+		     enum tc_setup_type type, void *type_data, bool err_stop,
+		     struct netlink_ext_ack *extack)
 {
 	int ok_count;
 	int ret;
 
 	ret = tcf_block_cb_call(block, type, type_data, err_stop);
-	if (ret < 0)
+	if (ret < 0) {
+		NL_SET_ERR_MSG(extack, "Failed to inialize tcf block");
 		return ret;
+	}
 	ok_count = ret;
 
 	if (!exts)
 		return ok_count;
 	ret = tc_exts_setup_cb_egdev_call(exts, type, type_data, err_stop);
-	if (ret < 0)
+	if (ret < 0) {
+		NL_SET_ERR_MSG(extack, "Failed to inialize tcf block extensions");
 		return ret;
+	}
 	ok_count += ret;
 
 	return ok_count;

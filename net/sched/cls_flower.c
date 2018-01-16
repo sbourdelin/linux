@@ -228,13 +228,14 @@ static void fl_hw_destroy_filter(struct tcf_proto *tp, struct cls_fl_filter *f)
 	cls_flower.cookie = (unsigned long) f;
 
 	tc_setup_cb_call(block, &f->exts, TC_SETUP_CLSFLOWER,
-			 &cls_flower, false);
+			 &cls_flower, false, NULL);
 }
 
 static int fl_hw_replace_filter(struct tcf_proto *tp,
 				struct flow_dissector *dissector,
 				struct fl_flow_key *mask,
-				struct cls_fl_filter *f)
+				struct cls_fl_filter *f,
+				struct netlink_ext_ack *extack)
 {
 	struct tc_cls_flower_offload cls_flower = {};
 	struct tcf_block *block = tp->chain->block;
@@ -251,7 +252,7 @@ static int fl_hw_replace_filter(struct tcf_proto *tp,
 	cls_flower.classid = f->res.classid;
 
 	err = tc_setup_cb_call(block, &f->exts, TC_SETUP_CLSFLOWER,
-			       &cls_flower, skip_sw);
+			       &cls_flower, skip_sw, extack);
 	if (err < 0) {
 		fl_hw_destroy_filter(tp, f);
 		return err;
@@ -277,7 +278,7 @@ static void fl_hw_update_stats(struct tcf_proto *tp, struct cls_fl_filter *f)
 	cls_flower.classid = f->res.classid;
 
 	tc_setup_cb_call(block, &f->exts, TC_SETUP_CLSFLOWER,
-			 &cls_flower, false);
+			 &cls_flower, false, NULL);
 }
 
 static void __fl_delete(struct tcf_proto *tp, struct cls_fl_filter *f)
@@ -942,7 +943,7 @@ static int fl_change(struct net *net, struct sk_buff *in_skb,
 		err = fl_hw_replace_filter(tp,
 					   &head->dissector,
 					   &mask.key,
-					   fnew);
+					   fnew, extack);
 		if (err)
 			goto errout_idr;
 	}

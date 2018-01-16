@@ -147,7 +147,8 @@ static bool cls_bpf_is_ebpf(const struct cls_bpf_prog *prog)
 }
 
 static int cls_bpf_offload_cmd(struct tcf_proto *tp, struct cls_bpf_prog *prog,
-			       struct cls_bpf_prog *oldprog)
+			       struct cls_bpf_prog *oldprog,
+			       struct netlink_ext_ack *extack)
 {
 	struct tcf_block *block = tp->chain->block;
 	struct tc_cls_bpf_offload cls_bpf = {};
@@ -167,10 +168,11 @@ static int cls_bpf_offload_cmd(struct tcf_proto *tp, struct cls_bpf_prog *prog,
 	cls_bpf.exts_integrated = obj->exts_integrated;
 	cls_bpf.gen_flags = obj->gen_flags;
 
-	err = tc_setup_cb_call(block, NULL, TC_SETUP_CLSBPF, &cls_bpf, skip_sw);
+	err = tc_setup_cb_call(block, NULL, TC_SETUP_CLSBPF, &cls_bpf, skip_sw,
+			       extack);
 	if (prog) {
 		if (err < 0) {
-			cls_bpf_offload_cmd(tp, oldprog, prog);
+			cls_bpf_offload_cmd(tp, oldprog, prog, NULL);
 			return err;
 		} else if (err > 0) {
 			prog->gen_flags |= TCA_CLS_FLAGS_IN_HW;
@@ -184,7 +186,8 @@ static int cls_bpf_offload_cmd(struct tcf_proto *tp, struct cls_bpf_prog *prog,
 }
 
 static int cls_bpf_offload(struct tcf_proto *tp, struct cls_bpf_prog *prog,
-			   struct cls_bpf_prog *oldprog)
+			   struct cls_bpf_prog *oldprog,
+			   struct netlink_ext_ack *extack)
 {
 	if (prog && oldprog && prog->gen_flags != oldprog->gen_flags)
 		return -EINVAL;
@@ -196,7 +199,7 @@ static int cls_bpf_offload(struct tcf_proto *tp, struct cls_bpf_prog *prog,
 	if (!prog && !oldprog)
 		return 0;
 
-	return cls_bpf_offload_cmd(tp, prog, oldprog);
+	return cls_bpf_offload_cmd(tp, prog, oldprog, extack);
 }
 
 static void cls_bpf_stop_offload(struct tcf_proto *tp,
@@ -204,7 +207,7 @@ static void cls_bpf_stop_offload(struct tcf_proto *tp,
 {
 	int err;
 
-	err = cls_bpf_offload_cmd(tp, NULL, prog);
+	err = cls_bpf_offload_cmd(tp, NULL, prog, NULL);
 	if (err)
 		pr_err("Stopping hardware offload failed: %d\n", err);
 }
@@ -223,7 +226,7 @@ static void cls_bpf_offload_update_stats(struct tcf_proto *tp,
 	cls_bpf.exts_integrated = prog->exts_integrated;
 	cls_bpf.gen_flags = prog->gen_flags;
 
-	tc_setup_cb_call(block, NULL, TC_SETUP_CLSBPF, &cls_bpf, false);
+	tc_setup_cb_call(block, NULL, TC_SETUP_CLSBPF, &cls_bpf, false, NULL);
 }
 
 static int cls_bpf_init(struct tcf_proto *tp)
@@ -504,7 +507,7 @@ static int cls_bpf_change(struct net *net, struct sk_buff *in_skb,
 	if (ret < 0)
 		goto errout_idr;
 
-	ret = cls_bpf_offload(tp, prog, oldprog);
+	ret = cls_bpf_offload(tp, prog, oldprog, extack);
 	if (ret)
 		goto errout_parms;
 
