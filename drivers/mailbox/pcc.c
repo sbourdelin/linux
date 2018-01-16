@@ -478,10 +478,8 @@ static int __init acpi_pcc_probe(void)
 
 	pcc_mbox_channels = kzalloc(sizeof(struct mbox_chan) *
 			sum, GFP_KERNEL);
-	if (!pcc_mbox_channels) {
-		pr_err("Could not allocate space for PCC mbox channels\n");
+	if (!pcc_mbox_channels)
 		return -ENOMEM;
-	}
 
 	pcc_doorbell_vaddr = kcalloc(sum, sizeof(void *), GFP_KERNEL);
 	if (!pcc_doorbell_vaddr) {
