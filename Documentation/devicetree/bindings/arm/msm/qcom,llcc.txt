@@ -1,0 +1,93 @@
+* LLCC (Last Level Cache Controller)
+
+Properties:
+- compatible:
+	Usage: required
+	Value type: <string>
+	Definition: must be "qcom,llcc-core"
+
+- reg:
+	Usage: required
+	Value Type: <prop-encoded-array>
+	Definition: must be addresses and sizes of the LLCC registers
+
+- llcc-bank-off:
+	Usage: required
+	Value Type: <u32 array>
+	Definition: Offsets of llcc banks from llcc base address starting from
+		    LLCC bank0.
+
+- llcc-broadcast-off:
+	Usage: required
+	Value Type: <u32>
+	Definition: Offset of broadcast register from LLCC bank0 address.
+
+- #cache-cells:
+	Usage: required
+	Value Type: <u32>
+	Definition: Number of cache cells, must be 1
+
+- max-slices:
+	usage: required
+	Value Type: <u32>
+	Definition: Number of cache slices supported by hardware
+
+- status:
+	Usage: optional
+	Value type: <string>
+	Definition: Property to enable or disable the driver
+
+== llcc amon device ==
+
+Properties:
+-qcom,fg-cnt : The value of fine grained counter of activity monitor
+	        block.
+
+compatible devices:
+		qcom,sdm845-llcc
+
+Example:
+
+	qcom,system-cache@1300000 {
+		compatible = "qcom,llcc-core", "syscon", "simple-mfd";
+		reg = <0x1300000 0x50000>;
+		reg-names = "llcc_base";
+
+		llcc: qcom,sdm845-llcc {
+			compatible = "qcom,sdm845-llcc";
+			#cache-cells = <1>;
+			max-slices = <32>;
+		};
+
+		qcom,llcc-ecc {
+			compatible = "qcom,llcc-ecc";
+		};
+
+		qcom,llcc-amon {
+			compatible = "qcom,llcc-amon";
+			qcom,fg-cnt = <0x7>;
+		};
+
+	};
+
+== Client ==
+
+Properties:
+- cache-slice-names:
+	Usage: required
+	Value type: <stringlist>
+	Definition: A set of names that identify the usecase names of a client that uses
+		    cache slice. These strings are used to look up the cache slice
+		    entries by name.
+
+- cache-slices:
+	Usage: required
+	Value type: <prop-encoded-array>
+	Definition: The tuple has phandle to llcc device as the first argument and the
+		    second argument is the usecase id of the client.
+For example:
+
+	video-decoder-encoder {
+		cache-slice-names = "vidsc0", "vidsc1";
+		cache-slices = <&llcc 2>, <&llcc 3>;
+	};
