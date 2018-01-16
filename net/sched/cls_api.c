@@ -780,7 +780,7 @@ replay:
 		parent = q->handle;
 	} else {
 		q = qdisc_lookup(dev, TC_H_MAJ(t->tcm_parent));
-		if (q == NULL)
+		if (!q)
 			return -EINVAL;
 	}
 
