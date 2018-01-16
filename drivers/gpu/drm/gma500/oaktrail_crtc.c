@@ -134,7 +134,7 @@ static bool mrst_sdvo_find_best_pll(const struct gma_limit_t *limit,
 				    struct drm_crtc *crtc, int target,
 				    int refclk, struct gma_clock_t *best_clock)
 {
-	struct gma_clock_t clock;
+	struct gma_clock_t clock = {};
 	u32 target_vco, actual_freq;
 	s32 freq_error, min_error = 100000;
 
@@ -191,7 +191,7 @@ static bool mrst_lvds_find_best_pll(const struct gma_limit_t *limit,
 				    struct drm_crtc *crtc, int target,
 				    int refclk, struct gma_clock_t *best_clock)
 {
-	struct gma_clock_t clock;
+	struct gma_clock_t clock = {};
 	int err = target;
 
 	memset(best_clock, 0, sizeof(*best_clock));
