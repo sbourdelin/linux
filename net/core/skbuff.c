@@ -4945,6 +4945,40 @@ bool skb_gso_validate_mtu(const struct sk_buff *skb, unsigned int mtu)
 }
 EXPORT_SYMBOL_GPL(skb_gso_validate_mtu);
 
+/**
+ * skb_gso_validate_len - Will a split GSO skb fit in a given length?
+ *
+ * @skb: GSO skb
+ * @len: length to validate against
+ *
+ * skb_gso_validate_len validates if a given skb will fit a wanted
+ * length once split, including L2, L3 and L4 headers.
+ *
+ * Similar to skb_gso_validate_mtu, but inclusive of L2 headers.
+ */
+bool skb_gso_validate_len(const struct sk_buff *skb, unsigned int len)
+{
+	const struct skb_shared_info *shinfo = skb_shinfo(skb);
+	const struct sk_buff *iter;
+	unsigned int hlen;
+
+	hlen = skb_gso_mac_seglen(skb);
+
+	if (shinfo->gso_size != GSO_BY_FRAGS)
+		return hlen <= len;
+
+	/* Undo this so we can re-use header sizes */
+	hlen -= GSO_BY_FRAGS;
+
+	skb_walk_frags(skb, iter) {
+		if (hlen + skb_headlen(iter) > len)
+			return false;
+	}
+
+	return true;
+}
+EXPORT_SYMBOL_GPL(skb_gso_validate_len);
+
 static struct sk_buff *skb_reorder_vlan_header(struct sk_buff *skb)
 {
 	if (skb_cow(skb, skb_headroom(skb)) < 0) {

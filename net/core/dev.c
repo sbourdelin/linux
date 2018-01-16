@@ -1841,11 +1841,12 @@ bool is_skb_forwardable(const struct net_device *dev, const struct sk_buff *skb)
 	if (skb->len <= len)
 		return true;
 
-	/* if TSO is enabled, we don't care about the length as the packet
-	 * could be forwarded without being segmented before
+	/*
+	 * if TSO is enabled, we need to check the size of the
+	 * segmented packets
 	 */
 	if (skb_is_gso(skb))
-		return true;
+		return skb_gso_validate_len(skb, len);
 
 	return false;
 }
