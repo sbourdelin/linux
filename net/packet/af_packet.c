@@ -2542,8 +2542,6 @@ static int tpacket_fill_skb(struct packet_sock *po, struct sk_buff *skb,
 		len = ((to_write > len_max) ? len_max : to_write);
 	}
 
-	skb_probe_transport_header(skb, 0);
-
 	return tp_len;
 }
 
@@ -2744,6 +2742,11 @@ tpacket_error:
 			goto tpacket_error;
 		}
 
+		if (!skb_probe_transport_header_hard(skb, 0)) {
+			tp_len = -EINVAL;
+			goto tpacket_error;
+		}
+
 		skb->destructor = tpacket_destruct_skb;
 		__packet_set_status(po, ph, TP_STATUS_SENDING);
 		packet_inc_pending(&po->tx_ring);
@@ -2935,7 +2938,10 @@ static int packet_snd(struct socket *sock, struct msghdr *msg, size_t len)
 		len += sizeof(vnet_hdr);
 	}
 
-	skb_probe_transport_header(skb, reserve);
+	if (!skb_probe_transport_header_hard(skb, reserve)) {
+		err = -EINVAL;
+		goto out_free;
+	}
 
 	if (unlikely(extra_len == 4))
 		skb->no_fcs = 1;

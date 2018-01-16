@@ -1670,16 +1670,8 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 		}
 	}
 
-	if (virtio_net_hdr_to_skb(skb, &gso, tun_is_little_endian(tun))) {
-		this_cpu_inc(tun->pcpu_stats->rx_frame_errors);
-		kfree_skb(skb);
-		if (frags) {
-			tfile->napi.skb = NULL;
-			mutex_unlock(&tfile->napi_mutex);
-		}
-
-		return -EINVAL;
-	}
+	if (virtio_net_hdr_to_skb(skb, &gso, tun_is_little_endian(tun)))
+		goto frame_error;
 
 	switch (tun->flags & TUN_TYPE_MASK) {
 	case IFF_TUN:
@@ -1721,7 +1713,8 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 	}
 
 	skb_reset_network_header(skb);
-	skb_probe_transport_header(skb, 0);
+	if (!skb_probe_transport_header_hard(skb, 0))
+		goto frame_error;
 
 	if (skb_xdp) {
 		struct bpf_prog *xdp_prog;
@@ -1785,6 +1778,15 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 
 	tun_flow_update(tun, rxhash, tfile);
 	return total_len;
+
+frame_error:
+	this_cpu_inc(tun->pcpu_stats->rx_frame_errors);
+	kfree_skb(skb);
+	if (frags) {
+		tfile->napi.skb = NULL;
+		mutex_unlock(&tfile->napi_mutex);
+	}
+	return -EINVAL;
 }
 
 static ssize_t tun_chr_write_iter(struct kiocb *iocb, struct iov_iter *from)

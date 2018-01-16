@@ -1159,7 +1159,8 @@ static int xenvif_tx_submit(struct xenvif_queue *queue)
 		skb->protocol = eth_type_trans(skb, skb->dev);
 		skb_reset_network_header(skb);
 
-		if (checksum_setup(queue, skb)) {
+		if (checksum_setup(queue, skb) ||
+		    !skb_probe_transport_header_hard(skb, 0)) {
 			netdev_dbg(queue->vif->dev,
 				   "Can't setup checksum in net_tx_action\n");
 			/* We have to set this flag to trigger the callback */
@@ -1168,8 +1169,6 @@ static int xenvif_tx_submit(struct xenvif_queue *queue)
 			kfree_skb(skb);
 			continue;
 		}
-
-		skb_probe_transport_header(skb, 0);
 
 		/* If the packet is GSO then we will have just set up the
 		 * transport header offset in checksum_setup so it's now

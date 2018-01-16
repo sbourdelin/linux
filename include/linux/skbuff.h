@@ -37,6 +37,7 @@
 #include <linux/sched/clock.h>
 #include <net/flow_dissector.h>
 #include <linux/splice.h>
+#include <linux/in.h>
 #include <linux/in6.h>
 #include <linux/if_packet.h>
 #include <net/flow.h>
@@ -2335,17 +2336,48 @@ static inline void skb_pop_mac_header(struct sk_buff *skb)
 	skb->mac_header = skb->network_header;
 }
 
-static inline void skb_probe_transport_header(struct sk_buff *skb,
-					      const int offset_hint)
+static inline bool skb_validate_dodgy_gso(struct sk_buff *skb,
+					  struct flow_keys *keys)
+{
+	switch (skb_shinfo(skb)->gso_type) {
+	case 0:
+		return true;
+	case SKB_GSO_TCPV4 | SKB_GSO_DODGY:
+	case SKB_GSO_TCPV4 | SKB_GSO_DODGY | SKB_GSO_TCP_ECN:
+		return keys->basic.n_proto == htons(ETH_P_IP) &&
+		       keys->basic.ip_proto == IPPROTO_TCP;
+	case SKB_GSO_TCPV6 | SKB_GSO_DODGY:
+	case SKB_GSO_TCPV6 | SKB_GSO_DODGY | SKB_GSO_TCP_ECN:
+		return keys->basic.n_proto == htons(ETH_P_IPV6) &&
+		       keys->basic.ip_proto == IPPROTO_TCP;
+	case SKB_GSO_UDP | SKB_GSO_DODGY:
+		return keys->basic.ip_proto == IPPROTO_UDP;
+	default:
+		return false;
+	}
+}
+
+static inline bool skb_probe_transport_header_hard(struct sk_buff *skb,
+						   const int offset_hint)
 {
 	struct flow_keys keys;
 
+	if (skb_flow_dissect_flow_keys(skb, &keys, 0)) {
+		skb_set_transport_header(skb, keys.control.thoff);
+		return skb_validate_dodgy_gso(skb, &keys);
+	} else {
+		skb_set_transport_header(skb, offset_hint);
+		return !skb_shinfo(skb)->gso_type;
+	}
+}
+
+static inline void skb_probe_transport_header(struct sk_buff *skb,
+					      const int offset_hint)
+{
 	if (skb_transport_header_was_set(skb))
 		return;
-	else if (skb_flow_dissect_flow_keys(skb, &keys, 0))
-		skb_set_transport_header(skb, keys.control.thoff);
-	else
-		skb_set_transport_header(skb, offset_hint);
+
+	skb_probe_transport_header_hard(skb, offset_hint);
 }
 
 static inline void skb_mac_header_rebuild(struct sk_buff *skb)
