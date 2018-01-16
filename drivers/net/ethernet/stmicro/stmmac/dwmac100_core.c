@@ -28,7 +28,8 @@
 #include <asm/io.h>
 #include "dwmac100.h"
 
-static void dwmac100_core_init(struct mac_device_info *hw, int mtu)
+static void dwmac100_core_init(struct mac_device_info *hw,
+			       struct net_device *dev)
 {
 	void __iomem *ioaddr = hw->pcsr;
 	u32 value = readl(ioaddr + MAC_CONTROL);
