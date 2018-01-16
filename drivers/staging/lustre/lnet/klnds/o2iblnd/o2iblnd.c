@@ -890,7 +890,8 @@ void kiblnd_destroy_conn(struct kib_conn *conn, bool free_conn)
 		atomic_dec(&net->ibn_nconns);
 	}
 
-	kfree(conn);
+	if (free_conn)
+		kfree(conn);
 }
 
 int kiblnd_close_peer_conns_locked(struct kib_peer *peer, int why)
