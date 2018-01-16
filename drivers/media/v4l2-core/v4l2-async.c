@@ -374,16 +374,25 @@ static int __v4l2_async_notifier_register(struct v4l2_async_notifier *notifier)
 	struct device *dev =
 		notifier->v4l2_dev ? notifier->v4l2_dev->dev : NULL;
 	struct v4l2_async_subdev *asd;
+	struct v4l2_async_notifier *n;
 	int ret;
 	int i;
 
 	if (notifier->num_subdevs > V4L2_MAX_SUBDEVS)
 		return -EINVAL;
 
+	mutex_lock(&list_lock);
+
+	/* Avoid re-registering a notifier. */
+	list_for_each_entry(n, &notifier_list, list) {
+		if (WARN_ON(n == notifier)) {
+			ret = -EEXIST;
+			goto err_unlock;
+		}
+	}
+
 	INIT_LIST_HEAD(&notifier->waiting);
 	INIT_LIST_HEAD(&notifier->done);
-
-	mutex_lock(&list_lock);
 
 	for (i = 0; i < notifier->num_subdevs; i++) {
 		asd = notifier->subdevs[i];
