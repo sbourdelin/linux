@@ -749,28 +749,28 @@ int ixgbe_ipsec_tx(struct ixgbe_ring *tx_ring,
 	struct xfrm_state *xs;
 	struct tx_sa *tsa;
 
-	if (!first->skb->sp->len) {
+	if (unlikely(!first->skb->sp->len)) {
 		netdev_err(tx_ring->netdev, "%s: no xfrm state len = %d\n",
 			   __func__, first->skb->sp->len);
 		return 0;
 	}
 
 	xs = xfrm_input_state(first->skb);
-	if (!xs) {
+	if (unlikely(!xs)) {
 		netdev_err(tx_ring->netdev, "%s: no xfrm_input_state() xs = %p\n",
 			   __func__, xs);
 		return 0;
 	}
 
 	itd->sa_idx = xs->xso.offload_handle - IXGBE_IPSEC_BASE_TX_INDEX;
-	if (itd->sa_idx > IXGBE_IPSEC_MAX_SA_COUNT) {
+	if (unlikely(itd->sa_idx > IXGBE_IPSEC_MAX_SA_COUNT)) {
 		netdev_err(tx_ring->netdev, "%s: bad sa_idx=%d handle=%lu\n",
 			   __func__, itd->sa_idx, xs->xso.offload_handle);
 		return 0;
 	}
 
 	tsa = &ipsec->tx_tbl[itd->sa_idx];
-	if (!tsa->used) {
+	if (unlikely(!tsa->used)) {
 		netdev_err(tx_ring->netdev, "%s: unused sa_idx=%d\n",
 			   __func__, itd->sa_idx);
 		return 0;
