@@ -148,7 +148,7 @@ static void ixgbe_ipsec_clear_hw_tables(struct ixgbe_adapter *adapter)
 		ixgbe_ipsec_set_rx_sa(hw, idx, 0, buf, 0, 0, 0);
 		ixgbe_ipsec_set_rx_ip(hw, idx, (__be32 *)buf);
 	}
-	for (; idx < IXGBE_IPSEC_MAX_RX_IP_COUNT; idx++) {
+	for (; idx < IXGBE_IPSEC_MAX_SA_COUNT; idx++) {
 		ixgbe_ipsec_set_tx_sa(hw, idx, buf, 0);
 		ixgbe_ipsec_set_rx_sa(hw, idx, 0, buf, 0, 0, 0);
 	}
