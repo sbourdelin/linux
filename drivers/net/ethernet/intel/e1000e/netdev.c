@@ -1927,8 +1927,15 @@ static irqreturn_t e1000_msix_other(int __always_unused irq, void *data)
 			adapter->total_rx_packets = 0;
 			__napi_schedule(&adapter->napi);
 		}
-	}
-	if (icr & E1000_ICR_LSC) {
+		if (icr & E1000_ICR_LSC)
+			goto update_link;
+	} else {
+		/* We assume if the RXO bit is not set that this is a
+		 * link status change event. This is needed due to emulated
+		 * versions of the device that may not correctly populate
+		 * the LSC bit.
+		 */
+update_link:
 		ew32(ICR, E1000_ICR_LSC);
 		hw->mac.get_link_status = true;
 		/* guard against interrupt when we're going down */
