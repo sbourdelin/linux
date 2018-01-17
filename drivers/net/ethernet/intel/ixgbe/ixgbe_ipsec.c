@@ -863,6 +863,9 @@ void ixgbe_init_ipsec_offload(struct ixgbe_adapter *adapter)
 	struct ixgbe_ipsec *ipsec;
 	size_t size;
 
+	if (adapter->hw.mac.type == ixgbe_mac_82598EB)
+		return;
+
 	ipsec = kzalloc(sizeof(*ipsec), GFP_KERNEL);
 	if (!ipsec)
 		goto err1;
