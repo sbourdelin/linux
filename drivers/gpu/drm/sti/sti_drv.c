@@ -276,6 +276,7 @@ static void sti_unbind(struct device *dev)
 	struct drm_device *ddev = dev_get_drvdata(dev);
 
 	drm_dev_unregister(ddev);
+	drm_atomic_helper_shutdown(ddev);
 	drm_mode_config_cleanup(ddev);
 	sti_cleanup(ddev);
 	drm_dev_unref(ddev);
