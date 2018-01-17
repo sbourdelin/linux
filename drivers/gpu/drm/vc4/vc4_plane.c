@@ -825,12 +825,6 @@ static const struct drm_plane_helper_funcs vc4_plane_helper_funcs = {
 	.cleanup_fb = vc4_cleanup_fb,
 };
 
-static void vc4_plane_destroy(struct drm_plane *plane)
-{
-	drm_plane_helper_disable(plane);
-	drm_plane_cleanup(plane);
-}
-
 /* Implements immediate (non-vblank-synced) updates of the cursor
  * position, or falls back to the atomic helper otherwise.
  */
@@ -910,7 +904,7 @@ out:
 static const struct drm_plane_funcs vc4_plane_funcs = {
 	.update_plane = vc4_update_plane,
 	.disable_plane = drm_atomic_helper_disable_plane,
-	.destroy = vc4_plane_destroy,
+	.destroy = drm_plane_cleanup,
 	.set_property = NULL,
 	.reset = vc4_plane_reset,
 	.atomic_duplicate_state = vc4_plane_duplicate_state,

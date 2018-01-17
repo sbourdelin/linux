@@ -31,6 +31,7 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/pm_runtime.h>
+#include <drm/drm_atomic_helper.h>
 #include <drm/drm_fb_cma_helper.h>
 #include <drm/drm_fb_helper.h>
 
@@ -298,6 +299,8 @@ static void vc4_drm_unbind(struct device *dev)
 	drm_dev_unregister(drm);
 
 	drm_fb_cma_fbdev_fini(drm);
+
+	drm_atomic_helper_shutdown(drm);
 
 	drm_mode_config_cleanup(drm);
 

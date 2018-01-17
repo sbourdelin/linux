@@ -2,7 +2,6 @@
 config DRM_MSM
 	tristate "MSM DRM"
 	depends on DRM
-	depends on ARCH_QCOM || (ARM && COMPILE_TEST)
 	depends on OF && COMMON_CLK
 	depends on MMU
 	select QCOM_MDT_LOADER if ARCH_QCOM
