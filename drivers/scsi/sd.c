@@ -1576,6 +1576,10 @@ static unsigned int sd_check_events(struct gendisk *disk, unsigned int clearing)
 	sdp = sdkp->device;
 	SCSI_LOG_HLQUEUE(3, sd_printk(KERN_INFO, sdkp, "sd_check_events\n"));
 
+	if (!sdp->removable) {
+		retval = 0;
+		goto out;
+	}
 	/*
 	 * If the device is offline, don't send any commands - just pretend as
 	 * if the command failed.  If the device ever comes back online, we
