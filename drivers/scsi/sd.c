@@ -139,6 +139,15 @@ static const char *sd_cache_types[] = {
 	"write back, no read (daft)"
 };
 
+/*
+ * wce rcd write_cache read_cache
+ * 0   0   off         on
+ * 0   1   off         off
+ * 1   0   on          on
+ * 1   1   on          off
+ */
+static const char * const sd_wce_rcd[] = {"00", "01", "10", "11"};
+
 static void sd_set_flush_flag(struct scsi_disk *sdkp)
 {
 	bool wc = false, fua = false;
@@ -180,8 +189,11 @@ cache_type_store(struct device *dev, struct device_attribute *attr,
 	}
 
 	ct = sysfs_match_string(sd_cache_types, buf);
-	if (ct < 0)
-		return -EINVAL;
+	if (ct < 0) {
+		ct = sysfs_match_string(sd_wce_rcd, buf);
+		if (ct < 0)
+			return -EINVAL;
+	}
 
 	rcd = ct & 0x01 ? 1 : 0;
 	wce = (ct & 0x02) && !sdkp->write_prot ? 1 : 0;
@@ -282,7 +294,9 @@ cache_type_show(struct device *dev, struct device_attribute *attr, char *buf)
 	struct scsi_disk *sdkp = to_scsi_disk(dev);
 	int ct = sdkp->RCD + 2*sdkp->WCE;
 
-	return sprintf(buf, "%s\n", sd_cache_types[ct]);
+	return sprintf(buf, "%s\n%s\nwrite:%s, read:%s\n", sd_cache_types[ct],
+			sd_wce_rcd[ct], sdkp->WCE ? "on" : "off",
+			sdkp->RCD ? "off" : "on");
 }
 static DEVICE_ATTR_RW(cache_type);
 
