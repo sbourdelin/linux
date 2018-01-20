@@ -1452,6 +1452,7 @@ struct skl_wm_level {
 struct skl_wm_params {
 	bool x_tiled, y_tiled;
 	bool rc_surface;
+	bool is_nv12;
 	uint32_t width;
 	uint8_t cpp;
 	uint32_t plane_pixel_rate;
