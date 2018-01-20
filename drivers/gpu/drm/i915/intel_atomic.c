@@ -325,7 +325,13 @@ int intel_atomic_setup_scalers(struct drm_i915_private *dev_priv,
 		}
 
 		/* set scaler mode */
-		if (IS_GEMINILAKE(dev_priv) || IS_CANNONLAKE(dev_priv)) {
+		if ((IS_BROXTON(dev_priv) || IS_KABYLAKE(dev_priv)) &&
+			plane_state && plane_state->base.fb &&
+			plane_state->base.fb->format->format ==
+			DRM_FORMAT_NV12) {
+			scaler_state->scalers[*scaler_id].mode =
+				PS_SCALER_MODE_NV12;
+		} else if (IS_GEMINILAKE(dev_priv) || IS_CANNONLAKE(dev_priv)) {
 			scaler_state->scalers[*scaler_id].mode = 0;
 		} else if (num_scalers_need == 1 && intel_crtc->pipe != PIPE_C) {
 			/*
