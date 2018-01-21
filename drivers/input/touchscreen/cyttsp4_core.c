@@ -2037,14 +2037,12 @@ struct cyttsp4 *cyttsp4_probe(const struct cyttsp4_bus_ops *ops,
 
 	cd = kzalloc(sizeof(*cd), GFP_KERNEL);
 	if (!cd) {
-		dev_err(dev, "%s: Error, kzalloc\n", __func__);
 		rc = -ENOMEM;
 		goto error_alloc_data;
 	}
 
 	cd->xfer_buf = kzalloc(xfer_buf_size, GFP_KERNEL);
 	if (!cd->xfer_buf) {
-		dev_err(dev, "%s: Error, kzalloc\n", __func__);
 		rc = -ENOMEM;
 		goto error_free_cd;
 	}
