@@ -22,6 +22,9 @@ static int devm_ioremap_match(struct device *dev, void *res, void *match_data)
  * @size: Size of map
  *
  * Managed ioremap().  Map is automatically unmapped on driver detach.
+ *
+ * When possible, use devm_ioremap_resource() or
+ * devm_ioremap_shared_resource() instead.
  */
 void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
 			   resource_size_t size)
@@ -116,13 +119,14 @@ void devm_iounmap(struct device *dev, void __iomem *addr)
 EXPORT_SYMBOL(devm_iounmap);
 
 /**
- * devm_ioremap_resource() - check, request region, and ioremap resource
+ * __devm_ioremap_resource() - check, request region, and ioremap resource
  * @dev: generic device to handle the resource for
  * @res: resource to be handled
+ * @shared: region is not requested when true
  *
- * Checks that a resource is a valid memory region, requests the memory
- * region and ioremaps it. All operations are managed and will be undone
- * on driver detach.
+ * Checks that a resource is a valid memory region, eventually requests the
+ * memory region and ioremaps it. All operations are managed and will be
+ * undone on driver detach.
  *
  * Returns a pointer to the remapped memory or an ERR_PTR() encoded error code
  * on failure. Usage example:
@@ -132,7 +136,8 @@ EXPORT_SYMBOL(devm_iounmap);
  *	if (IS_ERR(base))
  *		return PTR_ERR(base);
  */
-void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res)
+void __iomem *__devm_ioremap_resource(struct device *dev, struct resource *res,
+				      bool shared)
 {
 	resource_size_t size;
 	const char *name;
@@ -148,7 +153,7 @@ void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res)
 	size = resource_size(res);
 	name = res->name ?: dev_name(dev);
 
-	if (!devm_request_mem_region(dev, res->start, size, name)) {
+	if (!shared && !devm_request_mem_region(dev, res->start, size, name)) {
 		dev_err(dev, "can't request region for resource %pR\n", res);
 		return IOMEM_ERR_PTR(-EBUSY);
 	}
@@ -156,13 +161,14 @@ void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res)
 	dest_ptr = devm_ioremap(dev, res->start, size);
 	if (!dest_ptr) {
 		dev_err(dev, "ioremap failed for resource %pR\n", res);
-		devm_release_mem_region(dev, res->start, size);
+		if (!shared)
+			devm_release_mem_region(dev, res->start, size);
 		dest_ptr = IOMEM_ERR_PTR(-ENOMEM);
 	}
 
 	return dest_ptr;
 }
-EXPORT_SYMBOL(devm_ioremap_resource);
+EXPORT_SYMBOL(__devm_ioremap_resource);
 
 #ifdef CONFIG_HAS_IOPORT_MAP
 /*

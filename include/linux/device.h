@@ -731,7 +731,14 @@ void __iomem *devm_ioremap_nocache(struct device *dev, resource_size_t offset,
 				   resource_size_t size);
 void __iomem *devm_ioremap_wc(struct device *dev, resource_size_t offset,
 				   resource_size_t size);
-void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res);
+
+#define devm_ioremap_resource(dev, res) \
+	__devm_ioremap_resource(dev, res, false)
+#define devm_ioremap_shared_resource(dev, res) \
+	__devm_ioremap_resource(dev, res, true)
+
+void __iomem *__devm_ioremap_resource(struct device *dev, struct resource *res,
+				      bool shared);
 
 void devm_iounmap(struct device *dev, void __iomem *addr);
 
