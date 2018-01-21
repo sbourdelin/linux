@@ -206,7 +206,7 @@ static struct sst_acpi_desc sst_acpi_broadwell_desc = {
 	.dma_size = SST_LPT_DSP_DMA_SIZE,
 };
 
-#if !IS_ENABLED(CONFIG_SND_SST_IPC_ACPI)
+#if !IS_ENABLED(CONFIG_SND_SST_IPC)
 static struct sst_acpi_desc sst_acpi_baytrail_desc = {
 	.drv_name = "baytrail-pcm-audio",
 	.machines = snd_soc_acpi_intel_baytrail_legacy_machines,
@@ -222,7 +222,7 @@ static struct sst_acpi_desc sst_acpi_baytrail_desc = {
 static const struct acpi_device_id sst_acpi_match[] = {
 	{ "INT33C8", (unsigned long)&sst_acpi_haswell_desc },
 	{ "INT3438", (unsigned long)&sst_acpi_broadwell_desc },
-#if !IS_ENABLED(CONFIG_SND_SST_IPC_ACPI)
+#if !IS_ENABLED(CONFIG_SND_SST_IPC)
 	{ "80860F28", (unsigned long)&sst_acpi_baytrail_desc },
 #endif
 	{ }
