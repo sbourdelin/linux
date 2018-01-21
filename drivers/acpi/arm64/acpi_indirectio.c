@@ -142,7 +142,7 @@ int acpi_indirectio_set_logicio_res(struct device *child,
 	return ret;
 }
 
-int
+static int
 acpi_indirectio_pre_setup(struct acpi_device *adev,
 			  struct acpi_indirectio_host_data *pdata)
 {
@@ -239,8 +239,17 @@ free_range:
 	return ret;
 }
 
+const struct acpi_indirectio_device_desc hisi_lpc_host_desc = {
+	.pdata = {
+		.io_size = PIO_INDIRECT_SIZE,
+		.io_start = 0,
+	},
+	.pre_setup = acpi_indirectio_pre_setup,
+};
+
 /* All the host devices which apply indirect-IO can be listed here. */
 static const struct acpi_device_id acpi_indirect_host_id[] = {
+	{"HISI0191", INDIRECT_IO_INFO(hisi_lpc_host_desc)},
 	{""},
 };
 
