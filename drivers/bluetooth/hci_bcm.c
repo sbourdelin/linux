@@ -336,11 +336,13 @@ static int bcm_open(struct hci_uart *hu)
 		hu->oper_speed = bdev->oper_speed;
 		err = bcm_gpio_set_power(bdev, true);
 		if (err)
-			goto err_free;
+			goto err_close_serdev;
 	}
 
 	return 0;
 
+err_close_serdev:
+	serdev_device_close(hu->serdev);
 err_free:
 	hu->priv = NULL;
 	kfree(bcm);
