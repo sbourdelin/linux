@@ -198,10 +198,8 @@ static int mcs5000_ts_probe(struct i2c_client *client,
 		return -EINVAL;
 
 	data = devm_kzalloc(&client->dev, sizeof(*data), GFP_KERNEL);
-	if (!data) {
-		dev_err(&client->dev, "Failed to allocate memory\n");
+	if (!data)
 		return -ENOMEM;
-	}
 
 	data->client = client;
 
