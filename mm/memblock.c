@@ -1100,6 +1100,7 @@ void __init_memblock __next_mem_pfn_range(int *idx, int nid,
 	if (out_nid)
 		*out_nid = r->nid;
 }
+#endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
 
 unsigned long __init_memblock memblock_next_valid_pfn(unsigned long pfn,
 						      unsigned long max_pfn)
@@ -1129,6 +1130,7 @@ unsigned long __init_memblock memblock_next_valid_pfn(unsigned long pfn,
 		return min(PHYS_PFN(type->regions[right].base), max_pfn);
 }
 
+#ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
 /**
  * memblock_set_node - set node ID on memblock regions
  * @base: base of area to set node ID for
