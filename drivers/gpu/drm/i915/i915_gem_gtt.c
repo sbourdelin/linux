@@ -409,7 +409,10 @@ static struct page *vm_alloc_page(struct i915_address_space *vm, gfp_t gfp)
 	if (unlikely(!pvec->nr))
 		return NULL;
 
-	set_pages_array_wc(pvec->pages, pvec->nr);
+	if (unlikely(set_pages_array_wc(pvec->pages, pvec->nr))) {
+		__pagevec_release(pvec);
+		return NULL;
+	}
 
 	return pvec->pages[--pvec->nr];
 }
