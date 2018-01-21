@@ -978,10 +978,8 @@ static int edt_ft5x06_ts_probe(struct i2c_client *client,
 	dev_dbg(&client->dev, "probing for EDT FT5x06 I2C\n");
 
 	tsdata = devm_kzalloc(&client->dev, sizeof(*tsdata), GFP_KERNEL);
-	if (!tsdata) {
-		dev_err(&client->dev, "failed to allocate driver data.\n");
+	if (!tsdata)
 		return -ENOMEM;
-	}
 
 	chip_data = of_device_get_match_data(&client->dev);
 	if (!chip_data)
