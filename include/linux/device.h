@@ -734,7 +734,6 @@ void __iomem *devm_ioremap_wc(struct device *dev, resource_size_t offset,
 void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res);
 
 void devm_iounmap(struct device *dev, void __iomem *addr);
-void devm_ioremap_release(struct device *dev, void *res);
 
 void *devm_memremap(struct device *dev, resource_size_t offset,
 		size_t size, unsigned long flags);

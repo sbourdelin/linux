@@ -5,7 +5,7 @@
 #include <linux/gfp.h>
 #include <linux/export.h>
 
-void devm_ioremap_release(struct device *dev, void *res)
+static void devm_ioremap_release(struct device *dev, void *res)
 {
 	iounmap(*(void __iomem **)res);
 }
