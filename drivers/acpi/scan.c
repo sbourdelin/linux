@@ -2141,6 +2141,7 @@ int __init acpi_scan_init(void)
 	acpi_amba_init();
 	acpi_watchdog_init();
 	acpi_init_lpit();
+	acpi_indirectio_scan_init();
 
 	acpi_scan_add_handler(&generic_device_handler);
 
