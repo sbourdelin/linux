@@ -956,8 +956,6 @@ cyttsp4_get_mt_touches_pr_tch:
 	cyttsp4_final_sync(md->input, si->si_ofs.tch_abs[CY_TCH_T].max, ids);
 
 	md->num_prv_tch = num_cur_tch;
-
-	return;
 }
 
 /* read xy_data for all current touches */
@@ -1272,8 +1270,6 @@ static void cyttsp4_watchdog_timer(struct timer_list *t)
 	dev_vdbg(cd->dev, "%s: Watchdog timer triggered\n", __func__);
 
 	schedule_work(&cd->watchdog_work);
-
-	return;
 }
 
 static int cyttsp4_request_exclusive(struct cyttsp4 *cd, void *ownptr,
@@ -1492,7 +1488,6 @@ static void cyttsp4_watchdog_work(struct work_struct *work)
 	cyttsp4_start_wd_timer(cd);
 cyttsp4_timer_watchdog_exit_error:
 	mutex_unlock(&cd->system_lock);
-	return;
 }
 
 static int cyttsp4_core_sleep_(struct cyttsp4 *cd)
