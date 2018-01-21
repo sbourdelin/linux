@@ -1282,9 +1282,10 @@ err_free_descs:
 err_free_gdev:
 	ida_simple_remove(&gpio_ida, gdev->id);
 	/* failures here can mean systems won't boot... */
-	pr_err("%s: GPIOs %d..%d (%s) failed to register\n", __func__,
-	       gdev->base, gdev->base + gdev->ngpio - 1,
-	       chip->label ? : "generic");
+	if (status != -EPROBE_DEFER)
+		pr_err("%s: GPIOs %d..%d (%s) failed to register\n", __func__,
+		       gdev->base, gdev->base + gdev->ngpio - 1,
+		       chip->label ? : "generic");
 	kfree(gdev);
 	return status;
 }
