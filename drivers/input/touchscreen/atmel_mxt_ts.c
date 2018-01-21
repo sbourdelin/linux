@@ -1507,10 +1507,8 @@ static int mxt_update_cfg(struct mxt_data *data, const struct firmware *cfg)
 			MXT_INFO_CHECKSUM_SIZE;
 	config_mem_size = data->mem_size - cfg_start_ofs;
 	config_mem = kzalloc(config_mem_size, GFP_KERNEL);
-	if (!config_mem) {
-		dev_err(dev, "Failed to allocate memory\n");
+	if (!config_mem)
 		return -ENOMEM;
-	}
 
 	ret = mxt_prepare_cfg_mem(data, cfg, data_pos, cfg_start_ofs,
 				  config_mem, config_mem_size);
@@ -1612,10 +1610,8 @@ static int mxt_get_object_table(struct mxt_data *data)
 
 	table_size = data->info.object_num * sizeof(struct mxt_object);
 	object_table = kzalloc(table_size, GFP_KERNEL);
-	if (!object_table) {
-		dev_err(&data->client->dev, "Failed to allocate memory\n");
+	if (!object_table)
 		return -ENOMEM;
-	}
 
 	error = __mxt_read_reg(client, MXT_OBJECT_START, table_size,
 			object_table);
@@ -1714,7 +1710,6 @@ static int mxt_get_object_table(struct mxt_data *data)
 	data->msg_buf = kcalloc(data->max_reportid,
 				data->T5_msg_size, GFP_KERNEL);
 	if (!data->msg_buf) {
-		dev_err(&client->dev, "Failed to allocate message buffer\n");
 		error = -ENOMEM;
 		goto free_object_table;
 	}
