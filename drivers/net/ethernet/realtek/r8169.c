@@ -5572,7 +5572,7 @@ static void rtl_set_rx_mode(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
 	void __iomem *ioaddr = tp->mmio_addr;
-	u32 mc_filter[2];	/* Multicast hash filter */
+	u64 mc_filter;	/* Multicast hash filter */
 	int rx_mode;
 	u32 tmp = 0;
 
@@ -5582,20 +5582,20 @@ static void rtl_set_rx_mode(struct net_device *dev)
 		rx_mode =
 		    AcceptBroadcast | AcceptMulticast | AcceptMyPhys |
 		    AcceptAllPhys;
-		mc_filter[1] = mc_filter[0] = 0xffffffff;
+		mc_filter = ~0ULL;
 	} else if ((netdev_mc_count(dev) > multicast_filter_limit) ||
 		   (dev->flags & IFF_ALLMULTI)) {
 		/* Too many to filter perfectly -- accept all multicasts. */
 		rx_mode = AcceptBroadcast | AcceptMulticast | AcceptMyPhys;
-		mc_filter[1] = mc_filter[0] = 0xffffffff;
+		mc_filter = ~0ULL;
 	} else {
 		struct netdev_hw_addr *ha;
 
 		rx_mode = AcceptBroadcast | AcceptMyPhys;
-		mc_filter[1] = mc_filter[0] = 0;
+		mc_filter = 0ULL;
 		netdev_for_each_mc_addr(ha, dev) {
 			int bit_nr = ether_crc(ETH_ALEN, ha->addr) >> 26;
-			mc_filter[bit_nr >> 5] |= 1 << (bit_nr & 31);
+			mc_filter |= BIT_ULL(bit_nr);
 			rx_mode |= AcceptMulticast;
 		}
 	}
@@ -5605,18 +5605,14 @@ static void rtl_set_rx_mode(struct net_device *dev)
 
 	tmp = (RTL_R32(RxConfig) & ~RX_CONFIG_ACCEPT_MASK) | rx_mode;
 
-	if (tp->mac_version > RTL_GIGA_MAC_VER_06) {
-		u32 data = mc_filter[0];
-
-		mc_filter[0] = swab32(mc_filter[1]);
-		mc_filter[1] = swab32(data);
-	}
+	if (tp->mac_version > RTL_GIGA_MAC_VER_06)
+		swab64s(&mc_filter);
 
 	if (tp->mac_version == RTL_GIGA_MAC_VER_35)
-		mc_filter[1] = mc_filter[0] = 0xffffffff;
+		mc_filter = ~0ULL;
 
-	RTL_W32(MAR0 + 4, mc_filter[1]);
-	RTL_W32(MAR0 + 0, mc_filter[0]);
+	RTL_W32(MAR0 + 4, mc_filter >> 32);
+	RTL_W32(MAR0 + 0, mc_filter & GENMASK_ULL(31, 0));
 
 	RTL_W32(RxConfig, tmp);
 }
