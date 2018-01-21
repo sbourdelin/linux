@@ -25,9 +25,6 @@
 #include <asm/io.h>
 #include <asm/page.h>
 
-struct device;
-struct resource;
-
 __visible void __iowrite32_copy(void __iomem *to, const void *from, size_t count);
 void __ioread32_copy(void *to, const void __iomem *from, size_t count);
 void __iowrite64_copy(void __iomem *to, const void *from, size_t count);
@@ -51,44 +48,8 @@ int arch_ioremap_pmd_supported(void);
 static inline void ioremap_huge_init(void) { }
 #endif
 
-/*
- * Managed iomap interface
- */
-#ifdef CONFIG_HAS_IOPORT_MAP
-void __iomem * devm_ioport_map(struct device *dev, unsigned long port,
-			       unsigned int nr);
-void devm_ioport_unmap(struct device *dev, void __iomem *addr);
-#else
-static inline void __iomem *devm_ioport_map(struct device *dev,
-					     unsigned long port,
-					     unsigned int nr)
-{
-	return NULL;
-}
-
-static inline void devm_ioport_unmap(struct device *dev, void __iomem *addr)
-{
-}
-#endif
-
-#define IOMEM_ERR_PTR(err) (__force void __iomem *)ERR_PTR(err)
-
-void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
-			   resource_size_t size);
-void __iomem *devm_ioremap_nocache(struct device *dev, resource_size_t offset,
-				   resource_size_t size);
-void __iomem *devm_ioremap_wc(struct device *dev, resource_size_t offset,
-				   resource_size_t size);
-void devm_iounmap(struct device *dev, void __iomem *addr);
 int check_signature(const volatile void __iomem *io_addr,
 			const unsigned char *signature, int length);
-void devm_ioremap_release(struct device *dev, void *res);
-
-void *devm_memremap(struct device *dev, resource_size_t offset,
-		size_t size, unsigned long flags);
-void devm_memunmap(struct device *dev, void *addr);
-
-void *__devm_memremap_pages(struct device *dev, struct resource *res);
 
 #ifdef CONFIG_PCI
 /*
