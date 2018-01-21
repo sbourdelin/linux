@@ -612,10 +612,8 @@ static int nand_davinci_probe(struct platform_device *pdev)
 {
 	struct davinci_nand_pdata	*pdata;
 	struct davinci_nand_info	*info;
-	struct resource			*res1;
-	struct resource			*res2;
+	struct resource			*res;
 	void __iomem			*vaddr;
-	void __iomem			*base;
 	int				ret;
 	uint32_t			val;
 	struct mtd_info			*mtd;
@@ -638,14 +636,8 @@ static int nand_davinci_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, info);
 
-	res1 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-	res2 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-	if (!res1 || !res2) {
-		dev_err(&pdev->dev, "resource missing\n");
-		return -EINVAL;
-	}
-
-	vaddr = devm_ioremap_resource(&pdev->dev, res1);
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	vaddr = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(vaddr))
 		return PTR_ERR(vaddr);
 
@@ -655,14 +647,12 @@ static int nand_davinci_probe(struct platform_device *pdev)
 	 * by AEMIF, so we cannot request it twice, just ioremap.
 	 * The AEMIF and NAND drivers not use the same registers in this range.
 	 */
-	base = devm_ioremap(&pdev->dev, res2->start, resource_size(res2));
-	if (!base) {
-		dev_err(&pdev->dev, "ioremap failed for resource %pR\n", res2);
-		return -EADDRNOTAVAIL;
-	}
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+	info->base = devm_ioremap_shared_resource(&pdev->dev, res);
+	if (IS_ERR(info->base))
+		return PTR_ERR(info->base);
 
 	info->dev		= &pdev->dev;
-	info->base		= base;
 	info->vaddr		= vaddr;
 
 	mtd			= nand_to_mtd(&info->chip);
