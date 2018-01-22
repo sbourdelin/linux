@@ -37,6 +37,7 @@
 #include <asm/smp.h> /* Required for cpu_sibling_mask() in UP configs */
 #include <asm/opal.h>
 #include <linux/timer.h>
+#include <linux/hashtable.h>
 
 #define POWERNV_MAX_PSTATES	256
 #define PMSR_PSAFE_ENABLE	(1UL << 30)
@@ -130,6 +131,9 @@ static struct chip {
 static int nr_chips;
 static DEFINE_PER_CPU(struct chip *, chip_info);
 
+static u32 freq_domain_indicator;
+static bool p9_occ_quirk;
+
 /*
  * Note:
  * The set of pstates consists of contiguous integers.
@@ -194,6 +198,38 @@ static inline void reset_gpstates(struct cpufreq_policy *policy)
 	gpstates->last_gpstate_idx = 0;
 }
 
+#define SIZE NR_CPUS
+#define ORDER_FREQ_MAP ilog2(SIZE)
+
+static DEFINE_HASHTABLE(freq_domain_map, ORDER_FREQ_MAP);
+
+struct hashmap {
+	cpumask_t mask;
+	int chip_id;
+	u32 pir_key;
+	struct hlist_node hash_node;
+};
+
+static void insert(u32 key, int cpu)
+{
+	struct hashmap *data;
+
+	hash_for_each_possible(freq_domain_map, data, hash_node, key%SIZE) {
+		if (data->chip_id == cpu_to_chip_id(cpu) &&
+			data->pir_key == key) {
+			cpumask_set_cpu(cpu, &data->mask);
+			return;
+		}
+	}
+
+	data = kzalloc(sizeof(*data), GFP_KERNEL);
+	hash_add(freq_domain_map, &data->hash_node, key%SIZE);
+	cpumask_set_cpu(cpu, &data->mask);
+	data->chip_id = cpu_to_chip_id(cpu);
+	data->pir_key = key;
+
+}
+
 /*
  * Initialize the freq table based on data obtained
  * from the firmware passed via device-tree
@@ -206,6 +242,7 @@ static int init_powernv_pstates(void)
 	u32 len_ids, len_freqs;
 	u32 pstate_min, pstate_max, pstate_nominal;
 	u32 pstate_turbo, pstate_ultra_turbo;
+	u32 key;
 
 	power_mgt = of_find_node_by_path("/ibm,opal/power-mgt");
 	if (!power_mgt) {
@@ -246,9 +283,18 @@ static int init_powernv_pstates(void)
 	else
 		powernv_pstate_info.wof_enabled = true;
 
+	if (of_device_is_compatible(power_mgt, "freq-domain-v1") &&
+		of_property_read_u32(power_mgt, "ibm,freq-domain-indicator",
+				&freq_domain_indicator))
+		pr_warn("ibm,freq-domain-indicator not found\n");
+
+        if (of_device_is_compatible(power_mgt, "p9-occ-quirk"))
+		p9_occ_quirk = true;
+
 next:
 	pr_info("cpufreq pstate min %d nominal %d max %d\n", pstate_min,
 		pstate_nominal, pstate_max);
+	pr_info("frequency domain indicator %d", freq_domain_indicator);
 	pr_info("Workload Optimized Frequency is %s in the platform\n",
 		(powernv_pstate_info.wof_enabled) ? "enabled" : "disabled");
 
@@ -274,6 +320,15 @@ next:
 	if (!nr_pstates) {
 		pr_warn("No PStates found\n");
 		return -ENODEV;
+	}
+
+	if (freq_domain_indicator) {
+		hash_init(freq_domain_map);
+		for_each_possible_cpu(i) {
+			key = ((u32) get_hard_smp_processor_id(i) &
+				freq_domain_indicator);
+			insert(key, i);
+		}
 	}
 
 	powernv_pstate_info.nr_pstates = nr_pstates;
@@ -760,25 +815,56 @@ gpstates_done:
 
 	spin_unlock(&gpstates->gpstate_lock);
 
-	/*
-	 * Use smp_call_function to send IPI and execute the
-	 * mtspr on target CPU.  We could do that without IPI
-	 * if current CPU is within policy->cpus (core)
+	/* The current DVFS implementation in firmware requires that to set a
+	 * frequency in a quad, all cores of the quad need to set frequency in
+	 * their respective PMCR's. Ideally setting frequency on any of the
+	 * core of that quad should change frequency for the quad.
 	 */
-	smp_call_function_any(policy->cpus, set_pstate, &freq_data, 1);
+	if (p9_occ_quirk) {
+		cpumask_t temp;
+		u32 cpu;
+
+		cpumask_copy(&temp, policy->cpus);
+		while (!cpumask_empty(&temp)) {
+			cpu = cpumask_first(&temp);
+			smp_call_function_any(cpu_sibling_mask(cpu),
+					set_pstate, &freq_data, 1);
+			cpumask_andnot(&temp, &temp, cpu_sibling_mask(cpu));
+		}
+	} else {
+		smp_call_function_any(policy->cpus, set_pstate, &freq_data, 1);
+	}
+
 	return 0;
 }
 
 static int powernv_cpufreq_cpu_init(struct cpufreq_policy *policy)
 {
-	int base, i, ret;
+	int ret;
 	struct kernfs_node *kn;
 	struct global_pstate_info *gpstates;
 
-	base = cpu_first_thread_sibling(policy->cpu);
+	if (!freq_domain_indicator) {
+		int base, i;
 
-	for (i = 0; i < threads_per_core; i++)
-		cpumask_set_cpu(base + i, policy->cpus);
+		base = cpu_first_thread_sibling(policy->cpu);
+		for (i = 0; i < threads_per_core; i++)
+			cpumask_set_cpu(base + i, policy->cpus);
+	} else {
+		u32 key;
+		struct hashmap *data;
+
+		key = ((u32) get_hard_smp_processor_id(policy->cpu) &
+				freq_domain_indicator);
+		hash_for_each_possible(freq_domain_map, data, hash_node,
+								 key%SIZE) {
+			if (data->chip_id == cpu_to_chip_id(policy->cpu) &&
+				data->pir_key == key) {
+				cpumask_copy(policy->cpus, &data->mask);
+				break;
+			}
+		}
+	}
 
 	kn = kernfs_find_and_get(policy->kobj.sd, throttle_attr_grp.name);
 	if (!kn) {
