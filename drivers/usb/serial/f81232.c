@@ -742,6 +742,7 @@ static int f81232_port_probe(struct usb_serial_port *port)
 	port->port.drain_delay = 256;
 	priv->port = port;
 
+	device_set_wakeup_enable(&port->serial->dev->dev, true);
 	return 0;
 }
 
@@ -752,6 +753,7 @@ static int f81232_port_remove(struct usb_serial_port *port)
 	priv = usb_get_serial_port_data(port);
 	kfree(priv);
 
+	device_set_wakeup_enable(&port->serial->dev->dev, false);
 	return 0;
 }
 
