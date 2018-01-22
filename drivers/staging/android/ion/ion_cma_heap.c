@@ -42,6 +42,8 @@ static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
 	if (!pages)
 		return -ENOMEM;
 
+	memset(page_address(pages), 0, size);
+
 	table = kmalloc(sizeof(*table), GFP_KERNEL);
 	if (!table)
 		goto err;
