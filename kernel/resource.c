@@ -1134,6 +1134,24 @@ resource_size_t resource_alignment(struct resource *res)
 
 static DECLARE_WAIT_QUEUE_HEAD(muxed_resource_wait);
 
+/*
+ * On some ppc32 platforms (Nintendo Wii), reserved memory is used to work
+ * around the fact that Linux doesn't support discontiguous memory (all memory
+ * is treated as one large area with holes punched in it), and reserved memory
+ * is allowed to be allocated.
+ */
+#ifdef CONFIG_PPC32
+static bool conflict_ignored(struct resource *conflict)
+{
+	extern int __allow_ioremap_reserved;
+
+	return __allow_ioremap_reserved &&
+		(conflict->flags & IORESOURCE_SYSRAM);
+}
+#else
+static bool conflict_ignored(struct resource *conflict) { return false; }
+#endif
+
 /**
  * __request_region - create a new busy resource region
  * @parent: parent resource descriptor
@@ -1166,8 +1184,9 @@ struct resource * __request_region(struct resource *parent,
 		res->desc = parent->desc;
 
 		conflict = __request_resource(parent, res);
-		if (!conflict)
+		if (!conflict || conflict_ignored(conflict))
 			break;
+
 		if (conflict != parent) {
 			if (!(conflict->flags & IORESOURCE_BUSY)) {
 				parent = conflict;
