@@ -2326,7 +2326,7 @@ static int usba_udc_probe(struct platform_device *pdev)
 	/* Make sure we start from a clean slate */
 	ret = clk_prepare_enable(pclk);
 	if (ret) {
-		dev_err(&pdev->dev, "Unable to enable pclk, aborting.\n");
+		dev_err(&pdev->dev, "Unable to enable pclk: %d\n", ret);
 		return ret;
 	}
 
@@ -2346,7 +2346,7 @@ static int usba_udc_probe(struct platform_device *pdev)
 	ret = devm_request_irq(&pdev->dev, irq, usba_udc_irq, 0,
 				"atmel_usba_udc", udc);
 	if (ret) {
-		dev_err(&pdev->dev, "Cannot request irq %d (error %d)\n",
+		dev_err(&pdev->dev, "Cannot request irq %d: %d)\n",
 			irq, ret);
 		return ret;
 	}
