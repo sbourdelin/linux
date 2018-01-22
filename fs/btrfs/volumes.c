@@ -689,14 +689,18 @@ static int btrfs_open_one_device(struct btrfs_fs_devices *fs_devices,
 
 	device->generation = btrfs_super_generation(disk_super);
 
+	/*
+	 * Set the device as writeable and then check if its
+	 * seed or readonly device. Both SUPER_FLAG_SEEDING and
+	 * bdev_read_only(bdev) can be set by the user when device
+	 * is unmounted. And this fn is called at the time of mount.
+	 */
+	set_bit(BTRFS_DEV_STATE_WRITEABLE, &device->dev_state);
 	if (btrfs_super_flags(disk_super) & BTRFS_SUPER_FLAG_SEEDING) {
 		clear_bit(BTRFS_DEV_STATE_WRITEABLE, &device->dev_state);
 		fs_devices->seeding = 1;
-	} else {
-		if (bdev_read_only(bdev))
-			clear_bit(BTRFS_DEV_STATE_WRITEABLE, &device->dev_state);
-		else
-			set_bit(BTRFS_DEV_STATE_WRITEABLE, &device->dev_state);
+	} else if (bdev_read_only(bdev)) {
+		clear_bit(BTRFS_DEV_STATE_WRITEABLE, &device->dev_state);
 	}
 
 	q = bdev_get_queue(bdev);
