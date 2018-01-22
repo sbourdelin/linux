@@ -27,6 +27,8 @@ struct a4xx_gpu {
 	/* if OCMEM is used for GMEM: */
 	uint32_t ocmem_base;
 	void *ocmem_hdl;
+
+	const struct firmware *pm4, *pfp;
 };
 #define to_a4xx_gpu(x) container_of(x, struct a4xx_gpu, base)
 

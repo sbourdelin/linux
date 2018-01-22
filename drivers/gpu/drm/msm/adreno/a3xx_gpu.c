@@ -69,11 +69,58 @@ static bool a3xx_me_init(struct msm_gpu *gpu)
 	return a3xx_idle(gpu);
 }
 
+static int a3xx_ucode_init(struct msm_gpu *gpu)
+{
+	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
+	struct a3xx_gpu *a3xx_gpu = to_a3xx_gpu(adreno_gpu);
+	const struct firmware *fw;
+	uint32_t *ptr, len;
+	int i;
+
+	if (!a3xx_gpu->pm4) {
+		fw = adreno_request_fw(adreno_gpu, adreno_gpu->info->pm4fw);
+		if (IS_ERR(fw))
+			return PTR_ERR(fw);
+
+		a3xx_gpu->pm4 = fw;
+	}
+
+	if (!a3xx_gpu->pfp) {
+		fw = adreno_request_fw(adreno_gpu, adreno_gpu->info->pfpfw);
+		if (IS_ERR(fw))
+			return PTR_ERR(fw);
+
+		a3xx_gpu->pfp = fw;
+	}
+
+	/* Load PM4: */
+	ptr = (uint32_t *)(a3xx_gpu->pm4->data);
+	len = a3xx_gpu->pm4->size / 4;
+	DBG("loading PM4 ucode version: %x", ptr[1]);
+
+	gpu_write(gpu, REG_AXXX_CP_DEBUG,
+			AXXX_CP_DEBUG_DYNAMIC_CLK_DISABLE |
+			AXXX_CP_DEBUG_MIU_128BIT_WRITE_ENABLE);
+	gpu_write(gpu, REG_AXXX_CP_ME_RAM_WADDR, 0);
+	for (i = 1; i < len; i++)
+		gpu_write(gpu, REG_AXXX_CP_ME_RAM_DATA, ptr[i]);
+
+	/* Load PFP: */
+	ptr = (uint32_t *)(a3xx_gpu->pfp->data);
+	len = a3xx_gpu->pfp->size / 4;
+	DBG("loading PFP ucode version: %x", ptr[5]);
+
+	gpu_write(gpu, REG_A3XX_CP_PFP_UCODE_ADDR, 0);
+	for (i = 1; i < len; i++)
+		gpu_write(gpu, REG_A3XX_CP_PFP_UCODE_DATA, ptr[i]);
+
+	return 0;
+}
+
 static int a3xx_hw_init(struct msm_gpu *gpu)
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
 	struct a3xx_gpu *a3xx_gpu = to_a3xx_gpu(adreno_gpu);
-	uint32_t *ptr, len;
 	int i, ret;
 
 	DBG("%s", gpu->name);
@@ -225,6 +272,10 @@ static int a3xx_hw_init(struct msm_gpu *gpu)
 	if (ret)
 		return ret;
 
+	ret = a3xx_ucode_init(gpu);
+	if (ret)
+		return ret;
+
 	/* setup access protection: */
 	gpu_write(gpu, REG_A3XX_CP_PROTECT_CTRL, 0x00000007);
 
@@ -248,33 +299,6 @@ static int a3xx_hw_init(struct msm_gpu *gpu)
 
 	/* VBIF registers */
 	gpu_write(gpu, REG_A3XX_CP_PROTECT(12), 0x6b00c000);
-
-	/* NOTE: PM4/micro-engine firmware registers look to be the same
-	 * for a2xx and a3xx.. we could possibly push that part down to
-	 * adreno_gpu base class.  Or push both PM4 and PFP but
-	 * parameterize the pfp ucode addr/data registers..
-	 */
-
-	/* Load PM4: */
-	ptr = (uint32_t *)(adreno_gpu->pm4->data);
-	len = adreno_gpu->pm4->size / 4;
-	DBG("loading PM4 ucode version: %x", ptr[1]);
-
-	gpu_write(gpu, REG_AXXX_CP_DEBUG,
-			AXXX_CP_DEBUG_DYNAMIC_CLK_DISABLE |
-			AXXX_CP_DEBUG_MIU_128BIT_WRITE_ENABLE);
-	gpu_write(gpu, REG_AXXX_CP_ME_RAM_WADDR, 0);
-	for (i = 1; i < len; i++)
-		gpu_write(gpu, REG_AXXX_CP_ME_RAM_DATA, ptr[i]);
-
-	/* Load PFP: */
-	ptr = (uint32_t *)(adreno_gpu->pfp->data);
-	len = adreno_gpu->pfp->size / 4;
-	DBG("loading PFP ucode version: %x", ptr[5]);
-
-	gpu_write(gpu, REG_A3XX_CP_PFP_UCODE_ADDR, 0);
-	for (i = 1; i < len; i++)
-		gpu_write(gpu, REG_A3XX_CP_PFP_UCODE_DATA, ptr[i]);
 
 	/* CP ROQ queue sizes (bytes) - RB:16, ST:16, IB1:32, IB2:64 */
 	if (adreno_is_a305(adreno_gpu) || adreno_is_a306(adreno_gpu) ||
@@ -325,6 +349,9 @@ static void a3xx_destroy(struct msm_gpu *gpu)
 	struct a3xx_gpu *a3xx_gpu = to_a3xx_gpu(adreno_gpu);
 
 	DBG("%s", gpu->name);
+
+	release_firmware(a3xx_gpu->pm4);
+	release_firmware(a3xx_gpu->pfp);
 
 	adreno_gpu_cleanup(adreno_gpu);
 

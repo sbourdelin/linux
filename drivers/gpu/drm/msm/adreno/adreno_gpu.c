@@ -138,39 +138,12 @@ adreno_request_fw(struct adreno_gpu *adreno_gpu, const char *fwname)
 	return ERR_PTR(-ENOENT);
 }
 
-static int adreno_load_fw(struct adreno_gpu *adreno_gpu)
-{
-	const struct firmware *fw;
-
-	if (adreno_gpu->pm4)
-		return 0;
-
-	fw = adreno_request_fw(adreno_gpu, adreno_gpu->info->pm4fw);
-	if (IS_ERR(fw))
-		return PTR_ERR(fw);
-	adreno_gpu->pm4 = fw;
-
-	fw = adreno_request_fw(adreno_gpu, adreno_gpu->info->pfpfw);
-	if (IS_ERR(fw)) {
-		release_firmware(adreno_gpu->pm4);
-		adreno_gpu->pm4 = NULL;
-		return PTR_ERR(fw);
-	}
-	adreno_gpu->pfp = fw;
-
-	return 0;
-}
-
 int adreno_hw_init(struct msm_gpu *gpu)
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
 	int ret, i;
 
 	DBG("%s", gpu->name);
-
-	ret = adreno_load_fw(adreno_gpu);
-	if (ret)
-		return ret;
 
 	for (i = 0; i < gpu->nr_rings; i++) {
 		struct msm_ringbuffer *ring = gpu->rb[i];
@@ -569,8 +542,5 @@ int adreno_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 
 void adreno_gpu_cleanup(struct adreno_gpu *adreno_gpu)
 {
-	release_firmware(adreno_gpu->pm4);
-	release_firmware(adreno_gpu->pfp);
-
 	msm_gpu_cleanup(&adreno_gpu->base);
 }
