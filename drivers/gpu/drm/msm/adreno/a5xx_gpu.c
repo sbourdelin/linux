@@ -433,34 +433,6 @@ static int a5xx_preempt_start(struct msm_gpu *gpu)
 }
 
 
-static struct drm_gem_object *a5xx_ucode_load_bo(struct msm_gpu *gpu,
-		const char *fwname, u64 *iova)
-{
-	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
-	const struct firmware *fw;
-	struct drm_gem_object *bo;
-	void *ptr;
-
-	fw = adreno_request_fw(adreno_gpu, fwname);
-	if (IS_ERR(fw))
-		return ERR_CAST(fw);
-
-	ptr = msm_gem_kernel_new_locked(gpu->dev, fw->size - 4,
-		MSM_BO_UNCACHED | MSM_BO_GPU_READONLY, gpu->aspace, &bo, iova);
-
-	if (IS_ERR(ptr)) {
-		bo = ERR_CAST(ptr);
-		goto out;
-	}
-
-	memcpy(ptr, &fw->data[4], fw->size - 4);
-
-	msm_gem_put_vaddr(bo);
-out:
-	release_firmware(fw);
-	return bo;
-}
-
 static int a5xx_ucode_init(struct msm_gpu *gpu)
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
@@ -468,7 +440,7 @@ static int a5xx_ucode_init(struct msm_gpu *gpu)
 	int ret;
 
 	if (!a5xx_gpu->pm4_bo) {
-		a5xx_gpu->pm4_bo = a5xx_ucode_load_bo(gpu,
+		a5xx_gpu->pm4_bo = adreno_request_fw_bo(gpu,
 			adreno_gpu->info->pm4fw, &a5xx_gpu->pm4_iova);
 
 		if (IS_ERR(a5xx_gpu->pm4_bo)) {
@@ -481,7 +453,7 @@ static int a5xx_ucode_init(struct msm_gpu *gpu)
 	}
 
 	if (!a5xx_gpu->pfp_bo) {
-		a5xx_gpu->pfp_bo = a5xx_ucode_load_bo(gpu,
+		a5xx_gpu->pfp_bo = adreno_request_fw_bo(gpu,
 			adreno_gpu->info->pfpfw, &a5xx_gpu->pfp_iova);
 
 		if (IS_ERR(a5xx_gpu->pfp_bo)) {

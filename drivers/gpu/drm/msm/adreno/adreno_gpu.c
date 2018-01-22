@@ -138,6 +138,35 @@ adreno_request_fw(struct adreno_gpu *adreno_gpu, const char *fwname)
 	return ERR_PTR(-ENOENT);
 }
 
+struct drm_gem_object *adreno_request_fw_bo(struct msm_gpu *gpu,
+		const char *fwname, u64 *iova)
+{
+	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
+	const struct firmware *fw;
+	struct drm_gem_object *bo;
+	void *ptr;
+
+	fw = adreno_request_fw(adreno_gpu, fwname);
+	if (IS_ERR(fw))
+		return ERR_CAST(fw);
+
+	ptr = msm_gem_kernel_new_locked(gpu->dev, fw->size - 4,
+		MSM_BO_UNCACHED | MSM_BO_GPU_READONLY, gpu->aspace, &bo, iova);
+
+	if (IS_ERR(ptr)) {
+		bo = ERR_CAST(ptr);
+		goto out;
+	}
+
+	memcpy(ptr, &fw->data[4], fw->size - 4);
+
+	msm_gem_put_vaddr(bo);
+out:
+	release_firmware(fw);
+	return bo;
+}
+
+
 int adreno_hw_init(struct msm_gpu *gpu)
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
