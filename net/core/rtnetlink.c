@@ -117,7 +117,7 @@ EXPORT_SYMBOL(rtnl_trylock);
 
 int rtnl_is_locked(void)
 {
-	return mutex_is_locked(&rtnl_mutex);
+	return __mutex_owner(&rtnl_mutex) == current;
 }
 EXPORT_SYMBOL(rtnl_is_locked);
 
