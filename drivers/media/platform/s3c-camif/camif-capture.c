@@ -1261,11 +1261,11 @@ static void __camif_subdev_try_format(struct camif_dev *camif,
 	/* FIXME: constraints against codec or preview path ? */
 	pix_lim = &variant->vp_pix_limits[VP_CODEC];
 
-	while (i-- >= 0)
+	while (--i >= 0)
 		if (camif_mbus_formats[i] == mf->code)
 			break;
-
-	mf->code = camif_mbus_formats[i];
+	if (i < 0)
+		return;
 
 	if (pad == CAMIF_SD_PAD_SINK) {
 		v4l_bound_align_image(&mf->width, 8, CAMIF_MAX_PIX_WIDTH,
