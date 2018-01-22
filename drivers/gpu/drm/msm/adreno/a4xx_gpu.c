@@ -141,12 +141,55 @@ static bool a4xx_me_init(struct msm_gpu *gpu)
 	return a4xx_idle(gpu);
 }
 
+static int a4xx_ucode_init(struct msm_gpu *gpu)
+{
+	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
+	struct a4xx_gpu *a4xx_gpu = to_a4xx_gpu(adreno_gpu);
+	const struct firmware *fw;
+	uint32_t *ptr, len;
+	int i;
+
+	if (!a4xx_gpu->pm4) {
+		fw = adreno_request_fw(adreno_gpu, adreno_gpu->info->pm4fw);
+		if (IS_ERR(fw))
+			return PTR_ERR(fw);
+
+		a4xx_gpu->pm4 = fw;
+	}
+
+	if (!a4xx_gpu->pfp) {
+		fw = adreno_request_fw(adreno_gpu, adreno_gpu->info->pfpfw);
+		if (IS_ERR(fw))
+			return PTR_ERR(fw);
+
+		a4xx_gpu->pfp = fw;
+	}
+
+	/* Load PM4: */
+	ptr = (uint32_t *)(a4xx_gpu->pm4->data);
+	len = a4xx_gpu->pm4->size / 4;
+	DBG("loading PM4 ucode version: %u", ptr[0]);
+	gpu_write(gpu, REG_A4XX_CP_ME_RAM_WADDR, 0);
+	for (i = 1; i < len; i++)
+		gpu_write(gpu, REG_A4XX_CP_ME_RAM_DATA, ptr[i]);
+
+	/* Load PFP: */
+	ptr = (uint32_t *)(a4xx_gpu->pfp->data);
+	len = a4xx_gpu->pfp->size / 4;
+	DBG("loading PFP ucode version: %u", ptr[0]);
+
+	gpu_write(gpu, REG_A4XX_CP_PFP_UCODE_ADDR, 0);
+	for (i = 1; i < len; i++)
+		gpu_write(gpu, REG_A4XX_CP_PFP_UCODE_DATA, ptr[i]);
+
+	return 0;
+}
+
 static int a4xx_hw_init(struct msm_gpu *gpu)
 {
 	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
 	struct a4xx_gpu *a4xx_gpu = to_a4xx_gpu(adreno_gpu);
-	uint32_t *ptr, len;
-	int i, ret;
+	int ret;
 
 	if (adreno_is_a420(adreno_gpu)) {
 		gpu_write(gpu, REG_A4XX_VBIF_ABIT_SORT, 0x0001001F);
@@ -273,22 +316,9 @@ static int a4xx_hw_init(struct msm_gpu *gpu)
 	if (ret)
 		return ret;
 
-	/* Load PM4: */
-	ptr = (uint32_t *)(adreno_gpu->pm4->data);
-	len = adreno_gpu->pm4->size / 4;
-	DBG("loading PM4 ucode version: %u", ptr[0]);
-	gpu_write(gpu, REG_A4XX_CP_ME_RAM_WADDR, 0);
-	for (i = 1; i < len; i++)
-		gpu_write(gpu, REG_A4XX_CP_ME_RAM_DATA, ptr[i]);
-
-	/* Load PFP: */
-	ptr = (uint32_t *)(adreno_gpu->pfp->data);
-	len = adreno_gpu->pfp->size / 4;
-	DBG("loading PFP ucode version: %u", ptr[0]);
-
-	gpu_write(gpu, REG_A4XX_CP_PFP_UCODE_ADDR, 0);
-	for (i = 1; i < len; i++)
-		gpu_write(gpu, REG_A4XX_CP_PFP_UCODE_DATA, ptr[i]);
+	ret = a4xx_ucode_init(gpu);
+	if (ret)
+		return ret;
 
 	/* clear ME_HALT to start micro engine */
 	gpu_write(gpu, REG_A4XX_CP_ME_CNTL, 0);
@@ -323,6 +353,9 @@ static void a4xx_destroy(struct msm_gpu *gpu)
 	struct a4xx_gpu *a4xx_gpu = to_a4xx_gpu(adreno_gpu);
 
 	DBG("%s", gpu->name);
+
+	release_firmware(a4xx_gpu->pm4);
+	release_firmware(a4xx_gpu->pfp);
 
 	adreno_gpu_cleanup(adreno_gpu);
 

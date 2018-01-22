@@ -114,9 +114,6 @@ struct adreno_gpu {
 		FW_LOCATION_HELPER,
 	} fwloc;
 
-	/* firmware: */
-	const struct firmware *pm4, *pfp;
-
 	/*
 	 * Register offsets are different between some GPUs.
 	 * GPU specific offsets will be exported by GPU specific
