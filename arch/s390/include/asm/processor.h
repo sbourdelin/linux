@@ -378,6 +378,9 @@ extern void memcpy_absolute(void *, void *, size_t);
 	memcpy_absolute(&(dest), &__tmp, sizeof(__tmp));	\
 } while (0)
 
+extern int s390_isolate_bp(void);
+#define ISOLATE_BP s390_isolate_bp
+
 #endif /* __ASSEMBLY__ */
 
 #endif /* __ASM_S390_PROCESSOR_H */
