@@ -204,39 +204,32 @@ static int free_vm_stack_cache(unsigned int cpu)
 static unsigned long *alloc_thread_stack_node(struct task_struct *tsk, int node)
 {
 #ifdef CONFIG_VMAP_STACK
-	void *stack;
+	struct vm_struct *stack;
 	int i;
 
 	for (i = 0; i < NR_CACHED_STACKS; i++) {
-		struct vm_struct *s;
-
-		s = this_cpu_xchg(cached_stacks[i], NULL);
-
-		if (!s)
+		stack = this_cpu_xchg(cached_stacks[i], NULL);
+		if (!stack)
 			continue;
 
 #ifdef CONFIG_DEBUG_KMEMLEAK
 		/* Clear stale pointers from reused stack. */
-		memset(s->addr, 0, THREAD_SIZE);
+		memset(stack->addr, 0, THREAD_SIZE);
 #endif
-		tsk->stack_vm_area = s;
-		return s->addr;
+		tsk->stack_vm_area = stack;
+		return stack->addr;
 	}
 
-	stack = __vmalloc_node_range(THREAD_SIZE, THREAD_ALIGN,
-				     VMALLOC_START, VMALLOC_END,
-				     THREADINFO_GFP,
-				     PAGE_KERNEL,
-				     0, node, __builtin_return_address(0));
+	stack = __vmalloc_area(THREAD_SIZE, THREAD_ALIGN,
+			       VMALLOC_START, VMALLOC_END,
+			       THREADINFO_GFP, PAGE_KERNEL,
+			       0, node, __builtin_return_address(0));
+	if (unlikely(!stack))
+		return NULL;
 
-	/*
-	 * We can't call find_vm_area() in interrupt context, and
-	 * free_thread_stack() can be called in interrupt context,
-	 * so cache the vm_struct.
-	 */
-	if (stack)
-		tsk->stack_vm_area = find_vm_area(stack);
-	return stack;
+	/* Cache the vm_struct for stack to page conversions. */
+	tsk->stack_vm_area = stack;
+	return stack->addr;
 #else
 	struct page *page = alloc_pages_node(node, THREADINFO_GFP,
 					     THREAD_SIZE_ORDER);
