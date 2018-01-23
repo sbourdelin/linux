@@ -581,8 +581,17 @@ void netvsc_device_remove(struct hv_device *device)
 
 	cancel_work_sync(&net_device->subchan_work);
 
+	/*
+	 * Revoke receive buffer. If host is pre-Win2016 then tear down
+	 * receive buffer GPADL. Do the same for send buffer.
+	 */
 	netvsc_revoke_recv_buf(device, net_device);
+	if (vmbus_proto_version < VERSION_WIN10)
+		netvsc_teardown_recv_buf_gpadl(device, net_device);
+
 	netvsc_revoke_send_buf(device, net_device);
+	if (vmbus_proto_version < VERSION_WIN10)
+		netvsc_teardown_send_buf_gpadl(device, net_device);
 
 	RCU_INIT_POINTER(net_device_ctx->nvdev, NULL);
 
@@ -595,8 +604,14 @@ void netvsc_device_remove(struct hv_device *device)
 	/* Now, we can close the channel safely */
 	vmbus_close(device->channel);
 
-	netvsc_teardown_recv_buf_gpadl(device, net_device);
-	netvsc_teardown_send_buf_gpadl(device, net_device);
+	/*
+	 * If host is Win2016 or higher then we do the GPADL tear down
+	 * here after VMBus is closed, instead of doing it earlier.
+	 */
+	if (vmbus_proto_version >= VERSION_WIN10) {
+		netvsc_teardown_recv_buf_gpadl(device, net_device);
+		netvsc_teardown_send_buf_gpadl(device, net_device);
+	}
 
 	/* And dissassociate NAPI context from device */
 	for (i = 0; i < net_device->num_chn; i++)
