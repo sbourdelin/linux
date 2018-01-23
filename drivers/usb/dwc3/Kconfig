@@ -106,4 +106,13 @@ config USB_DWC3_ST
 	  inside (i.e. STiH407).
 	  Say 'Y' or 'M' if you have one such device.
 
+config USB_DWC3_UNIPHIER
+	tristate "Socionext UniPhier Platforms"
+	depends on (ARCH_UNIPHIER || COMPILE_TEST) && OF
+	default USB_DWC3
+	help
+	  Support USB2/3 functionality in UniPhier platforms.
+	  Say 'Y' or 'M' if your system that UniPhier SoC is implemented
+	  has USB controllers based on DWC USB3 IP.
+
 endif
