@@ -1725,7 +1725,7 @@ fail:
 }
 
 /**
- *	__vmalloc_node_range  -  allocate virtually contiguous memory
+ *	__vmalloc_area  -  allocate virtually contiguous memory
  *	@size:		allocation size
  *	@align:		desired alignment
  *	@start:		vm area range start
@@ -1738,9 +1738,11 @@ fail:
  *
  *	Allocate enough pages to cover @size from the page level
  *	allocator with @gfp_mask flags.  Map them into contiguous
- *	kernel virtual space, using a pagetable protection of @prot.
+ *	kernel virtual space, using a pagetable protection of @prot
+ *
+ *	Returns the area descriptor on success or %NULL on failure.
  */
-void *__vmalloc_node_range(unsigned long size, unsigned long align,
+struct vm_struct *__vmalloc_area(unsigned long size, unsigned long align,
 			unsigned long start, unsigned long end, gfp_t gfp_mask,
 			pgprot_t prot, unsigned long vm_flags, int node,
 			const void *caller)
@@ -1771,12 +1773,41 @@ void *__vmalloc_node_range(unsigned long size, unsigned long align,
 
 	kmemleak_vmalloc(area, size, gfp_mask);
 
-	return addr;
+	return area;
 
 fail:
 	warn_alloc(gfp_mask, NULL,
 			  "vmalloc: allocation failure: %lu bytes", real_size);
 	return NULL;
+}
+
+/**
+ *	__vmalloc_node_range  -  allocate virtually contiguous memory
+ *	@size:		allocation size
+ *	@align:		desired alignment
+ *	@start:		vm area range start
+ *	@end:		vm area range end
+ *	@gfp_mask:	flags for the page level allocator
+ *	@prot:		protection mask for the allocated pages
+ *	@vm_flags:	additional vm area flags (e.g. %VM_NO_GUARD)
+ *	@node:		node to use for allocation or NUMA_NO_NODE
+ *	@caller:	caller's return address
+ *
+ *	Allocate enough pages to cover @size from the page level
+ *	allocator with @gfp_mask flags.  Map them into contiguous
+ *	kernel virtual space, using a pagetable protection of @prot.
+ */
+void *__vmalloc_node_range(unsigned long size, unsigned long align,
+			unsigned long start, unsigned long end, gfp_t gfp_mask,
+			pgprot_t prot, unsigned long vm_flags, int node,
+			const void *caller)
+{
+	struct vm_struct *area;
+
+	area = __vmalloc_area(size, align, start, end, gfp_mask,
+			      prot, vm_flags, node, caller);
+
+	return area ? area->addr : NULL;
 }
 
 /**
