@@ -282,6 +282,16 @@ static int handle_mem_filter(void)
 	    !strstr(args, "kaslr_mem="))
 		return 0;
 
+#ifdef CONFIG_MEMORY_HOTPLUG
+	/*
+	 * Check if 'kaslr_mem=' specified when 'movable_node' found. If not,
+	 * just give a warrning. Otherwise memory hotplug could be
+	 * affected if kernel is put on movable memory regions.
+	 */
+	if (strstr(args, "movable_node") && !strstr(args, "kaslr_mem="))
+		warn("'kaslr_mem=' should be specified when using 'movable_node'.\n");
+#endif
+
 	tmp_cmdline = malloc(len + 1);
 	if (!tmp_cmdline)
 		error("Failed to allocate space for tmp_cmdline");
