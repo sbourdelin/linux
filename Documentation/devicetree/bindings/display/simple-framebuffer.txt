@@ -56,6 +56,9 @@ Optional properties:
   framebuffer remains active.
 
 - display : phandle pointing to the primary display hardware node
+- memory-region: phandle to a node describing memory region as framebuffer
+		 memory instead of reg property. The node should include
+		 'no-map'.
 
 Example:
 
