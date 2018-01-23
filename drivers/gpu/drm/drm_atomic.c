@@ -2100,6 +2100,9 @@ static int prepare_crtc_signaling(struct drm_device *dev,
 	for_each_new_crtc_in_state(state, crtc, crtc_state, i) {
 		s32 __user *fence_ptr;
 
+		if (!crtc_state->active)
+			continue;
+
 		fence_ptr = get_out_fence_for_crtc(crtc_state->state, crtc);
 
 		if (arg->flags & DRM_MODE_PAGE_FLIP_EVENT || fence_ptr) {
