@@ -2284,6 +2284,7 @@ static int  __perf_install_in_context(void *info)
 	struct perf_event_context *ctx = event->ctx;
 	struct perf_cpu_context *cpuctx = __get_cpu_context(ctx);
 	struct perf_event_context *task_ctx = cpuctx->task_ctx;
+	struct perf_cgroup *cgrp;
 	bool reprogram = true;
 	int ret = 0;
 
@@ -2309,6 +2310,19 @@ static int  __perf_install_in_context(void *info)
 		WARN_ON_ONCE(reprogram && cpuctx->task_ctx && cpuctx->task_ctx != ctx);
 	} else if (task_ctx) {
 		raw_spin_lock(&task_ctx->lock);
+	}
+
+	if (event->cgrp) {
+		/*
+		 * Only care about cgroup events.
+		 *
+		 * If only the task belongs to cgroup of this event,
+		 * we will continue the installment
+		 */
+		cgrp = perf_cgroup_from_task(current, ctx);
+		if (!cgroup_is_descendant(cgrp->css.cgroup,
+					event->cgrp->css.cgroup))
+			goto unlock;
 	}
 
 	if (reprogram) {
