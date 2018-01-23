@@ -19,8 +19,8 @@
 #include <net/ip.h>
 #include <net/pkt_cls.h>
 
-static int em_ipset_change(struct net *net, void *data, int data_len,
-			   struct tcf_ematch *em)
+static int em_ipset_change(struct net *net, __be16 protocol, void *data,
+			   int data_len, struct tcf_ematch *em)
 {
 	struct xt_set_info *set = data;
 	ip_set_id_t index;

@@ -120,8 +120,8 @@ static int em_canid_match(struct sk_buff *skb, struct tcf_ematch *m,
 	return match;
 }
 
-static int em_canid_change(struct net *net, void *data, int len,
-			  struct tcf_ematch *m)
+static int em_canid_change(struct net *net, __be16 protocol, void *data,
+			   int len, struct tcf_ematch *m)
 {
 	struct can_filter *conf = data; /* Array with rules */
 	struct canid_match *cm;
