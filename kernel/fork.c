@@ -207,6 +207,17 @@ static unsigned long *alloc_thread_stack_node(struct task_struct *tsk, int node)
 	struct vm_struct *stack;
 	int i;
 
+#ifdef CONFIG_VMAP_STACK_AS_FALLBACK
+	struct page *page;
+
+	page = alloc_pages_node(node, THREADINFO_GFP & ~__GFP_DIRECT_RECLAIM,
+				THREAD_SIZE_ORDER);
+	if (page) {
+		tsk->stack_vm_area = NULL;
+		return page_address(page);
+	}
+#endif
+
 	for (i = 0; i < NR_CACHED_STACKS; i++) {
 		stack = this_cpu_xchg(cached_stacks[i], NULL);
 		if (!stack)

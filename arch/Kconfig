@@ -904,6 +904,20 @@ config VMAP_STACK
 	  the stack to map directly to the KASAN shadow map using a formula
 	  that is incorrect if the stack is in vmalloc space.
 
+config VMAP_STACK_AS_FALLBACK
+	default n
+	bool "Use a virtually-mapped stack as fallback for directly-mapped"
+	depends on VMAP_STACK
+	help
+	  With this option kernel first tries to allocate directly-mapped stack
+	  without calling direct memory reclaim and fallback to vmap stack.
+
+	  Allocation of directly mapped stack faster than vmap if system a lot
+	  of free memory and much slower if all memory is used or fragmented.
+
+	  This option neutralize stack overflow protection but allows to
+	  achieve best performance for syscalls fork() and clone().
+
 config ARCH_OPTIONAL_KERNEL_RWX
 	def_bool n
 
