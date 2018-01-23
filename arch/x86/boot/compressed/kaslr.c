@@ -692,6 +692,7 @@ static bool
 process_efi_entries(unsigned long minimum, unsigned long image_size)
 {
 	struct efi_info *e = &boot_params->efi_info;
+	char *args = (char *)get_cmd_line_ptr();
 	bool efi_mirror_found = false;
 	struct mem_vector region;
 	efi_memory_desc_t *md;
@@ -724,6 +725,12 @@ process_efi_entries(unsigned long minimum, unsigned long image_size)
 			break;
 		}
 	}
+
+#ifdef CONFIG_MEMORY_HOTPLUG
+	/* Skip memory mirror if 'movabale_node' specified */
+	if (strstr(args, "movable_node"))
+		efi_mirror_found = false;
+#endif
 
 	for (i = 0; i < nr_desc; i++) {
 		md = efi_early_memdesc_ptr(pmap, e->efi_memdesc_size, i);
