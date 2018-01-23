@@ -13,6 +13,7 @@
 #include <linux/threads.h>
 #include <linux/atomic.h>
 #include <linux/cpumask.h>
+#include <uapi/linux/sched/types.h>
 
 struct workqueue_struct;
 
@@ -127,9 +128,9 @@ struct delayed_work {
  */
 struct workqueue_attrs {
 	/**
-	 * @nice: nice level
+	 * @sched_attr: kworker's scheduling parameters
 	 */
-	int nice;
+	struct sched_attr sched_attr;
 
 	/**
 	 * @cpumask: allowed CPUs
