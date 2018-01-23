@@ -477,7 +477,7 @@ static int synth_alloc_pages(struct snd_emu10k1 *emu, struct snd_emu10k1_memblk 
 			if (p)
 				__free_page(p);
 			/* try to allocate from <16MB zone */
-			p = alloc_page(GFP_ATOMIC | GFP_DMA |
+			p = alloc_page(GFP_KERNEL | GFP_DMA |
 				       __GFP_NORETRY | /* no OOM-killer */
 				       __GFP_NOWARN);
 		}
