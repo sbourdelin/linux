@@ -108,6 +108,15 @@ enum mem_avoid_index {
 
 static struct mem_vector mem_avoid[MEM_AVOID_MAX];
 
+/* Only support at most 4 usable memory regions specified for kaslr */
+#define MAX_KASLR_MEM_USABLE	4
+
+/* Store the usable memory regions for kaslr */
+static struct mem_vector mem_usable[MAX_KASLR_MEM_USABLE];
+
+/* The amount of usable regions for kaslr user specify, not more than 4 */
+static int num_usable_region;
+
 static bool mem_overlaps(struct mem_vector *one, struct mem_vector *two)
 {
 	/* Item one is entirely before item two. */
@@ -206,7 +215,62 @@ static void mem_avoid_memmap(char *str)
 		memmap_too_large = true;
 }
 
-static int handle_mem_memmap(void)
+static int parse_kaslr_mem(char *p,
+			   unsigned long long *start,
+			   unsigned long long *size)
+{
+	char *oldp;
+
+	if (!p)
+		return -EINVAL;
+
+	oldp = p;
+	*size = memparse(p, &p);
+	if (p == oldp)
+		return -EINVAL;
+
+	switch (*p) {
+	case '@':
+		*start = memparse(p + 1, &p);
+		return 0;
+	default:
+		/*
+		 * If w/o offset, only size specified, kaslr_mem=nn[KMG]
+		 * has the same behaviour as kaslr_mem=nn[KMG]@0. It means
+		 * the region starts from 0.
+		 */
+		*start = 0;
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+static void parse_kaslr_mem_regions(char *str)
+{
+	static int i;
+
+	while (str && (i < MAX_KASLR_MEM_USABLE)) {
+		int rc;
+		unsigned long long start, size;
+		char *k = strchr(str, ',');
+
+		if (k)
+			*k++ = 0;
+
+		rc = parse_kaslr_mem(str, &start, &size);
+		if (rc < 0)
+			break;
+		str = k;
+
+		mem_usable[i].start = start;
+		mem_usable[i].size = size;
+		i++;
+	}
+	num_usable_region = i;
+}
+
+static int handle_mem_filter(void)
 {
 	char *args = (char *)get_cmd_line_ptr();
 	size_t len = strlen((char *)args);
@@ -214,7 +278,8 @@ static int handle_mem_memmap(void)
 	char *param, *val;
 	u64 mem_size;
 
-	if (!strstr(args, "memmap=") && !strstr(args, "mem="))
+	if (!strstr(args, "memmap=") && !strstr(args, "mem=") &&
+	    !strstr(args, "kaslr_mem="))
 		return 0;
 
 	tmp_cmdline = malloc(len + 1);
@@ -239,6 +304,8 @@ static int handle_mem_memmap(void)
 
 		if (!strcmp(param, "memmap")) {
 			mem_avoid_memmap(val);
+		} else if (!strcmp(param, "kaslr_mem")) {
+			parse_kaslr_mem_regions(val);
 		} else if (!strcmp(param, "mem")) {
 			char *p = val;
 
@@ -378,7 +445,7 @@ static void mem_avoid_init(unsigned long input, unsigned long input_size,
 	/* We don't need to set a mapping for setup_data. */
 
 	/* Mark the memmap regions we need to avoid */
-	handle_mem_memmap();
+	handle_mem_filter();
 
 #ifdef CONFIG_X86_VERBOSE_BOOTUP
 	/* Make sure video RAM can be used. */
