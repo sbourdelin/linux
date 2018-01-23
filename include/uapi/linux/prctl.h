@@ -207,4 +207,12 @@ struct prctl_mm_map {
 # define PR_SVE_VL_LEN_MASK		0xffff
 # define PR_SVE_VL_INHERIT		(1 << 17) /* inherit across exec */
 
+/*
+ * Prevent branch prediction entries created by the execution of
+ * user space code of this task to be used in any other context.
+ * This makes it impossible for malicious user space code to train
+ * a branch in the kernel code or in another task to be mispredicted.
+ */
+#define PR_ISOLATE_BP			52
+
 #endif /* _LINUX_PRCTL_H */

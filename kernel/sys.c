@@ -117,6 +117,9 @@
 #ifndef SVE_GET_VL
 # define SVE_GET_VL()		(-EINVAL)
 #endif
+#ifndef ISOLATE_BP
+# define ISOLATE_BP()		(-EINVAL)
+#endif
 
 /*
  * this is where the system-wide overflow UID and GID are defined, for
@@ -2397,6 +2400,9 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		break;
 	case PR_SVE_GET_VL:
 		error = SVE_GET_VL();
+		break;
+	case PR_ISOLATE_BP:
+		error = ISOLATE_BP();
 		break;
 	default:
 		error = -EINVAL;
