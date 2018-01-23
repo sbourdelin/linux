@@ -2350,6 +2350,16 @@
 			allocations which rules out almost all kernel
 			allocations. Use with caution!
 
+	kaslr_mem=nn[KMG][@ss[KMG]]
+			[KNL] Force usage of a specific region of memory
+			for KASLR during kernel decompression stage.
+			Region of usable memory is from ss to ss+nn. If ss
+			is omitted, it is equivalent to kaslr_mem=nn[KMG]@0.
+			Multiple regions can be specified, comma delimited.
+			Notice: only support 4 regions at most now.
+			Example:
+			kaslr_mem=1G,500M@2G,1G@4G
+
 	MTD_Partition=	[MTD]
 			Format: <name>,<region-number>,<size>,<offset>
 
