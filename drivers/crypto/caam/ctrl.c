@@ -571,6 +571,27 @@ static int caam_probe(struct platform_device *pdev)
 			       MCFGR_LONG_PTR : 0));
 
 	/*
+	 * Detect if we are in TrustZone mode by trying to set MCFGR_LARGE_BURST
+	 * In the first instance if TrustZone is active the MCR will read
+	 * all-zero so if we read non-zero we know we can skip further checks.
+	 * However its possible MCR is zero in non-TrustZone mode so if
+	 * ctrl->mcr == 0 try to flip MCFGR_LARGE_BURST. If we cannot set the
+	 * bit when MCR is zero we've detected TrustZone mode and then we know
+	 * the first page of the CAAM is not accessible to Linux else flip
+	 * MCFGR_LARGE_BURST back to off.
+	 */
+	if (!rd_reg32(&ctrl->mcr)) {
+		clrsetbits_32(&ctrl->mcr, 0, MCFGR_LARGE_BURST);
+		if (!rd_reg32(&ctrl->mcr))
+			ctrlpriv->trust_zone = true;
+		else
+			clrsetbits_32(&ctrl->mcr, MCFGR_LARGE_BURST, 0);
+
+		if (ctrlpriv->trust_zone)
+			dev_info(dev, "TrustZone mode detected\n");
+	}
+
+	/*
 	 *  Read the Compile Time paramters and SCFGR to determine
 	 * if Virtualization is enabled for this platform
 	 */
