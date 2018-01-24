@@ -567,6 +567,8 @@ int invoke_pm_fn(u32 pm_api_id, u32 arg0, u32 arg1, u32 arg2, u32 arg3,
 		 u32 *ret_payload);
 int zynqmp_pm_ret_code(u32 ret_status);
 
+int zynqmp_pm_ggs_init(struct device *dev);
+
 #if IS_REACHABLE(CONFIG_ARCH_ZYNQMP)
 const struct zynqmp_eemi_ops *get_eemi_ops(void);
 #else

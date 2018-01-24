@@ -15,10 +15,13 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 
 #include <linux/firmware/xilinx/zynqmp/firmware.h>
+
+#define DRIVER_NAME	"zynqmp_firmware"
 
 /**
  * zynqmp_pm_ret_code - Convert PMU-FW error codes to Linux error codes
@@ -995,5 +998,33 @@ static int __init zynqmp_plat_init(void)
 
 	return ret;
 }
+
+static const struct of_device_id firmware_of_match[] = {
+	{ .compatible = "xlnx,zynqmp-firmware", },
+	{ /* end of table */ },
+};
+
+MODULE_DEVICE_TABLE(of, firmware_of_match);
+
+static int zynqmp_firmware_probe(struct platform_device *pdev)
+{
+	int ret;
+
+	ret = zynqmp_pm_ggs_init(&pdev->dev);
+	if (ret)
+		dev_err(&pdev->dev, "%s() GGS init fail with error %d\n",
+			__func__, ret);
+
+	return ret;
+}
+
+static struct platform_driver zynqmp_firmware_platform_driver = {
+	.probe   = zynqmp_firmware_probe,
+	.driver  = {
+			.name             = DRIVER_NAME,
+			.of_match_table   = firmware_of_match,
+		   },
+};
+builtin_platform_driver(zynqmp_firmware_platform_driver);
 
 early_initcall(zynqmp_plat_init);
