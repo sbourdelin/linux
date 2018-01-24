@@ -20,6 +20,7 @@
 #include <linux/uaccess.h>
 
 #include <linux/firmware/xilinx/zynqmp/firmware.h>
+#include <linux/firmware/xilinx/zynqmp/firmware-debug.h>
 
 #define DRIVER_NAME	"zynqmp_firmware"
 
@@ -1011,9 +1012,13 @@ static int zynqmp_firmware_probe(struct platform_device *pdev)
 	int ret;
 
 	ret = zynqmp_pm_ggs_init(&pdev->dev);
-	if (ret)
+	if (ret) {
 		dev_err(&pdev->dev, "%s() GGS init fail with error %d\n",
 			__func__, ret);
+		return ret;
+	}
+
+	zynqmp_pm_api_debugfs_init();
 
 	return ret;
 }
