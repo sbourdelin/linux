@@ -711,6 +711,24 @@ static int caam_probe(struct platform_device *pdev)
 			int inst_handles =
 				rd_reg32(&ctrl->r4tst[0].rdsta) &
 								RDSTA_IFMASK;
+
+			/*
+			 * If TrustZone is active then u-boot or the TrustZone
+			 * firmware must have initialized the RNG for us else we
+			 * cannot do so from Linux.
+			 *
+			 * We've previously detected TrustZone so now let's
+			 * detect if the RNG has been initialized.
+			 */
+			if (ctrlpriv->trust_zone) {
+				ret = -ENODEV;
+				if (ctrlpriv->rng4_sh_init || inst_handles)
+					ret = 0;
+				dev_info(dev, "TrustZone active RNG looks %s\n",
+					 ret ? "uninitialized" : "initialized");
+				break;
+			}
+
 			/*
 			 * If either SH were instantiated by somebody else
 			 * (e.g. u-boot) then it is assumed that the entropy
