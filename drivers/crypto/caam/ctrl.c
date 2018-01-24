@@ -704,7 +704,10 @@ static int caam_probe(struct platform_device *pdev)
 					 ent_delay);
 				kick_trng(pdev, ent_delay);
 				ent_delay += 400;
+			} else if (ctrlpriv->rng4_sh_init && inst_handles) {
+				ent_delay += 400;
 			}
+
 			/*
 			 * if instantiate_rng(...) fails, the loop will rerun
 			 * and the kick_trng(...) function will modfiy the
