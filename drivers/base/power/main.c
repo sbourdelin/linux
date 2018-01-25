@@ -1037,6 +1037,7 @@ static void async_resume(void *data, async_cookie_t cookie)
 void dpm_resume(pm_message_t state)
 {
 	struct device *dev;
+	bool suspended = (pm_transition.event != PM_EVENT_ON);
 	ktime_t starttime = ktime_get();
 
 	trace_suspend_resume(TPS("dpm_resume"), state.event, true);
@@ -1080,7 +1081,8 @@ void dpm_resume(pm_message_t state)
 	async_synchronize_full();
 	dpm_show_time(starttime, state, 0, NULL);
 
-	cpufreq_resume();
+	if (likely(suspended))
+		cpufreq_resume();
 	trace_suspend_resume(TPS("dpm_resume"), state.event, false);
 }
 
