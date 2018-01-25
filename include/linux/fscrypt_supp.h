@@ -138,6 +138,33 @@ static inline bool fscrypt_match_name(const struct fscrypt_name *fname,
 	return !memcmp(de_name, fname->disk_name.name, fname->disk_name.len);
 }
 
+static inline bool fscrypt_charset_match_name(const struct fscrypt_name *fname,
+					      const struct charset *charset,
+					      const u8 *de_name,
+					      u32 de_name_len, bool ignorecase)
+{
+	if (unlikely(!fname->disk_name.name)) {
+		const struct fscrypt_digested_name *n =
+			(const void *)fname->crypto_buf.name;
+		if (WARN_ON_ONCE(fname->usr_fname->name[0] != '_'))
+			return false;
+		if (de_name_len <= FSCRYPT_FNAME_MAX_UNDIGESTED_SIZE)
+			return false;
+		return !memcmp(FSCRYPT_FNAME_DIGEST(de_name, de_name_len),
+			       n->digest, FSCRYPT_FNAME_DIGEST_SIZE);
+	}
+
+	if (!ignorecase) {
+		return !charset_strncmp(charset, (char *) de_name, de_name_len,
+					fname->disk_name.name,
+					fname->disk_name.len);
+	}
+
+	return !charset_strncasecmp(charset, (char *) de_name, de_name_len,
+				    fname->disk_name.name,
+				    fname->disk_name.len);
+}
+
 /* bio.c */
 extern void fscrypt_decrypt_bio_pages(struct fscrypt_ctx *, struct bio *);
 extern void fscrypt_pullback_bio_page(struct page **, bool);
