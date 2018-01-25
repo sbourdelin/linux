@@ -30,6 +30,7 @@
 #include "i915_utils.h"
 #include "i915_gem_request.h"
 #include "i915_syncmap.h"
+#include "i915_reg.h"
 
 struct i915_gem_timeline;
 
@@ -86,6 +87,7 @@ struct i915_gem_timeline {
 	struct drm_i915_private *i915;
 	const char *name;
 
+	struct intel_timeline class[MAX_ENGINE_CLASS];
 	struct intel_timeline engine[I915_NUM_ENGINES];
 };
 

@@ -75,6 +75,10 @@ static int __i915_gem_timeline_init(struct drm_i915_private *i915,
 
 	/* Called during early_init before we know how many engines there are */
 	fences = dma_fence_context_alloc(ARRAY_SIZE(timeline->engine));
+	for (i = 0; i < ARRAY_SIZE(timeline->class); i++)
+		__intel_timeline_init(&timeline->class[i],
+				      timeline, fences++,
+				      lockclass, lockname);
 	for (i = 0; i < ARRAY_SIZE(timeline->engine); i++)
 		__intel_timeline_init(&timeline->engine[i],
 				      timeline, fences++,
@@ -137,6 +141,11 @@ void i915_gem_timelines_park(struct drm_i915_private *i915)
 	lockdep_assert_held(&i915->drm.struct_mutex);
 
 	list_for_each_entry(timeline, &i915->gt.timelines, link) {
+		for (i = 0; i < ARRAY_SIZE(timeline->class); i++) {
+			struct intel_timeline *tl = &timeline->class[i];
+
+			i915_syncmap_free(&tl->sync);
+		}
 		for (i = 0; i < ARRAY_SIZE(timeline->engine); i++) {
 			struct intel_timeline *tl = &timeline->engine[i];
 
@@ -156,6 +165,9 @@ void i915_gem_timeline_fini(struct i915_gem_timeline *timeline)
 	int i;
 
 	lockdep_assert_held(&timeline->i915->drm.struct_mutex);
+
+	for (i = 0; i < ARRAY_SIZE(timeline->class); i++)
+		__intel_timeline_fini(&timeline->class[i]);
 
 	for (i = 0; i < ARRAY_SIZE(timeline->engine); i++)
 		__intel_timeline_fini(&timeline->engine[i]);

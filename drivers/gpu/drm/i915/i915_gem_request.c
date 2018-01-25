@@ -371,6 +371,7 @@ static void i915_gem_request_retire(struct drm_i915_gem_request *request)
 {
 	struct intel_engine_cs *engine = request->engine;
 	struct i915_gem_active *active, *next;
+	struct intel_timeline *timeline;
 
 	lockdep_assert_held(&request->i915->drm.struct_mutex);
 	GEM_BUG_ON(!i915_sw_fence_signaled(&request->submit));
@@ -382,6 +383,12 @@ static void i915_gem_request_retire(struct drm_i915_gem_request *request)
 	spin_lock_irq(&engine->timeline->lock);
 	list_del_init(&request->link);
 	spin_unlock_irq(&engine->timeline->lock);
+
+	timeline = i915_gem_context_lookup_timeline_class(request->ctx,
+							  engine->class);
+	spin_lock_irq(&timeline->lock);
+	list_del(&request->ctx_link);
+	spin_unlock_irq(&timeline->lock);
 
 	unreserve_engine(request->engine);
 	advance_ring(request);
@@ -1025,6 +1032,12 @@ void __i915_add_request(struct drm_i915_gem_request *request, bool flush_caches)
 
 	GEM_BUG_ON(timeline->seqno != request->fence.seqno);
 	i915_gem_active_set(&timeline->last_request, request);
+
+	timeline = i915_gem_context_lookup_timeline_class(request->ctx,
+							  engine->class);
+	spin_lock_irq(&timeline->lock);
+	list_add(&request->ctx_link, &timeline->requests);
+	spin_unlock_irq(&timeline->lock);
 
 	list_add_tail(&request->ring_link, &ring->request_list);
 	request->emitted_jiffies = jiffies;
