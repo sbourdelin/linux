@@ -1350,6 +1350,7 @@ enum {
 	Opt_dioread_nolock, Opt_dioread_lock,
 	Opt_discard, Opt_nodiscard, Opt_init_itable, Opt_noinit_itable,
 	Opt_max_dir_size_kb, Opt_nojournal_checksum, Opt_nombcache,
+	Opt_ignore_case,
 };
 
 static const match_table_t tokens = {
@@ -1432,6 +1433,7 @@ static const match_table_t tokens = {
 	{Opt_noinit_itable, "noinit_itable"},
 	{Opt_max_dir_size_kb, "max_dir_size_kb=%u"},
 	{Opt_test_dummy_encryption, "test_dummy_encryption"},
+	{Opt_ignore_case, "ignorecase"},
 	{Opt_nombcache, "nombcache"},
 	{Opt_nombcache, "no_mbcache"},	/* for backward compatibility */
 	{Opt_removed, "check=none"},	/* mount option from ext2/3 */
@@ -1686,6 +1688,9 @@ static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 		return 1;
 	case Opt_nolazytime:
 		sb->s_flags &= ~SB_LAZYTIME;
+		return 1;
+	case Opt_ignore_case:
+		set_opt2(sb, CASE_INSENSITIVE);
 		return 1;
 	}
 
