@@ -430,10 +430,23 @@ ALT_FTR_SECTION_END_NESTED_IFSET(CPU_FTR_ARCH_207S, 66);		\
  */
 _GLOBAL(power9_idle_stop)
 	std	r3, PACA_REQ_PSSCR(r13)
+	sync
+	lwz	r5, PACA_DONT_STOP(r13)
+	cmpwi	r5, 0
+	bne	1f
 	mtspr 	SPRN_PSSCR,r3
 	LOAD_REG_ADDR(r4,power_enter_stop)
 	b	pnv_powersave_common
 	/* No return */
+1:
+	/*
+	 * We get here when TM / thread reconfiguration bug workaround
+	 * code wants to get the CPU into SMT4 mode, and therefore
+	 * we are being asked not to stop.
+	 */
+	li	r3, 0
+	std	r3, PACA_REQ_PSSCR(r13)
+	blr		/* return 0 for wakeup cause / SRR1 value */
 
 /*
  * On waking up from stop 0,1,2 with ESL=1 on POWER9 DD1,
@@ -584,6 +597,8 @@ FTR_SECTION_ELSE_NESTED(71)
 	mfspr	r5, SPRN_PSSCR
 	rldicl  r5,r5,4,60
 ALT_FTR_SECTION_END_NESTED_IFSET(CPU_FTR_POWER9_DD1, 71)
+	li	r0, 0		/* clear requested_psscr to say we're awake */
+	std	r0, PACA_REQ_PSSCR(r13)
 	cmpd	cr4,r5,r4
 	bge	cr4,pnv_wakeup_tb_loss /* returns to caller */
 

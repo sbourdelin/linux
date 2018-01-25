@@ -24,6 +24,7 @@
 #include <asm/code-patching.h>
 #include <asm/smp.h>
 #include <asm/runlatch.h>
+#include <asm/dbell.h>
 
 #include "powernv.h"
 #include "subcore.h"
@@ -386,6 +387,67 @@ void power9_idle(void)
 {
 	power9_idle_type(pnv_default_stop_val, pnv_default_stop_mask);
 }
+
+#ifdef CONFIG_KVM_BOOK3S_HV_POSSIBLE
+/*
+ * This is used in working around bugs in thread reconfiguration
+ * on POWER9 (at least up to Nimbus DD2.2) relating to transactional
+ * memory and the way that XER[SO] is checkpointed.
+ * This function forces the core into SMT4 in order by asking
+ * all other threads not to stop, and sending a message to any
+ * that are in a stop state.
+ * Must be called with preemption disabled.
+ */
+void pnv_power9_force_smt4(void)
+{
+	int cpu, cpu0, thr;
+	struct paca_struct *tpaca;
+	int awake_threads = 1;		/* this thread is awake */
+	int poke_threads = 0;
+
+	cpu = smp_processor_id();
+	cpu0 = cpu & ~(threads_per_core - 1);
+	tpaca = &paca[cpu0];
+	for (thr = 0; thr < threads_per_core; ++thr) {
+		if (cpu != cpu0 + thr)
+			atomic_inc(&tpaca[thr].dont_stop);
+	}
+	/* order setting dont_stop vs testing requested_psscr */
+	mb();
+	for (thr = 0; thr < threads_per_core; ++thr) {
+		if (!tpaca[thr].requested_psscr)
+			++awake_threads;
+		else
+			poke_threads |= (1 << thr);
+	}
+
+	/* If at least 3 threads are awake, the core is in SMT4 already */
+	if (awake_threads < threads_per_core - 1) {
+		/* We have to wake some threads; we'll use msgsnd */
+		for (thr = 0; thr < threads_per_core; ++thr) {
+			if (poke_threads & (1 << thr))
+				ppc_msgsnd(PPC_DBELL_MSGTYPE, 0,
+					   tpaca[thr].hw_cpu_id);
+		}
+		/* now spin until at least 3 threads are awake */
+		do {
+			for (thr = 0; thr < threads_per_core; ++thr) {
+				if ((poke_threads & (1 << thr)) &&
+				    !tpaca[thr].requested_psscr) {
+					++awake_threads;
+					poke_threads &= ~(1 << thr);
+				}
+			}
+		} while (awake_threads < threads_per_core - 1);
+	}
+	/* clear all the dont_stop flags */
+	for (thr = 0; thr < threads_per_core; ++thr) {
+		if (cpu != cpu0 + thr)
+			atomic_dec(&tpaca[thr].dont_stop);
+	}
+}
+EXPORT_SYMBOL_GPL(pnv_power9_force_smt4);
+#endif /* CONFIG_KVM_BOOK3S_HV_POSSIBLE */
 
 #ifdef CONFIG_HOTPLUG_CPU
 static void pnv_program_cpu_hotplug_lpcr(unsigned int cpu, u64 lpcr_val)
