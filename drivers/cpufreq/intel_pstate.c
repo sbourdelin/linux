@@ -689,6 +689,8 @@ static void intel_pstate_get_hwp_max(unsigned int cpu, int *phy_max,
 {
 	u64 cap;
 
+	/* In case HWP is disabled after resumed from S3. */
+	wrmsrl_on_cpu(cpu, MSR_PM_ENABLE, 0x1);
 	rdmsrl_on_cpu(cpu, MSR_HWP_CAPABILITIES, &cap);
 	if (global.no_turbo)
 		*current_max = HWP_GUARANTEED_PERF(cap);
@@ -711,6 +713,8 @@ static void intel_pstate_hwp_set(unsigned int cpu)
 	if (cpu_data->policy == CPUFREQ_POLICY_PERFORMANCE)
 		min = max;
 
+	/* In case HWP is disabled after resumed from S3. */
+	wrmsrl_on_cpu(cpu, MSR_PM_ENABLE, 0x1);
 	rdmsrl_on_cpu(cpu, MSR_HWP_REQUEST, &value);
 
 	value &= ~HWP_MIN_PERF(~0L);
