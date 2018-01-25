@@ -1991,6 +1991,22 @@ static ktime_t __intel_engine_get_busy_time(struct intel_engine_cs *engine)
 	return total;
 }
 
+static ktime_t
+___intel_engine_get_busy_time(struct intel_engine_cs *engine, ktime_t now)
+{
+	ktime_t total = engine->stats.total;
+
+	/*
+	 * If the engine is executing something at the moment
+	 * add it to the total.
+	 */
+	if (engine->stats.active)
+		total = ktime_add(total,
+				  ktime_sub(now, engine->stats.start));
+
+	return total;
+}
+
 /**
  * intel_engine_get_busy_time() - Return current accumulated engine busyness
  * @engine: engine to report on
@@ -2004,6 +2020,25 @@ ktime_t intel_engine_get_busy_time(struct intel_engine_cs *engine)
 
 	spin_lock_irqsave(&engine->stats.lock, flags);
 	total = __intel_engine_get_busy_time(engine);
+	spin_unlock_irqrestore(&engine->stats.lock, flags);
+
+	return total;
+}
+
+/**
+ * intel_engine_get_busy_time() - Return current accumulated engine busyness
+ * @engine: engine to report on
+ *
+ * Returns accumulated time @engine was busy since engine stats were enabled.
+ */
+ktime_t
+intel_engine_get_busy_time_now(struct intel_engine_cs *engine, ktime_t now)
+{
+	ktime_t total;
+	unsigned long flags;
+
+	spin_lock_irqsave(&engine->stats.lock, flags);
+	total = ___intel_engine_get_busy_time(engine, now);
 	spin_unlock_irqrestore(&engine->stats.lock, flags);
 
 	return total;

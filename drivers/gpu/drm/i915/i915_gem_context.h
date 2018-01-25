@@ -163,6 +163,25 @@ struct i915_gem_context {
 		int pin_count;
 	} engine[I915_NUM_ENGINES];
 
+	/**
+	 * @stats_enabled: Has this context enabled per-engine stats.
+	 *
+	 * Boolean tracked per-engine.
+	 */
+	bool stats_enabled[I915_NUM_ENGINES];
+
+	/**
+	 * @prev_busy: Previous engine busyness.
+	 *
+	 * For VCS engines.
+	 */
+	u64 prev_busy[2];
+
+	/**
+	 * @prev_instance: Previously submitted to VCS instance.
+	 */
+	u8 prev_instance;
+
 	/** ring_size: size for allocating the per-engine ring buffer */
 	u32 ring_size;
 	/** desc_template: invariant fields for the HW context descriptor */

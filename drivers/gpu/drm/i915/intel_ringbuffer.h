@@ -1085,5 +1085,7 @@ int intel_enable_engine_stats(struct intel_engine_cs *engine);
 void intel_disable_engine_stats(struct intel_engine_cs *engine);
 
 ktime_t intel_engine_get_busy_time(struct intel_engine_cs *engine);
+ktime_t intel_engine_get_busy_time_now(struct intel_engine_cs *engine,
+				       ktime_t now);
 
 #endif /* _INTEL_RINGBUFFER_H_ */

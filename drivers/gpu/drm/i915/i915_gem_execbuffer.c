@@ -2018,6 +2018,53 @@ gen8_dispatch_bsd_engine(struct drm_i915_private *dev_priv,
 	return file_priv->bsd_engine;
 }
 
+static void
+ctx_enable_stats(struct i915_gem_context *ctx, enum intel_engine_id id)
+{
+	int ret;
+
+	ret = intel_enable_engine_stats(ctx->i915->engine[id]);
+
+	ctx->stats_enabled[id] = ret == 0;
+}
+
+static u8 eb_rr_instance(struct drm_i915_private *i915)
+{
+	return atomic_fetch_xor(1, &i915->mm.bsd_engine_dispatch_index);
+}
+
+static u8 ctx_best_vcs_instance(struct i915_gem_context *ctx)
+{
+	ktime_t now = ktime_get();
+	u64 busy[2], prev_busy[2];
+	u8 instance;
+
+	busy[0] = intel_engine_get_busy_time_now(ctx->i915->engine[_VCS(0)],
+						 now);
+	busy[1] = intel_engine_get_busy_time_now(ctx->i915->engine[_VCS(1)],
+						 now);
+
+	prev_busy[0] = ctx->prev_busy[0];
+	prev_busy[1] = ctx->prev_busy[1];
+
+	ctx->prev_busy[0] = busy[0];
+	ctx->prev_busy[1] = busy[1];
+
+	busy[0] -= prev_busy[0];
+	busy[1] -= prev_busy[1];
+
+	if (busy[0] < busy[1])
+		instance = 0;
+	else if (busy[1] < busy[0])
+		instance = 1;
+	else
+		instance = ctx->prev_instance;
+
+	ctx->prev_instance = instance;
+
+	return instance;
+}
+
 static int eb_select_engine_class_instance(struct i915_execbuffer *eb)
 {
 	struct drm_i915_private *i915 = eb->i915;
@@ -2037,8 +2084,19 @@ static int eb_select_engine_class_instance(struct i915_execbuffer *eb)
 		unsigned int vcs_instances = 2;
 		struct intel_timeline *timeline;
 
-		instance = atomic_fetch_xor(1,
-					    &i915->mm.bsd_engine_dispatch_index);
+		if (intel_engine_supports_stats(i915->engine[VCS])) {
+			if (!eb->ctx->stats_enabled[_VCS(0)])
+				ctx_enable_stats(eb->ctx, _VCS(0));
+
+			if (!eb->ctx->stats_enabled[_VCS(1)])
+				ctx_enable_stats(eb->ctx, _VCS(1));
+		}
+
+		if (eb->ctx->stats_enabled[_VCS(0)] &&
+		    eb->ctx->stats_enabled[_VCS(1)])
+			instance = ctx_best_vcs_instance(eb->ctx);
+		else
+			instance = eb_rr_instance(i915);
 
 		do {
 			engine = i915->engine[_VCS(instance)];

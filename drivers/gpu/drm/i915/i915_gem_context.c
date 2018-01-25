@@ -129,6 +129,9 @@ static void i915_gem_context_free(struct i915_gem_context *ctx)
 	for (i = 0; i < I915_NUM_ENGINES; i++) {
 		struct intel_context *ce = &ctx->engine[i];
 
+		if (ctx->stats_enabled[i])
+			intel_disable_engine_stats(ctx->i915->engine[i]);
+
 		if (!ce->state)
 			continue;
 
