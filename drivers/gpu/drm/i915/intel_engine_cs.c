@@ -229,6 +229,9 @@ intel_engine_setup(struct drm_i915_private *dev_priv,
 	engine->irq_shift = info->irq_shift;
 	engine->class = info->class;
 	engine->instance = info->instance;
+	if (INTEL_GEN(dev_priv) >= 8 && engine->class == VIDEO_DECODE_CLASS &&
+	    engine->instance == 0)
+		engine->caps = I915_BSD_CAP_HEVC;
 
 	engine->uabi_id = info->uabi_id;
 	engine->uabi_class = class_info->uabi_class;

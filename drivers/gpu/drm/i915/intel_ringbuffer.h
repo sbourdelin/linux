@@ -297,6 +297,8 @@ struct intel_engine_cs {
 
 	u8 class;
 	u8 instance;
+	u8 caps;
+
 	u32 context_size;
 	u32 mmio_base;
 	unsigned int irq_shift;

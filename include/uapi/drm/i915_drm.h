@@ -1051,7 +1051,18 @@ struct drm_i915_gem_execbuffer2 {
 #define I915_EXEC_INSTANCE_SHIFT	(21)
 #define I915_EXEC_INSTANCE_MASK		(0xff << I915_EXEC_INSTANCE_SHIFT)
 
-#define __I915_EXEC_UNKNOWN_FLAGS (-((1 << 29) << 1))
+/*
+ * Inform the kernel of what engine capabilities this batch buffer
+ * requires. For example only the first VCS engine has the HEVC block.
+ *
+ * We reserve four bits for the capabilities where each can be shared
+ * between different engines. Eg. first bit can mean one feature for
+ * one engine and something else for the other.
+ */
+#define I915_EXEC_ENGINE_CAP_SHIFT	(29)
+#define I915_EXEC_ENGINE_CAP_MASK	(0xf << I915_EXEC_ENGINE_CAP_SHIFT)
+
+#define __I915_EXEC_UNKNOWN_FLAGS (-((1ULL << 33) << 1))
 
 #define I915_EXEC_CONTEXT_ID_MASK	(0xffffffff)
 #define i915_execbuffer2_set_context_id(eb2, context) \
@@ -1063,6 +1074,10 @@ struct drm_i915_gem_execbuffer2 {
 	(I915_EXEC_CLASS_INSTANCE | \
 	(class) | \
 	((instance) << I915_EXEC_INSTANCE_SHIFT))
+
+#define I915_BSD_CAP_HEVC	(1 << 0)
+
+#define I915_ENGINE_CAP_FLAG(v)	((v) << I915_EXEC_ENGINE_CAP_SHIFT)
 
 struct drm_i915_gem_pin {
 	/** Handle of the buffer to be pinned. */

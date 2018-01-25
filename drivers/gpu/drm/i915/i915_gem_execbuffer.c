@@ -56,9 +56,10 @@ enum {
 #define __EXEC_OBJECT_INTERNAL_FLAGS	(~0u << 27) /* all of the above */
 #define __EXEC_OBJECT_RESERVED (__EXEC_OBJECT_HAS_PIN | __EXEC_OBJECT_HAS_FENCE)
 
-#define __EXEC_HAS_RELOC	BIT(31)
-#define __EXEC_VALIDATED	BIT(30)
-#define __EXEC_INTERNAL_FLAGS	(~0u << 30)
+#define __EXEC_HAS_RELOC	BIT_ULL(63)
+#define __EXEC_VALIDATED	BIT_ULL(62)
+#define __EXEC_INTERNAL_FLAGS	(~0ULL << 62)
+
 #define UPDATE			PIN_OFFSET_FIXED
 
 #define BATCH_OFFSET_BIAS (256*1024)
@@ -2021,8 +2022,16 @@ eb_select_engine_class_instance(struct drm_i915_private *i915, u64 eb_flags)
 	u8 class = eb_flags & I915_EXEC_RING_MASK;
 	u8 instance = (eb_flags & I915_EXEC_INSTANCE_MASK) >>
 		      I915_EXEC_INSTANCE_SHIFT;
+	u8 caps = (eb_flags & I915_EXEC_ENGINE_CAP_MASK) >>
+		  I915_EXEC_ENGINE_CAP_SHIFT;
+	struct intel_engine_cs *engine;
 
-	return intel_engine_lookup_user(i915, class, instance);
+	engine = intel_engine_lookup_user(i915, class, instance);
+
+	if (engine && ((caps & engine->caps) != caps))
+		return NULL;
+
+	return engine;
 }
 
 #define I915_USER_RINGS (4)
@@ -2231,6 +2240,8 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	BUILD_BUG_ON(__EXEC_INTERNAL_FLAGS & ~__I915_EXEC_ILLEGAL_FLAGS);
 	BUILD_BUG_ON(__EXEC_OBJECT_INTERNAL_FLAGS &
 		     ~__EXEC_OBJECT_UNKNOWN_FLAGS);
+
+	BUILD_BUG_ON(__EXEC_INTERNAL_FLAGS & ~__I915_EXEC_UNKNOWN_FLAGS);
 
 	eb.i915 = to_i915(dev);
 	eb.file = file;
