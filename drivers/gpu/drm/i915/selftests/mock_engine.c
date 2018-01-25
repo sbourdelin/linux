@@ -174,8 +174,7 @@ struct intel_engine_cs *mock_engine(struct drm_i915_private *i915,
 	engine->base.emit_breadcrumb = mock_emit_breadcrumb;
 	engine->base.submit_request = mock_submit_request;
 
-	engine->base.timeline =
-		&i915->gt.global_timeline.engine[engine->base.id];
+	intel_engine_init_timeline(&engine->base);
 
 	intel_engine_init_breadcrumbs(&engine->base);
 	engine->base.breadcrumbs.mock = true; /* prevent touching HW for irqs */

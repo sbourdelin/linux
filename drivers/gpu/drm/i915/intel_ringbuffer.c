@@ -1124,7 +1124,9 @@ err:
 }
 
 struct intel_ring *
-intel_engine_create_ring(struct intel_engine_cs *engine, int size)
+intel_engine_create_ring(struct intel_engine_cs *engine,
+			 struct i915_gem_timeline *timeline,
+			 int size)
 {
 	struct intel_ring *ring;
 	struct i915_vma *vma;
@@ -1137,6 +1139,7 @@ intel_engine_create_ring(struct intel_engine_cs *engine, int size)
 		return ERR_PTR(-ENOMEM);
 
 	INIT_LIST_HEAD(&ring->request_list);
+	ring->timeline = &timeline->engine[engine->id];
 
 	ring->size = size;
 	/* Workaround an erratum on the i830 which causes a hang if
@@ -1333,7 +1336,9 @@ static int intel_init_ring_buffer(struct intel_engine_cs *engine)
 	if (err)
 		goto err;
 
-	ring = intel_engine_create_ring(engine, 32 * PAGE_SIZE);
+	ring = intel_engine_create_ring(engine,
+					&engine->i915->gt.legacy_timeline,
+					32 * PAGE_SIZE);
 	if (IS_ERR(ring)) {
 		err = PTR_ERR(ring);
 		goto err;

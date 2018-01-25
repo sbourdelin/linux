@@ -696,7 +696,7 @@ i915_gem_request_alloc(struct intel_engine_cs *engine,
 		}
 	}
 
-	req->timeline = i915_gem_context_lookup_timeline(ctx, engine);
+	req->timeline = ring->timeline;
 	GEM_BUG_ON(req->timeline == engine->timeline);
 
 	spin_lock_init(&req->lock);

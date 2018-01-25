@@ -388,7 +388,8 @@ void intel_engine_init_global_seqno(struct intel_engine_cs *engine, u32 seqno)
 
 static void intel_engine_init_timeline(struct intel_engine_cs *engine)
 {
-	engine->timeline = &engine->i915->gt.global_timeline.engine[engine->id];
+	engine->timeline =
+		&engine->i915->gt.execution_timeline.engine[engine->id];
 }
 
 static bool csb_force_mmio(struct drm_i915_private *i915)

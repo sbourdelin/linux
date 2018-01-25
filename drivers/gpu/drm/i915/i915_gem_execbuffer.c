@@ -1753,6 +1753,7 @@ static int eb_move_to_gpu(struct i915_execbuffer *eb)
 		unsigned int flags = eb->flags[i];
 		struct i915_vma *vma = eb->vma[i];
 		struct drm_i915_gem_object *obj = vma->obj;
+		struct drm_i915_gem_request *order;
 
 		if (flags & EXEC_OBJECT_CAPTURE) {
 			struct i915_gem_capture_list *capture;
@@ -1781,6 +1782,29 @@ static int eb_move_to_gpu(struct i915_execbuffer *eb)
 		if (unlikely(obj->cache_dirty & ~obj->cache_coherent)) {
 			if (i915_gem_clflush_object(obj, 0))
 				flags &= ~EXEC_OBJECT_ASYNC;
+		}
+
+		/*
+		 * XXX As we allow multiple queues to share the vma, but
+		 * with different timelines, yet we rely on a single
+		 * timeline through the vm (for activity tracking
+		 * see i915_vma_move_to_active()/i915_vma_retire()) we impose
+		 * that ordering constraint on the different timelines here.
+		 *
+		 * Note that this ordering constraint is undesirable as we
+		 * want to keep our weakly ordered reads through the GEM
+		 * interface. That will require us to be able to track
+		 * multiple timelines (lifting the current limit of one
+		 * per engine), like struct reservation_object but coupled
+		 * into our activity tracking.
+		 */
+		order = i915_gem_active_peek(&vma->last_read[eb->engine->id],
+					     &eb->i915->drm.struct_mutex);
+		if (order) {
+			err = i915_gem_request_await_dma_fence(eb->request,
+							       &order->fence);
+			if (err)
+				return err;
 		}
 
 		if (flags & EXEC_OBJECT_ASYNC)
