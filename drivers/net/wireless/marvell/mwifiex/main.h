@@ -891,6 +891,7 @@ struct mwifiex_adapter {
 	spinlock_t main_proc_lock;
 	u32 mwifiex_processing;
 	u8 more_task_flag;
+	u8 more_rx_task_flag;
 	u16 tx_buf_size;
 	u16 curr_tx_buf_size;
 	/* sdio single port rx aggregation capability */

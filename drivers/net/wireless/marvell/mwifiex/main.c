@@ -163,6 +163,7 @@ void mwifiex_queue_main_work(struct mwifiex_adapter *adapter)
 	spin_lock_irqsave(&adapter->main_proc_lock, flags);
 	if (adapter->mwifiex_processing) {
 		adapter->more_task_flag = true;
+		adapter->more_rx_task_flag = true;
 		spin_unlock_irqrestore(&adapter->main_proc_lock, flags);
 	} else {
 		spin_unlock_irqrestore(&adapter->main_proc_lock, flags);
@@ -177,6 +178,7 @@ void mwifiex_queue_rx_work(struct mwifiex_adapter *adapter)
 
 	spin_lock_irqsave(&adapter->rx_proc_lock, flags);
 	if (adapter->rx_processing) {
+		adapter->more_rx_task_flag = true;
 		spin_unlock_irqrestore(&adapter->rx_proc_lock, flags);
 	} else {
 		spin_unlock_irqrestore(&adapter->rx_proc_lock, flags);
@@ -193,13 +195,14 @@ static int mwifiex_process_rx(struct mwifiex_adapter *adapter)
 
 	spin_lock_irqsave(&adapter->rx_proc_lock, flags);
 	if (adapter->rx_processing || adapter->rx_locked) {
+		adapter->more_rx_task_flag = true;
 		spin_unlock_irqrestore(&adapter->rx_proc_lock, flags);
 		goto exit_rx_proc;
 	} else {
 		adapter->rx_processing = true;
 		spin_unlock_irqrestore(&adapter->rx_proc_lock, flags);
 	}
-
+rx_process_start:
 	/* Check for Rx data */
 	while ((skb = skb_dequeue(&adapter->rx_data_q))) {
 		atomic_dec(&adapter->rx_pending);
@@ -221,6 +224,11 @@ static int mwifiex_process_rx(struct mwifiex_adapter *adapter)
 		}
 	}
 	spin_lock_irqsave(&adapter->rx_proc_lock, flags);
+	if (adapter->more_rx_task_flag) {
+		adapter->more_rx_task_flag = false;
+		spin_unlock_irqrestore(&adapter->rx_proc_lock, flags);
+		goto rx_process_start;
+	}
 	adapter->rx_processing = false;
 	spin_unlock_irqrestore(&adapter->rx_proc_lock, flags);
 
