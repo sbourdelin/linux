@@ -1369,6 +1369,7 @@ struct ext4_sb_info {
 	struct kobject s_kobj;
 	struct completion s_kobj_unregister;
 	struct super_block *s_sb;
+	const struct charset *encoding;
 
 	/* Journaling */
 	struct journal_s *s_journal;

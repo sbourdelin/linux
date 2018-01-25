@@ -40,6 +40,7 @@
 #include <linux/dax.h>
 #include <linux/cleancache.h>
 #include <linux/uaccess.h>
+#include <linux/charsets.h>
 
 #include <linux/kthread.h>
 #include <linux/freezer.h>
@@ -1350,7 +1351,7 @@ enum {
 	Opt_dioread_nolock, Opt_dioread_lock,
 	Opt_discard, Opt_nodiscard, Opt_init_itable, Opt_noinit_itable,
 	Opt_max_dir_size_kb, Opt_nojournal_checksum, Opt_nombcache,
-	Opt_ignore_case,
+	Opt_ignore_case, Opt_encoding,
 };
 
 static const match_table_t tokens = {
@@ -1434,6 +1435,7 @@ static const match_table_t tokens = {
 	{Opt_max_dir_size_kb, "max_dir_size_kb=%u"},
 	{Opt_test_dummy_encryption, "test_dummy_encryption"},
 	{Opt_ignore_case, "ignorecase"},
+	{Opt_encoding, "encoding=%s"},
 	{Opt_nombcache, "nombcache"},
 	{Opt_nombcache, "no_mbcache"},	/* for backward compatibility */
 	{Opt_removed, "check=none"},	/* mount option from ext2/3 */
@@ -1644,6 +1646,7 @@ static const struct mount_opts {
 	{Opt_max_dir_size_kb, 0, MOPT_GTE0},
 	{Opt_test_dummy_encryption, 0, MOPT_GTE0},
 	{Opt_nombcache, EXT4_MOUNT_NO_MBCACHE, MOPT_SET},
+	{Opt_encoding, 0, MOPT_EXT4_ONLY | MOPT_STRING},
 	{Opt_err, 0, 0}
 };
 
@@ -1882,6 +1885,16 @@ static int handle_mount_opt(struct super_block *sb, char *opt, int token,
 		sbi->s_mount_opt |= m->mount_opt;
 	} else if (token == Opt_data_err_ignore) {
 		sbi->s_mount_opt &= ~m->mount_opt;
+	} else if (token == Opt_encoding) {
+		char *charset = match_strdup(&args[0]);
+
+		sbi->encoding = charset_load(charset);
+		if (!sbi->encoding) {
+			ext4_msg(sb, KERN_ERR, "Encoding %s not supported\n",
+				 charset);
+			return -1;
+		}
+		kfree(charset);
 	} else {
 		if (!args->from)
 			arg = 1;
@@ -1968,6 +1981,12 @@ static int parse_options(char *options, struct super_block *sb,
 			return 0;
 		}
 	}
+
+	if (test_opt2(sb, CASE_INSENSITIVE) && !sbi->encoding) {
+		ext4_msg(sb, KERN_WARNING, "Encoding not explicitly specified "
+			 "or identified on the superblock.  ASCII is assumed.");
+	}
+
 	return 1;
 }
 
@@ -3597,6 +3616,12 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	if (!parse_options((char *) data, sb, &journal_devnum,
 			   &journal_ioprio, 0))
 		goto failed_mount;
+
+	if (!sbi->encoding) {
+		sbi->encoding = charset_load("ascii");
+		if (!sbi->encoding)
+			goto failed_mount;
+	}
 
 	if (test_opt(sb, DATA_FLAGS) == EXT4_MOUNT_JOURNAL_DATA) {
 		printk_once(KERN_WARNING "EXT4-fs: Warning: mounting "
