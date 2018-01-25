@@ -303,6 +303,36 @@ skip_write:
 	return 0;
 }
 
+static void commit_checkpoint_with_barrier(struct f2fs_sb_info *sbi,
+	void *src, block_t blk_addr)
+{
+	struct writeback_control wbc = {
+		.for_reclaim = 0,
+	};
+	struct page *page = grab_meta_page(sbi, blk_addr);
+	int err;
+
+	memcpy(page_address(page), src, PAGE_SIZE);
+	set_page_dirty(page);
+
+	f2fs_wait_on_page_writeback(page, META, true);
+	BUG_ON(PageWriteback(page));
+	if (unlikely(!clear_page_dirty_for_io(page)))
+		BUG();
+
+	/* writeout cp page2 */
+	err = __f2fs_write_meta_page(page, &wbc, FS_CP_META_IO);
+	if (err) {
+		f2fs_put_page(page, 1);
+		f2fs_stop_checkpoint(sbi, false);
+		return;
+	}
+	f2fs_put_page(page, 0);
+
+	/* submit checkpoint with barrier */
+	f2fs_submit_merged_write(sbi, META_FLUSH);
+}
+
 long sync_meta_pages(struct f2fs_sb_info *sbi, enum page_type type,
 				long nr_to_write, enum iostat_type io_type)
 {
@@ -1301,9 +1331,6 @@ static int do_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 		start_blk += NR_CURSEG_NODE_TYPE;
 	}
 
-	/* writeout checkpoint block */
-	update_meta_page(sbi, ckpt, start_blk);
-
 	/* wait for previous submitted node/meta pages writeback */
 	wait_on_all_pages_writeback(sbi);
 
@@ -1317,10 +1344,14 @@ static int do_checkpoint(struct f2fs_sb_info *sbi, struct cp_control *cpc)
 	sbi->last_valid_block_count = sbi->total_valid_block_count;
 	percpu_counter_set(&sbi->alloc_valid_block_count, 0);
 
-	/* Here, we only have one bio having CP pack */
-	sync_meta_pages(sbi, META_FLUSH, LONG_MAX, FS_CP_META_IO);
+	/* Here, we have one bio having CP pack except cp page2 */
+	sync_meta_pages(sbi, META, LONG_MAX, FS_CP_META_IO);
 
 	/* wait for previous submitted meta pages writeback */
+	wait_on_all_pages_writeback(sbi);
+
+	/* barrier and flush checkpoint cp page2 */
+	commit_checkpoint_with_barrier(sbi, ckpt, start_blk);
 	wait_on_all_pages_writeback(sbi);
 
 	release_ino_entry(sbi, false);
