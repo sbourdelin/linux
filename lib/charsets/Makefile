@@ -4,7 +4,7 @@ obj-$(CONFIG_CHARSETS) += charsets.o
 
 obj-$(CONFIG_CHARSETS) += ascii.o
 
-utf8-y += utf8norm.o
+utf8-y += utf8_core.o utf8norm.o
 obj-$(CONFIG_UTF8_NORMALIZATION) +=  utf8.o
 
 $(obj)/utf8norm.o: $(obj)/utf8data.h
