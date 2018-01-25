@@ -622,10 +622,8 @@ static int tegra_kbc_probe(struct platform_device *pdev)
 	match = of_match_device(tegra_kbc_of_match, &pdev->dev);
 
 	kbc = devm_kzalloc(&pdev->dev, sizeof(*kbc), GFP_KERNEL);
-	if (!kbc) {
-		dev_err(&pdev->dev, "failed to alloc memory for kbc\n");
+	if (!kbc)
 		return -ENOMEM;
-	}
 
 	kbc->dev = &pdev->dev;
 	kbc->hw_support = match->data;
