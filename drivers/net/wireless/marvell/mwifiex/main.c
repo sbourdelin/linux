@@ -171,7 +171,7 @@ void mwifiex_queue_main_work(struct mwifiex_adapter *adapter)
 }
 EXPORT_SYMBOL_GPL(mwifiex_queue_main_work);
 
-static void mwifiex_queue_rx_work(struct mwifiex_adapter *adapter)
+void mwifiex_queue_rx_work(struct mwifiex_adapter *adapter)
 {
 	unsigned long flags;
 
@@ -183,6 +183,7 @@ static void mwifiex_queue_rx_work(struct mwifiex_adapter *adapter)
 		queue_work(adapter->rx_workqueue, &adapter->rx_work);
 	}
 }
+EXPORT_SYMBOL_GPL(mwifiex_queue_rx_work);
 
 static int mwifiex_process_rx(struct mwifiex_adapter *adapter)
 {
@@ -283,10 +284,10 @@ process_start:
 				mwifiex_process_hs_config(adapter);
 			if (adapter->if_ops.process_int_status)
 				adapter->if_ops.process_int_status(adapter);
+			if (adapter->rx_work_enabled && adapter->data_received)
+				mwifiex_queue_rx_work(adapter);
 		}
 
-		if (adapter->rx_work_enabled && adapter->data_received)
-			mwifiex_queue_rx_work(adapter);
 
 		/* Need to wake up the card ? */
 		if ((adapter->ps_state == PS_STATE_SLEEP) &&
