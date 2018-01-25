@@ -1,0 +1,33 @@
+The files in this directory are part of the Unicode Character Database
+for version 10.0.0 of the Unicode standard.
+
+The full set of files can be found here:
+
+  http://www.unicode.org/Public/10.0.0/ucd/
+
+The latest released version of the UCD can be found here:
+
+  http://www.unicode.org/Public/UCD/latest/
+
+The files in this directory are identical, except that they have been
+renamed with a suffix indicating the unicode version.
+
+Individual source links:
+
+  http://www.unicode.org/Public/10.0.0/ucd/CaseFolding.txt
+  http://www.unicode.org/Public/10.0.0/ucd/DerivedAge.txt
+  http://www.unicode.org/Public/10.0.0/ucd/extracted/DerivedCombiningClass.txt
+  http://www.unicode.org/Public/10.0.0/ucd/DerivedCoreProperties.txt
+  http://www.unicode.org/Public/10.0.0/ucd/NormalizationCorrections.txt
+  http://www.unicode.org/Public/10.0.0/ucd/NormalizationTest.txt
+  http://www.unicode.org/Public/10.0.0/ucd/UnicodeData.txt
+
+md5sums
+
+  7893b6e005c5a521319a0d12062ae122  CaseFolding-10.0.0.txt
+  a602e4b44de3350087e40f2eb2184898  DerivedAge-10.0.0.txt
+  5abdeb21af4edcc5d1e4c0b5802fc7a7  DerivedCombiningClass-10.0.0.txt
+  eda11c2c2e3c308d9d3b90e2b3282024  DerivedCoreProperties-10.0.0.txt
+  425ece5ffbecd0140d98c13ce05724aa  NormalizationCorrections-10.0.0.txt
+  7296fe7aa07d7d288e65d559af2ad49b  NormalizationTest-10.0.0.txt
+  2a52f30695dcc821f0f224650552beaf  UnicodeData-10.0.0.txt
