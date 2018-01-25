@@ -204,6 +204,8 @@ struct i915_execbuffer {
 	struct drm_i915_gem_request *request; /** our request to build */
 	struct i915_vma *batch; /** identity of the batch obj/vma */
 
+	struct drm_i915_gem_request *prev_request; /** request to depend on */
+
 	/** actual size of execobj[] as we may extend it for the cmdparser */
 	unsigned int buffer_count;
 
@@ -2018,23 +2020,51 @@ gen8_dispatch_bsd_engine(struct drm_i915_private *dev_priv,
 
 static int eb_select_engine_class_instance(struct i915_execbuffer *eb)
 {
+	struct drm_i915_private *i915 = eb->i915;
 	u64 eb_flags = eb->args->flags;
 	u8 class = eb_flags & I915_EXEC_RING_MASK;
 	u8 instance = (eb_flags & I915_EXEC_INSTANCE_MASK) >>
 		      I915_EXEC_INSTANCE_SHIFT;
 	u8 caps = (eb_flags & I915_EXEC_ENGINE_CAP_MASK) >>
 		  I915_EXEC_ENGINE_CAP_SHIFT;
+	struct drm_i915_gem_request *prev_req = NULL;
 	struct intel_engine_cs *engine;
 
-	if (instance && eb->ctx->virtual)
+	if (eb->ctx->virtual && instance) {
 		return -EINVAL;
+	} else if ((HAS_BSD(i915) && HAS_BSD2(i915)) && eb->ctx->virtual &&
+		   class == I915_ENGINE_CLASS_VIDEO) {
+		unsigned int vcs_instances = 2;
+		struct intel_timeline *timeline;
 
-	engine = intel_engine_lookup_user(eb->i915, class, instance);
+		instance = atomic_fetch_xor(1,
+					    &i915->mm.bsd_engine_dispatch_index);
 
-	if (engine && ((caps & engine->caps) != caps))
-		return -EINVAL;
+		do {
+			engine = i915->engine[_VCS(instance)];
+			instance ^= 1;
+			vcs_instances--;
+		} while ((caps & engine->caps) != caps && vcs_instances > 0);
+
+		if ((caps & engine->caps) != caps)
+			return -EINVAL;
+
+		timeline = i915_gem_context_lookup_timeline_class(eb->ctx,
+								  VIDEO_DECODE_CLASS);
+		spin_lock_irq(&timeline->lock);
+		prev_req = list_first_entry_or_null(&timeline->requests,
+						    struct drm_i915_gem_request,
+						    ctx_link);
+		spin_unlock_irq(&timeline->lock);
+	} else {
+		engine = intel_engine_lookup_user(i915, class, instance);
+
+		if (engine && ((caps & engine->caps) != caps))
+			return -EINVAL;
+	}
 
 	eb->engine = engine;
+	eb->prev_request = prev_req;
 
 	return 0;
 }
@@ -2100,6 +2130,7 @@ static int eb_select_engine(struct i915_execbuffer *eb, struct drm_file *file)
 	}
 
 	eb->engine = engine;
+	eb->prev_request = NULL;
 
 	return 0;
 }
@@ -2425,6 +2456,13 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	if (IS_ERR(eb.request)) {
 		err = PTR_ERR(eb.request);
 		goto err_batch_unpin;
+	}
+
+	if (eb.prev_request) {
+		err = i915_gem_request_await_dma_fence(eb.request,
+						       &eb.prev_request->fence);
+		if (err)
+			goto err_request;
 	}
 
 	if (in_fence) {
