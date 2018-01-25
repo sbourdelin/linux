@@ -582,6 +582,8 @@ config PRIME_NUMBERS
 config STRING_SELFTEST
 	tristate "Test string functions"
 
+config CHARSETS
+       tristate "Character encoding sets"
 endmenu
 
 config GENERIC_ASHLDI3
