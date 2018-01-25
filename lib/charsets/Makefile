@@ -6,6 +6,7 @@ obj-$(CONFIG_CHARSETS) += ascii.o
 
 utf8-y += utf8_core.o utf8norm.o
 obj-$(CONFIG_UTF8_NORMALIZATION) +=  utf8.o
+obj-$(CONFIG_UTF8_SELFTEST) += test_ucd.o
 
 $(obj)/utf8norm.o: $(obj)/utf8data.h
 $(obj)/utf8data.h: $(srctree)/$(src)/ucd/*.txt $(objtree)/scripts/mkutf8data FORCE

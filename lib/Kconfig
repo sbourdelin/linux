@@ -593,6 +593,11 @@ config UTF8_NORMALIZATION
 	depends on CHARSETS
 	help
 	  Say Y here to enable utf8 normalization support.
+
+config UTF8_SELFTEST
+	tristate "Test UTF-8 normalization support"
+	default n
+	depends on UTF8_NORMALIZATION
 endmenu
 
 config GENERIC_ASHLDI3
