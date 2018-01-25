@@ -4358,6 +4358,11 @@ no_journal:
 	if (es->s_error_count)
 		mod_timer(&sbi->s_err_report, jiffies + 300*HZ); /* 5 minutes */
 
+	if (test_opt2(sb, CASE_INSENSITIVE))
+		sb->s_d_op = &ext4_ci_dentry_ops;
+	else
+		sb->s_d_op = &ext4_dentry_ops;
+
 	/* Enable message ratelimiting. Default is 10 messages per 5 secs. */
 	ratelimit_state_init(&sbi->s_err_ratelimit_state, 5 * HZ, 10);
 	ratelimit_state_init(&sbi->s_warning_ratelimit_state, 5 * HZ, 10);

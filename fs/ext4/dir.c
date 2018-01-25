@@ -25,6 +25,7 @@
 #include <linux/fs.h>
 #include <linux/buffer_head.h>
 #include <linux/slab.h>
+#include <linux/charsets.h>
 #include "ext4.h"
 #include "xattr.h"
 
@@ -660,4 +661,76 @@ const struct file_operations ext4_dir_operations = {
 	.fsync		= ext4_sync_file,
 	.open		= ext4_dir_open,
 	.release	= ext4_release_dir,
+};
+
+static int ext4_d_hash(const struct dentry *dentry, struct qstr *q)
+{
+	unsigned long hash;
+	int i, len;
+	char *str;
+	const struct charset *charset = EXT4_SB(dentry->d_sb)->encoding;
+
+	len = charset_normalize(charset, q->name, q->len, &str);
+
+	if (len < 0) {
+		kfree(str);
+		return -EINVAL;
+	}
+
+	hash = init_name_hash(dentry);
+	for (i = 0; i < len; i++)
+		hash = partial_name_hash(str[i], hash);
+	q->hash = end_name_hash(hash);
+
+	kfree(str);
+	return 0;
+}
+
+static int ext4_d_compare(const struct dentry *dentry, unsigned int len,
+			  const char *str, const struct qstr *name)
+{
+	const struct charset *charset = EXT4_SB(dentry->d_sb)->encoding;
+
+	return charset_strncmp(charset, str, len, name->name, strlen(name->name));
+}
+
+const struct dentry_operations ext4_dentry_ops = {
+	.d_hash = ext4_d_hash,
+	.d_compare = ext4_d_compare,
+};
+
+static int ext4_d_ci_hash(const struct dentry *dentry, struct qstr *q)
+{
+	unsigned long hash;
+	int i, len;
+	char *str;
+	const struct charset *charset = EXT4_SB(dentry->d_sb)->encoding;
+
+	len = charset_casefold(charset, q->name, q->len, &str);
+
+	if (len < 0) {
+		kfree(str);
+		return -EINVAL;
+	}
+
+	hash = init_name_hash(dentry);
+	for (i = 0; i < len; i++)
+		hash = partial_name_hash(str[i], hash);
+	q->hash = end_name_hash(hash);
+
+	kfree(str);
+	return 0;
+}
+
+static int ext4_d_ci_compare(const struct dentry *dentry, unsigned int len,
+			     const char *str, const struct qstr *name)
+{
+	const struct charset *charset = EXT4_SB(dentry->d_sb)->encoding;
+
+	return charset_strncasecmp(charset, str, len, name->name, strlen(name->name));
+}
+
+const struct dentry_operations ext4_ci_dentry_ops = {
+	.d_hash = ext4_d_ci_hash,
+	.d_compare = ext4_d_ci_compare,
 };
