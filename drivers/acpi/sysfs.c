@@ -823,7 +823,7 @@ end:
  */
 #define ACPI_MASKABLE_GPE_MAX	0x80
 
-static u64 __initdata acpi_masked_gpes;
+static __initdata DECLARE_BITMAP(acpi_masked_gpes, ACPI_MASKABLE_GPE_MAX);
 
 static int __init acpi_gpe_set_masked_gpes(char *val)
 {
@@ -831,7 +831,7 @@ static int __init acpi_gpe_set_masked_gpes(char *val)
 
 	if (kstrtou8(val, 0, &gpe) || gpe > ACPI_MASKABLE_GPE_MAX)
 		return -EINVAL;
-	acpi_masked_gpes |= ((u64)1<<gpe);
+	set_bit(gpe, acpi_masked_gpes);
 
 	return 1;
 }
@@ -846,7 +846,7 @@ void __init acpi_gpe_apply_masked_gpes(void)
 	for (gpe = 0;
 	     gpe < min_t(u8, ACPI_MASKABLE_GPE_MAX, acpi_current_gpe_count);
 	     gpe++) {
-		if (acpi_masked_gpes & ((u64)1<<gpe)) {
+		if (test_bit(gpe, acpi_masked_gpes)) {
 			status = acpi_get_gpe_device(gpe, &handle);
 			if (ACPI_SUCCESS(status)) {
 				pr_info("Masking GPE 0x%x.\n", gpe);
