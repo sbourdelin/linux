@@ -16,14 +16,23 @@
 /*
  * PVH variables.
  *
- * xen_pvh and pvh_bootparams need to live in data segment since they
- * are used after startup_{32|64}, which clear .bss, are invoked.
+ * xen_pvh, pvh_bootparams and pvh_start_info need to live in data segment
+ * since they are used after startup_{32|64}, which clear .bss, are invoked.
  */
 bool xen_pvh __attribute__((section(".data"))) = 0;
 struct boot_params pvh_bootparams __attribute__((section(".data")));
+struct hvm_start_info pvh_start_info __attribute__((section(".data")));
 
-struct hvm_start_info pvh_start_info;
 unsigned int pvh_start_info_sz = sizeof(pvh_start_info);
+
+acpi_physical_address acpi_arch_get_root_pointer(void)
+{
+	if (xen_pvh)
+		return pvh_start_info.rsdp_paddr;
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(acpi_arch_get_root_pointer);
 
 static void __init init_pvh_bootparams(void)
 {
