@@ -539,9 +539,14 @@ static void vlv_dsi_device_ready(struct intel_encoder *encoder)
 	}
 }
 
-static void intel_dsi_device_ready(struct intel_encoder *encoder)
+void intel_dsi_device_ready(struct intel_encoder *encoder)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
+
+	/* Already done? */
+	if (intel_dsi->device_ready)
+		return;
 
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv))
 		vlv_dsi_device_ready(encoder);
@@ -549,6 +554,8 @@ static void intel_dsi_device_ready(struct intel_encoder *encoder)
 		bxt_dsi_device_ready(encoder);
 	else if (IS_GEMINILAKE(dev_priv))
 		glk_dsi_device_ready(encoder);
+
+	intel_dsi->device_ready = true;
 }
 
 static void glk_dsi_enter_low_power_mode(struct intel_encoder *encoder)
@@ -786,6 +793,36 @@ static void intel_dsi_msleep(struct intel_dsi *intel_dsi, int msec)
  * - wait t4                                           - wait t4
  */
 
+/*
+ * Some v1 VBT MIPI sequences do the deassert in the init OTP sequence.
+ * The deassert must be done before calling intel_dsi_device_ready, while
+ * intel_dsi_device_ready() must be called before any send packet ops inside
+ * the init OTP sequence. mipi_exec_send_packet() deals with calling
+ * intel_dsi_device_ready() if necessary. This function checks if we need
+ * to call init OTP at deassert time.
+ */
+static bool intel_dsi_use_init_otp_as_deassert(struct intel_dsi *intel_dsi)
+{
+	struct drm_i915_private *dev_priv = to_i915(intel_dsi->base.base.dev);
+
+	/* Limit this to VLV for now. */
+	if (!IS_VALLEYVIEW(dev_priv))
+		return false;
+
+	/* Limit this to v1 vid-mode sequences */
+	if (!is_vid_mode(intel_dsi) || dev_priv->vbt.dsi.seq_version != 1)
+		return false;
+
+	/* If there is an assert-reset seq and no deassert one, use init OTP */
+	if (dev_priv->vbt.dsi.sequence[MIPI_SEQ_ASSERT_RESET] != 0 &&
+	    dev_priv->vbt.dsi.sequence[MIPI_SEQ_DEASSERT_RESET] == 0) {
+		DRM_DEBUG_KMS("Using init OTP to deassert reset\n");
+		return true;
+	}
+
+	return false;
+}
+
 static void intel_dsi_pre_enable(struct intel_encoder *encoder,
 				 const struct intel_crtc_state *pipe_config,
 				 const struct drm_connector_state *conn_state)
@@ -840,7 +877,10 @@ static void intel_dsi_pre_enable(struct intel_encoder *encoder,
 	intel_dsi_msleep(intel_dsi, intel_dsi->panel_on_delay);
 
 	/* Deassert reset */
-	intel_dsi_vbt_exec_sequence(intel_dsi, MIPI_SEQ_DEASSERT_RESET);
+	if (intel_dsi_use_init_otp_as_deassert(intel_dsi))
+		intel_dsi_vbt_exec_sequence(intel_dsi, MIPI_SEQ_INIT_OTP);
+	else
+		intel_dsi_vbt_exec_sequence(intel_dsi, MIPI_SEQ_DEASSERT_RESET);
 
 	if (IS_GEMINILAKE(dev_priv)) {
 		glk_cold_boot = glk_dsi_enable_io(encoder);
@@ -858,7 +898,8 @@ static void intel_dsi_pre_enable(struct intel_encoder *encoder,
 		intel_dsi_prepare(encoder, pipe_config);
 
 	/* Send initialization commands in LP mode */
-	intel_dsi_vbt_exec_sequence(intel_dsi, MIPI_SEQ_INIT_OTP);
+	if (!intel_dsi_use_init_otp_as_deassert(intel_dsi))
+		intel_dsi_vbt_exec_sequence(intel_dsi, MIPI_SEQ_INIT_OTP);
 
 	/* Enable port in pre-enable phase itself because as per hw team
 	 * recommendation, port should be enabled befor plane & pipe */
@@ -925,12 +966,15 @@ static void intel_dsi_disable(struct intel_encoder *encoder,
 static void intel_dsi_clear_device_ready(struct intel_encoder *encoder)
 {
 	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct intel_dsi *intel_dsi = enc_to_intel_dsi(&encoder->base);
 
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv) ||
 	    IS_BROXTON(dev_priv))
 		vlv_dsi_clear_device_ready(encoder);
 	else if (IS_GEMINILAKE(dev_priv))
 		glk_dsi_clear_device_ready(encoder);
+
+	intel_dsi->device_ready = false;
 }
 
 static void intel_dsi_post_disable(struct intel_encoder *encoder,
@@ -943,6 +987,9 @@ static void intel_dsi_post_disable(struct intel_encoder *encoder,
 	u32 val;
 
 	DRM_DEBUG_KMS("\n");
+
+	/* in case the dsi panel is on when the i915 driver gets loaded */
+	intel_dsi->device_ready = true;
 
 	if (is_vid_mode(intel_dsi)) {
 		for_each_dsi_port(port, intel_dsi->ports)

@@ -118,6 +118,12 @@ static const u8 *mipi_exec_send_packet(struct intel_dsi *intel_dsi,
 
 	DRM_DEBUG_KMS("\n");
 
+	/* Make sure the device is in ready state (LP-11) */
+	if (!intel_dsi->device_ready) {
+		intel_dsi_device_ready(&intel_dsi->base);
+		usleep_range(10000, 20000);
+	}
+
 	flags = *data++;
 	type = *data++;
 

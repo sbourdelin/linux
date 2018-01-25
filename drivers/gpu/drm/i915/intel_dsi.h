@@ -46,6 +46,9 @@ struct intel_dsi {
 
 	struct intel_connector *attached_connector;
 
+	/* Have we put the device in ready state (LP-11) ? */
+	bool device_ready;
+
 	/* bit mask of ports being driven */
 	u16 ports;
 
@@ -132,6 +135,7 @@ static inline struct intel_dsi *enc_to_intel_dsi(struct drm_encoder *encoder)
 /* intel_dsi.c */
 void wait_for_dsi_fifo_empty(struct intel_dsi *intel_dsi, enum port port);
 enum mipi_dsi_pixel_format pixel_format_from_register_bits(u32 fmt);
+void intel_dsi_device_ready(struct intel_encoder *encoder);
 
 /* intel_dsi_pll.c */
 bool intel_dsi_pll_is_enabled(struct drm_i915_private *dev_priv);
