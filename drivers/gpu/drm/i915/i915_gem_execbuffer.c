@@ -2273,24 +2273,6 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	if (args->flags & I915_EXEC_IS_PINNED)
 		eb.batch_flags |= I915_DISPATCH_PINNED;
 
-	eb.engine = eb_select_engine(eb.i915, file, args);
-	if (!eb.engine)
-		return -EINVAL;
-
-	if (args->flags & I915_EXEC_RESOURCE_STREAMER) {
-		if (!HAS_RESOURCE_STREAMER(eb.i915)) {
-			DRM_DEBUG("RS is only allowed for Haswell, Gen8 and above\n");
-			return -EINVAL;
-		}
-		if (eb.engine->id != RCS) {
-			DRM_DEBUG("RS is not available on %s\n",
-				 eb.engine->name);
-			return -EINVAL;
-		}
-
-		eb.batch_flags |= I915_DISPATCH_RS;
-	}
-
 	if (args->flags & I915_EXEC_FENCE_IN) {
 		in_fence = sync_file_get_fence(lower_32_bits(args->rsvd2));
 		if (!in_fence)
@@ -2314,6 +2296,25 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	err = eb_select_context(&eb);
 	if (unlikely(err))
 		goto err_destroy;
+
+	err = -EINVAL;
+	eb.engine = eb_select_engine(eb.i915, file, args);
+	if (!eb.engine)
+		goto err_engine;
+
+	if (args->flags & I915_EXEC_RESOURCE_STREAMER) {
+		if (!HAS_RESOURCE_STREAMER(eb.i915)) {
+			DRM_DEBUG("RS is only allowed for Haswell, Gen8 and above\n");
+			goto err_engine;
+		}
+		if (eb.engine->id != RCS) {
+			DRM_DEBUG("RS is not available on %s\n",
+				  eb.engine->name);
+			goto err_engine;
+		}
+
+		eb.batch_flags |= I915_DISPATCH_RS;
+	}
 
 	/*
 	 * Take a local wakeref for preparing to dispatch the execbuf as
@@ -2475,6 +2476,7 @@ err_vma:
 	mutex_unlock(&dev->struct_mutex);
 err_rpm:
 	intel_runtime_pm_put(eb.i915);
+err_engine:
 	i915_gem_context_put(eb.ctx);
 err_destroy:
 	eb_destroy(&eb);
