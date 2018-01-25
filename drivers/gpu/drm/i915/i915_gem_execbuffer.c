@@ -2026,6 +2026,9 @@ static int eb_select_engine_class_instance(struct i915_execbuffer *eb)
 		  I915_EXEC_ENGINE_CAP_SHIFT;
 	struct intel_engine_cs *engine;
 
+	if (instance && eb->ctx->virtual)
+		return -EINVAL;
+
 	engine = intel_engine_lookup_user(eb->i915, class, instance);
 
 	if (engine && ((caps & engine->caps) != caps))
@@ -2067,6 +2070,9 @@ static int eb_select_engine(struct i915_execbuffer *eb, struct drm_file *file)
 			  "bsd dispatch flags: %llx\n", flags);
 		return -EINVAL;
 	}
+
+	if (user_ring_id == I915_EXEC_BSD && eb->ctx->virtual)
+		return -EINVAL;
 
 	if (user_ring_id == I915_EXEC_BSD && HAS_BSD2(dev_priv)) {
 		unsigned int bsd_idx = flags & I915_EXEC_BSD_MASK;

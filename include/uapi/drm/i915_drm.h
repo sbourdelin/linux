@@ -1414,7 +1414,7 @@ struct drm_i915_gem_context_create_v2 {
 	__u32 flags;
 #define I915_GEM_CONTEXT_SHARE_GTT 0x1
 	__u32 share_ctx;
-	__u32 pad;
+	__u32 virtual;
 };
 
 struct drm_i915_gem_context_destroy {

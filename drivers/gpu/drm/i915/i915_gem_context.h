@@ -149,6 +149,8 @@ struct i915_gem_context {
 	 */
 	int priority;
 
+	unsigned int virtual;
+
 	/** ggtt_offset_bias: placement restriction for context objects */
 	u32 ggtt_offset_bias;
 

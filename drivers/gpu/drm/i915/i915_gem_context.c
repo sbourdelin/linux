@@ -667,14 +667,17 @@ int i915_gem_context_create_ioctl(struct drm_device *dev, void *data,
 	unsigned int flags = CREATE_VM | CREATE_TIMELINE;
 	int err;
 
+	if (args->flags & ~I915_GEM_CONTEXT_SHARE_GTT)
+		return -EINVAL;
+
+	if (args->virtual > 1)
+		return -EINVAL;
+
 	if (!dev_priv->engine[RCS]->context_size)
 		return -ENODEV;
 
-	if (args->pad != 0)
-		return -EINVAL;
-
-	if (args->flags & ~I915_GEM_CONTEXT_SHARE_GTT)
-		return -EINVAL;
+	if (args->virtual && !HAS_BSD2(dev_priv))
+		return -ENODEV;
 
 	if (client_is_banned(file_priv)) {
 		DRM_DEBUG("client %s[%d] banned from creating ctx\n",
@@ -715,6 +718,8 @@ int i915_gem_context_create_ioctl(struct drm_device *dev, void *data,
 	}
 
 	GEM_BUG_ON(i915_gem_context_is_kernel(ctx));
+
+	ctx->virtual = args->virtual;
 
 	args->ctx_id = ctx->user_handle;
 	DRM_DEBUG("HW context %d created\n", args->ctx_id);
