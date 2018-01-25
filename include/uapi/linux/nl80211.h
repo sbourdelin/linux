@@ -992,6 +992,11 @@
  *
  * @NL80211_CMD_RELOAD_REGDB: Request that the regdb firmware file is reloaded.
  *
+ * @NL80211_CMD_STA_OPMODE_CHANGED: An event that notify station's
+ *	ht opmode or vht opmode changes using any of &NL80211_ATTR_SMPS_MODE,
+ *	&NL80211_ATTR_CHANNEL_WIDTH,&NL80211_ATTR_NSS attributes with its
+ *	address(specified in &NL80211_ATTR_MAC).
+ *
  * @NL80211_CMD_MAX: highest used command number
  * @__NL80211_CMD_AFTER_LAST: internal use
  */
@@ -1197,6 +1202,8 @@ enum nl80211_commands {
 	NL80211_CMD_PORT_AUTHORIZED,
 
 	NL80211_CMD_RELOAD_REGDB,
+
+	NL80211_CMD_STA_OPMODE_CHANGED,
 
 	/* add new commands above here */
 
@@ -2153,6 +2160,9 @@ enum nl80211_commands {
  * @NL80211_ATTR_PMKR0_NAME: PMK-R0 Name for offloaded FT.
  * @NL80211_ATTR_PORT_AUTHORIZED: (reserved)
  *
+ * @NL80211_ATTR_NSS: Station's New/updated  RX_NSS value notified using this
+ *	u8 attribute. This is used with %NL80211_CMD_STA_OPMODE_CHANGED.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2578,6 +2588,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_WANT_1X_4WAY_HS,
 	NL80211_ATTR_PMKR0_NAME,
 	NL80211_ATTR_PORT_AUTHORIZED,
+
+	NL80211_ATTR_NSS,
 
 	/* add attributes here, update the policy in nl80211.c */
 
