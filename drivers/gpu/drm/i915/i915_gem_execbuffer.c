@@ -2016,9 +2016,9 @@ gen8_dispatch_bsd_engine(struct drm_i915_private *dev_priv,
 	return file_priv->bsd_engine;
 }
 
-static struct intel_engine_cs *
-eb_select_engine_class_instance(struct drm_i915_private *i915, u64 eb_flags)
+static int eb_select_engine_class_instance(struct i915_execbuffer *eb)
 {
+	u64 eb_flags = eb->args->flags;
 	u8 class = eb_flags & I915_EXEC_RING_MASK;
 	u8 instance = (eb_flags & I915_EXEC_INSTANCE_MASK) >>
 		      I915_EXEC_INSTANCE_SHIFT;
@@ -2026,12 +2026,14 @@ eb_select_engine_class_instance(struct drm_i915_private *i915, u64 eb_flags)
 		  I915_EXEC_ENGINE_CAP_SHIFT;
 	struct intel_engine_cs *engine;
 
-	engine = intel_engine_lookup_user(i915, class, instance);
+	engine = intel_engine_lookup_user(eb->i915, class, instance);
 
 	if (engine && ((caps & engine->caps) != caps))
-		return NULL;
+		return -EINVAL;
 
-	return engine;
+	eb->engine = engine;
+
+	return 0;
 }
 
 #define I915_USER_RINGS (4)
@@ -2044,31 +2046,30 @@ static const enum intel_engine_id user_ring_map[I915_USER_RINGS + 1] = {
 	[I915_EXEC_VEBOX]	= VECS
 };
 
-static struct intel_engine_cs *
-eb_select_engine(struct drm_i915_private *dev_priv,
-		 struct drm_file *file,
-		 struct drm_i915_gem_execbuffer2 *args)
+static int eb_select_engine(struct i915_execbuffer *eb, struct drm_file *file)
 {
-	unsigned int user_ring_id = args->flags & I915_EXEC_RING_MASK;
+	struct drm_i915_private *dev_priv = eb->i915;
+	u64 flags = eb->args->flags;
+	unsigned int user_ring_id = flags & I915_EXEC_RING_MASK;
 	struct intel_engine_cs *engine;
 
-	if (args->flags & I915_EXEC_CLASS_INSTANCE)
-		return eb_select_engine_class_instance(dev_priv, args->flags);
+	if (flags & I915_EXEC_CLASS_INSTANCE)
+		return eb_select_engine_class_instance(eb);
 
 	if (user_ring_id > I915_USER_RINGS) {
 		DRM_DEBUG("execbuf with unknown ring: %u\n", user_ring_id);
-		return NULL;
+		return -EINVAL;
 	}
 
 	if ((user_ring_id != I915_EXEC_BSD) &&
-	    ((args->flags & I915_EXEC_BSD_MASK) != 0)) {
+	    ((flags & I915_EXEC_BSD_MASK) != 0)) {
 		DRM_DEBUG("execbuf with non bsd ring but with invalid "
-			  "bsd dispatch flags: %d\n", (int)(args->flags));
-		return NULL;
+			  "bsd dispatch flags: %llx\n", flags);
+		return -EINVAL;
 	}
 
 	if (user_ring_id == I915_EXEC_BSD && HAS_BSD2(dev_priv)) {
-		unsigned int bsd_idx = args->flags & I915_EXEC_BSD_MASK;
+		unsigned int bsd_idx = flags & I915_EXEC_BSD_MASK;
 
 		if (bsd_idx == I915_EXEC_BSD_DEFAULT) {
 			bsd_idx = gen8_dispatch_bsd_engine(dev_priv, file);
@@ -2079,7 +2080,7 @@ eb_select_engine(struct drm_i915_private *dev_priv,
 		} else {
 			DRM_DEBUG("execbuf with unknown bsd ring: %u\n",
 				  bsd_idx);
-			return NULL;
+			return -EINVAL;
 		}
 
 		engine = dev_priv->engine[_VCS(bsd_idx)];
@@ -2089,10 +2090,12 @@ eb_select_engine(struct drm_i915_private *dev_priv,
 
 	if (!engine) {
 		DRM_DEBUG("execbuf with invalid ring: %u\n", user_ring_id);
-		return NULL;
+		return -EINVAL;
 	}
 
-	return engine;
+	eb->engine = engine;
+
+	return 0;
 }
 
 static void
@@ -2297,12 +2300,12 @@ i915_gem_do_execbuffer(struct drm_device *dev,
 	if (unlikely(err))
 		goto err_destroy;
 
-	err = -EINVAL;
-	eb.engine = eb_select_engine(eb.i915, file, args);
-	if (!eb.engine)
+	err = eb_select_engine(&eb, file);
+	if (err)
 		goto err_engine;
 
 	if (args->flags & I915_EXEC_RESOURCE_STREAMER) {
+		err = -EINVAL;
 		if (!HAS_RESOURCE_STREAMER(eb.i915)) {
 			DRM_DEBUG("RS is only allowed for Haswell, Gen8 and above\n");
 			goto err_engine;
