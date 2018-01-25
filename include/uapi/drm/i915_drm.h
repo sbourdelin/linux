@@ -1046,13 +1046,23 @@ struct drm_i915_gem_execbuffer2 {
  */
 #define I915_EXEC_FENCE_ARRAY   (1<<19)
 
-#define __I915_EXEC_UNKNOWN_FLAGS (-(I915_EXEC_FENCE_ARRAY<<1))
+#define I915_EXEC_CLASS_INSTANCE	(1<<20)
+
+#define I915_EXEC_INSTANCE_SHIFT	(21)
+#define I915_EXEC_INSTANCE_MASK		(0xff << I915_EXEC_INSTANCE_SHIFT)
+
+#define __I915_EXEC_UNKNOWN_FLAGS (-((1 << 29) << 1))
 
 #define I915_EXEC_CONTEXT_ID_MASK	(0xffffffff)
 #define i915_execbuffer2_set_context_id(eb2, context) \
 	(eb2).rsvd1 = context & I915_EXEC_CONTEXT_ID_MASK
 #define i915_execbuffer2_get_context_id(eb2) \
 	((eb2).rsvd1 & I915_EXEC_CONTEXT_ID_MASK)
+
+#define i915_execbuffer2_engine(class, instance) \
+	(I915_EXEC_CLASS_INSTANCE | \
+	(class) | \
+	((instance) << I915_EXEC_INSTANCE_SHIFT))
 
 struct drm_i915_gem_pin {
 	/** Handle of the buffer to be pinned. */

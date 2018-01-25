@@ -2015,6 +2015,16 @@ gen8_dispatch_bsd_engine(struct drm_i915_private *dev_priv,
 	return file_priv->bsd_engine;
 }
 
+static struct intel_engine_cs *
+eb_select_engine_class_instance(struct drm_i915_private *i915, u64 eb_flags)
+{
+	u8 class = eb_flags & I915_EXEC_RING_MASK;
+	u8 instance = (eb_flags & I915_EXEC_INSTANCE_MASK) >>
+		      I915_EXEC_INSTANCE_SHIFT;
+
+	return intel_engine_lookup_user(i915, class, instance);
+}
+
 #define I915_USER_RINGS (4)
 
 static const enum intel_engine_id user_ring_map[I915_USER_RINGS + 1] = {
@@ -2032,6 +2042,9 @@ eb_select_engine(struct drm_i915_private *dev_priv,
 {
 	unsigned int user_ring_id = args->flags & I915_EXEC_RING_MASK;
 	struct intel_engine_cs *engine;
+
+	if (args->flags & I915_EXEC_CLASS_INSTANCE)
+		return eb_select_engine_class_instance(dev_priv, args->flags);
 
 	if (user_ring_id > I915_USER_RINGS) {
 		DRM_DEBUG("execbuf with unknown ring: %u\n", user_ring_id);
