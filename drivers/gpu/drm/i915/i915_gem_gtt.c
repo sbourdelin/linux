@@ -2204,7 +2204,7 @@ i915_ppgtt_create(struct drm_i915_private *dev_priv,
 	return ppgtt;
 }
 
-void i915_ppgtt_close(struct i915_address_space *vm)
+static void ppgtt_close(struct i915_address_space *vm)
 {
 	struct list_head *phases[] = {
 		&vm->active_list,
@@ -2231,6 +2231,8 @@ void i915_ppgtt_release(struct kref *kref)
 		container_of(kref, struct i915_hw_ppgtt, ref);
 
 	trace_i915_ppgtt_release(&ppgtt->base);
+
+	ppgtt_close(&ppgtt->base);
 
 	/* vmas should already be unbound and destroyed */
 	WARN_ON(!list_empty(&ppgtt->base.active_list));

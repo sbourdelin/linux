@@ -1712,7 +1712,6 @@ int i915_gem_huge_page_mock_selftests(void)
 	err = i915_subtests(tests, ppgtt);
 
 out_close:
-	i915_ppgtt_close(&ppgtt->base);
 	i915_ppgtt_put(ppgtt);
 
 out_unlock:

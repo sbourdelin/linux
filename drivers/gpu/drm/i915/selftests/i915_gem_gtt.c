@@ -914,7 +914,6 @@ static int exercise_ppgtt(struct drm_i915_private *dev_priv,
 
 	err = func(dev_priv, &ppgtt->base, 0, ppgtt->base.total, end_time);
 
-	i915_ppgtt_close(&ppgtt->base);
 	i915_ppgtt_put(ppgtt);
 out_unlock:
 	mutex_unlock(&dev_priv->drm.struct_mutex);

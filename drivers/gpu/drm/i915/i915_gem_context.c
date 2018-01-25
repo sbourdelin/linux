@@ -109,6 +109,8 @@ static void lut_close(struct i915_gem_context *ctx)
 		struct i915_vma *vma = rcu_dereference_raw(*slot);
 
 		radix_tree_iter_delete(&ctx->handles_vma, &iter, slot);
+
+		vma->open_count--;
 		__i915_gem_object_release_unless_active(vma->obj);
 	}
 	rcu_read_unlock();
@@ -202,8 +204,6 @@ static void context_close(struct i915_gem_context *ctx)
 	 * the ppgtt).
 	 */
 	lut_close(ctx);
-	if (ctx->ppgtt)
-		i915_ppgtt_close(&ctx->ppgtt->base);
 
 	ctx->file_priv = ERR_PTR(-EBADF);
 	i915_gem_context_put(ctx);
@@ -339,6 +339,9 @@ static void __destroy_hw_context(struct i915_gem_context *ctx,
 	context_close(ctx);
 }
 
+#define CREATE_TIMELINE BIT(0)
+#define CREATE_VM BIT(1)
+
 /**
  * The default context needs to exist per ring that uses contexts. It stores the
  * context state of the GPU for applications that don't utilize HW contexts, as
@@ -346,7 +349,8 @@ static void __destroy_hw_context(struct i915_gem_context *ctx,
  */
 static struct i915_gem_context *
 i915_gem_create_context(struct drm_i915_private *dev_priv,
-			struct drm_i915_file_private *file_priv)
+			struct drm_i915_file_private *file_priv,
+			unsigned int flags)
 {
 	struct i915_gem_context *ctx;
 
@@ -359,7 +363,7 @@ i915_gem_create_context(struct drm_i915_private *dev_priv,
 	if (IS_ERR(ctx))
 		return ctx;
 
-	if (USES_FULL_PPGTT(dev_priv)) {
+	if (flags & CREATE_VM && USES_FULL_PPGTT(dev_priv)) {
 		struct i915_hw_ppgtt *ppgtt;
 
 		ppgtt = i915_ppgtt_create(dev_priv, file_priv, ctx->name);
@@ -374,7 +378,7 @@ i915_gem_create_context(struct drm_i915_private *dev_priv,
 		ctx->desc_template = default_desc_template(dev_priv, ppgtt);
 	}
 
-	if (HAS_EXECLISTS(dev_priv)) {
+	if (flags & CREATE_TIMELINE && HAS_EXECLISTS(dev_priv)) {
 		struct i915_gem_timeline *timeline;
 
 		timeline = i915_gem_timeline_create(dev_priv, ctx->name);
@@ -436,7 +440,7 @@ i915_gem_context_create_kernel(struct drm_i915_private *i915, int prio)
 {
 	struct i915_gem_context *ctx;
 
-	ctx = i915_gem_create_context(i915, NULL);
+	ctx = i915_gem_create_context(i915, NULL, CREATE_VM | CREATE_TIMELINE);
 	if (IS_ERR(ctx))
 		return ctx;
 
@@ -558,7 +562,8 @@ int i915_gem_context_open(struct drm_i915_private *i915,
 	idr_init(&file_priv->context_idr);
 
 	mutex_lock(&i915->drm.struct_mutex);
-	ctx = i915_gem_create_context(i915, file_priv);
+	ctx = i915_gem_create_context(i915, file_priv,
+				      CREATE_VM | CREATE_TIMELINE);
 	mutex_unlock(&i915->drm.struct_mutex);
 	if (IS_ERR(ctx)) {
 		idr_destroy(&file_priv->context_idr);
@@ -655,15 +660,20 @@ int i915_gem_context_create_ioctl(struct drm_device *dev, void *data,
 				  struct drm_file *file)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
-	struct drm_i915_gem_context_create *args = data;
+	struct drm_i915_gem_context_create_v2 *args = data;
 	struct drm_i915_file_private *file_priv = file->driver_priv;
+	struct i915_gem_context *share = NULL;
 	struct i915_gem_context *ctx;
-	int ret;
+	unsigned int flags = CREATE_VM | CREATE_TIMELINE;
+	int err;
 
 	if (!dev_priv->engine[RCS]->context_size)
 		return -ENODEV;
 
 	if (args->pad != 0)
+		return -EINVAL;
+
+	if (args->flags & ~I915_GEM_CONTEXT_SHARE_GTT)
 		return -EINVAL;
 
 	if (client_is_banned(file_priv)) {
@@ -674,21 +684,45 @@ int i915_gem_context_create_ioctl(struct drm_device *dev, void *data,
 		return -EIO;
 	}
 
-	ret = i915_mutex_lock_interruptible(dev);
-	if (ret)
-		return ret;
+	if (args->flags & I915_GEM_CONTEXT_SHARE_GTT) {
+		share = i915_gem_context_lookup(file_priv, args->share_ctx);
+		if (!share)
+			return -ENOENT;
 
-	ctx = i915_gem_create_context(dev_priv, file_priv);
+		if (!share->ppgtt) {
+			err = -ENODEV;
+			goto out;
+		}
+
+		flags &= ~CREATE_VM;
+	}
+
+	err = i915_mutex_lock_interruptible(dev);
+	if (err)
+		goto out;
+
+	ctx = i915_gem_create_context(dev_priv, file_priv, flags);
 	mutex_unlock(&dev->struct_mutex);
-	if (IS_ERR(ctx))
-		return PTR_ERR(ctx);
+	if (IS_ERR(ctx)) {
+		err = PTR_ERR(ctx);
+		goto out;
+	}
+
+	if (!(flags & CREATE_VM)) {
+		i915_ppgtt_get(share->ppgtt);
+		ctx->ppgtt = share->ppgtt;
+		ctx->desc_template = share->desc_template;
+	}
 
 	GEM_BUG_ON(i915_gem_context_is_kernel(ctx));
 
 	args->ctx_id = ctx->user_handle;
 	DRM_DEBUG("HW context %d created\n", args->ctx_id);
 
-	return 0;
+out:
+	if (share)
+		i915_gem_context_put(share);
+	return err;
 }
 
 int i915_gem_context_destroy_ioctl(struct drm_device *dev, void *data,

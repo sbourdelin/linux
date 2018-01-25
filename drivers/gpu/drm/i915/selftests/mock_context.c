@@ -90,5 +90,6 @@ live_context(struct drm_i915_private *i915, struct drm_file *file)
 {
 	lockdep_assert_held(&i915->drm.struct_mutex);
 
-	return i915_gem_create_context(i915, file->driver_priv);
+	return i915_gem_create_context(i915, file->driver_priv,
+				       CREATE_VM | CREATE_TIMELINE);
 }
