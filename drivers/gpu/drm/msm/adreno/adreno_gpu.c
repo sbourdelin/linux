@@ -17,6 +17,7 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <linux/ascii85.h>
 #include <linux/pm_opp.h>
 #include "adreno_gpu.h"
 #include "msm_gem.h"
@@ -377,10 +378,29 @@ struct msm_gpu_state *adreno_gpu_state_get(struct msm_gpu *gpu)
 	do_gettimeofday(&state->time);
 
 	for (i = 0; i < gpu->nr_rings; i++) {
+		int size = 0, j;
+
 		state->ring[i].fence = gpu->rb[i]->memptrs->fence;
 		state->ring[i].seqno = gpu->rb[i]->seqno;
 		state->ring[i].rptr = get_rptr(adreno_gpu, gpu->rb[i]);
 		state->ring[i].wptr = get_wptr(gpu->rb[i]);
+
+		/*
+		 * Only copy used parts of the ring buffers (this should save
+		 * data size for lightly used rings)
+		 */
+		for(j = 0; j < MSM_GPU_RINGBUFFER_SZ >> 2; j++)
+			if (gpu->rb[i]->start[j])
+				size = j;
+
+		if (size) {
+			state->ring[i].data = kmalloc((size + 1) << 2, GFP_KERNEL);
+			if (state->ring[i].data) {
+				memcpy(state->ring[i].data, gpu->rb[i]->start,
+				(size + 1) << 2);
+				state->ring[i].data_size = (size + 1) << 2;
+			}
+		}
 	}
 
 	/* Count the number of registers */
@@ -411,8 +431,12 @@ struct msm_gpu_state *adreno_gpu_state_get(struct msm_gpu *gpu)
 
 static void adreno_gpu_state_destroy(struct kref *kref)
 {
+	int i;
 	struct msm_gpu_state *state = container_of(kref,
 		struct msm_gpu_state, ref);
+
+	for(i = 0; i < ARRAY_SIZE(state->ring); i++)
+		kfree(state->ring[i].data);
 
 	kfree(state->comm);
 	kfree(state->cmd);
@@ -453,6 +477,26 @@ void adreno_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 		seq_printf(m, "    retired-fence: %d\n", state->ring[i].fence);
 		seq_printf(m, "    rptr: %d\n", state->ring[i].rptr);
 		seq_printf(m, "    wptr: %d\n", state->ring[i].wptr);
+		seq_printf(m, "    size: %d\n", MSM_GPU_RINGBUFFER_SZ);
+
+		if (state->ring[i].data && state->ring[i].data_size) {
+			u32 *ptr = (u32 *) state->ring[i].data;
+			char out[6];
+			int len = ascii85_encode_len(state->ring[i].data_size);
+			int j;
+
+			seq_printf(m, "    data: !!ascii85 |\n");
+			seq_printf(m, "     ");
+
+			for(j = 0; j < len; j++) {
+				if (ascii85_encode(ptr[j], out))
+					seq_printf(m, out);
+				else
+					seq_printf(m, "z");
+			}
+
+			seq_printf(m, "\n");
+		}
 	}
 
 	seq_printf(m, "registers:\n");
