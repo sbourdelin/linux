@@ -345,6 +345,7 @@ static int ttm_bo_vm_access_kmap(struct ttm_buffer_object *bo,
 		page++;
 		bytes_left -= bytes;
 		offset = 0;
+		buf += bytes;
 	} while (bytes_left);
 
 	return len;
