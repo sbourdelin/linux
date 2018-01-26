@@ -2153,7 +2153,7 @@ static void genpd_dev_pm_detach(struct device *dev, bool power_off)
 		if (ret != -EAGAIN)
 			break;
 
-		mdelay(i);
+		msleep(i);
 		cond_resched();
 	}
 
@@ -2228,7 +2228,7 @@ int genpd_dev_pm_attach(struct device *dev)
 		if (ret != -EAGAIN)
 			break;
 
-		mdelay(i);
+		msleep(i);
 		cond_resched();
 	}
 	mutex_unlock(&gpd_list_lock);
