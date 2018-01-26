@@ -2769,17 +2769,6 @@ int open_ctree(struct super_block *sb,
 		goto fail_tree_roots;
 	}
 
-	/*
-	 * keep the device that is marked to be the target device for the
-	 * dev_replace procedure
-	 */
-	btrfs_close_extra_devices(fs_devices, 0);
-
-	if (!fs_devices->latest_bdev) {
-		btrfs_err(fs_info, "failed to read devices");
-		goto fail_tree_roots;
-	}
-
 retry_root_backup:
 	generation = btrfs_super_generation(disk_super);
 
@@ -2835,8 +2824,6 @@ retry_root_backup:
 		btrfs_err(fs_info, "failed to init dev_replace: %d", ret);
 		goto fail_block_groups;
 	}
-
-	btrfs_close_extra_devices(fs_devices, 1);
 
 	ret = btrfs_sysfs_add_fsid(fs_devices, NULL);
 	if (ret) {
