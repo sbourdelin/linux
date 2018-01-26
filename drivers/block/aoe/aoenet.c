@@ -138,7 +138,7 @@ aoenet_rcv(struct sk_buff *skb, struct net_device *ifp, struct packet_type *pt, 
 	if (dev_net(ifp) != &init_net)
 		goto exit;
 
-	skb = skb_share_check(skb, GFP_ATOMIC);
+	skb = skb_share_check(skb, GFP_KERNEL);
 	if (skb == NULL)
 		return 0;
 	if (!is_aoe_netif(ifp))
