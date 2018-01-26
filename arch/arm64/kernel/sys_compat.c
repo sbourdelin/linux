@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/syscalls.h>
 #include <linux/uaccess.h>
+#include <linux/mm.h>
 
 #include <asm/cacheflush.h>
 #include <asm/unistd.h>
@@ -32,23 +33,36 @@
 static long
 __do_compat_cache_op(unsigned long start, unsigned long end)
 {
-	long ret;
+	struct vm_area_struct *vma = NULL;
+	long ret = 0;
 
+	down_read(&current->mm->mmap_sem);
 	do {
 		unsigned long chunk = min(PAGE_SIZE, end - start);
 
-		if (fatal_signal_pending(current))
-			return 0;
+		if (!vma || vma->vm_end <= start) {
+			vma = find_vma(current->mm, start);
+			if (!vma) {
+				ret = -EFAULT;
+				goto done;
+			}
+		}
 
-		ret = __flush_cache_user_range(start, start + chunk);
-		if (ret)
-			return ret;
+		if (fatal_signal_pending(current))
+			goto done;
+
+		if (follow_page(vma, start, 0)) {
+			ret = __flush_cache_user_range(start, start + chunk);
+			if (ret)
+				goto done;
+		}
 
 		cond_resched();
 		start += chunk;
 	} while (start < end);
-
-	return 0;
+done:
+	up_read(&current->mm->mmap_sem);
+	return ret;
 }
 
 static inline long
