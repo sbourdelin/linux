@@ -1166,7 +1166,7 @@ static int psend(struct atm_vcc *vcc, struct sk_buff *skb)
 		if (skb_headroom(skb) < sizeof(*header))
 			expand_by = sizeof(*header) - skb_headroom(skb);
 
-		ret = pskb_expand_head(skb, expand_by, 0, GFP_ATOMIC);
+		ret = pskb_expand_head(skb, expand_by, 0, GFP_KERNEL);
 		if (ret) {
 			dev_warn(&card->dev->dev, "pskb_expand_head failed.\n");
 			solos_pop(vcc, skb);
