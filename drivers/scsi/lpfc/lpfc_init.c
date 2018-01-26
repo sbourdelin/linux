@@ -8011,9 +8011,10 @@ static int
 lpfc_alloc_fcp_wq_cq(struct lpfc_hba *phba, int wqidx)
 {
 	struct lpfc_queue *qdesc;
+	uint32_t wqesize;
 
 	/* Create Fast Path FCP CQs */
-	if (phba->fcp_embed_io)
+	if (phba->enab_exp_wqcq_pages)
 		/* Increase the CQ size when WQEs contain an embedded cdb */
 		qdesc = lpfc_sli4_queue_alloc(phba, LPFC_EXPANDED_PAGE_SIZE,
 					      phba->sli4_hba.cq_esize,
@@ -8031,15 +8032,18 @@ lpfc_alloc_fcp_wq_cq(struct lpfc_hba *phba, int wqidx)
 	phba->sli4_hba.fcp_cq[wqidx] = qdesc;
 
 	/* Create Fast Path FCP WQs */
-	if (phba->fcp_embed_io)
 		/* Increase the WQ size when WQEs contain an embedded cdb */
+	if (phba->enab_exp_wqcq_pages) {
+		wqesize = (phba->fcp_embed_io) ?
+			LPFC_WQE128_SIZE : phba->sli4_hba.wq_esize;
 		qdesc = lpfc_sli4_queue_alloc(phba, LPFC_EXPANDED_PAGE_SIZE,
-					      LPFC_WQE128_SIZE,
+					      wqesize,
 					      LPFC_WQE_EXP_COUNT);
-	else
+	} else {
 		qdesc = lpfc_sli4_queue_alloc(phba, LPFC_DEFAULT_PAGE_SIZE,
 					      phba->sli4_hba.wq_esize,
 					      phba->sli4_hba.wq_ecount);
+	}
 	if (!qdesc) {
 		lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
 				"0503 Failed allocate fast-path FCP WQ (%d)\n",
@@ -10485,6 +10489,12 @@ lpfc_get_sli4_parameters(struct lpfc_hba *phba, LPFC_MBOXQ_t *mboxq)
 	else
 		phba->fcp_embed_io = 0;
 
+	if ((bf_get(cfg_cqpsize, mbx_sli4_parameters) & LPFC_CQ_16K_PAGE_SZ) &&
+	    (bf_get(cfg_wqpsize, mbx_sli4_parameters) & LPFC_WQ_16K_PAGE_SZ) &&
+	    (sli4_params->wqsize & LPFC_WQ_SZ128_SUPPORT))
+		phba->enab_exp_wqcq_pages = 1;
+	else
+		phba->enab_exp_wqcq_pages = 0;
 	/*
 	 * Check if the SLI port supports MDS Diagnostics
 	 */
@@ -12227,6 +12237,7 @@ int
 lpfc_fof_queue_create(struct lpfc_hba *phba)
 {
 	struct lpfc_queue *qdesc;
+	uint32_t wqesize;
 
 	/* Create FOF EQ */
 	qdesc = lpfc_sli4_queue_alloc(phba, LPFC_DEFAULT_PAGE_SIZE,
@@ -12240,7 +12251,7 @@ lpfc_fof_queue_create(struct lpfc_hba *phba)
 	if (phba->cfg_fof) {
 
 		/* Create OAS CQ */
-		if (phba->fcp_embed_io)
+		if (phba->enab_exp_wqcq_pages)
 			qdesc = lpfc_sli4_queue_alloc(phba,
 						      LPFC_EXPANDED_PAGE_SIZE,
 						      phba->sli4_hba.cq_esize,
@@ -12256,16 +12267,19 @@ lpfc_fof_queue_create(struct lpfc_hba *phba)
 		phba->sli4_hba.oas_cq = qdesc;
 
 		/* Create OAS WQ */
-		if (phba->fcp_embed_io)
+		if (phba->enab_exp_wqcq_pages) {
+			wqesize = (phba->fcp_embed_io) ?
+				LPFC_WQE128_SIZE : phba->sli4_hba.wq_esize;
 			qdesc = lpfc_sli4_queue_alloc(phba,
 						      LPFC_EXPANDED_PAGE_SIZE,
-						      LPFC_WQE128_SIZE,
+						      wqesize,
 						      LPFC_WQE_EXP_COUNT);
-		else
+		} else {
 			qdesc = lpfc_sli4_queue_alloc(phba,
 						      LPFC_DEFAULT_PAGE_SIZE,
 						      phba->sli4_hba.wq_esize,
 						      phba->sli4_hba.wq_ecount);
+		}
 		if (!qdesc)
 			goto out_error;
 
