@@ -31,6 +31,7 @@
 #include <linux/stop_machine.h>
 #include <linux/zlib.h>
 #include <drm/drm_print.h>
+#include <linux/ascii85.h>
 
 #include "i915_drv.h"
 
@@ -500,29 +501,6 @@ void i915_error_printf(struct drm_i915_error_state_buf *e, const char *f, ...)
 	va_start(args, f);
 	i915_error_vprintf(e, f, args);
 	va_end(args);
-}
-
-static int
-ascii85_encode_len(int len)
-{
-	return DIV_ROUND_UP(len, 4);
-}
-
-static bool
-ascii85_encode(u32 in, char *out)
-{
-	int i;
-
-	if (in == 0)
-		return false;
-
-	out[5] = '\0';
-	for (i = 5; i--; ) {
-		out[i] = '!' + in % 85;
-		in /= 85;
-	}
-
-	return true;
 }
 
 static void print_error_obj(struct drm_i915_error_state_buf *m,
