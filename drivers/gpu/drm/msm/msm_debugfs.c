@@ -16,10 +16,68 @@
  */
 
 #ifdef CONFIG_DEBUG_FS
+
+#include <generated/utsrelease.h>
+#include <linux/debugfs.h>
 #include "msm_drv.h"
 #include "msm_gpu.h"
 #include "msm_kms.h"
 #include "msm_debugfs.h"
+
+static int msm_gpu_crash_show(struct seq_file *m, void *data)
+{
+	struct msm_gpu *gpu = m->private;
+	struct msm_gpu_state *state;
+
+	state = msm_gpu_crashstate_get(gpu);
+	if (!state)
+		return 0;
+
+	seq_printf(m, "%s Crash Status:\n", gpu->name);
+	seq_puts(m, "Kernel: " UTS_RELEASE "\n");
+	seq_printf(m, "Time: %ld s %ld us\n",
+		state->time.tv_sec, state->time.tv_usec);
+	if (state->comm)
+		seq_printf(m, "comm: %s\n", state->comm);
+	if (state->cmd)
+		seq_printf(m, "cmdline: %s\n", state->cmd);
+
+	gpu->funcs->show(gpu, state, m);
+
+	msm_gpu_crashstate_put(gpu);
+
+	return 0;
+}
+
+static ssize_t msm_gpu_crash_write(struct file *file, const char __user *buf,
+		size_t count, loff_t *pos)
+{
+	struct msm_gpu *gpu = ((struct seq_file *)file->private_data)->private;
+
+	dev_err(gpu->dev->dev, "Releasing the GPU crash state\n");
+	msm_gpu_crashstate_put(gpu);
+
+	return count;
+}
+
+static int msm_gpu_crash_open(struct inode *inode, struct file *file)
+{
+	struct msm_drm_private *priv = inode->i_private;
+
+	if (!priv->gpu)
+		return -ENODEV;
+
+	return single_open(file, msm_gpu_crash_show, priv->gpu);
+}
+
+static const struct file_operations msm_gpu_crash_fops = {
+	.owner = THIS_MODULE,
+	.open = msm_gpu_crash_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+	.write = msm_gpu_crash_write,
+};
 
 static int msm_gpu_show(struct drm_device *dev, struct seq_file *m)
 {
@@ -169,6 +227,9 @@ int msm_debugfs_init(struct drm_minor *minor)
 		dev_err(dev->dev, "could not install msm_debugfs_list\n");
 		return ret;
 	}
+
+	debugfs_create_file("crash", 0644, minor->debugfs_root,
+		priv, &msm_gpu_crash_fops);
 
 	if (priv->kms->funcs->debugfs_init)
 		ret = priv->kms->funcs->debugfs_init(priv->kms, minor);

@@ -273,6 +273,30 @@ int msm_gpu_hw_init(struct msm_gpu *gpu)
 	return ret;
 }
 
+static void msm_gpu_crashstate_capture(struct msm_gpu *gpu, char *comm,
+		char *cmd)
+{
+	struct msm_gpu_state *state;
+
+	/* Only save one crash state at a a time */
+	if (gpu->crashstate)
+		return;
+
+	state = gpu->funcs->gpu_state_get(gpu);
+	if (IS_ERR_OR_NULL(state))
+		return;
+
+	/* Fill in the additional crash state information */
+	state->comm = kstrdup(comm, GFP_KERNEL);
+	state->cmd = kstrdup(cmd, GFP_KERNEL);
+
+	kref_get(&state->ref);
+
+	/* Set the active crash state to be dumped on failure */
+	gpu->crashstate = state;
+}
+
+
 /*
  * Hangcheck detection for locked gpu:
  */
@@ -314,6 +338,7 @@ static void recover_worker(struct work_struct *work)
 	struct msm_drm_private *priv = dev->dev_private;
 	struct msm_gem_submit *submit;
 	struct msm_ringbuffer *cur_ring = gpu->funcs->active_ring(gpu);
+	char *comm = NULL, *cmd = NULL;
 	int i;
 
 	mutex_lock(&dev->struct_mutex);
@@ -326,8 +351,9 @@ static void recover_worker(struct work_struct *work)
 
 		rcu_read_lock();
 		task = pid_task(submit->pid, PIDTYPE_PID);
+
 		if (task) {
-			char *cmd;
+			comm = kstrdup(task->comm, GFP_KERNEL);
 
 			/*
 			 * So slightly annoying, in other paths like
@@ -342,20 +368,25 @@ static void recover_worker(struct work_struct *work)
 			mutex_unlock(&dev->struct_mutex);
 			cmd = kstrdup_quotable_cmdline(task, GFP_KERNEL);
 			mutex_lock(&dev->struct_mutex);
+		}
 
+		rcu_read_unlock();
+
+		if (comm && cmd) {
 			dev_err(dev->dev, "%s: offending task: %s (%s)\n",
-				gpu->name, task->comm, cmd);
+				gpu->name, comm, cmd);
 
 			msm_rd_dump_submit(priv->hangrd, submit,
-				"offending task: %s (%s)", task->comm, cmd);
-
-			kfree(cmd);
-		} else {
+				"offending task: %s (%s)", comm, cmd);
+		} else
 			msm_rd_dump_submit(priv->hangrd, submit, NULL);
-		}
-		rcu_read_unlock();
 	}
 
+	/* Record the crash state */
+	msm_gpu_crashstate_capture(gpu, comm, cmd);
+
+	kfree(cmd);
+	kfree(comm);
 
 	/*
 	 * Update all the rings with the latest and greatest fence.. this

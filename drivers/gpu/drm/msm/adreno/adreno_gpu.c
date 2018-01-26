@@ -372,6 +372,8 @@ struct msm_gpu_state *adreno_gpu_state_get(struct msm_gpu *gpu)
 	if (!state)
 		return ERR_PTR(-ENOMEM);
 
+	kref_init(&state->ref);
+
 	do_gettimeofday(&state->time);
 
 	for (i = 0; i < gpu->nr_rings; i++) {
@@ -407,13 +409,23 @@ struct msm_gpu_state *adreno_gpu_state_get(struct msm_gpu *gpu)
 	return state;
 }
 
-void adreno_gpu_state_put(struct msm_gpu_state *state)
+static void adreno_gpu_state_destroy(struct kref *kref)
 {
-	if (IS_ERR_OR_NULL(state))
-		return;
+	struct msm_gpu_state *state = container_of(kref,
+		struct msm_gpu_state, ref);
 
+	kfree(state->comm);
+	kfree(state->cmd);
 	kfree(state->registers);
 	kfree(state);
+}
+
+int adreno_gpu_state_put(struct msm_gpu_state *state)
+{
+	if (IS_ERR_OR_NULL(state))
+		return 1;
+
+	return kref_put(&state->ref, adreno_gpu_state_destroy);
 }
 
 #ifdef CONFIG_DEBUG_FS
