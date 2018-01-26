@@ -564,23 +564,36 @@ static int bad_syscall(int n, struct pt_regs *regs)
 static inline int
 __do_cache_op(unsigned long start, unsigned long end)
 {
-	int ret;
+	struct vm_area_struct *vma = NULL;
+	int ret = 0;
 
+	down_read(&current->mm->mmap_sem);
 	do {
 		unsigned long chunk = min(PAGE_SIZE, end - start);
+
+		if (!vma || vma->vm_end <= start) {
+			vma = find_vma(current->mm, start);
+			if (!vma) {
+				ret = -EFAULT;
+				goto done;
+			}
+		}
 
 		if (fatal_signal_pending(current))
 			return 0;
 
-		ret = flush_cache_user_range(start, start + chunk);
-		if (ret)
-			return ret;
+		if (follow_page(vma, start, 0)) {
+			ret = flush_cache_user_range(start, start + chunk);
+			if (ret)
+				goto done;
+		}
 
 		cond_resched();
 		start += chunk;
 	} while (start < end);
-
-	return 0;
+done:
+	up_read(&current->mm->mmap_sem);
+	return ret;
 }
 
 static inline int
