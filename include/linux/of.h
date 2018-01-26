@@ -21,6 +21,7 @@
 #include <linux/notifier.h>
 #include <linux/property.h>
 #include <linux/list.h>
+#include <linux/hashtable.h>
 
 #include <asm/byteorder.h>
 #include <asm/errno.h>
@@ -65,12 +66,17 @@ struct device_node {
 #endif
 	unsigned long _flags;
 	void	*data;
+	struct hlist_node hash;
 #if defined(CONFIG_SPARC)
 	const char *path_component_name;
 	unsigned int unique_id;
 	struct of_irq_controller *irq_trans;
 #endif
 };
+
+#define DT_HASH_BITS 6
+extern DECLARE_HASHTABLE(dt_hash_table, DT_HASH_BITS);
+extern spinlock_t dt_hash_spinlock;
 
 #define MAX_PHANDLE_ARGS 16
 struct of_phandle_args {

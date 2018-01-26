@@ -31,6 +31,10 @@
 
 #include "of_private.h"
 
+static bool dt_hash_needs_init = true;
+DECLARE_HASHTABLE(dt_hash_table, DT_HASH_BITS);
+DEFINE_SPINLOCK(dt_hash_spinlock);
+
 /*
  * of_fdt_limit_memory - limit the number of regions in the /memory node
  * @limit: maximum entries
@@ -238,6 +242,20 @@ static void populate_properties(const void *blob,
 		pp->value  = (__be32 *)val;
 		*pprev     = pp;
 		pprev      = &pp->next;
+	}
+
+	/*
+	 * In 'dryrun = true' cases, np is some non-NULL junk. So, protect
+	 * against those cases.
+	 */
+	if (!dryrun && np->phandle) {
+		spin_lock(&dt_hash_spinlock);
+		if (dt_hash_needs_init) {
+			dt_hash_needs_init = false;
+			hash_init(dt_hash_table);
+		}
+		hash_add(dt_hash_table, &np->hash, np->phandle);
+		spin_unlock(&dt_hash_spinlock);
 	}
 
 	/* With version 0x10 we may not have the name property,

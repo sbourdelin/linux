@@ -1001,10 +1001,14 @@ struct device_node *of_find_node_by_phandle(phandle handle)
 	if (!handle)
 		return NULL;
 
-	raw_spin_lock_irqsave(&devtree_lock, flags);
-	for_each_of_allnodes(np)
+	spin_lock(&dt_hash_spinlock);
+	hash_for_each_possible(dt_hash_table, np, hash, handle)
 		if (np->phandle == handle)
 			break;
+
+	spin_unlock(&dt_hash_spinlock);
+
+	raw_spin_lock_irqsave(&devtree_lock, flags);
 	of_node_get(np);
 	raw_spin_unlock_irqrestore(&devtree_lock, flags);
 	return np;
