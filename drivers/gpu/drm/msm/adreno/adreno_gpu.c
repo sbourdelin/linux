@@ -438,23 +438,28 @@ void adreno_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
 	if (IS_ERR_OR_NULL(state))
 		return;
 
-	seq_printf(m, "status:   %08x\n", state->rbbm_status);
 	seq_printf(m, "revision: %d (%d.%d.%d.%d)\n",
 			adreno_gpu->info->revn, adreno_gpu->rev.core,
 			adreno_gpu->rev.major, adreno_gpu->rev.minor,
 			adreno_gpu->rev.patchid);
 
-	for (i = 0; i < gpu->nr_rings; i++) {
-		seq_printf(m, "rb %d: fence:    %d/%d\n", i,
-			state->ring[i].fence, state->ring[i].seqno);
+	seq_printf(m, "rbbm-status: 0x%08x\n", state->rbbm_status);
 
-		seq_printf(m, "      rptr:     %d\n", state->ring[i].rptr);
-		seq_printf(m, "rb wptr:  %d\n", state->ring[i].wptr);
+	seq_printf(m, "ringbuffer:\n");
+
+	for (i = 0; i < gpu->nr_rings; i++) {
+		seq_printf(m, "  - id: %d\n", i);
+		seq_printf(m, "    last-fence: %d\n", state->ring[i].seqno);
+		seq_printf(m, "    retired-fence: %d\n", state->ring[i].fence);
+		seq_printf(m, "    rptr: %d\n", state->ring[i].rptr);
+		seq_printf(m, "    wptr: %d\n", state->ring[i].wptr);
 	}
 
-	seq_printf(m, "IO:region %s 00000000 00020000\n", gpu->name);
-	for (i = 0; i < state->nr_registers; i++) {
-		seq_printf(m, "IO:R %08x %08x\n",
+	seq_printf(m, "registers:\n");
+	seq_printf(m, "  - [offset, value]\n");
+
+	for(i = 0; i < state->nr_registers; i++) {
+		seq_printf(m, "  - [0x%04x, 0x%08x]\n",
 			state->registers[i * 2] << 2,
 			state->registers[(i * 2) + 1]);
 	}

@@ -33,9 +33,11 @@ static int msm_gpu_crash_show(struct seq_file *m, void *data)
 	if (!state)
 		return 0;
 
-	seq_printf(m, "%s Crash Status:\n", gpu->name);
-	seq_puts(m, "Kernel: " UTS_RELEASE "\n");
-	seq_printf(m, "Time: %ld s %ld us\n",
+	/* FIXME: add tags? */
+	seq_puts(m, "---\n");
+	seq_puts(m, "kernel: " UTS_RELEASE "\n");
+	seq_printf(m, "module: " KBUILD_MODNAME "\n");
+	seq_printf(m, "time: %ld.%ld\n",
 		state->time.tv_sec, state->time.tv_usec);
 	if (state->comm)
 		seq_printf(m, "comm: %s\n", state->comm);
