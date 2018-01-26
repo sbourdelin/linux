@@ -65,7 +65,8 @@ struct msm_gpu_funcs {
 	void (*destroy)(struct msm_gpu *gpu);
 #ifdef CONFIG_DEBUG_FS
 	/* show GPU status in debugfs: */
-	void (*show)(struct msm_gpu *gpu, struct seq_file *m);
+	void (*show)(struct msm_gpu *gpu, struct msm_gpu_state *state,
+			struct seq_file *m);
 #endif
 	int (*gpu_busy)(struct msm_gpu *gpu, uint64_t *value);
 	struct msm_gpu_state *(*gpu_state_get)(struct msm_gpu *gpu);

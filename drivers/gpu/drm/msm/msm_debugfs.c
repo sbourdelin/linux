@@ -25,13 +25,22 @@ static int msm_gpu_show(struct drm_device *dev, struct seq_file *m)
 {
 	struct msm_drm_private *priv = dev->dev_private;
 	struct msm_gpu *gpu = priv->gpu;
+	struct msm_gpu_state *state;
 
-	if (gpu) {
-		seq_printf(m, "%s Status:\n", gpu->name);
-		pm_runtime_get_sync(&gpu->pdev->dev);
-		gpu->funcs->show(gpu, m);
-		pm_runtime_put_sync(&gpu->pdev->dev);
-	}
+	if (!gpu)
+		return 0;
+
+	pm_runtime_get_sync(&gpu->pdev->dev);
+	state = gpu->funcs->gpu_state_get(gpu);
+	pm_runtime_put_sync(&gpu->pdev->dev);
+
+	if (IS_ERR(state))
+		return PTR_ERR(state);
+
+	seq_printf(m, "%s Status:\n", gpu->name);
+	gpu->funcs->show(gpu, state, m);
+
+	gpu->funcs->gpu_state_put(state);
 
 	return 0;
 }

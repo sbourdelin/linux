@@ -207,7 +207,8 @@ void adreno_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit,
 void adreno_flush(struct msm_gpu *gpu, struct msm_ringbuffer *ring);
 bool adreno_idle(struct msm_gpu *gpu, struct msm_ringbuffer *ring);
 #ifdef CONFIG_DEBUG_FS
-void adreno_show(struct msm_gpu *gpu, struct seq_file *m);
+void adreno_show(struct msm_gpu *gpu, struct msm_gpu_state *state,
+		struct seq_file *m);
 #endif
 void adreno_dump_info(struct msm_gpu *gpu);
 void adreno_dump(struct msm_gpu *gpu);
@@ -218,7 +219,6 @@ int adreno_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 		struct adreno_gpu *gpu, const struct adreno_gpu_funcs *funcs,
 		int nr_rings);
 void adreno_gpu_cleanup(struct adreno_gpu *gpu);
-
 
 struct msm_gpu_state *adreno_gpu_state_get(struct msm_gpu *gpu);
 void adreno_gpu_state_put(struct msm_gpu_state *state);
