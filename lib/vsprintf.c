@@ -535,14 +535,18 @@ char *special_hex_number(char *buf, char *end, unsigned long long num, int size)
 	return number(buf, end, num, spec);
 }
 
-static void move_right(char *buf, char *end, unsigned len, unsigned spaces)
+static void move_right(char *buf, char *end, unsigned int len,
+		       unsigned int spaces, struct printf_spec spec)
 {
 	size_t size;
+	char pad;
+
+	pad = (spec.flags & ZEROPAD) ? '0' : ' ';
 	if (buf >= end)	/* nowhere to put anything */
 		return;
 	size = end - buf;
 	if (size <= spaces) {
-		memset(buf, ' ', size);
+		memset(buf, pad, size);
 		return;
 	}
 	if (len) {
@@ -550,7 +554,7 @@ static void move_right(char *buf, char *end, unsigned len, unsigned spaces)
 			len = size - spaces;
 		memmove(buf + spaces, buf, len);
 	}
-	memset(buf, ' ', spaces);
+	memset(buf, pad, spaces);
 }
 
 /*
@@ -565,18 +569,21 @@ static noinline_for_stack
 char *widen_string(char *buf, int n, char *end, struct printf_spec spec)
 {
 	unsigned spaces;
+	char pad;
 
 	if (likely(n >= spec.field_width))
 		return buf;
 	/* we want to pad the sucker */
 	spaces = spec.field_width - n;
 	if (!(spec.flags & LEFT)) {
-		move_right(buf - n, end, n, spaces);
+		move_right(buf - n, end, n, spaces, spec);
 		return buf + spaces;
 	}
+
+	pad = (spec.flags & ZEROPAD) ? '0' : ' ';
 	while (spaces--) {
 		if (buf < end)
-			*buf = ' ';
+			*buf = pad;
 		++buf;
 	}
 	return buf;
@@ -1702,6 +1709,8 @@ static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
 
 	if (unlikely(!have_filled_random_ptr_key)) {
 		spec.field_width = default_width;
+		spec.flags |= ZEROPAD;
+
 		/* string length must be less than default_width */
 		return string(buf, end, "(ptrval)", spec);
 	}
