@@ -62,9 +62,13 @@ int ide_cdrom_drive_status(struct cdrom_device_info *cdi, int slot_nr)
 			return CDS_NO_DISC;
 	}
 
-	if (sense.sense_key == NOT_READY && sense.asc == 0x04
-			&& sense.ascq == 0x04)
-		return CDS_DISC_OK;
+	if (sense.sense_key == NOT_READY && sense.asc == 0x04)
+		switch (sense.ascq) {
+		case 0x01:
+			return CDS_DRIVE_NOT_READY;
+		case 0x04:
+			return CDS_DISC_OK;
+		}
 
 	/*
 	 * If not using Mt Fuji extended media tray reports,
@@ -77,7 +81,7 @@ int ide_cdrom_drive_status(struct cdrom_device_info *cdi, int slot_nr)
 		else
 			return CDS_TRAY_OPEN;
 	}
-	return CDS_DRIVE_NOT_READY;
+	return CDS_DRIVE_ERROR;
 }
 
 /*

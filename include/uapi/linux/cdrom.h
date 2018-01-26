@@ -398,6 +398,7 @@ struct cdrom_generic_command
 #define CDS_TRAY_OPEN		2
 #define CDS_DRIVE_NOT_READY	3
 #define CDS_DISC_OK		4
+#define CDS_DRIVE_ERROR		5
 
 /* return values for the CDROM_DISC_STATUS ioctl */
 /* can also return CDS_NO_[INFO|DISC], from above */

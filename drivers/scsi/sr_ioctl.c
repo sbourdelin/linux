@@ -333,7 +333,7 @@ int sr_drive_status(struct cdrom_device_info *cdi, int slot)
 	else
 		return CDS_TRAY_OPEN;
 
-	return CDS_DRIVE_NOT_READY;
+	return CDS_DRIVE_ERROR;
 }
 
 int sr_disk_status(struct cdrom_device_info *cdi)

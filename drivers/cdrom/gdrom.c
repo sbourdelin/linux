@@ -390,7 +390,7 @@ static int gdrom_drivestatus(struct cdrom_device_info *cd_info, int ignore)
 	if (sense == 0)
 		return CDS_DISC_OK;
 	if (sense == 0x20)
-		return CDS_DRIVE_NOT_READY;
+		return CDS_DRIVE_ERROR;
 	/* default */
 	return CDS_NO_INFO;
 }
