@@ -573,6 +573,7 @@ static int __run_perf_stat(int argc, const char **argv)
 {
 	int interval = stat_config.interval;
 	int times = stat_config.times;
+	int time = stat_config.time;
 	char msg[BUFSIZ];
 	unsigned long long t0, t1;
 	struct perf_evsel *counter;
@@ -586,6 +587,9 @@ static int __run_perf_stat(int argc, const char **argv)
 	if (interval) {
 		ts.tv_sec  = interval / USEC_PER_MSEC;
 		ts.tv_nsec = (interval % USEC_PER_MSEC) * NSEC_PER_MSEC;
+	} else if (time) {
+		ts.tv_sec  = time / USEC_PER_MSEC;
+		ts.tv_nsec = (time % USEC_PER_MSEC) * NSEC_PER_MSEC;
 	} else {
 		ts.tv_sec  = 1;
 		ts.tv_nsec = 0;
@@ -698,9 +702,11 @@ try_again:
 		perf_evlist__start_workload(evsel_list);
 		enable_counters();
 
-		if (interval) {
+		if (interval || time) {
 			while (!waitpid(child_pid, &status, WNOHANG)) {
 				nanosleep(&ts, NULL);
+				if (time)
+					break;
 				process_interval();
 				if (interval_count == true) {
 					if (--times == 0)
@@ -722,6 +728,8 @@ try_again:
 		enable_counters();
 		while (!done) {
 			nanosleep(&ts, NULL);
+			if (time)
+				break;
 			if (interval) {
 				process_interval();
 				if (interval_count == true) {
@@ -1904,6 +1912,8 @@ static const struct option stat_options[] = {
 		    "print counts at regular interval in ms (>= 10)"),
 	OPT_INTEGER(0, "interval-count", &stat_config.times,
 		    "print counts for fixed number of times"),
+	OPT_UINTEGER(0, "time", &stat_config.time,
+		    "print counts after a period of time in ms (>= 10)"),
 	OPT_SET_UINT(0, "per-socket", &stat_config.aggr_mode,
 		     "aggregate counts per processor socket", AGGR_SOCKET),
 	OPT_SET_UINT(0, "per-core", &stat_config.aggr_mode,
@@ -2701,7 +2711,7 @@ int cmd_stat(int argc, const char **argv)
 	int status = -EINVAL, run_idx;
 	const char *mode;
 	FILE *output = stderr;
-	unsigned int interval;
+	unsigned int interval, time;
 	int times;
 	const char * const stat_subcommands[] = { "record", "report" };
 
@@ -2734,6 +2744,7 @@ int cmd_stat(int argc, const char **argv)
 
 	interval = stat_config.interval;
 	times = stat_config.times;
+	time = stat_config.time;
 
 	/*
 	 * For record command the -o is already taken care of.
@@ -2885,12 +2896,30 @@ int cmd_stat(int argc, const char **argv)
 				   "The overhead percentage could be high in some cases. "
 				   "Please proceed with caution.\n");
 	}
+
 	if (times && interval)
 		interval_count = true;
 	else if (times && !interval) {
 		pr_err("interval-count option should be used together with "
 				"interval-print.\n");
 		parse_options_usage(stat_usage, stat_options, "interval-count", 0);
+		parse_options_usage(stat_usage, stat_options, "I", 1);
+		goto out;
+	}
+
+	if (time && time < 100) {
+		if (time < 10) {
+			pr_err("time must be >= 10ms.\n");
+			parse_options_usage(stat_usage, stat_options, "time", 0);
+			goto out;
+		} else
+			pr_warning("time < 100ms. "
+				   "The overhead percentage could be high in some cases. "
+				   "Please proceed with caution.\n");
+	}
+	if (time && interval) {
+		pr_err("time option is not supported with interval-print.\n");
+		parse_options_usage(stat_usage, stat_options, "time", 0);
 		parse_options_usage(stat_usage, stat_options, "I", 1);
 		goto out;
 	}
