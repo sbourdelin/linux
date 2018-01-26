@@ -1422,7 +1422,7 @@ fore200e_open(struct atm_vcc *vcc)
 
     spin_unlock_irqrestore(&fore200e->q_lock, flags);
 
-    fore200e_vcc = kzalloc(sizeof(struct fore200e_vcc), GFP_ATOMIC);
+    fore200e_vcc = kzalloc(sizeof(struct fore200e_vcc), GFP_KERNEL);
     if (fore200e_vcc == NULL) {
 	vc_map->vcc = NULL;
 	return -ENOMEM;
