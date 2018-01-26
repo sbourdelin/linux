@@ -3563,7 +3563,7 @@ static int idt77252_preset(struct idt77252_dev *card)
 
 	/* Software reset */
 	writel(SAR_CFG_SWRST, SAR_REG_CFG);
-	mdelay(1);
+	usleep_range(500, 1000);
 	writel(0, SAR_REG_CFG);
 
 	IPRINTK("%s: Software resetted.\n", card->name);
