@@ -323,7 +323,7 @@ static bool DAC960_CreateAuxiliaryStructures(DAC960_Controller_T *Controller)
 		CommandsRemaining = CommandAllocationGroupSize;
 	  CommandGroupByteCount =
 		CommandsRemaining * CommandAllocationLength;
-	  AllocationPointer = kzalloc(CommandGroupByteCount, GFP_ATOMIC);
+	  AllocationPointer = kzalloc(CommandGroupByteCount, GFP_KERNEL);
 	  if (AllocationPointer == NULL)
 		return DAC960_Failure(Controller,
 					"AUXILIARY STRUCTURE CREATION");
@@ -335,13 +335,13 @@ static bool DAC960_CreateAuxiliaryStructures(DAC960_Controller_T *Controller)
       Command->Next = Controller->FreeCommands;
       Controller->FreeCommands = Command;
       Controller->Commands[CommandIdentifier-1] = Command;
-      ScatterGatherCPU = pci_pool_alloc(ScatterGatherPool, GFP_ATOMIC,
+      ScatterGatherCPU = pci_pool_alloc(ScatterGatherPool, GFP_KERNEL,
 							&ScatterGatherDMA);
       if (ScatterGatherCPU == NULL)
 	  return DAC960_Failure(Controller, "AUXILIARY STRUCTURE CREATION");
 
       if (RequestSensePool != NULL) {
-  	  RequestSenseCPU = pci_pool_alloc(RequestSensePool, GFP_ATOMIC,
+  	  RequestSenseCPU = pci_pool_alloc(RequestSensePool, GFP_KERNEL,
 						&RequestSenseDMA);
   	  if (RequestSenseCPU == NULL) {
                 pci_pool_free(ScatterGatherPool, ScatterGatherCPU,
