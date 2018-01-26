@@ -518,9 +518,11 @@ static bool load_builtin_intel_microcode(struct cpio_data *cp)
  * Print ucode update info.
  */
 static void
-print_ucode_info(struct ucode_cpu_info *uci, unsigned int date)
+print_ucode_info(struct ucode_cpu_info *uci, unsigned int date,
+			unsigned int prev_rev)
 {
-	pr_info_once("microcode updated early to revision 0x%x, date = %04x-%02x-%02x\n",
+	pr_info_once("microcode updated early from revision 0x%x to 0x%x, date = %04x-%02x-%02x\n",
+		     prev_rev,
 		     uci->cpu_sig.rev,
 		     date & 0xffff,
 		     date >> 24,
@@ -531,6 +533,7 @@ print_ucode_info(struct ucode_cpu_info *uci, unsigned int date)
 
 static int delay_ucode_info;
 static int current_mc_date;
+static int prev_revision;
 
 /*
  * Print early updated ucode info after printk works. This is delayed info dump.
@@ -541,7 +544,7 @@ void show_ucode_info_early(void)
 
 	if (delay_ucode_info) {
 		collect_cpu_info_early(&uci);
-		print_ucode_info(&uci, current_mc_date);
+		print_ucode_info(&uci, current_mc_date, prev_revision);
 		delay_ucode_info = 0;
 	}
 }
@@ -550,11 +553,12 @@ void show_ucode_info_early(void)
  * At this point, we can not call printk() yet. Delay printing microcode info in
  * show_ucode_info_early() until printk() works.
  */
-static void print_ucode(struct ucode_cpu_info *uci)
+static void print_ucode(struct ucode_cpu_info *uci, unsigned int prev_rev)
 {
 	struct microcode_intel *mc;
 	int *delay_ucode_info_p;
 	int *current_mc_date_p;
+	int *prev_revision_p;
 
 	mc = uci->mc;
 	if (!mc)
@@ -562,13 +566,16 @@ static void print_ucode(struct ucode_cpu_info *uci)
 
 	delay_ucode_info_p = (int *)__pa_nodebug(&delay_ucode_info);
 	current_mc_date_p = (int *)__pa_nodebug(&current_mc_date);
+	prev_revision_p = (int *)__pa_nodebug(&prev_revision);
 
 	*delay_ucode_info_p = 1;
 	*current_mc_date_p = mc->hdr.date;
+	*prev_revision_p = prev_rev;
 }
 #else
 
-static inline void print_ucode(struct ucode_cpu_info *uci)
+static inline void print_ucode(struct ucode_cpu_info *uci,
+				unsigned int prev_rev)
 {
 	struct microcode_intel *mc;
 
@@ -576,18 +583,20 @@ static inline void print_ucode(struct ucode_cpu_info *uci)
 	if (!mc)
 		return;
 
-	print_ucode_info(uci, mc->hdr.date);
+	print_ucode_info(uci, mc->hdr.date, prev_rev);
 }
 #endif
 
 static int apply_microcode_early(struct ucode_cpu_info *uci, bool early)
 {
 	struct microcode_intel *mc;
-	u32 rev;
+	u32 rev, prev_rev;
 
 	mc = uci->mc;
 	if (!mc)
 		return 0;
+
+	prev_rev = intel_get_microcode_revision();
 
 	/* write microcode via MSR 0x79 */
 	native_wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)mc->bits);
@@ -599,9 +608,9 @@ static int apply_microcode_early(struct ucode_cpu_info *uci, bool early)
 	uci->cpu_sig.rev = rev;
 
 	if (early)
-		print_ucode(uci);
+		print_ucode(uci, prev_rev);
 	else
-		print_ucode_info(uci, mc->hdr.date);
+		print_ucode_info(uci, mc->hdr.date, prev_rev);
 
 	return 0;
 }
