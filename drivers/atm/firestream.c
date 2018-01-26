@@ -1184,7 +1184,7 @@ static int fs_send (struct atm_vcc *atm_vcc, struct sk_buff *skb)
 
 	vcc->last_skb = skb;
 
-	td = kmalloc (sizeof (struct FS_BPENTRY), GFP_ATOMIC);
+	td = kmalloc (sizeof (struct FS_BPENTRY), GFP_KERNEL);
 	fs_dprintk (FS_DEBUG_ALLOC, "Alloc transd: %p(%zd)\n", td, sizeof (struct FS_BPENTRY));
 	if (!td) {
 		/* Oops out of mem */
