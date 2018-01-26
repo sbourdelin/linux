@@ -1087,6 +1087,15 @@ int open_for_common(struct cdrom_device_info *cdi, tracktype *tracks)
 			}
 			cd_dbg(CD_OPEN, "the tray is now closed\n");
 		}
+		/* the door should be closed now, check for the disc */
+		if (ret == CDS_DRIVE_NOT_READY) {
+			int poll_res = poll_event_interruptible(
+				CDS_DRIVE_NOT_READY !=
+				(ret = cdo->drive_status(cdi, CDSL_CURRENT)),
+				500);
+			if (poll_res == -ERESTARTSYS)
+				return poll_res;
+		}
 		if (ret != CDS_DISC_OK)
 			return -ENOMEDIUM;
 	}
