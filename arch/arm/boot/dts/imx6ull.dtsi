@@ -67,6 +67,12 @@
 			};
 		};
 
+		aips-bus@2100000 {
+			/delete-node/ caam@21400000;
+			/delete-node/ sim@218c0000;
+			/delete-node/ sim@21b40000;
+		};
+
 		aips3: aips-bus@2200000 {
 			compatible = "fsl,aips-bus", "simple-bus";
 			#address-cells = <1>;
