@@ -192,7 +192,7 @@ static inline int btintel_read_boot_params(struct hci_dev *hdev,
 
 static inline int btintel_download_firmware(struct hci_dev *dev,
 					    const struct firmware *fw,
-					    u32 *boot_param);
+					    u32 *boot_param)
 {
 	return -EOPNOTSUPP;
 }
