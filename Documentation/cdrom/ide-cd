@@ -455,6 +455,9 @@ main (int argc, char **argv)
 		case CDS_DRIVE_NOT_READY:
 			printf ("Drive Not Ready.\n");
 			break;
+		case CDS_DRIVE_ERROR:
+			printf ("Drive problem.\n");
+			break;
 		default:
 			printf ("This Should not happen!\n");
 			break;
@@ -480,6 +483,9 @@ main (int argc, char **argv)
 				break;
 			case CDS_NO_INFO:
 				printf ("No Information available.");
+				break;
+			case CDS_DRIVE_ERROR:
+				printf ("Drive problem.\n");
 				break;
 			default:
 				printf ("This Should not happen!\n");

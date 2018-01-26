@@ -700,6 +700,7 @@ CDROM_DRIVE_STATUS		Get tray position, etc.
 	    CDS_TRAY_OPEN
 	    CDS_DRIVE_NOT_READY
 	    CDS_DISC_OK
+	    CDS_DRIVE_ERROR
 	    -1			error
 
 	error returns:

@@ -371,10 +371,16 @@ $$
 CDS_NO_INFO& no information available\cr
 CDS_NO_DISC& no disc is inserted, tray is closed\cr
 CDS_TRAY_OPEN& tray is opened\cr
-CDS_DRIVE_NOT_READY& something is wrong, tray is moving?\cr
+CDS_DRIVE_NOT_READY& tray just closed?\cr
 CDS_DISC_OK& a disc is loaded and everything is fine\cr
+CDS_DRIVE_ERROR& something is wrong\cr
 }
 $$
+
+Note: The IDE and SCSI cdroms have a status code 'drive becoming ready' which
+is typically returned when the drive has just closed and is analyzing the disc.
+For other cdrom types this state is not reported by the hardware or not
+implemented by the driver.
 
 \subsection{$Int\ media_changed(struct\ cdrom_device_info * cdi, int\ disc_nr)$}
 
