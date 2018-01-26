@@ -1065,7 +1065,7 @@ void i40evf_down(struct i40evf_adapter *adapter)
 
 	/* remove all VLAN filters */
 	list_for_each_entry(vlf, &adapter->vlan_filter_list, list) {
-		f->remove = true;
+		vlf->remove = true;
 	}
 
 	spin_unlock_bh(&adapter->mac_vlan_list_lock);
