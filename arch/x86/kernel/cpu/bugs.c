@@ -230,7 +230,6 @@ retpoline_auto:
 	}
 
 	spectre_v2_enabled = mode;
-	pr_info("%s\n", spectre_v2_strings[mode]);
 
 	/*
 	 * If neither SMEP or KPTI are available, there is a risk of
