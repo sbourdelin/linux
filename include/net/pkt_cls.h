@@ -474,7 +474,7 @@ struct tcf_ematch_tree {
 struct tcf_ematch_ops {
 	int			kind;
 	int			datalen;
-	int			(*change)(struct net *net, void *,
+	int			(*change)(struct net *net, __be16, void *,
 					  int, struct tcf_ematch *);
 	int			(*match)(struct sk_buff *, struct tcf_ematch *,
 					 struct tcf_pkt_info *);

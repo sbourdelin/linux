@@ -242,7 +242,8 @@ static int tcf_em_validate(struct tcf_proto *tp,
 			goto errout;
 
 		if (em->ops->change) {
-			err = em->ops->change(net, data, data_len, em);
+			err = em->ops->change(net, tp->protocol, data, data_len,
+			                      em);
 			if (err < 0)
 				goto errout;
 		} else if (data_len > 0) {

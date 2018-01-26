@@ -44,7 +44,7 @@ static int em_text_match(struct sk_buff *skb, struct tcf_ematch *m,
 	return skb_find_text(skb, from, to, tm->config) != UINT_MAX;
 }
 
-static int em_text_change(struct net *net, void *data, int len,
+static int em_text_change(struct net *net, __be16 protocol, void *data, int len,
 			  struct tcf_ematch *m)
 {
 	struct text_match *tm;

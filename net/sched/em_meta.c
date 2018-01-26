@@ -904,7 +904,7 @@ static const struct nla_policy meta_policy[TCA_EM_META_MAX + 1] = {
 	[TCA_EM_META_HDR]	= { .len = sizeof(struct tcf_meta_hdr) },
 };
 
-static int em_meta_change(struct net *net, void *data, int len,
+static int em_meta_change(struct net *net, __be16 protocol, void *data, int len,
 			  struct tcf_ematch *m)
 {
 	int err;
