@@ -2725,7 +2725,7 @@ DAC960_DetectController(struct pci_dev *PCI_Device,
   void __iomem *BaseAddress;
   int i;
 
-  Controller = kzalloc(sizeof(DAC960_Controller_T), GFP_ATOMIC);
+  Controller = kzalloc(sizeof(DAC960_Controller_T), GFP_KERNEL);
   if (Controller == NULL) {
 	DAC960_Error("Unable to allocate Controller structure for "
                        "Controller at\n", NULL);
