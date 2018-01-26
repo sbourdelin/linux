@@ -32,7 +32,7 @@
 
 /* The datasheet for the X710 and XL710 indicate that the maximum value for
  * the ITR is 8160usec which is then called out as 0xFF0 with a 2usec
- * resoltion. 8160 is 0x1FE0 when written out in hex. So instead of storing
+ * resolution. 8160 is 0x1FE0 when written out in hex. So instead of storing
  * the register value which is divided by 2 lets use the actual values and
  * avoid an excessive amount of translation.
  */
@@ -442,7 +442,8 @@ struct i40e_ring_container {
 	unsigned long last_itr_update;	/* jiffies of last ITR update */
 	u16 count;
 	enum i40e_latency_range latency_range;
-	u16 itr;
+	u16 target_itr;			/* target ITR setting for ring(s) */
+	u16 current_itr;		/* current ITR setting for ring(s) */
 };
 
 /* iterator for handling rings in ring container */
