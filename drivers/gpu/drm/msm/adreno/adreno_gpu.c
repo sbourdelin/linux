@@ -362,6 +362,60 @@ bool adreno_idle(struct msm_gpu *gpu, struct msm_ringbuffer *ring)
 	return false;
 }
 
+struct msm_gpu_state *adreno_gpu_state_get(struct msm_gpu *gpu)
+{
+	struct adreno_gpu *adreno_gpu = to_adreno_gpu(gpu);
+	struct msm_gpu_state *state;
+	int i, count = 0;
+
+	state = kzalloc(sizeof(*state), GFP_KERNEL);
+	if (!state)
+		return ERR_PTR(-ENOMEM);
+
+	do_gettimeofday(&state->time);
+
+	for (i = 0; i < gpu->nr_rings; i++) {
+		state->ring[i].fence = gpu->rb[i]->memptrs->fence;
+		state->ring[i].seqno = gpu->rb[i]->seqno;
+		state->ring[i].rptr = get_rptr(adreno_gpu, gpu->rb[i]);
+		state->ring[i].wptr = get_wptr(gpu->rb[i]);
+	}
+
+	/* Count the number of registers */
+	for (i = 0; adreno_gpu->registers[i] != ~0; i += 2)
+		count += adreno_gpu->registers[i + 1] -
+			adreno_gpu->registers[i] + 1;
+
+	state->registers = kcalloc(count * 2, sizeof(u32), GFP_KERNEL);
+	if (state->registers) {
+		int pos = 0;
+
+		for (i = 0; adreno_gpu->registers[i] != ~0; i += 2) {
+			uint32_t start = adreno_gpu->registers[i];
+			uint32_t end   = adreno_gpu->registers[i+1];
+			uint32_t addr;
+
+			for (addr = start; addr <= end; addr++) {
+				state->registers[pos++] = addr;
+				state->registers[pos++] = gpu_read(gpu, addr);
+			}
+		}
+
+		state->nr_registers = count;
+	}
+
+	return state;
+}
+
+void adreno_gpu_state_put(struct msm_gpu_state *state)
+{
+	if (IS_ERR_OR_NULL(state))
+		return;
+
+	kfree(state->registers);
+	kfree(state);
+}
+
 #ifdef CONFIG_DEBUG_FS
 void adreno_show(struct msm_gpu *gpu, struct seq_file *m)
 {
