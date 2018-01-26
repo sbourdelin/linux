@@ -335,7 +335,9 @@ static loff_t ashmem_llseek(struct file *file, loff_t offset, int origin)
 		goto out;
 	}
 
+	mutex_unlock(&ashmem_mutex);
 	ret = vfs_llseek(asma->file, offset, origin);
+	mutex_lock(&ashmem_mutex);
 	if (ret < 0)
 		goto out;
 
