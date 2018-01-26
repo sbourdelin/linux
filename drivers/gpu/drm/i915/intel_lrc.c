@@ -1360,6 +1360,25 @@ static u32 *gen9_init_indirectctx_bb(struct intel_engine_cs *engine, u32 *batch)
 	return batch;
 }
 
+static u32 *gen10_init_indirectctx_bb(struct intel_engine_cs *engine, u32 *batch)
+{
+	int i;
+
+	/* WaPipeControlBefore3DStateSamplePattern: cnl */
+	batch = gen8_emit_pipe_control(batch,
+				       PIPE_CONTROL_CS_STALL,
+				       0);
+	for (i = 0; i < 8; i++)
+		*batch++ = MI_NOOP;
+
+	/* Pad to end of cacheline */
+	while ((unsigned long)batch % CACHELINE_BYTES)
+		*batch++ = MI_NOOP;
+
+	return batch;
+}
+
+
 #define CTX_WA_BB_OBJ_SIZE (PAGE_SIZE)
 
 static int lrc_setup_wa_ctx(struct intel_engine_cs *engine)
@@ -1413,7 +1432,9 @@ static int intel_init_workaround_bb(struct intel_engine_cs *engine)
 
 	switch (INTEL_GEN(engine->i915)) {
 	case 10:
-		return 0;
+		wa_bb_fn[0] = gen10_init_indirectctx_bb;
+		wa_bb_fn[1] = NULL;
+		break;
 	case 9:
 		wa_bb_fn[0] = gen9_init_indirectctx_bb;
 		wa_bb_fn[1] = NULL;
