@@ -410,6 +410,7 @@ static u8
 #define bq27425_regs bq27421_regs
 #define bq27441_regs bq27421_regs
 #define bq27621_regs bq27421_regs
+#define bq27411_regs bq27421_regs
 
 static enum power_supply_property bq27000_props[] = {
 	POWER_SUPPLY_PROP_STATUS,
@@ -633,6 +634,7 @@ static enum power_supply_property bq27421_props[] = {
 #define bq27425_props bq27421_props
 #define bq27441_props bq27421_props
 #define bq27621_props bq27421_props
+#define bq27411_props bq27421_props
 
 struct bq27xxx_dm_reg {
 	u8 subclass_id;
@@ -716,6 +718,17 @@ static struct bq27xxx_dm_reg bq27621_dm_regs[] = {
 #define bq27621_dm_regs 0
 #endif
 
+#if 0 /* not yet tested */
+static struct bq27xxx_dm_reg bq27411_dm_regs[] = {
+	[BQ27XXX_DM_DESIGN_CAPACITY]   = { 82, 10, 2,    0, 32767 },
+	[BQ27XXX_DM_DESIGN_ENERGY]     = { 82, 12, 2,    0, 32767 },
+	[BQ27XXX_DM_TERMINATE_VOLTAGE] = { 82, 16, 2, 2800,  3700 },
+};
+#else
+#define bq27411_dm_regs 0
+#endif
+
+
 #define BQ27XXX_O_ZERO	0x00000001
 #define BQ27XXX_O_OTDC	0x00000002
 #define BQ27XXX_O_UTOT  0x00000004
@@ -762,6 +775,7 @@ static struct {
 	[BQ27425]   = BQ27XXX_DATA(bq27425,   0x04143672, BQ27XXX_O_UTOT | BQ27XXX_O_CFGUP),
 	[BQ27441]   = BQ27XXX_DATA(bq27441,   0x80008000, BQ27XXX_O_UTOT | BQ27XXX_O_CFGUP | BQ27XXX_O_RAM),
 	[BQ27621]   = BQ27XXX_DATA(bq27621,   0x80008000, BQ27XXX_O_UTOT | BQ27XXX_O_CFGUP | BQ27XXX_O_RAM),
+	[BQ27411]   = BQ27XXX_DATA(bq27411,   0x80008000, BQ27XXX_O_UTOT | BQ27XXX_O_CFGUP | BQ27XXX_O_RAM),
 };
 
 static DEFINE_MUTEX(bq27xxx_list_lock);
