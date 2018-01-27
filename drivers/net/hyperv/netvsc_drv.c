@@ -820,7 +820,7 @@ static int netvsc_set_channels(struct net_device *net,
 	    channels->rx_count || channels->tx_count || channels->other_count)
 		return -EINVAL;
 
-	if (!nvdev || nvdev->destroy)
+	if (!nvdev)
 		return -ENODEV;
 
 	if (nvdev->nvsp_version < NVSP_PROTOCOL_VERSION_5)
@@ -830,9 +830,6 @@ static int netvsc_set_channels(struct net_device *net,
 		return -EINVAL;
 
 	orig = nvdev->num_chn;
-	was_opened = rndis_filter_opened(nvdev);
-	if (was_opened)
-		rndis_filter_close(nvdev);
 
 	memset(&device_info, 0, sizeof(device_info));
 	device_info.num_chn = count;
@@ -840,6 +837,11 @@ static int netvsc_set_channels(struct net_device *net,
 	device_info.send_section_size = nvdev->send_section_size;
 	device_info.recv_sections = nvdev->recv_section_cnt;
 	device_info.recv_section_size = nvdev->recv_section_size;
+
+	was_opened = netif_running(net);
+	netif_device_detach(net);
+	if (was_opened)
+		rndis_filter_close(nvdev);
 
 	rndis_filter_device_remove(dev, nvdev);
 
@@ -858,6 +860,8 @@ static int netvsc_set_channels(struct net_device *net,
 
 	if (was_opened)
 		rndis_filter_open(nvdev);
+
+	netif_device_attach(net);
 
 	/* We may have missed link change notifications */
 	net_device_ctx->last_reconfig = 0;
@@ -934,7 +938,7 @@ static int netvsc_change_mtu(struct net_device *ndev, int mtu)
 	bool was_opened;
 	int ret = 0;
 
-	if (!nvdev || nvdev->destroy)
+	if (!nvdev)
 		return -ENODEV;
 
 	/* Change MTU of underlying VF netdev first. */
@@ -944,17 +948,17 @@ static int netvsc_change_mtu(struct net_device *ndev, int mtu)
 			return ret;
 	}
 
-	netif_device_detach(ndev);
-	was_opened = rndis_filter_opened(nvdev);
-	if (was_opened)
-		rndis_filter_close(nvdev);
-
 	memset(&device_info, 0, sizeof(device_info));
 	device_info.num_chn = nvdev->num_chn;
 	device_info.send_sections = nvdev->send_section_cnt;
 	device_info.send_section_size = nvdev->send_section_size;
 	device_info.recv_sections = nvdev->recv_section_cnt;
 	device_info.recv_section_size = nvdev->recv_section_size;
+
+	was_opened = netif_running(ndev);
+	netif_device_detach(ndev);
+	if (was_opened)
+		rndis_filter_close(nvdev);
 
 	rndis_filter_device_remove(hdev, nvdev);
 
@@ -1497,7 +1501,7 @@ static int netvsc_set_ringparam(struct net_device *ndev,
 	bool was_opened;
 	int ret = 0;
 
-	if (!nvdev || nvdev->destroy)
+	if (!nvdev)
 		return -ENODEV;
 
 	memset(&orig, 0, sizeof(orig));
@@ -1519,8 +1523,8 @@ static int netvsc_set_ringparam(struct net_device *ndev,
 	device_info.recv_sections = new_rx;
 	device_info.recv_section_size = nvdev->recv_section_size;
 
+	was_opened = netif_running(ndev);
 	netif_device_detach(ndev);
-	was_opened = rndis_filter_opened(nvdev);
 	if (was_opened)
 		rndis_filter_close(nvdev);
 
@@ -1542,6 +1546,7 @@ static int netvsc_set_ringparam(struct net_device *ndev,
 
 	if (was_opened)
 		rndis_filter_open(nvdev);
+
 	netif_device_attach(ndev);
 
 	/* We may have missed link change notifications */

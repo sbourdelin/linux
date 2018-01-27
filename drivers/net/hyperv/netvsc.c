@@ -849,7 +849,7 @@ int netvsc_send(struct net_device *ndev,
 	bool try_batch, xmit_more;
 
 	/* If device is rescinded, return error and packet will get dropped. */
-	if (unlikely(!net_device || net_device->destroy))
+	if (unlikely(!net_device))
 		return -ENODEV;
 
 	/* We may race with netvsc_connect_vsp()/netvsc_init_buf() and get
@@ -995,10 +995,6 @@ static int send_recv_completions(struct net_device *ndev,
 		if (++mrc->first == nvdev->recv_completion_cnt)
 			mrc->first = 0;
 	}
-
-	/* receive completion ring has been emptied */
-	if (unlikely(nvdev->destroy))
-		wake_up(&nvdev->wait_drain);
 
 	return 0;
 }

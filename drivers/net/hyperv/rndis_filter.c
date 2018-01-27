@@ -923,6 +923,7 @@ cleanup:
 	return ret;
 }
 
+/* Are there any outstanding sends */
 static bool netvsc_device_idle(const struct netvsc_device *nvdev)
 {
 	int i;
@@ -930,8 +931,7 @@ static bool netvsc_device_idle(const struct netvsc_device *nvdev)
 	for (i = 0; i < nvdev->num_chn; i++) {
 		const struct netvsc_channel *nvchan = &nvdev->chan_table[i];
 
-		if (nvchan->mrc.first != nvchan->mrc.next)
-			return false;
+		napi_synchronize(&nvchan->napi);
 
 		if (atomic_read(&nvchan->queue_sends) > 0)
 			return false;
@@ -944,14 +944,12 @@ static void rndis_filter_halt_device(struct rndis_device *dev)
 {
 	struct rndis_request *request;
 	struct rndis_halt_request *halt;
-	struct net_device_context *net_device_ctx = netdev_priv(dev->ndev);
-	struct netvsc_device *nvdev = rtnl_dereference(net_device_ctx->nvdev);
 
 	/* Attempt to do a rndis device halt */
 	request = get_rndis_request(dev, RNDIS_MSG_HALT,
 				RNDIS_MESSAGE_SIZE(struct rndis_halt_request));
 	if (!request)
-		goto cleanup;
+		return;
 
 	/* Setup the rndis set */
 	halt = &request->request_msg.msg.halt_req;
@@ -962,17 +960,7 @@ static void rndis_filter_halt_device(struct rndis_device *dev)
 
 	dev->state = RNDIS_DEV_UNINITIALIZED;
 
-cleanup:
-	nvdev->destroy = true;
-
-	/* Force flag to be ordered before waiting */
-	wmb();
-
-	/* Wait for all send completions */
-	wait_event(nvdev->wait_drain, netvsc_device_idle(nvdev));
-
-	if (request)
-		put_rndis_request(dev, request);
+	put_rndis_request(dev, request);
 }
 
 static int rndis_filter_open_device(struct rndis_device *dev)
@@ -994,9 +982,11 @@ static int rndis_filter_open_device(struct rndis_device *dev)
 
 static int rndis_filter_close_device(struct rndis_device *dev)
 {
+	struct net_device_context *net_device_ctx = netdev_priv(dev->ndev);
+	struct netvsc_device *nvdev = rtnl_dereference(net_device_ctx->nvdev);
 	int ret;
 
-	if (dev->state != RNDIS_DEV_DATAINITIALIZED)
+	if (!nvdev || dev->state != RNDIS_DEV_DATAINITIALIZED)
 		return 0;
 
 	/* Make sure rndis_set_multicast doesn't re-enable filter! */
@@ -1004,10 +994,23 @@ static int rndis_filter_close_device(struct rndis_device *dev)
 
 	ret = rndis_filter_set_packet_filter(dev, 0);
 	if (ret == -ENODEV)
-		ret = 0;
+		ret = 0;	/* rescinded is ok */
 
-	if (ret == 0)
+	if (ret == 0) {
+		/* Indicate that wakeup on send done is desired */
+		nvdev->destroy = true;
+
+		/* Force flag to be ordered before waiting */
+		wmb();
+
+		/* Wait for all completions */
+		wait_event(nvdev->wait_drain, netvsc_device_idle(nvdev));
+
+		/* No more wakeups please */
+		nvdev->destroy = false;
+
 		dev->state = RNDIS_DEV_INITIALIZED;
+	}
 
 	return ret;
 }
@@ -1363,11 +1366,4 @@ int rndis_filter_close(struct netvsc_device *nvdev)
 		return -EINVAL;
 
 	return rndis_filter_close_device(nvdev->extension);
-}
-
-bool rndis_filter_opened(const struct netvsc_device *nvdev)
-{
-	const struct rndis_device *dev = nvdev->extension;
-
-	return dev->state == RNDIS_DEV_DATAINITIALIZED;
 }
