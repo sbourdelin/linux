@@ -413,10 +413,8 @@ matrix_keypad_parse_dt(struct device *dev)
 	}
 
 	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-	if (!pdata) {
-		dev_err(dev, "could not allocate memory for platform data\n");
+	if (!pdata)
 		return ERR_PTR(-ENOMEM);
-	}
 
 	pdata->num_row_gpios = nrow = of_gpio_named_count(np, "row-gpios");
 	pdata->num_col_gpios = ncol = of_gpio_named_count(np, "col-gpios");
@@ -445,10 +443,8 @@ matrix_keypad_parse_dt(struct device *dev)
 			     sizeof(unsigned int) *
 				(pdata->num_row_gpios + pdata->num_col_gpios),
 			     GFP_KERNEL);
-	if (!gpios) {
-		dev_err(dev, "could not allocate memory for gpios\n");
+	if (!gpios)
 		return ERR_PTR(-ENOMEM);
-	}
 
 	for (i = 0; i < pdata->num_row_gpios; i++)
 		gpios[i] = of_get_named_gpio(np, "row-gpios", i);
