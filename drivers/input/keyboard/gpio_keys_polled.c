@@ -253,10 +253,8 @@ static int gpio_keys_polled_probe(struct platform_device *pdev)
 	size = sizeof(struct gpio_keys_polled_dev) +
 			pdata->nbuttons * sizeof(struct gpio_keys_button_data);
 	bdev = devm_kzalloc(dev, size, GFP_KERNEL);
-	if (!bdev) {
-		dev_err(dev, "no memory for private data\n");
+	if (!bdev)
 		return -ENOMEM;
-	}
 
 	poll_dev = devm_input_allocate_polled_device(dev);
 	if (!poll_dev) {

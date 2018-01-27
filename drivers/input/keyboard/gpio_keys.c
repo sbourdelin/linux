@@ -757,10 +757,8 @@ static int gpio_keys_probe(struct platform_device *pdev)
 	size = sizeof(struct gpio_keys_drvdata) +
 			pdata->nbuttons * sizeof(struct gpio_button_data);
 	ddata = devm_kzalloc(dev, size, GFP_KERNEL);
-	if (!ddata) {
-		dev_err(dev, "failed to allocate state\n");
+	if (!ddata)
 		return -ENOMEM;
-	}
 
 	ddata->keymap = devm_kcalloc(dev,
 				     pdata->nbuttons, sizeof(ddata->keymap[0]),
