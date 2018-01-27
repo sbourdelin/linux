@@ -965,7 +965,7 @@ static void gc_attach(struct parport *pp)
 		return;
 	}
 
-	gc = kzalloc(sizeof(struct gc), GFP_KERNEL);
+	gc = kzalloc(sizeof(*gc), GFP_KERNEL);
 	if (!gc)
 		goto err_unreg_pardev;
 
