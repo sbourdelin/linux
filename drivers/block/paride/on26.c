@@ -163,7 +163,7 @@ static int on26_test_port( PIA *pi)  /* hard reset */
                 on26_write_regr(pi,0,6,0xb0);
                 y = on26_read_regr(pi,0,7);
                 if (!((x&0x80)||(y&0x80))) break;
-                mdelay(100);
+                msleep(100);
             }
 
 	    if (i == RESET_WAIT) 
