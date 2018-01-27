@@ -184,10 +184,8 @@ static int max7359_probe(struct i2c_client *client,
 
 	keypad = devm_kzalloc(&client->dev, sizeof(struct max7359_keypad),
 			      GFP_KERNEL);
-	if (!keypad) {
-		dev_err(&client->dev, "failed to allocate memory\n");
+	if (!keypad)
 		return -ENOMEM;
-	}
 
 	input_dev = devm_input_allocate_device(&client->dev);
 	if (!input_dev) {
