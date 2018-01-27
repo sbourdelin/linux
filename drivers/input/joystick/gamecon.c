@@ -966,10 +966,8 @@ static void gc_attach(struct parport *pp)
 	}
 
 	gc = kzalloc(sizeof(struct gc), GFP_KERNEL);
-	if (!gc) {
-		pr_err("Not enough memory\n");
+	if (!gc)
 		goto err_unreg_pardev;
-	}
 
 	mutex_init(&gc->mutex);
 	gc->pd = pd;
