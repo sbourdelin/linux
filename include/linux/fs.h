@@ -1469,6 +1469,7 @@ static inline void i_gid_write(struct inode *inode, gid_t gid)
 }
 
 extern struct timespec current_time(struct inode *inode);
+extern unsigned int sysctl_dio_short_writes;
 
 /*
  * Snapshotting support.

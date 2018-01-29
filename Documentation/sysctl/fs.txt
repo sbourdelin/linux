@@ -22,6 +22,7 @@ Currently, these files are in /proc/sys/fs:
 - aio-max-nr
 - aio-nr
 - dentry-state
+- dio_short_writes
 - dquot-max
 - dquot-nr
 - file-max
@@ -73,6 +74,19 @@ Age_limit is the age in seconds after which dcache entries
 can be reclaimed when memory is short and want_pages is
 nonzero when shrink_dcache_pages() has been called and the
 dcache isn't pruned yet.
+
+==============================================================
+
+dio_short_writes:
+
+In case Direct I/O encounters an transient error, it returns
+the errorcode, even if it has performed part of the write.
+This flag, if on (default), will return the number of bytes written
+so far, as the write(2) symantics are. However, some older applications
+still consider a direct write as an error if all of the I/O
+submitted is not complete. ie write(file, count, buf) != count.
+This option can be disabled on systems in order to support
+existing applications which do not expect short writes.
 
 ==============================================================
 

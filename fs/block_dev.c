@@ -409,7 +409,7 @@ __blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter, int nr_pages)
 
 	if (!ret)
 		ret = blk_status_to_errno(dio->bio.bi_status);
-	if (likely(!ret))
+	if (likely(dio->size))
 		ret = dio->size;
 
 	bio_put(&dio->bio);

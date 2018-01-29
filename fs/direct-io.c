@@ -151,6 +151,7 @@ struct dio {
 } ____cacheline_aligned_in_smp;
 
 static struct kmem_cache *dio_cache __read_mostly;
+unsigned int sysctl_dio_short_writes = 1;
 
 /*
  * How many pages are in the queue?
@@ -262,7 +263,7 @@ static ssize_t dio_complete(struct dio *dio, ssize_t ret, unsigned int flags)
 		ret = dio->page_errors;
 	if (ret == 0)
 		ret = dio->io_error;
-	if (ret == 0)
+	if (!sysctl_dio_short_writes && (ret == 0))
 		ret = transferred;
 
 	if (dio->end_io) {
@@ -310,7 +311,9 @@ static ssize_t dio_complete(struct dio *dio, ssize_t ret, unsigned int flags)
 	}
 
 	kmem_cache_free(dio_cache, dio);
-	return ret;
+	if (!sysctl_dio_short_writes)
+		return ret;
+	return transferred ? transferred : ret;
 }
 
 static void dio_aio_complete_work(struct work_struct *work)
