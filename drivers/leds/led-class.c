@@ -20,6 +20,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/timer.h>
+#include <linux/pm_qos.h>
 #include <uapi/linux/uleds.h>
 #include "leds.h"
 
@@ -196,6 +197,11 @@ static int led_suspend(struct device *dev)
 {
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
 
+	if(dev_pm_qos_flags(dev, PM_QOS_FLAG_NO_POWER_OFF) ==
+			PM_QOS_FLAGS_ALL) {
+		return 0;
+	}
+
 	if (led_cdev->flags & LED_CORE_SUSPENDRESUME)
 		led_classdev_suspend(led_cdev);
 
@@ -205,6 +211,11 @@ static int led_suspend(struct device *dev)
 static int led_resume(struct device *dev)
 {
 	struct led_classdev *led_cdev = dev_get_drvdata(dev);
+
+	if(dev_pm_qos_flags(dev, PM_QOS_FLAG_NO_POWER_OFF) ==
+			PM_QOS_FLAGS_ALL) {
+		return 0;
+	}
 
 	if (led_cdev->flags & LED_CORE_SUSPENDRESUME)
 		led_classdev_resume(led_cdev);
@@ -290,6 +301,18 @@ int of_led_classdev_register(struct device *parent, struct device_node *np,
 	down_write(&leds_list_lock);
 	list_add_tail(&led_cdev->node, &leds_list);
 	up_write(&leds_list_lock);
+
+	/* Attempt to let userspace take over the policy. */
+	ret = dev_pm_qos_expose_flags(led_cdev->dev,
+			PM_QOS_FLAG_NO_POWER_OFF);
+	if (ret < 0) {
+		dev_warn(led_cdev->dev, "failed to expose pm_qos_no_poweroff\n");
+		return 0;
+	}
+
+	ret = dev_pm_qos_update_flags(led_cdev->dev,
+			PM_QOS_FLAG_NO_POWER_OFF,
+			0);
 
 	if (!led_cdev->max_brightness)
 		led_cdev->max_brightness = LED_FULL;
