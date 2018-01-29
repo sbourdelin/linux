@@ -407,14 +407,27 @@ static int kvm_psci_call(struct kvm_vcpu *vcpu)
 int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
 {
 	u32 func_id = smccc_get_function(vcpu);
-	u32 val;
+	u32 val, feature;
 
 	switch (func_id) {
 	case ARM_SMCCC_VERSION_FUNC_ID:
 		val = ARM_SMCCC_VERSION_1_1;
 		break;
 	case ARM_SMCCC_ARCH_FEATURES_FUNC_ID:
-		val = -1;	/* Nothing supported yet */
+		feature = smccc_get_arg1(vcpu);
+		switch(feature) {
+#ifdef CONFIG_ARM64
+		case ARM_SMCCC_ARCH_WORKAROUND_1:
+			if (cpus_have_const_cap(ARM64_HARDEN_BRANCH_PREDICTOR))
+				val = 0;
+			else
+				val = -1;
+			break;
+#endif
+		default:
+			val = -1;
+			break;
+		}
 		break;
 	default:
 		return kvm_psci_call(vcpu);
