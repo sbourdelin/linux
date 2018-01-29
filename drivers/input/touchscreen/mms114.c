@@ -20,7 +20,7 @@
 
 /* Write only registers */
 #define MMS114_MODE_CONTROL		0x01
-#define MMS114_OPERATION_MODE_MASK	0xE
+#define MMS114_OPERATION_MODE_MASK	0xe
 #define MMS114_ACTIVE			(1 << 1)
 
 #define MMS114_XY_RESOLUTION_H		0x02
@@ -30,12 +30,12 @@
 #define MMS114_MOVING_THRESHOLD		0x06
 
 /* Read only registers */
-#define MMS114_PACKET_SIZE		0x0F
+#define MMS114_PACKET_SIZE		0x0f
 #define MMS114_INFOMATION		0x10
-#define MMS114_TSP_REV			0xF0
+#define MMS114_TSP_REV			0xf0
 
-#define MMS152_FW_REV			0xE1
-#define MMS152_COMPAT_GROUP		0xF2
+#define MMS152_FW_REV			0xe1
+#define MMS152_COMPAT_GROUP		0xf2
 
 /* 200ms needs after power on */
 #define MMS114_POWERON_DELAY		200
