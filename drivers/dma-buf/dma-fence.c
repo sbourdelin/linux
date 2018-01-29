@@ -171,6 +171,39 @@ void dma_fence_release(struct kref *kref)
 
 	trace_dma_fence_destroy(fence);
 
+	/*
+	 * If the WARN_ON below is triggered it could be because the dma fence
+	 * was not signaled and therefore, the cb list is still not empty
+	 * because the cb functions were not called.
+	 *
+	 * A more subtle case is where the fence got signaled by a thread that
+	 * didn't hold a ref to the fence. The following describes the scenario:
+	 *
+	 *      Thread A                            Thread B
+	 *--------------------------        --------------------------
+	 * calls dma_fence_signal() {
+	 *      set signal bit
+	 *
+	 *            scheduled out
+	 *      ---------------------------> calls dma_fence_wait_timeout() and
+	 *                                   returns immediately
+	 *
+	 *                                   calls dma_fence_put()
+	 *                                         |
+	 *                                         |thread A doesn't hold ref
+	 *                                         |to fence so ref goes to 0
+	 *                                         |and release is called
+	 *                                         |
+	 *                                         -> dma_fence_release()
+	 *                                            |
+	 *                                            -> WARN_ON triggered
+	 *
+	 *      go over CB list,
+	 *      call each CB and remove it
+	 *      }
+	 *
+	 *
+	 */
 	WARN_ON(!list_empty(&fence->cb_list));
 
 	if (fence->ops->release)
