@@ -5621,6 +5621,11 @@ static unsigned long capacity_orig_of(int cpu)
 	return cpu_rq(cpu)->cpu_capacity_orig;
 }
 
+static inline bool full_capacity(int cpu)
+{
+	return capacity_of(cpu) >= (capacity_orig_of(cpu)*3)/4;
+}
+
 static unsigned long cpu_avg_load_per_task(int cpu)
 {
 	struct rq *rq = cpu_rq(cpu);
@@ -6083,7 +6088,7 @@ static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int 
 
 		for_each_cpu(cpu, cpu_smt_mask(core)) {
 			cpumask_clear_cpu(cpu, cpus);
-			if (!idle_cpu(cpu))
+			if (!idle_cpu(cpu) || !full_capacity(cpu))
 				idle = false;
 		}
 
@@ -6104,7 +6109,8 @@ static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int 
  */
 static int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int target)
 {
-	int cpu;
+	int cpu, rcpu = -1;
+	unsigned long max_cap = 0;
 
 	if (!static_branch_likely(&sched_smt_present))
 		return -1;
@@ -6112,11 +6118,13 @@ static int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int t
 	for_each_cpu(cpu, cpu_smt_mask(target)) {
 		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
 			continue;
-		if (idle_cpu(cpu))
-			return cpu;
+		if (idle_cpu(cpu) && (capacity_of(cpu) > max_cap)) {
+			max_cap = capacity_of(cpu);
+			rcpu = cpu;
+		}
 	}
 
-	return -1;
+	return rcpu;
 }
 
 #else /* CONFIG_SCHED_SMT */
@@ -6145,6 +6153,8 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	u64 time, cost;
 	s64 delta;
 	int cpu, nr = INT_MAX;
+	int best_cpu = -1;
+	unsigned int best_cap = 0;
 
 	this_sd = rcu_dereference(*this_cpu_ptr(&sd_llc));
 	if (!this_sd)
@@ -6175,8 +6185,15 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 			return -1;
 		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
 			continue;
-		if (idle_cpu(cpu))
-			break;
+		if (idle_cpu(cpu)) {
+			if (full_capacity(cpu)) {
+				best_cpu = cpu;
+				break;
+			} else if (capacity_of(cpu) > best_cap) {
+				best_cap = capacity_of(cpu);
+				best_cpu = cpu;
+			}
+		}
 	}
 
 	time = local_clock() - time;
@@ -6184,7 +6201,7 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	delta = (s64)(time - cost) / 8;
 	this_sd->avg_scan_cost += delta;
 
-	return cpu;
+	return best_cpu;
 }
 
 /*
@@ -6195,13 +6212,14 @@ static int select_idle_sibling(struct task_struct *p, int prev, int target)
 	struct sched_domain *sd;
 	int i;
 
-	if (idle_cpu(target))
+	if (idle_cpu(target) && full_capacity(target))
 		return target;
 
 	/*
 	 * If the previous cpu is cache affine and idle, don't be stupid.
 	 */
-	if (prev != target && cpus_share_cache(prev, target) && idle_cpu(prev))
+	if (prev != target && cpus_share_cache(prev, target) && idle_cpu(prev) &&
+	    full_capacity(prev))
 		return prev;
 
 	sd = rcu_dereference(per_cpu(sd_llc, target));
