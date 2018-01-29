@@ -13,7 +13,7 @@ a migration causes a different PSCI version to be exposed out of the
 blue to an unsuspecting guest.
 
 In order to remedy this situation, KVM exposes a set of "firmware
-pseuodo-registers" that can be manipulated using the GET/SET_ONE_REG
+pseudo-registers" that can be manipulated using the GET/SET_ONE_REG
 interface. These registers can be saved/restored by userspace, and set
 to a convenient value if required.
 
@@ -21,8 +21,10 @@ The following register is defined:
 
 * KVM_REG_ARM_PSCI_VERSION:
 
-  - Only valid if the vcpu has KVM_ARM_VCPU_PSCI_0_2 feature set
-  - Returns the current PSCI version on GET_ONE_REG
-  - Allows any supported PSCI version compatible with v0.2 to be set
-    with SET_ONE_REG
+  - Only valid if the vcpu has the KVM_ARM_VCPU_PSCI_0_2 feature set
+    (and thus has already been initialized)
+  - Returns the current PSCI version on GET_ONE_REG (defaulting to the
+    highest PSCI version implemented by KVM and compatible with v0.2)
+  - Allows any PSCI version implemented by KVM and compatible with
+    v0.2 to be set with SET_ONE_REG
   - Affects the whole VM (even if the register view is per-vcpu)
