@@ -31,6 +31,7 @@
 #include "gfs2.h"
 #include "incore.h"
 #include "bmap.h"
+#include "aops.h"
 #include "dir.h"
 #include "glock.h"
 #include "glops.h"
@@ -712,6 +713,10 @@ static ssize_t gfs2_file_buffered_write(struct kiocb *iocb, struct iov_iter *fro
 	current->backing_dev_info = inode_to_bdi(inode);
 
 	ret = iomap_file_buffered_write(iocb, from, &gfs2_iomap_ops);
+	if (ret == -ENOTBLK) {
+		ret = gfs2_stuffed_write(iocb, from);
+		gfs2_write_unlock(inode);
+	}
 
 	current->backing_dev_info = NULL;
 
@@ -761,10 +766,7 @@ static ssize_t gfs2_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 
 	if (iocb->ki_flags & IOCB_DIRECT)
 		return generic_file_write_iter(iocb, from);
-	ret = gfs2_file_buffered_write(iocb, from);
-	if (ret == -ENOTBLK)
-		ret = generic_file_write_iter(iocb, from);
-	return ret;
+	return gfs2_file_buffered_write(iocb, from);
 }
 
 static int fallocate_chunk(struct inode *inode, loff_t offset, loff_t len,

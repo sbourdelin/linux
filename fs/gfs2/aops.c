@@ -22,6 +22,7 @@
 #include <linux/backing-dev.h>
 #include <linux/uio.h>
 #include <trace/events/writeback.h>
+#include <linux/sched/signal.h>
 
 #include "gfs2.h"
 #include "incore.h"
@@ -820,7 +821,7 @@ out:
  * This copies the data from the page into the inode block after
  * the inode data structure itself.
  *
- * Returns: errno
+ * Returns: copied bytes or errno
  */
 static int gfs2_stuffed_write_end(struct inode *inode, struct buffer_head *dibh,
 				  loff_t pos, unsigned copied,
@@ -850,6 +851,96 @@ static int gfs2_stuffed_write_end(struct inode *inode, struct buffer_head *dibh,
 	return copied;
 }
 
+ssize_t gfs2_stuffed_write(struct kiocb *iocb, struct iov_iter *from)
+{
+	struct inode *inode = iocb->ki_filp->f_mapping->host;
+	struct gfs2_inode *ip = GFS2_I(inode);
+	struct gfs2_sbd *sdp = GFS2_SB(inode);
+	loff_t pos = iocb->ki_pos;
+	struct page *page = NULL;
+	ssize_t written = 0, ret;
+
+	BUG_ON(!gfs2_glock_is_locked_by_me(ip->i_gl));
+	BUG_ON(!gfs2_is_stuffed(ip));
+
+	ret = gfs2_trans_begin(sdp, RES_DINODE, 0);
+	if (ret)
+		return ret;
+
+	do {
+		struct buffer_head *dibh;
+		unsigned long offset;
+		unsigned long bytes;
+		size_t copied;
+
+		offset = pos & (PAGE_SIZE - 1);
+		bytes = min_t(unsigned long, PAGE_SIZE - offset,
+					     iov_iter_count(from));
+again:
+		/*
+		 * Bring in the user page that we will copy from _first_.
+		 * Otherwise there's a nasty deadlock on copying from the
+		 * same page as we're writing to, without it being marked
+		 * up-to-date.
+		 *
+		 * Not only is this an optimisation, but it is also required
+		 * to check that the address is actually valid, when atomic
+		 * usercopies are used, below.
+		 */
+		if (unlikely(iov_iter_fault_in_readable(from, bytes))) {
+			ret = -EFAULT;
+			goto out;
+		}
+
+		if (fatal_signal_pending(current)) {
+			ret = -EINTR;
+			goto out;
+		}
+
+		page = grab_cache_page_write_begin(inode->i_mapping, pos >> PAGE_SHIFT, AOP_FLAG_NOFS);
+		if (!page)
+			return -ENOMEM;
+
+		if (!PageUptodate(page)) {
+			ret = stuffed_readpage(ip, page);
+			if (ret)
+				goto out;
+		}
+
+		if (mapping_writably_mapped(inode->i_mapping))
+			flush_dcache_page(page);
+
+		copied = iov_iter_copy_from_user_atomic(page, from, pos, bytes);
+
+		flush_dcache_page(page);
+
+		ret = gfs2_meta_inode_buffer(ip, &dibh);
+		if (ret)
+			goto out;
+		ret = gfs2_stuffed_write_end(inode, dibh, pos, copied, page);
+		page = NULL;
+		brelse(dibh);
+		if (ret < 0)
+			goto out;
+
+		iov_iter_advance(from, copied);
+		if (unlikely(copied == 0)) {
+			bytes = iov_iter_single_seg_count(from);
+			goto again;
+		}
+		pos += copied;
+		written += copied;
+	} while (iov_iter_count(from));
+
+out:
+	if (page) {
+		unlock_page(page);
+		put_page(page);
+	}
+	gfs2_trans_end(sdp);
+	return written ? written : ret;
+}
+
 /**
  * gfs2_write_end
  * @file: The file to write to
@@ -863,7 +954,7 @@ static int gfs2_stuffed_write_end(struct inode *inode, struct buffer_head *dibh,
  * The main write_end function for GFS2. We just put our locking around the VFS
  * provided functions.
  *
- * Returns: errno
+ * Returns: copied bytes or errno
  */
 
 static int gfs2_write_end(struct file *file, struct address_space *mapping,

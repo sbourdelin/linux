@@ -826,7 +826,7 @@ out_uninit:
 	return error;
 }
 
-static void gfs2_write_unlock(struct inode *inode)
+void gfs2_write_unlock(struct inode *inode)
 {
 	struct gfs2_inode *ip = GFS2_I(inode);
 	struct gfs2_sbd *sdp = GFS2_SB(inode);
@@ -855,8 +855,8 @@ static int gfs2_iomap_begin_write(struct inode *inode, loff_t pos, loff_t length
 
 	if (gfs2_is_stuffed(ip)) {
 		if (pos + length <= gfs2_max_stuffed_size(ip)) {
-			ret = -ENOTBLK;
-			goto out_unlock;
+			/* Keep the inode locked! */
+			return -ENOTBLK;
 		}
 	}
 
@@ -927,7 +927,6 @@ out_qunlock:
 		gfs2_quota_unlock(ip);
 out_release:
 	release_metapath(&mp);
-out_unlock:
 	gfs2_write_unlock(inode);
 	return ret;
 }
