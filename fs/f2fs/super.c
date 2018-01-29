@@ -2075,6 +2075,25 @@ static int sanity_check_raw_super(struct f2fs_sb_info *sbi,
 		return 1;
 	}
 
+	/* check quota sysfile ino info */
+	if (raw_super->feature & cpu_to_le32(F2FS_FEATURE_QUOTA_INO)) {
+		if (le32_to_cpu(raw_super->qf_ino[0]) != 4 ||
+			le32_to_cpu(raw_super->qf_ino[1]) != 5) {
+			f2fs_msg(sb, KERN_INFO,
+				"Invalid Quota Ino: user_ino(%u), grp_ino(%u)",
+				le32_to_cpu(raw_super->qf_ino[0]),
+				le32_to_cpu(raw_super->qf_ino[1]));
+			return 1;
+		}
+		if (raw_super->feature & cpu_to_le32(F2FS_FEATURE_PRJQUOTA) &&
+			le32_to_cpu(raw_super->qf_ino[2]) != 6) {
+			f2fs_msg(sb, KERN_INFO,
+				"Invalid Quota Ino: prj_ino(%u)",
+				le32_to_cpu(raw_super->qf_ino[2]));
+			return 1;
+		}
+	}
+
 	if (le32_to_cpu(raw_super->segment_count) > F2FS_MAX_SEGMENT) {
 		f2fs_msg(sb, KERN_INFO,
 			"Invalid segment count (%u)",
