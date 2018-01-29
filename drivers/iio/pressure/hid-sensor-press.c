@@ -280,10 +280,8 @@ static int hid_press_probe(struct platform_device *pdev)
 
 	indio_dev->channels = kmemdup(press_channels, sizeof(press_channels),
 				      GFP_KERNEL);
-	if (!indio_dev->channels) {
-		dev_err(&pdev->dev, "failed to duplicate channels\n");
+	if (!indio_dev->channels)
 		return -ENOMEM;
-	}
 
 	ret = press_parse_report(pdev, hsdev,
 				 (struct iio_chan_spec *)indio_dev->channels,
