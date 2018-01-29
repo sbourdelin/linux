@@ -277,10 +277,8 @@ static int hid_dev_rot_probe(struct platform_device *pdev)
 	indio_dev->channels = devm_kmemdup(&pdev->dev, dev_rot_channels,
 					   sizeof(dev_rot_channels),
 					   GFP_KERNEL);
-	if (!indio_dev->channels) {
-		dev_err(&pdev->dev, "failed to duplicate channels\n");
+	if (!indio_dev->channels)
 		return -ENOMEM;
-	}
 
 	ret = dev_rot_parse_report(pdev, hsdev,
 				   (struct iio_chan_spec *)indio_dev->channels,
