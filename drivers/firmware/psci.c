@@ -511,6 +511,26 @@ static void __init psci_init_migrate(void)
 	pr_info("Trusted OS resident on physical CPU 0x%lx\n", cpuid);
 }
 
+static void __init psci_init_smccc(u32 ver)
+{
+	int feature = PSCI_RET_NOT_SUPPORTED;
+
+	if (PSCI_VERSION_MAJOR(ver) >= 1)
+		feature = psci_features(ARM_SMCCC_VERSION_FUNC_ID);
+
+	if (feature == PSCI_RET_NOT_SUPPORTED) {
+		psci_ops.variant = SMCCC_VARIANT_1_0;
+	} else {
+		ver = invoke_psci_fn(ARM_SMCCC_VERSION_FUNC_ID, 0, 0, 0);
+		if (ver != ARM_SMCCC_VERSION_1_1)
+			psci_ops.variant = SMCCC_VARIANT_1_0;
+		else
+			psci_ops.variant = SMCCC_VARIANT_1_1;
+	}
+
+	pr_info("SMC Calling Convention v1.%d\n", psci_ops.variant);
+}
+
 static void __init psci_0_2_set_functions(void)
 {
 	pr_info("Using standard PSCI v0.2 function IDs\n");
@@ -557,6 +577,7 @@ static int __init psci_probe(void)
 	psci_0_2_set_functions();
 
 	psci_init_migrate();
+	psci_init_smccc(ver);
 
 	if (PSCI_VERSION_MAJOR(ver) >= 1) {
 		psci_init_cpu_suspend();
