@@ -36,10 +36,11 @@
 #include "super.h"
 #include "util.h"
 #include "glops.h"
+#include "aops.h"
 
 
-static void gfs2_page_add_databufs(struct gfs2_inode *ip, struct page *page,
-				   unsigned int from, unsigned int len)
+void gfs2_page_add_databufs(struct gfs2_inode *ip, struct page *page,
+			    unsigned int from, unsigned int len)
 {
 	struct buffer_head *head = page_buffers(page);
 	unsigned int bsize = head->b_size;
@@ -773,7 +774,7 @@ out_uninit:
  * adjust_fs_space - Adjusts the free space available due to gfs2_grow
  * @inode: the rindex inode
  */
-static void adjust_fs_space(struct inode *inode)
+void adjust_fs_space(struct inode *inode)
 {
 	struct gfs2_sbd *sdp = inode->i_sb->s_fs_info;
 	struct gfs2_inode *m_ip = GFS2_I(sdp->sd_statfs_inode);

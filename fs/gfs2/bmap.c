@@ -28,6 +28,7 @@
 #include "trans.h"
 #include "dir.h"
 #include "util.h"
+#include "aops.h"
 #include "trace_gfs2.h"
 
 /* This doesn't need to be that large as max 64 bit pointers in a 4k
@@ -40,6 +41,8 @@ struct metapath {
 	int mp_fheight; /* find_metapath height */
 	int mp_aheight; /* actual height (lookup height) */
 };
+
+static int punch_hole(struct gfs2_inode *ip, u64 offset, u64 length);
 
 /**
  * gfs2_unstuffer_page - unstuff a stuffed inode into a block cached by a page
@@ -375,7 +378,7 @@ static int fillup_metapath(struct gfs2_inode *ip, struct metapath *mp, int h)
 	return mp->mp_aheight - x - 1;
 }
 
-static inline void release_metapath(struct metapath *mp)
+static void release_metapath(struct metapath *mp)
 {
 	int i;
 
@@ -383,6 +386,7 @@ static inline void release_metapath(struct metapath *mp)
 		if (mp->mp_bh[i] == NULL)
 			break;
 		brelse(mp->mp_bh[i]);
+		mp->mp_bh[i] = NULL;
 	}
 }
 
@@ -795,6 +799,139 @@ do_alloc:
 	goto out;
 }
 
+static int gfs2_write_lock(struct inode *inode)
+{
+	struct gfs2_inode *ip = GFS2_I(inode);
+	struct gfs2_sbd *sdp = GFS2_SB(inode);
+	int error;
+
+	gfs2_holder_init(ip->i_gl, LM_ST_EXCLUSIVE, 0, &ip->i_gh);
+	error = gfs2_glock_nq(&ip->i_gh);
+	if (error)
+		goto out_uninit;
+	if (&ip->i_inode == sdp->sd_rindex) {
+		struct gfs2_inode *m_ip = GFS2_I(sdp->sd_statfs_inode);
+
+		error = gfs2_glock_nq_init(m_ip->i_gl, LM_ST_EXCLUSIVE,
+					   GL_NOCACHE, &m_ip->i_gh);
+		if (error)
+			goto out_unlock;
+	}
+	return 0;
+
+out_unlock:
+	gfs2_glock_dq(&ip->i_gh);
+out_uninit:
+	gfs2_holder_uninit(&ip->i_gh);
+	return error;
+}
+
+static void gfs2_write_unlock(struct inode *inode)
+{
+	struct gfs2_inode *ip = GFS2_I(inode);
+	struct gfs2_sbd *sdp = GFS2_SB(inode);
+
+	if (&ip->i_inode == sdp->sd_rindex) {
+		struct gfs2_inode *m_ip = GFS2_I(sdp->sd_statfs_inode);
+
+		gfs2_glock_dq_uninit(&m_ip->i_gh);
+	}
+	gfs2_glock_dq_uninit(&ip->i_gh);
+}
+
+static int gfs2_iomap_begin_write(struct inode *inode, loff_t pos, loff_t length,
+				  unsigned flags, struct iomap *iomap)
+{
+	struct metapath mp = { .mp_aheight = 1, };
+	struct gfs2_inode *ip = GFS2_I(inode);
+	struct gfs2_sbd *sdp = GFS2_SB(inode);
+	unsigned int data_blocks = 0, ind_blocks = 0, rblocks;
+	int alloc_required;
+	int ret;
+
+	ret = gfs2_write_lock(inode);
+	if (ret)
+		return ret;
+
+	if (gfs2_is_stuffed(ip)) {
+		if (pos + length <= gfs2_max_stuffed_size(ip)) {
+			ret = -ENOTBLK;
+			goto out_unlock;
+		}
+	}
+
+	ret = gfs2_iomap_get(inode, pos, length, flags, iomap, &mp);
+	if (ret)
+		goto out_release;
+	alloc_required = iomap->type != IOMAP_MAPPED;
+
+	if (alloc_required || gfs2_is_jdata(ip))
+		gfs2_write_calc_reserv(ip, iomap->length, &data_blocks, &ind_blocks);
+
+	if (alloc_required) {
+		struct gfs2_alloc_parms ap = { .target = data_blocks + ind_blocks };
+		ret = gfs2_quota_lock_check(ip, &ap);
+		if (ret)
+			goto out_release;
+
+		ret = gfs2_inplace_reserve(ip, &ap);
+		if (ret)
+			goto out_qunlock;
+	}
+
+	rblocks = RES_DINODE + ind_blocks;
+	if (gfs2_is_jdata(ip))
+		rblocks += data_blocks;
+	if (ind_blocks || data_blocks)
+		rblocks += RES_STATFS + RES_QUOTA;
+	if (inode == sdp->sd_rindex)
+		rblocks += 2 * RES_STATFS;
+	if (alloc_required)
+		rblocks += gfs2_rg_blocks(ip, data_blocks + ind_blocks);
+
+	ret = gfs2_trans_begin(sdp, rblocks, iomap->length >> inode->i_blkbits);
+	if (ret)
+		goto out_trans_fail;
+
+	if (gfs2_is_stuffed(ip)) {
+		ret = gfs2_unstuff_dinode(ip, NULL);
+		if (ret)
+			goto out_trans_end;
+		release_metapath(&mp);
+		ret = gfs2_iomap_get(inode, iomap->offset, iomap->length,
+				     flags, iomap, &mp);
+		if (ret)
+			goto out_trans_end;
+	}
+
+	if (iomap->type != IOMAP_MAPPED) {
+		ret = gfs2_iomap_alloc(inode, iomap, flags, &mp);
+		if (ret) {
+			gfs2_trans_end(sdp);
+			if (alloc_required)
+				gfs2_inplace_release(ip);
+			punch_hole(ip, iomap->offset, iomap->length);
+			goto out_qunlock;
+		}
+	}
+	release_metapath(&mp);
+	return 0;
+
+out_trans_end:
+	gfs2_trans_end(sdp);
+out_trans_fail:
+	if (alloc_required)
+		gfs2_inplace_release(ip);
+out_qunlock:
+	if (alloc_required)
+		gfs2_quota_unlock(ip);
+out_release:
+	release_metapath(&mp);
+out_unlock:
+	gfs2_write_unlock(inode);
+	return ret;
+}
+
 static int gfs2_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
 			    unsigned flags, struct iomap *iomap)
 {
@@ -804,10 +941,7 @@ static int gfs2_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
 
 	trace_gfs2_iomap_start(ip, pos, length, flags);
 	if (flags & IOMAP_WRITE) {
-		ret = gfs2_iomap_get(inode, pos, length, flags, iomap, &mp);
-		if (!ret && iomap->type == IOMAP_HOLE)
-			ret = gfs2_iomap_alloc(inode, iomap, flags, &mp);
-		release_metapath(&mp);
+		ret = gfs2_iomap_begin_write(inode, pos, length, flags, iomap);
 	} else {
 		ret = gfs2_iomap_get(inode, pos, length, flags, iomap, &mp);
 		release_metapath(&mp);
@@ -816,8 +950,58 @@ static int gfs2_iomap_begin(struct inode *inode, loff_t pos, loff_t length,
 	return ret;
 }
 
+static int gfs2_iomap_write_end(struct inode *inode, loff_t pos, unsigned len,
+				unsigned copied, struct page *page)
+{
+	struct gfs2_inode *ip = GFS2_I(inode);
+
+	if (gfs2_is_jdata(ip))
+		gfs2_page_add_databufs(ip, page, offset_in_page(pos), len);
+	return iomap_write_end(inode, pos, len, copied, page);
+}
+
+static int gfs2_iomap_end(struct inode *inode, loff_t pos, loff_t length,
+			  ssize_t written, unsigned flags, struct iomap *iomap)
+{
+	struct gfs2_inode *ip = GFS2_I(inode);
+	struct gfs2_sbd *sdp = GFS2_SB(inode);
+	struct gfs2_trans *tr = current->journal_info;
+
+	if (!(flags & IOMAP_WRITE))
+		return 0;
+
+	gfs2_ordered_add_inode(ip);
+
+	if (tr->tr_num_buf_new)
+		__mark_inode_dirty(inode, I_DIRTY_DATASYNC);
+
+	if (inode == sdp->sd_rindex) {
+		adjust_fs_space(inode);
+		sdp->sd_rindex_uptodate = 0;
+	}
+
+	gfs2_trans_end(sdp);
+	gfs2_inplace_release(ip);
+
+	if (length != written && (iomap->flags & IOMAP_F_NEW)) {
+		/* Deallocate blocks that were just allocated. */
+		pos += written;
+		length -= written;
+		truncate_pagecache_range(inode, pos, pos + length - 1);
+		punch_hole(ip, pos, length);
+	}
+
+	if (ip->i_qadata && ip->i_qadata->qa_qd_num)
+		gfs2_quota_unlock(ip);
+	gfs2_write_unlock(inode);
+	return 0;
+}
+
 const struct iomap_ops gfs2_iomap_ops = {
 	.iomap_begin = gfs2_iomap_begin,
+	.write_begin = iomap_write_begin,
+	.write_end = gfs2_iomap_write_end,
+	.iomap_end = gfs2_iomap_end,
 };
 
 /**

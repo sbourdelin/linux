@@ -26,6 +26,7 @@
 #include <linux/dlm.h>
 #include <linux/dlm_plock.h>
 #include <linux/delay.h>
+#include <linux/backing-dev.h>
 
 #include "gfs2.h"
 #include "incore.h"
@@ -688,6 +689,41 @@ static int gfs2_fsync(struct file *file, loff_t start, loff_t end,
 	return ret ? ret : ret1;
 }
 
+static ssize_t gfs2_file_buffered_write(struct kiocb *iocb, struct iov_iter *from)
+{
+	struct file *file = iocb->ki_filp;
+	struct inode *inode = file->f_mapping->host;
+	ssize_t ret;
+
+	inode_lock(inode);
+	ret = generic_write_checks(iocb, from);
+	if (ret <= 0)
+		goto out;
+
+	ret = file_remove_privs(file);
+	if (ret)
+		goto out;
+
+	ret = file_update_time(file);
+	if (ret)
+		goto out;
+
+	/* We can write back this queue in page reclaim */
+	current->backing_dev_info = inode_to_bdi(inode);
+
+	ret = iomap_file_buffered_write(iocb, from, &gfs2_iomap_ops);
+
+	current->backing_dev_info = NULL;
+
+out:
+	inode_unlock(inode);
+	if (likely(ret > 0)) {
+		/* Handle various SYNC-type writes */
+		ret = generic_write_sync(iocb, ret);
+	}
+	return ret;
+}
+
 /**
  * gfs2_file_write_iter - Perform a write to a file
  * @iocb: The io context
@@ -706,7 +742,7 @@ static ssize_t gfs2_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 {
 	struct file *file = iocb->ki_filp;
 	struct gfs2_inode *ip = GFS2_I(file_inode(file));
-	int ret;
+	ssize_t ret;
 
 	ret = gfs2_rsqa_alloc(ip);
 	if (ret)
@@ -723,7 +759,12 @@ static ssize_t gfs2_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 		gfs2_glock_dq_uninit(&gh);
 	}
 
-	return generic_file_write_iter(iocb, from);
+	if (iocb->ki_flags & IOCB_DIRECT)
+		return generic_file_write_iter(iocb, from);
+	ret = gfs2_file_buffered_write(iocb, from);
+	if (ret == -ENOTBLK)
+		ret = generic_file_write_iter(iocb, from);
+	return ret;
 }
 
 static int fallocate_chunk(struct inode *inode, loff_t offset, loff_t len,
