@@ -1736,7 +1736,8 @@ static int nvme_set_host_mem(struct nvme_dev *dev, u32 bits)
 	c.features.dword14	= cpu_to_le32(upper_32_bits(dma_addr));
 	c.features.dword15	= cpu_to_le32(dev->nr_host_mem_descs);
 
-	ret = nvme_submit_sync_cmd(dev->ctrl.admin_q, &c, NULL, 0);
+	ret = __nvme_submit_sync_cmd(dev->ctrl.admin_q, &c, NULL, NULL, 0, 0,
+			NVME_QID_ANY, 0, BLK_MQ_REQ_NOWAIT);
 	if (ret) {
 		dev_warn(dev->ctrl.device,
 			 "failed to set host mem (err %d, flags %#x).\n",
