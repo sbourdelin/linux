@@ -39,6 +39,7 @@
 #include <scsi/scsi_ioctl.h>
 #include <scsi/scsi_dh.h>
 #include <scsi/sg.h>
+#include <scsi/scsi_devinfo.h>
 
 #include "scsi_priv.h"
 #include "scsi_logging.h"
@@ -432,6 +433,84 @@ static void scsi_report_sense(struct scsi_device *sdev,
 	}
 }
 
+struct aborted_cmd_blist {
+	u8 asc;
+	u8 ascq;
+	int retval;
+	const char *vendor;
+	const char *model;
+	bool warned;
+};
+
+/**
+ * scsi_aborted_cmd_quirk - Handle special return codes for ABORTED COMMAND
+ * @sdev:	SCSI device that returned ABORTED COMMAND.
+ * @sshdr:	Sense data
+ *
+ * Return value:
+ *	SUCCESS or FAILED or NEEDS_RETRY or ADD_TO_MLQUEUE
+ *
+ * Notes:
+ *	This is only called for devices that have the blist flag
+ *      BLIST_ABORTED_CMD_QUIRK set.
+ */
+static int scsi_aborted_cmd_quirk(const struct scsi_device *sdev,
+				  const struct scsi_sense_hdr *sshdr)
+{
+	static struct aborted_cmd_blist blist[] = {
+		/*
+		 * 44/00: SYMMETRIX uses this code for a variety of internal
+		 * issues, all of which can be recovered by retry
+		 */
+		{ 0x44, 0x00, ADD_TO_MLQUEUE, "EMC", "SYMMETRIX", false },
+		/*
+		 * c1/01: This is used by ETERNUS to indicate the
+		 * command should be retried unconditionally
+		 */
+		{ 0xc1, 0x01, ADD_TO_MLQUEUE, "FUJITSU", "ETERNUS_DXM", false }
+	};
+	struct aborted_cmd_blist *found = NULL;
+	int ret = NEEDS_RETRY, i;
+
+	for (i = 0; i < sizeof(blist)/sizeof(struct aborted_cmd_blist); i++) {
+		if (sshdr->asc == blist[i].asc &&
+		    sshdr->ascq == blist[i].ascq) {
+			found = &blist[i];
+			ret = found->retval;
+			break;
+		}
+	}
+
+	if (found == NULL || found->warned)
+		return ret;
+
+	found->warned = true;
+
+	/*
+	 * When we encounter a known ASC/ASCQ combination, it may or may not
+	 * match the device for which this combination is known.
+	 * Warn only once for each known ASC/ASCQ combination.
+	 * We can't afford making a string comparison every time in the
+	 * SCSI command return path, and a wrong match here is expected to be
+	 * non-fatal.
+	 */
+	if (!strcmp(sdev->vendor, found->vendor) &&
+	    !strcmp(sdev->model, found->model)) {
+		SCSI_LOG_ERROR_RECOVERY(3,
+			sdev_printk(KERN_INFO, sdev,
+				    "special retcode %d for ABORTED COMMAND %02x/%02x on %s:%s (expected)",
+				    ret, sshdr->asc, sshdr->ascq,
+				    sdev->vendor, sdev->model));
+	} else {
+		SCSI_LOG_ERROR_RECOVERY(1,
+			sdev_printk(KERN_WARNING, sdev,
+				    "special retcode %d for ABORTED COMMAND %02x/%02x on %s:%s (UNEXPECTED, please inform linux-scsi@vger.kernel.org)",
+				    ret, sshdr->asc, sshdr->ascq,
+				    sdev->vendor, sdev->model));
+	}
+	return ret;
+}
+
 /**
  * scsi_check_sense - Examine scsi cmd sense
  * @scmd:	Cmd to have sense checked.
@@ -502,6 +581,9 @@ int scsi_check_sense(struct scsi_cmnd *scmd)
 	case ABORTED_COMMAND:
 		if (sshdr.asc == 0x10) /* DIF */
 			return SUCCESS;
+
+		if (sdev->sdev_bflags & BLIST_ABORTED_CMD_QUIRK)
+			return scsi_aborted_cmd_quirk(sdev, &sshdr);
 
 		return NEEDS_RETRY;
 	case NOT_READY:
