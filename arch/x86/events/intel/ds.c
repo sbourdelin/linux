@@ -1306,17 +1306,82 @@ get_next_pebs_record_by_bit(void *base, void *top, int bit)
 	return NULL;
 }
 
+/*
+ * Specific intel_pmu_save_and_restart() for auto-reload.
+ * It only be called from drain_pebs().
+ */
+static int intel_pmu_save_and_restart_reload(struct perf_event *event,
+					     int reload_times)
+{
+	struct hw_perf_event *hwc = &event->hw;
+	int shift = 64 - x86_pmu.cntval_bits;
+	u64 reload_val = hwc->sample_period;
+	u64 prev_raw_count, new_raw_count;
+	u64 delta;
+
+	WARN_ON((reload_times == 0) || (reload_val == 0));
+
+	/*
+	 * drain_pebs() only happens when the PMU is disabled.
+	 * It doesnot need to specially handle the previous event value.
+	 * The hwc->prev_count will be updated in x86_perf_event_set_period().
+	 */
+	prev_raw_count = local64_read(&hwc->prev_count);
+	rdpmcl(hwc->event_base_rdpmc, new_raw_count);
+
+	/*
+	 * Now we have the new raw value and have updated the prev
+	 * timestamp already. We can now calculate the elapsed delta
+	 * (event-)time and add that to the generic event.
+	 *
+	 * Careful, not all hw sign-extends above the physical width
+	 * of the count.
+	 *
+	 * There is a small gap between 'PEBS hardware is armed' and 'the NMI
+	 * is handled'. Because of the gap, the first record also needs to be
+	 * specially handled.
+	 * The formula to calculate the increments of event->count is as below.
+	 * The increments = the period for first record +
+	 *                  (reload_times - 1) * reload_val +
+	 *                  the gap
+	 * 'The period for first record' can be got from -prev_raw_count.
+	 *
+	 * 'The gap' = new_raw_count + reload_val. Because the start point of
+	 * counting is always -reload_val for auto-reload.
+	 *
+	 * The period_left needs to do the same adjustment by adding
+	 * reload_val.
+	 */
+	delta = (reload_val << shift) + (new_raw_count << shift) -
+		(prev_raw_count << shift);
+	delta >>= shift;
+
+	local64_add(reload_val * (reload_times - 1), &event->count);
+	local64_add(delta, &event->count);
+	local64_sub(delta, &hwc->period_left);
+
+	return x86_perf_event_set_period(event);
+}
+
 static void __intel_pmu_pebs_event(struct perf_event *event,
 				   struct pt_regs *iregs,
 				   void *base, void *top,
 				   int bit, int count)
 {
+	struct hw_perf_event *hwc = &event->hw;
 	struct perf_sample_data data;
 	struct pt_regs regs;
 	void *at = get_next_pebs_record_by_bit(base, top, bit);
 
-	if (!intel_pmu_save_and_restart(event) &&
-	    !(event->hw.flags & PERF_X86_EVENT_AUTO_RELOAD))
+	if (hwc->flags & PERF_X86_EVENT_AUTO_RELOAD) {
+		/*
+		 * Now, auto-reload is only enabled in fixed period mode.
+		 * The reload value is always hwc->sample_period.
+		 * May need to change it, if auto-reload is enabled in
+		 * freq mode later.
+		 */
+		intel_pmu_save_and_restart_reload(event, count);
+	} else if (!intel_pmu_save_and_restart(event))
 		return;
 
 	while (count > 1) {
