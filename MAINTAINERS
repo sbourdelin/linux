@@ -780,8 +780,8 @@ F:	drivers/net/ethernet/amd/xgbe/
 F:	arch/arm64/boot/dts/amd/amd-seattle-xgbe*.dtsi
 
 AMS (Apple Motion Sensor) DRIVER
-M:	Michael Hanselmann <linux-kernel@hansmi.ch>
-S:	Supported
+L:	linuxppc-dev@lists.ozlabs.org
+S:	Orphan
 F:	drivers/macintosh/ams/
 
 ANALOG DEVICES INC AD9389B DRIVER
