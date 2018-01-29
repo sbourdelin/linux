@@ -61,6 +61,8 @@ struct iomap {
 #define IOMAP_DIRECT		(1 << 4) /* direct I/O */
 #define IOMAP_NOWAIT		(1 << 5) /* Don't wait for writeback */
 
+struct page;
+
 struct iomap_ops {
 	/*
 	 * Return the existing mapping at pos, or reserve space starting at
@@ -71,6 +73,21 @@ struct iomap_ops {
 			unsigned flags, struct iomap *iomap);
 
 	/*
+	 * Begin writing to a page, similar to block_write_begin but in a
+	 * mapping returned by iomap_begin.  Usually initialized to
+	 * iomap_write_begin.
+	 */
+	int (*write_begin)(struct inode *inode, loff_t pos, unsigned len,
+			   unsigned flags, struct page **pagep,
+			   struct iomap *iomap);
+
+	/*
+	 * End writing to a page.  Usually initialized to iomap_write_end.
+	 */
+	int (*write_end)(struct inode *inode, loff_t pos, unsigned len,
+			 unsigned copied, struct page *page);
+
+	/*
 	 * Commit and/or unreserve space previous allocated using iomap_begin.
 	 * Written indicates the length of the successful write operation which
 	 * needs to be commited, while the rest needs to be unreserved.
@@ -79,6 +96,11 @@ struct iomap_ops {
 	int (*iomap_end)(struct inode *inode, loff_t pos, loff_t length,
 			ssize_t written, unsigned flags, struct iomap *iomap);
 };
+
+int iomap_write_begin(struct inode *inode, loff_t pos, unsigned len,
+		      unsigned flags, struct page **pagep, struct iomap *iomap);
+int iomap_write_end(struct inode *inode, loff_t pos, unsigned len,
+		    unsigned copied, struct page *page);
 
 ssize_t iomap_file_buffered_write(struct kiocb *iocb, struct iov_iter *from,
 		const struct iomap_ops *ops);

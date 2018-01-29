@@ -848,6 +848,8 @@ ext2_iomap_end(struct inode *inode, loff_t offset, loff_t length,
 
 const struct iomap_ops ext2_iomap_ops = {
 	.iomap_begin		= ext2_iomap_begin,
+	.write_begin		= iomap_write_begin,
+	.write_end		= iomap_write_end,
 	.iomap_end		= ext2_iomap_end,
 };
 #else

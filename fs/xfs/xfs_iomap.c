@@ -1181,6 +1181,8 @@ xfs_file_iomap_end(
 
 const struct iomap_ops xfs_iomap_ops = {
 	.iomap_begin		= xfs_file_iomap_begin,
+	.write_begin		= iomap_write_begin,
+	.write_end		= iomap_write_end,
 	.iomap_end		= xfs_file_iomap_end,
 };
 

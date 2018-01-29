@@ -3601,6 +3601,8 @@ orphan_del:
 
 const struct iomap_ops ext4_iomap_ops = {
 	.iomap_begin		= ext4_iomap_begin,
+	.write_begin		= iomap_write_begin,
+	.write_end		= iomap_write_end,
 	.iomap_end		= ext4_iomap_end,
 };
 
