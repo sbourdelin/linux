@@ -4066,38 +4066,57 @@ int snd_soc_dapm_link_dai_widgets(struct snd_soc_card *card)
 	return 0;
 }
 
+static void dapm_check_dai_valid_widget(struct snd_soc_card *card,
+					struct snd_soc_pcm_runtime *rtd,
+					struct snd_soc_dai *codec_dai,
+					struct snd_soc_dai *cpu_dai)
+{
+	struct snd_soc_dapm_widget *sink, *source;
+
+	/* connect BE DAI playback if widgets are valid */
+	if (codec_dai->playback_widget && cpu_dai->playback_widget) {
+		source = cpu_dai->playback_widget;
+		sink = codec_dai->playback_widget;
+		dev_err(rtd->dev, "connected DAI link %s:%s -> %s:%s\n",
+				cpu_dai->component->name,
+				source->name,
+				codec_dai->component->name,
+				sink->name);
+
+		snd_soc_dapm_add_path(&card->dapm, source, sink,
+				NULL, NULL);
+	}
+
+	/* connect BE DAI capture if widgets are valid */
+	if (codec_dai->capture_widget && cpu_dai->capture_widget) {
+		source = codec_dai->capture_widget;
+		sink = cpu_dai->capture_widget;
+		dev_err(rtd->dev, "connected DAI link %s:%s -> %s:%s\n",
+				codec_dai->component->name,
+				source->name,
+				cpu_dai->component->name,
+				sink->name);
+
+		snd_soc_dapm_add_path(&card->dapm, source, sink,
+				NULL, NULL);
+	}
+
+}
+
 static void dapm_connect_dai_link_widgets(struct snd_soc_card *card,
 					  struct snd_soc_pcm_runtime *rtd)
 {
-	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
-	struct snd_soc_dapm_widget *sink, *source;
-	int i;
+	struct snd_soc_dai *cpu_dai;
+	int i, j;
 
 	for (i = 0; i < rtd->num_codecs; i++) {
 		struct snd_soc_dai *codec_dai = rtd->codec_dais[i];
 
-		/* connect BE DAI playback if widgets are valid */
-		if (codec_dai->playback_widget && cpu_dai->playback_widget) {
-			source = cpu_dai->playback_widget;
-			sink = codec_dai->playback_widget;
-			dev_dbg(rtd->dev, "connected DAI link %s:%s -> %s:%s\n",
-				cpu_dai->component->name, source->name,
-				codec_dai->component->name, sink->name);
+		for (j = 0; j < rtd->num_cpu_dai; j++) {
+			cpu_dai = rtd->cpu_dais[j];
 
-			snd_soc_dapm_add_path(&card->dapm, source, sink,
-				NULL, NULL);
-		}
-
-		/* connect BE DAI capture if widgets are valid */
-		if (codec_dai->capture_widget && cpu_dai->capture_widget) {
-			source = codec_dai->capture_widget;
-			sink = cpu_dai->capture_widget;
-			dev_dbg(rtd->dev, "connected DAI link %s:%s -> %s:%s\n",
-				codec_dai->component->name, source->name,
-				cpu_dai->component->name, sink->name);
-
-			snd_soc_dapm_add_path(&card->dapm, source, sink,
-				NULL, NULL);
+			dapm_check_dai_valid_widget(card, rtd,
+						codec_dai, cpu_dai);
 		}
 	}
 }
@@ -4164,7 +4183,9 @@ static void soc_dapm_stream_event(struct snd_soc_pcm_runtime *rtd, int stream,
 {
 	int i;
 
-	soc_dapm_dai_stream_event(rtd->cpu_dai, stream, event);
+	for (i = 0; i < rtd->num_cpu_dai; i++)
+		soc_dapm_dai_stream_event(rtd->cpu_dais[i], stream, event);
+
 	for (i = 0; i < rtd->num_codecs; i++)
 		soc_dapm_dai_stream_event(rtd->codec_dais[i], stream, event);
 
