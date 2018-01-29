@@ -28,8 +28,8 @@ static struct task_struct *
 pick_next_task_idle(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 {
 	put_prev_task(rq, prev);
-	update_idle_core(rq);
 	schedstat_inc(rq->sched_goidle);
+	smt_util(rq, 1, 0);
 	return rq->idle;
 }
 
@@ -49,6 +49,7 @@ dequeue_task_idle(struct rq *rq, struct task_struct *p, int flags)
 static void put_prev_task_idle(struct rq *rq, struct task_struct *prev)
 {
 	rq_last_tick_reset(rq);
+	smt_util(rq, 0, 1);
 }
 
 static void task_tick_idle(struct rq *rq, struct task_struct *curr, int queued)

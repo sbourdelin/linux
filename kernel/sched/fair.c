@@ -6011,127 +6011,125 @@ static inline int find_idlest_cpu(struct sched_domain *sd, struct task_struct *p
 
 #ifdef CONFIG_SCHED_SMT
 
-static inline void set_idle_cores(int cpu, int val)
-{
-	struct sched_domain_shared *sds;
-
-	sds = rcu_dereference(per_cpu(sd_llc_shared, cpu));
-	if (sds)
-		WRITE_ONCE(sds->has_idle_cores, val);
-}
-
-static inline bool test_idle_cores(int cpu, bool def)
-{
-	struct sched_domain_shared *sds;
-
-	sds = rcu_dereference(per_cpu(sd_llc_shared, cpu));
-	if (sds)
-		return READ_ONCE(sds->has_idle_cores);
-
-	return def;
-}
-
 /*
- * Scans the local SMT mask to see if the entire core is idle, and records this
- * information in sd_llc_shared->has_idle_cores.
- *
- * Since SMT siblings share all cache levels, inspecting this limited remote
- * state should be fairly cheap.
+ * Find an idle cpu in the core starting search from random index.
  */
-void __update_idle_core(struct rq *rq)
+static int select_idle_smt(struct task_struct *p, struct sched_group *sg)
 {
-	int core = cpu_of(rq);
-	int cpu;
+	int i, rand_index, rand_cpu;
+	int this_cpu = smp_processor_id();
 
-	rcu_read_lock();
-	if (test_idle_cores(core, true))
-		goto unlock;
+	rand_index = CPU_PSEUDO_RANDOM(this_cpu) % sg->group_weight;
+	rand_cpu = sg->cp_array[rand_index];
 
-	for_each_cpu(cpu, cpu_smt_mask(core)) {
-		if (cpu == core)
+	for_each_cpu_wrap(i, sched_group_span(sg), rand_cpu) {
+		if (!cpumask_test_cpu(i, &p->cpus_allowed))
 			continue;
-
-		if (!idle_cpu(cpu))
-			goto unlock;
+		if (idle_cpu(i))
+			return i;
 	}
-
-	set_idle_cores(core, 1);
-unlock:
-	rcu_read_unlock();
-}
-
-/*
- * Scan the entire LLC domain for idle cores; this dynamically switches off if
- * there are no idle cores left in the system; tracked through
- * sd_llc->shared->has_idle_cores and enabled through update_idle_core() above.
- */
-static int select_idle_core(struct task_struct *p, struct sched_domain *sd, int target)
-{
-	struct cpumask *cpus = this_cpu_cpumask_var_ptr(select_idle_mask);
-	int core, cpu;
-
-	if (!static_branch_likely(&sched_smt_present))
-		return -1;
-
-	if (!test_idle_cores(target, false))
-		return -1;
-
-	cpumask_and(cpus, sched_domain_span(sd), &p->cpus_allowed);
-
-	for_each_cpu_wrap(core, cpus, target) {
-		bool idle = true;
-
-		for_each_cpu(cpu, cpu_smt_mask(core)) {
-			cpumask_clear_cpu(cpu, cpus);
-			if (!idle_cpu(cpu))
-				idle = false;
-		}
-
-		if (idle)
-			return core;
-	}
-
-	/*
-	 * Failed to find an idle core; stop looking for one.
-	 */
-	set_idle_cores(target, 0);
 
 	return -1;
 }
 
 /*
- * Scan the local SMT mask for idle CPUs.
+ * Compare the SMT utilization of the two groups and select the one which
+ * has more capacity left.
  */
-static int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int target)
+static int smt_should_migrate(struct sched_group *here,
+			      struct sched_group *there, int self_util)
 {
-	int cpu;
+	int this_cpu = smp_processor_id();
+	int here_util = here->utilization, there_util = there->utilization;
 
-	if (!static_branch_likely(&sched_smt_present))
-		return -1;
+	/* Discount self utilization if it belongs to here or there */
+	if (self_util > 0) {
+		if (cpumask_test_cpu(this_cpu, sched_group_span(here)))
+			here_util -= self_util;
+		else if (cpumask_test_cpu(this_cpu, sched_group_span(there)))
+			there_util -= self_util;
+	}
 
-	for_each_cpu(cpu, cpu_smt_mask(target)) {
-		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
-			continue;
-		if (idle_cpu(cpu))
+	/* Return true if other group has more capacity left */
+	return (there->group_weight - there_util >
+		here->group_weight - here_util);
+}
+
+/*
+ * SMT balancing works by comparing the target cpu group with a random group
+ * in llc domain. It calls smt_should_migrate to decide which group has more
+ * capacity left. The balancing starts top down fom sd_llc to SMT core level.
+ * Finally idle cpu search is only done in the core.
+ */
+static int smt_balance(struct task_struct *p, struct sched_domain *sd, int cpu)
+{
+	struct sched_group *sg, *src_sg, *start_sg, *tgt_sg;
+	struct cpumask *span;
+	int rand_idx, weight;
+	int cpu_orig = cpu;
+	int rand_cpu;
+	int this_cpu = smp_processor_id();
+	struct rq *this_rq = cpu_rq(this_cpu);
+	struct rq *rq = cpu_rq(cpu);
+	int self_util = 0;
+	int balanced = 0;
+
+	if (p == this_rq->curr)
+		self_util = rq->curr_util;
+
+	for_each_lower_domain(sd) {
+		if (sd->level == 0)
+			break;
+
+		/* Pick a random group that has cpus where the thread can run */
+		src_sg = sd->groups;
+		tgt_sg = NULL;
+		rand_idx = CPU_PSEUDO_RANDOM(this_cpu) % sd->sg_num;
+		start_sg = sd->sg_array[rand_idx];
+		sg = start_sg;
+		do {
+			span = sched_group_span(sg);
+			if (sg != src_sg &&
+			    cpumask_intersects(span, &p->cpus_allowed)) {
+				tgt_sg = sg;
+				break;
+			}
+			sg = sg->next;
+		} while (sg != start_sg);
+
+		/*
+		 * Compare the target group with random group and select the
+		 * one which has more SMT capacity left. Choose a random CPU in
+		 * the group to spread the load, then find the group's parent sd
+		 * so the group's sd is used on the next main loop iteration.
+		 */
+		if (tgt_sg && smt_should_migrate(src_sg, tgt_sg, self_util)) {
+			weight = tgt_sg->group_weight;
+			rand_idx = CPU_PSEUDO_RANDOM(this_cpu) % weight;
+			rand_cpu = tgt_sg->cp_array[rand_idx];
+			for_each_cpu_wrap(cpu, span, rand_cpu) {
+				if (cpumask_test_cpu(cpu, &p->cpus_allowed))
+					break;
+			}
+			for_each_domain(cpu, sd) {
+				if (weight < sd->span_weight)
+					break;
+			}
+			balanced = 1;
+		}
+	}
+
+	/* sd is now lowest level SMT core */
+	if (sd->parent && (balanced || !idle_cpu(cpu_orig))) {
+		cpu = select_idle_smt(p, sd->parent->groups);
+		if (cpu >= 0)
 			return cpu;
 	}
 
-	return -1;
+	return cpu_orig;
 }
 
 #else /* CONFIG_SCHED_SMT */
-
-static inline int select_idle_core(struct task_struct *p, struct sched_domain *sd, int target)
-{
-	return -1;
-}
-
-static inline int select_idle_smt(struct task_struct *p, struct sched_domain *sd, int target)
-{
-	return -1;
-}
-
-#endif /* CONFIG_SCHED_SMT */
 
 /*
  * Scan the LLC domain for idle CPUs; this is dynamically regulated by
@@ -6148,7 +6146,7 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 
 	this_sd = rcu_dereference(*this_cpu_ptr(&sd_llc));
 	if (!this_sd)
-		return -1;
+		return target;
 
 	/*
 	 * Due to large variance we need a large fuzz factor; hackbench in
@@ -6158,7 +6156,7 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	avg_cost = this_sd->avg_scan_cost + 1;
 
 	if (sched_feat(SIS_AVG_CPU) && avg_idle < avg_cost)
-		return -1;
+		return target;
 
 	if (sched_feat(SIS_PROP)) {
 		u64 span_avg = sd->span_weight * avg_idle;
@@ -6172,7 +6170,7 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 
 	for_each_cpu_wrap(cpu, sched_domain_span(sd), target) {
 		if (!--nr)
-			return -1;
+			return target;
 		if (!cpumask_test_cpu(cpu, &p->cpus_allowed))
 			continue;
 		if (idle_cpu(cpu))
@@ -6187,41 +6185,7 @@ static int select_idle_cpu(struct task_struct *p, struct sched_domain *sd, int t
 	return cpu;
 }
 
-/*
- * Try and locate an idle core/thread in the LLC cache domain.
- */
-static int select_idle_sibling(struct task_struct *p, int prev, int target)
-{
-	struct sched_domain *sd;
-	int i;
-
-	if (idle_cpu(target))
-		return target;
-
-	/*
-	 * If the previous cpu is cache affine and idle, don't be stupid.
-	 */
-	if (prev != target && cpus_share_cache(prev, target) && idle_cpu(prev))
-		return prev;
-
-	sd = rcu_dereference(per_cpu(sd_llc, target));
-	if (!sd)
-		return target;
-
-	i = select_idle_core(p, sd, target);
-	if ((unsigned)i < nr_cpumask_bits)
-		return i;
-
-	i = select_idle_cpu(p, sd, target);
-	if ((unsigned)i < nr_cpumask_bits)
-		return i;
-
-	i = select_idle_smt(p, sd, target);
-	if ((unsigned)i < nr_cpumask_bits)
-		return i;
-
-	return target;
-}
+#endif /* CONFIG_SCHED_SMT */
 
 /*
  * cpu_util returns the amount of capacity of a CPU that is used by CFS
@@ -6302,6 +6266,31 @@ static int wake_cap(struct task_struct *p, int cpu, int prev_cpu)
 	sync_entity_load_avg(&p->se);
 
 	return min_cap * 1024 < task_util(p) * capacity_margin;
+}
+
+static int select_idle_sibling(struct task_struct *p, int prev, int target)
+{
+	struct sched_domain *sd;
+
+	if (idle_cpu(target))
+		return target;
+
+	/*
+	 * If the previous cpu is cache affine and idle, don't be stupid.
+	 */
+	if (prev != target && cpus_share_cache(prev, target) && idle_cpu(prev))
+		return prev;
+
+	sd = rcu_dereference(per_cpu(sd_llc, target));
+	if (!sd)
+		return target;
+
+#ifdef CONFIG_SCHED_SMT
+	return smt_balance(p, sd, target);
+#else
+
+	return select_idle_cpu(p, sd, target);
+#endif
 }
 
 /*
