@@ -78,7 +78,7 @@ struct mms114_touch {
 	u8 width;
 	u8 strength;
 	u8 reserved[2];
-} __packed;
+};
 
 static void mms114_process_mt(struct mms114_data *data, struct mms114_touch *touch)
 {
