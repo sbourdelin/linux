@@ -207,14 +207,15 @@ static irqreturn_t mms114_interrupt(int irq, void *dev_id)
 	}
 	mutex_unlock(&input_dev->mutex);
 
-	packet_size = mms114_read_reg(data, MMS114_PACKET_SIZE);
+	packet_size = i2c_smbus_read_byte_data(data->client,
+					       MMS114_PACKET_SIZE);
 	if (packet_size <= 0)
 		goto out;
 
 	touch_size = packet_size / MMS114_PACKET_NUM;
 
-	error = __mms114_read_reg(data, MMS114_INFOMATION, packet_size,
-			(u8 *)touch);
+	error = i2c_smbus_read_i2c_block_data(data->client, MMS114_INFOMATION,
+					      packet_size, (u8 *)touch);
 	if (error < 0)
 		goto out;
 
@@ -254,7 +255,8 @@ static int mms114_get_version(struct mms114_data *data)
 
 	switch (data->type) {
 	case TYPE_MMS152:
-		error = __mms114_read_reg(data, MMS152_FW_REV, 3, buf);
+		error = i2c_smbus_read_i2c_block_data(data->client,
+						      MMS152_FW_REV, 3, buf);
 		if (error)
 			return error;
 
@@ -268,7 +270,8 @@ static int mms114_get_version(struct mms114_data *data)
 		break;
 
 	case TYPE_MMS114:
-		error = __mms114_read_reg(data, MMS114_TSP_REV, 6, buf);
+		error = i2c_smbus_read_i2c_block_data(data->client,
+						      MMS114_TSP_REV, 6, buf);
 		if (error)
 			return error;
 
@@ -300,30 +303,35 @@ static int mms114_setup_regs(struct mms114_data *data)
 
 	val = (props->max_x >> 8) & 0xf;
 	val |= ((props->max_y >> 8) & 0xf) << 4;
-	error = mms114_write_reg(data, MMS114_XY_RESOLUTION_H, val);
+	error = i2c_smbus_write_byte_data(data->client,
+					  MMS114_XY_RESOLUTION_H, val);
 	if (error < 0)
 		return error;
 
 	val = props->max_x & 0xff;
-	error = mms114_write_reg(data, MMS114_X_RESOLUTION, val);
+	error = i2c_smbus_write_byte_data(data->client,
+					  MMS114_X_RESOLUTION, val);
 	if (error < 0)
 		return error;
 
 	val = props->max_x & 0xff;
-	error = mms114_write_reg(data, MMS114_Y_RESOLUTION, val);
+	error = i2c_smbus_write_byte_data(data->client,
+					  MMS114_Y_RESOLUTION, val);
 	if (error < 0)
 		return error;
 
 	if (data->contact_threshold) {
-		error = mms114_write_reg(data, MMS114_CONTACT_THRESHOLD,
-				data->contact_threshold);
+		error = i2c_smbus_write_byte_data(data->client,
+						  MMS114_CONTACT_THRESHOLD,
+						  data->contact_threshold);
 		if (error < 0)
 			return error;
 	}
 
 	if (data->moving_threshold) {
-		error = mms114_write_reg(data, MMS114_MOVING_THRESHOLD,
-				data->moving_threshold);
+		error = i2c_smbus_write_byte_data(data->client,
+						  MMS114_MOVING_THRESHOLD,
+						  data->moving_threshold);
 		if (error < 0)
 			return error;
 	}
