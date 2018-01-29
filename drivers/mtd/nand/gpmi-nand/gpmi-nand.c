@@ -206,7 +206,7 @@ static int set_geometry_by_ecc_info(struct gpmi_nand_data *this)
 	unsigned int block_mark_bit_offset;
 
 	if (!(chip->ecc_strength_ds > 0 && chip->ecc_step_ds > 0))
-		return -EINVAL;
+		return -ENOTSUPP;
 
 	switch (chip->ecc_step_ds) {
 	case SZ_512:
@@ -423,11 +423,15 @@ static int legacy_set_geometry(struct gpmi_nand_data *this)
 
 int common_nfc_set_geometry(struct gpmi_nand_data *this)
 {
-	if ((of_property_read_bool(this->dev->of_node, "fsl,use-minimum-ecc"))
-				|| legacy_set_geometry(this))
-		return set_geometry_by_ecc_info(this);
+	int ret = -ENOTSUPP;
 
-	return 0;
+	if (of_property_read_bool(this->dev->of_node, "fsl,use-minimum-ecc"))
+		ret = set_geometry_by_ecc_info(this);
+
+	if (ret == -ENOTSUPP)
+		return legacy_set_geometry(this);
+
+	return ret;
 }
 
 struct dma_chan *get_dma_chan(struct gpmi_nand_data *this)
