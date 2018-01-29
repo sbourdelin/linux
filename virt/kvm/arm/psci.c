@@ -17,6 +17,7 @@
 
 #include <linux/preempt.h>
 #include <linux/kvm_host.h>
+#include <linux/uaccess.h>
 #include <linux/wait.h>
 
 #include <asm/cputype.h>
@@ -235,8 +236,19 @@ static void kvm_psci_system_reset(struct kvm_vcpu *vcpu)
 
 int kvm_psci_version(struct kvm_vcpu *vcpu)
 {
-	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features))
-		return KVM_ARM_PSCI_0_2;
+	/*
+	 * Our PSCI implementation stays the same across versions from
+	 * v0.2 onward, only adding the few mandatory functions (such
+	 * as FEATURES with 1.0) that are required by newer
+	 * revisions. It is thus safe to return the latest, unless
+	 * userspace has instructed us otherwise.
+	 */
+	if (test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features)) {
+		if (vcpu->kvm->arch.psci_version)
+			return vcpu->kvm->arch.psci_version;
+
+		return KVM_ARM_PSCI_LATEST;
+	}
 
 	return KVM_ARM_PSCI_0_1;
 }
@@ -407,4 +419,56 @@ int kvm_psci_call(struct kvm_vcpu *vcpu)
 	default:
 		return -EINVAL;
 	};
+}
+
+int kvm_arm_get_fw_num_regs(struct kvm_vcpu *vcpu)
+{
+	return 1;		/* PSCI version */
+}
+
+int kvm_arm_copy_fw_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+{
+	if (put_user(KVM_REG_ARM_PSCI_VERSION, uindices))
+		return -EFAULT;
+
+	return 0;
+}
+
+int kvm_arm_get_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+{
+	if (reg->id == KVM_REG_ARM_PSCI_VERSION) {
+		void __user *uaddr = (void __user *)(long)reg->addr;
+		u64 val;
+
+		val = kvm_psci_version(vcpu, vcpu->kvm);
+		if (val == KVM_ARM_PSCI_0_1)
+			return -EINVAL;
+		if (copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
+
+		return 0;
+	}
+
+	return -EINVAL;
+}
+
+int kvm_arm_set_fw_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+{
+	if (reg->id == KVM_REG_ARM_PSCI_VERSION &&
+	    test_bit(KVM_ARM_VCPU_PSCI_0_2, vcpu->arch.features)) {
+		void __user *uaddr = (void __user *)(long)reg->addr;
+		u64 val;
+
+		if (copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id)))
+			return -EFAULT;
+
+		switch (val) {
+		case KVM_ARM_PSCI_0_2:
+		case KVM_ARM_PSCI_1_0:
+			vcpu->kvm->arch.psci_version = val;
+			return 0;
+		}
+	}
+
+	return -EINVAL;
 }
