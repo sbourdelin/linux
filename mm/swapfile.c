@@ -98,6 +98,21 @@ static atomic_t proc_poll_event = ATOMIC_INIT(0);
 
 atomic_t nr_rotate_swap = ATOMIC_INIT(0);
 
+/*
+ * expose this value for others use
+ */
+long get_total_swap_pages(void)
+{
+	long ret;
+
+	spin_lock(&swap_lock);
+	ret = total_swap_pages;
+	spin_unlock(&swap_lock);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(get_total_swap_pages);
+
 static inline unsigned char swap_count(unsigned char ent)
 {
 	return ent & ~SWAP_HAS_CACHE;	/* may include SWAP_HAS_CONT flag */

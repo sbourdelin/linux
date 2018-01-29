@@ -484,6 +484,7 @@ extern int try_to_free_swap(struct page *);
 struct backing_dev_info;
 extern int init_swap_address_space(unsigned int type, unsigned long nr_pages);
 extern void exit_swap_address_space(unsigned int type);
+extern long get_total_swap_pages(void);
 
 #else /* CONFIG_SWAP */
 
@@ -514,6 +515,11 @@ static inline struct swap_info_struct *swp_swap_info(swp_entry_t entry)
 
 static inline void show_swap_cache_info(void)
 {
+}
+
+long get_total_swap_pages(void)
+{
+	return 0;
 }
 
 #define free_swap_and_cache(e) ({(is_migration_entry(e) || is_device_private_entry(e));})
