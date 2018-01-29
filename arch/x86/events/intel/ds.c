@@ -1306,6 +1306,22 @@ get_next_pebs_record_by_bit(void *base, void *top, int bit)
 	return NULL;
 }
 
+int intel_pmu_large_pebs_read(struct perf_event *event)
+{
+	struct cpu_hw_events *cpuc = this_cpu_ptr(&cpu_hw_events);
+
+	/* Check if the event has large pebs */
+	if (!pebs_needs_sched_cb(cpuc))
+		return 0;
+
+	perf_pmu_disable(event->pmu);
+	intel_pmu_drain_pebs_buffer();
+	x86_perf_event_update(event);
+	perf_pmu_enable(event->pmu);
+
+	return 1;
+}
+
 /*
  * Specific intel_pmu_save_and_restart() for auto-reload.
  * It only be called from drain_pebs().
