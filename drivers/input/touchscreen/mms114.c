@@ -28,7 +28,7 @@
 
 /* Read only registers */
 #define MMS114_PACKET_SIZE		0x0f
-#define MMS114_INFOMATION		0x10
+#define MMS114_INFORMATION		0x10
 #define MMS114_TSP_REV			0xf0
 
 #define MMS152_FW_REV			0xe1
@@ -138,7 +138,7 @@ static irqreturn_t mms114_interrupt(int irq, void *dev_id)
 
 	touch_size = packet_size / MMS114_PACKET_NUM;
 
-	error = i2c_smbus_read_i2c_block_data(data->client, MMS114_INFOMATION,
+	error = i2c_smbus_read_i2c_block_data(data->client, MMS114_INFORMATION,
 					      packet_size, (u8 *)touch);
 	if (error < 0)
 		goto out;
