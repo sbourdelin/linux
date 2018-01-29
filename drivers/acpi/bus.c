@@ -88,6 +88,45 @@ static const struct dmi_system_id dsdt_dmi_table[] __initconst = {
 };
 #endif
 
+#ifdef CONFIG_X86
+static int set_gbl_term_list(const struct dmi_system_id *id)
+{
+	pr_notice("%s detected - parse the entire table as a term_list\n",
+		  id->ident);
+	acpi_gbl_parse_table_as_term_list = 1;
+	return 0;
+}
+
+static const struct dmi_system_id gbl_term_list_dmi_table[] __initconst = {
+	/*
+	 * Touchpad on Dell XPS 9570/Precision M5530 doesn't work under I2C
+	 * mode.
+	 * https://bugzilla.kernel.org/show_bug.cgi?id=198515
+	 */
+	{
+		.callback = set_gbl_term_list,
+		.ident = "Dell Precision M5530",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Precision M5530"),
+		},
+	},
+	{
+		.callback = set_gbl_term_list,
+		.ident = "Dell XPS 15 9570",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "XPS 15 9570"),
+		},
+	},
+	{}
+};
+#else
+static const struct dmi_system_id gbl_term_list_dmi_table[] __initconst = {
+	{}
+};
+#endif
+
 /* --------------------------------------------------------------------------
                                 Device Management
    -------------------------------------------------------------------------- */
@@ -1006,6 +1045,8 @@ void __init acpi_early_init(void)
 	 * DSDT will be copied to memory
 	 */
 	dmi_check_system(dsdt_dmi_table);
+
+	dmi_check_system(gbl_term_list_dmi_table);
 
 	status = acpi_reallocate_root_table();
 	if (ACPI_FAILURE(status)) {
