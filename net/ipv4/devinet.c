@@ -1049,18 +1049,22 @@ int devinet_ioctl(struct net *net, unsigned int cmd, struct ifreq *ifr)
 	switch (cmd) {
 	case SIOCGIFADDR:	/* Get interface address */
 		sin->sin_addr.s_addr = ifa->ifa_local;
+		ret = 0;
 		break;
 
 	case SIOCGIFBRDADDR:	/* Get the broadcast address */
 		sin->sin_addr.s_addr = ifa->ifa_broadcast;
+		ret = 0;
 		break;
 
 	case SIOCGIFDSTADDR:	/* Get the destination address */
 		sin->sin_addr.s_addr = ifa->ifa_address;
+		ret = 0;
 		break;
 
 	case SIOCGIFNETMASK:	/* Get the netmask for the interface */
 		sin->sin_addr.s_addr = ifa->ifa_mask;
+		ret = 0;
 		break;
 
 	case SIOCSIFFLAGS:
