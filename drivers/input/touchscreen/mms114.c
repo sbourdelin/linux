@@ -37,9 +37,6 @@
 #define MMS152_FW_REV			0xE1
 #define MMS152_COMPAT_GROUP		0xF2
 
-/* Minimum delay time is 50us between stop and start signal of i2c */
-#define MMS114_I2C_DELAY		50
-
 /* 200ms needs after power on */
 #define MMS114_POWERON_DELAY		200
 
@@ -82,76 +79,6 @@ struct mms114_touch {
 	u8 strength;
 	u8 reserved[2];
 } __packed;
-
-static int __mms114_read_reg(struct mms114_data *data, unsigned int reg,
-			     unsigned int len, u8 *val)
-{
-	struct i2c_client *client = data->client;
-	struct i2c_msg xfer[2];
-	u8 buf = reg & 0xff;
-	int error;
-
-	if (reg <= MMS114_MODE_CONTROL && reg + len > MMS114_MODE_CONTROL)
-		BUG();
-
-	/* Write register: use repeated start */
-	xfer[0].addr = client->addr;
-	xfer[0].flags = I2C_M_TEN | I2C_M_NOSTART;
-	xfer[0].len = 1;
-	xfer[0].buf = &buf;
-
-	/* Read data */
-	xfer[1].addr = client->addr;
-	xfer[1].flags = I2C_M_RD;
-	xfer[1].len = len;
-	xfer[1].buf = val;
-
-	error = i2c_transfer(client->adapter, xfer, 2);
-	if (error != 2) {
-		dev_err(&client->dev,
-			"%s: i2c transfer failed (%d)\n", __func__, error);
-		return error < 0 ? error : -EIO;
-	}
-	udelay(MMS114_I2C_DELAY);
-
-	return 0;
-}
-
-static int mms114_read_reg(struct mms114_data *data, unsigned int reg)
-{
-	u8 val;
-	int error;
-
-	if (reg == MMS114_MODE_CONTROL)
-		return data->cache_mode_control;
-
-	error = __mms114_read_reg(data, reg, 1, &val);
-	return error < 0 ? error : val;
-}
-
-static int mms114_write_reg(struct mms114_data *data, unsigned int reg,
-			    unsigned int val)
-{
-	struct i2c_client *client = data->client;
-	u8 buf[2];
-	int error;
-
-	buf[0] = reg & 0xff;
-	buf[1] = val & 0xff;
-
-	error = i2c_master_send(client, buf, 2);
-	if (error != 2) {
-		dev_err(&client->dev,
-			"%s: i2c send failed (%d)\n", __func__, error);
-		return error < 0 ? error : -EIO;
-	}
-	udelay(MMS114_I2C_DELAY);
-
-	if (reg == MMS114_MODE_CONTROL)
-		data->cache_mode_control = val;
-
-	return 0;
-}
 
 static void mms114_process_mt(struct mms114_data *data, struct mms114_touch *touch)
 {
@@ -231,19 +158,25 @@ out:
 
 static int mms114_set_active(struct mms114_data *data, bool active)
 {
-	int val;
+	int val, err;
 
-	val = mms114_read_reg(data, MMS114_MODE_CONTROL);
+	val = i2c_smbus_read_byte_data(data->client, MMS114_MODE_CONTROL);
 	if (val < 0)
 		return val;
 
-	val &= ~MMS114_OPERATION_MODE_MASK;
+	val = data->cache_mode_control &= ~MMS114_OPERATION_MODE_MASK;
 
 	/* If active is false, sleep mode */
 	if (active)
 		val |= MMS114_ACTIVE;
 
-	return mms114_write_reg(data, MMS114_MODE_CONTROL, val);
+	err = i2c_smbus_write_byte_data(data->client, MMS114_MODE_CONTROL, val);
+	if (err < 0)
+		return err;
+
+	data->cache_mode_control = val;
+
+	return 0;
 }
 
 static int mms114_get_version(struct mms114_data *data)
