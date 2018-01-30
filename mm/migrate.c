@@ -1354,6 +1354,9 @@ out:
  * or free list only if ret != 0.
  *
  * Returns the number of pages that were not migrated, or an error code.
+ *
+ * The caller must hold at least down_read(mmap_sem) for to-be-migrated pages
+ * to protect related page tables and VMAs from changing.
  */
 int migrate_pages(struct list_head *from, new_page_t get_new_page,
 		free_page_t put_new_page, unsigned long private,
@@ -1457,6 +1460,12 @@ static int store_status(int __user *status, int start, int value, int nr)
 	return 0;
 }
 
+/*
+ * Migrates the pages from pagelist and put back those not migrated.
+ *
+ * The caller must at least hold down_read(mmap_sem), which is required
+ * for migrate_pages()
+ */
 static int do_move_pages_to_node(struct mm_struct *mm,
 		struct list_head *pagelist, int node)
 {
@@ -1487,7 +1496,6 @@ static int add_page_for_migration(struct mm_struct *mm, unsigned long addr,
 	unsigned int follflags;
 	int err;
 
-	down_read(&mm->mmap_sem);
 	err = -EFAULT;
 	vma = find_vma(mm, addr);
 	if (!vma || addr < vma->vm_start || !vma_migratable(vma))
@@ -1540,7 +1548,6 @@ out_putpage:
 	 */
 	put_page(page);
 out:
-	up_read(&mm->mmap_sem);
 	return err;
 }
 
@@ -1561,6 +1568,7 @@ static int do_pages_move(struct mm_struct *mm, nodemask_t task_nodes,
 
 	migrate_prep();
 
+	down_read(&mm->mmap_sem);
 	for (i = start = 0; i < nr_pages; i++) {
 		const void __user *p;
 		unsigned long addr;
@@ -1628,6 +1636,7 @@ out_flush:
 	if (!err)
 		err = err1;
 out:
+	up_read(&mm->mmap_sem);
 	return err;
 }
 
