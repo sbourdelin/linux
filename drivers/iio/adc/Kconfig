@@ -686,6 +686,7 @@ config STM32_DFSDM_CORE
 config STM32_DFSDM_ADC
 	tristate "STMicroelectronics STM32 dfsdm adc"
 	depends on (ARCH_STM32 && OF) || COMPILE_TEST
+	depends on HAS_DMA
 	select STM32_DFSDM_CORE
 	select REGMAP_MMIO
 	select IIO_BUFFER_HW_CONSUMER
