@@ -33,6 +33,7 @@
 #include <linux/of_platform.h>
 #include <linux/percpu.h>
 #include <linux/slab.h>
+#include <linux/syscore_ops.h>
 
 #include <linux/irqchip.h>
 #include <linux/irqchip/arm-gic-v3.h>
@@ -46,6 +47,7 @@
 #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
 #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
 #define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
+#define ITS_FLAGS_SAVE_SUSPEND_STATE		(1ULL << 3)
 
 #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
 
@@ -83,6 +85,15 @@ struct its_baser {
 	u32		psz;
 };
 
+/*
+ * Saved ITS state - this is where saved state for the ITS is stored
+ * when it's disabled during system suspend.
+ */
+struct its_ctx {
+	u64			cbaser;
+	u32			ctlr;
+};
+
 struct its_device;
 
 /*
@@ -101,6 +112,7 @@ struct its_node {
 	struct its_collection	*collections;
 	struct fwnode_handle	*fwnode_handle;
 	u64			(*get_msi_base)(struct its_device *its_dev);
+	struct its_ctx		its_ctx;
 	struct list_head	its_device_list;
 	u64			flags;
 	unsigned long		list_nr;
@@ -3042,6 +3054,75 @@ static void its_enable_quirks(struct its_node *its)
 	gic_enable_quirks(iidr, its_quirks, its);
 }
 
+static int its_save_disable(void)
+{
+	struct its_node *its;
+	int err = 0;
+
+	spin_lock(&its_lock);
+	list_for_each_entry(its, &its_nodes, entry) {
+		if (its->flags & ITS_FLAGS_SAVE_SUSPEND_STATE) {
+			struct its_ctx *ctx = &its->its_ctx;
+			void __iomem *base = its->base;
+
+			ctx->ctlr = readl_relaxed(base + GITS_CTLR);
+			err = its_force_quiescent(base);
+			if (err) {
+				pr_err("ITS failed to quiesce\n");
+				writel_relaxed(ctx->ctlr, base + GITS_CTLR);
+				goto err;
+			}
+
+			ctx->cbaser = gits_read_cbaser(base + GITS_CBASER);
+		}
+	}
+
+err:
+	if (err) {
+		list_for_each_entry_continue_reverse(its, &its_nodes, entry) {
+			if (its->flags & ITS_FLAGS_SAVE_SUSPEND_STATE) {
+				struct its_ctx *ctx = &its->its_ctx;
+				void __iomem *base = its->base;
+
+				writel_relaxed(ctx->ctlr, base + GITS_CTLR);
+			}
+		}
+	}
+
+	spin_unlock(&its_lock);
+
+	return err;
+}
+
+static void its_restore_enable(void)
+{
+	struct its_node *its;
+
+	spin_lock(&its_lock);
+	list_for_each_entry(its, &its_nodes, entry) {
+		if (its->flags & ITS_FLAGS_SAVE_SUSPEND_STATE) {
+			struct its_ctx *ctx = &its->its_ctx;
+			void __iomem *base = its->base;
+			struct its_baser *baser;
+			int i;
+
+			gits_write_cbaser(ctx->cbaser, base + GITS_CBASER);
+			/* Restore GITS_BASER from the value cache. */
+			for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+				baser = &its->tables[i];
+				its_write_baser(its, baser, baser->val);
+			}
+			writel_relaxed(ctx->ctlr, base + GITS_CTLR);
+		}
+	}
+	spin_unlock(&its_lock);
+}
+
+static struct syscore_ops its_syscore_ops = {
+	.suspend = its_save_disable,
+	.resume = its_restore_enable,
+};
+
 static int its_init_domain(struct fwnode_handle *handle, struct its_node *its)
 {
 	struct irq_domain *inner_domain;
@@ -3260,6 +3341,9 @@ static int __init its_probe_one(struct resource *res,
 	if (its->is_v4)
 		ctlr |= GITS_CTLR_ImDe;
 	writel_relaxed(ctlr, its->base + GITS_CTLR);
+
+	if (fwnode_property_present(handle, "reset-on-suspend"))
+		its->flags |= ITS_FLAGS_SAVE_SUSPEND_STATE;
 
 	err = its_init_domain(handle, its);
 	if (err)
@@ -3514,6 +3598,8 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
 			pr_err("ITS: Disabling GICv4 support\n");
 		}
 	}
+
+	register_syscore_ops(&its_syscore_ops);
 
 	return 0;
 }
