@@ -515,8 +515,10 @@ void hwrng_unregister(struct hwrng *rng)
 	mutex_lock(&rng_mutex);
 
 	list_del(&rng->list);
-	if (current_rng == rng)
+	if (current_rng == rng) {
+		drop_current_rng();
 		enable_best_rng();
+	}
 
 	if (list_empty(&rng_list)) {
 		mutex_unlock(&rng_mutex);
