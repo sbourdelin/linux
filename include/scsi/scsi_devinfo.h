@@ -28,6 +28,12 @@
 #define BLIST_LARGELUN		((__force blist_flags_t)(1 << 9))
 /* override additional length field */
 #define BLIST_INQUIRY_36	((__force blist_flags_t)(1 << 10))
+/*
+ * Device uses special return codes for ABORTED COMMAND
+ * This flag must go together with matching status handling code in
+ * scsi_aborted_cmd_quirk()
+ */
+#define BLIST_ABORTED_CMD_QUIRK	((__force blist_flags_t)(1 << 11))
 /* do not do automatic start on add */
 #define BLIST_NOSTARTONADD	((__force blist_flags_t)(1 << 12))
 /* try REPORT_LUNS even for SCSI-2 devs (if HBA supports more than 8 LUNs) */
