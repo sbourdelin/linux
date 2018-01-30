@@ -6774,7 +6774,7 @@ ftrace_enable_sysctl(struct ctl_table *table, int write,
 
 	} else {
 		/* stopping ftrace calls (just send to ftrace_stub) */
-		ftrace_trace_function = ftrace_stub;
+		clear_ftrace_function();
 
 		ftrace_shutdown_sysctl();
 	}
