@@ -81,6 +81,10 @@ Optional:
 - reset-on-suspend: Boolean property. Indicates that the ITS state is
   reset on suspend. The state is then saved on suspend and restored on
   resume.
+- collections-reset-on-suspend : Boolean property. If the collections for the
+  ITS are stored internally instead of externally, the state will be lost if the
+  GIC loses power. Setting this enables the kernel to reset the collections
+  state on resume for this ITS node.
 
 The main GIC node must contain the appropriate #address-cells,
 #size-cells and ranges properties for the reg property of all ITS
