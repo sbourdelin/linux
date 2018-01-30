@@ -576,6 +576,16 @@ config HISILICON_ERRATUM_161600802
 
 	  If unsure, say Y.
 
+config ARM_GIC500_COLLECTIONS_RESET
+	bool "GIC-500 Collections: Workaround for GIC-500 Collections on suspend reset"
+	default y
+	help
+	  The GIC-500 can store Collections state internally for the ITS. If
+	  the ITS is reset on suspend (ie from power getting disabled), the
+	  collections need to be reconfigured on resume.
+
+	  If unsure, say Y.
+
 config QCOM_FALKOR_ERRATUM_E1041
 	bool "Falkor E1041: Speculative instruction fetches might cause errant memory access"
 	default y
