@@ -790,9 +790,7 @@ static SUNXI_CCU_M_WITH_MUX_GATE(gpu_sun4i_clk, "gpu", gpu_parents_sun4i,
 				 0x154, 0, 4, 24, 2, BIT(31),
 				 CLK_SET_RATE_PARENT);
 
-static const char *const gpu_parents_sun7i[] = { "pll-video0", "pll-ve",
-						 "pll-ddr-other", "pll-video1",
-						 "pll-gpu" };
+static const char *const gpu_parents_sun7i[] = { "pll-gpu" };
 static const u8 gpu_table_sun7i[] = { 0, 1, 2, 3, 4 };
 static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(gpu_sun7i_clk, "gpu",
 				       gpu_parents_sun7i, gpu_table_sun7i,
