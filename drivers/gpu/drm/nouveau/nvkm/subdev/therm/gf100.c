@@ -1,5 +1,5 @@
 /*
- * Copyright 2012 Red Hat Inc.
+ * Copyright 2018 Red Hat Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -19,43 +19,41 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * Authors: Ben Skeggs
+ * Authors: Lyude Paul
  */
+#include <core/device.h>
+
 #include "priv.h"
 
-#include <subdev/gpio.h>
-
-int
-gt215_therm_fan_sense(struct nvkm_therm *therm)
-{
-	struct nvkm_device *device = therm->subdev.device;
-	u32 tach = nvkm_rd32(device, 0x00e728) & 0x0000ffff;
-	u32 ctrl = nvkm_rd32(device, 0x00e720);
-	if (ctrl & 0x00000001)
-		return tach * 60 / 2;
-	return -ENODEV;
-}
-
+#define pack_for_each_init(init, pack, head)                          \
+	for (pack = head; pack && pack->init; pack++)                 \
+		  for (init = pack->init; init && init->count; init++)
 void
-gt215_therm_init(struct nvkm_therm *therm)
+gf100_clkgate_init(struct nvkm_therm *therm,
+		   const struct nvkm_therm_clkgate_pack *p)
 {
 	struct nvkm_device *device = therm->subdev.device;
-	struct dcb_gpio_func *tach = &therm->fan->tach;
+	const struct nvkm_therm_clkgate_pack *pack;
+	const struct nvkm_therm_clkgate_init *init;
+	u32 next, addr;
 
-	g84_sensor_setup(therm);
+	pack_for_each_init(init, pack, p) {
+		next = init->addr + init->count * 8;
+		addr = init->addr;
 
-	/* enable fan tach, count revolutions per-second */
-	nvkm_mask(device, 0x00e720, 0x00000003, 0x00000002);
-	if (tach->func != DCB_GPIO_UNUSED) {
-		nvkm_wr32(device, 0x00e724, device->crystal * 1000);
-		nvkm_mask(device, 0x00e720, 0x001f0000, tach->line << 16);
-		nvkm_mask(device, 0x00e720, 0x00000001, 0x00000001);
+		nvkm_trace(&therm->subdev, "{ 0x%06x, %d, 0x%08x }\n",
+			   init->addr, init->count, init->data);
+		while (addr < next) {
+			nvkm_trace(&therm->subdev, "\t0x%06x = 0x%08x\n",
+				   addr, init->data);
+			nvkm_wr32(device, addr, init->data);
+			addr += 8;
+		}
 	}
-	nvkm_mask(device, 0x00e720, 0x00000002, 0x00000000);
 }
 
 static const struct nvkm_therm_func
-gt215_therm = {
+gf100_therm_func = {
 	.init = gt215_therm_init,
 	.fini = g84_therm_fini,
 	.pwm_ctrl = nv50_fan_pwm_ctrl,
@@ -65,11 +63,13 @@ gt215_therm = {
 	.temp_get = g84_temp_get,
 	.fan_sense = gt215_therm_fan_sense,
 	.program_alarms = nvkm_therm_program_alarms_polling,
+	/* TODO: Fermi clockgating isn't understood fully yet, so we leave it
+	 * disabled here */
 };
 
 int
-gt215_therm_new(struct nvkm_device *device, int index,
-	       struct nvkm_therm **ptherm)
+gf100_therm_new(struct nvkm_device *device, int index,
+		struct nvkm_therm **ptherm)
 {
-	return nvkm_therm_new_(&gt215_therm, device, index, ptherm);
+	return nvkm_therm_new_(&gf100_therm_func, device, index, ptherm);
 }
