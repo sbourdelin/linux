@@ -1465,7 +1465,7 @@ static int do_move_pages_to_node(struct mm_struct *mm,
 	if (list_empty(pagelist))
 		return 0;
 
-	err = migrate_pages(pagelist, alloc_new_node_page, NULL, node,
+	err = migrate_pages(pagelist, new_page_alloc_syscall, NULL, node,
 			MIGRATE_SYNC, MR_SYSCALL);
 	if (err)
 		putback_movable_pages(pagelist);
@@ -1796,21 +1796,6 @@ static bool migrate_balanced_pgdat(struct pglist_data *pgdat,
 	return false;
 }
 
-static struct page *alloc_misplaced_dst_page(struct page *page,
-					   unsigned long data)
-{
-	int nid = (int) data;
-	struct page *newpage;
-
-	newpage = __alloc_pages_node(nid,
-					 (GFP_HIGHUSER_MOVABLE |
-					  __GFP_THISNODE | __GFP_NOMEMALLOC |
-					  __GFP_NORETRY | __GFP_NOWARN) &
-					 ~__GFP_RECLAIM, 0);
-
-	return newpage;
-}
-
 /*
  * page migration rate limiting control.
  * Do not migrate more than @pages_to_migrate in a @migrate_interval_millisecs
@@ -1929,7 +1914,7 @@ int migrate_misplaced_page(struct page *page, struct vm_area_struct *vma,
 		goto out;
 
 	list_add(&page->lru, &migratepages);
-	nr_remaining = migrate_pages(&migratepages, alloc_misplaced_dst_page,
+	nr_remaining = migrate_pages(&migratepages, new_page_alloc_misplaced,
 				     NULL, node, MIGRATE_ASYNC,
 				     MR_NUMA_MISPLACED);
 	if (nr_remaining) {

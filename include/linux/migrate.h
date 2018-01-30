@@ -3,6 +3,7 @@
 #define _LINUX_MIGRATE_H
 
 #include <linux/mm.h>
+#include <linux/rmap.h>
 #include <linux/mempolicy.h>
 #include <linux/migrate_mode.h>
 #include <linux/hugetlb.h>
@@ -30,6 +31,84 @@ enum migrate_reason {
 
 /* In mm/debug.c; also keep sync with include/trace/events/migrate.h */
 extern char *migrate_reason_names[MR_TYPES];
+
+#ifdef CONFIG_MIGRATION
+/*
+ * Allocate a new page for page migration based on vma policy.
+ * Start by assuming the page is mapped by the same vma as contains @start.
+ * Search forward from there, if not.  N.B., this assumes that the
+ * list of pages handed to migrate_pages()--which is how we get here--
+ * is in virtual address order.
+ */
+static inline struct page *new_page_alloc_mbind(struct page *page, unsigned long start)
+{
+	struct vm_area_struct *vma;
+	unsigned long uninitialized_var(address);
+
+	vma = find_vma(current->mm, start);
+	while (vma) {
+		address = page_address_in_vma(page, vma);
+		if (address != -EFAULT)
+			break;
+		vma = vma->vm_next;
+	}
+
+	if (PageHuge(page)) {
+		return alloc_huge_page_vma(page_hstate(compound_head(page)),
+				vma, address);
+	} else if (PageTransHuge(page)) {
+		struct page *thp;
+
+		thp = alloc_hugepage_vma(GFP_TRANSHUGE, vma, address,
+					 HPAGE_PMD_ORDER);
+		if (!thp)
+			return NULL;
+		prep_transhuge_page(thp);
+		return thp;
+	}
+	/*
+	 * if !vma, alloc_page_vma() will use task or system default policy
+	 */
+	return alloc_page_vma(GFP_HIGHUSER_MOVABLE | __GFP_RETRY_MAYFAIL,
+			vma, address);
+}
+
+/* page allocation callback for NUMA node migration */
+static inline struct page *new_page_alloc_syscall(struct page *page, unsigned long node)
+{
+	if (PageHuge(page))
+		return alloc_huge_page_node(page_hstate(compound_head(page)),
+					node);
+	else if (PageTransHuge(page)) {
+		struct page *thp;
+
+		thp = alloc_pages_node(node,
+			(GFP_TRANSHUGE | __GFP_THISNODE),
+			HPAGE_PMD_ORDER);
+		if (!thp)
+			return NULL;
+		prep_transhuge_page(thp);
+		return thp;
+	} else
+		return __alloc_pages_node(node, GFP_HIGHUSER_MOVABLE |
+						    __GFP_THISNODE, 0);
+}
+
+
+static inline struct page *new_page_alloc_misplaced(struct page *page,
+					   unsigned long data)
+{
+	int nid = (int) data;
+	struct page *newpage;
+
+	newpage = __alloc_pages_node(nid,
+					 (GFP_HIGHUSER_MOVABLE |
+					  __GFP_THISNODE | __GFP_NOMEMALLOC |
+					  __GFP_NORETRY | __GFP_NOWARN) &
+					 ~__GFP_RECLAIM, 0);
+
+	return newpage;
+}
 
 static inline struct page *new_page_nodemask(struct page *page,
 				int preferred_nid, nodemask_t *nodemask)
@@ -59,7 +138,34 @@ static inline struct page *new_page_nodemask(struct page *page,
 	return new_page;
 }
 
-#ifdef CONFIG_MIGRATION
+static inline struct page *new_page_alloc_failure(struct page *p, unsigned long private)
+{
+	int nid = page_to_nid(p);
+
+	return new_page_nodemask(p, nid, &node_states[N_MEMORY]);
+}
+
+/*
+ * Try to allocate from a different node but reuse this node if there
+ * are no other online nodes to be used (e.g. we are offlining a part
+ * of the only existing node).
+ */
+static inline struct page *new_page_alloc_hotplug(struct page *page, unsigned long private)
+{
+	int nid = page_to_nid(page);
+	nodemask_t nmask = node_states[N_MEMORY];
+
+	node_clear(nid, nmask);
+	if (nodes_empty(nmask))
+		node_set(nid, nmask);
+
+	return new_page_nodemask(page, nid, &nmask);
+}
+
+static inline struct page *new_page_alloc_contig(struct page *page, unsigned long private)
+{
+	return new_page_nodemask(page, numa_node_id(), &node_states[N_MEMORY]);
+}
 
 extern void putback_movable_pages(struct list_head *l);
 extern int migrate_page(struct address_space *mapping,
@@ -81,6 +187,10 @@ extern int migrate_page_move_mapping(struct address_space *mapping,
 		struct buffer_head *head, enum migrate_mode mode,
 		int extra_count);
 #else
+static inline struct page *new_page_alloc_mbind(struct page *page, unsigned long start)
+{
+	return NULL;
+}
 
 static inline void putback_movable_pages(struct list_head *l) {}
 static inline int migrate_pages(struct list_head *l, new_page_t new,

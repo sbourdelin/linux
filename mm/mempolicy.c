@@ -917,27 +917,6 @@ static void migrate_page_add(struct page *page, struct list_head *pagelist,
 	}
 }
 
-/* page allocation callback for NUMA node migration */
-struct page *alloc_new_node_page(struct page *page, unsigned long node)
-{
-	if (PageHuge(page))
-		return alloc_huge_page_node(page_hstate(compound_head(page)),
-					node);
-	else if (PageTransHuge(page)) {
-		struct page *thp;
-
-		thp = alloc_pages_node(node,
-			(GFP_TRANSHUGE | __GFP_THISNODE),
-			HPAGE_PMD_ORDER);
-		if (!thp)
-			return NULL;
-		prep_transhuge_page(thp);
-		return thp;
-	} else
-		return __alloc_pages_node(node, GFP_HIGHUSER_MOVABLE |
-						    __GFP_THISNODE, 0);
-}
-
 /*
  * Migrate pages from one node to a target node.
  * Returns error or the number of pages not migrated.
@@ -962,7 +941,7 @@ static int migrate_to_node(struct mm_struct *mm, int source, int dest,
 			flags | MPOL_MF_DISCONTIG_OK, &pagelist);
 
 	if (!list_empty(&pagelist)) {
-		err = migrate_pages(&pagelist, alloc_new_node_page, NULL, dest,
+		err = migrate_pages(&pagelist, new_page_alloc_syscall, NULL, dest,
 					MIGRATE_SYNC, MR_SYSCALL);
 		if (err)
 			putback_movable_pages(&pagelist);
@@ -1076,45 +1055,6 @@ int do_migrate_pages(struct mm_struct *mm, const nodemask_t *from,
 
 }
 
-/*
- * Allocate a new page for page migration based on vma policy.
- * Start by assuming the page is mapped by the same vma as contains @start.
- * Search forward from there, if not.  N.B., this assumes that the
- * list of pages handed to migrate_pages()--which is how we get here--
- * is in virtual address order.
- */
-static struct page *new_page(struct page *page, unsigned long start)
-{
-	struct vm_area_struct *vma;
-	unsigned long uninitialized_var(address);
-
-	vma = find_vma(current->mm, start);
-	while (vma) {
-		address = page_address_in_vma(page, vma);
-		if (address != -EFAULT)
-			break;
-		vma = vma->vm_next;
-	}
-
-	if (PageHuge(page)) {
-		return alloc_huge_page_vma(page_hstate(compound_head(page)),
-				vma, address);
-	} else if (PageTransHuge(page)) {
-		struct page *thp;
-
-		thp = alloc_hugepage_vma(GFP_TRANSHUGE, vma, address,
-					 HPAGE_PMD_ORDER);
-		if (!thp)
-			return NULL;
-		prep_transhuge_page(thp);
-		return thp;
-	}
-	/*
-	 * if !vma, alloc_page_vma() will use task or system default policy
-	 */
-	return alloc_page_vma(GFP_HIGHUSER_MOVABLE | __GFP_RETRY_MAYFAIL,
-			vma, address);
-}
 #else
 
 static void migrate_page_add(struct page *page, struct list_head *pagelist,
@@ -1126,11 +1066,6 @@ int do_migrate_pages(struct mm_struct *mm, const nodemask_t *from,
 		     const nodemask_t *to, int flags)
 {
 	return -ENOSYS;
-}
-
-static struct page *new_page(struct page *page, unsigned long start)
-{
-	return NULL;
 }
 #endif
 
@@ -1213,7 +1148,7 @@ static long do_mbind(unsigned long start, unsigned long len,
 
 		if (!list_empty(&pagelist)) {
 			WARN_ON_ONCE(flags & MPOL_MF_LAZY);
-			nr_failed = migrate_pages(&pagelist, new_page, NULL,
+			nr_failed = migrate_pages(&pagelist, new_page_alloc_mbind, NULL,
 				start, MIGRATE_SYNC, MR_MEMPOLICY_MBIND);
 			if (nr_failed)
 				putback_movable_pages(&pagelist);
