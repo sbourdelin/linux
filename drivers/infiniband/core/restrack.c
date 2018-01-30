@@ -3,6 +3,7 @@
  * Copyright (c) 2017-2018 Mellanox Technologies. All rights reserved.
  */
 
+#include <rdma/rdma_cm.h>
 #include <rdma/ib_verbs.h>
 #include <rdma/restrack.h>
 #include <linux/mutex.h>
@@ -67,6 +68,7 @@ static struct ib_device *res_to_dev(struct rdma_restrack_entry *res)
 	struct ib_pd *pd;
 	struct ib_cq *cq;
 	struct ib_qp *qp;
+	struct rdma_cm_id *cm_id;
 
 	switch (type) {
 	case RDMA_RESTRACK_PD:
@@ -85,12 +87,37 @@ static struct ib_device *res_to_dev(struct rdma_restrack_entry *res)
 		xrcd = container_of(res, struct ib_xrcd, res);
 		dev = xrcd->device;
 		break;
+	case RDMA_RESTRACK_CM_ID:
+		cm_id = container_of(res, struct rdma_cm_id, res);
+		dev = cm_id->device;
+		break;
 	default:
 		WARN_ONCE(true, "Wrong resource tracking type %u\n", type);
 		return NULL;
 	}
 
 	return dev;
+}
+
+static bool res_is_user(struct rdma_restrack_entry *res)
+{
+	enum rdma_restrack_type type = res->type;
+	bool is_user;
+
+	switch (type) {
+	case RDMA_RESTRACK_CM_ID: {
+		struct rdma_cm_id *cm_id;
+
+		cm_id = container_of(res, struct rdma_cm_id, res);
+		is_user = !cm_id->caller;
+		break;
+	}
+	default:
+		is_user = !uaccess_kernel();
+		break;
+	}
+
+	return is_user;
 }
 
 void rdma_restrack_add(struct rdma_restrack_entry *res)
@@ -100,7 +127,7 @@ void rdma_restrack_add(struct rdma_restrack_entry *res)
 	if (!dev)
 		return;
 
-	if (!uaccess_kernel()) {
+	if (res_is_user(res)) {
 		get_task_struct(current);
 		res->task = current;
 		res->kern_name = NULL;
