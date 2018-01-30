@@ -76,7 +76,7 @@ struct gen_pool_chunk {
 	phys_addr_t phys_addr;		/* physical starting address of memory chunk */
 	unsigned long start_addr;	/* start address of memory chunk */
 	unsigned long end_addr;		/* end address of memory chunk (inclusive) */
-	unsigned long bits[0];		/* bitmap for allocating memory chunk */
+	unsigned long entries[0];	/* bitmap for allocating memory chunk */
 };
 
 /*
