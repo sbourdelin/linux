@@ -542,7 +542,7 @@ void gen_pool_flush_chunk(struct gen_pool *pool,
 	memset(chunk->entries, 0,
 	       DIV_ROUND_UP(size >> pool->min_alloc_order * BITS_PER_ENTRY,
 			    BITS_PER_BYTE));
-	atomic_set(&chunk->avail, size);
+	atomic_long_set(&chunk->avail, size);
 }
 
 

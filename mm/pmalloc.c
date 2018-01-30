@@ -25,6 +25,8 @@
 #include <asm/cacheflush.h>
 #include <asm/page.h>
 
+#include "pmalloc-selftest.h"
+
 /**
  * pmalloc_data contains the data specific to a pmalloc pool,
  * in a format compatible with the design of gen_alloc.
@@ -152,7 +154,7 @@ static void pmalloc_disconnect(struct pmalloc_data *data,
 do { \
 	sysfs_attr_init(&data->attr_##attr_name.attr); \
 	data->attr_##attr_name.attr.name = #attr_name; \
-	data->attr_##attr_name.attr.mode = VERIFY_OCTAL_PERMISSIONS(0444); \
+	data->attr_##attr_name.attr.mode = VERIFY_OCTAL_PERMISSIONS(0400); \
 	data->attr_##attr_name.show = pmalloc_pool_show_##attr_name; \
 } while (0)
 
@@ -335,7 +337,7 @@ bool pmalloc_prealloc(struct gen_pool *pool, size_t size)
 
 	return true;
 abort:
-	vfree(chunk);
+	vfree_atomic(chunk);
 	return false;
 
 }
@@ -401,7 +403,7 @@ return_allocation:
 abort:
 	untag_chunk(chunk);
 free:
-	vfree(chunk);
+	vfree_atomic(chunk);
 	return NULL;
 }
 
@@ -508,6 +510,7 @@ static int __init pmalloc_late_init(void)
 		}
 	}
 	mutex_unlock(&pmalloc_mutex);
+	pmalloc_selftest();
 	return 0;
 }
 late_initcall(pmalloc_late_init);
