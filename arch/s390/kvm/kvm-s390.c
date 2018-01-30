@@ -1504,6 +1504,39 @@ out:
 #define KVM_S390_CMMA_SIZE_MAX ((u32)KVM_S390_SKEYS_MAX)
 
 /*
+ * Similar to gfn_to_memslot, but returns the index of a memslot also when the
+ * address falls in a hole. In that case the index of one of the memslots
+ * bordering the hole is returned.
+ */
+static int gfn_to_memslot_approx(struct kvm *kvm, gfn_t gfn)
+{
+	struct kvm_memslots *slots = kvm_memslots(kvm);
+	int start = 0, end = slots->used_slots;
+	int slot = atomic_read(&slots->lru_slot);
+	struct kvm_memory_slot *memslots = slots->memslots;
+
+	if (gfn >= memslots[slot].base_gfn &&
+	    gfn < memslots[slot].base_gfn + memslots[slot].npages)
+		return slot;
+
+	while (start < end) {
+		slot = start + (end - start) / 2;
+
+		if (gfn >= memslots[slot].base_gfn)
+			end = slot;
+		else
+			start = slot + 1;
+	}
+
+	if (gfn >= memslots[start].base_gfn &&
+	    gfn < memslots[start].base_gfn + memslots[start].npages) {
+		atomic_set(&slots->lru_slot, start);
+	}
+
+	return start;
+}
+
+/*
  * This function searches for the next page with dirty CMMA attributes, and
  * saves the attributes in the buffer up to either the end of the buffer or
  * until a block of at least KVM_S390_MAX_BIT_DISTANCE clean bits is found;
