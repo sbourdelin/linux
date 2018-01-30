@@ -121,6 +121,9 @@ extern unsigned long gen_pool_alloc_algo(struct gen_pool *, size_t,
 extern void *gen_pool_dma_alloc(struct gen_pool *pool, size_t size,
 		dma_addr_t *dma);
 extern void gen_pool_free(struct gen_pool *, unsigned long, size_t);
+
+extern void gen_pool_flush_chunk(struct gen_pool *pool,
+				 struct gen_pool_chunk *chunk);
 extern void gen_pool_for_each_chunk(struct gen_pool *,
 	void (*)(struct gen_pool *, struct gen_pool_chunk *, void *), void *);
 extern size_t gen_pool_avail(struct gen_pool *);
