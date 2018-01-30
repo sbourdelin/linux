@@ -49,6 +49,7 @@ my @ignore = ();
 my $help = 0;
 my $configuration_file = ".checkpatch.conf";
 my $max_line_length = 80;
+my $max_changed_lines; # undef = no max
 my $ignore_perl_version = 0;
 my $minimum_perl_version = 5.10.0;
 my $min_conf_desc_length = 4;
@@ -92,6 +93,8 @@ Options:
   --ignore TYPE(,TYPE2...)   ignore various comma separated message types
   --show-types               show the specific message type in the output
   --max-line-length=n        set the maximum line length, if exceeded, warn
+  --max-changed-lines=n      set the maximum number of changed lines allowed,
+                             if exceeded, warn. (insertions + deletions)
   --min-conf-desc-length=n   set the min description length, if shorter, warn
   --root=PATH                PATH to the kernel tree root
   --no-summary               suppress the per-file summary
@@ -209,6 +212,7 @@ GetOptions(
 	'show-types!'	=> \$show_types,
 	'list-types!'	=> \$list_types,
 	'max-line-length=i' => \$max_line_length,
+	'max-changed-lines=i' => \$max_changed_lines,
 	'min-conf-desc-length=i' => \$min_conf_desc_length,
 	'root=s'	=> \$root,
 	'summary!'	=> \$summary,
@@ -2165,6 +2169,8 @@ sub process {
 	my $filename = shift;
 
 	my $linenr=0;
+	my $inserted_lines_total=0;
+	my $deleted_lines_total=0;
 	my $prevline="";
 	my $prevrawline="";
 	my $stashline="";
@@ -2232,6 +2238,14 @@ sub process {
 		$line = $rawline;
 
 		push(@fixed, $rawline) if ($fix);
+
+		if ($rawline=~/^\+/ && $rawline!~/^\+\+\+/) {
+			$inserted_lines_total++
+		}
+
+		if ($rawline=~/^-/ && $rawline!~/^---/) {
+			$deleted_lines_total++;
+		}
 
 		if ($rawline=~/^\+\+\+\s+(\S+)/) {
 			$setup_docs = 0;
@@ -2305,6 +2319,13 @@ sub process {
 	}
 
 	$prefix = '';
+
+	#print "inserted: $inserted_lines_total\n";
+	#print "deleted: $deleted_lines_total\n";
+	if (defined $max_changed_lines &&
+	    ($inserted_lines_total+$deleted_lines_total > $max_changed_lines)) {
+		WARN("MAX_CHANGED_LINES", "please split the change into smaller parts\n");
+	}
 
 	$realcnt = 0;
 	$linenr = 0;
