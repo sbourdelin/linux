@@ -832,7 +832,7 @@ void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
 		kvm->arch.kvm_ops->irq_bypass_del_producer(cons, prod);
 }
 
-#ifdef CONFIG_VSX
+#ifdef CONFIG_ALTIVEC
 static inline int kvmppc_get_vsr_dword_offset(int index)
 {
 	int offset;
@@ -848,7 +848,9 @@ static inline int kvmppc_get_vsr_dword_offset(int index)
 
 	return offset;
 }
+#endif /* CONFIG_ALTIVEC */
 
+#ifdef CONFIG_VSX
 static inline int kvmppc_get_vsr_word_offset(int index)
 {
 	int offset;
@@ -924,6 +926,31 @@ static inline void kvmppc_set_vsr_word(struct kvm_vcpu *vcpu,
 	}
 }
 #endif /* CONFIG_VSX */
+
+#ifdef CONFIG_ALTIVEC
+static inline void kvmppc_set_vmx_dword(struct kvm_vcpu *vcpu,
+		u64 gpr)
+{
+	int index = vcpu->arch.io_gpr & KVM_MMIO_REG_MASK;
+	u32 hi, lo;
+
+#ifdef __BIG_ENDIAN
+	hi = gpr >> 32;
+	lo = gpr & 0xffffffff;
+#else
+	lo = gpr >> 32;
+	hi = gpr & 0xffffffff;
+#endif
+
+	if (vcpu->arch.mmio_vmx_copy_nums == 1) {
+		VCPU_VSX_VR(vcpu, index).u[kvmppc_get_vsr_word_offset(2)] = lo;
+		VCPU_VSX_VR(vcpu, index).u[kvmppc_get_vsr_word_offset(3)] = hi;
+	} else if (vcpu->arch.mmio_vmx_copy_nums == 2) {
+		VCPU_VSX_VR(vcpu, index).u[kvmppc_get_vsr_word_offset(0)] = lo;
+		VCPU_VSX_VR(vcpu, index).u[kvmppc_get_vsr_word_offset(1)] = hi;
+	}
+}
+#endif /* CONFIG_ALTIVEC */
 
 #ifdef CONFIG_PPC_FPU
 static inline u64 sp_to_dp(u32 fprs)
@@ -1026,6 +1053,11 @@ static void kvmppc_complete_mmio_load(struct kvm_vcpu *vcpu,
 		else if (vcpu->arch.mmio_vsx_copy_type ==
 				KVMPPC_VSX_COPY_DWORD_LOAD_DUMP)
 			kvmppc_set_vsr_dword_dump(vcpu, gpr);
+		break;
+#endif
+#ifdef CONFIG_ALTIVEC
+	case KVM_MMIO_REG_VMX:
+		kvmppc_set_vmx_dword(vcpu, gpr);
 		break;
 #endif
 	default:
@@ -1307,6 +1339,113 @@ static int kvmppc_emulate_mmio_vsx_loadstore(struct kvm_vcpu *vcpu,
 }
 #endif /* CONFIG_VSX */
 
+#ifdef CONFIG_ALTIVEC
+/* handle quadword load access in two halves */
+int kvmppc_handle_load128_by2x64(struct kvm_run *run, struct kvm_vcpu *vcpu,
+		unsigned int rt, int is_default_endian)
+{
+	enum emulation_result emulated;
+
+	while (vcpu->arch.mmio_vmx_copy_nums) {
+		emulated = __kvmppc_handle_load(run, vcpu, rt, 8,
+				is_default_endian, 0);
+
+		if (emulated != EMULATE_DONE)
+			break;
+
+		vcpu->arch.paddr_accessed += run->mmio.len;
+		vcpu->arch.mmio_vmx_copy_nums--;
+	}
+
+	return emulated;
+}
+
+static inline int kvmppc_get_vmx_data(struct kvm_vcpu *vcpu, int rs, u64 *val)
+{
+	vector128 vrs = VCPU_VSX_VR(vcpu, rs);
+
+	if (vcpu->arch.mmio_vmx_copy_nums == 1) {
+#ifdef __BIG_ENDIAN
+		*val = vrs.u[kvmppc_get_vsr_word_offset(3)];
+		*val = (*val << 32) | vrs.u[kvmppc_get_vsr_word_offset(2)];
+#else
+		*val = vrs.u[kvmppc_get_vsr_word_offset(2)];
+		*val = (*val << 32) | vrs.u[kvmppc_get_vsr_word_offset(3)];
+#endif
+		return 0;
+	} else if (vcpu->arch.mmio_vmx_copy_nums == 2) {
+#ifdef __BIG_ENDIAN
+		*val = vrs.u[kvmppc_get_vsr_word_offset(1)];
+		*val = (*val << 32) | vrs.u[kvmppc_get_vsr_word_offset(0)];
+#else
+		*val = vrs.u[kvmppc_get_vsr_word_offset(0)];
+		*val = (*val << 32) | vrs.u[kvmppc_get_vsr_word_offset(1)];
+#endif
+		return 0;
+	}
+	return -1;
+}
+
+/* handle quadword store in two halves */
+int kvmppc_handle_store128_by2x64(struct kvm_run *run, struct kvm_vcpu *vcpu,
+		unsigned int rs, int is_default_endian)
+{
+	u64 val = 0;
+	enum emulation_result emulated = EMULATE_DONE;
+
+	vcpu->arch.io_gpr = rs;
+
+	while (vcpu->arch.mmio_vmx_copy_nums) {
+		if (kvmppc_get_vmx_data(vcpu, rs, &val) == -1)
+			return EMULATE_FAIL;
+
+		emulated = kvmppc_handle_store(run, vcpu, val, 8,
+				is_default_endian);
+		if (emulated != EMULATE_DONE)
+			break;
+
+		vcpu->arch.paddr_accessed += run->mmio.len;
+		vcpu->arch.mmio_vmx_copy_nums--;
+	}
+
+	return emulated;
+}
+
+static int kvmppc_emulate_mmio_vmx_loadstore(struct kvm_vcpu *vcpu,
+		struct kvm_run *run)
+{
+	enum emulation_result emulated = EMULATE_FAIL;
+	int r;
+
+	vcpu->arch.paddr_accessed += run->mmio.len;
+
+	if (!vcpu->mmio_is_write) {
+		emulated = kvmppc_handle_load128_by2x64(run, vcpu,
+				vcpu->arch.io_gpr, 1);
+	} else {
+		emulated = kvmppc_handle_store128_by2x64(run, vcpu,
+				vcpu->arch.io_gpr, 1);
+	}
+
+	switch (emulated) {
+	case EMULATE_DO_MMIO:
+		run->exit_reason = KVM_EXIT_MMIO;
+		r = RESUME_HOST;
+		break;
+	case EMULATE_FAIL:
+		pr_info("KVM: MMIO emulation failed (VMX repeat)\n");
+		run->exit_reason = KVM_EXIT_INTERNAL_ERROR;
+		run->internal.suberror = KVM_INTERNAL_ERROR_EMULATION;
+		r = RESUME_HOST;
+		break;
+	default:
+		r = RESUME_GUEST;
+		break;
+	}
+	return r;
+}
+#endif /* CONFIG_ALTIVEC */
+
 int kvm_vcpu_ioctl_get_one_reg(struct kvm_vcpu *vcpu, struct kvm_one_reg *reg)
 {
 	int r = 0;
@@ -1420,6 +1559,18 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 
 		if (vcpu->arch.mmio_vsx_copy_nums > 0) {
 			r = kvmppc_emulate_mmio_vsx_loadstore(vcpu, run);
+			if (r == RESUME_HOST) {
+				vcpu->mmio_needed = 1;
+				return r;
+			}
+		}
+#endif
+#ifdef CONFIG_ALTIVEC
+		if (vcpu->arch.mmio_vmx_copy_nums > 0)
+			vcpu->arch.mmio_vmx_copy_nums--;
+
+		if (vcpu->arch.mmio_vmx_copy_nums > 0) {
+			r = kvmppc_emulate_mmio_vmx_loadstore(vcpu, run);
 			if (r == RESUME_HOST) {
 				vcpu->mmio_needed = 1;
 				return r;
