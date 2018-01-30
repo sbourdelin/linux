@@ -55,6 +55,11 @@ bool kvm_mpx_supported(void)
 }
 EXPORT_SYMBOL_GPL(kvm_mpx_supported);
 
+bool perf_ext_supported(void)
+{
+	return boot_cpu_has(X86_FEATURE_PERFCTR_CORE);
+}
+
 u64 kvm_supported_xcr0(void)
 {
 	u64 xcr0 = KVM_SUPPORTED_XCR0 & host_xcr0;
@@ -323,6 +328,7 @@ static inline int __do_cpuid_ent(struct kvm_cpuid_entry2 *entry, u32 function,
 	unsigned f_invpcid = kvm_x86_ops->invpcid_supported() ? F(INVPCID) : 0;
 	unsigned f_mpx = kvm_mpx_supported() ? F(MPX) : 0;
 	unsigned f_xsaves = kvm_x86_ops->xsaves_supported() ? F(XSAVES) : 0;
+	unsigned f_perfext = perf_ext_supported() ? F(PERFCTR_CORE) : 0;
 
 	/* cpuid 1.edx */
 	const u32 kvm_cpuid_1_edx_x86_features =
@@ -361,7 +367,7 @@ static inline int __do_cpuid_ent(struct kvm_cpuid_entry2 *entry, u32 function,
 		F(LAHF_LM) | F(CMP_LEGACY) | 0 /*SVM*/ | 0 /* ExtApicSpace */ |
 		F(CR8_LEGACY) | F(ABM) | F(SSE4A) | F(MISALIGNSSE) |
 		F(3DNOWPREFETCH) | F(OSVW) | 0 /* IBS */ | F(XOP) |
-		0 /* SKINIT, WDT, LWP */ | F(FMA4) | F(TBM);
+		0 /* SKINIT, WDT, LWP */ | F(FMA4) | F(TBM) | f_perfext;
 
 	/* cpuid 0xC0000001.edx */
 	const u32 kvm_cpuid_C000_0001_edx_x86_features =
