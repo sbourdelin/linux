@@ -810,10 +810,18 @@ enum bpf_netdev_command {
 	BPF_OFFLOAD_DESTROY,
 	BPF_OFFLOAD_MAP_ALLOC,
 	BPF_OFFLOAD_MAP_FREE,
+	/* Registers callbacks with the driver that is used to support
+	 * AF_XDP sockets in zero copy mode.
+	 */
+	XDP_REGISTER_XSK,
+	/* Unregisters and AF_XDP socket in zero copy mode. */
+	XDP_UNREGISTER_XSK,
 };
 
 struct bpf_prog_offload_ops;
 struct netlink_ext_ack;
+struct xsk_tx_parms;
+struct xsk_rx_parms;
 
 struct netdev_bpf {
 	enum bpf_netdev_command command;
@@ -844,6 +852,15 @@ struct netdev_bpf {
 		struct {
 			struct bpf_offloaded_map *offmap;
 		};
+		/* XDP_REGISTER_XSK, XDP_UNREGISTER_XSK
+		 * All fields used for XDP_REGISTER_XSK.
+		 * queue_id the only field used for XDP_UNREGISTER_XSK.
+		 */
+		struct {
+			struct xsk_tx_parms *tx_parms;
+			struct xsk_rx_parms *rx_parms;
+			u32 queue_id;
+		} xsk;
 	};
 };
 
