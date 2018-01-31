@@ -277,10 +277,8 @@ static int hid_prox_probe(struct platform_device *pdev)
 
 	indio_dev->channels = kmemdup(prox_channels, sizeof(prox_channels),
 				      GFP_KERNEL);
-	if (!indio_dev->channels) {
-		dev_err(&pdev->dev, "failed to duplicate channels\n");
+	if (!indio_dev->channels)
 		return -ENOMEM;
-	}
 
 	ret = prox_parse_report(pdev, hsdev,
 				(struct iio_chan_spec *)indio_dev->channels,

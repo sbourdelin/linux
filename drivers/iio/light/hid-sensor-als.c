@@ -299,10 +299,8 @@ static int hid_als_probe(struct platform_device *pdev)
 
 	indio_dev->channels = kmemdup(als_channels,
 				      sizeof(als_channels), GFP_KERNEL);
-	if (!indio_dev->channels) {
-		dev_err(&pdev->dev, "failed to duplicate channels\n");
+	if (!indio_dev->channels)
 		return -ENOMEM;
-	}
 
 	ret = als_parse_report(pdev, hsdev,
 			       (struct iio_chan_spec *)indio_dev->channels,
