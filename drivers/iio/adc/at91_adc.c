@@ -912,7 +912,6 @@ static int at91_adc_probe_dt(struct at91_adc_state *st,
 					sizeof(struct at91_adc_trigger),
 					GFP_KERNEL);
 	if (!st->trigger_list) {
-		dev_err(&idev->dev, "Could not allocate trigger list memory.\n");
 		ret = -ENOMEM;
 		goto error_ret;
 	}

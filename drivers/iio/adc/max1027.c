@@ -425,10 +425,8 @@ static int max1027_probe(struct spi_device *spi)
 	st->buffer = devm_kmalloc(&indio_dev->dev,
 				  indio_dev->num_channels * 2,
 				  GFP_KERNEL);
-	if (st->buffer == NULL) {
-		dev_err(&indio_dev->dev, "Can't allocate buffer\n");
+	if (!st->buffer)
 		return -ENOMEM;
-	}
 
 	ret = iio_triggered_buffer_setup(indio_dev, &iio_pollfunc_store_time,
 					 &max1027_trigger_handler, NULL);
