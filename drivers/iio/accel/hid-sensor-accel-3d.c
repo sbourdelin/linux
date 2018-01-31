@@ -383,11 +383,9 @@ static int hid_accel_3d_probe(struct platform_device *pdev)
 		return ret;
 	}
 	indio_dev->channels = kmemdup(channel_spec, channel_size, GFP_KERNEL);
-
-	if (!indio_dev->channels) {
-		dev_err(&pdev->dev, "failed to duplicate channels\n");
+	if (!indio_dev->channels)
 		return -ENOMEM;
-	}
+
 	ret = accel_3d_parse_report(pdev, hsdev,
 				(struct iio_chan_spec *)indio_dev->channels,
 				hsdev->usage, accel_state);
