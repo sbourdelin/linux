@@ -1178,6 +1178,9 @@ struct dev_ifalias {
  * int (*ndo_xdp_xmit)(struct net_device *dev, struct xdp_buff *xdp);
  *	This function is used to submit a XDP packet for transmit on a
  *	netdevice.
+ * int	(*ndo_xdp_xmit_xsk)(struct net_device *dev, u32 queue_id);
+ *      This function is used to transmit a packet from an XDP socket
+ *      when a zero copy allocator is used.
  * void (*ndo_xdp_flush)(struct net_device *dev);
  *	This function is used to inform the driver to flush a particular
  *	xdp tx queue. Must be called on same CPU as xdp_xmit.
@@ -1367,6 +1370,8 @@ struct net_device_ops {
 					   struct netdev_bpf *bpf);
 	int			(*ndo_xdp_xmit)(struct net_device *dev,
 						struct xdp_buff *xdp);
+	int			(*ndo_xdp_xmit_xsk)(struct net_device *dev,
+						    u32 queue_id);
 	void			(*ndo_xdp_flush)(struct net_device *dev);
 };
 
