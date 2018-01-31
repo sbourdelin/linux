@@ -504,6 +504,7 @@ struct xdp_buff {
 	void *data_end;
 	void *data_meta;
 	void *data_hard_start;
+	unsigned long bp_handle;
 	struct xdp_rxq_info *rxq;
 };
 

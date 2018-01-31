@@ -37,6 +37,7 @@ struct xdp_rxq_info {
 	struct net_device *dev;
 	u32 queue_index;
 	u32 reg_state;
+	struct buff_pool *bpool;
 } ____cacheline_aligned; /* perf critical, avoid false-sharing */
 
 int xdp_rxq_info_reg(struct xdp_rxq_info *xdp_rxq,
