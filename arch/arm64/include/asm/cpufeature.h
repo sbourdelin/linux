@@ -142,7 +142,8 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *    capabilities and if there is a conflict, the kernel takes an action, based
  *    on the severity (e.g, a CPU could be prevented from booting or cause a
  *    kernel panic). The CPU is allowed to "affect" the state of the capability,
- *    if it has not been finalised already.
+ *    if it has not been finalised already. See section 5 for more details on
+ *    conflicts.
  *
  * 4) Action: As mentioned in (2), the kernel can take an action for each detected
  *    capability, on all CPUs on the system. This is always initiated only after
@@ -155,6 +156,32 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *	b) Any late CPU, brought up after (1), the action is triggered via:
  *		check_local_cpu_capabilities() -> verify_local_cpu_capabilities()
  *
+ * 5) Conflicts: Based on the state of the capability on a late CPU vs. the system
+ *    state, we could have the following combinations :
+ *
+ *		x-----------------------------x
+ *		| Type  | System   | Late CPU |
+ *		|-----------------------------|
+ *		|  a    |   y      |    n     |
+ *		|-----------------------------|
+ *		|  b    |   n      |    y     |
+ *		x-----------------------------x
+ *
+ *     Case (a) is not permitted for capabilities which are usually system
+ *     features, which the system expects all CPUs to have. While (a) is ignored
+ *     for capabilities which represents an erratum work around.
+ *
+ *     Case (b) is not permitted for erratum capabilities, which might require
+ *     some work arounds which cannot be applied really late. Meanwhile, most
+ *     of the features could safely ignore (b), as the system doesn't use it
+ *     anyway.
+ *
+ *     However, there are some exceptions to the assumptions and require each
+ *     capability to define how the conflict should be addressed. So we use two
+ *     separate flag bits to indicate whether the above cases should be treated
+ *     as conflicts:
+ *		ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU - Case(a) is safe
+ *		ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU - Case(b) is safe
  */
 
 
@@ -164,6 +191,26 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
 #define ARM64_CPUCAP_SCOPE_SYSTEM		((u16)BIT(1))
 #define SCOPE_SYSTEM				ARM64_CPUCAP_SCOPE_SYSTEM
 #define SCOPE_LOCAL_CPU				ARM64_CPUCAP_SCOPE_LOCAL_CPU
+
+/* Is it permitted for a late CPU to have this capability when system doesn't already have */
+#define ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU	((u16)BIT(4))
+/* Is it safe for a late CPU to miss this capability when system has it */
+#define ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	((u16)BIT(5))
+
+/*
+ * CPU errata detected at boot time based on feature of one or more CPUs.
+ * It is not safe for a late CPU to have this feature when the system doesn't
+ * have it. But it is safe to miss the feature if the system has it.
+ */
+#define ARM64_CPUCAP_LOCAL_CPU_ERRATUM		\
+	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU)
+/*
+ * CPU feature detected at boot time based on system-wide value of a feature.
+ * It is safe for a late CPU to have this feature even though the system doesn't
+ * have it already. But the CPU must have this feature if the system does.
+ */
+#define ARM64_CPUCAP_SYSTEM_FEATURE	\
+	(ARM64_CPUCAP_SCOPE_SYSTEM | ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
 
 struct arm64_cpu_capabilities {
 	const char *desc;
@@ -196,6 +243,18 @@ struct arm64_cpu_capabilities {
 static inline int cpucap_default_scope(const struct arm64_cpu_capabilities *cap)
 {
 	return cap->type & ARM64_CPUCAP_SCOPE_MASK;
+}
+
+static inline bool
+cpucap_late_cpu_optional(const struct arm64_cpu_capabilities *cap)
+{
+	return !!(cap->type & ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU);
+}
+
+static inline bool
+cpucap_late_cpu_permitted(const struct arm64_cpu_capabilities *cap)
+{
+	return !!(cap->type & ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU);
 }
 
 extern DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
