@@ -18,6 +18,7 @@
 #include <linux/pageblock-flags.h>
 #include <linux/page-flags-layout.h>
 #include <linux/atomic.h>
+#include <linux/mm_types.h>
 #include <asm/page.h>
 
 /* Free memory management - zoned buddy allocator.  */
@@ -232,8 +233,18 @@ struct zone_reclaim_stat {
 	unsigned long		recent_scanned[2];
 };
 
+#define lru_head(lru_list_head)	(&(lru_list_head)->pseudo_page.lru)
+
+struct lru_list_head {
+	struct page		pseudo_page;
+	unsigned		first_batch_npages;
+	unsigned		first_batch_tag;
+	unsigned		last_batch_npages;
+	unsigned		last_batch_tag;
+};
+
 struct lruvec {
-	struct list_head		lists[NR_LRU_LISTS];
+	struct lru_list_head		lists[NR_LRU_LISTS];
 	struct zone_reclaim_stat	reclaim_stat;
 	/* Evictions & activations on the inactive file list */
 	atomic_long_t			inactive_age;

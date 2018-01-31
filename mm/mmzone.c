@@ -92,8 +92,11 @@ void lruvec_init(struct lruvec *lruvec)
 
 	memset(lruvec, 0, sizeof(struct lruvec));
 
-	for_each_lru(lru)
-		INIT_LIST_HEAD(&lruvec->lists[lru]);
+	for_each_lru(lru) {
+		INIT_LIST_HEAD(lru_head(&lruvec->lists[lru]));
+		lruvec->lists[lru].pseudo_page.lru_sentinel = true;
+		lruvec->lists[lru].pseudo_page.lru_batch = NUM_LRU_BATCH_LOCKS;
+	}
 }
 
 #if defined(CONFIG_NUMA_BALANCING) && !defined(LAST_CPUPID_NOT_IN_PAGE_FLAGS)
