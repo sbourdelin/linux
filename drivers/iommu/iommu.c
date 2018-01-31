@@ -1562,12 +1562,12 @@ int iommu_map(struct iommu_domain *domain, unsigned long iova,
 }
 EXPORT_SYMBOL_GPL(iommu_map);
 
-static size_t __iommu_unmap(struct iommu_domain *domain,
-			    unsigned long iova, size_t size,
-			    bool sync)
+static ssize_t __iommu_unmap(struct iommu_domain *domain,
+			     unsigned long iova, size_t size,
+			     bool sync)
 {
 	const struct iommu_ops *ops = domain->ops;
-	size_t unmapped_page, unmapped = 0;
+	ssize_t unmapped_page, unmapped = 0;
 	unsigned long orig_iova = iova;
 	unsigned int min_pagesz;
 
@@ -1622,15 +1622,15 @@ static size_t __iommu_unmap(struct iommu_domain *domain,
 	return unmapped;
 }
 
-size_t iommu_unmap(struct iommu_domain *domain,
-		   unsigned long iova, size_t size)
+ssize_t iommu_unmap(struct iommu_domain *domain,
+		    unsigned long iova, size_t size)
 {
 	return __iommu_unmap(domain, iova, size, true);
 }
 EXPORT_SYMBOL_GPL(iommu_unmap);
 
-size_t iommu_unmap_fast(struct iommu_domain *domain,
-			unsigned long iova, size_t size)
+ssize_t iommu_unmap_fast(struct iommu_domain *domain,
+			 unsigned long iova, size_t size)
 {
 	return __iommu_unmap(domain, iova, size, false);
 }

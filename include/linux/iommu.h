@@ -199,8 +199,8 @@ struct iommu_ops {
 	void (*detach_dev)(struct iommu_domain *domain, struct device *dev);
 	int (*map)(struct iommu_domain *domain, unsigned long iova,
 		   phys_addr_t paddr, size_t size, int prot);
-	size_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
-		     size_t size);
+	ssize_t (*unmap)(struct iommu_domain *domain, unsigned long iova,
+			 size_t size);
 	size_t (*map_sg)(struct iommu_domain *domain, unsigned long iova,
 			 struct scatterlist *sg, unsigned int nents, int prot);
 	void (*flush_iotlb_all)(struct iommu_domain *domain);
@@ -299,10 +299,10 @@ extern void iommu_detach_device(struct iommu_domain *domain,
 extern struct iommu_domain *iommu_get_domain_for_dev(struct device *dev);
 extern int iommu_map(struct iommu_domain *domain, unsigned long iova,
 		     phys_addr_t paddr, size_t size, int prot);
-extern size_t iommu_unmap(struct iommu_domain *domain, unsigned long iova,
-			  size_t size);
-extern size_t iommu_unmap_fast(struct iommu_domain *domain,
-			       unsigned long iova, size_t size);
+extern ssize_t iommu_unmap(struct iommu_domain *domain, unsigned long iova,
+			   size_t size);
+extern ssize_t iommu_unmap_fast(struct iommu_domain *domain,
+				unsigned long iova, size_t size);
 extern size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long iova,
 				struct scatterlist *sg,unsigned int nents,
 				int prot);
@@ -465,14 +465,14 @@ static inline int iommu_map(struct iommu_domain *domain, unsigned long iova,
 	return -ENODEV;
 }
 
-static inline int iommu_unmap(struct iommu_domain *domain, unsigned long iova,
-			      size_t size)
+static inline ssize_t iommu_unmap(struct iommu_domain *domain,
+				  unsigned long iova, size_t size)
 {
 	return -ENODEV;
 }
 
-static inline int iommu_unmap_fast(struct iommu_domain *domain, unsigned long iova,
-				   int gfp_order)
+static inline ssize_t iommu_unmap_fast(struct iommu_domain *domain,
+				       unsigned long iova, int gfp_order)
 {
 	return -ENODEV;
 }

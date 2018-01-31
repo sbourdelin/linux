@@ -5067,8 +5067,8 @@ static int intel_iommu_map(struct iommu_domain *domain,
 	return ret;
 }
 
-static size_t intel_iommu_unmap(struct iommu_domain *domain,
-				unsigned long iova, size_t size)
+static ssize_t intel_iommu_unmap(struct iommu_domain *domain,
+				 unsigned long iova, size_t size)
 {
 	struct dmar_domain *dmar_domain = to_dmar_domain(domain);
 	struct page *freelist = NULL;

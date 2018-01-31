@@ -3042,11 +3042,11 @@ static int amd_iommu_map(struct iommu_domain *dom, unsigned long iova,
 	return ret;
 }
 
-static size_t amd_iommu_unmap(struct iommu_domain *dom, unsigned long iova,
-			   size_t page_size)
+static ssize_t amd_iommu_unmap(struct iommu_domain *dom, unsigned long iova,
+			       size_t page_size)
 {
 	struct protection_domain *domain = to_pdomain(dom);
-	size_t unmap_size;
+	ssize_t unmap_size;
 
 	if (domain->mode == PAGE_MODE_NONE)
 		return -EINVAL;
