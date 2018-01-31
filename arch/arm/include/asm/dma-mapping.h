@@ -114,7 +114,7 @@ static inline bool is_device_dma_coherent(struct device *dev)
  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
  * @size: required memory size
  * @handle: bus-specific DMA address
- * @attrs: optinal attributes that specific mapping properties
+ * @attrs: optional attributes that specific mapping properties
  *
  * Allocate some memory for a device for performing DMA.  This function
  * allocates pages, and will return the CPU-viewed address, and sets @handle
@@ -129,7 +129,7 @@ extern void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
  * @size: size of memory originally requested in dma_alloc_coherent
  * @cpu_addr: CPU-view address returned from dma_alloc_coherent
  * @handle: device-view address returned from dma_alloc_coherent
- * @attrs: optinal attributes that specific mapping properties
+ * @attrs: optional attributes that specific mapping properties
  *
  * Free (and unmap) a DMA buffer previously allocated by
  * arm_dma_alloc().
@@ -147,7 +147,7 @@ extern void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
  * @cpu_addr: kernel CPU-view address returned from dma_alloc_coherent
  * @handle: device-view address returned from dma_alloc_coherent
  * @size: size of memory originally requested in dma_alloc_coherent
- * @attrs: optinal attributes that specific mapping properties
+ * @attrs: optional attributes that specific mapping properties
  *
  * Map a coherent DMA buffer previously allocated by dma_alloc_coherent
  * into user space.  The coherent DMA buffer must not be freed by the
