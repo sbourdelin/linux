@@ -3007,6 +3007,13 @@ scsih_abort(struct scsi_cmnd *scmd)
 		goto out;
 	}
 
+	if (ioc->remove_host) {
+		scmd->result = DID_NO_CONNECT << 16;
+		scmd->scsi_done(scmd);
+		r = SUCCESS;
+		goto out;
+	}
+
 	/* search for the command */
 	smid = _scsih_scsi_lookup_find_by_scmd(ioc, scmd);
 	if (!smid) {
@@ -3063,6 +3070,13 @@ scsih_dev_reset(struct scsi_cmnd *scmd)
 	if (!sas_device_priv_data || !sas_device_priv_data->sas_target) {
 		sdev_printk(KERN_INFO, scmd->device,
 			"device been deleted! scmd(%p)\n", scmd);
+		scmd->result = DID_NO_CONNECT << 16;
+		scmd->scsi_done(scmd);
+		r = SUCCESS;
+		goto out;
+	}
+
+	if (ioc->remove_host) {
 		scmd->result = DID_NO_CONNECT << 16;
 		scmd->scsi_done(scmd);
 		r = SUCCESS;
@@ -3131,6 +3145,13 @@ scsih_target_reset(struct scsi_cmnd *scmd)
 		goto out;
 	}
 
+	if (ioc->remove_host) {
+		scmd->result = DID_NO_CONNECT << 16;
+		scmd->scsi_done(scmd);
+		r = SUCCESS;
+		goto out;
+	}
+
 	/* for hidden raid components obtain the volume_handle */
 	handle = 0;
 	if (sas_device_priv_data->sas_target->flags &
@@ -3178,6 +3199,13 @@ scsih_host_reset(struct scsi_cmnd *scmd)
 	pr_info(MPT3SAS_FMT "attempting host reset! scmd(%p)\n",
 	    ioc->name, scmd);
 	scsi_print_command(scmd);
+
+	if (ioc->remove_host) {
+		scmd->result = DID_NO_CONNECT << 16;
+		scmd->scsi_done(scmd);
+		r = FAILED;
+		goto out;
+	}
 
 	if (ioc->is_driver_loading) {
 		pr_info(MPT3SAS_FMT "Blocking the host reset\n",
