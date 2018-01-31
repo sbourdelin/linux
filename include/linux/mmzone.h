@@ -19,6 +19,7 @@
 #include <linux/page-flags-layout.h>
 #include <linux/atomic.h>
 #include <linux/mm_types.h>
+#include <linux/pagevec.h>
 #include <asm/page.h>
 
 /* Free memory management - zoned buddy allocator.  */
@@ -259,6 +260,8 @@ struct lruvec {
 #define LRU_ALL_FILE (BIT(LRU_INACTIVE_FILE) | BIT(LRU_ACTIVE_FILE))
 #define LRU_ALL_ANON (BIT(LRU_INACTIVE_ANON) | BIT(LRU_ACTIVE_ANON))
 #define LRU_ALL	     ((1 << NR_LRU_LISTS) - 1)
+
+#define LRU_BATCH_MAX PAGEVEC_SIZE
 
 #define NUM_LRU_BATCH_LOCKS 32
 struct lru_batch_lock {

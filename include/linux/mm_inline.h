@@ -3,6 +3,7 @@
 #define LINUX_MM_INLINE_H
 
 #include <linux/huge_mm.h>
+#include <linux/random.h>
 #include <linux/swap.h>
 
 /**
@@ -44,25 +45,137 @@ static __always_inline void update_lru_size(struct lruvec *lruvec,
 #endif
 }
 
+static __always_inline void __add_page_to_lru_list(struct page *page,
+				struct lruvec *lruvec, enum lru_list lru)
+{
+	int tag;
+	struct page *cur, *next, *second_page;
+	struct lru_list_head *head = &lruvec->lists[lru];
+
+	list_add(&page->lru, lru_head(head));
+	/* Set sentinel unconditionally until batch is full. */
+	page->lru_sentinel = true;
+
+	second_page = container_of(page->lru.next, struct page, lru);
+	VM_BUG_ON_PAGE(!second_page->lru_sentinel, second_page);
+
+	page->lru_batch = head->first_batch_tag;
+	++head->first_batch_npages;
+
+	if (head->first_batch_npages < LRU_BATCH_MAX)
+		return;
+
+	tag = head->first_batch_tag;
+	if (likely(second_page->lru_batch == tag)) {
+		/* Unset sentinel bit in all non-sentinel nodes. */
+		cur = second_page;
+		list_for_each_entry_from(cur, lru_head(head), lru) {
+			next = list_next_entry(cur, lru);
+			if (next->lru_batch != tag)
+				break;
+			cur->lru_sentinel = false;
+		}
+	}
+
+	tag = prandom_u32_max(NUM_LRU_BATCH_LOCKS);
+	if (unlikely(tag == head->first_batch_tag))
+		tag = (tag + 1) % NUM_LRU_BATCH_LOCKS;
+	head->first_batch_tag = tag;
+	head->first_batch_npages = 0;
+}
+
 static __always_inline void add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
 	update_lru_size(lruvec, lru, page_zonenum(page), hpage_nr_pages(page));
-	list_add(&page->lru, lru_head(&lruvec->lists[lru]));
+	__add_page_to_lru_list(page, lruvec, lru);
+}
+
+static __always_inline void __add_page_to_lru_list_tail(struct page *page,
+				struct lruvec *lruvec, enum lru_list lru)
+{
+	int tag;
+	struct page *cur, *prev, *second_page;
+	struct lru_list_head *head = &lruvec->lists[lru];
+
+	list_add_tail(&page->lru, lru_head(head));
+	/* Set sentinel unconditionally until batch is full. */
+	page->lru_sentinel = true;
+
+	second_page = container_of(page->lru.prev, struct page, lru);
+	VM_BUG_ON_PAGE(!second_page->lru_sentinel, second_page);
+
+	page->lru_batch = head->last_batch_tag;
+	++head->last_batch_npages;
+
+	if (head->last_batch_npages < LRU_BATCH_MAX)
+		return;
+
+	tag = head->last_batch_tag;
+	if (likely(second_page->lru_batch == tag)) {
+		/* Unset sentinel bit in all non-sentinel nodes. */
+		cur = second_page;
+		list_for_each_entry_from_reverse(cur, lru_head(head), lru) {
+			prev = list_prev_entry(cur, lru);
+			if (prev->lru_batch != tag)
+				break;
+			cur->lru_sentinel = false;
+		}
+	}
+
+	tag = prandom_u32_max(NUM_LRU_BATCH_LOCKS);
+	if (unlikely(tag == head->last_batch_tag))
+		tag = (tag + 1) % NUM_LRU_BATCH_LOCKS;
+	head->last_batch_tag = tag;
+	head->last_batch_npages = 0;
 }
 
 static __always_inline void add_page_to_lru_list_tail(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
+
 	update_lru_size(lruvec, lru, page_zonenum(page), hpage_nr_pages(page));
-	list_add_tail(&page->lru, lru_head(&lruvec->lists[lru]));
+	__add_page_to_lru_list_tail(page, lruvec, lru);
+}
+
+static __always_inline void __del_page_from_lru_list(struct page *page,
+				struct lruvec *lruvec, enum lru_list lru)
+{
+	struct page *left, *right;
+
+	left  = container_of(page->lru.prev, struct page, lru);
+	right = container_of(page->lru.next, struct page, lru);
+
+	if (page->lru_sentinel) {
+		VM_BUG_ON(!left->lru_sentinel && !right->lru_sentinel);
+		left->lru_sentinel = true;
+		right->lru_sentinel = true;
+	}
+
+	list_del(&page->lru);
 }
 
 static __always_inline void del_page_from_lru_list(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
-	list_del(&page->lru);
+	__del_page_from_lru_list(page, lruvec, lru);
 	update_lru_size(lruvec, lru, page_zonenum(page), -hpage_nr_pages(page));
+}
+
+static __always_inline void move_page_to_lru_list(struct page *page,
+						  struct lruvec *lruvec,
+						  enum lru_list lru)
+{
+	__del_page_from_lru_list(page, lruvec, lru);
+	__add_page_to_lru_list(page, lruvec, lru);
+}
+
+static __always_inline void move_page_to_lru_list_tail(struct page *page,
+						       struct lruvec *lruvec,
+						       enum lru_list lru)
+{
+	__del_page_from_lru_list(page, lruvec, lru);
+	__add_page_to_lru_list_tail(page, lruvec, lru);
 }
 
 /**
