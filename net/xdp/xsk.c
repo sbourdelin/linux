@@ -52,6 +52,8 @@ struct xdp_sock {
 	struct xsk_info tx;
 	struct net_device *dev;
 	struct xsk_umem *umem;
+	/* Protects multiple processes from entering sendmsg */
+	struct mutex tx_mutex;
 	u32 ifindex;
 	u16 queue_id;
 };
@@ -346,8 +348,10 @@ static int xsk_release(struct socket *sock)
 		synchronize_net();
 
 		xskpa_destroy(xs->rx.pa);
+		xskpa_destroy(xs->tx.pa);
 		xsk_umem_destroy(xs_prev->umem);
 		xskq_destroy(xs_prev->rx.q);
+		xskq_destroy(xs_prev->tx.q);
 		kobject_put(&xs_prev->dev->_rx[xs->queue_id].kobj);
 		dev_put(xs_prev->dev);
 	}
@@ -406,6 +410,8 @@ static int xsk_bind(struct socket *sock, struct sockaddr *addr, int addr_len)
 	xs->ifindex = sxdp->sxdp_ifindex;
 	xs->queue_id = sxdp->sxdp_queue_id;
 	spin_lock_init(&xs->rx.pa_lock);
+	spin_lock_init(&xs->tx.pa_lock);
+	mutex_init(&xs->tx_mutex);
 
 	/* Rx */
 	xs->rx.buff_info = xsk_buff_info_create(xs->rx.umem);
@@ -423,10 +429,31 @@ static int xsk_bind(struct socket *sock, struct sockaddr *addr, int addr_len)
 		goto out_rx_pa;
 	}
 
+	/* Tx */
+	xs->tx.buff_info = xsk_buff_info_create(xs->tx.umem);
+	if (!xs->tx.buff_info) {
+		err = -ENOMEM;
+		goto out_tx_bi;
+	}
+	xskq_set_buff_info(xs->tx.q, xs->tx.buff_info, XSK_VALIDATION_TX);
+
+	xs->tx.pa = xskpa_create((struct xsk_user_queue *)xs->tx.q,
+				 xs->tx.buff_info, XSK_ARRAY_SIZE);
+	if (!xs->tx.pa) {
+		err = -ENOMEM;
+		goto out_tx_pa;
+	}
+
 	rcu_assign_pointer(dev->_rx[sxdp->sxdp_queue_id].xs, xs);
 
 	goto out_unlock;
 
+out_tx_pa:
+	xsk_buff_info_destroy(xs->tx.buff_info);
+	xs->tx.buff_info = NULL;
+out_tx_bi:
+	xskpa_destroy(xs->rx.pa);
+	xs->rx.pa = NULL;
 out_rx_pa:
 	xsk_buff_info_destroy(xs->rx.buff_info);
 	xs->rx.buff_info = NULL;
@@ -621,9 +648,171 @@ static int xsk_getsockopt(struct socket *sock, int level, int optname,
 	return -EOPNOTSUPP;
 }
 
+void xsk_tx_completion(struct net_device *dev, u16 queue_index,
+		       unsigned int npackets)
+{
+	unsigned long flags;
+	struct xdp_sock *xs;
+
+	rcu_read_lock();
+	xs = lookup_xsk(dev, queue_index);
+	if (unlikely(!xs)) {
+		rcu_read_unlock();
+		return;
+	}
+
+	spin_lock_irqsave(&xs->tx.pa_lock, flags);
+	WARN_ON_ONCE(xskpa_flush_n(xs->tx.pa, npackets));
+	spin_unlock_irqrestore(&xs->tx.pa_lock, flags);
+	rcu_read_unlock();
+}
+EXPORT_SYMBOL_GPL(xsk_tx_completion);
+
+static void xsk_destruct_skb(struct sk_buff *skb)
+{
+	u64 idx = (u64)skb_shinfo(skb)->destructor_arg;
+	struct xsk_frame_set p = {.start = idx,
+				  .curr = idx,
+				  .end = idx + 1};
+	struct xdp_sock *xs;
+	unsigned long flags;
+
+	rcu_read_lock();
+	xs = lookup_xsk(skb->dev, skb_get_queue_mapping(skb));
+	if (unlikely(!xs)) {
+		rcu_read_unlock();
+		return;
+	}
+
+	p.pkt_arr = xs->tx.pa;
+	xskf_packet_completed(&p);
+	spin_lock_irqsave(&xs->tx.pa_lock, flags);
+	WARN_ON_ONCE(xskpa_flush_completed(xs->tx.pa));
+	spin_unlock_irqrestore(&xs->tx.pa_lock, flags);
+	rcu_read_unlock();
+
+	sock_wfree(skb);
+}
+
+static int xsk_xmit_skb(struct sk_buff *skb)
+{
+	struct net_device *dev = skb->dev;
+	struct sk_buff *orig_skb = skb;
+	struct netdev_queue *txq;
+	int ret = NETDEV_TX_BUSY;
+	bool again = false;
+
+	if (unlikely(!netif_running(dev) || !netif_carrier_ok(dev)))
+		goto drop;
+
+	skb = validate_xmit_skb_list(skb, dev, &again);
+	if (skb != orig_skb)
+		return NET_XMIT_DROP;
+
+	txq = skb_get_tx_queue(dev, skb);
+
+	local_bh_disable();
+
+	HARD_TX_LOCK(dev, txq, smp_processor_id());
+	if (!netif_xmit_frozen_or_drv_stopped(txq))
+		ret = netdev_start_xmit(skb, dev, txq, false);
+	HARD_TX_UNLOCK(dev, txq);
+
+	local_bh_enable();
+
+	if (!dev_xmit_complete(ret))
+		goto out_err;
+
+	return ret;
+drop:
+	atomic_long_inc(&dev->tx_dropped);
+out_err:
+	kfree_skb(skb);
+	return NET_XMIT_DROP;
+}
+
+static int xsk_generic_xmit(struct sock *sk, struct msghdr *m,
+			    size_t total_len)
+{
+	bool need_wait = !(m->msg_flags & MSG_DONTWAIT);
+	struct xdp_sock *xs = xdp_sk(sk);
+	struct xsk_frame_set p;
+	struct sk_buff *skb;
+	unsigned long flags;
+	int err = 0;
+
+	if (need_wait)
+		/* Not implemented yet. */
+		return -EINVAL;
+
+	mutex_lock(&xs->tx_mutex);
+	spin_lock_irqsave(&xs->tx.pa_lock, flags);
+	xskpa_populate(xs->tx.pa);
+	spin_unlock_irqrestore(&xs->tx.pa_lock, flags);
+
+	while (xskpa_next_packet(xs->tx.pa, &p)) {
+		u32 len = xskf_get_packet_len(&p);
+
+		if (unlikely(len > xs->dev->mtu)) {
+			err = -EMSGSIZE;
+			goto out_err;
+		}
+
+		skb = sock_alloc_send_skb(sk, len, !need_wait, &err);
+		if (unlikely(!skb)) {
+			err = -EAGAIN;
+			goto out_err;
+		}
+
+		/* XXX Use fragments for the data here */
+		skb_put(skb, len);
+		err = skb_store_bits(skb, 0, xskf_get_data(&p), len);
+		if (unlikely(err))
+			goto out_skb;
+
+		skb->dev = xs->dev;
+		skb->priority = sk->sk_priority;
+		skb->mark = sk->sk_mark;
+		skb_set_queue_mapping(skb, xs->queue_id);
+		skb_shinfo(skb)->destructor_arg =
+			(void *)(long)xskf_get_frame_id(&p);
+		skb->destructor = xsk_destruct_skb;
+
+		err = xsk_xmit_skb(skb);
+		/* Ignore NET_XMIT_CN as packet might have been sent */
+		if (err == NET_XMIT_DROP || err == NETDEV_TX_BUSY) {
+			err = -EAGAIN;
+			break;
+		}
+	}
+
+	mutex_unlock(&xs->tx_mutex);
+	return err;
+
+out_skb:
+	kfree_skb(skb);
+out_err:
+	xskf_set_error(&p, -err);
+	xskf_packet_completed(&p);
+	spin_lock_irqsave(&xs->tx.pa_lock, flags);
+	WARN_ON_ONCE(xskpa_flush_completed(xs->tx.pa));
+	spin_unlock_irqrestore(&xs->tx.pa_lock, flags);
+	mutex_unlock(&xs->tx_mutex);
+
+	return err;
+}
+
 static int xsk_sendmsg(struct socket *sock, struct msghdr *m, size_t total_len)
 {
-	return -EOPNOTSUPP;
+	struct sock *sk = sock->sk;
+	struct xdp_sock *xs = xdp_sk(sk);
+
+	if (unlikely(!xs->dev))
+		return -ENXIO;
+	if (unlikely(!(xs->dev->flags & IFF_UP)))
+		return -ENETDOWN;
+
+	return xsk_generic_xmit(sk, m, total_len);
 }
 
 static int xsk_mmap(struct file *file, struct socket *sock,
