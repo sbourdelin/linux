@@ -249,6 +249,11 @@ struct lruvec {
 #define LRU_ALL_ANON (BIT(LRU_INACTIVE_ANON) | BIT(LRU_ACTIVE_ANON))
 #define LRU_ALL	     ((1 << NR_LRU_LISTS) - 1)
 
+#define NUM_LRU_BATCH_LOCKS 32
+struct lru_batch_lock {
+	spinlock_t lock;
+} ____cacheline_aligned_in_smp;
+
 /* Isolate unmapped file */
 #define ISOLATE_UNMAPPED	((__force isolate_mode_t)0x2)
 /* Isolate for asynchronous migration */
@@ -714,6 +719,8 @@ typedef struct pglist_data {
 	struct lruvec		lruvec;
 
 	unsigned long		flags;
+
+	struct lru_batch_lock lru_batch_locks[NUM_LRU_BATCH_LOCKS];
 
 	ZONE_PADDING(_pad2_)
 

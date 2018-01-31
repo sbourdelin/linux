@@ -190,6 +190,11 @@ struct page {
 		struct kmem_cache *slab_cache;	/* SL[AU]B: Pointer to slab */
 	};
 
+	struct {
+		unsigned lru_batch;
+		bool lru_sentinel;
+	};
+
 #ifdef CONFIG_MEMCG
 	struct mem_cgroup *mem_cgroup;
 #endif

@@ -6070,6 +6070,7 @@ static unsigned long __paginginit calc_memmap_size(unsigned long spanned_pages,
  */
 static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 {
+	size_t i;
 	enum zone_type j;
 	int nid = pgdat->node_id;
 
@@ -6092,6 +6093,8 @@ static void __paginginit free_area_init_core(struct pglist_data *pgdat)
 	pgdat_page_ext_init(pgdat);
 	spin_lock_init(&pgdat->lru_lock);
 	lruvec_init(node_lruvec(pgdat));
+	for (i = 0; i < NUM_LRU_BATCH_LOCKS; ++i)
+		spin_lock_init(&pgdat->lru_batch_locks[i].lock);
 
 	pgdat->per_cpu_nodestats = &boot_nodestats;
 
