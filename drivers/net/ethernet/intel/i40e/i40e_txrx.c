@@ -31,6 +31,7 @@
 #include "i40e.h"
 #include "i40e_trace.h"
 #include "i40e_prototype.h"
+#include "buff_pool.h"
 
 static inline __le64 build_ctob(u32 td_cmd, u32 td_offset, unsigned int size,
 				u32 td_tag)
@@ -1091,32 +1092,6 @@ reset_latency:
 }
 
 /**
- * i40e_reuse_rx_page - page flip buffer and store it back on the ring
- * @rx_ring: rx descriptor ring to store buffers on
- * @old_buff: donor buffer to have page reused
- *
- * Synchronizes page for reuse by the adapter
- **/
-static void i40e_reuse_rx_page(struct i40e_ring *rx_ring,
-			       struct i40e_rx_buffer *old_buff)
-{
-	struct i40e_rx_buffer *new_buff;
-	u16 nta = rx_ring->next_to_alloc;
-
-	new_buff = &rx_ring->rx_bi[nta];
-
-	/* update, and store next to alloc */
-	nta++;
-	rx_ring->next_to_alloc = (nta < rx_ring->count) ? nta : 0;
-
-	/* transfer page from old buffer to new buffer */
-	new_buff->dma		= old_buff->dma;
-	new_buff->page		= old_buff->page;
-	new_buff->page_offset	= old_buff->page_offset;
-	new_buff->pagecnt_bias	= old_buff->pagecnt_bias;
-}
-
-/**
  * i40e_rx_is_programming_status - check for programming status descriptor
  * @qw: qword representing status_error_len in CPU ordering
  *
@@ -1161,12 +1136,8 @@ static void i40e_clean_programming_status(struct i40e_ring *rx_ring,
 
 	prefetch(I40E_RX_DESC(rx_ring, ntc));
 
-	/* place unused page back on the ring */
-	i40e_reuse_rx_page(rx_ring, rx_buffer);
-	rx_ring->rx_stats.page_reuse_count++;
-
-	/* clear contents of buffer_info */
-	rx_buffer->page = NULL;
+	bpool_free(rx_ring->bpool, rx_buffer->handle);
+	rx_buffer->handle = 0;
 
 	id = (qw & I40E_RX_PROG_STATUS_DESC_QW1_PROGID_MASK) >>
 		  I40E_RX_PROG_STATUS_DESC_QW1_PROGID_SHIFT;
@@ -1246,28 +1217,17 @@ void i40e_clean_rx_ring(struct i40e_ring *rx_ring)
 	for (i = 0; i < rx_ring->count; i++) {
 		struct i40e_rx_buffer *rx_bi = &rx_ring->rx_bi[i];
 
-		if (!rx_bi->page)
+		if (!rx_bi->handle)
 			continue;
 
 		/* Invalidate cache lines that may have been written to by
 		 * device so that we avoid corrupting memory.
 		 */
-		dma_sync_single_range_for_cpu(rx_ring->dev,
-					      rx_bi->dma,
-					      rx_bi->page_offset,
-					      rx_ring->rx_buf_len,
-					      DMA_FROM_DEVICE);
+		bpool_buff_dma_sync_cpu(rx_ring->bpool, rx_bi->handle, 0,
+					rx_ring->rx_buf_len);
 
-		/* free resources associated with mapping */
-		dma_unmap_page_attrs(rx_ring->dev, rx_bi->dma,
-				     i40e_rx_pg_size(rx_ring),
-				     DMA_FROM_DEVICE,
-				     I40E_RX_DMA_ATTR);
-
-		__page_frag_cache_drain(rx_bi->page, rx_bi->pagecnt_bias);
-
-		rx_bi->page = NULL;
-		rx_bi->page_offset = 0;
+		bpool_free(rx_ring->bpool, rx_bi->handle);
+		rx_bi->handle = 0;
 	}
 
 	bi_size = sizeof(struct i40e_rx_buffer) * rx_ring->count;
@@ -1276,7 +1236,6 @@ void i40e_clean_rx_ring(struct i40e_ring *rx_ring)
 	/* Zero out the descriptor ring */
 	memset(rx_ring->desc, 0, rx_ring->size);
 
-	rx_ring->next_to_alloc = 0;
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
 }
@@ -1295,6 +1254,9 @@ void i40e_free_rx_resources(struct i40e_ring *rx_ring)
 	rx_ring->xdp_prog = NULL;
 	kfree(rx_ring->rx_bi);
 	rx_ring->rx_bi = NULL;
+
+	i40e_buff_pool_destroy(rx_ring->bpool);
+	rx_ring->bpool = NULL;
 
 	if (rx_ring->desc) {
 		dma_free_coherent(rx_ring->dev, rx_ring->size,
@@ -1336,7 +1298,6 @@ int i40e_setup_rx_descriptors(struct i40e_ring *rx_ring)
 		goto err;
 	}
 
-	rx_ring->next_to_alloc = 0;
 	rx_ring->next_to_clean = 0;
 	rx_ring->next_to_use = 0;
 
@@ -1366,9 +1327,6 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
 {
 	rx_ring->next_to_use = val;
 
-	/* update next to alloc since we have filled the ring */
-	rx_ring->next_to_alloc = val;
-
 	/* Force memory writes to complete before letting h/w
 	 * know there are new descriptors to fetch.  (Only
 	 * applicable for weak-ordered memory model archs,
@@ -1376,17 +1334,6 @@ static inline void i40e_release_rx_desc(struct i40e_ring *rx_ring, u32 val)
 	 */
 	wmb();
 	writel(val, rx_ring->tail);
-}
-
-/**
- * i40e_rx_offset - Return expected offset into page to access data
- * @rx_ring: Ring we are requesting offset of
- *
- * Returns the offset value for ring into the data buffer.
- */
-static inline unsigned int i40e_rx_offset(struct i40e_ring *rx_ring)
-{
-	return ring_uses_build_skb(rx_ring) ? I40E_SKB_PAD : 0;
 }
 
 /**
@@ -1400,43 +1347,14 @@ static inline unsigned int i40e_rx_offset(struct i40e_ring *rx_ring)
 static bool i40e_alloc_mapped_page(struct i40e_ring *rx_ring,
 				   struct i40e_rx_buffer *bi)
 {
-	struct page *page = bi->page;
-	dma_addr_t dma;
+	unsigned long handle;
+	int err;
 
-	/* since we are recycling buffers we should seldom need to alloc */
-	if (likely(page)) {
-		rx_ring->rx_stats.page_reuse_count++;
-		return true;
-	}
-
-	/* alloc new page for storage */
-	page = dev_alloc_pages(i40e_rx_pg_order(rx_ring));
-	if (unlikely(!page)) {
-		rx_ring->rx_stats.alloc_page_failed++;
+	err = bpool_alloc(rx_ring->bpool, &handle);
+	if (err)
 		return false;
-	}
 
-	/* map page for use */
-	dma = dma_map_page_attrs(rx_ring->dev, page, 0,
-				 i40e_rx_pg_size(rx_ring),
-				 DMA_FROM_DEVICE,
-				 I40E_RX_DMA_ATTR);
-
-	/* if mapping failed free memory back to system since
-	 * there isn't much point in holding memory we can't use
-	 */
-	if (dma_mapping_error(rx_ring->dev, dma)) {
-		__free_pages(page, i40e_rx_pg_order(rx_ring));
-		rx_ring->rx_stats.alloc_page_failed++;
-		return false;
-	}
-
-	bi->dma = dma;
-	bi->page = page;
-	bi->page_offset = i40e_rx_offset(rx_ring);
-
-	page_ref_add(page, USHRT_MAX - 1);
-	bi->pagecnt_bias = USHRT_MAX;
+	bi->handle = handle;
 
 	return true;
 }
@@ -1480,19 +1398,19 @@ bool i40e_alloc_rx_buffers(struct i40e_ring *rx_ring, u16 cleaned_count)
 	bi = &rx_ring->rx_bi[ntu];
 
 	do {
+		unsigned int headroom;
+		dma_addr_t dma;
+
 		if (!i40e_alloc_mapped_page(rx_ring, bi))
 			goto no_buffers;
 
-		/* sync the buffer for use by the device */
-		dma_sync_single_range_for_device(rx_ring->dev, bi->dma,
-						 bi->page_offset,
-						 rx_ring->rx_buf_len,
-						 DMA_FROM_DEVICE);
+		dma = bpool_buff_dma(rx_ring->bpool, bi->handle);
+		headroom = rx_ring->rx_buf_hr;
 
-		/* Refresh the desc even if buffer_addrs didn't change
-		 * because each write-back erases this info.
-		 */
-		rx_desc->read.pkt_addr = cpu_to_le64(bi->dma + bi->page_offset);
+		bpool_buff_dma_sync_dev(rx_ring->bpool, bi->handle,
+					headroom, rx_ring->rx_buf_len);
+
+		rx_desc->read.pkt_addr = cpu_to_le64(dma + headroom);
 
 		rx_desc++;
 		bi++;
@@ -1739,78 +1657,6 @@ static bool i40e_cleanup_headers(struct i40e_ring *rx_ring, struct sk_buff *skb,
 }
 
 /**
- * i40e_page_is_reusable - check if any reuse is possible
- * @page: page struct to check
- *
- * A page is not reusable if it was allocated under low memory
- * conditions, or it's not in the same NUMA node as this CPU.
- */
-static inline bool i40e_page_is_reusable(struct page *page)
-{
-	return (page_to_nid(page) == numa_mem_id()) &&
-		!page_is_pfmemalloc(page);
-}
-
-/**
- * i40e_can_reuse_rx_page - Determine if this page can be reused by
- * the adapter for another receive
- *
- * @rx_buffer: buffer containing the page
- *
- * If page is reusable, rx_buffer->page_offset is adjusted to point to
- * an unused region in the page.
- *
- * For small pages, @truesize will be a constant value, half the size
- * of the memory at page.  We'll attempt to alternate between high and
- * low halves of the page, with one half ready for use by the hardware
- * and the other half being consumed by the stack.  We use the page
- * ref count to determine whether the stack has finished consuming the
- * portion of this page that was passed up with a previous packet.  If
- * the page ref count is >1, we'll assume the "other" half page is
- * still busy, and this page cannot be reused.
- *
- * For larger pages, @truesize will be the actual space used by the
- * received packet (adjusted upward to an even multiple of the cache
- * line size).  This will advance through the page by the amount
- * actually consumed by the received packets while there is still
- * space for a buffer.  Each region of larger pages will be used at
- * most once, after which the page will not be reused.
- *
- * In either case, if the page is reusable its refcount is increased.
- **/
-static bool i40e_can_reuse_rx_page(struct i40e_rx_buffer *rx_buffer)
-{
-	unsigned int pagecnt_bias = rx_buffer->pagecnt_bias;
-	struct page *page = rx_buffer->page;
-
-	/* Is any reuse possible? */
-	if (unlikely(!i40e_page_is_reusable(page)))
-		return false;
-
-#if (PAGE_SIZE < 8192)
-	/* if we are only owner of page we can reuse it */
-	if (unlikely((page_count(page) - pagecnt_bias) > 1))
-		return false;
-#else
-#define I40E_LAST_OFFSET \
-	(SKB_WITH_OVERHEAD(PAGE_SIZE) - I40E_RXBUFFER_2048)
-	if (rx_buffer->page_offset > I40E_LAST_OFFSET)
-		return false;
-#endif
-
-	/* If we have drained the page fragment pool we need to update
-	 * the pagecnt_bias and page count so that we fully restock the
-	 * number of references the driver holds.
-	 */
-	if (unlikely(pagecnt_bias == 1)) {
-		page_ref_add(page, USHRT_MAX - 1);
-		rx_buffer->pagecnt_bias = USHRT_MAX;
-	}
-
-	return true;
-}
-
-/**
  * i40e_add_rx_frag - Add contents of Rx buffer to sk_buff
  * @rx_ring: rx descriptor ring to transact packets on
  * @rx_buffer: buffer containing page to add
@@ -1823,25 +1669,24 @@ static bool i40e_can_reuse_rx_page(struct i40e_rx_buffer *rx_buffer)
  * The function will then update the page offset.
  **/
 static void i40e_add_rx_frag(struct i40e_ring *rx_ring,
-			     struct i40e_rx_buffer *rx_buffer,
 			     struct sk_buff *skb,
-			     unsigned int size)
+			     unsigned long handle,
+			     unsigned int size,
+			     unsigned int headroom)
 {
-#if (PAGE_SIZE < 8192)
-	unsigned int truesize = i40e_rx_pg_size(rx_ring) / 2;
-#else
-	unsigned int truesize = SKB_DATA_ALIGN(size + i40e_rx_offset(rx_ring));
-#endif
+	unsigned int truesize = bpool_buff_truesize(rx_ring->bpool);
+	unsigned int pg_off;
+	struct page *pg;
+	int err;
 
-	skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, rx_buffer->page,
-			rx_buffer->page_offset, size, truesize);
+	err = bpool_buff_convert_to_page(rx_ring->bpool, handle, &pg, &pg_off);
+	if (err) {
+		bpool_free(rx_ring->bpool, handle);
+		return;
+	}
 
-	/* page is being used so we must update the page offset */
-#if (PAGE_SIZE < 8192)
-	rx_buffer->page_offset ^= truesize;
-#else
-	rx_buffer->page_offset += truesize;
-#endif
+	skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, pg, pg_off + headroom,
+			size, truesize);
 }
 
 /**
@@ -1853,22 +1698,16 @@ static void i40e_add_rx_frag(struct i40e_ring *rx_ring,
  * for use by the CPU.
  */
 static struct i40e_rx_buffer *i40e_get_rx_buffer(struct i40e_ring *rx_ring,
-						 const unsigned int size)
+						 unsigned long *handle,
+						 const unsigned int size,
+						 unsigned int *headroom)
 {
 	struct i40e_rx_buffer *rx_buffer;
 
 	rx_buffer = &rx_ring->rx_bi[rx_ring->next_to_clean];
-	prefetchw(rx_buffer->page);
-
-	/* we are reusing so sync this buffer for CPU use */
-	dma_sync_single_range_for_cpu(rx_ring->dev,
-				      rx_buffer->dma,
-				      rx_buffer->page_offset,
-				      size,
-				      DMA_FROM_DEVICE);
-
-	/* We have pulled a buffer for use, so decrement pagecnt_bias */
-	rx_buffer->pagecnt_bias--;
+	*handle = rx_buffer->handle;
+	*headroom = rx_ring->rx_buf_hr;
+	bpool_buff_dma_sync_cpu(rx_ring->bpool, *handle, *headroom, size);
 
 	return rx_buffer;
 }
@@ -1884,56 +1723,56 @@ static struct i40e_rx_buffer *i40e_get_rx_buffer(struct i40e_ring *rx_ring,
  * skb correctly.
  */
 static struct sk_buff *i40e_construct_skb(struct i40e_ring *rx_ring,
-					  struct i40e_rx_buffer *rx_buffer,
-					  struct xdp_buff *xdp)
+					  unsigned long handle,
+					  unsigned int size,
+					  unsigned int headroom)
 {
-	unsigned int size = xdp->data_end - xdp->data;
-#if (PAGE_SIZE < 8192)
-	unsigned int truesize = i40e_rx_pg_size(rx_ring) / 2;
-#else
-	unsigned int truesize = SKB_DATA_ALIGN(size);
-#endif
-	unsigned int headlen;
+	unsigned int truesize = bpool_buff_truesize(rx_ring->bpool);
+	unsigned int pg_off, headlen;
 	struct sk_buff *skb;
+	struct page *pg;
+	void *data;
+	int err;
 
+	data = bpool_buff_ptr(rx_ring->bpool, handle) + headroom;
 	/* prefetch first cache line of first page */
-	prefetch(xdp->data);
+	prefetch(data);
 #if L1_CACHE_BYTES < 128
-	prefetch(xdp->data + L1_CACHE_BYTES);
+	prefetch(data + L1_CACHE_BYTES);
 #endif
 
 	/* allocate a skb to store the frags */
 	skb = __napi_alloc_skb(&rx_ring->q_vector->napi,
 			       I40E_RX_HDR_SIZE,
 			       GFP_ATOMIC | __GFP_NOWARN);
-	if (unlikely(!skb))
+	if (unlikely(!skb)) {
+		bpool_free(rx_ring->bpool, handle);
 		return NULL;
+	}
 
 	/* Determine available headroom for copy */
 	headlen = size;
 	if (headlen > I40E_RX_HDR_SIZE)
-		headlen = eth_get_headlen(xdp->data, I40E_RX_HDR_SIZE);
+		headlen = eth_get_headlen(data, I40E_RX_HDR_SIZE);
 
 	/* align pull length to size of long to optimize memcpy performance */
-	memcpy(__skb_put(skb, headlen), xdp->data,
-	       ALIGN(headlen, sizeof(long)));
+	memcpy(__skb_put(skb, headlen), data, ALIGN(headlen, sizeof(long)));
 
 	/* update all of the pointers */
 	size -= headlen;
 	if (size) {
-		skb_add_rx_frag(skb, 0, rx_buffer->page,
-				rx_buffer->page_offset + headlen,
-				size, truesize);
+		err = bpool_buff_convert_to_page(rx_ring->bpool, handle, &pg,
+						 &pg_off);
+		if (err) {
+			dev_kfree_skb(skb);
+			bpool_free(rx_ring->bpool, handle);
+			return NULL;
+		}
 
-		/* buffer is used by skb, update page_offset */
-#if (PAGE_SIZE < 8192)
-		rx_buffer->page_offset ^= truesize;
-#else
-		rx_buffer->page_offset += truesize;
-#endif
+		skb_add_rx_frag(skb, 0, pg, pg_off + headroom + headlen, size,
+				truesize);
 	} else {
-		/* buffer is unused, reset bias back to rx_buffer */
-		rx_buffer->pagecnt_bias++;
+		bpool_free(rx_ring->bpool, handle);
 	}
 
 	return skb;
@@ -1949,68 +1788,43 @@ static struct sk_buff *i40e_construct_skb(struct i40e_ring *rx_ring,
  * to set up the skb correctly and avoid any memcpy overhead.
  */
 static struct sk_buff *i40e_build_skb(struct i40e_ring *rx_ring,
-				      struct i40e_rx_buffer *rx_buffer,
-				      struct xdp_buff *xdp)
+				      unsigned long handle,
+				      unsigned int size,
+				      unsigned int headroom)
 {
-	unsigned int size = xdp->data_end - xdp->data;
-#if (PAGE_SIZE < 8192)
-	unsigned int truesize = i40e_rx_pg_size(rx_ring) / 2;
-#else
-	unsigned int truesize = SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) +
-				SKB_DATA_ALIGN(I40E_SKB_PAD + size);
-#endif
+	void *data, *data_hard_start;
 	struct sk_buff *skb;
+	unsigned int frag_size, pg_off;
+	struct page *pg;
+	int err;
 
-	/* prefetch first cache line of first page */
-	prefetch(xdp->data);
-#if L1_CACHE_BYTES < 128
-	prefetch(xdp->data + L1_CACHE_BYTES);
-#endif
-	/* build an skb around the page buffer */
-	skb = build_skb(xdp->data_hard_start, truesize);
-	if (unlikely(!skb))
+	err = bpool_buff_convert_to_page(rx_ring->bpool, handle, &pg, &pg_off);
+	if (err) {
+		bpool_free(rx_ring->bpool, handle);
 		return NULL;
-
-	/* update pointers within the skb to store the data */
-	skb_reserve(skb, I40E_SKB_PAD);
-	__skb_put(skb, size);
-
-	/* buffer is used by skb, update page_offset */
-#if (PAGE_SIZE < 8192)
-	rx_buffer->page_offset ^= truesize;
-#else
-	rx_buffer->page_offset += truesize;
-#endif
-
-	return skb;
-}
-
-/**
- * i40e_put_rx_buffer - Clean up used buffer and either recycle or free
- * @rx_ring: rx descriptor ring to transact packets on
- * @rx_buffer: rx buffer to pull data from
- *
- * This function will clean up the contents of the rx_buffer.  It will
- * either recycle the bufer or unmap it and free the associated resources.
- */
-static void i40e_put_rx_buffer(struct i40e_ring *rx_ring,
-			       struct i40e_rx_buffer *rx_buffer)
-{
-	if (i40e_can_reuse_rx_page(rx_buffer)) {
-		/* hand second half of page back to the ring */
-		i40e_reuse_rx_page(rx_ring, rx_buffer);
-		rx_ring->rx_stats.page_reuse_count++;
-	} else {
-		/* we are not reusing the buffer so unmap it */
-		dma_unmap_page_attrs(rx_ring->dev, rx_buffer->dma,
-				     i40e_rx_pg_size(rx_ring),
-				     DMA_FROM_DEVICE, I40E_RX_DMA_ATTR);
-		__page_frag_cache_drain(rx_buffer->page,
-					rx_buffer->pagecnt_bias);
 	}
 
-	/* clear contents of buffer_info */
-	rx_buffer->page = NULL;
+	frag_size = bpool_total_buff_size(rx_ring->bpool) +
+		    SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+	data_hard_start = page_address(pg) + pg_off;
+	data = data_hard_start + headroom;
+	/* prefetch first cache line of first page */
+	prefetch(data);
+#if L1_CACHE_BYTES < 128
+	prefetch(data + L1_CACHE_BYTES);
+#endif
+	/* build an skb around the page buffer */
+	skb = build_skb(data_hard_start, frag_size);
+	if (unlikely(!skb)) {
+		page_frag_free(data);
+		return NULL;
+	}
+
+	/* update pointers within the skb to store the data */
+	skb_reserve(skb, headroom);
+	__skb_put(skb, size);
+
+	return skb;
 }
 
 /**
@@ -2053,17 +1867,43 @@ static bool i40e_is_non_eop(struct i40e_ring *rx_ring,
 static int i40e_xmit_xdp_ring(struct xdp_buff *xdp,
 			      struct i40e_ring *xdp_ring);
 
+static int i40e_xdp_buff_convert_page(struct i40e_ring *rx_ring,
+				      struct xdp_buff *xdp,
+				      unsigned long handle,
+				      unsigned int size,
+				      unsigned int headroom)
+{
+	unsigned int pg_off;
+	struct page *pg;
+	int err;
+
+	err = bpool_buff_convert_to_page(rx_ring->bpool, handle, &pg, &pg_off);
+	if (err)
+		return err;
+
+	xdp->data_hard_start = page_address(pg) + pg_off;
+	xdp->data = xdp->data_hard_start + headroom;
+	xdp_set_data_meta_invalid(xdp);
+	xdp->data_end = xdp->data + size;
+	xdp->rxq = &rx_ring->xdp_rxq;
+
+	return 0;
+}
+
 /**
  * i40e_run_xdp - run an XDP program
  * @rx_ring: Rx ring being processed
  * @xdp: XDP buffer containing the frame
  **/
 static struct sk_buff *i40e_run_xdp(struct i40e_ring *rx_ring,
-				    struct xdp_buff *xdp)
+				    unsigned long handle,
+				    unsigned int *size,
+				    unsigned int *headroom)
 {
 	int err, result = I40E_XDP_PASS;
 	struct i40e_ring *xdp_ring;
 	struct bpf_prog *xdp_prog;
+	struct xdp_buff xdp;
 	u32 act;
 
 	rcu_read_lock();
@@ -2072,20 +1912,47 @@ static struct sk_buff *i40e_run_xdp(struct i40e_ring *rx_ring,
 	if (!xdp_prog)
 		goto xdp_out;
 
-	act = bpf_prog_run_xdp(xdp_prog, xdp);
+	xdp.data_hard_start = bpool_buff_ptr(rx_ring->bpool, handle);
+	xdp.data = xdp.data_hard_start + *headroom;
+	xdp_set_data_meta_invalid(&xdp);
+	xdp.data_end = xdp.data + *size;
+	xdp.rxq = &rx_ring->xdp_rxq;
+
+	act = bpf_prog_run_xdp(xdp_prog, &xdp);
+
+	*headroom = xdp.data - xdp.data_hard_start;
+	*size = xdp.data_end - xdp.data;
+
 	switch (act) {
 	case XDP_PASS:
 		break;
 	case XDP_TX:
+		err = i40e_xdp_buff_convert_page(rx_ring, &xdp, handle, *size,
+						 *headroom);
+		if (err) {
+			result = I40E_XDP_CONSUMED;
+			break;
+		}
+
 		xdp_ring = rx_ring->vsi->xdp_rings[rx_ring->queue_index];
-		result = i40e_xmit_xdp_ring(xdp, xdp_ring);
+		result = i40e_xmit_xdp_ring(&xdp, xdp_ring);
+		if (result == I40E_XDP_CONSUMED) {
+			page_frag_free(xdp.data);
+			result = I40E_XDP_TX; /* Hmm, here we bump the tail unnecessary, but better flow... */
+		}
 		break;
 	case XDP_REDIRECT:
-		err = xdp_do_redirect(rx_ring->netdev, xdp, xdp_prog);
-		if (!err)
-			result = I40E_XDP_TX;
-		else
+		err = i40e_xdp_buff_convert_page(rx_ring, &xdp, handle, *size,
+						 *headroom);
+		if (err) {
 			result = I40E_XDP_CONSUMED;
+			break;
+		}
+
+		err = xdp_do_redirect(rx_ring->netdev, &xdp, xdp_prog);
+		result = I40E_XDP_TX;
+		if (err)
+			page_frag_free(xdp.data);
 		break;
 	default:
 		bpf_warn_invalid_xdp_action(act);
@@ -2099,27 +1966,6 @@ static struct sk_buff *i40e_run_xdp(struct i40e_ring *rx_ring,
 xdp_out:
 	rcu_read_unlock();
 	return ERR_PTR(-result);
-}
-
-/**
- * i40e_rx_buffer_flip - adjusted rx_buffer to point to an unused region
- * @rx_ring: Rx ring
- * @rx_buffer: Rx buffer to adjust
- * @size: Size of adjustment
- **/
-static void i40e_rx_buffer_flip(struct i40e_ring *rx_ring,
-				struct i40e_rx_buffer *rx_buffer,
-				unsigned int size)
-{
-#if (PAGE_SIZE < 8192)
-	unsigned int truesize = i40e_rx_pg_size(rx_ring) / 2;
-
-	rx_buffer->page_offset ^= truesize;
-#else
-	unsigned int truesize = SKB_DATA_ALIGN(i40e_rx_offset(rx_ring) + size);
-
-	rx_buffer->page_offset += truesize;
-#endif
 }
 
 static inline void i40e_xdp_ring_update_tail(struct i40e_ring *xdp_ring)
@@ -2150,14 +1996,12 @@ static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
 	struct sk_buff *skb = rx_ring->skb;
 	u16 cleaned_count = I40E_DESC_UNUSED(rx_ring);
 	bool failure = false, xdp_xmit = false;
-	struct xdp_buff xdp;
-
-	xdp.rxq = &rx_ring->xdp_rxq;
 
 	while (likely(total_rx_packets < (unsigned int)budget)) {
 		struct i40e_rx_buffer *rx_buffer;
 		union i40e_rx_desc *rx_desc;
-		unsigned int size;
+		unsigned int size, headroom;
+		unsigned long handle;
 		u16 vlan_tag;
 		u8 rx_ptype;
 		u64 qword;
@@ -2195,45 +2039,35 @@ static int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget)
 			break;
 
 		i40e_trace(clean_rx_irq, rx_ring, rx_desc, skb);
-		rx_buffer = i40e_get_rx_buffer(rx_ring, size);
+		rx_buffer = i40e_get_rx_buffer(rx_ring, &handle, size,
+					       &headroom);
 
 		/* retrieve a buffer from the ring */
-		if (!skb) {
-			xdp.data = page_address(rx_buffer->page) +
-				   rx_buffer->page_offset;
-			xdp_set_data_meta_invalid(&xdp);
-			xdp.data_hard_start = xdp.data -
-					      i40e_rx_offset(rx_ring);
-			xdp.data_end = xdp.data + size;
-
-			skb = i40e_run_xdp(rx_ring, &xdp);
-		}
+		if (!skb)
+			skb = i40e_run_xdp(rx_ring, handle, &size, &headroom);
 
 		if (IS_ERR(skb)) {
-			if (PTR_ERR(skb) == -I40E_XDP_TX) {
+			if (PTR_ERR(skb) == -I40E_XDP_TX)
 				xdp_xmit = true;
-				i40e_rx_buffer_flip(rx_ring, rx_buffer, size);
-			} else {
-				rx_buffer->pagecnt_bias++;
-			}
+			else
+				bpool_free(rx_ring->bpool, handle);
 			total_rx_bytes += size;
 			total_rx_packets++;
 		} else if (skb) {
-			i40e_add_rx_frag(rx_ring, rx_buffer, skb, size);
+			i40e_add_rx_frag(rx_ring, skb, handle, size, headroom);
 		} else if (ring_uses_build_skb(rx_ring)) {
-			skb = i40e_build_skb(rx_ring, rx_buffer, &xdp);
+			skb = i40e_build_skb(rx_ring, handle, size, headroom);
 		} else {
-			skb = i40e_construct_skb(rx_ring, rx_buffer, &xdp);
+			skb = i40e_construct_skb(rx_ring, handle, size,
+						 headroom);
 		}
+
+		rx_buffer->handle = 0;
 
 		/* exit if we failed to retrieve a buffer */
-		if (!skb) {
-			rx_ring->rx_stats.alloc_buff_failed++;
-			rx_buffer->pagecnt_bias++;
+		if (!skb)
 			break;
-		}
 
-		i40e_put_rx_buffer(rx_ring, rx_buffer);
 		cleaned_count++;
 
 		if (i40e_is_non_eop(rx_ring, rx_desc, skb))

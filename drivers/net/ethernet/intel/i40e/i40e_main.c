@@ -39,6 +39,7 @@
  */
 #define CREATE_TRACE_POINTS
 #include "i40e_trace.h"
+#include "buff_pool.h"
 
 const char i40e_driver_name[] = "i40e";
 static const char i40e_driver_string[] =
@@ -3217,7 +3218,9 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	/* clear the context structure first */
 	memset(&rx_ctx, 0, sizeof(rx_ctx));
 
-	ring->rx_buf_len = vsi->rx_buf_len;
+	ring->bpool = i40e_buff_pool_create(ring->dev);
+	ring->rx_buf_hr = (u16)bpool_buff_headroom(ring->bpool);
+	ring->rx_buf_len = (u16)bpool_buff_size(ring->bpool);
 
 	rx_ctx.dbuff = DIV_ROUND_UP(ring->rx_buf_len,
 				    BIT_ULL(I40E_RXQ_CTX_DBUFF_SHIFT));
@@ -3312,20 +3315,8 @@ static int i40e_vsi_configure_rx(struct i40e_vsi *vsi)
 	int err = 0;
 	u16 i;
 
-	if (!vsi->netdev || (vsi->back->flags & I40E_FLAG_LEGACY_RX)) {
-		vsi->max_frame = I40E_MAX_RXBUFFER;
-		vsi->rx_buf_len = I40E_RXBUFFER_2048;
-#if (PAGE_SIZE < 8192)
-	} else if (!I40E_2K_TOO_SMALL_WITH_PADDING &&
-		   (vsi->netdev->mtu <= ETH_DATA_LEN)) {
-		vsi->max_frame = I40E_RXBUFFER_1536 - NET_IP_ALIGN;
-		vsi->rx_buf_len = I40E_RXBUFFER_1536 - NET_IP_ALIGN;
-#endif
-	} else {
-		vsi->max_frame = I40E_MAX_RXBUFFER;
-		vsi->rx_buf_len = (PAGE_SIZE < 8192) ? I40E_RXBUFFER_3072 :
-						       I40E_RXBUFFER_2048;
-	}
+	vsi->max_frame = I40E_MAX_RXBUFFER;
+	vsi->rx_buf_len = I40E_RXBUFFER_3072;
 
 	/* set up individual rings */
 	for (i = 0; i < vsi->num_queue_pairs && !err; i++)
@@ -11601,6 +11592,9 @@ static int i40e_xdp_setup(struct i40e_vsi *vsi,
 	bool need_reset;
 	int i;
 
+	/* XXX What's the correct behavior here, when we can have
+	 * different different rx_buf_lens per ring?
+	 */
 	/* Don't allow frames that span over multiple buffers */
 	if (frame_size > vsi->rx_buf_len)
 		return -EINVAL;

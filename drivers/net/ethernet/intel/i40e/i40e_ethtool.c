@@ -1647,7 +1647,6 @@ rx_unwind:
 			 */
 			rx_rings[i].next_to_use = 0;
 			rx_rings[i].next_to_clean = 0;
-			rx_rings[i].next_to_alloc = 0;
 			/* do a struct copy */
 			*vsi->rx_rings[i] = rx_rings[i];
 		}
