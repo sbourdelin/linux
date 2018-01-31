@@ -452,7 +452,7 @@
 	MEM_KEEP(exit.text)						\
 
 
-/* sched.text is aling to function alignment to secure we have same
+/* sched.text is aligned to function alignment to secure we have same
  * address even at second ld pass when generating System.map */
 #define SCHED_TEXT							\
 		ALIGN_FUNCTION();					\
@@ -460,7 +460,7 @@
 		*(.sched.text)						\
 		VMLINUX_SYMBOL(__sched_text_end) = .;
 
-/* spinlock.text is aling to function alignment to secure we have same
+/* spinlock.text is aligned to function alignment to secure we have same
  * address even at second ld pass when generating System.map */
 #define LOCK_TEXT							\
 		ALIGN_FUNCTION();					\
