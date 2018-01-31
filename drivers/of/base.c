@@ -91,9 +91,13 @@ int __weak of_node_to_nid(struct device_node *np)
 }
 #endif
 
+static void of_populate_phandle_cache(void);
+
 void __init of_core_init(void)
 {
 	struct device_node *np;
+
+	of_populate_phandle_cache();
 
 	/* Create the kset, and register existing nodes */
 	mutex_lock(&of_mutex);
@@ -986,6 +990,72 @@ int of_modalias_node(struct device_node *node, char *modalias, int len)
 }
 EXPORT_SYMBOL_GPL(of_modalias_node);
 
+phandle live_tree_max_phandle(void)
+{
+	struct device_node *node;
+	phandle max_phandle;
+	unsigned long flags;
+
+	raw_spin_lock_irqsave(&devtree_lock, flags);
+	max_phandle = 0;
+	for_each_of_allnodes(node) {
+		if (node->phandle != OF_PHANDLE_ILLEGAL &&
+		    node->phandle > max_phandle)
+			max_phandle = node->phandle;
+	}
+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+
+	return max_phandle;
+}
+
+static struct device_node **phandle_cache;
+static u32 max_phandle_cache;
+
+static int __init of_free_phandle_cache(void)
+{
+	max_phandle_cache = 0;
+	kfree(phandle_cache);
+	phandle_cache = NULL;
+
+	return 0;
+}
+late_initcall_sync(of_free_phandle_cache);
+
+static void of_populate_phandle_cache(void)
+{
+	unsigned long flags;
+	phandle max_phandle;
+	u32 nodes = 0;
+	struct device_node *np;
+
+	if (phandle_cache)
+		return;
+
+	max_phandle = live_tree_max_phandle();
+
+	raw_spin_lock_irqsave(&devtree_lock, flags);
+
+	for_each_of_allnodes(np)
+		nodes++;
+
+	/* sanity cap for malformed tree */
+	if (max_phandle > nodes)
+		max_phandle = nodes;
+
+	phandle_cache = kzalloc((max_phandle + 1) * sizeof(*phandle_cache),
+				GFP_KERNEL);
+
+	for_each_of_allnodes(np)
+		if (np->phandle != OF_PHANDLE_ILLEGAL  &&
+		    np->phandle <= max_phandle &&
+		    np->phandle)
+			phandle_cache[np->phandle] = np;
+
+	max_phandle_cache = max_phandle;
+
+	raw_spin_unlock_irqrestore(&devtree_lock, flags);
+}
+
 /**
  * of_find_node_by_phandle - Find a node given a phandle
  * @handle:	phandle of the node to find
@@ -995,16 +1065,23 @@ EXPORT_SYMBOL_GPL(of_modalias_node);
  */
 struct device_node *of_find_node_by_phandle(phandle handle)
 {
-	struct device_node *np;
+	struct device_node *np = NULL;
 	unsigned long flags;
 
 	if (!handle)
 		return NULL;
 
 	raw_spin_lock_irqsave(&devtree_lock, flags);
-	for_each_of_allnodes(np)
-		if (np->phandle == handle)
-			break;
+
+	if (handle <= max_phandle_cache)
+		np = phandle_cache[handle];
+
+	if (!np || np->phandle != handle) {
+		for_each_of_allnodes(np)
+			if (np->phandle == handle)
+				break;
+	}
+
 	of_node_get(np);
 	raw_spin_unlock_irqrestore(&devtree_lock, flags);
 	return np;
