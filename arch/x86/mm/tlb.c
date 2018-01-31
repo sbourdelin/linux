@@ -574,37 +574,38 @@ static unsigned long tlb_single_page_flush_ceiling __read_mostly = 33;
 void flush_tlb_mm_range(struct mm_struct *mm, unsigned long start,
 				unsigned long end, unsigned long vmflag)
 {
+	struct flush_tlb_info *info;
 	int cpu;
 
-	struct flush_tlb_info info = {
-		.mm = mm,
-	};
+	info = __alloca_with_align(sizeof(*info),
+				   SMP_CACHE_BYTES * BITS_PER_BYTE);
+	info->mm = mm;
 
 	cpu = get_cpu();
 
 	/* This is also a barrier that synchronizes with switch_mm(). */
-	info.new_tlb_gen = inc_mm_tlb_gen(mm);
+	info->new_tlb_gen = inc_mm_tlb_gen(mm);
 
 	/* Should we flush just the requested range? */
 	if ((end != TLB_FLUSH_ALL) &&
 	    !(vmflag & VM_HUGETLB) &&
 	    ((end - start) >> PAGE_SHIFT) <= tlb_single_page_flush_ceiling) {
-		info.start = start;
-		info.end = end;
+		info->start = start;
+		info->end = end;
 	} else {
-		info.start = 0UL;
-		info.end = TLB_FLUSH_ALL;
+		info->start = 0UL;
+		info->end = TLB_FLUSH_ALL;
 	}
 
 	if (mm == this_cpu_read(cpu_tlbstate.loaded_mm)) {
 		VM_WARN_ON(irqs_disabled());
 		local_irq_disable();
-		flush_tlb_func_local(&info, TLB_LOCAL_MM_SHOOTDOWN);
+		flush_tlb_func_local(info, TLB_LOCAL_MM_SHOOTDOWN);
 		local_irq_enable();
 	}
 
 	if (cpumask_any_but(mm_cpumask(mm), cpu) < nr_cpu_ids)
-		flush_tlb_others(mm_cpumask(mm), &info);
+		flush_tlb_others(mm_cpumask(mm), info);
 
 	put_cpu();
 }

@@ -314,6 +314,11 @@
 #define __designated_init __attribute__((designated_init))
 #endif
 
+#if GCC_VERSION >= 60100
+#define __alloca_with_align(size, alignment)				\
+	__builtin_alloca_with_align(size, alignment)
+#endif
+
 #endif	/* gcc version >= 40000 specific checks */
 
 #if !defined(__noclone)
