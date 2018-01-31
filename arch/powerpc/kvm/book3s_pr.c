@@ -98,7 +98,7 @@ static void kvmppc_core_vcpu_load_pr(struct kvm_vcpu *vcpu, int cpu)
 	struct kvmppc_book3s_shadow_vcpu *svcpu = svcpu_get(vcpu);
 	memcpy(svcpu->slb, to_book3s(vcpu)->slb_shadow, sizeof(svcpu->slb));
 	svcpu->slb_max = to_book3s(vcpu)->slb_shadow_max;
-	svcpu->in_use = 0;
+	vcpu->arch.svcpu_in_use = 0;
 	svcpu_put(svcpu);
 #endif
 
@@ -120,9 +120,9 @@ static void kvmppc_core_vcpu_put_pr(struct kvm_vcpu *vcpu)
 {
 #ifdef CONFIG_PPC_BOOK3S_64
 	struct kvmppc_book3s_shadow_vcpu *svcpu = svcpu_get(vcpu);
-	if (svcpu->in_use) {
+	if (vcpu->arch.svcpu_in_use)
 		kvmppc_copy_from_svcpu(vcpu, svcpu);
-	}
+
 	memcpy(to_book3s(vcpu)->slb_shadow, svcpu->slb, sizeof(svcpu->slb));
 	to_book3s(vcpu)->slb_shadow_max = svcpu->slb_max;
 	svcpu_put(svcpu);
@@ -176,7 +176,7 @@ void kvmppc_copy_to_svcpu(struct kvmppc_book3s_shadow_vcpu *svcpu,
 	vcpu->arch.entry_vtb = get_vtb();
 	if (cpu_has_feature(CPU_FTR_ARCH_207S))
 		vcpu->arch.entry_ic = mfspr(SPRN_IC);
-	svcpu->in_use = true;
+	vcpu->arch.svcpu_in_use = true;
 }
 
 /* Copy data touched by real-mode code from shadow vcpu back to vcpu */
@@ -193,7 +193,7 @@ void kvmppc_copy_from_svcpu(struct kvm_vcpu *vcpu,
 	 * Maybe we were already preempted and synced the svcpu from
 	 * our preempt notifiers. Don't bother touching this svcpu then.
 	 */
-	if (!svcpu->in_use)
+	if (!vcpu->arch.svcpu_in_use)
 		goto out;
 
 	vcpu->arch.gpr[0] = svcpu->gpr[0];
@@ -230,7 +230,7 @@ void kvmppc_copy_from_svcpu(struct kvm_vcpu *vcpu,
 	to_book3s(vcpu)->vtb += get_vtb() - vcpu->arch.entry_vtb;
 	if (cpu_has_feature(CPU_FTR_ARCH_207S))
 		vcpu->arch.ic += mfspr(SPRN_IC) - vcpu->arch.entry_ic;
-	svcpu->in_use = false;
+	vcpu->arch.svcpu_in_use = false;
 
 out:
 	preempt_enable();

@@ -785,6 +785,10 @@ struct kvm_vcpu_arch {
 	struct dentry *debugfs_dir;
 	struct dentry *debugfs_timings;
 #endif /* CONFIG_KVM_BOOK3S_HV_EXIT_TIMING */
+	bool svcpu_in_use; /* indicates whether current vcpu need copy svcpu
+			    * content to local.
+			    * false: no need to copy; true: need copy;
+			    */
 };
 
 #define VCPU_FPR(vcpu, i)	(vcpu)->arch.fp.fpr[i][TS_FPROFFSET]
