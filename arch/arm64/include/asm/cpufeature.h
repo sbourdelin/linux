@@ -198,6 +198,8 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
 /* Is it safe for a late CPU to miss this capability when system has it */
 #define ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	((u16)BIT(5))
 
+#define ARM64_CPUCAP_SCOPE_ALL			 \
+	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_SCOPE_SYSTEM)
 /*
  * CPU errata detected at boot time based on feature of one or more CPUs.
  * It is not safe for a late CPU to have this feature when the system doesn't
