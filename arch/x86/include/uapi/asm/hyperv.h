@@ -412,6 +412,16 @@ struct hv_timer_message_payload {
 	__u64 delivery_time;	/* When the message was delivered */
 };
 
+/* Define virtual processor assist page structure. */
+struct hv_vp_assist_page {
+	__u32 apic_assist;
+	__u32 reserved;
+	__u64 vtl_control[2];
+	__u64 nested_enlightenments_control[2];
+	__u32 enlighten_vmentry;
+	__u64 current_nested_vmcs;
+};
+
 #define HV_STIMER_ENABLE		(1ULL << 0)
 #define HV_STIMER_PERIODIC		(1ULL << 1)
 #define HV_STIMER_LAZY			(1ULL << 2)
