@@ -66,5 +66,11 @@ void bpool_buff_dma_sync_dev(struct buff_pool *pool,
 struct buff_pool *i40e_buff_pool_create(struct device *dev);
 void i40e_buff_pool_destroy(struct buff_pool *pool);
 
+struct buff_pool *i40e_buff_pool_recycle_create(unsigned int mtu,
+						bool reserve_headroom,
+						struct device *dev,
+						unsigned int pool_size);
+void i40e_buff_pool_recycle_destroy(struct buff_pool *pool);
+
 #endif /* BUFF_POOL_H_ */
 
