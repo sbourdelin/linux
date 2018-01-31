@@ -3733,8 +3733,11 @@ static void *intel_alloc_coherent(struct device *dev, size_t size,
 		}
 	}
 
-	if (!page)
-		page = alloc_pages(flags, order);
+	if (!page) {
+		page = alloc_pages_node(dev_to_node(dev), flags, order);
+		if (!page)
+			page = alloc_pages(flags, order);
+	}
 	if (!page)
 		return NULL;
 	memset(page_address(page), 0, size);
