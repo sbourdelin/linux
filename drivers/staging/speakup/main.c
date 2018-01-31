@@ -261,9 +261,12 @@ static unsigned char get_attributes(struct vc_data *vc, u16 *pos)
 
 static void speakup_date(struct vc_data *vc)
 {
-	spk_x = spk_cx = vc->vc_x;
-	spk_y = spk_cy = vc->vc_y;
-	spk_pos = spk_cp = vc->vc_pos;
+	spk_x =  vc->vc_x;
+	spk_cx = vc->vc_x;
+	spk_y = vc->vc_y;
+	spk_cy = vc->vc_y;
+	spk_pos =  vc->vc_pos;
+	spk_cp = vc->vc_pos;
 	spk_old_attr = spk_attr;
 	spk_attr = get_attributes(vc, (u_short *)spk_pos);
 }
