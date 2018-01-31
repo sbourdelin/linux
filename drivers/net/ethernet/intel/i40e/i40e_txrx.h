@@ -390,6 +390,8 @@ struct i40e_ring {
 	struct xdp_rxq_info xdp_rxq;
 	struct buff_pool *bpool;
 	struct i40e_xsk_ctx *xsk;
+	bool (*clean_tx)(struct i40e_vsi *vsi,
+			 struct i40e_ring *tx_ring, int napi_budget);
 } ____cacheline_internodealigned_in_smp;
 
 static inline bool ring_uses_build_skb(struct i40e_ring *ring)
@@ -480,6 +482,8 @@ int __i40e_maybe_stop_tx(struct i40e_ring *tx_ring, int size);
 bool __i40e_chk_linearize(struct sk_buff *skb);
 int i40e_xdp_xmit(struct net_device *dev, struct xdp_buff *xdp);
 void i40e_xdp_flush(struct net_device *dev);
+bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
+		       struct i40e_ring *tx_ring, int napi_budget);
 
 
 /**

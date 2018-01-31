@@ -681,7 +681,7 @@ void i40e_clean_tx_ring(struct i40e_ring *tx_ring)
 	tx_ring->next_to_use = 0;
 	tx_ring->next_to_clean = 0;
 
-	if (!tx_ring->netdev)
+	if (!tx_ring->netdev || ring_is_xdp(tx_ring))
 		return;
 
 	/* cleanup Tx queue statistics */
@@ -791,8 +791,8 @@ void i40e_detect_recover_hung(struct i40e_vsi *vsi)
  *
  * Returns true if there's any budget left (e.g. the clean is finished)
  **/
-static bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
-			      struct i40e_ring *tx_ring, int napi_budget)
+bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
+		       struct i40e_ring *tx_ring, int napi_budget)
 {
 	u16 i = tx_ring->next_to_clean;
 	struct i40e_tx_buffer *tx_buf;
@@ -2249,7 +2249,7 @@ int i40e_napi_poll(struct napi_struct *napi, int budget)
 	 * budget and be more aggressive about cleaning up the Tx descriptors.
 	 */
 	i40e_for_each_ring(ring, q_vector->tx) {
-		if (!i40e_clean_tx_irq(vsi, ring, budget)) {
+		if (!ring->clean_tx(vsi, ring, budget)) {
 			clean_complete = false;
 			continue;
 		}
