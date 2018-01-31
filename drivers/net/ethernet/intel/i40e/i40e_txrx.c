@@ -1256,8 +1256,11 @@ void i40e_free_rx_resources(struct i40e_ring *rx_ring)
 	kfree(rx_ring->rx_bi);
 	rx_ring->rx_bi = NULL;
 
-	bpool_destroy(rx_ring->bpool);
+	if (!ring_has_xsk_buff_pool(rx_ring))
+		bpool_destroy(rx_ring->bpool);
+
 	rx_ring->bpool = NULL;
+	clear_ring_xsk_buff_pool(rx_ring);
 
 	if (rx_ring->desc) {
 		dma_free_coherent(rx_ring->dev, rx_ring->size,
@@ -1917,6 +1920,7 @@ static struct sk_buff *i40e_run_xdp(struct i40e_ring *rx_ring,
 	xdp.data = xdp.data_hard_start + *headroom;
 	xdp_set_data_meta_invalid(&xdp);
 	xdp.data_end = xdp.data + *size;
+	xdp.bp_handle = handle;
 	xdp.rxq = &rx_ring->xdp_rxq;
 
 	act = bpf_prog_run_xdp(xdp_prog, &xdp);
@@ -1943,17 +1947,8 @@ static struct sk_buff *i40e_run_xdp(struct i40e_ring *rx_ring,
 		}
 		break;
 	case XDP_REDIRECT:
-		err = i40e_xdp_buff_convert_page(rx_ring, &xdp, handle, *size,
-						 *headroom);
-		if (err) {
-			result = I40E_XDP_CONSUMED;
-			break;
-		}
-
 		err = xdp_do_redirect(rx_ring->netdev, &xdp, xdp_prog);
-		result = I40E_XDP_TX;
-		if (err)
-			page_frag_free(xdp.data);
+		result = err ? I40E_XDP_CONSUMED : I40E_XDP_TX;
 		break;
 	default:
 		bpf_warn_invalid_xdp_action(act);

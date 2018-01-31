@@ -806,6 +806,10 @@ struct i40e_vsi {
 
 	/* VSI specific handlers */
 	irqreturn_t (*irq_handler)(int irq, void *data);
+
+	struct i40e_xsk_ctx **xsk_ctxs;
+	u16 num_xsk_ctxs;
+	u16 xsk_ctxs_in_use;
 } ____cacheline_internodealigned_in_smp;
 
 struct i40e_netdev_priv {
@@ -1109,4 +1113,24 @@ static inline bool i40e_enabled_xdp_vsi(struct i40e_vsi *vsi)
 
 int i40e_create_queue_channel(struct i40e_vsi *vsi, struct i40e_channel *ch);
 int i40e_set_bw_limit(struct i40e_vsi *vsi, u16 seid, u64 max_tx_rate);
+
+static inline bool i40e_xsk_attached(struct i40e_ring *rxr)
+{
+	bool xdp_on = i40e_enabled_xdp_vsi(rxr->vsi);
+	int qid = rxr->queue_index;
+
+	return rxr->vsi->xsk_ctxs && rxr->vsi->xsk_ctxs[qid] && xdp_on;
+}
+
+static inline struct buff_pool *i40e_xsk_buff_pool(struct i40e_ring *rxr)
+{
+	bool xdp_on = i40e_enabled_xdp_vsi(rxr->vsi);
+	int qid = rxr->queue_index;
+
+	if (!rxr->vsi->xsk_ctxs || !rxr->vsi->xsk_ctxs[qid] || !xdp_on)
+		return NULL;
+
+	return rxr->vsi->xsk_ctxs[qid]->buff_pool;
+}
+
 #endif /* _I40E_H_ */

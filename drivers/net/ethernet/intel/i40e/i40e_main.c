@@ -29,6 +29,7 @@
 #include <linux/pci.h>
 #include <linux/bpf.h>
 #include <linux/buff_pool.h>
+#include <net/xdp_sock.h>
 
 /* Local includes */
 #include "i40e.h"
@@ -3211,6 +3212,7 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	u32 chain_len = vsi->back->hw.func_caps.rx_buf_chain_len;
 	u16 pf_q = vsi->base_queue + ring->queue_index;
 	struct i40e_hw *hw = &vsi->back->hw;
+	struct buff_pool *xsk_buff_pool;
 	struct i40e_hmc_obj_rxq rx_ctx;
 	bool reserve_headroom;
 	unsigned int mtu = 0;
@@ -3229,9 +3231,20 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	} else {
 		reserve_headroom = false;
 	}
-	ring->bpool = i40e_buff_pool_recycle_create(mtu, reserve_headroom,
-						    ring->dev,
-						    ring->count);
+
+	xsk_buff_pool = i40e_xsk_buff_pool(ring);
+	if (xsk_buff_pool) {
+		ring->bpool = xsk_buff_pool;
+		ring->xdp_rxq.bpool = xsk_buff_pool;
+		set_ring_xsk_buff_pool(ring);
+	} else {
+		ring->bpool = i40e_buff_pool_recycle_create(mtu,
+							    reserve_headroom,
+							    ring->dev,
+							    ring->count);
+		ring->xdp_rxq.bpool = NULL;
+		clear_ring_xsk_buff_pool(ring);
+	}
 	ring->rx_buf_hr = (u16)bpool_buff_headroom(ring->bpool);
 	ring->rx_buf_len = (u16)bpool_buff_size(ring->bpool);
 
@@ -9923,6 +9936,25 @@ static void i40e_clear_rss_config_user(struct i40e_vsi *vsi)
 	vsi->rss_lut_user = NULL;
 }
 
+static void i40e_free_xsk_ctxs(struct i40e_vsi *vsi)
+{
+	struct i40e_xsk_ctx *ctx;
+	u16 i;
+
+	if (!vsi->xsk_ctxs)
+		return;
+
+	for (i = 0; i < vsi->num_xsk_ctxs; i++) {
+		ctx = vsi->xsk_ctxs[i];
+		/* ctx free'd by error handle */
+		if (ctx)
+			ctx->err_handler(ctx->err_ctx, -1 /* XXX wat? */);
+	}
+
+	kfree(vsi->xsk_ctxs);
+	vsi->xsk_ctxs = NULL;
+}
+
 /**
  * i40e_vsi_clear - Deallocate the VSI provided
  * @vsi: the VSI being un-configured
@@ -9937,6 +9969,8 @@ static int i40e_vsi_clear(struct i40e_vsi *vsi)
 	if (!vsi->back)
 		goto free_vsi;
 	pf = vsi->back;
+
+	i40e_free_xsk_ctxs(vsi);
 
 	mutex_lock(&pf->switch_mutex);
 	if (!pf->vsi[vsi->idx]) {
@@ -11636,6 +11670,394 @@ static int i40e_xdp_setup(struct i40e_vsi *vsi,
 }
 
 /**
+ * i40e_enter_busy_conf - Enters busy config state
+ * @vsi: vsi
+ *
+ * Returns 0 on success, <0 for failure.
+ **/
+static int i40e_enter_busy_conf(struct i40e_vsi *vsi)
+{
+	struct i40e_pf *pf = vsi->back;
+	int timeout = 50;
+
+	while (test_and_set_bit(__I40E_CONFIG_BUSY, pf->state)) {
+		timeout--;
+		if (!timeout)
+			return -EBUSY;
+		usleep_range(1000, 2000);
+	}
+
+	return 0;
+}
+
+/**
+ * i40e_exit_busy_conf - Exits busy config state
+ * @vsi: vsi
+ **/
+static void i40e_exit_busy_conf(struct i40e_vsi *vsi)
+{
+	struct i40e_pf *pf = vsi->back;
+
+	clear_bit(__I40E_CONFIG_BUSY, pf->state);
+}
+
+/**
+ * i40e_queue_pair_reset_stats - Resets all statistics for a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ **/
+static void i40e_queue_pair_reset_stats(struct i40e_vsi *vsi, int queue_pair)
+{
+	memset(&vsi->rx_rings[queue_pair]->rx_stats, 0,
+	       sizeof(vsi->rx_rings[queue_pair]->rx_stats));
+	memset(&vsi->tx_rings[queue_pair]->stats, 0,
+	       sizeof(vsi->tx_rings[queue_pair]->stats));
+	if (i40e_enabled_xdp_vsi(vsi)) {
+		memset(&vsi->xdp_rings[queue_pair]->stats, 0,
+		       sizeof(vsi->xdp_rings[queue_pair]->stats));
+	}
+}
+
+/**
+ * i40e_queue_pair_clean_rings - Cleans all the rings of a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ **/
+static void i40e_queue_pair_clean_rings(struct i40e_vsi *vsi, int queue_pair)
+{
+	i40e_clean_tx_ring(vsi->tx_rings[queue_pair]);
+	if (i40e_enabled_xdp_vsi(vsi))
+		i40e_clean_tx_ring(vsi->xdp_rings[queue_pair]);
+	i40e_clean_rx_ring(vsi->rx_rings[queue_pair]);
+}
+
+/**
+ * i40e_queue_pair_control_napi - Enables/disables NAPI for a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ * @enable: true for enable, false for disable
+ **/
+static void i40e_queue_pair_control_napi(struct i40e_vsi *vsi, int queue_pair,
+					 bool enable)
+{
+	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+	struct i40e_q_vector *q_vector = rxr->q_vector;
+
+	if (!vsi->netdev)
+		return;
+
+	/* All rings in a qp belong to the same qvector. */
+	if (q_vector->rx.ring || q_vector->tx.ring) {
+		if (enable)
+			napi_enable(&q_vector->napi);
+		else
+			napi_disable(&q_vector->napi);
+	}
+}
+
+/**
+ * i40e_queue_pair_control_rings - Enables/disables all rings for a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ * @enable: true for enable, false for disable
+ *
+ * Returns 0 on success, <0 on failure.
+ **/
+static int i40e_queue_pair_control_rings(struct i40e_vsi *vsi, int queue_pair,
+					 bool enable)
+{
+	struct i40e_pf *pf = vsi->back;
+	int pf_q, ret = 0;
+
+	pf_q = vsi->base_queue + queue_pair;
+	ret = i40e_control_wait_tx_q(vsi->seid, pf, pf_q,
+				     false /*is xdp*/, enable);
+	if (ret) {
+		dev_info(&pf->pdev->dev,
+			 "VSI seid %d Tx ring %d %sable timeout\n",
+			 vsi->seid, pf_q, (enable ? "en" : "dis"));
+		return ret;
+	}
+
+	i40e_control_rx_q(pf, pf_q, enable);
+	ret = i40e_pf_rxq_wait(pf, pf_q, enable);
+	if (ret) {
+		dev_info(&pf->pdev->dev,
+			 "VSI seid %d Rx ring %d %sable timeout\n",
+			 vsi->seid, pf_q, (enable ? "en" : "dis"));
+		return ret;
+	}
+
+	/* Due to HW errata, on Rx disable only, the register can
+	 * indicate done before it really is. Needs 50ms to be sure
+	 */
+	if (!enable)
+		mdelay(50);
+
+	if (!i40e_enabled_xdp_vsi(vsi))
+		return ret;
+
+	ret = i40e_control_wait_tx_q(vsi->seid, pf,
+				     pf_q + vsi->alloc_queue_pairs,
+				     true /*is xdp*/, enable);
+	if (ret) {
+		dev_info(&pf->pdev->dev,
+			 "VSI seid %d XDP Tx ring %d %sable timeout\n",
+			 vsi->seid, pf_q, (enable ? "en" : "dis"));
+	}
+
+	return ret;
+}
+
+/**
+ * i40e_queue_pair_enable_irq - Enables interrupts for a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue_pair
+ **/
+static void i40e_queue_pair_enable_irq(struct i40e_vsi *vsi, int queue_pair)
+{
+	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+	struct i40e_pf *pf = vsi->back;
+	struct i40e_hw *hw = &pf->hw;
+
+	/* All rings in a qp belong to the same qvector. */
+	if (pf->flags & I40E_FLAG_MSIX_ENABLED)
+		i40e_irq_dynamic_enable(vsi, rxr->q_vector->v_idx);
+	else
+		i40e_irq_dynamic_enable_icr0(pf);
+
+	i40e_flush(hw);
+}
+
+/**
+ * i40e_queue_pair_disable_irq - Disables interrupts for a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue_pair
+ **/
+static void i40e_queue_pair_disable_irq(struct i40e_vsi *vsi, int queue_pair)
+{
+	struct i40e_ring *rxr = vsi->rx_rings[queue_pair];
+	struct i40e_pf *pf = vsi->back;
+	struct i40e_hw *hw = &pf->hw;
+
+	/* For simplicity, instead of removing the qp interrupt causes
+	 * from the interrupt linked list, we simply disable the interrupt, and
+	 * leave the list intact.
+	 *
+	 * All rings in a qp belong to the same qvector.
+	 */
+	if (pf->flags & I40E_FLAG_MSIX_ENABLED) {
+		u32 intpf = vsi->base_vector + rxr->q_vector->v_idx;
+
+		wr32(hw, I40E_PFINT_DYN_CTLN(intpf - 1), 0);
+		i40e_flush(hw);
+		synchronize_irq(pf->msix_entries[intpf].vector);
+	} else {
+		/* Legacy and MSI mode - this stops all interrupt handling */
+		wr32(hw, I40E_PFINT_ICR0_ENA, 0);
+		wr32(hw, I40E_PFINT_DYN_CTL0, 0);
+		i40e_flush(hw);
+		synchronize_irq(pf->pdev->irq);
+	}
+}
+
+/**
+ * i40e_queue_pair_disable - Disables a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ *
+ * Returns 0 on success, <0 on failure.
+ **/
+static int i40e_queue_pair_disable(struct i40e_vsi *vsi, int queue_pair)
+{
+	int err;
+
+	err = i40e_enter_busy_conf(vsi);
+	if (err)
+		return err;
+
+	i40e_queue_pair_disable_irq(vsi, queue_pair);
+	err = i40e_queue_pair_control_rings(vsi, queue_pair,
+					    false /* disable */);
+	i40e_queue_pair_control_napi(vsi, queue_pair, false /* disable */);
+	i40e_queue_pair_clean_rings(vsi, queue_pair);
+	i40e_queue_pair_reset_stats(vsi, queue_pair);
+
+	return err;
+}
+
+/**
+ * i40e_queue_pair_enable - Enables a queue pair
+ * @vsi: vsi
+ * @queue_pair: queue pair
+ *
+ * Returns 0 on success, <0 on failure.
+ **/
+static int i40e_queue_pair_enable(struct i40e_vsi *vsi, int queue_pair)
+{
+	int err;
+
+	err = i40e_configure_tx_ring(vsi->tx_rings[queue_pair]);
+	if (err)
+		return err;
+
+	if (i40e_enabled_xdp_vsi(vsi)) {
+		err = i40e_configure_tx_ring(vsi->xdp_rings[queue_pair]);
+		if (err)
+			return err;
+	}
+
+	err = i40e_configure_rx_ring(vsi->rx_rings[queue_pair]);
+	if (err)
+		return err;
+
+	err = i40e_queue_pair_control_rings(vsi, queue_pair, true /* enable */);
+	i40e_queue_pair_control_napi(vsi, queue_pair, true /* enable */);
+	i40e_queue_pair_enable_irq(vsi, queue_pair);
+
+	i40e_exit_busy_conf(vsi);
+
+	return err;
+}
+
+static void i40e_free_xsk_ctxs_if_last(struct i40e_vsi *vsi)
+{
+	if (vsi->xsk_ctxs_in_use > 0)
+		return;
+
+	kfree(vsi->xsk_ctxs);
+	vsi->xsk_ctxs = NULL;
+	vsi->num_xsk_ctxs = 0;
+}
+
+static int i40e_alloc_xsk_ctxs(struct i40e_vsi *vsi)
+{
+	if (vsi->xsk_ctxs)
+		return 0;
+
+	vsi->num_xsk_ctxs = vsi->alloc_queue_pairs;
+	vsi->xsk_ctxs = kcalloc(vsi->num_xsk_ctxs, sizeof(*vsi->xsk_ctxs),
+				GFP_KERNEL);
+	if (!vsi->xsk_ctxs) {
+		vsi->num_xsk_ctxs = 0;
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static int i40e_add_xsk_ctx(struct i40e_vsi *vsi,
+			    int queue_id,
+			    struct buff_pool *buff_pool,
+			    void *err_ctx,
+			    void (*err_handler)(void *, int))
+{
+	struct i40e_xsk_ctx *ctx;
+	int err;
+
+	err = i40e_alloc_xsk_ctxs(vsi);
+	if (err)
+		return err;
+
+	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+	if (!ctx) {
+		i40e_free_xsk_ctxs_if_last(vsi);
+		return -ENOMEM;
+	}
+
+	vsi->xsk_ctxs_in_use++;
+	ctx->buff_pool = buff_pool;
+	ctx->err_ctx = err_ctx;
+	ctx->err_handler = err_handler;
+
+	vsi->xsk_ctxs[queue_id] = ctx;
+
+	return 0;
+}
+
+static void i40e_remove_xsk_ctx(struct i40e_vsi *vsi, int queue_id)
+{
+	kfree(vsi->xsk_ctxs[queue_id]);
+	vsi->xsk_ctxs[queue_id] = NULL;
+	vsi->xsk_ctxs_in_use--;
+	i40e_free_xsk_ctxs_if_last(vsi);
+}
+
+static int i40e_xsk_enable(struct net_device *netdev, u32 qid,
+			   struct xsk_rx_parms *parms)
+{
+	struct i40e_netdev_priv *np = netdev_priv(netdev);
+	struct i40e_vsi *vsi = np->vsi;
+	bool if_running;
+	int err;
+
+	if (vsi->type != I40E_VSI_MAIN)
+		return -EINVAL;
+
+	if (qid >= vsi->num_queue_pairs)
+		return -EINVAL;
+
+	if (vsi->xsk_ctxs && vsi->xsk_ctxs[qid])
+		return -EBUSY;
+
+	err = parms->dma_map(parms->buff_pool, &vsi->back->pdev->dev,
+			     DMA_FROM_DEVICE, I40E_RX_DMA_ATTR);
+	if (err)
+		return err;
+
+	if_running = netif_running(netdev) && i40e_enabled_xdp_vsi(vsi);
+
+	if (if_running) {
+		err = i40e_queue_pair_disable(vsi, qid);
+		if (err)
+			return err;
+	}
+
+	err = i40e_add_xsk_ctx(vsi, qid, parms->buff_pool,
+			       parms->error_report_ctx, parms->error_report);
+	if (err)
+		return err;
+
+	if (if_running) {
+		err = i40e_queue_pair_enable(vsi, qid);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
+static int i40e_xsk_disable(struct net_device *netdev, u32 qid,
+			    struct xsk_rx_parms *parms)
+{
+	struct i40e_netdev_priv *np = netdev_priv(netdev);
+	struct i40e_vsi *vsi = np->vsi;
+	bool if_running;
+	int err;
+
+	if (!vsi->xsk_ctxs || qid >= vsi->num_xsk_ctxs || !vsi->xsk_ctxs[qid])
+		return -EINVAL;
+
+	if_running = netif_running(netdev) && i40e_enabled_xdp_vsi(vsi);
+
+	if (if_running) {
+		err = i40e_queue_pair_disable(vsi, qid);
+		if (err)
+			return err;
+	}
+
+	i40e_remove_xsk_ctx(vsi, qid);
+
+	if (if_running) {
+		err = i40e_queue_pair_enable(vsi, qid);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
+/**
  * i40e_xdp - implements ndo_bpf for i40e
  * @dev: netdevice
  * @xdp: XDP command
@@ -11656,6 +12078,12 @@ static int i40e_xdp(struct net_device *dev,
 		xdp->prog_attached = i40e_enabled_xdp_vsi(vsi);
 		xdp->prog_id = vsi->xdp_prog ? vsi->xdp_prog->aux->id : 0;
 		return 0;
+	case XDP_REGISTER_XSK:
+		return i40e_xsk_enable(dev, xdp->xsk.queue_id,
+				       xdp->xsk.rx_parms);
+	case XDP_UNREGISTER_XSK:
+		return i40e_xsk_disable(dev, xdp->xsk.queue_id,
+					xdp->xsk.rx_parms);
 	default:
 		return -EINVAL;
 	}

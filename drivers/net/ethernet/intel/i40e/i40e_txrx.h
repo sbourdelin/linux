@@ -245,6 +245,14 @@ static inline unsigned int i40e_txd_use_count(unsigned int size)
 #define I40E_TX_FLAGS_VLAN_PRIO_SHIFT	29
 #define I40E_TX_FLAGS_VLAN_SHIFT	16
 
+/* Signals completion of a TX packet for an XDP socket. */
+typedef void (*tx_completion_func)(u32 start, u32 npackets,
+				   unsigned long ctx1, unsigned long ctx2);
+/* Returns the next packet to send for an XDP socket. */
+typedef int (*get_tx_packet_func)(struct net_device *dev, u32 queue_id,
+				  dma_addr_t *dma, void **data, u32 *len,
+				  u32 *offset);
+
 struct i40e_tx_buffer {
 	struct i40e_tx_desc *next_to_watch;
 	union {
@@ -289,6 +297,12 @@ enum i40e_ring_state_t {
 	__I40E_TX_FDIR_INIT_DONE,
 	__I40E_TX_XPS_INIT_DONE,
 	__I40E_RING_STATE_NBITS /* must be last */
+};
+
+struct i40e_xsk_ctx {
+	struct buff_pool *buff_pool;
+	void *err_ctx;
+	void (*err_handler)(void *ctx, int errno);
 };
 
 /* some useful defines for virtchannel interface, which
@@ -346,6 +360,7 @@ struct i40e_ring {
 #define I40E_TXR_FLAGS_WB_ON_ITR		BIT(0)
 #define I40E_RXR_FLAGS_BUILD_SKB_ENABLED	BIT(1)
 #define I40E_TXR_FLAGS_XDP			BIT(2)
+#define I40E_RXR_FLAGS_XSK_BUFF_POOL		BIT(3)
 
 	/* stats structs */
 	struct i40e_queue_stats	stats;
@@ -374,6 +389,7 @@ struct i40e_ring {
 	struct i40e_channel *ch;
 	struct xdp_rxq_info xdp_rxq;
 	struct buff_pool *bpool;
+	struct i40e_xsk_ctx *xsk;
 } ____cacheline_internodealigned_in_smp;
 
 static inline bool ring_uses_build_skb(struct i40e_ring *ring)
@@ -399,6 +415,21 @@ static inline bool ring_is_xdp(struct i40e_ring *ring)
 static inline void set_ring_xdp(struct i40e_ring *ring)
 {
 	ring->flags |= I40E_TXR_FLAGS_XDP;
+}
+
+static inline bool ring_has_xsk_buff_pool(struct i40e_ring *ring)
+{
+	return !!(ring->flags & I40E_RXR_FLAGS_XSK_BUFF_POOL);
+}
+
+static inline void clear_ring_xsk_buff_pool(struct i40e_ring *ring)
+{
+	ring->flags &= ~I40E_RXR_FLAGS_XSK_BUFF_POOL;
+}
+
+static inline void set_ring_xsk_buff_pool(struct i40e_ring *ring)
+{
+	ring->flags |= I40E_RXR_FLAGS_XSK_BUFF_POOL;
 }
 
 enum i40e_latency_range {
@@ -536,4 +567,5 @@ static inline struct netdev_queue *txring_txq(const struct i40e_ring *ring)
 {
 	return netdev_get_tx_queue(ring->netdev, ring->queue_index);
 }
+
 #endif /* _I40E_TXRX_H_ */
