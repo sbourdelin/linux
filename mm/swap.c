@@ -200,16 +200,16 @@ static void pagevec_lru_move_fn(struct pagevec *pvec,
 
 		if (pagepgdat != pgdat) {
 			if (pgdat)
-				spin_unlock_irqrestore(&pgdat->lru_lock, flags);
+				lru_unlock_all(pgdat, &flags);
 			pgdat = pagepgdat;
-			spin_lock_irqsave(&pgdat->lru_lock, flags);
+			lru_lock_all(pgdat, &flags);
 		}
 
 		lruvec = mem_cgroup_page_lruvec(page, pgdat);
 		(*move_fn)(page, lruvec, arg);
 	}
 	if (pgdat)
-		spin_unlock_irqrestore(&pgdat->lru_lock, flags);
+		lru_unlock_all(pgdat, &flags);
 	release_pages(pvec->pages, pvec->nr);
 	pagevec_reinit(pvec);
 }
@@ -330,9 +330,9 @@ void activate_page(struct page *page)
 	struct zone *zone = page_zone(page);
 
 	page = compound_head(page);
-	spin_lock_irq(zone_lru_lock(zone));
+	lru_lock_all(zone->zone_pgdat, NULL);
 	__activate_page(page, mem_cgroup_page_lruvec(page, zone->zone_pgdat), NULL);
-	spin_unlock_irq(zone_lru_lock(zone));
+	lru_unlock_all(zone->zone_pgdat, NULL);
 }
 #endif
 

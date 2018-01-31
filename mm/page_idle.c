@@ -42,12 +42,12 @@ static struct page *page_idle_get_page(unsigned long pfn)
 		return NULL;
 
 	zone = page_zone(page);
-	spin_lock_irq(zone_lru_lock(zone));
+	lru_lock_all(zone->zone_pgdat, NULL);
 	if (unlikely(!PageLRU(page))) {
 		put_page(page);
 		page = NULL;
 	}
-	spin_unlock_irq(zone_lru_lock(zone));
+	lru_unlock_all(zone->zone_pgdat, NULL);
 	return page;
 }
 

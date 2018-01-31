@@ -2461,7 +2461,7 @@ static void __split_huge_page(struct page *page, struct list_head *list,
 		spin_unlock(&head->mapping->tree_lock);
 	}
 
-	spin_unlock_irqrestore(zone_lru_lock(page_zone(head)), flags);
+	lru_unlock_all(page_zone(head)->zone_pgdat, &flags);
 
 	unfreeze_page(head);
 
@@ -2661,7 +2661,7 @@ int split_huge_page_to_list(struct page *page, struct list_head *list)
 		lru_add_drain();
 
 	/* prevent PageLRU to go away from under us, and freeze lru stats */
-	spin_lock_irqsave(zone_lru_lock(page_zone(head)), flags);
+	lru_lock_all(page_zone(head)->zone_pgdat, &flags);
 
 	if (mapping) {
 		void **pslot;
@@ -2709,7 +2709,7 @@ int split_huge_page_to_list(struct page *page, struct list_head *list)
 		spin_unlock(&pgdata->split_queue_lock);
 fail:		if (mapping)
 			spin_unlock(&mapping->tree_lock);
-		spin_unlock_irqrestore(zone_lru_lock(page_zone(head)), flags);
+		lru_unlock_all(page_zone(head)->zone_pgdat, &flags);
 		unfreeze_page(head);
 		ret = -EBUSY;
 	}
