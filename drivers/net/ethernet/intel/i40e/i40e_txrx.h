@@ -253,17 +253,21 @@ typedef int (*get_tx_packet_func)(struct net_device *dev, u32 queue_id,
 				  dma_addr_t *dma, void **data, u32 *len,
 				  u32 *offset);
 
+struct i40e_tx_completion {
+	tx_completion_func func;
+	unsigned long ctx1;
+	unsigned long ctx2;
+};
+
 struct i40e_tx_buffer {
 	struct i40e_tx_desc *next_to_watch;
 	union {
 		struct sk_buff *skb;
 		void *raw_buf;
 	};
+	struct i40e_tx_completion *completion;
 	unsigned int bytecount;
 	unsigned short gso_segs;
-	tx_completion_func completion;
-	unsigned long ctx1;
-	unsigned long ctx2;
 
 	DEFINE_DMA_UNMAP_ADDR(dma);
 	DEFINE_DMA_UNMAP_LEN(len);
@@ -306,6 +310,8 @@ struct i40e_xsk_ctx {
 	struct buff_pool *buff_pool;
 	void *err_ctx;
 	void (*err_handler)(void *ctx, int errno);
+	struct i40e_tx_completion tx_comp;
+	get_tx_packet_func get_tx_packet;
 };
 
 /* some useful defines for virtchannel interface, which
@@ -395,6 +401,9 @@ struct i40e_ring {
 	struct i40e_xsk_ctx *xsk;
 	bool (*clean_tx)(struct i40e_vsi *vsi,
 			 struct i40e_ring *tx_ring, int napi_budget);
+	get_tx_packet_func get_packet;
+	struct i40e_tx_completion xdp_tx_completion;
+	struct i40e_tx_completion xsk_tx_completion;
 } ____cacheline_internodealigned_in_smp;
 
 static inline bool ring_uses_build_skb(struct i40e_ring *ring)
@@ -484,11 +493,14 @@ void i40e_detect_recover_hung(struct i40e_vsi *vsi);
 int __i40e_maybe_stop_tx(struct i40e_ring *tx_ring, int size);
 bool __i40e_chk_linearize(struct sk_buff *skb);
 int i40e_xdp_xmit(struct net_device *dev, struct xdp_buff *xdp);
+int i40e_xdp_xmit_xsk(struct net_device *dev, u32 queue_id);
 void i40e_xdp_flush(struct net_device *dev);
 bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
 		       struct i40e_ring *tx_ring, int napi_budget);
 bool i40e_xdp_clean_tx_irq(struct i40e_vsi *vsi,
 			   struct i40e_ring *tx_ring, int napi_budget);
+void i40e_xdp_tx_completion(u32 start, u32 npackets,
+			    unsigned long ctx1, unsigned long ctx2);
 
 /**
  * i40e_get_head - Retrieve head from head writeback

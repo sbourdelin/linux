@@ -627,16 +627,21 @@ static void i40e_fd_handle_status(struct i40e_ring *rx_ring,
  * @ring:      the ring that owns the buffer
  * @tx_buffer: the buffer to free
  **/
-static void i40e_unmap_and_free_tx_resource(struct i40e_ring *ring,
-					    struct i40e_tx_buffer *tx_buffer)
+static void i40e_unmap_and_free_tx_resource(struct i40e_ring *ring, int i)
 {
+	struct i40e_tx_buffer *tx_buffer = &ring->tx_bi[i];
+
 	if (tx_buffer->skb) {
-		if (tx_buffer->tx_flags & I40E_TX_FLAGS_FD_SB)
+		if (tx_buffer->tx_flags & I40E_TX_FLAGS_FD_SB) {
 			kfree(tx_buffer->raw_buf);
-		else if (ring_is_xdp(ring))
-			page_frag_free(tx_buffer->raw_buf);
-		else
+		} else if (ring_is_xdp(ring)) {
+			struct i40e_tx_completion *comp =
+				tx_buffer->completion;
+
+			comp->func(i, 1, comp->ctx1, comp->ctx2);
+		} else {
 			dev_kfree_skb_any(tx_buffer->skb);
+		}
 		if (dma_unmap_len(tx_buffer, len))
 			dma_unmap_single(ring->dev,
 					 dma_unmap_addr(tx_buffer, dma),
@@ -670,7 +675,7 @@ void i40e_clean_tx_ring(struct i40e_ring *tx_ring)
 
 	/* Free all the Tx ring sk_buffs */
 	for (i = 0; i < tx_ring->count; i++)
-		i40e_unmap_and_free_tx_resource(tx_ring, &tx_ring->tx_bi[i]);
+		i40e_unmap_and_free_tx_resource(tx_ring, i);
 
 	bi_size = sizeof(struct i40e_tx_buffer) * tx_ring->count;
 	memset(tx_ring->tx_bi, 0, bi_size);
@@ -781,6 +786,16 @@ void i40e_detect_recover_hung(struct i40e_vsi *vsi)
 	}
 }
 
+static inline void i40e_xdp_ring_update_tail(struct i40e_ring *xdp_ring)
+{
+	/* Force memory writes to complete before letting h/w
+	 * know there are new descriptors to fetch.
+	 */
+	wmb();
+
+	writel(xdp_ring->next_to_use, xdp_ring->tail);
+}
+
 #define WB_STRIDE 4
 
 static void i40e_update_stats_and_arm_wb(struct i40e_ring *tx_ring,
@@ -812,8 +827,8 @@ static void i40e_update_stats_and_arm_wb(struct i40e_ring *tx_ring,
 	}
 }
 
-static void i40e_xdp_tx_completion(u32 start, u32 npackets,
-				   unsigned long ctx1, unsigned long ctx2)
+void i40e_xdp_tx_completion(u32 start, u32 npackets,
+			    unsigned long ctx1, unsigned long ctx2)
 {
 	struct i40e_ring *tx_ring = (struct i40e_ring *)ctx1;
 	struct i40e_tx_buffer *tx_buf;
@@ -843,6 +858,72 @@ static void i40e_xdp_tx_completion(u32 start, u32 npackets,
 	}
 }
 
+static bool i40e_xmit_xsk(struct i40e_ring *xdp_ring)
+{
+	struct i40e_vsi *vsi = xdp_ring->vsi;
+	struct i40e_tx_buffer *tx_bi;
+	struct i40e_tx_desc *tx_desc;
+	bool packets_pending = false;
+	bool packets_sent = false;
+	dma_addr_t dma;
+	void *data;
+	u32 offset;
+	u32 len;
+
+	if (!xdp_ring->get_packet)
+		return 0;
+
+	if (unlikely(!I40E_DESC_UNUSED(xdp_ring))) {
+		xdp_ring->tx_stats.tx_busy++;
+		return false;
+	}
+
+	packets_pending = xdp_ring->get_packet(xdp_ring->netdev,
+					       xdp_ring->queue_index -
+					       vsi->alloc_queue_pairs,
+					       &dma, &data, &len, &offset);
+	while (packets_pending) {
+		packets_sent = true;
+		dma_sync_single_for_device(xdp_ring->dev, dma, len,
+					   DMA_TO_DEVICE);
+
+		tx_bi = &xdp_ring->tx_bi[xdp_ring->next_to_use];
+		tx_bi->bytecount = len;
+		tx_bi->gso_segs = 1;
+		tx_bi->raw_buf = data;
+		tx_bi->completion = &xdp_ring->xsk_tx_completion;
+
+		tx_desc = I40E_TX_DESC(xdp_ring, xdp_ring->next_to_use);
+		tx_desc->buffer_addr = cpu_to_le64(dma);
+		tx_desc->cmd_type_offset_bsz = build_ctob(I40E_TX_DESC_CMD_ICRC
+							| I40E_TX_DESC_CMD_EOP,
+							  0, len, 0);
+
+		xdp_ring->next_to_use++;
+		if (xdp_ring->next_to_use == xdp_ring->count)
+			xdp_ring->next_to_use = 0;
+
+		packets_pending = xdp_ring->get_packet(xdp_ring->netdev,
+						       xdp_ring->queue_index -
+						       vsi->alloc_queue_pairs,
+						       &dma, &data, &len,
+						       &offset);
+		if (unlikely(!I40E_DESC_UNUSED(xdp_ring))) {
+			xdp_ring->tx_stats.tx_busy++;
+			break;
+		}
+	}
+
+	/* Request an interrupt for the last frame. */
+	if (packets_sent)
+		tx_desc->cmd_type_offset_bsz |= (I40E_TX_DESC_CMD_RS <<
+						 I40E_TXD_QW1_CMD_SHIFT);
+
+	i40e_xdp_ring_update_tail(xdp_ring);
+
+	return !packets_pending;
+}
+
 /**
  * i40e_xdp_clean_tx_irq - Reclaim resources after transmit completes
  * @vsi: the VSI we care about
@@ -855,7 +936,6 @@ static void i40e_xdp_tx_completion(u32 start, u32 npackets,
 bool i40e_xdp_clean_tx_irq(struct i40e_vsi *vsi,
 			   struct i40e_ring *tx_ring, int napi_budget)
 {
-	u16 i = tx_ring->next_to_clean;
 	struct i40e_tx_buffer *tx_buf;
 	struct i40e_tx_desc *tx_head;
 	struct i40e_tx_desc *tx_desc;
@@ -864,50 +944,43 @@ bool i40e_xdp_clean_tx_irq(struct i40e_vsi *vsi,
 	struct i40e_tx_buffer *prev_buf;
 	unsigned int packets_completed = 0;
 	u16 start = tx_ring->next_to_clean;
+	bool xmit_done;
 
-	tx_buf = &tx_ring->tx_bi[i];
+	tx_buf = &tx_ring->tx_bi[tx_ring->next_to_clean];
 	prev_buf = tx_buf;
-	tx_desc = I40E_TX_DESC(tx_ring, i);
-	i -= tx_ring->count;
 
 	tx_head = I40E_TX_DESC(tx_ring, i40e_get_head(tx_ring));
 
 	do {
-		struct i40e_tx_desc *eop_desc = tx_buf->next_to_watch;
+		tx_desc = I40E_TX_DESC(tx_ring, tx_ring->next_to_clean);
 
-		/* if next_to_watch is not set then there is no work pending */
-		if (!eop_desc)
-			break;
-
-		/* prevent any other reads prior to eop_desc */
-		smp_rmb();
-
-		i40e_trace(clean_tx_irq, tx_ring, tx_desc, tx_buf);
 		/* we have caught up to head, no work left to do */
 		if (tx_head == tx_desc)
 			break;
 
-		/* clear next_to_watch to prevent false hangs */
-		tx_buf->next_to_watch = NULL;
+		tx_desc->buffer_addr = 0;
+		tx_desc->cmd_type_offset_bsz = 0;
 
 		/* update the statistics for this packet */
 		total_bytes += tx_buf->bytecount;
 		total_packets += tx_buf->gso_segs;
 
 		if (prev_buf->completion != tx_buf->completion) {
-			prev_buf->completion(start, packets_completed,
-					     prev_buf->ctx1, prev_buf->ctx2);
+			struct i40e_tx_completion *comp = prev_buf->completion;
+
+			comp->func(start, packets_completed,
+				   comp->ctx1, comp->ctx2);
 			packets_completed = 0;
-			start = i + tx_ring->count - 1;
+			start = tx_ring->next_to_clean;
 		}
 		packets_completed++;
 
 		/* move us one more past the eop_desc for start of next pkt */
 		prev_buf = tx_buf++;
 		tx_desc++;
-		i++;
-		if (unlikely(!i)) {
-			i -= tx_ring->count;
+		tx_ring->next_to_clean++;
+		if (unlikely(tx_ring->next_to_clean == tx_ring->count)) {
+			tx_ring->next_to_clean = 0;
 			tx_buf = tx_ring->tx_bi;
 			tx_desc = I40E_TX_DESC(tx_ring, 0);
 		}
@@ -918,16 +991,18 @@ bool i40e_xdp_clean_tx_irq(struct i40e_vsi *vsi,
 		budget--;
 	} while (likely(budget));
 
-	if (packets_completed > 0)
-		prev_buf->completion(start, packets_completed,
-				     prev_buf->ctx1, prev_buf->ctx2);
+	if (packets_completed > 0) {
+		struct i40e_tx_completion *comp = prev_buf->completion;
 
-	i += tx_ring->count;
-	tx_ring->next_to_clean = i;
+		comp->func(start, packets_completed, comp->ctx1, comp->ctx2);
+	}
+
 	i40e_update_stats_and_arm_wb(tx_ring, vsi, total_packets,
 				     total_bytes, budget);
 
-	return !!budget;
+	xmit_done = i40e_xmit_xsk(tx_ring);
+
+	return !!budget && xmit_done;
 }
 
 /**
@@ -1001,7 +1076,7 @@ bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
 				i -= tx_ring->count;
 				tx_buf = tx_ring->tx_bi;
 				tx_desc = I40E_TX_DESC(tx_ring, 0);
-			}
+		}
 
 			/* unmap any remaining paged data */
 			if (dma_unmap_len(tx_buf, len)) {
@@ -2084,16 +2159,6 @@ static struct sk_buff *i40e_run_xdp(struct i40e_ring *rx_ring,
 xdp_out:
 	rcu_read_unlock();
 	return ERR_PTR(-result);
-}
-
-static inline void i40e_xdp_ring_update_tail(struct i40e_ring *xdp_ring)
-{
-	/* Force memory writes to complete before letting h/w
-	 * know there are new descriptors to fetch.
-	 */
-	wmb();
-
-	writel(xdp_ring->next_to_use, xdp_ring->tail);
 }
 
 /**
@@ -3264,7 +3329,7 @@ dma_error:
 	/* clear dma mappings for failed tx_bi map */
 	for (;;) {
 		tx_bi = &tx_ring->tx_bi[i];
-		i40e_unmap_and_free_tx_resource(tx_ring, tx_bi);
+		i40e_unmap_and_free_tx_resource(tx_ring, i);
 		if (tx_bi == first)
 			break;
 		if (i == 0)
@@ -3304,8 +3369,7 @@ static int i40e_xmit_xdp_ring(struct xdp_buff *xdp,
 	tx_bi->bytecount = size;
 	tx_bi->gso_segs = 1;
 	tx_bi->raw_buf = xdp->data;
-	tx_bi->completion = i40e_xdp_tx_completion;
-	tx_bi->ctx1 = (unsigned long)xdp_ring;
+	tx_bi->completion = &xdp_ring->xdp_tx_completion;
 
 	/* record length, and DMA address */
 	dma_unmap_len_set(tx_bi, len, size);
@@ -3317,16 +3381,10 @@ static int i40e_xmit_xdp_ring(struct xdp_buff *xdp,
 						  | I40E_TXD_CMD,
 						  0, size, 0);
 
-	/* Make certain all of the status bits have been updated
-	 * before next_to_watch is written.
-	 */
-	smp_wmb();
-
 	i++;
 	if (i == xdp_ring->count)
 		i = 0;
 
-	tx_bi->next_to_watch = tx_desc;
 	xdp_ring->next_to_use = i;
 
 	return I40E_XDP_TX;
@@ -3497,6 +3555,54 @@ int i40e_xdp_xmit(struct net_device *dev, struct xdp_buff *xdp)
 	err = i40e_xmit_xdp_ring(xdp, vsi->xdp_rings[queue_index]);
 	if (err != I40E_XDP_TX)
 		return -ENOMEM;
+
+	return 0;
+}
+
+/**
+ * i40e_napi_is_scheduled - If napi is running, set the NAPIF_STATE_MISSED
+ * @n: napi context
+ *
+ * Returns true if NAPI is scheduled.
+ **/
+static bool i40e_napi_is_scheduled(struct napi_struct *n)
+{
+	unsigned long val, new;
+
+	do {
+		val = READ_ONCE(n->state);
+		if (val & NAPIF_STATE_DISABLE)
+			return true;
+
+		if (!(val & NAPIF_STATE_SCHED))
+			return false;
+
+		new = val | NAPIF_STATE_MISSED;
+	} while (cmpxchg(&n->state, val, new) != val);
+
+	return true;
+}
+
+/**
+ * i40e_xdp_xmit_xsk - Implements ndo_xdp_xmit_xsk
+ * @dev: netdev
+ * @queue_id: queue pair index
+ *
+ * Returns zero if sent, else an error code
+ **/
+int i40e_xdp_xmit_xsk(struct net_device *dev, u32 queue_id)
+{
+	struct i40e_netdev_priv *np = netdev_priv(dev);
+	struct i40e_vsi *vsi = np->vsi;
+	struct i40e_ring *tx_ring;
+
+	if (test_bit(__I40E_VSI_DOWN, vsi->state))
+		return -EAGAIN;
+
+	tx_ring = vsi->tx_rings[queue_id + vsi->alloc_queue_pairs];
+
+	if (!i40e_napi_is_scheduled(&tx_ring->q_vector->napi))
+		i40e_force_wb(vsi, tx_ring->q_vector);
 
 	return 0;
 }

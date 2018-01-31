@@ -10027,6 +10027,22 @@ static void i40e_vsi_clear_rings(struct i40e_vsi *vsi)
 	}
 }
 
+static void i40e_restore_xsk_tx(struct i40e_vsi *vsi, int qid,
+				struct i40e_ring *xdp_ring)
+{
+	if (!vsi->xsk_ctxs)
+		return;
+
+	if (qid < 0 || qid >= vsi->num_xsk_ctxs)
+		return;
+
+	if (!vsi->xsk_ctxs[qid])
+		return;
+
+	xdp_ring->xsk_tx_completion = vsi->xsk_ctxs[qid]->tx_comp;
+	xdp_ring->get_packet = vsi->xsk_ctxs[qid]->get_tx_packet;
+}
+
 /**
  * i40e_alloc_rings - Allocates the Rx and Tx rings for the provided VSI
  * @vsi: the VSI being configured
@@ -10072,10 +10088,13 @@ static int i40e_alloc_rings(struct i40e_vsi *vsi)
 		ring->size = 0;
 		ring->dcb_tc = 0;
 		ring->clean_tx = i40e_xdp_clean_tx_irq;
+		ring->xdp_tx_completion.func = i40e_xdp_tx_completion;
+		ring->xdp_tx_completion.ctx1 = (unsigned long)ring;
 		if (vsi->back->hw_features & I40E_HW_WB_ON_ITR_CAPABLE)
 			ring->flags = I40E_TXR_FLAGS_WB_ON_ITR;
 		set_ring_xdp(ring);
 		ring->tx_itr_setting = pf->tx_itr_default;
+		i40e_restore_xsk_tx(vsi, i, ring);
 		vsi->xdp_rings[i] = ring++;
 
 setup_rx:
@@ -11985,8 +12004,54 @@ static void i40e_remove_xsk_ctx(struct i40e_vsi *vsi, int queue_id)
 	i40e_free_xsk_ctxs_if_last(vsi);
 }
 
-static int i40e_xsk_enable(struct net_device *netdev, u32 qid,
-			   struct xsk_rx_parms *parms)
+static int i40e_xsk_tx_enable(struct i40e_vsi *vsi, u32 qid,
+			      struct xsk_tx_parms *parms)
+{
+	struct i40e_ring *xdp_ring = NULL;
+	int err;
+
+	if (qid >= vsi->num_queue_pairs)
+		return -EINVAL;
+
+	if (!parms->tx_completion || !parms->get_tx_packet)
+		return -EINVAL;
+
+	err = parms->dma_map(parms->buff_pool, &vsi->back->pdev->dev,
+			     DMA_TO_DEVICE, 0);
+	if (err)
+		return err;
+
+	vsi->xsk_ctxs[qid]->tx_comp.func = parms->tx_completion;
+	vsi->xsk_ctxs[qid]->tx_comp.ctx1 = parms->ctx1;
+	vsi->xsk_ctxs[qid]->tx_comp.ctx2 = parms->ctx2;
+	vsi->xsk_ctxs[qid]->get_tx_packet = parms->get_tx_packet;
+
+	if (i40e_enabled_xdp_vsi(vsi)) {
+		xdp_ring = vsi->tx_rings[qid + vsi->alloc_queue_pairs];
+		xdp_ring->xsk_tx_completion.func = parms->tx_completion;
+		xdp_ring->xsk_tx_completion.ctx1 = parms->ctx1;
+		xdp_ring->xsk_tx_completion.ctx2 = parms->ctx2;
+		xdp_ring->get_packet = parms->get_tx_packet;
+	}
+
+	return 0;
+}
+
+static void i40e_xsk_tx_disable(struct i40e_vsi *vsi, u32 queue_id)
+{
+	struct i40e_ring *xdp_ring;
+
+	if (i40e_enabled_xdp_vsi(vsi)) {
+		xdp_ring = vsi->tx_rings[queue_id + vsi->alloc_queue_pairs];
+		xdp_ring->xsk_tx_completion.func = NULL;
+		xdp_ring->xsk_tx_completion.ctx1 = 0;
+		xdp_ring->xsk_tx_completion.ctx2 = 0;
+		xdp_ring->get_packet = NULL;
+	}
+}
+
+static int i40e_xsk_rx_enable(struct net_device *netdev, u32 qid,
+			      struct xsk_rx_parms *parms)
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_vsi *vsi = np->vsi;
@@ -12029,8 +12094,8 @@ static int i40e_xsk_enable(struct net_device *netdev, u32 qid,
 	return 0;
 }
 
-static int i40e_xsk_disable(struct net_device *netdev, u32 qid,
-			    struct xsk_rx_parms *parms)
+static int i40e_xsk_rx_disable(struct net_device *netdev, u32 qid,
+			       struct xsk_rx_parms *parms)
 {
 	struct i40e_netdev_priv *np = netdev_priv(netdev);
 	struct i40e_vsi *vsi = np->vsi;
@@ -12069,6 +12134,7 @@ static int i40e_xdp(struct net_device *dev,
 {
 	struct i40e_netdev_priv *np = netdev_priv(dev);
 	struct i40e_vsi *vsi = np->vsi;
+	int err;
 
 	if (vsi->type != I40E_VSI_MAIN)
 		return -EINVAL;
@@ -12081,11 +12147,14 @@ static int i40e_xdp(struct net_device *dev,
 		xdp->prog_id = vsi->xdp_prog ? vsi->xdp_prog->aux->id : 0;
 		return 0;
 	case XDP_REGISTER_XSK:
-		return i40e_xsk_enable(dev, xdp->xsk.queue_id,
-				       xdp->xsk.rx_parms);
+		err = i40e_xsk_rx_enable(dev, xdp->xsk.queue_id,
+					 xdp->xsk.rx_parms);
+		return err ?: i40e_xsk_tx_enable(vsi, xdp->xsk.queue_id,
+						 xdp->xsk.tx_parms);
 	case XDP_UNREGISTER_XSK:
-		return i40e_xsk_disable(dev, xdp->xsk.queue_id,
-					xdp->xsk.rx_parms);
+		i40e_xsk_tx_disable(vsi, xdp->xsk.queue_id);
+		return i40e_xsk_rx_disable(dev, xdp->xsk.queue_id,
+					   xdp->xsk.rx_parms);
 	default:
 		return -EINVAL;
 	}
@@ -12125,6 +12194,7 @@ static const struct net_device_ops i40e_netdev_ops = {
 	.ndo_bridge_setlink	= i40e_ndo_bridge_setlink,
 	.ndo_bpf		= i40e_xdp,
 	.ndo_xdp_xmit		= i40e_xdp_xmit,
+	.ndo_xdp_xmit_xsk	= i40e_xdp_xmit_xsk,
 	.ndo_xdp_flush		= i40e_xdp_flush,
 };
 
