@@ -255,19 +255,13 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 		 * predictor when switching between processes. This stops
 		 * one process from doing Spectre-v2 attacks on another.
 		 *
-		 * As an optimization, flush indirect branches only when
-		 * switching into processes that disable dumping. This
-		 * protects high value processes like gpg, without having
-		 * too high performance overhead. IBPB is *expensive*!
-		 *
 		 * This will not flush branches when switching into kernel
 		 * threads. It will also not flush if we switch to idle
 		 * thread and back to the same process. It will flush if we
-		 * switch to a different non-dumpable process.
+		 * switch to a different user process.
 		 */
 		if (tsk && tsk->mm &&
-		    tsk->mm->context.ctx_id != last_ctx_id &&
-		    get_dumpable(tsk->mm) != SUID_DUMP_USER)
+		    tsk->mm->context.ctx_id != last_ctx_id)
 			indirect_branch_prediction_barrier();
 
 		if (IS_ENABLED(CONFIG_VMAP_STACK)) {
