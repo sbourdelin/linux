@@ -500,6 +500,7 @@ static void srcu_gp_end(struct srcu_struct *sp)
 {
 	unsigned long cbdelay;
 	bool cbs;
+	bool last_lvl;
 	int cpu;
 	unsigned long flags;
 	unsigned long gpseq;
@@ -532,7 +533,8 @@ static void srcu_gp_end(struct srcu_struct *sp)
 	rcu_for_each_node_breadth_first(sp, snp) {
 		raw_spin_lock_irq_rcu_node(snp);
 		cbs = false;
-		if (snp >= sp->level[rcu_num_lvls - 1])
+		last_lvl = snp >= sp->level[rcu_num_lvls - 1];
+		if (last_lvl)
 			cbs = snp->srcu_have_cbs[idx] == gpseq;
 		snp->srcu_have_cbs[idx] = gpseq;
 		rcu_seq_set_state(&snp->srcu_have_cbs[idx], 1);
@@ -545,7 +547,7 @@ static void srcu_gp_end(struct srcu_struct *sp)
 			srcu_schedule_cbs_snp(sp, snp, mask, cbdelay);
 
 		/* Occasionally prevent srcu_data counter wrap. */
-		if (!(gpseq & counter_wrap_check))
+		if (!(gpseq & counter_wrap_check) && last_lvl)
 			for (cpu = snp->grplo; cpu <= snp->grphi; cpu++) {
 				sdp = per_cpu_ptr(sp->sda, cpu);
 				raw_spin_lock_irqsave_rcu_node(sdp, flags);
