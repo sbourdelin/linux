@@ -178,6 +178,38 @@ static __always_inline void move_page_to_lru_list_tail(struct page *page,
 	__add_page_to_lru_list_tail(page, lruvec, lru);
 }
 
+static __always_inline void lru_lock_all(struct pglist_data *pgdat,
+					 unsigned long *flags)
+{
+	size_t i;
+
+	if (flags)
+		local_irq_save(*flags);
+	else
+		local_irq_disable();
+
+	for (i = 0; i < NUM_LRU_BATCH_LOCKS; ++i)
+		spin_lock(&pgdat->lru_batch_locks[i].lock);
+
+	spin_lock(&pgdat->lru_lock);
+}
+
+static __always_inline void lru_unlock_all(struct pglist_data *pgdat,
+					   unsigned long *flags)
+{
+	int i;
+
+	spin_unlock(&pgdat->lru_lock);
+
+	for (i = NUM_LRU_BATCH_LOCKS - 1; i >= 0; --i)
+		spin_unlock(&pgdat->lru_batch_locks[i].lock);
+
+	if (flags)
+		local_irq_restore(*flags);
+	else
+		local_irq_enable();
+}
+
 /**
  * page_lru_base_type - which LRU list type should a page be on?
  * @page: the page to test
