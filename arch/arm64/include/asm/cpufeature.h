@@ -104,7 +104,7 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *    some checks at runtime. This could be, e.g, checking the value of a field
  *    in CPU ID feature register or checking the cpu model. The capability
  *    provides a call back ( @matches() ) to perform the check.
- *    Scope defines how the checks should be performed. There are two cases:
+ *    Scope defines how the checks should be performed. There are three cases:
  *
  *     a) SCOPE_LOCAL_CPU: check all the CPUs and "detect" if at least one
  *        matches. This implies, we have to run the check on all the booting
@@ -117,6 +117,11 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *        field in one of the CPU ID feature registers, we use the sanitised
  *        value of the register from the CPU feature infrastructure to make
  *        the decision.
+ *		Or
+ *     c) SCOPE_BOOT_CPU: Check only on the primary boot CPU to detect the feature.
+ *        This category is for features that are "finalised" (or used) by the kernel
+ *        very early even before the SMP cpus are brought up.
+ *
  *    The process of detection is usually denoted by "update" capability state
  *    in the code.
  *
@@ -129,6 +134,10 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *    EL2 with Virtualisation Host Extensions). The kernel usually disallows
  *    any changes to the state of a capability once it finalises the capability
  *    and takes any action, as it may be impossible to execute the actions safely.
+ *    At the moment there are two passes of finalising the capabilities.
+ *      a) Boot CPU scope capabilities - Finalised by primary boot CPU via
+ *         setup_boot_cpu_capabilities().
+ *      b) Everything except (a) - Run via setup_system_capabilities().
  *
  * 3) Verification: When a CPU is brought online (e.g, by user or by the kernel),
  *    the kernel should make sure that it is safe to use the CPU, by verifying
@@ -139,11 +148,22 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *
  *    As explained in (2) above, capabilities could be finalised at different
  *    points in the execution. Each CPU is verified against the "finalised"
- *    capabilities and if there is a conflict, the kernel takes an action, based
- *    on the severity (e.g, a CPU could be prevented from booting or cause a
- *    kernel panic). The CPU is allowed to "affect" the state of the capability,
- *    if it has not been finalised already. See section 5 for more details on
- *    conflicts.
+ *    capabilities.
+ *
+ *	x------------------------------------------------------------------- x
+ *	| Verification:       | Boot CPU | SMP CPUs by kernel | CPUs by user |
+ *	|--------------------------------------------------------------------|
+ *	| Primary boot CPU    |          |                    |              |
+ *	|  capability         |   n      |      y             |       y      |
+ *	|--------------------------------------------------------------------|
+ *	| All others          |   n      |      n             |       y      |
+ *	x--------------------------------------------------------------------x
+ *
+ *
+ *    If there is a conflict, the kernel takes an action, based on the severity
+ *    (e.g, a CPU could be prevented from booting or cause a kernel panic).
+ *    The CPU is allowed to "affect" the state of the capability, if it has not
+ *    been finalised already. See section 5 for more details on conflicts.
  *
  * 4) Action: As mentioned in (2), the kernel can take an action for each detected
  *    capability, on all CPUs on the system. This is always initiated only after
@@ -186,20 +206,28 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  */
 
 
-/* Decide how the capability is detected. On a local CPU vs System wide */
-#define ARM64_CPUCAP_SCOPE_MASK			0x3
+/*
+ * Decide how the capability is detected.
+ * On any local CPU vs System wide vs the primary boot CPU
+ */
+#define ARM64_CPUCAP_SCOPE_MASK			0x7
 #define ARM64_CPUCAP_SCOPE_LOCAL_CPU		((u16)BIT(0))
 #define ARM64_CPUCAP_SCOPE_SYSTEM		((u16)BIT(1))
+/*
+ * The capabilitiy is detected on the Boot CPU and is used by kernel
+ * during early boot. i.e, the capability should be "detected" and "enabled"
+ * as early as possibly on all booting CPUs.
+ */
+#define ARM64_CPUCAP_SCOPE_BOOT_CPU		((u16)BIT(2))
 #define SCOPE_SYSTEM				ARM64_CPUCAP_SCOPE_SYSTEM
 #define SCOPE_LOCAL_CPU				ARM64_CPUCAP_SCOPE_LOCAL_CPU
+#define SCOPE_BOOT_CPU				ARM64_CPUCAP_SCOPE_BOOT_CPU
 
 /* Is it permitted for a late CPU to have this capability when system doesn't already have */
 #define ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU	((u16)BIT(4))
 /* Is it safe for a late CPU to miss this capability when system has it */
 #define ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	((u16)BIT(5))
 
-#define ARM64_CPUCAP_SCOPE_ALL			 \
-	(ARM64_CPUCAP_SCOPE_LOCAL_CPU | ARM64_CPUCAP_SCOPE_SYSTEM)
 /*
  * CPU errata detected at boot time based on feature of one or more CPUs.
  * It is not safe for a late CPU to have this feature when the system doesn't

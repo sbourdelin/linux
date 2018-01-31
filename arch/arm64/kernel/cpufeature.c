@@ -504,7 +504,7 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
 }
 
 extern const struct arm64_cpu_capabilities arm64_errata[];
-static void update_cpu_local_capabilities(void);
+static void __init setup_boot_cpu_capabilities(void);
 
 void __init init_cpu_features(struct cpuinfo_arm64 *info)
 {
@@ -550,10 +550,10 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
 	}
 
 	/*
-	 * Run the errata work around checks on the boot CPU, once we have
-	 * initialised the cpu feature infrastructure.
+	 * Detect and enable early CPU features based on the boot CPU, after
+	 * we have initialised the CPU feature infrastructure.
 	 */
-	update_cpu_local_capabilities();
+	setup_boot_cpu_capabilities();
 }
 
 static void update_cpu_ftr_reg(struct arm64_ftr_reg *reg, u64 new)
@@ -1235,12 +1235,21 @@ __enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps, u16 scope_m
 
 		if (caps->cpu_enable) {
 			/*
-			 * Use stop_machine() as it schedules the work allowing
-			 * us to modify PSTATE, instead of on_each_cpu() which
-			 * uses an IPI, giving us a PSTATE that disappears when
-			 * we return.
+			 * If we are dealing with EARLY detected features, we
+			 * have to enable this only on the Boot CPU, where it
+			 * is detected. All the secondaries enable it via
+			 * verify_early_cpu_capabilities().
+			 *
+			 * Otherwise, use stop_machine() as it schedules the
+			 * work allowing us to modify PSTATE, instead of
+			 * on_each_cpu() which uses an IPI, giving us a PSTATE
+			 * that disappears when we return.
 			 */
-			stop_machine(__enable_cpu_capability, (void *)caps, cpu_online_mask);
+			if (scope_mask & ARM64_CPUCAP_SCOPE_BOOT_CPU)
+				caps->cpu_enable(caps);
+			else
+				stop_machine(__enable_cpu_capability,
+					(void *)caps, cpu_online_mask);
 		}
 	}
 }
@@ -1315,6 +1324,12 @@ static void check_early_cpu_features(void)
 {
 	verify_cpu_run_el();
 	verify_cpu_asid_bits();
+	/*
+	 * Early features are used by the kernel already. If there
+	 * is a conflict, we cannot proceed further.
+	 */
+	if (!verify_local_cpu_caps(ARM64_CPUCAP_SCOPE_BOOT_CPU))
+		cpu_panic_kernel();
 }
 
 static void
@@ -1381,7 +1396,7 @@ static void enable_cpu_capabilities(u16 scope_mask)
  */
 static void verify_local_cpu_capabilities(void)
 {
-	if (!verify_local_cpu_caps(ARM64_CPUCAP_SCOPE_ALL))
+	if (!verify_local_cpu_caps(~ARM64_CPUCAP_SCOPE_BOOT_CPU))
 		cpu_die_early();
 	verify_local_elf_hwcaps(arm64_elf_hwcaps);
 
@@ -1415,6 +1430,15 @@ void check_local_cpu_capabilities(void)
 		verify_local_cpu_capabilities();
 }
 
+static void __init setup_boot_cpu_capabilities(void)
+{
+	/* Detect capabilities with either SCOPE_BOOT_CPU or SCOPE_LOCAL_CPU */
+	update_cpu_capabilities(ARM64_CPUCAP_SCOPE_BOOT_CPU |
+				 ARM64_CPUCAP_SCOPE_LOCAL_CPU);
+	/* Enable the SCOPE_BOOT_CPU capabilities alone right away */
+	enable_cpu_capabilities(ARM64_CPUCAP_SCOPE_BOOT_CPU);
+}
+
 static void __init setup_system_capabilities(void)
 {
 	/*
@@ -1422,8 +1446,8 @@ static void __init setup_system_capabilities(void)
 	 * finalise the capabilities that depend on it.
 	 */
 	update_system_capabilities();
-	/* Enable all the available capabilities */
-	enable_cpu_capabilities(ARM64_CPUCAP_SCOPE_ALL);
+	/* Enable all the available capabilities, which are not already enabled. */
+	enable_cpu_capabilities(~ARM64_CPUCAP_SCOPE_BOOT_CPU);
 }
 
 DEFINE_STATIC_KEY_FALSE(arm64_const_caps_ready);
