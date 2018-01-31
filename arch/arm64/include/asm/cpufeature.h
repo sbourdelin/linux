@@ -260,6 +260,13 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
 	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
 	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU)
 
+/*
+ * Critical CPU feature used early in the boot based on the boot CPU.
+ * The feature should be matched by all booting CPU (both miss and hit
+ * cases).
+ */
+#define ARM64_CPUCAP_CRITICAL_BOOT_CPU_FEATURE ARM64_CPUCAP_SCOPE_BOOT_CPU
+
 struct arm64_cpu_capabilities {
 	const char *desc;
 	u16 capability;
