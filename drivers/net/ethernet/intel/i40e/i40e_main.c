@@ -3211,6 +3211,8 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	u16 pf_q = vsi->base_queue + ring->queue_index;
 	struct i40e_hw *hw = &vsi->back->hw;
 	struct i40e_hmc_obj_rxq rx_ctx;
+	bool reserve_headroom;
+	unsigned int mtu = 0;
 	i40e_status err = 0;
 
 	bitmap_zero(ring->state, __I40E_RING_STATE_NBITS);
@@ -3218,7 +3220,17 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	/* clear the context structure first */
 	memset(&rx_ctx, 0, sizeof(rx_ctx));
 
-	ring->bpool = i40e_buff_pool_create(ring->dev);
+	reserve_headroom = !vsi->netdev;
+
+	if (vsi->netdev) {
+		mtu = vsi->netdev->mtu;
+		reserve_headroom = !(vsi->back->flags & I40E_FLAG_LEGACY_RX);
+	} else {
+		reserve_headroom = false;
+	}
+	ring->bpool = i40e_buff_pool_recycle_create(mtu, reserve_headroom,
+						    ring->dev,
+						    ring->count);
 	ring->rx_buf_hr = (u16)bpool_buff_headroom(ring->bpool);
 	ring->rx_buf_len = (u16)bpool_buff_size(ring->bpool);
 

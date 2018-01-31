@@ -1255,7 +1255,7 @@ void i40e_free_rx_resources(struct i40e_ring *rx_ring)
 	kfree(rx_ring->rx_bi);
 	rx_ring->rx_bi = NULL;
 
-	i40e_buff_pool_destroy(rx_ring->bpool);
+	i40e_buff_pool_recycle_destroy(rx_ring->bpool);
 	rx_ring->bpool = NULL;
 
 	if (rx_ring->desc) {
