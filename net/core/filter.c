@@ -1809,6 +1809,8 @@ struct redirect_info {
 	struct bpf_map *map;
 	struct bpf_map *map_to_flush;
 	unsigned long   map_owner;
+	bool to_xsk;
+	/* XXX cache xsk socket here, to avoid lookup? */
 };
 
 static DEFINE_PER_CPU(struct redirect_info, redirect_info);
@@ -2707,6 +2709,7 @@ static int xdp_do_generic_redirect_map(struct net_device *dev,
 	ri->ifindex = 0;
 	ri->map = NULL;
 	ri->map_owner = 0;
+	ri->to_xsk = false;
 
 	if (unlikely(xdp_map_invalid(xdp_prog, map_owner))) {
 		err = -EFAULT;
@@ -2815,6 +2818,25 @@ static const struct bpf_func_proto bpf_xdp_redirect_map_proto = {
 	.arg1_type      = ARG_CONST_MAP_PTR,
 	.arg2_type      = ARG_ANYTHING,
 	.arg3_type      = ARG_ANYTHING,
+};
+
+BPF_CALL_0(bpf_xdpsk_redirect)
+{
+	struct redirect_info *ri = this_cpu_ptr(&redirect_info);
+
+	/* XXX Would it be better to check for socket existence here,
+	 * and XDP_ABORTED on failure? Also, then we can populate xsk
+	 * in ri, and don't have to do the lookup multiple times.
+	 */
+	ri->to_xsk = true;
+
+	return XDP_REDIRECT;
+}
+
+static const struct bpf_func_proto bpf_xdpsk_redirect_proto = {
+	.func		= bpf_xdpsk_redirect,
+	.gpl_only	= false,
+	.ret_type	= RET_INTEGER,
 };
 
 bool bpf_helper_changes_pkt_data(void *func)
@@ -3544,6 +3566,8 @@ xdp_func_proto(enum bpf_func_id func_id)
 		return &bpf_xdp_redirect_proto;
 	case BPF_FUNC_redirect_map:
 		return &bpf_xdp_redirect_map_proto;
+	case BPF_FUNC_xdpsk_redirect:
+		return &bpf_xdpsk_redirect_proto;
 	default:
 		return bpf_base_func_proto(func_id);
 	}

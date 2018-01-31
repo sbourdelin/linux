@@ -696,6 +696,9 @@ union bpf_attr {
  * int bpf_override_return(pt_regs, rc)
  *	@pt_regs: pointer to struct pt_regs
  *	@rc: the return value to set
+ *
+ * int bpf_xdpsk_redirect()
+ *	Return: XDP_REDIRECT
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -757,7 +760,8 @@ union bpf_attr {
 	FN(perf_prog_read_value),	\
 	FN(getsockopt),			\
 	FN(override_return),		\
-	FN(sock_ops_cb_flags_set),
+	FN(sock_ops_cb_flags_set),	\
+	FN(xdpsk_redirect),
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
  * function eBPF program intends to call
