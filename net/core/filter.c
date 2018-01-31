@@ -57,6 +57,7 @@
 #include <net/busy_poll.h>
 #include <net/tcp.h>
 #include <linux/bpf_trace.h>
+#include <net/xdp_sock.h>
 
 /**
  *	sk_filter_trim_cap - run a packet through a socket filter
@@ -1809,8 +1810,8 @@ struct redirect_info {
 	struct bpf_map *map;
 	struct bpf_map *map_to_flush;
 	unsigned long   map_owner;
-	bool to_xsk;
-	/* XXX cache xsk socket here, to avoid lookup? */
+	bool xsk;
+	struct xdp_sock *xsk_to_flush;
 };
 
 static DEFINE_PER_CPU(struct redirect_info, redirect_info);
@@ -2575,6 +2576,7 @@ static int __bpf_tx_xdp_map(struct net_device *dev_rx, void *fwd,
 void xdp_do_flush_map(void)
 {
 	struct redirect_info *ri = this_cpu_ptr(&redirect_info);
+	struct xdp_sock *xsk = ri->xsk_to_flush;
 	struct bpf_map *map = ri->map_to_flush;
 
 	ri->map_to_flush = NULL;
@@ -2590,6 +2592,10 @@ void xdp_do_flush_map(void)
 			break;
 		}
 	}
+
+	ri->xsk_to_flush = NULL;
+	if (xsk)
+		xsk_flush(xsk);
 }
 EXPORT_SYMBOL_GPL(xdp_do_flush_map);
 
@@ -2611,6 +2617,29 @@ static inline bool xdp_map_invalid(const struct bpf_prog *xdp_prog,
 	return (unsigned long)xdp_prog->aux != aux;
 }
 
+static int xdp_do_xsk_redirect(struct xdp_buff *xdp, struct bpf_prog *xdp_prog)
+{
+	struct redirect_info *ri = this_cpu_ptr(&redirect_info);
+	struct xdp_sock *xsk;
+
+	ri->ifindex = 0;
+	ri->map = NULL;
+	ri->map_owner = 0;
+	ri->xsk = false;
+
+	xsk = xsk_rcv(ri->xsk_to_flush, xdp);
+	if (IS_ERR(xsk)) {
+		_trace_xdp_redirect_err(xdp->rxq->dev, xdp_prog, -1,
+					PTR_ERR(xsk));
+		return PTR_ERR(xsk);
+	}
+
+	ri->xsk_to_flush = xsk;
+	_trace_xdp_redirect(xdp->rxq->dev, xdp_prog, -1);
+
+	return 0;
+}
+
 static int xdp_do_redirect_map(struct net_device *dev, struct xdp_buff *xdp,
 			       struct bpf_prog *xdp_prog)
 {
@@ -2624,6 +2653,7 @@ static int xdp_do_redirect_map(struct net_device *dev, struct xdp_buff *xdp,
 	ri->ifindex = 0;
 	ri->map = NULL;
 	ri->map_owner = 0;
+	ri->xsk = false;
 
 	if (unlikely(xdp_map_invalid(xdp_prog, map_owner))) {
 		err = -EFAULT;
@@ -2659,6 +2689,9 @@ int xdp_do_redirect(struct net_device *dev, struct xdp_buff *xdp,
 	u32 index = ri->ifindex;
 	int err;
 
+	if (ri->xsk)
+		return xdp_do_xsk_redirect(xdp, xdp_prog);
+
 	if (ri->map)
 		return xdp_do_redirect_map(dev, xdp, xdp_prog);
 
@@ -2680,6 +2713,30 @@ err:
 	return err;
 }
 EXPORT_SYMBOL_GPL(xdp_do_redirect);
+
+static int xdp_do_generic_xsk_redirect(struct sk_buff *skb,
+				       struct xdp_buff *xdp,
+				       struct bpf_prog *xdp_prog)
+{
+	struct redirect_info *ri = this_cpu_ptr(&redirect_info);
+	int err;
+
+	ri->ifindex = 0;
+	ri->map = NULL;
+	ri->map_owner = 0;
+	ri->xsk = false;
+
+	err = xsk_generic_rcv(xdp);
+	if (err) {
+		_trace_xdp_redirect_err(xdp->rxq->dev, xdp_prog, -1, err);
+		return err;
+	}
+
+	consume_skb(skb);
+	_trace_xdp_redirect(xdp->rxq->dev, xdp_prog, -1);  /* XXX fix tracing to support xsk */
+
+	return 0;
+}
 
 static int __xdp_generic_ok_fwd_dev(struct sk_buff *skb, struct net_device *fwd)
 {
@@ -2709,7 +2766,7 @@ static int xdp_do_generic_redirect_map(struct net_device *dev,
 	ri->ifindex = 0;
 	ri->map = NULL;
 	ri->map_owner = 0;
-	ri->to_xsk = false;
+	ri->xsk = false;
 
 	if (unlikely(xdp_map_invalid(xdp_prog, map_owner))) {
 		err = -EFAULT;
@@ -2733,6 +2790,7 @@ static int xdp_do_generic_redirect_map(struct net_device *dev,
 	}
 
 	_trace_xdp_redirect_map(dev, xdp_prog, fwd, map, index);
+	generic_xdp_tx(skb, xdp_prog);
 	return 0;
 err:
 	_trace_xdp_redirect_map_err(dev, xdp_prog, fwd, map, index, err);
@@ -2740,12 +2798,15 @@ err:
 }
 
 int xdp_do_generic_redirect(struct net_device *dev, struct sk_buff *skb,
-			    struct bpf_prog *xdp_prog)
+			    struct xdp_buff *xdp, struct bpf_prog *xdp_prog)
 {
 	struct redirect_info *ri = this_cpu_ptr(&redirect_info);
 	u32 index = ri->ifindex;
 	struct net_device *fwd;
 	int err = 0;
+
+	if (ri->xsk)
+		return xdp_do_generic_xsk_redirect(skb, xdp, xdp_prog);
 
 	if (ri->map)
 		return xdp_do_generic_redirect_map(dev, skb, xdp_prog);
@@ -2762,6 +2823,7 @@ int xdp_do_generic_redirect(struct net_device *dev, struct sk_buff *skb,
 
 	skb->dev = fwd;
 	_trace_xdp_redirect(dev, xdp_prog, index);
+	generic_xdp_tx(skb, xdp_prog);
 	return 0;
 err:
 	_trace_xdp_redirect_err(dev, xdp_prog, index, err);
@@ -2828,7 +2890,7 @@ BPF_CALL_0(bpf_xdpsk_redirect)
 	 * and XDP_ABORTED on failure? Also, then we can populate xsk
 	 * in ri, and don't have to do the lookup multiple times.
 	 */
-	ri->to_xsk = true;
+	ri->xsk = true;
 
 	return XDP_REDIRECT;
 }
