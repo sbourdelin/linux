@@ -14,6 +14,10 @@ struct xdp_sock;
  */
 
 struct xsk_tx_parms {
+	struct buff_pool *buff_pool;
+	int (*dma_map)(struct buff_pool *bp, struct device *dev,
+		       enum dma_data_direction dir,
+		       unsigned long attr);
 	void (*tx_completion)(u32 start, u32 npackets,
 			      unsigned long ctx1, unsigned long ctx2);
 	unsigned long ctx1;

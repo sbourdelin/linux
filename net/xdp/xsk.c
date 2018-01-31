@@ -68,7 +68,7 @@ struct xdp_sock {
 static inline bool xsk_is_zc_cap(struct xdp_sock *xs)
 {
 	return xs->zc_mode;
-}
+};
 
 static void xsk_set_zc_cap(struct xdp_sock *xs)
 {
@@ -85,6 +85,7 @@ static struct xdp_sock *xdp_sk(struct sock *sk)
 	return (struct xdp_sock *)sk;
 }
 
+/* CONFIG */
 static void xsk_umem_unpin_pages(struct xsk_umem *umem)
 {
 	unsigned int i;
@@ -393,6 +394,7 @@ static int xsk_release(struct socket *sock)
 		xsk_buff_info_destroy(xs->rx.buff_info);
 
 		xskpa_destroy(xs->tx.pa);
+		bpool_destroy(xs->tx.bp);
 		xskq_destroy(xs_prev->tx.q);
 		xsk_buff_info_destroy(xs->tx.buff_info);
 
@@ -423,16 +425,95 @@ static int xsk_dma_map_pool_cb(struct buff_pool *pool, struct device *dev,
 static void xsk_error_report(void *ctx, int err)
 {
 	struct xsk_sock *xs = (struct xsk_sock *)ctx;
+
+	(void)xs;
+}
+
+static inline struct xdp_sock *lookup_xsk(struct net_device *dev,
+					  unsigned int queue_id)
+{
+	if (unlikely(queue_id > dev->num_rx_queues))
+		return NULL;
+
+	return rcu_dereference(dev->_rx[queue_id].xs);
+}
+
+/* TX */
+static void xsk_tx_completion(u32 start, u32 npackets,
+			      unsigned long ctx1, unsigned long ctx2)
+{
+	struct net_device *dev = (struct net_device *)ctx1;
+	u32 queue_id = (u32)ctx2;
+	struct xdp_sock *xs;
+
+	(void)start;
+	rcu_read_lock();
+	xs = lookup_xsk(dev, queue_id);
+	if (likely(xs))
+		WARN_ON_ONCE(xskpa_flush_n(xs->tx.pa, npackets));
+
+	rcu_read_unlock();
+}
+
+static int xsk_get_packet(struct net_device *dev, u32 queue_id,
+			  dma_addr_t *dma, void **data, u32 *len,
+			  u32 *offset)
+{
+	struct xsk_frame_set p;
+	struct xdp_sock *xs;
+	int ret = 0;
+
+	rcu_read_lock();
+	xs = lookup_xsk(dev, queue_id);
+	if (unlikely(!xs))
+		goto out;
+
+	if (xskpa_next_frame_populate(xs->tx.pa, &p)) {
+		struct xsk_buff *buff;
+
+		*offset = xskf_get_data_offset(&p);
+		*len = xskf_get_frame_len(&p);
+		*data = xskf_get_data(&p);
+		buff = xsk_buff_info_get_buff(xs->tx.buff_info,
+					      xskf_get_frame_id(&p));
+		WARN_ON_ONCE(!buff);
+		if (!buff)
+			goto out;
+		*dma = buff->dma;
+		ret = 1;
+	}
+
+out:
+	rcu_read_unlock();
+	return ret;
 }
 
 static void xsk_try_enable_zc(struct xdp_sock *xs)
 {
 	struct xsk_rx_parms rx_parms = {};
+	struct xsk_tx_parms tx_parms = {};
 	struct netdev_bpf bpf = {};
 	int err;
 
-	if (!xs->dev->netdev_ops->ndo_bpf)
+	if (!xs->dev->netdev_ops->ndo_bpf ||
+	    !xs->dev->netdev_ops->ndo_xdp_xmit_xsk)
 		return;
+
+	/* Until we can attach an XDP program on TX as well,
+	 * egress operates in the same mode (XDP_SKB or XDP_DRV) as set
+	 * by the XDP RX program loading.
+	 * An XDP program need to be loaded, for now.
+	 */
+	if (xs->dev->netdev_ops->ndo_bpf) {
+		struct netdev_bpf xdp;
+
+		rtnl_lock();
+		__dev_xdp_query(xs->dev, xs->dev->netdev_ops->ndo_bpf, &xdp);
+		rtnl_unlock();
+
+		if (!xdp.prog_attached)
+			return;
+	}
 
 	rx_parms.buff_pool = xs->rx.bp;
 	rx_parms.dma_map = xsk_dma_map_pool_cb;
@@ -442,6 +523,14 @@ static void xsk_try_enable_zc(struct xdp_sock *xs)
 	bpf.command = XDP_REGISTER_XSK;
 	bpf.xsk.rx_parms = &rx_parms;
 	bpf.xsk.queue_id = xs->queue_id;
+
+	tx_parms.buff_pool = xs->tx.bp;
+	tx_parms.dma_map = xsk_dma_map_pool_cb;
+	tx_parms.tx_completion = xsk_tx_completion;
+	tx_parms.ctx1 = (unsigned long)xs->dev;
+	tx_parms.ctx2 = xs->queue_id;
+	tx_parms.get_tx_packet = xsk_get_packet;
+	bpf.xsk.tx_parms = &tx_parms;
 
 	rtnl_lock();
 	err = xs->dev->netdev_ops->ndo_bpf(xs->dev, &bpf);
@@ -536,12 +625,29 @@ static int xsk_bind(struct socket *sock, struct sockaddr *addr, int addr_len)
 		goto out_tx_pa;
 	}
 
+	xs->tx.bp = xsk_buff_pool_create(xs->tx.buff_info, xs->tx.q);
+	if (!xs->tx.bp) {
+		err = -ENOMEM;
+		goto out_tx_bp;
+	}
+
 	rcu_assign_pointer(dev->_rx[sxdp->sxdp_queue_id].xs, xs);
 
 	xsk_try_enable_zc(xs);
+	/* Need to have an XDP program loaded for now. */
+	if (!xsk_is_zc_cap(xs) && !dev->xdp_prog) {
+		err = -ENODATA;
+		goto out_no_xdp_prog;
+	}
 
 	goto out_unlock;
 
+out_no_xdp_prog:
+	xskpa_destroy(xs->tx.pa);
+	xs->tx.pa = NULL;
+out_tx_bp:
+	bpool_destroy(xs->tx.bp);
+	xs->tx.bp = NULL;
 out_tx_pa:
 	xsk_buff_info_destroy(xs->tx.buff_info);
 	xs->tx.buff_info = NULL;
@@ -563,15 +669,7 @@ out_unlock:
 	return err;
 }
 
-static inline struct xdp_sock *lookup_xsk(struct net_device *dev,
-					  unsigned int queue_id)
-{
-	if (unlikely(queue_id > dev->num_rx_queues))
-		return NULL;
-
-	return rcu_dereference(dev->_rx[queue_id].xs);
-}
-
+/* RX */
 int xsk_generic_rcv(struct xdp_buff *xdp)
 {
 	u32 len = xdp->data_end - xdp->data;
@@ -753,25 +851,19 @@ static int xsk_getsockopt(struct socket *sock, int level, int optname,
 	return -EOPNOTSUPP;
 }
 
-void xsk_tx_completion(struct net_device *dev, u16 queue_index,
-		       unsigned int npackets)
+static int xsk_xdp_xmit(struct sock *sk, struct msghdr *m,
+			size_t total_len)
 {
-	unsigned long flags;
-	struct xdp_sock *xs;
+	bool need_wait = !(m->msg_flags & MSG_DONTWAIT);
+	struct xdp_sock *xs = xdp_sk(sk);
+	struct net_device *dev = xs->dev;
 
-	rcu_read_lock();
-	xs = lookup_xsk(dev, queue_index);
-	if (unlikely(!xs)) {
-		rcu_read_unlock();
-		return;
-	}
+	if (need_wait)
+		/* Not implemented yet. */
+		return -EINVAL;
 
-	spin_lock_irqsave(&xs->tx.pa_lock, flags);
-	WARN_ON_ONCE(xskpa_flush_n(xs->tx.pa, npackets));
-	spin_unlock_irqrestore(&xs->tx.pa_lock, flags);
-	rcu_read_unlock();
+	return dev->netdev_ops->ndo_xdp_xmit_xsk(dev, xs->queue_id);
 }
-EXPORT_SYMBOL_GPL(xsk_tx_completion);
 
 static void xsk_destruct_skb(struct sk_buff *skb)
 {
@@ -917,7 +1009,10 @@ static int xsk_sendmsg(struct socket *sock, struct msghdr *m, size_t total_len)
 	if (unlikely(!(xs->dev->flags & IFF_UP)))
 		return -ENETDOWN;
 
-	return xsk_generic_xmit(sk, m, total_len);
+	if (!xsk_is_zc_cap(xs))
+		return xsk_generic_xmit(sk, m, total_len);
+
+	return xsk_xdp_xmit(sk, m, total_len);
 }
 
 static int xsk_mmap(struct file *file, struct socket *sock,

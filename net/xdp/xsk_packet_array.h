@@ -149,6 +149,11 @@ static inline void *xskf_get_data(struct xsk_frame_set *p)
 	return buff->data + desc->offset;
 }
 
+static inline dma_addr_t xskf_get_dma(struct xsk_frame_set *p)
+{
+	return 0;
+}
+
 static inline u32 xskf_get_data_offset(struct xsk_frame_set *p)
 {
 	return p->pkt_arr->items[p->curr & p->pkt_arr->mask].offset;
