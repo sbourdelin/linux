@@ -108,6 +108,7 @@ extern unsigned int core_pipe_limit;
 extern int pid_max;
 extern int pid_max_min, pid_max_max;
 extern int percpu_pagelist_fraction;
+extern int percpu_pagelist_batch;
 extern int latencytop_enabled;
 extern unsigned int sysctl_nr_open_min, sysctl_nr_open_max;
 #ifndef CONFIG_MMU
@@ -1456,6 +1457,14 @@ static struct ctl_table vm_table[] = {
 		.maxlen		= sizeof(percpu_pagelist_fraction),
 		.mode		= 0644,
 		.proc_handler	= percpu_pagelist_fraction_sysctl_handler,
+		.extra1		= &zero,
+	},
+	{
+		.procname	= "percpu_pagelist_batch",
+		.data		= &percpu_pagelist_batch,
+		.maxlen		= sizeof(percpu_pagelist_batch),
+		.mode		= 0644,
+		.proc_handler	= percpu_pagelist_batch_sysctl_handler,
 		.extra1		= &zero,
 	},
 #ifdef CONFIG_MMU

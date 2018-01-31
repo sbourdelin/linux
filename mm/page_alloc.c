@@ -130,6 +130,7 @@ unsigned long totalreserve_pages __read_mostly;
 unsigned long totalcma_pages __read_mostly;
 
 int percpu_pagelist_fraction;
+int percpu_pagelist_batch;
 gfp_t gfp_allowed_mask __read_mostly = GFP_BOOT_MASK;
 
 /*
@@ -5544,7 +5545,8 @@ static void pageset_set_high_and_batch(struct zone *zone,
 			(zone->managed_pages /
 				percpu_pagelist_fraction));
 	else
-		pageset_set_batch(pcp, zone_batchsize(zone));
+		pageset_set_batch(pcp, percpu_pagelist_batch ?
+				percpu_pagelist_batch : zone_batchsize(zone));
 }
 
 static void __meminit zone_pageset_init(struct zone *zone, int cpu)
@@ -7252,6 +7254,42 @@ int percpu_pagelist_fraction_sysctl_handler(struct ctl_table *table, int write,
 
 	/* No change? */
 	if (percpu_pagelist_fraction == old_percpu_pagelist_fraction)
+		goto out;
+
+	for_each_populated_zone(zone) {
+		unsigned int cpu;
+
+		for_each_possible_cpu(cpu)
+			pageset_set_high_and_batch(zone,
+					per_cpu_ptr(zone->pageset, cpu));
+	}
+out:
+	mutex_unlock(&pcp_batch_high_lock);
+	return ret;
+}
+
+int percpu_pagelist_batch_sysctl_handler(struct ctl_table *table, int write,
+	void __user *buffer, size_t *length, loff_t *ppos)
+{
+	struct zone *zone;
+	int old_percpu_pagelist_batch;
+	int ret;
+
+	mutex_lock(&pcp_batch_high_lock);
+	old_percpu_pagelist_batch = percpu_pagelist_batch;
+
+	ret = proc_dointvec_minmax(table, write, buffer, length, ppos);
+	if (!write || ret < 0)
+		goto out;
+
+	/* Sanity checking to avoid pcp imbalance */
+	if (percpu_pagelist_batch <= 0) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	/* No change? */
+	if (percpu_pagelist_batch == old_percpu_pagelist_batch)
 		goto out;
 
 	for_each_populated_zone(zone) {
