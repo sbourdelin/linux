@@ -253,6 +253,16 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
 	 ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
 
 /*
+ * CPU errata work around detected at boot time based on one or more CPUs.
+ * All conflicts are ignored. This implies any work around shouldn't
+ * depend when a CPU could be brought up.
+ */
+#define ARM64_CPUCAP_WEAK_LOCAL_CPU_ERRATUM		\
+	(ARM64_CPUCAP_SCOPE_LOCAL_CPU		|	\
+	 ARM64_CPUCAP_OPTIONAL_FOR_LATE_CPU	|	\
+	 ARM64_CPUCAP_PERMITTED_FOR_LATE_CPU)
+
+/*
  * CPU feature detected at boot time, on one or more CPUs. A late CPU
  * is not allowed to have the capability when the system doesn't have it.
  * It is Ok for a late CPU to miss the feature.

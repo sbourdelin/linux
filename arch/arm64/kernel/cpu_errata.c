@@ -259,6 +259,12 @@ static const struct midr_range arm64_bp_harden_psci_cpus[] = {
 	{},
 };
 
+static bool bp_hardening_always_on(const struct arm64_cpu_capabilities *cap,
+				   int scope)
+{
+	return true;
+}
+
 static const struct arm64_cpu_capabilities arm64_bp_harden_list[] = {
 	{
 		CAP_MIDR_RANGE_LIST(arm64_bp_harden_psci_cpus),
@@ -267,6 +273,17 @@ static const struct arm64_cpu_capabilities arm64_bp_harden_list[] = {
 	{
 		CAP_MIDR_ALL_VERSIONS(MIDR_QCOM_FALKOR_V1),
 		.cpu_enable = qcom_enable_link_stack_sanitization,
+	},
+	/*
+	 * Always enable the capability to make sure a late CPU can
+	 * safely use the BP hardening call backs. Since we use per-CPU
+	 * pointers for the call backs, the work around only affects the
+	 * CPUs which have some methods installed by any real matching entries
+	 * above. As such we don't have any specific cpu_enable() callback
+	 * for this entry, as it is just to make sure we always "detect" it.
+	 */
+	{
+		.matches = bp_hardening_always_on,
 	},
 	{},
 };
@@ -407,7 +424,7 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
 #ifdef CONFIG_HARDEN_BRANCH_PREDICTOR
 	{
 		.capability = ARM64_HARDEN_BRANCH_PREDICTOR,
-		.type = ARM64_CPUCAP_LOCAL_CPU_ERRATUM,
+		.type = ARM64_CPUCAP_WEAK_LOCAL_CPU_ERRATUM,
 		.matches = multi_entry_cap_matches,
 		.cpu_enable = multi_entry_cap_cpu_enable,
 		.cap_list = arm64_bp_harden_list,
