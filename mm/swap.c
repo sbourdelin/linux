@@ -731,6 +731,7 @@ void lru_add_drain_all(void)
 	put_online_cpus();
 }
 
+#define LRU_BITMAP_SIZE	512
 /**
  * release_pages - batched put_page()
  * @pages: array of pages to release
@@ -742,15 +743,31 @@ void lru_add_drain_all(void)
  */
 void release_pages(struct page **pages, int nr)
 {
-	int i;
+	int h, i;
 	LIST_HEAD(pages_to_free);
 	struct pglist_data *locked_pgdat = NULL;
 	spinlock_t *locked_lru_batch = NULL;
 	struct lruvec *lruvec;
 	unsigned long uninitialized_var(flags);
+	DECLARE_BITMAP(lru_bitmap, LRU_BITMAP_SIZE);
 
+	VM_BUG_ON(nr > LRU_BITMAP_SIZE);
+
+	bitmap_zero(lru_bitmap, nr);
+
+	for (h = 0; h < 2; h++) {
 	for (i = 0; i < nr; i++) {
 		struct page *page = pages[i];
+
+		if (h == 0) {
+			if (PageLRU(page) && page->lru_sentinel) {
+				bitmap_set(lru_bitmap, i, 1);
+				continue;
+			}
+		} else {
+			if (!test_bit(i, lru_bitmap))
+				continue;
+		}
 
 		if (is_huge_zero_page(page))
 			continue;
@@ -797,6 +814,7 @@ void release_pages(struct page **pages, int nr)
 		__ClearPageWaiters(page);
 
 		list_add(&page->lru, &pages_to_free);
+	}
 	}
 	if (locked_lru_batch) {
 		lru_batch_unlock(NULL, &locked_lru_batch, &locked_pgdat,
