@@ -743,9 +743,9 @@ static int hidma_request_msi(struct hidma_dev *dmadev,
 
 static bool hidma_test_capability(struct device *dev, enum hidma_cap test_cap)
 {
-	enum hidma_cap cap;
+	const enum hidma_cap cap;
 
-	cap = (enum hidma_cap) device_get_match_data(dev);
+	cap = (const enum hidma_cap) device_get_match_data(dev);
 	return cap ? ((cap & test_cap) > 0) : 0;
 }
 
