@@ -28,6 +28,7 @@
 #include <linux/of_net.h>
 #include <linux/pci.h>
 #include <linux/bpf.h>
+#include <linux/buff_pool.h>
 
 /* Local includes */
 #include "i40e.h"
@@ -39,7 +40,7 @@
  */
 #define CREATE_TRACE_POINTS
 #include "i40e_trace.h"
-#include "buff_pool.h"
+#include "i40e_buff_pool.h"
 
 const char i40e_driver_name[] = "i40e";
 static const char i40e_driver_string[] =

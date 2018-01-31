@@ -1,93 +1,9 @@
-#include "buff_pool.h"
+#include "i40e_buff_pool.h"
+
+#include <linux/buff_pool.h>
 
 #include "i40e.h"
 #include "i40e_txrx.h"
-
-struct buff_pool_ops {
-	int (*alloc)(void *pool, unsigned long *handle);
-	void (*free)(void *pool, unsigned long handle);
-	unsigned int (*buff_size)(void *pool);
-	unsigned int (*total_buff_size)(void *pool);
-	unsigned int (*buff_headroom)(void *pool);
-	unsigned int (*buff_truesize)(void *pool);
-	void *(*buff_ptr)(void *pool, unsigned long handle);
-	int (*buff_convert_to_page)(void *pool,
-				    unsigned long handle,
-				    struct page **pg, unsigned int *pg_off);
-	dma_addr_t (*buff_dma)(void *pool,
-			       unsigned long handle);
-	void (*buff_dma_sync_cpu)(void *pool,
-				  unsigned long handle,
-				  unsigned int off,
-				  unsigned int size);
-	void (*buff_dma_sync_dev)(void *pool,
-				  unsigned long handle,
-				  unsigned int off,
-				  unsigned int size);
-};
-
-int bpool_alloc(struct buff_pool *pool, unsigned long *handle)
-{
-	return pool->ops->alloc(pool->pool, handle);
-}
-
-void bpool_free(struct buff_pool *pool, unsigned long handle)
-{
-	pool->ops->free(pool->pool, handle);
-}
-
-unsigned int bpool_buff_size(struct buff_pool *pool)
-{
-	return pool->ops->buff_size(pool->pool);
-}
-
-unsigned int bpool_total_buff_size(struct buff_pool *pool)
-{
-	return pool->ops->total_buff_size(pool->pool);
-}
-
-unsigned int bpool_buff_headroom(struct buff_pool *pool)
-{
-	return pool->ops->buff_headroom(pool->pool);
-}
-
-unsigned int bpool_buff_truesize(struct buff_pool *pool)
-{
-	return pool->ops->buff_truesize(pool->pool);
-}
-
-void *bpool_buff_ptr(struct buff_pool *pool, unsigned long handle)
-{
-	return pool->ops->buff_ptr(pool->pool, handle);
-}
-
-int bpool_buff_convert_to_page(struct buff_pool *pool, unsigned long handle,
-			       struct page **pg, unsigned int *pg_off)
-{
-	return pool->ops->buff_convert_to_page(pool->pool, handle, pg, pg_off);
-}
-
-dma_addr_t bpool_buff_dma(struct buff_pool *pool,
-			  unsigned long handle)
-{
-	return pool->ops->buff_dma(pool->pool, handle);
-}
-
-void bpool_buff_dma_sync_cpu(struct buff_pool *pool,
-			     unsigned long handle,
-			     unsigned int off,
-			     unsigned int size)
-{
-	pool->ops->buff_dma_sync_cpu(pool->pool, handle, off, size);
-}
-
-void bpool_buff_dma_sync_dev(struct buff_pool *pool,
-			     unsigned long handle,
-			     unsigned int off,
-			     unsigned int size)
-{
-	pool->ops->buff_dma_sync_dev(pool->pool, handle, off, size);
-}
 
 /* Naive, non-recycling allocator. */
 
@@ -233,6 +149,11 @@ static void i40e_bp_buff_dma_sync_dev(void *pool,
 					 DMA_FROM_DEVICE);
 }
 
+static void i40e_bp_destroy(void *pool)
+{
+	kfree(pool);
+}
+
 struct buff_pool *i40e_buff_pool_create(struct device *dev)
 {
 	struct i40e_bp_pool *pool_impl;
@@ -267,6 +188,7 @@ struct buff_pool *i40e_buff_pool_create(struct device *dev)
 	pool_ops->buff_dma = i40e_bp_buff_dma;
 	pool_ops->buff_dma_sync_cpu = i40e_bp_buff_dma_sync_cpu;
 	pool_ops->buff_dma_sync_dev = i40e_bp_buff_dma_sync_dev;
+	pool_ops->destroy = i40e_bp_destroy;
 
 	pool_impl->dev = dev;
 
@@ -274,13 +196,6 @@ struct buff_pool *i40e_buff_pool_create(struct device *dev)
 	pool->ops = pool_ops;
 
 	return pool;
-}
-
-void i40e_buff_pool_destroy(struct buff_pool *pool)
-{
-	kfree(pool->ops);
-	kfree(pool->pool);
-	kfree(pool);
 }
 
 /* Recycling allocator */
@@ -470,8 +385,8 @@ static int i40e_bpr_buff_convert_to_page(void *pool, unsigned long handle,
 	return 0;
 }
 
-static dma_addr_t i40e_bpr_buff_dma(void *pool,
-				    unsigned long handle)
+static inline dma_addr_t i40e_bpr_buff_dma(void *pool,
+					   unsigned long handle)
 {
 	struct i40e_bpr_header *hdr;
 
@@ -582,6 +497,23 @@ static void calc_buffer_size(unsigned int mtu, bool reserve_headroom,
 				      buff_len, headroom, pg_order);
 }
 
+static void i40e_bpr_destroy(void *pool)
+{
+	struct i40e_bpr_pool *impl = (struct i40e_bpr_pool *)pool;
+	struct i40e_bpr_header *hdr;
+
+	while (impl->head != impl->tail) {
+		hdr = impl->buffs[impl->head];
+		dma_unmap_page_attrs(impl->dev, hdr->dma, impl->pg_size,
+				     DMA_FROM_DEVICE, I40E_RX_DMA_ATTR);
+		__page_frag_cache_drain(virt_to_head_page(hdr),
+					hdr->pagecnt_bias);
+		impl->head = (impl->head + 1) & impl->buffs_size_mask;
+	}
+
+	kfree(impl);
+}
+
 struct buff_pool *i40e_buff_pool_recycle_create(unsigned int mtu,
 						bool reserve_headroom,
 						struct device *dev,
@@ -637,11 +569,7 @@ struct buff_pool *i40e_buff_pool_recycle_create(unsigned int mtu,
 	pool_ops->buff_dma = i40e_bpr_buff_dma;
 	pool_ops->buff_dma_sync_cpu = i40e_bpr_buff_dma_sync_cpu;
 	pool_ops->buff_dma_sync_dev = i40e_bpr_buff_dma_sync_dev;
-
-	pr_err("%s mtu=%u reserve=%d pool_size=%u buff_tot_len=%u buff_len=%u headroom=%u pg_order=%u pf_size=%u\n",
-	       __func__,
-	       mtu, (int)reserve_headroom, pool_size, impl->buff_tot_len,
-	       impl->buff_len, impl->headroom, impl->pg_order, impl->pg_size);
+	pool_ops->destroy = i40e_bpr_destroy;
 
 	pool->pool = impl;
 	pool->ops = pool_ops;
@@ -649,22 +577,4 @@ struct buff_pool *i40e_buff_pool_recycle_create(unsigned int mtu,
 	return pool;
 }
 
-void i40e_buff_pool_recycle_destroy(struct buff_pool *pool)
-{
-	struct i40e_bpr_pool *impl = (struct i40e_bpr_pool *)pool->pool;
-	struct i40e_bpr_header *hdr;
-
-	while (impl->head != impl->tail) {
-		hdr = impl->buffs[impl->head];
-		dma_unmap_page_attrs(impl->dev, hdr->dma, impl->pg_size,
-				     DMA_FROM_DEVICE, I40E_RX_DMA_ATTR);
-		__page_frag_cache_drain(virt_to_head_page(hdr),
-					hdr->pagecnt_bias);
-		impl->head = (impl->head + 1) & impl->buffs_size_mask;
-	}
-
-	kfree(pool->ops);
-	kfree(pool->pool);
-	kfree(pool);
-}
 

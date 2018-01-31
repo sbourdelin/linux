@@ -27,11 +27,12 @@
 #include <linux/prefetch.h>
 #include <net/busy_poll.h>
 #include <linux/bpf_trace.h>
+#include <linux/buff_pool.h>
 #include <net/xdp.h>
 #include "i40e.h"
 #include "i40e_trace.h"
 #include "i40e_prototype.h"
-#include "buff_pool.h"
+#include "i40e_buff_pool.h"
 
 static inline __le64 build_ctob(u32 td_cmd, u32 td_offset, unsigned int size,
 				u32 td_tag)
@@ -1255,7 +1256,7 @@ void i40e_free_rx_resources(struct i40e_ring *rx_ring)
 	kfree(rx_ring->rx_bi);
 	rx_ring->rx_bi = NULL;
 
-	i40e_buff_pool_recycle_destroy(rx_ring->bpool);
+	bpool_destroy(rx_ring->bpool);
 	rx_ring->bpool = NULL;
 
 	if (rx_ring->desc) {
