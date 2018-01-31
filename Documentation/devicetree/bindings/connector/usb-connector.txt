@@ -1,0 +1,48 @@
+USB Connector
+=============
+
+USB connector node represents physical USB connector. It should be
+a child of USB interface controller.
+
+Required properties:
+- compatible: describes type of the connector, must be one of:
+    "usb-a-connector", "usb-b-connector", "usb-c-connector",
+
+Optional properties:
+- label: symbolic name for the connector
+- type: size of the connector, should be specified in case of USB-A, USB-B
+  non-standard (large) connector sizes: "mini", "micro"
+
+Required nodes:
+- any data bus to the connector should be modeled using the OF graph bindings
+  specified in bindings/graph.txt, unless the bus is between parent node and
+  the connector. Since single connector can have multpile data buses every bus
+  has assigned OF graph port number as follows:
+    0: High Speed (HS), present in all connectors,
+    1: Super Speed (SS), present in SS capable connectors,
+    2: Sideband use (SBU), present in USB-C,
+    3: Mobile High-Definition Link (MHL), present in 11-pin Samsung micro-USB
+
+Example
+-------
+
+muic_max77843@66 {
+	...
+	musb_con: connector {
+		compatible = "usb-b-connector";
+		label = "micro-USB";
+		type = "micro";
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@3 {
+				reg = <3>;
+				musb_con_mhl_in: endpoint {
+					remote-endpoint = <&mhl_out>;
+				};
+			};
+		};
+	};
+};
