@@ -677,7 +677,8 @@ static long vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma,
 	}
 
 	while (iova < end) {
-		size_t unmapped, len;
+		ssize_t unmapped;
+		size_t len;
 		phys_addr_t phys, next;
 
 		phys = iommu_iova_to_phys(domain->domain, iova);
@@ -699,7 +700,7 @@ static long vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma,
 		}
 
 		unmapped = iommu_unmap(domain->domain, iova, len);
-		if (WARN_ON(!unmapped))
+		if (WARN_ON(unmapped <= 0))
 			break;
 
 		unlocked += vfio_unpin_pages_remote(dma, iova,
