@@ -129,6 +129,12 @@ struct dma_ops_domain {
 static struct iova_domain reserved_iova_ranges;
 static struct lock_class_key reserved_rbtree_key;
 
+struct amd_iommu_flush_entries {
+	struct list_head list;
+	unsigned long iova;
+	size_t size;
+};
+
 /****************************************************************************
  *
  * Helper functions
@@ -3055,9 +3061,6 @@ static size_t amd_iommu_unmap(struct iommu_domain *dom, unsigned long iova,
 	unmap_size = iommu_unmap_page(domain, iova, page_size);
 	mutex_unlock(&domain->api_lock);
 
-	domain_flush_tlb_pde(domain);
-	domain_flush_complete(domain);
-
 	return unmap_size;
 }
 
@@ -3175,6 +3178,71 @@ static bool amd_iommu_is_attach_deferred(struct iommu_domain *domain,
 	return dev_data->defer_attach;
 }
 
+static void amd_iommu_flush_iotlb_all(struct iommu_domain *domain)
+{
+	struct protection_domain *dom = to_pdomain(domain);
+
+	domain_flush_tlb_pde(dom);
+	domain_flush_complete(dom);
+}
+
+static void amd_iommu_iotlb_range_add(struct iommu_domain *domain,
+				      unsigned long iova, size_t size)
+{
+	struct amd_iommu_flush_entries *entry, *p;
+	unsigned long flags;
+	bool found = false;
+
+	spin_lock_irqsave(&amd_iommu_flush_list_lock, flags);
+	list_for_each_entry(p, &amd_iommu_flush_list, list) {
+		if (iova != p->iova)
+			continue;
+
+		if (size > p->size) {
+			p->size = size;
+			pr_debug("%s: update range: iova=%#lx, size = %#lx\n",
+				 __func__, p->iova, p->size);
+		}
+		found = true;
+		break;
+	}
+
+	if (!found) {
+		entry = kzalloc(sizeof(struct amd_iommu_flush_entries),
+				GFP_KERNEL);
+		if (entry) {
+			pr_debug("%s: new range: iova=%lx, size=%#lx\n",
+				 __func__, iova, size);
+
+			entry->iova = iova;
+			entry->size = size;
+			list_add(&entry->list, &amd_iommu_flush_list);
+		}
+	}
+	spin_unlock_irqrestore(&amd_iommu_flush_list_lock, flags);
+}
+
+static void amd_iommu_iotlb_sync(struct iommu_domain *domain)
+{
+	struct protection_domain *pdom = to_pdomain(domain);
+	struct amd_iommu_flush_entries *entry, *next;
+	unsigned long flags;
+
+	/* Note:
+	 * Currently, IOMMU driver just flushes the whole IO/TLB for
+	 * a given domain. So, just remove entries from the list here.
+	 */
+	spin_lock_irqsave(&amd_iommu_flush_list_lock, flags);
+	list_for_each_entry_safe(entry, next, &amd_iommu_flush_list, list) {
+		list_del(&entry->list);
+		kfree(entry);
+	}
+	spin_unlock_irqrestore(&amd_iommu_flush_list_lock, flags);
+
+	domain_flush_tlb_pde(pdom);
+	domain_flush_complete(pdom);
+}
+
 const struct iommu_ops amd_iommu_ops = {
 	.capable = amd_iommu_capable,
 	.domain_alloc = amd_iommu_domain_alloc,
@@ -3193,6 +3261,9 @@ const struct iommu_ops amd_iommu_ops = {
 	.apply_resv_region = amd_iommu_apply_resv_region,
 	.is_attach_deferred = amd_iommu_is_attach_deferred,
 	.pgsize_bitmap	= AMD_IOMMU_PGSIZES,
+	.flush_iotlb_all = amd_iommu_flush_iotlb_all,
+	.iotlb_range_add = amd_iommu_iotlb_range_add,
+	.iotlb_sync = amd_iommu_iotlb_sync,
 };
 
 /*****************************************************************************

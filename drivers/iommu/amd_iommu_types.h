@@ -670,6 +670,13 @@ extern spinlock_t amd_iommu_pd_lock;
 extern struct list_head amd_iommu_pd_list;
 
 /*
+ * Declarations for the global flush list to support
+ * iotlb_range_add() and iotlb_sync.
+ */
+extern spinlock_t amd_iommu_flush_list_lock;
+extern struct list_head amd_iommu_flush_list;
+
+/*
  * Structure defining one entry in the device table
  */
 struct dev_table_entry {
