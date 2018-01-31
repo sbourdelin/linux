@@ -233,10 +233,12 @@ static int ohci_urb_enqueue (
 		/* Start up the I/O watchdog timer, if it's not running */
 		if (!timer_pending(&ohci->io_watchdog) &&
 				list_empty(&ohci->eds_in_use) &&
+				!ohci->timer_running &&
 				!(ohci->flags & OHCI_QUIRK_QEMU)) {
 			ohci->prev_frame_no = ohci_frame_no(ohci);
 			mod_timer(&ohci->io_watchdog,
 					jiffies + IO_WATCHDOG_DELAY);
+			ohci->timer_running = 1;
 		}
 		list_add(&ed->in_use_list, &ohci->eds_in_use);
 
@@ -501,6 +503,7 @@ static int ohci_init (struct ohci_hcd *ohci)
 		return 0;
 
 	timer_setup(&ohci->io_watchdog, io_watchdog_func, 0);
+	ohci->timer_running = 0;
 
 	ohci->hcca = dma_alloc_coherent (hcd->self.controller,
 			sizeof(*ohci->hcca), &ohci->hcca_dma, GFP_KERNEL);
@@ -732,6 +735,7 @@ static void io_watchdog_func(struct timer_list *t)
 	struct td	*td, *td_start, *td_next;
 	unsigned	frame_no;
 	unsigned long	flags;
+	int		timer_running = 0;
 
 	spin_lock_irqsave(&ohci->lock, flags);
 
@@ -841,10 +845,12 @@ static void io_watchdog_func(struct timer_list *t)
 					&ohci->regs->donehead);
 			mod_timer(&ohci->io_watchdog,
 					jiffies + IO_WATCHDOG_DELAY);
+			timer_running = 1;
 		}
 	}
 
  done:
+	ohci->timer_running = timer_running;
 	spin_unlock_irqrestore(&ohci->lock, flags);
 }
 
@@ -973,6 +979,7 @@ static void ohci_stop (struct usb_hcd *hcd)
 	if (quirk_nec(ohci))
 		flush_work(&ohci->nec_work);
 	del_timer_sync(&ohci->io_watchdog);
+	ohci->timer_running = 0;
 
 	ohci_writel (ohci, OHCI_INTR_MIE, &ohci->regs->intrdisable);
 	ohci_usb_reset(ohci);

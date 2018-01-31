@@ -427,6 +427,7 @@ struct ohci_hcd {
 	unsigned		wdh_cnt, prev_wdh_cnt;
 	u32			prev_donehead;
 	struct timer_list	io_watchdog;
+	int			timer_running;
 
 	struct work_struct	nec_work;	/* Worker for NEC quirk */
 
