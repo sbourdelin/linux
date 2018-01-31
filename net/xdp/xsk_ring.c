@@ -41,7 +41,8 @@ struct xsk_queue *xskq_create(u32 nentries)
 	q->queue_ops.enqueue = xskq_enqueue_from_array;
 	q->queue_ops.enqueue_completed = xskq_enqueue_completed_from_array;
 	q->queue_ops.dequeue = xskq_dequeue_to_array;
-	q->used_idx = 0;
+	q->used_idx_head = 0;
+	q->used_idx_tail = 0;
 	q->last_avail_idx = 0;
 	q->ring_mask = nentries - 1;
 	q->num_free = 0;
