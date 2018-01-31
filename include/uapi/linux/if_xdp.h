@@ -36,4 +36,37 @@ struct xdp_mr_req {
 	__u32	data_headroom;  /* Frame head room */
 };
 
+struct xdp_ring_req {
+	__u32   mr_fd;      /* FD of packet buffer area registered
+			     * with XDP_MEM_REG
+			     */
+	__u32   desc_nr;    /* Number of descriptors in ring */
+};
+
+/* Pgoff for mmaping the rings */
+#define XDP_PGOFF_RX_RING 0
+#define XDP_PGOFF_TX_RING 0x80000000
+
+/* XDP user space ring structure */
+#define XDP_DESC_KERNEL 0x0080 /* The descriptor is owned by the kernel */
+#define XDP_PKT_CONT    1      /* The packet continues in the next descriptor */
+
+struct xdp_desc {
+	__u32 idx;
+	__u32 len;
+	__u16 offset;
+	__u8  error; /* an errno */
+	__u8  flags;
+	__u8  padding[4];
+};
+
+struct xdp_queue {
+	struct xdp_desc *ring;
+
+	__u32 avail_idx;
+	__u32 last_used_idx;
+	__u32 num_free;
+	__u32 ring_mask;
+};
+
 #endif /* _LINUX_IF_XDP_H */

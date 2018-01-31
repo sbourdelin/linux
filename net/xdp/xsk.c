@@ -23,15 +23,30 @@
 #include <linux/sched/signal.h>
 #include <linux/sched/task.h>
 #include <linux/socket.h>
+#include <linux/file.h>
+#include <linux/uaccess.h>
+#include <linux/net.h>
+#include <linux/netdevice.h>
 #include <net/sock.h>
 
 #include "xsk.h"
+#include "xsk_buff.h"
+#include "xsk_ring.h"
 
 #define XSK_UMEM_MIN_FRAME_SIZE 2048
+
+struct xsk_info {
+	struct xsk_queue *q;
+	struct xsk_umem *umem;
+	struct socket *mrsock;
+	struct xsk_buff_info *buff_info;
+};
 
 struct xdp_sock {
 	/* struct sock must be the first member of struct xdp_sock */
 	struct sock sk;
+	struct xsk_info rx;
+	struct xsk_info tx;
 	struct xsk_umem *umem;
 };
 
@@ -225,6 +240,81 @@ out:
 	return ret < 0 ? ERR_PTR(ret) : umem;
 }
 
+static struct socket *xsk_umem_sock_get(int fd)
+{
+	struct socket *sock;
+	int err;
+
+	sock = sockfd_lookup(fd, &err);
+	if (!sock)
+		return ERR_PTR(err);
+
+	/* Parameter checking */
+	if (sock->sk->sk_family != PF_XDP) {
+		err = -ESOCKTNOSUPPORT;
+		goto out;
+	}
+
+	if (!xdp_sk(sock->sk)->umem) {
+		err = -ESOCKTNOSUPPORT;
+		goto out;
+	}
+
+	return sock;
+out:
+	sockfd_put(sock);
+	return ERR_PTR(err);
+}
+
+static int xsk_init_ring(struct sock *sk, int mr_fd, u32 desc_nr,
+			 struct xsk_info *info)
+{
+	struct xsk_umem *umem;
+	struct socket *mrsock;
+
+	if (desc_nr == 0)
+		return -EINVAL;
+
+	mrsock = xsk_umem_sock_get(mr_fd);
+	if (IS_ERR(mrsock))
+		return PTR_ERR(mrsock);
+	umem = xdp_sk(mrsock->sk)->umem;
+
+	/* Check if umem is from this socket, if so do not make
+	 * circular references.
+	 */
+	lock_sock(sk);
+	if (sk->sk_socket == mrsock)
+		sockfd_put(mrsock);
+
+	info->q = xskq_create(desc_nr);
+	if (!info->q)
+		goto out_queue;
+
+	info->umem = umem;
+	info->mrsock = mrsock;
+	release_sock(sk);
+	return 0;
+
+out_queue:
+	release_sock(sk);
+	return -ENOMEM;
+}
+
+static int xsk_init_rx_ring(struct sock *sk, int mr_fd, u32 desc_nr)
+{
+	struct xdp_sock *xs = xdp_sk(sk);
+
+	return xsk_init_ring(sk, mr_fd, desc_nr, &xs->rx);
+}
+
+static int xsk_init_tx_ring(struct sock *sk, int mr_fd, u32 desc_nr)
+{
+	struct xdp_sock *xs = xdp_sk(sk);
+
+	return xsk_init_ring(sk, mr_fd, desc_nr, &xs->tx);
+}
+
 static int xsk_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
@@ -241,6 +331,8 @@ static int xsk_release(struct socket *sock)
 	local_bh_enable();
 
 	xsk_umem_destroy(xs->umem);
+	xskq_destroy(xs->rx.q);
+	xskq_destroy(xs->tx.q);
 
 	sock_orphan(sk);
 	sock->sk = NULL;
@@ -298,6 +390,21 @@ static int xsk_setsockopt(struct socket *sock, int level, int optname,
 
 		return 0;
 	}
+	case XDP_RX_RING:
+	case XDP_TX_RING:
+	{
+		struct xdp_ring_req req;
+
+		if (optlen < sizeof(req))
+			return -EINVAL;
+		if (copy_from_user(&req, optval, sizeof(req)))
+			return -EFAULT;
+
+		if (optname == XDP_TX_RING)
+			return xsk_init_tx_ring(sk, req.mr_fd, req.desc_nr);
+
+		return xsk_init_rx_ring(sk, req.mr_fd, req.desc_nr);
+	}
 	default:
 		break;
 	}
@@ -319,7 +426,25 @@ static int xsk_sendmsg(struct socket *sock, struct msghdr *m, size_t total_len)
 static int xsk_mmap(struct file *file, struct socket *sock,
 		    struct vm_area_struct *vma)
 {
-	return -EOPNOTSUPP;
+	unsigned long size = vma->vm_end - vma->vm_start;
+	struct sock *sk = sock->sk;
+	struct xdp_sock *xs = xdp_sk(sk);
+	struct xsk_queue *q;
+	unsigned long pfn;
+
+	if (vma->vm_pgoff == XDP_PGOFF_RX_RING)
+		q = xs->rx.q;
+	else if (vma->vm_pgoff == XDP_PGOFF_TX_RING >> PAGE_SHIFT)
+		q = xs->tx.q;
+	else
+		return -EINVAL;
+
+	if (size != xskq_get_ring_size(q))
+		return -EFBIG;
+
+	pfn = virt_to_phys(xskq_get_ring_address(q)) >> PAGE_SHIFT;
+	return remap_pfn_range(vma, vma->vm_start, pfn,
+			       size, vma->vm_page_prot);
 }
 
 static struct proto xsk_proto = {
