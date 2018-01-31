@@ -26,12 +26,14 @@ enum hv_cpuid_function {
 	HVCPUID_FEATURES			= 0x40000003,
 	HVCPUID_ENLIGHTENMENT_INFO		= 0x40000004,
 	HVCPUID_IMPLEMENTATION_LIMITS		= 0x40000005,
+	HVCPUID_NESTED_FEATURES			= 0x4000000A
 };
 
 struct ms_hyperv_info {
 	u32 features;
 	u32 misc_features;
 	u32 hints;
+	u32 nested_features;
 	u32 max_vp_index;
 	u32 max_lp_index;
 };
