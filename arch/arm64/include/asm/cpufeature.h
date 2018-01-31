@@ -155,6 +155,7 @@ extern struct arm64_ftr_reg arm64_ftr_reg_ctrel0;
  *
  *	b) Any late CPU, brought up after (1), the action is triggered via:
  *		check_local_cpu_capabilities() -> verify_local_cpu_capabilities()
+ *		  -> __verify_local_cpu_caps()
  *
  * 5) Conflicts: Based on the state of the capability on a late CPU vs. the system
  *    state, we could have the following combinations :
