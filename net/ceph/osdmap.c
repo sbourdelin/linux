@@ -1730,7 +1730,7 @@ int ceph_calc_file_object_mapping(struct ceph_file_layout *layout,
 	stripepos = bl % sc;
 	objsetno = stripeno / su_per_object;
 
-	*ono = objsetno * sc + stripepos;
+	*ono = (u64)objsetno * sc + stripepos;
 	dout("objset %u * sc %u = ono %u\n", objsetno, sc, (unsigned int)*ono);
 
 	/* *oxoff = *off % layout->fl_stripe_unit;  # offset in su */
