@@ -210,6 +210,64 @@ static __always_inline void lru_unlock_all(struct pglist_data *pgdat,
 		local_irq_enable();
 }
 
+static __always_inline spinlock_t *page_lru_batch_lock(struct page *page)
+{
+	return &page_pgdat(page)->lru_batch_locks[page->lru_batch].lock;
+}
+
+/**
+ * lru_batch_lock - lock an LRU list batch
+ */
+static __always_inline void lru_batch_lock(struct page *page,
+					   spinlock_t **locked_lru_batch,
+					   struct pglist_data **locked_pgdat,
+					   unsigned long *flags)
+{
+	spinlock_t *lru_batch = page_lru_batch_lock(page);
+	struct pglist_data *pgdat = page_pgdat(page);
+
+	VM_BUG_ON(*locked_pgdat && !page->lru_sentinel);
+
+	if (lru_batch != *locked_lru_batch) {
+		VM_BUG_ON(*locked_pgdat);
+		VM_BUG_ON(*locked_lru_batch);
+		spin_lock_irqsave(lru_batch, *flags);
+		*locked_lru_batch = lru_batch;
+		if (page->lru_sentinel) {
+			spin_lock(&pgdat->lru_lock);
+			*locked_pgdat = pgdat;
+		}
+	} else if (!*locked_pgdat && page->lru_sentinel) {
+		spin_lock(&pgdat->lru_lock);
+		*locked_pgdat = pgdat;
+	}
+}
+
+/**
+ * lru_batch_unlock - unlock an LRU list batch
+ */
+static __always_inline void lru_batch_unlock(struct page *page,
+					     spinlock_t **locked_lru_batch,
+					     struct pglist_data **locked_pgdat,
+					     unsigned long *flags)
+{
+	spinlock_t *lru_batch = (page) ? page_lru_batch_lock(page) : NULL;
+
+	VM_BUG_ON(!*locked_lru_batch);
+
+	if (lru_batch != *locked_lru_batch) {
+		if (*locked_pgdat) {
+			spin_unlock(&(*locked_pgdat)->lru_lock);
+			*locked_pgdat = NULL;
+		}
+		spin_unlock_irqrestore(*locked_lru_batch, *flags);
+		*locked_lru_batch = NULL;
+	} else if (*locked_pgdat && !page->lru_sentinel) {
+		spin_unlock(&(*locked_pgdat)->lru_lock);
+		*locked_pgdat = NULL;
+	}
+}
+
 /**
  * page_lru_base_type - which LRU list type should a page be on?
  * @page: the page to test
