@@ -261,6 +261,9 @@ struct i40e_tx_buffer {
 	};
 	unsigned int bytecount;
 	unsigned short gso_segs;
+	tx_completion_func completion;
+	unsigned long ctx1;
+	unsigned long ctx2;
 
 	DEFINE_DMA_UNMAP_ADDR(dma);
 	DEFINE_DMA_UNMAP_LEN(len);
@@ -484,7 +487,8 @@ int i40e_xdp_xmit(struct net_device *dev, struct xdp_buff *xdp);
 void i40e_xdp_flush(struct net_device *dev);
 bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
 		       struct i40e_ring *tx_ring, int napi_budget);
-
+bool i40e_xdp_clean_tx_irq(struct i40e_vsi *vsi,
+			   struct i40e_ring *tx_ring, int napi_budget);
 
 /**
  * i40e_get_head - Retrieve head from head writeback

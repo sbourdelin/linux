@@ -783,6 +783,153 @@ void i40e_detect_recover_hung(struct i40e_vsi *vsi)
 
 #define WB_STRIDE 4
 
+static void i40e_update_stats_and_arm_wb(struct i40e_ring *tx_ring,
+					 struct i40e_vsi *vsi,
+					 unsigned int total_packets,
+					 unsigned int total_bytes,
+					 int budget)
+{
+	u64_stats_update_begin(&tx_ring->syncp);
+	tx_ring->stats.bytes += total_bytes;
+	tx_ring->stats.packets += total_packets;
+	u64_stats_update_end(&tx_ring->syncp);
+	tx_ring->q_vector->tx.total_bytes += total_bytes;
+	tx_ring->q_vector->tx.total_packets += total_packets;
+
+	if (tx_ring->flags & I40E_TXR_FLAGS_WB_ON_ITR) {
+		/* check to see if there are < 4 descriptors
+		 * waiting to be written back, then kick the hardware to force
+		 * them to be written back in case we stay in NAPI.
+		 * In this mode on X722 we do not enable Interrupt.
+		 */
+		unsigned int j = i40e_get_tx_pending(tx_ring);
+
+		if (budget &&
+		    ((j / WB_STRIDE) == 0) && j > 0 &&
+		    !test_bit(__I40E_VSI_DOWN, vsi->state) &&
+		    (I40E_DESC_UNUSED(tx_ring) != tx_ring->count))
+			tx_ring->arm_wb = true;
+	}
+}
+
+static void i40e_xdp_tx_completion(u32 start, u32 npackets,
+				   unsigned long ctx1, unsigned long ctx2)
+{
+	struct i40e_ring *tx_ring = (struct i40e_ring *)ctx1;
+	struct i40e_tx_buffer *tx_buf;
+	u32 i = 0;
+
+	(void)ctx2;
+	tx_buf = &tx_ring->tx_bi[start];
+	while (i < npackets) {
+		/* free the XDP data */
+		page_frag_free(tx_buf->raw_buf);
+
+		/* unmap skb header data */
+		dma_unmap_single(tx_ring->dev,
+				 dma_unmap_addr(tx_buf, dma),
+				 dma_unmap_len(tx_buf, len),
+				 DMA_TO_DEVICE);
+
+		/* clear tx_buffer data */
+		tx_buf->skb = NULL;
+		dma_unmap_len_set(tx_buf, len, 0);
+
+		/* Next packet */
+		tx_buf++;
+		i++;
+		if (unlikely(i + start == tx_ring->count))
+			tx_buf = tx_ring->tx_bi;
+	}
+}
+
+/**
+ * i40e_xdp_clean_tx_irq - Reclaim resources after transmit completes
+ * @vsi: the VSI we care about
+ * @tx_ring: Tx ring to clean
+ * @napi_budget: Used to determine if we are in netpoll
+ *
+ * Used for XDP packets.
+ * Returns true if there's any budget left (e.g. the clean is finished)
+ **/
+bool i40e_xdp_clean_tx_irq(struct i40e_vsi *vsi,
+			   struct i40e_ring *tx_ring, int napi_budget)
+{
+	u16 i = tx_ring->next_to_clean;
+	struct i40e_tx_buffer *tx_buf;
+	struct i40e_tx_desc *tx_head;
+	struct i40e_tx_desc *tx_desc;
+	unsigned int total_bytes = 0, total_packets = 0;
+	unsigned int budget = vsi->work_limit;
+	struct i40e_tx_buffer *prev_buf;
+	unsigned int packets_completed = 0;
+	u16 start = tx_ring->next_to_clean;
+
+	tx_buf = &tx_ring->tx_bi[i];
+	prev_buf = tx_buf;
+	tx_desc = I40E_TX_DESC(tx_ring, i);
+	i -= tx_ring->count;
+
+	tx_head = I40E_TX_DESC(tx_ring, i40e_get_head(tx_ring));
+
+	do {
+		struct i40e_tx_desc *eop_desc = tx_buf->next_to_watch;
+
+		/* if next_to_watch is not set then there is no work pending */
+		if (!eop_desc)
+			break;
+
+		/* prevent any other reads prior to eop_desc */
+		smp_rmb();
+
+		i40e_trace(clean_tx_irq, tx_ring, tx_desc, tx_buf);
+		/* we have caught up to head, no work left to do */
+		if (tx_head == tx_desc)
+			break;
+
+		/* clear next_to_watch to prevent false hangs */
+		tx_buf->next_to_watch = NULL;
+
+		/* update the statistics for this packet */
+		total_bytes += tx_buf->bytecount;
+		total_packets += tx_buf->gso_segs;
+
+		if (prev_buf->completion != tx_buf->completion) {
+			prev_buf->completion(start, packets_completed,
+					     prev_buf->ctx1, prev_buf->ctx2);
+			packets_completed = 0;
+			start = i + tx_ring->count - 1;
+		}
+		packets_completed++;
+
+		/* move us one more past the eop_desc for start of next pkt */
+		prev_buf = tx_buf++;
+		tx_desc++;
+		i++;
+		if (unlikely(!i)) {
+			i -= tx_ring->count;
+			tx_buf = tx_ring->tx_bi;
+			tx_desc = I40E_TX_DESC(tx_ring, 0);
+		}
+
+		prefetch(tx_desc);
+
+		/* update budget accounting */
+		budget--;
+	} while (likely(budget));
+
+	if (packets_completed > 0)
+		prev_buf->completion(start, packets_completed,
+				     prev_buf->ctx1, prev_buf->ctx2);
+
+	i += tx_ring->count;
+	tx_ring->next_to_clean = i;
+	i40e_update_stats_and_arm_wb(tx_ring, vsi, total_packets,
+				     total_bytes, budget);
+
+	return !!budget;
+}
+
 /**
  * i40e_clean_tx_irq - Reclaim resources after transmit completes
  * @vsi: the VSI we care about
@@ -829,11 +976,8 @@ bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
 		total_bytes += tx_buf->bytecount;
 		total_packets += tx_buf->gso_segs;
 
-		/* free the skb/XDP data */
-		if (ring_is_xdp(tx_ring))
-			page_frag_free(tx_buf->raw_buf);
-		else
-			napi_consume_skb(tx_buf->skb, napi_budget);
+		/* free the skb data */
+		napi_consume_skb(tx_buf->skb, napi_budget);
 
 		/* unmap skb header data */
 		dma_unmap_single(tx_ring->dev,
@@ -887,30 +1031,8 @@ bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
 
 	i += tx_ring->count;
 	tx_ring->next_to_clean = i;
-	u64_stats_update_begin(&tx_ring->syncp);
-	tx_ring->stats.bytes += total_bytes;
-	tx_ring->stats.packets += total_packets;
-	u64_stats_update_end(&tx_ring->syncp);
-	tx_ring->q_vector->tx.total_bytes += total_bytes;
-	tx_ring->q_vector->tx.total_packets += total_packets;
-
-	if (tx_ring->flags & I40E_TXR_FLAGS_WB_ON_ITR) {
-		/* check to see if there are < 4 descriptors
-		 * waiting to be written back, then kick the hardware to force
-		 * them to be written back in case we stay in NAPI.
-		 * In this mode on X722 we do not enable Interrupt.
-		 */
-		unsigned int j = i40e_get_tx_pending(tx_ring);
-
-		if (budget &&
-		    ((j / WB_STRIDE) == 0) && (j > 0) &&
-		    !test_bit(__I40E_VSI_DOWN, vsi->state) &&
-		    (I40E_DESC_UNUSED(tx_ring) != tx_ring->count))
-			tx_ring->arm_wb = true;
-	}
-
-	if (ring_is_xdp(tx_ring))
-		return !!budget;
+	i40e_update_stats_and_arm_wb(tx_ring, vsi, total_packets,
+				     total_bytes, budget);
 
 	/* notify netdev of completed buffers */
 	netdev_tx_completed_queue(txring_txq(tx_ring),
@@ -3182,6 +3304,8 @@ static int i40e_xmit_xdp_ring(struct xdp_buff *xdp,
 	tx_bi->bytecount = size;
 	tx_bi->gso_segs = 1;
 	tx_bi->raw_buf = xdp->data;
+	tx_bi->completion = i40e_xdp_tx_completion;
+	tx_bi->ctx1 = (unsigned long)xdp_ring;
 
 	/* record length, and DMA address */
 	dma_unmap_len_set(tx_bi, len, size);
