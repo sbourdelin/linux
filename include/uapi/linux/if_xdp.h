@@ -29,4 +29,11 @@ struct sockaddr_xdp {
 #define XDP_RX_RING	2
 #define XDP_TX_RING	3
 
+struct xdp_mr_req {
+	__u64	addr;           /* Start of packet data area */
+	__u64	len;            /* Length of packet data area */
+	__u32	frame_size;     /* Frame size */
+	__u32	data_headroom;  /* Frame head room */
+};
+
 #endif /* _LINUX_IF_XDP_H */

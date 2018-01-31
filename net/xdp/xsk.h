@@ -12,7 +12,20 @@
  * more details.
  */
 
-#ifndef _LINUX_XDPSOCK_H
-#define _LINUX_XDPSOCK_H
+#ifndef _LINUX_XSK_H
+#define _LINUX_XSK_H
 
-#endif /* _LINUX_XDPSOCK_H */
+#define XSK_KERNEL_HEADROOM 256 /* Headrom for XDP */
+
+struct xsk_umem {
+	struct pid *pid;
+	struct page **pgs;
+	unsigned long address;
+	size_t size;
+	u32 npgs;
+	u32 frame_size;
+	u32 nframes;
+	u32 data_headroom;
+};
+
+#endif /* _LINUX_XSK_H */
