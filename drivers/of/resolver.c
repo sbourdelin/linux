@@ -19,27 +19,6 @@
 
 #include "of_private.h"
 
-/* illegal phandle value (set when unresolved) */
-#define OF_PHANDLE_ILLEGAL	0xdeadbeef
-
-static phandle live_tree_max_phandle(void)
-{
-	struct device_node *node;
-	phandle phandle;
-	unsigned long flags;
-
-	raw_spin_lock_irqsave(&devtree_lock, flags);
-	phandle = 0;
-	for_each_of_allnodes(node) {
-		if (node->phandle != OF_PHANDLE_ILLEGAL &&
-				node->phandle > phandle)
-			phandle = node->phandle;
-	}
-	raw_spin_unlock_irqrestore(&devtree_lock, flags);
-
-	return phandle;
-}
-
 static void adjust_overlay_phandles(struct device_node *overlay,
 		int phandle_delta)
 {
