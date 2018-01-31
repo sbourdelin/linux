@@ -1629,6 +1629,7 @@ int isolate_lru_page(struct page *page)
 			int lru = page_lru(page);
 			get_page(page);
 			ClearPageLRU(page);
+			smp_rmb(); /* Pairs with smp_wmb in __pagevec_lru_add */
 			del_page_from_lru_list(page, lruvec, lru);
 			ret = 0;
 		}

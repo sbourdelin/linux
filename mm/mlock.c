@@ -109,6 +109,7 @@ static bool __munlock_isolate_lru_page(struct page *page, bool getpage)
 		if (getpage)
 			get_page(page);
 		ClearPageLRU(page);
+		smp_rmb(); /* Pairs with smp_wmb in __pagevec_lru_add */
 		del_page_from_lru_list(page, lruvec, page_lru(page));
 		return true;
 	}

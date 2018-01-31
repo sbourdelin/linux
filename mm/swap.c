@@ -220,6 +220,7 @@ static void pagevec_move_tail_fn(struct page *page, struct lruvec *lruvec,
 	int *pgmoved = arg;
 
 	if (PageLRU(page) && !PageUnevictable(page)) {
+		smp_rmb();	/* Pairs with smp_wmb in __pagevec_lru_add */
 		del_page_from_lru_list(page, lruvec, page_lru(page));
 		ClearPageActive(page);
 		add_page_to_lru_list_tail(page, lruvec, page_lru(page));
@@ -277,6 +278,7 @@ static void __activate_page(struct page *page, struct lruvec *lruvec,
 		int file = page_is_file_cache(page);
 		int lru = page_lru_base_type(page);
 
+		smp_rmb();	/* Pairs with smp_wmb in __pagevec_lru_add */
 		del_page_from_lru_list(page, lruvec, lru);
 		SetPageActive(page);
 		lru += LRU_ACTIVE;
@@ -544,6 +546,7 @@ static void lru_deactivate_file_fn(struct page *page, struct lruvec *lruvec,
 	file = page_is_file_cache(page);
 	lru = page_lru_base_type(page);
 
+	smp_rmb();	/* Pairs with smp_wmb in __pagevec_lru_add */
 	del_page_from_lru_list(page, lruvec, lru + active);
 	ClearPageActive(page);
 	ClearPageReferenced(page);
@@ -578,6 +581,7 @@ static void lru_lazyfree_fn(struct page *page, struct lruvec *lruvec,
 	    !PageSwapCache(page) && !PageUnevictable(page)) {
 		bool active = PageActive(page);
 
+		smp_rmb();	/* Pairs with smp_wmb in __pagevec_lru_add */
 		del_page_from_lru_list(page, lruvec,
 				       LRU_INACTIVE_ANON + active);
 		ClearPageActive(page);
@@ -903,6 +907,60 @@ static void __pagevec_lru_add_fn(struct page *page, struct lruvec *lruvec,
 	trace_mm_lru_insertion(page, lru);
 }
 
+#define	MAX_LRU_SPLICES 4
+
+struct lru_splice {
+	struct list_head list;
+	struct lruvec *lruvec;
+	enum lru_list lru;
+	int nid;
+	int zid;
+	size_t nr_pages;
+};
+
+/*
+ * Adds a page to a local list for splicing, or else to the singletons
+ * list for individual processing.
+ *
+ * Returns the new number of splices in the splices list.
+ */
+size_t add_page_to_lru_splice(struct lru_splice *splices, size_t nr_splices,
+			      struct list_head *singletons, struct page *page)
+{
+	int i;
+	enum lru_list lru = page_lru(page);
+	enum zone_type zid = page_zonenum(page);
+	int nid = page_to_nid(page);
+	struct lruvec *lruvec;
+
+	VM_BUG_ON_PAGE(PageLRU(page), page);
+
+	lruvec = mem_cgroup_page_lruvec(page, NODE_DATA(nid));
+
+	for (i = 0; i < nr_splices; ++i) {
+		if (splices[i].lruvec == lruvec && splices[i].zid == zid) {
+			list_add(&page->lru, &splices[i].list);
+			splices[nr_splices].nr_pages += hpage_nr_pages(page);
+			return nr_splices;
+		}
+	}
+
+	if (nr_splices < MAX_LRU_SPLICES) {
+		INIT_LIST_HEAD(&splices[nr_splices].list);
+		splices[nr_splices].lruvec = lruvec;
+		splices[nr_splices].lru = lru;
+		splices[nr_splices].nid = nid;
+		splices[nr_splices].zid = zid;
+		splices[nr_splices].nr_pages = hpage_nr_pages(page);
+		list_add(&page->lru, &splices[nr_splices].list);
+		++nr_splices;
+	} else {
+		list_add(&page->lru, singletons);
+	}
+
+	return nr_splices;
+}
+
 /*
  * Add the passed pages to the LRU, then drop the caller's refcount
  * on them.  Reinitialises the caller's pagevec.
@@ -911,12 +969,59 @@ void __pagevec_lru_add(struct pagevec *pvec)
 {
 	int i;
 	struct pglist_data *pgdat = NULL;
-	struct lruvec *lruvec;
 	unsigned long flags = 0;
+	struct lru_splice splices[MAX_LRU_SPLICES];
+	size_t nr_splices = 0;
+	LIST_HEAD(singletons);
+	struct page *page, *next;
 
-	for (i = 0; i < pagevec_count(pvec); i++) {
-		struct page *page = pvec->pages[i];
-		struct pglist_data *pagepgdat = page_pgdat(page);
+	/*
+	 * Sort the pages into local lists to splice onto the LRU once we
+	 * hold lru_lock.  In the common case there should be few of these
+	 * local lists.
+	 */
+	for (i = 0; i < pagevec_count(pvec); ++i) {
+		page = pvec->pages[i];
+		nr_splices = add_page_to_lru_splice(splices, nr_splices,
+						    &singletons, page);
+	}
+
+	/*
+	 * Paired with read barriers where we check PageLRU and modify
+	 * page->lru, for example pagevec_move_tail_fn.
+	 */
+	smp_wmb();
+
+	for (i = 0; i < pagevec_count(pvec); i++)
+		SetPageLRU(pvec->pages[i]);
+
+	for (i = 0; i < nr_splices; ++i) {
+		struct lru_splice *s = &splices[i];
+		struct pglist_data *splice_pgdat = NODE_DATA(s->nid);
+
+		if (splice_pgdat != pgdat) {
+			if (pgdat)
+				spin_unlock_irqrestore(&pgdat->lru_lock, flags);
+			pgdat = splice_pgdat;
+			spin_lock_irqsave(&pgdat->lru_lock, flags);
+		}
+
+		update_lru_size(s->lruvec, s->lru, s->zid, s->nr_pages);
+		list_splice(&s->list, lru_head(&s->lruvec->lists[s->lru]));
+		update_page_reclaim_stat(s->lruvec, is_file_lru(s->lru),
+					 is_active_lru(s->lru));
+		/* XXX add splice tracepoint */
+	}
+
+       while (!list_empty(&singletons)) {
+		struct pglist_data *pagepgdat;
+		struct lruvec *lruvec;
+		struct list_head *list;
+
+		list = singletons.next;
+		page = list_entry(list, struct page, lru);
+		list_del(list);
+		pagepgdat = page_pgdat(page);
 
 		if (pagepgdat != pgdat) {
 			if (pgdat)
