@@ -70,6 +70,7 @@
 #include <linux/pci.h>
 #include <linux/vmalloc.h>
 #include <linux/device.h>
+#include <drm/drm_fb_helper.h>
 
 #include <asm/io.h>
 #include <linux/uaccess.h>
@@ -2259,6 +2260,23 @@ static const struct bin_attribute edid2_attr = {
 	.read	= radeon_show_edid2,
 };
 
+static int radeon_kick_out_firmware_fb(struct pci_dev *pdev)
+{
+	struct apertures_struct *ap;
+
+	ap = alloc_apertures(1);
+	if (!ap)
+		return -ENOMEM;
+
+	ap->ranges[0].base = pci_resource_start(pdev, 0);
+	ap->ranges[0].size = pci_resource_len(pdev, 0);
+
+	drm_fb_helper_remove_conflicting_framebuffers(ap, KBUILD_MODNAME, false);
+
+	kfree(ap);
+
+	return 0;
+}
 
 static int radeonfb_pci_register(struct pci_dev *pdev,
 				 const struct pci_device_id *ent)
@@ -2312,19 +2330,27 @@ static int radeonfb_pci_register(struct pci_dev *pdev,
 	rinfo->fb_base_phys = pci_resource_start (pdev, 0);
 	rinfo->mmio_base_phys = pci_resource_start (pdev, 2);
 
+	ret = radeon_kick_out_firmware_fb(pdev);
+	if (ret)
+		return ret;
+
 	/* request the mem regions */
 	ret = pci_request_region(pdev, 0, "radeonfb framebuffer");
 	if (ret < 0) {
+#ifndef CONFIG_FB_OF
 		printk( KERN_ERR "radeonfb (%s): cannot request region 0.\n",
 			pci_name(rinfo->pdev));
 		goto err_release_fb;
+#endif
 	}
 
 	ret = pci_request_region(pdev, 2, "radeonfb mmio");
 	if (ret < 0) {
+#ifndef CONFIG_FB_OF
 		printk( KERN_ERR "radeonfb (%s): cannot request region 2.\n",
 			pci_name(rinfo->pdev));
 		goto err_release_pci0;
+#endif
 	}
 
 	/* map the regions */
@@ -2509,10 +2535,12 @@ err_unmap_rom:
 	iounmap(rinfo->mmio_base);
 err_release_pci2:
 	pci_release_region(pdev, 2);
+#ifndef CONFIG_FB_OF
 err_release_pci0:
 	pci_release_region(pdev, 0);
 err_release_fb:
         framebuffer_release(info);
+#endif
 err_disable:
 err_out:
 	return ret;
