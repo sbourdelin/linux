@@ -745,31 +745,21 @@ void release_pages(struct page **pages, int nr)
 	int i;
 	LIST_HEAD(pages_to_free);
 	struct pglist_data *locked_pgdat = NULL;
+	spinlock_t *locked_lru_batch = NULL;
 	struct lruvec *lruvec;
 	unsigned long uninitialized_var(flags);
-	unsigned int uninitialized_var(lock_batch);
 
 	for (i = 0; i < nr; i++) {
 		struct page *page = pages[i];
-
-		/*
-		 * Make sure the IRQ-safe lock-holding time does not get
-		 * excessive with a continuous string of pages from the
-		 * same pgdat. The lock is held only if pgdat != NULL.
-		 */
-		if (locked_pgdat && ++lock_batch == SWAP_CLUSTER_MAX) {
-			lru_unlock_all(locked_pgdat, &flags);
-			locked_pgdat = NULL;
-		}
 
 		if (is_huge_zero_page(page))
 			continue;
 
 		/* Device public page can not be huge page */
 		if (is_device_public_page(page)) {
-			if (locked_pgdat) {
-				lru_unlock_all(locked_pgdat, &flags);
-				locked_pgdat = NULL;
+			if (locked_lru_batch) {
+				lru_batch_unlock(NULL, &locked_lru_batch,
+						 &locked_pgdat, &flags);
 			}
 			put_zone_device_private_or_public_page(page);
 			continue;
@@ -780,26 +770,23 @@ void release_pages(struct page **pages, int nr)
 			continue;
 
 		if (PageCompound(page)) {
-			if (locked_pgdat) {
-				lru_unlock_all(locked_pgdat, &flags);
-				locked_pgdat = NULL;
+			if (locked_lru_batch) {
+				lru_batch_unlock(NULL, &locked_lru_batch,
+						 &locked_pgdat, &flags);
 			}
 			__put_compound_page(page);
 			continue;
 		}
 
 		if (PageLRU(page)) {
-			struct pglist_data *pgdat = page_pgdat(page);
-
-			if (pgdat != locked_pgdat) {
-				if (locked_pgdat)
-					lru_unlock_all(locked_pgdat, &flags);
-				lock_batch = 0;
-				locked_pgdat = pgdat;
-				lru_lock_all(locked_pgdat, &flags);
+			if (locked_lru_batch) {
+				lru_batch_unlock(page, &locked_lru_batch,
+						 &locked_pgdat, &flags);
 			}
+			lru_batch_lock(page, &locked_lru_batch, &locked_pgdat,
+				       &flags);
 
-			lruvec = mem_cgroup_page_lruvec(page, locked_pgdat);
+			lruvec = mem_cgroup_page_lruvec(page, page_pgdat(page));
 			VM_BUG_ON_PAGE(!PageLRU(page), page);
 			__ClearPageLRU(page);
 			del_page_from_lru_list(page, lruvec, page_off_lru(page));
@@ -811,8 +798,10 @@ void release_pages(struct page **pages, int nr)
 
 		list_add(&page->lru, &pages_to_free);
 	}
-	if (locked_pgdat)
-		lru_unlock_all(locked_pgdat, &flags);
+	if (locked_lru_batch) {
+		lru_batch_unlock(NULL, &locked_lru_batch, &locked_pgdat,
+				 &flags);
+	}
 
 	mem_cgroup_uncharge_list(&pages_to_free);
 	free_unref_page_list(&pages_to_free);
