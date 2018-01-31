@@ -1181,9 +1181,8 @@ static bool __this_cpu_has_cap(const struct arm64_cpu_capabilities *cap_array,
 		return false;
 
 	for (caps = cap_array; caps->matches; caps++)
-		if (caps->capability == cap &&
-		    caps->matches(caps, SCOPE_LOCAL_CPU))
-			return true;
+		if (caps->capability == cap)
+			return caps->matches(caps, SCOPE_LOCAL_CPU);
 	return false;
 }
 
@@ -1275,7 +1274,7 @@ static bool __verify_local_cpu_caps(const struct arm64_cpu_capabilities *caps_li
 		if (!(caps->type & scope_mask))
 			continue;
 
-		cpu_has_cap = __this_cpu_has_cap(caps_list, caps->capability);
+		cpu_has_cap = caps->matches(caps, SCOPE_LOCAL_CPU);
 		system_has_cap =  cpus_have_cap(caps->capability);
 
 		if (system_has_cap) {

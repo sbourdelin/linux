@@ -290,6 +290,7 @@ struct arm64_cpu_capabilities {
 			bool sign;
 			unsigned long hwcap;
 		};
+		const struct arm64_cpu_capabilities *cap_list;
 	};
 };
 
