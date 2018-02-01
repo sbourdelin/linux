@@ -47,6 +47,7 @@ i915-y := i915_drv.o \
 i915-$(CONFIG_COMPAT)   += i915_ioc32.o
 i915-$(CONFIG_DEBUG_FS) += i915_debugfs.o intel_pipe_crc.o
 i915-$(CONFIG_PERF_EVENTS) += i915_pmu.o
+i915-$(CONFIG_CGROUPS) += i915_cgroup.o
 
 # GEM code
 i915-y += i915_cmd_parser.o \

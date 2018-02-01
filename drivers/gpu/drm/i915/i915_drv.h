@@ -2349,6 +2349,9 @@ struct drm_i915_private {
 
 	struct i915_pmu pmu;
 
+	/* Linux cgroup integration */
+	struct cgroup_driver *i915_cgroups;
+
 	/*
 	 * NOTE: This is the dri1/ums dungeon, don't add stuff here. Your patch
 	 * will be rejected. Instead look for a better place.
@@ -2901,6 +2904,27 @@ intel_ggtt_update_needs_vtd_wa(struct drm_i915_private *dev_priv)
 
 int intel_sanitize_enable_ppgtt(struct drm_i915_private *dev_priv,
 				int enable_ppgtt);
+
+/* i915_cgroup.c */
+#ifdef CONFIG_CGROUPS
+int i915_cgroup_init(struct drm_i915_private *dev_priv);
+int i915_cgroup_setparam_ioctl(struct drm_device *dev, void *data,
+			       struct drm_file *file);
+void i915_cgroup_shutdown(struct drm_i915_private *dev_priv);
+#else
+static inline int
+i915_cgroup_init(struct drm_i915_private *dev_priv)
+{
+	return 0;
+}
+static inline void i915_cgroup_shutdown(struct drm_i915_private *dev_priv) {}
+static inline int
+i915_cgroup_setparam_ioctl(struct drm_device *dev, void *data,
+			   struct drm_file *file)
+{
+	return -EINVAL;
+}
+#endif
 
 /* i915_drv.c */
 void __printf(3, 4)
