@@ -3728,6 +3728,11 @@
 	reset_devices	[KNL] Force drivers to reset the underlying device
 			during initialization.
 
+	restrict_smt	[KNL,SMP] Restrict user tasks to run on the first SMT
+			thread of each core. Secondary SMT threads can still
+			be used by kernel tasks and by user tasks exclusively
+			pinned to them by a user with CAP_SYS_NICE.
+
 	resume=		[SWSUSP]
 			Specify the partition device for software suspend
 			Format:

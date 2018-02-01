@@ -4677,10 +4677,29 @@ out_unlock:
 	return retval;
 }
 
+static void cpumask_restrict_smt(struct cpumask *new_mask)
+{
+	int cpu;
+
+	for_each_cpu(cpu, new_mask) {
+		const struct cpumask *smt_mask = cpu_smt_mask(cpu);
+		int first_thread = cpumask_first(smt_mask);
+		int last_thread = cpumask_last(smt_mask);
+
+		if (cpu != first_thread) {
+			if (!cpumask_test_cpu(first_thread, new_mask)) {
+				cpumask_set_cpu(first_thread, new_mask);
+				cpu = last_thread;
+			}
+		}
+	}
+}
+
 long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 {
 	cpumask_var_t cpus_allowed, new_mask;
 	struct task_struct *p;
+	int cap_sys_nice = false;
 	int retval;
 
 	rcu_read_lock();
@@ -4714,6 +4733,7 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 			rcu_read_unlock();
 			goto out_free_new_mask;
 		}
+		cap_sys_nice = true;
 		rcu_read_unlock();
 	}
 
@@ -4724,6 +4744,16 @@ long sched_setaffinity(pid_t pid, const struct cpumask *in_mask)
 
 	cpuset_cpus_allowed(p, cpus_allowed);
 	cpumask_and(new_mask, in_mask, cpus_allowed);
+
+	if (sysctl_sched_restrict_smt && p->sched_class == &fair_sched_class) {
+		if (!cap_sys_nice) {
+			rcu_read_lock();
+			if (!ns_capable(__task_cred(p)->user_ns, CAP_SYS_NICE)) {
+				cpumask_restrict_smt(new_mask);
+			}
+			rcu_read_unlock();
+		}
+	}
 
 	/*
 	 * Since bandwidth control happens on root_domain basis,

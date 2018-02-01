@@ -101,6 +101,13 @@ unsigned int normalized_sysctl_sched_wakeup_granularity	= 1000000UL;
 
 const_debug unsigned int sysctl_sched_migration_cost	= 500000UL;
 
+/*
+ * Control SMT restricted mode. If set to 1 (default is 0),
+ * and multiple sibling SMT threads are present in a new cpu mask for
+ * task->cpus_allowed, only the first thread per core will be admited.
+ */
+unsigned int sysctl_sched_restrict_smt __read_mostly;
+
 #ifdef CONFIG_SMP
 /*
  * For asym packing, by default the lower numbered cpu has higher priority.
@@ -6449,6 +6456,32 @@ static void task_dead_fair(struct task_struct *p)
 {
 	remove_entity_load_avg(&p->se);
 }
+
+static void set_cpus_allowed_fair(struct task_struct *p, const struct cpumask *new_mask)
+{
+	cpumask_var_t tmp_mask;
+	int cpu, thread;
+
+	if (p->flags & PF_KTHREAD ||
+	    !static_branch_likely(&sched_smt_present) ||
+	    !sysctl_sched_restrict_smt ||
+	    !alloc_cpumask_var(&tmp_mask, GFP_KERNEL)) {
+	    /* Fallback to common function */
+	    return set_cpus_allowed_common(p, new_mask);
+	}
+
+	cpumask_copy(tmp_mask, new_mask);
+	for_each_cpu(cpu, tmp_mask) {
+		for_each_cpu(thread, cpu_smt_mask(cpu)) {
+			if (thread != cpu)
+				cpumask_clear_cpu(thread, tmp_mask);
+		}
+	}
+	cpumask_copy(&p->cpus_allowed, tmp_mask);
+	p->nr_cpus_allowed = cpumask_weight(tmp_mask);
+
+	free_cpumask_var(tmp_mask);
+}
 #endif /* CONFIG_SMP */
 
 static unsigned long wakeup_gran(struct sched_entity *se)
@@ -9447,6 +9480,11 @@ static void task_fork_fair(struct task_struct *p)
 	struct rq *rq = this_rq();
 	struct rq_flags rf;
 
+	if (sysctl_sched_restrict_smt) {
+		/* Reset restricted SMT policy */
+		set_cpus_allowed_fair(p, &p->cpus_allowed);
+	}
+
 	rq_lock(rq, &rf);
 	update_rq_clock(rq);
 
@@ -9913,7 +9951,7 @@ const struct sched_class fair_sched_class = {
 	.rq_offline		= rq_offline_fair,
 
 	.task_dead		= task_dead_fair,
-	.set_cpus_allowed	= set_cpus_allowed_common,
+	.set_cpus_allowed	= set_cpus_allowed_fair,
 #endif
 
 	.set_curr_task          = set_curr_task_fair,
@@ -9932,6 +9970,15 @@ const struct sched_class fair_sched_class = {
 	.task_change_group	= task_change_group_fair,
 #endif
 };
+
+static int __init setup_restrict_smt(char *str)
+{
+	sysctl_sched_restrict_smt = 1;
+
+	return 1;
+}
+
+__setup("restrict_smt", setup_restrict_smt);
 
 #ifdef CONFIG_SCHED_DEBUG
 void print_cfs_stats(struct seq_file *m, int cpu)
