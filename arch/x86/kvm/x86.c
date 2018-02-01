@@ -6361,6 +6361,7 @@ void kvm_arch_exit(void)
 
 int kvm_vcpu_halt(struct kvm_vcpu *vcpu)
 {
+	kvm_vcpu_set_halted(vcpu);
 	++vcpu->stat.halt_exits;
 	if (lapic_in_kernel(vcpu)) {
 		vcpu->arch.mp_state = KVM_MP_STATE_HALTED;
@@ -7292,6 +7293,7 @@ static int vcpu_run(struct kvm_vcpu *vcpu)
 
 	for (;;) {
 		if (kvm_vcpu_running(vcpu)) {
+			kvm_vcpu_set_running(vcpu);
 			r = vcpu_enter_guest(vcpu);
 		} else {
 			r = vcpu_block(kvm, vcpu);

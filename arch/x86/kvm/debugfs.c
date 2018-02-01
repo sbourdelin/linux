@@ -15,6 +15,15 @@ bool kvm_arch_has_vcpu_debugfs(void)
 	return true;
 }
 
+static int vcpu_get_halted(void *data, u64 *val)
+{
+	struct kvm_vcpu *vcpu = (struct kvm_vcpu *) data;
+	*val = vcpu->halted;
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(vcpu_halted_fops, vcpu_get_halted, NULL, "%lld\n");
+
 static int vcpu_get_tsc_offset(void *data, u64 *val)
 {
 	struct kvm_vcpu *vcpu = (struct kvm_vcpu *) data;
@@ -48,6 +57,12 @@ int kvm_arch_create_vcpu_debugfs(struct kvm_vcpu *vcpu)
 	ret = debugfs_create_file("tsc-offset", 0444,
 							vcpu->debugfs_dentry,
 							vcpu, &vcpu_tsc_offset_fops);
+	if (!ret)
+		return -ENOMEM;
+
+	ret = debugfs_create_file("halted", 0444,
+				    vcpu->debugfs_dentry,
+				    vcpu, &vcpu_halted_fops);
 	if (!ret)
 		return -ENOMEM;
 

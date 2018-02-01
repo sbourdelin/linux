@@ -272,9 +272,20 @@ struct kvm_vcpu {
 	} spin_loop;
 #endif
 	bool preempted;
+	bool halted;
 	struct kvm_vcpu_arch arch;
 	struct dentry *debugfs_dentry;
 };
+
+static inline void kvm_vcpu_set_running(struct kvm_vcpu *vcpu)
+{
+    vcpu->halted = 0;
+}
+
+static inline void kvm_vcpu_set_halted(struct kvm_vcpu *vcpu)
+{
+    vcpu->halted = 1;
+}
 
 static inline int kvm_vcpu_exiting_guest_mode(struct kvm_vcpu *vcpu)
 {
