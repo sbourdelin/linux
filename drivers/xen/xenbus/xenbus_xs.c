@@ -227,6 +227,12 @@ static void xs_send(struct xb_req_data *req, struct xsd_sockmsg *msg)
 	req->state = xb_req_state_queued;
 	init_waitqueue_head(&req->wq);
 
+	/*
+	 * Request comes from userspace so save the original req_id
+	 * and restore it later in the reply.
+	 */
+	if (xs_request_is_user(req))
+		req->user_req_id = req->msg.req_id;
 	req->msg.req_id = xs_request_enter(req);
 
 	mutex_lock(&xb_write_mutex);

@@ -76,6 +76,7 @@ struct xb_req_data {
 	struct list_head list;
 	wait_queue_head_t wq;
 	struct xsd_sockmsg msg;
+	uint32_t user_req_id;
 	enum xsd_sockmsg_type type;
 	char *body;
 	const struct kvec *vec;
@@ -131,5 +132,7 @@ void xenbus_ring_ops_init(void);
 
 int xenbus_dev_request_and_reply(struct xsd_sockmsg *msg, void *par);
 void xenbus_dev_queue_reply(struct xb_req_data *req);
+
+#define xs_request_is_user(_r) ((_r)->cb == xenbus_dev_queue_reply)
 
 #endif
