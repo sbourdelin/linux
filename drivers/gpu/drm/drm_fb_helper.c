@@ -1791,6 +1791,8 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 	int i;
 	struct drm_fb_helper_surface_size sizes;
 	int gamma_size = 0;
+	struct drm_plane *plane;
+	int best_depth = 0;
 
 	memset(&sizes, 0, sizeof(struct drm_fb_helper_surface_size));
 	sizes.surface_depth = 24;
@@ -1798,7 +1800,10 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 	sizes.fb_width = (u32)-1;
 	sizes.fb_height = (u32)-1;
 
-	/* if driver picks 8 or 16 by default use that for both depth/bpp */
+	/*
+	 * If driver picks 8 or 16 by default use that for both depth/bpp
+	 * to begin with
+	 */
 	if (preferred_bpp != sizes.surface_bpp)
 		sizes.surface_depth = sizes.surface_bpp = preferred_bpp;
 
@@ -1831,6 +1836,39 @@ static int drm_fb_helper_single_fb_probe(struct drm_fb_helper *fb_helper,
 			}
 			break;
 		}
+	}
+
+	/*
+	 * If we run into a situation where, for example, the primary plane
+	 * supports RGBA5551 (16 bpp, depth 15) but not RGB565 (16 bpp, depth
+	 * 16) we need to scale down the depth of the sizes we request.
+	 */
+	drm_for_each_plane(plane, fb_helper->dev) {
+		/* Only check the primary plane */
+		if (plane->type != DRM_PLANE_TYPE_PRIMARY)
+			continue;
+
+		for (i = 0; i < plane->format_count; i++) {
+			const struct drm_format_info *fmt;
+
+			fmt = drm_format_info(plane->format_types[i]);
+			/* We found a perfect fit, great */
+			if (fmt->depth == sizes.surface_depth)
+				break;
+
+			/* Skip depths above what we're looking for */
+			if (fmt->depth > sizes.surface_depth)
+				continue;
+
+			/* Best depth found so far */
+			if (fmt->depth > best_depth)
+				best_depth = fmt->depth;
+		}
+	}
+	if (sizes.surface_depth != best_depth) {
+		DRM_DEBUG("requested bpp %d, scaled depth down to %d",
+			  sizes.surface_bpp, best_depth);
+		sizes.surface_depth = best_depth;
 	}
 
 	crtc_count = 0;
