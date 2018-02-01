@@ -153,7 +153,7 @@ There is work in progress to make the scheduling period for each group
 
 The constraint on the period is that a subgroup must have a smaller or
 equal period to its parent. But realistically its not very useful _yet_
-as its prone to starvation without deadline scheduling.
+as its prone to starvation.
 
 Consider two sibling groups A and B; both have 50% bandwidth, but A's
 period is twice the length of B's.
@@ -168,16 +168,7 @@ This means that currently a while (1) loop in A will run for the full period of
 B and can starve B's tasks (assuming they are of lower priority) for a whole
 period.
 
-The next project will be SCHED_EDF (Earliest Deadline First scheduling) to bring
-full deadline scheduling to the linux kernel. Deadline scheduling the above
-groups and treating end of the period as a deadline will ensure that they both
-get their allocated time.
-
-Implementing SCHED_EDF might take a while to complete. Priority Inheritance is
-the biggest challenge as the current linux PI infrastructure is geared towards
-the limited static priority levels 0-99. With deadline scheduling you need to
-do deadline inheritance (since priority is inversely proportional to the
-deadline delta (deadline - now)).
-
-This means the whole PI machinery will have to be reworked - and that is one of
-the most complex pieces of code we have.
+Nowadays it is possible to use the deadline scheduler (SCHED_DEADLINE) to
+allocate runtime/period for tasks. The deadline scheduler does not suffer the
+side effects explained above. For more information about the deadline
+scheduler, you should read Documentation/scheduler/sched-deadline.txt.
