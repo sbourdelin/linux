@@ -32,7 +32,7 @@
 #include "vmwgfx_binding.h"
 
 struct vmw_user_context {
-	struct ttm_base_object base;
+	struct vmwgfx_base_object base;
 	struct vmw_resource res;
 	struct vmw_ctx_binding_state *cbs;
 	struct vmw_cmdbuf_res_manager *man;
@@ -43,7 +43,7 @@ struct vmw_user_context {
 
 static void vmw_user_context_free(struct vmw_resource *res);
 static struct vmw_resource *
-vmw_user_context_base_to_res(struct ttm_base_object *base);
+vmw_user_context_base_to_res(struct vmwgfx_base_object *base);
 
 static int vmw_gb_context_create(struct vmw_resource *res);
 static int vmw_gb_context_bind(struct vmw_resource *res,
@@ -691,7 +691,7 @@ static int vmw_dx_context_destroy(struct vmw_resource *res)
  */
 
 static struct vmw_resource *
-vmw_user_context_base_to_res(struct ttm_base_object *base)
+vmw_user_context_base_to_res(struct vmwgfx_base_object *base)
 {
 	return &(container_of(base, struct vmw_user_context, base)->res);
 }
@@ -707,7 +707,7 @@ static void vmw_user_context_free(struct vmw_resource *res)
 
 	(void) vmw_context_bind_dx_query(res, NULL);
 
-	ttm_base_object_kfree(ctx, base);
+	vmwgfx_base_object_kfree(ctx, base);
 	ttm_mem_global_free(vmw_mem_glob(dev_priv),
 			    vmw_user_context_size);
 }
@@ -717,9 +717,9 @@ static void vmw_user_context_free(struct vmw_resource *res)
  * base object. It releases the base-object's reference on the resource object.
  */
 
-static void vmw_user_context_base_release(struct ttm_base_object **p_base)
+static void vmw_user_context_base_release(struct vmwgfx_base_object **p_base)
 {
-	struct ttm_base_object *base = *p_base;
+	struct vmwgfx_base_object *base = *p_base;
 	struct vmw_user_context *ctx =
 	    container_of(base, struct vmw_user_context, base);
 	struct vmw_resource *res = &ctx->res;
@@ -732,9 +732,9 @@ int vmw_context_destroy_ioctl(struct drm_device *dev, void *data,
 			      struct drm_file *file_priv)
 {
 	struct drm_vmw_context_arg *arg = (struct drm_vmw_context_arg *)data;
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 
-	return ttm_ref_object_base_unref(tfile, arg->cid, TTM_REF_USAGE);
+	return vmwgfx_ref_object_base_unref(tfile, arg->cid, VMWGFX_REF_USAGE);
 }
 
 static int vmw_context_define(struct drm_device *dev, void *data,
@@ -745,7 +745,7 @@ static int vmw_context_define(struct drm_device *dev, void *data,
 	struct vmw_resource *res;
 	struct vmw_resource *tmp;
 	struct drm_vmw_context_arg *arg = (struct drm_vmw_context_arg *)data;
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct ttm_operation_ctx ttm_opt_ctx = {
 		.interruptible = true,
 		.no_wait_gpu = false
@@ -766,7 +766,7 @@ static int vmw_context_define(struct drm_device *dev, void *data,
 		vmw_user_context_size = ttm_round_pot(sizeof(*ctx)) + 128 +
 		  ((dev_priv->has_mob) ? vmw_cmdbuf_res_man_size() : 0);
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -801,7 +801,7 @@ static int vmw_context_define(struct drm_device *dev, void *data,
 		goto out_unlock;
 
 	tmp = vmw_resource_reference(&ctx->res);
-	ret = ttm_base_object_init(tfile, &ctx->base, false, VMW_RES_CONTEXT,
+	ret = vmwgfx_base_object_init(tfile, &ctx->base, false, VMW_RES_CONTEXT,
 				   &vmw_user_context_base_release, NULL);
 
 	if (unlikely(ret != 0)) {
@@ -813,7 +813,7 @@ static int vmw_context_define(struct drm_device *dev, void *data,
 out_err:
 	vmw_resource_unreference(&res);
 out_unlock:
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 	return ret;
 }
 

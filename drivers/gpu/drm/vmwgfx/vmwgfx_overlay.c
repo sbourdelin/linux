@@ -461,7 +461,7 @@ static bool vmw_overlay_available(const struct vmw_private *dev_priv)
 int vmw_overlay_ioctl(struct drm_device *dev, void *data,
 		      struct drm_file *file_priv)
 {
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct vmw_private *dev_priv = vmw_priv(dev);
 	struct vmw_overlay *overlay = dev_priv->overlay_priv;
 	struct drm_vmw_control_stream_arg *arg =

@@ -245,7 +245,7 @@ out_err:
 int vmw_present_ioctl(struct drm_device *dev, void *data,
 		      struct drm_file *file_priv)
 {
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct vmw_private *dev_priv = vmw_priv(dev);
 	struct drm_vmw_present_arg *arg =
 		(struct drm_vmw_present_arg *)data;
@@ -294,7 +294,7 @@ int vmw_present_ioctl(struct drm_device *dev, void *data,
 	}
 	vfb = vmw_framebuffer_to_vfb(fb);
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0))
 		goto out_no_ttm_lock;
 
@@ -314,7 +314,7 @@ int vmw_present_ioctl(struct drm_device *dev, void *data,
 	vmw_surface_unreference(&surface);
 
 out_no_surface:
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 out_no_ttm_lock:
 	drm_framebuffer_unreference(fb);
 out_no_fb:
@@ -383,7 +383,7 @@ int vmw_present_readback_ioctl(struct drm_device *dev, void *data,
 		goto out_no_ttm_lock;
 	}
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0))
 		goto out_no_ttm_lock;
 
@@ -391,7 +391,7 @@ int vmw_present_readback_ioctl(struct drm_device *dev, void *data,
 			       vfb, user_fence_rep,
 			       clips, num_clips);
 
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 out_no_ttm_lock:
 	drm_framebuffer_unreference(fb);
 out_no_fb:

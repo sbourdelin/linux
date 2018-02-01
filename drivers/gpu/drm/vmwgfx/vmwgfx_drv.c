@@ -30,9 +30,9 @@
 #include <drm/drmP.h>
 #include "vmwgfx_drv.h"
 #include "vmwgfx_binding.h"
+#include "vmwgfx_object.h"
 #include <drm/ttm/ttm_placement.h>
 #include <drm/ttm/ttm_bo_driver.h>
-#include <drm/ttm/ttm_object.h>
 #include <drm/ttm/ttm_module.h>
 #include <linux/dma_remapping.h>
 
@@ -644,7 +644,7 @@ static int vmw_driver_load(struct drm_device *dev, unsigned long chipset)
 	mutex_init(&dev_priv->binding_mutex);
 	mutex_init(&dev_priv->global_kms_state_mutex);
 	rwlock_init(&dev_priv->resource_lock);
-	ttm_lock_init(&dev_priv->reservation_sem);
+	vmwgfx_lock_init(&dev_priv->reservation_sem);
 	spin_lock_init(&dev_priv->hw_lock);
 	spin_lock_init(&dev_priv->waiter_lock);
 	spin_lock_init(&dev_priv->cap_lock);
@@ -775,7 +775,7 @@ static int vmw_driver_load(struct drm_device *dev, unsigned long chipset)
 
 
 	vmw_master_init(&dev_priv->fbdev_master);
-	ttm_lock_set_kill(&dev_priv->fbdev_master.lock, false, SIGTERM);
+	vmwgfx_lock_set_kill(&dev_priv->fbdev_master.lock, false, SIGTERM);
 	dev_priv->active_master = &dev_priv->fbdev_master;
 
 	dev_priv->mmio_virt = memremap(dev_priv->mmio_start,
@@ -796,7 +796,7 @@ static int vmw_driver_load(struct drm_device *dev, unsigned long chipset)
 		goto out_err4;
 	}
 
-	dev_priv->tdev = ttm_object_device_init
+	dev_priv->tdev = vmwgfx_object_device_init
 		(dev_priv->mem_global_ref.object, 12, &vmw_prime_dmabuf_ops);
 
 	if (unlikely(dev_priv->tdev == NULL)) {
@@ -943,7 +943,7 @@ out_no_irq:
 	else
 		pci_release_regions(dev->pdev);
 out_no_device:
-	ttm_object_device_release(&dev_priv->tdev);
+	vmwgfx_object_device_release(&dev_priv->tdev);
 out_err4:
 	memunmap(dev_priv->mmio_virt);
 out_err3:
@@ -995,7 +995,7 @@ static void vmw_driver_unload(struct drm_device *dev)
 	else
 		pci_release_regions(dev->pdev);
 
-	ttm_object_device_release(&dev_priv->tdev);
+	vmwgfx_object_device_release(&dev_priv->tdev);
 	memunmap(dev_priv->mmio_virt);
 	if (dev_priv->ctx.staged_bindings)
 		vmw_binding_state_free(dev_priv->ctx.staged_bindings);
@@ -1018,12 +1018,12 @@ static void vmw_postclose(struct drm_device *dev,
 		struct vmw_master *vmaster =
 			vmw_master(vmw_fp->locked_master);
 
-		ttm_lock_set_kill(&vmaster->lock, true, SIGTERM);
-		ttm_vt_unlock(&vmaster->lock);
+		vmwgfx_lock_set_kill(&vmaster->lock, true, SIGTERM);
+		vmwgfx_vt_unlock(&vmaster->lock);
 		drm_master_put(&vmw_fp->locked_master);
 	}
 
-	ttm_object_file_release(&vmw_fp->tfile);
+	vmwgfx_object_file_release(&vmw_fp->tfile);
 	kfree(vmw_fp);
 }
 
@@ -1037,7 +1037,7 @@ static int vmw_driver_open(struct drm_device *dev, struct drm_file *file_priv)
 	if (unlikely(!vmw_fp))
 		return ret;
 
-	vmw_fp->tfile = ttm_object_file_init(dev_priv->tdev, 10);
+	vmw_fp->tfile = vmwgfx_object_file_init(dev_priv->tdev, 10);
 	if (unlikely(vmw_fp->tfile == NULL))
 		goto out_no_tfile;
 
@@ -1092,7 +1092,7 @@ static struct vmw_master *vmw_master_check(struct drm_device *dev,
 	 * authenticating master exits.
 	 */
 	vmaster = vmw_master(file_priv->master);
-	ret = ttm_read_lock(&vmaster->lock, true);
+	ret = vmwgfx_read_lock(&vmaster->lock, true);
 	if (unlikely(ret != 0))
 		vmaster = ERR_PTR(ret);
 
@@ -1155,7 +1155,7 @@ static long vmw_generic_ioctl(struct file *filp, unsigned int cmd,
 
 	ret = ioctl_func(filp, cmd, arg);
 	if (vmaster)
-		ttm_read_unlock(&vmaster->lock);
+		vmwgfx_read_unlock(&vmaster->lock);
 
 	return ret;
 
@@ -1186,7 +1186,7 @@ static void vmw_lastclose(struct drm_device *dev)
 
 static void vmw_master_init(struct vmw_master *vmaster)
 {
-	ttm_lock_init(&vmaster->lock);
+	vmwgfx_lock_init(&vmaster->lock);
 }
 
 static int vmw_master_create(struct drm_device *dev,
@@ -1199,7 +1199,7 @@ static int vmw_master_create(struct drm_device *dev,
 		return -ENOMEM;
 
 	vmw_master_init(vmaster);
-	ttm_lock_set_kill(&vmaster->lock, true, SIGTERM);
+	vmwgfx_lock_set_kill(&vmaster->lock, true, SIGTERM);
 	master->driver_priv = vmaster;
 
 	return 0;
@@ -1226,17 +1226,17 @@ static int vmw_master_set(struct drm_device *dev,
 
 	if (active) {
 		BUG_ON(active != &dev_priv->fbdev_master);
-		ret = ttm_vt_lock(&active->lock, false, vmw_fp->tfile);
+		ret = vmwgfx_vt_lock(&active->lock, false, vmw_fp->tfile);
 		if (unlikely(ret != 0))
 			return ret;
 
-		ttm_lock_set_kill(&active->lock, true, SIGTERM);
+		vmwgfx_lock_set_kill(&active->lock, true, SIGTERM);
 		dev_priv->active_master = NULL;
 	}
 
-	ttm_lock_set_kill(&vmaster->lock, false, SIGTERM);
+	vmwgfx_lock_set_kill(&vmaster->lock, false, SIGTERM);
 	if (!from_open) {
-		ttm_vt_unlock(&vmaster->lock);
+		vmwgfx_vt_unlock(&vmaster->lock);
 		BUG_ON(vmw_fp->locked_master != file_priv->master);
 		drm_master_put(&vmw_fp->locked_master);
 	}
@@ -1261,21 +1261,21 @@ static void vmw_master_drop(struct drm_device *dev,
 	 */
 
 	vmw_fp->locked_master = drm_master_get(file_priv->master);
-	ret = ttm_vt_lock(&vmaster->lock, false, vmw_fp->tfile);
+	ret = vmwgfx_vt_lock(&vmaster->lock, false, vmw_fp->tfile);
 	vmw_kms_legacy_hotspot_clear(dev_priv);
 	if (unlikely((ret != 0))) {
 		DRM_ERROR("Unable to lock TTM at VT switch.\n");
 		drm_master_put(&vmw_fp->locked_master);
 	}
 
-	ttm_lock_set_kill(&vmaster->lock, false, SIGTERM);
+	vmwgfx_lock_set_kill(&vmaster->lock, false, SIGTERM);
 
 	if (!dev_priv->enable_fb)
 		vmw_svga_disable(dev_priv);
 
 	dev_priv->active_master = &dev_priv->fbdev_master;
-	ttm_lock_set_kill(&dev_priv->fbdev_master.lock, false, SIGTERM);
-	ttm_vt_unlock(&dev_priv->fbdev_master.lock);
+	vmwgfx_lock_set_kill(&dev_priv->fbdev_master.lock, false, SIGTERM);
+	vmwgfx_vt_unlock(&dev_priv->fbdev_master.lock);
 
 	if (dev_priv->enable_fb)
 		vmw_fb_on(dev_priv);
@@ -1304,9 +1304,9 @@ static void __vmw_svga_enable(struct vmw_private *dev_priv)
  */
 void vmw_svga_enable(struct vmw_private *dev_priv)
 {
-	(void) ttm_read_lock(&dev_priv->reservation_sem, false);
+	(void) vmwgfx_read_lock(&dev_priv->reservation_sem, false);
 	__vmw_svga_enable(dev_priv);
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 }
 
 /**
@@ -1337,7 +1337,7 @@ static void __vmw_svga_disable(struct vmw_private *dev_priv)
  */
 void vmw_svga_disable(struct vmw_private *dev_priv)
 {
-	ttm_write_lock(&dev_priv->reservation_sem, false);
+	vmwgfx_write_lock(&dev_priv->reservation_sem, false);
 	spin_lock(&dev_priv->svga_lock);
 	if (dev_priv->bdev.man[TTM_PL_VRAM].use_type) {
 		dev_priv->bdev.man[TTM_PL_VRAM].use_type = false;
@@ -1349,7 +1349,7 @@ void vmw_svga_disable(struct vmw_private *dev_priv)
 			  SVGA_REG_ENABLE_ENABLE);
 	} else
 		spin_unlock(&dev_priv->svga_lock);
-	ttm_write_unlock(&dev_priv->reservation_sem);
+	vmwgfx_write_unlock(&dev_priv->reservation_sem);
 }
 
 static void vmw_remove(struct pci_dev *pdev)
@@ -1370,7 +1370,7 @@ static int vmwgfx_pm_notifier(struct notifier_block *nb, unsigned long val,
 	case PM_HIBERNATION_PREPARE:
 		if (dev_priv->enable_fb)
 			vmw_fb_off(dev_priv);
-		ttm_suspend_lock(&dev_priv->reservation_sem);
+		vmwgfx_suspend_lock(&dev_priv->reservation_sem);
 
 		/*
 		 * This empties VRAM and unbinds all GMR bindings.
@@ -1385,7 +1385,7 @@ static int vmwgfx_pm_notifier(struct notifier_block *nb, unsigned long val,
 	case PM_POST_HIBERNATION:
 	case PM_POST_RESTORE:
 		vmw_fence_fifo_up(dev_priv->fman);
-		ttm_suspend_unlock(&dev_priv->reservation_sem);
+		vmwgfx_suspend_unlock(&dev_priv->reservation_sem);
 		if (dev_priv->enable_fb)
 			vmw_fb_on(dev_priv);
 		break;

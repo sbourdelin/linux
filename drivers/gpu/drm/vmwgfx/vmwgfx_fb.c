@@ -378,7 +378,7 @@ static int vmw_fb_create_bo(struct vmw_private *vmw_priv,
 	struct vmw_dma_buffer *vmw_bo;
 	int ret;
 
-	(void) ttm_write_lock(&vmw_priv->reservation_sem, false);
+	(void) vmwgfx_write_lock(&vmw_priv->reservation_sem, false);
 
 	vmw_bo = kmalloc(sizeof(*vmw_bo), GFP_KERNEL);
 	if (!vmw_bo) {
@@ -394,12 +394,12 @@ static int vmw_fb_create_bo(struct vmw_private *vmw_priv,
 		goto err_unlock; /* init frees the buffer on failure */
 
 	*out = vmw_bo;
-	ttm_write_unlock(&vmw_priv->reservation_sem);
+	vmwgfx_write_unlock(&vmw_priv->reservation_sem);
 
 	return 0;
 
 err_unlock:
-	ttm_write_unlock(&vmw_priv->reservation_sem);
+	vmwgfx_write_unlock(&vmw_priv->reservation_sem);
 	return ret;
 }
 

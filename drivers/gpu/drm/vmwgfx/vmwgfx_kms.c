@@ -140,7 +140,7 @@ static void vmw_cursor_update_position(struct vmw_private *dev_priv,
 
 
 void vmw_kms_cursor_snoop(struct vmw_surface *srf,
-			  struct ttm_object_file *tfile,
+			  struct vmwgfx_object_file *tfile,
 			  struct ttm_buffer_object *bo,
 			  SVGA3dCmdHeader *header)
 {
@@ -851,7 +851,7 @@ static void vmw_framebuffer_surface_destroy(struct drm_framebuffer *framebuffer)
 	drm_framebuffer_cleanup(framebuffer);
 	vmw_surface_unreference(&vfbs->surface);
 	if (vfbs->base.user_obj)
-		ttm_base_object_unref(&vfbs->base.user_obj);
+		vmwgfx_base_object_unref(&vfbs->base.user_obj);
 
 	kfree(vfbs);
 }
@@ -874,7 +874,7 @@ static int vmw_framebuffer_surface_dirty(struct drm_framebuffer *framebuffer,
 
 	drm_modeset_lock_all(dev_priv->dev);
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0)) {
 		drm_modeset_unlock_all(dev_priv->dev);
 		return ret;
@@ -901,7 +901,7 @@ static int vmw_framebuffer_surface_dirty(struct drm_framebuffer *framebuffer,
 						 num_clips, inc, NULL);
 
 	vmw_fifo_flush(dev_priv, false);
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 
 	drm_modeset_unlock_all(dev_priv->dev);
 
@@ -1056,7 +1056,7 @@ static void vmw_framebuffer_dmabuf_destroy(struct drm_framebuffer *framebuffer)
 	drm_framebuffer_cleanup(framebuffer);
 	vmw_dmabuf_unreference(&vfbd->buffer);
 	if (vfbd->base.user_obj)
-		ttm_base_object_unref(&vfbd->base.user_obj);
+		vmwgfx_base_object_unref(&vfbd->base.user_obj);
 
 	kfree(vfbd);
 }
@@ -1075,7 +1075,7 @@ static int vmw_framebuffer_dmabuf_dirty(struct drm_framebuffer *framebuffer,
 
 	drm_modeset_lock_all(dev_priv->dev);
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0)) {
 		drm_modeset_unlock_all(dev_priv->dev);
 		return ret;
@@ -1114,7 +1114,7 @@ static int vmw_framebuffer_dmabuf_dirty(struct drm_framebuffer *framebuffer,
 	}
 
 	vmw_fifo_flush(dev_priv, false);
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 
 	drm_modeset_unlock_all(dev_priv->dev);
 
@@ -1420,11 +1420,11 @@ static struct drm_framebuffer *vmw_kms_fb_create(struct drm_device *dev,
 						 const struct drm_mode_fb_cmd2 *mode_cmd)
 {
 	struct vmw_private *dev_priv = vmw_priv(dev);
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct vmw_framebuffer *vfb = NULL;
 	struct vmw_surface *surface = NULL;
 	struct vmw_dma_buffer *bo = NULL;
-	struct ttm_base_object *user_obj;
+	struct vmwgfx_base_object *user_obj;
 	int ret;
 
 	/**
@@ -1449,7 +1449,7 @@ static struct drm_framebuffer *vmw_kms_fb_create(struct drm_device *dev,
 	 * command stream using user-space handles.
 	 */
 
-	user_obj = ttm_base_object_lookup(tfile, mode_cmd->handles[0]);
+	user_obj = vmwgfx_base_object_lookup(tfile, mode_cmd->handles[0]);
 	if (unlikely(user_obj == NULL)) {
 		DRM_ERROR("Could not locate requested kms frame buffer.\n");
 		return ERR_PTR(-ENOENT);
@@ -1493,7 +1493,7 @@ err_out:
 
 	if (ret) {
 		DRM_ERROR("failed to create vmw_framebuffer: %i\n", ret);
-		ttm_base_object_unref(&user_obj);
+		vmwgfx_base_object_unref(&user_obj);
 		return ERR_PTR(ret);
 	} else
 		vfb->user_obj = user_obj;

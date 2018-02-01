@@ -28,7 +28,7 @@
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
 
-/** @file ttm_lock.h
+/** @file vmwgfx_lock.h
  * This file implements a simple replacement for the buffer manager use
  * of the DRM heavyweight hardware lock.
  * The lock is a read-write lock. Taking it in read mode and write mode
@@ -46,16 +46,16 @@
  *
  */
 
-#ifndef _TTM_LOCK_H_
-#define _TTM_LOCK_H_
+#ifndef _VMWGFX_LOCK_H_
+#define _VMWGFX_LOCK_H_
 
 #include <linux/wait.h>
 #include <linux/atomic.h>
 
-#include "ttm_object.h"
+#include "vmwgfx_object.h"
 
 /**
- * struct ttm_lock
+ * struct vmwgfx_lock
  *
  * @base: ttm base object used solely to release the lock if the client
  * holding the lock dies.
@@ -67,51 +67,51 @@
  * @signal: Signal to send when kill_takers is true.
  */
 
-struct ttm_lock {
-	struct ttm_base_object base;
+struct vmwgfx_lock {
+	struct vmwgfx_base_object base;
 	wait_queue_head_t queue;
 	spinlock_t lock;
 	int32_t rw;
 	uint32_t flags;
 	bool kill_takers;
 	int signal;
-	struct ttm_object_file *vt_holder;
+	struct vmwgfx_object_file *vt_holder;
 };
 
 
 /**
- * ttm_lock_init
+ * vmwgfx_lock_init
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  * Initializes the lock.
  */
-extern void ttm_lock_init(struct ttm_lock *lock);
+extern void vmwgfx_lock_init(struct vmwgfx_lock *lock);
 
 /**
- * ttm_read_unlock
+ * vmwgfx_read_unlock
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  *
  * Releases a read lock.
  */
-extern void ttm_read_unlock(struct ttm_lock *lock);
+extern void vmwgfx_read_unlock(struct vmwgfx_lock *lock);
 
 /**
- * ttm_read_lock
+ * vmwgfx_read_lock
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  * @interruptible: Interruptible sleeping while waiting for a lock.
  *
  * Takes the lock in read mode.
  * Returns:
  * -ERESTARTSYS If interrupted by a signal and interruptible is true.
  */
-extern int ttm_read_lock(struct ttm_lock *lock, bool interruptible);
+extern int vmwgfx_read_lock(struct vmwgfx_lock *lock, bool interruptible);
 
 /**
- * ttm_read_trylock
+ * vmwgfx_read_trylock
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  * @interruptible: Interruptible sleeping while waiting for a lock.
  *
  * Tries to take the lock in read mode. If the lock is already held
@@ -123,107 +123,107 @@ extern int ttm_read_lock(struct ttm_lock *lock, bool interruptible);
  * -EBUSY The lock was already held in write mode.
  * -ERESTARTSYS If interrupted by a signal and interruptible is true.
  */
-extern int ttm_read_trylock(struct ttm_lock *lock, bool interruptible);
+extern int vmwgfx_read_trylock(struct vmwgfx_lock *lock, bool interruptible);
 
 /**
- * ttm_write_unlock
+ * vmwgfx_write_unlock
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  *
  * Releases a write lock.
  */
-extern void ttm_write_unlock(struct ttm_lock *lock);
+extern void vmwgfx_write_unlock(struct vmwgfx_lock *lock);
 
 /**
- * ttm_write_lock
+ * vmwgfx_write_lock
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  * @interruptible: Interruptible sleeping while waiting for a lock.
  *
  * Takes the lock in write mode.
  * Returns:
  * -ERESTARTSYS If interrupted by a signal and interruptible is true.
  */
-extern int ttm_write_lock(struct ttm_lock *lock, bool interruptible);
+extern int vmwgfx_write_lock(struct vmwgfx_lock *lock, bool interruptible);
 
 /**
- * ttm_lock_downgrade
+ * vmwgfx_lock_downgrade
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  *
  * Downgrades a write lock to a read lock.
  */
-extern void ttm_lock_downgrade(struct ttm_lock *lock);
+extern void vmwgfx_lock_downgrade(struct vmwgfx_lock *lock);
 
 /**
- * ttm_suspend_lock
+ * vmwgfx_suspend_lock
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  *
  * Takes the lock in suspend mode. Excludes read and write mode.
  */
-extern void ttm_suspend_lock(struct ttm_lock *lock);
+extern void vmwgfx_suspend_lock(struct vmwgfx_lock *lock);
 
 /**
- * ttm_suspend_unlock
+ * vmwgfx_suspend_unlock
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  *
  * Releases a suspend lock
  */
-extern void ttm_suspend_unlock(struct ttm_lock *lock);
+extern void vmwgfx_suspend_unlock(struct vmwgfx_lock *lock);
 
 /**
- * ttm_vt_lock
+ * vmwgfx_vt_lock
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  * @interruptible: Interruptible sleeping while waiting for a lock.
- * @tfile: Pointer to a struct ttm_object_file to register the lock with.
+ * @tfile: Pointer to a struct vmwgfx_object_file to register the lock with.
  *
  * Takes the lock in vt mode.
  * Returns:
  * -ERESTARTSYS If interrupted by a signal and interruptible is true.
  * -ENOMEM: Out of memory when locking.
  */
-extern int ttm_vt_lock(struct ttm_lock *lock, bool interruptible,
-		       struct ttm_object_file *tfile);
+extern int vmwgfx_vt_lock(struct vmwgfx_lock *lock, bool interruptible,
+			  struct vmwgfx_object_file *tfile);
 
 /**
- * ttm_vt_unlock
+ * vmwgfx_vt_lock
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  *
  * Releases a vt lock.
  * Returns:
  * -EINVAL If the lock was not held.
  */
-extern int ttm_vt_unlock(struct ttm_lock *lock);
+extern int vmwgfx_vt_unlock(struct vmwgfx_lock *lock);
 
 /**
- * ttm_write_unlock
+ * vmwgfx_write_unlock
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  *
  * Releases a write lock.
  */
-extern void ttm_write_unlock(struct ttm_lock *lock);
+extern void vmwgfx_write_unlock(struct vmwgfx_lock *lock);
 
 /**
- * ttm_write_lock
+ * vmwgfx_write_lock
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  * @interruptible: Interruptible sleeping while waiting for a lock.
  *
  * Takes the lock in write mode.
  * Returns:
  * -ERESTARTSYS If interrupted by a signal and interruptible is true.
  */
-extern int ttm_write_lock(struct ttm_lock *lock, bool interruptible);
+extern int vmwgfx_write_lock(struct vmwgfx_lock *lock, bool interruptible);
 
 /**
- * ttm_lock_set_kill
+ * vmwgfx_lock_set_kill
  *
- * @lock: Pointer to a struct ttm_lock
+ * @lock: Pointer to a struct vmwgfx_lock
  * @val: Boolean whether to kill processes taking the lock.
  * @signal: Signal to send to the process taking the lock.
  *
@@ -231,14 +231,14 @@ extern int ttm_write_lock(struct ttm_lock *lock, bool interruptible);
  * on using the TTM functionality when its resources has been taken down, for
  * example when the X server exits. A typical sequence would look like this:
  * - X server takes lock in write mode.
- * - ttm_lock_set_kill() is called with @val set to true.
+ * - vmwgfx_lock_set_kill() is called with @val set to true.
  * - As part of X server exit, TTM resources are taken down.
  * - X server releases the lock on file release.
  * - Another dri client wants to render, takes the lock and is killed.
  *
  */
-static inline void ttm_lock_set_kill(struct ttm_lock *lock, bool val,
-				     int signal)
+static inline void vmwgfx_lock_set_kill(struct vmwgfx_lock *lock, bool val,
+					int signal)
 {
 	lock->kill_takers = val;
 	if (val)

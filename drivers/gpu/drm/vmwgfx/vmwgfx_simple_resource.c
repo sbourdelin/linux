@@ -36,7 +36,7 @@
  * @simple: The embedded struct vmw_simple_resource.
  */
 struct vmw_user_simple_resource {
-	struct ttm_base_object base;
+	struct vmwgfx_base_object base;
 	size_t account_size;
 	struct vmw_simple_resource simple;
 /*
@@ -101,22 +101,22 @@ static void vmw_simple_resource_free(struct vmw_resource *res)
 	struct vmw_private *dev_priv = res->dev_priv;
 	size_t size = usimple->account_size;
 
-	ttm_base_object_kfree(usimple, base);
+	vmwgfx_base_object_kfree(usimple, base);
 	ttm_mem_global_free(vmw_mem_glob(dev_priv), size);
 }
 
 /**
  * vmw_simple_resource_base_release - TTM object release callback
  *
- * @p_base: The struct ttm_base_object member of the simple resource object.
+ * @p_base: The struct vmwgfx_base_object member of the simple resource object.
  *
- * Called when the last reference to the embedded struct ttm_base_object is
+ * Called when the last reference to the embedded struct vmwgfx_base_object is
  * gone. Typically results in an object free, unless there are other
  * references to the embedded struct vmw_resource.
  */
-static void vmw_simple_resource_base_release(struct ttm_base_object **p_base)
+static void vmw_simple_resource_base_release(struct vmwgfx_base_object **p_base)
 {
-	struct ttm_base_object *base = *p_base;
+	struct vmwgfx_base_object *base = *p_base;
 	struct vmw_user_simple_resource *usimple =
 		container_of(base, struct vmw_user_simple_resource, base);
 	struct vmw_resource *res = &usimple->simple.res;
@@ -148,7 +148,7 @@ vmw_simple_resource_create_ioctl(struct drm_device *dev, void *data,
 	struct vmw_user_simple_resource *usimple;
 	struct vmw_resource *res;
 	struct vmw_resource *tmp;
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct ttm_operation_ctx ctx = {
 		.interruptible = true,
 		.no_wait_gpu = false
@@ -161,13 +161,13 @@ vmw_simple_resource_create_ioctl(struct drm_device *dev, void *data,
 	  func->size;
 	account_size = ttm_round_pot(alloc_size) + VMW_IDA_ACC_SIZE;
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (ret)
 		return ret;
 
 	ret = ttm_mem_global_alloc(vmw_mem_glob(dev_priv), account_size,
 				   &ctx);
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 	if (ret) {
 		if (ret != -ERESTARTSYS)
 			DRM_ERROR("Out of graphics memory for %s"
@@ -199,7 +199,7 @@ vmw_simple_resource_create_ioctl(struct drm_device *dev, void *data,
 		goto out_ret;
 
 	tmp = vmw_resource_reference(res);
-	ret = ttm_base_object_init(tfile, &usimple->base, false,
+	ret = vmwgfx_base_object_init(tfile, &usimple->base, false,
 				   func->ttm_res_type,
 				   &vmw_simple_resource_base_release, NULL);
 
@@ -219,7 +219,7 @@ out_ret:
  * vmw_simple_resource_lookup - Look up a simple resource from its user-space
  * handle.
  *
- * @tfile: struct ttm_object_file identifying the caller.
+ * @tfile: struct vmwgfx_object_file identifying the caller.
  * @handle: The user-space handle.
  * @func: The struct vmw_simple_resource_func identifying the simple resource
  * type.
@@ -228,15 +228,15 @@ out_ret:
  * successfule. Error pointer otherwise.
  */
 struct vmw_resource *
-vmw_simple_resource_lookup(struct ttm_object_file *tfile,
+vmw_simple_resource_lookup(struct vmwgfx_object_file *tfile,
 			   uint32_t handle,
 			   const struct vmw_simple_resource_func *func)
 {
 	struct vmw_user_simple_resource *usimple;
-	struct ttm_base_object *base;
+	struct vmwgfx_base_object *base;
 	struct vmw_resource *res;
 
-	base = ttm_base_object_lookup(tfile, handle);
+	base = vmwgfx_base_object_lookup(tfile, handle);
 	if (!base) {
 		DRM_ERROR("Invalid %s handle 0x%08lx.\n",
 			  func->res_func.type_name,
@@ -244,8 +244,8 @@ vmw_simple_resource_lookup(struct ttm_object_file *tfile,
 		return ERR_PTR(-ESRCH);
 	}
 
-	if (ttm_base_object_type(base) != func->ttm_res_type) {
-		ttm_base_object_unref(&base);
+	if (vmwgfx_base_object_type(base) != func->ttm_res_type) {
+		vmwgfx_base_object_unref(&base);
 		DRM_ERROR("Invalid type of %s handle 0x%08lx.\n",
 			  func->res_func.type_name,
 			  (unsigned long) handle);
@@ -254,7 +254,7 @@ vmw_simple_resource_lookup(struct ttm_object_file *tfile,
 
 	usimple = container_of(base, typeof(*usimple), base);
 	res = vmw_resource_reference(&usimple->simple.res);
-	ttm_base_object_unref(&base);
+	vmwgfx_base_object_unref(&base);
 
 	return res;
 }

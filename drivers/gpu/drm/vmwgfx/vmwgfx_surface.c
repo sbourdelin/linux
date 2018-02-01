@@ -43,11 +43,11 @@
  * @master: master of the creating client. Used for security check.
  */
 struct vmw_user_surface {
-	struct ttm_prime_object prime;
+	struct vmwgfx_prime_object prime;
 	struct vmw_surface srf;
 	uint32_t size;
 	struct drm_master *master;
-	struct ttm_base_object *backup_base;
+	struct vmwgfx_base_object *backup_base;
 };
 
 /**
@@ -66,7 +66,7 @@ struct vmw_surface_offset {
 
 static void vmw_user_surface_free(struct vmw_resource *res);
 static struct vmw_resource *
-vmw_user_surface_base_to_res(struct ttm_base_object *base);
+vmw_user_surface_base_to_res(struct vmwgfx_base_object *base);
 static int vmw_legacy_srf_bind(struct vmw_resource *res,
 			       struct ttm_validate_buffer *val_buf);
 static int vmw_legacy_srf_unbind(struct vmw_resource *res,
@@ -612,7 +612,7 @@ static int vmw_surface_init(struct vmw_private *dev_priv,
  * for the user-visible object identified by the TTM base object @base.
  */
 static struct vmw_resource *
-vmw_user_surface_base_to_res(struct ttm_base_object *base)
+vmw_user_surface_base_to_res(struct vmwgfx_base_object *base)
 {
 	return &(container_of(base, struct vmw_user_surface,
 			      prime.base)->srf.res);
@@ -636,7 +636,7 @@ static void vmw_user_surface_free(struct vmw_resource *res)
 	kfree(srf->offsets);
 	kfree(srf->sizes);
 	kfree(srf->snooper.image);
-	ttm_prime_object_kfree(user_srf, prime);
+	vmwgfx_prime_object_kfree(user_srf, prime);
 	ttm_mem_global_free(vmw_mem_glob(dev_priv), size);
 }
 
@@ -649,16 +649,16 @@ static void vmw_user_surface_free(struct vmw_resource *res)
  * Drops the base object's reference on its resource, and the
  * pointer pointed to by *p_base is set to NULL.
  */
-static void vmw_user_surface_base_release(struct ttm_base_object **p_base)
+static void vmw_user_surface_base_release(struct vmwgfx_base_object **p_base)
 {
-	struct ttm_base_object *base = *p_base;
+	struct vmwgfx_base_object *base = *p_base;
 	struct vmw_user_surface *user_srf =
 	    container_of(base, struct vmw_user_surface, prime.base);
 	struct vmw_resource *res = &user_srf->srf.res;
 
 	*p_base = NULL;
 	if (user_srf->backup_base)
-		ttm_base_object_unref(&user_srf->backup_base);
+		vmwgfx_base_object_unref(&user_srf->backup_base);
 	vmw_resource_unreference(&res);
 }
 
@@ -674,9 +674,9 @@ int vmw_surface_destroy_ioctl(struct drm_device *dev, void *data,
 			      struct drm_file *file_priv)
 {
 	struct drm_vmw_surface_arg *arg = (struct drm_vmw_surface_arg *)data;
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 
-	return ttm_ref_object_base_unref(tfile, arg->sid, TTM_REF_USAGE);
+	return vmwgfx_ref_object_base_unref(tfile, arg->sid, VMWGFX_REF_USAGE);
 }
 
 /**
@@ -699,7 +699,7 @@ int vmw_surface_define_ioctl(struct drm_device *dev, void *data,
 	    (union drm_vmw_surface_create_arg *)data;
 	struct drm_vmw_surface_create_req *req = &arg->req;
 	struct drm_vmw_surface_arg *rep = &arg->rep;
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct ttm_operation_ctx ctx = {
 		.interruptible = true,
 		.no_wait_gpu = false
@@ -740,7 +740,7 @@ int vmw_surface_define_ioctl(struct drm_device *dev, void *data,
 		return -EINVAL;
 	}
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -857,7 +857,7 @@ int vmw_surface_define_ioctl(struct drm_device *dev, void *data,
 	}
 
 	tmp = vmw_resource_reference(&srf->res);
-	ret = ttm_prime_object_init(tfile, res->backup_size, &user_srf->prime,
+	ret = vmwgfx_prime_object_init(tfile, res->backup_size, &user_srf->prime,
 				    req->shareable, VMW_RES_SURFACE,
 				    &vmw_user_surface_base_release, NULL);
 
@@ -870,18 +870,18 @@ int vmw_surface_define_ioctl(struct drm_device *dev, void *data,
 	rep->sid = user_srf->prime.base.hash.key;
 	vmw_resource_unreference(&res);
 
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 	return 0;
 out_no_copy:
 	kfree(srf->offsets);
 out_no_offsets:
 	kfree(srf->sizes);
 out_no_sizes:
-	ttm_prime_object_kfree(user_srf, prime);
+	vmwgfx_prime_object_kfree(user_srf, prime);
 out_no_user_srf:
 	ttm_mem_global_free(vmw_mem_glob(dev_priv), size);
 out_unlock:
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 	return ret;
 }
 
@@ -891,17 +891,17 @@ vmw_surface_handle_reference(struct vmw_private *dev_priv,
 			     struct drm_file *file_priv,
 			     uint32_t u_handle,
 			     enum drm_vmw_handle_type handle_type,
-			     struct ttm_base_object **base_p)
+			     struct vmwgfx_base_object **base_p)
 {
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct vmw_user_surface *user_srf;
 	uint32_t handle;
-	struct ttm_base_object *base;
+	struct vmwgfx_base_object *base;
 	int ret;
 	bool require_exist = false;
 
 	if (handle_type == DRM_VMW_HANDLE_PRIME) {
-		ret = ttm_prime_fd_to_handle(tfile, u_handle, &handle);
+		ret = vmwgfx_prime_fd_to_handle(tfile, u_handle, &handle);
 		if (unlikely(ret != 0))
 			return ret;
 	} else {
@@ -918,13 +918,13 @@ vmw_surface_handle_reference(struct vmw_private *dev_priv,
 	}
 
 	ret = -EINVAL;
-	base = ttm_base_object_lookup_for_ref(dev_priv->tdev, handle);
+	base = vmwgfx_base_object_lookup_for_ref(dev_priv->tdev, handle);
 	if (unlikely(!base)) {
 		DRM_ERROR("Could not find surface to reference.\n");
 		goto out_no_lookup;
 	}
 
-	if (unlikely(ttm_base_object_type(base) != VMW_RES_SURFACE)) {
+	if (unlikely(vmwgfx_base_object_type(base) != VMW_RES_SURFACE)) {
 		DRM_ERROR("Referenced object is not a surface.\n");
 		goto out_bad_resource;
 	}
@@ -941,7 +941,7 @@ vmw_surface_handle_reference(struct vmw_private *dev_priv,
 		    user_srf->master != file_priv->master)
 			require_exist = true;
 
-		ret = ttm_ref_object_add(tfile, base, TTM_REF_USAGE, NULL,
+		ret = vmwgfx_ref_object_add(tfile, base, VMWGFX_REF_USAGE, NULL,
 					 require_exist);
 		if (unlikely(ret != 0)) {
 			DRM_ERROR("Could not add a reference to a surface.\n");
@@ -953,10 +953,10 @@ vmw_surface_handle_reference(struct vmw_private *dev_priv,
 	return 0;
 
 out_bad_resource:
-	ttm_base_object_unref(&base);
+	vmwgfx_base_object_unref(&base);
 out_no_lookup:
 	if (handle_type == DRM_VMW_HANDLE_PRIME)
-		(void) ttm_ref_object_base_unref(tfile, handle, TTM_REF_USAGE);
+		(void) vmwgfx_ref_object_base_unref(tfile, handle, VMWGFX_REF_USAGE);
 
 	return ret;
 }
@@ -977,11 +977,11 @@ int vmw_surface_reference_ioctl(struct drm_device *dev, void *data,
 	    (union drm_vmw_surface_reference_arg *)data;
 	struct drm_vmw_surface_arg *req = &arg->req;
 	struct drm_vmw_surface_create_req *rep = &arg->rep;
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct vmw_surface *srf;
 	struct vmw_user_surface *user_srf;
 	struct drm_vmw_size __user *user_sizes;
-	struct ttm_base_object *base;
+	struct vmwgfx_base_object *base;
 	int ret;
 
 	ret = vmw_surface_handle_reference(dev_priv, file_priv, req->sid,
@@ -1004,11 +1004,11 @@ int vmw_surface_reference_ioctl(struct drm_device *dev, void *data,
 	if (unlikely(ret != 0)) {
 		DRM_ERROR("copy_to_user failed %p %u\n",
 			  user_sizes, srf->num_sizes);
-		ttm_ref_object_base_unref(tfile, base->hash.key, TTM_REF_USAGE);
+		vmwgfx_ref_object_base_unref(tfile, base->hash.key, VMWGFX_REF_USAGE);
 		ret = -EFAULT;
 	}
 
-	ttm_base_object_unref(&base);
+	vmwgfx_base_object_unref(&base);
 
 	return ret;
 }
@@ -1276,7 +1276,7 @@ int vmw_gb_surface_define_ioctl(struct drm_device *dev, void *data,
 	    (union drm_vmw_gb_surface_create_arg *)data;
 	struct drm_vmw_gb_surface_create_req *req = &arg->req;
 	struct drm_vmw_gb_surface_create_rep *rep = &arg->rep;
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	int ret;
 	uint32_t size;
 	uint32_t backup_handle = 0;
@@ -1311,7 +1311,7 @@ int vmw_gb_surface_define_ioctl(struct drm_device *dev, void *data,
 	if (drm_is_primary_client(file_priv))
 		user_srf->master = drm_master_get(file_priv->master);
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -1348,7 +1348,7 @@ int vmw_gb_surface_define_ioctl(struct drm_device *dev, void *data,
 	}
 
 	tmp = vmw_resource_reference(res);
-	ret = ttm_prime_object_init(tfile, res->backup_size, &user_srf->prime,
+	ret = vmwgfx_prime_object_init(tfile, res->backup_size, &user_srf->prime,
 				    req->drm_surface_flags &
 				    drm_vmw_surface_flag_shareable,
 				    VMW_RES_SURFACE,
@@ -1376,7 +1376,7 @@ int vmw_gb_surface_define_ioctl(struct drm_device *dev, void *data,
 	vmw_resource_unreference(&res);
 
 out_unlock:
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 	return ret;
 }
 
@@ -1396,10 +1396,10 @@ int vmw_gb_surface_reference_ioctl(struct drm_device *dev, void *data,
 	    (union drm_vmw_gb_surface_reference_arg *)data;
 	struct drm_vmw_surface_arg *req = &arg->req;
 	struct drm_vmw_gb_surface_ref_rep *rep = &arg->rep;
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct vmw_surface *srf;
 	struct vmw_user_surface *user_srf;
-	struct ttm_base_object *base;
+	struct vmwgfx_base_object *base;
 	uint32_t backup_handle;
 	int ret = -EINVAL;
 
@@ -1423,8 +1423,8 @@ int vmw_gb_surface_reference_ioctl(struct drm_device *dev, void *data,
 	if (unlikely(ret != 0)) {
 		DRM_ERROR("Could not add a reference to a GB surface "
 			  "backup buffer.\n");
-		(void) ttm_ref_object_base_unref(tfile, base->hash.key,
-						 TTM_REF_USAGE);
+		(void) vmwgfx_ref_object_base_unref(tfile, base->hash.key,
+						 VMWGFX_REF_USAGE);
 		goto out_bad_resource;
 	}
 
@@ -1445,7 +1445,7 @@ int vmw_gb_surface_reference_ioctl(struct drm_device *dev, void *data,
 	rep->crep.buffer_size = srf->res.backup->base.num_pages * PAGE_SIZE;
 
 out_bad_resource:
-	ttm_base_object_unref(&base);
+	vmwgfx_base_object_unref(&base);
 
 	return ret;
 }
@@ -1528,7 +1528,7 @@ int vmw_surface_gb_priv_define(struct drm_device *dev,
 		return -EINVAL;
 	}
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -1591,13 +1591,13 @@ int vmw_surface_gb_priv_define(struct drm_device *dev,
 	 */
 	ret = vmw_surface_init(dev_priv, srf, vmw_user_surface_free);
 
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 	return ret;
 
 out_no_user_srf:
 	ttm_mem_global_free(vmw_mem_glob(dev_priv), user_accounting_size);
 
 out_unlock:
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 	return ret;
 }

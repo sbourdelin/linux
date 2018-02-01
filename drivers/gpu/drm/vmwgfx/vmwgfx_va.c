@@ -116,8 +116,8 @@ int vmw_stream_unref_ioctl(struct drm_device *dev, void *data,
 {
 	struct drm_vmw_stream_arg *arg = (struct drm_vmw_stream_arg *)data;
 
-	return ttm_ref_object_base_unref(vmw_fpriv(file_priv)->tfile,
-					 arg->stream_id, TTM_REF_USAGE);
+	return vmwgfx_ref_object_base_unref(vmw_fpriv(file_priv)->tfile,
+					 arg->stream_id, VMWGFX_REF_USAGE);
 }
 
 /**
@@ -140,7 +140,7 @@ int vmw_stream_claim_ioctl(struct drm_device *dev, void *data,
 /**
  * vmw_user_stream_lookup - Look up a struct vmw_user_stream from a handle.
  * @dev_priv: Pointer to a struct vmw_private.
- * @tfile: struct ttm_object_file identifying the caller.
+ * @tfile: struct vmwgfx_object_file identifying the caller.
  * @inout_id: In: The user-space handle. Out: The stream id.
  * @out: On output contains a refcounted pointer to the embedded
  * struct vmw_resource.
@@ -150,7 +150,7 @@ int vmw_stream_claim_ioctl(struct drm_device *dev, void *data,
  *   Negative error value on failure.
  */
 int vmw_user_stream_lookup(struct vmw_private *dev_priv,
-			   struct ttm_object_file *tfile,
+			   struct vmwgfx_object_file *tfile,
 			   uint32_t *inout_id, struct vmw_resource **out)
 {
 	struct vmw_stream *stream;

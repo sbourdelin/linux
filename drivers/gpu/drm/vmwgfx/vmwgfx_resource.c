@@ -26,8 +26,8 @@
  **************************************************************************/
 
 #include "vmwgfx_drv.h"
+#include "vmwgfx_object.h"
 #include <drm/vmwgfx_drm.h>
-#include <drm/ttm/ttm_object.h>
 #include <drm/ttm/ttm_placement.h>
 #include <drm/drmP.h>
 #include "vmwgfx_resource_priv.h"
@@ -36,7 +36,7 @@
 #define VMW_RES_EVICT_ERR_COUNT 10
 
 struct vmw_user_dma_buffer {
-	struct ttm_prime_object prime;
+	struct vmwgfx_prime_object prime;
 	struct vmw_dma_buffer dma;
 };
 
@@ -239,7 +239,7 @@ void vmw_resource_activate(struct vmw_resource *res,
  * TTM user-space handle and perform basic type checks
  *
  * @dev_priv:     Pointer to a device private struct
- * @tfile:        Pointer to a struct ttm_object_file identifying the caller
+ * @tfile:        Pointer to a struct vmwgfx_object_file identifying the caller
  * @handle:       The TTM user-space handle
  * @converter:    Pointer to an object describing the resource type
  * @p_res:        On successful return the location pointed to will contain
@@ -249,21 +249,21 @@ void vmw_resource_activate(struct vmw_resource *res,
  * type, -EINVAL will be returned.
  */
 int vmw_user_resource_lookup_handle(struct vmw_private *dev_priv,
-				    struct ttm_object_file *tfile,
+				    struct vmwgfx_object_file *tfile,
 				    uint32_t handle,
 				    const struct vmw_user_resource_conv
 				    *converter,
 				    struct vmw_resource **p_res)
 {
-	struct ttm_base_object *base;
+	struct vmwgfx_base_object *base;
 	struct vmw_resource *res;
 	int ret = -EINVAL;
 
-	base = ttm_base_object_lookup(tfile, handle);
+	base = vmwgfx_base_object_lookup(tfile, handle);
 	if (unlikely(base == NULL))
 		return -EINVAL;
 
-	if (unlikely(ttm_base_object_type(base) != converter->object_type))
+	if (unlikely(vmwgfx_base_object_type(base) != converter->object_type))
 		goto out_bad_resource;
 
 	res = converter->base_obj_to_res(base);
@@ -281,7 +281,7 @@ int vmw_user_resource_lookup_handle(struct vmw_private *dev_priv,
 	ret = 0;
 
 out_bad_resource:
-	ttm_base_object_unref(&base);
+	vmwgfx_base_object_unref(&base);
 
 	return ret;
 }
@@ -292,7 +292,7 @@ out_bad_resource:
  * The pointer this pointed at by out_surf and out_buf needs to be null.
  */
 int vmw_user_lookup_handle(struct vmw_private *dev_priv,
-			   struct ttm_object_file *tfile,
+			   struct vmwgfx_object_file *tfile,
 			   uint32_t handle,
 			   struct vmw_surface **out_surf,
 			   struct vmw_dma_buffer **out_buf)
@@ -361,7 +361,7 @@ static void vmw_user_dmabuf_destroy(struct ttm_buffer_object *bo)
 {
 	struct vmw_user_dma_buffer *vmw_user_bo = vmw_user_dma_buffer(bo);
 
-	ttm_prime_object_kfree(vmw_user_bo, prime);
+	vmwgfx_prime_object_kfree(vmw_user_bo, prime);
 }
 
 int vmw_dmabuf_init(struct vmw_private *dev_priv,
@@ -389,10 +389,10 @@ int vmw_dmabuf_init(struct vmw_private *dev_priv,
 	return ret;
 }
 
-static void vmw_user_dmabuf_release(struct ttm_base_object **p_base)
+static void vmw_user_dmabuf_release(struct vmwgfx_base_object **p_base)
 {
 	struct vmw_user_dma_buffer *vmw_user_bo;
-	struct ttm_base_object *base = *p_base;
+	struct vmwgfx_base_object *base = *p_base;
 	struct ttm_buffer_object *bo;
 
 	*p_base = NULL;
@@ -406,14 +406,14 @@ static void vmw_user_dmabuf_release(struct ttm_base_object **p_base)
 	ttm_bo_unref(&bo);
 }
 
-static void vmw_user_dmabuf_ref_obj_release(struct ttm_base_object *base,
-					    enum ttm_ref_type ref_type)
+static void vmw_user_dmabuf_ref_obj_release(struct vmwgfx_base_object *base,
+					    enum vmwgfx_ref_type ref_type)
 {
 	struct vmw_user_dma_buffer *user_bo;
 	user_bo = container_of(base, struct vmw_user_dma_buffer, prime.base);
 
 	switch (ref_type) {
-	case TTM_REF_SYNCCPU_WRITE:
+	case VMWGFX_REF_SYNCCPU_WRITE:
 		ttm_bo_synccpu_write_release(&user_bo->dma.base);
 		break;
 	default:
@@ -425,7 +425,7 @@ static void vmw_user_dmabuf_ref_obj_release(struct ttm_base_object *base,
  * vmw_user_dmabuf_alloc - Allocate a user dma buffer
  *
  * @dev_priv: Pointer to a struct device private.
- * @tfile: Pointer to a struct ttm_object_file on which to register the user
+ * @tfile: Pointer to a struct vmwgfx_object_file on which to register the user
  * object.
  * @size: Size of the dma buffer.
  * @shareable: Boolean whether the buffer is shareable with other open files.
@@ -434,12 +434,12 @@ static void vmw_user_dmabuf_ref_obj_release(struct ttm_base_object *base,
  * should be assigned.
  */
 int vmw_user_dmabuf_alloc(struct vmw_private *dev_priv,
-			  struct ttm_object_file *tfile,
+			  struct vmwgfx_object_file *tfile,
 			  uint32_t size,
 			  bool shareable,
 			  uint32_t *handle,
 			  struct vmw_dma_buffer **p_dma_buf,
-			  struct ttm_base_object **p_base)
+			  struct vmwgfx_base_object **p_base)
 {
 	struct vmw_user_dma_buffer *user_bo;
 	struct ttm_buffer_object *tmp;
@@ -460,11 +460,11 @@ int vmw_user_dmabuf_alloc(struct vmw_private *dev_priv,
 		return ret;
 
 	tmp = ttm_bo_reference(&user_bo->dma.base);
-	ret = ttm_prime_object_init(tfile,
+	ret = vmwgfx_prime_object_init(tfile,
 				    size,
 				    &user_bo->prime,
 				    shareable,
-				    ttm_buffer_type,
+				    vmwgfx_buffer_type,
 				    &vmw_user_dmabuf_release,
 				    &vmw_user_dmabuf_ref_obj_release);
 	if (unlikely(ret != 0)) {
@@ -491,7 +491,7 @@ out_no_base_object:
  * @tfile: Identifying the caller.
  */
 int vmw_user_dmabuf_verify_access(struct ttm_buffer_object *bo,
-				  struct ttm_object_file *tfile)
+				  struct vmwgfx_object_file *tfile)
 {
 	struct vmw_user_dma_buffer *vmw_user_bo;
 
@@ -501,7 +501,7 @@ int vmw_user_dmabuf_verify_access(struct ttm_buffer_object *bo,
 	vmw_user_bo = vmw_user_dma_buffer(bo);
 
 	/* Check that the caller has opened the object. */
-	if (likely(ttm_ref_object_exists(tfile, &vmw_user_bo->prime.base)))
+	if (likely(vmwgfx_ref_object_exists(tfile, &vmw_user_bo->prime.base)))
 		return 0;
 
 	DRM_ERROR("Could not grant buffer access.\n");
@@ -520,7 +520,7 @@ int vmw_user_dmabuf_verify_access(struct ttm_buffer_object *bo,
  * A blocking grab will be automatically released when @tfile is closed.
  */
 static int vmw_user_dmabuf_synccpu_grab(struct vmw_user_dma_buffer *user_bo,
-					struct ttm_object_file *tfile,
+					struct vmwgfx_object_file *tfile,
 					uint32_t flags)
 {
 	struct ttm_buffer_object *bo = &user_bo->dma.base;
@@ -545,8 +545,8 @@ static int vmw_user_dmabuf_synccpu_grab(struct vmw_user_dma_buffer *user_bo,
 	if (unlikely(ret != 0))
 		return ret;
 
-	ret = ttm_ref_object_add(tfile, &user_bo->prime.base,
-				 TTM_REF_SYNCCPU_WRITE, &existed, false);
+	ret = vmwgfx_ref_object_add(tfile, &user_bo->prime.base,
+				 VMWGFX_REF_SYNCCPU_WRITE, &existed, false);
 	if (ret != 0 || existed)
 		ttm_bo_synccpu_write_release(&user_bo->dma.base);
 
@@ -562,12 +562,12 @@ static int vmw_user_dmabuf_synccpu_grab(struct vmw_user_dma_buffer *user_bo,
  * @flags: Flags indicating the type of release.
  */
 static int vmw_user_dmabuf_synccpu_release(uint32_t handle,
-					   struct ttm_object_file *tfile,
+					   struct vmwgfx_object_file *tfile,
 					   uint32_t flags)
 {
 	if (!(flags & drm_vmw_synccpu_allow_cs))
-		return ttm_ref_object_base_unref(tfile, handle,
-						 TTM_REF_SYNCCPU_WRITE);
+		return vmwgfx_ref_object_base_unref(tfile, handle,
+						 VMWGFX_REF_SYNCCPU_WRITE);
 
 	return 0;
 }
@@ -590,8 +590,8 @@ int vmw_user_dmabuf_synccpu_ioctl(struct drm_device *dev, void *data,
 		(struct drm_vmw_synccpu_arg *) data;
 	struct vmw_dma_buffer *dma_buf;
 	struct vmw_user_dma_buffer *user_bo;
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
-	struct ttm_base_object *buffer_base;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_base_object *buffer_base;
 	int ret;
 
 	if ((arg->flags & (drm_vmw_synccpu_read | drm_vmw_synccpu_write)) == 0
@@ -613,7 +613,7 @@ int vmw_user_dmabuf_synccpu_ioctl(struct drm_device *dev, void *data,
 				       dma);
 		ret = vmw_user_dmabuf_synccpu_grab(user_bo, tfile, arg->flags);
 		vmw_dmabuf_unreference(&dma_buf);
-		ttm_base_object_unref(&buffer_base);
+		vmwgfx_base_object_unref(&buffer_base);
 		if (unlikely(ret != 0 && ret != -ERESTARTSYS &&
 			     ret != -EBUSY)) {
 			DRM_ERROR("Failed synccpu grab on handle 0x%08x.\n",
@@ -650,7 +650,7 @@ int vmw_dmabuf_alloc_ioctl(struct drm_device *dev, void *data,
 	uint32_t handle;
 	int ret;
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -668,7 +668,7 @@ int vmw_dmabuf_alloc_ioctl(struct drm_device *dev, void *data,
 	vmw_dmabuf_unreference(&dma_buf);
 
 out_no_dmabuf:
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 
 	return ret;
 }
@@ -679,27 +679,27 @@ int vmw_dmabuf_unref_ioctl(struct drm_device *dev, void *data,
 	struct drm_vmw_unref_dmabuf_arg *arg =
 	    (struct drm_vmw_unref_dmabuf_arg *)data;
 
-	return ttm_ref_object_base_unref(vmw_fpriv(file_priv)->tfile,
+	return vmwgfx_ref_object_base_unref(vmw_fpriv(file_priv)->tfile,
 					 arg->handle,
-					 TTM_REF_USAGE);
+					 VMWGFX_REF_USAGE);
 }
 
-int vmw_user_dmabuf_lookup(struct ttm_object_file *tfile,
+int vmw_user_dmabuf_lookup(struct vmwgfx_object_file *tfile,
 			   uint32_t handle, struct vmw_dma_buffer **out,
-			   struct ttm_base_object **p_base)
+			   struct vmwgfx_base_object **p_base)
 {
 	struct vmw_user_dma_buffer *vmw_user_bo;
-	struct ttm_base_object *base;
+	struct vmwgfx_base_object *base;
 
-	base = ttm_base_object_lookup(tfile, handle);
+	base = vmwgfx_base_object_lookup(tfile, handle);
 	if (unlikely(base == NULL)) {
 		pr_err("Invalid buffer object handle 0x%08lx\n",
 		       (unsigned long)handle);
 		return -ESRCH;
 	}
 
-	if (unlikely(ttm_base_object_type(base) != ttm_buffer_type)) {
-		ttm_base_object_unref(&base);
+	if (unlikely(vmwgfx_base_object_type(base) != vmwgfx_buffer_type)) {
+		vmwgfx_base_object_unref(&base);
 		pr_err("Invalid buffer object handle 0x%08lx\n",
 		       (unsigned long)handle);
 		return -EINVAL;
@@ -711,13 +711,13 @@ int vmw_user_dmabuf_lookup(struct ttm_object_file *tfile,
 	if (p_base)
 		*p_base = base;
 	else
-		ttm_base_object_unref(&base);
+		vmwgfx_base_object_unref(&base);
 	*out = &vmw_user_bo->dma;
 
 	return 0;
 }
 
-int vmw_user_dmabuf_reference(struct ttm_object_file *tfile,
+int vmw_user_dmabuf_reference(struct vmwgfx_object_file *tfile,
 			      struct vmw_dma_buffer *dma_buf,
 			      uint32_t *handle)
 {
@@ -729,8 +729,8 @@ int vmw_user_dmabuf_reference(struct ttm_object_file *tfile,
 	user_bo = container_of(dma_buf, struct vmw_user_dma_buffer, dma);
 
 	*handle = user_bo->prime.base.hash.key;
-	return ttm_ref_object_add(tfile, &user_bo->prime.base,
-				  TTM_REF_USAGE, NULL, false);
+	return vmwgfx_ref_object_add(tfile, &user_bo->prime.base,
+				  VMWGFX_REF_USAGE, NULL, false);
 }
 
 /**
@@ -755,7 +755,7 @@ int vmw_dumb_create(struct drm_file *file_priv,
 	args->pitch = args->width * ((args->bpp + 7) / 8);
 	args->size = args->pitch * args->height;
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -767,7 +767,7 @@ int vmw_dumb_create(struct drm_file *file_priv,
 
 	vmw_dmabuf_unreference(&dma_buf);
 out_no_dmabuf:
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 	return ret;
 }
 
@@ -785,7 +785,7 @@ int vmw_dumb_map_offset(struct drm_file *file_priv,
 			struct drm_device *dev, uint32_t handle,
 			uint64_t *offset)
 {
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct vmw_dma_buffer *out_buf;
 	int ret;
 
@@ -811,8 +811,8 @@ int vmw_dumb_destroy(struct drm_file *file_priv,
 		     struct drm_device *dev,
 		     uint32_t handle)
 {
-	return ttm_ref_object_base_unref(vmw_fpriv(file_priv)->tfile,
-					 handle, TTM_REF_USAGE);
+	return vmwgfx_ref_object_base_unref(vmw_fpriv(file_priv)->tfile,
+					 handle, VMWGFX_REF_USAGE);
 }
 
 /**
@@ -1451,7 +1451,7 @@ int vmw_resource_pin(struct vmw_resource *res, bool interruptible)
 	struct vmw_private *dev_priv = res->dev_priv;
 	int ret;
 
-	ttm_write_lock(&dev_priv->reservation_sem, interruptible);
+	vmwgfx_write_lock(&dev_priv->reservation_sem, interruptible);
 	mutex_lock(&dev_priv->cmdbuf_mutex);
 	ret = vmw_resource_reserve(res, interruptible, false);
 	if (ret)
@@ -1490,7 +1490,7 @@ out_no_validate:
 	vmw_resource_unreserve(res, false, NULL, 0UL);
 out_no_reserve:
 	mutex_unlock(&dev_priv->cmdbuf_mutex);
-	ttm_write_unlock(&dev_priv->reservation_sem);
+	vmwgfx_write_unlock(&dev_priv->reservation_sem);
 
 	return ret;
 }
@@ -1508,7 +1508,7 @@ void vmw_resource_unpin(struct vmw_resource *res)
 	struct vmw_private *dev_priv = res->dev_priv;
 	int ret;
 
-	(void) ttm_read_lock(&dev_priv->reservation_sem, false);
+	(void) vmwgfx_read_lock(&dev_priv->reservation_sem, false);
 	mutex_lock(&dev_priv->cmdbuf_mutex);
 
 	ret = vmw_resource_reserve(res, false, true);
@@ -1526,7 +1526,7 @@ void vmw_resource_unpin(struct vmw_resource *res)
 	vmw_resource_unreserve(res, false, NULL, 0UL);
 
 	mutex_unlock(&dev_priv->cmdbuf_mutex);
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 }
 
 /**

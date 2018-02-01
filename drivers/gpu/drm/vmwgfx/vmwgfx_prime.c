@@ -31,8 +31,8 @@
  */
 
 #include "vmwgfx_drv.h"
+#include "vmwgfx_object.h"
 #include <linux/dma-buf.h>
-#include <drm/ttm/ttm_object.h>
 
 /*
  * DMA-BUF attach- and mapping methods. No need to implement
@@ -121,9 +121,9 @@ int vmw_prime_fd_to_handle(struct drm_device *dev,
 			   struct drm_file *file_priv,
 			   int fd, u32 *handle)
 {
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 
-	return ttm_prime_fd_to_handle(tfile, fd, handle);
+	return vmwgfx_prime_fd_to_handle(tfile, fd, handle);
 }
 
 int vmw_prime_handle_to_fd(struct drm_device *dev,
@@ -131,7 +131,7 @@ int vmw_prime_handle_to_fd(struct drm_device *dev,
 			   uint32_t handle, uint32_t flags,
 			   int *prime_fd)
 {
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 
-	return ttm_prime_handle_to_fd(tfile, handle, flags, prime_fd);
+	return vmwgfx_prime_handle_to_fd(tfile, handle, flags, prime_fd);
 }

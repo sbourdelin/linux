@@ -27,78 +27,77 @@
 /*
  * Authors: Thomas Hellstrom <thellstrom-at-vmware-dot-com>
  */
-/** @file ttm_object.h
+/** @file vmwgfx_object.h
  *
  * Base- and reference object implementation for the various
  * ttm objects. Implements reference counting, minimal security checks
  * and release on file close.
  */
 
-#ifndef _TTM_OBJECT_H_
-#define _TTM_OBJECT_H_
+#ifndef _VMWGFX_OBJECT_H_
+#define _VMWGFX_OBJECT_H_
 
 #include <linux/list.h>
 #include <drm/drm_hashtab.h>
+#include <drm/ttm/ttm_memory.h>
 #include <linux/kref.h>
 #include <linux/rcupdate.h>
 #include <linux/dma-buf.h>
 
-#include "ttm_memory.h"
-
 /**
- * enum ttm_ref_type
+ * enum vmwgfx_ref_type
  *
  * Describes what type of reference a ref object holds.
  *
- * TTM_REF_USAGE is a simple refcount on a base object.
+ * VMWGFX_REF_USAGE is a simple refcount on a base object.
  *
- * TTM_REF_SYNCCPU_READ is a SYNCCPU_READ reference on a
+ * VMWGFX_REF_SYNCCPU_READ is a SYNCCPU_READ reference on a
  * buffer object.
  *
- * TTM_REF_SYNCCPU_WRITE is a SYNCCPU_WRITE reference on a
+ * VMWGFX_REF_SYNCCPU_WRITE is a SYNCCPU_WRITE reference on a
  * buffer object.
  *
  */
 
-enum ttm_ref_type {
-	TTM_REF_USAGE,
-	TTM_REF_SYNCCPU_READ,
-	TTM_REF_SYNCCPU_WRITE,
-	TTM_REF_NUM
+enum vmwgfx_ref_type {
+	VMWGFX_REF_USAGE,
+	VMWGFX_REF_SYNCCPU_READ,
+	VMWGFX_REF_SYNCCPU_WRITE,
+	VMWGFX_REF_NUM
 };
 
 /**
- * enum ttm_object_type
+ * enum vmwgfx_object_type
  *
  * One entry per ttm object type.
  * Device-specific types should use the
- * ttm_driver_typex types.
+ * vmwgfx_driver_typex types.
  */
 
-enum ttm_object_type {
-	ttm_fence_type,
-	ttm_buffer_type,
-	ttm_lock_type,
-	ttm_prime_type,
-	ttm_driver_type0 = 256,
-	ttm_driver_type1,
-	ttm_driver_type2,
-	ttm_driver_type3,
-	ttm_driver_type4,
-	ttm_driver_type5
+enum vmwgfx_object_type {
+	vmwgfx_fence_type,
+	vmwgfx_buffer_type,
+	vmwgfx_lock_type,
+	vmwgfx_prime_type,
+	vmwgfx_driver_type0 = 256,
+	vmwgfx_driver_type1,
+	vmwgfx_driver_type2,
+	vmwgfx_driver_type3,
+	vmwgfx_driver_type4,
+	vmwgfx_driver_type5
 };
 
-struct ttm_object_file;
-struct ttm_object_device;
+struct vmwgfx_object_file;
+struct vmwgfx_object_device;
 
 /**
- * struct ttm_base_object
+ * struct vmwgfx_base_object
  *
  * @hash: hash entry for the per-device object hash.
  * @type: derived type this object is base class for.
- * @shareable: Other ttm_object_files can access this object.
+ * @shareable: Other vmwgfx_object_files can access this object.
  *
- * @tfile: Pointer to ttm_object_file of the creator.
+ * @tfile: Pointer to vmwgfx_object_file of the creator.
  * NULL if the object was not created by a user request.
  * (kernel object).
  *
@@ -114,7 +113,7 @@ struct ttm_object_device;
  * "base" should be set to NULL by the function.
  *
  * @ref_obj_release: A function to be called when a reference object
- * with another ttm_ref_type than TTM_REF_USAGE is deleted.
+ * with another vmwgfx_ref_type than VMWGFX_REF_USAGE is deleted.
  * This function may, for example, release a lock held by a user-space
  * process.
  *
@@ -123,108 +122,108 @@ struct ttm_object_device;
  * access and refcounting, minimal access contol and hooks for unref actions.
  */
 
-struct ttm_base_object {
+struct vmwgfx_base_object {
 	struct rcu_head rhead;
 	struct drm_hash_item hash;
-	enum ttm_object_type object_type;
+	enum vmwgfx_object_type object_type;
 	bool shareable;
-	struct ttm_object_file *tfile;
+	struct vmwgfx_object_file *tfile;
 	struct kref refcount;
-	void (*refcount_release) (struct ttm_base_object **base);
-	void (*ref_obj_release) (struct ttm_base_object *base,
-				 enum ttm_ref_type ref_type);
+	void (*refcount_release) (struct vmwgfx_base_object **base);
+	void (*ref_obj_release) (struct vmwgfx_base_object *base,
+				 enum vmwgfx_ref_type ref_type);
 };
 
 
 /**
- * struct ttm_prime_object - Modified base object that is prime-aware
+ * struct vmwgfx_prime_object - Modified base object that is prime-aware
  *
- * @base: struct ttm_base_object that we derive from
+ * @base: struct vmwgfx_base_object that we derive from
  * @mutex: Mutex protecting the @dma_buf member.
  * @size: Size of the dma_buf associated with this object
  * @real_type: Type of the underlying object. Needed since we're setting
- * the value of @base::object_type to ttm_prime_type
+ * the value of @base::object_type to vmwgfx_prime_type
  * @dma_buf: Non ref-coutned pointer to a struct dma_buf created from this
  * object.
  * @refcount_release: The underlying object's release method. Needed since
  * we set @base::refcount_release to our own release method.
  */
 
-struct ttm_prime_object {
-	struct ttm_base_object base;
+struct vmwgfx_prime_object {
+	struct vmwgfx_base_object base;
 	struct mutex mutex;
 	size_t size;
-	enum ttm_object_type real_type;
+	enum vmwgfx_object_type real_type;
 	struct dma_buf *dma_buf;
-	void (*refcount_release) (struct ttm_base_object **);
+	void (*refcount_release) (struct vmwgfx_base_object **);
 };
 
 /**
- * ttm_base_object_init
+ * vmwgfx_base_object_init
  *
- * @tfile: Pointer to a struct ttm_object_file.
- * @base: The struct ttm_base_object to initialize.
+ * @tfile: Pointer to a struct vmwgfx_object_file.
+ * @base: The struct vmwgfx_base_object to initialize.
  * @shareable: This object is shareable with other applcations.
  * (different @tfile pointers.)
  * @type: The object type.
- * @refcount_release: See the struct ttm_base_object description.
- * @ref_obj_release: See the struct ttm_base_object description.
+ * @refcount_release: See the struct vmwgfx_base_object description.
+ * @ref_obj_release: See the struct vmwgfx_base_object description.
  *
- * Initializes a struct ttm_base_object.
+ * Initializes a struct vmwgfx_base_object.
  */
 
-extern int ttm_base_object_init(struct ttm_object_file *tfile,
-				struct ttm_base_object *base,
+extern int vmwgfx_base_object_init(struct vmwgfx_object_file *tfile,
+				struct vmwgfx_base_object *base,
 				bool shareable,
-				enum ttm_object_type type,
-				void (*refcount_release) (struct ttm_base_object
+				enum vmwgfx_object_type type,
+				void (*refcount_release) (struct vmwgfx_base_object
 							  **),
-				void (*ref_obj_release) (struct ttm_base_object
+				void (*ref_obj_release) (struct vmwgfx_base_object
 							 *,
-							 enum ttm_ref_type
+							 enum vmwgfx_ref_type
 							 ref_type));
 
 /**
- * ttm_base_object_lookup
+ * vmwgfx_base_object_lookup
  *
- * @tfile: Pointer to a struct ttm_object_file.
+ * @tfile: Pointer to a struct vmwgfx_object_file.
  * @key: Hash key
  *
- * Looks up a struct ttm_base_object with the key @key.
+ * Looks up a struct vmwgfx_base_object with the key @key.
  */
 
-extern struct ttm_base_object *ttm_base_object_lookup(struct ttm_object_file
+extern struct vmwgfx_base_object *vmwgfx_base_object_lookup(struct vmwgfx_object_file
 						      *tfile, uint32_t key);
 
 /**
- * ttm_base_object_lookup_for_ref
+ * vmwgfx_base_object_lookup_for_ref
  *
- * @tdev: Pointer to a struct ttm_object_device.
+ * @tdev: Pointer to a struct vmwgfx_object_device.
  * @key: Hash key
  *
- * Looks up a struct ttm_base_object with the key @key.
+ * Looks up a struct vmwgfx_base_object with the key @key.
  * This function should only be used when the struct tfile associated with the
  * caller doesn't yet have a reference to the base object.
  */
 
-extern struct ttm_base_object *
-ttm_base_object_lookup_for_ref(struct ttm_object_device *tdev, uint32_t key);
+extern struct vmwgfx_base_object *
+vmwgfx_base_object_lookup_for_ref(struct vmwgfx_object_device *tdev, uint32_t key);
 
 /**
- * ttm_base_object_unref
+ * vmwgfx_base_object_unref
  *
- * @p_base: Pointer to a pointer referencing a struct ttm_base_object.
+ * @p_base: Pointer to a pointer referencing a struct vmwgfx_base_object.
  *
  * Decrements the base object refcount and clears the pointer pointed to by
  * p_base.
  */
 
-extern void ttm_base_object_unref(struct ttm_base_object **p_base);
+extern void vmwgfx_base_object_unref(struct vmwgfx_base_object **p_base);
 
 /**
- * ttm_ref_object_add.
+ * vmwgfx_ref_object_add.
  *
- * @tfile: A struct ttm_object_file representing the application owning the
+ * @tfile: A struct vmwgfx_object_file representing the application owning the
  * ref_object.
  * @base: The base object to reference.
  * @ref_type: The type of reference.
@@ -244,16 +243,16 @@ extern void ttm_base_object_unref(struct ttm_base_object **p_base);
  * make sure the lock is released if the application dies. A ref object
  * will hold a single reference on a base object.
  */
-extern int ttm_ref_object_add(struct ttm_object_file *tfile,
-			      struct ttm_base_object *base,
-			      enum ttm_ref_type ref_type, bool *existed,
+extern int vmwgfx_ref_object_add(struct vmwgfx_object_file *tfile,
+			      struct vmwgfx_base_object *base,
+			      enum vmwgfx_ref_type ref_type, bool *existed,
 			      bool require_existed);
 
-extern bool ttm_ref_object_exists(struct ttm_object_file *tfile,
-				  struct ttm_base_object *base);
+extern bool vmwgfx_ref_object_exists(struct vmwgfx_object_file *tfile,
+				  struct vmwgfx_base_object *base);
 
 /**
- * ttm_ref_object_base_unref
+ * vmwgfx_ref_object_base_unref
  *
  * @key: Key representing the base object.
  * @ref_type: Ref type of the ref object to be dereferenced.
@@ -263,38 +262,38 @@ extern bool ttm_ref_object_exists(struct ttm_object_file *tfile,
  * references, the ref object will be destroyed and the base object
  * will be unreferenced.
  */
-extern int ttm_ref_object_base_unref(struct ttm_object_file *tfile,
+extern int vmwgfx_ref_object_base_unref(struct vmwgfx_object_file *tfile,
 				     unsigned long key,
-				     enum ttm_ref_type ref_type);
+				     enum vmwgfx_ref_type ref_type);
 
 /**
- * ttm_object_file_init - initialize a struct ttm_object file
+ * vmwgfx_object_file_init - initialize a struct vmwgfx_object file
  *
- * @tdev: A struct ttm_object device this file is initialized on.
+ * @tdev: A struct vmwgfx_object device this file is initialized on.
  * @hash_order: Order of the hash table used to hold the reference objects.
  *
  * This is typically called by the file_ops::open function.
  */
 
-extern struct ttm_object_file *ttm_object_file_init(struct ttm_object_device
+extern struct vmwgfx_object_file *vmwgfx_object_file_init(struct vmwgfx_object_device
 						    *tdev,
 						    unsigned int hash_order);
 
 /**
- * ttm_object_file_release - release data held by a ttm_object_file
+ * vmwgfx_object_file_release - release data held by a vmwgfx_object_file
  *
- * @p_tfile: Pointer to pointer to the ttm_object_file object to release.
+ * @p_tfile: Pointer to pointer to the vmwgfx_object_file object to release.
  * *p_tfile will be set to NULL by this function.
  *
- * Releases all data associated by a ttm_object_file.
+ * Releases all data associated by a vmwgfx_object_file.
  * Typically called from file_ops::release. The caller must
  * ensure that there are no concurrent users of tfile.
  */
 
-extern void ttm_object_file_release(struct ttm_object_file **p_tfile);
+extern void vmwgfx_object_file_release(struct vmwgfx_object_file **p_tfile);
 
 /**
- * ttm_object device init - initialize a struct ttm_object_device
+ * vmwgfx_object device init - initialize a struct vmwgfx_object_device
  *
  * @mem_glob: struct ttm_mem_global for memory accounting.
  * @hash_order: Order of hash table used to hash the base objects.
@@ -304,51 +303,51 @@ extern void ttm_object_file_release(struct ttm_object_file **p_tfile);
  * data structures needed for ttm base and ref objects.
  */
 
-extern struct ttm_object_device *
-ttm_object_device_init(struct ttm_mem_global *mem_glob,
+extern struct vmwgfx_object_device *
+vmwgfx_object_device_init(struct ttm_mem_global *mem_glob,
 		       unsigned int hash_order,
 		       const struct dma_buf_ops *ops);
 
 /**
- * ttm_object_device_release - release data held by a ttm_object_device
+ * vmwgfx_object_device_release - release data held by a vmwgfx_object_device
  *
- * @p_tdev: Pointer to pointer to the ttm_object_device object to release.
+ * @p_tdev: Pointer to pointer to the vmwgfx_object_device object to release.
  * *p_tdev will be set to NULL by this function.
  *
- * Releases all data associated by a ttm_object_device.
+ * Releases all data associated by a vmwgfx_object_device.
  * Typically called from driver::unload before the destruction of the
  * device private data structure.
  */
 
-extern void ttm_object_device_release(struct ttm_object_device **p_tdev);
+extern void vmwgfx_object_device_release(struct vmwgfx_object_device **p_tdev);
 
-#define ttm_base_object_kfree(__object, __base)\
+#define vmwgfx_base_object_kfree(__object, __base)\
 	kfree_rcu(__object, __base.rhead)
 
-extern int ttm_prime_object_init(struct ttm_object_file *tfile,
+extern int vmwgfx_prime_object_init(struct vmwgfx_object_file *tfile,
 				 size_t size,
-				 struct ttm_prime_object *prime,
+				 struct vmwgfx_prime_object *prime,
 				 bool shareable,
-				 enum ttm_object_type type,
+				 enum vmwgfx_object_type type,
 				 void (*refcount_release)
-				 (struct ttm_base_object **),
+				 (struct vmwgfx_base_object **),
 				 void (*ref_obj_release)
-				 (struct ttm_base_object *,
-				  enum ttm_ref_type ref_type));
+				 (struct vmwgfx_base_object *,
+				  enum vmwgfx_ref_type ref_type));
 
-static inline enum ttm_object_type
-ttm_base_object_type(struct ttm_base_object *base)
+static inline enum vmwgfx_object_type
+vmwgfx_base_object_type(struct vmwgfx_base_object *base)
 {
-	return (base->object_type == ttm_prime_type) ?
-		container_of(base, struct ttm_prime_object, base)->real_type :
+	return (base->object_type == vmwgfx_prime_type) ?
+		container_of(base, struct vmwgfx_prime_object, base)->real_type :
 		base->object_type;
 }
-extern int ttm_prime_fd_to_handle(struct ttm_object_file *tfile,
+extern int vmwgfx_prime_fd_to_handle(struct vmwgfx_object_file *tfile,
 				  int fd, u32 *handle);
-extern int ttm_prime_handle_to_fd(struct ttm_object_file *tfile,
+extern int vmwgfx_prime_handle_to_fd(struct vmwgfx_object_file *tfile,
 				  uint32_t handle, uint32_t flags,
 				  int *prime_fd);
 
-#define ttm_prime_object_kfree(__obj, __prime)		\
+#define vmwgfx_prime_object_kfree(__obj, __prime)		\
 	kfree_rcu(__obj, __prime.base.rhead)
 #endif

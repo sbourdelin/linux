@@ -3891,8 +3891,8 @@ vmw_execbuf_copy_fence_user(struct vmw_private *dev_priv,
 			fence_rep.fd = -1;
 		}
 
-		ttm_ref_object_base_unref(vmw_fp->tfile,
-					  fence_handle, TTM_REF_USAGE);
+		vmwgfx_ref_object_base_unref(vmw_fp->tfile,
+					  fence_handle, VMWGFX_REF_USAGE);
 		DRM_ERROR("Fence copy error. Syncing.\n");
 		(void) vmw_fence_obj_wait(fence, false, false,
 					  VMW_FENCE_WAIT_TIMEOUT);
@@ -4525,7 +4525,7 @@ int vmw_execbuf_ioctl(struct drm_device *dev, unsigned long data,
 			goto out;
 	}
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -4536,7 +4536,7 @@ int vmw_execbuf_ioctl(struct drm_device *dev, unsigned long data,
 				  (void __user *)(unsigned long)arg.fence_rep,
 				  NULL,
 				  arg.flags);
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 	if (unlikely(ret != 0))
 		goto out;
 

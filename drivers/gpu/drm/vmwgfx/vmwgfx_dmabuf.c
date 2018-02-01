@@ -52,7 +52,7 @@ int vmw_dmabuf_pin_in_placement(struct vmw_private *dev_priv,
 	int ret;
 	uint32_t new_flags;
 
-	ret = ttm_write_lock(&dev_priv->reservation_sem, interruptible);
+	ret = vmwgfx_write_lock(&dev_priv->reservation_sem, interruptible);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -74,7 +74,7 @@ int vmw_dmabuf_pin_in_placement(struct vmw_private *dev_priv,
 	ttm_bo_unreserve(bo);
 
 err:
-	ttm_write_unlock(&dev_priv->reservation_sem);
+	vmwgfx_write_unlock(&dev_priv->reservation_sem);
 	return ret;
 }
 
@@ -101,7 +101,7 @@ int vmw_dmabuf_pin_in_vram_or_gmr(struct vmw_private *dev_priv,
 	int ret;
 	uint32_t new_flags;
 
-	ret = ttm_write_lock(&dev_priv->reservation_sem, interruptible);
+	ret = vmwgfx_write_lock(&dev_priv->reservation_sem, interruptible);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -129,7 +129,7 @@ out_unreserve:
 
 	ttm_bo_unreserve(bo);
 err:
-	ttm_write_unlock(&dev_priv->reservation_sem);
+	vmwgfx_write_unlock(&dev_priv->reservation_sem);
 	return ret;
 }
 
@@ -185,7 +185,7 @@ int vmw_dmabuf_pin_in_start_of_vram(struct vmw_private *dev_priv,
 	placement.num_busy_placement = 1;
 	placement.busy_placement = &place;
 
-	ret = ttm_write_lock(&dev_priv->reservation_sem, interruptible);
+	ret = vmwgfx_write_lock(&dev_priv->reservation_sem, interruptible);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -220,7 +220,7 @@ int vmw_dmabuf_pin_in_start_of_vram(struct vmw_private *dev_priv,
 
 	ttm_bo_unreserve(bo);
 err_unlock:
-	ttm_write_unlock(&dev_priv->reservation_sem);
+	vmwgfx_write_unlock(&dev_priv->reservation_sem);
 
 	return ret;
 }
@@ -244,7 +244,7 @@ int vmw_dmabuf_unpin(struct vmw_private *dev_priv,
 	struct ttm_buffer_object *bo = &buf->base;
 	int ret;
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, interruptible);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, interruptible);
 	if (unlikely(ret != 0))
 		return ret;
 
@@ -257,7 +257,7 @@ int vmw_dmabuf_unpin(struct vmw_private *dev_priv,
 	ttm_bo_unreserve(bo);
 
 err:
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 	return ret;
 }
 

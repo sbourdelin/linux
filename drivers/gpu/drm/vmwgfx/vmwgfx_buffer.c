@@ -775,7 +775,7 @@ static void vmw_evict_flags(struct ttm_buffer_object *bo,
 
 static int vmw_verify_access(struct ttm_buffer_object *bo, struct file *filp)
 {
-	struct ttm_object_file *tfile =
+	struct vmwgfx_object_file *tfile =
 		vmw_fpriv((struct drm_file *)filp->private_data)->tfile;
 
 	return vmw_user_dmabuf_verify_access(bo, tfile);

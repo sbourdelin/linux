@@ -40,12 +40,12 @@ enum vmw_cmdbuf_res_state {
 
 /**
  * struct vmw_user_resource_conv - Identify a derived user-exported resource
- * type and provide a function to convert its ttm_base_object pointer to
+ * type and provide a function to convert its vmwgfx_base_object pointer to
  * a struct vmw_resource
  */
 struct vmw_user_resource_conv {
-	enum ttm_object_type object_type;
-	struct vmw_resource *(*base_obj_to_res)(struct ttm_base_object *base);
+	enum vmwgfx_object_type object_type;
+	struct vmw_resource *(*base_obj_to_res)(struct vmwgfx_base_object *base);
 	void (*res_free) (struct vmw_resource *res);
 };
 
@@ -128,7 +128,7 @@ vmw_simple_resource_create_ioctl(struct drm_device *dev,
 				 struct drm_file *file_priv,
 				 const struct vmw_simple_resource_func *func);
 struct vmw_resource *
-vmw_simple_resource_lookup(struct ttm_object_file *tfile,
+vmw_simple_resource_lookup(struct vmwgfx_object_file *tfile,
 			   uint32_t handle,
 			   const struct vmw_simple_resource_func *func);
 #endif

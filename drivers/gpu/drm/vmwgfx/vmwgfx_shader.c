@@ -40,7 +40,7 @@ struct vmw_shader {
 };
 
 struct vmw_user_shader {
-	struct ttm_base_object base;
+	struct vmwgfx_base_object base;
 	struct vmw_shader shader;
 };
 
@@ -59,7 +59,7 @@ static size_t vmw_shader_dx_size;
 
 static void vmw_user_shader_free(struct vmw_resource *res);
 static struct vmw_resource *
-vmw_user_shader_base_to_res(struct ttm_base_object *base);
+vmw_user_shader_base_to_res(struct vmwgfx_base_object *base);
 
 static int vmw_gb_shader_create(struct vmw_resource *res);
 static int vmw_gb_shader_bind(struct vmw_resource *res,
@@ -671,7 +671,7 @@ out_resource_init:
  */
 
 static struct vmw_resource *
-vmw_user_shader_base_to_res(struct ttm_base_object *base)
+vmw_user_shader_base_to_res(struct vmwgfx_base_object *base)
 {
 	return &(container_of(base, struct vmw_user_shader, base)->
 		 shader.res);
@@ -683,7 +683,7 @@ static void vmw_user_shader_free(struct vmw_resource *res)
 		container_of(res, struct vmw_user_shader, shader.res);
 	struct vmw_private *dev_priv = res->dev_priv;
 
-	ttm_base_object_kfree(ushader, base);
+	vmwgfx_base_object_kfree(ushader, base);
 	ttm_mem_global_free(vmw_mem_glob(dev_priv),
 			    vmw_user_shader_size);
 }
@@ -703,9 +703,9 @@ static void vmw_shader_free(struct vmw_resource *res)
  * base object. It releases the base-object's reference on the resource object.
  */
 
-static void vmw_user_shader_base_release(struct ttm_base_object **p_base)
+static void vmw_user_shader_base_release(struct vmwgfx_base_object **p_base)
 {
-	struct ttm_base_object *base = *p_base;
+	struct vmwgfx_base_object *base = *p_base;
 	struct vmw_resource *res = vmw_user_shader_base_to_res(base);
 
 	*p_base = NULL;
@@ -716,10 +716,10 @@ int vmw_shader_destroy_ioctl(struct drm_device *dev, void *data,
 			      struct drm_file *file_priv)
 {
 	struct drm_vmw_shader_arg *arg = (struct drm_vmw_shader_arg *)data;
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 
-	return ttm_ref_object_base_unref(tfile, arg->handle,
-					 TTM_REF_USAGE);
+	return vmwgfx_ref_object_base_unref(tfile, arg->handle,
+					 VMWGFX_REF_USAGE);
 }
 
 static int vmw_user_shader_alloc(struct vmw_private *dev_priv,
@@ -729,7 +729,7 @@ static int vmw_user_shader_alloc(struct vmw_private *dev_priv,
 				 SVGA3dShaderType shader_type,
 				 uint8_t num_input_sig,
 				 uint8_t num_output_sig,
-				 struct ttm_object_file *tfile,
+				 struct vmwgfx_object_file *tfile,
 				 u32 *handle)
 {
 	struct vmw_user_shader *ushader;
@@ -782,7 +782,7 @@ static int vmw_user_shader_alloc(struct vmw_private *dev_priv,
 		goto out;
 
 	tmp = vmw_resource_reference(res);
-	ret = ttm_base_object_init(tfile, &ushader->base, false,
+	ret = vmwgfx_base_object_init(tfile, &ushader->base, false,
 				   VMW_RES_SHADER,
 				   &vmw_user_shader_base_release, NULL);
 
@@ -861,7 +861,7 @@ static int vmw_shader_define(struct drm_device *dev, struct drm_file *file_priv,
 			     uint32_t *shader_handle)
 {
 	struct vmw_private *dev_priv = vmw_priv(dev);
-	struct ttm_object_file *tfile = vmw_fpriv(file_priv)->tfile;
+	struct vmwgfx_object_file *tfile = vmw_fpriv(file_priv)->tfile;
 	struct vmw_dma_buffer *buffer = NULL;
 	SVGA3dShaderType shader_type;
 	int ret;
@@ -896,7 +896,7 @@ static int vmw_shader_define(struct drm_device *dev, struct drm_file *file_priv,
 		goto out_bad_arg;
 	}
 
-	ret = ttm_read_lock(&dev_priv->reservation_sem, true);
+	ret = vmwgfx_read_lock(&dev_priv->reservation_sem, true);
 	if (unlikely(ret != 0))
 		goto out_bad_arg;
 
@@ -904,7 +904,7 @@ static int vmw_shader_define(struct drm_device *dev, struct drm_file *file_priv,
 				    shader_type, num_input_sig,
 				    num_output_sig, tfile, shader_handle);
 
-	ttm_read_unlock(&dev_priv->reservation_sem);
+	vmwgfx_read_unlock(&dev_priv->reservation_sem);
 out_bad_arg:
 	vmw_dmabuf_unreference(&buffer);
 	return ret;
@@ -970,7 +970,7 @@ int vmw_shader_remove(struct vmw_cmdbuf_res_manager *man,
  * unique to the shader type.
  * @bytecode: Pointer to the bytecode of the shader.
  * @shader_type: Shader type.
- * @tfile: Pointer to a struct ttm_object_file that the guest-backed shader is
+ * @tfile: Pointer to a struct vmwgfx_object_file that the guest-backed shader is
  * to be created with.
  * @list: Caller's list of staged command buffer resource actions.
  *
