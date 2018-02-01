@@ -2431,9 +2431,12 @@ static void cma_ndev_work_handler(struct work_struct *_work)
 	    id_priv->state == RDMA_CM_DEVICE_REMOVAL)
 		goto out;
 
-	if (id_priv->id.event_handler(&id_priv->id, &work->event)) {
-		cma_exch(id_priv, RDMA_CM_DESTROYING);
-		destroy = 1;
+	/*event_handler is null when create cm id by calling rds_ib_laddr_check*/
+	if (id_priv->id.event_handler) {
+		if (id_priv->id.event_handler(&id_priv->id, &work->event)) {
+			cma_exch(id_priv, RDMA_CM_DESTROYING);
+			destroy = 1;
+		}
 	}
 
 out:
