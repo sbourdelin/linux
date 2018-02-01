@@ -144,6 +144,7 @@ extern void copy_page(void *to, const void *from);
 
 #ifdef CONFIG_KUSER_HELPERS
 #define __HAVE_ARCH_GATE_AREA 1
+#define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
 #endif
 
 #ifdef CONFIG_ARM_LPAE
