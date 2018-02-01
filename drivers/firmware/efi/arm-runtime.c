@@ -115,23 +115,23 @@ static bool __init efi_virtmap_init(void)
  * non-early mapping of the UEFI system table and virtual mappings for all
  * EFI_MEMORY_RUNTIME regions.
  */
-static int __init arm_enable_runtime_services(void)
+void __init efi_enter_virtual_mode(void)
 {
 	u64 mapsize;
 
 	if (!efi_enabled(EFI_BOOT)) {
 		pr_info("EFI services will not be available.\n");
-		return 0;
+		return;
 	}
 
 	if (efi_runtime_disabled()) {
 		pr_info("EFI runtime services will be disabled.\n");
-		return 0;
+		return;
 	}
 
 	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
 		pr_info("EFI runtime services access via paravirt.\n");
-		return 0;
+		return;
 	}
 
 	pr_info("Remapping and enabling EFI services.\n");
@@ -140,21 +140,18 @@ static int __init arm_enable_runtime_services(void)
 
 	if (efi_memmap_init_late(efi.memmap.phys_map, mapsize)) {
 		pr_err("Failed to remap EFI memory map\n");
-		return -ENOMEM;
+		return;
 	}
 
 	if (!efi_virtmap_init()) {
 		pr_err("UEFI virtual mapping missing or invalid -- runtime services will not be available\n");
-		return -ENOMEM;
+		return;
 	}
 
 	/* Set up runtime services function pointers */
 	efi_native_runtime_setup();
 	set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
-
-	return 0;
 }
-early_initcall(arm_enable_runtime_services);
 
 void efi_virtmap_load(void)
 {
