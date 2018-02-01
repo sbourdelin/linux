@@ -833,4 +833,31 @@ static inline void put_cgroup_ns(struct cgroup_namespace *ns)
 		free_cgroup_ns(ns);
 }
 
+struct cgroup_driver_funcs;
+
+#ifdef CONFIG_CGROUP_DRIVER
+
+struct cgroup_driver *cgroup_driver_init(struct cgroup_driver_funcs *funcs);
+void cgroup_driver_release(struct cgroup_driver *drv);
+struct cgroup_driver_data * cgroup_driver_get_data(struct cgroup_driver *drv,
+						   struct cgroup *cgrp,
+						   bool *is_new);
+
+#else /* !CONFIG_CGROUP_DRIVER */
+
+static inline struct cgroup_driver *
+cgroup_driver_init(struct cgroup_driver_funcs *funcs) {
+	return NULL;
+}
+static inline void cgroup_driver_release(struct cgroup_driver *drv) {}
+static inline struct cgroup_driver_data *
+cgroup_driver_get_data(struct cgroup_driver *drv,
+		       struct cgroup *cgrp,
+		       bool *is_new)
+{
+	return ERR_PTR(-EINVAL);
+}
+
+#endif /* !CONFIG_CGROUP_DRIVER */
+
 #endif /* _LINUX_CGROUP_H */

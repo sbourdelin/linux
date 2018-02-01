@@ -8,6 +8,7 @@
 #ifndef _LINUX_CGROUP_DEFS_H
 #define _LINUX_CGROUP_DEFS_H
 
+#include <linux/hashtable.h>
 #include <linux/limits.h>
 #include <linux/list.h>
 #include <linux/idr.h>
@@ -27,6 +28,7 @@ struct cgroup;
 struct cgroup_root;
 struct cgroup_subsys;
 struct cgroup_taskset;
+struct cgroup_driver;
 struct kernfs_node;
 struct kernfs_ops;
 struct kernfs_open_file;
@@ -307,6 +309,22 @@ struct cgroup_stat {
 	struct prev_cputime prev_cputime;
 };
 
+/*
+ * Driver-specific cgroup data.  Drivers should subclass this structure with
+ * their own fields for data that should be stored alongside individual
+ * cgroups.
+ */
+struct cgroup_driver_data {
+	/* Driver this data structure is associated with */
+	struct cgroup_driver *drv;
+
+	/* Node in cgroup's data hashtable */
+	struct hlist_node cgroupnode;
+
+	/* Node in driver's data list; used to cleanup on driver unload */
+	struct list_head drivernode;
+};
+
 struct cgroup {
 	/* self css with NULL ->ss, points back to this cgroup */
 	struct cgroup_subsys_state self;
@@ -426,6 +444,12 @@ struct cgroup {
 
 	/* used to store eBPF programs */
 	struct cgroup_bpf bpf;
+
+	/*
+	 * list of cgroup_driver_data structures; used to manage
+	 * driver-specific data associated with individual cgroups
+	 */
+	DECLARE_HASHTABLE(driver_data, 4);
 
 	/* ids of the ancestors at each level including self */
 	int ancestor_ids[];
@@ -660,6 +684,19 @@ struct cgroup_subsys {
 	 * specifies the mask of subsystems that this one depends on.
 	 */
 	unsigned int depends_on;
+};
+
+/* Function table for handling driver-specific cgroup data */
+struct cgroup_driver_funcs {
+	/* Allocates driver-specific data for a cgroup */
+	struct cgroup_driver_data *(*alloc_data)(struct cgroup_driver *drv);
+
+	/*
+	 * Frees a driver-specific datastructure.
+	 *
+	 * This function is optional; if NULL, data will be kvfree()'d.
+	 */
+	void (*free_data)(struct cgroup_driver_data *data);
 };
 
 extern struct percpu_rw_semaphore cgroup_threadgroup_rwsem;

@@ -873,6 +873,10 @@ config SOCK_CGROUP_DATA
 	bool
 	default n
 
+config CGROUP_DRIVER
+	bool
+	default n
+
 endif # CGROUPS
 
 menuconfig NAMESPACES
