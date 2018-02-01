@@ -483,21 +483,15 @@ static void intel_engine_cleanup_scratch(struct intel_engine_cs *engine)
 	i915_vma_unpin_and_release(&engine->scratch);
 }
 
-static void cleanup_phys_status_page(struct intel_engine_cs *engine)
-{
-	struct drm_i915_private *dev_priv = engine->i915;
-
-	if (!dev_priv->status_page_dmah)
-		return;
-
-	drm_pci_free(&dev_priv->drm, dev_priv->status_page_dmah);
-	engine->status_page.page_addr = NULL;
-}
-
 static void cleanup_status_page(struct intel_engine_cs *engine)
 {
-	struct i915_vma *vma;
 	struct drm_i915_gem_object *obj;
+	struct drm_dma_handle *dmah;
+	struct i915_vma *vma;
+
+	dmah = fetch_and_zero(&engine->i915->status_page_dmah);
+	if (dmah)
+		drm_pci_free(&engine->i915->drm, dmah);
 
 	vma = fetch_and_zero(&engine->status_page.vma);
 	if (!vma)
@@ -669,10 +663,7 @@ void intel_engine_cleanup_common(struct intel_engine_cs *engine)
 {
 	intel_engine_cleanup_scratch(engine);
 
-	if (HWS_NEEDS_PHYSICAL(engine->i915))
-		cleanup_phys_status_page(engine);
-	else
-		cleanup_status_page(engine);
+	cleanup_status_page(engine);
 
 	intel_engine_fini_breadcrumbs(engine);
 	intel_engine_cleanup_cmd_parser(engine);
