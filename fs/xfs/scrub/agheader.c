@@ -518,7 +518,7 @@ int
 xfs_scrub_agfl(
 	struct xfs_scrub_context	*sc)
 {
-	struct xfs_scrub_agfl_info	sai = { 0 };
+	struct xfs_scrub_agfl_info	sai = { { 0 } };
 	struct xfs_agf			*agf;
 	xfs_agnumber_t			agno;
 	unsigned int			agflcount;
