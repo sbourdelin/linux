@@ -250,7 +250,7 @@ int dma_fifo_out_complete(struct dma_fifo *fifo, struct dma_pending *complete)
 	if (list_empty(&fifo->pending) && fifo->open == 0)
 		return -EINVAL;
 
-	if (FAIL(fifo, list_empty(&fifo->pending) != (fifo->open == 0),
+	if (FAIL(fifo, list_empty(&fifo->pending) != fifo->open == 0,
 		 "pending list disagrees with open count:%d",
 		 fifo->open))
 		return -ENXIO;

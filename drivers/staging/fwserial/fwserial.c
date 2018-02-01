@@ -1287,7 +1287,7 @@ static void fwtty_set_termios(struct tty_struct *tty, struct ktermios *old)
 	spin_lock_bh(&port->lock);
 	baud = set_termios(port, tty);
 
-	if ((baud == 0) && (old->c_cflag & CBAUD)) {
+	if (baud == 0 && (old->c_cflag & CBAUD)) {
 		port->mctrl &= ~(TIOCM_DTR | TIOCM_RTS);
 	} else if ((baud != 0) && !(old->c_cflag & CBAUD)) {
 		if (C_CRTSCTS(tty) || !tty_throttled(tty))
