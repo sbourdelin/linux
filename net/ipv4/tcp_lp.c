@@ -134,7 +134,7 @@ static u32 tcp_lp_remote_hz_estimator(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct lp *lp = inet_csk_ca(sk);
-	s64 rhz = lp->remote_hz << 6;	/* remote HZ << 6 */
+	s64 rhz = (s64)lp->remote_hz << 6;	/* remote HZ << 6 */
 	s64 m = 0;
 
 	/* not yet record reference time
@@ -147,7 +147,7 @@ static u32 tcp_lp_remote_hz_estimator(struct sock *sk)
 	    tp->rx_opt.rcv_tsecr == lp->local_ref_time)
 		goto out;
 
-	m = TCP_TS_HZ *
+	m = (s64)TCP_TS_HZ *
 	    (tp->rx_opt.rcv_tsval - lp->remote_ref_time) /
 	    (tp->rx_opt.rcv_tsecr - lp->local_ref_time);
 	if (m < 0)
@@ -193,8 +193,8 @@ static u32 tcp_lp_owd_calculator(struct sock *sk)
 
 	if (lp->flag & LP_VALID_RHZ) {
 		owd =
-		    tp->rx_opt.rcv_tsval * (LP_RESOL / lp->remote_hz) -
-		    tp->rx_opt.rcv_tsecr * (LP_RESOL / TCP_TS_HZ);
+		    (s64)tp->rx_opt.rcv_tsval * (LP_RESOL / lp->remote_hz) -
+		    (s64)tp->rx_opt.rcv_tsecr * (LP_RESOL / TCP_TS_HZ);
 		if (owd < 0)
 			owd = -owd;
 	}
