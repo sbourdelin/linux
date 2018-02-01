@@ -1912,6 +1912,9 @@ static int i915_context_status(struct seq_file *m, void *unused)
 		seq_putc(m, ctx->remap_slice ? 'R' : 'r');
 		seq_putc(m, '\n');
 
+		seq_printf(m, "Priority %d (prio offset = %d)\n",
+			   ctx->priority, ctx->priority_offset);
+
 		for_each_engine(engine, dev_priv, id) {
 			struct intel_context *ce = &ctx->engine[engine->id];
 
