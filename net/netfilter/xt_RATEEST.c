@@ -36,7 +36,9 @@ static void xt_rateest_hash_insert(struct xt_rateest *est)
 	unsigned int h;
 
 	h = xt_rateest_hash(est->name);
+	mutex_lock(&xt_rateest_mutex);
 	hlist_add_head(&est->list, &rateest_hash[h]);
+	mutex_unlock(&xt_rateest_mutex);
 }
 
 struct xt_rateest *xt_rateest_lookup(const char *name)
