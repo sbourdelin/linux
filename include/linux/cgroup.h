@@ -842,6 +842,7 @@ void cgroup_driver_release(struct cgroup_driver *drv);
 struct cgroup_driver_data * cgroup_driver_get_data(struct cgroup_driver *drv,
 						   struct cgroup *cgrp,
 						   bool *is_new);
+struct cgroup *cgroup_for_driver_process(struct pid *pid);
 
 #else /* !CONFIG_CGROUP_DRIVER */
 
@@ -856,6 +857,11 @@ cgroup_driver_get_data(struct cgroup_driver *drv,
 		       bool *is_new)
 {
 	return ERR_PTR(-EINVAL);
+}
+static inline struct cgroup *
+cgroup_for_driver_process(struct pid *pid)
+{
+	return NULL;
 }
 
 #endif /* !CONFIG_CGROUP_DRIVER */

@@ -128,3 +128,27 @@ out:
 	return data;
 }
 EXPORT_SYMBOL(cgroup_driver_get_data);
+
+/**
+ * cgroup_for_driver_process - return the cgroup for a process
+ * @pid: process to lookup cgroup for
+ *
+ * Returns the cgroup from the v2 hierarchy that a process belongs to.
+ * This function is intended to be called from drivers and will obtain
+ * the necessary cgroup locks.
+ *
+ * RETURNS:
+ * Process' cgroup in the default (v2) hierarchy
+ */
+struct cgroup *
+cgroup_for_driver_process(struct pid *pid)
+{
+	struct task_struct *task = pid_task(pid, PIDTYPE_PID);
+
+	mutex_lock(&cgroup_mutex);
+	spin_lock_irq(&css_set_lock);
+	task_cgroup_from_root(task, &cgrp_dfl_root);
+	spin_unlock_irq(&css_set_lock);
+	mutex_unlock(&cgroup_mutex);
+}
+EXPORT_SYMBOL(cgroup_for_driver_process);
