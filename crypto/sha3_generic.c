@@ -35,7 +35,7 @@ static const u64 keccakf_rndc[24] = {
 
 /* update the state with given number of rounds */
 
-static void __attribute__((__optimize__("O3"))) keccakf(u64 st[25])
+static void __optimize("O3") keccakf(u64 st[25])
 {
 	u64 t[5], tt, bc[5];
 	int round;
