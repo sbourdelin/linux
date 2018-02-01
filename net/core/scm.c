@@ -213,7 +213,7 @@ error:
 }
 EXPORT_SYMBOL(__scm_send);
 
-int put_cmsg(struct msghdr * msg, int level, int type, int len, void *data)
+int __put_cmsg(struct msghdr *msg, int level, int type, int len, void *data)
 {
 	struct cmsghdr __user *cm
 		= (__force struct cmsghdr __user *)msg->msg_control;
@@ -250,7 +250,7 @@ int put_cmsg(struct msghdr * msg, int level, int type, int len, void *data)
 out:
 	return err;
 }
-EXPORT_SYMBOL(put_cmsg);
+EXPORT_SYMBOL(__put_cmsg);
 
 void scm_detach_fds(struct msghdr *msg, struct scm_cookie *scm)
 {

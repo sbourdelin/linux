@@ -342,7 +342,23 @@ struct ucred {
 #define IPX_TYPE	1
 
 extern int move_addr_to_kernel(void __user *uaddr, int ulen, struct sockaddr_storage *kaddr);
-extern int put_cmsg(struct msghdr*, int level, int type, int len, void *data);
+extern int __put_cmsg(struct msghdr*, int level, int type, int len, void *data);
+/*
+ * Provide a bounce buffer for copying cmsg data to userspace when the size
+ * is constant. Without this, hardened usercopy will see the dynamic size
+ * calculation in __put_cmsg and try to block it. Constant sized copies
+ * should not trigger hardened usercopy checks.
+ */
+#define put_cmsg(_msg, _level, _type, _len, _ptr) ({			\
+	int _rc;							\
+	if (__builtin_constant_p(_len)) {				\
+		typeof(*(_ptr)) _val = *(_ptr);				\
+		BUILD_BUG_ON(sizeof(_val) != (_len));			\
+		_rc = __put_cmsg(_msg, _level, _type, sizeof(_val), &_val); \
+	} else {							\
+		_rc = __put_cmsg(_msg, _level, _type, _len, _ptr);	\
+	}								\
+	_rc;})
 
 struct timespec;
 
