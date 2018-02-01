@@ -147,6 +147,15 @@ struct i915_gem_context {
 	 */
 	int priority;
 
+	/**
+	 * @priority_offset: priority offset
+	 *
+	 * A value, configured via cgroup, that sets the starting priority
+	 * of the context.  Any priority set explicitly via context parameter
+	 * will be added to the priority offset.
+	 */
+	int priority_offset;
+
 	/** ggtt_offset_bias: placement restriction for context objects */
 	u32 ggtt_offset_bias;
 

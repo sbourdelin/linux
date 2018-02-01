@@ -274,7 +274,9 @@ __create_hw_context(struct drm_i915_private *dev_priv,
 	kref_init(&ctx->ref);
 	list_add_tail(&ctx->link, &dev_priv->contexts.list);
 	ctx->i915 = dev_priv;
-	ctx->priority = I915_PRIORITY_NORMAL;
+	ctx->priority_offset =
+		i915_cgroup_get_prio_offset(dev_priv, file_priv);
+	ctx->priority = I915_PRIORITY_NORMAL + ctx->priority_offset;
 
 	INIT_RADIX_TREE(&ctx->handles_vma, GFP_KERNEL);
 	INIT_LIST_HEAD(&ctx->handles_list);
@@ -816,7 +818,7 @@ int i915_gem_context_setparam_ioctl(struct drm_device *dev, void *data,
 				 !capable(CAP_SYS_NICE))
 				ret = -EPERM;
 			else
-				ctx->priority = priority;
+				ctx->priority = priority + ctx->priority_offset;
 		}
 		break;
 

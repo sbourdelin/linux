@@ -11,6 +11,8 @@
 
 struct i915_cgroup_data {
 	struct cgroup_driver_data base;
+
+	int priority_offset;
 };
 
 static inline struct i915_cgroup_data *
@@ -72,6 +74,8 @@ i915_cgroup_setparam_ioctl(struct drm_device *dev, void *data,
 	struct cgroup *cgrp;
 	struct file *f;
 	struct inode *inode = NULL;
+	struct cgroup_driver_data *cgrpdata;
+	struct i915_cgroup_data *i915data;
 	int ret;
 
 	if (!dev_priv->i915_cgroups) {
@@ -125,10 +129,52 @@ i915_cgroup_setparam_ioctl(struct drm_device *dev, void *data,
 		return ret;
 
 	switch (req->param) {
+	case I915_CGROUP_PARAM_PRIORITY_OFFSET:
+		cgrpdata = cgroup_driver_get_data(dev_priv->i915_cgroups, cgrp,
+						  NULL);
+		if (IS_ERR(cgrpdata))
+			return PTR_ERR(cgrpdata);
+
+		DRM_DEBUG_DRIVER("Setting cgroup priority offset to %lld\n",
+				 req->value);
+		i915data = cgrp_to_i915(cgrpdata);
+		i915data->priority_offset = req->value;
+		break;
 	default:
 		DRM_DEBUG_DRIVER("Invalid cgroup parameter %lld\n", req->param);
 		return -EINVAL;
 	}
 
 	return 0;
+}
+
+/**
+ * i915_cgroup_get_prio_offset() - get prio offset for current proc's cgroup
+ * @dev_priv: drm device
+ * @file_priv: file handle for calling process
+ *
+ * RETURNS:
+ * Priority offset associated with the calling process' cgroup in the default
+ * (v2) hierarchy, otherwise 0 if no explicit priority has been assigned.
+ */
+int
+i915_cgroup_get_prio_offset(struct drm_i915_private *dev_priv,
+			    struct drm_i915_file_private *file_priv)
+{
+       struct cgroup *cgrp;
+       struct cgroup_driver_data *cgrpdata;
+
+       /* Ignore internally-created contexts not associated with a process */
+       if (!file_priv)
+               return 0;
+
+       cgrp = drm_file_get_cgroup(file_priv->file);
+       if (WARN_ON(!cgrp))
+               return 0;
+
+       cgrpdata = cgroup_driver_get_data(dev_priv->i915_cgroups, cgrp, NULL);
+       if (IS_ERR(cgrpdata))
+	       return 0;
+
+       return cgrp_to_i915(cgrpdata)->priority_offset;
 }
