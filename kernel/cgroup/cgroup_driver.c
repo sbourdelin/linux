@@ -4,6 +4,7 @@
 
 #include <linux/hashtable.h>
 #include <linux/mm.h>
+#include <linux/sched/task.h>
 
 /*
  * General data structure returned by cgroup_driver_init() and used as a
@@ -143,12 +144,19 @@ EXPORT_SYMBOL(cgroup_driver_get_data);
 struct cgroup *
 cgroup_for_driver_process(struct pid *pid)
 {
-	struct task_struct *task = pid_task(pid, PIDTYPE_PID);
+	struct task_struct *task;
+	struct cgroup *cgrp;
+
+	read_lock(&tasklist_lock);
+	task = pid_task(pid, PIDTYPE_PID);
+	read_unlock(&tasklist_lock);
 
 	mutex_lock(&cgroup_mutex);
 	spin_lock_irq(&css_set_lock);
-	task_cgroup_from_root(task, &cgrp_dfl_root);
+	cgrp = task_cgroup_from_root(task, &cgrp_dfl_root);
 	spin_unlock_irq(&css_set_lock);
 	mutex_unlock(&cgroup_mutex);
+
+	return cgrp;
 }
 EXPORT_SYMBOL(cgroup_for_driver_process);

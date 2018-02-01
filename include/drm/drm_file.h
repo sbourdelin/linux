@@ -32,6 +32,7 @@
 
 #include <linux/types.h>
 #include <linux/completion.h>
+#include <linux/cgroup.h>
 
 #include <uapi/drm/drm.h>
 
@@ -377,5 +378,24 @@ void drm_event_cancel_free(struct drm_device *dev,
 			   struct drm_pending_event *p);
 void drm_send_event_locked(struct drm_device *dev, struct drm_pending_event *e);
 void drm_send_event(struct drm_device *dev, struct drm_pending_event *e);
+
+#ifdef CONFIG_CGROUPS
+/**
+ * drm_file_get_cgroup - obtain cgroup for drm_file's owning process
+ * @file_priv: DRM file
+ *
+ * Obtains the cgroup from a specific hierarchy that the drm_file's owning
+ * process belongs to.  The cgroup may be used to set driver-specific
+ * policy (priority, vram usage, etc.).
+ */
+static inline struct cgroup *
+drm_file_get_cgroup(struct drm_file *file_priv)
+{
+	return cgroup_for_driver_process(file_priv->pid);
+}
+#else
+static inline struct cgroup *
+drm_file_get_cgroup(struct drm_file *file_priv) { return NULL; }
+#endif
 
 #endif /* _DRM_FILE_H_ */
