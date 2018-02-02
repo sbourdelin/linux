@@ -1,5 +1,6 @@
 /*
  * Copyright 2012 Red Hat Inc.
+ * Copyright 2018 Raptor Engineering, LLC.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
@@ -31,6 +32,8 @@
 
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_crtc_helper.h>
+
+extern int ast_resetpalette;
 
 void ast_set_index_reg_mask(struct ast_private *ast,
 			    uint32_t base, uint8_t index,
@@ -483,6 +486,7 @@ int ast_driver_load(struct drm_device *dev, unsigned long flags)
 	struct ast_private *ast;
 	bool need_post;
 	int ret = 0;
+	int index = 0;
 
 	ast = kzalloc(sizeof(struct ast_private), GFP_KERNEL);
 	if (!ast)
@@ -515,6 +519,10 @@ int ast_driver_load(struct drm_device *dev, unsigned long flags)
 			goto out_free;
 		}
 	}
+
+	if (ast_resetpalette == 1)
+		for (index = 0x00; index < 0x100; index++)
+			ast_load_palette_index(ast, index, index, index, index);
 
 	ast_detect_chip(dev, &need_post);
 

@@ -46,20 +46,6 @@ static int ast_cursor_set(struct drm_crtc *crtc,
 static int ast_cursor_move(struct drm_crtc *crtc,
 			   int x, int y);
 
-static inline void ast_load_palette_index(struct ast_private *ast,
-				     u8 index, u8 red, u8 green,
-				     u8 blue)
-{
-	ast_io_write8(ast, AST_IO_DAC_INDEX_WRITE, index);
-	ast_io_read8(ast, AST_IO_SEQ_PORT);
-	ast_io_write8(ast, AST_IO_DAC_DATA, red);
-	ast_io_read8(ast, AST_IO_SEQ_PORT);
-	ast_io_write8(ast, AST_IO_DAC_DATA, green);
-	ast_io_read8(ast, AST_IO_SEQ_PORT);
-	ast_io_write8(ast, AST_IO_DAC_DATA, blue);
-	ast_io_read8(ast, AST_IO_SEQ_PORT);
-}
-
 static void ast_crtc_load_lut(struct drm_crtc *crtc)
 {
 	struct ast_private *ast = crtc->dev->dev_private;
