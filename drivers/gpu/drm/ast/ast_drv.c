@@ -1,5 +1,6 @@
 /*
  * Copyright 2012 Red Hat Inc.
+ * Copyright 2018 Raptor Engineering, LLC.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the
@@ -34,9 +35,12 @@
 #include "ast_drv.h"
 
 int ast_modeset = -1;
+int ast_resetpalette = -1;
 
 MODULE_PARM_DESC(modeset, "Disable/Enable modesetting");
+MODULE_PARM_DESC(resetpalette, "Disable/Enable palette reset on load");
 module_param_named(modeset, ast_modeset, int, 0400);
+module_param_named(resetpalette, ast_resetpalette, int, 0400);
 
 #define PCI_VENDOR_ASPEED 0x1a03
 
