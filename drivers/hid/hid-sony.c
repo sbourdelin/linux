@@ -1981,7 +1981,6 @@ static int sony_leds_init(struct sony_sc *sc)
 
 		led = kzalloc(sizeof(struct led_classdev) + name_sz, GFP_KERNEL);
 		if (!led) {
-			hid_err(hdev, "Couldn't allocate memory for LED %d\n", n);
 			ret = -ENOMEM;
 			goto error_leds;
 		}
@@ -2799,10 +2798,8 @@ static int sony_probe(struct hid_device *hdev, const struct hid_device_id *id)
 		quirks |= FUTUREMAX_DANCE_MAT;
 
 	sc = devm_kzalloc(&hdev->dev, sizeof(*sc), GFP_KERNEL);
-	if (sc == NULL) {
-		hid_err(hdev, "can't alloc sony descriptor\n");
+	if (!sc)
 		return -ENOMEM;
-	}
 
 	spin_lock_init(&sc->lock);
 
