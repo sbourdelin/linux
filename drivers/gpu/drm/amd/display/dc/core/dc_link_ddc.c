@@ -661,7 +661,7 @@ enum ddc_result dal_ddc_service_read_dpcd_data(
 		ddc->ctx->i2caux,
 		ddc->ddc_pin,
 		&command))
-		return DDC_RESULT_SUCESSFULL;
+		return DDC_RESULT_SUCCESSFUL;
 
 	return DDC_RESULT_FAILED_OPERATION;
 }
@@ -698,7 +698,7 @@ enum ddc_result dal_ddc_service_write_dpcd_data(
 		ddc->ctx->i2caux,
 		ddc->ddc_pin,
 		&command))
-		return DDC_RESULT_SUCESSFULL;
+		return DDC_RESULT_SUCCESSFUL;
 
 	return DDC_RESULT_FAILED_OPERATION;
 }
