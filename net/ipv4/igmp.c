@@ -583,8 +583,8 @@ static int igmpv3_send_report(struct in_device *in_dev, struct ip_mc_list *pmc)
 	struct net *net = dev_net(in_dev->dev);
 	int type;
 
+	rcu_read_lock();
 	if (!pmc) {
-		rcu_read_lock();
 		for_each_pmc_rcu(in_dev, pmc) {
 			if (pmc->multiaddr == IGMP_ALL_HOSTS)
 				continue;
@@ -599,7 +599,6 @@ static int igmpv3_send_report(struct in_device *in_dev, struct ip_mc_list *pmc)
 			skb = add_grec(skb, pmc, type, 0, 0);
 			spin_unlock_bh(&pmc->lock);
 		}
-		rcu_read_unlock();
 	} else {
 		spin_lock_bh(&pmc->lock);
 		if (pmc->sfcount[MCAST_EXCLUDE])
@@ -609,6 +608,8 @@ static int igmpv3_send_report(struct in_device *in_dev, struct ip_mc_list *pmc)
 		skb = add_grec(skb, pmc, type, 0, 0);
 		spin_unlock_bh(&pmc->lock);
 	}
+	rcu_read_unlock();
+
 	if (!skb)
 		return 0;
 	return igmpv3_sendpack(skb);
