@@ -130,7 +130,7 @@ static ssize_t dm_dp_aux_transfer(struct drm_dp_aux *aux,
 		 msg->address,
 		 msg->buffer,
 		 msg->size,
-		 r == DDC_RESULT_SUCESSFULL);
+		 r == DDC_RESULT_SUCCESSFUL);
 #endif
 
 	return msg->size;

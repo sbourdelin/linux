@@ -1168,7 +1168,7 @@ static void dpcd_configure_panel_mode(
 				&edp_config_set.raw,
 				sizeof(edp_config_set.raw));
 
-			ASSERT(result == DDC_RESULT_SUCESSFULL);
+			ASSERT(result == DDC_RESULT_SUCCESSFUL);
 		}
 	}
 	dm_logger_write(link->ctx->logger, LOG_DETECTION_DP_CAPS,
