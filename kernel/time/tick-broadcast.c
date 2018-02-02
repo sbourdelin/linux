@@ -659,6 +659,14 @@ static void tick_handle_oneshot_broadcast(struct clock_event_device *dev)
 	 */
 	if (next_event != KTIME_MAX)
 		tick_broadcast_set_event(dev, next_cpu, next_event);
+	else
+		/*
+		 * not program broadcast timer, but set the value to show that
+		 * the next event is not set, which is used in
+		 * __tick_broadcast_oneshot_control in idle tick_broadcast
+		 * enter/exit control flow.
+		 */
+		dev->next_event.tv64 = KTIME_MAX;
 
 	raw_spin_unlock(&tick_broadcast_lock);
 
