@@ -398,10 +398,16 @@ static int u32_init(struct tcf_proto *tp)
 static int u32_destroy_key(struct tcf_proto *tp, struct tc_u_knode *n,
 			   bool free_pf)
 {
+	struct tc_u_hnode *ht;
+
 	tcf_exts_destroy(&n->exts);
 	tcf_exts_put_net(&n->exts);
-	if (n->ht_down)
-		n->ht_down->refcnt--;
+
+	rcu_read_lock_bh();
+	ht = rcu_dereference_bh(n->ht_down);
+	if (ht && ht->refcnt-- == 0)
+		kfree(ht);
+	rcu_read_unlock_bh();
 #ifdef CONFIG_CLS_U32_PERF
 	if (free_pf)
 		free_percpu(n->pf);
@@ -625,7 +631,12 @@ static int u32_destroy_hnode(struct tcf_proto *tp, struct tc_u_hnode *ht,
 			idr_destroy(&ht->handle_idr);
 			idr_remove_ext(&tp_c->handle_idr, ht->handle);
 			RCU_INIT_POINTER(*hn, ht->next);
-			kfree_rcu(ht, rcu);
+
+			/* u32_destroy_key() will will later free ht for us, if
+			 * it's still referenced by some knode
+			 */
+			if (ht->refcnt == 0)
+				kfree_rcu(ht, rcu);
 			return 0;
 		}
 	}
@@ -668,7 +679,11 @@ static void u32_destroy(struct tcf_proto *tp, struct netlink_ext_ack *extack)
 
 		while ((ht = rtnl_dereference(tp_c->hlist)) != NULL) {
 			RCU_INIT_POINTER(tp_c->hlist, ht->next);
-			kfree_rcu(ht, rcu);
+			/* u32_destroy_key() will will later free ht for us, if
+			 * it's still referenced by some knode
+			 */
+			if (ht->refcnt == 0)
+				kfree_rcu(ht, rcu);
 		}
 
 		idr_destroy(&tp_c->handle_idr);
