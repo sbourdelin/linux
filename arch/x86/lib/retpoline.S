@@ -9,14 +9,22 @@
 #include <asm/nospec-branch.h>
 #include <asm/bitsperlong.h>
 
-.macro THUNK reg
+.macro _THUNK prefix, reg
 	.section .text.__x86.indirect_thunk
 
-ENTRY(__x86_indirect_thunk_\reg)
+ENTRY(\prefix\reg)
 	CFI_STARTPROC
 	JMP_NOSPEC %\reg
 	CFI_ENDPROC
-ENDPROC(__x86_indirect_thunk_\reg)
+ENDPROC(\prefix\reg)
+.endm
+
+.macro THUNK reg
+_THUNK __x86_indirect_thunk_ \reg
+.endm
+
+.macro CLANG_THUNK reg
+_THUNK __llvm_external_retpoline_ \reg
 .endm
 
 /*
@@ -27,8 +35,11 @@ ENDPROC(__x86_indirect_thunk_\reg)
  * the simple and nasty way...
  */
 #define __EXPORT_THUNK(sym) _ASM_NOKPROBE(sym); EXPORT_SYMBOL(sym)
-#define EXPORT_THUNK(reg) __EXPORT_THUNK(__x86_indirect_thunk_ ## reg)
+#define _EXPORT_THUNK(thunk, reg) __EXPORT_THUNK(thunk ## reg)
+#define EXPORT_THUNK(reg) _EXPORT_THUNK(__x86_indirect_thunk_, reg)
 #define GENERATE_THUNK(reg) THUNK reg ; EXPORT_THUNK(reg)
+#define EXPORT_CLANG_THUNK(reg) _EXPORT_THUNK(__llvm_external_retpoline_, reg)
+#define GENERATE_CLANG_THUNK(reg) CLANG_THUNK reg ; EXPORT_CLANG_THUNK(reg)
 
 GENERATE_THUNK(_ASM_AX)
 GENERATE_THUNK(_ASM_BX)
@@ -46,6 +57,11 @@ GENERATE_THUNK(r12)
 GENERATE_THUNK(r13)
 GENERATE_THUNK(r14)
 GENERATE_THUNK(r15)
+
+#ifdef __clang__
+GENERATE_CLANG_THUNK(r11)
+#endif
+
 #endif
 
 /*
