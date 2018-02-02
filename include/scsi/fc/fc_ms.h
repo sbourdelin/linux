@@ -128,7 +128,7 @@ struct fc_fdmi_port_name {
 struct fc_fdmi_attr_entry {
 	__be16		type;
 	__be16		len;
-	__u8		value[1];
+	__u8		value[];
 } __attribute__((__packed__));
 
 /*
