@@ -351,6 +351,8 @@ int mdev_device_create(struct kobject *kobj, struct device *dev, uuid_le uuid)
 		goto create_failed;
 	}
 
+	kobject_uevent(&(mdev->dev.kobj), KOBJ_CHANGE);
+
 	mdev->type_kobj = kobj;
 	dev_dbg(&mdev->dev, "MDEV: created\n");
 
