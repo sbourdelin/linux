@@ -7,6 +7,54 @@
 
 #include "../../util/header.h"
 
+/* This code based on gcc cpuid.h __get_cpuid_max() */
+unsigned int have_cpuid(void)
+{
+	unsigned int __eax, __ebx;
+
+#ifndef __x86_64__
+/* See if we can use cpuid.  On AMD64 we always can.  */
+#if __GNUC__ >= 3
+	__asm__ ("pushf{l|d}\n\t"
+		"pushf{l|d}\n\t"
+		"pop{l}\t%0\n\t"
+		"mov{l}\t{%0, %1|%1, %0}\n\t"
+		"xor{l}\t{%2, %0|%0, %2}\n\t"
+		"push{l}\t%0\n\t"
+		"popf{l|d}\n\t"
+		"pushf{l|d}\n\t"
+		"pop{l}\t%0\n\t"
+		"popf{l|d}\n\t"
+		: "=&r" (__eax), "=&r" (__ebx)
+		: "i" (0x00200000));
+#else
+/* Host GCCs older than 3.0 weren't supporting Intel asm syntax
+ * nor alternatives in i386 code.
+ */
+	__asm__ ("pushfl\n\t"
+		"pushfl\n\t"
+		"popl\t%0\n\t"
+		"movl\t%0, %1\n\t"
+		"xorl\t%2, %0\n\t"
+		"pushl\t%0\n\t"
+		"popfl\n\t"
+		"pushfl\n\t"
+		"popl\t%0\n\t"
+		"popfl\n\t"
+		: "=&r" (__eax), "=&r" (__ebx)
+		: "i" (0x00200000));
+#endif
+
+	if (!((__eax ^ __ebx) & 0x00200000))
+		return 0;
+	else
+		return 1;
+#endif
+
+/* All x86_64 support cpuid */
+	return 1;
+}
+
 static inline void
 cpuid(unsigned int op, unsigned int *a, unsigned int *b, unsigned int *c,
       unsigned int *d)
@@ -27,6 +75,9 @@ __get_cpuid(char *buffer, size_t sz, const char *fmt)
 	int family = -1, model = -1, step = -1;
 	int nb;
 	char vendor[16];
+
+	if (!have_cpuid())
+		return -1;
 
 	cpuid(0, &lvl, &b, &c, &d);
 	strncpy(&vendor[0], (char *)(&b), 4);
