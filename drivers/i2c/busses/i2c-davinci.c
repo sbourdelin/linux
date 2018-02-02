@@ -783,10 +783,8 @@ static int davinci_i2c_probe(struct platform_device *pdev)
 
 	dev = devm_kzalloc(&pdev->dev, sizeof(struct davinci_i2c_dev),
 			GFP_KERNEL);
-	if (!dev) {
-		dev_err(&pdev->dev, "Memory allocation failed\n");
+	if (!dev)
 		return -ENOMEM;
-	}
 
 	init_completion(&dev->cmd_complete);
 #ifdef CONFIG_CPU_FREQ
