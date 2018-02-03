@@ -20,6 +20,7 @@ Required properties :
 		- "allwinner,sun50i-a64-ccu"
 		- "allwinner,sun50i-a64-r-ccu"
 		- "allwinner,sun50i-h5-ccu"
+		- "allwinner,sun50i-h6-ccu"
 		- "nextthing,gr8-ccu"
 
 - reg: Must contain the registers base address and length
