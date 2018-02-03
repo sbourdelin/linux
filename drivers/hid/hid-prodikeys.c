@@ -798,7 +798,7 @@ static int pk_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	unsigned short ifnum = intf->cur_altsetting->desc.bInterfaceNumber;
 	unsigned long quirks = id->driver_data;
 	struct pk_device *pk;
-	struct pcmidi_snd *pm = NULL;
+	struct pcmidi_snd *pm;
 
 	pk = kzalloc(sizeof(*pk), GFP_KERNEL);
 	if (!pk)
