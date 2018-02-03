@@ -678,10 +678,8 @@ static int rmi_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	alloc_size = data->output_report_size + data->input_report_size;
 
 	data->writeReport = devm_kzalloc(&hdev->dev, alloc_size, GFP_KERNEL);
-	if (!data->writeReport) {
-		hid_err(hdev, "failed to allocate buffer for HID reports\n");
+	if (!data->writeReport)
 		return -ENOMEM;
-	}
 
 	data->readReport = data->writeReport + data->output_report_size;
 
