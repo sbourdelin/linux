@@ -622,10 +622,6 @@ static void move_data_block(struct inode *inode, block_t bidx,
 	if (!check_valid_map(F2FS_I_SB(inode), segno, off))
 		goto out;
 
-	if (f2fs_is_atomic_file(inode) &&
-		!f2fs_is_commit_atomic_write(inode))
-		goto out;
-
 	if (f2fs_is_pinned_file(inode)) {
 		f2fs_pin_file_control(inode, true);
 		goto out;
@@ -680,6 +676,12 @@ static void move_data_block(struct inode *inode, block_t bidx,
 		goto put_page_out;
 	}
 
+	if (f2fs_is_atomic_file(inode) &&
+		!f2fs_is_commit_atomic_write(inode) &&
+		!IS_GC_WRITTEN_PAGE(fio.encrypted_page)) {
+		set_page_private(fio.encrypted_page, (unsigned long)GC_WRITTEN_PAGE);
+		SetPagePrivate(fio.encrypted_page);
+	}
 	set_page_dirty(fio.encrypted_page);
 	f2fs_wait_on_page_writeback(fio.encrypted_page, DATA, true);
 	if (clear_page_dirty_for_io(fio.encrypted_page))
@@ -730,9 +732,6 @@ static void move_data_page(struct inode *inode, block_t bidx, int gc_type,
 	if (!check_valid_map(F2FS_I_SB(inode), segno, off))
 		goto out;
 
-	if (f2fs_is_atomic_file(inode) &&
-		!f2fs_is_commit_atomic_write(inode))
-		goto out;
 	if (f2fs_is_pinned_file(inode)) {
 		if (gc_type == FG_GC)
 			f2fs_pin_file_control(inode, true);
@@ -742,6 +741,12 @@ static void move_data_page(struct inode *inode, block_t bidx, int gc_type,
 	if (gc_type == BG_GC) {
 		if (PageWriteback(page))
 			goto out;
+		if (f2fs_is_atomic_file(inode) &&
+			!f2fs_is_commit_atomic_write(inode) &&
+			!IS_GC_WRITTEN_PAGE(page)) {
+			set_page_private(page, (unsigned long)GC_WRITTEN_PAGE);
+			SetPagePrivate(page);
+		}
 		set_page_dirty(page);
 		set_cold_data(page);
 	} else {
@@ -762,6 +767,12 @@ static void move_data_page(struct inode *inode, block_t bidx, int gc_type,
 		int err;
 
 retry:
+		if (f2fs_is_atomic_file(inode) &&
+			!f2fs_is_commit_atomic_write(inode) &&
+			!IS_GC_WRITTEN_PAGE(page)) {
+			set_page_private(page, (unsigned long)GC_WRITTEN_PAGE);
+			SetPagePrivate(page);
+		}
 		set_page_dirty(page);
 		f2fs_wait_on_page_writeback(page, DATA, true);
 		if (clear_page_dirty_for_io(page)) {

@@ -120,6 +120,10 @@ static void f2fs_write_end_io(struct bio *bio)
 
 		dec_page_count(sbi, type);
 		clear_cold_data(page);
+		if (IS_GC_WRITTEN_PAGE(page)) {
+			set_page_private(page, 0);
+			ClearPagePrivate(page);
+		}
 		end_page_writeback(page);
 	}
 	if (!get_pages(sbi, F2FS_WB_CP_DATA) &&
@@ -2418,7 +2422,8 @@ static int f2fs_set_data_page_dirty(struct page *page)
 	if (!PageUptodate(page))
 		SetPageUptodate(page);
 
-	if (f2fs_is_atomic_file(inode) && !f2fs_is_commit_atomic_write(inode)) {
+	if (f2fs_is_atomic_file(inode) && !f2fs_is_commit_atomic_write(inode)
+		&& !IS_GC_WRITTEN_PAGE(page)) {
 		if (!IS_ATOMIC_WRITTEN_PAGE(page)) {
 			register_inmem_page(inode, page);
 			return 1;

@@ -203,11 +203,14 @@ struct segment_allocation {
  */
 #define ATOMIC_WRITTEN_PAGE		((unsigned long)-1)
 #define DUMMY_WRITTEN_PAGE		((unsigned long)-2)
+#define GC_WRITTEN_PAGE		((unsigned long)-3)
 
 #define IS_ATOMIC_WRITTEN_PAGE(page)			\
 		(page_private(page) == (unsigned long)ATOMIC_WRITTEN_PAGE)
 #define IS_DUMMY_WRITTEN_PAGE(page)			\
 		(page_private(page) == (unsigned long)DUMMY_WRITTEN_PAGE)
+#define IS_GC_WRITTEN_PAGE(page)			\
+		(page_private(page) == (unsigned long)GC_WRITTEN_PAGE)
 
 struct inmem_pages {
 	struct list_head list;
