@@ -169,7 +169,8 @@ static void matrix_keypad_scan(struct work_struct *work)
 	/* Enable IRQs again */
 	spin_lock_irq(&keypad->lock);
 	keypad->scan_pending = false;
-	enable_row_irqs(keypad);
+	if (keypad->stopped == false)
+		enable_row_irqs(keypad);
 	spin_unlock_irq(&keypad->lock);
 }
 
@@ -202,14 +203,16 @@ static int matrix_keypad_start(struct input_dev *dev)
 {
 	struct matrix_keypad *keypad = input_get_drvdata(dev);
 
+	spin_lock_irq(&keypad->lock);
 	keypad->stopped = false;
-	mb();
 
 	/*
 	 * Schedule an immediate key scan to capture current key state;
 	 * columns will be activated and IRQs be enabled after the scan.
 	 */
-	schedule_delayed_work(&keypad->work, 0);
+	if (keypad->scan_pending == false)
+		schedule_delayed_work(&keypad->work, 0);
+	spin_unlock_irq(&keypad->lock);
 
 	return 0;
 }
@@ -218,14 +221,17 @@ static void matrix_keypad_stop(struct input_dev *dev)
 {
 	struct matrix_keypad *keypad = input_get_drvdata(dev);
 
+	spin_lock_irq(&keypad->lock);
 	keypad->stopped = true;
-	mb();
-	flush_work(&keypad->work.work);
 	/*
 	 * matrix_keypad_scan() will leave IRQs enabled;
 	 * we should disable them now.
 	 */
-	disable_row_irqs(keypad);
+	if (keypad->scan_pending == false)
+		disable_row_irqs(keypad);
+	spin_unlock_irq(&keypad->lock);
+
+	flush_work(&keypad->work.work);
 }
 
 #ifdef CONFIG_PM_SLEEP
