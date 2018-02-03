@@ -281,7 +281,7 @@ static unsigned int kyber_sched_tags_shift(struct kyber_queue_data *kqd)
 	 * All of the hardware queues have the same depth, so we can just grab
 	 * the shift of the first one.
 	 */
-	return kqd->q->queue_hw_ctx[0]->sched_tags->bitmap_tags.sb.shift;
+	return kqd->q->queue_hw_ctx[0]->sched_tags->bitmap_tags->sb.shift;
 }
 
 static struct kyber_queue_data *kyber_queue_data_alloc(struct request_queue *q)

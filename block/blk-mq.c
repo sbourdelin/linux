@@ -1136,7 +1136,7 @@ static bool blk_mq_mark_tag_wait(struct blk_mq_hw_ctx **hctx,
 		return false;
 	}
 
-	ws = bt_wait_ptr(&this_hctx->tags->bitmap_tags, this_hctx);
+	ws = bt_wait_ptr(this_hctx->tags->bitmap_tags, this_hctx);
 	add_wait_queue(&ws->wait, wait);
 
 	/*
