@@ -548,10 +548,9 @@ int picolcd_init_framebuffer(struct picolcd_data *data)
 	fbdata->force   = 1;
 	fbdata->vbitmap = info->par + sizeof(struct picolcd_fb_data);
 	fbdata->bitmap  = vmalloc(PICOLCDFB_SIZE*8);
-	if (fbdata->bitmap == NULL) {
-		dev_err(dev, "can't get a free page for framebuffer\n");
+	if (!fbdata->bitmap)
 		goto err_nomem;
-	}
+
 	info->screen_base = (char __force __iomem *)fbdata->bitmap;
 	info->fix.smem_start = (unsigned long)fbdata->bitmap;
 	memset(fbdata->vbitmap, 0xff, PICOLCDFB_SIZE);

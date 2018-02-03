@@ -122,7 +122,6 @@ int picolcd_init_leds(struct picolcd_data *data, struct hid_report *report)
 	for (i = 0; i < 8; i++) {
 		led = kzalloc(sizeof(struct led_classdev)+name_sz, GFP_KERNEL);
 		if (!led) {
-			dev_err(dev, "can't allocate memory for LED %d\n", i);
 			ret = -ENOMEM;
 			goto err;
 		}
