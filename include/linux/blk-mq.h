@@ -82,6 +82,7 @@ struct blk_mq_tag_set {
 	void			*driver_data;
 
 	struct blk_mq_tags	**tags;
+	struct blk_mq_tags	*global_tags;	/* for BLK_MQ_F_GLOBAL_TAGS */
 
 	struct mutex		tag_list_lock;
 	struct list_head	tag_list;
@@ -175,6 +176,7 @@ enum {
 	BLK_MQ_F_SHOULD_MERGE	= 1 << 0,
 	BLK_MQ_F_TAG_SHARED	= 1 << 1,
 	BLK_MQ_F_SG_MERGE	= 1 << 2,
+	BLK_MQ_F_GLOBAL_TAGS	= 1 << 3,
 	BLK_MQ_F_BLOCKING	= 1 << 5,
 	BLK_MQ_F_NO_SCHED	= 1 << 6,
 	BLK_MQ_F_ALLOC_POLICY_START_BIT = 8,
