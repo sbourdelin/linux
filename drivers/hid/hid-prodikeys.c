@@ -804,8 +804,6 @@ static int pk_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	if (!pk)
 		return -ENOMEM;
 
-	pk->hdev = hdev;
-
 	pm = kzalloc(sizeof(*pm), GFP_KERNEL);
 	if (pm == NULL) {
 		ret = -ENOMEM;
@@ -814,6 +812,7 @@ static int pk_probe(struct hid_device *hdev, const struct hid_device_id *id)
 
 	pm->pk = pk;
 	pk->pm = pm;
+	pk->hdev = hdev;
 	pm->ifnum = ifnum;
 
 	hid_set_drvdata(hdev, pk);
