@@ -228,11 +228,11 @@ static void pcmidi_send_note(struct pcmidi_snd *pm,
 
 	if (!pm->in_substream ||
 	    !test_bit(pm->in_substream->number, &pm->in_triggered))
-		goto drop_note;
+		goto unlock;
 
 	snd_rawmidi_receive(pm->in_substream, buffer, 3);
 
-drop_note:
+unlock:
 	spin_unlock_irqrestore(&pm->rawmidi_in_lock, flags);
 }
 
