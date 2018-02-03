@@ -45,10 +45,8 @@ static int saitek_probe(struct hid_device *hdev,
 	int ret;
 
 	ssc = devm_kzalloc(&hdev->dev, sizeof(*ssc), GFP_KERNEL);
-	if (ssc == NULL) {
-		hid_err(hdev, "can't alloc saitek descriptor\n");
+	if (!ssc)
 		return -ENOMEM;
-	}
 
 	ssc->quirks = quirks;
 	ssc->mode = -1;
