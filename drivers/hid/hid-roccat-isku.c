@@ -280,10 +280,9 @@ static int isku_init_specials(struct hid_device *hdev)
 	}
 
 	isku = kzalloc(sizeof(*isku), GFP_KERNEL);
-	if (!isku) {
-		hid_err(hdev, "can't alloc device descriptor\n");
+	if (!isku)
 		return -ENOMEM;
-	}
+
 	hid_set_drvdata(hdev, isku);
 
 	retval = isku_init_isku_device_struct(usb_dev, isku);

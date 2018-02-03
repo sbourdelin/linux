@@ -123,10 +123,9 @@ static int lua_init_specials(struct hid_device *hdev)
 	int retval;
 
 	lua = kzalloc(sizeof(*lua), GFP_KERNEL);
-	if (!lua) {
-		hid_err(hdev, "can't alloc device descriptor\n");
+	if (!lua)
 		return -ENOMEM;
-	}
+
 	hid_set_drvdata(hdev, lua);
 
 	retval = lua_init_lua_device_struct(usb_dev, lua);

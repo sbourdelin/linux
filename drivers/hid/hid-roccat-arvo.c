@@ -300,10 +300,9 @@ static int arvo_init_specials(struct hid_device *hdev)
 	}
 
 	arvo = kzalloc(sizeof(*arvo), GFP_KERNEL);
-	if (!arvo) {
-		hid_err(hdev, "can't alloc device descriptor\n");
+	if (!arvo)
 		return -ENOMEM;
-	}
+
 	hid_set_drvdata(hdev, arvo);
 
 	retval = arvo_init_arvo_device_struct(usb_dev, arvo);

@@ -385,10 +385,9 @@ static int koneplus_init_specials(struct hid_device *hdev)
 			== USB_INTERFACE_PROTOCOL_MOUSE) {
 
 		koneplus = kzalloc(sizeof(*koneplus), GFP_KERNEL);
-		if (!koneplus) {
-			hid_err(hdev, "can't alloc device descriptor\n");
+		if (!koneplus)
 			return -ENOMEM;
-		}
+
 		hid_set_drvdata(hdev, koneplus);
 
 		retval = koneplus_init_koneplus_device_struct(usb_dev, koneplus);

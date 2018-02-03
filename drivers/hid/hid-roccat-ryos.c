@@ -97,10 +97,9 @@ static int ryos_init_specials(struct hid_device *hdev)
 	}
 
 	ryos = kzalloc(sizeof(*ryos), GFP_KERNEL);
-	if (!ryos) {
-		hid_err(hdev, "can't alloc device descriptor\n");
+	if (!ryos)
 		return -ENOMEM;
-	}
+
 	hid_set_drvdata(hdev, ryos);
 
 	retval = roccat_common2_device_init_struct(usb_dev, ryos);

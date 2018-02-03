@@ -69,10 +69,9 @@ static int savu_init_specials(struct hid_device *hdev)
 	}
 
 	savu = kzalloc(sizeof(*savu), GFP_KERNEL);
-	if (!savu) {
-		hid_err(hdev, "can't alloc device descriptor\n");
+	if (!savu)
 		return -ENOMEM;
-	}
+
 	hid_set_drvdata(hdev, savu);
 
 	retval = roccat_common2_device_init_struct(usb_dev, savu);

@@ -89,10 +89,9 @@ static int konepure_init_specials(struct hid_device *hdev)
 	}
 
 	konepure = kzalloc(sizeof(*konepure), GFP_KERNEL);
-	if (!konepure) {
-		hid_err(hdev, "can't alloc device descriptor\n");
+	if (!konepure)
 		return -ENOMEM;
-	}
+
 	hid_set_drvdata(hdev, konepure);
 
 	retval = roccat_common2_device_init_struct(usb_dev, konepure);
