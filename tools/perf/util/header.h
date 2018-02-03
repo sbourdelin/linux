@@ -171,6 +171,8 @@ int write_padded(struct feat_fd *fd, const void *bf,
 /*
  * arch specific callback
  */
+int have_cpuid_p(void);
+
 int get_cpuid(char *buffer, size_t sz);
 
 char *get_cpuid_str(struct perf_pmu *pmu __maybe_unused);

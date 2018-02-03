@@ -7,6 +7,57 @@
 
 #include "../../util/header.h"
 
+#ifndef __x86_64__
+
+/* This code based on arch/x86/kernel/cpu/common.c
+ * Standard macro to see if a specific flag is changeable.
+ */
+static inline int flag_is_changeable_p(u32 flag)
+{
+	u32 f1, f2;
+
+	/*
+	 * Cyrix and IDT cpus allow disabling of CPUID
+	 * so the code below may return different results
+	 * when it is executed before and after enabling
+	 * the CPUID. Add "volatile" to not allow gcc to
+	 * optimize the subsequent calls to this function.
+	 */
+	asm volatile ("pushfl		\n\t"
+		      "pushfl		\n\t"
+		      "popl %0		\n\t"
+		      "movl %0, %1	\n\t"
+		      "xorl %2, %0	\n\t"
+		      "pushl %0		\n\t"
+		      "popfl		\n\t"
+		      "pushfl		\n\t"
+		      "popl %0		\n\t"
+		      "popfl		\n\t"
+
+		      : "=&r" (f1), "=&r" (f2)
+		      : "ir" (flag));
+
+	return ((f1^f2) & flag) != 0;
+}
+
+#define X86_EFLAGS_ID 0x00200000
+
+/* Probe for the CPUID instruction */
+int have_cpuid_p(void)
+{
+	return flag_is_changeable_p(X86_EFLAGS_ID);
+}
+
+#else	/* CONFIG_X86_64 */
+
+/* All X86_64 have cpuid instruction */
+int have_cpuid_p(void)
+{
+	return 1;
+}
+
+#endif	/* CONFIG_X86_64 */
+
 static inline void
 cpuid(unsigned int op, unsigned int *a, unsigned int *b, unsigned int *c,
       unsigned int *d)
@@ -27,6 +78,9 @@ __get_cpuid(char *buffer, size_t sz, const char *fmt)
 	int family = -1, model = -1, step = -1;
 	int nb;
 	char vendor[16];
+
+	if (!have_cpuid_p())
+		return -1;
 
 	cpuid(0, &lvl, &b, &c, &d);
 	strncpy(&vendor[0], (char *)(&b), 4);
