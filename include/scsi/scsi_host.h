@@ -452,6 +452,9 @@ struct scsi_host_template {
 	/* True if the controller does not support WRITE SAME */
 	unsigned no_write_same:1;
 
+	/* tell scsi core we support blk-mq only */
+	unsigned force_blk_mq:1;
+
 	/*
 	 * Countdown for host blocking with no commands outstanding.
 	 */
