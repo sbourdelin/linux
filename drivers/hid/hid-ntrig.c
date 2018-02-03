@@ -905,10 +905,8 @@ static int ntrig_probe(struct hid_device *hdev, const struct hid_device_id *id)
 				| HID_QUIRK_NO_INIT_REPORTS;
 
 	nd = kmalloc(sizeof(struct ntrig_data), GFP_KERNEL);
-	if (!nd) {
-		hid_err(hdev, "cannot allocate N-Trig data\n");
+	if (!nd)
 		return -ENOMEM;
-	}
 
 	nd->reading_mt = 0;
 	nd->min_width = 0;
