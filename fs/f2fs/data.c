@@ -1580,14 +1580,13 @@ bool should_update_outplace(struct inode *inode, struct f2fs_io_info *fio)
 		return true;
 	if (S_ISDIR(inode->i_mode))
 		return true;
-	if (f2fs_is_atomic_file(inode))
-		return true;
 	if (fio) {
 		if (is_cold_data(fio->page))
 			return true;
 		if (IS_ATOMIC_WRITTEN_PAGE(fio->page))
 			return true;
-	}
+	} else if (f2fs_is_atomic_file(inode))
+		return true;
 	return false;
 }
 
