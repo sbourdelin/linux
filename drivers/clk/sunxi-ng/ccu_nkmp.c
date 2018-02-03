@@ -81,7 +81,7 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
 					unsigned long parent_rate)
 {
 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
-	unsigned long n, m, k, p;
+	unsigned long n, m, k, p, rate;
 	u32 reg;
 
 	reg = readl(nkmp->common.base + nkmp->common.reg);
@@ -107,7 +107,11 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
 	p = reg >> nkmp->p.shift;
 	p &= (1 << nkmp->p.width) - 1;
 
-	return (parent_rate * n * k >> p) / m;
+	rate = (parent_rate * n * k >> p) / m;
+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
+		rate /= nkmp->fixed_post_div;
+
+	return rate;
 }
 
 static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
@@ -115,6 +119,9 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
 {
 	struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
 	struct _ccu_nkmp _nkmp;
+
+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
+		rate *= nkmp->fixed_post_div;
 
 	_nkmp.min_n = nkmp->n.min ?: 1;
 	_nkmp.max_n = nkmp->n.max ?: 1 << nkmp->n.width;
@@ -127,7 +134,11 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
 
 	ccu_nkmp_find_best(*parent_rate, rate, &_nkmp);
 
-	return *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
+	rate = *parent_rate * _nkmp.n * _nkmp.k / (_nkmp.m * _nkmp.p);
+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
+		rate = rate / nkmp->fixed_post_div;
+
+	return rate;
 }
 
 static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
@@ -137,6 +148,9 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
 	struct _ccu_nkmp _nkmp;
 	unsigned long flags;
 	u32 reg;
+
+	if (nkmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
+		rate = rate * nkmp->fixed_post_div;
 
 	_nkmp.min_n = nkmp->n.min ?: 1;
 	_nkmp.max_n = nkmp->n.max ?: 1 << nkmp->n.width;
