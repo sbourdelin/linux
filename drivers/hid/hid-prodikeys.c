@@ -235,8 +235,6 @@ static void pcmidi_send_note(struct pcmidi_snd *pm,
 
 drop_note:
 	spin_unlock_irqrestore(&pm->rawmidi_in_lock, flags);
-
-	return;
 }
 
 static void pcmidi_sustained_note_release(struct timer_list *t)
