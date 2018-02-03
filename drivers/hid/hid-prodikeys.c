@@ -801,16 +801,13 @@ static int pk_probe(struct hid_device *hdev, const struct hid_device_id *id)
 	struct pcmidi_snd *pm = NULL;
 
 	pk = kzalloc(sizeof(*pk), GFP_KERNEL);
-	if (pk == NULL) {
-		hid_err(hdev, "can't alloc descriptor\n");
+	if (!pk)
 		return -ENOMEM;
-	}
 
 	pk->hdev = hdev;
 
 	pm = kzalloc(sizeof(*pm), GFP_KERNEL);
 	if (pm == NULL) {
-		hid_err(hdev, "can't alloc descriptor\n");
 		ret = -ENOMEM;
 		goto err_free_pk;
 	}
