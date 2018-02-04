@@ -1905,6 +1905,26 @@ error:
 }
 
 #ifdef CONFIG_PM_SLEEP
+static int acpi_ec_suspend_noirq(struct device *dev)
+{
+	struct acpi_ec *ec =
+		acpi_driver_data(to_acpi_device(dev));
+
+	if (ec == first_ec)
+		acpi_ec_enter_noirq(ec);
+	return 0;
+}
+
+static int acpi_ec_resume_noirq(struct device *dev)
+{
+	struct acpi_ec *ec =
+		acpi_driver_data(to_acpi_device(dev));
+
+	if (ec == first_ec)
+		acpi_ec_leave_noirq(ec);
+	return 0;
+}
+
 static int acpi_ec_suspend(struct device *dev)
 {
 	struct acpi_ec *ec =
