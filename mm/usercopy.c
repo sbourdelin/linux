@@ -15,6 +15,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/mm.h>
+#include <linux/pmalloc.h>
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/sched/task.h>
@@ -222,6 +223,7 @@ static inline const char *check_heap_object(const void *ptr, unsigned long n,
 void __check_object_size(const void *ptr, unsigned long n, bool to_user)
 {
 	const char *err;
+	int retv;
 
 	/* Skip all tests if size is zero. */
 	if (!n)
@@ -229,12 +231,12 @@ void __check_object_size(const void *ptr, unsigned long n, bool to_user)
 
 	/* Check for invalid addresses. */
 	err = check_bogus_address(ptr, n);
-	if (err)
+	if (unlikely(err))
 		goto report;
 
 	/* Check for bad heap object. */
 	err = check_heap_object(ptr, n, to_user);
-	if (err)
+	if (unlikely(err))
 		goto report;
 
 	/* Check for bad stack object. */
@@ -257,8 +259,23 @@ void __check_object_size(const void *ptr, unsigned long n, bool to_user)
 
 	/* Check for object in kernel to avoid text exposure. */
 	err = check_kernel_text_object(ptr, n);
-	if (!err)
-		return;
+	if (unlikely(err))
+		goto report;
+
+	/* Check if object is from a pmalloc chunk.
+	 */
+	retv = is_pmalloc_object(ptr, n);
+	if (unlikely(retv)) {
+		if (unlikely(!to_user)) {
+			err = "<trying to write to pmalloc object>";
+			goto report;
+		}
+		if (retv < 0) {
+			err = "<invalid pmalloc object>";
+			goto report;
+		}
+	}
+	return;
 
 report:
 	report_usercopy(ptr, n, to_user, err);
