@@ -21,6 +21,7 @@ Core utilities
    flexible-arrays
    librs
    genalloc
+   pmalloc
 
 Interfaces for kernel debugging
 ===============================
