@@ -184,6 +184,7 @@ struct nvkm_device_func {
 struct nvkm_device_quirk {
 	u8 tv_pin_mask;
 	u8 tv_gpio;
+	u8 outp_links_skip;
 };
 
 struct nvkm_device_chip {
