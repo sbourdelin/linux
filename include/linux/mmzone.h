@@ -355,6 +355,12 @@ enum zone_type {
 
 #ifndef __GENERATING_BOUNDS_H
 
+struct order0_cluster {
+	struct list_head list[MIGRATE_PCPTYPES];
+	unsigned long offset[MIGRATE_PCPTYPES];
+	int batch;
+};
+
 struct zone {
 	/* Read-mostly fields */
 
@@ -459,6 +465,7 @@ struct zone {
 
 	/* free areas of different sizes */
 	struct free_area	free_area[MAX_ORDER];
+	struct order0_cluster   order0_cluster;
 
 	/* zone flags, see below */
 	unsigned long		flags;

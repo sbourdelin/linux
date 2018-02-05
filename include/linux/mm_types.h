@@ -43,26 +43,33 @@ struct page {
 	/* First double word block */
 	unsigned long flags;		/* Atomic flags, some possibly
 					 * updated asynchronously */
-	union {
-		struct address_space *mapping;	/* If low bit clear, points to
-						 * inode address_space, or NULL.
-						 * If page mapped as anonymous
-						 * memory, low bit is set, and
-						 * it points to anon_vma object
-						 * or KSM private structure. See
-						 * PAGE_MAPPING_ANON and
-						 * PAGE_MAPPING_KSM.
-						 */
-		void *s_mem;			/* slab first object */
-		atomic_t compound_mapcount;	/* first tail page */
-		/* page_deferred_list().next	 -- second tail page */
-	};
 
-	/* Second double word */
 	union {
-		pgoff_t index;		/* Our offset within mapping. */
-		void *freelist;		/* sl[aou]b first free object */
-		/* page_deferred_list().prev	-- second tail page */
+		struct {
+			union {
+				struct address_space *mapping;	/* If low bit clear, points to
+								 * inode address_space, or NULL.
+								 * If page mapped as anonymous
+								 * memory, low bit is set, and
+								 * it points to anon_vma object
+								 * or KSM private structure. See
+								 * PAGE_MAPPING_ANON and
+								 * PAGE_MAPPING_KSM.
+								 */
+				void *s_mem;			/* slab first object */
+				atomic_t compound_mapcount;	/* first tail page */
+				/* page_deferred_list().next	 -- second tail page */
+			};
+
+			/* Second double word */
+			union {
+				pgoff_t index;		/* Our offset within mapping. */
+				void *freelist;		/* sl[aou]b first free object */
+				/* page_deferred_list().prev	-- second tail page */
+			};
+		};
+
+		struct list_head cluster;
 	};
 
 	union {

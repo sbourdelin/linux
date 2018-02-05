@@ -736,6 +736,7 @@ static inline void rmv_page_order(struct page *page)
 {
 	__ClearPageBuddy(page);
 	set_page_private(page, 0);
+	BUG_ON(page->cluster.next);
 }
 
 /*
@@ -792,6 +793,9 @@ static void inline __do_merge(struct page *page, unsigned int order,
 
 	VM_BUG_ON_PAGE(pfn & ((1 << order) - 1), page);
 	VM_BUG_ON_PAGE(bad_range(zone, page), page);
+
+	/* order0 merge doesn't work yet */
+	BUG_ON(!order);
 
 continue_merging:
 	while (order < max_order - 1) {
@@ -883,6 +887,19 @@ void do_merge(struct zone *zone, struct page *page, int migratetype)
 	__do_merge(page, 0, zone, migratetype);
 }
 
+static inline void add_to_order0_free_list(struct page *page, struct zone *zone, int mt)
+{
+	struct order0_cluster *cluster = &zone->order0_cluster;
+
+	list_add(&page->lru, &zone->free_area[0].free_list[mt]);
+
+	/* If this is the pcp->batch(th) page, link it to the cluster list */
+	if (mt < MIGRATE_PCPTYPES && !(++cluster->offset[mt] % cluster->batch)) {
+		list_add(&page->cluster, &cluster->list[mt]);
+		cluster->offset[mt] = 0;
+	}
+}
+
 static inline bool should_skip_merge(struct zone *zone, unsigned int order)
 {
 #ifdef CONFIG_COMPACTION
@@ -929,7 +946,7 @@ static inline void __free_one_page(struct page *page,
 		__mod_zone_freepage_state(zone, 1 << order, migratetype);
 
 	if (should_skip_merge(zone, order)) {
-		list_add(&page->lru, &zone->free_area[order].free_list[migratetype]);
+		add_to_order0_free_list(page, zone, migratetype);
 		/*
 		 * 1 << 16 set on page->private to indicate this order0
 		 * page skipped merging during free time
@@ -1727,7 +1744,10 @@ static inline void expand(struct zone *zone, struct page *page,
 		if (set_page_guard(zone, &page[size], high, migratetype))
 			continue;
 
-		list_add(&page[size].lru, &area->free_list[migratetype]);
+		if (high)
+			list_add(&page[size].lru, &area->free_list[migratetype]);
+		else
+			add_to_order0_free_list(&page[size], zone, migratetype);
 		area->nr_free++;
 		set_page_order(&page[size], high);
 	}
@@ -1876,6 +1896,11 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 		list_del(&page->lru);
 		rmv_page_order(page);
 		area->nr_free--;
+		if (!current_order && migratetype < MIGRATE_PCPTYPES) {
+			BUG_ON(!zone->order0_cluster.offset[migratetype]);
+			BUG_ON(page->cluster.next);
+			zone->order0_cluster.offset[migratetype]--;
+		}
 		expand(zone, page, order, current_order, area, migratetype);
 		set_pcppage_migratetype(page, migratetype);
 		return page;
@@ -1963,8 +1988,13 @@ static int move_freepages(struct zone *zone,
 		}
 
 		order = page_order(page);
-		list_move(&page->lru,
+		if (order) {
+			list_move(&page->lru,
 			  &zone->free_area[order].free_list[migratetype]);
+		} else {
+			__list_del_entry(&page->lru);
+			add_to_order0_free_list(page, zone, migratetype);
+		}
 		page += 1 << order;
 		pages_moved += 1 << order;
 	}
@@ -2113,7 +2143,12 @@ static void steal_suitable_fallback(struct zone *zone, struct page *page,
 
 single_page:
 	area = &zone->free_area[current_order];
-	list_move(&page->lru, &area->free_list[start_type]);
+	if (current_order)
+		list_move(&page->lru, &area->free_list[start_type]);
+	else {
+		__list_del_entry(&page->lru);
+		add_to_order0_free_list(page, zone, start_type);
+	}
 }
 
 /*
@@ -2374,6 +2409,45 @@ retry:
 	return page;
 }
 
+static noinline int rmqueue_bulk_cluster(struct zone *zone, unsigned int order,
+			unsigned long count, struct list_head *list,
+			int migratetype)
+{
+	struct list_head *cluster_head;
+	struct page *head, *tail;
+
+	cluster_head = &zone->order0_cluster.list[migratetype];
+	head = list_first_entry_or_null(cluster_head, struct page, cluster);
+	if (!head)
+		return 0;
+
+	if (head->cluster.next == cluster_head)
+		tail = list_last_entry(&zone->free_area[0].free_list[migratetype], struct page, lru);
+	else {
+		struct page *tmp = list_entry(head->cluster.next, struct page, cluster);
+		tail = list_entry(tmp->lru.prev, struct page, lru);
+	}
+
+	zone->free_area[0].nr_free -= count;
+
+	/* Remove the page from the cluster list */
+	list_del(&head->cluster);
+	/* Restore the two page fields */
+	head->cluster.next = head->cluster.prev = NULL;
+
+	/* Take the pcp->batch pages off free_area list */
+	tail->lru.next->prev = head->lru.prev;
+	head->lru.prev->next = tail->lru.next;
+
+	/* Attach them to list */
+	head->lru.prev = list;
+	list->next = &head->lru;
+	tail->lru.next = list;
+	list->prev = &tail->lru;
+
+	return 1;
+}
+
 /*
  * Obtain a specified number of elements from the buddy allocator, all under
  * a single hold of the lock, for efficiency.  Add them to the supplied list.
@@ -2386,6 +2460,28 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 	int i, alloced = 0;
 
 	spin_lock(&zone->lock);
+	if (count == zone->order0_cluster.batch &&
+	    rmqueue_bulk_cluster(zone, order, count, list, migratetype)) {
+		struct page *page, *tmp;
+		spin_unlock(&zone->lock);
+
+		i = alloced = count;
+		list_for_each_entry_safe(page, tmp, list, lru) {
+			rmv_page_order(page);
+			set_pcppage_migratetype(page, migratetype);
+
+			if (unlikely(check_pcp_refill(page))) {
+				list_del(&page->lru);
+				alloced--;
+				continue;
+			}
+			if (is_migrate_cma(get_pcppage_migratetype(page)))
+				__mod_zone_page_state(zone, NR_FREE_CMA_PAGES,
+						-(1 << order));
+		}
+		goto done_alloc;
+	}
+
 	for (i = 0; i < count; ++i) {
 		struct page *page = __rmqueue(zone, order, migratetype);
 		if (unlikely(page == NULL))
@@ -2410,7 +2506,9 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 			__mod_zone_page_state(zone, NR_FREE_CMA_PAGES,
 					      -(1 << order));
 	}
+	spin_unlock(&zone->lock);
 
+done_alloc:
 	/*
 	 * i pages were removed from the buddy list even if some leak due
 	 * to check_pcp_refill failing so adjust NR_FREE_PAGES based
@@ -2418,7 +2516,6 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 	 * pages added to the pcp list.
 	 */
 	__mod_zone_page_state(zone, NR_FREE_PAGES, -(i << order));
-	spin_unlock(&zone->lock);
 	return alloced;
 }
 
@@ -5446,6 +5543,10 @@ static void __meminit zone_init_free_lists(struct zone *zone)
 	for_each_migratetype_order(order, t) {
 		INIT_LIST_HEAD(&zone->free_area[order].free_list[t]);
 		zone->free_area[order].nr_free = 0;
+		if (!order && t < MIGRATE_PCPTYPES) {
+			INIT_LIST_HEAD(&zone->order0_cluster.list[t]);
+			zone->order0_cluster.offset[t] = 0;
+		}
 	}
 }
 
@@ -5483,6 +5584,9 @@ static int zone_batchsize(struct zone *zone)
 	 * and the other with pages of the other colors.
 	 */
 	batch = rounddown_pow_of_two(batch + batch/2) - 1;
+	if (batch < 1)
+		batch = 1;
+	zone->order0_cluster.batch = batch;
 
 	return batch;
 
