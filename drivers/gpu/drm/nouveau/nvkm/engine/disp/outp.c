@@ -99,6 +99,18 @@ nvkm_outp_release(struct nvkm_outp *outp, u8 user)
 	}
 }
 
+static inline bool
+nvkm_outp_ior_route_quirk(struct nvkm_outp *outp)
+{
+	struct nvkm_device *dev = outp->disp->engine.subdev.device;
+
+	int macro_link = __ffs(outp->info.or) * 2 + outp->info.sorconf.link;
+	if (unlikely(dev->quirk))
+		return !(dev->quirk->outp_links_skip & BIT(macro_link));
+
+	return true;
+}
+
 static inline int
 nvkm_outp_acquire_ior(struct nvkm_outp *outp, u8 user, struct nvkm_ior *ior)
 {
@@ -115,6 +127,7 @@ nvkm_outp_acquire(struct nvkm_outp *outp, u8 user)
 	struct nvkm_ior *ior = outp->ior;
 	enum nvkm_ior_proto proto;
 	enum nvkm_ior_type type;
+	bool route_crossbar = nvkm_outp_ior_route_quirk(outp);
 
 	OUTP_TRACE(outp, "acquire %02x |= %02x %p", outp->acquired, user, ior);
 	if (ior) {
@@ -138,7 +151,8 @@ nvkm_outp_acquire(struct nvkm_outp *outp, u8 user)
 	/* Failing that, a completely unused OR is the next best thing. */
 	list_for_each_entry(ior, &outp->disp->ior, head) {
 		if (!ior->asy.outp && ior->type == type && !ior->arm.outp &&
-		    (ior->func->route.set || ior->id == __ffs(outp->info.or)))
+		    ((ior->func->route.set && route_crossbar) ||
+		     ior->id == __ffs(outp->info.or)))
 			return nvkm_outp_acquire_ior(outp, user, ior);
 	}
 
@@ -147,7 +161,8 @@ nvkm_outp_acquire(struct nvkm_outp *outp, u8 user)
 	 */
 	list_for_each_entry(ior, &outp->disp->ior, head) {
 		if (!ior->asy.outp && ior->type == type &&
-		    (ior->func->route.set || ior->id == __ffs(outp->info.or)))
+		    ((ior->func->route.set && route_crossbar) ||
+		     ior->id == __ffs(outp->info.or)))
 			return nvkm_outp_acquire_ior(outp, user, ior);
 	}
 
