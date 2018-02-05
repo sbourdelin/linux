@@ -338,7 +338,7 @@ ssize_t cpu_show_spectre_v2(struct device *dev,
 }
 #endif
 
-void __ibp_barrier(void)
+void __visible __ibp_barrier(void)
 {
 	__wrmsr(MSR_IA32_PRED_CMD, PRED_CMD_IBPB, 0);
 }
