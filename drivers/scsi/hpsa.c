@@ -8691,11 +8691,8 @@ reinit_after_soft_reset:
 	/* Disable discovery polling.*/
 	h->discovery_polling = 0;
 
-
 	/* Turn the interrupts on so we can service requests */
 	h->access.set_intr_mask(h, HPSA_INTR_ON);
-
-	hpsa_hba_inquiry(h);
 
 	h->lastlogicals = kzalloc(sizeof(*(h->lastlogicals)), GFP_KERNEL);
 	if (!h->lastlogicals)
@@ -8706,6 +8703,8 @@ reinit_after_soft_reset:
 	rc = hpsa_scsi_add_host(h);
 	if (rc)
 		goto clean7; /* perf, sg, cmd, irq, shost, pci, lu, aer/h */
+
+	hpsa_hba_inquiry(h);
 
 	/* Monitor the controller for firmware lockups */
 	h->heartbeat_sample_interval = HEARTBEAT_SAMPLE_INTERVAL;
