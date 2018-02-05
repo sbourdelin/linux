@@ -5968,7 +5968,7 @@ F:	drivers/uio/uio_pci_generic.c
 
 GENWQE (IBM Generic Workqueue Card)
 M:	Frank Haverkamp <haver@linux.vnet.ibm.com>
-M:	Guilherme G. Piccoli <gpiccoli@linux.vnet.ibm.com>
+M:	Mauro S. M. Rodrigues <maurosr@linux.vnet.ibm.com>
 S:	Supported
 F:	drivers/misc/genwqe/
 
