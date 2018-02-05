@@ -11583,6 +11583,7 @@ static void nested_vmx_vmexit(struct kvm_vcpu *vcpu, u32 exit_reason,
 	 */
 	nested_vmx_failValid(vcpu, VMXERR_ENTRY_INVALID_CONTROL_FIELD);
 
+	vcpu->arch.cr4 = vmcs12->host_cr4;
 	load_vmcs12_mmu_host_state(vcpu, vmcs12);
 
 	/*
