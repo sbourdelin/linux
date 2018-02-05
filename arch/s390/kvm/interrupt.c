@@ -169,7 +169,16 @@ static int ckc_interrupts_enabled(struct kvm_vcpu *vcpu)
 
 static int ckc_irq_pending(struct kvm_vcpu *vcpu)
 {
-	if (vcpu->arch.sie_block->ckc >= kvm_s390_get_tod_clock_fast(vcpu->kvm))
+	int64_t ckc, tod;
+
+	if (vcpu->arch.sie_block->gcr[0] & 0x0020000000000000ul &&
+	    test_kvm_facility(vcpu->kvm, 139)) {
+		ckc = vcpu->arch.sie_block->ckc;
+		tod = kvm_s390_get_tod_clock_fast(vcpu->kvm);
+		if (ckc >= tod)
+			return 0;
+	} else if (vcpu->arch.sie_block->ckc >=
+		   kvm_s390_get_tod_clock_fast(vcpu->kvm))
 		return 0;
 	return ckc_interrupts_enabled(vcpu);
 }
@@ -1066,13 +1075,24 @@ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
 
 static u64 __calculate_sltime(struct kvm_vcpu *vcpu)
 {
-	u64 now, cputm, sltime = 0;
+	u64 now, cputm, ckc, sltime = 0;
+	int64_t ckc_signed, now_signed;
 
 	if (ckc_interrupts_enabled(vcpu)) {
-		now = kvm_s390_get_tod_clock_fast(vcpu->kvm);
-		sltime = tod_to_ns(vcpu->arch.sie_block->ckc - now);
-		/* already expired or overflow? */
-		if (!sltime || vcpu->arch.sie_block->ckc <= now)
+		if (vcpu->arch.sie_block->gcr[0] & 0x0020000000000000ul &&
+		    test_kvm_facility(vcpu->kvm, 139)) {
+			now = kvm_s390_get_tod_clock_fast(vcpu->kvm);
+			ckc = vcpu->arch.sie_block->ckc;
+			if (ckc < now)
+				sltime = tod_to_ns(now - ckc);
+		} else {
+			now_signed = kvm_s390_get_tod_clock_fast(vcpu->kvm);
+			ckc_signed = vcpu->arch.sie_block->ckc;
+			if (ckc_signed < now_signed)
+				sltime = tod_to_ns(now_signed - ckc_signed);
+		}
+		/* already expired */
+		if (!sltime)
 			return 0;
 		if (cpu_timer_interrupts_enabled(vcpu)) {
 			cputm = kvm_s390_get_cpu_timer(vcpu);
