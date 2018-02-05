@@ -417,7 +417,7 @@ static void logi_dj_recv_add_djhid_device(struct dj_receiver_dev *djrcv_dev,
 	snprintf(tmpstr, sizeof(tmpstr), ":%d", dj_report->device_index);
 	strlcat(dj_hiddev->phys, tmpstr, sizeof(dj_hiddev->phys));
 
-	dj_dev = kzalloc(sizeof(struct dj_device), GFP_KERNEL);
+	dj_dev = kzalloc(sizeof(*dj_dev), GFP_KERNEL);
 	if (!dj_dev)
 		goto dj_device_allocate_fail;
 
@@ -611,7 +611,7 @@ static int logi_dj_recv_query_paired_devices(struct dj_receiver_dev *djrcv_dev)
 	if (djrcv_dev->querying_devices)
 		return 0;
 
-	dj_report = kzalloc(sizeof(struct dj_report), GFP_KERNEL);
+	dj_report = kzalloc(sizeof(*dj_report), GFP_KERNEL);
 	if (!dj_report)
 		return -ENOMEM;
 	dj_report->report_id = REPORT_ID_DJ_SHORT;
@@ -627,11 +627,10 @@ static int logi_dj_recv_switch_to_dj_mode(struct dj_receiver_dev *djrcv_dev,
 					  unsigned timeout)
 {
 	struct hid_device *hdev = djrcv_dev->hdev;
-	struct dj_report *dj_report;
 	u8 *buf;
 	int retval;
+	struct dj_report *dj_report = kzalloc(sizeof(*dj_report), GFP_KERNEL);
 
-	dj_report = kzalloc(sizeof(struct dj_report), GFP_KERNEL);
 	if (!dj_report)
 		return -ENOMEM;
 	dj_report->report_id = REPORT_ID_DJ_SHORT;
@@ -1005,8 +1004,7 @@ static int logi_dj_probe(struct hid_device *hdev,
 	}
 
 	/* Treat interface 2 */
-
-	djrcv_dev = kzalloc(sizeof(struct dj_receiver_dev), GFP_KERNEL);
+	djrcv_dev = kzalloc(sizeof(*djrcv_dev), GFP_KERNEL);
 	if (!djrcv_dev)
 		return -ENOMEM;
 
