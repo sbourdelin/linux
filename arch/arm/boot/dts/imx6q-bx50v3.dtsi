@@ -388,3 +388,7 @@
 		#interrupt-cells = <1>;
 	};
 };
+
+&pmu {
+	secure-reg-access;
+};
