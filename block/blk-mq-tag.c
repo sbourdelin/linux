@@ -379,9 +379,11 @@ free_tags:
 	return NULL;
 }
 
-struct blk_mq_tags *blk_mq_init_tags(unsigned int total_tags,
+struct blk_mq_tags *blk_mq_init_tags(struct blk_mq_tag_set *set,
+				     unsigned int total_tags,
 				     unsigned int reserved_tags,
-				     int node, int alloc_policy)
+				     int node, int alloc_policy,
+				     bool global_tag)
 {
 	struct blk_mq_tags *tags;
 
@@ -397,6 +399,14 @@ struct blk_mq_tags *blk_mq_init_tags(unsigned int total_tags,
 	tags->nr_tags = total_tags;
 	tags->nr_reserved_tags = reserved_tags;
 
+	WARN_ON(global_tag && !set->global_tags);
+	if (global_tag && set->global_tags) {
+		tags->bitmap_tags = set->global_tags->bitmap_tags;
+		tags->breserved_tags = set->global_tags->breserved_tags;
+		tags->active_queues = set->global_tags->active_queues;
+		tags->global_tags = true;
+		return tags;
+	}
 	tags->bitmap_tags = &tags->__bitmap_tags;
 	tags->breserved_tags = &tags->__breserved_tags;
 	tags->active_queues = &tags->__active_queues;
@@ -406,8 +416,10 @@ struct blk_mq_tags *blk_mq_init_tags(unsigned int total_tags,
 
 void blk_mq_free_tags(struct blk_mq_tags *tags)
 {
-	sbitmap_queue_free(tags->bitmap_tags);
-	sbitmap_queue_free(tags->breserved_tags);
+	if (!tags->global_tags) {
+		sbitmap_queue_free(tags->bitmap_tags);
+		sbitmap_queue_free(tags->breserved_tags);
+	}
 	kfree(tags);
 }
 
@@ -441,7 +453,8 @@ int blk_mq_tag_update_depth(struct blk_mq_hw_ctx *hctx,
 		if (tdepth > 16 * BLKDEV_MAX_RQ)
 			return -EINVAL;
 
-		new = blk_mq_alloc_rq_map(set, hctx->queue_num, tdepth, 0);
+		new = blk_mq_alloc_rq_map(set, hctx->queue_num, tdepth, 0,
+				(*tagsptr)->global_tags);
 		if (!new)
 			return -ENOMEM;
 		ret = blk_mq_alloc_rqs(set, new, hctx->queue_num, tdepth);

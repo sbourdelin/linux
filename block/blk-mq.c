@@ -2011,7 +2011,8 @@ void blk_mq_free_rq_map(struct blk_mq_tags *tags)
 struct blk_mq_tags *blk_mq_alloc_rq_map(struct blk_mq_tag_set *set,
 					unsigned int hctx_idx,
 					unsigned int nr_tags,
-					unsigned int reserved_tags)
+					unsigned int reserved_tags,
+					bool global_tags)
 {
 	struct blk_mq_tags *tags;
 	int node;
@@ -2020,8 +2021,9 @@ struct blk_mq_tags *blk_mq_alloc_rq_map(struct blk_mq_tag_set *set,
 	if (node == NUMA_NO_NODE)
 		node = set->numa_node;
 
-	tags = blk_mq_init_tags(nr_tags, reserved_tags, node,
-				BLK_MQ_FLAG_TO_ALLOC_POLICY(set->flags));
+	tags = blk_mq_init_tags(set, nr_tags, reserved_tags, node,
+				BLK_MQ_FLAG_TO_ALLOC_POLICY(set->flags),
+				global_tags);
 	if (!tags)
 		return NULL;
 
@@ -2324,7 +2326,8 @@ static bool __blk_mq_alloc_rq_map(struct blk_mq_tag_set *set, int hctx_idx)
 	int ret = 0;
 
 	set->tags[hctx_idx] = blk_mq_alloc_rq_map(set, hctx_idx,
-					set->queue_depth, set->reserved_tags);
+					set->queue_depth, set->reserved_tags,
+					!!(set->flags & BLK_MQ_F_GLOBAL_TAGS));
 	if (!set->tags[hctx_idx])
 		return false;
 
@@ -2879,15 +2882,28 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 	if (ret)
 		goto out_free_mq_map;
 
+	if (set->flags & BLK_MQ_F_GLOBAL_TAGS) {
+		ret = -ENOMEM;
+		set->global_tags = blk_mq_init_tags(set, set->queue_depth,
+				set->reserved_tags, set->numa_node,
+				BLK_MQ_FLAG_TO_ALLOC_POLICY(set->flags),
+				false);
+		if (!set->global_tags)
+			goto out_free_mq_map;
+	}
+
 	ret = blk_mq_alloc_rq_maps(set);
 	if (ret)
-		goto out_free_mq_map;
+		goto out_free_global_tags;
 
 	mutex_init(&set->tag_list_lock);
 	INIT_LIST_HEAD(&set->tag_list);
 
 	return 0;
 
+out_free_global_tags:
+	if (set->global_tags)
+		blk_mq_free_tags(set->global_tags);
 out_free_mq_map:
 	kfree(set->mq_map);
 	set->mq_map = NULL;
@@ -2901,6 +2917,9 @@ EXPORT_SYMBOL(blk_mq_alloc_tag_set);
 void blk_mq_free_tag_set(struct blk_mq_tag_set *set)
 {
 	int i;
+
+	if (set->global_tags)
+		blk_mq_free_tags(set->global_tags);
 
 	for (i = 0; i < nr_cpu_ids; i++)
 		blk_mq_free_map_and_requests(set, i);

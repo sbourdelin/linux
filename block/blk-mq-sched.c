@@ -81,6 +81,17 @@ static bool blk_mq_sched_restart_hctx(struct blk_mq_hw_ctx *hctx)
 	} else
 		clear_bit(BLK_MQ_S_SCHED_RESTART, &hctx->state);
 
+	/* need to restart all hw queues for global tags */
+	if (hctx->flags & BLK_MQ_F_GLOBAL_TAGS) {
+		struct blk_mq_hw_ctx *hctx2;
+		int i;
+
+		queue_for_each_hw_ctx(hctx->queue, hctx2, i)
+			if (blk_mq_run_hw_queue(hctx2, true))
+				return true;
+		return false;
+	}
+
 	return blk_mq_run_hw_queue(hctx, true);
 }
 
@@ -495,7 +506,7 @@ static int blk_mq_sched_alloc_tags(struct request_queue *q,
 	int ret;
 
 	hctx->sched_tags = blk_mq_alloc_rq_map(set, hctx_idx, q->nr_requests,
-					       set->reserved_tags);
+					       set->reserved_tags, false);
 	if (!hctx->sched_tags)
 		return -ENOMEM;
 
