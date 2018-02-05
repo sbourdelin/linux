@@ -2099,6 +2099,17 @@ static int tcp_mtu_probe(struct sock *sk)
 			return 0;
 	}
 
+	len = probe_size;
+	tcp_for_write_queue_from_safe(skb, next, sk) {
+		if (len <= skb->len)
+			break;
+
+		if (unlikely(TCP_SKB_CB(skb)->eor))
+			return -1;
+
+		len -= skb->len;
+	}
+
 	/* We're allowed to probe.  Build it now. */
 	nskb = sk_stream_alloc_skb(sk, probe_size, GFP_ATOMIC, false);
 	if (!nskb)
