@@ -418,12 +418,8 @@ static void logi_dj_recv_add_djhid_device(struct dj_receiver_dev *djrcv_dev,
 	strlcat(dj_hiddev->phys, tmpstr, sizeof(dj_hiddev->phys));
 
 	dj_dev = kzalloc(sizeof(struct dj_device), GFP_KERNEL);
-
-	if (!dj_dev) {
-		dev_err(&djrcv_hdev->dev, "%s: failed allocating dj_device\n",
-			__func__);
+	if (!dj_dev)
 		goto dj_device_allocate_fail;
-	}
 
 	dj_dev->reports_supported = get_unaligned_le32(
 		dj_report->report_params + DEVICE_PAIRED_RF_REPORT_TYPE);
@@ -1011,11 +1007,9 @@ static int logi_dj_probe(struct hid_device *hdev,
 	/* Treat interface 2 */
 
 	djrcv_dev = kzalloc(sizeof(struct dj_receiver_dev), GFP_KERNEL);
-	if (!djrcv_dev) {
-		dev_err(&hdev->dev,
-			"%s:failed allocating dj_receiver_dev\n", __func__);
+	if (!djrcv_dev)
 		return -ENOMEM;
-	}
+
 	djrcv_dev->hdev = hdev;
 	INIT_WORK(&djrcv_dev->work, delayedwork_callback);
 	spin_lock_init(&djrcv_dev->lock);
