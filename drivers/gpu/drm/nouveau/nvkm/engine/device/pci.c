@@ -797,6 +797,13 @@ nvkm_device_pci_10de_139b[] = {
 	{}
 };
 
+static const struct nvkm_device_pci_vendor
+nvkm_device_pci_10de_1b81[] = {
+	/* Gainward GTX 1070 8192 MB */
+	{ 0x10b0, 0x1b81, "GeForce GTX 1070",{ .outp_links_skip = BIT(7) } },
+	{}
+};
+
 static const struct nvkm_device_pci_device
 nvkm_device_pci_10de[] = {
 	{ 0x0020, "RIVA TNT" },
@@ -1556,7 +1563,7 @@ nvkm_device_pci_10de[] = {
 	{ 0x1b06, "GeForce GTX 1080 TI" },
 	{ 0x1bb7, "Quadro P6000" },
 	{ 0x1b80, "GeForce GTX 1080" },
-	{ 0x1b81, "GeForce GTX 1070" },
+	{ 0x1b81, "GeForce GTX 1070", nvkm_device_pci_10de_1b81 },
 	{ 0x1b82, "GeForce GTX 1070 TI" },
 	{ 0x1b84, "GeForce GTX 1060 3GB" },
 	{ 0x1b87, "P104-100" },
