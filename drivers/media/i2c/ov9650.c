@@ -1130,7 +1130,7 @@ static int __ov965x_set_frame_interval(struct ov965x *ov965x,
 	if (fi->interval.denominator == 0)
 		return -EINVAL;
 
-	req_int = (u64)(fi->interval.numerator * 10000) /
+	req_int = fi->interval.numerator * 10000ULL /
 		fi->interval.denominator;
 
 	for (i = 0; i < ARRAY_SIZE(ov965x_intervals); i++) {
@@ -1139,7 +1139,7 @@ static int __ov965x_set_frame_interval(struct ov965x *ov965x,
 		if (mbus_fmt->width != iv->size.width ||
 		    mbus_fmt->height != iv->size.height)
 			continue;
-		err = abs((u64)(iv->interval.numerator * 10000) /
+		err = abs(iv->interval.numerator * 10000ULL /
 			    iv->interval.denominator - req_int);
 		if (err < min_err) {
 			fiv = iv;
@@ -1148,8 +1148,9 @@ static int __ov965x_set_frame_interval(struct ov965x *ov965x,
 	}
 	ov965x->fiv = fiv;
 
-	v4l2_dbg(1, debug, &ov965x->sd, "Changed frame interval to %u us\n",
-		 fiv->interval.numerator * 1000000 / fiv->interval.denominator);
+	v4l2_dbg(1, debug, &ov965x->sd, "Changed frame interval to %llu us\n",
+		 fiv->interval.numerator * 1000000ULL /
+		 fiv->interval.denominator);
 
 	return 0;
 }
