@@ -1555,6 +1555,11 @@ enum ib_poll_context {
 	IB_POLL_WORKQUEUE,	/* poll from workqueue */
 };
 
+struct ib_cq_workqueue_poll {
+	struct irq_am		am;
+	struct work_struct	work;
+};
+
 struct ib_cq {
 	struct ib_device       *device;
 	struct ib_uobject      *uobject;
@@ -1566,8 +1571,8 @@ struct ib_cq {
 	enum ib_poll_context	poll_ctx;
 	struct ib_wc		*wc;
 	union {
-		struct irq_poll		iop;
-		struct work_struct	work;
+		struct irq_poll			iop;
+		struct ib_cq_workqueue_poll	wq;
 	};
 };
 

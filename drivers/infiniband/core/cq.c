@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/irq-am.h>
 #include <rdma/ib_verbs.h>
 
 /* # of WCs to poll for with a single call to ib_poll_cq */
@@ -66,6 +67,13 @@ static int ib_cq_am(struct ib_cq *cq, unsigned short level)
 static int ib_cq_irqpoll_am(struct irq_poll *iop, unsigned short level)
 {
 	struct ib_cq *cq = container_of(iop, struct ib_cq, iop);
+
+	return ib_cq_am(cq, level);
+}
+
+static int ib_cq_workqueue_am(struct irq_am *am, unsigned short level)
+{
+	struct ib_cq *cq = container_of(am, struct ib_cq, wq.am);
 
 	return ib_cq_am(cq, level);
 }
@@ -147,18 +155,21 @@ static void ib_cq_completion_softirq(struct ib_cq *cq, void *private)
 
 static void ib_cq_poll_work(struct work_struct *work)
 {
-	struct ib_cq *cq = container_of(work, struct ib_cq, work);
+	struct ib_cq *cq = container_of(work, struct ib_cq, wq.work);
 	int completed;
 
 	completed = __ib_process_cq(cq, IB_POLL_BUDGET_WORKQUEUE);
+	irq_am_add_comps(&cq->wq.am, completed);
 	if (completed >= IB_POLL_BUDGET_WORKQUEUE ||
 	    ib_req_notify_cq(cq, IB_POLL_FLAGS) > 0)
-		queue_work(ib_comp_wq, &cq->work);
+		queue_work(ib_comp_wq, &cq->wq.work);
+	else
+		irq_am_add_event(&cq->wq.am);
 }
 
 static void ib_cq_completion_workqueue(struct ib_cq *cq, void *private)
 {
-	queue_work(ib_comp_wq, &cq->work);
+	queue_work(ib_comp_wq, &cq->wq.work);
 }
 
 /**
@@ -214,7 +225,10 @@ struct ib_cq *ib_alloc_cq(struct ib_device *dev, void *private,
 		break;
 	case IB_POLL_WORKQUEUE:
 		cq->comp_handler = ib_cq_completion_workqueue;
-		INIT_WORK(&cq->work, ib_cq_poll_work);
+		INIT_WORK(&cq->wq.work, ib_cq_poll_work);
+		if (cq->device->modify_cq)
+			irq_am_init(&cq->wq.am, IB_CQ_AM_NR_EVENTS,
+				IB_CQ_AM_NR_LEVELS, 0, ib_cq_workqueue_am);
 		ib_req_notify_cq(cq, IB_CQ_NEXT_COMP);
 		break;
 	default:
@@ -250,7 +264,8 @@ void ib_free_cq(struct ib_cq *cq)
 		irq_poll_disable(&cq->iop);
 		break;
 	case IB_POLL_WORKQUEUE:
-		cancel_work_sync(&cq->work);
+		cancel_work_sync(&cq->wq.work);
+		irq_am_cleanup(&cq->wq.am);
 		break;
 	default:
 		WARN_ON_ONCE(1);
