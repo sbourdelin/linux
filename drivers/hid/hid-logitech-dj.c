@@ -463,16 +463,17 @@ static void delayedwork_callback(struct work_struct *work)
 				sizeof(struct dj_report));
 
 	if (count != sizeof(struct dj_report)) {
-		dev_err(&djrcv_dev->hdev->dev, "%s: workitem triggered without "
-			"notifications available\n", __func__);
+		dev_err(&djrcv_dev->hdev->dev,
+			"%s: workitem triggered without notifications available\n",
+			__func__);
 		spin_unlock_irqrestore(&djrcv_dev->lock, flags);
 		return;
 	}
 
 	if (!kfifo_is_empty(&djrcv_dev->notif_fifo)) {
 		if (schedule_work(&djrcv_dev->work) == 0) {
-			dbg_hid("%s: did not schedule the work item, was "
-				"already queued\n", __func__);
+			dbg_hid("%s: did not schedule the work item, was already queued\n",
+				__func__);
 		}
 	}
 
@@ -502,8 +503,8 @@ static void delayedwork_callback(struct work_struct *work)
 			break;
 		}
 		dev_err(&djrcv_dev->hdev->dev,
-			"%s:logi_dj_recv_query_paired_devices "
-			"error:%d\n", __func__, retval);
+			"%s:logi_dj_recv_query_paired_devices error:%d\n",
+			__func__, retval);
 		}
 		dbg_hid("%s: unexpected report type\n", __func__);
 	}
@@ -517,8 +518,8 @@ static void logi_dj_recv_queue_notification(struct dj_receiver_dev *djrcv_dev,
 	kfifo_in(&djrcv_dev->notif_fifo, dj_report, sizeof(struct dj_report));
 
 	if (schedule_work(&djrcv_dev->work) == 0) {
-		dbg_hid("%s: did not schedule the work item, was already "
-			"queued\n", __func__);
+		dbg_hid("%s: did not schedule the work item, was already queued\n",
+			__func__);
 	}
 }
 
@@ -541,8 +542,7 @@ static void logi_dj_recv_forward_null_report(struct dj_receiver_dev *djrcv_dev,
 					     HID_INPUT_REPORT,
 					     reportbuffer,
 					     hid_reportid_size_map[i], 1)) {
-				dbg_hid("hid_input_report error sending null "
-					"report\n");
+				dbg_hid("hid_input_report error sending null report\n");
 			}
 		}
 	}
@@ -770,8 +770,8 @@ static int logi_dj_ll_parse(struct hid_device *hid)
 	}
 
 	if (djdev->reports_supported & STD_MOUSE) {
-		dbg_hid("%s: sending a mouse descriptor, reports_supported: "
-			"%x\n", __func__, djdev->reports_supported);
+		dbg_hid("%s: sending a mouse descriptor, reports_supported: %x\n",
+			__func__, djdev->reports_supported);
 		rdcat(rdesc, &rsize, mse_descriptor, sizeof(mse_descriptor));
 	}
 
@@ -1068,8 +1068,9 @@ static int logi_dj_probe(struct hid_device *hdev,
 
 	retval = logi_dj_recv_query_paired_devices(djrcv_dev);
 	if (retval < 0) {
-		dev_err(&hdev->dev, "%s:logi_dj_recv_query_paired_devices "
-			"error:%d\n", __func__, retval);
+		dev_err(&hdev->dev,
+			"%s:logi_dj_recv_query_paired_devices error:%d\n",
+			__func__, retval);
 		goto logi_dj_recv_query_paired_devices_failed;
 	}
 
