@@ -457,6 +457,9 @@ struct scsi_host_template {
 	 */
 	unsigned int max_host_blocked;
 
+	/* True if the host supports a host-wide tagspace */
+	unsigned host_tagset:1;
+
 	/*
 	 * Default value for the blocking.  If the queue is empty,
 	 * host_blocked counts down in the request_fn until it restarts
