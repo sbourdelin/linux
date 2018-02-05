@@ -266,27 +266,34 @@ static void free_obj_work(struct work_struct *work)
 	}
 }
 
+static bool __free_object(struct debug_obj *obj)
+{
+	unsigned long flags;
+	bool work;
+
+	raw_spin_lock_irqsave(&pool_lock, flags);
+	work = (obj_pool_free > debug_objects_pool_size) && obj_cache ?
+		true : false;
+	obj_pool_used--;
+
+	if (work) {
+		obj_nr_tofree++;
+		hlist_add_head(&obj->node, &obj_to_free);
+	} else {
+		obj_pool_free++;
+		hlist_add_head(&obj->node, &obj_pool);
+	}
+	raw_spin_unlock_irqrestore(&pool_lock, flags);
+	return work;
+}
+
 /*
  * Put the object back into the pool and schedule work to free objects
  * if necessary.
  */
 static void free_object(struct debug_obj *obj)
 {
-	unsigned long flags;
-	int sched = 0;
-
-	raw_spin_lock_irqsave(&pool_lock, flags);
-	/*
-	 * schedule work when the pool is filled and the cache is
-	 * initialized:
-	 */
-	if (obj_pool_free > debug_objects_pool_size && obj_cache)
-		sched = 1;
-	hlist_add_head(&obj->node, &obj_pool);
-	obj_pool_free++;
-	obj_pool_used--;
-	raw_spin_unlock_irqrestore(&pool_lock, flags);
-	if (sched)
+	if (__free_object(obj))
 		schedule_work(&debug_obj_work);
 }
 
