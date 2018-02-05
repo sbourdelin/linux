@@ -3474,6 +3474,9 @@ asmlinkage __visible void __sched schedule(void)
 	struct task_struct *tsk = current;
 
 	sched_submit_work(tsk);
+	if (tsk->mm)
+		sync_mm_rss(tsk->mm);
+
 	do {
 		preempt_disable();
 		__schedule(false);
