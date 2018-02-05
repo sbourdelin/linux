@@ -221,6 +221,21 @@ out:
 }
 EXPORT_SYMBOL_GPL(nf_flow_table_iterate);
 
+static void
+__nf_flow_offload_free(struct flow_offload *flow, void *data)
+{
+	struct nf_flowtable *flow_table = data;
+
+	flow_offload_del(flow_table, flow);
+}
+
+void nf_flow_table_free(struct nf_flowtable *flow_table)
+{
+	nf_flow_table_iterate(flow_table, __nf_flow_offload_free, flow_table);
+	rhashtable_destroy(&flow_table->rhashtable);
+}
+EXPORT_SYMBOL_GPL(nf_flow_table_free);
+
 static inline bool nf_flow_has_expired(const struct flow_offload *flow)
 {
 	return (__s32)(flow->timeout - (u32)jiffies) <= 0;
