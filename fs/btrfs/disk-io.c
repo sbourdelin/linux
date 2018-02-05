@@ -2570,6 +2570,8 @@ int open_ctree(struct super_block *sb,
 	init_waitqueue_head(&fs_info->async_submit_wait);
 
 	INIT_LIST_HEAD(&fs_info->pinned_chunks);
+	INIT_LIST_HEAD(&fs_info->bad_chunks);
+	seqlock_init(&fs_info->bc_lock);
 
 	/* Usable values until the real ones are cached from the superblock */
 	fs_info->nodesize = 4096;

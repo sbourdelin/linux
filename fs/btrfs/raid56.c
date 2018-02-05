@@ -888,14 +888,19 @@ static void rbio_orig_end_io(struct btrfs_raid_bio *rbio, blk_status_t err)
 }
 
 /*
- * end io function used by finish_rmw.  When we finally
- * get here, we've written a full stripe
+ * end io function used by finish_rmw.  When we finally get here, we've written
+ * a full stripe.
+ *
+ * Note that this is not under interrupt context as we queued endio to workers.
  */
 static void raid_write_end_io(struct bio *bio)
 {
 	struct btrfs_raid_bio *rbio = bio->bi_private;
 	blk_status_t err = bio->bi_status;
 	int max_errors;
+	u64 stripe_start = rbio->bbio->raid_map[0];
+	struct btrfs_fs_info *fs_info = rbio->fs_info;
+	int err_cnt;
 
 	if (err)
 		fail_bio_stripe(rbio, bio);
@@ -908,12 +913,58 @@ static void raid_write_end_io(struct bio *bio)
 	err = BLK_STS_OK;
 
 	/* OK, we have read all the stripes we need to. */
+	err_cnt = atomic_read(&rbio->error);
 	max_errors = (rbio->operation == BTRFS_RBIO_PARITY_SCRUB) ?
 		     0 : rbio->bbio->max_errors;
 	if (atomic_read(&rbio->error) > max_errors)
 		err = BLK_STS_IOERR;
 
 	rbio_orig_end_io(rbio, err);
+
+	/*
+	 * If there is any error, this stripe is a degraded one, so is the whole
+	 * chunk, expose this chunk info to sysfs.
+	 */
+	if (unlikely(err_cnt)) {
+		struct btrfs_bad_chunk *bc;
+		struct btrfs_bad_chunk *tmp;
+		struct extent_map *em;
+		unsigned long flags;
+
+		em = get_chunk_map(fs_info, stripe_start, 1);
+		if (IS_ERR(em))
+			return;
+
+		bc = kzalloc(sizeof(*bc), GFP_NOFS);
+		/* If allocation fails, it's OK. */
+		if (!bc) {
+			free_extent_map(em);
+			return;
+		}
+
+		write_seqlock_irqsave(&fs_info->bc_lock, flags);
+		list_for_each_entry(tmp, &fs_info->bad_chunks, list) {
+			if (tmp->chunk_offset != em->start)
+				continue;
+
+			/*
+			 * Don't bother if this chunk has already been recorded.
+			 */
+			write_sequnlock_irqrestore(&fs_info->bc_lock, flags);
+			kfree(bc);
+			free_extent_map(em);
+			return;
+		}
+
+		/* Add new bad chunk to list. */
+		bc->chunk_offset = em->start;
+		free_extent_map(em);
+
+		INIT_LIST_HEAD(&bc->list);
+		list_add(&bc->list, &fs_info->bad_chunks);
+
+		write_sequnlock_irqrestore(&fs_info->bc_lock, flags);
+	}
 }
 
 /*
@@ -1319,6 +1370,8 @@ write_data:
 		bio->bi_private = rbio;
 		bio->bi_end_io = raid_write_end_io;
 		bio_set_op_attrs(bio, REQ_OP_WRITE, 0);
+
+		btrfs_bio_wq_end_io(rbio->fs_info, bio, BTRFS_WQ_ENDIO_RAID56);
 
 		submit_bio(bio);
 	}
@@ -2464,6 +2517,8 @@ submit_write:
 		bio->bi_private = rbio;
 		bio->bi_end_io = raid_write_end_io;
 		bio_set_op_attrs(bio, REQ_OP_WRITE, 0);
+
+		btrfs_bio_wq_end_io(rbio->fs_info, bio, BTRFS_WQ_ENDIO_RAID56);
 
 		submit_bio(bio);
 	}

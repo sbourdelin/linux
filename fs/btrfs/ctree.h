@@ -1101,6 +1101,9 @@ struct btrfs_fs_info {
 	spinlock_t ref_verify_lock;
 	struct rb_root block_tree;
 #endif
+
+	struct list_head bad_chunks;
+	seqlock_t bc_lock;
 };
 
 static inline struct btrfs_fs_info *btrfs_sb(struct super_block *sb)
@@ -2567,6 +2570,11 @@ static inline gfp_t btrfs_alloc_write_mask(struct address_space *mapping)
 }
 
 /* extent-tree.c */
+
+struct btrfs_bad_chunk {
+	u64 chunk_offset;
+	struct list_head list;
+};
 
 enum btrfs_inline_ref_type {
 	BTRFS_REF_TYPE_INVALID =	 0,

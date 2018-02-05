@@ -9903,6 +9903,19 @@ int btrfs_free_block_groups(struct btrfs_fs_info *info)
 		kobject_del(&space_info->kobj);
 		kobject_put(&space_info->kobj);
 	}
+
+	/* Clean up bad chunks. */
+	write_seqlock_irq(&info->bc_lock);
+	while (!list_empty(&info->bad_chunks)) {
+		struct btrfs_bad_chunk *bc;
+
+		bc = list_first_entry(&info->bad_chunks,
+				      struct btrfs_bad_chunk, list);
+		list_del_init(&bc->list);
+		kfree(bc);
+	}
+	write_sequnlock_irq(&info->bc_lock);
+
 	return 0;
 }
 

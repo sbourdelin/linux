@@ -2804,8 +2804,8 @@ static int btrfs_del_sys_chunk(struct btrfs_fs_info *fs_info, u64 chunk_offset)
 	return ret;
 }
 
-static struct extent_map *get_chunk_map(struct btrfs_fs_info *fs_info,
-					u64 logical, u64 length)
+struct extent_map *get_chunk_map(struct btrfs_fs_info *fs_info,
+				 u64 logical, u64 length)
 {
 	struct extent_map_tree *em_tree;
 	struct extent_map *em;
@@ -2841,6 +2841,7 @@ int btrfs_remove_chunk(struct btrfs_trans_handle *trans,
 	u64 dev_extent_len = 0;
 	int i, ret = 0;
 	struct btrfs_fs_devices *fs_devices = fs_info->fs_devices;
+	struct btrfs_bad_chunk *bc;
 
 	em = get_chunk_map(fs_info, chunk_offset, 1);
 	if (IS_ERR(em)) {
@@ -2917,6 +2918,16 @@ int btrfs_remove_chunk(struct btrfs_trans_handle *trans,
 	}
 
 out:
+	write_seqlock_irq(&fs_info->bc_lock);
+	list_for_each_entry(bc, &fs_info->bad_chunks, list) {
+		if (bc->chunk_offset == chunk_offset) {
+			list_del_init(&bc->list);
+			kfree(bc);
+			break;
+		}
+	}
+	write_sequnlock_irq(&fs_info->bc_lock);
+
 	/* once for us */
 	free_extent_map(em);
 	return ret;

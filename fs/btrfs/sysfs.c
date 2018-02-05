@@ -490,12 +490,38 @@ static ssize_t quota_override_store(struct kobject *kobj,
 
 BTRFS_ATTR_RW(, quota_override, quota_override_show, quota_override_store);
 
+static ssize_t btrfs_bad_chunks_show(struct kobject *kobj,
+				     struct kobj_attribute *a, char *buf)
+{
+	struct btrfs_fs_info *fs_info = to_fs_info(kobj);
+	struct btrfs_bad_chunk *bc;
+	int len = 0;
+	unsigned int seq;
+
+	/* read lock please */
+	do {
+		seq = read_seqbegin(&fs_info->bc_lock);
+		list_for_each_entry(bc, &fs_info->bad_chunks, list) {
+			len += snprintf(buf + len, PAGE_SIZE - len, "%llu\n",
+					bc->chunk_offset);
+			/* chunk offset is u64 */
+			if (len >= PAGE_SIZE)
+				break;
+		}
+	} while (read_seqretry(&fs_info->bc_lock, seq));
+
+	return len;
+}
+
+BTRFS_ATTR(, bad_chunks, btrfs_bad_chunks_show);
+
 static const struct attribute *btrfs_attrs[] = {
 	BTRFS_ATTR_PTR(, label),
 	BTRFS_ATTR_PTR(, nodesize),
 	BTRFS_ATTR_PTR(, sectorsize),
 	BTRFS_ATTR_PTR(, clone_alignment),
 	BTRFS_ATTR_PTR(, quota_override),
+	BTRFS_ATTR_PTR(, bad_chunks),
 	NULL,
 };
 
