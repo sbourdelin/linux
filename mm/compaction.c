@@ -669,6 +669,28 @@ static bool too_many_isolated(struct zone *zone)
 	return isolated > (inactive + active) / 2;
 }
 
+static int merge_page(struct zone *zone, struct page *page, unsigned long pfn)
+{
+	int order = 0;
+	unsigned long buddy_pfn = __find_buddy_pfn(pfn, order);
+	struct page *buddy = page + (buddy_pfn - pfn);
+
+	/* Only do merging if the merge skipped page's buddy is also free */
+	if (PageBuddy(buddy)) {
+		int mt = get_pageblock_migratetype(page);
+		unsigned long flags;
+
+		spin_lock_irqsave(&zone->lock, flags);
+		if (likely(page_merge_skipped(page))) {
+			do_merge(zone, page, mt);
+			order = page_order(page);
+		}
+		spin_unlock_irqrestore(&zone->lock, flags);
+	}
+
+	return order;
+}
+
 /**
  * isolate_migratepages_block() - isolate all migrate-able pages within
  *				  a single pageblock
@@ -777,6 +799,12 @@ isolate_migratepages_block(struct compact_control *cc, unsigned long low_pfn,
 		 */
 		if (PageBuddy(page)) {
 			unsigned long freepage_order = page_order_unsafe(page);
+			/*
+			 * If the page didn't do merging on free time, now do
+			 * it since we are doing compaction.
+			 */
+			if (page_merge_skipped(page))
+				freepage_order = merge_page(zone, page, low_pfn);
 
 			/*
 			 * Without lock, we cannot be sure that what we got is

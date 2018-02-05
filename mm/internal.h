@@ -228,8 +228,21 @@ int find_suitable_fallback(struct free_area *area, unsigned int order,
 static inline unsigned int page_order(struct page *page)
 {
 	/* PageBuddy() must be checked by the caller */
-	return page_private(page);
+	return page_private(page) & ~(1 << 16);
 }
+
+/*
+ * This function returns if the page is in buddy but didn't do any merging
+ * for performance reason. This function only makes sense if PageBuddy(page)
+ * is also true. The caller should hold zone->lock for this function to return
+ * correct value, or it can handle invalid values gracefully.
+ */
+static inline bool page_merge_skipped(struct page *page)
+{
+	return PageBuddy(page) && (page->private & (1 << 16));
+}
+
+void do_merge(struct zone *zone, struct page *page, int migratetype);
 
 /*
  * Like page_order(), but for callers who cannot afford to hold the zone lock.

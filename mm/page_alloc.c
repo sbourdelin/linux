@@ -781,49 +781,14 @@ static inline int page_is_buddy(struct page *page, struct page *buddy,
 	return 0;
 }
 
-/*
- * Freeing function for a buddy system allocator.
- *
- * The concept of a buddy system is to maintain direct-mapped table
- * (containing bit values) for memory blocks of various "orders".
- * The bottom level table contains the map for the smallest allocatable
- * units of memory (here, pages), and each level above it describes
- * pairs of units from the levels below, hence, "buddies".
- * At a high level, all that happens here is marking the table entry
- * at the bottom level available, and propagating the changes upward
- * as necessary, plus some accounting needed to play nicely with other
- * parts of the VM system.
- * At each level, we keep a list of pages, which are heads of continuous
- * free pages of length of (1 << order) and marked with _mapcount
- * PAGE_BUDDY_MAPCOUNT_VALUE. Page's order is recorded in page_private(page)
- * field.
- * So when we are allocating or freeing one, we can derive the state of the
- * other.  That is, if we allocate a small block, and both were
- * free, the remainder of the region must be split into blocks.
- * If a block is freed, and its buddy is also free, then this
- * triggers coalescing into a block of larger size.
- *
- * -- nyc
- */
-
-static inline void __free_one_page(struct page *page,
-		unsigned long pfn,
-		struct zone *zone, unsigned int order,
-		int migratetype)
+static void inline __do_merge(struct page *page, unsigned int order,
+				struct zone *zone, int migratetype)
 {
+	unsigned int max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
+	unsigned long pfn = page_to_pfn(page);
 	unsigned long combined_pfn;
 	unsigned long uninitialized_var(buddy_pfn);
 	struct page *buddy;
-	unsigned int max_order;
-
-	max_order = min_t(unsigned int, MAX_ORDER, pageblock_order + 1);
-
-	VM_BUG_ON(!zone_is_initialized(zone));
-	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
-
-	VM_BUG_ON(migratetype == -1);
-	if (likely(!is_migrate_isolate(migratetype)))
-		__mod_zone_freepage_state(zone, 1 << order, migratetype);
 
 	VM_BUG_ON_PAGE(pfn & ((1 << order) - 1), page);
 	VM_BUG_ON_PAGE(bad_range(zone, page), page);
@@ -879,8 +844,6 @@ continue_merging:
 	}
 
 done_merging:
-	set_page_order(page, order);
-
 	/*
 	 * If this is not the largest possible page, check if the buddy
 	 * of the next-highest order is free. If it is, it's possible
@@ -905,7 +868,78 @@ done_merging:
 
 	list_add(&page->lru, &zone->free_area[order].free_list[migratetype]);
 out:
+	set_page_order(page, order);
 	zone->free_area[order].nr_free++;
+}
+
+void do_merge(struct zone *zone, struct page *page, int migratetype)
+{
+	VM_BUG_ON(page_order(page) != 0);
+
+	list_del(&page->lru);
+	zone->free_area[0].nr_free--;
+	rmv_page_order(page);
+
+	__do_merge(page, 0, zone, migratetype);
+}
+
+static inline bool should_skip_merge(struct zone *zone, unsigned int order)
+{
+#ifdef CONFIG_COMPACTION
+	return !zone->compact_considered && !order;
+#else
+	return false;
+#endif
+}
+
+/*
+ * Freeing function for a buddy system allocator.
+ *
+ * The concept of a buddy system is to maintain direct-mapped table
+ * (containing bit values) for memory blocks of various "orders".
+ * The bottom level table contains the map for the smallest allocatable
+ * units of memory (here, pages), and each level above it describes
+ * pairs of units from the levels below, hence, "buddies".
+ * At a high level, all that happens here is marking the table entry
+ * at the bottom level available, and propagating the changes upward
+ * as necessary, plus some accounting needed to play nicely with other
+ * parts of the VM system.
+ * At each level, we keep a list of pages, which are heads of continuous
+ * free pages of length of (1 << order) and marked with _mapcount
+ * PAGE_BUDDY_MAPCOUNT_VALUE. Page's order is recorded in page_private(page)
+ * field.
+ * So when we are allocating or freeing one, we can derive the state of the
+ * other.  That is, if we allocate a small block, and both were
+ * free, the remainder of the region must be split into blocks.
+ * If a block is freed, and its buddy is also free, then this
+ * triggers coalescing into a block of larger size.
+ *
+ * -- nyc
+ */
+static inline void __free_one_page(struct page *page,
+		unsigned long pfn,
+		struct zone *zone, unsigned int order,
+		int migratetype)
+{
+	VM_BUG_ON(!zone_is_initialized(zone));
+	VM_BUG_ON_PAGE(page->flags & PAGE_FLAGS_CHECK_AT_PREP, page);
+
+	VM_BUG_ON(migratetype == -1);
+	if (likely(!is_migrate_isolate(migratetype)))
+		__mod_zone_freepage_state(zone, 1 << order, migratetype);
+
+	if (should_skip_merge(zone, order)) {
+		list_add(&page->lru, &zone->free_area[order].free_list[migratetype]);
+		/*
+		 * 1 << 16 set on page->private to indicate this order0
+		 * page skipped merging during free time
+		 */
+		set_page_order(page, order | (1 << 16));
+		zone->free_area[order].nr_free++;
+		return;
+	}
+
+	__do_merge(page, order, zone, migratetype);
 }
 
 /*
