@@ -1025,7 +1025,7 @@ static const struct sectioncheck sectioncheck[] = {
 	.bad_tosec = { INIT_SECTIONS, NULL },
 	.mismatch = DATA_TO_ANY_INIT,
 	.symbol_white_list = {
-		"*_template", "*_timer", "*_sht", "*_ops",
+		"*_template", "*_timer", "*_sht", "*_ops", "*_ops.lto_priv*",
 		"*_probe", "*_probe_one", "*_console", NULL
 	},
 },
