@@ -8,8 +8,10 @@ perf-trace - strace inspired tool
 SYNOPSIS
 --------
 [verse]
-'perf trace'
-'perf trace record'
+'perf trace' [<options>] [<command>]
+'perf trace' [<options>] -- <command> [<options>]
+'perf trace record' [<options>] [<command>]
+'perf trace record' [<options>] -- <command> [<options>]
 
 DESCRIPTION
 -----------
