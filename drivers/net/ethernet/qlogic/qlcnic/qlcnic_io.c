@@ -303,7 +303,6 @@ static void qlcnic_send_filter(struct qlcnic_adapter *adapter,
 			       struct cmd_desc_type0 *first_desc,
 			       struct sk_buff *skb)
 {
-	struct vlan_ethhdr *vh = (struct vlan_ethhdr *)(skb->data);
 	struct ethhdr *phdr = (struct ethhdr *)(skb->data);
 	u16 protocol = ntohs(skb->protocol);
 	struct qlcnic_filter *fil, *tmp_fil;
@@ -318,6 +317,8 @@ static void qlcnic_send_filter(struct qlcnic_adapter *adapter,
 
 	if (adapter->flags & QLCNIC_VLAN_FILTERING) {
 		if (protocol == ETH_P_8021Q) {
+			struct vlan_ethhdr *vh;
+
 			vh = (struct vlan_ethhdr *)skb->data;
 			vlan_id = ntohs(vh->h_vlan_TCI);
 		} else if (skb_vlan_tag_present(skb)) {
@@ -624,7 +625,7 @@ out_err:
 static void qlcnic_unmap_buffers(struct pci_dev *pdev, struct sk_buff *skb,
 				 struct qlcnic_cmd_buffer *pbuf)
 {
-	struct qlcnic_skb_frag *nf = &pbuf->frag_array[0];
+	struct qlcnic_skb_frag *nf;
 	int i, nr_frags = skb_shinfo(skb)->nr_frags;
 
 	for (i = 0; i < nr_frags; i++) {
