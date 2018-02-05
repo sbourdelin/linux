@@ -101,6 +101,8 @@ struct irq_am {
 
 	struct work_struct		work;
 	irq_am_fn			*program;
+	struct dentry			*debugfs_dir;
+	int				id;
 };
 
 void irq_am_add_event(struct irq_am *am);
