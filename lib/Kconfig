@@ -500,6 +500,11 @@ config DDR
 	  information. This data is useful for drivers handling
 	  DDR SDRAM controllers.
 
+config IRQ_AM
+	bool "IRQ adaptive moderation library"
+	help
+	  Helper library to implement adaptive moderation for I/O devices.
+
 config IRQ_POLL
 	bool "IRQ polling library"
 	help
