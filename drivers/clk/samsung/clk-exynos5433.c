@@ -765,6 +765,14 @@ static const struct samsung_pll_rate_table exynos5433_aud_pll_rates[] __initcons
 	PLL_36XX_RATE(294912000U,  98, 1, 3,  19923),
 	PLL_36XX_RATE(288000000U,  96, 1, 3,      0),
 	PLL_36XX_RATE(252000000U,  84, 1, 3,      0),
+	PLL_36XX_RATE(200000000U, 200, 3, 3,      0),
+	PLL_36XX_RATE(196608001U, 197, 3, 3, -25690),
+	PLL_36XX_RATE(180633609U, 301, 5, 3,   3671),
+	PLL_36XX_RATE(131072006U, 131, 3, 3,   4719),
+	PLL_36XX_RATE(100000000U, 200, 3, 4,      0),
+	PLL_36XX_RATE(65536003U,  131, 3, 4,   4719),
+	PLL_36XX_RATE(49152000U,  197, 3, 5, -25690),
+	PLL_36XX_RATE(32768001U,  131, 3, 5,   4719),
 	{ /* sentinel */ }
 };
 
