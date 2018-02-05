@@ -507,6 +507,7 @@ config IRQ_AM
 
 config IRQ_POLL
 	bool "IRQ polling library"
+	select IRQ_AM
 	help
 	  Helper library to poll interrupt mitigation using polling.
 

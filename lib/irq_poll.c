@@ -53,6 +53,7 @@ static void __irq_poll_complete(struct irq_poll *iop)
 	list_del(&iop->list);
 	smp_mb__before_atomic();
 	clear_bit_unlock(IRQ_POLL_F_SCHED, &iop->state);
+	irq_am_add_event(&iop->am);
 }
 
 /**
@@ -106,8 +107,10 @@ static void __latent_entropy irq_poll_softirq(struct softirq_action *h)
 
 		weight = iop->weight;
 		work = 0;
-		if (test_bit(IRQ_POLL_F_SCHED, &iop->state))
+		if (test_bit(IRQ_POLL_F_SCHED, &iop->state)) {
 			work = iop->poll(iop, weight);
+			irq_am_add_comps(&iop->am, work);
+		}
 
 		budget -= work;
 
@@ -144,6 +147,7 @@ static void __latent_entropy irq_poll_softirq(struct softirq_action *h)
  **/
 void irq_poll_disable(struct irq_poll *iop)
 {
+	irq_am_cleanup(&iop->am);
 	set_bit(IRQ_POLL_F_DISABLE, &iop->state);
 	while (test_and_set_bit(IRQ_POLL_F_SCHED, &iop->state))
 		msleep(1);
@@ -184,6 +188,30 @@ void irq_poll_init(struct irq_poll *iop, int weight, irq_poll_fn *poll_fn)
 	iop->poll = poll_fn;
 }
 EXPORT_SYMBOL(irq_poll_init);
+
+static int irq_poll_am(struct irq_am *am, unsigned short level)
+{
+	struct irq_poll *iop = container_of(am, struct irq_poll, am);
+
+	return iop->amfn(iop, level);
+}
+
+/**
+ * irq_poll_init_am - Initialize adaptive moderation parameters on this @iop
+ * @iop:      The parent iopoll structure
+ * @weight:   The default weight (or command completion budget)
+ * @poll_fn:  The handler to invoke
+ *
+ * Description:
+ *     Initialize adaptive moderation for this irq_poll structure.
+ **/
+void irq_poll_init_am(struct irq_poll *iop, unsigned int nr_events,
+        unsigned short nr_levels, unsigned short start_level, irq_poll_am_fn *amfn)
+{
+	iop->amfn = amfn;
+	irq_am_init(&iop->am, nr_events, nr_levels, start_level, irq_poll_am);
+}
+EXPORT_SYMBOL(irq_poll_init_am);
 
 static int irq_poll_cpu_dead(unsigned int cpu)
 {
