@@ -75,9 +75,11 @@ static void strip(char *str)
 static void check_stdin(void)
 {
 	if (!valid_stdin) {
-		printf(_("aborted!\n\n"));
-		printf(_("Console input/output is redirected. "));
-		printf(_("Run 'make oldconfig' to update configuration.\n\n"));
+		fprintf(stderr,
+			_("Aborted!\n"
+			  "Console input/output is redirected.\n"
+			  "Run 'make oldconfig' to update configuration.\n\n")
+			);
 		exit(1);
 	}
 }
@@ -565,7 +567,7 @@ int main(int ac, char **av)
 		}
 	}
 	if (ac == optind) {
-		printf(_("%s: Kconfig file missing\n"), av[0]);
+		fprintf(stderr, _("%s: Kconfig file missing\n"), av[0]);
 		conf_usage(progname);
 		exit(1);
 	}
@@ -590,9 +592,11 @@ int main(int ac, char **av)
 		if (!defconfig_file)
 			defconfig_file = conf_get_default_confname();
 		if (conf_read(defconfig_file)) {
-			printf(_("***\n"
-				"*** Can't find default configuration \"%s\"!\n"
-				"***\n"), defconfig_file);
+			fprintf(stderr,
+				_("***\n"
+				  "*** Can't find default configuration \"%s\"!\n"
+				  "***\n"),
+				defconfig_file);
 			exit(1);
 		}
 		break;
