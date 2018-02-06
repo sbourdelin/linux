@@ -317,6 +317,8 @@ static int conf_choice(struct menu *menu)
 		case oldaskconfig:
 			fflush(stdout);
 			xfgets(line, sizeof(line), stdin);
+			if (!tty_stdio)
+				printf("\n");
 			strip(line);
 			if (line[0] == '?') {
 				print_help(menu);
