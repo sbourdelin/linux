@@ -24,6 +24,7 @@
 #include <linux/bitops.h>
 #include <linux/mutex.h>
 #include <linux/shmem_fs.h>
+#include <linux/sched/mm.h>
 #include "ashmem.h"
 
 #define ASHMEM_NAME_PREFIX "dev/ashmem/"
@@ -438,8 +439,17 @@ ashmem_shrink_scan(struct shrinker *shrink, struct shrink_control *sc)
 	if (!(sc->gfp_mask & __GFP_FS))
 		return SHRINK_STOP;
 
-	if (!mutex_trylock(&ashmem_mutex))
+	/*
+	 * Release reclaim-fs marking since we've already checked GFP_FS, This
+	 * will prevent lockdep's reclaim recursion deadlock false positives.
+	 * We'll renable it before returning from this function.
+	 */
+	fs_reclaim_release(sc->gfp_mask);
+
+	if (!mutex_trylock(&ashmem_mutex)) {
+		fs_reclaim_acquire(sc->gfp_mask);
 		return -1;
+	}
 
 	list_for_each_entry_safe(range, next, &ashmem_lru_list, lru) {
 		loff_t start = range->pgstart * PAGE_SIZE;
@@ -456,6 +466,8 @@ ashmem_shrink_scan(struct shrinker *shrink, struct shrink_control *sc)
 			break;
 	}
 	mutex_unlock(&ashmem_mutex);
+
+	fs_reclaim_acquire(sc->gfp_mask);
 	return freed;
 }
 
