@@ -159,18 +159,28 @@ config FUNCTION_GRAPH_TRACER
 	  the return value. This is done by setting the current return
 	  address on the current task structure into a stack of calls.
 
+config TRACE_PREEMPT_TOGGLE
+	bool
+	help
+	  Enables hooks which will be called when preemption is first disabled,
+	  and last enabled.
+
+config PREEMPTIRQ_TRACEPOINTS
+	bool
+	depends on TRACE_PREEMPT_TOGGLE || TRACE_IRQFLAGS
+	default y
+	help
+	  Create preempt/irq toggle tracepoints if needed, so that other parts
+	  of the kernel can use them to generate or add hooks to them.
 
 config PREEMPTIRQ_EVENTS
 	bool "Enable trace events for preempt and irq disable/enable"
 	select TRACE_IRQFLAGS
-	depends on DEBUG_PREEMPT || !PROVE_LOCKING
+	select TRACE_PREEMPT_TOGGLE if PREEMPT
 	depends on TRACING
 	default n
 	help
 	  Enable tracing of disable and enable events for preemption and irqs.
-	  For tracing preempt disable/enable events, DEBUG_PREEMPT must be
-	  enabled. For tracing irq disable/enable events, PROVE_LOCKING must
-	  be disabled.
 
 config IRQSOFF_TRACER
 	bool "Interrupts-off Latency Tracer"
@@ -207,6 +217,7 @@ config PREEMPT_TRACER
 	select RING_BUFFER_ALLOW_SWAP
 	select TRACER_SNAPSHOT
 	select TRACER_SNAPSHOT_PER_CPU_SWAP
+	select TRACE_PREEMPT_TOGGLE
 	help
 	  This option measures the time spent in preemption-off critical
 	  sections, with microsecond accuracy.
