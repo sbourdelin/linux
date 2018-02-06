@@ -7,6 +7,14 @@ Optional properties:
 - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
 - enable-gpios: GPIO pin to enable or disable the panel
 - backlight: phandle of the backlight device attached to the panel
+- override-mode: For devices which require a mode which differs from the
+		 display_timing's "typical" mode, and whose restrictions cannot
+		 be applied across the entire platform. The mode must fall
+		 within the bounds of the panel's specified display_timing, and
+		 cannot be used if the panel already specifies a single fixed
+		 mode. The format is specified under "timing subnode" in
+		 display-timing.txt
+
 
 Example:
 
@@ -18,4 +26,16 @@ Example:
 		enable-gpios = <&gpio 90 0>;
 
 		backlight = <&backlight>;
+
+		override-mode {
+			clock-frequency = <266604720>;
+			hactive = <2400>;
+			hfront-porch = <48>;
+			hback-porch = <84>;
+			hsync-len = <32>;
+			vactive = <1600>;
+			vfront-porch = <3>;
+			vback-porch = <120>;
+			vsync-len = <10>;
+		}
 	};
