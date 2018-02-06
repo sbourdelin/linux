@@ -67,6 +67,14 @@ static bool page_idle_clear_pte_refs_one(struct page *page,
 		if (pvmw.pte) {
 			referenced = ptep_clear_young_notify(vma, addr,
 					pvmw.pte);
+			/*
+			 * For PTE-mapped THP, one sub page is referenced,
+			 * the whole THP is referenced.
+			 */
+			if (referenced && PageTransCompound(pvmw.page)) {
+				page_vma_mapped_walk_done(&pvmw);
+				break;
+			}
 		} else if (IS_ENABLED(CONFIG_TRANSPARENT_HUGEPAGE)) {
 			referenced = pmdp_clear_young_notify(vma, addr,
 					pvmw.pmd);
