@@ -411,15 +411,13 @@ struct msm_kms *mdp4_kms_init(struct drm_device *dev)
 	struct platform_device *pdev = to_platform_device(dev->dev);
 	struct mdp4_platform_config *config = mdp4_get_config(pdev);
 	struct mdp4_kms *mdp4_kms;
-	struct msm_kms *kms = NULL;
+	struct msm_kms *kms;
 	struct msm_gem_address_space *aspace;
 	int irq, ret;
 
 	mdp4_kms = kzalloc(sizeof(*mdp4_kms), GFP_KERNEL);
-	if (!mdp4_kms) {
-		ret = -ENOMEM;
-		goto fail;
-	}
+	if (!mdp4_kms)
+		return ERR_PTR(-ENOMEM);
 
 	mdp_kms_init(&mdp4_kms->base, &kms_funcs);
 
@@ -550,8 +548,7 @@ struct msm_kms *mdp4_kms_init(struct drm_device *dev)
 	return kms;
 
 fail:
-	if (kms)
-		mdp4_destroy(kms);
+	mdp4_destroy(kms);
 	return ERR_PTR(ret);
 }
 
