@@ -5,6 +5,7 @@
 #include <linux/const.h>
 #include <linux/types.h>
 #include <linux/mem_encrypt.h>
+#include <asm/patchable_const.h>
 
 /* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT		12
@@ -17,7 +18,8 @@
 #define PUD_PAGE_SIZE		(_AC(1, UL) << PUD_SHIFT)
 #define PUD_PAGE_MASK		(~(PUD_PAGE_SIZE-1))
 
-#define __PHYSICAL_MASK		((phys_addr_t)(__sme_clr((1ULL << __PHYSICAL_MASK_SHIFT) - 1)))
+#define __PHYSICAL_MASK_DEFAULT	((_AC(1, ULL) << __PHYSICAL_MASK_SHIFT) - 1)
+
 #define __VIRTUAL_MASK		((1UL << __VIRTUAL_MASK_SHIFT) - 1)
 
 /* Cast *PAGE_MASK to a signed type so that it is sign-extended if
@@ -54,6 +56,13 @@
 #endif	/* CONFIG_X86_64 */
 
 #ifndef __ASSEMBLY__
+
+#ifdef CONFIG_AMD_MEM_ENCRYPT
+DECLARE_PATCHABLE_CONST_U64(__PHYSICAL_MASK);
+#define __PHYSICAL_MASK		__PHYSICAL_MASK_READ()
+#else
+#define __PHYSICAL_MASK		((phys_addr_t)__PHYSICAL_MASK_DEFAULT)
+#endif
 
 extern int devmem_is_allowed(unsigned long pagenr);
 

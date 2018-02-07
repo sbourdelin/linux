@@ -1033,4 +1033,9 @@ void __init __nostackprotector sme_enable(struct boot_params *bp)
 		sme_me_mask = 0;
 	else
 		sme_me_mask = active_by_default ? me_mask : 0;
+
+	if (__PHYSICAL_MASK_SET(__PHYSICAL_MASK & ~sme_me_mask)) {
+		/* Can we handle it? */
+		BUG();
+	}
 }
