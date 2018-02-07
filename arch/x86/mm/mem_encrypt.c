@@ -36,13 +36,6 @@ static char sme_cmdline_arg[] __initdata = "mem_encrypt";
 static char sme_cmdline_on[]  __initdata = "on";
 static char sme_cmdline_off[] __initdata = "off";
 
-/*
- * Since SME related variables are set early in the boot process they must
- * reside in the .data section so as not to be zeroed out when the .bss
- * section is later cleared.
- */
-u64 sme_me_mask __section(.data) = 0;
-EXPORT_SYMBOL(sme_me_mask);
 DEFINE_STATIC_KEY_FALSE(sev_enable_key);
 EXPORT_SYMBOL_GPL(sev_enable_key);
 
@@ -997,7 +990,7 @@ void __init __nostackprotector sme_enable(struct boot_params *bp)
 			return;
 
 		/* SEV state cannot be controlled by a command line option */
-		sme_me_mask = me_mask;
+		sme_me_mask_SET(me_mask);
 		sev_enabled = true;
 		return;
 	}
@@ -1028,11 +1021,11 @@ void __init __nostackprotector sme_enable(struct boot_params *bp)
 	cmdline_find_option(cmdline_ptr, cmdline_arg, buffer, sizeof(buffer));
 
 	if (!strncmp(buffer, cmdline_on, sizeof(buffer)))
-		sme_me_mask = me_mask;
+		sme_me_mask_SET(me_mask);
 	else if (!strncmp(buffer, cmdline_off, sizeof(buffer)))
-		sme_me_mask = 0;
+		sme_me_mask_SET(0);
 	else
-		sme_me_mask = active_by_default ? me_mask : 0;
+		sme_me_mask_SET(active_by_default ? me_mask : 0);
 
 	if (__PHYSICAL_MASK_SET(__PHYSICAL_MASK & ~sme_me_mask)) {
 		/* Can we handle it? */

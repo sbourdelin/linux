@@ -18,10 +18,13 @@
 #include <linux/init.h>
 
 #include <asm/bootparam.h>
+#include <asm/patchable_const.h>
 
 #ifdef CONFIG_AMD_MEM_ENCRYPT
 
-extern u64 sme_me_mask;
+#define sme_me_mask_DEFAULT 0
+DECLARE_PATCHABLE_CONST_U64(sme_me_mask);
+#define sme_me_mask sme_me_mask_READ()
 
 void sme_encrypt_execute(unsigned long encrypted_kernel_vaddr,
 			 unsigned long decrypted_kernel_vaddr,

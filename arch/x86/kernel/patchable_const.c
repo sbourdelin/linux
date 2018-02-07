@@ -90,11 +90,13 @@ int patch_const_u64(unsigned long **start, unsigned long **stop,
 }
 
 PATCHABLE_CONST_U64(__PHYSICAL_MASK);
+PATCHABLE_CONST_U64(sme_me_mask);
 
 #ifdef CONFIG_MODULES
 /* Add an entry for a constant here if it expected to be seen in the modules */
 static const struct const_u64_table const_u64_table[] = {
 	{"__PHYSICAL_MASK", __PHYSICAL_MASK_DEFAULT, &__PHYSICAL_MASK_CURRENT},
+	{"sme_me_mask", sme_me_mask_DEFAULT, &sme_me_mask_CURRENT},
 };
 
 __init_or_module __nostackprotector
