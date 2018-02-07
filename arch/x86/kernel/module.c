@@ -36,6 +36,7 @@
 #include <asm/pgtable.h>
 #include <asm/setup.h>
 #include <asm/unwind.h>
+#include <asm/patchable_const.h>
 
 #if 0
 #define DEBUGP(fmt, ...)				\
@@ -243,6 +244,19 @@ int module_finalize(const Elf_Ehdr *hdr,
 			orc = s;
 		if (!strcmp(".orc_unwind_ip", secstrings + s->sh_name))
 			orc_ip = s;
+
+		if (IS_ENABLED(CONFIG_PATCHABLE_CONST) &&
+				!strncmp(secstrings + s->sh_name,
+					"const_u64_", strlen("const_u64_"))) {
+			const char *name;
+			unsigned long **start, **stop;
+
+			name = secstrings + s->sh_name + strlen("const_u64_");
+			start = (void *)s->sh_addr;
+			stop = (void *)s->sh_addr + s->sh_size;
+
+			module_patch_const_u64(name, start, stop);
+		}
 	}
 
 	if (alt) {
