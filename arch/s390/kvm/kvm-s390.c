@@ -1964,8 +1964,6 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	for (i = 0; i < S390_ARCH_FAC_LIST_SIZE_U64; i++) {
 		if (i < kvm_s390_fac_list_mask_size())
 			kvm->arch.model.fac_mask[i] &= kvm_s390_fac_list_mask[i];
-		else
-			kvm->arch.model.fac_mask[i] = 0UL;
 	}
 
 	/* Populate the facility list initially. */
@@ -1990,8 +1988,6 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 	kvm_s390_crypto_init(kvm);
 
 	mutex_init(&kvm->arch.float_int.ais_lock);
-	kvm->arch.float_int.simm = 0;
-	kvm->arch.float_int.nimm = 0;
 	spin_lock_init(&kvm->arch.float_int.lock);
 	for (i = 0; i < FIRQ_LIST_COUNT; i++)
 		INIT_LIST_HEAD(&kvm->arch.float_int.lists[i]);
@@ -2016,10 +2012,6 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
 		kvm->arch.gmap->private = kvm;
 		kvm->arch.gmap->pfault_enabled = 0;
 	}
-
-	kvm->arch.css_support = 0;
-	kvm->arch.use_irqchip = 0;
-	kvm->arch.epoch = 0;
 
 	spin_lock_init(&kvm->arch.start_stop_lock);
 	kvm_s390_vsie_init(kvm);
