@@ -417,7 +417,6 @@ struct msm_kms *mdp4_kms_init(struct drm_device *dev)
 
 	mdp4_kms = kzalloc(sizeof(*mdp4_kms), GFP_KERNEL);
 	if (!mdp4_kms) {
-		dev_err(dev->dev, "failed to allocate kms\n");
 		ret = -ENOMEM;
 		goto fail;
 	}
