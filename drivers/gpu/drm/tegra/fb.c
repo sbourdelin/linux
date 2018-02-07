@@ -301,10 +301,8 @@ static struct tegra_fbdev *tegra_fbdev_create(struct drm_device *drm)
 	struct tegra_fbdev *fbdev;
 
 	fbdev = kzalloc(sizeof(*fbdev), GFP_KERNEL);
-	if (!fbdev) {
-		dev_err(drm->dev, "failed to allocate DRM fbdev\n");
+	if (!fbdev)
 		return ERR_PTR(-ENOMEM);
-	}
 
 	drm_fb_helper_prepare(drm, &fbdev->base, &tegra_fb_helper_funcs);
 
