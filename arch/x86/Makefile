@@ -232,7 +232,12 @@ KBUILD_CFLAGS += -fno-asynchronous-unwind-tables
 
 # Avoid indirect branches in kernel to deal with Spectre
 ifdef CONFIG_RETPOLINE
-    RETPOLINE_CFLAGS += $(call cc-option,-mindirect-branch=thunk-extern -mindirect-branch-register)
+    # gcc
+    RETPOLINE_CFLAGS = $(call cc-option,-mindirect-branch=thunk-extern -mindirect-branch-register)
+    ifeq ($(RETPOLINE_CFLAGS),)
+	# clang
+	RETPOLINE_CFLAGS = $(call cc-option,-mretpoline-external-thunk)
+    endif
     ifneq ($(RETPOLINE_CFLAGS),)
         KBUILD_CFLAGS += $(RETPOLINE_CFLAGS) -DRETPOLINE
     endif
