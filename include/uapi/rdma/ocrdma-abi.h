@@ -106,7 +106,7 @@ struct ocrdma_create_qp_ureq {
 	__u32 rsvd1;	/* pad */
 };
 
-struct ocrdma_create_qp_uresp {
+sxtruct ocrdma_create_qp_uresp {
 	__u16 qp_id;
 	__u16 sq_dbid;
 	__u16 rq_dbid;
@@ -127,7 +127,7 @@ struct ocrdma_create_qp_uresp {
 	__u32 db_rq_offset;
 	__u32 db_shift;
 	__u64 rsvd[11];
-} __packed;
+};
 
 struct ocrdma_create_srq_uresp {
 	__u16 rq_dbid;
