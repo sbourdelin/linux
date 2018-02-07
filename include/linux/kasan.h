@@ -42,6 +42,9 @@ void kasan_unpoison_shadow(const void *address, size_t size);
 void kasan_unpoison_task_stack(struct task_struct *task);
 void kasan_unpoison_stack_above_sp_to(const void *watermark);
 
+void kasan_poison_irq_stack(void);
+void kasan_unpoison_irq_stack(void);
+
 void kasan_alloc_pages(struct page *page, unsigned int order);
 void kasan_free_pages(struct page *page, unsigned int order);
 

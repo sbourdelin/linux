@@ -472,6 +472,9 @@ END(irq_entries_start)
  * The invariant is that, if irq_count != -1, then the IRQ stack is in use.
  */
 .macro ENTER_IRQ_STACK regs=1 old_rsp
+#ifdef CONFIG_KASAN
+	call	x86_unpoison_irq_stack
+#endif
 	DEBUG_ENTRY_ASSERT_IRQS_OFF
 	movq	%rsp, \old_rsp
 
@@ -539,6 +542,9 @@ END(irq_entries_start)
 	 */
 
 	decl	PER_CPU_VAR(irq_count)
+#ifdef CONFIG_KASAN
+	call	x86_poison_irq_stack
+#endif
 .endm
 
 /*

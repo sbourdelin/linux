@@ -77,3 +77,16 @@ bool handle_irq(struct irq_desc *desc, struct pt_regs *regs)
 	generic_handle_irq_desc(desc);
 	return true;
 }
+
+#ifdef CONFIG_KASAN
+void __visible x86_poison_irq_stack(void)
+{
+	if (this_cpu_read(irq_count) == -1)
+		kasan_poison_irq_stack();
+}
+void __visible x86_unpoison_irq_stack(void)
+{
+	if (this_cpu_read(irq_count) == -1)
+		kasan_unpoison_irq_stack();
+}
+#endif

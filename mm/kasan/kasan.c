@@ -412,6 +412,22 @@ void kasan_poison_object_data(struct kmem_cache *cache, void *object)
 			KASAN_KMALLOC_REDZONE);
 }
 
+#ifdef KASAN_IRQ_STACK_SIZE
+void kasan_poison_irq_stack(void)
+{
+	void *stack = percpu_irq_stack_addr();
+
+	kasan_poison_shadow(stack, KASAN_IRQ_STACK_SIZE, KASAN_GLOBAL_REDZONE);
+}
+
+void kasan_unpoison_irq_stack(void)
+{
+	void *stack = percpu_irq_stack_addr();
+
+	kasan_unpoison_shadow(stack, KASAN_IRQ_STACK_SIZE);
+}
+#endif /* KASAN_IRQ_STACK_SIZE */
+
 static inline int in_irqentry_text(unsigned long ptr)
 {
 	return (ptr >= (unsigned long)&__irqentry_text_start &&

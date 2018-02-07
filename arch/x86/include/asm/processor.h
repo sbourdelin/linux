@@ -404,6 +404,12 @@ union irq_stack_union {
 	};
 };
 
+#define KASAN_IRQ_STACK_SIZE \
+	(sizeof(union irq_stack_union) - \
+		(offsetof(union irq_stack_union, stack_canary) + 8))
+
+#define percpu_irq_stack_addr() this_cpu_ptr(irq_stack_union.irq_stack)
+
 DECLARE_PER_CPU_FIRST(union irq_stack_union, irq_stack_union) __visible;
 DECLARE_INIT_PER_CPU(irq_stack_union);
 
