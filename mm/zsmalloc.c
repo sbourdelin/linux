@@ -192,6 +192,7 @@ static struct vfsmount *zsmalloc_mnt;
  * (see: fix_fullness_group())
  */
 static const int fullness_threshold_frac = 4;
+static size_t zs_huge_class_size;
 
 struct size_class {
 	spinlock_t lock;
@@ -1417,6 +1418,19 @@ void zs_unmap_object(struct zs_pool *pool, unsigned long handle)
 }
 EXPORT_SYMBOL_GPL(zs_unmap_object);
 
+/*
+ * Check if the object's size falls into huge_class area. We must take
+ * ZS_HANDLE_SIZE into account and test the actual size we are going to
+ * use up. zs_malloc() unconditionally adds handle size before it performs
+ * size_class lookup, so we may endup in a huge class yet zs_huge_object()
+ * returned 'false'.
+ */
+bool zs_huge_object(size_t sz)
+{
+	return sz + ZS_HANDLE_SIZE >= zs_huge_class_size;
+}
+EXPORT_SYMBOL_GPL(zs_huge_object);
+
 static unsigned long obj_malloc(struct size_class *class,
 				struct zspage *zspage, unsigned long handle)
 {
@@ -2404,6 +2418,9 @@ struct zs_pool *zs_create_pool(const char *name)
 			INIT_LIST_HEAD(&class->fullness_list[fullness]);
 
 		prev_class = class;
+		if (pages_per_zspage == 1 && objs_per_zspage == 1
+				&& !zs_huge_class_size)
+			zs_huge_class_size = size;
 	}
 
 	/* debug only, don't abort if it fails */
