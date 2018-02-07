@@ -363,7 +363,7 @@ static int bcm2835aux_spi_transfer_one(struct spi_master *master,
 	 * chunk getting transferred - in our case the chunk size
 	 * is 3 bytes, so we approximate this by 9 bits/byte
 	 */
-	xfer_time_us = tfr->len * 9 * 1000000;
+	xfer_time_us = tfr->len * 9ULL * 1000000;
 	do_div(xfer_time_us, spi_used_hz);
 
 	/* run in polling mode for short transfers */
