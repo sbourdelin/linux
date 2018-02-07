@@ -40,6 +40,7 @@
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
+#include <drm/drm_fourcc.h>
 
 #include "drm_crtc_internal.h"
 #include "drm_crtc_helper_internal.h"
@@ -1561,6 +1562,147 @@ unlock:
 }
 EXPORT_SYMBOL(drm_fb_helper_ioctl);
 
+#define FB_FORMAT_C(c) { \
+	.format = DRM_FORMAT_C##c,    \
+	.blue   = { .length = (c), }, \
+	.green  = { .length = (c), }, \
+	.red    = { .length = (c), }, \
+}
+#define FB_FORMAT_RGB(r, g, b) { \
+	.format = DRM_FORMAT_RGB##r##g##b, \
+	.blue   = { .length = (b), .offset = 0, }, \
+	.green  = { .length = (g), .offset = (b), }, \
+	.red    = { .length = (r), .offset = (b)+(g), }, \
+}
+#define FB_FORMAT_BGR(b, g, r) { \
+	.format = DRM_FORMAT_BGR##b##g##r, \
+	.red    = { .length = (r), .offset = 0, }, \
+	.green  = { .length = (g), .offset = (r), }, \
+	.blue   = { .length = (b), .offset = (r)+(g), }, \
+}
+#define FB_FORMAT_XRGB(x, r, g, b) { \
+	.format = DRM_FORMAT_XRGB##x##r##g##b, \
+	.blue   = { .length = (b), .offset = 0, }, \
+	.green  = { .length = (g), .offset = (b), }, \
+	.red    = { .length = (r), .offset = (b)+(g), }, \
+}
+#define FB_FORMAT_XBGR(x, b, g, r) { \
+	.format = DRM_FORMAT_XBGR##x##b##g##r, \
+	.red    = { .length = (r), .offset = 0, }, \
+	.green  = { .length = (g), .offset = (r), }, \
+	.blue   = { .length = (b), .offset = (r)+(g), }, \
+}
+#define FB_FORMAT_RGBX(r, g, b, x) { \
+	.format = DRM_FORMAT_RGBX##r##g##b##x, \
+	.blue   = { .length = (b), .offset = (x), }, \
+	.green  = { .length = (g), .offset = (x)+(b), }, \
+	.red    = { .length = (r), .offset = (x)+(b)+(g), }, \
+}
+#define FB_FORMAT_BGRX(b, g, r, x) { \
+	.format = DRM_FORMAT_BGRX##b##g##r##x, \
+	.red    = { .length = (r), .offset = (x), }, \
+	.green  = { .length = (g), .offset = (x)+(r), }, \
+	.blue   = { .length = (b), .offset = (x)+(r)+(g), }, \
+}
+#define FB_FORMAT_ARGB(a, r, g, b) { \
+	.format = DRM_FORMAT_ARGB##a##r##g##b, \
+	.blue   = { .length = (b), .offset = 0, }, \
+	.green  = { .length = (g), .offset = (b), }, \
+	.red    = { .length = (r), .offset = (b)+(g), }, \
+	.transp = { .length = (a), .offset = (b)+(g)+(r), }, \
+}
+#define FB_FORMAT_ABGR(a, b, g, r) { \
+	.format = DRM_FORMAT_ABGR##a##b##g##r, \
+	.red    = { .length = (r), .offset = 0, }, \
+	.green  = { .length = (g), .offset = (r), }, \
+	.blue   = { .length = (b), .offset = (r)+(g), },\
+	.transp = { .length = (a), .offset = (r)+(g)+(b), }, \
+}
+#define FB_FORMAT_RGBA(r, g, b, a) { \
+	.format = DRM_FORMAT_RGBA##r##g##b##a, \
+	.transp = { .length = (a), .offset = 0, }, \
+	.blue   = { .length = (b), .offset = (a), }, \
+	.green  = { .length = (g), .offset = (a)+(b), }, \
+	.red    = { .length = (r), .offset = (a)+(b)+(g), }, \
+}
+#define FB_FORMAT_BGRA(b, g, r, a) { \
+	.format = DRM_FORMAT_BGRA##b##g##r##a, \
+	.transp = { .length = (a), .offset = 0, }, \
+	.red    = { .length = (r), .offset = (a), }, \
+	.green  = { .length = (g), .offset = (a)+(r), }, \
+	.blue   = { .length = (b), .offset = (a)+(r)+(g), }, \
+}
+
+struct drm_fb_helper_format {
+	u32 format;
+	struct fb_bitfield red, green, blue, transp;
+};
+
+static const struct drm_fb_helper_format fb_formats[] = {
+	FB_FORMAT_C(8),
+
+	FB_FORMAT_XRGB(1, 5, 5, 5),
+	FB_FORMAT_XBGR(1, 5, 5, 5),
+	FB_FORMAT_RGBX(5, 5, 5, 1),
+	FB_FORMAT_BGRX(5, 5, 5, 1),
+
+	FB_FORMAT_ARGB(1, 5, 5, 5),
+	FB_FORMAT_ABGR(1, 5, 5, 5),
+	FB_FORMAT_RGBA(5, 5, 5, 1),
+	FB_FORMAT_BGRA(5, 5, 5, 1),
+
+	FB_FORMAT_RGB(5, 6, 5),
+	FB_FORMAT_BGR(5, 6, 5),
+
+	FB_FORMAT_RGB(8, 8, 8),
+	FB_FORMAT_BGR(8, 8, 8),
+
+	FB_FORMAT_XRGB(8, 8, 8, 8),
+	FB_FORMAT_XBGR(8, 8, 8, 8),
+	FB_FORMAT_RGBX(8, 8, 8, 8),
+	FB_FORMAT_BGRX(8, 8, 8, 8),
+
+	FB_FORMAT_ARGB(8, 8, 8, 8),
+	FB_FORMAT_ABGR(8, 8, 8, 8),
+	FB_FORMAT_RGBA(8, 8, 8, 8),
+	FB_FORMAT_BGRA(8, 8, 8, 8),
+
+	FB_FORMAT_XRGB(2, 10, 10, 10),
+	FB_FORMAT_XBGR(2, 10, 10, 10),
+	FB_FORMAT_RGBX(10, 10, 10, 2),
+	FB_FORMAT_BGRX(10, 10, 10, 2),
+
+	FB_FORMAT_ARGB(2, 10, 10, 10),
+	FB_FORMAT_ABGR(2, 10, 10, 10),
+	FB_FORMAT_RGBA(10, 10, 10, 2),
+	FB_FORMAT_BGRA(10, 10, 10, 2),
+};
+
+static bool fb_format_match(const struct fb_var_screeninfo *var,
+			    const struct drm_fb_helper_format *fb_format)
+{
+	return !memcmp(&var->red, &fb_format->red,
+		       sizeof(var->red)) &&
+		!memcmp(&var->green, &fb_format->green,
+			sizeof(var->green)) &&
+		!memcmp(&var->blue, &fb_format->blue,
+			sizeof(var->blue)) &&
+		!memcmp(&var->transp, &fb_format->transp,
+			sizeof(var->transp));
+}
+
+static const struct drm_fb_helper_format *fb_format_lookup(u32 format)
+{
+	int i;
+
+	for (i = 0; i < ARRAY_SIZE(fb_formats); i++) {
+		if (fb_formats[i].format == format)
+			return &fb_formats[i];
+	}
+
+	return NULL;
+}
+
 /**
  * drm_fb_helper_check_var - implementation for &fb_ops.fb_check_var
  * @var: screeninfo to check
@@ -1569,9 +1711,9 @@ EXPORT_SYMBOL(drm_fb_helper_ioctl);
 int drm_fb_helper_check_var(struct fb_var_screeninfo *var,
 			    struct fb_info *info)
 {
+	const struct drm_fb_helper_format *fb_format;
 	struct drm_fb_helper *fb_helper = info->par;
 	struct drm_framebuffer *fb = fb_helper->fb;
-	int depth;
 
 	if (var->pixclock != 0 || in_dbg_master())
 		return -EINVAL;
@@ -1591,72 +1733,20 @@ int drm_fb_helper_check_var(struct fb_var_screeninfo *var,
 		return -EINVAL;
 	}
 
-	switch (var->bits_per_pixel) {
-	case 16:
-		depth = (var->green.length == 6) ? 16 : 15;
-		break;
-	case 32:
-		depth = (var->transp.length > 0) ? 32 : 24;
-		break;
-	default:
-		depth = var->bits_per_pixel;
-		break;
-	}
+	/*
+	 * FIXME just store the fb_bitfields for the
+	 * chosen fb format somewhere to avoid the lookup?
+	 * Or sort the table and use bsearch()?
+	 */
+	fb_format = fb_format_lookup(fb->format->format);
+	if (WARN_ON(!fb_format))
+		return -EINVAL;
 
-	switch (depth) {
-	case 8:
-		var->red.offset = 0;
-		var->green.offset = 0;
-		var->blue.offset = 0;
-		var->red.length = 8;
-		var->green.length = 8;
-		var->blue.length = 8;
-		var->transp.length = 0;
-		var->transp.offset = 0;
-		break;
-	case 15:
-		var->red.offset = 10;
-		var->green.offset = 5;
-		var->blue.offset = 0;
-		var->red.length = 5;
-		var->green.length = 5;
-		var->blue.length = 5;
-		var->transp.length = 1;
-		var->transp.offset = 15;
-		break;
-	case 16:
-		var->red.offset = 11;
-		var->green.offset = 5;
-		var->blue.offset = 0;
-		var->red.length = 5;
-		var->green.length = 6;
-		var->blue.length = 5;
-		var->transp.length = 0;
-		var->transp.offset = 0;
-		break;
-	case 24:
-		var->red.offset = 16;
-		var->green.offset = 8;
-		var->blue.offset = 0;
-		var->red.length = 8;
-		var->green.length = 8;
-		var->blue.length = 8;
-		var->transp.length = 0;
-		var->transp.offset = 0;
-		break;
-	case 32:
-		var->red.offset = 16;
-		var->green.offset = 8;
-		var->blue.offset = 0;
-		var->red.length = 8;
-		var->green.length = 8;
-		var->blue.length = 8;
-		var->transp.length = 8;
-		var->transp.offset = 24;
-		break;
-	default:
+	if (!fb_format_match(var, fb_format)) {
+		DRM_DEBUG_KMS("var screeninfo does not match pixel format\n");
 		return -EINVAL;
 	}
+
 	return 0;
 }
 EXPORT_SYMBOL(drm_fb_helper_check_var);
@@ -1948,6 +2038,7 @@ EXPORT_SYMBOL(drm_fb_helper_fill_fix);
 void drm_fb_helper_fill_var(struct fb_info *info, struct drm_fb_helper *fb_helper,
 			    uint32_t fb_width, uint32_t fb_height)
 {
+	const struct drm_fb_helper_format *fb_format;
 	struct drm_framebuffer *fb = fb_helper->fb;
 
 	info->pseudo_palette = fb_helper->pseudo_palette;
@@ -1959,59 +2050,14 @@ void drm_fb_helper_fill_var(struct fb_info *info, struct drm_fb_helper *fb_helpe
 	info->var.yoffset = 0;
 	info->var.activate = FB_ACTIVATE_NOW;
 
-	switch (fb->format->depth) {
-	case 8:
-		info->var.red.offset = 0;
-		info->var.green.offset = 0;
-		info->var.blue.offset = 0;
-		info->var.red.length = 8; /* 8bit DAC */
-		info->var.green.length = 8;
-		info->var.blue.length = 8;
-		info->var.transp.offset = 0;
-		info->var.transp.length = 0;
-		break;
-	case 15:
-		info->var.red.offset = 10;
-		info->var.green.offset = 5;
-		info->var.blue.offset = 0;
-		info->var.red.length = 5;
-		info->var.green.length = 5;
-		info->var.blue.length = 5;
-		info->var.transp.offset = 15;
-		info->var.transp.length = 1;
-		break;
-	case 16:
-		info->var.red.offset = 11;
-		info->var.green.offset = 5;
-		info->var.blue.offset = 0;
-		info->var.red.length = 5;
-		info->var.green.length = 6;
-		info->var.blue.length = 5;
-		info->var.transp.offset = 0;
-		break;
-	case 24:
-		info->var.red.offset = 16;
-		info->var.green.offset = 8;
-		info->var.blue.offset = 0;
-		info->var.red.length = 8;
-		info->var.green.length = 8;
-		info->var.blue.length = 8;
-		info->var.transp.offset = 0;
-		info->var.transp.length = 0;
-		break;
-	case 32:
-		info->var.red.offset = 16;
-		info->var.green.offset = 8;
-		info->var.blue.offset = 0;
-		info->var.red.length = 8;
-		info->var.green.length = 8;
-		info->var.blue.length = 8;
-		info->var.transp.offset = 24;
-		info->var.transp.length = 8;
-		break;
-	default:
-		break;
-	}
+	fb_format = fb_format_lookup(fb->format->format);
+	if (WARN_ON(!fb_format))
+		return;
+
+	info->var.red = fb_format->red;
+	info->var.green = fb_format->green;
+	info->var.blue = fb_format->blue;
+	info->var.transp = fb_format->transp;
 
 	info->var.xres = fb_width;
 	info->var.yres = fb_height;
