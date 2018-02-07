@@ -844,10 +844,8 @@ static int interface_init(struct mdp5_kms *mdp5_kms)
 			continue;
 
 		intf = kzalloc(sizeof(*intf), GFP_KERNEL);
-		if (!intf) {
-			dev_err(dev->dev, "failed to construct INTF%d\n", i);
+		if (!intf)
 			return -ENOMEM;
-		}
 
 		intf->num = i;
 		intf->type = intf_types[i];

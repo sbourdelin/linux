@@ -717,7 +717,6 @@ struct mdp5_ctl_manager *mdp5_ctlm_init(struct drm_device *dev,
 
 	ctl_mgr = kzalloc(sizeof(*ctl_mgr), GFP_KERNEL);
 	if (!ctl_mgr) {
-		dev_err(dev->dev, "failed to allocate CTL manager\n");
 		ret = -ENOMEM;
 		goto fail;
 	}
