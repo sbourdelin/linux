@@ -692,6 +692,7 @@ static void move_data_block(struct inode *inode, block_t bidx,
 	fio.op = REQ_OP_WRITE;
 	fio.op_flags = REQ_SYNC;
 	fio.new_blkaddr = newaddr;
+	set_cold_data(fio.page);
 	err = f2fs_submit_page_write(&fio);
 	if (err) {
 		if (PageWriteback(fio.encrypted_page))
