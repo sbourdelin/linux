@@ -16,6 +16,8 @@
  */
 
 #ifdef CONFIG_DEBUG_FS
+
+#include <linux/debugfs.h>
 #include "msm_drv.h"
 #include "msm_gpu.h"
 #include "msm_kms.h"
@@ -26,6 +28,7 @@ static int msm_gpu_show(struct drm_device *dev, struct seq_file *m)
 	struct msm_drm_private *priv = dev->dev_private;
 	struct msm_gpu *gpu = priv->gpu;
 	struct msm_gpu_state *state;
+	struct drm_printer p = drm_seq_file_printer(m);
 
 	if (!gpu)
 		return 0;
@@ -37,8 +40,8 @@ static int msm_gpu_show(struct drm_device *dev, struct seq_file *m)
 	if (IS_ERR(state))
 		return PTR_ERR(state);
 
-	seq_printf(m, "%s Status:\n", gpu->name);
-	gpu->funcs->show(gpu, state, m);
+	drm_printf(&p, "%s Status:\n", gpu->name);
+	gpu->funcs->show(gpu, state, &p);
 
 	gpu->funcs->gpu_state_put(state);
 
