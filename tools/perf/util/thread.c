@@ -212,6 +212,7 @@ static int ____thread__set_comm(struct thread *thread, const char *str,
 			unwind__flush_access(thread);
 	}
 
+	thread->comm_changed = true;
 	thread->comm_set = true;
 
 	return 0;

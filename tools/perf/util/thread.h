@@ -27,6 +27,7 @@ struct thread {
 	int			cpu;
 	refcount_t		refcnt;
 	char			shortname[3];
+	bool			comm_changed;
 	bool			comm_set;
 	int			comm_len;
 	bool			dead; /* if set thread has exited */
