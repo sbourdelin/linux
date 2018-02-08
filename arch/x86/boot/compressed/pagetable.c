@@ -16,6 +16,9 @@
 #define __pa(x)  ((unsigned long)(x))
 #define __va(x)  ((void *)((unsigned long)(x)))
 
+/* No need in adjustable __PHYSICAL_MASK during decompresssion phase */
+#undef CONFIG_DYNAMIC_PHYSICAL_MASK
+
 /*
  * The pgtable.h and mm/ident_map.c includes make use of the SME related
  * information which is not used in the compressed image support. Un-define
