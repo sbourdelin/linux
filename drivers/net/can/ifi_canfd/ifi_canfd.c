@@ -211,6 +211,7 @@ struct ifi_canfd_priv {
 	struct napi_struct	napi;
 	struct net_device	*ndev;
 	void __iomem		*base;
+	unsigned int		tx_len;
 };
 
 static void ifi_canfd_irq_enable(struct net_device *ndev, bool enable)
@@ -617,8 +618,10 @@ static irqreturn_t ifi_canfd_isr(int irq, void *dev_id)
 
 	/* TX IRQ */
 	if (isr & IFI_CANFD_INTERRUPT_TXFIFO_REMOVE) {
-		stats->tx_bytes += can_get_echo_skb(ndev, 0);
+		can_free_echo_skb(ndev, 0);
+		stats->tx_bytes += priv->tx_len;
 		stats->tx_packets++;
+		priv->tx_len = 0;
 		can_led_event(ndev, CAN_LED_EVENT_TX);
 	}
 
@@ -889,6 +892,7 @@ static netdev_tx_t ifi_canfd_start_xmit(struct sk_buff *skb,
 	}
 
 	txdlc = can_len2dlc(cf->len);
+	priv->tx_len = txdlc;
 	if ((priv->can.ctrlmode & CAN_CTRLMODE_FD) && can_is_canfd_skb(skb)) {
 		txdlc |= IFI_CANFD_TXFIFO_DLC_EDL;
 		if (cf->flags & CANFD_BRS)
@@ -897,6 +901,9 @@ static netdev_tx_t ifi_canfd_start_xmit(struct sk_buff *skb,
 
 	if (cf->can_id & CAN_RTR_FLAG)
 		txdlc |= IFI_CANFD_TXFIFO_DLC_RTR;
+
+	/* set FNR to 1, so we get our Tx Message looped back into RxFIFO */
+	txdlc += (1 << IFI_CANFD_TXFIFO_DLC_FNR_OFFSET);
 
 	/* message ram configuration */
 	writel(txid, priv->base + IFI_CANFD_TXFIFO_ID);
