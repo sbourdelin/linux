@@ -484,8 +484,6 @@ void oaktrail_crtc_hdmi_dpms(struct drm_crtc *crtc, int mode)
 
 	/* LNC Chicken Bits - Squawk! */
 	REG_WRITE(0x70400, 0x4000);
-
-	return;
 }
 
 static void oaktrail_hdmi_dpms(struct drm_encoder *encoder, int mode)
