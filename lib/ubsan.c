@@ -328,6 +328,20 @@ void __ubsan_handle_type_mismatch(struct type_mismatch_data *data,
 }
 EXPORT_SYMBOL(__ubsan_handle_type_mismatch);
 
+void __ubsan_handle_type_mismatch_v1(struct type_mismatch_data_v1 *data_v1,
+				     unsigned long ptr)
+{
+	struct type_mismatch_data data = {
+		.location = data_v1->location,
+		.type = data_v1->type,
+		.alignment = 1UL << data_v1->log_alignment,
+		.type_check_kind = data_v1->type_check_kind,
+	};
+
+	__ubsan_handle_type_mismatch(&data, ptr);
+}
+EXPORT_SYMBOL(__ubsan_handle_type_mismatch_v1);
+
 void __ubsan_handle_nonnull_return(struct nonnull_return_data *data)
 {
 	unsigned long flags;
