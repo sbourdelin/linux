@@ -21,6 +21,7 @@
  *
  */
 #include <linux/firmware.h>
+#include <drm/drm_cache.h>
 #include "amdgpu.h"
 #include "gmc_v9_0.h"
 #include "amdgpu_atomfirmware.h"
@@ -841,6 +842,7 @@ static int gmc_v9_0_sw_init(void *handle)
 	 */
 	adev->need_dma32 = false;
 	dma_bits = adev->need_dma32 ? 32 : 44;
+	adev->need_swiotlb = drm_get_max_iomem() > ((u64)1 << dma_bits);
 	r = pci_set_dma_mask(adev->pdev, DMA_BIT_MASK(dma_bits));
 	if (r) {
 		adev->need_dma32 = true;
