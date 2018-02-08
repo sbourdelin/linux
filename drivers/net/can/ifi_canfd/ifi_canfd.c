@@ -607,7 +607,7 @@ static irqreturn_t ifi_canfd_isr(int irq, void *dev_id)
 		return IRQ_NONE;
 
 	/* Clear all pending interrupts but ErrWarn */
-	writel(clr_irq_mask, priv->base + IFI_CANFD_INTERRUPT);
+	writel(isr & clr_irq_mask, priv->base + IFI_CANFD_INTERRUPT);
 
 	/* RX IRQ or bus warning, start NAPI */
 	if (isr & rx_irq_mask) {
