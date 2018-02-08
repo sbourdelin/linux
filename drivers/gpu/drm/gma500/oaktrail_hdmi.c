@@ -690,11 +690,8 @@ void oaktrail_hdmi_setup(struct drm_device *dev)
 		return;
 
 	hdmi_dev = kzalloc(sizeof(struct oaktrail_hdmi_dev), GFP_KERNEL);
-	if (!hdmi_dev) {
-		dev_err(dev->dev, "failed to allocate memory\n");
+	if (!hdmi_dev)
 		goto out;
-	}
-
 
 	ret = pci_enable_device(pdev);
 	if (ret) {

@@ -530,10 +530,8 @@ int psb_fbdev_init(struct drm_device *dev)
 	int ret;
 
 	fbdev = kzalloc(sizeof(struct psb_fbdev), GFP_KERNEL);
-	if (!fbdev) {
-		dev_err(dev->dev, "no memory\n");
+	if (!fbdev)
 		return -ENOMEM;
-	}
 
 	dev_priv->fbdev = fbdev;
 
