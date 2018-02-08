@@ -5282,6 +5282,19 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 	 * run last pass of JIT
 	 */
 	for (i = 0; i <= env->subprog_cnt; i++) {
+		u32 flen = func[i]->len, callee_cnt = 0;
+		struct bpf_prog **callee;
+
+		/* for now assume that the maximum number of bpf function
+		 * calls that can be made by a caller must be at most the
+		 * number of bpf instructions in that function
+		 */
+		callee = kzalloc(sizeof(func[i]) * flen, GFP_KERNEL);
+		if (!callee) {
+			err = -ENOMEM;
+			goto out_free;
+		}
+
 		insn = func[i]->insnsi;
 		for (j = 0; j < func[i]->len; j++, insn++) {
 			if (insn->code != (BPF_JMP | BPF_CALL) ||
@@ -5292,6 +5305,26 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 			insn->imm = (u64 (*)(u64, u64, u64, u64, u64))
 				func[subprog]->bpf_func -
 				__bpf_call_base;
+
+			/* the offset to the callee from __bpf_call_base
+			 * may be larger than what the 32 bit integer imm
+			 * can accomodate which will truncate the higher
+			 * order bits
+			 *
+			 * to avoid this, we additionally utilize the aux
+			 * data of each caller function for storing the
+			 * addresses of every callee associated with it
+			 */
+			callee[callee_cnt++] = func[subprog];
+		}
+
+		/* free up callee list if no function calls were made */
+		if (!callee_cnt) {
+			kfree(callee);
+			callee = NULL;
+		} else {
+			func[i]->aux->func = callee;
+			func[i]->aux->func_cnt = callee_cnt;
 		}
 	}
 	for (i = 0; i <= env->subprog_cnt; i++) {
@@ -5338,8 +5371,12 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 	return 0;
 out_free:
 	for (i = 0; i <= env->subprog_cnt; i++)
-		if (func[i])
+		if (func[i]) {
+			/* cleanup callee list */
+			if (func[i]->aux->func)
+				kfree(func[i]->aux->func);
 			bpf_jit_free(func[i]);
+		}
 	kfree(func);
 	/* cleanup main prog to be interpreted */
 	prog->jit_requested = 0;
