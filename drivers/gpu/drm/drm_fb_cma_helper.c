@@ -408,10 +408,9 @@ struct drm_fbdev_cma *drm_fbdev_cma_init_with_funcs(struct drm_device *dev,
 	int ret;
 
 	fbdev_cma = kzalloc(sizeof(*fbdev_cma), GFP_KERNEL);
-	if (!fbdev_cma) {
-		dev_err(dev->dev, "Failed to allocate drm fbdev.\n");
+	if (!fbdev_cma)
 		return ERR_PTR(-ENOMEM);
-	}
+
 	fbdev_cma->fb_funcs = funcs;
 
 	helper = &fbdev_cma->fb_helper;
