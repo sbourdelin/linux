@@ -44,6 +44,8 @@ struct ptr_ring {
 	void **queue;
 };
 
+#define PTR_RING_MAX_ALLOC 65536
+
 /* Note: callers invoking this in a loop must use a compiler barrier,
  * for example cpu_relax().
  *
@@ -466,6 +468,8 @@ static inline int ptr_ring_consume_batched_bh(struct ptr_ring *r,
 
 static inline void **__ptr_ring_init_queue_alloc(unsigned int size, gfp_t gfp)
 {
+	if (size > PTR_RING_MAX_ALLOC)
+		return NULL;
 	return kvmalloc_array(size, sizeof(void *), gfp | __GFP_ZERO);
 }
 
