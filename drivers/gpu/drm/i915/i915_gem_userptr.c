@@ -411,7 +411,7 @@ struct get_pages_work {
 	struct task_struct *task;
 };
 
-static struct sg_table *
+static int
 __i915_gem_userptr_alloc_pages(struct drm_i915_gem_object *obj,
 			       struct page **pvec, int num_pages)
 {
@@ -422,7 +422,7 @@ __i915_gem_userptr_alloc_pages(struct drm_i915_gem_object *obj,
 
 	st = kmalloc(sizeof(*st), GFP_KERNEL);
 	if (!st)
-		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 
 alloc_table:
 	ret = __sg_alloc_table_from_pages(st, pvec, num_pages,
@@ -431,7 +431,7 @@ alloc_table:
 					  GFP_KERNEL);
 	if (ret) {
 		kfree(st);
-		return ERR_PTR(ret);
+		return ret;
 	}
 
 	ret = i915_gem_gtt_prepare_pages(obj, st);
@@ -444,14 +444,14 @@ alloc_table:
 		}
 
 		kfree(st);
-		return ERR_PTR(ret);
+		return ret;
 	}
 
 	sg_page_sizes = i915_sg_page_sizes(st->sgl);
 
 	__i915_gem_object_set_pages(obj, st, sg_page_sizes);
 
-	return st;
+	return 0;
 }
 
 static int
@@ -532,19 +532,14 @@ __i915_gem_userptr_get_pages_worker(struct work_struct *_work)
 
 	mutex_lock(&obj->mm.lock);
 	if (obj->userptr.work == &work->work) {
-		struct sg_table *pages = ERR_PTR(ret);
-
 		if (pinned == npages) {
-			pages = __i915_gem_userptr_alloc_pages(obj, pvec,
-							       npages);
-			if (!IS_ERR(pages)) {
+			ret = __i915_gem_userptr_alloc_pages(obj, pvec, npages);
+			if (!ret)
 				pinned = 0;
-				pages = NULL;
-			}
 		}
 
-		obj->userptr.work = ERR_CAST(pages);
-		if (IS_ERR(pages))
+		obj->userptr.work = ERR_PTR(ret);
+		if (ret)
 			__i915_gem_userptr_set_active(obj, false);
 	}
 	mutex_unlock(&obj->mm.lock);
@@ -557,7 +552,7 @@ __i915_gem_userptr_get_pages_worker(struct work_struct *_work)
 	kfree(work);
 }
 
-static struct sg_table *
+static int
 __i915_gem_userptr_get_pages_schedule(struct drm_i915_gem_object *obj)
 {
 	struct get_pages_work *work;
@@ -583,7 +578,7 @@ __i915_gem_userptr_get_pages_schedule(struct drm_i915_gem_object *obj)
 	 */
 	work = kmalloc(sizeof(*work), GFP_KERNEL);
 	if (work == NULL)
-		return ERR_PTR(-ENOMEM);
+		return -ENOMEM;
 
 	obj->userptr.work = &work->work;
 
@@ -595,7 +590,38 @@ __i915_gem_userptr_get_pages_schedule(struct drm_i915_gem_object *obj)
 	INIT_WORK(&work->work, __i915_gem_userptr_get_pages_worker);
 	queue_work(to_i915(obj->base.dev)->mm.userptr_wq, &work->work);
 
-	return ERR_PTR(-EAGAIN);
+	return -EAGAIN;
+}
+
+static int
+probe_range(struct mm_struct *mm, unsigned long addr, unsigned long len)
+{
+	const unsigned long end = addr + len;
+	struct vm_area_struct *vma;
+	int ret = -EFAULT;
+
+	for (vma = find_vma(mm, addr); vma; vma = vma->vm_next) {
+		if (vma->vm_start > addr)
+			break;
+
+		/*
+		 * Exclude any VMA that is backed only by struct_page, i.e.
+		 * IO regions that include our own GGTT mmaps. We cannot handle
+		 * such ranges, as we may encounter deadlocks around our
+		 * struct_mutex on mmu_invalidate_range.
+		 */
+		if (vma->vm_flags & (VM_PFNMAP | VM_MIXEDMAP))
+			break;
+
+		if (vma->vm_end >= end) {
+			ret = 0;
+			break;
+		}
+
+		addr = vma->vm_end;
+	}
+
+	return ret;
 }
 
 static int i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj)
@@ -603,9 +629,7 @@ static int i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj)
 	const int num_pages = obj->base.size >> PAGE_SHIFT;
 	struct mm_struct *mm = obj->userptr.mm->mm;
 	struct page **pvec;
-	struct sg_table *pages;
-	bool active;
-	int pinned;
+	int pinned, err;
 
 	/* If userspace should engineer that these pages are replaced in
 	 * the vma between us binding this page into the GTT and completion
@@ -634,38 +658,52 @@ static int i915_gem_userptr_get_pages(struct drm_i915_gem_object *obj)
 
 	pvec = NULL;
 	pinned = 0;
-
 	if (mm == current->mm) {
 		pvec = kvmalloc_array(num_pages, sizeof(struct page *),
 				      GFP_KERNEL |
 				      __GFP_NORETRY |
 				      __GFP_NOWARN);
-		if (pvec) /* defer to worker if malloc fails */
+		if (pvec) { /* defer to worker if malloc fails */
 			pinned = __get_user_pages_fast(obj->userptr.ptr,
 						       num_pages,
 						       !obj->userptr.read_only,
 						       pvec);
+			if (pinned < 0) {
+				err = pinned;
+				goto out_pvec;
+			}
+		}
 	}
 
-	active = false;
-	if (pinned < 0) {
-		pages = ERR_PTR(pinned);
-		pinned = 0;
-	} else if (pinned < num_pages) {
-		pages = __i915_gem_userptr_get_pages_schedule(obj);
-		active = pages == ERR_PTR(-EAGAIN);
-	} else {
-		pages = __i915_gem_userptr_alloc_pages(obj, pvec, num_pages);
-		active = !IS_ERR(pages);
-	}
-	if (active)
-		__i915_gem_userptr_set_active(obj, true);
+	/* lockdep doesn't yet automatically allow nesting of readers */
+	down_read_nested(&mm->mmap_sem, SINGLE_DEPTH_NESTING);
 
-	if (IS_ERR(pages))
-		release_pages(pvec, pinned);
+	if (pinned < num_pages &&
+	    probe_range(mm, obj->userptr.ptr, obj->base.size)) {
+		err = -EFAULT;
+		goto err_pinned;
+	}
+
+	err = __i915_gem_userptr_set_active(obj, true);
+	if (err)
+		goto err_pinned;
+
+	if (pinned < num_pages)
+		err = __i915_gem_userptr_get_pages_schedule(obj);
+	else
+		err = __i915_gem_userptr_alloc_pages(obj, pvec, num_pages);
+	if (err != -EAGAIN) {
+		__i915_gem_userptr_set_active(obj, false);
+		goto err_pinned;
+	}
+
+	pinned = 0;
+err_pinned:
+	up_read(&mm->mmap_sem);
+	release_pages(pvec, pinned);
+out_pvec:
 	kvfree(pvec);
-
-	return PTR_ERR_OR_ZERO(pages);
+	return err;
 }
 
 static void
