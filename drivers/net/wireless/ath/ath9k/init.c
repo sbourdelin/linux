@@ -56,7 +56,7 @@ static int ath9k_led_active_high = -1;
 module_param_named(led_active_high, ath9k_led_active_high, int, 0444);
 MODULE_PARM_DESC(led_active_high, "Invert LED polarity");
 
-static int ath9k_btcoex_enable;
+static int ath9k_btcoex_enable = 1;
 module_param_named(btcoex_enable, ath9k_btcoex_enable, int, 0444);
 MODULE_PARM_DESC(btcoex_enable, "Enable wifi-BT coexistence");
 
@@ -693,7 +693,6 @@ static int ath9k_init_softc(u16 devid, struct ath_softc *sc,
 	common->hw = sc->hw;
 	common->priv = sc;
 	common->debug_mask = ath9k_debug;
-	common->btcoex_enabled = ath9k_btcoex_enable == 1;
 	common->disable_ani = false;
 
 	/*
@@ -715,13 +714,16 @@ static int ath9k_init_softc(u16 devid, struct ath_softc *sc,
 	/*
 	 * Enable WLAN/BT RX Antenna diversity only when:
 	 *
-	 * - BTCOEX is disabled.
 	 * - the user manually requests the feature.
 	 * - the HW cap is set using the platform data.
 	 */
-	if (!common->btcoex_enabled && ath9k_bt_ant_diversity &&
+	if (ath9k_bt_ant_diversity &&
 	    (pCap->hw_caps & ATH9K_HW_CAP_BT_ANT_DIV))
 		common->bt_ant_diversity = 1;
+
+	/* Enable btcoex when ant_diversity is disabled */
+	if (!common->bt_ant_diversity && ath9k_btcoex_enable)
+		common->btcoex_enabled = 1;
 
 	spin_lock_init(&common->cc_lock);
 	spin_lock_init(&sc->intr_lock);
