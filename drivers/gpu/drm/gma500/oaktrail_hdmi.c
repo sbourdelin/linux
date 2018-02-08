@@ -637,11 +637,11 @@ void oaktrail_hdmi_init(struct drm_device *dev,
 	struct drm_connector *connector;
 	struct drm_encoder *encoder;
 
-	gma_encoder = kzalloc(sizeof(struct gma_encoder), GFP_KERNEL);
+	gma_encoder = kzalloc(sizeof(*gma_encoder), GFP_KERNEL);
 	if (!gma_encoder)
 		return;
 
-	gma_connector = kzalloc(sizeof(struct gma_connector), GFP_KERNEL);
+	gma_connector = kzalloc(sizeof(*gma_connector), GFP_KERNEL);
 	if (!gma_connector)
 		goto failed_connector;
 
@@ -689,7 +689,7 @@ void oaktrail_hdmi_setup(struct drm_device *dev)
 	if (!pdev)
 		return;
 
-	hdmi_dev = kzalloc(sizeof(struct oaktrail_hdmi_dev), GFP_KERNEL);
+	hdmi_dev = kzalloc(sizeof(*hdmi_dev), GFP_KERNEL);
 	if (!hdmi_dev)
 		goto out;
 

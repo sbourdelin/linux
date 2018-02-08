@@ -525,11 +525,10 @@ static int psb_fbdev_destroy(struct drm_device *dev, struct psb_fbdev *fbdev)
 
 int psb_fbdev_init(struct drm_device *dev)
 {
-	struct psb_fbdev *fbdev;
 	struct drm_psb_private *dev_priv = dev->dev_private;
 	int ret;
+	struct psb_fbdev *fbdev = kzalloc(sizeof(*fbdev), GFP_KERNEL);
 
-	fbdev = kzalloc(sizeof(struct psb_fbdev), GFP_KERNEL);
 	if (!fbdev)
 		return -ENOMEM;
 
