@@ -7,6 +7,13 @@
 #include <linux/poison.h>
 #include <linux/ratelimit.h>
 
+/********** mm/debug-pagealloc.c **********/
+#ifdef CONFIG_PAGE_POISONING_ZERO
+#define PAGE_POISON 0x00
+#else
+#define PAGE_POISON 0xaa
+#endif
+
 static bool want_page_poisoning __read_mostly;
 
 static int early_page_poison_param(char *buf)
@@ -29,6 +36,23 @@ bool page_poisoning_enabled(void)
 		(!IS_ENABLED(CONFIG_ARCH_SUPPORTS_DEBUG_PAGEALLOC) &&
 		debug_pagealloc_enabled()));
 }
+
+/**
+ * page_poison_val_get - get the page poison value if page poisoning is enabled
+ * @val: the caller's memory to get the page poison value
+ *
+ * Return true with @val stores the poison value if page poisoning is enabled.
+ * Otherwise, return false with @val unchanged.
+ */
+bool page_poison_val_get(u8 *val)
+{
+	if (!page_poisoning_enabled())
+		return false;
+
+	*val = PAGE_POISON;
+	return true;
+}
+EXPORT_SYMBOL_GPL(page_poison_val_get);
 
 static void poison_page(struct page *page)
 {

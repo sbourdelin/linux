@@ -2469,11 +2469,13 @@ extern int apply_to_page_range(struct mm_struct *mm, unsigned long address,
 extern bool page_poisoning_enabled(void);
 extern void kernel_poison_pages(struct page *page, int numpages, int enable);
 extern bool page_is_poisoned(struct page *page);
+extern bool page_poison_val_get(u8 *val);
 #else
 static inline bool page_poisoning_enabled(void) { return false; }
 static inline void kernel_poison_pages(struct page *page, int numpages,
 					int enable) { }
 static inline bool page_is_poisoned(struct page *page) { return false; }
+static inline bool page_poison_val_get(u8 *val) { return false; };
 #endif
 
 #ifdef CONFIG_DEBUG_PAGEALLOC
