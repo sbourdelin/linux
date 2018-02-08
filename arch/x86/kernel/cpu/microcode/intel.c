@@ -38,6 +38,7 @@
 #include <asm/tlbflush.h>
 #include <asm/setup.h>
 #include <asm/msr.h>
+#include "../kernel/cpu/cpu.h" /* get_cpu_cap() */
 
 static const char ucode_path[] = "kernel/x86/microcode/GenuineIntel.bin";
 
@@ -767,7 +768,7 @@ static int apply_microcode_intel(int cpu)
 {
 	struct microcode_intel *mc;
 	struct ucode_cpu_info *uci;
-	struct cpuinfo_x86 *c;
+	struct cpuinfo_x86 *c, new_cpuinfo;
 	static int prev_rev;
 	u32 rev;
 
@@ -795,16 +796,22 @@ static int apply_microcode_intel(int cpu)
 		return -1;
 	}
 
+	c = &cpu_data(cpu);
 	if (rev != prev_rev) {
 		pr_info("updated to revision 0x%x, date = %04x-%02x-%02x\n",
 			rev,
 			mc->hdr.date & 0xffff,
 			mc->hdr.date >> 24,
 			(mc->hdr.date >> 16) & 0xff);
+		memset(&new_cpuinfo, 0, sizeof (struct cpuinfo_x86));
+		get_cpu_cap(&new_cpuinfo);
+		if (memcmp(&c->x86_capability, &new_cpuinfo.x86_capability,
+			sizeof(new_cpuinfo.x86_capability))) {
+				pr_warn_once("New features found in loaded microcode, but will be ignored\n");
+				pr_warn_once("Please consider either early loading through initrd/built-in or a potential BIOS update.\n");
+		}
 		prev_rev = rev;
 	}
-
-	c = &cpu_data(cpu);
 
 	uci->cpu_sig.rev = rev;
 	c->microcode = rev;
