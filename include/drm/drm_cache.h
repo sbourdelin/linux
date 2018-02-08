@@ -39,6 +39,19 @@ void drm_clflush_pages(struct page *pages[], unsigned long num_pages);
 void drm_clflush_sg(struct sg_table *st);
 void drm_clflush_virt_range(void *addr, unsigned long length);
 
+static inline u64 drm_get_max_iomem(void)
+{
+	struct resource *tmp;
+	u64 max_iomem = 0;
+
+	for (tmp = iomem_resource.child; tmp; tmp = tmp->sibling) {
+		max_iomem = max(max_iomem,  tmp->end);
+	}
+
+	return max_iomem;
+}
+
+
 static inline bool drm_arch_can_wc_memory(void)
 {
 #if defined(CONFIG_PPC) && !defined(CONFIG_NOT_COHERENT_CACHE)
