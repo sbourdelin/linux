@@ -132,6 +132,8 @@ static void check_hung_task(struct task_struct *t, unsigned long timeout)
 		trigger_all_cpu_backtrace();
 		panic("hung_task: blocked tasks");
 	}
+
+	wake_up_process(t);
 }
 
 /*
