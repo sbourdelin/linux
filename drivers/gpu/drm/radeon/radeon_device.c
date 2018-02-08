@@ -29,6 +29,7 @@
 #include <linux/slab.h>
 #include <drm/drmP.h>
 #include <drm/drm_crtc_helper.h>
+#include <drm/drm_cache.h>
 #include <drm/radeon_drm.h>
 #include <linux/pm_runtime.h>
 #include <linux/vgaarb.h>
@@ -1367,6 +1368,7 @@ int radeon_device_init(struct radeon_device *rdev,
 		rdev->need_dma32 = true;
 
 	dma_bits = rdev->need_dma32 ? 32 : 40;
+	rdev->need_swiotlb = drm_get_max_iomem() > ((u64)1 << dma_bits);
 	r = pci_set_dma_mask(rdev->pdev, DMA_BIT_MASK(dma_bits));
 	if (r) {
 		rdev->need_dma32 = true;
