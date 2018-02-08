@@ -607,7 +607,8 @@ fb: psubq Pq,Qq | vpsubq Vx,Hx,Wx (66),(v1)
 fc: paddb Pq,Qq | vpaddb Vx,Hx,Wx (66),(v1)
 fd: paddw Pq,Qq | vpaddw Vx,Hx,Wx (66),(v1)
 fe: paddd Pq,Qq | vpaddd Vx,Hx,Wx (66),(v1)
-ff: UD0
+# UD0 is special. This is changed in newer processor to have operands.
+ff: UD0 Gd,Ed
 EndTable
 
 Table: 3-byte opcode 1 (0x0f 0x38)
