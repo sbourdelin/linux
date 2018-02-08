@@ -31,6 +31,7 @@
 #include <linux/stop_machine.h>
 #include <linux/zlib.h>
 #include <drm/drm_print.h>
+#include <linux/ascii85.h>
 
 #include "i915_drv.h"
 
@@ -502,35 +503,12 @@ void i915_error_printf(struct drm_i915_error_state_buf *e, const char *f, ...)
 	va_end(args);
 }
 
-static int
-ascii85_encode_len(int len)
-{
-	return DIV_ROUND_UP(len, 4);
-}
-
-static bool
-ascii85_encode(u32 in, char *out)
-{
-	int i;
-
-	if (in == 0)
-		return false;
-
-	out[5] = '\0';
-	for (i = 5; i--; ) {
-		out[i] = '!' + in % 85;
-		in /= 85;
-	}
-
-	return true;
-}
-
 static void print_error_obj(struct drm_i915_error_state_buf *m,
 			    struct intel_engine_cs *engine,
 			    const char *name,
 			    struct drm_i915_error_object *obj)
 {
-	char out[6];
+	char out[ASCII85_BUFSZ];
 	int page;
 
 	if (!obj)
@@ -545,19 +523,15 @@ static void print_error_obj(struct drm_i915_error_state_buf *m,
 
 	err_compression_marker(m);
 	for (page = 0; page < obj->page_count; page++) {
-		int i, len;
+		int i;
+		long len = PAGE_SIZE;
 
-		len = PAGE_SIZE;
 		if (page == obj->page_count - 1)
 			len -= obj->unused;
 		len = ascii85_encode_len(len);
 
-		for (i = 0; i < len; i++) {
-			if (ascii85_encode(obj->pages[page][i], out))
-				err_puts(m, out);
-			else
-				err_puts(m, "z");
-		}
+		for (i = 0; i < len; i++)
+			error_puts(m, ascii85_encode(obj->pages[page][i], out));
 	}
 	err_puts(m, "\n");
 }
