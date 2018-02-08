@@ -291,6 +291,54 @@ static int kvmppc_create_pte(struct kvm *kvm, pte_t pte, unsigned long gpa,
 	return ret;
 }
 
+/*
+ * Stolen from virt/kvm/kvm_main.c
+ */
+static int hva_to_pfn_remapped(struct vm_area_struct *vma,
+			       unsigned long addr, bool write_fault,
+			       unsigned long *p_pfn)
+{
+	unsigned long pfn;
+	int r;
+
+	r = follow_pfn(vma, addr, &pfn);
+	if (r) {
+		/*
+		 * get_user_pages fails for VM_IO and VM_PFNMAP vmas and does
+		 * not call the fault handler, so do it here.
+		 */
+		bool unlocked = false;
+
+		r = fixup_user_fault(current, current->mm, addr,
+				     (write_fault ? FAULT_FLAG_WRITE : 0),
+				     &unlocked);
+		if (unlocked)
+			return -EAGAIN;
+		if (r)
+			return r;
+
+		r = follow_pfn(vma, addr, &pfn);
+		if (r)
+			return r;
+	}
+
+	/*
+	 * Get a reference here because callers of *hva_to_pfn* and
+	 * *gfn_to_pfn* ultimately call kvm_release_pfn_clean on the
+	 * returned pfn.  This is only needed if the VMA has VM_MIXEDMAP
+	 * set, but the kvm_get_pfn/kvm_release_pfn_clean pair will
+	 * simply do nothing for reserved pfns.
+	 *
+	 * Whoever called remap_pfn_range is also going to call e.g.
+	 * unmap_mapping_range before the underlying pages are freed,
+	 * causing a call to our MMU notifier.
+	 */
+	kvm_get_pfn(pfn);
+
+	*p_pfn = pfn;
+	return 0;
+}
+
 int kvmppc_book3s_radix_page_fault(struct kvm_run *run, struct kvm_vcpu *vcpu,
 				   unsigned long ea, unsigned long dsisr)
 {
@@ -402,8 +450,15 @@ int kvmppc_book3s_radix_page_fault(struct kvm_run *run, struct kvm_vcpu *vcpu,
 		vma = find_vma(current->mm, hva);
 		if (vma && vma->vm_start <= hva && hva < vma->vm_end &&
 		    (vma->vm_flags & VM_PFNMAP)) {
-			pfn = vma->vm_pgoff +
-				((hva - vma->vm_start) >> PAGE_SHIFT);
+			if (vma->vm_flags & (VM_IO | VM_PFNMAP)) {
+				ret = hva_to_pfn_remapped(vma, hva, writing,
+							  &pfn);
+				if (ret == -EAGAIN)
+					return RESUME_GUEST;
+			} else {
+				pfn = vma->vm_pgoff +
+					((hva - vma->vm_start) >> PAGE_SHIFT);
+			}
 			pgflags = pgprot_val(vma->vm_page_prot);
 		}
 		up_read(&current->mm->mmap_sem);
