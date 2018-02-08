@@ -10985,8 +10985,14 @@ static int nested_vmx_run(struct kvm_vcpu *vcpu, bool launch)
 	if (ret)
 		return ret;
 
-	if (vmcs12->guest_activity_state == GUEST_ACTIVITY_HLT)
-		return kvm_vcpu_halt(vcpu);
+	if (vmcs12->guest_activity_state == GUEST_ACTIVITY_HLT) {
+		u32 intr_info = vmcs_read32(VM_ENTRY_INTR_INFO_FIELD);
+		u32 exec_control = vmcs_read32(SECONDARY_VM_EXEC_CONTROL);
+
+		if (!(intr_info & VECTORING_INFO_VALID_MASK) &&
+			!(exec_control & SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY))
+			return kvm_vcpu_halt(vcpu);
+	}
 
 	vmx->nested.nested_run_pending = 1;
 
