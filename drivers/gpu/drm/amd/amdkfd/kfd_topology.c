@@ -1039,7 +1039,6 @@ int kfd_topology_init(void)
 		crat_image = kmalloc(image_size, GFP_KERNEL);
 		if (!crat_image) {
 			ret = -ENOMEM;
-			pr_err("No memory for allocating CRAT image\n");
 			goto err;
 		}
 		ret = kfd_topology_get_crat_acpi(crat_image, &image_size);
