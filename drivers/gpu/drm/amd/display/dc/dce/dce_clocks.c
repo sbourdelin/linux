@@ -304,7 +304,8 @@ static bool dce_clock_set_min_clocks_state(
 	enum dm_pp_clocks_state clocks_state)
 {
 	struct dm_pp_power_level_change_request level_change_req = {
-			clocks_state };
+		.power_level = (enum dm_pp_power_level)clocks_state
+	};
 
 	if (clocks_state > clk->max_clks_state) {
 		/*Requested state exceeds max supported state.*/
