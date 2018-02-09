@@ -313,6 +313,11 @@ static int nldev_get_doit(struct sk_buff *skb, struct nlmsghdr *nlh,
 	nlh = nlmsg_put(msg, NETLINK_CB(skb).portid, nlh->nlmsg_seq,
 			RDMA_NL_GET_TYPE(RDMA_NL_NLDEV, RDMA_NLDEV_CMD_GET),
 			0, 0);
+	if (!nlh) {
+		err = -EMSGSIZE;
+		goto err_free;
+
+	}
 
 	err = fill_dev_info(msg, device);
 	if (err)
@@ -344,6 +349,8 @@ static int _nldev_get_dumpit(struct ib_device *device,
 	nlh = nlmsg_put(skb, NETLINK_CB(cb->skb).portid, cb->nlh->nlmsg_seq,
 			RDMA_NL_GET_TYPE(RDMA_NL_NLDEV, RDMA_NLDEV_CMD_GET),
 			0, NLM_F_MULTI);
+	if (!nlh)
+		goto out;
 
 	if (fill_dev_info(skb, device)) {
 		nlmsg_cancel(skb, nlh);
@@ -354,7 +361,8 @@ static int _nldev_get_dumpit(struct ib_device *device,
 
 	idx++;
 
-out:	cb->args[0] = idx;
+out:
+	cb->args[0] = idx;
 	return skb->len;
 }
 
@@ -404,6 +412,10 @@ static int nldev_port_get_doit(struct sk_buff *skb, struct nlmsghdr *nlh,
 	nlh = nlmsg_put(msg, NETLINK_CB(skb).portid, nlh->nlmsg_seq,
 			RDMA_NL_GET_TYPE(RDMA_NL_NLDEV, RDMA_NLDEV_CMD_GET),
 			0, 0);
+	if (!nlh) {
+		err = -EMSGSIZE;
+		goto err_free;
+	}
 
 	err = fill_port_info(msg, device, port);
 	if (err)
@@ -464,6 +476,8 @@ static int nldev_port_get_dumpit(struct sk_buff *skb,
 				RDMA_NL_GET_TYPE(RDMA_NL_NLDEV,
 						 RDMA_NLDEV_CMD_PORT_GET),
 				0, NLM_F_MULTI);
+		if (!nlh)
+			goto out;
 
 		if (fill_port_info(skb, device, p)) {
 			nlmsg_cancel(skb, nlh);
@@ -507,6 +521,10 @@ static int nldev_res_get_doit(struct sk_buff *skb, struct nlmsghdr *nlh,
 	nlh = nlmsg_put(msg, NETLINK_CB(skb).portid, nlh->nlmsg_seq,
 			RDMA_NL_GET_TYPE(RDMA_NL_NLDEV, RDMA_NLDEV_CMD_RES_GET),
 			0, 0);
+	if (!nlh) {
+		ret = -EMSGSIZE;
+		goto err_free;
+	}
 
 	ret = fill_res_info(msg, device);
 	if (ret)
@@ -537,6 +555,8 @@ static int _nldev_res_get_dumpit(struct ib_device *device,
 	nlh = nlmsg_put(skb, NETLINK_CB(cb->skb).portid, cb->nlh->nlmsg_seq,
 			RDMA_NL_GET_TYPE(RDMA_NL_NLDEV, RDMA_NLDEV_CMD_RES_GET),
 			0, NLM_F_MULTI);
+	if (!nlh)
+		goto out;
 
 	if (fill_res_info(skb, device)) {
 		nlmsg_cancel(skb, nlh);
@@ -603,6 +623,10 @@ static int nldev_res_get_qp_dumpit(struct sk_buff *skb,
 	nlh = nlmsg_put(skb, NETLINK_CB(cb->skb).portid, cb->nlh->nlmsg_seq,
 			RDMA_NL_GET_TYPE(RDMA_NL_NLDEV, RDMA_NLDEV_CMD_RES_QP_GET),
 			0, NLM_F_MULTI);
+	if (!nlh) {
+		ret = -EMSGSIZE;
+		goto err_index;
+	}
 
 	if (fill_nldev_handle(skb, device)) {
 		ret = -EMSGSIZE;
