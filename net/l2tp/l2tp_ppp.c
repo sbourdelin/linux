@@ -425,6 +425,28 @@ abort:
  * Session (and tunnel control) socket create/destroy.
  *****************************************************************************/
 
+/* called with ps->sk_lock */
+static void pppol2tp_attach(struct l2tp_session *session, struct sock *sk)
+{
+	struct pppol2tp_session *ps = l2tp_session_priv(session);
+
+	write_lock_bh(&sk->sk_callback_lock);
+	rcu_assign_sk_user_data(sk, session);
+	write_unlock_bh(&sk->sk_callback_lock);
+	rcu_assign_pointer(ps->sk, sk);
+}
+
+/* called with ps->sk_lock */
+static void pppol2tp_detach(struct l2tp_session *session, struct sock *sk)
+{
+	struct pppol2tp_session *ps = l2tp_session_priv(session);
+
+	rcu_assign_pointer(ps->sk, NULL);
+	write_lock_bh(&sk->sk_callback_lock);
+	rcu_assign_sk_user_data(sk, NULL);
+	write_unlock_bh(&sk->sk_callback_lock);
+}
+
 /* Called by l2tp_core when a session socket is being closed.
  */
 static void pppol2tp_session_close(struct l2tp_session *session)
@@ -462,10 +484,18 @@ static void pppol2tp_session_destruct(struct sock *sk)
 
 static void pppol2tp_put_sk(struct rcu_head *head)
 {
-	struct pppol2tp_session *ps;
+	struct pppol2tp_session *ps = container_of(head, typeof(*ps), rcu);
+	struct l2tp_session *session = container_of((void *)ps,
+						    typeof(*session), priv);
+	struct sock *sk = ps->__sk;
 
-	ps = container_of(head, typeof(*ps), rcu);
-	sock_put(ps->__sk);
+	/* If session is invalid, something serious is wrong. Warn and
+	 * leak the socket.
+	 */
+	WARN_ON(session->magic != L2TP_SESSION_MAGIC);
+	if (session->magic != L2TP_SESSION_MAGIC)
+		return;
+	sock_put(sk);
 }
 
 /* Called when the PPPoX socket (session) is closed.
@@ -615,25 +645,147 @@ static void pppol2tp_session_init(struct l2tp_session *session)
 	}
 }
 
-/* connect() handler. Attach a PPPoX socket to a tunnel UDP socket
+/* Prepare a tunnel. If a tunnel instance doesn't already exist,
+ * optionally create it. Return with a ref on the tunnel instance.
+ */
+static int pppol2tp_tunnel_prep(struct net *net, int fd, int ver,
+				u32 tunnel_id, u32 peer_tunnel_id,
+				bool can_create, struct l2tp_tunnel **tunnelp)
+{
+	struct l2tp_tunnel *tunnel;
+	int error;
+
+	tunnel = l2tp_tunnel_get(net, tunnel_id);
+	if (!tunnel && can_create) {
+		struct l2tp_tunnel_cfg tcfg = {
+			.encap = L2TP_ENCAPTYPE_UDP,
+			.debug = 0,
+		};
+		error = l2tp_tunnel_create(net, fd, ver, tunnel_id,
+					   peer_tunnel_id, &tcfg, &tunnel);
+		if (error < 0)
+			return error;
+
+		l2tp_tunnel_inc_refcount(tunnel);
+	}
+
+	/* Error if we can't find the tunnel */
+	if (!tunnel)
+		return -ENOENT;
+
+	if (!tunnel->recv_payload_hook)
+		tunnel->recv_payload_hook = pppol2tp_recv_payload_hook;
+
+	if (tunnel->peer_tunnel_id == 0)
+		tunnel->peer_tunnel_id = peer_tunnel_id;
+
+	*tunnelp = tunnel;
+	return 0;
+
+	l2tp_tunnel_dec_refcount(tunnel);
+	return error;
+}
+
+/* Prepare a session in a tunnel. If the session doesn't already
+ * exist, create it and add it to the tunnel's session list. Return
+ * with a ref on the session instance and its sk_lock held.
+ */
+static int pppol2tp_session_prep(struct sock *sk, struct l2tp_tunnel *tunnel,
+				 u32 session_id, u32 peer_session_id,
+				 struct l2tp_session **sessionp)
+{
+	struct l2tp_session *session;
+	struct pppol2tp_session *ps;
+	int error;
+	struct l2tp_session_cfg cfg = {};
+
+	session = l2tp_session_get(sock_net(sk), tunnel, session_id);
+	if (session) {
+		ps = l2tp_session_priv(session);
+
+		/* Using a pre-existing session is fine as long as it hasn't
+		 * been connected yet.
+		 */
+		mutex_lock(&ps->sk_lock);
+		if (rcu_dereference_protected(ps->sk,
+					      lockdep_is_held(&ps->sk_lock))) {
+			mutex_unlock(&ps->sk_lock);
+			l2tp_session_dec_refcount(session);
+			return -EEXIST;
+		}
+	} else {
+		/* Default MTU must allow space for UDP/L2TP/PPP headers */
+		cfg.mtu = 1500 - PPPOL2TP_HEADER_OVERHEAD;
+		cfg.mru = cfg.mtu;
+
+		session = l2tp_session_create(sizeof(struct pppol2tp_session),
+					      tunnel, session_id,
+					      peer_session_id, &cfg);
+		if (IS_ERR(session)) {
+			error = PTR_ERR(session);
+			return error;
+		}
+
+		pppol2tp_session_init(session);
+		ps = l2tp_session_priv(session);
+
+		mutex_lock(&ps->sk_lock);
+		error = l2tp_session_register(session, tunnel);
+		if (error < 0) {
+			mutex_unlock(&ps->sk_lock);
+			kfree(session);
+			return error;
+		}
+		l2tp_session_inc_refcount(session);
+	}
+
+	*sessionp = session;
+	return 0;
+}
+
+static int pppol2tp_setup_ppp(struct l2tp_session *session, struct sock *sk)
+{
+	struct pppox_sock *po = pppox_sk(sk);
+
+	/* The only header we need to worry about is the L2TP
+	 * header. This size is different depending on whether
+	 * sequence numbers are enabled for the data channel.
+	 */
+	po->chan.hdrlen = PPPOL2TP_L2TP_HDR_SIZE_NOSEQ;
+
+	po->chan.private = sk;
+	po->chan.ops	 = &pppol2tp_chan_ops;
+	po->chan.mtu	 = session->mtu;
+
+	return ppp_register_net_channel(sock_net(sk), &po->chan);
+}
+
+/* connect() handler. Attach a PPPoX socket to a tunnel socket.
+ * The PPPoX socket is associated with an l2tp_session and the tunnel
+ * socket is associated with an l2tp_tunnel. The l2tp_tunnel and
+ * l2tp_session are usually created by netlink before the PPPoX socket
+ * is connected. However, for L2TPv2 we support a legacy mode where
+ * netlink is not used and we create the l2tp_tunnel and l2tp_session
+ * when the PPPoX sockets are connected. In legacy mode, a per-tunnel
+ * PPPoX socket is used as a control socket for the tunnel and is
+ * identified by session_id 0. An l2tp_session is created to manage
+ * the control socket and an l2tp_tunnel is created for the tunnel if
+ * it doesn't already exist.
  */
 static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 			    int sockaddr_len, int flags)
 {
 	struct sock *sk = sock->sk;
 	struct sockaddr_pppol2tp *sp = (struct sockaddr_pppol2tp *) uservaddr;
-	struct pppox_sock *po = pppox_sk(sk);
 	struct l2tp_session *session = NULL;
-	struct l2tp_tunnel *tunnel;
+	struct l2tp_tunnel *tunnel = NULL;
 	struct pppol2tp_session *ps;
-	struct l2tp_session_cfg cfg = { 0, };
 	int error = 0;
 	u32 tunnel_id, peer_tunnel_id;
 	u32 session_id, peer_session_id;
-	bool drop_refcnt = false;
-	bool drop_tunnel = false;
 	int ver = 2;
 	int fd;
+	bool is_ctrl_skt;
 
 	lock_sock(sk);
 
@@ -695,139 +847,56 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 		goto end; /* bad socket address */
 	}
 
-	/* Don't bind if tunnel_id is 0 */
 	error = -EINVAL;
-	if (tunnel_id == 0)
+	if (tunnel_id == 0 || peer_tunnel_id == 0)
 		goto end;
 
-	tunnel = l2tp_tunnel_get(sock_net(sk), tunnel_id);
-	if (tunnel)
-		drop_tunnel = true;
-
-	/* Special case: create tunnel context if session_id and
-	 * peer_session_id is 0. Otherwise look up tunnel using supplied
-	 * tunnel id.
+	/* The socket is a control socket if session_id is 0. There is
+	 * one control socket per tunnel. Control sockets do not have ppp.
 	 */
-	if ((session_id == 0) && (peer_session_id == 0)) {
-		if (tunnel == NULL) {
-			struct l2tp_tunnel_cfg tcfg = {
-				.encap = L2TP_ENCAPTYPE_UDP,
-				.debug = 0,
-			};
-			error = l2tp_tunnel_create(sock_net(sk), fd, ver, tunnel_id, peer_tunnel_id, &tcfg, &tunnel);
-			if (error < 0)
-				goto end;
-		}
-	} else {
-		/* Error if we can't find the tunnel */
-		error = -ENOENT;
-		if (tunnel == NULL)
-			goto end;
+	is_ctrl_skt = (session_id == 0 && peer_session_id == 0);
 
-		/* Error if socket is not prepped */
-		if (tunnel->sock == NULL)
-			goto end;
-	}
-
-	if (tunnel->recv_payload_hook == NULL)
-		tunnel->recv_payload_hook = pppol2tp_recv_payload_hook;
-
-	if (tunnel->peer_tunnel_id == 0)
-		tunnel->peer_tunnel_id = peer_tunnel_id;
-
-	session = l2tp_session_get(sock_net(sk), tunnel, session_id);
-	if (session) {
-		drop_refcnt = true;
-		ps = l2tp_session_priv(session);
-
-		/* Using a pre-existing session is fine as long as it hasn't
-		 * been connected yet.
-		 */
-		mutex_lock(&ps->sk_lock);
-		if (rcu_dereference_protected(ps->sk,
-					      lockdep_is_held(&ps->sk_lock))) {
-			mutex_unlock(&ps->sk_lock);
-			error = -EEXIST;
-			goto end;
-		}
-	} else {
-		/* Default MTU must allow space for UDP/L2TP/PPP headers */
-		cfg.mtu = 1500 - PPPOL2TP_HEADER_OVERHEAD;
-		cfg.mru = cfg.mtu;
-
-		session = l2tp_session_create(sizeof(struct pppol2tp_session),
-					      tunnel, session_id,
-					      peer_session_id, &cfg);
-		if (IS_ERR(session)) {
-			error = PTR_ERR(session);
-			goto end;
-		}
-
-		pppol2tp_session_init(session);
-		ps = l2tp_session_priv(session);
-		l2tp_session_inc_refcount(session);
-
-		mutex_lock(&ps->sk_lock);
-		error = l2tp_session_register(session, tunnel);
-		if (error < 0) {
-			mutex_unlock(&ps->sk_lock);
-			kfree(session);
-			goto end;
-		}
-		drop_refcnt = true;
-	}
-
-	/* Special case: if source & dest session_id == 0x0000, this
-	 * socket is being created to manage the tunnel. Just set up
-	 * the internal context for use by ioctl() and sockopt()
-	 * handlers.
-	 */
-	if ((session->session_id == 0) &&
-	    (session->peer_session_id == 0)) {
-		error = 0;
-		goto out_no_ppp;
-	}
-
-	/* The only header we need to worry about is the L2TP
-	 * header. This size is different depending on whether
-	 * sequence numbers are enabled for the data channel.
-	 */
-	po->chan.hdrlen = PPPOL2TP_L2TP_HDR_SIZE_NOSEQ;
-
-	po->chan.private = sk;
-	po->chan.ops	 = &pppol2tp_chan_ops;
-	po->chan.mtu	 = session->mtu;
-
-	error = ppp_register_net_channel(sock_net(sk), &po->chan);
-	if (error) {
-		mutex_unlock(&ps->sk_lock);
+	/* prep and possibly create the l2tp tunnel instance */
+	error = pppol2tp_tunnel_prep(sock_net(sk), fd, ver, tunnel_id,
+				     peer_tunnel_id, is_ctrl_skt, &tunnel);
+	if (error)
 		goto end;
+
+	/* prep and possibly create the l2tp session instance */
+	error = pppol2tp_session_prep(sk, tunnel, session_id,
+				      peer_session_id, &session);
+	if (error)
+		goto end;
+
+	/* setup ppp unless it's a control socket */
+	ps = l2tp_session_priv(session);
+	if (!is_ctrl_skt) {
+		error = pppol2tp_setup_ppp(session, sk);
+		if (error) {
+			mutex_unlock(&ps->sk_lock);
+			goto end;
+		}
 	}
 
-out_no_ppp:
-	/* This is how we get the session context from the socket. */
-	write_lock_bh(&sk->sk_callback_lock);
-	rcu_assign_sk_user_data(sk, session);
-	write_unlock_bh(&sk->sk_callback_lock);
-	rcu_assign_pointer(ps->sk, sk);
+	/* The session has now been added to the tunnel. Hold the
+	 * socket to prevent it going away until the session is
+	 * destroyed and attach it to the session such that we can get
+	 * the session instance from the socket and vice versa.
+	 */
+	sock_hold(sk);
+	pppol2tp_attach(session, sk);
 	mutex_unlock(&ps->sk_lock);
-
-	/* Keep the reference we've grabbed on the session: sk doesn't expect
-	 * the session to disappear. pppol2tp_session_destruct() is responsible
-	 * for dropping it.
-	 */
-	drop_refcnt = false;
 
 	sk->sk_state = PPPOX_CONNECTED;
 	l2tp_info(session, L2TP_MSG_CONTROL, "%s: created\n",
 		  session->name);
 
 end:
-	if (drop_refcnt)
-		l2tp_session_dec_refcount(session);
-	if (drop_tunnel)
-		l2tp_tunnel_dec_refcount(tunnel);
 	release_sock(sk);
+	if (session)
+		l2tp_session_dec_refcount(session);
+	if (tunnel)
+		l2tp_tunnel_dec_refcount(tunnel);
 
 	return error;
 }
@@ -841,6 +910,7 @@ static int pppol2tp_session_create(struct net *net, struct l2tp_tunnel *tunnel,
 {
 	int error;
 	struct l2tp_session *session;
+	struct pppol2tp_session *ps;
 
 	/* Error if tunnel socket is not prepped */
 	if (!tunnel->sock) {
@@ -864,10 +934,14 @@ static int pppol2tp_session_create(struct net *net, struct l2tp_tunnel *tunnel,
 	}
 
 	pppol2tp_session_init(session);
-
+	ps = l2tp_session_priv(session);
+	mutex_lock(&ps->sk_lock);
 	error = l2tp_session_register(session, tunnel);
-	if (error < 0)
+	if (error < 0) {
+		mutex_unlock(&ps->sk_lock);
 		goto err_sess;
+	}
+	mutex_unlock(&ps->sk_lock);
 
 	return 0;
 
