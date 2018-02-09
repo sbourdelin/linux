@@ -290,6 +290,7 @@ int l2tp_session_register(struct l2tp_session *session,
 		spin_unlock_bh(&tunnel->lock);
 		return -ENODEV;
 	}
+	l2tp_tunnel_inc_refcount(tunnel);
 	spin_unlock_bh(&tunnel->lock);
 
 	head = l2tp_session_id_hash(tunnel, session->session_id);
@@ -315,14 +316,9 @@ int l2tp_session_register(struct l2tp_session *session,
 				goto err_tlock_pnlock;
 			}
 
-		l2tp_tunnel_inc_refcount(tunnel);
-		sock_hold(tunnel->sock);
 		hlist_add_head_rcu(&session->global_hlist, g_head);
 
 		spin_unlock_bh(&pn->l2tp_session_hlist_lock);
-	} else {
-		l2tp_tunnel_inc_refcount(tunnel);
-		sock_hold(tunnel->sock);
 	}
 
 	hlist_add_head(&session->hlist, head);
@@ -334,6 +330,7 @@ err_tlock_pnlock:
 	spin_unlock_bh(&pn->l2tp_session_hlist_lock);
 err_tlock:
 	write_unlock_bh(&tunnel->hlist_lock);
+	l2tp_tunnel_dec_refcount(tunnel);
 
 	return err;
 }
