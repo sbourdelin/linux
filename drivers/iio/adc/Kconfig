@@ -775,17 +775,21 @@ config TI_ADC161S626
 	  called ti-adc161s626.
 
 config TI_ADS1015
-	tristate "Texas Instruments ADS1015 ADC"
-	depends on I2C && !SENSORS_ADS1015
-	select REGMAP_I2C
+	tristate
 	select IIO_BUFFER
 	select IIO_TRIGGERED_BUFFER
+
+config TI_ADS1015_I2C
+	tristate "Texas Instruments ADS1015 I2C ADC"
+	depends on I2C && !SENSORS_ADS1015
+	select REGMAP_I2C
+	select TI_ADS1015
 	help
 	  If you say yes here you get support for Texas Instruments ADS1015
 	  ADC chip.
 
 	  This driver can also be built as a module. If so, the module will be
-	  called ti-ads1015.
+	  called ti-ads1015_i2c.
 
 config TI_ADS7950
 	tristate "Texas Instruments ADS7950 ADC driver"
