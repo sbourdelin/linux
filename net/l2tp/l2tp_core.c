@@ -1216,6 +1216,7 @@ static void l2tp_tunnel_destruct(struct sock *sk)
 
 
 	/* Disable udp encapsulation */
+	write_lock_bh(&sk->sk_callback_lock);
 	switch (tunnel->encap) {
 	case L2TP_ENCAPTYPE_UDP:
 		/* No longer an encapsulation socket. See net/ipv4/udp.c */
@@ -1229,7 +1230,8 @@ static void l2tp_tunnel_destruct(struct sock *sk)
 
 	/* Remove hooks into tunnel socket */
 	sk->sk_destruct = tunnel->old_sk_destruct;
-	sk->sk_user_data = NULL;
+	rcu_assign_sk_user_data(sk, NULL);
+	write_unlock_bh(&sk->sk_callback_lock);
 
 	/* Remove the tunnel struct from the tunnel list */
 	pn = l2tp_pernet(tunnel->l2tp_net);
@@ -1583,6 +1585,20 @@ int l2tp_tunnel_create(struct net *net, int fd, int version, u32 tunnel_id, u32 
 	}
 #endif
 
+	/* Assign socket sk_user_data. Must be done with
+	 * sk_callback_lock. Bail if sk_user_data is already assigned.
+	 */
+	write_lock_bh(&sk->sk_callback_lock);
+	if (sk->sk_user_data) {
+		err = -EALREADY;
+		write_unlock_bh(&sk->sk_callback_lock);
+		kfree(tunnel);
+		tunnel = NULL;
+		goto err;
+	}
+	rcu_assign_sk_user_data(sk, tunnel);
+	write_unlock_bh(&sk->sk_callback_lock);
+
 	/* Mark socket as an encapsulation socket. See net/ipv4/udp.c */
 	tunnel->encap = encap;
 	if (encap == L2TP_ENCAPTYPE_UDP) {
@@ -1594,8 +1610,6 @@ int l2tp_tunnel_create(struct net *net, int fd, int version, u32 tunnel_id, u32 
 		udp_cfg.encap_destroy = l2tp_udp_encap_destroy;
 
 		setup_udp_tunnel_sock(net, sock, &udp_cfg);
-	} else {
-		sk->sk_user_data = tunnel;
 	}
 
 	/* Hook on the tunnel socket destructor so that we can cleanup
@@ -1603,6 +1617,7 @@ int l2tp_tunnel_create(struct net *net, int fd, int version, u32 tunnel_id, u32 
 	 */
 	tunnel->old_sk_destruct = sk->sk_destruct;
 	sk->sk_destruct = &l2tp_tunnel_destruct;
+
 	tunnel->sock = sk;
 	tunnel->fd = fd;
 	lockdep_set_class_and_name(&sk->sk_lock.slock, &l2tp_socket_class, "l2tp_sock");
