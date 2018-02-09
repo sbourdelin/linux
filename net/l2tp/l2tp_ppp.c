@@ -447,18 +447,57 @@ static void pppol2tp_detach(struct l2tp_session *session, struct sock *sk)
 	write_unlock_bh(&sk->sk_callback_lock);
 }
 
-/* Called by l2tp_core when a session socket is being closed.
+static void pppol2tp_session_free_rcu(struct rcu_head *head)
+{
+	struct pppol2tp_session *ps = container_of(head, typeof(*ps), rcu);
+	struct l2tp_session *session = container_of((void *)ps,
+						    typeof(*session), priv);
+
+	/* If session is invalid, something serious is wrong. Warn and
+	 * leak the socket and session.
+	 */
+	WARN_ON(session->magic != L2TP_SESSION_MAGIC);
+	if (session->magic != L2TP_SESSION_MAGIC)
+		return;
+
+	if (ps->__sk)
+		sock_put(ps->__sk);
+	kfree(session);
+}
+
+/* Called by l2tp_core when a session is being freed.
+ */
+static void pppol2tp_session_free(struct l2tp_session *session)
+{
+	struct pppol2tp_session *ps = l2tp_session_priv(session);
+
+	/* If session is invalid, something serious is wrong. Warn and
+	 * leak the socket and session.
+	 */
+	WARN_ON(session->magic != L2TP_SESSION_MAGIC);
+	if (session->magic != L2TP_SESSION_MAGIC)
+		return;
+
+	call_rcu(&ps->rcu, pppol2tp_session_free_rcu);
+}
+
+/* Called by l2tp_core when a session is being closed.
  */
 static void pppol2tp_session_close(struct l2tp_session *session)
 {
 	struct sock *sk;
 
 	BUG_ON(session->magic != L2TP_SESSION_MAGIC);
-
 	sk = pppol2tp_session_get_sock(session);
 	if (sk) {
-		if (sk->sk_socket)
-			inet_shutdown(sk->sk_socket, SEND_SHUTDOWN);
+		struct pppol2tp_session *ps = l2tp_session_priv(session);
+
+		mutex_lock(&ps->sk_lock);
+		ps->__sk = rcu_dereference_protected(ps->sk,
+						     lockdep_is_held(&ps->sk_lock));
+		RCU_INIT_POINTER(ps->sk, NULL);
+		pppol2tp_detach(session, sk);
+		mutex_unlock(&ps->sk_lock);
 		sock_put(sk);
 	}
 }
@@ -468,34 +507,8 @@ static void pppol2tp_session_close(struct l2tp_session *session)
  */
 static void pppol2tp_session_destruct(struct sock *sk)
 {
-	struct l2tp_session *session = sk->sk_user_data;
-
 	skb_queue_purge(&sk->sk_receive_queue);
 	skb_queue_purge(&sk->sk_write_queue);
-
-	if (session) {
-		write_lock_bh(&sk->sk_callback_lock);
-		rcu_assign_sk_user_data(sk, NULL);
-		write_unlock_bh(&sk->sk_callback_lock);
-		BUG_ON(session->magic != L2TP_SESSION_MAGIC);
-		l2tp_session_dec_refcount(session);
-	}
-}
-
-static void pppol2tp_put_sk(struct rcu_head *head)
-{
-	struct pppol2tp_session *ps = container_of(head, typeof(*ps), rcu);
-	struct l2tp_session *session = container_of((void *)ps,
-						    typeof(*session), priv);
-	struct sock *sk = ps->__sk;
-
-	/* If session is invalid, something serious is wrong. Warn and
-	 * leak the socket.
-	 */
-	WARN_ON(session->magic != L2TP_SESSION_MAGIC);
-	if (session->magic != L2TP_SESSION_MAGIC)
-		return;
-	sock_put(sk);
 }
 
 /* Called when the PPPoX socket (session) is closed.
@@ -520,27 +533,13 @@ static int pppol2tp_release(struct socket *sock)
 	sk->sk_state = PPPOX_DEAD;
 	sock_orphan(sk);
 	sock->sk = NULL;
-
-	session = pppol2tp_sock_to_session(sk);
-	if (session != NULL) {
-		struct pppol2tp_session *ps;
-
-		l2tp_session_delete(session);
-
-		ps = l2tp_session_priv(session);
-		mutex_lock(&ps->sk_lock);
-		ps->__sk = rcu_dereference_protected(ps->sk,
-						     lockdep_is_held(&ps->sk_lock));
-		RCU_INIT_POINTER(ps->sk, NULL);
-		mutex_unlock(&ps->sk_lock);
-		call_rcu(&ps->rcu, pppol2tp_put_sk);
-
-		/* Rely on the sock_put() call at the end of the function for
-		 * dropping the reference held by pppol2tp_sock_to_session().
-		 * The last reference will be dropped by pppol2tp_put_sk().
-		 */
-	}
 	release_sock(sk);
+
+	rcu_read_lock_bh();
+	session = rcu_dereference_bh(__sk_user_data((sk)));
+	if (session)
+		l2tp_session_delete(session);
+	rcu_read_unlock_bh();
 
 	/* This will delete the session context via
 	 * pppol2tp_session_destruct() if the socket's refcnt drops to
@@ -624,6 +623,7 @@ static void pppol2tp_session_init(struct l2tp_session *session)
 
 	session->recv_skb = pppol2tp_recv;
 	session->session_close = pppol2tp_session_close;
+	session->session_free = pppol2tp_session_free;
 #if IS_ENABLED(CONFIG_L2TP_DEBUGFS)
 	session->show = pppol2tp_show;
 #endif
