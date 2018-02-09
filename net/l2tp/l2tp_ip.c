@@ -242,12 +242,9 @@ static void l2tp_ip_destroy_sock(struct sock *sk)
 	rcu_read_lock();
 	tunnel = rcu_dereference_sk_user_data(sk);
 	if (tunnel) {
-		l2tp_tunnel_closeall(tunnel);
-		sock_put(sk);
+		l2tp_tunnel_delete(tunnel);
 	}
 	rcu_read_unlock();
-
-	sk_refcnt_debug_dec(sk);
 }
 
 static int l2tp_ip_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
