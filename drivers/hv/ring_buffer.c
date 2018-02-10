@@ -400,7 +400,11 @@ EXPORT_SYMBOL_GPL(__hv_pkt_iter_next);
 void hv_pkt_iter_close(struct vmbus_channel *channel)
 {
 	struct hv_ring_buffer_info *rbi = &channel->inbound;
-	u32 orig_write_sz = hv_get_bytes_to_write(rbi);
+	u32 curr_write_sz;
+	u32 delta = rbi->ring_buffer->read_index < rbi->priv_read_index ?
+			(rbi->priv_read_index - rbi->ring_buffer->read_index) :
+			(rbi->ring_datasize - rbi->ring_buffer->read_index +
+			rbi->priv_read_index);
 
 	/*
 	 * Make sure all reads are done before we update the read index since
@@ -423,12 +427,15 @@ void hv_pkt_iter_close(struct vmbus_channel *channel)
 	 */
 	virt_mb();
 
-	/* If host has disabled notifications then skip */
-	if (rbi->ring_buffer->interrupt_mask)
-		return;
-
 	if (rbi->ring_buffer->feature_bits.feat_pending_send_sz) {
 		u32 pending_sz = READ_ONCE(rbi->ring_buffer->pending_send_sz);
+
+		/*
+		 * Ensure the read of write_index in hv_get_bytes_to_write()
+		 * happens after the read of pending_send_sz.
+		 */
+		virt_rmb();
+		curr_write_sz = hv_get_bytes_to_write(rbi);
 
 		/*
 		 * If there was space before we began iteration,
@@ -436,14 +443,15 @@ void hv_pkt_iter_close(struct vmbus_channel *channel)
 		 * pending_sz is zero then host has nothing pending
 		 * and does not need to be signaled.
 		 */
-		if (orig_write_sz > pending_sz)
+		if (curr_write_sz - delta > pending_sz)
 			return;
 
 		/* If pending write will not fit, don't give false hope. */
-		if (hv_get_bytes_to_write(rbi) < pending_sz)
+		if (curr_write_sz <= pending_sz)
 			return;
+
+		vmbus_setevent(channel);
 	}
 
-	vmbus_setevent(channel);
 }
 EXPORT_SYMBOL_GPL(hv_pkt_iter_close);
