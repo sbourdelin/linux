@@ -12,14 +12,14 @@
 
 #define TPS(x)  tracepoint_string(x)
 
-DECLARE_EVENT_CLASS(cpu,
+TRACE_EVENT(cpu_idle,
 
-	TP_PROTO(unsigned int state, unsigned int cpu_id),
+	TP_PROTO(int state, unsigned int cpu_id),
 
 	TP_ARGS(state, cpu_id),
 
 	TP_STRUCT__entry(
-		__field(	u32,		state		)
+		__field(	int,		state		)
 		__field(	u32,		cpu_id		)
 	),
 
@@ -28,15 +28,8 @@ DECLARE_EVENT_CLASS(cpu,
 		__entry->cpu_id = cpu_id;
 	),
 
-	TP_printk("state=%lu cpu_id=%lu", (unsigned long)__entry->state,
+	TP_printk("state=%d cpu_id=%lu", __entry->state,
 		  (unsigned long)__entry->cpu_id)
-);
-
-DEFINE_EVENT(cpu, cpu_idle,
-
-	TP_PROTO(unsigned int state, unsigned int cpu_id),
-
-	TP_ARGS(state, cpu_id)
 );
 
 TRACE_EVENT(powernv_throttle,
@@ -141,11 +134,24 @@ TRACE_EVENT(pstate_sample,
 		{ PM_EVENT_RESTORE, "restore" }, \
 		{ PM_EVENT_RECOVER, "recover" })
 
-DEFINE_EVENT(cpu, cpu_frequency,
+TRACE_EVENT(cpu_frequency,
 
 	TP_PROTO(unsigned int frequency, unsigned int cpu_id),
 
-	TP_ARGS(frequency, cpu_id)
+	TP_ARGS(frequency, cpu_id),
+
+	TP_STRUCT__entry(
+		__field(	u32,		frequency	)
+		__field(	u32,		cpu_id		)
+	),
+
+	TP_fast_assign(
+		__entry->frequency = frequency;
+		__entry->cpu_id = cpu_id;
+	),
+
+	TP_printk("frequency=%lu cpu_id=%lu", __entry->frequency,
+		  (unsigned long)__entry->cpu_id)
 );
 
 TRACE_EVENT(device_pm_callback_start,
