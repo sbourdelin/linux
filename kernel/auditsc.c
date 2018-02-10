@@ -1530,7 +1530,8 @@ void __audit_syscall_entry(int major, unsigned long a1, unsigned long a2,
 	context->dummy = !audit_n_rules;
 	if (!context->dummy && state == AUDIT_BUILD_CONTEXT) {
 		context->prio = 0;
-		state = audit_filter_syscall(tsk, context, &audit_filter_list[AUDIT_FILTER_ENTRY]);
+		if (auditd_test_task(tsk))
+			return;
 	}
 	if (state == AUDIT_DISABLED)
 		return;
