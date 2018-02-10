@@ -101,6 +101,9 @@ enum pageflags {
 	PG_young,
 	PG_idle,
 #endif
+#ifdef CONFIG_SWAP_PAGE_ZERO
+	PG_zero,		/* zero page */
+#endif
 	__NR_PAGEFLAGS,
 
 	/* Filesystems */
@@ -368,6 +371,13 @@ SETPAGEFLAG(Young, young, PF_ANY)
 TESTCLEARFLAG(Young, young, PF_ANY)
 PAGEFLAG(Idle, idle, PF_ANY)
 #endif
+
+#ifdef CONFIG_SWAP_PAGE_ZERO
+PAGEFLAG(Zero, zero, PF_ANY)
+#else
+PAGEFLAG_FALSE(Zero)
+#endif
+
 
 /*
  * On an anonymous page mapped into a user virtual memory area,

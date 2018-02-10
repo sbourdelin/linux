@@ -486,6 +486,18 @@ config FRONTSWAP
 
 	  If unsure, say Y to enable frontswap.
 
+config SWAP_PAGE_ZERO
+	bool "Reset zero swap page to empty_zero_page for reading swap fault"
+	depends on SWAP
+	default n
+	help
+	  Reset zero swap page to empty_zero_page when reading
+	  swap fault happens. The original swap page would be freed soon.
+	  This could save few memories as well increase same amount page
+	  faults.
+
+	  If unsure, say N
+
 config CMA
 	bool "Contiguous Memory Allocator"
 	depends on HAVE_MEMBLOCK && MMU

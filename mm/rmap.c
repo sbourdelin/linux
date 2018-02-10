@@ -1550,6 +1550,11 @@ static bool try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
 				break;
 			}
 
+			if (unlikely(PageZero(page))) {
+				dec_mm_counter(mm, MM_ANONPAGES);
+				goto discard;
+			}
+
 			if (swap_duplicate(entry) < 0) {
 				set_pte_at(mm, address, pvmw.pte, pteval);
 				ret = false;

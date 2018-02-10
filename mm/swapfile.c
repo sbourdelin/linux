@@ -1577,6 +1577,7 @@ bool reuse_swap_page(struct page *page, int *total_map_swapcount)
 				return false;
 			}
 			spin_unlock(&p->lock);
+			ClearPageZero(page);
 		}
 	}
 

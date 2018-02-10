@@ -509,6 +509,8 @@ int migrate_page_move_mapping(struct address_space *mapping,
 		if (PageSwapCache(page)) {
 			SetPageSwapCache(newpage);
 			set_page_private(newpage, page_private(page));
+			if (PageZero(page))
+				SetPageZero(newpage);
 		}
 	} else {
 		VM_BUG_ON_PAGE(PageSwapCache(page), page);
@@ -696,8 +698,10 @@ void migrate_page_states(struct page *newpage, struct page *page)
 	 * Please do not reorder this without considering how mm/ksm.c's
 	 * get_ksm_page() depends upon ksm_migrate_page() and PageSwapCache().
 	 */
-	if (PageSwapCache(page))
+	if (PageSwapCache(page)) {
 		ClearPageSwapCache(page);
+		ClearPageZero(page);
+	}
 	ClearPagePrivate(page);
 	set_page_private(page, 0);
 

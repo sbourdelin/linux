@@ -2872,6 +2872,35 @@ void unmap_mapping_range(struct address_space *mapping,
 }
 EXPORT_SYMBOL(unmap_mapping_range);
 
+#ifdef CONFIG_SWAP_PAGE_ZERO
+static int swap_page_zero_shared(struct vm_fault *vmf)
+{
+	pte_t pte;
+	struct vm_area_struct *vma = vmf->vma;
+
+	/* Use the zero-page for reads */
+	if (!(vmf->flags & FAULT_FLAG_WRITE) &&
+			!mm_forbids_zeropage(vma->vm_mm)) {
+		pte = pte_mkspecial(pfn_pte(my_zero_pfn(vmf->address),
+						vma->vm_page_prot));
+
+		dec_mm_counter_fast(vma->vm_mm, MM_SWAPENTS);
+		set_pte_at(vma->vm_mm, vmf->address, vmf->pte, pte);
+		/* No need to invalidate - it was non-present before */
+		update_mmu_cache(vma, vmf->address, vmf->pte);
+		swap_free(vmf->entry);
+		try_to_free_swap(vmf->page);
+		return 1;
+	}
+	return 0;
+}
+#else
+static int swap_page_zero_shared(struct vm_fault *vmf)
+{
+	return 0;
+}
+#endif
+
 /*
  * We enter with non-exclusive mmap_sem (to exclude vma changes,
  * but allow concurrent faults), and pte mapped but not yet locked.
@@ -3028,6 +3057,13 @@ int do_swap_page(struct vm_fault *vmf)
 	if (unlikely(!PageUptodate(page))) {
 		ret = VM_FAULT_SIGBUS;
 		goto out_nomap;
+	}
+
+	if (unlikely(PageZero(page))) {
+		vmf->page = page;
+		vmf->entry = entry;
+		if (swap_page_zero_shared(vmf))
+			goto out_nomap;
 	}
 
 	/*

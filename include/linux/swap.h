@@ -431,6 +431,17 @@ extern struct page *do_swap_page_readahead(swp_entry_t fentry, gfp_t gfp_mask,
 					   struct vm_fault *vmf,
 					   struct vma_swap_readahead *swap_ra);
 
+#ifdef CONFIG_SWAP_PAGE_ZERO
+static inline void swap_mark_page_zero(struct page *page)
+{
+	if (unlikely(!PageLocked(page)))
+		return;
+	if (unlikely(!PageSwapCache(page)))
+		return;
+	SetPageZero(page);
+}
+#endif
+
 /* linux/mm/swapfile.c */
 extern atomic_long_t nr_swap_pages;
 extern long total_swap_pages;
@@ -626,6 +637,12 @@ static inline swp_entry_t get_swap_page(struct page *page)
 	entry.val = 0;
 	return entry;
 }
+
+#ifdef CONFIG_SWAP_PAGE_ZERO
+void swap_mark_page_zero(struct page *page)
+{
+}
+#endif
 
 #endif /* CONFIG_SWAP */
 

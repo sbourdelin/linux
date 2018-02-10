@@ -32,6 +32,7 @@
 #include <linux/idr.h>
 #include <linux/sysfs.h>
 #include <linux/cpuhotplug.h>
+#include <linux/swap.h>
 
 #include "zram_drv.h"
 
@@ -866,6 +867,8 @@ static int __zram_bvec_read(struct zram *zram, struct page *page, u32 index,
 		zram_fill_page(mem, PAGE_SIZE, value);
 		kunmap_atomic(mem);
 		zram_slot_unlock(zram, index);
+		if (value == 0)
+			wap_mark_page_zero(page);
 		return 0;
 	}
 

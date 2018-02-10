@@ -192,6 +192,7 @@ void __delete_from_swap_cache(struct page *page)
 		set_page_private(page + i, 0);
 	}
 	ClearPageSwapCache(page);
+	ClearPageZero(page);
 	address_space->nrpages -= nr;
 	__mod_node_page_state(page_pgdat(page), NR_FILE_PAGES, -nr);
 	ADD_CACHE_INFO(del_total, nr);
