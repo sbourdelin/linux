@@ -32,6 +32,15 @@
 #define INPUT_PROP_CNT			(INPUT_PROP_MAX + 1)
 
 /*
+ * Event action types
+ */
+#define EV_ACT_ANY			0x00	/* asserted or deasserted */
+#define EV_ACT_ASSERTED			0x01	/* asserted */
+#define EV_ACT_DEASSERTED		0x02	/* deasserted */
+#define EV_ACT_MAX			0x02
+#define EV_ACT_CNT			(EV_ACT_MAX+1)
+
+/*
  * Event types
  */
 
