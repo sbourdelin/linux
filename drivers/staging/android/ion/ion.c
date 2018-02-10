@@ -68,7 +68,8 @@ static void ion_buffer_add(struct ion_device *dev,
 static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 					    struct ion_device *dev,
 					    unsigned long len,
-					    unsigned long flags)
+					    unsigned long flags,
+					    unsigned int align)
 {
 	struct ion_buffer *buffer;
 	int ret;
@@ -80,14 +81,14 @@ static struct ion_buffer *ion_buffer_create(struct ion_heap *heap,
 	buffer->heap = heap;
 	buffer->flags = flags;
 
-	ret = heap->ops->allocate(heap, buffer, len, flags);
+	ret = heap->ops->allocate(heap, buffer, len, flags, align);
 
 	if (ret) {
 		if (!(heap->flags & ION_HEAP_FLAG_DEFER_FREE))
 			goto err2;
 
 		ion_heap_freelist_drain(heap, 0);
-		ret = heap->ops->allocate(heap, buffer, len, flags);
+		ret = heap->ops->allocate(heap, buffer, len, flags, align);
 		if (ret)
 			goto err2;
 	}
@@ -380,7 +381,10 @@ static const struct dma_buf_ops dma_buf_ops = {
 	.unmap = ion_dma_buf_kunmap,
 };
 
-int ion_alloc(size_t len, unsigned int heap_id_mask, unsigned int flags)
+int ion_alloc(size_t len,
+	      unsigned int heap_id_mask,
+	      unsigned int flags,
+	      unsigned int align)
 {
 	struct ion_device *dev = internal_dev;
 	struct ion_buffer *buffer = NULL;
@@ -407,7 +411,7 @@ int ion_alloc(size_t len, unsigned int heap_id_mask, unsigned int flags)
 		/* if the caller didn't specify this heap id */
 		if (!((1 << heap->id) & heap_id_mask))
 			continue;
-		buffer = ion_buffer_create(heap, dev, len, flags);
+		buffer = ion_buffer_create(heap, dev, len, flags, align);
 		if (!IS_ERR(buffer))
 			break;
 	}

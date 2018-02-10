@@ -26,7 +26,8 @@ struct ion_chunk_heap {
 static int ion_chunk_heap_allocate(struct ion_heap *heap,
 				   struct ion_buffer *buffer,
 				   unsigned long size,
-				   unsigned long flags)
+				   unsigned long flags,
+				   unsigned int align)
 {
 	struct ion_chunk_heap *chunk_heap =
 		container_of(heap, struct ion_chunk_heap, heap);

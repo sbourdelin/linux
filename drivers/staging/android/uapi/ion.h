@@ -61,9 +61,8 @@ enum ion_heap_type {
  * @len:		size of the allocation
  * @heap_id_mask:	mask of heap ids to allocate from
  * @flags:		flags passed to heap
- * @handle:		pointer that will be populated with a cookie to use to
- *			refer to this allocation
- *
+ * @fd:		file descriptor associated with newly allocated buffer
+ * @align:	allocation alignment
  * Provided by userspace as an argument to the ioctl
  */
 struct ion_allocation_data {
@@ -71,7 +70,7 @@ struct ion_allocation_data {
 	__u32 heap_id_mask;
 	__u32 flags;
 	__u32 fd;
-	__u32 unused;
+	__u32 align;
 };
 
 #define MAX_HEAP_NAME			32

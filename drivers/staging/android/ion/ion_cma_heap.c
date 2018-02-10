@@ -23,24 +23,30 @@ struct ion_cma_heap {
 #define to_cma_heap(x) container_of(x, struct ion_cma_heap, heap)
 
 /* ION CMA heap operations functions */
-static int ion_cma_allocate(struct ion_heap *heap, struct ion_buffer *buffer,
+static int ion_cma_allocate(struct ion_heap *heap,
+			    struct ion_buffer *buffer,
 			    unsigned long len,
-			    unsigned long flags)
+			    unsigned long flags,
+			    unsigned int align)
 {
 	struct ion_cma_heap *cma_heap = to_cma_heap(heap);
 	struct sg_table *table;
 	struct page *pages;
 	unsigned long size = PAGE_ALIGN(len);
 	unsigned long nr_pages = size >> PAGE_SHIFT;
-	unsigned long align = get_order(size);
+	int order = get_order(align);
 	int ret;
 
-	if (align > CONFIG_CMA_ALIGNMENT)
-		align = CONFIG_CMA_ALIGNMENT;
+	/* CMA allocation alignment is in PAGE_SIZE order */
+	if (order > CONFIG_CMA_ALIGNMENT)
+		order = CONFIG_CMA_ALIGNMENT;
 
-	pages = cma_alloc(cma_heap->cma, nr_pages, align, GFP_KERNEL);
+	pages = cma_alloc(cma_heap->cma, nr_pages, order, GFP_KERNEL);
 	if (!pages)
 		return -ENOMEM;
+
+	pr_debug("Allocated block of %lu pages starting at 0x%lX",
+		 nr_pages, page_to_pfn(pages));
 
 	table = kmalloc(sizeof(*table), GFP_KERNEL);
 	if (!table)

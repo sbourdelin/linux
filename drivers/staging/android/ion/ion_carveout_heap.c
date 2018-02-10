@@ -50,7 +50,8 @@ static void ion_carveout_free(struct ion_heap *heap, phys_addr_t addr,
 static int ion_carveout_heap_allocate(struct ion_heap *heap,
 				      struct ion_buffer *buffer,
 				      unsigned long size,
-				      unsigned long flags)
+				      unsigned long flags,
+				      unsigned int align)
 {
 	struct sg_table *table;
 	phys_addr_t paddr;

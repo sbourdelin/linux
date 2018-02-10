@@ -114,8 +114,10 @@ struct ion_device {
  */
 struct ion_heap_ops {
 	int (*allocate)(struct ion_heap *heap,
-			struct ion_buffer *buffer, unsigned long len,
-			unsigned long flags);
+			struct ion_buffer *buffer,
+			unsigned long len,
+			unsigned long flags,
+			unsigned int align);
 	void (*free)(struct ion_buffer *buffer);
 	void * (*map_kernel)(struct ion_heap *heap, struct ion_buffer *buffer);
 	void (*unmap_kernel)(struct ion_heap *heap, struct ion_buffer *buffer);
@@ -220,7 +222,8 @@ int ion_heap_pages_zero(struct page *page, size_t size, pgprot_t pgprot);
 
 int ion_alloc(size_t len,
 	      unsigned int heap_id_mask,
-	      unsigned int flags);
+	      unsigned int flags,
+	      unsigned int align);
 
 /**
  * ion_heap_init_shrinker

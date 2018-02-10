@@ -75,7 +75,8 @@ long ion_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 
 		fd = ion_alloc(data.allocation.len,
 			       data.allocation.heap_id_mask,
-			       data.allocation.flags);
+			       data.allocation.flags,
+			       data.allocation.align);
 		if (fd < 0)
 			return fd;
 

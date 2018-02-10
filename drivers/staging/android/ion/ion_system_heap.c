@@ -116,7 +116,8 @@ static struct page *alloc_largest_available(struct ion_system_heap *heap,
 static int ion_system_heap_allocate(struct ion_heap *heap,
 				    struct ion_buffer *buffer,
 				    unsigned long size,
-				    unsigned long flags)
+				    unsigned long flags,
+				    unsigned int align)
 {
 	struct ion_system_heap *sys_heap = container_of(heap,
 							struct ion_system_heap,
@@ -354,7 +355,8 @@ device_initcall(ion_system_heap_create);
 static int ion_system_contig_heap_allocate(struct ion_heap *heap,
 					   struct ion_buffer *buffer,
 					   unsigned long len,
-					   unsigned long flags)
+					   unsigned long flags,
+					   unsigned int align)
 {
 	int order = get_order(len);
 	struct page *page;
