@@ -81,5 +81,6 @@ int qtnf_cmd_start_cac(const struct qtnf_vif *vif,
 		       u32 cac_time_ms);
 int qtnf_cmd_set_mac_acl(const struct qtnf_vif *vif,
 			 const struct cfg80211_acl_data *params);
+int qtnf_cmd_send_pm_set(struct qtnf_bus *bus, u8 pm_mode, u32 timeout);
 
 #endif /* QLINK_COMMANDS_H_ */

@@ -52,6 +52,8 @@
 #define QTNF_DEF_WDOG_TIMEOUT		5
 #define QTNF_TX_TIMEOUT_TRSHLD		100
 
+#define QTNF_DEFAULT_STANDBY_TIMER	(15 * 60)
+
 extern const struct net_device_ops qtnf_netdev_ops;
 
 struct qtnf_bus;

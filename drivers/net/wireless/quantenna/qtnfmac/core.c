@@ -26,6 +26,10 @@
 #include "event.h"
 #include "util.h"
 
+static bool auto_standby = true;
+module_param(auto_standby, bool, 0644);
+MODULE_PARM_DESC(auto_standby, "set to 0 to disable auto standby mode");
+
 #define QTNF_DMP_MAX_LEN 48
 #define QTNF_PRIMARY_VIF_IDX	0
 
@@ -552,6 +556,53 @@ error:
 	return ret;
 }
 
+static ssize_t qtnf_pm_standby_timeout_show(struct device *dev,
+					    struct device_attribute *attr,
+					    char *buf)
+{
+	struct qtnf_bus *bus = dev_get_drvdata(dev);
+
+	sprintf(buf, "%u\n", bus->standby_timeout);
+	return strlen(buf);
+}
+
+static ssize_t qtnf_pm_standby_timeout_store(struct device *dev,
+					     struct device_attribute *attr,
+					     const char *buf, size_t count)
+{
+	struct qtnf_bus *bus = dev_get_drvdata(dev);
+	int timeout;
+
+	if (count < 1)
+		goto out;
+
+	if (kstrtoint(buf, 0, &timeout))
+		goto out;
+
+	if (timeout < 0)
+		timeout = 0;
+	else if (timeout > S32_MAX)
+		timeout = S32_MAX;
+
+	if (timeout == bus->standby_timeout)
+		goto out;
+
+	if (timeout) {
+		if (!qtnf_cmd_send_pm_set(bus, QLINK_PM_AUTO_STANDBY,
+					  timeout))
+			bus->standby_timeout = timeout;
+	} else {
+		if (!qtnf_cmd_send_pm_set(bus, QLINK_PM_OFF, 0))
+			bus->standby_timeout = 0;
+	}
+
+out:
+	return (ssize_t)count;
+}
+
+static DEVICE_ATTR(standby_timeout, 0644, qtnf_pm_standby_timeout_show,
+		   qtnf_pm_standby_timeout_store);
+
 int qtnf_core_attach(struct qtnf_bus *bus)
 {
 	unsigned int i;
@@ -608,6 +659,25 @@ int qtnf_core_attach(struct qtnf_bus *bus)
 		}
 	}
 
+	if (auto_standby) {
+		bus->standby_timeout = QTNF_DEFAULT_STANDBY_TIMER;
+		ret = qtnf_cmd_send_pm_set(bus, QLINK_PM_AUTO_STANDBY,
+					   bus->standby_timeout);
+		if (ret)
+			bus->standby_timeout = 0;
+	} else {
+		bus->standby_timeout = 0;
+		ret = qtnf_cmd_send_pm_set(bus, QLINK_PM_OFF, 0);
+	}
+
+	if (ret) {
+		pr_err("failed to init PM auto standby: %d\n", ret);
+		/* Do not cancel init when PM mode not configured */
+	}
+
+	if (device_create_file(bus->dev, &dev_attr_standby_timeout))
+		pr_err("failed to init sysfs standby control file: %d\n", ret);
+
 	return 0;
 
 error:
@@ -620,6 +690,13 @@ EXPORT_SYMBOL_GPL(qtnf_core_attach);
 void qtnf_core_detach(struct qtnf_bus *bus)
 {
 	unsigned int macid;
+	int ret;
+
+	device_remove_file(bus->dev, &dev_attr_standby_timeout);
+
+	ret = qtnf_cmd_send_pm_set(bus, QLINK_PM_OFF, 0);
+	if (ret)
+		pr_err("failed to deinit NSM: %d\n", ret);
 
 	qtnf_bus_data_rx_stop(bus);
 

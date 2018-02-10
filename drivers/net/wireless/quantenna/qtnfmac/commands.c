@@ -2753,3 +2753,36 @@ int qtnf_cmd_set_mac_acl(const struct qtnf_vif *vif,
 
 	return ret;
 }
+
+int qtnf_cmd_send_pm_set(struct qtnf_bus *bus, u8 pm_mode, u32 timeout)
+{
+	struct sk_buff *cmd_skb;
+	u16 res_code = QLINK_CMD_RESULT_OK;
+	struct qlink_cmd_pm_set *cmd;
+	int ret = 0;
+
+	cmd_skb = qtnf_cmd_alloc_new_cmdskb(QLINK_MACID_RSVD, QLINK_VIFID_RSVD,
+					    QLINK_CMD_PM_SET, sizeof(*cmd));
+	if (!cmd_skb)
+		return -ENOMEM;
+
+	cmd = (struct qlink_cmd_pm_set *)cmd_skb->data;
+	cmd->pm_mode = pm_mode;
+	cmd->pm_standby_timer = cpu_to_le32(timeout);
+
+	qtnf_bus_lock(bus);
+
+	ret = qtnf_cmd_send(bus, cmd_skb, &res_code);
+
+	if (unlikely(ret))
+		goto out;
+
+	if (unlikely(res_code != QLINK_CMD_RESULT_OK)) {
+		pr_err("cmd exec failed: 0x%.4X\n", res_code);
+		ret = -EFAULT;
+	}
+
+out:
+	qtnf_bus_unlock(bus);
+	return ret;
+}
