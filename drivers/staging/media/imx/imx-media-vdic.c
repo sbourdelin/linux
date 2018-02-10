@@ -556,6 +556,39 @@ __vdic_get_fmt(struct vdic_priv *priv, struct v4l2_subdev_pad_config *cfg,
 		return &priv->format_mbus[pad];
 }
 
+static void vdic_init_pad_format(struct vdic_priv *priv, unsigned int pad,
+				 struct v4l2_subdev_pad_config *cfg)
+{
+	struct v4l2_mbus_framefmt *mf;
+	u32 code = 0;
+
+	mf = __vdic_get_fmt(priv, cfg, pad, cfg ?
+			   V4L2_SUBDEV_FORMAT_TRY : V4L2_SUBDEV_FORMAT_ACTIVE);
+
+	if (pad != VDIC_SINK_PAD_IDMAC)
+		imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
+
+	imx_media_init_mbus_fmt(mf, 640, 480, code, V4L2_FIELD_NONE,
+				cfg ? NULL : &priv->cc[pad]);
+}
+
+static int vdic_init_cfg(struct v4l2_subdev *sd,
+			 struct v4l2_subdev_pad_config *cfg)
+{
+	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
+	unsigned int i;
+
+	mutex_lock(&priv->lock);
+
+	/* initialize TRY formats on all pads */
+	for (i = 0; i < sd->entity.num_pads; i++)
+		vdic_init_pad_format(priv, i, cfg);
+
+	mutex_unlock(&priv->lock);
+
+	return 0;
+}
+
 static int vdic_enum_mbus_code(struct v4l2_subdev *sd,
 			       struct v4l2_subdev_pad_config *cfg,
 			       struct v4l2_subdev_mbus_code_enum *code)
@@ -861,7 +894,6 @@ static int vdic_registered(struct v4l2_subdev *sd)
 {
 	struct vdic_priv *priv = v4l2_get_subdevdata(sd);
 	int i, ret;
-	u32 code;
 
 	/* get media device */
 	priv->md = dev_get_drvdata(sd->v4l2_dev->dev);
@@ -870,16 +902,8 @@ static int vdic_registered(struct v4l2_subdev *sd)
 		priv->pad[i].flags = (i == VDIC_SRC_PAD_DIRECT) ?
 			MEDIA_PAD_FL_SOURCE : MEDIA_PAD_FL_SINK;
 
-		code = 0;
-		if (i != VDIC_SINK_PAD_IDMAC)
-			imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
-
 		/* set a default mbus format  */
-		ret = imx_media_init_mbus_fmt(&priv->format_mbus[i],
-					      640, 480, code, V4L2_FIELD_NONE,
-					      &priv->cc[i]);
-		if (ret)
-			return ret;
+		vdic_init_pad_format(priv, i, NULL);
 
 		/* init default frame interval */
 		priv->frame_interval[i].numerator = 1;
@@ -909,6 +933,7 @@ static void vdic_unregistered(struct v4l2_subdev *sd)
 }
 
 static const struct v4l2_subdev_pad_ops vdic_pad_ops = {
+	.init_cfg = vdic_init_cfg,
 	.enum_mbus_code = vdic_enum_mbus_code,
 	.get_fmt = vdic_get_fmt,
 	.set_fmt = vdic_set_fmt,

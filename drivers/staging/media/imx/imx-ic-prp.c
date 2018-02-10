@@ -100,9 +100,39 @@ __prp_get_fmt(struct prp_priv *priv, struct v4l2_subdev_pad_config *cfg,
 		return &priv->format_mbus;
 }
 
+static void prp_init_pad_format(struct prp_priv *priv, unsigned int pad,
+				struct v4l2_subdev_pad_config *cfg)
+{
+	struct v4l2_mbus_framefmt *mf;
+	u32 code;
+
+	mf = __prp_get_fmt(priv, cfg, pad, cfg ?
+			    V4L2_SUBDEV_FORMAT_TRY : V4L2_SUBDEV_FORMAT_ACTIVE);
+
+	imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
+	imx_media_init_mbus_fmt(mf, 640, 480, code, V4L2_FIELD_NONE, NULL);
+}
+
 /*
  * V4L2 subdev operations.
  */
+
+static int prp_init_cfg(struct v4l2_subdev *sd,
+			struct v4l2_subdev_pad_config *cfg)
+{
+	struct prp_priv *priv = sd_to_priv(sd);
+	unsigned int i;
+
+	mutex_lock(&priv->lock);
+
+	/* initialize TRY formats on all pads */
+	for (i = 0; i < sd->entity.num_pads; i++)
+		prp_init_pad_format(priv, i, cfg);
+
+	mutex_unlock(&priv->lock);
+
+	return 0;
+}
 
 static int prp_enum_mbus_code(struct v4l2_subdev *sd,
 			      struct v4l2_subdev_pad_config *cfg,
@@ -436,8 +466,7 @@ static int prp_s_frame_interval(struct v4l2_subdev *sd,
 static int prp_registered(struct v4l2_subdev *sd)
 {
 	struct prp_priv *priv = sd_to_priv(sd);
-	int i, ret;
-	u32 code;
+	int i;
 
 	/* get media device */
 	priv->md = dev_get_drvdata(sd->v4l2_dev->dev);
@@ -452,16 +481,13 @@ static int prp_registered(struct v4l2_subdev *sd)
 	priv->frame_interval.denominator = 30;
 
 	/* set a default mbus format  */
-	imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
-	ret = imx_media_init_mbus_fmt(&priv->format_mbus, 640, 480, code,
-				      V4L2_FIELD_NONE, NULL);
-	if (ret)
-		return ret;
+	prp_init_pad_format(priv, 0, NULL);
 
 	return media_entity_pads_init(&sd->entity, PRP_NUM_PADS, priv->pad);
 }
 
 static const struct v4l2_subdev_pad_ops prp_pad_ops = {
+	.init_cfg = prp_init_cfg,
 	.enum_mbus_code = prp_enum_mbus_code,
 	.get_fmt = prp_get_fmt,
 	.set_fmt = prp_set_fmt,

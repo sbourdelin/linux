@@ -1125,6 +1125,39 @@ static void csi_try_crop(struct csi_priv *priv,
 	}
 }
 
+static void csi_init_pad_format(struct csi_priv *priv, unsigned int pad,
+				struct v4l2_subdev_pad_config *cfg)
+{
+	struct v4l2_mbus_framefmt *mf;
+	u32 code = 0;
+
+	mf = __csi_get_fmt(priv, cfg, pad, cfg ?
+			   V4L2_SUBDEV_FORMAT_TRY : V4L2_SUBDEV_FORMAT_ACTIVE);
+
+	if (pad != CSI_SINK_PAD)
+		imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
+
+	imx_media_init_mbus_fmt(mf, 640, 480, code, V4L2_FIELD_NONE,
+				cfg ? NULL : &priv->cc[pad]);
+}
+
+static int csi_init_cfg(struct v4l2_subdev *sd,
+			struct v4l2_subdev_pad_config *cfg)
+{
+	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+	unsigned int i;
+
+	mutex_lock(&priv->lock);
+
+	/* initialize TRY formats on all pads */
+	for (i = 0; i < sd->entity.num_pads; i++)
+		csi_init_pad_format(priv, i, cfg);
+
+	mutex_unlock(&priv->lock);
+
+	return 0;
+}
+
 static int csi_enum_mbus_code(struct v4l2_subdev *sd,
 			      struct v4l2_subdev_pad_config *cfg,
 			      struct v4l2_subdev_mbus_code_enum *code)
@@ -1614,7 +1647,6 @@ static int csi_registered(struct v4l2_subdev *sd)
 	struct csi_priv *priv = v4l2_get_subdevdata(sd);
 	struct ipu_csi *csi;
 	int i, ret;
-	u32 code;
 
 	/* get media device */
 	priv->md = dev_get_drvdata(sd->v4l2_dev->dev);
@@ -1631,16 +1663,8 @@ static int csi_registered(struct v4l2_subdev *sd)
 		priv->pad[i].flags = (i == CSI_SINK_PAD) ?
 			MEDIA_PAD_FL_SINK : MEDIA_PAD_FL_SOURCE;
 
-		code = 0;
-		if (i != CSI_SINK_PAD)
-			imx_media_enum_ipu_format(&code, 0, CS_SEL_YUV);
-
 		/* set a default mbus format  */
-		ret = imx_media_init_mbus_fmt(&priv->format_mbus[i],
-					      640, 480, code, V4L2_FIELD_NONE,
-					      &priv->cc[i]);
-		if (ret)
-			goto put_csi;
+		csi_init_pad_format(priv, i, NULL);
 
 		/* init default frame interval */
 		priv->frame_interval[i].numerator = 1;
@@ -1715,6 +1739,7 @@ static const struct v4l2_subdev_video_ops csi_video_ops = {
 };
 
 static const struct v4l2_subdev_pad_ops csi_pad_ops = {
+	.init_cfg = csi_init_cfg,
 	.enum_mbus_code = csi_enum_mbus_code,
 	.enum_frame_size = csi_enum_frame_size,
 	.enum_frame_interval = csi_enum_frame_interval,

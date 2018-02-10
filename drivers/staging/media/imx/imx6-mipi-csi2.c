@@ -447,6 +447,44 @@ out:
 	return ret;
 }
 
+static struct v4l2_mbus_framefmt *
+__csi2_get_fmt(struct csi2_dev *csi2, struct v4l2_subdev_pad_config *cfg,
+	       unsigned int pad, enum v4l2_subdev_format_whence which)
+{
+	if (which == V4L2_SUBDEV_FORMAT_TRY)
+		return v4l2_subdev_get_try_format(&csi2->sd, cfg, pad);
+	else
+		return &csi2->format_mbus;
+}
+
+static void csi2_init_pad_format(struct csi2_dev *csi2, unsigned int pad,
+				 struct v4l2_subdev_pad_config *cfg)
+{
+	struct v4l2_mbus_framefmt *mf;
+
+	mf = __csi2_get_fmt(csi2, cfg, pad, cfg ?
+			    V4L2_SUBDEV_FORMAT_TRY : V4L2_SUBDEV_FORMAT_ACTIVE);
+
+	imx_media_init_mbus_fmt(mf, 640, 480, 0, V4L2_FIELD_NONE, NULL);
+}
+
+static int csi2_init_cfg(struct v4l2_subdev *sd,
+			 struct v4l2_subdev_pad_config *cfg)
+{
+	struct csi2_dev *csi2 = sd_to_dev(sd);
+	unsigned int i;
+
+	mutex_lock(&csi2->lock);
+
+	/* initialize TRY formats on all pads */
+	for (i = 0; i < sd->entity.num_pads; i++)
+		csi2_init_pad_format(csi2, i, cfg);
+
+	mutex_unlock(&csi2->lock);
+
+	return 0;
+}
+
 static int csi2_get_fmt(struct v4l2_subdev *sd,
 			struct v4l2_subdev_pad_config *cfg,
 			struct v4l2_subdev_format *sdformat)
@@ -456,11 +494,7 @@ static int csi2_get_fmt(struct v4l2_subdev *sd,
 
 	mutex_lock(&csi2->lock);
 
-	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY)
-		fmt = v4l2_subdev_get_try_format(&csi2->sd, cfg,
-						 sdformat->pad);
-	else
-		fmt = &csi2->format_mbus;
+	fmt = __csi2_get_fmt(csi2, cfg, sdformat->pad, sdformat->which);
 
 	sdformat->format = *fmt;
 
@@ -474,6 +508,7 @@ static int csi2_set_fmt(struct v4l2_subdev *sd,
 			struct v4l2_subdev_format *sdformat)
 {
 	struct csi2_dev *csi2 = sd_to_dev(sd);
+	struct v4l2_mbus_framefmt *fmt;
 	int ret = 0;
 
 	if (sdformat->pad >= CSI2_NUM_PADS)
@@ -490,10 +525,9 @@ static int csi2_set_fmt(struct v4l2_subdev *sd,
 	if (sdformat->pad != CSI2_SINK_PAD)
 		sdformat->format = csi2->format_mbus;
 
-	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY)
-		cfg->try_fmt = sdformat->format;
-	else
-		csi2->format_mbus = sdformat->format;
+	fmt = __csi2_get_fmt(csi2, cfg, sdformat->pad, sdformat->which);
+
+	*fmt = sdformat->format;
 out:
 	mutex_unlock(&csi2->lock);
 	return ret;
@@ -505,7 +539,7 @@ out:
 static int csi2_registered(struct v4l2_subdev *sd)
 {
 	struct csi2_dev *csi2 = sd_to_dev(sd);
-	int i, ret;
+	int i;
 
 	for (i = 0; i < CSI2_NUM_PADS; i++) {
 		csi2->pad[i].flags = (i == CSI2_SINK_PAD) ?
@@ -513,10 +547,7 @@ static int csi2_registered(struct v4l2_subdev *sd)
 	}
 
 	/* set a default mbus format  */
-	ret = imx_media_init_mbus_fmt(&csi2->format_mbus,
-				      640, 480, 0, V4L2_FIELD_NONE, NULL);
-	if (ret)
-		return ret;
+	csi2_init_pad_format(csi2, 0, NULL);
 
 	return media_entity_pads_init(&sd->entity, CSI2_NUM_PADS, csi2->pad);
 }
@@ -531,6 +562,7 @@ static const struct v4l2_subdev_video_ops csi2_video_ops = {
 };
 
 static const struct v4l2_subdev_pad_ops csi2_pad_ops = {
+	.init_cfg = csi2_init_cfg,
 	.get_fmt = csi2_get_fmt,
 	.set_fmt = csi2_set_fmt,
 };
