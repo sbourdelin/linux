@@ -45,13 +45,17 @@ struct fib4_rule {
 #ifdef CONFIG_IP_ROUTE_CLASSID
 	u32			tclassid;
 #endif
+	__be16			sport;
+	__be16			dport;
+	u8			proto;
 };
 
 static bool fib4_rule_matchall(const struct fib_rule *rule)
 {
 	struct fib4_rule *r = container_of(rule, struct fib4_rule, common);
 
-	if (r->dst_len || r->src_len || r->tos)
+	if (r->dst_len || r->src_len || r->tos || r->proto || r->sport ||
+	    r->dport)
 		return false;
 	return fib_rule_matchall(rule);
 }
@@ -182,6 +186,15 @@ static int fib4_rule_match(struct fib_rule *rule, struct flowi *fl, int flags)
 	if (r->tos && (r->tos != fl4->flowi4_tos))
 		return 0;
 
+	if (r->proto && (r->proto != fl4->flowi4_proto))
+		return 0;
+
+	if (r->sport && (r->sport != fl4->fl4_sport))
+		return 0;
+
+	if (r->dport && (r->dport != fl4->fl4_dport))
+		return 0;
+
 	return 1;
 }
 
@@ -243,6 +256,14 @@ static int fib4_rule_configure(struct fib_rule *rule, struct sk_buff *skb,
 			net->ipv4.fib_num_tclassid_users++;
 	}
 #endif
+	if (tb[FRA_PROTO])
+		rule4->proto = nla_get_u8(tb[FRA_PROTO]);
+
+	if (tb[FRA_DPORT])
+		rule4->dport = nla_get_be16(tb[FRA_DPORT]);
+
+	if (tb[FRA_SPORT])
+		rule4->sport = nla_get_be16(tb[FRA_SPORT]);
 
 	rule4->src_len = frh->src_len;
 	rule4->srcmask = inet_make_mask(rule4->src_len);
@@ -301,6 +322,15 @@ static int fib4_rule_compare(struct fib_rule *rule, struct fib_rule_hdr *frh,
 	if (frh->dst_len && (rule4->dst != nla_get_in_addr(tb[FRA_DST])))
 		return 0;
 
+	if (tb[FRA_PROTO] && (rule4->proto != nla_get_u8(tb[FRA_PROTO])))
+		return 0;
+
+	if (tb[FRA_SPORT] && (rule4->sport != nla_get_be16(tb[FRA_SPORT])))
+		return 0;
+
+	if (tb[FRA_DPORT] && (rule4->dport != nla_get_be16(tb[FRA_DPORT])))
+		return 0;
+
 	return 1;
 }
 
@@ -323,6 +353,15 @@ static int fib4_rule_fill(struct fib_rule *rule, struct sk_buff *skb,
 	    nla_put_u32(skb, FRA_FLOW, rule4->tclassid))
 		goto nla_put_failure;
 #endif
+	if (rule4->proto &&
+	    nla_put_u8(skb, FRA_PROTO, rule4->proto))
+		goto nla_put_failure;
+	if (rule4->sport &&
+	    nla_put_be16(skb, FRA_SPORT, rule4->sport))
+		goto nla_put_failure;
+	if (rule4->dport &&
+	    nla_put_be16(skb, FRA_DPORT, rule4->dport))
+		goto nla_put_failure;
 	return 0;
 
 nla_put_failure:
@@ -333,7 +372,10 @@ static size_t fib4_rule_nlmsg_payload(struct fib_rule *rule)
 {
 	return nla_total_size(4) /* dst */
 	       + nla_total_size(4) /* src */
-	       + nla_total_size(4); /* flow */
+	       + nla_total_size(4) /* flow */
+	       + nla_total_size(1) /* proto */
+	       + nla_total_size(2) /* sport */
+	       + nla_total_size(2); /* dport */
 }
 
 static void fib4_rule_flush_cache(struct fib_rules_ops *ops)

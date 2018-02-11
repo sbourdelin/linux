@@ -58,6 +58,9 @@ enum {
 	FRA_PAD,
 	FRA_L3MDEV,	/* iif or oif is l3mdev goto its table */
 	FRA_UID_RANGE,	/* UID range */
+	FRA_PROTO,	/* ip proto */
+	FRA_SPORT,	/* sport */
+	FRA_DPORT,	/* dport */
 	__FRA_MAX
 };
 
