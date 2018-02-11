@@ -256,14 +256,20 @@ static int fib4_rule_configure(struct fib_rule *rule, struct sk_buff *skb,
 			net->ipv4.fib_num_tclassid_users++;
 	}
 #endif
-	if (tb[FRA_PROTO])
+	if (tb[FRA_PROTO]) {
 		rule4->proto = nla_get_u8(tb[FRA_PROTO]);
+		net->ipv4.fib_rules_require_fldissect = true;
+	}
 
-	if (tb[FRA_DPORT])
+	if (tb[FRA_DPORT]) {
 		rule4->dport = nla_get_be16(tb[FRA_DPORT]);
+		net->ipv4.fib_rules_require_fldissect = true;
+	}
 
-	if (tb[FRA_SPORT])
+	if (tb[FRA_SPORT]) {
 		rule4->sport = nla_get_be16(tb[FRA_SPORT]);
+		net->ipv4.fib_rules_require_fldissect = true;
+	}
 
 	rule4->src_len = frh->src_len;
 	rule4->srcmask = inet_make_mask(rule4->src_len);
@@ -431,6 +437,7 @@ int __net_init fib4_rules_init(struct net *net)
 		goto fail;
 	net->ipv4.rules_ops = ops;
 	net->ipv4.fib_has_custom_rules = false;
+	net->ipv4.fib_rules_require_fldissect = false;
 	return 0;
 
 fail:

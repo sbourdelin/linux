@@ -1798,7 +1798,7 @@ static void ip_multipath_l3_keys(const struct sk_buff *skb,
 
 /* if skb is set it will be used and fl4 can be NULL */
 int fib_multipath_hash(const struct fib_info *fi, const struct flowi4 *fl4,
-		       const struct sk_buff *skb)
+		       const struct sk_buff *skb, struct flow_keys *flkeys)
 {
 	struct net *net = fi->fib_net;
 	struct flow_keys hash_keys;
@@ -1825,12 +1825,20 @@ int fib_multipath_hash(const struct fib_info *fi, const struct flowi4 *fl4,
 			if (skb->l4_hash)
 				return skb_get_hash_raw(skb) >> 1;
 			memset(&hash_keys, 0, sizeof(hash_keys));
-			skb_flow_dissect_flow_keys(skb, &keys, flag);
-			hash_keys.addrs.v4addrs.src = keys.addrs.v4addrs.src;
-			hash_keys.addrs.v4addrs.dst = keys.addrs.v4addrs.dst;
-			hash_keys.ports.src = keys.ports.src;
-			hash_keys.ports.dst = keys.ports.dst;
-			hash_keys.basic.ip_proto = keys.basic.ip_proto;
+			if (flkeys) {
+				hash_keys.addrs.v4addrs.src = flkeys->addrs.v4addrs.src;
+				hash_keys.addrs.v4addrs.dst = flkeys->addrs.v4addrs.dst;
+				hash_keys.ports.src = flkeys->ports.src;
+				hash_keys.ports.dst = flkeys->ports.dst;
+				hash_keys.basic.ip_proto = flkeys->basic.ip_proto;
+			} else {
+				skb_flow_dissect_flow_keys(skb, &keys, flag);
+				hash_keys.addrs.v4addrs.src = keys.addrs.v4addrs.src;
+				hash_keys.addrs.v4addrs.dst = keys.addrs.v4addrs.dst;
+				hash_keys.ports.src = keys.ports.src;
+				hash_keys.ports.dst = keys.ports.dst;
+				hash_keys.basic.ip_proto = keys.basic.ip_proto;
+			}
 		} else {
 			memset(&hash_keys, 0, sizeof(hash_keys));
 			hash_keys.control.addr_type = FLOW_DISSECTOR_KEY_IPV4_ADDRS;
@@ -1852,11 +1860,12 @@ EXPORT_SYMBOL_GPL(fib_multipath_hash);
 static int ip_mkroute_input(struct sk_buff *skb,
 			    struct fib_result *res,
 			    struct in_device *in_dev,
-			    __be32 daddr, __be32 saddr, u32 tos)
+			    __be32 daddr, __be32 saddr, u32 tos,
+			    struct flow_keys *hkeys)
 {
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 	if (res->fi && res->fi->fib_nhs > 1) {
-		int h = fib_multipath_hash(res->fi, NULL, skb);
+		int h = fib_multipath_hash(res->fi, NULL, skb, hkeys);
 
 		fib_select_multipath(res, h);
 	}
@@ -1882,13 +1891,14 @@ static int ip_route_input_slow(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 			       struct fib_result *res)
 {
 	struct in_device *in_dev = __in_dev_get_rcu(dev);
+	struct flow_keys *flkeys = NULL, _flkeys;
+	struct net    *net = dev_net(dev);
 	struct ip_tunnel_info *tun_info;
-	struct flowi4	fl4;
+	int		err = -EINVAL;
 	unsigned int	flags = 0;
 	u32		itag = 0;
 	struct rtable	*rth;
-	int		err = -EINVAL;
-	struct net    *net = dev_net(dev);
+	struct flowi4	fl4;
 	bool do_cache;
 
 	/* IP on this device is disabled. */
@@ -1947,6 +1957,19 @@ static int ip_route_input_slow(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	fl4.daddr = daddr;
 	fl4.saddr = saddr;
 	fl4.flowi4_uid = sock_net_uid(net, NULL);
+
+#ifdef CONFIG_IP_MULTIPLE_TABLES
+	if (net->ipv4.fib_rules_require_fldissect) {
+		unsigned int flag = FLOW_DISSECTOR_F_STOP_AT_ENCAP;
+
+		memset(&_flkeys, 0, sizeof(_flkeys));
+		skb_flow_dissect_flow_keys(skb, &_flkeys, flag);
+		fl4.fl4_sport = _flkeys.ports.src;
+		fl4.fl4_dport = _flkeys.ports.dst;
+		fl4.flowi4_proto = _flkeys.basic.ip_proto;
+		flkeys = &_flkeys;
+	}
+#endif
 	err = fib_lookup(net, &fl4, res, 0);
 	if (err != 0) {
 		if (!IN_DEV_FORWARD(in_dev))
@@ -1972,7 +1995,7 @@ static int ip_route_input_slow(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 	if (res->type != RTN_UNICAST)
 		goto martian_destination;
 
-	err = ip_mkroute_input(skb, res, in_dev, daddr, saddr, tos);
+	err = ip_mkroute_input(skb, res, in_dev, daddr, saddr, tos, flkeys);
 out:	return err;
 
 brd_input:
