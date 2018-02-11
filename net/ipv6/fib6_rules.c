@@ -271,14 +271,20 @@ static int fib6_rule_configure(struct fib_rule *rule, struct sk_buff *skb,
 	rule6->dst.plen = frh->dst_len;
 	rule6->tclass = frh->tos;
 
-	if (tb[FRA_PROTO])
+	if (tb[FRA_PROTO]) {
 		rule6->proto = nla_get_u8(tb[FRA_PROTO]);
+		net->ipv6.fib6_rules_require_fldissect = true;
+	}
 
-	if (tb[FRA_SPORT])
+	if (tb[FRA_SPORT]) {
 		rule6->sport = nla_get_be16(tb[FRA_SPORT]);
+		net->ipv6.fib6_rules_require_fldissect = true;
+	}
 
-	if (tb[FRA_DPORT])
+	if (tb[FRA_DPORT]) {
 		rule6->dport = nla_get_be16(tb[FRA_DPORT]);
+		net->ipv6.fib6_rules_require_fldissect = true;
+	}
 
 	net->ipv6.fib6_has_custom_rules = true;
 	err = 0;
