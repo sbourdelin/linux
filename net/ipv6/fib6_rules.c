@@ -28,13 +28,17 @@ struct fib6_rule {
 	struct rt6key		src;
 	struct rt6key		dst;
 	u8			tclass;
+	u8			proto;
+	__be16			sport;
+	__be16			dport;
 };
 
 static bool fib6_rule_matchall(const struct fib_rule *rule)
 {
 	struct fib6_rule *r = container_of(rule, struct fib6_rule, common);
 
-	if (r->dst.plen || r->src.plen || r->tclass)
+	if (r->dst.plen || r->src.plen || r->tclass || r->proto || r->sport ||
+	    r->dport)
 		return false;
 	return fib_rule_matchall(rule);
 }
@@ -223,6 +227,15 @@ static int fib6_rule_match(struct fib_rule *rule, struct flowi *fl, int flags)
 	if (r->tclass && r->tclass != ip6_tclass(fl6->flowlabel))
 		return 0;
 
+	if (r->proto && r->proto != fl6->flowi6_proto)
+		return 0;
+
+	if (r->sport && r->sport != fl6->fl6_sport)
+		return 0;
+
+	if (r->dport && r->dport != fl6->fl6_dport)
+		return 0;
+
 	return 1;
 }
 
@@ -258,6 +271,15 @@ static int fib6_rule_configure(struct fib_rule *rule, struct sk_buff *skb,
 	rule6->dst.plen = frh->dst_len;
 	rule6->tclass = frh->tos;
 
+	if (tb[FRA_PROTO])
+		rule6->proto = nla_get_u8(tb[FRA_PROTO]);
+
+	if (tb[FRA_SPORT])
+		rule6->sport = nla_get_be16(tb[FRA_SPORT]);
+
+	if (tb[FRA_DPORT])
+		rule6->dport = nla_get_be16(tb[FRA_DPORT]);
+
 	net->ipv6.fib6_has_custom_rules = true;
 	err = 0;
 errout:
@@ -286,6 +308,18 @@ static int fib6_rule_compare(struct fib_rule *rule, struct fib_rule_hdr *frh,
 	    nla_memcmp(tb[FRA_DST], &rule6->dst.addr, sizeof(struct in6_addr)))
 		return 0;
 
+	if (tb[FRA_PROTO] &&
+	    (rule6->proto != nla_get_u8(tb[FRA_PROTO])))
+		return 0;
+
+	if (tb[FRA_SPORT] &&
+	    (rule6->sport != nla_get_be32(tb[FRA_SPORT])))
+		return 0;
+
+	if (tb[FRA_DPORT] &&
+	    (rule6->dport != nla_get_be32(tb[FRA_DPORT])))
+		return 0;
+
 	return 1;
 }
 
@@ -301,7 +335,13 @@ static int fib6_rule_fill(struct fib_rule *rule, struct sk_buff *skb,
 	if ((rule6->dst.plen &&
 	     nla_put_in6_addr(skb, FRA_DST, &rule6->dst.addr)) ||
 	    (rule6->src.plen &&
-	     nla_put_in6_addr(skb, FRA_SRC, &rule6->src.addr)))
+	     nla_put_in6_addr(skb, FRA_SRC, &rule6->src.addr)) ||
+	    (rule6->proto &&
+		nla_put_u8(skb, FRA_PROTO, rule6->proto)) ||
+	    (rule6->sport &&
+		nla_put_be16(skb, FRA_SPORT, rule6->sport)) ||
+	    (rule6->dport &&
+		nla_put_be16(skb, FRA_DPORT, rule6->dport)))
 		goto nla_put_failure;
 	return 0;
 
@@ -312,7 +352,10 @@ nla_put_failure:
 static size_t fib6_rule_nlmsg_payload(struct fib_rule *rule)
 {
 	return nla_total_size(16) /* dst */
-	       + nla_total_size(16); /* src */
+	       + nla_total_size(16) /* src */
+	       + nla_total_size(1) /* proto */
+	       + nla_total_size(2) /* sport */
+	       + nla_total_size(2); /* dport */
 }
 
 static const struct fib_rules_ops __net_initconst fib6_rules_ops_template = {
