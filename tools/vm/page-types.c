@@ -107,6 +107,7 @@
 
 static const char * const page_flag_names[] = {
 	[KPF_LOCKED]		= "L:locked",
+	[KPF_WAITERS]		= "Q:waiters",
 	[KPF_ERROR]		= "E:error",
 	[KPF_REFERENCED]	= "R:referenced",
 	[KPF_UPTODATE]		= "U:uptodate",
@@ -497,6 +498,12 @@ static uint64_t well_known_flags(uint64_t flags)
 	/* hide non-hugeTLB compound pages */
 	if ((flags & BITS_COMPOUND) && !(flags & BIT(HUGE)))
 		flags &= ~BITS_COMPOUND;
+
+	/* Treat WAITERS without LOCKED or WRITEBACK as false-postive */
+	if ((flags & (BIT(WAITERS) |
+		      BIT(LOCKED) |
+		      BIT(WRITEBACK))) == BIT(WAITERS))
+		flags &= ~BIT(WAITERS);
 
 	return flags;
 }
