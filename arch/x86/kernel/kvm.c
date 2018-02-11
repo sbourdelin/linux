@@ -604,6 +604,11 @@ unsigned int kvm_arch_para_features(void)
 	return cpuid_eax(kvm_cpuid_base() | KVM_CPUID_FEATURES);
 }
 
+unsigned int kvm_arch_hint_features(void)
+{
+	return cpuid_edx(kvm_cpuid_base() | KVM_CPUID_FEATURES);
+}
+
 static uint32_t __init kvm_detect(void)
 {
 	return kvm_cpuid_base();
