@@ -25,21 +25,6 @@
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 
-static void pgd_ctor(void *addr)
-{
-	memset(addr, 0, PGD_TABLE_SIZE);
-}
-
-static void pud_ctor(void *addr)
-{
-	memset(addr, 0, PUD_TABLE_SIZE);
-}
-
-static void pmd_ctor(void *addr)
-{
-	memset(addr, 0, PMD_TABLE_SIZE);
-}
-
 struct kmem_cache *pgtable_cache[MAX_PGTABLE_INDEX_SIZE];
 EXPORT_SYMBOL_GPL(pgtable_cache);	/* used by kvm_hv module */
 

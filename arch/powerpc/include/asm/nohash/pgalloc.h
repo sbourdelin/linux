@@ -21,4 +21,20 @@ static inline void tlb_flush_pgtable(struct mmu_gather *tlb,
 #else
 #include <asm/nohash/32/pgalloc.h>
 #endif
+
+static inline void pgd_ctor(void *addr)
+{
+	memset(addr, 0, PGD_TABLE_SIZE);
+}
+
+static inline void pud_ctor(void *addr)
+{
+	memset(addr, 0, PUD_TABLE_SIZE);
+}
+
+static inline void pmd_ctor(void *addr)
+{
+	memset(addr, 0, PMD_TABLE_SIZE);
+}
+
 #endif /* _ASM_POWERPC_NOHASH_PGALLOC_H */
