@@ -29,6 +29,8 @@ Optional subnode-properties:
 	- linux,can-disable: Boolean, indicates that button is connected
 	  to dedicated (not shared) interrupt which can be disabled to
 	  suppress events from the button.
+	- gpio-key,level-trigger: Boolean, indicates that button's interrupt
+	  type is level trigger. Otherwise it is edge trigger as default.
 
 Example nodes:
 
