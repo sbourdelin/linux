@@ -99,8 +99,34 @@ static struct drm_minor **drm_minor_get_slot(struct drm_device *dev,
 	case DRM_MINOR_CONTROL:
 		return &dev->control;
 	default:
+		DRM_ERROR("Error in %s: Invalid dev, type = %d\n",
+			  __func__, type);
 		return NULL;
 	}
+}
+
+static inline int drm_minor_set_minor(struct drm_device *dev,
+				      unsigned int type,
+				      struct drm_minor *minor)
+{
+	struct drm_minor **slot = drm_minor_get_slot(dev, type);
+	int retval = -ENODEV;
+
+	if (slot) {
+		retval = 0;
+		*slot = minor;
+	}
+	return retval;
+}
+
+static inline struct drm_minor *drm_minor_get_minor(struct drm_device *dev,
+						    unsigned int type)
+{
+	struct drm_minor **slot = drm_minor_get_slot(dev, type);
+
+	if (slot)
+		return *slot;
+	return NULL;
 }
 
 static int drm_minor_alloc(struct drm_device *dev, unsigned int type)
@@ -137,8 +163,9 @@ static int drm_minor_alloc(struct drm_device *dev, unsigned int type)
 		goto err_index;
 	}
 
-	*drm_minor_get_slot(dev, type) = minor;
-	return 0;
+	r = drm_minor_set_minor(dev, type, minor);
+	if (r == 0)
+		return r;
 
 err_index:
 	spin_lock_irqsave(&drm_minor_lock, flags);
@@ -155,6 +182,9 @@ static void drm_minor_free(struct drm_device *dev, unsigned int type)
 	unsigned long flags;
 
 	slot = drm_minor_get_slot(dev, type);
+	if (!slot)
+		return;
+
 	minor = *slot;
 	if (!minor)
 		return;
@@ -177,7 +207,7 @@ static int drm_minor_register(struct drm_device *dev, unsigned int type)
 
 	DRM_DEBUG("\n");
 
-	minor = *drm_minor_get_slot(dev, type);
+	minor = drm_minor_get_minor(dev, type);
 	if (!minor)
 		return 0;
 
@@ -209,7 +239,7 @@ static void drm_minor_unregister(struct drm_device *dev, unsigned int type)
 	struct drm_minor *minor;
 	unsigned long flags;
 
-	minor = *drm_minor_get_slot(dev, type);
+	minor = drm_minor_get_minor(dev, type);
 	if (!minor || !device_is_registered(minor->kdev))
 		return;
 
