@@ -1336,7 +1336,7 @@ static struct cpuhp_step cpuhp_ap_states[] = {
 		.teardown.single	= smpcfd_dying_cpu,
 	},
 	/* Entry state on starting. Interrupts enabled from here on. Transient
-	 * state for synchronsization */
+	 * state for synchronization */
 	[CPUHP_AP_ONLINE] = {
 		.name			= "ap:online",
 	},
