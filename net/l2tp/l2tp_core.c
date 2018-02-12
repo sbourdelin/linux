@@ -1642,7 +1642,7 @@ EXPORT_SYMBOL_GPL(l2tp_session_free);
  * shutdown via. l2tp_session_delete and a pseudowire-specific session_close
  * callback.
  */
-void __l2tp_session_unhash(struct l2tp_session *session)
+static void l2tp_session_unhash(struct l2tp_session *session)
 {
 	struct l2tp_tunnel *tunnel = session->tunnel;
 
@@ -1663,7 +1663,6 @@ void __l2tp_session_unhash(struct l2tp_session *session)
 		}
 	}
 }
-EXPORT_SYMBOL_GPL(__l2tp_session_unhash);
 
 /* Workqueue session deletion function */
 static void l2tp_session_del_work(struct work_struct *work)
@@ -1674,7 +1673,7 @@ static void l2tp_session_del_work(struct work_struct *work)
 	l2tp_info(session, L2TP_MSG_CONTROL,
 		  "%s: closing session\n", session->name);
 
-	__l2tp_session_unhash(session);
+	l2tp_session_unhash(session);
 	l2tp_session_queue_purge(session);
 	if (session->session_close)
 		(*session->session_close)(session);
