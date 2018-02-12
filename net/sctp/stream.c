@@ -6,7 +6,7 @@
  *
  * This file is part of the SCTP kernel implementation
  *
- * These functions manipulate sctp tsn mapping array.
+ * These functions work for sctp stream basic operation and reconfig.
  *
  * This SCTP implementation is free software;
  * you can redistribute it and/or modify it under the terms of
