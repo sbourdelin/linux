@@ -120,7 +120,7 @@ static u32 __get_vblank_counter(struct drm_device *dev, unsigned int pipe)
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
 		struct drm_crtc *crtc = drm_crtc_from_index(dev, pipe);
 
-		if (crtc->funcs->get_vblank_counter)
+		if (crtc && crtc->funcs->get_vblank_counter)
 			return crtc->funcs->get_vblank_counter(crtc);
 	}
 
@@ -318,7 +318,7 @@ static void __disable_vblank(struct drm_device *dev, unsigned int pipe)
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
 		struct drm_crtc *crtc = drm_crtc_from_index(dev, pipe);
 
-		if (crtc->funcs->disable_vblank) {
+		if (crtc && crtc->funcs->disable_vblank) {
 			crtc->funcs->disable_vblank(crtc);
 			return;
 		}
@@ -918,7 +918,7 @@ static int __enable_vblank(struct drm_device *dev, unsigned int pipe)
 	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
 		struct drm_crtc *crtc = drm_crtc_from_index(dev, pipe);
 
-		if (crtc->funcs->enable_vblank)
+		if (crtc && crtc->funcs->enable_vblank)
 			return crtc->funcs->enable_vblank(crtc);
 	}
 
