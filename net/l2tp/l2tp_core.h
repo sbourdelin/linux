@@ -75,6 +75,8 @@ struct l2tp_session {
 	int			magic;		/* should be
 						 * L2TP_SESSION_MAGIC */
 	long			dead;
+	bool                    closing;
+	spinlock_t              lock;		/* protect closing */
 
 	struct l2tp_tunnel	*tunnel;	/* back pointer to tunnel
 						 * context */
