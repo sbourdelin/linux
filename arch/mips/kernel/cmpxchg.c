@@ -9,6 +9,7 @@
  */
 
 #include <linux/bitops.h>
+#include <linux/spinlock.h>
 #include <asm/cmpxchg.h>
 
 unsigned long __xchg_small(volatile void *ptr, unsigned long val, unsigned int size)
@@ -107,3 +108,19 @@ unsigned long __cmpxchg_small(volatile void *ptr, unsigned long old,
 			return old;
 	}
 }
+
+static DEFINE_SPINLOCK(cmpxchg_lock);
+
+u64 __cmpxchg_u64(u64 *ptr, u64 old, u64 new)
+{
+	unsigned long flags;
+	u64 prev;
+
+	spin_lock_irqsave(&cmpxchg_lock, flags);
+	if ((prev = *ptr) == old)
+		*ptr = new;
+	spin_unlock_irqrestore(&cmpxchg_lock, flags);
+
+	return prev;
+}
+EXPORT_SYMBOL(__cmpxchg_u64);
