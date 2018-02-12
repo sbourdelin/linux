@@ -443,7 +443,9 @@ static void pppol2tp_session_destruct(struct sock *sk)
 	skb_queue_purge(&sk->sk_write_queue);
 
 	if (session) {
-		sk->sk_user_data = NULL;
+		write_lock_bh(&sk->sk_callback_lock);
+		rcu_assign_sk_user_data(sk, NULL);
+		write_unlock_bh(&sk->sk_callback_lock);
 		BUG_ON(session->magic != L2TP_SESSION_MAGIC);
 		l2tp_session_dec_refcount(session);
 	}
@@ -796,7 +798,9 @@ static int pppol2tp_connect(struct socket *sock, struct sockaddr *uservaddr,
 
 out_no_ppp:
 	/* This is how we get the session context from the socket. */
-	sk->sk_user_data = session;
+	write_lock_bh(&sk->sk_callback_lock);
+	rcu_assign_sk_user_data(sk, session);
+	write_unlock_bh(&sk->sk_callback_lock);
 	rcu_assign_pointer(ps->sk, sk);
 	mutex_unlock(&ps->sk_lock);
 
