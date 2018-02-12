@@ -2081,6 +2081,17 @@ static int pcm_accessible_state(struct snd_pcm_runtime *runtime)
 	}
 }
 
+static int pcm_preload(struct snd_pcm_substream *substream)
+{
+	int ret = 0;
+
+	if (substream->ops->preload)
+		ret = substream->ops->preload(substream);
+
+	return ret;
+}
+
+
 /* update to the given appl_ptr and call ack callback if needed;
  * when an error is returned, take back to the original value
  */
@@ -2218,6 +2229,9 @@ snd_pcm_sframes_t __snd_pcm_lib_xfer(struct snd_pcm_substream *substream,
 		snd_pcm_stream_unlock_irq(substream);
 		err = writer(substream, appl_ofs, data, offset, frames,
 			     transfer);
+		if (is_playback && !err &&
+		    runtime->status->state == SNDRV_PCM_STATE_PREPARED)
+			err = pcm_preload(substream);
 		snd_pcm_stream_lock_irq(substream);
 		if (err < 0)
 			goto _end_unlock;
