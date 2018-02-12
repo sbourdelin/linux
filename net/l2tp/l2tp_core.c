@@ -163,6 +163,13 @@ struct l2tp_tunnel *l2tp_tunnel_get(const struct net *net, u32 tunnel_id)
 	rcu_read_lock_bh();
 	list_for_each_entry_rcu(tunnel, &pn->l2tp_tunnel_list, list) {
 		if (tunnel->tunnel_id == tunnel_id) {
+			spin_lock_bh(&tunnel->lock);
+			if (tunnel->closing) {
+				spin_unlock_bh(&tunnel->lock);
+				rcu_read_unlock_bh();
+				return NULL;
+			}
+			spin_unlock_bh(&tunnel->lock);
 			l2tp_tunnel_inc_refcount(tunnel);
 			rcu_read_unlock_bh();
 
@@ -278,13 +285,16 @@ int l2tp_session_register(struct l2tp_session *session,
 	struct l2tp_net *pn;
 	int err;
 
+	spin_lock_bh(&tunnel->lock);
+	if (tunnel->closing) {
+		spin_unlock_bh(&tunnel->lock);
+		return -ENODEV;
+	}
+	spin_unlock_bh(&tunnel->lock);
+
 	head = l2tp_session_id_hash(tunnel, session->session_id);
 
 	write_lock_bh(&tunnel->hlist_lock);
-	if (!tunnel->acpt_newsess) {
-		err = -ENODEV;
-		goto err_tlock;
-	}
 
 	hlist_for_each_entry(session_walk, head, hlist)
 		if (session_walk->session_id == session->session_id) {
@@ -1220,7 +1230,6 @@ void l2tp_tunnel_closeall(struct l2tp_tunnel *tunnel)
 		  tunnel->name);
 
 	write_lock_bh(&tunnel->hlist_lock);
-	tunnel->acpt_newsess = false;
 	for (hash = 0; hash < L2TP_HASH_SIZE; hash++) {
 again:
 		hlist_for_each_safe(walk, tmp, &tunnel->session_hlist[hash]) {
@@ -1506,7 +1515,6 @@ int l2tp_tunnel_create(struct net *net, int fd, int version, u32 tunnel_id, u32 
 	sprintf(&tunnel->name[0], "tunl %u", tunnel_id);
 	spin_lock_init(&tunnel->lock);
 	rwlock_init(&tunnel->hlist_lock);
-	tunnel->acpt_newsess = true;
 
 	/* The net we belong to */
 	tunnel->l2tp_net = net;
@@ -1709,6 +1717,13 @@ EXPORT_SYMBOL_GPL(l2tp_session_set_header_len);
 struct l2tp_session *l2tp_session_create(int priv_size, struct l2tp_tunnel *tunnel, u32 session_id, u32 peer_session_id, struct l2tp_session_cfg *cfg)
 {
 	struct l2tp_session *session;
+
+	spin_lock_bh(&tunnel->lock);
+	if (tunnel->closing) {
+		spin_unlock_bh(&tunnel->lock);
+		return ERR_PTR(-ENODEV);
+	}
+	spin_unlock_bh(&tunnel->lock);
 
 	session = kzalloc(sizeof(struct l2tp_session) + priv_size, GFP_KERNEL);
 	if (session != NULL) {
