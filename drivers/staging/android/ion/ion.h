@@ -72,7 +72,6 @@ struct ion_buffer {
 	size_t size;
 	void *priv_virt;
 	struct mutex lock;
-	int kmap_cnt;
 	void *vaddr;
 	struct sg_table *sg_table;
 	struct list_head attachments;

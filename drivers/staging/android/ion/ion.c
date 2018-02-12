@@ -27,6 +27,7 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/vmalloc.h>
+#include <linux/highmem.h>
 
 #include "ion.h"
 
@@ -119,8 +120,6 @@ err2:
 
 void ion_buffer_destroy(struct ion_buffer *buffer)
 {
-	if (WARN_ON(buffer->kmap_cnt > 0))
-		buffer->heap->ops->unmap_kernel(buffer->heap, buffer);
 	buffer->heap->ops->free(buffer);
 	kfree(buffer);
 }
@@ -138,34 +137,6 @@ static void _ion_buffer_destroy(struct ion_buffer *buffer)
 		ion_heap_freelist_add(heap, buffer);
 	else
 		ion_buffer_destroy(buffer);
-}
-
-static void *ion_buffer_kmap_get(struct ion_buffer *buffer)
-{
-	void *vaddr;
-
-	if (buffer->kmap_cnt) {
-		buffer->kmap_cnt++;
-		return buffer->vaddr;
-	}
-	vaddr = buffer->heap->ops->map_kernel(buffer->heap, buffer);
-	if (WARN_ONCE(!vaddr,
-		      "heap->ops->map_kernel should return ERR_PTR on error"))
-		return ERR_PTR(-EINVAL);
-	if (IS_ERR(vaddr))
-		return vaddr;
-	buffer->vaddr = vaddr;
-	buffer->kmap_cnt++;
-	return vaddr;
-}
-
-static void ion_buffer_kmap_put(struct ion_buffer *buffer)
-{
-	buffer->kmap_cnt--;
-	if (!buffer->kmap_cnt) {
-		buffer->heap->ops->unmap_kernel(buffer->heap, buffer);
-		buffer->vaddr = NULL;
-	}
 }
 
 static struct sg_table *dup_sg_table(struct sg_table *table)
@@ -305,33 +276,67 @@ static void ion_dma_buf_release(struct dma_buf *dmabuf)
 	_ion_buffer_destroy(buffer);
 }
 
+static inline int sg_page_count(struct scatterlist *sg)
+{
+	return PAGE_ALIGN(sg->offset + sg->length) >> PAGE_SHIFT;
+}
+
+static struct page *ion_dma_buf_get_page(struct sg_table *sg_table,
+					 unsigned long offset)
+{
+	struct page *page;
+	struct scatterlist *sg;
+	int i;
+	unsigned int nr_pages;
+
+	nr_pages = 0;
+	page = NULL;
+	/* Find the page with specified offset */
+	for_each_sg(sg_table->sgl, sg, sg_table->nents, i) {
+		if (nr_pages + sg_page_count(sg) > offset) {
+			page = nth_page(sg_page(sg), offset - nr_pages);
+			break;
+		}
+
+		nr_pages += sg_page_count(sg);
+	}
+
+	return page;
+}
 static void *ion_dma_buf_kmap(struct dma_buf *dmabuf, unsigned long offset)
 {
 	struct ion_buffer *buffer = dmabuf->priv;
 
-	return buffer->vaddr + offset * PAGE_SIZE;
+	return kmap(ion_dma_buf_get_page(buffer->sg_table, offset));
 }
 
 static void ion_dma_buf_kunmap(struct dma_buf *dmabuf, unsigned long offset,
 			       void *ptr)
 {
+	kunmap(ptr);
+}
+
+static void *ion_dma_buf_kmap_atomic(struct dma_buf *dmabuf,
+				     unsigned long offset)
+{
+	struct ion_buffer *buffer = dmabuf->priv;
+
+	return kmap_atomic(ion_dma_buf_get_page(buffer->sg_table,
+						offset));
+}
+
+static void ion_dma_buf_kunmap_atomic(struct dma_buf *dmabuf,
+				      unsigned long offset,
+				      void *ptr)
+{
+	kunmap_atomic(ptr);
 }
 
 static int ion_dma_buf_begin_cpu_access(struct dma_buf *dmabuf,
 					enum dma_data_direction direction)
 {
 	struct ion_buffer *buffer = dmabuf->priv;
-	void *vaddr;
 	struct ion_dma_buf_attachment *a;
-
-	/*
-	 * TODO: Move this elsewhere because we don't always need a vaddr
-	 */
-	if (buffer->heap->ops->map_kernel) {
-		mutex_lock(&buffer->lock);
-		vaddr = ion_buffer_kmap_get(buffer);
-		mutex_unlock(&buffer->lock);
-	}
 
 	mutex_lock(&buffer->lock);
 	list_for_each_entry(a, &buffer->attachments, list) {
@@ -348,12 +353,6 @@ static int ion_dma_buf_end_cpu_access(struct dma_buf *dmabuf,
 {
 	struct ion_buffer *buffer = dmabuf->priv;
 	struct ion_dma_buf_attachment *a;
-
-	if (buffer->heap->ops->map_kernel) {
-		mutex_lock(&buffer->lock);
-		ion_buffer_kmap_put(buffer);
-		mutex_unlock(&buffer->lock);
-	}
 
 	mutex_lock(&buffer->lock);
 	list_for_each_entry(a, &buffer->attachments, list) {
@@ -374,8 +373,8 @@ static const struct dma_buf_ops dma_buf_ops = {
 	.detach = ion_dma_buf_detatch,
 	.begin_cpu_access = ion_dma_buf_begin_cpu_access,
 	.end_cpu_access = ion_dma_buf_end_cpu_access,
-	.map_atomic = ion_dma_buf_kmap,
-	.unmap_atomic = ion_dma_buf_kunmap,
+	.map_atomic = ion_dma_buf_kmap_atomic,
+	.unmap_atomic = ion_dma_buf_kunmap_atomic,
 	.map = ion_dma_buf_kmap,
 	.unmap = ion_dma_buf_kunmap,
 };
