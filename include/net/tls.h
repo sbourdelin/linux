@@ -55,6 +55,25 @@
 
 #define TLS_AAD_SPACE_SIZE		13
 
+#define TLS_DEVICE_NAME_MAX            64
+
+struct tls_device {
+	char name[TLS_DEVICE_NAME_MAX];
+	struct list_head dev_list;
+
+	/* When calling get_netdev, the HW vendor's driver should return the
+	 * net device of device @device at port @port_num or NULL if such
+	 * a net device doesn't exist
+	 */
+	struct net_device *(*netdev)(struct tls_device *device,
+				     struct net_device *netdev);
+	int (*feature)(struct tls_device *device);
+	int (*hash)(struct tls_device *device, struct sock *sk);
+	void (*unhash)(struct tls_device *device, struct sock *sk);
+	void (*prot)(struct tls_device *device,
+		     struct sock *sk);
+};
+
 struct tls_sw_context {
 	struct crypto_aead *aead_send;
 
@@ -254,5 +273,7 @@ static inline struct tls_offload_context *tls_offload_ctx(
 
 int tls_proccess_cmsg(struct sock *sk, struct msghdr *msg,
 		      unsigned char *record_type);
+void tls_register_device(struct tls_device *device);
+void tls_unregister_device(struct tls_device *device);
 
 #endif /* _TLS_OFFLOAD_H */
