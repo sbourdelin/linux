@@ -2826,8 +2826,8 @@ static int meminfo_show(struct seq_file *seq, void *v)
 		"Tx payload:", "Rx payload:", "LE hash:", "iSCSI region:",
 		"TDDP region:", "TPT region:", "STAG region:", "RQ region:",
 		"RQUDP region:", "PBL region:", "TXPBL region:",
-		"DBVFIFO region:", "ULPRX state:", "ULPTX state:",
-		"On-chip queues:"
+		"TLSKey region:", "DBVFIFO region:", "ULPRX state:",
+		"ULPTX state:", "On-chip queues:"
 	};
 
 	int i, n;
@@ -2943,6 +2943,12 @@ static int meminfo_show(struct seq_file *seq, void *v)
 	ulp_region(RX_RQUDP);
 	ulp_region(RX_PBL);
 	ulp_region(TX_PBL);
+	if (adap->params.crypto & FW_CAPS_CONFIG_TLS_INLINE) {
+		ulp_region(RX_TLS_KEY);
+	} else {
+		md->base = 0;
+		md->idx = ARRAY_SIZE(region);
+	}
 #undef ulp_region
 	md->base = 0;
 	md->idx = ARRAY_SIZE(region);
@@ -3098,6 +3104,14 @@ static int chcr_show(struct seq_file *seq, void *v)
 		   atomic_read(&adap->chcr_stats.fallback));
 	seq_printf(seq, "IPSec PDU: %10u\n",
 		   atomic_read(&adap->chcr_stats.ipsec_cnt));
+
+	seq_puts(seq, "\nChelsio Inline TLS Stats\n");
+	seq_printf(seq, "TLS PDU Tx: %u\n",
+		   atomic_read(&adap->chcr_stats.tls_pdu_tx));
+	seq_printf(seq, "TLS PDU Rx: %u\n",
+		   atomic_read(&adap->chcr_stats.tls_pdu_rx));
+	seq_printf(seq, "TLS Keys (DDR) Count: %u\n",
+		   atomic_read(&adap->chcr_stats.tls_key));
 	return 0;
 }
 
