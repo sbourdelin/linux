@@ -138,7 +138,7 @@ static int pl111_modeset_init(struct drm_device *dev)
 
 	drm_mode_config_reset(dev);
 
-	drm_fb_cma_fbdev_init(dev, 32, 0);
+	drm_fb_cma_fbdev_init(dev, 32, 1);
 
 	drm_kms_helper_poll_init(dev);
 
