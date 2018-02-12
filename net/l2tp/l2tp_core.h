@@ -123,6 +123,8 @@ struct l2tp_session {
 	struct l2tp_stats	stats;
 	struct hlist_node	global_hlist;	/* Global hash list node */
 
+	struct work_struct	del_work;
+
 	int (*build_header)(struct l2tp_session *session, void *buf);
 	void (*recv_skb)(struct l2tp_session *session, struct sk_buff *skb, int data_len);
 	void (*session_close)(struct l2tp_session *session);

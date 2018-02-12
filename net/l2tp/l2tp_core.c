@@ -1702,6 +1702,24 @@ void __l2tp_session_unhash(struct l2tp_session *session)
 }
 EXPORT_SYMBOL_GPL(__l2tp_session_unhash);
 
+/* Workqueue session deletion function */
+static void l2tp_session_del_work(struct work_struct *work)
+{
+	struct l2tp_session *session = container_of(work, struct l2tp_session,
+						    del_work);
+
+	__l2tp_session_unhash(session);
+	l2tp_session_queue_purge(session);
+	if (session->session_close)
+		(*session->session_close)(session);
+
+	/* drop initial ref */
+	l2tp_session_dec_refcount(session);
+
+	/* drop workqueue ref */
+	l2tp_session_dec_refcount(session);
+}
+
 /* This function is used by the netlink SESSION_DELETE command and by
    pseudowire modules.
  */
@@ -1715,13 +1733,9 @@ int l2tp_session_delete(struct l2tp_session *session)
 	session->closing = true;
 	spin_unlock_bh(&session->lock);
 
-	__l2tp_session_unhash(session);
-	l2tp_session_queue_purge(session);
-	if (session->session_close != NULL)
-		(*session->session_close)(session);
-
-	l2tp_session_dec_refcount(session);
-
+	/* Hold session ref while queued work item is pending */
+	l2tp_session_inc_refcount(session);
+	queue_work(l2tp_wq, &session->del_work);
 	return 0;
 }
 EXPORT_SYMBOL_GPL(l2tp_session_delete);
@@ -1782,6 +1796,8 @@ struct l2tp_session *l2tp_session_create(int priv_size, struct l2tp_tunnel *tunn
 		INIT_HLIST_NODE(&session->hlist);
 		INIT_HLIST_NODE(&session->global_hlist);
 		spin_lock_init(&session->lock);
+
+		INIT_WORK(&session->del_work, l2tp_session_del_work);
 
 		/* Inherit debug options from tunnel */
 		session->debug = tunnel->debug;
