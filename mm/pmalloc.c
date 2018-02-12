@@ -22,6 +22,7 @@
 #include <asm/page.h>
 
 #include <linux/pmalloc.h>
+#include "pmalloc-selftest.h"
 /*
  * pmalloc_data contains the data specific to a pmalloc pool,
  * in a format compatible with the design of gen_alloc.
@@ -494,6 +495,7 @@ static int __init pmalloc_late_init(void)
 		}
 	}
 	mutex_unlock(&pmalloc_mutex);
+	pmalloc_selftest();
 	return 0;
 }
 late_initcall(pmalloc_late_init);
