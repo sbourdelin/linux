@@ -555,7 +555,12 @@ static void trie_free(struct bpf_map *map)
 	struct lpm_trie_node __rcu **slot;
 	struct lpm_trie_node *node;
 
-	raw_spin_lock(&trie->lock);
+	/* at this point bpf_prog->aux->refcnt == 0 and this map->refcnt == 0,
+	 * so the programs (can be more than one that used this map) were
+	 * disconnected from events. Wait for outstanding programs to complete
+	 * update/lookup/delete/get_next_key and free the trie.
+	 */
+	synchronize_rcu();
 
 	/* Always start at the root and walk down to a node that has no
 	 * children. Then free that node, nullify its reference in the parent
@@ -588,7 +593,7 @@ static void trie_free(struct bpf_map *map)
 	}
 
 unlock:
-	raw_spin_unlock(&trie->lock);
+	kfree(trie);
 }
 
 static int trie_get_next_key(struct bpf_map *map, void *_key, void *_next_key)
