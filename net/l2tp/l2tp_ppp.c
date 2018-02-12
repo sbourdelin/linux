@@ -172,8 +172,16 @@ static inline struct l2tp_session *pppol2tp_sock_to_session(struct sock *sk)
 		rcu_read_unlock_bh();
 		return NULL;
 	}
+
+	spin_lock_bh(&session->lock);
+	if (session->closing) {
+		spin_unlock_bh(&session->lock);
+		rcu_read_unlock_bh();
+		return NULL;
+	}
 	l2tp_session_inc_refcount(session);
-	rcu_read_unlock();
+	spin_unlock_bh(&session->lock);
+	rcu_read_unlock_bh();
 
 	BUG_ON(session->magic != L2TP_SESSION_MAGIC);
 
