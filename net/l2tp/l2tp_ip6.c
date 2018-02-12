@@ -248,16 +248,19 @@ static void l2tp_ip6_close(struct sock *sk, long timeout)
 
 static void l2tp_ip6_destroy_sock(struct sock *sk)
 {
-	struct l2tp_tunnel *tunnel = l2tp_sock_to_tunnel(sk);
+	struct l2tp_tunnel *tunnel;
 
 	lock_sock(sk);
 	ip6_flush_pending_frames(sk);
 	release_sock(sk);
 
+	rcu_read_lock();
+	tunnel = rcu_dereference_sk_user_data(sk);
 	if (tunnel) {
 		l2tp_tunnel_closeall(tunnel);
 		sock_put(sk);
 	}
+	rcu_read_unlock();
 
 	inet6_destroy_sock(sk);
 }
