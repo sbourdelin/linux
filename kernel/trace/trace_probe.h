@@ -417,3 +417,5 @@ print_probe_args(struct trace_seq *s, struct probe_arg *args, int nr_args,
 }
 
 extern int set_print_fmt(struct trace_probe *tp, bool is_return);
+extern int traceprobe_define_arg_fields(struct trace_event_call *event_call,
+					size_t offset, struct trace_probe *tp);
