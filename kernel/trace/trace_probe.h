@@ -91,24 +91,49 @@ static nokprobe_inline void *get_loc_data(u32 *dl, void *ent)
 	return (u8 *)ent + get_rloc_offs(*dl);
 }
 
-/* Data fetch function type */
-typedef	void (*fetch_func_t)(struct pt_regs *, void *, void *);
 /* Printing function type */
 typedef int (*print_type_func_t)(struct trace_seq *, void *, void *);
 
-/* Fetch types */
-enum {
-	FETCH_MTD_reg = 0,
-	FETCH_MTD_stack,
-	FETCH_MTD_retval,
-	FETCH_MTD_comm,
-	FETCH_MTD_memory,
-	FETCH_MTD_symbol,
-	FETCH_MTD_deref,
-	FETCH_MTD_bitfield,
-	FETCH_MTD_file_offset,
-	FETCH_MTD_END,
+enum fetch_op {
+	FETCH_OP_NOP = 0,
+	// Stage 1 (load) ops
+	FETCH_OP_REG,		/* Register : .param = offset */
+	FETCH_OP_STACK,		/* Stack : .param = index */
+	FETCH_OP_STACKP,	/* Stack pointer */
+	FETCH_OP_RETVAL,	/* Return value */
+	FETCH_OP_IMM,		/* Immediate : .immediate */
+	FETCH_OP_COMM,		/* Current comm */
+	FETCH_OP_FOFFS,		/* File offset: .immediate */
+	// Stage 2 (dereference) op
+	FETCH_OP_DEREF,		/* Dereference: .offset */
+	// Stage 3 (store) ops
+	FETCH_OP_ST_RAW,	/* Raw: .size */
+	FETCH_OP_ST_MEM,	/* Mem: .offset, .size */
+	FETCH_OP_ST_STRING,	/* String: .offset, .size */
+	// Stage 4 (modify) op
+	FETCH_OP_MOD_BF,	/* Bitfield: .basesize, .lshift, .rshift */
+	FETCH_OP_END,
 };
+
+struct fetch_insn {
+	enum fetch_op op;
+	union {
+		unsigned int param;
+		struct {
+			unsigned int size;
+			int offset;
+		};
+		struct {
+			unsigned char basesize;
+			unsigned char lshift;
+			unsigned char rshift;
+		};
+		unsigned long immediate;
+	};
+};
+
+/* fetch + deref*N + store + mod + end <= 16, this allows N=12, enough */
+#define FETCH_INSN_MAX	16
 
 /* Fetch type information table */
 struct fetch_type {
@@ -118,13 +143,6 @@ struct fetch_type {
 	print_type_func_t	print;		/* Print functions */
 	const char		*fmt;		/* Fromat string */
 	const char		*fmttype;	/* Name in format file */
-	/* Fetch functions */
-	fetch_func_t		fetch[FETCH_MTD_END];
-};
-
-struct fetch_param {
-	fetch_func_t		fn;
-	void 			*data;
 };
 
 /* For defining macros, define string/string_size types */
@@ -154,65 +172,11 @@ DECLARE_BASIC_PRINT_TYPE_FUNC(x64);
 
 DECLARE_BASIC_PRINT_TYPE_FUNC(string);
 
-#define FETCH_FUNC_NAME(method, type)	fetch_##method##_##type
-
-/* Declare macro for basic types */
-#define DECLARE_FETCH_FUNC(method, type)				\
-extern void FETCH_FUNC_NAME(method, type)(struct pt_regs *regs, 	\
-					  void *data, void *dest)
-
-#define DECLARE_BASIC_FETCH_FUNCS(method) 	\
-DECLARE_FETCH_FUNC(method, u8);			\
-DECLARE_FETCH_FUNC(method, u16);		\
-DECLARE_FETCH_FUNC(method, u32);		\
-DECLARE_FETCH_FUNC(method, u64)
-
-DECLARE_BASIC_FETCH_FUNCS(reg);
-#define fetch_reg_string			NULL
-#define fetch_reg_string_size			NULL
-
-DECLARE_BASIC_FETCH_FUNCS(retval);
-#define fetch_retval_string			NULL
-#define fetch_retval_string_size		NULL
-
-DECLARE_BASIC_FETCH_FUNCS(symbol);
-DECLARE_FETCH_FUNC(symbol, string);
-DECLARE_FETCH_FUNC(symbol, string_size);
-
-DECLARE_BASIC_FETCH_FUNCS(deref);
-DECLARE_FETCH_FUNC(deref, string);
-DECLARE_FETCH_FUNC(deref, string_size);
-
-DECLARE_BASIC_FETCH_FUNCS(bitfield);
-#define fetch_bitfield_string			NULL
-#define fetch_bitfield_string_size		NULL
-
-/* comm only makes sense as a string */
-#define fetch_comm_u8		NULL
-#define fetch_comm_u16		NULL
-#define fetch_comm_u32		NULL
-#define fetch_comm_u64		NULL
-DECLARE_FETCH_FUNC(comm, string);
-DECLARE_FETCH_FUNC(comm, string_size);
-
-/*
- * Define macro for basic types - we don't need to define s* types, because
- * we have to care only about bitwidth at recording time.
- */
-#define DEFINE_BASIC_FETCH_FUNCS(method) \
-DEFINE_FETCH_##method(u8)		\
-DEFINE_FETCH_##method(u16)		\
-DEFINE_FETCH_##method(u32)		\
-DEFINE_FETCH_##method(u64)
-
 /* Default (unsigned long) fetch type */
 #define __DEFAULT_FETCH_TYPE(t) x##t
 #define _DEFAULT_FETCH_TYPE(t) __DEFAULT_FETCH_TYPE(t)
 #define DEFAULT_FETCH_TYPE _DEFAULT_FETCH_TYPE(BITS_PER_LONG)
 #define DEFAULT_FETCH_TYPE_STR __stringify(DEFAULT_FETCH_TYPE)
-
-#define ASSIGN_FETCH_FUNC(method, type)	\
-	[FETCH_MTD_##method] = FETCH_FUNC_NAME(method, type)
 
 #define __ASSIGN_FETCH_TYPE(_name, ptype, ftype, _size, sign, _fmttype)	\
 	{.name = _name,				\
@@ -221,17 +185,6 @@ DEFINE_FETCH_##method(u64)
 	 .print = PRINT_TYPE_FUNC_NAME(ptype),		\
 	 .fmt = PRINT_TYPE_FMT_NAME(ptype),		\
 	 .fmttype = _fmttype,				\
-	 .fetch = {					\
-ASSIGN_FETCH_FUNC(reg, ftype),				\
-ASSIGN_FETCH_FUNC(stack, ftype),			\
-ASSIGN_FETCH_FUNC(retval, ftype),			\
-ASSIGN_FETCH_FUNC(comm, ftype),				\
-ASSIGN_FETCH_FUNC(memory, ftype),			\
-ASSIGN_FETCH_FUNC(symbol, ftype),			\
-ASSIGN_FETCH_FUNC(deref, ftype),			\
-ASSIGN_FETCH_FUNC(bitfield, ftype),			\
-ASSIGN_FETCH_FUNC(file_offset, ftype),			\
-	  }						\
 	}
 
 #define ASSIGN_FETCH_TYPE(ptype, ftype, sign)			\
@@ -243,44 +196,9 @@ ASSIGN_FETCH_FUNC(file_offset, ftype),			\
 
 #define ASSIGN_FETCH_TYPE_END {}
 
-#define FETCH_TYPE_STRING	0
-#define FETCH_TYPE_STRSIZE	1
-
-#ifdef CONFIG_KPROBE_EVENTS
-struct symbol_cache;
-unsigned long update_symbol_cache(struct symbol_cache *sc);
-void free_symbol_cache(struct symbol_cache *sc);
-struct symbol_cache *alloc_symbol_cache(const char *sym, long offset);
-#else
-/* uprobes do not support symbol fetch methods */
-#define fetch_symbol_u8			NULL
-#define fetch_symbol_u16		NULL
-#define fetch_symbol_u32		NULL
-#define fetch_symbol_u64		NULL
-#define fetch_symbol_string		NULL
-#define fetch_symbol_string_size	NULL
-
-struct symbol_cache {
-};
-static inline unsigned long __used update_symbol_cache(struct symbol_cache *sc)
-{
-	return 0;
-}
-
-static inline void __used free_symbol_cache(struct symbol_cache *sc)
-{
-}
-
-static inline struct symbol_cache * __used
-alloc_symbol_cache(const char *sym, long offset)
-{
-	return NULL;
-}
-#endif /* CONFIG_KPROBE_EVENTS */
-
 struct probe_arg {
-	struct fetch_param	fetch;
-	struct fetch_param	fetch_size;
+	struct fetch_insn	*code;
+	bool			dynamic;/* Dynamic array (string) is used */
 	unsigned int		offset;	/* Offset from argument entry */
 	const char		*name;	/* Name of this argument */
 	const char		*comm;	/* Command of this argument */
@@ -312,12 +230,6 @@ static inline bool trace_probe_is_registered(struct trace_probe *tp)
 	return !!(tp->flags & TP_FLAG_REGISTERED);
 }
 
-static nokprobe_inline void call_fetch(struct fetch_param *fprm,
-				 struct pt_regs *regs, void *dest)
-{
-	return fprm->fn(regs, fprm->data, dest);
-}
-
 /* Check the name is good for event/group/fields */
 static inline bool is_good_name(const char *name)
 {
@@ -343,8 +255,7 @@ find_event_file_link(struct trace_probe *tp, struct trace_event_file *file)
 }
 
 extern int traceprobe_parse_probe_arg(char *arg, ssize_t *size,
-		   struct probe_arg *parg, bool is_return, bool is_kprobe,
-		   const struct fetch_type *ftbl);
+		   struct probe_arg *parg, bool is_return, bool is_kprobe);
 
 extern int traceprobe_conflict_field_name(const char *name,
 			       struct probe_arg *args, int narg);
@@ -354,18 +265,72 @@ extern void traceprobe_free_probe_arg(struct probe_arg *arg);
 
 extern int traceprobe_split_symbol_offset(char *symbol, unsigned long *offset);
 
+/* traceprobe fetch helper  */
+static nokprobe_inline void
+fetch_store_raw(unsigned long val, struct fetch_insn *code, void *buf)
+{
+	switch (code->size) {
+	case 1:
+		*(u8 *)buf = (u8)val;
+		break;
+	case 2:
+		*(u16 *)buf = (u16)val;
+		break;
+	case 4:
+		*(u32 *)buf = (u32)val;
+		break;
+	case 8:
+		//TBD: 32bit signed
+		*(u64 *)buf = (u64)val;
+		break;
+	default:
+		*(unsigned long *)buf = val;
+	}
+}
+
+static nokprobe_inline void
+fetch_apply_bitfield(struct fetch_insn *code, void *buf)
+{
+	switch (code->basesize) {
+	case 1:
+		*(u8 *)buf <<= code->lshift;
+		*(u8 *)buf >>= code->rshift;
+		break;
+	case 2:
+		*(u16 *)buf <<= code->lshift;
+		*(u16 *)buf >>= code->rshift;
+		break;
+	case 4:
+		*(u32 *)buf <<= code->lshift;
+		*(u32 *)buf >>= code->rshift;
+		break;
+	case 8:
+		*(u64 *)buf <<= code->lshift;
+		*(u64 *)buf >>= code->rshift;
+		break;
+	}
+}
+
+/* Define this for each callsite */
+static int
+process_fetch_insn(struct fetch_insn *code, struct pt_regs *regs,
+		   void *dest, bool pre);
+
 /* Sum up total data length for dynamic arraies (strings) */
 static nokprobe_inline int
 __get_data_size(struct trace_probe *tp, struct pt_regs *regs)
 {
+	struct probe_arg *arg;
 	int i, ret = 0;
 	u32 len;
 
-	for (i = 0; i < tp->nr_args; i++)
-		if (unlikely(tp->args[i].fetch_size.fn)) {
-			call_fetch(&tp->args[i].fetch_size, regs, &len);
+	for (i = 0; i < tp->nr_args; i++) {
+		arg = tp->args + i;
+		if (unlikely(arg->dynamic)) {
+			process_fetch_insn(arg->code, regs, &len, true);
 			ret += len;
 		}
+	}
 
 	return ret;
 }
@@ -375,30 +340,31 @@ static nokprobe_inline void
 store_trace_args(int ent_size, struct trace_probe *tp, struct pt_regs *regs,
 		 u8 *data, int maxlen)
 {
-	int i;
+	struct probe_arg *arg;
 	u32 end = tp->size;
 	u32 *dl;	/* Data (relative) location */
+	int i;
 
 	for (i = 0; i < tp->nr_args; i++) {
-		if (unlikely(tp->args[i].fetch_size.fn)) {
+		arg = tp->args + i;
+		if (unlikely(arg->dynamic)) {
 			/*
 			 * First, we set the relative location and
 			 * maximum data length to *dl
 			 */
-			dl = (u32 *)(data + tp->args[i].offset);
-			*dl = make_data_rloc(maxlen, end - tp->args[i].offset);
+			dl = (u32 *)(data + arg->offset);
+			*dl = make_data_rloc(maxlen, end - arg->offset);
 			/* Then try to fetch string or dynamic array data */
-			call_fetch(&tp->args[i].fetch, regs, dl);
+			process_fetch_insn(arg->code, regs, dl, false);
 			/* Reduce maximum length */
 			end += get_rloc_len(*dl);
 			maxlen -= get_rloc_len(*dl);
 			/* Trick here, convert data_rloc to data_loc */
-			*dl = convert_rloc_to_loc(*dl,
-				 ent_size + tp->args[i].offset);
+			*dl = convert_rloc_to_loc(*dl, ent_size + arg->offset);
 		} else
 			/* Just fetching data normally */
-			call_fetch(&tp->args[i].fetch, regs,
-				   data + tp->args[i].offset);
+			process_fetch_insn(arg->code, regs, data + arg->offset,
+					   false);
 	}
 }
 
