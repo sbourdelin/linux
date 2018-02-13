@@ -1812,8 +1812,6 @@ static void ip6_multipath_l3_keys(const struct sk_buff *skb,
 
 	key_iph = inner_iph;
 out:
-	memset(keys, 0, sizeof(*keys));
-	keys->control.addr_type = FLOW_DISSECTOR_KEY_IPV6_ADDRS;
 	keys->addrs.v6addrs.src = key_iph->saddr;
 	keys->addrs.v6addrs.dst = key_iph->daddr;
 	keys->tags.flow_label = ip6_flowinfo(key_iph);
@@ -1826,6 +1824,8 @@ u32 rt6_multipath_hash(const struct flowi6 *fl6, const struct sk_buff *skb)
 	struct flow_keys hash_keys;
 
 	if (skb) {
+		memset(&hash_keys, 0, sizeof(hash_keys));
+		hash_keys.control.addr_type = FLOW_DISSECTOR_KEY_IPV6_ADDRS;
 		ip6_multipath_l3_keys(skb, &hash_keys);
 		return flow_hash_from_keys(&hash_keys) >> 1;
 	}
