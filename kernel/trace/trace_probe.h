@@ -114,6 +114,8 @@ enum fetch_op {
 	FETCH_OP_ST_STRING,	/* String: .offset, .size */
 	// Stage 4 (modify) op
 	FETCH_OP_MOD_BF,	/* Bitfield: .basesize, .lshift, .rshift */
+	// Stage 5 (loop) op
+	FETCH_OP_LP_ARRAY,	/* Array: .param = loop count */
 	FETCH_OP_END,
 };
 
@@ -203,13 +205,16 @@ DECLARE_BASIC_PRINT_TYPE_FUNC(symbol);
 	_ASSIGN_FETCH_TYPE(#ptype, ptype, ftype, sizeof(ftype), sign, atype)
 
 #define ASSIGN_FETCH_TYPE_END {}
+#define MAX_ARRAY_LEN	64
 
 struct probe_arg {
 	struct fetch_insn	*code;
 	bool			dynamic;/* Dynamic array (string) is used */
 	unsigned int		offset;	/* Offset from argument entry */
+	unsigned int		count;	/* Array count */
 	const char		*name;	/* Name of this argument */
 	const char		*comm;	/* Command of this argument */
+	char			*fmt;	/* Format string if needed */
 	const struct fetch_type	*type;	/* Type of this argument */
 };
 
@@ -385,16 +390,30 @@ static inline int
 print_probe_args(struct trace_seq *s, struct probe_arg *args, int nr_args,
 		 u8 *data, void *field)
 {
-	int i;
+	void *p;
+	int i, j;
 
 	for (i = 0; i < nr_args; i++) {
-		trace_seq_printf(s, " %s=", args[i].name);
-		if (!args[i].type->print(s, data + args[i].offset, field))
-			return -ENOMEM;
+		struct probe_arg *a = args + i;
+
+		trace_seq_printf(s, " %s=", a->name);
+		if (likely(!a->count)) {
+			if (!a->type->print(s, data + a->offset, field))
+				return -ENOMEM;
+			continue;
+		}
+		trace_seq_putc(s, '{');
+		p = data + a->offset;
+		for (j = 0; j < a->count; j++) {
+			if (!a->type->print(s, p, field))
+				return -ENOMEM;
+			trace_seq_putc(s, j == a->count - 1 ? '}' : ',');
+			p += a->type->size;
+		}
 	}
 	return 0;
 }
 
-extern int set_print_fmt(struct trace_probe *tp, bool is_return);
+extern int traceprobe_set_print_fmt(struct trace_probe *tp, bool is_return);
 extern int traceprobe_define_arg_fields(struct trace_event_call *event_call,
 					size_t offset, struct trace_probe *tp);

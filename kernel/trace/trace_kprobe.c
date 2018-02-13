@@ -835,8 +835,9 @@ static int
 process_fetch_insn(struct fetch_insn *code, struct pt_regs *regs, void *dest,
 		   bool pre)
 {
+	struct fetch_insn *s3 = NULL;
 	unsigned long val;
-	int ret;
+	int ret, i = 0;
 
 	/* 1st stage: get value from context */
 	switch (code->op) {
@@ -877,6 +878,8 @@ process_fetch_insn(struct fetch_insn *code, struct pt_regs *regs, void *dest,
 		code++;
 	}
 
+stage3:
+	s3 = code;
 	/* 3rd stage: store value to buffer */
 	switch (code->op) {
 	case FETCH_OP_ST_RAW:
@@ -900,6 +903,16 @@ process_fetch_insn(struct fetch_insn *code, struct pt_regs *regs, void *dest,
 	if (code->op == FETCH_OP_MOD_BF) {
 		fetch_apply_bitfield(code, dest);
 		code++;
+	}
+
+	/* the last stage: Loop on array */
+	if (code->op == FETCH_OP_LP_ARRAY) {
+		if (++i < code->param) {
+			code = s3;
+			val += s3->size;
+			dest += s3->size;
+			goto stage3;
+		}
 	}
 
 	return code->op == FETCH_OP_END ? 0 : -EILSEQ;
@@ -1248,7 +1261,7 @@ static int register_kprobe_event(struct trace_kprobe *tk)
 		call->event.funcs = &kprobe_funcs;
 		call->class->define_fields = kprobe_event_define_fields;
 	}
-	if (set_print_fmt(&tk->tp, trace_kprobe_is_return(tk)) < 0)
+	if (traceprobe_set_print_fmt(&tk->tp, trace_kprobe_is_return(tk)) < 0)
 		return -ENOMEM;
 	ret = register_trace_event(&call->event);
 	if (!ret) {

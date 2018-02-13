@@ -378,8 +378,8 @@ int traceprobe_parse_probe_arg(char *arg, ssize_t *size,
 		struct probe_arg *parg, unsigned int flags)
 {
 	struct fetch_insn *code, *tmp = NULL;
-	const char *t;
-	int ret;
+	char *t, *t2;
+	int ret, len;
 
 	if (strlen(arg) > MAX_ARGSTR_LEN) {
 		pr_info("Argument is too long.: %s\n",  arg);
@@ -390,24 +390,40 @@ int traceprobe_parse_probe_arg(char *arg, ssize_t *size,
 		pr_info("Failed to allocate memory for command '%s'.\n", arg);
 		return -ENOMEM;
 	}
-	t = strchr(parg->comm, ':');
+	t = strchr(arg, ':');
 	if (t) {
-		arg[t - parg->comm] = '\0';
-		t++;
+		*t = '\0';
+		t2 = strchr(++t, '[');
+		if (t2) {
+			*t2 = '\0';
+			parg->count = simple_strtoul(t2 + 1, &t2, 0);
+			if (strcmp(t2, "]") || parg->count == 0)
+				return -EINVAL;
+		}
 	}
 	/*
 	 * The default type of $comm should be "string", and it can't be
 	 * dereferenced.
 	 */
 	if (!t && strcmp(arg, "$comm") == 0)
-		t = "string";
-	parg->type = find_fetch_type(t);
+		parg->type = find_fetch_type("string");
+	else
+		parg->type = find_fetch_type(t);
 	if (!parg->type) {
 		pr_info("Unsupported type: %s\n", t);
 		return -EINVAL;
 	}
 	parg->offset = *size;
-	*size += parg->type->size;
+	*size += parg->type->size * (parg->count ?: 1);
+
+	if (parg->count) {
+		len = strlen(parg->type->fmttype) + 6;
+		parg->fmt = kmalloc(len, GFP_KERNEL);
+		if (!parg->fmt)
+			return -ENOMEM;
+		snprintf(parg->fmt, len, "%s[%d]", parg->type->fmttype,
+			 parg->count);
+	}
 
 	code = tmp = kzalloc(sizeof(*code) * FETCH_INSN_MAX, GFP_KERNEL);
 	if (!code)
@@ -453,6 +469,21 @@ int traceprobe_parse_probe_arg(char *arg, ssize_t *size,
 		if (ret)
 			goto fail;
 	}
+	/* Loop(Array) operation */
+	if (parg->count) {
+		if (code->op != FETCH_OP_ST_MEM) {
+			pr_info("array only accepts memory or address\n");
+			ret = -EINVAL;
+			goto fail;
+		}
+		code++;
+		if (code->op != FETCH_OP_NOP) {
+			ret = -E2BIG;
+			goto fail;
+		}
+		code->op = FETCH_OP_LP_ARRAY;
+		code->param = parg->count;
+	}
 	code++;
 	code->op = FETCH_OP_END;
 
@@ -491,14 +522,17 @@ void traceprobe_free_probe_arg(struct probe_arg *arg)
 	kfree(arg->code);
 	kfree(arg->name);
 	kfree(arg->comm);
+	kfree(arg->fmt);
 }
 
+/* When len=0, we just calculate the needed length */
+#define LEN_OR_ZERO (len ? len - pos : 0)
 static int __set_print_fmt(struct trace_probe *tp, char *buf, int len,
 			   bool is_return)
 {
-	int i;
+	struct probe_arg *parg;
+	int i, j;
 	int pos = 0;
-
 	const char *fmt, *arg;
 
 	if (!is_return) {
@@ -509,35 +543,51 @@ static int __set_print_fmt(struct trace_probe *tp, char *buf, int len,
 		arg = "REC->" FIELD_STRING_FUNC ", REC->" FIELD_STRING_RETIP;
 	}
 
-	/* When len=0, we just calculate the needed length */
-#define LEN_OR_ZERO (len ? len - pos : 0)
-
 	pos += snprintf(buf + pos, LEN_OR_ZERO, "\"%s", fmt);
 
 	for (i = 0; i < tp->nr_args; i++) {
-		pos += snprintf(buf + pos, LEN_OR_ZERO, " %s=%s",
-				tp->args[i].name, tp->args[i].type->fmt);
+		parg = tp->args + i;
+		pos += snprintf(buf + pos, LEN_OR_ZERO, " %s=", parg->name);
+		if (parg->count) {
+			pos += snprintf(buf + pos, LEN_OR_ZERO, "{%s",
+					parg->type->fmt);
+			for (j = 1; j < parg->count; j++)
+				pos += snprintf(buf + pos, LEN_OR_ZERO, ",%s",
+						parg->type->fmt);
+			pos += snprintf(buf + pos, LEN_OR_ZERO, "}");
+		} else
+			pos += snprintf(buf + pos, LEN_OR_ZERO, "%s",
+					parg->type->fmt);
 	}
 
 	pos += snprintf(buf + pos, LEN_OR_ZERO, "\", %s", arg);
 
 	for (i = 0; i < tp->nr_args; i++) {
-		if (strcmp(tp->args[i].type->name, "string") == 0)
+		parg = tp->args + i;
+		if (parg->count) {
+			if (strcmp(parg->type->name, "string") == 0)
+				fmt = ", __get_str(%s[%d])";
+			else
+				fmt = ", REC->%s[%d]";
+			for (j = 0; j < parg->count; j++)
+				pos += snprintf(buf + pos, LEN_OR_ZERO,
+						fmt, parg->name, j);
+		} else {
+			if (strcmp(parg->type->name, "string") == 0)
+				fmt = ", __get_str(%s)";
+			else
+				fmt = ", REC->%s";
 			pos += snprintf(buf + pos, LEN_OR_ZERO,
-					", __get_str(%s)",
-					tp->args[i].name);
-		else
-			pos += snprintf(buf + pos, LEN_OR_ZERO, ", REC->%s",
-					tp->args[i].name);
+					fmt, parg->name);
+		}
 	}
-
-#undef LEN_OR_ZERO
 
 	/* return the length of print_fmt */
 	return pos;
 }
+#undef LEN_OR_ZERO
 
-int set_print_fmt(struct trace_probe *tp, bool is_return)
+int traceprobe_set_print_fmt(struct trace_probe *tp, bool is_return)
 {
 	int len;
 	char *print_fmt;
@@ -563,11 +613,16 @@ int traceprobe_define_arg_fields(struct trace_event_call *event_call,
 	/* Set argument names as fields */
 	for (i = 0; i < tp->nr_args; i++) {
 		struct probe_arg *parg = &tp->args[i];
+		const char *fmt = parg->type->fmttype;
+		int size = parg->type->size;
 
-		ret = trace_define_field(event_call, parg->type->fmttype,
-					 parg->name,
+		if (parg->fmt)
+			fmt = parg->fmt;
+		if (parg->count)
+			size *= parg->count;
+		ret = trace_define_field(event_call, fmt, parg->name,
 					 offset + parg->offset,
-					 parg->type->size,
+					 parg->type->size * parg->count,
 					 parg->type->is_signed,
 					 FILTER_OTHER);
 		if (ret)
