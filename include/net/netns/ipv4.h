@@ -68,6 +68,9 @@ struct netns_ipv4 {
 
 	struct inet_peer_base	*peers;
 	struct sock  * __percpu	*tcp_sk;
+#ifdef CONFIG_PROC_FS
+	int __percpu *tcp_sock_allocated;
+#endif
 	struct netns_frags	frags;
 #ifdef CONFIG_NETFILTER
 	struct xt_table		*iptable_filter;

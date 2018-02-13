@@ -453,6 +453,8 @@ void tcp_init_sock(struct sock *sk)
 	sk->sk_rcvbuf = sock_net(sk)->ipv4.sysctl_tcp_rmem[1];
 
 	sk_sockets_allocated_inc(sk);
+	if (likely(sk->sk_net_refcnt))
+		tcp_sock_allocated_add(sock_net(sk), 1);
 }
 EXPORT_SYMBOL(tcp_init_sock);
 

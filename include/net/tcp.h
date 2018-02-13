@@ -1780,6 +1780,8 @@ struct sk_buff **tcp_gro_receive(struct sk_buff **head, struct sk_buff *skb);
 int tcp_gro_complete(struct sk_buff *skb);
 
 void __tcp_v4_send_check(struct sk_buff *skb, __be32 saddr, __be32 daddr);
+void tcp_sock_allocated_add(struct net *net, int val);
+int tcp_sock_allocated_get(struct net *net);
 
 static inline u32 tcp_notsent_lowat(const struct tcp_sock *tp)
 {

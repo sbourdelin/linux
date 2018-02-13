@@ -559,6 +559,9 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 		newtp->rack.reo_wnd_persist = 0;
 		newtp->rack.dsack_seen = 0;
 
+		if (likely(newsk->sk_net_refcnt))
+			tcp_sock_allocated_add(sock_net(newsk), 1);
+
 		__TCP_INC_STATS(sock_net(sk), TCP_MIB_PASSIVEOPENS);
 	}
 	return newsk;

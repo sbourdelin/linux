@@ -1928,6 +1928,8 @@ void tcp_v4_destroy_sock(struct sock *sk)
 	tcp_saved_syn_free(tp);
 
 	sk_sockets_allocated_dec(sk);
+	if (likely(sk->sk_net_refcnt))
+		tcp_sock_allocated_add(sock_net(sk), -1);
 }
 EXPORT_SYMBOL(tcp_v4_destroy_sock);
 
@@ -2446,6 +2448,28 @@ struct proto tcp_prot = {
 };
 EXPORT_SYMBOL(tcp_prot);
 
+void tcp_sock_allocated_add(struct net *net, int val)
+{
+#ifdef CONFIG_PROC_FS
+	this_cpu_add(*net->ipv4.tcp_sock_allocated, val);
+#endif
+}
+EXPORT_SYMBOL(tcp_sock_allocated_add);
+
+int tcp_sock_allocated_get(struct net *net)
+{
+#ifdef CONFIG_PROC_FS
+	int cpu, res = 0;
+
+	for_each_possible_cpu(cpu)
+		res += *per_cpu_ptr(net->ipv4.tcp_sock_allocated, cpu);
+	return res;
+#else
+	return 0;
+#endif
+}
+EXPORT_SYMBOL(tcp_sock_allocated_get);
+
 static void __net_exit tcp_sk_exit(struct net *net)
 {
 	int cpu;
@@ -2455,6 +2479,10 @@ static void __net_exit tcp_sk_exit(struct net *net)
 	for_each_possible_cpu(cpu)
 		inet_ctl_sock_destroy(*per_cpu_ptr(net->ipv4.tcp_sk, cpu));
 	free_percpu(net->ipv4.tcp_sk);
+
+#ifdef CONFIG_PROC_FS
+	free_percpu(net->ipv4.tcp_sock_allocated);
+#endif
 }
 
 static int __net_init tcp_sk_init(struct net *net)
@@ -2464,6 +2492,12 @@ static int __net_init tcp_sk_init(struct net *net)
 	net->ipv4.tcp_sk = alloc_percpu(struct sock *);
 	if (!net->ipv4.tcp_sk)
 		return -ENOMEM;
+
+#ifdef CONFIG_PROC_FS
+	net->ipv4.tcp_sock_allocated = alloc_percpu(int);
+	if (!net->ipv4.tcp_sock_allocated)
+		goto fail;
+#endif
 
 	for_each_possible_cpu(cpu) {
 		struct sock *sk;

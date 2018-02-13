@@ -58,7 +58,7 @@ static int sockstat_seq_show(struct seq_file *seq, void *v)
 	int orphans, sockets;
 
 	orphans = percpu_counter_sum_positive(&tcp_orphan_count);
-	sockets = proto_sockets_allocated_sum_positive(&tcp_prot);
+	sockets = tcp_sock_allocated_get(net);
 
 	socket_seq_show(seq);
 	seq_printf(seq, "TCP: inuse %d orphan %d tw %d alloc %d mem %ld\n",
