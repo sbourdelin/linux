@@ -926,10 +926,31 @@ iter_next_cumulative_entry(struct hist_entry_iter *iter,
 			   struct addr_location *al)
 {
 	struct callchain_cursor_node *node;
+	struct hist_entry **tmp;
+	int i;
 
 	node = callchain_cursor_current(&callchain_cursor);
 	if (node == NULL)
 		return 0;
+
+	/*
+	 * If there are too many nodes in callchain,
+	 * increase the size of he_cache[].
+	 */
+	if (iter->curr == iter->max_stack) {
+		i = 2 * iter->max_stack + 1;
+		tmp = realloc(iter->priv, sizeof(struct hist_entry *) * i);
+		if (tmp == NULL) {
+			/*
+			 * No need to free iter->priv here. It will be
+			 * freed in iter_finish_cumulative_entry.
+			 */
+			return 0;
+		}
+
+		iter->priv = tmp;
+		iter->max_stack = i;
+	}
 
 	return fill_callchain_info(al, node, iter->hide_unresolved);
 }
