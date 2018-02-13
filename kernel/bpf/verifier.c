@@ -5288,11 +5288,25 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 			    insn->src_reg != BPF_PSEUDO_CALL)
 				continue;
 			subprog = insn->off;
-			insn->off = 0;
 			insn->imm = (u64 (*)(u64, u64, u64, u64, u64))
 				func[subprog]->bpf_func -
 				__bpf_call_base;
 		}
+
+		/* the offset to a callee function from __bpf_call_base
+		 * may be larger than what the 32 bit integer imm can
+		 * accomodate which will truncate the higher order bits
+		 *
+		 * to avoid this, we additionally utilize the aux data
+		 * of each function to point to a list of all function
+		 * addresses determined by the verifier
+		 *
+		 * the off field of the instruction provides the index
+		 * in this list where the start address of a function
+		 * is available
+		 */
+		func[i]->aux->func = func;
+		func[i]->aux->func_cnt = env->subprog_cnt + 1;
 	}
 	for (i = 0; i <= env->subprog_cnt; i++) {
 		old_bpf_func = func[i]->bpf_func;
