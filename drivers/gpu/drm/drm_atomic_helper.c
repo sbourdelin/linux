@@ -3791,6 +3791,9 @@ int drm_atomic_helper_legacy_gamma_set(struct drm_crtc *crtc,
 	if (!state)
 		return -ENOMEM;
 
+	/* Don't wait for vblank after updating gamma. */
+	state->legacy_cursor_update = true;
+
 	blob = drm_property_create_blob(dev,
 					sizeof(struct drm_color_lut) * size,
 					NULL);
