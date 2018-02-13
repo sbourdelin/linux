@@ -16,14 +16,31 @@
 #include <net/ipv6.h>
 #include <net/addrconf.h>
 #include <net/inet_frag.h>
+#include <net/netevent.h>
 #ifdef CONFIG_NETLABEL
 #include <net/calipso.h>
 #endif
 
+static int zero;
 static int one = 1;
 static int auto_flowlabels_min;
 static int auto_flowlabels_max = IP6_AUTO_FLOW_LABEL_MAX;
 
+static int proc_rt6_multipath_hash_policy(struct ctl_table *table, int write,
+					  void __user *buffer, size_t *lenp,
+					  loff_t *ppos)
+{
+	struct net *net;
+	int ret;
+
+	net = container_of(table->data, struct net,
+			   ipv6.sysctl.multipath_hash_policy);
+	ret = proc_dointvec_minmax(table, write, buffer, lenp, ppos);
+	if (write && ret == 0)
+		call_netevent_notifiers(NETEVENT_IPV6_MPATH_HASH_UPDATE, net);
+
+	return ret;
+}
 
 static struct ctl_table ipv6_table_template[] = {
 	{
@@ -125,6 +142,15 @@ static struct ctl_table ipv6_table_template[] = {
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
+	},
+	{
+		.procname	= "fib_multipath_hash_policy",
+		.data		= &init_net.ipv6.sysctl.multipath_hash_policy,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler   = proc_rt6_multipath_hash_policy,
+		.extra1		= &zero,
+		.extra2		= &one,
 	},
 	{ }
 };
