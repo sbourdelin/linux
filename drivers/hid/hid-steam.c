@@ -34,12 +34,17 @@ struct steam_device {
 	unsigned long quirks;
 	struct work_struct work_connect;
 	bool connected;
+	char serial_no[11];
 };
 
 static int steam_register(struct steam_device *steam);
 static void steam_unregister(struct steam_device *steam);
 static void steam_do_connect_event(struct steam_device *steam, bool connected);
 static void steam_do_input_event(struct steam_device *steam, u8 *data);
+static int steam_send_report(struct steam_device *steam,
+		u8 *cmd, int size);
+static int steam_recv_report(struct steam_device *steam,
+		u8 *data, int size);
 
 static int steam_input_open(struct input_dev *dev)
 {
@@ -53,6 +58,78 @@ static void steam_input_close(struct input_dev *dev)
 	struct steam_device *steam = input_get_drvdata(dev);
 
 	hid_hw_close(steam->hid_dev);
+}
+
+#define STEAM_FEATURE_REPORT_SIZE 65
+
+static int steam_send_report(struct steam_device *steam,
+		u8 *cmd, int size)
+{
+	int retry;
+	int ret;
+	u8 *buf = kzalloc(STEAM_FEATURE_REPORT_SIZE, GFP_KERNEL);
+
+	if (!buf)
+		return -ENOMEM;
+
+	/* The report ID is always 0 */
+	memcpy(buf + 1, cmd, size);
+
+	/* Sometimes the wireless controller fails with EPIPE
+	 * when sending a feature report.
+	 * Doing a HID_REQ_GET_REPORT and waiting for a while
+	 * seems to fix that.
+	 */
+	for (retry = 0; retry < 10; ++retry) {
+		ret = hid_hw_raw_request(steam->hid_dev, 0,
+				buf, size + 1,
+				HID_FEATURE_REPORT, HID_REQ_SET_REPORT);
+		if (ret != -EPIPE)
+			break;
+		dbg_hid("%s: failed, retrying (%d times)\n", __func__, retry+1);
+		steam_recv_report(steam, NULL, 0);
+		msleep(50);
+	}
+	kfree(buf);
+	return ret;
+}
+
+static int steam_recv_report(struct steam_device *steam,
+		u8 *data, int size)
+{
+	int ret;
+	u8 *buf = kzalloc(STEAM_FEATURE_REPORT_SIZE, GFP_KERNEL);
+
+	if (!buf)
+		return -ENOMEM;
+
+	/* The report ID is always 0 */
+	ret = hid_hw_raw_request(steam->hid_dev, 0x00,
+			buf, STEAM_FEATURE_REPORT_SIZE,
+			HID_FEATURE_REPORT, HID_REQ_GET_REPORT);
+	memcpy(data, buf + 1, size);
+	kfree(buf);
+	return ret;
+}
+
+static int steam_get_serial(struct steam_device *steam)
+{
+	/* Send: 0xae 0x15 0x01
+	 * Recv: 0xae 0x15 0x01 serialnumber (10 chars)
+	 */
+	int ret;
+	u8 cmd[] = {0xae, 0x15, 0x01};
+	u8 reply[14];
+
+	ret = steam_send_report(steam, cmd, sizeof(cmd));
+	if (ret < 0)
+		return ret;
+	ret = steam_recv_report(steam, reply, sizeof(reply));
+	if (ret < 0)
+		return ret;
+	reply[13] = 0;
+	strcpy(steam->serial_no, reply + 3);
+	return 0;
 }
 
 static void steam_work_connect_cb(struct work_struct *work)
@@ -385,7 +462,12 @@ static int steam_register(struct steam_device *steam)
 
 	dbg_hid("%s\n", __func__);
 
-	hid_info(hdev, "Steam Controller connected");
+	ret = steam_get_serial(steam);
+	if (ret)
+		return ret;
+
+	hid_info(hdev, "Steam Controller SN: '%s' connected",
+			steam->serial_no);
 
 	input = input_allocate_device();
 	if (!input)
@@ -398,7 +480,7 @@ static int steam_register(struct steam_device *steam)
 
 	input->name = "Steam Controller";
 	input->phys = hdev->phys;
-	input->uniq = hdev->uniq;
+	input->uniq = steam->serial_no;
 	input->id.bustype = hdev->bus;
 	input->id.vendor  = hdev->vendor;
 	input->id.product = hdev->product;
@@ -447,7 +529,8 @@ static void steam_unregister(struct steam_device *steam)
 	dbg_hid("%s\n", __func__);
 
 	if (steam->input_dev) {
-		hid_info(steam->hid_dev, "Steam Controller disconnected");
+		hid_info(steam->hid_dev, "Steam Controller SN: '%s' disconnected",
+			steam->serial_no);
 		input_unregister_device(steam->input_dev);
 		steam->input_dev = NULL;
 	}
