@@ -1700,9 +1700,25 @@ static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
 	const int default_width = 2 * sizeof(ptr);
 
 	if (unlikely(!have_filled_random_ptr_key)) {
+		char *ptrval_str = "(ptrval)";
+		char str[default_width + 1];
+		int len = strlen(ptrval_str);
+
+		if (default_width > len) {
+			int pos;
+
+			pos = (default_width - len) / 2;
+			memset(str, '=', default_width);
+			memcpy(str + pos + 1, ptrval_str + 1, len - 2);
+			str[0] = '(';
+			str[default_width - 1] = ')';
+			str[default_width] = 0;
+			ptrval_str = str;
+		}
+
 		spec.field_width = default_width;
 		/* string length must be less than default_width */
-		return string(buf, end, "(ptrval)", spec);
+		return string(buf, end, ptrval_str, spec);
 	}
 
 #ifdef CONFIG_64BIT
