@@ -279,7 +279,7 @@ int do_shash(unsigned char *name, unsigned char *result,
 	sdesc = kmalloc(size, GFP_KERNEL);
 	if (!sdesc) {
 		rc = -ENOMEM;
-		goto do_shash_err;
+		goto free_shash;
 	}
 	sdesc->shash.tfm = hash;
 	sdesc->shash.flags = 0x0;
@@ -314,9 +314,9 @@ int do_shash(unsigned char *name, unsigned char *result,
 		pr_err("%s: Could not generate %s hash\n", __func__, name);
 
 do_shash_err:
-	crypto_free_shash(hash);
 	kfree(sdesc);
-
+free_shash:
+	crypto_free_shash(hash);
 	return rc;
 }
 
