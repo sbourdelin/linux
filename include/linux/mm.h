@@ -557,6 +557,57 @@ static inline void *kvmalloc_array(size_t n, size_t size, gfp_t flags)
 	return kvmalloc(n * size, flags);
 }
 
+/**
+ * kvmalloc_ab_c() - Allocate memory.
+ * @n: Number of elements.
+ * @size: Size of each element (should be constant).
+ * @c: Size of header (should be constant).
+ * @gfp: Memory allocation flags.
+ *
+ * Use this function to allocate @n * @size + @c bytes of memory.  This
+ * function is safe to use when @n is controlled from userspace; it will
+ * return %NULL if the required amount of memory cannot be allocated.
+ * Use kvfree() to free the allocated memory.
+ *
+ * The kvzalloc_hdr_arr() function is easier to use as it has typechecking
+ * and you do not need to remember which of the arguments should be constants.
+ *
+ * Context: Process context.  May sleep; the @gfp flags should be based on
+ *	    %GFP_KERNEL.
+ * Return: A pointer to the allocated memory or %NULL.
+ */
+static inline __must_check
+void *kvmalloc_ab_c(size_t n, size_t size, size_t c, gfp_t gfp)
+{
+	if (size != 0 && n > (SIZE_MAX - c) / size)
+		return NULL;
+
+	return kvmalloc(n * size + c, gfp);
+}
+#define kvzalloc_ab_c(a, b, c, gfp)	kvmalloc_ab_c(a, b, c, gfp | __GFP_ZERO)
+
+/**
+ * kvzalloc_struct() - Allocate and zero-fill a structure containing a
+ *		       variable length array.
+ * @p: Pointer to the structure.
+ * @member: Name of the array member.
+ * @n: Number of elements in the array.
+ * @gfp: Memory allocation flags.
+ *
+ * Allocate (and zero-fill) enough memory for a structure with an array
+ * of @n elements.  This function is safe to use when @n is specified by
+ * userspace as the arithmetic will not overflow.
+ * Use kvfree() to free the allocated memory.
+ *
+ * Context: Process context.  May sleep; the @gfp flags should be based on
+ *	    %GFP_KERNEL.
+ * Return: Zero-filled memory or a NULL pointer.
+ */
+#define kvzalloc_struct(p, member, n, gfp)				\
+	(typeof(p))kvzalloc_ab_c(n,					\
+		sizeof(*(p)->member) + __must_be_array((p)->member),	\
+		offsetof(typeof(*(p)), member), gfp)
+
 extern void kvfree(const void *addr);
 
 static inline atomic_t *compound_mapcount_ptr(struct page *page)
