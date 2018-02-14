@@ -821,6 +821,7 @@ out:
 	return skb;
 }
 
+#ifdef CONFIG_NETFILTER
 unsigned int ipvlan_nf_input(void *priv, struct sk_buff *skb,
 			     const struct nf_hook_state *state)
 {
@@ -837,3 +838,4 @@ unsigned int ipvlan_nf_input(void *priv, struct sk_buff *skb,
 out:
 	return NF_ACCEPT;
 }
+#endif

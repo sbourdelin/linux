@@ -15,6 +15,16 @@ struct ipvlan_netns {
 	unsigned int ipvl_nf_hook_refcnt;
 };
 
+static const struct l3mdev_ops ipvl_l3mdev_ops = {
+	.l3mdev_l3_rcv = ipvlan_l3_rcv,
+};
+
+static void ipvlan_adjust_mtu(struct ipvl_dev *ipvlan, struct net_device *dev)
+{
+	ipvlan->dev->mtu = dev->mtu;
+}
+
+#ifdef CONFIG_NETFILTER
 static const struct nf_hook_ops ipvl_nfops[] = {
 	{
 		.hook     = ipvlan_nf_input,
@@ -31,15 +41,6 @@ static const struct nf_hook_ops ipvl_nfops[] = {
 	},
 #endif
 };
-
-static const struct l3mdev_ops ipvl_l3mdev_ops = {
-	.l3mdev_l3_rcv = ipvlan_l3_rcv,
-};
-
-static void ipvlan_adjust_mtu(struct ipvl_dev *ipvlan, struct net_device *dev)
-{
-	ipvlan->dev->mtu = dev->mtu;
-}
 
 static int ipvlan_register_nf_hook(struct net *net)
 {
@@ -70,6 +71,16 @@ static void ipvlan_unregister_nf_hook(struct net *net)
 		nf_unregister_net_hooks(net, ipvl_nfops,
 					ARRAY_SIZE(ipvl_nfops));
 }
+#else
+static int ipvlan_register_nf_hook(struct net *net)
+{
+	return 0;
+}
+
+static void ipvlan_unregister_nf_hook(struct net *net)
+{
+}
+#endif
 
 static int ipvlan_set_port_mode(struct ipvl_port *port, u16 nval)
 {
@@ -1015,8 +1026,10 @@ static void ipvlan_ns_exit(struct net *net)
 
 	if (WARN_ON_ONCE(vnet->ipvl_nf_hook_refcnt)) {
 		vnet->ipvl_nf_hook_refcnt = 0;
+#ifdef CONFIG_NETFILTER
 		nf_unregister_net_hooks(net, ipvl_nfops,
 					ARRAY_SIZE(ipvl_nfops));
+#endif
 	}
 }
 
