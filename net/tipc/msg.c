@@ -434,6 +434,9 @@ bool tipc_msg_extract(struct sk_buff *skb, struct sk_buff **iskb, int *pos)
 	skb_pull(*iskb, offset);
 	imsz = msg_size(buf_msg(*iskb));
 	skb_trim(*iskb, imsz);
+
+	/* Scale extracted buffer's truesize to avoid double accounting */
+	(*iskb)->truesize = SKB_TRUESIZE(imsz);
 	if (unlikely(!tipc_msg_validate(iskb)))
 		goto none;
 	*pos += align(imsz);
