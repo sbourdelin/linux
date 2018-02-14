@@ -53,6 +53,11 @@
 #define CCS811_STATUS_FW_MODE_MASK	BIT(7)
 #define CCS811_STATUS_FW_MODE_APPLICATION	BIT(7)
 
+#define IS_APP_VALID_LOADED(x) \
+	(CCS811_STATUS_APP_VALID_LOADED == (CCS811_STATUS_APP_VALID_MASK & x))
+#define IS_FW_MODE_APPLICATION(x) \
+	(CCS811_STATUS_FW_MODE_APPLICATION == (CCS811_STATUS_FW_MODE_MASK & x))
+
 /* Measurement modes */
 #define CCS811_MODE_IDLE	0x00
 #define CCS811_MODE_IAQ_1SEC	0x10
@@ -133,8 +138,10 @@ static int ccs811_start_sensor_application(struct i2c_client *client)
 	if (ret < 0)
 		return ret;
 
-	if ((ret & CCS811_STATUS_APP_VALID_MASK) !=
-	    CCS811_STATUS_APP_VALID_LOADED)
+	if (IS_FW_MODE_APPLICATION(ret))
+		return 0;
+
+	if (!IS_APP_VALID_LOADED(ret))
 		return -EIO;
 
 	ret = i2c_smbus_write_byte(client, CCS811_APP_START);
@@ -145,8 +152,7 @@ static int ccs811_start_sensor_application(struct i2c_client *client)
 	if (ret < 0)
 		return ret;
 
-	if ((ret & CCS811_STATUS_FW_MODE_MASK) !=
-	    CCS811_STATUS_FW_MODE_APPLICATION) {
+	if (!IS_FW_MODE_APPLICATION(ret)) {
 		dev_err(&client->dev, "Application failed to start. Sensor is still in boot mode.\n");
 		return -EIO;
 	}
