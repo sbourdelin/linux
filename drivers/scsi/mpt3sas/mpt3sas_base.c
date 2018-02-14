@@ -56,6 +56,7 @@
 #include <linux/interrupt.h>
 #include <linux/dma-mapping.h>
 #include <linux/io.h>
+#include <linux/io-64-nonatomic-lo-hi.h>
 #include <linux/time.h>
 #include <linux/ktime.h>
 #include <linux/kthread.h>
@@ -2968,16 +2969,9 @@ mpt3sas_base_free_smid(struct MPT3SAS_ADAPTER *ioc, u16 smid)
  * @writeq_lock: spin lock
  *
  * Glue for handling an atomic 64 bit word to MMIO. This special handling takes
- * care of 32 bit environment where its not quarenteed to send the entire word
+ * care of 32 bit environment where its not guaranteed to send the entire word
  * in one transfer.
  */
-#if defined(writeq) && defined(CONFIG_64BIT)
-static inline void
-_base_writeq(__u64 b, volatile void __iomem *addr, spinlock_t *writeq_lock)
-{
-	writeq(cpu_to_le64(b), addr);
-}
-#else
 static inline void
 _base_writeq(__u64 b, volatile void __iomem *addr, spinlock_t *writeq_lock)
 {
@@ -2985,11 +2979,9 @@ _base_writeq(__u64 b, volatile void __iomem *addr, spinlock_t *writeq_lock)
 	__u64 data_out = cpu_to_le64(b);
 
 	spin_lock_irqsave(writeq_lock, flags);
-	writel((u32)(data_out), addr);
-	writel((u32)(data_out >> 32), (addr + 4));
+	writeq(data_out, addr);
 	spin_unlock_irqrestore(writeq_lock, flags);
 }
-#endif
 
 /**
  * _base_put_smid_scsi_io - send SCSI_IO request to firmware
