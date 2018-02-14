@@ -59,6 +59,7 @@
 #define TCPC_POWER_CTRL_VCONN_ENABLE	BIT(0)
 
 #define TCPC_CC_STATUS			0x1d
+#define TCPC_CC_STATUS_DRPRST		BIT(5)
 #define TCPC_CC_STATUS_TERM		BIT(4)
 #define TCPC_CC_STATUS_CC2_SHIFT	2
 #define TCPC_CC_STATUS_CC2_MASK		0x3
@@ -121,4 +122,18 @@
 #define TCPC_VBUS_VOLTAGE_ALARM_HI_CFG		0x76
 #define TCPC_VBUS_VOLTAGE_ALARM_LO_CFG		0x78
 
+struct tcpci;
+struct tcpci_vendor_data {
+	int (*init)(struct tcpci *tcpci, struct tcpci_vendor_data *data);
+	int (*irq_handler)(struct tcpci *tcpci, struct tcpci_vendor_data *data,
+			   u16 *status);
+};
+
+int tcpci_read16(struct tcpci *tcpci, unsigned int reg, u16 *val);
+int tcpci_write16(struct tcpci *tcpci, unsigned int reg, u16 val);
+int tcpci_read8(struct tcpci *tcpci, unsigned int reg, u8 *val);
+int tcpci_write8(struct tcpci *tcpci, unsigned int reg, u8 val);
+struct tcpci *tcpci_register_port(struct i2c_client *client,
+				  struct tcpci_vendor_data *data);
+void tcpci_unregister_port(struct tcpci *tcpci);
 #endif /* __LINUX_USB_TCPCI_H */

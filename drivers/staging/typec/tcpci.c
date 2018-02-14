@@ -30,6 +30,7 @@ struct tcpci {
 	bool controls_vbus;
 
 	struct tcpc_dev tcpc;
+	struct tcpci_vendor_data *vdata;
 };
 
 static inline struct tcpci *tcpc_to_tcpci(struct tcpc_dev *tcpc)
@@ -37,16 +38,29 @@ static inline struct tcpci *tcpc_to_tcpci(struct tcpc_dev *tcpc)
 	return container_of(tcpc, struct tcpci, tcpc);
 }
 
-static int tcpci_read16(struct tcpci *tcpci, unsigned int reg,
-			u16 *val)
+int tcpci_read16(struct tcpci *tcpci, unsigned int reg, u16 *val)
 {
 	return regmap_raw_read(tcpci->regmap, reg, val, sizeof(u16));
 }
+EXPORT_SYMBOL_GPL(tcpci_read16);
 
-static int tcpci_write16(struct tcpci *tcpci, unsigned int reg, u16 val)
+int tcpci_write16(struct tcpci *tcpci, unsigned int reg, u16 val)
 {
 	return regmap_raw_write(tcpci->regmap, reg, &val, sizeof(u16));
 }
+EXPORT_SYMBOL_GPL(tcpci_write16);
+
+int tcpci_read8(struct tcpci *tcpci, unsigned int reg, u8 *val)
+{
+	return regmap_raw_read(tcpci->regmap, reg, val, sizeof(u8));
+}
+EXPORT_SYMBOL_GPL(tcpci_read8);
+
+int tcpci_write8(struct tcpci *tcpci, unsigned int reg, u8 val)
+{
+	return regmap_raw_write(tcpci->regmap, reg, &val, sizeof(u8));
+}
+EXPORT_SYMBOL_GPL(tcpci_write8);
 
 static int tcpci_set_cc(struct tcpc_dev *tcpc, enum typec_cc_status cc)
 {
@@ -98,8 +112,10 @@ static int tcpci_set_cc(struct tcpc_dev *tcpc, enum typec_cc_status cc)
 static int tcpci_start_drp_toggling(struct tcpc_dev *tcpc,
 				    enum typec_cc_status cc)
 {
+	int ret;
 	struct tcpci *tcpci = tcpc_to_tcpci(tcpc);
-	unsigned int reg = TCPC_ROLE_CTRL_DRP;
+	unsigned int reg = (TCPC_ROLE_CTRL_CC_RD << TCPC_ROLE_CTRL_CC1_SHIFT) |
+			   (TCPC_ROLE_CTRL_CC_RD << TCPC_ROLE_CTRL_CC2_SHIFT);
 
 	switch (cc) {
 	default:
@@ -116,8 +132,19 @@ static int tcpci_start_drp_toggling(struct tcpc_dev *tcpc,
 			TCPC_ROLE_CTRL_RP_VAL_SHIFT);
 		break;
 	}
-
-	return regmap_write(tcpci->regmap, TCPC_ROLE_CTRL, reg);
+	ret = regmap_write(tcpci->regmap, TCPC_ROLE_CTRL, reg);
+	if (ret < 0)
+		return ret;
+	usleep_range(500, 1000);
+	reg |= TCPC_ROLE_CTRL_DRP;
+	ret = regmap_write(tcpci->regmap, TCPC_ROLE_CTRL, reg);
+	if (ret < 0)
+		return ret;
+	ret = regmap_write(tcpci->regmap, TCPC_COMMAND,
+			   TCPC_CMD_LOOK4CONNECTION);
+	if (ret < 0)
+		return ret;
+	return 0;
 }
 
 static enum typec_cc_status tcpci_to_typec_cc(unsigned int cc, bool sink)
@@ -323,6 +350,15 @@ static int tcpci_init(struct tcpc_dev *tcpc)
 	if (time_after(jiffies, timeout))
 		return -ETIMEDOUT;
 
+	/* Handle vendor init */
+	if (tcpci->vdata) {
+		if (tcpci->vdata->init) {
+			ret = (*tcpci->vdata->init)(tcpci, tcpci->vdata);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
 	/* Clear all events */
 	ret = tcpci_write16(tcpci, TCPC_ALERT, 0xffff);
 	if (ret < 0)
@@ -350,6 +386,13 @@ static irqreturn_t tcpci_irq(int irq, void *dev_id)
 	u16 status;
 
 	tcpci_read16(tcpci, TCPC_ALERT, &status);
+
+	/* Handle vendor defined interrupt */
+	if (tcpci->vdata) {
+		if (tcpci->vdata->irq_handler)
+			(*tcpci->vdata->irq_handler)(tcpci, tcpci->vdata,
+						     &status);
+	}
 
 	/*
 	 * Clear alert status for everything except RX_STATUS, which shouldn't
@@ -417,7 +460,7 @@ static const struct regmap_config tcpci_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
 
-	.max_register = 0x7F, /* 0x80 .. 0xFF are vendor defined */
+	.max_register = 0xFF, /* 0x80 .. 0xFF are vendor defined */
 };
 
 static const struct tcpc_config tcpci_tcpc_config = {
@@ -435,22 +478,22 @@ static int tcpci_parse_config(struct tcpci *tcpci)
 	return 0;
 }
 
-static int tcpci_probe(struct i2c_client *client,
-		       const struct i2c_device_id *i2c_id)
+struct tcpci *tcpci_register_port(struct i2c_client *client,
+				  struct tcpci_vendor_data *vdata)
 {
 	struct tcpci *tcpci;
 	int err;
 
 	tcpci = devm_kzalloc(&client->dev, sizeof(*tcpci), GFP_KERNEL);
 	if (!tcpci)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	tcpci->client = client;
 	tcpci->dev = &client->dev;
-	i2c_set_clientdata(client, tcpci);
+	tcpci->vdata = vdata;
 	tcpci->regmap = devm_regmap_init_i2c(client, &tcpci_regmap_config);
 	if (IS_ERR(tcpci->regmap))
-		return PTR_ERR(tcpci->regmap);
+		return ERR_CAST(tcpci->regmap);
 
 	tcpci->tcpc.init = tcpci_init;
 	tcpci->tcpc.get_vbus = tcpci_get_vbus;
@@ -467,7 +510,7 @@ static int tcpci_probe(struct i2c_client *client,
 
 	err = tcpci_parse_config(tcpci);
 	if (err < 0)
-		return err;
+		return ERR_PTR(err);
 
 	/* Disable chip interrupts */
 	tcpci_write16(tcpci, TCPC_ALERT_MASK, 0);
@@ -477,17 +520,40 @@ static int tcpci_probe(struct i2c_client *client,
 					IRQF_ONESHOT | IRQF_TRIGGER_LOW,
 					dev_name(tcpci->dev), tcpci);
 	if (err < 0)
-		return err;
+		return ERR_PTR(err);
 
 	tcpci->port = tcpm_register_port(tcpci->dev, &tcpci->tcpc);
-	return PTR_ERR_OR_ZERO(tcpci->port);
+	if (PTR_ERR_OR_ZERO(tcpci->port))
+		return ERR_CAST(tcpci->port);
+
+	return tcpci;
+}
+EXPORT_SYMBOL_GPL(tcpci_register_port);
+
+void tcpci_unregister_port(struct tcpci *tcpci)
+{
+	tcpm_unregister_port(tcpci->port);
+}
+EXPORT_SYMBOL_GPL(tcpci_unregister_port);
+
+static int tcpci_probe(struct i2c_client *client,
+		       const struct i2c_device_id *i2c_id)
+{
+	struct tcpci *tcpci;
+
+	tcpci = tcpci_register_port(client, NULL);
+	if (PTR_ERR_OR_ZERO(tcpci))
+		return PTR_ERR(tcpci);
+
+	i2c_set_clientdata(client, tcpci);
+	return 0;
 }
 
 static int tcpci_remove(struct i2c_client *client)
 {
 	struct tcpci *tcpci = i2c_get_clientdata(client);
 
-	tcpm_unregister_port(tcpci->port);
+	tcpci_unregister_port(tcpci);
 
 	return 0;
 }
