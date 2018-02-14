@@ -168,8 +168,19 @@ static int sii902x_get_modes(struct drm_connector *connector)
 		return ret;
 
 	edid = drm_get_edid(connector, sii902x->i2c->adapter);
-	drm_mode_connector_update_edid_property(connector, edid);
-	if (edid) {
+	if (!edid) {
+		/*
+		 * This happens when using a simple DVI-to-VGA converter
+		 * dongle for example: the I2C lines are not bridged over
+		 * to VGA DDC.
+		 */
+		DRM_INFO("EDID readout failed, falling back to standard modes\n");
+		ret = drm_add_modes_noedid(connector, 1920, 1080);
+		/* Set some standard resolution most monitors can handle */
+		drm_set_preferred_mode(connector, 1024, 768);
+	} else {
+		/* Data from EDID readout */
+		drm_mode_connector_update_edid_property(connector, edid);
 		num = drm_add_edid_modes(connector, edid);
 		kfree(edid);
 	}
