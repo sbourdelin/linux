@@ -593,7 +593,8 @@ try_preserve_large_page(pte_t *kpte, unsigned long address,
 	 * different bit positions in the two formats.
 	 */
 	req_prot = pgprot_4k_2_large(req_prot);
-	req_prot = pgprot_set_on_present(req_prot, _PAGE_GLOBAL | _PAGE_PSE);
+	req_prot = pgprot_set_on_present(req_prot,
+			__PAGE_KERNEL_GLOBAL | _PAGE_PSE);
 	req_prot = canon_pgprot(req_prot);
 
 	/*
@@ -703,7 +704,7 @@ __split_large_page(struct cpa_data *cpa, pte_t *kpte, unsigned long address,
 		return 1;
 	}
 
-	ref_prot = pgprot_set_on_present(ref_prot, _PAGE_GLOBAL);
+	ref_prot = pgprot_set_on_present(ref_prot, __PAGE_KERNEL_GLOBAL);
 
 	/*
 	 * Get the target pfn from the original entry:
@@ -926,7 +927,7 @@ static void populate_pte(struct cpa_data *cpa,
 
 	pte = pte_offset_kernel(pmd, start);
 
-	pgprot = pgprot_set_on_present(pgprot, _PAGE_GLOBAL);
+	pgprot = pgprot_set_on_present(pgprot, __PAGE_KERNEL_GLOBAL);
 	pgprot = canon_pgprot(pgprot);
 
 	while (num_pages-- && start < end) {
@@ -1219,7 +1220,7 @@ repeat:
 
 		new_prot = static_protections(new_prot, address, pfn);
 
-		new_prot = pgprot_set_on_present(new_prot, _PAGE_GLOBAL);
+		new_prot = pgprot_set_on_present(new_prot, __PAGE_KERNEL_GLOBAL);
 
 		/*
 		 * We need to keep the pfn from the existing PTE,
