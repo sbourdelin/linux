@@ -739,7 +739,8 @@ static bool ttm_bo_evict_swapout_allowable(struct ttm_buffer_object *bo,
 static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 			       uint32_t mem_type,
 			       const struct ttm_place *place,
-			       struct ttm_operation_ctx *ctx)
+			       struct ttm_operation_ctx *ctx,
+			       struct list_head *evicted)
 {
 	struct ttm_bo_global *glob = bdev->glob;
 	struct ttm_mem_type_manager *man = &bdev->man[mem_type];
@@ -789,15 +790,26 @@ static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
 
 	ret = ttm_bo_evict(bo, ctx);
 	if (locked) {
-		ttm_bo_unreserve(bo);
+		list_add_tail(&bo->lru, evicted);
 	} else {
 		spin_lock(&glob->lru_lock);
 		ttm_bo_add_to_lru(bo);
 		spin_unlock(&glob->lru_lock);
+		kref_put(&bo->list_kref, ttm_bo_release_list);
 	}
 
-	kref_put(&bo->list_kref, ttm_bo_release_list);
 	return ret;
+}
+
+static void ttm_mem_evict_cleanup(struct list_head *evicted)
+{
+	struct ttm_buffer_object *bo, *tmp;
+
+	list_for_each_entry_safe(bo, tmp, evicted, lru) {
+		list_del_init(&bo->lru);
+		ttm_bo_unreserve(bo);
+		kref_put(&bo->list_kref, ttm_bo_release_list);
+	}
 }
 
 void ttm_bo_mem_put(struct ttm_buffer_object *bo, struct ttm_mem_reg *mem)
@@ -849,20 +861,26 @@ static int ttm_bo_mem_force_space(struct ttm_buffer_object *bo,
 {
 	struct ttm_bo_device *bdev = bo->bdev;
 	struct ttm_mem_type_manager *man = &bdev->man[mem_type];
+	struct list_head evicted;
 	int ret;
 
+	INIT_LIST_HEAD(&evicted);
 	do {
 		ret = (*man->func->get_node)(man, bo, place, mem);
 		if (unlikely(ret != 0))
 			return ret;
 		if (mem->mm_node)
 			break;
-		ret = ttm_mem_evict_first(bdev, mem_type, place, ctx);
+		ret = ttm_mem_evict_first(bdev, mem_type, place, ctx, &evicted);
 		if (unlikely(ret != 0))
-			return ret;
+			goto error;
 	} while (1);
 	mem->mem_type = mem_type;
-	return ttm_bo_add_move_fence(bo, man, mem);
+	ret = ttm_bo_add_move_fence(bo, man, mem);
+
+error:
+	ttm_mem_evict_cleanup(&evicted);
+	return ret;
 }
 
 static uint32_t ttm_bo_select_caching(struct ttm_mem_type_manager *man,
@@ -1342,6 +1360,7 @@ static int ttm_bo_force_list_clean(struct ttm_bo_device *bdev,
 	struct ttm_operation_ctx ctx = { false, false };
 	struct ttm_mem_type_manager *man = &bdev->man[mem_type];
 	struct ttm_bo_global *glob = bdev->glob;
+	struct list_head evicted;
 	struct dma_fence *fence;
 	int ret;
 	unsigned i;
@@ -1349,18 +1368,20 @@ static int ttm_bo_force_list_clean(struct ttm_bo_device *bdev,
 	/*
 	 * Can't use standard list traversal since we're unlocking.
 	 */
-
+	INIT_LIST_HEAD(&evicted);
 	spin_lock(&glob->lru_lock);
 	for (i = 0; i < TTM_MAX_BO_PRIORITY; ++i) {
 		while (!list_empty(&man->lru[i])) {
 			spin_unlock(&glob->lru_lock);
-			ret = ttm_mem_evict_first(bdev, mem_type, NULL, &ctx);
+			ret = ttm_mem_evict_first(bdev, mem_type, NULL, &ctx,
+						  &evicted);
 			if (ret)
 				return ret;
 			spin_lock(&glob->lru_lock);
 		}
 	}
 	spin_unlock(&glob->lru_lock);
+	ttm_mem_evict_cleanup(&evicted);
 
 	spin_lock(&man->move_lock);
 	fence = dma_fence_get(man->move);
