@@ -724,6 +724,16 @@ struct drm_mode_config {
 	 * the degamma LUT as supported by the driver (read-only).
 	 */
 	struct drm_property *degamma_lut_size_property;
+ 	/**
+	 * @plane_degamma_lut_property: Optional Plane property to set the LUT
+	 * used to convert the framebuffer's colors to linear gamma.
+	 */
+	struct drm_property *plane_degamma_lut_property;
+	/**
+	 * @plane_degamma_lut_size_property: Optional Plane property for the
+	 * size of the degamma LUT as supported by the driver (read-only).
+	 */
+	struct drm_property *plane_degamma_lut_size_property;
 	/**
 	 * @ctm_property: Optional CRTC property to set the
 	 * matrix used to convert colors after the lookup in the

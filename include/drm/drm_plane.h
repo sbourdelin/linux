@@ -131,7 +131,17 @@ struct drm_plane_state {
 	 */
 	struct drm_crtc_commit *commit;
 
+	/* @degamma_lut:
+	 *
+	 * Lookup table for converting framebuffer pixel data before apply the
+	 * color conversion matrix @ctm. See drm_plane_enable_color_mgmt(). The
+	 * blob (if not NULL) is an array of &struct drm_color_lut.
+	 */
+	struct drm_property_blob *degamma_lut;
+
 	struct drm_atomic_state *state;
+
+	bool color_mgmt_changed : 1;
 };
 
 static inline struct drm_rect

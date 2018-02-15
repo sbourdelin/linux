@@ -717,6 +717,8 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
 {
 	struct drm_device *dev = plane->dev;
 	struct drm_mode_config *config = &dev->mode_config;
+	bool replaced = false;
+	int ret;
 
 	if (property == config->prop_fb_id) {
 		struct drm_framebuffer *fb = drm_framebuffer_lookup(dev, NULL, val);
@@ -762,6 +764,12 @@ static int drm_atomic_plane_set_property(struct drm_plane *plane,
 	} else if (plane->funcs->atomic_set_property) {
 		return plane->funcs->atomic_set_property(plane, state,
 				property, val);
+	} else if (property == config->plane_degamma_lut_property) {
+		ret = drm_atomic_replace_property_blob_from_id(dev,
+					&state->degamma_lut,
+					val, -1, &replaced);
+		state->color_mgmt_changed |= replaced;
+		return ret;
 	} else {
 		return -EINVAL;
 	}
@@ -820,6 +828,9 @@ drm_atomic_plane_get_property(struct drm_plane *plane,
 		*val = state->zpos;
 	} else if (plane->funcs->atomic_get_property) {
 		return plane->funcs->atomic_get_property(plane, state, property, val);
+	} else if (property == config->plane_degamma_lut_property) {
+		*val = (state->degamma_lut) ?
+			state->degamma_lut->base.id : 0;
 	} else {
 		return -EINVAL;
 	}
@@ -944,6 +955,7 @@ static void drm_atomic_plane_print_state(struct drm_printer *p,
 	drm_printf(p, "\tcrtc-pos=" DRM_RECT_FMT "\n", DRM_RECT_ARG(&dest));
 	drm_printf(p, "\tsrc-pos=" DRM_RECT_FP_FMT "\n", DRM_RECT_FP_ARG(&src));
 	drm_printf(p, "\trotation=%x\n", state->rotation);
+	drm_printf(p, "\tcolor_mgmt_changed=%d\n", state->color_mgmt_changed);
 
 	if (plane->funcs->atomic_print_state)
 		plane->funcs->atomic_print_state(p, state);
