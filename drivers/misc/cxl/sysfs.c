@@ -63,6 +63,20 @@ static ssize_t psl_timebase_synced_show(struct device *device,
 {
 	struct cxl *adapter = to_cxl_adapter(device);
 
+	/*
+	 * On P9, the Timebase value is only updated as a result of
+	 * PSL TimeBase command sent to CAPP.
+	 */
+	if (cxl_is_power9()) {
+		u64 psl_tb;
+		int delta;
+
+		psl_tb = cxl_p1_read(adapter, CXL_PSL9_Timebase);
+		delta = mftb() - psl_tb;
+		if (delta < 0)
+			delta = -delta;
+		adapter->psl_timebase_synced = true ? tb_to_ns(delta) < 16000 : false;
+	}
 	return scnprintf(buf, PAGE_SIZE, "%i\n", adapter->psl_timebase_synced);
 }
 
