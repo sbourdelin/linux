@@ -77,6 +77,7 @@ int of_resolve_phandles(struct device_node *tree);
 #endif
 
 #if defined(CONFIG_OF_OVERLAY)
+int of_overlay_fdt_apply(void *overlay_fdt, int *ovcs_id);
 void of_overlay_mutex_lock(void);
 void of_overlay_mutex_unlock(void);
 #else
