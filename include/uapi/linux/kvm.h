@@ -934,6 +934,7 @@ struct kvm_ppc_resize_hpt {
 #define KVM_CAP_S390_AIS_MIGRATION 150
 #define KVM_CAP_PPC_GET_CPU_CHAR 151
 #define KVM_CAP_S390_BPB 152
+#define KVM_CAP_GET_MSR_FEATURES 153
 
 #ifdef KVM_CAP_IRQ_ROUTING
 
@@ -1372,6 +1373,9 @@ struct kvm_enc_region {
 
 #define KVM_MEMORY_ENCRYPT_REG_REGION    _IOR(KVMIO, 0xbb, struct kvm_enc_region)
 #define KVM_MEMORY_ENCRYPT_UNREG_REGION  _IOR(KVMIO, 0xbc, struct kvm_enc_region)
+
+/* Available with KVM_CAP_GET_MSR_FEATURES */
+#define KVM_GET_MSR		  _IOR(KVMIO, 0xbd, struct kvm_msr_entry)
 
 /* Secure Encrypted Virtualization command */
 enum sev_cmd_id {

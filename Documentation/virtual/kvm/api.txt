@@ -3500,6 +3500,53 @@ Returns: 0 on success; -1 on error
 This ioctl can be used to unregister the guest memory region registered
 with KVM_MEMORY_ENCRYPT_REG_REGION ioctl above.
 
+4.113 KVM_GET_MSR_INDEX_LIST
+
+Capability: KVM_CAP_GET_MSR_FEATURES
+Architectures: x86
+Type: vm ioctl
+Parameters: struct kvm_msr_list (in/out)
+Returns: 0 on success; -1 on error
+Errors:
+  EFAULT:    the msr index list cannot be read from or written to
+  E2BIG:     the msr index list is to big to fit in the array specified by
+             the user.
+
+struct kvm_msr_list {
+	__u32 nmsrs; /* number of msrs in entries */
+	__u32 indices[0];
+};
+
+This ioctl returns the msrs that represent possible supported features.
+This list varies by kvm version and host processor.  The user fills in
+in the size of the indices array in nmsrs, and in return kvm adjusts nmsrs
+to reflect the actual number of msrs and fills in the indices array with
+their numbers.  To verify if an msr-based feature is available, the user
+should invoke KVM_GET_MSR for the msr in question.
+
+4.114 KVM_GET_MSR
+
+Capability: KVM_CAP_GET_MSR_FEATURES
+Architectures: x86
+Type: vm ioctl
+Parameters: struct kvm_msr_entry (in/out)
+Returns: 0 on MSR feature supported;
+         1 on MSR feature not supported;
+        -1 on error
+Errors:
+  EFAULT:    the msr entry cannot be read from or written to
+
+struct kvm_msr_entry {
+	__u32 index;
+	__u32 reserved;
+	__u64 data;
+};
+
+Using the list of msr-based features returned from KVM_GET_MSR_INDEX_LIST,
+the user can determine support for the msr-based feature using this ioctl.
+When a value of 0 is returned, the msr-based feature is supported and the
+data member of kvm_msr_entry contains the msr-based feature value.
+
 
 5. The kvm_run structure
 ------------------------

@@ -1049,6 +1049,15 @@ static u32 emulated_msrs[] = {
 
 static unsigned num_emulated_msrs;
 
+/*
+ * List of msr numbers which are used to expose MSR-based features that
+ * can be used by a hypervisor to validate requested CPU features.
+ */
+static u32 msr_based_features[] = {
+};
+
+static unsigned int num_msr_based_features = ARRAY_SIZE(msr_based_features);
+
 bool kvm_valid_efer(struct kvm_vcpu *vcpu, u64 efer)
 {
 	if (efer & efer_reserved_bits)
@@ -2785,6 +2794,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
 	case KVM_CAP_SET_BOOT_CPU_ID:
  	case KVM_CAP_SPLIT_IRQCHIP:
 	case KVM_CAP_IMMEDIATE_EXIT:
+	case KVM_CAP_GET_MSR_FEATURES:
 		r = 1;
 		break;
 	case KVM_CAP_ADJUST_CLOCK:
@@ -4408,6 +4418,47 @@ set_identity_unlock:
 		r = -ENOTTY;
 		if (kvm_x86_ops->mem_enc_unreg_region)
 			r = kvm_x86_ops->mem_enc_unreg_region(kvm, &region);
+		break;
+	}
+	case KVM_GET_MSR_INDEX_LIST: {
+		struct kvm_msr_list __user *user_msr_list = argp;
+		struct kvm_msr_list msr_list;
+		unsigned int n;
+
+		r = -EFAULT;
+		if (copy_from_user(&msr_list, user_msr_list, sizeof(msr_list)))
+			goto out;
+		n = msr_list.nmsrs;
+		msr_list.nmsrs = num_msr_based_features;
+		if (copy_to_user(user_msr_list, &msr_list, sizeof(msr_list)))
+			goto out;
+		r = -E2BIG;
+		if (n < msr_list.nmsrs)
+			goto out;
+		r = -EFAULT;
+		if (copy_to_user(user_msr_list->indices, &msr_based_features,
+				 num_msr_based_features * sizeof(u32)))
+			goto out;
+		r = 0;
+		break;
+	}
+	case KVM_GET_MSR: {
+		struct kvm_msr_entry __user *user_msr = argp;
+		struct kvm_msr_entry msr;
+
+		r = -EFAULT;
+		if (copy_from_user(&msr, user_msr, sizeof(msr)))
+			goto out;
+
+		r = 1;
+		if (!kvm_x86_ops->msr_feature || kvm_x86_ops->msr_feature(&msr))
+			goto out;
+
+		r = -EFAULT;
+		if (copy_to_user(user_msr, &msr, sizeof(msr)))
+			goto out;
+
+		r = 0;
 		break;
 	}
 	default:

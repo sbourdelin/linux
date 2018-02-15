@@ -172,6 +172,7 @@ struct kvm_fpu {
 	__u32 pad2;
 };
 
+/* for KVM_GET_MSR */
 struct kvm_msr_entry {
 	__u32 index;
 	__u32 reserved;
