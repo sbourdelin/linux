@@ -710,31 +710,30 @@ bool ttm_bo_eviction_valuable(struct ttm_buffer_object *bo,
 EXPORT_SYMBOL(ttm_bo_eviction_valuable);
 
 /**
- * Check the target bo is allowable to be evicted or swapout, including cases:
- *
- * a. if share same reservation object with ctx->resv, have assumption
- * reservation objects should already be locked, so not lock again and
- * return true directly when either the opreation allow_reserved_eviction
- * or the target bo already is in delayed free list;
- *
- * b. Otherwise, trylock it.
+ * Check if the target bo is allowed to be evicted or swapedout.
  */
 static bool ttm_bo_evict_swapout_allowable(struct ttm_buffer_object *bo,
-			struct ttm_operation_ctx *ctx, bool *locked)
+					   struct ttm_operation_ctx *ctx,
+					   bool *locked)
 {
-	bool ret = false;
+	/* First check if we can lock it */
+	*locked = reservation_object_trylock(bo->resv);
+	if (*locked)
+		return true;
 
-	*locked = false;
+	/* Check if it's locked because it is part of the current operation */
 	if (bo->resv == ctx->resv) {
 		reservation_object_assert_held(bo->resv);
-		if (ctx->allow_reserved_eviction || !list_empty(&bo->ddestroy))
-			ret = true;
-	} else {
-		*locked = reservation_object_trylock(bo->resv);
-		ret = *locked;
+		return ctx->allow_reserved_eviction ||
+			!list_empty(&bo->ddestroy);
 	}
 
-	return ret;
+	/* Check if it's locked because it was already evicted */
+	if (ww_mutex_is_owned_by(&bo->resv->lock, current, NULL))
+		return true;
+
+	/* Some other thread is using it, don't touch it */
+	return false;
 }
 
 static int ttm_mem_evict_first(struct ttm_bo_device *bdev,
