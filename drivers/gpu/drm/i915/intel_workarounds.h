@@ -7,8 +7,7 @@
 #ifndef _I915_WORKAROUNDS_H_
 #define _I915_WORKAROUNDS_H_
 
-int intel_ctx_workarounds_init(struct drm_i915_private *dev_priv);
-int intel_ctx_workarounds_emit(struct drm_i915_gem_request *req);
+void intel_ctx_workarounds_apply(struct drm_i915_private *dev_priv);
 
 void intel_gt_workarounds_apply(struct drm_i915_private *dev_priv);
 

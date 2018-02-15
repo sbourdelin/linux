@@ -7,40 +7,34 @@
 #include "i915_drv.h"
 #include "intel_workarounds.h"
 
-static int wa_add(struct drm_i915_private *dev_priv,
-		  i915_reg_t addr,
-		  const u32 mask, const u32 val)
+static void wa_add(struct drm_i915_private *dev_priv,
+		   i915_reg_t addr,
+		   const u32 mask, const u32 val)
 {
 	const u32 idx = dev_priv->workarounds.count;
 
+	I915_WRITE(addr, val);
+
 	if (WARN_ON(idx >= I915_MAX_WA_REGS))
-		return -ENOSPC;
+		return;
 
 	dev_priv->workarounds.reg[idx].addr = addr;
 	dev_priv->workarounds.reg[idx].value = val;
 	dev_priv->workarounds.reg[idx].mask = mask;
 
 	dev_priv->workarounds.count++;
-
-	return 0;
 }
 
-#define WA_REG(addr, mask, val) do { \
-		const int r = wa_add(dev_priv, (addr), (mask), (val)); \
-		if (r) \
-			return r; \
-	} while (0)
-
 #define WA_SET_BIT_MASKED(addr, mask) \
-	WA_REG(addr, (mask), _MASKED_BIT_ENABLE(mask))
+	wa_add(dev_priv, (addr), (mask), _MASKED_BIT_ENABLE(mask))
 
 #define WA_CLR_BIT_MASKED(addr, mask) \
-	WA_REG(addr, (mask), _MASKED_BIT_DISABLE(mask))
+	wa_add(dev_priv, (addr), (mask), _MASKED_BIT_DISABLE(mask))
 
 #define WA_SET_FIELD_MASKED(addr, mask, value) \
-	WA_REG(addr, mask, _MASKED_FIELD(mask, value))
+	wa_add(dev_priv, (addr), (mask), _MASKED_FIELD(mask, value))
 
-static int gen8_ctx_workarounds_init(struct drm_i915_private *dev_priv)
+static void gen8_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 {
 	WA_SET_BIT_MASKED(INSTPM, INSTPM_FORCE_ORDERING);
 
@@ -85,17 +79,11 @@ static int gen8_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	WA_SET_FIELD_MASKED(GEN7_GT_MODE,
 			    GEN6_WIZ_HASHING_MASK,
 			    GEN6_WIZ_HASHING_16x4);
-
-	return 0;
 }
 
-static int bdw_ctx_workarounds_init(struct drm_i915_private *dev_priv)
+static void bdw_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	int ret;
-
-	ret = gen8_ctx_workarounds_init(dev_priv);
-	if (ret)
-		return ret;
+	gen8_ctx_workarounds_apply(dev_priv);
 
 	/* WaDisableThreadStallDopClockGating:bdw (pre-production) */
 	WA_SET_BIT_MASKED(GEN8_ROW_CHICKEN, STALL_DOP_GATING_DISABLE);
@@ -116,28 +104,20 @@ static int bdw_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 			  HDC_FORCE_CONTEXT_SAVE_RESTORE_NON_COHERENT |
 			  /* WaDisableFenceDestinationToSLM:bdw (pre-prod) */
 			  (IS_BDW_GT3(dev_priv) ? HDC_FENCE_DEST_SLM_DISABLE : 0));
-
-	return 0;
 }
 
-static int chv_ctx_workarounds_init(struct drm_i915_private *dev_priv)
+static void chv_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	int ret;
-
-	ret = gen8_ctx_workarounds_init(dev_priv);
-	if (ret)
-		return ret;
+	gen8_ctx_workarounds_apply(dev_priv);
 
 	/* WaDisableThreadStallDopClockGating:chv */
 	WA_SET_BIT_MASKED(GEN8_ROW_CHICKEN, STALL_DOP_GATING_DISABLE);
 
 	/* Improve HiZ throughput on CHV. */
 	WA_SET_BIT_MASKED(HIZ_CHICKEN, CHV_HZ_8X8_MODE_IN_1X);
-
-	return 0;
 }
 
-static int gen9_ctx_workarounds_init(struct drm_i915_private *dev_priv)
+static void gen9_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 {
 	if (HAS_LLC(dev_priv)) {
 		/* WaCompressedResourceSamplerPbeMediaNewHashMode:skl,kbl
@@ -226,11 +206,9 @@ static int gen9_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	/* WaDisableGPGPUMidCmdPreemption:skl,bxt,blk,cfl,[cnl] */
 	WA_SET_FIELD_MASKED(GEN8_CS_CHICKEN1, GEN9_PREEMPT_GPGPU_LEVEL_MASK,
 			    GEN9_PREEMPT_GPGPU_COMMAND_LEVEL);
-
-	return 0;
 }
 
-static int skl_tune_iz_hashing(struct drm_i915_private *dev_priv)
+static void skl_tune_iz_hashing(struct drm_i915_private *dev_priv)
 {
 	u8 vals[3] = { 0, 0, 0 };
 	unsigned int i;
@@ -256,7 +234,7 @@ static int skl_tune_iz_hashing(struct drm_i915_private *dev_priv)
 	}
 
 	if (vals[0] == 0 && vals[1] == 0 && vals[2] == 0)
-		return 0;
+		return;
 
 	/* Tune IZ hashing. See intel_device_info_runtime_init() */
 	WA_SET_FIELD_MASKED(GEN7_GT_MODE,
@@ -266,28 +244,18 @@ static int skl_tune_iz_hashing(struct drm_i915_private *dev_priv)
 			    GEN9_IZ_HASHING(2, vals[2]) |
 			    GEN9_IZ_HASHING(1, vals[1]) |
 			    GEN9_IZ_HASHING(0, vals[0]));
-
-	return 0;
 }
 
-static int skl_ctx_workarounds_init(struct drm_i915_private *dev_priv)
+static void skl_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	int ret;
+	gen9_ctx_workarounds_apply(dev_priv);
 
-	ret = gen9_ctx_workarounds_init(dev_priv);
-	if (ret)
-		return ret;
-
-	return skl_tune_iz_hashing(dev_priv);
+	skl_tune_iz_hashing(dev_priv);
 }
 
-static int bxt_ctx_workarounds_init(struct drm_i915_private *dev_priv)
+static void bxt_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	int ret;
-
-	ret = gen9_ctx_workarounds_init(dev_priv);
-	if (ret)
-		return ret;
+	gen9_ctx_workarounds_apply(dev_priv);
 
 	/* WaDisableThreadStallDopClockGating:bxt */
 	WA_SET_BIT_MASKED(GEN8_ROW_CHICKEN,
@@ -296,17 +264,11 @@ static int bxt_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	/* WaToEnableHwFixForPushConstHWBug:bxt */
 	WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
 			  GEN8_SBE_DISABLE_REPLAY_BUF_OPTIMIZATION);
-
-	return 0;
 }
 
-static int kbl_ctx_workarounds_init(struct drm_i915_private *dev_priv)
+static void kbl_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	int ret;
-
-	ret = gen9_ctx_workarounds_init(dev_priv);
-	if (ret)
-		return ret;
+	gen9_ctx_workarounds_apply(dev_priv);
 
 	/* WaDisableFenceDestinationToSLM:kbl (pre-prod) */
 	if (IS_KBL_REVID(dev_priv, KBL_REVID_A0, KBL_REVID_A0))
@@ -322,32 +284,20 @@ static int kbl_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	WA_SET_BIT_MASKED(
 		GEN7_HALF_SLICE_CHICKEN1,
 		GEN7_SBE_SS_CACHE_DISPATCH_PORT_SHARING_DISABLE);
-
-	return 0;
 }
 
-static int glk_ctx_workarounds_init(struct drm_i915_private *dev_priv)
+static void glk_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	int ret;
-
-	ret = gen9_ctx_workarounds_init(dev_priv);
-	if (ret)
-		return ret;
+	gen9_ctx_workarounds_apply(dev_priv);
 
 	/* WaToEnableHwFixForPushConstHWBug:glk */
 	WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
 			  GEN8_SBE_DISABLE_REPLAY_BUF_OPTIMIZATION);
-
-	return 0;
 }
 
-static int cfl_ctx_workarounds_init(struct drm_i915_private *dev_priv)
+static void cfl_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	int ret;
-
-	ret = gen9_ctx_workarounds_init(dev_priv);
-	if (ret)
-		return ret;
+	gen9_ctx_workarounds_apply(dev_priv);
 
 	/* WaToEnableHwFixForPushConstHWBug:cfl */
 	WA_SET_BIT_MASKED(COMMON_SLICE_CHICKEN2,
@@ -357,11 +307,9 @@ static int cfl_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 	WA_SET_BIT_MASKED(
 		GEN7_HALF_SLICE_CHICKEN1,
 		GEN7_SBE_SS_CACHE_DISPATCH_PORT_SHARING_DISABLE);
-
-	return 0;
 }
 
-static int cnl_ctx_workarounds_init(struct drm_i915_private *dev_priv)
+static void cnl_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 {
 	/* WaForceContextSaveRestoreNonCoherent:cnl */
 	WA_SET_BIT_MASKED(CNL_HDC_CHICKEN0,
@@ -395,77 +343,35 @@ static int cnl_ctx_workarounds_init(struct drm_i915_private *dev_priv)
 
 	/* WaDisableEarlyEOT:cnl */
 	WA_SET_BIT_MASKED(GEN8_ROW_CHICKEN, DISABLE_EARLY_EOT);
-
-	return 0;
 }
 
-int intel_ctx_workarounds_init(struct drm_i915_private *dev_priv)
+void intel_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	int err;
-
 	dev_priv->workarounds.count = 0;
 
 	if (INTEL_GEN(dev_priv) < 8)
-		err = 0;
+		return;
 	else if (IS_BROADWELL(dev_priv))
-		err = bdw_ctx_workarounds_init(dev_priv);
+		bdw_ctx_workarounds_apply(dev_priv);
 	else if (IS_CHERRYVIEW(dev_priv))
-		err = chv_ctx_workarounds_init(dev_priv);
+		chv_ctx_workarounds_apply(dev_priv);
 	else if (IS_SKYLAKE(dev_priv))
-		err = skl_ctx_workarounds_init(dev_priv);
+		skl_ctx_workarounds_apply(dev_priv);
 	else if (IS_BROXTON(dev_priv))
-		err = bxt_ctx_workarounds_init(dev_priv);
+		bxt_ctx_workarounds_apply(dev_priv);
 	else if (IS_KABYLAKE(dev_priv))
-		err = kbl_ctx_workarounds_init(dev_priv);
+		kbl_ctx_workarounds_apply(dev_priv);
 	else if (IS_GEMINILAKE(dev_priv))
-		err = glk_ctx_workarounds_init(dev_priv);
+		glk_ctx_workarounds_apply(dev_priv);
 	else if (IS_COFFEELAKE(dev_priv))
-		err = cfl_ctx_workarounds_init(dev_priv);
+		cfl_ctx_workarounds_apply(dev_priv);
 	else if (IS_CANNONLAKE(dev_priv))
-		err = cnl_ctx_workarounds_init(dev_priv);
-	else {
+		cnl_ctx_workarounds_apply(dev_priv);
+	else
 		MISSING_CASE(INTEL_GEN(dev_priv));
-		err = 0;
-	}
-	if (err)
-		return err;
 
 	DRM_DEBUG_DRIVER("Number of context specific w/a: %d\n",
 			 dev_priv->workarounds.count);
-	return 0;
-}
-
-int intel_ctx_workarounds_emit(struct drm_i915_gem_request *req)
-{
-	struct i915_workarounds *w = &req->i915->workarounds;
-	u32 *cs;
-	int ret, i;
-
-	if (w->count == 0)
-		return 0;
-
-	ret = req->engine->emit_flush(req, EMIT_BARRIER);
-	if (ret)
-		return ret;
-
-	cs = intel_ring_begin(req, (w->count * 2 + 2));
-	if (IS_ERR(cs))
-		return PTR_ERR(cs);
-
-	*cs++ = MI_LOAD_REGISTER_IMM(w->count);
-	for (i = 0; i < w->count; i++) {
-		*cs++ = i915_mmio_reg_offset(w->reg[i].addr);
-		*cs++ = w->reg[i].value;
-	}
-	*cs++ = MI_NOOP;
-
-	intel_ring_advance(req, cs);
-
-	ret = req->engine->emit_flush(req, EMIT_BARRIER);
-	if (ret)
-		return ret;
-
-	return 0;
 }
 
 static void bdw_gt_workarounds_apply(struct drm_i915_private *dev_priv)

@@ -1915,10 +1915,6 @@ static int gen8_init_rcs_context(struct drm_i915_gem_request *req)
 {
 	int ret;
 
-	ret = intel_ctx_workarounds_emit(req);
-	if (ret)
-		return ret;
-
 	ret = intel_rcs_context_init_mocs(req);
 	/*
 	 * Failing to program the MOCS is non-fatal.The system will not

@@ -600,10 +600,6 @@ static int intel_rcs_ctx_init(struct drm_i915_gem_request *req)
 {
 	int ret;
 
-	ret = intel_ctx_workarounds_emit(req);
-	if (ret != 0)
-		return ret;
-
 	ret = i915_gem_render_state_emit(req);
 	if (ret)
 		return ret;
