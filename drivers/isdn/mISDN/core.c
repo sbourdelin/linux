@@ -129,8 +129,10 @@ static ssize_t channelmap_show(struct device *dev,
 	char *bp = buf;
 	int i;
 
-	for (i = 0; i <= mdev->nrbchan; i++)
-		*bp++ = test_channelmap(i, mdev->channelmap) ? '1' : '0';
+	if (mdev)
+		for (i = 0; i <= mdev->nrbchan; i++)
+			*bp++ = test_channelmap(i, mdev->channelmap) ?
+				'1' : '0';
 
 	return bp - buf;
 }
