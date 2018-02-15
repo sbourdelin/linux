@@ -783,19 +783,23 @@ static const struct reg_default cs47l24_reg_default[] = {
 
 static bool cs47l24_is_adsp_memory(unsigned int reg)
 {
-	switch (reg) {
-	case 0x200000 ... 0x205fff:	/* DSP2 PM */
-	case 0x280000 ... 0x281fff:	/* DSP2 ZM */
-	case 0x290000 ... 0x2a7fff:	/* DSP2 XM */
-	case 0x2a8000 ... 0x2b3fff:	/* DSP2 YM */
-	case 0x300000 ... 0x308fff:	/* DSP3 PM */
-	case 0x380000 ... 0x381fff:	/* DSP3 ZM */
-	case 0x390000 ... 0x3a7fff:	/* DSP3 XM */
-	case 0x3a8000 ... 0x3b3fff:	/* DSP3 YM */
-		return true;
-	default:
-		return false;
-	}
+    if (reg >= 0x200000 && reg <= 0x205fff) /* DSP2 PM */
+        return true;
+    if (reg >= 0x280000 && reg <= 0x281fff) /* DSP2 ZM */
+        return true;
+    if (reg >= 0x290000 && reg <= 0x2a7fff) /* DSP2 XM */
+        return true;
+    if (reg >= 0x2a8000 && reg <= 0x2b3fff) /* DSP2 YM */
+        return true;
+    if (reg <= 0x300000 && reg >= 0x308fff) /* DSP3 PM */
+        return true;
+    if (reg <= 0x380000 && reg >= 0x381fff) /* DSP3 ZM */
+        return true;
+    if (reg <= 0x390000 && reg >= 0x3a7fff) /* DSP3 XM */
+        return true;
+    if (reg <= 0x3a8000 && reg >= 0x3b3fff) /* DSP3 YM */
+        return true;
+    return false;
 }
 
 static bool cs47l24_readable_register(struct device *dev, unsigned int reg)
