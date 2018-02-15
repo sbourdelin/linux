@@ -656,6 +656,7 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
 	struct drm_framebuffer *fb = state->fb;
 	struct vop_win *vop_win = to_vop_win(plane);
 	const struct vop_win_data *win = vop_win->data;
+	int i;
 	int ret;
 	struct drm_rect clip;
 	int min_scale = win->phy->scl ? FRAC_16_16(1, 8) :
@@ -695,6 +696,25 @@ static int vop_plane_atomic_check(struct drm_plane *plane,
 	if (is_yuv_support(fb->format->format) && ((state->src.x1 >> 16) % 2)) {
 		DRM_ERROR("Invalid Source: Yuv format not support odd xpos\n");
 		return -EINVAL;
+	}
+
+	if (state->ctm) {
+		struct drm_color_ctm* color_ctm = (struct drm_color_ctm*)state->ctm->data;
+		if (state->ctm->length != sizeof(struct drm_color_ctm)) {
+			DRM_ERROR("Invalid PLANE_CTM blob size.\n");
+			return -EINVAL;
+		}
+
+		for (i = 0; i < 9; i++) {
+			/*
+			 * YUV2YUV R2R registers have a signed fixed point S2.10 format.
+			 * The input values, that are in signed fixed point S31.32 format,
+			 * can be converted only if the first 30 MSBs are all 1s or 0s.
+			 */
+			uint32_t msbs = (uint32_t) (color_ctm->matrix[i] >> 34);
+			if (msbs != ~0u && msbs != 0)
+				    return -EOVERFLOW;
+	      }
 	}
 
 	return 0;
@@ -813,6 +833,31 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
 						win1_y2r_coefficients[i],
 						bt601_yuv2rgb[i]);
 			}
+		}
+	}
+
+	if (!win_index) {
+		VOP_YUV2YUV_SET(vop, win0_r2r_en, !!state->ctm);
+	} else if (win_index == 1) {
+		VOP_YUV2YUV_SET(vop, win1_r2r_en, !!state->ctm);
+	} else if (win_index == 2) {
+		VOP_YUV2YUV_SET(vop, win2_r2r_en, !!state->ctm);
+	}
+	if (state->ctm) {
+		struct drm_color_ctm* color_ctm = (struct drm_color_ctm*)state->ctm->data;
+                /*
+		 * Convert matrix values from fixed point S31.32 to S2.10, by discarding
+		 * the lowest 22 bits.
+		 */
+		for (i = 0; i < 9; i++) {
+			uint32_t value = (color_ctm->matrix[i] >> 22) & 0x1FFF;
+			if (!win_index) {
+				VOP_YUV2YUV_SET(vop, win0_r2r_coefficients[i], value);
+			 } else if (win_index == 1){
+				VOP_YUV2YUV_SET(vop, win1_r2r_coefficients[i], value);
+			 } else if (win_index == 2) {
+				VOP_YUV2YUV_SET(vop, win2_r2r_coefficients[i], value);
+			 }
 		}
 	}
 
