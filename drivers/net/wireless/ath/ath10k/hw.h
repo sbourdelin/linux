@@ -495,6 +495,7 @@ struct ath10k_hw_params {
 	const char *name;
 	u32 patch_load_addr;
 	int uart_pin;
+	int led_pin; // 1 for peregrine, 17 for beeliner, 58 for ipq4019
 	u32 otp_exe_param;
 
 	/* Type of hw cycle counter wraparound logic, for more info

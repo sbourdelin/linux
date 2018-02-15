@@ -24,6 +24,8 @@
 #include <linux/pci.h>
 #include <linux/uuid.h>
 #include <linux/time.h>
+#include <linux/gpio.h>
+#include <linux/leds.h>
 
 #include "htt.h"
 #include "htc.h"
@@ -769,6 +771,17 @@ struct ath10k_per_peer_tx_stats {
 	u32	reserved2;
 };
 
+struct ath10k_gpiocontrol {
+	struct ath10k *ar;
+	u32 gpio_set_num, gpio_num, gpio_input, gpio_pull_type, gpio_intr_mode, gpio_set; /* since we have no gpio read method, these are the state variables for debugfs.  */
+	struct gpio_led wifi_led;
+	struct gpio_chip gchip;
+	struct led_classdev cdev;
+	char label[48];
+	u32 gpio_state_dir; /* same as for debugfs, but for gpiochip implementation */
+	u32 gpio_state_pin;
+};
+
 struct ath10k {
 	struct ath_common ath_common;
 	struct ieee80211_hw *hw;
@@ -797,6 +810,8 @@ struct ath10k {
 	u32 low_5ghz_chan;
 	u32 high_5ghz_chan;
 	bool ani_enabled;
+	struct ath10k_gpiocontrol *gpio;
+	int gpio_attached;
 
 	bool p2p;
 
