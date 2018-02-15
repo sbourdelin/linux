@@ -27,10 +27,18 @@ Optional properties:
   it to an output when the power-off handler is called. If this optional
   property is not specified, the GPIO is initialized as an output in its
   inactive state.
+- timeout: Time to wait before asserting a WARN_ON(1). If nothing is
+           specified, 3000 ms is used.
 
 Examples:
 
 gpio-poweroff {
 	compatible = "gpio-poweroff";
 	gpios = <&gpio 4 0>;
+};
+
+gpio-poweroff {
+	compatible = "gpio-poweroff";
+	gpios = <&gpio 4 0>;
+	timeout = <3000>;
 };
