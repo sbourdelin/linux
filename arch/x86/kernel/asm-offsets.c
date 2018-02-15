@@ -97,6 +97,7 @@ void common(void) {
 
 	/* TLB state for the entry code */
 	OFFSET(TLB_STATE_user_pcid_flush_mask, tlb_state, user_pcid_flush_mask);
+	OFFSET(TLB_STATE_pti_disable, tlb_state, pti_disable);
 
 	/* Layout info for cpu_entry_area */
 	OFFSET(CPU_ENTRY_AREA_tss, cpu_entry_area, tss);

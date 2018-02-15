@@ -217,6 +217,12 @@ struct tlb_state {
 	unsigned long cr4;
 
 	/*
+	 * Cached value of mm.pti_enable to simplify and speed up kernel entry
+	 * code.
+	 */
+	unsigned short pti_disable;
+
+	/*
 	 * This is a list of all contexts that might exist in the TLB.
 	 * There is one per ASID that we use, and the ASID (what the
 	 * CPU calls PCID) is the index into ctxts.
@@ -298,6 +304,12 @@ static inline void invalidate_other_asid(void)
 	this_cpu_write(cpu_tlbstate.invalidate_other, true);
 }
 
+/* Return whether page-table isolation is disabled on this CPU */
+static inline unsigned short cpu_pti_disable(void)
+{
+	return this_cpu_read(cpu_tlbstate.pti_disable);
+}
+
 /*
  * Save some of cr4 feature set we're using (e.g.  Pentium 4MB
  * enable and PPro Global page enable), so that any CPU's that boot
@@ -355,7 +367,8 @@ static inline void __native_flush_tlb(void)
 	 */
 	WARN_ON_ONCE(preemptible());
 
-	invalidate_user_asid(this_cpu_read(cpu_tlbstate.loaded_mm_asid));
+	if (!cpu_pti_disable())
+		invalidate_user_asid(this_cpu_read(cpu_tlbstate.loaded_mm_asid));
 
 	/* If current->mm == NULL then the read_cr3() "borrows" an mm */
 	native_write_cr3(__native_read_cr3());
@@ -404,7 +417,7 @@ static inline void __native_flush_tlb_single(unsigned long addr)
 
 	asm volatile("invlpg (%0)" ::"r" (addr) : "memory");
 
-	if (!static_cpu_has(X86_FEATURE_PTI))
+	if (!static_cpu_has(X86_FEATURE_PTI) || cpu_pti_disable())
 		return;
 
 	/*

@@ -216,7 +216,14 @@ For 32-bit we have the following conventions - kernel is built with
 
 .macro SWITCH_TO_KERNEL_CR3 scratch_reg:req
 	ALTERNATIVE "jmp .Lend_\@", "", X86_FEATURE_PTI
+
+	/*
+	 * Do not switch on compatibility mode.
+	 */
 	mov	%cr3, \scratch_reg
+	testq	$PTI_USER_PGTABLE_MASK, \scratch_reg
+	jz	.Lend_\@
+
 	ADJUST_KERNEL_CR3 \scratch_reg
 	mov	\scratch_reg, %cr3
 .Lend_\@:
@@ -225,8 +232,20 @@ For 32-bit we have the following conventions - kernel is built with
 #define THIS_CPU_user_pcid_flush_mask   \
 	PER_CPU_VAR(cpu_tlbstate) + TLB_STATE_user_pcid_flush_mask
 
+#define THIS_CPU_pti_disable \
+	PER_CPU_VAR(cpu_tlbstate) + TLB_STATE_pti_disable
+
 .macro SWITCH_TO_USER_CR3_NOSTACK scratch_reg:req scratch_reg2:req
 	ALTERNATIVE "jmp .Lend_\@", "", X86_FEATURE_PTI
+
+	/*
+	 * Do not switch on compatibility mode. If there is no need for a
+	 * flush, run lfence to avoid speculative execution returning to user
+	 * with the wrong CR3.
+	 */
+	cmpw    $(0), THIS_CPU_pti_disable
+	jnz     .Lno_spec_\@
+
 	mov	%cr3, \scratch_reg
 
 	ALTERNATIVE "jmp .Lwrcr3_\@", "", X86_FEATURE_PCID
@@ -243,6 +262,10 @@ For 32-bit we have the following conventions - kernel is built with
 	btr	\scratch_reg, THIS_CPU_user_pcid_flush_mask
 	movq	\scratch_reg2, \scratch_reg
 	jmp	.Lwrcr3_pcid_\@
+
+.Lno_spec_\@:
+	lfence
+	jmp	.Lend_\@
 
 .Lnoflush_\@:
 	movq	\scratch_reg2, \scratch_reg
@@ -289,6 +312,12 @@ For 32-bit we have the following conventions - kernel is built with
 	ALTERNATIVE "jmp .Lwrcr3_\@", "", X86_FEATURE_PCID
 
 	/*
+	 * Do not restore if PTI is disabled.
+	 */
+	cmpw    $(0), THIS_CPU_pti_disable
+	jnz     .Lno_spec_\@
+
+	/*
 	 * KERNEL pages can always resume with NOFLUSH as we do
 	 * explicit flushes.
 	 */
@@ -306,6 +335,10 @@ For 32-bit we have the following conventions - kernel is built with
 
 	btr	\scratch_reg, THIS_CPU_user_pcid_flush_mask
 	jmp	.Lwrcr3_\@
+
+.Lno_spec_\@:
+	lfence
+	jmp	.Lend_\@
 
 .Lnoflush_\@:
 	SET_NOFLUSH_BIT \save_reg
