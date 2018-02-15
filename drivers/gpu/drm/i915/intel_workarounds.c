@@ -374,12 +374,95 @@ void intel_ctx_workarounds_apply(struct drm_i915_private *dev_priv)
 			 dev_priv->workarounds.count);
 }
 
+static void gen8_set_l3sqc_credits(struct drm_i915_private *dev_priv,
+				   int general_prio_credits,
+				   int high_prio_credits)
+{
+	u32 misccpctl;
+	u32 val;
+
+	/* WaTempDisableDOPClkGating:bdw */
+	misccpctl = I915_READ(GEN7_MISCCPCTL);
+	I915_WRITE(GEN7_MISCCPCTL, misccpctl & ~GEN7_DOP_CLOCK_GATE_ENABLE);
+
+	val = I915_READ(GEN8_L3SQCREG1);
+	val &= ~L3_PRIO_CREDITS_MASK;
+	val |= L3_GENERAL_PRIO_CREDITS(general_prio_credits);
+	val |= L3_HIGH_PRIO_CREDITS(high_prio_credits);
+	I915_WRITE(GEN8_L3SQCREG1, val);
+
+	/*
+	 * Wait at least 100 clocks before re-enabling clock gating.
+	 * See the definition of L3SQCREG1 in BSpec.
+	 */
+	POSTING_READ(GEN8_L3SQCREG1);
+	udelay(1);
+	I915_WRITE(GEN7_MISCCPCTL, misccpctl);
+}
+
 static void bdw_gt_workarounds_apply(struct drm_i915_private *dev_priv)
 {
+	/* The GTT cache must be disabled if the system is using 2M pages. */
+	bool can_use_gtt_cache = !HAS_PAGE_SIZES(dev_priv,
+						 I915_GTT_PAGE_SIZE_2M);
+	/* WaSwitchSolVfFArbitrationPriority:bdw */
+	I915_WRITE(GAM_ECOCHK, I915_READ(GAM_ECOCHK) | HSW_ECOCHK_ARB_PRIO_SOL);
+
+	/* WaVSRefCountFullforceMissDisable:bdw */
+	/* WaDSRefCountFullforceMissDisable:bdw */
+	I915_WRITE(GEN7_FF_THREAD_MODE,
+		   I915_READ(GEN7_FF_THREAD_MODE) &
+		   ~(GEN8_FF_DS_REF_CNT_FFME | GEN7_FF_VS_REF_CNT_FFME));
+
+
+	I915_WRITE(GEN6_RC_SLEEP_PSMI_CONTROL,
+		   _MASKED_BIT_ENABLE(GEN8_RC_SEMA_IDLE_MSG_DISABLE));
+
+
+	/* WaDisableSDEUnitClockGating:bdw */
+	I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
+		   GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
+
+
+	/* WaProgramL3SqcReg1Default:bdw */
+	gen8_set_l3sqc_credits(dev_priv, 30, 2);
+
+	/* WaGttCachingOffByDefault:bdw */
+	I915_WRITE(HSW_GTT_CACHE_EN, can_use_gtt_cache ? GTT_CACHE_EN_ALL : 0);
 }
 
 static void chv_gt_workarounds_apply(struct drm_i915_private *dev_priv)
 {
+	/* WaVSRefCountFullforceMissDisable:chv */
+	/* WaDSRefCountFullforceMissDisable:chv */
+	I915_WRITE(GEN7_FF_THREAD_MODE,
+		   I915_READ(GEN7_FF_THREAD_MODE) &
+		   ~(GEN8_FF_DS_REF_CNT_FFME | GEN7_FF_VS_REF_CNT_FFME));
+
+	/* WaDisableSemaphoreAndSyncFlipWait:chv */
+	I915_WRITE(GEN6_RC_SLEEP_PSMI_CONTROL,
+		   _MASKED_BIT_ENABLE(GEN8_RC_SEMA_IDLE_MSG_DISABLE));
+
+	/* WaDisableCSUnitClockGating:chv */
+	I915_WRITE(GEN6_UCGCTL1, I915_READ(GEN6_UCGCTL1) |
+		   GEN6_CSUNIT_CLOCK_GATE_DISABLE);
+
+	/* WaDisableSDEUnitClockGating:chv */
+	I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
+		   GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
+
+	/*
+	 * WaProgramL3SqcReg1Default:chv
+	 * See gfxspecs/Related Documents/Performance Guide/
+	 * LSQC Setting Recommendations.
+	 */
+	gen8_set_l3sqc_credits(dev_priv, 38, 2);
+
+	/*
+	 * GTT cache may not work with big pages, so if those
+	 * are ever enabled GTT cache may need to be disabled.
+	 */
+	I915_WRITE(HSW_GTT_CACHE_EN, GTT_CACHE_EN_ALL);
 }
 
 static void gen9_gt_workarounds_apply(struct drm_i915_private *dev_priv)
@@ -462,6 +545,10 @@ static void bxt_gt_workarounds_apply(struct drm_i915_private *dev_priv)
 	I915_WRITE(GEN9_GAMT_ECO_REG_RW_IA,
 		   (I915_READ(GEN9_GAMT_ECO_REG_RW_IA) |
 		    GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS));
+
+	/* WaDisableSDEUnitClockGating:bxt */
+	I915_WRITE(GEN8_UCGCTL6, (I915_READ(GEN8_UCGCTL6) |
+				  GEN8_SDEUNIT_CLOCK_GATE_DISABLE));
 }
 
 static void kbl_gt_workarounds_apply(struct drm_i915_private *dev_priv)
@@ -486,6 +573,16 @@ static void kbl_gt_workarounds_apply(struct drm_i915_private *dev_priv)
 	I915_WRITE(GEN9_GAMT_ECO_REG_RW_IA,
 		   (I915_READ(GEN9_GAMT_ECO_REG_RW_IA) |
 		    GAMT_ECO_ENABLE_IN_PLACE_DECOMPRESS));
+
+	/* WaDisableSDEUnitClockGating:kbl */
+	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_B0))
+		I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
+			   GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
+
+	/* WaDisableGamClockGating:kbl */
+	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_B0))
+		I915_WRITE(GEN6_UCGCTL1, I915_READ(GEN6_UCGCTL1) |
+			   GEN6_GAMUNIT_CLOCK_GATE_DISABLE);
 }
 
 static void glk_gt_workarounds_apply(struct drm_i915_private *dev_priv)
@@ -527,6 +624,10 @@ static void cnl_gt_workarounds_apply(struct drm_i915_private *dev_priv)
 	/* WaEnablePreemptionGranularityControlByUMD:cnl */
 	I915_WRITE(GEN7_FF_SLICE_CS_CHICKEN1,
 		   _MASKED_BIT_ENABLE(GEN9_FFSC_PERCTX_PREEMPT_CTRL));
+
+	/* This is not an Wa. Enable for better image quality */
+	I915_WRITE(_3D_CHICKEN3,
+		   _MASKED_BIT_ENABLE(_3D_CHICKEN3_AA_LINE_QUALITY_FIX_ENABLE));
 }
 
 void intel_gt_workarounds_apply(struct drm_i915_private *dev_priv)
@@ -553,41 +654,9 @@ void intel_gt_workarounds_apply(struct drm_i915_private *dev_priv)
 		MISSING_CASE(INTEL_GEN(dev_priv));
 }
 
-static void gen8_set_l3sqc_credits(struct drm_i915_private *dev_priv,
-				   int general_prio_credits,
-				   int high_prio_credits)
-{
-	u32 misccpctl;
-	u32 val;
-
-	/* WaTempDisableDOPClkGating:bdw */
-	misccpctl = I915_READ(GEN7_MISCCPCTL);
-	I915_WRITE(GEN7_MISCCPCTL, misccpctl & ~GEN7_DOP_CLOCK_GATE_ENABLE);
-
-	val = I915_READ(GEN8_L3SQCREG1);
-	val &= ~L3_PRIO_CREDITS_MASK;
-	val |= L3_GENERAL_PRIO_CREDITS(general_prio_credits);
-	val |= L3_HIGH_PRIO_CREDITS(high_prio_credits);
-	I915_WRITE(GEN8_L3SQCREG1, val);
-
-	/*
-	 * Wait at least 100 clocks before re-enabling clock gating.
-	 * See the definition of L3SQCREG1 in BSpec.
-	 */
-	POSTING_READ(GEN8_L3SQCREG1);
-	udelay(1);
-	I915_WRITE(GEN7_MISCCPCTL, misccpctl);
-}
-
 static void bdw_display_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	/* The GTT cache must be disabled if the system is using 2M pages. */
-	bool can_use_gtt_cache = !HAS_PAGE_SIZES(dev_priv,
-						 I915_GTT_PAGE_SIZE_2M);
 	enum pipe pipe;
-
-	/* WaSwitchSolVfFArbitrationPriority:bdw */
-	I915_WRITE(GAM_ECOCHK, I915_READ(GAM_ECOCHK) | HSW_ECOCHK_ARB_PRIO_SOL);
 
 	/* WaPsrDPAMaskVBlankInSRD:bdw */
 	I915_WRITE(CHICKEN_PAR1_1,
@@ -599,25 +668,6 @@ static void bdw_display_workarounds_apply(struct drm_i915_private *dev_priv)
 			   I915_READ(CHICKEN_PIPESL_1(pipe)) |
 			   BDW_DPRS_MASK_VBLANK_SRD);
 	}
-
-	/* WaVSRefCountFullforceMissDisable:bdw */
-	/* WaDSRefCountFullforceMissDisable:bdw */
-	I915_WRITE(GEN7_FF_THREAD_MODE,
-		   I915_READ(GEN7_FF_THREAD_MODE) &
-		   ~(GEN8_FF_DS_REF_CNT_FFME | GEN7_FF_VS_REF_CNT_FFME));
-
-	I915_WRITE(GEN6_RC_SLEEP_PSMI_CONTROL,
-		   _MASKED_BIT_ENABLE(GEN8_RC_SEMA_IDLE_MSG_DISABLE));
-
-	/* WaDisableSDEUnitClockGating:bdw */
-	I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
-		   GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
-
-	/* WaProgramL3SqcReg1Default:bdw */
-	gen8_set_l3sqc_credits(dev_priv, 30, 2);
-
-	/* WaGttCachingOffByDefault:bdw */
-	I915_WRITE(HSW_GTT_CACHE_EN, can_use_gtt_cache ? GTT_CACHE_EN_ALL : 0);
 
 	/* WaKVMNotificationOnConfigChange:bdw */
 	I915_WRITE(CHICKEN_PAR2_1, I915_READ(CHICKEN_PAR2_1)
@@ -634,36 +684,6 @@ static void bdw_display_workarounds_apply(struct drm_i915_private *dev_priv)
 
 static void chv_display_workarounds_apply(struct drm_i915_private *dev_priv)
 {
-	/* WaVSRefCountFullforceMissDisable:chv */
-	/* WaDSRefCountFullforceMissDisable:chv */
-	I915_WRITE(GEN7_FF_THREAD_MODE,
-		   I915_READ(GEN7_FF_THREAD_MODE) &
-		   ~(GEN8_FF_DS_REF_CNT_FFME | GEN7_FF_VS_REF_CNT_FFME));
-
-	/* WaDisableSemaphoreAndSyncFlipWait:chv */
-	I915_WRITE(GEN6_RC_SLEEP_PSMI_CONTROL,
-		   _MASKED_BIT_ENABLE(GEN8_RC_SEMA_IDLE_MSG_DISABLE));
-
-	/* WaDisableCSUnitClockGating:chv */
-	I915_WRITE(GEN6_UCGCTL1, I915_READ(GEN6_UCGCTL1) |
-		   GEN6_CSUNIT_CLOCK_GATE_DISABLE);
-
-	/* WaDisableSDEUnitClockGating:chv */
-	I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
-		   GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
-
-	/*
-	 * WaProgramL3SqcReg1Default:chv
-	 * See gfxspecs/Related Documents/Performance Guide/
-	 * LSQC Setting Recommendations.
-	 */
-	gen8_set_l3sqc_credits(dev_priv, 38, 2);
-
-	/*
-	 * GTT cache may not work with big pages, so if those
-	 * are ever enabled GTT cache may need to be disabled.
-	 */
-	I915_WRITE(HSW_GTT_CACHE_EN, GTT_CACHE_EN_ALL);
 }
 
 static void gen9_display_workarounds_apply(struct drm_i915_private *dev_priv)
@@ -723,10 +743,6 @@ static void bxt_display_workarounds_apply(struct drm_i915_private *dev_priv)
 {
 	gen9_display_workarounds_apply(dev_priv);
 
-	/* WaDisableSDEUnitClockGating:bxt */
-	I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
-		   GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
-
 	/*
 	 * FIXME:
 	 * GEN8_HDCUNIT_CLOCK_GATE_DISABLE_HDCREQ applies on 3x6 GT SKUs only.
@@ -745,16 +761,6 @@ static void bxt_display_workarounds_apply(struct drm_i915_private *dev_priv)
 static void kbl_display_workarounds_apply(struct drm_i915_private *dev_priv)
 {
 	gen9_display_workarounds_apply(dev_priv);
-
-	/* WaDisableSDEUnitClockGating:kbl */
-	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_B0))
-		I915_WRITE(GEN8_UCGCTL6, I915_READ(GEN8_UCGCTL6) |
-			   GEN8_SDEUNIT_CLOCK_GATE_DISABLE);
-
-	/* WaDisableGamClockGating:kbl */
-	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_B0))
-		I915_WRITE(GEN6_UCGCTL1, I915_READ(GEN6_UCGCTL1) |
-			   GEN6_GAMUNIT_CLOCK_GATE_DISABLE);
 
 	/* WaFbcNukeOnHostModify:kbl */
 	I915_WRITE(ILK_DPFC_CHICKEN, I915_READ(ILK_DPFC_CHICKEN) |
@@ -808,9 +814,6 @@ static void cnl_display_workarounds_apply(struct drm_i915_private *dev_priv)
 	u32 val;
 	cnp_display_workarounds_apply(dev_priv);
 
-	/* This is not an Wa. Enable for better image quality */
-	I915_WRITE(_3D_CHICKEN3,
-		   _MASKED_BIT_ENABLE(_3D_CHICKEN3_AA_LINE_QUALITY_FIX_ENABLE));
 
 	/* WaEnableChickenDCPR:cnl */
 	I915_WRITE(GEN8_CHICKEN_DCPR_1,
@@ -834,10 +837,6 @@ static void cnl_display_workarounds_apply(struct drm_i915_private *dev_priv)
 	I915_WRITE(UNSLICE_UNIT_LEVEL_CLKGATE, val);
 }
 
-/*
- * FIXME: Some of the WAs applied here are incorrectly classified as Display
- * WAs. We still need to go through them and apply them in the right place.
- */
 void intel_display_workarounds_apply(struct drm_i915_private *dev_priv)
 {
 	if (INTEL_GEN(dev_priv) < 8)
