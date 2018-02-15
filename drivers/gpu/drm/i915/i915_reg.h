@@ -1961,6 +1961,34 @@ enum i915_power_well_id {
 						    _CNL_PORT_PCS_DW1_LN0_F)
 #define   COMMON_KEEPER_EN		(1 << 26)
 
+/* CNL Port TX registers */
+#define _CNL_PORT_TX_AE_GRP_OFFSET		0x162340
+#define _CNL_PORT_TX_B_GRP_OFFSET		0x1623C0
+#define _CNL_PORT_TX_C_GRP_OFFSET		0x162B40
+#define _CNL_PORT_TX_D_GRP_OFFSET		0x162BC0
+#define _CNL_PORT_TX_F_GRP_OFFSET		0x162A40
+#define _CNL_PORT_TX_AE_LN0_OFFSET		0x162440
+#define _CNL_PORT_TX_B_LN0_OFFSET		0x162640
+#define _CNL_PORT_TX_C_LN0_OFFSET		0x162C40
+#define _CNL_PORT_TX_D_LN0_OFFSET		0x162E40
+#define _CNL_PORT_TX_F_LN0_OFFSET		0x162840
+#define CNL_PORT_TX_DW_GRP(port, dw)	(_PICK((port), \
+					       _CNL_PORT_TX_AE_GRP_OFFSET, \
+					       _CNL_PORT_TX_B_GRP_OFFSET, \
+					       _CNL_PORT_TX_B_GRP_OFFSET, \
+					       _CNL_PORT_TX_D_GRP_OFFSET, \
+					       _CNL_PORT_TX_AE_GRP_OFFSET, \
+					       _CNL_PORT_TX_F_GRP_OFFSET) + \
+					       4*(dw))
+#define CNL_PORT_TX_DW_LN0(port, dw)	(_PICK((port), \
+					       _CNL_PORT_TX_AE_LN0_OFFSET, \
+					       _CNL_PORT_TX_B_LN0_OFFSET, \
+					       _CNL_PORT_TX_B_LN0_OFFSET, \
+					       _CNL_PORT_TX_D_LN0_OFFSET, \
+					       _CNL_PORT_TX_AE_LN0_OFFSET, \
+					       _CNL_PORT_TX_F_LN0_OFFSET) + \
+					       4*(dw))
+
 #define _CNL_PORT_TX_DW2_GRP_AE		0x162348
 #define _CNL_PORT_TX_DW2_GRP_B		0x1623C8
 #define _CNL_PORT_TX_DW2_GRP_C		0x162B48
