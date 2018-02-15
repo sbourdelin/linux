@@ -4592,6 +4592,14 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 	{ "WDC WD3000JD-*",		NULL,	ATA_HORKAGE_WD_BROKEN_LPM },
 	{ "WDC WD3200JD-*",		NULL,	ATA_HORKAGE_WD_BROKEN_LPM },
 
+	/*
+	 * Crucial BX100 SSD has broken min_power and med_power_with_dipm
+	 * support.
+	 *
+	 * https://bugs.launchpad.net/bugs/1726930
+	 */
+	{ "CT*BX100SSD1",		NULL,	ATA_HORKAGE_NOLPM },
+
 	/* End Marker */
 	{ }
 };
