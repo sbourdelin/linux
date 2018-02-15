@@ -15,7 +15,7 @@
 #endif
 
 #ifndef __ASSEMBLY__
-#include <linux/kernel.h>
+#include <linux/types.h>
 
 #ifdef CONFIG_BUG
 
