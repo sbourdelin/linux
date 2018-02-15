@@ -416,8 +416,8 @@ bool tipc_msg_bundle(struct sk_buff *skb, struct tipc_msg *msg, u32 mtu)
  */
 bool tipc_msg_extract(struct sk_buff *skb, struct sk_buff **iskb, int *pos)
 {
+	int imsz, offset, clone_cnt, skb_overhead;
 	struct tipc_msg *msg;
-	int imsz, offset;
 
 	*iskb = NULL;
 	if (unlikely(skb_linearize(skb)))
@@ -434,6 +434,11 @@ bool tipc_msg_extract(struct sk_buff *skb, struct sk_buff **iskb, int *pos)
 	skb_pull(*iskb, offset);
 	imsz = msg_size(buf_msg(*iskb));
 	skb_trim(*iskb, imsz);
+
+	/* Scale extracted buffer's truesize to avoid double accounting */
+	clone_cnt = max_t(u32, 1, msg_msgcnt(msg));
+	skb_overhead = skb->truesize - skb->len;
+	(*iskb)->truesize = SKB_TRUESIZE(imsz) + skb_overhead / clone_cnt;
 	if (unlikely(!tipc_msg_validate(iskb)))
 		goto none;
 	*pos += align(imsz);
