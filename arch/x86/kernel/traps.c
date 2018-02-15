@@ -61,6 +61,7 @@
 #include <asm/mpx.h>
 #include <asm/vm86.h>
 #include <asm/umip.h>
+#include <asm/pti.h>
 
 #ifdef CONFIG_X86_64
 #include <asm/x86_init.h>
@@ -315,7 +316,6 @@ DO_ERROR(X86_TRAP_OF,     SIGSEGV, "overflow",			overflow)
 DO_ERROR(X86_TRAP_UD,     SIGILL,  "invalid opcode",		invalid_op)
 DO_ERROR(X86_TRAP_OLD_MF, SIGFPE,  "coprocessor segment overrun",coprocessor_segment_overrun)
 DO_ERROR(X86_TRAP_TS,     SIGSEGV, "invalid TSS",		invalid_TSS)
-DO_ERROR(X86_TRAP_NP,     SIGBUS,  "segment not present",	segment_not_present)
 DO_ERROR(X86_TRAP_SS,     SIGBUS,  "stack segment",		stack_segment)
 DO_ERROR(X86_TRAP_AC,     SIGBUS,  "alignment check",		alignment_check)
 
@@ -528,6 +528,27 @@ exit_trap:
 	 */
 	do_trap(X86_TRAP_BR, SIGSEGV, "bounds", regs, error_code, NULL);
 }
+
+dotraplinkage void
+do_segment_not_present(struct pt_regs *regs, long error_code)
+{
+	RCU_LOCKDEP_WARN(!rcu_is_watching(), "entry code didn't wake RCU");
+	cond_local_irq_enable(regs);
+
+	/*
+	 * 64-bit mode was disabled to prevent unnecessary page table isolation.
+	 * Enable it, and from now on page-tables will be switched on kernel
+	 * entry. Due to potential race conditions, we check the error code to
+	 * see whether it references the __USER_CS, and ensure we only handle a
+	 * single event per thread.
+	 */
+	if (pti_handle_segment_not_present(error_code))
+		return;
+
+	do_trap(X86_TRAP_NP, SIGTRAP, "segment not present", regs, error_code,
+		NULL);
+}
+NOKPROBE_SYMBOL(do_segment_not_present);
 
 dotraplinkage void
 do_general_protection(struct pt_regs *regs, long error_code)

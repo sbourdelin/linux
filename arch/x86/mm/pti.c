@@ -148,6 +148,136 @@ pgd_t __pti_set_user_pgd(pgd_t *pgdp, pgd_t pgd)
 	return pgd;
 }
 
+static void pti_update_user_pgds(struct mm_struct *mm, bool pti_enable)
+{
+	int i;
+
+	if (!(__supported_pte_mask & _PAGE_NX))
+		return;
+
+	for (i = 0; i < PTRS_PER_PGD / 2; i++) {
+		pgd_t pgd, *pgdp = &mm->pgd[i];
+
+		pgd = *pgdp;
+
+		if ((pgd.pgd & (_PAGE_USER|_PAGE_PRESENT)) !=
+			(_PAGE_USER|_PAGE_PRESENT))
+			continue;
+
+		if (pti_enable)
+			pgd.pgd |= _PAGE_NX;
+		else
+			pgd.pgd &= ~_PAGE_NX;
+
+		*pgdp = pgd;
+	}
+}
+
+static void pti_cpu_update_func(void *info)
+{
+	struct mm_struct *mm = (struct mm_struct *)info;
+
+	if (mm != this_cpu_read(cpu_tlbstate.loaded_mm))
+		return;
+
+	/*
+	 * Keep CS64 and CPU settings in sync despite potential concurrent
+	 * updates.
+	 */
+	set_cpu_pti_disable(READ_ONCE(mm->context.pti_disable));
+}
+
+/*
+ * Reenable PTI after it was selectively disabled. Since the mm is in use, and
+ * the NX-bit of the PGD may be set while the user still uses the kernel PGD, it
+ * may lead to spurious page-faults. The page-fault handler should be able to
+ * handle them gracefully.
+ */
+void __pti_reenable(void)
+{
+	struct mm_struct *mm = current->mm;
+	int cpu;
+
+	if (!mm_pti_disable(mm))
+		return;
+
+	/*
+	 * Prevent spurious page-fault storm while we set the NX-bit and have
+	 * yet not updated the per-CPU pti_disable flag.
+	 */
+	down_write(&mm->mmap_sem);
+
+	if (!mm_pti_disable(mm))
+		goto out;
+
+	/*
+	 * First, mark the PTI is enabled. Although we do anything yet, we are
+	 * safe as long as we do not reenable CS64. Since we did not update the
+	 * page tables yet, this may lead to spurious page-faults, but we need
+	 * the pti_disable in mm to be set for __pti_set_user_pgd() to do the
+	 * right thing.  Holding mmap_sem would ensure matter we hold the
+	 * mmap_sem to prevent them from swamping the system.
+	 */
+	mm->context.pti_disable = PTI_DISABLE_OFF;
+
+	/* Second, restore the NX bits. */
+	pti_update_user_pgds(mm, true);
+
+	/*
+	 * Third, flush the entire mm. By doing so we also force the processes
+	 * to reload the correct page-table on return. This also provides a
+	 * barrier before we restore USER_CS, ensuring we see the update
+	 * cpumask.
+	 */
+	flush_tlb_mm(mm);
+
+	/*
+	 * Finally, restore CS64 to its correct state and mark that PTI is
+	 * reenabled.
+	 */
+	cpu = get_cpu();
+	pti_cpu_update_func(mm);
+	if (cpumask_any_but(mm_cpumask(mm), cpu) < nr_cpu_ids)
+		smp_call_function_many(mm_cpumask(mm), pti_cpu_update_func,
+				       mm, 1);
+	put_cpu();
+
+out:
+	up_write(&mm->mmap_sem);
+}
+
+void __pti_disable(unsigned short type)
+{
+	struct mm_struct *mm = current->mm;
+
+	/*
+	 * Give disabling options with higher value higher priority, as they are
+	 * permanent and not transient. This also avoids re-disabling.
+	 */
+	if (mm_pti_disable(mm) >= type)
+		return;
+
+	mm->context.pti_disable = type;
+
+	pti_update_user_pgds(mm, false);
+
+	preempt_disable();
+	set_cpu_pti_disable(type);
+	preempt_enable();
+}
+
+bool pti_handle_segment_not_present(long error_code)
+{
+	if (!static_cpu_has(X86_FEATURE_PTI))
+		return false;
+
+	if ((unsigned short)error_code != GDT_ENTRY_DEFAULT_USER_CS << 3)
+		return false;
+
+	pti_reenable();
+	return true;
+}
+
 /*
  * Walk the user copy of the page tables (optionally) trying to allocate
  * page table pages on the way down.
