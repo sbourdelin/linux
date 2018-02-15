@@ -36,6 +36,7 @@
 #include <asm/xics.h>
 #include <asm/xive.h>
 #include <asm/plpar_wrappers.h>
+#include <asm/cputhreads.h>
 
 #include "pseries.h"
 #include "offline_states.h"
@@ -254,6 +255,8 @@ static int pseries_add_processor(struct device_node *np)
 	if (!intserv)
 		return 0;
 
+	process_thread_group_mask(np, NULL, 0);
+
 	zalloc_cpumask_var(&candidate_mask, GFP_KERNEL);
 	zalloc_cpumask_var(&tmp, GFP_KERNEL);
 
@@ -325,6 +328,7 @@ static void pseries_remove_processor(struct device_node *np)
 	cpu_maps_update_begin();
 	for (i = 0; i < nthreads; i++) {
 		thread = be32_to_cpu(intserv[i]);
+		cpumask_clear_cpu(thread, &ppc_thread_group_mask);
 		for_each_present_cpu(cpu) {
 			if (get_hard_smp_processor_id(cpu) != thread)
 				continue;
@@ -363,10 +367,12 @@ static int dlpar_online_cpu(struct device_node *dn)
 			BUG_ON(get_cpu_current_state(cpu)
 					!= CPU_STATE_OFFLINE);
 			cpu_maps_update_done();
-			timed_topology_update(1);
-			rc = device_online(get_cpu_device(cpu));
-			if (rc)
-				goto out;
+			if (cpumask_test_cpu(thread, &ppc_thread_group_mask)) {
+				timed_topology_update(1);
+				rc = device_online(get_cpu_device(cpu));
+				if (rc)
+					goto out;
+			}
 			cpu_maps_update_begin();
 
 			break;

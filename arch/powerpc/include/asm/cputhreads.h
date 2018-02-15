@@ -31,6 +31,12 @@ extern cpumask_t threads_core_mask;
 #define threads_core_mask	(*get_cpu_mask(0))
 #endif
 
+extern cpumask_t ppc_thread_group_mask;
+
+extern int process_thread_group_mask(struct device_node *dn,
+					const __be32 *prop, int prop_len);
+
+
 /* cpu_thread_mask_to_cores - Return a cpumask of one per cores
  *                            hit by the argument
  *

@@ -416,13 +416,18 @@ EXPORT_SYMBOL_GPL(threads_per_subcore);
 EXPORT_SYMBOL_GPL(threads_shift);
 EXPORT_SYMBOL_GPL(threads_core_mask);
 
-static void __init cpu_init_thread_core_maps(int tpc)
+cpumask_t ppc_thread_group_mask;
+EXPORT_SYMBOL_GPL(ppc_thread_group_mask);
+
+static void __init cpu_init_thread_core_maps(int tpc,
+				cpumask_t *thread_group_mask)
 {
 	int i;
 
 	threads_per_core = tpc;
 	threads_per_subcore = tpc;
 	cpumask_clear(&threads_core_mask);
+	DBG("INFO: Entry %s (%d)\n", __FUNCTION__, tpc);
 
 	/* This implementation only supports power of 2 number of threads
 	 * for simplicity and performance
@@ -432,12 +437,112 @@ static void __init cpu_init_thread_core_maps(int tpc)
 
 	for (i = 0; i < tpc; i++)
 		cpumask_set_cpu(i, &threads_core_mask);
+	cpumask_and(&threads_core_mask, &threads_core_mask, thread_group_mask);
 
 	printk(KERN_INFO "CPU maps initialized for %d thread%s per core\n",
 	       tpc, tpc > 1 ? "s" : "");
 	printk(KERN_DEBUG " (thread shift is %d)\n", threads_shift);
 }
 
+int process_thread_group_mask(struct device_node *dn,
+				const __be32 *prop, int prop_len)
+{
+	const __be32 *thrgrp;
+	const __be32 *intserv;
+	int lentg, len, cpu, nthreads = 1;
+	int j, k, rc = 0;
+	u32 cc_type = 0, no_split = 0, thr_per_split = 0;
+	DBG("INFO: Entry %s\n", __FUNCTION__);
+
+	/* First CPU/thread */
+	intserv = of_get_property(dn, "reg", &len);
+	if (intserv)
+		cpu = of_read_number(intserv, 1);
+	else
+		cpu = 0;
+
+	/* Num of threads in core */
+	intserv = of_get_property(dn, "ibm,ppc-interrupt-server#s",
+				&len);
+	if (intserv) {
+		DBG("    ibm,ppc-interrupt-server#s -> %d threads\n",
+		    nthreads);
+	} else {
+		DBG("    no ibm,ppc-interrupt-server#s -> 1 thread\n");
+		len = 4;
+	}
+
+	nthreads = len / sizeof(int);
+	DBG("    cpu %d nthreads %d\n", cpu, nthreads);
+
+	if (prop) {
+		thrgrp = prop;
+	} else {
+		thrgrp = of_get_property(dn, "ibm,thread-groups",
+					&lentg);
+		if (!thrgrp) {
+			rc = -ENOENT;
+			DBG("    error, %d\n", __LINE__);
+			goto endit;
+		}
+	}
+
+	/* Process the thread groups for the Core thread mask */
+	/* Characteristic type per table */
+	cc_type = of_read_number(thrgrp++, 1);
+
+	/*
+	 * 1 : Group shares common L1, translation cache, and
+	 *     instruction data flow
+	 * >1 : Reserved
+	 */
+	if (cc_type != 1) {
+		rc = -EINVAL;
+		DBG("    error, %d\n", __LINE__);
+		goto endit;
+	}
+
+	/* No. splits */
+	no_split = of_read_number(thrgrp++, 1);
+	if (no_split == 0) {
+		rc = -EINVAL;
+		DBG("    error, %d\n", __LINE__);
+		goto endit;
+	}
+
+	/* Threads per split */
+	thr_per_split = of_read_number(thrgrp++, 1);
+	if (thr_per_split == 0) {
+		rc = -EINVAL;
+		DBG("    error, %d\n", __LINE__);
+		goto endit;
+	}
+
+	DBG("    Property ibm,thread-group "
+		"(cc_t=%d, no_spl=%d, thr_p_spl=%d)\n",
+		(int)cc_type, (int)no_split, (int)thr_per_split);
+
+	for (j = 0; j < no_split; j++) {
+		for (k = 0; k < thr_per_split; k++) {
+			u32 t = of_read_number(thrgrp++, 1);
+
+			cpumask_set_cpu(t, &ppc_thread_group_mask);
+			DBG("      !!enable thread %d\n", (int)t);
+		}
+	}
+
+endit:
+	if (rc) {
+		DBG("    WARNING: error processing (%d)"
+		    "ibm,thread-group property\n", rc);
+		for (j = 0; j < nthreads; j++)
+			cpumask_set_cpu(cpu+j,
+					&ppc_thread_group_mask);
+	}
+
+	return rc;
+}
+EXPORT_SYMBOL(process_thread_group_mask);
 
 /**
  * setup_cpu_maps - initialize the following cpu maps:
@@ -489,20 +594,35 @@ void __init smp_setup_cpu_maps(void)
 
 		nthreads = len / sizeof(int);
 
+		process_thread_group_mask(dn, NULL, 0);
+
 		for (j = 0; j < nthreads && cpu < nr_cpu_ids; j++) {
 			bool avail;
-
-			DBG("    thread %d -> cpu %d (hard id %d)\n",
-			    j, cpu, be32_to_cpu(intserv[j]));
 
 			avail = of_device_is_available(dn);
 			if (!avail)
 				avail = !of_property_match_string(dn,
 						"enable-method", "spin-table");
 
-			set_cpu_present(cpu, avail);
-			set_hard_smp_processor_id(cpu, be32_to_cpu(intserv[j]));
-			set_cpu_possible(cpu, true);
+			DBG("    thread %d -> cpu %d (hard id %d) %d\n",
+			    j, cpu, be32_to_cpu(intserv[j]),
+			    cpumask_test_cpu(cpu, &ppc_thread_group_mask));
+
+			if (cpumask_test_cpu(cpu,
+					&ppc_thread_group_mask)) {
+				DBG("        !!thread %d present"
+					"/possible\n", (int)cpu);
+				set_cpu_present(cpu, avail);
+				set_hard_smp_processor_id(cpu,
+					be32_to_cpu(intserv[j]));
+				set_cpu_possible(cpu, true);
+			} else {
+				DBG("        !!NOT thread %d "
+					"present/possible\n", (int)cpu);
+				set_cpu_present(cpu, false);
+				set_cpu_possible(cpu, false);
+			}
+
 			cpu++;
 		}
 	}
@@ -561,7 +681,7 @@ void __init smp_setup_cpu_maps(void)
 	 * every CPU in the system. If that is not the case, then some code
 	 * here will have to be reworked
 	 */
-	cpu_init_thread_core_maps(nthreads);
+	cpu_init_thread_core_maps(nthreads, &ppc_thread_group_mask);
 
 	/* Now that possible cpus are set, set nr_cpu_ids for later use */
 	setup_nr_cpu_ids();

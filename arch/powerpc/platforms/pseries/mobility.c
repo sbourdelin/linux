@@ -20,6 +20,7 @@
 
 #include <asm/machdep.h>
 #include <asm/rtas.h>
+#include <asm/cputhreads.h>
 #include "pseries.h"
 
 static struct kobject *mobility_kobj;
@@ -121,6 +122,11 @@ static int update_dt_property(struct device_node *dn, struct property **prop,
 	}
 
 	if (!more) {
+		printk(KERN_INFO "INFO: Processing %s %s\n", __FUNCTION__, name);
+		if (strcmp(name, "ibm,thread-groups") == 0)
+			process_thread_group_mask(dn,
+				new_prop->value, new_prop->length);
+
 		of_update_property(dn, new_prop);
 		*prop = NULL;
 	}
