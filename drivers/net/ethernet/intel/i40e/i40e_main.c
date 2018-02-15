@@ -6551,37 +6551,36 @@ int i40e_up(struct i40e_vsi *vsi)
  * @pf: board private structure
  * @is_up: whether the link state should be forced up or down
  **/
-static void i40e_force_link_state(struct i40e_pf *pf, bool is_up)
+static i40e_status i40e_force_link_state(struct i40e_pf *pf, bool is_up)
 {
 	struct i40e_aq_get_phy_abilities_resp abilities;
 	struct i40e_aq_set_phy_config config = {0};
 	struct i40e_hw *hw = &pf->hw;
-	enum i40e_aq_phy_type cnt;
-	u64 mask = 0;
 	i40e_status err;
+	u64 mask;
 
 	/* Get the current phy config */
 	err = i40e_aq_get_phy_capabilities(hw, false, false, &abilities,
 					   NULL);
-	if (err)
-		dev_dbg(&pf->pdev->dev,
+	if (err) {
+		dev_err(&pf->pdev->dev,
 			"failed to get phy cap., ret =  %s last_status =  %s\n",
 			i40e_stat_str(hw, err),
 			i40e_aq_str(hw, hw->aq.asq_last_status));
+		return err;
+	}
 
 	/* If link needs to go up, but was not forced to go down,
 	 * no need for a flap
 	 */
 	if (is_up && abilities.phy_type != 0)
-		return;
+		return I40E_SUCCESS;
 
 	/* To force link we need to set bits for all supported PHY types,
 	 * but there are now more than 32, so we need to split the bitmap
 	 * across two fields.
 	 */
-	for (cnt = I40E_PHY_TYPE_SGMII; cnt < I40E_PHY_TYPE_MAX; cnt++)
-		mask |= (1ULL << cnt);
-
+	mask = I40E_PHY_TYPES_BITMASK;
 	config.phy_type = is_up ? cpu_to_le32((u32)(mask & 0xffffffff)) : 0;
 	config.phy_type_ext = is_up ? (u8)((mask >> 32) & 0xff) : 0;
 	/* Copy the old settings, except of phy_type */
@@ -6592,11 +6591,13 @@ static void i40e_force_link_state(struct i40e_pf *pf, bool is_up)
 	config.low_power_ctrl = abilities.d3_lpan;
 	err = i40e_aq_set_phy_config(hw, &config, NULL);
 
-	if (err)
-		dev_dbg(&pf->pdev->dev,
+	if (err) {
+		dev_err(&pf->pdev->dev,
 			"set phy config ret =  %s last_status =  %s\n",
 			i40e_stat_str(&pf->hw, err),
 			i40e_aq_str(&pf->hw, pf->hw.aq.asq_last_status));
+		return err;
+	}
 
 	/* Update the link info */
 	err = i40e_update_link_info(hw);
@@ -6610,6 +6611,8 @@ static void i40e_force_link_state(struct i40e_pf *pf, bool is_up)
 	}
 
 	i40e_aq_set_link_restart_an(hw, true, NULL);
+
+	return I40E_SUCCESS;
 }
 
 /**
@@ -7593,7 +7596,8 @@ int i40e_open(struct net_device *netdev)
 
 	netif_carrier_off(netdev);
 
-	i40e_force_link_state(pf, true);
+	if (i40e_force_link_state(pf, true))
+		return -EAGAIN;
 
 	err = i40e_vsi_open(vsi);
 	if (err)
