@@ -3,6 +3,8 @@
 #define _INTEL_RINGBUFFER_H_
 
 #include <linux/hashtable.h>
+#include <linux/seqlock.h>
+
 #include "i915_gem_batch_pool.h"
 #include "i915_gem_request.h"
 #include "i915_gem_timeline.h"
@@ -567,7 +569,7 @@ struct intel_engine_cs {
 		/**
 		 * @lock: Lock protecting the below fields.
 		 */
-		spinlock_t lock;
+		seqlock_t lock;
 		/**
 		 * @enabled: Reference count indicating number of listeners.
 		 */
@@ -1014,12 +1016,10 @@ intel_engine_lookup_user(struct drm_i915_private *i915, u8 class, u8 instance);
 
 static inline void intel_engine_context_in(struct intel_engine_cs *engine)
 {
-	unsigned long flags;
-
 	if (READ_ONCE(engine->stats.enabled) == 0)
 		return;
 
-	spin_lock_irqsave(&engine->stats.lock, flags);
+	write_seqlock(&engine->stats.lock);
 
 	if (engine->stats.enabled > 0) {
 		if (engine->stats.active++ == 0)
@@ -1027,17 +1027,15 @@ static inline void intel_engine_context_in(struct intel_engine_cs *engine)
 		GEM_BUG_ON(engine->stats.active == 0);
 	}
 
-	spin_unlock_irqrestore(&engine->stats.lock, flags);
+	write_sequnlock(&engine->stats.lock);
 }
 
 static inline void intel_engine_context_out(struct intel_engine_cs *engine)
 {
-	unsigned long flags;
-
 	if (READ_ONCE(engine->stats.enabled) == 0)
 		return;
 
-	spin_lock_irqsave(&engine->stats.lock, flags);
+	write_seqlock(&engine->stats.lock);
 
 	if (engine->stats.enabled > 0) {
 		ktime_t last;
@@ -1064,7 +1062,7 @@ static inline void intel_engine_context_out(struct intel_engine_cs *engine)
 		}
 	}
 
-	spin_unlock_irqrestore(&engine->stats.lock, flags);
+	write_sequnlock(&engine->stats.lock);
 }
 
 int intel_enable_engine_stats(struct intel_engine_cs *engine);
