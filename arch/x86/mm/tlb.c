@@ -178,6 +178,28 @@ static void sync_current_stack_to_mm(struct mm_struct *mm)
 		}
 	}
 }
+static void switch_pti_disable(struct mm_struct *mm)
+{
+#ifdef CONFIG_PAGE_TABLE_ISOLATION
+	unsigned short prev_pti_disable, next_pti_disable;
+
+	if (!static_cpu_has(X86_FEATURE_PTI))
+		return;
+
+	prev_pti_disable = cpu_pti_disable();
+
+	/*
+	 * Avoid concurrent changes to mm_pti_disable()), since we need to
+	 * ensure both CS64 and the CPU indication are identical
+	 */
+	next_pti_disable = READ_ONCE(mm->context.pti_disable);
+
+	if (prev_pti_disable == next_pti_disable)
+		return;
+
+	set_cpu_pti_disable(next_pti_disable);
+#endif
+}
 
 void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 			struct task_struct *tsk)
@@ -291,6 +313,9 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 			/* See above wrt _rcuidle. */
 			trace_tlb_flush_rcuidle(TLB_FLUSH_ON_TASK_SWITCH, 0);
 		}
+
+		/* Disable/reenable page-table isolation as needed */
+		switch_pti_disable(next);
 
 		this_cpu_write(cpu_tlbstate.loaded_mm, next);
 		this_cpu_write(cpu_tlbstate.loaded_mm_asid, new_asid);

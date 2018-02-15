@@ -310,6 +310,18 @@ static inline unsigned short cpu_pti_disable(void)
 	return this_cpu_read(cpu_tlbstate.pti_disable);
 }
 
+static inline void set_cpu_pti_disable(unsigned short disable)
+{
+	/*
+	 * Enabling/disabling CS64 and updating the state must be done
+	 * atomically
+	 */
+	WARN_ON_ONCE(preemptible());
+
+	pti_update_user_cs64(cpu_pti_disable(), disable);
+	this_cpu_write(cpu_tlbstate.pti_disable, disable);
+}
+
 /*
  * Save some of cr4 feature set we're using (e.g.  Pentium 4MB
  * enable and PPro Global page enable), so that any CPU's that boot
