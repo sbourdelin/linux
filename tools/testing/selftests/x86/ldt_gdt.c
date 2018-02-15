@@ -50,6 +50,11 @@
 # define INT80_CLOBBERS "r8", "r9", "r10", "r11"
 #else
 # define INT80_CLOBBERS
+
+/* copied from asm/segment.h */
+#define GDT_ENTRY_DEFAULT_USER_CS	14
+#define GDT_ENTRY_DEFAULT_USER_DS	15
+
 #endif
 
 static int nerrs;
@@ -907,6 +912,40 @@ static void test_gdt_invalidation(void)
 #endif
 }
 
+struct far_jmp_addr {
+	unsigned long addr;
+	unsigned short seg;
+} __packed;
+
+static void switch_to_cs64(void)
+{
+#ifdef __i386__
+	struct far_jmp_addr far_jmp_compat, far_jmp_64;
+	unsigned short ds;
+
+	/* Poor's man detection of compatibility mode;  */
+	asm volatile ("mov %%ds, %0" : [ds]"=r"(ds));
+	if (ds >> 3 != 5)
+		return;
+
+	far_jmp_64.seg = (6 << 3) | 3;		/* __USER_CS */
+	far_jmp_compat.seg = (4 << 3) | 3;	/* __USER32_CS */
+
+	asm volatile ("movl $.cs64_target, (%[target64])\n\t"
+		      "movl $.cs32_target, (%[target32])\n\t"
+		      "ljmp *%[jmp_addr_64]\n\t"
+		      ".cs64_target:\n\t"
+		      "ljmp *%[jmp_addr_32]\n\t"
+		      ".cs32_target:\n\t" : :
+		      [jmp_addr_64]"m"(far_jmp_64),
+		      [jmp_addr_32]"m"(far_jmp_compat),
+		      [target64]"r"(&far_jmp_64.addr),
+		      [target32]"r"(&far_jmp_compat.addr) : "memory");
+
+	printf("[OK]\tSwitching to CS64 and back\n");
+#endif
+}
+
 int main(int argc, char **argv)
 {
 	if (argc == 1 && !strcmp(argv[0], "ldt_gdt_test_exec"))
@@ -922,6 +961,8 @@ int main(int argc, char **argv)
 	do_exec_test();
 
 	test_gdt_invalidation();
+
+	switch_to_cs64();
 
 	return nerrs ? 1 : 0;
 }
