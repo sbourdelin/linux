@@ -139,7 +139,9 @@ static void pgd_ctor(struct mm_struct *mm, pgd_t *pgd)
 	if (!SHARED_KERNEL_PMD) {
 		pgd_set_mm(pgd, mm);
 		pgd_list_add(pgd);
-	}
+	} else if (IS_ENABLED(CONFIG_PAGE_TABLE_ISOLATION) &&
+		   static_cpu_has(X86_FEATURE_PTI))
+		pgd_set_mm(pgd, mm);
 }
 
 static void pgd_dtor(pgd_t *pgd)

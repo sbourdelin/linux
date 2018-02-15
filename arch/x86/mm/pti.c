@@ -134,10 +134,15 @@ pgd_t __pti_set_user_pgd(pgd_t *pgdp, pgd_t pgd)
 	 *     may execute from it
 	 *  - we don't have NX support
 	 *  - we're clearing the PGD (i.e. the new pgd is not present).
+	 *  - PTI is disabled.
 	 */
 	if ((pgd.pgd & (_PAGE_USER|_PAGE_PRESENT)) == (_PAGE_USER|_PAGE_PRESENT) &&
-	    (__supported_pte_mask & _PAGE_NX))
-		pgd.pgd |= _PAGE_NX;
+	    (__supported_pte_mask & _PAGE_NX)) {
+		struct mm_struct *mm = pgd_page_get_mm(virt_to_page(pgdp));
+
+		if (!mm_pti_disable(mm))
+			pgd.pgd |= _PAGE_NX;
+	}
 
 	/* return the copy of the PGD we want the kernel to use: */
 	return pgd;

@@ -36,6 +36,9 @@ typedef struct {
 	/* True if mm supports a task running in 32 bit compatibility mode. */
 	unsigned short ia32_compat;
 #endif
+#ifdef CONFIG_PAGE_TABLE_ISOLATION
+	unsigned short pti_disable;
+#endif
 
 	struct mutex lock;
 	void __user *vdso;			/* vdso base address */
