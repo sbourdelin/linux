@@ -167,11 +167,13 @@ static ssize_t fw_platform_size_show(struct kobject *kobj,
 	return sprintf(buf, "%d\n", efi_enabled(EFI_64BIT) ? 64 : 32);
 }
 
-static struct kobj_attribute efi_attr_fw_vendor = __ATTR_RO(fw_vendor);
-static struct kobj_attribute efi_attr_runtime = __ATTR_RO(runtime);
-static struct kobj_attribute efi_attr_config_table = __ATTR_RO(config_table);
+static struct kobj_attribute efi_attr_fw_vendor =
+	__ATTR_RO_MODE(fw_vendor, 0400);
+static struct kobj_attribute efi_attr_runtime = __ATTR_RO_MODE(runtime, 0400);
+static struct kobj_attribute efi_attr_config_table =
+	__ATTR_RO_MODE(config_table, 0400);
 static struct kobj_attribute efi_attr_fw_platform_size =
-	__ATTR_RO(fw_platform_size);
+	__ATTR_RO_MODE(fw_platform_size, 0400);
 
 static struct attribute *efi_subsys_attrs[] = {
 	&efi_attr_systab.attr,
