@@ -28,16 +28,7 @@
 #include <linux/types.h>
 #include <linux/uaccess.h>
 #include <linux/watchdog.h>
-#ifdef CONFIG_HPWDT_NMI_DECODING
-#include <linux/dmi.h>
-#include <linux/spinlock.h>
-#include <linux/nmi.h>
-#include <linux/kdebug.h>
-#include <linux/notifier.h>
-#include <asm/set_memory.h>
-#endif /* CONFIG_HPWDT_NMI_DECODING */
 #include <asm/nmi.h>
-#include <asm/frame.h>
 
 #define HPWDT_VERSION			"1.4.0"
 #define SECS_TO_TICKS(secs)		((secs) * 1000 / 128)
