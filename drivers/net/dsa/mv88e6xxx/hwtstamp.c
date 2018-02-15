@@ -200,14 +200,17 @@ int mv88e6xxx_port_hwtstamp_get(struct dsa_switch *ds, int port,
 				struct ifreq *ifr)
 {
 	struct mv88e6xxx_chip *chip = ds->priv;
-	struct mv88e6xxx_port_hwtstamp *ps = &chip->port_hwtstamp[port];
-	struct hwtstamp_config *config = &ps->tstamp_config;
+	struct mv88e6xxx_port_hwtstamp *ps;
+	struct hwtstamp_config *config;
 
 	if (!chip->info->ptp_support)
 		return -EOPNOTSUPP;
 
 	if (port < 0 || port >= mv88e6xxx_num_ports(chip))
 		return -EINVAL;
+
+	ps = &chip->port_hwtstamp[port];
+	config = &ps->tstamp_config;
 
 	return copy_to_user(ifr->ifr_data, config, sizeof(*config)) ?
 		-EFAULT : 0;
