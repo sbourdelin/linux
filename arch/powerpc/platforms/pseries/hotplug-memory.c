@@ -1160,6 +1160,13 @@ static int pseries_update_drconf_memory(struct of_reconfig_data *pr)
 					  memblock_size);
 			rc = (rc < 0) ? -EINVAL : 0;
 			break;
+		} else if ((be32_to_cpu(old_drmem[i].aa_index) !=
+					be32_to_cpu(new_drmem[i].aa_index)) &&
+				(be32_to_cpu(new_drmem[i].flags) &
+					DRCONF_MEM_ASSIGNED)) {
+			rc = dlpar_memory_readd_by_index(
+				be32_to_cpu(new_drmem[i].drc_index),
+				pr->prop);
 		}
 	}
 	return rc;

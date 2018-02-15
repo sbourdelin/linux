@@ -636,6 +636,27 @@ static int dlpar_cpu_remove_by_index(u32 drc_index)
 	return rc;
 }
 
+static int dlpar_cpu_readd_by_index(u32 drc_index)
+{
+	int rc = 0;
+
+	pr_info("Attempting to update CPU, drc index %x\n", drc_index);
+
+	if (dlpar_cpu_remove_by_index(drc_index))
+		rc = -EINVAL;
+	else if (dlpar_cpu_add(drc_index))
+		rc = -EINVAL;
+
+	if (rc)
+		pr_info("Failed to update cpu at drc_index %lx\n",
+				(unsigned long int)drc_index);
+	else
+		pr_info("CPU at drc_index %lx was updated\n",
+				(unsigned long int)drc_index);
+
+	return rc;
+}
+
 static int find_dlpar_cpus_to_remove(u32 *cpu_drcs, int cpus_to_remove)
 {
 	struct device_node *dn;
@@ -826,6 +847,9 @@ int dlpar_cpu(struct pseries_hp_errorlog *hp_elog)
 		else
 			rc = -EINVAL;
 		break;
+	case PSERIES_HP_ELOG_ACTION_READD:
+		rc = dlpar_cpu_readd_by_index(drc_index);
+		break;
 	default:
 		pr_err("Invalid action (%d) specified\n", hp_elog->action);
 		rc = -EINVAL;
@@ -876,11 +900,52 @@ static ssize_t dlpar_cpu_release(const char *buf, size_t count)
 
 #endif /* CONFIG_ARCH_CPU_PROBE_RELEASE */
 
+static int pseries_update_cpu(struct of_reconfig_data *pr)
+{
+	u32 old_entries, new_entries;
+	__be32 *p, *old_assoc, *new_assoc;
+	int rc = 0;
+
+	/* So far, we only handle the 'ibm,associativity' property,
+	 * here.
+	 * The first int of the property is the number of domains
+	 * described.  This is followed by an array of level values.
+	 */
+	p = (__be32 *) pr->old_prop->value;
+	if (!p)
+		return -EINVAL;
+	old_entries = be32_to_cpu(*p++);
+	old_assoc = p;
+
+	p = (__be32 *)pr->prop->value;
+	if (!p)
+		return -EINVAL;
+	new_entries = be32_to_cpu(*p++);
+	new_assoc = p;
+
+	if (old_entries == new_entries) {
+		int sz = old_entries * sizeof(int);
+
+		if (!memcmp(old_assoc, new_assoc, sz))
+			rc = dlpar_cpu_readd_by_index(
+					be32_to_cpu(pr->dn->phandle));
+
+	} else {
+		rc = dlpar_cpu_readd_by_index(
+					be32_to_cpu(pr->dn->phandle));
+	}
+
+	return rc;
+}
+
 static int pseries_smp_notifier(struct notifier_block *nb,
 				unsigned long action, void *data)
 {
 	struct of_reconfig_data *rd = data;
 	int err = 0;
+
+	if (strcmp(rd->dn->type, "cpu"))
+		return notifier_from_errno(err);
 
 	switch (action) {
 	case OF_RECONFIG_ATTACH_NODE:
@@ -888,6 +953,10 @@ static int pseries_smp_notifier(struct notifier_block *nb,
 		break;
 	case OF_RECONFIG_DETACH_NODE:
 		pseries_remove_processor(rd->dn);
+		break;
+	case OF_RECONFIG_UPDATE_PROPERTY:
+		if (!strcmp(rd->prop->name, "ibm,associativity"))
+			err = pseries_update_cpu(rd);
 		break;
 	}
 	return notifier_from_errno(err);
