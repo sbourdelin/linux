@@ -38,6 +38,7 @@ static bool pretimeout = 1;
 #else
 static bool pretimeout;
 #endif
+static bool iLO5;
 
 static void __iomem *pci_mem_addr;		/* the PCI-memory address */
 static unsigned long __iomem *hpwdt_nmistat;
@@ -135,12 +136,12 @@ static int hpwdt_pretimeout(unsigned int ulReason, struct pt_regs *regs)
 		"3. OA Forward Progress Log\n"
 		"4. iLO Event Log";
 
-	if ((ulReason == NMI_UNKNOWN) && !mynmi)
-		return NMI_DONE;
-
 	pr_debug("nmi: ulReason=%d, mynmi=0x%0x\n", ulReason, mynmi);
 
 	if (!pretimeout)
+		return NMI_DONE;
+
+	if (iLO5 && (ulReason == NMI_UNKNOWN) && !mynmi)
 		return NMI_DONE;
 
 	if (allow_kdump)
@@ -274,6 +275,9 @@ static int hpwdt_probe(struct pci_dev *dev, const struct pci_device_id *ent)
 	dev_info(&dev->dev, "HPE Watchdog Timer Driver: %s"
 			", timer margin: %d seconds (nowayout=%d).\n",
 			HPWDT_VERSION, hpwdt_dev.timeout, nowayout);
+
+	if (dev->subsystem_vendor == PCI_VENDOR_ID_HP_3PAR)
+		iLO5 = 1;
 
 	return 0;
 
