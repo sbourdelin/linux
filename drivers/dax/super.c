@@ -81,9 +81,9 @@ EXPORT_SYMBOL_GPL(fs_dax_get_by_bdev);
  * This is a library function for filesystems to check if the block device
  * can be mounted with dax option.
  *
- * Return: negative errno if unsupported, 0 if supported.
+ * Return: true if supported, false if unsupported
  */
-int bdev_dax_supported(struct super_block *sb, struct block_device *bdev,
+bool bdev_dax_supported(struct super_block *sb, struct block_device *bdev,
 		       int blocksize)
 {
 	struct dax_device *dax_dev;
@@ -96,21 +96,21 @@ int bdev_dax_supported(struct super_block *sb, struct block_device *bdev,
 	if (blocksize != PAGE_SIZE) {
 		pr_debug("VFS (%s): error: unsupported blocksize for dax\n",
 				sb->s_id);
-		return -EINVAL;
+		return false;
 	}
 
 	err = bdev_dax_pgoff(bdev, 0, PAGE_SIZE, &pgoff);
 	if (err) {
-		pr_debug("VFS (%s): error: unaligned partition for dax\n",
-				sb->s_id);
-		return err;
+		pr_debug("VFS (%s): error: unaligned partition for dax: %d\n",
+				sb->s_id, err);
+		return false;
 	}
 
 	dax_dev = dax_get_by_host(bdev->bd_disk->disk_name);
 	if (!dax_dev) {
 		pr_debug("VFS (%s): error: device does not support dax\n",
 				sb->s_id);
-		return -EOPNOTSUPP;
+		return false;
 	}
 
 	id = dax_read_lock();
@@ -122,7 +122,7 @@ int bdev_dax_supported(struct super_block *sb, struct block_device *bdev,
 	if (len < 1) {
 		pr_debug("VFS (%s): error: dax access failed (%ld)\n",
 				sb->s_id, len);
-		return len < 0 ? len : -EIO;
+		return false;
 	}
 
 	if ((IS_ENABLED(CONFIG_FS_DAX_LIMITED) && pfn_t_special(pfn))
@@ -131,10 +131,10 @@ int bdev_dax_supported(struct super_block *sb, struct block_device *bdev,
 	else {
 		pr_debug("VFS (%s): error: dax support not enabled\n",
 				sb->s_id);
-		return -EOPNOTSUPP;
+		return false;
 	}
 
-	return 0;
+	return true;
 }
 EXPORT_SYMBOL_GPL(bdev_dax_supported);
 #endif
