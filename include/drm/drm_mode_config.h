@@ -735,6 +735,12 @@ struct drm_mode_config {
 	 */
 	struct drm_property *plane_degamma_lut_size_property;
 	/**
+	 * @plane_ctm_property: Optional CRTC property to set the
+	 * matrix used to convert colors after the lookup in the
+	 * degamma LUT.
+	 */
+	struct drm_property *plane_ctm_property;
+	/**
 	 * @ctm_property: Optional CRTC property to set the
 	 * matrix used to convert colors after the lookup in the
 	 * degamma LUT.

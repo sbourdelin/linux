@@ -361,6 +361,12 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
 	if (!prop)
 		return -ENOMEM;
 	dev->mode_config.plane_degamma_lut_size_property = prop;
+	prop = drm_property_create(dev,
+			DRM_MODE_PROP_BLOB,
+			"PLANE_CTM", 0);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.plane_ctm_property = prop;
 
 	return 0;
 }

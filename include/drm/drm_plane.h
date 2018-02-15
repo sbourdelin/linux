@@ -139,6 +139,14 @@ struct drm_plane_state {
 	 */
 	struct drm_property_blob *degamma_lut;
 
+ 	/**
+	 * @ctm:
+	 *
+	 * Color transformation matrix. See drm_plane_enable_color_mgmt(). The
+	 * blob (if not NULL) is a &struct drm_color_ctm.
+	 */
+	struct drm_property_blob *ctm;
+
 	struct drm_atomic_state *state;
 
 	bool color_mgmt_changed : 1;
