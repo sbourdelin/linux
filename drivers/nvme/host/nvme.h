@@ -83,6 +83,11 @@ enum nvme_quirks {
 	 * Supports the LighNVM command set if indicated in vs[1].
 	 */
 	NVME_QUIRK_LIGHTNVM			= (1 << 6),
+
+	/*
+	 * The controller needs to do a PCI reset after resume.
+	 */
+	NVME_QUIRK_PCI_RESET_RESUME		= (1 << 7),
 };
 
 /*

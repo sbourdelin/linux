@@ -2084,6 +2084,9 @@ static int nvme_pci_enable(struct nvme_dev *dev)
 	int result = -ENOMEM;
 	struct pci_dev *pdev = to_pci_dev(dev->dev);
 
+	if (dev->ctrl.quirks & NVME_QUIRK_PCI_RESET_RESUME)
+		pci_reset_function(pdev);
+
 	if (pci_enable_device_mem(pdev))
 		return result;
 
@@ -2455,6 +2458,13 @@ static unsigned long check_vendor_combination_bug(struct pci_dev *pdev)
 		if (dmi_match(DMI_BOARD_VENDOR, "ASUSTeK COMPUTER INC.") &&
 		    dmi_match(DMI_BOARD_NAME, "PRIME B350M-A"))
 			return NVME_QUIRK_NO_APST;
+		/*
+		 * Samsung SSD 960 EVO and SM961/PM961 drop off the PCIe bus
+		 * after system suspend on Razer Blade Stealth.
+		 */
+		else if (dmi_match(DMI_SYS_VENDOR, "Razer") &&
+			 dmi_match(DMI_PRODUCT_NAME, "Blade Stealth"))
+			return NVME_QUIRK_PCI_RESET_RESUME;
 	}
 
 	return 0;
