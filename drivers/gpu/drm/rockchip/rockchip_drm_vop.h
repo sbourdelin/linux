@@ -80,6 +80,13 @@ struct vop_misc {
 };
 
 struct vop_yuv2yuv {
+	struct vop_reg win0_r2r_en;
+	struct vop_reg win0_r2r_coefficients[12];
+	struct vop_reg win1_r2r_en;
+	struct vop_reg win1_r2r_coefficients[12];
+	struct vop_reg win2_r2r_en;
+	struct vop_reg win2_r2r_coefficients[12];
+
 	struct vop_reg win0_y2r_en;
 	struct vop_reg win0_y2r_coefficients[12];
 

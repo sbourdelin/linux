@@ -423,6 +423,54 @@ static const struct vop_output rk3399_output = {
 };
 
 static const struct vop_yuv2yuv rk3399_vop_yuv2yuv = {
+	.win0_r2r_en = VOP_REG(RK3399_YUV2YUV_WIN, 0x1, 0),
+	.win0_r2r_coefficients = {
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 0, 0xffff, 0),
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 0, 0xffff, 16),
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 4, 0xffff, 0),
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 4, 0xffff, 16),
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 8, 0xffff, 0),
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 8, 0xffff, 16),
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 12, 0xffff, 0),
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 12, 0xffff, 16),
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 16, 0xffff, 0),
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 20, 0xffffffff, 0),
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 24, 0xffffffff, 0),
+		VOP_REG(RK3399_WIN0_YUV2YUV_3X3 + 28, 0xffffffff, 0),
+	 },
+
+	.win1_r2r_en = VOP_REG(RK3399_YUV2YUV_WIN, 0x1, 8),
+	.win1_r2r_coefficients = {
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 0, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 0, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 4, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 4, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 8, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 8, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 12, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 12, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 16, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 20, 0xffffffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 24, 0xffffffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_3X3 + 28, 0xffffffff, 0),
+	 },
+
+	.win2_r2r_en = VOP_REG(RK3399_YUV2YUV_WIN, 0x1, 16),
+	.win2_r2r_coefficients = {
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 0, 0xffff, 0),
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 0, 0xffff, 16),
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 4, 0xffff, 0),
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 4, 0xffff, 16),
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 8, 0xffff, 0),
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 8, 0xffff, 16),
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 12, 0xffff, 0),
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 12, 0xffff, 16),
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 16, 0xffff, 0),
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 20, 0xffffffff, 0),
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 24, 0xffffffff, 0),
+		VOP_REG(RK3399_WIN2_YUV2YUV_3X3 + 28, 0xffffffff, 0),
+	 },
+
 	.win0_y2r_en = VOP_REG(RK3399_YUV2YUV_WIN, 0x1, 1),
 	.win0_y2r_coefficients = {
 		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 0, 0xffff, 0),
