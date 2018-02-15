@@ -32,6 +32,7 @@
 
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv6.h>
+#include <linux/netfilter_bridge.h>
 
 #include <net/sock.h>
 #include <net/snmp.h>
@@ -202,8 +203,12 @@ int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt
 
 	rcu_read_unlock();
 
-	/* Must drop socket now because of tproxy. */
-	skb_orphan(skb);
+	/* If nf_bridge calls iptables then tproxy already happened.
+	 * No need to call skb_orphan as this would undo tproxy.
+	 */
+	if (!nf_bridge_has_called_iptables(skb))
+		/* Must drop socket now because of tproxy. */
+		skb_orphan(skb);
 
 	return NF_HOOK(NFPROTO_IPV6, NF_INET_PRE_ROUTING,
 		       net, NULL, skb, dev, NULL,

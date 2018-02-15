@@ -143,6 +143,7 @@
 #include <net/checksum.h>
 #include <net/inet_ecn.h>
 #include <linux/netfilter_ipv4.h>
+#include <linux/netfilter_bridge.h>
 #include <net/xfrm.h>
 #include <linux/mroute.h>
 #include <linux/netlink.h>
@@ -487,8 +488,12 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 	memset(IPCB(skb), 0, sizeof(struct inet_skb_parm));
 	IPCB(skb)->iif = skb->skb_iif;
 
-	/* Must drop socket now because of tproxy. */
-	skb_orphan(skb);
+	/* If nf_bridge calls iptables then tproxy already happened.
+	 * No need to call skb_orphan as this would undo tproxy.
+	 */
+	if (!nf_bridge_has_called_iptables(skb))
+		/* Must drop socket now because of tproxy. */
+		skb_orphan(skb);
 
 	return NF_HOOK(NFPROTO_IPV4, NF_INET_PRE_ROUTING,
 		       net, NULL, skb, dev, NULL,
