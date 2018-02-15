@@ -741,6 +741,17 @@ struct drm_mode_config {
 	 */
 	struct drm_property *plane_ctm_property;
 	/**
+	 * @plane_gamma_lut_property: Optional Plane property to set the LUT
+	 * used to convert the colors, after the CTM matrix, to the common
+	 * gamma space chosen for blending.
+	 */
+	struct drm_property *plane_gamma_lut_property;
+	/**
+	 * @plane_gamma_lut_size_property: Optional Plane property for the size
+	 * of the gamma LUT as supported by the driver (read-only).
+	 */
+	struct drm_property *plane_gamma_lut_size_property;
+	/**
 	 * @ctm_property: Optional CRTC property to set the
 	 * matrix used to convert colors after the lookup in the
 	 * degamma LUT.

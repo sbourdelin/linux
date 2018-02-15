@@ -147,6 +147,15 @@ struct drm_plane_state {
 	 */
 	struct drm_property_blob *ctm;
 
+	/**
+	 * @gamma_lut:
+	 *
+	 * Lookup table for converting pixel data after the color conversion
+	 * matrix @ctm.  See drm_plane_enable_color_mgmt(). The blob (if not
+	 * NULL) is an array of &struct drm_color_lut.
+	 */
+	struct drm_property_blob *gamma_lut;
+
 	struct drm_atomic_state *state;
 
 	bool color_mgmt_changed : 1;

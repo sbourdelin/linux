@@ -368,6 +368,20 @@ static int drm_mode_create_standard_properties(struct drm_device *dev)
 		return -ENOMEM;
 	dev->mode_config.plane_ctm_property = prop;
 
+	prop = drm_property_create(dev,
+			DRM_MODE_PROP_BLOB,
+			"PLANE_GAMMA_LUT", 0);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.plane_gamma_lut_property = prop;
+
+	prop = drm_property_create_range(dev,
+			DRM_MODE_PROP_IMMUTABLE,
+			"PLANE_GAMMA_LUT_SIZE", 0, UINT_MAX);
+	if (!prop)
+		return -ENOMEM;
+	dev->mode_config.plane_gamma_lut_size_property = prop;
+
 	return 0;
 }
 
