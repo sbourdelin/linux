@@ -10703,8 +10703,9 @@ static bool check_digital_port_conflicts(struct drm_atomic_state *state)
 	struct drm_device *dev = state->dev;
 	struct drm_connector *connector;
 	struct drm_connector_list_iter conn_iter;
-	unsigned int used_ports = 0;
-	unsigned int used_mst_ports = 0;
+	unsigned long used_ports = 0;
+	unsigned long used_mst_ports = 0;
+	bool ok = false;
 
 	/*
 	 * Walk the connector list instead of the encoder
@@ -10715,6 +10716,7 @@ static bool check_digital_port_conflicts(struct drm_atomic_state *state)
 	drm_for_each_connector_iter(connector, &conn_iter) {
 		struct drm_connector_state *connector_state;
 		struct intel_encoder *encoder;
+		unsigned int port_mask;
 
 		connector_state = drm_atomic_get_existing_connector_state(state, connector);
 		if (!connector_state)
@@ -10724,40 +10726,41 @@ static bool check_digital_port_conflicts(struct drm_atomic_state *state)
 			continue;
 
 		encoder = to_intel_encoder(connector_state->best_encoder);
+		port_mask = BIT(encoder->port);
 
 		WARN_ON(!connector_state->crtc);
 
 		switch (encoder->type) {
-			unsigned int port_mask;
 		case INTEL_OUTPUT_DDI:
 			if (WARN_ON(!HAS_DDI(to_i915(dev))))
-				break;
+				goto error;
 		case INTEL_OUTPUT_DP:
 		case INTEL_OUTPUT_HDMI:
 		case INTEL_OUTPUT_EDP:
-			port_mask = 1 << encoder->port;
-
-			/* the same port mustn't appear more than once */
-			if (used_ports & port_mask)
-				return false;
+			/* the same port must not appear more than once */
+			if ((used_ports | used_mst_ports) & port_mask)
+				goto error;
 
 			used_ports |= port_mask;
 			break;
+
 		case INTEL_OUTPUT_DP_MST:
-			used_mst_ports |=
-				1 << encoder->port;
+			/* can not mix MST and SST/HDMI on the same port */
+			if (used_ports & port_mask)
+				goto error;
+
+			used_mst_ports |= port_mask;
 			break;
+
 		default:
 			break;
 		}
 	}
+	ok = true;
+error:
 	drm_connector_list_iter_end(&conn_iter);
 
-	/* can't mix MST and SST/HDMI on the same port */
-	if (used_ports & used_mst_ports)
-		return false;
-
-	return true;
+	return ok;
 }
 
 static void
