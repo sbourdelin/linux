@@ -35,6 +35,7 @@
 		.completion = q,			\
 		.wait_count = c,			\
 		.rc = rc,				\
+		.free = NULL,				\
 	}
 
 
@@ -61,6 +62,7 @@ struct cache_req {
  * @completion: triggered when request is done
  * @wait_count: count of waiters for this completion
  * @err: err return from the controller
+ * @free: the request object to be freed at tx_done
  */
 struct rpmh_request {
 	struct tcs_request msg;
@@ -69,6 +71,7 @@ struct rpmh_request {
 	atomic_t *wait_count;
 	struct rpmh_client *rc;
 	int err;
+	struct rpmh_request *free;
 };
 
 /**
@@ -113,6 +116,8 @@ void rpmh_tx_done(struct tcs_request *msg, int r)
 		dev_err(rpm_msg->rc->dev,
 		       "RPMH TX fail in msg addr 0x%x, err=%d\n",
 		       rpm_msg->msg.payload[0].addr, r);
+
+	kfree(rpm_msg->free);
 
 	/* Signal the blocking thread we are done */
 	if (wc && atomic_dec_and_test(wc) && compl)
@@ -256,6 +261,53 @@ static int __rpmh_write(struct rpmh_client *rc, enum rpmh_state state,
 
 	return ret;
 }
+
+static struct rpmh_request *__get_rpmh_msg_async(struct rpmh_client *rc,
+						enum rpmh_state state,
+						struct tcs_cmd *cmd, int n)
+{
+	struct rpmh_request *req;
+
+	if (IS_ERR_OR_NULL(rc) || !cmd || n <= 0 || n > MAX_RPMH_PAYLOAD)
+		return ERR_PTR(-EINVAL);
+
+	req = kcalloc(1, sizeof(*req), GFP_ATOMIC);
+	if (!req)
+		return ERR_PTR(-ENOMEM);
+
+	memcpy(req->cmd, cmd, n * sizeof(*cmd));
+
+	req->msg.state = state;
+	req->msg.payload = req->cmd;
+	req->msg.num_payload = n;
+	req->free = req;
+
+	return req;
+}
+
+/**
+ * rpmh_write_async: Write a set of RPMH commands
+ *
+ * @rc: The RPMh handle got from rpmh_get_dev_channel
+ * @state: Active/sleep set
+ * @cmd: The payload data
+ * @n: The number of elements in payload
+ *
+ * Write a set of RPMH commands, the order of commands is maintained
+ * and will be sent as a single shot.
+ */
+int rpmh_write_async(struct rpmh_client *rc, enum rpmh_state state,
+		    struct tcs_cmd *cmd, int n)
+{
+	struct rpmh_request *rpm_msg;
+
+	rpm_msg = __get_rpmh_msg_async(rc, state, cmd, n);
+	if (IS_ERR(rpm_msg))
+		return PTR_ERR(rpm_msg);
+
+	return __rpmh_write(rc, state, rpm_msg);
+}
+EXPORT_SYMBOL(rpmh_write_async);
 
 /**
  * rpmh_write: Write a set of RPMH commands and block until response
