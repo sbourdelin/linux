@@ -797,6 +797,9 @@ static irqreturn_t malidp_de_irq(int irq, void *arg)
 	if (status & de->vsync_irq)
 		drm_crtc_handle_vblank(&malidp->crtc);
 
+	if (status  & ~de->vsync_irq & de->irq_mask)
+		trace_printk("error occurred DE_STATUS is 0x%08X\n", status);
+
 	malidp_hw_clear_irq(hwdev, MALIDP_DE_BLOCK, status);
 
 	return (ret == IRQ_NONE) ? IRQ_HANDLED : ret;
@@ -879,6 +882,9 @@ static irqreturn_t malidp_se_irq(int irq, void *arg)
 	status = malidp_hw_read(hwdev, hw->map.se_base + MALIDP_REG_STATUS);
 	status &= mask;
 	/* ToDo: status decoding and firing up of VSYNC and page flip events */
+
+	if (status & ~se->vsync_irq & se->irq_mask)
+		trace_printk("error occurred SE_STATUS is 0x%08X\n", status);
 
 	malidp_hw_clear_irq(hwdev, MALIDP_SE_BLOCK, status);
 
