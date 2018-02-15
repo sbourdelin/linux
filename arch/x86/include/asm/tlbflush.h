@@ -319,6 +319,12 @@ static inline void set_cpu_pti_disable(unsigned short disable)
 	WARN_ON_ONCE(preemptible());
 
 	pti_update_user_cs64(cpu_pti_disable(), disable);
+	if (__supported_pte_mask & _PAGE_GLOBAL) {
+		if (disable)
+			cr4_set_bits(X86_CR4_PGE);
+		else
+			cr4_clear_bits(X86_CR4_PGE);
+	}
 	this_cpu_write(cpu_tlbstate.pti_disable, disable);
 }
 

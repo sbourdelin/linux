@@ -161,12 +161,6 @@ struct map_range {
 
 static int page_size_mask;
 
-static void enable_global_pages(void)
-{
-	if (!static_cpu_has(X86_FEATURE_PTI))
-		__supported_pte_mask |= _PAGE_GLOBAL;
-}
-
 static void __init probe_page_size_mask(void)
 {
 	/*
@@ -186,8 +180,10 @@ static void __init probe_page_size_mask(void)
 	/* Enable PGE if available */
 	__supported_pte_mask &= ~_PAGE_GLOBAL;
 	if (boot_cpu_has(X86_FEATURE_PGE)) {
-		cr4_set_bits_and_update_boot(X86_CR4_PGE);
-		enable_global_pages();
+		__supported_pte_mask |= _PAGE_GLOBAL;
+
+		if (!static_cpu_has(X86_FEATURE_PTI))
+			cr4_set_bits_and_update_boot(X86_CR4_PGE);
 	}
 
 	/* Enable 1 GB linear kernel mappings if available: */
@@ -683,6 +679,8 @@ void __init init_mem_mapping(void)
 #else
 	early_ioremap_page_table_range_init();
 #endif
+	if (static_cpu_has(X86_FEATURE_PTI))
+		cr4_clear_bits(X86_CR4_PGE);
 
 	load_cr3(swapper_pg_dir);
 	__flush_tlb_all();

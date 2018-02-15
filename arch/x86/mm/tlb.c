@@ -74,7 +74,8 @@ static void choose_new_asid(struct mm_struct *next, u64 next_tlb_gen,
 		return;
 	}
 
-	if (this_cpu_read(cpu_tlbstate.invalidate_other))
+	if (this_cpu_read(cpu_tlbstate.invalidate_other) &&
+	    !mm_pti_disable(next))
 		clear_asid_other();
 
 	for (asid = 0; asid < TLB_NR_DYN_ASIDS; asid++) {
