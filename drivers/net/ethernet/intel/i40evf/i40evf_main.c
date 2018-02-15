@@ -2708,22 +2708,19 @@ static int i40evf_parse_cls_flower(struct i40evf_adapter *adapter,
 		if (!ipv6_addr_any(&mask->dst) || !ipv6_addr_any(&mask->src))
 			field_flags |= I40EVF_CLOUD_FIELD_IIP;
 
-		if (key->dst.s6_addr) {
-			for (i = 0; i < 4; i++)
-				filter->f.mask.tcp_spec.dst_ip[i] |=
+		for (i = 0; i < 4; i++)
+			filter->f.mask.tcp_spec.dst_ip[i] |=
 							cpu_to_be32(0xffffffff);
-			memcpy(&filter->f.data.tcp_spec.dst_ip,
-			       &key->dst.s6_addr32,
-			       sizeof(filter->f.data.tcp_spec.dst_ip));
-		}
-		if (key->src.s6_addr) {
-			for (i = 0; i < 4; i++)
-				filter->f.mask.tcp_spec.src_ip[i] |=
+		memcpy(&filter->f.data.tcp_spec.dst_ip,
+		       &key->dst.s6_addr32,
+		       sizeof(filter->f.data.tcp_spec.dst_ip));
+
+		for (i = 0; i < 4; i++)
+			filter->f.mask.tcp_spec.src_ip[i] |=
 							cpu_to_be32(0xffffffff);
-			memcpy(&filter->f.data.tcp_spec.src_ip,
-			       &key->src.s6_addr32,
-			       sizeof(filter->f.data.tcp_spec.src_ip));
-		}
+		memcpy(&filter->f.data.tcp_spec.src_ip,
+		       &key->src.s6_addr32,
+		       sizeof(filter->f.data.tcp_spec.src_ip));
 	}
 	if (dissector_uses_key(f->dissector, FLOW_DISSECTOR_KEY_PORTS)) {
 		struct flow_dissector_key_ports *key =
