@@ -263,8 +263,8 @@ int prism2mgmt_scan(struct wlandevice *wlandev, void *msgp)
 			goto exit;
 		}
 		/* ibss options */
-		result = hfa384x_drvr_setconfig16(hw,
-					HFA384x_RID_CREATEIBSS,
+		result = hfa384x_drvr_setconfig16
+					(hw, HFA384x_RID_CREATEIBSS,
 					HFA384x_CREATEIBSS_JOINCREATEIBSS);
 		if (result) {
 			netdev_err(wlandev->netdev,
