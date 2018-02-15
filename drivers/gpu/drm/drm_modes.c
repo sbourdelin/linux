@@ -1620,6 +1620,7 @@ EXPORT_SYMBOL(drm_mode_create_from_cmdline_mode);
  * drm_crtc_convert_to_umode - convert a drm_display_mode into a modeinfo
  * @out: drm_mode_modeinfo struct to return to the user
  * @in: drm_display_mode to use
+ * @file_priv: file_priv structure, to get the user capabilities
  *
  * Convert a drm_display_mode into a drm_mode_modeinfo structure to return to
  * the user.

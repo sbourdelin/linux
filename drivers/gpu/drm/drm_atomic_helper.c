@@ -186,7 +186,7 @@ static int handle_conflicting_encoders(struct drm_atomic_state *state,
 
 		if (!crtc_state->connector_mask) {
 			ret = drm_atomic_set_mode_prop_for_crtc(crtc_state,
-								NULL);
+								NULL, NULL);
 			if (ret < 0)
 				goto out;
 
@@ -2749,7 +2749,7 @@ static int update_output_state(struct drm_atomic_state *state,
 
 		if (!new_crtc_state->connector_mask) {
 			ret = drm_atomic_set_mode_prop_for_crtc(new_crtc_state,
-								NULL);
+								NULL, NULL);
 			if (ret < 0)
 				return ret;
 
@@ -2930,7 +2930,7 @@ int drm_atomic_helper_disable_all(struct drm_device *dev,
 
 		crtc_state->active = false;
 
-		ret = drm_atomic_set_mode_prop_for_crtc(crtc_state, NULL);
+		ret = drm_atomic_set_mode_prop_for_crtc(crtc_state, NULL, NULL);
 		if (ret < 0)
 			goto free;
 

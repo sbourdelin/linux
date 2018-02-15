@@ -367,7 +367,7 @@ drm_atomic_get_crtc_state(struct drm_atomic_state *state,
 			  struct drm_crtc *crtc);
 int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 		struct drm_crtc_state *state, struct drm_property *property,
-		uint64_t val);
+		uint64_t val, struct drm_file *file_priv);
 struct drm_plane_state * __must_check
 drm_atomic_get_plane_state(struct drm_atomic_state *state,
 			   struct drm_plane *plane);
@@ -583,7 +583,8 @@ drm_atomic_set_mode_for_crtc(struct drm_crtc_state *state,
 			     const struct drm_display_mode *mode);
 int __must_check
 drm_atomic_set_mode_prop_for_crtc(struct drm_crtc_state *state,
-				  struct drm_property_blob *blob);
+				  struct drm_property_blob *blob,
+				  struct drm_file *file_priv);
 int __must_check
 drm_atomic_set_crtc_for_plane(struct drm_plane_state *plane_state,
 			      struct drm_crtc *crtc);

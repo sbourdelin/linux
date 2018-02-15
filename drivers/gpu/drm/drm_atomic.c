@@ -368,6 +368,7 @@ EXPORT_SYMBOL(drm_atomic_set_mode_for_crtc);
  * drm_atomic_set_mode_prop_for_crtc - set mode for CRTC
  * @state: the CRTC whose incoming state to update
  * @blob: pointer to blob property to use for mode
+ * @file_priv: file priv structure, to get the userspace capabilities
  *
  * Set a mode (originating from a blob property) on the desired CRTC state.
  * This function will take a reference on the blob property for the CRTC state,
@@ -378,7 +379,8 @@ EXPORT_SYMBOL(drm_atomic_set_mode_for_crtc);
  * Zero on success, error code on failure. Cannot return -EDEADLK.
  */
 int drm_atomic_set_mode_prop_for_crtc(struct drm_crtc_state *state,
-                                      struct drm_property_blob *blob)
+				      struct drm_property_blob *blob,
+				      struct drm_file *file_priv)
 {
 	if (blob == state->mode_blob)
 		return 0;
@@ -389,10 +391,20 @@ int drm_atomic_set_mode_prop_for_crtc(struct drm_crtc_state *state,
 	memset(&state->mode, 0, sizeof(state->mode));
 
 	if (blob) {
+		struct drm_mode_modeinfo *u_mode;
+
+		u_mode = (struct drm_mode_modeinfo *) blob->data;
+		if (!file_priv->aspect_ratio_allowed &&
+		    (u_mode->flags & DRM_MODE_FLAG_PIC_AR_MASK) !=
+		    DRM_MODE_FLAG_PIC_AR_NONE) {
+			DRM_DEBUG_ATOMIC("Unexpected aspect-ratio flag bits\n");
+			return -EINVAL;
+		}
+
 		if (blob->length != sizeof(struct drm_mode_modeinfo) ||
 		    drm_mode_convert_umode(state->crtc->dev, &state->mode,
-		                           (const struct drm_mode_modeinfo *)
-		                            blob->data))
+					   (const struct drm_mode_modeinfo *)
+					   u_mode))
 			return -EINVAL;
 
 		state->mode_blob = drm_property_blob_get(blob);
@@ -441,6 +453,7 @@ drm_atomic_replace_property_blob_from_id(struct drm_device *dev,
  * @state: the state object to update with the new property value
  * @property: the property to set
  * @val: the new property value
+ * @file_priv: the file private structure, to get the user capabilities
  *
  * This function handles generic/core properties and calls out to driver's
  * &drm_crtc_funcs.atomic_set_property for driver properties. To ensure
@@ -452,7 +465,7 @@ drm_atomic_replace_property_blob_from_id(struct drm_device *dev,
  */
 int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 		struct drm_crtc_state *state, struct drm_property *property,
-		uint64_t val)
+		uint64_t val, struct drm_file *file_priv)
 {
 	struct drm_device *dev = crtc->dev;
 	struct drm_mode_config *config = &dev->mode_config;
@@ -465,7 +478,7 @@ int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 		struct drm_property_blob *mode =
 			drm_property_lookup_blob(dev, val);
 		mode->is_video_mode = true;
-		ret = drm_atomic_set_mode_prop_for_crtc(state, mode);
+		ret = drm_atomic_set_mode_prop_for_crtc(state, mode, file_priv);
 		drm_property_blob_put(mode);
 		return ret;
 	} else if (property == config->degamma_lut_property) {
@@ -1918,7 +1931,8 @@ out:
 int drm_atomic_set_property(struct drm_atomic_state *state,
 			    struct drm_mode_object *obj,
 			    struct drm_property *prop,
-			    uint64_t prop_value)
+			    uint64_t prop_value,
+			    struct drm_file *file_priv)
 {
 	struct drm_mode_object *ref;
 	int ret;
@@ -1952,7 +1966,7 @@ int drm_atomic_set_property(struct drm_atomic_state *state,
 		}
 
 		ret = drm_atomic_crtc_set_property(crtc,
-				crtc_state, prop, prop_value);
+				crtc_state, prop, prop_value, file_priv);
 		break;
 	}
 	case DRM_MODE_OBJECT_PLANE: {
@@ -2341,7 +2355,7 @@ retry:
 			}
 
 			ret = drm_atomic_set_property(state, obj, prop,
-						      prop_value);
+						      prop_value, file_priv);
 			if (ret) {
 				drm_mode_object_put(obj);
 				goto out;

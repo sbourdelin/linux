@@ -430,6 +430,9 @@ int drm_mode_getcrtc(struct drm_device *dev,
 	if (crtc->state) {
 		if (crtc->state->enable) {
 			drm_mode_convert_to_umode(&crtc_resp->mode, &crtc->state->mode);
+			if (!file_priv->aspect_ratio_allowed)
+				crtc->state->mode.flags &=
+				(~DRM_MODE_FLAG_PIC_AR_MASK);
 			crtc_resp->mode_valid = 1;
 
 		} else {
@@ -440,6 +443,9 @@ int drm_mode_getcrtc(struct drm_device *dev,
 		crtc_resp->y = crtc->y;
 		if (crtc->enabled) {
 			drm_mode_convert_to_umode(&crtc_resp->mode, &crtc->mode);
+			if (!file_priv->aspect_ratio_allowed)
+				crtc->mode.flags &=
+				(~DRM_MODE_FLAG_PIC_AR_MASK);
 			crtc_resp->mode_valid = 1;
 
 		} else {
@@ -613,6 +619,15 @@ retry:
 			ret = -ENOMEM;
 			goto out;
 		}
+
+		if (!file_priv->aspect_ratio_allowed &&
+		    (crtc_req->mode.flags & DRM_MODE_FLAG_PIC_AR_MASK) !=
+		    DRM_MODE_FLAG_PIC_AR_NONE) {
+			DRM_DEBUG_KMS("Unexpected aspect-ratio flag bits\n");
+			ret = -EINVAL;
+			goto out;
+		}
+
 
 		ret = drm_mode_convert_umode(dev, mode, &crtc_req->mode);
 		if (ret) {
