@@ -358,4 +358,21 @@ static inline bool ww_mutex_is_locked(struct ww_mutex *lock)
 	return mutex_is_locked(&lock->base);
 }
 
+/**
+ * ww_mutex_is_owned_by - is the w/w mutex locked by this task in that context
+ * @lock: the mutex to be queried
+ * @task: the task structure to check
+ * @ctx: the w/w acquire context to test
+ *
+ * Returns true if the mutex is locked in the context by the given task, false
+ * otherwise.
+ */
+static inline bool ww_mutex_is_owned_by(struct ww_mutex *lock,
+					struct task_struct *task,
+					struct ww_acquire_ctx *ctx)
+{
+	return likely(__mutex_owner(&lock->base) == task) &&
+		READ_ONCE(lock->ctx) == ctx;
+}
+
 #endif
