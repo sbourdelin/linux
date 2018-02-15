@@ -5290,6 +5290,16 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	setup_memwin(adapter);
+
+	/* Register panic notifier */
+	err = cxgb4_cudbg_register_notifier(adapter);
+	if (err) {
+		dev_warn(adapter->pdev_dev,
+			 "Fail registering panic notifier, err: %d. Continuing\n",
+			 err);
+		err = 0;
+	}
+
 	err = adap_init0(adapter);
 #ifdef CONFIG_DEBUG_FS
 	bitmap_zero(adapter->sge.blocked_fl, adapter->sge.egr_sz);
@@ -5537,6 +5547,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		destroy_workqueue(adapter->workq);
 
 	kfree(adapter->mbox_log);
+	cxgb4_cudbg_unregister_notifier(adapter);
 	kfree(adapter);
  out_unmap_bar0:
 	iounmap(regs);
@@ -5610,6 +5621,8 @@ static void remove_one(struct pci_dev *pdev)
 		pci_release_regions(pdev);
 		kfree(adapter->mbox_log);
 		synchronize_rcu();
+		/* Unregister panic notifier */
+		cxgb4_cudbg_unregister_notifier(adapter);
 		kfree(adapter);
 	}
 #ifdef CONFIG_PCI_IOV

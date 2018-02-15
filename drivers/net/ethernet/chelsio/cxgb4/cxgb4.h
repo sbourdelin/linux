@@ -568,6 +568,7 @@ enum {                                 /* adapter flags */
 	FW_OFLD_CONN       = (1 << 9),
 	ROOT_NO_RELAXED_ORDERING = (1 << 10),
 	SHUTTING_DOWN	   = (1 << 11),
+	K_CRASH            = (1 << 12),
 };
 
 enum {
@@ -946,6 +947,10 @@ struct adapter {
 
 	/* Ethtool Dump */
 	struct ethtool_dump eth_dump;
+
+	void *dump_buf; /* Dump buffer for collecting logs in panic */
+	u32 dump_buf_size; /* Dump buffer size */
+	struct notifier_block panic_nb; /* Panic notifier info */
 };
 
 /* Support for "sched-class" command to allow a TX Scheduling Class to be

@@ -383,13 +383,25 @@ static void cxgb4_cudbg_collect_entity(struct cudbg_init *pdbg_init,
 
 static int cudbg_alloc_compress_buff(struct cudbg_init *pdbg_init)
 {
+	struct adapter *adap = pdbg_init->adap;
 	u32 workspace_size;
 
 	workspace_size = cudbg_get_workspace_size();
-	pdbg_init->compress_buff = vzalloc(CUDBG_COMPRESS_BUFF_SIZE +
-					   workspace_size);
-	if (!pdbg_init->compress_buff)
-		return -ENOMEM;
+
+	if (adap->flags & K_CRASH) {
+		/* In panic scenario, the compression buffer is already
+		 * allocated. So, just update accordingly.
+		 */
+		pdbg_init->compress_buff = (u8 *)adap->dump_buf +
+					   adap->dump_buf_size -
+					   workspace_size -
+					   CUDBG_COMPRESS_BUFF_SIZE;
+	} else {
+		pdbg_init->compress_buff = vzalloc(CUDBG_COMPRESS_BUFF_SIZE +
+						   workspace_size);
+		if (!pdbg_init->compress_buff)
+			return -ENOMEM;
+	}
 
 	pdbg_init->compress_buff_size = CUDBG_COMPRESS_BUFF_SIZE;
 	pdbg_init->workspace = (u8 *)pdbg_init->compress_buff +
@@ -399,6 +411,14 @@ static int cudbg_alloc_compress_buff(struct cudbg_init *pdbg_init)
 
 static void cudbg_free_compress_buff(struct cudbg_init *pdbg_init)
 {
+	struct adapter *adap = pdbg_init->adap;
+
+	/* Don't free in panic scenario.  We need the buffer to be present
+	 * in vmcore so that we can extract the dump.
+	 */
+	if (adap->flags & K_CRASH)
+		return;
+
 	if (pdbg_init->compress_buff)
 		vfree(pdbg_init->compress_buff);
 }
@@ -487,4 +507,69 @@ void cxgb4_init_ethtool_dump(struct adapter *adapter)
 	adapter->eth_dump.flag = CXGB4_ETH_DUMP_NONE;
 	adapter->eth_dump.version = adapter->params.fw_vers;
 	adapter->eth_dump.len = 0;
+}
+
+static int cxgb4_panic_notify(struct notifier_block *this, unsigned long event,
+			      void *ptr)
+{
+	struct adapter *adap = container_of(this, struct adapter, panic_nb);
+	bool use_bd;
+	u32 len;
+
+	/* Save original value and restore after collection */
+	use_bd = adap->use_bd;
+
+	dev_info(adap->pdev_dev, "Initialized cxgb4 crash handler");
+	adap->flags |= K_CRASH;
+
+	/* Don't contact firmware.  Directly access registers */
+	adap->use_bd = true;
+
+	len = adap->dump_buf_size;
+	cxgb4_cudbg_collect(adap, adap->dump_buf, &len, CXGB4_ETH_DUMP_ALL);
+	dev_info(adap->pdev_dev, "cxgb4 debug collection done...");
+
+	/* Restore original value */
+	adap->use_bd = use_bd;
+	return NOTIFY_DONE;
+}
+
+int cxgb4_cudbg_register_notifier(struct adapter *adap)
+{
+	u32 wsize, len;
+
+	len = sizeof(struct cudbg_hdr) +
+	      sizeof(struct cudbg_entity_hdr) * CUDBG_MAX_ENTITY;
+	len += cxgb4_get_dump_length(adap, CXGB4_ETH_DUMP_ALL);
+
+	/* If compression is enabled, allocate extra memory needed for
+	 * compression too.
+	 */
+	wsize = cudbg_get_workspace_size();
+	if (wsize)
+		wsize += CUDBG_COMPRESS_BUFF_SIZE;
+
+	adap->dump_buf_size = len + wsize;
+	adap->dump_buf = vzalloc(adap->dump_buf_size);
+	if (!adap->dump_buf)
+		return -ENOMEM;
+
+	/* Print info so that we can extract firmware dump from vmcore */
+	dev_info(adap->pdev_dev,
+		 "Registering cxgb4 panic handler.., Buffer start address = %p, size: %u\n",
+		 adap->dump_buf, len);
+
+	adap->panic_nb.notifier_call = cxgb4_panic_notify;
+	adap->panic_nb.priority = INT_MAX;
+	atomic_notifier_chain_register(&panic_notifier_list, &adap->panic_nb);
+	return 0;
+}
+
+void cxgb4_cudbg_unregister_notifier(struct adapter *adap)
+{
+	if (adap->dump_buf) {
+		atomic_notifier_chain_unregister(&panic_notifier_list,
+						 &adap->panic_nb);
+		vfree(adap->dump_buf);
+	}
 }
