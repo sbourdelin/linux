@@ -483,6 +483,7 @@ static const struct vop_data rk3399_vop_lit = {
 	.modeset = &rk3288_modeset,
 	.output = &rk3399_output,
 	.misc = &rk3368_misc,
+	.yuv2yuv = &rk3399_vop_yuv2yuv,
 	.win = rk3399_vop_lit_win_data,
 	.win_size = ARRAY_SIZE(rk3399_vop_lit_win_data),
 };
