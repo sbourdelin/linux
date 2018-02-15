@@ -194,6 +194,7 @@ struct drm_property {
  * @head_global: entry on the global blob list in
  * 	&drm_mode_config.property_blob_list.
  * @head_file: entry on the per-file blob list in &drm_file.blobs list.
+ * @is_video_mode: flag to mark the blobs that contain drm_mode_modeinfo.
  * @length: size of the blob in bytes, invariant over the lifetime of the object
  * @data: actual data, embedded at the end of this structure
  *
@@ -208,6 +209,7 @@ struct drm_property_blob {
 	struct drm_device *dev;
 	struct list_head head_global;
 	struct list_head head_file;
+	bool is_video_mode;
 	size_t length;
 	unsigned char data[];
 };

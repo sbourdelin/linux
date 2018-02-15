@@ -746,6 +746,12 @@ int drm_mode_getblob_ioctl(struct drm_device *dev,
 	if (!blob)
 		return -ENOENT;
 
+	if (blob->is_video_mode && !file_priv->aspect_ratio_allowed) {
+		struct drm_mode_modeinfo *mode =
+			(struct drm_mode_modeinfo *) blob->data;
+		mode->flags &= (~DRM_MODE_FLAG_PIC_AR_MASK);
+	}
+
 	if (out_resp->length == blob->length) {
 		if (copy_to_user(u64_to_user_ptr(out_resp->data),
 				 blob->data,

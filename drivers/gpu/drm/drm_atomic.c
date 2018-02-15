@@ -464,6 +464,7 @@ int drm_atomic_crtc_set_property(struct drm_crtc *crtc,
 	else if (property == config->prop_mode_id) {
 		struct drm_property_blob *mode =
 			drm_property_lookup_blob(dev, val);
+		mode->is_video_mode = true;
 		ret = drm_atomic_set_mode_prop_for_crtc(state, mode);
 		drm_property_blob_put(mode);
 		return ret;
