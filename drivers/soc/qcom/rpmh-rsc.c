@@ -170,6 +170,52 @@ static struct tcs_group *get_tcs_of_type(struct rsc_drv *drv, int type)
 	return tcs;
 }
 
+/**
+ * rpmh_rsc_invalidate - Invalidate sleep and wake TCSes
+ *
+ * @drv: the mailbox controller
+ */
+int rpmh_rsc_invalidate(struct rsc_drv *drv)
+{
+	struct tcs_group *tcs;
+	int m, type, ret = 0;
+	int inv_types[] = { WAKE_TCS, SLEEP_TCS };
+	unsigned long drv_flags, flags;
+
+	/* Lock the DRV and clear sleep and wake TCSes */
+	spin_lock_irqsave(&drv->drv_lock, drv_flags);
+	for (type = 0; type < ARRAY_SIZE(inv_types); type++) {
+		tcs = get_tcs_of_type(drv, inv_types[type]);
+		if (IS_ERR(tcs))
+			continue;
+
+		spin_lock_irqsave(&tcs->tcs_lock, flags);
+		if (bitmap_empty(tcs->slots, MAX_TCS_SLOTS)) {
+			spin_unlock_irqrestore(&tcs->tcs_lock, flags);
+			continue;
+		}
+
+		/* Clear the enable register for each TCS of the type */
+		for (m = tcs->tcs_offset;
+		    m < tcs->tcs_offset + tcs->num_tcs; m++) {
+			if (!tcs_is_free(drv, m)) {
+				spin_unlock_irqrestore(&tcs->tcs_lock, flags);
+				ret = -EAGAIN;
+				goto drv_unlock;
+			}
+			write_tcs_reg_sync(drv, RSC_DRV_CMD_ENABLE, m, 0, 0);
+			/* Mark the TCS slots as free */
+			bitmap_zero(tcs->slots, MAX_TCS_SLOTS);
+		}
+		spin_unlock_irqrestore(&tcs->tcs_lock, flags);
+	}
+drv_unlock:
+	spin_unlock_irqrestore(&drv->drv_lock, drv_flags);
+
+	return ret;
+}
+EXPORT_SYMBOL(rpmh_rsc_invalidate);
+
 static struct tcs_group *get_tcs_for_msg(struct rsc_drv *drv,
 					struct tcs_request *msg)
 {
