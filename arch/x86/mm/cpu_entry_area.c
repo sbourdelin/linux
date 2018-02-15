@@ -28,6 +28,13 @@ void cea_set_pte(void *cea_vaddr, phys_addr_t pa, pgprot_t flags)
 {
 	unsigned long va = (unsigned long) cea_vaddr;
 
+	/*
+	 * The cpu_entry_area is shared between the user and kernel
+	 * page tables.  All of its ptes can safely be global.
+	 */
+	if (boot_cpu_has(X86_FEATURE_PGE))
+		pgprot_val(flags) |= _PAGE_GLOBAL;
+
 	set_pte_vaddr(va, pfn_pte(pa >> PAGE_SHIFT, flags));
 }
 
