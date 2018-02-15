@@ -33,7 +33,6 @@
 static unsigned int soft_margin = DEFAULT_MARGIN;	/* in seconds */
 static bool nowayout = WATCHDOG_NOWAYOUT;
 #ifdef CONFIG_HPWDT_NMI_DECODING
-static unsigned int allow_kdump = 1;
 static bool pretimeout = 1;
 #else
 static bool pretimeout;
@@ -144,8 +143,7 @@ static int hpwdt_pretimeout(unsigned int ulReason, struct pt_regs *regs)
 	if (iLO5 && (ulReason == NMI_UNKNOWN) && !mynmi)
 		return NMI_DONE;
 
-	if (allow_kdump)
-		hpwdt_stop(&hpwdt_dev);
+	hpwdt_stop(&hpwdt_dev);
 
 	hex_byte_pack(panic_msg, mynmi);
 	nmi_panic(regs, panic_msg);
@@ -184,10 +182,7 @@ static int hpwdt_init_nmi_decoding(struct pci_dev *dev)
 	if (retval)
 		goto error2;
 
-	dev_info(&dev->dev,
-			"HPE Watchdog Timer Driver: NMI decoding initialized"
-			", allow kernel dump: %s (default = 1/ON)\n",
-			(allow_kdump == 0) ? "OFF" : "ON");
+	dev_info(&dev->dev, "HPE Watchdog Timer Driver: NMI decoding initialized\n");
 	return 0;
 
 error2:
@@ -346,9 +341,6 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
 		__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
 
 #ifdef CONFIG_HPWDT_NMI_DECODING	/* { */
-module_param(allow_kdump, int, 0);
-MODULE_PARM_DESC(allow_kdump, "Start a kernel dump after NMI occurs");
-
 module_param(pretimeout, bool, 0);
 MODULE_PARM_DESC(pretimeout, "Watchdog pretimeout enabled");
 #endif					/* } */
