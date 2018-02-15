@@ -422,6 +422,40 @@ static const struct vop_output rk3399_output = {
 	.mipi_en = VOP_REG(RK3288_SYS_CTRL, 0x1, 15),
 };
 
+static const struct vop_yuv2yuv rk3399_vop_yuv2yuv = {
+	.win0_y2r_en = VOP_REG(RK3399_YUV2YUV_WIN, 0x1, 1),
+	.win0_y2r_coefficients = {
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 0, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 0, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 4, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 4, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 8, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 8, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 12, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 12, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 16, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 20, 0xffffffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 24, 0xffffffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 28, 0xffffffff, 0),
+	},
+
+	.win1_y2r_en = VOP_REG(RK3399_YUV2YUV_WIN, 0x1, 9),
+	.win1_y2r_coefficients = {
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 0, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 0, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 4, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 4, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 8, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 8, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 12, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 12, 0xffff, 16),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 16, 0xffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 20, 0xffffffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 24, 0xffffffff, 0),
+		VOP_REG(RK3399_WIN1_YUV2YUV_Y2R + 28, 0xffffffff, 0),
+	},
+};
+
 static const struct vop_data rk3399_vop_big = {
 	.version = VOP_VERSION(3, 5),
 	.feature = VOP_FEATURE_OUTPUT_RGB10,
@@ -430,8 +464,9 @@ static const struct vop_data rk3399_vop_big = {
 	.modeset = &rk3288_modeset,
 	.output = &rk3399_output,
 	.misc = &rk3368_misc,
-	.win = rk3368_vop_win_data,
-	.win_size = ARRAY_SIZE(rk3368_vop_win_data),
+	.yuv2yuv = &rk3399_vop_yuv2yuv,
+	.win = rk3399_vop_win_data,
+	.win_size = ARRAY_SIZE(rk3399_vop_win_data),
 };
 
 static const struct vop_win_data rk3399_vop_lit_win_data[] = {
