@@ -1551,7 +1551,7 @@ static int gen8_init_render_ring(struct intel_engine_cs *engine)
 
 	I915_WRITE(INSTPM, _MASKED_BIT_ENABLE(INSTPM_FORCE_ORDERING));
 
-	return init_workarounds_ring(engine);
+	return 0;
 }
 
 static int gen9_init_render_ring(struct intel_engine_cs *engine)
@@ -1562,7 +1562,11 @@ static int gen9_init_render_ring(struct intel_engine_cs *engine)
 	if (ret)
 		return ret;
 
-	return init_workarounds_ring(engine);
+	ret = intel_whitelist_workarounds_apply(engine);
+	if (ret)
+		return ret;
+
+	return 0;
 }
 
 static void reset_irq(struct intel_engine_cs *engine)
@@ -1911,7 +1915,7 @@ static int gen8_init_rcs_context(struct drm_i915_gem_request *req)
 {
 	int ret;
 
-	ret = intel_ring_workarounds_emit(req);
+	ret = intel_ctx_workarounds_emit(req);
 	if (ret)
 		return ret;
 
