@@ -42,4 +42,7 @@ void drm_plane_enable_color_mgmt(struct drm_plane *plane,
 				 bool plane_has_ctm,
 				 uint plane_gamma_lut_size);
 
+int drm_mode_plane_set_gamma_size(struct drm_plane *plane,
+				  int plane_gamma_size);
+
 #endif

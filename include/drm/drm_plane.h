@@ -585,6 +585,10 @@ struct drm_plane {
 
 	struct drm_property *zpos_property;
 	struct drm_property *rotation_property;
+
+	/* Legacy FB Plane gamma size for reporting to userspace */
+	uint32_t gamma_size;
+	uint16_t *gamma_store;
 };
 
 #define obj_to_plane(x) container_of(x, struct drm_plane, base)

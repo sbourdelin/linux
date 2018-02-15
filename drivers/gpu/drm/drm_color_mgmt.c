@@ -204,6 +204,47 @@ int drm_mode_crtc_set_gamma_size(struct drm_crtc *crtc,
 EXPORT_SYMBOL(drm_mode_crtc_set_gamma_size);
 
 /**
+ * drm_mode_plane_set_gamma_size - set the gamma table size
+ * @plane: Plane to set the gamma table size for
+ * @gamma_size: size of the gamma table
+ *
+ * Drivers which support gamma tables should set this to the supported gamma
+ * table size when initializing the Plane. Currently the drm core only supports
+ * a fixed gamma table size.
+ *
+ * Returns:
+ * Zero on success, negative errno on failure.
+ */
+int drm_mode_plane_set_gamma_size(struct drm_plane *plane,
+				int gamma_size)
+{
+	uint16_t *r_base, *g_base, *b_base;
+	int i;
+
+	plane->gamma_size = gamma_size;
+
+	plane->gamma_store = kcalloc(gamma_size, sizeof(uint16_t) * 3,
+			GFP_KERNEL);
+	if (!plane->gamma_store) {
+		plane->gamma_size = 0;
+		return -ENOMEM;
+	}
+
+	r_base = plane->gamma_store;
+	g_base = r_base + gamma_size;
+	b_base = g_base + gamma_size;
+	for (i = 0; i < gamma_size; i++) {
+		r_base[i] = i << 8;
+		g_base[i] = i << 8;
+		b_base[i] = i << 8;
+	}
+
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_mode_plane_set_gamma_size);
+
+/**
  * drm_mode_gamma_set_ioctl - set the gamma table
  * @dev: DRM device
  * @data: ioctl data
