@@ -51,15 +51,15 @@
  *  - GET_UNIQUE ioctl, implemented by drm_getunique is wrapped up in libdrm
  *    through the drmGetBusid function.
  *  - The libdrm drmSetBusid function is backed by the SET_UNIQUE ioctl. All
- *    that code is nerved in the kernel with drm_invalid_op().
+ *    that code is nerfed in the kernel with drm_invalid_op().
  *  - The internal set_busid kernel functions and driver callbacks are
  *    exclusively use by the SET_VERSION ioctl, because only drm 1.0 (which is
- *    nerved) allowed userspace to set the busid through the above ioctl.
+ *    nerfed) allowed userspace to set the busid through the above ioctl.
  *  - Other ioctls and functions involved are named consistently.
  *
  * For anyone wondering what's the difference between drm 1.1 and 1.4: Correctly
  * handling pci domains in the busid on ppc. Doing this correctly was only
- * implemented in libdrm in 2010, hence can't be nerved yet. No one knows what's
+ * implemented in libdrm in 2010, hence can't be nerfed yet. No one knows what's
  * special with drm 1.2 and 1.3.
  *
  * Now the actual horror story of how device lookup in drm works. At large,
