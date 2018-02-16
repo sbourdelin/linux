@@ -12703,12 +12703,10 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 		struct i915_vma *vma;
 
 		vma = intel_pin_and_fence_fb_obj(fb, new_state->rotation);
-		if (!IS_ERR(vma)) {
+		if (!IS_ERR(vma))
 			to_intel_plane_state(new_state)->vma = vma;
-			intel_fb_obj_flush(obj, ORIGIN_DIRTYFB);
-		} else {
+		else
 			ret =  PTR_ERR(vma);
-		}
 	}
 
 	i915_gem_object_wait_priority(obj, 0, I915_PRIORITY_DISPLAY);
