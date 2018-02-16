@@ -269,6 +269,21 @@ struct drm_i915_gem_object {
 	struct drm_dma_handle *phys_handle;
 
 	struct reservation_object __builtin_resv;
+
+	/**
+	 * @read_domains:
+	 *
+	 * Read memory domains. These monitor which caches contain read/write data
+	 * related to the object. When transitioning from one set of domains
+	 * to another, the driver is called to ensure that caches are suitably
+	 * flushed and invalidated.
+	 */
+	uint32_t read_domains;
+
+	/**
+	 * @write_domain: Corresponding unique write memory domain.
+	 */
+	uint32_t write_domain;
 };
 
 static inline struct drm_i915_gem_object *
