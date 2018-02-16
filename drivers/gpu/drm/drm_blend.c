@@ -104,6 +104,38 @@
  */
 
 /**
+ * drm_plane_create_alpha_property - create a new alpha property
+ * @plane: drm plane
+ * @max_alpha: maximum value of alpha
+ *
+ * This function initializes a generic, mutable, alpha property and
+ * enables support for it in the DRM core.
+ *
+ * The alpha property will be allowed to be within the bounds of 0
+ * (transparent) to @max_alpha (opaque)
+ *
+ * Returns:
+ * 0 on success, negative error code on failure.
+ */
+int drm_plane_create_alpha_property(struct drm_plane *plane, u16 max_alpha)
+{
+	struct drm_property *prop;
+
+	prop = drm_property_create_range(plane->dev, 0, "alpha", 0, max_alpha);
+	if (!prop)
+		return -ENOMEM;
+
+	drm_object_attach_property(&plane->base, prop, max_alpha);
+	plane->alpha_property = prop;
+
+	if (plane->state)
+		plane->state->alpha = max_alpha;
+
+	return 0;
+}
+EXPORT_SYMBOL(drm_plane_create_alpha_property);
+
+/**
  * drm_plane_create_rotation_property - create a new rotation property
  * @plane: drm plane
  * @rotation: initial value of the rotation property

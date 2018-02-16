@@ -99,5 +99,5 @@ radeon,DVI-I,“coherent”,RANGE,"Min=0, Max=1",Connector,TBD
 ,,"""underscan vborder""",RANGE,"Min=0, Max=128",Connector,TBD
 ,Audio,“audio”,ENUM,"{ ""off"", ""on"", ""auto"" }",Connector,TBD
 ,FMT Dithering,“dither”,ENUM,"{ ""off"", ""on"" }",Connector,TBD
-rcar-du,Generic,"""alpha""",RANGE,"Min=0, Max=255",Plane,TBD
+,,"""alpha""",RANGE,"Min=0, Max=Driver dependant",Plane,Opacity of the plane from transparent (0) to fully opaque (MAX). If this property is set to a value different than max, and that the pixel will define an alpha component, the property will have precendance and the pixel value will be ignored. The alpha value is represented as straight alpha, ie the colors haven't been pre-adjusted for their opacity by multiplication. Therefore, the equation to get a color value for one pixel, assuming two planes A and B, will be (color_a * alpha_a + color_b * alpha_b * (MAX - alpha_a) / MAX) / (alpha_a + alpha_b * (MAX - alpha_a) / MAX)
 ,,"""colorkey""",RANGE,"Min=0, Max=0x01ffffff",Plane,TBD
