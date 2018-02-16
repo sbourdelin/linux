@@ -1775,33 +1775,75 @@ static void __usb_hcd_giveback_urb(struct urb *urb)
 	usb_put_urb(urb);
 }
 
-static void usb_giveback_urb_bh(unsigned long param)
+static void usb_hcd_rh_gb_urb(struct work_struct *work)
 {
-	struct giveback_urb_bh *bh = (struct giveback_urb_bh *)param;
-	struct list_head local_list;
+	struct giveback_urb	*bh = container_of(work, struct giveback_urb,
+						   rh_compl);
+	struct list_head	urb_list;
 
 	spin_lock_irq(&bh->lock);
-	bh->running = true;
- restart:
-	list_replace_init(&bh->head, &local_list);
+	list_replace_init(&bh->rh_head, &urb_list);
 	spin_unlock_irq(&bh->lock);
 
-	while (!list_empty(&local_list)) {
+	while (!list_empty(&urb_list)) {
 		struct urb *urb;
 
-		urb = list_entry(local_list.next, struct urb, urb_list);
+		urb = list_first_entry(&urb_list, struct urb, urb_list);
 		list_del_init(&urb->urb_list);
-		bh->completing_ep = urb->ep;
 		__usb_hcd_giveback_urb(urb);
-		bh->completing_ep = NULL;
+	}
+}
+
+
+#define URB_PRIO_HIGH	0
+#define URB_PRIO_LOW	1
+
+static irqreturn_t usb_hcd_gb_urb(int irq, void *__hcd)
+{
+	struct usb_hcd		*hcd = __hcd;
+	struct giveback_urb	*bh = &hcd->gb_urb;
+	struct list_head	urb_list[2];
+	int			i;
+
+	INIT_LIST_HEAD(&urb_list[URB_PRIO_HIGH]);
+	INIT_LIST_HEAD(&urb_list[URB_PRIO_LOW]);
+
+	spin_lock_irq(&bh->lock);
+ restart:
+	list_splice_tail_init(&bh->prio_hi_head, &urb_list[URB_PRIO_HIGH]);
+	list_splice_tail_init(&bh->prio_lo_head, &urb_list[URB_PRIO_LOW]);
+	spin_unlock_irq(&bh->lock);
+
+	for (i = 0; i < ARRAY_SIZE(urb_list); i++) {
+		while (!list_empty(&urb_list[i])) {
+			struct urb *urb;
+
+			urb = list_first_entry(&urb_list[i],
+					       struct urb, urb_list);
+			list_del_init(&urb->urb_list);
+			if (i == URB_PRIO_HIGH)
+				bh->completing_ep = urb->ep;
+
+			__usb_hcd_giveback_urb(urb);
+
+			if (i == URB_PRIO_HIGH)
+				bh->completing_ep = NULL;
+
+			if (i == URB_PRIO_LOW &&
+			    !list_empty_careful(&urb_list[URB_PRIO_HIGH])) {
+				spin_lock_irq(&bh->lock);
+				goto restart;
+			}
+		}
 	}
 
 	/* check if there are new URBs to giveback */
 	spin_lock_irq(&bh->lock);
-	if (!list_empty(&bh->head))
+	if (!list_empty(&bh->prio_hi_head) ||
+	    !list_empty(&bh->prio_lo_head))
 		goto restart;
-	bh->running = false;
 	spin_unlock_irq(&bh->lock);
+	return IRQ_HANDLED;
 }
 
 /**
@@ -1823,37 +1865,32 @@ static void usb_giveback_urb_bh(unsigned long param)
  */
 void usb_hcd_giveback_urb(struct usb_hcd *hcd, struct urb *urb, int status)
 {
-	struct giveback_urb_bh *bh;
-	bool running, high_prio_bh;
+	struct giveback_urb	*bh = &hcd->gb_urb;
+	struct list_head	*lh;
 
 	/* pass status to tasklet via unlinked */
 	if (likely(!urb->unlinked))
 		urb->unlinked = status;
 
-	if (!hcd_giveback_urb_in_bh(hcd) && !is_root_hub(urb->dev)) {
+	if (is_root_hub(urb->dev)) {
+		spin_lock(&bh->lock);
+		list_add_tail(&urb->urb_list, &bh->rh_head);
+		spin_unlock(&bh->lock);
+		queue_work(system_highpri_wq, &bh->rh_compl);
+		return;
+	}
+	if (!hcd_giveback_urb_in_bh(hcd)) {
 		__usb_hcd_giveback_urb(urb);
 		return;
 	}
 
-	if (usb_pipeisoc(urb->pipe) || usb_pipeint(urb->pipe)) {
-		bh = &hcd->high_prio_bh;
-		high_prio_bh = true;
-	} else {
-		bh = &hcd->low_prio_bh;
-		high_prio_bh = false;
-	}
-
-	spin_lock(&bh->lock);
-	list_add_tail(&urb->urb_list, &bh->head);
-	running = bh->running;
-	spin_unlock(&bh->lock);
-
-	if (running)
-		;
-	else if (high_prio_bh)
-		tasklet_hi_schedule(&bh->bh);
+	if (usb_pipeisoc(urb->pipe) || usb_pipeint(urb->pipe))
+		lh = &bh->prio_hi_head;
 	else
-		tasklet_schedule(&bh->bh);
+		lh = &bh->prio_lo_head;
+	spin_lock(&bh->lock);
+	list_add_tail(&urb->urb_list, lh);
+	spin_unlock(&bh->lock);
 }
 EXPORT_SYMBOL_GPL(usb_hcd_giveback_urb);
 
@@ -2436,9 +2473,17 @@ irqreturn_t usb_hcd_irq (int irq, void *__hcd)
 		rc = IRQ_NONE;
 	else if (hcd->driver->irq(hcd) == IRQ_NONE)
 		rc = IRQ_NONE;
-	else
-		rc = IRQ_HANDLED;
+	else {
+		struct giveback_urb	*bh = &hcd->gb_urb;
 
+		spin_lock(&bh->lock);
+		if (!list_empty(&bh->prio_hi_head) ||
+		    !list_empty(&bh->prio_lo_head))
+			rc = IRQ_WAKE_THREAD;
+		else
+			rc = IRQ_HANDLED;
+		spin_unlock(&bh->lock);
+	}
 	return rc;
 }
 EXPORT_SYMBOL_GPL(usb_hcd_irq);
@@ -2492,12 +2537,13 @@ EXPORT_SYMBOL_GPL (usb_hc_died);
 
 /*-------------------------------------------------------------------------*/
 
-static void init_giveback_urb_bh(struct giveback_urb_bh *bh)
+static void init_giveback_urb(struct giveback_urb *bh)
 {
-
 	spin_lock_init(&bh->lock);
-	INIT_LIST_HEAD(&bh->head);
-	tasklet_init(&bh->bh, usb_giveback_urb_bh, (unsigned long)bh);
+	INIT_LIST_HEAD(&bh->prio_lo_head);
+	INIT_LIST_HEAD(&bh->prio_hi_head);
+	INIT_LIST_HEAD(&bh->rh_head);
+	INIT_WORK(&bh->rh_compl, usb_hcd_rh_gb_urb);
 }
 
 struct usb_hcd *__usb_create_hcd(const struct hc_driver *driver,
@@ -2672,7 +2718,8 @@ static int usb_hcd_request_irqs(struct usb_hcd *hcd,
 
 		snprintf(hcd->irq_descr, sizeof(hcd->irq_descr), "%s:usb%d",
 				hcd->driver->description, hcd->self.busnum);
-		retval = request_irq(irqnum, &usb_hcd_irq, irqflags,
+		retval = request_threaded_irq(irqnum, usb_hcd_irq,
+					      usb_hcd_gb_urb, irqflags,
 				hcd->irq_descr, hcd);
 		if (retval != 0) {
 			dev_err(hcd->self.controller,
@@ -2863,9 +2910,7 @@ int usb_add_hcd(struct usb_hcd *hcd,
 			&& device_can_wakeup(&hcd->self.root_hub->dev))
 		dev_dbg(hcd->self.controller, "supports USB remote wakeup\n");
 
-	/* initialize tasklets */
-	init_giveback_urb_bh(&hcd->high_prio_bh);
-	init_giveback_urb_bh(&hcd->low_prio_bh);
+	init_giveback_urb(&hcd->gb_urb);
 
 	/* enable irqs just before we start the controller,
 	 * if the BIOS provides legacy PCI irqs.
