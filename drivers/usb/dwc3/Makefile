@@ -50,3 +50,6 @@ obj-$(CONFIG_USB_DWC3_OF_SIMPLE)	+= dwc3-of-simple.o
 obj-$(CONFIG_USB_DWC3_ST)		+= dwc3-st.o
 
 dwc3-pci-y				:= pci.o
+ifneq ($(CONFIG_USB_DWC3_PCI_DEBUGFS),)
+	dwc3-pci-y			+= pci-debugfs.o
+endif

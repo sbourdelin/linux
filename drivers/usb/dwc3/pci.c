@@ -18,6 +18,8 @@
 #include <linux/gpio/consumer.h>
 #include <linux/acpi.h>
 #include <linux/delay.h>
+#include <linux/spinlock.h>
+#include <linux/debugfs.h>
 
 #include "dwc3-pci.h"
 
@@ -322,6 +324,8 @@ static int dwc3_pci_probe(struct pci_dev *pci,
 		goto err;
 	}
 
+	spin_lock_init(&dwc->lock);
+
 	dev_set_name(dev, "dwc3-pci.%02x:%02x.%d", pci->bus->number,
 		     PCI_SLOT(pci->devfn), PCI_FUNC(pci->devfn));
 
@@ -329,9 +333,13 @@ static int dwc3_pci_probe(struct pci_dev *pci,
 	if (ret)
 		goto err;
 
+	dwc3_pci_debugfs_init(dwc);
+
+#ifndef CONFIG_USB_DWC3_PCI_DEBUGFS
 	ret = dwc3_pci_add_platform_device(dwc);
 	if (ret)
 		goto err;
+#endif
 
 	device_init_wakeup(dev, true);
 	pci_set_drvdata(pci, dwc);
@@ -353,10 +361,13 @@ static void dwc3_pci_remove(struct pci_dev *pci)
 #ifdef CONFIG_PM
 	cancel_work_sync(&dwc->wakeup_work);
 #endif
+	dwc3_pci_debugfs_exit(dwc);
 	device_init_wakeup(&pci->dev, false);
 	pm_runtime_get(&pci->dev);
 	kfree(dwc->properties);
-	platform_device_unregister(dwc->dwc3);
+
+	if (dwc->dwc3)
+		platform_device_unregister(dwc->dwc3);
 }
 
 static const struct pci_device_id dwc3_pci_id_table[] = {

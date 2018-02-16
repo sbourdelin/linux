@@ -80,6 +80,17 @@ config USB_DWC3_PCI
 	  One such PCIe-based platform is Synopsys' PCIe HAPS model of
 	  this IP.
 
+if USB_DWC3_PCI
+config USB_DWC3_PCI_DEBUGFS
+	bool "Enable PCI Debugfs"
+	depends on DEBUG_FS
+	default n
+	help
+	  Enable debugging options for DWC3 PCIe-base platform. This allows
+	  setting of DWC3 properties dynamically.
+
+endif
+
 config USB_DWC3_KEYSTONE
 	tristate "Texas Instruments Keystone2 Platforms"
 	depends on ARCH_KEYSTONE || COMPILE_TEST
