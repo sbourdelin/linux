@@ -786,11 +786,21 @@ static enum ucode_state apply_microcode_intel(int cpu)
 
 	uci = ucode_cpu_info + cpu;
 	mc = uci->mc;
+
 	if (!mc) {
 		/* Look for a newer patch in our cache: */
 		mc = find_patch(uci);
 		if (!mc)
 			return UCODE_NFOUND;
+	} else {
+		rev = intel_get_microcode_revision();
+		/*
+		 * Its possible the microcode got udpated
+		 * because its sibling update was done earlier.
+		 * Skip the udpate in that case.
+		 */
+		if (rev == mc->hdr.rev)
+			goto done;
 	}
 
 	/* write microcode via MSR 0x79 */
@@ -813,6 +823,7 @@ static enum ucode_state apply_microcode_intel(int cpu)
 		prev_rev = rev;
 	}
 
+done:
 	c = &cpu_data(cpu);
 
 	uci->cpu_sig.rev = rev;
