@@ -33,7 +33,7 @@
 #include <linux/bug.h>
 #include <asm/patch.h>
 
-#include "../decode-arm.h"
+#include "decode-arm.h"
 #include "../decode-thumb.h"
 #include "core.h"
 

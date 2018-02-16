@@ -20,7 +20,7 @@
 #define _ARM_KERNEL_KPROBES_H
 
 #include <asm/kprobes.h>
-#include "../decode.h"
+#include "decode.h"
 
 /*
  * These undefined instructions must be unique and

@@ -17,7 +17,7 @@
 
 #include <linux/kernel.h>
 #include <linux/types.h>
-#include "../decode.h"
+#include "decode.h"
 
 extern probes_check_t checker_stack_use_none;
 extern probes_check_t checker_stack_use_unknown;

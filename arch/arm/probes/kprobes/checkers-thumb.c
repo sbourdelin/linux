@@ -14,7 +14,7 @@
  */
 
 #include <linux/kernel.h>
-#include "../decode.h"
+#include "decode.h"
 #include "../decode-thumb.h"
 #include "checkers.h"
 

@@ -17,8 +17,8 @@
 #include <asm/opcodes.h>
 #include <asm/traps.h>
 
-#include "../decode.h"
-#include "../decode-arm.h"
+#include "decode.h"
+#include "decode-arm.h"
 #include "core.h"
 
 #define UPROBE_TRAP_NR	UINT_MAX

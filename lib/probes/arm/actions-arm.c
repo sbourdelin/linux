@@ -13,8 +13,8 @@
 #include <linux/uprobes.h>
 #include <linux/module.h>
 
-#include "../decode.h"
-#include "../decode-arm.h"
+#include "decode.h"
+#include "decode-arm.h"
 #include "core.h"
 
 static int uprobes_substitute_pc(unsigned long *pinsn, u32 oregs)

@@ -14,8 +14,8 @@
  */
 
 #include <linux/kernel.h>
-#include "../decode.h"
-#include "../decode-arm.h"
+#include "decode.h"
+#include "decode-arm.h"
 #include "checkers.h"
 
 enum probes_insn checker_stack_use_none(probes_opcode_t insn,

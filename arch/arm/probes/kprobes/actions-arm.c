@@ -62,7 +62,7 @@
 #include <linux/kprobes.h>
 #include <linux/ptrace.h>
 
-#include "../decode-arm.h"
+#include "decode-arm.h"
 #include "core.h"
 #include "checkers.h"
 
