@@ -11,6 +11,7 @@
 #include <linux/types.h>
 #include <linux/wait.h>
 #include <linux/audit.h>
+#include <linux/freezer.h>
 
 #include "fanotify.h"
 
@@ -63,7 +64,9 @@ static int fanotify_get_response(struct fsnotify_group *group,
 
 	pr_debug("%s: group=%p event=%p\n", __func__, group, event);
 
-	wait_event(group->fanotify_data.access_waitq, event->response);
+	while (!event->response)
+		wait_event_freezable(group->fanotify_data.access_waitq,
+				     event->response);
 
 	/* userspace responded, convert to something usable */
 	switch (event->response & ~FAN_AUDIT) {
