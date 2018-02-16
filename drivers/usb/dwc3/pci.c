@@ -19,6 +19,8 @@
 #include <linux/acpi.h>
 #include <linux/delay.h>
 
+#include "dwc3-pci.h"
+
 #define PCI_DEVICE_ID_SYNOPSYS_HAPSUSB3		0xabcd
 #define PCI_DEVICE_ID_SYNOPSYS_HAPSUSB3_AXI	0xabce
 #define PCI_DEVICE_ID_SYNOPSYS_HAPSUSB31	0xabcf
@@ -42,28 +44,6 @@
 
 #define PROPERTY_ARRAY_INITIAL_SIZE	32
 
-/**
- * struct dwc3_pci - Driver private structure
- * @dwc3: child dwc3 platform_device
- * @pci: our link to PCI bus
- * @guid: _DSM GUID
- * @has_dsm_for_pm: true for devices which need to run _DSM on runtime PM
- * @properties: null terminated array of device properties
- * @property_array_size: property array size
- */
-struct dwc3_pci {
-	struct platform_device *dwc3;
-	struct pci_dev *pci;
-
-	guid_t guid;
-
-	unsigned int has_dsm_for_pm:1;
-	struct work_struct wakeup_work;
-
-	struct property_entry *properties;
-	int property_array_size;
-};
-
 static const struct acpi_gpio_params reset_gpios = { 0, 0, false };
 static const struct acpi_gpio_params cs_gpios = { 1, 0, false };
 
@@ -80,8 +60,8 @@ static const struct acpi_gpio_mapping acpi_dwc3_byt_gpios[] = {
  *
  * Returns 0 on success otherwise negative errno.
  */
-static int dwc3_pci_add_one_property(struct dwc3_pci *dwc,
-				     struct property_entry property)
+int dwc3_pci_add_one_property(struct dwc3_pci *dwc,
+			      struct property_entry property)
 {
 	int idx = 0;
 	int count;
@@ -121,8 +101,8 @@ static int dwc3_pci_add_one_property(struct dwc3_pci *dwc,
  *
  * Returns 0 on success otherwise negative errno.
  */
-static int dwc3_pci_add_properties(struct dwc3_pci *dwc,
-				   struct property_entry *properties)
+int dwc3_pci_add_properties(struct dwc3_pci *dwc,
+			    struct property_entry *properties)
 {
 	int ret;
 	int idx;
@@ -243,7 +223,7 @@ static int dwc3_pci_quirks(struct dwc3_pci *dwc)
 	return 0;
 }
 
-static int dwc3_pci_add_platform_device(struct dwc3_pci *dwc)
+int dwc3_pci_add_platform_device(struct dwc3_pci *dwc)
 {
 	struct resource		res[2];
 	int			ret;
