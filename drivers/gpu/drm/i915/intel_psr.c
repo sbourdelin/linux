@@ -738,6 +738,17 @@ static void intel_psr_exit(struct drm_i915_private *dev_priv)
 			WARN_ON(!(val & EDP_PSR2_ENABLE));
 			I915_WRITE(EDP_PSR2_CTL, val & ~EDP_PSR2_ENABLE);
 		} else {
+			/* Wait for about 6 frames in case we just enabled PSR,
+			 * this prevents the screen from freezing as the HW does
+			 * not seem to be able to back off cleanly it is already
+			 * trying to enter PSR.
+			 */
+			intel_wait_for_register(dev_priv,
+						EDP_PSR_STATUS,
+						EDP_PSR_STATUS_STATE_MASK,
+						EDP_PSR_STATUS_STATE_SRDENT,
+						100);
+
 			val = I915_READ(EDP_PSR_CTL);
 			WARN_ON(!(val & EDP_PSR_ENABLE));
 			I915_WRITE(EDP_PSR_CTL, val & ~EDP_PSR_ENABLE);
