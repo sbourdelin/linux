@@ -604,6 +604,11 @@ static int acp_init(void __iomem *acp_mmio, u32 asic_type)
 	val &= ~ACP_SOFT_RESET__SoftResetAud_MASK;
 	acp_reg_write(val, acp_mmio, mmACP_SOFT_RESET);
 
+	/*For BT instance change pins from UART to BT */
+	val = acp_reg_read(acp_mmio, mmACP_BT_UART_PAD_SEL);
+	val |= ACP_BT_UART_PAD_SELECT_MASK;
+	acp_reg_write(val, acp_mmio, mmACP_BT_UART_PAD_SEL);
+
 	/* initiailize Onion control DAGB register */
 	acp_reg_write(ACP_ONION_CNTL_DEFAULT, acp_mmio,
 			mmACP_AXI2DAGB_ONION_CNTL);

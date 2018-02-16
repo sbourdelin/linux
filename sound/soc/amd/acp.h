@@ -108,6 +108,7 @@
 #define ACP_I2S_BT_16BIT_RESOLUTION_EN	0x04
 #define I2S_SP_INSTANCE 1
 #define I2S_BT_INSTANCE 3
+#define ACP_BT_UART_PAD_SELECT_MASK		0x1
 enum acp_dma_priority_level {
 	/* 0x0 Specifies the DMA channel is given normal priority */
 	ACP_DMA_PRIORITY_LEVEL_NORMAL = 0x0,
