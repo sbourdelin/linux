@@ -15,25 +15,33 @@
 #ifndef _ARM_PROBES_H
 #define _ARM_PROBES_H
 
-typedef u32 probe_opcode_t;
-struct arch_probe_insn;
+enum probes_insn {
+	INSN_REJECTED,
+	INSN_GOOD_NO_SLOT,
+	INSN_GOOD,
+};
 
-typedef void (probes_handler_t) (u32 opcode,
-			   struct arch_probe_insn *api,
+typedef u32 probes_opcode_t;
+struct arch_probes_insn;
+
+typedef void (probes_insn_handler_t) (u32 opcode,
+			   struct arch_probes_insn *api,
 			   struct pt_regs *);
 
+typedef unsigned long (probes_check_cc)(unsigned long);
+
 /* architecture specific copy of original instruction */
-struct arch_probe_insn {
-	probe_opcode_t *insn;
+struct arch_probes_insn {
+	probes_opcode_t *insn;
 	pstate_check_t *pstate_cc;
-	probes_handler_t *handler;
+	probes_insn_handler_t *insn_handler;
 	/* restore address after step xol */
 	unsigned long restore;
 };
 #ifdef CONFIG_KPROBES
 typedef u32 kprobe_opcode_t;
 struct arch_specific_insn {
-	struct arch_probe_insn api;
+	struct arch_probes_insn api;
 };
 #endif
 

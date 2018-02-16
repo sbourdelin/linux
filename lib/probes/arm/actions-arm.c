@@ -15,7 +15,10 @@
 
 #include "decode.h"
 #include "decode-arm.h"
-#include "core.h"
+
+#ifdef CONFIG_ARM64
+#include <../../../arm/include/asm/opcodes.h>
+#endif /* CONFIG_ARM64  */
 
 static int uprobes_substitute_pc(unsigned long *pinsn, u32 oregs)
 {
@@ -72,8 +75,8 @@ static void uprobe_set_pc(struct arch_uprobe *auprobe,
 {
 	u32 pcreg = auprobe->pcreg;
 
-	autask->backup = regs->uregs[pcreg];
-	regs->uregs[pcreg] = regs->ARM_pc + 8;
+	autask->backup = pt_regs_read_reg(regs, pcreg);
+	pt_regs_write_reg(regs, pcreg, instruction_pointer(regs) + 8);
 }
 
 static void uprobe_unset_pc(struct arch_uprobe *auprobe,
@@ -81,7 +84,7 @@ static void uprobe_unset_pc(struct arch_uprobe *auprobe,
 			    struct pt_regs *regs)
 {
 	/* PC will be taken care of by common code */
-	regs->uregs[auprobe->pcreg] = autask->backup;
+	pt_regs_write_reg(regs, auprobe->pcreg, autask->backup);
 }
 
 static void uprobe_aluwrite_pc(struct arch_uprobe *auprobe,
@@ -90,8 +93,8 @@ static void uprobe_aluwrite_pc(struct arch_uprobe *auprobe,
 {
 	u32 pcreg = auprobe->pcreg;
 
-	alu_write_pc(regs->uregs[pcreg], regs);
-	regs->uregs[pcreg] = autask->backup;
+	alu_write_pc(pt_regs_read_reg(regs, pcreg), regs);
+	pt_regs_write_reg(regs, pcreg, autask->backup);
 }
 
 static void uprobe_write_pc(struct arch_uprobe *auprobe,
@@ -100,8 +103,8 @@ static void uprobe_write_pc(struct arch_uprobe *auprobe,
 {
 	u32 pcreg = auprobe->pcreg;
 
-	load_write_pc(regs->uregs[pcreg], regs);
-	regs->uregs[pcreg] = autask->backup;
+	load_write_pc(pt_regs_read_reg(regs, pcreg), regs);
+	pt_regs_write_reg(regs, pcreg, autask->backup);
 }
 
 enum probes_insn
@@ -109,12 +112,13 @@ decode_pc_ro(probes_opcode_t insn, struct arch_probes_insn *asi,
 	     const struct decode_header *d)
 {
 	struct arch_uprobe *auprobe = container_of(asi, struct arch_uprobe,
-						   asi);
+							api);
+
 	struct decode_emulate *decode = (struct decode_emulate *) d;
 	u32 regs = decode->header.type_regs.bits >> DECODE_TYPE_BITS;
 	int reg;
 
-	reg = uprobes_substitute_pc(&auprobe->ixol[0], regs);
+	reg = uprobes_substitute_pc((unsigned long *)&auprobe->ixol[0], regs);
 	if (reg == 15)
 		return INSN_GOOD;
 
@@ -133,7 +137,8 @@ decode_wb_pc(probes_opcode_t insn, struct arch_probes_insn *asi,
 	     const struct decode_header *d, bool alu)
 {
 	struct arch_uprobe *auprobe = container_of(asi, struct arch_uprobe,
-						   asi);
+						   api);
+
 	enum probes_insn ret = decode_pc_ro(insn, asi, d);
 
 	if (((insn >> 12) & 0xf) == 15)
@@ -158,13 +163,110 @@ decode_ldr(probes_opcode_t insn, struct arch_probes_insn *asi,
 	return decode_wb_pc(insn, asi, d, false);
 }
 
+/*
+ * based on arm kprobes implementation
+ */
+static void __kprobes simulate_ldm1stm1(probes_opcode_t insn,
+		struct arch_probes_insn *asi,
+		struct pt_regs *regs)
+{
+	int rn = (insn >> 16) & 0xf;
+	int lbit = insn & (1 << 20);
+	int wbit = insn & (1 << 21);
+	int ubit = insn & (1 << 23);
+	int pbit = insn & (1 << 24);
+	int reg;
+	u32 *addr = (u32 *)pt_regs_read_reg(regs, rn);
+	unsigned int reg_bit_vector;
+	unsigned int reg_count;
+
+	reg_count = 0;
+	reg_bit_vector = insn & 0xffff;
+
+	while (reg_bit_vector) {
+		reg_bit_vector &= (reg_bit_vector - 1);
+		++reg_count;
+	}
+	if (!ubit)
+		addr -= reg_count;
+	addr += (!pbit == !ubit);
+
+	reg_bit_vector = insn & 0xffff;
+
+	while (reg_bit_vector) {
+		reg = __ffs(reg_bit_vector);
+		reg_bit_vector &= (reg_bit_vector - 1);
+		if (lbit) {	/* LDM */
+			if (reg == 15)
+				instruction_pointer_set(regs, (*addr++) - 4);
+			else
+				pt_regs_write_reg(regs, reg, *addr++);
+		} else { /* STM */
+			if (reg == 15)
+				*addr++ = instruction_pointer(regs);
+			else
+				*addr++ = pt_regs_read_reg(regs, reg);
+		}
+	}
+
+	/* write back new value of Rn */
+	if (wbit) {
+		if (!ubit)
+			addr -= reg_count;
+		addr -= (!pbit == !ubit);
+		if (rn == 15)
+			instruction_pointer_set(regs, (long)addr);
+		else
+			pt_regs_write_reg(regs, rn, (long)addr);
+	}
+
+	instruction_pointer_set(regs, instruction_pointer(regs) + 4);
+}
+
+static void __kprobes simulate_stm1_pc(probes_opcode_t insn,
+		struct arch_probes_insn *asi,
+		struct pt_regs *regs)
+{
+	unsigned long addr = instruction_pointer(regs) - 4;
+
+	instruction_pointer_set(regs, (long)addr + str_pc_offset);
+	simulate_ldm1stm1(insn, asi, regs);
+	instruction_pointer_set(regs, (long)addr + 4);
+}
+
+static void __kprobes simulate_ldm1_pc(probes_opcode_t insn,
+		struct arch_probes_insn *asi,
+		struct pt_regs *regs)
+{
+	simulate_ldm1stm1(insn, asi, regs);
+	load_write_pc(instruction_pointer(regs), regs);
+}
+
+enum probes_insn
+uprobe_decode_ldmstm_aarch64(probes_opcode_t insn,
+	     struct arch_probes_insn *asi,
+	     const struct decode_header *d)
+{
+	probes_insn_handler_t *handler = 0;
+	unsigned int reglist = insn & 0xffff;
+	int is_ldm = insn & 0x100000;
+
+	/* PC on a reglist? */
+	if (reglist & 0x8000)
+		handler = is_ldm ? simulate_ldm1_pc : simulate_stm1_pc;
+	else
+		handler = simulate_ldm1stm1;
+	asi->insn_handler = handler;
+	return INSN_GOOD_NO_SLOT;
+}
+
 enum probes_insn
 uprobe_decode_ldmstm(probes_opcode_t insn,
 		     struct arch_probes_insn *asi,
 		     const struct decode_header *d)
 {
 	struct arch_uprobe *auprobe = container_of(asi, struct arch_uprobe,
-						   asi);
+			api);
 	unsigned int reglist = insn & 0xffff;
 	int rn = (insn >> 16) & 0xf;
 	int lbit = insn & (1 << 20);
@@ -228,5 +330,9 @@ const union decode_action uprobes_probes_actions[] = {
 	[PROBES_MUL_ADD] = {.handler = probes_simulate_nop},
 	[PROBES_BITFIELD] = {.handler = probes_simulate_nop},
 	[PROBES_BRANCH] = {.handler = simulate_bbl},
+#ifdef CONFIG_ARM64
+	[PROBES_LDMSTM] = {.decoder = uprobe_decode_ldmstm_aarch64}
+#else
 	[PROBES_LDMSTM] = {.decoder = uprobe_decode_ldmstm}
+#endif
 };

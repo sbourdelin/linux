@@ -13,11 +13,16 @@
 
 #include <linux/kernel.h>
 #include <linux/types.h>
+#ifdef CONFIG_ARM64
+#include <asm/insn.h>
+#include <../../../arm/include/asm/opcodes.h>
+#else /* CONFIG_ARM64 */
 #include <asm/system_info.h>
 #include <asm/ptrace.h>
+#endif /* CONFIG_ARM64 */
 #include <linux/bug.h>
-
 #include "decode.h"
+
 
 
 #ifndef find_str_pc_offset
@@ -189,7 +194,9 @@ void __kprobes probes_emulate_none(probes_opcode_t opcode,
 	struct arch_probes_insn *asi,
 	struct pt_regs *regs)
 {
+#ifndef CONFIG_ARM64
 	asi->insn_fn();
+#endif /* CONFIG_ARM64 */
 }
 
 /*
@@ -430,6 +437,7 @@ probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
 	 */
 	probes_opcode_t origin_insn = insn;
 
+#ifndef CONFIG_ARM64
 	/*
 	 * stack_space is initialized to 0 here. Checker functions
 	 * should update is value if they find this is a stack store
@@ -446,7 +454,7 @@ probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
 	 * registers are used', to prevent any potential optimization.
 	 */
 	asi->register_usage_flags = ~0UL;
-
+#endif /* CONFIG_ARM64 */
 	if (emulate)
 		insn = prepare_emulated_insn(insn, asi, thumb);
 

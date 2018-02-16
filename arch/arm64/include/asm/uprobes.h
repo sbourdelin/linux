@@ -22,6 +22,12 @@
 typedef u32 uprobe_opcode_t;
 
 struct arch_uprobe_task {
+	u64 backup;
+};
+
+enum uprobe_arch {
+	UPROBE_AARCH64,
+	UPROBE_AARCH32
 };
 
 struct arch_uprobe {
@@ -29,8 +35,21 @@ struct arch_uprobe {
 		u8 insn[MAX_UINSN_BYTES];
 		u8 ixol[MAX_UINSN_BYTES];
 	};
-	struct arch_probe_insn api;
+
+	probes_opcode_t orig_insn;
+	probes_opcode_t bp_insn;
+
+	struct arch_probes_insn api;
 	bool simulate;
+	u64 pcreg;
+	enum uprobe_arch arch;
+
+	void (*prehandler)(struct arch_uprobe *auprobe,
+			   struct arch_uprobe_task *autask,
+			   struct pt_regs *regs);
+	void (*posthandler)(struct arch_uprobe *auprobe,
+		    struct arch_uprobe_task *autask,
+		    struct pt_regs *regs);
 };
 
 #endif

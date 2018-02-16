@@ -92,7 +92,7 @@ static bool __kprobes check_tbnz(u32 opcode, struct pt_regs *regs)
  * instruction simulation functions
  */
 void __kprobes
-simulate_adr_adrp(u32 opcode, struct arch_probe_insn *api,
+simulate_adr_adrp(u32 opcode, struct arch_probes_insn *api,
 		struct pt_regs *regs)
 {
 	long imm, xn, val;
@@ -112,7 +112,7 @@ simulate_adr_adrp(u32 opcode, struct arch_probe_insn *api,
 }
 
 void __kprobes
-simulate_b_bl(u32 opcode, struct arch_probe_insn *api,
+simulate_b_bl(u32 opcode, struct arch_probes_insn *api,
 		struct pt_regs *regs)
 {
 	int disp = bbl_displacement(opcode);
@@ -126,7 +126,7 @@ simulate_b_bl(u32 opcode, struct arch_probe_insn *api,
 }
 
 void __kprobes
-simulate_b_cond(u32 opcode, struct arch_probe_insn *api,
+simulate_b_cond(u32 opcode, struct arch_probes_insn *api,
 		struct pt_regs *regs)
 {
 	int disp = 4;
@@ -139,7 +139,7 @@ simulate_b_cond(u32 opcode, struct arch_probe_insn *api,
 }
 
 void __kprobes
-simulate_br_blr_ret(u32 opcode, struct arch_probe_insn *api,
+simulate_br_blr_ret(u32 opcode, struct arch_probes_insn *api,
 		struct pt_regs *regs)
 {
 	int xn = (opcode >> 5) & 0x1f;
@@ -154,7 +154,7 @@ simulate_br_blr_ret(u32 opcode, struct arch_probe_insn *api,
 }
 
 void __kprobes
-simulate_cbz_cbnz(u32 opcode, struct arch_probe_insn *api,
+simulate_cbz_cbnz(u32 opcode, struct arch_probes_insn *api,
 		struct pt_regs *regs)
 {
 	int disp = 4;
@@ -171,7 +171,7 @@ simulate_cbz_cbnz(u32 opcode, struct arch_probe_insn *api,
 }
 
 void __kprobes
-simulate_tbz_tbnz(u32 opcode, struct arch_probe_insn *api,
+simulate_tbz_tbnz(u32 opcode, struct arch_probes_insn *api,
 		struct pt_regs *regs)
 {
 	int disp = 4;
@@ -188,7 +188,7 @@ simulate_tbz_tbnz(u32 opcode, struct arch_probe_insn *api,
 }
 
 void __kprobes
-simulate_ldr_literal(u32 opcode, struct arch_probe_insn *api,
+simulate_ldr_literal(u32 opcode, struct arch_probes_insn *api,
 		struct pt_regs *regs)
 {
 	u64 *load_addr;
@@ -208,7 +208,7 @@ simulate_ldr_literal(u32 opcode, struct arch_probe_insn *api,
 }
 
 void __kprobes
-simulate_ldrsw_literal(u32 opcode, struct arch_probe_insn *api,
+simulate_ldrsw_literal(u32 opcode, struct arch_probes_insn *api,
 		struct pt_regs *regs)
 {
 	s32 *load_addr;

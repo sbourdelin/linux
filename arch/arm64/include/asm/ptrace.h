@@ -274,8 +274,29 @@ static inline void procedure_link_pointer_set(struct pt_regs *regs,
 	procedure_link_pointer(regs) = val;
 }
 
+
+#define link_register(regs)			((regs)->compat_lr)
+
+static inline void link_register_set(struct pt_regs *regs,
+					   unsigned long val)
+{
+	link_register(regs) = val;
+}
+
+#define	state_register(regs)		((regs)->pstate)
+
+static inline void state_register_set(struct pt_regs *regs,
+					   unsigned long val)
+{
+	state_register(regs) = val;
+}
+
+
 #undef profile_pc
 extern unsigned long profile_pc(struct pt_regs *regs);
+
+
+#define ARM_COMPAT_LR_OFFSET	4
 
 #endif /* __ASSEMBLY__ */
 #endif

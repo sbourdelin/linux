@@ -38,7 +38,7 @@ int set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
 
 bool arch_uprobe_ignore(struct arch_uprobe *auprobe, struct pt_regs *regs)
 {
-	if (!auprobe->asi.insn_check_cc(regs->ARM_cpsr)) {
+	if (!auprobe->api.insn_check_cc(regs->ARM_cpsr)) {
 		regs->ARM_pc += 4;
 		return true;
 	}
@@ -55,7 +55,7 @@ bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
 
 	opcode = __mem_to_opcode_arm(*(unsigned int *) auprobe->insn);
 
-	auprobe->asi.insn_singlestep(opcode, &auprobe->asi, regs);
+	auprobe->api.insn_singlestep(opcode, &auprobe->api, regs);
 
 	return true;
 }
@@ -87,7 +87,7 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
 	auprobe->ixol[0] = __opcode_to_mem_arm(insn);
 	auprobe->ixol[1] = __opcode_to_mem_arm(UPROBE_SS_ARM_INSN);
 
-	ret = arm_probes_decode_insn(insn, &auprobe->asi, false,
+	ret = arm_probes_decode_insn(insn, &auprobe->api, false,
 				     uprobes_probes_actions, NULL);
 	switch (ret) {
 	case INSN_REJECTED:

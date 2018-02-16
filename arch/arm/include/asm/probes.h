@@ -21,6 +21,13 @@
 
 #ifndef __ASSEMBLY__
 
+enum probes_insn {
+	INSN_REJECTED,
+	INSN_GOOD_NO_SLOT,
+	INSN_GOOD,
+};
+
+
 typedef u32 probes_opcode_t;
 
 struct arch_probes_insn;
@@ -45,6 +52,7 @@ struct arch_probes_insn {
 	bool				kprobe_direct_exec;
 };
 
+extern probes_check_cc * const probes_condition_checks[];
 #endif /* __ASSEMBLY__ */
 
 /*

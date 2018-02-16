@@ -39,7 +39,7 @@ struct arch_uprobe {
 	void (*posthandler)(struct arch_uprobe *auprobe,
 			    struct arch_uprobe_task *autask,
 			    struct pt_regs *regs);
-	struct arch_probes_insn asi;
+	struct arch_probes_insn api;
 };
 
 #endif

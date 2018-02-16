@@ -23,10 +23,20 @@
 #include <linux/stddef.h>
 #include <asm/probes.h>
 #include <asm/kprobes.h>
+#ifdef CONFIG_ARM64
+#include <asm/ptrace.h>
+#include <asm/insn.h>
 
-void __init arm_probes_decode_init(void);
+#define PSR_T_BIT	COMPAT_PSR_T_BIT
 
-extern probes_check_cc * const probes_condition_checks[16];
+#define str_pc_offset 8
+#define load_write_pc_interworks true
+#define alu_write_pc_interworks true
+#define find_str_pc_offset()
+#define test_load_write_pc_interworking()
+#define test_alu_write_pc_interworking()
+
+#else /* CONFIG_ARM64 */
 
 #if __LINUX_ARM_ARCH__ >= 7
 
@@ -40,8 +50,7 @@ extern probes_check_cc * const probes_condition_checks[16];
 extern int str_pc_offset;
 void __init find_str_pc_offset(void);
 
-#endif
-
+#endif /* __LINUX_ARM_ARCH__ */
 
 /*
  * Update ITSTATE after normal execution of an IT block instruction.
@@ -69,9 +78,13 @@ static inline unsigned long it_advance(unsigned long cpsr)
 	return cpsr;
 }
 
+#endif /* CONFIG_ARM64 */
+
+void __init arm_probes_decode_init(void);
+
 static inline void __kprobes bx_write_pc(long pcv, struct pt_regs *regs)
 {
-	long cpsr = regs->ARM_cpsr;
+	long cpsr = state_register(regs);
 
 	if (pcv & 0x1) {
 		cpsr |= PSR_T_BIT;
@@ -80,11 +93,11 @@ static inline void __kprobes bx_write_pc(long pcv, struct pt_regs *regs)
 		cpsr &= ~PSR_T_BIT;
 		pcv &= ~0x2;	/* Avoid UNPREDICTABLE address allignment */
 	}
-	regs->ARM_cpsr = cpsr;
-	regs->ARM_pc = pcv;
+	state_register_set(regs, cpsr);
+	instruction_pointer_set(regs, pcv);
 }
 
-
+#ifndef CONFIG_ARM64
 #if __LINUX_ARM_ARCH__ >= 6
 
 /* Kernels built for >= ARMv6 should never run on <= ARMv5 hardware, so... */
@@ -98,16 +111,18 @@ extern bool load_write_pc_interworks;
 void __init test_load_write_pc_interworking(void);
 
 #endif
+#endif /* CONFIG_ARM64 */
 
 static inline void __kprobes load_write_pc(long pcv, struct pt_regs *regs)
 {
 	if (load_write_pc_interworks)
 		bx_write_pc(pcv, regs);
 	else
-		regs->ARM_pc = pcv;
+		instruction_pointer_set(regs, pcv);
 }
 
 
+#ifndef CONFIG_ARM64
 #if __LINUX_ARM_ARCH__ >= 7
 
 #define alu_write_pc_interworks true
@@ -126,13 +141,14 @@ extern bool alu_write_pc_interworks;
 void __init test_alu_write_pc_interworking(void);
 
 #endif /* __LINUX_ARM_ARCH__ == 6 */
+#endif /* CONFIG_ARM64 */
 
 static inline void __kprobes alu_write_pc(long pcv, struct pt_regs *regs)
 {
 	if (alu_write_pc_interworks)
 		bx_write_pc(pcv, regs);
 	else
-		regs->ARM_pc = pcv;
+		instruction_pointer_set(regs, pcv);
 }
 
 
@@ -395,11 +411,6 @@ struct decode_or {
 #define DECODE_OR(_mask, _value)				\
 	DECODE_HEADER(DECODE_TYPE_OR, _mask, _value, 0)
 
-enum probes_insn {
-	INSN_REJECTED,
-	INSN_GOOD,
-	INSN_GOOD_NO_SLOT
-};
 
 struct decode_reject {
 	struct decode_header	header;

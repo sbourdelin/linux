@@ -68,8 +68,8 @@ static void __kprobes arch_simulate_insn(struct kprobe *p, struct pt_regs *regs)
 {
 	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
 
-	if (p->ainsn.api.handler)
-		p->ainsn.api.handler((u32)p->opcode, &p->ainsn.api, regs);
+	if (p->ainsn.api.insn_handler)
+		p->ainsn.api.insn_handler((u32)p->opcode, &p->ainsn.api, regs);
 
 	/* single step simulated, now go for post processing */
 	post_kprobe_handler(kcb, regs);

@@ -61,39 +61,45 @@
 void __kprobes simulate_bbl(probes_opcode_t insn,
 		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
-	long iaddr = (long) regs->ARM_pc - 4;
-	int disp  = branch_displacement(insn);
+	long iaddr = (long) instruction_pointer(regs) + ARM_COMPAT_LR_OFFSET;
+	int disp = branch_displacement(insn);
 
 	if (insn & (1 << 24))
-		regs->ARM_lr = iaddr + 4;
+		link_register_set(regs, iaddr);
 
-	regs->ARM_pc = iaddr + 8 + disp;
+	instruction_pointer_set(regs, iaddr + 4 + disp);
 }
 
 void __kprobes simulate_blx1(probes_opcode_t insn,
 		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
-	long iaddr = (long) regs->ARM_pc - 4;
+	long iaddr = (long) instruction_pointer(regs) + ARM_COMPAT_LR_OFFSET;
 	int disp = branch_displacement(insn);
+	long cpsr;
 
-	regs->ARM_lr = iaddr + 4;
-	regs->ARM_pc = iaddr + 8 + disp + ((insn >> 23) & 0x2);
-	regs->ARM_cpsr |= PSR_T_BIT;
+	link_register_set(regs, iaddr);
+	instruction_pointer_set(regs, iaddr + 4 + disp + ((insn >> 23) & 0x2));
+	cpsr = state_register(regs) | PSR_T_BIT;
+	state_register_set(regs, cpsr);
 }
 
 void __kprobes simulate_blx2bx(probes_opcode_t insn,
 		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
 	int rm = insn & 0xf;
-	long rmv = regs->uregs[rm];
+	long rmv = pt_regs_read_reg(regs, rm);
+	long cpsr;
 
 	if (insn & (1 << 5))
-		regs->ARM_lr = (long) regs->ARM_pc;
+		link_register_set(regs, (long) instruction_pointer(regs));
 
-	regs->ARM_pc = rmv & ~0x1;
-	regs->ARM_cpsr &= ~PSR_T_BIT;
-	if (rmv & 0x1)
-		regs->ARM_cpsr |= PSR_T_BIT;
+	instruction_pointer_set(regs, rmv & ~0x1);
+	cpsr = state_register(regs) & ~PSR_T_BIT;
+	state_register_set(regs, cpsr);
+	if (rmv & 0x1) {
+		cpsr = state_register(regs) | PSR_T_BIT;
+		state_register_set(regs, cpsr);
+	}
 }
 
 void __kprobes simulate_mrs(probes_opcode_t insn,
@@ -102,13 +108,13 @@ void __kprobes simulate_mrs(probes_opcode_t insn,
 	int rd = (insn >> 12) & 0xf;
 	unsigned long mask = 0xf8ff03df; /* Mask out execution state */
 
-	regs->uregs[rd] = regs->ARM_cpsr & mask;
+	pt_regs_write_reg(regs, rd, state_register(regs) & mask);
 }
 
 void __kprobes simulate_mov_ipsp(probes_opcode_t insn,
 		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
-	regs->uregs[12] = regs->uregs[13];
+	pt_regs_write_reg(regs, 12, pt_regs_read_reg(regs, 13));
 }
 
 /*
@@ -246,13 +252,14 @@ static const union decode_item arm_cccc_0000_____1001_table[] = {
 
 static const union decode_item arm_cccc_0001_____1001_table[] = {
 	/* Synchronization primitives					*/
-
+#ifndef CONFIG_ARM64
 #if __LINUX_ARM_ARCH__ < 6
 	/* Deprecated on ARMv6 and may be UNDEFINED on v7		*/
 	/* SMP/SWPB		cccc 0001 0x00 xxxx xxxx xxxx 1001 xxxx */
 	DECODE_EMULATEX	(0x0fb000f0, 0x01000090, PROBES_SWP,
 						 REGS(NOPC, NOPC, 0, 0, NOPC)),
 #endif
+#endif /* CONFIG_ARM64 */
 	/* LDREX/STREX{,D,B,H}	cccc 0001 1xxx xxxx xxxx xxxx 1001 xxxx */
 	/* And unallocated instructions...				*/
 	DECODE_END
@@ -709,7 +716,7 @@ EXPORT_SYMBOL_GPL(probes_decode_arm_table);
 static void __kprobes arm_singlestep(probes_opcode_t insn,
 		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
-	regs->ARM_pc += 4;
+	instruction_pointer_set(regs, instruction_pointer(regs) + 4);
 	asi->insn_handler(insn, asi, regs);
 }
 
@@ -730,8 +737,10 @@ arm_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
 		       bool emulate, const union decode_action *actions,
 		       const struct decode_checker *checkers[])
 {
+#ifndef CONFIG_ARM64
 	asi->insn_singlestep = arm_singlestep;
 	asi->insn_check_cc = probes_condition_checks[insn>>28];
+#endif
 	return probes_decode_insn(insn, asi, probes_decode_arm_table, false,
 				  emulate, actions, checkers);
 }

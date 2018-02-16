@@ -93,6 +93,8 @@ static inline long regs_return_value(struct pt_regs *regs)
 }
 
 #define instruction_pointer(regs)	(regs)->ARM_pc
+#define link_register(regs)			((regs)->ARM_lr)
+#define	state_register(regs)		((regs)->ARM_cpsr)
 
 #ifdef CONFIG_THUMB2_KERNEL
 #define frame_pointer(regs) (regs)->ARM_r7
@@ -104,6 +106,35 @@ static inline void instruction_pointer_set(struct pt_regs *regs,
 					   unsigned long val)
 {
 	instruction_pointer(regs) = val;
+}
+
+static inline void link_register_set(struct pt_regs *regs,
+					   unsigned long val)
+{
+	link_register(regs) = val;
+}
+
+static inline void state_register_set(struct pt_regs *regs,
+					   unsigned long val)
+{
+	state_register(regs) = val;
+}
+
+/*
+ * Read a register given an architectural register index r.
+ */
+static inline unsigned long pt_regs_read_reg(const struct pt_regs *regs, int r)
+{
+	return regs->uregs[r];
+}
+
+/*
+ * Write a register given an architectural register index r.
+ */
+static inline void pt_regs_write_reg(struct pt_regs *regs, int r,
+				     unsigned long val)
+{
+	regs->uregs[r] = val;
 }
 
 #ifdef CONFIG_SMP
@@ -167,5 +198,6 @@ static inline unsigned long user_stack_pointer(struct pt_regs *regs)
 		((current_stack_pointer | (THREAD_SIZE - 1)) - 7) - 1;	\
 })
 
+#define ARM_COMPAT_LR_OFFSET	0
 #endif /* __ASSEMBLY__ */
 #endif

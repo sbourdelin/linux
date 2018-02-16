@@ -77,8 +77,8 @@ static bool __kprobes aarch64_insn_is_steppable(u32 insn)
  *   INSN_GOOD         If instruction is supported and uses instruction slot,
  *   INSN_GOOD_NO_SLOT If instruction is supported but doesn't use its slot.
  */
-enum probe_insn __kprobes
-arm_probe_decode_insn(probe_opcode_t insn, struct arch_probe_insn *api)
+enum probes_insn __kprobes
+arm_probe_decode_insn(probes_opcode_t insn, struct arch_probes_insn *api)
 {
 	/*
 	 * Instructions reading or modifying the PC won't work from the XOL
@@ -88,26 +88,26 @@ arm_probe_decode_insn(probe_opcode_t insn, struct arch_probe_insn *api)
 		return INSN_GOOD;
 
 	if (aarch64_insn_is_bcond(insn)) {
-		api->handler = simulate_b_cond;
+		api->insn_handler = simulate_b_cond;
 	} else if (aarch64_insn_is_cbz(insn) ||
 	    aarch64_insn_is_cbnz(insn)) {
-		api->handler = simulate_cbz_cbnz;
+		api->insn_handler = simulate_cbz_cbnz;
 	} else if (aarch64_insn_is_tbz(insn) ||
 	    aarch64_insn_is_tbnz(insn)) {
-		api->handler = simulate_tbz_tbnz;
+		api->insn_handler = simulate_tbz_tbnz;
 	} else if (aarch64_insn_is_adr_adrp(insn)) {
-		api->handler = simulate_adr_adrp;
+		api->insn_handler = simulate_adr_adrp;
 	} else if (aarch64_insn_is_b(insn) ||
 	    aarch64_insn_is_bl(insn)) {
-		api->handler = simulate_b_bl;
+		api->insn_handler = simulate_b_bl;
 	} else if (aarch64_insn_is_br(insn) ||
 	    aarch64_insn_is_blr(insn) ||
 	    aarch64_insn_is_ret(insn)) {
-		api->handler = simulate_br_blr_ret;
+		api->insn_handler = simulate_br_blr_ret;
 	} else if (aarch64_insn_is_ldr_lit(insn)) {
-		api->handler = simulate_ldr_literal;
+		api->insn_handler = simulate_ldr_literal;
 	} else if (aarch64_insn_is_ldrsw_lit(insn)) {
-		api->handler = simulate_ldrsw_literal;
+		api->insn_handler = simulate_ldrsw_literal;
 	} else {
 		/*
 		 * Instruction cannot be stepped out-of-line and we don't
@@ -138,12 +138,12 @@ is_probed_address_atomic(kprobe_opcode_t *scan_start, kprobe_opcode_t *scan_end)
 	return false;
 }
 
-enum probe_insn __kprobes
+enum probes_insn __kprobes
 arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi)
 {
-	enum probe_insn decoded;
-	probe_opcode_t insn = le32_to_cpu(*addr);
-	probe_opcode_t *scan_end = NULL;
+	enum probes_insn decoded;
+	probes_opcode_t insn = le32_to_cpu(*addr);
+	probes_opcode_t *scan_end = NULL;
 	unsigned long size = 0, offset = 0;
 
 	/*
