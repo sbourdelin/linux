@@ -2081,6 +2081,7 @@ qualifier:
 
 	case 'x':
 		spec->flags |= SMALL;
+		/* fall through */
 
 	case 'X':
 		spec->base = 16;
@@ -3035,8 +3036,10 @@ int vsscanf(const char *buf, const char *fmt, va_list args)
 			break;
 		case 'i':
 			base = 0;
+			/* fall through */
 		case 'd':
 			is_sign = true;
+			/* fall through */
 		case 'u':
 			break;
 		case '%':
