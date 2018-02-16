@@ -672,6 +672,11 @@ static const struct snd_kcontrol_new da7219_snd_controls[] = {
 	SOC_DOUBLE_R("Headphone ZC Gain Switch", DA7219_HP_L_CTRL,
 		     DA7219_HP_R_CTRL, DA7219_HP_L_AMP_ZC_EN_SHIFT,
 		     DA7219_SWITCH_EN_MAX, DA7219_NO_INVERT),
+
+	/* Clock Enable */
+	SOC_SINGLE("Clock Enable", DA7219_DAI_CLK_MODE,
+		   DA7219_DAI_CLK_EN_SHIFT, DA7219_SWITCH_EN_MAX,
+		   DA7219_NO_INVERT),
 };
 
 
