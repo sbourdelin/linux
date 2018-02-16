@@ -44,7 +44,6 @@ static inline struct rcar_du_vsp_plane *to_rcar_vsp_plane(struct drm_plane *p)
  * @state: base DRM plane state
  * @format: information about the pixel format used by the plane
  * @sg_tables: scatter-gather tables for the frame buffer memory
- * @alpha: value of the plane alpha property
  * @zpos: value of the plane zpos property
  */
 struct rcar_du_vsp_plane_state {
@@ -53,7 +52,6 @@ struct rcar_du_vsp_plane_state {
 	const struct rcar_du_format_info *format;
 	struct sg_table sg_tables[3];
 
-	unsigned int alpha;
 	unsigned int zpos;
 };
 
