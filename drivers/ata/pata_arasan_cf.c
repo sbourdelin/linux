@@ -790,12 +790,12 @@ static struct ata_port_operations arasan_cf_ops = {
 static int arasan_cf_probe(struct platform_device *pdev)
 {
 	struct arasan_cf_dev *acdev;
-	struct arasan_cf_pdata *pdata = dev_get_platdata(&pdev->dev);
+	struct arasan_cf_pdata *pdata;
 	struct ata_host *host;
 	struct ata_port *ap;
 	struct resource *res;
 	u32 quirk;
-	irq_handler_t irq_handler = NULL;
+	irq_handler_t irq_handler;
 	int ret;
 
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -812,6 +812,7 @@ static int arasan_cf_probe(struct platform_device *pdev)
 	if (!acdev)
 		return -ENOMEM;
 
+	pdata = dev_get_platdata(&pdev->dev);
 	if (pdata)
 		quirk = pdata->quirk;
 	else
@@ -819,10 +820,12 @@ static int arasan_cf_probe(struct platform_device *pdev)
 
 	/* if irq is 0, support only PIO */
 	acdev->irq = platform_get_irq(pdev, 0);
-	if (acdev->irq)
+	if (acdev->irq) {
 		irq_handler = arasan_cf_interrupt;
-	else
+	} else {
 		quirk |= CF_BROKEN_MWDMA | CF_BROKEN_UDMA;
+		irq_handler = NULL;
+	}
 
 	acdev->pbase = res->start;
 	acdev->vbase = devm_ioremap_nocache(&pdev->dev, res->start,
