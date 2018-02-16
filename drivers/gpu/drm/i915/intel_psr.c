@@ -484,6 +484,8 @@ static void hsw_psr_enable_source(struct intel_dp *intel_dp,
 			   EDP_PSR_DEBUG_MASK_HPD |
 			   EDP_PSR_DEBUG_MASK_LPSP);
 	}
+
+	intel_display_power_get(dev_priv, intel_dp->aux_io_power_domain);
 }
 
 /**
@@ -617,6 +619,8 @@ static void hsw_psr_disable(struct intel_dp *intel_dp,
 		else
 			WARN_ON(I915_READ(EDP_PSR_CTL) & EDP_PSR_ENABLE);
 	}
+
+	intel_display_power_put(dev_priv, intel_dp->aux_io_power_domain);
 }
 
 /**

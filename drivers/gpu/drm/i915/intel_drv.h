@@ -989,6 +989,7 @@ struct intel_dp {
 	struct drm_dp_desc desc;
 	struct drm_dp_aux aux;
 	enum intel_display_power_domain aux_power_domain;
+	enum intel_display_power_domain aux_io_power_domain;
 	uint8_t train_set[4];
 	int panel_power_up_delay;
 	int panel_power_down_delay;

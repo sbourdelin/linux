@@ -6023,22 +6023,28 @@ intel_dp_init_connector_port_info(struct intel_digital_port *intel_dig_port)
 	switch (encoder->port) {
 	case PORT_A:
 		intel_dp->aux_power_domain = POWER_DOMAIN_AUX_A;
+		intel_dp->aux_io_power_domain = POWER_DOMAIN_AUX_IO_A;
 		break;
 	case PORT_B:
 		intel_dp->aux_power_domain = POWER_DOMAIN_AUX_B;
+		intel_dp->aux_io_power_domain = POWER_DOMAIN_AUX_IO_B;
 		break;
 	case PORT_C:
 		intel_dp->aux_power_domain = POWER_DOMAIN_AUX_C;
+		intel_dp->aux_io_power_domain = POWER_DOMAIN_AUX_IO_C;
 		break;
 	case PORT_D:
 		intel_dp->aux_power_domain = POWER_DOMAIN_AUX_D;
+		intel_dp->aux_io_power_domain = POWER_DOMAIN_AUX_IO_D;
 		break;
 	case PORT_E:
 		/* FIXME: Check VBT for actual wiring of PORT E */
 		intel_dp->aux_power_domain = POWER_DOMAIN_AUX_D;
+		intel_dp->aux_io_power_domain = POWER_DOMAIN_AUX_IO_D;
 		break;
 	case PORT_F:
 		intel_dp->aux_power_domain = POWER_DOMAIN_AUX_F;
+		intel_dp->aux_io_power_domain = POWER_DOMAIN_AUX_IO_F;
 		break;
 	default:
 		MISSING_CASE(encoder->port);
