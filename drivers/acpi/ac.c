@@ -332,6 +332,13 @@ static const struct dmi_system_id ac_dmi_table[] = {
 		DMI_MATCH(DMI_PRODUCT_NAME, "32597CG"),
 		},
 	},
+	{
+	.callback = ac_not_use_pmic_quirk,
+	.ident = "ECS EF20EA",
+	.matches = {
+		DMI_MATCH(DMI_PRODUCT_NAME, "EF20EA"),
+		},
+	},
 	{},
 };
 
