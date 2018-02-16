@@ -112,10 +112,9 @@ bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
 		return false;
 
 	insn = *(probe_opcode_t *)(&auprobe->insn[0]);
-	addr = instruction_pointer(regs);
 
 	if (auprobe->api.handler)
-		auprobe->api.handler(insn, addr, regs);
+		auprobe->api.handler(insn, &auprobe->api, regs);
 
 	return true;
 }

@@ -16,7 +16,11 @@
 #define _ARM_PROBES_H
 
 typedef u32 probe_opcode_t;
-typedef void (probes_handler_t) (u32 opcode, long addr, struct pt_regs *);
+struct arch_probe_insn;
+
+typedef void (probes_handler_t) (u32 opcode,
+			   struct arch_probe_insn *api,
+			   struct pt_regs *);
 
 /* architecture specific copy of original instruction */
 struct arch_probe_insn {

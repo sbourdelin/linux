@@ -92,9 +92,11 @@ static bool __kprobes check_tbnz(u32 opcode, struct pt_regs *regs)
  * instruction simulation functions
  */
 void __kprobes
-simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs)
+simulate_adr_adrp(u32 opcode, struct arch_probe_insn *api,
+		struct pt_regs *regs)
 {
 	long imm, xn, val;
+	long addr = instruction_pointer(regs);
 
 	xn = opcode & 0x1f;
 	imm = ((opcode >> 3) & 0x1ffffc) | ((opcode >> 29) & 0x3);
@@ -110,9 +112,11 @@ simulate_adr_adrp(u32 opcode, long addr, struct pt_regs *regs)
 }
 
 void __kprobes
-simulate_b_bl(u32 opcode, long addr, struct pt_regs *regs)
+simulate_b_bl(u32 opcode, struct arch_probe_insn *api,
+		struct pt_regs *regs)
 {
 	int disp = bbl_displacement(opcode);
+	long addr = instruction_pointer(regs);
 
 	/* Link register is x30 */
 	if (opcode & (1 << 31))
@@ -122,9 +126,11 @@ simulate_b_bl(u32 opcode, long addr, struct pt_regs *regs)
 }
 
 void __kprobes
-simulate_b_cond(u32 opcode, long addr, struct pt_regs *regs)
+simulate_b_cond(u32 opcode, struct arch_probe_insn *api,
+		struct pt_regs *regs)
 {
 	int disp = 4;
+	long addr = instruction_pointer(regs);
 
 	if (aarch32_opcode_cond_checks[opcode & 0xf](regs->pstate & 0xffffffff))
 		disp = bcond_displacement(opcode);
@@ -133,9 +139,11 @@ simulate_b_cond(u32 opcode, long addr, struct pt_regs *regs)
 }
 
 void __kprobes
-simulate_br_blr_ret(u32 opcode, long addr, struct pt_regs *regs)
+simulate_br_blr_ret(u32 opcode, struct arch_probe_insn *api,
+		struct pt_regs *regs)
 {
 	int xn = (opcode >> 5) & 0x1f;
+	long addr = instruction_pointer(regs);
 
 	/* update pc first in case we're doing a "blr lr" */
 	instruction_pointer_set(regs, get_x_reg(regs, xn));
@@ -146,9 +154,11 @@ simulate_br_blr_ret(u32 opcode, long addr, struct pt_regs *regs)
 }
 
 void __kprobes
-simulate_cbz_cbnz(u32 opcode, long addr, struct pt_regs *regs)
+simulate_cbz_cbnz(u32 opcode, struct arch_probe_insn *api,
+		struct pt_regs *regs)
 {
 	int disp = 4;
+	long addr = instruction_pointer(regs);
 
 	if (opcode & (1 << 24)) {
 		if (check_cbnz(opcode, regs))
@@ -161,9 +171,11 @@ simulate_cbz_cbnz(u32 opcode, long addr, struct pt_regs *regs)
 }
 
 void __kprobes
-simulate_tbz_tbnz(u32 opcode, long addr, struct pt_regs *regs)
+simulate_tbz_tbnz(u32 opcode, struct arch_probe_insn *api,
+		struct pt_regs *regs)
 {
 	int disp = 4;
+	long addr = instruction_pointer(regs);
 
 	if (opcode & (1 << 24)) {
 		if (check_tbnz(opcode, regs))
@@ -176,11 +188,13 @@ simulate_tbz_tbnz(u32 opcode, long addr, struct pt_regs *regs)
 }
 
 void __kprobes
-simulate_ldr_literal(u32 opcode, long addr, struct pt_regs *regs)
+simulate_ldr_literal(u32 opcode, struct arch_probe_insn *api,
+		struct pt_regs *regs)
 {
 	u64 *load_addr;
 	int xn = opcode & 0x1f;
 	int disp;
+	long addr = instruction_pointer(regs);
 
 	disp = ldr_displacement(opcode);
 	load_addr = (u64 *) (addr + disp);
@@ -194,11 +208,13 @@ simulate_ldr_literal(u32 opcode, long addr, struct pt_regs *regs)
 }
 
 void __kprobes
-simulate_ldrsw_literal(u32 opcode, long addr, struct pt_regs *regs)
+simulate_ldrsw_literal(u32 opcode, struct arch_probe_insn *api,
+		struct pt_regs *regs)
 {
 	s32 *load_addr;
 	int xn = opcode & 0x1f;
 	int disp;
+	long addr = instruction_pointer(regs);
 
 	disp = ldr_displacement(opcode);
 	load_addr = (s32 *) (addr + disp);
