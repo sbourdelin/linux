@@ -55,6 +55,7 @@ bool load_write_pc_interworks;
 void __init test_load_write_pc_interworking(void)
 {
 	int arch = cpu_architecture();
+
 	BUG_ON(arch == CPU_ARCH_UNKNOWN);
 	load_write_pc_interworks = arch >= CPU_ARCH_ARMv5T;
 }
@@ -69,6 +70,7 @@ bool alu_write_pc_interworks;
 void __init test_alu_write_pc_interworking(void)
 {
 	int arch = cpu_architecture();
+
 	BUG_ON(arch == CPU_ARCH_UNKNOWN);
 	alu_write_pc_interworks = arch >= CPU_ARCH_ARMv7;
 }
@@ -151,6 +153,7 @@ static unsigned long __kprobes __check_lt(unsigned long cpsr)
 static unsigned long __kprobes __check_gt(unsigned long cpsr)
 {
 	unsigned long temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
+
 	temp |= (cpsr << 1);			 /* PSR_N_BIT |= PSR_Z_BIT */
 	return (~temp) & PSR_N_BIT;
 }
@@ -158,6 +161,7 @@ static unsigned long __kprobes __check_gt(unsigned long cpsr)
 static unsigned long __kprobes __check_le(unsigned long cpsr)
 {
 	unsigned long temp = cpsr ^ (cpsr << 3); /* PSR_N_BIT ^= PSR_V_BIT */
+
 	temp |= (cpsr << 1);			 /* PSR_N_BIT |= PSR_Z_BIT */
 	return temp & PSR_N_BIT;
 }
@@ -228,6 +232,7 @@ set_emulated_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
 #ifdef CONFIG_THUMB2_KERNEL
 	if (thumb) {
 		u16 *ip = (u16 *)asi->insn;
+
 		if (is_wide_instruction(insn))
 			*ip++ = __opcode_to_mem_thumb16(insn >> 16);
 		*ip++ = __opcode_to_mem_thumb16(insn);
@@ -465,6 +470,7 @@ probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi,
 
 		case DECODE_TYPE_TABLE: {
 			struct decode_table *d = (struct decode_table *)h;
+
 			next = (struct decode_header *)d->table.table;
 			break;
 		}

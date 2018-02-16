@@ -66,8 +66,8 @@ void __kprobes simulate_mov_ipsp(probes_opcode_t opcode,
 
 extern const union decode_item probes_decode_arm_table[];
 
-enum probes_insn arm_probes_decode_insn(probes_opcode_t,
-		struct arch_probes_insn *, bool emulate,
+enum probes_insn arm_probes_decode_insn(probes_opcode_t opcode,
+		struct arch_probes_insn *api, bool emulate,
 		const union decode_action *actions,
 		const struct decode_checker *checkers[]);
 

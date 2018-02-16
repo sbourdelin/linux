@@ -59,6 +59,7 @@ static inline unsigned long it_advance(unsigned long cpsr)
 		/* We need to shift left ITSTATE<4:0> */
 		const unsigned long mask = 0x06001c00;  /* Mask ITSTATE<4:0> */
 		unsigned long it = cpsr & mask;
+
 		it <<= 1;
 		it |= it >> (27 - 10);  /* Carry ITSTATE<2> to correct place */
 		it &= mask;
@@ -71,6 +72,7 @@ static inline unsigned long it_advance(unsigned long cpsr)
 static inline void __kprobes bx_write_pc(long pcv, struct pt_regs *regs)
 {
 	long cpsr = regs->ARM_cpsr;
+
 	if (pcv & 0x1) {
 		cpsr |= PSR_T_BIT;
 		pcv &= ~0x1;
@@ -253,7 +255,8 @@ static inline void __kprobes alu_write_pc(long pcv, struct pt_regs *regs)
  * instruction will be modified to "AND R0, R2, R3, ASL R1" and then placed into
  * the kprobes instruction slot. This can then be called later by the handler
  * function emulate_rd12rn16rm0rs8_rwflags (a pointer to which is retrieved from
- * the indicated slot in the action array), in order to simulate the instruction.
+ * the indicated slot in the action array), in order to simulate the
+ * instruction.
  */
 
 enum decode_type {
@@ -282,7 +285,7 @@ enum decode_reg_type {
 	REG_TYPE_NOPCWB,   /* No PC if load/store write-back flag also set */
 
 	/* The following types are used when the encoding for PC indicates
-	 * another instruction form. This distiction only matters for test
+	 * another instruction form. This distinction only matters for test
 	 * case coverage checks.
 	 */
 	REG_TYPE_NOPCX,	   /* Register must not be PC */

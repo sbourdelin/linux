@@ -165,10 +165,10 @@ uprobe_decode_ldmstm(probes_opcode_t insn,
 {
 	struct arch_uprobe *auprobe = container_of(asi, struct arch_uprobe,
 						   asi);
-	unsigned reglist = insn & 0xffff;
+	unsigned int reglist = insn & 0xffff;
 	int rn = (insn >> 16) & 0xf;
 	int lbit = insn & (1 << 20);
-	unsigned used = reglist | (1 << rn);
+	unsigned int used = reglist | (1 << rn);
 
 	if (rn == 15)
 		return INSN_REJECTED;

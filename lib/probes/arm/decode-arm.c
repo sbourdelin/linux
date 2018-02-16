@@ -101,6 +101,7 @@ void __kprobes simulate_mrs(probes_opcode_t insn,
 {
 	int rd = (insn >> 12) & 0xf;
 	unsigned long mask = 0xf8ff03df; /* Mask out execution state */
+
 	regs->uregs[rd] = regs->ARM_cpsr & mask;
 }
 
