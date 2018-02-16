@@ -37,14 +37,22 @@
 
 #define MUX_TX_MAX_SIZE 2048
 
-#define gdm_tty_send(n, d, l, i, c, b) (\
-	n->tty_dev->send_func(n->tty_dev->priv_dev, d, l, i, c, b))
-#define gdm_tty_recv(n, c) (\
-	n->tty_dev->recv_func(n->tty_dev->priv_dev, c))
-#define gdm_tty_send_control(n, r, v, d, l) (\
-	n->tty_dev->send_control(n->tty_dev->priv_dev, r, v, d, l))
+#define gdm_tty_send(n, d, l, i, c, b)					\
+	({ typeof(n) n_ = (n);						\
+		void *priv_dev = n_->tty_dev->priv_dev;			\
+		n_->tty_dev->send_func(priv_dev, d, l, i, c, b); })
+#define gdm_tty_recv(n, c)					\
+	({ typeof(n) n_ = (n);					\
+		void *priv_dev = n_->tty_dev->priv_dev;		\
+		n_->tty_dev->recv_func(priv_dev, c); })
+#define gdm_tty_send_control(n, r, v, d, l)				\
+	({ typeof(n) n_ = (n);						\
+		void *priv_dev = n_->tty_dev->priv_dev;			\
+		n_->tty_dev->send_control(priv_dev, r, v, d, l); })
 
-#define GDM_TTY_READY(gdm) (gdm && gdm->tty_dev && gdm->port.count)
+#define GDM_TTY_READY(gdm)						\
+	({ typeof(gdm) gdm_ = gdm;					\
+		gdm_ && gdm_->tty_dev && gdm_->port.count; })
 
 static struct tty_driver *gdm_driver[TTY_MAX_COUNT];
 static struct gdm *gdm_table[TTY_MAX_COUNT][GDM_TTY_MINOR];
