@@ -1064,7 +1064,7 @@ int prism2mgmt_autojoin(struct wlandevice *wlandev, void *msgp)
 
 	/* Set the ssid */
 	memset(bytebuf, 0, 256);
-	pstr = (struct p80211pstrd *)&(msg->ssid.data);
+	pstr = (struct p80211pstrd *)&msg->ssid.data;
 	prism2mgmt_pstr2bytestr(p2bytestr, pstr);
 	result = hfa384x_drvr_setconfig(hw, HFA384x_RID_CNFDESIREDSSID,
 					bytebuf,
