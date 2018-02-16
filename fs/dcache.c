@@ -623,6 +623,48 @@ again:
 	return parent;
 }
 
+/**
+ * dentry_lock_inode - Lock dentry->d_inode->i_lock
+ * @dentry:	The dentry to operate on
+ *
+ * Tries to acquire @dentry->d_inode->i_lock with a trylock first. If that
+ * fails it retries in correct lock order, which requires dropping
+ * @dentry->d_lock under RCU protection and then reacquiring it after
+ * locking @dentry->d_inode->i_lock.
+ *
+ * After both locks are acquired it must be verified that @dentry->d_inode
+ * did not change while @dentry->d_lock was dropped. If it's unchanged
+ * return true, otherwise drop @dentry->d_inode->i_lock and return false.
+ *
+ * Note, that even if @dentry->d_inode is unchanged, all other relevant struct
+ * members of @dentry must be reevaluated by the caller.
+ */
+static bool dentry_lock_inode(struct dentry *dentry)
+{
+	struct inode *inode = dentry->d_inode;
+
+	lockdep_assert_held(&dentry->d_lock);
+
+	if (unlikely(!spin_trylock(&inode->i_lock))) {
+		rcu_read_lock();
+		spin_unlock(&dentry->d_lock);
+		spin_lock(&inode->i_lock);
+		spin_lock(&dentry->d_lock);
+		rcu_read_unlock();
+
+		/*
+		 * @dentry->d_inode might have changed after dropping
+		 * @dentry->d_lock. If so, release @inode->i_lock and
+		 * signal the caller to restart the operation.
+		 */
+		if (unlikely(inode != dentry->d_inode)) {
+			spin_unlock(&inode->i_lock);
+			return false;
+		}
+	}
+	return true;
+}
+
 /*
  * Finish off a dentry we've decided to kill.
  * dentry->d_lock must be held, returns with it unlocked.
@@ -2378,22 +2420,36 @@ void d_delete(struct dentry * dentry)
 	/*
 	 * Are we the only user?
 	 */
-again:
 	spin_lock(&dentry->d_lock);
+again:
 	inode = dentry->d_inode;
 	isdir = S_ISDIR(inode->i_mode);
 	if (dentry->d_lockref.count == 1) {
-		if (!spin_trylock(&inode->i_lock)) {
-			spin_unlock(&dentry->d_lock);
-			cpu_relax();
+		/*
+		 * Lock the inode. Might drop dentry->d_lock temporarily
+		 * which allows inode to change. Start over if that happens.
+		 */
+		if (!dentry_lock_inode(dentry))
 			goto again;
+
+		/*
+		 * Recheck refcount as it might have been incremented while
+		 * d_lock was dropped.
+		 */
+		if (dentry->d_lockref.count != 1) {
+			spin_unlock(&inode->i_lock);
+			goto drop;
 		}
+		/*
+		 * isdir is not reloaded because it is not possible that it
+		 * changes on the same inode.
+		 */
 		dentry->d_flags &= ~DCACHE_CANT_MOUNT;
 		dentry_unlink_inode(dentry);
 		fsnotify_nameremove(dentry, isdir);
 		return;
 	}
-
+drop:
 	if (!d_unhashed(dentry))
 		__d_drop(dentry);
 
