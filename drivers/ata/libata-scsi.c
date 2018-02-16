@@ -1345,14 +1345,9 @@ int ata_scsi_slave_config(struct scsi_device *sdev)
 {
 	struct ata_port *ap = ata_shost_to_port(sdev->host);
 	struct ata_device *dev = __ata_scsi_find_dev(ap, sdev);
-	int rc = 0;
 
 	ata_scsi_sdev_config(sdev);
-
-	if (dev)
-		rc = ata_scsi_dev_config(sdev, dev);
-
-	return rc;
+	return dev ? ata_scsi_dev_config(sdev, dev) : 0;
 }
 
 /**
