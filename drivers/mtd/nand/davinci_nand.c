@@ -865,7 +865,7 @@ static struct platform_driver nand_davinci_driver = {
 	.probe		= nand_davinci_probe,
 	.remove		= nand_davinci_remove,
 	.driver		= {
-		.name	= "davinci_nand",
+		.name	= "davinci-nand",
 		.of_match_table = of_match_ptr(davinci_nand_of_match),
 	},
 };
