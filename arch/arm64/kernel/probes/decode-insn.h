@@ -32,7 +32,7 @@ enum probes_insn __kprobes
 arm_kprobe_decode_insn(kprobe_opcode_t *addr, struct arch_specific_insn *asi);
 #endif
 enum probes_insn __kprobes
-arm_probe_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi);
+arm64_probes_decode_insn(probes_opcode_t insn, struct arch_probes_insn *asi);
 
 extern const union decode_action uprobes_probes_actions[];
 #endif /* _ARM_KERNEL_KPROBES_ARM64_H */
