@@ -62,6 +62,16 @@ static ssize_t psl_timebase_synced_show(struct device *device,
 					char *buf)
 {
 	struct cxl *adapter = to_cxl_adapter(device);
+	u64 psl_tb;
+	int delta;
+
+	psl_tb = adapter->native->sl_ops->timebase_read(adapter);
+	delta = mftb() - psl_tb;
+	if (delta < 0)
+		delta = -delta;
+
+	/* CORE TB and PSL TB difference <= 16usecs ? */
+	adapter->psl_timebase_synced = (tb_to_ns(delta) < 16000) ? true : false;
 
 	return scnprintf(buf, PAGE_SIZE, "%i\n", adapter->psl_timebase_synced);
 }
