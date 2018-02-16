@@ -551,6 +551,7 @@ enum taint_enum {
 	TAINT_SOFTLOCKUP,
 	TAINT_LIVEPATCH,
 	TAINT_AUX,
+	TAINT_RANDSTRUCT,
 
 	/* End of taint bits */
 	TAINT_FLAGS_COUNT
