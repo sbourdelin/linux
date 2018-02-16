@@ -819,10 +819,6 @@ char *hex_string(char *buf, char *end, u8 *addr, struct printf_spec spec,
 		/* nothing to print */
 		return buf;
 
-	if (ZERO_OR_NULL_PTR(addr))
-		/* NULL pointer */
-		return string(buf, end, NULL, spec);
-
 	switch (fmt[1]) {
 	case 'C':
 		separator = ':';
@@ -1258,10 +1254,6 @@ char *escaped_string(char *buf, char *end, u8 *addr, struct printf_spec spec,
 	if (spec.field_width == 0)
 		return buf;				/* nothing to print */
 
-	if (ZERO_OR_NULL_PTR(addr))
-		return string(buf, end, NULL, spec);	/* NULL pointer */
-
-
 	do {
 		switch (fmt[count++]) {
 		case 'a':
@@ -1455,7 +1447,7 @@ static noinline_for_stack
 char *clock(char *buf, char *end, struct clk *clk, struct printf_spec spec,
 	    const char *fmt)
 {
-	if (!IS_ENABLED(CONFIG_HAVE_CLK) || !clk)
+	if (!IS_ENABLED(CONFIG_HAVE_CLK))
 		return string(buf, end, NULL, spec);
 
 	switch (fmt[1]) {
@@ -1579,9 +1571,6 @@ char *device_node_string(char *buf, char *end, struct device_node *dn,
 
 	if (!IS_ENABLED(CONFIG_OF))
 		return string(buf, end, "(!OF)", spec);
-
-	if ((unsigned long)dn < PAGE_SIZE)
-		return string(buf, end, "(null)", spec);
 
 	/* simple case without anything any more format specifiers */
 	fmt++;
