@@ -216,6 +216,16 @@ static int __replace_page(struct vm_area_struct *vma, unsigned long addr,
 }
 
 /**
+ * get_swbp_insn - return breakpoint instruction.
+ * Default implementation of get_swbp_insn
+ * Returns architecture-dependent breakpoint instruction opcode
+ */
+uprobe_opcode_t __weak get_swbp_insn(void)
+{
+	return UPROBE_SWBP_INSN;
+}
+
+/**
  * is_swbp_insn - check if instruction is breakpoint instruction.
  * @insn: instruction to be checked.
  * Default implementation of is_swbp_insn
@@ -1178,7 +1188,7 @@ static int xol_add_vma(struct mm_struct *mm, struct xol_area *area)
 static struct xol_area *__create_xol_area(unsigned long vaddr)
 {
 	struct mm_struct *mm = current->mm;
-	uprobe_opcode_t insn = UPROBE_SWBP_INSN;
+	uprobe_opcode_t insn = get_swbp_insn();
 	struct xol_area *area;
 
 	area = kmalloc(sizeof(*area), GFP_KERNEL);
