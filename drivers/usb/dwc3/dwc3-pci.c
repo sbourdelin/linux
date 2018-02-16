@@ -40,12 +40,16 @@
 #define PCI_INTEL_BXT_STATE_D0		0
 #define PCI_INTEL_BXT_STATE_D3		3
 
+#define PROPERTY_ARRAY_INITIAL_SIZE	32
+
 /**
  * struct dwc3_pci - Driver private structure
  * @dwc3: child dwc3 platform_device
  * @pci: our link to PCI bus
  * @guid: _DSM GUID
  * @has_dsm_for_pm: true for devices which need to run _DSM on runtime PM
+ * @properties: null terminated array of device properties
+ * @property_array_size: property array size
  */
 struct dwc3_pci {
 	struct platform_device *dwc3;
@@ -55,6 +59,9 @@ struct dwc3_pci {
 
 	unsigned int has_dsm_for_pm:1;
 	struct work_struct wakeup_work;
+
+	struct property_entry *properties;
+	int property_array_size;
 };
 
 static const struct acpi_gpio_params reset_gpios = { 0, 0, false };
@@ -66,10 +73,76 @@ static const struct acpi_gpio_mapping acpi_dwc3_byt_gpios[] = {
 	{ },
 };
 
+/**
+ * dwc3_pci_add_one_property - Add one device property to dwc->properties
+ * @dwc: dwc3 pci private structure
+ * @property: device property
+ *
+ * Returns 0 on success otherwise negative errno.
+ */
+static int dwc3_pci_add_one_property(struct dwc3_pci *dwc,
+				     struct property_entry property)
+{
+	int idx = 0;
+	int count;
+
+	while (dwc->properties[idx].name)
+		idx++;
+
+	/* Account for null terminate element in array */
+	count = idx + 1;
+
+	/* Increase the array size if not large enough */
+	if (count == dwc->property_array_size) {
+		struct property_entry *tmp;
+
+		tmp = kcalloc(dwc->property_array_size * 2,
+			      sizeof(*tmp), GFP_KERNEL);
+		if (!tmp)
+			return -ENOMEM;
+
+		memcpy(tmp, dwc->properties,
+		       dwc->property_array_size * sizeof(*tmp));
+
+		kfree(dwc->properties);
+		dwc->properties = tmp;
+		dwc->property_array_size *= 2;
+	}
+
+	dwc->properties[idx] = property;
+
+	return 0;
+}
+
+/**
+ * dwc3_pci_add_properties - Add multiple properties to dwc->properties
+ * @dwc: dwc3 pci private structure
+ * @properties: null terminated device property array
+ *
+ * Returns 0 on success otherwise negative errno.
+ */
+static int dwc3_pci_add_properties(struct dwc3_pci *dwc,
+				   struct property_entry *properties)
+{
+	int ret;
+	int idx;
+
+	if (!properties)
+		return -EINVAL;
+
+	for (idx = 0; properties[idx].name; idx++) {
+		ret = dwc3_pci_add_one_property(dwc, properties[idx]);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
+}
+
 static int dwc3_pci_quirks(struct dwc3_pci *dwc)
 {
-	struct platform_device		*dwc3 = dwc->dwc3;
 	struct pci_dev			*pdev = dwc->pci;
+	int				ret;
 
 	if (pdev->vendor == PCI_VENDOR_ID_AMD &&
 	    pdev->device == PCI_DEVICE_ID_AMD_NL_USB) {
@@ -96,21 +169,17 @@ static int dwc3_pci_quirks(struct dwc3_pci *dwc)
 			{ },
 		};
 
-		return platform_device_add_properties(dwc3, properties);
+		ret = dwc3_pci_add_properties(dwc, properties);
+		if (ret)
+			return ret;
 	}
 
 	if (pdev->vendor == PCI_VENDOR_ID_INTEL) {
-		int ret;
-
 		struct property_entry properties[] = {
 			PROPERTY_ENTRY_STRING("dr_mode", "peripheral"),
 			PROPERTY_ENTRY_BOOL("linux,sysdev_is_parent"),
 			{ }
 		};
-
-		ret = platform_device_add_properties(dwc3, properties);
-		if (ret < 0)
-			return ret;
 
 		if (pdev->device == PCI_DEVICE_ID_INTEL_BXT ||
 				pdev->device == PCI_DEVICE_ID_INTEL_BXT_M) {
@@ -148,6 +217,10 @@ static int dwc3_pci_quirks(struct dwc3_pci *dwc)
 				usleep_range(10000, 11000);
 			}
 		}
+
+		ret = dwc3_pci_add_properties(dwc, properties);
+		if (ret)
+			return ret;
 	}
 
 	if (pdev->vendor == PCI_VENDOR_ID_SYNOPSYS &&
@@ -162,7 +235,9 @@ static int dwc3_pci_quirks(struct dwc3_pci *dwc)
 			{ },
 		};
 
-		return platform_device_add_properties(dwc3, properties);
+		ret = dwc3_pci_add_properties(dwc, properties);
+		if (ret)
+			return ret;
 	}
 
 	return 0;
@@ -229,10 +304,22 @@ static int dwc3_pci_probe(struct pci_dev *pci,
 	dwc->dwc3->dev.parent = dev;
 	ACPI_COMPANION_SET(&dwc->dwc3->dev, ACPI_COMPANION(dev));
 
+	dwc->property_array_size = PROPERTY_ARRAY_INITIAL_SIZE;
+	dwc->properties = kcalloc(dwc->property_array_size,
+				  sizeof(*dwc->properties), GFP_KERNEL);
+	if (!dwc->properties) {
+		ret = -ENOMEM;
+		goto err;
+	}
+
 	dev_set_name(dev, "dwc3-pci.%02x:%02x.%d", pci->bus->number,
 		     PCI_SLOT(pci->devfn), PCI_FUNC(pci->devfn));
 
 	ret = dwc3_pci_quirks(dwc);
+	if (ret)
+		goto err;
+
+	ret = platform_device_add_properties(dwc->dwc3, dwc->properties);
 	if (ret)
 		goto err;
 
@@ -251,6 +338,7 @@ static int dwc3_pci_probe(struct pci_dev *pci,
 
 	return 0;
 err:
+	kfree(dwc->properties);
 	platform_device_put(dwc->dwc3);
 	return ret;
 }
@@ -264,6 +352,7 @@ static void dwc3_pci_remove(struct pci_dev *pci)
 #endif
 	device_init_wakeup(&pci->dev, false);
 	pm_runtime_get(&pci->dev);
+	kfree(dwc->properties);
 	platform_device_unregister(dwc->dwc3);
 }
 
