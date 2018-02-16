@@ -4601,6 +4601,12 @@ static int ath10k_start(struct ieee80211_hw *hw)
 	switch (ar->state) {
 	case ATH10K_STATE_OFF:
 		ar->state = ATH10K_STATE_ON;
+
+		/* need to reset gpio state */
+		if (ar->hw_params.led_pin) { 
+			ath10k_wmi_gpio_config(ar, ar->hw_params.led_pin, 0, WMI_GPIO_PULL_NONE, WMI_GPIO_INTTYPE_DISABLE);
+			ath10k_wmi_gpio_output(ar, ar->hw_params.led_pin, 1);
+		}
 		break;
 	case ATH10K_STATE_RESTARTING:
 		ar->state = ATH10K_STATE_RESTARTED;

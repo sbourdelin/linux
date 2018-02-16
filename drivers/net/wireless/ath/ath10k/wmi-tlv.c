@@ -3251,6 +3251,69 @@ ath10k_wmi_tlv_op_gen_echo(struct ath10k *ar, u32 value)
 }
 
 static struct sk_buff *
+ath10k_wmi_tlv_op_gen_gpio_config(struct ath10k *ar, u32 gpio_num, u32 input, u32 pull_type, u32 intr_mode)
+{
+    struct wmi_gpio_config_cmd *cmd;
+    struct wmi_tlv *tlv;
+    struct sk_buff *skb;
+    void *ptr; 
+    size_t len;
+
+    len = sizeof(*tlv) + sizeof(*cmd);
+    skb = ath10k_wmi_alloc_skb(ar, len);
+    if (!skb)
+	return ERR_PTR(-ENOMEM);
+
+    ptr = (void *)skb->data;
+    tlv = ptr;
+    tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_GPIO_CONFIG_CMD);
+    tlv->len = __cpu_to_le16(sizeof(*cmd));
+
+    cmd = (struct wmi_gpio_config_cmd *)skb->data;
+    cmd->pull_type = __cpu_to_le32(pull_type);
+    cmd->gpio_num = __cpu_to_le32(gpio_num);
+    cmd->input = __cpu_to_le32(input);
+    cmd->intr_mode = __cpu_to_le32(intr_mode);
+
+    ptr += sizeof(*tlv);
+    ptr += sizeof(*cmd);
+
+    ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv gpio_config gpio_num 0x%08x input 0x%08x pull_type 0x%08x intr_mode 0x%08x\n", gpio_num, input, pull_type, intr_mode);
+    return skb;
+}
+
+static struct sk_buff *
+ath10k_wmi_tlv_op_gen_gpio_output(struct ath10k *ar, u32 gpio_num, u32 set)
+{
+    struct wmi_gpio_output_cmd *cmd;
+    struct wmi_tlv *tlv;
+    struct sk_buff *skb;
+    void *ptr; 
+    size_t len;
+
+    len = sizeof(*tlv) + sizeof(*cmd);
+    skb = ath10k_wmi_alloc_skb(ar, len);
+    if (!skb)
+	return ERR_PTR(-ENOMEM);
+
+    ptr = (void *)skb->data;
+    tlv = ptr;
+    tlv->tag = __cpu_to_le16(WMI_TLV_TAG_STRUCT_GPIO_OUTPUT_CMD);
+    tlv->len = __cpu_to_le16(sizeof(*cmd));
+
+    cmd = (struct wmi_gpio_output_cmd *)skb->data;
+    cmd->gpio_num = __cpu_to_le32(gpio_num);
+    cmd->set = __cpu_to_le32(set);
+
+    ptr += sizeof(*tlv);
+    ptr += sizeof(*cmd);
+
+    ath10k_dbg(ar, ATH10K_DBG_WMI, "wmi tlv gpio_output gpio_num 0x%08x set 0x%08x\n", gpio_num, set);
+    return skb;
+}
+
+
+static struct sk_buff *
 ath10k_wmi_tlv_op_gen_vdev_spectral_conf(struct ath10k *ar,
 					 const struct wmi_vdev_spectral_conf_arg *arg)
 {
@@ -3727,6 +3790,8 @@ static const struct wmi_ops wmi_tlv_ops = {
 	.fw_stats_fill = ath10k_wmi_main_op_fw_stats_fill,
 	.get_vdev_subtype = ath10k_wmi_op_get_vdev_subtype,
 	.gen_echo = ath10k_wmi_tlv_op_gen_echo,
+	.gen_gpio_config = ath10k_wmi_tlv_op_gen_gpio_config,
+	.gen_gpio_output = ath10k_wmi_tlv_op_gen_gpio_output,
 	.gen_vdev_spectral_conf = ath10k_wmi_tlv_op_gen_vdev_spectral_conf,
 	.gen_vdev_spectral_enable = ath10k_wmi_tlv_op_gen_vdev_spectral_enable,
 };
