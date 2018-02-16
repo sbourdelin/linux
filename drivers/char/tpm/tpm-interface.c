@@ -431,7 +431,7 @@ ssize_t tpm_transmit(struct tpm_chip *chip, struct tpm_space *space,
 	/* Store the decision as chip->locality will be changed. */
 	need_locality = chip->locality == -1;
 
-	if (!(flags & TPM_TRANSMIT_RAW) &&
+	if (!(flags & TPM_TRANSMIT_IGNORE_LOCALITY) &&
 	    need_locality && chip->ops->request_locality)  {
 		rc = chip->ops->request_locality(chip, 0);
 		if (rc < 0)
