@@ -1228,8 +1228,8 @@ static void const *XGI_GetLcdPtr(struct XGI330_LCDDataTablStruct const *table,
 	return table[i].DATAPTR;
 }
 
-static struct SiS_TVData const *XGI_GetTVPtr(
-	unsigned short ModeIdIndex,
+static struct SiS_TVData const *XGI_GetTVPtr
+(unsigned short ModeIdIndex,
 	unsigned short RefreshRateTableIndex,
 	struct vb_device_info *pVBInfo)
 {
