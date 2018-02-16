@@ -1880,6 +1880,10 @@ static ssize_t tun_get_user(struct tun_struct *tun, struct tun_file *tfile,
 			default:
 				this_cpu_inc(tun->pcpu_stats->rx_dropped);
 				kfree_skb(skb);
+				if (frags) {
+					tfile->napi.skb = NULL;
+					mutex_unlock(&tfile->napi_mutex);
+				}
 				return -EINVAL;
 			}
 		}
