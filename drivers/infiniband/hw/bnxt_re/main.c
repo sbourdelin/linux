@@ -658,6 +658,7 @@ static void bnxt_re_dev_remove(struct bnxt_re_dev *rdev)
 	synchronize_rcu();
 	flush_workqueue(bnxt_re_wq);
 
+	kfree(rdev->gid_map);
 	ib_dealloc_device(&rdev->ibdev);
 	/* rdev is gone */
 }
@@ -666,6 +667,7 @@ static struct bnxt_re_dev *bnxt_re_dev_add(struct net_device *netdev,
 					   struct bnxt_en_dev *en_dev)
 {
 	struct bnxt_re_dev *rdev;
+	u32 count;
 
 	/* Allocate bnxt_re_dev instance here */
 	rdev = (struct bnxt_re_dev *)ib_alloc_device(sizeof(*rdev));
@@ -688,6 +690,17 @@ static struct bnxt_re_dev *bnxt_re_dev_add(struct net_device *netdev,
 	atomic_set(&rdev->mw_count, 0);
 	rdev->cosq[0] = 0xFFFF;
 	rdev->cosq[1] = 0xFFFF;
+
+	rdev->gid_map = kzalloc(sizeof(*rdev->gid_map) *
+				BNXT_RE_MAX_SGID_ENTRIES,
+				GFP_KERNEL);
+	if (!rdev->gid_map) {
+		ib_dealloc_device(&rdev->ibdev);
+		return NULL;
+	}
+
+	for (count = 0; count < BNXT_RE_MAX_SGID_ENTRIES; count++)
+		rdev->gid_map[count] = -1;
 
 	mutex_lock(&bnxt_re_dev_lock);
 	list_add_tail_rcu(&rdev->list, &bnxt_re_dev_list);

@@ -348,6 +348,7 @@ int bnxt_re_del_gid(struct ib_device *ibdev, u8 port_num,
 			return -EFAULT;
 		}
 		ctx->refcnt--;
+		rdev->gid_map[index] = -1;
 		if (!ctx->refcnt) {
 			rc = bnxt_qplib_del_sgid(sgid_tbl, gid_to_del, true);
 			if (rc) {
@@ -386,6 +387,8 @@ int bnxt_re_add_gid(struct ib_device *ibdev, u8 port_num,
 		ctx_tbl = sgid_tbl->ctx;
 		ctx_tbl[tbl_idx]->refcnt++;
 		*context = ctx_tbl[tbl_idx];
+		/* tbl_idx is the HW table index and index is the stack index */
+		rdev->gid_map[index] = tbl_idx;
 		return 0;
 	}
 
@@ -401,6 +404,8 @@ int bnxt_re_add_gid(struct ib_device *ibdev, u8 port_num,
 	ctx->idx = tbl_idx;
 	ctx->refcnt = 1;
 	ctx_tbl[tbl_idx] = ctx;
+	/* tbl_idx is the HW table index and index is the stack index */
+	rdev->gid_map[index] = tbl_idx;
 	*context = ctx;
 
 	return rc;
@@ -691,12 +696,8 @@ struct ib_ah *bnxt_re_create_ah(struct ib_pd *ib_pd,
 	/* Supply the configuration for the HW */
 	memcpy(ah->qplib_ah.dgid.data, grh->dgid.raw,
 	       sizeof(union ib_gid));
-	/*
-	 * If RoCE V2 is enabled, stack will have two entries for
-	 * each GID entry. Avoiding this duplicte entry in HW. Dividing
-	 * the GID index by 2 for RoCE V2
-	 */
-	ah->qplib_ah.sgid_index = grh->sgid_index / 2;
+	/* Retrieve the HW index from the driver SGID map */
+	ah->qplib_ah.sgid_index = rdev->gid_map[ah_attr->grh.sgid_index];
 	ah->qplib_ah.host_sgid_index = grh->sgid_index;
 	ah->qplib_ah.traffic_class = grh->traffic_class;
 	ah->qplib_ah.flow_label = grh->flow_label;
@@ -1638,11 +1639,9 @@ int bnxt_re_modify_qp(struct ib_qp *ib_qp, struct ib_qp_attr *qp_attr,
 		memcpy(qp->qplib_qp.ah.dgid.data, grh->dgid.raw,
 		       sizeof(qp->qplib_qp.ah.dgid.data));
 		qp->qplib_qp.ah.flow_label = grh->flow_label;
-		/* If RoCE V2 is enabled, stack will have two entries for
-		 * each GID entry. Avoiding this duplicte entry in HW. Dividing
-		 * the GID index by 2 for RoCE V2
-		 */
-		qp->qplib_qp.ah.sgid_index = grh->sgid_index / 2;
+		/* Retrieve the HW index from the driver SGID map */
+		qp->qplib_qp.ah.sgid_index =
+			rdev->gid_map[qp_attr->ah_attr.grh.sgid_index];
 		qp->qplib_qp.ah.host_sgid_index = grh->sgid_index;
 		qp->qplib_qp.ah.hop_limit = grh->hop_limit;
 		qp->qplib_qp.ah.traffic_class = grh->traffic_class;

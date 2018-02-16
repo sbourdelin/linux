@@ -109,6 +109,7 @@ struct bnxt_re_sqp_entries {
 #define BNXT_RE_MAX_MSIX		9
 #define BNXT_RE_AEQ_IDX			0
 #define BNXT_RE_NQ_IDX			1
+#define BNXT_RE_MAX_SGID_ENTRIES	256
 
 struct bnxt_re_dev {
 	struct ib_device		ibdev;
@@ -170,6 +171,8 @@ struct bnxt_re_dev {
 	u32 is_virtfn;
 	u32 num_vfs;
 	struct bnxt_qplib_roce_stats	stats;
+	/* Array to handle gid mapping */
+	char				*gid_map;
 };
 
 #define to_bnxt_re_dev(ptr, member)	\
