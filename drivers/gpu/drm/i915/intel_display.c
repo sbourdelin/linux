@@ -13123,7 +13123,7 @@ intel_legacy_cursor_update(struct drm_plane *plane,
 			goto out_unlock;
 		}
 
-		intel_fb_obj_flush(intel_fb_obj(fb), ORIGIN_DIRTYFB);
+		intel_fb_obj_flush(intel_fb_obj(fb), ORIGIN_FLIP);
 		to_intel_plane_state(new_plane_state)->vma = vma;
 	}
 
