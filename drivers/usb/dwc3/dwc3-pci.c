@@ -229,6 +229,9 @@ static int dwc3_pci_probe(struct pci_dev *pci,
 	dwc->dwc3->dev.parent = dev;
 	ACPI_COMPANION_SET(&dwc->dwc3->dev, ACPI_COMPANION(dev));
 
+	dev_set_name(dev, "dwc3-pci.%02x:%02x.%d", pci->bus->number,
+		     PCI_SLOT(pci->devfn), PCI_FUNC(pci->devfn));
+
 	ret = dwc3_pci_quirks(dwc);
 	if (ret)
 		goto err;
