@@ -243,41 +243,12 @@ static int dwc3_pci_quirks(struct dwc3_pci *dwc)
 	return 0;
 }
 
-#ifdef CONFIG_PM
-static void dwc3_pci_resume_work(struct work_struct *work)
+static int dwc3_pci_add_platform_device(struct dwc3_pci *dwc)
 {
-	struct dwc3_pci *dwc = container_of(work, struct dwc3_pci, wakeup_work);
-	struct platform_device *dwc3 = dwc->dwc3;
-	int ret;
-
-	ret = pm_runtime_get_sync(&dwc3->dev);
-	if (ret)
-		return;
-
-	pm_runtime_mark_last_busy(&dwc3->dev);
-	pm_runtime_put_sync_autosuspend(&dwc3->dev);
-}
-#endif
-
-static int dwc3_pci_probe(struct pci_dev *pci,
-		const struct pci_device_id *id)
-{
-	struct dwc3_pci		*dwc;
 	struct resource		res[2];
 	int			ret;
+	struct pci_dev		*pci = dwc->pci;
 	struct device		*dev = &pci->dev;
-
-	ret = pcim_enable_device(pci);
-	if (ret) {
-		dev_err(dev, "failed to enable pci device\n");
-		return -ENODEV;
-	}
-
-	pci_set_master(pci);
-
-	dwc = devm_kzalloc(dev, sizeof(*dwc), GFP_KERNEL);
-	if (!dwc)
-		return -ENOMEM;
 
 	dwc->dwc3 = platform_device_alloc("dwc3", PLATFORM_DEVID_AUTO);
 	if (!dwc->dwc3)
@@ -300,10 +271,69 @@ static int dwc3_pci_probe(struct pci_dev *pci,
 		goto err;
 	}
 
-	dwc->pci = pci;
 	dwc->dwc3->dev.parent = dev;
 	ACPI_COMPANION_SET(&dwc->dwc3->dev, ACPI_COMPANION(dev));
 
+	if (dwc->properties[0].name) {
+		ret = platform_device_add_properties(dwc->dwc3,
+						     dwc->properties);
+		if (ret) {
+			dev_err(dev, "couldn't add properties to device\n");
+			goto err;
+		}
+	}
+
+	ret = platform_device_add(dwc->dwc3);
+	if (ret) {
+		dev_err(dev, "failed to register dwc3 device\n");
+		goto err;
+	}
+
+	return 0;
+
+err:
+	platform_device_put(dwc->dwc3);
+	dwc->dwc3 = NULL;
+	return ret;
+}
+
+#ifdef CONFIG_PM
+static void dwc3_pci_resume_work(struct work_struct *work)
+{
+	struct dwc3_pci *dwc = container_of(work, struct dwc3_pci, wakeup_work);
+	struct platform_device *dwc3 = dwc->dwc3;
+	int ret;
+
+	ret = pm_runtime_get_sync(&dwc3->dev);
+	if (ret)
+		return;
+
+	pm_runtime_mark_last_busy(&dwc3->dev);
+	pm_runtime_put_sync_autosuspend(&dwc3->dev);
+}
+#endif
+
+static int dwc3_pci_probe(struct pci_dev *pci,
+		const struct pci_device_id *id)
+{
+	struct dwc3_pci		*dwc;
+	int			ret;
+	struct device		*dev = &pci->dev;
+
+	ret = pcim_enable_device(pci);
+	if (ret) {
+		dev_err(dev, "failed to enable pci device\n");
+		return -ENODEV;
+	}
+
+	pci_set_master(pci);
+
+	dwc = devm_kzalloc(dev, sizeof(*dwc), GFP_KERNEL);
+	if (!dwc)
+		return -ENOMEM;
+
+	dwc->pci = pci;
+	dwc->dwc3 = NULL;
 	dwc->property_array_size = PROPERTY_ARRAY_INITIAL_SIZE;
 	dwc->properties = kcalloc(dwc->property_array_size,
 				  sizeof(*dwc->properties), GFP_KERNEL);
@@ -319,15 +349,9 @@ static int dwc3_pci_probe(struct pci_dev *pci,
 	if (ret)
 		goto err;
 
-	ret = platform_device_add_properties(dwc->dwc3, dwc->properties);
+	ret = dwc3_pci_add_platform_device(dwc);
 	if (ret)
 		goto err;
-
-	ret = platform_device_add(dwc->dwc3);
-	if (ret) {
-		dev_err(dev, "failed to register dwc3 device\n");
-		goto err;
-	}
 
 	device_init_wakeup(dev, true);
 	pci_set_drvdata(pci, dwc);
@@ -339,7 +363,6 @@ static int dwc3_pci_probe(struct pci_dev *pci,
 	return 0;
 err:
 	kfree(dwc->properties);
-	platform_device_put(dwc->dwc3);
 	return ret;
 }
 
