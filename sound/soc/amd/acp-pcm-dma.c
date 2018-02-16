@@ -37,7 +37,7 @@
 #define MAX_BUFFER (PLAYBACK_MAX_PERIOD_SIZE * PLAYBACK_MAX_NUM_PERIODS)
 #define MIN_BUFFER MAX_BUFFER
 
-#define ST_PLAYBACK_MAX_PERIOD_SIZE 8192
+#define ST_PLAYBACK_MAX_PERIOD_SIZE 4096
 #define ST_CAPTURE_MAX_PERIOD_SIZE  ST_PLAYBACK_MAX_PERIOD_SIZE
 #define ST_MAX_BUFFER (ST_PLAYBACK_MAX_PERIOD_SIZE * PLAYBACK_MAX_NUM_PERIODS)
 #define ST_MIN_BUFFER ST_MAX_BUFFER
@@ -320,42 +320,99 @@ static void config_acp_dma(void __iomem *acp_mmio,
 	u16 ch1, ch2, destination, dma_dscr_idx;
 
 	if (audio_config->direction == SNDRV_PCM_STREAM_PLAYBACK) {
-		pte_offset = ACP_PLAYBACK_PTE_OFFSET;
-		ch1 = SYSRAM_TO_ACP_CH_NUM;
-		ch2 = ACP_TO_I2S_DMA_CH_NUM;
-		sram_bank = ACP_SHARED_RAM_BANK_1_ADDRESS;
-		destination = TO_ACP_I2S_1;
-
-	} else {
-		pte_offset = ACP_CAPTURE_PTE_OFFSET;
-		ch1 = SYSRAM_TO_ACP_CH_NUM;
-		ch2 = ACP_TO_I2S_DMA_CH_NUM;
-		switch (asic_type) {
-		case CHIP_STONEY:
+		switch (audio_config->i2s_play_instance) {
+		case I2S_BT_INSTANCE:
+			pte_offset = ACP_ST_I2S_BT_PLAYBACK_PTE_OFFSET;
+			ch1 = SYSRAM_TO_ACP_BT_INSTANCE_CH_NUM;
+			ch2 = ACP_TO_I2S_DMA_BT_INSTANCE_CH_NUM;
 			sram_bank = ACP_SHARED_RAM_BANK_3_ADDRESS;
+			destination = TO_BLUETOOTH;
 			break;
+		case I2S_SP_INSTANCE:
 		default:
-			sram_bank = ACP_SHARED_RAM_BANK_5_ADDRESS;
+			switch (asic_type) {
+			case CHIP_STONEY:
+				pte_offset = ACP_ST_I2S_SP_PLAYBACK_PTE_OFFSET;
+				break;
+			default:
+				pte_offset = ACP_PLAYBACK_PTE_OFFSET;
+			}
+			ch1 = SYSRAM_TO_ACP_CH_NUM;
+			ch2 = ACP_TO_I2S_DMA_CH_NUM;
+			sram_bank = ACP_SHARED_RAM_BANK_1_ADDRESS;
+			destination = TO_ACP_I2S_1;
 		}
-		destination = FROM_ACP_I2S_1;
+	} else {
+		switch (audio_config->i2s_capture_instance) {
+		case I2S_BT_INSTANCE:
+			pte_offset = ACP_ST_I2S_BT_CAPTURE_PTE_OFFSET;
+			ch1 = ACP_TO_SYSRAM_BT_INSTANCE_CH_NUM;
+			ch2 = I2S_TO_ACP_DMA_BT_INSTANCE_CH_NUM;
+			sram_bank = ACP_SHARED_RAM_BANK_4_ADDRESS;
+			destination = FROM_BLUETOOTH;
+			break;
+		case I2S_SP_INSTANCE:
+		default:
+			pte_offset = ACP_CAPTURE_PTE_OFFSET;
+			ch1 = SYSRAM_TO_ACP_CH_NUM;
+			ch2 = ACP_TO_I2S_DMA_CH_NUM;
+			switch (asic_type) {
+			case CHIP_STONEY:
+				sram_bank = ACP_SHARED_RAM_BANK_2_ADDRESS;
+				break;
+			default:
+				sram_bank = ACP_SHARED_RAM_BANK_5_ADDRESS;
+			}
+			destination = FROM_ACP_I2S_1;
+		}
 	}
 
 	acp_pte_config(acp_mmio, audio_config->pg, audio_config->num_of_pages,
 			pte_offset);
-	if (audio_config->direction == SNDRV_PCM_STREAM_PLAYBACK)
-		dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH12;
-	else
-		dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH14;
+	if (audio_config->direction == SNDRV_PCM_STREAM_PLAYBACK) {
+		switch (audio_config->i2s_play_instance) {
+		case I2S_BT_INSTANCE:
+			dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH8;
+			break;
+		case I2S_SP_INSTANCE:
+		default:
+			dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH12;
+		}
+	} else {
+		switch (audio_config->i2s_capture_instance) {
+		case I2S_BT_INSTANCE:
+			dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH10;
+			break;
+		case I2S_SP_INSTANCE:
+		default:
+			dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH14;
+		}
+	}
 
 	/* Configure System memory <-> ACP SRAM DMA descriptors */
 	set_acp_sysmem_dma_descriptors(acp_mmio, audio_config->size,
 				       audio_config->direction, pte_offset,
 					ch1, sram_bank, dma_dscr_idx, asic_type);
 
-	if (audio_config->direction == SNDRV_PCM_STREAM_PLAYBACK)
-		dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH13;
-	else
-		dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH15;
+	if (audio_config->direction == SNDRV_PCM_STREAM_PLAYBACK) {
+		switch (audio_config->i2s_play_instance) {
+		case I2S_BT_INSTANCE:
+			dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH9;
+			break;
+		case I2S_SP_INSTANCE:
+		default:
+			dma_dscr_idx = PLAYBACK_START_DMA_DESCR_CH13;
+		}
+	} else {
+		switch (audio_config->i2s_capture_instance) {
+		case I2S_BT_INSTANCE:
+			dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH11;
+			break;
+		case I2S_SP_INSTANCE:
+		default:
+			dma_dscr_idx = CAPTURE_START_DMA_DESCR_CH15;
+		}
+	}
 	/* Configure ACP SRAM <-> I2S DMA descriptors */
 	set_acp_to_i2s_dma_descriptors(acp_mmio, audio_config->size,
 					audio_config->direction, sram_bank,
@@ -385,6 +442,9 @@ static void acp_dma_start(void __iomem *acp_mmio,
 	case ACP_TO_I2S_DMA_CH_NUM:
 	case ACP_TO_SYSRAM_CH_NUM:
 	case I2S_TO_ACP_DMA_CH_NUM:
+	case ACP_TO_I2S_DMA_BT_INSTANCE_CH_NUM:
+	case ACP_TO_SYSRAM_BT_INSTANCE_CH_NUM:
+	case I2S_TO_ACP_DMA_BT_INSTANCE_CH_NUM:
 		dma_ctrl |= ACP_DMA_CNTL_0__DMAChIOCEn_MASK;
 		break;
 	default:
