@@ -675,9 +675,8 @@ static u8 *it821x_firmware_command(struct ata_port *ap, u8 cmd, int len)
 	while(n++ < 10) {
 		status = ioread8(ap->ioaddr.status_addr);
 		if (status & ATA_ERR) {
-			kfree(buf);
 			printk(KERN_ERR "it821x_firmware_command: rejected\n");
-			return NULL;
+			goto free_buffer;
 		}
 		if (status & ATA_DRQ) {
 			ioread16_rep(ap->ioaddr.data_addr, buf, len/2);
@@ -685,8 +684,10 @@ static u8 *it821x_firmware_command(struct ata_port *ap, u8 cmd, int len)
 		}
 		usleep_range(500, 1000);
 	}
-	kfree(buf);
+
 	printk(KERN_ERR "it821x_firmware_command: timeout\n");
+free_buffer:
+	kfree(buf);
 	return NULL;
 }
 
