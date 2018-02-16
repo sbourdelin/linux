@@ -143,7 +143,14 @@ int arch_decode_instruction(struct elf *elf, struct section *sec,
 		}
 		break;
 
-	case 0x50 ... 0x57:
+	case 0x50:
+        case 0x51:
+        case 0x52:
+        case 0x53:
+        case 0x54:
+        case 0x55:
+        case 0x56:
+        case 0x57:
 
 		/* push reg */
 		*type = INSN_STACK;
@@ -153,7 +160,14 @@ int arch_decode_instruction(struct elf *elf, struct section *sec,
 
 		break;
 
-	case 0x58 ... 0x5f:
+	case 0x58:
+        case 0x59:
+        case 0x5a:
+        case 0x5b:
+        case 0x5c:
+        case 0x5d:
+        case 0x5e:
+        case 0x5f:
 
 		/* pop reg */
 		*type = INSN_STACK;
@@ -171,7 +185,22 @@ int arch_decode_instruction(struct elf *elf, struct section *sec,
 		op->dest.type = OP_DEST_PUSH;
 		break;
 
-	case 0x70 ... 0x7f:
+	case 0x70:
+        case 0x71:
+        case 0x72:
+        case 0x73:
+        case 0x74:
+        case 0x75:
+        case 0x76:
+        case 0x77:
+        case 0x78:
+        case 0x79:
+        case 0x7a:
+        case 0x7b:
+        case 0x7c:
+        case 0x7d:
+        case 0x7e:
+        case 0x7f:
 		*type = INSN_JUMP_CONDITIONAL;
 		break;
 
