@@ -83,7 +83,7 @@ static struct resource davinci_sffsdr_nandflash_resource[] = {
 };
 
 static struct platform_device davinci_sffsdr_nandflash_device = {
-	.name		= "davinci_nand", /* Name of driver */
+	.name		= "davinci-nand", /* Name of driver */
 	.id		= 0,
 	.dev		= {
 		.platform_data	= &davinci_sffsdr_nandflash_data,

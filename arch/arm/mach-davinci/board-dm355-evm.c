@@ -97,7 +97,7 @@ static struct resource davinci_nand_resources[] = {
 };
 
 static struct platform_device davinci_nand_device = {
-	.name			= "davinci_nand",
+	.name			= "davinci-nand",
 	.id			= 0,
 
 	.num_resources		= ARRAY_SIZE(davinci_nand_resources),

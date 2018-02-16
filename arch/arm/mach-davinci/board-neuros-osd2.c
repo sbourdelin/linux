@@ -107,7 +107,7 @@ static struct resource davinci_ntosd2_nandflash_resource[] = {
 };
 
 static struct platform_device davinci_ntosd2_nandflash_device = {
-	.name		= "davinci_nand",
+	.name		= "davinci-nand",
 	.id		= 0,
 	.dev		= {
 		.platform_data	= &davinci_ntosd2_nandflash_data,

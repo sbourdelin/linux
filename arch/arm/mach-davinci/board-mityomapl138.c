@@ -422,7 +422,7 @@ static struct resource mityomapl138_nandflash_resource[] = {
 };
 
 static struct platform_device mityomapl138_nandflash_device = {
-	.name		= "davinci_nand",
+	.name		= "davinci-nand",
 	.id		= 1,
 	.dev		= {
 		.platform_data	= &mityomapl138_nandflash_data,
