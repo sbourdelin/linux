@@ -1178,11 +1178,15 @@ static int acp_dma_trigger(struct snd_pcm_substream *substream, int cmd)
 			switch (rtd->i2s_play_instance) {
 			case I2S_BT_INSTANCE:
 				ret = acp_dma_stop(rtd->acp_mmio,
+						SYSRAM_TO_ACP_BT_INSTANCE_CH_NUM);
+				ret = acp_dma_stop(rtd->acp_mmio,
 						ACP_TO_I2S_DMA_BT_INSTANCE_CH_NUM);
 				rtd->i2sbt_renderbytescount = 0;
 				break;
 			case I2S_SP_INSTANCE:
 			default:
+				ret = acp_dma_stop(rtd->acp_mmio,
+						SYSRAM_TO_ACP_CH_NUM);
 				ret =  acp_dma_stop(rtd->acp_mmio,
 						ACP_TO_I2S_DMA_CH_NUM);
 				rtd->i2ssp_renderbytescount = 0;
@@ -1192,12 +1196,16 @@ static int acp_dma_trigger(struct snd_pcm_substream *substream, int cmd)
 			case I2S_BT_INSTANCE:
 				ret = acp_dma_stop(rtd->acp_mmio,
 						I2S_TO_ACP_DMA_BT_INSTANCE_CH_NUM);
+				ret = acp_dma_stop(rtd->acp_mmio,
+						ACP_TO_SYSRAM_BT_INSTANCE_CH_NUM);
 				rtd->i2sbt_capturebytescount = 0;
 				break;
 			case I2S_SP_INSTANCE:
 			default:
 				ret = acp_dma_stop(rtd->acp_mmio,
 						I2S_TO_ACP_DMA_CH_NUM);
+				ret = acp_dma_stop(rtd->acp_mmio,
+						ACP_TO_SYSRAM_CH_NUM);
 				rtd->i2ssp_capturebytescount = 0;
 			}
 		}
