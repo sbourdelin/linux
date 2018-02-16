@@ -243,7 +243,7 @@ static void log_heading(struct log_entry *entry)
 
 static void append_entry(
 		struct log_entry *entry,
-		char *buffer,
+		const char *buffer,
 		uint32_t buf_size)
 {
 	if (!entry->buf ||
@@ -345,7 +345,9 @@ void dm_logger_append_va(
 		if (size < LOG_MAX_LINE_SIZE - 1) {
 			append_entry(entry, buffer, size);
 		} else {
-			append_entry(entry, "LOG_ERROR, line too long\n", 27);
+			static const char msg[] = "LOG_ERROR, line too long\n";
+
+			append_entry(entry, msg, sizeof(msg));
 		}
 	}
 }
