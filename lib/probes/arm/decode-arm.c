@@ -87,11 +87,17 @@ void __kprobes simulate_blx2bx(probes_opcode_t insn,
 		struct arch_probes_insn *asi, struct pt_regs *regs)
 {
 	int rm = insn & 0xf;
-	long rmv = pt_regs_read_reg(regs, rm);
+	long rmv;
 	long cpsr;
 
+	if (rm == 15)
+		rmv = (long) instruction_pointer(regs);
+	else
+		rmv = pt_regs_read_reg(regs, rm);
+
 	if (insn & (1 << 5))
-		link_register_set(regs, (long) instruction_pointer(regs));
+		link_register_set(regs,
+				(long) instruction_pointer(regs) + ARM_COMPAT_LR_OFFSET);
 
 	instruction_pointer_set(regs, rmv & ~0x1);
 	cpsr = state_register(regs) & ~PSR_T_BIT;
@@ -108,7 +114,10 @@ void __kprobes simulate_mrs(probes_opcode_t insn,
 	int rd = (insn >> 12) & 0xf;
 	unsigned long mask = 0xf8ff03df; /* Mask out execution state */
 
-	pt_regs_write_reg(regs, rd, state_register(regs) & mask);
+	if (rd == 15)
+		instruction_pointer_set(regs, state_register(regs) & mask);
+	else
+		pt_regs_write_reg(regs, rd, state_register(regs) & mask);
 }
 
 void __kprobes simulate_mov_ipsp(probes_opcode_t insn,

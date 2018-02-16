@@ -364,6 +364,14 @@ int aarch32_break_handler(struct pt_regs *regs)
 	if (!bp)
 		return -EFAULT;
 
+	/*
+	 * Since bp != false, a sofware breakpoint instruction is being handled.
+	 * If in user mode (compat_user_mode() few lines above),
+	 * try to handle it by an uprobe handler, if registered.
+	 */
+	if (!brk_handler((unsigned long)pc, BRK64_ESR_UPROBES, regs))
+		return 0;
+
 	send_user_sigtrap(TRAP_BRKPT);
 	return 0;
 }

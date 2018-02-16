@@ -11,8 +11,46 @@
 #include <asm/cacheflush.h>
 
 #include "decode-insn.h"
+#include "decode.h"
+#include "decode-arm.h"
+#include <../../../arm/include/asm/opcodes.h>
 
 #define UPROBE_INV_FAULT_CODE	UINT_MAX
+
+uprobe_opcode_t get_swbp_insn(void)
+{
+	if (is_compat_task())
+		return AARCH32_BREAK_ARM;
+	else
+		return UPROBE_SWBP_INSN;
+}
+
+bool is_swbp_insn(uprobe_opcode_t *insn)
+{
+	return ((__mem_to_opcode_arm(*insn) & 0x0fffffff) ==
+				(AARCH32_BREAK_ARM & 0x0fffffff)) ||
+				*insn == UPROBE_SWBP_INSN;
+}
+
+int set_swbp(struct arch_uprobe *auprobe, struct mm_struct *mm,
+	     unsigned long vaddr)
+{
+	if (auprobe->arch == UPROBE_AARCH32)
+		return uprobe_write_opcode(mm, vaddr,
+				__opcode_to_mem_arm(auprobe->bp_insn));
+	else
+		return uprobe_write_opcode(mm, vaddr, UPROBE_SWBP_INSN);
+}
+
+int set_orig_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
+		unsigned long vaddr)
+{
+	if (auprobe->arch == UPROBE_AARCH32)
+		return uprobe_write_opcode(mm, vaddr, auprobe->orig_insn);
+	else
+		return uprobe_write_opcode(mm, vaddr,
+				*(uprobe_opcode_t *)&auprobe->insn);
+}
 
 void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
 		void *src, unsigned long len)
@@ -38,16 +76,45 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
 		unsigned long addr)
 {
 	probes_opcode_t insn;
-
-	/* TODO: Currently we do not support AARCH32 instruction probing */
-	if (mm->context.flags & MMCF_AARCH32)
-		return -ENOTSUPP;
-	else if (!IS_ALIGNED(addr, AARCH64_INSN_SIZE))
-		return -EINVAL;
+	enum probes_insn retval;
+	unsigned int bpinsn;
 
 	insn = *(probes_opcode_t *)(&auprobe->insn[0]);
 
-	switch (arm64_probes_decode_insn(insn, &auprobe->api)) {
+	if (!IS_ALIGNED(addr, AARCH64_INSN_SIZE))
+		return -EINVAL;
+
+	/* check if AARCH32 */
+	if (is_compat_task()) {
+
+		/* Thumb is not supported yet */
+		if (addr & 0x3)
+			return -EINVAL;
+
+		retval = arm_probes_decode_insn(insn, &auprobe->api, false,
+					     uprobes_probes_actions, NULL);
+		auprobe->arch = UPROBE_AARCH32;
+
+		/*
+		 * original instruction could have been modified
+		 * when preparing for xol on AArch32
+		 */
+		auprobe->orig_insn = insn;
+
+		bpinsn = AARCH32_BREAK_ARM & 0x0fffffff;
+		if (insn >= 0xe0000000) /* Unconditional instruction */
+			bpinsn |= 0xe0000000;
+		else /* Copy condition from insn */
+			bpinsn |= insn & 0xf0000000;
+
+		auprobe->bp_insn = bpinsn;
+	} else {
+		insn = *(probes_opcode_t *)(&auprobe->insn[0]);
+		retval = arm64_probes_decode_insn(insn, &auprobe->api);
+		auprobe->arch = UPROBE_AARCH64;
+	}
+
+	switch (retval) {
 	case INSN_REJECTED:
 		return -EINVAL;
 
@@ -65,6 +132,9 @@ int arch_uprobe_analyze_insn(struct arch_uprobe *auprobe, struct mm_struct *mm,
 int arch_uprobe_pre_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
 {
 	struct uprobe_task *utask = current->utask;
+
+	if (auprobe->prehandler)
+		auprobe->prehandler(auprobe, &utask->autask, regs);
 
 	/* Initialize with an invalid fault code to detect if ol insn trapped */
 	current->thread.fault_code = UPROBE_INV_FAULT_CODE;
@@ -88,6 +158,9 @@ int arch_uprobe_post_xol(struct arch_uprobe *auprobe, struct pt_regs *regs)
 
 	user_disable_single_step(current);
 
+	if (auprobe->posthandler)
+		auprobe->posthandler(auprobe, &utask->autask, regs);
+
 	return 0;
 }
 bool arch_uprobe_xol_was_trapped(struct task_struct *t)
@@ -103,10 +176,24 @@ bool arch_uprobe_xol_was_trapped(struct task_struct *t)
 	return false;
 }
 
+bool arch_uprobe_ignore(struct arch_uprobe *auprobe, struct pt_regs *regs)
+{
+	probes_opcode_t insn = *(probes_opcode_t *)(&auprobe->insn[0]);
+	pstate_check_t *check = (*aarch32_opcode_cond_checks[insn >> 28]);
+
+	if (auprobe->arch == UPROBE_AARCH64)
+		return false;
+
+	if (!check(regs->pstate & 0xffffffff)) {
+		instruction_pointer_set(regs, instruction_pointer(regs) + 4);
+		return true;
+	}
+	return false;
+}
+
 bool arch_uprobe_skip_sstep(struct arch_uprobe *auprobe, struct pt_regs *regs)
 {
 	probes_opcode_t insn;
-	unsigned long addr;
 
 	if (!auprobe->simulate)
 		return false;
@@ -154,9 +241,14 @@ arch_uretprobe_hijack_return_addr(unsigned long trampoline_vaddr,
 {
 	unsigned long orig_ret_vaddr;
 
-	orig_ret_vaddr = procedure_link_pointer(regs);
 	/* Replace the return addr with trampoline addr */
-	procedure_link_pointer_set(regs, trampoline_vaddr);
+	if (is_compat_task()) {
+		orig_ret_vaddr = link_register(regs);
+		link_register_set(regs, trampoline_vaddr);
+	} else {
+		orig_ret_vaddr = procedure_link_pointer(regs);
+		procedure_link_pointer_set(regs, trampoline_vaddr);
+	}
 
 	return orig_ret_vaddr;
 }

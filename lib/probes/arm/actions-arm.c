@@ -15,10 +15,7 @@
 
 #include "decode.h"
 #include "decode-arm.h"
-
-#ifdef CONFIG_ARM64
 #include <../../../arm/include/asm/opcodes.h>
-#endif /* CONFIG_ARM64  */
 
 static int uprobes_substitute_pc(unsigned long *pinsn, u32 oregs)
 {
@@ -75,8 +72,13 @@ static void uprobe_set_pc(struct arch_uprobe *auprobe,
 {
 	u32 pcreg = auprobe->pcreg;
 
-	autask->backup = pt_regs_read_reg(regs, pcreg);
-	pt_regs_write_reg(regs, pcreg, instruction_pointer(regs) + 8);
+	if (pcreg == 15) {
+		autask->backup = instruction_pointer(regs);
+		instruction_pointer_set(regs, instruction_pointer(regs) + 8);
+	} else {
+		autask->backup = pt_regs_read_reg(regs, pcreg);
+		pt_regs_write_reg(regs, pcreg, instruction_pointer(regs) + 8);
+	}
 }
 
 static void uprobe_unset_pc(struct arch_uprobe *auprobe,
@@ -84,7 +86,10 @@ static void uprobe_unset_pc(struct arch_uprobe *auprobe,
 			    struct pt_regs *regs)
 {
 	/* PC will be taken care of by common code */
-	pt_regs_write_reg(regs, auprobe->pcreg, autask->backup);
+	if (auprobe->pcreg == 15)
+		instruction_pointer_set(regs, autask->backup);
+	else
+		pt_regs_write_reg(regs, auprobe->pcreg, autask->backup);
 }
 
 static void uprobe_aluwrite_pc(struct arch_uprobe *auprobe,
@@ -93,8 +98,13 @@ static void uprobe_aluwrite_pc(struct arch_uprobe *auprobe,
 {
 	u32 pcreg = auprobe->pcreg;
 
-	alu_write_pc(pt_regs_read_reg(regs, pcreg), regs);
-	pt_regs_write_reg(regs, pcreg, autask->backup);
+	if (pcreg == 15) {
+		alu_write_pc(instruction_pointer(regs), regs);
+		instruction_pointer_set(regs, autask->backup);
+	} else {
+		alu_write_pc(pt_regs_read_reg(regs, pcreg), regs);
+		pt_regs_write_reg(regs, pcreg, autask->backup);
+	}
 }
 
 static void uprobe_write_pc(struct arch_uprobe *auprobe,
@@ -103,8 +113,13 @@ static void uprobe_write_pc(struct arch_uprobe *auprobe,
 {
 	u32 pcreg = auprobe->pcreg;
 
-	load_write_pc(pt_regs_read_reg(regs, pcreg), regs);
-	pt_regs_write_reg(regs, pcreg, autask->backup);
+	if (pcreg == 15) {
+		load_write_pc(instruction_pointer(regs), regs);
+		instruction_pointer_set(regs, autask->backup);
+	} else {
+		load_write_pc(pt_regs_read_reg(regs, pcreg), regs);
+		pt_regs_write_reg(regs, pcreg, autask->backup);
+	}
 }
 
 enum probes_insn
