@@ -1,0 +1,7 @@
+menuconfig BPFILTER
+	bool "BPF Filter Configuration"
+	depends on NET && BPF
+
+if BPFILTER
+
+endif
