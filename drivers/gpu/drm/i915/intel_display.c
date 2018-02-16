@@ -2806,10 +2806,15 @@ intel_find_initial_plane_obj(struct intel_crtc *intel_crtc,
 	return;
 
 valid_fb:
+	obj = intel_fb_obj(fb);
 	mutex_lock(&dev->struct_mutex);
 	intel_state->vma =
 		intel_pin_and_fence_fb_obj(fb, primary->state->rotation);
+
+	if (!IS_ERR(intel_state->vma))
+		intel_fb_obj_flush(obj, ORIGIN_DIRTYFB);
 	mutex_unlock(&dev->struct_mutex);
+
 	if (IS_ERR(intel_state->vma)) {
 		DRM_ERROR("failed to pin boot fb on pipe %d: %li\n",
 			  intel_crtc->pipe, PTR_ERR(intel_state->vma));
@@ -2832,7 +2837,6 @@ valid_fb:
 	intel_state->base.src = drm_plane_state_src(plane_state);
 	intel_state->base.dst = drm_plane_state_dest(plane_state);
 
-	obj = intel_fb_obj(fb);
 	if (i915_gem_object_is_tiled(obj))
 		dev_priv->preserve_bios_swizzle = true;
 
@@ -12699,10 +12703,12 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 		struct i915_vma *vma;
 
 		vma = intel_pin_and_fence_fb_obj(fb, new_state->rotation);
-		if (!IS_ERR(vma))
+		if (!IS_ERR(vma)) {
 			to_intel_plane_state(new_state)->vma = vma;
-		else
+			intel_fb_obj_flush(obj, ORIGIN_DIRTYFB);
+		} else {
 			ret =  PTR_ERR(vma);
+		}
 	}
 
 	i915_gem_object_wait_priority(obj, 0, I915_PRIORITY_DISPLAY);
@@ -13117,6 +13123,7 @@ intel_legacy_cursor_update(struct drm_plane *plane,
 			goto out_unlock;
 		}
 
+		intel_fb_obj_flush(intel_fb_obj(fb), ORIGIN_DIRTYFB);
 		to_intel_plane_state(new_plane_state)->vma = vma;
 	}
 

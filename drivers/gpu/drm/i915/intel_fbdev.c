@@ -204,6 +204,7 @@ static int intelfb_create(struct drm_fb_helper *helper,
 		sizes->fb_height = intel_fb->base.height;
 	}
 
+	fb = &ifbdev->fb->base;
 	mutex_lock(&dev->struct_mutex);
 	intel_runtime_pm_get(dev_priv);
 
@@ -211,11 +212,12 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	 * This also validates that any existing fb inherited from the
 	 * BIOS is suitable for own access.
 	 */
-	vma = intel_pin_and_fence_fb_obj(&ifbdev->fb->base, DRM_MODE_ROTATE_0);
+	vma = intel_pin_and_fence_fb_obj(fb, DRM_MODE_ROTATE_0);
 	if (IS_ERR(vma)) {
 		ret = PTR_ERR(vma);
 		goto out_unlock;
 	}
+	intel_fb_obj_flush(intel_fb_obj(fb), ORIGIN_DIRTYFB);
 
 	info = drm_fb_helper_alloc_fbi(helper);
 	if (IS_ERR(info)) {
@@ -225,8 +227,6 @@ static int intelfb_create(struct drm_fb_helper *helper,
 	}
 
 	info->par = helper;
-
-	fb = &ifbdev->fb->base;
 
 	ifbdev->helper.fb = fb;
 
