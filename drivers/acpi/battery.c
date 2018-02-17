@@ -116,6 +116,10 @@ enum {
 	   post-1.29 BIOS), but as of Nov. 2012, no such update is
 	   available for the 2010 models.  */
 	ACPI_BATTERY_QUIRK_THINKPAD_MAH,
+	/* for batteries reporting current capacity with design capacity
+	 * on a full charge, but showing degradation in full charge cap.
+	 */
+	ACPI_BATTERY_QUIRK_DESIGN_MAX_CAPACITY,
 };
 
 struct acpi_battery {
@@ -198,6 +202,13 @@ static int acpi_battery_is_charged(struct acpi_battery *battery)
 		return 1;
 
 	/* we don't do any sort of metric based on percentages */
+	return 0;
+}
+
+static inline int acpi_battery_is_degraded(struct acpi_battery *battery)
+{
+	if (battery->full_charge_capacity && battery->design_capacity)
+		return battery->full_charge_capacity < battery->design_capacity;
 	return 0;
 }
 
@@ -475,6 +486,9 @@ static int extract_battery_info(const int use_bix,
 		   it's impossible to tell if they would need an adjustment
 		   or not if their values were higher.  */
 	}
+	if (test_bit(ACPI_BATTERY_QUIRK_DESIGN_MAX_CAPACITY, &battery->flags) &&
+	    battery->capacity_now > battery->full_charge_capacity)
+		battery->capacity_now = battery->full_charge_capacity;
 	return result;
 }
 
@@ -567,6 +581,10 @@ static int acpi_battery_get_state(struct acpi_battery *battery)
 		battery->capacity_now = battery->capacity_now *
 		    10000 / battery->design_voltage;
 	}
+	if (test_bit(ACPI_BATTERY_QUIRK_DESIGN_MAX_CAPACITY, &battery->flags) &&
+	    battery->capacity_now > battery->full_charge_capacity)
+		battery->capacity_now = battery->full_charge_capacity;
+
 	return result;
 }
 
@@ -742,6 +760,16 @@ static void acpi_battery_quirks(struct acpi_battery *battery)
 				    10000 / battery->design_voltage;
 			}
 		}
+	}
+
+	if (test_bit(ACPI_BATTERY_QUIRK_DESIGN_MAX_CAPACITY, &battery->flags))
+		return;
+
+	if (acpi_battery_is_degraded(battery) &&
+	    battery->capacity_now > battery->full_charge_capacity) {
+		set_bit(ACPI_BATTERY_QUIRK_DESIGN_MAX_CAPACITY,
+			&battery->flags);
+		battery->capacity_now = battery->full_charge_capacity;
 	}
 }
 
