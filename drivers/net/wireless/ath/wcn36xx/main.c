@@ -261,7 +261,7 @@ static void wcn36xx_feat_caps_info(struct wcn36xx *wcn)
 
 	for (i = 0; i < MAX_FEATURE_SUPPORTED; i++) {
 		if (get_feat_caps(wcn->fw_feat_caps, i))
-			wcn36xx_info("FW Cap %s\n", wcn36xx_get_cap_name(i));
+			wcn36xx_dbg(WCN36XX_DBG_MAC, "FW Cap %s\n", wcn36xx_get_cap_name(i));
 	}
 }
 
