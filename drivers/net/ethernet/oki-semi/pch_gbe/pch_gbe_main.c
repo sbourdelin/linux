@@ -1260,6 +1260,9 @@ static void pch_gbe_tx_queue(struct pch_gbe_adapter *adapter,
 	tx_desc->tx_frame_ctrl = (frame_ctrl);
 	tx_desc->gbec_status = (DSC_INIT16);
 
+	/* Ensure writes to descriptors complete before DMA begins */
+	mmiowb();
+
 	if (unlikely(++ring_num == tx_ring->count))
 		ring_num = 0;
 
@@ -1960,6 +1963,9 @@ int pch_gbe_up(struct pch_gbe_adapter *adapter)
 	pch_gbe_alloc_tx_buffers(adapter, tx_ring);
 	pch_gbe_alloc_rx_buffers(adapter, rx_ring, rx_ring->count);
 	adapter->tx_queue_len = netdev->tx_queue_len;
+
+	/* Ensure writes to descriptors complete before DMA begins */
+	mmiowb();
 
 	pch_gbe_enable_dma_tx(&adapter->hw);
 	pch_gbe_enable_dma_rx(&adapter->hw);
