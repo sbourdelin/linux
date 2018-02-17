@@ -71,6 +71,7 @@ There are four components to pagemap:
     23. BALLOON
     24. ZERO_PAGE
     25. IDLE
+    26. WAITERS
 
  * /proc/kpagecgroup.  This file contains a 64-bit inode number of the
    memory cgroup each page is charged to, indexed by PFN. Only available when
@@ -126,6 +127,13 @@ Short descriptions to the page flags:
     Documentation/vm/idle_page_tracking.txt). Note that this flag may be
     stale in case the page was accessed via a PTE. To make sure the flag
     is up-to-date one has to read /sys/kernel/mm/page_idle/bitmap first.
+
+26. WAITERS
+    Indicates tasks are waiting when bits LOCKED or WRITEBACK will be cleared.
+    They might be blocked by undergoing IO or by contention on page lock.
+    Bit WAITERS might be false-positive, in this case next clear of LOCKED or
+    WRITEBACK will clear WAITERS too. I.e. without LOCKED and WRITEBACK it's
+    false-positive for sure.
 
     [IO related page flags]
  1. ERROR     IO error occurred
