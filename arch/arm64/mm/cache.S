@@ -24,6 +24,7 @@
 #include <asm/cpufeature.h>
 #include <asm/alternative.h>
 #include <asm/asm-uaccess.h>
+#include <asm/cache.h>
 
 /*
  *	flush_icache_range(start,end)
@@ -50,7 +51,12 @@ ENTRY(flush_icache_range)
  */
 ENTRY(__flush_cache_user_range)
 	uaccess_ttbr0_enable x2, x3, x4
-	dcache_line_size x2, x3
+	dcache_line_size x2, x3, x4
+alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+	tbnz    x4, #CTR_IDC_SHIFT, 8f
+alternative_else
+	nop
+alternative_endif
 	sub	x3, x2, #1
 	bic	x4, x0, x3
 1:
@@ -60,7 +66,9 @@ user_alt 9f, "dc cvau, x4",  "dc civac, x4",  ARM64_WORKAROUND_CLEAN_CACHE
 	b.lo	1b
 	dsb	ish
 
-	invalidate_icache_by_line x0, x1, x2, x3, 9f
+8:
+	invalidate_icache_by_line x0, x1, x2, x3, x4, 9f
+
 	mov	x0, #0
 1:
 	uaccess_ttbr0_disable x1, x2
@@ -82,7 +90,7 @@ ENDPROC(__flush_cache_user_range)
 ENTRY(invalidate_icache_range)
 	uaccess_ttbr0_enable x2, x3, x4
 
-	invalidate_icache_by_line x0, x1, x2, x3, 2f
+	invalidate_icache_by_line x0, x1, x2, x3, x4, 2f
 	mov	x0, xzr
 1:
 	uaccess_ttbr0_disable x1, x2
@@ -102,7 +110,7 @@ ENDPROC(invalidate_icache_range)
  *	- size    - size in question
  */
 ENTRY(__flush_dcache_area)
-	dcache_by_line_op civac, sy, x0, x1, x2, x3
+	dcache_by_line_op civac, sy, x0, x1, x2, x3, x4
 	ret
 ENDPIPROC(__flush_dcache_area)
 
@@ -116,7 +124,7 @@ ENDPIPROC(__flush_dcache_area)
  *	- size    - size in question
  */
 ENTRY(__clean_dcache_area_pou)
-	dcache_by_line_op cvau, ish, x0, x1, x2, x3
+	dcache_by_line_op cvau, ish, x0, x1, x2, x3, x4
 	ret
 ENDPROC(__clean_dcache_area_pou)
 
@@ -140,7 +148,7 @@ ENTRY(__inval_dcache_area)
  */
 __dma_inv_area:
 	add	x1, x1, x0
-	dcache_line_size x2, x3
+	dcache_line_size x2, x3, x4
 	sub	x3, x2, #1
 	tst	x1, x3				// end cache line aligned?
 	bic	x1, x1, x3
@@ -178,7 +186,7 @@ ENTRY(__clean_dcache_area_poc)
  *	- size    - size in question
  */
 __dma_clean_area:
-	dcache_by_line_op cvac, sy, x0, x1, x2, x3
+	dcache_by_line_op cvac, sy, x0, x1, x2, x3, x4
 	ret
 ENDPIPROC(__clean_dcache_area_poc)
 ENDPROC(__dma_clean_area)
@@ -193,7 +201,7 @@ ENDPROC(__dma_clean_area)
  *	- size    - size in question
  */
 ENTRY(__clean_dcache_area_pop)
-	dcache_by_line_op cvap, sy, x0, x1, x2, x3
+	dcache_by_line_op cvap, sy, x0, x1, x2, x3, x4
 	ret
 ENDPIPROC(__clean_dcache_area_pop)
 
@@ -206,7 +214,7 @@ ENDPIPROC(__clean_dcache_area_pop)
  *	- size    - size in question
  */
 ENTRY(__dma_flush_area)
-	dcache_by_line_op civac, sy, x0, x1, x2, x3
+	dcache_by_line_op civac, sy, x0, x1, x2, x3, x4
 	ret
 ENDPIPROC(__dma_flush_area)
 

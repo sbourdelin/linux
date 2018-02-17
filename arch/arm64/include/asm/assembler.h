@@ -30,6 +30,7 @@
 #include <asm/pgtable-hwdef.h>
 #include <asm/ptrace.h>
 #include <asm/thread_info.h>
+#include <asm/cache.h>
 
 	.macro save_and_disable_daif, flags
 	mrs	\flags, daif
@@ -334,9 +335,9 @@ alternative_endif
  * raw_dcache_line_size - get the minimum D-cache line size on this CPU
  * from the CTR register.
  */
-	.macro	raw_dcache_line_size, reg, tmp
-	mrs	\tmp, ctr_el0			// read CTR
-	ubfm	\tmp, \tmp, #16, #19		// cache line size encoding
+	.macro	raw_dcache_line_size, reg, tmp, ctr
+	mrs	\ctr, ctr_el0			// read CTR
+	ubfm	\tmp, \ctr, #16, #19		// cache line size encoding
 	mov	\reg, #4			// bytes per word
 	lsl	\reg, \reg, \tmp		// actual cache line size
 	.endm
@@ -344,9 +345,9 @@ alternative_endif
 /*
  * dcache_line_size - get the safe D-cache line size across all CPUs
  */
-	.macro	dcache_line_size, reg, tmp
-	read_ctr	\tmp
-	ubfm		\tmp, \tmp, #16, #19	// cache line size encoding
+	.macro	dcache_line_size, reg, tmp, ctr
+	read_ctr	\ctr
+	ubfm		\tmp, \ctr, #16, #19	// cache line size encoding
 	mov		\reg, #4		// bytes per word
 	lsl		\reg, \reg, \tmp	// actual cache line size
 	.endm
@@ -355,9 +356,9 @@ alternative_endif
  * raw_icache_line_size - get the minimum I-cache line size on this CPU
  * from the CTR register.
  */
-	.macro	raw_icache_line_size, reg, tmp
-	mrs	\tmp, ctr_el0			// read CTR
-	and	\tmp, \tmp, #0xf		// cache line size encoding
+	.macro	raw_icache_line_size, reg, tmp, ctr
+	mrs	\ctr, ctr_el0			// read CTR
+	and	\tmp, \ctr, #0xf		// cache line size encoding
 	mov	\reg, #4			// bytes per word
 	lsl	\reg, \reg, \tmp		// actual cache line size
 	.endm
@@ -365,9 +366,9 @@ alternative_endif
 /*
  * icache_line_size - get the safe I-cache line size across all CPUs
  */
-	.macro	icache_line_size, reg, tmp
-	read_ctr	\tmp
-	and		\tmp, \tmp, #0xf	// cache line size encoding
+	.macro	icache_line_size, reg, tmp, ctr
+	read_ctr	\ctr
+	and		\tmp, \ctr, #0xf	// cache line size encoding
 	mov		\reg, #4		// bytes per word
 	lsl		\reg, \reg, \tmp	// actual cache line size
 	.endm
@@ -408,13 +409,21 @@ alternative_endif
  * 	size:		size of the region
  * 	Corrupts:	kaddr, size, tmp1, tmp2
  */
-	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
-	dcache_line_size \tmp1, \tmp2
+	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2, tmp3
+	dcache_line_size \tmp1, \tmp2, \tmp3
 	add	\size, \kaddr, \size
 	sub	\tmp2, \tmp1, #1
 	bic	\kaddr, \kaddr, \tmp2
 9998:
-	.if	(\op == cvau || \op == cvac)
+	.if	(\op == cvau)
+alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
+	tbnz	\tmp3, #CTR_IDC_SHIFT, 9997f
+	dc	cvau, \kaddr
+alternative_else
+	dc	civac, \kaddr
+	nop
+alternative_endif
+	.elseif (\op == cvac)
 alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
 	dc	\op, \kaddr
 alternative_else
@@ -433,6 +442,7 @@ alternative_endif
 	cmp	\kaddr, \size
 	b.lo	9998b
 	dsb	\domain
+9997:
 	.endm
 
 /*
@@ -441,10 +451,11 @@ alternative_endif
  *
  * 	start, end:	virtual addresses describing the region
  *	label:		A label to branch to on user fault.
- * 	Corrupts:	tmp1, tmp2
+ * 	Corrupts:	tmp1, tmp2, tmp3
  */
-	.macro invalidate_icache_by_line start, end, tmp1, tmp2, label
-	icache_line_size \tmp1, \tmp2
+	.macro invalidate_icache_by_line start, end, tmp1, tmp2, tmp3, label
+	icache_line_size \tmp1, \tmp2, \tmp3
+	tbnz    \tmp3, #CTR_DIC_SHIFT, 9996f
 	sub	\tmp2, \tmp1, #1
 	bic	\tmp2, \start, \tmp2
 9997:
@@ -454,6 +465,7 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
 	b.lo	9997b
 	dsb	ish
 	isb
+9996:
 	.endm
 
 /*
