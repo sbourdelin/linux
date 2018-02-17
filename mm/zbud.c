@@ -188,11 +188,11 @@ static int zbud_zpool_shrink(void *pool, unsigned int pages,
 static void *zbud_zpool_map(void *pool, unsigned long handle,
 			enum zpool_mapmode mm)
 {
-	return zbud_map(pool, handle);
+	return (void *)(handle);
 }
 static void zbud_zpool_unmap(void *pool, unsigned long handle)
 {
-	zbud_unmap(pool, handle);
+
 }
 
 static u64 zbud_zpool_total_size(void *pool)
@@ -566,32 +566,6 @@ next:
 	}
 	spin_unlock(&pool->lock);
 	return -EAGAIN;
-}
-
-/**
- * zbud_map() - maps the allocation associated with the given handle
- * @pool:	pool in which the allocation resides
- * @handle:	handle associated with the allocation to be mapped
- *
- * While trivial for zbud, the mapping functions for others allocators
- * implementing this allocation API could have more complex information encoded
- * in the handle and could create temporary mappings to make the data
- * accessible to the user.
- *
- * Returns: a pointer to the mapped allocation
- */
-void *zbud_map(struct zbud_pool *pool, unsigned long handle)
-{
-	return (void *)(handle);
-}
-
-/**
- * zbud_unmap() - maps the allocation associated with the given handle
- * @pool:	pool in which the allocation resides
- * @handle:	handle associated with the allocation to be unmapped
- */
-void zbud_unmap(struct zbud_pool *pool, unsigned long handle)
-{
 }
 
 /**
