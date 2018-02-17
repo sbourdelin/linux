@@ -850,7 +850,7 @@ void hostif_scan_indication(struct ks_wlan_private *priv)
 		DPRINTK(4, " scan_ind_count=%d :: aplist.size=%d\n",
 			priv->scan_ind_count, priv->aplist.size);
 		get_ap_information(priv, (struct ap_info_t *)(priv->rxp),
-				   &(priv->aplist.ap[priv->scan_ind_count - 1]));
+				   &(priv->aplist.ap priv->scan_ind_count - 1));
 		priv->aplist.size = priv->scan_ind_count;
 	} else {
 		DPRINTK(4, " count over :: scan_ind_count=%d\n",
