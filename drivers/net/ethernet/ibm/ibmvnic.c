@@ -1179,7 +1179,9 @@ static int __ibmvnic_close(struct net_device *netdev)
 			}
 		}
 	}
-	clean_rx_pools(adapter);
+	if (unlikely(adapter->resetting &&
+		     adapter->reset_reason != VNIC_RESET_NON_FATAL))
+		clean_rx_pools(adapter);
 	clean_tx_pools(adapter);
 	adapter->state = VNIC_CLOSED;
 	return rc;
