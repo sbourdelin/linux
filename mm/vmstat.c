@@ -1044,15 +1044,22 @@ static void fill_contig_page_info(struct zone *zone,
 }
 
 /*
- * A fragmentation index only makes sense if an allocation of a requested
- * size would fail. If that is true, the fragmentation index indicates
- * whether external fragmentation or a lack of memory was the problem.
- * The value can be used to determine if page reclaim or compaction
- * should be used
+ * If there is no block of at least the requested size, implying that an
+ * allocation would fail, then it might be possible to conjure one by
+ * compaction.  As this is expensive it is reserved for those cases in which
+ * there is a relatively high degree of fragmentation.  For low degrees, page
+ * reclaim is more appropriate since an allocation failure is more likely to be
+ * caused by a lack of memory.
+ *
+ * This function calculates an index in the range 0 to 1, expressed in units of
+ * 1/1000, indicating low and high fragmentation respectively.  The special
+ * value of -1 indicates that free blocks of sufficient size are available and
+ * that an allocation should therefore succeed.
  */
 static int __fragmentation_index(unsigned int order, struct contig_page_info *info)
 {
 	unsigned long requested = 1UL << order;
+	int result;
 
 	if (WARN_ON_ONCE(order >= MAX_ORDER))
 		return 0;
@@ -1060,17 +1067,37 @@ static int __fragmentation_index(unsigned int order, struct contig_page_info *in
 	if (!info->free_blocks_total)
 		return 0;
 
-	/* Fragmentation index only makes sense when a request would fail */
 	if (info->free_blocks_suitable)
 		return -1000;
 
 	/*
-	 * Index is between 0 and 1 so return within 3 decimal places
+	 * If the number of requested-size blocks that could be constructed if
+	 * all free blocks were compacted is
 	 *
-	 * 0 => allocation would fail due to lack of memory
-	 * 1 => allocation would fail due to fragmentation
+	 *	B = info->free_pages/requested
+	 *
+	 * then, conceptually, the number of fragments into which each
+	 * requested-size block has been split is
+	 *
+	 *	N = info->free_blocks_total/B
+	 *
+	 * In the least and most fragmented cases all free memory resides on
+	 * either the order - 1 free list or the base page free list
+	 * respecively, thus the range of this function is given by
+	 * 2 <= N <= requested.  The fragmentation index,
+	 *
+	 *	F = 1 - 2/N,
+	 *
+	 * has the more useful range of 0 < F <= 1.  In order to inhibit
+	 * compaction in the event of a pathological shortfall of memory this
+	 * function truncates and returns
+	 *
+	 *	F - 1/info->free_blocks_total
 	 */
-	return 1000 - div_u64( (1000+(div_u64(info->free_pages * 1000ULL, requested))), info->free_blocks_total);
+	result = 1000 - div_u64((1000 + (div_u64(info->free_pages * 2000ULL,
+			requested))), info->free_blocks_total);
+
+	return (result < 0) ? 0 : result;
 }
 
 /* Same as __fragmentation index but allocs contig_page_info on stack */
