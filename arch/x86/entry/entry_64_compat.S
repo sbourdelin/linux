@@ -350,7 +350,24 @@ ENTRY(entry_INT80_compat)
 	pushq	%rax			/* pt_regs->orig_ax */
 
 	/* switch to thread stack expects orig_ax to be pushed */
-	call	switch_to_thread_stack
+	pushq	%rdi
+
+	/* Need to switch before accessing the thread stack. */
+	SWITCH_TO_KERNEL_CR3 scratch_reg=%rdi
+	movq	%rsp, %rdi
+	movq	PER_CPU_VAR(cpu_current_top_of_stack), %rsp
+	 /* We have RDI and orig_ax on the stack on top of the IRET frame.
+	  * That means offset=16 */
+	UNWIND_HINT_IRET_REGS base=%rdi offset=16
+
+	pushq	6*8(%rdi)		/* regs->ss */
+	pushq	5*8(%rdi)		/* regs->rsp */
+	pushq	4*8(%rdi)		/* regs->eflags */
+	pushq	3*8(%rdi)		/* regs->cs */
+	pushq	2*8(%rdi)		/* regs->ip */
+	pushq	1*8(%rdi)		/* regs->orig_ax */
+
+	movq	(%rdi), %rdi		/* restore %rdi */
 
 	pushq	%rdi			/* pt_regs->di */
 	pushq	%rsi			/* pt_regs->si */
