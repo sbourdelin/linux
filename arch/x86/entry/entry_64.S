@@ -538,6 +538,15 @@ END(irq_entries_start)
  *
  * Entry runs with interrupts off.
  */
+ENTRY(interrupt_helper)
+	UNWIND_HINT_FUNC
+	cld
+
+	PUSH_AND_CLEAR_REGS save_ret=1
+	ENCODE_FRAME_POINTER 8
+
+	ret
+END(interrupt_helper)
 
 /* 0(%rsp): ~(interrupt number) */
 	.macro interrupt func
@@ -549,8 +558,7 @@ END(irq_entries_start)
 	call	switch_to_thread_stack
 1:
 
-	PUSH_AND_CLEAR_REGS
-	ENCODE_FRAME_POINTER
+	call	interrupt_helper
 
 	testb	$3, CS(%rsp)
 	jz	1f
