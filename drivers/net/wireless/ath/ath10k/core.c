@@ -21,6 +21,10 @@
 #include <linux/dmi.h>
 #include <linux/ctype.h>
 #include <asm/byteorder.h>
+#include <linux/leds.h>
+#include <linux/platform_device.h>
+#include <linux/version.h>
+
 
 #include "core.h"
 #include "mac.h"
@@ -65,6 +69,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA988X_HW_2_0_VERSION,
 		.dev_id = QCA988X_2_0_DEVICE_ID,
 		.name = "qca988x hw2.0",
+		.led_pin = 1,
+		.gpio_count = 24, 
 		.patch_load_addr = QCA988X_HW_2_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_ALL,
@@ -94,6 +100,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA988X_HW_2_0_VERSION,
 		.dev_id = QCA988X_2_0_DEVICE_ID_UBNT,
 		.name = "qca988x hw2.0 ubiquiti",
+		.led_pin = 1,
+		.gpio_count = 24, 
 		.patch_load_addr = QCA988X_HW_2_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_ALL,
@@ -123,6 +131,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA9887_HW_1_0_VERSION,
 		.dev_id = QCA9887_1_0_DEVICE_ID,
 		.name = "qca9887 hw1.0",
+		.led_pin = 1,
+		.gpio_count = 24, 
 		.patch_load_addr = QCA9887_HW_1_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_ALL,
@@ -267,6 +277,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA99X0_HW_2_0_DEV_VERSION,
 		.dev_id = QCA99X0_2_0_DEVICE_ID,
 		.name = "qca99x0 hw2.0",
+		.led_pin = 17,
+		.gpio_count = 35, 
 		.patch_load_addr = QCA99X0_HW_2_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.otp_exe_param = 0x00000700,
@@ -301,6 +313,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA9984_HW_1_0_DEV_VERSION,
 		.dev_id = QCA9984_1_0_DEVICE_ID,
 		.name = "qca9984/qca9994 hw1.0",
+		.led_pin = 17,
+		.gpio_count = 35, 
 		.patch_load_addr = QCA9984_HW_1_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_EACH,
@@ -340,6 +354,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA9888_HW_2_0_DEV_VERSION,
 		.dev_id = QCA9888_2_0_DEVICE_ID,
 		.name = "qca9888 hw2.0",
+		.led_pin = 17,
+		.gpio_count = 35, 
 		.patch_load_addr = QCA9888_HW_2_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_EACH,
@@ -2132,12 +2148,148 @@ static int ath10k_core_reset_rx_filter(struct ath10k *ar)
 	return 0;
 }
 
+#ifdef CONFIG_GPIOLIB
+
+static int ath10k_gpio_pin_cfg_input(struct gpio_chip *chip, unsigned offset)
+{
+	struct ath10k_gpiocontrol *gpio = container_of(chip, struct ath10k_gpiocontrol, gchip);
+	ath10k_wmi_gpio_config(gpio->ar, offset, 1, WMI_GPIO_PULL_NONE, WMI_GPIO_INTTYPE_DISABLE); // configure to input
+	gpio->gpio_state_dir = 1;
+	return 0;
+}
+
+/* gpio_chip handler : set GPIO to output */
+static int ath10k_gpio_pin_cfg_output(struct gpio_chip *chip, unsigned offset,
+				     int value)
+{
+	struct ath10k_gpiocontrol *gpio = container_of(chip, struct ath10k_gpiocontrol, gchip);
+
+	ath10k_wmi_gpio_config(gpio->ar, offset, 0, WMI_GPIO_PULL_NONE, WMI_GPIO_INTTYPE_DISABLE); // configure to output
+	ath10k_wmi_gpio_output(gpio->ar, offset, value);
+	gpio->gpio_state_dir = 0;
+	gpio->gpio_state_pin = value;
+	return 0;
+}
+
+/* gpio_chip handler : query GPIO direction (0=out, 1=in) */
+static int ath10k_gpio_pin_get_dir(struct gpio_chip *chip, unsigned offset)
+{
+	struct ath10k_gpiocontrol *gpio = container_of(chip, struct ath10k_gpiocontrol, gchip);
+
+	return gpio->gpio_state_dir;
+}
+
+/* gpio_chip handler : get GPIO pin value */
+static int ath10k_gpio_pin_get(struct gpio_chip *chip, unsigned offset)
+{
+	struct ath10k_gpiocontrol *gpio = container_of(chip, struct ath10k_gpiocontrol, gchip);
+
+	return gpio->gpio_state_pin;
+}
+
+/* gpio_chip handler : set GPIO pin to value */
+static void ath10k_gpio_pin_set(struct gpio_chip *chip, unsigned offset,
+			       int value)
+{
+	struct ath10k_gpiocontrol *gpio = container_of(chip, struct ath10k_gpiocontrol, gchip);
+
+	ath10k_wmi_gpio_output(gpio->ar, offset, value);
+	gpio->gpio_state_pin = value;
+}
+
+/* register GPIO chip */
+static int ath10k_register_gpio_chip(struct ath10k *ar)
+{
+	struct ath10k_gpiocontrol *gpio;
+	gpio = kzalloc(sizeof(struct ath10k_gpiocontrol), GFP_KERNEL);
+	if (!gpio) {
+		return -1;
+	}
+ 
+	snprintf(gpio->label, sizeof(gpio->label), "ath10k-%s",
+		 wiphy_name(ar->hw->wiphy));
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,5,0)
+	gpio->gchip.parent = ar->dev;
+#else
+	gpio->gchip.dev = ar->dev;
+#endif
+	gpio->gchip.base = -1;	/* determine base automatically */
+	gpio->gchip.ngpio = ar->hw_params.gpio_count;
+	gpio->gchip.label = gpio->label;
+	gpio->gchip.direction_input = ath10k_gpio_pin_cfg_input;
+	gpio->gchip.direction_output = ath10k_gpio_pin_cfg_output;
+	gpio->gchip.get_direction = ath10k_gpio_pin_get_dir;
+	gpio->gchip.get = ath10k_gpio_pin_get;
+	gpio->gchip.set = ath10k_gpio_pin_set;
+
+	if (gpiochip_add(&gpio->gchip)) {
+		printk(KERN_ERR "Error while registering gpio chip\n");
+		return -1;
+	}
+	gpio->gchip.owner = NULL;
+	ar->gpio = gpio;
+	gpio->ar = ar;
+	return 0;
+}
+
+#ifdef CONFIG_LEDS_CLASS
+static void ath10k_led_brightness(struct led_classdev *led_cdev,
+			       enum led_brightness brightness)
+{
+	struct ath10k_gpiocontrol *gpio = container_of(led_cdev, struct ath10k_gpiocontrol, cdev);
+	struct gpio_led *led = &gpio->wifi_led;
+	if (gpio->ar->state == ATH10K_STATE_ON) {
+		gpio->gpio_state_pin = (brightness != LED_OFF) ^ led->active_low;
+		ath10k_wmi_gpio_output(gpio->ar, led->gpio, gpio->gpio_state_pin);
+	}
+}
+
+static int ath10k_add_led(struct ath10k *ar, struct gpio_led *gpioled)
+{
+	int ret;
+	struct ath10k_gpiocontrol *gpio = ar->gpio; 
+	if (!gpio)
+		return -1;
+	gpio->cdev.name = gpioled->name;
+	gpio->cdev.default_trigger = gpioled->default_trigger;
+	gpio->cdev.brightness_set = ath10k_led_brightness;
+
+	ret = led_classdev_register(wiphy_dev(ar->hw->wiphy), &gpio->cdev);
+	if (ret < 0)
+		return ret;
+
+	return 0;
+}
+#endif
+
+#endif
+
+/* remove GPIO chip */
+static void ath10k_unregister_gpio_chip(struct ath10k *ar)
+{
+#ifdef CONFIG_GPIOLIB
+	struct ath10k_gpiocontrol *gpio = ar->gpio; 
+	if (gpio) {
+		gpiochip_remove(&gpio->gchip);
+		kfree(gpio);
+	}
+#endif
+}
+
+static void ath10k_unregister_led(struct ath10k *ar)
+{
+#ifdef CONFIG_GPIOLIB
+	if (ar->gpio)
+		led_classdev_unregister(&ar->gpio->cdev);
+#endif
+}
+
+
 int ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode,
 		      const struct ath10k_fw_components *fw)
 {
 	int status;
 	u32 val;
-
 	lockdep_assert_held(&ar->conf_mutex);
 
 	clear_bit(ATH10K_FLAG_CRASH_FLUSH, &ar->dev_flags);
@@ -2372,8 +2524,32 @@ int ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode,
 	if (status)
 		goto err_hif_stop;
 
-	return 0;
 
+#ifdef CONFIG_GPIOLIB
+	/* LED Code */
+	if (ar->hw_params.led_pin) { // only configure if non zero
+		if (!ar->gpio_attached) {
+			status = ath10k_register_gpio_chip(ar);
+			if (status) {
+				goto err_no_led;
+			}
+#ifdef CONFIG_LEDS_CLASS
+			ar->gpio_attached = 1;
+			ar->gpio->wifi_led.active_low = 1;
+			ar->gpio->wifi_led.gpio = ar->hw_params.led_pin;
+			ar->gpio->wifi_led.name = ar->gpio->label;
+			ar->gpio->wifi_led.default_state = LEDS_GPIO_DEFSTATE_KEEP;
+		
+			ath10k_add_led(ar, &ar->gpio->wifi_led);
+#endif
+		}
+		ath10k_wmi_gpio_config(ar, ar->hw_params.led_pin, 0, WMI_GPIO_PULL_NONE, WMI_GPIO_INTTYPE_DISABLE); // configure to output
+		ath10k_wmi_gpio_output(ar, ar->hw_params.led_pin, 1);
+	}
+err_no_led:;
+#endif
+	
+	return 0;
 err_hif_stop:
 	ath10k_hif_stop(ar);
 err_htt_rx_detach:
@@ -2673,6 +2849,9 @@ void ath10k_core_unregister(struct ath10k *ar)
 	ath10k_core_free_board_files(ar);
 
 	ath10k_debug_unregister(ar);
+
+	ath10k_unregister_led(ar);
+	ath10k_unregister_gpio_chip(ar);
 }
 EXPORT_SYMBOL(ath10k_core_unregister);
 
