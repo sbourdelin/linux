@@ -621,16 +621,6 @@ ENTRY(interrupt_helper)
 	ret
 END(interrupt_helper)
 
-/* 0(%rsp): ~(interrupt number) */
-	.macro interrupt func
-	cld
-
-	call	interrupt_helper
-
-	UNWIND_HINT_REGS indirect=1
-	call	\func	/* rdi points to pt_regs */
-	.endm
-
 	/*
 	 * The interrupt stubs push (~vector+0x80) onto the stack and
 	 * then jump to common_interrupt.
@@ -639,7 +629,9 @@ END(interrupt_helper)
 common_interrupt:
 	ASM_CLAC
 	addq	$-0x80, (%rsp)			/* Adjust vector to [-256, -1] range */
-	interrupt do_IRQ
+	call	interrupt_helper
+	UNWIND_HINT_REGS indirect=1
+	call	do_IRQ	/* rdi points to pt_regs */
 	/* 0(%rsp): old RSP */
 ret_from_intr:
 	DISABLE_INTERRUPTS(CLBR_ANY)
@@ -835,7 +827,9 @@ ENTRY(\sym)
 	ASM_CLAC
 	pushq	$~(\num)
 .Lcommon_\sym:
-	interrupt \do_sym
+	call	interrupt_helper
+	UNWIND_HINT_REGS indirect=1
+	call	\do_sym	/* rdi points to pt_regs */
 	jmp	ret_from_intr
 END(\sym)
 .endm
