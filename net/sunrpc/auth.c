@@ -551,12 +551,6 @@ rpcauth_lookup_credcache(struct rpc_auth *auth, struct auth_cred * acred,
 	hlist_for_each_entry_rcu(entry, &cache->hashtable[nr], cr_hash) {
 		if (!entry->cr_ops->crmatch(acred, entry, flags))
 			continue;
-		if (flags & RPCAUTH_LOOKUP_RCU) {
-			if (test_bit(RPCAUTH_CRED_HASHED, &entry->cr_flags) &&
-			    !test_bit(RPCAUTH_CRED_NEW, &entry->cr_flags))
-				cred = entry;
-			break;
-		}
 		spin_lock(&cache->lock);
 		if (test_bit(RPCAUTH_CRED_HASHED, &entry->cr_flags) == 0) {
 			spin_unlock(&cache->lock);
@@ -570,9 +564,6 @@ rpcauth_lookup_credcache(struct rpc_auth *auth, struct auth_cred * acred,
 
 	if (cred != NULL)
 		goto found;
-
-	if (flags & RPCAUTH_LOOKUP_RCU)
-		return ERR_PTR(-ECHILD);
 
 	new = auth->au_ops->crcreate(auth, acred, flags, gfp);
 	if (IS_ERR(new)) {
@@ -897,15 +888,10 @@ int __init rpcauth_init_module(void)
 	err = rpc_init_authunix();
 	if (err < 0)
 		goto out1;
-	err = rpc_init_generic_auth();
-	if (err < 0)
-		goto out2;
 	err = register_shrinker(&rpc_cred_shrinker);
 	if (err < 0)
-		goto out3;
+		goto out2;
 	return 0;
-out3:
-	rpc_destroy_generic_auth();
 out2:
 	rpc_destroy_authunix();
 out1:
@@ -915,6 +901,5 @@ out1:
 void rpcauth_remove_module(void)
 {
 	rpc_destroy_authunix();
-	rpc_destroy_generic_auth();
 	unregister_shrinker(&rpc_cred_shrinker);
 }
