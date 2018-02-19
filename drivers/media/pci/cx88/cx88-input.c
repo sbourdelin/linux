@@ -566,20 +566,17 @@ static int get_key_pvr2000(struct IR_i2c *ir, enum rc_proto *protocol,
 
 	/* poll IR chip */
 	flags = i2c_smbus_read_byte_data(ir->c, 0x10);
-	if (flags < 0) {
-		dprintk("read error\n");
-		return 0;
-	}
+	if (flags < 0)
+		goto report_read_failure;
+
 	/* key pressed ? */
 	if (0 == (flags & 0x80))
 		return 0;
 
 	/* read actual key code */
 	code = i2c_smbus_read_byte_data(ir->c, 0x00);
-	if (code < 0) {
-		dprintk("read error\n");
-		return 0;
-	}
+	if (code < 0)
+		goto report_read_failure;
 
 	dprintk("IR Key/Flags: (0x%02x/0x%02x)\n",
 		code & 0xff, flags & 0xff);
@@ -588,6 +585,10 @@ static int get_key_pvr2000(struct IR_i2c *ir, enum rc_proto *protocol,
 	*scancode = code & 0xff;
 	*toggle = 0;
 	return 1;
+
+report_read_failure:
+	dprintk("read error\n");
+	return 0;
 }
 
 void cx88_i2c_init_ir(struct cx88_core *core)

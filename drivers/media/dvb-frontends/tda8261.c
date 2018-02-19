@@ -129,18 +129,17 @@ static int tda8261_set_params(struct dvb_frontend *fe)
 
 	/* Set params */
 	err = tda8261_write(state, buf);
-	if (err < 0) {
-		pr_err("%s: I/O Error\n", __func__);
-		return err;
-	}
+	if (err < 0)
+		goto report_failure;
+
 	/* sleep for some time */
 	pr_debug("%s: Waiting to Phase LOCK\n", __func__);
 	msleep(20);
 	/* check status */
-	if ((err = tda8261_get_status(fe, &status)) < 0) {
-		pr_err("%s: I/O Error\n", __func__);
-		return err;
-	}
+	err = tda8261_get_status(fe, &status);
+	if (err < 0)
+		goto report_failure;
+
 	if (status == 1) {
 		pr_debug("%s: Tuner Phase locked: status=%d\n", __func__,
 			 status);
@@ -150,6 +149,10 @@ static int tda8261_set_params(struct dvb_frontend *fe)
 	}
 
 	return 0;
+
+report_failure:
+	pr_err("%s: I/O Error\n", __func__);
+	return err;
 }
 
 static void tda8261_release(struct dvb_frontend *fe)

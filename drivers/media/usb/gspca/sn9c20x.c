@@ -1788,10 +1788,8 @@ static int sd_init(struct gspca_dev *gspca_dev)
 	for (i = 0; i < ARRAY_SIZE(bridge_init); i++) {
 		value = bridge_init[i][1];
 		reg_w(gspca_dev, bridge_init[i][0], &value, 1);
-		if (gspca_dev->usb_err < 0) {
-			pr_err("Device initialization failed\n");
-			return gspca_dev->usb_err;
-		}
+		if (gspca_dev->usb_err < 0)
+			goto report_failure;
 	}
 
 	if (sd->flags & LED_REVERSE)
@@ -1800,10 +1798,8 @@ static int sd_init(struct gspca_dev *gspca_dev)
 		reg_w1(gspca_dev, 0x1006, 0x20);
 
 	reg_w(gspca_dev, 0x10c0, i2c_init, 9);
-	if (gspca_dev->usb_err < 0) {
-		pr_err("Device initialization failed\n");
-		return gspca_dev->usb_err;
-	}
+	if (gspca_dev->usb_err < 0)
+		goto report_failure;
 
 	switch (sd->sensor) {
 	case SENSOR_OV9650:
@@ -1869,6 +1865,11 @@ static int sd_init(struct gspca_dev *gspca_dev)
 		pr_err("Unsupported sensor\n");
 		gspca_dev->usb_err = -ENODEV;
 	}
+	goto exit;
+
+report_failure:
+	pr_err("Device initialization failed\n");
+exit:
 	return gspca_dev->usb_err;
 }
 

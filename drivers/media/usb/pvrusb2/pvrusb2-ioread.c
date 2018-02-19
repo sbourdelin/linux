@@ -266,8 +266,7 @@ static int pvr2_ioread_get_buffer(struct pvr2_ioread *cp)
 				pvr2_trace(PVR2_TRACE_DATA_FLOW,
 					   "/*---TRACE_READ---*/ pvr2_ioread_read id=%p queue_error=%d",
 					   cp,stat);
-				pvr2_ioread_stop(cp);
-				return 0;
+				goto stop_read;
 			}
 			cp->c_buf = NULL;
 			cp->c_data_ptr = NULL;
@@ -286,9 +285,8 @@ static int pvr2_ioread_get_buffer(struct pvr2_ioread *cp)
 				pvr2_trace(PVR2_TRACE_DATA_FLOW,
 					   "/*---TRACE_READ---*/ pvr2_ioread_read id=%p buffer_error=%d",
 					   cp,stat);
-				pvr2_ioread_stop(cp);
 				// Give up.
-				return 0;
+				goto stop_read;
 			}
 			// Start over...
 			continue;
@@ -298,6 +296,10 @@ static int pvr2_ioread_get_buffer(struct pvr2_ioread *cp)
 			pvr2_buffer_get_id(cp->c_buf)];
 	}
 	return !0;
+
+stop_read:
+	pvr2_ioread_stop(cp);
+	return 0;
 }
 
 static void pvr2_ioread_filter(struct pvr2_ioread *cp)

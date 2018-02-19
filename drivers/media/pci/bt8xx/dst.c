@@ -134,17 +134,20 @@ EXPORT_SYMBOL(rdc_reset_state);
 static int rdc_8820_reset(struct dst_state *state)
 {
 	dprintk(3, "Resetting DST\n");
-	if (dst_gpio_outb(state, RDC_8820_RESET, RDC_8820_RESET, 0, NO_DELAY) < 0) {
-		pr_err("dst_gpio_outb ERROR !\n");
-		return -1;
-	}
+	if (dst_gpio_outb(state, RDC_8820_RESET, RDC_8820_RESET, 0, NO_DELAY)
+	    < 0)
+		goto report_failure;
+
 	udelay(1000);
-	if (dst_gpio_outb(state, RDC_8820_RESET, RDC_8820_RESET, RDC_8820_RESET, DELAY) < 0) {
-		pr_err("dst_gpio_outb ERROR !\n");
-		return -1;
-	}
+	if (dst_gpio_outb(state, RDC_8820_RESET, RDC_8820_RESET,
+			  RDC_8820_RESET, DELAY) < 0)
+		goto report_failure;
 
 	return 0;
+
+report_failure:
+	pr_err("dst_gpio_outb ERROR !\n");
+	return -1;
 }
 
 static int dst_pio_enable(struct dst_state *state)

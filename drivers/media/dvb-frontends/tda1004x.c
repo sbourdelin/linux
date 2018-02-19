@@ -1299,20 +1299,22 @@ struct dvb_frontend* tda10045_attach(const struct tda1004x_config* config,
 	id = tda1004x_read_byte(state, TDA1004X_CHIPID);
 	if (id < 0) {
 		printk(KERN_ERR "tda10045: chip is not answering. Giving up.\n");
-		kfree(state);
-		return NULL;
+		goto free_state;
 	}
 
 	if (id != 0x25) {
 		printk(KERN_ERR "Invalid tda1004x ID = 0x%02x. Can't proceed\n", id);
-		kfree(state);
-		return NULL;
+		goto free_state;
 	}
 
 	/* create dvb_frontend */
 	memcpy(&state->frontend.ops, &tda10045_ops, sizeof(struct dvb_frontend_ops));
 	state->frontend.demodulator_priv = state;
 	return &state->frontend;
+
+free_state:
+	kfree(state);
+	return NULL;
 }
 
 static const struct dvb_frontend_ops tda10046_ops = {
@@ -1369,19 +1371,21 @@ struct dvb_frontend* tda10046_attach(const struct tda1004x_config* config,
 	id = tda1004x_read_byte(state, TDA1004X_CHIPID);
 	if (id < 0) {
 		printk(KERN_ERR "tda10046: chip is not answering. Giving up.\n");
-		kfree(state);
-		return NULL;
+		goto free_state;
 	}
 	if (id != 0x46) {
 		printk(KERN_ERR "Invalid tda1004x ID = 0x%02x. Can't proceed\n", id);
-		kfree(state);
-		return NULL;
+		goto free_state;
 	}
 
 	/* create dvb_frontend */
 	memcpy(&state->frontend.ops, &tda10046_ops, sizeof(struct dvb_frontend_ops));
 	state->frontend.demodulator_priv = state;
 	return &state->frontend;
+
+free_state:
+	kfree(state);
+	return NULL;
 }
 
 module_param(debug, int, 0644);

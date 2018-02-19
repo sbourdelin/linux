@@ -83,33 +83,33 @@ static int dst_ci_command(struct dst_state* state, u8 * data, u8 *ca_string, u8 
 
 	if (write_dst(state, data, len)) {
 		dprintk(verbose, DST_CA_INFO, 1, " Write not successful, trying to recover");
-		dst_error_recovery(state);
-		goto error;
+		goto error_recovery;
 	}
 	if ((dst_pio_disable(state)) < 0) {
 		dprintk(verbose, DST_CA_ERROR, 1, " DST PIO disable failed.");
-		goto error;
+		goto unlock;
 	}
-	if (read_dst(state, &reply, GET_ACK) < 0) {
-		dprintk(verbose, DST_CA_INFO, 1, " Read not successful, trying to recover");
-		dst_error_recovery(state);
-		goto error;
-	}
+	if (read_dst(state, &reply, GET_ACK) < 0)
+		goto report_read_failure;
+
 	if (read) {
 		if (! dst_wait_dst_ready(state, LONG_DELAY)) {
 			dprintk(verbose, DST_CA_NOTICE, 1, " 8820 not ready");
-			goto error;
+			goto unlock;
 		}
-		if (read_dst(state, ca_string, 128) < 0) {	/*	Try to make this dynamic	*/
-			dprintk(verbose, DST_CA_INFO, 1, " Read not successful, trying to recover");
-			dst_error_recovery(state);
-			goto error;
-		}
+		/* Try to make this dynamic */
+		if (read_dst(state, ca_string, 128) < 0)
+			goto report_read_failure;
 	}
 	mutex_unlock(&state->dst_mutex);
 	return 0;
 
-error:
+report_read_failure:
+	dprintk(verbose, DST_CA_INFO, 1,
+		" Read not successful, trying to recover");
+error_recovery:
+	dst_error_recovery(state);
+unlock:
 	mutex_unlock(&state->dst_mutex);
 	return -EIO;
 }

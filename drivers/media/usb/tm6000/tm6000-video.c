@@ -589,10 +589,8 @@ static int tm6000_prepare_isoc(struct tm6000_core *dev)
 
 	dev->isoc_ctl.transfer_buffer = kmalloc(sizeof(void *)*num_bufs,
 				   GFP_KERNEL);
-	if (!dev->isoc_ctl.transfer_buffer) {
-		kfree(dev->isoc_ctl.urb);
-		return -ENOMEM;
-	}
+	if (!dev->isoc_ctl.transfer_buffer)
+		goto free_urb;
 
 	dprintk(dev, V4L2_DEBUG_QUEUE, "Allocating %d x %d packets (%d bytes) of %d bytes each to handle %u size\n",
 		    max_packets, num_bufs, sb_size,
@@ -604,9 +602,8 @@ static int tm6000_prepare_isoc(struct tm6000_core *dev)
 
 		/* call free, as some buffers might have been allocated */
 		tm6000_free_urb_buffers(dev);
-		kfree(dev->isoc_ctl.urb);
 		kfree(dev->isoc_ctl.transfer_buffer);
-		return -ENOMEM;
+		goto free_urb;
 	}
 
 	/* allocate urbs and transfer buffers */
@@ -636,6 +633,10 @@ static int tm6000_prepare_isoc(struct tm6000_core *dev)
 	}
 
 	return 0;
+
+free_urb:
+	kfree(dev->isoc_ctl.urb);
+	return -ENOMEM;
 }
 
 static int tm6000_start_thread(struct tm6000_core *dev)

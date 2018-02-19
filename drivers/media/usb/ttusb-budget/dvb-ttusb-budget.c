@@ -1665,8 +1665,7 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	if (result < 0) {
 		dprintk("%s: ttusb_alloc_iso_urbs - failed\n", __func__);
 		mutex_unlock(&ttusb->semi2c);
-		kfree(ttusb);
-		return result;
+		goto err_free_usb;
 	}
 
 	if (ttusb_init_controller(ttusb))
@@ -1677,11 +1676,9 @@ static int ttusb_probe(struct usb_interface *intf, const struct usb_device_id *i
 	result = dvb_register_adapter(&ttusb->adapter,
 				      "Technotrend/Hauppauge Nova-USB",
 				      THIS_MODULE, &udev->dev, adapter_nr);
-	if (result < 0) {
-		ttusb_free_iso_urbs(ttusb);
-		kfree(ttusb);
-		return result;
-	}
+	if (result < 0)
+		goto err_free_iso_urbs;
+
 	ttusb->adapter.priv = ttusb;
 
 	/* i2c */
@@ -1752,7 +1749,9 @@ err_i2c_del_adapter:
 	i2c_del_adapter(&ttusb->i2c_adap);
 err_unregister_adapter:
 	dvb_unregister_adapter (&ttusb->adapter);
+err_free_iso_urbs:
 	ttusb_free_iso_urbs(ttusb);
+err_free_usb:
 	kfree(ttusb);
 	return result;
 }

@@ -328,16 +328,12 @@ static int csid_set_power(struct v4l2_subdev *sd, int on)
 			return ret;
 
 		ret = csid_set_clock_rates(csid);
-		if (ret < 0) {
-			regulator_disable(csid->vdda);
-			return ret;
-		}
+		if (ret < 0)
+			goto disable_regulator;
 
 		ret = camss_enable_clocks(csid->nclocks, csid->clock, dev);
-		if (ret < 0) {
-			regulator_disable(csid->vdda);
-			return ret;
-		}
+		if (ret < 0)
+			goto disable_regulator;
 
 		enable_irq(csid->irq);
 
@@ -345,8 +341,7 @@ static int csid_set_power(struct v4l2_subdev *sd, int on)
 		if (ret < 0) {
 			disable_irq(csid->irq);
 			camss_disable_clocks(csid->nclocks, csid->clock);
-			regulator_disable(csid->vdda);
-			return ret;
+			goto disable_regulator;
 		}
 
 		hw_version = readl_relaxed(csid->base + CAMSS_CSID_HW_VERSION);
@@ -357,6 +352,11 @@ static int csid_set_power(struct v4l2_subdev *sd, int on)
 		ret = regulator_disable(csid->vdda);
 	}
 
+	goto exit;
+
+disable_regulator:
+	regulator_disable(csid->vdda);
+exit:
 	return ret;
 }
 

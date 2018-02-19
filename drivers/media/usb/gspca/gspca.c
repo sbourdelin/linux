@@ -907,10 +907,8 @@ static int gspca_init_transfer(struct gspca_dev *gspca_dev)
 			ret = create_urbs(gspca_dev,
 				alt_xfer(&intf->altsetting[alt], xfer,
 					 gspca_dev->xfer_ep));
-			if (ret < 0) {
-				destroy_urbs(gspca_dev);
-				goto out;
-			}
+			if (ret < 0)
+				goto destroy_urbs;
 		}
 
 		/* clear the bulk endpoint */
@@ -920,10 +918,9 @@ static int gspca_init_transfer(struct gspca_dev *gspca_dev)
 
 		/* start the cam */
 		ret = gspca_dev->sd_desc->start(gspca_dev);
-		if (ret < 0) {
-			destroy_urbs(gspca_dev);
-			goto out;
-		}
+		if (ret < 0)
+			goto destroy_urbs;
+
 		gspca_dev->streaming = 1;
 		v4l2_ctrl_handler_setup(gspca_dev->vdev.ctrl_handler);
 
@@ -974,6 +971,10 @@ retry:
 out:
 	gspca_input_create_urb(gspca_dev);
 	return ret;
+
+destroy_urbs:
+	destroy_urbs(gspca_dev);
+	goto out;
 }
 
 static void gspca_set_default_mode(struct gspca_dev *gspca_dev)

@@ -571,7 +571,7 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 		/* Checks if there's enough bytes to read */
 		if (p + sizeof(size) > endp) {
 			tuner_err("Firmware chunk size is wrong\n");
-			return -EINVAL;
+			goto e_inval;
 		}
 
 		size = le16_to_cpu(*(__le16 *) p);
@@ -583,28 +583,23 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 		if (!size) {
 			/* Special callback command received */
 			rc = do_tuner_callback(fe, XC2028_TUNER_RESET, 0);
-			if (rc < 0) {
-				tuner_err("Error at RESET code %d\n",
-					   (*p) & 0x7f);
-				return -EINVAL;
-			}
+			if (rc < 0)
+				goto report_failure;
+
 			continue;
 		}
 		if (size >= 0xff00) {
 			switch (size) {
 			case 0xff00:
 				rc = do_tuner_callback(fe, XC2028_RESET_CLK, 0);
-				if (rc < 0) {
-					tuner_err("Error at RESET code %d\n",
-						  (*p) & 0x7f);
-					return -EINVAL;
-				}
+				if (rc < 0)
+					goto report_failure;
+
 				break;
 			default:
 				tuner_info("Invalid RESET code %d\n",
 					   size & 0x7f);
-				return -EINVAL;
-
+				goto e_inval;
 			}
 			continue;
 		}
@@ -618,7 +613,7 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 		if ((size + p > endp)) {
 			tuner_err("missing bytes: need %d, have %d\n",
 				   size, (int)(endp - p));
-			return -EINVAL;
+			goto e_inval;
 		}
 
 		buf[0] = *p;
@@ -635,7 +630,7 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 			rc = i2c_send(priv, buf, len + 1);
 			if (rc < 0) {
 				tuner_err("%d returned from send\n", rc);
-				return -EINVAL;
+				goto e_inval;
 			}
 
 			p += len;
@@ -650,6 +645,11 @@ static int load_firmware(struct dvb_frontend *fe, unsigned int type,
 		}
 	}
 	return 0;
+
+report_failure:
+	tuner_err("Error at RESET code %d\n", (*p) & 0x7f);
+e_inval:
+	return -EINVAL;
 }
 
 static int load_scode(struct dvb_frontend *fe, unsigned int type,

@@ -861,15 +861,14 @@ int tm6000_cards_setup(struct tm6000_core *dev)
 		for (i = 0; i < 2; i++) {
 			rc = tm6000_set_reg(dev, REQ_03_SET_GET_MCU_PIN,
 						dev->gpio.tuner_reset, 0x00);
-			if (rc < 0) {
-				printk(KERN_ERR "Error %i doing tuner reset\n", rc);
-				return rc;
-			}
+			if (rc < 0)
+				goto report_failure;
 
 			msleep(10); /* Just to be conservative */
 			rc = tm6000_set_reg(dev, REQ_03_SET_GET_MCU_PIN,
 						dev->gpio.tuner_reset, 0x01);
 			if (rc < 0) {
+report_failure:
 				printk(KERN_ERR "Error %i doing tuner reset\n", rc);
 				return rc;
 			}

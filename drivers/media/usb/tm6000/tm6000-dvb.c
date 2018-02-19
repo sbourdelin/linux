@@ -134,8 +134,8 @@ static int tm6000_start_stream(struct tm6000_core *dev)
 
 	dvb->bulk_urb->transfer_buffer = kzalloc(size, GFP_KERNEL);
 	if (!dvb->bulk_urb->transfer_buffer) {
-		usb_free_urb(dvb->bulk_urb);
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto free_urb;
 	}
 
 	usb_fill_bulk_urb(dvb->bulk_urb, dev->udev, pipe,
@@ -160,11 +160,14 @@ static int tm6000_start_stream(struct tm6000_core *dev)
 									ret);
 
 		kfree(dvb->bulk_urb->transfer_buffer);
-		usb_free_urb(dvb->bulk_urb);
-		return ret;
+		goto free_urb;
 	}
 
 	return 0;
+
+free_urb:
+	usb_free_urb(dvb->bulk_urb);
+	return ret;
 }
 
 static void tm6000_stop_stream(struct tm6000_core *dev)
