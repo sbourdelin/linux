@@ -10,6 +10,7 @@
 #include <linux/netfilter/nf_tables.h>
 #include <linux/u64_stats_sync.h>
 #include <net/netfilter/nf_flow_table.h>
+#include <linux/filter.h>
 #include <net/netlink.h>
 
 #define NFT_JUMP_STACK_SIZE	16
@@ -796,10 +797,23 @@ static inline int nft_expr_clone(struct nft_expr *dst, struct nft_expr *src)
 	return 0;
 }
 
+/* Size of buffer to store jit transformation. Instead of having a fixed buffer
+ * size per rule, we can calculate this in runtime when walking over the syntax
+ * tree instead, this is a proof of concept at this stage, so use a fixed size
+ * buffer.
+ */
+#define NFT_RULE_JIT_BUFSIZ	32
+
+struct nft_rule_jit {
+	struct sock_filter	insn[NFT_RULE_JIT_BUFSIZ];
+	unsigned int		len;
+};
+
 /**
  *	struct nft_rule - nf_tables rule
  *
  *	@list: used internally
+ *	@jit: instructions that result from jit transformation
  *	@handle: rule handle
  *	@genmask: generation mask
  *	@dlen: length of expression data
@@ -808,6 +822,7 @@ static inline int nft_expr_clone(struct nft_expr *dst, struct nft_expr *src)
  */
 struct nft_rule {
 	struct list_head		list;
+	struct nft_rule_jit		jit;
 	u64				handle:42,
 					genmask:2,
 					dlen:12,
@@ -915,6 +930,8 @@ struct nft_stats {
  *	struct nft_base_chain - nf_tables base chain
  *
  *	@ops: netfilter hook ops
+ *	@fp: jitted filter program
+ *	@fp_stash: jitted filter program stash (for two-commit phase protocol)
  *	@type: chain type
  *	@policy: default policy
  *	@stats: per-cpu chain stats
@@ -923,6 +940,8 @@ struct nft_stats {
  */
 struct nft_base_chain {
 	struct nf_hook_ops		ops;
+	struct bpf_prog	__rcu		*fp;
+	struct bpf_prog			*fp_stash;
 	const struct nf_chain_type	*type;
 	u8				policy;
 	u8				flags;

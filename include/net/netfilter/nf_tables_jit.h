@@ -120,4 +120,17 @@ struct nft_ast_xfrm_desc {
 int nft_ast_xfrm(const struct list_head *ast_stmt_list,
 		 const struct nft_ast_xfrm_desc *base_desc, void *data);
 
+struct sock_fprog_kern;
+
+void nft_jit_emit_basechain_policy(struct sock_fprog_kern *prog,
+				   unsigned int verdict);
+int nft_jit_rule(struct nft_rule *rule,
+                 const struct nft_ast_xfrm_desc *xfrm_desc);
+
+extern struct nft_ast_xfrm_desc nft_jit_bpf_xfrm_desc;
+
+int nft_jit_prepare(struct net *net);
+void nft_jit_commit(struct net *net);
+void nft_jit_release(struct net *net);
+
 #endif

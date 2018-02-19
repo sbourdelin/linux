@@ -1,6 +1,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/netfilter.h>
+#include <linux/filter.h>
 #include <net/netfilter/nf_tables.h>
 #include <net/netfilter/nf_tables_jit.h>
 
@@ -205,3 +206,134 @@ int nft_ast_xfrm(const struct list_head *ast_stmt_list,
 	return err;
 }
 EXPORT_SYMBOL_GPL(nft_ast_xfrm);
+
+int nft_jit_rule(struct nft_rule *rule,
+		 const struct nft_ast_xfrm_desc *xfrm_desc)
+{
+	LIST_HEAD(stmt_list);
+	int err;
+
+	err = nft_delinearize(&stmt_list, rule);
+	if (err < 0)
+		return err;
+
+	err = nft_ast_xfrm(&stmt_list, xfrm_desc, &rule->jit);
+	if (err < 0)
+		return err;
+
+	/* TODO: Remove this, just here to print result of delinearization. */
+	nft_ast_stmt_list_print(&stmt_list);
+
+	nft_ast_stmt_list_release(&stmt_list);
+
+	return err;
+}
+
+void nft_jit_emit_basechain_policy(struct sock_fprog_kern *prog,
+				   unsigned int verdict)
+{
+	struct sock_filter ret = BPF_STMT(BPF_RET | BPF_K, verdict);
+
+	prog->filter[prog->len] = ret;
+	prog->len++;
+}
+
+static void nft_jit_rule_add(struct sock_fprog_kern *prog,
+			     const struct nft_rule_jit *jit)
+{
+	memcpy(&prog->filter[prog->len], jit->insn,
+	       jit->len * sizeof(struct sock_filter));
+	prog->len += jit->len;
+}
+
+int nft_jit_prepare(struct net *net)
+{
+	struct nft_base_chain *basechain;
+	struct sock_fprog_kern prog;
+	struct sock_filter *filter;
+	struct nft_table *table;
+	struct nft_chain *chain;
+	struct nft_rule *rule;
+	unsigned int len = 1;
+	struct bpf_prog *fp;
+
+	list_for_each_entry(table, &net->nft.tables, list) {
+		list_for_each_entry(chain, &table->chains, list) {
+			if (!nft_is_base_chain(chain))
+				continue;
+
+			basechain = nft_base_chain(chain);
+
+			list_for_each_entry(rule, &chain->rules, list) {
+				if (!nft_is_active_next(net, rule))
+					continue;
+
+				len += rule->jit.len;
+			}
+
+			filter = kmalloc(len * sizeof(*filter), GFP_KERNEL);
+			if (!filter)
+				return -ENOMEM;
+
+			prog.filter = filter;
+			prog.len = 0;
+
+			list_for_each_entry(rule, &chain->rules, list) {
+				if (!nft_is_active_next(net, rule))
+					continue;
+
+				nft_jit_rule_add(&prog, &rule->jit);
+			}
+
+			nft_jit_emit_basechain_policy(&prog, basechain->policy);
+
+			if (bpf_prog_create(&fp, &prog)) {
+				kfree(filter);
+				return -ENOMEM;
+			}
+
+			kfree(filter);
+			nft_base_chain(chain)->fp_stash = fp;
+		}
+	}
+
+	return 0;
+}
+
+void nft_jit_commit(struct net *net)
+{
+	struct nft_base_chain *basechain;
+	struct nft_table *table;
+	struct nft_chain *chain;
+	struct bpf_prog *old_fp;
+
+	list_for_each_entry(table, &net->nft.tables, list) {
+		list_for_each_entry(chain, &table->chains, list) {
+			if (!nft_is_base_chain(chain))
+				continue;
+
+			basechain = nft_base_chain(chain);
+			old_fp = basechain->fp;
+			rcu_assign_pointer(basechain->fp, basechain->fp_stash);
+			basechain->fp_stash = old_fp;
+		}
+	}
+}
+
+void nft_jit_release(struct net *net)
+{
+	struct nft_base_chain *basechain;
+	struct nft_table *table;
+	struct nft_chain *chain;
+
+	list_for_each_entry(table, &net->nft.tables, list) {
+		list_for_each_entry(chain, &table->chains, list) {
+			if (!nft_is_base_chain(chain))
+				continue;
+
+			basechain = nft_base_chain(chain);
+			bpf_prog_free(basechain->fp_stash);
+			basechain->fp_stash = NULL;
+		}
+	}
+}

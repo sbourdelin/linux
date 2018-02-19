@@ -15,11 +15,13 @@
 #include <linux/netlink.h>
 #include <linux/vmalloc.h>
 #include <linux/netfilter.h>
+#include <linux/filter.h>
 #include <linux/netfilter/nfnetlink.h>
 #include <linux/netfilter/nf_tables.h>
 #include <net/netfilter/nf_flow_table.h>
 #include <net/netfilter/nf_tables_core.h>
 #include <net/netfilter/nf_tables.h>
+#include <net/netfilter/nf_tables_jit.h>
 #include <net/net_namespace.h>
 #include <net/sock.h>
 
@@ -1324,13 +1326,16 @@ static int nf_tables_addchain(struct nft_ctx *ctx, u8 family, u8 genmask,
 	struct nft_stats __percpu *stats;
 	struct net *net = ctx->net;
 	struct nft_chain *chain;
+	struct bpf_prog *fp;
 	int err;
 
 	if (table->use == UINT_MAX)
 		return -EOVERFLOW;
 
 	if (nla[NFTA_CHAIN_HOOK]) {
+		struct sock_fprog_kern prog;
 		struct nft_chain_hook hook;
+		struct sock_filter filter;
 		struct nf_hook_ops *ops;
 
 		err = nft_chain_parse_hook(net, nla, &hook, family, create);
@@ -1370,6 +1375,18 @@ static int nf_tables_addchain(struct nft_ctx *ctx, u8 family, u8 genmask,
 
 		if (basechain->type->type == NFT_CHAIN_T_NAT)
 			ops->nat_hook = true;
+
+		prog.filter = &filter;
+		prog.len = 0;
+		nft_jit_emit_basechain_policy(&prog, NF_ACCEPT);
+
+		if (bpf_prog_create(&fp, &prog)) {
+			nft_chain_release_hook(&hook);
+			free_percpu(basechain->stats);
+			kfree(basechain);
+			return -ENOMEM;
+		}
+		RCU_INIT_POINTER(basechain->fp, fp);
 
 		chain->flags |= NFT_BASE_CHAIN;
 		basechain->policy = policy;
@@ -2323,6 +2340,10 @@ static int nf_tables_newrule(struct net *net, struct sock *nlsk,
 		else
 			list_add_rcu(&rule->list, &chain->rules);
 	}
+
+	err = nft_jit_rule(rule, &nft_jit_bpf_xfrm_desc);
+	if (err < 0)
+		goto err3;
 
 	if (nft_trans_rule_add(&ctx, NFT_MSG_NEWRULE, rule) == NULL) {
 		err = -ENOMEM;
@@ -5707,6 +5728,9 @@ static int nf_tables_commit(struct net *net, struct sk_buff *skb)
 	struct nft_trans *trans, *next;
 	struct nft_trans_elem *te;
 
+	if (nft_jit_prepare(net) < 0)
+		return -1;
+
 	/* Bump generation counter, invalidate any dump in progress */
 	while (++net->nft.base_seq == 0);
 
@@ -5832,7 +5856,11 @@ static int nf_tables_commit(struct net *net, struct sk_buff *skb)
 		}
 	}
 
+	nft_jit_commit(net);
+
 	synchronize_rcu();
+
+	nft_jit_release(net);
 
 	list_for_each_entry_safe(trans, next, &net->nft.commit_list, list) {
 		list_del(&trans->list);

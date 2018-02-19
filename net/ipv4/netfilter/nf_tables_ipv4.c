@@ -22,12 +22,9 @@ static unsigned int nft_do_chain_ipv4(void *priv,
 				      struct sk_buff *skb,
 				      const struct nf_hook_state *state)
 {
-	struct nft_pktinfo pkt;
+	const struct nft_chain *chain = priv;
 
-	nft_set_pktinfo(&pkt, skb, state);
-	nft_set_pktinfo_ipv4(&pkt, skb);
-
-	return nft_do_chain(&pkt, priv);
+	return BPF_PROG_RUN(nft_base_chain(chain)->fp, skb);
 }
 
 static const struct nf_chain_type filter_ipv4 = {
