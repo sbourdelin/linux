@@ -192,9 +192,9 @@ struct s5p_mfc_buf {
  * struct s5p_mfc_pm - power management data structure
  */
 struct s5p_mfc_pm {
-	struct clk	*clock_gate;
-	const char * const *clk_names;
-	struct clk	*clocks[MFC_MAX_CLOCKS];
+	struct clk		*clock_gate;
+	const char * const	*clk_names;
+	struct clk_bulk_data	*clocks;
 	int		num_clocks;
 	bool		use_clock_gating;
 

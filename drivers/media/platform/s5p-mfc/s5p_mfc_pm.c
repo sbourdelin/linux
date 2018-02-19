@@ -24,7 +24,7 @@ static atomic_t clk_ref;
 
 int s5p_mfc_init_pm(struct s5p_mfc_dev *dev)
 {
-	int i;
+	int ret;
 
 	pm = &dev->pm;
 	p_dev = dev;
@@ -35,17 +35,17 @@ int s5p_mfc_init_pm(struct s5p_mfc_dev *dev)
 	pm->clock_gate = NULL;
 
 	/* clock control */
-	for (i = 0; i < pm->num_clocks; i++) {
-		pm->clocks[i] = devm_clk_get(pm->device, pm->clk_names[i]);
-		if (IS_ERR(pm->clocks[i])) {
-			mfc_err("Failed to get clock: %s\n",
-				pm->clk_names[i]);
-			return PTR_ERR(pm->clocks[i]);
-		}
-	}
+	pm->clocks = devm_clk_bulk_alloc(pm->device, pm->num_clocks,
+					 pm->clk_names);
+	if (IS_ERR(pm->clocks))
+		return PTR_ERR(pm->clocks);
+
+	ret = devm_clk_bulk_get(pm->device, pm->num_clocks, pm->clocks);
+	if (ret < 0)
+		return ret;
 
 	if (dev->variant->use_clock_gating)
-		pm->clock_gate = pm->clocks[0];
+		pm->clock_gate = pm->clocks[0].clk;
 
 	pm_runtime_enable(pm->device);
 	atomic_set(&clk_ref, 0);
@@ -75,43 +75,32 @@ void s5p_mfc_clock_off(void)
 
 int s5p_mfc_power_on(void)
 {
-	int i, ret = 0;
+	int ret = 0;
 
 	ret = pm_runtime_get_sync(pm->device);
 	if (ret < 0)
 		return ret;
 
 	/* clock control */
-	for (i = 0; i < pm->num_clocks; i++) {
-		ret = clk_prepare_enable(pm->clocks[i]);
-		if (ret < 0) {
-			mfc_err("clock prepare failed for clock: %s\n",
-				pm->clk_names[i]);
-			i++;
-			goto err;
-		}
-	}
+	ret = clk_bulk_prepare_enable(pm->num_clocks, pm->clocks);
+	if (ret < 0)
+		goto err;
 
 	/* prepare for software clock gating */
 	clk_disable(pm->clock_gate);
 
 	return 0;
 err:
-	while (--i > 0)
-		clk_disable_unprepare(pm->clocks[i]);
 	pm_runtime_put(pm->device);
 	return ret;
 }
 
 int s5p_mfc_power_off(void)
 {
-	int i;
-
 	/* finish software clock gating */
 	clk_enable(pm->clock_gate);
 
-	for (i = 0; i < pm->num_clocks; i++)
-		clk_disable_unprepare(pm->clocks[i]);
+	clk_bulk_disable_unprepare(pm->num_clocks, pm->clocks);
 
 	return pm_runtime_put_sync(pm->device);
 }
