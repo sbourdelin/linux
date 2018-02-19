@@ -661,8 +661,12 @@ out:
 	return !ret;
 }
 
-static bool sunxi_mc_smp_cpu_can_disable(unsigned int __unused)
+static bool sunxi_mc_smp_cpu_can_disable(unsigned int cpu)
 {
+	/* CPU0 hotplug handled only for sun9i */
+	if (of_machine_is_compatible("allwinner,sun8i-a83t"))
+		if (cpu == 0)
+			return false;
 	return true;
 }
 #endif
