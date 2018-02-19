@@ -2903,7 +2903,7 @@ static int s5p_jpeg_probe(struct platform_device *pdev)
 {
 	struct s5p_jpeg *jpeg;
 	struct resource *res;
-	int i, ret;
+	int ret;
 
 	/* JPEG IP abstraction struct */
 	jpeg = devm_kzalloc(&pdev->dev, sizeof(struct s5p_jpeg), GFP_KERNEL);
@@ -2938,15 +2938,16 @@ static int s5p_jpeg_probe(struct platform_device *pdev)
 	}
 
 	/* clocks */
-	for (i = 0; i < jpeg->variant->num_clocks; i++) {
-		jpeg->clocks[i] = devm_clk_get(&pdev->dev,
-					      jpeg->variant->clk_names[i]);
-		if (IS_ERR(jpeg->clocks[i])) {
-			dev_err(&pdev->dev, "failed to get clock: %s\n",
-				jpeg->variant->clk_names[i]);
-			return PTR_ERR(jpeg->clocks[i]);
-		}
-	}
+	jpeg->clocks = devm_clk_bulk_alloc(&pdev->dev,
+					   jpeg->variant->num_clocks,
+					   jpeg->variant->clk_names);
+	if (IS_ERR(jpeg->clocks))
+		return PTR_ERR(jpeg->clocks);
+
+	ret = devm_clk_bulk_get(&pdev->dev, jpeg->variant->num_clocks,
+				jpeg->clocks);
+	if (ret < 0)
+		return ret;
 
 	/* v4l2 device */
 	ret = v4l2_device_register(&pdev->dev, &jpeg->v4l2_dev);
@@ -3047,7 +3048,6 @@ device_register_rollback:
 static int s5p_jpeg_remove(struct platform_device *pdev)
 {
 	struct s5p_jpeg *jpeg = platform_get_drvdata(pdev);
-	int i;
 
 	pm_runtime_disable(jpeg->dev);
 
@@ -3058,8 +3058,8 @@ static int s5p_jpeg_remove(struct platform_device *pdev)
 	v4l2_device_unregister(&jpeg->v4l2_dev);
 
 	if (!pm_runtime_status_suspended(&pdev->dev)) {
-		for (i = jpeg->variant->num_clocks - 1; i >= 0; i--)
-			clk_disable_unprepare(jpeg->clocks[i]);
+		clk_bulk_disable_unprepare(jpeg->variant->num_clocks,
+					   jpeg->clocks);
 	}
 
 	return 0;
@@ -3069,10 +3069,8 @@ static int s5p_jpeg_remove(struct platform_device *pdev)
 static int s5p_jpeg_runtime_suspend(struct device *dev)
 {
 	struct s5p_jpeg *jpeg = dev_get_drvdata(dev);
-	int i;
 
-	for (i = jpeg->variant->num_clocks - 1; i >= 0; i--)
-		clk_disable_unprepare(jpeg->clocks[i]);
+	clk_bulk_disable_unprepare(jpeg->variant->num_clocks, jpeg->clocks);
 
 	return 0;
 }
@@ -3081,16 +3079,11 @@ static int s5p_jpeg_runtime_resume(struct device *dev)
 {
 	struct s5p_jpeg *jpeg = dev_get_drvdata(dev);
 	unsigned long flags;
-	int i, ret;
+	int ret;
 
-	for (i = 0; i < jpeg->variant->num_clocks; i++) {
-		ret = clk_prepare_enable(jpeg->clocks[i]);
-		if (ret) {
-			while (--i >= 0)
-				clk_disable_unprepare(jpeg->clocks[i]);
-			return ret;
-		}
-	}
+	ret = clk_bulk_prepare_enable(jpeg->variant->num_clocks, jpeg->clocks);
+	if (ret)
+		return ret;
 
 	spin_lock_irqsave(&jpeg->slock, flags);
 
