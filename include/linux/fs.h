@@ -3009,8 +3009,10 @@ void inode_dio_wait(struct inode *inode);
  * inode_dio_begin - signal start of a direct I/O requests
  * @inode: inode the direct I/O happens on
  *
- * This is called once we've finished processing a direct I/O request,
- * and is used to wake up callers waiting for direct I/O to be quiesced.
+ * This is called before we begin processing a direct I/O request,
+ * and is used to quiesce callers of inode_dio_wait. It must be
+ * called under a lock that serialising getting a reference to
+ * ->i_dio_count (usually the inode_lock)
  */
 static inline void inode_dio_begin(struct inode *inode)
 {
