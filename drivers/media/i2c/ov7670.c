@@ -996,6 +996,10 @@ static int ov7670_try_fmt_internal(struct v4l2_subdev *sd,
 	fmt->height = wsize->height;
 	fmt->colorspace = ov7670_formats[index].colorspace;
 
+	fmt->ycbcr_enc = V4L2_YCBCR_ENC_DEFAULT;
+	fmt->quantization = V4L2_QUANTIZATION_DEFAULT;
+	fmt->xfer_func = V4L2_XFER_FUNC_DEFAULT;
+
 	info->format = *fmt;
 
 	return 0;
