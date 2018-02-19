@@ -746,30 +746,11 @@ static int max_cb_time(struct net *net)
 	return max(nn->nfsd4_lease/10, (time_t)1) * HZ;
 }
 
-static struct rpc_cred *callback_cred;
-
-int set_callback_cred(void)
-{
-	if (callback_cred)
-		return 0;
-	callback_cred = rpc_lookup_machine_cred("nfs");
-	if (!callback_cred)
-		return -ENOMEM;
-	return 0;
-}
-
-void cleanup_callback_cred(void)
-{
-	if (callback_cred) {
-		put_rpccred(callback_cred);
-		callback_cred = NULL;
-	}
-}
-
 static struct rpc_cred *get_backchannel_cred(struct nfs4_client *clp, struct rpc_clnt *client, struct nfsd4_session *ses)
 {
 	if (clp->cl_minorversion == 0) {
-		return get_rpccred(callback_cred);
+		client->cl_principal = "nfs";
+		return get_rpccred(rpc_machine_cred());
 	} else {
 		struct rpc_auth *auth = client->cl_auth;
 		struct auth_cred acred = {};
