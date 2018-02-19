@@ -502,7 +502,7 @@ static void cc_setup_cipher_data(struct crypto_tfm *tfm,
 		set_dout_dlli(&desc[*seq_size], sg_dma_address(dst),
 			      nbytes, NS_BIT, (!areq ? 0 : 1));
 		if (areq)
-			set_queue_last_ind(&desc[*seq_size]);
+			set_queue_last_ind(ctx_p->drvdata, &desc[*seq_size]);
 
 		set_flow_mode(&desc[*seq_size], flow_mode);
 		(*seq_size)++;
@@ -547,7 +547,7 @@ static void cc_setup_cipher_data(struct crypto_tfm *tfm,
 				      (!areq ? 0 : 1));
 		}
 		if (areq)
-			set_queue_last_ind(&desc[*seq_size]);
+			set_queue_last_ind(ctx_p->drvdata, &desc[*seq_size]);
 
 		set_flow_mode(&desc[*seq_size], flow_mode);
 		(*seq_size)++;
@@ -749,6 +749,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_XTS,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "xts512(aes)",
@@ -765,6 +766,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 		.cipher_mode = DRV_CIPHER_XTS,
 		.flow_mode = S_DIN_to_AES,
 		.data_unit = 512,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "xts4096(aes)",
@@ -781,6 +783,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 		.cipher_mode = DRV_CIPHER_XTS,
 		.flow_mode = S_DIN_to_AES,
 		.data_unit = 4096,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "essiv(aes)",
@@ -796,6 +799,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_ESSIV,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "essiv512(aes)",
@@ -812,6 +816,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 		.cipher_mode = DRV_CIPHER_ESSIV,
 		.flow_mode = S_DIN_to_AES,
 		.data_unit = 512,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "essiv4096(aes)",
@@ -828,6 +833,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 		.cipher_mode = DRV_CIPHER_ESSIV,
 		.flow_mode = S_DIN_to_AES,
 		.data_unit = 4096,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "bitlocker(aes)",
@@ -843,6 +849,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_BITLOCKER,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "bitlocker512(aes)",
@@ -859,6 +866,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 		.cipher_mode = DRV_CIPHER_BITLOCKER,
 		.flow_mode = S_DIN_to_AES,
 		.data_unit = 512,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "bitlocker4096(aes)",
@@ -875,6 +883,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 		.cipher_mode = DRV_CIPHER_BITLOCKER,
 		.flow_mode = S_DIN_to_AES,
 		.data_unit = 4096,
+		.min_hw_rev = CC_HW_REV_712,
 	},
 	{
 		.name = "ecb(aes)",
@@ -891,6 +900,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_ECB,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "cbc(aes)",
@@ -907,6 +917,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 		},
 		.cipher_mode = DRV_CIPHER_CBC,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "ofb(aes)",
@@ -923,6 +934,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_OFB,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "cts1(cbc(aes))",
@@ -939,6 +951,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_CBC_CTS,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "ctr(aes)",
@@ -955,6 +968,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_CTR,
 		.flow_mode = S_DIN_to_AES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "cbc(des3_ede)",
@@ -971,6 +985,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_CBC,
 		.flow_mode = S_DIN_to_DES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "ecb(des3_ede)",
@@ -987,6 +1002,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_ECB,
 		.flow_mode = S_DIN_to_DES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "cbc(des)",
@@ -1003,6 +1019,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_CBC,
 		.flow_mode = S_DIN_to_DES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 	{
 		.name = "ecb(des)",
@@ -1019,6 +1036,7 @@ static const struct cc_alg_template skcipher_algs[] = {
 			},
 		.cipher_mode = DRV_CIPHER_ECB,
 		.flow_mode = S_DIN_to_DES,
+		.min_hw_rev = CC_HW_REV_630,
 	},
 };
 
@@ -1095,6 +1113,9 @@ int cc_cipher_alloc(struct cc_drvdata *drvdata)
 	dev_dbg(dev, "Number of algorithms = %zu\n",
 		ARRAY_SIZE(skcipher_algs));
 	for (alg = 0; alg < ARRAY_SIZE(skcipher_algs); alg++) {
+		if (skcipher_algs[alg].min_hw_rev > drvdata->hw_rev)
+			continue;
+
 		dev_dbg(dev, "creating %s\n", skcipher_algs[alg].driver_name);
 		t_alg = cc_create_alg(&skcipher_algs[alg], dev);
 		if (IS_ERR(t_alg)) {
