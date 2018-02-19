@@ -184,6 +184,9 @@ struct v4l2_subdev_io_pin_config {
  * @s_power: puts subdevice in power saving mode (on == 0) or normal operation
  *	mode (on == 1).
  *
+ * @tuner_standby: puts the tuner in standby mode. It will be woken up
+ *	automatically the next time it is used.
+ *
  * @interrupt_service_routine: Called by the bridge chip's interrupt service
  *	handler, when an interrupt status has be raised due to this subdev,
  *	so that this subdev can handle the details.  It may schedule work to be
@@ -212,6 +215,7 @@ struct v4l2_subdev_core_ops {
 	int (*s_register)(struct v4l2_subdev *sd, const struct v4l2_dbg_register *reg);
 #endif
 	int (*s_power)(struct v4l2_subdev *sd, int on);
+	int (*tuner_standby)(struct v4l2_subdev *sd);
 	int (*interrupt_service_routine)(struct v4l2_subdev *sd,
 						u32 status, bool *handled);
 	int (*subscribe_event)(struct v4l2_subdev *sd, struct v4l2_fh *fh,

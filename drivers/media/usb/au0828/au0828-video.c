@@ -1092,7 +1092,7 @@ static int au0828_v4l2_close(struct file *filp)
 		ret = v4l_enable_media_source(vdev);
 		if (ret == 0)
 			v4l2_device_call_all(&dev->v4l2_dev, 0, core,
-					     s_power, 0);
+					     tuner_standby);
 		dev->std_set_in_tuner_core = 0;
 
 		/* When close the device, set the usb intf0 into alt0 to free

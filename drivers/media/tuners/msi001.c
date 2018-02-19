@@ -291,24 +291,15 @@ err:
 	return ret;
 }
 
-static int msi001_s_power(struct v4l2_subdev *sd, int on)
+static int msi001_tuner_standby(struct v4l2_subdev *sd)
 {
 	struct msi001_dev *dev = sd_to_msi001_dev(sd);
-	struct spi_device *spi = dev->spi;
-	int ret;
 
-	dev_dbg(&spi->dev, "on=%d\n", on);
-
-	if (on)
-		ret = 0;
-	else
-		ret = msi001_wreg(dev, 0x000000);
-
-	return ret;
+	return msi001_wreg(dev, 0x000000);
 }
 
 static const struct v4l2_subdev_core_ops msi001_core_ops = {
-	.s_power                  = msi001_s_power,
+	.tuner_standby                  = msi001_tuner_standby,
 };
 
 static int msi001_g_tuner(struct v4l2_subdev *sd, struct v4l2_tuner *v)

@@ -386,18 +386,12 @@ static inline struct fc2580_dev *fc2580_subdev_to_dev(struct v4l2_subdev *sd)
 	return container_of(sd, struct fc2580_dev, subdev);
 }
 
-static int fc2580_s_power(struct v4l2_subdev *sd, int on)
+static int fc2580_tuner_standby(struct v4l2_subdev *sd)
 {
 	struct fc2580_dev *dev = fc2580_subdev_to_dev(sd);
-	struct i2c_client *client = dev->client;
 	int ret;
 
-	dev_dbg(&client->dev, "on=%d\n", on);
-
-	if (on)
-		ret = fc2580_init(dev);
-	else
-		ret = fc2580_sleep(dev);
+	ret = fc2580_sleep(dev);
 	if (ret)
 		return ret;
 
@@ -405,7 +399,7 @@ static int fc2580_s_power(struct v4l2_subdev *sd, int on)
 }
 
 static const struct v4l2_subdev_core_ops fc2580_subdev_core_ops = {
-	.s_power                  = fc2580_s_power,
+	.tuner_standby                  = fc2580_tuner_standby,
 };
 
 static int fc2580_g_tuner(struct v4l2_subdev *sd, struct v4l2_tuner *v)
