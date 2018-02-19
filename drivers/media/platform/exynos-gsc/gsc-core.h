@@ -334,7 +334,7 @@ struct gsc_dev {
 	struct gsc_variant		*variant;
 	u16				id;
 	int				num_clocks;
-	struct clk			*clock[GSC_MAX_CLOCKS];
+	struct clk_bulk_data		*clocks;
 	void __iomem			*regs;
 	wait_queue_head_t		irq_queue;
 	struct gsc_m2m_device		m2m;

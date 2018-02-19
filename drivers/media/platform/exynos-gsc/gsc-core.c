@@ -1149,7 +1149,6 @@ static int gsc_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	const struct gsc_driverdata *drv_data = of_device_get_match_data(dev);
 	int ret;
-	int i;
 
 	gsc = devm_kzalloc(dev, sizeof(struct gsc_dev), GFP_KERNEL);
 	if (!gsc)
@@ -1187,25 +1186,19 @@ static int gsc_probe(struct platform_device *pdev)
 		return -ENXIO;
 	}
 
-	for (i = 0; i < gsc->num_clocks; i++) {
-		gsc->clock[i] = devm_clk_get(dev, drv_data->clk_names[i]);
-		if (IS_ERR(gsc->clock[i])) {
-			dev_err(dev, "failed to get clock: %s\n",
-				drv_data->clk_names[i]);
-			return PTR_ERR(gsc->clock[i]);
-		}
-	}
+	gsc->clocks = devm_clk_bulk_alloc(dev, gsc->num_clocks,
+					  drv_data->clk_names);
+	if (IS_ERR(gsc->clocks))
+		return PTR_ERR(gsc->clocks);
 
-	for (i = 0; i < gsc->num_clocks; i++) {
-		ret = clk_prepare_enable(gsc->clock[i]);
-		if (ret) {
-			dev_err(dev, "clock prepare failed for clock: %s\n",
-				drv_data->clk_names[i]);
-			while (--i >= 0)
-				clk_disable_unprepare(gsc->clock[i]);
-			return ret;
-		}
-	}
+	ret = devm_clk_bulk_get(dev, gsc->num_clocks,
+				gsc->clocks);
+	if (ret)
+		return ret;
+
+	ret = clk_bulk_prepare_enable(gsc->num_clocks, gsc->clocks);
+	if (ret)
+		return ret;
 
 	ret = devm_request_irq(dev, res->start, gsc_irq_handler,
 				0, pdev->name, gsc);
@@ -1239,15 +1232,14 @@ static int gsc_probe(struct platform_device *pdev)
 err_v4l2:
 	v4l2_device_unregister(&gsc->v4l2_dev);
 err_clk:
-	for (i = gsc->num_clocks - 1; i >= 0; i--)
-		clk_disable_unprepare(gsc->clock[i]);
+	clk_bulk_disable_unprepare(gsc->num_clocks, gsc->clocks);
+
 	return ret;
 }
 
 static int gsc_remove(struct platform_device *pdev)
 {
 	struct gsc_dev *gsc = platform_get_drvdata(pdev);
-	int i;
 
 	pm_runtime_get_sync(&pdev->dev);
 
@@ -1255,8 +1247,7 @@ static int gsc_remove(struct platform_device *pdev)
 	v4l2_device_unregister(&gsc->v4l2_dev);
 
 	vb2_dma_contig_clear_max_seg_size(&pdev->dev);
-	for (i = 0; i < gsc->num_clocks; i++)
-		clk_disable_unprepare(gsc->clock[i]);
+	clk_bulk_disable_unprepare(gsc->num_clocks, gsc->clocks);
 
 	pm_runtime_put_noidle(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
@@ -1307,18 +1298,12 @@ static int gsc_runtime_resume(struct device *dev)
 {
 	struct gsc_dev *gsc = dev_get_drvdata(dev);
 	int ret = 0;
-	int i;
 
 	pr_debug("gsc%d: state: 0x%lx\n", gsc->id, gsc->state);
 
-	for (i = 0; i < gsc->num_clocks; i++) {
-		ret = clk_prepare_enable(gsc->clock[i]);
-		if (ret) {
-			while (--i >= 0)
-				clk_disable_unprepare(gsc->clock[i]);
-			return ret;
-		}
-	}
+	ret = clk_bulk_prepare_enable(gsc->num_clocks, gsc->clocks);
+	if (ret)
+		return ret;
 
 	gsc_hw_set_sw_reset(gsc);
 	gsc_wait_reset(gsc);
@@ -1331,14 +1316,12 @@ static int gsc_runtime_suspend(struct device *dev)
 {
 	struct gsc_dev *gsc = dev_get_drvdata(dev);
 	int ret = 0;
-	int i;
 
 	ret = gsc_m2m_suspend(gsc);
 	if (ret)
 		return ret;
 
-	for (i = gsc->num_clocks - 1; i >= 0; i--)
-		clk_disable_unprepare(gsc->clock[i]);
+	clk_bulk_disable_unprepare(gsc->num_clocks, gsc->clocks);
 
 	pr_debug("gsc%d: state: 0x%lx\n", gsc->id, gsc->state);
 	return ret;
