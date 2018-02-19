@@ -81,4 +81,43 @@ void nft_ast_stmt_list_print(struct list_head *stmt_list);
 
 int nft_delinearize(struct list_head *ast_stmt_list, struct nft_rule *rule);
 
+/*
+ * Tree of transformation callback definitions.
+ */
+struct nft_ast_xfrm_state;
+
+/**
+ *	struct nft_ast_proto_desc - nf_tables protocol transformation description
+ *
+ *	@xfrm: transformation callback
+ */
+struct nft_ast_proto_desc {
+	int (*xfrm)(const struct nft_ast_expr *dlexpr,
+		    struct nft_ast_xfrm_state *state, void *data);
+};
+
+/**
+ *	struct nft_ast_meta_desc - nf_tables meta transformation description
+ *
+ *	@xfrm: transformation callback
+ */
+struct nft_ast_meta_desc {
+	int (*xfrm)(const struct nft_ast_expr *dlexpr,
+		    struct nft_ast_xfrm_state *state, void *data);
+};
+
+/**
+ *	struct nft_ast_xfrm_desc - nf_tables generic transformation description
+ *
+ *	@key: meta key
+ *	@xfrm: transformation callback
+ */
+struct nft_ast_xfrm_desc {
+	const struct nft_ast_proto_desc	*proto_desc;
+	const struct nft_ast_meta_desc	*meta_desc;
+};
+
+int nft_ast_xfrm(const struct list_head *ast_stmt_list,
+		 const struct nft_ast_xfrm_desc *base_desc, void *data);
+
 #endif

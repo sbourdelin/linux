@@ -134,3 +134,74 @@ void nft_ast_stmt_list_print(struct list_head *stmt_list)
 	}
 }
 EXPORT_SYMBOL_GPL(nft_ast_stmt_list_print);
+
+struct nft_ast_xfrm_state {
+	const struct nft_ast_xfrm_desc *xfrm_desc;
+	void *data;
+};
+
+static int nft_ast_xfrm_relational(const struct nft_ast_expr *dlexpr,
+				   struct nft_ast_xfrm_state *state)
+{
+	const struct nft_ast_expr *left = dlexpr->relational.left;
+	const struct nft_ast_expr *right = dlexpr->relational.right;
+	const struct nft_ast_xfrm_desc *xfrm_desc = state->xfrm_desc;
+	int err;
+
+	if (right->type != NFT_AST_EXPR_VALUE)
+		return -EOPNOTSUPP;
+
+	switch (left->type) {
+	case NFT_AST_EXPR_META:
+		err = xfrm_desc->meta_desc->xfrm(dlexpr, state, state->data);
+		break;
+	case NFT_AST_EXPR_PAYLOAD:
+		err = xfrm_desc->proto_desc->xfrm(dlexpr, state, state->data);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return err;
+}
+
+static int nft_ast_xfrm_expr(const struct nft_ast_expr *dlexpr,
+			     struct nft_ast_xfrm_state *state)
+{
+	int err;
+
+	switch (dlexpr->type) {
+	case NFT_AST_EXPR_RELATIONAL:
+		err = nft_ast_xfrm_relational(dlexpr, state);
+		break;
+	default:
+		return -EOPNOTSUPP;
+	}
+
+	return err;
+}
+
+int nft_ast_xfrm(const struct list_head *ast_stmt_list,
+		 const struct nft_ast_xfrm_desc *xfrm_desc, void *data)
+{
+	struct nft_ast_xfrm_state state = {
+		.xfrm_desc	= xfrm_desc,
+		.data		= data,
+	};
+	struct nft_ast_stmt *stmt;
+	int err = 0;
+
+	list_for_each_entry(stmt, ast_stmt_list, list) {
+		switch (stmt->type) {
+		case NFT_AST_STMT_EXPR:
+			err = nft_ast_xfrm_expr(stmt->expr, &state);
+			if (err < 0)
+				return err;
+			break;
+		default:
+			return -EOPNOTSUPP;
+		}
+	}
+	return err;
+}
+EXPORT_SYMBOL_GPL(nft_ast_xfrm);
