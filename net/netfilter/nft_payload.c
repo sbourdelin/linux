@@ -18,6 +18,7 @@
 #include <linux/netfilter/nf_tables.h>
 #include <net/netfilter/nf_tables_core.h>
 #include <net/netfilter/nf_tables.h>
+#include <net/netfilter/nf_tables_jit.h>
 /* For layer 4 checksum field offset. */
 #include <linux/tcp.h>
 #include <linux/udp.h>
@@ -153,12 +154,32 @@ nla_put_failure:
 	return -1;
 }
 
+static int nft_payload_delinearize(struct nft_ast_expr **regs,
+				   const struct nft_expr *expr,
+				   struct list_head *stmt_list)
+{
+	struct nft_payload *priv = nft_expr_priv(expr);
+	struct nft_ast_expr *dlexpr;
+
+	dlexpr = nft_ast_expr_alloc(NFT_AST_EXPR_PAYLOAD);
+	if (dlexpr == NULL)
+		return -ENOMEM;
+
+	dlexpr->payload.base	= priv->base;
+	dlexpr->payload.offset	= priv->offset;
+	dlexpr->len		= priv->len;
+
+	regs[priv->dreg] = dlexpr;
+	return 0;
+}
+
 static const struct nft_expr_ops nft_payload_ops = {
 	.type		= &nft_payload_type,
 	.size		= NFT_EXPR_SIZE(sizeof(struct nft_payload)),
 	.eval		= nft_payload_eval,
 	.init		= nft_payload_init,
 	.dump		= nft_payload_dump,
+	.delinearize	= nft_payload_delinearize,
 };
 
 const struct nft_expr_ops nft_payload_fast_ops = {
@@ -167,6 +188,7 @@ const struct nft_expr_ops nft_payload_fast_ops = {
 	.eval		= nft_payload_eval,
 	.init		= nft_payload_init,
 	.dump		= nft_payload_dump,
+	.delinearize	= nft_payload_delinearize,
 };
 
 static inline void nft_csum_replace(__sum16 *sum, __wsum fsum, __wsum tsum)

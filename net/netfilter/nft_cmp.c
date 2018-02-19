@@ -16,6 +16,7 @@
 #include <linux/netfilter/nf_tables.h>
 #include <net/netfilter/nf_tables_core.h>
 #include <net/netfilter/nf_tables.h>
+#include <net/netfilter/nf_tables_jit.h>
 
 struct nft_cmp_expr {
 	struct nft_data		data;
@@ -109,12 +110,78 @@ nla_put_failure:
 	return -1;
 }
 
+static enum nft_ast_expr_ops nft_cmp_to_ops[NFT_CMP_GTE + 1] = {
+	[NFT_CMP_EQ]	= NFT_AST_OP_EQ,
+	[NFT_CMP_NEQ]	= NFT_AST_OP_NEQ,
+	[NFT_CMP_LT]	= NFT_AST_OP_LT,
+	[NFT_CMP_LTE]	= NFT_AST_OP_LTE,
+	[NFT_CMP_GT]	= NFT_AST_OP_GT,
+	[NFT_CMP_GTE]	= NFT_AST_OP_GTE,
+};
+
+static int nft_ast_expr_cmp_op(enum nft_cmp_ops op)
+{
+	BUG_ON(op > NFT_CMP_GTE + 1);
+
+	return nft_cmp_to_ops[op];
+}
+
+static int __nft_cmp_delinearize(struct nft_ast_expr **regs,
+				 const struct nft_cmp_expr *priv,
+				 struct list_head *stmt_list)
+{
+	struct nft_ast_expr *right, *tree;
+	struct nft_ast_stmt *stmt;
+	int err;
+
+	if (regs[priv->sreg] == NULL)
+		return -EINVAL;
+
+	right = nft_ast_expr_alloc(NFT_AST_EXPR_VALUE);
+	if (right == NULL)
+		return -ENOMEM;
+
+	right->value.data = priv->data;
+	right->len = priv->len;
+
+	err = -ENOMEM;
+	tree = nft_ast_expr_alloc(NFT_AST_EXPR_RELATIONAL);
+	if (tree == NULL)
+		goto err1;
+
+	tree->op = nft_ast_expr_cmp_op(priv->op);
+	tree->relational.left = regs[priv->sreg];
+	tree->relational.right = right;
+	tree->len = tree->relational.left->len;
+
+	stmt = nft_ast_stmt_alloc(NFT_AST_STMT_EXPR);
+	if (stmt == NULL)
+		goto err2;
+
+	stmt->expr = tree;
+	list_add_tail(&stmt->list, stmt_list);
+	return 0;
+err2:
+	nft_ast_expr_destroy(tree);
+err1:
+	nft_ast_expr_destroy(right);
+	return err;
+}
+
+static int nft_cmp_delinearize(struct nft_ast_expr **regs,
+			       const struct nft_expr *expr,
+			       struct list_head *stmt_list)
+{
+	return __nft_cmp_delinearize(regs, nft_expr_priv(expr), stmt_list);
+}
+
 static const struct nft_expr_ops nft_cmp_ops = {
 	.type		= &nft_cmp_type,
 	.size		= NFT_EXPR_SIZE(sizeof(struct nft_cmp_expr)),
 	.eval		= nft_cmp_eval,
 	.init		= nft_cmp_init,
 	.dump		= nft_cmp_dump,
+	.delinearize	= nft_cmp_delinearize,
 };
 
 static int nft_cmp_fast_init(const struct nft_ctx *ctx,
@@ -164,12 +231,32 @@ nla_put_failure:
 	return -1;
 }
 
+static int nft_cmp_fast_delinearize(struct nft_ast_expr **regs,
+				    const struct nft_expr *expr,
+				    struct list_head *stmt_list)
+{
+	const struct nft_cmp_fast_expr *priv = nft_expr_priv(expr);
+	struct nft_cmp_expr cmp = {
+		.data   = {
+			.data   = {
+				[0] = priv->data,
+			},
+		},
+		.sreg   = priv->sreg,
+		.len    = priv->len,
+		.op     = NFT_AST_OP_EQ,
+	};
+
+	return __nft_cmp_delinearize(regs, &cmp, stmt_list);
+}
+
 const struct nft_expr_ops nft_cmp_fast_ops = {
 	.type		= &nft_cmp_type,
 	.size		= NFT_EXPR_SIZE(sizeof(struct nft_cmp_fast_expr)),
 	.eval		= NULL,	/* inlined */
 	.init		= nft_cmp_fast_init,
 	.dump		= nft_cmp_fast_dump,
+	.delinearize	= nft_cmp_fast_delinearize,
 };
 
 static const struct nft_expr_ops *

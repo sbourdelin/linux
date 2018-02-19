@@ -712,6 +712,8 @@ struct nft_expr_type {
 
 #define NFT_EXPR_STATEFUL		0x1
 
+struct nft_ast_expr;
+
 /**
  *	struct nft_expr_ops - nf_tables expression operations
  *
@@ -722,6 +724,7 @@ struct nft_expr_type {
  *	@dump: function to dump parameters
  *	@type: expression type
  *	@validate: validate expression, called during loop detection
+ *	@delinearize: convert expression to intermediate representation
  *	@data: extra data to attach to this expression operation
  */
 struct nft_expr;
@@ -743,6 +746,9 @@ struct nft_expr_ops {
 	int				(*validate)(const struct nft_ctx *ctx,
 						    const struct nft_expr *expr,
 						    const struct nft_data **data);
+	int				(*delinearize)(struct nft_ast_expr **regs,
+						       const struct nft_expr *expr,
+						       struct list_head *stmt);
 	const struct nft_expr_type	*type;
 	void				*data;
 };

@@ -75,7 +75,8 @@ obj-$(CONFIG_NF_DUP_NETDEV)	+= nf_dup_netdev.o
 # nf_tables
 nf_tables-objs := nf_tables_core.o nf_tables_api.o nf_tables_trace.o \
 		  nft_immediate.o nft_cmp.o nft_range.o nft_bitwise.o \
-		  nft_byteorder.o nft_payload.o nft_lookup.o nft_dynset.o
+		  nft_byteorder.o nft_payload.o nft_lookup.o nft_dynset.o \
+		  nf_tables_jit.o
 
 obj-$(CONFIG_NF_TABLES)		+= nf_tables.o
 obj-$(CONFIG_NF_TABLES_INET)	+= nf_tables_inet.o

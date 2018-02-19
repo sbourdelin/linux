@@ -24,6 +24,7 @@
 #include <net/tcp_states.h> /* for TCP_TIME_WAIT */
 #include <net/netfilter/nf_tables.h>
 #include <net/netfilter/nf_tables_core.h>
+#include <net/netfilter/nf_tables_jit.h>
 #include <net/netfilter/nft_meta.h>
 
 #include <uapi/linux/netfilter_bridge.h> /* NF_BR_PRE_ROUTING */
@@ -469,6 +470,23 @@ void nft_meta_set_destroy(const struct nft_ctx *ctx,
 }
 EXPORT_SYMBOL_GPL(nft_meta_set_destroy);
 
+static int nft_meta_get_delinearize(struct nft_ast_expr **regs,
+				    const struct nft_expr *expr,
+				    struct list_head *stmt_list)
+{
+	struct nft_meta *priv = nft_expr_priv(expr);
+	struct nft_ast_expr *dlexpr;
+
+	dlexpr = nft_ast_expr_alloc(NFT_AST_EXPR_META);
+	if (dlexpr == NULL)
+		return -ENOMEM;
+
+	dlexpr->meta.key = priv->key;
+
+	regs[priv->dreg] = dlexpr;
+	return 0;
+}
+
 static struct nft_expr_type nft_meta_type;
 static const struct nft_expr_ops nft_meta_get_ops = {
 	.type		= &nft_meta_type,
@@ -477,6 +495,7 @@ static const struct nft_expr_ops nft_meta_get_ops = {
 	.init		= nft_meta_get_init,
 	.dump		= nft_meta_get_dump,
 	.validate	= nft_meta_get_validate,
+	.delinearize	= nft_meta_get_delinearize,
 };
 
 static const struct nft_expr_ops nft_meta_set_ops = {
