@@ -93,6 +93,13 @@ static int __init arc_cs_setup_gfrc(struct device_node *node)
 		return -ENXIO;
 	}
 
+	/*
+	 * Halt GFRC if either of 4 cores in SMP cluster is halted.
+	 * Only works for ARC HS v3.0+, on earlier versions has no effect.
+	 * 	TODO: set mask only for used cores.
+	 */
+	__mcip_cmd_data(CMD_GFRC_SET_CORE, 0, 0xf);
+
 	ret = arc_get_timer_clk(node);
 	if (ret)
 		return ret;
