@@ -292,7 +292,20 @@ int ima_appraise_measurement(enum ima_hooks func,
 	}
 
 out:
-	if (status != INTEGRITY_PASS) {
+	/*
+	 * Files on both privileged and unprivileged mounted untrusted
+	 * filesystems (eg. FUSE) should fail signature verification, but
+	 * this might break existing systems.  Differentiate between the
+	 * new unprivileged non-init mounted filesystems and everything else.
+	 */
+	if ((inode->i_sb->s_iflags & SB_I_IMA_UNTRUSTED_FS) &&
+	    ((inode->i_sb->s_user_ns != &init_user_ns) ||
+	     (iint->flags & IMA_FAIL_UNTRUSTED_FS))) {
+		status = INTEGRITY_FAIL;
+		cause = "untrusted-filesystem";
+		integrity_audit_msg(AUDIT_INTEGRITY_DATA, inode, filename,
+				    op, cause, rc, 0);
+	} else if (status != INTEGRITY_PASS) {
 		if ((ima_appraise & IMA_APPRAISE_FIX) &&
 		    (!xattr_value ||
 		     xattr_value->type != EVM_IMA_XATTR_DIGSIG)) {
@@ -309,6 +322,7 @@ out:
 	} else {
 		ima_cache_flags(iint, func);
 	}
+
 	ima_set_cache_status(iint, func, status);
 	return status;
 }
