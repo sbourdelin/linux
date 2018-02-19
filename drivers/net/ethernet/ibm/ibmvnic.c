@@ -730,6 +730,43 @@ static void ibmvnic_napi_disable(struct ibmvnic_adapter *adapter)
 	adapter->napi_enabled = false;
 }
 
+static int init_napi(struct ibmvnic_adapter *adapter)
+{
+	int i;
+
+	adapter->napi = kcalloc(adapter->req_rx_queues,
+				sizeof(struct napi_struct), GFP_KERNEL);
+	if (!adapter->napi)
+		return -ENOMEM;
+
+	for (i = 0; i < adapter->req_rx_queues; i++) {
+		netdev_dbg(adapter->netdev, "Adding napi[%d]\n", i);
+		netif_napi_add(adapter->netdev, &adapter->napi[i],
+			       ibmvnic_poll, NAPI_POLL_WEIGHT);
+	}
+
+	return 0;
+}
+
+static void release_napi(struct ibmvnic_adapter *adapter)
+{
+	int i;
+
+	if (!adapter->napi)
+		return;
+
+	for (i = 0; i < adapter->num_active_rx_scrqs; i++) {
+		if (&adapter->napi[i]) {
+			netdev_dbg(adapter->netdev,
+				   "Releasing napi[%d]\n", i);
+			netif_napi_del(&adapter->napi[i]);
+		}
+	}
+
+	kfree(adapter->napi);
+	adapter->napi = NULL;
+}
+
 static int ibmvnic_login(struct net_device *netdev)
 {
 	struct ibmvnic_adapter *adapter = netdev_priv(netdev);
@@ -783,8 +820,6 @@ static int ibmvnic_login(struct net_device *netdev)
 
 static void release_resources(struct ibmvnic_adapter *adapter)
 {
-	int i;
-
 	release_vpd_data(adapter);
 
 	release_tx_pools(adapter);
@@ -793,16 +828,7 @@ static void release_resources(struct ibmvnic_adapter *adapter)
 	release_stats_token(adapter);
 	release_stats_buffers(adapter);
 	release_error_buffers(adapter);
-
-	if (adapter->napi) {
-		for (i = 0; i < adapter->req_rx_queues; i++) {
-			if (&adapter->napi[i]) {
-				netdev_dbg(adapter->netdev,
-					   "Releasing napi[%d]\n", i);
-				netif_napi_del(&adapter->napi[i]);
-			}
-		}
-	}
+	release_napi(adapter);
 }
 
 static int set_link_state(struct ibmvnic_adapter *adapter, u8 link_state)
@@ -921,7 +947,7 @@ static int ibmvnic_get_vpd(struct ibmvnic_adapter *adapter)
 static int init_resources(struct ibmvnic_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
-	int i, rc;
+	int rc;
 
 	rc = set_real_num_queues(netdev);
 	if (rc)
@@ -947,16 +973,10 @@ static int init_resources(struct ibmvnic_adapter *adapter)
 	}
 
 	adapter->map_id = 1;
-	adapter->napi = kcalloc(adapter->req_rx_queues,
-				sizeof(struct napi_struct), GFP_KERNEL);
-	if (!adapter->napi)
-		return -ENOMEM;
 
-	for (i = 0; i < adapter->req_rx_queues; i++) {
-		netdev_dbg(netdev, "Adding napi[%d]\n", i);
-		netif_napi_add(netdev, &adapter->napi[i], ibmvnic_poll,
-			       NAPI_POLL_WEIGHT);
-	}
+	rc = init_napi(adapter);
+	if (rc)
+		return rc;
 
 	send_map_query(adapter);
 
@@ -1640,6 +1660,9 @@ static int do_reset(struct ibmvnic_adapter *adapter,
 			release_tx_pools(adapter);
 			init_rx_pools(netdev);
 			init_tx_pools(netdev);
+
+			release_napi(adapter);
+			init_napi(adapter);
 
 			adapter->num_active_tx_scrqs = adapter->req_tx_queues;
 			adapter->num_active_rx_scrqs = adapter->req_rx_queues;
