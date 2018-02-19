@@ -606,7 +606,7 @@ out:
  * readdirplus.
  */
 static int
-nfs3_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
+nfs3_proc_readdir(struct dentry *dentry, const struct cred *cred,
 		  u64 cookie, struct page **pages, unsigned int count, bool plus)
 {
 	struct inode		*dir = d_inode(dentry);
@@ -623,11 +623,15 @@ nfs3_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
 		.verf		= verf,
 		.plus		= plus
 	};
+	struct auth_cred acred = {
+		.cred		= cred,
+	};
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs3_procedures[NFS3PROC_READDIR],
 		.rpc_argp	= &arg,
 		.rpc_resp	= &res,
-		.rpc_cred	= cred
+		.rpc_cred	= rpc_lookup_generic_cred(&acred,
+							  0, GFP_NOFS),
 	};
 	int status = -ENOMEM;
 
@@ -637,6 +641,8 @@ nfs3_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
 	dprintk("NFS call  readdir%s %d\n",
 			plus? "plus" : "", (unsigned int) cookie);
 
+	if (!msg.rpc_cred)
+		return -ENOMEM;
 	res.dir_attr = nfs_alloc_fattr();
 	if (res.dir_attr == NULL)
 		goto out;
@@ -648,6 +654,7 @@ nfs3_proc_readdir(struct dentry *dentry, struct rpc_cred *cred,
 
 	nfs_free_fattr(res.dir_attr);
 out:
+	put_rpccred(msg.rpc_cred);
 	dprintk("NFS reply readdir%s: %d\n",
 			plus? "plus" : "", status);
 	return status;
