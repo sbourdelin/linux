@@ -55,7 +55,7 @@ info()
 #
 archive_builtin()
 {
-	if [ -n "${CONFIG_THIN_ARCHIVES}" ]; then
+	if [ -n "${KERNEL_CONFIG[CONFIG_THIN_ARCHIVES]}" ]; then
 		info AR built-in.o
 		rm -f built-in.o;
 		${AR} rcsTP${KBUILD_ARFLAGS} built-in.o			\
@@ -70,7 +70,7 @@ modpost_link()
 {
 	local objects
 
-	if [ -n "${CONFIG_THIN_ARCHIVES}" ]; then
+	if [ -n "${KERNEL_CONFIG[CONFIG_THIN_ARCHIVES]}" ]; then
 		objects="--whole-archive				\
 			built-in.o					\
 			--no-whole-archive				\
@@ -96,7 +96,7 @@ vmlinux_link()
 	local objects
 
 	if [ "${SRCARCH}" != "um" ]; then
-		if [ -n "${CONFIG_THIN_ARCHIVES}" ]; then
+		if [ -n "${KERNEL_CONFIG[CONFIG_THIN_ARCHIVES]}" ]; then
 			objects="--whole-archive			\
 				built-in.o				\
 				--no-whole-archive			\
@@ -116,7 +116,7 @@ vmlinux_link()
 		${LD} ${LDFLAGS} ${LDFLAGS_vmlinux} -o ${2}		\
 			-T ${lds} ${objects}
 	else
-		if [ -n "${CONFIG_THIN_ARCHIVES}" ]; then
+		if [ -n "${KERNEL_CONFIG[CONFIG_THIN_ARCHIVES]}" ]; then
 			objects="-Wl,--whole-archive			\
 				built-in.o				\
 				-Wl,--no-whole-archive			\
@@ -226,14 +226,7 @@ if [ "$1" = "clean" ]; then
 fi
 
 # We need access to CONFIG_ symbols
-case "${KCONFIG_CONFIG}" in
-*/*)
-	. "${KCONFIG_CONFIG}"
-	;;
-*)
-	# Force using a file from the current directory
-	. "./${KCONFIG_CONFIG}"
-esac
+. ${KBUILD_SRC}/scripts/importkconf.sh
 
 # Update version
 info GEN .version
@@ -259,7 +252,7 @@ ${MAKE} -f "${srctree}/scripts/Makefile.modpost" vmlinux.o
 
 kallsymso=""
 kallsyms_vmlinux=""
-if [ -n "${CONFIG_KALLSYMS}" ]; then
+if [ -n "${KERNEL_CONFIG[CONFIG_KALLSYMS]}" ]; then
 
 	# kallsyms support
 	# Generate section listing all symbols and add it into vmlinux
@@ -312,7 +305,7 @@ fi
 info LD vmlinux
 vmlinux_link "${kallsymso}" vmlinux
 
-if [ -n "${CONFIG_BUILDTIME_EXTABLE_SORT}" ]; then
+if [ -n "${KERNEL_CONFIG[CONFIG_BUILDTIME_EXTABLE_SORT]}" ]; then
 	info SORTEX vmlinux
 	sortextable vmlinux
 fi
@@ -321,7 +314,7 @@ info SYSMAP System.map
 mksysmap vmlinux System.map
 
 # step a (see comment above)
-if [ -n "${CONFIG_KALLSYMS}" ]; then
+if [ -n "${KERNEL_CONFIG[CONFIG_KALLSYMS]}" ]; then
 	mksysmap ${kallsyms_vmlinux} .tmp_System.map
 
 	if ! cmp -s System.map .tmp_System.map; then

@@ -39,14 +39,7 @@ case "$KBUILD_VERBOSE" in
 esac
 
 # We need access to CONFIG_ symbols
-case "${KCONFIG_CONFIG}" in
-*/*)
-	. "${KCONFIG_CONFIG}"
-	;;
-*)
-	# Force using a file from the current directory
-	. "./${KCONFIG_CONFIG}"
-esac
+. ${KBUILD_SRC}/scripts/importkconf.sh
 
 # In case it doesn't exist yet...
 if [ -e "$cur_ksyms_file" ]; then touch "$cur_ksyms_file"; fi
@@ -62,14 +55,14 @@ EOT
 [ "$(ls -A "$MODVERDIR")" ] &&
 sed -ns -e '3{s/ /\n/g;/^$/!p;}' "$MODVERDIR"/*.mod | sort -u |
 while read sym; do
-	if [ -n "$CONFIG_HAVE_UNDERSCORE_SYMBOL_PREFIX" ]; then
+	if [ -n "${KERNEL_CONFIG[CONFIG_HAVE_UNDERSCORE_SYMBOL_PREFIX]}" ]; then
 		sym="${sym#_}"
 	fi
 	echo "#define __KSYM_${sym} 1"
 done >> "$new_ksyms_file"
 
 # Special case for modversions (see modpost.c)
-if [ -n "$CONFIG_MODVERSIONS" ]; then
+if [ -n "${KERNEL_CONFIG[CONFIG_MODVERSIONS]}" ]; then
 	echo "#define __KSYM_module_layout 1" >> "$new_ksyms_file"
 fi
 
