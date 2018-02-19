@@ -1,5 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2015-2018, Intel Corporation.
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Copyright (c) 2015-2018, Intel Corporation.
+ */
 
 #ifndef _UAPI_LINUX_IPMI_BMC_H
 #define _UAPI_LINUX_IPMI_BMC_H
