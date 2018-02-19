@@ -149,12 +149,12 @@ struct r852_device {
 
 #define dbg(format, ...) \
 	if (debug) \
-		printk(KERN_DEBUG DRV_NAME ": " format "\n", ## __VA_ARGS__)
+		pr_debug(DRV_NAME ": " format "\n", ## __VA_ARGS__)
 
 #define dbg_verbose(format, ...) \
 	if (debug > 1) \
-		printk(KERN_DEBUG DRV_NAME ": " format "\n", ## __VA_ARGS__)
+		pr_debug(DRV_NAME ": " format "\n", ## __VA_ARGS__)
 
 
 #define message(format, ...) \
-	printk(KERN_INFO DRV_NAME ": " format "\n", ## __VA_ARGS__)
+	pr_info(DRV_NAME ": " format "\n", ## __VA_ARGS__)
