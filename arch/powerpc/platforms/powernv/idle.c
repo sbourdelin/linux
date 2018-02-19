@@ -56,8 +56,11 @@ u64 pnv_first_deep_stop_state = MAX_STOP_STATE;
  */
 static u64 pnv_deepest_stop_psscr_val;
 static u64 pnv_deepest_stop_psscr_mask;
+static u64 pnv_deepest_cpuidle_psscr_val;
+static u64 pnv_deepest_cpuidle_psscr_mask;
 static u64 pnv_deepest_stop_flag;
 static bool deepest_stop_found;
+static bool deepest_cpuidle_found;
 
 static int pnv_save_sprs_for_deep_states(void)
 {
@@ -76,7 +79,14 @@ static int pnv_save_sprs_for_deep_states(void)
 	uint64_t hid5_val = mfspr(SPRN_HID5);
 	uint64_t hmeer_val = mfspr(SPRN_HMEER);
 	uint64_t msr_val = MSR_IDLE;
-	uint64_t psscr_val = pnv_deepest_stop_psscr_val;
+
+	/*
+	 * Pick deepest cpuidle psscr as the value to be
+	 * restored through wakeup engine.
+	 * We will request a deeper state to be restored
+	 * in hotplug path
+	 */
+	uint64_t psscr_val = pnv_deepest_cpuidle_psscr_val;
 
 	for_each_possible_cpu(cpu) {
 		uint64_t pir = get_hard_smp_processor_id(cpu);
@@ -409,7 +419,7 @@ static void pnv_program_cpu_hotplug_lpcr(unsigned int cpu, u64 lpcr_val)
  */
 unsigned long pnv_cpu_offline(unsigned int cpu)
 {
-	unsigned long srr1;
+	u64 srr1;
 	u32 idle_states = pnv_get_supported_cpuidle_states();
 	u64 lpcr_val;
 
@@ -429,12 +439,18 @@ unsigned long pnv_cpu_offline(unsigned int cpu)
 	__ppc64_runlatch_off();
 
 	if (cpu_has_feature(CPU_FTR_ARCH_300) && deepest_stop_found) {
-		unsigned long psscr;
+		u64 psscr;
+		u64 pir = get_hard_smp_processor_id(cpu);
 
 		psscr = mfspr(SPRN_PSSCR);
 		psscr = (psscr & ~pnv_deepest_stop_psscr_mask) |
 						pnv_deepest_stop_psscr_val;
+		if (pnv_deepest_stop_psscr_val != pnv_deepest_cpuidle_psscr_val)
+			opal_slw_set_reg(pir, P9_STOP_SPR_PSSCR, psscr);
 		srr1 = power9_idle_stop(psscr);
+		psscr = (psscr & ~pnv_deepest_cpuidle_psscr_mask) |
+						pnv_deepest_cpuidle_psscr_val;
+		opal_slw_set_reg(pir, P9_STOP_SPR_PSSCR, psscr);
 
 	} else if ((idle_states & OPAL_PM_WINKLE_ENABLED) &&
 		   (idle_states & OPAL_PM_LOSE_FULL_CONTEXT)) {
@@ -555,6 +571,7 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 	u64 *psscr_val = NULL;
 	u64 *psscr_mask = NULL;
 	u32 *residency_ns = NULL;
+	u32 *latency_ns = NULL;
 	u64 max_residency_ns = 0;
 	int rc = 0, i;
 
@@ -562,6 +579,8 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 	psscr_mask = kcalloc(dt_idle_states, sizeof(*psscr_mask), GFP_KERNEL);
 	residency_ns = kcalloc(dt_idle_states, sizeof(*residency_ns),
 			       GFP_KERNEL);
+	latency_ns = kcalloc(dt_idle_states, sizeof(*latency_ns),
+			     GFP_KERNEL);
 
 	if (!psscr_val || !psscr_mask || !residency_ns) {
 		rc = -1;
@@ -588,6 +607,13 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 				       "ibm,cpu-idle-state-residency-ns",
 					residency_ns, dt_idle_states)) {
 		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-residency-ns in DT\n");
+		rc = -1;
+		goto out;
+	}
+	if (of_property_read_u32_array(np,
+				       "ibm,cpu-idle-state-latencies-ns",
+					latency_ns, dt_idle_states)) {
+		pr_warn("cpuidle-powernv: missing ibm,cpu-idle-state-latency-ns in DT\n");
 		rc = -1;
 		goto out;
 	}
@@ -621,6 +647,12 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 			continue;
 		}
 
+		if (latency_ns[i] <= POWERNV_THRESHOLD_LATENCY_NS) {
+			pnv_deepest_cpuidle_psscr_val = psscr_val[i];
+			pnv_deepest_cpuidle_psscr_mask = psscr_mask[i];
+			deepest_cpuidle_found = true;
+		}
+
 		if (max_residency_ns < residency_ns[i]) {
 			max_residency_ns = residency_ns[i];
 			pnv_deepest_stop_psscr_val = psscr_val[i];
@@ -651,6 +683,14 @@ static int __init pnv_power9_idle_init(struct device_node *np, u32 *flags,
 		pr_info("cpuidle-powernv: Deepest stop: psscr = 0x%016llx,mask=0x%016llx\n",
 			pnv_deepest_stop_psscr_val,
 			pnv_deepest_stop_psscr_mask);
+	}
+
+	if (unlikely(!deepest_cpuidle_found)) {
+		pr_warn("cpuidle-powernv: No suitable deepest CPU-idle state found");
+	} else {
+		pr_info("cpuidle-powernv: Deepest cpuidle: psscr = 0x%016llx,mask=0x%016llx\n",
+			pnv_deepest_cpuidle_psscr_val,
+			pnv_deepest_cpuidle_psscr_mask);
 	}
 
 	pr_info("cpuidle-powernv: Requested Level (RL) value of first deep stop = 0x%llx\n",

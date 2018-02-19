@@ -67,6 +67,8 @@
 #define ERR_EC_ESL_MISMATCH		-1
 #define ERR_DEEP_STATE_ESL_MISMATCH	-2
 
+#define POWERNV_THRESHOLD_LATENCY_NS 200000
+
 #ifndef __ASSEMBLY__
 /* Additional SPRs that need to be saved/restored during stop */
 struct stop_sprs {
