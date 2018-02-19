@@ -269,7 +269,7 @@ struct nfs4_layoutget_res {
 struct nfs4_layoutget {
 	struct nfs4_layoutget_args args;
 	struct nfs4_layoutget_res res;
-	struct rpc_cred *cred;
+	const struct cred *cred;
 	gfp_t gfp_flags;
 };
 
@@ -308,7 +308,7 @@ struct nfs4_layoutcommit_data {
 	struct rpc_task task;
 	struct nfs_fattr fattr;
 	struct list_head lseg_list;
-	struct rpc_cred *cred;
+	const struct cred *cred;
 	struct inode *inode;
 	struct nfs4_layoutcommit_args args;
 	struct nfs4_layoutcommit_res res;
@@ -333,7 +333,7 @@ struct nfs4_layoutreturn_res {
 struct nfs4_layoutreturn {
 	struct nfs4_layoutreturn_args args;
 	struct nfs4_layoutreturn_res res;
-	struct rpc_cred *cred;
+	const struct cred *cred;
 	struct nfs_client *clp;
 	struct inode *inode;
 	int rpc_status;
@@ -1439,7 +1439,7 @@ enum {
 struct nfs_io_completion;
 struct nfs_pgio_header {
 	struct inode		*inode;
-	struct rpc_cred		*cred;
+	const struct cred		*cred;
 	struct list_head	pages;
 	struct nfs_page		*req;
 	struct nfs_writeverf	verf;		/* Used for writes */
@@ -1500,7 +1500,7 @@ struct nfs_commit_info {
 struct nfs_commit_data {
 	struct rpc_task		task;
 	struct inode		*inode;
-	struct rpc_cred		*cred;
+	const struct cred		*cred;
 	struct nfs_fattr	fattr;
 	struct nfs_writeverf	verf;
 	struct list_head	pages;		/* Coalesced requests we wish to flush */
@@ -1531,7 +1531,7 @@ struct nfs_unlinkdata {
 	struct nfs_removeres res;
 	struct dentry *dentry;
 	wait_queue_head_t wq;
-	struct rpc_cred	*cred;
+	const struct cred *cred;
 	struct nfs_fattr dir_attr;
 	long timeout;
 };
@@ -1539,7 +1539,7 @@ struct nfs_unlinkdata {
 struct nfs_renamedata {
 	struct nfs_renameargs	args;
 	struct nfs_renameres	res;
-	struct rpc_cred		*cred;
+	const struct cred	*cred;
 	struct inode		*old_dir;
 	struct dentry		*old_dentry;
 	struct nfs_fattr	old_fattr;
