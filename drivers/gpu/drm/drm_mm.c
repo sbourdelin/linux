@@ -179,21 +179,23 @@ static void drm_mm_interval_tree_add_node(struct drm_mm_node *hole_node,
 {
 	struct drm_mm *mm = hole_node->mm;
 	struct rb_node **link, *rb;
-	struct drm_mm_node *parent;
 	bool leftmost;
 
 	node->__subtree_last = LAST(node);
 
-	if (hole_node->allocated) {
-		rb = &hole_node->rb;
-		while (rb) {
-			parent = rb_entry(rb, struct drm_mm_node, rb);
+	if (likely(hole_node->allocated)) {
+		struct drm_mm_node *parent;
+
+		/* Update the interval range above us */
+		parent = hole_node;
+		do {
 			if (parent->__subtree_last >= node->__subtree_last)
 				break;
 
 			parent->__subtree_last = node->__subtree_last;
 			rb = rb_parent(rb);
-		}
+		} while ((parent = rb_entry_safe(&parent->rb,
+						 struct drm_mm_node, rb)));
 
 		rb = &hole_node->rb;
 		link = &hole_node->rb.rb_right;
@@ -205,6 +207,8 @@ static void drm_mm_interval_tree_add_node(struct drm_mm_node *hole_node,
 	}
 
 	while (*link) {
+		struct drm_mm_node *parent;
+
 		rb = *link;
 		parent = rb_entry(rb, struct drm_mm_node, rb);
 		if (parent->__subtree_last < node->__subtree_last)
