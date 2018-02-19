@@ -3117,6 +3117,10 @@
 		pcie_scan_all	Scan all possible PCIe devices.  Otherwise we
 				only look for one device below a PCIe downstream
 				port.
+		bridge_pm	Enable runtime power management of all bridges,
+				including conventional PCI bridges, PCIe ports,
+				and hotplug bridges.
+		no_bridge_pm	Disable runtime power management of all bridges.
 		big_root_window	Try to add a big 64bit memory window to the PCIe
 				root complex on AMD CPUs. Some GFX hardware
 				can resize a BAR to allow access to all VRAM.
@@ -3142,10 +3146,6 @@
 			unconditionally.
 		compat	Treat PCIe ports as PCI-to-PCI bridges, disable the PCIe
 			ports driver.
-
-	pcie_port_pm=	[PCIE] PCIe port power management handling:
-		off	Disable power management of all PCIe ports
-		force	Forcibly enable power management of all PCIe ports
 
 	pcie_pme=	[PCIE,PM] Native PCIe PME signaling options:
 		nomsi	Do not use MSI for native PCIe PME signaling (this makes

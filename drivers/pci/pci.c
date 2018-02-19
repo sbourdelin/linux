@@ -111,10 +111,8 @@ unsigned int pcibios_max_latency = 255;
 /* If set, the PCIe ARI capability will not be used. */
 static bool pcie_ari_disabled;
 
-/* Disable bridge_d3 for all PCIe ports */
-static bool pci_bridge_d3_disable;
-/* Force bridge_d3 for all PCIe ports */
-static bool pci_bridge_d3_force;
+static bool pci_bridge_d3_disable;	/* Disable D3 for all bridges */
+static bool pci_bridge_d3_force;	/* Enable D3 for all bridges */
 
 static int __init pcie_port_pm_setup(char *str)
 {
@@ -2260,6 +2258,12 @@ bool pci_bridge_d3_possible(struct pci_dev *bridge)
 {
 	unsigned int year;
 
+	if (pci_bridge_d3_disable)
+		return false;
+
+	if (pci_bridge_d3_force)
+		return true;
+
 	/*
 	 * In principle we should be able to put conventional PCI bridges
 	 * into D3.  We only support it for PCIe because (a) we want to
@@ -2274,8 +2278,6 @@ bool pci_bridge_d3_possible(struct pci_dev *bridge)
 	case PCI_EXP_TYPE_ROOT_PORT:
 	case PCI_EXP_TYPE_UPSTREAM:
 	case PCI_EXP_TYPE_DOWNSTREAM:
-		if (pci_bridge_d3_disable)
-			return false;
 
 		/*
 		 * Hotplug interrupts cannot be delivered if the link is down,
@@ -2294,9 +2296,6 @@ bool pci_bridge_d3_possible(struct pci_dev *bridge)
 		 */
 		if (bridge->is_hotplug_bridge)
 			return false;
-
-		if (pci_bridge_d3_force)
-			return true;
 
 		/*
 		 * It should be safe to put PCIe ports from 2015 or newer
@@ -5708,6 +5707,10 @@ static int __init pci_setup(char *str)
 				pcie_bus_config = PCIE_BUS_PEER2PEER;
 			} else if (!strncmp(str, "pcie_scan_all", 13)) {
 				pci_add_flags(PCI_SCAN_ALL_PCIE_DEVS);
+			} else if (!strncmp(str, "bridge_pm", 9)) {
+				pci_bridge_d3_force = true;
+			} else if (!strncmp(str, "no_bridge_pm", 12)) {
+				pci_bridge_d3_disable = true;
 			} else {
 				printk(KERN_ERR "PCI: Unknown option `%s'\n",
 						str);
