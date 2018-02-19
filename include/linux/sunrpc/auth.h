@@ -58,8 +58,6 @@ struct rpc_cred {
 	atomic_t		cr_count;	/* ref count */
 	const struct cred	*cr_cred;
 
-	kuid_t			cr_uid;
-
 	/* per-flavor data */
 };
 #define RPCAUTH_CRED_NEW	0
