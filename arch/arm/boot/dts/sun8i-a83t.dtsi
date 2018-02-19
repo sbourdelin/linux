@@ -805,6 +805,11 @@
 			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
+		prcm@1f01400 {
+			compatible = "allwinner,sun8i-a83t-prcm";
+			reg = <0x1f01400 0x400>;
+		};
+
 		r_ccu: clock@1f01400 {
 			compatible = "allwinner,sun8i-a83t-r-ccu";
 			reg = <0x01f01400 0x400>;
