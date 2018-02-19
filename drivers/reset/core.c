@@ -493,6 +493,44 @@ struct reset_control *__of_reset_control_get(struct device_node *node,
 }
 EXPORT_SYMBOL_GPL(__of_reset_control_get);
 
+static struct reset_control *
+__reset_control_get_from_lookup(struct device *dev, const char *reset_id,
+				bool shared, bool optional)
+{
+	struct reset_controller_dev *rcdev;
+	const char *dev_id = dev_name(dev);
+	struct reset_control *rstc = NULL;
+	const struct reset_lookup *lookup;
+	int index;
+
+	mutex_lock(&reset_list_mutex);
+
+	list_for_each_entry(rcdev, &reset_controller_list, list) {
+		if (!rcdev->lookup)
+			continue;
+
+		lookup = rcdev->lookup;
+		for (index = 0; lookup->dev; index++, lookup++) {
+			if (strcmp(dev_id, lookup->dev))
+				continue;
+
+			if ((!reset_id && !lookup->reset_id) ||
+			    !strcmp(reset_id, lookup->reset_id)) {
+				rstc = __reset_control_get_internal(rcdev,
+							lookup->id, shared);
+				break;
+			}
+		}
+	}
+
+	mutex_unlock(&reset_list_mutex);
+
+	if (!rstc)
+		return optional ? NULL : ERR_PTR(-ENOENT);
+
+	return rstc;
+}
+
 struct reset_control *__reset_control_get(struct device *dev, const char *id,
 					  int index, bool shared, bool optional)
 {
@@ -500,7 +538,7 @@ struct reset_control *__reset_control_get(struct device *dev, const char *id,
 		return __of_reset_control_get(dev->of_node, id, index, shared,
 					      optional);
 
-	return optional ? NULL : ERR_PTR(-EINVAL);
+	return __reset_control_get_from_lookup(dev, id, shared, optional);
 }
 EXPORT_SYMBOL_GPL(__reset_control_get);
 

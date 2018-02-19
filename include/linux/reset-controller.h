@@ -22,6 +22,20 @@ struct reset_control_ops {
 	int (*status)(struct reset_controller_dev *rcdev, unsigned long id);
 };
 
+/**
+ * struct reset_lookup - a single entry in a reset lookup table
+ *
+ * @dev: name of the device associated with this reset
+ * @reset_id: additional reset identifier (if the device uses multiple
+ *            reset lines)
+ * @id: ID of the reset controller in the reset controller device
+ */
+struct reset_lookup {
+	const char *dev;
+	const char *reset_id;
+	unsigned long id;
+};
+
 struct module;
 struct device_node;
 struct of_phandle_args;
@@ -34,6 +48,8 @@ struct of_phandle_args;
  * @list: internal list of reset controller devices
  * @reset_control_head: head of internal list of requested reset controls
  * @of_node: corresponding device tree node as phandle target
+ * @lookup: array of lookup entries associated with this request controller,
+ *          must end with a zeroed sentinel entry
  * @of_reset_n_cells: number of cells in reset line specifiers
  * @of_xlate: translation function to translate from specifier as found in the
  *            device tree to id as given to the reset control ops
@@ -45,6 +61,7 @@ struct reset_controller_dev {
 	struct list_head list;
 	struct list_head reset_control_head;
 	struct device_node *of_node;
+	const struct reset_lookup *lookup;
 	int of_reset_n_cells;
 	int (*of_xlate)(struct reset_controller_dev *rcdev,
 			const struct of_phandle_args *reset_spec);
