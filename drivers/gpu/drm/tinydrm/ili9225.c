@@ -300,7 +300,7 @@ static int ili9225_dbi_command(struct mipi_dbi *mipi, u8 cmd, u8 *par,
 
 	gpiod_set_value_cansleep(mipi->dc, 0);
 	speed_hz = mipi_dbi_spi_cmd_max_speed(spi, 1);
-	ret = tinydrm_spi_transfer(spi, speed_hz, NULL, 8, &cmd, 1);
+	ret = tinydrm_spi_transfer(spi, speed_hz, NULL, 8, &cmd, NULL, 1);
 	if (ret || !num)
 		return ret;
 
@@ -310,7 +310,8 @@ static int ili9225_dbi_command(struct mipi_dbi *mipi, u8 cmd, u8 *par,
 	gpiod_set_value_cansleep(mipi->dc, 1);
 	speed_hz = mipi_dbi_spi_cmd_max_speed(spi, num);
 
-	return tinydrm_spi_transfer(spi, speed_hz, NULL, bpw, par, num);
+	return tinydrm_spi_transfer(spi, speed_hz, NULL, bpw, par, mipi->rx_buf,
+				    num);
 }
 
 static const u32 ili9225_formats[] = {
@@ -400,6 +401,7 @@ MODULE_DEVICE_TABLE(spi, ili9225_id);
 
 static int ili9225_probe(struct spi_device *spi)
 {
+	size_t bufsize = mipi_dbi_max_buf_size(&ili9225_mode);
 	struct device *dev = &spi->dev;
 	struct mipi_dbi *mipi;
 	struct gpio_desc *rs;
@@ -424,7 +426,7 @@ static int ili9225_probe(struct spi_device *spi)
 
 	device_property_read_u32(dev, "rotation", &rotation);
 
-	ret = mipi_dbi_spi_init(spi, mipi, rs);
+	ret = mipi_dbi_spi_init(spi, mipi, rs, bufsize);
 	if (ret)
 		return ret;
 

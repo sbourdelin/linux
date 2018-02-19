@@ -434,6 +434,7 @@ EXPORT_SYMBOL(_tinydrm_dbg_spi_message);
  * @header: Optional header transfer
  * @bpw: Bits per word
  * @buf: Buffer to transfer
+ * @rx_buf: Optional dummy buffer
  * @len: Buffer length
  *
  * This SPI transfer helper breaks up the transfer of @buf into chunks which
@@ -442,16 +443,22 @@ EXPORT_SYMBOL(_tinydrm_dbg_spi_message);
  * does a 8-bit transfer.
  * If @header is set, it is prepended to each SPI message.
  *
+ * Some SPI controllers need an RX buffer even though we are not receiving
+ * anything useful. @rx_buf can be provided so that the SPI controller does not
+ * have to reallocate this buffer on each transfer. This is useful for large
+ * transfers, e.g. when updating the GRAM.
+ *
  * Returns:
  * Zero on success, negative error code on failure.
  */
 int tinydrm_spi_transfer(struct spi_device *spi, u32 speed_hz,
 			 struct spi_transfer *header, u8 bpw, const void *buf,
-			 size_t len)
+			 void *rx_buf, size_t len)
 {
 	struct spi_transfer tr = {
 		.bits_per_word = bpw,
 		.speed_hz = speed_hz,
+		.rx_buf = rx_buf,
 	};
 	struct spi_message m;
 	u16 *swap_buf = NULL;

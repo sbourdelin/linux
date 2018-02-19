@@ -42,6 +42,14 @@
 #define ST7586_DISP_CTRL_MX	BIT(6)
 #define ST7586_DISP_CTRL_MY	BIT(7)
 
+static inline size_t st7586_buf_max_size(const struct drm_display_mode *mode)
+{
+	size_t width = (mode->hdisplay + 2) / 3; /* 3 pixels per byte */
+	size_t height = mode->vdisplay;
+
+	return width * height;
+}
+
 /*
  * The ST7586 controller has an unusual pixel format where 2bpp grayscale is
  * packed 3 pixels per byte with the first two pixels using 3 bits and the 3rd
@@ -263,7 +271,7 @@ static int st7586_init(struct device *dev, struct mipi_dbi *mipi,
 		struct drm_driver *driver, const struct drm_display_mode *mode,
 		unsigned int rotation)
 {
-	size_t bufsize = (mode->vdisplay + 2) / 3 * mode->hdisplay;
+	size_t bufsize = st7586_buf_max_size(mode);
 	struct tinydrm_device *tdev = &mipi->tinydrm;
 	int ret;
 
@@ -337,6 +345,7 @@ MODULE_DEVICE_TABLE(spi, st7586_id);
 
 static int st7586_probe(struct spi_device *spi)
 {
+	size_t bufsize = st7586_buf_max_size(&st7586_mode);
 	struct device *dev = &spi->dev;
 	struct mipi_dbi *mipi;
 	struct gpio_desc *a0;
@@ -361,7 +370,7 @@ static int st7586_probe(struct spi_device *spi)
 
 	device_property_read_u32(dev, "rotation", &rotation);
 
-	ret = mipi_dbi_spi_init(spi, mipi, a0);
+	ret = mipi_dbi_spi_init(spi, mipi, a0, bufsize);
 	if (ret)
 		return ret;
 

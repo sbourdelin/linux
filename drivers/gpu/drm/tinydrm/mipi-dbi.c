@@ -364,7 +364,7 @@ int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
 		  struct drm_driver *driver,
 		  const struct drm_display_mode *mode, unsigned int rotation)
 {
-	size_t bufsize = mode->vdisplay * mode->hdisplay * sizeof(u16);
+	size_t bufsize = mipi_dbi_max_buf_size(mode);
 	struct tinydrm_device *tdev = &mipi->tinydrm;
 	int ret;
 
@@ -848,7 +848,7 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
 
 	gpiod_set_value_cansleep(mipi->dc, 0);
 	speed_hz = mipi_dbi_spi_cmd_max_speed(spi, 1);
-	ret = tinydrm_spi_transfer(spi, speed_hz, NULL, 8, &cmd, 1);
+	ret = tinydrm_spi_transfer(spi, speed_hz, NULL, 8, &cmd, NULL, 1);
 	if (ret || !num)
 		return ret;
 
@@ -858,7 +858,8 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
 	gpiod_set_value_cansleep(mipi->dc, 1);
 	speed_hz = mipi_dbi_spi_cmd_max_speed(spi, num);
 
-	return tinydrm_spi_transfer(spi, speed_hz, NULL, bpw, par, num);
+	return tinydrm_spi_transfer(spi, speed_hz, NULL, bpw, par, mipi->rx_buf,
+				    num);
 }
 
 /**
@@ -866,6 +867,7 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
  * @spi: SPI device
  * @mipi: &mipi_dbi structure to initialize
  * @dc: D/C gpio (optional)
+ * @max_size: Maximum TX buffer size needed by the caller
  *
  * This function sets &mipi_dbi->command, enables &mipi->read_commands for the
  * usual read commands. It should be followed by a call to mipi_dbi_init() or
@@ -884,7 +886,7 @@ static int mipi_dbi_typec3_command(struct mipi_dbi *mipi, u8 cmd,
  * Zero on success, negative error code on failure.
  */
 int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
-		      struct gpio_desc *dc)
+		      struct gpio_desc *dc, size_t max_size)
 {
 	size_t tx_size = tinydrm_spi_max_transfer_size(spi, 0);
 	struct device *dev = &spi->dev;
@@ -927,6 +929,16 @@ int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
 		mipi->tx_buf9_len = tx_size;
 		mipi->tx_buf9 = devm_kmalloc(dev, tx_size, GFP_KERNEL);
 		if (!mipi->tx_buf9)
+			return -ENOMEM;
+	}
+
+	/*
+	 * Allocate a dummy RX buffer if needed, otherwise the SPI controller
+	 * will have to reallocate a new buffer on each transfer.
+	 */
+	if (spi->controller->flags & SPI_CONTROLLER_MUST_RX) {
+		mipi->rx_buf = devm_kmalloc(dev, max_size, GFP_KERNEL);
+		if (!mipi->rx_buf)
 			return -ENOMEM;
 	}
 

@@ -169,6 +169,7 @@ MODULE_DEVICE_TABLE(spi, mi0283qt_id);
 
 static int mi0283qt_probe(struct spi_device *spi)
 {
+	size_t bufsize = mipi_dbi_max_buf_size(&mi0283qt_mode);
 	struct device *dev = &spi->dev;
 	struct mipi_dbi *mipi;
 	struct gpio_desc *dc;
@@ -201,7 +202,7 @@ static int mi0283qt_probe(struct spi_device *spi)
 
 	device_property_read_u32(dev, "rotation", &rotation);
 
-	ret = mipi_dbi_spi_init(spi, mipi, dc);
+	ret = mipi_dbi_spi_init(spi, mipi, dc, bufsize);
 	if (ret)
 		return ret;
 

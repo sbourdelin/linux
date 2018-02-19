@@ -31,6 +31,7 @@ struct regulator;
  * @tx_buf: Buffer used for transfer (copy clip rect area)
  * @tx_buf9: Buffer used for Option 1 9-bit conversion
  * @tx_buf9_len: Size of tx_buf9.
+ * @rx_buf: Optional dummy RX buffer.
  * @swap_bytes: Swap bytes in buffer before transfer
  * @reset: Optional reset gpio
  * @rotation: initial rotation in degrees Counter Clock Wise
@@ -48,6 +49,7 @@ struct mipi_dbi {
 	u16 *tx_buf;
 	void *tx_buf9;
 	size_t tx_buf9_len;
+	void *rx_buf;
 	bool swap_bytes;
 	struct gpio_desc *reset;
 	unsigned int rotation;
@@ -62,7 +64,7 @@ mipi_dbi_from_tinydrm(struct tinydrm_device *tdev)
 }
 
 int mipi_dbi_spi_init(struct spi_device *spi, struct mipi_dbi *mipi,
-		      struct gpio_desc *dc);
+		      struct gpio_desc *dc, size_t max_size);
 int mipi_dbi_init(struct device *dev, struct mipi_dbi *mipi,
 		  const struct drm_simple_display_pipe_funcs *pipe_funcs,
 		  struct drm_driver *driver,
@@ -79,6 +81,18 @@ int mipi_dbi_command_read(struct mipi_dbi *mipi, u8 cmd, u8 *val);
 int mipi_dbi_command_buf(struct mipi_dbi *mipi, u8 cmd, u8 *data, size_t len);
 int mipi_dbi_buf_copy(void *dst, struct drm_framebuffer *fb,
 		      struct drm_clip_rect *clip, bool swap);
+
+/**
+ * mipi_dbi_max_buf_size - Get the maximum required framebuffer memory size
+ * @mode: The display mode data
+ *
+ * Computes the maximum buffer size needed for a 2 byte per pixel display.
+ */
+static inline size_t mipi_dbi_max_buf_size(const struct drm_display_mode *mode)
+{
+	return mode->hdisplay * mode->vdisplay * sizeof(u16);
+}
+
 /**
  * mipi_dbi_command - MIPI DCS command with optional parameter(s)
  * @mipi: MIPI structure
