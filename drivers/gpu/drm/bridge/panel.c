@@ -161,6 +161,10 @@ struct drm_bridge *drm_panel_bridge_add(struct drm_panel *panel,
 	if (!panel)
 		return ERR_PTR(-EINVAL);
 
+	if (WARN_ON(!panel->dev->driver) ||
+	    !try_module_get(panel->dev->driver->owner))
+		return ERR_PTR(-ENODEV);
+
 	panel_bridge = devm_kzalloc(panel->dev, sizeof(*panel_bridge),
 				    GFP_KERNEL);
 	if (!panel_bridge)
@@ -199,6 +203,9 @@ void drm_panel_bridge_remove(struct drm_bridge *bridge)
 	panel_bridge = drm_bridge_to_panel_bridge(bridge);
 
 	drm_bridge_remove(bridge);
+
+	module_put(panel_bridge->panel->dev->driver->owner);
+
 	devm_kfree(panel_bridge->panel->dev, bridge);
 }
 EXPORT_SYMBOL(drm_panel_bridge_remove);
