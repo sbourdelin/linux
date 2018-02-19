@@ -19,6 +19,22 @@
 #include <linux/clk.h>
 #include <linux/device.h>
 #include <linux/export.h>
+#include <linux/slab.h>
+
+struct clk_bulk_data *clk_bulk_alloc(int num_clocks, const char *const *clk_ids)
+{
+	struct clk_bulk_data *ptr;
+	int i;
+
+	ptr = kcalloc(num_clocks, sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
+		return ERR_PTR(-ENOMEM);
+
+	for (i = 0; i < num_clocks; i++)
+		ptr[i].id = clk_ids[i];
+
+	return ptr;
+}
 
 void clk_bulk_put(int num_clks, struct clk_bulk_data *clks)
 {

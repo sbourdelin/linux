@@ -9,6 +9,39 @@
 #include <linux/export.h>
 #include <linux/gfp.h>
 
+struct clk_bulk_devres {
+	struct clk_bulk_data *clks;
+	int num_clks;
+};
+
+static void devm_clk_alloc_release(struct device *dev, void *res)
+{
+	struct clk_bulk_devres *devres = res;
+
+	clk_bulk_free(devres->clks);
+}
+
+struct clk_bulk_data *devm_clk_bulk_alloc(struct device *dev, int num_clks,
+					  const char *const *clk_ids)
+{
+	struct clk_bulk_data **ptr, *clk_bulk;
+
+	ptr = devres_alloc(devm_clk_alloc_release,
+			   num_clks * sizeof(*ptr), GFP_KERNEL);
+	if (!ptr)
+		return ERR_PTR(-ENOMEM);
+
+	clk_bulk = clk_bulk_alloc(num_clks, clk_ids);
+	if (clk_bulk) {
+		*ptr = clk_bulk;
+		devres_add(dev, ptr);
+	} else {
+		devres_free(ptr);
+	}
+
+	return clk_bulk;
+}
+
 static void devm_clk_release(struct device *dev, void *res)
 {
 	clk_put(*(struct clk **)res);
@@ -34,10 +67,6 @@ struct clk *devm_clk_get(struct device *dev, const char *id)
 }
 EXPORT_SYMBOL(devm_clk_get);
 
-struct clk_bulk_devres {
-	struct clk_bulk_data *clks;
-	int num_clks;
-};
 
 static void devm_clk_bulk_release(struct device *dev, void *res)
 {

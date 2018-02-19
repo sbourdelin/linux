@@ -15,6 +15,7 @@
 #include <linux/err.h>
 #include <linux/kernel.h>
 #include <linux/notifier.h>
+#include <linux/slab.h>
 
 struct device;
 struct clk;
@@ -240,6 +241,52 @@ static inline void clk_bulk_unprepare(int num_clks, struct clk_bulk_data *clks)
 #endif
 
 #ifdef CONFIG_HAVE_CLK
+
+/**
+ * clk_bulk_alloc - allocates an array of clk_bulk_data and fills their
+ *		    id field
+ * @num_clks: number of clk_bulk_data
+ * @clk_ids: array of clock consumer ID's
+ *
+ * This function allows drivers to dynamically create an array of clk_bulk_data
+ * and fill their id field in one operation. If successful, it allows calling
+ * clk_bulk_get on the pointer returned by this function.
+ *
+ * Returns a pointer to a clk_bulk_data array, or valid IS_ERR() condition
+ * containing errno.
+ */
+struct clk_bulk_data *clk_bulk_alloc(int num_clks, const char *const *clk_ids);
+
+/**
+ * devm_clk_bulk_alloc - allocates an array of clk_bulk_data and fills their
+ *			 id field
+ * @dev: device for clock "consumer"
+ * @num_clks: number of clk_bulk_data
+ * @clk_ids: array of clock consumer ID's
+ *
+ * This function allows drivers to dynamically create an array of clk_bulk_data
+ * and fill their id field in one operation with management, the array will
+ * automatically be freed when the device is unbound. If successful, it allows
+ * calling clk_bulk_get on the pointer returned by this function.
+ *
+ * Returns a pointer to a clk_bulk_data array, or valid IS_ERR() condition
+ * containing errno.
+ */
+struct clk_bulk_data *devm_clk_bulk_alloc(struct device *dev, int num_clks,
+					  const char * const *clk_ids);
+
+/**
+ * clk_bulk_free - frees the array of clk_bulk_data
+ * @clks: pointer to clk_bulk_data array
+ *
+ * This function frees the array allocated by clk_bulk_data. It must be called
+ * when all clks are freed.
+ */
+static inline void clk_bulk_free(struct clk_bulk_data *clks)
+{
+	kfree(clks);
+}
+
 /**
  * clk_get - lookup and obtain a reference to a clock producer.
  * @dev: device for clock "consumer"
@@ -597,6 +644,23 @@ struct clk *clk_get_parent(struct clk *clk);
 struct clk *clk_get_sys(const char *dev_id, const char *con_id);
 
 #else /* !CONFIG_HAVE_CLK */
+
+static inline struct clk_bulk_data *clk_bulk_alloc(int num_clks,
+						   const char **clk_ids)
+{
+	return NULL;
+}
+
+static inline struct clk_bulk_data *devm_clk_bulk_alloc(struct device *dev,
+							int num_clks,
+							const char **clk_ids)
+{
+	return NULL;
+}
+
+static inline void clk_bulk_free(struct clk_bulk_data *clks)
+{
+}
 
 static inline struct clk *clk_get(struct device *dev, const char *id)
 {
