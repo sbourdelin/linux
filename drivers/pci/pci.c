@@ -2260,6 +2260,13 @@ bool pci_bridge_d3_possible(struct pci_dev *bridge)
 {
 	unsigned int year;
 
+	/*
+	 * In principle we should be able to put conventional PCI bridges
+	 * into D3.  We only support it for PCIe because (a) we want to
+	 * save power on new (2015 and newer) SoCs that can enter deep
+	 * low-power states only if PCIe Root Ports are in D3 and (b) we
+	 * don't want to risk regressions on older hardware.
+	 */
 	if (!pci_is_pcie(bridge))
 		return false;
 
@@ -2276,6 +2283,14 @@ bool pci_bridge_d3_possible(struct pci_dev *bridge)
 		 * hotplug ports handled by firmware in System Management Mode
 		 * may not be put into D3 by the OS (Thunderbolt on non-Macs).
 		 * For simplicity, disallow in general for now.
+		 *
+		 * Per PCIe r4.0, sec 6.7.3.4, if the form factor requires
+		 * wake support, a hot-plug capable Downstream Port must
+		 * support generation of a wakeup event on hot-plug events
+		 * that occur when the system is in a sleep state or the
+		 * Port is in device state D1, D2, or D3hot.  Therefore, it
+		 * might be possible to use D3 even for hot-plug Ports, but
+		 * for now we do not.
 		 */
 		if (bridge->is_hotplug_bridge)
 			return false;
@@ -2285,7 +2300,9 @@ bool pci_bridge_d3_possible(struct pci_dev *bridge)
 
 		/*
 		 * It should be safe to put PCIe ports from 2015 or newer
-		 * to D3.
+		 * to D3.  We have vague reports of possible hardware
+		 * issues when putting older PCIe ports into D3.  See
+		 * changelog.
 		 */
 		if (dmi_get_date(DMI_BIOS_DATE, &year, NULL, NULL) &&
 		    year >= 2015) {
