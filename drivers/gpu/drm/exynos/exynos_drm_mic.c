@@ -88,7 +88,7 @@
 
 #define MIC_BS_SIZE_2D(x)	((x) & 0x3fff)
 
-static char *clk_names[] = { "pclk_mic0", "sclk_rgb_vclk_to_mic0" };
+static const char *const clk_names[] = { "pclk_mic0", "sclk_rgb_vclk_to_mic0" };
 #define NUM_CLKS		ARRAY_SIZE(clk_names)
 static DEFINE_MUTEX(mic_mutex);
 
@@ -96,7 +96,7 @@ struct exynos_mic {
 	struct device *dev;
 	void __iomem *reg;
 	struct regmap *sysreg;
-	struct clk *clks[NUM_CLKS];
+	struct clk_bulk_data *clks;
 
 	bool i80_mode;
 	struct videomode vm;
@@ -338,10 +338,8 @@ static const struct component_ops exynos_mic_component_ops = {
 static int exynos_mic_suspend(struct device *dev)
 {
 	struct exynos_mic *mic = dev_get_drvdata(dev);
-	int i;
 
-	for (i = NUM_CLKS - 1; i > -1; i--)
-		clk_disable_unprepare(mic->clks[i]);
+	clk_bulk_disable_unprepare(NUM_CLKS, mic->clks);
 
 	return 0;
 }
@@ -349,19 +347,8 @@ static int exynos_mic_suspend(struct device *dev)
 static int exynos_mic_resume(struct device *dev)
 {
 	struct exynos_mic *mic = dev_get_drvdata(dev);
-	int ret, i;
 
-	for (i = 0; i < NUM_CLKS; i++) {
-		ret = clk_prepare_enable(mic->clks[i]);
-		if (ret < 0) {
-			DRM_ERROR("Failed to enable clock (%s)\n",
-							clk_names[i]);
-			while (--i > -1)
-				clk_disable_unprepare(mic->clks[i]);
-			return ret;
-		}
-	}
-	return 0;
+	return clk_bulk_prepare_enable(NUM_CLKS, mic->clks);
 }
 #endif
 
@@ -374,7 +361,7 @@ static int exynos_mic_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct exynos_mic *mic;
 	struct resource res;
-	int ret, i;
+	int ret;
 
 	mic = devm_kzalloc(dev, sizeof(*mic), GFP_KERNEL);
 	if (!mic) {
@@ -405,15 +392,15 @@ static int exynos_mic_probe(struct platform_device *pdev)
 		goto err;
 	}
 
-	for (i = 0; i < NUM_CLKS; i++) {
-		mic->clks[i] = devm_clk_get(dev, clk_names[i]);
-		if (IS_ERR(mic->clks[i])) {
-			DRM_ERROR("mic: Failed to get clock (%s)\n",
-								clk_names[i]);
-			ret = PTR_ERR(mic->clks[i]);
-			goto err;
-		}
+	mic->clks = devm_clk_bulk_alloc(dev, NUM_CLKS, clk_names);
+	if (IS_ERR(mic->clks)) {
+		ret = PTR_ERR(mic->clks);
+		goto err;
 	}
+
+	ret = devm_clk_bulk_get(dev, NUM_CLKS, mic->clks);
+	if (ret < 0)
+		goto err;
 
 	platform_set_drvdata(pdev, mic);
 
