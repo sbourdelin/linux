@@ -22,6 +22,7 @@ struct panel_bridge {
 	struct drm_connector connector;
 	struct drm_panel *panel;
 	u32 connector_type;
+	struct device_link *link;	/* link to master drm dev */
 };
 
 static inline struct panel_bridge *
@@ -57,6 +58,22 @@ static const struct drm_connector_funcs panel_bridge_connector_funcs = {
 	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 };
 
+static int panel_bridge_link_to_master(struct panel_bridge *panel_bridge)
+{
+	struct device *mdev = panel_bridge->bridge.dev->dev;
+	struct device *pdev = panel_bridge->panel->dev;
+	u32 flags = DL_FLAG_AUTOREMOVE;
+
+	panel_bridge->link = device_link_add(mdev, pdev, flags);
+	if (!panel_bridge->link) {
+		dev_err(pdev, "failed to link panel %s to %s\n",
+			dev_name(pdev), dev_name(mdev));
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int panel_bridge_attach(struct drm_bridge *bridge)
 {
 	struct panel_bridge *panel_bridge = drm_bridge_to_panel_bridge(bridge);
@@ -82,6 +99,9 @@ static int panel_bridge_attach(struct drm_bridge *bridge)
 	drm_mode_connector_attach_encoder(&panel_bridge->connector,
 					  bridge->encoder);
 
+	if (panel_bridge_link_to_master(panel_bridge))
+		return -EINVAL;
+
 	ret = drm_panel_attach(panel_bridge->panel, &panel_bridge->connector);
 	if (ret < 0)
 		return ret;
@@ -94,6 +114,8 @@ static void panel_bridge_detach(struct drm_bridge *bridge)
 	struct panel_bridge *panel_bridge = drm_bridge_to_panel_bridge(bridge);
 
 	drm_panel_detach(panel_bridge->panel);
+
+	device_link_del(panel_bridge->link);
 }
 
 static void panel_bridge_pre_enable(struct drm_bridge *bridge)
