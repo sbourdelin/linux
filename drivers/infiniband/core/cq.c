@@ -16,7 +16,7 @@
 #include <rdma/ib_verbs.h>
 
 /* # of WCs to poll for with a single call to ib_poll_cq */
-#define IB_POLL_BATCH			16
+#define IB_POLL_BATCH			8
 
 /* # of WCs to iterate over before yielding */
 #define IB_POLL_BUDGET_IRQ		256
