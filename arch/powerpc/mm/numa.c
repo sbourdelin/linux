@@ -259,6 +259,7 @@ static int of_node_to_nid_single(struct device_node *device)
 	return nid;
 }
 
+#ifdef CONFIG_NUMA
 /* Walk the device tree upwards, looking for an associativity id */
 int of_node_to_nid(struct device_node *device)
 {
@@ -277,6 +278,7 @@ int of_node_to_nid(struct device_node *device)
 	return nid;
 }
 EXPORT_SYMBOL(of_node_to_nid);
+#endif
 
 static int __init find_min_common_depth(void)
 {
@@ -749,6 +751,7 @@ static void __init setup_nonnuma(void)
 	}
 }
 
+#ifdef CONFIG_NUMA
 void __init dump_numa_cpu_topology(void)
 {
 	unsigned int node;
@@ -783,6 +786,7 @@ void __init dump_numa_cpu_topology(void)
 		pr_cont("\n");
 	}
 }
+#endif
 
 /* Initialize NODE_DATA for a node on the local memory */
 static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
