@@ -23,11 +23,13 @@
 #include <linux/rfkill.h>
 #include <linux/platform_device.h>
 #include <linux/clk.h>
+#include <linux/serdev.h>
 #include <linux/slab.h>
 #include <linux/acpi.h>
 #include <linux/gpio/consumer.h>
 
 struct rfkill_gpio_data {
+	struct device		*dev;
 	const char		*name;
 	enum rfkill_type	type;
 	struct gpio_desc	*reset_gpio;
@@ -84,40 +86,42 @@ static int rfkill_gpio_acpi_probe(struct device *dev,
 	return devm_acpi_dev_add_driver_gpios(dev, acpi_rfkill_default_gpios);
 }
 
-static int rfkill_gpio_probe(struct platform_device *pdev)
+static int rfkill_gpio_serdev_probe(struct serdev_device *serdev)
 {
 	struct rfkill_gpio_data *rfkill;
 	struct gpio_desc *gpio;
 	const char *type_name = NULL;
 	int ret;
 
-	rfkill = devm_kzalloc(&pdev->dev, sizeof(*rfkill), GFP_KERNEL);
+	rfkill = devm_kzalloc(&serdev->dev, sizeof(*rfkill), GFP_KERNEL);
 	if (!rfkill)
 		return -ENOMEM;
 
-	device_property_read_string(&pdev->dev, "name", &rfkill->name);
-	device_property_read_string(&pdev->dev, "type", &type_name);
+	rfkill->dev = &serdev->dev;
+
+	device_property_read_string(rfkill->dev, "name", &rfkill->name);
+	device_property_read_string(rfkill->dev, "type", &type_name);
 
 	if (!rfkill->name)
-		rfkill->name = dev_name(&pdev->dev);
+		rfkill->name = dev_name(rfkill->dev);
 
 	rfkill->type = rfkill_find_type(type_name);
 
-	if (ACPI_HANDLE(&pdev->dev)) {
-		ret = rfkill_gpio_acpi_probe(&pdev->dev, rfkill);
+	if (ACPI_HANDLE(rfkill->dev)) {
+		ret = rfkill_gpio_acpi_probe(rfkill->dev, rfkill);
 		if (ret)
 			return ret;
 	}
 
-	rfkill->clk = devm_clk_get(&pdev->dev, NULL);
+	rfkill->clk = devm_clk_get(rfkill->dev, NULL);
 
-	gpio = devm_gpiod_get_optional(&pdev->dev, "reset", GPIOD_OUT_LOW);
+	gpio = devm_gpiod_get_optional(rfkill->dev, "reset", GPIOD_OUT_LOW);
 	if (IS_ERR(gpio))
 		return PTR_ERR(gpio);
 
 	rfkill->reset_gpio = gpio;
 
-	gpio = devm_gpiod_get_optional(&pdev->dev, "shutdown", GPIOD_OUT_LOW);
+	gpio = devm_gpiod_get_optional(rfkill->dev, "shutdown", GPIOD_OUT_LOW);
 	if (IS_ERR(gpio))
 		return PTR_ERR(gpio);
 
@@ -125,11 +129,11 @@ static int rfkill_gpio_probe(struct platform_device *pdev)
 
 	/* Make sure at-least one GPIO is defined for this instance */
 	if (!rfkill->reset_gpio && !rfkill->shutdown_gpio) {
-		dev_err(&pdev->dev, "invalid platform data\n");
+		dev_err(rfkill->dev, "invalid platform data\n");
 		return -EINVAL;
 	}
 
-	rfkill->rfkill_dev = rfkill_alloc(rfkill->name, &pdev->dev,
+	rfkill->rfkill_dev = rfkill_alloc(rfkill->name, rfkill->dev,
 					  rfkill->type, &rfkill_gpio_ops,
 					  rfkill);
 	if (!rfkill->rfkill_dev)
@@ -139,21 +143,19 @@ static int rfkill_gpio_probe(struct platform_device *pdev)
 	if (ret < 0)
 		return ret;
 
-	platform_set_drvdata(pdev, rfkill);
+	serdev_device_set_drvdata(serdev, rfkill);
 
-	dev_info(&pdev->dev, "%s device registered.\n", rfkill->name);
+	dev_info(rfkill->dev, "%s device registered.\n", rfkill->name);
 
 	return 0;
 }
 
-static int rfkill_gpio_remove(struct platform_device *pdev)
+static void rfkill_gpio_serdev_remove(struct serdev_device *serdev)
 {
-	struct rfkill_gpio_data *rfkill = platform_get_drvdata(pdev);
+	struct rfkill_gpio_data *rfkill = serdev_device_get_drvdata(serdev);
 
 	rfkill_unregister(rfkill->rfkill_dev);
 	rfkill_destroy(rfkill->rfkill_dev);
-
-	return 0;
 }
 
 #ifdef CONFIG_ACPI
@@ -165,16 +167,16 @@ static const struct acpi_device_id rfkill_acpi_match[] = {
 MODULE_DEVICE_TABLE(acpi, rfkill_acpi_match);
 #endif
 
-static struct platform_driver rfkill_gpio_driver = {
-	.probe = rfkill_gpio_probe,
-	.remove = rfkill_gpio_remove,
+static struct serdev_device_driver rfkill_gpio_serdev_driver = {
+	.probe = rfkill_gpio_serdev_probe,
+	.remove = rfkill_gpio_serdev_remove,
 	.driver = {
 		.name = "rfkill_gpio",
 		.acpi_match_table = ACPI_PTR(rfkill_acpi_match),
 	},
 };
 
-module_platform_driver(rfkill_gpio_driver);
+module_serdev_device_driver(rfkill_gpio_serdev_driver);
 
 MODULE_DESCRIPTION("gpio rfkill");
 MODULE_AUTHOR("NVIDIA");
