@@ -128,7 +128,7 @@ enum txStartCondition {
 	fifo_not_empty
 };
 
-enum addressFiltering {
+enum address_filtering {
 	filteringOff,
 	nodeAddress,
 	nodeOrBroadcastAddress
