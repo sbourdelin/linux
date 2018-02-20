@@ -3350,11 +3350,7 @@ __alloc_pages_may_oom(gfp_t gfp_mask, unsigned int order,
 
 	*did_some_progress = 0;
 
-	/*
-	 * Acquire the oom lock.  If that fails, somebody else is
-	 * making progress for us.
-	 */
-	if (!mutex_trylock(&oom_lock)) {
+	if (mutex_lock_killable(&oom_lock)) {
 		*did_some_progress = 1;
 		schedule_timeout_uninterruptible(1);
 		return NULL;
