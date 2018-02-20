@@ -362,9 +362,9 @@ static void __init get_n_mem_cells(int *n_addr_cells, int *n_size_cells)
 	of_node_put(memory);
 }
 
-static unsigned long read_n_cells(int n, const __be32 **buf)
+static u64 read_n_cells(int n, const __be32 **buf)
 {
-	unsigned long result = 0;
+	u64 result = 0;
 
 	while (n--) {
 		result = (result << 32) | of_read_number(*buf, 1);
