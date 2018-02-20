@@ -115,6 +115,11 @@ static inline bool intel_uc_fw_is_selected(struct intel_uc_fw *uc_fw)
 	return uc_fw->path != NULL;
 }
 
+static inline bool intel_uc_fw_is_loaded(struct intel_uc_fw *uc_fw)
+{
+	return uc_fw->load_status == INTEL_UC_FIRMWARE_SUCCESS;
+}
+
 void intel_uc_fw_fetch(struct drm_i915_private *dev_priv,
 		       struct intel_uc_fw *uc_fw);
 int intel_uc_fw_upload(struct intel_uc_fw *uc_fw,

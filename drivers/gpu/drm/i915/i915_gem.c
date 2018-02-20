@@ -5315,8 +5315,10 @@ int i915_gem_init(struct drm_i915_private *dev_priv)
 	intel_init_gt_powersave(dev_priv);
 
 	ret = intel_uc_init(dev_priv);
-	if (ret)
+	if (ret) {
+		GEM_BUG_ON(ret == -EIO);
 		goto err_pm;
+	}
 
 	ret = i915_gem_init_hw(dev_priv);
 	if (ret)
@@ -5363,7 +5365,8 @@ err_init_hw:
 	i915_gem_contexts_lost(dev_priv);
 	intel_uc_fini_hw(dev_priv);
 err_uc_init:
-	intel_uc_fini(dev_priv);
+	if (ret != -EIO)
+		intel_uc_fini(dev_priv);
 err_pm:
 	if (ret != -EIO) {
 		intel_cleanup_gt_powersave(dev_priv);
@@ -5377,10 +5380,10 @@ err_unlock:
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 	mutex_unlock(&dev_priv->drm.struct_mutex);
 
-	intel_uc_fini_misc(dev_priv);
-
-	if (ret != -EIO)
+	if (ret != -EIO) {
+		intel_uc_fini_misc(dev_priv);
 		i915_gem_cleanup_userptr(dev_priv);
+	}
 
 	if (ret == -EIO) {
 		/*

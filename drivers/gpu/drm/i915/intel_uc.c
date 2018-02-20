@@ -421,11 +421,13 @@ err_out:
 	 * Note that there is no fallback as either user explicitly asked for
 	 * the GuC or driver default option was to run with the GuC enabled.
 	 */
-	if (GEM_WARN_ON(ret == -EIO))
-		ret = -EINVAL;
-
 	dev_err(dev_priv->drm.dev, "GuC initialization failed %d\n", ret);
-	return ret;
+
+	/* Mark GuC firmware as failed to avoid redundant clean-up */
+	guc->fw.load_status = INTEL_UC_FIRMWARE_FAIL;
+
+	/* We want to disable GPU submission but keep KMS alive */
+	return -EIO;
 }
 
 void intel_uc_fini_hw(struct drm_i915_private *dev_priv)
@@ -436,6 +438,9 @@ void intel_uc_fini_hw(struct drm_i915_private *dev_priv)
 		return;
 
 	GEM_BUG_ON(!HAS_GUC(dev_priv));
+
+	if (!intel_guc_is_loaded(guc))
+		return;
 
 	if (USES_GUC_SUBMISSION(dev_priv))
 		intel_guc_submission_disable(guc);

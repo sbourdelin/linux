@@ -100,6 +100,11 @@ static inline void intel_guc_notify(struct intel_guc *guc)
 	guc->notify(guc);
 }
 
+static inline bool intel_guc_is_loaded(struct intel_guc *guc)
+{
+	return intel_uc_fw_is_loaded(&guc->fw);
+}
+
 /*
  * GuC does not allow any gfx GGTT address that falls into range [0, WOPCM_TOP),
  * which is reserved for Boot ROM, SRAM and WOPCM. Currently this top address is
