@@ -3379,7 +3379,9 @@ BPF_CALL_2(bpf_sock_ops_cb_flags_set, struct bpf_sock_ops_kern *, bpf_sock,
 	   int, argval)
 {
 	struct sock *sk = bpf_sock->sk;
+#ifdef CONFIG_INET
 	int val = argval & BPF_SOCK_OPS_ALL_CB_FLAGS;
+#endif
 
 	if (!sk_fullsock(sk))
 		return -EINVAL;
