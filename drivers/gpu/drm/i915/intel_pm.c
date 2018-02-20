@@ -4714,11 +4714,6 @@ static void cnl_compute_transition_wm(struct intel_crtc_state *cstate,
 				trans_offset_b;
 	} else {
 		res_blocks = wm_l0->plane_res_b + trans_offset_b;
-
-		/* WA BUG:1938466 add one block for non y-tile planes */
-		if (IS_CNL_REVID(dev_priv, CNL_REVID_A0, CNL_REVID_A0))
-			res_blocks += 1;
-
 	}
 
 	res_blocks += 1;
