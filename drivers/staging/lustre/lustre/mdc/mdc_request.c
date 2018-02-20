@@ -1060,8 +1060,10 @@ static void mdc_adjust_dirpages(struct page **pages, int cfs_pgs, int lu_pgs)
 
 		while (--lu_pgs > 0) {
 			ent = lu_dirent_start(dp);
-			for (end_dirent = ent; ent;
-			     end_dirent = ent, ent = lu_dirent_next(ent));
+			while (ent) {
+				end_dirent = ent;
+				ent = lu_dirent_next(ent);
+			}
 
 			/* Advance dp to next lu_dirpage. */
 			dp = (struct lu_dirpage *)((char *)dp + LU_PAGE_SIZE);
