@@ -201,6 +201,7 @@ int intel_huc_auth(struct intel_huc *huc)
 	struct intel_guc *guc = &i915->guc;
 	struct i915_vma *vma;
 	int ret;
+	u32 status;
 
 	if (huc->fw.load_status != INTEL_UC_FIRMWARE_SUCCESS)
 		return -ENOEXEC;
@@ -210,28 +211,35 @@ int intel_huc_auth(struct intel_huc *huc)
 	if (IS_ERR(vma)) {
 		ret = PTR_ERR(vma);
 		DRM_ERROR("HuC: Failed to pin huc fw object %d\n", ret);
-		return ret;
+		goto fail;
 	}
 
 	ret = intel_guc_auth_huc(guc,
 				 guc_ggtt_offset(vma) + huc->fw.rsa_offset);
 	if (ret) {
 		DRM_ERROR("HuC: GuC did not ack Auth request %d\n", ret);
-		goto out;
+		goto fail_unpin;
 	}
 
 	/* Check authentication status, it should be done by now */
-	ret = intel_wait_for_register(i915,
-				      HUC_STATUS2,
-				      HUC_FW_VERIFIED,
-				      HUC_FW_VERIFIED,
-				      50);
+	ret = __intel_wait_for_register(i915,
+					HUC_STATUS2,
+					HUC_FW_VERIFIED,
+					HUC_FW_VERIFIED,
+					2, 50, &status);
 	if (ret) {
-		DRM_ERROR("HuC: Authentication failed %d\n", ret);
-		goto out;
+		DRM_ERROR("HuC: Firmware not verified %#x\n", status);
+		goto fail_unpin;
 	}
 
-out:
 	i915_vma_unpin(vma);
+	return 0;
+
+fail_unpin:
+	i915_vma_unpin(vma);
+fail:
+	huc->fw.load_status = INTEL_UC_FIRMWARE_FAIL;
+
+	DRM_ERROR("HuC: Authentication failed %d\n", ret);
 	return ret;
 }
