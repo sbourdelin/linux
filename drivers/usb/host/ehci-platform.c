@@ -29,6 +29,7 @@
 #include <linux/of.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
 #include <linux/reset.h>
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
@@ -46,6 +47,7 @@ struct ehci_platform_priv {
 	struct reset_control *rsts;
 	struct phy **phys;
 	int num_phys;
+	struct regulator *vbus_supply;
 	bool reset_on_resume;
 };
 
@@ -99,6 +101,15 @@ static int ehci_platform_power_on(struct platform_device *dev)
 		}
 	}
 
+	if (priv->vbus_supply) {
+		ret = regulator_enable(priv->vbus_supply);
+		if (ret) {
+			dev_err(&dev->dev,
+				"failed to enable vbus supply: %d\n", ret);
+			goto err_exit_phy;
+		}
+	}
+
 	return 0;
 
 err_exit_phy:
@@ -118,6 +129,9 @@ static void ehci_platform_power_off(struct platform_device *dev)
 	struct usb_hcd *hcd = platform_get_drvdata(dev);
 	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
 	int clk, phy_num;
+
+	if (priv->vbus_supply)
+		regulator_disable(priv->vbus_supply);
 
 	for (phy_num = 0; phy_num < priv->num_phys; phy_num++) {
 		phy_power_off(priv->phys[phy_num]);
@@ -246,6 +260,15 @@ static int ehci_platform_probe(struct platform_device *dev)
 	err = reset_control_deassert(priv->rsts);
 	if (err)
 		goto err_put_clks;
+
+	priv->vbus_supply = devm_regulator_get_optional(&dev->dev, "vbus");
+	if (IS_ERR(priv->vbus_supply)) {
+		err = PTR_ERR(priv->vbus_supply);
+		if (err == -ENODEV)
+			priv->vbus_supply = NULL;
+		else
+			goto err_reset;
+	}
 
 	if (pdata->big_endian_desc)
 		ehci->big_endian_desc = 1;

@@ -19,6 +19,7 @@ Optional properties:
  - phys : phandle + phy specifier pair
  - phy-names : "usb"
  - resets : phandle + reset specifier pair
+ - vbus-supply : phandle of regulator supplying vbus
 
 Example (Sequoia 440EPx):
     ehci@e0000300 {
