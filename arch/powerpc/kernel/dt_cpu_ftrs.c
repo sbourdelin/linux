@@ -707,7 +707,9 @@ static __init void cpufeatures_cpu_quirks(void)
 	 */
 	if ((version & 0xffffff00) == 0x004e0100)
 		cur_cpu_spec->cpu_features |= CPU_FTR_POWER9_DD1;
-	else if ((version & 0xffffefff) == 0x004e0201)
+	else if ((version & 0xffffefff) == 0x004e0200)
+		; /* DD2.0 has no feature flag */
+	else /* DD2.1 and up have DD2_1 */
 		cur_cpu_spec->cpu_features |= CPU_FTR_POWER9_DD2_1;
 }
 
