@@ -44,6 +44,12 @@ that somebody changing the code will also change the documentation. The
 overview kernel-doc comments may be placed anywhere at the top indentation
 level.
 
+Running the ``kernel-doc`` tool with increased verbosity and without actual
+output generation may be used to verify proper formating of the
+documentation comments. For example::
+
+	scripts/kernel-doc -v -none drivers/foo/bar.c
+
 Function documentation
 ----------------------
 
