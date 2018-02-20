@@ -1447,19 +1447,8 @@ static int __f2fs_issue_discard_zone(struct f2fs_sb_info *sbi,
 		blkstart -= FDEV(devi).start_blk;
 	}
 
-	/*
-	 * We need to know the type of the zone: for conventional zones,
-	 * use regular discard if the drive supports it. For sequential
-	 * zones, reset the zone write pointer.
-	 */
-	switch (get_blkz_type(sbi, bdev, blkstart)) {
-
-	case BLK_ZONE_TYPE_CONVENTIONAL:
-		if (!blk_queue_discard(bdev_get_queue(bdev)))
-			return 0;
-		return __queue_discard_cmd(sbi, bdev, lblkstart, blklen);
-	case BLK_ZONE_TYPE_SEQWRITE_REQ:
-	case BLK_ZONE_TYPE_SEQWRITE_PREF:
+	/* For sequential zones, reset the zone write pointer */
+	if (f2fs_blkz_is_seq(sbi, bdev, blkstart)) {
 		sector = SECTOR_FROM_BLOCK(blkstart);
 		nr_sects = SECTOR_FROM_BLOCK(blklen);
 
@@ -1474,10 +1463,12 @@ static int __f2fs_issue_discard_zone(struct f2fs_sb_info *sbi,
 		trace_f2fs_issue_reset_zone(bdev, blkstart);
 		return blkdev_reset_zones(bdev, sector,
 					  nr_sects, GFP_NOFS);
-	default:
-		/* Unknown zone type: broken device ? */
-		return -EIO;
 	}
+
+	 /* For conventional zones, use regular discard if supported */
+	if (!blk_queue_discard(bdev_get_queue(bdev)))
+		return 0;
+	return __queue_discard_cmd(sbi, bdev, lblkstart, blklen);
 }
 #endif
 
