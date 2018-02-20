@@ -29,6 +29,7 @@
 #include <linux/of.h>
 #include <linux/phy/phy.h>
 #include <linux/platform_device.h>
+#include <linux/regulator/consumer.h>
 #include <linux/reset.h>
 #include <linux/usb.h>
 #include <linux/usb/hcd.h>
@@ -46,6 +47,7 @@ struct ehci_platform_priv {
 	struct reset_control *rsts;
 	struct phy **phys;
 	int num_phys;
+	struct regulator *vbus_supply;
 	bool reset_on_resume;
 };
 
@@ -74,6 +76,25 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
 	if (pdata->no_io_watchdog)
 		ehci->need_io_watchdog = 0;
 	return 0;
+}
+
+static int ehci_platform_port_power(struct usb_hcd *hcd, int portnum,
+				    bool enable)
+{
+	struct ehci_platform_priv *priv = hcd_to_ehci_priv(hcd);
+	int ret = 0;
+
+	if (priv->vbus_supply) {
+		if (enable)
+			ret = regulator_enable(priv->vbus_supply);
+		else
+			ret = regulator_disable(priv->vbus_supply);
+		if (ret)
+			dev_err(hcd->self.controller,
+				"failed to %s vbus supply: %d\n",
+				enable ? "enable" : "disable", ret);
+	}
+	return ret;
 }
 
 static int ehci_platform_power_on(struct platform_device *dev)
@@ -134,6 +155,7 @@ static struct hc_driver __read_mostly ehci_platform_hc_driver;
 static const struct ehci_driver_overrides platform_overrides __initconst = {
 	.reset =		ehci_platform_reset,
 	.extra_priv_size =	sizeof(struct ehci_platform_priv),
+	.port_power =		ehci_platform_port_power,
 };
 
 static struct usb_ehci_pdata ehci_platform_defaults = {
@@ -246,6 +268,15 @@ static int ehci_platform_probe(struct platform_device *dev)
 	err = reset_control_deassert(priv->rsts);
 	if (err)
 		goto err_put_clks;
+
+	priv->vbus_supply = devm_regulator_get_optional(&dev->dev, "vbus");
+	if (IS_ERR(priv->vbus_supply)) {
+		err = PTR_ERR(priv->vbus_supply);
+		if (err == -ENODEV)
+			priv->vbus_supply = NULL;
+		else
+			goto err_reset;
+	}
 
 	if (pdata->big_endian_desc)
 		ehci->big_endian_desc = 1;
