@@ -47,8 +47,7 @@ static irqreturn_t gemini_powerbutton_interrupt(int irq, void *data)
 	val &= 0x70U;
 	switch (val) {
 	case GEMINI_STAT_CIR:
-		dev_info(gpw->dev, "infrared poweroff\n");
-		orderly_poweroff(true);
+		dev_info(gpw->dev, "infrared poweroff - ignored\n");
 		break;
 	case GEMINI_STAT_RTC:
 		dev_info(gpw->dev, "RTC poweroff\n");
