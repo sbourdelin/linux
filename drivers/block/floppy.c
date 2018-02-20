@@ -1819,15 +1819,14 @@ static void show_floppy(void)
 	if (work_pending(&floppy_work))
 		pr_info("floppy_work.func=%pf\n", floppy_work.func);
 	if (delayed_work_pending(&fd_timer))
-		pr_info("delayed work.function=%p expires=%ld\n",
+		pr_info("delayed work.function=%pf expires=%ld\n",
 		       fd_timer.work.func,
 		       fd_timer.timer.expires - jiffies);
 	if (delayed_work_pending(&fd_timeout))
-		pr_info("timer_function=%p expires=%ld\n",
+		pr_info("timer_function=%pf expires=%ld\n",
 		       fd_timeout.work.func,
 		       fd_timeout.timer.expires - jiffies);
 
-	pr_info("cont=%p\n", cont);
 	pr_info("current_req=%p\n", current_req);
 	pr_info("command_status=%d\n", command_status);
 	pr_info("\n");
