@@ -472,7 +472,7 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
 /*****************************************************************************
  * Ethernet switch
  ****************************************************************************/
-static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
+static __initconst const char *const orion_ge00_mvmdio_bus_name = "orion-mii";
 static __initdata struct mdio_board_info
 		  orion_ge00_switch_board_info;
 
