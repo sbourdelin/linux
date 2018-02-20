@@ -17,7 +17,6 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 #include "pch_gbe.h"
-#include "pch_gbe_phy.h"
 #include "pch_gbe_api.h"
 
 /* bus type values */
@@ -57,41 +56,8 @@ static void pch_gbe_plat_get_bus_info(struct pch_gbe_hw *hw)
 	hw->bus.width = pch_gbe_bus_width_pcie_x1;
 }
 
-/**
- * pch_gbe_plat_init_hw - Initialize hardware
- * @hw:	Pointer to the HW structure
- * Returns:
- *	0:		Successfully
- *	Negative value:	Failed-EBUSY
- */
-static s32 pch_gbe_plat_init_hw(struct pch_gbe_hw *hw)
-{
-	s32 ret_val;
-
-	ret_val = pch_gbe_phy_get_id(hw);
-	if (ret_val) {
-		struct pch_gbe_adapter *adapter = pch_gbe_hw_to_adapter(hw);
-
-		netdev_err(adapter->netdev, "pch_gbe_phy_get_id error\n");
-		return ret_val;
-	}
-	pch_gbe_phy_init_setting(hw);
-	/* Setup Mac interface option RGMII */
-#ifdef PCH_GBE_MAC_IFOP_RGMII
-	pch_gbe_phy_set_rgmii(hw);
-#endif
-	return ret_val;
-}
-
 static const struct pch_gbe_functions pch_gbe_ops = {
 	.get_bus_info      = pch_gbe_plat_get_bus_info,
-	.init_hw           = pch_gbe_plat_init_hw,
-	.read_phy_reg      = pch_gbe_phy_read_reg_miic,
-	.write_phy_reg     = pch_gbe_phy_write_reg_miic,
-	.reset_phy         = pch_gbe_phy_hw_reset,
-	.sw_reset_phy      = pch_gbe_phy_sw_reset,
-	.power_up_phy      = pch_gbe_phy_power_up,
-	.power_down_phy    = pch_gbe_phy_power_down,
 	.read_mac_addr     = pch_gbe_mac_read_mac_addr
 };
 
@@ -160,70 +126,6 @@ s32 pch_gbe_hal_init_hw(struct pch_gbe_hw *hw)
 }
 
 /**
- * pch_gbe_hal_read_phy_reg - Reads PHY register
- * @hw:	    Pointer to the HW structure
- * @offset: The register to read
- * @data:   The buffer to store the 16-bit read.
- * Returns:
- *	0:	Successfully
- *	Negative value:	Failed
- */
-s32 pch_gbe_hal_read_phy_reg(struct pch_gbe_hw *hw, u32 offset,
-					u16 *data)
-{
-	if (!hw->func->read_phy_reg)
-		return 0;
-	return hw->func->read_phy_reg(hw, offset, data);
-}
-
-/**
- * pch_gbe_hal_write_phy_reg - Writes PHY register
- * @hw:	    Pointer to the HW structure
- * @offset: The register to read
- * @data:   The value to write.
- * Returns:
- *	0:	Successfully
- *	Negative value:	Failed
- */
-s32 pch_gbe_hal_write_phy_reg(struct pch_gbe_hw *hw, u32 offset,
-					u16 data)
-{
-	if (!hw->func->write_phy_reg)
-		return 0;
-	return hw->func->write_phy_reg(hw, offset, data);
-}
-
-/**
- * pch_gbe_hal_phy_hw_reset - Hard PHY reset
- * @hw:	    Pointer to the HW structure
- */
-void pch_gbe_hal_phy_hw_reset(struct pch_gbe_hw *hw)
-{
-	if (!hw->func->reset_phy) {
-		struct pch_gbe_adapter *adapter = pch_gbe_hw_to_adapter(hw);
-
-		netdev_err(adapter->netdev, "ERROR: configuration\n");
-		return;
-	}
-	hw->func->reset_phy(hw);
-}
-
-/**
- * pch_gbe_hal_phy_sw_reset - Soft PHY reset
- * @hw:	    Pointer to the HW structure
- */
-void pch_gbe_hal_phy_sw_reset(struct pch_gbe_hw *hw)
-{
-	if (!hw->func->sw_reset_phy) {
-		struct pch_gbe_adapter *adapter = pch_gbe_hw_to_adapter(hw);
-
-		netdev_err(adapter->netdev, "ERROR: configuration\n");
-		return;
-	}
-	hw->func->sw_reset_phy(hw);
-}
-
-/**
  * pch_gbe_hal_read_mac_addr - Reads MAC address
  * @hw:	Pointer to the HW structure
  * Returns:
@@ -239,24 +141,4 @@ s32 pch_gbe_hal_read_mac_addr(struct pch_gbe_hw *hw)
 		return -ENOSYS;
 	}
 	return hw->func->read_mac_addr(hw);
-}
-
-/**
- * pch_gbe_hal_power_up_phy - Power up PHY
- * @hw:	Pointer to the HW structure
- */
-void pch_gbe_hal_power_up_phy(struct pch_gbe_hw *hw)
-{
-	if (hw->func->power_up_phy)
-		hw->func->power_up_phy(hw);
-}
-
-/**
- * pch_gbe_hal_power_down_phy - Power down PHY
- * @hw:	Pointer to the HW structure
- */
-void pch_gbe_hal_power_down_phy(struct pch_gbe_hw *hw)
-{
-	if (hw->func->power_down_phy)
-		hw->func->power_down_phy(hw);
 }

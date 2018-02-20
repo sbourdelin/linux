@@ -23,6 +23,8 @@
 #include <linux/net_tstamp.h>
 #include <linux/ptp_classify.h>
 #include <linux/gpio.h>
+#include <linux/gpio/consumer.h>
+#include <linux/at803x_phy.h>
 
 #define DRV_VERSION     "1.01"
 const char pch_driver_version[] = DRV_VERSION;
@@ -33,7 +35,6 @@ const char pch_driver_version[] = DRV_VERSION;
 #define DSC_INIT16			0xC000
 #define PCH_GBE_DMA_ALIGN		0
 #define PCH_GBE_DMA_PADDING		2
-#define PCH_GBE_WATCHDOG_PERIOD		(5 * HZ)	/* watchdog time */
 #define PCH_GBE_COPYBREAK_DEFAULT	256
 #define PCH_GBE_PCI_BAR			1
 #define PCH_GBE_RESERVE_MEMORY		0x200000	/* 2MB */
@@ -115,9 +116,6 @@ const char pch_driver_version[] = DRV_VERSION;
 
 static unsigned int copybreak __read_mostly = PCH_GBE_COPYBREAK_DEFAULT;
 
-static int pch_gbe_mdio_read(struct net_device *netdev, int addr, int reg);
-static void pch_gbe_mdio_write(struct net_device *netdev, int addr, int reg,
-			       int data);
 static void pch_gbe_set_multi(struct net_device *netdev);
 
 static int pch_ptp_match(struct sk_buff *skb, u16 uid_hi, u32 uid_lo, u16 seqid)
@@ -650,6 +648,99 @@ static void pch_gbe_init_stats(struct pch_gbe_adapter *adapter)
 	return;
 }
 
+static void pch_gbe_set_mode(struct pch_gbe_adapter *adapter, u16 speed,
+			      u16 duplex)
+{
+	struct net_device *netdev = adapter->netdev;
+	struct pch_gbe_hw *hw = &adapter->hw;
+	unsigned long mode = 0;
+
+	/* Set the communication mode */
+	switch (speed) {
+	case SPEED_10:
+		mode = PCH_GBE_MODE_MII_ETHER;
+		netdev->tx_queue_len = 10;
+		break;
+	case SPEED_100:
+		mode = PCH_GBE_MODE_MII_ETHER;
+		netdev->tx_queue_len = 100;
+		break;
+	case SPEED_1000:
+		mode = PCH_GBE_MODE_GMII_ETHER;
+		break;
+	}
+	if (duplex == DUPLEX_FULL)
+		mode |= PCH_GBE_MODE_FULL_DUPLEX;
+	else
+		mode |= PCH_GBE_MODE_HALF_DUPLEX;
+	iowrite32(mode, &hw->reg->MODE);
+}
+
+static void pch_gbe_set_rgmii_ctrl(struct pch_gbe_adapter *adapter, u16 speed,
+				    u16 duplex)
+{
+	struct pch_gbe_hw *hw = &adapter->hw;
+	unsigned long rgmii = 0;
+
+	/* Set the RGMII control. */
+#ifdef PCH_GBE_MAC_IFOP_RGMII
+	switch (speed) {
+	case SPEED_10:
+		rgmii = (PCH_GBE_RGMII_RATE_2_5M |
+			 PCH_GBE_MAC_RGMII_CTRL_SETTING);
+		break;
+	case SPEED_100:
+		rgmii = (PCH_GBE_RGMII_RATE_25M |
+			 PCH_GBE_MAC_RGMII_CTRL_SETTING);
+		break;
+	case SPEED_1000:
+		rgmii = (PCH_GBE_RGMII_RATE_125M |
+			 PCH_GBE_MAC_RGMII_CTRL_SETTING);
+		break;
+	}
+	iowrite32(rgmii, &hw->reg->RGMII_CTRL);
+#else	/* GMII */
+	rgmii = 0;
+	iowrite32(rgmii, &hw->reg->RGMII_CTRL);
+#endif
+}
+
+/**
+ * pch_gbe_change_link - PHY has changed state
+ * @netdev:	Network interface device structure
+ */
+static void pch_gbe_change_link(struct net_device *netdev)
+{
+	struct pch_gbe_adapter *adapter = netdev_priv(netdev);
+	struct phy_device *phydev = adapter->phydev;
+	struct pch_gbe_hw *hw = &adapter->hw;
+
+	if (phydev->link) {
+		netdev->tx_queue_len = adapter->tx_queue_len;
+		hw->mac.link_speed = phydev->speed;
+		hw->mac.link_duplex = phydev->duplex;
+
+		/* Set the RGMII control. */
+		pch_gbe_set_rgmii_ctrl(adapter, hw->mac.link_speed,
+						hw->mac.link_duplex);
+		/* Set the communication mode */
+		pch_gbe_set_mode(adapter, hw->mac.link_speed,
+				 hw->mac.link_duplex);
+		netif_wake_queue(netdev);
+	} else if (!phydev->link && (netif_carrier_ok(netdev))) {
+		hw->mac.link_speed = SPEED_10;
+		hw->mac.link_duplex = DUPLEX_HALF;
+		netif_stop_queue(netdev);
+	}
+	phy_print_status(phydev);
+}
+
+static int pch_gbe_phy_disable_hibernate(struct phy_device *phydev)
+{
+	return at803x_debug_reg_mask(phydev, AT8031_HIBERNATE,
+				     AT8031_PS_HIB_EN, 0);
+}
+
 /**
  * pch_gbe_init_phy - Initialize PHY
  * @adapter:  Board private structure to initialize
@@ -660,56 +751,39 @@ static void pch_gbe_init_stats(struct pch_gbe_adapter *adapter)
 static int pch_gbe_init_phy(struct pch_gbe_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
-	u32 addr;
-	u16 bmcr, stat;
+	int ret;
 
-	/* Discover phy addr by searching addrs in order {1,0,2,..., 31} */
-	for (addr = 0; addr < PCH_GBE_PHY_REGS_LEN; addr++) {
-		adapter->mii.phy_id = (addr == 0) ? 1 : (addr == 1) ? 0 : addr;
-		bmcr = pch_gbe_mdio_read(netdev, adapter->mii.phy_id, MII_BMCR);
-		stat = pch_gbe_mdio_read(netdev, adapter->mii.phy_id, MII_BMSR);
-		stat = pch_gbe_mdio_read(netdev, adapter->mii.phy_id, MII_BMSR);
-		if (!((bmcr == 0xFFFF) || ((stat == 0) && (bmcr == 0))))
-			break;
-	}
-	adapter->hw.phy.addr = adapter->mii.phy_id;
-	netdev_dbg(netdev, "phy_addr = %d\n", adapter->mii.phy_id);
-	if (addr == PCH_GBE_PHY_REGS_LEN)
-		return -EAGAIN;
-	/* Selected the phy and isolate the rest */
-	for (addr = 0; addr < PCH_GBE_PHY_REGS_LEN; addr++) {
-		if (addr != adapter->mii.phy_id) {
-			pch_gbe_mdio_write(netdev, addr, MII_BMCR,
-					   BMCR_ISOLATE);
-		} else {
-			bmcr = pch_gbe_mdio_read(netdev, addr, MII_BMCR);
-			pch_gbe_mdio_write(netdev, addr, MII_BMCR,
-					   bmcr & ~BMCR_ISOLATE);
-		}
+	if (adapter->pdata && adapter->pdata->phy_disable_hibernate)
+		phy_register_fixup(adapter->mdiobus->id,
+				   ATH8031_PHY_ID, AT803X_PHY_ID_MASK,
+				   pch_gbe_phy_disable_hibernate);
+
+	adapter->phydev = phy_find_first(adapter->mdiobus);
+	if (!adapter->phydev)
+		return -ENODEV;
+
+	ret = phy_connect_direct(netdev, adapter->phydev, pch_gbe_change_link,
+				 PHY_INTERFACE_MODE_RGMII_TXID);
+	if (ret) {
+		netdev_err(netdev, "Could not attach to PHY\n");
+		return ret;
 	}
 
-	/* MII setup */
-	adapter->mii.phy_id_mask = 0x1F;
-	adapter->mii.reg_num_mask = 0x1F;
-	adapter->mii.dev = adapter->netdev;
-	adapter->mii.mdio_read = pch_gbe_mdio_read;
-	adapter->mii.mdio_write = pch_gbe_mdio_write;
-	adapter->mii.supports_gmii = mii_check_gmii_support(&adapter->mii);
 	return 0;
 }
 
 /**
  * pch_gbe_mdio_read - The read function for mii
- * @netdev: Network interface device structure
+ * @bus: MDIO bus device structure
  * @addr:   Phy ID
  * @reg:    Access location
  * Returns:
  *	0:	Successfully
  *	Negative value:	Failed
  */
-static int pch_gbe_mdio_read(struct net_device *netdev, int addr, int reg)
+static int pch_gbe_mdio_read(struct mii_bus *bus, int addr, int reg)
 {
-	struct pch_gbe_adapter *adapter = netdev_priv(netdev);
+	struct pch_gbe_adapter *adapter = bus->priv;
 	struct pch_gbe_hw *hw = &adapter->hw;
 
 	return pch_gbe_mac_ctrl_miim(hw, addr, PCH_GBE_HAL_MIIM_READ, reg,
@@ -718,18 +792,42 @@ static int pch_gbe_mdio_read(struct net_device *netdev, int addr, int reg)
 
 /**
  * pch_gbe_mdio_write - The write function for mii
- * @netdev: Network interface device structure
- * @addr:   Phy ID (not used)
+ * @bus: MDIO bus device structure
+ * @addr:   Phy ID
  * @reg:    Access location
  * @data:   Write data
+ * Returns:
+ *	0:	Successfully
+ *	Negative value:	Failed
  */
-static void pch_gbe_mdio_write(struct net_device *netdev,
-			       int addr, int reg, int data)
+static int pch_gbe_mdio_write(struct mii_bus *bus, int addr, int reg, u16 data)
 {
-	struct pch_gbe_adapter *adapter = netdev_priv(netdev);
+	struct pch_gbe_adapter *adapter = bus->priv;
 	struct pch_gbe_hw *hw = &adapter->hw;
 
-	pch_gbe_mac_ctrl_miim(hw, addr, PCH_GBE_HAL_MIIM_WRITE, reg, data);
+	return pch_gbe_mac_ctrl_miim(hw, addr, PCH_GBE_HAL_MIIM_WRITE, reg,
+				     data);
+}
+
+static int pch_gbe_init_mdio(struct pch_gbe_adapter *adapter)
+{
+	struct device *dev = &adapter->pdev->dev;
+	struct mii_bus *bus;
+
+	bus = devm_mdiobus_alloc(dev);
+	if (!bus)
+		return -ENOMEM;
+
+	bus->read = pch_gbe_mdio_read;
+	bus->write = pch_gbe_mdio_write;
+	bus->parent = dev;
+	bus->name = "pch_gdb";
+	snprintf(bus->id, MII_BUS_ID_SIZE, "%s-mii", dev_name(dev));
+	bus->priv = adapter;
+
+	adapter->mdiobus = bus;
+
+	return mdiobus_register(bus);
 }
 
 /**
@@ -1027,113 +1125,6 @@ pch_gbe_clean_rx_ring(struct pch_gbe_adapter *adapter,
 	rx_ring->next_to_use = 0;
 	iowrite32(rx_ring->dma, &hw->reg->RX_DSC_HW_P);
 	iowrite32((rx_ring->size - 0x10), &hw->reg->RX_DSC_SIZE);
-}
-
-static void pch_gbe_set_rgmii_ctrl(struct pch_gbe_adapter *adapter, u16 speed,
-				    u16 duplex)
-{
-	struct pch_gbe_hw *hw = &adapter->hw;
-	unsigned long rgmii = 0;
-
-	/* Set the RGMII control. */
-#ifdef PCH_GBE_MAC_IFOP_RGMII
-	switch (speed) {
-	case SPEED_10:
-		rgmii = (PCH_GBE_RGMII_RATE_2_5M |
-			 PCH_GBE_MAC_RGMII_CTRL_SETTING);
-		break;
-	case SPEED_100:
-		rgmii = (PCH_GBE_RGMII_RATE_25M |
-			 PCH_GBE_MAC_RGMII_CTRL_SETTING);
-		break;
-	case SPEED_1000:
-		rgmii = (PCH_GBE_RGMII_RATE_125M |
-			 PCH_GBE_MAC_RGMII_CTRL_SETTING);
-		break;
-	}
-	iowrite32(rgmii, &hw->reg->RGMII_CTRL);
-#else	/* GMII */
-	rgmii = 0;
-	iowrite32(rgmii, &hw->reg->RGMII_CTRL);
-#endif
-}
-static void pch_gbe_set_mode(struct pch_gbe_adapter *adapter, u16 speed,
-			      u16 duplex)
-{
-	struct net_device *netdev = adapter->netdev;
-	struct pch_gbe_hw *hw = &adapter->hw;
-	unsigned long mode = 0;
-
-	/* Set the communication mode */
-	switch (speed) {
-	case SPEED_10:
-		mode = PCH_GBE_MODE_MII_ETHER;
-		netdev->tx_queue_len = 10;
-		break;
-	case SPEED_100:
-		mode = PCH_GBE_MODE_MII_ETHER;
-		netdev->tx_queue_len = 100;
-		break;
-	case SPEED_1000:
-		mode = PCH_GBE_MODE_GMII_ETHER;
-		break;
-	}
-	if (duplex == DUPLEX_FULL)
-		mode |= PCH_GBE_MODE_FULL_DUPLEX;
-	else
-		mode |= PCH_GBE_MODE_HALF_DUPLEX;
-	iowrite32(mode, &hw->reg->MODE);
-}
-
-/**
- * pch_gbe_watchdog - Watchdog process
- * @data:  Board private structure
- */
-static void pch_gbe_watchdog(struct timer_list *t)
-{
-	struct pch_gbe_adapter *adapter = from_timer(adapter, t,
-						     watchdog_timer);
-	struct net_device *netdev = adapter->netdev;
-	struct pch_gbe_hw *hw = &adapter->hw;
-
-	netdev_dbg(netdev, "right now = %ld\n", jiffies);
-
-	pch_gbe_update_stats(adapter);
-	if ((mii_link_ok(&adapter->mii)) && (!netif_carrier_ok(netdev))) {
-		struct ethtool_cmd cmd = { .cmd = ETHTOOL_GSET };
-		netdev->tx_queue_len = adapter->tx_queue_len;
-		/* mii library handles link maintenance tasks */
-		if (mii_ethtool_gset(&adapter->mii, &cmd)) {
-			netdev_err(netdev, "ethtool get setting Error\n");
-			mod_timer(&adapter->watchdog_timer,
-				  round_jiffies(jiffies +
-						PCH_GBE_WATCHDOG_PERIOD));
-			return;
-		}
-		hw->mac.link_speed = ethtool_cmd_speed(&cmd);
-		hw->mac.link_duplex = cmd.duplex;
-		/* Set the RGMII control. */
-		pch_gbe_set_rgmii_ctrl(adapter, hw->mac.link_speed,
-						hw->mac.link_duplex);
-		/* Set the communication mode */
-		pch_gbe_set_mode(adapter, hw->mac.link_speed,
-				 hw->mac.link_duplex);
-		netdev_dbg(netdev,
-			   "Link is Up %d Mbps %s-Duplex\n",
-			   hw->mac.link_speed,
-			   cmd.duplex == DUPLEX_FULL ? "Full" : "Half");
-		netif_carrier_on(netdev);
-		netif_wake_queue(netdev);
-	} else if ((!mii_link_ok(&adapter->mii)) &&
-		   (netif_carrier_ok(netdev))) {
-		netdev_dbg(netdev, "NIC Link is Down\n");
-		hw->mac.link_speed = SPEED_10;
-		hw->mac.link_duplex = DUPLEX_HALF;
-		netif_carrier_off(netdev);
-		netif_stop_queue(netdev);
-	}
-	mod_timer(&adapter->watchdog_timer,
-		  round_jiffies(jiffies + PCH_GBE_WATCHDOG_PERIOD));
 }
 
 /**
@@ -1964,8 +1955,6 @@ int pch_gbe_up(struct pch_gbe_adapter *adapter)
 	pch_gbe_enable_dma_rx(&adapter->hw);
 	pch_gbe_enable_mac_rx(&adapter->hw);
 
-	mod_timer(&adapter->watchdog_timer, jiffies);
-
 	napi_enable(&adapter->napi);
 	pch_gbe_irq_enable(adapter);
 	netif_start_queue(adapter->netdev);
@@ -1995,8 +1984,6 @@ void pch_gbe_down(struct pch_gbe_adapter *adapter)
 
 	pch_gbe_irq_disable(adapter);
 	pch_gbe_free_irq(adapter);
-
-	del_timer_sync(&adapter->watchdog_timer);
 
 	netdev->tx_queue_len = adapter->tx_queue_len;
 	netif_carrier_off(netdev);
@@ -2064,7 +2051,6 @@ static int pch_gbe_sw_init(struct pch_gbe_adapter *adapter)
 static int pch_gbe_open(struct net_device *netdev)
 {
 	struct pch_gbe_adapter *adapter = netdev_priv(netdev);
-	struct pch_gbe_hw *hw = &adapter->hw;
 	int err;
 
 	/* allocate transmit descriptors */
@@ -2075,7 +2061,7 @@ static int pch_gbe_open(struct net_device *netdev)
 	err = pch_gbe_setup_rx_resources(adapter, adapter->rx_ring);
 	if (err)
 		goto err_setup_rx;
-	pch_gbe_hal_power_up_phy(hw);
+	phy_start(adapter->phydev);
 	err = pch_gbe_up(adapter);
 	if (err)
 		goto err_up;
@@ -2083,8 +2069,7 @@ static int pch_gbe_open(struct net_device *netdev)
 	return 0;
 
 err_up:
-	if (!adapter->wake_up_evt)
-		pch_gbe_hal_power_down_phy(hw);
+	phy_stop(adapter->phydev);
 	pch_gbe_free_rx_resources(adapter, adapter->rx_ring);
 err_setup_rx:
 	pch_gbe_free_tx_resources(adapter, adapter->tx_ring);
@@ -2103,11 +2088,9 @@ err_setup_tx:
 static int pch_gbe_stop(struct net_device *netdev)
 {
 	struct pch_gbe_adapter *adapter = netdev_priv(netdev);
-	struct pch_gbe_hw *hw = &adapter->hw;
 
 	pch_gbe_down(adapter);
-	if (!adapter->wake_up_evt)
-		pch_gbe_hal_power_down_phy(hw);
+	phy_stop(adapter->phydev);
 	pch_gbe_free_tx_resources(adapter, adapter->tx_ring);
 	pch_gbe_free_rx_resources(adapter, adapter->rx_ring);
 	return 0;
@@ -2319,7 +2302,7 @@ static int pch_gbe_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 	if (cmd == SIOCSHWTSTAMP)
 		return hwtstamp_ioctl(netdev, ifr, cmd);
 
-	return generic_mii_ioctl(&adapter->mii, if_mii(ifr), cmd, NULL);
+	return phy_mii_ioctl(adapter->phydev, ifr, cmd);
 }
 
 /**
@@ -2437,7 +2420,6 @@ static pci_ers_result_t pch_gbe_io_slot_reset(struct pci_dev *pdev)
 	}
 	pci_set_master(pdev);
 	pci_enable_wake(pdev, PCI_D0, 0);
-	pch_gbe_hal_power_up_phy(hw);
 	pch_gbe_reset(adapter);
 	/* Clear wake up status */
 	pch_gbe_mac_set_wol_event(hw, 0);
@@ -2482,7 +2464,7 @@ static int __pch_gbe_suspend(struct pci_dev *pdev)
 		pch_gbe_mac_set_wol_event(hw, wufc);
 		pci_disable_device(pdev);
 	} else {
-		pch_gbe_hal_power_down_phy(hw);
+		phy_stop(adapter->phydev);
 		pch_gbe_mac_set_wol_event(hw, wufc);
 		pci_disable_device(pdev);
 	}
@@ -2511,7 +2493,7 @@ static int pch_gbe_resume(struct device *device)
 		return err;
 	}
 	pci_set_master(pdev);
-	pch_gbe_hal_power_up_phy(hw);
+	phy_start(adapter->phydev);
 	pch_gbe_reset(adapter);
 	/* Clear wake on lan control and status */
 	pch_gbe_mac_set_wol_event(hw, 0);
@@ -2541,7 +2523,12 @@ static void pch_gbe_remove(struct pci_dev *pdev)
 	cancel_work_sync(&adapter->reset_task);
 	unregister_netdev(netdev);
 
-	pch_gbe_hal_phy_hw_reset(&adapter->hw);
+	phy_stop(adapter->phydev);
+	phy_detach(adapter->phydev);
+
+	phy_unregister_fixup(adapter->mdiobus->id, ATH8031_PHY_ID,
+			     AT803X_PHY_ID_MASK);
+	mdiobus_unregister(adapter->mdiobus);
 
 	free_netdev(netdev);
 }
@@ -2591,8 +2578,6 @@ static int pch_gbe_probe(struct pci_dev *pdev,
 	adapter->hw.back = adapter;
 	adapter->hw.reg = pcim_iomap_table(pdev)[PCH_GBE_PCI_BAR];
 	adapter->pdata = (struct pch_gbe_privdata *)pci_id->driver_data;
-	if (adapter->pdata && adapter->pdata->platform_init)
-		adapter->pdata->platform_init(pdev);
 
 	adapter->ptp_pdev =
 		pci_get_domain_bus_and_slot(pci_domain_nr(adapter->pdev->bus),
@@ -2600,7 +2585,6 @@ static int pch_gbe_probe(struct pci_dev *pdev,
 					    PCI_DEVFN(12, 4));
 
 	netdev->netdev_ops = &pch_gbe_netdev_ops;
-	netdev->watchdog_timeo = PCH_GBE_WATCHDOG_PERIOD;
 	netif_napi_add(netdev, &adapter->napi,
 		       pch_gbe_napi_poll, PCH_GBE_RX_WEIGHT);
 	netdev->hw_features = NETIF_F_RXCSUM |
@@ -2621,19 +2605,28 @@ static int pch_gbe_probe(struct pci_dev *pdev,
 	if (ret)
 		goto err_free_netdev;
 
+	ret = pch_gbe_init_mdio(adapter);
+	if (ret) {
+		dev_err(&pdev->dev, "MDIO initialize error\n");
+		goto err_free_netdev;
+	}
+
 	/* Initialize PHY */
 	ret = pch_gbe_init_phy(adapter);
 	if (ret) {
 		dev_err(&pdev->dev, "PHY initialize error\n");
-		goto err_free_adapter;
+		goto err_free_mdiobus;
 	}
+
+	if (adapter->pdata && adapter->pdata->platform_init)
+		adapter->pdata->platform_init(adapter);
 	pch_gbe_hal_get_bus_info(&adapter->hw);
 
 	/* Read the MAC address. and store to the private data */
 	ret = pch_gbe_hal_read_mac_addr(&adapter->hw);
 	if (ret) {
 		dev_err(&pdev->dev, "MAC address Read Error\n");
-		goto err_free_adapter;
+		goto err_free_phy;
 	}
 
 	memcpy(netdev->dev_addr, adapter->hw.mac.addr, netdev->addr_len);
@@ -2647,8 +2640,6 @@ static int pch_gbe_probe(struct pci_dev *pdev,
 		dev_err(&pdev->dev, "Invalid MAC address, "
 		                    "interface disabled.\n");
 	}
-	timer_setup(&adapter->watchdog_timer, pch_gbe_watchdog, 0);
-
 	INIT_WORK(&adapter->reset_task, pch_gbe_reset_task);
 
 	pch_gbe_check_options(adapter);
@@ -2662,22 +2653,22 @@ static int pch_gbe_probe(struct pci_dev *pdev,
 
 	ret = register_netdev(netdev);
 	if (ret)
-		goto err_free_adapter;
+		goto err_free_phy;
 	/* tell the stack to leave us alone until pch_gbe_open() is called */
 	netif_carrier_off(netdev);
 	netif_stop_queue(netdev);
 
 	dev_dbg(&pdev->dev, "PCH Network Connection\n");
 
-	/* Disable hibernation on certain platforms */
-	if (adapter->pdata && adapter->pdata->phy_disable_hibernate)
-		pch_gbe_phy_disable_hibernate(&adapter->hw);
-
 	device_set_wakeup_enable(&pdev->dev, 1);
 	return 0;
 
-err_free_adapter:
-	pch_gbe_hal_phy_hw_reset(&adapter->hw);
+err_free_phy:
+	phy_disconnect(adapter->phydev);
+err_free_mdiobus:
+	phy_unregister_fixup(adapter->mdiobus->id, ATH8031_PHY_ID,
+			     AT803X_PHY_ID_MASK);
+	mdiobus_unregister(adapter->mdiobus);
 err_free_netdev:
 	free_netdev(netdev);
 	return ret;
@@ -2686,24 +2677,24 @@ err_free_netdev:
 /* The AR803X PHY on the MinnowBoard requires a physical pin to be toggled to
  * ensure it is awake for probe and init. Request the line and reset the PHY.
  */
-static int pch_gbe_minnow_platform_init(struct pci_dev *pdev)
+static int pch_gbe_minnow_platform_init(struct pch_gbe_adapter *adapter)
 {
 	unsigned long flags = GPIOF_DIR_OUT | GPIOF_INIT_HIGH | GPIOF_EXPORT;
+	struct phy_device *phydev = adapter->phydev;
+	struct device *dev = &adapter->pdev->dev;
 	unsigned gpio = MINNOW_PHY_RESET_GPIO;
 	int ret;
 
-	ret = devm_gpio_request_one(&pdev->dev, gpio, flags,
-				    "minnow_phy_reset");
+	ret = devm_gpio_request_one(dev, gpio, flags, "minnow_phy_reset");
 	if (ret) {
-		dev_err(&pdev->dev,
+		dev_err(dev,
 			"ERR: Can't request PHY reset GPIO line '%d'\n", gpio);
 		return ret;
 	}
 
-	gpio_set_value(gpio, 0);
-	usleep_range(1250, 1500);
-	gpio_set_value(gpio, 1);
-	usleep_range(1250, 1500);
+	phydev->mdio.reset = gpio_to_desc(gpio);
+	phydev->mdio.reset_assert_delay = 1500;
+	phydev->mdio.reset_deassert_delay = 1500;
 
 	return ret;
 }

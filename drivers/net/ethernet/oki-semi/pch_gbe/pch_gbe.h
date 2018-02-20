@@ -22,7 +22,8 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
-#include <linux/mii.h>
+#include <linux/mdio.h>
+#include <linux/phy.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>
@@ -332,23 +333,11 @@ struct pch_gbe_hw;
  * struct  pch_gbe_functions - HAL APi function pointer
  * @get_bus_info:	for pch_gbe_hal_get_bus_info
  * @init_hw:		for pch_gbe_hal_init_hw
- * @read_phy_reg:	for pch_gbe_hal_read_phy_reg
- * @write_phy_reg:	for pch_gbe_hal_write_phy_reg
- * @reset_phy:		for pch_gbe_hal_phy_hw_reset
- * @sw_reset_phy:	for pch_gbe_hal_phy_sw_reset
- * @power_up_phy:	for pch_gbe_hal_power_up_phy
- * @power_down_phy:	for pch_gbe_hal_power_down_phy
  * @read_mac_addr:	for pch_gbe_hal_read_mac_addr
  */
 struct pch_gbe_functions {
 	void (*get_bus_info) (struct pch_gbe_hw *);
 	s32 (*init_hw) (struct pch_gbe_hw *);
-	s32 (*read_phy_reg) (struct pch_gbe_hw *, u32, u16 *);
-	s32 (*write_phy_reg) (struct pch_gbe_hw *, u32, u16);
-	void (*reset_phy) (struct pch_gbe_hw *);
-	void (*sw_reset_phy) (struct pch_gbe_hw *);
-	void (*power_up_phy) (struct pch_gbe_hw *hw);
-	void (*power_down_phy) (struct pch_gbe_hw *hw);
 	s32 (*read_mac_addr) (struct pch_gbe_hw *);
 };
 
@@ -378,18 +367,10 @@ struct pch_gbe_mac_info {
 
 /**
  * struct pch_gbe_phy_info - PHY information
- * @addr:		PHY address
- * @id:			PHY's identifier
- * @revision:		PHY's revision
  * @reset_delay_us:	HW reset delay time[us]
- * @autoneg_advertised:	Autoneg advertised
  */
 struct pch_gbe_phy_info {
-	u32 addr;
-	u32 id;
-	u32 revision;
 	u32 reset_delay_us;
-	u16 autoneg_advertised;
 };
 
 /*!
@@ -578,6 +559,8 @@ struct pch_gbe_hw_stats {
 	u32 intr_tcpip_err_count;
 };
 
+struct pch_gbe_adapter;
+
 /**
  * struct pch_gbe_privdata - PCI Device ID driver data
  * @phy_tx_clk_delay:		Bool, configure the PHY TX delay in software
@@ -588,7 +571,7 @@ struct pch_gbe_hw_stats {
 struct pch_gbe_privdata {
 	bool phy_tx_clk_delay;
 	bool phy_disable_hibernate;
-	int (*platform_init)(struct pci_dev *pdev);
+	int (*platform_init)(struct pch_gbe_adapter *adapter);
 };
 
 /**
@@ -603,8 +586,8 @@ struct pch_gbe_privdata {
  * @hw:			Pointer of hardware structure
  * @stats:		Hardware status
  * @reset_task:		Reset task
- * @mii:		MII information structure
- * @watchdog_timer:	Watchdog timer list
+ * @mdiobus:		Pointer of MDIO bus structure
+ * @phydev:		Pointer of PHY device structure
  * @wake_up_evt:	Wake up event
  * @config_space:	Configuration space
  * @msg_enable:		Driver message level
@@ -628,8 +611,8 @@ struct pch_gbe_adapter {
 	struct pch_gbe_hw hw;
 	struct pch_gbe_hw_stats stats;
 	struct work_struct reset_task;
-	struct mii_if_info mii;
-	struct timer_list watchdog_timer;
+	struct mii_bus *mdiobus;
+	struct phy_device *phydev;
 	u32 wake_up_evt;
 	u32 *config_space;
 	unsigned long led_status;
