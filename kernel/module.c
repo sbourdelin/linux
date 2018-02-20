@@ -288,6 +288,11 @@ bool is_module_sig_enforced(void)
 }
 EXPORT_SYMBOL(is_module_sig_enforced);
 
+static bool sig_taint = IS_ENABLED(CONFIG_MODULE_SIG_TAINT);
+#ifndef CONFIG_MODULE_SIG_TAINT
+module_param(sig_taint, bool_enable_only, 0644);
+#endif /* !CONFIG_MODULE_SIG_TAINT */
+
 /* Block module loading/unloading? */
 int modules_disabled = 0;
 core_param(nomodule, modules_disabled, bint, 0);
@@ -3685,7 +3690,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
 
 #ifdef CONFIG_MODULE_SIG
 	mod->sig_ok = info->sig_ok;
-	if (!mod->sig_ok) {
+	if (!mod->sig_ok && sig_taint) {
 		pr_notice_once("%s: module verification failed: signature "
 			       "and/or required key missing - tainting "
 			       "kernel\n", mod->name);
