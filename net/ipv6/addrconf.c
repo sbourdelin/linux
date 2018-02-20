@@ -1968,6 +1968,7 @@ static void addrconf_dad_stop(struct inet6_ifaddr *ifp, int dad_failed)
 		spin_lock_bh(&ifp->lock);
 		addrconf_del_dad_work(ifp);
 		ifp->flags |= IFA_F_TENTATIVE;
+		ifp->flags &= ~IFA_F_OPTIMISTIC;
 		spin_unlock_bh(&ifp->lock);
 		if (dad_failed)
 			ipv6_ifa_notify(0, ifp);
@@ -4501,6 +4502,9 @@ static int inet6_addr_modify(struct inet6_ifaddr *ifp, u32 ifa_flags,
 	    (ifp->flags & IFA_F_TEMPORARY || ifp->prefix_len != 64))
 		return -EINVAL;
 
+	if (!(ifp->flags & (IFA_F_TENTATIVE | IFA_F_DADFAILED)))
+		ifa_flags &= ~IFA_F_OPTIMISTIC;
+
 	timeout = addrconf_timeout_fixup(valid_lft, HZ);
 	if (addrconf_finite_timeout(timeout)) {
 		expires = jiffies_to_clock_t(timeout * HZ);
@@ -4607,7 +4611,10 @@ inet6_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh,
 
 	/* We ignore other flags so far. */
 	ifa_flags &= IFA_F_NODAD | IFA_F_HOMEADDRESS | IFA_F_MANAGETEMPADDR |
-		     IFA_F_NOPREFIXROUTE | IFA_F_MCAUTOJOIN;
+		     IFA_F_NOPREFIXROUTE | IFA_F_MCAUTOJOIN | IFA_F_OPTIMISTIC;
+
+	if (ifa_flags & IFA_F_NODAD && ifa_flags & IFA_F_OPTIMISTIC)
+		return -EINVAL;
 
 	ifa = ipv6_get_ifaddr(net, pfx, dev, 1);
 	if (!ifa) {
