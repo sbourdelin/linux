@@ -18,6 +18,7 @@
 #include <linux/etherdevice.h>
 #include <linux/of_gpio.h>
 #include <linux/gpio/consumer.h>
+#include <linux/at803x_phy.h>
 
 #define AT803X_INTR_ENABLE			0x12
 #define AT803X_INTR_ENABLE_AUTONEG_ERR		BIT(15)
@@ -93,8 +94,8 @@ static int at803x_debug_reg_read(struct phy_device *phydev, u16 reg)
 	return phy_read(phydev, AT803X_DEBUG_DATA);
 }
 
-static int at803x_debug_reg_mask(struct phy_device *phydev, u16 reg,
-				 u16 clear, u16 set)
+int at803x_debug_reg_mask(struct phy_device *phydev, u16 reg,
+			  u16 clear, u16 set)
 {
 	u16 val;
 	int ret;
