@@ -4686,7 +4686,7 @@ skl_compute_linetime_wm(struct intel_crtc_state *cstate)
 	return linetime_wm;
 }
 
-static void skl_compute_transition_wm(struct intel_crtc_state *cstate,
+static void cnl_compute_transition_wm(struct intel_crtc_state *cstate,
 				      struct skl_wm_params *wp,
 				      struct skl_wm_level *wm_l0,
 				      uint16_t ddb_allocation,
@@ -4694,24 +4694,16 @@ static void skl_compute_transition_wm(struct intel_crtc_state *cstate,
 {
 	struct drm_device *dev = cstate->base.crtc->dev;
 	const struct drm_i915_private *dev_priv = to_i915(dev);
-	uint16_t trans_min, trans_y_tile_min;
+	uint16_t trans_min = 4, trans_y_tile_min;
 	const uint16_t trans_amount = 10; /* This is configurable amount */
 	uint16_t trans_offset_b, res_blocks;
 
 	if (!cstate->base.active)
 		goto exit;
 
-	/* Transition WM are not recommended by HW team for GEN9 */
-	if (INTEL_GEN(dev_priv) <= 9)
-		goto exit;
-
 	/* Transition WM don't make any sense if ipc is disabled */
 	if (!dev_priv->ipc_enabled)
 		goto exit;
-
-	trans_min = 0;
-	if (INTEL_GEN(dev_priv) >= 10)
-		trans_min = 4;
 
 	trans_offset_b = trans_min + trans_amount;
 
@@ -4780,8 +4772,12 @@ static int skl_build_pipe_wm(struct intel_crtc_state *cstate,
 					    intel_pstate, &wm_params, wm);
 		if (ret)
 			return ret;
-		skl_compute_transition_wm(cstate, &wm_params, &wm->wm[0],
-					  ddb_blocks, &wm->trans_wm);
+
+		/* Transition WM are not recommended by HW team for GEN9 */
+		if (INTEL_GEN(dev_priv) >= 10)
+			cnl_compute_transition_wm(cstate, &wm_params,
+						  &wm->wm[0], ddb_blocks,
+						  &wm->trans_wm);
 	}
 	pipe_wm->linetime = skl_compute_linetime_wm(cstate);
 
