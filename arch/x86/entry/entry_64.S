@@ -584,6 +584,7 @@ END(irq_entries_start)
 /* 8(%rsp): ~(interrupt number) */
 ENTRY(interrupt_entry)
 	UNWIND_HINT_FUNC
+	ASM_CLAC
 	cld
 
 	testb	$3, CS-ORIG_RAX+8(%rsp)
@@ -626,7 +627,6 @@ END(interrupt_entry)
 	 */
 	.p2align CONFIG_X86_L1_CACHE_SHIFT
 common_interrupt:
-	ASM_CLAC
 	addq	$-0x80, (%rsp)			/* Adjust vector to [-256, -1] range */
 	call	interrupt_entry
 	UNWIND_HINT_REGS indirect=1
@@ -823,7 +823,6 @@ END(common_interrupt)
 .macro apicinterrupt3 num sym do_sym
 ENTRY(\sym)
 	UNWIND_HINT_IRET_REGS
-	ASM_CLAC
 	pushq	$~(\num)
 .Lcommon_\sym:
 	call	interrupt_entry
