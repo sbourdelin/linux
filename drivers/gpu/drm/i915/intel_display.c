@@ -2068,7 +2068,8 @@ static unsigned int intel_surf_alignment(const struct drm_framebuffer *fb,
 }
 
 struct i915_vma *
-intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb, unsigned int rotation)
+intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb, unsigned int rotation,
+			struct drm_plane *plane, enum pipe pipe)
 {
 	struct drm_device *dev = fb->dev;
 	struct drm_i915_private *dev_priv = to_i915(dev);
@@ -2076,6 +2077,8 @@ intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb, unsigned int rotation)
 	struct i915_ggtt_view view;
 	struct i915_vma *vma;
 	u32 alignment;
+	bool needs_fence = false;
+	struct intel_plane *intel_plane;
 
 	WARN_ON(!mutex_is_locked(&dev->struct_mutex));
 
@@ -2105,13 +2108,19 @@ intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb, unsigned int rotation)
 	vma = i915_gem_object_pin_to_display_plane(obj, alignment, &view);
 	if (IS_ERR(vma))
 		goto err;
+	/*
+	 * Install the fence for pre-i965(GEN4-) tiled frame buffers all the
+	 * time but only do it for i965(GEN4) and beyond when the frame buffer
+	 * compression is enabled during boot up or runtime.
+	 */
+	intel_plane = to_intel_plane(plane);
+	if (INTEL_GEN(dev_priv) < 4 || (intel_fbc_can_enable(dev_priv) &&
+		(pipe == PIPE_A) && intel_plane &&
+		(intel_plane->id == PLANE_PRIMARY)))
+		needs_fence = true;
 
 	if (i915_vma_is_map_and_fenceable(vma)) {
-		/* Install a fence for tiled scan-out. Pre-i965 always needs a
-		 * fence, whereas 965+ only requires a fence if using
-		 * framebuffer compression.  For simplicity, we always, when
-		 * possible, install a fence as the cost is not that onerous.
-		 *
+		/*
 		 * If we fail to fence the tiled scanout, then either the
 		 * modeset will reject the change (which is highly unlikely as
 		 * the affected systems, all but one, do not have unmappable
@@ -2123,7 +2132,16 @@ intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb, unsigned int rotation)
 		 * something and try to run the system in a "less than optimal"
 		 * mode that matches the user configuration.
 		 */
-		i915_vma_pin_fence(vma);
+		if (needs_fence)
+			i915_vma_pin_fence(vma);
+		else if (vma->fence)
+			/*
+			 * For a reused fence, increase its ref count even if
+			 * it's not pinned to maintain the count consistancy.
+			 * This is because the count is unconditionally 
+			 * decreased when the fence is unpinned.
+			 */
+			vma->fence->pin_count++;
 	}
 
 	i915_vma_get(vma);
@@ -2794,7 +2812,8 @@ intel_find_initial_plane_obj(struct intel_crtc *intel_crtc,
 valid_fb:
 	mutex_lock(&dev->struct_mutex);
 	intel_state->vma =
-		intel_pin_and_fence_fb_obj(fb, primary->state->rotation);
+		intel_pin_and_fence_fb_obj(fb, primary->state->rotation,
+					primary, intel_crtc->pipe);
 	mutex_unlock(&dev->struct_mutex);
 	if (IS_ERR(intel_state->vma)) {
 		DRM_ERROR("failed to pin boot fb on pipe %d: %li\n",
@@ -12639,8 +12658,9 @@ intel_prepare_plane_fb(struct drm_plane *plane,
 		ret = i915_gem_object_attach_phys(obj, align);
 	} else {
 		struct i915_vma *vma;
-
-		vma = intel_pin_and_fence_fb_obj(fb, new_state->rotation);
+		struct intel_crtc *temp_crtc = to_intel_crtc(new_state->crtc);
+		vma = intel_pin_and_fence_fb_obj(fb, new_state->rotation,
+						plane, temp_crtc->pipe);
 		if (!IS_ERR(vma))
 			to_intel_plane_state(new_state)->vma = vma;
 		else
@@ -13053,7 +13073,9 @@ intel_legacy_cursor_update(struct drm_plane *plane,
 			goto out_unlock;
 		}
 	} else {
-		vma = intel_pin_and_fence_fb_obj(fb, new_plane_state->rotation);
+		struct intel_crtc *temp_crtc = to_intel_crtc(crtc);
+		vma = intel_pin_and_fence_fb_obj(fb, new_plane_state->rotation,
+						plane, temp_crtc->pipe);
 		if (IS_ERR(vma)) {
 			DRM_DEBUG_KMS("failed to pin object\n");
 

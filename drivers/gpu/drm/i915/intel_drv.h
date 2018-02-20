@@ -1417,7 +1417,8 @@ void intel_release_load_detect_pipe(struct drm_connector *connector,
 				    struct intel_load_detect_pipe *old,
 				    struct drm_modeset_acquire_ctx *ctx);
 struct i915_vma *
-intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb, unsigned int rotation);
+intel_pin_and_fence_fb_obj(struct drm_framebuffer *fb, unsigned int rotation,
+			   struct drm_plane *plane, enum pipe pipe);
 void intel_unpin_fb_vma(struct i915_vma *vma);
 struct drm_framebuffer *
 intel_framebuffer_create(struct drm_i915_gem_object *obj,
@@ -1673,6 +1674,7 @@ void intel_fbc_flush(struct drm_i915_private *dev_priv,
 		     unsigned int frontbuffer_bits, enum fb_op_origin origin);
 void intel_fbc_cleanup_cfb(struct drm_i915_private *dev_priv);
 void intel_fbc_handle_fifo_underrun_irq(struct drm_i915_private *dev_priv);
+bool intel_fbc_can_enable(struct drm_i915_private *dev_priv);
 
 /* intel_hdmi.c */
 void intel_hdmi_init(struct drm_i915_private *dev_priv, i915_reg_t hdmi_reg,
