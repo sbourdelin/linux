@@ -744,7 +744,7 @@ int btrfs_dev_replace_cancel(struct btrfs_fs_info *fs_info)
 	ret = btrfs_commit_transaction(trans);
 	WARN_ON(ret);
 
-	btrfs_info(fs_info, "dev_replace from %s (devid %llu) to %s canceled",
+	btrfs_info_in_rcu(fs_info, "dev_replace from %s (devid %llu) to %s cancelled",
 		   btrfs_dev_name(src_device), src_device->devid,
 		   btrfs_dev_name(tgt_device));
 
