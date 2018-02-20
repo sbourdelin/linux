@@ -749,6 +749,13 @@ static void __init setup_nonnuma(void)
 				  PFN_PHYS(end_pfn - start_pfn),
 				  &memblock.memory, nid);
 		node_set_online(nid);
+
+		/*
+		 * On DISCONTIGMEM systems, place different memory blocks into
+		 * different nodes.
+		 */
+		if (IS_ENABLED(CONFIG_DISCONTIGMEM) && nid < MAX_NUMNODES - 1)
+			nid++;
 	}
 }
 

@@ -26,6 +26,27 @@ extern struct pglist_data *node_data[];
  */
 #define NODE_DATA(nid)		(node_data[nid])
 
+static inline int pfn_to_nid(unsigned long pfn)
+{
+	int nid;
+
+	for (nid = 0; nid < MAX_NUMNODES && NODE_DATA(nid); nid++)
+		if (pfn >= node_start_pfn(nid) && pfn <= node_end_pfn(nid))
+			return nid;
+
+	return -1;
+}
+
+static inline int pfn_valid(int pfn)
+{
+	int nid = pfn_to_nid(pfn);
+
+	if (nid >= 0)
+		return pfn < node_end_pfn(nid);
+
+	return 0;
+}
+
 /*
  * Following are specific to this numa platform.
  */
