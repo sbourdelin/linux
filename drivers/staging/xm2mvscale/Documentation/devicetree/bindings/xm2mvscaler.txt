@@ -1,0 +1,25 @@
+Xilinx M2M Video Scaler
+-----------------------
+This document describes the DT bindings required by the
+Xilinx M2M Video Scaler driver.
+
+Required Properties:
+- compatible		: Must be "xlnx,v-m2m-scaler"
+- reg			: Memory map for module access
+- reset-gpios		: Should contain GPIO reset phandle
+- interrupt-parent	: Interrupt controller the interrupt is routed through
+- interrupts		: Should contain DMA channel interrupt
+- xlnx,scaler-num-taps	: The number of filter taps for scaling filter
+- xlnx,scaler-max-chan	: The maximum number of supported scaling channels
+
+Examples
+---------
+	v_multi_scaler: v_multi_scaler@a0000000 {
+		compatible = "xlnx,v-m2m-scaler";
+		reg = <0x0 0xa0000000 0x0 0x10000>;
+		reset-gpios = <&gpio 78 1>;
+		interrupt-parent = <&gic>;
+		interrupts = <0 89 4>;
+		xlnx,scaler-num-taps = <6>;
+		xlnx,scaler-max-chan = <4>;
+	};
