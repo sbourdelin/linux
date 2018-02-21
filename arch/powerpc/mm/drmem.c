@@ -35,7 +35,7 @@ static u32 drmem_lmb_flags(struct drmem_lmb *lmb)
 	 * Return the value of the lmb flags field minus the reserved
 	 * bit used internally for hotplug processing.
 	 */
-	return lmb->flags & ~DRMEM_LMB_RESERVED;
+	return lmb->flags & ~DRMEM_LMB_ISOLATED;
 }
 
 static struct property *clone_property(struct property *prop, u32 prop_sz)

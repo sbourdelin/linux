@@ -72,21 +72,21 @@ static inline u32 drmem_lmb_size(void)
 	return drmem_info->lmb_size;
 }
 
-#define DRMEM_LMB_RESERVED	0x80000000
+#define DRMEM_LMB_ISOLATED	0x80000000
 
-static inline void drmem_mark_lmb_reserved(struct drmem_lmb *lmb)
+static inline void drmem_mark_lmb_isolated(struct drmem_lmb *lmb)
 {
-	lmb->flags |= DRMEM_LMB_RESERVED;
+	lmb->flags |= DRMEM_LMB_ISOLATED;
 }
 
-static inline void drmem_remove_lmb_reservation(struct drmem_lmb *lmb)
+static inline void drmem_remove_lmb_isolation(struct drmem_lmb *lmb)
 {
-	lmb->flags &= ~DRMEM_LMB_RESERVED;
+	lmb->flags &= ~DRMEM_LMB_ISOLATED;
 }
 
-static inline bool drmem_lmb_reserved(struct drmem_lmb *lmb)
+static inline bool drmem_lmb_isolated(struct drmem_lmb *lmb)
 {
-	return lmb->flags & DRMEM_LMB_RESERVED;
+	return lmb->flags & DRMEM_LMB_ISOLATED;
 }
 
 u64 drmem_lmb_memory_max(void);

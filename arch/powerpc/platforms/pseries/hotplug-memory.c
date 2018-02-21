@@ -467,7 +467,7 @@ static int dlpar_memory_remove_by_count(u32 lmbs_to_remove)
 		/* Mark this lmb so we can add it later if all of the
 		 * requested LMBs cannot be removed.
 		 */
-		drmem_mark_lmb_reserved(lmb);
+		drmem_mark_lmb_isolated(lmb);
 
 		lmbs_removed++;
 		if (lmbs_removed == lmbs_to_remove)
@@ -478,7 +478,7 @@ static int dlpar_memory_remove_by_count(u32 lmbs_to_remove)
 		pr_err("Memory hot-remove failed, adding LMB's back\n");
 
 		for_each_drmem_lmb(lmb) {
-			if (!drmem_lmb_reserved(lmb))
+			if (!drmem_lmb_isolated(lmb))
 				continue;
 
 			rc = dlpar_add_lmb(lmb);
@@ -486,20 +486,20 @@ static int dlpar_memory_remove_by_count(u32 lmbs_to_remove)
 				pr_err("Failed to add LMB back, drc index %x\n",
 				       lmb->drc_index);
 
-			drmem_remove_lmb_reservation(lmb);
+			drmem_remove_lmb_isolation(lmb);
 		}
 
 		rc = -EINVAL;
 	} else {
 		for_each_drmem_lmb(lmb) {
-			if (!drmem_lmb_reserved(lmb))
+			if (!drmem_lmb_isolated(lmb))
 				continue;
 
 			dlpar_release_drc(lmb->drc_index);
 			pr_info("Memory at %llx was hot-removed\n",
 				lmb->base_addr);
 
-			drmem_remove_lmb_reservation(lmb);
+			drmem_remove_lmb_isolation(lmb);
 		}
 		rc = 0;
 	}
@@ -608,7 +608,7 @@ static int dlpar_memory_remove_by_ic(u32 lmbs_to_remove, u32 drc_index)
 		if (rc)
 			break;
 
-		drmem_mark_lmb_reserved(lmb);
+		drmem_mark_lmb_isolated(lmb);
 	}
 
 	if (rc) {
@@ -616,7 +616,7 @@ static int dlpar_memory_remove_by_ic(u32 lmbs_to_remove, u32 drc_index)
 
 
 		for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
-			if (!drmem_lmb_reserved(lmb))
+			if (!drmem_lmb_isolated(lmb))
 				continue;
 
 			rc = dlpar_add_lmb(lmb);
@@ -624,19 +624,19 @@ static int dlpar_memory_remove_by_ic(u32 lmbs_to_remove, u32 drc_index)
 				pr_err("Failed to add LMB, drc index %x\n",
 				       lmb->drc_index);
 
-			drmem_remove_lmb_reservation(lmb);
+			drmem_remove_lmb_isolation(lmb);
 		}
 		rc = -EINVAL;
 	} else {
 		for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
-			if (!drmem_lmb_reserved(lmb))
+			if (!drmem_lmb_isolated(lmb))
 				continue;
 
 			dlpar_release_drc(lmb->drc_index);
 			pr_info("Memory at %llx (drc index %x) was hot-removed\n",
 				lmb->base_addr, lmb->drc_index);
 
-			drmem_remove_lmb_reservation(lmb);
+			drmem_remove_lmb_isolation(lmb);
 		}
 	}
 
@@ -760,7 +760,7 @@ static int dlpar_memory_add_by_count(u32 lmbs_to_add)
 		/* Mark this lmb so we can remove it later if all of the
 		 * requested LMBs cannot be added.
 		 */
-		drmem_mark_lmb_reserved(lmb);
+		drmem_mark_lmb_isolated(lmb);
 
 		lmbs_added++;
 		if (lmbs_added == lmbs_to_add)
@@ -771,7 +771,7 @@ static int dlpar_memory_add_by_count(u32 lmbs_to_add)
 		pr_err("Memory hot-add failed, removing any added LMBs\n");
 
 		for_each_drmem_lmb(lmb) {
-			if (!drmem_lmb_reserved(lmb))
+			if (!drmem_lmb_isolated(lmb))
 				continue;
 
 			rc = dlpar_remove_lmb(lmb);
@@ -781,17 +781,17 @@ static int dlpar_memory_add_by_count(u32 lmbs_to_add)
 			else
 				dlpar_release_drc(lmb->drc_index);
 
-			drmem_remove_lmb_reservation(lmb);
+			drmem_remove_lmb_isolation(lmb);
 		}
 		rc = -EINVAL;
 	} else {
 		for_each_drmem_lmb(lmb) {
-			if (!drmem_lmb_reserved(lmb))
+			if (!drmem_lmb_isolated(lmb))
 				continue;
 
 			pr_info("Memory at %llx (drc index %x) was hot-added\n",
 				lmb->base_addr, lmb->drc_index);
-			drmem_remove_lmb_reservation(lmb);
+			drmem_remove_lmb_isolation(lmb);
 		}
 		rc = 0;
 	}
@@ -874,14 +874,14 @@ static int dlpar_memory_add_by_ic(u32 lmbs_to_add, u32 drc_index)
 			break;
 		}
 
-		drmem_mark_lmb_reserved(lmb);
+		drmem_mark_lmb_isolated(lmb);
 	}
 
 	if (rc) {
 		pr_err("Memory indexed-count-add failed, removing any added LMBs\n");
 
 		for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
-			if (!drmem_lmb_reserved(lmb))
+			if (!drmem_lmb_isolated(lmb))
 				continue;
 
 			rc = dlpar_remove_lmb(lmb);
@@ -891,17 +891,17 @@ static int dlpar_memory_add_by_ic(u32 lmbs_to_add, u32 drc_index)
 			else
 				dlpar_release_drc(lmb->drc_index);
 
-			drmem_remove_lmb_reservation(lmb);
+			drmem_remove_lmb_isolation(lmb);
 		}
 		rc = -EINVAL;
 	} else {
 		for_each_drmem_lmb_in_range(lmb, start_lmb, end_lmb) {
-			if (!drmem_lmb_reserved(lmb))
+			if (!drmem_lmb_isolated(lmb))
 				continue;
 
 			pr_info("Memory at %llx (drc index %x) was hot-added\n",
 				lmb->base_addr, lmb->drc_index);
-			drmem_remove_lmb_reservation(lmb);
+			drmem_remove_lmb_isolation(lmb);
 		}
 	}
 
