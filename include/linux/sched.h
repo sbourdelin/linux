@@ -221,12 +221,21 @@ struct task_cputime {
 #define prof_exp			stime
 #define sched_exp			sum_exec_runtime
 
+/*
+ * vtime_state states:
+ *
+ * @VTIME_INACTIVE tells if task is sleeping or running in a CPU with
+ * VTIME inactive.
+ *
+ * @VTIME_USER tells if task is running in userspace in a CPU with
+ * VTIME active.
+ *
+ * @VTIME_SYS tells if task is running in kernelspace in a CPU with
+ * VTIME active.
+ */
 enum vtime_state {
-	/* Task is sleeping or running in a CPU with VTIME inactive: */
 	VTIME_INACTIVE = 0,
-	/* Task runs in userspace in a CPU with VTIME active: */
 	VTIME_USER,
-	/* Task runs in kernelspace in a CPU with VTIME active: */
 	VTIME_SYS,
 };
 
