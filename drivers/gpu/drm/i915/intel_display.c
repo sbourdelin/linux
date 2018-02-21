@@ -2076,7 +2076,7 @@ static bool intel_plane_uses_fence(const struct intel_plane_state *plane_state)
 	if (i915_gem_object_get_tiling(obj) == I915_TILING_NONE)
 		return false;
 
-	return INTEL_GEN(dev_priv) < 4 || plane->id == PLANE_PRIMARY;
+	return INTEL_GEN(dev_priv) < 4 || plane->has_fbc;
 }
 
 struct i915_vma *
