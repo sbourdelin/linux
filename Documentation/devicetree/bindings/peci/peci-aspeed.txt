@@ -1,0 +1,73 @@
+Device tree configuration for PECI buses on the AST24XX and AST25XX SoCs.
+
+Required properties:
+- compatible
+	"aspeed,ast2400-peci" or "aspeed,ast2500-peci"
+	- aspeed,ast2400-peci: Aspeed AST2400 family PECI controller
+	- aspeed,ast2500-peci: Aspeed AST2500 family PECI controller
+
+- reg
+	Should contain PECI registers location and length.
+
+- #address-cells
+	Should be <1>.
+
+- #size-cells
+	Should be <0>.
+
+- interrupts
+	Should contain PECI interrupt.
+
+- clocks
+	Should contain clock source for PECI hardware module. Should reference
+	clkin clock.
+
+- clock_frequency
+	Should contain the operation frequency of PECI hardware module.
+	187500 ~ 24000000
+
+Optional properties:
+- msg-timing-nego
+	Message timing negotiation period. This value will determine the period
+	of message timing negotiation to be issued by PECI controller. The unit
+	of the programmed value is four times of PECI clock period.
+	0 ~ 255 (default: 1)
+
+- addr-timing-nego
+	Address timing negotiation period. This value will determine the period
+	of address timing negotiation to be issued by PECI controller. The unit
+	of the programmed value is four times of PECI clock period.
+	0 ~ 255 (default: 1)
+
+- rd-sampling-point
+	Read sampling point selection. The whole period of a bit time will be
+	divided into 16 time frames. This value will determine which time frame
+	this controller will sample PECI signal for data read back. Usually in
+	the middle of a bit time is the best.
+	0 ~ 15 (default: 8)
+
+- cmd_timeout_ms
+	Command timeout in units of ms.
+	1 ~ 60000 (default: 1000)
+
+Example:
+	peci: peci@1e78b000 {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x0 0x1e78b000 0x60>;
+
+		peci0: peci-bus@0 {
+			compatible = "aspeed,ast2500-peci";
+			reg = <0x0 0x60>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			interrupts = <15>;
+			clocks = <&clk_clkin>;
+			clock-frequency = <24000000>;
+			msg-timing-nego = <1>;
+			addr-timing-nego = <1>;
+			rd-sampling-point = <8>;
+			cmd-timeout-ms = <1000>;
+		};
+	};
