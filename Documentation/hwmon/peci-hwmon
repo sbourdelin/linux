@@ -1,0 +1,73 @@
+Kernel driver peci-hwmon
+===============================
+
+Supported chips:
+	Any recent Intel CPU which is connected through a PECI bus.
+	Addresses scanned: PECI client address 0x30 - 0x37
+	Datasheet: Available from http://www.intel.com/design/literature.htm
+
+Author:
+	Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+
+Description
+-----------
+
+This driver implements a generic PECI hwmon feature which provides Digital
+Thermal Sensor (DTS) thermal readings of the CPU package, CPU cores and DIMM
+components that are accessible using the PECI Client Command Suite via the
+processor PECI client.
+
+All temperature values are given in millidegree Celsius and will be measurable
+only when the target CPU is powered on.
+
+sysfs attributes
+----------------
+
+temp1_input		Provides current die temperature of the CPU package.
+temp1_max		Provides thermal control temperature of the CPU package
+			which is also known as Tcontrol.
+temp1_crit		Provides shutdown temperature of the CPU package which
+			is also known as the maximum processor junction
+			temperature, Tjmax or Tprochot.
+temp1_crit_hyst		Provides the hysteresis value from Tcontrol to Tjmax of
+			the CPU package.
+
+temp2_input		Provides current DTS thermal margin to Tcontrol of the
+			CPU package. Value 0 means it reaches to Tcontrol
+			temperature. Sub-zero value means the die temperature
+			goes across Tconrtol to Tjmax.
+temp2_min		Provides the minimum DTS thermal margin to Tcontrol of
+			the CPU package.
+temp2_lcrit		Provides the value when the CPU package temperature
+			reaches to Tjmax.
+
+temp3_input		Provides current Tcontrol temperature of the CPU
+			package which is also known as Fan Temperature target.
+			Indicates the relative value from thermal monitor trip
+			temperature at which fans should be engaged.
+temp3_crit		Provides Tcontrol critical value of the CPU package
+			which is same to Tjmax.
+
+temp4_input		Provides current Tthrottle temperature of the CPU
+			package. Used for throttling temperature. If this value
+			is allowed and lower than Tjmax - the throttle will
+			occur and reported at lower than Tjmax.
+
+temp5_input		Provides the maximum junction temperature, Tjmax of the
+			CPU package.
+
+temp<n>_label		Provides core temperature if this label indicates
+			'Core #'.
+temp[n]_input		Provides current temperature of each core.
+temp[n]_max		Provides thermal control temperature of the core.
+temp[n]_crit		Provides shutdown temperature of the core.
+temp[n]_crit_hyst	Provides the hysteresis value from Tcontrol to Tjmax of
+			the core.
+
+temp<n>_label		Provides DDR DIMM temperature if this label indicates
+			'DIMM #'.
+temp<n>_input		Provides current temperature of the DDR DIMM.
+
+Note:
+	DIMM temperature group will be appeared when the client CPU's BIOS
+	completes memory training and testing.
