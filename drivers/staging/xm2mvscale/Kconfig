@@ -1,0 +1,11 @@
+config XILINX_M2M_VSC
+	tristate "Xilinx M2M Video Scaler"
+	depends on ARCH_ZYNQMP && OF
+	---help---
+	  This driver is developed for Xilinx M2M Video Scaler IP,
+	  designed to allow passage of frame buffers from the source
+	  kernel sub-system, apply video scaling and forward to the
+	  sink kernel sub-system.
+
+	  To compile this driver as a module, choose M here.
+	  If unsure, choose N.
