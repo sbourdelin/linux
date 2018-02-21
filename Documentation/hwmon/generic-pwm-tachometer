@@ -1,0 +1,17 @@
+Kernel driver generic-pwm-tachometer
+====================================
+
+This driver enables the use of a PWM module to monitor a fan. It uses the
+generic PWM interface and can be used on SoCs as along as the SoC supports
+Tachometer controller that moniors the Fan speed in periods.
+
+Author: Rajkumar Rampelli <rrajk@nvidia.com>
+
+Description
+-----------
+
+The driver implements a simple interface for monitoring the Fan speed using
+PWM module and Tachometer controller. It requests period value through PWM
+capture interface to Tachometer and measures the Rotations per minute using
+received period value. It exposes the Fan speed in RPM to the user space by
+using the hwmon's sysfs interface.

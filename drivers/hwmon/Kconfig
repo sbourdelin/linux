@@ -1878,6 +1878,16 @@ config SENSORS_XGENE
 	  If you say yes here you get support for the temperature
 	  and power sensors for APM X-Gene SoC.
 
+config GENERIC_PWM_TACHOMETER
+	tristate "Generic PWM based tachometer driver"
+	depends on PWM
+	help
+	  Enables a driver to use PWM signal from motor to use
+	  for measuring the motor speed. The RPM is captured by
+	  PWM modules which has PWM capture capability and this
+	  drivers reads the captured data from PWM IP to convert
+	  it to speed in RPM.
+
 if ACPI
 
 comment "ACPI drivers"
