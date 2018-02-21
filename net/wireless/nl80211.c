@@ -1506,6 +1506,9 @@ static int nl80211_send_wiphy(struct cfg80211_registered_device *rdev,
 		if ((rdev->wiphy.flags & WIPHY_FLAG_TDLS_EXTERNAL_SETUP) &&
 		    nla_put_flag(msg, NL80211_ATTR_TDLS_EXTERNAL_SETUP))
 			goto nla_put_failure;
+		if ((rdev->wiphy.flags & WIPHY_FLAG_DFS_OFFLOAD) &&
+		    nla_put_flag(msg, NL80211_ATTR_DFS_OFFLOAD))
+			goto nla_put_failure;
 		state->split_start++;
 		if (state->split)
 			break;
@@ -7543,6 +7546,10 @@ static int nl80211_start_radar_detection(struct sk_buff *skb,
 
 	if (!cfg80211_chandef_dfs_usable(wdev->wiphy, &chandef))
 		return -EINVAL;
+
+	/* CAC start is offloaded to HW and can't be started manually */
+	if (wdev->wiphy->flags & WIPHY_FLAG_DFS_OFFLOAD)
+		return -EOPNOTSUPP;
 
 	if (!rdev->ops->start_radar_detection)
 		return -EOPNOTSUPP;

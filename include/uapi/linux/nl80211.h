@@ -2153,6 +2153,13 @@ enum nl80211_commands {
  * @NL80211_ATTR_PMKR0_NAME: PMK-R0 Name for offloaded FT.
  * @NL80211_ATTR_PORT_AUTHORIZED: (reserved)
  *
+ * @NL80211_ATTR_DFS_OFFLOAD: Indicates that the HW will offload DFS actions.
+ *	Device will do all DFS-related actions by itself,
+ *	informing user-space about CAC progress, radar detection event,
+ *	channel change triggered by radar detection event.
+ *	No need to start CAC from user-space, no need to react to
+ *	"radar detected" event.
+ *
  * @NUM_NL80211_ATTR: total number of nl80211_attrs available
  * @NL80211_ATTR_MAX: highest attribute number currently defined
  * @__NL80211_ATTR_AFTER_LAST: internal use
@@ -2578,6 +2585,8 @@ enum nl80211_attrs {
 	NL80211_ATTR_WANT_1X_4WAY_HS,
 	NL80211_ATTR_PMKR0_NAME,
 	NL80211_ATTR_PORT_AUTHORIZED,
+
+	NL80211_ATTR_DFS_OFFLOAD,
 
 	/* add attributes here, update the policy in nl80211.c */
 
