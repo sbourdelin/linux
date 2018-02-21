@@ -776,7 +776,7 @@ static enum ucode_state apply_microcode_intel(int cpu)
 {
 	struct microcode_intel *mc;
 	struct ucode_cpu_info *uci;
-	struct cpuinfo_x86 *c;
+	struct cpuinfo_x86 *c = &cpu_data(cpu);
 	static int prev_rev;
 	u32 rev;
 
@@ -791,6 +791,18 @@ static enum ucode_state apply_microcode_intel(int cpu)
 		mc = find_patch(uci);
 		if (!mc)
 			return UCODE_NFOUND;
+	}
+
+	rev = intel_get_microcode_revision();
+	/*
+	 * Its possible the microcode got updated
+	 * because its sibling update was done earlier.
+	 * Skip the update in that case.
+	 */
+	if (rev >= mc->hdr.rev) {
+		uci->cpu_sig.rev = rev;
+		c->microcode = rev;
+		return UCODE_OK;
 	}
 
 	/* write microcode via MSR 0x79 */
@@ -812,8 +824,6 @@ static enum ucode_state apply_microcode_intel(int cpu)
 			(mc->hdr.date >> 16) & 0xff);
 		prev_rev = rev;
 	}
-
-	c = &cpu_data(cpu);
 
 	uci->cpu_sig.rev = rev;
 	c->microcode = rev;
