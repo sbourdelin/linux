@@ -809,6 +809,7 @@ static enum ucode_state apply_microcode_intel(int cpu)
 	wbinvd();
 	/* write microcode via MSR 0x79 */
 	wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)mc->bits);
+	pr_debug("ucode loading for cpu %d done\n", cpu);
 
 	rev = intel_get_microcode_revision();
 

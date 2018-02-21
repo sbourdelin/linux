@@ -31,6 +31,9 @@
 #include <linux/cpu.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
+#include <linux/nmi.h>
+#include <linux/stop_machine.h>
+#include <linux/delay.h>
 
 #include <asm/microcode_intel.h>
 #include <asm/cpu_device_id.h>
@@ -489,19 +492,82 @@ static void __exit microcode_dev_exit(void)
 /* fake device for request_firmware */
 static struct platform_device	*microcode_pdev;
 
-static enum ucode_state reload_for_cpu(int cpu)
+static struct ucode_update_param {
+	spinlock_t ucode_lock;
+	atomic_t   count;
+	atomic_t   errors;
+	atomic_t   enter;
+	int	   timeout;
+} uc_data;
+
+static void do_ucode_update(int cpu, struct ucode_update_param *ucd)
 {
-	struct ucode_cpu_info *uci = ucode_cpu_info + cpu;
-	enum ucode_state ustate;
+	enum ucode_state retval = 0;
 
-	if (!uci->valid)
-		return UCODE_OK;
+	spin_lock(&ucd->ucode_lock);
+	retval = microcode_ops->apply_microcode(cpu);
+	spin_unlock(&ucd->ucode_lock);
+	if (retval > UCODE_NFOUND) {
+		atomic_inc(&ucd->errors);
+		pr_warn("microcode update to cpu %d failed\n", cpu);
+	}
+	atomic_inc(&ucd->count);
+}
 
-	ustate = microcode_ops->request_microcode_fw(cpu, &microcode_pdev->dev, true);
-	if (ustate != UCODE_OK)
-		return ustate;
+/*
+ * Wait for upto 1sec for all cpus
+ * to show up in the rendezvous function
+ */
+#define MAX_UCODE_RENDEZVOUS	1000000000 /* nanosec */
+#define SPINUNIT		100	   /* 100ns */
 
-	return apply_microcode_on_target(cpu);
+/*
+ * Each cpu waits for 1sec max.
+ */
+static int ucode_wait_timedout(int *time_out, void *data)
+{
+	struct ucode_update_param *ucd = data;
+	if (*time_out < SPINUNIT) {
+		pr_err("Not all cpus entered ucode update handler %d cpus missing\n",
+			(num_online_cpus() - atomic_read(&ucd->enter)));
+		return 1;
+	}
+	*time_out -= SPINUNIT;
+	touch_nmi_watchdog();
+	return 0;
+}
+
+/*
+ * All cpus enter here before a ucode load upto 1 sec.
+ * If not all cpus showed up, we abort the ucode update
+ * and return. ucode update is serialized with the spinlock
+ */
+static int ucode_load_rendezvous(void *data)
+{
+	int cpu = smp_processor_id();
+	struct ucode_update_param *ucd = data;
+	int timeout = MAX_UCODE_RENDEZVOUS;
+	int total_cpus = num_online_cpus();
+
+	/*
+	 * Wait for all cpu's to arrive
+	 */
+	atomic_dec(&ucd->enter);
+	while(atomic_read(&ucd->enter)) {
+		if (ucode_wait_timedout(&timeout, ucd))
+			return 1;
+		ndelay(SPINUNIT);
+	}
+
+	do_ucode_update(cpu, ucd);
+
+	/*
+	 * Wait for all cpu's to complete
+	 * ucode update
+	 */
+	while (atomic_read(&ucd->count) != total_cpus)
+		cpu_relax();
+	return 0;
 }
 
 static ssize_t reload_store(struct device *dev,
@@ -509,7 +575,6 @@ static ssize_t reload_store(struct device *dev,
 			    const char *buf, size_t size)
 {
 	enum ucode_state tmp_ret = UCODE_OK;
-	bool do_callback = false;
 	unsigned long val;
 	ssize_t ret = 0;
 	int cpu;
@@ -523,21 +588,37 @@ static ssize_t reload_store(struct device *dev,
 
 	get_online_cpus();
 	mutex_lock(&microcode_mutex);
+	/*
+	 * First load the microcode file for all cpu's
+	 */
 	for_each_online_cpu(cpu) {
-		tmp_ret = reload_for_cpu(cpu);
+		tmp_ret = microcode_ops->request_microcode_fw(cpu,
+				&microcode_pdev->dev, true);
 		if (tmp_ret > UCODE_NFOUND) {
-			pr_warn("Error reloading microcode on CPU %d\n", cpu);
+			pr_warn("Error reloading microcode file for CPU %d\n", cpu);
 
 			/* set retval for the first encountered reload error */
 			if (!ret)
 				ret = -EINVAL;
 		}
-
-		if (tmp_ret == UCODE_UPDATED)
-			do_callback = true;
 	}
+	pr_debug("Done loading microcode file for all cpus\n");
 
-	if (!ret && do_callback)
+	memset(&uc_data, 0, sizeof(struct ucode_update_param));
+	spin_lock_init(&uc_data.ucode_lock);
+	atomic_set(&uc_data.enter, num_online_cpus());
+	/*
+	 * Wait for a 1 sec
+	 */
+	uc_data.timeout = USEC_PER_SEC;
+	stop_machine(ucode_load_rendezvous, &uc_data, cpu_online_mask);
+
+	pr_debug("Total CPUS = %d uperrors = %d\n",
+		atomic_read(&uc_data.count), atomic_read(&uc_data.errors));
+
+	if (atomic_read(&uc_data.errors))
+		pr_warn("Update failed for %d cpus\n", atomic_read(&uc_data.errors));
+	else
 		microcode_check();
 
 	mutex_unlock(&microcode_mutex);
