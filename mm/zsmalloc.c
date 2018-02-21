@@ -296,7 +296,7 @@ struct mapping_area {
 };
 
 #ifdef CONFIG_COMPACTION
-static int zs_register_migration(struct zs_pool *pool);
+static bool zs_register_migration(struct zs_pool *pool);
 static void zs_unregister_migration(struct zs_pool *pool);
 static void migrate_lock_init(struct zspage *zspage);
 static void migrate_read_lock(struct zspage *zspage);
@@ -307,7 +307,7 @@ static void SetZsPageMovable(struct zs_pool *pool, struct zspage *zspage);
 #else
 static int zsmalloc_mount(void) { return 0; }
 static void zsmalloc_unmount(void) {}
-static int zs_register_migration(struct zs_pool *pool) { return 0; }
+static bool zs_register_migration(struct zs_pool *pool) { return false; }
 static void zs_unregister_migration(struct zs_pool *pool) {}
 static void migrate_lock_init(struct zspage *zspage) {}
 static void migrate_read_lock(struct zspage *zspage) {}
@@ -2091,17 +2091,17 @@ const struct address_space_operations zsmalloc_aops = {
 	.putback_page = zs_page_putback,
 };
 
-static int zs_register_migration(struct zs_pool *pool)
+static bool zs_register_migration(struct zs_pool *pool)
 {
 	pool->inode = alloc_anon_inode(zsmalloc_mnt->mnt_sb);
 	if (IS_ERR(pool->inode)) {
 		pool->inode = NULL;
-		return 1;
+		return false;
 	}
 
 	pool->inode->i_mapping->private_data = pool;
 	pool->inode->i_mapping->a_ops = &zsmalloc_aops;
-	return 0;
+	return true;
 }
 
 static void zs_unregister_migration(struct zs_pool *pool)
@@ -2399,7 +2399,7 @@ struct zs_pool *zs_create_pool(const char *name)
 	/* debug only, don't abort if it fails */
 	zs_pool_stat_create(pool, name);
 
-	if (zs_register_migration(pool))
+	if (zs_register_migration(pool) == false)
 		goto err;
 
 	/*
