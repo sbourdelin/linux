@@ -985,8 +985,9 @@ static int wilc_spi_clear_int_ext(struct wilc *wilc, u32 val)
 {
 	struct spi_device *spi = to_spi_device(wilc->dev);
 	int ret;
-	u32 flags;
 	u32 tbl_ctl;
+	u32 expected_irqs, unexpected_irqs;
+	int i;
 
 	if (g_spi.has_thrpt_enh) {
 		ret = spi_internal_write(wilc, 0xe844 - WILC_SPI_REG_BASE,
@@ -994,36 +995,25 @@ static int wilc_spi_clear_int_ext(struct wilc *wilc, u32 val)
 		return ret;
 	}
 
-	flags = val & (BIT(MAX_NUM_INT) - 1);
-	if (flags) {
-		int i;
+	expected_irqs = val & GENMASK(g_spi.nint - 1, 0);
+	unexpected_irqs = val & GENMASK(MAX_NUM_INT - 1, g_spi.nint);
 
-		ret = 1;
-		for (i = 0; i < g_spi.nint; i++) {
-			/*
-			 * No matter what you write 1 or 0,
-			 * it will clear interrupt.
-			 */
-			if (flags & 1)
-				ret = wilc_spi_write_reg(wilc,
-							 0x10c8 + i * 4, 1);
-			if (!ret)
-				break;
-			flags >>= 1;
-		}
-		if (!ret) {
-			dev_err(&spi->dev,
-				"Failed wilc_spi_write_reg, set reg %x ...\n",
-				0x10c8 + i * 4);
-			goto _fail_;
-		}
-		for (i = g_spi.nint; i < MAX_NUM_INT; i++) {
-			if (flags & 1)
+	for (i = 0; i < g_spi.nint && expected_irqs; i++) {
+		/* No matter what you write 1 or 0, it will clear interrupt. */
+		if (expected_irqs & BIT(i)) {
+			ret = wilc_spi_write_reg(wilc, 0x10c8 + i * 4, 1);
+			if (!ret) {
 				dev_err(&spi->dev,
-					"Unexpected interrupt cleared %d...\n",
-					i);
-			flags >>= 1;
+					"Failed wilc_spi_write_reg, set reg %x ...\n",
+					0x10c8 + i * 4);
+				goto _fail_;
+			}
 		}
+	}
+	for (i = g_spi.nint; i < MAX_NUM_INT && unexpected_irqs; i++) {
+		if (unexpected_irqs & BIT(i))
+			dev_err(&spi->dev,
+				"Unexpected interrupt cleared %d...\n", i);
 	}
 
 	tbl_ctl = 0;
