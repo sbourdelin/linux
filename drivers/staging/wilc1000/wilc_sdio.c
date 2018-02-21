@@ -876,14 +876,9 @@ static int sdio_clear_int_ext(struct wilc *wilc, u32 val)
 	if (g_sdio.has_thrpt_enh3) {
 		u32 reg;
 
-		if (g_sdio.irq_gpio) {
-			u32 flags;
+		reg = g_sdio.irq_gpio ?
+			(val & GENMASK(MAX_NUN_INT_THRPT_ENH2 - 1, 0)) : 0;
 
-			flags = val & (BIT(MAX_NUN_INT_THRPT_ENH2) - 1);
-			reg = flags;
-		} else {
-			reg = 0;
-		}
 		/* select VMM table 0 */
 		if ((val & SEL_VMM_TBL0) == SEL_VMM_TBL0)
 			reg |= BIT(5);
@@ -918,44 +913,37 @@ static int sdio_clear_int_ext(struct wilc *wilc, u32 val)
 		 * Cannot clear multiple interrupts.
 		 * Must clear each interrupt individually.
 		 */
-		u32 flags;
+		int i;
+		u32 expected_irqs, unexpected_irqs;
 
-		flags = val & (BIT(MAX_NUM_INT) - 1);
-		if (flags) {
-			int i;
+		expected_irqs = val & GENMASK(g_sdio.nint - 1, 0);
+		unexpected_irqs = val & GENMASK(MAX_NUM_INT - 1, g_sdio.nint);
 
-			ret = 1;
-			for (i = 0; i < g_sdio.nint; i++) {
-				if (flags & 1) {
-					struct sdio_cmd52 cmd;
+		for (i = 0; i < g_sdio.nint && expected_irqs; i++) {
+			if (expected_irqs & BIT(i)) {
+				struct sdio_cmd52 cmd;
 
-					cmd.read_write = 1;
-					cmd.function = 0;
-					cmd.raw = 0;
-					cmd.address = 0xf8;
-					cmd.data = BIT(i);
+				cmd.read_write = 1;
+				cmd.function = 0;
+				cmd.raw = 0;
+				cmd.address = 0xf8;
+				cmd.data = BIT(i);
 
-					ret = wilc_sdio_cmd52(wilc, &cmd);
-					if (ret) {
-						dev_err(&func->dev,
-							"Failed cmd52, set 0xf8 data (%d) ...\n",
-							__LINE__);
-						goto _fail_;
-					}
-				}
-				if (!ret)
-					break;
-				flags >>= 1;
-			}
-			if (!ret)
-				goto _fail_;
-			for (i = g_sdio.nint; i < MAX_NUM_INT; i++) {
-				if (flags & 1)
+				ret = wilc_sdio_cmd52(wilc, &cmd);
+				if (ret) {
 					dev_err(&func->dev,
-						"Unexpected interrupt cleared %d...\n",
-						i);
-				flags >>= 1;
+						"Failed cmd52, set 0xf8 data (%d) ...\n",
+						__LINE__);
+					goto _fail_;
+				}
 			}
+		}
+
+		for (i = g_sdio.nint; i < MAX_NUM_INT && unexpected_irqs; i++) {
+			if (unexpected_irqs & BIT(i))
+				dev_err(&func->dev,
+					"Unexpected interrupt cleared %d...\n",
+					i);
 		}
 	}
 
