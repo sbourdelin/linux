@@ -46,16 +46,6 @@ static inline bool fbc_supported(struct drm_i915_private *dev_priv)
 	return HAS_FBC(dev_priv);
 }
 
-static inline bool fbc_on_pipe_a_only(struct drm_i915_private *dev_priv)
-{
-	return IS_HASWELL(dev_priv) || INTEL_GEN(dev_priv) >= 8;
-}
-
-static inline bool fbc_on_plane_a_only(struct drm_i915_private *dev_priv)
-{
-	return INTEL_GEN(dev_priv) < 4;
-}
-
 static inline bool no_fbc_on_multiple_pipes(struct drm_i915_private *dev_priv)
 {
 	return INTEL_GEN(dev_priv) <= 3;
@@ -1095,13 +1085,10 @@ void intel_fbc_choose_crtc(struct drm_i915_private *dev_priv,
 		struct intel_crtc_state *crtc_state;
 		struct intel_crtc *crtc = to_intel_crtc(plane_state->base.crtc);
 
+		if (!plane->has_fbc)
+			continue;
+
 		if (!plane_state->base.visible)
-			continue;
-
-		if (fbc_on_pipe_a_only(dev_priv) && crtc->pipe != PIPE_A)
-			continue;
-
-		if (fbc_on_plane_a_only(dev_priv) && plane->i9xx_plane != PLANE_A)
 			continue;
 
 		crtc_state = intel_atomic_get_new_crtc_state(state, crtc);
@@ -1358,7 +1345,7 @@ static bool need_fbc_vtd_wa(struct drm_i915_private *dev_priv)
 void intel_fbc_init(struct drm_i915_private *dev_priv)
 {
 	struct intel_fbc *fbc = &dev_priv->fbc;
-	enum pipe pipe;
+	struct intel_plane *plane;
 
 	INIT_WORK(&fbc->work.work, intel_fbc_work_fn);
 	INIT_WORK(&fbc->underrun_work, intel_fbc_underrun_work_fn);
@@ -1379,12 +1366,11 @@ void intel_fbc_init(struct drm_i915_private *dev_priv)
 		return;
 	}
 
-	for_each_pipe(dev_priv, pipe) {
-		fbc->possible_framebuffer_bits |=
-			INTEL_FRONTBUFFER(pipe, PLANE_PRIMARY);
 
-		if (fbc_on_pipe_a_only(dev_priv))
-			break;
+	for_each_intel_plane(&dev_priv->drm, plane) {
+		if (plane->has_fbc)
+			fbc->possible_framebuffer_bits |=
+				INTEL_FRONTBUFFER(plane->pipe, plane->id);
 	}
 
 	/* This value was pulled out of someone's hat */

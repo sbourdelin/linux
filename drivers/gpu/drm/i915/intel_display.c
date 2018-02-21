@@ -13219,6 +13219,32 @@ static const struct drm_plane_funcs intel_cursor_plane_funcs = {
 	.format_mod_supported = intel_cursor_plane_format_mod_supported,
 };
 
+static bool i9xx_plane_has_fbc(struct drm_i915_private *dev_priv,
+			       enum i9xx_plane_id i9xx_plane)
+{
+	if (!HAS_FBC(dev_priv))
+		return false;
+
+	if (IS_BROADWELL(dev_priv) || IS_HASWELL(dev_priv))
+		return i9xx_plane == PLANE_A;
+	else if (IS_IVYBRIDGE(dev_priv))
+		return i9xx_plane == PLANE_A || i9xx_plane == PLANE_B ||
+			i9xx_plane == PLANE_C;
+	else if (INTEL_GEN(dev_priv) >= 4)
+		return i9xx_plane == PLANE_A || i9xx_plane == PLANE_B;
+	else
+		return i9xx_plane == PLANE_A;
+}
+
+static bool skl_plane_has_fbc(struct drm_i915_private *dev_priv,
+			      enum pipe pipe, enum plane_id plane_id)
+{
+	if (!HAS_FBC(dev_priv))
+		return false;
+
+	return pipe == PIPE_A && plane_id == PLANE_PRIMARY;
+}
+
 static struct intel_plane *
 intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 {
@@ -13261,6 +13287,15 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 		primary->i9xx_plane = (enum i9xx_plane_id) pipe;
 	primary->id = PLANE_PRIMARY;
 	primary->frontbuffer_bit = INTEL_FRONTBUFFER(pipe, primary->id);
+
+	if (INTEL_GEN(dev_priv) >= 9)
+		primary->has_fbc = skl_plane_has_fbc(dev_priv,
+						     primary->pipe,
+						     primary->id);
+	else
+		primary->has_fbc = i9xx_plane_has_fbc(dev_priv,
+						      primary->i9xx_plane);
+
 	primary->check_plane = intel_check_primary_plane;
 
 	if (INTEL_GEN(dev_priv) >= 9) {
@@ -14636,6 +14671,8 @@ int intel_modeset_init(struct drm_device *dev)
 			return ret;
 		}
 	}
+
+	intel_fbc_init(dev_priv);
 
 	intel_shared_dpll_init(dev);
 	intel_update_fdi_pll_freq(dev_priv);
