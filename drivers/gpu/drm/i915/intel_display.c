@@ -86,6 +86,7 @@ static const uint32_t skl_primary_formats[] = {
 	DRM_FORMAT_YVYU,
 	DRM_FORMAT_UYVY,
 	DRM_FORMAT_VYUY,
+	DRM_FORMAT_NV12,
 };
 
 static const uint64_t skl_format_modifiers_noccs[] = {
@@ -13281,6 +13282,10 @@ intel_primary_plane_create(struct drm_i915_private *dev_priv, enum pipe pipe)
 	if (INTEL_GEN(dev_priv) >= 9) {
 		intel_primary_formats = skl_primary_formats;
 		num_formats = ARRAY_SIZE(skl_primary_formats);
+
+		if ((INTEL_GEN(dev_priv) == 9 && pipe == PIPE_C) &&
+		    !IS_GEMINILAKE(dev_priv))
+			num_formats -= 1;
 
 		if (skl_plane_has_ccs(dev_priv, pipe, PLANE_PRIMARY))
 			modifiers = skl_format_modifiers_ccs;
