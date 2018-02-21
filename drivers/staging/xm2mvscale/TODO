@@ -1,0 +1,18 @@
+* Fix checkpatch.pl complaints
+* Investigate if V4L2/Media framework can be used on top of HW Layer instead
+  of exisiting char driver.
+* Possible remaining coding style fix.
+* Add support for DMABUF.
+* This is an early prototype, hardware register map changes are expected.
+* Update driver for 64-bit DMA address once the new Xilinx M2M Scaler IP
+  has support for 64-bit DMA Addresses. Current IP supports 32-bit DMA addresses.
+* Remove deadcode.
+* Add documents in Documentation beyond the DT binding doc.
+* This needs a home  in the proper drivers area (example : drivers/misc/),
+  once the quality of the driver is improved. Suggestions about where
+  it should be placed are welcome.
+* The IOCTL header could be moved to an uapi/* area once this is out of staging.
+
+Please send any patches to:
+Greg Kroah-Hartman <greg@kroah.com> and Rohit Athavale <rathaval@xilinx.com>
+
