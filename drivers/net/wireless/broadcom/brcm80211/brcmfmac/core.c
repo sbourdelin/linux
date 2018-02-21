@@ -1110,6 +1110,13 @@ void brcmf_dev_reset(struct device *dev)
 		brcmf_fil_cmd_int_set(drvr->iflist[0], BRCMF_C_TERMINATED, 1);
 }
 
+int brcmf_dev_coredump(struct device *dev)
+{
+	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
+
+	return brcmf_debug_create_memdump(bus_if, NULL, 0);
+}
+
 void brcmf_detach(struct device *dev)
 {
 	s32 i;
