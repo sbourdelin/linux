@@ -657,6 +657,13 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 
 	dev->inst = inst;
 
+	dev->v4l2_dev.mdev = &dev->mdev;
+
+	/* Initialize media device */
+	strlcpy(dev->mdev.model, VIVID_MODULE_NAME, sizeof(dev->mdev.model));
+	dev->mdev.dev = &pdev->dev;
+	media_device_init(&dev->mdev);
+
 	/* register v4l2_device */
 	snprintf(dev->v4l2_dev.name, sizeof(dev->v4l2_dev.name),
 			"%s-%03d", VIVID_MODULE_NAME, inst);
@@ -1173,6 +1180,11 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		vfd->lock = &dev->mutex;
 		video_set_drvdata(vfd, dev);
 
+		dev->vid_cap_pad.flags = MEDIA_PAD_FL_SINK;
+		ret = media_entity_pads_init(&vfd->entity, 1, &dev->vid_cap_pad);
+		if (ret)
+			goto unreg_dev;
+
 #ifdef CONFIG_VIDEO_VIVID_CEC
 		if (in_type_counter[HDMI]) {
 			struct cec_adapter *adap;
@@ -1225,6 +1237,11 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		vfd->lock = &dev->mutex;
 		video_set_drvdata(vfd, dev);
 
+		dev->vid_out_pad.flags = MEDIA_PAD_FL_SOURCE;
+		ret = media_entity_pads_init(&vfd->entity, 1, &dev->vid_out_pad);
+		if (ret)
+			goto unreg_dev;
+
 #ifdef CONFIG_VIDEO_VIVID_CEC
 		for (i = 0; i < dev->num_outputs; i++) {
 			struct cec_adapter *adap;
@@ -1274,6 +1291,11 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		vfd->tvnorms = tvnorms_cap;
 		video_set_drvdata(vfd, dev);
 
+		dev->vbi_cap_pad.flags = MEDIA_PAD_FL_SINK;
+		ret = media_entity_pads_init(&vfd->entity, 1, &dev->vbi_cap_pad);
+		if (ret)
+			goto unreg_dev;
+
 		ret = video_register_device(vfd, VFL_TYPE_VBI, vbi_cap_nr[inst]);
 		if (ret < 0)
 			goto unreg_dev;
@@ -1299,6 +1321,11 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		vfd->tvnorms = tvnorms_out;
 		video_set_drvdata(vfd, dev);
 
+		dev->vbi_out_pad.flags = MEDIA_PAD_FL_SOURCE;
+		ret = media_entity_pads_init(&vfd->entity, 1, &dev->vbi_out_pad);
+		if (ret)
+			goto unreg_dev;
+
 		ret = video_register_device(vfd, VFL_TYPE_VBI, vbi_out_nr[inst]);
 		if (ret < 0)
 			goto unreg_dev;
@@ -1321,6 +1348,11 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 		vfd->queue = &dev->vb_sdr_cap_q;
 		vfd->lock = &dev->mutex;
 		video_set_drvdata(vfd, dev);
+
+		dev->sdr_cap_pad.flags = MEDIA_PAD_FL_SINK;
+		ret = media_entity_pads_init(&vfd->entity, 1, &dev->sdr_cap_pad);
+		if (ret)
+			goto unreg_dev;
 
 		ret = video_register_device(vfd, VFL_TYPE_SDR, sdr_cap_nr[inst]);
 		if (ret < 0)
@@ -1368,12 +1400,21 @@ static int vivid_create_instance(struct platform_device *pdev, int inst)
 					  video_device_node_name(vfd));
 	}
 
+	/* Register the media device */
+	ret = media_device_register(&dev->mdev);
+	if (ret) {
+		dev_err(dev->mdev.dev,
+			"media device register failed (err=%d)\n", ret);
+		goto unreg_dev;
+	}
+
 	/* Now that everything is fine, let's add it to device list */
 	vivid_devs[inst] = dev;
 
 	return 0;
 
 unreg_dev:
+	media_device_unregister(&dev->mdev);
 	video_unregister_device(&dev->radio_tx_dev);
 	video_unregister_device(&dev->radio_rx_dev);
 	video_unregister_device(&dev->sdr_cap_dev);
@@ -1443,6 +1484,8 @@ static int vivid_remove(struct platform_device *pdev)
 		dev = vivid_devs[i];
 		if (!dev)
 			continue;
+
+		media_device_unregister(&dev->mdev);
 
 		if (dev->has_vid_cap) {
 			v4l2_info(&dev->v4l2_dev, "unregistering %s\n",

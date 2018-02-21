@@ -136,6 +136,7 @@ struct vivid_cec_work {
 struct vivid_dev {
 	unsigned			inst;
 	struct v4l2_device		v4l2_dev;
+	struct media_device		mdev;
 	struct v4l2_ctrl_handler	ctrl_hdl_user_gen;
 	struct v4l2_ctrl_handler	ctrl_hdl_user_vid;
 	struct v4l2_ctrl_handler	ctrl_hdl_user_aud;
@@ -144,18 +145,23 @@ struct vivid_dev {
 	struct v4l2_ctrl_handler	ctrl_hdl_loop_cap;
 	struct v4l2_ctrl_handler	ctrl_hdl_fb;
 	struct video_device		vid_cap_dev;
+	struct media_pad 		vid_cap_pad;
 	struct v4l2_ctrl_handler	ctrl_hdl_vid_cap;
 	struct video_device		vid_out_dev;
+	struct media_pad 		vid_out_pad;
 	struct v4l2_ctrl_handler	ctrl_hdl_vid_out;
 	struct video_device		vbi_cap_dev;
+	struct media_pad 		vbi_cap_pad;
 	struct v4l2_ctrl_handler	ctrl_hdl_vbi_cap;
 	struct video_device		vbi_out_dev;
+	struct media_pad 		vbi_out_pad;
 	struct v4l2_ctrl_handler	ctrl_hdl_vbi_out;
 	struct video_device		radio_rx_dev;
 	struct v4l2_ctrl_handler	ctrl_hdl_radio_rx;
 	struct video_device		radio_tx_dev;
 	struct v4l2_ctrl_handler	ctrl_hdl_radio_tx;
 	struct video_device		sdr_cap_dev;
+	struct media_pad 		sdr_cap_pad;
 	struct v4l2_ctrl_handler	ctrl_hdl_sdr_cap;
 	spinlock_t			slock;
 	struct mutex			mutex;
