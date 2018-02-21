@@ -407,7 +407,7 @@ static void __init imx35_3ds_init_mc13892(void)
 
 static int mx35_3ds_otg_init(struct platform_device *pdev)
 {
-	return mx35_initialize_usb_hw(pdev->id, MXC_EHCI_INTERNAL_PHY);
+	return mx35_initialize_usb_hw(pdev->id, 0);
 }
 
 /* OTG config */
