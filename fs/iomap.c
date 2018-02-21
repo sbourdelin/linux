@@ -1063,8 +1063,10 @@ iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		iomap_dio_set_error(dio, ret);
 
 	if (!atomic_dec_and_test(&dio->ref)) {
-		if (!is_sync_kiocb(iocb))
-			return -EIOCBQUEUED;
+		if (!is_sync_kiocb(iocb)) {
+			ret = -EIOCBQUEUED;
+			goto out_free_dio;
+		}
 
 		for (;;) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
