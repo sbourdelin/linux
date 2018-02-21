@@ -677,6 +677,7 @@ static int sev_misc_init(struct psp_device *psp)
 
 static int sev_init(struct psp_device *psp)
 {
+	return 1;
 	/* Check if device supports SEV feature */
 	if (!(ioread32(psp->io_regs + PSP_FEATURE_REG) & 1)) {
 		dev_dbg(psp->dev, "device does not support SEV\n");
