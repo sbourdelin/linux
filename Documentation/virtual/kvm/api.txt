@@ -127,10 +127,11 @@ flag KVM_VM_MIPS_VZ.
 
 Capability: basic
 Architectures: x86
-Type: system
+Type: system ioctl, vm ioctl
 Parameters: struct kvm_msr_list (in/out)
 Returns: 0 on success; -1 on error
 Errors:
+  EFAULT:    the msr index list cannot be read from or written to
   E2BIG:     the msr index list is to be to fit in the array specified by
              the user.
 
@@ -139,15 +140,21 @@ struct kvm_msr_list {
 	__u32 indices[0];
 };
 
+The user fills in the size of the indices array in nmsrs, and in return
+kvm adjusts nmsrs to reflect the actual number of msrs and fills in the
+indices array with their numbers.
+
+When used in a system ioctl:
 This ioctl returns the guest msrs that are supported.  The list varies
-by kvm version and host processor, but does not change otherwise.  The
-user fills in the size of the indices array in nmsrs, and in return
-kvm adjusts nmsrs to reflect the actual number of msrs and fills in
-the indices array with their numbers.
+by kvm version and host processor, but does not change otherwise.
 
 Note: if kvm indicates supports MCE (KVM_CAP_MCE), then the MCE bank MSRs are
 not returned in the MSR list, as different vcpus can have a different number
 of banks, as set via the KVM_X86_SETUP_MCE ioctl.
+
+When used in a vm ioctl:
+This ioctl returns the msrs that represent possible supported features.
+This list varies by kvm version and host processor.
 
 
 4.4 KVM_CHECK_EXTENSION
@@ -477,12 +484,18 @@ Support for this has been removed.  Use KVM_SET_GUEST_DEBUG instead.
 
 Capability: basic
 Architectures: x86
-Type: vcpu ioctl
+Type: vm ioctl, vcpu ioctl
 Parameters: struct kvm_msrs (in/out)
-Returns: 0 on success, -1 on error
+Returns: number of msrs successfully returned;
+        -1 on error
 
+When used in a vm ioctl:
+Reads the values of msr-based features for the VM. The list of msr-based
+features can be obtained using KVM_GET_MSR_INDEX_LIST in a vm ioctl.
+
+When used in a vcpu ioctl:
 Reads model-specific registers from the vcpu.  Supported msr indices can
-be obtained using KVM_GET_MSR_INDEX_LIST.
+be obtained using KVM_GET_MSR_INDEX_LIST in a system ioctl.
 
 struct kvm_msrs {
 	__u32 nmsrs; /* number of msrs in entries */
