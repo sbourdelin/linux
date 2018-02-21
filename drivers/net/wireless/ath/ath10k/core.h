@@ -24,6 +24,8 @@
 #include <linux/pci.h>
 #include <linux/uuid.h>
 #include <linux/time.h>
+#include <linux/gpio.h>
+#include <linux/leds.h>
 
 #include "htt.h"
 #include "htc.h"
@@ -769,6 +771,40 @@ struct ath10k_per_peer_tx_stats {
 	u32	reserved2;
 };
 
+struct ath10k_gpiocontrol {
+	struct ath10k *ar;
+
+	/* since we have no gpio read method, these are the state variables for debugfs.  */	
+	u32 gpio_set_num;
+	u32 gpio_num;
+	u32 gpio_input;
+	u32 gpio_pull_type;
+	u32 gpio_intr_mode;
+	u32 gpio_set; 
+
+#if IS_ENABLED(CONFIG_GPIOLIB)
+	struct gpio_chip gchip;
+#endif /* CONFIG_GPIOLIB */
+#if IS_ENABLED(CONFIG_LEDS_CLASS)
+	struct gpio_led wifi_led;
+	struct led_classdev cdev;
+#endif /* CONFIG_LEDS_CLASS */
+	char label[48];
+	u32 gpio_state_dir; /* same as for debugfs, but for gpiochip implementation */
+	u32 gpio_state_pin;
+};
+
+#if IS_ENABLED(CONFIG_LEDS_CLASS)
+void ath10k_reset_led_pin(struct ath10k *ar);
+
+#else
+
+static void inline ath10k_reset_led_pin(struct ath10k *ar)
+{
+
+}
+#endif /* CONFIG_LEDS_CLASS */
+
 struct ath10k {
 	struct ath_common ath_common;
 	struct ieee80211_hw *hw;
@@ -797,7 +833,8 @@ struct ath10k {
 	u32 low_5ghz_chan;
 	u32 high_5ghz_chan;
 	bool ani_enabled;
-
+	struct ath10k_gpiocontrol *gpio;
+	int gpio_attached;
 	bool p2p;
 
 	struct {

@@ -4601,6 +4601,11 @@ static int ath10k_start(struct ieee80211_hw *hw)
 	switch (ar->state) {
 	case ATH10K_STATE_OFF:
 		ar->state = ATH10K_STATE_ON;
+		/* 
+		 * under some circumstances, the gpio pin gets reconfigured to default state by the firmware, so we need to reconfigure it
+		 * this behaviour has only ben seen on QCA9984 and QCA99XX devices so far
+		 */    
+		ath10k_reset_led_pin(ar); 
 		break;
 	case ATH10K_STATE_RESTARTING:
 		ar->state = ATH10K_STATE_RESTARTED;
