@@ -19,6 +19,7 @@
 #include <linux/aer.h>
 #include <linux/pcieport_if.h>
 #include "portdrv.h"
+#include "./../pci.h"
 
 static DEFINE_MUTEX(pci_err_recovery_lock);
 
@@ -181,7 +182,7 @@ static pci_ers_result_t default_reset_link(struct pci_dev *dev)
 	return PCI_ERS_RESULT_RECOVERED;
 }
 
-static pci_ers_result_t reset_link(struct pci_dev *dev)
+static pci_ers_result_t reset_link(struct pci_dev *dev, int severity)
 {
 	struct pci_dev *udev;
 	pci_ers_result_t status;
@@ -195,9 +196,17 @@ static pci_ers_result_t reset_link(struct pci_dev *dev)
 		udev = dev->bus->self;
 	}
 
+
+	/* Use the service driver of the component firstly */
+#if IS_ENABLED(CONFIG_PCIE_DPC)
+	if (severity == DPC_FATAL)
+		driver = pci_find_dpc_service(udev);
+#endif
 #if IS_ENABLED(CONFIG_PCIEAER)
-	/* Use the aer driver of the component firstly */
-	driver = pci_find_aer_service(udev);
+	if ((severity == AER_FATAL) ||
+	    (severity == AER_NONFATAL) ||
+	    (severity == AER_CORRECTABLE))
+		driver = pci_find_aer_service(udev);
 #endif
 
 	if (driver && driver->reset_link) {
@@ -287,7 +296,8 @@ void pci_do_recovery(struct pci_dev *dev, int severity)
 
 	mutex_lock(&pci_err_recovery_lock);
 
-	if (severity == AER_FATAL)
+	if ((severity == AER_FATAL) ||
+	    (severity == DPC_FATAL))
 		state = pci_channel_io_frozen;
 	else
 		state = pci_channel_io_normal;
@@ -297,10 +307,14 @@ void pci_do_recovery(struct pci_dev *dev, int severity)
 			"error_detected",
 			report_error_detected);
 
-	if (severity == AER_FATAL) {
-		result = reset_link(dev);
+	if ((severity == AER_FATAL) ||
+	    (severity == DPC_FATAL)) {
+		result = reset_link(dev, severity);
 		if (result != PCI_ERS_RESULT_RECOVERED)
 			goto failed;
+		else if (severity == DPC_FATAL)
+			goto resume;
+
 	}
 
 	if (status == PCI_ERS_RESULT_CAN_RECOVER)
@@ -324,6 +338,7 @@ void pci_do_recovery(struct pci_dev *dev, int severity)
 	if (status != PCI_ERS_RESULT_RECOVERED)
 		goto failed;
 
+resume:
 	broadcast_error_message(dev,
 				state,
 				"resume",
