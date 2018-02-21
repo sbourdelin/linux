@@ -7863,30 +7863,18 @@ static int handle_vmptrld(struct kvm_vcpu *vcpu)
 	}
 
 	if (vmx->nested.current_vmptr != vmptr) {
-		struct vmcs12 *new_vmcs12;
-		struct page *page;
-		page = kvm_vcpu_gpa_to_page(vcpu, vmptr);
-		if (is_error_page(page)) {
-			nested_vmx_failInvalid(vcpu);
-			return kvm_skip_emulated_instruction(vcpu);
-		}
-		new_vmcs12 = kmap(page);
-		if (new_vmcs12->revision_id != VMCS12_REVISION) {
-			kunmap(page);
-			kvm_release_page_clean(page);
-			nested_vmx_failValid(vcpu,
-				VMXERR_VMPTRLD_INCORRECT_VMCS_REVISION_ID);
-			return kvm_skip_emulated_instruction(vcpu);
-		}
-
 		nested_release_vmcs12(vmx);
+
 		/*
 		 * Load VMCS12 from guest memory since it is not already
 		 * cached.
 		 */
-		memcpy(vmx->nested.cached_vmcs12, new_vmcs12, VMCS12_SIZE);
-		kunmap(page);
-		kvm_release_page_clean(page);
+		if (kvm_read_guest(vcpu->kvm, vmptr, vmx->nested.cached_vmcs12,
+				   sizeof(*vmx->nested.cached_vmcs12)) ||
+		    vmx->nested.cached_vmcs12->revision_id != VMCS12_REVISION) {
+			nested_vmx_failInvalid(vcpu);
+			return kvm_skip_emulated_instruction(vcpu);
+		}
 
 		set_current_vmptr(vmx, vmptr);
 	}
