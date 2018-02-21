@@ -1632,6 +1632,56 @@ struct page *gfn_to_page(struct kvm *kvm, gfn_t gfn)
 }
 EXPORT_SYMBOL_GPL(gfn_to_page);
 
+bool kvm_vcpu_map(struct kvm_vcpu *vcpu, gfn_t gfn, struct kvm_host_map *map)
+{
+	kvm_pfn_t pfn;
+	void *kaddr = NULL;
+	struct page *page = NULL;
+
+	if (map->kaddr && map->gfn == gfn)
+		/* If the mapping is valid and guest memory is already mapped */
+		return true;
+	else if (map->kaddr)
+		/* If the mapping is valid but trying to map a different guest pfn */
+		kvm_vcpu_unmap(map);
+
+	pfn = kvm_vcpu_gfn_to_pfn(vcpu, gfn);
+	if (is_error_pfn(pfn))
+		return false;
+
+	if (pfn_valid(pfn)) {
+		page = pfn_to_page(pfn);
+		kaddr = vmap(&page, 1, VM_MAP, PAGE_KERNEL);
+	} else {
+		kaddr = memremap(pfn_to_hpa(pfn), PAGE_SIZE, MEMREMAP_WB);
+	}
+
+	if (!kaddr)
+		return false;
+
+	map->page = page;
+	map->kaddr = kaddr;
+	map->pfn = pfn;
+	map->gfn = gfn;
+
+	return true;
+}
+EXPORT_SYMBOL_GPL(kvm_vcpu_gfn_to_kaddr);
+
+void kvm_vcpu_unmap(struct kvm_host_map *map)
+{
+	if (!map->kaddr)
+		return;
+
+	if (map->page)
+		kunmap(map->page);
+	else
+		memunmap(map->kaddr);
+
+	kvm_release_pfn_dirty(map->pfn);
+	memset(map, 0, sizeof(*map));
+}
+
 struct page *kvm_vcpu_gfn_to_page(struct kvm_vcpu *vcpu, gfn_t gfn)
 {
 	kvm_pfn_t pfn;
