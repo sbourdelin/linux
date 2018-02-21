@@ -462,6 +462,9 @@ struct nested_vmx {
 	struct page *apic_access_page;
 	struct page *virtual_apic_page;
 	struct page *pi_desc_page;
+
+	struct kvm_host_map msr_bitmap_map;
+
 	struct pi_desc *pi_desc;
 	bool pi_pending;
 	u16 posted_intr_nv;
@@ -7481,6 +7484,8 @@ static inline void nested_release_vmcs12(struct vcpu_vmx *vmx)
 				  vmx->nested.current_vmptr >> PAGE_SHIFT,
 				  vmx->nested.cached_vmcs12, 0, VMCS12_SIZE);
 
+	kvm_vcpu_unmap(&vmx->nested.msr_bitmap_map);
+
 	vmx->nested.current_vmptr = -1ull;
 }
 
@@ -7520,6 +7525,8 @@ static void free_nested(struct vcpu_vmx *vmx)
 		vmx->nested.pi_desc_page = NULL;
 		vmx->nested.pi_desc = NULL;
 	}
+
+	kvm_vcpu_unmap(&vmx->nested.msr_bitmap_map);
 
 	free_loaded_vmcs(&vmx->nested.vmcs02);
 }
@@ -10191,9 +10198,10 @@ static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 						 struct vmcs12 *vmcs12)
 {
 	int msr;
-	struct page *page;
 	unsigned long *msr_bitmap_l1;
 	unsigned long *msr_bitmap_l0 = to_vmx(vcpu)->nested.vmcs02.msr_bitmap;
+	struct kvm_host_map *map = &to_vmx(vcpu)->nested.msr_bitmap_map;
+
 	/*
 	 * pred_cmd & spec_ctrl are trying to verify two things:
 	 *
@@ -10219,11 +10227,11 @@ static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 	    !pred_cmd && !spec_ctrl)
 		return false;
 
-	page = kvm_vcpu_gpa_to_page(vcpu, vmcs12->msr_bitmap);
-	if (is_error_page(page))
+	if (!kvm_vcpu_map(vcpu, gpa_to_gfn(vmcs12->msr_bitmap), map))
 		return false;
 
-	msr_bitmap_l1 = (unsigned long *)kmap(page);
+	msr_bitmap_l1 = (unsigned long *)map->kaddr;
+
 	if (nested_cpu_has_apic_reg_virt(vmcs12)) {
 		/*
 		 * L0 need not intercept reads for MSRs between 0x800 and 0x8ff, it
@@ -10270,9 +10278,6 @@ static inline bool nested_vmx_prepare_msr_bitmap(struct kvm_vcpu *vcpu,
 					msr_bitmap_l1, msr_bitmap_l0,
 					MSR_IA32_PRED_CMD,
 					MSR_TYPE_W);
-
-	kunmap(page);
-	kvm_release_page_clean(page);
 
 	return true;
 }
