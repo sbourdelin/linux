@@ -137,26 +137,22 @@ static void synic_clear_sint_msg_pending(struct kvm_vcpu_hv_synic *synic,
 					u32 sint)
 {
 	struct kvm_vcpu *vcpu = synic_to_vcpu(synic);
-	struct page *page;
-	gpa_t gpa;
+	struct kvm_host_map map;
 	struct hv_message *msg;
 	struct hv_message_page *msg_page;
 
-	gpa = synic->msg_page & PAGE_MASK;
-	page = kvm_vcpu_gfn_to_page(vcpu, gpa >> PAGE_SHIFT);
-	if (is_error_page(page)) {
+	if (!kvm_vcpu_map(vcpu, gpa_to_gfn(synic->msg_page), &map)) {
 		vcpu_err(vcpu, "Hyper-V SynIC can't get msg page, gpa 0x%llx\n",
-			 gpa);
+			 synic->msg_page);
 		return;
 	}
-	msg_page = kmap_atomic(page);
 
+	msg_page = map.kaddr;
 	msg = &msg_page->sint_message[sint];
 	msg->header.message_flags.msg_pending = 0;
 
-	kunmap_atomic(msg_page);
-	kvm_release_page_dirty(page);
-	kvm_vcpu_mark_page_dirty(vcpu, gpa >> PAGE_SHIFT);
+	kvm_vcpu_unmap(&map);
+	kvm_vcpu_mark_page_dirty(vcpu, gpa_to_gfn(synic->msg_page));
 }
 
 static void kvm_hv_notify_acked_sint(struct kvm_vcpu *vcpu, u32 sint)
