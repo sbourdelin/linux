@@ -599,7 +599,7 @@ static struct iio_sw_device *iio_dummy_probe(const char *name)
 	 * indio_dev->dev.parent = &client->dev;
 	 */
 
-	 /*
+	/*
 	 * Make the iio_dev struct available to remove function.
 	 * Bus equivalents
 	 * i2c_set_clientdata(client, indio_dev);
@@ -690,6 +690,7 @@ static int iio_dummy_remove(struct iio_sw_device *swd)
 
 	return 0;
 }
+
 /**
  * module_iio_sw_device_driver() -  device driver registration
  *
