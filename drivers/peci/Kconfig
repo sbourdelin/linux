@@ -14,7 +14,26 @@ config PECI
 	  processor and chipset components to external monitoring or control
 	  devices.
 
+	  If you want PECI support, you should say Y here and also to the
+	  specific driver for your bus adapter(s) below.
+
 	  This PECI support can also be built as a module.  If so, the module
 	  will be called peci-core.
+
+if PECI
+
+config PECI_ASPEED
+	tristate "Aspeed AST24xx/AST25xx PECI support"
+	select REGMAP_MMIO
+	depends on OF && (ARCH_ASPEED || COMPILE_TEST)
+	help
+	  Say Y here if you want support for the Platform Environment Control
+	  Interface (PECI) bus adapter driver on the Aspeed AST24XX and AST25XX
+	  SoCs.
+
+	  This support is also available as a module.  If so, the module
+	  will be called peci-aspeed.
+
+endif # PECI
 
 endmenu
