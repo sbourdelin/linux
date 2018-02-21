@@ -387,7 +387,8 @@ int device_links_check_suppliers(struct device *dev)
  * @dev: Device to update the links for.
  *
  * The probe has been successful, so update links from this device to any
- * consumers by changing their status to "available".
+ * consumers by changing their status to "available".  Mark the consumers
+ * for deferred probing in case the supplier was unbound and is now rebound.
  *
  * Also change the status of @dev's links to suppliers to "active".
  *
@@ -405,6 +406,7 @@ void device_links_driver_bound(struct device *dev)
 
 		WARN_ON(link->status != DL_STATE_DORMANT);
 		WRITE_ONCE(link->status, DL_STATE_AVAILABLE);
+		driver_deferred_probe_add(link->consumer);
 	}
 
 	list_for_each_entry(link, &dev->links.suppliers, c_node) {
