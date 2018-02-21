@@ -3020,8 +3020,9 @@ static void ilk_setup_wm_latency(struct drm_i915_private *dev_priv)
 
 static void skl_setup_wm_latency(struct drm_i915_private *dev_priv)
 {
-	intel_read_wm_latency(dev_priv, dev_priv->wm.skl_latency);
-	intel_print_wm_latency(dev_priv, "Gen9 Plane", dev_priv->wm.skl_latency);
+	intel_read_wm_latency(dev_priv, dev_priv->wm.skl_latency.raw);
+	intel_print_wm_latency(dev_priv, "Gen9 Plane",
+			       dev_priv->wm.skl_latency.raw);
 }
 
 static bool ilk_validate_pipe_wm(struct drm_device *dev,
@@ -3735,12 +3736,7 @@ bool intel_can_enable_sagv(struct drm_atomic_state *state)
 		     !wm->wm[level].plane_en; --level)
 		     { }
 
-		latency = dev_priv->wm.skl_latency[level];
-
-		if (skl_needs_memory_bw_wa(intel_state) &&
-		    plane->base.state->fb->modifier ==
-		    I915_FORMAT_MOD_X_TILED)
-			latency += 15;
+		latency = dev_priv->wm.skl_latency.adjusted[level];
 
 		/*
 		 * If any of the planes on this pipe don't enable wm levels that
@@ -4493,7 +4489,7 @@ skl_compute_plane_wm_params(const struct drm_i915_private *dev_priv,
 	return 0;
 }
 
-static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
+static int skl_compute_plane_wm(struct drm_i915_private *dev_priv,
 				struct intel_crtc_state *cstate,
 				const struct intel_plane_state *intel_pstate,
 				uint16_t ddb_allocation,
@@ -4504,7 +4500,7 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 				bool *enabled /* out */)
 {
 	const struct drm_plane_state *pstate = &intel_pstate->base;
-	uint32_t latency = dev_priv->wm.skl_latency[level];
+	uint16_t latency = dev_priv->wm.skl_latency.raw[level];
 	uint_fixed_16_16_t method1, method2;
 	uint_fixed_16_16_t selected_result;
 	uint32_t res_blocks, res_lines;
@@ -4528,11 +4524,14 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 	if (apply_memory_bw_wa && wp->x_tiled)
 		latency += 15;
 
-	method1 = skl_wm_method1(dev_priv, wp->plane_pixel_rate,
-				 wp->cpp, latency, wp->dbuf_block_size);
+	dev_priv->wm.skl_latency.adjusted[level] = latency;
+
+	method1 = skl_wm_method1(dev_priv, wp->plane_pixel_rate, wp->cpp,
+				 dev_priv->wm.skl_latency.adjusted[level],
+				 wp->dbuf_block_size);
 	method2 = skl_wm_method2(wp->plane_pixel_rate,
 				 cstate->base.adjusted_mode.crtc_htotal,
-				 latency,
+				 dev_priv->wm.skl_latency.adjusted[level],
 				 wp->plane_blocks_per_line);
 
 	if (wp->y_tiled) {
@@ -4545,7 +4544,7 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 		else if (ddb_allocation >=
 			 fixed16_to_u32_round_up(wp->plane_blocks_per_line))
 			selected_result = min_fixed16(method1, method2);
-		else if (latency >= wp->linetime_us)
+		else if (dev_priv->wm.skl_latency.adjusted[level] >= wp->linetime_us)
 			selected_result = min_fixed16(method1, method2);
 		else
 			selected_result = method1;
@@ -4624,7 +4623,7 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 }
 
 static int
-skl_compute_wm_levels(const struct drm_i915_private *dev_priv,
+skl_compute_wm_levels(struct drm_i915_private *dev_priv,
 		      struct skl_ddb_allocation *ddb,
 		      struct intel_crtc_state *cstate,
 		      const struct intel_plane_state *intel_pstate,
@@ -4747,7 +4746,7 @@ static int skl_build_pipe_wm(struct intel_crtc_state *cstate,
 {
 	struct drm_device *dev = cstate->base.crtc->dev;
 	struct drm_crtc_state *crtc_state = &cstate->base;
-	const struct drm_i915_private *dev_priv = to_i915(dev);
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_plane *plane;
 	const struct drm_plane_state *pstate;
 	struct skl_plane_wm *wm;

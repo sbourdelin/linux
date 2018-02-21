@@ -3660,7 +3660,8 @@ static const struct file_operations i915_displayport_test_type_fops = {
 	.release = single_release
 };
 
-static void wm_latency_show(struct seq_file *m, const uint16_t wm[8])
+static void wm_latency_show(struct seq_file *m, const uint16_t wm[8],
+			    const char *header)
 {
 	struct drm_i915_private *dev_priv = m->private;
 	struct drm_device *dev = &dev_priv->drm;
@@ -3675,6 +3676,9 @@ static void wm_latency_show(struct seq_file *m, const uint16_t wm[8])
 		num_levels = 3;
 	else
 		num_levels = ilk_wm_max_level(dev_priv) + 1;
+
+	if (header)
+		seq_printf(m, "%s\n", header);
 
 	drm_modeset_lock_all(dev);
 
@@ -3703,14 +3707,12 @@ static void wm_latency_show(struct seq_file *m, const uint16_t wm[8])
 static int pri_wm_latency_show(struct seq_file *m, void *data)
 {
 	struct drm_i915_private *dev_priv = m->private;
-	const uint16_t *latencies;
 
-	if (INTEL_GEN(dev_priv) >= 9)
-		latencies = dev_priv->wm.skl_latency;
-	else
-		latencies = dev_priv->wm.pri_latency;
-
-	wm_latency_show(m, latencies);
+	if (INTEL_GEN(dev_priv) >= 9) {
+		wm_latency_show(m, dev_priv->wm.skl_latency.raw, "Raw");
+		wm_latency_show(m, dev_priv->wm.skl_latency.adjusted, "Adjusted");
+	} else
+		wm_latency_show(m, dev_priv->wm.pri_latency, NULL);
 
 	return 0;
 }
@@ -3718,14 +3720,12 @@ static int pri_wm_latency_show(struct seq_file *m, void *data)
 static int spr_wm_latency_show(struct seq_file *m, void *data)
 {
 	struct drm_i915_private *dev_priv = m->private;
-	const uint16_t *latencies;
 
-	if (INTEL_GEN(dev_priv) >= 9)
-		latencies = dev_priv->wm.skl_latency;
-	else
-		latencies = dev_priv->wm.spr_latency;
-
-	wm_latency_show(m, latencies);
+	if (INTEL_GEN(dev_priv) >= 9) {
+		wm_latency_show(m, dev_priv->wm.skl_latency.raw, "Raw");
+		wm_latency_show(m, dev_priv->wm.skl_latency.adjusted, "Adjusted");
+	} else
+		wm_latency_show(m, dev_priv->wm.spr_latency, NULL);
 
 	return 0;
 }
@@ -3733,14 +3733,12 @@ static int spr_wm_latency_show(struct seq_file *m, void *data)
 static int cur_wm_latency_show(struct seq_file *m, void *data)
 {
 	struct drm_i915_private *dev_priv = m->private;
-	const uint16_t *latencies;
 
-	if (INTEL_GEN(dev_priv) >= 9)
-		latencies = dev_priv->wm.skl_latency;
-	else
-		latencies = dev_priv->wm.cur_latency;
-
-	wm_latency_show(m, latencies);
+	if (INTEL_GEN(dev_priv) >= 9) {
+		wm_latency_show(m, dev_priv->wm.skl_latency.raw, "Raw");
+		wm_latency_show(m, dev_priv->wm.skl_latency.adjusted, "Adjusted");
+	} else
+		wm_latency_show(m, dev_priv->wm.cur_latency, NULL);
 
 	return 0;
 }
@@ -3829,7 +3827,7 @@ static ssize_t pri_wm_latency_write(struct file *file, const char __user *ubuf,
 	uint16_t *latencies;
 
 	if (INTEL_GEN(dev_priv) >= 9)
-		latencies = dev_priv->wm.skl_latency;
+		latencies = dev_priv->wm.skl_latency.raw;
 	else
 		latencies = dev_priv->wm.pri_latency;
 
@@ -3844,7 +3842,7 @@ static ssize_t spr_wm_latency_write(struct file *file, const char __user *ubuf,
 	uint16_t *latencies;
 
 	if (INTEL_GEN(dev_priv) >= 9)
-		latencies = dev_priv->wm.skl_latency;
+		latencies = dev_priv->wm.skl_latency.raw;
 	else
 		latencies = dev_priv->wm.spr_latency;
 
@@ -3859,7 +3857,7 @@ static ssize_t cur_wm_latency_write(struct file *file, const char __user *ubuf,
 	uint16_t *latencies;
 
 	if (INTEL_GEN(dev_priv) >= 9)
-		latencies = dev_priv->wm.skl_latency;
+		latencies = dev_priv->wm.skl_latency.raw;
 	else
 		latencies = dev_priv->wm.cur_latency;
 
