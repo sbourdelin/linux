@@ -754,7 +754,7 @@ static int create_trace_kprobe(int argc, char **argv)
 		/* a symbol specified */
 		symbol = argv[1];
 		/* TODO: support .init module functions */
-		ret = traceprobe_split_symbol_offset(symbol, &offset);
+		ret = traceprobe_split_symbol_offset(symbol, (long *)&offset);
 		if (ret) {
 			pr_info("Failed to parse either an address or a symbol.\n");
 			return ret;
