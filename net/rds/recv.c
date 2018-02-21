@@ -577,6 +577,43 @@ out:
 	return ret;
 }
 
+static int rds_recvmsg_zcookie(struct rds_sock *rs, struct msghdr *msg)
+{
+	struct sk_buff *skb, *tmp;
+	struct sock_exterr_skb *serr;
+	struct sock *sk = rds_rs_to_sk(rs);
+	struct sk_buff_head *q = &sk->sk_error_queue;
+	struct rds_zcopy_cookies done;
+	u32 *ptr;
+	int i;
+	unsigned long flags;
+
+	spin_lock_irqsave(&q->lock, flags);
+	if (skb_queue_empty(q)) {
+		spin_unlock_irqrestore(&q->lock, flags);
+		return 0;
+	}
+	skb_queue_walk_safe(q, skb, tmp) {
+		serr = SKB_EXT_ERR(skb);
+		if (serr->ee.ee_origin == SO_EE_ORIGIN_ZCOOKIE) {
+			__skb_unlink(skb, q);
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&q->lock, flags);
+
+	if (!skb)
+		return 0;
+	memset(&done, 0, sizeof(done));
+	done.num = serr->ee.ee_data;
+	ptr = (u32 *)skb->data;
+	for (i = 0; i < done.num; i++)
+		done.cookies[i] = *ptr++;
+	put_cmsg(msg, SOL_RDS, RDS_CMSG_ZCOPY_COMPLETION, sizeof(done), &done);
+	consume_skb(skb);
+	return done.num;
+}
+
 int rds_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 		int msg_flags)
 {
@@ -586,6 +623,7 @@ int rds_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 	int ret = 0, nonblock = msg_flags & MSG_DONTWAIT;
 	DECLARE_SOCKADDR(struct sockaddr_in *, sin, msg->msg_name);
 	struct rds_incoming *inc = NULL;
+	int ncookies;
 
 	/* udp_recvmsg()->sock_recvtimeo() gets away without locking too.. */
 	timeo = sock_rcvtimeo(sk, nonblock);
@@ -607,6 +645,14 @@ int rds_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 		if (rs->rs_cong_notify) {
 			ret = rds_notify_cong(rs, msg);
 			break;
+		}
+
+		if (list_empty(&rs->rs_recv_queue) && nonblock) {
+			ncookies = rds_recvmsg_zcookie(rs, msg);
+			if (ncookies) {
+				ret = 0;
+				break;
+			}
 		}
 
 		if (!rds_next_incoming(rs, &inc)) {
@@ -656,6 +702,7 @@ int rds_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 			msg->msg_flags |= MSG_TRUNC;
 		}
 
+		ncookies = rds_recvmsg_zcookie(rs, msg);
 		if (rds_cmsg_recv(inc, msg, rs)) {
 			ret = -EFAULT;
 			goto out;
