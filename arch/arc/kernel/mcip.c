@@ -112,6 +112,7 @@ static void mcip_ipi_clear(int irq)
 static void mcip_probe_n_setup(void)
 {
 	struct mcip_bcr mp;
+	u32 i, mcip_mask = 0;
 
 	READ_BCR(ARC_REG_MCIP_BCR, mp);
 
@@ -126,8 +127,16 @@ static void mcip_probe_n_setup(void)
 	cpuinfo_arc700[0].extn.gfrc = mp.gfrc;
 
 	if (mp.dbg) {
-		__mcip_cmd_data(CMD_DEBUG_SET_SELECT, 0, 0xf);
-		__mcip_cmd_data(CMD_DEBUG_SET_MASK, 0xf, 0xf);
+		for_each_possible_cpu(i)
+			mcip_mask |= BIT(i);
+
+		__mcip_cmd_data(CMD_DEBUG_SET_SELECT, 0, mcip_mask);
+		/*
+		 * Parameter specified halt cause:
+		 * STATUS32[H]/actionpoint/breakpoint/self-halt
+		 * We choose all of them (0xF).
+		 */
+		__mcip_cmd_data(CMD_DEBUG_SET_MASK, 0xF, mcip_mask);
 	}
 }
 
