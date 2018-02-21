@@ -424,6 +424,14 @@ static int ec_device_probe(struct platform_device *pdev)
 		goto failed;
 	}
 
+	/* check whether this EC is a sensor hub. */
+	if (cros_ec_check_features(ec, EC_FEATURE_MOTION_SENSE))
+		cros_ec_sensors_register(ec);
+
+	/* Take control of the lightbar from the EC. */
+	lb_manual_suspend_ctrl(ec, 1);
+
+	/* We can now add the sysfs class, we know which parameter to show */
 	retval = cdev_device_add(&ec->cdev, &ec->class_dev);
 	if (retval) {
 		dev_err(dev, "cdev_device_add failed => %d\n", retval);
@@ -432,13 +440,6 @@ static int ec_device_probe(struct platform_device *pdev)
 
 	if (cros_ec_debugfs_init(ec))
 		dev_warn(dev, "failed to create debugfs directory\n");
-
-	/* check whether this EC is a sensor hub. */
-	if (cros_ec_check_features(ec, EC_FEATURE_MOTION_SENSE))
-		cros_ec_sensors_register(ec);
-
-	/* Take control of the lightbar from the EC. */
-	lb_manual_suspend_ctrl(ec, 1);
 
 	return 0;
 
