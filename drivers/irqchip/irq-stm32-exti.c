@@ -176,16 +176,12 @@ static int stm32_irq_set_wake(struct irq_data *data, unsigned int on)
 static int stm32_exti_alloc(struct irq_domain *d, unsigned int virq,
 			    unsigned int nr_irqs, void *data)
 {
-	struct irq_chip_generic *gc;
 	struct irq_fwspec *fwspec = data;
 	irq_hw_number_t hwirq;
 
 	hwirq = fwspec->param[0];
-	gc = irq_get_domain_generic_chip(d, hwirq);
 
 	irq_map_generic_chip(d, virq, hwirq);
-	irq_domain_set_info(d, virq, hwirq, &gc->chip_types->chip, gc,
-			    handle_simple_irq, NULL, NULL);
 
 	return 0;
 }
@@ -200,7 +196,6 @@ static void stm32_exti_free(struct irq_domain *d, unsigned int virq,
 
 struct irq_domain_ops irq_exti_domain_ops = {
 	.map	= irq_map_generic_chip,
-	.xlate	= irq_domain_xlate_onetwocell,
 	.alloc  = stm32_exti_alloc,
 	.free	= stm32_exti_free,
 };
@@ -231,7 +226,7 @@ __init stm32_exti_init(const struct stm32_exti_bank **stm32_exti_banks,
 	}
 
 	ret = irq_alloc_domain_generic_chips(domain, IRQS_PER_BANK, 1, "exti",
-					     handle_edge_irq, clr, 0, 0);
+					     handle_simple_irq, clr, 0, 0);
 	if (ret) {
 		pr_err("%pOF: Could not allocate generic interrupt chip.\n",
 			node);
@@ -246,13 +241,10 @@ __init stm32_exti_init(const struct stm32_exti_bank **stm32_exti_banks,
 
 		gc->reg_base = base;
 		gc->chip_types->type = IRQ_TYPE_EDGE_BOTH;
-		gc->chip_types->chip.irq_ack = irq_gc_ack_set_bit;
 		gc->chip_types->chip.irq_mask = irq_gc_mask_clr_bit;
 		gc->chip_types->chip.irq_unmask = irq_gc_mask_set_bit;
 		gc->chip_types->chip.irq_set_type = stm32_irq_set_type;
 		gc->chip_types->chip.irq_set_wake = stm32_irq_set_wake;
-		gc->chip_types->regs.ack = stm32_bank->pr_ofst;
-		gc->chip_types->regs.mask = stm32_bank->imr_ofst;
 		gc->private = (void *)stm32_bank;
 
 		/* Determine number of irqs supported */
