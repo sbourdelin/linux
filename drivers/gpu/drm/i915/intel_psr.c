@@ -88,11 +88,12 @@ static void hsw_psr_setup_vsc(struct intel_dp *intel_dp,
 	struct drm_i915_private *dev_priv = to_i915(intel_dig_port->base.base.dev);
 	struct edp_vsc_psr psr_vsc;
 
+	memset(&psr_vsc, 0, sizeof(psr_vsc));
+	psr_vsc.sdp_header.HB0 = 0;
+	psr_vsc.sdp_header.HB1 = 0x7;
+
 	if (dev_priv->psr.psr2_support) {
 		/* Prepare VSC Header for SU as per EDP 1.4 spec, Table 6.11 */
-		memset(&psr_vsc, 0, sizeof(psr_vsc));
-		psr_vsc.sdp_header.HB0 = 0;
-		psr_vsc.sdp_header.HB1 = 0x7;
 		if (dev_priv->psr.colorimetry_support &&
 		    dev_priv->psr.y_cord_support) {
 			psr_vsc.sdp_header.HB2 = 0x5;
@@ -106,9 +107,6 @@ static void hsw_psr_setup_vsc(struct intel_dp *intel_dp,
 		}
 	} else {
 		/* Prepare VSC packet as per EDP 1.3 spec, Table 3.10 */
-		memset(&psr_vsc, 0, sizeof(psr_vsc));
-		psr_vsc.sdp_header.HB0 = 0;
-		psr_vsc.sdp_header.HB1 = 0x7;
 		psr_vsc.sdp_header.HB2 = 0x2;
 		psr_vsc.sdp_header.HB3 = 0x8;
 	}
