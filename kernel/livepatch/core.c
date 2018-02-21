@@ -945,8 +945,12 @@ static void klp_free_object_loaded(struct klp_object *obj)
 
 	obj->mod = NULL;
 
-	klp_for_each_func(obj, func)
+	klp_for_each_func(obj, func) {
 		func->old_addr = 0;
+
+		if (klp_is_func_type(func, KLP_FUNC_NOP))
+			func->new_func = NULL;
+	}
 }
 
 /*
@@ -984,7 +988,12 @@ static void klp_free_patch(struct klp_patch *patch)
 
 static int klp_init_func(struct klp_object *obj, struct klp_func *func)
 {
-	if (!func->old_name || !func->new_func)
+	if (!func->old_name)
+		return -EINVAL;
+
+	/* NOPs do not know the address until the patched module is loaded. */
+	if (!func->new_func &&
+	    (!klp_is_func_type(func, KLP_FUNC_NOP) || klp_is_object_loaded(obj)))
 		return -EINVAL;
 
 	INIT_LIST_HEAD(&func->stack_node);
@@ -1038,6 +1047,9 @@ static int klp_init_object_loaded(struct klp_patch *patch,
 			       func->old_name);
 			return -ENOENT;
 		}
+
+		if (klp_is_func_type(func, KLP_FUNC_NOP))
+			func->new_func = (void *)func->old_addr;
 
 		ret = kallsyms_lookup_size_offset((unsigned long)func->new_func,
 						  &func->new_size, NULL);
