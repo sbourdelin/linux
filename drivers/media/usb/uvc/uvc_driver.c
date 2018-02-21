@@ -447,6 +447,13 @@ static int uvc_parse_format(struct uvc_device *dev,
 				width_multiplier = 2;
 			}
 		}
+		if (dev->quirks & UVC_QUIRK_FORCE_GBRG) {
+			if (format->fcc == V4L2_PIX_FMT_SGRBG8) {
+				strlcpy(format->name, "GBRG Bayer (GBRG)",
+					sizeof(format->name));
+				format->fcc = V4L2_PIX_FMT_SGBRG8;
+			}
+		}
 
 		if (buffer[2] == UVC_VS_FORMAT_UNCOMPRESSED) {
 			ftype = UVC_VS_FRAME_UNCOMPRESSED;
@@ -2762,6 +2769,15 @@ static const struct usb_device_id uvc_ids[] = {
 	  .bInterfaceClass	= USB_CLASS_VENDOR_SPEC,
 	  .bInterfaceSubClass	= 1,
 	  .bInterfaceProtocol	= 0 },
+	/* PHYTEC CAM 004H cameras */
+	{ .match_flags		= USB_DEVICE_ID_MATCH_DEVICE
+				| USB_DEVICE_ID_MATCH_INT_INFO,
+	  .idVendor		= 0x199e,
+	  .idProduct		= 0x8302,
+	  .bInterfaceClass	= USB_CLASS_VIDEO,
+	  .bInterfaceSubClass	= 1,
+	  .bInterfaceProtocol	= 0,
+	  .driver_info		= UVC_QUIRK_FORCE_GBRG },
 	/* Bodelin ProScopeHR */
 	{ .match_flags		= USB_DEVICE_ID_MATCH_DEVICE
 				| USB_DEVICE_ID_MATCH_DEV_HI
