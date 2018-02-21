@@ -5090,10 +5090,13 @@ static int btrfs_setsize(struct inode *inode, struct iattr *attr)
 		/* we don't support swapfiles, so vmtruncate shouldn't fail */
 		truncate_setsize(inode, newsize);
 
-		/* Disable nonlocked read DIO to avoid the end less truncate */
-		btrfs_inode_block_unlocked_dio(BTRFS_I(inode));
+		/*
+		 * Truncate after all in-flight dios are finished, new ones
+		 * will block on inode_lock. This only matters for AIO requests
+		 * since DIO READ is performed under inode_shared_lock and
+		 * write under exclusive lock.
+		 */
 		inode_dio_wait(inode);
-		btrfs_inode_resume_unlocked_dio(BTRFS_I(inode));
 
 		ret = btrfs_truncate(inode);
 		if (ret && inode->i_nlink) {
@@ -8755,14 +8758,11 @@ static ssize_t btrfs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 	loff_t offset = iocb->ki_pos;
 	size_t count = 0;
 	int flags = 0;
-	bool wakeup = true;
 	bool relock = false;
 	ssize_t ret;
 
 	if (check_direct_IO(fs_info, iter, offset))
 		return 0;
-
-	inode_dio_begin(inode);
 
 	/*
 	 * The generic stuff only does filemap_write_and_wait_range, which
@@ -8777,6 +8777,9 @@ static ssize_t btrfs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 					 offset + count - 1);
 
 	if (iov_iter_rw(iter) == WRITE) {
+
+		inode_dio_begin(inode);
+
 		/*
 		 * If the write DIO is beyond the EOF, we need update
 		 * the isize, but it is protected by i_mutex. So we can
@@ -8806,11 +8809,13 @@ static ssize_t btrfs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 		dio_data.unsubmitted_oe_range_end = (u64)offset;
 		current->journal_info = &dio_data;
 		down_read(&BTRFS_I(inode)->dio_sem);
-	} else if (test_bit(BTRFS_INODE_READDIO_NEED_LOCK,
-				     &BTRFS_I(inode)->runtime_flags)) {
-		inode_dio_end(inode);
-		flags = DIO_LOCKING | DIO_SKIP_HOLES;
-		wakeup = false;
+	} else {
+		/*
+		 * In DIO READ case locking the inode in shared mode ensures
+		 * we are protected against parallel writes/truncates
+		 */
+		inode_lock_shared(inode);
+		inode_dio_begin(inode);
 	}
 
 	ret = __blockdev_direct_IO(iocb, inode,
@@ -8841,10 +8846,11 @@ static ssize_t btrfs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 			btrfs_delalloc_release_space(inode, data_reserved,
 					offset, count - (size_t)ret);
 		btrfs_delalloc_release_extents(BTRFS_I(inode), count);
-	}
+	} else
+		inode_unlock_shared(inode);
 out:
-	if (wakeup)
-		inode_dio_end(inode);
+	inode_dio_end(inode);
+
 	if (relock)
 		inode_lock(inode);
 
