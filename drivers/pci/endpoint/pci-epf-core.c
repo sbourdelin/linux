@@ -220,9 +220,10 @@ struct pci_epf *pci_epf_create(const char *name)
 	*buf = '\0';
 
 	epf->name = kstrdup(func_name, GFP_KERNEL);
+	kfree(func_name);
 	if (!epf->name) {
 		ret = -ENOMEM;
-		goto free_func_name;
+		goto free_epf;
 	}
 
 	dev = &epf->dev;
@@ -238,15 +239,11 @@ struct pci_epf *pci_epf_create(const char *name)
 	if (ret)
 		goto put_dev;
 
-	kfree(func_name);
 	return epf;
 
 put_dev:
 	put_device(dev);
 	kfree(epf->name);
-
-free_func_name:
-	kfree(func_name);
 
 free_epf:
 	kfree(epf);
