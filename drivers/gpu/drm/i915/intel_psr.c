@@ -90,7 +90,7 @@ static void hsw_psr_setup_vsc(struct intel_dp *intel_dp,
 
 	memset(&psr_vsc, 0, sizeof(psr_vsc));
 	psr_vsc.sdp_header.HB0 = 0;
-	psr_vsc.sdp_header.HB1 = 0x7;
+	psr_vsc.sdp_header.HB1 = DP_SDP_VSC;
 
 	if (dev_priv->psr.psr2_support) {
 		/* Prepare VSC Header for SU as per EDP 1.4 spec, Table 6.11 */
