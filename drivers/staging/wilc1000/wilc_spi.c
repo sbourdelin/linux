@@ -955,6 +955,7 @@ static int wilc_spi_read_int(struct wilc *wilc, u32 *int_status)
 	tmp = (byte_cnt >> 2) & IRQ_DMA_WD_CNT_MASK;
 
 	j = 0;
+	unknown_mask = GENMASK(g_spi.nint - 1, 0);
 	do {
 		wilc_spi_read_reg(wilc, 0x1a90, &irq_flags);
 		tmp |= ((irq_flags >> 27) << IRG_FLAGS_OFFSET);
@@ -963,8 +964,6 @@ static int wilc_spi_read_int(struct wilc *wilc, u32 *int_status)
 			wilc_spi_read_reg(wilc, 0x1a94, &irq_flags);
 			tmp |= (((irq_flags >> 0) & 0x7) << k);
 		}
-
-		unknown_mask = ~((1ul << g_spi.nint) - 1);
 
 		if ((tmp >> IRG_FLAGS_OFFSET) & unknown_mask) {
 			dev_err(&spi->dev,
