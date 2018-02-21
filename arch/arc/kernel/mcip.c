@@ -22,10 +22,33 @@ static DEFINE_RAW_SPINLOCK(mcip_lock);
 
 static char smp_cpuinfo_buf[128];
 
+/*
+ * Set mask to halt GFRC if any online core in SMP cluster is halted.
+ * Only works for ARC HS v3.0+, on earlier versions has no effect.
+ */
+static void mcip_update_gfrc_halt_mask(int cpu)
+{
+	struct mcip_bcr mp;
+	u32 gfrc_halt_mask;
+
+	READ_BCR(ARC_REG_MCIP_BCR, mp);
+
+	if (!mp.gfrc)
+		return;
+
+	__mcip_cmd(CMD_GFRC_READ_CORE, 0);
+	gfrc_halt_mask = read_aux_reg(ARC_REG_MCIP_READBACK);
+	gfrc_halt_mask |= BIT(cpu);
+	__mcip_cmd_data(CMD_GFRC_SET_CORE, 0, gfrc_halt_mask);
+}
+
 static void mcip_setup_per_cpu(int cpu)
 {
 	smp_ipi_irq_setup(cpu, IPI_IRQ);
 	smp_ipi_irq_setup(cpu, SOFTIRQ_IRQ);
+
+	/* Update GFRC halt mask as new CPU came online */
+	mcip_update_gfrc_halt_mask(cpu);
 }
 
 static void mcip_ipi_send(int cpu)
