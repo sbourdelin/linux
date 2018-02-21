@@ -5981,20 +5981,18 @@ int btrfs_subvolume_reserve_metadata(struct btrfs_root *root,
 				     u64 *qgroup_reserved,
 				     bool use_global_rsv)
 {
-	u64 num_bytes;
 	int ret;
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	struct btrfs_block_rsv *global_rsv = &fs_info->global_block_rsv;
+	/* One for parent inode, two for dir entries */
+	u64 num_bytes = 3 * fs_info->nodesize;
 
-	if (test_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags)) {
-		/* One for parent inode, two for dir entries */
-		num_bytes = 3 * fs_info->nodesize;
-		ret = btrfs_qgroup_reserve_meta(root, num_bytes, true);
-		if (ret)
-			return ret;
-	} else {
+	ret = btrfs_qgroup_reserve_meta(root, num_bytes, true);
+	if (ret == -ENODATA) {
 		num_bytes = 0;
-	}
+		ret = 0;
+	} else if (ret)
+		return ret;
 
 	*qgroup_reserved = num_bytes;
 
@@ -6050,6 +6048,7 @@ int btrfs_delalloc_reserve_metadata(struct btrfs_inode *inode, u64 num_bytes)
 	enum btrfs_reserve_flush_enum flush = BTRFS_RESERVE_FLUSH_ALL;
 	int ret = 0;
 	bool delalloc_lock = true;
+	u64 qgroup_reserved;
 
 	/* If we are a free space inode we need to not flush since we will be in
 	 * the middle of a transaction commit.  We also don't need the delalloc
@@ -6083,17 +6082,17 @@ int btrfs_delalloc_reserve_metadata(struct btrfs_inode *inode, u64 num_bytes)
 	btrfs_calculate_inode_block_rsv_size(fs_info, inode);
 	spin_unlock(&inode->lock);
 
-	if (test_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags)) {
-		ret = btrfs_qgroup_reserve_meta(root,
-				nr_extents * fs_info->nodesize, true);
-		if (ret)
-			goto out_fail;
-	}
+	qgroup_reserved = nr_extents * fs_info->nodesize;
+	ret = btrfs_qgroup_reserve_meta(root, qgroup_reserved, true);
+	if (ret == -ENODATA) {
+		ret = 0;
+		qgroup_reserved = 0;
+	} if (ret)
+		goto out_fail;
 
 	ret = btrfs_inode_rsv_refill(inode, flush);
 	if (unlikely(ret)) {
-		btrfs_qgroup_free_meta(root,
-				       nr_extents * fs_info->nodesize);
+		btrfs_qgroup_free_meta(root, qgroup_reserved);
 		goto out_fail;
 	}
 

@@ -3021,7 +3021,7 @@ int btrfs_qgroup_reserve_meta(struct btrfs_root *root, int num_bytes,
 
 	if (!test_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags) ||
 	    !is_fstree(root->objectid) || num_bytes == 0)
-		return 0;
+		return -ENODATA;
 
 	BUG_ON(num_bytes != round_down(num_bytes, fs_info->nodesize));
 	trace_qgroup_meta_reserve(root, (s64)num_bytes);
@@ -3053,7 +3053,7 @@ void btrfs_qgroup_free_meta(struct btrfs_root *root, int num_bytes)
 	struct btrfs_fs_info *fs_info = root->fs_info;
 
 	if (!test_bit(BTRFS_FS_QUOTA_ENABLED, &fs_info->flags) ||
-	    !is_fstree(root->objectid))
+	    !is_fstree(root->objectid) || num_bytes == 0)
 		return;
 
 	BUG_ON(num_bytes != round_down(num_bytes, fs_info->nodesize));

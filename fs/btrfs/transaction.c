@@ -510,7 +510,10 @@ start_transaction(struct btrfs_root *root, unsigned int num_items,
 		qgroup_reserved = num_items * fs_info->nodesize;
 		ret = btrfs_qgroup_reserve_meta(root, qgroup_reserved,
 						enforce_qgroups);
-		if (ret)
+		if (ret == -ENODATA) {
+			ret = 0;
+			qgroup_reserved = 0;
+		} else if (ret)
 			return ERR_PTR(ret);
 
 		num_bytes = btrfs_calc_trans_metadata_size(fs_info, num_items);
