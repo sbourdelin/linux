@@ -1043,6 +1043,7 @@ struct intel_dp {
 	i915_reg_t output_reg;
 	i915_reg_t aux_ch_ctl_reg;
 	i915_reg_t aux_ch_data_reg[5];
+	i915_reg_t aux_ch_mutex_reg;
 	uint32_t DP;
 	int link_rate;
 	uint8_t lane_count;

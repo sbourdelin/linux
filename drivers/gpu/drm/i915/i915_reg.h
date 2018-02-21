@@ -5318,6 +5318,7 @@ enum {
 #define _DPA_AUX_CH_DATA3	(dev_priv->info.display_mmio_offset + 0x6401c)
 #define _DPA_AUX_CH_DATA4	(dev_priv->info.display_mmio_offset + 0x64020)
 #define _DPA_AUX_CH_DATA5	(dev_priv->info.display_mmio_offset + 0x64024)
+#define _DPA_AUX_CH_MUTEX	(dev_priv->info.display_mmio_offset + 0x6402C)
 
 #define _DPB_AUX_CH_CTL		(dev_priv->info.display_mmio_offset + 0x64110)
 #define _DPB_AUX_CH_DATA1	(dev_priv->info.display_mmio_offset + 0x64114)
@@ -5325,6 +5326,7 @@ enum {
 #define _DPB_AUX_CH_DATA3	(dev_priv->info.display_mmio_offset + 0x6411c)
 #define _DPB_AUX_CH_DATA4	(dev_priv->info.display_mmio_offset + 0x64120)
 #define _DPB_AUX_CH_DATA5	(dev_priv->info.display_mmio_offset + 0x64124)
+#define _DPB_AUX_CH_MUTEX	(dev_priv->info.display_mmio_offset + 0x6412C)
 
 #define _DPC_AUX_CH_CTL		(dev_priv->info.display_mmio_offset + 0x64210)
 #define _DPC_AUX_CH_DATA1	(dev_priv->info.display_mmio_offset + 0x64214)
@@ -5332,6 +5334,7 @@ enum {
 #define _DPC_AUX_CH_DATA3	(dev_priv->info.display_mmio_offset + 0x6421c)
 #define _DPC_AUX_CH_DATA4	(dev_priv->info.display_mmio_offset + 0x64220)
 #define _DPC_AUX_CH_DATA5	(dev_priv->info.display_mmio_offset + 0x64224)
+#define _DPC_AUX_CH_MUTEX	(dev_priv->info.display_mmio_offset + 0x6422C)
 
 #define _DPD_AUX_CH_CTL		(dev_priv->info.display_mmio_offset + 0x64310)
 #define _DPD_AUX_CH_DATA1	(dev_priv->info.display_mmio_offset + 0x64314)
@@ -5339,6 +5342,7 @@ enum {
 #define _DPD_AUX_CH_DATA3	(dev_priv->info.display_mmio_offset + 0x6431c)
 #define _DPD_AUX_CH_DATA4	(dev_priv->info.display_mmio_offset + 0x64320)
 #define _DPD_AUX_CH_DATA5	(dev_priv->info.display_mmio_offset + 0x64324)
+#define _DPD_AUX_CH_MUTEX	(dev_priv->info.display_mmio_offset + 0x6432C)
 
 #define _DPF_AUX_CH_CTL		(dev_priv->info.display_mmio_offset + 0x64510)
 #define _DPF_AUX_CH_DATA1	(dev_priv->info.display_mmio_offset + 0x64514)
@@ -5346,6 +5350,7 @@ enum {
 #define _DPF_AUX_CH_DATA3	(dev_priv->info.display_mmio_offset + 0x6451c)
 #define _DPF_AUX_CH_DATA4	(dev_priv->info.display_mmio_offset + 0x64520)
 #define _DPF_AUX_CH_DATA5	(dev_priv->info.display_mmio_offset + 0x64524)
+#define _DPF_AUX_CH_MUTEX	(dev_priv->info.display_mmio_offset + 0x6452C)
 
 #define DP_AUX_CH_CTL(port)	_MMIO_PORT(port, _DPA_AUX_CH_CTL, _DPB_AUX_CH_CTL)
 #define DP_AUX_CH_DATA(port, i)	_MMIO(_PORT(port, _DPA_AUX_CH_DATA1, _DPB_AUX_CH_DATA1) + (i) * 4) /* 5 registers */
@@ -5377,6 +5382,10 @@ enum {
 #define   DP_AUX_CH_CTL_FW_SYNC_PULSE_SKL_MASK (0x1f << 5)
 #define   DP_AUX_CH_CTL_FW_SYNC_PULSE_SKL(c) (((c) - 1) << 5)
 #define   DP_AUX_CH_CTL_SYNC_PULSE_SKL(c)   ((c) - 1)
+
+#define DP_AUX_CH_MUTEX(port)	_MMIO_PORT(port, _DPA_AUX_CH_MUTEX, _DPB_AUX_CH_MUTEX)
+#define   DP_AUX_CH_MUTEX_ENABLE		(1 << 31)
+#define   DP_AUX_CH_MUTEX_STATUS		(1 << 30)
 
 /*
  * Computing GMCH M and N values for the Display Port link

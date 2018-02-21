@@ -1081,6 +1081,45 @@ static uint32_t intel_dp_get_aux_send_ctl(struct intel_dp *intel_dp,
 						aux_clock_divider);
 }
 
+static bool intel_dp_aux_ch_trylock(struct intel_dp *intel_dp)
+{
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_i915_private *dev_priv =
+			to_i915(intel_dig_port->base.base.dev);
+
+	if (INTEL_GEN(dev_priv) < 9)
+		return true;
+
+	I915_WRITE(intel_dp->aux_ch_mutex_reg, DP_AUX_CH_MUTEX_ENABLE);
+
+	/* Spec says that mutex is acquired when status bit is read as unset,
+	 * if set it should be read again after 500usec. Here waiting for
+	 * 2msec or 4 tries before give up.
+	 */
+	if (__intel_wait_for_register(dev_priv, intel_dp->aux_ch_mutex_reg,
+				      DP_AUX_CH_MUTEX_STATUS, 0, 500, 2,
+				      NULL)) {
+		DRM_WARN("dp_aux_ch port locked for too long");
+		return false;
+	}
+
+	return true;
+}
+
+static void intel_dp_aux_ch_unlock(struct intel_dp *intel_dp)
+{
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_i915_private *dev_priv =
+			to_i915(intel_dig_port->base.base.dev);
+
+	if (INTEL_GEN(dev_priv) < 9)
+		return;
+
+	/* setting the status bit releases the mutex + keep mutex enabled */
+	I915_WRITE(intel_dp->aux_ch_mutex_reg, DP_AUX_CH_MUTEX_ENABLE |
+		   DP_AUX_CH_MUTEX_STATUS);
+}
+
 static int
 intel_dp_aux_ch(struct intel_dp *intel_dp,
 		const uint8_t *send, int send_bytes,
@@ -1114,6 +1153,11 @@ intel_dp_aux_ch(struct intel_dp *intel_dp,
 	pm_qos_update_request(&dev_priv->pm_qos, 0);
 
 	intel_dp_check_edp(intel_dp);
+
+	if (!intel_dp_aux_ch_trylock(intel_dp)) {
+		ret = -EBUSY;
+		goto out_locked;
+	}
 
 	/* Try to wait for any previous AUX channel activity */
 	for (try = 0; try < 3; try++) {
@@ -1244,6 +1288,8 @@ done:
 
 	ret = recv_bytes;
 out:
+	intel_dp_aux_ch_unlock(intel_dp);
+out_locked:
 	pm_qos_update_request(&dev_priv->pm_qos, PM_QOS_DEFAULT_VALUE);
 
 	if (vdd)
@@ -1496,6 +1542,10 @@ static void intel_aux_reg_init(struct intel_dp *intel_dp)
 	intel_dp->aux_ch_ctl_reg = intel_aux_ctl_reg(dev_priv, port);
 	for (i = 0; i < ARRAY_SIZE(intel_dp->aux_ch_data_reg); i++)
 		intel_dp->aux_ch_data_reg[i] = intel_aux_data_reg(dev_priv, port, i);
+	if (INTEL_INFO(dev_priv)->gen >= 9) {
+		intel_dp->aux_ch_mutex_reg = DP_AUX_CH_MUTEX(port);
+		I915_WRITE(intel_dp->aux_ch_mutex_reg, DP_AUX_CH_MUTEX_ENABLE);
+	}
 }
 
 static void
