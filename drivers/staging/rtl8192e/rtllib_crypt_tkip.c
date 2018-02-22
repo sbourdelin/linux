@@ -314,7 +314,7 @@ static int rtllib_tkip_encrypt(struct sk_buff *skb, int hdr_len, void *priv)
 		tkip_mixing_phase2(rc4key, tkey->key, tkey->tx_ttak,
 				   tkey->tx_iv16);
 	} else
-	tkey->tx_phase1_done = 1;
+		tkey->tx_phase1_done = 1;
 
 
 	len = skb->len - hdr_len;
@@ -512,7 +512,7 @@ static int michael_mic(struct crypto_ahash *tfm_michael, u8 *key, u8 *hdr,
 	int err;
 
 	if (tfm_michael == NULL) {
-		pr_warn("michael_mic: tfm_michael == NULL\n");
+		pr_warn("%s: tfm_michael == NULL\n", __func__);
 		return -1;
 	}
 	sg_init_table(sg, 2);
