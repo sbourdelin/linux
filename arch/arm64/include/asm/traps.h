@@ -72,16 +72,21 @@ static inline int in_entry_text(unsigned long ptr)
  * CPUs with the RAS extensions have an Implementation-Defined-Syndrome bit
  * to indicate whether this ESR has a RAS encoding. CPUs without this feature
  * have a ISS-Valid bit in the same position.
- * If this bit is set, we know its not a RAS SError.
+ * If this bit is set, we know it is not a categorized RAS SError.
  * If its clear, we need to know if the CPU supports RAS. Uncategorized RAS
  * errors share the same encoding as an all-zeros encoding from a CPU that
  * doesn't support RAS.
  */
-static inline bool arm64_is_ras_serror(u32 esr)
+static inline bool arm64_is_categorized_ras_serror(u32 esr)
 {
 	WARN_ON(preemptible());
 
+	/* This is Implementation-Defined Syndrome */
 	if (esr & ESR_ELx_IDS)
+		return false;
+
+	if ((esr & ESR_ELx_FSC) != ESR_ELx_FSC_SERROR)
+		/* No severity information : Uncategorized */
 		return false;
 
 	if (this_cpu_has_cap(ARM64_HAS_RAS_EXTN))
@@ -101,17 +106,8 @@ static inline u32 arm64_ras_serror_get_severity(u32 esr)
 {
 	u32 aet = esr & ESR_ELx_AET;
 
-	if (!arm64_is_ras_serror(esr)) {
+	if (!arm64_is_categorized_ras_serror(esr)) {
 		/* Not a RAS error, we can't interpret the ESR. */
-		return ESR_ELx_AET_UC;
-	}
-
-	/*
-	 * AET is RES0 if 'the value returned in the DFSC field is not
-	 * [ESR_ELx_FSC_SERROR]'
-	 */
-	if ((esr & ESR_ELx_FSC) != ESR_ELx_FSC_SERROR) {
-		/* No severity information : Uncategorized */
 		return ESR_ELx_AET_UC;
 	}
 

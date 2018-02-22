@@ -40,7 +40,8 @@ typedef int (*exit_handle_fn)(struct kvm_vcpu *, struct kvm_run *);
 
 static void kvm_handle_guest_serror(struct kvm_vcpu *vcpu, u32 esr)
 {
-	if (!arm64_is_ras_serror(esr) || arm64_is_fatal_ras_serror(NULL, esr))
+	if (!arm64_is_categorized_ras_serror(esr) ||
+			arm64_is_fatal_ras_serror(NULL, esr))
 		kvm_inject_vabt(vcpu);
 }
 

@@ -689,12 +689,12 @@ bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned int esr)
 		 * a more severe error.
 		 */
 		return false;
-
+	/* The exception has been imprecise */
 	case ESR_ELx_AET_UEU:	/* Uncorrected Unrecoverable */
+	/* The exception is precise */
 	case ESR_ELx_AET_UER:	/* Uncorrected Recoverable */
 		/*
-		 * The CPU can't make progress. The exception may have
-		 * been imprecise.
+		 * The CPU can't make progress.
 		 */
 		return true;
 
@@ -710,7 +710,8 @@ asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
 	nmi_enter();
 
 	/* non-RAS errors are not containable */
-	if (!arm64_is_ras_serror(esr) || arm64_is_fatal_ras_serror(regs, esr))
+	if (!arm64_is_categorized_ras_serror(esr) ||
+			arm64_is_fatal_ras_serror(regs, esr))
 		arm64_serror_panic(regs, esr);
 
 	nmi_exit();
