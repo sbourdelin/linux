@@ -422,9 +422,10 @@ static int dw8250_probe(struct platform_device *pdev)
 	}
 
 	if (irq < 0) {
-		if (irq != -EPROBE_DEFER)
-			dev_err(dev, "cannot get irq\n");
-		return irq;
+		if (irq == -EPROBE_DEFER)
+			return irq;
+		dev_warn(dev, "cannot get irq, using polling mode\n");
+		irq = 0;
 	}
 
 	spin_lock_init(&p->lock);
