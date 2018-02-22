@@ -17,4 +17,9 @@ config DRM_CLIENT_FBDEV
 	help
 	  Generic fbdev emulation
 
+config DRM_CLIENT_BOOTSPLASH
+	tristate "DRM Bootsplash"
+	help
+	  DRM Bootsplash
+
 endmenu
