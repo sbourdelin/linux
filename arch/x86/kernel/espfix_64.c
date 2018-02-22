@@ -167,7 +167,7 @@ void init_espfix_ap(int cpu)
 		goto unlock_done;
 
 	node = cpu_to_node(cpu);
-	ptemask = __supported_pte_mask;
+	ptemask = __default_kernel_pte_mask;
 
 	pud_p = &espfix_pud_page[pud_index(addr)];
 	pud = *pud_p;
