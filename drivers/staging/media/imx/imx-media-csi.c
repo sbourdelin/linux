@@ -1736,6 +1736,13 @@ static const struct v4l2_subdev_internal_ops csi_internal_ops = {
 	.unregistered = csi_unregistered,
 };
 
+static int imx_csi_parse_endpoint(struct device *dev,
+				  struct v4l2_fwnode_endpoint *vep,
+				  struct v4l2_async_subdev *asd)
+{
+	return fwnode_device_is_available(asd->match.fwnode) ? 0 : -EINVAL;
+}
+
 static int imx_csi_probe(struct platform_device *pdev)
 {
 	struct ipu_client_platformdata *pdata;
@@ -1798,7 +1805,9 @@ static int imx_csi_probe(struct platform_device *pdev)
 	priv->dev->of_node = pdata->of_node;
 	pinctrl = devm_pinctrl_get_select_default(priv->dev);
 
-	ret = v4l2_async_register_subdev(&priv->sd);
+	ret = v4l2_async_register_fwnode_subdev(
+		&priv->sd, sizeof(struct v4l2_async_subdev),
+		NULL, 0, imx_csi_parse_endpoint);
 	if (ret)
 		goto free;
 
