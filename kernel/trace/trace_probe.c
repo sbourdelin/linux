@@ -320,21 +320,26 @@ static fetch_func_t get_fetch_size_function(const struct fetch_type *type,
 }
 
 /* Split symbol and offset. */
-int traceprobe_split_symbol_offset(char *symbol, unsigned long *offset)
+int traceprobe_split_symbol_offset(char *symbol, long *offset)
 {
+	unsigned long ul;
 	char *tmp;
 	int ret;
 
 	if (!offset)
 		return -EINVAL;
 
-	tmp = strchr(symbol, '+');
+	tmp = strpbrk(symbol, "+-");
 	if (tmp) {
-		/* skip sign because kstrtoul doesn't accept '+' */
-		ret = kstrtoul(tmp + 1, 0, offset);
+		ret = kstrtoul(tmp + 1, 0, &ul);
 		if (ret)
 			return ret;
-
+		if (ul > LONG_MAX)
+			return -E2BIG;
+		if (*tmp == '-')
+			*offset = -ul;
+		else
+			*offset = ul;
 		*tmp = '\0';
 	} else
 		*offset = 0;
