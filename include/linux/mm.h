@@ -1507,14 +1507,28 @@ extern int mprotect_fixup(struct vm_area_struct *vma,
  */
 int __get_user_pages_fast(unsigned long start, int nr_pages, int write,
 			  struct page **pages);
+
+#ifdef SPLIT_RSS_COUNTING
+/* Flush all task-buffered MM counters to the mm */
+void sync_mm_rss_all_users(struct mm_struct *mm);
+#endif
+
 /*
  * per-process(per-mm_struct) statistics.
  */
 static inline unsigned long get_mm_counter(struct mm_struct *mm, int member)
 {
-	long val = atomic_long_read(&mm->rss_stat.count[member]);
+	long val;
 
 #ifdef SPLIT_RSS_COUNTING
+	if (atomic_xchg(&mm->rss_stat.dirty, 0))
+		sync_mm_rss_all_users(mm);
+#endif
+
+	val = atomic_long_read(&mm->rss_stat.count[member]);
+
+#ifdef SPLIT_RSS_COUNTING
+
 	/*
 	 * counter is updated in asynchronous manner and may go to minus.
 	 * But it's never be expected number for users.

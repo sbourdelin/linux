@@ -12,6 +12,7 @@
 #include <linux/threads.h>
 #include <linux/atomic.h>
 #include <linux/cpumask.h>
+#include <linux/spinlock.h>
 
 #include <asm/page.h>
 
@@ -46,14 +47,20 @@ enum {
 
 #if USE_SPLIT_PTE_PTLOCKS && defined(CONFIG_MMU)
 #define SPLIT_RSS_COUNTING
-/* per-thread cached information, */
+/* per-thread cached information */
 struct task_rss_stat {
-	int events;	/* for synchronization threshold */
-	int count[NR_MM_COUNTERS];
+	spinlock_t lock;
+	bool marked_mm_dirty;
+	long count[NR_MM_COUNTERS];
 };
 #endif /* USE_SPLIT_PTE_PTLOCKS */
 
 struct mm_rss_stat {
+#ifdef SPLIT_RSS_COUNTING
+	/* When true, indicates that we need to flush task counters to
+	 * the mm structure.  */
+	atomic_t dirty;
+#endif
 	atomic_long_t count[NR_MM_COUNTERS];
 };
 

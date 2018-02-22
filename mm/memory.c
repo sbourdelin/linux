@@ -44,6 +44,7 @@
 #include <linux/sched/coredump.h>
 #include <linux/sched/numa_balancing.h>
 #include <linux/sched/task.h>
+#include <linux/sched/signal.h>
 #include <linux/hugetlb.h>
 #include <linux/mman.h>
 #include <linux/swap.h>
@@ -141,48 +142,66 @@ core_initcall(init_zero_pfn);
 
 #if defined(SPLIT_RSS_COUNTING)
 
-void sync_mm_rss(struct mm_struct *mm)
+static void sync_mm_rss_task(struct task_struct *task, struct mm_struct *mm)
 {
 	int i;
-
-	for (i = 0; i < NR_MM_COUNTERS; i++) {
-		if (current->rss_stat.count[i]) {
-			add_mm_counter(mm, i, current->rss_stat.count[i]);
-			current->rss_stat.count[i] = 0;
+	if (unlikely(task->mm != mm))
+		return;
+	spin_lock(&task->rss_stat.lock);
+	if (task->rss_stat.marked_mm_dirty) {
+		task->rss_stat.marked_mm_dirty = false;
+		for (i = 0; i < NR_MM_COUNTERS; ++i) {
+			add_mm_counter(mm, i, task->rss_stat.count[i]);
+			task->rss_stat.count[i] = 0;
 		}
 	}
-	current->rss_stat.events = 0;
+	spin_unlock(&task->rss_stat.lock);
+}
+
+void sync_mm_rss(struct mm_struct *mm)
+{
+	sync_mm_rss_task(current, mm);
+}
+
+void sync_mm_rss_all_users(struct mm_struct *mm)
+{
+	struct task_struct *p, *t;
+	rcu_read_lock();
+	for_each_process(p) {
+		if (p->mm != mm)
+			continue;
+		for_each_thread(p, t) {
+			task_lock(t);  /* Stop t->mm changing */
+			sync_mm_rss_task(t, mm);
+			task_unlock(t);
+		}
+	}
+	rcu_read_unlock();
 }
 
 static void add_mm_counter_fast(struct mm_struct *mm, int member, int val)
 {
 	struct task_struct *task = current;
 
-	if (likely(task->mm == mm))
+	if (likely(task->mm == mm)) {
+		spin_lock(&task->rss_stat.lock);
 		task->rss_stat.count[member] += val;
-	else
+		if (!task->rss_stat.marked_mm_dirty) {
+			task->rss_stat.marked_mm_dirty = true;
+			atomic_set(&mm->rss_stat.dirty, 1);
+		}
+		spin_unlock(&task->rss_stat.lock);
+	} else {
 		add_mm_counter(mm, member, val);
+	}
 }
 #define inc_mm_counter_fast(mm, member) add_mm_counter_fast(mm, member, 1)
 #define dec_mm_counter_fast(mm, member) add_mm_counter_fast(mm, member, -1)
 
-/* sync counter once per 64 page faults */
-#define TASK_RSS_EVENTS_THRESH	(64)
-static void check_sync_rss_stat(struct task_struct *task)
-{
-	if (unlikely(task != current))
-		return;
-	if (unlikely(task->rss_stat.events++ > TASK_RSS_EVENTS_THRESH))
-		sync_mm_rss(task->mm);
-}
 #else /* SPLIT_RSS_COUNTING */
 
 #define inc_mm_counter_fast(mm, member) inc_mm_counter(mm, member)
 #define dec_mm_counter_fast(mm, member) dec_mm_counter(mm, member)
-
-static void check_sync_rss_stat(struct task_struct *task)
-{
-}
 
 #endif /* SPLIT_RSS_COUNTING */
 
@@ -4118,9 +4137,6 @@ int handle_mm_fault(struct vm_area_struct *vma, unsigned long address,
 
 	count_vm_event(PGFAULT);
 	count_memcg_event_mm(vma->vm_mm, PGFAULT);
-
-	/* do counter updates before entering really critical section. */
-	check_sync_rss_stat(current);
 
 	if (!arch_vma_access_permitted(vma, flags & FAULT_FLAG_WRITE,
 					    flags & FAULT_FLAG_INSTRUCTION,
