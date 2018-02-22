@@ -640,7 +640,6 @@ int ip_do_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 
 		/* Everything is OK. Generate! */
 
-		err = 0;
 		offset = 0;
 		frag = skb_shinfo(skb)->frag_list;
 		skb_frag_list_init(skb);
