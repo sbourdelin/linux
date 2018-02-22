@@ -445,3 +445,14 @@ void intel_uc_fini_hw(struct drm_i915_private *dev_priv)
 	if (USES_GUC_SUBMISSION(dev_priv))
 		gen9_disable_guc_interrupts(dev_priv);
 }
+
+void intel_uc_reset_prepare(struct drm_i915_private *i915)
+{
+	if (!USES_GUC(i915))
+		return;
+
+	GEM_BUG_ON(!HAS_GUC(i915));
+
+	intel_huc_reset_prepare(&i915->huc);
+	intel_guc_reset_prepare(&i915->guc);
+}
