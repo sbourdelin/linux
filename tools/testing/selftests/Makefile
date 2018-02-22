@@ -128,12 +128,21 @@ ifdef INSTALL_PATH
 
 	for TARGET in $(TARGETS); do \
 		BUILD_TARGET=$$BUILD/$$TARGET;	\
+		echo "_$${TARGET//-/_}()" >> $(ALL_SCRIPT); \
+		echo "{" >> $(ALL_SCRIPT); \
 		echo "echo ; echo Running tests in $$TARGET" >> $(ALL_SCRIPT); \
 		echo "echo ========================================" >> $(ALL_SCRIPT); \
 		echo "cd $$TARGET" >> $(ALL_SCRIPT); \
 		make -s --no-print-directory OUTPUT=$$BUILD_TARGET -C $$TARGET emit_tests >> $(ALL_SCRIPT); \
 		echo "cd \$$ROOT" >> $(ALL_SCRIPT); \
+		echo "}" >> $(ALL_SCRIPT); \
+		echo "" >> $(ALL_SCRIPT); \
 	done;
+
+	echo "TARGETS=\$${1:-\`ls -d */ | sed 's#/##' \`}" >> $(ALL_SCRIPT);
+	echo "for TARGET in \$${TARGETS//,/ }; do" >> $(ALL_SCRIPT);
+	echo "    _\$${TARGET//-/_}" >> $(ALL_SCRIPT);
+	echo "done" >> $(ALL_SCRIPT);
 
 	chmod u+x $(ALL_SCRIPT)
 else
