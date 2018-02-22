@@ -113,6 +113,9 @@ __early_ioremap(resource_size_t phys_addr, unsigned long size, pgprot_t prot)
 
 	WARN_ON(system_state >= SYSTEM_RUNNING);
 
+	/* Sanitize 'prot' against any unsupported bits: */
+	pgprot_val(prot) &= __default_kernel_pte_mask;
+
 	slot = -1;
 	for (i = 0; i < FIX_BTMAPS_SLOTS; i++) {
 		if (!prev_map[i]) {
