@@ -136,6 +136,8 @@ struct pwm_device *
 of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
 {
 	struct pwm_device *pwm;
+	struct pwm_caps caps;
+	int modebit;
 
 	/* check, whether the driver supports a third cell for flags */
 	if (pc->of_pwm_n_cells < 3)
@@ -152,11 +154,23 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
 	if (IS_ERR(pwm))
 		return pwm;
 
+	pwm_get_caps(pc, pwm, &caps);
+
 	pwm->args.period = args->args[1];
 	pwm->args.polarity = PWM_POLARITY_NORMAL;
+	pwm->args.mode = BIT(ffs(caps.modes) - 1);
 
-	if (args->args_count > 2 && args->args[2] & PWM_POLARITY_INVERTED)
-		pwm->args.polarity = PWM_POLARITY_INVERSED;
+	if (args->args_count > 2) {
+		if (args->args[2] & PWM_POLARITY_INVERTED)
+			pwm->args.polarity = PWM_POLARITY_INVERSED;
+
+		for (modebit = PWM_MODE_COMPLEMENTARY_BIT;
+		     modebit < PWM_MODE_CNT; modebit++)
+			if (args->args[2] & BIT(modebit)) {
+				pwm->args.mode = BIT(modebit);
+				break;
+			}
+	}
 
 	return pwm;
 }
@@ -166,6 +180,7 @@ static struct pwm_device *
 of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
 {
 	struct pwm_device *pwm;
+	struct pwm_caps caps;
 
 	/* sanity check driver support */
 	if (pc->of_pwm_n_cells < 2)
@@ -182,7 +197,9 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
 	if (IS_ERR(pwm))
 		return pwm;
 
+	pwm_get_caps(pc, pwm, &caps);
 	pwm->args.period = args->args[1];
+	pwm->args.mode = BIT(ffs(caps.modes) - 1);
 
 	return pwm;
 }
@@ -250,6 +267,39 @@ static bool pwm_ops_check(const struct pwm_ops *ops)
 }
 
 /**
+ * pwm_get_caps() - get PWM capabilities
+ * @chip: PWM chip
+ * @pwm: PWM device to get the capabilities for
+ * @caps: returned capabilities
+ *
+ * Retrievers capabilities for PWM device.
+ */
+void pwm_get_caps(struct pwm_chip *chip, struct pwm_device *pwm,
+		  struct pwm_caps *caps)
+{
+	if (!chip || !pwm || !caps)
+		return;
+
+	if (chip->ops && chip->ops->get_caps)
+		pwm->chip->ops->get_caps(chip, pwm, caps);
+	else if (chip->get_default_caps)
+		chip->get_default_caps(caps);
+}
+EXPORT_SYMBOL_GPL(pwm_get_caps);
+
+static void pwmchip_get_default_caps(struct pwm_caps *caps)
+{
+	static const struct pwm_caps default_caps = {
+		.modes = PWM_MODE(NORMAL),
+	};
+
+	if (!caps)
+		return;
+
+	*caps = default_caps;
+}
+
+/**
  * pwmchip_add_with_polarity() - register a new PWM chip
  * @chip: the PWM chip to add
  * @polarity: initial polarity of PWM channels
@@ -264,7 +314,8 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
 			      enum pwm_polarity polarity)
 {
 	struct pwm_device *pwm;
-	unsigned int i;
+	struct pwm_caps caps;
+	unsigned int i, j;
 	int ret;
 
 	if (!chip || !chip->dev || !chip->ops || !chip->npwm)
@@ -274,6 +325,8 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
 		return -EINVAL;
 
 	mutex_lock(&pwm_lock);
+
+	chip->get_default_caps = pwmchip_get_default_caps;
 
 	ret = alloc_pwms(chip->base, chip->npwm);
 	if (ret < 0)
@@ -295,6 +348,16 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
 		pwm->hwpwm = i;
 		pwm->state.polarity = polarity;
 
+		pwm_get_caps(chip, pwm, &caps);
+
+		/* Check if modes are supported. */
+		if (!pwm_caps_valid(caps)) {
+			ret = -EINVAL;
+			goto free;
+		}
+
+		pwm->state.mode = BIT(ffs(caps.modes) - 1);
+
 		if (chip->ops->get_state)
 			chip->ops->get_state(chip, pwm, &pwm->state);
 
@@ -314,6 +377,17 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
 	pwmchip_sysfs_export(chip);
 
 out:
+	mutex_unlock(&pwm_lock);
+	return ret;
+
+free:
+	for (j = 0; j < i; j++) {
+		pwm = &chip->pwms[j];
+		radix_tree_delete(&pwm_tree, pwm->pwm);
+	}
+	kfree(chip->pwms);
+	chip->pwms = NULL;
+
 	mutex_unlock(&pwm_lock);
 	return ret;
 }
@@ -466,10 +540,17 @@ EXPORT_SYMBOL_GPL(pwm_free);
  */
 int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
 {
+	struct pwm_caps caps;
 	int err;
 
 	if (!pwm || !state || !state->period ||
-	    state->duty_cycle > state->period)
+	    state->duty_cycle > state->period ||
+	    !pwm_mode_valid(state->mode))
+		return -EINVAL;
+
+	/* Check if mode is supported by PWM. */
+	pwm_get_caps(pwm->chip, pwm, &caps);
+	if (!(caps.modes & state->mode))
 		return -EINVAL;
 
 	if (!memcmp(state, &pwm->state, sizeof(*state)))
@@ -530,6 +611,9 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
 
 			pwm->state.enabled = state->enabled;
 		}
+
+		/* No mode support for non-atomic PWM. */
+		pwm->state.mode = state->mode;
 	}
 
 	return 0;
@@ -578,6 +662,8 @@ int pwm_adjust_config(struct pwm_device *pwm)
 
 	pwm_get_args(pwm, &pargs);
 	pwm_get_state(pwm, &state);
+
+	state.mode = pargs.mode;
 
 	/*
 	 * If the current period is zero it means that either the PWM driver
@@ -767,6 +853,7 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
 	unsigned int best = 0;
 	struct pwm_lookup *p, *chosen = NULL;
 	unsigned int match;
+	struct pwm_caps caps;
 	int err;
 
 	/* look up via DT first */
@@ -848,8 +935,10 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
 	if (IS_ERR(pwm))
 		return pwm;
 
+	pwm_get_caps(chip, pwm, &caps);
 	pwm->args.period = chosen->period;
 	pwm->args.polarity = chosen->polarity;
+	pwm->args.mode = BIT(ffs(caps.modes) - 1);
 
 	return pwm;
 }
@@ -999,6 +1088,7 @@ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
 		seq_printf(s, " duty: %u ns", state.duty_cycle);
 		seq_printf(s, " polarity: %s",
 			   state.polarity ? "inverse" : "normal");
+		seq_printf(s, " mode: %s", pwm_mode_desc(state.mode));
 
 		seq_puts(s, "\n");
 	}
