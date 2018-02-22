@@ -61,9 +61,9 @@ In addition to the PWM state, the PWM API also exposes PWM arguments, which
 are the reference PWM config one should use on this PWM.
 PWM arguments are usually platform-specific and allows the PWM user to only
 care about dutycycle relatively to the full period (like, duty = 50% of the
-period). struct pwm_args contains 2 fields (period and polarity) and should
-be used to set the initial PWM config (usually done in the probe function
-of the PWM user). PWM arguments are retrieved with pwm_get_args().
+period). struct pwm_args contains 3 fields (period, polarity and mode) and
+should be used to set the initial PWM config (usually done in the probe
+function of the PWM user). PWM arguments are retrieved with pwm_get_args().
 
 Using PWMs with the sysfs interface
 -----------------------------------
@@ -109,6 +109,26 @@ channel that was exported. The following properties will then be available:
 
 	- 0 - disabled
 	- 1 - enabled
+
+  mode
+    Get/set PWM channel working mode.
+
+    Normal mode - for PWM channels with one output; this should be the
+        default working mode for every PWM channel; output waveforms looks
+        like this:
+             __    __    __    __
+    PWM   __|  |__|  |__|  |__|  |__
+            <--T-->
+
+    Complementary mode - for PWM channels two outputs; output waveforms
+        looks line this:
+             __    __    __    __
+    PWMH1 __|  |__|  |__|  |__|  |__
+          __    __    __    __    __
+    PWML1   |__|  |__|  |__|  |__|
+            <--T-->
+
+    Where T is the signal period.
 
 Implementing a PWM driver
 -------------------------

@@ -46,11 +46,16 @@ period in nanoseconds.
 Optionally, the pwm-specifier can encode a number of flags (defined in
 <dt-bindings/pwm/pwm.h>) in a third cell:
 - PWM_POLARITY_INVERTED: invert the PWM signal polarity
+- PWM_DTMODE_COMPLEMENTARY: PWM complementary working mode (for PWM
+channels two outputs); if not specified, the default for PWM channel will
+be used
 
-Example with optional PWM specifier for inverse polarity
+Example with optional PWM specifier for inverse polarity and complementary
+mode:
 
 	bl: backlight {
-		pwms = <&pwm 0 5000000 PWM_POLARITY_INVERTED>;
+		pwms = <&pwm 0 5000000
+			(PWM_DTMODE_COMPLEMENTARY | PWM_POLARITY_INVERTED)>;
 		pwm-names = "backlight";
 	};
 
