@@ -464,9 +464,11 @@ our $logFunctions = qr{(?x:
 our $signature_tags = qr{(?xi:
 	Signed-off-by:|
 	Acked-by:|
+	Co-Developed-by:|
 	Tested-by:|
 	Reviewed-by:|
 	Reported-by:|
+	Root-caused-by:|
 	Suggested-by:|
 	To:|
 	Cc:

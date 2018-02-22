@@ -234,6 +234,13 @@ The tags in common use are:
    people who test our code and let us know when things do not work
    correctly.
 
+ - Suggested-by: names a person who suggested the solution, but may not
+   have constructed the full patch. A weaker version of `Co-Developed-by`.
+
+ - Root-caused-by: names a person who diagnosed the root cause of a
+   problem. This usually indicates significantly more work than a simple
+   `Reported-by`.
+
  - Cc: the named person received a copy of the patch and had the
    opportunity to comment on it.
 
