@@ -437,6 +437,8 @@ acpi_ns_check_package_list(struct acpi_evaluate_info *info,
 	 */
 	for (i = 0; i < count; i++) {
 		sub_package = *elements;
+		if (sub_package == NULL)
+			break;
 		sub_elements = sub_package->package.elements;
 		info->parent_package = sub_package;
 
