@@ -3300,6 +3300,13 @@ static bool intel_ddi_a_force_4_lanes(struct intel_digital_port *dport)
 {
 	struct drm_i915_private *dev_priv = to_i915(dport->base.base.dev);
 
+	/*
+	 * Starting on gen 11, all ports support 4 lanes, don't print messages
+	 * related to this.
+	 */
+	if (INTEL_GEN(dev_priv) >= 11)
+		return false;
+
 	if (dport->base.port != PORT_A)
 		return false;
 
@@ -3332,7 +3339,9 @@ void intel_ddi_init(struct drm_i915_private *dev_priv, enum port port)
 	bool init_hdmi, init_dp, init_lspcon = false;
 	int max_lanes;
 
-	if (I915_READ(DDI_BUF_CTL(PORT_A)) & DDI_A_4_LANES) {
+	if (INTEL_GEN(dev_priv) >= 11) {
+		max_lanes = 4;
+	} else if (I915_READ(DDI_BUF_CTL(PORT_A)) & DDI_A_4_LANES) {
 		switch (port) {
 		case PORT_A:
 			max_lanes = 4;
@@ -3403,9 +3412,13 @@ void intel_ddi_init(struct drm_i915_private *dev_priv, enum port port)
 	intel_encoder->suspend = intel_dp_encoder_suspend;
 	intel_encoder->get_power_domains = intel_ddi_get_power_domains;
 
-	intel_dig_port->saved_port_bits = I915_READ(DDI_BUF_CTL(port)) &
-					  (DDI_BUF_PORT_REVERSAL |
-					   DDI_A_4_LANES);
+	if (INTEL_GEN(dev_priv) >= 11)
+		intel_dig_port->saved_port_bits = I915_READ(DDI_BUF_CTL(port)) &
+						  DDI_BUF_PORT_REVERSAL;
+	else
+		intel_dig_port->saved_port_bits = I915_READ(DDI_BUF_CTL(port)) &
+						  (DDI_BUF_PORT_REVERSAL |
+						   DDI_A_4_LANES);
 
 	switch (port) {
 	case PORT_A:
