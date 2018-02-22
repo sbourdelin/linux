@@ -155,12 +155,16 @@ static struct pwm_device *
 pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
 {
 	struct pwm_device *pwm;
+	struct pwm_caps caps;
 
 	pwm = pwm_request_from_chip(pc, 0, NULL);
 	if (IS_ERR(pwm))
 		return pwm;
 
+	pwm_get_caps(pc, pwm, &caps);
+
 	pwm->args.period = args->args[0];
+	pwm->args.mode = BIT(ffs(caps.modes) - 1);
 
 	return pwm;
 }
