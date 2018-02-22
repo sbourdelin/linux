@@ -862,6 +862,66 @@ int drm_dev_set_unique(struct drm_device *dev, const char *name)
 }
 EXPORT_SYMBOL(drm_dev_set_unique);
 
+/**
+ * drm_device_list_iter_begin - Initialize a DRM device iterator
+ * @iter: DRM device iterator
+ *
+ * Sets @iter up to walk the registered DRM devices. @iter must always be
+ * cleaned up again by calling drm_device_list_iter_end(). Iteration itself
+ * happens using drm_device_list_iter_next() or drm_for_each_device_iter().
+ */
+void drm_device_list_iter_begin(struct drm_device_list_iter *iter)
+{
+	iter->dev = NULL;
+	iter->minor_id = 0;
+}
+EXPORT_SYMBOL(drm_device_list_iter_begin);
+
+/**
+ * drm_device_list_iter_next - Return the next DRM device
+ * @iter: DRM device iterator
+ *
+ * Returns the next DRM device for @iter, or NULL when there are no more
+ * devices.
+ */
+struct drm_device *
+drm_device_list_iter_next(struct drm_device_list_iter *iter)
+{
+	struct drm_minor *minor;
+
+	drm_dev_put(iter->dev);
+	iter->dev = NULL;
+
+	/* Loop through the primary minors */
+	for (; iter->minor_id < 64; iter->minor_id++) {
+		minor = drm_minor_acquire(iter->minor_id);
+		if (IS_ERR(minor))
+			continue;
+
+		iter->dev = minor->dev;
+		iter->minor_id++;
+		return minor->dev;
+	}
+
+	return NULL;
+}
+EXPORT_SYMBOL(drm_device_list_iter_next);
+
+/**
+ * drm_device_list_iter_end - Tear down a DRM device iterator
+ * @iter: DRM device iterator
+ *
+ * Tears down @iter and releases any resources (like &drm_device references)
+ * acquired while walking the devices. This must always be called, both when
+ * the iteration completes fully or when it was aborted without walking the
+ * entire list.
+ */
+void drm_device_list_iter_end(struct drm_device_list_iter *iter)
+{
+	drm_dev_put(iter->dev);
+}
+EXPORT_SYMBOL(drm_device_list_iter_end);
+
 /*
  * DRM Core
  * The DRM core module initializes all global DRM objects and makes them

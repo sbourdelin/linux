@@ -644,5 +644,39 @@ static inline int drm_dev_is_unplugged(struct drm_device *dev)
 
 int drm_dev_set_unique(struct drm_device *dev, const char *name);
 
+/**
+ * struct drm_device_list_iter - DRM device iterator
+ *
+ * This iterator tracks state needed to be able to walk the registered
+ * DRM devices. Only use together with drm_device_list_iter_begin(),
+ * drm_device_list_iter_end() and drm_device_list_iter_next() respectively
+ * the convenience macro drm_for_each_device_iter().
+ */
+struct drm_device_list_iter {
+/* private: */
+	unsigned int minor_id;
+	struct drm_device *dev;
+};
+
+void drm_device_list_iter_begin(struct drm_device_list_iter *iter);
+struct drm_device *
+drm_device_list_iter_next(struct drm_device_list_iter *iter);
+void drm_device_list_iter_end(struct drm_device_list_iter *iter);
+
+/**
+ * drm_for_each_device_iter - DRM device iterator macro
+ * @dev: DRM device pointer used as cursor
+ * @iter: DRM device iterator
+ *
+ * Note that @dev is only valid within the list body, if you want to use @dev
+ * after calling drm_device_list_iter_end() then you need to grab your own
+ * reference first using drm_dev_get().
+ *
+ * Note:
+ * The DRM device was registered at the point when the reference was taken,
+ * but it's not guaranteed that this is still the case inside the loop.
+ */
+#define drm_for_each_device_iter(dev, iter) \
+	while ((dev = drm_device_list_iter_next(iter)))
 
 #endif
