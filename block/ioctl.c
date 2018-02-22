@@ -163,14 +163,18 @@ int __blkdev_reread_part(struct block_device *bdev)
 {
 	struct gendisk *disk = bdev->bd_disk;
 
-	if (!disk_part_scan_enabled(disk) || bdev != bdev->bd_contains)
+	if (bdev != bdev->bd_contains) // must be whole disk
 		return -EINVAL;
+
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
 
 	lockdep_assert_held(&bdev->bd_mutex);
 
-	return rescan_partitions(disk, bdev);
+	if (disk_part_scan_enabled(disk))
+		return rescan_partitions(disk, bdev);
+	else // update size but not partitions, could be sr or sd
+		return disk->fops->revalidate_disk(disk);
 }
 EXPORT_SYMBOL(__blkdev_reread_part);
 
