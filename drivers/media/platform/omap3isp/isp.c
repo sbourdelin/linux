@@ -2025,6 +2025,9 @@ static int isp_fwnode_parse(struct device *dev,
 	dev_dbg(dev, "parsing endpoint %pOF, interface %u\n",
 		to_of_node(vep->base.local_fwnode), vep->base.port);
 
+	if (!fwnode_device_is_available(asd->match.fwnode))
+		return -EINVAL;
+
 	switch (vep->base.port) {
 	case ISP_OF_PHY_PARALLEL:
 		buscfg->interface = ISP_INTERFACE_PARALLEL;

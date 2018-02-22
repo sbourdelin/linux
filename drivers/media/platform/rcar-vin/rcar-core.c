@@ -149,6 +149,9 @@ static int rvin_digital_parse_v4l2(struct device *dev,
 	struct rvin_graph_entity *rvge =
 		container_of(asd, struct rvin_graph_entity, asd);
 
+	if (!fwnode_device_is_available(asd->match.fwnode))
+		return -EINVAL;
+
 	if (vep->base.port || vep->base.id)
 		return -ENOTCONN;
 

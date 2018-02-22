@@ -361,7 +361,7 @@ static int v4l2_async_notifier_fwnode_parse_endpoint(
 	asd->match_type = V4L2_ASYNC_MATCH_FWNODE;
 	asd->match.fwnode =
 		fwnode_graph_get_remote_port_parent(endpoint);
-	if (!asd->match.fwnode) {
+	if (!asd->match.fwnode && !parse_endpoint) {
 		dev_warn(dev, "bad remote port parent\n");
 		ret = -EINVAL;
 		goto out_err;
@@ -384,7 +384,7 @@ static int v4l2_async_notifier_fwnode_parse_endpoint(
 			 "driver could not parse port@%u/endpoint@%u (%d)\n",
 			 vep->base.port, vep->base.id, ret);
 	v4l2_fwnode_endpoint_free(vep);
-	if (ret < 0)
+	if (ret < 0 || !asd->match.fwnode)
 		goto out_err;
 
 	notifier->subdevs[notifier->num_subdevs] = asd;
