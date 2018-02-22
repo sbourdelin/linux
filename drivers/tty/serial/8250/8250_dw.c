@@ -405,13 +405,16 @@ static void dw8250_setup_port(struct uart_port *p)
 static int dw8250_probe(struct platform_device *pdev)
 {
 	struct uart_8250_port uart = {};
-	struct resource *regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	struct resource *regs;
 	int irq = platform_get_irq(pdev, 0);
 	struct uart_port *p = &uart.port;
 	struct device *dev = &pdev->dev;
 	struct dw8250_data *data;
 	int err;
 	u32 val;
+
+	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0) ?:
+	       platform_get_resource(pdev, IORESOURCE_IO, 0);
 
 	if (!regs) {
 		dev_err(dev, "no registers defined\n");
@@ -425,22 +428,28 @@ static int dw8250_probe(struct platform_device *pdev)
 	}
 
 	spin_lock_init(&p->lock);
-	p->mapbase	= regs->start;
 	p->irq		= irq;
 	p->handle_irq	= dw8250_handle_irq;
 	p->pm		= dw8250_do_pm;
 	p->type		= PORT_8250;
 	p->flags	= UPF_SHARE_IRQ | UPF_FIXED_PORT;
 	p->dev		= dev;
-	p->iotype	= UPIO_MEM;
-	p->serial_in	= dw8250_serial_in;
-	p->serial_out	= dw8250_serial_out;
 	p->set_ldisc	= dw8250_set_ldisc;
 	p->set_termios	= dw8250_set_termios;
 
-	p->membase = devm_ioremap(dev, regs->start, resource_size(regs));
-	if (!p->membase)
-		return -ENOMEM;
+	if ((regs->flags & IORESOURCE_TYPE_BITS) == IORESOURCE_MEM) {
+		p->mapbase	= regs->start;
+		p->membase = devm_ioremap(dev, regs->start,
+					  resource_size(regs));
+		if (!p->membase)
+			return -ENOMEM;
+		p->iotype = UPIO_MEM;
+		p->serial_in	= dw8250_serial_in;
+		p->serial_out	= dw8250_serial_out;
+	} else {
+		p->iobase = regs->start;
+		p->iotype = UPIO_PORT;
+	}
 
 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
 	if (!data)
