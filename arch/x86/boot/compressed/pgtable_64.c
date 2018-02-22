@@ -60,7 +60,7 @@ struct paging_config paging_prepare(void)
 
 	/* Copy trampoline code in place */
 	memcpy(trampoline + TRAMPOLINE_32BIT_CODE_OFFSET / sizeof(unsigned long),
-			&trampoline_32bit_src, TRAMPOLINE_32BIT_CODE_SIZE);
+			trampoline_32bit_src, TRAMPOLINE_32BIT_CODE_SIZE);
 
 	/*
 	 * Set up a new page table that will be used for switching from 4-
