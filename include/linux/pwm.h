@@ -29,11 +29,14 @@ enum pwm_polarity {
  * PWM modes
  * @PWM_MODE_NORMAL_BIT: PWM has one output
  * @PWM_MODE_COMPLEMENTARY_BIT: PWM has 2 outputs with opposite polarities
+ * @PWM_MODE_PUSH_PULL_BIT: PWM has 2 outputs with same polarities and the edges
+ * are complementary delayed for one period
  * @PWM_MODE_CNT: PWM modes count
  */
 enum {
 	PWM_MODE_NORMAL_BIT,
 	PWM_MODE_COMPLEMENTARY_BIT,
+	PWM_MODE_PUSH_PULL_BIT,
 	PWM_MODE_CNT,
 };
 
@@ -481,7 +484,11 @@ static inline bool pwm_caps_valid(struct pwm_caps caps)
 
 static inline const char * const pwm_mode_desc(unsigned long mode)
 {
-	static const char * const modes[] = { "normal", "complementary"	};
+	static const char * const modes[] = {
+		"normal",
+		"complementary",
+		"push-pull",
+	};
 
 	if (!pwm_mode_valid(mode))
 		return "invalid";
