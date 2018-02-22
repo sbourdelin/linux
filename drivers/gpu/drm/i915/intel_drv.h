@@ -630,6 +630,7 @@ struct intel_crtc_state {
 	bool update_pipe; /* can a fast modeset be performed? */
 	bool disable_cxsr;
 	bool update_wm_pre, update_wm_post; /* watermarks are updated */
+	bool sagv; /* Disable SAGV on any latency higher than its block time */
 	bool fb_changed; /* fb on any of the planes is changed */
 	bool fifo_changed; /* FIFO split is changed */
 
@@ -1909,7 +1910,7 @@ void skl_pipe_wm_get_hw_state(struct drm_crtc *crtc,
 			      struct skl_pipe_wm *out);
 void g4x_wm_sanitize(struct drm_i915_private *dev_priv);
 void vlv_wm_sanitize(struct drm_i915_private *dev_priv);
-bool intel_can_enable_sagv(struct drm_atomic_state *state);
+bool intel_can_enable_sagv(struct intel_atomic_state *state, u32 latency);
 int intel_enable_sagv(struct drm_i915_private *dev_priv);
 int intel_disable_sagv(struct drm_i915_private *dev_priv);
 bool skl_wm_level_equals(const struct skl_wm_level *l1,

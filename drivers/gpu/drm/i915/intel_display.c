@@ -5090,6 +5090,8 @@ static bool hsw_post_update_enable_ips(const struct intel_crtc_state *old_crtc_s
 static void intel_post_plane_update(struct intel_crtc_state *old_crtc_state)
 {
 	struct intel_crtc *crtc = to_intel_crtc(old_crtc_state->base.crtc);
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_atomic_state *old_state = old_crtc_state->base.state;
 	struct intel_crtc_state *pipe_config =
 		intel_atomic_get_new_crtc_state(to_intel_atomic_state(old_state),
@@ -5120,6 +5122,9 @@ static void intel_post_plane_update(struct intel_crtc_state *old_crtc_state)
 		     !old_primary_state->base.visible))
 			intel_post_enable_primary(&crtc->base, pipe_config);
 	}
+
+	if (pipe_config->sagv)
+		intel_enable_sagv(dev_priv);
 }
 
 static void intel_pre_plane_update(struct intel_crtc_state *old_crtc_state,
@@ -5205,6 +5210,9 @@ static void intel_pre_plane_update(struct intel_crtc_state *old_crtc_state,
 						     pipe_config);
 	else if (pipe_config->update_wm_pre)
 		intel_update_watermarks(crtc);
+
+	if (!pipe_config->sagv)
+		intel_disable_sagv(dev_priv);
 }
 
 static void intel_crtc_disable_planes(struct drm_crtc *crtc, unsigned plane_mask)
@@ -12352,13 +12360,6 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 
 		intel_set_cdclk(dev_priv, &dev_priv->cdclk.actual);
 
-		/*
-		 * SKL workaround: bspec recommends we disable the SAGV when we
-		 * have more then one pipe enabled
-		 */
-		if (!intel_can_enable_sagv(state))
-			intel_disable_sagv(dev_priv);
-
 		intel_modeset_verify_disabled(dev, state);
 	}
 
@@ -12416,9 +12417,6 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 
 	if (intel_state->modeset)
 		intel_verify_planes(intel_state);
-
-	if (intel_state->modeset && intel_can_enable_sagv(state))
-		intel_enable_sagv(dev_priv);
 
 	drm_atomic_helper_commit_hw_done(state);
 
