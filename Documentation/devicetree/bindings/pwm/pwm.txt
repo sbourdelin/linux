@@ -49,6 +49,8 @@ Optionally, the pwm-specifier can encode a number of flags (defined in
 - PWM_DTMODE_COMPLEMENTARY: PWM complementary working mode (for PWM
 channels two outputs); if not specified, the default for PWM channel will
 be used
+- PWM_DTMODE_PUSH_PULL: PWM push-pull working modes (for PWM channels with
+two outputs); if not specified the default for PWM channel will be used
 
 Example with optional PWM specifier for inverse polarity and complementary
 mode:
