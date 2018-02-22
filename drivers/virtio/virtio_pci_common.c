@@ -572,6 +572,47 @@ err_enable_device:
 	return rc;
 }
 
+#ifdef CONFIG_PCI_IOV
+static int virtio_pci_sriov_disable(struct pci_dev *pci_dev)
+{
+	/* If vfs are assigned we cannot shut down SR-IOV without causing
+	 * issues, so just leave the hardware available.
+	 */
+	if (pci_vfs_assigned(pci_dev)) {
+		dev_warn(&pci_dev->dev,
+			 "Unloading driver while VFs are assigned - VFs will not be deallocated\n");
+		return -EPERM;
+	}
+	pci_disable_sriov(pci_dev);
+	return 0;
+}
+
+static int virtio_pci_sriov_enable(struct pci_dev *pci_dev, int num_vfs)
+{
+	int rc = 0;
+
+	if (pci_num_vf(pci_dev))
+		return -EINVAL;
+
+	rc = pci_enable_sriov(pci_dev, num_vfs);
+	if (rc) {
+		dev_warn(&pci_dev->dev, "Failed to enable PCI sriov: %d\n", rc);
+		return rc;
+	}
+	dev_info(&pci_dev->dev, "SR-IOV enabled with %d VFs\n", num_vfs);
+	return num_vfs;
+}
+
+static int virtio_pci_sriov_configure(struct pci_dev *dev, int num_vfs)
+{
+	if (num_vfs)
+		return virtio_pci_sriov_enable(dev, num_vfs);
+	if (!pci_num_vf(dev))
+		return -EINVAL;
+	return virtio_pci_sriov_disable(dev);
+}
+#endif /* CONFIG_PCI_IOV */
+
 static void virtio_pci_remove(struct pci_dev *pci_dev)
 {
 	struct virtio_pci_device *vp_dev = pci_get_drvdata(pci_dev);
@@ -584,6 +625,9 @@ static void virtio_pci_remove(struct pci_dev *pci_dev)
 	else
 		virtio_pci_modern_remove(vp_dev);
 
+#ifdef CONFIG_PCI_IOV
+	virtio_pci_sriov_disable(pci_dev);
+#endif
 	pci_disable_device(pci_dev);
 	put_device(dev);
 }
@@ -595,6 +639,9 @@ static struct pci_driver virtio_pci_driver = {
 	.remove		= virtio_pci_remove,
 #ifdef CONFIG_PM_SLEEP
 	.driver.pm	= &virtio_pci_pm_ops,
+#endif
+#ifdef CONFIG_PCI_IOV
+	.sriov_configure = virtio_pci_sriov_configure,
 #endif
 };
 
