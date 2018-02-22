@@ -216,6 +216,8 @@ struct drm_framebuffer *drm_framebuffer_lookup(struct drm_device *dev,
 void drm_framebuffer_remove(struct drm_framebuffer *fb);
 void drm_framebuffer_cleanup(struct drm_framebuffer *fb);
 void drm_framebuffer_unregister_private(struct drm_framebuffer *fb);
+bool drm_mode_can_dirtyfb(struct drm_device *dev, u32 fb_id,
+			  struct drm_file *file_priv);
 
 /**
  * drm_framebuffer_get - acquire a framebuffer reference

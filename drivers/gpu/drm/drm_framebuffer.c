@@ -601,6 +601,37 @@ int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
 }
 
 /**
+ * drm_mode_can_dirtyfb - check if the FB does flushing
+ * @dev: drm device
+ * @fb_id: Framebuffer id
+ * @file_priv: drm file
+ *
+ * Returns:
+ * True if the framebuffer does flushing, false otherwise.
+ */
+bool drm_mode_can_dirtyfb(struct drm_device *dev, u32 fb_id,
+			  struct drm_file *file_priv)
+{
+	struct drm_framebuffer *fb;
+	bool ret = false;
+
+	if (!drm_core_check_feature(dev, DRIVER_MODESET))
+		return false;
+
+	fb = drm_framebuffer_lookup(dev, file_priv, fb_id);
+	if (!fb)
+		return false;
+
+	if (fb->funcs->dirty)
+		ret = true;
+
+	drm_framebuffer_put(fb);
+
+	return ret;
+}
+EXPORT_SYMBOL(drm_mode_can_dirtyfb);
+
+/**
  * drm_fb_release - remove and free the FBs on this file
  * @priv: drm file for the ioctl
  *
