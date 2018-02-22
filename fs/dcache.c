@@ -696,27 +696,67 @@ again:
 static struct dentry *dentry_kill(struct dentry *dentry)
 	__releases(dentry->d_lock)
 {
-	struct inode *inode = dentry->d_inode;
-	struct dentry *parent = NULL;
+	int saved_count = dentry->d_lockref.count;
+	struct dentry *parent;
+	struct inode *inode;
 
-	if (inode && unlikely(!spin_trylock(&inode->i_lock)))
-		goto failed;
+again:
+	inode = dentry->d_inode;
 
-	if (!IS_ROOT(dentry)) {
-		parent = dentry->d_parent;
-		if (unlikely(!spin_trylock(&parent->d_lock))) {
-			if (inode)
-				spin_unlock(&inode->i_lock);
-			goto failed;
-		}
+	/*
+	 * Lock the inode. It will fail if the refcount
+	 * changed while trying to lock the inode.
+	 */
+	if (inode && !dentry_lock_inode(dentry))
+		goto out_ref_changed;
+
+	parent = lock_parent(dentry);
+
+	/*
+	 * Check refcount because it might have changed
+	 * if d_lock was temporarily dropped.
+	 */
+	if (unlikely(dentry->d_lockref.count != saved_count)) {
+		if (parent)
+			spin_unlock(&parent->d_lock);
+		if (inode)
+			spin_unlock(&inode->i_lock);
+		goto out_ref_changed;
+	}
+
+	/*
+	 * d_inode might have changed if d_lock was temporarily
+	 * dropped. If it changed it is necessary to start over
+	 * because a wrong inode (or no inode) lock is held.
+	 */
+	if (unlikely(inode != dentry->d_inode)) {
+		if (parent)
+			spin_unlock(&parent->d_lock);
+		if (inode)
+			spin_unlock(&inode->i_lock);
+		goto again;
 	}
 
 	__dentry_kill(dentry);
 	return parent;
 
-failed:
+out_ref_changed:
+	/*
+	 * The refcount was incremented while dentry->d_lock was dropped.
+	 * Just decrement the refcount, unlock, and tell the caller to
+	 * stop the directory walk.
+	 *
+	 * For paranoia reasons check whether the refcount is < 1. If so,
+	 * report the detection and avoid the decrement which would just
+	 * cause a problem in some other place. The warning might be
+	 * helpful to decode the root cause of the refcounting bug.
+	 */
+	if (!WARN_ON(dentry->d_lockref.count < 1))
+		dentry->d_lockref.count--;
+
 	spin_unlock(&dentry->d_lock);
-	return dentry; /* try again with same dentry */
+
+	return NULL;
 }
 
 /*
@@ -888,10 +928,8 @@ repeat:
 
 kill_it:
 	dentry = dentry_kill(dentry);
-	if (dentry) {
-		cond_resched();
+	if (dentry)
 		goto repeat;
-	}
 }
 EXPORT_SYMBOL(dput);
 
