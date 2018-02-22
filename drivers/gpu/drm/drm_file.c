@@ -35,6 +35,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 
+#include <drm/drm_client.h>
 #include <drm/drm_file.h>
 #include <drm/drmP.h>
 
@@ -443,6 +444,8 @@ void drm_lastclose(struct drm_device * dev)
 
 	if (drm_core_check_feature(dev, DRIVER_LEGACY))
 		drm_legacy_dev_reinit(dev);
+
+	drm_client_dev_lastclose(dev);
 }
 
 /**

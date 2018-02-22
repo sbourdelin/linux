@@ -67,6 +67,7 @@ struct drm_device {
 
 	struct mutex filelist_mutex;
 	struct list_head filelist;
+	struct list_head filelist_internal;
 
 	/** \name Memory management */
 	/*@{ */

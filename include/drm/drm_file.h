@@ -249,6 +249,13 @@ struct drm_file {
 	void *driver_priv;
 
 	/**
+	 * @user_priv:
+	 *
+	 * Optional pointer for user private data. Useful for in-kernel clients.
+	 */
+	void *user_priv;
+
+	/**
 	 * @fbs:
 	 *
 	 * List of &struct drm_framebuffer associated with this file, using the

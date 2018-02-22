@@ -1,0 +1,4 @@
+menu "DRM Clients"
+	depends on DRM
+
+endmenu

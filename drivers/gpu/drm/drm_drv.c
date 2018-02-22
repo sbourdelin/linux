@@ -33,6 +33,7 @@
 #include <linux/mount.h>
 #include <linux/slab.h>
 
+#include <drm/drm_client.h>
 #include <drm/drm_drv.h>
 #include <drm/drmP.h>
 
@@ -463,6 +464,7 @@ int drm_dev_init(struct drm_device *dev,
 	dev->driver = driver;
 
 	INIT_LIST_HEAD(&dev->filelist);
+	INIT_LIST_HEAD(&dev->filelist_internal);
 	INIT_LIST_HEAD(&dev->ctxlist);
 	INIT_LIST_HEAD(&dev->vmalist);
 	INIT_LIST_HEAD(&dev->maplist);
@@ -787,6 +789,8 @@ int drm_dev_register(struct drm_device *dev, unsigned long flags)
 		 dev->dev ? dev_name(dev->dev) : "virtual device",
 		 dev->primary->index);
 
+	drm_client_dev_register(dev);
+
 	goto out_unlock;
 
 err_minors:
@@ -839,6 +843,8 @@ void drm_dev_unregister(struct drm_device *dev)
 	drm_minor_unregister(dev, DRM_MINOR_PRIMARY);
 	drm_minor_unregister(dev, DRM_MINOR_RENDER);
 	drm_minor_unregister(dev, DRM_MINOR_CONTROL);
+
+	drm_client_dev_unregister(dev);
 }
 EXPORT_SYMBOL(drm_dev_unregister);
 
