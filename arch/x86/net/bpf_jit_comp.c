@@ -261,6 +261,35 @@ static void emit_prologue(u8 **pprog, u32 stack_depth)
 	*pprog = prog;
 }
 
+#ifdef CONFIG_RETPOLINE
+# define RETPOLINE_SIZE	17
+# define OFFSET_ADJ	RETPOLINE_SIZE
+
+/* Instead of plain jmp %rax, we emit a retpoline to control
+ * speculative execution for the indirect branch.
+ */
+static void emit_retpoline_rax_trampoline(u8 **pprog)
+{
+	u8 *prog = *pprog;
+	int cnt = 0;
+
+	EMIT1_off32(0xE8, 7);	 /* callq <set_up_target> */
+	/* capture_spec: */
+	EMIT2(0xF3, 0x90);	 /* pause */
+	EMIT3(0x0F, 0xAE, 0xE8); /* lfence */
+	EMIT2(0xEB, 0xF9);	 /* jmp <capture_spec> */
+	/* set_up_target: */
+	EMIT4(0x48, 0x89, 0x04, 0x24); /* mov %rax,(%rsp) */
+	EMIT1(0xC3);		 /* retq */
+
+	BUILD_BUG_ON(cnt != RETPOLINE_SIZE);
+	*pprog = prog;
+}
+#else
+/* Plain jmp %rax version used. */
+# define OFFSET_ADJ	2
+#endif
+
 /* generate the following code:
  * ... bpf_tail_call(void *ctx, struct bpf_array *array, u64 index) ...
  *   if (index >= array->map.max_entries)
@@ -290,7 +319,7 @@ static void emit_bpf_tail_call(u8 **pprog)
 	EMIT2(0x89, 0xD2);                        /* mov edx, edx */
 	EMIT3(0x39, 0x56,                         /* cmp dword ptr [rsi + 16], edx */
 	      offsetof(struct bpf_array, map.max_entries));
-#define OFFSET1 43 /* number of bytes to jump */
+#define OFFSET1 (41 + OFFSET_ADJ) /* number of bytes to jump */
 	EMIT2(X86_JBE, OFFSET1);                  /* jbe out */
 	label1 = cnt;
 
@@ -299,7 +328,7 @@ static void emit_bpf_tail_call(u8 **pprog)
 	 */
 	EMIT2_off32(0x8B, 0x85, 36);              /* mov eax, dword ptr [rbp + 36] */
 	EMIT3(0x83, 0xF8, MAX_TAIL_CALL_CNT);     /* cmp eax, MAX_TAIL_CALL_CNT */
-#define OFFSET2 32
+#define OFFSET2 (30 + OFFSET_ADJ)
 	EMIT2(X86_JA, OFFSET2);                   /* ja out */
 	label2 = cnt;
 	EMIT3(0x83, 0xC0, 0x01);                  /* add eax, 1 */
@@ -313,7 +342,7 @@ static void emit_bpf_tail_call(u8 **pprog)
 	 *   goto out;
 	 */
 	EMIT3(0x48, 0x85, 0xC0);		  /* test rax,rax */
-#define OFFSET3 10
+#define OFFSET3 (8 + OFFSET_ADJ)
 	EMIT2(X86_JE, OFFSET3);                   /* je out */
 	label3 = cnt;
 
@@ -326,15 +355,18 @@ static void emit_bpf_tail_call(u8 **pprog)
 	 * rdi == ctx (1st arg)
 	 * rax == prog->bpf_func + prologue_size
 	 */
-	EMIT2(0xFF, 0xE0);                        /* jmp rax */
-
-	/* out: */
-	BUILD_BUG_ON(cnt - label1 != OFFSET1);
-	BUILD_BUG_ON(cnt - label2 != OFFSET2);
-	BUILD_BUG_ON(cnt - label3 != OFFSET3);
+	BUILD_BUG_ON(cnt - label1 != OFFSET1 - OFFSET_ADJ);
+	BUILD_BUG_ON(cnt - label2 != OFFSET2 - OFFSET_ADJ);
+	BUILD_BUG_ON(cnt - label3 != OFFSET3 - OFFSET_ADJ);
+#ifdef CONFIG_RETPOLINE
 	*pprog = prog;
+	emit_retpoline_rax_trampoline(pprog);
+#else
+	EMIT2(0xFF, 0xE0);	/* jmp rax */
+	*pprog = prog;
+#endif
+	/* out: */
 }
-
 
 static void emit_load_skb_data_hlen(u8 **pprog)
 {
