@@ -22,4 +22,9 @@ config DRM_CLIENT_BOOTSPLASH
 	help
 	  DRM Bootsplash
 
+config DRM_CLIENT_VTCON
+	tristate "DRM VT console"
+	help
+	  DRM VT console
+
 endmenu
