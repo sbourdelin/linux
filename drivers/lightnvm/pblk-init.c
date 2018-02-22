@@ -510,6 +510,7 @@ static int pblk_luns_init(struct pblk *pblk, struct ppa_addr *luns)
 		if (ret) {
 			while (--i >= 0)
 				kfree(pblk->luns[i].bb_list);
+			kfree(pblk->luns);
 			return ret;
 		}
 	}
