@@ -581,6 +581,9 @@ struct sta_info {
 
 	struct cfg80211_chan_def tdls_chandef;
 
+	int last_cqm_event_signal;
+	unsigned int count_rx_signal;
+
 	/* keep last! */
 	struct ieee80211_sta sta;
 };
