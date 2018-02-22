@@ -486,10 +486,11 @@ int drm_mode_getfb(struct drm_device *dev,
 }
 
 /**
- * drm_mode_dirtyfb_ioctl - flush frontbuffer rendering on an FB
- * @dev: drm device for the ioctl
- * @data: data pointer for the ioctl
- * @file_priv: drm file for the ioctl call
+ * drm_mode_dirtyfb - flush frontbuffer rendering on an FB
+ * @dev: drm device
+ * @r: pointer to request structure
+ * @file_priv: drm file
+ * @user: true if called form userspace, false if called by in-kernel client
  *
  * Lookup the FB and flush out the damaged area supplied by userspace as a clip
  * rectangle list. Generic userspace which does frontbuffer rendering must call
@@ -499,17 +500,16 @@ int drm_mode_getfb(struct drm_device *dev,
  * Modesetting drivers which always update the frontbuffer do not need to
  * implement the corresponding &drm_framebuffer_funcs.dirty callback.
  *
- * Called by the user via ioctl.
+ * Called by the user via ioctl, or by an in-kernel client.
  *
  * Returns:
  * Zero on success, negative errno on failure.
  */
-int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
-			   void *data, struct drm_file *file_priv)
+int drm_mode_dirtyfb(struct drm_device *dev, struct drm_mode_fb_dirty_cmd *r,
+		     struct drm_file *file_priv, bool user)
 {
 	struct drm_clip_rect __user *clips_ptr;
 	struct drm_clip_rect *clips = NULL;
-	struct drm_mode_fb_dirty_cmd *r = data;
 	struct drm_framebuffer *fb;
 	unsigned flags;
 	int num_clips;
@@ -523,9 +523,8 @@ int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
 		return -ENOENT;
 
 	num_clips = r->num_clips;
-	clips_ptr = (struct drm_clip_rect __user *)(unsigned long)r->clips_ptr;
 
-	if (!num_clips != !clips_ptr) {
+	if (!num_clips != !r->clips_ptr) {
 		ret = -EINVAL;
 		goto out_err1;
 	}
@@ -538,22 +537,28 @@ int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
 		goto out_err1;
 	}
 
-	if (num_clips && clips_ptr) {
+	if (num_clips && r->clips_ptr) {
 		if (num_clips < 0 || num_clips > DRM_MODE_FB_DIRTY_MAX_CLIPS) {
 			ret = -EINVAL;
 			goto out_err1;
 		}
-		clips = kcalloc(num_clips, sizeof(*clips), GFP_KERNEL);
-		if (!clips) {
-			ret = -ENOMEM;
-			goto out_err1;
-		}
 
-		ret = copy_from_user(clips, clips_ptr,
-				     num_clips * sizeof(*clips));
-		if (ret) {
-			ret = -EFAULT;
-			goto out_err2;
+		if (user) {
+			clips_ptr = (struct drm_clip_rect __user *)(unsigned long)r->clips_ptr;
+			clips = kcalloc(num_clips, sizeof(*clips), GFP_KERNEL);
+			if (!clips) {
+				ret = -ENOMEM;
+				goto out_err1;
+			}
+
+			ret = copy_from_user(clips, clips_ptr,
+					     num_clips * sizeof(*clips));
+			if (ret) {
+				ret = -EFAULT;
+				goto out_err2;
+			}
+		} else {
+			clips = (struct drm_clip_rect *)(unsigned long)r->clips_ptr;
 		}
 	}
 
@@ -565,11 +570,18 @@ int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
 	}
 
 out_err2:
-	kfree(clips);
+	if (user)
+		kfree(clips);
 out_err1:
 	drm_framebuffer_put(fb);
 
 	return ret;
+}
+
+int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
+			   void *data, struct drm_file *file_priv)
+{
+	return drm_mode_dirtyfb(dev, data, file_priv, true);
 }
 
 /**

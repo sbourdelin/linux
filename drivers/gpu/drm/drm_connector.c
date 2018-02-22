@@ -1544,10 +1544,10 @@ static bool drm_mode_expose_to_userspace(const struct drm_display_mode *mode,
 	return true;
 }
 
-int drm_mode_getconnector(struct drm_device *dev, void *data,
-			  struct drm_file *file_priv)
+int drm_mode_getconnector(struct drm_device *dev,
+			  struct drm_mode_get_connector *out_resp,
+			  struct drm_file *file_priv, bool user)
 {
-	struct drm_mode_get_connector *out_resp = data;
 	struct drm_connector *connector;
 	struct drm_encoder *encoder;
 	struct drm_display_mode *mode;
@@ -1556,9 +1556,10 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	int ret = 0;
 	int copied = 0;
 	int i;
-	struct drm_mode_modeinfo u_mode;
-	struct drm_mode_modeinfo __user *mode_ptr;
-	uint32_t __user *encoder_ptr;
+	struct drm_mode_modeinfo __user *mode_ptr_user;
+	struct drm_mode_modeinfo u_mode, *mode_ptr;
+	uint32_t __user *encoder_ptr_user;
+	u32 *encoder_ptr;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EINVAL;
@@ -1575,13 +1576,18 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 
 	if ((out_resp->count_encoders >= encoders_count) && encoders_count) {
 		copied = 0;
-		encoder_ptr = (uint32_t __user *)(unsigned long)(out_resp->encoders_ptr);
+		encoder_ptr_user = (uint32_t __user *)(unsigned long)(out_resp->encoders_ptr);
+		encoder_ptr = (u32 *)(unsigned long)(out_resp->encoders_ptr);
 		for (i = 0; i < DRM_CONNECTOR_MAX_ENCODER; i++) {
 			if (connector->encoder_ids[i] != 0) {
-				if (put_user(connector->encoder_ids[i],
-					     encoder_ptr + copied)) {
-					ret = -EFAULT;
-					goto out;
+				if (user) {
+					if (put_user(connector->encoder_ids[i],
+						     encoder_ptr_user + copied)) {
+						ret = -EFAULT;
+						goto out;
+					}
+				} else {
+					encoder_ptr[copied] = connector->encoder_ids[i];
 				}
 				copied++;
 			}
@@ -1616,18 +1622,23 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	 */
 	if ((out_resp->count_modes >= mode_count) && mode_count) {
 		copied = 0;
-		mode_ptr = (struct drm_mode_modeinfo __user *)(unsigned long)out_resp->modes_ptr;
+		mode_ptr_user = (struct drm_mode_modeinfo __user *)(unsigned long)out_resp->modes_ptr;
+		mode_ptr = (struct drm_mode_modeinfo *)(unsigned long)out_resp->modes_ptr;
 		list_for_each_entry(mode, &connector->modes, head) {
 			if (!drm_mode_expose_to_userspace(mode, file_priv))
 				continue;
 
 			drm_mode_convert_to_umode(&u_mode, mode);
-			if (copy_to_user(mode_ptr + copied,
-					 &u_mode, sizeof(u_mode))) {
-				ret = -EFAULT;
-				mutex_unlock(&dev->mode_config.mutex);
+			if (user) {
+				if (copy_to_user(mode_ptr_user + copied,
+						 &u_mode, sizeof(u_mode))) {
+					ret = -EFAULT;
+					mutex_unlock(&dev->mode_config.mutex);
 
-				goto out;
+					goto out;
+				}
+			} else {
+				mode_ptr[copied] = u_mode;
 			}
 			copied++;
 		}
@@ -1656,6 +1667,11 @@ out:
 	return ret;
 }
 
+int drm_mode_getconnector_ioctl(struct drm_device *dev, void *data,
+				struct drm_file *file_priv)
+{
+	return drm_mode_getconnector(dev, data, file_priv, true);
+}
 
 /**
  * DOC: Tile group

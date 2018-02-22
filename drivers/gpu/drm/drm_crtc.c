@@ -538,21 +538,21 @@ EXPORT_SYMBOL(drm_crtc_check_viewport);
 /**
  * drm_mode_setcrtc - set CRTC configuration
  * @dev: drm device for the ioctl
- * @data: data pointer for the ioctl
- * @file_priv: drm file for the ioctl call
+ * @crtc_req: pointer to request structure
+ * @file_priv: drm file
+ * @user: True if called form userspace, false from in-kernel client
  *
- * Build a new CRTC configuration based on user request.
+ * Build a new CRTC configuration based on request.
  *
- * Called by the user via ioctl.
+ * Called by the user via ioctl, or by an in-kernel client.
  *
  * Returns:
  * Zero on success, negative errno on failure.
  */
-int drm_mode_setcrtc(struct drm_device *dev, void *data,
-		     struct drm_file *file_priv)
+int drm_mode_setcrtc(struct drm_device *dev, struct drm_mode_crtc *crtc_req,
+		     struct drm_file *file_priv, bool user)
 {
 	struct drm_mode_config *config = &dev->mode_config;
-	struct drm_mode_crtc *crtc_req = data;
 	struct drm_crtc *crtc;
 	struct drm_connector **connector_set = NULL, *connector;
 	struct drm_framebuffer *fb = NULL;
@@ -678,10 +678,14 @@ retry:
 
 		for (i = 0; i < crtc_req->count_connectors; i++) {
 			connector_set[i] = NULL;
-			set_connectors_ptr = (uint32_t __user *)(unsigned long)crtc_req->set_connectors_ptr;
-			if (get_user(out_id, &set_connectors_ptr[i])) {
-				ret = -EFAULT;
-				goto out;
+			if (user) {
+				set_connectors_ptr = (uint32_t __user *)(unsigned long)crtc_req->set_connectors_ptr;
+				if (get_user(out_id, &set_connectors_ptr[i])) {
+					ret = -EFAULT;
+					goto out;
+				}
+			} else {
+				out_id = ((u32 *)(unsigned long)crtc_req->set_connectors_ptr)[i];
 			}
 
 			connector = drm_connector_lookup(dev, file_priv, out_id);
@@ -730,6 +734,12 @@ out:
 	mutex_unlock(&crtc->dev->mode_config.mutex);
 
 	return ret;
+}
+
+int drm_mode_setcrtc_ioctl(struct drm_device *dev, void *data,
+			   struct drm_file *file_priv)
+{
+	return drm_mode_setcrtc(dev, data, file_priv, true);
 }
 
 int drm_mode_crtc_set_obj_prop(struct drm_mode_object *obj,

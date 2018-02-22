@@ -81,19 +81,20 @@ void drm_modeset_unregister_all(struct drm_device *dev)
  * Returns:
  * Zero on success, negative errno on failure.
  */
-int drm_mode_getresources(struct drm_device *dev, void *data,
-			  struct drm_file *file_priv)
+int drm_mode_getresources(struct drm_device *dev,
+			  struct drm_mode_card_res *card_res,
+			  struct drm_file *file_priv, bool user)
 {
-	struct drm_mode_card_res *card_res = data;
 	struct drm_framebuffer *fb;
 	struct drm_connector *connector;
 	struct drm_crtc *crtc;
 	struct drm_encoder *encoder;
 	int count, ret = 0;
-	uint32_t __user *fb_id;
-	uint32_t __user *crtc_id;
-	uint32_t __user *connector_id;
-	uint32_t __user *encoder_id;
+	uint32_t __user *fb_id_user;
+	uint32_t __user *crtc_id_user;
+	uint32_t __user *connector_id_user;
+	uint32_t __user *encoder_id_user;
+	u32 *fb_id, *crtc_id, *connector_id, *encoder_id;
 	struct drm_connector_list_iter conn_iter;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
@@ -102,12 +103,18 @@ int drm_mode_getresources(struct drm_device *dev, void *data,
 
 	mutex_lock(&file_priv->fbs_lock);
 	count = 0;
-	fb_id = u64_to_user_ptr(card_res->fb_id_ptr);
+	fb_id_user = u64_to_user_ptr(card_res->fb_id_ptr);
+	fb_id = (u32 *)(unsigned long)(card_res->fb_id_ptr);
 	list_for_each_entry(fb, &file_priv->fbs, filp_head) {
-		if (count < card_res->count_fbs &&
-		    put_user(fb->base.id, fb_id + count)) {
-			mutex_unlock(&file_priv->fbs_lock);
-			return -EFAULT;
+		if (count < card_res->count_fbs) {
+			if (user) {
+				if (put_user(fb->base.id, fb_id_user + count)) {
+					mutex_unlock(&file_priv->fbs_lock);
+					return -EFAULT;
+				}
+			} else {
+				fb_id[count] = fb->base.id;
+			}
 		}
 		count++;
 	}
@@ -120,36 +127,54 @@ int drm_mode_getresources(struct drm_device *dev, void *data,
 	card_res->min_width = dev->mode_config.min_width;
 
 	count = 0;
-	crtc_id = u64_to_user_ptr(card_res->crtc_id_ptr);
+	crtc_id_user = u64_to_user_ptr(card_res->crtc_id_ptr);
+	crtc_id = (u32 *)(unsigned long)(card_res->crtc_id_ptr);
 	drm_for_each_crtc(crtc, dev) {
 		if (drm_lease_held(file_priv, crtc->base.id)) {
-			if (count < card_res->count_crtcs &&
-			    put_user(crtc->base.id, crtc_id + count))
-				return -EFAULT;
+			if (count < card_res->count_crtcs) {
+				if (user) {
+					if (put_user(crtc->base.id, crtc_id_user + count))
+						return -EFAULT;
+				} else {
+					crtc_id[count] = crtc->base.id;
+				}
+			}
 			count++;
 		}
 	}
 	card_res->count_crtcs = count;
 
 	count = 0;
-	encoder_id = u64_to_user_ptr(card_res->encoder_id_ptr);
+	encoder_id_user = u64_to_user_ptr(card_res->encoder_id_ptr);
+	encoder_id = (u32 *)(unsigned long)(card_res->encoder_id_ptr);
 	drm_for_each_encoder(encoder, dev) {
-		if (count < card_res->count_encoders &&
-		    put_user(encoder->base.id, encoder_id + count))
-			return -EFAULT;
+		if (count < card_res->count_encoders) {
+			if (user) {
+				if (put_user(encoder->base.id, encoder_id_user + count))
+					return -EFAULT;
+			} else {
+				encoder_id[count] = encoder->base.id;
+			}
+		}
 		count++;
 	}
 	card_res->count_encoders = count;
 
 	drm_connector_list_iter_begin(dev, &conn_iter);
 	count = 0;
-	connector_id = u64_to_user_ptr(card_res->connector_id_ptr);
+	connector_id_user = u64_to_user_ptr(card_res->connector_id_ptr);
+	connector_id = (u32 *)(unsigned long)(card_res->connector_id_ptr);
 	drm_for_each_connector_iter(connector, &conn_iter) {
 		if (drm_lease_held(file_priv, connector->base.id)) {
-			if (count < card_res->count_connectors &&
-			    put_user(connector->base.id, connector_id + count)) {
-				drm_connector_list_iter_end(&conn_iter);
-				return -EFAULT;
+			if (count < card_res->count_connectors) {
+				if (user) {
+					if (put_user(connector->base.id, connector_id_user + count)) {
+						drm_connector_list_iter_end(&conn_iter);
+						return -EFAULT;
+					}
+				} else {
+					connector_id[count] = connector->base.id;
+				}
 			}
 			count++;
 		}
@@ -158,6 +183,12 @@ int drm_mode_getresources(struct drm_device *dev, void *data,
 	drm_connector_list_iter_end(&conn_iter);
 
 	return ret;
+}
+
+int drm_mode_getresources_ioctl(struct drm_device *dev, void *data,
+				struct drm_file *file_priv)
+{
+	return drm_mode_getresources(dev, data, file_priv, true);
 }
 
 /**

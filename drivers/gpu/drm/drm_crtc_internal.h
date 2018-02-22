@@ -45,20 +45,26 @@ void drm_crtc_unregister_all(struct drm_device *dev);
 
 struct dma_fence *drm_crtc_create_fence(struct drm_crtc *crtc);
 
+int drm_mode_setcrtc(struct drm_device *dev, struct drm_mode_crtc *crtc_req,
+		     struct drm_file *file_priv, bool user);
+
 /* IOCTLs */
 int drm_mode_getcrtc(struct drm_device *dev,
 		     void *data, struct drm_file *file_priv);
-int drm_mode_setcrtc(struct drm_device *dev,
-		     void *data, struct drm_file *file_priv);
+int drm_mode_setcrtc_ioctl(struct drm_device *dev,
+			   void *data, struct drm_file *file_priv);
 
 
 /* drm_mode_config.c */
 int drm_modeset_register_all(struct drm_device *dev);
 void drm_modeset_unregister_all(struct drm_device *dev);
+int drm_mode_getresources(struct drm_device *dev,
+			  struct drm_mode_card_res *card_res,
+			  struct drm_file *file_priv, bool user);
 
 /* IOCTLs */
-int drm_mode_getresources(struct drm_device *dev,
-			  void *data, struct drm_file *file_priv);
+int drm_mode_getresources_ioctl(struct drm_device *dev, void *data,
+				struct drm_file *file_priv);
 
 
 /* drm_dumb_buffers.c */
@@ -143,12 +149,15 @@ int drm_mode_connector_set_obj_prop(struct drm_mode_object *obj,
 int drm_connector_create_standard_properties(struct drm_device *dev);
 const char *drm_get_connector_force_name(enum drm_connector_force force);
 void drm_connector_free_work_fn(struct work_struct *work);
+int drm_mode_getconnector(struct drm_device *dev,
+			  struct drm_mode_get_connector *out_resp,
+			  struct drm_file *file_priv, bool user);
 
 /* IOCTL */
 int drm_mode_connector_property_set_ioctl(struct drm_device *dev,
 					  void *data, struct drm_file *file_priv);
-int drm_mode_getconnector(struct drm_device *dev,
-			  void *data, struct drm_file *file_priv);
+int drm_mode_getconnector_ioctl(struct drm_device *dev,
+				void *data, struct drm_file *file_priv);
 
 /* drm_framebuffer.c */
 struct drm_framebuffer *
@@ -161,6 +170,8 @@ int drm_framebuffer_check_src_coords(uint32_t src_x, uint32_t src_y,
 				     const struct drm_framebuffer *fb);
 void drm_fb_release(struct drm_file *file_priv);
 
+int drm_mode_dirtyfb(struct drm_device *dev, struct drm_mode_fb_dirty_cmd *req,
+		     struct drm_file *file_priv, bool user);
 
 /* IOCTL */
 int drm_mode_addfb(struct drm_device *dev,
