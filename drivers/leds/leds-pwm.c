@@ -39,8 +39,11 @@ struct led_pwm_priv {
 static void __led_pwm_set(struct led_pwm_data *led_dat)
 {
 	int new_duty = led_dat->duty;
+	struct pwm_caps caps = { };
 
-	pwm_config(led_dat->pwm, new_duty, led_dat->period);
+	pwm_get_caps(led_dat->pwm->chip, led_dat->pwm, &caps);
+	pwm_config(led_dat->pwm, new_duty, led_dat->period,
+		   BIT(ffs(caps.modes) - 1));
 
 	if (new_duty == 0)
 		pwm_disable(led_dat->pwm);

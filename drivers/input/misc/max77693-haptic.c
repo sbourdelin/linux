@@ -76,7 +76,7 @@ static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
 
 	pwm_get_args(haptic->pwm_dev, &pargs);
 	delta = (pargs.period + haptic->pwm_duty) / 2;
-	error = pwm_config(haptic->pwm_dev, delta, pargs.period);
+	error = pwm_config(haptic->pwm_dev, delta, pargs.period, pargs.mode);
 	if (error) {
 		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
 		return error;

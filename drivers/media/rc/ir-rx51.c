@@ -55,10 +55,13 @@ static int init_timing_params(struct ir_rx51 *ir_rx51)
 {
 	struct pwm_device *pwm = ir_rx51->pwm;
 	int duty, period = DIV_ROUND_CLOSEST(NSEC_PER_SEC, ir_rx51->freq);
+	struct pwm_caps caps = { };
 
 	duty = DIV_ROUND_CLOSEST(ir_rx51->duty_cycle * period, 100);
 
-	pwm_config(pwm, duty, period);
+	pwm_get_caps(pwm->chip, pwm, &caps);
+
+	pwm_config(pwm, duty, period, BIT(ffs(caps.modes) - 1));
 
 	return 0;
 }

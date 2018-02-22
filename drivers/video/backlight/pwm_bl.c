@@ -63,10 +63,14 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
 
 static void pwm_backlight_power_off(struct pwm_bl_data *pb)
 {
+	struct pwm_caps caps = { };
+
 	if (!pb->enabled)
 		return;
 
-	pwm_config(pb->pwm, 0, pb->period);
+	pwm_get_caps(pb->pwm->chip, pb->pwm, &caps);
+
+	pwm_config(pb->pwm, 0, pb->period, BIT(ffs(caps.modes) - 1));
 	pwm_disable(pb->pwm);
 
 	if (pb->enable_gpio)
@@ -96,6 +100,7 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
 {
 	struct pwm_bl_data *pb = bl_get_data(bl);
 	int brightness = bl->props.brightness;
+	struct pwm_caps caps = { };
 	int duty_cycle;
 
 	if (bl->props.power != FB_BLANK_UNBLANK ||
@@ -108,7 +113,9 @@ static int pwm_backlight_update_status(struct backlight_device *bl)
 
 	if (brightness > 0) {
 		duty_cycle = compute_duty_cycle(pb, brightness);
-		pwm_config(pb->pwm, duty_cycle, pb->period);
+		pwm_get_caps(pb->pwm->chip, pb->pwm, &caps);
+		pwm_config(pb->pwm, duty_cycle, pb->period,
+			   BIT(ffs(caps.modes) - 1));
 		pwm_backlight_power_on(pb, brightness);
 	} else
 		pwm_backlight_power_off(pb);

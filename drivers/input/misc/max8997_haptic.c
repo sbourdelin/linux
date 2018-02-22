@@ -73,7 +73,11 @@ static int max8997_haptic_set_duty_cycle(struct max8997_haptic *chip)
 
 	if (chip->mode == MAX8997_EXTERNAL_MODE) {
 		unsigned int duty = chip->pwm_period * chip->level / 100;
-		ret = pwm_config(chip->pwm, duty, chip->pwm_period);
+		struct pwm_caps caps = { };
+
+		pwm_get_caps(chip->pwm->chip, chip->pwm, &caps);
+		ret = pwm_config(chip->pwm, duty, chip->pwm_period,
+				 BIT(ffs(caps.modes) - 1));
 	} else {
 		int i;
 		u8 duty_index = 0;

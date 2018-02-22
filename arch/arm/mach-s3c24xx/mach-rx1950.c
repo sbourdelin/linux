@@ -386,8 +386,13 @@ static void rx1950_lcd_power(int enable)
 {
 	int i;
 	static int enabled;
+	struct pwm_caps caps = { };
+
 	if (enabled == enable)
 		return;
+
+	pwm_get_caps(lcd_pwm->chip, lcd_pwm, &caps);
+
 	if (!enable) {
 
 		/* GPC11-GPC15->OUTPUT */
@@ -433,14 +438,16 @@ static void rx1950_lcd_power(int enable)
 
 		/* GPB1->OUTPUT, GPB1->0 */
 		gpio_direction_output(S3C2410_GPB(1), 0);
-		pwm_config(lcd_pwm, 0, LCD_PWM_PERIOD);
+		pwm_config(lcd_pwm, 0, LCD_PWM_PERIOD,
+			   BIT(ffs(caps.modes) - 1));
 		pwm_disable(lcd_pwm);
 
 		/* GPC0->0, GPC10->0 */
 		gpio_direction_output(S3C2410_GPC(0), 0);
 		gpio_direction_output(S3C2410_GPC(10), 0);
 	} else {
-		pwm_config(lcd_pwm, LCD_PWM_DUTY, LCD_PWM_PERIOD);
+		pwm_config(lcd_pwm, LCD_PWM_DUTY, LCD_PWM_PERIOD,
+			   BIT(ffs(caps.modes) - 1));
 		pwm_enable(lcd_pwm);
 
 		gpio_direction_output(S3C2410_GPC(0), 1);

@@ -128,6 +128,7 @@ static void lp8788_pwm_ctrl(struct lp8788_bl *bl, int br, int max_br)
 	unsigned int duty;
 	struct device *dev;
 	struct pwm_device *pwm;
+	struct pwm_caps caps = { };
 
 	if (!bl->pdata)
 		return;
@@ -153,7 +154,9 @@ static void lp8788_pwm_ctrl(struct lp8788_bl *bl, int br, int max_br)
 		pwm_apply_args(pwm);
 	}
 
-	pwm_config(bl->pwm, duty, period);
+	pwm_get_caps(bl->pwm->chip, bl->pwm, &caps);
+
+	pwm_config(bl->pwm, duty, period, BIT(ffs(caps.modes) - 1));
 	if (duty)
 		pwm_enable(bl->pwm);
 	else

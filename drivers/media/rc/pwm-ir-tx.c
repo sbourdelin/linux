@@ -61,6 +61,7 @@ static int pwm_ir_tx(struct rc_dev *dev, unsigned int *txbuf,
 {
 	struct pwm_ir *pwm_ir = dev->priv;
 	struct pwm_device *pwm = pwm_ir->pwm;
+	struct pwm_caps caps = { };
 	int i, duty, period;
 	ktime_t edge;
 	long delta;
@@ -68,7 +69,9 @@ static int pwm_ir_tx(struct rc_dev *dev, unsigned int *txbuf,
 	period = DIV_ROUND_CLOSEST(NSEC_PER_SEC, pwm_ir->carrier);
 	duty = DIV_ROUND_CLOSEST(pwm_ir->duty_cycle * period, 100);
 
-	pwm_config(pwm, duty, period);
+	pwm_get_caps(pwm->chip, pwm, &caps);
+
+	pwm_config(pwm, duty, period, BIT(ffs(caps.modes) - 1));
 
 	edge = ktime_get();
 

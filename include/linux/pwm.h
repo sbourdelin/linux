@@ -357,11 +357,12 @@ int pwm_adjust_config(struct pwm_device *pwm);
  * @pwm: PWM device
  * @duty_ns: "on" time (in nanoseconds)
  * @period_ns: duration (in nanoseconds) of one cycle
+ * @mode: PWM mode
  *
  * Returns: 0 on success or a negative error code on failure.
  */
 static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
-			     int period_ns)
+			     int period_ns, unsigned long mode)
 {
 	struct pwm_state state;
 
@@ -377,6 +378,7 @@ static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
 
 	state.duty_cycle = duty_ns;
 	state.period = period_ns;
+	state.mode = mode;
 	return pwm_apply_state(pwm, &state);
 }
 
@@ -537,7 +539,7 @@ static inline int pwm_adjust_config(struct pwm_device *pwm)
 }
 
 static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
-			     int period_ns)
+			     int period_ns, unsigned long mode)
 {
 	return -EINVAL;
 }

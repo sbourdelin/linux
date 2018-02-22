@@ -633,8 +633,12 @@ static void pwm_set_backlight(const struct drm_connector_state *conn_state, u32 
 {
 	struct intel_panel *panel = &to_intel_connector(conn_state->connector)->panel;
 	int duty_ns = DIV_ROUND_UP(level * CRC_PMIC_PWM_PERIOD_NS, 100);
+	struct pwm_caps caps = { };
 
-	pwm_config(panel->backlight.pwm, duty_ns, CRC_PMIC_PWM_PERIOD_NS);
+	pwm_get_caps(panel->backlight.pwm->chip, panel->backlight.pwm, &caps);
+
+	pwm_config(panel->backlight.pwm, duty_ns, CRC_PMIC_PWM_PERIOD_NS,
+		   BIT(ffs(caps.modes) - 1));
 }
 
 static void
@@ -821,9 +825,13 @@ static void pwm_disable_backlight(const struct drm_connector_state *old_conn_sta
 {
 	struct intel_connector *connector = to_intel_connector(old_conn_state->connector);
 	struct intel_panel *panel = &connector->panel;
+	struct pwm_caps caps = { };
+
+	pwm_get_caps(panel->backlight.pwm->chip, panel->backlight.pwm, &caps);
 
 	/* Disable the backlight */
-	pwm_config(panel->backlight.pwm, 0, CRC_PMIC_PWM_PERIOD_NS);
+	pwm_config(panel->backlight.pwm, 0, CRC_PMIC_PWM_PERIOD_NS,
+		   BIT(ffs(caps.modes) - 1));
 	usleep_range(2000, 3000);
 	pwm_disable(panel->backlight.pwm);
 }
@@ -1754,6 +1762,7 @@ static int pwm_setup_backlight(struct intel_connector *connector,
 {
 	struct drm_device *dev = connector->base.dev;
 	struct intel_panel *panel = &connector->panel;
+	struct pwm_caps caps = { };
 	int retval;
 
 	/* Get the PWM chip for backlight control */
@@ -1770,8 +1779,10 @@ static int pwm_setup_backlight(struct intel_connector *connector,
 	 */
 	pwm_apply_args(panel->backlight.pwm);
 
+	pwm_get_caps(panel->backlight.pwm->chip, panel->backlight.pwm, &caps);
+
 	retval = pwm_config(panel->backlight.pwm, CRC_PMIC_PWM_PERIOD_NS,
-			    CRC_PMIC_PWM_PERIOD_NS);
+			    CRC_PMIC_PWM_PERIOD_NS, BIT(ffs(caps.modes) - 1));
 	if (retval < 0) {
 		DRM_ERROR("Failed to configure the pwm chip\n");
 		pwm_put(panel->backlight.pwm);

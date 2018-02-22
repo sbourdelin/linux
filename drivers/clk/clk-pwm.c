@@ -92,7 +92,8 @@ static int clk_pwm_probe(struct platform_device *pdev)
 	 * atomic PWM API.
 	 */
 	pwm_apply_args(pwm);
-	ret = pwm_config(pwm, (pargs.period + 1) >> 1, pargs.period);
+	ret = pwm_config(pwm, (pargs.period + 1) >> 1, pargs.period,
+			 pargs.mode);
 	if (ret < 0)
 		return ret;
 

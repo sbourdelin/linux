@@ -165,8 +165,10 @@ static void lm3630a_pwm_ctrl(struct lm3630a_chip *pchip, int br, int br_max)
 {
 	unsigned int period = pchip->pdata->pwm_period;
 	unsigned int duty = br * period / br_max;
+	struct pwm_caps caps = { };
 
-	pwm_config(pchip->pwmd, duty, period);
+	pwm_get_caps(pchip->pwmd->chip, pchip->pwmd, &caps);
+	pwm_config(pchip->pwmd, duty, period, BIT(ffs(caps.modes) - 1));
 	if (duty)
 		pwm_enable(pchip->pwmd);
 	else

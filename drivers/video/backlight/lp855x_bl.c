@@ -240,6 +240,7 @@ static void lp855x_pwm_ctrl(struct lp855x *lp, int br, int max_br)
 	unsigned int period = lp->pdata->period_ns;
 	unsigned int duty = br * period / max_br;
 	struct pwm_device *pwm;
+	struct pwm_caps caps = { };
 
 	/* request pwm device with the consumer name */
 	if (!lp->pwm) {
@@ -256,7 +257,8 @@ static void lp855x_pwm_ctrl(struct lp855x *lp, int br, int max_br)
 		pwm_apply_args(pwm);
 	}
 
-	pwm_config(lp->pwm, duty, period);
+	pwm_get_caps(lp->pwm->chip, lp->pwm, &caps);
+	pwm_config(lp->pwm, duty, period, BIT(ffs(caps.modes) - 1));
 	if (duty)
 		pwm_enable(lp->pwm);
 	else

@@ -308,7 +308,7 @@ static int pwm_fan_resume(struct device *dev)
 
 	pwm_get_args(ctx->pwm, &pargs);
 	duty = DIV_ROUND_UP(ctx->pwm_value * (pargs.period - 1), MAX_PWM);
-	ret = pwm_config(ctx->pwm, duty, pargs.period);
+	ret = pwm_config(ctx->pwm, duty, pargs.period, pargs.mode);
 	if (ret)
 		return ret;
 	return pwm_enable(ctx->pwm);
