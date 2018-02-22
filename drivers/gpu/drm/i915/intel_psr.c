@@ -56,6 +56,39 @@
 #include "intel_drv.h"
 #include "i915_drv.h"
 
+static void psr_power_get(struct intel_dp *intel_dp)
+{
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_i915_private *dev_priv = to_i915(intel_dig_port->base.base.dev);
+	enum intel_display_power_domain aux_domain;
+
+	if (INTEL_GEN(dev_priv) < 10)
+		return;
+
+	/* CNL HW requires corresponding AUX IOs to be powered up for PSR, AUX-A
+	 * does not require the driver to disable DC states, but the rest do.
+	 * Although PSR is enabled only on Port A currently, let's do this
+	 * correctly for other ports too.
+	 */
+	aux_domain = intel_dp->aux_ch == AUX_CH_A ? POWER_DOMAIN_AUX_IO_A :
+						    intel_dp->aux_power_domain;
+	intel_display_power_get(dev_priv, aux_domain);
+}
+
+static void psr_power_put(struct intel_dp *intel_dp)
+{
+	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
+	struct drm_i915_private *dev_priv = to_i915(intel_dig_port->base.base.dev);
+	enum intel_display_power_domain aux_domain;
+
+	if (INTEL_GEN(dev_priv) < 10)
+		return;
+
+	aux_domain = intel_dp->aux_ch == AUX_CH_A ? POWER_DOMAIN_AUX_IO_A :
+						    intel_dp->aux_power_domain;
+	intel_display_power_put(dev_priv, aux_domain);
+}
+
 static bool vlv_is_psr_active_on_pipe(struct drm_device *dev, int pipe)
 {
 	struct drm_i915_private *dev_priv = to_i915(dev);
@@ -459,6 +492,8 @@ static void hsw_psr_enable_source(struct intel_dp *intel_dp,
 	enum transcoder cpu_transcoder = crtc_state->cpu_transcoder;
 	u32 chicken;
 
+	psr_power_get(intel_dp);
+
 	if (dev_priv->psr.psr2_support) {
 		chicken = PSR2_VSC_ENABLE_PROG_HEADER;
 		if (dev_priv->psr.y_cord_support)
@@ -617,6 +652,8 @@ static void hsw_psr_disable(struct intel_dp *intel_dp,
 		else
 			WARN_ON(I915_READ(EDP_PSR_CTL) & EDP_PSR_ENABLE);
 	}
+
+	psr_power_put(intel_dp);
 }
 
 /**
