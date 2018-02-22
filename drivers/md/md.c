@@ -7607,6 +7607,14 @@ static int status_resync(struct seq_file *seq, struct mddev *mddev)
 	sector_t rt;
 	int scale;
 	unsigned int per_milli;
+	char *sync_action;
+
+	sync_action = (test_bit(MD_RECOVERY_RESHAPE, &mddev->recovery) ?
+		"reshape" :
+		(test_bit(MD_RECOVERY_CHECK, &mddev->recovery) ?
+		"check" :
+		(test_bit(MD_RECOVERY_SYNC, &mddev->recovery) ?
+		"resync" : "recovery")));
 
 	if (test_bit(MD_RECOVERY_SYNC, &mddev->recovery) ||
 	    test_bit(MD_RECOVERY_RESHAPE, &mddev->recovery))
@@ -7616,9 +7624,11 @@ static int status_resync(struct seq_file *seq, struct mddev *mddev)
 
 	resync = mddev->curr_resync;
 	if (resync <= 3) {
-		if (test_bit(MD_RECOVERY_DONE, &mddev->recovery))
+		if (test_bit(MD_RECOVERY_DONE, &mddev->recovery)) {
 			/* Still cleaning up */
-			resync = max_sectors;
+			seq_printf(seq, "\t%s=CLEANING UP", sync_action);
+			return 1;
+		}
 	} else if (resync > max_sectors)
 		resync = max_sectors;
 	else
@@ -7626,13 +7636,13 @@ static int status_resync(struct seq_file *seq, struct mddev *mddev)
 
 	if (resync == 0) {
 		if (mddev->recovery_cp < MaxSector) {
-			seq_printf(seq, "\tresync=PENDING");
+			seq_printf(seq, "\t%s=PENDING", sync_action);
 			return 1;
 		}
 		return 0;
 	}
 	if (resync < 3) {
-		seq_printf(seq, "\tresync=DELAYED");
+		seq_printf(seq, "\t%s=DELAYED", sync_action);
 		return 1;
 	}
 
@@ -7662,12 +7672,7 @@ static int status_resync(struct seq_file *seq, struct mddev *mddev)
 		seq_printf(seq, "] ");
 	}
 	seq_printf(seq, " %s =%3u.%u%% (%llu/%llu)",
-		   (test_bit(MD_RECOVERY_RESHAPE, &mddev->recovery)?
-		    "reshape" :
-		    (test_bit(MD_RECOVERY_CHECK, &mddev->recovery)?
-		     "check" :
-		     (test_bit(MD_RECOVERY_SYNC, &mddev->recovery) ?
-		      "resync" : "recovery"))),
+		   sync_action,
 		   per_milli/10, per_milli % 10,
 		   (unsigned long long) resync/2,
 		   (unsigned long long) max_sectors/2);
