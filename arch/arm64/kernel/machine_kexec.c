@@ -205,10 +205,17 @@ void machine_kexec(struct kimage *kimage)
 	 * uses physical addressing to relocate the new image to its final
 	 * position and transfers control to the image entry point when the
 	 * relocation is complete.
+	 * In case of kexec_file_load syscall, we directly start the kernel,
+	 * skipping purgatory.
 	 */
-
 	cpu_soft_restart(kimage != kexec_crash_image,
-		reboot_code_buffer_phys, kimage->head, kimage->start, 0);
+		reboot_code_buffer_phys, kimage->head, kimage->start,
+#ifdef CONFIG_KEXEC_FILE
+				kimage->purgatory_info.purgatory_buf ?
+						0 : kimage->arch.dtb_mem);
+#else
+				0);
+#endif
 
 	BUG(); /* Should never get here. */
 }
