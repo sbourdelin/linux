@@ -137,6 +137,7 @@ static struct pwm_device *
 cros_ec_pwm_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
 {
 	struct pwm_device *pwm;
+	struct pwm_caps caps;
 
 	if (args->args[0] >= pc->npwm)
 		return ERR_PTR(-EINVAL);
@@ -145,8 +146,11 @@ cros_ec_pwm_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
 	if (IS_ERR(pwm))
 		return pwm;
 
+	pwm_get_caps(pc, pwm, &caps);
+
 	/* The EC won't let us change the period */
 	pwm->args.period = EC_PWM_MAX_DUTY;
+	pwm->args.mode = BIT(ffs(caps.modes) - 1);
 
 	return pwm;
 }
