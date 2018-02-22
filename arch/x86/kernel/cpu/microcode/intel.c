@@ -601,6 +601,13 @@ static int apply_microcode_early(struct ucode_cpu_info *uci, bool early)
 		return UCODE_OK;
 	}
 
+	/*
+	 * Microcode updates can be safer if the caches are clean.
+	 * Some of the issues around in certain Broadwell parts
+	 * can be addressed by doing a full cache flush.
+	 */
+	native_wbinvd();
+
 	/* write microcode via MSR 0x79 */
 	native_wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)mc->bits);
 
@@ -816,6 +823,13 @@ static enum ucode_state apply_microcode_intel(int cpu)
 		c->microcode = rev;
 		return UCODE_OK;
 	}
+
+	/*
+	 * Microcode updates can be safer if the caches are clean.
+	 * Some of the issues around in certain Broadwell parts
+	 * can be addressed by doing a full cache flush.
+	 */
+	wbinvd();
 
 	/* write microcode via MSR 0x79 */
 	wrmsrl(MSR_IA32_UCODE_WRITE, (unsigned long)mc->bits);
