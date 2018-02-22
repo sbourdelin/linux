@@ -28,8 +28,9 @@
 
 static inline void arch_spin_unlock(arch_spinlock_t *lock)
 {
+	RISCV_FENCE(rw,w);
 	__asm__ __volatile__ (
-		"amoswap.w.rl x0, x0, %0"
+		"amoswap.w x0, x0, %0"
 		: "=A" (lock->lock)
 		:: "memory");
 }
@@ -39,10 +40,11 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
 	int tmp = 1, busy;
 
 	__asm__ __volatile__ (
-		"amoswap.w.aq %0, %2, %1"
+		"amoswap.w %0, %2, %1"
 		: "=r" (busy), "+A" (lock->lock)
 		: "r" (tmp)
 		: "memory");
+	RISCV_FENCE(r,rw);
 
 	return !busy;
 }
