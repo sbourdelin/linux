@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2015-2018, Intel Corporation.
+/*
+ * Copyright (c) 2015-2018, Intel Corporation.
+ */
 
 #define pr_fmt(fmt) "aspeed-kcs-bmc: " fmt
 
