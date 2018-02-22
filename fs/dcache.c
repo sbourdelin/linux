@@ -690,11 +690,17 @@ again:
 
 /*
  * Finish off a dentry we've decided to kill.
- * dentry->d_lock must be held, returns with it unlocked.
- * Returns dentry requiring refcount drop, or NULL if we're done.
+ * dentry->d_lock must be held and returns with it unlocked if the
+ * dentry was killed.
+ *
+ * Returns parent dentry requiring refcount drop or NULL if we're done
+ * or ERR_PTR(-EINTR) if the dentry was not killed because its refcount
+ * changed while preparing to kill.
+ *
+ * Note, if the dentry was not killed, i.e. ERR_PTR(-EINTR) returned,
+ * dentry->d_lock is left locked!
  */
 static struct dentry *dentry_kill(struct dentry *dentry)
-	__releases(dentry->d_lock)
 {
 	int saved_count = dentry->d_lockref.count;
 	struct dentry *parent;
@@ -741,6 +747,27 @@ again:
 	return parent;
 
 out_ref_changed:
+	/* dentry->d_lock still locked! */
+	return ERR_PTR(-EINTR);
+}
+
+/*
+ * Finish off a dentry where we are the last user (refcount=1) and
+ * we've decided to kill it.
+ * dentry->d_lock must be held, returns with it unlocked.
+ * Returns dentry requiring refcount drop, or NULL if we're done.
+ */
+static struct dentry *dentry_put_kill(struct dentry *dentry)
+	__releases(dentry->d_lock)
+{
+	struct dentry *parent;
+
+	parent = dentry_kill(dentry);
+	if (likely(!IS_ERR(parent)))
+		return parent;
+
+	/* dentry->d_lock still held */
+
 	/*
 	 * The refcount was incremented while dentry->d_lock was dropped.
 	 * Just decrement the refcount, unlock, and tell the caller to
@@ -927,7 +954,7 @@ repeat:
 	return;
 
 kill_it:
-	dentry = dentry_kill(dentry);
+	dentry = dentry_put_kill(dentry);
 	if (dentry)
 		goto repeat;
 }
@@ -1078,10 +1105,8 @@ static void shrink_dentry_list(struct list_head *list)
 	struct dentry *dentry, *parent;
 
 	while (!list_empty(list)) {
-		struct inode *inode;
 		dentry = list_entry(list->prev, struct dentry, d_lru);
 		spin_lock(&dentry->d_lock);
-		parent = lock_parent(dentry);
 
 		/*
 		 * The dispose list is isolated and dentries are not accounted
@@ -1089,15 +1114,13 @@ static void shrink_dentry_list(struct list_head *list)
 		 * here regardless of whether it is referenced or not.
 		 */
 		d_shrink_del(dentry);
-
+again:
 		/*
 		 * We found an inuse dentry which was not removed from
 		 * the LRU because of laziness during lookup. Do not free it.
 		 */
 		if (dentry->d_lockref.count > 0) {
 			spin_unlock(&dentry->d_lock);
-			if (parent)
-				spin_unlock(&parent->d_lock);
 			continue;
 		}
 
@@ -1105,23 +1128,14 @@ static void shrink_dentry_list(struct list_head *list)
 		if (unlikely(dentry->d_flags & DCACHE_DENTRY_KILLED)) {
 			bool can_free = dentry->d_flags & DCACHE_MAY_FREE;
 			spin_unlock(&dentry->d_lock);
-			if (parent)
-				spin_unlock(&parent->d_lock);
 			if (can_free)
 				dentry_free(dentry);
 			continue;
 		}
 
-		inode = dentry->d_inode;
-		if (inode && unlikely(!spin_trylock(&inode->i_lock))) {
-			d_shrink_add(dentry, list);
-			spin_unlock(&dentry->d_lock);
-			if (parent)
-				spin_unlock(&parent->d_lock);
-			continue;
-		}
-
-		__dentry_kill(dentry);
+		parent = dentry_kill(dentry);
+		if (unlikely(IS_ERR(parent)))
+			goto again;
 
 		/*
 		 * We need to prune ancestors too. This is necessary to prevent
@@ -1131,7 +1145,7 @@ static void shrink_dentry_list(struct list_head *list)
 		 */
 		dentry = parent;
 		while (dentry && !lockref_put_or_lock(&dentry->d_lockref))
-			dentry = dentry_kill(dentry);
+			dentry = dentry_put_kill(dentry);
 	}
 }
 
