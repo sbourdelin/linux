@@ -618,13 +618,24 @@ static void pseries_pci_fixup_iov_resources(struct pci_dev *pdev)
 {
 	const int *indexes;
 	struct device_node *dn = pci_device_to_OF_node(pdev);
+	int i;
+	struct resource *r;
 
 	if (!pdev->is_physfn || pdev->is_added)
 		return;
 	/*Firmware must support open sriov otherwise dont configure*/
 	indexes = of_get_property(dn, "ibm,open-sriov-vf-bar-info", NULL);
-	if (!indexes)
+	if (!indexes) {
+		/* Hide the BARs we can't configure, otherwise other
+		 * code may see r->flags != 0 and r->parent == 0
+		 * and raise an error. */
+		pci_warn(pdev, "No hypervisor support for SRIOV on this device, IOV BARs disabled.\n");
+		for (i = 0; i < PCI_SRIOV_NUM_BARS; i++) {
+			r = &pdev->resource[PCI_IOV_RESOURCES + i];
+			r->start = r->end = r->flags = 0;
+		}
 		return;
+	}
 	/* Assign the addresses from device tree*/
 	of_pci_parse_iov_addrs(pdev, indexes);
 }
