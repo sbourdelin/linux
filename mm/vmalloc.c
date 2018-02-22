@@ -1469,8 +1469,11 @@ struct vm_struct *find_vm_area(const void *addr)
 	struct vmap_area *va;
 
 	va = find_vmap_area((unsigned long)addr);
-	if (va && va->flags & VM_VM_AREA)
+	if (va && va->flags & VM_VM_AREA) {
+		if (is_vmalloc_addr(addr))
+			pr_err("struct page = %p", vmalloc_to_page(addr));
 		return va->vm;
+	}
 
 	return NULL;
 }
