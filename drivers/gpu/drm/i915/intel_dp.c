@@ -1059,29 +1059,11 @@ static uint32_t skl_get_aux_send_ctl(struct intel_dp *intel_dp,
 	       DP_AUX_CH_CTL_SYNC_PULSE_SKL(32);
 }
 
-static uint32_t intel_dp_get_aux_send_ctl(struct intel_dp *intel_dp,
-					  bool has_aux_irq,
-					  int send_bytes,
-					  uint32_t aux_clock_divider,
-					  bool aksv_write)
-{
-	uint32_t val = 0;
-
-	if (aksv_write) {
-		send_bytes += 5;
-		val |= DP_AUX_CH_CTL_AUX_AKSV_SELECT;
-	}
-
-	return val | intel_dp->get_aux_send_ctl(intel_dp,
-						has_aux_irq,
-						send_bytes,
-						aux_clock_divider);
-}
-
 static int
 intel_dp_aux_xfer(struct intel_dp *intel_dp,
 		  const uint8_t *send, int send_bytes,
-		  uint8_t *recv, int recv_size, bool aksv_write)
+		  uint8_t *recv, int recv_size,
+		  u32 aux_send_ctl_flags)
 {
 	struct intel_digital_port *intel_dig_port = dp_to_dig_port(intel_dp);
 	struct drm_i915_private *dev_priv =
@@ -1145,11 +1127,12 @@ intel_dp_aux_xfer(struct intel_dp *intel_dp,
 	}
 
 	while ((aux_clock_divider = intel_dp->get_aux_clock_divider(intel_dp, clock++))) {
-		u32 send_ctl = intel_dp_get_aux_send_ctl(intel_dp,
-							 has_aux_irq,
-							 send_bytes,
-							 aux_clock_divider,
-							 aksv_write);
+		u32 send_ctl = intel_dp->get_aux_send_ctl(intel_dp,
+							  has_aux_irq,
+							  send_bytes,
+							  aux_clock_divider);
+
+		send_ctl |= aux_send_ctl_flags;
 
 		/* Must try at least 3 times according to DP spec */
 		for (try = 0; try < 5; try++) {
@@ -1287,7 +1270,7 @@ intel_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 			memcpy(txbuf + HEADER_SIZE, msg->buffer, msg->size);
 
 		ret = intel_dp_aux_xfer(intel_dp, txbuf, txsize,
-					rxbuf, rxsize, false);
+					rxbuf, rxsize, 0);
 		if (ret > 0) {
 			msg->reply = rxbuf[0] >> 4;
 
@@ -1310,7 +1293,7 @@ intel_dp_aux_transfer(struct drm_dp_aux *aux, struct drm_dp_aux_msg *msg)
 			return -E2BIG;
 
 		ret = intel_dp_aux_xfer(intel_dp, txbuf, txsize,
-					rxbuf, rxsize, false);
+					rxbuf, rxsize, 0);
 		if (ret > 0) {
 			msg->reply = rxbuf[0] >> 4;
 			/*
@@ -5109,8 +5092,9 @@ int intel_dp_hdcp_write_an_aksv(struct intel_digital_port *intel_dig_port,
 	txbuf[2] = DP_AUX_HDCP_AKSV & 0xff;
 	txbuf[3] = DRM_HDCP_KSV_LEN - 1;
 
-	ret = intel_dp_aux_xfer(intel_dp, txbuf, sizeof(txbuf),
-				rxbuf, sizeof(rxbuf), true);
+	ret = intel_dp_aux_xfer(intel_dp, txbuf, sizeof(txbuf) + 5,
+				rxbuf, sizeof(rxbuf),
+				DP_AUX_CH_CTL_AUX_AKSV_SELECT);
 	if (ret < 0) {
 		DRM_ERROR("Write Aksv over DP/AUX failed (%d)\n", ret);
 		return ret;
