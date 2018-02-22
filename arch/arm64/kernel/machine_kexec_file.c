@@ -25,6 +25,7 @@ static int __dt_root_addr_cells;
 static int __dt_root_size_cells;
 
 const struct kexec_file_ops * const kexec_file_loaders[] = {
+	&kexec_image_ops,
 	NULL
 };
 
