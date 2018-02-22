@@ -1631,6 +1631,56 @@ int drm_mode_convert_umode(struct drm_device *dev,
 out:
 	return ret;
 }
+EXPORT_SYMBOL(drm_mode_convert_umode);
+
+/**
+ * drm_umode_equal - test modeinfo modes for equality
+ * @mode1: first mode
+ * @mode2: second mode
+ *
+ * Check to see if @mode1 and @mode2 are equivalent.
+ *
+ * Returns:
+ * True if the modes are equal, false otherwise.
+ */
+bool drm_umode_equal(const struct drm_mode_modeinfo *mode1,
+		     const struct drm_mode_modeinfo *mode2)
+{
+	if (!mode1 && !mode2)
+		return true;
+
+	if (!mode1 || !mode2)
+		return false;
+
+	/* do clock check convert to PICOS so fb modes get matched the same */
+	if (mode1->clock && mode2->clock) {
+		if (KHZ2PICOS(mode1->clock) != KHZ2PICOS(mode2->clock))
+			return false;
+	} else if (mode1->clock != mode2->clock) {
+		return false;
+	}
+
+	if ((mode1->flags & DRM_MODE_FLAG_3D_MASK) !=
+	    (mode2->flags & DRM_MODE_FLAG_3D_MASK))
+		return false;
+
+	if (mode1->hdisplay == mode2->hdisplay &&
+	    mode1->hsync_start == mode2->hsync_start &&
+	    mode1->hsync_end == mode2->hsync_end &&
+	    mode1->htotal == mode2->htotal &&
+	    mode1->hskew == mode2->hskew &&
+	    mode1->vdisplay == mode2->vdisplay &&
+	    mode1->vsync_start == mode2->vsync_start &&
+	    mode1->vsync_end == mode2->vsync_end &&
+	    mode1->vtotal == mode2->vtotal &&
+	    mode1->vscan == mode2->vscan &&
+	    (mode1->flags & ~DRM_MODE_FLAG_3D_MASK) ==
+	     (mode2->flags & ~DRM_MODE_FLAG_3D_MASK))
+		return true;
+
+	return false;
+}
+EXPORT_SYMBOL(drm_umode_equal);
 
 /**
  * drm_mode_is_420_only - if a given videomode can be only supported in YCBCR420
