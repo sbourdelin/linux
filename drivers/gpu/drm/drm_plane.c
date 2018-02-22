@@ -455,8 +455,8 @@ int drm_mode_plane_set_obj_prop(struct drm_plane *plane,
 }
 EXPORT_SYMBOL(drm_mode_plane_set_obj_prop);
 
-int drm_mode_getplane_res(struct drm_device *dev, void *data,
-			  struct drm_file *file_priv)
+int drm_mode_getplane_res_ioctl(struct drm_device *dev, void *data,
+				struct drm_file *file_priv)
 {
 	struct drm_mode_get_plane_res *plane_resp = data;
 	struct drm_mode_config *config;
@@ -495,8 +495,8 @@ int drm_mode_getplane_res(struct drm_device *dev, void *data,
 	return 0;
 }
 
-int drm_mode_getplane(struct drm_device *dev, void *data,
-		      struct drm_file *file_priv)
+int drm_mode_getplane_ioctl(struct drm_device *dev, void *data,
+			    struct drm_file *file_priv)
 {
 	struct drm_mode_get_plane *plane_resp = data;
 	struct drm_plane *plane;
@@ -679,8 +679,8 @@ fail:
 	return ret;
 }
 
-int drm_mode_setplane(struct drm_device *dev, void *data,
-		      struct drm_file *file_priv)
+int drm_mode_setplane_ioctl(struct drm_device *dev, void *data,
+			    struct drm_file *file_priv)
 {
 	struct drm_mode_set_plane *plane_req = data;
 	struct drm_plane *plane;

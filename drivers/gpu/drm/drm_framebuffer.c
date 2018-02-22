@@ -93,7 +93,7 @@ int drm_framebuffer_check_src_coords(uint32_t src_x, uint32_t src_y,
 }
 
 /**
- * drm_mode_addfb - add an FB to the graphics configuration
+ * drm_mode_addfb_ioctl - add an FB to the graphics configuration
  * @dev: drm device for the ioctl
  * @data: data pointer for the ioctl
  * @file_priv: drm file for the ioctl call
@@ -106,8 +106,8 @@ int drm_framebuffer_check_src_coords(uint32_t src_x, uint32_t src_y,
  * Returns:
  * Zero on success, negative errno on failure.
  */
-int drm_mode_addfb(struct drm_device *dev,
-		   void *data, struct drm_file *file_priv)
+int drm_mode_addfb_ioctl(struct drm_device *dev,
+			 void *data, struct drm_file *file_priv)
 {
 	struct drm_mode_fb_cmd *or = data;
 	struct drm_mode_fb_cmd2 r = {};
@@ -447,7 +447,7 @@ int drm_mode_rmfb_ioctl(struct drm_device *dev,
 }
 
 /**
- * drm_mode_getfb - get FB info
+ * drm_mode_getfb_ioctl - get FB info
  * @dev: drm device for the ioctl
  * @data: data pointer for the ioctl
  * @file_priv: drm file for the ioctl call
@@ -459,8 +459,8 @@ int drm_mode_rmfb_ioctl(struct drm_device *dev,
  * Returns:
  * Zero on success, negative errno on failure.
  */
-int drm_mode_getfb(struct drm_device *dev,
-		   void *data, struct drm_file *file_priv)
+int drm_mode_getfb_ioctl(struct drm_device *dev,
+			 void *data, struct drm_file *file_priv)
 {
 	struct drm_mode_fb_cmd *r = data;
 	struct drm_framebuffer *fb;

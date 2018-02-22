@@ -192,14 +192,14 @@ int drm_mode_dirtyfb(struct drm_device *dev, struct drm_mode_fb_dirty_cmd *req,
 		     struct drm_file *file_priv, bool user);
 
 /* IOCTL */
-int drm_mode_addfb(struct drm_device *dev,
-		   void *data, struct drm_file *file_priv);
+int drm_mode_addfb_ioctl(struct drm_device *dev,
+			 void *data, struct drm_file *file_priv);
 int drm_mode_addfb2_ioctl(struct drm_device *dev,
 			  void *data, struct drm_file *file_priv);
 int drm_mode_rmfb_ioctl(struct drm_device *dev,
 			void *data, struct drm_file *file_priv);
-int drm_mode_getfb(struct drm_device *dev,
-		   void *data, struct drm_file *file_priv);
+int drm_mode_getfb_ioctl(struct drm_device *dev,
+			 void *data, struct drm_file *file_priv);
 int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
 			   void *data, struct drm_file *file_priv);
 
@@ -235,12 +235,12 @@ int drm_mode_page_flip(struct drm_device *dev,
 void drm_bridge_detach(struct drm_bridge *bridge);
 
 /* IOCTL */
-int drm_mode_getplane_res(struct drm_device *dev, void *data,
-			  struct drm_file *file_priv);
-int drm_mode_getplane(struct drm_device *dev,
-		      void *data, struct drm_file *file_priv);
-int drm_mode_setplane(struct drm_device *dev,
-		      void *data, struct drm_file *file_priv);
+int drm_mode_getplane_res_ioctl(struct drm_device *dev, void *data,
+				struct drm_file *file_priv);
+int drm_mode_getplane_ioctl(struct drm_device *dev,
+			    void *data, struct drm_file *file_priv);
+int drm_mode_setplane_ioctl(struct drm_device *dev,
+			    void *data, struct drm_file *file_priv);
 int drm_mode_cursor_ioctl(struct drm_device *dev,
 			  void *data, struct drm_file *file_priv);
 int drm_mode_cursor2_ioctl(struct drm_device *dev,
