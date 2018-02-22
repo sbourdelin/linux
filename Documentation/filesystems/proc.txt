@@ -425,6 +425,7 @@ SwapPss:               0 kB
 KernelPageSize:        4 kB
 MMUPageSize:           4 kB
 Locked:                0 kB
+LockedRss:             0 kB
 VmFlags: rd ex mr mw me dw
 
 the first of these lines shows the same information as is displayed for the
@@ -461,7 +462,11 @@ For shmem mappings, "Swap" includes also the size of the mapped (and not
 replaced by copy-on-write) part of the underlying shmem object out on swap.
 "SwapPss" shows proportional swap share of this mapping. Unlike "Swap", this
 does not take into account swapped out page of underlying shmem objects.
-"Locked" indicates whether the mapping is locked in memory or not.
+"Locked" contains the PSS for locked mappings; "LockedRss" contains the
+amount resident and locked memory in the given mapping. That is, "Locked"
+depends on other processes also potentially mapping the given memory, while
+"LockedRss" is invariant. "LockedPrivate" is like "LockedRss", but counts only
+the pages unique to the process.
 
 "VmFlags" field deserves a separate description. This member represents the kernel
 flags associated with the particular virtual memory area in two letter encoded

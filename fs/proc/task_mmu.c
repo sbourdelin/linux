@@ -459,6 +459,8 @@ struct mem_size_stats {
 	unsigned long shared_hugetlb;
 	unsigned long private_hugetlb;
 	unsigned long first_vma_start;
+	unsigned long resident_locked;
+	unsigned long private_locked;
 	u64 pss;
 	u64 pss_locked;
 	u64 swap_pss;
@@ -472,6 +474,7 @@ static void smaps_account(struct mem_size_stats *mss,
 	int i, nr = compound ? 1 << compound_order(page) : 1;
 	unsigned long size = nr * PAGE_SIZE;
 	u64 pss_add = 0;
+	bool locked = vma->vm_flags & VM_LOCKED;
 
 	if (PageAnon(page)) {
 		mss->anonymous += size;
@@ -480,6 +483,9 @@ static void smaps_account(struct mem_size_stats *mss,
 	}
 
 	mss->resident += size;
+	if (locked)
+		mss->resident_locked += size;
+
 	/* Accumulate the size in pages that have been accessed. */
 	if (young || page_is_young(page) || PageReferenced(page))
 		mss->referenced += size;
@@ -495,6 +501,8 @@ static void smaps_account(struct mem_size_stats *mss,
 		else
 			mss->private_clean += size;
 		pss_add += (u64)size << PSS_SHIFT;
+		if (locked)
+			mss->private_locked += size;
 		goto done;
 	}
 
@@ -513,12 +521,14 @@ static void smaps_account(struct mem_size_stats *mss,
 			else
 				mss->private_clean += PAGE_SIZE;
 			pss_add += PAGE_SIZE << PSS_SHIFT;
+			if (locked)
+				mss->private_locked += size;
 		}
 	}
 
 done:
 	mss->pss += pss_add;
-	if (vma->vm_flags & VM_LOCKED)
+	if (locked)
 		mss->pss_locked += pss_add;
 }
 
@@ -859,7 +869,9 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 			   "Private_Hugetlb: %7lu kB\n"
 			   "Swap:           %8lu kB\n"
 			   "SwapPss:        %8lu kB\n"
-			   "Locked:         %8lu kB\n",
+			   "Locked:         %8lu kB\n"
+			   "LockedRss:      %8lu kB\n"
+			   "LockedPrivate:  %8lu kB\n",
 			   mss->resident >> 10,
 			   (unsigned long)(mss->pss >> (10 + PSS_SHIFT)),
 			   mss->shared_clean  >> 10,
@@ -875,7 +887,9 @@ static int show_smap(struct seq_file *m, void *v, int is_pid)
 			   mss->private_hugetlb >> 10,
 			   mss->swap >> 10,
 			   (unsigned long)(mss->swap_pss >> (10 + PSS_SHIFT)),
-			   (unsigned long)(mss->pss_locked >> (10 + PSS_SHIFT)));
+			   (unsigned long)(mss->pss_locked >> (10 + PSS_SHIFT)),
+			   mss->resident_locked >> 10,
+			   mss->private_locked >> 10);
 
 	if (!rollup_mode) {
 		arch_show_smap(m, vma);
