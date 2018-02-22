@@ -1962,6 +1962,29 @@ static const struct panel_desc tpk_f10a_0102 = {
 	},
 };
 
+static const struct drm_display_mode tvc_s9700rtwv43tr_01b_mode = {
+	.clock = 3000,
+	.hdisplay = 800,
+	.hsync_start = 800 + 39,
+	.hsync_end = 800 + 39 + 47,
+	.htotal = 800 + 39 + 47 + 39,
+	.vdisplay = 480,
+	.vsync_start = 480 + 13,
+	.vsync_end = 480 + 13 + 2,
+	.vtotal = 480 + 13 + 2 + 29,
+	.vrefresh = 62,
+};
+
+static const struct panel_desc tvc_s9700rtwv43tr_01b = {
+	.modes = &tvc_s9700rtwv43tr_01b_mode,
+	.num_modes = 1,
+	.bpc = 8,
+	.size = {
+		.width = 155,
+		.height = 90,
+	},
+};
+
 static const struct display_timing urt_umsh_8596md_timing = {
 	.pixelclock = { 33260000, 33260000, 33260000 },
 	.hactive = { 800, 800, 800 },
@@ -2213,6 +2236,9 @@ static const struct of_device_id platform_of_match[] = {
 	}, {
 		.compatible = "tpk,f10a-0102",
 		.data = &tpk_f10a_0102,
+	}, {
+		.compatible = "tvc,s9700rtwv43tr-01b",
+		.data = &tvc_s9700rtwv43tr_01b,
 	}, {
 		.compatible = "urt,umsh-8596md-t",
 		.data = &urt_umsh_8596md_parallel,
