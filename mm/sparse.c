@@ -405,6 +405,7 @@ static void __init sparse_early_usemaps_alloc_node(void *data,
 	unsigned long pnum;
 	unsigned long **usemap_map = (unsigned long **)data;
 	int size = usemap_size();
+	int i = 0;
 
 	usemap = sparse_early_usemaps_alloc_pgdat_section(NODE_DATA(nodeid),
 							  size * usemap_count);
@@ -413,12 +414,13 @@ static void __init sparse_early_usemaps_alloc_node(void *data,
 		return;
 	}
 
-	for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
+	for (pnum = pnum_begin; pnum < pnum_end && i < usemap_count; pnum++) {
 		if (!present_section_nr(pnum))
 			continue;
-		usemap_map[pnum] = usemap;
+		usemap_map[i] = usemap;
 		usemap += size;
-		check_usemap_section_nr(nodeid, usemap_map[pnum]);
+		check_usemap_section_nr(nodeid, usemap_map[i]);
+		i++;
 	}
 }
 
@@ -447,14 +449,17 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
 	void *map;
 	unsigned long pnum;
 	unsigned long size = sizeof(struct page) * PAGES_PER_SECTION;
+	int i;
 
 	map = alloc_remap(nodeid, size * map_count);
 	if (map) {
-		for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
+		i = 0;
+		for (pnum = pnum_begin; pnum < pnum_end && i < map_count; pnum++) {
 			if (!present_section_nr(pnum))
 				continue;
-			map_map[pnum] = map;
+			map_map[i] = map;
 			map += size;
+			i++;
 		}
 		return;
 	}
@@ -464,23 +469,27 @@ void __init sparse_mem_maps_populate_node(struct page **map_map,
 					      PAGE_SIZE, __pa(MAX_DMA_ADDRESS),
 					      BOOTMEM_ALLOC_ACCESSIBLE, nodeid);
 	if (map) {
-		for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
+		i = 0;
+		for (pnum = pnum_begin; pnum < pnum_end && i < map_count; pnum++) {
 			if (!present_section_nr(pnum))
 				continue;
-			map_map[pnum] = map;
+			map_map[i] = map;
 			map += size;
+			i++;
 		}
 		return;
 	}
 
 	/* fallback */
-	for (pnum = pnum_begin; pnum < pnum_end; pnum++) {
+	i = 0;
+	for (pnum = pnum_begin; pnum < pnum_end && i < map_count; pnum++) {
 		struct mem_section *ms;
 
 		if (!present_section_nr(pnum))
 			continue;
-		map_map[pnum] = sparse_mem_map_populate(pnum, nodeid, NULL);
-		if (map_map[pnum])
+		i++;
+		map_map[i-1] = sparse_mem_map_populate(pnum, nodeid, NULL);
+		if (map_map[i-1])
 			continue;
 		ms = __nr_to_section(pnum);
 		pr_err("%s: sparsemem memory map backing failed some memory will not be available\n",
@@ -558,6 +567,7 @@ static void __init alloc_usemap_and_memmap(void (*alloc_func)
 		/* new start, update count etc*/
 		nodeid_begin = nodeid;
 		pnum_begin = pnum;
+		data += map_count;
 		map_count = 1;
 	}
 	/* ok, last chunk */
@@ -576,6 +586,7 @@ void __init sparse_init(void)
 	unsigned long *usemap;
 	unsigned long **usemap_map;
 	int size;
+	int i = 0;
 #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
 	int size2;
 	struct page **map_map;
@@ -598,7 +609,7 @@ void __init sparse_init(void)
 	 * powerpc need to call sparse_init_one_section right after each
 	 * sparse_early_mem_map_alloc, so allocate usemap_map at first.
 	 */
-	size = sizeof(unsigned long *) * NR_MEM_SECTIONS;
+	size = sizeof(unsigned long *) * nr_present_sections;
 	usemap_map = memblock_virt_alloc(size, 0);
 	if (!usemap_map)
 		panic("can not allocate usemap_map\n");
@@ -606,7 +617,7 @@ void __init sparse_init(void)
 							(void *)usemap_map);
 
 #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
-	size2 = sizeof(struct page *) * NR_MEM_SECTIONS;
+	size2 = sizeof(struct page *) * nr_present_sections;
 	map_map = memblock_virt_alloc(size2, 0);
 	if (!map_map)
 		panic("can not allocate map_map\n");
@@ -617,14 +628,15 @@ void __init sparse_init(void)
 	for_each_present_section_nr(0, pnum) {
 		struct mem_section *ms;
 		ms = __nr_to_section(pnum);
-		usemap = usemap_map[pnum];
+		i++;
+		usemap = usemap_map[i-1];
 		if (!usemap) {
 			ms->section_mem_map = 0;
 			continue;
 		}
 
 #ifdef CONFIG_SPARSEMEM_ALLOC_MEM_MAP_TOGETHER
-		map = map_map[pnum];
+		map = map_map[i-1];
 #else
 		map = sparse_early_mem_map_alloc(pnum);
 #endif
