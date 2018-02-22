@@ -623,6 +623,71 @@ again:
 	return parent;
 }
 
+/**
+ * dentry_lock_inode - Lock dentry->d_inode->i_lock
+ * @dentry: The dentry to operate on
+ *
+ * Tries to acquire @dentry->d_inode->i_lock with a trylock first. If
+ * that fails it retries in correct lock order, which requires dropping
+ * @dentry->d_lock under RCU protection and then reacquiring it after
+ * locking @dentry->d_inode->i_lock.
+ *
+ * If @dentry->d_lockref.count changes while trying to acquire
+ * @dentry->d_inode->i_lock, drop @dentry->d_inode->i_lock and return
+ * false. Otherwise return true.
+ *
+ * Note that all relevant struct members of @dentry must be reevaluated by
+ * the caller since @dentry->d_lock might have been temporarily dropped.
+ */
+static bool dentry_lock_inode(struct dentry *dentry)
+{
+	int saved_count = dentry->d_lockref.count;
+	struct inode *inode;
+
+	lockdep_assert_held(&dentry->d_lock);
+again:
+	inode = dentry->d_inode;
+	if (likely(spin_trylock(&inode->i_lock)))
+		return true;
+
+	/*
+	 * The inode struct pointed to by "inode" is protected by RCU,
+	 * i.e. destroy_inode() uses call_rcu() to reclaim the memory.
+	 * Using rcu_read_lock() ensures that the inode struct remains
+	 * valid after dropping @dentry->d_lock, independent of whether
+	 * or not @dentry->d_inode continues to point to that inode.
+	 */
+	rcu_read_lock();
+
+	spin_unlock(&dentry->d_lock);
+	spin_lock(&inode->i_lock);
+	spin_lock(&dentry->d_lock);
+
+	/*
+	 * @dentry->d_lockref.count might have changed after dropping
+	 * @dentry->d_lock. If so, release @inode->i_lock and tell caller.
+	 */
+	if (unlikely(dentry->d_lockref.count != saved_count)) {
+		spin_unlock(&inode->i_lock);
+		rcu_read_unlock();
+		return false;
+	}
+
+	/*
+	 * @dentry->d_inode might have changed after dropping @dentry->d_lock.
+	 * If so, release @inode->i_lock and restart.
+	 */
+	if (unlikely(inode != dentry->d_inode)) {
+		spin_unlock(&inode->i_lock);
+		rcu_read_unlock();
+		goto again;
+	}
+
+	rcu_read_unlock();
+
+	return true;
+}
+
 /*
  * Finish off a dentry we've decided to kill.
  * dentry->d_lock must be held, returns with it unlocked.
@@ -2373,32 +2438,27 @@ EXPORT_SYMBOL(d_hash_and_lookup);
  
 void d_delete(struct dentry * dentry)
 {
-	struct inode *inode;
-	int isdir = 0;
+	int isdir;
 	/*
 	 * Are we the only user?
 	 */
-again:
-	spin_lock(&dentry->d_lock);
-	inode = dentry->d_inode;
-	isdir = S_ISDIR(inode->i_mode);
-	if (dentry->d_lockref.count == 1) {
-		if (!spin_trylock(&inode->i_lock)) {
-			spin_unlock(&dentry->d_lock);
-			cpu_relax();
-			goto again;
-		}
-		dentry->d_flags &= ~DCACHE_CANT_MOUNT;
-		dentry_unlink_inode(dentry);
-		fsnotify_nameremove(dentry, isdir);
-		return;
-	}
 
+	spin_lock(&dentry->d_lock);
+
+	if (dentry->d_lockref.count > 1 || !dentry_lock_inode(dentry))
+		goto drop;
+
+	dentry->d_flags &= ~DCACHE_CANT_MOUNT;
+	isdir = S_ISDIR(dentry->d_inode->i_mode);
+	dentry_unlink_inode(dentry);
+	fsnotify_nameremove(dentry, isdir);
+	return;
+drop:
 	if (!d_unhashed(dentry))
 		__d_drop(dentry);
 
+	isdir = S_ISDIR(dentry->d_inode->i_mode);
 	spin_unlock(&dentry->d_lock);
-
 	fsnotify_nameremove(dentry, isdir);
 }
 EXPORT_SYMBOL(d_delete);
