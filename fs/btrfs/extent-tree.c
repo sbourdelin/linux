@@ -9713,60 +9713,6 @@ out:
 	return ret;
 }
 
-static int find_first_block_group(struct btrfs_fs_info *fs_info,
-				  struct btrfs_path *path,
-				  struct btrfs_key *key)
-{
-	struct btrfs_root *root = fs_info->extent_root;
-	int ret = 0;
-	struct btrfs_key found_key;
-	struct extent_buffer *leaf;
-	int slot;
-
-	ret = btrfs_search_slot(NULL, root, key, path, 0, 0);
-	if (ret < 0)
-		goto out;
-
-	while (1) {
-		slot = path->slots[0];
-		leaf = path->nodes[0];
-		if (slot >= btrfs_header_nritems(leaf)) {
-			ret = btrfs_next_leaf(root, path);
-			if (ret == 0)
-				continue;
-			if (ret < 0)
-				goto out;
-			break;
-		}
-		btrfs_item_key_to_cpu(leaf, &found_key, slot);
-
-		if (found_key.objectid >= key->objectid &&
-		    found_key.type == BTRFS_BLOCK_GROUP_ITEM_KEY) {
-			struct extent_map_tree *em_tree;
-			struct extent_map *em;
-
-			em_tree = &root->fs_info->mapping_tree.map_tree;
-			read_lock(&em_tree->lock);
-			em = lookup_extent_mapping(em_tree, found_key.objectid,
-						   found_key.offset);
-			read_unlock(&em_tree->lock);
-			if (!em) {
-				btrfs_err(fs_info,
-			"logical %llu len %llu found bg but no related chunk",
-					  found_key.objectid, found_key.offset);
-				ret = -ENOENT;
-			} else {
-				ret = 0;
-			}
-			free_extent_map(em);
-			goto out;
-		}
-		path->slots[0]++;
-	}
-out:
-	return ret;
-}
-
 void btrfs_put_block_group_cache(struct btrfs_fs_info *info)
 {
 	struct btrfs_block_group_cache *block_group;
@@ -9988,12 +9934,15 @@ int btrfs_read_block_groups(struct btrfs_fs_info *info)
 {
 	struct btrfs_path *path;
 	int ret;
+	struct btrfs_mapping_tree *map_tree = &info->mapping_tree;
+	struct btrfs_root *extent_root = info->extent_root;
 	struct btrfs_block_group_cache *cache;
 	struct btrfs_space_info *space_info;
 	struct btrfs_key key;
 	struct btrfs_key found_key;
 	struct extent_buffer *leaf;
 	int need_clear = 0;
+	u64 cur = 0;
 	u64 cache_gen;
 	u64 feature;
 	int mixed;
@@ -10001,13 +9950,9 @@ int btrfs_read_block_groups(struct btrfs_fs_info *info)
 	feature = btrfs_super_incompat_flags(info->super_copy);
 	mixed = !!(feature & BTRFS_FEATURE_INCOMPAT_MIXED_GROUPS);
 
-	key.objectid = 0;
-	key.offset = 0;
-	key.type = BTRFS_BLOCK_GROUP_ITEM_KEY;
 	path = btrfs_alloc_path();
 	if (!path)
 		return -ENOMEM;
-	path->reada = READA_FORWARD;
 
 	cache_gen = btrfs_super_cache_generation(info->super_copy);
 	if (btrfs_test_opt(info, SPACE_CACHE) &&
@@ -10017,10 +9962,30 @@ int btrfs_read_block_groups(struct btrfs_fs_info *info)
 		need_clear = 1;
 
 	while (1) {
-		ret = find_first_block_group(info, path, &key);
-		if (ret > 0)
+		struct extent_map *em;
+
+		read_lock(&map_tree->map_tree.lock);
+		em = lookup_extent_mapping(&map_tree->map_tree, cur,
+					   ((u64)-1) - cur);
+		read_unlock(&map_tree->map_tree.lock);
+		if (!em)
 			break;
-		if (ret != 0)
+
+		key.objectid = em->start;
+		key.offset = em->len;
+		key.type = BTRFS_BLOCK_GROUP_ITEM_KEY;
+		cur = em->start + em->len;
+		free_extent_map(em);
+
+		ret = btrfs_search_slot(NULL, extent_root, &key, path, 0, 0);
+		if (ret > 0) {
+			WARN(1, KERN_ERR
+			"chunk [%llu %llu) doesn't has its block group item\n",
+			     key.objectid, key.objectid + key.offset);
+			ret = -ENOENT;
+			goto error;
+		}
+		if (ret < 0)
 			goto error;
 
 		leaf = path->nodes[0];
@@ -10062,7 +10027,6 @@ int btrfs_read_block_groups(struct btrfs_fs_info *info)
 			goto error;
 		}
 
-		key.objectid = found_key.objectid + found_key.offset;
 		btrfs_release_path(path);
 
 		/*
