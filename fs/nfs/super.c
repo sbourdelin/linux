@@ -1207,7 +1207,7 @@ static int nfs_parse_mount_options(char *raw,
 				   struct nfs_parsed_mount_data *mnt)
 {
 	char *p, *string, *secdata;
-	int rc, sloppy = 0, invalid_option = 0;
+	int rc, sloppy = 0, invalid_option = 0, minorversion = -1;
 	unsigned short protofamily = AF_UNSPEC;
 	unsigned short mountfamily = AF_UNSPEC;
 
@@ -1419,6 +1419,7 @@ static int nfs_parse_mount_options(char *raw,
 			if (option > NFS4_MAX_MINOR_VERSION)
 				goto out_invalid_value;
 			mnt->minorversion = option;
+			minorversion = option;
 			break;
 
 		/*
@@ -1655,6 +1656,9 @@ static int nfs_parse_mount_options(char *raw,
 		}
 	}
 
+	if (minorversion >= 0 && minorversion != mnt->minorversion)
+		goto out_mountvers_mismatch;
+
 	return 1;
 
 out_mountproto_mismatch:
@@ -1684,6 +1688,10 @@ out_nomem:
 out_security_failure:
 	free_secdata(secdata);
 	printk(KERN_INFO "NFS: security options invalid: %d\n", rc);
+	return 0;
+out_mountvers_mismatch:
+	printk(KERN_INFO "NFS: mismatch versions supplied vers=4.%d and "
+			 "minorversion=%d\n", mnt->minorversion, minorversion);
 	return 0;
 }
 
