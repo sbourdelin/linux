@@ -552,7 +552,7 @@ out_err:
 static void trie_free(struct bpf_map *map)
 {
 	struct lpm_trie *trie = container_of(map, struct lpm_trie, map);
-	struct lpm_trie_node __rcu **slot;
+	struct lpm_trie_node **slot;
 	struct lpm_trie_node *node;
 
 	/* Wait for outstanding programs to complete
@@ -569,23 +569,22 @@ static void trie_free(struct bpf_map *map)
 		slot = &trie->root;
 
 		for (;;) {
-			node = rcu_dereference_protected(*slot,
-					lockdep_is_held(&trie->lock));
+			node = *slot;
 			if (!node)
 				goto out;
 
-			if (rcu_access_pointer(node->child[0])) {
+			if (node->child[0]) {
 				slot = &node->child[0];
 				continue;
 			}
 
-			if (rcu_access_pointer(node->child[1])) {
+			if (node->child[1]) {
 				slot = &node->child[1];
 				continue;
 			}
 
 			kfree(node);
-			RCU_INIT_POINTER(*slot, NULL);
+			*slot = NULL;
 			break;
 		}
 	}
