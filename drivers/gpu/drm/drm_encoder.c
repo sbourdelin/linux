@@ -214,10 +214,10 @@ static struct drm_crtc *drm_encoder_get_crtc(struct drm_encoder *encoder)
 	return encoder->crtc;
 }
 
-int drm_mode_getencoder(struct drm_device *dev, void *data,
+int drm_mode_getencoder(struct drm_device *dev,
+			struct drm_mode_get_encoder *enc_resp,
 			struct drm_file *file_priv)
 {
-	struct drm_mode_get_encoder *enc_resp = data;
 	struct drm_encoder *encoder;
 	struct drm_crtc *crtc;
 
@@ -243,4 +243,10 @@ int drm_mode_getencoder(struct drm_device *dev, void *data,
 	enc_resp->possible_clones = encoder->possible_clones;
 
 	return 0;
+}
+
+int drm_mode_getencoder_ioctl(struct drm_device *dev, void *data,
+			      struct drm_file *file_priv)
+{
+	return drm_mode_getencoder(dev, data, file_priv);
 }

@@ -853,11 +853,10 @@ out_put:
 }
 EXPORT_SYMBOL(drm_gem_prime_fd_to_handle);
 
-int drm_prime_handle_to_fd_ioctl(struct drm_device *dev, void *data,
-				 struct drm_file *file_priv)
+int drm_prime_handle_to_fd(struct drm_device *dev,
+			   struct drm_prime_handle *args,
+			   struct drm_file *file_priv)
 {
-	struct drm_prime_handle *args = data;
-
 	if (!drm_core_check_feature(dev, DRIVER_PRIME))
 		return -EINVAL;
 
@@ -870,6 +869,12 @@ int drm_prime_handle_to_fd_ioctl(struct drm_device *dev, void *data,
 
 	return dev->driver->prime_handle_to_fd(dev, file_priv,
 			args->handle, args->flags, &args->fd);
+}
+
+int drm_prime_handle_to_fd_ioctl(struct drm_device *dev, void *data,
+				 struct drm_file *file_priv)
+{
+	return drm_prime_handle_to_fd(dev, data, file_priv);
 }
 
 int drm_prime_fd_to_handle_ioctl(struct drm_device *dev, void *data,

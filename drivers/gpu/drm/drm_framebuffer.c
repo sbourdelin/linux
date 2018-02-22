@@ -121,7 +121,7 @@ int drm_mode_addfb(struct drm_device *dev,
 	r.pixel_format = drm_mode_legacy_fb_format(or->bpp, or->depth);
 	r.handles[0] = or->handle;
 
-	ret = drm_mode_addfb2(dev, &r, file_priv);
+	ret = drm_mode_addfb2_ioctl(dev, &r, file_priv);
 	if (ret)
 		return ret;
 
@@ -305,23 +305,23 @@ drm_internal_framebuffer_create(struct drm_device *dev,
 
 /**
  * drm_mode_addfb2 - add an FB to the graphics configuration
- * @dev: drm device for the ioctl
- * @data: data pointer for the ioctl
- * @file_priv: drm file for the ioctl call
+ * @dev: drm device
+ * @r: pointer to request structure
+ * @file_priv: drm file
+ * @comm: optionally override the allocator name used for debug output
  *
  * Add a new FB to the specified CRTC, given a user request with format. This is
  * the 2nd version of the addfb ioctl, which supports multi-planar framebuffers
  * and uses fourcc codes as pixel format specifiers.
  *
- * Called by the user via ioctl.
+ * Called by the user via ioctl, or by an in-kernel client.
  *
  * Returns:
  * Zero on success, negative errno on failure.
  */
-int drm_mode_addfb2(struct drm_device *dev,
-		    void *data, struct drm_file *file_priv)
+int drm_mode_addfb2(struct drm_device *dev, struct drm_mode_fb_cmd2 *r,
+		    struct drm_file *file_priv, const char *comm)
 {
-	struct drm_mode_fb_cmd2 *r = data;
 	struct drm_framebuffer *fb;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
@@ -330,6 +330,9 @@ int drm_mode_addfb2(struct drm_device *dev,
 	fb = drm_internal_framebuffer_create(dev, r, file_priv);
 	if (IS_ERR(fb))
 		return PTR_ERR(fb);
+
+	if (comm)
+		strscpy(fb->comm, comm, TASK_COMM_LEN);
 
 	DRM_DEBUG_KMS("[FB:%d]\n", fb->base.id);
 	r->fb_id = fb->base.id;
@@ -340,6 +343,12 @@ int drm_mode_addfb2(struct drm_device *dev,
 	mutex_unlock(&file_priv->fbs_lock);
 
 	return 0;
+}
+
+int drm_mode_addfb2_ioctl(struct drm_device *dev,
+			  void *data, struct drm_file *file_priv)
+{
+	return drm_mode_addfb2(dev, data, file_priv, NULL);
 }
 
 struct drm_mode_rmfb_work {
@@ -362,29 +371,28 @@ static void drm_mode_rmfb_work_fn(struct work_struct *w)
 
 /**
  * drm_mode_rmfb - remove an FB from the configuration
- * @dev: drm device for the ioctl
- * @data: data pointer for the ioctl
- * @file_priv: drm file for the ioctl call
+ * @dev: drm device
+ * @fb_id: id of framebuffer to remove
+ * @file_priv: drm file
  *
- * Remove the FB specified by the user.
+ * Remove the specified FB.
  *
- * Called by the user via ioctl.
+ * Called by the user via ioctl, or by an in-kernel client.
  *
  * Returns:
  * Zero on success, negative errno on failure.
  */
-int drm_mode_rmfb(struct drm_device *dev,
-		   void *data, struct drm_file *file_priv)
+int drm_mode_rmfb(struct drm_device *dev, u32 fb_id,
+		  struct drm_file *file_priv)
 {
 	struct drm_framebuffer *fb = NULL;
 	struct drm_framebuffer *fbl = NULL;
-	uint32_t *id = data;
 	int found = 0;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
 		return -EINVAL;
 
-	fb = drm_framebuffer_lookup(dev, file_priv, *id);
+	fb = drm_framebuffer_lookup(dev, file_priv, fb_id);
 	if (!fb)
 		return -ENOENT;
 
@@ -428,6 +436,14 @@ int drm_mode_rmfb(struct drm_device *dev,
 fail_unref:
 	drm_framebuffer_put(fb);
 	return -ENOENT;
+}
+
+int drm_mode_rmfb_ioctl(struct drm_device *dev,
+			void *data, struct drm_file *file_priv)
+{
+	uint32_t *fb_id = data;
+
+	return drm_mode_rmfb(dev, *fb_id, file_priv);
 }
 
 /**

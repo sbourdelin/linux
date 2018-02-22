@@ -496,10 +496,10 @@ out:
 	return ret;
 }
 
-int drm_mode_obj_set_property_ioctl(struct drm_device *dev, void *data,
-				    struct drm_file *file_priv)
+int drm_mode_obj_set_property(struct drm_device *dev,
+			      struct drm_mode_obj_set_property *arg,
+			      struct drm_file *file_priv)
 {
-	struct drm_mode_obj_set_property *arg = data;
 	struct drm_mode_object *arg_obj;
 	struct drm_property *property;
 	int ret = -EINVAL;
@@ -526,4 +526,10 @@ int drm_mode_obj_set_property_ioctl(struct drm_device *dev, void *data,
 out_unref:
 	drm_mode_object_put(arg_obj);
 	return ret;
+}
+
+int drm_mode_obj_set_property_ioctl(struct drm_device *dev, void *data,
+				    struct drm_file *file_priv)
+{
+	return drm_mode_obj_set_property(dev, data, file_priv);
 }

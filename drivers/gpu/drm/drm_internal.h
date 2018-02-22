@@ -37,6 +37,9 @@ void drm_pci_agp_destroy(struct drm_device *dev);
 int drm_pci_set_busid(struct drm_device *dev, struct drm_master *master);
 
 /* drm_prime.c */
+int drm_prime_handle_to_fd(struct drm_device *dev,
+			   struct drm_prime_handle *args,
+			   struct drm_file *file_priv);
 int drm_prime_handle_to_fd_ioctl(struct drm_device *dev, void *data,
 				 struct drm_file *file_priv);
 int drm_prime_fd_to_handle_ioctl(struct drm_device *dev, void *data,
@@ -59,6 +62,8 @@ int drm_gem_name_info(struct seq_file *m, void *data);
 /* drm_vblank.c */
 void drm_vblank_disable_and_save(struct drm_device *dev, unsigned int pipe);
 void drm_vblank_cleanup(struct drm_device *dev);
+int drm_wait_vblank(struct drm_device *dev, union drm_wait_vblank *vblwait,
+		    struct drm_file *file_priv);
 
 /* IOCTLS */
 int drm_wait_vblank_ioctl(struct drm_device *dev, void *data,

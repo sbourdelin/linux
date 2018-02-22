@@ -45,12 +45,14 @@ void drm_crtc_unregister_all(struct drm_device *dev);
 
 struct dma_fence *drm_crtc_create_fence(struct drm_crtc *crtc);
 
+int drm_mode_getcrtc(struct drm_device *dev, struct drm_mode_crtc *crtc_resp,
+		     struct drm_file *file_priv);
 int drm_mode_setcrtc(struct drm_device *dev, struct drm_mode_crtc *crtc_req,
 		     struct drm_file *file_priv, bool user);
 
 /* IOCTLs */
-int drm_mode_getcrtc(struct drm_device *dev,
-		     void *data, struct drm_file *file_priv);
+int drm_mode_getcrtc_ioctl(struct drm_device *dev,
+			   void *data, struct drm_file *file_priv);
 int drm_mode_setcrtc_ioctl(struct drm_device *dev,
 			   void *data, struct drm_file *file_priv);
 
@@ -68,6 +70,12 @@ int drm_mode_getresources_ioctl(struct drm_device *dev, void *data,
 
 
 /* drm_dumb_buffers.c */
+int drm_mode_create_dumb(struct drm_device *dev,
+			 struct drm_mode_create_dumb *args,
+			 struct drm_file *file_priv);
+int drm_mode_destroy_dumb(struct drm_device *dev, u32 handle,
+			  struct drm_file *file_priv);
+
 /* IOCTLs */
 int drm_mode_create_dumb_ioctl(struct drm_device *dev,
 			       void *data, struct drm_file *file_priv);
@@ -122,6 +130,9 @@ int drm_mode_object_get_properties(struct drm_mode_object *obj, bool atomic,
 				   uint32_t *arg_count_props);
 struct drm_property *drm_mode_obj_find_prop_id(struct drm_mode_object *obj,
 					       uint32_t prop_id);
+int drm_mode_obj_set_property(struct drm_device *dev,
+			      struct drm_mode_obj_set_property *arg,
+			      struct drm_file *file_priv);
 
 /* IOCTL */
 
@@ -133,10 +144,13 @@ int drm_mode_obj_set_property_ioctl(struct drm_device *dev, void *data,
 /* drm_encoder.c */
 int drm_encoder_register_all(struct drm_device *dev);
 void drm_encoder_unregister_all(struct drm_device *dev);
+int drm_mode_getencoder(struct drm_device *dev,
+			struct drm_mode_get_encoder *enc_resp,
+			struct drm_file *file_priv);
 
 /* IOCTL */
-int drm_mode_getencoder(struct drm_device *dev,
-			void *data, struct drm_file *file_priv);
+int drm_mode_getencoder_ioctl(struct drm_device *dev,
+			      void *data, struct drm_file *file_priv);
 
 /* drm_connector.c */
 void drm_connector_ida_init(void);
@@ -170,16 +184,20 @@ int drm_framebuffer_check_src_coords(uint32_t src_x, uint32_t src_y,
 				     const struct drm_framebuffer *fb);
 void drm_fb_release(struct drm_file *file_priv);
 
+int drm_mode_addfb2(struct drm_device *dev, struct drm_mode_fb_cmd2 *r,
+		    struct drm_file *file_priv, const char *comm);
+int drm_mode_rmfb(struct drm_device *dev, u32 fb_id,
+		  struct drm_file *file_priv);
 int drm_mode_dirtyfb(struct drm_device *dev, struct drm_mode_fb_dirty_cmd *req,
 		     struct drm_file *file_priv, bool user);
 
 /* IOCTL */
 int drm_mode_addfb(struct drm_device *dev,
 		   void *data, struct drm_file *file_priv);
-int drm_mode_addfb2(struct drm_device *dev,
-		    void *data, struct drm_file *file_priv);
-int drm_mode_rmfb(struct drm_device *dev,
-		  void *data, struct drm_file *file_priv);
+int drm_mode_addfb2_ioctl(struct drm_device *dev,
+			  void *data, struct drm_file *file_priv);
+int drm_mode_rmfb_ioctl(struct drm_device *dev,
+			void *data, struct drm_file *file_priv);
 int drm_mode_getfb(struct drm_device *dev,
 		   void *data, struct drm_file *file_priv);
 int drm_mode_dirtyfb_ioctl(struct drm_device *dev,
@@ -209,6 +227,9 @@ int drm_plane_register_all(struct drm_device *dev);
 void drm_plane_unregister_all(struct drm_device *dev);
 int drm_plane_check_pixel_format(const struct drm_plane *plane,
 				 u32 format);
+int drm_mode_page_flip(struct drm_device *dev,
+		       struct drm_mode_crtc_page_flip_target *page_flip,
+		       struct drm_file *file_priv);
 
 /* drm_bridge.c */
 void drm_bridge_detach(struct drm_bridge *bridge);

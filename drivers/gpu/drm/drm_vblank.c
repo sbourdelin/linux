@@ -1445,12 +1445,11 @@ static void drm_wait_vblank_reply(struct drm_device *dev, unsigned int pipe,
 	reply->tval_usec = ts.tv_nsec / 1000;
 }
 
-int drm_wait_vblank_ioctl(struct drm_device *dev, void *data,
-			  struct drm_file *file_priv)
+int drm_wait_vblank(struct drm_device *dev, union drm_wait_vblank *vblwait,
+		    struct drm_file *file_priv)
 {
 	struct drm_crtc *crtc;
 	struct drm_vblank_crtc *vblank;
-	union drm_wait_vblank *vblwait = data;
 	int ret;
 	u64 req_seq, seq;
 	unsigned int pipe_index;
@@ -1565,6 +1564,12 @@ int drm_wait_vblank_ioctl(struct drm_device *dev, void *data,
 done:
 	drm_vblank_put(dev, pipe);
 	return ret;
+}
+
+int drm_wait_vblank_ioctl(struct drm_device *dev, void *data,
+			  struct drm_file *file_priv)
+{
+	return drm_wait_vblank_ioctl(dev, data, file_priv);
 }
 
 static void drm_handle_vblank_events(struct drm_device *dev, unsigned int pipe)

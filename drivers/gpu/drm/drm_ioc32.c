@@ -884,7 +884,7 @@ static int compat_drm_mode_addfb2(struct file *file, unsigned int cmd,
 			   sizeof(req64.modifier)))
 		return -EFAULT;
 
-	err = drm_ioctl_kernel(file, drm_mode_addfb2, &req64,
+	err = drm_ioctl_kernel(file, drm_mode_addfb2_ioctl, &req64,
 				DRM_CONTROL_ALLOW|DRM_UNLOCKED);
 	if (err)
 		return err;

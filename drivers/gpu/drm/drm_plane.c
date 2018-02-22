@@ -907,10 +907,10 @@ int drm_mode_cursor2_ioctl(struct drm_device *dev,
 	return drm_mode_cursor_common(dev, req, file_priv);
 }
 
-int drm_mode_page_flip_ioctl(struct drm_device *dev,
-			     void *data, struct drm_file *file_priv)
+int drm_mode_page_flip(struct drm_device *dev,
+		       struct drm_mode_crtc_page_flip_target *page_flip,
+		       struct drm_file *file_priv)
 {
-	struct drm_mode_crtc_page_flip_target *page_flip = data;
 	struct drm_crtc *crtc;
 	struct drm_framebuffer *fb = NULL;
 	struct drm_pending_vblank_event *e = NULL;
@@ -1081,4 +1081,10 @@ out:
 		drm_crtc_vblank_put(crtc);
 
 	return ret;
+}
+
+int drm_mode_page_flip_ioctl(struct drm_device *dev,
+			     void *data, struct drm_file *file_priv)
+{
+	return drm_mode_page_flip(dev, data, file_priv);
 }

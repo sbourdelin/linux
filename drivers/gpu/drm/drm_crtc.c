@@ -387,8 +387,8 @@ EXPORT_SYMBOL(drm_crtc_cleanup);
 /**
  * drm_mode_getcrtc - get CRTC configuration
  * @dev: drm device for the ioctl
- * @data: data pointer for the ioctl
- * @file_priv: drm file for the ioctl call
+ * @crtc_resp: pointer to crtc request structure
+ * @file_priv: drm file
  *
  * Construct a CRTC configuration structure to return to the user.
  *
@@ -397,10 +397,9 @@ EXPORT_SYMBOL(drm_crtc_cleanup);
  * Returns:
  * Zero on success, negative errno on failure.
  */
-int drm_mode_getcrtc(struct drm_device *dev,
-		     void *data, struct drm_file *file_priv)
+int drm_mode_getcrtc(struct drm_device *dev, struct drm_mode_crtc *crtc_resp,
+		     struct drm_file *file_priv)
 {
-	struct drm_mode_crtc *crtc_resp = data;
 	struct drm_crtc *crtc;
 
 	if (!drm_core_check_feature(dev, DRIVER_MODESET))
@@ -449,6 +448,12 @@ int drm_mode_getcrtc(struct drm_device *dev,
 	drm_modeset_unlock(&crtc->mutex);
 
 	return 0;
+}
+
+int drm_mode_getcrtc_ioctl(struct drm_device *dev,
+			   void *data, struct drm_file *file_priv)
+{
+	return drm_mode_getcrtc(dev, data, file_priv);
 }
 
 static int __drm_mode_set_config_internal(struct drm_mode_set *set,
