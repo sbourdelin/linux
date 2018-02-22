@@ -235,6 +235,9 @@ static void free_obj_work(struct work_struct *work)
 		hlist_move_list(&obj_to_free, &tofree);
 		obj_nr_tofree = 0;
 	}
+	hlist_for_each_entry(obj, &tofree, node)
+		debug_objects_freed++;
+
 	raw_spin_unlock_irqrestore(&pool_lock, flags);
 
 	hlist_for_each_entry_safe(obj, tmp, &tofree, node) {
