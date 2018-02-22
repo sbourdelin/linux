@@ -3047,6 +3047,29 @@ static inline void cfs_rq_util_change(struct cfs_rq *cfs_rq)
 	}
 }
 
+/*
+ * When a task is dequeued, its estimated utilization should not be update if
+ * its util_avg has not been updated at least once.
+ * This flag is used to synchronize util_avg updates with util_est updates.
+ * We map this information into the LSB bit of the utilization saved at
+ * dequeue time (i.e. util_est.dequeued).
+ */
+#define UTIL_EST_NEED_UPDATE_FLAG 0x1
+
+static inline void cfs_se_util_change(struct sched_avg *avg)
+{
+	if (sched_feat(UTIL_EST)) {
+		struct util_est ue = READ_ONCE(avg->util_est);
+
+		if (!(ue.enqueued & UTIL_EST_NEED_UPDATE_FLAG))
+			return;
+
+		/* Reset flag to report util_avg has been updated */
+		ue.enqueued &= ~UTIL_EST_NEED_UPDATE_FLAG;
+		WRITE_ONCE(avg->util_est, ue);
+	}
+}
+
 #ifdef CONFIG_SMP
 /*
  * Approximate:
@@ -3308,6 +3331,7 @@ __update_load_avg_se(u64 now, int cpu, struct cfs_rq *cfs_rq, struct sched_entit
 				cfs_rq->curr == se)) {
 
 		___update_load_avg(&se->avg, se_weight(se), se_runnable(se));
+		cfs_se_util_change(&se->avg);
 		return 1;
 	}
 
@@ -5218,7 +5242,7 @@ static inline void util_est_enqueue(struct cfs_rq *cfs_rq,
 
 	/* Update root cfs_rq's estimated utilization */
 	enqueued  = READ_ONCE(cfs_rq->avg.util_est.enqueued);
-	enqueued += _task_util_est(p);
+	enqueued += (_task_util_est(p) | 0x1);
 	WRITE_ONCE(cfs_rq->avg.util_est.enqueued, enqueued);
 }
 
@@ -5310,7 +5334,7 @@ static inline void util_est_dequeue(struct cfs_rq *cfs_rq,
 	if (cfs_rq->nr_running) {
 		ue.enqueued  = READ_ONCE(cfs_rq->avg.util_est.enqueued);
 		ue.enqueued -= min_t(unsigned int, ue.enqueued,
-				     _task_util_est(p));
+				     (_task_util_est(p) | UTIL_EST_NEED_UPDATE_FLAG));
 	}
 	WRITE_ONCE(cfs_rq->avg.util_est.enqueued, ue.enqueued);
 
@@ -5322,11 +5346,18 @@ static inline void util_est_dequeue(struct cfs_rq *cfs_rq,
 		return;
 
 	/*
+	 * Skip update of task's estimated utilization if the PELT signal has
+	 * never been updated (at least once) since last enqueue time.
+	 */
+	ue = READ_ONCE(p->se.avg.util_est);
+	if (ue.enqueued & UTIL_EST_NEED_UPDATE_FLAG)
+		return;
+
+	/*
 	 * Skip update of task's estimated utilization when its EWMA is
 	 * already ~1% close to its last activation value.
 	 */
-	ue = READ_ONCE(p->se.avg.util_est);
-	ue.enqueued = task_util(p);
+	ue.enqueued = (task_util(p) | UTIL_EST_NEED_UPDATE_FLAG);
 	last_ewma_diff = ue.enqueued - ue.ewma;
 	if (within_margin(last_ewma_diff, (SCHED_CAPACITY_SCALE / 100)))
 		return;
