@@ -38,4 +38,9 @@ void intel_huc_init_early(struct intel_huc *huc);
 int intel_huc_init_hw(struct intel_huc *huc);
 int intel_huc_auth(struct intel_huc *huc);
 
+static inline void intel_huc_prepare_to_reset(struct intel_huc *huc)
+{
+	intel_uc_fw_prepare_to_reset(&huc->fw);
+}
+
 #endif

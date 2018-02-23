@@ -2981,6 +2981,7 @@ int i915_gem_reset_prepare(struct drm_i915_private *dev_priv)
 	}
 
 	i915_gem_revoke_fences(dev_priv);
+	intel_uc_prepare_to_reset(dev_priv);
 
 	return err;
 }
@@ -4881,8 +4882,10 @@ void i915_gem_sanitize(struct drm_i915_private *i915)
 	 * it may impact the display and we are uncertain about the stability
 	 * of the reset, so this could be applied to even earlier gen.
 	 */
-	if (INTEL_GEN(i915) >= 5 && intel_has_gpu_reset(i915))
+	if (INTEL_GEN(i915) >= 5 && intel_has_gpu_reset(i915)) {
+		intel_uc_prepare_to_reset(i915);
 		WARN_ON(intel_gpu_reset(i915, ALL_ENGINES));
+	}
 }
 
 int i915_gem_suspend(struct drm_i915_private *dev_priv)

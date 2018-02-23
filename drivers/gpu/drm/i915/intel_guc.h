@@ -132,4 +132,9 @@ int intel_guc_resume(struct drm_i915_private *dev_priv);
 struct i915_vma *intel_guc_allocate_vma(struct intel_guc *guc, u32 size);
 u32 intel_guc_wopcm_size(struct drm_i915_private *dev_priv);
 
+static inline void intel_guc_prepare_to_reset(struct intel_guc *guc)
+{
+	intel_uc_fw_prepare_to_reset(&guc->fw);
+}
+
 #endif
