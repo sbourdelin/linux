@@ -92,6 +92,18 @@ module_param(msi, int, 0644);
 MODULE_PARM_DESC(msi, "whether to use MSI-X or MSI");
 
 /*
+ * Logic controls.
+ * ===============
+ */
+
+/* The Virtual Interfaces are connected to an internal switch on the chip
+ * which allows VIs attached to the same port to talk to each other even when
+ * the port link is down.  As a result, we generally want to always report a
+ * VI's link as being "up".
+ */
+#define force_link_up 1
+
+/*
  * Fundamental constants.
  * ======================
  */
@@ -155,7 +167,8 @@ void t4vf_os_link_changed(struct adapter *adapter, int pidx, int link_ok)
 		const char *fc;
 		const struct port_info *pi = netdev_priv(dev);
 
-		netif_carrier_on(dev);
+		if (!force_link_up)
+			netif_carrier_on(dev);
 
 		switch (pi->link_cfg.speed) {
 		case 100:
@@ -202,7 +215,9 @@ void t4vf_os_link_changed(struct adapter *adapter, int pidx, int link_ok)
 
 		netdev_info(dev, "link up, %s, full-duplex, %s PAUSE\n", s, fc);
 	} else {
-		netif_carrier_off(dev);
+		if (!force_link_up)
+			netif_carrier_off(dev);
+
 		netdev_info(dev, "link down\n");
 	}
 }
@@ -278,6 +293,13 @@ static int link_start(struct net_device *dev)
 	 */
 	if (ret == 0)
 		ret = t4vf_enable_vi(pi->adapter, pi->viid, true, true);
+
+	/* If we didn't experience any error and we're always reporting the
+	 * link as being "up", tell the OS that the link is up.
+	 */
+	if (ret == 0 && force_link_up)
+		netif_carrier_on(dev);
+
 	return ret;
 }
 
