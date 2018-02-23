@@ -4324,6 +4324,11 @@ extern bool intel_set_memory_cxsr(struct drm_i915_private *dev_priv,
 				  bool enable);
 extern void intel_dp_compute_dsc_parameters(struct intel_dp *dp);
 
+extern void intel_dsc_enable(struct intel_encoder *encoder,
+					struct intel_crtc_state *crtc_state);
+extern void intel_dsc_disable(struct intel_encoder *encoder,
+					struct intel_crtc_state *crtc_state);
+
 int i915_reg_read_ioctl(struct drm_device *dev, void *data,
 			struct drm_file *file);
 

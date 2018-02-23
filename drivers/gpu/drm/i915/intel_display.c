@@ -5264,6 +5264,11 @@ static void intel_encoders_pre_enable(struct drm_crtc *crtc,
 
 		if (encoder->pre_enable)
 			encoder->pre_enable(encoder, crtc_state, conn_state);
+		/*
+		 * Send PPS and Enable DSC after decompression is
+		 * enabled in DP sink
+		 */
+		intel_dsc_enable(encoder, crtc_state);
 	}
 }
 
@@ -5661,7 +5666,10 @@ static void haswell_crtc_disable(struct intel_crtc_state *old_crtc_state,
 	struct drm_crtc *crtc = old_crtc_state->base.crtc;
 	struct drm_i915_private *dev_priv = to_i915(crtc->dev);
 	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	struct drm_connector_state *conn_state;
+	struct drm_connector *conn;
 	enum transcoder cpu_transcoder = intel_crtc->config->cpu_transcoder;
+	int i;
 
 	intel_encoders_disable(crtc, old_crtc_state, old_state);
 
@@ -5677,6 +5685,18 @@ static void haswell_crtc_disable(struct intel_crtc_state *old_crtc_state,
 
 	if (!transcoder_is_dsi(cpu_transcoder))
 		intel_ddi_disable_transcoder_func(dev_priv, cpu_transcoder);
+
+	/* Invoke intel_dsc_disable */
+	for_each_new_connector_in_state(old_state, conn, conn_state, i) {
+		struct intel_encoder *encoder =
+			to_intel_encoder(conn_state->best_encoder);
+
+		if (conn_state->crtc != crtc)
+			continue;
+
+		/* Disable DSC if supported by platform and panel */
+		intel_dsc_disable(encoder, old_crtc_state);
+	}
 
 	if (INTEL_GEN(dev_priv) >= 9)
 		skylake_scaler_disable(intel_crtc);
