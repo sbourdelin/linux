@@ -179,6 +179,30 @@ doesn't matter what data value the shadow variable holds, its existence
 suggests how to handle the parent object.
 
 
+Use in cumulative patches
+-------------------------
+
+Cumulative livepatches provide a "one-stop" module containing all active
+livepatch code.  A cumulative patch disables and replaces any previously
+loaded livepatch.  Shadow variable lifetimes should be carefully
+considered when loading cumulative livepatches:
+
+- If shadow variables lifetimes are specific to livepatch module
+  versions, it may make sense to free them when the corresponding
+  livepatch module is unloaded.
+
+- If shadow variable instances may be safely handled across cumulative
+  livepatch module versions, then it may make sense to free them from
+  unpatch callbacks.  When a cumulative patch replaces an existing
+  livepatch, only the cumulative patch's callbacks will be executed.
+  This means that new cumulative livepatches may be loaded while
+  deprecated / disabled livepatches may be unloaded without clearing
+  existing shadow variables.
+
+See Documentation/livepatch/callbacks.txt and cumulative.txt for more
+information on these subjects.
+
+
 3. References
 =============
 
