@@ -7,6 +7,7 @@
  */
 
 #include <linux/elf.h>
+#include <linux/ftrace.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/sort.h>
@@ -22,6 +23,15 @@
 						    (PLT_ENT_STRIDE - 8))
 #endif
 
+static u32 fixed_plts[] = {
+	FTRACE_ADDR,
+	MCOUNT_ADDR,
+#ifdef CONFIG_OLD_MCOUNT
+	(unsigned long)ftrace_caller_old,
+	(unsigned long)mcount,
+#endif
+};
+
 static bool in_init(const struct module *mod, unsigned long loc)
 {
 	return loc - (u32)mod->init_layout.base < mod->init_layout.size;
@@ -31,26 +41,43 @@ u32 get_module_plt(struct module *mod, unsigned long loc, Elf32_Addr val)
 {
 	struct mod_plt_sec *pltsec = !in_init(mod, loc) ? &mod->arch.core :
 							  &mod->arch.init;
+	int idx;
+	struct plt_entries *plt;
 
-	struct plt_entries *plt = (struct plt_entries *)pltsec->plt->sh_addr;
-	int idx = 0;
+	/* Pre-allocate entries in the first plt */
+	if (!pltsec->plt_count) {
+		plt = (struct plt_entries *)pltsec->plt->sh_addr;
+		for (idx = 0; idx < ARRAY_SIZE(plt->ldr); ++idx)
+			plt->ldr[idx] = PLT_ENT_LDR;
+		memcpy(plt->lit, fixed_plts, sizeof(fixed_plts));
+		pltsec->plt_count = ARRAY_SIZE(fixed_plts);
+		/*
+		 * cache the address,
+		 * ELF header is available only during module load
+		 */
+		pltsec->plt_ent = plt;
+	}
+	plt = pltsec->plt_ent;
+
+	idx = ARRAY_SIZE(fixed_plts);
+	while (idx)
+		if (plt->lit[--idx] == val)
+			return (u32)&plt->ldr[idx];
 
 	/*
 	 * Look for an existing entry pointing to 'val'. Given that the
 	 * relocations are sorted, this will be the last entry we allocated.
 	 * (if one exists).
 	 */
-	if (pltsec->plt_count > 0) {
-		plt += (pltsec->plt_count - 1) / PLT_ENT_COUNT;
-		idx = (pltsec->plt_count - 1) % PLT_ENT_COUNT;
+	plt += (pltsec->plt_count - 1) / PLT_ENT_COUNT;
+	idx = (pltsec->plt_count - 1) % PLT_ENT_COUNT;
 
-		if (plt->lit[idx] == val)
-			return (u32)&plt->ldr[idx];
+	if (plt->lit[idx] == val)
+		return (u32)&plt->ldr[idx];
 
-		idx = (idx + 1) % PLT_ENT_COUNT;
-		if (!idx)
-			plt++;
-	}
+	idx = (idx + 1) % PLT_ENT_COUNT;
+	if (!idx)
+		plt++;
 
 	pltsec->plt_count++;
 	BUG_ON(pltsec->plt_count * PLT_ENT_SIZE > pltsec->plt->sh_size);
@@ -182,8 +209,8 @@ static unsigned int count_plts(const Elf32_Sym *syms, Elf32_Addr base,
 int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
 			      char *secstrings, struct module *mod)
 {
-	unsigned long core_plts = 0;
-	unsigned long init_plts = 0;
+	unsigned long core_plts = ARRAY_SIZE(fixed_plts);
+	unsigned long init_plts = ARRAY_SIZE(fixed_plts);
 	Elf32_Shdr *s, *sechdrs_end = sechdrs + ehdr->e_shnum;
 	Elf32_Sym *syms = NULL;
 
