@@ -258,6 +258,11 @@ struct intel_engine_execlists {
 	unsigned int port_mask;
 
 	/**
+	 * @queue_priority: Highest pending priority.
+	 */
+	int queue_priority;
+
+	/**
 	 * @queue: queue of requests, in priority lists
 	 */
 	struct rb_root queue;
