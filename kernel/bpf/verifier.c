@@ -445,8 +445,7 @@ static int copy_verifier_state(struct bpf_verifier_state *dst_state,
 	return 0;
 }
 
-static int pop_stack(struct bpf_verifier_env *env, int *prev_insn_idx,
-		     int *insn_idx)
+static int pop_stack(struct bpf_verifier_env *env, int *insn_idx)
 {
 	struct bpf_verifier_state *cur = env->cur_state;
 	struct bpf_verifier_stack_elem *elem, *head = env->head;
@@ -462,8 +461,7 @@ static int pop_stack(struct bpf_verifier_env *env, int *prev_insn_idx,
 	}
 	if (insn_idx)
 		*insn_idx = head->insn_idx;
-	if (prev_insn_idx)
-		*prev_insn_idx = head->prev_insn_idx;
+	env->prev_insn_idx = head->prev_insn_idx;
 	elem = head->next;
 	free_verifier_state(&head->st, false);
 	kfree(head);
@@ -516,7 +514,7 @@ err:
 	free_verifier_state(env->cur_state, true);
 	env->cur_state = NULL;
 	/* pop all elements and return */
-	while (!pop_stack(env, NULL, NULL));
+	while (!pop_stack(env, NULL));
 	return NULL;
 }
 
@@ -730,10 +728,11 @@ static void init_reg_state(struct bpf_verifier_env *env,
 
 static void init_func_state(struct bpf_verifier_env *env,
 			    struct bpf_func_state *state,
+			    struct bpf_func_state *parent,
 			    int entry, int frameno, int subprogno)
 {
 	state->insn_idx = entry;
-	state->parent = NULL;
+	state->parent = parent;
 	state->frameno = frameno;
 	state->subprogno = subprogno;
 	init_reg_state(env, state);
@@ -2112,6 +2111,7 @@ static int check_func_call(struct bpf_verifier_env *env, struct bpf_insn *insn,
 	 * callee can read/write into caller's stack
 	 */
 	init_func_state(env, callee,
+			caller->parent /* parent state for loop detection */,
 			target /* entry point */,
 			state->curframe + 1 /* frameno within this callchain */,
 			subprog /* subprog number within this prog */);
@@ -3480,6 +3480,12 @@ static bool reg_is_impossible(struct bpf_reg_state reg)
 		reg.smin_value > reg.smax_value);
 }
 
+enum cond_jmp_result {
+	COND_JMP_EITHER = 0, /* Both jump and fallthrough are possible */
+	COND_JMP_FALLTHROUGH, /* Jump branch is never taken */
+	COND_JMP_FOLLOW, /* Fallthrough branch is never taken */
+};
+
 static int check_cond_jmp_op(struct bpf_verifier_env *env,
 			     struct bpf_insn *insn, int *insn_idx)
 {
@@ -3503,7 +3509,7 @@ static int check_cond_jmp_op(struct bpf_verifier_env *env,
 
 		/* check src1 operand */
 		err = check_reg_arg(env, insn->src_reg, SRC_OP);
-		if (err)
+		if (err < 0)
 			return err;
 
 		if (is_pointer_value(env, insn->src_reg)) {
@@ -3520,10 +3526,14 @@ static int check_cond_jmp_op(struct bpf_verifier_env *env,
 
 	/* check src2 operand */
 	err = check_reg_arg(env, insn->dst_reg, SRC_OP);
-	if (err)
+	if (err < 0)
 		return err;
 
 	dst_reg = &regs[insn->dst_reg];
+
+	other_branch = push_stack(env, *insn_idx + insn->off + 1, *insn_idx);
+	if (!other_branch)
+		return -EFAULT;
 
 	/* detect if R == 0 where R was initialized to zero earlier */
 	if (BPF_SRC(insn->code) == BPF_K &&
@@ -3531,24 +3541,19 @@ static int check_cond_jmp_op(struct bpf_verifier_env *env,
 	    dst_reg->type == SCALAR_VALUE &&
 	    tnum_is_const(dst_reg->var_off)) {
 		if ((opcode == BPF_JEQ && dst_reg->var_off.value == insn->imm) ||
-		    (opcode == BPF_JNE && dst_reg->var_off.value != insn->imm)) {
+		    (opcode == BPF_JNE && dst_reg->var_off.value != insn->imm))
 			/* if (imm == imm) goto pc+off;
 			 * only follow the goto, ignore fall-through
 			 */
-			*insn_idx += insn->off;
-			return 0;
-		} else {
+			return COND_JMP_FOLLOW;
+		else
 			/* if (imm != imm) goto pc+off;
 			 * only follow fall-through branch, since
 			 * that's where the program will go
 			 */
-			return 0;
-		}
+			return COND_JMP_FALLTHROUGH;
 	}
 
-	other_branch = push_stack(env, *insn_idx + insn->off + 1, *insn_idx);
-	if (!other_branch)
-		return -EFAULT;
 	other_branch_regs = other_branch->frame[other_branch->curframe]->regs;
 
 	/* detect if we are comparing against a constant value so we can adjust
@@ -3599,33 +3604,21 @@ static int check_cond_jmp_op(struct bpf_verifier_env *env,
 	}
 	if (env->log.level)
 		print_verifier_state(env, this_branch->frame[this_branch->curframe]);
-
 	if (reg_is_impossible(other_branch_regs[insn->src_reg]) ||
-	    reg_is_impossible(other_branch_regs[insn->dst_reg])) {
+	    reg_is_impossible(other_branch_regs[insn->dst_reg]))
 		/* if (false) goto pc+off;
 		 * only follow fall-through branch, since
 		 * that's where the program will go
 		 */
-		verbose(env, "pruning impossible jump\n");
-		unpush_stack(env);
-	} else if (reg_is_impossible(regs[insn->src_reg]) ||
-		   reg_is_impossible(regs[insn->dst_reg])) {
+		return COND_JMP_FALLTHROUGH;
+	else if (reg_is_impossible(regs[insn->src_reg]) ||
+		 reg_is_impossible(regs[insn->dst_reg]))
 		/* if (true) goto pc+off;
 		 * only follow the goto, ignore fall-through
 		 */
-		verbose(env, "pruning impossible fall-through\n");
-		err = pop_stack(env, NULL, insn_idx);
-		if (err < 0) {
-			if (err != -ENOENT)
-				return err;
-		}
-		/* pushed goto included the +1, which caller will try to apply
-		 * so let's undo it here.
-		 */
-		(*insn_idx)--;
-	}
+		return COND_JMP_FOLLOW;
 
-	return 0;
+	return COND_JMP_EITHER;
 }
 
 /* return the map pointer stored inside BPF_LD_IMM64 instruction */
@@ -4214,23 +4207,141 @@ static int propagate_liveness(struct bpf_verifier_env *env,
 	return err;
 }
 
-static struct bpf_func_state *find_loop(struct bpf_verifier_env *env)
+static struct bpf_func_state *find_loop(struct bpf_verifier_env *env,
+					bool *saw_cond, bool *saw_bound)
 {
 	struct bpf_func_state *cur = cur_frame(env);
 	int insn_idx = cur->insn_idx;
 
-	while ((cur = cur->parent) != NULL)
+	while ((cur = cur->parent) != NULL) {
 		if (cur->insn_idx == insn_idx)
 			return cur;
+		if (cur->conditional && saw_cond)
+			*saw_cond = true;
+		if (cur->bounded_loop && saw_bound)
+			*saw_bound = true;
+	}
 	return NULL;
 }
 
-static int is_state_visited(struct bpf_verifier_env *env, int prev_insn_idx,
-			    int insn_idx)
+#define BPF_LINEAR_LOOP_LIMIT	16
+/* Test whether register has increased fast enough between %old and %new that it
+ * will reach %val in a reasonably small number of loop iterations.
+ * We pay attention only to the minimum value, as that's the worst case.
+ */
+static bool is_reg_increasing(struct bpf_verifier_env *env, u8 regno,
+			      struct bpf_reg_state *old,
+			      struct bpf_reg_state *new, u64 val)
+{
+	u64 oldval = old->umin_value;
+	u64 newval = new->umin_value;
+
+	if (oldval >= newval) {
+		verbose(env, "loop variable r%d is not increasing\n", regno);
+		return false;
+	}
+	/* Assuming the loop variable is linear in the iteration count, check
+	 * that we will be done in at most BPF_LINEAR_LOOP_LIMIT iterations.
+	 * If that assumption is in fact false, since we are checking this on
+	 * every iteration, we may approach %val by an exponential decay, but
+	 * since we're working in integers, that still ensures we get there in
+	 * a reasonable length of time (687 iterations in the absolute worst
+	 * case, from 64 / log2(16/15).)
+	 */
+	/* TODO think about overflow, this probably needs to be more careful */
+	if ((newval - oldval) * BPF_LINEAR_LOOP_LIMIT + oldval <= val) {
+		verbose(env, "loop variable r%d is increasing too slowly\n",
+			regno);
+		return false;
+	}
+	return true;
+}
+
+static bool is_conditional_jump(struct bpf_verifier_env *env)
+{
+	struct bpf_insn *insn = env->prog->insnsi + env->prev_insn_idx;
+	u8 opcode = BPF_OP(insn->code);
+
+	if (env->prev_insn_idx < 0)
+		return false;
+	/* Should be impossible, how else did we get here? */
+	if (BPF_CLASS(insn->code) != BPF_JMP) {
+		verbose(env, "back-edge is not a jump\n");
+		return false;
+	}
+	return !(opcode == BPF_JA || opcode == BPF_CALL || opcode == BPF_EXIT);
+}
+
+static bool is_loop_bounded(struct bpf_verifier_env *env, int insn_idx,
+			    struct bpf_func_state *old)
+{
+	struct bpf_insn *insn = env->prog->insnsi + env->prev_insn_idx;
+	struct bpf_func_state *new = cur_frame(env);
+	struct bpf_reg_state *oldreg, *newreg;
+	u8 opcode = BPF_OP(insn->code);
+
+	/* If our frames somehow don't match up, just say it's not safe. */
+	if (old->frameno != new->frameno) {
+		verbose(env, "looped from frame %d into %d\n", old->frameno,
+			new->frameno);
+	}
+	if (env->prev_insn_idx < 0) {
+		verbose(env, "back-edge without conditional jump\n");
+		return false;
+	}
+	/* Should be impossible, how else did we get here? */
+	if (BPF_CLASS(insn->code) != BPF_JMP) {
+		verbose(env, "back-edge is not a jump\n");
+		return false;
+	}
+	/* For now, we don't support variable as the loop bound */
+	if (BPF_SRC(insn->code) != BPF_K) {
+		verbose(env, "loop with variable bound not supported\n");
+		return false;
+	}
+	oldreg = &old->regs[insn->dst_reg];
+	newreg = &new->regs[insn->dst_reg];
+	/* Loop variable must be a scalar */
+	if (oldreg->type != SCALAR_VALUE) {
+		verbose(env, "loop variable r%d is not a scalar\n",
+			insn->dst_reg);
+		return false;
+	}
+	if (newreg->type != SCALAR_VALUE) {
+		verbose(env, "loop variable r%d is no longer a scalar\n",
+			insn->dst_reg);
+		return false;
+	}
+	switch (opcode) {
+	case BPF_JA: /* unconditional branch = infinite loop */
+	case BPF_CALL: /* weird.  Also unconditional */
+	case BPF_EXIT: /* also weird.  Also unconditional */
+		verbose(env, "loop with unconditional BPF_JMP insn\n");
+		return false;
+	case BPF_JLT:
+		/* e.g. for (i=0; i<k; i++) */
+		if (env->last_jump_taken)
+			return is_reg_increasing(env, insn->dst_reg, oldreg,
+						 newreg, insn->imm);
+		/* else something like "while(true) if (i<k) break;", which
+		 * we don't support yet
+		 */
+		verbose(env, "loop on conditional fallthrough\n");
+		return false;
+	default:
+		/* TODO handle other cases */
+		verbose(env, "loop with this opcode not supported (yet)\n");
+		return false;
+	}
+}
+
+static int is_state_visited(struct bpf_verifier_env *env, int insn_idx)
 {
 	struct bpf_verifier_state_list *new_sl;
 	struct bpf_verifier_state_list *sl;
 	struct bpf_verifier_state *cur = env->cur_state, *new;
+	bool saw_cond = false, saw_bound = false;
+	bool cond = false, bounded = false;
 	struct bpf_func_state *old;
 	int i, j, err;
 
@@ -4241,16 +4352,66 @@ static int is_state_visited(struct bpf_verifier_env *env, int prev_insn_idx,
 		 */
 		return 0;
 
+	cond = is_conditional_jump(env);
 	/* Check our parentage chain: have we looped? */
-	old = find_loop(env);
+	old = find_loop(env, &saw_cond, &saw_bound);
 	if (old != NULL) {
-		verbose(env, "back-edge from insn %d to %d\n", prev_insn_idx,
-			insn_idx);
-		return -EINVAL;
+		if (old->frameno != cur->curframe) {
+			/* if it's in our parentage chain, then it called us;
+			 * but we're the same insn, so in the same subprog, so
+			 * recursion has occurred.
+			 * The loop detection could handle recursion fine (it
+			 * distinguishes between bounded and unbounded
+			 * recursion, and the latter would quickly run out of
+			 * call stack anyway), but the stack max depth
+			 * calculation can't deal with it (because it doesn't
+			 * know how deeply we might recurse).
+			 */
+			verbose(env, "recursive call from insn %d to %d\n",
+				env->prev_insn_idx, insn_idx);
+			return -EINVAL;
+		}
+		/* Mark old state as not prunable */
+		old->in_loop = true;
+		if (cond)
+			bounded = is_loop_bounded(env, insn_idx, old);
+		if (bounded) {
+			verbose(env, "following bounded loop from insn %d to %d\n",
+				env->prev_insn_idx, insn_idx);
+		} else if (old->bounded_loop) {
+			/* This insn was managing the loop last time.  So we
+			 * have to insist it continues to do so, to prevent the
+			 * 'three-jump trick' (see test_verifier.c for example)
+			 * whereby at least one jump appears to be making
+			 * progress at any given time but none of them ever get
+			 * anywhere because they take it in turns to undo their
+			 * progress on alternate passages through the loop.
+			 */
+			verbose(env, "loop from insn %d to %d ceased to be bounded\n",
+				env->prev_insn_idx, insn_idx);
+			return -EINVAL;
+		} else if (saw_bound) {
+			verbose(env, "following loop from insn %d to %d, bounded elsewhere\n",
+				env->prev_insn_idx, insn_idx);
+		} else if (saw_cond && !cond) {
+			/* We're not a conditional, but there's a conditional
+			 * somewhere else in the loop.  So they will be
+			 * responsible for ensuring the loop is bounded (it's
+			 * possible we've been revisited but they haven't, which
+			 * is why they might not have bounded_loop set).
+			 */
+			verbose(env, "following loop from insn %d to %d for now, condition is elsewhere\n",
+				env->prev_insn_idx, insn_idx);
+		} else {
+			verbose(env, "back-edge from insn %d to %d\n",
+				env->prev_insn_idx, insn_idx);
+			return -EINVAL;
+		}
 	}
 
 	while (sl != STATE_LIST_MARK) {
-		if (states_equal(env, &sl->state, cur)) {
+		if (!sl->state.frame[sl->state.curframe]->in_loop &&
+		    states_equal(env, &sl->state, cur)) {
 			/* reached equivalent register/stack state,
 			 * prune the search.
 			 * Registers read by the continuation are read by us.
@@ -4272,9 +4433,10 @@ static int is_state_visited(struct bpf_verifier_env *env, int prev_insn_idx,
 	/* there were no equivalent states, remember current one.
 	 * technically the current state is not proven to be safe yet,
 	 * but it will either reach outer most bpf_exit (which means it's safe)
-	 * or it will be rejected. Since there are no loops, we won't be
-	 * seeing this tuple (frame[0].insn_idx, frame[1].insn_idx, .. insn_idx)
-	 * again on the way to bpf_exit
+	 * or it will be rejected.  The only way we can see this tuple
+	 * (frame[0].insn_idx, frame[1].insn_idx, .. insn_idx) again on the way
+	 * to bpf_exit is in a loop which will be caught above and marked with
+	 * 'looping' flag.
 	 */
 	new_sl = kzalloc(sizeof(struct bpf_verifier_state_list), GFP_KERNEL);
 	if (!new_sl)
@@ -4288,6 +4450,8 @@ static int is_state_visited(struct bpf_verifier_env *env, int prev_insn_idx,
 		kfree(new_sl);
 		return err;
 	}
+	new->frame[new->curframe]->conditional = cond;
+	new->frame[new->curframe]->bounded_loop = bounded;
 	new_sl->next = env->explored_states[insn_idx];
 	env->explored_states[insn_idx] = new_sl;
 	/* connect new state's regs to parentage chain */
@@ -4323,7 +4487,7 @@ static int do_check(struct bpf_verifier_env *env)
 	struct bpf_insn *insns = env->prog->insnsi;
 	struct bpf_reg_state *regs;
 	int insn_cnt = env->prog->len, i;
-	int insn_idx, prev_insn_idx = 0;
+	int insn_idx;
 	int insn_processed = 0;
 	int mainprogno;
 	bool do_print_state = false;
@@ -4342,7 +4506,9 @@ static int do_check(struct bpf_verifier_env *env)
 	if (mainprogno < 0)
 		return mainprogno;
 	insn_idx = 0;
+	env->prev_insn_idx = -1;
 	init_func_state(env, state->frame[0],
+			NULL /* parent state for loop detection */,
 			insn_idx /* entry point */,
 			0 /* frameno */,
 			mainprogno /* subprogno */);
@@ -4382,7 +4548,7 @@ static int do_check(struct bpf_verifier_env *env)
 		aux->subprogno = frame->subprogno;
 		aux->seen = true;
 
-		err = is_state_visited(env, prev_insn_idx, insn_idx);
+		err = is_state_visited(env, insn_idx);
 		if (err < 0)
 			return err;
 		if (err == 1) {
@@ -4390,7 +4556,7 @@ static int do_check(struct bpf_verifier_env *env)
 			if (env->log.level) {
 				if (do_print_state)
 					verbose(env, "\nfrom %d to %d: safe\n",
-						prev_insn_idx, insn_idx);
+						env->prev_insn_idx, insn_idx);
 				else
 					verbose(env, "%d: safe\n", insn_idx);
 			}
@@ -4405,7 +4571,7 @@ static int do_check(struct bpf_verifier_env *env)
 				verbose(env, "%d:", insn_idx);
 			else
 				verbose(env, "\nfrom %d to %d:",
-					prev_insn_idx, insn_idx);
+					env->prev_insn_idx, insn_idx);
 			print_verifier_state(env, frame);
 			do_print_state = false;
 		}
@@ -4421,7 +4587,7 @@ static int do_check(struct bpf_verifier_env *env)
 
 		if (bpf_prog_is_dev_bound(env->prog->aux)) {
 			err = bpf_prog_offload_verify_insn(env, insn_idx,
-							   prev_insn_idx);
+							   env->prev_insn_idx);
 			if (err)
 				return err;
 		}
@@ -4547,6 +4713,8 @@ static int do_check(struct bpf_verifier_env *env)
 		} else if (class == BPF_JMP) {
 			u8 opcode = BPF_OP(insn->code);
 
+			env->prev_insn_idx = insn_idx;
+			env->last_jump_taken = true;
 			if (opcode == BPF_CALL) {
 				if (BPF_SRC(insn->code) != BPF_K ||
 				    insn->off != 0 ||
@@ -4587,7 +4755,6 @@ static int do_check(struct bpf_verifier_env *env)
 
 				if (state->curframe) {
 					/* exit from nested function */
-					prev_insn_idx = insn_idx;
 					err = prepare_func_exit(env, &insn_idx);
 					if (err)
 						return err;
@@ -4614,7 +4781,11 @@ static int do_check(struct bpf_verifier_env *env)
 				if (err)
 					return err;
 process_bpf_exit:
-				err = pop_stack(env, &prev_insn_idx, &insn_idx);
+				err = pop_stack(env, &insn_idx);
+				/* We are following a path that was pushed to
+				 * the stack, thus was a jump-taken path.
+				 */
+				env->last_jump_taken = true;
 				if (err < 0) {
 					if (err != -ENOENT)
 						return err;
@@ -4625,8 +4796,20 @@ process_bpf_exit:
 				}
 			} else {
 				err = check_cond_jmp_op(env, insn, &insn_idx);
-				if (err)
+				if (err < 0)
 					return err;
+				if (err == COND_JMP_FOLLOW) {
+					verbose(env, "pruning impossible fall-through\n");
+					goto process_bpf_exit;
+				}
+				/* We are currently following the fall-through
+				 * path, whether we prune the jump path or not
+				 */
+				env->last_jump_taken = false;
+				if (err == COND_JMP_FALLTHROUGH) {
+					verbose(env, "pruning impossible jump\n");
+					unpush_stack(env);
+				}
 			}
 		} else if (class == BPF_LD) {
 			u8 mode = BPF_MODE(insn->code);
@@ -5541,7 +5724,7 @@ int bpf_check(struct bpf_prog **prog, union bpf_attr *attr)
 	}
 
 skip_full_check:
-	while (!pop_stack(env, NULL, NULL));
+	while (!pop_stack(env, NULL));
 	free_states(env);
 
 	if (ret == 0)

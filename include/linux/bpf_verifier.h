@@ -120,8 +120,11 @@ struct bpf_func_state {
 	 * zero == main subprog
 	 */
 	u32 subprogno;
+
 	/* loop detection; points into an explored_state */
 	struct bpf_func_state *parent;
+	/* These flags are only meaningful in an explored_state, not cur_state */
+	bool in_loop, bounded_loop, conditional;
 
 	/* should be second to last. See copy_func_state() */
 	int allocated_stack;
@@ -197,6 +200,8 @@ struct bpf_verifier_env {
 	u32 id_gen;			/* used to generate unique reg IDs */
 	bool allow_ptr_leaks;
 	bool seen_direct_write;
+	int prev_insn_idx;		/* last branch (BPF_JMP-class) insn */
+	bool last_jump_taken;		/* Was branch at prev_insn_idx taken? */
 	struct bpf_insn_aux_data *insn_aux_data; /* array of per-insn state */
 	struct bpf_verifer_log log;
 	struct bpf_subprog_info subprog_info[BPF_MAX_SUBPROGS];
