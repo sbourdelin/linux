@@ -285,7 +285,7 @@ void __init efi_esrt_init(void)
 	} else {
 		pr_err("Unsupported ESRT version %lld.\n",
 		       tmpesrt.fw_resource_version);
-		return;
+		goto err_memunmap;
 	}
 
 	if (tmpesrt.fw_resource_count > 0 && max - size < entry_size) {
