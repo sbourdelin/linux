@@ -5090,6 +5090,8 @@ static bool hsw_post_update_enable_ips(const struct intel_crtc_state *old_crtc_s
 static void intel_post_plane_update(struct intel_crtc_state *old_crtc_state)
 {
 	struct intel_crtc *crtc = to_intel_crtc(old_crtc_state->base.crtc);
+	struct drm_device *dev = crtc->base.dev;
+	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct drm_atomic_state *old_state = old_crtc_state->base.state;
 	struct intel_crtc_state *pipe_config =
 		intel_atomic_get_new_crtc_state(to_intel_atomic_state(old_state),
@@ -5205,6 +5207,9 @@ static void intel_pre_plane_update(struct intel_crtc_state *old_crtc_state,
 						     pipe_config);
 	else if (pipe_config->update_wm_pre)
 		intel_update_watermarks(crtc);
+
+	if (!pipe_config->sagv)
+		intel_disable_sagv(dev_priv);
 }
 
 static void intel_crtc_disable_planes(struct drm_crtc *crtc, unsigned plane_mask)
@@ -12358,7 +12363,6 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 		 */
 		if (!intel_can_enable_sagv(state))
 			intel_disable_sagv(dev_priv);
-
 		intel_modeset_verify_disabled(dev, state);
 	}
 
