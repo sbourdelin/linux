@@ -782,6 +782,395 @@ struct i915_psr {
 	void (*setup_vsc)(struct intel_dp *, const struct intel_crtc_state *);
 };
 
+struct picture_parameters_set {
+	union {
+		/* PPS0 */
+		unsigned char dsc_version;
+		struct {
+			/* Bit 0-3 Major version no */
+			unsigned char minor : 4;
+			/* Bit 4-7 Minor version no */
+			unsigned char major : 4;
+		};
+	};
+
+	union {
+		/* PPS 1 ,2 */
+		unsigned short picture_params_set_identifier;
+		struct {
+			/*
+			 * Bit 0-7 Application-specific identifier that can be
+			 * used to differentiate  between  different PPS table
+			 */
+			unsigned short pps_identifier : 8;
+			/* Bit 8-15 Reserved */
+			unsigned short pps2_reserved :8;
+		};
+	};
+
+	union {
+		/* PPS 3 */
+		unsigned char bpc_and_lbd;
+		struct {
+			/*
+			 * Bit  0-3 [1000 = 8 bits, 1001 = 9 bits,
+			 * 1010 = 10 bits, 1011 = 11 bits, 1100 = 12bits}
+			 */
+			unsigned char line_buffer_depth : 4;
+			/*
+			 * Bits 4-7 [1000 = 8 bits per component,1010 = 10 bits
+			 * per component,1100 = 12 bits per component]
+			 */
+			unsigned char bits_per_component : 4;
+		};
+	};
+
+	union {
+		/* PPS 4,5 */
+		unsigned short general_pps_params;
+		struct {
+			/*
+			 * Bits 0-1 The target bits/pixel (bpp) rate that is
+			 * used by the encoder, in steps of 1/16 of a
+			 * bit per pixel
+			 */
+			unsigned short bpp_low : 2;
+			/*
+			 * Bit 2 [0 = VBR mode is disabled,
+			 * 1 = VBR mode is enabled
+			 */
+			unsigned short vbr_mode : 1;
+			/* Bit 3 [0 = 4:4:4 sampling, 1 = 4:2:2 sampling] */
+			unsigned short enable422 : 1;
+			/*
+			 * Bit 4 [ 0 =  no conversion required,
+			 * 1 =  need conversion from RGB to YCoCg-R during
+			 * encoding]
+			 */
+			unsigned short convert_RGB : 1;
+			/*
+			 * Bit 5 [0 =  If block prediction is not supported
+			 * on the receiver, 1 =  If block prediction is
+			 * supported on the receiver]
+			 */
+			unsigned short block_prediction_enable : 1;
+			/* Bit 6-7 reserved */
+			unsigned short pps4_reserved :2;
+			/*
+			 * Bits 8-15  The target bits/pixel (bpp) rate that is
+			 * used by the encoder, in steps of 1/16 of a bit per
+			 * pixel
+			 */
+			unsigned short bpp_high : 8;
+		};
+	};
+
+	/* PPS 6,7 [2 bytes for pic height] */
+	unsigned short picture_height;
+	/* PPS 8,9 [2 bytes for pic width] */
+	unsigned short picture_width;
+	/* PPS 10,11 [2 bytes for slice height] */
+	unsigned short slice_height;
+	/* PPS 12,13 [2 bytes for slice width] */
+	unsigned short slice_width;
+
+	/*  PPS 14, 15 [2 bytes for Chunk size] */
+	unsigned short chunk_size;
+
+	union {
+		/* PPS 16,17 */
+		unsigned short initial_transmission_delay;
+		struct {
+			/*
+			 * Bit 0-1 Application-specific  identifier that can be
+			 * used to differentiate  between  different PPS table
+			 */
+			unsigned short transmission_delay_low : 2;
+			/* Bit 2-7 Reserved */
+			unsigned short pps16_reserved :6;
+			/*
+			 * Bit 8-15 Application-specific  identifier that can
+			 * be used to differentiate  between  different
+			 * PPS table
+			 */
+			unsigned short transmission_delay_high : 8;
+		};
+	};
+
+	/*
+	 * PPS 18,19 2 bytes for Decode delay.Specifies the number of pixel
+	 * times that the decoder accumulates data in its rate buffer before
+	 * starting to decode and output pixels.
+	 */
+	unsigned short initial_decode_delay;
+	union {
+		/* PPS 20, 21 */
+		unsigned short initial_scale_value;
+		struct {
+			/* Bit 0-7 Reserved */
+			unsigned short pps20_reserved :8;
+			/*
+			 * Bit 8-13 Specifies the initial rcXformScale factor
+			 * value used at the beginning of a slice
+			 */
+			unsigned short  initial_scale : 6;
+			/* Bit 14-15 Reserved */
+			unsigned short pps21_reserved :2;
+		};
+	};
+
+	/*
+	 * PPS 22, 23 Specifies the number of group times between incrementing
+	 * the rcXformScale factor at the end of a slice
+	 */
+	unsigned short scale_increment_interval;
+
+	union {
+		/* PPS 24, 25 */
+		unsigned short scale_decrement_interval;
+		struct {
+			/*
+			 * Bit  0-3 Specifies the number of group times between
+			 * decrementing the rcXformScale factor at the beginning
+			 * of a slice
+			 */
+			unsigned short scale_decrement_low : 4;
+			/* Bit 4-7 Reserved */
+			unsigned short pps24_reserved :4;
+			/*
+			 * Bit 8-15 Specifies the number of group times between
+			 * decrementing the rcXformScale factor at the beginning
+			 * of a slice
+			 */
+			unsigned short scale_decrement_high : 8;
+		};
+	};
+
+	union {
+		/* PPS 26, 27 */
+		unsigned short first_line_bpg_offset;
+		struct {
+			/* Bit 0-7 Reserved */
+			unsigned short pps26_reserved :8;
+			/*
+			 * Bit 8-12 Specifies the number of additional bits that
+			 * are allocated for each group on the first line
+			 * of a slice
+			 */
+			unsigned short bpg_offset : 5;
+			/* Bit 13-15 Reserved */
+			unsigned short pps27_reserved:3;
+		};
+	};
+
+	/*
+	 * PPS 28, 29 Specifies the number of bits (including fractional bits)
+	 * that are de-allocated for each group, for groups after the first line
+	 * of a slice. If the first line has an additional bit budget,
+	 * the additional bits that are allocated must come out of the budget
+	 * for coding the remainder of the slice
+	 */
+	unsigned short nfl_bpg_offset;
+
+	/*
+	 * PPS 30, 31 Specifies the number of bits (including fractional bits)
+	 * that are de-allocated for each group to enforce the slice constraint,
+	 * while allowing a programmable initial_offset.
+	 */
+	unsigned short slice_bpg_offset;
+	/* PPS 32, 33 */
+	unsigned short initial_offset;
+	/* PPS 34, 35 */
+	unsigned short final_offset;
+
+	union {
+		/* PPS 36 */
+		unsigned char flatness_min_qp;
+		struct {
+			/* Bit 0-5 Major version no */
+			unsigned char min_qp : 5;
+			/* Bit 0-3 Reserved */
+			unsigned char pps36_reserved :3;
+		};
+	};
+
+	union {
+		/* PPS 37 */
+		unsigned char flatness_max_qp;
+		struct {
+			/* Bit 0-5 Major version no */
+			unsigned char max_qp : 5;
+			/* Bit 0-3 Reserved */
+			unsigned char pps37_reserved :3;
+		};
+	};
+
+	/* PPS 38, 39 Specifies the number of bits within the“RC model,” */
+	unsigned short rc_model_size;
+
+	union {
+		/* PPS 40 */
+		unsigned char rc_edge_factor;
+		struct {
+			/* Bit 0-5 Major version no */
+			unsigned char edge_factor : 4;
+			/* Bit 0-3 Reserved */
+			unsigned char pps40_reserved :4;
+		};
+	};
+	union {
+		/* PPS 41 */
+		unsigned char rc_quan_incr_limit0;
+		struct {
+			/* Bit 0-5 Major version no */
+			unsigned char incr_limit0 : 5;
+			/* Bit 0-3 Reserved */
+			unsigned char pps41_reserved :3;
+		};
+	};
+
+	union {
+		/* PPS 42 */
+		unsigned char rc_quan_incr_limit1;
+		struct {
+			/* Bit 0-5 Major version no */
+			unsigned char incr_limit1 : 5;
+			/* Bit 0-3 Reserved */
+			unsigned char pps42_reserved :3;
+		};
+	};
+
+	union {
+		/* PPS 43 */
+		unsigned char rc_target_offset;
+		struct {
+			unsigned char low : 4;
+			unsigned char high : 4;
+		};
+	};
+
+	/* PPS 44 */
+	unsigned char rc_buffer_threshold0;
+	/* PPS 45 */
+	unsigned char rc_buffer_threshold1;
+	/* PPS 46 */
+	unsigned char rc_buffer_threshold2;
+	/* PPS 47 */
+	unsigned char rc_buffer_threshold3;
+	/* PPS 48 */
+	unsigned char rc_buffer_threshold4;
+	/* PPS 49 */
+	unsigned char rc_buffer_threshold5;
+	/* PPS 50 */
+	unsigned char rc_buffer_threshold6;
+	/* PPS 51 */
+	unsigned char rc_buffer_threshold7;
+	/* PPS 52 */
+	unsigned char rc_buffer_threshold8;
+	/* PPS 53 */
+	unsigned char rc_buffer_threshold9;
+	/* PPS 54 */
+	unsigned char rc_buffer_threshold10;
+	/* PPS 55 */
+	unsigned char rc_buffer_threshold11;
+	/* PPS 56 */
+	unsigned char rc_buffer_threshold12;
+	/* PPS 57 */
+	unsigned char rc_buffer_threshold13;
+
+	union {
+		/* PPS 58, 59,60, 61 */
+		unsigned long rc_range_parameter_block1;
+		struct {
+			unsigned long rc_range_parameter0 : 16;
+			unsigned long rc_range_parameter1 : 16;
+		};
+	};
+
+	union {
+		/* PPS 62, 63, 64, 65 */
+		unsigned long rc_range_parameter_block2;
+		struct {
+			unsigned long rc_range_parameter2 : 16;
+			unsigned long rc_range_parameter3 : 16;
+		};
+	};
+
+	union {
+		/* PPS 66 ,67,  68, 69 */
+		unsigned long rc_range_parameter_block3;
+		struct {
+			unsigned long rc_range_parameter4 : 16;
+			unsigned long rc_range_parameter5 : 16;
+		};
+	};
+
+	union {
+		/* PPS  70, 71, 72 ,73 */
+		unsigned long rc_range_parameter_block4;
+		struct {
+			unsigned long rc_range_parameter6 : 16;
+			unsigned long rc_range_parameter7 : 16;
+		};
+	};
+	union {
+		/* PPS  74, 75, 76, 77 */
+		unsigned long rc_range_parameter_block5;
+		struct {
+			unsigned long rc_range_parameter8 : 16;
+			unsigned long rc_range_parameter9 : 16;
+		};
+	};
+
+	union {
+		/* PPS 78, 79, 80, 81 */
+		unsigned long rc_range_parameter_block6;
+		struct {
+			unsigned long rc_range_parameter10 : 16;
+			unsigned long rc_range_parameter11 : 16;
+		};
+	};
+
+	union {
+		/* PPS 82, 83, 84, 85 */
+		unsigned long rc_range_parameter_block7;
+		struct {
+			unsigned long rc_range_parameter12 : 16;
+			unsigned long rc_range_parameter13 : 16;
+		};
+	};
+
+	union {
+		/* PPS 86,87,88,89 */
+		unsigned long rc_range_parameter_block8;
+		struct {
+			unsigned long rc_range_parameter14 : 16;
+			unsigned long pps_88_89_reserved : 16;
+		};
+	};
+
+	/* PPS 90, 91 */
+	unsigned short pps_short_90_reserved;
+	/* PPS 92, 93, 94, 95 */
+	unsigned long pps_long_92_reserved;
+	/* PPS 96, 97, 98, 99 */
+	unsigned long pps_long_96_reserved;
+	/* PPS 100, 101, 102 , 103 */
+	unsigned long pps_long_100_reserved;
+	/* PPS 104, 105, 106 , 107 */
+	unsigned long pps_long_104_reserved;
+	/* PPS 108, 109, 110 , 111 */
+	unsigned long pps_long_108_reserved;
+	/* PPS 112, 113, 114 , 115 */
+	unsigned long pps_long_112_reserved;
+	/* PPS 116, 117, 118 , 119 */
+	unsigned long pps_long_116_reserved;
+	/* PPS 120, 121, 122 , 123 */
+	unsigned long pps_long_120_reserved;
+	/* PPS 124, 125, 126 , 127 */
+	unsigned long pps_long_124_reserved;
+};
+
 /* DSC Configuration structure */
 #define NUM_BUF_RANGES		15
 
