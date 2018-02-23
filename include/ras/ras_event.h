@@ -13,6 +13,7 @@
 #include <linux/aer.h>
 #include <linux/cper.h>
 #include <linux/mm.h>
+#include "../../../drivers/pci/pci.h"
 
 /*
  * MCE Extended Error Log trace event
