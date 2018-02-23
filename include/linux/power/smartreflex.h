@@ -143,6 +143,13 @@
 #define OMAP3430_SR_ERRWEIGHT		0x04
 #define OMAP3430_SR_ERRMAXLIMIT		0x02
 
+enum sr_instance {
+	OMAP_SR_MPU,			/* shared with iva on omap3 */
+	OMAP_SR_CORE,
+	OMAP_SR_IVA,
+	OMAP_SR_NR,
+};
+
 struct omap_sr {
 	char				*name;
 	struct list_head		node;
