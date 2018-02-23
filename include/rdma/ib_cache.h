@@ -105,6 +105,19 @@ int ib_find_gid_by_filter(struct ib_device *device,
 					 const struct ib_gid_attr *,
 					 void *),
 			  void *context, u16 *index);
+
+/**
+ * ib_get_gid_context_by_index - Returns HW driver's GID context for the
+ * specified gid index
+ * @device: The device to query
+ * @port_num: The port number of the device where the GID value belongs
+ * @index: The index into the cached GID table
+ */
+
+void *ib_get_gid_context_by_index(struct ib_device *device,
+				  u8		port_num,
+				  u16		index);
+
 /**
  * ib_get_cached_pkey - Returns a cached PKey table entry
  * @device: The device to query.

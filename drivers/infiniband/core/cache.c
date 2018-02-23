@@ -859,6 +859,24 @@ int ib_find_cached_gid(struct ib_device *device,
 }
 EXPORT_SYMBOL(ib_find_cached_gid);
 
+void *ib_get_gid_context_by_index(struct ib_device *device,
+				  u8		   port_num,
+				  u16		   index)
+{
+	struct ib_gid_table	  *table;
+
+	if (!rdma_is_port_valid(device, port_num))
+		return NULL;
+
+	table = device->cache.ports[port_num - rdma_start_port(device)].gid;
+
+	if (index < 0 || index >= table->sz)
+		return NULL;
+
+	return table->data_vec[index].context;
+}
+EXPORT_SYMBOL(ib_get_gid_context_by_index);
+
 int ib_find_gid_by_filter(struct ib_device *device,
 			  const union ib_gid *gid,
 			  u8 port_num,
