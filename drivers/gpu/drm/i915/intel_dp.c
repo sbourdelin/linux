@@ -6140,6 +6140,149 @@ intel_dp_drrs_init(struct intel_connector *connector,
 	return downclock_mode;
 }
 
+static void intel_dp_sink_get_dsc_capability(struct intel_dp *intel_dp,
+					struct dp_sink_dsc_caps *dp_dsc_caps)
+{
+	u8 rcbuffer_blocksize;
+	u8 fec_dpcd;
+	unsigned long line_buffer_bit_depth, sink_support_max_bpp_msb;
+
+	/* VDSC is supported only for eDp v1.4 or higher, DPCD 0x00700 offset */
+	if (intel_dp->edp_dpcd[0] < 0x03)
+		return;
+
+	/* Read DPCD 0x060 to 0x06a */
+	if (drm_dp_dpcd_read(&intel_dp->aux, DP_DSC_SUPPORT, intel_dp->dsc_dpcd,
+			     sizeof(intel_dp->dsc_dpcd)) < 0)
+		return;
+
+	dp_dsc_caps->is_dsc_supported = intel_dp->dsc_dpcd[0] &
+					DP_DSC_DECOMPRESSION_IS_SUPPORTED;
+
+	if (!dp_dsc_caps->is_dsc_supported)
+		return;
+
+	drm_dp_dpcd_readb(&intel_dp->aux, 0x090, &fec_dpcd);
+	intel_dp->fec_dpcd = fec_dpcd;
+
+	/* For DP DSC, FEC support is must */
+	if (!(intel_dp->fec_dpcd & 0x1))
+		return;
+
+	/* No VDSC support for less than 8 BPC */
+	if (intel_dp->dsc_dpcd[0xa] < DP_DSC_8_BPC)
+		return;
+
+	if (intel_dp->dsc_dpcd[0xa] & DP_DSC_8_BPC)
+		DRM_INFO("8 Bits per color support\n");
+	if (intel_dp->dsc_dpcd[0xa] & DP_DSC_10_BPC)
+		DRM_INFO("10 Bits per color support\n");
+	if (intel_dp->dsc_dpcd[0xa] & DP_DSC_12_BPC)
+		DRM_INFO("12 Bits per color support\n");
+
+	dp_dsc_caps->dsc_major_ver = intel_dp->dsc_dpcd[1] & DP_DSC_MAJOR_MASK;
+	dp_dsc_caps->dsc_minor_ver = (intel_dp->dsc_dpcd[1] &
+				DP_DSC_MINOR_MASK) >> DP_DSC_MINOR_SHIFT;
+
+	rcbuffer_blocksize = intel_dp->dsc_dpcd[2] & 0x3;
+
+	switch (rcbuffer_blocksize) {
+	case 0:
+		dp_dsc_caps->rcbuffer_blocksize = 1;
+		break;
+	case 1:
+		dp_dsc_caps->rcbuffer_blocksize = 4;
+		break;
+	case 2:
+		dp_dsc_caps->rcbuffer_blocksize = 16;
+		break;
+	case 3:
+		dp_dsc_caps->rcbuffer_blocksize = 64;
+		break;
+	default:
+		break;
+
+	}
+	dp_dsc_caps->rcbuffer_size_in_blocks = intel_dp->dsc_dpcd[3] + 1;
+
+	dp_dsc_caps->rcbuffer_size =
+			dp_dsc_caps->rcbuffer_size_in_blocks *
+			dp_dsc_caps->rcbuffer_blocksize * 1024 * 8;
+
+	dp_dsc_caps->slice_caps = intel_dp->dsc_dpcd[4];
+	line_buffer_bit_depth = intel_dp->dsc_dpcd[5];
+
+	if (line_buffer_bit_depth == 8)
+		dp_dsc_caps->line_buffer_bit_depth = intel_dp->dsc_dpcd[5];
+	else
+		dp_dsc_caps->line_buffer_bit_depth = intel_dp->dsc_dpcd[5] + 9;
+
+	dp_dsc_caps->is_block_pred_supported = intel_dp->dsc_dpcd[6] &
+					DP_DSC_BLK_PREDICTION_IS_SUPPORTED;
+
+	dp_dsc_caps->sink_support_max_bpp = intel_dp->dsc_dpcd[7];
+	sink_support_max_bpp_msb = (intel_dp->dsc_dpcd[8] & 0x3) << 8;
+	dp_dsc_caps->sink_support_max_bpp |= sink_support_max_bpp_msb;
+
+	dp_dsc_caps->color_format_caps = intel_dp->dsc_dpcd[9];
+	dp_dsc_caps->color_depth_caps = intel_dp->dsc_dpcd[0xa];
+}
+
+static void intel_dp_get_compression_data(struct intel_dp *intel_dp,
+					struct dp_sink_dsc_caps dp_dsc_caps)
+{
+	if (!dp_dsc_caps.is_dsc_supported)
+		return;
+
+	intel_dp->compr_params.compression_support =
+						dp_dsc_caps.is_dsc_supported;
+	intel_dp->compr_params.dsc_cfg.dsc_version_major =
+						dp_dsc_caps.dsc_major_ver;
+	intel_dp->compr_params.dsc_cfg.dsc_version_minor =
+						dp_dsc_caps.dsc_minor_ver;
+
+	/* By default set bpc to 8 */
+	intel_dp->compr_params.dsc_cfg.bits_per_component = 8;
+
+	/* Take the max for Bits per component */
+	if (intel_dp->dsc_dpcd[0xa] & DP_DSC_8_BPC)
+		intel_dp->compr_params.dsc_cfg.bits_per_component = 8;
+	if (intel_dp->dsc_dpcd[0xa] & DP_DSC_10_BPC)
+		intel_dp->compr_params.dsc_cfg.bits_per_component = 10;
+	if (intel_dp->dsc_dpcd[0xa] & DP_DSC_12_BPC)
+		intel_dp->compr_params.dsc_cfg.bits_per_component = 12;
+
+	intel_dp->compr_params.compression_bpp =
+					dp_dsc_caps.sink_support_max_bpp >> 4;
+	intel_dp->compr_params.dsc_cfg.bits_per_pixel =
+					dp_dsc_caps.sink_support_max_bpp;
+	intel_dp->compr_params.dsc_cfg.convert_rgb = dp_dsc_caps.RGB_support;
+	intel_dp->compr_params.dsc_cfg.enable422 = dp_dsc_caps.YCbCr422_support;
+	intel_dp->compr_params.dsc_cfg.block_pred_enable =
+					dp_dsc_caps.is_block_pred_supported;
+
+	/* Always try to enable 2 DSC instances, by default */
+	intel_dp->compr_params.dsc_cfg.num_vdsc_instances = 2;
+
+	if (dp_dsc_caps.four_slice_per_line_support)
+		intel_dp->compr_params.dsc_cfg.slice_count = 4;
+	else if (dp_dsc_caps.two_slice_per_line_support)
+		intel_dp->compr_params.dsc_cfg.slice_count = 2;
+	else if (dp_dsc_caps.one_slice_per_line_support) {
+		/*
+		 * Cannot use 2 DSC engines simultaneously when
+		 * slice per line support is only 1
+		 */
+		intel_dp->compr_params.dsc_cfg.slice_count = 1;
+		intel_dp->compr_params.dsc_cfg.num_vdsc_instances = 1;
+	} else
+		DRM_INFO("Slice count not supported:%d\n",
+							dp_dsc_caps.slice_caps);
+
+	intel_dp->compr_params.dsc_cfg.line_buf_depth =
+					dp_dsc_caps.line_buffer_bit_depth;
+}
+
 static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 				     struct intel_connector *intel_connector)
 {
@@ -6149,6 +6292,7 @@ static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 	struct drm_display_mode *fixed_mode = NULL;
 	struct drm_display_mode *alt_fixed_mode = NULL;
 	struct drm_display_mode *downclock_mode = NULL;
+	struct dp_sink_dsc_caps sink_dp_dsc_caps = {0};
 	bool has_dpcd;
 	struct drm_display_mode *scan;
 	struct edid *edid;
@@ -6185,6 +6329,12 @@ static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 		/* if this fails, presume the device is a ghost */
 		DRM_INFO("failed to retrieve link info, disabling eDP\n");
 		goto out_vdd_off;
+	}
+
+	/* Get DSC capability of DP sink */
+	if (INTEL_GEN(dev_priv) >= 9) {
+		intel_dp_sink_get_dsc_capability(intel_dp, &sink_dp_dsc_caps);
+		intel_dp_get_compression_data(intel_dp, sink_dp_dsc_caps);
 	}
 
 	mutex_lock(&dev->mode_config.mutex);
@@ -6224,6 +6374,23 @@ static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 		}
 	}
 	mutex_unlock(&dev->mode_config.mutex);
+
+	if (intel_dp->compr_params.compression_support) {
+		intel_dp->compr_params.dsc_cfg.pic_width = fixed_mode->hdisplay;
+		intel_dp->compr_params.dsc_cfg.pic_height =
+							fixed_mode->vdisplay;
+		intel_dp->compr_params.dsc_cfg.slice_width = DIV_ROUND_UP(
+				intel_dp->compr_params.dsc_cfg.pic_width,
+				intel_dp->compr_params.dsc_cfg.slice_count);
+
+		/* slice height data is not available from dpcd */
+		if (intel_dp->compr_params.dsc_cfg.pic_height % 8 == 0)
+			intel_dp->compr_params.dsc_cfg.slice_height = 8;
+		if (intel_dp->compr_params.dsc_cfg.pic_height % 4 == 0)
+			intel_dp->compr_params.dsc_cfg.slice_height = 4;
+		if (intel_dp->compr_params.dsc_cfg.pic_height % 2 == 0)
+			intel_dp->compr_params.dsc_cfg.slice_height = 2;
+	}
 
 	if (IS_VALLEYVIEW(dev_priv) || IS_CHERRYVIEW(dev_priv)) {
 		intel_dp->edp_notifier.notifier_call = edp_notify_handler;
