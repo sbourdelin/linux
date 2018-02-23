@@ -124,7 +124,8 @@ struct bpf_func_state {
 	/* loop detection; points into an explored_state */
 	struct bpf_func_state *parent;
 	/* These flags are only meaningful in an explored_state, not cur_state */
-	bool in_loop, bounded_loop, conditional;
+	bool bounded_loop, conditional;
+	int live_children;
 
 	/* should be second to last. See copy_func_state() */
 	int allocated_stack;
