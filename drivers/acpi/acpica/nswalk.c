@@ -350,6 +350,7 @@ acpi_ns_walk_namespace(acpi_object_type type,
 
 			node_previously_visited = TRUE;
 		}
+		cond_resched();
 	}
 
 	/* Complete walk, not terminated by user function */
