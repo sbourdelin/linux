@@ -85,6 +85,9 @@ struct pv_init_ops {
 	 */
 	unsigned (*patch)(u8 type, u16 clobber, void *insnbuf,
 			  unsigned long addr, unsigned len);
+
+	/* called right after we finish boot allocator */
+	void (*after_bootmem)(void);
 } __no_randomize_layout;
 
 

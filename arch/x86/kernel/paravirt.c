@@ -315,6 +315,7 @@ struct pv_info pv_info = {
 
 struct pv_init_ops pv_init_ops = {
 	.patch = native_patch,
+	.after_bootmem = paravirt_nop,
 };
 
 struct pv_time_ops pv_time_ops = {

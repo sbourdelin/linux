@@ -816,6 +816,11 @@ static inline notrace unsigned long arch_local_irq_save(void)
 
 extern void default_banner(void);
 
+static inline void paravirt_after_bootmem(void)
+{
+	pv_init_ops.after_bootmem();
+}
+
 #else  /* __ASSEMBLY__ */
 
 #define _PVSITE(ptype, clobbers, ops, word, algn)	\
@@ -950,6 +955,10 @@ static inline void paravirt_arch_dup_mmap(struct mm_struct *oldmm,
 }
 
 static inline void paravirt_arch_exit_mmap(struct mm_struct *mm)
+{
+}
+
+static inline void paravirt_after_bootmem(void)
 {
 }
 #endif /* __ASSEMBLY__ */
