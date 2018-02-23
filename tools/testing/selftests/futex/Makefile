@@ -18,6 +18,9 @@ all:
 	done
 
 override define RUN_TESTS
+	@echo "TAP version 13";
+	@echo "selftests: futex";
+	@echo "========================================";
 	@cd $(OUTPUT); ./run.sh
 endef
 
