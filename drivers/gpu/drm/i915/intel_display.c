@@ -5098,10 +5098,14 @@ static void intel_post_plane_update(struct intel_crtc_state *old_crtc_state)
 	struct drm_plane_state *old_pri_state =
 		drm_atomic_get_existing_plane_state(old_state, primary);
 
+	DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
+
 	intel_frontbuffer_flip(to_i915(crtc->base.dev), pipe_config->fb_bits);
 
-	if (pipe_config->update_wm_post && pipe_config->base.active)
+	if (pipe_config->update_wm_post && pipe_config->base.active) {
+		DRM_ERROR("I915-DEBUG: %s %d - Update WM post \n", __FUNCTION__, __LINE__);
 		intel_update_watermarks(crtc);
+	}
 
 	if (hsw_post_update_enable_ips(old_crtc_state, pipe_config))
 		hsw_enable_ips(pipe_config);
@@ -5203,8 +5207,14 @@ static void intel_pre_plane_update(struct intel_crtc_state *old_crtc_state,
 	if (dev_priv->display.initial_watermarks != NULL)
 		dev_priv->display.initial_watermarks(old_intel_state,
 						     pipe_config);
-	else if (pipe_config->update_wm_pre)
+	else if (pipe_config->update_wm_pre) {
+		DRM_ERROR("I915-DEBUG: %s %d - Update WM pre?\n", __FUNCTION__, __LINE__);
 		intel_update_watermarks(crtc);
+	}
+
+	if (!pipe_config->sagv)
+		intel_disable_sagv(dev_priv);
+	DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
 }
 
 static void intel_crtc_disable_planes(struct drm_crtc *crtc, unsigned plane_mask)
@@ -5214,6 +5224,7 @@ static void intel_crtc_disable_planes(struct drm_crtc *crtc, unsigned plane_mask
 	struct drm_plane *p;
 	int pipe = intel_crtc->pipe;
 
+	DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
 	intel_crtc_dpms_overlay_disable(intel_crtc);
 
 	drm_for_each_plane_mask(p, dev, plane_mask)
@@ -12138,6 +12149,7 @@ static void intel_update_crtc(struct drm_crtc *crtc,
 		update_scanline_offset(intel_crtc);
 		dev_priv->display.crtc_enable(pipe_config, state);
 	} else {
+		DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
 		intel_pre_plane_update(to_intel_crtc_state(old_crtc_state),
 				       pipe_config);
 	}
@@ -12156,6 +12168,8 @@ static void intel_update_crtcs(struct drm_atomic_state *state)
 	struct drm_crtc *crtc;
 	struct drm_crtc_state *old_crtc_state, *new_crtc_state;
 	int i;
+
+	DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
 
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
 		if (!new_crtc_state->active)
@@ -12312,10 +12326,12 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 		if (!needs_modeset(new_crtc_state))
 			continue;
 
+		DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
 		intel_pre_plane_update(to_intel_crtc_state(old_crtc_state),
 				       to_intel_crtc_state(new_crtc_state));
 
 		if (old_crtc_state->active) {
+			DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
 			intel_crtc_disable_planes(crtc, old_crtc_state->plane_mask);
 			dev_priv->display.crtc_disable(to_intel_crtc_state(old_crtc_state), state);
 			intel_crtc->active = false;
@@ -12358,7 +12374,6 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 		 */
 		if (!intel_can_enable_sagv(state))
 			intel_disable_sagv(dev_priv);
-
 		intel_modeset_verify_disabled(dev, state);
 	}
 
@@ -12376,6 +12391,7 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 		}
 	}
 
+	DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
 	/* Now enable the clocks, plane, pipe, and connectors that we set up. */
 	dev_priv->display.update_crtcs(state);
 
@@ -12406,6 +12422,7 @@ static void intel_atomic_commit_tail(struct drm_atomic_state *state)
 	}
 
 	for_each_oldnew_crtc_in_state(state, crtc, old_crtc_state, new_crtc_state, i) {
+		DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
 		intel_post_plane_update(to_intel_crtc_state(old_crtc_state));
 
 		if (put_domains[i])
@@ -12447,6 +12464,7 @@ static void intel_atomic_commit_work(struct work_struct *work)
 	struct drm_atomic_state *state =
 		container_of(work, struct drm_atomic_state, commit_work);
 
+	DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
 	intel_atomic_commit_tail(state);
 }
 
@@ -12572,6 +12590,7 @@ static int intel_atomic_commit(struct drm_device *dev,
 	}
 
 	drm_atomic_state_get(state);
+	DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
 	INIT_WORK(&state->commit_work, intel_atomic_commit_work);
 
 	i915_sw_fence_commit(&intel_state->commit_ready);

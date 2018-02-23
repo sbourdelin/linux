@@ -3687,21 +3687,11 @@ bool intel_can_enable_sagv(struct drm_atomic_state *state)
 	struct drm_i915_private *dev_priv = to_i915(dev);
 	struct intel_atomic_state *intel_state = to_intel_atomic_state(state);
 	struct intel_crtc *crtc;
-	struct intel_plane *plane;
 	struct intel_crtc_state *cstate;
 	enum pipe pipe;
-	int level, latency;
-	int sagv_block_time_us;
 
 	if (!intel_has_sagv(dev_priv))
 		return false;
-
-	if (IS_GEN9(dev_priv))
-		sagv_block_time_us = 30;
-	else if (IS_GEN10(dev_priv))
-		sagv_block_time_us = 20;
-	else
-		sagv_block_time_us = 10;
 
 	/*
 	 * SKL+ workaround: bspec recommends we disable the SAGV when we have
@@ -3719,39 +3709,25 @@ bool intel_can_enable_sagv(struct drm_atomic_state *state)
 	crtc = intel_get_crtc_for_pipe(dev_priv, pipe);
 	cstate = to_intel_crtc_state(crtc->base.state);
 
+	/* Also check for latency here */
+	cstate = to_intel_crtc_state(crtc->base.state);
+	if (!cstate->sagv)
+		return false;
+
 	if (crtc->base.state->adjusted_mode.flags & DRM_MODE_FLAG_INTERLACE)
 		return false;
 
-	for_each_intel_plane_on_crtc(dev, crtc, plane) {
-		struct skl_plane_wm *wm =
-			&cstate->wm.skl.optimal.planes[plane->id];
-
-		/* Skip this plane if it's not enabled */
-		if (!wm->wm[0].plane_en)
-			continue;
-
-		/* Find the highest enabled wm level for this plane */
-		for (level = ilk_wm_max_level(dev_priv);
-		     !wm->wm[level].plane_en; --level)
-		     { }
-
-		latency = dev_priv->wm.skl_latency[level];
-
-		if (skl_needs_memory_bw_wa(intel_state) &&
-		    plane->base.state->fb->modifier ==
-		    I915_FORMAT_MOD_X_TILED)
-			latency += 15;
-
-		/*
-		 * If any of the planes on this pipe don't enable wm levels that
-		 * incur memory latencies higher than sagv_block_time_us we
-		 * can't enable the SAGV.
-		 */
-		if (latency < sagv_block_time_us)
-			return false;
-	}
-
 	return true;
+}
+
+u8 intel_sagv_block_time(const struct drm_i915_private *dev_priv)
+{
+	if (INTEL_GEN(dev_priv) >= 11)
+		return 10;
+	else if (IS_GEN10(dev_priv))
+		return 20;
+	else
+		return 30;
 }
 
 static void
@@ -4501,10 +4477,10 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 				const struct skl_wm_params *wp,
 				uint16_t *out_blocks, /* out */
 				uint8_t *out_lines, /* out */
-				bool *enabled /* out */)
+				bool *enabled, /* out */
+				uint32_t *latency /* out */)
 {
 	const struct drm_plane_state *pstate = &intel_pstate->base;
-	uint32_t latency = dev_priv->wm.skl_latency[level];
 	uint_fixed_16_16_t method1, method2;
 	uint_fixed_16_16_t selected_result;
 	uint32_t res_blocks, res_lines;
@@ -4513,7 +4489,9 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 	bool apply_memory_bw_wa = skl_needs_memory_bw_wa(state);
 	uint32_t min_disp_buf_needed;
 
-	if (latency == 0 ||
+	*latency = dev_priv->wm.skl_latency[level];
+
+	if (*latency == 0 ||
 	    !intel_wm_plane_visible(cstate, intel_pstate)) {
 		*enabled = false;
 		return 0;
@@ -4523,16 +4501,16 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 	if ((IS_KABYLAKE(dev_priv) || IS_COFFEELAKE(dev_priv) ||
 	    IS_CNL_REVID(dev_priv, CNL_REVID_A0, CNL_REVID_B0)) &&
 	    dev_priv->ipc_enabled)
-		latency += 4;
+		*latency += 4;
 
 	if (apply_memory_bw_wa && wp->x_tiled)
-		latency += 15;
+		*latency += 15;
 
 	method1 = skl_wm_method1(dev_priv, wp->plane_pixel_rate,
-				 wp->cpp, latency, wp->dbuf_block_size);
+				 wp->cpp, *latency, wp->dbuf_block_size);
 	method2 = skl_wm_method2(wp->plane_pixel_rate,
 				 cstate->base.adjusted_mode.crtc_htotal,
-				 latency,
+				 *latency,
 				 wp->plane_blocks_per_line);
 
 	if (wp->y_tiled) {
@@ -4545,7 +4523,7 @@ static int skl_compute_plane_wm(const struct drm_i915_private *dev_priv,
 		else if (ddb_allocation >=
 			 fixed16_to_u32_round_up(wp->plane_blocks_per_line))
 			selected_result = min_fixed16(method1, method2);
-		else if (latency >= wp->linetime_us)
+		else if (*latency >= wp->linetime_us)
 			selected_result = min_fixed16(method1, method2);
 		else
 			selected_result = method1;
@@ -4629,7 +4607,8 @@ skl_compute_wm_levels(const struct drm_i915_private *dev_priv,
 		      struct intel_crtc_state *cstate,
 		      const struct intel_plane_state *intel_pstate,
 		      const struct skl_wm_params *wm_params,
-		      struct skl_plane_wm *wm)
+		      struct skl_plane_wm *wm,
+		      bool *plane_sagv)
 {
 	struct intel_crtc *intel_crtc = to_intel_crtc(cstate->base.crtc);
 	struct drm_plane *plane = intel_pstate->base.plane;
@@ -4638,6 +4617,7 @@ skl_compute_wm_levels(const struct drm_i915_private *dev_priv,
 	enum pipe pipe = intel_crtc->pipe;
 	int level, max_level = ilk_wm_max_level(dev_priv);
 	int ret;
+	u32 latency;
 
 	if (WARN_ON(!intel_pstate->base.fb))
 		return -EINVAL;
@@ -4655,9 +4635,18 @@ skl_compute_wm_levels(const struct drm_i915_private *dev_priv,
 					   wm_params,
 					   &result->plane_res_b,
 					   &result->plane_res_l,
-					   &result->plane_en);
+					   &result->plane_en,
+					   &latency);
+
 		if (ret)
 			return ret;
+
+		/*
+		 * Only consider the latency of highest enabled wm level
+		 * on the plane for SAGV block time limitation.
+		 */
+		if (result->plane_en)
+			*plane_sagv = latency >= intel_sagv_block_time(dev_priv);
 	}
 
 	return 0;
@@ -4743,7 +4732,8 @@ exit:
 
 static int skl_build_pipe_wm(struct intel_crtc_state *cstate,
 			     struct skl_ddb_allocation *ddb,
-			     struct skl_pipe_wm *pipe_wm)
+			     struct skl_pipe_wm *pipe_wm,
+			     bool *sagv)
 {
 	struct drm_device *dev = cstate->base.crtc->dev;
 	struct drm_crtc_state *crtc_state = &cstate->base;
@@ -4751,6 +4741,7 @@ static int skl_build_pipe_wm(struct intel_crtc_state *cstate,
 	struct drm_plane *plane;
 	const struct drm_plane_state *pstate;
 	struct skl_plane_wm *wm;
+	bool plane_sagv = false;
 	int ret;
 
 	/*
@@ -4777,9 +4768,13 @@ static int skl_build_pipe_wm(struct intel_crtc_state *cstate,
 			return ret;
 
 		ret = skl_compute_wm_levels(dev_priv, ddb, cstate,
-					    intel_pstate, &wm_params, wm);
+					    intel_pstate, &wm_params, wm, &plane_sagv);
 		if (ret)
 			return ret;
+
+		/* Take all planes in consideration for SAGV block time check */
+		*sagv &= plane_sagv;
+
 		skl_compute_transition_wm(cstate, &wm_params, &wm->wm[0],
 					  ddb_blocks, &wm->trans_wm);
 	}
@@ -4810,6 +4805,7 @@ static void skl_write_wm_level(struct drm_i915_private *dev_priv,
 		val |= level->plane_res_l << PLANE_WM_LINES_SHIFT;
 	}
 
+	DRM_ERROR("I915-DEBUG: %s %d\n", __FUNCTION__, __LINE__);
 	I915_WRITE(reg, val);
 }
 
@@ -4899,12 +4895,13 @@ static int skl_update_pipe_wm(struct drm_crtc_state *cstate,
 			      const struct skl_pipe_wm *old_pipe_wm,
 			      struct skl_pipe_wm *pipe_wm, /* out */
 			      struct skl_ddb_allocation *ddb, /* out */
-			      bool *changed /* out */)
+			      bool *changed /* out */,
+			      bool *sagv /* out */)
 {
 	struct intel_crtc_state *intel_cstate = to_intel_crtc_state(cstate);
 	int ret;
 
-	ret = skl_build_pipe_wm(intel_cstate, ddb, pipe_wm);
+	ret = skl_build_pipe_wm(intel_cstate, ddb, pipe_wm, sagv);
 	if (ret)
 		return ret;
 
@@ -5099,6 +5096,7 @@ skl_compute_wm(struct drm_atomic_state *state)
 	struct drm_device *dev = state->dev;
 	struct skl_pipe_wm *pipe_wm;
 	bool changed = false;
+	bool sagv = true;
 	int ret, i;
 
 	/*
@@ -5147,9 +5145,11 @@ skl_compute_wm(struct drm_atomic_state *state)
 
 		pipe_wm = &intel_cstate->wm.skl.optimal;
 		ret = skl_update_pipe_wm(cstate, old_pipe_wm, pipe_wm,
-					 &results->ddb, &changed);
+					 &results->ddb, &changed, &sagv);
 		if (ret)
 			return ret;
+
+		intel_cstate->sagv = sagv;
 
 		if (changed)
 			results->dirty_pipes |= drm_crtc_mask(crtc);
