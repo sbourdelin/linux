@@ -44,6 +44,9 @@
 /* This means the buffer contains a list of buffer descriptors. */
 #define VRING_DESC_F_INDIRECT	4
 
+#define VRING_DESC_F_AVAIL(b)	((b) << 7)
+#define VRING_DESC_F_USED(b)	((b) << 15)
+
 /* The Host uses this in used->flags to advise the Guest: don't kick me when
  * you add a buffer.  It's unreliable, so it's simply an optimization.  Guest
  * will still kick if it's out of buffers. */
@@ -102,6 +105,36 @@ struct vring {
 	struct vring_avail *avail;
 
 	struct vring_used *used;
+};
+
+struct vring_packed_desc_event {
+	/* Descriptor Event Offset */
+	__virtio16 desc_event_off   : 15,
+	/* Descriptor Event Wrap Counter */
+		   desc_event_wrap  : 1;
+	/* Descriptor Event Flags */
+	__virtio16 desc_event_flags : 2;
+};
+
+struct vring_packed_desc {
+	/* Buffer Address. */
+	__virtio64 addr;
+	/* Buffer Length. */
+	__virtio32 len;
+	/* Buffer ID. */
+	__virtio16 id;
+	/* The flags depending on descriptor type. */
+	__virtio16 flags;
+};
+
+struct vring_packed {
+	unsigned int num;
+
+	struct vring_packed_desc *desc;
+
+	struct vring_packed_desc_event *driver;
+
+	struct vring_packed_desc_event *device;
 };
 
 /* Alignment requirements for vring elements.
@@ -169,6 +202,41 @@ static inline int vring_need_event(__u16 event_idx, __u16 new_idx, __u16 old)
 	 * Note also that req_event and req_prod in Xen start at 1,
 	 * event indexes in virtio start at 0. */
 	return (__u16)(new_idx - event_idx - 1) < (__u16)(new_idx - old);
+}
+
+/* The standard layout for the packed ring is a continuous chunk of memory
+ * which looks like this.
+ *
+ * struct vring_packed
+ * {
+ *	// The actual descriptors (16 bytes each)
+ *	struct vring_packed_desc desc[num];
+ *
+ *	// Padding to the next align boundary.
+ *	char pad[];
+ *
+ *	// Driver Event Suppression
+ *	struct vring_packed_desc_event driver;
+ *
+ *	// Device Event Suppression
+ *	struct vring_packed_desc_event device;
+ * };
+ */
+
+static inline void vring_packed_init(struct vring_packed *vr, unsigned int num,
+				     void *p, unsigned long align)
+{
+	vr->num = num;
+	vr->desc = p;
+	vr->driver = (void *)(((uintptr_t)p + sizeof(struct vring_packed_desc)
+		* num + align - 1) & ~(align - 1));
+	vr->device = vr->driver + 1;
+}
+
+static inline unsigned vring_packed_size(unsigned int num, unsigned long align)
+{
+	return ((sizeof(struct vring_packed_desc) * num + align - 1)
+		& ~(align - 1)) + sizeof(struct vring_packed_desc_event) * 2;
 }
 
 #endif /* _UAPI_LINUX_VIRTIO_RING_H */
