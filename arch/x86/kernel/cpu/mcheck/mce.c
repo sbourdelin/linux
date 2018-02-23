@@ -1783,7 +1783,6 @@ static void __mcheck_cpu_init_timer(void)
 {
 	struct timer_list *t = this_cpu_ptr(&mce_timer);
 
-	timer_setup(t, mce_timer_fn, TIMER_PINNED);
 	mce_start_timer(t);
 }
 
@@ -2041,8 +2040,10 @@ static void mce_enable_ce(void *all)
 		return;
 	cmci_reenable();
 	cmci_recheck();
-	if (all)
+	if (all) {
+		del_timer_sync(this_cpu_ptr(&mce_timer));
 		__mcheck_cpu_init_timer();
+	}
 }
 
 static struct bus_type mce_subsys = {
