@@ -604,6 +604,20 @@ struct mgmt_cp_set_appearance {
 } __packed;
 #define MGMT_SET_APPEARANCE_SIZE	2
 
+#define MGMT_OP_GET_PHY_CONFIGURATION	0x0044
+#define MGMT_GET_PHY_CONFIGURATION_SIZE		0
+struct mgmt_rp_get_phy_confguration {
+	__u16	supported_phys;
+	__u16	selected_phys;
+} __packed;
+
+#define MGMT_PHY_LE_1M_TX		0x0001
+#define MGMT_PHY_LE_1M_RX		0x0002
+#define MGMT_PHY_LE_2M_TX		0x0004
+#define MGMT_PHY_LE_2M_RX		0x0008
+#define MGMT_PHY_LE_CODED_TX		0x0010
+#define MGMT_PHY_LE_CODED_RX		0x0020
+
 #define MGMT_EV_CMD_COMPLETE		0x0001
 struct mgmt_ev_cmd_complete {
 	__le16	opcode;
