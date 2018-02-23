@@ -115,7 +115,6 @@ lpfc_sli4_wq_put(struct lpfc_queue *q, union lpfc_wqe *wqe)
 	struct lpfc_register doorbell;
 	uint32_t host_index;
 	uint32_t idx;
-	uint32_t i = 0;
 	uint8_t *tmp;
 
 	/* sanity check on queue memory */
@@ -138,12 +137,10 @@ lpfc_sli4_wq_put(struct lpfc_queue *q, union lpfc_wqe *wqe)
 	if (q->phba->sli3_options & LPFC_SLI4_PHWQ_ENABLED)
 		bf_set(wqe_wqid, &wqe->generic.wqe_com, q->queue_id);
 	lpfc_sli_pcimem_bcopy(wqe, temp_wqe, q->entry_size);
-	if (q->dpp_enable && q->phba->cfg_enable_dpp) {
+	if (q->dpp_enable && q->phba->cfg_enable_dpp)
 		/* write to DPP aperture taking advatage of Combined Writes */
-		tmp = (uint8_t *)wqe;
-		for (i = 0; i < q->entry_size; i += sizeof(uint64_t))
-			writeq(*((uint64_t *)(tmp + i)), q->dpp_regaddr + i);
-	}
+		memcpy_toio(tmp, q->dpp_regaddr, q->entry_size);
+
 	/* ensure WQE bcopy and DPP flushed before doorbell write */
 	wmb();
 
