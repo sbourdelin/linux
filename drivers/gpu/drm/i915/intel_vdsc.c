@@ -596,7 +596,8 @@ void populate_pps_sdp_for_sink(struct intel_encoder *encoder,
 	pps_params->bpp_high = (unsigned short)(vdsc_cfg->bits_per_pixel &
 									0xFF);
 
-	/* The PPS structure is stored as per our hardware registers which
+	/*
+	 * The PPS structure is stored as per our hardware registers which
 	 * are in little endian. When a value is assigned to a variable,
 	 * Intel systems stores data in little endian.
 	 * For e.g UINT16 a = 0x1234;
@@ -766,4 +767,426 @@ void populate_pps_sdp_for_sink(struct intel_encoder *encoder,
 					SWAP_TWO_BYTES(rc_range_parameters[13]);
 	pps_params->rc_range_parameter14 =
 					SWAP_TWO_BYTES(rc_range_parameters[14]);
+}
+
+void intel_dsc_regs_init(struct intel_encoder *encoder,
+				struct intel_dsc_regs *dsc_regs, int dsc_type)
+{
+	switch (dsc_type) {
+	case DSC_A:
+		dsc_regs->dsc_picture_params0 = DSCA_PICTURE_PARAMETER_SET_0;
+		dsc_regs->dsc_picture_params1 = DSCA_PICTURE_PARAMETER_SET_1;
+		dsc_regs->dsc_picture_params2 = DSCA_PICTURE_PARAMETER_SET_2;
+		dsc_regs->dsc_picture_params3 = DSCA_PICTURE_PARAMETER_SET_3;
+		dsc_regs->dsc_picture_params4 = DSCA_PICTURE_PARAMETER_SET_4;
+		dsc_regs->dsc_picture_params5 = DSCA_PICTURE_PARAMETER_SET_5;
+		dsc_regs->dsc_picture_params6 = DSCA_PICTURE_PARAMETER_SET_6;
+		dsc_regs->dsc_picture_params7 = DSCA_PICTURE_PARAMETER_SET_7;
+		dsc_regs->dsc_picture_params8 = DSCA_PICTURE_PARAMETER_SET_8;
+		dsc_regs->dsc_picture_params9 = DSCA_PICTURE_PARAMETER_SET_9;
+		dsc_regs->dsc_picture_params10 = DSCA_PICTURE_PARAMETER_SET_10;
+		dsc_regs->dsc_picture_params16 = DSCA_PICTURE_PARAMETER_SET_16;
+		dsc_regs->dsc_rc_buff_thresh0_0 = DSCA_RC_BUF_THRESH_0_0;
+		dsc_regs->dsc_rc_buff_thresh0_1 = DSCA_RC_BUF_THRESH_0_1;
+		dsc_regs->dsc_rc_buff_thresh1_0 = DSCA_RC_BUF_THRESH_1_0;
+		dsc_regs->dsc_rc_buff_thresh1_1 = DSCA_RC_BUF_THRESH_1_1;
+		dsc_regs->dsc_rc_range0_0 = DSCA_RC_RANGE_PARAMETERS_0_0;
+		dsc_regs->dsc_rc_range0_1 = DSCA_RC_RANGE_PARAMETERS_0_1;
+		dsc_regs->dsc_rc_range1_0 = DSCA_RC_RANGE_PARAMETERS_1_0;
+		dsc_regs->dsc_rc_range1_1 = DSCA_RC_RANGE_PARAMETERS_1_1;
+		dsc_regs->dsc_rc_range2_0 = DSCA_RC_RANGE_PARAMETERS_2_0;
+		dsc_regs->dsc_rc_range2_1 = DSCA_RC_RANGE_PARAMETERS_2_1;
+		dsc_regs->dsc_rc_range3_0 = DSCA_RC_RANGE_PARAMETERS_3_0;
+		dsc_regs->dsc_rc_range3_1 = DSCA_RC_RANGE_PARAMETERS_3_1;
+		break;
+	case DSC_C:
+		dsc_regs->dsc_picture_params0 = DSCC_PICTURE_PARAMETER_SET_0;
+		dsc_regs->dsc_picture_params1 = DSCC_PICTURE_PARAMETER_SET_1;
+		dsc_regs->dsc_picture_params2 = DSCC_PICTURE_PARAMETER_SET_2;
+		dsc_regs->dsc_picture_params3 = DSCC_PICTURE_PARAMETER_SET_3;
+		dsc_regs->dsc_picture_params4 = DSCC_PICTURE_PARAMETER_SET_4;
+		dsc_regs->dsc_picture_params5 = DSCC_PICTURE_PARAMETER_SET_5;
+		dsc_regs->dsc_picture_params6 = DSCC_PICTURE_PARAMETER_SET_6;
+		dsc_regs->dsc_picture_params7 = DSCC_PICTURE_PARAMETER_SET_7;
+		dsc_regs->dsc_picture_params8 = DSCC_PICTURE_PARAMETER_SET_8;
+		dsc_regs->dsc_picture_params9 = DSCC_PICTURE_PARAMETER_SET_9;
+		dsc_regs->dsc_picture_params10 = DSCC_PICTURE_PARAMETER_SET_10;
+		dsc_regs->dsc_picture_params16 = DSCC_PICTURE_PARAMETER_SET_16;
+		dsc_regs->dsc_rc_buff_thresh0_0 = DSCC_RC_BUF_THRESH_0_0;
+		dsc_regs->dsc_rc_buff_thresh0_1 = DSCC_RC_BUF_THRESH_0_1;
+		dsc_regs->dsc_rc_buff_thresh1_0 = DSCC_RC_BUF_THRESH_1_0;
+		dsc_regs->dsc_rc_buff_thresh1_1 = DSCC_RC_BUF_THRESH_1_1;
+		dsc_regs->dsc_rc_range0_0 = DSCC_RC_RANGE_PARAMETERS_0_0;
+		dsc_regs->dsc_rc_range0_1 = DSCC_RC_RANGE_PARAMETERS_0_1;
+		dsc_regs->dsc_rc_range1_0 = DSCC_RC_RANGE_PARAMETERS_1_0;
+		dsc_regs->dsc_rc_range1_1 = DSCC_RC_RANGE_PARAMETERS_1_1;
+		dsc_regs->dsc_rc_range2_0 = DSCC_RC_RANGE_PARAMETERS_2_0;
+		dsc_regs->dsc_rc_range2_1 = DSCC_RC_RANGE_PARAMETERS_2_1;
+		dsc_regs->dsc_rc_range3_0 = DSCC_RC_RANGE_PARAMETERS_3_0;
+		dsc_regs->dsc_rc_range3_1 = DSCC_RC_RANGE_PARAMETERS_3_1;
+		break;
+	};
+}
+
+void configure_dsc_params_for_dsc_controller(struct intel_encoder *encoder,
+					struct intel_crtc_state *crtc_state,
+					struct intel_dsc_regs *dsc_regs,
+					int dsc_type)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct intel_dp *intel_dp = NULL;
+	struct vdsc_config *vdsc_cfg  = NULL;
+	unsigned long rc_range_parameters[NUM_BUF_RANGES];
+	unsigned long chicken_bit_value = 0;
+	unsigned int i = 0;
+	int port_type = encoder->type;
+
+	union DSC_PICTURE_PARAMETER_SET_0_BXT pps0;
+	union DSC_PICTURE_PARAMETER_SET_1_BXT pps1;
+	union DSC_PICTURE_PARAMETER_SET_2_BXT pps2;
+	union DSC_PICTURE_PARAMETER_SET_3_BXT pps3;
+	union DSC_PICTURE_PARAMETER_SET_4_BXT pps4;
+	union DSC_PICTURE_PARAMETER_SET_5_BXT pps5;
+	union DSC_PICTURE_PARAMETER_SET_6_BXT pps6;
+	union DSC_PICTURE_PARAMETER_SET_7_BXT pps7;
+	union DSC_PICTURE_PARAMETER_SET_8_BXT pps8;
+	union DSC_PICTURE_PARAMETER_SET_9_BXT pps9;
+	union DSC_PICTURE_PARAMETER_SET_10_BXT pps10;
+	union DSC_PICTURE_PARAMETER_SET_16_BXT pps16;
+	union DSC_RC_BUF_THRESH_0_BXT rc_buffer0;
+	union DSC_RC_BUF_THRESH_1_BXT rc_buffer1;
+	union DSC_RC_RANGE_PARAMETERS_0_BXT rc_range0;
+	union DSC_RC_RANGE_PARAMETERS_1_BXT rc_range1;
+	union DSC_RC_RANGE_PARAMETERS_2_BXT rc_range2;
+	union DSC_RC_RANGE_PARAMETERS_3_BXT rc_range3;
+
+	if (port_type == INTEL_OUTPUT_EDP) {
+
+		intel_dp = enc_to_intel_dp(&encoder->base);
+		vdsc_cfg = &(intel_dp->compr_params.dsc_cfg);
+
+		/* Configure VDSC engine */
+		/* PPS0 */
+		pps0.dsc_version_major = vdsc_cfg->dsc_version_major;
+		pps0.dsc_version_minor = vdsc_cfg->dsc_version_minor;
+		pps0.bits_per_component = vdsc_cfg->bits_per_component;
+		pps0.line_buf_depth = vdsc_cfg->line_buf_depth;
+		pps0.block_pred_enable = vdsc_cfg->block_pred_enable;
+		pps0.convert_rgb = vdsc_cfg->convert_rgb;
+		pps0.enable_422 = vdsc_cfg->enable422;
+		/* Since platform itself does not support VBR Enable */
+		pps0.vbr_enable = 0;
+		I915_WRITE(dsc_regs->dsc_picture_params0, pps0.value);
+
+		/* PPS1 */
+		pps1.bits_per_pixel = vdsc_cfg->bits_per_pixel;
+		I915_WRITE(dsc_regs->dsc_picture_params1, pps1.value);
+
+		/* PPS2 */
+		pps2.pic_height = vdsc_cfg->pic_height;
+		pps2.pic_width = vdsc_cfg->pic_width /
+						vdsc_cfg->num_vdsc_instances;
+		I915_WRITE(dsc_regs->dsc_picture_params2, pps2.value);
+
+		/* PPS3 */
+		pps3.slice_height = vdsc_cfg->slice_height;
+		pps3.slice_width = vdsc_cfg->slice_width;
+		I915_WRITE(dsc_regs->dsc_picture_params3, pps3.value);
+
+		/* PPS4 */
+		pps4.initial_xmit_delay = vdsc_cfg->initial_xmit_delay;
+		pps4.initial_dec_delay = vdsc_cfg->initial_dec_delay;
+		I915_WRITE(dsc_regs->dsc_picture_params4, pps4.value);
+
+		/* PPS5 */
+		pps5.scale_increment_interval =
+					vdsc_cfg->scale_increment_interval;
+		pps5.scale_decrement_interval =
+					vdsc_cfg->scale_decrement_interval;
+		I915_WRITE(dsc_regs->dsc_picture_params5, pps5.value);
+
+		/* PPS6 */
+		pps6.initial_scale_value = vdsc_cfg->initial_scale_value;
+		pps6.first_line_bpg_offset = vdsc_cfg->first_line_bpg_Ofs;
+		pps6.flatness_min_qp = vdsc_cfg->flatness_minQp;
+		pps6.flatness_max_qp = vdsc_cfg->flatness_maxQp;
+		I915_WRITE(dsc_regs->dsc_picture_params6, pps6.value);
+
+		/* PPS7 */
+		pps7.slice_bpg_offset = vdsc_cfg->slice_bpg_offset;
+		pps7.nfl_bpg_offset = vdsc_cfg->nfl_bpg_offset;
+		I915_WRITE(dsc_regs->dsc_picture_params7, pps7.value);
+
+		/* PPS8 */
+		pps8.initial_offset = vdsc_cfg->initial_offset;
+		pps8.final_offset = vdsc_cfg->final_offset;
+		I915_WRITE(dsc_regs->dsc_picture_params8, pps8.value);
+
+		/* PPS9 */
+		pps9.rc_edge_factor = vdsc_cfg->rc_edge_factor;
+		pps9.rc_model_size = vdsc_cfg->rc_model_size;
+		I915_WRITE(dsc_regs->dsc_picture_params9, pps9.value);
+
+		/* PPS10 */
+		pps10.rc_quant_incr_limit0 = vdsc_cfg->rc_quant_incr_limit0;
+		pps10.rc_quant_incr_limit1 = vdsc_cfg->rc_quant_incr_limit1;
+		pps10.rc_tgt_offset_hi = vdsc_cfg->rc_tgt_offset_high;
+		pps10.rc_tgt_offset_lo = vdsc_cfg->rc_tgt_offset_low;
+		I915_WRITE(dsc_regs->dsc_picture_params10, pps10.value);
+
+		/* RC_Buffer 0 */
+		rc_buffer0.rc_buf_thresh_0 = vdsc_cfg->rc_buf_thresh[0];
+		rc_buffer0.rc_buf_thresh_1 = vdsc_cfg->rc_buf_thresh[1];
+		rc_buffer0.rc_buf_thresh_2 = vdsc_cfg->rc_buf_thresh[2];
+		rc_buffer0.rc_buf_thresh_3 = vdsc_cfg->rc_buf_thresh[3];
+		rc_buffer0.rc_buf_thresh_4 = vdsc_cfg->rc_buf_thresh[4];
+		rc_buffer0.rc_buf_thresh_5 = vdsc_cfg->rc_buf_thresh[5];
+		rc_buffer0.rc_buf_thresh_6 = vdsc_cfg->rc_buf_thresh[6];
+		rc_buffer0.rc_buf_thresh_7 = vdsc_cfg->rc_buf_thresh[7];
+		I915_WRITE(dsc_regs->dsc_rc_buff_thresh0_0,
+							rc_buffer0.value[0]);
+		I915_WRITE(dsc_regs->dsc_rc_buff_thresh0_1,
+							rc_buffer0.value[1]);
+
+		/* RC_Buffer 0 */
+		rc_buffer1.rc_buf_thresh_8 = vdsc_cfg->rc_buf_thresh[8];
+		rc_buffer1.rc_buf_thresh_9 = vdsc_cfg->rc_buf_thresh[9];
+		rc_buffer1.rc_buf_thresh_10 = vdsc_cfg->rc_buf_thresh[10];
+		rc_buffer1.rc_buf_thresh_11 = vdsc_cfg->rc_buf_thresh[11];
+		rc_buffer1.rc_buf_thresh_12 = vdsc_cfg->rc_buf_thresh[12];
+		rc_buffer1.rc_buf_thresh_13 = vdsc_cfg->rc_buf_thresh[13];
+		I915_WRITE(dsc_regs->dsc_rc_buff_thresh1_0,
+							rc_buffer1.value[0]);
+		I915_WRITE(dsc_regs->dsc_rc_buff_thresh1_1,
+							rc_buffer1.value[1]);
+
+		for (i = 0; i < NUM_BUF_RANGES; i++) {
+			rc_range_parameters[i] = (unsigned short)(
+			(vdsc_cfg->rc_range_params[i].range_bpg_offset << 10) |
+			(vdsc_cfg->rc_range_params[i].range_max_qp << 5) |
+			(vdsc_cfg->rc_range_params[i].range_min_qp));
+		}
+
+		/* RC Range1 */
+		rc_range0.value[0] = ((rc_range_parameters[1] << 16) |
+						(rc_range_parameters[0]));
+		rc_range0.value[1] = ((rc_range_parameters[3] << 16) |
+						(rc_range_parameters[2]));
+		I915_WRITE(dsc_regs->dsc_rc_range0_0, rc_range0.value[0]);
+		I915_WRITE(dsc_regs->dsc_rc_range0_1, rc_range0.value[1]);
+
+		/* RC Range2 */
+		rc_range1.value[0] = ((rc_range_parameters[5] << 16) |
+						(rc_range_parameters[4]));
+		rc_range1.value[1] = ((rc_range_parameters[7] << 16) |
+						(rc_range_parameters[6]));
+		I915_WRITE(dsc_regs->dsc_rc_range1_0, rc_range1.value[0]);
+		I915_WRITE(dsc_regs->dsc_rc_range1_1, rc_range1.value[1]);
+
+		/* RC Range3 */
+		rc_range2.value[0] = ((rc_range_parameters[9] << 16) |
+						(rc_range_parameters[8]));
+		rc_range2.value[1] = ((rc_range_parameters[11] << 16) |
+						(rc_range_parameters[10]));
+		I915_WRITE(dsc_regs->dsc_rc_range2_0, rc_range2.value[0]);
+		I915_WRITE(dsc_regs->dsc_rc_range2_1, rc_range2.value[1]);
+
+		/* RC Range4 */
+		rc_range3.value[0] = ((rc_range_parameters[13] << 16) |
+						(rc_range_parameters[12]));
+		rc_range3.value[1] = rc_range_parameters[14];
+		I915_WRITE(dsc_regs->dsc_rc_range3_0, rc_range3.value[0]);
+		I915_WRITE(dsc_regs->dsc_rc_range3_1, rc_range3.value[1]);
+
+		/* PPS16 */
+		pps16.slice_chunk_size = vdsc_cfg->chunk_size;
+		pps16.slice_per_line =
+			(vdsc_cfg->pic_width / vdsc_cfg->num_vdsc_instances) /
+							vdsc_cfg->slice_width;
+		pps16.slice_row_per_frame =
+				vdsc_cfg->pic_height / vdsc_cfg->slice_height;
+		I915_WRITE(dsc_regs->dsc_picture_params16, pps16.value);
+
+		chicken_bit_value = I915_READ(DSC_CHICKEN_1_A);
+		I915_WRITE(DSC_CHICKEN_1_A, 0x80000000);
+	}
+}
+
+void enable_pps_dip(struct intel_encoder *encoder,
+					struct intel_dsc_regs *dsc_regs)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	int type = encoder->port;
+	i915_reg_t dip_ctrl_reg;
+	unsigned int value = 0;
+
+	if (type == INTEL_OUTPUT_EDP || type == INTEL_OUTPUT_DP) {
+		dip_ctrl_reg = dsc_regs->dip_ctrl_reg;
+		value = I915_READ(dip_ctrl_reg);
+		value |= VDIP_ENABLE_PPS;
+		I915_WRITE(dip_ctrl_reg, value);
+	}
+}
+
+void write_dip(struct intel_encoder *encoder, unsigned char *dip_data,
+						unsigned char dip_size,
+						struct intel_dsc_regs *dsc_regs)
+{
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	unsigned int max_offset;
+	unsigned char count = 0;
+	unsigned char i = 0;
+	unsigned char data_to_write = 0;
+	unsigned char offset = 0;
+	unsigned long remaining_buffer = 0;
+	unsigned int video_dip_pps_data = 0;
+	unsigned int payload_data_reg;
+
+	/*
+	 * 33*4 = 132
+	 * 4 byte SDP header + 128 byte PPS data
+	 */
+	max_offset = 33;
+	payload_data_reg = dsc_regs->dip_pps_data_ctrl_reg;
+
+	if (dip_data) {
+		remaining_buffer = max_offset * 4;
+		data_to_write = dip_size;
+
+		while (remaining_buffer > 0 && offset < max_offset) {
+			if (data_to_write >= 4) {
+				video_dip_pps_data = (dip_data[count] |
+						(dip_data[count + 1] << 8) |
+						(dip_data[count + 2] << 16) |
+						(dip_data[count + 3] << 24));
+				data_to_write -= 4;
+				count += 4;
+				I915_WRITE(_MMIO(payload_data_reg),
+							video_dip_pps_data);
+			} else {
+				unsigned char buffer[4];
+
+				memset(&buffer[0], 0,
+						4 * sizeof(unsigned char));
+				for (i = 0; i < data_to_write; i++)
+					buffer[i] = dip_data[count++];
+				video_dip_pps_data = (buffer[0] |
+					(buffer[1] << 8) |
+					(buffer[2] << 16) | (buffer[3] << 24));
+				data_to_write = 0;
+				I915_WRITE(_MMIO(payload_data_reg),
+							video_dip_pps_data);
+			}
+			payload_data_reg += 0x4;
+			remaining_buffer -= 4;
+			offset++;
+		}
+	}
+}
+
+void send_pps_sdp_to_sink(struct intel_encoder *encoder, int pipe,
+			struct picture_parameters_set *pps_params,
+			struct intel_dsc_regs *dsc_regs)
+{
+	union pps_sdp sdp;
+	unsigned char payload_size = 0;
+
+	sdp.secondary_data_packet_header.sdp_id = 0;
+	sdp.secondary_data_packet_header.sdp_type = 0x10;
+	sdp.secondary_data_packet_header.sdp_byte1 = 0x7F;
+	sdp.secondary_data_packet_header.sdp_byte2 = 0x0;
+	sdp.pps_payload = *pps_params;
+
+	payload_size = SDP_HEADER_SIZE + PPS_PAYLOAD_SIZE;
+	write_dip(encoder, (unsigned char *)&sdp, payload_size, dsc_regs);
+}
+
+void intel_dsc_enable(struct intel_encoder *encoder,
+				struct intel_crtc_state *pipe_config)
+{
+	struct intel_dp *intel_dp = enc_to_intel_dp(&encoder->base);
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct picture_parameters_set pps_params;
+	struct intel_dsc_regs dsc_regs;
+	struct drm_crtc *crtc = pipe_config->base.crtc;
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	int pipe = intel_crtc->pipe;
+	int dsc_type1;
+	int dsc_type2;
+	int type = encoder->type;
+	unsigned int dss_ctrl1_value = 0;
+	unsigned int dss_ctrl2_value = 0;
+
+	if ((INTEL_GEN(dev_priv) < 9) ||
+				!intel_dp->compr_params.compression_support)
+		return;
+	/* TO DO: configure DSC params and program source regs */
+
+	if (type == INTEL_OUTPUT_EDP) {
+		dsc_regs.dss_ctrl1_reg = DSS_CONTROL1;
+		dsc_regs.dss_ctrl2_reg = DSS_CONTROL2;
+		dsc_regs.dip_ctrl_reg = VIDEO_DIP_CTL_EDP;
+		dsc_regs.dip_pps_data_ctrl_reg = VIDEO_DIP_PPS_DATA_EDP_REG;
+		dsc_type1 = DSC_A;
+		dsc_type2 = DSC_C;
+	} else if (type == INTEL_OUTPUT_DP) {
+		switch (pipe) {
+		case PIPE_A:
+			dsc_regs.dss_ctrl1_reg = PIPE_DSS_CTL1_PB;
+			dsc_regs.dss_ctrl2_reg = PIPE_DSS_CTL2_PB;
+			dsc_regs.dip_ctrl_reg = VIDEO_DIP_CTL_A;
+			dsc_regs.dip_pps_data_ctrl_reg =
+						VIDEO_DIP_DRM_DATA_TRANSA_REG;
+			dsc_type1 = PIPEA_DSC_0;
+			dsc_type2 = PIPEA_DSC_1;
+			break;
+		case PIPE_B:
+			dsc_regs.dss_ctrl1_reg = PIPE_DSS_CTL1_PC;
+			dsc_regs.dss_ctrl2_reg = PIPE_DSS_CTL2_PC;
+			dsc_regs.dip_ctrl_reg = VIDEO_DIP_CTL_B;
+			dsc_regs.dip_pps_data_ctrl_reg =
+						VIDEO_DIP_DRM_DATA_TRANSB_REG;
+			dsc_type1 = PIPEB_DSC_0;
+			dsc_type2 = PIPEB_DSC_1;
+			break;
+		default:
+			return;
+		}
+	} else {
+		DRM_ERROR("Func:%s Unsupported port:%d\n", __func__, type);
+	}
+
+	intel_dsc_regs_init(encoder, &dsc_regs, dsc_type1);
+	configure_dsc_params_for_dsc_controller(encoder, pipe_config,
+							&dsc_regs, dsc_type1);
+	if (intel_dp->compr_params.dsc_cfg.num_vdsc_instances != 1) {
+		intel_dsc_regs_init(encoder, &dsc_regs, dsc_type2);
+		configure_dsc_params_for_dsc_controller(encoder, pipe_config,
+							&dsc_regs, dsc_type2);
+	}
+	populate_pps_sdp_for_sink(encoder, pipe_config, &pps_params);
+
+	send_pps_sdp_to_sink(encoder, pipe, &pps_params, &dsc_regs);
+
+	enable_pps_dip(encoder, &dsc_regs);
+
+	dss_ctrl1_value = I915_READ(dsc_regs.dss_ctrl1_reg);
+	dss_ctrl2_value = I915_READ(dsc_regs.dss_ctrl2_reg);
+	if (type == INTEL_OUTPUT_EDP || type == INTEL_OUTPUT_DP) {
+		 /*
+		  * Enable joiner only if we are using both the VDSC engines
+		  * To check if splitters gets enabled by default in HW
+		  * if joiner is enabled
+		  */
+		if (intel_dp->compr_params.dsc_cfg.num_vdsc_instances != 1)
+			dss_ctrl1_value |= JOINER_ENABLE | SPLITTER_ENABLE;
+
+		I915_WRITE(dsc_regs.dss_ctrl1_reg, dss_ctrl1_value);
+
+		dss_ctrl2_value |= LEFT_BRANCH_VDSC_ENABLE;
+		if (intel_dp->compr_params.dsc_cfg.num_vdsc_instances != 1)
+			dss_ctrl2_value |= RIGHT_BRANCH_VDSC_ENABLE;
+
+		I915_WRITE(dsc_regs.dss_ctrl2_reg, dss_ctrl2_value);
+	}
 }
