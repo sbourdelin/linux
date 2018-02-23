@@ -328,14 +328,22 @@ void free_pages_and_swap_cache(struct page **pages, int nr)
  * lock getting page table operations atomic even if we drop the page
  * lock before returning.
  */
-struct page *lookup_swap_cache(swp_entry_t entry, struct vm_area_struct *vma,
-			       unsigned long addr)
+struct page *lookup_swap_cache(swp_entry_t entry, bool vma_ra,
+			struct vm_fault *vmf)
 {
 	struct page *page;
-	unsigned long ra_info;
-	int win, hits, readahead;
+	int readahead;
+	struct address_space *swapper_space = swap_address_space(entry);
 
-	page = find_get_page(swap_address_space(entry), swp_offset(entry));
+	if (!swapper_space) {
+		if (vmf)
+			pte_ERROR(vmf->orig_pte);
+		else
+			pr_err("Bad swp_entry: %lx\n", entry.val);
+		return NULL;
+	}
+
+	page = find_get_page(swapper_space, swp_offset(entry));
 
 	INC_CACHE_INFO(find_total);
 	if (page) {
@@ -343,18 +351,19 @@ struct page *lookup_swap_cache(swp_entry_t entry, struct vm_area_struct *vma,
 		if (unlikely(PageTransCompound(page)))
 			return page;
 		readahead = TestClearPageReadahead(page);
-		if (vma) {
-			ra_info = GET_SWAP_RA_VAL(vma);
-			win = SWAP_RA_WIN(ra_info);
-			hits = SWAP_RA_HITS(ra_info);
+		if (vma_ra) {
+			unsigned long ra_info = GET_SWAP_RA_VAL(vmf->vma);
+			int win = SWAP_RA_WIN(ra_info);
+			int hits = SWAP_RA_HITS(ra_info);
+
 			if (readahead)
 				hits = min_t(int, hits + 1, SWAP_RA_HITS_MAX);
-			atomic_long_set(&vma->swap_readahead_info,
-					SWAP_RA_VAL(addr, win, hits));
+			atomic_long_set(&vmf->vma->swap_readahead_info,
+					SWAP_RA_VAL(vmf->address, win, hits));
 		}
 		if (readahead) {
 			count_vm_event(SWAP_RA_HIT);
-			if (!vma)
+			if (!vma_ra)
 				atomic_inc(&swapin_readahead_hits);
 		}
 	}
@@ -675,7 +684,7 @@ struct page *swap_readahead_detect(struct vm_fault *vmf,
 	entry = pte_to_swp_entry(vmf->orig_pte);
 	if ((unlikely(non_swap_entry(entry))))
 		return NULL;
-	page = lookup_swap_cache(entry, vma, faddr);
+	page = lookup_swap_cache(entry, true, vmf);
 	if (page)
 		return page;
 

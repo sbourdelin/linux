@@ -2926,11 +2926,9 @@ int do_swap_page(struct vm_fault *vmf)
 		goto out;
 	}
 
-
 	delayacct_set_flag(DELAYACCT_PF_SWAPIN);
 	if (!page) {
-		page = lookup_swap_cache(entry, vma_readahead ? vma : NULL,
-					 vmf->address);
+		page = lookup_swap_cache(entry, vma_readahead, vmf);
 		swapcache = page;
 	}
 
