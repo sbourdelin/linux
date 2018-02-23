@@ -101,6 +101,7 @@ struct mgmt_rp_read_index_list {
 #define MGMT_SETTING_PRIVACY		0x00002000
 #define MGMT_SETTING_CONFIGURATION	0x00004000
 #define MGMT_SETTING_STATIC_ADDRESS	0x00008000
+#define MGMT_SETTING_PHY_CONFIGURATION  0x00010000
 
 #define MGMT_OP_READ_INFO		0x0004
 #define MGMT_READ_INFO_SIZE		0
@@ -618,6 +619,17 @@ struct mgmt_rp_get_phy_confguration {
 #define MGMT_PHY_LE_CODED_TX		0x0010
 #define MGMT_PHY_LE_CODED_RX		0x0020
 
+#define MGMT_PHY_LE_TX_MASK (MGMT_PHY_LE_1M_TX | MGMT_PHY_LE_2M_TX | \
+			     MGMT_PHY_LE_CODED_TX)
+#define MGMT_PHY_LE_RX_MASK (MGMT_PHY_LE_1M_RX | MGMT_PHY_LE_2M_RX | \
+			     MGMT_PHY_LE_CODED_RX)
+
+#define MGMT_OP_SET_PHY_CONFIGURATION	0x0045
+#define MGMT_SET_PHY_CONFIGURATION_SIZE		2
+struct mgmt_cp_set_phy_confguration {
+	__u16	default_phys;
+} __packed;
+
 #define MGMT_EV_CMD_COMPLETE		0x0001
 struct mgmt_ev_cmd_complete {
 	__le16	opcode;
@@ -837,4 +849,9 @@ struct mgmt_ev_advertising_removed {
 struct mgmt_ev_ext_info_changed {
 	__le16	eir_len;
 	__u8	eir[0];
+} __packed;
+
+#define MGMT_EV_PHY_CONFIGURATION_CHANGED	0x0026
+struct mgmt_ev_phy_configuration_changed {
+	__le16	selected_phys;
 } __packed;

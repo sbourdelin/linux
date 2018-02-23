@@ -1041,6 +1041,59 @@ static void hci_cc_le_set_random_addr(struct hci_dev *hdev, struct sk_buff *skb)
 	hci_dev_unlock(hdev);
 }
 
+static void hci_cc_le_set_default_phy(struct hci_dev *hdev, struct sk_buff *skb)
+{
+	__u8 status = *((__u8 *) skb->data);
+	struct hci_cp_le_set_default_phy *cp;
+
+	BT_DBG("%s status 0x%2.2x", hdev->name, status);
+
+	if (status)
+		return;
+
+	cp = hci_sent_cmd_data(hdev, HCI_OP_LE_SET_DEFAULT_PHY);
+	if (!cp)
+		return;
+
+	hci_dev_lock(hdev);
+
+	/* Clear previous PHY flags */
+	hci_dev_clear_flag(hdev, HCI_LE_PHY_1M_TX);
+	hci_dev_clear_flag(hdev, HCI_LE_PHY_1M_RX);
+	hci_dev_clear_flag(hdev, HCI_LE_PHY_2M_TX);
+	hci_dev_clear_flag(hdev, HCI_LE_PHY_2M_RX);
+	hci_dev_clear_flag(hdev, HCI_LE_PHY_CODED_TX);
+	hci_dev_clear_flag(hdev, HCI_LE_PHY_CODED_RX);
+
+	if (cp->all_phys & 0x01) {
+		hci_dev_set_flag(hdev, HCI_LE_PHY_1M_TX);
+	} else {
+		if (cp->tx_phys & HCI_LE_SET_PHY_1M)
+			hci_dev_set_flag(hdev, HCI_LE_PHY_1M_TX);
+
+		if (cp->tx_phys & HCI_LE_SET_PHY_2M)
+			hci_dev_set_flag(hdev, HCI_LE_PHY_2M_TX);
+
+		if (cp->tx_phys & HCI_LE_SET_PHY_CODED)
+			hci_dev_set_flag(hdev, HCI_LE_PHY_CODED_TX);
+	}
+
+	if (cp->all_phys & 0x02) {
+		hci_dev_set_flag(hdev, HCI_LE_PHY_1M_RX);
+	} else {
+		if (cp->rx_phys & HCI_LE_SET_PHY_1M)
+			hci_dev_set_flag(hdev, HCI_LE_PHY_1M_RX);
+
+		if (cp->rx_phys & HCI_LE_SET_PHY_2M)
+			hci_dev_set_flag(hdev, HCI_LE_PHY_2M_RX);
+
+		if (cp->rx_phys & HCI_LE_SET_PHY_CODED)
+			hci_dev_set_flag(hdev, HCI_LE_PHY_CODED_RX);
+	}
+
+	hci_dev_unlock(hdev);
+}
+
 static void hci_cc_le_set_adv_enable(struct hci_dev *hdev, struct sk_buff *skb)
 {
 	__u8 *sent, status = *((__u8 *) skb->data);
@@ -3126,6 +3179,10 @@ static void hci_cmd_complete_evt(struct hci_dev *hdev, struct sk_buff *skb,
 
 	case HCI_OP_LE_SET_EXT_SCAN_ENABLE:
 		hci_cc_le_set_ext_scan_enable(hdev, skb);
+		break;
+
+	case HCI_OP_LE_SET_DEFAULT_PHY:
+		hci_cc_le_set_default_phy(hdev, skb);
 		break;
 
 	default:
