@@ -579,6 +579,8 @@ static int sunxi_cluster_powerdown(unsigned int cluster)
 	reg = readl(prcm_base + PRCM_PWROFF_GATING_REG(cluster));
 	if (is_sun9i)
 		reg |= PRCM_PWROFF_GATING_REG_CLUSTER_SUN9I;
+	else
+		reg |= PRCM_PWROFF_GATING_REG_CLUSTER_SUN8I;
 	writel(reg, prcm_base + PRCM_PWROFF_GATING_REG(cluster));
 	udelay(20);
 
@@ -660,8 +662,12 @@ out:
 	return !ret;
 }
 
-static bool sunxi_mc_smp_cpu_can_disable(unsigned int __unused)
+static bool sunxi_mc_smp_cpu_can_disable(unsigned int cpu)
 {
+	/* CPU0 hotplug handled only for sun9i */
+	if (!is_sun9i)
+		if (cpu == 0)
+			return false;
 	return true;
 }
 #endif
