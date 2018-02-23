@@ -429,6 +429,7 @@ static int copy_verifier_state(struct bpf_verifier_state *dst_state,
 		dst_state->frame[i] = NULL;
 	}
 	dst_state->curframe = src->curframe;
+
 	for (i = 0; i <= src->curframe; i++) {
 		dst = dst_state->frame[i];
 		if (!dst) {
@@ -716,6 +717,7 @@ static void init_func_state(struct bpf_verifier_env *env,
 			    int entry, int frameno, int subprogno)
 {
 	state->insn_idx = entry;
+	state->parent = NULL;
 	state->frameno = frameno;
 	state->subprogno = subprogno;
 	init_reg_state(env, state);
@@ -3747,211 +3749,85 @@ static int check_return_code(struct bpf_verifier_env *env)
 	return 0;
 }
 
-/* non-recursive DFS pseudo code
- * 1  procedure DFS-iterative(G,v):
- * 2      label v as discovered
- * 3      let S be a stack
- * 4      S.push(v)
- * 5      while S is not empty
- * 6            t <- S.pop()
- * 7            if t is what we're looking for:
- * 8                return t
- * 9            for all edges e in G.adjacentEdges(t) do
- * 10               if edge e is already labelled
- * 11                   continue with the next edge
- * 12               w <- G.adjacentVertex(t,e)
- * 13               if vertex w is not discovered and not explored
- * 14                   label e as tree-edge
- * 15                   label w as discovered
- * 16                   S.push(w)
- * 17                   continue at 5
- * 18               else if vertex w is discovered
- * 19                   label e as back-edge
- * 20               else
- * 21                   // vertex w is explored
- * 22                   label e as forward- or cross-edge
- * 23           label t as explored
- * 24           S.pop()
- *
- * convention:
- * 0x10 - discovered
- * 0x11 - discovered and fall-through edge labelled
- * 0x12 - discovered and fall-through and branch edges labelled
- * 0x20 - explored
- */
-
-enum {
-	DISCOVERED = 0x10,
-	EXPLORED = 0x20,
-	FALLTHROUGH = 1,
-	BRANCH = 2,
-};
-
 #define STATE_LIST_MARK ((struct bpf_verifier_state_list *) -1L)
 
-static int *insn_stack;	/* stack of insns to process */
-static int cur_stack;	/* current stack index */
-static int *insn_state;
-
-/* t, w, e - match pseudo-code above:
- * t - index of current instruction
- * w - next instruction
- * e - edge
- */
-static int push_insn(int t, int w, int e, struct bpf_verifier_env *env)
+static int mark_jump_target(struct bpf_verifier_env *env, int from, int off)
 {
-	if (e == FALLTHROUGH && insn_state[t] >= (DISCOVERED | FALLTHROUGH))
-		return 0;
+	int to = from + off + 1;
 
-	if (e == BRANCH && insn_state[t] >= (DISCOVERED | BRANCH))
-		return 0;
-
-	if (w < 0 || w >= env->prog->len) {
-		verbose(env, "jump out of range from insn %d to %d\n", t, w);
+	if (to < 0 || to >= env->prog->len) {
+		verbose(env, "jump out of range from insn %d to %d\n", from, to);
 		return -EINVAL;
 	}
-
-	if (e == BRANCH)
-		/* mark branch target for state pruning */
-		env->explored_states[w] = STATE_LIST_MARK;
-
-	if (insn_state[w] == 0) {
-		/* tree-edge */
-		insn_state[t] = DISCOVERED | e;
-		insn_state[w] = DISCOVERED;
-		if (cur_stack >= env->prog->len)
-			return -E2BIG;
-		insn_stack[cur_stack++] = w;
-		return 1;
-	} else if ((insn_state[w] & 0xF0) == DISCOVERED) {
-		verbose(env, "back-edge from insn %d to %d\n", t, w);
-		return -EINVAL;
-	} else if (insn_state[w] == EXPLORED) {
-		/* forward- or cross-edge */
-		insn_state[t] = DISCOVERED | e;
-	} else {
-		verbose(env, "insn state internal bug\n");
-		return -EFAULT;
-	}
+	/* mark branch target for state pruning */
+	env->explored_states[to] = STATE_LIST_MARK;
 	return 0;
 }
 
-/* non-recursive depth-first-search to detect loops in BPF program
- * loop == back-edge in directed graph
- */
-static int check_cfg(struct bpf_verifier_env *env)
+/* Mark jump/branch targets for control flow tracking & state pruning */
+static int prepare_cfg_marks(struct bpf_verifier_env *env)
 {
 	struct bpf_insn *insns = env->prog->insnsi;
-	int insn_cnt = env->prog->len;
-	int ret = 0;
-	int i, t;
+	int insn_cnt = env->prog->len, i, err = 0;
 
-	insn_state = kcalloc(insn_cnt, sizeof(int), GFP_KERNEL);
-	if (!insn_state)
-		return -ENOMEM;
-
-	insn_stack = kcalloc(insn_cnt, sizeof(int), GFP_KERNEL);
-	if (!insn_stack) {
-		kfree(insn_state);
-		return -ENOMEM;
-	}
-
-	insn_state[0] = DISCOVERED; /* mark 1st insn as discovered */
-	insn_stack[0] = 0; /* 0 is the first instruction */
-	cur_stack = 1;
-
-peek_stack:
-	if (cur_stack == 0)
-		goto check_state;
-	t = insn_stack[cur_stack - 1];
-
-	if (BPF_CLASS(insns[t].code) == BPF_JMP) {
-		u8 opcode = BPF_OP(insns[t].code);
-
-		if (opcode == BPF_EXIT) {
-			goto mark_explored;
-		} else if (opcode == BPF_CALL) {
-			ret = push_insn(t, t + 1, FALLTHROUGH, env);
-			if (ret == 1)
-				goto peek_stack;
-			else if (ret < 0)
-				goto err_free;
-			if (t + 1 < insn_cnt)
-				env->explored_states[t + 1] = STATE_LIST_MARK;
-			if (insns[t].src_reg == BPF_PSEUDO_CALL) {
-				env->explored_states[t] = STATE_LIST_MARK;
-				ret = push_insn(t, t + insns[t].imm + 1, BRANCH, env);
-				if (ret == 1)
-					goto peek_stack;
-				else if (ret < 0)
-					goto err_free;
-			}
-		} else if (opcode == BPF_JA) {
-			if (BPF_SRC(insns[t].code) != BPF_K) {
-				ret = -EINVAL;
-				goto err_free;
-			}
-			/* unconditional jump with single edge */
-			ret = push_insn(t, t + insns[t].off + 1,
-					FALLTHROUGH, env);
-			if (ret == 1)
-				goto peek_stack;
-			else if (ret < 0)
-				goto err_free;
-			/* tell verifier to check for equivalent states
-			 * after every call and jump
-			 */
-			if (t + 1 < insn_cnt)
-				env->explored_states[t + 1] = STATE_LIST_MARK;
-		} else {
-			/* conditional jump with two edges */
-			env->explored_states[t] = STATE_LIST_MARK;
-			ret = push_insn(t, t + 1, FALLTHROUGH, env);
-			if (ret == 1)
-				goto peek_stack;
-			else if (ret < 0)
-				goto err_free;
-
-			ret = push_insn(t, t + insns[t].off + 1, BRANCH, env);
-			if (ret == 1)
-				goto peek_stack;
-			else if (ret < 0)
-				goto err_free;
-		}
-	} else {
-		/* all other non-branch instructions with single
-		 * fall-through edge
-		 */
-		ret = push_insn(t, t + 1, FALLTHROUGH, env);
-		if (ret == 1)
-			goto peek_stack;
-		else if (ret < 0)
-			goto err_free;
-	}
-
-mark_explored:
-	insn_state[t] = EXPLORED;
-	if (cur_stack-- <= 0) {
-		verbose(env, "pop stack internal bug\n");
-		ret = -EFAULT;
-		goto err_free;
-	}
-	goto peek_stack;
-
-check_state:
 	for (i = 0; i < insn_cnt; i++) {
-		if (insn_state[i] != EXPLORED) {
-			verbose(env, "unreachable insn %d\n", i);
-			ret = -EINVAL;
-			goto err_free;
-		}
-	}
-	ret = 0; /* cfg looks good */
+		u8 opcode = BPF_OP(insns[i].code);
 
-err_free:
-	kfree(insn_state);
-	kfree(insn_stack);
-	return ret;
+		if (BPF_CLASS(insns[i].code) != BPF_JMP) {
+			if (i + 1 == insn_cnt) {
+				verbose(env, "no exit/jump at end of program (insn %d)\n",
+					i);
+				return -EINVAL;
+			}
+			continue;
+		}
+		switch (opcode) {
+		case BPF_EXIT:
+			continue;
+		case BPF_CALL:
+			/* following insn is target of function return */
+			err = mark_jump_target(env, i, 0);
+			if (err)
+				return err;
+			if (insns[i].src_reg == BPF_PSEUDO_CALL)
+				err = mark_jump_target(env, i, insns[i].imm);
+			break;
+		case BPF_JA:
+			/* unconditional jump; mark target */
+			err = mark_jump_target(env, i, insns[i].off);
+			break;
+		default:
+			/* conditional jump; mark following insn and target */
+			err = mark_jump_target(env, i, 0);
+			if (err)
+				return err;
+			err = mark_jump_target(env, i, insns[i].off);
+		}
+		if (err)
+			return err;
+	}
+
+	/* Second pass, to detect statically unreachable code.  Any target of
+	 * a jump or call will have a state-list mark
+	 */
+	for (i = 0; i < insn_cnt; i++) {
+		/* insn following a non-jump is statically reachable */
+		if (BPF_CLASS(insns[i].code) != BPF_JMP)
+			continue;
+		/* insn following a CALL or conditional jump will have been
+		 * marked by that insn (see above).  So if following insn is
+		 * not marked, then we're an EXIT or JA and thus the
+		 * following insn is statically unreachable.
+		 * If we're last insn, and we're not an EXIT or JA, then first
+		 * pass would have complained in mark_jump_target().
+		 */
+		if (i + 1 < insn_cnt)
+			if (env->explored_states[i + 1] != STATE_LIST_MARK) {
+				verbose(env, "unreachable insn %d\n", i + 1);
+				return -EINVAL;
+			}
+	}
+	return 0;
 }
 
 /* check %cur's range satisfies %old's */
@@ -4287,11 +4163,24 @@ static int propagate_liveness(struct bpf_verifier_env *env,
 	return err;
 }
 
-static int is_state_visited(struct bpf_verifier_env *env, int insn_idx)
+static struct bpf_func_state *find_loop(struct bpf_verifier_env *env)
+{
+	struct bpf_func_state *cur = cur_frame(env);
+	int insn_idx = cur->insn_idx;
+
+	while ((cur = cur->parent) != NULL)
+		if (cur->insn_idx == insn_idx)
+			return cur;
+	return NULL;
+}
+
+static int is_state_visited(struct bpf_verifier_env *env, int prev_insn_idx,
+			    int insn_idx)
 {
 	struct bpf_verifier_state_list *new_sl;
 	struct bpf_verifier_state_list *sl;
 	struct bpf_verifier_state *cur = env->cur_state, *new;
+	struct bpf_func_state *old;
 	int i, j, err;
 
 	sl = env->explored_states[insn_idx];
@@ -4300,6 +4189,14 @@ static int is_state_visited(struct bpf_verifier_env *env, int insn_idx)
 		 * be doing state search here
 		 */
 		return 0;
+
+	/* Check our parentage chain: have we looped? */
+	old = find_loop(env);
+	if (old != NULL) {
+		verbose(env, "back-edge from insn %d to %d\n", prev_insn_idx,
+			insn_idx);
+		return -EINVAL;
+	}
 
 	while (sl != STATE_LIST_MARK) {
 		if (states_equal(env, &sl->state, cur)) {
@@ -4342,7 +4239,7 @@ static int is_state_visited(struct bpf_verifier_env *env, int insn_idx)
 	}
 	new_sl->next = env->explored_states[insn_idx];
 	env->explored_states[insn_idx] = new_sl;
-	/* connect new state to parentage chain */
+	/* connect new state's regs to parentage chain */
 	for (i = 0; i < BPF_REG_FP; i++)
 		cur_regs(env)[i].parent = &new->frame[new->curframe]->regs[i];
 	/* clear write marks in current state: the writes we did are not writes
@@ -4359,6 +4256,7 @@ static int is_state_visited(struct bpf_verifier_env *env, int insn_idx)
 		struct bpf_func_state *frame = cur->frame[j];
 		struct bpf_func_state *newframe = new->frame[j];
 
+		frame->parent = newframe;
 		for (i = 0; i < frame->allocated_stack / BPF_REG_SIZE; i++) {
 			frame->stack[i].spilled_ptr.live = REG_LIVE_NONE;
 			frame->stack[i].spilled_ptr.parent =
@@ -4404,7 +4302,7 @@ static int do_check(struct bpf_verifier_env *env)
 		u8 class;
 		int err;
 
-		if (insn_idx >= insn_cnt) {
+		if (insn_idx < 0 || insn_idx >= insn_cnt) {
 			verbose(env, "invalid insn idx %d insn_cnt %d\n",
 				insn_idx, insn_cnt);
 			return -EFAULT;
@@ -4433,7 +4331,7 @@ static int do_check(struct bpf_verifier_env *env)
 		aux->subprogno = frame->subprogno;
 		aux->seen = true;
 
-		err = is_state_visited(env, insn_idx);
+		err = is_state_visited(env, prev_insn_idx, insn_idx);
 		if (err < 0)
 			return err;
 		if (err == 1) {
@@ -5581,7 +5479,7 @@ int bpf_check(struct bpf_prog **prog, union bpf_attr *attr)
 
 	env->allow_ptr_leaks = capable(CAP_SYS_ADMIN);
 
-	ret = check_cfg(env);
+	ret = prepare_cfg_marks(env);
 	if (ret < 0)
 		goto skip_full_check;
 

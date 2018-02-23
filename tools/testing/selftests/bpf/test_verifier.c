@@ -644,14 +644,13 @@ static struct bpf_test tests[] = {
 		.insns = {
 			BPF_ALU64_REG(BPF_MOV, BPF_REG_0, BPF_REG_2),
 		},
-		.errstr = "jump out of range",
+		.errstr = "no exit/jump at end of program",
 		.result = REJECT,
 	},
 	{
 		"loop (back-edge)",
 		.insns = {
 			BPF_JMP_IMM(BPF_JA, 0, 0, -1),
-			BPF_EXIT_INSN(),
 		},
 		.errstr = "back-edge",
 		.result = REJECT,
@@ -659,11 +658,11 @@ static struct bpf_test tests[] = {
 	{
 		"loop2 (back-edge)",
 		.insns = {
+			BPF_MOV64_IMM(BPF_REG_0, 0),
 			BPF_MOV64_REG(BPF_REG_1, BPF_REG_0),
 			BPF_MOV64_REG(BPF_REG_2, BPF_REG_0),
 			BPF_MOV64_REG(BPF_REG_3, BPF_REG_0),
 			BPF_JMP_IMM(BPF_JA, 0, 0, -4),
-			BPF_EXIT_INSN(),
 		},
 		.errstr = "back-edge",
 		.result = REJECT,
@@ -671,6 +670,7 @@ static struct bpf_test tests[] = {
 	{
 		"conditional loop",
 		.insns = {
+			BPF_MOV64_IMM(BPF_REG_0, 0),
 			BPF_MOV64_REG(BPF_REG_1, BPF_REG_0),
 			BPF_MOV64_REG(BPF_REG_2, BPF_REG_0),
 			BPF_MOV64_REG(BPF_REG_3, BPF_REG_0),
@@ -9378,7 +9378,7 @@ static struct bpf_test tests[] = {
 			BPF_EXIT_INSN(),
 		},
 		.prog_type = BPF_PROG_TYPE_TRACEPOINT,
-		.errstr = "back-edge from insn 0 to 0",
+		.errstr = "frames is too deep",
 		.result = REJECT,
 	},
 	{
@@ -9706,7 +9706,7 @@ static struct bpf_test tests[] = {
 			BPF_EXIT_INSN(),
 		},
 		.prog_type = BPF_PROG_TYPE_TRACEPOINT,
-		.errstr = "back-edge",
+		.errstr = "frames is too deep",
 		.result = REJECT,
 	},
 	{
@@ -9718,7 +9718,7 @@ static struct bpf_test tests[] = {
 			BPF_EXIT_INSN(),
 		},
 		.prog_type = BPF_PROG_TYPE_TRACEPOINT,
-		.errstr = "back-edge",
+		.errstr = "frames is too deep",
 		.result = REJECT,
 	},
 	{

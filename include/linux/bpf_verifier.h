@@ -120,6 +120,8 @@ struct bpf_func_state {
 	 * zero == main subprog
 	 */
 	u32 subprogno;
+	/* loop detection; points into an explored_state */
+	struct bpf_func_state *parent;
 
 	/* should be second to last. See copy_func_state() */
 	int allocated_stack;
