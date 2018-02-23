@@ -576,8 +576,8 @@ static int omap_dm_timer_set_load(struct omap_dm_timer *timer, int autoreload,
 }
 
 /* Optimized set_load which removes costly spin wait in timer_start */
-int omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
-                            unsigned int load)
+static int omap_dm_timer_set_load_start(struct omap_dm_timer *timer,
+					int autoreload, unsigned int load)
 {
 	u32 l;
 
@@ -623,6 +623,30 @@ static int omap_dm_timer_set_match(struct omap_dm_timer *timer, int enable,
 	/* Save the context */
 	timer->context.tclr = l;
 	timer->context.tmar = match;
+	omap_dm_timer_disable(timer);
+	return 0;
+}
+
+static int omap_dm_timer_set_capture(struct omap_dm_timer *timer,
+				     int captmode, int edges)
+{
+	u32 l;
+
+	if (unlikely(!timer))
+		return -EINVAL;
+
+	omap_dm_timer_enable(timer);
+	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
+	l &= ~(OMAP_TIMER_CTRL_CAPTMODE | OMAP_TIMER_CTRL_SCPWM |
+	       OMAP_TIMER_CTRL_PT | OMAP_TIMER_CTRL_TCM_BOTHEDGES);
+	l |= OMAP_TIMER_CTRL_GPOCFG;
+	if (captmode)
+		l |= OMAP_TIMER_CTRL_CAPTMODE;
+	l |= edges << 8;
+	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
+
+	/* Save the context */
+	timer->context.tclr = l;
 	omap_dm_timer_disable(timer);
 	return 0;
 }
@@ -785,6 +809,22 @@ int omap_dm_timers_active(void)
 	return 0;
 }
 
+static int omap_dm_timer_read_capture(struct omap_dm_timer *timer,
+					unsigned int *reg,
+					unsigned int *reg2)
+{
+	if (unlikely(!timer || pm_runtime_suspended(&timer->pdev->dev))) {
+		pr_err("%s: timer not available or enabled.\n", __func__);
+		return -EINVAL;
+	}
+
+	*reg = omap_dm_timer_read_reg(timer, OMAP_TIMER_CAPTURE_REG);
+	if (reg2)
+		*reg2 = omap_dm_timer_read_reg(timer, OMAP_TIMER_CAPTURE2_REG);
+
+	return 0;
+}
+
 static const struct of_device_id omap_timer_match[];
 
 /**
@@ -930,11 +970,14 @@ const static struct omap_dm_timer_ops dmtimer_ops = {
 	.start = omap_dm_timer_start,
 	.stop = omap_dm_timer_stop,
 	.set_load = omap_dm_timer_set_load,
+	.set_load_start = omap_dm_timer_set_load_start,
 	.set_match = omap_dm_timer_set_match,
+	.set_capture = omap_dm_timer_set_capture,
 	.set_pwm = omap_dm_timer_set_pwm,
 	.set_prescaler = omap_dm_timer_set_prescaler,
 	.read_counter = omap_dm_timer_read_counter,
 	.write_counter = omap_dm_timer_write_counter,
+	.read_capture = omap_dm_timer_read_capture,
 	.read_status = omap_dm_timer_read_status,
 	.write_status = omap_dm_timer_write_status,
 };

@@ -43,8 +43,12 @@ struct omap_dm_timer_ops {
 
 	int	(*set_load)(struct omap_dm_timer *timer, int autoreload,
 			    unsigned int value);
+	int	(*set_load_start)(struct omap_dm_timer *timer, int autoreload,
+				  unsigned int value);
 	int	(*set_match)(struct omap_dm_timer *timer, int enable,
 			     unsigned int match);
+	int	(*set_capture)(struct omap_dm_timer *timer, int captmode,
+			       int edges);
 	int	(*set_pwm)(struct omap_dm_timer *timer, int def_on,
 			   int toggle, int trigger);
 	int	(*set_prescaler)(struct omap_dm_timer *timer, int prescaler);
@@ -52,6 +56,10 @@ struct omap_dm_timer_ops {
 	unsigned int (*read_counter)(struct omap_dm_timer *timer);
 	int	(*write_counter)(struct omap_dm_timer *timer,
 				 unsigned int value);
+
+	int	(*read_capture)(struct omap_dm_timer *timer, unsigned int *reg,
+				unsigned int *reg2);
+
 	unsigned int (*read_status)(struct omap_dm_timer *timer);
 	int	(*write_status)(struct omap_dm_timer *timer,
 				unsigned int value);
