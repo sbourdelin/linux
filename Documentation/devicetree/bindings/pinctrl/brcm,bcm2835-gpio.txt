@@ -54,8 +54,11 @@ Optional subnode-properties:
   0: none
   1: down
   2: up
+- brcm,level: Integer, representing the value of output buffer to apply to the pin(s):
+  0: low
+  1: high
 
-Each of brcm,function and brcm,pull may contain either a single value which
+Each of brcm,function, brcm,pull and brcm,level may contain either a single value which
 will be applied to all pins in brcm,pins, or 1 value for each entry in
 brcm,pins.
 
