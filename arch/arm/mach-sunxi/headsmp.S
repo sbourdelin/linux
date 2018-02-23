@@ -70,4 +70,9 @@ ENTRY(sunxi_boot)
 	bl	sunxi_mc_smp_cluster_cache_enable
 	b	secondary_startup
 ENDPROC(sunxi_boot)
+
+ENTRY(sunxi_mc_smp_resume)
+	bl	sunxi_mc_smp_cluster_cache_enable
+	b	cpu_resume
+ENDPROC(sunxi_mc_smp_resume)
 #endif
