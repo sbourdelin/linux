@@ -9798,7 +9798,7 @@ static struct bpf_test tests[] = {
 			BPF_JMP_IMM(BPF_JEQ, BPF_REG_1, 0, -2),
 		},
 		.prog_type = BPF_PROG_TYPE_TRACEPOINT,
-		.errstr = "jump out of range from insn 5 to 6",
+		.errstr = "no exit/jump at end of program (insn 5)",
 		.result = REJECT,
 	},
 	{
