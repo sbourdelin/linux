@@ -37,8 +37,12 @@ static const char * const sun6i_board_dt_compat[] = {
 };
 
 extern void __init sun6i_reset_init(void);
+extern void sunxi_init_cntvoff(void);
+
 static void __init sun6i_timer_init(void)
 {
+	sunxi_init_cntvoff();
+
 	of_clk_init(NULL);
 	if (IS_ENABLED(CONFIG_RESET_CONTROLLER))
 		sun6i_reset_init();
