@@ -159,6 +159,8 @@
 		dcfg: dcfg@1ee0000 {
 			compatible = "fsl,ls1021a-dcfg", "syscon";
 			reg = <0x0 0x1ee0000 0x0 0x10000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
 			big-endian;
 		};
 
@@ -202,6 +204,8 @@
 		scfg: scfg@1570000 {
 			compatible = "fsl,ls1021a-scfg", "syscon";
 			reg = <0x0 0x1570000 0x0 0x10000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
 			big-endian;
 		};
 
