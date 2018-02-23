@@ -672,6 +672,7 @@ struct ib_ah *bnxt_re_create_ah(struct ib_pd *ib_pd,
 	struct bnxt_re_dev *rdev = pd->rdev;
 	struct bnxt_re_ah *ah;
 	const struct ib_global_route *grh = rdma_ah_read_grh(ah_attr);
+	struct bnxt_re_gid_ctx *ctx = NULL;
 	int rc;
 	u8 nw_type;
 
@@ -691,12 +692,14 @@ struct ib_ah *bnxt_re_create_ah(struct ib_pd *ib_pd,
 	/* Supply the configuration for the HW */
 	memcpy(ah->qplib_ah.dgid.data, grh->dgid.raw,
 	       sizeof(union ib_gid));
-	/*
-	 * If RoCE V2 is enabled, stack will have two entries for
-	 * each GID entry. Avoiding this duplicte entry in HW. Dividing
-	 * the GID index by 2 for RoCE V2
-	 */
-	ah->qplib_ah.sgid_index = grh->sgid_index / 2;
+
+	/* Get the driver GID context to retrieve the HW mapping index */
+	ctx = (struct bnxt_re_gid_ctx *)ib_get_gid_context_by_index
+	       (&rdev->ibdev, 1, grh->sgid_index);
+	if (!ctx)
+		return ERR_PTR(-EINVAL);
+
+	ah->qplib_ah.sgid_index = ctx->idx;
 	ah->qplib_ah.host_sgid_index = grh->sgid_index;
 	ah->qplib_ah.traffic_class = grh->traffic_class;
 	ah->qplib_ah.flow_label = grh->flow_label;
@@ -1607,6 +1610,7 @@ int bnxt_re_modify_qp(struct ib_qp *ib_qp, struct ib_qp_attr *qp_attr,
 	union ib_gid sgid;
 	struct ib_gid_attr sgid_attr;
 	u8 nw_type;
+	struct bnxt_re_gid_ctx *ctx = NULL;
 
 	qp->qplib_qp.modify_flags = 0;
 	if (qp_attr_mask & IB_QP_STATE) {
@@ -1678,11 +1682,14 @@ int bnxt_re_modify_qp(struct ib_qp *ib_qp, struct ib_qp_attr *qp_attr,
 		memcpy(qp->qplib_qp.ah.dgid.data, grh->dgid.raw,
 		       sizeof(qp->qplib_qp.ah.dgid.data));
 		qp->qplib_qp.ah.flow_label = grh->flow_label;
-		/* If RoCE V2 is enabled, stack will have two entries for
-		 * each GID entry. Avoiding this duplicte entry in HW. Dividing
-		 * the GID index by 2 for RoCE V2
-		 */
-		qp->qplib_qp.ah.sgid_index = grh->sgid_index / 2;
+
+		/* Get the driver GID context to retrieve HW mapping index */
+		ctx = (struct bnxt_re_gid_ctx *)ib_get_gid_context_by_index
+		       (&rdev->ibdev, 1, grh->sgid_index);
+		if (!ctx)
+			return -EINVAL;
+
+		qp->qplib_qp.ah.sgid_index = ctx->idx;
 		qp->qplib_qp.ah.host_sgid_index = grh->sgid_index;
 		qp->qplib_qp.ah.hop_limit = grh->hop_limit;
 		qp->qplib_qp.ah.traffic_class = grh->traffic_class;
