@@ -107,8 +107,10 @@ struct bpf_stack_state {
  */
 struct bpf_func_state {
 	struct bpf_reg_state regs[MAX_BPF_REG];
-	/* index of call instruction that called into this func */
-	int callsite;
+	/* index of last instruction processed in this func.  In frames other
+	 * than innermost, will be call insn
+	 */
+	int insn_idx;
 	/* stack frame number of this function state from pov of
 	 * enclosing bpf_verifier_state.
 	 * 0 = main function, 1 = first callee.

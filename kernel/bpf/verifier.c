@@ -267,7 +267,7 @@ static void print_verifier_state(struct bpf_verifier_env *env,
 			/* reg->off should be 0 for SCALAR_VALUE */
 			verbose(env, "%lld", reg->var_off.value + reg->off);
 			if (t == PTR_TO_STACK)
-				verbose(env, ",call_%d", func(env, reg)->callsite);
+				verbose(env, ",frame_%u", reg->frameno);
 		} else {
 			verbose(env, "(id=%d", reg->id);
 			if (t != SCALAR_VALUE)
@@ -711,12 +711,11 @@ static void init_reg_state(struct bpf_verifier_env *env,
 	mark_reg_known_zero(env, regs, BPF_REG_1);
 }
 
-#define BPF_MAIN_FUNC (-1)
 static void init_func_state(struct bpf_verifier_env *env,
 			    struct bpf_func_state *state,
-			    int callsite, int frameno, int subprogno)
+			    int entry, int frameno, int subprogno)
 {
-	state->callsite = callsite;
+	state->insn_idx = entry;
 	state->frameno = frameno;
 	state->subprogno = subprogno;
 	init_reg_state(env, state);
@@ -2095,8 +2094,7 @@ static int check_func_call(struct bpf_verifier_env *env, struct bpf_insn *insn,
 	 * callee can read/write into caller's stack
 	 */
 	init_func_state(env, callee,
-			/* remember the callsite, it will be used by bpf_exit */
-			*insn_idx /* callsite */,
+			target /* entry point */,
 			state->curframe + 1 /* frameno within this callchain */,
 			subprog /* subprog number within this prog */);
 
@@ -2151,7 +2149,7 @@ static int prepare_func_exit(struct bpf_verifier_env *env, int *insn_idx)
 	/* return to the caller whatever r0 had in the callee */
 	caller->regs[BPF_REG_0] = *r0;
 
-	*insn_idx = callee->callsite + 1;
+	*insn_idx = caller->insn_idx + 1;
 	if (env->log.level) {
 		verbose(env, "returning from callee:\n");
 		print_verifier_state(env, callee);
@@ -4232,7 +4230,7 @@ static bool states_equal(struct bpf_verifier_env *env,
 	 * and all frame states need to be equivalent
 	 */
 	for (i = 0; i <= old->curframe; i++) {
-		if (old->frame[i]->callsite != cur->frame[i]->callsite)
+		if (old->frame[i]->insn_idx != cur->frame[i]->insn_idx)
 			return false;
 		if (!func_states_equal(old->frame[i], cur->frame[i]))
 			return false;
@@ -4327,7 +4325,7 @@ static int is_state_visited(struct bpf_verifier_env *env, int insn_idx)
 	 * technically the current state is not proven to be safe yet,
 	 * but it will either reach outer most bpf_exit (which means it's safe)
 	 * or it will be rejected. Since there are no loops, we won't be
-	 * seeing this tuple (frame[0].callsite, frame[1].callsite, .. insn_idx)
+	 * seeing this tuple (frame[0].insn_idx, frame[1].insn_idx, .. insn_idx)
 	 * again on the way to bpf_exit
 	 */
 	new_sl = kzalloc(sizeof(struct bpf_verifier_state_list), GFP_KERNEL);
@@ -4394,11 +4392,11 @@ static int do_check(struct bpf_verifier_env *env)
 	mainprogno = add_subprog(env, 0);
 	if (mainprogno < 0)
 		return mainprogno;
+	insn_idx = 0;
 	init_func_state(env, state->frame[0],
-			BPF_MAIN_FUNC /* callsite */,
+			insn_idx /* entry point */,
 			0 /* frameno */,
 			mainprogno /* subprogno */);
-	insn_idx = 0;
 	for (;;) {
 		struct bpf_insn_aux_data *aux = &env->insn_aux_data[insn_idx];
 		struct bpf_func_state *frame = cur_frame(env);
@@ -4411,6 +4409,8 @@ static int do_check(struct bpf_verifier_env *env)
 				insn_idx, insn_cnt);
 			return -EFAULT;
 		}
+
+		frame->insn_idx = insn_idx;
 
 		insn = &insns[insn_idx];
 		class = BPF_CLASS(insn->code);
