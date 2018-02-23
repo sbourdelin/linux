@@ -63,7 +63,8 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec, unsigned long ad
 	return ftrace_modify_code(ip, old, new);
 }
 
-int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+int ftrace_make_call(struct module *mod, struct dyn_ftrace *rec,
+		     unsigned long addr)
 {
 	unsigned long ip = rec->ip;
 	u32 old, new;

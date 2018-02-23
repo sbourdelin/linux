@@ -437,7 +437,8 @@ __ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
 #endif /* CONFIG_PPC64 */
 #endif /* CONFIG_MODULES */
 
-int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+int ftrace_make_call(struct module *mod, struct dyn_ftrace *rec,
+		     unsigned long addr)
 {
 	unsigned long ip = rec->ip;
 	unsigned int old, new;

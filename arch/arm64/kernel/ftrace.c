@@ -68,7 +68,8 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
 /*
  * Turn on the call to ftrace_caller() in instrumented function
  */
-int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+int ftrace_make_call(struct module *mod, struct dyn_ftrace *rec,
+		     unsigned long addr)
 {
 	unsigned long pc = rec->ip;
 	u32 old, new;

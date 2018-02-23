@@ -536,6 +536,7 @@ extern int ftrace_make_nop(struct module *mod,
 
 /**
  * ftrace_make_call - convert a nop call site into a call to addr
+ * @mod: module structure if called by module load initialization
  * @rec: the mcount call site record
  * @addr: the address that the call site should call
  *
@@ -554,7 +555,8 @@ extern int ftrace_make_nop(struct module *mod,
  *  -EPERM  on error writing to the location
  * Any other value will be considered a failure.
  */
-extern int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr);
+extern int ftrace_make_call(struct module *mod, struct dyn_ftrace *rec,
+			    unsigned long addr);
 
 #ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
 /**

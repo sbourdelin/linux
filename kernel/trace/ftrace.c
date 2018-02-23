@@ -2421,7 +2421,7 @@ unsigned long ftrace_get_addr_curr(struct dyn_ftrace *rec)
 }
 
 static int
-__ftrace_replace_code(struct dyn_ftrace *rec, int enable)
+__ftrace_replace_code(struct module *mod, struct dyn_ftrace *rec, int enable)
 {
 	unsigned long ftrace_old_addr;
 	unsigned long ftrace_addr;
@@ -2442,7 +2442,7 @@ __ftrace_replace_code(struct dyn_ftrace *rec, int enable)
 
 	case FTRACE_UPDATE_MAKE_CALL:
 		ftrace_bug_type = FTRACE_BUG_CALL;
-		return ftrace_make_call(rec, ftrace_addr);
+		return ftrace_make_call(mod, rec, ftrace_addr);
 
 	case FTRACE_UPDATE_MAKE_NOP:
 		ftrace_bug_type = FTRACE_BUG_NOP;
@@ -2470,7 +2470,7 @@ void __weak ftrace_replace_code(int enable)
 		if (rec->flags & FTRACE_FL_DISABLED)
 			continue;
 
-		failed = __ftrace_replace_code(rec, enable);
+		failed = __ftrace_replace_code(NULL, rec, enable);
 		if (failed) {
 			ftrace_bug(failed, rec);
 			/* Stop processing */

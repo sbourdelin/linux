@@ -162,7 +162,8 @@ int ftrace_update_ftrace_func(ftrace_func_t func)
 	return ret;
 }
 
-int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+int ftrace_make_call(struct module *mod, struct dyn_ftrace *rec,
+		     unsigned long addr)
 {
 	unsigned long new, old;
 	unsigned long ip = rec->ip;

@@ -162,7 +162,8 @@ int ftrace_make_nop(struct module *mod,
 	return -EINVAL;
 }
 
-int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+int ftrace_make_call(struct module *mod, struct dyn_ftrace *rec,
+		     unsigned long addr)
 {
 	unsigned const char *new, *old;
 	unsigned long ip = rec->ip;
