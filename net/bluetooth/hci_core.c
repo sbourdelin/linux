@@ -322,6 +322,10 @@ static void le_setup(struct hci_request *req)
 	/* LE-only controllers have LE implicitly enabled */
 	if (!lmp_bredr_capable(hdev))
 		hci_dev_set_flag(hdev, HCI_LE_ENABLED);
+
+	/* Set PHY to 1M for TX and RX */
+	hci_dev_set_flag(hdev, HCI_LE_PHY_1M_TX);
+	hci_dev_set_flag(hdev, HCI_LE_PHY_1M_RX);
 }
 
 static void hci_setup_event_mask(struct hci_request *req)
