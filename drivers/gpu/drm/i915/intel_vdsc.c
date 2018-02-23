@@ -48,6 +48,9 @@ enum COLUMN_INDEX_BPC {
 	MAX_COLUMN_INDEX
 };
 
+#define SWAP_TWO_BYTES(x) (unsigned short)(((x >> 8) & 0xFF) | \
+						((x << 8) & 0xFF00))
+
 #define TWOS_COMPLEMENT(x) (unsigned char)((~(x) + 1) & 0x3F)
 
 /* From DSC_v1.11 spec, rc_parameter_Set syntax element typically constant */
@@ -559,4 +562,208 @@ void intel_dp_compute_dsc_parameters(struct intel_dp *intel_dp)
 
 	intel_compute_rc_parameters(intel_dp);
 
+}
+
+void populate_pps_sdp_for_sink(struct intel_encoder *encoder,
+				struct intel_crtc_state *crtc_state,
+				struct picture_parameters_set *pps_params)
+{
+	struct intel_dp *intel_dp = enc_to_intel_dp(&encoder->base);
+	struct vdsc_config *vdsc_cfg  =  &(intel_dp->compr_params.dsc_cfg);
+	unsigned long rc_range_parameters[NUM_BUF_RANGES];
+	unsigned char i = 0;
+
+	/* PPS0 */
+	pps_params->major = (unsigned char)vdsc_cfg->dsc_version_major;
+	pps_params->minor = (unsigned char)vdsc_cfg->dsc_version_minor;
+
+	/* PPS1, PPS2 */
+	pps_params->picture_params_set_identifier = 0;
+
+	/* PPS3 */
+	pps_params->line_buffer_depth = (unsigned char)vdsc_cfg->line_buf_depth;
+	pps_params->bits_per_component =
+				(unsigned char)vdsc_cfg->bits_per_component;
+
+	/* PPS4,5 */
+	pps_params->block_prediction_enable =
+				(unsigned short)vdsc_cfg->block_pred_enable;
+	pps_params->convert_RGB = (unsigned short)vdsc_cfg->convert_rgb;
+	pps_params->enable422 = (unsigned short)vdsc_cfg->enable422;
+	pps_params->vbr_mode = (unsigned short)vdsc_cfg->vbr_enable;
+	pps_params->bpp_low = (unsigned short)(
+				(vdsc_cfg->bits_per_pixel >> 8) & 0x3);
+	pps_params->bpp_high = (unsigned short)(vdsc_cfg->bits_per_pixel &
+									0xFF);
+
+	/* The PPS structure is stored as per our hardware registers which
+	 * are in little endian. When a value is assigned to a variable,
+	 * Intel systems stores data in little endian.
+	 * For e.g UINT16 a = 0x1234;
+	 * 0x34 is stored at lower address followed by 0x12.
+	 * Though, PPS packet to the panel must have big endian format for
+	 * data spanning 2 bytes. According to that logic, swap the
+	 * fields of the PPS packets that span more than one byte.
+	 */
+
+	/* PPS6,7 */
+	pps_params->picture_height = SWAP_TWO_BYTES(vdsc_cfg->pic_height);
+
+	/* PPS8,9 */
+	pps_params->picture_width = SWAP_TWO_BYTES(vdsc_cfg->pic_width);
+
+	/* PPS10,11 */
+	pps_params->slice_height = SWAP_TWO_BYTES(vdsc_cfg->slice_height);
+
+	/* PPS12,13 */
+	pps_params->slice_width = SWAP_TWO_BYTES(vdsc_cfg->slice_width);
+
+	/* PPS14,15 */
+	pps_params->chunk_size = SWAP_TWO_BYTES(vdsc_cfg->chunk_size);
+
+	/* PPS15,16 */
+	pps_params->transmission_delay_low = (unsigned short)
+					((vdsc_cfg->initial_xmit_delay >> 8) &
+					0x3); //[9:8]
+	pps_params->transmission_delay_high = (unsigned short)
+					(vdsc_cfg->initial_xmit_delay & 0xFF);
+
+	/* PPS18,19 */
+	pps_params->initial_decode_delay =
+			SWAP_TWO_BYTES(vdsc_cfg->initial_dec_delay);
+
+	/* PPS20,21 */
+	pps_params->initial_scale =
+				(unsigned short)vdsc_cfg->initial_scale_value;
+
+	/* PPS22,23 */
+	pps_params->scale_increment_interval =
+			SWAP_TWO_BYTES(vdsc_cfg->scale_increment_interval);
+
+	/* PPS24,25 */
+	pps_params->scale_decrement_low = (unsigned short)(
+			(vdsc_cfg->scale_decrement_interval >> 8) & 0xF);
+	pps_params->scale_decrement_high = (unsigned short)(
+				vdsc_cfg->scale_decrement_interval & 0xFF);
+
+	/* PPS26,27 */
+	pps_params->bpg_offset = (unsigned short)vdsc_cfg->first_line_bpg_Ofs;
+
+	/* PPS28,29 */
+	pps_params->nfl_bpg_offset = SWAP_TWO_BYTES(vdsc_cfg->nfl_bpg_offset);
+
+	/* PPS30,31 */
+	pps_params->slice_bpg_offset =
+				SWAP_TWO_BYTES(vdsc_cfg->slice_bpg_offset);
+
+	/* PPS32,33 */
+	pps_params->initial_offset = SWAP_TWO_BYTES(vdsc_cfg->initial_offset);
+
+	/* PPS34,35 */
+	pps_params->final_offset = SWAP_TWO_BYTES(vdsc_cfg->final_offset);
+
+	/* PPS36 */
+	pps_params->flatness_min_qp = (unsigned char)vdsc_cfg->flatness_minQp;
+
+	/* PPS37 */
+	pps_params->flatness_max_qp = (unsigned char)vdsc_cfg->flatness_maxQp;
+
+	/* PPS38,39 */
+	pps_params->rc_model_size = SWAP_TWO_BYTES(vdsc_cfg->rc_model_size);
+
+	/* PPS40 */
+	pps_params->edge_factor = (unsigned char)vdsc_cfg->rc_edge_factor;
+
+	/* PPS41 */
+	pps_params->incr_limit0 = (unsigned char)vdsc_cfg->rc_quant_incr_limit0;
+
+	/* PPS42 */
+	pps_params->incr_limit1 = (unsigned char)vdsc_cfg->rc_quant_incr_limit1;
+
+	/* PPS43 */
+	pps_params->low = (unsigned char)vdsc_cfg->rc_tgt_offset_low;
+	pps_params->high = (unsigned char)vdsc_cfg->rc_tgt_offset_high;
+
+	/* PPS44 to PPS57 */
+	pps_params->rc_buffer_threshold0 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[0];
+	pps_params->rc_buffer_threshold1 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[1];
+	pps_params->rc_buffer_threshold2 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[2];
+	pps_params->rc_buffer_threshold3 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[3];
+	pps_params->rc_buffer_threshold4 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[4];
+	pps_params->rc_buffer_threshold5 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[5];
+	pps_params->rc_buffer_threshold6 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[6];
+	pps_params->rc_buffer_threshold7 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[7];
+	pps_params->rc_buffer_threshold8 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[8];
+	pps_params->rc_buffer_threshold9 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[9];
+	pps_params->rc_buffer_threshold10 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[10];
+	pps_params->rc_buffer_threshold11 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[11];
+	pps_params->rc_buffer_threshold12 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[12];
+	pps_params->rc_buffer_threshold13 =
+				(unsigned char)vdsc_cfg->rc_buf_thresh[13];
+
+	/*
+	 * For each RC range parameter, we need to do below steps:
+	 * For source programming the order is
+	 * ((offset << 10) | (max << 5) | min))
+	 * For sink programming the order is
+	 * ((min << 11) | (max << 6) | offset))
+	 */
+	for (i = 0; i < NUM_BUF_RANGES; i++) {
+		rc_range_parameters[i] = (unsigned short)(
+		(vdsc_cfg->rc_range_params[i].range_min_qp << 11) |
+		(vdsc_cfg->rc_range_params[i].range_max_qp << 6) |
+		(vdsc_cfg->rc_range_params[i].range_bpg_offset));
+	}
+
+	/*
+	 * Also while sending to the sink, we need to send in big endian order
+	 * So, swap the two bytes of data after above operations.
+	 * NOTE: The order of the min,max and offset field is not explicitly
+	 * called out in DSC spec yet. We are following this order based on
+	 * the VESA C Model implementation and the expectations from panel
+	 * and Pipe 2D model.
+	 */
+	pps_params->rc_range_parameter0 =
+					SWAP_TWO_BYTES(rc_range_parameters[0]);
+	pps_params->rc_range_parameter1 =
+					SWAP_TWO_BYTES(rc_range_parameters[1]);
+	pps_params->rc_range_parameter2 =
+					SWAP_TWO_BYTES(rc_range_parameters[2]);
+	pps_params->rc_range_parameter3 =
+					SWAP_TWO_BYTES(rc_range_parameters[3]);
+	pps_params->rc_range_parameter4 =
+					SWAP_TWO_BYTES(rc_range_parameters[4]);
+	pps_params->rc_range_parameter5 =
+					SWAP_TWO_BYTES(rc_range_parameters[5]);
+	pps_params->rc_range_parameter6 =
+					SWAP_TWO_BYTES(rc_range_parameters[6]);
+	pps_params->rc_range_parameter7 =
+					SWAP_TWO_BYTES(rc_range_parameters[7]);
+	pps_params->rc_range_parameter8 =
+					SWAP_TWO_BYTES(rc_range_parameters[8]);
+	pps_params->rc_range_parameter9 =
+					SWAP_TWO_BYTES(rc_range_parameters[9]);
+	pps_params->rc_range_parameter10 =
+					SWAP_TWO_BYTES(rc_range_parameters[10]);
+	pps_params->rc_range_parameter11 =
+					SWAP_TWO_BYTES(rc_range_parameters[11]);
+	pps_params->rc_range_parameter12 =
+					SWAP_TWO_BYTES(rc_range_parameters[12]);
+	pps_params->rc_range_parameter13 =
+					SWAP_TWO_BYTES(rc_range_parameters[13]);
+	pps_params->rc_range_parameter14 =
+					SWAP_TWO_BYTES(rc_range_parameters[14]);
 }
