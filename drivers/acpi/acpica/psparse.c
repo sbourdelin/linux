@@ -694,6 +694,8 @@ acpi_status acpi_ps_parse_aml(struct acpi_walk_state *walk_state)
 		}
 
 		acpi_ds_delete_walk_state(previous_walk_state);
+
+		cond_resched();
 	}
 
 	/* Normal exit */
