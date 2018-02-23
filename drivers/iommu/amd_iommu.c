@@ -3588,6 +3588,30 @@ static void set_dte_irq_entry(u16 devid, struct irq_remap_table *table)
 	amd_iommu_dev_table[devid].data[2] = dte;
 }
 
+static struct irq_remap_table *alloc_irq_table(void)
+{
+	struct irq_remap_table *table;
+
+	table = kzalloc(sizeof(*table), GFP_ATOMIC);
+	if (!table)
+		return NULL;
+
+	table->table = kmem_cache_alloc(amd_iommu_irq_cache, GFP_KERNEL);
+	if (!table->table) {
+		kfree(table);
+		return NULL;
+	}
+	spin_lock_init(&table->lock);
+
+	if (!AMD_IOMMU_GUEST_IR_GA(amd_iommu_guest_ir))
+		memset(table->table, 0,
+		       MAX_IRQS_PER_TABLE * sizeof(u32));
+	else
+		memset(table->table, 0,
+		       (MAX_IRQS_PER_TABLE * (sizeof(u64) * 2)));
+	return table;
+}
+
 static void set_remap_table_entry(struct amd_iommu *iommu, u16 devid,
 				  struct irq_remap_table *table)
 {
@@ -3599,6 +3623,7 @@ static void set_remap_table_entry(struct amd_iommu *iommu, u16 devid,
 static struct irq_remap_table *get_irq_table(u16 devid)
 {
 	struct irq_remap_table *table = NULL;
+	struct irq_remap_table *new_table = NULL;
 	struct amd_iommu *iommu;
 	unsigned long flags;
 	u16 alias;
@@ -3617,42 +3642,44 @@ static struct irq_remap_table *get_irq_table(u16 devid)
 	table = irq_lookup_table[alias];
 	if (table) {
 		set_remap_table_entry(iommu, devid, table);
-		goto out;
+		goto out_wait;
 	}
+	raw_spin_unlock_irqrestore(&iommu_table_lock, flags);
 
 	/* Nothing there yet, allocate new irq remapping table */
-	table = kzalloc(sizeof(*table), GFP_ATOMIC);
-	if (!table)
+	new_table = alloc_irq_table();
+	if (!new_table)
+		return NULL;
+
+	raw_spin_lock_irqsave(&iommu_table_lock, flags);
+
+	table = irq_lookup_table[devid];
+	if (table)
 		goto out_unlock;
 
-	/* Initialize table spin-lock */
-	spin_lock_init(&table->lock);
-
-	table->table = kmem_cache_alloc(amd_iommu_irq_cache, GFP_ATOMIC);
-	if (!table->table) {
-		kfree(table);
-		table = NULL;
-		goto out_unlock;
+	table = irq_lookup_table[alias];
+	if (table) {
+		set_remap_table_entry(iommu, devid, table);
+		goto out_wait;
 	}
 
-	if (!AMD_IOMMU_GUEST_IR_GA(amd_iommu_guest_ir))
-		memset(table->table, 0,
-		       MAX_IRQS_PER_TABLE * sizeof(u32));
-	else
-		memset(table->table, 0,
-		       (MAX_IRQS_PER_TABLE * (sizeof(u64) * 2)));
-
+	table = new_table;
+	new_table = NULL;
 
 	set_remap_table_entry(iommu, devid, table);
 	if (devid != alias)
 		set_remap_table_entry(iommu, alias, table);
 
-out:
+out_wait:
 	iommu_completion_wait(iommu);
 
 out_unlock:
 	raw_spin_unlock_irqrestore(&iommu_table_lock, flags);
 
+	if (new_table) {
+		kmem_cache_free(amd_iommu_irq_cache, new_table->table);
+		kfree(new_table);
+	}
 	return table;
 }
 
