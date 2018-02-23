@@ -782,6 +782,131 @@ struct i915_psr {
 	void (*setup_vsc)(struct intel_dp *, const struct intel_crtc_state *);
 };
 
+/* DSC Configuration structure */
+#define NUM_BUF_RANGES		15
+
+/* Configuration for a single Rate Control model range */
+struct rc_range_parameters {
+	/* Min Quantization Parameters allowed for this range */
+	unsigned long range_min_qp;
+	/* Max Quantization Parameters allowed for this range */
+	unsigned long range_max_qp;
+	/* Bits/group offset to apply to target for this group */
+	unsigned long range_bpg_offset;
+};
+
+struct vdsc_config {
+	/* Bits / component for previous reconstructed line buffer */
+	unsigned long line_buf_depth;
+	/*
+	 * Rate control buffer size (in bits); not in PPS,
+	 * used only in C model for checking overflow
+	 */
+	unsigned long rc_bits;
+	/* Bits per component to code (must be 8, 10, or 12) */
+	unsigned long bits_per_component;
+	/*
+	 * Flag indicating to do RGB - YCoCg conversion
+	 * and back (should be 1 for RGB input)
+	 */
+	bool convert_rgb;
+	unsigned long slice_count;
+	/* Slice Width */
+	unsigned long slice_width;
+	/* Slice Height */
+	unsigned long slice_height;
+	/*
+	 * 4:2:2 enable mode (from PPS, 4:2:2 conversion happens
+	 * outside of DSC encode/decode algorithm)
+	 */
+	bool enable422;
+	/* Picture Width */
+	unsigned long pic_width;
+	/* Picture Height */
+	unsigned long pic_height;
+	/* Offset to bits/group used by RC to determine QP adjustment */
+	unsigned long rc_tgt_offset_high;
+	/* Offset to bits/group used by RC to determine QP adjustment */
+	unsigned long rc_tgt_offset_low;
+	/* Bits/pixel target << 4 (ie., 4 fractional bits) */
+	unsigned long bits_per_pixel;
+	/*
+	 * Factor to determine if an edge is present based
+	 * on the bits produced
+	 */
+	unsigned long rc_edge_factor;
+	/* Slow down incrementing once the range reaches this value */
+	unsigned long rc_quant_incr_limit1;
+	/* Slow down incrementing once the range reaches this value */
+	unsigned long rc_quant_incr_limit0;
+	/* Number of pixels to delay the initial transmission */
+	unsigned long initial_xmit_delay;
+	/* Number of pixels to delay the VLD on the decoder,not including SSM */
+	unsigned long  initial_dec_delay;
+	/* Block prediction range (in pixels) */
+	bool block_pred_enable;
+	/* Bits/group offset to use for first line of the slice */
+	unsigned long first_line_bpg_Ofs;
+	/* Value to use for RC model offset at slice start */
+	unsigned long initial_offset;
+	/* X position in the picture of top-left corner of slice */
+	unsigned long x_start;
+	/* Y position in the picture of top-left corner of slice */
+	unsigned long y_start;
+	/* Thresholds defining each of the buffer ranges */
+	unsigned long rc_buf_thresh[NUM_BUF_RANGES - 1];
+	/* Parameters for each of the RC ranges */
+	struct rc_range_parameters rc_range_params[NUM_BUF_RANGES];
+	/* Total size of RC model */
+	unsigned long rc_model_size;
+	/* Minimum QP where flatness information is sent */
+	unsigned long flatness_minQp;
+	/* Maximum QP where flatness information is sent */
+	unsigned long flatness_maxQp;
+	/*
+	 * MAX-MIN for all components is required to
+	 * be <= this value for flatness to be used
+	 */
+	unsigned long flatness_det_thresh;
+	/* Initial value for scale factor */
+	unsigned long initial_scale_value;
+	/* Decrement scale factor every scale_decrement_interval groups */
+	unsigned long scale_decrement_interval;
+	/* Increment scale factor every scale_increment_interval groups */
+	unsigned long scale_increment_interval;
+	/* Non-first line BPG offset to use */
+	unsigned long nfl_bpg_offset;
+	/* BPG offset used to enforce slice bit */
+	unsigned long slice_bpg_offset;
+	/* Final RC linear transformation offset value */
+	unsigned long final_offset;
+	/* Enable on-off VBR (ie., disable stuffing bits) */
+	bool vbr_enable;
+	/* Mux word size (in bits) for SSM mode */
+	unsigned long mux_word_size;
+	/*
+	 * The (max) size in bytes of the "chunks" that are
+	 * used in slice multiplexing
+	 */
+	unsigned long chunk_size;
+	/* Placeholder for PPS identifier */
+	unsigned long pps_identifier;
+	/* DSC Minor Version */
+	unsigned long dsc_version_minor;
+	/* DSC Major version */
+	unsigned long dsc_version_major;
+	/* Number of VDSC engines */
+	unsigned long num_vdsc_instances;
+};
+
+/* Compression caps stored in encoder */
+struct i915_compression_params {
+	bool compression_support;
+	unsigned long compression_bpp;
+	struct vdsc_config dsc_cfg;
+	unsigned char slice_count;
+};
+
 enum intel_pch {
 	PCH_NONE = 0,	/* No PCH present */
 	PCH_IBX,	/* Ibexpeak PCH */

@@ -1040,6 +1040,63 @@ struct intel_dp_compliance {
 	u8 test_lane_count;
 };
 
+/* Vesa Display Stream Capability of DP Sink */
+struct dp_sink_dsc_caps {
+	/* Display Stream Compression Support */
+	bool is_dsc_supported;
+	u8 dsc_major_ver;
+	u8 dsc_minor_ver;
+	u16 rcbuffer_blocksize;
+	/* n+1 value */
+	u16 rcbuffer_size_in_blocks;
+	unsigned long rcbuffer_size;
+
+	union {
+		u8 slice_caps;
+		struct {
+			u8 one_slice_per_line_support : 1;
+			u8 two_slice_per_line_support : 1;
+			u8 slice_caps_reserved1 : 1;
+			u8 four_slice_per_line_support : 1;
+			u8 slice_caps_reserved2 : 4;
+		};
+	};
+	/* Decode line buffer bits of precision */
+	unsigned long line_buffer_bit_depth;
+	bool is_block_pred_supported;
+	unsigned long sink_support_max_bpp;
+
+	union {
+		u8 color_format_caps;
+		struct {
+			u8 RGB_support : 1;
+			u8 YCbCr444_support : 1;
+			u8 YCbCr422_support : 1;
+			u8 color_format_caps_reserved : 5;
+		};
+	};
+
+	union {
+		u8 color_depth_caps;
+		struct {
+			u8 color_depth_caps_reserved1 : 1;
+			u8 support_8bpc : 1;
+			u8 support_10bpc : 1;
+			u8 support_12bpc : 1;
+			u8 color_depth_caps_reserved2 : 4;
+		};
+	};
+
+	u16 slice_height;
+	u16 slice_width;
+	/* Y Resolution */
+	u16 pic_height;
+	/* X Resolution */
+	u16 pic_width;
+};
+
+
+
 struct intel_dp {
 	i915_reg_t output_reg;
 	i915_reg_t aux_ch_ctl_reg;
@@ -1057,6 +1114,8 @@ struct intel_dp {
 	uint8_t psr_dpcd[EDP_PSR_RECEIVER_CAP_SIZE];
 	uint8_t downstream_ports[DP_MAX_DOWNSTREAM_PORTS];
 	uint8_t edp_dpcd[EDP_DISPLAY_CTL_CAP_SIZE];
+	uint8_t dsc_dpcd[DP_DSC_RECEIVER_CAP_SIZE];
+	uint8_t fec_dpcd;
 	/* source rates */
 	int num_source_rates;
 	const int *source_rates;
@@ -1132,6 +1191,9 @@ struct intel_dp {
 
 	/* Displayport compliance testing */
 	struct intel_dp_compliance compliance;
+
+	/* For Vesa Display Stream Compression Support */
+	struct i915_compression_params compr_params;
 };
 
 struct intel_lspcon {
