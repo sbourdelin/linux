@@ -2562,6 +2562,20 @@ static bool downstream_hpd_needs_d0(struct intel_dp *intel_dp)
 		intel_dp->downstream_ports[0] & DP_DS_PORT_HPD;
 }
 
+void intel_dp_sink_set_decompression_state(struct intel_dp *intel_dp,
+							int decomp_state)
+{
+	int ret;
+
+	if (!intel_dp->compr_params.compression_support)
+		return;
+
+	ret = drm_dp_dpcd_writeb(&intel_dp->aux, DP_DSC_ENABLE, decomp_state);
+	if (ret < 0)
+		DRM_ERROR("DCPD write fail offset:0x%x for decompr state:%d\n",
+						DP_DSC_ENABLE, decomp_state);
+}
+
 /* If the sink supports it, try to set the power state appropriately */
 void intel_dp_sink_dpms(struct intel_dp *intel_dp, int mode)
 {

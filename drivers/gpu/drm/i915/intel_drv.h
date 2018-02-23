@@ -1686,6 +1686,8 @@ int intel_dp_get_link_train_fallback_values(struct intel_dp *intel_dp,
 void intel_dp_start_link_train(struct intel_dp *intel_dp);
 void intel_dp_stop_link_train(struct intel_dp *intel_dp);
 void intel_dp_sink_dpms(struct intel_dp *intel_dp, int mode);
+void intel_dp_sink_set_decompression_state(struct intel_dp *intel_dp,
+							int decomp_state);
 void intel_dp_encoder_reset(struct drm_encoder *encoder);
 void intel_dp_encoder_suspend(struct intel_encoder *intel_encoder);
 void intel_dp_encoder_destroy(struct drm_encoder *encoder);

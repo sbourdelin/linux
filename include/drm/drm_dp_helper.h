@@ -449,6 +449,8 @@
 # define DP_AUX_FRAME_SYNC_VALID	    (1 << 0)
 
 #define DP_DSC_ENABLE                       0x160   /* DP 1.4 */
+#define DECOMPRESSION_ENABLE		    (1 << 0)
+#define DECOMPRESSION_DISABLE		    0
 
 #define DP_PSR_EN_CFG			    0x170   /* XXX 1.2? */
 # define DP_PSR_ENABLE			    (1 << 0)
