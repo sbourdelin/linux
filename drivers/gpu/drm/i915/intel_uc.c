@@ -63,6 +63,8 @@ static int __get_platform_enable_guc(struct drm_i915_private *dev_priv)
 		enable_guc |= ENABLE_GUC_LOAD_HUC;
 
 	/* Any platform specific fine-tuning can be done here */
+	if (boot_cpu_has(X86_FEATURE_HYPERVISOR))
+		enable_guc = 0;
 
 	return enable_guc;
 }
