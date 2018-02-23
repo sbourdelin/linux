@@ -1160,6 +1160,8 @@ void hci_conn_del_sysfs(struct hci_conn *conn);
 #define use_ext_scan(dev) (((dev)->commands[37] & 0x20) && \
 			   ((dev)->commands[37] & 0x40))
 
+#define use_ext_conn(dev) ((dev)->commands[37] & 0x80)
+
 /* ----- HCI protocols ----- */
 #define HCI_PROTO_DEFER             0x01
 

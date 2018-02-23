@@ -711,6 +711,12 @@ static int hci_init3_req(struct hci_request *req, unsigned long opt)
 		if (use_ext_scan(hdev))
 			events[1] |= 0x10;	/* LE Extended adv report */
 
+		/* If the controller supports the LE Extended connection
+		 *  enable the corresponding event.
+		 */
+		if (use_ext_conn(hdev))
+			events[1] |= 0x02;      /* LE Enhanced conn complete */
+
 		hci_req_add(req, HCI_OP_LE_SET_EVENT_MASK, sizeof(events),
 			    events);
 
