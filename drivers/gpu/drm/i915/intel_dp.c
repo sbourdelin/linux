@@ -6349,6 +6349,7 @@ static bool intel_edp_init_connector(struct intel_dp *intel_dp,
 	if (INTEL_GEN(dev_priv) >= 9) {
 		intel_dp_sink_get_dsc_capability(intel_dp, &sink_dp_dsc_caps);
 		intel_dp_get_compression_data(intel_dp, sink_dp_dsc_caps);
+		intel_dp_compute_dsc_parameters(intel_dp);
 	}
 
 	mutex_lock(&dev->mode_config.mutex);

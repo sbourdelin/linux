@@ -795,6 +795,17 @@ struct rc_range_parameters {
 	unsigned long range_bpg_offset;
 };
 
+struct rc_parameters {
+	unsigned long initial_xmit_delay;
+	unsigned long first_line_bpg_Ofs;
+	unsigned long initial_offset;
+	unsigned long flatness_minQp;
+	unsigned long flatness_maxQp;
+	unsigned long rc_quant_incr_limit0;
+	unsigned long rc_quant_incr_limit1;
+	struct rc_range_parameters rc_range_params[NUM_BUF_RANGES];
+};
+
 struct vdsc_config {
 	/* Bits / component for previous reconstructed line buffer */
 	unsigned long line_buf_depth;
@@ -3864,6 +3875,7 @@ extern void intel_init_pch_refclk(struct drm_i915_private *dev_priv);
 extern int intel_set_rps(struct drm_i915_private *dev_priv, u8 val);
 extern bool intel_set_memory_cxsr(struct drm_i915_private *dev_priv,
 				  bool enable);
+extern void intel_dp_compute_dsc_parameters(struct intel_dp *dp);
 
 int i915_reg_read_ioctl(struct drm_device *dev, void *data,
 			struct drm_file *file);
