@@ -9764,4 +9764,452 @@ enum skl_power_gate {
 						 _ICL_PHY_MISC_B)
 #define  ICL_PHY_MISC_DE_IO_COMP_PWR_DOWN	(1 << 23)
 
+/* VDSC  regs */
+
+#define DSS_CONTROL1				_MMIO(0x67400)
+#define JOINER_ENABLE				(1 << 30)
+#define SPLITTER_ENABLE				(1 << 31)
+
+#define DSS_CONTROL2				_MMIO(0x67404)
+#define LEFT_BRANCH_VDSC_ENABLE			(1 << 31)
+#define RIGHT_BRANCH_VDSC_ENABLE		(1 << 15)
+
+#define PIPE_DSS_CTL1_PB			_MMIO(0x78200)
+#define PIPE_DSS_CTL2_PB			_MMIO(0x78204)
+#define PIPE_DSS_CTL1_PC			_MMIO(0x78400)
+#define PIPE_DSS_CTL2_PC			_MMIO(0x78404)
+
+#define DSCA_PICTURE_PARAMETER_SET_0		_MMIO(0x6B200)
+#define DSCA_PICTURE_PARAMETER_SET_1		_MMIO(0x6B204)
+#define DSCA_PICTURE_PARAMETER_SET_2		_MMIO(0x6B208)
+#define DSCA_PICTURE_PARAMETER_SET_3		_MMIO(0x6B20C)
+#define DSCA_PICTURE_PARAMETER_SET_4		_MMIO(0x6B210)
+#define DSCA_PICTURE_PARAMETER_SET_5		_MMIO(0x6B214)
+#define DSCA_PICTURE_PARAMETER_SET_6		_MMIO(0x6B218)
+#define DSCA_PICTURE_PARAMETER_SET_7		_MMIO(0x6B21C)
+#define DSCA_PICTURE_PARAMETER_SET_8		_MMIO(0x6B220)
+#define DSCA_PICTURE_PARAMETER_SET_9		_MMIO(0x6B224)
+#define DSCA_PICTURE_PARAMETER_SET_10		_MMIO(0x6B228)
+#define DSCA_PICTURE_PARAMETER_SET_11		_MMIO(0x6B22C)
+#define DSCA_PICTURE_PARAMETER_SET_12		_MMIO(0x6B260)
+#define DSCA_PICTURE_PARAMETER_SET_13		_MMIO(0x6B264)
+#define DSCA_PICTURE_PARAMETER_SET_14		_MMIO(0x6B268)
+#define DSCA_PICTURE_PARAMETER_SET_15		_MMIO(0x6B26C)
+#define DSCA_PICTURE_PARAMETER_SET_16		_MMIO(0x6B270)
+
+#define DSCC_PICTURE_PARAMETER_SET_0		_MMIO(0x6BA00)
+#define DSCC_PICTURE_PARAMETER_SET_1		_MMIO(0x6BA04)
+#define DSCC_PICTURE_PARAMETER_SET_2		_MMIO(0x6BA08)
+#define DSCC_PICTURE_PARAMETER_SET_3		_MMIO(0x6BA0C)
+#define DSCC_PICTURE_PARAMETER_SET_4		_MMIO(0x6BA10)
+#define DSCC_PICTURE_PARAMETER_SET_5		_MMIO(0x6BA14)
+#define DSCC_PICTURE_PARAMETER_SET_6		_MMIO(0x6BA18)
+#define DSCC_PICTURE_PARAMETER_SET_7		_MMIO(0x6BA1C)
+#define DSCC_PICTURE_PARAMETER_SET_8		_MMIO(0x6BA20)
+#define DSCC_PICTURE_PARAMETER_SET_9		_MMIO(0x6BA24)
+#define DSCC_PICTURE_PARAMETER_SET_10		_MMIO(0x6BA28)
+#define DSCC_PICTURE_PARAMETER_SET_11		_MMIO(0x6BA2C)
+#define DSCC_PICTURE_PARAMETER_SET_12		_MMIO(0x6BA60)
+#define DSCC_PICTURE_PARAMETER_SET_13		_MMIO(0x6BA64)
+#define DSCC_PICTURE_PARAMETER_SET_14		_MMIO(0x6BA68)
+#define DSCC_PICTURE_PARAMETER_SET_15		_MMIO(0x6BA6C)
+#define DSCC_PICTURE_PARAMETER_SET_16		_MMIO(0x6BA70)
+
+#define DSC0_PICTURE_PARAMETER_SET_0_PB		_MMIO(0x78270)
+#define DSC0_PICTURE_PARAMETER_SET_1_PB		_MMIO(0x78274)
+#define DSC0_PICTURE_PARAMETER_SET_2_PB		_MMIO(0x78278)
+#define DSC0_PICTURE_PARAMETER_SET_3_PB		_MMIO(0x7827C)
+#define DSC0_PICTURE_PARAMETER_SET_4_PB		_MMIO(0x78280)
+#define DSC0_PICTURE_PARAMETER_SET_5_PB		_MMIO(0x78284)
+#define DSC0_PICTURE_PARAMETER_SET_6_PB		_MMIO(0x78288)
+#define DSC0_PICTURE_PARAMETER_SET_7_PB		_MMIO(0x7828C)
+#define DSC0_PICTURE_PARAMETER_SET_8_PB		_MMIO(0x78290)
+#define DSC0_PICTURE_PARAMETER_SET_9_PB		_MMIO(0x78294)
+#define DSC0_PICTURE_PARAMETER_SET_10_PB	_MMIO(0x78298)
+#define DSC0_PICTURE_PARAMETER_SET_11_PB	_MMIO(0x7829C)
+#define DSC0_PICTURE_PARAMETER_SET_12_PB	_MMIO(0x782A0)
+#define DSC0_PICTURE_PARAMETER_SET_13_PB	_MMIO(0x782A4)
+#define DSC0_PICTURE_PARAMETER_SET_14_PB	_MMIO(0x782A8)
+#define DSC0_PICTURE_PARAMETER_SET_15_PB	_MMIO(0x782AC)
+#define DSC0_PICTURE_PARAMETER_SET_16_PB	_MMIO(0x782B0)
+
+#define DSC1_PICTURE_PARAMETER_SET_0_PB		_MMIO(0x78370)
+#define DSC1_PICTURE_PARAMETER_SET_1_PB		_MMIO(0x78374)
+#define DSC1_PICTURE_PARAMETER_SET_2_PB		_MMIO(0x78378)
+#define DSC1_PICTURE_PARAMETER_SET_3_PB		_MMIO(0x7837C)
+#define DSC1_PICTURE_PARAMETER_SET_4_PB		_MMIO(0x78380)
+#define DSC1_PICTURE_PARAMETER_SET_5_PB		_MMIO(0x78384)
+#define DSC1_PICTURE_PARAMETER_SET_6_PB		_MMIO(0x78388)
+#define DSC1_PICTURE_PARAMETER_SET_7_PB		_MMIO(0x7838C)
+#define DSC1_PICTURE_PARAMETER_SET_8_PB		_MMIO(0x78390)
+#define DSC1_PICTURE_PARAMETER_SET_9_PB		_MMIO(0x78394)
+#define DSC1_PICTURE_PARAMETER_SET_10_PB	_MMIO(0x78398)
+#define DSC1_PICTURE_PARAMETER_SET_11_PB	_MMIO(0x7839C)
+#define DSC1_PICTURE_PARAMETER_SET_12_PB	_MMIO(0x783A0)
+#define DSC1_PICTURE_PARAMETER_SET_13_PB	_MMIO(0x783A4)
+#define DSC1_PICTURE_PARAMETER_SET_14_PB	_MMIO(0x783A8)
+#define DSC1_PICTURE_PARAMETER_SET_15_PB	_MMIO(0x783AC)
+#define DSC1_PICTURE_PARAMETER_SET_16_PB	_MMIO(0x783B0)
+
+#define DSC0_PICTURE_PARAMETER_SET_0_PC		_MMIO(0x78470)
+#define DSC0_PICTURE_PARAMETER_SET_1_PC		_MMIO(0x78474)
+#define DSC0_PICTURE_PARAMETER_SET_2_PC		_MMIO(0x78478)
+#define DSC0_PICTURE_PARAMETER_SET_3_PC		_MMIO(0x7847C)
+#define DSC0_PICTURE_PARAMETER_SET_4_PC		_MMIO(0x78480)
+#define DSC0_PICTURE_PARAMETER_SET_5_PC		_MMIO(0x78484)
+#define DSC0_PICTURE_PARAMETER_SET_6_PC		_MMIO(0x78488)
+#define DSC0_PICTURE_PARAMETER_SET_7_PC		_MMIO(0x7848C)
+#define DSC0_PICTURE_PARAMETER_SET_8_PC		_MMIO(0x78490)
+#define DSC0_PICTURE_PARAMETER_SET_9_PC		_MMIO(0x78494)
+#define DSC0_PICTURE_PARAMETER_SET_10_PC	_MMIO(0x78498)
+#define DSC0_PICTURE_PARAMETER_SET_11_PC	_MMIO(0x7849C)
+#define DSC0_PICTURE_PARAMETER_SET_12_PC	_MMIO(0x784A0)
+#define DSC0_PICTURE_PARAMETER_SET_13_PC	_MMIO(0x784A4)
+#define DSC0_PICTURE_PARAMETER_SET_14_PC	_MMIO(0x784A8)
+#define DSC0_PICTURE_PARAMETER_SET_15_PC	_MMIO(0x784AC)
+#define DSC0_PICTURE_PARAMETER_SET_16_PC	_MMIO(0x784B0)
+
+#define DSC1_PICTURE_PARAMETER_SET_0_PC		_MMIO(0x78570)
+#define DSC1_PICTURE_PARAMETER_SET_1_PC		_MMIO(0x78574)
+#define DSC1_PICTURE_PARAMETER_SET_2_PC		_MMIO(0x78578)
+#define DSC1_PICTURE_PARAMETER_SET_3_PC		_MMIO(0x7857C)
+#define DSC1_PICTURE_PARAMETER_SET_4_PC		_MMIO(0x78580)
+#define DSC1_PICTURE_PARAMETER_SET_5_PC		_MMIO(0x78584)
+#define DSC1_PICTURE_PARAMETER_SET_6_PC		_MMIO(0x78588)
+#define DSC1_PICTURE_PARAMETER_SET_7_PC		_MMIO(0x7858C)
+#define DSC1_PICTURE_PARAMETER_SET_8_PC		_MMIO(0x78590)
+#define DSC1_PICTURE_PARAMETER_SET_9_PC		_MMIO(0x78594)
+#define DSC1_PICTURE_PARAMETER_SET_10_PC	_MMIO(0x78598)
+#define DSC1_PICTURE_PARAMETER_SET_11_PC	_MMIO(0x7859C)
+#define DSC1_PICTURE_PARAMETER_SET_12_PC	_MMIO(0x785A0)
+#define DSC1_PICTURE_PARAMETER_SET_13_PC	_MMIO(0x785A4)
+#define DSC1_PICTURE_PARAMETER_SET_14_PC	_MMIO(0x785A8)
+#define DSC1_PICTURE_PARAMETER_SET_15_PC	_MMIO(0x785AC)
+#define DSC1_PICTURE_PARAMETER_SET_16_PC	_MMIO(0x785B0)
+
+#define DSCA_RC_BUF_THRESH_0_0			_MMIO(0x6B230)
+#define DSCA_RC_BUF_THRESH_0_1			_MMIO(0x6B234)
+#define DSCA_RC_BUF_THRESH_1_0			_MMIO(0x6B238)
+#define DSCA_RC_BUF_THRESH_1_1			_MMIO(0x6B23C)
+
+#define DSCC_RC_BUF_THRESH_0_0			_MMIO(0x6BA30)
+#define DSCC_RC_BUF_THRESH_0_1			_MMIO(0x6BA34)
+#define DSCC_RC_BUF_THRESH_1_0			_MMIO(0x6BA38)
+#define DSCC_RC_BUF_THRESH_1_1			_MMIO(0x6BA3C)
+
+#define DSC0_RC_BUF_THRESH_0_0_PB		_MMIO(0x78254)
+#define DSC0_RC_BUF_THRESH_0_1_PB		_MMIO(0x78258)
+#define DSC1_RC_BUF_THRESH_0_0_PB		_MMIO(0x78354)
+#define DSC1_RC_BUF_THRESH_0_1_PB		_MMIO(0x78358)
+#define DSC0_RC_BUF_THRESH_0_0_PC		_MMIO(0x78454)
+#define DSC0_RC_BUF_THRESH_0_1_PC		_MMIO(0x78458)
+#define DSC1_RC_BUF_THRESH_0_0_PC		_MMIO(0x78554)
+#define DSC1_RC_BUF_THRESH_0_1_PC		_MMIO(0x78558)
+
+#define DSC0_RC_BUF_THRESH_1_0_PB		_MMIO(0x7825C)
+#define DSC0_RC_BUF_THRESH_1_1_PB		_MMIO(0x78260)
+#define DSC1_RC_BUF_THRESH_1_0_PB		_MMIO(0x7835C)
+#define DSC1_RC_BUF_THRESH_1_1_PB		_MMIO(0x78360)
+#define DSC0_RC_BUF_THRESH_1_0_PC		_MMIO(0x7845C)
+#define DSC0_RC_BUF_THRESH_1_1_PC		_MMIO(0x78460)
+#define DSC1_RC_BUF_THRESH_1_0_PC		_MMIO(0x7855C)
+#define DSC1_RC_BUF_THRESH_1_1_PC		_MMIO(0x78560)
+
+#define DSCA_RC_RANGE_PARAMETERS_0_0		_MMIO(0x6B240)
+#define DSCA_RC_RANGE_PARAMETERS_0_1		_MMIO(0x6B244)
+#define DSCA_RC_RANGE_PARAMETERS_1_0		_MMIO(0x6B248)
+#define DSCA_RC_RANGE_PARAMETERS_1_1		_MMIO(0x6B24C)
+#define DSCA_RC_RANGE_PARAMETERS_2_0		_MMIO(0x6B250)
+#define DSCA_RC_RANGE_PARAMETERS_2_1		_MMIO(0x6B254)
+#define DSCA_RC_RANGE_PARAMETERS_3_0		_MMIO(0x6B258)
+#define DSCA_RC_RANGE_PARAMETERS_3_1		_MMIO(0x6B25C)
+
+#define DSCC_RC_RANGE_PARAMETERS_0_0		_MMIO(0x6BA40)
+#define DSCC_RC_RANGE_PARAMETERS_0_1		_MMIO(0x6BA44)
+#define DSCC_RC_RANGE_PARAMETERS_1_0		_MMIO(0x6BA48)
+#define DSCC_RC_RANGE_PARAMETERS_1_1		_MMIO(0x6BA4C)
+#define DSCC_RC_RANGE_PARAMETERS_2_0		_MMIO(0x6BA50)
+#define DSCC_RC_RANGE_PARAMETERS_2_1		_MMIO(0x6BA54)
+#define DSCC_RC_RANGE_PARAMETERS_3_0		_MMIO(0x6BA58)
+#define DSCC_RC_RANGE_PARAMETERS_3_1		_MMIO(0x6BA5C)
+
+#define VIDEO_DIP_CTL_A				_MMIO(0x60200)
+#define VIDEO_DIP_CTL_B				_MMIO(0x61200)
+#define VIDEO_DIP_CTL_C				_MMIO(0x62200)
+#define VIDEO_DIP_CTL_EDP			_MMIO(0x6F200)
+#define VDIP_ENABLE_VSC				(1 << 20)
+#define VDIP_ENABLE_PPS				(1 << 24)
+#define VIDEO_DIP_PPS_DATA_EDP_REG		0x6F350
+
+// HDMI Video-related Data Island Packet Data
+#define VIDEO_DIP_DRM_DATA_TRANSA_REG		0x60440
+#define VIDEO_DIP_DRM_DATA_TRANSB_REG		0x61440
+#define VIDEO_DIP_DRM_DATA_TRANSC_REG		0x62440
+
+// VDSC PPS data
+#define VIDEO_DIP_DATA_PPS_TRANSEDP_REG		0x6F350
+
+#define DSC_CHICKEN_1_A				_MMIO(0x6B280)
+#define DSC_CHICKEN_1_C				_MMIO(0x6BA80)
+
+struct intel_dsc_regs {
+	i915_reg_t dsc_picture_params0;
+	i915_reg_t dsc_picture_params1;
+	i915_reg_t dsc_picture_params2;
+	i915_reg_t dsc_picture_params3;
+	i915_reg_t dsc_picture_params4;
+	i915_reg_t dsc_picture_params5;
+	i915_reg_t dsc_picture_params6;
+	i915_reg_t dsc_picture_params7;
+	i915_reg_t dsc_picture_params8;
+	i915_reg_t dsc_picture_params9;
+	i915_reg_t dsc_picture_params10;
+	i915_reg_t dsc_picture_params11;
+	i915_reg_t dsc_picture_params12;
+	i915_reg_t dsc_picture_params13;
+	i915_reg_t dsc_picture_params14;
+	i915_reg_t dsc_picture_params15;
+	i915_reg_t dsc_picture_params16;
+	i915_reg_t dsc_rc_buff_thresh0_0;
+	i915_reg_t dsc_rc_buff_thresh0_1;
+	i915_reg_t dsc_rc_buff_thresh1_0;
+	i915_reg_t dsc_rc_buff_thresh1_1;
+	i915_reg_t dsc_rc_range0_0;
+	i915_reg_t dsc_rc_range0_1;
+	i915_reg_t dsc_rc_range1_0;
+	i915_reg_t dsc_rc_range1_1;
+	i915_reg_t dsc_rc_range2_0;
+	i915_reg_t dsc_rc_range2_1;
+	i915_reg_t dsc_rc_range3_0;
+	i915_reg_t dsc_rc_range3_1;
+	i915_reg_t dss_ctrl1_reg;
+	i915_reg_t dss_ctrl2_reg;
+	i915_reg_t dip_ctrl_reg;
+	unsigned int dip_pps_data_ctrl_reg;
+};
+
+union DSC_PICTURE_PARAMETER_SET_0_BXT {
+	struct {
+		unsigned int dsc_version_major : 4;
+		unsigned int dsc_version_minor : 4;
+		unsigned int bits_per_component : 4;
+		unsigned int line_buf_depth : 4;
+		unsigned int block_pred_enable : 1;
+		unsigned int convert_rgb : 1;
+		unsigned int enable_422  : 1;
+		unsigned int vbr_enable  : 1;
+		unsigned int allow_double_buffer_update_disable : 1;
+		unsigned int reserved: 11;
+	};
+	unsigned int value;
+};
+
+union DSC_PICTURE_PARAMETER_SET_1_BXT {
+	struct {
+		unsigned int bits_per_pixel : 10;
+		unsigned int reserved: 22;
+	};
+	unsigned int value;
+};
+
+union DSC_PICTURE_PARAMETER_SET_2_BXT {
+	struct {
+		unsigned int pic_height : 16;
+		unsigned int pic_width  : 16;
+	};
+	unsigned int value;
+};
+
+union DSC_PICTURE_PARAMETER_SET_3_BXT {
+	struct {
+
+	/* This defines the height of the slice in number of pixels. */
+	unsigned int slice_height : 16;
+
+	/* This defines the width of the slice in number of pixels. */
+	unsigned int slice_width  : 16;
+	};
+	unsigned int value;
+};
+
+union DSC_PICTURE_PARAMETER_SET_4_BXT {
+	struct {
+		unsigned int initial_xmit_delay : 10;
+		unsigned int reserved : 6;
+		unsigned int initial_dec_delay : 16;
+	};
+	unsigned int value;
+};
+
+union DSC_PICTURE_PARAMETER_SET_5_BXT {
+	struct {
+		unsigned int scale_increment_interval : 16;
+		unsigned int scale_decrement_interval   : 12;
+		unsigned int reserved: 4;
+	};
+	unsigned int value;
+};
+
+union DSC_PICTURE_PARAMETER_SET_6_BXT {
+	struct {
+		unsigned int initial_scale_value : 6;
+		unsigned int reserved_1 : 2;
+		unsigned int first_line_bpg_offset : 5;
+		unsigned int reserved_2: 3;
+		unsigned int flatness_min_qp : 5;
+		unsigned int reserved_3 : 3;
+		unsigned int flatness_max_qp : 5;
+		unsigned int reserved: 3;
+	};
+	unsigned int value;
+};
+
+union DSC_PICTURE_PARAMETER_SET_7_BXT {
+	struct {
+		unsigned int slice_bpg_offset : 16;
+		unsigned int nfl_bpg_offset : 16;
+	};
+	unsigned int value;
+};
+
+union DSC_PICTURE_PARAMETER_SET_8_BXT {
+	struct {
+		unsigned int final_offset : 16;
+		unsigned int initial_offset : 16;
+	};
+	unsigned int value;
+};
+
+union DSC_PICTURE_PARAMETER_SET_9_BXT {
+	struct {
+		unsigned int rc_model_size : 16;
+		unsigned int rc_edge_factor  : 4;
+		unsigned int reserved : 12;
+	};
+	unsigned int value;
+};
+
+union DSC_PICTURE_PARAMETER_SET_10_BXT {
+	struct {
+		unsigned int rc_quant_incr_limit0 : 5;
+		unsigned int reserved_1 : 3;
+		unsigned int rc_quant_incr_limit1 : 5;
+		unsigned int reserved_2 : 3;
+		unsigned int rc_tgt_offset_hi : 4;
+		unsigned int rc_tgt_offset_lo : 4;
+		unsigned int reserved_3 : 8;
+	};
+	unsigned int value;
+};
+
+union DSC_PICTURE_PARAMETER_SET_16_BXT {
+	struct {
+		unsigned int slice_chunk_size : 16;
+		unsigned int slice_per_line : 3;
+		unsigned int reserved : 1;
+		unsigned int slice_row_per_frame : 12;
+	};
+	unsigned int value;
+};
+
+
+union DSC_RC_BUF_THRESH_0_BXT {
+	struct {
+		unsigned int rc_buf_thresh_0 : 8;
+		unsigned int rc_buf_thresh_1 : 8;
+		unsigned int rc_buf_thresh_2 : 8;
+		unsigned int rc_buf_thresh_3 : 8;
+		unsigned int rc_buf_thresh_4 : 8;
+		unsigned int rc_buf_thresh_5 : 8;
+		unsigned int rc_buf_thresh_6 : 8;
+		unsigned int rc_buf_thresh_7 : 8;
+	};
+	unsigned int value[2];
+};
+
+union DSC_RC_BUF_THRESH_1_BXT {
+	struct {
+		unsigned int rc_buf_thresh_8 : 8;
+		unsigned int rc_buf_thresh_9 : 8;
+		unsigned int rc_buf_thresh_10 : 8;
+		unsigned int rc_buf_thresh_11 : 8;
+		unsigned int rc_buf_thresh_12 : 8;
+		unsigned int rc_buf_thresh_13 : 8;
+		unsigned int reserved : 16;
+	};
+	unsigned int value[2];
+};
+
+union DSC_RC_RANGE_PARAMETERS_0_BXT {
+	struct {
+		unsigned int rc_min_qp_0 : 5;
+		unsigned int rc_max_qp_0 : 5;
+		unsigned int rc_bpg_offset_0 : 6;
+		unsigned int rc_min_qp_1 : 5;
+		unsigned int rc_max_qp_1 : 5;
+		unsigned int rc_bpg_offset_1 : 6;
+		unsigned int rc_min_qp_2 : 5;
+		unsigned int rc_max_qp_2 : 5;
+		unsigned int rc_bpg_offset_2 : 6;
+		unsigned int rc_min_qp_3 : 5;
+		unsigned int rc_max_qp_3 : 5;
+		unsigned int rc_bpg_offset_3 : 6;
+	};
+	unsigned int value[2];
+};
+
+union DSC_RC_RANGE_PARAMETERS_1_BXT {
+	struct {
+		unsigned int rc_min_qp_4 : 5;
+		unsigned int rc_max_qp_4 : 5;
+		unsigned int rc_bpg_offset_4 : 6;
+		unsigned int rc_min_qp_5 : 5;
+		unsigned int rc_max_qp_5 : 5;
+		unsigned int rc_bpg_offset_5 : 6;
+		unsigned int rc_min_qp_6 : 5;
+		unsigned int rc_max_qp_6 : 5;
+		unsigned int rc_bpg_offset_6 : 6;
+		unsigned int rc_min_qp_7 : 5;
+		unsigned int rc_max_qp_7 : 5;
+		unsigned int rc_bpg_offset_7 : 6;
+	};
+	unsigned int value[2];
+};
+
+union DSC_RC_RANGE_PARAMETERS_2_BXT {
+	struct {
+		unsigned int rc_min_qp_8 : 5;
+		unsigned int rc_max_qp_8 : 5;
+		unsigned int rc_bpg_offset_8 : 6;
+		unsigned int rc_min_qp_9 : 5;
+		unsigned int rc_max_qp_9 : 5;
+		unsigned int rc_bpg_offset_9 : 6;
+		unsigned int rc_min_qp_10 : 5;
+		unsigned int rc_max_qp_10 : 5;
+		unsigned int rc_bpg_offset_10 : 6;
+		unsigned int rc_min_qp_11 : 5;
+		unsigned int rc_max_qp_11 : 5;
+		unsigned int rc_bpg_offset_11 : 6;
+	};
+	unsigned int value[2];
+};
+
+union DSC_RC_RANGE_PARAMETERS_3_BXT {
+	struct {
+		unsigned int rc_min_qp_12 : 5;
+		unsigned int rc_max_qp_12 : 5;
+		unsigned int rc_bpg_offset_12 : 6;
+		unsigned int rc_min_qp_13 : 5;
+		unsigned int rc_max_qp_13 : 5;
+		unsigned int rc_bpg_offset_13 : 6;
+		unsigned int rc_min_qp_14 : 5;
+		unsigned int rc_max_qp_14 : 5;
+		unsigned int rc_bpg_offset_14 : 6;
+		unsigned int reserved_1 : 5;
+		unsigned int reserved_2 : 5;
+		unsigned int reserved_3 : 6;
+	};
+	unsigned int value[2];
+};
+
 #endif /* _I915_REG_H_ */

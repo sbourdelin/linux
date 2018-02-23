@@ -1171,8 +1171,66 @@ struct picture_parameters_set {
 	unsigned long pps_long_124_reserved;
 };
 
+/* Secondary Data Packet Header */
+struct sdp_header {
+	/* SDP ID */
+	unsigned char sdp_id;
+	/* SDP Type */
+	unsigned char sdp_type;
+	union {
+		unsigned char sdp_byte1;
+		struct {
+			unsigned char revision_no :5;
+			unsigned char reserved1 :3;
+		};
+	};
+
+	union {
+		unsigned char sdp_byte2;
+		struct {
+			unsigned char num_of_valid_data_bytes : 5;
+			unsigned char reserved2 : 3;
+		};
+	};
+};
+
+union pps_sdp {
+	struct {
+		/* VS header data */
+		struct sdp_header secondary_data_packet_header;
+		/* PPS Payload */
+		struct picture_parameters_set pps_payload;
+	};
+};
+
+/* There are two instances of VDSC engines */
+#define DSC0		0
+#define DSC1		1
+
+/* Dislay Compression Units */
+enum dsc_types {
+	/*  DSC_0 engine for eDP/MIPIDSI */
+	DSC_A = 0,
+	/* DSC_1 engine for eDP/MIPI DSI */
+	DSC_C = 1,
+	/* Applicable from Gen11.5 */
+	PIPEA_DSC_0 = 2,
+	PIPEA_DSC_1 = 3,
+	PIPEB_DSC_0 = 4,
+	PIPEB_DSC_1 = 5,
+	PIPEC_DSC_0 = 6,
+	PIPEC_DSC_1 = 7,
+	PIPED_DSC_0 = 8,
+	PIPED_DSC_1 = 9,
+	MAX_DSC_TYPES,
+	DSC_UNDEFINED = 127
+};
+
 /* DSC Configuration structure */
 #define NUM_BUF_RANGES		15
+/* Size in Bytes */
+#define SDP_HEADER_SIZE		4
+#define PPS_PAYLOAD_SIZE	128
 
 /* Configuration for a single Rate Control model range */
 struct rc_range_parameters {
