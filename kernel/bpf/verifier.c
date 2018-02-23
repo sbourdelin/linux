@@ -728,111 +728,49 @@ enum reg_arg_type {
 	DST_OP_NO_MARK	/* same as above, check only, don't mark */
 };
 
-static int cmp_subprogs(const void *a, const void *b)
+static int find_subprog(struct bpf_verifier_env *env, int insn_idx)
 {
-	return *(int *)a - *(int *)b;
-}
+	struct bpf_insn_aux_data *aux;
+	int insn_cnt = env->prog->len;
+	u32 subprogno;
 
-static int find_subprog(struct bpf_verifier_env *env, int off)
-{
-	u32 *p;
-
-	p = bsearch(&off, env->subprog_starts, env->subprog_cnt,
-		    sizeof(env->subprog_starts[0]), cmp_subprogs);
-	if (!p)
+	if (insn_idx >= insn_cnt || insn_idx < 0) {
+		verbose(env, "find_subprog of invalid insn_idx %d\n", insn_idx);
+		return -EINVAL;
+	}
+	aux = &env->insn_aux_data[insn_idx];
+	if (!aux->seen) /* haven't visited this line yet */
 		return -ENOENT;
-	return p - env->subprog_starts;
-
+	subprogno = aux->subprogno;
+	/* validate that we are at start of subprog */
+	if (env->subprog_info[subprogno].start != insn_idx) {
+		verbose(env, "insn_idx %d is in subprog %u but that starts at %d\n",
+			insn_idx, subprogno, env->subprog_info[subprogno].start);
+		return -EINVAL;
+	}
+	return subprogno;
 }
 
 static int add_subprog(struct bpf_verifier_env *env, int off)
 {
 	int insn_cnt = env->prog->len;
+	struct bpf_subprog_info *info;
 	int ret;
 
 	if (off >= insn_cnt || off < 0) {
 		verbose(env, "call to invalid destination\n");
 		return -EINVAL;
 	}
-	ret = find_subprog(env, off);
-	if (ret >= 0)
-		return 0;
 	if (env->subprog_cnt >= BPF_MAX_SUBPROGS) {
 		verbose(env, "too many subprograms\n");
 		return -E2BIG;
 	}
-	env->subprog_starts[env->subprog_cnt++] = off;
-	sort(env->subprog_starts, env->subprog_cnt,
-	     sizeof(env->subprog_starts[0]), cmp_subprogs, NULL);
-	return 0;
-}
-
-static int check_subprogs(struct bpf_verifier_env *env)
-{
-	int i, ret, subprog_start, subprog_end, off, cur_subprog = 0;
-	struct bpf_insn *insn = env->prog->insnsi;
-	int insn_cnt = env->prog->len;
-
-	/* determine subprog starts. The end is one before the next starts */
-	for (i = 0; i < insn_cnt; i++) {
-		if (insn[i].code != (BPF_JMP | BPF_CALL))
-			continue;
-		if (insn[i].src_reg != BPF_PSEUDO_CALL)
-			continue;
-		if (!env->allow_ptr_leaks) {
-			verbose(env, "function calls to other bpf functions are allowed for root only\n");
-			return -EPERM;
-		}
-		if (bpf_prog_is_dev_bound(env->prog->aux)) {
-			verbose(env, "function calls in offloaded programs are not supported yet\n");
-			return -EINVAL;
-		}
-		ret = add_subprog(env, i + insn[i].imm + 1);
-		if (ret < 0)
-			return ret;
-	}
-
-	if (env->log.level > 1)
-		for (i = 0; i < env->subprog_cnt; i++)
-			verbose(env, "func#%d @%d\n", i, env->subprog_starts[i]);
-
-	/* now check that all jumps are within the same subprog */
-	subprog_start = 0;
-	if (env->subprog_cnt == cur_subprog)
-		subprog_end = insn_cnt;
-	else
-		subprog_end = env->subprog_starts[cur_subprog++];
-	for (i = 0; i < insn_cnt; i++) {
-		u8 code = insn[i].code;
-
-		if (BPF_CLASS(code) != BPF_JMP)
-			goto next;
-		if (BPF_OP(code) == BPF_EXIT || BPF_OP(code) == BPF_CALL)
-			goto next;
-		off = i + insn[i].off + 1;
-		if (off < subprog_start || off >= subprog_end) {
-			verbose(env, "jump out of range from insn %d to %d\n", i, off);
-			return -EINVAL;
-		}
-next:
-		if (i == subprog_end - 1) {
-			/* to avoid fall-through from one subprog into another
-			 * the last insn of the subprog should be either exit
-			 * or unconditional jump back
-			 */
-			if (code != (BPF_JMP | BPF_EXIT) &&
-			    code != (BPF_JMP | BPF_JA)) {
-				verbose(env, "last insn is not an exit or jmp\n");
-				return -EINVAL;
-			}
-			subprog_start = subprog_end;
-			if (env->subprog_cnt == cur_subprog)
-				subprog_end = insn_cnt;
-			else
-				subprog_end = env->subprog_starts[cur_subprog++];
-		}
-	}
-	return 0;
+	ret = env->subprog_cnt++;
+	info = &env->subprog_info[ret];
+	info->start = off;
+	info->stack_depth = 0;
+	memset(info->callees, 0, sizeof(info->callees));
+	return ret;
 }
 
 static
@@ -1454,80 +1392,83 @@ static int update_stack_depth(struct bpf_verifier_env *env,
 			      const struct bpf_func_state *func,
 			      int off)
 {
-	u16 stack = env->subprog_stack_depth[func->subprogno];
+	struct bpf_subprog_info *info;
 
-	if (stack >= -off)
-		return 0;
+	if (!func) return -EFAULT;
+	if (func->subprogno >= BPF_MAX_SUBPROGS) return -E2BIG;
+	info = &env->subprog_info[func->subprogno];
 
 	/* update known max for given subprogram */
-	env->subprog_stack_depth[func->subprogno] = -off;
+	info->stack_depth = max_t(u16, info->stack_depth, -off);
 	return 0;
 }
 
-/* starting from main bpf function walk all instructions of the function
- * and recursively walk all callees that given function can call.
- * Ignore jump and exit insns.
- * Since recursion is prevented by check_cfg() this algorithm
- * only needs a local stack of MAX_CALL_FRAMES to remember callsites
+/* Topologically sort the call graph, and thereby determine the maximum stack
+ * depth of each subprog's worst-case call chain.  Store in total_stack_depth.
  */
 static int check_max_stack_depth(struct bpf_verifier_env *env)
 {
-	int depth = 0, frame = 0, subprog = 0, i = 0, subprog_end;
-	struct bpf_insn *insn = env->prog->insnsi;
-	int insn_cnt = env->prog->len;
-	int ret_insn[MAX_CALL_FRAMES];
-	int ret_prog[MAX_CALL_FRAMES];
+	DECLARE_BITMAP(frontier, BPF_MAX_SUBPROGS) = {0};
+	DECLARE_BITMAP(visited, BPF_MAX_SUBPROGS) = {0};
+	int subprog, i, j;
 
-process_func:
-	/* round up to 32-bytes, since this is granularity
-	 * of interpreter stack size
-	 */
-	depth += round_up(max_t(u32, env->subprog_stack_depth[subprog], 1), 32);
-	if (depth > MAX_BPF_STACK) {
-		verbose(env, "combined stack size of %d calls is %d. Too large\n",
-			frame + 1, depth);
-		return -EACCES;
-	}
-continue_func:
-	if (env->subprog_cnt == subprog)
-		subprog_end = insn_cnt;
-	else
-		subprog_end = env->subprog_starts[subprog];
-	for (; i < subprog_end; i++) {
-		if (insn[i].code != (BPF_JMP | BPF_CALL))
-			continue;
-		if (insn[i].src_reg != BPF_PSEUDO_CALL)
-			continue;
-		/* remember insn and function to return to */
-		ret_insn[frame] = i + 1;
-		ret_prog[frame] = subprog;
+	/* subprog 0 has no incoming edges, and should be the only such */
+	__set_bit(0, frontier);
+	env->subprog_info[0].total_stack_depth = env->subprog_info[0].stack_depth;
 
-		/* find the callee */
-		i = i + insn[i].imm + 1;
-		subprog = find_subprog(env, i);
-		if (subprog < 0) {
-			WARN_ONCE(1, "verifier bug. No program starts at insn %d\n",
-				  i);
-			return -EFAULT;
+	while (true) {
+		/* select a frontier node */
+		subprog = find_first_bit(frontier, BPF_MAX_SUBPROGS);
+		if (subprog >= BPF_MAX_SUBPROGS) /* frontier is empty, done */
+			break;
+		/* remove it from the frontier */
+		__clear_bit(subprog, frontier);
+		/* validate its total stack depth */
+		if (env->subprog_info[subprog].total_stack_depth > MAX_BPF_STACK) {
+			verbose(env, "combined stack size of calls to %d (at insn %d) is %d.  Too large\n",
+				subprog, env->subprog_info[subprog].start,
+				env->subprog_info[subprog].total_stack_depth);
+			return -EACCES;
 		}
-		subprog++;
-		frame++;
-		if (frame >= MAX_CALL_FRAMES) {
-			WARN_ONCE(1, "verifier bug. Call stack is too deep\n");
-			return -EFAULT;
+		if (env->log.level > 1) {
+			verbose(env, "combined stack size of calls to %d (at insn %d) is %d\n",
+				subprog, env->subprog_info[subprog].start,
+				env->subprog_info[subprog].total_stack_depth);
 		}
-		goto process_func;
+		__set_bit(subprog, visited);
+		/* for each callee */
+		for_each_set_bit(i, env->subprog_info[subprog].callees,
+				 BPF_MAX_SUBPROGS) {
+			/* round up to 32-bytes, since this is granularity of
+			 * interpreter stack size
+			 */
+			u16 stack_depth = round_up(max_t(u16, env->subprog_info[i].stack_depth, 1), 32);
+
+			/* Update callee total stack depth */
+			env->subprog_info[i].total_stack_depth = max_t(u16,
+				env->subprog_info[i].total_stack_depth,
+				env->subprog_info[subprog].total_stack_depth +
+				stack_depth);
+			/* does it have unvisited callers? */
+			for_each_clear_bit(j, visited, env->subprog_cnt) {
+				if (test_bit(i, env->subprog_info[j].callees))
+					break;
+			}
+			/* if not, add it to the frontier */
+			if (j >= env->subprog_cnt)
+				__set_bit(i, frontier);
+		}
 	}
-	/* end of for() loop means the last insn of the 'subprog'
-	 * was reached. Doesn't matter whether it was JA or EXIT
-	 */
-	if (frame == 0)
-		return 0;
-	depth -= round_up(max_t(u32, env->subprog_stack_depth[subprog], 1), 32);
-	frame--;
-	i = ret_insn[frame];
-	subprog = ret_prog[frame];
-	goto continue_func;
+
+	/* are any nodes left unvisited? */
+	subprog = find_first_zero_bit(visited, env->subprog_cnt);
+	if (subprog < env->subprog_cnt) {
+		/* then call graph is not acyclic, which shouldn't happen */
+		verbose(env, "verifier bug.  Call graph has a cycle including subprog %d (at insn %d)\n",
+			subprog, env->subprog_info[subprog].start);
+		return -EFAULT;
+	}
+	return 0;
 }
 
 #ifndef CONFIG_BPF_JIT_ALWAYS_ON
@@ -1542,8 +1483,7 @@ static int get_callee_stack_depth(struct bpf_verifier_env *env,
 			  start);
 		return -EFAULT;
 	}
-	subprog++;
-	return env->subprog_stack_depth[subprog];
+	return env->subprog_info[subprog].stack_depth;
 }
 #endif
 
@@ -2078,7 +2018,7 @@ static int check_map_func_compatibility(struct bpf_verifier_env *env,
 	case BPF_FUNC_tail_call:
 		if (map->map_type != BPF_MAP_TYPE_PROG_ARRAY)
 			goto error;
-		if (env->subprog_cnt) {
+		if (env->subprog_cnt > 1) {
 			verbose(env, "tail_calls are not allowed in programs with bpf-to-bpf calls\n");
 			return -EINVAL;
 		}
@@ -2213,21 +2153,32 @@ static int check_func_call(struct bpf_verifier_env *env, struct bpf_insn *insn,
 {
 	struct bpf_verifier_state *state = env->cur_state;
 	struct bpf_func_state *caller, *callee;
-	int i, subprog, target_insn;
+	int i, subprog, target;
 
 	if (state->curframe + 1 >= MAX_CALL_FRAMES) {
 		verbose(env, "the call stack of %d frames is too deep\n",
 			state->curframe + 2);
 		return -E2BIG;
 	}
-
-	target_insn = *insn_idx + insn->imm;
-	subprog = find_subprog(env, target_insn + 1);
-	if (subprog < 0) {
-		verbose(env, "verifier bug. No program starts at insn %d\n",
-			target_insn + 1);
-		return -EFAULT;
+	if (!env->allow_ptr_leaks) {
+		verbose(env, "function calls to other bpf functions are allowed for root only\n");
+		return -EPERM;
 	}
+	if (bpf_prog_is_dev_bound(env->prog->aux)) {
+		verbose(env, "function calls in offloaded programs are not supported yet\n");
+		return -EINVAL;
+	}
+
+
+	target = *insn_idx + insn->imm;
+	/* We will increment insn_idx (PC) in do_check() after handling this
+	 * call insn, so the actual start of the function is target + 1.
+	 */
+	subprog = find_subprog(env, target + 1);
+	if (subprog == -ENOENT)
+		subprog = add_subprog(env, target + 1);
+	if (subprog < 0)
+		return subprog;
 
 	caller = state->frame[state->curframe];
 	if (state->frame[state->curframe + 1]) {
@@ -2241,6 +2192,9 @@ static int check_func_call(struct bpf_verifier_env *env, struct bpf_insn *insn,
 		return -ENOMEM;
 	state->frame[state->curframe + 1] = callee;
 
+	/* record edge in call graph */
+	__set_bit(subprog, env->subprog_info[caller->subprogno].callees);
+
 	/* callee cannot access r0, r6 - r9 for reading and has to write
 	 * into its own stack before reading from it.
 	 * callee can read/write into caller's stack
@@ -2249,7 +2203,7 @@ static int check_func_call(struct bpf_verifier_env *env, struct bpf_insn *insn,
 			/* remember the callsite, it will be used by bpf_exit */
 			*insn_idx /* callsite */,
 			state->curframe + 1 /* frameno within this callchain */,
-			subprog + 1 /* subprog number within this prog */);
+			subprog /* subprog number within this prog */);
 
 	/* copy r1 - r5 args that callee can access */
 	for (i = BPF_REG_1; i <= BPF_REG_5; i++)
@@ -2265,7 +2219,7 @@ static int check_func_call(struct bpf_verifier_env *env, struct bpf_insn *insn,
 	state->curframe++;
 
 	/* and go analyze first insn of the callee */
-	*insn_idx = target_insn;
+	*insn_idx = target;
 
 	if (env->log.level) {
 		verbose(env, "caller:\n");
@@ -3807,13 +3761,15 @@ static int check_ld_abs(struct bpf_verifier_env *env, struct bpf_insn *insn)
 		return -EINVAL;
 	}
 
-	if (env->subprog_cnt) {
+	if (cur_frame(env)->subprogno) {
 		/* when program has LD_ABS insn JITs and interpreter assume
 		 * that r1 == ctx == skb which is not the case for callees
 		 * that can have arbitrary arguments. It's problematic
 		 * for main prog as well since JITs would need to analyze
 		 * all functions in order to make proper register save/restore
-		 * decisions in the main prog. Hence disallow LD_ABS with calls
+		 * decisions in the main prog. Hence disallow LD_ABS with calls.
+		 * However, if we're the main-function (subprog 0) then we know
+		 * _we_ were called with r1 == ctx, so it's fine.
 		 */
 		verbose(env, "BPF_LD_[ABS|IND] instructions cannot be mixed with bpf-to-bpf calls\n");
 		return -EINVAL;
@@ -3994,10 +3950,6 @@ static int check_cfg(struct bpf_verifier_env *env)
 	int insn_cnt = env->prog->len;
 	int ret = 0;
 	int i, t;
-
-	ret = check_subprogs(env);
-	if (ret < 0)
-		return ret;
 
 	insn_state = kcalloc(insn_cnt, sizeof(int), GFP_KERNEL);
 	if (!insn_state)
@@ -4521,6 +4473,7 @@ static int do_check(struct bpf_verifier_env *env)
 	int insn_cnt = env->prog->len, i;
 	int insn_idx, prev_insn_idx = 0;
 	int insn_processed = 0;
+	int mainprogno;
 	bool do_print_state = false;
 
 	state = kzalloc(sizeof(struct bpf_verifier_state), GFP_KERNEL);
@@ -4534,12 +4487,17 @@ static int do_check(struct bpf_verifier_env *env)
 		return -ENOMEM;
 	}
 	env->cur_state = state;
+	mainprogno = add_subprog(env, 0);
+	if (mainprogno < 0)
+		return mainprogno;
 	init_func_state(env, state->frame[0],
 			BPF_MAIN_FUNC /* callsite */,
 			0 /* frameno */,
-			0 /* subprogno, zero == main subprog */);
+			mainprogno /* subprogno */);
 	insn_idx = 0;
 	for (;;) {
+		struct bpf_insn_aux_data *aux = &env->insn_aux_data[insn_idx];
+		struct bpf_func_state *frame = cur_frame(env);
 		struct bpf_insn *insn;
 		u8 class;
 		int err;
@@ -4559,6 +4517,17 @@ static int do_check(struct bpf_verifier_env *env)
 				insn_processed);
 			return -E2BIG;
 		}
+
+		/* check the insn doesn't appear in multiple subprogs, which
+		 * would imply bad function calls/returns/jumps
+		 */
+		if (aux->seen && aux->subprogno != frame->subprogno) {
+			verbose(env, "insn %d was in subprog %u, now %u\n",
+				insn_idx, aux->subprogno, frame->subprogno);
+			return -EINVAL;
+		}
+		aux->subprogno = frame->subprogno;
+		aux->seen = true;
 
 		err = is_state_visited(env, insn_idx);
 		if (err < 0)
@@ -4584,7 +4553,7 @@ static int do_check(struct bpf_verifier_env *env)
 			else
 				verbose(env, "\nfrom %d to %d:",
 					prev_insn_idx, insn_idx);
-			print_verifier_state(env, state->frame[state->curframe]);
+			print_verifier_state(env, frame);
 			do_print_state = false;
 		}
 
@@ -4605,7 +4574,6 @@ static int do_check(struct bpf_verifier_env *env)
 		}
 
 		regs = cur_regs(env);
-		env->insn_aux_data[insn_idx].seen = true;
 		if (class == BPF_ALU || class == BPF_ALU64) {
 			err = check_alu_op(env, insn);
 			if (err)
@@ -4821,7 +4789,15 @@ process_bpf_exit:
 					return err;
 
 				insn_idx++;
-				env->insn_aux_data[insn_idx].seen = true;
+				/* Mark second half of LD_IMM64 insn */
+				aux++;
+				if (aux->seen && aux->subprogno != frame->subprogno) {
+					verbose(env, "insn %d was in subprog %u, now %u\n",
+						insn_idx, aux->subprogno, frame->subprogno);
+					return -EINVAL;
+				}
+				aux->subprogno = frame->subprogno;
+				aux->seen = true;
 			} else {
 				verbose(env, "invalid BPF_LD mode\n");
 				return -EINVAL;
@@ -4836,15 +4812,15 @@ process_bpf_exit:
 
 	verbose(env, "processed %d insns (limit %d), stack depth ",
 		insn_processed, BPF_COMPLEXITY_LIMIT_INSNS);
-	for (i = 0; i < env->subprog_cnt + 1; i++) {
-		u32 depth = env->subprog_stack_depth[i];
+	for (i = 0; i < env->subprog_cnt; i++) {
+		u32 depth = env->subprog_info[i].stack_depth;
 
-		verbose(env, "%d", depth);
-		if (i + 1 < env->subprog_cnt + 1)
+		if (i)
 			verbose(env, "+");
+		verbose(env, "%d", depth);
 	}
 	verbose(env, "\n");
-	env->prog->aux->stack_depth = env->subprog_stack_depth[0];
+	env->prog->aux->stack_depth = env->subprog_info[0].stack_depth;
 	return 0;
 }
 
@@ -5037,8 +5013,10 @@ static int adjust_insn_aux_data(struct bpf_verifier_env *env, u32 prog_len,
 	memcpy(new_data, old_data, sizeof(struct bpf_insn_aux_data) * off);
 	memcpy(new_data + off + cnt - 1, old_data + off,
 	       sizeof(struct bpf_insn_aux_data) * (prog_len - off - cnt + 1));
-	for (i = off; i < off + cnt - 1; i++)
+	for (i = off; i < off + cnt - 1; i++) {
 		new_data[i].seen = true;
+		new_data[i].subprogno = old_data[off].subprogno;
+	}
 	env->insn_aux_data = new_data;
 	vfree(old_data);
 	return 0;
@@ -5051,9 +5029,9 @@ static void adjust_subprog_starts(struct bpf_verifier_env *env, u32 off, u32 len
 	if (len == 1)
 		return;
 	for (i = 0; i < env->subprog_cnt; i++) {
-		if (env->subprog_starts[i] < off)
+		if (env->subprog_info[i].start < off)
 			continue;
-		env->subprog_starts[i] += len - 1;
+		env->subprog_info[i].start += len - 1;
 	}
 }
 
@@ -5212,15 +5190,19 @@ static int convert_ctx_accesses(struct bpf_verifier_env *env)
 static int jit_subprogs(struct bpf_verifier_env *env)
 {
 	struct bpf_prog *prog = env->prog, **func, *tmp;
-	int i, j, subprog_start, subprog_end = 0, len, subprog;
+	int i, j, subprog;
 	struct bpf_insn *insn;
 	void *old_bpf_func;
 	int err = -ENOMEM;
 
-	if (env->subprog_cnt == 0)
+	if (env->subprog_cnt <= 1)
 		return 0;
 
+	for (i = 0; i <= env->subprog_cnt; i++)
+		env->subprog_info[i].len = 0;
+
 	for (i = 0, insn = prog->insnsi; i < prog->len; i++, insn++) {
+		env->subprog_info[env->insn_aux_data[i].subprogno].len++;
 		if (insn->code != (BPF_JMP | BPF_CALL) ||
 		    insn->src_reg != BPF_PSEUDO_CALL)
 			continue;
@@ -5233,7 +5215,7 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 		/* temporarily remember subprog id inside insn instead of
 		 * aux_data, since next loop will split up all insns into funcs
 		 */
-		insn->off = subprog + 1;
+		insn->off = subprog;
 		/* remember original imm in case JIT fails and fallback
 		 * to interpreter will be needed
 		 */
@@ -5242,25 +5224,59 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 		insn->imm = 1;
 	}
 
-	func = kzalloc(sizeof(prog) * (env->subprog_cnt + 1), GFP_KERNEL);
+	func = kzalloc(sizeof(prog) * env->subprog_cnt, GFP_KERNEL);
 	if (!func)
 		return -ENOMEM;
 
-	for (i = 0; i <= env->subprog_cnt; i++) {
-		subprog_start = subprog_end;
-		if (env->subprog_cnt == i)
-			subprog_end = prog->len;
-		else
-			subprog_end = env->subprog_starts[i];
+	for (i = 0; i < env->subprog_cnt; i++) {
+		struct bpf_subprog_info *info = &env->subprog_info[i];
+		int k = 0;
 
-		len = subprog_end - subprog_start;
-		func[i] = bpf_prog_alloc(bpf_prog_size(len), GFP_USER);
+		func[i] = bpf_prog_alloc(bpf_prog_size(info->len), GFP_USER);
 		if (!func[i])
 			goto out_free;
-		memcpy(func[i]->insnsi, &prog->insnsi[subprog_start],
-		       len * sizeof(struct bpf_insn));
+
+		for (j = 0; j < prog->len; j++) {
+			if (env->insn_aux_data[j].subprogno != i)
+				continue;
+			if (WARN_ON_ONCE(k >= info->len)) {
+				verbose(env, "Tried to add insn %d to subprog %d but previously counted %d\n",
+					k, i, info->len);
+				err = -EFAULT;
+				goto out_free;
+			}
+			env->insn_aux_data[j].subprog_off = k;
+			memcpy(func[i]->insnsi + k++, prog->insnsi + j,
+			       sizeof(struct bpf_insn));
+		}
+		if (WARN_ON_ONCE(k != info->len)) {
+			verbose(env, "Only %d insns in subprog %d but previously counted %d\n",
+				k, i, info->len);
+		}
+		/* Fix up jump offsets.  If a subprog was not contiguous, then
+		 * jumps within it need their offsets adjusting to account for
+		 * the insns that are not present in the subprog.
+		 */
+		for (j = 0; j < prog->len; j++) {
+			if (env->insn_aux_data[j].subprogno != i)
+				continue;
+			k = env->insn_aux_data[j].subprog_off;
+			insn = func[i]->insnsi + k;
+			if (BPF_CLASS(insn->code) == BPF_JMP &&
+			    BPF_OP(insn->code) != BPF_CALL &&
+			    BPF_OP(insn->code) != BPF_EXIT) {
+				/* This was a jump from orig[j] to orig[j+off+1]
+				 * which becomes a jump from new[k] to
+				 * new[aux[j+off+1].subprog_off]
+				 */
+				int t = env->insn_aux_data[j + insn->off + 1].subprog_off;
+
+				insn->off = t - k - 1;
+			}
+		}
+
 		func[i]->type = prog->type;
-		func[i]->len = len;
+		func[i]->len = info->len;
 		if (bpf_prog_calc_tag(func[i]))
 			goto out_free;
 		func[i]->is_func = 1;
@@ -5268,7 +5284,7 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 		 * Long term would need debug info to populate names
 		 */
 		func[i]->aux->name[0] = 'F';
-		func[i]->aux->stack_depth = env->subprog_stack_depth[i];
+		func[i]->aux->stack_depth = env->subprog_info[i].stack_depth;
 		func[i]->jit_requested = 1;
 		func[i] = bpf_int_jit_compile(func[i]);
 		if (!func[i]->jited) {
@@ -5281,7 +5297,7 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 	 * now populate all bpf_calls with correct addresses and
 	 * run last pass of JIT
 	 */
-	for (i = 0; i <= env->subprog_cnt; i++) {
+	for (i = 0; i < env->subprog_cnt; i++) {
 		insn = func[i]->insnsi;
 		for (j = 0; j < func[i]->len; j++, insn++) {
 			if (insn->code != (BPF_JMP | BPF_CALL) ||
@@ -5289,12 +5305,16 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 				continue;
 			subprog = insn->off;
 			insn->off = 0;
+			if (subprog < 0 || subprog >= env->subprog_cnt) {
+				err = -EFAULT;
+				goto out_free;
+			}
 			insn->imm = (u64 (*)(u64, u64, u64, u64, u64))
 				func[subprog]->bpf_func -
 				__bpf_call_base;
 		}
 	}
-	for (i = 0; i <= env->subprog_cnt; i++) {
+	for (i = 0; i < env->subprog_cnt; i++) {
 		old_bpf_func = func[i]->bpf_func;
 		tmp = bpf_int_jit_compile(func[i]);
 		if (tmp != func[i] || func[i]->bpf_func != old_bpf_func) {
@@ -5308,7 +5328,7 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 	/* finally lock prog and jit images for all functions and
 	 * populate kallsysm
 	 */
-	for (i = 0; i <= env->subprog_cnt; i++) {
+	for (i = 0; i < env->subprog_cnt; i++) {
 		bpf_prog_lock_ro(func[i]);
 		bpf_prog_kallsyms_add(func[i]);
 	}
@@ -5325,7 +5345,7 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 			continue;
 		insn->off = env->insn_aux_data[i].call_imm;
 		subprog = find_subprog(env, i + insn->off + 1);
-		addr  = (unsigned long)func[subprog + 1]->bpf_func;
+		addr  = (unsigned long)func[subprog]->bpf_func;
 		addr &= PAGE_MASK;
 		insn->imm = (u64 (*)(u64, u64, u64, u64, u64))
 			    addr - __bpf_call_base;
@@ -5334,10 +5354,10 @@ static int jit_subprogs(struct bpf_verifier_env *env)
 	prog->jited = 1;
 	prog->bpf_func = func[0]->bpf_func;
 	prog->aux->func = func;
-	prog->aux->func_cnt = env->subprog_cnt + 1;
+	prog->aux->func_cnt = env->subprog_cnt;
 	return 0;
 out_free:
-	for (i = 0; i <= env->subprog_cnt; i++)
+	for (i = 0; i < env->subprog_cnt; i++)
 		if (func[i])
 			bpf_jit_free(func[i]);
 	kfree(func);
@@ -5367,6 +5387,7 @@ static int fixup_call_args(struct bpf_verifier_env *env)
 		err = jit_subprogs(env);
 		if (err == 0)
 			return 0;
+		verbose(env, "failed to jit_subprogs %d\n", err);
 	}
 #ifndef CONFIG_BPF_JIT_ALWAYS_ON
 	for (i = 0; i < prog->len; i++, insn++) {

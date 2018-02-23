@@ -146,6 +146,8 @@ struct bpf_insn_aux_data {
 		s32 call_imm;			/* saved imm field of call insn */
 	};
 	int ctx_field_size; /* the ctx field size for load insn, maybe 0 */
+	u16 subprogno; /* subprog in which this insn resides, valid iff @seen */
+	u16 subprog_off; /* insn_idx within subprog, computed in jit_subprogs */
 	bool seen; /* this insn was processed by the verifier */
 };
 
@@ -168,6 +170,15 @@ static inline bool bpf_verifier_log_full(const struct bpf_verifer_log *log)
 
 #define BPF_MAX_SUBPROGS 256
 
+struct bpf_subprog_info {
+	/* which other subprogs does this one directly call? */
+	DECLARE_BITMAP(callees, BPF_MAX_SUBPROGS);
+	u32 start; /* insn idx of function entry point */
+	u16 stack_depth; /* max. stack depth used by this function */
+	u16 total_stack_depth; /* max. stack depth used by entire call chain */
+	u16 len; /* #insns in this subprog */
+};
+
 /* single container for all structs
  * one verifier_env per bpf_check() call
  */
@@ -186,20 +197,23 @@ struct bpf_verifier_env {
 	bool seen_direct_write;
 	struct bpf_insn_aux_data *insn_aux_data; /* array of per-insn state */
 	struct bpf_verifer_log log;
-	u32 subprog_starts[BPF_MAX_SUBPROGS];
-	/* computes the stack depth of each bpf function */
-	u16 subprog_stack_depth[BPF_MAX_SUBPROGS + 1];
+	struct bpf_subprog_info subprog_info[BPF_MAX_SUBPROGS];
 	u32 subprog_cnt;
 };
 
 __printf(2, 3) void bpf_verifier_log_write(struct bpf_verifier_env *env,
 					   const char *fmt, ...);
 
-static inline struct bpf_reg_state *cur_regs(struct bpf_verifier_env *env)
+static inline struct bpf_func_state *cur_frame(struct bpf_verifier_env *env)
 {
 	struct bpf_verifier_state *cur = env->cur_state;
 
-	return cur->frame[cur->curframe]->regs;
+	return cur->frame[cur->curframe];
+}
+
+static inline struct bpf_reg_state *cur_regs(struct bpf_verifier_env *env)
+{
+	return cur_frame(env)->regs;
 }
 
 int bpf_prog_offload_verifier_prep(struct bpf_verifier_env *env);
