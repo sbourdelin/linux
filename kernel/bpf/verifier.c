@@ -3813,83 +3813,110 @@ static int check_return_code(struct bpf_verifier_env *env)
 
 #define STATE_LIST_MARK ((struct bpf_verifier_state_list *) -1L)
 
-static int mark_jump_target(struct bpf_verifier_env *env, int from, int off)
-{
-	int to = from + off + 1;
-
-	if (to < 0 || to >= env->prog->len) {
-		verbose(env, "jump out of range from insn %d to %d\n", from, to);
-		return -EINVAL;
-	}
-	/* mark branch target for state pruning */
-	env->explored_states[to] = STATE_LIST_MARK;
-	return 0;
-}
-
 /* Mark jump/branch targets for control flow tracking & state pruning */
 static int prepare_cfg_marks(struct bpf_verifier_env *env)
 {
 	struct bpf_insn *insns = env->prog->insnsi;
 	int insn_cnt = env->prog->len, i, err = 0;
+	unsigned long *frontier, *visited;
 
-	for (i = 0; i < insn_cnt; i++) {
-		u8 opcode = BPF_OP(insns[i].code);
+	frontier = kcalloc(BITS_TO_LONGS(insn_cnt), sizeof(unsigned long),
+			   GFP_KERNEL);
+	if (!frontier)
+		return -ENOMEM;
+	visited = kcalloc(BITS_TO_LONGS(insn_cnt), sizeof(unsigned long),
+			  GFP_KERNEL);
+	if (!visited) {
+		err = -ENOMEM;
+		goto out_frontier;
+	}
 
+	/* insn 0 is our start node */
+	__set_bit(0, frontier);
+
+	/* flood fill to find all reachable insns and mark jump targets */
+	while (true) {
+		bool fallthrough = false, jump = false;
+		int target;
+		u8 opcode;
+
+		/* select a frontier node */
+		i = find_first_bit(frontier, insn_cnt);
+		if (i >= insn_cnt) /* frontier is empty, done */
+			break;
+		/* remove it from the frontier */
+		__clear_bit(i, frontier);
+		/* mark it as visited */
+		__set_bit(i, visited);
+		opcode = BPF_OP(insns[i].code);
 		if (BPF_CLASS(insns[i].code) != BPF_JMP) {
-			if (i + 1 == insn_cnt) {
+			fallthrough = true;
+		} else {
+			switch (opcode) {
+			case BPF_EXIT:
+				break;
+			case BPF_CALL:
+				/* following insn is target of function return */
+				fallthrough = true;
+				/* subprog call insns 'branch both ways', as the
+				 * subprog will eventually exit
+				 */
+				if (insns[i].src_reg == BPF_PSEUDO_CALL) {
+					jump = true;
+					target = i + insns[i].imm + 1;
+				}
+				break;
+			case BPF_JA:
+				/* unconditional jump; mark target */
+				jump = true;
+				target = i + insns[i].off + 1;
+				break;
+			default:
+				/* conditional jump; branch both ways */
+				fallthrough = true;
+				jump = true;
+				target = i + insns[i].off + 1;
+				break;
+			}
+		}
+		/* if targets are unvisited, add them to the frontier */
+		if (fallthrough) {
+			if (i + 1 >= insn_cnt) {
 				verbose(env, "no exit/jump at end of program (insn %d)\n",
 					i);
-				return -EINVAL;
+				err = -EINVAL;
+				goto out_visited;
 			}
-			continue;
+			if (!test_bit(i + 1, visited))
+				__set_bit(i + 1, frontier);
 		}
-		switch (opcode) {
-		case BPF_EXIT:
-			continue;
-		case BPF_CALL:
-			/* following insn is target of function return */
-			err = mark_jump_target(env, i, 0);
-			if (err)
-				return err;
-			if (insns[i].src_reg == BPF_PSEUDO_CALL)
-				err = mark_jump_target(env, i, insns[i].imm);
-			break;
-		case BPF_JA:
-			/* unconditional jump; mark target */
-			err = mark_jump_target(env, i, insns[i].off);
-			break;
-		default:
-			/* conditional jump; mark following insn and target */
-			err = mark_jump_target(env, i, 0);
-			if (err)
-				return err;
-			err = mark_jump_target(env, i, insns[i].off);
+		if (jump) {
+			if (target < 0 || target >= insn_cnt) {
+				verbose(env, "jump out of range from insn %d to %d\n", i, target);
+				err = -EINVAL;
+				goto out_visited;
+			}
+			if (!test_bit(target, visited))
+				__set_bit(target, frontier);
+			/* mark branch target for state pruning */
+			env->explored_states[target] = STATE_LIST_MARK;
+			if (fallthrough)
+				/* mark fallthrough for state pruning */
+				env->explored_states[i + 1] = STATE_LIST_MARK;
 		}
-		if (err)
-			return err;
 	}
 
-	/* Second pass, to detect statically unreachable code.  Any target of
-	 * a jump or call will have a state-list mark
-	 */
-	for (i = 0; i < insn_cnt; i++) {
-		/* insn following a non-jump is statically reachable */
-		if (BPF_CLASS(insns[i].code) != BPF_JMP)
-			continue;
-		/* insn following a CALL or conditional jump will have been
-		 * marked by that insn (see above).  So if following insn is
-		 * not marked, then we're an EXIT or JA and thus the
-		 * following insn is statically unreachable.
-		 * If we're last insn, and we're not an EXIT or JA, then first
-		 * pass would have complained in mark_jump_target().
-		 */
-		if (i + 1 < insn_cnt)
-			if (env->explored_states[i + 1] != STATE_LIST_MARK) {
-				verbose(env, "unreachable insn %d\n", i + 1);
-				return -EINVAL;
-			}
+	/* Check for statically unreachable code. */
+	i = find_first_zero_bit(visited, insn_cnt);
+	if (i < insn_cnt) {
+		verbose(env, "unreachable insn %d\n", i);
+		err = -EINVAL;
 	}
-	return 0;
+out_visited:
+	kfree(visited);
+out_frontier:
+	kfree(frontier);
+	return err;
 }
 
 /* check %cur's range satisfies %old's */
