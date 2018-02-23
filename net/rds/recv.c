@@ -577,6 +577,35 @@ out:
 	return ret;
 }
 
+static int rds_recvmsg_zcookie(struct rds_sock *rs, struct msghdr *msg)
+{
+	struct sk_buff *skb;
+	struct sk_buff_head *q = &rs->rs_zcookie_queue;
+	struct rds_zcopy_cookies *done;
+	int ret;
+
+	if (!sock_flag(rds_rs_to_sk(rs), SOCK_ZEROCOPY) || !skb_peek(q))
+		return 0;
+
+	if (!msg->msg_control ||
+	    msg->msg_controllen < CMSG_SPACE(sizeof(*done)))
+		return 0;
+
+	skb = skb_dequeue(q);
+	if (!skb)
+		return 0;
+	done = (struct rds_zcopy_cookies *)skb->cb;
+	ret = done->num;
+	if (put_cmsg(msg, SOL_RDS, RDS_CMSG_ZCOPY_COMPLETION, sizeof(*done),
+		     done)) {
+		skb_queue_head(q, skb);
+		ret = 0;
+	} else {
+		consume_skb(skb);
+	}
+	return ret;
+}
+
 int rds_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 		int msg_flags)
 {
@@ -586,6 +615,7 @@ int rds_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 	int ret = 0, nonblock = msg_flags & MSG_DONTWAIT;
 	DECLARE_SOCKADDR(struct sockaddr_in *, sin, msg->msg_name);
 	struct rds_incoming *inc = NULL;
+	int ncookies;
 
 	/* udp_recvmsg()->sock_recvtimeo() gets away without locking too.. */
 	timeo = sock_rcvtimeo(sk, nonblock);
@@ -611,7 +641,8 @@ int rds_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 
 		if (!rds_next_incoming(rs, &inc)) {
 			if (nonblock) {
-				ret = -EAGAIN;
+				ncookies = rds_recvmsg_zcookie(rs, msg);
+				ret = ncookies ? 0 : -EAGAIN;
 				break;
 			}
 
@@ -660,6 +691,7 @@ int rds_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 			ret = -EFAULT;
 			goto out;
 		}
+		ncookies = rds_recvmsg_zcookie(rs, msg);
 
 		rds_stats_inc(s_recv_delivered);
 
