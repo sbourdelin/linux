@@ -1156,6 +1156,15 @@ void hci_conn_del_sysfs(struct hci_conn *conn);
 #define bredr_sc_enabled(dev)  (lmp_sc_capable(dev) && \
 				hci_dev_test_flag(dev, HCI_SC_ENABLED))
 
+#define scan_1m(dev) (hci_dev_test_flag(dev, HCI_LE_PHY_1M_TX) || \
+		      hci_dev_test_flag(dev, HCI_LE_PHY_1M_RX))
+
+#define scan_2m(dev) (hci_dev_test_flag(dev, HCI_LE_PHY_2M_TX) || \
+		      hci_dev_test_flag(dev, HCI_LE_PHY_2M_RX))
+
+#define scan_coded(dev) (hci_dev_test_flag(dev, HCI_LE_PHY_CODED_TX) || \
+			 hci_dev_test_flag(dev, HCI_LE_PHY_CODED_RX))
+
 /* Use ext scanning if set ext scan param and ext scan enable is supported */
 #define use_ext_scan(dev) (((dev)->commands[37] & 0x20) && \
 			   ((dev)->commands[37] & 0x40))
