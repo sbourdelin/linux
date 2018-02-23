@@ -3,6 +3,7 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "sane_ctype.h"
 
@@ -360,15 +361,18 @@ char *rtrim(char *s)
 
 char *asprintf_expr_inout_ints(const char *var, bool in, size_t nints, int *ints)
 {
-	/*
-	 * FIXME: replace this with an expression using log10() when we
-	 * find a suitable implementation, maybe the one in the dvb drivers...
-	 *
-	 * "%s == %d || " = log10(MAXINT) * 2 + 8 chars for the operators
-	 */
-	size_t size = nints * 28 + 1; /* \0 */
+	int max_int = 1;
+	int no_digits;
+	size_t size;
 	size_t i, printed = 0;
-	char *expr = malloc(size);
+	char *expr = NULL;
+
+	for (i = 0; i < nints; ++i)
+		max_int = max(ints[i], max_int);
+
+	no_digits = log10(max_int) + 1;
+	size = (no_digits + strlen(var) + 8) * nints;
+	expr = malloc(size);
 
 	if (expr) {
 		const char *or_and = "||", *eq_neq = "==";
