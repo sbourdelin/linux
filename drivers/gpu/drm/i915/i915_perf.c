@@ -3019,7 +3019,8 @@ static bool gen7_is_valid_b_counter_addr(struct drm_i915_private *dev_priv, u32 
 		(addr >= i915_mmio_reg_offset(OAREPORTTRIG1) &&
 		 addr <= i915_mmio_reg_offset(OAREPORTTRIG8)) ||
 		(addr >= i915_mmio_reg_offset(OACEC0_0) &&
-		 addr <= i915_mmio_reg_offset(OACEC7_1));
+		 addr <= i915_mmio_reg_offset(OACEC7_1)) ||
+		addr == i915_mmio_reg_offset(NOASELECT);
 }
 
 static bool gen7_is_valid_mux_addr(struct drm_i915_private *dev_priv, u32 addr)

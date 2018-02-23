@@ -1155,6 +1155,8 @@ static inline bool i915_mmio_reg_valid(i915_reg_t reg)
 
 #define HSW_MBVID2_MISR0	_MMIO(0x9EC0)
 
+#define NOASELECT		_MMIO(0x236C)
+
 /* NOA (Gen8+) */
 #define NOA_CONFIG(i)	    _MMIO(0x0D0C + (i) * 4)
 
