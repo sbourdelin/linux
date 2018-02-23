@@ -9768,11 +9768,14 @@ enum skl_power_gate {
 
 #define DSS_CONTROL1				_MMIO(0x67400)
 #define JOINER_ENABLE				(1 << 30)
+#define JOINER_DISABLE				(0 << 30)
 #define SPLITTER_ENABLE				(1 << 31)
 
 #define DSS_CONTROL2				_MMIO(0x67404)
 #define LEFT_BRANCH_VDSC_ENABLE			(1 << 31)
+#define LEFT_BRANCH_VDSC_DISABLE		(0 << 31)
 #define RIGHT_BRANCH_VDSC_ENABLE		(1 << 15)
+#define RIGHT_BRANCH_VDSC_DISABLE		(0 << 15)
 
 #define PIPE_DSS_CTL1_PB			_MMIO(0x78200)
 #define PIPE_DSS_CTL2_PB			_MMIO(0x78204)

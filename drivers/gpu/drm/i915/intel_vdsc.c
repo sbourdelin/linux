@@ -1190,3 +1190,54 @@ void intel_dsc_enable(struct intel_encoder *encoder,
 		I915_WRITE(dsc_regs.dss_ctrl2_reg, dss_ctrl2_value);
 	}
 }
+
+void intel_dsc_disable(struct intel_encoder *encoder,
+				struct intel_crtc_state *pipe_config)
+{
+	struct intel_dp *intel_dp = enc_to_intel_dp(&encoder->base);
+	struct drm_i915_private *dev_priv = to_i915(encoder->base.dev);
+	struct intel_dsc_regs dsc_regs;
+	struct drm_crtc *crtc = pipe_config->base.crtc;
+	struct intel_crtc *intel_crtc = to_intel_crtc(crtc);
+	int pipe = intel_crtc->pipe;
+	int type = encoder->type;
+	unsigned int dss_ctrl1_value = 0;
+	unsigned int dss_ctrl2_value = 0;
+
+	if ((INTEL_GEN(dev_priv) < 9) ||
+				!intel_dp->compr_params.compression_support)
+		return;
+
+	if (type == INTEL_OUTPUT_EDP) {
+		dsc_regs.dss_ctrl1_reg = DSS_CONTROL1;
+		dsc_regs.dss_ctrl2_reg = DSS_CONTROL2;
+	} else if (type == INTEL_OUTPUT_DP) {
+		switch (pipe) {
+		case PIPE_A:
+			dsc_regs.dss_ctrl1_reg = PIPE_DSS_CTL1_PB;
+			dsc_regs.dss_ctrl2_reg = PIPE_DSS_CTL2_PB;
+			break;
+		case PIPE_B:
+			dsc_regs.dss_ctrl1_reg = PIPE_DSS_CTL1_PC;
+			dsc_regs.dss_ctrl2_reg = PIPE_DSS_CTL2_PC;
+			break;
+		default:
+			return;
+		}
+	} else {
+		DRM_ERROR("Func:%s Unsupported port:%d\n", __func__, type);
+	}
+
+	dss_ctrl1_value = I915_READ(dsc_regs.dss_ctrl1_reg);
+	dss_ctrl2_value = I915_READ(dsc_regs.dss_ctrl2_reg);
+
+	if ((dss_ctrl2_value & LEFT_BRANCH_VDSC_ENABLE) ||
+		(dss_ctrl2_value & RIGHT_BRANCH_VDSC_ENABLE))
+		dss_ctrl2_value &= LEFT_BRANCH_VDSC_DISABLE &
+						RIGHT_BRANCH_VDSC_DISABLE;
+	I915_WRITE(dsc_regs.dss_ctrl2_reg, dss_ctrl2_value);
+
+	if (dss_ctrl1_value & JOINER_ENABLE)
+		dss_ctrl1_value &= JOINER_DISABLE;
+	I915_WRITE(dsc_regs.dss_ctrl1_reg, dss_ctrl1_value);
+}
