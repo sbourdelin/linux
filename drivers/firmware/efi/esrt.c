@@ -335,6 +335,14 @@ void __init efi_esrt_init(void)
 	pr_info("Reserving ESRT space from %pa to %pa.\n", &esrt_data, &end);
 	efi_mem_reserve(esrt_data, esrt_data_size);
 
+	/*
+	 * Mark the ESRT memory region as nomap to avoid it being exposed as
+	 * System RAM in /proc/iomem. Otherwise this block can be overwritten
+	 * which will then cause failures in kexec'd kernels since the ESRT
+	 * information is no longer there.
+	 */
+	memblock_mark_nomap(esrt_data, esrt_data_size);
+
 	pr_debug("esrt-init: loaded.\n");
 err_memunmap:
 	early_memunmap(va, size);
