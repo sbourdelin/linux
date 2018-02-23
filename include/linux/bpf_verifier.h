@@ -121,12 +121,6 @@ struct bpf_func_state {
 	 */
 	u32 subprogno;
 
-	/* loop detection; points into an explored_state */
-	struct bpf_func_state *parent;
-	/* These flags are only meaningful in an explored_state, not cur_state */
-	bool bounded_loop, conditional;
-	int live_children;
-
 	/* should be second to last. See copy_func_state() */
 	int allocated_stack;
 	struct bpf_stack_state *stack;
@@ -137,6 +131,12 @@ struct bpf_verifier_state {
 	/* call stack tracking */
 	struct bpf_func_state *frame[MAX_CALL_FRAMES];
 	u32 curframe;
+
+	/* loop detection; points into an explored_state */
+	struct bpf_verifier_state *parent;
+	/* These flags are only meaningful in an explored_state, not cur_state */
+	bool bounded_loop, conditional;
+	int live_children;
 };
 
 /* linked list of verifier states used to prune search */
