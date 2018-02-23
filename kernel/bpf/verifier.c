@@ -472,6 +472,22 @@ static int pop_stack(struct bpf_verifier_env *env, int *prev_insn_idx,
 	return 0;
 }
 
+/* Throw away top element of stack.  Like pop_stack but don't update cur_state */
+static int unpush_stack(struct bpf_verifier_env *env)
+{
+	struct bpf_verifier_stack_elem *elem, *head = env->head;
+
+	if (env->head == NULL)
+		return -ENOENT;
+
+	elem = head->next;
+	free_verifier_state(&head->st, false);
+	kfree(head);
+	env->head = elem;
+	env->stack_size--;
+	return 0;
+}
+
 static struct bpf_verifier_state *push_stack(struct bpf_verifier_env *env,
 					     int insn_idx, int prev_insn_idx)
 {
@@ -2376,8 +2392,10 @@ static int adjust_ptr_min_max_vals(struct bpf_verifier_env *env,
 	if ((known && (smin_val != smax_val || umin_val != umax_val)) ||
 	    smin_val > smax_val || umin_val > umax_val) {
 		/* Taint dst register if offset had invalid bounds derived from
-		 * e.g. dead branches.
+		 * e.g. dead branches.  This should be impossible now, since we
+		 * prune dead branches in check_cond_jmp_op().
 		 */
+		WARN_ON_ONCE(1);
 		__mark_reg_unknown(dst_reg);
 		return 0;
 	}
@@ -3455,6 +3473,13 @@ static bool try_match_pkt_pointers(const struct bpf_insn *insn,
 	return true;
 }
 
+static bool reg_is_impossible(struct bpf_reg_state reg)
+{
+	return reg.type == SCALAR_VALUE &&
+	       (reg.umin_value > reg.umax_value ||
+		reg.smin_value > reg.smax_value);
+}
+
 static int check_cond_jmp_op(struct bpf_verifier_env *env,
 			     struct bpf_insn *insn, int *insn_idx)
 {
@@ -3574,6 +3599,32 @@ static int check_cond_jmp_op(struct bpf_verifier_env *env,
 	}
 	if (env->log.level)
 		print_verifier_state(env, this_branch->frame[this_branch->curframe]);
+
+	if (reg_is_impossible(other_branch_regs[insn->src_reg]) ||
+	    reg_is_impossible(other_branch_regs[insn->dst_reg])) {
+		/* if (false) goto pc+off;
+		 * only follow fall-through branch, since
+		 * that's where the program will go
+		 */
+		verbose(env, "pruning impossible jump\n");
+		unpush_stack(env);
+	} else if (reg_is_impossible(regs[insn->src_reg]) ||
+		   reg_is_impossible(regs[insn->dst_reg])) {
+		/* if (true) goto pc+off;
+		 * only follow the goto, ignore fall-through
+		 */
+		verbose(env, "pruning impossible fall-through\n");
+		err = pop_stack(env, NULL, insn_idx);
+		if (err < 0) {
+			if (err != -ENOENT)
+				return err;
+		}
+		/* pushed goto included the +1, which caller will try to apply
+		 * so let's undo it here.
+		 */
+		(*insn_idx)--;
+	}
+
 	return 0;
 }
 
