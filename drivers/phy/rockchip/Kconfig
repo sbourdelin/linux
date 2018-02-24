@@ -30,7 +30,7 @@ config PHY_ROCKCHIP_PCIE
 	tristate "Rockchip PCIe PHY Driver"
 	depends on (ARCH_ROCKCHIP && OF) || COMPILE_TEST
 	select GENERIC_PHY
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  Enable this to support the Rockchip PCIe PHY.
 

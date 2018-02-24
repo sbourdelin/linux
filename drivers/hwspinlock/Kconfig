@@ -19,7 +19,7 @@ config HWSPINLOCK_QCOM
 	tristate "Qualcomm Hardware Spinlock device"
 	depends on HWSPINLOCK
 	depends on ARCH_QCOM
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  Say y here to support the Qualcomm Hardware Mutex functionality, which
 	  provides a synchronisation mechanism for the various processors on

@@ -5,7 +5,7 @@ config PHY_DA8XX_USB
 	tristate "TI DA8xx USB PHY Driver"
 	depends on ARCH_DAVINCI_DA8XX
 	select GENERIC_PHY
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  Enable this to support the USB PHY on DA8xx SoCs.
 

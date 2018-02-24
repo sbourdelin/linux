@@ -50,7 +50,7 @@ config RESET_HSDK
 config RESET_IMX7
 	bool "i.MX7 Reset Driver" if COMPILE_TEST
 	default SOC_IMX7D
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  This enables the reset controller driver for i.MX7 SoCs.
 
@@ -110,7 +110,7 @@ config RESET_TI_SCI
 config RESET_TI_SYSCON
 	tristate "TI SYSCON Reset Driver"
 	depends on HAS_IOMEM
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  This enables the reset driver support for TI devices with
 	  memory-mapped reset registers as part of a syscon device node. If

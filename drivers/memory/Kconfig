@@ -29,7 +29,7 @@ config ATMEL_EBI
 	bool "Atmel EBI driver"
 	default y
 	depends on ARCH_AT91 && OF
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	select MFD_ATMEL_SMC
 	help
 	  Driver for Atmel EBI controller.

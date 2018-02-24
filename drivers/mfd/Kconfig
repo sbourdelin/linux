@@ -123,7 +123,7 @@ config MFD_ATMEL_HLCDC
 
 config MFD_ATMEL_SMC
 	bool
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 
 config MFD_BCM590XX
 	tristate "Broadcom BCM590xx PMUs"
@@ -1206,6 +1206,7 @@ config MFD_SUN6I_PRCM
 config MFD_SYSCON
 	bool "System Controller Register R/W Based on Regmap"
 	select REGMAP_MMIO
+	default y
 	help
 	  Select this option to enable accessing system control registers
 	  via regmap.
@@ -1843,7 +1844,7 @@ config MFD_VEXPRESS_SYSREG
 	select CLKSRC_MMIO
 	select GPIO_GENERIC_PLATFORM
 	select MFD_CORE
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  System Registers are the platform configuration block
 	  on the ARM Ltd. Versatile Express board.

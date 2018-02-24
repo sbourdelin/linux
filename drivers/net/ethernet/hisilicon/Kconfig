@@ -39,7 +39,7 @@ config HIP04_ETH
 	tristate "HISILICON P04 Ethernet support"
 	depends on HAS_IOMEM	# For MFD_SYSCON
 	select MARVELL_PHY
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	select HNS_MDIO
 	---help---
 	  If you wish to compile a kernel for a hardware with hisilicon p04 SoC and

@@ -107,7 +107,7 @@ config PCI_LAYERSCAPE
 	depends on PCI
 	depends on OF && (ARM || ARCH_LAYERSCAPE)
 	depends on PCI_MSI_IRQ_DOMAIN
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	select PCIE_DW_HOST
 	help
 	  Say Y here if you want PCIe controller support on Layerscape SoCs.

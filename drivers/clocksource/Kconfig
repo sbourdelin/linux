@@ -61,7 +61,7 @@ config FTTMR010_TIMER
 	depends on HAS_IOMEM
 	select CLKSRC_MMIO
 	select TIMER_OF
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  Enables support for the Faraday Technology timer block
 	  FTTMR010.
@@ -387,7 +387,7 @@ config ATMEL_PIT
 config ATMEL_ST
 	bool "Atmel ST timer support" if COMPILE_TEST
 	select TIMER_OF
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  Support for the Atmel ST timer.
 

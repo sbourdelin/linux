@@ -136,7 +136,7 @@ config COMMON_CLK_CS2000_CP
 config COMMON_CLK_GEMINI
 	bool "Clock driver for Cortina Systems Gemini SoC"
 	depends on ARCH_GEMINI || COMPILE_TEST
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	select RESET_CONTROLLER
 	---help---
 	  This driver supports the SoC clocks on the Cortina Systems Gemini
@@ -146,7 +146,7 @@ config COMMON_CLK_ASPEED
 	bool "Clock driver for Aspeed BMC SoCs"
 	depends on ARCH_ASPEED || COMPILE_TEST
 	default ARCH_ASPEED
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	select RESET_CONTROLLER
 	---help---
 	  This driver supports the SoC clocks on the Aspeed BMC platforms.
@@ -193,9 +193,8 @@ config COMMON_CLK_XGENE
 	  Sypport for the APM X-Gene SoC reference, PLL, and device clocks.
 
 config COMMON_CLK_NXP
-	def_bool COMMON_CLK && (ARCH_LPC18XX || ARCH_LPC32XX)
+	def_bool COMMON_CLK && ((ARCH_LPC18XX && MFD_SYSCON) || ARCH_LPC32XX)
 	select REGMAP_MMIO if ARCH_LPC32XX
-	select MFD_SYSCON if ARCH_LPC18XX
 	---help---
 	  Support for clock providers on NXP platforms.
 
@@ -224,7 +223,7 @@ config COMMON_CLK_PIC32
 config COMMON_CLK_OXNAS
 	bool "Clock driver for the OXNAS SoC Family"
 	depends on ARCH_OXNAS || COMPILE_TEST
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	---help---
 	  Support for the OXNAS SoC Family clocks.
 

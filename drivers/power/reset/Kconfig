@@ -170,7 +170,7 @@ config POWER_RESET_KEYSTONE
 	bool "Keystone reset driver"
 	depends on ARCH_KEYSTONE || COMPILE_TEST
 	depends on HAS_IOMEM
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  Reboot support for the KEYSTONE SoCs.
 
@@ -178,7 +178,7 @@ config POWER_RESET_SYSCON
 	bool "Generic SYSCON regmap reset driver"
 	depends on OF
 	depends on HAS_IOMEM
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  Reboot support for generic SYSCON mapped register reset.
 
@@ -186,7 +186,7 @@ config POWER_RESET_SYSCON_POWEROFF
 	bool "Generic SYSCON regmap poweroff driver"
 	depends on OF
 	depends on HAS_IOMEM
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  Poweroff support for generic SYSCON mapped register poweroff.
 

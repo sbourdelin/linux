@@ -374,8 +374,8 @@ config HAVE_S3C2410_WATCHDOG
 config S3C2410_WATCHDOG
 	tristate "S3C2410 Watchdog"
 	depends on HAVE_S3C2410_WATCHDOG || COMPILE_TEST
+	depends on MFD_SYSCON
 	select WATCHDOG_CORE
-	select MFD_SYSCON if ARCH_EXYNOS
 	help
 	  Watchdog timer block in the Samsung SoCs. This will reboot
 	  the system when the timer expires with the watchdog enabled.
@@ -545,7 +545,7 @@ config TS4800_WATCHDOG
 	depends on HAS_IOMEM && OF
 	depends on SOC_IMX51 || COMPILE_TEST
 	select WATCHDOG_CORE
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  Technologic Systems TS-4800 has watchdog timer implemented in
 	  an external FPGA. Say Y here if you want to support for the

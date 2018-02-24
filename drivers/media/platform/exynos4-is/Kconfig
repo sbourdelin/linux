@@ -20,7 +20,7 @@ config VIDEO_S5P_FIMC
 	depends on HAS_DMA
 	select VIDEOBUF2_DMA_CONTIG
 	select V4L2_MEM2MEM_DEV
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	select VIDEO_EXYNOS4_IS_COMMON
 	help
 	  This is a V4L2 driver for Samsung S5P and EXYNOS4 SoC camera host

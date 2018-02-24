@@ -176,7 +176,7 @@ config AHCI_CEVA
 config AHCI_MTK
 	tristate "MediaTek AHCI SATA support"
 	depends on ARCH_MEDIATEK
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	help
 	  This option enables support for the MediaTek SoC's
 	  onboard AHCI SATA controller.

@@ -168,7 +168,7 @@ config PINCTRL_GEMINI
 	default ARCH_GEMINI
 	select PINMUX
 	select GENERIC_PINCONF
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 
 config PINCTRL_MCP23S08
 	tristate "Microchip MCP23xxx I/O expander"
@@ -194,14 +194,14 @@ config PINCTRL_OXNAS
 	select GPIOLIB
 	select OF_GPIO
 	select GPIOLIB_IRQCHIP
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 
 config PINCTRL_ROCKCHIP
 	bool
 	select PINMUX
 	select GENERIC_PINCONF
 	select GENERIC_IRQ_CHIP
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 
 config PINCTRL_RZA1
 	bool "Renesas RZ/A1 gpio and pinctrl driver"

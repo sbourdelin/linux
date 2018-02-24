@@ -1,7 +1,7 @@
 config COMMON_CLK_BOSTON
 	bool "Clock driver for MIPS Boston boards"
 	depends on MIPS || COMPILE_TEST
-	select MFD_SYSCON
+	depends on MFD_SYSCON
 	---help---
 	  Enable this to support the system & CPU clocks on the MIPS Boston
 	  development board from Imagination Technologies. These are simple
