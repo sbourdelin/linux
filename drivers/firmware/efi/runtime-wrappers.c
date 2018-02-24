@@ -68,6 +68,16 @@
  * semaphore (efi_runtime_lock) and caller waits until the work is
  * finished, hence _only_ one work is queued at a time. So, queue_work()
  * should never fail.
+ *
+ * efi_rts_workqueue to run efi_runtime_services() shouldn't be used
+ * while in atomic, because caller thread might sleep. pstore writes
+ * could potentially be invoked in interrupt context and it uses
+ * set_variable<>() and query_variable_info<>(), so pstore code doesn't
+ * use efi_rts_workqueue.
+ *
+ * Semantics that caller function should follow while passing arguments:
+ * 1. If argument is a pointer (of any type), pass it as is.
+ * 2. If argument is a value (of any type), address of the value is passed.
  */
 #define efi_queue_work(_rts, _arg1, _arg2, _arg3, _arg4, _arg5)		\
 ({									\
@@ -150,7 +160,7 @@ static efi_status_t virt_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc)
 
 	if (down_interruptible(&efi_runtime_lock))
 		return EFI_ABORTED;
-	status = efi_call_virt(get_time, tm, tc);
+	status = efi_queue_work(GET_TIME, tm, tc, NULL, NULL, NULL);
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -161,7 +171,7 @@ static efi_status_t virt_efi_set_time(efi_time_t *tm)
 
 	if (down_interruptible(&efi_runtime_lock))
 		return EFI_ABORTED;
-	status = efi_call_virt(set_time, tm);
+	status = efi_queue_work(SET_TIME, tm, NULL, NULL, NULL, NULL);
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -174,7 +184,8 @@ static efi_status_t virt_efi_get_wakeup_time(efi_bool_t *enabled,
 
 	if (down_interruptible(&efi_runtime_lock))
 		return EFI_ABORTED;
-	status = efi_call_virt(get_wakeup_time, enabled, pending, tm);
+	status = efi_queue_work(GET_WAKEUP_TIME, enabled, pending, tm, NULL,
+				NULL);
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -185,7 +196,8 @@ static efi_status_t virt_efi_set_wakeup_time(efi_bool_t enabled, efi_time_t *tm)
 
 	if (down_interruptible(&efi_runtime_lock))
 		return EFI_ABORTED;
-	status = efi_call_virt(set_wakeup_time, enabled, tm);
+	status = efi_queue_work(SET_WAKEUP_TIME, &enabled, tm, NULL, NULL,
+				NULL);
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -200,8 +212,8 @@ static efi_status_t virt_efi_get_variable(efi_char16_t *name,
 
 	if (down_interruptible(&efi_runtime_lock))
 		return EFI_ABORTED;
-	status = efi_call_virt(get_variable, name, vendor, attr, data_size,
-			       data);
+	status = efi_queue_work(GET_VARIABLE, name, vendor, attr, data_size,
+				data);
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -214,7 +226,8 @@ static efi_status_t virt_efi_get_next_variable(unsigned long *name_size,
 
 	if (down_interruptible(&efi_runtime_lock))
 		return EFI_ABORTED;
-	status = efi_call_virt(get_next_variable, name_size, name, vendor);
+	status = efi_queue_work(GET_NEXT_VARIABLE, name_size, name, vendor,
+				NULL, NULL);
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -229,8 +242,15 @@ static efi_status_t virt_efi_set_variable(efi_char16_t *name,
 
 	if (down_interruptible(&efi_runtime_lock))
 		return EFI_ABORTED;
-	status = efi_call_virt(set_variable, name, vendor, attr, data_size,
-			       data);
+
+	/* pstore shouldn't use efi_rts_wq while in atomic */
+	if (!in_atomic())
+		status = efi_queue_work(SET_VARIABLE, name, vendor, &attr,
+					&data_size, data);
+	else
+		status = efi_call_virt(set_variable, name, vendor, attr,
+				       data_size, data);
+
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -245,8 +265,14 @@ virt_efi_set_variable_nonblocking(efi_char16_t *name, efi_guid_t *vendor,
 	if (down_trylock(&efi_runtime_lock))
 		return EFI_NOT_READY;
 
-	status = efi_call_virt(set_variable, name, vendor, attr, data_size,
-			       data);
+	/* pstore shouldn't use efi_rts_wq while in atomic */
+	if (!in_atomic())
+		status = efi_queue_work(SET_VARIABLE_NONBLOCKING, &name, vendor,
+					&attr,	&data_size, data);
+	else
+		status = efi_call_virt(set_variable, name, vendor, attr,
+				       data_size, data);
+
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -264,8 +290,17 @@ static efi_status_t virt_efi_query_variable_info(u32 attr,
 
 	if (down_interruptible(&efi_runtime_lock))
 		return EFI_ABORTED;
-	status = efi_call_virt(query_variable_info, attr, storage_space,
-			       remaining_space, max_variable_size);
+
+	/* pstore shouldn't use efi_rts_wq while in atomic */
+	if (!in_atomic())
+		status = efi_queue_work(QUERY_VARIABLE_INFO, &attr,
+					storage_space, remaining_space,
+					max_variable_size, NULL);
+	else
+		status = efi_call_virt(query_variable_info, attr,
+				       storage_space, remaining_space,
+				       max_variable_size);
+
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -284,8 +319,16 @@ virt_efi_query_variable_info_nonblocking(u32 attr,
 	if (down_trylock(&efi_runtime_lock))
 		return EFI_NOT_READY;
 
-	status = efi_call_virt(query_variable_info, attr, storage_space,
-			       remaining_space, max_variable_size);
+	/* pstore shouldn't use efi_rts_wq while in atomic */
+	if (!in_atomic())
+		status = efi_queue_work(QUERY_VARIABLE_INFO_NONBLOCKING, &attr,
+					storage_space, remaining_space,
+					max_variable_size, NULL);
+	else
+		status = efi_call_virt(query_variable_info, attr,
+				       storage_space, remaining_space,
+				       max_variable_size);
+
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -296,7 +339,8 @@ static efi_status_t virt_efi_get_next_high_mono_count(u32 *count)
 
 	if (down_interruptible(&efi_runtime_lock))
 		return EFI_ABORTED;
-	status = efi_call_virt(get_next_high_mono_count, count);
+	status = efi_queue_work(GET_NEXT_HIGH_MONO_COUNT, count, NULL, NULL,
+				NULL, NULL);
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -311,7 +355,8 @@ static void virt_efi_reset_system(int reset_type,
 			"could not get exclusive access to the firmware\n");
 		return;
 	}
-	__efi_call_virt(reset_system, reset_type, status, data_size, data);
+	efi_queue_work(RESET_SYSTEM, &reset_type, &status, &data_size, data,
+		       NULL);
 	up(&efi_runtime_lock);
 }
 
@@ -326,7 +371,8 @@ static efi_status_t virt_efi_update_capsule(efi_capsule_header_t **capsules,
 
 	if (down_interruptible(&efi_runtime_lock))
 		return EFI_ABORTED;
-	status = efi_call_virt(update_capsule, capsules, count, sg_list);
+	status = efi_queue_work(UPDATE_CAPSULE, capsules, &count, &sg_list,
+				NULL, NULL);
 	up(&efi_runtime_lock);
 	return status;
 }
@@ -343,8 +389,8 @@ static efi_status_t virt_efi_query_capsule_caps(efi_capsule_header_t **capsules,
 
 	if (down_interruptible(&efi_runtime_lock))
 		return EFI_ABORTED;
-	status = efi_call_virt(query_capsule_caps, capsules, count, max_size,
-			       reset_type);
+	status = efi_queue_work(QUERY_CAPSULE_CAPS, capsules, &count,
+				max_size, reset_type, NULL);
 	up(&efi_runtime_lock);
 	return status;
 }
