@@ -119,13 +119,17 @@ ip_vs_update_conntrack(struct sk_buff *skb, struct ip_vs_conn *cp, int outin)
 	if (outin) {
 		new_tuple.src.u3 = cp->daddr;
 		if (new_tuple.dst.protonum != IPPROTO_ICMP &&
-		    new_tuple.dst.protonum != IPPROTO_ICMPV6)
+		    new_tuple.dst.protonum != IPPROTO_ICMPV6) {
 			new_tuple.src.u.tcp.port = cp->dport;
+			ct->status |= IPS_SRC_NAT;
+		}
 	} else {
 		new_tuple.dst.u3 = cp->vaddr;
 		if (new_tuple.dst.protonum != IPPROTO_ICMP &&
-		    new_tuple.dst.protonum != IPPROTO_ICMPV6)
+		    new_tuple.dst.protonum != IPPROTO_ICMPV6) {
 			new_tuple.dst.u.tcp.port = cp->vport;
+			ct->status |= IPS_DST_NAT;
+		}
 	}
 	IP_VS_DBG(7, "%s: Updating conntrack ct=%p, status=0x%lX, "
 		  "ctinfo=%d, old reply=" FMT_TUPLE
