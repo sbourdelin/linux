@@ -668,7 +668,8 @@ static int i915_load_modeset_init(struct drm_device *dev)
 
 	intel_register_dsm_handler();
 
-	ret = vga_switcheroo_register_client(pdev, &i915_switcheroo_ops, false);
+	ret = vga_switcheroo_register_client(pdev, &i915_switcheroo_ops,
+					     HAS_RUNTIME_PM(dev_priv));
 	if (ret)
 		goto cleanup_vga_client;
 
