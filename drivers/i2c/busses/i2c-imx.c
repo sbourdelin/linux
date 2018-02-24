@@ -890,8 +890,10 @@ static int i2c_imx_xfer(struct i2c_adapter *adapter,
 	dev_dbg(&i2c_imx->adapter.dev, "<%s>\n", __func__);
 
 	result = pm_runtime_get_sync(i2c_imx->adapter.dev.parent);
-	if (result < 0)
+	if (result < 0) {
+		pm_runtime_put_noidle(i2c_imx->adapter.dev.parent);
 		goto out;
+	}
 
 	/* Start I2C transfer */
 	result = i2c_imx_start(i2c_imx);
@@ -1179,8 +1181,10 @@ static int i2c_imx_remove(struct platform_device *pdev)
 	int ret;
 
 	ret = pm_runtime_get_sync(&pdev->dev);
-	if (ret < 0)
+	if (ret < 0) {
+		pm_runtime_put_noidle(&pdev->dev);
 		return ret;
+	}
 
 	/* remove adapter */
 	dev_dbg(&i2c_imx->adapter.dev, "adapter removed\n");
