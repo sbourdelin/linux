@@ -1652,4 +1652,27 @@ struct linux_efi_tpm_eventlog {
 
 extern int efi_tpm_eventlog_init(void);
 
+/*
+ * efi_runtime_work:	Details of EFI Runtime Service work
+ * @func:		EFI Runtime Service function identifier
+ * @arg<1-5>:		EFI Runtime Service function arguments
+ * @status:		Status of executing EFI Runtime Service
+ */
+struct efi_runtime_work {
+	u8 func;
+	void *arg1;
+	void *arg2;
+	void *arg3;
+	void *arg4;
+	void *arg5;
+	efi_status_t status;
+	struct work_struct work;
+};
+
+/* Workqueue to queue EFI Runtime Services */
+extern struct workqueue_struct *efi_rts_wq;
+
+/* Call back function that calls EFI Runtime Services */
+extern void efi_call_rts(struct work_struct *work);
+
 #endif /* _LINUX_EFI_H */

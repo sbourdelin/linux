@@ -76,6 +76,8 @@ static unsigned long *efi_tables[] = {
 	&efi.mem_attr_table,
 };
 
+struct workqueue_struct *efi_rts_wq;
+
 static bool disable_runtime;
 static int __init setup_noefi(char *arg)
 {
@@ -328,6 +330,15 @@ static int __init efisubsys_init(void)
 
 	if (!efi_enabled(EFI_BOOT))
 		return 0;
+
+	/* Create a work queue to run EFI Runtime Services */
+	efi_rts_wq = create_workqueue("efi_rts_workqueue");
+	if (!efi_rts_wq) {
+		pr_err("Failed to create efi_rts_workqueue, EFI runtime services "
+		       "disabled.\n");
+		clear_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+		return 0;
+	}
 
 	/*
 	 * Clean DUMMY object calls EFI Runtime Service, set_variable(), so

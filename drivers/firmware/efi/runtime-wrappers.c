@@ -1,6 +1,14 @@
 /*
  * runtime-wrappers.c - Runtime Services function call wrappers
  *
+ * Implementation summary:
+ * -----------------------
+ * 1. When user/kernel thread requests to execute efi_runtime_service(),
+ * enqueue work to efi_rts_workqueue.
+ * 2. Caller thread waits until the work is finished because it's
+ * dependent on the return status and execution of efi_runtime_service().
+ * For instance, get_variable() and get_next_variable().
+ *
  * Copyright (C) 2014 Linaro Ltd. <ard.biesheuvel@linaro.org>
  *
  * Split off from arch/x86/platform/efi/efi.c
@@ -22,6 +30,8 @@
 #include <linux/mutex.h>
 #include <linux/semaphore.h>
 #include <linux/stringify.h>
+#include <linux/workqueue.h>
+
 #include <asm/efi.h>
 
 /*
@@ -32,6 +42,50 @@
 	efi_call_virt_pointer(efi.systab->runtime, f, args)
 #define __efi_call_virt(f, args...) \
 	__efi_call_virt_pointer(efi.systab->runtime, f, args)
+
+/* Each EFI Runtime Service is represented with a unique number */
+#define GET_TIME					0
+#define SET_TIME					1
+#define GET_WAKEUP_TIME					2
+#define SET_WAKEUP_TIME					3
+#define GET_VARIABLE					4
+#define GET_NEXT_VARIABLE				5
+#define SET_VARIABLE					6
+#define SET_VARIABLE_NONBLOCKING			7
+#define QUERY_VARIABLE_INFO				8
+#define QUERY_VARIABLE_INFO_NONBLOCKING			9
+#define GET_NEXT_HIGH_MONO_COUNT			10
+#define RESET_SYSTEM					11
+#define UPDATE_CAPSULE					12
+#define QUERY_CAPSULE_CAPS				13
+
+/*
+ * efi_queue_work:	Queue efi_runtime_service() and wait until it's done
+ * @rts:		efi_runtime_service() function identifier
+ * @rts_arg<1-5>:	efi_runtime_service() function arguments
+ *
+ * Accesses to efi_runtime_services() are serialized by a binary
+ * semaphore (efi_runtime_lock) and caller waits until the work is
+ * finished, hence _only_ one work is queued at a time. So, queue_work()
+ * should never fail.
+ */
+#define efi_queue_work(_rts, _arg1, _arg2, _arg3, _arg4, _arg5)		\
+({									\
+	struct efi_runtime_work efi_rts_work;				\
+	efi_rts_work.status = EFI_ABORTED;				\
+									\
+	INIT_WORK_ONSTACK(&efi_rts_work.work, efi_call_rts);		\
+	efi_rts_work.func = _rts;					\
+	efi_rts_work.arg1 = _arg1;					\
+	efi_rts_work.arg2 = _arg2;					\
+	efi_rts_work.arg3 = _arg3;					\
+	efi_rts_work.arg4 = _arg4;					\
+	efi_rts_work.arg5 = _arg5;					\
+	if (queue_work(efi_rts_wq, &efi_rts_work.work))			\
+		flush_work(&efi_rts_work.work);				\
+									\
+	efi_rts_work.status;						\
+})
 
 void efi_call_virt_check_flags(unsigned long flags, const char *call)
 {
@@ -311,4 +365,93 @@ void efi_native_runtime_setup(void)
 	efi.query_variable_info_nonblocking = virt_efi_query_variable_info_nonblocking;
 	efi.update_capsule = virt_efi_update_capsule;
 	efi.query_capsule_caps = virt_efi_query_capsule_caps;
+}
+
+/*
+ * Calls the appropriate efi_runtime_service() with the appropriate
+ * arguments.
+ *
+ * Semantics followed by efi_call_rts() to understand efi_runtime_work:
+ * 1. If argument was a pointer, recast it from void pointer to original
+ * pointer type.
+ * 2. If argument was a value, recast it from void pointer to original
+ * pointer type and dereference it.
+ */
+void efi_call_rts(struct work_struct *work)
+{
+	struct efi_runtime_work *efi_rts_work;
+	void *arg1, *arg2, *arg3, *arg4, *arg5;
+	efi_status_t status = EFI_NOT_FOUND;
+
+	efi_rts_work = container_of(work, struct efi_runtime_work, work);
+	arg1 = efi_rts_work->arg1;
+	arg2 = efi_rts_work->arg2;
+	arg3 = efi_rts_work->arg3;
+	arg4 = efi_rts_work->arg4;
+	arg5 = efi_rts_work->arg5;
+
+	switch (efi_rts_work->func) {
+	case GET_TIME:
+		status = efi_call_virt(get_time, (efi_time_t *)arg1,
+				       (efi_time_cap_t *)arg2);
+		break;
+	case SET_TIME:
+		status = efi_call_virt(set_time, (efi_time_t *)arg1);
+		break;
+	case GET_WAKEUP_TIME:
+		status = efi_call_virt(get_wakeup_time, (efi_bool_t *)arg1,
+				       (efi_bool_t *)arg2, (efi_time_t *)arg3);
+		break;
+	case SET_WAKEUP_TIME:
+		status = efi_call_virt(set_wakeup_time, *(efi_bool_t *)arg1,
+				       (efi_time_t *)arg2);
+		break;
+	case GET_VARIABLE:
+		status = efi_call_virt(get_variable, (efi_char16_t *)arg1,
+				       (efi_guid_t *)arg2, (u32 *)arg3,
+				       (unsigned long *)arg4, (void *)arg5);
+		break;
+	case GET_NEXT_VARIABLE:
+		status = efi_call_virt(get_next_variable, (unsigned long *)arg1,
+				       (efi_char16_t *)arg2,
+				       (efi_guid_t *)arg3);
+		break;
+	case SET_VARIABLE:
+	case SET_VARIABLE_NONBLOCKING:
+		status = efi_call_virt(set_variable, (efi_char16_t *)arg1,
+				       (efi_guid_t *)arg2, *(u32 *)arg3,
+				       *(unsigned long *)arg4, (void *)arg5);
+		break;
+	case QUERY_VARIABLE_INFO:
+	case QUERY_VARIABLE_INFO_NONBLOCKING:
+		status = efi_call_virt(query_variable_info, *(u32 *)arg1,
+				       (u64 *)arg2, (u64 *)arg3, (u64 *)arg4);
+		break;
+	case GET_NEXT_HIGH_MONO_COUNT:
+		status = efi_call_virt(get_next_high_mono_count, (u32 *)arg1);
+		break;
+	case RESET_SYSTEM:
+		__efi_call_virt(reset_system, *(int *)arg1,
+				*(efi_status_t *)arg2,
+				*(unsigned long *)arg3,
+				(efi_char16_t *)arg4);
+		break;
+	case UPDATE_CAPSULE:
+		status = efi_call_virt(update_capsule,
+				       (efi_capsule_header_t **)arg1,
+				       *(unsigned long *)arg2,
+				       *(unsigned long *)arg3);
+		break;
+	case QUERY_CAPSULE_CAPS:
+		status = efi_call_virt(query_capsule_caps,
+				       (efi_capsule_header_t **)arg1,
+				       *(unsigned long *)arg2, (u64 *)arg3,
+				       (int *)arg4);
+		break;
+	default:
+		pr_err("Not a valid EFI_RT_SERVICE?");
+		status = EFI_NOT_FOUND;
+		break;
+	}
+	efi_rts_work->status = status;
 }
