@@ -1210,7 +1210,6 @@ int most_start_channel(struct most_interface *iface, int id,
 		num_buffer = arm_mbo_chain(c, c->cfg.direction,
 					   most_write_completion);
 	if (unlikely(!num_buffer)) {
-		pr_info("failed to allocate memory\n");
 		ret = -ENOMEM;
 		goto error;
 	}
@@ -1389,7 +1388,6 @@ int most_register_interface(struct most_interface *iface)
 
 	iface->p = kzalloc(sizeof(*iface->p), GFP_KERNEL);
 	if (!iface->p) {
-		pr_info("Failed to allocate interface instance\n");
 		ida_simple_remove(&mdev_id, id);
 		return -ENOMEM;
 	}
