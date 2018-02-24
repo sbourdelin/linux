@@ -465,6 +465,7 @@ struct igb_nfc_input {
 struct igb_nfc_filter {
 	struct hlist_node nfc_node;
 	struct igb_nfc_input filter;
+	unsigned long cookie;
 	u16 etype_reg_index;
 	u16 sw_idx;
 	u16 action;
@@ -748,5 +749,9 @@ int igb_add_mac_filter(struct igb_adapter *adapter, const u8 *addr,
 		       const u8 queue, const u8 flags);
 int igb_del_mac_filter(struct igb_adapter *adapter, const u8 *addr,
 		       const u8 queue, const u8 flags);
+
+int igb_update_ethtool_nfc_entry(struct igb_adapter *adapter,
+				 struct igb_nfc_filter *input,
+				 u16 sw_idx);
 
 #endif /* _IGB_H_ */

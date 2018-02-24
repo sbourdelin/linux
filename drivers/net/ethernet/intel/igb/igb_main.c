@@ -2499,10 +2499,148 @@ static int igb_offload_cbs(struct igb_adapter *adapter,
 	return 0;
 }
 
+#define ETHER_TYPE_FULL_MASK ((__force __be16)~0)
+
+static int igb_parse_cls_flower(struct igb_adapter *adapter,
+				struct tc_cls_flower_offload *f,
+				int traffic_class,
+				struct igb_nfc_filter *input)
+{
+	if (f->dissector->used_keys &
+	    ~(BIT(FLOW_DISSECTOR_KEY_BASIC) |
+	      BIT(FLOW_DISSECTOR_KEY_CONTROL) |
+	      BIT(FLOW_DISSECTOR_KEY_ETH_ADDRS) |
+	      BIT(FLOW_DISSECTOR_KEY_VLAN))) {
+		dev_err(&adapter->pdev->dev, "Unsupported key used: 0x%x\n",
+			f->dissector->used_keys);
+		return -EOPNOTSUPP;
+	}
+
+	if (dissector_uses_key(f->dissector, FLOW_DISSECTOR_KEY_ETH_ADDRS)) {
+		struct flow_dissector_key_eth_addrs *key =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_ETH_ADDRS,
+						  f->key);
+
+		struct flow_dissector_key_eth_addrs *mask =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_ETH_ADDRS,
+						  f->mask);
+
+		if (is_broadcast_ether_addr(mask->dst)) {
+			input->filter.match_flags |=
+				IGB_FILTER_FLAG_DST_MAC_ADDR;
+			ether_addr_copy(input->filter.dst_addr, key->dst);
+		}
+
+		if (is_broadcast_ether_addr(mask->src)) {
+			input->filter.match_flags |=
+				IGB_FILTER_FLAG_SRC_MAC_ADDR;
+			ether_addr_copy(input->filter.src_addr, key->src);
+		}
+	}
+
+	if (dissector_uses_key(f->dissector, FLOW_DISSECTOR_KEY_BASIC)) {
+		struct flow_dissector_key_basic *key =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_BASIC,
+						  f->key);
+
+		struct flow_dissector_key_basic *mask =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_BASIC,
+						  f->mask);
+
+		if (mask->n_proto == ETHER_TYPE_FULL_MASK) {
+			input->filter.match_flags |=
+				IGB_FILTER_FLAG_ETHER_TYPE;
+			input->filter.etype = key->n_proto;
+		}
+	}
+
+	if (dissector_uses_key(f->dissector, FLOW_DISSECTOR_KEY_VLAN)) {
+		struct flow_dissector_key_vlan *key =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_VLAN,
+						  f->key);
+		struct flow_dissector_key_vlan *mask =
+			skb_flow_dissector_target(f->dissector,
+						  FLOW_DISSECTOR_KEY_VLAN,
+						  f->mask);
+
+		if (mask->vlan_priority) {
+			input->filter.match_flags |= IGB_FILTER_FLAG_VLAN_TCI;
+			input->filter.vlan_tci = key->vlan_priority;
+		}
+	}
+
+	input->action = traffic_class;
+	input->cookie = f->cookie;
+
+	return 0;
+}
+
 static int igb_configure_clsflower(struct igb_adapter *adapter,
 				   struct tc_cls_flower_offload *cls_flower)
 {
-	return -EOPNOTSUPP;
+	struct igb_nfc_filter *input, *rule;
+	u16 location = 0;
+	int err, tc;
+
+	if (!(adapter->netdev->hw_features & NETIF_F_NTUPLE))
+		return -EOPNOTSUPP;
+
+	tc = tc_classid_to_hwtc(adapter->netdev, cls_flower->classid);
+	if (tc < 0) {
+		dev_err(&adapter->pdev->dev, "Invalid traffic class\n");
+		return -EINVAL;
+	}
+
+	input = kzalloc(sizeof(*input), GFP_KERNEL);
+	if (!input)
+		return -ENOMEM;
+
+	err = igb_parse_cls_flower(adapter, cls_flower, tc, input);
+	if (err < 0)
+		goto error_parse;
+
+	spin_lock(&adapter->nfc_lock);
+
+	hlist_for_each_entry(rule, &adapter->nfc_filter_list, nfc_node) {
+		if (!memcmp(&input->filter, &rule->filter,
+			    sizeof(input->filter))) {
+			err = -EEXIST;
+			dev_err(&adapter->pdev->dev,
+				"tc-flower: this filter is already set\n");
+			goto error_locked;
+		}
+
+		if (rule->sw_idx > location)
+			location = rule->sw_idx;
+	}
+
+	if (adapter->nfc_filter_count != 0)
+		location++;
+
+	input->sw_idx = location;
+
+	err = igb_add_filter(adapter, input);
+	if (err < 0)
+		goto error_locked;
+
+	igb_update_ethtool_nfc_entry(adapter, input, location);
+
+	spin_unlock(&adapter->nfc_lock);
+
+	return 0;
+
+error_locked:
+	spin_unlock(&adapter->nfc_lock);
+
+error_parse:
+	kfree(input);
+
+	return err;
 }
 
 static int igb_delete_clsflower(struct igb_adapter *adapter,

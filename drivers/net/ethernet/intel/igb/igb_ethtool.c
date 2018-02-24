@@ -2919,9 +2919,9 @@ int igb_erase_filter(struct igb_adapter *adapter, struct igb_nfc_filter *input)
 	return 0;
 }
 
-static int igb_update_ethtool_nfc_entry(struct igb_adapter *adapter,
-					struct igb_nfc_filter *input,
-					u16 sw_idx)
+int igb_update_ethtool_nfc_entry(struct igb_adapter *adapter,
+				 struct igb_nfc_filter *input,
+				 u16 sw_idx)
 {
 	struct igb_nfc_filter *rule, *parent;
 	int err = -EINVAL;
@@ -2936,8 +2936,11 @@ static int igb_update_ethtool_nfc_entry(struct igb_adapter *adapter,
 		parent = rule;
 	}
 
-	/* if there is an old rule occupying our place remove it */
-	if (rule && (rule->sw_idx == sw_idx)) {
+	/* if there is an old rule occupying our place remove it, also
+	 * only allow rules added by ethtool to be removed, these
+	 * rules don't have a cookie
+	 */
+	if (rule && (!rule->cookie && rule->sw_idx == sw_idx)) {
 		if (!input)
 			err = igb_erase_filter(adapter, rule);
 
