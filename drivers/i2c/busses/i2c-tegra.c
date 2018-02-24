@@ -484,6 +484,7 @@ static int tegra_i2c_init(struct tegra_i2c_dev *i2c_dev)
 	err = pm_runtime_get_sync(i2c_dev->dev);
 	if (err < 0) {
 		dev_err(i2c_dev->dev, "runtime resume failed %d\n", err);
+		pm_runtime_put_noidle(i2c_dev->dev);
 		return err;
 	}
 
@@ -740,6 +741,7 @@ static int tegra_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[],
 	ret = pm_runtime_get_sync(i2c_dev->dev);
 	if (ret < 0) {
 		dev_err(i2c_dev->dev, "runtime resume failed %d\n", ret);
+		pm_runtime_put_noidle(i2c_dev->dev);
 		return ret;
 	}
 
