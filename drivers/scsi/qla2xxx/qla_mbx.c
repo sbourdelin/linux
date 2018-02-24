@@ -1498,9 +1498,8 @@ qla2x00_lun_reset(struct fc_port *fcport, uint64_t l, int tag)
 	mcp->tov = MBX_TOV_SECONDS;
 	mcp->flags = 0;
 	rval = qla2x00_mailbox_command(vha, mcp);
-	if (rval != QLA_SUCCESS) {
+	if (rval != QLA_SUCCESS)
 		ql_dbg(ql_dbg_mbx, vha, 0x1043, "Failed=%x.\n", rval);
-	}
 
 	/* Issue marker IOCB. */
 	rval2 = qla2x00_marker(vha, req, rsp, fcport->loop_id, l,
@@ -4029,9 +4028,8 @@ qla2x00_send_change_request(scsi_qla_host_t *vha, uint16_t format,
 	rval = qla2x00_mailbox_command(vha, mcp);
 
 	if (rval == QLA_SUCCESS) {
-		if (mcp->mb[0] != MBS_COMMAND_COMPLETE) {
+		if (mcp->mb[0] != MBS_COMMAND_COMPLETE)
 			rval = BIT_1;
-		}
 	} else
 		rval = BIT_1;
 
@@ -4110,9 +4108,8 @@ qla84xx_verify_chip(struct scsi_qla_host *vha, uint16_t *status)
 	    "Entered %s.\n", __func__);
 
 	mn = dma_pool_alloc(ha->s_dma_pool, GFP_KERNEL, &mn_dma);
-	if (mn == NULL) {
+	if (mn == NULL)
 		return QLA_MEMORY_ALLOC_FAILED;
-	}
 
 	/* Force Update? */
 	options = ha->cs84xx->fw_update ? VCO_FORCE_UPDATE : 0;
@@ -4963,9 +4960,8 @@ qla2x00_echo_test(scsi_qla_host_t *vha, struct msg_echo_lb *mreq,
 	mcp->mb[0] = MBC_DIAGNOSTIC_ECHO;
 	/* BIT_6 specifies 64bit address */
 	mcp->mb[1] = mreq->options | BIT_15 | BIT_6;
-	if (IS_CNA_CAPABLE(ha)) {
+	if (IS_CNA_CAPABLE(ha))
 		mcp->mb[2] = vha->fcoe_fcf_idx;
-	}
 	mcp->mb[16] = LSW(mreq->rcv_dma);
 	mcp->mb[17] = MSW(mreq->rcv_dma);
 	mcp->mb[6] = LSW(MSD(mreq->rcv_dma));

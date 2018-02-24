@@ -1078,9 +1078,8 @@ qla2x00_eh_wait_on_command(struct scsi_cmnd *cmd)
 		return ret;
 	}
 
-	while (CMD_SP(cmd) && wait_iter--) {
+	while (CMD_SP(cmd) && wait_iter--)
 		msleep(ABORT_POLLING_PERIOD);
-	}
 	if (CMD_SP(cmd))
 		ret = QLA_FUNCTION_FAILED;
 
@@ -1409,9 +1408,8 @@ __qla2xxx_eh_generic_reset(char *name, enum nexus_wait_type type,
 	fc_port_t *fcport = (struct fc_port *) cmd->device->hostdata;
 	int err;
 
-	if (!fcport) {
+	if (!fcport)
 		return FAILED;
-	}
 
 	err = fc_block_scsi_eh(cmd);
 	if (err != 0)
@@ -1522,9 +1520,8 @@ qla2xxx_eh_bus_reset(struct scsi_cmnd *cmd)
 	id = cmd->device->id;
 	lun = cmd->device->lun;
 
-	if (!fcport) {
+	if (!fcport)
 		return ret;
-	}
 
 	ret = fc_block_scsi_eh(cmd);
 	if (ret != 0)
@@ -1667,9 +1664,8 @@ qla2x00_loop_reset(scsi_qla_host_t *vha)
 	struct fc_port *fcport;
 	struct qla_hw_data *ha = vha->hw;
 
-	if (IS_QLAFX00(ha)) {
+	if (IS_QLAFX00(ha))
 		return qlafx00_loop_reset(vha);
-	}
 
 	if (ql2xtargetreset == 1 && ha->flags.enable_target_reset) {
 		list_for_each_entry(fcport, &vha->vp_fcports, list) {

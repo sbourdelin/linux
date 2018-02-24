@@ -141,9 +141,8 @@ qla27xx_read8(void __iomem *window, void *buf, ulong *len)
 {
 	uint8_t value = ~0;
 
-	if (buf) {
+	if (buf)
 		value = RD_REG_BYTE(window);
-	}
 	qla27xx_insert32(value, buf, len);
 }
 
@@ -152,9 +151,8 @@ qla27xx_read16(void __iomem *window, void *buf, ulong *len)
 {
 	uint16_t value = ~0;
 
-	if (buf) {
+	if (buf)
 		value = RD_REG_WORD(window);
-	}
 	qla27xx_insert32(value, buf, len);
 }
 
@@ -163,9 +161,8 @@ qla27xx_read32(void __iomem *window, void *buf, ulong *len)
 {
 	uint32_t value = ~0;
 
-	if (buf) {
+	if (buf)
 		value = RD_REG_DWORD(window);
-	}
 	qla27xx_insert32(value, buf, len);
 }
 
@@ -192,9 +189,8 @@ qla27xx_write_reg(__iomem struct device_reg_24xx *reg,
 {
 	__iomem void *window = (void __iomem *)reg + offset;
 
-	if (buf) {
+	if (buf)
 		WRT_REG_DWORD(window, data);
-	}
 }
 
 static inline void

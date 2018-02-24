@@ -3304,9 +3304,8 @@ qlafx00_fxdisc_iocb(srb_t *sp, struct fxdisc_entry_fx00 *pfxiocb)
 			    cpu_to_le32(fxio->u.fxiocb.rsp_len);
 		}
 
-		if (fxio->u.fxiocb.flags & SRB_FXDISC_REQ_DWRD_VALID) {
+		if (fxio->u.fxiocb.flags & SRB_FXDISC_REQ_DWRD_VALID)
 			fx_iocb.dataword = fxio->u.fxiocb.req_data;
-		}
 		fx_iocb.flags = fxio->u.fxiocb.flags;
 	} else {
 		struct scatterlist *sg;

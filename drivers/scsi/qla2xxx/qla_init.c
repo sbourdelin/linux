@@ -3064,9 +3064,8 @@ qla81xx_mpi_sync(scsi_qla_host_t *vha)
 	dw &= ~MPS_MASK;
 	dw |= dc;
 	rval = qla2x00_write_ram_word(vha, 0x7a15, dw);
-	if (rval != QLA_SUCCESS) {
+	if (rval != QLA_SUCCESS)
 		ql_log(ql_log_warn, vha, 0x0114, "Unable to gain sync.\n");
-	}
 
 done_release:
 	rval = qla2x00_write_ram_word(vha, 0x7c00, 0);
@@ -3842,9 +3841,8 @@ qla2x00_fw_ready(scsi_qla_host_t *vha)
 	 * Firmware should take at most one RATOV to login, plus 5 seconds for
 	 * our own processing.
 	 */
-	if ((wait_time = (ha->retry_count*ha->login_timeout) + 5) < min_wait) {
+	if ((wait_time = (ha->retry_count*ha->login_timeout) + 5) < min_wait)
 		wait_time = min_wait;
-	}
 
 	/* Min wait time if loop down */
 	mtime = jiffies + (min_wait * HZ);
@@ -3861,9 +3859,8 @@ qla2x00_fw_ready(scsi_qla_host_t *vha)
 		memset(state, -1, sizeof(state));
 		rval = qla2x00_get_firmware_state(vha, state);
 		if (rval == QLA_SUCCESS) {
-			if (state[0] < FSTATE_LOSS_OF_SYNC) {
+			if (state[0] < FSTATE_LOSS_OF_SYNC)
 				vha->device_flags &= ~DFLG_NO_CABLE;
-			}
 			if (IS_QLA84XX(ha) && state[0] != FSTATE_READY) {
 				ql_dbg(ql_dbg_taskm, vha, 0x801f,
 				    "fw_state=%x 84xx=%x.\n", state[0],
@@ -4683,9 +4680,8 @@ qla2x00_configure_loop(scsi_qla_host_t *vha)
 	if (test_bit(LOOP_RESYNC_NEEDED, &vha->dpc_flags)) {
 		if (test_bit(LOCAL_LOOP_UPDATE, &save_flags))
 			set_bit(LOCAL_LOOP_UPDATE, &vha->dpc_flags);
-		if (test_bit(RSCN_UPDATE, &save_flags)) {
+		if (test_bit(RSCN_UPDATE, &save_flags))
 			set_bit(RSCN_UPDATE, &vha->dpc_flags);
-		}
 	}
 
 	return (rval);
@@ -5397,9 +5393,8 @@ qla2x00_find_all_fabric_devs(scsi_qla_host_t *vha)
 					    new_fcport->port_name);
 				}
 
-				if (swl[swl_idx].d_id.b.rsvd_1 != 0) {
+				if (swl[swl_idx].d_id.b.rsvd_1 != 0)
 					last_dev = 1;
-				}
 				swl_idx++;
 			}
 		} else {
@@ -5665,9 +5660,8 @@ qla2x00_fabric_login(scsi_qla_host_t *vha, fc_port_t *fcport,
 		rval = ha->isp_ops->fabric_login(vha, fcport->loop_id,
 		    fcport->d_id.b.domain, fcport->d_id.b.area,
 		    fcport->d_id.b.al_pa, mb, BIT_0);
-		if (rval != QLA_SUCCESS) {
+		if (rval != QLA_SUCCESS)
 			return rval;
-		}
 		if (mb[0] == MBS_PORT_ID_USED) {
 			/*
 			 * Device has another loop ID.  The firmware team
@@ -5705,9 +5699,8 @@ qla2x00_fabric_login(scsi_qla_host_t *vha, fc_port_t *fcport,
 				fcport->port_type = FCT_INITIATOR;
 			} else {
 				fcport->port_type = FCT_TARGET;
-				if (mb[1] & BIT_1) {
+				if (mb[1] & BIT_1)
 					fcport->flags |= FCF_FCP2_DEVICE;
-				}
 			}
 
 			if (mb[10] & BIT_0)

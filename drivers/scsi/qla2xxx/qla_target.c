@@ -3107,9 +3107,8 @@ int qlt_xmit_response(struct qla_tgt_cmd *cmd, int xmit_type,
 
 	res = qlt_pre_xmit_response(cmd, &prm, xmit_type, scsi_status,
 	    &full_req_cnt);
-	if (unlikely(res != 0)) {
+	if (unlikely(res != 0))
 		return res;
-	}
 
 	spin_lock_irqsave(qpair->qp_lock_ptr, flags);
 
