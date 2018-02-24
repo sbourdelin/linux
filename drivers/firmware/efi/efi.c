@@ -33,6 +33,7 @@
 #include <linux/memblock.h>
 
 #include <asm/early_ioremap.h>
+#include <asm/efi.h>
 
 struct efi __read_mostly efi = {
 	.mps			= EFI_INVALID_TABLE_ADDR,
@@ -327,6 +328,12 @@ static int __init efisubsys_init(void)
 
 	if (!efi_enabled(EFI_BOOT))
 		return 0;
+
+	/*
+	 * Clean DUMMY object calls EFI Runtime Service, set_variable(), so
+	 * it should be invoked only after efi_rts_workqueue is ready.
+	 */
+	efi_delete_dummy_variable();
 
 	/* We register the efi directory at /sys/firmware/efi */
 	efi_kobj = kobject_create_and_add("efi", firmware_kobj);
