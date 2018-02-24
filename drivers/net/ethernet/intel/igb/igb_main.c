@@ -2643,10 +2643,40 @@ error_parse:
 	return err;
 }
 
+static int igb_delete_filter_by_cookie(struct igb_adapter *adapter,
+				       unsigned long cookie)
+{
+	struct igb_nfc_filter *filter;
+	int err;
+
+	spin_lock(&adapter->nfc_lock);
+
+	hlist_for_each_entry(filter, &adapter->nfc_filter_list, nfc_node) {
+		if (filter->cookie == cookie)
+			break;
+	}
+
+	if (!filter) {
+		err = -ENOENT;
+		goto out;
+	}
+
+	err = igb_erase_filter(adapter, filter);
+
+	hlist_del(&filter->nfc_node);
+	kfree(filter);
+	adapter->nfc_filter_count--;
+
+out:
+	spin_unlock(&adapter->nfc_lock);
+
+	return err;
+}
+
 static int igb_delete_clsflower(struct igb_adapter *adapter,
 				struct tc_cls_flower_offload *cls_flower)
 {
-	return -EOPNOTSUPP;
+	return igb_delete_filter_by_cookie(adapter, cls_flower->cookie);
 }
 
 static int igb_setup_tc_cls_flower(struct igb_adapter *adapter,
