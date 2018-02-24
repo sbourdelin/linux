@@ -10428,6 +10428,29 @@ err_fd:
 	return err;
 }
 
+int perf_find_pmu_type_by_name(const char *name)
+{
+	struct pmu *pmu;
+	int ret = -1;
+
+	mutex_lock(&pmus_lock);
+
+	list_for_each_entry(pmu, &pmus, entry) {
+		if (!pmu->name || pmu->type < 0)
+			continue;
+
+		if (!strcmp(name, pmu->name)) {
+			ret = pmu->type;
+			goto out;
+		}
+	}
+
+out:
+	mutex_unlock(&pmus_lock);
+
+	return ret;
+}
+
 /**
  * perf_event_create_kernel_counter
  *
