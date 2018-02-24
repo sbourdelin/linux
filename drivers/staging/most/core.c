@@ -916,7 +916,11 @@ static void arm_mbo(struct mbo *mbo)
 	unsigned long flags;
 	struct most_channel *c;
 
-	BUG_ON((!mbo) || (!mbo->context));
+	if (WARN_ONCE(!mbo || !mbo->context,
+		      "Bad mbo or missing channel reference.\n")) {
+		return;
+	}
+
 	c = mbo->context;
 
 	if (c->is_poisoned) {
@@ -1001,7 +1005,7 @@ _exit:
 void most_submit_mbo(struct mbo *mbo)
 {
 	if (WARN_ONCE(!mbo || !mbo->context,
-		      "bad mbo or missing channel reference\n"))
+		      "Bad mbo or missing channel reference.\n"))
 		return;
 
 	nq_hdm_mbo(mbo);
@@ -1019,7 +1023,10 @@ static void most_write_completion(struct mbo *mbo)
 {
 	struct most_channel *c;
 
-	BUG_ON((!mbo) || (!mbo->context));
+	if (WARN_ONCE(!mbo || !mbo->context,
+		      "Bad mbo or missing channel reference.\n")) {
+		return;
+	}
 
 	c = mbo->context;
 	if (mbo->status == MBO_E_INVAL)
