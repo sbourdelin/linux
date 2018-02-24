@@ -3484,6 +3484,10 @@ static int __perf_event_read_cpu(struct perf_event *event, int event_cpu)
 {
 	u16 local_pkg, event_pkg;
 
+	if (event->group_caps & PERF_EV_CAP_READ_ANY_CPU) {
+		return smp_processor_id();
+	}
+
 	if (event->group_caps & PERF_EV_CAP_READ_ACTIVE_PKG) {
 		int local_cpu = smp_processor_id();
 
@@ -3575,6 +3579,7 @@ int perf_event_read_local(struct perf_event *event, u64 *value,
 {
 	unsigned long flags;
 	int ret = 0;
+	bool is_any_cpu = !!(event->group_caps & PERF_EV_CAP_READ_ANY_CPU);
 
 	/*
 	 * Disabling interrupts avoids all counter scheduling (context
@@ -3600,7 +3605,8 @@ int perf_event_read_local(struct perf_event *event, u64 *value,
 
 	/* If this is a per-CPU event, it must be for this CPU */
 	if (!(event->attach_state & PERF_ATTACH_TASK) &&
-	    event->cpu != smp_processor_id()) {
+	    event->cpu != smp_processor_id() &&
+	    !is_any_cpu) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -3610,7 +3616,7 @@ int perf_event_read_local(struct perf_event *event, u64 *value,
 	 * or local to this CPU. Furthermore it means its ACTIVE (otherwise
 	 * oncpu == -1).
 	 */
-	if (event->oncpu == smp_processor_id())
+	if (event->oncpu == smp_processor_id() || is_any_cpu)
 		event->pmu->read(event);
 
 	*value = local64_read(&event->count);
