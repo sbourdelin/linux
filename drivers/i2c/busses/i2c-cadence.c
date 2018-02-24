@@ -574,8 +574,10 @@ static int cdns_i2c_master_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
 	bool hold_quirk;
 
 	ret = pm_runtime_get_sync(id->dev);
-	if (ret < 0)
+	if (ret < 0) {
+		pm_runtime_put_noidle(id->dev);
 		return ret;
+	}
 	/* Check if the bus is free */
 	if (cdns_i2c_readreg(CDNS_I2C_SR_OFFSET) & CDNS_I2C_SR_BA) {
 		ret = -EAGAIN;
