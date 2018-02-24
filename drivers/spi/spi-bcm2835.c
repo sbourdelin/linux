@@ -579,6 +579,19 @@ static int bcm2835_spi_transfer_one(struct spi_master *master,
 	return bcm2835_spi_transfer_one_irq(master, spi, tfr, cs);
 }
 
+static int bcm2835_spi_transfer_one_message(struct spi_controller *ctlr,
+					struct spi_message *msg)
+{
+	int ret;
+	gfp_t gfp_flags = GFP_KERNEL | GFP_DMA;
+	size_t max_transfer_size = 64;
+	ret = spi_split_transfers_maxsize(ctlr, msg, max_transfer_size, gfp_flags);
+	if (ret)
+		return ret;
+
+	return spi_transfer_one_message(ctlr, msg);
+}
+
 static int bcm2835_spi_prepare_message(struct spi_master *master,
 				       struct spi_message *msg)
 {
@@ -739,6 +752,7 @@ static int bcm2835_spi_probe(struct platform_device *pdev)
 	master->setup = bcm2835_spi_setup;
 	master->set_cs = bcm2835_spi_set_cs;
 	master->transfer_one = bcm2835_spi_transfer_one;
+	master->transfer_one_message = bcm2835_spi_transfer_one_message;
 	master->handle_err = bcm2835_spi_handle_err;
 	master->prepare_message = bcm2835_spi_prepare_message;
 	master->dev.of_node = pdev->dev.of_node;

@@ -1003,7 +1003,7 @@ static int spi_map_msg(struct spi_controller *ctlr, struct spi_message *msg)
  * drivers which implement a transfer_one() operation.  It provides
  * standard handling of delays and chip select management.
  */
-static int spi_transfer_one_message(struct spi_controller *ctlr,
+int spi_transfer_one_message(struct spi_controller *ctlr,
 				    struct spi_message *msg)
 {
 	struct spi_transfer *xfer;
@@ -1026,7 +1026,6 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
 
 		if (xfer->tx_buf || xfer->rx_buf) {
 			reinit_completion(&ctlr->xfer_completion);
-
 			ret = ctlr->transfer_one(ctlr, msg->spi, xfer);
 			if (ret < 0) {
 				SPI_STATISTICS_INCREMENT_FIELD(statm,
@@ -1111,6 +1110,7 @@ out:
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(spi_transfer_one_message);
 
 /**
  * spi_finalize_current_transfer - report completion of a transfer
@@ -2583,7 +2583,6 @@ static int __spi_split_transfer_maxsize(struct spi_controller *ctlr,
 
 	/* calculate how many we have to replace */
 	count = DIV_ROUND_UP(xfer->len, maxsize);
-
 	/* create replacement */
 	srt = spi_replace_transfers(msg, xfer, 1, count, NULL, 0, gfp);
 	if (IS_ERR(srt))
