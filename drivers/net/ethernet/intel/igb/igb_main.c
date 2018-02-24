@@ -2823,8 +2823,10 @@ static int igb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 			       NETIF_F_HW_VLAN_CTAG_TX |
 			       NETIF_F_RXALL;
 
-	if (hw->mac.type >= e1000_i350)
-		netdev->hw_features |= NETIF_F_NTUPLE;
+	if (hw->mac.type >= e1000_i350) {
+		netdev->hw_features |= (NETIF_F_NTUPLE | NETIF_F_HW_TC);
+		netdev->features |= NETIF_F_HW_TC;
+	}
 
 	if (pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
