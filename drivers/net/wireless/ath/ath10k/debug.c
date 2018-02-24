@@ -1084,6 +1084,126 @@ exit:
 	return ret;
 }
 
+#if IS_ENABLED(CONFIG_ATH10K_LEDS)
+static ssize_t ath10k_read_gpio_config(struct file *file, char __user *user_buf,
+				      size_t count, loff_t *ppos)
+{
+	struct ath10k *ar = file->private_data;
+	struct ath10k_gpiocontrol *gpio = ar->gpio; 
+	size_t len;
+	char buf[96];
+	if (!gpio)
+		return 0;
+
+	len = scnprintf(buf, sizeof(buf), "%u %u %u %u\n", gpio->gpio_num, gpio->gpio_input, gpio->gpio_pull_type, gpio->gpio_intr_mode);
+
+	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+
+static ssize_t ath10k_write_gpio_config(struct file *file,
+				      const char __user *user_buf,
+				      size_t count, loff_t *ppos)
+{
+	struct ath10k *ar = file->private_data;
+	struct ath10k_gpiocontrol *gpio = ar->gpio; 
+	int ret;
+	char buf[96];
+	u32 gpio_num, input, pull_type, intr_mode;
+	if (!gpio)
+		return -EINVAL;
+
+	simple_write_to_buffer(buf, sizeof(buf) - 1, ppos, user_buf, count);
+
+	/* make sure that buf is null terminated */
+	buf[sizeof(buf) - 1] = 0;
+
+	gpio->gpio_num = gpio_num;
+	gpio->gpio_input = input;
+	gpio->gpio_pull_type = pull_type;
+	gpio->gpio_intr_mode = intr_mode;
+	ret = sscanf(buf, "%u %u %u %u", &gpio_num, &input, &pull_type, &intr_mode);
+
+	if (!ret)
+		return -EINVAL;
+
+
+	mutex_lock(&ar->conf_mutex);
+
+
+	ret = ath10k_wmi_gpio_config(ar, gpio_num, input, pull_type, intr_mode);
+
+	if (ret) {
+		ath10k_warn(ar, "gpio_config cfg failed from debugfs: %d\n", ret);
+		goto exit;
+	}
+	ret = count;
+
+exit:
+	mutex_unlock(&ar->conf_mutex);
+
+	return ret;
+}
+
+static ssize_t ath10k_read_gpio_output(struct file *file, char __user *user_buf,
+				      size_t count, loff_t *ppos)
+{
+	struct ath10k *ar = file->private_data;
+	struct ath10k_gpiocontrol *gpio = ar->gpio; 
+	size_t len;
+	char buf[96];
+	if (!gpio)
+		return 0;
+
+	len = scnprintf(buf, sizeof(buf), "%u %u\n", gpio->gpio_num, gpio->gpio_set);
+
+	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+
+static ssize_t ath10k_write_gpio_output(struct file *file,
+				      const char __user *user_buf,
+				      size_t count, loff_t *ppos)
+{
+	struct ath10k *ar = file->private_data;
+	struct ath10k_gpiocontrol *gpio = ar->gpio; 
+	int ret;
+	char buf[96];
+	u32 gpio_num, set;
+	if (!gpio)
+		return -EINVAL;
+
+	simple_write_to_buffer(buf, sizeof(buf) - 1, ppos, user_buf, count);
+
+	/* make sure that buf is null terminated */
+	buf[sizeof(buf) - 1] = 0;
+
+	gpio->gpio_set_num = gpio_num;
+	gpio->gpio_set = set;
+	ret = sscanf(buf, "%u %u", &gpio_num, &set);
+
+	if (!ret)
+		return -EINVAL;
+
+
+	mutex_lock(&ar->conf_mutex);
+
+
+	ret = ath10k_wmi_gpio_output(ar, gpio_num, set);
+
+	if (ret) {
+		ath10k_warn(ar, "gpio_output cfg failed from debugfs: %d\n", ret);
+		goto exit;
+	}
+	ret = count;
+
+exit:
+	mutex_unlock(&ar->conf_mutex);
+
+	return ret;
+}
+#endif
+
 /* TODO:  Would be nice to always support ethtool stats, would need to
  * move the stats storage out of ath10k_debug, or always have ath10k_debug
  * struct available..
@@ -1251,6 +1371,25 @@ static const struct file_operations fops_fw_dbglog = {
 	.owner = THIS_MODULE,
 	.llseek = default_llseek,
 };
+
+
+#if IS_ENABLED(CONFIG_ATH10K_LEDS)
+static const struct file_operations fops_gpio_output = {
+	.read = ath10k_read_gpio_output,
+	.write = ath10k_write_gpio_output,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
+static const struct file_operations fops_gpio_config = {
+	.read = ath10k_read_gpio_config,
+	.write = ath10k_write_gpio_config,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+#endif
 
 static int ath10k_debug_cal_data_fetch(struct ath10k *ar)
 {
@@ -2217,6 +2356,13 @@ int ath10k_debug_register(struct ath10k *ar)
 	debugfs_create_file("fw_dbglog", 0600, ar->debug.debugfs_phy, ar,
 			    &fops_fw_dbglog);
 
+#if IS_ENABLED(CONFIG_ATH10K_LEDS)
+	debugfs_create_file("gpio_output", 0600, ar->debug.debugfs_phy, ar,
+			    &fops_gpio_output);
+
+	debugfs_create_file("gpio_config", 0600, ar->debug.debugfs_phy, ar,
+			    &fops_gpio_config);
+#endif
 	debugfs_create_file("cal_data", 0400, ar->debug.debugfs_phy, ar,
 			    &fops_cal_data);
 
