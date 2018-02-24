@@ -491,22 +491,6 @@ static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
 	struct vm_area_struct *vma;
 	bool ret = true;
 
-	/*
-	 * We have to make sure to not race with the victim exit path
-	 * and cause premature new oom victim selection:
-	 * __oom_reap_task_mm		exit_mm
-	 *   mmget_not_zero
-	 *				  mmput
-	 *				    atomic_dec_and_test
-	 *				  exit_oom_victim
-	 *				[...]
-	 *				out_of_memory
-	 *				  select_bad_process
-	 *				    # no TIF_MEMDIE task selects new victim
-	 *  unmap_page_range # frees some memory
-	 */
-	mutex_lock(&oom_lock);
-
 	if (!down_read_trylock(&mm->mmap_sem)) {
 		ret = false;
 		trace_skip_task_reaping(tsk->pid);
@@ -581,7 +565,6 @@ static bool __oom_reap_task_mm(struct task_struct *tsk, struct mm_struct *mm)
 
 	trace_finish_task_reaping(tsk->pid);
 unlock_oom:
-	mutex_unlock(&oom_lock);
 	return ret;
 }
 
@@ -1078,7 +1061,6 @@ bool out_of_memory(struct oom_control *oc)
 {
 	unsigned long freed = 0;
 	enum oom_constraint constraint = CONSTRAINT_NONE;
-	bool delay = false; /* if set, delay next allocation attempt */
 
 	if (oom_killer_disabled)
 		return false;
@@ -1128,10 +1110,8 @@ bool out_of_memory(struct oom_control *oc)
 		return true;
 	}
 
-	if (mem_cgroup_select_oom_victim(oc) && oom_kill_memcg_victim(oc)) {
-		delay = true;
+	if (mem_cgroup_select_oom_victim(oc) && oom_kill_memcg_victim(oc))
 		goto out;
-	}
 
 	select_bad_process(oc);
 	/* Found nothing?!?! Either we hang forever, or we panic. */
@@ -1139,20 +1119,10 @@ bool out_of_memory(struct oom_control *oc)
 		dump_header(oc, NULL);
 		panic("Out of memory and no killable processes...\n");
 	}
-	if (oc->chosen_task && oc->chosen_task != INFLIGHT_VICTIM) {
+	if (oc->chosen_task && oc->chosen_task != INFLIGHT_VICTIM)
 		oom_kill_process(oc, !is_memcg_oom(oc) ? "Out of memory" :
 				 "Memory cgroup out of memory");
-		delay = true;
-	}
-
 out:
-	/*
-	 * Give the killed process a good chance to exit before trying
-	 * to allocate memory again.
-	 */
-	if (delay)
-		schedule_timeout_killable(1);
-
 	return !!oc->chosen_task;
 }
 
@@ -1178,4 +1148,5 @@ void pagefault_out_of_memory(void)
 		return;
 	out_of_memory(&oc);
 	mutex_unlock(&oom_lock);
+	schedule_timeout_killable(1);
 }
