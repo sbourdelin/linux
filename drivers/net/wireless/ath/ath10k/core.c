@@ -21,6 +21,10 @@
 #include <linux/dmi.h>
 #include <linux/ctype.h>
 #include <asm/byteorder.h>
+#include <linux/leds.h>
+#include <linux/platform_device.h>
+#include <linux/version.h>
+
 
 #include "core.h"
 #include "mac.h"
@@ -65,6 +69,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA988X_HW_2_0_VERSION,
 		.dev_id = QCA988X_2_0_DEVICE_ID,
 		.name = "qca988x hw2.0",
+		.led_pin = 1,
+		.gpio_count = 24, 
 		.patch_load_addr = QCA988X_HW_2_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_ALL,
@@ -94,6 +100,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA988X_HW_2_0_VERSION,
 		.dev_id = QCA988X_2_0_DEVICE_ID_UBNT,
 		.name = "qca988x hw2.0 ubiquiti",
+		.led_pin = 1,
+		.gpio_count = 24, 
 		.patch_load_addr = QCA988X_HW_2_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_ALL,
@@ -123,6 +131,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA9887_HW_1_0_VERSION,
 		.dev_id = QCA9887_1_0_DEVICE_ID,
 		.name = "qca9887 hw1.0",
+		.led_pin = 1,
+		.gpio_count = 24, 
 		.patch_load_addr = QCA9887_HW_1_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_ALL,
@@ -267,6 +277,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA99X0_HW_2_0_DEV_VERSION,
 		.dev_id = QCA99X0_2_0_DEVICE_ID,
 		.name = "qca99x0 hw2.0",
+		.led_pin = 17,
+		.gpio_count = 35, 
 		.patch_load_addr = QCA99X0_HW_2_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.otp_exe_param = 0x00000700,
@@ -301,6 +313,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA9984_HW_1_0_DEV_VERSION,
 		.dev_id = QCA9984_1_0_DEVICE_ID,
 		.name = "qca9984/qca9994 hw1.0",
+		.led_pin = 17,
+		.gpio_count = 35, 
 		.patch_load_addr = QCA9984_HW_1_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_EACH,
@@ -340,6 +354,8 @@ static const struct ath10k_hw_params ath10k_hw_params_list[] = {
 		.id = QCA9888_HW_2_0_DEV_VERSION,
 		.dev_id = QCA9888_2_0_DEVICE_ID,
 		.name = "qca9888 hw2.0",
+		.led_pin = 17,
+		.gpio_count = 35, 
 		.patch_load_addr = QCA9888_HW_2_0_PATCH_LOAD_ADDR,
 		.uart_pin = 7,
 		.cc_wraparound_type = ATH10K_HW_CC_WRAP_SHIFTED_EACH,
@@ -2372,8 +2388,15 @@ int ath10k_core_start(struct ath10k *ar, enum ath10k_firmware_mode mode,
 	if (status)
 		goto err_hif_stop;
 
-	return 0;
+	
+	status = ath10k_attach_led(ar);
+	if (status)
+		goto err_no_led;
 
+	ath10k_attach_gpio(ar);
+
+err_no_led:	
+	return 0;
 err_hif_stop:
 	ath10k_hif_stop(ar);
 err_htt_rx_detach:
@@ -2673,6 +2696,9 @@ void ath10k_core_unregister(struct ath10k *ar)
 	ath10k_core_free_board_files(ar);
 
 	ath10k_debug_unregister(ar);
+
+	ath10k_unregister_gpio_chip(ar);
+	ath10k_unregister_led(ar);
 }
 EXPORT_SYMBOL(ath10k_core_unregister);
 
