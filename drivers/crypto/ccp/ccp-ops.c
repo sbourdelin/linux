@@ -1770,10 +1770,6 @@ static int ccp_run_rsa_cmd(struct ccp_cmd_queue *cmd_q, struct ccp_cmd *cmd)
 	if (!rsa->exp || !rsa->mod || !rsa->src || !rsa->dst)
 		return -EINVAL;
 
-	memset(&op, 0, sizeof(op));
-	op.cmd_q = cmd_q;
-	op.jobid = CCP_NEW_JOBID(cmd_q->ccp);
-
 	/* The RSA modulus must precede the message being acted upon, so
 	 * it must be copied to a DMA area where the message and the
 	 * modulus can be concatenated.  Therefore the input buffer
@@ -1784,6 +1780,26 @@ static int ccp_run_rsa_cmd(struct ccp_cmd_queue *cmd_q, struct ccp_cmd *cmd)
 	 */
 	o_len = 32 * ((rsa->key_size + 255) / 256);
 	i_len = o_len * 2;
+
+	if (rsa->mod_len > o_len) {
+		dev_err(cmd_q->ccp->dev,
+			"RSA modulus of %u bytes too large for key size of %u bits\n",
+			(unsigned int)rsa->mod_len,
+			(unsigned int)rsa->key_size);
+		return -EINVAL;
+	}
+
+	if (rsa->src_len > o_len) {
+		dev_err(cmd_q->ccp->dev,
+			"RSA data of %u bytes too large for key size of %u bits\n",
+			(unsigned int)rsa->src_len,
+			(unsigned int)rsa->key_size);
+		return -EINVAL;
+	}
+
+	memset(&op, 0, sizeof(op));
+	op.cmd_q = cmd_q;
+	op.jobid = CCP_NEW_JOBID(cmd_q->ccp);
 
 	sb_count = 0;
 	if (cmd_q->ccp->vdata->version < CCP_VERSION(5, 0)) {
