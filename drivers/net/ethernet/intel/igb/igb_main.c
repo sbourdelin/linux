@@ -6848,8 +6848,8 @@ static void igb_set_default_mac_filter(struct igb_adapter *adapter)
  * default for the destination address, if matching by source address
  * is desired the flag IGB_MAC_STATE_SRC_ADDR can be used.
  */
-static int igb_add_mac_filter(struct igb_adapter *adapter, const u8 *addr,
-			      const u8 queue, const u8 flags)
+int igb_add_mac_filter(struct igb_adapter *adapter, const u8 *addr,
+		       const u8 queue, const u8 flags)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	int rar_entries = hw->mac.rar_entry_count -
@@ -6884,8 +6884,8 @@ static int igb_add_mac_filter(struct igb_adapter *adapter, const u8 *addr,
  * matching by source address is to be removed the flag
  * IGB_MAC_STATE_SRC_ADDR can be used.
  */
-static int igb_del_mac_filter(struct igb_adapter *adapter, const u8 *addr,
-			      const u8 queue, const u8 flags)
+int igb_del_mac_filter(struct igb_adapter *adapter, const u8 *addr,
+		       const u8 queue, const u8 flags)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	int rar_entries = hw->mac.rar_entry_count -

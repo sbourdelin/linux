@@ -153,6 +153,9 @@ static const char igb_priv_flags_strings[][ETH_GSTRING_LEN] = {
 
 #define IGB_PRIV_FLAGS_STR_LEN ARRAY_SIZE(igb_priv_flags_strings)
 
+static const u8 broadcast_addr[ETH_ALEN] = {
+	0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+
 static int igb_get_link_ksettings(struct net_device *netdev,
 				  struct ethtool_link_ksettings *cmd)
 {
@@ -2495,6 +2498,25 @@ static int igb_get_ethtool_nfc_entry(struct igb_adapter *adapter,
 			fsp->h_ext.vlan_tci = rule->filter.vlan_tci;
 			fsp->m_ext.vlan_tci = htons(VLAN_PRIO_MASK);
 		}
+		if (rule->filter.match_flags & IGB_FILTER_FLAG_DST_MAC_ADDR) {
+			ether_addr_copy(fsp->h_u.ether_spec.h_dest,
+					rule->filter.dst_addr);
+			/* As we only support matching by the full
+			 * mask, return the mask to userspace
+			 */
+			ether_addr_copy(fsp->m_u.ether_spec.h_dest,
+					broadcast_addr);
+		}
+		if (rule->filter.match_flags & IGB_FILTER_FLAG_SRC_MAC_ADDR) {
+			ether_addr_copy(fsp->h_u.ether_spec.h_source,
+					rule->filter.src_addr);
+			/* As we only support matching by the full
+			 * mask, return the mask to userspace
+			 */
+			ether_addr_copy(fsp->m_u.ether_spec.h_source,
+					broadcast_addr);
+		}
+
 		return 0;
 	}
 	return -EINVAL;
@@ -2699,6 +2721,58 @@ static int igb_set_rss_hash_opt(struct igb_adapter *adapter,
 	return 0;
 }
 
+static int igb_rxnfc_write_dst_mac_filter(struct igb_adapter *adapter,
+					  struct igb_nfc_filter *input)
+{
+	int err;
+
+	err = igb_add_mac_filter(adapter, input->filter.dst_addr,
+				 input->action, 0);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
+
+static int igb_rxnfc_write_src_mac_filter(struct igb_adapter *adapter,
+					  struct igb_nfc_filter *input)
+{
+	int err;
+
+	err = igb_add_mac_filter(adapter, input->filter.src_addr,
+				 input->action, IGB_MAC_STATE_SRC_ADDR);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
+
+static int igb_rxnfc_del_dst_mac_filter(struct igb_adapter *adapter,
+					struct igb_nfc_filter *input)
+{
+	int err;
+
+	err = igb_del_mac_filter(adapter, input->filter.dst_addr,
+				 input->action, 0);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
+
+static int igb_rxnfc_del_src_mac_filter(struct igb_adapter *adapter,
+					struct igb_nfc_filter *input)
+{
+	int err;
+
+	err = igb_del_mac_filter(adapter, input->filter.src_addr,
+				 input->action, IGB_MAC_STATE_SRC_ADDR);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
+
 static int igb_rxnfc_write_etype_filter(struct igb_adapter *adapter,
 					struct igb_nfc_filter *input)
 {
@@ -2776,6 +2850,18 @@ int igb_add_filter(struct igb_adapter *adapter, struct igb_nfc_filter *input)
 			return err;
 	}
 
+	if (input->filter.match_flags & IGB_FILTER_FLAG_DST_MAC_ADDR) {
+		err = igb_rxnfc_write_dst_mac_filter(adapter, input);
+		if (err)
+			return err;
+	}
+
+	if (input->filter.match_flags & IGB_FILTER_FLAG_SRC_MAC_ADDR) {
+		err = igb_rxnfc_write_src_mac_filter(adapter, input);
+		if (err)
+			return err;
+	}
+
 	if (input->filter.match_flags & IGB_FILTER_FLAG_VLAN_TCI)
 		err = igb_rxnfc_write_vlan_prio_filter(adapter, input);
 
@@ -2823,6 +2909,12 @@ int igb_erase_filter(struct igb_adapter *adapter, struct igb_nfc_filter *input)
 	if (input->filter.match_flags & IGB_FILTER_FLAG_VLAN_TCI)
 		igb_clear_vlan_prio_filter(adapter,
 					   ntohs(input->filter.vlan_tci));
+
+	if (input->filter.match_flags & IGB_FILTER_FLAG_SRC_MAC_ADDR)
+		igb_rxnfc_del_src_mac_filter(adapter, input);
+
+	if (input->filter.match_flags & IGB_FILTER_FLAG_DST_MAC_ADDR)
+		igb_rxnfc_del_dst_mac_filter(adapter, input);
 
 	return 0;
 }
@@ -2905,10 +2997,6 @@ static int igb_add_ethtool_nfc_entry(struct igb_adapter *adapter,
 	if ((fsp->flow_type & ~FLOW_EXT) != ETHER_FLOW)
 		return -EINVAL;
 
-	if (fsp->m_u.ether_spec.h_proto != ETHER_TYPE_FULL_MASK &&
-	    fsp->m_ext.vlan_tci != htons(VLAN_PRIO_MASK))
-		return -EINVAL;
-
 	input = kzalloc(sizeof(*input), GFP_KERNEL);
 	if (!input)
 		return -ENOMEM;
@@ -2916,6 +3004,20 @@ static int igb_add_ethtool_nfc_entry(struct igb_adapter *adapter,
 	if (fsp->m_u.ether_spec.h_proto == ETHER_TYPE_FULL_MASK) {
 		input->filter.etype = fsp->h_u.ether_spec.h_proto;
 		input->filter.match_flags = IGB_FILTER_FLAG_ETHER_TYPE;
+	}
+
+	/* Only support matching addresses by the full mask */
+	if (is_broadcast_ether_addr(fsp->m_u.ether_spec.h_source)) {
+		input->filter.match_flags |= IGB_FILTER_FLAG_SRC_MAC_ADDR;
+		ether_addr_copy(input->filter.src_addr,
+				fsp->h_u.ether_spec.h_source);
+	}
+
+	/* Only support matching addresses by the full mask */
+	if (is_broadcast_ether_addr(fsp->m_u.ether_spec.h_dest)) {
+		input->filter.match_flags |= IGB_FILTER_FLAG_DST_MAC_ADDR;
+		ether_addr_copy(input->filter.dst_addr,
+				fsp->h_u.ether_spec.h_dest);
 	}
 
 	if ((fsp->flow_type & FLOW_EXT) && fsp->m_ext.vlan_tci) {

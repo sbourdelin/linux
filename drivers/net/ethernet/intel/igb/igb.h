@@ -442,6 +442,8 @@ struct hwmon_buff {
 enum igb_filter_match_flags {
 	IGB_FILTER_FLAG_ETHER_TYPE = 0x1,
 	IGB_FILTER_FLAG_VLAN_TCI   = 0x2,
+	IGB_FILTER_FLAG_SRC_MAC_ADDR   = 0x4,
+	IGB_FILTER_FLAG_DST_MAC_ADDR   = 0x8,
 };
 
 #define IGB_MAX_RXNFC_FILTERS 16
@@ -456,6 +458,8 @@ struct igb_nfc_input {
 	u8 match_flags;
 	__be16 etype;
 	__be16 vlan_tci;
+	u8 src_addr[ETH_ALEN];
+	u8 dst_addr[ETH_ALEN];
 };
 
 struct igb_nfc_filter {
@@ -739,5 +743,10 @@ int igb_add_filter(struct igb_adapter *adapter,
 		   struct igb_nfc_filter *input);
 int igb_erase_filter(struct igb_adapter *adapter,
 		     struct igb_nfc_filter *input);
+
+int igb_add_mac_filter(struct igb_adapter *adapter, const u8 *addr,
+		       const u8 queue, const u8 flags);
+int igb_del_mac_filter(struct igb_adapter *adapter, const u8 *addr,
+		       const u8 queue, const u8 flags);
 
 #endif /* _IGB_H_ */
