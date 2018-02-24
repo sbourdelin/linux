@@ -452,62 +452,26 @@ int tinydrm_spi_transfer(struct spi_device *spi, u32 speed_hz,
 	struct spi_transfer tr = {
 		.bits_per_word = bpw,
 		.speed_hz = speed_hz,
+		.tx_buf = buf,
+		.len = len
 	};
 	struct spi_message m;
-	u16 *swap_buf = NULL;
 	size_t max_chunk;
-	size_t chunk;
-	int ret = 0;
 
-	if (WARN_ON_ONCE(bpw != 8 && bpw != 16))
-		return -EINVAL;
-
-	max_chunk = tinydrm_spi_max_transfer_size(spi, 0);
+	max_chunk = SIZE_MAX;
 
 	if (drm_debug & DRM_UT_DRIVER)
 		pr_debug("[drm:%s] bpw=%u, max_chunk=%zu, transfers:\n",
-			 __func__, bpw, max_chunk);
-
-	if (bpw == 16 && !tinydrm_spi_bpw_supported(spi, 16)) {
-		tr.bits_per_word = 8;
-		if (tinydrm_machine_little_endian()) {
-			swap_buf = kmalloc(min(len, max_chunk), GFP_KERNEL);
-			if (!swap_buf)
-				return -ENOMEM;
-		}
-	}
+			__func__, bpw, max_chunk);
 
 	spi_message_init(&m);
 	if (header)
 		spi_message_add_tail(header, &m);
 	spi_message_add_tail(&tr, &m);
 
-	while (len) {
-		chunk = min(len, max_chunk);
+	tinydrm_dbg_spi_message(spi, &m);
 
-		tr.tx_buf = buf;
-		tr.len = chunk;
-
-		if (swap_buf) {
-			const u16 *buf16 = buf;
-			unsigned int i;
-
-			for (i = 0; i < chunk / 2; i++)
-				swap_buf[i] = swab16(buf16[i]);
-
-			tr.tx_buf = swap_buf;
-		}
-
-		buf += chunk;
-		len -= chunk;
-
-		tinydrm_dbg_spi_message(spi, &m);
-		ret = spi_sync(spi, &m);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
+	return spi_sync(spi, &m);
 }
 EXPORT_SYMBOL(tinydrm_spi_transfer);
 

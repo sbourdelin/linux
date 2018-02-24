@@ -365,19 +365,6 @@ static bool bcm2835_spi_can_dma(struct spi_master *master,
 	if (tfr->len < BCM2835_SPI_DMA_MIN_LENGTH)
 		return false;
 
-	/* BCM2835_SPI_DLEN has defined a max transfer size as
-	 * 16 bit, so max is 65535
-	 * we can revisit this by using an alternative transfer
-	 * method - ideally this would get done without any more
-	 * interaction...
-	 */
-	if (tfr->len > 65535) {
-		dev_warn_once(&spi->dev,
-			      "transfer size of %d too big for dma-transfer\n",
-			      tfr->len);
-		return false;
-	}
-
 	/* if we run rx/tx_buf with word aligned addresses then we are OK */
 	if ((((size_t)tfr->rx_buf & 3) == 0) &&
 	    (((size_t)tfr->tx_buf & 3) == 0))
@@ -461,7 +448,7 @@ static void bcm2835_dma_init(struct spi_master *master, struct device *dev)
 
 	/* all went well, so set can_dma */
 	master->can_dma = bcm2835_spi_can_dma;
-	master->max_dma_len = 65535; /* limitation by BCM2835_SPI_DLEN */
+	master->max_dma_len = 65528; /* limitation by BCM2835_SPI_DLEN */
 	/* need to do TX AND RX DMA, so we need dummy buffers */
 	master->flags = SPI_MASTER_MUST_RX | SPI_MASTER_MUST_TX;
 
