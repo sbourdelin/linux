@@ -1061,8 +1061,10 @@ static int img_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg *msgs,
 	}
 
 	ret = pm_runtime_get_sync(adap->dev.parent);
-	if (ret < 0)
+	if (ret < 0) {
+		pm_runtime_put_noidle(adap->dev.parent);
 		return ret;
+	}
 
 	for (i = 0; i < num; i++) {
 		struct i2c_msg *msg = &msgs[i];
@@ -1162,8 +1164,10 @@ static int img_i2c_init(struct img_i2c *i2c)
 	int ret;
 
 	ret = pm_runtime_get_sync(i2c->adap.dev.parent);
-	if (ret < 0)
+	if (ret < 0) {
+		pm_runtime_put_noidle(i2c->adap.dev.parent);
 		return ret;
+	}
 
 	rev = img_i2c_readl(i2c, SCB_CORE_REV_REG);
 	if ((rev & 0x00ffffff) < 0x00020200) {
