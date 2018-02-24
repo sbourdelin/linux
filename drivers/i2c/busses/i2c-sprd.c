@@ -284,8 +284,10 @@ static int sprd_i2c_master_xfer(struct i2c_adapter *i2c_adap,
 	int im, ret;
 
 	ret = pm_runtime_get_sync(i2c_dev->dev);
-	if (ret < 0)
+	if (ret < 0) {
+		pm_runtime_put_noidle(i2c_dev->dev);
 		return ret;
+	}
 
 	for (im = 0; im < num - 1; im++) {
 		ret = sprd_i2c_handle_msg(i2c_adap, &msgs[im], 0);
@@ -572,8 +574,10 @@ static int sprd_i2c_remove(struct platform_device *pdev)
 	int ret;
 
 	ret = pm_runtime_get_sync(i2c_dev->dev);
-	if (ret < 0)
+	if (ret < 0) {
+		pm_runtime_put_noidle(i2c_dev->dev);
 		return ret;
+	}
 
 	i2c_del_adapter(&i2c_dev->adap);
 	clk_disable_unprepare(i2c_dev->clk);
