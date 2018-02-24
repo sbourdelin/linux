@@ -108,6 +108,12 @@
 #define SLAB_KASAN		0
 #endif
 
+/*
+ * Some old applications may want to read/write particular slab cache
+ * by name and therefore this can not be merged.
+ */
+#define SLAB_VISIBLE_UAPI	0x10000000UL
+
 /* The following flags affect the page allocator grouping pages by mobility */
 /* Objects are reclaimable */
 #define SLAB_RECLAIM_ACCOUNT	((slab_flags_t __force)0x00020000U)
