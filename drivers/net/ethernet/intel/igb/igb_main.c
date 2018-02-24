@@ -6843,8 +6843,13 @@ static void igb_set_default_mac_filter(struct igb_adapter *adapter)
 	igb_rar_set_index(adapter, 0);
 }
 
+/* Add a MAC filter for 'addr' directing matching traffic to 'queue',
+ * 'flags' is used to indicate what kind of match is made, match is by
+ * default for the destination address, if matching by source address
+ * is desired the flag IGB_MAC_STATE_SRC_ADDR can be used.
+ */
 static int igb_add_mac_filter(struct igb_adapter *adapter, const u8 *addr,
-			      const u8 queue)
+			      const u8 queue, const u8 flags)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	int rar_entries = hw->mac.rar_entry_count -
@@ -6864,7 +6869,7 @@ static int igb_add_mac_filter(struct igb_adapter *adapter, const u8 *addr,
 
 		ether_addr_copy(adapter->mac_table[i].addr, addr);
 		adapter->mac_table[i].queue = queue;
-		adapter->mac_table[i].state |= IGB_MAC_STATE_IN_USE;
+		adapter->mac_table[i].state |= (IGB_MAC_STATE_IN_USE | flags);
 
 		igb_rar_set_index(adapter, i);
 		return i;
@@ -6873,8 +6878,14 @@ static int igb_add_mac_filter(struct igb_adapter *adapter, const u8 *addr,
 	return -ENOSPC;
 }
 
+/* Remove a MAC filter for 'addr' directing matching traffic to
+ * 'queue', 'flags' is used to indicate what kind of match need to be
+ * removed, match is by default for the destination address, if
+ * matching by source address is to be removed the flag
+ * IGB_MAC_STATE_SRC_ADDR can be used.
+ */
 static int igb_del_mac_filter(struct igb_adapter *adapter, const u8 *addr,
-			      const u8 queue)
+			      const u8 queue, const u8 flags)
 {
 	struct e1000_hw *hw = &adapter->hw;
 	int rar_entries = hw->mac.rar_entry_count -
@@ -6889,14 +6900,15 @@ static int igb_del_mac_filter(struct igb_adapter *adapter, const u8 *addr,
 	 * for the VF MAC addresses.
 	 */
 	for (i = 0; i < rar_entries; i++) {
-		if (!(adapter->mac_table[i].state & IGB_MAC_STATE_IN_USE))
+		if (!(adapter->mac_table[i].state &
+		      (IGB_MAC_STATE_IN_USE | flags)))
 			continue;
 		if (adapter->mac_table[i].queue != queue)
 			continue;
 		if (!ether_addr_equal(adapter->mac_table[i].addr, addr))
 			continue;
 
-		adapter->mac_table[i].state &= ~IGB_MAC_STATE_IN_USE;
+		adapter->mac_table[i].state &= ~(IGB_MAC_STATE_IN_USE | flags);
 		memset(adapter->mac_table[i].addr, 0, ETH_ALEN);
 		adapter->mac_table[i].queue = 0;
 
@@ -6912,7 +6924,8 @@ static int igb_uc_sync(struct net_device *netdev, const unsigned char *addr)
 	struct igb_adapter *adapter = netdev_priv(netdev);
 	int ret;
 
-	ret = igb_add_mac_filter(adapter, addr, adapter->vfs_allocated_count);
+	ret = igb_add_mac_filter(adapter, addr,
+				 adapter->vfs_allocated_count, 0);
 
 	return min_t(int, ret, 0);
 }
@@ -6921,7 +6934,7 @@ static int igb_uc_unsync(struct net_device *netdev, const unsigned char *addr)
 {
 	struct igb_adapter *adapter = netdev_priv(netdev);
 
-	igb_del_mac_filter(adapter, addr, adapter->vfs_allocated_count);
+	igb_del_mac_filter(adapter, addr, adapter->vfs_allocated_count, 0);
 
 	return 0;
 }
@@ -6943,7 +6956,8 @@ static int igb_set_vf_mac_filter(struct igb_adapter *adapter, const int vf,
 			if (entry->vf == vf) {
 				entry->vf = -1;
 				entry->free = true;
-				igb_del_mac_filter(adapter, entry->vf_mac, vf);
+				igb_del_mac_filter(adapter,
+						   entry->vf_mac, vf, 0);
 			}
 		}
 		break;
@@ -6974,7 +6988,7 @@ static int igb_set_vf_mac_filter(struct igb_adapter *adapter, const int vf,
 			entry->vf = vf;
 			ether_addr_copy(entry->vf_mac, addr);
 
-			ret = igb_add_mac_filter(adapter, addr, vf);
+			ret = igb_add_mac_filter(adapter, addr, vf, 0);
 			ret = min_t(int, ret, 0);
 		} else {
 			ret = -ENOSPC;
@@ -8749,6 +8763,9 @@ static void igb_rar_set_index(struct igb_adapter *adapter, u32 index)
 	if (adapter->mac_table[index].state & IGB_MAC_STATE_IN_USE) {
 		if (is_valid_ether_addr(addr))
 			rar_high |= E1000_RAH_AV;
+
+		if (adapter->mac_table[index].state & IGB_MAC_STATE_SRC_ADDR)
+			rar_high |= E1000_RAH_ASEL_SRC_ADDR;
 
 		switch (hw->mac.type) {
 		case e1000_82575:
