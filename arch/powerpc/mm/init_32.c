@@ -79,6 +79,7 @@ EXPORT_SYMBOL(agp_special_page);
 #endif
 
 void MMU_init(void);
+void __init MMU_setup(void);
 
 /*
  * this tells the system to map all of ram with the segregs
