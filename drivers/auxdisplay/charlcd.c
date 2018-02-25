@@ -67,6 +67,11 @@
 #define LCD_ESCAPE_LEN		24	/* Max chars for LCD escape command */
 #define LCD_ESCAPE_CHAR		27	/* Use char 27 for escape command */
 
+struct charlcd_priv_addr {
+	unsigned long int x;
+	unsigned long int y;
+};
+
 struct charlcd_priv {
 	struct charlcd lcd;
 
@@ -80,12 +85,9 @@ struct charlcd_priv {
 	unsigned long int flags;
 
 	/* Contains the LCD X and Y offset */
-	struct {
-		unsigned long int x;
-		unsigned long int y;
-	} addr;
+	struct charlcd_priv_addr addr;
 
-	/* Current escape sequence and it's length or -1 if outside */
+	/* Current escape sequence and its length or -1 if outside */
 	struct {
 		char buf[LCD_ESCAPE_LEN + 1];
 		int len;
