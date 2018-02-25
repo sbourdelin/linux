@@ -11,6 +11,23 @@
 #include <linux/usb/hcd.h>
 #include "usb.h"
 
+static char quirks_param[128];
+module_param_string(quirks, quirks_param, sizeof(quirks_param), 0644);
+MODULE_PARM_DESC(quirks, "Add/modify USB quirks by specifying quirks=vendorID:productID:quirks");
+
+static char quirks_param_orig[128];
+
+static LIST_HEAD(quirk_list);
+
+static struct mutex quirk_mutex;
+
+struct quirk_entry {
+	u16 vid;
+	u16 pid;
+	u32 flags;
+	struct list_head list;
+};
+
 /* Lists of quirky USB devices, split in device quirks and interface quirks.
  * Device quirks are applied at the very beginning of the enumeration process,
  * right after reading the device descriptor. They can thus only match on device
@@ -305,6 +322,105 @@ static bool usb_match_any_interface(struct usb_device *udev,
 	return false;
 }
 
+static int usb_build_quirk_list(const char *quirks_param)
+{
+	char *param, *p, *field;
+	u16 vid, pid;
+	u32 flags;
+	struct quirk_entry *quirk;
+
+	usb_release_quirk_list();
+
+	param = vmalloc(strlen(quirks_param));
+	if (!param)
+		return -ENOMEM;
+
+	strcpy(param, quirks_param);
+	p = param;
+	while (p && *p) {
+		/* Each entry consists of VID:PID:flags */
+		field = strsep(&p, ":");
+		if (!field)
+			break;
+
+		if (kstrtou16(field, 16, &vid))
+			break;
+
+		field = strsep(&p, ":");
+		if (!field)
+			break;
+
+		if (kstrtou16(field, 16, &pid))
+			break;
+
+		field = strsep(&p, ",");
+		if (!field)
+			break;
+
+		/* Collect the flags */
+		for (flags = 0; *field; field++) {
+			switch (tolower(*field)) {
+			case 'a':
+				flags |= USB_QUIRK_STRING_FETCH_255;
+				break;
+			case 'b':
+				flags |= USB_QUIRK_RESET_RESUME;
+				break;
+			case 'c':
+				flags |= USB_QUIRK_NO_SET_INTF;
+				break;
+			case 'd':
+				flags |= USB_QUIRK_CONFIG_INTF_STRINGS;
+				break;
+			case 'e':
+				flags |= USB_QUIRK_RESET;
+				break;
+			case 'f':
+				flags |= USB_QUIRK_HONOR_BNUMINTERFACES;
+				break;
+			case 'g':
+				flags |= USB_QUIRK_DELAY_INIT;
+				break;
+			case 'h':
+				flags |= USB_QUIRK_LINEAR_UFRAME_INTR_BINTERVAL;
+				break;
+			case 'i':
+				flags |= USB_QUIRK_DEVICE_QUALIFIER;
+				break;
+			case 'j':
+				flags |= USB_QUIRK_IGNORE_REMOTE_WAKEUP;
+				break;
+			case 'k':
+				flags |= USB_QUIRK_NO_LPM;
+				break;
+			case 'l':
+				flags |= USB_QUIRK_LINEAR_FRAME_INTR_BINTERVAL;
+				break;
+			case 'm':
+				flags |= USB_QUIRK_DISCONNECT_SUSPEND;
+				break;
+			/* Ignore unrecognized flag characters */
+			}
+		}
+
+		quirk = vmalloc(sizeof(struct quirk_entry));
+		if (!quirk) {
+			vfree(param);
+			return -ENOMEM;
+		}
+
+		quirk->vid = vid;
+		quirk->pid = pid;
+		quirk->flags = flags;
+
+		list_add(&quirk->list, &quirk_list);
+	}
+
+	vfree(param);
+
+	return 0;
+}
+
 static int usb_amd_resume_quirk(struct usb_device *udev)
 {
 	struct usb_hcd *hcd;
@@ -317,8 +433,8 @@ static int usb_amd_resume_quirk(struct usb_device *udev)
 	return 0;
 }
 
-static u32 __usb_detect_quirks(struct usb_device *udev,
-			       const struct usb_device_id *id)
+static u32 usb_detect_static_quirks(struct usb_device *udev,
+				    const struct usb_device_id *id)
 {
 	u32 quirks = 0;
 
@@ -336,20 +452,44 @@ static u32 __usb_detect_quirks(struct usb_device *udev,
 	return quirks;
 }
 
+static u32 usb_detect_dynamic_quirks(struct usb_device *udev)
+{
+	u16 vid = le16_to_cpu(udev->descriptor.idVendor);
+	u16 pid = le16_to_cpu(udev->descriptor.idProduct);
+	struct quirk_entry *quirk;
+
+	mutex_lock(&quirk_mutex);
+	if (strcmp(quirks_param, quirks_param_orig) != 0) {
+		strcpy(quirks_param_orig, quirks_param);
+		if (usb_build_quirk_list(quirks_param))
+			dev_warn(&udev->dev, "failed to build quirk list");
+	}
+	mutex_unlock(&quirk_mutex);
+
+	list_for_each_entry(quirk, &quirk_list, list) {
+		if (vid == quirk->vid && pid == quirk->pid)
+			return quirk->flags;
+	}
+
+	return 0;
+}
+
 /*
  * Detect any quirks the device has, and do any housekeeping for it if needed.
  */
 void usb_detect_quirks(struct usb_device *udev)
 {
-	udev->quirks = __usb_detect_quirks(udev, usb_quirk_list);
+	udev->quirks = usb_detect_static_quirks(udev, usb_quirk_list);
 
 	/*
 	 * Pixart-based mice would trigger remote wakeup issue on AMD
 	 * Yangtze chipset, so set them as RESET_RESUME flag.
 	 */
 	if (usb_amd_resume_quirk(udev))
-		udev->quirks |= __usb_detect_quirks(udev,
+		udev->quirks |= usb_detect_static_quirks(udev,
 				usb_amd_resume_quirk_list);
+
+	udev->quirks ^= usb_detect_dynamic_quirks(udev);
 
 	if (udev->quirks)
 		dev_dbg(&udev->dev, "USB quirks for this device: %x\n",
@@ -369,11 +509,21 @@ void usb_detect_interface_quirks(struct usb_device *udev)
 {
 	u32 quirks;
 
-	quirks = __usb_detect_quirks(udev, usb_interface_quirk_list);
+	quirks = usb_detect_static_quirks(udev, usb_interface_quirk_list);
 	if (quirks == 0)
 		return;
 
 	dev_dbg(&udev->dev, "USB interface quirks for this device: %x\n",
 		quirks);
 	udev->quirks |= quirks;
+}
+
+void usb_release_quirk_list(void)
+{
+	struct quirk_entry *quirk, *tmp;
+
+	list_for_each_entry_safe(quirk, tmp, &quirk_list, list) {
+		list_del(&quirk->list);
+		vfree(quirk);
+	}
 }
