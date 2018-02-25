@@ -295,6 +295,11 @@
 				bias-pull-up;
 			};
 
+			pwm_ch0_pin: pwm-ch0-pin {
+				pins = "PB2";
+				function = "pwm";
+			};
+
 			uart0_pb_pins: uart0-pb-pins {
 				pins = "PB22", "PB23";
 				function = "uart0";
@@ -304,6 +309,14 @@
 		wdt: watchdog@1c20c90 {
 			compatible = "allwinner,sun4i-a10-wdt";
 			reg = <0x01c20c90 0x10>;
+		};
+
+		pwm: pwm@1c23400 {
+			     compatible = "allwinner,sun8i-r40-pwm";
+			     reg = <0x01c23400 0x154>;
+			     clocks = <&osc24M>;
+			     #pwm-cells = <3>;
+			     status = "disabled";
 		};
 
 		uart0: serial@1c28000 {
