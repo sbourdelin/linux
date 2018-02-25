@@ -188,6 +188,10 @@ static int cros_ec_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 	if (alarm_time < 0 || alarm_time > U32_MAX)
 		return -EINVAL;
 
+	/* Don't set an alarm in the past. */
+	if ((u32)alarm_time <= current_time)
+		return -ETIME;
+
 	if (!alrm->enabled) {
 		/*
 		 * If the alarm is being disabled, send an alarm
@@ -196,11 +200,7 @@ static int cros_ec_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
 		alarm_offset = EC_RTC_ALARM_CLEAR;
 		cros_ec_rtc->saved_alarm = (u32)alarm_time;
 	} else {
-		/* Don't set an alarm in the past. */
-		if ((u32)alarm_time < current_time)
-			alarm_offset = EC_RTC_ALARM_CLEAR;
-		else
-			alarm_offset = (u32)alarm_time - current_time;
+		alarm_offset = (u32)alarm_time - current_time;
 	}
 
 	ret = cros_ec_rtc_set(cros_ec, EC_CMD_RTC_SET_ALARM, alarm_offset);
