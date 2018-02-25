@@ -481,6 +481,12 @@ struct ieee80211_sta_rx_stats {
  * @pcpu_rx_stats: per-CPU RX statistics, assigned only if the driver needs
  *	this (by advertising the USES_RSS hw flag)
  * @status_stats: TX status statistics
+ * @last_cqm_event_signal: Last data frame signal strength average that
+ *	triggered a cqm event for a connected station. 0 indicates that no
+ *	event has been generated for the station.
+ * @count_rx_signal: Number of data frames used in avg signal for a station.
+ *	This can be used to avoid generating less reliable cqm events for
+ *	the station.
  */
 struct sta_info {
 	/* General information, mostly static */
@@ -580,6 +586,9 @@ struct sta_info {
 	u8 reserved_tid;
 
 	struct cfg80211_chan_def tdls_chandef;
+
+	int last_cqm_event_signal;
+	unsigned int count_rx_signal;
 
 	/* keep last! */
 	struct ieee80211_sta sta;
