@@ -24,11 +24,28 @@
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
+#include <linux/mdio-bitbang.h>
 #include <linux/gpio.h>
-#include <linux/platform_data/mdio-gpio.h>
 
 #include <linux/of_gpio.h>
 #include <linux/of_mdio.h>
+
+struct mdio_gpio_platform_data {
+	/* GPIO numbers for bus pins */
+	unsigned int mdc;
+	unsigned int mdio;
+	unsigned int mdo;
+
+	bool mdc_active_low;
+	bool mdio_active_low;
+	bool mdo_active_low;
+
+	u32 phy_mask;
+	u32 phy_ignore_ta_mask;
+	int irqs[PHY_MAX_ADDR];
+	/* reset callback */
+	int (*reset)(struct mii_bus *bus);
+};
 
 struct mdio_gpio_info {
 	struct mdiobb_ctrl ctrl;
