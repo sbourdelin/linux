@@ -471,27 +471,62 @@ static inline int handle_lcd_special_code(struct charlcd *lcd)
 		break;
 	}
 	case 'x':	/* gotoxy : LxXXX[yYYY]; */
-	case 'y':	/* gotoxy : LyYYY[xXXX]; */
+	case 'y': {	/* gotoxy : LyYYY[xXXX]; */
+
+		char* nxt_esc;
+		char  nxt_cmd;
+		char  cmd;
+		struct charlcd_priv_addr tmp_addr;
+
 		if (!strchr(esc, ';'))
 			break;
 
-		while (*esc) {
-			if (*esc == 'x') {
-				esc++;
-				if (kstrtoul(esc, 10, &priv->addr.x) < 0)
+		/* sequence is processed whether legal or illegal */
+		processed = 1;
+
+		/* copy current address to temporary buffer */
+		tmp_addr = priv->addr;
+
+		nxt_cmd = *esc++;
+		nxt_esc = esc;
+
+		while ('\0' != *esc) {
+
+			cmd = nxt_cmd;
+			esc = nxt_esc;
+			nxt_esc = strpbrk(esc, "xy;");
+			if (NULL != nxt_esc) {
+				nxt_cmd = *nxt_esc;
+				/* terminate current sequence with NUL */
+				*nxt_esc++ = '\0';
+			}
+
+			if ('x' == cmd) {
+				if (kstrtoul(esc, 10, &tmp_addr.x) < 0)
 					break;
-			} else if (*esc == 'y') {
-				esc++;
-				if (kstrtoul(esc, 10, &priv->addr.y) < 0)
+			} else if ('y' == cmd) {
+				if (kstrtoul(esc, 10, &tmp_addr.y) < 0)
 					break;
 			} else {
+				/* break on unknown command or ';' */
 				break;
 			}
+
 		}
 
+		/* unknown commands in sequence will be followed by at least ';' */
+		if ('\0' != *esc)
+			break;
+
+		/* clamp new x/y coordinates */
+		if (tmp_addr.x >= lcd->width)
+			tmp_addr.x = lcd->width - 1;
+		tmp_addr.y %= lcd->height;
+
+		priv->addr = tmp_addr;
 		charlcd_gotoxy(lcd);
-		processed = 1;
 		break;
+	}
 	}
 
 	/* TODO: This indent party here got ugly, clean it! */
