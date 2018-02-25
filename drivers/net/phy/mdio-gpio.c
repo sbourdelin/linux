@@ -239,16 +239,11 @@ static int mdio_gpio_probe(struct platform_device *pdev)
 	if (!bitbang)
 		return -ENOMEM;
 
-	if (pdev->dev.of_node) {
-		pdata = mdio_gpio_of_get_data(dev);
-		bus_id = of_alias_get_id(dev->of_node, "mdio-gpio");
-		if (bus_id < 0) {
-			dev_warn(dev, "failed to get alias id\n");
-			bus_id = 0;
-		}
-	} else {
-		pdata = dev_get_platdata(dev);
-		bus_id = pdev->id;
+	pdata = mdio_gpio_of_get_data(dev);
+	bus_id = of_alias_get_id(dev->of_node, "mdio-gpio");
+	if (bus_id < 0) {
+		dev_warn(dev, "failed to get alias id\n");
+		bus_id = 0;
 	}
 
 	if (!pdata)
@@ -258,11 +253,7 @@ static int mdio_gpio_probe(struct platform_device *pdev)
 	if (!new_bus)
 		return -ENODEV;
 
-	if (dev->of_node)
-		ret = of_mdiobus_register(new_bus, dev->of_node);
-	else
-		ret = mdiobus_register(new_bus);
-
+	ret = of_mdiobus_register(new_bus, dev->of_node);
 	if (ret)
 		mdio_gpio_bus_deinit(dev);
 
