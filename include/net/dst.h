@@ -193,6 +193,9 @@ static inline void dst_metric_set(struct dst_entry *dst, int metric, u32 val)
 		p[metric-1] = val;
 }
 
+int dst_metrics_convert(struct net *net, struct nlattr *fc_mx, int fc_mx_len,
+			u32 *metrics);
+
 /* Kernel-internal feature bits that are unallocated in user space. */
 #define DST_FEATURE_ECN_CA	(1 << 31)
 
