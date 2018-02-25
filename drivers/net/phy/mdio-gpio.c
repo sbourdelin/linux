@@ -52,14 +52,14 @@ struct mdio_gpio_info {
 	struct gpio_desc *mdc, *mdio, *mdo;
 };
 
-static void *mdio_gpio_of_get_data(struct platform_device *pdev)
+static void *mdio_gpio_of_get_data(struct device *dev)
 {
-	struct device_node *np = pdev->dev.of_node;
+	struct device_node *np = dev->of_node;
 	struct mdio_gpio_platform_data *pdata;
 	enum of_gpio_flags flags;
 	int ret;
 
-	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
 	if (!pdata)
 		return NULL;
 
@@ -142,20 +142,16 @@ static const struct mdiobb_ops mdio_gpio_ops = {
 };
 
 static struct mii_bus *mdio_gpio_bus_init(struct device *dev,
+					  struct mdio_gpio_info *bitbang,
 					  struct mdio_gpio_platform_data *pdata,
 					  int bus_id)
 {
 	struct mii_bus *new_bus;
-	struct mdio_gpio_info *bitbang;
 	int i;
 	int mdc, mdio, mdo;
 	unsigned long mdc_flags = GPIOF_OUT_INIT_LOW;
 	unsigned long mdio_flags = GPIOF_DIR_IN;
 	unsigned long mdo_flags = GPIOF_OUT_INIT_HIGH;
-
-	bitbang = devm_kzalloc(dev, sizeof(*bitbang), GFP_KERNEL);
-	if (!bitbang)
-		goto out;
 
 	bitbang->ctrl.ops = &mdio_gpio_ops;
 	bitbang->ctrl.reset = pdata->reset;
@@ -234,35 +230,41 @@ static void mdio_gpio_bus_destroy(struct device *dev)
 static int mdio_gpio_probe(struct platform_device *pdev)
 {
 	struct mdio_gpio_platform_data *pdata;
+	struct device *dev = &pdev->dev;
+	struct mdio_gpio_info *bitbang;
 	struct mii_bus *new_bus;
 	int ret, bus_id;
 
+	bitbang = devm_kzalloc(dev, sizeof(*bitbang), GFP_KERNEL);
+	if (!bitbang)
+		return -ENOMEM;
+
 	if (pdev->dev.of_node) {
-		pdata = mdio_gpio_of_get_data(pdev);
-		bus_id = of_alias_get_id(pdev->dev.of_node, "mdio-gpio");
+		pdata = mdio_gpio_of_get_data(dev);
+		bus_id = of_alias_get_id(dev->of_node, "mdio-gpio");
 		if (bus_id < 0) {
-			dev_warn(&pdev->dev, "failed to get alias id\n");
+			dev_warn(dev, "failed to get alias id\n");
 			bus_id = 0;
 		}
 	} else {
-		pdata = dev_get_platdata(&pdev->dev);
+		pdata = dev_get_platdata(dev);
 		bus_id = pdev->id;
 	}
 
 	if (!pdata)
 		return -ENODEV;
 
-	new_bus = mdio_gpio_bus_init(&pdev->dev, pdata, bus_id);
+	new_bus = mdio_gpio_bus_init(dev, bitbang, pdata, bus_id);
 	if (!new_bus)
 		return -ENODEV;
 
-	if (pdev->dev.of_node)
-		ret = of_mdiobus_register(new_bus, pdev->dev.of_node);
+	if (dev->of_node)
+		ret = of_mdiobus_register(new_bus, dev->of_node);
 	else
 		ret = mdiobus_register(new_bus);
 
 	if (ret)
-		mdio_gpio_bus_deinit(&pdev->dev);
+		mdio_gpio_bus_deinit(dev);
 
 	return ret;
 }
