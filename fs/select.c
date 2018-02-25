@@ -384,6 +384,31 @@ void zero_fd_set(unsigned long nr, unsigned long *fdset)
 	memset(fdset, 0, FDS_BYTES(nr));
 }
 
+/*
+ * Ooo, nasty.  We need here to frob 32-bit unsigned longs to
+ * 64-bit unsigned longs.
+ */
+static
+int compat_get_fd_set(unsigned long nr, compat_ulong_t __user *ufdset,
+			unsigned long *fdset)
+{
+	if (ufdset) {
+		return compat_get_bitmap(fdset, ufdset, nr);
+	} else {
+		zero_fd_set(nr, fdset);
+		return 0;
+	}
+}
+
+static
+int compat_set_fd_set(unsigned long nr, compat_ulong_t __user *ufdset,
+		      unsigned long *fdset)
+{
+	if (!ufdset)
+		return 0;
+	return compat_put_bitmap(ufdset, fdset, nr);
+}
+
 #define FDS_IN(fds, n)		(fds->in + n)
 #define FDS_OUT(fds, n)		(fds->out + n)
 #define FDS_EX(fds, n)		(fds->ex + n)
@@ -644,10 +669,24 @@ int core_sys_select(int n, fd_set __user *inp, fd_set __user *outp,
 	fds.res_out = bits + 4*size;
 	fds.res_ex  = bits + 5*size;
 
+#if defined(CONFIG_X86_X32)
+	if (test_thread_flag(TIF_X32)) {
+		if ((ret = compat_get_fd_set(n, (compat_ulong_t __user *)inp, fds.in)) ||
+		    (ret = compat_get_fd_set(n, (compat_ulong_t __user *)outp, fds.out)) ||
+		    (ret = compat_get_fd_set(n, (compat_ulong_t __user *)exp, fds.ex)))
+			goto out;
+	} else {
+		if ((ret = get_fd_set(n, inp, fds.in)) ||
+		    (ret = get_fd_set(n, outp, fds.out)) ||
+		    (ret = get_fd_set(n, exp, fds.ex)))
+			goto out;
+	}
+#else
 	if ((ret = get_fd_set(n, inp, fds.in)) ||
 	    (ret = get_fd_set(n, outp, fds.out)) ||
 	    (ret = get_fd_set(n, exp, fds.ex)))
 		goto out;
+#endif
 	zero_fd_set(n, fds.res_in);
 	zero_fd_set(n, fds.res_out);
 	zero_fd_set(n, fds.res_ex);
@@ -663,10 +702,24 @@ int core_sys_select(int n, fd_set __user *inp, fd_set __user *outp,
 		ret = 0;
 	}
 
+#if defined(CONFIG_X86_X32)
+	if (test_thread_flag(TIF_X32)) {
+		if ((ret = compat_set_fd_set(n, (compat_ulong_t __user *)inp, fds.res_in)) ||
+		    (ret = compat_set_fd_set(n, (compat_ulong_t __user *)outp, fds.res_out)) ||
+		    (ret = compat_set_fd_set(n, (compat_ulong_t __user *)exp, fds.res_ex)))
+			ret = -EFAULT;
+	} else {
+		if (set_fd_set(n, inp, fds.res_in) ||
+		    set_fd_set(n, outp, fds.res_out) ||
+		    set_fd_set(n, exp, fds.res_ex))
+			ret = -EFAULT;
+	}
+#else
 	if (set_fd_set(n, inp, fds.res_in) ||
 	    set_fd_set(n, outp, fds.res_out) ||
 	    set_fd_set(n, exp, fds.res_ex))
 		ret = -EFAULT;
+#endif
 
 out:
 	if (bits != stack_fds)
@@ -1147,31 +1200,6 @@ sticky:
 	if (ret == -ERESTARTNOHAND)
 		ret = -EINTR;
 	return ret;
-}
-
-/*
- * Ooo, nasty.  We need here to frob 32-bit unsigned longs to
- * 64-bit unsigned longs.
- */
-static
-int compat_get_fd_set(unsigned long nr, compat_ulong_t __user *ufdset,
-			unsigned long *fdset)
-{
-	if (ufdset) {
-		return compat_get_bitmap(fdset, ufdset, nr);
-	} else {
-		zero_fd_set(nr, fdset);
-		return 0;
-	}
-}
-
-static
-int compat_set_fd_set(unsigned long nr, compat_ulong_t __user *ufdset,
-		      unsigned long *fdset)
-{
-	if (!ufdset)
-		return 0;
-	return compat_put_bitmap(ufdset, fdset, nr);
 }
 
 
