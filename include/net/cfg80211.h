@@ -5706,6 +5706,21 @@ void cfg80211_cqm_rssi_notify(struct net_device *dev,
 			      s32 rssi_level, gfp_t gfp);
 
 /**
+ * cfg80211_ap_sta_cqm_rssi_notify - CQM rssi event for connected stations
+ * @dev: network device
+ * @mac: peer's MAC address
+ * @rssi_event: the triggered RSSI event
+ * @rssi_level: new RSSI level value or 0 if not available
+ * @gfp: context flags
+ *
+ * This function is called when a configured connection quality monitoring
+ * rssi threshold reached event occurs for a station.
+ */
+void cfg80211_ap_sta_cqm_rssi_notify(struct net_device *dev, const u8 *mac,
+		enum nl80211_cqm_rssi_threshold_event rssi_event,
+		s32 rssi_level, gfp_t gfp);
+
+/**
  * cfg80211_cqm_pktloss_notify - notify userspace about packetloss to peer
  * @dev: network device
  * @peer: peer's MAC address

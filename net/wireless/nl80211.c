@@ -44,6 +44,7 @@ enum nl80211_multicast_groups {
 	NL80211_MCGRP_MLME,
 	NL80211_MCGRP_VENDOR,
 	NL80211_MCGRP_NAN,
+	NL80211_MCGRP_AP_STA_CQM,
 	NL80211_MCGRP_TESTMODE /* keep last - ifdef! */
 };
 
@@ -54,6 +55,8 @@ static const struct genl_multicast_group nl80211_mcgrps[] = {
 	[NL80211_MCGRP_MLME] = { .name = NL80211_MULTICAST_GROUP_MLME },
 	[NL80211_MCGRP_VENDOR] = { .name = NL80211_MULTICAST_GROUP_VENDOR },
 	[NL80211_MCGRP_NAN] = { .name = NL80211_MULTICAST_GROUP_NAN },
+	[NL80211_MCGRP_AP_STA_CQM] = {
+				.name = NL80211_MULTICAST_GROUP_AP_STA_CQM },
 #ifdef CONFIG_NL80211_TESTMODE
 	[NL80211_MCGRP_TESTMODE] = { .name = NL80211_MULTICAST_GROUP_TESTMODE }
 #endif
@@ -9905,8 +9908,13 @@ static int nl80211_set_cqm_rssi(struct genl_info *info,
 		prev = thresholds[i];
 	}
 
-	if (wdev->iftype != NL80211_IFTYPE_STATION &&
-	    wdev->iftype != NL80211_IFTYPE_P2P_CLIENT)
+	if ((wdev->iftype != NL80211_IFTYPE_STATION &&
+	     wdev->iftype != NL80211_IFTYPE_P2P_CLIENT) &&
+	    ((wdev->iftype == NL80211_IFTYPE_AP ||
+	      wdev->iftype == NL80211_IFTYPE_AP_VLAN ||
+	      wdev->iftype == NL80211_IFTYPE_P2P_GO) &&
+	     !wiphy_ext_feature_isset(&rdev->wiphy,
+				NL80211_EXT_FEATURE_AP_STA_CQM_RSSI_CONFIG)))
 		return -EOPNOTSUPP;
 
 	wdev_lock(wdev);
@@ -14587,9 +14595,24 @@ static void cfg80211_send_cqm(struct sk_buff *msg, gfp_t gfp)
 				NL80211_MCGRP_MLME, gfp);
 }
 
-void cfg80211_cqm_rssi_notify(struct net_device *dev,
-			      enum nl80211_cqm_rssi_threshold_event rssi_event,
-			      s32 rssi_level, gfp_t gfp)
+static void cfg80211_send_ap_sta_cqm(struct sk_buff *msg, gfp_t gfp)
+{
+	void **cb = (void **)msg->cb;
+	struct cfg80211_registered_device *rdev = cb[2];
+
+	nla_nest_end(msg, cb[1]);
+	genlmsg_end(msg, cb[0]);
+
+	memset(msg->cb, 0, sizeof(msg->cb));
+
+	genlmsg_multicast_netns(&nl80211_fam, wiphy_net(&rdev->wiphy), msg, 0,
+				NL80211_MCGRP_AP_STA_CQM, gfp);
+}
+
+static struct sk_buff *cfg80211_cqm_rssi_prepare(struct net_device *dev,
+			const u8 *mac,
+			enum nl80211_cqm_rssi_threshold_event rssi_event,
+			s32 rssi_level, gfp_t gfp)
 {
 	struct sk_buff *msg;
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
@@ -14599,7 +14622,7 @@ void cfg80211_cqm_rssi_notify(struct net_device *dev,
 
 	if (WARN_ON(rssi_event != NL80211_CQM_RSSI_THRESHOLD_EVENT_LOW &&
 		    rssi_event != NL80211_CQM_RSSI_THRESHOLD_EVENT_HIGH))
-		return;
+		return NULL;
 
 	if (wdev->cqm_config) {
 		wdev->cqm_config->last_rssi_event_value = rssi_level;
@@ -14612,7 +14635,7 @@ void cfg80211_cqm_rssi_notify(struct net_device *dev,
 
 	msg = cfg80211_prepare_cqm(dev, NULL, gfp);
 	if (!msg)
-		return;
+		return NULL;
 
 	if (nla_put_u32(msg, NL80211_ATTR_CQM_RSSI_THRESHOLD_EVENT,
 			rssi_event))
@@ -14622,14 +14645,42 @@ void cfg80211_cqm_rssi_notify(struct net_device *dev,
 				      rssi_level))
 		goto nla_put_failure;
 
-	cfg80211_send_cqm(msg, gfp);
-
-	return;
+	return msg;
 
  nla_put_failure:
 	nlmsg_free(msg);
+	return NULL;
+}
+
+void cfg80211_cqm_rssi_notify(struct net_device *dev,
+			      enum nl80211_cqm_rssi_threshold_event rssi_event,
+			      s32 rssi_level, gfp_t gfp)
+{
+	struct sk_buff *msg;
+
+	msg = cfg80211_cqm_rssi_prepare(dev, NULL, rssi_event, rssi_level,
+					gfp);
+	if (!msg)
+		return;
+	cfg80211_send_cqm(msg, gfp);
+
+	return;
 }
 EXPORT_SYMBOL(cfg80211_cqm_rssi_notify);
+
+void cfg80211_ap_sta_cqm_rssi_notify(struct net_device *dev, const u8 *mac,
+			  enum nl80211_cqm_rssi_threshold_event rssi_event,
+			  s32 rssi_level, gfp_t gfp)
+{
+	struct sk_buff *msg;
+
+	msg = cfg80211_cqm_rssi_prepare(dev, mac, rssi_event, rssi_level,
+					gfp);
+	if (!msg)
+		return;
+	cfg80211_send_ap_sta_cqm(msg, gfp);
+}
+EXPORT_SYMBOL(cfg80211_ap_sta_cqm_rssi_notify);
 
 void cfg80211_cqm_txe_notify(struct net_device *dev,
 			     const u8 *peer, u32 num_packets,

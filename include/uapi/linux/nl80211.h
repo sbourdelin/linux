@@ -49,6 +49,7 @@
 #define NL80211_MULTICAST_GROUP_MLME		"mlme"
 #define NL80211_MULTICAST_GROUP_VENDOR		"vendor"
 #define NL80211_MULTICAST_GROUP_NAN		"nan"
+#define NL80211_MULTICAST_GROUP_AP_STA_CQM	"apstacqm"
 #define NL80211_MULTICAST_GROUP_TESTMODE	"testmode"
 
 /**
@@ -4999,6 +5000,10 @@ enum nl80211_feature_flags {
  * @NL80211_EXT_FEATURE_LOW_SPAN_SCAN: Driver supports low span scan.
  * @NL80211_EXT_FEATURE_LOW_POWER_SCAN: Driver supports low power scan.
  * @NL80211_EXT_FEATURE_HIGH_ACCURACY_SCAN: Driver supports high accuracy scan.
+ * @NL80211_EXT_FEATURE_AP_STA_CQM_RSSI_CONFIG: With this driver will accept
+ *	%NL80211_ATTR_CQM_RSSI_THOLD and %NL80211_ATTR_CQM_RSSI_HYST attributes
+ *	for AP/AP_VLAN/P2P_GO interface to monitor rssi values of connected
+ *	client.
  *
  * @NUM_NL80211_EXT_FEATURES: number of extended features.
  * @MAX_NL80211_EXT_FEATURES: highest extended feature index.
@@ -5029,6 +5034,7 @@ enum nl80211_ext_feature_index {
 	NL80211_EXT_FEATURE_LOW_SPAN_SCAN,
 	NL80211_EXT_FEATURE_LOW_POWER_SCAN,
 	NL80211_EXT_FEATURE_HIGH_ACCURACY_SCAN,
+	NL80211_EXT_FEATURE_AP_STA_CQM_RSSI_CONFIG,
 
 	/* add new features before the definition below */
 	NUM_NL80211_EXT_FEATURES,
