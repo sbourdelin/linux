@@ -5612,7 +5612,7 @@ static int of_pci_bus_find_domain_nr(struct device *parent)
 		domain = pci_get_new_domain_nr();
 	} else {
 		dev_err(parent, "Node %pOF has inconsistent \"linux,pci-domain\" property in DT\n",
-			parent->of_node);
+			parent ? parent->of_node : NULL);
 		domain = -1;
 	}
 
