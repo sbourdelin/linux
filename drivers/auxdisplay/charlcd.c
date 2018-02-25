@@ -43,6 +43,8 @@
 /* LCD commands */
 #define LCD_CMD_DISPLAY_CLEAR	0x01	/* Clear entire display */
 
+#define LCD_CMD_HOME            0x02    /* Set DDRAM address to 0 and unshift display */
+
 #define LCD_CMD_ENTRY_MODE	0x04	/* Set entry mode */
 #define LCD_CMD_CURSOR_INC	0x02	/* Increment cursor */
 
@@ -182,7 +184,8 @@ static void charlcd_home(struct charlcd *lcd)
 
 	priv->addr.x = 0;
 	priv->addr.y = 0;
-	charlcd_gotoxy(lcd);
+	lcd->ops->write_cmd(lcd, LCD_CMD_HOME);
+	long_sleep(2);
 }
 
 static void charlcd_print(struct charlcd *lcd, char c)
@@ -202,9 +205,12 @@ static void charlcd_print(struct charlcd *lcd, char c)
 
 static void charlcd_clear_fast(struct charlcd *lcd)
 {
+	struct charlcd_priv *priv = to_priv(lcd);
 	int pos;
 
-	charlcd_home(lcd);
+	priv->addr.x = 0;
+	priv->addr.y = 0;
+	charlcd_gotoxy(lcd);
 
 	if (lcd->ops->clear_fast)
 		lcd->ops->clear_fast(lcd);
