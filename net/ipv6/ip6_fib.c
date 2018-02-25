@@ -800,38 +800,6 @@ insert_above:
 	return ln;
 }
 
-static void fib6_copy_metrics(u32 *mp, const struct mx6_config *mxc)
-{
-	int i;
-
-	for (i = 0; i < RTAX_MAX; i++) {
-		if (test_bit(i, mxc->mx_valid))
-			mp[i] = mxc->mx[i];
-	}
-}
-
-static int fib6_commit_metrics(struct dst_entry *dst, struct mx6_config *mxc)
-{
-	if (!mxc->mx)
-		return 0;
-
-	if (dst->flags & DST_HOST) {
-		u32 *mp = dst_metrics_write_ptr(dst);
-
-		if (unlikely(!mp))
-			return -ENOMEM;
-
-		fib6_copy_metrics(mp, mxc);
-	} else {
-		dst_init_metrics(dst, mxc->mx, false);
-
-		/* We've stolen mx now. */
-		mxc->mx = NULL;
-	}
-
-	return 0;
-}
-
 static void fib6_purge_rt(struct rt6_info *rt, struct fib6_node *fn,
 			  struct net *net)
 {
@@ -865,7 +833,7 @@ static void fib6_purge_rt(struct rt6_info *rt, struct fib6_node *fn,
  */
 
 static int fib6_add_rt2node(struct fib6_node *fn, struct rt6_info *rt,
-			    struct nl_info *info, struct mx6_config *mxc,
+			    struct nl_info *info,
 			    struct netlink_ext_ack *extack)
 {
 	struct rt6_info *leaf = rcu_dereference_protected(fn->leaf,
@@ -880,7 +848,6 @@ static int fib6_add_rt2node(struct fib6_node *fn, struct rt6_info *rt,
 	int found = 0;
 	bool rt_can_ecmp = rt6_qualify_for_ecmp(rt);
 	u16 nlflags = NLM_F_EXCL;
-	int err;
 
 	if (info->nlh && (info->nlh->nlmsg_flags & NLM_F_APPEND))
 		nlflags |= NLM_F_APPEND;
@@ -922,7 +889,7 @@ static int fib6_add_rt2node(struct fib6_node *fn, struct rt6_info *rt,
 					rt6_clean_expires(iter);
 				else
 					rt6_set_expires(iter, rt->dst.expires);
-				iter->rt6i_pmtu = rt->rt6i_pmtu;
+				iter->fib6_pmtu = rt->fib6_pmtu;
 				return -EEXIST;
 			}
 			/* If we have the same destination and the same metric,
@@ -1001,9 +968,6 @@ next_iter:
 
 add:
 		nlflags |= NLM_F_CREATE;
-		err = fib6_commit_metrics(&rt->dst, mxc);
-		if (err)
-			return err;
 
 		rcu_assign_pointer(rt->rt6_next, iter);
 		atomic_inc(&rt->rt6i_ref);
@@ -1029,10 +993,6 @@ add:
 			pr_warn("NLM_F_REPLACE set, but no existing node found!\n");
 			return -ENOENT;
 		}
-
-		err = fib6_commit_metrics(&rt->dst, mxc);
-		if (err)
-			return err;
 
 		atomic_inc(&rt->rt6i_ref);
 		rcu_assign_pointer(rt->rt6i_node, fn);
@@ -1126,8 +1086,7 @@ void fib6_update_sernum_upto_root(struct net *net, struct rt6_info *rt)
  */
 
 int fib6_add(struct fib6_node *root, struct rt6_info *rt,
-	     struct nl_info *info, struct mx6_config *mxc,
-	     struct netlink_ext_ack *extack)
+	     struct nl_info *info, struct netlink_ext_ack *extack)
 {
 	struct fib6_table *table = rt->rt6i_table;
 	struct fib6_node *fn, *pn = NULL;
@@ -1235,7 +1194,7 @@ int fib6_add(struct fib6_node *root, struct rt6_info *rt,
 	}
 #endif
 
-	err = fib6_add_rt2node(fn, rt, info, mxc, extack);
+	err = fib6_add_rt2node(fn, rt, info, extack);
 	if (!err) {
 		__fib6_update_sernum_upto_root(rt, sernum);
 		fib6_start_gc(info->nl_net, rt);
