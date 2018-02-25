@@ -500,6 +500,12 @@ config MISC_RTSX
 	tristate
 	default MISC_RTSX_PCI || MISC_RTSX_USB
 
+config VMGENID
+	tristate "Virtual Machine Generation ID driver"
+	help
+	  This is a Virtual Machine Generation ID driver which provides
+	  a virtual machine unique identifier.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
