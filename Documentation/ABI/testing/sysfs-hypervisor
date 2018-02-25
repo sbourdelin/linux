@@ -1,0 +1,13 @@
+What:		/sys/hypervisor/vm_gen_counter
+Date:		February 2018
+Contact:	Or Idgar <idgar@virtualoco.com>
+		Gal Hammer <ghammer@redhat.com>
+Description:	Expose the virtual machine generation ID. The directory
+		contains two files: "generation_id" and "raw". Both files
+		represent the same information.
+
+		"generation_id" file is a UUID string
+		representation.
+
+		"raw" file is a 128-bit integer
+		representation (binary).
