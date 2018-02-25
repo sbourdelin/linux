@@ -556,7 +556,7 @@ void restore_math(struct pt_regs *regs)
 	regs->msr = msr;
 }
 
-void save_all(struct task_struct *tsk)
+static void save_all(struct task_struct *tsk)
 {
 	unsigned long usermsr;
 
