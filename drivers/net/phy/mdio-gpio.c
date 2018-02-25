@@ -25,9 +25,7 @@
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
 #include <linux/mdio-bitbang.h>
-#include <linux/gpio.h>
-
-#include <linux/of_gpio.h>
+#include <linux/gpio/consumer.h>
 #include <linux/of_mdio.h>
 
 struct mdio_gpio_info {
@@ -94,41 +92,23 @@ static const struct mdiobb_ops mdio_gpio_ops = {
 static struct mii_bus *mdio_gpio_bus_init(struct device *dev,
 					  struct mdio_gpio_info *bitbang)
 {
-	unsigned long mdo_flags = GPIOF_OUT_INIT_HIGH;
-	unsigned long mdc_flags = GPIOF_OUT_INIT_LOW;
-	unsigned long mdio_flags = GPIOF_DIR_IN;
 	struct device_node *np = dev->of_node;
-	enum of_gpio_flags flags;
 	struct mii_bus *new_bus;
-	bool mdio_active_low;
-	bool mdc_active_low;
-	bool mdo_active_low;
-	unsigned int mdio;
-	unsigned int mdc;
-	unsigned int mdo;
 	int bus_id;
 	int ret, i;
 
-	ret = of_get_gpio_flags(np, 0, &flags);
-	if (ret < 0)
-		return NULL;
-
-	mdc = ret;
-	mdc_active_low = flags & OF_GPIO_ACTIVE_LOW;
-
-	ret = of_get_gpio_flags(np, 1, &flags);
-	if (ret < 0)
-		return NULL;
-	mdio = ret;
-	mdio_active_low = flags & OF_GPIO_ACTIVE_LOW;
-
-	ret = of_get_gpio_flags(np, 2, &flags);
-	if (ret > 0) {
-		mdo = ret;
-		mdo_active_low = flags & OF_GPIO_ACTIVE_LOW;
-	} else {
-		mdo = 0;
-	}
+	bitbang->mdc =
+		devm_gpiod_get_index(dev, NULL, 0, GPIOD_OUT_LOW);
+	if (IS_ERR(bitbang->mdc))
+		return ERR_CAST(bitbang->mdc);
+	bitbang->mdio =
+		devm_gpiod_get_index(dev, NULL, 1, GPIOD_IN);
+	if (IS_ERR(bitbang->mdio))
+		return ERR_CAST(bitbang->mdio);
+	bitbang->mdo =
+		devm_gpiod_get_index_optional(dev, NULL, 2, GPIOD_OUT_HIGH);
+	if (IS_ERR(bitbang->mdo))
+		return ERR_CAST(bitbang->mdo);
 
 	bus_id = of_alias_get_id(np, "mdio-gpio");
 	if (bus_id < 0) {
@@ -137,27 +117,21 @@ static struct mii_bus *mdio_gpio_bus_init(struct device *dev,
 	}
 
 	bitbang->ctrl.ops = &mdio_gpio_ops;
-	bitbang->mdc = gpio_to_desc(mdc);
-	if (mdc_active_low)
-		mdc_flags = GPIOF_OUT_INIT_HIGH | GPIOF_ACTIVE_LOW;
-	bitbang->mdio = gpio_to_desc(mdio);
-	if (mdio_active_low)
-		mdio_flags |= GPIOF_ACTIVE_LOW;
-	if (mdo) {
-		bitbang->mdo = gpio_to_desc(mdo);
-		if (mdo_active_low)
-			mdo_flags = GPIOF_OUT_INIT_LOW | GPIOF_ACTIVE_LOW;
-	}
 
 	new_bus = alloc_mdio_bitbang(&bitbang->ctrl);
-	if (!new_bus)
+	if (!new_bus) {
+		ret = -ENOMEM;
 		goto out;
+	}
 
 	new_bus->name = "GPIO Bitbanged MDIO",
 	new_bus->parent = dev;
 
-	if (new_bus->phy_mask == ~0)
+	if (new_bus->phy_mask == ~0) {
+		dev_err(dev, "no PHY in mask\n");
+		ret = -ENODEV;
 		goto out_free_bus;
+	}
 
 	for (i = 0; i < PHY_MAX_ADDR; i++)
 		if (!new_bus->irq[i])
@@ -168,15 +142,6 @@ static struct mii_bus *mdio_gpio_bus_init(struct device *dev,
 	else
 		strncpy(new_bus->id, "gpio", MII_BUS_ID_SIZE);
 
-	if (devm_gpio_request_one(dev, mdc, mdc_flags, "mdc"))
-		goto out_free_bus;
-
-	if (devm_gpio_request_one(dev, mdio, mdio_flags, "mdio"))
-		goto out_free_bus;
-
-	if (mdo && devm_gpio_request_one(dev, mdo, mdo_flags, "mdo"))
-		goto out_free_bus;
-
 	dev_set_drvdata(dev, new_bus);
 
 	return new_bus;
@@ -184,7 +149,7 @@ static struct mii_bus *mdio_gpio_bus_init(struct device *dev,
 out_free_bus:
 	free_mdio_bitbang(new_bus);
 out:
-	return NULL;
+	return ERR_PTR(ret);
 }
 
 static void mdio_gpio_bus_deinit(struct device *dev)
@@ -216,8 +181,8 @@ static int mdio_gpio_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	new_bus = mdio_gpio_bus_init(dev, bitbang);
-	if (!new_bus)
-		return -ENODEV;
+	if (IS_ERR(new_bus))
+		return PTR_ERR(new_bus);
 
 	ret = of_mdiobus_register(new_bus, np);
 	if (ret)
