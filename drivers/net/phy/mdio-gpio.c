@@ -30,60 +30,10 @@
 #include <linux/of_gpio.h>
 #include <linux/of_mdio.h>
 
-struct mdio_gpio_platform_data {
-	/* GPIO numbers for bus pins */
-	unsigned int mdc;
-	unsigned int mdio;
-	unsigned int mdo;
-
-	bool mdc_active_low;
-	bool mdio_active_low;
-	bool mdo_active_low;
-
-	u32 phy_mask;
-	u32 phy_ignore_ta_mask;
-	int irqs[PHY_MAX_ADDR];
-	/* reset callback */
-	int (*reset)(struct mii_bus *bus);
-};
-
 struct mdio_gpio_info {
 	struct mdiobb_ctrl ctrl;
 	struct gpio_desc *mdc, *mdio, *mdo;
 };
-
-static void *mdio_gpio_of_get_data(struct device *dev)
-{
-	struct device_node *np = dev->of_node;
-	struct mdio_gpio_platform_data *pdata;
-	enum of_gpio_flags flags;
-	int ret;
-
-	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
-	if (!pdata)
-		return NULL;
-
-	ret = of_get_gpio_flags(np, 0, &flags);
-	if (ret < 0)
-		return NULL;
-
-	pdata->mdc = ret;
-	pdata->mdc_active_low = flags & OF_GPIO_ACTIVE_LOW;
-
-	ret = of_get_gpio_flags(np, 1, &flags);
-	if (ret < 0)
-		return NULL;
-	pdata->mdio = ret;
-	pdata->mdio_active_low = flags & OF_GPIO_ACTIVE_LOW;
-
-	ret = of_get_gpio_flags(np, 2, &flags);
-	if (ret > 0) {
-		pdata->mdo = ret;
-		pdata->mdo_active_low = flags & OF_GPIO_ACTIVE_LOW;
-	}
-
-	return pdata;
-}
 
 static void mdio_dir(struct mdiobb_ctrl *ctrl, int dir)
 {
@@ -142,31 +92,60 @@ static const struct mdiobb_ops mdio_gpio_ops = {
 };
 
 static struct mii_bus *mdio_gpio_bus_init(struct device *dev,
-					  struct mdio_gpio_info *bitbang,
-					  struct mdio_gpio_platform_data *pdata,
-					  int bus_id)
+					  struct mdio_gpio_info *bitbang)
 {
-	struct mii_bus *new_bus;
-	int i;
-	int mdc, mdio, mdo;
+	unsigned long mdo_flags = GPIOF_OUT_INIT_HIGH;
 	unsigned long mdc_flags = GPIOF_OUT_INIT_LOW;
 	unsigned long mdio_flags = GPIOF_DIR_IN;
-	unsigned long mdo_flags = GPIOF_OUT_INIT_HIGH;
+	struct device_node *np = dev->of_node;
+	enum of_gpio_flags flags;
+	struct mii_bus *new_bus;
+	bool mdio_active_low;
+	bool mdc_active_low;
+	bool mdo_active_low;
+	unsigned int mdio;
+	unsigned int mdc;
+	unsigned int mdo;
+	int bus_id;
+	int ret, i;
+
+	ret = of_get_gpio_flags(np, 0, &flags);
+	if (ret < 0)
+		return NULL;
+
+	mdc = ret;
+	mdc_active_low = flags & OF_GPIO_ACTIVE_LOW;
+
+	ret = of_get_gpio_flags(np, 1, &flags);
+	if (ret < 0)
+		return NULL;
+	mdio = ret;
+	mdio_active_low = flags & OF_GPIO_ACTIVE_LOW;
+
+	ret = of_get_gpio_flags(np, 2, &flags);
+	if (ret > 0) {
+		mdo = ret;
+		mdo_active_low = flags & OF_GPIO_ACTIVE_LOW;
+	} else {
+		mdo = 0;
+	}
+
+	bus_id = of_alias_get_id(np, "mdio-gpio");
+	if (bus_id < 0) {
+		dev_warn(dev, "failed to get alias id\n");
+		bus_id = 0;
+	}
 
 	bitbang->ctrl.ops = &mdio_gpio_ops;
-	bitbang->ctrl.reset = pdata->reset;
-	mdc = pdata->mdc;
 	bitbang->mdc = gpio_to_desc(mdc);
-	if (pdata->mdc_active_low)
+	if (mdc_active_low)
 		mdc_flags = GPIOF_OUT_INIT_HIGH | GPIOF_ACTIVE_LOW;
-	mdio = pdata->mdio;
 	bitbang->mdio = gpio_to_desc(mdio);
-	if (pdata->mdio_active_low)
+	if (mdio_active_low)
 		mdio_flags |= GPIOF_ACTIVE_LOW;
-	mdo = pdata->mdo;
 	if (mdo) {
 		bitbang->mdo = gpio_to_desc(mdo);
-		if (pdata->mdo_active_low)
+		if (mdo_active_low)
 			mdo_flags = GPIOF_OUT_INIT_LOW | GPIOF_ACTIVE_LOW;
 	}
 
@@ -175,10 +154,6 @@ static struct mii_bus *mdio_gpio_bus_init(struct device *dev,
 		goto out;
 
 	new_bus->name = "GPIO Bitbanged MDIO",
-
-	new_bus->phy_mask = pdata->phy_mask;
-	new_bus->phy_ignore_ta_mask = pdata->phy_ignore_ta_mask;
-	memcpy(new_bus->irq, pdata->irqs, sizeof(new_bus->irq));
 	new_bus->parent = dev;
 
 	if (new_bus->phy_mask == ~0)
@@ -229,31 +204,22 @@ static void mdio_gpio_bus_destroy(struct device *dev)
 
 static int mdio_gpio_probe(struct platform_device *pdev)
 {
-	struct mdio_gpio_platform_data *pdata;
 	struct device *dev = &pdev->dev;
 	struct mdio_gpio_info *bitbang;
 	struct mii_bus *new_bus;
-	int ret, bus_id;
+	struct device_node *np;
+	int ret;
 
+	np = dev->of_node;
 	bitbang = devm_kzalloc(dev, sizeof(*bitbang), GFP_KERNEL);
 	if (!bitbang)
 		return -ENOMEM;
 
-	pdata = mdio_gpio_of_get_data(dev);
-	bus_id = of_alias_get_id(dev->of_node, "mdio-gpio");
-	if (bus_id < 0) {
-		dev_warn(dev, "failed to get alias id\n");
-		bus_id = 0;
-	}
-
-	if (!pdata)
-		return -ENODEV;
-
-	new_bus = mdio_gpio_bus_init(dev, bitbang, pdata, bus_id);
+	new_bus = mdio_gpio_bus_init(dev, bitbang);
 	if (!new_bus)
 		return -ENODEV;
 
-	ret = of_mdiobus_register(new_bus, dev->of_node);
+	ret = of_mdiobus_register(new_bus, np);
 	if (ret)
 		mdio_gpio_bus_deinit(dev);
 
