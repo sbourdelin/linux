@@ -31,6 +31,7 @@
 #include <linux/sched/signal.h>
 #include <linux/sched/mm.h>
 #include <linux/compat.h>
+#include <linux/security.h>
 #include <asm/elf.h>
 
 #include "physaddr.h"
@@ -218,6 +219,9 @@ const char *arch_vma_name(struct vm_area_struct *vma)
 bool mmap_address_hint_valid(unsigned long addr, unsigned long len)
 {
 	if (TASK_SIZE - len < addr)
+		return false;
+
+	if (addr < mmap_min_addr)
 		return false;
 
 	return (addr > DEFAULT_MAP_WINDOW) == (addr + len > DEFAULT_MAP_WINDOW);
