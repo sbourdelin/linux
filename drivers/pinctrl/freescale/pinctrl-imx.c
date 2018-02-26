@@ -605,8 +605,8 @@ static int imx_pinctrl_probe_dt(struct platform_device *pdev,
 	struct device_node *np = pdev->dev.of_node;
 	struct device_node *child;
 	struct pinctrl_dev *pctl = ipctl->pctl;
-	u32 nfuncs = 0;
-	u32 i = 0;
+	int nfuncs = 0;
+	int i = 0;
 	bool flat_funcs;
 
 	if (!np)
