@@ -691,8 +691,8 @@ struct device_node *__of_find_node_by_path(struct device_node *parent,
 		return NULL;
 
 	__for_each_child_of_node(parent, child) {
-		const char *name = kbasename(child->full_name);
-		if (strncmp(path, name, len) == 0 && (strlen(name) == len))
+		if (strncmp(path, child->full_name, len) == 0 &&
+		    (strlen(child->full_name) == len))
 			return child;
 	}
 	return NULL;
