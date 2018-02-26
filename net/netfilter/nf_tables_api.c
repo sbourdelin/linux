@@ -5037,9 +5037,9 @@ static int nf_tables_newflowtable(struct net *net, struct sock *nlsk,
 {
 	const struct nfgenmsg *nfmsg = nlmsg_data(nlh);
 	const struct nf_flowtable_type *type;
+	struct nft_flowtable *flowtable, *ft;
 	u8 genmask = nft_genmask_next(net);
 	int family = nfmsg->nfgen_family;
-	struct nft_flowtable *flowtable;
 	struct nft_table *table;
 	struct nft_ctx ctx;
 	int err, i, k;
@@ -5099,6 +5099,13 @@ static int nf_tables_newflowtable(struct net *net, struct sock *nlsk,
 		goto err3;
 
 	for (i = 0; i < flowtable->ops_len; i++) {
+		list_for_each_entry(ft, &table->flowtables, list) {
+			if (ft->ops[i].dev == flowtable->ops[i].dev &&
+			    ft->ops[i].pf == flowtable->ops[i].pf) {
+				err = -EBUSY;
+				goto err4;
+			}
+		}
 		err = nf_register_net_hook(net, &flowtable->ops[i]);
 		if (err < 0)
 			goto err4;
