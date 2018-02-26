@@ -1295,6 +1295,7 @@ bpt_cmds(void)
 	switch (cmd) {
 #ifndef CONFIG_PPC_8xx
 	static const char badaddr[] = "Only kernel addresses are permitted for breakpoints\n";
+	static const char warnxmon[] = "xmon: Enabling debugger hooks\n";
 	int mode;
 	case 'd':	/* bd - hardware data breakpoint */
 		mode = 7;
@@ -1314,6 +1315,11 @@ bpt_cmds(void)
 			}
 			dabr.address &= ~HW_BRK_TYPE_DABR;
 			dabr.enabled = mode | BP_DABR;
+		}
+		/* Enable xmon hooks if needed */
+		if (!xmon_on) {
+			printf(warnxmon);
+			xmon_on = 1;
 		}
 		break;
 
@@ -1335,6 +1341,12 @@ bpt_cmds(void)
 		if (bp != NULL) {
 			bp->enabled |= BP_CIABR;
 			iabr = bp;
+
+			/* Enable xmon hooks if needed */
+			if (!xmon_on) {
+				printf(warnxmon);
+				xmon_on = 1;
+			}
 		}
 		break;
 #endif
@@ -1399,8 +1411,15 @@ bpt_cmds(void)
 		if (!check_bp_loc(a))
 			break;
 		bp = new_breakpoint(a);
-		if (bp != NULL)
+		if (bp != NULL) {
 			bp->enabled |= BP_TRAP;
+
+			/* Enable xmon hooks if needed */
+			if (!xmon_on) {
+				printf(warnxmon);
+				xmon_on = 1;
+			}
+		}
 		break;
 	}
 }
@@ -3651,9 +3670,22 @@ device_initcall(setup_xmon_sysrq);
 #ifdef CONFIG_DEBUG_FS
 static int xmon_dbgfs_set(void *data, u64 val)
 {
+	int i;
+
 	xmon_on = !!val;
 	xmon_init(xmon_on);
 
+	/* make sure all breakpoints removed when disabling */
+	if (!xmon_on) {
+		for (i = 0; i < NBPTS; ++i)
+			bpts[i].enabled = 0;
+		/* if anything set inform user that breakpoints are cleared */
+		if (iabr || dabr.enabled)
+			pr_info("xmon: All breakpoints cleared\n");
+
+		iabr = NULL;
+		dabr.enabled = 0;
+	}
 	return 0;
 }
 
