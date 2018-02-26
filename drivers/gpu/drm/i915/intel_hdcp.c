@@ -16,6 +16,47 @@
 
 #define KEY_LOAD_TRIES	5
 
+static
+struct intel_digital_port *conn_to_dig_port(struct intel_connector *connector)
+{
+	return enc_to_dig_port(&intel_attached_encoder(&connector->base)->base);
+}
+
+static inline bool hdcp_port_accessible(struct intel_connector *connector)
+{
+	struct intel_digital_port *intel_dig_port = conn_to_dig_port(connector);
+	int ret = -ENXIO;
+	u8 bksv[DRM_HDCP_KSV_LEN];
+
+	ret = connector->hdcp_shim->read_bksv(intel_dig_port, bksv);
+	if (!ret)
+		return true;
+	return false;
+}
+
+static bool wait_for_hdcp_port(struct intel_connector *connector)
+{
+	int i, tries = 10;
+
+	for (i = 0; i < tries; i++) {
+		if (connector->base.status != connector_status_connected ||
+		    connector->base.state->content_protection ==
+		    DRM_MODE_CONTENT_PROTECTION_UNDESIRED ||
+		    connector->hdcp_value ==
+		    DRM_MODE_CONTENT_PROTECTION_UNDESIRED)
+			return false;
+
+		if (hdcp_port_accessible(connector))
+			break;
+
+		msleep_interruptible(500);
+	}
+
+	if (i == tries)
+		return false;
+	return true;
+}
+
 static int intel_hdcp_poll_ksv_fifo(struct intel_digital_port *intel_dig_port,
 				    const struct intel_hdcp_shim *shim)
 {
@@ -584,12 +625,6 @@ static int intel_hdcp_auth(struct intel_digital_port *intel_dig_port,
 	return 0;
 }
 
-static
-struct intel_digital_port *conn_to_dig_port(struct intel_connector *connector)
-{
-	return enc_to_dig_port(&intel_attached_encoder(&connector->base)->base);
-}
-
 static int _intel_hdcp_disable(struct intel_connector *connector)
 {
 	struct drm_i915_private *dev_priv = connector->base.dev->dev_private;
@@ -719,14 +754,26 @@ int intel_hdcp_init(struct intel_connector *connector,
 
 int intel_hdcp_enable(struct intel_connector *connector)
 {
-	int ret;
+	int ret, tries = 2;
 
 	if (!connector->hdcp_shim)
 		return -ENOENT;
 
 	mutex_lock(&connector->hdcp_mutex);
 
+enable_hdcp:
 	ret = _intel_hdcp_enable(connector);
+
+	/*
+	 * Suddenly if sink is NACK-ed for the access of HDCP
+	 * registers, but display is still connected, poll for hdcp
+	 * port accessibility. One of the HDCP spec requirement.
+	 */
+	if ((ret == -EIO || ret == -ENXIO) &&
+	    connector->base.status == connector_status_connected &&
+	    !hdcp_port_accessible(connector))
+		if (wait_for_hdcp_port(connector) && --tries)
+			goto enable_hdcp;
 	if (ret)
 		goto out;
 
@@ -836,6 +883,19 @@ int intel_hdcp_check_link(struct intel_connector *connector)
 		connector->hdcp_value = DRM_MODE_CONTENT_PROTECTION_DESIRED;
 		schedule_work(&connector->hdcp_prop_work);
 		goto out;
+	}
+
+	/*
+	 * Suddenly if sink is NACK-ed for the access of HDCP
+	 * registers, but display is still connected, poll for hdcp
+	 * port accessibility. One of the HDCP spec requirement.
+	 */
+	if (connector->base.status == connector_status_connected &&
+	    !hdcp_port_accessible(connector)) {
+		mutex_unlock(&connector->hdcp_mutex);
+		if (!wait_for_hdcp_port(connector))
+			return ret;
+		mutex_lock(&connector->hdcp_mutex);
 	}
 
 	ret = _intel_hdcp_enable(connector);
