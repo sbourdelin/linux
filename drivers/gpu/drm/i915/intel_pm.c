@@ -3693,7 +3693,7 @@ bool intel_can_enable_sagv(struct drm_atomic_state *state)
 	int level, latency;
 	int sagv_block_time_us;
 
-	if (!intel_has_sagv(dev_priv))
+	if (!intel_has_sagv(dev_priv) || i915_modparams.disable_sagv)
 		return false;
 
 	if (IS_GEN9(dev_priv))
