@@ -151,7 +151,7 @@ static int tcf_act_police_init(struct net *net, struct nlattr *nla,
 	police->tcfp_mtu = parm->mtu;
 	if (police->tcfp_mtu == 0) {
 		police->tcfp_mtu = ~0;
-		if (R_tab)
+		if (R_tab && P_tab)
 			police->tcfp_mtu = 255 << R_tab->rate.cell_log;
 	}
 	if (R_tab) {
