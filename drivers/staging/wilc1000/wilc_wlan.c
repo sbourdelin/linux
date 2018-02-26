@@ -1230,6 +1230,8 @@ int wilc_wlan_cfg_set(struct wilc_vif *vif, int start, u16 wid, u8 *buffer,
 	wilc->cfg_frame_offset = offset;
 
 	if (commit) {
+		unsigned long tmp = msecs_to_jiffies(CFG_PKTS_TIMEOUT);
+
 		netdev_dbg(vif->ndev,
 			   "[WILC]PACKET Commit with sequence number %d\n",
 			   wilc->cfg_seq_no);
@@ -1239,8 +1241,7 @@ int wilc_wlan_cfg_set(struct wilc_vif *vif, int start, u16 wid, u8 *buffer,
 		if (wilc_wlan_cfg_commit(vif, WILC_CFG_SET, drv_handler))
 			ret_size = 0;
 
-		if (!wait_for_completion_timeout(&wilc->cfg_event,
-						 msecs_to_jiffies(CFG_PKTS_TIMEOUT))) {
+		if (!wait_for_completion_timeout(&wilc->cfg_event, tmp)) {
 			netdev_dbg(vif->ndev, "Set Timed Out\n");
 			ret_size = 0;
 		}
