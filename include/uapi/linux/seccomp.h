@@ -16,10 +16,11 @@
 #define SECCOMP_SET_MODE_FILTER		1
 #define SECCOMP_GET_ACTION_AVAIL	2
 
-/* Valid flags for SECCOMP_SET_MODE_FILTER */
-#define SECCOMP_FILTER_FLAG_TSYNC	1
-#define SECCOMP_FILTER_FLAG_LOG		2
 
+/* Valid flags for SECCOMP_SET_MODE_FILTER */
+#define SECCOMP_FILTER_FLAG_TSYNC	(1 << 0)
+#define SECCOMP_FILTER_FLAG_LOG		(1 << 1)
+#define SECCOMP_FILTER_FLAG_EXTENDED	(1 << 2)
 /*
  * All BPF programs must return a 32-bit value.
  * The bottom 16-bits are for optional return data.
