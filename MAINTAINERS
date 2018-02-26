@@ -136,6 +136,12 @@ Maintainers List (try to look for most precise areas first)
 
 		-----------------------------------
 
+ROCKCHIP RK1608 DRIVER
+M:	Leo Wen <leo.wen@rock-chips.com>
+S:	Maintained
+F:	drivers/media/spi/rk1608.c
+F:	drivers/media/spi/rk1608.h
+
 3C59X NETWORK DRIVER
 M:	Steffen Klassert <klassert@mathematik.tu-chemnitz.de>
 L:	netdev@vger.kernel.org
