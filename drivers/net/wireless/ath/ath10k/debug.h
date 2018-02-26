@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2005-2011 Atheros Communications Inc.
  * Copyright (c) 2011-2017 Qualcomm Atheros, Inc.
+ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -101,6 +102,9 @@ void ath10k_debug_unregister(struct ath10k *ar);
 void ath10k_debug_fw_stats_process(struct ath10k *ar, struct sk_buff *skb);
 void ath10k_debug_tpc_stats_process(struct ath10k *ar,
 				    struct ath10k_tpc_stats *tpc_stats);
+void
+ath10k_debug_tpc_stats_final_process(struct ath10k *ar,
+				     struct ath10k_tpc_stats_final *tpc_stats);
 void ath10k_debug_dbglog_add(struct ath10k *ar, u8 *buffer, int len);
 
 #define ATH10K_DFS_STAT_INC(ar, c) (ar->debug.dfs_stats.c++)
@@ -160,6 +164,13 @@ static inline void ath10k_debug_fw_stats_process(struct ath10k *ar,
 
 static inline void ath10k_debug_tpc_stats_process(struct ath10k *ar,
 						  struct ath10k_tpc_stats *tpc_stats)
+{
+	kfree(tpc_stats);
+}
+
+static inline void
+ath10k_debug_tpc_stats_final_process(struct ath10k *ar,
+				     struct ath10k_tpc_stats_final *tpc_stats)
 {
 	kfree(tpc_stats);
 }
