@@ -28,15 +28,12 @@
 
 #define DAI_NAME_SIZE	32
 
-struct imx_wm8962_data {
+struct imx_priv {
 	struct snd_soc_dai_link dai;
 	struct snd_soc_card card;
 	char codec_dai_name[DAI_NAME_SIZE];
 	char platform_name[DAI_NAME_SIZE];
 	unsigned int clk_frequency;
-};
-
-struct imx_priv {
 	struct platform_device *pdev;
 	int sample_rate;
 	snd_pcm_format_t sample_format;
@@ -72,7 +69,6 @@ static int imx_wm8962_set_bias_level(struct snd_soc_card *card,
 	struct snd_soc_pcm_runtime *rtd;
 	struct snd_soc_dai *codec_dai;
 	struct imx_priv *priv = snd_soc_card_get_drvdata(card);
-	struct imx_wm8962_data *data = snd_soc_card_get_drvdata(card);
 	struct device *dev = &priv->pdev->dev;
 	unsigned int pll_out;
 	int ret;
@@ -91,7 +87,7 @@ static int imx_wm8962_set_bias_level(struct snd_soc_card *card,
 				pll_out = priv->sample_rate * 256;
 
 			ret = snd_soc_dai_set_pll(codec_dai, WM8962_FLL,
-					WM8962_FLL_MCLK, data->clk_frequency,
+					WM8962_FLL_MCLK, priv->clk_frequency,
 					pll_out);
 			if (ret < 0) {
 				dev_err(dev, "failed to start FLL: %d\n", ret);
@@ -111,7 +107,7 @@ static int imx_wm8962_set_bias_level(struct snd_soc_card *card,
 	case SND_SOC_BIAS_STANDBY:
 		if (dapm->bias_level == SND_SOC_BIAS_PREPARE) {
 			ret = snd_soc_dai_set_sysclk(codec_dai,
-					WM8962_SYSCLK_MCLK, data->clk_frequency,
+					WM8962_SYSCLK_MCLK, priv->clk_frequency,
 					SND_SOC_CLOCK_IN);
 			if (ret < 0) {
 				dev_err(dev,
@@ -141,14 +137,13 @@ static int imx_wm8962_late_probe(struct snd_soc_card *card)
 	struct snd_soc_pcm_runtime *rtd;
 	struct snd_soc_dai *codec_dai;
 	struct imx_priv *priv = snd_soc_card_get_drvdata(card);
-	struct imx_wm8962_data *data = snd_soc_card_get_drvdata(card);
 	struct device *dev = &priv->pdev->dev;
 	int ret;
 
 	rtd = snd_soc_get_pcm_runtime(card, card->dai_link[0].name);
 	codec_dai = rtd->codec_dai;
 	ret = snd_soc_dai_set_sysclk(codec_dai, WM8962_SYSCLK_MCLK,
-			data->clk_frequency, SND_SOC_CLOCK_IN);
+			priv->clk_frequency, SND_SOC_CLOCK_IN);
 	if (ret < 0)
 		dev_err(dev, "failed to set sysclk in %s\n", __func__);
 
@@ -161,7 +156,6 @@ static int imx_wm8962_probe(struct platform_device *pdev)
 	struct device_node *ssi_np, *codec_np;
 	struct platform_device *ssi_pdev;
 	struct i2c_client *codec_dev;
-	struct imx_wm8962_data *data;
 	struct imx_priv *priv;
 	struct clk *codec_clk;
 	int int_port, ext_port;
@@ -232,12 +226,6 @@ static int imx_wm8962_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-	if (!data) {
-		ret = -ENOMEM;
-		goto fail;
-	}
-
 	codec_clk = clk_get(&codec_dev->dev, NULL);
 	if (IS_ERR(codec_clk)) {
 		ret = PTR_ERR(codec_clk);
@@ -245,39 +233,39 @@ static int imx_wm8962_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
-	data->clk_frequency = clk_get_rate(codec_clk);
+	priv->clk_frequency = clk_get_rate(codec_clk);
 	clk_put(codec_clk);
 
-	data->dai.name = "HiFi";
-	data->dai.stream_name = "HiFi";
-	data->dai.codec_dai_name = "wm8962";
-	data->dai.codec_of_node = codec_np;
-	data->dai.cpu_dai_name = dev_name(&ssi_pdev->dev);
-	data->dai.platform_of_node = ssi_np;
-	data->dai.ops = &imx_hifi_ops;
-	data->dai.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
+	priv->dai.name = "HiFi";
+	priv->dai.stream_name = "HiFi";
+	priv->dai.codec_dai_name = "wm8962";
+	priv->dai.codec_of_node = codec_np;
+	priv->dai.cpu_dai_name = dev_name(&ssi_pdev->dev);
+	priv->dai.platform_of_node = ssi_np;
+	priv->dai.ops = &imx_hifi_ops;
+	priv->dai.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
 			    SND_SOC_DAIFMT_CBM_CFM;
 
-	data->card.dev = &pdev->dev;
-	ret = snd_soc_of_parse_card_name(&data->card, "model");
+	priv->card.dev = &pdev->dev;
+	ret = snd_soc_of_parse_card_name(&priv->card, "model");
 	if (ret)
 		goto fail;
-	ret = snd_soc_of_parse_audio_routing(&data->card, "audio-routing");
+	ret = snd_soc_of_parse_audio_routing(&priv->card, "audio-routing");
 	if (ret)
 		goto fail;
-	data->card.num_links = 1;
-	data->card.owner = THIS_MODULE;
-	data->card.dai_link = &data->dai;
-	data->card.dapm_widgets = imx_wm8962_dapm_widgets;
-	data->card.num_dapm_widgets = ARRAY_SIZE(imx_wm8962_dapm_widgets);
+	priv->card.num_links = 1;
+	priv->card.owner = THIS_MODULE;
+	priv->card.dai_link = &priv->dai;
+	priv->card.dapm_widgets = imx_wm8962_dapm_widgets;
+	priv->card.num_dapm_widgets = ARRAY_SIZE(imx_wm8962_dapm_widgets);
 
-	data->card.late_probe = imx_wm8962_late_probe;
-	data->card.set_bias_level = imx_wm8962_set_bias_level;
+	priv->card.late_probe = imx_wm8962_late_probe;
+	priv->card.set_bias_level = imx_wm8962_set_bias_level;
 
-	platform_set_drvdata(pdev, &data->card);
-	snd_soc_card_set_drvdata(&data->card, data);
+	platform_set_drvdata(pdev, &priv->card);
+	snd_soc_card_set_drvdata(&priv->card, priv);
 
-	ret = devm_snd_soc_register_card(&pdev->dev, &data->card);
+	ret = devm_snd_soc_register_card(&pdev->dev, &priv->card);
 	if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
 		goto fail;
