@@ -1007,6 +1007,9 @@ int intel_hdmi_hdcp_read_ri_prime(struct intel_digital_port *intel_dig_port,
 				  u8 *ri_prime)
 {
 	int ret;
+
+	wait_remaining_ms_from_jiffies(jiffies, 100);
+
 	ret = intel_hdmi_hdcp_read(intel_dig_port, DRM_HDCP_DDC_RI_PRIME,
 				   ri_prime, DRM_HDCP_RI_LEN);
 	if (ret)
@@ -1027,6 +1030,29 @@ int intel_hdmi_hdcp_read_ksv_ready(struct intel_digital_port *intel_dig_port,
 		return ret;
 	}
 	*ksv_ready = val & DRM_HDCP_DDC_BCAPS_KSV_FIFO_READY;
+
+	return 0;
+}
+
+static
+int intel_hdmi_hdcp_ksv_ready(struct intel_digital_port *intel_dig_port)
+{
+	int ret, read_ret;
+	bool ksv_ready;
+
+	/* Poll for ksv list ready (spec says max time allowed is 5s) */
+	ret = __wait_for(read_ret =
+			 intel_hdmi_hdcp_read_ksv_ready(intel_dig_port,
+							&ksv_ready),
+			 read_ret || ksv_ready, 5 * 1000 * 1000, 1000,
+			 100 * 1000);
+	if (ret)
+		return ret;
+	if (read_ret)
+		return read_ret;
+	if (!ksv_ready)
+		return -ETIMEDOUT;
+
 	return 0;
 }
 
@@ -1112,7 +1138,7 @@ static const struct intel_hdcp_shim intel_hdmi_hdcp_shim = {
 	.read_bstatus = intel_hdmi_hdcp_read_bstatus,
 	.repeater_present = intel_hdmi_hdcp_repeater_present,
 	.read_ri_prime = intel_hdmi_hdcp_read_ri_prime,
-	.read_ksv_ready = intel_hdmi_hdcp_read_ksv_ready,
+	.wait_for_ksv_ready = intel_hdmi_hdcp_ksv_ready,
 	.read_ksv_fifo = intel_hdmi_hdcp_read_ksv_fifo,
 	.read_v_prime_part = intel_hdmi_hdcp_read_v_prime_part,
 	.toggle_signalling = intel_hdmi_hdcp_toggle_signalling,

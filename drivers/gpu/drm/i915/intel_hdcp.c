@@ -57,27 +57,6 @@ static bool wait_for_hdcp_port(struct intel_connector *connector)
 	return true;
 }
 
-static int intel_hdcp_poll_ksv_fifo(struct intel_digital_port *intel_dig_port,
-				    const struct intel_hdcp_shim *shim)
-{
-	int ret, read_ret;
-	bool ksv_ready;
-
-	/* Poll for ksv list ready (spec says max time allowed is 5s) */
-	ret = __wait_for(read_ret = shim->read_ksv_ready(intel_dig_port,
-							 &ksv_ready),
-			 read_ret || ksv_ready, 5 * 1000 * 1000, 1000,
-			 100 * 1000);
-	if (ret)
-		return ret;
-	if (read_ret)
-		return read_ret;
-	if (!ksv_ready)
-		return -ETIMEDOUT;
-
-	return 0;
-}
-
 static bool hdcp_key_loadable(struct drm_i915_private *dev_priv)
 {
 	struct i915_power_domains *power_domains = &dev_priv->power_domains;
@@ -222,7 +201,7 @@ int intel_hdcp_auth_downstream(struct intel_digital_port *intel_dig_port,
 
 	dev_priv = intel_dig_port->base.base.dev->dev_private;
 
-	ret = intel_hdcp_poll_ksv_fifo(intel_dig_port, shim);
+	ret = shim->wait_for_ksv_ready(intel_dig_port);
 	if (ret) {
 		DRM_ERROR("KSV list failed to become ready (%d)\n", ret);
 		return ret;
@@ -476,7 +455,6 @@ static int intel_hdcp_auth(struct intel_digital_port *intel_dig_port,
 {
 	struct drm_i915_private *dev_priv;
 	enum port port;
-	unsigned long r0_prime_gen_start;
 	int ret, i, tries = 2;
 	union {
 		u32 reg[2];
@@ -531,8 +509,6 @@ static int intel_hdcp_auth(struct intel_digital_port *intel_dig_port,
 	if (ret)
 		return ret;
 
-	r0_prime_gen_start = jiffies;
-
 	memset(&bksv, 0, sizeof(bksv));
 
 	/* HDCP spec states that we must retry the bksv if it is invalid */
@@ -572,22 +548,11 @@ static int intel_hdcp_auth(struct intel_digital_port *intel_dig_port,
 	}
 
 	/*
-	 * Wait for R0' to become available. The spec says minimum 100ms from
-	 * Aksv, but some monitors can take longer than this. So we are
-	 * combinely waiting for 300mSec just to be sure in case of HDMI.
 	 * DP HDCP Spec mandates the two more reattempt to read R0, incase
 	 * of R0 mismatch.
-	 *
-	 * On DP, there's an R0_READY bit available but no such bit
-	 * exists on HDMI. Since the upper-bound is the same, we'll just do
-	 * the stupid thing instead of polling on one and not the other.
 	 */
-
 	tries = 3;
 	for (i = 0; i < tries; i++) {
-		wait_remaining_ms_from_jiffies(r0_prime_gen_start,
-					       100 * (i + 1));
-
 		ri.reg = 0;
 		ret = shim->read_ri_prime(intel_dig_port, ri.shim);
 		if (ret)
@@ -749,6 +714,8 @@ int intel_hdcp_init(struct intel_connector *connector,
 	mutex_init(&connector->hdcp_mutex);
 	INIT_DELAYED_WORK(&connector->hdcp_check_work, intel_hdcp_check_work);
 	INIT_WORK(&connector->hdcp_prop_work, intel_hdcp_prop_work);
+
+	init_completion(&connector->cp_irq_recved);
 	return 0;
 }
 

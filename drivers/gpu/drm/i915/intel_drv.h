@@ -353,8 +353,7 @@ struct intel_hdcp_shim {
 	int (*read_ri_prime)(struct intel_digital_port *intel_dig_port, u8 *ri);
 
 	/* Determines if the receiver's KSV FIFO is ready for consumption */
-	int (*read_ksv_ready)(struct intel_digital_port *intel_dig_port,
-			      bool *ksv_ready);
+	int (*wait_for_ksv_ready)(struct intel_digital_port *intel_dig_port);
 
 	/* Reads the ksv fifo for num_downstream devices */
 	int (*read_ksv_fifo)(struct intel_digital_port *intel_dig_port,
@@ -413,6 +412,9 @@ struct intel_connector {
 	uint64_t hdcp_value; /* protected by hdcp_mutex */
 	struct delayed_work hdcp_check_work;
 	struct work_struct hdcp_prop_work;
+
+	/* To indicate the assertion of CP_IRQ */
+	struct completion cp_irq_recved;
 };
 
 struct intel_digital_connector_state {

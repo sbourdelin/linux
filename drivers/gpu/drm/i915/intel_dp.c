@@ -4402,6 +4402,7 @@ static bool
 intel_dp_short_pulse(struct intel_dp *intel_dp)
 {
 	struct drm_i915_private *dev_priv = to_i915(intel_dp_to_dev(intel_dp));
+	struct intel_connector *connector = intel_dp->attached_connector;
 	u8 sink_irq_vector = 0;
 	u8 old_sink_count = intel_dp->sink_count;
 	bool ret;
@@ -4436,8 +4437,11 @@ intel_dp_short_pulse(struct intel_dp *intel_dp)
 
 		if (sink_irq_vector & DP_AUTOMATED_TEST_REQUEST)
 			intel_dp_handle_test_request(intel_dp);
-		if (sink_irq_vector & (DP_CP_IRQ | DP_SINK_SPECIFIC_IRQ))
-			DRM_DEBUG_DRIVER("CP or sink specific irq unhandled\n");
+		if (sink_irq_vector & DP_CP_IRQ)
+			if (connector->hdcp_shim)
+				complete_all(&connector->cp_irq_recved);
+		if (sink_irq_vector & DP_SINK_SPECIFIC_IRQ)
+			DRM_DEBUG_DRIVER("Sink specific irq unhandled\n");
 	}
 
 	intel_dp_check_link_status(intel_dp);
@@ -5049,6 +5053,25 @@ void intel_dp_encoder_suspend(struct intel_encoder *intel_encoder)
 	pps_unlock(intel_dp);
 }
 
+static int intel_dp_hdcp_wait_for_cp_irq(struct completion *cp_irq_recved,
+					 int timeout)
+{
+	long ret;
+
+	if (completion_done(cp_irq_recved))
+		reinit_completion(cp_irq_recved);
+
+	ret = wait_for_completion_interruptible_timeout(cp_irq_recved,
+							msecs_to_jiffies(
+							timeout));
+	reinit_completion(cp_irq_recved);
+	if (ret < 0)
+		return (int)ret;
+	else if (!ret)
+		return -ETIMEDOUT;
+	return 0;
+}
+
 static
 int intel_dp_hdcp_write_an_aksv(struct intel_digital_port *intel_dig_port,
 				u8 *an)
@@ -5154,11 +5177,38 @@ int intel_dp_hdcp_repeater_present(struct intel_digital_port *intel_dig_port,
 	return 0;
 }
 
+static int intel_dp_hdcp_wait_for_r0(struct intel_digital_port *intel_dig_port)
+{
+	struct intel_dp *dp = &intel_dig_port->dp;
+	struct intel_connector *connector = dp->attached_connector;
+	int ret;
+	u8 bstatus;
+
+	intel_dp_hdcp_wait_for_cp_irq(&connector->cp_irq_recved, 100);
+
+	ret = drm_dp_dpcd_read(&intel_dig_port->dp.aux, DP_AUX_HDCP_BSTATUS,
+			       &bstatus, 1);
+	if (ret != 1) {
+		DRM_ERROR("Read bstatus from DP/AUX failed (%d)\n", ret);
+		return ret >= 0 ? -EIO : ret;
+	}
+
+	if (!(bstatus & DP_BSTATUS_R0_PRIME_READY))
+		return -ETIMEDOUT;
+
+	return 0;
+}
+
 static
 int intel_dp_hdcp_read_ri_prime(struct intel_digital_port *intel_dig_port,
 				u8 *ri_prime)
 {
 	ssize_t ret;
+
+	ret = intel_dp_hdcp_wait_for_r0(intel_dig_port);
+	if (!ret)
+		return ret;
+
 	ret = drm_dp_dpcd_read(&intel_dig_port->dp.aux, DP_AUX_HDCP_RI_PRIME,
 			       ri_prime, DRM_HDCP_RI_LEN);
 	if (ret != DRM_HDCP_RI_LEN) {
@@ -5169,18 +5219,26 @@ int intel_dp_hdcp_read_ri_prime(struct intel_digital_port *intel_dig_port,
 }
 
 static
-int intel_dp_hdcp_read_ksv_ready(struct intel_digital_port *intel_dig_port,
-				 bool *ksv_ready)
+int intel_dp_hdcp_ksv_ready(struct intel_digital_port *intel_dig_port)
 {
+	struct intel_dp *dp = &intel_dig_port->dp;
+	struct intel_connector *connector = dp->attached_connector;
 	ssize_t ret;
 	u8 bstatus;
+
+	intel_dp_hdcp_wait_for_cp_irq(&connector->cp_irq_recved,
+				      5 * 1000 * 1000);
+
 	ret = drm_dp_dpcd_read(&intel_dig_port->dp.aux, DP_AUX_HDCP_BSTATUS,
 			       &bstatus, 1);
 	if (ret != 1) {
 		DRM_ERROR("Read bstatus from DP/AUX failed (%zd)\n", ret);
 		return ret >= 0 ? -EIO : ret;
 	}
-	*ksv_ready = bstatus & DP_BSTATUS_READY;
+
+	if (!(bstatus & DP_BSTATUS_READY))
+		return -ETIMEDOUT;
+
 	return 0;
 }
 
@@ -5271,7 +5329,7 @@ static const struct intel_hdcp_shim intel_dp_hdcp_shim = {
 	.read_bstatus = intel_dp_hdcp_read_bstatus,
 	.repeater_present = intel_dp_hdcp_repeater_present,
 	.read_ri_prime = intel_dp_hdcp_read_ri_prime,
-	.read_ksv_ready = intel_dp_hdcp_read_ksv_ready,
+	.wait_for_ksv_ready = intel_dp_hdcp_ksv_ready,
 	.read_ksv_fifo = intel_dp_hdcp_read_ksv_fifo,
 	.read_v_prime_part = intel_dp_hdcp_read_v_prime_part,
 	.toggle_signalling = intel_dp_hdcp_toggle_signalling,
