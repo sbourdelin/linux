@@ -1260,7 +1260,7 @@ static inline int managed_dentry_rcu(const struct path *path)
  * Try to skip to top of mountpoint pile in rcuwalk mode.  Fail if
  * we meet a managed dentry that would need blocking.
  */
-static bool __follow_mount_rcu(struct nameidata *nd, struct path *path,
+static bool follow_mount_rcu(struct nameidata *nd, struct path *path,
 			       struct inode **inode, unsigned *seqp)
 {
 	for (;;) {
@@ -1566,7 +1566,7 @@ static int lookup_fast(struct nameidata *nd,
 				return -ENOENT;
 			path->mnt = mnt;
 			path->dentry = dentry;
-			if (likely(__follow_mount_rcu(nd, path, inode, seqp)))
+			if (likely(follow_mount_rcu(nd, path, inode, seqp)))
 				return 1;
 		}
 		if (unlazy_child(nd, dentry, seq))
@@ -2243,7 +2243,7 @@ static int handle_lookup_down(struct nameidata *nd)
 		 * at the very beginning of walk, so we lose nothing
 		 * if we simply redo everything in non-RCU mode
 		 */
-		if (unlikely(!__follow_mount_rcu(nd, &path, &inode, &seq)))
+		if (unlikely(!follow_mount_rcu(nd, &path, &inode, &seq)))
 			return -ECHILD;
 	} else {
 		dget(path.dentry);
