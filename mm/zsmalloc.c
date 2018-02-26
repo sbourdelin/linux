@@ -811,15 +811,15 @@ out:
  */
 static int get_pages_per_zspage(int class_size)
 {
+	int zspage_size = 0;
 	int i, max_usedpc = 0;
 	/* zspage order which gives maximum used size per KB */
 	int max_usedpc_order = 1;
 
 	for (i = 1; i <= ZS_MAX_PAGES_PER_ZSPAGE; i++) {
-		int zspage_size;
 		int waste, usedpc;
 
-		zspage_size = i * PAGE_SIZE;
+		zspage_size += PAGE_SIZE;
 		waste = zspage_size % class_size;
 		usedpc = (zspage_size - waste) * 100 / zspage_size;
 
