@@ -75,6 +75,7 @@ config PPC_BOOK3S_64
 	select ARCH_SUPPORTS_NUMA_BALANCING
 	select IRQ_WORK
 	select HAVE_KERNEL_XZ
+	select HAVE_FUTEX_CMPXCHG if FUTEX
 
 config PPC_BOOK3E_64
 	bool "Embedded processors"
