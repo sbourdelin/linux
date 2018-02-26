@@ -120,7 +120,10 @@ struct ebt_entries {
 
 struct ebt_entry_match {
 	union {
-		char name[EBT_FUNCTION_MAXNAMELEN];
+		struct {
+			char name[EBT_FUNCTION_MAXNAMELEN];
+			uint8_t revision;
+		};
 		struct xt_match *match;
 	} u;
 	/* size of data */
