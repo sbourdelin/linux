@@ -1,0 +1,97 @@
+Rockchip RK1608 as a PreISP to link on Soc
+------------------------------------------
+
+Required properties:
+
+- compatible		: "rockchip,rk1608";
+- reg			: SPI slave address of the rk1608;
+- clocks		: Must contain an entry for each entry in clock-names;
+- clock-names		: Must contain "mclk" for the device's master clock;
+- reset-gpio		: GPIO connected to reset pin;
+- irq-gpio		: GPIO connected to irq pin;
+- sleepst-gpio		: GPIO connected to sleepst pin;
+- wakeup-gpio		: GPIO connected to wakeup pin;
+- powerdown-gpio	: GPIO connected to powerdown pin;
+- rockchip,powerdown0	: GPIO connected to the sensor0's powerdown pin;
+- rockchip,reset0	: GPIO connected to the sensor0's reset pin;
+- rockchip,powerdown1	: GPIO connected to the sensor1's powerdown pin;
+- rockchip,reset1	: GPIO connected to the sensor1's reset pin;
+- pinctrl-names		: Should contain only one value - "default";
+- pinctrl-0		: Pin control group to be used for this controller;
+
+Optional properties:
+
+- spi-max-frequency	: Maximum SPI clocking speed of the device;
+
+The device node should contain one 'port' child node with one child 'endpoint'
+node, according to the bindings defined in Documentation/devicetree/bindings/
+media/video-interfaces.txt. The following are properties specific to those
+nodes.
+
+endpoint node
+-------------
+
+- data-lanes : (optional) specifies MIPI CSI-2 data lanes as covered in
+	       video-interfaces.txt. If present it should be <1> - the device
+	       supports only one data lane without re-mapping.
+
+Note1: Since no data is generated in RK1608，so this is meaningful that you need
+a extra sensor (such as a camera) mounted on RK1608. You need to use endpoint@x
+to match these sensors.
+
+Note2:You must set the current value of the spi pins to be 8mA, if they are not.
+
+Example:
+&spi0 {
+	status = "okay";
+	spi_rk1608@00 {
+		compatible =  "rockchip,rk1608";
+		status = "okay";
+		reg = <0>;
+		spi-max-frequency = <24000000>;
+		link-freqs = /bits/ 64 <400000000>;
+		clocks = <&cru SCLK_SPI0>, <&cru SCLK_VIP_OUT>,
+		<&cru DCLK_VOP0>, <&cru ACLK_VIP>, <&cru HCLK_VIP>,
+		<&cru PCLK_ISP_IN>, <&cru PCLK_ISP_IN>,
+		<&cru PCLK_ISP_IN>, <&cru SCLK_MIPIDSI_24M>,
+		<&cru PCLK_MIPI_CSI>;
+		clock-names = "mclk", "mipi_clk",  "pd_cif", "aclk_cif",
+			"hclk_cif", "cif0_in", "g_pclkin_cif",
+			"cif0_out", "clk_mipi_24m", "hclk_mipiphy";
+		reset-gpio = <&gpio6 0 GPIO_ACTIVE_HIGH>;
+		irq-gpio = <&gpio6 2 GPIO_ACTIVE_HIGH>;
+		sleepst-gpio = <&gpio6 1 GPIO_ACTIVE_HIGH>;
+		wakeup-gpio = <&gpio6 4 GPIO_ACTIVE_HIGH>;
+		powerdown-gpio = <&gpio8 0 GPIO_ACTIVE_HIGH>;
+
+		rockchip,powerdown1 = <&gpio5 9 GPIO_ACTIVE_HIGH>;
+		rockchip,reset1 = <&gpio6 8 GPIO_ACTIVE_HIGH>;
+
+		rockchip,powerdown0 = <&gpio5 8 GPIO_ACTIVE_HIGH>;
+		rockchip,reset0 = <&gpio6 7 GPIO_ACTIVE_HIGH>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&rk1608_irq_gpios &rk1608_wake_gpios
+			     &rk1608_sleep_gpios>;
+
+		port@0 {
+			mipi_dphy_out: endpoint {
+				remote-endpoint = <&mipi_dphy_in>;
+				clock-lanes = <0>;
+				data-lanes = <1 2 3 4>;
+				clock-noncontinuous;
+				link-frequencies =
+					/bits/ 64 <400000000>;
+			};
+		};
+		/* Example: we have two cameras */
+		port@1 {
+			sensor_in0: endpoint@0 {
+				remote-endpoint = <&sensor_out0>;
+			};
+			sensor_in1: endpoint@1 {
+				remote-endpoint = <&sensor_out1>;
+			};
+		};
+	};
+};
