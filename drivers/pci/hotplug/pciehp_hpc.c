@@ -608,7 +608,17 @@ static irqreturn_t pciehp_isr(int irq, void *dev_id)
 	if (events & PCI_EXP_SLTSTA_ABP) {
 		ctrl_info(ctrl, "Slot(%s): Attention button pressed\n",
 			  slot_name(slot));
-		pciehp_queue_interrupt_event(slot, INT_BUTTON_PRESS);
+
+		if (!test_and_set_bit(0, &slot_being_removed_rescanned))
+			pciehp_queue_interrupt_event(slot, INT_BUTTON_PRESS);
+		else {
+			if (slot->state == BLINKINGOFF_STATE || slot->state == BLINKINGON_STATE)
+				pciehp_queue_interrupt_event(slot, INT_BUTTON_PRESS);
+			else
+				ctrl_info(ctrl, "Slot(%s): Slot operation failed because a remove or"
+					" rescan operation is under processing, please try later!\n",
+					slot_name(slot));
+		}
 	}
 
 	/*

@@ -4,6 +4,12 @@
 #include <linux/pci-aspm.h>
 #include "pci.h"
 
+/*
+ * When a slot is being hotplug through Attention Button or being
+ * removed/rescanned through sysfs, this flag is set.
+ */
+unsigned long slot_being_removed_rescanned;
+
 static void pci_free_resources(struct pci_dev *dev)
 {
 	int i;

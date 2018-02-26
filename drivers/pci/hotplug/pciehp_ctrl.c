@@ -30,6 +30,7 @@ void pciehp_queue_interrupt_event(struct slot *p_slot, u32 event_type)
 	info = kmalloc(sizeof(*info), GFP_ATOMIC);
 	if (!info) {
 		ctrl_err(p_slot->ctrl, "dropped event %d (ENOMEM)\n", event_type);
+		slot_being_removed_rescanned = 0;
 		return;
 	}
 
@@ -174,6 +175,7 @@ static void pciehp_power_thread(struct work_struct *work)
 		mutex_lock(&p_slot->lock);
 		p_slot->state = STATIC_STATE;
 		mutex_unlock(&p_slot->lock);
+		slot_being_removed_rescanned = 0;
 		break;
 	case ENABLE_REQ:
 		mutex_lock(&p_slot->hotplug_lock);
@@ -184,6 +186,7 @@ static void pciehp_power_thread(struct work_struct *work)
 		mutex_lock(&p_slot->lock);
 		p_slot->state = STATIC_STATE;
 		mutex_unlock(&p_slot->lock);
+		slot_being_removed_rescanned = 0;
 		break;
 	default:
 		break;
@@ -202,6 +205,7 @@ static void pciehp_queue_power_work(struct slot *p_slot, int req)
 	if (!info) {
 		ctrl_err(p_slot->ctrl, "no memory to queue %s request\n",
 			 (req == ENABLE_REQ) ? "poweron" : "poweroff");
+		slot_being_removed_rescanned = 0;
 		return;
 	}
 	info->p_slot = p_slot;
@@ -270,6 +274,7 @@ static void handle_button_press_event(struct slot *p_slot)
 		ctrl_info(ctrl, "Slot(%s): Action canceled due to button press\n",
 			  slot_name(p_slot));
 		p_slot->state = STATIC_STATE;
+		slot_being_removed_rescanned = 0;
 		break;
 	case POWEROFF_STATE:
 	case POWERON_STATE:
@@ -280,10 +285,12 @@ static void handle_button_press_event(struct slot *p_slot)
 		 */
 		ctrl_info(ctrl, "Slot(%s): Button ignored\n",
 			  slot_name(p_slot));
+		slot_being_removed_rescanned = 0;
 		break;
 	default:
 		ctrl_err(ctrl, "Slot(%s): Ignoring invalid state %#x\n",
 			 slot_name(p_slot), p_slot->state);
+		slot_being_removed_rescanned = 0;
 		break;
 	}
 }
