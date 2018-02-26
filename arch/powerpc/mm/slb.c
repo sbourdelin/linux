@@ -23,6 +23,7 @@
 #include <asm/smp.h>
 #include <linux/compiler.h>
 #include <linux/mm_types.h>
+#include <linux/context_tracking.h>
 
 #include <asm/udbg.h>
 #include <asm/code-patching.h>
@@ -339,4 +340,153 @@ void slb_initialize(void)
 				     mmu_kernel_ssize, lflags, KSTACK_INDEX);
 
 	asm volatile("isync":::"memory");
+}
+
+/*
+ * Only handle insert of 1TB slb entries.
+ */
+static void insert_slb_entry(unsigned long vsid, unsigned long ea,
+			     int bpsize, int ssize)
+{
+	int slb_cache_index;
+	unsigned long flags;
+	enum slb_index index;
+	unsigned long vsid_data, esid_data;
+
+	/*
+	 * We are irq disabled, hence should be safe
+	 * to access PACA.
+	 */
+	index =  get_paca()->stab_rr;
+	/*
+	 * simple round roubin replacement of slb.
+	 */
+	if (index < mmu_slb_size)
+		index++;
+	else
+		index = SLB_NUM_BOLTED;
+	get_paca()->stab_rr = index;
+
+	flags = SLB_VSID_USER | mmu_psize_defs[bpsize].sllp;
+	vsid_data =  (vsid << SLB_VSID_SHIFT_1T) | flags |
+		((unsigned long) ssize << SLB_VSID_SSIZE_SHIFT);
+	esid_data = mk_esid_data(ea, mmu_highuser_ssize, index);
+
+	asm volatile("slbmte %0, %1" : : "r" (vsid_data), "r" (esid_data)
+		     : "memory");
+	/*
+	 * Now update slb cache entries
+	 */
+	slb_cache_index = get_paca()->slb_cache_ptr;
+	if (slb_cache_index < SLB_CACHE_ENTRIES) {
+		/*
+		 * We have space in slb cache for optimized switch_slb().
+		 * Top 36 bits from esid_data as per ISA
+		 */
+		get_paca()->slb_cache[slb_cache_index++] = esid_data >> 28;
+	}
+	/*
+	 * if we are full, just increment and return.
+	 */
+	get_paca()->slb_cache_ptr++;
+	return;
+}
+
+static void alloc_extended_context(struct mm_struct *mm, unsigned long ea)
+{
+	int context_id;
+
+	int index = (ea >> H_BITS_FIRST_CONTEXT) - 1;
+
+	/*
+	 * we need to do locking only here. If this value was not set before
+	 * we will have taken an SLB miss and will reach here. The value will
+	 * be either 0 or a valid extended context. We need to make sure two
+	 * parallel SLB miss don't end up allocating extended_context for the
+	 * same range. The locking below ensures that. For now we take the
+	 * heavy mmap_sem. But can be changed to per mm_context_t custom lock
+	 * if needed.
+	 */
+	down_read(&mm->mmap_sem);
+	context_id = hash__alloc_context_id();
+	if (context_id < 0) {
+		up_read(&mm->mmap_sem);
+		pagefault_out_of_memory();
+		return;
+	}
+	/* Check for parallel allocation after holding lock */
+	if (!mm->context.extended_id[index])
+		mm->context.extended_id[index] = context_id;
+	else
+		__destroy_context(context_id);
+	up_read(&mm->mmap_sem);
+	return;
+}
+
+static void __handle_multi_context_slb_miss(struct pt_regs *regs,
+					    unsigned long ea)
+{
+	int context, bpsize;
+	unsigned long vsid;
+	struct mm_struct *mm = current->mm;
+
+	context = get_esid_context(&mm->context, ea);
+	if (!context) {
+		/*
+		 * haven't allocated context yet for this range.
+		 * Enable irq and allo context and return. We will
+		 * take an slb miss on this again and come here with
+		 * allocated context.
+		 */
+		/* We restore the interrupt state now */
+		if (!arch_irq_disabled_regs(regs))
+			local_irq_enable();
+		return alloc_extended_context(mm, ea);
+	}
+	/*
+	 * We are always above 1TB, hence use high user segment size.
+	 */
+	vsid = __get_vsid(context, ea, mmu_highuser_ssize);
+	bpsize = get_slice_psize(mm, ea);
+
+	insert_slb_entry(vsid, ea, bpsize, mmu_highuser_ssize);
+	return;
+}
+
+/*
+ * exception_enter() handling? FIXME!!
+ */
+void handle_multi_context_slb_miss(struct pt_regs *regs)
+{
+	enum ctx_state prev_state = exception_enter();
+	unsigned long ea = regs->dar;
+
+	/*
+	 * Kernel always runs with single context. Hence
+	 * anything that request for multi context is
+	 * considered bad slb request.
+	 */
+	if (!user_mode(regs))
+		return bad_page_fault(regs, ea, SIGSEGV);
+
+	if (REGION_ID(ea) != USER_REGION_ID)
+		goto slb_bad_addr;
+	/*
+	 * Are we beyound what the page table layout support ?
+	 */
+	if ((ea & ~REGION_MASK) >= H_PGTABLE_RANGE)
+		goto slb_bad_addr;
+
+	/* Lower address should be handled by asm code */
+	if (ea <= (1UL << H_BITS_FIRST_CONTEXT))
+		goto slb_bad_addr;
+
+	__handle_multi_context_slb_miss(regs, ea);
+	exception_exit(prev_state);
+	return;
+
+slb_bad_addr:
+	_exception(SIGSEGV, regs, SEGV_BNDERR, ea);
+	exception_exit(prev_state);
+	return;
 }

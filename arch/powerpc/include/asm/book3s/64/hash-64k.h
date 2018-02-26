@@ -6,6 +6,11 @@
 #define H_PMD_INDEX_SIZE  10
 #define H_PUD_INDEX_SIZE  7
 #define H_PGD_INDEX_SIZE  8
+/*
+ * No of address bits below which we use the default context
+ * for slb allocation. For 64k this is 512TB.
+ */
+#define H_BITS_FIRST_CONTEXT	49
 
 /*
  * 64k aligned address free up few of the lower bits of RPN for us

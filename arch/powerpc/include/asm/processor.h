@@ -119,9 +119,16 @@ void release_thread(struct task_struct *);
  */
 #define TASK_SIZE_USER64		TASK_SIZE_512TB
 #define DEFAULT_MAP_WINDOW_USER64	TASK_SIZE_128TB
+#define TASK_CONTEXT_SIZE		TASK_SIZE_512TB
 #else
 #define TASK_SIZE_USER64		TASK_SIZE_64TB
 #define DEFAULT_MAP_WINDOW_USER64	TASK_SIZE_64TB
+/*
+ * We don't need allocate extended context id for 4K
+ * page size. We limit max address on this config to
+ * 64TB.
+ */
+#define TASK_CONTEXT_SIZE		TASK_SIZE_64TB
 #endif
 
 /*

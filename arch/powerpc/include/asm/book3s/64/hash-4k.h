@@ -11,6 +11,12 @@
 #define H_PUD_INDEX_SIZE  9
 #define H_PGD_INDEX_SIZE  9
 
+/*
+ * No of address bits below which we use the default context
+ * for slb allocation. For 4k this is 64TB.
+ */
+#define H_BITS_FIRST_CONTEXT	46
+
 #ifndef __ASSEMBLY__
 #define H_PTE_TABLE_SIZE	(sizeof(pte_t) << H_PTE_INDEX_SIZE)
 #define H_PMD_TABLE_SIZE	(sizeof(pmd_t) << H_PMD_INDEX_SIZE)

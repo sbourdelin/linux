@@ -82,6 +82,12 @@ struct spinlock;
 
 typedef struct {
 	mm_context_id_t id;
+	/*
+	 * One context for each 512TB above the first 512TB.
+	 * First 512TB context is saved in id and is also used
+	 * as PIDR.
+	 */
+	mm_context_id_t extended_id[(TASK_SIZE_USER64/TASK_CONTEXT_SIZE) - 1];
 	u16 user_psize;		/* page size index */
 
 	/* Number of bits in the mm_cpumask */
@@ -173,6 +179,24 @@ extern void radix_init_pseries(void);
 #else
 static inline void radix_init_pseries(void) { };
 #endif
+
+static inline int get_esid_context(mm_context_t *ctx, unsigned long ea)
+{
+	int index = ea >> H_BITS_FIRST_CONTEXT;
+
+	if (index == 0)
+		return ctx->id;
+	return ctx->extended_id[--index];
+}
+
+static inline unsigned long get_user_vsid(mm_context_t *ctx,
+					  unsigned long ea, int ssize)
+{
+	unsigned long context = get_esid_context(ctx, ea);
+
+	return __get_vsid(context, ea, ssize);
+}
+
 
 #endif /* __ASSEMBLY__ */
 #endif /* _ASM_POWERPC_BOOK3S_64_MMU_H_ */

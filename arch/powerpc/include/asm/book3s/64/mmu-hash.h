@@ -691,8 +691,8 @@ static inline int user_segment_size(unsigned long addr)
 	return MMU_SEGSIZE_256M;
 }
 
-static inline unsigned long get_vsid(unsigned long context, unsigned long ea,
-				     int ssize)
+static inline unsigned long __get_vsid(unsigned long context, unsigned long ea,
+				       int ssize)
 {
 	unsigned long va_bits = VA_BITS;
 	unsigned long vsid_bits;
@@ -744,7 +744,7 @@ static inline unsigned long get_kernel_vsid(unsigned long ea, int ssize)
 	 */
 	context = (ea >> 60) - KERNEL_REGION_CONTEXT_OFFSET;
 
-	return get_vsid(context, ea, ssize);
+	return __get_vsid(context, ea, ssize);
 }
 
 unsigned htab_shift_for_mem_size(unsigned long mem_size);
