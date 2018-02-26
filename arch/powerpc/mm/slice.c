@@ -482,7 +482,7 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 	 * already
 	 */
 	slice_mask_for_size(mm, psize, &good_mask, high_limit);
-	slice_print_mask(" good_mask", good_mask);
+	slice_print_mask("Mask for page size", good_mask);
 
 	/*
 	 * Here "good" means slices that are already the right page size,
@@ -511,15 +511,17 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 			slice_or_mask(&good_mask, &compat_mask);
 	}
 #endif
-
 	/* First check hint if it's valid or if we have MAP_FIXED */
 	if (addr != 0 || fixed) {
-		/* Build a mask for the requested range */
+		/*
+		 * Build a mask for the requested range
+		 */
 		slice_range_to_mask(addr, len, &mask);
-		slice_print_mask(" mask", mask);
+		slice_print_mask("Request range mask", mask);
 
-		/* Check if we fit in the good mask. If we do, we just return,
-		 * nothing else to do
+		/*
+		 * Check if we fit in the good mask. If we do, we just
+		 * return, nothing else to do
 		 */
 		if (slice_check_fit(mm, mask, good_mask)) {
 			slice_dbg(" fits good !\n");
@@ -557,8 +559,8 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 		return -EBUSY;
 
 	slice_dbg(" search...\n");
-
-	/* If we had a hint that didn't work out, see if we can fit
+	/*
+	 * If we had a hint that didn't work out, see if we can fit
 	 * anywhere in the good area.
 	 */
 	if (addr) {
@@ -577,7 +579,16 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 			       psize, topdown, high_limit);
 
 #ifdef CONFIG_PPC_64K_PAGES
+	/*
+	 * If we didn't request for fixed mapping, we never looked at
+	 * compat area. Now that we are not finding space, let's look
+	 * at the 4K slice also.
+	 */
 	if (addr == -ENOMEM && psize == MMU_PAGE_64K) {
+		/*
+		 * mask variable is free here. Use that for compat
+		 * size mask.
+		 */
 		/* retry the search with 4k-page slices included */
 		slice_or_mask(&potential_mask, &compat_mask);
 		addr = slice_find_area(mm, len, potential_mask,
