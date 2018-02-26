@@ -271,6 +271,22 @@ Compiling the kernel
    To have the build system also tell the reason for the rebuild of each
    target, use ``V=2``.  The default is ``V=0``.
 
+ - Host libs in non standard locations:
+
+   Some host programs are linked with external libraries, such as openssl
+   or libelf.  If these libs are installed in non standard locations on
+   your build system, you may specify it via the ``HOST_CFLAGS`` and
+   ``HOST_LDFLAGS`` parameters on the ``make`` command line.
+
+   For example, if you have installed host libs in ``/foo/staging``, you
+   may use the following command::
+
+     make HOST_CFLAGS="-I/foo/staging/include" \
+          HOST_LDFLAGS="-L/foo/staging/lib -Wl,-rpath=/foo/staging/lib"
+
+   Please note: If the ``HOST_CFLAGS`` or ``HOST_LDFLAGS`` options are
+   used, then they must be used for all invocations of make.
+
  - Keep a backup kernel handy in case something goes wrong.  This is
    especially true for the development releases, since each new release
    contains new code which has not been debugged.  Make sure you keep a
