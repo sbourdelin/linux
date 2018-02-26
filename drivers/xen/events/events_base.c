@@ -758,6 +758,7 @@ out:
 error_irq:
 	for (; i >= 0; i--)
 		__unbind_from_irq(irq + i);
+	xen_free_irq(irq);
 	mutex_unlock(&irq_mapping_update_lock);
 	return ret;
 }
