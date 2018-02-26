@@ -94,7 +94,7 @@ static void of_device_make_bus_id(struct device *dev)
 
 		/* format arguments only used if dev_name() resolves to NULL */
 		dev_set_name(dev, dev_name(dev) ? "%s:%s" : "%s",
-			     kbasename(node->full_name), dev_name(dev));
+			     node->full_name, dev_name(dev));
 		node = node->parent;
 	}
 }
