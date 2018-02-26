@@ -1415,8 +1415,11 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
 		goto err_disable_pm_runtime;
 	}
 
-	phy_power_off(dp->phy);
 	pm_runtime_put(dev);
+	/*
+	 * intentionally keep PHY powered on, Chromebook2 Peach-PIT board
+	 * freezes otherwise
+	 */
 
 	return 0;
 
@@ -1448,6 +1451,7 @@ void analogix_dp_unbind(struct device *dev, struct device *master,
 
 	drm_dp_aux_unregister(&dp->aux);
 	pm_runtime_disable(dev);
+	phy_power_off(dp->phy);
 	clk_disable_unprepare(dp->clock);
 }
 EXPORT_SYMBOL_GPL(analogix_dp_unbind);
