@@ -417,8 +417,7 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 {
 	struct slice_mask mask;
 	struct slice_mask good_mask;
-	struct slice_mask potential_mask;
-	struct slice_mask compat_mask;
+	struct slice_mask tmp_mask;
 	int fixed = (flags & MAP_FIXED);
 	int pshift = max_t(int, mmu_psize_defs[psize].shift, PAGE_SHIFT);
 	unsigned long page_size = 1UL << pshift;
@@ -453,11 +452,8 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 	bitmap_zero(mask.high_slices, SLICE_NUM_HIGH);
 
 	/* silence stupid warning */;
-	potential_mask.low_slices = 0;
-	bitmap_zero(potential_mask.high_slices, SLICE_NUM_HIGH);
-
-	compat_mask.low_slices = 0;
-	bitmap_zero(compat_mask.high_slices, SLICE_NUM_HIGH);
+	tmp_mask.low_slices = 0;
+	bitmap_zero(tmp_mask.high_slices, SLICE_NUM_HIGH);
 
 	/* Sanity checks */
 	BUG_ON(mm->task_size == 0);
@@ -506,9 +502,11 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 #ifdef CONFIG_PPC_64K_PAGES
 	/* If we support combo pages, we can allow 64k pages in 4k slices */
 	if (psize == MMU_PAGE_64K) {
-		slice_mask_for_size(mm, MMU_PAGE_4K, &compat_mask, high_limit);
+		slice_mask_for_size(mm, MMU_PAGE_4K, &tmp_mask, high_limit);
 		if (fixed)
-			slice_or_mask(&good_mask, &compat_mask);
+			slice_or_mask(&good_mask, &tmp_mask);
+
+		slice_print_mask("Mask for compat page size", tmp_mask);
 	}
 #endif
 	/* First check hint if it's valid or if we have MAP_FIXED */
@@ -545,11 +543,11 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 	 * We don't fit in the good mask, check what other slices are
 	 * empty and thus can be converted
 	 */
-	slice_mask_for_free(mm, &potential_mask, high_limit);
-	slice_or_mask(&potential_mask, &good_mask);
-	slice_print_mask(" potential", potential_mask);
+	slice_mask_for_free(mm, &tmp_mask, high_limit);
+	slice_or_mask(&tmp_mask, &good_mask);
+	slice_print_mask("Free area/potential ", tmp_mask);
 
-	if ((addr != 0 || fixed) && slice_check_fit(mm, mask, potential_mask)) {
+	if ((addr != 0 || fixed) && slice_check_fit(mm, mask, tmp_mask)) {
 		slice_dbg(" fits potential !\n");
 		goto convert;
 	}
@@ -575,7 +573,7 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 	/* Now let's see if we can find something in the existing slices
 	 * for that size plus free slices
 	 */
-	addr = slice_find_area(mm, len, potential_mask,
+	addr = slice_find_area(mm, len, tmp_mask,
 			       psize, topdown, high_limit);
 
 #ifdef CONFIG_PPC_64K_PAGES
@@ -589,9 +587,10 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 		 * mask variable is free here. Use that for compat
 		 * size mask.
 		 */
+		slice_mask_for_size(mm, MMU_PAGE_4K, &mask, high_limit);
 		/* retry the search with 4k-page slices included */
-		slice_or_mask(&potential_mask, &compat_mask);
-		addr = slice_find_area(mm, len, potential_mask,
+		slice_or_mask(&tmp_mask, &mask);
+		addr = slice_find_area(mm, len, tmp_mask,
 				       psize, topdown, high_limit);
 	}
 #endif
@@ -604,8 +603,9 @@ unsigned long slice_get_unmapped_area(unsigned long addr, unsigned long len,
 	slice_print_mask(" mask", mask);
 
  convert:
+	slice_mask_for_size(mm, MMU_PAGE_4K, &tmp_mask, high_limit);
 	slice_andnot_mask(&mask, &good_mask);
-	slice_andnot_mask(&mask, &compat_mask);
+	slice_andnot_mask(&mask, &tmp_mask);
 	if (mask.low_slices || !bitmap_empty(mask.high_slices, SLICE_NUM_HIGH)) {
 		slice_convert(mm, mask, psize);
 		if (psize > MMU_PAGE_BASE)
