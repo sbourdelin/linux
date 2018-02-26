@@ -2739,6 +2739,7 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 	uint16_t req_length = 0, rsp_length = 0;
 	struct req_que *req = NULL;
 	struct rsp_que *rsp = NULL;
+	int probe_failed = 0;
 	int i;
 
 	bars = pci_select_bars(pdev, IORESOURCE_MEM | IORESOURCE_IO);
@@ -3024,7 +3025,7 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		ql_log_pci(ql_log_fatal, pdev, 0x0031,
 		    "Failed to allocate memory for adapter, aborting.\n");
 
-		goto probe_hw_failed;
+		goto probe_hw_failed_no_mem;
 	}
 
 	req->max_q_depth = MAX_Q_DEPTH;
@@ -3102,7 +3103,7 @@ qla2x00_probe_one(struct pci_dev *pdev, const struct pci_device_id *id)
 		ql_log(ql_log_fatal, base_vha, 0x003d,
 		    "Failed to allocate memory for queue pointers..."
 		    "aborting.\n");
-		goto probe_init_failed;
+		goto probe_failed;
 	}
 
 	if (ha->mqenable && shost_use_blk_mq(host)) {
@@ -3387,16 +3388,8 @@ skip_dpc:
 
 	return 0;
 
-probe_init_failed:
-	qla2x00_free_req_que(ha, req);
-	ha->req_q_map[0] = NULL;
-	clear_bit(0, ha->req_qid_map);
-	qla2x00_free_rsp_que(ha, rsp);
-	ha->rsp_q_map[0] = NULL;
-	clear_bit(0, ha->rsp_qid_map);
-	ha->max_req_queues = ha->max_rsp_queues = 0;
-
 probe_failed:
+	probe_failed = 1;
 	if (base_vha->timer_active)
 		qla2x00_stop_timer(base_vha);
 	base_vha->flags.online = 0;
@@ -3412,9 +3405,14 @@ probe_failed:
 	scsi_host_put(base_vha->host);
 
 probe_hw_failed:
-	qla2x00_mem_free(ha);
-	qla2x00_free_req_que(ha, req);
-	qla2x00_free_rsp_que(ha, rsp);
+	/* These already done in qla2x00_free_device, don't double free */
+	if (!probe_failed) {
+		qla2x00_mem_free(ha);
+		qla2x00_free_req_que(ha, req);
+		qla2x00_free_rsp_que(ha, rsp);
+	}
+
+probe_hw_failed_no_mem:
 	qla2x00_clear_drv_active(ha);
 
 iospace_config_failed:
