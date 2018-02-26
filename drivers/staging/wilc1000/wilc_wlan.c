@@ -798,6 +798,7 @@ static void wilc_wlan_handle_rxq(struct wilc *wilc)
 			u32 header;
 			u32 pkt_len, pkt_offset, tp_len;
 			int is_cfg_packet;
+			int tmp;
 
 			memcpy(&header, &buffer[offset], 4);
 			header = cpu_to_le32(header);
@@ -815,28 +816,31 @@ static void wilc_wlan_handle_rxq(struct wilc *wilc)
 						IS_MANAGMEMENT_CALLBACK |
 						IS_MGMT_STATUS_SUCCES);
 
-				wilc_wfi_mgmt_rx(wilc, &buffer[offset + HOST_HDR_OFFSET], pkt_len);
+				tmp = offset + HOST_HDR_OFFSET;
+				wilc_wfi_mgmt_rx(wilc, &buffer[tmp], pkt_len);
+			} else if (!is_cfg_packet) {
+				if (pkt_len > 0) {
+					wilc_frmw_to_linux(wilc,
+							   &buffer[offset],
+							   pkt_len,
+							   pkt_offset);
+				}
 			} else {
-				if (!is_cfg_packet) {
-					if (pkt_len > 0) {
-						wilc_frmw_to_linux(wilc,
-								   &buffer[offset],
-								   pkt_len,
-								   pkt_offset);
-					}
-				} else {
-					struct wilc_cfg_rsp rsp;
+				struct wilc_cfg_rsp rsp;
 
-					wilc_wlan_cfg_indicate_rx(wilc, &buffer[pkt_offset + offset], pkt_len, &rsp);
-					if (rsp.type == WILC_CFG_RSP) {
-						if (wilc->cfg_seq_no == rsp.seq_no)
-							complete(&wilc->cfg_event);
-					} else if (rsp.type == WILC_CFG_RSP_STATUS) {
-						wilc_mac_indicate(wilc, WILC_MAC_INDICATE_STATUS);
+				tmp = pkt_offset + offset;
+				wilc_wlan_cfg_indicate_rx(wilc, &buffer[tmp],
+							  pkt_len, &rsp);
+				if (rsp.type == WILC_CFG_RSP) {
+					if (wilc->cfg_seq_no == rsp.seq_no)
+						complete(&wilc->cfg_event);
+				} else if (rsp.type == WILC_CFG_RSP_STATUS) {
+					tmp = WILC_MAC_INDICATE_STATUS;
+					wilc_mac_indicate(wilc, tmp);
 
-					} else if (rsp.type == WILC_CFG_RSP_SCAN) {
-						wilc_mac_indicate(wilc, WILC_MAC_INDICATE_SCAN);
-					}
+				} else if (rsp.type == WILC_CFG_RSP_SCAN) {
+					tmp = WILC_MAC_INDICATE_SCAN;
+					wilc_mac_indicate(wilc, tmp);
 				}
 			}
 			offset += tp_len;
