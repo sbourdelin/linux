@@ -405,15 +405,13 @@ EXPORT_SYMBOL_GPL(of_reserved_mem_device_release);
  */
 struct reserved_mem *of_reserved_mem_lookup(struct device_node *np)
 {
-	const char *name;
 	int i;
 
 	if (!np->full_name)
 		return NULL;
 
-	name = kbasename(np->full_name);
 	for (i = 0; i < reserved_mem_count; i++)
-		if (!strcmp(reserved_mem[i].name, name))
+		if (!strcmp(reserved_mem[i].name, np->full_name))
 			return &reserved_mem[i];
 
 	return NULL;
