@@ -496,25 +496,35 @@ static int intel_hdcp_auth(struct intel_digital_port *intel_dig_port,
 	}
 
 	/*
-	 * Wait for R0' to become available. The spec says 100ms from Aksv, but
-	 * some monitors can take longer than this. We'll set the timeout at
-	 * 300ms just to be sure.
+	 * Wait for R0' to become available. The spec says minimum 100ms from
+	 * Aksv, but some monitors can take longer than this. So we are
+	 * combinely waiting for 300mSec just to be sure in case of HDMI.
+	 * DP HDCP Spec mandates the two more reattempt to read R0, incase
+	 * of R0 mismatch.
 	 *
 	 * On DP, there's an R0_READY bit available but no such bit
 	 * exists on HDMI. Since the upper-bound is the same, we'll just do
 	 * the stupid thing instead of polling on one and not the other.
 	 */
-	wait_remaining_ms_from_jiffies(r0_prime_gen_start, 300);
 
-	ri.reg = 0;
-	ret = shim->read_ri_prime(intel_dig_port, ri.shim);
-	if (ret)
-		return ret;
-	I915_WRITE(PORT_HDCP_RPRIME(port), ri.reg);
+	tries = 3;
+	for (i = 0; i < tries; i++) {
+		wait_remaining_ms_from_jiffies(r0_prime_gen_start,
+					       100 * (i + 1));
 
-	/* Wait for Ri prime match */
-	if (wait_for(I915_READ(PORT_HDCP_STATUS(port)) &
-		     (HDCP_STATUS_RI_MATCH | HDCP_STATUS_ENC), 1)) {
+		ri.reg = 0;
+		ret = shim->read_ri_prime(intel_dig_port, ri.shim);
+		if (ret)
+			return ret;
+		I915_WRITE(PORT_HDCP_RPRIME(port), ri.reg);
+
+		/* Wait for Ri prime match */
+		if (!wait_for(I915_READ(PORT_HDCP_STATUS(port)) &
+		    (HDCP_STATUS_RI_MATCH | HDCP_STATUS_ENC), 1))
+			break;
+	}
+
+	if (i == tries) {
 		DRM_ERROR("Timed out waiting for Ri prime match (%x)\n",
 			  I915_READ(PORT_HDCP_STATUS(port)));
 		return -ETIMEDOUT;
