@@ -35,4 +35,13 @@ typedef int __kernel_mqd_t;
 
 #include <asm/posix_types.h>
 
+/* in case the kernel header asm/posix_types.h is too old (< 3.4) to provide
+ * __kernel_long_t, provide it here */
+#ifndef __kernel_long_t
+typedef long		__kernel_long_t;
+#endif
+#ifndef __kernel_ulong_t
+typedef unsigned long	__kernel_ulong_t;
+#endif
+
 #endif /* _LINUX_POSIX_TYPES_H */
