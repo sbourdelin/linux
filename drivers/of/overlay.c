@@ -323,19 +323,15 @@ static int add_changeset_property(struct overlay_changeset *ovcs,
 static int add_changeset_node(struct overlay_changeset *ovcs,
 		struct device_node *target_node, struct device_node *node)
 {
-	const char *node_kbasename;
 	struct device_node *tchild;
 	int ret = 0;
 
-	node_kbasename = kbasename(node->full_name);
-
 	for_each_child_of_node(target_node, tchild)
-		if (!of_node_cmp(node_kbasename, kbasename(tchild->full_name)))
+		if (!of_node_cmp(node->full_name, tchild->full_name))
 			break;
 
 	if (!tchild) {
-		tchild = __of_node_dup(node, "%pOF/%s",
-				       target_node, node_kbasename);
+		tchild = __of_node_dup(node, node->full_name);
 		if (!tchild)
 			return -ENOMEM;
 
