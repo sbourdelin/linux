@@ -88,6 +88,9 @@ EXPORT_SYMBOL_GPL(hyperv_cs);
 u32 *hv_vp_index;
 EXPORT_SYMBOL_GPL(hv_vp_index);
 
+struct hv_vp_assist_page **hv_vp_assist_page;
+EXPORT_SYMBOL_GPL(hv_vp_assist_page);
+
 u32 hv_max_vp_index;
 
 static int hv_cpu_init(unsigned int cpu)
@@ -100,6 +103,23 @@ static int hv_cpu_init(unsigned int cpu)
 
 	if (msr_vp_index > hv_max_vp_index)
 		hv_max_vp_index = msr_vp_index;
+
+	if (!hv_vp_assist_page)
+		return 0;
+
+	if (!hv_vp_assist_page[smp_processor_id()])
+		hv_vp_assist_page[smp_processor_id()] =
+			__vmalloc(PAGE_SIZE, GFP_KERNEL, PAGE_KERNEL);
+
+	if (hv_vp_assist_page[smp_processor_id()]) {
+		u64 val;
+
+		val = vmalloc_to_pfn(hv_vp_assist_page[smp_processor_id()]);
+		val = (val << HV_X64_MSR_VP_ASSIST_PAGE_ADDRESS_SHIFT) |
+			HV_X64_MSR_VP_ASSIST_PAGE_ENABLE;
+
+		wrmsrl(HV_X64_MSR_VP_ASSIST_PAGE, val);
+	}
 
 	return 0;
 }
@@ -198,6 +218,12 @@ static int hv_cpu_die(unsigned int cpu)
 	struct hv_reenlightenment_control re_ctrl;
 	unsigned int new_cpu;
 
+	if (hv_vp_assist_page && hv_vp_assist_page[cpu]) {
+		wrmsrl(HV_X64_MSR_VP_ASSIST_PAGE, 0);
+		vfree(hv_vp_assist_page[cpu]);
+		hv_vp_assist_page[cpu] = NULL;
+	}
+
 	if (hv_reenlightenment_cb == NULL)
 		return 0;
 
@@ -240,6 +266,13 @@ void hyperv_init(void)
 				    GFP_KERNEL);
 	if (!hv_vp_index)
 		return;
+
+	hv_vp_assist_page = kcalloc(num_possible_cpus(),
+				    sizeof(*hv_vp_assist_page), GFP_KERNEL);
+	if (!hv_vp_assist_page) {
+		ms_hyperv.hints &= ~HV_X64_ENLIGHTENED_VMCS_RECOMMENDED;
+		return;
+	}
 
 	if (cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "x86/hyperv_init:online",
 			      hv_cpu_init, hv_cpu_die) < 0)
