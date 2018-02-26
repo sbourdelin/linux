@@ -3501,6 +3501,12 @@ void __drm_atomic_helper_plane_duplicate_state(struct drm_plane *plane,
 
 	if (state->fb)
 		drm_framebuffer_get(state->fb);
+	if (state->degamma_lut)
+		drm_property_reference_blob(state->degamma_lut);
+	if (state->ctm)
+		drm_property_reference_blob(state->ctm);
+	if (state->gamma_lut)
+		drm_property_reference_blob(state->gamma_lut);
 
 	state->fence = NULL;
 	state->commit = NULL;
@@ -3548,6 +3554,9 @@ void __drm_atomic_helper_plane_destroy_state(struct drm_plane_state *state)
 
 	if (state->commit)
 		drm_crtc_commit_put(state->commit);
+	drm_property_unreference_blob(state->degamma_lut);
+	drm_property_unreference_blob(state->ctm);
+	drm_property_unreference_blob(state->gamma_lut);
 }
 EXPORT_SYMBOL(__drm_atomic_helper_plane_destroy_state);
 

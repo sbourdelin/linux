@@ -105,6 +105,11 @@ struct drm_plane_state {
 	uint32_t src_x, src_y;
 	uint32_t src_h, src_w;
 
+	/* Color transform blob properties exposed to userspace */
+	struct drm_property_blob *degamma_lut;
+	struct drm_property_blob *ctm;
+	struct drm_property_blob *gamma_lut;
+
 	/* Plane rotation */
 	unsigned int rotation;
 
@@ -130,6 +135,9 @@ struct drm_plane_state {
 	 * May be NULL.
 	 */
 	struct drm_crtc_commit *commit;
+
+	/* computed state bits used by drivers */
+	bool color_mgmt_changed : 1;
 
 	struct drm_atomic_state *state;
 };
