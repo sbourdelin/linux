@@ -367,6 +367,54 @@ static void sriov_disable(struct pci_dev *dev)
 	pci_iov_set_numvfs(dev, 0);
 }
 
+/**
+ * pci_sriov_disable - standard helper to disable SR-IOV
+ * @dev:the PCI PF device whose VFs are to be disabled
+ */
+int pci_sriov_disable(struct pci_dev *dev)
+{
+	/*
+	 * If vfs are assigned we cannot shut down SR-IOV without causing
+	 * issues, so just leave the hardware available.
+	 */
+	if (pci_vfs_assigned(dev)) {
+		pci_warn(&dev->dev,
+			 "Cannot disable SR-IOV while VFs are assigned - VFs will not be deallocated\n");
+		return -EPERM;
+	}
+	pci_disable_sriov(dev);
+	return 0;
+}
+
+static int pci_sriov_enable(struct pci_dev *dev, int num_vfs)
+{
+	int rc;
+
+	if (pci_num_vf(dev))
+		return -EINVAL;
+
+	rc = pci_enable_sriov(dev, num_vfs);
+	if (rc) {
+		pci_warn(dev, "Failed to enable PCI sriov: %d\n", rc);
+		return rc;
+	}
+	dev_info(dev, "SR-IOV enabled with %d VFs\n", num_vfs);
+	return num_vfs;
+}
+
+/**
+ * pci_sriov_configure - standard helper to configure SR-IOV
+ * @dev: the PCI PF device that is configuring SR-IOV
+ */
+int pci_sriov_configure(struct pci_dev *dev, int num_vfs)
+{
+	if (num_vfs)
+		return pci_sriov_enable(dev, num_vfs);
+	if (!pci_num_vf(dev))
+		return -EINVAL;
+	return pci_sriov_disable(dev);
+}
+
 static int sriov_init(struct pci_dev *dev, int pos)
 {
 	int i, bar64;
