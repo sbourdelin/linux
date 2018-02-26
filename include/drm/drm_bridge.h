@@ -177,7 +177,8 @@ struct drm_bridge_funcs {
 	 * pipeline has been called already. If the bridge is the first element
 	 * then this would be &drm_encoder_helper_funcs.mode_set. The display
 	 * pipe (i.e.  clocks and timing signals) is off when this function is
-	 * called.
+	 * called. If the bridge is connected to the crtc, the adjusted_mode
+	 * parameter is the one defined in &drm_crtc_state.adjusted_mode.
 	 */
 	void (*mode_set)(struct drm_bridge *bridge,
 			 struct drm_display_mode *mode,
