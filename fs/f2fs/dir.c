@@ -825,9 +825,15 @@ int f2fs_fill_dentries(struct dir_context *ctx, struct f2fs_dentry_ptr *d,
 			int save_len = fstr->len;
 			int err;
 
+			de_name.name = kmemdup(d->filename[bit_pos],
+				de_name.len, GFP_NOFS);
+			if (!de_name.name)
+				return -ENOMEM;
+
 			err = fscrypt_fname_disk_to_usr(d->inode,
 						(u32)de->hash_code, 0,
 						&de_name, fstr);
+			kfree(de_name.name);
 			if (err)
 				return err;
 
