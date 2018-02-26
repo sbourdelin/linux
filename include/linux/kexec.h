@@ -114,9 +114,6 @@ struct purgatory_info {
 	 * relocation. This memory can be freed post image load.
 	 */
 	void *purgatory_buf;
-
-	/* Address where purgatory is finally loaded and is executed from */
-	unsigned long purgatory_load_addr;
 };
 
 struct kimage;
@@ -237,9 +234,7 @@ extern asmlinkage long sys_kexec_load(unsigned long entry,
 extern int kernel_kexec(void);
 extern struct page *kimage_alloc_control_pages(struct kimage *image,
 						unsigned int order);
-extern int kexec_load_purgatory(struct kimage *image, unsigned long min,
-				unsigned long max, int top_down,
-				unsigned long *load_addr);
+extern int kexec_load_purgatory(struct kimage *image, struct kexec_buf *kbuf);
 extern int kexec_purgatory_get_set_symbol(struct kimage *image,
 					  const char *name, void *buf,
 					  unsigned int size, bool get_value);
