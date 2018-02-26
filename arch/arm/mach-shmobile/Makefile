@@ -16,6 +16,7 @@ obj-$(CONFIG_ARCH_R8A7790)	+= setup-r8a7790.o
 obj-$(CONFIG_ARCH_R8A7791)	+= setup-r8a7791.o
 obj-$(CONFIG_ARCH_EMEV2)	+= setup-emev2.o
 obj-$(CONFIG_ARCH_R7S72100)	+= setup-r7s72100.o
+obj-$(CONFIG_ARCH_R9A06G032)	+= setup-r9a06g032.o
 
 # CPU reset vector handling objects
 cpu-y				:= platsmp.o headsmp.o

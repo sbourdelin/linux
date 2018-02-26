@@ -1,0 +1,94 @@
+/*
+ * Base Device Tree Source for the Renesas RZ/N1 SoC
+ *
+ * Copyright (C) 2018 Renesas Electronics Europe Limited
+ *
+ * SPDX-License-Identifier: GPL-2.0
+ */
+
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/interrupt-controller/rzn1-irq.h>
+#include <dt-bindings/soc/renesas,rzn1-map.h>
+#include <dt-bindings/gpio/gpio.h>
+
+#include "skeleton.dtsi"
+
+/ {
+	compatible = "renesas,r9a06g032";
+	interrupt-parent = <&gic>;
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a7";
+			reg = <0>;
+		};
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a7";
+			reg = <1>;
+		};
+	};
+	aliases {
+		serial0 = &uart0;
+	};
+	arm_timer: timer {
+		compatible = "arm,armv7-timer";
+		arm,cpu-registers-not-fw-configured;
+		interrupts =
+			<GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
+				IRQ_TYPE_LEVEL_LOW)>,
+			<GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
+				IRQ_TYPE_LEVEL_LOW)>,
+			<GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
+				IRQ_TYPE_LEVEL_LOW)>,
+			<GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
+				IRQ_TYPE_LEVEL_LOW)>;
+	};
+	gic: interrupt-controller@RZN1_GIC_BASE {
+		compatible = "arm,cortex-a7-gic";
+		reg = <0x44101000 0x1000>,	/* Distributer */
+		      <0x44102000 0x1000>,	/* CPU interface */
+		      <0x44104000 0x2000>,	/* Virt interface control */
+		      <0x44106000 0x2000>;	/* Virt CPU interface */
+		interrupt-controller;
+		#interrupt-cells = <3>;
+		interrupts =
+			<GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) |
+				IRQ_TYPE_LEVEL_HIGH)>;
+	};
+	clocks: clocks@0 {
+		/*
+		 * this is fixed clock for now,
+		 * until the clock driver is merged
+		 */
+		clk_uarts: clk_uarts@0 {
+			#clock-cells = <0>;
+			compatible = "fixed-clock";
+			clock-frequency = <47619047>;
+		};
+	};
+	bus {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		uart0: serial@RZN1_UART0_BASE {
+			compatible = "snps,dw-apb-uart";
+			reg = <RZN1_UART0_BASE RZN1_UART0_SIZE>;
+			interrupts = <GIC_SPI RZN1_IRQ_UART0
+					IRQ_TYPE_LEVEL_HIGH>;
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			clocks = <&clk_uarts>;
+			clock-names = "baudclk";
+			status = "disabled";
+		};
+	};
+};
