@@ -613,7 +613,14 @@ int btrfs_parse_options(struct btrfs_fs_info *info, char *options,
 		case Opt_max_inline:
 			num = match_strdup(&args[0]);
 			if (num) {
-				info->max_inline = memparse(num, NULL);
+				char *retptr;
+
+				info->max_inline = memparse(num, &retptr);
+				if (*retptr != '\0') {
+					ret = -EINVAL;
+					kfree(num);
+					goto out;
+				}
 				kfree(num);
 
 				if (info->max_inline) {
