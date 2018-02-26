@@ -128,7 +128,7 @@ int __of_attach_node_sysfs(struct device_node *np)
 		name = safe_name(&of_kset->kobj, "base");
 		parent = NULL;
 	} else {
-		name = safe_name(&np->parent->kobj, kbasename(np->full_name));
+		name = safe_name(&np->parent->kobj, np->full_name);
 		parent = &np->parent->kobj;
 	}
 	if (!name)
