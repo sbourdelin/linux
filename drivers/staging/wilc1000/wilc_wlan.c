@@ -1273,13 +1273,14 @@ int wilc_wlan_cfg_get(struct wilc_vif *vif, int start, u16 wid, int commit,
 	wilc->cfg_frame_offset = offset;
 
 	if (commit) {
+		unsigned long tmp = msecs_to_jiffies(CFG_PKTS_TIMEOUT);
+
 		wilc->cfg_frame_in_use = 1;
 
 		if (wilc_wlan_cfg_commit(vif, WILC_CFG_QUERY, drv_handler))
 			ret_size = 0;
 
-		if (!wait_for_completion_timeout(&wilc->cfg_event,
-					msecs_to_jiffies(CFG_PKTS_TIMEOUT))) {
+		if (!wait_for_completion_timeout(&wilc->cfg_event, tmp)) {
 			netdev_dbg(vif->ndev, "Get Timed Out\n");
 			ret_size = 0;
 		}
