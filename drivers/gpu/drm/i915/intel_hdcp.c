@@ -150,7 +150,7 @@ int intel_hdcp_auth_downstream(struct intel_digital_port *intel_dig_port,
 	struct drm_i915_private *dev_priv;
 	u32 vprime, sha_text, sha_leftovers, rep_ctl;
 	u8 bstatus[2], num_downstream, *ksv_fifo;
-	int ret, i, j, sha_idx;
+	int ret, i, j, sha_idx, tries = 3;
 
 	dev_priv = intel_dig_port->base.base.dev->dev_private;
 
@@ -189,6 +189,7 @@ int intel_hdcp_auth_downstream(struct intel_digital_port *intel_dig_port,
 	if (ret)
 		return ret;
 
+read_v_prime:
 	/* Process V' values from the receiver */
 	for (i = 0; i < DRM_HDCP_V_PRIME_NUM_PARTS; i++) {
 		ret = shim->read_v_prime_part(intel_dig_port, i, &vprime);
@@ -385,6 +386,13 @@ int intel_hdcp_auth_downstream(struct intel_digital_port *intel_dig_port,
 		return -ETIMEDOUT;
 	}
 	if (!(I915_READ(HDCP_REP_CTL) & HDCP_SHA1_V_MATCH)) {
+
+		/*
+		 * When V prime mismatches, DP Spec mandates re-read of
+		 * V prime atleast twice.
+		 */
+		if (--tries)
+			goto read_v_prime;
 		DRM_ERROR("SHA-1 mismatch, HDCP failed\n");
 		return -ENXIO;
 	}
