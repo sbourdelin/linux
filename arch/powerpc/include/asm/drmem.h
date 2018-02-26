@@ -94,6 +94,14 @@ void __init walk_drmem_lmbs(struct device_node *dn,
 			void (*func)(struct drmem_lmb *, const __be32 **));
 int drmem_update_dt(void);
 
+void walk_drmem_v1_lmbs(const __be32 *prop, const __be32 *data,
+			void (*func)(struct drmem_lmb *, const __be32 **));
+
+void read_drconf_v2_cell(struct of_drconf_cell_v2 *dr_cell,
+			const __be32 **prop);
+void walk_drmem_v2_lmbs(const __be32 *prop, const __be32 *data,
+			void (*func)(struct drmem_lmb *, const __be32 **));
+
 #ifdef CONFIG_PPC_PSERIES
 void __init walk_drmem_lmbs_early(unsigned long node,
 			void (*func)(struct drmem_lmb *, const __be32 **));

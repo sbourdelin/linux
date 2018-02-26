@@ -1051,49 +1051,155 @@ static int pseries_update_drconf_memory(struct of_reconfig_data *pr)
 	return rc;
 }
 
+static inline int pseries_memory_v2_find_drc(u32 drc_index,
+			u64 *base_addr, unsigned long memblock_size,
+			struct of_drconf_cell_v2 *dm)
+{
+	if ((dm->drc_index <= drc_index) &&
+		(drc_index <= (dm->drc_index + dm->seq_lmbs - 1))) {
+		int offset = drc_index - dm->drc_index;
+
+		(*base_addr) = dm->base_addr +
+				(offset * memblock_size);
+	} else if (drc_index > (dm->drc_index +
+				dm->seq_lmbs - 1)) {
+		return -1;
+	} else if (dm->drc_index > drc_index) {
+		return -1;
+	}
+
+	return 0;
+}
+
+static int pseries_update_drconf_memory_v2(struct of_reconfig_data *pr)
+{
+	const __be32 *new_drmem, *old_drmem;
+	unsigned long memblock_size;
+	u32 new_lmb_sets, old_lmb_sets;
+	u64 old_base_addr;
+	int i, rc = 0;
+
+	if (rtas_hp_event)
+		return 0;
+
+	memblock_size = pseries_memory_block_size();
+	if (!memblock_size)
+		return -EINVAL;
+
+	/* The first int of the property is the number of lmb's
+	 * described by the property. This is followed by an array
+	 * of of_drconf_cell_v2 entries. Get the number of entries
+	 * and skip to the array of of_drconf_cell_v2's.
+	 */
+	old_drmem = (__be32 *) pr->old_prop->value;
+	if (!old_drmem)
+		return -EINVAL;
+	old_lmb_sets = of_read_number(old_drmem++, 1);
+
+	new_drmem = (__be32 *)pr->prop->value;
+	new_lmb_sets = of_read_number(new_drmem++, 1);
+
+	for (i = 0; i < old_lmb_sets; i++) {
+		int j;
+		struct of_drconf_cell_v2 old_cell, new_cell;
+
+		read_drconf_v2_cell(&old_cell, &old_drmem);
+		read_drconf_v2_cell(&new_cell, &new_drmem);
+
+		for (j = 0; j < new_cell.seq_lmbs; j++) {
+			if (pseries_memory_v2_find_drc(
+				new_cell.drc_index + j,
+				&old_base_addr,
+				memblock_size,
+				&old_cell))
+				continue;
+
+			if ((old_cell.flags &
+					DRCONF_MEM_ASSIGNED) &&
+			    (!(new_cell.flags &
+					DRCONF_MEM_ASSIGNED))) {
+				rc = pseries_remove_memblock(
+					old_base_addr,
+					memblock_size);
+			} else if ((!(old_cell.flags &
+					DRCONF_MEM_ASSIGNED)) &&
+				   (new_cell.flags &
+					DRCONF_MEM_ASSIGNED)) {
+				rc = memblock_add(
+					old_base_addr, memblock_size);
+			} else if ((old_cell.aa_index !=
+				    new_cell.aa_index) &&
+				   (new_cell.flags &
+					DRCONF_MEM_ASSIGNED)) {
+				dlpar_memory_readd_by_index(
+					new_cell.drc_index + j);
+			}
+		}
+	}
+
+	return 0;
+}
+
 struct assoc_arrays {
 	u32 n_arrays;
 	u32 array_sz;
 	const __be32 *arrays;
 };
 
-static int pseries_update_ala_memory_aai(int aa_index,
-					struct property *dmprop)
+struct update_ala_memory_aai_struct {
+	int aa_index;
+};
+
+static void update_ala_memory_aai_cb(struct drmem_lmb *lmb,
+					const __be32 **data)
 {
-	struct of_drconf_cell *drmem;
-	u32 entries;
-	__be32 *p;
-	int i;
-	int rc = 0;
+	struct update_ala_memory_aai_struct *updt =
+		(struct update_ala_memory_aai_struct *)*data;
 
-	p = (__be32 *) dmprop->value;
-	if (!p)
-		return -EINVAL;
+	if ((lmb->aa_index != updt->aa_index) &&
+		(lmb->flags & DRCONF_MEM_ASSIGNED))
+		dlpar_memory_readd_by_index(lmb->drc_index);
+}
 
-	/* The first int of the property is the number of lmb's
-	 * described by the property. This is followed by an array
-	 * of of_drconf_cell entries. Get the number of entries
-	 * and skip to the array of of_drconf_cell's.
-	 */
-	entries = be32_to_cpu(*p++);
-	drmem = (struct of_drconf_cell *)p;
+static int pseries_update_ala_memory_aai_v1(int aa_index,
+				const __be32 *dmprop)
+{
+	struct update_ala_memory_aai_struct data = {
+		aa_index };
 
-	for (i = 0; i < entries; i++) {
-		if ((be32_to_cpu(drmem[i].aa_index) != aa_index) &&
-			(be32_to_cpu(drmem[i].flags) & DRCONF_MEM_ASSIGNED)) {
-			rc = dlpar_memory_readd_by_index(
-				be32_to_cpu(drmem[i].drc_index));
-		}
-	}
+	walk_drmem_v1_lmbs(dmprop, (const __be32 *)&data,
+			update_ala_memory_aai_cb);
 
-	return rc;
+	return 0;
+}
+
+static int pseries_update_ala_memory_aai_v2(int aa_index,
+				const __be32 *dmprop)
+{
+	struct update_ala_memory_aai_struct data = {
+		aa_index };
+
+	walk_drmem_v2_lmbs(dmprop, (const __be32 *)&data,
+			update_ala_memory_aai_cb);
+
+	return 0;
+}
+
+static int pseries_update_ala_memory_aai(int v1, int aa_index,
+				const __be32 *dmprop)
+{
+	if (v1)
+		return pseries_update_ala_memory_aai_v1(aa_index, dmprop);
+	else
+		return pseries_update_ala_memory_aai_v2(aa_index, dmprop);
 }
 
 static int pseries_update_ala_memory(struct of_reconfig_data *pr)
 {
 	struct assoc_arrays new_ala, old_ala;
 	struct device_node *dn;
-	struct property *dmprop;
+	const __be32 *dmprop;
+	bool v1 = true;
 	__be32 *p;
 	int i, lim;
 
@@ -1104,10 +1210,15 @@ static int pseries_update_ala_memory(struct of_reconfig_data *pr)
 	if (!dn)
 		return -ENODEV;
 
-	dmprop = of_find_property(dn, "ibm,dynamic-memory", NULL);
+	dmprop = of_get_property(dn, "ibm,dynamic-memory", NULL);
 	if (!dmprop) {
-		of_node_put(dn);
-		return -ENODEV;
+		v1 = false;
+		dmprop = of_get_property(dn, "ibm,dynamic-memory-v2",
+					NULL);
+		if (!dmprop) {
+			of_node_put(dn);
+			return -ENODEV;
+		}
 	}
 
 	/*
@@ -1149,11 +1260,11 @@ static int pseries_update_ala_memory(struct of_reconfig_data *pr)
 						new_ala.array_sz))
 				continue;
 
-			pseries_update_ala_memory_aai(i, dmprop);
+			pseries_update_ala_memory_aai(v1, i, dmprop);
 		}
 
 		for (i = lim; i < new_ala.n_arrays; i++)
-			pseries_update_ala_memory_aai(i, dmprop);
+			pseries_update_ala_memory_aai(v1, i, dmprop);
 
 	} else {
 		/* Update all entries representing these rows;
@@ -1161,7 +1272,7 @@ static int pseries_update_ala_memory(struct of_reconfig_data *pr)
 		 * have equivalent values.
 		 */
 		for (i = 0; i < lim; i++)
-			pseries_update_ala_memory_aai(i, dmprop);
+			pseries_update_ala_memory_aai(v1, i, dmprop);
 	}
 
 	of_node_put(dn);
@@ -1184,6 +1295,8 @@ static int pseries_memory_notifier(struct notifier_block *nb,
 	case OF_RECONFIG_UPDATE_PROPERTY:
 		if (!strcmp(rd->prop->name, "ibm,dynamic-memory"))
 			err = pseries_update_drconf_memory(rd);
+		if (!strcmp(rd->prop->name, "ibm,dynamic-memory-v2"))
+			err = pseries_update_drconf_memory_v2(rd);
 		if (!strcmp(rd->prop->name,
 				"ibm,associativity-lookup-arrays"))
 			err = pseries_update_ala_memory(rd);

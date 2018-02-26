@@ -193,7 +193,7 @@ int drmem_update_dt(void)
 	return rc;
 }
 
-static void __init read_drconf_v1_cell(struct drmem_lmb *lmb,
+static void read_drconf_v1_cell(struct drmem_lmb *lmb,
 				       const __be32 **prop)
 {
 	const __be32 *p = *prop;
@@ -209,7 +209,7 @@ static void __init read_drconf_v1_cell(struct drmem_lmb *lmb,
 	*prop = p;
 }
 
-static void __init __walk_drmem_v1_lmbs(const __be32 *prop, const __be32 *usm,
+void walk_drmem_v1_lmbs(const __be32 *prop, const __be32 *data,
 			void (*func)(struct drmem_lmb *, const __be32 **))
 {
 	struct drmem_lmb lmb;
@@ -221,11 +221,12 @@ static void __init __walk_drmem_v1_lmbs(const __be32 *prop, const __be32 *usm,
 
 	for (i = 0; i < n_lmbs; i++) {
 		read_drconf_v1_cell(&lmb, &prop);
-		func(&lmb, &usm);
+		func(&lmb, &data);
 	}
 }
+EXPORT_SYMBOL(walk_drmem_v1_lmbs);
 
-static void __init read_drconf_v2_cell(struct of_drconf_cell_v2 *dr_cell,
+void read_drconf_v2_cell(struct of_drconf_cell_v2 *dr_cell,
 				       const __be32 **prop)
 {
 	const __be32 *p = *prop;
@@ -238,8 +239,9 @@ static void __init read_drconf_v2_cell(struct of_drconf_cell_v2 *dr_cell,
 
 	*prop = p;
 }
+EXPORT_SYMBOL(read_drconf_v2_cell);
 
-static void __init __walk_drmem_v2_lmbs(const __be32 *prop, const __be32 *usm,
+void walk_drmem_v2_lmbs(const __be32 *prop, const __be32 *data,
 			void (*func)(struct drmem_lmb *, const __be32 **))
 {
 	struct of_drconf_cell_v2 dr_cell;
@@ -263,10 +265,11 @@ static void __init __walk_drmem_v2_lmbs(const __be32 *prop, const __be32 *usm,
 			lmb.aa_index = dr_cell.aa_index;
 			lmb.flags = dr_cell.flags;
 
-			func(&lmb, &usm);
+			func(&lmb, &data);
 		}
 	}
 }
+EXPORT_SYMBOL(walk_drmem_v2_lmbs);
 
 #ifdef CONFIG_PPC_PSERIES
 void __init walk_drmem_lmbs_early(unsigned long node,
@@ -285,12 +288,12 @@ void __init walk_drmem_lmbs_early(unsigned long node,
 
 	prop = of_get_flat_dt_prop(node, "ibm,dynamic-memory", &len);
 	if (prop) {
-		__walk_drmem_v1_lmbs(prop, usm, func);
+		walk_drmem_v1_lmbs(prop, usm, func);
 	} else {
 		prop = of_get_flat_dt_prop(node, "ibm,dynamic-memory-v2",
 					   &len);
 		if (prop)
-			__walk_drmem_v2_lmbs(prop, usm, func);
+			walk_drmem_v2_lmbs(prop, usm, func);
 	}
 
 	memblock_dump_all();
@@ -345,11 +348,11 @@ void __init walk_drmem_lmbs(struct device_node *dn,
 
 	prop = of_get_property(dn, "ibm,dynamic-memory", NULL);
 	if (prop) {
-		__walk_drmem_v1_lmbs(prop, usm, func);
+		walk_drmem_v1_lmbs(prop, usm, func);
 	} else {
 		prop = of_get_property(dn, "ibm,dynamic-memory-v2", NULL);
 		if (prop)
-			__walk_drmem_v2_lmbs(prop, usm, func);
+			walk_drmem_v2_lmbs(prop, usm, func);
 	}
 }
 

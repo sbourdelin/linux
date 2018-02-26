@@ -537,7 +537,7 @@ void *of_fdt_unflatten_tree(const unsigned long *blob,
 EXPORT_SYMBOL_GPL(of_fdt_unflatten_tree);
 
 /* Everything below here references initial_boot_params directly. */
-int __initdata dt_root_addr_cells;
+int dt_root_addr_cells;
 int __initdata dt_root_size_cells;
 
 void *initial_boot_params;
@@ -1011,7 +1011,7 @@ int __init early_init_dt_scan_root(unsigned long node, const char *uname,
 	return 1;
 }
 
-u64 __init dt_mem_next_cell(int s, const __be32 **cellp)
+u64 dt_mem_next_cell(int s, const __be32 **cellp)
 {
 	const __be32 *p = *cellp;
 
