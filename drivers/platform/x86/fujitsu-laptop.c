@@ -107,8 +107,7 @@
 #define EVENT_HK4			0x413
 #define EVENT_HK5			0x420
 
-#define MAX_HOTKEY_RINGBUFFER_SIZE	100
-#define RINGBUFFERSIZE			40
+#define HOTKEY_RINGBUFFER_SIZE		16
 
 /* Constant related to FUNC_FLAGS */
 #define FLAG_DOCK			BIT(9)
@@ -815,7 +814,7 @@ static int acpi_fujitsu_laptop_add(struct acpi_device *device)
 
 	/* kfifo */
 	spin_lock_init(&priv->fifo_lock);
-	ret = kfifo_alloc(&priv->fifo, RINGBUFFERSIZE * sizeof(int),
+	ret = kfifo_alloc(&priv->fifo, HOTKEY_RINGBUFFER_SIZE * sizeof(int),
 			  GFP_KERNEL);
 	if (ret)
 		return ret;
@@ -825,7 +824,7 @@ static int acpi_fujitsu_laptop_add(struct acpi_device *device)
 
 	while (call_fext_func(device, FUNC_BUTTONS, OP_GET_EVENTS,
 			      0x0, 0x0) != 0 &&
-	       i++ < MAX_HOTKEY_RINGBUFFER_SIZE)
+	       i++ < HOTKEY_RINGBUFFER_SIZE)
 		; /* No action, result is discarded */
 	acpi_handle_debug(device->handle, "Discarded %i ringbuffer entries\n",
 			  i);
@@ -941,7 +940,7 @@ static void acpi_fujitsu_laptop_notify(struct acpi_device *device, u32 event)
 
 	while ((irb = call_fext_func(device, FUNC_BUTTONS, OP_GET_EVENTS,
 				     0x0, 0x0)) != 0 &&
-	       i++ < MAX_HOTKEY_RINGBUFFER_SIZE) {
+	       i++ < HOTKEY_RINGBUFFER_SIZE) {
 		scancode = irb & 0x4ff;
 		if (sparse_keymap_entry_from_scancode(priv->input, scancode))
 			acpi_fujitsu_laptop_press(device, scancode);
