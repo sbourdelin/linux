@@ -605,6 +605,7 @@ static ssize_t sriov_numvfs_store(struct device *dev,
 				  struct device_attribute *attr,
 				  const char *buf, size_t count)
 {
+	int (*sriov_configure)(struct pci_dev *dev, int num_vfs);
 	struct pci_dev *pdev = to_pci_dev(dev);
 	int ret;
 	u16 num_vfs;
@@ -622,15 +623,20 @@ static ssize_t sriov_numvfs_store(struct device *dev,
 		goto exit;
 
 	/* is PF driver loaded w/callback */
-	if (!pdev->driver || !pdev->driver->sriov_configure) {
-		pci_info(pdev, "Driver doesn't support SRIOV configuration via sysfs\n");
-		ret = -ENOENT;
-		goto exit;
-	}
+	if (pdev->driver && pdev->driver->sriov_configure)
+		sriov_configure = pdev->driver->sriov_configure;
+	else
+		sriov_configure = pci_sriov_configure_unmanaged;
 
 	if (num_vfs == 0) {
 		/* disable VFs */
-		ret = pdev->driver->sriov_configure(pdev, 0);
+		ret = sriov_configure(pdev, 0);
+
+		/*
+		 * Fall back to drivers_autoprobe in case legacy driver
+		 * decides to enable SR-IOV on load.
+		 */
+		pdev->sriov->autoprobe = pdev->sriov->drivers_autoprobe;
 		goto exit;
 	}
 
@@ -642,7 +648,14 @@ static ssize_t sriov_numvfs_store(struct device *dev,
 		goto exit;
 	}
 
-	ret = pdev->driver->sriov_configure(pdev, num_vfs);
+	/*
+	 * Update autoprobe based on unmanaged_autoprobe settings if PF
+	 * driver is not managing the SR-IOV configuration for this device.
+	 */
+	if (!pdev->driver || !pdev->driver->sriov_configure)
+		pdev->sriov->autoprobe = pdev->sriov->unmanaged_autoprobe;
+
+	ret = sriov_configure(pdev, num_vfs);
 	if (ret < 0)
 		goto exit;
 
@@ -705,7 +718,37 @@ static ssize_t sriov_drivers_autoprobe_store(struct device *dev,
 	if (kstrtobool(buf, &drivers_autoprobe) < 0)
 		return -EINVAL;
 
+	device_lock(&pdev->dev);
+
 	pdev->sriov->drivers_autoprobe = drivers_autoprobe;
+	if (!pdev->sriov->num_VFs)
+		pdev->sriov->autoprobe = drivers_autoprobe;
+
+	device_unlock(&pdev->dev);
+
+	return count;
+}
+
+static ssize_t sriov_unmanaged_autoprobe_show(struct device *dev,
+					      struct device_attribute *attr,
+					      char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sprintf(buf, "%u\n", pdev->sriov->unmanaged_autoprobe);
+}
+
+static ssize_t sriov_unmanaged_autoprobe_store(struct device *dev,
+					       struct device_attribute *attr,
+					       const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	bool unmanaged_autoprobe;
+
+	if (kstrtobool(buf, &unmanaged_autoprobe) < 0)
+		return -EINVAL;
+
+	pdev->sriov->unmanaged_autoprobe = unmanaged_autoprobe;
 
 	return count;
 }
@@ -720,6 +763,10 @@ static struct device_attribute sriov_vf_device_attr = __ATTR_RO(sriov_vf_device)
 static struct device_attribute sriov_drivers_autoprobe_attr =
 		__ATTR(sriov_drivers_autoprobe, (S_IRUGO|S_IWUSR|S_IWGRP),
 		       sriov_drivers_autoprobe_show, sriov_drivers_autoprobe_store);
+static struct device_attribute sriov_unmanaged_autoprobe_attr =
+		__ATTR(sriov_unmanaged_autoprobe, (S_IRUGO|S_IWUSR|S_IWGRP),
+		       sriov_unmanaged_autoprobe_show,
+		       sriov_unmanaged_autoprobe_store);
 #endif /* CONFIG_PCI_IOV */
 
 static ssize_t driver_override_store(struct device *dev,
@@ -1789,6 +1836,7 @@ static struct attribute *sriov_dev_attrs[] = {
 	&sriov_stride_attr.attr,
 	&sriov_vf_device_attr.attr,
 	&sriov_drivers_autoprobe_attr.attr,
+	&sriov_unmanaged_autoprobe_attr.attr,
 	NULL,
 };
 

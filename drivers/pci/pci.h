@@ -272,7 +272,9 @@ struct pci_sriov {
 	struct pci_dev	*dev;		/* Lowest numbered PF */
 	struct pci_dev	*self;		/* This PF */
 	resource_size_t	barsz[PCI_SRIOV_NUM_BARS];	/* VF BAR size */
-	bool		drivers_autoprobe; /* Auto probing of VFs by driver */
+	bool		autoprobe;	/* Auto probing of VFs by VF driver */
+	bool		drivers_autoprobe;	/* "" managed by PF driver */
+	bool		unmanaged_autoprobe;	/* "" unmanaged by kernel */
 };
 
 /* pci_dev priv_flags */
