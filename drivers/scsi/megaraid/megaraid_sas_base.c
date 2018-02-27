@@ -5140,6 +5140,26 @@ skip_alloc:
 		instance->use_seqnum_jbod_fp = false;
 }
 
+static void megasas_setup_reply_map(struct megasas_instance *instance)
+{
+	const struct cpumask *mask;
+	unsigned int queue, cpu;
+
+	for (queue = 0; queue < instance->msix_vectors; queue++) {
+		mask = pci_irq_get_affinity(instance->pdev, queue);
+		if (!mask)
+			goto fallback;
+
+		for_each_cpu(cpu, mask)
+			instance->reply_map[cpu] = queue;
+	}
+	return;
+
+fallback:
+	for_each_possible_cpu(cpu)
+		instance->reply_map[cpu] = 0;
+}
+
 /**
  * megasas_init_fw -	Initializes the FW
  * @instance:		Adapter soft state
@@ -5317,6 +5337,8 @@ static int megasas_init_fw(struct megasas_instance *instance)
 		if (i < 0)
 			goto fail_setup_irqs;
 	}
+
+	megasas_setup_reply_map(instance);
 
 	dev_info(&instance->pdev->dev,
 		"firmware supports msix\t: (%d)", fw_msix_count);
@@ -6420,6 +6442,11 @@ static int megasas_probe_one(struct pci_dev *pdev,
 	memset(instance, 0, sizeof(*instance));
 	atomic_set(&instance->fw_reset_no_pci_access, 0);
 
+	instance->reply_map = kzalloc(sizeof(unsigned int) * nr_cpu_ids,
+			GFP_KERNEL);
+	if (!instance->reply_map)
+		goto fail_alloc_reply_map;
+
 	/*
 	 * Initialize PCI related and misc parameters
 	 */
@@ -6511,8 +6538,9 @@ fail_io_attach:
 	if (instance->msix_vectors)
 		pci_free_irq_vectors(instance->pdev);
 fail_init_mfi:
+	kfree(instance->reply_map);
+fail_alloc_reply_map:
 	scsi_host_put(host);
-
 fail_alloc_instance:
 	pci_disable_device(pdev);
 
@@ -6716,6 +6744,8 @@ megasas_resume(struct pci_dev *pdev)
 				     instance->msix_vectors : 1, irq_flags);
 	if (rval < 0)
 		goto fail_reenable_msix;
+
+	megasas_setup_reply_map(instance);
 
 	if (instance->adapter_type != MFI_SERIES) {
 		megasas_reset_reply_desc(instance);
@@ -6930,6 +6960,8 @@ skip_firing_dcmds:
 	megasas_free_ctrl_dma_buffers(instance);
 
 	megasas_free_ctrl_mem(instance);
+
+	kfree(instance->reply_map);
 
 	scsi_host_put(host);
 

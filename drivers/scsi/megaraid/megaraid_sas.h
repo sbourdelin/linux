@@ -2106,7 +2106,7 @@ enum MR_PD_TYPE {
 #define MR_NVME_PAGE_SIZE_MASK		0x000000FF
 
 struct megasas_instance {
-
+	unsigned int *reply_map;
 	__le32 *producer;
 	dma_addr_t producer_h;
 	__le32 *consumer;
