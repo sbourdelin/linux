@@ -2828,6 +2828,7 @@ static int tipc_setsockopt(struct socket *sock, int lvl, int opt,
 	case TIPC_SRC_DROPPABLE:
 	case TIPC_DEST_DROPPABLE:
 	case TIPC_CONN_TIMEOUT:
+	case TIPC_SO_RCVBUF:
 		if (ol < sizeof(value))
 			return -EINVAL;
 		if (get_user(value, (u32 __user *)ov))
@@ -2875,6 +2876,10 @@ static int tipc_setsockopt(struct socket *sock, int lvl, int opt,
 		break;
 	case TIPC_GROUP_LEAVE:
 		res = tipc_sk_leave(tsk);
+		break;
+	case TIPC_SO_RCVBUF:
+		value = max_t(int, value, sysctl_tipc_rmem[0]);
+		sk->sk_rcvbuf = min_t(int, value, sysctl_tipc_rmem[2]);
 		break;
 	default:
 		res = -EINVAL;
@@ -2943,6 +2948,9 @@ static int tipc_getsockopt(struct socket *sock, int lvl, int opt,
 		if (tsk->group)
 			tipc_group_self(tsk->group, &seq, &scope);
 		value = seq.type;
+		break;
+	case TIPC_SO_RCVBUF:
+		value = sk->sk_rcvbuf;
 		break;
 	default:
 		res = -EINVAL;
