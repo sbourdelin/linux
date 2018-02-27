@@ -232,7 +232,7 @@ PE_NAME opt_event_config
 		YYABORT;
 
 	ALLOC_LIST(list);
-	if (parse_events_add_pmu(_parse_state, list, $1, $2)) {
+	if (parse_events_add_pmu(_parse_state, list, $1, $2, false)) {
 		struct perf_pmu *pmu = NULL;
 		int ok = 0;
 
@@ -245,7 +245,7 @@ PE_NAME opt_event_config
 			if (!strncmp($1, name, strlen($1)) || !fnmatch($1, name, 0)) {
 				if (parse_events_copy_term_list(orig_terms, &terms))
 					YYABORT;
-				if (!parse_events_add_pmu(_parse_state, list, pmu->name, terms))
+				if (!parse_events_add_pmu(_parse_state, list, pmu->name, terms, true))
 					ok++;
 				parse_events_terms__delete(terms);
 			}
