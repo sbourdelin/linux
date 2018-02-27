@@ -78,6 +78,7 @@ struct sock_mapping {
 #define PVCALLS_STATUS_BIND          1
 #define PVCALLS_STATUS_LISTEN        2
 			uint8_t status;
+			uint8_t pad[7];
 		/*
 		 * Internal state-machine flags.
 		 * Only one accept operation can be inflight for a socket.
