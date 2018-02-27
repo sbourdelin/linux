@@ -2777,10 +2777,10 @@ int open_ctree(struct super_block *sb,
 	}
 
 	/*
-	 * keep the device that is marked to be the target device for the
+	 * keep the devid that is marked to be the target device for the
 	 * dev_replace procedure
 	 */
-	btrfs_close_extra_devices(fs_devices, 0);
+	btrfs_free_extra_devids(fs_devices, 0);
 
 	if (!fs_devices->latest_bdev) {
 		btrfs_err(fs_info, "failed to read devices");
@@ -2843,7 +2843,7 @@ retry_root_backup:
 		goto fail_block_groups;
 	}
 
-	btrfs_close_extra_devices(fs_devices, 1);
+	btrfs_free_extra_devids(fs_devices, 1);
 
 	ret = btrfs_sysfs_add_fsid(fs_devices, NULL);
 	if (ret) {
