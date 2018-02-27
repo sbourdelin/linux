@@ -1167,6 +1167,19 @@ config ARM64_ACPI_PARKING_PROTOCOL
 	  protocol even if the corresponding data is present in the ACPI
 	  MADT table.
 
+config ARM64_PREFER_ACPI
+	bool "Prefer usage of ACPI boot tables over device-tree"
+	depends on ACPI
+	help
+	  Normally device-tree is preferred over ACPI on arm64 unless
+	  explicitly preferred via kernel command line, something like: acpi=on
+	  This configuration changes this default behaviour by pretending
+	  the user set acpi=on on the command line. This configuration still
+	  allows the user to turn acpi table parsing off via acpi=off. If
+	  for some reason the table checks fail the system will still fall
+	  back to using device-tree unless the user explicitly sets acpi=force
+	  on the command line.
+
 config CMDLINE
 	string "Default kernel command string"
 	default ""
