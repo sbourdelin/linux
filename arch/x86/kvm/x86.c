@@ -7671,6 +7671,10 @@ EXPORT_SYMBOL_GPL(kvm_task_switch);
 
 int kvm_valid_sregs(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
 {
+	if (!guest_cpuid_has(vcpu, X86_FEATURE_XSAVE) &&
+			(sregs->cr4 & X86_CR4_OSXSAVE))
+		return -EINVAL;
+
 	if ((sregs->efer & EFER_LME) && (sregs->cr0 & X86_CR0_PG)) {
 		/*
 		 * When EFER.LME and CR0.PG are set, the processor is in
@@ -7701,14 +7705,10 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
 	struct desc_ptr dt;
 	int ret = -EINVAL;
 
-	vcpu_load(vcpu);
-
-	if (!guest_cpuid_has(vcpu, X86_FEATURE_XSAVE) &&
-			(sregs->cr4 & X86_CR4_OSXSAVE))
-		goto out;
-
 	if (kvm_valid_sregs(vcpu, sregs))
-		goto out;
+		return ret;
+
+	vcpu_load(vcpu);
 
 	apic_base_msr.data = sregs->apic_base;
 	apic_base_msr.host_initiated = true;
