@@ -936,7 +936,9 @@ static ssize_t environ_read(struct file *file, char __user *buf,
 	if (!mmget_not_zero(mm))
 		goto free;
 
-	down_read(&mm->mmap_sem);
+	ret = down_read_killable(&mm->mmap_sem);
+	if (ret)
+		goto out_mmput;
 	env_start = mm->env_start;
 	env_end = mm->env_end;
 	up_read(&mm->mmap_sem);
@@ -953,7 +955,8 @@ static ssize_t environ_read(struct file *file, char __user *buf,
 		max_len = min_t(size_t, PAGE_SIZE, count);
 		this_len = min(max_len, this_len);
 
-		retval = access_remote_vm(mm, (env_start + src), page, this_len, 0);
+		retval = access_remote_vm_killable(mm, (env_start + src),
+						page, this_len, 0);
 
 		if (retval <= 0) {
 			ret = retval;
@@ -971,6 +974,8 @@ static ssize_t environ_read(struct file *file, char __user *buf,
 		count -= retval;
 	}
 	*ppos = src;
+
+out_mmput:
 	mmput(mm);
 
 free:
