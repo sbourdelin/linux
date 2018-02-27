@@ -415,9 +415,11 @@ struct kernel_sym {
 };
 
 struct dump_data {
+	unsigned char prog_tag[BPF_TAG_SIZE];
 	unsigned long address_call_base;
 	struct kernel_sym *sym_mapping;
 	__u32 sym_count;
+	unsigned int curr_line;
 	char scratch_buff[SYM_MAX_NAME];
 };
 
@@ -499,16 +501,16 @@ static void print_insn(struct bpf_verifier_env *env, const char *fmt, ...)
 }
 
 static const char *print_call_pcrel(struct dump_data *dd,
-				    struct kernel_sym *sym,
-				    unsigned long address,
 				    const struct bpf_insn *insn)
 {
-	if (sym)
-		snprintf(dd->scratch_buff, sizeof(dd->scratch_buff),
-			 "%+d#%s", insn->off, sym->name);
-	else
-		snprintf(dd->scratch_buff, sizeof(dd->scratch_buff),
-			 "%+d#0x%lx", insn->off, address);
+	snprintf(dd->scratch_buff, sizeof(dd->scratch_buff),
+		 "+%d#bpf_prog_%02x%02x%02x%02x%02x%02x%02x%02x+%d",
+		 insn->off,
+		 dd->prog_tag[0], dd->prog_tag[1],
+		 dd->prog_tag[2], dd->prog_tag[3],
+		 dd->prog_tag[4], dd->prog_tag[5],
+		 dd->prog_tag[6], dd->prog_tag[7],
+		 dd->curr_line + insn->off + 1);
 	return dd->scratch_buff;
 }
 
@@ -534,7 +536,7 @@ static const char *print_call(void *private_data,
 
 	sym = kernel_syms_search(dd, address);
 	if (insn->src_reg == BPF_PSEUDO_CALL)
-		return print_call_pcrel(dd, sym, address, insn);
+		return print_call_pcrel(dd, insn);
 	else
 		return print_call_helper(dd, sym, address);
 }
@@ -576,6 +578,7 @@ static void dump_xlated_plain(struct dump_data *dd, void *buf,
 		double_insn = insn[i].code == (BPF_LD | BPF_IMM | BPF_DW);
 
 		printf("% 4d: ", i);
+		dd->curr_line = i;
 		print_bpf_insn(&cbs, NULL, insn + i, true);
 
 		if (opcodes) {
@@ -628,6 +631,7 @@ static void dump_xlated_json(struct dump_data *dd, void *buf,
 
 		jsonw_start_object(json_wtr);
 		jsonw_name(json_wtr, "disasm");
+		dd->curr_line = i;
 		print_bpf_insn(&cbs, NULL, insn + i, true);
 
 		if (opcodes) {
@@ -791,6 +795,7 @@ static int do_dump(int argc, char **argv)
 
 			disasm_print_insn(buf, *member_len, opcodes, name);
 		} else {
+			memcpy(dd.prog_tag, info.tag, sizeof(info.tag));
 			kernel_syms_load(&dd);
 			if (json_output)
 				dump_xlated_json(&dd, buf, *member_len, opcodes);
