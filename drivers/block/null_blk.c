@@ -163,6 +163,10 @@ static int g_submit_queues = 1;
 module_param_named(submit_queues, g_submit_queues, int, S_IRUGO);
 MODULE_PARM_DESC(submit_queues, "Number of submission queues");
 
+static int g_host_tags = 0;
+module_param_named(host_tags, g_host_tags, int, S_IRUGO);
+MODULE_PARM_DESC(host_tags, "All submission queues share one tags");
+
 static int g_home_node = NUMA_NO_NODE;
 module_param_named(home_node, g_home_node, int, S_IRUGO);
 MODULE_PARM_DESC(home_node, "Home node for the device");
@@ -1622,6 +1626,8 @@ static int null_init_tag_set(struct nullb *nullb, struct blk_mq_tag_set *set)
 	set->flags = BLK_MQ_F_SHOULD_MERGE;
 	if (g_no_sched)
 		set->flags |= BLK_MQ_F_NO_SCHED;
+	if (g_host_tags)
+		set->flags |= BLK_MQ_F_HOST_TAGS;
 	set->driver_data = NULL;
 
 	if ((nullb && nullb->dev->blocking) || g_blocking)
