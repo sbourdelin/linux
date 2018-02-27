@@ -2096,6 +2096,10 @@ static int bpf_skb_proto_4_to_6(struct sk_buff *skb)
 		return ret;
 
 	if (skb_is_gso(skb)) {
+		/* SCTP uses GSO_BY_FRAGS, cannot adjust */
+		if (unlikely(skb_shinfo(skb)->gso_type & SKB_GSO_SCTP))
+			return -ENOTSUPP;
+
 		/* SKB_GSO_TCPV4 needs to be changed into
 		 * SKB_GSO_TCPV6.
 		 */
@@ -2132,6 +2136,10 @@ static int bpf_skb_proto_6_to_4(struct sk_buff *skb)
 		return ret;
 
 	if (skb_is_gso(skb)) {
+		/* SCTP uses GSO_BY_FRAGS, cannot adjust */
+		if (unlikely(skb_shinfo(skb)->gso_type & SKB_GSO_SCTP))
+			return -ENOTSUPP;
+
 		/* SKB_GSO_TCPV6 needs to be changed into
 		 * SKB_GSO_TCPV4.
 		 */
@@ -2252,6 +2260,10 @@ static int bpf_skb_net_grow(struct sk_buff *skb, u32 len_diff)
 		return ret;
 
 	if (skb_is_gso(skb)) {
+		/* SCTP uses GSO_BY_FRAGS, cannot adjust */
+		if (unlikely(skb_shinfo(skb)->gso_type & SKB_GSO_SCTP))
+			return -ENOTSUPP;
+
 		/* Due to header grow, MSS needs to be downgraded. */
 		skb_decrease_gso_size(skb, len_diff);
 		/* Header must be checked, and gso_segs recomputed. */
@@ -2276,6 +2288,10 @@ static int bpf_skb_net_shrink(struct sk_buff *skb, u32 len_diff)
 		return ret;
 
 	if (skb_is_gso(skb)) {
+		/* SCTP uses GSO_BY_FRAGS, cannot adjust */
+		if (unlikely(skb_shinfo(skb)->gso_type & SKB_GSO_SCTP))
+			return -ENOTSUPP;
+
 		/* Due to header shrink, MSS can be upgraded. */
 		skb_increase_gso_size(skb, len_diff);
 		/* Header must be checked, and gso_segs recomputed. */
