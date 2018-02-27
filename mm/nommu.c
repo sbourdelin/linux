@@ -1802,13 +1802,11 @@ void filemap_map_pages(struct vm_fault *vmf,
 }
 EXPORT_SYMBOL(filemap_map_pages);
 
-int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
+static int raw_access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long addr, void *buf, int len, unsigned int gup_flags)
 {
 	struct vm_area_struct *vma;
 	int write = gup_flags & FOLL_WRITE;
-
-	down_read(&mm->mmap_sem);
 
 	/* the access must start within one of the target process's mappings */
 	vma = find_vma(mm, addr);
@@ -1830,9 +1828,33 @@ int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		len = 0;
 	}
 
-	up_read(&mm->mmap_sem);
-
 	return len;
+}
+
+int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
+		unsigned long addr, void *buf, int len, unsigned int gup_flags)
+{
+	int ret;
+
+	down_read(&mm->mmap_sem);
+	ret = raw_access_remote_vm(tsk, mm, addr, buf, len, gup_flags);
+	up_read(&mm->mmap_sem);
+	return ret;
+}
+
+int __access_remote_vm_killable(struct task_struct *tsk, struct mm_struct *mm,
+		unsigned long addr, void *buf, int len, unsigned int gup_flags)
+{
+	int ret;
+
+	ret = down_read_killable(&mm->mmap_sem);
+	if (ret)
+		goto out;
+
+	ret = raw_access_remote_vm(tsk, mm, addr, buf, len, gup_flags);
+	up_read(&mm->mmap_sem);
+out:
+	return ret;
 }
 
 /**
@@ -1845,6 +1867,12 @@ int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
  *
  * The caller must hold a reference on @mm.
  */
+int access_remote_vm_killable(struct mm_struct *mm, unsigned long addr,
+		void *buf, int len, unsigned int gup_flags)
+{
+	return __access_remote_vm_killable(NULL, mm, addr, buf, len, gup_flags);
+}
+
 int access_remote_vm(struct mm_struct *mm, unsigned long addr,
 		void *buf, int len, unsigned int gup_flags)
 {

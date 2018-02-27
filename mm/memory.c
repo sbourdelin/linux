@@ -4398,18 +4398,13 @@ int generic_access_phys(struct vm_area_struct *vma, unsigned long addr,
 EXPORT_SYMBOL_GPL(generic_access_phys);
 #endif
 
-/*
- * Access another process' address space as given in mm.  If non-NULL, use the
- * given task for page fault accounting.
- */
-int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
+static int raw_access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long addr, void *buf, int len, unsigned int gup_flags)
 {
 	struct vm_area_struct *vma;
 	void *old_buf = buf;
 	int write = gup_flags & FOLL_WRITE;
 
-	down_read(&mm->mmap_sem);
 	/* ignore errors, just check how much was successfully transferred */
 	while (len) {
 		int bytes, ret, offset;
@@ -4458,9 +4453,38 @@ int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		buf += bytes;
 		addr += bytes;
 	}
-	up_read(&mm->mmap_sem);
 
 	return buf - old_buf;
+}
+
+/*
+ * Access another process' address space as given in mm.  If non-NULL, use the
+ * given task for page fault accounting.
+ */
+int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
+		unsigned long addr, void *buf, int len, unsigned int gup_flags)
+{
+	int ret;
+
+	down_read(&mm->mmap_sem);
+	ret = raw_access_remote_vm(tsk, mm, addr, buf, len, gup_flags);
+	up_read(&mm->mmap_sem);
+	return ret;
+}
+
+int __access_remote_vm_killable(struct task_struct *tsk, struct mm_struct *mm,
+		unsigned long addr, void *buf, int len, unsigned int gup_flags)
+{
+	int ret;
+
+	ret = down_read_killable(&mm->mmap_sem);
+	if (ret)
+		goto out;
+
+	ret = raw_access_remote_vm(tsk, mm, addr, buf, len, gup_flags);
+	up_read(&mm->mmap_sem);
+out:
+	return ret;
 }
 
 /**
@@ -4473,6 +4497,12 @@ int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
  *
  * The caller must hold a reference on @mm.
  */
+int access_remote_vm_killable(struct mm_struct *mm, unsigned long addr,
+		void *buf, int len, unsigned int gup_flags)
+{
+	return __access_remote_vm_killable(NULL, mm, addr, buf, len, gup_flags);
+}
+
 int access_remote_vm(struct mm_struct *mm, unsigned long addr,
 		void *buf, int len, unsigned int gup_flags)
 {
