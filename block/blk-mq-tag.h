@@ -13,6 +13,8 @@ struct blk_mq_tags {
 
 	atomic_t active_queues;
 
+	unsigned int start_tag;
+
 	struct sbitmap_queue bitmap_tags;
 	struct sbitmap_queue breserved_tags;
 
@@ -78,13 +80,13 @@ static inline void blk_mq_tag_idle(struct blk_mq_hw_ctx *hctx)
 static inline void blk_mq_tag_set_rq(struct blk_mq_hw_ctx *hctx,
 		unsigned int tag, struct request *rq)
 {
-	hctx->tags->rqs[tag] = rq;
+	hctx->tags->rqs[tag - hctx->tags->start_tag] = rq;
 }
 
 static inline bool blk_mq_tag_is_reserved(struct blk_mq_tags *tags,
 					  unsigned int tag)
 {
-	return tag < tags->nr_reserved_tags;
+	return (tag - tags->start_tag) < tags->nr_reserved_tags;
 }
 
 #endif

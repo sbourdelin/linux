@@ -270,7 +270,7 @@ static struct request *blk_mq_rq_ctx_init(struct blk_mq_alloc_data *data,
 		unsigned int tag, unsigned int op)
 {
 	struct blk_mq_tags *tags = blk_mq_tags_from_data(data);
-	struct request *rq = tags->static_rqs[tag];
+	struct request *rq = tags->static_rqs[tag - tags->start_tag];
 	req_flags_t rq_flags = 0;
 
 	if (data->flags & BLK_MQ_REQ_INTERNAL) {
@@ -283,7 +283,7 @@ static struct request *blk_mq_rq_ctx_init(struct blk_mq_alloc_data *data,
 		}
 		rq->tag = tag;
 		rq->internal_tag = -1;
-		data->hctx->tags->rqs[rq->tag] = rq;
+		data->hctx->tags->rqs[rq->tag - tags->start_tag] = rq;
 	}
 
 	/* csd/requeue_work/fifo_time is initialized before use */
@@ -801,6 +801,7 @@ EXPORT_SYMBOL(blk_mq_delay_kick_requeue_list);
 
 struct request *blk_mq_tag_to_rq(struct blk_mq_tags *tags, unsigned int tag)
 {
+	tag -= tags->start_tag;
 	if (tag < tags->nr_tags) {
 		prefetch(tags->rqs[tag]);
 		return tags->rqs[tag];
@@ -1076,7 +1077,7 @@ bool blk_mq_get_driver_tag(struct request *rq, struct blk_mq_hw_ctx **hctx,
 			rq->rq_flags |= RQF_MQ_INFLIGHT;
 			atomic_inc(&data.hctx->nr_active);
 		}
-		data.hctx->tags->rqs[rq->tag] = rq;
+		data.hctx->tags->rqs[rq->tag - data.hctx->tags->start_tag] = rq;
 	}
 
 done:
