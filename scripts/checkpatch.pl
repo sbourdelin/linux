@@ -5797,16 +5797,33 @@ sub process {
 		    defined $stat &&
 		    $stat =~ /^\+(?![^\{]*\{\s*).*\b(\w+)\s*\(.*$String\s*,/s &&
 		    $1 !~ /^_*volatile_*$/) {
-			my $bad_extension = "";
+			my $specifier;
+			my $extension;
+			my $bad_specifier = "";
+			my $stat_real;
+
 			my $lc = $stat =~ tr@\n@@;
 			$lc = $lc + $linenr;
 		        for (my $count = $linenr; $count <= $lc; $count++) {
 				my $fmt = get_quoted_string($lines[$count - 1], raw_line($count, 0));
 				$fmt =~ s/%%//g;
-				if ($fmt =~ /(\%[\*\d\.]*p(?![\WSsBKRraEhMmIiUDdgVCbGNOx]).)/) {
-					$bad_extension = $1;
-					last;
+
+				while ($fmt =~ /(\%[\*\d\.]*p(\w))/g) {
+					$specifier = $1;
+					$extension = $2;
+					if ($extension !~ /[FfSsBKRraEhMmIiUDdgVCbGNOx]/) {
+						$bad_specifier = $specifier;
+						last;
+					}
+					if ($extension eq "x" && !defined($stat_real)) {
+						if (!defined($stat_real)) {
+							$stat_real = get_stat_real($linenr, $lc);
+						}
+						WARN("VSPRINTF_SPECIFIER_PX",
+						     "Using vsprintf specifier '\%px' potentially exposes the kernel memory layout, if you don't really need the address please consider using '\%p'.\n" . "$here\n$stat_real\n");
+					}
 				}
+
 			}
 			if ($bad_extension ne "") {
 				my $stat_real = get_stat_real($linenr, $lc);
@@ -5819,7 +5836,7 @@ sub process {
 				}
 
 				WARN("VSPRINTF_POINTER_EXTENSION",
-				     "$ext_type vsprintf pointer extension '$bad_extension'$use\n" . "$here\n$stat_real\n");
+				     "Invalid vsprintf pointer extension '$bad_specifier'\n" . "$here\n$stat_real\n");
 			}
 		}
 
