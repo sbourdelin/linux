@@ -23,8 +23,9 @@
 #include "cipher.h"
 
 /* This array is based on the hash algo type supported in spu.h */
-char *hash_alg_name[] = { "None", "md5", "sha1", "sha224", "sha256", "aes",
-	"sha384", "sha512", "sha3_224", "sha3_256", "sha3_384", "sha3_512" };
+char const * const hash_alg_name[] = { "None", "md5", "sha1", "sha224",
+	"sha256", "aes", "sha384", "sha512", "sha3_224", "sha3_256", "sha3_384",
+	"sha3_512" };
 
 /* Assumes SPU-M messages are in big endian */
 void spum_dump_msg_hdr(u8 *buf, unsigned int buf_len)

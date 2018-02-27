@@ -111,7 +111,7 @@ enum aead_type {
 	AEAD_TYPE_LAST
 };
 
-extern char *hash_alg_name[HASH_ALG_LAST];
+extern const char * const hash_alg_name[HASH_ALG_LAST];
 
 struct spu_request_opts {
 	bool is_inbound;
