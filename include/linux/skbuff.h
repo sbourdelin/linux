@@ -4044,6 +4044,22 @@ static inline void skb_gso_reset(struct sk_buff *skb)
 	skb_shinfo(skb)->gso_type = 0;
 }
 
+static inline void skb_increase_gso_size(struct sk_buff *skb, u16 increment)
+{
+	if (WARN_ON_ONCE(skb_shinfo(skb)->gso_size == GSO_BY_FRAGS))
+		return;
+
+	skb_shinfo(skb)->gso_size += increment;
+}
+
+static inline void skb_decrease_gso_size(struct sk_buff *skb, u16 decrement)
+{
+	if (WARN_ON_ONCE(skb_shinfo(skb)->gso_size == GSO_BY_FRAGS))
+		return;
+
+	skb_shinfo(skb)->gso_size -= decrement;
+}
+
 void __skb_warn_lro_forwarding(const struct sk_buff *skb);
 
 static inline bool skb_warn_if_lro(const struct sk_buff *skb)
