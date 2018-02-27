@@ -933,6 +933,7 @@ static int ip_error(struct sk_buff *skb)
 	struct in_device *in_dev = __in_dev_get_rcu(skb->dev);
 	struct rtable *rt = skb_rtable(skb);
 	struct inet_peer *peer;
+	int in_dev_forward;
 	unsigned long now;
 	struct net *net;
 	bool send;
@@ -943,7 +944,13 @@ static int ip_error(struct sk_buff *skb)
 		goto out;
 
 	net = dev_net(rt->dst.dev);
-	if (!IN_DEV_FORWARD(in_dev)) {
+	if (netif_is_l3_master(skb->dev)) {
+		in_dev_forward = IN_DEV_FORWARD(
+			__in_dev_get_rcu(__dev_get_by_index(net, IPCB(skb)->iif)));
+	} else {
+		in_dev_forward = IN_DEV_FORWARD(in_dev);
+	}
+	if (!in_dev_forward) {
 		switch (rt->dst.error) {
 		case EHOSTUNREACH:
 			__IP_INC_STATS(net, IPSTATS_MIB_INADDRERRORS);
