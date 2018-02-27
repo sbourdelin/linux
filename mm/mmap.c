@@ -45,6 +45,7 @@
 #include <linux/moduleparam.h>
 #include <linux/pkeys.h>
 #include <linux/oom.h>
+#include <linux/random.h>
 
 #include <linux/uaccess.h>
 #include <asm/cacheflush.h>
@@ -1789,6 +1790,176 @@ unacct_error:
 	if (charged)
 		vm_unacct_memory(charged);
 	return error;
+}
+
+unsigned long unmapped_area_random(struct vm_unmapped_area_info *info)
+{
+	// first lets find right border with unmapped_area_topdown
+	struct mm_struct *mm = current->mm;
+	struct vm_area_struct *vma;
+	struct vm_area_struct *right_vma = 0;
+	unsigned long entropy;
+	unsigned int entropy_count;
+	unsigned long length, low_limit, high_limit, gap_start, gap_end;
+	unsigned long addr, low, high;
+
+	/* Adjust search length to account for worst case alignment overhead */
+	length = info->length + info->align_mask;
+	if (length < info->length)
+		return -ENOMEM;
+
+	/*
+	 * Adjust search limits by the desired length.
+	 * See implementation comment at top of unmapped_area().
+	 */
+	gap_end = info->high_limit;
+	if (gap_end < length)
+		return -ENOMEM;
+	high_limit = gap_end - length;
+
+	info->low_limit = 0x10000;
+	if (info->low_limit > high_limit)
+		return -ENOMEM;
+	low_limit = info->low_limit + length;
+
+	/* Check highest gap, which does not precede any rbtree node */
+	gap_start = mm->highest_vm_end;
+	if (gap_start <= high_limit)
+		goto found;
+
+	/* Check if rbtree root looks promising */
+	if (RB_EMPTY_ROOT(&mm->mm_rb))
+		return -ENOMEM;
+	vma = rb_entry(mm->mm_rb.rb_node, struct vm_area_struct, vm_rb);
+	if (vma->rb_subtree_gap < length)
+		return -ENOMEM;
+
+	while (true) {
+		/* Visit right subtree if it looks promising */
+		gap_start = vma->vm_prev ? vm_end_gap(vma->vm_prev) : 0;
+		if (gap_start <= high_limit && vma->vm_rb.rb_right) {
+			struct vm_area_struct *right =
+				rb_entry(vma->vm_rb.rb_right,
+					 struct vm_area_struct, vm_rb);
+			if (right->rb_subtree_gap >= length) {
+				vma = right;
+				continue;
+			}
+		}
+
+check_current_down:
+		/* Check if current node has a suitable gap */
+		gap_end = vm_start_gap(vma);
+		if (gap_end < low_limit)
+			return -ENOMEM;
+		if (gap_start <= high_limit &&
+		    gap_end > gap_start && gap_end - gap_start >= length)
+			goto found;
+
+		/* Visit left subtree if it looks promising */
+		if (vma->vm_rb.rb_left) {
+			struct vm_area_struct *left =
+				rb_entry(vma->vm_rb.rb_left,
+					 struct vm_area_struct, vm_rb);
+			if (left->rb_subtree_gap >= length) {
+				vma = left;
+				continue;
+			}
+		}
+
+		/* Go back up the rbtree to find next candidate node */
+		while (true) {
+			struct rb_node *prev = &vma->vm_rb;
+
+			if (!rb_parent(prev))
+				return -ENOMEM;
+			vma = rb_entry(rb_parent(prev),
+				       struct vm_area_struct, vm_rb);
+			if (prev == vma->vm_rb.rb_right) {
+				gap_start = vma->vm_prev ?
+					vm_end_gap(vma->vm_prev) : 0;
+				goto check_current_down;
+			}
+		}
+	}
+
+found:
+	right_vma = vma;
+	low = gap_start;
+	high = gap_end - length;
+
+	entropy = get_random_long();
+	entropy_count = 0;
+
+	// from left node to right we check if node is fine and
+	// randomly select it.
+	vma = mm->mmap;
+	while (vma != right_vma) {
+		/* Visit left subtree if it looks promising */
+		gap_end = vm_start_gap(vma);
+		if (gap_end >= low_limit && vma->vm_rb.rb_left) {
+			struct vm_area_struct *left =
+				rb_entry(vma->vm_rb.rb_left,
+					 struct vm_area_struct, vm_rb);
+			if (left->rb_subtree_gap >= length) {
+				vma = left;
+				continue;
+			}
+		}
+
+		gap_start = vma->vm_prev ? vm_end_gap(vma->vm_prev) : low_limit;
+check_current_up:
+		/* Check if current node has a suitable gap */
+		if (gap_start > high_limit)
+			break;
+		if (gap_end >= low_limit &&
+		    gap_end > gap_start && gap_end - gap_start >= length) {
+			if (entropy & 1) {
+				low = gap_start;
+				high = gap_end - length;
+			}
+			entropy >>= 1;
+			if (++entropy_count == 64) {
+				entropy = get_random_long();
+				entropy_count = 0;
+			}
+		}
+
+		/* Visit right subtree if it looks promising */
+		if (vma->vm_rb.rb_right) {
+			struct vm_area_struct *right =
+				rb_entry(vma->vm_rb.rb_right,
+					 struct vm_area_struct, vm_rb);
+			if (right->rb_subtree_gap >= length) {
+				vma = right;
+				continue;
+			}
+		}
+
+		/* Go back up the rbtree to find next candidate node */
+		while (true) {
+			struct rb_node *prev = &vma->vm_rb;
+
+			if (!rb_parent(prev))
+				BUG(); // this should not happen
+			vma = rb_entry(rb_parent(prev),
+				       struct vm_area_struct, vm_rb);
+			if (prev == vma->vm_rb.rb_left) {
+				gap_start = vm_end_gap(vma->vm_prev);
+				gap_end = vm_start_gap(vma);
+				if (vma == right_vma)
+					break;
+				goto check_current_up;
+			}
+		}
+	}
+
+	if (high == low)
+		return low;
+
+	addr = get_random_long() % ((high - low) >> PAGE_SHIFT);
+	addr = low + (addr << PAGE_SHIFT);
+	return addr;
 }
 
 unsigned long unmapped_area(struct vm_unmapped_area_info *info)
