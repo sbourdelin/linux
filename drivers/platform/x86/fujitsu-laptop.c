@@ -78,14 +78,14 @@
 
 #define ACPI_FUJITSU_NOTIFY_CODE	0x80
 
-/* FUNC interface - command values */
-#define FUNC_FLAGS			BIT(12)
-#define FUNC_LEDS			(BIT(12) | BIT(0))
-#define FUNC_BUTTONS			(BIT(12) | BIT(1))
-#define FUNC_BACKLIGHT			(BIT(12) | BIT(2))
-
 /* FUNC interface - responses */
 #define UNSUPPORTED_CMD			BIT(31)
+
+/* FUNC interface - function selectors */
+#define FUNC_BACKLIGHT			(BIT(12) | BIT(2))
+#define FUNC_BUTTONS			(BIT(12) | BIT(1))
+#define FUNC_FLAGS			BIT(12)
+#define FUNC_LEDS			(BIT(12) | BIT(0))
 
 /* FUNC interface - operations */
 #define OP_GET				BIT(1)
@@ -95,17 +95,32 @@
 #define OP_SET				BIT(0)
 #define OP_SET_EXT			(BIT(2) | BIT(0))
 
-/* FUNC interface - status flags */
-#define FLAG_RFKILL			BIT(5)
-#define FLAG_LID			BIT(8)
-#define FLAG_DOCK			BIT(9)
+/* Constants related to FUNC_BACKLIGHT */
+#define FEAT_BACKLIGHT_POWER		BIT(2)
+#define STATE_BACKLIGHT_OFF		(BIT(0) | BIT(1))
+#define STATE_BACKLIGHT_ON		0
 
-/* FUNC interface - LED control */
+/* Constants related to FUNC_BUTTONS */
+#define EVENT_HK1			0x410
+#define EVENT_HK2			0x411
+#define EVENT_HK3			0x412
+#define EVENT_HK4			0x413
+#define EVENT_HK5			0x420
+
+#define MAX_HOTKEY_RINGBUFFER_SIZE	100
+#define RINGBUFFERSIZE			40
+
+/* Constant related to FUNC_FLAGS */
+#define FLAG_DOCK			BIT(9)
+#define FLAG_LID			BIT(8)
+#define FLAG_RFKILL			BIT(5)
+
+/* Constants related to FUNC_LEDS */
+#define FEAT_KEYBOARD_LAMPS		BIT(8)
+#define FEAT_LOGOLAMP_ALWAYS		BIT(14)
+#define FEAT_LOGOLAMP_POWERON		BIT(13)
 #define STATE_LED_OFF			BIT(0)
 #define STATE_LED_ON			(BIT(0) | BIT(16) | BIT(17))
-#define FEAT_LOGOLAMP_POWERON		BIT(13)
-#define FEAT_LOGOLAMP_ALWAYS		BIT(14)
-#define FEAT_KEYBOARD_LAMPS		BIT(8)
 
 #define FEAT_RADIO_LED			BIT(5)
 #define STATE_RADIO_LED_OFF		0
@@ -113,22 +128,6 @@
 
 #define FEAT_ECO_LED			BIT(16)
 #define STATE_ECO_LED_ON		BIT(19)
-
-/* FUNC interface - backlight power control */
-#define FEAT_BACKLIGHT_POWER		BIT(2)
-#define STATE_BACKLIGHT_OFF		(BIT(0) | BIT(1))
-#define STATE_BACKLIGHT_ON		0
-
-/* Scancodes read from the GIRB register */
-#define EVENT_HK1			0x410
-#define EVENT_HK2			0x411
-#define EVENT_HK3			0x412
-#define EVENT_HK4			0x413
-#define EVENT_HK5			0x420
-
-/* Hotkey ringbuffer limits */
-#define MAX_HOTKEY_RINGBUFFER_SIZE	100
-#define RINGBUFFERSIZE			40
 
 /* Module parameters */
 static int use_alt_lcd_levels = -1;
