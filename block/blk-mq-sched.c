@@ -495,7 +495,7 @@ static int blk_mq_sched_alloc_tags(struct request_queue *q,
 	int ret;
 
 	hctx->sched_tags = blk_mq_alloc_rq_map(set, hctx_idx, q->nr_requests,
-					       set->reserved_tags);
+					       set->reserved_tags, 0);
 	if (!hctx->sched_tags)
 		return -ENOMEM;
 

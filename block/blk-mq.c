@@ -2012,7 +2012,8 @@ void blk_mq_free_rq_map(struct blk_mq_tags *tags)
 struct blk_mq_tags *blk_mq_alloc_rq_map(struct blk_mq_tag_set *set,
 					unsigned int hctx_idx,
 					unsigned int nr_tags,
-					unsigned int reserved_tags)
+					unsigned int reserved_tags,
+					unsigned int start_tag)
 {
 	struct blk_mq_tags *tags;
 	int node;
@@ -2021,8 +2022,9 @@ struct blk_mq_tags *blk_mq_alloc_rq_map(struct blk_mq_tag_set *set,
 	if (node == NUMA_NO_NODE)
 		node = set->numa_node;
 
-	tags = blk_mq_init_tags(nr_tags, reserved_tags, node,
-				BLK_MQ_FLAG_TO_ALLOC_POLICY(set->flags));
+	tags = blk_mq_init_tags(set, nr_tags, reserved_tags, node,
+				BLK_MQ_FLAG_TO_ALLOC_POLICY(set->flags),
+				start_tag);
 	if (!tags)
 		return NULL;
 
@@ -2073,6 +2075,9 @@ int blk_mq_alloc_rqs(struct blk_mq_tag_set *set, struct blk_mq_tags *tags,
 	unsigned int i, j, entries_per_page, max_order = 4;
 	size_t rq_size, left;
 	int node;
+
+	if (tags->host_wide && !hctx_idx)
+		depth += set->__host_queue_depth - set->nr_hw_queues * set->queue_depth;
 
 	node = blk_mq_hw_queue_to_node(set->mq_map, hctx_idx);
 	if (node == NUMA_NO_NODE)
@@ -2323,12 +2328,25 @@ static void blk_mq_init_cpu_queues(struct request_queue *q,
 static bool __blk_mq_alloc_rq_map(struct blk_mq_tag_set *set, int hctx_idx)
 {
 	int ret = 0;
+	unsigned int queue_depth = set->queue_depth;
+	unsigned int extra, start_tag = 0;
 
-	set->tags[hctx_idx] = blk_mq_alloc_rq_map(set, hctx_idx,
-					set->queue_depth, set->reserved_tags);
+	if (set->flags & BLK_MQ_F_HOST_TAGS) {
+		extra = set->__host_queue_depth - set->nr_hw_queues * queue_depth;
+		/* Assign extra tags to hw queue 0 */
+		if (hctx_idx == 0)
+			queue_depth += extra;
+		else
+			start_tag = hctx_idx * queue_depth + extra;
+	}
+
+	set->tags[hctx_idx] = blk_mq_alloc_rq_map(set, hctx_idx, queue_depth,
+						  set->reserved_tags,
+						  start_tag);
 	if (!set->tags[hctx_idx])
 		return false;
 
+	set->tags[hctx_idx]->host_wide = !!(set->flags & BLK_MQ_F_HOST_TAGS);
 	ret = blk_mq_alloc_rqs(set, set->tags[hctx_idx], hctx_idx,
 				set->queue_depth);
 	if (!ret)
@@ -2879,6 +2897,21 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 	ret = blk_mq_update_queue_map(set);
 	if (ret)
 		goto out_free_mq_map;
+
+	/*
+	 * Divide host tags to each hw queues equally, and assign extra
+	 * tags to hw queue 0, see __blk_mq_alloc_rq_map().
+	 *
+	 * It is driver's responsility to choose a suitable 'nr_hw_queues'
+	 * for getting a good 'hw queue depth', so that enough parallelism
+	 * can be exploited from device internal view to get good performance,
+	 * for example, 32 is often fine for HDD., and 256 or a bit less is
+	 * enough for SSD.
+	 */
+	if (set->flags & BLK_MQ_F_HOST_TAGS) {
+		set->__host_queue_depth = set->queue_depth;
+		set->queue_depth = set->__host_queue_depth / set->nr_hw_queues;
+	}
 
 	ret = blk_mq_alloc_rq_maps(set);
 	if (ret)

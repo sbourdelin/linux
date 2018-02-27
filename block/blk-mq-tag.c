@@ -380,9 +380,11 @@ free_tags:
 	return NULL;
 }
 
-struct blk_mq_tags *blk_mq_init_tags(unsigned int total_tags,
+struct blk_mq_tags *blk_mq_init_tags(struct blk_mq_tag_set *set,
+				     unsigned int total_tags,
 				     unsigned int reserved_tags,
-				     int node, int alloc_policy)
+				     int node, int alloc_policy,
+				     unsigned int start_tag)
 {
 	struct blk_mq_tags *tags;
 
@@ -397,6 +399,7 @@ struct blk_mq_tags *blk_mq_init_tags(unsigned int total_tags,
 
 	tags->nr_tags = total_tags;
 	tags->nr_reserved_tags = reserved_tags;
+	tags->start_tag = start_tag;
 
 	return blk_mq_init_bitmap_tags(tags, node, alloc_policy);
 }
@@ -438,7 +441,8 @@ int blk_mq_tag_update_depth(struct blk_mq_hw_ctx *hctx,
 		if (tdepth > 16 * BLKDEV_MAX_RQ)
 			return -EINVAL;
 
-		new = blk_mq_alloc_rq_map(set, hctx->queue_num, tdepth, 0);
+		new = blk_mq_alloc_rq_map(set, hctx->queue_num, tdepth, 0,
+				tags->start_tag);
 		if (!new)
 			return -ENOMEM;
 		ret = blk_mq_alloc_rqs(set, new, hctx->queue_num, tdepth);
