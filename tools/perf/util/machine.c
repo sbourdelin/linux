@@ -1299,9 +1299,18 @@ static int machine__process_kernel_mmap_event(struct machine *machine,
 	else
 		kernel_type = DSO_TYPE_GUEST_KERNEL;
 
-	is_kernel_mmap = memcmp(event->mmap.filename,
-				machine->mmap_name,
-				strlen(machine->mmap_name) - 1) == 0;
+	/*
+	 * If machine mmap_name doesn't start with char '[', it includes
+	 * the specified kernel vmlinux name with option '-k'.  So set
+	 * is_kernel_mmap as true to create machine symbol map.
+	 */
+	if (machine->mmap_name[0] != '[')
+		is_kernel_mmap = true;
+	else
+		is_kernel_mmap = memcmp(event->mmap.filename,
+					machine->mmap_name,
+					strlen(machine->mmap_name) - 1) == 0;
+
 	if (event->mmap.filename[0] == '/' ||
 	    (!is_kernel_mmap && event->mmap.filename[0] == '[')) {
 		map = machine__findnew_module_map(machine, event->mmap.start,
