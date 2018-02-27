@@ -1328,6 +1328,7 @@ config MEMBARRIER
 config CHECKPOINT_RESTORE
 	bool "Checkpoint/restore support" if EXPERT
 	select PROC_CHILDREN
+	select PROC_PAGE_MONITOR
 	default n
 	help
 	  Enables additional kernel features in a sake of checkpoint/restore.
