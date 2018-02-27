@@ -23,6 +23,8 @@
 #define SPU_OFIFO_CTRL      0x40
 #define SPU_FIFO_WATERMARK  0x1FF
 
+static char const * const aead_alg_name[] = { "ccm(aes)", "gcm(aes)", "authenc" };
+
 /**
  * spu_sg_at_offset() - Find the scatterlist entry at a given distance from the
  * start of a scatterlist.

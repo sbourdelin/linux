@@ -26,8 +26,6 @@
 char *hash_alg_name[] = { "None", "md5", "sha1", "sha224", "sha256", "aes",
 	"sha384", "sha512", "sha3_224", "sha3_256", "sha3_384", "sha3_512" };
 
-char *aead_alg_name[] = { "ccm(aes)", "gcm(aes)", "authenc" };
-
 /* Assumes SPU-M messages are in big endian */
 void spum_dump_msg_hdr(u8 *buf, unsigned int buf_len)
 {
