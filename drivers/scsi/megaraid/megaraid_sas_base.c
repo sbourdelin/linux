@@ -3163,6 +3163,7 @@ static struct scsi_host_template megasas_template = {
 	.use_clustering = ENABLE_CLUSTERING,
 	.change_queue_depth = scsi_change_queue_depth,
 	.no_write_same = 1,
+	.host_tagset = 1,
 };
 
 /**
@@ -5918,6 +5919,8 @@ static int megasas_start_aen(struct megasas_instance *instance)
 static int megasas_io_attach(struct megasas_instance *instance)
 {
 	struct Scsi_Host *host = instance->host;
+	/* 256 tags should be high enough to saturate device */
+	int max_queues = DIV_ROUND_UP(host->can_queue, 256);
 
 	/*
 	 * Export parameters required by SCSI mid-layer
@@ -5957,6 +5960,9 @@ static int megasas_io_attach(struct megasas_instance *instance)
 	host->max_id = MEGASAS_MAX_DEV_PER_CHANNEL;
 	host->max_lun = MEGASAS_MAX_LUN;
 	host->max_cmd_len = 16;
+
+	/* per NUMA node hw queue */
+	host->nr_hw_queues = min_t(int, nr_node_ids, max_queues);
 
 	/*
 	 * Notify the mid-layer about the new controller
