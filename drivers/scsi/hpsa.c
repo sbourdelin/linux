@@ -978,6 +978,7 @@ static struct scsi_host_template hpsa_driver_template = {
 	.shost_attrs = hpsa_shost_attrs,
 	.max_sectors = 1024,
 	.no_write_same = 1,
+	.host_tagset = 1,
 };
 
 static inline u32 next_command(struct ctlr_info *h, u8 q)
@@ -5769,6 +5770,11 @@ static int hpsa_scsi_host_alloc(struct ctlr_info *h)
 static int hpsa_scsi_add_host(struct ctlr_info *h)
 {
 	int rv;
+	/* 256 tags should be high enough to saturate device */
+	int max_queues = DIV_ROUND_UP(h->scsi_host->can_queue, 256);
+
+	/* per NUMA node hw queue */
+	h->scsi_host->nr_hw_queues = min_t(int, nr_node_ids, max_queues);
 
 	rv = scsi_add_host(h->scsi_host, &h->pdev->dev);
 	if (rv) {
