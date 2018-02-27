@@ -11,6 +11,7 @@
  */
 
 #include <linux/atomic.h>
+#include <linux/ctype.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
@@ -293,12 +294,85 @@ static int charlcd_init_display(struct charlcd *lcd)
 }
 
 /*
+ * Parses a base 10 number from a string, until a non-digit number is found or
+ * until PARSE_N_MAX_SIZE digits.
+ *
+ * See kstrtoul() for the meaning of the return value.
+ * It also returns the next character in the string, i.e. the first non-digit.
+ */
+#define PARSE_N_MAX_SIZE (3)
+static unsigned long parse_n(const char *s, unsigned long *res,
+	const char **next_s)
+{
+	char tmp[PARSE_N_MAX_SIZE + 1];
+	int i;
+
+	for (i = 0; ; ++i) {
+		if (!isdigit(s[i]))
+			break;
+		if (i >= PARSE_N_MAX_SIZE)
+			return -EINVAL;
+		tmp[i] = s[i];
+	}
+
+	tmp[i] = 0;
+	*next_s = &s[i];
+	return kstrtoul(tmp, 10, res);
+}
+
+/*
+ * Parses a movement command of the form "(.*);", where the group can be
+ * any number of subcommands of the form "(x|y)[0-9]+".
+ *
+ * Returns whether the command is valid. The position arguments are
+ * only written if the parsing was successful.
+ *
+ * For instance:
+ *   - ";"          returns (<original x>, <original y>).
+ *   - "x1;"        returns (1, <original y>).
+ *   - "y2x1;"      returns (1, 2).
+ *   - "x12y34x56;" returns (56, 34).
+ *   - "x1"         fails.
+ *   - "xy12;"      fails.
+ *   - "x12yy12;"   fails.
+ */
+static bool parse_xy(const char *s, unsigned long *x, unsigned long *y)
+{
+	unsigned long new_x = *x;
+	unsigned long new_y = *y;
+	const char *next_s;
+
+	for (;;) {
+		if (!*s)
+			return false;
+
+		if (*s == ';')
+			break;
+
+		if (*s == 'x') {
+			if (parse_n(s + 1, &new_x, &next_s) != 0)
+				return false;
+			s = next_s;
+		} else if (*s == 'y') {
+			if (parse_n(s + 1, &new_y, &next_s) != 0)
+				return false;
+			s = next_s;
+		} else {
+			return false;
+		}
+	}
+
+	*x = new_x;
+	*y = new_y;
+	return true;
+}
+
+/*
  * These are the file operation function for user access to /dev/lcd
  * This function can also be called from inside the kernel, by
  * setting file and ppos to NULL.
  *
  */
-
 static inline int handle_lcd_special_code(struct charlcd *lcd)
 {
 	struct charlcd_priv *priv = to_priv(lcd);
@@ -469,24 +543,11 @@ static inline int handle_lcd_special_code(struct charlcd *lcd)
 	}
 	case 'x':	/* gotoxy : LxXXX[yYYY]; */
 	case 'y':	/* gotoxy : LyYYY[xXXX]; */
-		if (!strchr(esc, ';'))
-			break;
+		/* If the command is valid, move to the new address */
+		if (parse_xy(esc, &priv->addr.x, &priv->addr.y))
+			charlcd_gotoxy(lcd);
 
-		while (*esc) {
-			if (*esc == 'x') {
-				esc++;
-				if (kstrtoul(esc, 10, &priv->addr.x) < 0)
-					break;
-			} else if (*esc == 'y') {
-				esc++;
-				if (kstrtoul(esc, 10, &priv->addr.y) < 0)
-					break;
-			} else {
-				break;
-			}
-		}
-
-		charlcd_gotoxy(lcd);
+		/* Regardless of its validity, mark as processed */
 		processed = 1;
 		break;
 	}
