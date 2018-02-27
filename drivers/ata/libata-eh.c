@@ -1384,7 +1384,9 @@ void ata_eh_detach_dev(struct ata_device *dev)
 
 	if (ata_scsi_offline_dev(dev)) {
 		dev->flags |= ATA_DFLAG_DETACHED;
-		ap->pflags |= ATA_PFLAG_SCSI_HOTPLUG;
+		/* libsas handles the hotplug itself */
+		if (!(ap->flags & ATA_FLAG_SAS_HOST))
+			ap->pflags |= ATA_PFLAG_SCSI_HOTPLUG;
 	}
 
 	/* clear per-dev EH info */
@@ -3256,7 +3258,9 @@ static int ata_eh_revalidate_and_attach(struct ata_link *link,
 		}
 
 		spin_lock_irqsave(ap->lock, flags);
-		ap->pflags |= ATA_PFLAG_SCSI_HOTPLUG;
+		/* libsas handles the hotplug itself */
+		if (!(ap->flags & ATA_FLAG_SAS_HOST))
+			ap->pflags |= ATA_PFLAG_SCSI_HOTPLUG;
 		spin_unlock_irqrestore(ap->lock, flags);
 
 		/* new device discovered, configure xfermode */
