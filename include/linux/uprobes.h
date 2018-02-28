@@ -115,6 +115,12 @@ struct uprobes_state {
 	struct xol_area		*xol_area;
 };
 
+struct uprobe_map_info {
+	struct uprobe_map_info *next;
+	struct mm_struct *mm;
+	unsigned long vaddr;
+};
+
 extern int set_swbp(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
 extern int set_orig_insn(struct arch_uprobe *aup, struct mm_struct *mm, unsigned long vaddr);
 extern bool is_swbp_insn(uprobe_opcode_t *insn);
@@ -149,6 +155,11 @@ extern bool arch_uretprobe_is_alive(struct return_instance *ret, enum rp_check c
 extern bool arch_uprobe_ignore(struct arch_uprobe *aup, struct pt_regs *regs);
 extern void arch_uprobe_copy_ixol(struct page *page, unsigned long vaddr,
 					 void *src, unsigned long len);
+unsigned long offset_to_vaddr(struct vm_area_struct *vma, loff_t offset);
+void copy_from_page(struct page *page, unsigned long vaddr, void *dst, int len);
+void copy_to_page(struct page *page, unsigned long vaddr, const void *src, int len);
+struct uprobe_map_info *free_uprobe_map_info(struct uprobe_map_info *info);
+
 #else /* !CONFIG_UPROBES */
 struct uprobes_state {
 };
@@ -201,6 +212,18 @@ static inline void uprobe_copy_process(struct task_struct *t, unsigned long flag
 {
 }
 static inline void uprobe_clear_state(struct mm_struct *mm)
+{
+}
+unsigned long offset_to_vaddr(struct vm_area_struct *vma, loff_t offset)
+{
+}
+void copy_from_page(struct page *page, unsigned long vaddr, void *dst, int len)
+{
+}
+void copy_to_page(struct page *page, unsigned long vaddr, const void *src, int len)
+{
+}
+struct uprobe_map_info *free_uprobe_map_info(struct uprobe_map_info *info)
 {
 }
 #endif /* !CONFIG_UPROBES */
