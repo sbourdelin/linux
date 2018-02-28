@@ -2432,9 +2432,11 @@ static int afiucv_iucv_init(void)
 	af_iucv_dev->driver = &af_iucv_driver;
 	err = device_register(af_iucv_dev);
 	if (err)
-		goto out_driver;
+		goto out_iucv_dev;
 	return 0;
 
+out_iucv_dev:
+	kfree(af_iucv_dev);
 out_driver:
 	driver_unregister(&af_iucv_driver);
 out_iucv:
@@ -2495,6 +2497,7 @@ static void __exit afiucv_exit(void)
 {
 	if (pr_iucv) {
 		device_unregister(af_iucv_dev);
+		kfree(af_iucv_dev);
 		driver_unregister(&af_iucv_driver);
 		pr_iucv->iucv_unregister(&af_iucv_handler, 0);
 		symbol_put(iucv_if);
