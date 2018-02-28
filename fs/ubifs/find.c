@@ -233,7 +233,7 @@ static const struct ubifs_lprops *scan_for_dirty(struct ubifs_info *c,
 int ubifs_find_dirty_leb(struct ubifs_info *c, struct ubifs_lprops *ret_lp,
 			 int min_space, int pick_free)
 {
-	int err = 0, sum, exclude_index = pick_free == 2 ? 1 : 0;
+	int err = 0, exclude_index = pick_free == 2 ? 1 : 0;
 	const struct ubifs_lprops *lp = NULL, *idx_lp = NULL;
 	struct ubifs_lpt_heap *heap, *idx_heap;
 
@@ -285,6 +285,7 @@ int ubifs_find_dirty_leb(struct ubifs_info *c, struct ubifs_lprops *ret_lp,
 	idx_heap = &c->lpt_heap[LPROPS_DIRTY_IDX - 1];
 
 	if (idx_heap->cnt && !exclude_index) {
+		int sum;
 		idx_lp = idx_heap->arr[0];
 		sum = idx_lp->free + idx_lp->dirty;
 		/*
