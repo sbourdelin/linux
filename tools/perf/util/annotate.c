@@ -188,7 +188,13 @@ static int call__parse(struct arch *arch, struct ins_operands *ops, struct map *
 {
 	char *endptr, *tok, *name;
 
-	ops->target.addr = strtoull(ops->raw, &endptr, 16);
+	if (!strcmp(arch->name, "s390")) {
+		ops->target.addr =  0;
+		tok = strchr(ops->raw, ',');
+		if (tok)
+			ops->target.addr = strtoull(tok + 1, &endptr, 16);
+	} else
+		ops->target.addr = strtoull(ops->raw, &endptr, 16);
 
 	name = strchr(endptr, '<');
 	if (name == NULL)
