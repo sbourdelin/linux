@@ -114,6 +114,11 @@ static int steam_send_report(struct steam_device *steam,
 	return ret;
 }
 
+static inline int steam_send_report_byte(struct steam_device *steam, u8 cmd)
+{
+	return steam_send_report(steam, &cmd, 1);
+}
+
 static int steam_get_serial(struct steam_device *steam)
 {
 	/*
@@ -133,6 +138,16 @@ static int steam_get_serial(struct steam_device *steam)
 	reply[13] = 0;
 	strcpy(steam->serial_no, reply + 3);
 	return 0;
+}
+
+/*
+ * This command requests the wireless adaptor to post an event
+ * with the connection status. Useful if this driver is loaded when
+ * the controller is already connected.
+ */
+static inline int steam_request_conn_status(struct steam_device *steam)
+{
+	return steam_send_report_byte(steam, 0xb4);
 }
 
 static int steam_input_open(struct input_dev *dev)
@@ -363,6 +378,7 @@ static int steam_probe(struct hid_device *hdev,
 			goto hid_hw_open_fail;
 		}
 		hid_info(hdev, "Steam wireless receiver connected");
+		steam_request_conn_status(steam);
 	} else {
 		ret = steam_register(steam);
 		if (ret) {
