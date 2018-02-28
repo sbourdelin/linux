@@ -643,6 +643,7 @@ PAGEFLAG_FALSE(DoubleMap)
 #define PG_buddy	0x00000080
 #define PG_balloon	0x00000100
 #define PG_kmemcg	0x00000200
+#define PG_vmalloc	0x00000400
 
 #define PageType(page, flag)						\
 	((page->page_type & (PAGE_TYPE_BASE | flag)) == PAGE_TYPE_BASE)
@@ -680,6 +681,11 @@ PAGE_TYPE_OPS(Balloon, balloon)
  * pages allocated with __GFP_ACCOUNT. It gets cleared on page free.
  */
 PAGE_TYPE_OPS(Kmemcg, kmemcg)
+
+/*
+ * Pages allocated through vmalloc are tagged with this bit.
+ */
+PAGE_TYPE_OPS(Vmalloc, vmalloc)
 
 extern bool is_free_buddy_page(struct page *page);
 
