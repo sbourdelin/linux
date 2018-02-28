@@ -25,6 +25,7 @@
 #include <linux/namei.h>
 #include <linux/string.h>
 #include <linux/rculist.h>
+#include <linux/sched/mm.h>
 
 #include "trace_probe.h"
 
@@ -58,6 +59,7 @@ struct trace_uprobe {
 	struct inode			*inode;
 	char				*filename;
 	unsigned long			offset;
+	unsigned long			sdt_offset; /* sdt semaphore offset */
 	unsigned long			nhit;
 	struct trace_probe		tp;
 };
@@ -502,6 +504,16 @@ static int create_trace_uprobe(int argc, char **argv)
 	for (i = 0; i < argc && i < MAX_TRACE_ARGS; i++) {
 		struct probe_arg *parg = &tu->tp.args[i];
 
+		/* This is not really an argument. */
+		if (argv[i][0] == '*') {
+			ret = kstrtoul(&(argv[i][1]), 0, &tu->sdt_offset);
+			if (ret) {
+				pr_info("Invalid semaphore address.\n");
+				goto error;
+			}
+			continue;
+		}
+
 		/* Increment count for freeing args in error case */
 		tu->tp.nr_args++;
 
@@ -894,6 +906,131 @@ print_uprobe_event(struct trace_iterator *iter, int flags, struct trace_event *e
 	return trace_handle_return(s);
 }
 
+static bool sdt_valid_vma(struct trace_uprobe *tu, struct vm_area_struct *vma)
+{
+	unsigned long vaddr = offset_to_vaddr(vma, tu->sdt_offset);
+
+	return tu->sdt_offset &&
+		vma->vm_file &&
+		file_inode(vma->vm_file) == tu->inode &&
+		vma->vm_flags & VM_WRITE &&
+		vma->vm_start <= vaddr &&
+		vma->vm_end > vaddr;
+}
+
+static struct vm_area_struct *
+sdt_find_vma(struct mm_struct *mm, struct trace_uprobe *tu)
+{
+	struct vm_area_struct *tmp;
+
+	for (tmp = mm->mmap; tmp != NULL; tmp = tmp->vm_next)
+		if (sdt_valid_vma(tu, tmp))
+			return tmp;
+
+	return NULL;
+}
+
+static int
+sdt_update_sem(struct mm_struct *mm, unsigned long vaddr, short val)
+{
+	struct page *page;
+	struct vm_area_struct *vma;
+	int ret = 0;
+	unsigned short orig = 0;
+
+	if (vaddr == 0)
+		return -EINVAL;
+
+	ret = get_user_pages_remote(NULL, mm, vaddr, 1,
+		FOLL_FORCE | FOLL_WRITE, &page, &vma, NULL);
+	if (ret <= 0)
+		return ret;
+
+	copy_from_page(page, vaddr, &orig, sizeof(orig));
+	orig += val;
+	copy_to_page(page, vaddr, &orig, sizeof(orig));
+	put_page(page);
+	return 0;
+}
+
+/*
+ * TODO: Adding this defination in include/linux/uprobes.h throws
+ * warnings about address_sapce. Adding it here for the time being.
+ */
+struct uprobe_map_info *build_uprobe_map_info(struct address_space *mapping, loff_t offset, bool is_register);
+
+static void sdt_increment_sem(struct trace_uprobe *tu)
+{
+	struct uprobe_map_info *info;
+	struct vm_area_struct *vma;
+	unsigned long vaddr;
+
+	uprobe_start_dup_mmap();
+	info = build_uprobe_map_info(tu->inode->i_mapping, tu->sdt_offset, false);
+	if (IS_ERR(info))
+		goto out;
+
+	while (info) {
+		down_write(&info->mm->mmap_sem);
+		vma = sdt_find_vma(info->mm, tu);
+		if (!vma)
+			goto cont;
+
+		vaddr = offset_to_vaddr(vma, tu->sdt_offset);
+		sdt_update_sem(info->mm, vaddr, 1);
+
+cont:
+		up_write(&info->mm->mmap_sem);
+		mmput(info->mm);
+		info = free_uprobe_map_info(info);
+	}
+
+out:
+	uprobe_end_dup_mmap();
+}
+
+/* Called with down_write(&vma->vm_mm->mmap_sem) */
+void trace_uprobe_mmap_callback(struct vm_area_struct *vma)
+{
+	struct trace_uprobe *tu;
+	unsigned long vaddr;
+
+	mutex_lock(&uprobe_lock);
+	list_for_each_entry(tu, &uprobe_list, list) {
+		if (!sdt_valid_vma(tu, vma) ||
+		    !trace_probe_is_enabled(&tu->tp))
+			continue;
+
+		vaddr = offset_to_vaddr(vma, tu->sdt_offset);
+		sdt_update_sem(vma->vm_mm, vaddr, 1);
+	}
+	mutex_unlock(&uprobe_lock);
+}
+
+static void sdt_decrement_sem(struct trace_uprobe *tu)
+{
+	struct vm_area_struct *vma;
+	unsigned long vaddr;
+	struct uprobe_map_info *info;
+
+	info = build_uprobe_map_info(tu->inode->i_mapping, tu->sdt_offset, false);
+	if (IS_ERR(info))
+		return;
+
+	while (info) {
+		down_write(&info->mm->mmap_sem);
+		vma = sdt_find_vma(info->mm, tu);
+		if (vma) {
+			vaddr = offset_to_vaddr(vma, tu->sdt_offset);
+			sdt_update_sem(info->mm, vaddr, -1);
+		}
+		up_write(&info->mm->mmap_sem);
+
+		mmput(info->mm);
+		info = free_uprobe_map_info(info);
+	}
+}
+
 typedef bool (*filter_func_t)(struct uprobe_consumer *self,
 				enum uprobe_filter_ctx ctx,
 				struct mm_struct *mm);
@@ -939,6 +1076,9 @@ probe_event_enable(struct trace_uprobe *tu, struct trace_event_file *file,
 	if (ret)
 		goto err_buffer;
 
+	if (tu->sdt_offset)
+		sdt_increment_sem(tu);
+
 	return 0;
 
  err_buffer:
@@ -978,6 +1118,9 @@ probe_event_disable(struct trace_uprobe *tu, struct trace_event_file *file)
 	}
 
 	WARN_ON(!uprobe_filter_is_empty(&tu->filter));
+
+	if (tu->sdt_offset)
+		sdt_decrement_sem(tu);
 
 	uprobe_unregister(tu->inode, tu->offset, &tu->consumer);
 	tu->tp.flags &= file ? ~TP_FLAG_TRACE : ~TP_FLAG_PROFILE;
@@ -1423,6 +1566,8 @@ static __init int init_uprobe_trace(void)
 	/* Profile interface */
 	trace_create_file("uprobe_profile", 0444, d_tracer,
 				    NULL, &uprobe_profile_ops);
+
+	uprobe_mmap_callback = trace_uprobe_mmap_callback;
 	return 0;
 }
 

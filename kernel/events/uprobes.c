@@ -1051,6 +1051,8 @@ static void build_probe_list(struct inode *inode,
 	spin_unlock(&uprobes_treelock);
 }
 
+void (*uprobe_mmap_callback)(struct vm_area_struct *vma) = NULL;
+
 /*
  * Called from mmap_region/vma_adjust with mm->mmap_sem acquired.
  *
@@ -1062,6 +1064,9 @@ int uprobe_mmap(struct vm_area_struct *vma)
 	struct list_head tmp_list;
 	struct uprobe *uprobe, *u;
 	struct inode *inode;
+
+	if (vma->vm_flags & VM_WRITE && uprobe_mmap_callback)
+		uprobe_mmap_callback(vma);
 
 	if (no_uprobe_events() || !valid_vma(vma, true))
 		return 0;
