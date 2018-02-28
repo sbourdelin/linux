@@ -89,6 +89,7 @@ struct flash_info {
 #define NO_CHIP_ERASE		BIT(12) /* Chip does not support chip erase */
 #define SPI_NOR_SKIP_SFDP	BIT(13)	/* Skip parsing of SFDP tables */
 #define USE_CLSR		BIT(14)	/* use CLSR command */
+#define SPI_DATAFLASH		BIT(15) /* Atmel Dataflash memory */
 
 	int	(*quad_enable)(struct spi_nor *nor);
 };
@@ -306,6 +307,20 @@ static int s3an_sr_ready(struct spi_nor *nor)
 	return !!(val & XSR_RDY);
 }
 
+static int dataflash_sr_ready(struct spi_nor *nor)
+{
+	int ret;
+	u8 val;
+
+	ret = nor->read_reg(nor, SPINOR_OP_DFRDSR, &val, 1);
+	if (ret < 0) {
+		dev_err(nor->dev, "error %d reading DFSR\n", ret);
+		return ret;
+	}
+
+	return !!(val & DFSR_RDY);
+}
+
 static inline int spi_nor_sr_ready(struct spi_nor *nor)
 {
 	int sr = read_sr(nor);
@@ -354,6 +369,8 @@ static int spi_nor_ready(struct spi_nor *nor)
 
 	if (nor->flags & SNOR_F_READY_XSR_RDY)
 		sr = s3an_sr_ready(nor);
+	else if (nor->flags & SPI_DATAFLASH)
+		sr = dataflash_sr_ready(nor);
 	else
 		sr = spi_nor_sr_ready(nor);
 	if (sr < 0)
@@ -457,6 +474,44 @@ static loff_t spi_nor_s3an_addr_convert(struct spi_nor *nor, unsigned int addr)
 	return page | offset;
 }
 
+static loff_t spi_nor_dataflash_addr_convert(struct spi_nor *nor,
+					     unsigned int addr)
+{
+	unsigned int offset;
+	unsigned int page;
+	unsigned int page_offset;
+
+	page = addr / nor->page_size;
+	offset = addr % nor->page_size;
+	page_offset = fls(nor->page_size);
+	if (is_power_of_2(nor->page_size))
+		page_offset--;
+
+	return (page << page_offset) | offset;
+}
+
+static int spi_nor_dataflash_erase_sector(struct spi_nor *nor, u32 addr)
+{
+	u32 block_size = 8 * nor->page_size;
+	u32 blocks = nor->mtd.erasesize / block_size;
+	u32 addr_local;
+	u8 buf[SPI_NOR_MAX_ADDR_WIDTH];
+	int i, j;
+
+	for (j = 0; j < blocks; j++) {
+		addr_local = spi_nor_dataflash_addr_convert(nor, addr);
+		for (i = nor->addr_width - 1; i >= 0; i--) {
+			buf[i] = addr_local & 0xff;
+			addr_local >>= 8;
+		}
+		nor->write_reg(nor, nor->erase_opcode, buf, nor->addr_width);
+		addr += block_size;
+		spi_nor_wait_till_ready(nor);
+	}
+
+	return 0;
+}
+
 /*
  * Initiate the erasure of a single sector
  */
@@ -542,7 +597,11 @@ static int spi_nor_erase(struct mtd_info *mtd, struct erase_info *instr)
 		while (len) {
 			write_enable(nor);
 
-			ret = spi_nor_erase_sector(nor, addr);
+			if (nor->flags & SPI_DATAFLASH)
+				ret = spi_nor_dataflash_erase_sector(nor, addr);
+			else
+				ret = spi_nor_erase_sector(nor, addr);
+
 			if (ret)
 				goto erase_err;
 
@@ -914,6 +973,20 @@ static int macronix_quad_enable(struct spi_nor *nor);
 		.page_size = 256,					\
 		.flags = (_flags),
 
+#define INFOP(_jedec_id, _ext_id, _sector_size, _n_sectors, _page_size, _flags)	\
+		.id = {							\
+			((_jedec_id) >> 16) & 0xff,			\
+			((_jedec_id) >> 8) & 0xff,			\
+			(_jedec_id) & 0xff,				\
+			((_ext_id) >> 8) & 0xff,			\
+			(_ext_id) & 0xff,				\
+			},						\
+		.id_len = (!(_jedec_id) ? 0 : (3 + ((_ext_id) ? 2 : 0))),	\
+		.sector_size = (_sector_size),				\
+		.n_sectors = (_n_sectors),				\
+		.page_size = _page_size,				\
+		.flags = (_flags),
+
 #define INFO6(_jedec_id, _ext_id, _sector_size, _n_sectors, _flags)	\
 		.id = {							\
 			((_jedec_id) >> 16) & 0xff,			\
@@ -975,7 +1048,14 @@ static const struct flash_info spi_nor_ids[] = {
 	{ "at26df161a", INFO(0x1f4601, 0, 64 * 1024, 32, SECT_4K) },
 	{ "at26df321",  INFO(0x1f4700, 0, 64 * 1024, 64, SECT_4K) },
 
-	{ "at45db081d", INFO(0x1f2500, 0, 64 * 1024, 16, SECT_4K) },
+	{ "at45db021d", INFOP(0x1f2300, 0, 512 * 264,  2, 264, SPI_DATAFLASH | NO_CHIP_ERASE) },
+	{ "at45db041d", INFOP(0x1f2400, 0, 256 * 264,  8, 264, SPI_DATAFLASH | NO_CHIP_ERASE) },
+	{ "at45db081d", INFOP(0x1f2500, 0, 256 * 264, 16, 264, SPI_DATAFLASH | NO_CHIP_ERASE) },
+	{ "at45db161d", INFOP(0x1f2600, 0, 256 * 528, 16, 528, SPI_DATAFLASH | NO_CHIP_ERASE) },
+	{ "at45db321d", INFOP(0x1f2700, 0, 128 * 528, 64, 528, SPI_DATAFLASH | NO_CHIP_ERASE) },
+	{ "at45db321d", INFOP(0x1f2701, 0, 128 * 528, 64, 528, SPI_DATAFLASH | NO_CHIP_ERASE) },
+	{ "at45db642d", INFOP(0x1f2800, 0, 256 * 1056, 32, 1056, SPI_DATAFLASH | NO_CHIP_ERASE) },
+	{ "at45db641e", INFOP(0x1f2800, 0x0100, 1024 * 264, 32, 264, SPI_DATAFLASH | NO_CHIP_ERASE) },
 
 	/* EON -- en25xxx */
 	{ "en25f32",    INFO(0x1c3116, 0, 64 * 1024,   64, SECT_4K) },
@@ -1278,6 +1358,9 @@ static int spi_nor_read(struct mtd_info *mtd, loff_t from, size_t len,
 		if (nor->flags & SNOR_F_S3AN_ADDR_DEFAULT)
 			addr = spi_nor_s3an_addr_convert(nor, addr);
 
+		if (nor->flags & SPI_DATAFLASH)
+			addr = spi_nor_dataflash_addr_convert(nor, addr);
+
 		ret = nor->read(nor, addr, len, buf);
 		if (ret == 0) {
 			/* We shouldn't see 0-length reads */
@@ -1379,6 +1462,21 @@ sst_write_err:
 	return ret;
 }
 
+static int dataflash_memtobuf(struct spi_nor *nor, u32 addr)
+{
+	u8 buf[SPI_NOR_MAX_ADDR_WIDTH];
+	int i;
+
+	addr = spi_nor_dataflash_addr_convert(nor, addr);
+
+	for (i = nor->addr_width - 1; i >= 0; i--) {
+		buf[i] = addr & 0xff;
+		addr >>= 8;
+	}
+
+	return nor->write_reg(nor, SPINOR_OP_DFMTB, buf, nor->addr_width);
+}
+
 /*
  * Write an address range to the nor chip.  Data must be written in
  * FLASH_PAGESIZE chunks.  The address range may be any size provided
@@ -1420,8 +1518,16 @@ static int spi_nor_write(struct mtd_info *mtd, loff_t to, size_t len,
 		page_remain = min_t(size_t,
 				    nor->page_size - page_offset, len - i);
 
+		if (nor->flags & SPI_DATAFLASH) {
+			dataflash_memtobuf(nor, addr);
+			spi_nor_wait_till_ready(nor);
+		}
+
 		if (nor->flags & SNOR_F_S3AN_ADDR_DEFAULT)
 			addr = spi_nor_s3an_addr_convert(nor, addr);
+
+		if (nor->flags & SPI_DATAFLASH)
+			addr = spi_nor_dataflash_addr_convert(nor, addr);
 
 		write_enable(nor);
 		ret = nor->write(nor, addr, page_remain, buf + i);
@@ -1738,6 +1844,37 @@ static int s3an_nor_scan(const struct flash_info *info, struct spi_nor *nor)
 		/* Flash in Default addressing mode */
 		nor->flags |= SNOR_F_S3AN_ADDR_DEFAULT;
 	}
+
+	return 0;
+}
+
+static int dataflash_nor_scan(const struct flash_info *info,
+			      struct spi_nor *nor)
+{
+	int ret;
+	u8 val;
+
+	ret = nor->read_reg(nor, SPINOR_OP_DFRDSR, &val, 1);
+	if (ret < 0) {
+		dev_err(nor->dev, "error reading status register\n");
+		return ret;
+	}
+
+	nor->erase_opcode = SPINOR_OP_DFBE_8k;
+	nor->program_opcode = SPINOR_OP_DFBTOM;
+	nor->read_opcode = SPINOR_OP_DFRD;
+	nor->flags |= SNOR_F_NO_OP_CHIP_ERASE;
+
+	if (val & DFSR_PAGESIZE) {
+		/* Flash in Power of 2 mode */
+		nor->mtd.erasesize = nor->mtd.erasesize / nor->page_size *
+		(1 << (fls(nor->page_size) - 1));
+		nor->mtd.size = nor->mtd.erasesize * info->n_sectors;
+		nor->page_size = 1 << (fls(nor->page_size) - 1);
+		nor->mtd.writebufsize = nor->page_size;
+	}
+
+	nor->read_dummy = 32;
 
 	return 0;
 }
@@ -2818,6 +2955,9 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
 	if (info->flags & SPI_S3AN)
 		nor->flags |=  SNOR_F_READY_XSR_RDY;
 
+	if (info->flags & SPI_DATAFLASH)
+		nor->flags |= SPI_DATAFLASH;
+
 	/* Parse the Serial Flash Discoverable Parameters table. */
 	ret = spi_nor_init_params(nor, info, &params);
 	if (ret)
@@ -2918,6 +3058,12 @@ int spi_nor_scan(struct spi_nor *nor, const char *name,
 
 	if (info->flags & SPI_S3AN) {
 		ret = s3an_nor_scan(info, nor);
+		if (ret)
+			return ret;
+	}
+
+	if (info->flags & SPI_DATAFLASH) {
+		ret = dataflash_nor_scan(info, nor);
 		if (ret)
 			return ret;
 	}

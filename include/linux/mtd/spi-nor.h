@@ -91,6 +91,16 @@
 #define SPINOR_OP_WRDI		0x04	/* Write disable */
 #define SPINOR_OP_AAI_WP	0xad	/* Auto address increment word program */
 
+/* Used for Atmel Dataflashes only. */
+#define SPINOR_OP_DFRDSR	0xd7
+#define SPINOR_OP_DFBE_8k	0x50
+#define SPINOR_OP_DFMTB		0x53
+#define SPINOR_OP_DFBTOM	0x82
+#define SPINOR_OP_DFRD		0xe8
+
+#define DFSR_PAGESIZE		BIT(0)	/* Page size in Po2 or Linear */
+#define DFSR_RDY		BIT(7)	/* Ready */
+
 /* Used for S3AN flashes only */
 #define SPINOR_OP_XSE		0x50	/* Sector erase */
 #define SPINOR_OP_XPP		0x82	/* Page program */
