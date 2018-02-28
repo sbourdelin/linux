@@ -95,9 +95,14 @@ static int synic_set_sint(struct kvm_vcpu_hv_synic *synic, int sint,
 			  u64 data, bool host)
 {
 	int vector, old_vector;
+	bool masked, polling;
 
 	vector = data & HV_SYNIC_SINT_VECTOR_MASK;
-	if (vector < HV_SYNIC_FIRST_VALID_VECTOR && !host)
+	masked = data & HV_SYNIC_SINT_MASKED;
+	polling = data & HV_SYNIC_SINT_POLLING;
+
+	if (vector < HV_SYNIC_FIRST_VALID_VECTOR &&
+	    !host && !masked && !polling)
 		return 1;
 	/*
 	 * Guest may configure multiple SINTs to use the same vector, so
