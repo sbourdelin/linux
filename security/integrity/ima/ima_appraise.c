@@ -276,13 +276,25 @@ int ima_appraise_measurement(enum ima_hooks func,
 					     (const char *)xattr_value, rc,
 					     iint->ima_hash->digest,
 					     iint->ima_hash->length);
-		if (rc == -EOPNOTSUPP) {
-			status = INTEGRITY_UNKNOWN;
-		} else if (rc) {
+		if (rc) {
+			if (rc == -EOPNOTSUPP) {
+				status = INTEGRITY_UNKNOWN;
+				break;
+			}
+			if (func == KEXEC_KERNEL_CHECK) {
+				rc = integrity_digsig_verify(
+						INTEGRITY_KEYRING_PLATFORM,
+						(const char *)xattr_value,
+						xattr_len,
+						iint->ima_hash->digest,
+						iint->ima_hash->length);
+				if (!rc) {
+					status = INTEGRITY_PASS;
+					break;
+				}
+			}
 			cause = "invalid-signature";
 			status = INTEGRITY_FAIL;
-		} else {
-			status = INTEGRITY_PASS;
 		}
 		break;
 	default:

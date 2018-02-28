@@ -136,12 +136,22 @@ int integrity_kernel_read(struct file *file, loff_t offset,
 #define INTEGRITY_KEYRING_EVM		0
 #define INTEGRITY_KEYRING_IMA		1
 #define INTEGRITY_KEYRING_MODULE	2
-#define INTEGRITY_KEYRING_MAX		3
+#define INTEGRITY_KEYRING_PLATFORM	3
+#define INTEGRITY_KEYRING_MAX		4
 
 #ifdef CONFIG_INTEGRITY_SIGNATURE
 
 int integrity_digsig_verify(const unsigned int id, const char *sig, int siglen,
 			    const char *digest, int digestlen);
+
+#ifdef CONFIG_IMA_USE_PLATFORM_KEYRING
+int __init integrity_load_keyring(const unsigned int id);
+#else
+static inline int __init integrity_load_keyring(const unsigned int id)
+{
+	return 0;
+}
+#endif
 
 int __init integrity_init_keyring(const unsigned int id);
 int __init integrity_load_x509(const unsigned int id, const char *path);
@@ -152,6 +162,11 @@ static inline int integrity_digsig_verify(const unsigned int id,
 					  const char *digest, int digestlen)
 {
 	return -EOPNOTSUPP;
+}
+
+static inline int __init integrity_load_keyring(const unsigned int id)
+{
+	return 0;
 }
 
 static inline int integrity_init_keyring(const unsigned int id)

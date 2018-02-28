@@ -227,3 +227,13 @@ config IMA_APPRAISE_SIGNED_INIT
 	default n
 	help
 	   This option requires user-space init to be signed.
+
+config IMA_USE_PLATFORM_KEYRING
+       bool "IMA uses keys from Platform Keyring for verification"
+       depends on PLATFORM_KEYRING
+       depends on IMA_APPRAISE
+       depends on INTEGRITY_ASYMMETRIC_KEYS
+       default n
+       help
+	  This option enables IMA appraisal to look for the platform
+	  trusted keys in .platform_keys keyring.

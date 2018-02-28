@@ -35,6 +35,8 @@ static const char *keyring_name[INTEGRITY_KEYRING_MAX] = {
 	".ima",
 #endif
 	"_module",
+	".platform_keys",
+
 };
 
 #ifdef CONFIG_INTEGRITY_TRUSTED_KEYRING
@@ -78,6 +80,19 @@ int integrity_digsig_verify(const unsigned int id, const char *sig, int siglen,
 
 	return -EOPNOTSUPP;
 }
+
+#ifdef CONFIG_IMA_USE_PLATFORM_KEYRING
+int __init integrity_load_keyring(const unsigned int id)
+{
+
+	keyring[id] = find_keyring_by_name(keyring_name[id], 0);
+	if (IS_ERR(keyring[id]))
+		if (PTR_ERR(keyring[id]) != -ENOKEY)
+			return PTR_ERR(keyring[id]);
+	return 0;
+
+}
+#endif
 
 int __init integrity_init_keyring(const unsigned int id)
 {

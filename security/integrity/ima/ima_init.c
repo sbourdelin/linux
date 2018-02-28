@@ -122,6 +122,10 @@ int __init ima_init(void)
 	if (rc)
 		return rc;
 
+	rc = integrity_load_keyring(INTEGRITY_KEYRING_PLATFORM);
+	if (rc)
+		pr_info("Platform keyring is not found. (rc=%d)\n", rc);
+
 	rc = ima_init_crypto();
 	if (rc)
 		return rc;
