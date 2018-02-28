@@ -138,7 +138,7 @@ static struct irqaction irq0 = {
 	.name = "MFT2",
 };
 
-void read_persistent_clock(struct timespec *ts)
+void read_persistent_clock64(struct timespec64 *ts)
 {
 	unsigned int epoch, year, mon, day, hour, min, sec;
 
@@ -158,7 +158,7 @@ void read_persistent_clock(struct timespec *ts)
 		epoch = 1952;
 	year += epoch;
 
-	ts->tv_sec = mktime(year, mon, day, hour, min, sec);
+	ts->tv_sec = mktime64(year, mon, day, hour, min, sec);
 	ts->tv_nsec = (INITIAL_JIFFIES % HZ) * (NSEC_PER_SEC / HZ);
 }
 
