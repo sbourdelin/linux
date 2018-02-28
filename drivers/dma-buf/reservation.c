@@ -74,12 +74,9 @@ int reservation_object_reserve_shared(struct reservation_object *obj)
 	old = reservation_object_get_list(obj);
 
 	if (old && old->shared_max) {
-		if (old->shared_count < old->shared_max) {
-			/* perform an in-place update */
-			kfree(obj->staged);
-			obj->staged = NULL;
+		if (old->shared_count < old->shared_max)
 			return 0;
-		} else
+		else
 			max = old->shared_max * 2;
 	} else
 		max = 4;
