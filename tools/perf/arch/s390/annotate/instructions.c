@@ -12,8 +12,7 @@ static struct ins_ops *s390__associate_ins_ops(struct arch *arch, const char *na
 		ops = &jump_ops;
 	/* override call/returns */
 	if (!strcmp(name, "bras") ||
-	    !strcmp(name, "brasl") ||
-	    !strcmp(name, "basr"))
+	    !strcmp(name, "brasl"))
 		ops = &call_ops;
 	if (!strcmp(name, "br"))
 		ops = &ret_ops;
