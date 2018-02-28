@@ -644,6 +644,7 @@ PAGEFLAG_FALSE(DoubleMap)
 #define PG_balloon	0x00000100
 #define PG_kmemcg	0x00000200
 #define PG_vmalloc	0x00000400
+#define PG_table	0x00000800
 
 #define PageType(page, flag)						\
 	((page->page_type & (PAGE_TYPE_BASE | flag)) == PAGE_TYPE_BASE)
@@ -686,6 +687,11 @@ PAGE_TYPE_OPS(Kmemcg, kmemcg)
  * Pages allocated through vmalloc are tagged with this bit.
  */
 PAGE_TYPE_OPS(Vmalloc, vmalloc)
+
+/*
+ * Marks pages in use as page tables.
+ */
+PAGE_TYPE_OPS(Table, table)
 
 extern bool is_free_buddy_page(struct page *page);
 
