@@ -187,6 +187,10 @@ int sun4i_rgb_init(struct drm_device *drm, struct sun4i_tcon *tcon)
 		return 0;
 	}
 
+	/* Init min and max clock divisor according to RGB encoder */
+	tcon->dclk_min_div = 6;
+	tcon->dclk_max_div = 127;
+
 	drm_encoder_helper_add(&rgb->encoder,
 			       &sun4i_rgb_enc_helper_funcs);
 	ret = drm_encoder_init(drm,

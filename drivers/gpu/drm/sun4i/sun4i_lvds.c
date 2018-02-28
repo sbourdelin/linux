@@ -123,6 +123,10 @@ int sun4i_lvds_init(struct drm_device *drm, struct sun4i_tcon *tcon)
 		return 0;
 	}
 
+	/* Init min and max clock divisor according to LVDS encoder */
+	tcon->dclk_min_div = 7;
+	tcon->dclk_max_div = 7;
+
 	drm_encoder_helper_add(&lvds->encoder,
 			       &sun4i_lvds_enc_helper_funcs);
 	ret = drm_encoder_init(drm,
