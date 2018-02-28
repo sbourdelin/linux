@@ -158,7 +158,6 @@ static void tree_nodes_free(struct rb_root *root,
 static unsigned int
 count_tree(struct net *net, struct rb_root *root,
 	   const u32 *key, u8 keylen,
-	   u8 family,
 	   const struct nf_conntrack_tuple *tuple,
 	   const struct nf_conntrack_zone *zone)
 {
@@ -246,7 +245,6 @@ count_tree(struct net *net, struct rb_root *root,
 unsigned int nf_conncount_count(struct net *net,
 				struct nf_conncount_data *data,
 				const u32 *key,
-				unsigned int family,
 				const struct nf_conntrack_tuple *tuple,
 				const struct nf_conntrack_zone *zone)
 {
@@ -259,7 +257,7 @@ unsigned int nf_conncount_count(struct net *net,
 
 	spin_lock_bh(&nf_conncount_locks[hash % CONNCOUNT_LOCK_SLOTS]);
 
-	count = count_tree(net, root, key, data->keylen, family, tuple, zone);
+	count = count_tree(net, root, key, data->keylen, tuple, zone);
 
 	spin_unlock_bh(&nf_conncount_locks[hash % CONNCOUNT_LOCK_SLOTS]);
 
@@ -267,11 +265,11 @@ unsigned int nf_conncount_count(struct net *net,
 }
 EXPORT_SYMBOL_GPL(nf_conncount_count);
 
-struct nf_conncount_data *nf_conncount_init(struct net *net, unsigned int family,
+struct nf_conncount_data *nf_conncount_init(struct net *net,
 					    unsigned int keylen)
 {
 	struct nf_conncount_data *data;
-	int ret, i;
+	int i;
 
 	if (keylen % sizeof(u32) ||
 	    keylen / sizeof(u32) > MAX_KEYLEN ||
@@ -283,12 +281,6 @@ struct nf_conncount_data *nf_conncount_init(struct net *net, unsigned int family
 	data = kmalloc(sizeof(*data), GFP_KERNEL);
 	if (!data)
 		return ERR_PTR(-ENOMEM);
-
-	ret = nf_ct_netns_get(net, family);
-	if (ret < 0) {
-		kfree(data);
-		return ERR_PTR(ret);
-	}
 
 	for (i = 0; i < ARRAY_SIZE(data->root); ++i)
 		data->root[i] = RB_ROOT;
@@ -318,12 +310,9 @@ static void destroy_tree(struct rb_root *r)
 	}
 }
 
-void nf_conncount_destroy(struct net *net, unsigned int family,
-			  struct nf_conncount_data *data)
+void nf_conncount_destroy(struct nf_conncount_data *data)
 {
 	unsigned int i;
-
-	nf_ct_netns_put(net, family);
 
 	for (i = 0; i < ARRAY_SIZE(data->root); ++i)
 		destroy_tree(&data->root[i]);
