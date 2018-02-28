@@ -128,7 +128,6 @@ enum g762_regs {
 			 G762_REG_FAN_CMD2_GEAR_MODE_1)) >> 2))
 
 struct g762_data {
-	struct device *hwmon_dev;
 	struct i2c_client *client;
 	struct clk *clk;
 
@@ -1051,9 +1050,17 @@ static inline int g762_fan_init(struct device *dev)
 					 data->fan_cmd1);
 }
 
+static void g762_remove(void *data)
+{
+	struct g762_data *g762 = data;
+	struct i2c_client *client = g762->client;
+
+	g762_of_clock_disable(client);
+}
 static int g762_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct device *dev = &client->dev;
+	struct device *hwmon_dev;
 	struct g762_data *data;
 	int ret;
 
@@ -1086,10 +1093,12 @@ static int g762_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	if (ret)
 		goto clock_dis;
 
-	data->hwmon_dev = hwmon_device_register_with_groups(dev, client->name,
-							    data, g762_groups);
-	if (IS_ERR(data->hwmon_dev)) {
-		ret = PTR_ERR(data->hwmon_dev);
+	devm_add_action(dev, g762_remove, data);
+
+	hwmon_dev = devm_hwmon_device_register_with_groups(dev, client->name,
+							   data, g762_groups);
+	if (IS_ERR(hwmon_dev)) {
+		ret = PTR_ERR(hwmon_dev);
 		goto clock_dis;
 	}
 
@@ -1101,23 +1110,12 @@ static int g762_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	return ret;
 }
 
-static int g762_remove(struct i2c_client *client)
-{
-	struct g762_data *data = i2c_get_clientdata(client);
-
-	hwmon_device_unregister(data->hwmon_dev);
-	g762_of_clock_disable(client);
-
-	return 0;
-}
-
 static struct i2c_driver g762_driver = {
 	.driver = {
 		.name = DRVNAME,
 		.of_match_table = of_match_ptr(g762_dt_match),
 	},
 	.probe	  = g762_probe,
-	.remove	  = g762_remove,
 	.id_table = g762_id,
 };
 
