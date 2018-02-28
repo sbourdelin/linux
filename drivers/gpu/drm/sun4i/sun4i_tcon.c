@@ -277,7 +277,7 @@ static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
 	u32 reg, val = 0;
 
 	tcon->dclk_min_div = 7;
-	tcon->dclk_max_div = 7;
+	tcon->dclk_max_div = 18;
 	sun4i_tcon0_mode_set_common(tcon, mode);
 
 	/* Adjust clock delay */
