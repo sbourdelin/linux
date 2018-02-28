@@ -49,6 +49,7 @@ int tsc_clocksource_reliable;
 
 static u32 art_to_tsc_numerator;
 static u32 art_to_tsc_denominator;
+static u32 art_to_tsc_hz;
 static u64 art_to_tsc_offset;
 struct clocksource *art_related_clocksource;
 
@@ -976,7 +977,7 @@ core_initcall(cpufreq_register_tsc_scaling);
  */
 static void __init detect_art(void)
 {
-	unsigned int unused[2];
+	unsigned int unused;
 
 	if (boot_cpu_data.cpuid_level < ART_CPUID_LEAF)
 		return;
@@ -992,7 +993,7 @@ static void __init detect_art(void)
 		return;
 
 	cpuid(ART_CPUID_LEAF, &art_to_tsc_denominator,
-	      &art_to_tsc_numerator, unused, unused+1);
+	      &art_to_tsc_numerator, &art_to_tsc_hz, &unused);
 
 	if (art_to_tsc_denominator < ART_MIN_DENOMINATOR)
 		return;
@@ -1001,6 +1002,15 @@ static void __init detect_art(void)
 
 	/* Make this sticky over multiple CPU init calls */
 	setup_force_cpu_cap(X86_FEATURE_ART);
+
+	if (art_to_tsc_hz == 0) {
+		if (boot_cpu_data.x86_model == INTEL_FAM6_ATOM_GOLDMONT)
+			art_to_tsc_hz = 19200000;
+		else
+			return;
+	}
+
+	setup_force_cpu_cap(X86_FEATURE_ART_NS);
 }
 
 
@@ -1178,6 +1188,27 @@ struct system_counterval_t convert_art_to_tsc(u64 art)
 			.cycles = res};
 }
 EXPORT_SYMBOL(convert_art_to_tsc);
+
+#define ART_NS_QUANTITY	1000000000
+
+/*
+ * Convert ART ns to TSC given numerator/denominator found in detect_art()
+ */
+struct system_counterval_t convert_art_ns_to_tsc(u64 art_ns)
+{
+	u64 tmp, rem, res, art;
+
+	rem = do_div(art_ns, ART_NS_QUANTITY);
+
+	res = art_ns * art_to_tsc_hz;
+	tmp = rem * art_to_tsc_hz;
+
+	do_div(tmp, ART_NS_QUANTITY);
+	art = res + tmp;
+
+	return convert_art_to_tsc(art);
+}
+EXPORT_SYMBOL(convert_art_ns_to_tsc);
 
 static void tsc_refine_calibration_work(struct work_struct *work);
 static DECLARE_DELAYED_WORK(tsc_irqwork, tsc_refine_calibration_work);
