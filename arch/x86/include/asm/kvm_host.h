@@ -753,6 +753,10 @@ struct kvm_hv {
 	u64 hv_crash_ctl;
 
 	HV_REFERENCE_TSC_PAGE tsc_ref;
+
+	u64 hv_reenlightenment_control;
+	u64 hv_tsc_emulation_control;
+	u64 hv_tsc_emulation_status;
 };
 
 enum kvm_irqchip_mode {
