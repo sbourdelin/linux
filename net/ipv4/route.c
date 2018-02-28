@@ -930,19 +930,26 @@ out_put_peer:
 
 static int ip_error(struct sk_buff *skb)
 {
-	struct in_device *in_dev = __in_dev_get_rcu(skb->dev);
 	struct rtable *rt = skb_rtable(skb);
+	struct net_device *dev = skb->dev;
+	struct in_device *in_dev;
 	struct inet_peer *peer;
 	unsigned long now;
 	struct net *net;
 	bool send;
 	int code;
 
+	net = dev_net(rt->dst.dev);
+
+	if (netif_is_l3_master(skb->dev))
+		dev = __dev_get_by_index(net, IPCB(skb)->iif);
+
+	in_dev = __in_dev_get_rcu(dev);
+
 	/* IP on this device is disabled. */
 	if (!in_dev)
 		goto out;
 
-	net = dev_net(rt->dst.dev);
 	if (!IN_DEV_FORWARD(in_dev)) {
 		switch (rt->dst.error) {
 		case EHOSTUNREACH:
