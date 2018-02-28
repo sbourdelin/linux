@@ -132,9 +132,11 @@ irqreturn_t timer_interrupt(int irq, void *dummy)
 	return IRQ_HANDLED;
 }
 
-void read_persistent_clock(struct timespec *ts)
+void read_persistent_clock64(struct timespec64 *ts)
 {
-	time_t secs_since_1970 = (365 * 37 + 9) * 24 * 60 * 60;	/* 1 Jan 2007 */
+	/* 1 Jan 2007 */
+	time64_t secs_since_1970 = (365 * 37 + 9) * 24 * 60 * 60;
+
 	ts->tv_sec = secs_since_1970;
 	ts->tv_nsec = 0;
 }
