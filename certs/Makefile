@@ -104,3 +104,16 @@ targets += signing_key.x509
 $(obj)/signing_key.x509: scripts/extract-cert $(X509_DEP) FORCE
 	$(call if_changed,extract_certs,$(MODULE_SIG_KEY_SRCPREFIX)$(CONFIG_MODULE_SIG_KEY))
 endif # CONFIG_MODULE_SIG
+
+
+ifeq ($(CONFIG_PLATFORM_KEYRING),y)
+
+$(eval $(call config_filename,PLATFORM_TRUSTED_KEYS))
+
+# GCC doesn't include .incbin files in -MD generated dependencies (PR#66871)
+$(obj)/system_certificates.o: $(obj)/platform_certificate_list
+
+targets += platform_certificate_list
+$(obj)/platform_certificate_list: scripts/extract-cert $(PLATFORM_TRUSTED_KEYS_FILENAME) FORCE
+	$(call if_changed,extract_certs,$(CONFIG_PLATFORM_TRUSTED_KEYS))
+endif # CONFIG_PLATFORM_KEYRING

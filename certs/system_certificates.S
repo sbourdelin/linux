@@ -14,6 +14,15 @@ __cert_list_start:
 	.incbin "certs/x509_certificate_list"
 __cert_list_end:
 
+#ifdef CONFIG_PLATFORM_KEYRING
+	.align 8
+	.globl VMLINUX_SYMBOL(platform_certificate_list)
+VMLINUX_SYMBOL(platform_certificate_list):
+__platform_cert_list_start:
+	.incbin "certs/platform_certificate_list"
+__platform_cert_list_end:
+#endif /* CONFIG_PLATFORM_KEYRING */
+
 #ifdef CONFIG_SYSTEM_EXTRA_CERTIFICATE
 	.globl VMLINUX_SYMBOL(system_extra_cert)
 	.size system_extra_cert, CONFIG_SYSTEM_EXTRA_CERTIFICATE_SIZE
@@ -35,3 +44,14 @@ VMLINUX_SYMBOL(system_certificate_list_size):
 #else
 	.long __cert_list_end - __cert_list_start
 #endif
+
+#ifdef CONFIG_PLATFORM_KEYRING
+	.align 8
+	.globl VMLINUX_SYMBOL(platform_certificate_list_size)
+VMLINUX_SYMBOL(platform_certificate_list_size):
+#ifdef CONFIG_64BIT
+	.quad __platform_cert_list_end - __platform_cert_list_start
+#else
+	.long __platform_cert_list_end - __platform_cert_list_start
+#endif
+#endif /* CONFIG_PLATFORM_KEYRING */

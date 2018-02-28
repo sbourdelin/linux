@@ -19,14 +19,22 @@
 #include <keys/system_keyring.h>
 #include <crypto/pkcs7.h>
 
+#define BUILTIN_TRUSTED_KEYRING	0
+#define PLATFORM_KEYRING	1
+
 static struct key *builtin_trusted_keys;
 #ifdef CONFIG_SECONDARY_TRUSTED_KEYRING
 static struct key *secondary_trusted_keys;
+#endif
+#ifdef CONFIG_PLATFORM_KEYRING
+static struct key *platform_keys __ro_after_init;
 #endif
 
 extern __initconst const u8 system_certificate_list[];
 extern __initconst const unsigned long system_certificate_list_size;
 
+extern __initconst const u8 platform_certificate_list[];
+extern __initconst const unsigned long platform_certificate_list_size;
 /**
  * restrict_link_to_builtin_trusted - Restrict keyring addition by built in CA
  *
@@ -123,6 +131,18 @@ static __init int system_trusted_keyring_init(void)
 		panic("Can't link trusted keyrings\n");
 #endif
 
+#ifdef CONFIG_PLATFORM_KEYRING
+	platform_keys =
+		keyring_alloc(".platform_keys",
+			      KUIDT_INIT(0), KGIDT_INIT(0), current_cred(),
+			      ((KEY_POS_ALL & ~KEY_POS_SETATTR) |
+			       KEY_USR_VIEW | KEY_USR_READ | KEY_USR_SEARCH),
+			      KEY_ALLOC_NOT_IN_QUOTA,
+			      NULL, NULL);
+	if (IS_ERR(platform_keys))
+		panic("Can't allocate platform keyring\n");
+#endif
+
 	return 0;
 }
 
@@ -132,18 +152,19 @@ static __init int system_trusted_keyring_init(void)
 device_initcall(system_trusted_keyring_init);
 
 /*
- * Load the compiled-in list of X.509 certificates.
+ * Load the certificates to the keyring.
  */
-static __init int load_system_certificate_list(void)
+static __init int load_certificate_list(const u8 *p, unsigned long size,
+		struct key *keyring)
 {
 	key_ref_t key;
-	const u8 *p, *end;
+	const u8 *end;
 	size_t plen;
 
-	pr_notice("Loading compiled-in X.509 certificates\n");
+	pr_notice("Loading compiled-in X.509 certificates to %s\n",
+			keyring->description);
 
-	p = system_certificate_list;
-	end = p + system_certificate_list_size;
+	end = p + size;
 	while (p < end) {
 		/* Each cert begins with an ASN.1 SEQUENCE tag and must be more
 		 * than 256 bytes in size.
@@ -158,16 +179,17 @@ static __init int load_system_certificate_list(void)
 		if (plen > end - p)
 			goto dodgy_cert;
 
-		key = key_create_or_update(make_key_ref(builtin_trusted_keys, 1),
-					   "asymmetric",
-					   NULL,
-					   p,
-					   plen,
-					   ((KEY_POS_ALL & ~KEY_POS_SETATTR) |
-					   KEY_USR_VIEW | KEY_USR_READ),
-					   KEY_ALLOC_NOT_IN_QUOTA |
-					   KEY_ALLOC_BUILT_IN |
-					   KEY_ALLOC_BYPASS_RESTRICTION);
+		key = key_create_or_update(make_key_ref(keyring, 1),
+				"asymmetric",
+				NULL,
+				p,
+				plen,
+				((KEY_POS_ALL & ~KEY_POS_SETATTR) |
+				 KEY_USR_VIEW | KEY_USR_READ),
+				KEY_ALLOC_NOT_IN_QUOTA |
+				KEY_ALLOC_BUILT_IN |
+				KEY_ALLOC_BYPASS_RESTRICTION);
+
 		if (IS_ERR(key)) {
 			pr_err("Problem loading in-kernel X.509 certificate (%ld)\n",
 			       PTR_ERR(key));
@@ -185,7 +207,25 @@ dodgy_cert:
 	pr_err("Problem parsing in-kernel X.509 certificate list\n");
 	return 0;
 }
-late_initcall(load_system_certificate_list);
+
+/*
+ * Load the compiled-in list of system and platform X.509 certificates.
+ */
+static __init int load_compiled_certificate_list(void)
+{
+	/* Loading certs in builtin keyring */
+	load_certificate_list(system_certificate_list,
+			system_certificate_list_size, builtin_trusted_keys);
+
+#ifdef CONFIG_PLATFORM_KEYRING
+	/* Loading certs in platform keyring */
+	load_certificate_list(platform_certificate_list,
+			platform_certificate_list_size, platform_keys);
+#endif
+
+	return 0;
+}
+late_initcall(load_compiled_certificate_list);
 
 #ifdef CONFIG_SYSTEM_DATA_VERIFICATION
 

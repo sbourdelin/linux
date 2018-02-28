@@ -83,4 +83,21 @@ config SYSTEM_BLACKLIST_HASH_LIST
 	  wrapper to incorporate the list into the kernel.  Each <hash> should
 	  be a string of hex digits.
 
+config PLATFORM_KEYRING
+        bool "Provide keyring for platform trusted keys"
+        depends on KEYS
+        depends on ASYMMETRIC_KEY_TYPE
+        help
+	  Provide a separate, distinct keyring for platform trusted keys, which
+	  the kernel automatically populates during initialization from values
+	  embedded during build, used for verifying the kexec'ed kernel image
+	  and, possibly, the initramfs signature.
+
+config PLATFORM_TRUSTED_KEYS
+	string "Platform/Firmware trusted X.509 certs."
+	depends on PLATFORM_KEYRING
+	help
+	  Provide the filename of a PEM-formatted file containing the platform
+	  trusted X.509 certificates to be loaded in the platform keyring.
+
 endmenu
