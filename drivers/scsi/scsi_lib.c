@@ -650,6 +650,7 @@ static void scsi_release_bidi_buffers(struct scsi_cmnd *cmd)
 	cmd->request->next_rq->special = NULL;
 }
 
+/* Returns false when no more bytes to process, true if there are more */
 static bool scsi_end_request(struct request *req, blk_status_t error,
 		unsigned int bytes, unsigned int bidi_bytes)
 {
@@ -1030,38 +1031,44 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 			 */
 			scsi_req(req->next_rq)->resid_len = scsi_in(cmd)->resid;
 			if (scsi_end_request(req, BLK_STS_OK, blk_rq_bytes(req),
-					blk_rq_bytes(req->next_rq)))
-				BUG();
+					     blk_rq_bytes(req->next_rq)))
+				WARN(true, "Bidi command with remaining bytes");
 			return;
 		}
 	}
 
-	/* no bidi support for !blk_rq_is_passthrough yet */
-	BUG_ON(blk_bidi_rq(req));
+	/* no bidi support yet, other than in pass-through */
+	if (unlikely(blk_bidi_rq(req))) {
+		WARN_ONCE(true, "Only support bidi command in passthrough");
+		scmd_printk(KERN_ERR, cmd, "Killing bidi command\n");
+		if (scsi_end_request(req, BLK_STS_IOERR, blk_rq_bytes(req),
+				     blk_rq_bytes(req->next_rq)))
+			WARN(true, "Bidi command with remaining bytes");
+		return;
+	}
 
-	/*
-	 * Next deal with any sectors which we were able to correctly
-	 * handle.
-	 */
 	SCSI_LOG_HLCOMPLETE(1, scmd_printk(KERN_INFO, cmd,
 		"%u sectors total, %d bytes done.\n",
 		blk_rq_sectors(req), good_bytes));
 
 	/*
-	 * special case: failed zero length commands always need to
-	 * drop down into the retry code. Otherwise, if we finished
-	 * all bytes in the request we are done now.
+	 * Next deal with any sectors which we were able to correctly
+	 * handle. Fast path should return in this block.
 	 */
-	if (unlikely(!(blk_stat && blk_rq_bytes(req) == 0) &&
-		     !scsi_end_request(req, blk_stat, good_bytes, 0)))
-		return;
-
+	if (likely(blk_rq_bytes(req) > 0 || blk_stat == BLK_STS_OK)) {
+		if (likely(!scsi_end_request(req, blk_stat, good_bytes, 0)))
+			return;	/* no bytes remaining */
+	}
 	/*
-	 * Kill remainder if no retrys.
+	 * This leaves failed, zero length commands plus commands with
+	 * some bytes remaining.
 	 */
+
+	/* Kill remainder if no retrys. */
 	if (unlikely(blk_stat && scsi_noretry_cmd(cmd))) {
 		if (scsi_end_request(req, blk_stat, blk_rq_bytes(req), 0))
-			BUG();
+			WARN_ONCE(true,
+			     "Bytes remaining after failed, no-retry command");
 		return;
 	}
 
@@ -1071,8 +1078,8 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	 */
 	if (likely(result == 0)) {
 		/*
-		 * Fast path: Unprep the request and put it back at the head
-		 * of the queue. A new command will be prepared and issued.
+		 * Unprep the request and put it back at the head of the
+		 * queue. A new command will be prepared and issued.
 		 * This block is the same as case ACTION_REPREP in
 		 * scsi_io_completion_action() above.
 		 */
