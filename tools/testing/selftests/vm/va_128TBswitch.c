@@ -44,6 +44,7 @@ struct testcase {
 	unsigned long flags;
 	const char *msg;
 	unsigned int low_addr_required:1;
+	unsigned int high_addr_required:1;
 	unsigned int keep_mapped:1;
 };
 
@@ -108,6 +109,7 @@ static struct testcase testcases[] = {
 		.flags = MAP_PRIVATE | MAP_ANONYMOUS,
 		.msg = "mmap(HIGH_ADDR)",
 		.keep_mapped = 1,
+		.high_addr_required = 1,
 	},
 	{
 		.addr = HIGH_ADDR,
@@ -115,12 +117,14 @@ static struct testcase testcases[] = {
 		.flags = MAP_PRIVATE | MAP_ANONYMOUS,
 		.msg = "mmap(HIGH_ADDR) again",
 		.keep_mapped = 1,
+		.high_addr_required = 1,
 	},
 	{
 		.addr = HIGH_ADDR,
 		.size = 2 * PAGE_SIZE,
 		.flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED,
 		.msg = "mmap(HIGH_ADDR, MAP_FIXED)",
+		.high_addr_required = 1,
 	},
 	{
 		.addr = (void *) -1,
@@ -128,12 +132,14 @@ static struct testcase testcases[] = {
 		.flags = MAP_PRIVATE | MAP_ANONYMOUS,
 		.msg = "mmap(-1)",
 		.keep_mapped = 1,
+		.high_addr_required = 1,
 	},
 	{
 		.addr = (void *) -1,
 		.size = 2 * PAGE_SIZE,
 		.flags = MAP_PRIVATE | MAP_ANONYMOUS,
 		.msg = "mmap(-1) again",
+		.high_addr_required = 1,
 	},
 	{
 		.addr = ((void *)(ADDR_SWITCH_HINT - PAGE_SIZE)),
@@ -193,6 +199,7 @@ static struct testcase hugetlb_testcases[] = {
 		.flags = MAP_HUGETLB | MAP_PRIVATE | MAP_ANONYMOUS,
 		.msg = "mmap(HIGH_ADDR, MAP_HUGETLB)",
 		.keep_mapped = 1,
+		.high_addr_required = 1,
 	},
 	{
 		.addr = HIGH_ADDR,
@@ -200,12 +207,14 @@ static struct testcase hugetlb_testcases[] = {
 		.flags = MAP_HUGETLB | MAP_PRIVATE | MAP_ANONYMOUS,
 		.msg = "mmap(HIGH_ADDR, MAP_HUGETLB) again",
 		.keep_mapped = 1,
+		.high_addr_required = 1,
 	},
 	{
 		.addr = HIGH_ADDR,
 		.size = HUGETLB_SIZE,
 		.flags = MAP_HUGETLB | MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED,
 		.msg = "mmap(HIGH_ADDR, MAP_FIXED | MAP_HUGETLB)",
+		.high_addr_required = 1,
 	},
 	{
 		.addr = (void *) -1,
@@ -213,12 +222,14 @@ static struct testcase hugetlb_testcases[] = {
 		.flags = MAP_HUGETLB | MAP_PRIVATE | MAP_ANONYMOUS,
 		.msg = "mmap(-1, MAP_HUGETLB)",
 		.keep_mapped = 1,
+		.high_addr_required = 1,
 	},
 	{
 		.addr = (void *) -1,
 		.size = HUGETLB_SIZE,
 		.flags = MAP_HUGETLB | MAP_PRIVATE | MAP_ANONYMOUS,
 		.msg = "mmap(-1, MAP_HUGETLB) again",
+		.high_addr_required = 1,
 	},
 	{
 		.addr = (void *)(ADDR_SWITCH_HINT - PAGE_SIZE),
@@ -257,14 +268,16 @@ static int run_test(struct testcase *test, int count)
 		if (t->low_addr_required && p >= (void *)(ADDR_SWITCH_HINT)) {
 			printf("FAILED\n");
 			ret = 1;
-		} else {
-			/*
-			 * Do a dereference of the address returned so that we catch
-			 * bugs in page fault handling
-			 */
-			memset(p, 0, t->size);
+		} else if (t->high_addr_required && p < (void *)(ADDR_SWITCH_HINT)) {
+			printf("FAILED\n");
+			ret = 1;
+		} else
 			printf("OK\n");
-		}
+		/*
+		 * Do a dereference of the address returned so that we catch
+		 * bugs in page fault handling
+		 */
+		memset(p, 0, t->size);
 		if (!t->keep_mapped)
 			munmap(p, t->size);
 	}
