@@ -739,103 +739,41 @@ static blk_status_t __scsi_error_from_host_byte(struct scsi_cmnd *cmd,
 }
 
 /*
- * Function:    scsi_io_completion()
- *
- * Purpose:     Completion processing for block device I/O requests.
- *
- * Arguments:   cmd   - command that is finished.
- *
- * Lock status: Assumed that no lock is held upon entry.
- *
- * Returns:     Nothing
- *
- * Notes:       We will finish off the specified number of sectors.  If we
- *		are done, the command block will be released and the queue
- *		function will be goosed.  If we are not done then we have to
- *		figure out what to do next:
- *
- *		a) We can call scsi_requeue_command().  The request
- *		   will be unprepared and put back on the queue.  Then
- *		   a new command will be created for it.  This should
- *		   be used if we made forward progress, or if we want
- *		   to switch from READ(10) to READ(6) for example.
- *
- *		b) We can call __scsi_queue_insert().  The request will
- *		   be put back on the queue and retried using the same
- *		   command as before, possibly after a delay.
- *
- *		c) We can call scsi_end_request() with -EIO to fail
- *		   the remainder of the request.
+ * Helper for scsi_io_completion() when cmd->result is non-zero. Returns
+ * BLK_STS_NOTSUPP if this function does not change blk_status .
  */
-void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
+static blk_status_t scsi_io_completion_nz_result(struct scsi_cmnd *cmd,
+						 int result)
 {
-	int result = cmd->result;
-	struct request_queue *q = cmd->device->request_queue;
+	bool sense_valid;
+	bool about_current;
+	/* __scsi_error_from_host_byte() does not return BLK_STS_NOTSUPP */
+	blk_status_t blk_stat = BLK_STS_NOTSUPP;
 	struct request *req = cmd->request;
-	blk_status_t error = BLK_STS_OK;
 	struct scsi_sense_hdr sshdr;
-	bool sense_valid = false;
-	int sense_deferred = 0, level = 0;
-	enum {ACTION_FAIL, ACTION_REPREP, ACTION_RETRY,
-	      ACTION_DELAYED_RETRY} action;
-	unsigned long wait_for = (cmd->allowed + 1) * req->timeout;
 
-	if (result) {
-		sense_valid = scsi_command_normalize_sense(cmd, &sshdr);
-		if (sense_valid)
-			sense_deferred = scsi_sense_is_deferred(&sshdr);
-	}
+	sense_valid = scsi_command_normalize_sense(cmd, &sshdr);
+	about_current = sense_valid ? !scsi_sense_is_deferred(&sshdr) : true;
 
 	if (blk_rq_is_passthrough(req)) {
-		if (result) {
-			if (sense_valid) {
-				/*
-				 * SG_IO wants current and deferred errors
-				 */
-				scsi_req(req)->sense_len =
-					min(8 + cmd->sense_buffer[7],
-					    SCSI_SENSE_BUFFERSIZE);
-			}
-			if (!sense_deferred)
-				error = __scsi_error_from_host_byte(cmd, result);
-		}
-		/*
-		 * __scsi_error_from_host_byte may have reset the host_byte
-		 */
-		scsi_req(req)->result = cmd->result;
-		scsi_req(req)->resid_len = scsi_get_resid(cmd);
-
-		if (scsi_bidi_cmnd(cmd)) {
+		if (sense_valid) {
 			/*
-			 * Bidi commands Must be complete as a whole,
-			 * both sides at once.
+			 * SG_IO wants current and deferred errors
 			 */
-			scsi_req(req->next_rq)->resid_len = scsi_in(cmd)->resid;
-			if (scsi_end_request(req, BLK_STS_OK, blk_rq_bytes(req),
-					blk_rq_bytes(req->next_rq)))
-				BUG();
-			return;
+			scsi_req(req)->sense_len =
+				min(8 + cmd->sense_buffer[7],
+				    SCSI_SENSE_BUFFERSIZE);
 		}
-	} else if (blk_rq_bytes(req) == 0 && result && !sense_deferred) {
+		if (about_current)
+			blk_stat = __scsi_error_from_host_byte(cmd, result);
+	} else if (blk_rq_bytes(req) == 0 && about_current) {
 		/*
 		 * Flush commands do not transfers any data, and thus cannot use
 		 * good_bytes != blk_rq_bytes(req) as the signal for an error.
-		 * This sets the error explicitly for the problem case.
+		 * This sets blk_stat explicitly for the problem case.
 		 */
-		error = __scsi_error_from_host_byte(cmd, result);
+		blk_stat = __scsi_error_from_host_byte(cmd, result);
 	}
-
-	/* no bidi support for !blk_rq_is_passthrough yet */
-	BUG_ON(blk_bidi_rq(req));
-
-	/*
-	 * Next deal with any sectors which we were able to correctly
-	 * handle.
-	 */
-	SCSI_LOG_HLCOMPLETE(1, scmd_printk(KERN_INFO, cmd,
-		"%u sectors total, %d bytes done.\n",
-		blk_rq_sectors(req), good_bytes));
-
 	/*
 	 * Recovered errors need reporting, but they're always treated as
 	 * success, so fiddle the result code here.  For passthrough requests
@@ -843,45 +781,50 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 	 * is what gets returned to the user
 	 */
 	if (sense_valid && (sshdr.sense_key == RECOVERED_ERROR)) {
-		/* if ATA PASS-THROUGH INFORMATION AVAILABLE skip
-		 * print since caller wants ATA registers. Only occurs on
-		 * SCSI ATA PASS_THROUGH commands when CK_COND=1
+		/*
+		 * if ATA PASS-THROUGH INFORMATION AVAILABLE skip
+		 * print since caller wants ATA registers. Only occurs
+		 * on SCSI ATA PASS_THROUGH commands when CK_COND=1
 		 */
 		if ((sshdr.asc == 0x0) && (sshdr.ascq == 0x1d))
 			;
 		else if (!(req->rq_flags & RQF_QUIET))
 			scsi_print_sense(cmd);
-		result = 0;
-		/* for passthrough error may be set */
-		error = BLK_STS_OK;
+		/* for passthrough, blk_stat may be set */
+		blk_stat = BLK_STS_OK;
 	}
-
 	/*
-	 * special case: failed zero length commands always need to
-	 * drop down into the retry code. Otherwise, if we finished
-	 * all bytes in the request we are done now.
+	 * Another corner case: the SCSI status byte is non-zero but 'good'.
+	 * Example: PRE-FETCH command returns SAM_STAT_CONDITION_MET when
+	 * it is able to fit nominated LBs in its cache (and SAM_STAT_GOOD
+	 * if it can't fit). Treat SAM_STAT_CONDITION_MET and the related
+	 * intermediate statuses (both obsolete in SAM-4) as good.
 	 */
-	if (!(blk_rq_bytes(req) == 0 && error) &&
-	    !scsi_end_request(req, error, good_bytes, 0))
-		return;
+	if (status_byte(result) && scsi_status_is_good(result))
+		blk_stat = BLK_STS_OK;
 
-	/*
-	 * Kill remainder if no retrys.
-	 */
-	if (error && scsi_noretry_cmd(cmd)) {
-		if (scsi_end_request(req, error, blk_rq_bytes(req), 0))
-			BUG();
-		return;
-	}
+	return blk_stat;
+}
 
-	/*
-	 * If there had been no error, but we have leftover bytes in the
-	 * requeues just queue the command up again.
-	 */
-	if (result == 0)
-		goto requeue;
+/* Helper for scsi_io_completion() when special action required. */
+static void scsi_io_completion_action(struct scsi_cmnd *cmd, int result)
+{
+	struct request_queue *q = cmd->device->request_queue;
+	struct request *req = cmd->request;
+	int level = 0;
+	enum {ACTION_FAIL, ACTION_REPREP, ACTION_RETRY,
+	      ACTION_DELAYED_RETRY} action;
+	unsigned long wait_for = (cmd->allowed + 1) * req->timeout;
+	struct scsi_sense_hdr sshdr;
+	bool sense_valid_and_current = false;
+	blk_status_t blk_stat;		/* enum, BLK_STS_OK is 0 */
 
-	error = __scsi_error_from_host_byte(cmd, result);
+	/* sense not about current command is termed: deferred */
+	if (scsi_command_normalize_sense(cmd, &sshdr) &&
+	    !scsi_sense_is_deferred(&sshdr))
+		sense_valid_and_current = true;
+
+	blk_stat = __scsi_error_from_host_byte(cmd, result);
 
 	if (host_byte(result) == DID_RESET) {
 		/* Third party bus reset or reset for error recovery
@@ -889,7 +832,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 		 * happens.
 		 */
 		action = ACTION_RETRY;
-	} else if (sense_valid && !sense_deferred) {
+	} else if (sense_valid_and_current) {
 		switch (sshdr.sense_key) {
 		case UNIT_ATTENTION:
 			if (cmd->device->removable) {
@@ -925,18 +868,18 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 				action = ACTION_REPREP;
 			} else if (sshdr.asc == 0x10) /* DIX */ {
 				action = ACTION_FAIL;
-				error = BLK_STS_PROTECTION;
+				blk_stat = BLK_STS_PROTECTION;
 			/* INVALID COMMAND OPCODE or INVALID FIELD IN CDB */
 			} else if (sshdr.asc == 0x20 || sshdr.asc == 0x24) {
 				action = ACTION_FAIL;
-				error = BLK_STS_TARGET;
+				blk_stat = BLK_STS_TARGET;
 			} else
 				action = ACTION_FAIL;
 			break;
 		case ABORTED_COMMAND:
 			action = ACTION_FAIL;
 			if (sshdr.asc == 0x10) /* DIF */
-				error = BLK_STS_PROTECTION;
+				blk_stat = BLK_STS_PROTECTION;
 			break;
 		case NOT_READY:
 			/* If the device is in the process of becoming
@@ -999,17 +942,16 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 				scsi_print_command(cmd);
 			}
 		}
-		if (!scsi_end_request(req, error, blk_rq_err_bytes(req), 0))
+		if (!scsi_end_request(req, blk_stat, blk_rq_err_bytes(req), 0))
 			return;
 		/*FALLTHRU*/
 	case ACTION_REPREP:
-	requeue:
 		/* Unprep the request and put it back at the head of the queue.
 		 * A new command will be prepared and issued.
 		 */
-		if (q->mq_ops) {
+		if (q->mq_ops)
 			scsi_mq_requeue_cmd(cmd);
-		} else {
+		else {
 			scsi_release_buffers(cmd);
 			scsi_requeue_command(q, cmd);
 		}
@@ -1023,6 +965,125 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
 		__scsi_queue_insert(cmd, SCSI_MLQUEUE_DEVICE_BUSY, false);
 		break;
 	}
+}
+
+/*
+ * Function:    scsi_io_completion()
+ *
+ * Purpose:     Completion processing for block device I/O requests.
+ *
+ * Arguments:   cmd   - command that is finished.
+ *
+ * Lock status: Assumed that no lock is held upon entry.
+ *
+ * Returns:     Nothing
+ *
+ * Notes:       We will finish off the specified number of sectors.  If we
+ *		are done, the command block will be released and the queue
+ *		function will be goosed.  If we are not done then we have to
+ *		figure out what to do next:
+ *
+ *		a) We can call scsi_requeue_command().  The request
+ *		   will be unprepared and put back on the queue.  Then
+ *		   a new command will be created for it.  This should
+ *		   be used if we made forward progress, or if we want
+ *		   to switch from READ(10) to READ(6) for example.
+ *
+ *		b) We can call __scsi_queue_insert().  The request will
+ *		   be put back on the queue and retried using the same
+ *		   command as before, possibly after a delay.
+ *
+ *		c) We can call scsi_end_request() with -EIO to fail
+ *		   the remainder of the request.
+ *
+ *		Most of the work is now done in the two helper functions
+ *		above: scsi_io_completion_nz_result() and
+ *		scsi_io_completion_action(). What is left here is mainly
+ *		the fast path (i.e. when cmd->result is zero).
+ */
+void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes)
+{
+	int result = cmd->result;
+	struct request_queue *q = cmd->device->request_queue;
+	struct request *req = cmd->request;
+	blk_status_t blk_stat = BLK_STS_OK;	/* enum: BLK_STS_OK is 0 */
+
+	if (unlikely(result)) {
+		blk_stat = scsi_io_completion_nz_result(cmd, result);
+		if (blk_stat == BLK_STS_OK)
+			result = 0;
+		if (blk_stat == BLK_STS_NOTSUPP)  /* flagging no change */
+			blk_stat = BLK_STS_OK;
+	}
+
+	if (unlikely(blk_rq_is_passthrough(req))) {
+		/*
+		 * __scsi_error_from_host_byte may have reset the host_byte
+		 */
+		scsi_req(req)->result = cmd->result;
+		scsi_req(req)->resid_len = scsi_get_resid(cmd);
+
+		if (unlikely(scsi_bidi_cmnd(cmd))) {
+			/*
+			 * Bidi commands Must be complete as a whole,
+			 * both sides at once.
+			 */
+			scsi_req(req->next_rq)->resid_len = scsi_in(cmd)->resid;
+			if (scsi_end_request(req, BLK_STS_OK, blk_rq_bytes(req),
+					blk_rq_bytes(req->next_rq)))
+				BUG();
+			return;
+		}
+	}
+
+	/* no bidi support for !blk_rq_is_passthrough yet */
+	BUG_ON(blk_bidi_rq(req));
+
+	/*
+	 * Next deal with any sectors which we were able to correctly
+	 * handle.
+	 */
+	SCSI_LOG_HLCOMPLETE(1, scmd_printk(KERN_INFO, cmd,
+		"%u sectors total, %d bytes done.\n",
+		blk_rq_sectors(req), good_bytes));
+
+	/*
+	 * special case: failed zero length commands always need to
+	 * drop down into the retry code. Otherwise, if we finished
+	 * all bytes in the request we are done now.
+	 */
+	if (unlikely(!(blk_stat && blk_rq_bytes(req) == 0) &&
+		     !scsi_end_request(req, blk_stat, good_bytes, 0)))
+		return;
+
+	/*
+	 * Kill remainder if no retrys.
+	 */
+	if (unlikely(blk_stat && scsi_noretry_cmd(cmd))) {
+		if (scsi_end_request(req, blk_stat, blk_rq_bytes(req), 0))
+			BUG();
+		return;
+	}
+
+	/*
+	 * If there had been no error, but we have leftover bytes in the
+	 * requeues just queue the command up again.
+	 */
+	if (likely(result == 0)) {
+		/*
+		 * Fast path: Unprep the request and put it back at the head
+		 * of the queue. A new command will be prepared and issued.
+		 * This block is the same as case ACTION_REPREP in
+		 * scsi_io_completion_action() above.
+		 */
+		if (q->mq_ops)
+			scsi_mq_requeue_cmd(cmd);
+		else {
+			scsi_release_buffers(cmd);
+			scsi_requeue_command(q, cmd);
+		}
+	} else
+		scsi_io_completion_action(cmd, result);
 }
 
 static int scsi_init_sgtable(struct request *req, struct scsi_data_buffer *sdb)
