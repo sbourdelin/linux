@@ -71,7 +71,7 @@ static irqreturn_t timer_interrupt(int irq, void *dummy)
 	return IRQ_HANDLED;
 }
 
-void read_persistent_clock(struct timespec *ts)
+void read_persistent_clock64(struct timespec64 *ts)
 {
 	struct rtc_time time;
 	ts->tv_sec = 0;
@@ -82,7 +82,7 @@ void read_persistent_clock(struct timespec *ts)
 
 		if ((time.tm_year += 1900) < 1970)
 			time.tm_year += 100;
-		ts->tv_sec = mktime(time.tm_year, time.tm_mon, time.tm_mday,
+		ts->tv_sec = mktime64(time.tm_year, time.tm_mon, time.tm_mday,
 				      time.tm_hour, time.tm_min, time.tm_sec);
 	}
 }
