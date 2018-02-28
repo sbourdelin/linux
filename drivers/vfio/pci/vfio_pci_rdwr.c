@@ -17,6 +17,7 @@
 #include <linux/pci.h>
 #include <linux/uaccess.h>
 #include <linux/io.h>
+#include <linux/vfio.h>
 #include <linux/vgaarb.h>
 
 #include "vfio_pci_private.h"
@@ -274,4 +275,118 @@ ssize_t vfio_pci_vga_rw(struct vfio_pci_device *vdev, char __user *buf,
 		*ppos += done;
 
 	return done;
+}
+
+#define VFIO_PCI_IOEVENTFD_HANDLER(size)				\
+static int vfio_pci_ioeventfd_handler##size(void *opaque, void *data)	\
+{									\
+	vfio_iowrite##size((unsigned long)data, opaque);		\
+	return 0;							\
+}
+
+#ifdef iowrite64
+VFIO_PCI_IOEVENTFD_HANDLER(64)
+#endif
+VFIO_PCI_IOEVENTFD_HANDLER(32)
+VFIO_PCI_IOEVENTFD_HANDLER(16)
+VFIO_PCI_IOEVENTFD_HANDLER(8)
+
+long vfio_pci_ioeventfd(struct vfio_pci_device *vdev, loff_t offset,
+			uint64_t data, int count, int fd)
+{
+	struct pci_dev *pdev = vdev->pdev;
+	loff_t pos = offset & VFIO_PCI_OFFSET_MASK;
+	int ret, bar = VFIO_PCI_OFFSET_TO_INDEX(offset);
+	struct vfio_pci_ioeventfd *ioeventfd;
+	int (*handler)(void *addr, void *value);
+
+	/* Only support ioeventfds into BARs */
+	if (bar > VFIO_PCI_BAR5_REGION_INDEX)
+		return -EINVAL;
+
+	if (pos + count > pci_resource_len(pdev, bar))
+		return -EINVAL;
+
+	/* Disallow ioeventfds working around MSI-X table writes */
+	if (bar == vdev->msix_bar &&
+	    !(pos + count <= vdev->msix_offset ||
+	      pos >= vdev->msix_offset + vdev->msix_size))
+		return -EINVAL;
+
+	switch (count) {
+	case 1:
+		handler = &vfio_pci_ioeventfd_handler8;
+		break;
+	case 2:
+		handler = &vfio_pci_ioeventfd_handler16;
+		break;
+	case 4:
+		handler = &vfio_pci_ioeventfd_handler32;
+		break;
+#ifdef iowrite64
+	case 8:
+		handler = &vfio_pci_ioeventfd_handler64;
+		break;
+#endif
+	default:
+		return -EINVAL;
+	}
+
+	ret = vfio_pci_setup_barmap(vdev, bar);
+	if (ret)
+		return ret;
+
+	mutex_lock(&vdev->ioeventfds_lock);
+
+	list_for_each_entry(ioeventfd, &vdev->ioeventfds_list, next) {
+		if (ioeventfd->pos == pos && ioeventfd->bar == bar &&
+		    ioeventfd->data == data && ioeventfd->count == count) {
+			if (fd == -1) {
+				vfio_virqfd_disable(&ioeventfd->virqfd);
+				list_del(&ioeventfd->next);
+				vdev->ioeventfds_nr--;
+				kfree(ioeventfd);
+				ret = 0;
+			} else
+				ret = -EEXIST;
+
+			goto out_unlock;
+		}
+	}
+
+	if (fd < 0) {
+		ret = -ENODEV;
+		goto out_unlock;
+	}
+
+	if (vdev->ioeventfds_nr >= VFIO_PCI_IOEVENTFD_MAX) {
+		ret = -ENOSPC;
+		goto out_unlock;
+	}
+
+	ioeventfd = kzalloc(sizeof(*ioeventfd), GFP_KERNEL);
+	if (!ioeventfd) {
+		ret = -ENOMEM;
+		goto out_unlock;
+	}
+
+	ioeventfd->pos = pos;
+	ioeventfd->bar = bar;
+	ioeventfd->data = data;
+	ioeventfd->count = count;
+
+	ret = vfio_virqfd_enable(vdev->barmap[bar] + pos, handler, NULL,
+				 (void *)data, &ioeventfd->virqfd, fd);
+	if (ret) {
+		kfree(ioeventfd);
+		goto out_unlock;
+	}
+
+	list_add(&ioeventfd->next, &vdev->ioeventfds_list);
+	vdev->ioeventfds_nr++;
+
+out_unlock:
+	mutex_unlock(&vdev->ioeventfds_lock);
+
+	return ret;
 }
