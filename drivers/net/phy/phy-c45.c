@@ -268,12 +268,13 @@ EXPORT_SYMBOL_GPL(genphy_c45_read_mdix);
 
 /* The gen10g_* functions are the old Clause 45 stub */
 
-static int gen10g_config_aneg(struct phy_device *phydev)
+int gen10g_config_aneg(struct phy_device *phydev)
 {
 	return 0;
 }
+EXPORT_SYMBOL_GPL(gen10g_config_aneg);
 
-static int gen10g_read_status(struct phy_device *phydev)
+int gen10g_read_status(struct phy_device *phydev)
 {
 	u32 mmd_mask = phydev->c45_ids.devices_in_package;
 	int ret;
@@ -291,14 +292,16 @@ static int gen10g_read_status(struct phy_device *phydev)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(gen10g_read_status);
 
-static int gen10g_soft_reset(struct phy_device *phydev)
+int gen10g_soft_reset(struct phy_device *phydev)
 {
 	/* Do nothing for now */
 	return 0;
 }
+EXPORT_SYMBOL_GPL(gen10g_soft_reset);
 
-static int gen10g_config_init(struct phy_device *phydev)
+int gen10g_config_init(struct phy_device *phydev)
 {
 	/* Temporarily just say we support everything */
 	phydev->supported = SUPPORTED_10000baseT_Full;
@@ -306,16 +309,19 @@ static int gen10g_config_init(struct phy_device *phydev)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(gen10g_config_init);
 
-static int gen10g_suspend(struct phy_device *phydev)
+int gen10g_suspend(struct phy_device *phydev)
 {
 	return 0;
 }
+EXPORT_SYMBOL_GPL(gen10g_suspend);
 
-static int gen10g_resume(struct phy_device *phydev)
+int gen10g_resume(struct phy_device *phydev)
 {
 	return 0;
 }
+EXPORT_SYMBOL_GPL(gen10g_resume);
 
 struct phy_driver genphy_10g_driver = {
 	.phy_id         = 0xffffffff,
