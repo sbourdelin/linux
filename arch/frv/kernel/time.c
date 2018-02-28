@@ -85,7 +85,7 @@ void time_divisor_init(void)
 }
 
 
-void read_persistent_clock(struct timespec *ts)
+void read_persistent_clock64(struct timespec64 *ts)
 {
 	unsigned int year, mon, day, hour, min, sec;
 
@@ -101,7 +101,7 @@ void read_persistent_clock(struct timespec *ts)
 
 	if ((year += 1900) < 1970)
 		year += 100;
-	ts->tv_sec = mktime(year, mon, day, hour, min, sec);
+	ts->tv_sec = mktime64(year, mon, day, hour, min, sec);
 	ts->tv_nsec = 0;
 }
 
