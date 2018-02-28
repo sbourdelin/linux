@@ -49,6 +49,11 @@ struct trace_uprobe_filter {
 	struct list_head	perf_events;
 };
 
+struct sdt_mm_list {
+	struct mm_struct *mm;
+	struct sdt_mm_list *next;
+};
+
 /*
  * uprobe event core functions
  */
@@ -60,6 +65,8 @@ struct trace_uprobe {
 	char				*filename;
 	unsigned long			offset;
 	unsigned long			sdt_offset; /* sdt semaphore offset */
+	struct sdt_mm_list		*sml;
+	struct rw_semaphore		sml_rw_sem;
 	unsigned long			nhit;
 	struct trace_probe		tp;
 };
@@ -273,6 +280,7 @@ alloc_trace_uprobe(const char *group, const char *event, int nargs, bool is_ret)
 	if (is_ret)
 		tu->consumer.ret_handler = uretprobe_dispatcher;
 	init_trace_uprobe_filter(&tu->filter);
+	init_rwsem(&tu->sml_rw_sem);
 	return tu;
 
 error:
@@ -953,6 +961,75 @@ sdt_update_sem(struct mm_struct *mm, unsigned long vaddr, short val)
 	return 0;
 }
 
+static bool sdt_check_mm_list(struct trace_uprobe *tu, struct mm_struct *mm)
+{
+	struct sdt_mm_list *tmp = tu->sml;
+
+	if (!tu->sml || !mm)
+		return false;
+
+	while (tmp) {
+		if (tmp->mm == mm)
+			return true;
+		tmp = tmp->next;
+	}
+
+	return false;
+}
+
+static void sdt_add_mm_list(struct trace_uprobe *tu, struct mm_struct *mm)
+{
+	struct sdt_mm_list *tmp;
+
+	tmp = kzalloc(sizeof(*tmp), GFP_KERNEL);
+	if (!tmp) {
+		pr_info("sdt_add_mm_list failed.\n");
+		return;
+	}
+	tmp->mm = mm;
+	tmp->next = tu->sml;
+	tu->sml = tmp;
+}
+
+static void sdt_del_mm_list(struct trace_uprobe *tu, struct mm_struct *mm)
+{
+	struct sdt_mm_list *prev, *curr;
+
+	if (!tu->sml)
+		return;
+
+	if (tu->sml->mm == mm) {
+		curr = tu->sml;
+		tu->sml = tu->sml->next;
+		kfree(curr);
+		return;
+	}
+
+	prev = tu->sml;
+	curr = tu->sml->next;
+	while (curr) {
+		if (curr->mm == mm) {
+			prev->next = curr->next;
+			kfree(curr);
+			return;
+		}
+		prev = curr;
+		curr = curr->next;
+	}
+}
+
+static void sdt_flush_mm_list(struct trace_uprobe *tu)
+{
+	struct sdt_mm_list *next, *curr = tu->sml;
+
+	while (curr) {
+		next = curr->next;
+		kfree(curr);
+		curr = next;
+	}
+	tu->sml = NULL;
+}
+
 /*
  * TODO: Adding this defination in include/linux/uprobes.h throws
  * warnings about address_sapce. Adding it here for the time being.
@@ -970,20 +1047,26 @@ static void sdt_increment_sem(struct trace_uprobe *tu)
 	if (IS_ERR(info))
 		goto out;
 
+	down_write(&tu->sml_rw_sem);
 	while (info) {
 		down_write(&info->mm->mmap_sem);
 		vma = sdt_find_vma(info->mm, tu);
 		if (!vma)
 			goto cont;
 
+		if (sdt_check_mm_list(tu, info->mm))
+			goto cont;
+
 		vaddr = offset_to_vaddr(vma, tu->sdt_offset);
-		sdt_update_sem(info->mm, vaddr, 1);
+		if (!sdt_update_sem(info->mm, vaddr, 1))
+			sdt_add_mm_list(tu, info->mm);
 
 cont:
 		up_write(&info->mm->mmap_sem);
 		mmput(info->mm);
 		info = free_uprobe_map_info(info);
 	}
+	up_write(&tu->sml_rw_sem);
 
 out:
 	uprobe_end_dup_mmap();
@@ -1001,8 +1084,16 @@ void trace_uprobe_mmap_callback(struct vm_area_struct *vma)
 		    !trace_probe_is_enabled(&tu->tp))
 			continue;
 
+		down_write(&tu->sml_rw_sem);
+		if (sdt_check_mm_list(tu, vma->vm_mm))
+			goto cont;
+
 		vaddr = offset_to_vaddr(vma, tu->sdt_offset);
-		sdt_update_sem(vma->vm_mm, vaddr, 1);
+		if (!sdt_update_sem(vma->vm_mm, vaddr, 1))
+			sdt_add_mm_list(tu, vma->vm_mm);
+
+cont:
+		up_write(&tu->sml_rw_sem);
 	}
 	mutex_unlock(&uprobe_lock);
 }
@@ -1017,7 +1108,11 @@ static void sdt_decrement_sem(struct trace_uprobe *tu)
 	if (IS_ERR(info))
 		return;
 
+	down_write(&tu->sml_rw_sem);
 	while (info) {
+		if (!sdt_check_mm_list(tu, info->mm))
+			goto cont;
+
 		down_write(&info->mm->mmap_sem);
 		vma = sdt_find_vma(info->mm, tu);
 		if (vma) {
@@ -1025,10 +1120,14 @@ static void sdt_decrement_sem(struct trace_uprobe *tu)
 			sdt_update_sem(info->mm, vaddr, -1);
 		}
 		up_write(&info->mm->mmap_sem);
+		sdt_del_mm_list(tu, info->mm);
 
+cont:
 		mmput(info->mm);
 		info = free_uprobe_map_info(info);
 	}
+	sdt_flush_mm_list(tu);
+	up_write(&tu->sml_rw_sem);
 }
 
 typedef bool (*filter_func_t)(struct uprobe_consumer *self,
