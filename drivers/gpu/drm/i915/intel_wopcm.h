@@ -30,5 +30,6 @@ struct intel_wopcm {
 
 void intel_wopcm_init_early(struct intel_wopcm *wopcm);
 int intel_wopcm_init(struct intel_wopcm *wopcm);
+int intel_wopcm_init_hw(struct intel_wopcm *wopcm);
 
 #endif
