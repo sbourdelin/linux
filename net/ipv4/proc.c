@@ -61,10 +61,11 @@ static int sockstat_seq_show(struct seq_file *seq, void *v)
 	sockets = proto_sockets_allocated_sum_positive(&tcp_prot);
 
 	socket_seq_show(seq);
-	seq_printf(seq, "TCP: inuse %d orphan %d tw %d alloc %d mem %ld\n",
+	seq_printf(seq, "TCP: inuse %d orphan %d tw %d alloc %d mem %ld ports %u\n",
 		   sock_prot_inuse_get(net, &tcp_prot), orphans,
 		   atomic_read(&net->ipv4.tcp_death_row.tw_count), sockets,
-		   proto_memory_allocated(&tcp_prot));
+		   proto_memory_allocated(&tcp_prot),
+		   inet_csk_count_ports(net, &tcp_prot));
 	seq_printf(seq, "UDP: inuse %d mem %ld\n",
 		   sock_prot_inuse_get(net, &udp_prot),
 		   proto_memory_allocated(&udp_prot));

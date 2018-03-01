@@ -265,7 +265,7 @@ inet_csk_rto_backoff(const struct inet_connection_sock *icsk,
 }
 
 struct sock *inet_csk_accept(struct sock *sk, int flags, int *err, bool kern);
-
+unsigned int inet_csk_count_ports(struct net *net, struct proto *prot);
 int inet_csk_get_port(struct sock *sk, unsigned short snum);
 
 struct dst_entry *inet_csk_route_req(const struct sock *sk, struct flowi4 *fl4,

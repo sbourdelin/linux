@@ -424,6 +424,28 @@ static int inet_csk_wait_for_connect(struct sock *sk, long timeo)
 	return err;
 }
 
+/* Count how many any entries are in the bind hash table */
+unsigned int inet_csk_count_ports(struct net *net, struct proto *prot)
+{
+	struct inet_hashinfo *hinfo = prot->h.hashinfo;
+	struct inet_bind_hashbucket *head;
+	struct inet_bind_bucket *tb;
+	unsigned int i, ports = 0;
+
+	for (i = 0; i < hinfo->bhash_size; i++) {
+		head = &hinfo->bhash[i];
+
+		spin_lock_bh(&head->lock);
+		inet_bind_bucket_for_each(tb, &head->chain) {
+			if (net_eq(ib_net(tb), net))
+				++ports;
+		}
+		spin_unlock_bh(&head->lock);
+	}
+
+	return ports;
+}
+
 /*
  * This will accept the next outstanding connection.
  */
