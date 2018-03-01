@@ -1677,6 +1677,66 @@ static void scsi_eh_offline_sdevs(struct list_head *work_q,
 }
 
 /**
+ * scsi_zbc_noretry_cmd - Determine if ZBC device command can be retried
+ * @scmd:       Failed cmd to check
+ *
+ * Test the error condition of a failed ZBC device command to determine cases
+ * that are known to be not worth retrying.
+ * If the specified command is not intended for a ZBC device, do nothing.
+ */
+bool scsi_zbc_noretry_cmd(struct scsi_cmnd *scmd)
+{
+	struct request *rq = scmd->request;
+	struct scsi_sense_hdr sshdr;
+
+	/*
+	 * The request queue zone model may not be set when this is called
+	 * during device probe/revalidation. In that case, just fall back to
+	 * default behavior and let the caller decide what to do with failures.
+	 */
+	if (!blk_queue_is_zoned(rq->q))
+		return false;
+
+	if (!scsi_command_normalize_sense(scmd, &sshdr))
+		/* no valid sense data, don't know, so maybe retry */
+		return false;
+
+	if (sshdr.sense_key != ILLEGAL_REQUEST)
+		return false;
+
+	switch (req_op(rq)) {
+	case REQ_OP_ZONE_RESET:
+
+		if (sshdr.asc == 0x24) {
+			/*
+			 * INVALID FIELD IN CDB error: reset of a conventional
+			 * zone was attempted. Nothing to worry about, so be
+			 * quiet about the error.
+			 */
+			if (!blk_rq_is_passthrough(rq))
+				rq->rq_flags |= RQF_QUIET;
+			return true;
+		}
+		return false;
+
+	case REQ_OP_WRITE:
+	case REQ_OP_WRITE_ZEROES:
+	case REQ_OP_WRITE_SAME:
+
+		/*
+		 * INVALID ADDRESS FOR WRITE error: It is unlikely that
+		 * retrying write requests failed with any kind of
+		 * alignement error will result in success. So don't.
+		 */
+		return sshdr.asc == 0x21;
+
+	default:
+		return false;
+	}
+}
+EXPORT_SYMBOL_GPL(scsi_zbc_noretry_cmd);
+
+/**
  * scsi_noretry_cmd - determine if command should be failed fast
  * @scmd:	SCSI cmd to examine.
  */
@@ -1704,6 +1764,12 @@ int scsi_noretry_cmd(struct scsi_cmnd *scmd)
 		return 0;
 
 check_type:
+	/*
+	 * For ZBC, do not retry conditions that will only fail again.
+	 */
+	if (scmd->device->type == TYPE_ZBC &&
+	    scsi_zbc_noretry_cmd(scmd))
+		return 1;
 	/*
 	 * assume caller has checked sense and determined
 	 * the check condition was retryable.

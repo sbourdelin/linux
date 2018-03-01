@@ -284,8 +284,7 @@ extern void sd_zbc_remove(struct scsi_disk *sdkp);
 extern void sd_zbc_print_zones(struct scsi_disk *sdkp);
 extern int sd_zbc_setup_report_cmnd(struct scsi_cmnd *cmd);
 extern int sd_zbc_setup_reset_cmnd(struct scsi_cmnd *cmd);
-extern void sd_zbc_complete(struct scsi_cmnd *cmd, unsigned int good_bytes,
-			    struct scsi_sense_hdr *sshdr);
+extern void sd_zbc_complete(struct scsi_cmnd *cmd, unsigned int good_bytes);
 
 #else /* CONFIG_BLK_DEV_ZONED */
 
@@ -310,8 +309,9 @@ static inline int sd_zbc_setup_reset_cmnd(struct scsi_cmnd *cmd)
 }
 
 static inline void sd_zbc_complete(struct scsi_cmnd *cmd,
-				   unsigned int good_bytes,
-				   struct scsi_sense_hdr *sshdr) {}
+				   unsigned int good_bytes)
+{
+}
 
 #endif /* CONFIG_BLK_DEV_ZONED */
 

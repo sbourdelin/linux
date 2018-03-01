@@ -18,6 +18,7 @@ extern int scsi_block_when_processing_errors(struct scsi_device *);
 extern bool scsi_command_normalize_sense(const struct scsi_cmnd *cmd,
 					 struct scsi_sense_hdr *sshdr);
 extern int scsi_check_sense(struct scsi_cmnd *);
+extern bool scsi_zbc_noretry_cmd(struct scsi_cmnd *);
 
 static inline bool scsi_sense_is_deferred(const struct scsi_sense_hdr *sshdr)
 {
