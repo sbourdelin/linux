@@ -444,6 +444,11 @@ alternative_endif
  * 	Corrupts:	tmp1, tmp2
  */
 	.macro invalidate_icache_by_line start, end, tmp1, tmp2, label
+#ifdef CONFIG_ARM64_SKIP_CACHE_POU
+alternative_if ARM64_HAS_CACHE_DIC
+	b	9996f
+alternative_else_nop_endif
+#endif
 	icache_line_size \tmp1, \tmp2
 	sub	\tmp2, \tmp1, #1
 	bic	\tmp2, \start, \tmp2
@@ -453,6 +458,7 @@ USER(\label, ic	ivau, \tmp2)			// invalidate I line PoU
 	cmp	\tmp2, \end
 	b.lo	9997b
 	dsb	ish
+9996:
 	isb
 	.endm
 

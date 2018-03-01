@@ -1091,6 +1091,18 @@ config ARM64_RAS_EXTN
 	  and access the new registers if the system supports the extension.
 	  Platform RAS features may additionally depend on firmware support.
 
+config ARM64_SKIP_CACHE_POU
+	bool "Enable support to skip cache PoU operations"
+	default y
+	help
+	  Explicit point of unification cache operations can be eliminated
+	  in software if the hardware handles transparently. The new bits in
+	  CTR_EL0, CTR_EL0.DIC and CTR_EL0.IDC indicates the hardware
+	  capabilities of ICache and DCache PoU requirements.
+
+	  Selecting this feature will allow the kernel to optimize cache
+	  maintenance to the PoU.
+
 endmenu
 
 config ARM64_SVE
