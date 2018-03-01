@@ -128,7 +128,6 @@ enum g762_regs {
 			 G762_REG_FAN_CMD2_GEAR_MODE_1)) >> 2))
 
 struct g762_data {
-	struct device *hwmon_dev;
 	struct i2c_client *client;
 	struct clk *clk;
 
@@ -173,6 +172,9 @@ struct g762_data {
 		      *   4: Mask ALERT# (g763 only)
 		      */
 };
+
+static void g762_remove(void *data);
+
 
 /*
  * Convert count value from fan controller register (FAN_SET_CNT) into fan
@@ -626,6 +628,7 @@ static int g762_of_clock_enable(struct i2c_client *client)
 	data = i2c_get_clientdata(client);
 	data->clk = clk;
 
+	devm_add_action(&client->dev, g762_remove, data);
 	return 0;
 
  clk_unprep:
@@ -1051,9 +1054,17 @@ static inline int g762_fan_init(struct device *dev)
 					 data->fan_cmd1);
 }
 
+static void g762_remove(void *data)
+{
+	struct g762_data *g762 = data;
+
+	g762_of_clock_disable(g762->client);
+}
+
 static int g762_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct device *dev = &client->dev;
+	struct device *hwmon_dev;
 	struct g762_data *data;
 	int ret;
 
@@ -1080,35 +1091,16 @@ static int g762_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		return ret;
 	ret = g762_of_prop_import(client);
 	if (ret)
-		goto clock_dis;
+		return ret;
 	/* ... or platform_data */
 	ret = g762_pdata_prop_import(client);
 	if (ret)
-		goto clock_dis;
+		return ret;
 
-	data->hwmon_dev = hwmon_device_register_with_groups(dev, client->name,
+	hwmon_dev = devm_hwmon_device_register_with_groups(dev, client->name,
 							    data, g762_groups);
-	if (IS_ERR(data->hwmon_dev)) {
-		ret = PTR_ERR(data->hwmon_dev);
-		goto clock_dis;
-	}
 
-	return 0;
-
- clock_dis:
-	g762_of_clock_disable(client);
-
-	return ret;
-}
-
-static int g762_remove(struct i2c_client *client)
-{
-	struct g762_data *data = i2c_get_clientdata(client);
-
-	hwmon_device_unregister(data->hwmon_dev);
-	g762_of_clock_disable(client);
-
-	return 0;
+	return PTR_ERR_OR_ZERO(hwmon_dev);
 }
 
 static struct i2c_driver g762_driver = {
@@ -1117,7 +1109,6 @@ static struct i2c_driver g762_driver = {
 		.of_match_table = of_match_ptr(g762_dt_match),
 	},
 	.probe	  = g762_probe,
-	.remove	  = g762_remove,
 	.id_table = g762_id,
 };
 
