@@ -57,6 +57,14 @@ osi_setup_entries[OSI_STRING_ENTRIES_MAX] __initdata = {
 	{"Processor Device", true},
 	{"3.0 _SCP Extensions", true},
 	{"Processor Aggregator Device", true},
+	/* Linux-Dell-Video is used by BIOS to disable RTD3 for nvidia graphics
+	 * cards as RTD3 is not supported by drivers now. Systems with nvidia
+	 * cards will hang without RTD3 disabled.
+	 *
+	 * Once nvidia drivers officially support RTD3, this _OSI strings can
+	 * be removed if both new and old graphics cards are supported.
+	 */
+	{"Linux-Dell-Video", true},
 };
 
 static u32 acpi_osi_handler(acpi_string interface, u32 supported)
