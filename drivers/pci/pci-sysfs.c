@@ -710,6 +710,30 @@ static ssize_t sriov_drivers_autoprobe_store(struct device *dev,
 	return count;
 }
 
+static ssize_t sriov_unmanaged_autoprobe_show(struct device *dev,
+					      struct device_attribute *attr,
+					      char *buf)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+
+	return sprintf(buf, "%u\n", pdev->sriov->unmanaged_autoprobe);
+}
+
+static ssize_t sriov_unmanaged_autoprobe_store(struct device *dev,
+					       struct device_attribute *attr,
+					       const char *buf, size_t count)
+{
+	struct pci_dev *pdev = to_pci_dev(dev);
+	bool unmanaged_autoprobe;
+
+	if (kstrtobool(buf, &unmanaged_autoprobe) < 0)
+		return -EINVAL;
+
+	pdev->sriov->unmanaged_autoprobe = unmanaged_autoprobe;
+
+	return count;
+}
+
 static struct device_attribute sriov_totalvfs_attr = __ATTR_RO(sriov_totalvfs);
 static struct device_attribute sriov_numvfs_attr =
 		__ATTR(sriov_numvfs, (S_IRUGO|S_IWUSR|S_IWGRP),
@@ -720,6 +744,10 @@ static struct device_attribute sriov_vf_device_attr = __ATTR_RO(sriov_vf_device)
 static struct device_attribute sriov_drivers_autoprobe_attr =
 		__ATTR(sriov_drivers_autoprobe, (S_IRUGO|S_IWUSR|S_IWGRP),
 		       sriov_drivers_autoprobe_show, sriov_drivers_autoprobe_store);
+static struct device_attribute sriov_unmanaged_autoprobe_attr =
+		__ATTR(sriov_unmanaged_autoprobe, (S_IRUGO|S_IWUSR|S_IWGRP),
+		       sriov_unmanaged_autoprobe_show,
+		       sriov_unmanaged_autoprobe_store);
 #endif /* CONFIG_PCI_IOV */
 
 static ssize_t driver_override_store(struct device *dev,
@@ -1789,6 +1817,7 @@ static struct attribute *sriov_dev_attrs[] = {
 	&sriov_stride_attr.attr,
 	&sriov_vf_device_attr.attr,
 	&sriov_drivers_autoprobe_attr.attr,
+	&sriov_unmanaged_autoprobe_attr.attr,
 	NULL,
 };
 
