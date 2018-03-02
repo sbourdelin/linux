@@ -13,6 +13,7 @@
 #define MAX_CMDS_PER_TCS		16
 #define MAX_TCS_PER_TYPE		3
 #define MAX_TCS_NR			(MAX_TCS_PER_TYPE * TCS_TYPE_NR)
+#define MAX_TCS_SLOTS			(MAX_CMDS_PER_TCS * MAX_TCS_PER_TYPE)
 
 struct rsc_drv;
 
@@ -44,6 +45,8 @@ struct tcs_response {
  * @ncpt: number of commands in each TCS
  * @tcs_lock: lock for synchronizing this TCS writes
  * @responses: response objects for requests sent from each TCS
+ * @cmd_addr: flattened cache of cmds in sleep/wake TCS
+ * @slots: indicates which of @cmd_addr are occupied
  */
 struct tcs_group {
 	struct rsc_drv *drv;
@@ -54,6 +57,9 @@ struct tcs_group {
 	int ncpt;
 	spinlock_t tcs_lock;
 	struct tcs_response *responses[MAX_TCS_PER_TYPE];
+	u32 *cmd_addr;
+	DECLARE_BITMAP(slots, MAX_TCS_SLOTS);
+
 };
 
 /**
@@ -83,6 +89,7 @@ struct rsc_drv {
 
 
 int rpmh_rsc_send_data(struct rsc_drv *drv, struct tcs_request *msg);
+int rpmh_rsc_write_ctrl_data(struct rsc_drv *drv, struct tcs_request *msg);
 
 void rpmh_tx_done(struct tcs_request *msg, int r);
 
