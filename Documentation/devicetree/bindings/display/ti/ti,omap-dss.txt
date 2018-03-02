@@ -21,6 +21,13 @@ a RGB pixel stream to encoders.
 The encoder modules encode the received RGB pixel stream to a video output like
 HDMI, MIPI DPI, etc.
 
+DISPC
+-----
+
+Optional properties:
+- max-memory-bandwidth: Input memory (from main memory to dispc) bandwidth limit
+			in bytes per second
+
 Video Ports
 -----------
 
