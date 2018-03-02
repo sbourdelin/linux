@@ -2157,7 +2157,8 @@ static void vmx_save_host_state(struct kvm_vcpu *vcpu)
 
 #ifdef CONFIG_X86_64
 	vmcs_writel(HOST_FS_BASE, current->thread.fsbase);
-	vmcs_writel(HOST_GS_BASE, read_msr(MSR_GS_BASE));
+	vmcs_writel(HOST_GS_BASE, (unsigned long)
+		    per_cpu(irq_stack_union.gs_base, smp_processor_id()));
 #else
 	vmcs_writel(HOST_FS_BASE, segment_base(vmx->host_state.fs_sel));
 	vmcs_writel(HOST_GS_BASE, segment_base(vmx->host_state.gs_sel));
