@@ -637,6 +637,16 @@ void omapdss_set_is_initialized(bool set);
 struct device_node *dss_of_port_get_parent_device(struct device_node *port);
 u32 dss_of_port_get_port_number(struct device_node *port);
 
+struct dispc_plane_mappings {
+	struct {
+		u32 main_id;
+		u32 aux_id;
+		u32 crtc_mask;
+		bool	is_virtual;
+	} plane[4];
+	u32 num_planes;
+};
+
 struct dss_mgr_ops {
 	int (*connect)(enum omap_channel channel,
 		struct omap_dss_device *dst);
@@ -719,6 +729,7 @@ struct dispc_ops {
 			enum omap_channel channel);
 
 	const u32 *(*ovl_get_color_modes)(enum omap_plane_id plane);
+	int (*get_plane_mapping)(struct dispc_plane_mappings *plane);
 };
 
 void dispc_set_ops(const struct dispc_ops *o);

@@ -4334,6 +4334,115 @@ static u32 dispc_get_memory_bandwidth_limit(void)
 	return limit;
 }
 
+static struct device_node *dispc_of_get_plane_by_id(struct device_node *node,
+						    u32 id)
+{
+	struct device_node *plane;
+
+	for_each_child_of_node(node, plane) {
+		u32 plane_id = 0;
+
+		if (of_node_cmp(plane->name, "plane") != 0)
+			continue;
+		of_property_read_u32(plane, "reg", &plane_id);
+		if (id == plane_id)
+			break;
+	}
+
+	return plane;
+}
+
+static int dispc_parse_dt_plane_data(struct dispc_plane_mappings *plane)
+{
+	struct platform_device *pdev = dispc.pdev;
+	struct device_node *np = pdev->dev.of_node;
+	struct device_node *ep;
+	struct property *prop;
+	const __be32 *cur;
+	u32 v;
+	u32 num_ovls = dispc_get_num_ovls();
+	unsigned long int hw_plane_mask = (1 << num_ovls) - 1;
+	u32 num_planes;
+	int i, index;
+
+	if (!np)
+		return 0;
+
+	for (i = 0; i < num_ovls; i++) {
+		ep = dispc_of_get_plane_by_id(np, i);
+		if (!ep)
+			break;
+		if (!of_property_read_bool(ep, "hw-planes")) {
+			dev_err(&pdev->dev,
+				"malformed plane node: hw-planes missing.\n");
+			return -EINVAL;
+		}
+
+		index = 0;
+		of_property_for_each_u32(ep, "hw-planes", prop, cur, v) {
+			if (v >= num_ovls) {
+				dev_err(&pdev->dev,
+					"hw-planes property: '%d' out-of-range.\n",
+					v);
+				return -EINVAL;
+			}
+			if (!(hw_plane_mask & BIT_MASK(v))) {
+				dev_err(&pdev->dev,
+					"hw-planes property: '%d' used more than once.\n",
+					v);
+				return -EINVAL;
+			}
+			clear_bit(v, &hw_plane_mask);
+
+			if (index == 0) {
+				plane->plane[i].main_id = v;
+			} else if (index == 1) {
+				plane->plane[i].aux_id = v;
+				plane->plane[i].is_virtual = true;
+			} else if (index > 1) {
+				dev_err(&pdev->dev,
+					"hw-planes property: more than 2 values specified.\n");
+				return -EINVAL;
+			}
+			index++;
+		}
+
+		of_property_for_each_u32(ep, "hw-crtcs", prop, cur, v) {
+			if (v >= num_ovls) {
+				dev_err(&pdev->dev,
+					"hw-crtcs property: '%d' out-of-range.\n",
+					v);
+				return -EINVAL;
+			}
+			plane->plane[i].crtc_mask |= 1 << v;
+		}
+	}
+
+	num_planes = i;
+
+	if (num_planes) {
+		dev_dbg(&pdev->dev, "Plane definitions found from DT:");
+		for (i = 0; i < num_planes; i++) {
+			if (plane->plane[i].is_virtual) {
+				dev_dbg(&pdev->dev,
+					"plane%d: virtual hw-planes: %d, %d crtc_mask: 0x%04x",
+					i, plane->plane[i].main_id,
+					plane->plane[i].aux_id,
+					plane->plane[i].crtc_mask);
+			} else {
+				dev_dbg(&pdev->dev,
+					"plane%d: hw-planes: %d crtc_mask: 0x%04x",
+					i, plane->plane[i].main_id,
+					plane->plane[i].crtc_mask);
+			}
+		}
+	}
+
+	plane->num_planes = num_planes;
+
+	return 0;
+}
+
 /*
  * Workaround for errata i734 in DSS dispc
  *  - LCD1 Gamma Correction Is Not Working When GFX Pipe Is Disabled
@@ -4525,6 +4634,7 @@ static const struct dispc_ops dispc_ops = {
 	.ovl_enable = dispc_ovl_enable,
 	.ovl_setup = dispc_ovl_setup,
 	.ovl_get_color_modes = dispc_ovl_get_color_modes,
+	.get_plane_mapping = dispc_parse_dt_plane_data,
 };
 
 /* DISPC HW IP initialisation */
