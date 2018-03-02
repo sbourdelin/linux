@@ -27,6 +27,34 @@ DISPC
 Optional properties:
 - max-memory-bandwidth: Input memory (from main memory to dispc) bandwidth limit
 			in bytes per second
+- plane: Child node(s) which defines which logical plane are available to
+	the system. If at least one plane child node is defined then
+	only planes defined by these nodes will be available to the system.
+	Plane nodes must be sequential starting with reg = <0> as DT parsing
+	will stop on the first missing numbered node.
+	This means if plane #1 is defined but plane #0 is not then it will
+	be as if none of the plane nodes were defined.
+
+	Each plane node contains the following properties:
+	Required properties:
+	- reg:       Used to number the logical plane
+	- hw-planes: One or two HW plane number(s).
+		     When 2 numbers are present this indicates a virtual plane
+		     composed of two physical planes intended to be used
+		     when the display is larger then the capacity of a
+		     single plane i.e. wider than 2048 pixels.
+		     The first number in the pair will dictate the capabilities
+		     of the virtual plane. This means that for proper
+		     operation the virtual plane should be composed of HW
+		     planes of the same capabilities.
+		     If GFX plane is used in a virtual plane it should be
+		     specified first, otherwise unexpected behavior would
+		     be encountered.
+	Optional property:
+	- hw-crtcs:  One or more HW crtc number(s).
+		     Describe the list of CRTCs on which this plane is
+		     available. If this node is not present then the
+		     plane will be available on all available CRTCs.
 
 Video Ports
 -----------
@@ -215,4 +243,39 @@ OMAP HDMI --(HDMI)--> TPD12S015 --(HDMI)--> HDMI Connector
 			remote-endpoint = <&tpd12s015_in>;
 		};
 	};
+};
+
+A short example on how to define a virtual plane configuration
+to enable wide display support.
+Here we define:
+- plane#0 to be the HW plane #0 (i.e. GFX plane)
+	  only available on crtc #0
+- plane#1 to be a virtual wide plane composed of HW plane #1 and #2
+	  (i.e. VID1 & VID2) available on crtc #0 & #1
+- plane#2 to be the HW plane #3 (i.e. VID3 plane)
+	  only available on crtc #0
+
+&dss {
+        dispc@58001000 {
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+                plane@0 {
+                        reg = <0>;
+                        hw-planes = <0>;
+                        hw-crtcs = <0>;
+                };
+
+                plane@1 {
+                        reg = <1>;
+                        hw-planes = <1 2>;
+                        hw-crtcs = <0 1>;
+                };
+
+                plane@2 {
+                        reg = <2>;
+                        hw-planes = <3>;
+                        hw-crtcs = <0>;
+                };
+        };
 };
