@@ -584,6 +584,7 @@ static void virtio_pci_remove(struct pci_dev *pci_dev)
 	else
 		virtio_pci_modern_remove(vp_dev);
 
+	pci_disable_sriov(pci_dev);
 	pci_disable_device(pci_dev);
 	put_device(dev);
 }
@@ -595,6 +596,9 @@ static struct pci_driver virtio_pci_driver = {
 	.remove		= virtio_pci_remove,
 #ifdef CONFIG_PM_SLEEP
 	.driver.pm	= &virtio_pci_pm_ops,
+#endif
+#ifdef CONFIG_PCI_IOV
+	.sriov_configure = pci_sriov_configure_unmanaged,
 #endif
 };
 
