@@ -30,7 +30,8 @@ struct drm_plane;
 
 struct drm_plane *omap_plane_init(struct drm_device *dev,
 		int idx, enum drm_plane_type type,
-		u32 possible_crtcs);
+		u32 possible_crtcs,
+		struct dispc_plane_mappings *plane_mappings);
 void omap_plane_install_properties(struct drm_plane *plane,
 		struct drm_mode_object *obj);
 

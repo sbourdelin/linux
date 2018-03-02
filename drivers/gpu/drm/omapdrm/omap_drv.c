@@ -188,10 +188,9 @@ cleanup:
 	return r;
 }
 
-static int omap_modeset_init_properties(struct drm_device *dev)
+static int omap_modeset_init_properties(struct drm_device *dev, u32 num_planes)
 {
 	struct omap_drm_private *priv = dev->dev_private;
-	unsigned int num_planes = priv->dispc_ops->get_num_ovls();
 
 	priv->zorder_prop = drm_property_create_range(dev, 0, "zorder", 0,
 						      num_planes - 1);
@@ -210,10 +209,19 @@ static int omap_modeset_init(struct drm_device *dev)
 	int num_crtcs, crtc_idx, plane_idx;
 	int ret;
 	u32 plane_crtc_mask;
+	struct dispc_plane_mappings plane_mappings = {0};
 
 	drm_mode_config_init(dev);
 
-	ret = omap_modeset_init_properties(dev);
+	ret = priv->dispc_ops->get_plane_mapping(&plane_mappings);
+	if (ret < 0)
+		return ret;
+
+	/* use plane mappings info */
+	if (plane_mappings.num_planes)
+		num_ovls = plane_mappings.num_planes;
+
+	ret = omap_modeset_init_properties(dev, num_ovls);
 	if (ret < 0)
 		return ret;
 
@@ -266,7 +274,7 @@ static int omap_modeset_init(struct drm_device *dev)
 			return -ENOMEM;
 
 		plane = omap_plane_init(dev, plane_idx, DRM_PLANE_TYPE_PRIMARY,
-					plane_crtc_mask);
+					plane_crtc_mask, &plane_mappings);
 		if (IS_ERR(plane))
 			return PTR_ERR(plane);
 
@@ -296,7 +304,7 @@ static int omap_modeset_init(struct drm_device *dev)
 			return -EINVAL;
 
 		plane = omap_plane_init(dev, plane_idx, DRM_PLANE_TYPE_OVERLAY,
-			plane_crtc_mask);
+					plane_crtc_mask, &plane_mappings);
 		if (IS_ERR(plane))
 			return PTR_ERR(plane);
 
