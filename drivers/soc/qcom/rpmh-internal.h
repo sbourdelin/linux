@@ -90,6 +90,7 @@ struct rsc_drv {
 
 int rpmh_rsc_send_data(struct rsc_drv *drv, struct tcs_request *msg);
 int rpmh_rsc_write_ctrl_data(struct rsc_drv *drv, struct tcs_request *msg);
+int rpmh_rsc_invalidate(struct rsc_drv *drv);
 
 void rpmh_tx_done(struct tcs_request *msg, int r);
 
