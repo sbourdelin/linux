@@ -18,6 +18,9 @@ int rpmh_write(struct rpmh_client *rc, enum rpmh_state state,
 int rpmh_write_async(struct rpmh_client *rc, enum rpmh_state state,
 		    struct tcs_cmd *cmd, int n);
 
+int rpmh_write_batch(struct rpmh_client *rc, enum rpmh_state state,
+		    struct tcs_cmd *cmd, int *n);
+
 struct rpmh_client *rpmh_get_client(struct platform_device *pdev);
 
 int rpmh_flush(struct rpmh_client *rc);
@@ -38,6 +41,11 @@ static inline struct rpmh_client *rpmh_get_client(struct platform_device *pdev)
 static inline int rpmh_write_async(struct rpmh_client *rc,
 				  enum rpmh_state state,
 				  struct tcs_cmd *cmd, int n)
+{ return -ENODEV; }
+
+static inline int rpmh_write_batch(struct rpmh_client *rc,
+				  enum rpmh_state state,
+				  struct tcs_cmd *cmd, int *n)
 { return -ENODEV; }
 
 static inline int rpmh_flush(struct rpmh_client *rc)
