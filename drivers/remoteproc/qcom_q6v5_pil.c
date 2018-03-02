@@ -841,17 +841,18 @@ static int q6v5_start(struct rproc *rproc)
 		dev_err(qproc->dev, "failed to enable supplies\n");
 		goto disable_proxy_clk;
 	}
-	ret = qproc->ops->reset_start(qproc);
-	if (ret) {
-		dev_err(qproc->dev, "failed to deassert mss restart\n");
-		goto disable_vdd;
-	}
 
 	ret = q6v5_clk_enable(qproc->dev, qproc->active_clks,
 			      qproc->active_clk_count);
 	if (ret) {
 		dev_err(qproc->dev, "failed to enable clocks\n");
-		goto assert_reset;
+		goto disable_vdd;
+	}
+
+	ret = qproc->ops->reset_start(qproc);
+	if (ret) {
+		dev_err(qproc->dev, "failed to deassert mss restart\n");
+		goto disable_active_clks;
 	}
 
 	/* Assign MBA image access in DDR to q6 */
@@ -862,7 +863,7 @@ static int q6v5_start(struct rproc *rproc)
 		dev_err(qproc->dev,
 			"assigning Q6 access to mba memory failed: %d\n",
 			xfermemop_ret);
-		goto disable_active_clks;
+		goto assert_reset;
 	}
 
 	writel(qproc->mba_phys, qproc->rmb_base + RMB_MBA_IMAGE_REG);
@@ -931,12 +932,12 @@ reclaim_mba:
 			"Failed to reclaim mba buffer, system may become unstable\n");
 	}
 
+assert_reset:
+	qproc->ops->reset_stop(qproc);
 disable_active_clks:
 	q6v5_clk_disable(qproc->dev, qproc->active_clks,
 			 qproc->active_clk_count);
 
-assert_reset:
-	qproc->ops->reset_stop(qproc);
 disable_vdd:
 	q6v5_regulator_disable(qproc, qproc->active_regs,
 			       qproc->active_reg_count);
