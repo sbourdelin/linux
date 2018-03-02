@@ -1224,6 +1224,8 @@ static void vfio_pci_remove(struct pci_dev *pdev)
 				VGA_RSRC_LEGACY_IO | VGA_RSRC_LEGACY_MEM);
 	}
 
+	pci_disable_sriov(pdev);
+
 	if (!disable_idle_d3)
 		pci_set_power_state(pdev, PCI_D0);
 }
@@ -1260,12 +1262,67 @@ static const struct pci_error_handlers vfio_err_handlers = {
 	.error_detected = vfio_pci_aer_err_detected,
 };
 
+static int vfio_pci_sriov_configure(struct pci_dev *pdev, int nr_virtfn)
+{
+	struct vfio_pci_device *vdev;
+	struct vfio_device *device;
+	int err;
+
+	device = vfio_device_get_from_dev(&pdev->dev);
+	if (device == NULL)
+		return -ENODEV;
+
+	vdev = vfio_device_data(device);
+	if (vdev == NULL) {
+		vfio_device_put(device);
+		return -ENODEV;
+	}
+
+	/*
+	 * If a userspace process is already using this device just return
+	 * busy and don't allow for any changes.
+	 */
+	if (vdev->refcnt) {
+		pci_warn(pdev,
+			 "PF is currently in use, blocked until released by user\n");
+		return -EBUSY;
+	}
+
+	err = pci_sriov_configure_unmanaged(pdev, nr_virtfn);
+	if (err <= 0)
+		return err;
+
+	/*
+	 * We are now leaving VFs in the control of some unknown PF entity.
+	 *
+	 * Best case is a well behaved userspace PF is expected and any VMs
+	 * that the VFs will be assigned to are dependent on the userspace
+	 * entity anyway. An example being NFV where maybe the PF is acting
+	 * as an accelerated interface for a firewall or switch.
+	 *
+	 * Worst case is somebody really messed up and just enabled SR-IOV
+	 * on a device they were planning to assign to a VM somwhere.
+	 *
+	 * In either case it is probably best for us to set the taint flag
+	 * and warn the user since this could get really ugly really quick
+	 * if this wasn't what they were planning to do.
+	 */
+	add_taint(TAINT_USER, LOCKDEP_STILL_OK);
+	pci_warn(pdev,
+		 "Adding kernel taint for vfio-pci now managing SR-IOV PF device\n");
+
+	return nr_virtfn;
+}
+
 static struct pci_driver vfio_pci_driver = {
 	.name		= "vfio-pci",
 	.id_table	= NULL, /* only dynamic ids */
 	.probe		= vfio_pci_probe,
 	.remove		= vfio_pci_remove,
 	.err_handler	= &vfio_err_handlers,
+#ifdef CONFIG_PCI_IOV
+	.sriov_configure = vfio_pci_sriov_configure,
+#endif
 };
 
 struct vfio_devices {
