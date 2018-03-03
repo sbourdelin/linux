@@ -139,7 +139,7 @@ struct drm_driver {
 	 *
 	 * All legacy drivers use this callback to de-initialize the hardware.
 	 * This is purely because of the shadow-attach model, where the DRM
-	 * kernel driver does not really own the hardware. Instead ownershipe is
+	 * kernel driver does not really own the hardware. Instead ownership is
 	 * handled with the help of userspace through an inheritedly racy dance
 	 * to set/unset the VT into raw mode.
 	 *
