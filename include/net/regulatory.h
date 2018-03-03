@@ -156,9 +156,10 @@ struct regulatory_request {
  *	system. Conversely, a self-managed wiphy does not share its regulatory
  *	hints with other devices in the system. If a system contains several
  *	devices, one or more of which are self-managed, there might be
- *	contradictory regulatory settings between them. Usage of flag is
- *	generally discouraged. Only use it if the FW/driver is incompatible
- *	with non-locally originated hints.
+ *	contradictory regulatory settings between them. Regulatory information
+ *	from trusted user space sources can still be passed to self-managed
+ *	wiphy. Usage of this flag is generally discouraged. Only use it if the
+ *	FW/driver is incompatible with non-locally originated hints.
  *	This flag is incompatible with the flags: %REGULATORY_CUSTOM_REG,
  *	%REGULATORY_STRICT_REG, %REGULATORY_COUNTRY_IE_FOLLOW_POWER,
  *	%REGULATORY_COUNTRY_IE_IGNORE and %REGULATORY_DISABLE_BEACON_HINTS.
