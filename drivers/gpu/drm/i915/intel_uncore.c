@@ -1890,7 +1890,31 @@ static reset_func intel_get_gpu_reset(struct drm_i915_private *dev_priv)
 		return NULL;
 }
 
-int intel_gpu_reset(struct drm_i915_private *dev_priv, unsigned engine_mask)
+static void i915_engines_set_mode(struct drm_i915_private *dev_priv,
+				  unsigned int engine_mask,
+				  u32 mode)
+{
+	struct intel_engine_cs *engine;
+	enum intel_engine_id id;
+
+	if (INTEL_GEN(dev_priv) < 3)
+		return;
+
+	for_each_engine_masked(engine, dev_priv, engine_mask, id)
+		I915_WRITE_FW(RING_MI_MODE(engine->mmio_base), mode);
+}
+
+void intel_gpu_reset_prepare(struct drm_i915_private *dev_priv,
+			     unsigned int engine_mask)
+{
+	intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
+	i915_engines_set_mode(dev_priv, engine_mask,
+			      _MASKED_BIT_ENABLE(STOP_RING));
+}
+
+int intel_gpu_reset(struct drm_i915_private *dev_priv,
+		    unsigned int engine_mask)
 {
 	reset_func reset = intel_get_gpu_reset(dev_priv);
 	int retry;
@@ -1928,6 +1952,16 @@ int intel_gpu_reset(struct drm_i915_private *dev_priv, unsigned engine_mask)
 	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 
 	return ret;
+}
+
+void intel_gpu_reset_finish(struct drm_i915_private *dev_priv,
+			    unsigned int engine_mask)
+{
+	/* Clear the STOP_RING bit as the reset may not have occurred */
+	i915_engines_set_mode(dev_priv, engine_mask,
+			      _MASKED_BIT_DISABLE(STOP_RING));
+
+	intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
 }
 
 bool intel_has_gpu_reset(struct drm_i915_private *dev_priv)

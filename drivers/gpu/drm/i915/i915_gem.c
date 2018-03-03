@@ -2953,6 +2953,8 @@ i915_gem_reset_prepare_engine(struct intel_engine_cs *engine)
 	if (engine->i915->guc.preempt_wq)
 		flush_workqueue(engine->i915->guc.preempt_wq);
 
+	intel_gpu_reset_prepare(engine->i915, BIT(engine->id));
+
 	if (engine->irq_seqno_barrier)
 		engine->irq_seqno_barrier(engine);
 
@@ -3154,6 +3156,8 @@ void i915_gem_reset(struct drm_i915_private *dev_priv)
 
 void i915_gem_reset_finish_engine(struct intel_engine_cs *engine)
 {
+	intel_gpu_reset_finish(engine->i915, BIT(engine->id));
+
 	tasklet_enable(&engine->execlists.tasklet);
 	kthread_unpark(engine->breadcrumbs.signaler);
 

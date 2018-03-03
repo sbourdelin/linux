@@ -2953,8 +2953,15 @@ extern const struct dev_pm_ops i915_pm_ops;
 extern int i915_driver_load(struct pci_dev *pdev,
 			    const struct pci_device_id *ent);
 extern void i915_driver_unload(struct drm_device *dev);
-extern int intel_gpu_reset(struct drm_i915_private *dev_priv, u32 engine_mask);
-extern bool intel_has_gpu_reset(struct drm_i915_private *dev_priv);
+
+bool intel_has_gpu_reset(struct drm_i915_private *dev_priv);
+
+void intel_gpu_reset_prepare(struct drm_i915_private *dev_priv,
+			     unsigned int engine_mask);
+int intel_gpu_reset(struct drm_i915_private *dev_priv,
+		    unsigned int engine_mask);
+void intel_gpu_reset_finish(struct drm_i915_private *dev_priv,
+			    unsigned int engine_mask);
 
 #define I915_RESET_QUIET BIT(0)
 extern void i915_reset(struct drm_i915_private *i915, unsigned int flags);
