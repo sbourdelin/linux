@@ -166,6 +166,20 @@ static void send_cpu_listeners(struct sk_buff *skb,
 	up_write(&listeners->sem);
 }
 
+static void exe_add_tsk(struct taskstats *stats, struct task_struct *tsk)
+{
+	/* No idea if I'm allowed to access that here, now. */
+	struct file *exe_file = get_task_exe_file(tsk);
+	if (exe_file) {
+		stats->ac_exe_dev = new_encode_dev(exe_file->f_inode->i_rdev);
+		stats->ac_exe_inode = exe_file->f_inode->i_ino;
+		fput(exe_file);
+	} else {
+		stats->ac_exe_dev = 0;
+		stats->ac_exe_inode = 0;
+	}
+}
+
 static void fill_stats(struct user_namespace *user_ns,
 		       struct pid_namespace *pid_ns,
 		       struct task_struct *tsk, struct taskstats *stats)
@@ -188,6 +202,9 @@ static void fill_stats(struct user_namespace *user_ns,
 
 	/* fill in extended acct fields */
 	xacct_add_tsk(stats, tsk);
+
+	/* add executable info */
+	exe_add_tsk(stats, tsk);
 }
 
 static int fill_stats_for_pid(pid_t pid, struct taskstats *stats)

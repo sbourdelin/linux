@@ -34,7 +34,7 @@
  */
 
 
-#define TASKSTATS_VERSION	8
+#define TASKSTATS_VERSION	9
 #define TS_COMM_LEN		32	/* should be >= TASK_COMM_LEN
 					 * in linux/sched.h */
 
@@ -164,6 +164,24 @@ struct taskstats {
 	/* Delay waiting for memory reclaim */
 	__u64	freepages_count;
 	__u64	freepages_delay_total;
+
+	/*
+	 * Version 9:
+	 * Extra fields detailing executable file (/proc/$pid/exe).
+	 * Values are both zero if there is no executable file
+	 * Chose 64 bit for both to keep alignment. Only 32 bit expected
+	 * for device, while userspace will usually only use 16 anyway.
+	 * The client application is supposed to translate that to a
+	 * file path itself, with knowledge about possible failure
+	 * modes (changes in mounts, filesystem operations).
+	 * Communicating the path from the kernel's view would mean
+	 * adding PATH_MAX bytes to this struct and more work.
+	 * I guess we do not want that. It would be convenient, though.
+	 */
+	__u64	ac_exe_dev;	/* device ID */
+	__u64	ac_exe_inode;	/* inode number */
+	/* Version 9 ends here. */
+
 };
 
 
