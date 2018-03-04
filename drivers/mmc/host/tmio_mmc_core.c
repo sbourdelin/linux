@@ -1247,7 +1247,7 @@ int tmio_mmc_host_probe(struct tmio_mmc_host *_host)
 		_host->ops.get_ro = mmc_gpio_get_ro;
 
 	if (mmc_can_gpio_cd(mmc))
-		_host->ops.get_ro = mmc_gpio_get_cd;
+		_host->ops.get_cd = mmc_gpio_get_cd;
 
 	_host->native_hotplug = !(mmc_can_gpio_cd(mmc) ||
 				  mmc->caps & MMC_CAP_NEEDS_POLL ||
