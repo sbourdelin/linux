@@ -95,7 +95,7 @@ static inline unsigned long perf_ip_adjust(struct pt_regs *regs)
 {
 	return 0;
 }
-static inline void perf_get_data_addr(struct pt_regs *regs, u64 *addrp) { }
+static inline void perf_get_data_addr(struct pt_regs *regs, u64 *addrp, struct perf_event *event) { }
 static inline u32 perf_get_misc_flags(struct pt_regs *regs)
 {
 	return 0;
@@ -174,7 +174,7 @@ static inline unsigned long perf_ip_adjust(struct pt_regs *regs)
  * pointed to by SIAR; this is indicated by the [POWER6_]MMCRA_SDSYNC, the
  * [POWER7P_]MMCRA_SDAR_VALID bit in MMCRA, or the SDAR_VALID bit in SIER.
  */
-static inline void perf_get_data_addr(struct pt_regs *regs, u64 *addrp)
+static inline void perf_get_data_addr(struct pt_regs *regs, u64 *addrp, struct perf_event *event)
 {
 	unsigned long mmcra = regs->dsisr;
 	bool sdar_valid;
@@ -198,6 +198,11 @@ static inline void perf_get_data_addr(struct pt_regs *regs, u64 *addrp)
 
 	if (!(mmcra & MMCRA_SAMPLE_ENABLE) || sdar_valid)
 		*addrp = mfspr(SPRN_SDAR);
+
+	if (perf_paranoid_kernel() && !capable(CAP_SYS_ADMIN) &&
+		(event->attr.exclude_kernel || event->attr.exclude_hv) &&
+		is_kernel_addr(mfspr(SPRN_SDAR)))
+		*addrp = 0;
 }
 
 static bool regs_sihv(struct pt_regs *regs)
@@ -2054,7 +2059,7 @@ static void record_and_restart(struct perf_event *event, unsigned long val,
 
 		if (event->attr.sample_type &
 		    (PERF_SAMPLE_ADDR | PERF_SAMPLE_PHYS_ADDR))
-			perf_get_data_addr(regs, &data.addr);
+			perf_get_data_addr(regs, &data.addr, event);
 
 		if (event->attr.sample_type & PERF_SAMPLE_BRANCH_STACK) {
 			struct cpu_hw_events *cpuhw;
