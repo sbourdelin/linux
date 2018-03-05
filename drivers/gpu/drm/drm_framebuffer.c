@@ -148,6 +148,23 @@ static int fb_plane_height(int height,
 	return DIV_ROUND_UP(height, format->vsub);
 }
 
+static bool planes_have_format(struct drm_device *dev, u32 format)
+{
+	struct drm_plane *plane;
+
+	/* TODO: maybe maintain a device level format list? */
+	drm_for_each_plane(plane, dev) {
+		int i;
+
+		for (i = 0; i < plane->format_count; i++) {
+			if (plane->format_types[i] == format)
+				return true;
+		}
+	}
+
+	return false;
+}
+
 static int framebuffer_check(struct drm_device *dev,
 			     const struct drm_mode_fb_cmd2 *r)
 {
@@ -161,6 +178,15 @@ static int framebuffer_check(struct drm_device *dev,
 		DRM_DEBUG_KMS("bad framebuffer format %s\n",
 		              drm_get_format_name(r->pixel_format,
 		                                  &format_name));
+		return -EINVAL;
+	}
+
+	if (!planes_have_format(dev, r->pixel_format)) {
+		struct drm_format_name_buf format_name;
+
+		DRM_DEBUG_KMS("unsupported framebuffer format %s\n",
+			      drm_get_format_name(r->pixel_format,
+						  &format_name));
 		return -EINVAL;
 	}
 
