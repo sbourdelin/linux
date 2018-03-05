@@ -447,7 +447,7 @@ qedr_addr6_resolve(struct qedr_dev *dev,
 	fl6.daddr = dst_in->sin6_addr;
 	fl6.saddr = src_in->sin6_addr;
 
-	dst = ip6_route_output(&init_net, NULL, &fl6);
+	dst = ip6_route_output(dev_net(dev->ndev), NULL, &fl6);
 
 	if ((!dst) || dst->error) {
 		if (dst) {
