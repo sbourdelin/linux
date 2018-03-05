@@ -10564,11 +10564,8 @@ static int nested_vmx_load_cr3(struct kvm_vcpu *vcpu, unsigned long cr3, bool ne
 	return 0;
 }
 
-static void prepare_vmcs02_full(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
-			       bool from_vmentry)
+static void prepare_vmcs02_segmentation(struct vmcs12 *vmcs12)
 {
-	struct vcpu_vmx *vmx = to_vmx(vcpu);
-
 	vmcs_write16(GUEST_ES_SELECTOR, vmcs12->guest_es_selector);
 	vmcs_write16(GUEST_SS_SELECTOR, vmcs12->guest_ss_selector);
 	vmcs_write16(GUEST_DS_SELECTOR, vmcs12->guest_ds_selector);
@@ -10600,6 +10597,12 @@ static void prepare_vmcs02_full(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 	vmcs_writel(GUEST_TR_BASE, vmcs12->guest_tr_base);
 	vmcs_writel(GUEST_GDTR_BASE, vmcs12->guest_gdtr_base);
 	vmcs_writel(GUEST_IDTR_BASE, vmcs12->guest_idtr_base);
+}
+
+static void prepare_vmcs02_full(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
+			       bool from_vmentry)
+{
+	struct vcpu_vmx *vmx = to_vmx(vcpu);
 
 	vmcs_write32(GUEST_SYSENTER_CS, vmcs12->guest_sysenter_cs);
 	vmcs_writel(GUEST_PENDING_DBG_EXCEPTIONS,
@@ -10714,6 +10717,14 @@ static int prepare_vmcs02(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12,
 	vmcs_write32(GUEST_CS_AR_BYTES, vmcs12->guest_cs_ar_bytes);
 	vmcs_writel(GUEST_ES_BASE, vmcs12->guest_es_base);
 	vmcs_writel(GUEST_CS_BASE, vmcs12->guest_cs_base);
+
+	/*
+	 * Segment registers must be synchronized prior to any code that may
+	 * trigger a call to emulation_required()/guest_state_valid(), e.g.
+	 * vmx_set_cr0().
+	 */
+	if (vmx->nested.dirty_vmcs12)
+		prepare_vmcs02_segmentation(vmcs12);
 
 	/*
 	 * Not in vmcs02: GUEST_PML_INDEX, HOST_FS_SELECTOR, HOST_GS_SELECTOR,
