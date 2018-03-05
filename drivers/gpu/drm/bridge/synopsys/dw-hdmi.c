@@ -2567,8 +2567,10 @@ err_res:
 
 static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
 {
-	if (hdmi->audio && !IS_ERR(hdmi->audio))
+	if (hdmi->audio && !IS_ERR(hdmi->audio)) {
+		kfree(hdmi->audio->dev.dma_mask);
 		platform_device_unregister(hdmi->audio);
+	}
 	if (!IS_ERR(hdmi->cec))
 		platform_device_unregister(hdmi->cec);
 
