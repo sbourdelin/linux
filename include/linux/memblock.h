@@ -432,6 +432,10 @@ static inline unsigned long memblock_reserved_memory_within(phys_addr_t start_ad
 	return 0;
 }
 
+static inline int memblock_free(phys_addr_t base, phys_addr_t size)
+{
+	return 0;
+}
 #endif /* CONFIG_HAVE_MEMBLOCK */
 
 #endif /* __KERNEL__ */
