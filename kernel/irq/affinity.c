@@ -94,17 +94,17 @@ static int get_nodes_in_cpumask(const cpumask_var_t *node_to_cpumask,
 	return nodes;
 }
 
-static int irq_build_affinity_masks(int nvecs, const struct irq_affinity *affd,
+static int irq_build_affinity_masks(const struct irq_affinity *affd,
+				    const int start_vec, const int affv,
 				    const cpumask_var_t *node_to_cpumask,
 				    const struct cpumask *cpu_mask,
 				    struct cpumask *nmsk,
 				    struct cpumask *masks)
 {
-	int affv = nvecs - affd->pre_vectors - affd->post_vectors;
 	int last_affv = affv + affd->pre_vectors;
-	int curvec = affd->pre_vectors;
+	int curvec = start_vec;
 	nodemask_t nodemsk = NODE_MASK_NONE;
-	int n, nodes, cpus_per_vec, extra_vecs;
+	int n, nodes, cpus_per_vec, extra_vecs, done = 0;
 
 	nodes = get_nodes_in_cpumask(node_to_cpumask, cpu_mask, &nodemsk);
 
@@ -116,8 +116,10 @@ static int irq_build_affinity_masks(int nvecs, const struct irq_affinity *affd,
 		for_each_node_mask(n, nodemsk) {
 			cpumask_copy(masks + curvec,
 				     node_to_cpumask[n]);
-			if (++curvec == last_affv)
+			if (++done == affv)
 				break;
+			if (++curvec == last_affv)
+				curvec = affd->pre_vectors;
 		}
 		goto out;
 	}
@@ -150,13 +152,16 @@ static int irq_build_affinity_masks(int nvecs, const struct irq_affinity *affd,
 			irq_spread_init_one(masks + curvec, nmsk, cpus_per_vec);
 		}
 
-		if (curvec >= last_affv)
+		done += v;
+		if (done >= affv)
 			break;
+		if (curvec >= last_affv)
+			curvec = affd->pre_vectors;
 		--nodes;
 	}
 
 out:
-	return curvec - affd->pre_vectors;
+	return done;
 }
 
 /**
@@ -169,6 +174,7 @@ out:
 struct cpumask *
 irq_create_affinity_masks(int nvecs, const struct irq_affinity *affd)
 {
+	int affv = nvecs - affd->pre_vectors - affd->post_vectors;
 	int curvec;
 	struct cpumask *masks;
 	cpumask_var_t nmsk, *node_to_cpumask;
@@ -198,7 +204,8 @@ irq_create_affinity_masks(int nvecs, const struct irq_affinity *affd)
 	/* Stabilize the cpumasks */
 	get_online_cpus();
 	build_node_to_cpumask(node_to_cpumask);
-	curvec += irq_build_affinity_masks(nvecs, affd, node_to_cpumask,
+	curvec += irq_build_affinity_masks(affd, curvec, affv,
+					   node_to_cpumask,
 					   cpu_possible_mask, nmsk, masks);
 	put_online_cpus();
 
