@@ -6836,6 +6836,8 @@ static int handle_invalid_guest_state(struct kvm_vcpu *vcpu)
 
 		err = emulate_instruction(vcpu, 0);
 
+		vmx->nested.nested_run_pending = 0;
+
 		if (err == EMULATE_USER_EXIT) {
 			++vcpu->stat.mmio_exits;
 			ret = 0;
