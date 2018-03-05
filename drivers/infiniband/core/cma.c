@@ -1050,6 +1050,8 @@ EXPORT_SYMBOL(rdma_init_qp_attr);
 static inline int cma_zero_addr(struct sockaddr *addr)
 {
 	switch (addr->sa_family) {
+	case AF_UNSPEC:
+		return 1;
 	case AF_INET:
 		return ipv4_is_zeronet(((struct sockaddr_in *)addr)->sin_addr.s_addr);
 	case AF_INET6:
@@ -3069,19 +3071,21 @@ static int cma_port_is_unique(struct rdma_bind_list *bind_list,
 			continue;
 
 		/* different dest port -> unique */
-		if (!cma_any_port(cur_daddr) &&
+		if (!cma_any_port(daddr) &&
+		    !cma_any_port(cur_daddr) &&
 		    (dport != cur_dport))
+			continue;
+
+		/* different dst address -> unique */
+		if (!cma_any_addr(daddr) &&
+		    !cma_any_addr(cur_daddr) &&
+		    cma_addr_cmp(daddr, cur_daddr))
 			continue;
 
 		/* different src address -> unique */
 		if (!cma_any_addr(saddr) &&
 		    !cma_any_addr(cur_saddr) &&
 		    cma_addr_cmp(saddr, cur_saddr))
-			continue;
-
-		/* different dst address -> unique */
-		if (!cma_any_addr(cur_daddr) &&
-		    cma_addr_cmp(daddr, cur_daddr))
 			continue;
 
 		return -EADDRNOTAVAIL;
