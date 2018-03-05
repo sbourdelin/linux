@@ -77,7 +77,10 @@ struct acm_rb {
 	unsigned char		*base;
 	dma_addr_t		dma;
 	int			index;
+	struct urb		*urb;
 	struct acm		*instance;
+	unsigned int		offset;
+	struct list_head	node;
 };
 
 struct acm {
@@ -96,6 +99,7 @@ struct acm {
 	unsigned long read_urbs_free;
 	struct urb *read_urbs[ACM_NR];
 	struct acm_rb read_buffers[ACM_NR];
+	struct list_head wait_list;
 	struct acm_wb *putbuffer;			/* for acm_tty_put_char() */
 	int rx_buflimit;
 	spinlock_t read_lock;

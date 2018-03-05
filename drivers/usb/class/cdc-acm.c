@@ -150,12 +150,18 @@ static inline int acm_set_control(struct acm *acm, int control)
 static void acm_kill_urbs(struct acm *acm)
 {
 	int i;
+	struct acm_rb *rb, *t;
 
 	usb_kill_urb(acm->ctrlurb);
 	for (i = 0; i < ACM_NW; i++)
 		usb_kill_urb(acm->wb[i].urb);
 	for (i = 0; i < acm->rx_buflimit; i++)
 		usb_kill_urb(acm->read_urbs[i]);
+	list_for_each_entry_safe(rb, t, &acm->wait_list, node) {
+		set_bit(rb->index, &acm->read_urbs_free);
+		rb->offset = 0;
+		list_del_init(&rb->node);
+	}
 }
 
 /*
@@ -453,14 +459,27 @@ static int acm_submit_read_urbs(struct acm *acm, gfp_t mem_flags)
 	return 0;
 }
 
-static void acm_process_read_urb(struct acm *acm, struct urb *urb)
+static int acm_process_read_urb(struct acm *acm, struct urb *urb)
 {
+	int flipped, remainder;
+	struct acm_rb *rb = urb->context;
 	if (!urb->actual_length)
-		return;
+		return 0;
+	flipped = tty_insert_flip_string(&acm->port,
+			urb->transfer_buffer + rb->offset,
+			urb->actual_length - rb->offset);
+	rb->offset += flipped;
+	remainder = urb->actual_length - rb->offset;
+	if (remainder != 0)
+		dev_dbg(&acm->data->dev,
+			"remaining data: usb %d len %d offset %d flipped %d\n",
+			rb->index, urb->actual_length, rb->offset, flipped);
+	else
+		rb->offset = 0;
 
-	tty_insert_flip_string(&acm->port, urb->transfer_buffer,
-			urb->actual_length);
 	tty_flip_buffer_push(&acm->port);
+
+	return remainder;
 }
 
 static void acm_read_bulk_callback(struct urb *urb)
@@ -473,17 +492,29 @@ static void acm_read_bulk_callback(struct urb *urb)
 	dev_vdbg(&acm->data->dev, "got urb %d, len %d, status %d\n",
 		rb->index, urb->actual_length, status);
 
-	set_bit(rb->index, &acm->read_urbs_free);
-
 	if (!acm->dev) {
 		dev_dbg(&acm->data->dev, "%s - disconnected\n", __func__);
+		set_bit(rb->index, &acm->read_urbs_free);
 		return;
 	}
 
+	if (status == 0) {
+		int rem = urb->actual_length;
+
+		usb_mark_last_busy(acm->dev);
+		if (list_empty_careful(&acm->wait_list))
+			rem = acm_process_read_urb(acm, urb);
+		if (rem) {
+			dev_vdbg(&acm->data->dev,
+				"queuing urb %d\n", rb->index);
+			list_add_tail(&rb->node, &acm->wait_list);
+			return;
+		}
+	}
+	set_bit(rb->index, &acm->read_urbs_free);
+
 	switch (status) {
 	case 0:
-		usb_mark_last_busy(acm->dev);
-		acm_process_read_urb(acm, urb);
 		break;
 	case -EPIPE:
 		set_bit(EVENT_RX_STALL, &acm->flags);
@@ -517,6 +548,8 @@ static void acm_read_bulk_callback(struct urb *urb)
 		acm_submit_read_urb(acm, rb->index, GFP_ATOMIC);
 	} else {
 		spin_unlock_irqrestore(&acm->read_lock, flags);
+		dev_vdbg(&acm->data->dev,
+			"urb %d is suspended by throttling\n", rb->index);
 	}
 }
 
@@ -548,8 +581,14 @@ static void acm_softint(struct work_struct *work)
 
 	if (test_bit(EVENT_RX_STALL, &acm->flags)) {
 		if (!(usb_autopm_get_interface(acm->data))) {
+			struct acm_rb *rb, *t;
 			for (i = 0; i < acm->rx_buflimit; i++)
 				usb_kill_urb(acm->read_urbs[i]);
+			list_for_each_entry_safe(rb, t, &acm->wait_list, node) {
+				set_bit(rb->index, &acm->read_urbs_free);
+				rb->offset = 0;
+				list_del_init(&rb->node);
+			}
 			usb_clear_halt(acm->dev, acm->in);
 			acm_submit_read_urbs(acm, GFP_KERNEL);
 			usb_autopm_put_interface(acm->data);
@@ -898,14 +937,32 @@ static void acm_tty_unthrottle(struct tty_struct *tty)
 {
 	struct acm *acm = tty->driver_data;
 	unsigned int was_throttled;
+	struct acm_rb *rb, *t;
+	bool processed = false;
+	int rem = 0;
 
 	spin_lock_irq(&acm->read_lock);
+
+	list_for_each_entry_safe(rb, t, &acm->wait_list, node) {
+		dev_vdbg(&acm->data->dev, "processing urb %d: %d/%d\n",
+			rb->index, rb->offset, rb->urb->actual_length);
+		rem = acm_process_read_urb(acm, rb->urb);
+		if (rem) {
+			spin_unlock_irq(&acm->read_lock);
+			return;
+		}
+		processed = true;
+		set_bit(rb->index, &acm->read_urbs_free);
+		rb->offset = 0;
+		list_del_init(&rb->node);
+	}
+
 	was_throttled = acm->throttled;
 	acm->throttled = 0;
 	acm->throttle_req = 0;
 	spin_unlock_irq(&acm->read_lock);
 
-	if (was_throttled)
+	if (was_throttled || processed)
 		acm_submit_read_urbs(acm, GFP_KERNEL);
 }
 
@@ -1427,6 +1484,8 @@ made_compressed_probe:
 	if (!acm->ctrlurb)
 		goto alloc_fail5;
 
+	INIT_LIST_HEAD(&acm->wait_list);
+
 	for (i = 0; i < num_rx_buf; i++) {
 		struct acm_rb *rb = &(acm->read_buffers[i]);
 		struct urb *urb;
@@ -1442,6 +1501,9 @@ made_compressed_probe:
 		if (!urb)
 			goto alloc_fail6;
 
+		rb->offset = 0;
+		rb->urb = urb;
+		INIT_LIST_HEAD(&rb->node);
 		urb->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 		urb->transfer_dma = rb->dma;
 		if (usb_endpoint_xfer_int(epread))
