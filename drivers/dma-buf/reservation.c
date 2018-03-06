@@ -118,7 +118,8 @@ reservation_object_add_shared_inplace(struct reservation_object *obj,
 		old_fence = rcu_dereference_protected(fobj->shared[i],
 						reservation_object_held(obj));
 
-		if (old_fence->context == fence->context) {
+		if (old_fence->context == fence->context &&
+			dma_fence_is_later(fence, old_fence)) {
 			/* memory barrier is added by write_seqcount_begin */
 			RCU_INIT_POINTER(fobj->shared[i], fence);
 			write_seqcount_end(&obj->seq);
@@ -158,6 +159,7 @@ reservation_object_add_shared_replace(struct reservation_object *obj,
 				      struct dma_fence *fence)
 {
 	unsigned i, j, k;
+	bool wrong_fence = false;
 
 	dma_fence_get(fence);
 
@@ -179,15 +181,29 @@ reservation_object_add_shared_replace(struct reservation_object *obj,
 		check = rcu_dereference_protected(old->shared[i],
 						reservation_object_held(obj));
 
-		if (check->context == fence->context ||
-		    dma_fence_is_signaled(check))
+		if (dma_fence_is_signaled(check)) {
+			/* put check to tail of fobj if signaled */
 			RCU_INIT_POINTER(fobj->shared[--k], check);
-		else
+		} else if (check->context == fence->context) {
+			if (dma_fence_is_later(fence, check)) {
+				/* put check to tail of fobj if it is deprecated */
+				RCU_INIT_POINTER(fobj->shared[--k], check);
+			} else {
+				/* this is a wrong operation that add an eld fence */
+				wrong_fence = true;
+				RCU_INIT_POINTER(fobj->shared[j++], check);
+			}
+		} else {
+			/* add fence to new slot */
 			RCU_INIT_POINTER(fobj->shared[j++], check);
+		}
 	}
+
 	fobj->shared_count = j;
-	RCU_INIT_POINTER(fobj->shared[fobj->shared_count], fence);
-	fobj->shared_count++;
+	if (!wrong_fence) {
+		RCU_INIT_POINTER(fobj->shared[fobj->shared_count], fence);
+		fobj->shared_count++;
+	}
 
 done:
 	preempt_disable();
