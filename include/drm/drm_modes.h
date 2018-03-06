@@ -461,6 +461,10 @@ bool drm_mode_is_420_also(const struct drm_display_info *display,
 			  const struct drm_display_mode *mode);
 bool drm_mode_is_420(const struct drm_display_info *display,
 		     const struct drm_display_mode *mode);
+bool drm_mode_aspect_ratio_allowed(const struct drm_file *file_priv,
+				   uint32_t flags);
+void drm_mode_handle_aspect_ratio(const struct drm_file *file_priv,
+				  uint32_t *flags);
 
 struct drm_display_mode *drm_cvt_mode(struct drm_device *dev,
 				      int hdisplay, int vdisplay, int vrefresh,

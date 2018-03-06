@@ -1761,3 +1761,47 @@ bool drm_mode_is_420(const struct drm_display_info *display,
 		drm_mode_is_420_also(display, mode);
 }
 EXPORT_SYMBOL(drm_mode_is_420);
+
+/**
+ * drm_mode_aspect_ratio_allowed - checks if the aspect-ratio information
+ * is expected from the user-mode.
+ *
+ * If the user has set aspect-ratio cap, then the flag of the user-mode is
+ * allowed to contain aspect-ratio value.
+ * If the user does not set aspect-ratio cap, then the only value allowed in the
+ * flags bits is aspect-ratio NONE.
+ *
+ * @file_priv: file private structure to get the user capabilities
+ * @flag: 32 bit flag that contains the aspect-ratio information.
+ *
+ * Returns:
+ * true if the aspect-ratio info is allowed in the user-mode flags.
+ * false, otherwise.
+ */
+bool
+drm_mode_aspect_ratio_allowed(const struct drm_file *file_priv, uint32_t flags)
+{
+	return file_priv->aspect_ratio_allowed ||
+	       (flags & DRM_MODE_FLAG_PIC_AR_MASK) == DRM_MODE_FLAG_PIC_AR_NONE;
+}
+EXPORT_SYMBOL(drm_mode_aspect_ratio_allowed);
+
+/**
+ * drm_mode_handle_aspect_ratio - handles the aspect-ratio bits in the user-mode
+ * flags.
+ *
+ * Checks if the aspect-ratio information is allowed. Resets the aspect-ratio
+ * bits in the user-mode flag, if aspect-ratio info is not allowed.
+ *
+ * @file_priv: file private structure to get the user capabilities.
+ * @flag: 32 bit flag that is to be modified, in case the aspect
+ * ratio info is not allowed.
+ *
+ */
+void
+drm_mode_handle_aspect_ratio(const struct drm_file *file_priv, uint32_t *flags)
+{
+	if (!drm_mode_aspect_ratio_allowed(file_priv, *flags))
+		*flags &= ~DRM_MODE_FLAG_PIC_AR_MASK;
+}
+EXPORT_SYMBOL(drm_mode_handle_aspect_ratio);
