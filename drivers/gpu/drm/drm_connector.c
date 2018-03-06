@@ -1531,14 +1531,36 @@ static struct drm_encoder *drm_connector_get_encoder(struct drm_connector *conne
 	return connector->encoder;
 }
 
-static bool drm_mode_expose_to_userspace(const struct drm_display_mode *mode,
-					 const struct drm_file *file_priv)
+static bool
+drm_mode_expose_to_userspace(const struct drm_display_mode *mode,
+			     const struct drm_display_mode *last_mode,
+			     const struct drm_file *file_priv)
 {
 	/*
 	 * If user-space hasn't configured the driver to expose the stereo 3D
 	 * modes, don't expose them.
 	 */
 	if (!file_priv->stereo_allowed && drm_mode_is_stereo(mode))
+		return false;
+	/*
+	 * If user-space hasn't configured the driver to expose the modes with
+	 * aspect-ratio, don't expose them. But in case of a unique mode, let
+	 * the mode be passed, so that it can be enumerated with aspect-ratio
+	 * bits erased.
+	 *
+	 * It is assumed here, that the list of modes for a given connector, is
+	 * sorted, such that modes that have different aspect-ratios, but are
+	 * otherwise identical, are back to back.
+	 * This way, saving the last valid mode, and matching it with the
+	 * current mode will help in determining, if the current mode is unique.
+	 */
+	if (!file_priv->aspect_ratio_allowed &&
+	    mode->picture_aspect_ratio != HDMI_PICTURE_ASPECT_NONE &&
+	    last_mode && drm_mode_match(mode, last_mode,
+					DRM_MODE_MATCH_TIMINGS |
+					DRM_MODE_MATCH_CLOCK |
+					DRM_MODE_MATCH_FLAGS |
+					DRM_MODE_MATCH_3D_FLAGS))
 		return false;
 
 	return true;
@@ -1551,6 +1573,7 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	struct drm_connector *connector;
 	struct drm_encoder *encoder;
 	struct drm_display_mode *mode;
+	struct drm_display_mode *last_valid_mode;
 	int mode_count = 0;
 	int encoders_count = 0;
 	int ret = 0;
@@ -1606,9 +1629,13 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	out_resp->connection = connector->status;
 
 	/* delayed so we get modes regardless of pre-fill_modes state */
+	last_valid_mode = NULL;
 	list_for_each_entry(mode, &connector->modes, head)
-		if (drm_mode_expose_to_userspace(mode, file_priv))
+		if (drm_mode_expose_to_userspace(mode, last_valid_mode,
+						 file_priv)) {
 			mode_count++;
+			last_valid_mode = mode;
+		}
 
 	/*
 	 * This ioctl is called twice, once to determine how much space is
@@ -1617,11 +1644,15 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 	if ((out_resp->count_modes >= mode_count) && mode_count) {
 		copied = 0;
 		mode_ptr = (struct drm_mode_modeinfo __user *)(unsigned long)out_resp->modes_ptr;
+		last_valid_mode = NULL;
 		list_for_each_entry(mode, &connector->modes, head) {
-			if (!drm_mode_expose_to_userspace(mode, file_priv))
+			if (!drm_mode_expose_to_userspace(mode,
+							  last_valid_mode,
+							  file_priv))
 				continue;
 
 			drm_mode_convert_to_umode(&u_mode, mode);
+			drm_mode_handle_aspect_ratio(file_priv, &u_mode.flags);
 			if (copy_to_user(mode_ptr + copied,
 					 &u_mode, sizeof(u_mode))) {
 				ret = -EFAULT;
@@ -1629,6 +1660,7 @@ int drm_mode_getconnector(struct drm_device *dev, void *data,
 
 				goto out;
 			}
+			last_valid_mode = mode;
 			copied++;
 		}
 	}
