@@ -753,6 +753,11 @@ int drm_mode_getblob_ioctl(struct drm_device *dev,
 			ret = -EFAULT;
 			goto unref;
 		}
+		if (blob->is_video_mode) {
+			struct drm_mode_modeinfo *mode =
+			(struct drm_mode_modeinfo *) out_resp->data;
+			drm_mode_handle_aspect_ratio(file_priv, &mode->flags);
+		}
 	}
 	out_resp->length = blob->length;
 unref:
