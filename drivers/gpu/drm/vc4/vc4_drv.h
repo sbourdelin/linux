@@ -302,6 +302,12 @@ struct vc4_hvs {
 
 struct vc4_plane {
 	struct drm_plane base;
+
+	/* Set when the plane has per-pixel alpha content or does not cover
+	 * the entire screen. This is a hint to the CRTC that it might need
+	 * to enable background color fill.
+	 */
+	bool needs_bg_fill;
 };
 
 static inline struct vc4_plane *

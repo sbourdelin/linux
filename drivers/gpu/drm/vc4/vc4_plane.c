@@ -517,10 +517,12 @@ static int vc4_plane_mode_set(struct drm_plane *plane,
 {
 	struct vc4_dev *vc4 = to_vc4_dev(plane->dev);
 	struct vc4_plane_state *vc4_state = to_vc4_plane_state(state);
+	struct vc4_plane *vc4_plane = to_vc4_plane(plane);
 	struct drm_framebuffer *fb = state->fb;
 	u32 ctl0_offset = vc4_state->dlist_count;
 	const struct hvs_format *format = vc4_get_hvs_format(fb->format->format);
 	int num_planes = drm_format_num_planes(format->drm);
+	bool covers_screen;
 	u32 scl0, scl1, pitch0;
 	u32 lbm_size, tiling;
 	unsigned long irqflags;
@@ -625,7 +627,7 @@ static int vc4_plane_mode_set(struct drm_plane *plane,
 				      SCALER_POS2_ALPHA_MODE_PIPELINE :
 				      SCALER_POS2_ALPHA_MODE_FIXED,
 				      SCALER_POS2_ALPHA_MODE) |
-			(format->has_alpha ? SCALER_POS2_ALPHA_PREMULT : 0) |
+			(fb->format->has_alpha ? SCALER_POS2_ALPHA_PREMULT : 0) |
 			VC4_SET_FIELD(vc4_state->src_w[0], SCALER_POS2_WIDTH) |
 			VC4_SET_FIELD(vc4_state->src_h[0], SCALER_POS2_HEIGHT));
 
@@ -700,6 +702,17 @@ static int vc4_plane_mode_set(struct drm_plane *plane,
 
 	vc4_state->dlist[ctl0_offset] |=
 		VC4_SET_FIELD(vc4_state->dlist_count, SCALER_CTL0_SIZE);
+
+	/* crtc_* are already clipped coordinates. */
+	covers_screen = vc4_state->crtc_x == 0 && vc4_state->crtc_y == 0 &&
+			vc4_state->crtc_w == state->crtc->mode.hdisplay &&
+			vc4_state->crtc_h == state->crtc->mode.vdisplay;
+	/* Background fill might be necessary when the plane has per-pixel
+	 * alpha content and blends from the background or does not cover
+	 * the entire screen.
+	 */
+	vc4_plane->needs_bg_fill = fb->format->has_alpha || !covers_screen;
+
 
 	return 0;
 }
