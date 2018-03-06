@@ -446,6 +446,7 @@ int drm_mode_getcrtc(struct drm_device *dev,
 			crtc_resp->mode_valid = 0;
 		}
 	}
+	drm_mode_handle_aspect_ratio(file_priv, &crtc_resp->mode.flags);
 	drm_modeset_unlock(&crtc->mutex);
 
 	return 0;
@@ -613,6 +614,13 @@ retry:
 			ret = -ENOMEM;
 			goto out;
 		}
+		if (!drm_mode_aspect_ratio_allowed(file_priv,
+						   crtc_req->mode.flags)) {
+			DRM_DEBUG_KMS("Unexpected aspect-ratio flag bits\n");
+			ret = -EINVAL;
+			goto out;
+		}
+
 
 		ret = drm_mode_convert_umode(dev, mode, &crtc_req->mode);
 		if (ret) {
