@@ -2114,7 +2114,6 @@ static int option_probe(struct usb_serial *serial,
 {
 	struct usb_interface_descriptor *iface_desc =
 				&serial->interface->cur_altsetting->desc;
-	struct usb_device_descriptor *dev_desc = &serial->dev->descriptor;
 	const struct option_blacklist_info *blacklist;
 
 	/* Never bind to the CD-Rom emulation interface	*/
@@ -2129,14 +2128,6 @@ static int option_probe(struct usb_serial *serial,
 	blacklist = (void *)id->driver_info;
 	if (blacklist && test_bit(iface_desc->bInterfaceNumber,
 						&blacklist->reserved))
-		return -ENODEV;
-	/*
-	 * Don't bind network interface on Samsung GT-B3730, it is handled by
-	 * a separate module.
-	 */
-	if (dev_desc->idVendor == cpu_to_le16(SAMSUNG_VENDOR_ID) &&
-	    dev_desc->idProduct == cpu_to_le16(SAMSUNG_PRODUCT_GT_B3730) &&
-	    iface_desc->bInterfaceClass != USB_CLASS_CDC_DATA)
 		return -ENODEV;
 
 	/* Store the blacklist info so we can use it during attach. */
