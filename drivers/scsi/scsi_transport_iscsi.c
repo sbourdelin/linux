@@ -221,8 +221,10 @@ iscsi_create_endpoint(int dd_size)
 	ep->dev.class = &iscsi_endpoint_class;
 	dev_set_name(&ep->dev, "ep-%llu", (unsigned long long) id);
 	err = device_register(&ep->dev);
-        if (err)
-                goto free_ep;
+	if (err) {
+		put_device(&ep->dev);
+		return NULL;
+	}
 
 	err = sysfs_create_group(&ep->dev.kobj, &iscsi_endpoint_group);
 	if (err)
@@ -234,10 +236,6 @@ iscsi_create_endpoint(int dd_size)
 
 unregister_dev:
 	device_unregister(&ep->dev);
-	return NULL;
-
-free_ep:
-	kfree(ep);
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(iscsi_create_endpoint);
@@ -783,7 +781,7 @@ unreg_iface:
 
 free_iface:
 	put_device(iface->dev.parent);
-	kfree(iface);
+	put_device(&iface->dev);
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(iscsi_create_iface);
@@ -1260,7 +1258,7 @@ iscsi_create_flashnode_sess(struct Scsi_Host *shost, int index,
 	return fnode_sess;
 
 free_fnode_sess:
-	kfree(fnode_sess);
+	put_device(&fnode_sess->dev);
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(iscsi_create_flashnode_sess);
@@ -1308,7 +1306,7 @@ iscsi_create_flashnode_conn(struct Scsi_Host *shost,
 	return fnode_conn;
 
 free_fnode_conn:
-	kfree(fnode_conn);
+	put_device(&fnode_conn->dev);
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(iscsi_create_flashnode_conn);
@@ -2268,6 +2266,8 @@ iscsi_create_conn(struct iscsi_cls_session *session, int dd_size, uint32_t cid)
 
 release_parent_ref:
 	put_device(&session->dev);
+	put_device(&conn->dev);
+	conn = NULL;
 free_conn:
 	kfree(conn);
 	return NULL;
@@ -4420,8 +4420,10 @@ iscsi_register_transport(struct iscsi_transport *tt)
 	priv->dev.class = &iscsi_transport_class;
 	dev_set_name(&priv->dev, "%s", tt->name);
 	err = device_register(&priv->dev);
-	if (err)
-		goto free_priv;
+	if (err) {
+		put_device(&priv->dev);
+		return NULL;
+	}
 
 	err = sysfs_create_group(&priv->dev.kobj, &iscsi_transport_group);
 	if (err)
@@ -4455,9 +4457,6 @@ iscsi_register_transport(struct iscsi_transport *tt)
 
 unregister_dev:
 	device_unregister(&priv->dev);
-	return NULL;
-free_priv:
-	kfree(priv);
 	return NULL;
 }
 EXPORT_SYMBOL_GPL(iscsi_register_transport);
