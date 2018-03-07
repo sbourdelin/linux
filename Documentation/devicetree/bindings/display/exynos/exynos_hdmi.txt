@@ -50,6 +50,9 @@ Required properties for Exynos 5433:
 - clock-names: aliases for above clock specfiers.
 - samsung,sysreg: handle to syscon used to control the system registers.
 
+Optional properties for Exynos 4210, 4212, 5420 and 5433:
+ - #sound-dai-cells: should be 0.
+
 Example:
 
 	hdmi {
