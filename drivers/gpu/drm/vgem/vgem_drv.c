@@ -87,10 +87,10 @@ static int vgem_gem_fault(struct vm_fault *vmf)
 	mutex_unlock(&obj->pages_lock);
 	if (ret) {
 		struct page *page;
+		struct address_space *mapping;
 
-		page = shmem_read_mapping_page(
-					file_inode(obj->base.filp)->i_mapping,
-					page_offset);
+		mapping = file_inode(obj->base.filp)->i_mapping;
+		page = shmem_read_mapping_page(mapping, page_offset);
 		if (!IS_ERR(page)) {
 			vmf->page = page;
 			ret = 0;
