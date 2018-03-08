@@ -353,6 +353,7 @@ output_code()
 	critical_section_t *cs;
 	symbol_node_t *cur_node;
 	int instrcount;
+	int num_critical_sections;
 
 	instrcount = 0;
 	fprintf(ofile,
@@ -440,19 +441,20 @@ output_code()
 "	uint16_t	end;\n"
 "} critical_sections[] = {\n");
 
+	num_critical_sections = 0;
 	for (cs = TAILQ_FIRST(&cs_tailq);
 	     cs != NULL;
 	     cs = TAILQ_NEXT(cs, links)) {
 		fprintf(ofile, "%s\t{ %d, %d }",
 			cs == TAILQ_FIRST(&cs_tailq) ? "" : ",\n",
 			cs->begin_addr, cs->end_addr);
+		num_critical_sections++;
 	}
 
 	fprintf(ofile, "\n};\n\n");
 
 	fprintf(ofile,
-"static const int num_critical_sections = sizeof(critical_sections)\n"
-"				       / sizeof(*critical_sections);\n");
+		"#define NUM_CRITICAL_SECTIONS %d\n", num_critical_sections);
 
 	fprintf(stderr, "%s: %d instructions used\n", appname, instrcount);
 }
