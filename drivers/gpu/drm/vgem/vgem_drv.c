@@ -226,7 +226,7 @@ static int vgem_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
 }
 
 static int vgem_gem_dumb_map(struct drm_file *file, struct drm_device *dev,
-			     uint32_t handle, uint64_t *offset)
+			     u32 handle, uint64_t *offset)
 {
 	struct drm_gem_object *obj;
 	int ret;
