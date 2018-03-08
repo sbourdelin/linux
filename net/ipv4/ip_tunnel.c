@@ -363,8 +363,7 @@ static struct ip_tunnel *ip_tunnel_create(struct net *net,
 	struct net_device *dev;
 	int t_hlen;
 
-	BUG_ON(!itn->fb_tunnel_dev);
-	dev = __ip_tunnel_create(net, itn->fb_tunnel_dev->rtnl_link_ops, parms);
+	dev = __ip_tunnel_create(net, itn->rtnl_link_ops, parms);
 	if (IS_ERR(dev))
 		return ERR_CAST(dev);
 
@@ -845,7 +844,6 @@ int ip_tunnel_ioctl(struct net_device *dev, struct ip_tunnel_parm *p, int cmd)
 	struct net *net = t->net;
 	struct ip_tunnel_net *itn = net_generic(net, t->ip_tnl_net_id);
 
-	BUG_ON(!itn->fb_tunnel_dev);
 	switch (cmd) {
 	case SIOCGETTUNNEL:
 		if (dev == itn->fb_tunnel_dev) {
@@ -870,7 +868,7 @@ int ip_tunnel_ioctl(struct net_device *dev, struct ip_tunnel_parm *p, int cmd)
 				p->o_key = 0;
 		}
 
-		t = ip_tunnel_find(itn, p, itn->fb_tunnel_dev->type);
+		t = ip_tunnel_find(itn, p, itn->type);
 
 		if (cmd == SIOCADDTUNNEL) {
 			if (!t) {
@@ -1014,10 +1012,15 @@ int ip_tunnel_init_net(struct net *net, unsigned int ip_tnl_net_id,
 	struct ip_tunnel_parm parms;
 	unsigned int i;
 
+	itn->rtnl_link_ops = ops;
 	for (i = 0; i < IP_TNL_HASH_SIZE; i++)
 		INIT_HLIST_HEAD(&itn->tunnels[i]);
 
-	if (!ops) {
+	if (!ops || !net_has_fallback_tunnels(net)) {
+		struct ip_tunnel_net *it_init_net;
+
+		it_init_net = net_generic(&init_net, ip_tnl_net_id);
+		itn->type = it_init_net->type;
 		itn->fb_tunnel_dev = NULL;
 		return 0;
 	}
@@ -1035,6 +1038,7 @@ int ip_tunnel_init_net(struct net *net, unsigned int ip_tnl_net_id,
 		itn->fb_tunnel_dev->features |= NETIF_F_NETNS_LOCAL;
 		itn->fb_tunnel_dev->mtu = ip_tunnel_bind_dev(itn->fb_tunnel_dev);
 		ip_tunnel_add(itn, netdev_priv(itn->fb_tunnel_dev));
+		itn->type = itn->fb_tunnel_dev->type;
 	}
 	rtnl_unlock();
 
@@ -1042,10 +1046,10 @@ int ip_tunnel_init_net(struct net *net, unsigned int ip_tnl_net_id,
 }
 EXPORT_SYMBOL_GPL(ip_tunnel_init_net);
 
-static void ip_tunnel_destroy(struct ip_tunnel_net *itn, struct list_head *head,
+static void ip_tunnel_destroy(struct net *net, struct ip_tunnel_net *itn,
+			      struct list_head *head,
 			      struct rtnl_link_ops *ops)
 {
-	struct net *net = dev_net(itn->fb_tunnel_dev);
 	struct net_device *dev, *aux;
 	int h;
 
@@ -1077,7 +1081,7 @@ void ip_tunnel_delete_nets(struct list_head *net_list, unsigned int id,
 	rtnl_lock();
 	list_for_each_entry(net, net_list, exit_list) {
 		itn = net_generic(net, id);
-		ip_tunnel_destroy(itn, &list, ops);
+		ip_tunnel_destroy(net, itn, &list, ops);
 	}
 	unregister_netdevice_many(&list);
 	rtnl_unlock();
