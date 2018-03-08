@@ -94,7 +94,8 @@ static int vgem_gem_fault(struct vm_fault *vmf)
 		if (!IS_ERR(page)) {
 			vmf->page = page;
 			ret = 0;
-		} else switch (PTR_ERR(page)) {
+		} else {
+			switch (PTR_ERR(page)) {
 			case -ENOSPC:
 			case -ENOMEM:
 				ret = VM_FAULT_OOM;
@@ -110,8 +111,8 @@ static int vgem_gem_fault(struct vm_fault *vmf)
 				WARN_ON(PTR_ERR(page));
 				ret = VM_FAULT_SIGBUS;
 				break;
+			}
 		}
-
 	}
 	return ret;
 }
