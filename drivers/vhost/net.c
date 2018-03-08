@@ -972,6 +972,7 @@ static struct socket *vhost_net_stop_vq(struct vhost_net *n,
 	vhost_net_disable_vq(n, vq);
 	vq->private_data = NULL;
 	vhost_net_buf_unproduce(nvq);
+	vq->rx_ring = NULL;
 	mutex_unlock(&vq->mutex);
 	return sock;
 }
@@ -1161,8 +1162,6 @@ static long vhost_net_set_backend(struct vhost_net *n, unsigned index, int fd)
 		vhost_net_disable_vq(n, vq);
 		vq->private_data = sock;
 		vhost_net_buf_unproduce(nvq);
-		if (index == VHOST_NET_VQ_RX)
-			nvq->rx_ring = get_tap_ptr_ring(fd);
 		r = vhost_vq_init_access(vq);
 		if (r)
 			goto err_used;
@@ -1172,6 +1171,10 @@ static long vhost_net_set_backend(struct vhost_net *n, unsigned index, int fd)
 
 		oldubufs = nvq->ubufs;
 		nvq->ubufs = ubufs;
+		if (index == VHOST_NET_VQ_RX)
+			nvq->rx_ring = get_tap_ptr_ring(fd);
+		else
+			nvq->rx_ring = NULL;
 
 		n->tx_packets = 0;
 		n->tx_zcopy_err = 0;
