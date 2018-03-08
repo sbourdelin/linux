@@ -25,7 +25,7 @@
 
 #include "vgem_drv.h"
 
-#define VGEM_FENCE_TIMEOUT (10*HZ)
+#define VGEM_FENCE_TIMEOUT (10 * HZ)
 
 struct vgem_fence {
 	struct dma_fence base;
