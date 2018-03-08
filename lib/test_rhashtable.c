@@ -498,14 +498,16 @@ static unsigned int __init print_ht(struct rhltable *rhlt)
 	char buff[512] = "";
 	unsigned int i, cnt = 0;
 
+	rcu_read_lock();
+
 	ht = &rhlt->ht;
-	tbl = rht_dereference(ht->tbl, ht);
+	tbl = rht_dereference_rcu(ht->tbl, ht);
 	for (i = 0; i < tbl->size; i++) {
 		struct rhash_head *pos, *next;
 		struct test_obj_rhl *p;
 
-		pos = rht_dereference(tbl->buckets[i], ht);
-		next = !rht_is_a_nulls(pos) ? rht_dereference(pos->next, ht) : NULL;
+		pos = rht_dereference_rcu(tbl->buckets[i], ht);
+		next = !rht_is_a_nulls(pos) ? rht_dereference_rcu(pos->next, ht) : NULL;
 
 		if (!rht_is_a_nulls(pos)) {
 			sprintf(buff, "%s\nbucket[%d] -> ", buff, i);
@@ -516,7 +518,7 @@ static unsigned int __init print_ht(struct rhltable *rhlt)
 			sprintf(buff, "%s[[", buff);
 			do {
 				pos = &list->rhead;
-				list = rht_dereference(list->next, ht);
+				list = rht_dereference_rcu(list->next, ht);
 				p = rht_obj(ht, pos);
 
 				sprintf(buff, "%s val %d (tid=%d)%s", buff, p->value.id, p->value.tid,
@@ -526,12 +528,14 @@ static unsigned int __init print_ht(struct rhltable *rhlt)
 
 			pos = next,
 			next = !rht_is_a_nulls(pos) ?
-				rht_dereference(pos->next, ht) : NULL;
+				rht_dereference_rcu(pos->next, ht) : NULL;
 
 			sprintf(buff, "%s]]%s", buff, !rht_is_a_nulls(pos) ? " -> " : "");
 		}
 	}
 	printk(KERN_ERR "\n---- ht: ----%s\n-------------\n", buff);
+
+	rcu_read_unlock();
 
 	return cnt;
 }
