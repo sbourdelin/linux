@@ -3389,9 +3389,11 @@ skip_dpc:
 
 probe_init_failed:
 	qla2x00_free_req_que(ha, req);
+	req = NULL;
 	ha->req_q_map[0] = NULL;
 	clear_bit(0, ha->req_qid_map);
 	qla2x00_free_rsp_que(ha, rsp);
+	rsp = NULL;
 	ha->rsp_q_map[0] = NULL;
 	clear_bit(0, ha->rsp_qid_map);
 	ha->max_req_queues = ha->max_rsp_queues = 0;
@@ -3689,6 +3691,10 @@ qla2x00_remove_one(struct pci_dev *pdev)
 
 	qla2x00_free_device(base_vha);
 
+	qla2x00_mem_free(ha);
+
+	qla2x00_free_queues(ha);
+
 	qla2x00_clear_drv_active(ha);
 
 	scsi_host_put(base_vha->host);
@@ -3752,12 +3758,7 @@ qla2x00_free_device(scsi_qla_host_t *vha)
 		ha->wq = NULL;
 	}
 
-
-	qla2x00_mem_free(ha);
-
 	qla82xx_md_free(vha);
-
-	qla2x00_free_queues(ha);
 }
 
 void qla2x00_free_fcports(struct scsi_qla_host *vha)
