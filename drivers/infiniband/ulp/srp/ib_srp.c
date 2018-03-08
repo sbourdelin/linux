@@ -3418,12 +3418,15 @@ static int srp_parse_in(struct net *net, struct sockaddr_storage *sa,
 			const char *addr_port_str)
 {
 	char *addr = kstrdup(addr_port_str, GFP_KERNEL);
-	char *port_str = addr;
+	char *port_str;
 	int ret;
 
 	if (!addr)
 		return -ENOMEM;
-	strsep(&port_str, ":");
+	port_str = strrchr(addr, ':');
+	if (!port_str)
+		return -EINVAL;
+	*port_str++ = '\0';
 	ret = inet_pton_with_scope(net, AF_UNSPEC, addr, port_str, sa);
 	kfree(addr);
 	return ret;
