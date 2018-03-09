@@ -245,7 +245,13 @@ static int vfio_pci_enable(struct vfio_pci_device *vdev)
 
 	if (likely(!nointxmask)) {
 		if (vfio_pci_nointx(pdev)) {
-			dev_info(&pdev->dev, "Masking broken INTx support\n");
+			u8 pin = 0;
+
+			pci_read_config_byte(vdev->pdev, PCI_INTERRUPT_PIN,
+					     &pin);
+			if (pin)
+				dev_info(&pdev->dev,
+					 "Masking broken INTx support\n");
 			vdev->nointx = true;
 			pci_intx(pdev, 0);
 		} else
