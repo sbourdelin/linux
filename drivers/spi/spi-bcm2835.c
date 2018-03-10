@@ -448,7 +448,7 @@ static void bcm2835_dma_init(struct spi_master *master, struct device *dev)
 
 	/* all went well, so set can_dma */
 	master->can_dma = bcm2835_spi_can_dma;
-	master->max_dma_len = 65535; /* limitation by BCM2835_SPI_DLEN */
+	master->max_dma_len = 65528; /* limitation by BCM2835_SPI_DLEN */
 	/* need to do TX AND RX DMA, so we need dummy buffers */
 	master->flags = SPI_MASTER_MUST_RX | SPI_MASTER_MUST_TX;
 
