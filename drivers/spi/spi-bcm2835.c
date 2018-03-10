@@ -365,19 +365,6 @@ static bool bcm2835_spi_can_dma(struct spi_master *master,
 	if (tfr->len < BCM2835_SPI_DMA_MIN_LENGTH)
 		return false;
 
-	/* BCM2835_SPI_DLEN has defined a max transfer size as
-	 * 16 bit, so max is 65535
-	 * we can revisit this by using an alternative transfer
-	 * method - ideally this would get done without any more
-	 * interaction...
-	 */
-	if (tfr->len > 65535) {
-		dev_warn_once(&spi->dev,
-			      "transfer size of %d too big for dma-transfer\n",
-			      tfr->len);
-		return false;
-	}
-
 	/* if we run rx/tx_buf with word aligned addresses then we are OK */
 	if ((((size_t)tfr->rx_buf & 3) == 0) &&
 	    (((size_t)tfr->tx_buf & 3) == 0))

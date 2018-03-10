@@ -1242,6 +1242,14 @@ static void __spi_pump_messages(struct spi_controller *ctlr, bool in_kthread)
 	trace_spi_message_start(ctlr->cur_msg);
 
 	if (ctlr->prepare_message) {
+		gfp_t gfp_flags = GFP_KERNEL | GFP_DMA;
+		size_t max_transfer_size = 32000;
+		ret = spi_split_transfers_maxsize(ctlr, ctlr->cur_msg, max_transfer_size, gfp_flags);
+		if (ret) {
+			dev_err(&ctlr->dev,
+				"failed to split message\n");
+			goto out;
+		}
 		ret = ctlr->prepare_message(ctlr, ctlr->cur_msg);
 		if (ret) {
 			dev_err(&ctlr->dev, "failed to prepare message: %d\n",
