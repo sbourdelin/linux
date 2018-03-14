@@ -36,7 +36,7 @@ void subpage_prot_free(struct mm_struct *mm)
 		}
 	}
 	addr = 0;
-	for (i = 0; i < 2; ++i) {
+	for (i = 0; i < (TASK_SIZE_USER64 >> 43); ++i) {
 		p = spt->protptrs[i];
 		if (!p)
 			continue;
@@ -194,6 +194,9 @@ long sys_subpage_prot(unsigned long addr, unsigned long len, u32 __user *map)
 	size_t nw;
 	unsigned long next, limit;
 	int err;
+
+	if (radix_enabled())
+		return -ENOENT;
 
 	/* Check parameters */
 	if ((addr & ~PAGE_MASK) || (len & ~PAGE_MASK) ||

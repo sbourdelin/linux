@@ -111,7 +111,7 @@ struct blk_shadow {
 };
 
 struct blkif_req {
-	int	error;
+	blk_status_t	error;
 };
 
 static inline struct blkif_req *blkif_req(struct request *rq)
@@ -262,6 +262,7 @@ static DEFINE_SPINLOCK(minor_lock);
 
 static int blkfront_setup_indirect(struct blkfront_ring_info *rinfo);
 static void blkfront_gather_backend_features(struct blkfront_info *info);
+static int negotiate_mq(struct blkfront_info *info);
 
 static int get_id_from_freelist(struct blkfront_ring_info *rinfo)
 {
@@ -708,6 +709,7 @@ static int blkif_queue_rw_req(struct request *req, struct blkfront_ring_info *ri
 	 * existing persistent grants, or if we have to get new grants,
 	 * as there are not sufficiently many free.
 	 */
+	bool new_persistent_gnts = false;
 	struct scatterlist *sg;
 	int num_sg, max_grefs, num_grant;
 
@@ -719,19 +721,21 @@ static int blkif_queue_rw_req(struct request *req, struct blkfront_ring_info *ri
 		 */
 		max_grefs += INDIRECT_GREFS(max_grefs);
 
-	/*
-	 * We have to reserve 'max_grefs' grants because persistent
-	 * grants are shared by all rings.
-	 */
-	if (max_grefs > 0)
-		if (gnttab_alloc_grant_references(max_grefs, &setup.gref_head) < 0) {
+	/* Check if we have enough persistent grants to allocate a requests */
+	if (rinfo->persistent_gnts_c < max_grefs) {
+		new_persistent_gnts = true;
+
+		if (gnttab_alloc_grant_references(
+		    max_grefs - rinfo->persistent_gnts_c,
+		    &setup.gref_head) < 0) {
 			gnttab_request_free_callback(
 				&rinfo->callback,
 				blkif_restart_queue_callback,
 				rinfo,
-				max_grefs);
+				max_grefs - rinfo->persistent_gnts_c);
 			return 1;
 		}
+	}
 
 	/* Fill out a communications ring structure. */
 	id = blkif_ring_get_request(rinfo, req, &ring_req);
@@ -832,7 +836,7 @@ static int blkif_queue_rw_req(struct request *req, struct blkfront_ring_info *ri
 	if (unlikely(require_extra_req))
 		rinfo->shadow[extra_id].req = *extra_ring_req;
 
-	if (max_grefs > 0)
+	if (new_persistent_gnts)
 		gnttab_free_grant_references(setup.gref_head);
 
 	return 0;
@@ -906,9 +910,9 @@ out_err:
 	return BLK_STS_IOERR;
 
 out_busy:
-	spin_unlock_irqrestore(&rinfo->ring_lock, flags);
 	blk_mq_stop_hw_queue(hctx);
-	return BLK_STS_RESOURCE;
+	spin_unlock_irqrestore(&rinfo->ring_lock, flags);
+	return BLK_STS_DEV_RESOURCE;
 }
 
 static void blkif_complete_rq(struct request *rq)
@@ -1616,7 +1620,7 @@ static irqreturn_t blkif_interrupt(int irq, void *dev_id)
 			if (unlikely(bret->status == BLKIF_RSP_EOPNOTSUPP)) {
 				printk(KERN_WARNING "blkfront: %s: %s op failed\n",
 				       info->gd->disk_name, op_name(bret->operation));
-				blkif_req(req)->error = -EOPNOTSUPP;
+				blkif_req(req)->error = BLK_STS_NOTSUPP;
 			}
 			if (unlikely(bret->status == BLKIF_RSP_ERROR &&
 				     rinfo->shadow[id].req.u.rw.nr_segments == 0)) {
@@ -1771,10 +1775,17 @@ static int talk_to_blkback(struct xenbus_device *dev,
 	unsigned int i, max_page_order;
 	unsigned int ring_page_order;
 
+	if (!info)
+		return -ENODEV;
+
 	max_page_order = xenbus_read_unsigned(info->xbdev->otherend,
 					      "max-ring-page-order", 0);
 	ring_page_order = min(xen_blkif_max_ring_order, max_page_order);
 	info->nr_ring_pages = 1 << ring_page_order;
+
+	err = negotiate_mq(info);
+	if (err)
+		goto destroy_blkring;
 
 	for (i = 0; i < info->nr_rings; i++) {
 		struct blkfront_ring_info *rinfo = &info->rinfo[i];
@@ -1975,11 +1986,6 @@ static int blkfront_probe(struct xenbus_device *dev,
 	}
 
 	info->xbdev = dev;
-	err = negotiate_mq(info);
-	if (err) {
-		kfree(info);
-		return err;
-	}
 
 	mutex_init(&info->mutex);
 	info->vdevice = vdevice;
@@ -2072,9 +2078,9 @@ static int blkfront_resume(struct xenbus_device *dev)
 			/*
 			 * Get the bios in the request so we can re-queue them.
 			 */
-			if (req_op(shadow[i].request) == REQ_OP_FLUSH ||
-			    req_op(shadow[i].request) == REQ_OP_DISCARD ||
-			    req_op(shadow[i].request) == REQ_OP_SECURE_ERASE ||
+			if (req_op(shadow[j].request) == REQ_OP_FLUSH ||
+			    req_op(shadow[j].request) == REQ_OP_DISCARD ||
+			    req_op(shadow[j].request) == REQ_OP_SECURE_ERASE ||
 			    shadow[j].request->cmd_flags & REQ_FUA) {
 				/*
 				 * Flush operations don't contain bios, so
@@ -2095,10 +2101,6 @@ static int blkfront_resume(struct xenbus_device *dev)
 	}
 
 	blkif_free(info, info->connected == BLKIF_STATE_CONNECTED);
-
-	err = negotiate_mq(info);
-	if (err)
-		return err;
 
 	err = talk_to_blkback(dev, info);
 	if (!err)
@@ -2453,7 +2455,7 @@ static void blkback_changed(struct xenbus_device *dev,
 	case XenbusStateClosed:
 		if (dev->state == XenbusStateClosed)
 			break;
-		/* Missed the backend's Closing state -- fallthrough */
+		/* fall through */
 	case XenbusStateClosing:
 		if (info)
 			blkfront_closing(info);

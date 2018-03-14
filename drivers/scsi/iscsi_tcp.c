@@ -163,7 +163,6 @@ static void iscsi_sw_tcp_state_change(struct sock *sk)
 	struct iscsi_tcp_conn *tcp_conn;
 	struct iscsi_sw_tcp_conn *tcp_sw_conn;
 	struct iscsi_conn *conn;
-	struct iscsi_session *session;
 	void (*old_state_change)(struct sock *);
 
 	read_lock_bh(&sk->sk_callback_lock);
@@ -172,7 +171,6 @@ static void iscsi_sw_tcp_state_change(struct sock *sk)
 		read_unlock_bh(&sk->sk_callback_lock);
 		return;
 	}
-	session = conn->session;
 
 	iscsi_sw_sk_state_check(sk);
 
@@ -309,6 +307,7 @@ static int iscsi_sw_tcp_xmit_segment(struct iscsi_tcp_conn *tcp_conn,
 
 /**
  * iscsi_sw_tcp_xmit - TCP transmit
+ * @conn: iscsi connection
  **/
 static int iscsi_sw_tcp_xmit(struct iscsi_conn *conn)
 {
@@ -359,6 +358,7 @@ error:
 
 /**
  * iscsi_tcp_xmit_qlen - return the number of bytes queued for xmit
+ * @conn: iscsi connection
  */
 static inline int iscsi_sw_tcp_xmit_qlen(struct iscsi_conn *conn)
 {

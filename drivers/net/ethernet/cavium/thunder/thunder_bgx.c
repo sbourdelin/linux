@@ -21,7 +21,7 @@
 #include "nic.h"
 #include "thunder_bgx.h"
 
-#define DRV_NAME	"thunder-BGX"
+#define DRV_NAME	"thunder_bgx"
 #define DRV_VERSION	"1.0"
 
 struct lmac {
@@ -245,6 +245,35 @@ void bgx_lmac_rx_tx_enable(int node, int bgx_idx, int lmacid, bool enable)
 }
 EXPORT_SYMBOL(bgx_lmac_rx_tx_enable);
 
+/* Enables or disables timestamp insertion by BGX for Rx packets */
+void bgx_config_timestamping(int node, int bgx_idx, int lmacid, bool enable)
+{
+	struct bgx *bgx = get_bgx(node, bgx_idx);
+	struct lmac *lmac;
+	u64 csr_offset, cfg;
+
+	if (!bgx)
+		return;
+
+	lmac = &bgx->lmac[lmacid];
+
+	if (lmac->lmac_type == BGX_MODE_SGMII ||
+	    lmac->lmac_type == BGX_MODE_QSGMII ||
+	    lmac->lmac_type == BGX_MODE_RGMII)
+		csr_offset = BGX_GMP_GMI_RXX_FRM_CTL;
+	else
+		csr_offset = BGX_SMUX_RX_FRM_CTL;
+
+	cfg = bgx_reg_read(bgx, lmacid, csr_offset);
+
+	if (enable)
+		cfg |= BGX_PKT_RX_PTP_EN;
+	else
+		cfg &= ~BGX_PKT_RX_PTP_EN;
+	bgx_reg_write(bgx, lmacid, csr_offset, cfg);
+}
+EXPORT_SYMBOL(bgx_config_timestamping);
+
 void bgx_lmac_get_pfc(int node, int bgx_idx, int lmacid, void *pause)
 {
 	struct pfc *pfc = (struct pfc *)pause;
@@ -292,10 +321,29 @@ static void bgx_sgmii_change_link_state(struct lmac *lmac)
 	u64 cmr_cfg;
 	u64 port_cfg = 0;
 	u64 misc_ctl = 0;
+	bool tx_en, rx_en;
 
 	cmr_cfg = bgx_reg_read(bgx, lmac->lmacid, BGX_CMRX_CFG);
-	cmr_cfg &= ~CMR_EN;
+	tx_en = cmr_cfg & CMR_PKT_TX_EN;
+	rx_en = cmr_cfg & CMR_PKT_RX_EN;
+	cmr_cfg &= ~(CMR_PKT_RX_EN | CMR_PKT_TX_EN);
 	bgx_reg_write(bgx, lmac->lmacid, BGX_CMRX_CFG, cmr_cfg);
+
+	/* Wait for BGX RX to be idle */
+	if (bgx_poll_reg(bgx, lmac->lmacid, BGX_GMP_GMI_PRTX_CFG,
+			 GMI_PORT_CFG_RX_IDLE, false)) {
+		dev_err(&bgx->pdev->dev, "BGX%d LMAC%d GMI RX not idle\n",
+			bgx->bgx_id, lmac->lmacid);
+		return;
+	}
+
+	/* Wait for BGX TX to be idle */
+	if (bgx_poll_reg(bgx, lmac->lmacid, BGX_GMP_GMI_PRTX_CFG,
+			 GMI_PORT_CFG_TX_IDLE, false)) {
+		dev_err(&bgx->pdev->dev, "BGX%d LMAC%d GMI TX not idle\n",
+			bgx->bgx_id, lmac->lmacid);
+		return;
+	}
 
 	port_cfg = bgx_reg_read(bgx, lmac->lmacid, BGX_GMP_GMI_PRTX_CFG);
 	misc_ctl = bgx_reg_read(bgx, lmac->lmacid, BGX_GMP_PCS_MISCX_CTL);
@@ -347,10 +395,8 @@ static void bgx_sgmii_change_link_state(struct lmac *lmac)
 	bgx_reg_write(bgx, lmac->lmacid, BGX_GMP_PCS_MISCX_CTL, misc_ctl);
 	bgx_reg_write(bgx, lmac->lmacid, BGX_GMP_GMI_PRTX_CFG, port_cfg);
 
-	port_cfg = bgx_reg_read(bgx, lmac->lmacid, BGX_GMP_GMI_PRTX_CFG);
-
-	/* Re-enable lmac */
-	cmr_cfg |= CMR_EN;
+	/* Restore CMR config settings */
+	cmr_cfg |= (rx_en ? CMR_PKT_RX_EN : 0) | (tx_en ? CMR_PKT_TX_EN : 0);
 	bgx_reg_write(bgx, lmac->lmacid, BGX_CMRX_CFG, cmr_cfg);
 
 	if (bgx->is_rgx && (cmr_cfg & (CMR_PKT_RX_EN | CMR_PKT_TX_EN)))
