@@ -11,8 +11,8 @@
 #include <linux/of_irq.h>
 #include <asm/io.h>
 
-static void *intc_baseaddr;
-#define IPRA ((unsigned long)intc_baseaddr)
+static volatile void __iomem *intc_baseaddr;
+#define IPRA (intc_baseaddr)
 
 static const unsigned char ipr_table[] = {
 	0x03, 0x02, 0x01, 0x00, 0x13, 0x12, 0x11, 0x10, /* 16 - 23 */
@@ -34,11 +34,11 @@ static const unsigned char ipr_table[] = {
 static void h8s_disable_irq(struct irq_data *data)
 {
 	int pos;
-	unsigned int addr;
+	volatile void __iomem *addr;
 	unsigned short pri;
 	int irq = data->irq;
 
-	addr = IPRA + ((ipr_table[irq - 16] & 0xf0) >> 3);
+	addr = (volatile void *)(IPRA + ((ipr_table[irq - 16] & 0xf0) >> 3));
 	pos = (ipr_table[irq - 16] & 0x0f) * 4;
 	pri = ~(0x000f << pos);
 	pri &= readw(addr);
@@ -48,11 +48,11 @@ static void h8s_disable_irq(struct irq_data *data)
 static void h8s_enable_irq(struct irq_data *data)
 {
 	int pos;
-	unsigned int addr;
+	volatile void __iomem *addr;
 	unsigned short pri;
 	int irq = data->irq;
 
-	addr = IPRA + ((ipr_table[irq - 16] & 0xf0) >> 3);
+	addr = (volatile void *)(IPRA + ((ipr_table[irq - 16] & 0xf0) >> 3));
 	pos = (ipr_table[irq - 16] & 0x0f) * 4;
 	pri = ~(0x000f << pos);
 	pri &= readw(addr);
