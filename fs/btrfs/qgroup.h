@@ -48,6 +48,26 @@ struct btrfs_qgroup_extent_record {
 	struct ulist *old_roots;
 };
 
+enum btrfs_qgroup_rsv_type {
+	BTRFS_QGROUP_RSV_DATA = 0,
+	BTRFS_QGROUP_RSV_META,
+	BTRFS_QGROUP_RSV_LAST,
+};
+
+/*
+ * Represents how many bytes we have reserved for this qgroup.
+ *
+ * Each type should have different reservation behavior.
+ * E.g, data follows its io_tree flag modification, while
+ * *currently* meta is just reserve-and-clear during transcation.
+ *
+ * TODO: Add new type for reservation which can survive transaction commit.
+ * Currect metadata reservation behavior is not suitable for such case.
+ */
+struct btrfs_qgroup_rsv {
+	u64 values[BTRFS_QGROUP_RSV_LAST];
+};
+
 /*
  * Qgroup reservation types:
  *

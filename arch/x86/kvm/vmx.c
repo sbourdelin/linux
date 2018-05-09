@@ -4770,6 +4770,14 @@ static int vmx_set_cr4(struct kvm_vcpu *vcpu, unsigned long cr4)
 		vmcs_clear_bits(SECONDARY_VM_EXEC_CONTROL,
 				SECONDARY_EXEC_DESC);
 
+	if ((cr4 & X86_CR4_UMIP) && !boot_cpu_has(X86_FEATURE_UMIP)) {
+		vmcs_set_bits(SECONDARY_VM_EXEC_CONTROL,
+			      SECONDARY_EXEC_DESC);
+		hw_cr4 &= ~X86_CR4_UMIP;
+	} else
+		vmcs_clear_bits(SECONDARY_VM_EXEC_CONTROL,
+				SECONDARY_EXEC_DESC);
+
 	if (cr4 & X86_CR4_VMXE) {
 		/*
 		 * To use VMXON (and later other VMX instructions), a guest
