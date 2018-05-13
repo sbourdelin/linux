@@ -1188,7 +1188,6 @@ static int btrfs_fill_super(struct super_block *sb,
 	sb->s_flags |= SB_POSIXACL;
 #endif
 	sb->s_flags |= SB_I_VERSION;
-	sb->s_iflags |= SB_I_CGROUPWB;
 
 	err = super_setup_bdi(sb);
 	if (err) {
@@ -1782,10 +1781,8 @@ static int btrfs_remount(struct super_block *sb, int *flags, char *data)
 	}
 
 	ret = btrfs_parse_options(fs_info, data, *flags);
-	if (ret) {
-		ret = -EINVAL;
+	if (ret)
 		goto restore;
-	}
 
 	btrfs_remount_begin(fs_info, old_opts, *flags);
 	btrfs_resize_thread_pool(fs_info,

@@ -28,7 +28,7 @@ extern struct mm_struct *mm_alloc(void);
  *
  * Use mmdrop() to release the reference acquired by mmgrab().
  *
- * See also <Documentation/vm/active_mm.txt> for an in-depth explanation
+ * See also <Documentation/vm/active_mm.rst> for an in-depth explanation
  * of &mm_struct.mm_count vs &mm_struct.mm_users.
  */
 static inline void mmgrab(struct mm_struct *mm)
@@ -62,7 +62,7 @@ static inline void mmdrop(struct mm_struct *mm)
  *
  * Use mmput() to release the reference acquired by mmget().
  *
- * See also <Documentation/vm/active_mm.txt> for an in-depth explanation
+ * See also <Documentation/vm/active_mm.rst> for an in-depth explanation
  * of &mm_struct.mm_count vs &mm_struct.mm_users.
  */
 static inline void mmget(struct mm_struct *mm)
@@ -94,14 +94,6 @@ extern struct mm_struct *get_task_mm(struct task_struct *task);
 extern struct mm_struct *mm_access(struct task_struct *task, unsigned int mode);
 /* Remove the current tasks stale references to the old mm_struct */
 extern void mm_release(struct task_struct *, struct mm_struct *);
-
-#ifdef CONFIG_MEMCG
-extern void mm_update_next_owner(struct mm_struct *mm);
-#else
-static inline void mm_update_next_owner(struct mm_struct *mm)
-{
-}
-#endif /* CONFIG_MEMCG */
 
 #ifdef CONFIG_MMU
 extern void arch_pick_mmap_layout(struct mm_struct *mm,
@@ -163,9 +155,13 @@ static inline gfp_t current_gfp_context(gfp_t flags)
 }
 
 #ifdef CONFIG_LOCKDEP
+extern void __fs_reclaim_acquire(void);
+extern void __fs_reclaim_release(void);
 extern void fs_reclaim_acquire(gfp_t gfp_mask);
 extern void fs_reclaim_release(gfp_t gfp_mask);
 #else
+static inline void __fs_reclaim_acquire(void) { }
+static inline void __fs_reclaim_release(void) { }
 static inline void fs_reclaim_acquire(gfp_t gfp_mask) { }
 static inline void fs_reclaim_release(gfp_t gfp_mask) { }
 #endif
@@ -205,6 +201,30 @@ static inline void memalloc_noreclaim_restore(unsigned int flags)
 {
 	current->flags = (current->flags & ~PF_MEMALLOC) | flags;
 }
+
+#ifdef CONFIG_MEMCG
+static inline struct mem_cgroup *memalloc_memcg_save(struct mem_cgroup *memcg)
+{
+	struct mem_cgroup *old_memcg = current->target_memcg;
+
+	current->target_memcg = memcg;
+	return old_memcg;
+}
+
+static inline void memalloc_memcg_restore(struct mem_cgroup *memcg)
+{
+	current->target_memcg = memcg;
+}
+#else
+static inline struct mem_cgroup *memalloc_memcg_save(struct mem_cgroup *memcg)
+{
+	return NULL;
+}
+
+static inline void memalloc_memcg_restore(struct mem_cgroup *memcg)
+{
+}
+#endif /* CONFIG_MEMCG */
 
 #ifdef CONFIG_MEMBARRIER
 enum {
