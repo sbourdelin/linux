@@ -471,6 +471,8 @@ static int audit_filter_rules(struct task_struct *tsk,
 			break;
 		case AUDIT_EXE:
 			result = audit_exe_compare(tsk, rule->exe);
+			if (f->op == Audit_not_equal)
+				result = !result;
 			break;
 		case AUDIT_UID:
 			result = audit_uid_comparator(cred->uid, f->op, f->uid);
@@ -1511,13 +1513,21 @@ void __audit_syscall_entry(int major, unsigned long a1, unsigned long a2,
 	struct audit_context *context = tsk->audit_context;
 	enum audit_state     state;
 
-	if (!context)
+	if (!audit_enabled || !context)
 		return;
 
 	BUG_ON(context->in_syscall || context->name_count);
 
-	if (!audit_enabled)
+	state = context->state;
+	if (state == AUDIT_DISABLED)
 		return;
+
+	context->dummy = !audit_n_rules;
+	if (!context->dummy && state == AUDIT_BUILD_CONTEXT) {
+		context->prio = 0;
+		if (auditd_test_task(tsk))
+			return;
+	}
 
 	context->arch	    = syscall_get_arch();
 	context->major      = major;
@@ -1525,16 +1535,6 @@ void __audit_syscall_entry(int major, unsigned long a1, unsigned long a2,
 	context->argv[1]    = a2;
 	context->argv[2]    = a3;
 	context->argv[3]    = a4;
-
-	state = context->state;
-	context->dummy = !audit_n_rules;
-	if (!context->dummy && state == AUDIT_BUILD_CONTEXT) {
-		context->prio = 0;
-		state = audit_filter_syscall(tsk, context, &audit_filter_list[AUDIT_FILTER_ENTRY]);
-	}
-	if (state == AUDIT_DISABLED)
-		return;
-
 	context->serial     = 0;
 	context->ctime = current_kernel_time64();
 	context->in_syscall = 1;
@@ -2466,7 +2466,19 @@ void audit_core_dumps(long signr)
 	audit_log_end(ab);
 }
 
-void __audit_seccomp(unsigned long syscall, long signr, int code)
+/**
+ * audit_seccomp - record information about a seccomp action
+ * @syscall: syscall number
+ * @signr: signal value
+ * @code: the seccomp action
+ *
+ * Record the information associated with a seccomp action. Event filtering for
+ * seccomp actions that are not to be logged is done in seccomp_log().
+ * Therefore, this function forces auditing independent of the audit_enabled
+ * and dummy context state because seccomp actions should be logged even when
+ * audit is not in use.
+ */
+void audit_seccomp(unsigned long syscall, long signr, int code)
 {
 	struct audit_buffer *ab;
 
@@ -2477,6 +2489,26 @@ void __audit_seccomp(unsigned long syscall, long signr, int code)
 	audit_log_format(ab, " sig=%ld arch=%x syscall=%ld compat=%d ip=0x%lx code=0x%x",
 			 signr, syscall_get_arch(), syscall,
 			 in_compat_syscall(), KSTK_EIP(current), code);
+	audit_log_end(ab);
+}
+
+void audit_seccomp_actions_logged(const char *names, const char *old_names,
+				  int res)
+{
+	struct audit_buffer *ab;
+
+	if (!audit_enabled)
+		return;
+
+	ab = audit_log_start(current->audit_context, GFP_KERNEL,
+			     AUDIT_CONFIG_CHANGE);
+	if (unlikely(!ab))
+		return;
+
+	audit_log_format(ab, "op=seccomp-logging");
+	audit_log_format(ab, " actions=%s", names);
+	audit_log_format(ab, " old-actions=%s", old_names);
+	audit_log_format(ab, " res=%d", res);
 	audit_log_end(ab);
 }
 

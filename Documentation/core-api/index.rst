@@ -14,13 +14,19 @@ Core utilities
    kernel-api
    assoc_array
    atomic_ops
+   cachetlb
+   refcount-vs-atomic
    cpu_hotplug
+   idr
    local_ops
    workqueue
    genericirq
    flexible-arrays
    librs
    genalloc
+   errseq
+   printk-formats
+   circular-buffers
 
 Interfaces for kernel debugging
 ===============================

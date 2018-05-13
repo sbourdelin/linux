@@ -95,18 +95,32 @@ u8 mwifiex_chan_type_to_sec_chan_offset(enum nl80211_channel_type chan_type)
 
 /* This function maps IEEE HT secondary channel type to NL80211 channel type
  */
-u8 mwifiex_sec_chan_offset_to_chan_type(u8 second_chan_offset)
+u8 mwifiex_get_chan_type(struct mwifiex_private *priv)
 {
-	switch (second_chan_offset) {
-	case IEEE80211_HT_PARAM_CHA_SEC_NONE:
-		return NL80211_CHAN_HT20;
-	case IEEE80211_HT_PARAM_CHA_SEC_ABOVE:
-		return NL80211_CHAN_HT40PLUS;
-	case IEEE80211_HT_PARAM_CHA_SEC_BELOW:
-		return NL80211_CHAN_HT40MINUS;
-	default:
-		return NL80211_CHAN_HT20;
+	struct mwifiex_channel_band channel_band;
+	int ret;
+
+	ret = mwifiex_get_chan_info(priv, &channel_band);
+
+	if (!ret) {
+		switch (channel_band.band_config.chan_width) {
+		case CHAN_BW_20MHZ:
+			if (IS_11N_ENABLED(priv))
+				return NL80211_CHAN_HT20;
+			else
+				return NL80211_CHAN_NO_HT;
+		case CHAN_BW_40MHZ:
+			if (channel_band.band_config.chan2_offset ==
+			    SEC_CHAN_ABOVE)
+				return NL80211_CHAN_HT40PLUS;
+			else
+				return NL80211_CHAN_HT40MINUS;
+		default:
+			return NL80211_CHAN_HT20;
+		}
 	}
+
+	return NL80211_CHAN_HT20;
 }
 
 /*
@@ -915,7 +929,7 @@ mwifiex_init_new_priv_params(struct mwifiex_private *priv,
 	adapter->rx_locked = false;
 	spin_unlock_irqrestore(&adapter->rx_proc_lock, flags);
 
-	mwifiex_set_mac_address(priv, dev);
+	mwifiex_set_mac_address(priv, dev, false, NULL);
 
 	return 0;
 }
@@ -1116,6 +1130,12 @@ mwifiex_cfg80211_change_virtual_intf(struct wiphy *wiphy,
 	struct mwifiex_private *priv = mwifiex_netdev_get_priv(dev);
 	enum nl80211_iftype curr_iftype = dev->ieee80211_ptr->iftype;
 
+	if (priv->scan_request) {
+		mwifiex_dbg(priv->adapter, ERROR,
+			    "change virtual interface: scan in process\n");
+		return -EBUSY;
+	}
+
 	switch (curr_iftype) {
 	case NL80211_IFTYPE_ADHOC:
 		switch (type) {
@@ -1180,7 +1200,6 @@ mwifiex_cfg80211_change_virtual_intf(struct wiphy *wiphy,
 	case NL80211_IFTYPE_AP:
 		switch (type) {
 		case NL80211_IFTYPE_ADHOC:
-		case NL80211_IFTYPE_STATION:
 			return mwifiex_change_vif_to_sta_adhoc(dev, curr_iftype,
 							       type, params);
 			break;
@@ -1960,7 +1979,8 @@ static int mwifiex_cfg80211_start_ap(struct wiphy *wiphy,
 		bss_cfg->bcast_ssid_ctl = 0;
 		break;
 	case NL80211_HIDDEN_SSID_ZERO_CONTENTS:
-		/* firmware doesn't support this type of hidden SSID */
+		bss_cfg->bcast_ssid_ctl = 2;
+		break;
 	default:
 		kfree(bss_cfg);
 		return -EINVAL;
@@ -2959,7 +2979,7 @@ struct wireless_dev *mwifiex_add_virtual_intf(struct wiphy *wiphy,
 	priv->netdev = dev;
 
 	if (!adapter->mfg_mode) {
-		mwifiex_set_mac_address(priv, dev);
+		mwifiex_set_mac_address(priv, dev, false, NULL);
 
 		ret = mwifiex_send_cmd(priv, HostCmd_CMD_SET_BSS_MODE,
 				       HostCmd_ACT_GEN_SET, 0, NULL, true);
@@ -3932,7 +3952,6 @@ static int mwifiex_cfg80211_get_channel(struct wiphy *wiphy,
 	struct mwifiex_private *priv = mwifiex_netdev_get_priv(wdev->netdev);
 	struct mwifiex_bssdescriptor *curr_bss;
 	struct ieee80211_channel *chan;
-	u8 second_chan_offset;
 	enum nl80211_channel_type chan_type;
 	enum nl80211_band band;
 	int freq;
@@ -3949,10 +3968,7 @@ static int mwifiex_cfg80211_get_channel(struct wiphy *wiphy,
 		chan = ieee80211_get_channel(wiphy, freq);
 
 		if (priv->ht_param_present) {
-			second_chan_offset = priv->assoc_resp_ht_param &
-					IEEE80211_HT_PARAM_CHA_SEC_OFFSET;
-			chan_type = mwifiex_sec_chan_offset_to_chan_type
-							(second_chan_offset);
+			chan_type = mwifiex_get_chan_type(priv);
 			cfg80211_chandef_create(chandef, chan, chan_type);
 		} else {
 			cfg80211_chandef_create(chandef, chan,

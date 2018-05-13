@@ -48,8 +48,26 @@
 	model = "Freescale i.MX7 SabreSD Board";
 	compatible = "fsl,imx7d-sdb", "fsl,imx7d";
 
-	memory {
+	memory@80000000 {
 		reg = <0x80000000 0x80000000>;
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_gpio_keys>;
+
+		volume-up {
+			label = "Volume Up";
+			gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_VOLUMEUP>;
+		};
+
+		volume-down {
+			label = "Volume Down";
+			gpios = <&gpio5 10 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_VOLUMEDOWN>;
+		};
 	};
 
 	spi4 {
@@ -82,7 +100,7 @@
 		enable-active-high;
 	};
 
-	reg_usb_otg2_vbus: regulator-usb-otg1-vbus {
+	reg_usb_otg2_vbus: regulator-usb-otg2-vbus {
 		compatible = "regulator-fixed";
 		regulator-name = "usb_otg2_vbus";
 		regulator-min-microvolt = <5000000>;
@@ -336,6 +354,11 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
+
+	mpl3115@60 {
+		compatible = "fsl,mpl3115";
+		reg = <0x60>;
+	};
 };
 
 &i2c3 {
@@ -514,6 +537,12 @@
 			>;
 		};
 
+		pinctrl_gpio_keys: gpio_keysgrp {
+			fsl,pins = <
+				MX7D_PAD_SD2_RESET_B__GPIO5_IO11	0x59
+				MX7D_PAD_SD2_WP__GPIO5_IO10		0x59
+			>;
+		};
 
 		pinctrl_hog: hoggrp {
 			fsl,pins = <

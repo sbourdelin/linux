@@ -158,10 +158,10 @@ static ssize_t dynamic_pool_show(struct device *dev,
 	return ret;
 };
 
-static DEVICE_ATTR(active_bo, 0444, active_bo_show, NULL);
-static DEVICE_ATTR(free_bo, 0444, free_bo_show, NULL);
-static DEVICE_ATTR(reserved_pool, 0444, reserved_pool_show, NULL);
-static DEVICE_ATTR(dynamic_pool, 0444, dynamic_pool_show, NULL);
+static DEVICE_ATTR_RO(active_bo);
+static DEVICE_ATTR_RO(free_bo);
+static DEVICE_ATTR_RO(reserved_pool);
+static DEVICE_ATTR_RO(dynamic_pool);
 
 static struct attribute *sysfs_attrs_ctrl[] = {
 	&dev_attr_active_bo.attr,
@@ -219,7 +219,7 @@ void hmm_cleanup(void)
 }
 
 ia_css_ptr hmm_alloc(size_t bytes, enum hmm_bo_type type,
-		     int from_highmem, void *userptr, bool cached)
+		     int from_highmem, const void __user *userptr, bool cached)
 {
 	unsigned int pgnr;
 	struct hmm_buffer_object *bo;

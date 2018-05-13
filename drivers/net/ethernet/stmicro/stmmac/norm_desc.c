@@ -253,7 +253,7 @@ static int ndesc_get_tx_timestamp_status(struct dma_desc *p)
 	return (le32_to_cpu(p->des0) & TDES0_TIME_STAMP_STATUS) >> 17;
 }
 
-static u64 ndesc_get_timestamp(void *desc, u32 ats)
+static void ndesc_get_timestamp(void *desc, u32 ats, u64 *ts)
 {
 	struct dma_desc *p = (struct dma_desc *)desc;
 	u64 ns;
@@ -262,10 +262,10 @@ static u64 ndesc_get_timestamp(void *desc, u32 ats)
 	/* convert high/sec time stamp value to nanosecond */
 	ns += le32_to_cpu(p->des3) * 1000000000ULL;
 
-	return ns;
+	*ts = ns;
 }
 
-static int ndesc_get_rx_timestamp_status(void *desc, u32 ats)
+static int ndesc_get_rx_timestamp_status(void *desc, void *next_desc, u32 ats)
 {
 	struct dma_desc *p = (struct dma_desc *)desc;
 
@@ -288,7 +288,7 @@ static void ndesc_display_ring(void *head, unsigned int size, bool rx)
 		u64 x;
 
 		x = *(u64 *)p;
-		pr_info("%d [0x%x]: 0x%x 0x%x 0x%x 0x%x",
+		pr_info("%03d [0x%x]: 0x%x 0x%x 0x%x 0x%x",
 			i, (unsigned int)virt_to_phys(p),
 			(unsigned int)x, (unsigned int)(x >> 32),
 			p->des2, p->des3);

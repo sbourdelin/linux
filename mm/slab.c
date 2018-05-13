@@ -1283,6 +1283,7 @@ void __init kmem_cache_init(void)
 				  nr_node_ids * sizeof(struct kmem_cache_node *),
 				  SLAB_HWCACHE_ALIGN, 0, 0);
 	list_add(&kmem_cache->list, &slab_caches);
+	memcg_link_cache(kmem_cache);
 	slab_state = PARTIAL;
 
 	/*
@@ -1316,8 +1317,6 @@ void __init kmem_cache_init(void)
 void __init kmem_cache_init_late(void)
 {
 	struct kmem_cache *cachep;
-
-	slab_state = UP;
 
 	/* 6) resize the head arrays to their final sizes */
 	mutex_lock(&slab_mutex);
@@ -1354,8 +1353,6 @@ static int __init cpucache_init(void)
 				slab_online_cpu, slab_offline_cpu);
 	WARN_ON(ret < 0);
 
-	/* Done! */
-	slab_state = FULL;
 	return 0;
 }
 __initcall(cpucache_init);
@@ -1585,11 +1582,8 @@ static void print_objinfo(struct kmem_cache *cachep, void *objp, int lines)
 		       *dbg_redzone2(cachep, objp));
 	}
 
-	if (cachep->flags & SLAB_STORE_USER) {
-		pr_err("Last user: [<%p>](%pSR)\n",
-		       *dbg_userword(cachep, objp),
-		       *dbg_userword(cachep, objp));
-	}
+	if (cachep->flags & SLAB_STORE_USER)
+		pr_err("Last user: (%pSR)\n", *dbg_userword(cachep, objp));
 	realobj = (char *)objp + obj_offset(cachep);
 	size = cachep->object_size;
 	for (i = 0; i < size && lines; i += 16, lines--) {
@@ -1622,7 +1616,7 @@ static void check_poison_obj(struct kmem_cache *cachep, void *objp)
 			/* Mismatch ! */
 			/* Print header */
 			if (lines == 0) {
-				pr_err("Slab corruption (%s): %s start=%p, len=%d\n",
+				pr_err("Slab corruption (%s): %s start=%px, len=%d\n",
 				       print_tainted(), cachep->name,
 				       realobj, size);
 				print_objinfo(cachep, objp, 0);
@@ -1651,13 +1645,13 @@ static void check_poison_obj(struct kmem_cache *cachep, void *objp)
 		if (objnr) {
 			objp = index_to_obj(cachep, page, objnr - 1);
 			realobj = (char *)objp + obj_offset(cachep);
-			pr_err("Prev obj: start=%p, len=%d\n", realobj, size);
+			pr_err("Prev obj: start=%px, len=%d\n", realobj, size);
 			print_objinfo(cachep, objp, 2);
 		}
 		if (objnr + 1 < cachep->num) {
 			objp = index_to_obj(cachep, page, objnr + 1);
 			realobj = (char *)objp + obj_offset(cachep);
-			pr_err("Next obj: start=%p, len=%d\n", realobj, size);
+			pr_err("Next obj: start=%px, len=%d\n", realobj, size);
 			print_objinfo(cachep, objp, 2);
 		}
 	}
@@ -1875,7 +1869,7 @@ static int __ref setup_cpu_cache(struct kmem_cache *cachep, gfp_t gfp)
 	return 0;
 }
 
-slab_flags_t kmem_cache_flags(unsigned long object_size,
+slab_flags_t kmem_cache_flags(unsigned int object_size,
 	slab_flags_t flags, const char *name,
 	void (*ctor)(void *))
 {
@@ -1883,7 +1877,7 @@ slab_flags_t kmem_cache_flags(unsigned long object_size,
 }
 
 struct kmem_cache *
-__kmem_cache_alias(const char *name, size_t size, size_t align,
+__kmem_cache_alias(const char *name, unsigned int size, unsigned int align,
 		   slab_flags_t flags, void (*ctor)(void *))
 {
 	struct kmem_cache *cachep;
@@ -2000,7 +1994,7 @@ int __kmem_cache_create(struct kmem_cache *cachep, slab_flags_t flags)
 	size_t ralign = BYTES_PER_WORD;
 	gfp_t gfp;
 	int err;
-	size_t size = cachep->size;
+	unsigned int size = cachep->size;
 
 #if DEBUG
 #if FORCED_DEBUG
@@ -2295,6 +2289,18 @@ static int drain_freelist(struct kmem_cache *cache,
 	}
 out:
 	return nr_freed;
+}
+
+bool __kmem_cache_empty(struct kmem_cache *s)
+{
+	int node;
+	struct kmem_cache_node *n;
+
+	for_each_kmem_cache_node(s, node, n)
+		if (!list_empty(&n->slabs_full) ||
+		    !list_empty(&n->slabs_partial))
+			return false;
+	return true;
 }
 
 int __kmem_cache_shrink(struct kmem_cache *cachep)
@@ -2609,7 +2615,7 @@ static void slab_put_obj(struct kmem_cache *cachep,
 	/* Verify double free bug */
 	for (i = page->active; i < cachep->num; i++) {
 		if (get_free_obj(page, i) == objnr) {
-			pr_err("slab: double free detected in cache '%s', objp %p\n",
+			pr_err("slab: double free detected in cache '%s', objp %px\n",
 			       cachep->name, objp);
 			BUG();
 		}
@@ -2659,6 +2665,7 @@ static struct page *cache_grow_begin(struct kmem_cache *cachep,
 				invalid_mask, &invalid_mask, flags, &flags);
 		dump_stack();
 	}
+	WARN_ON_ONCE(cachep->ctor && (flags & __GFP_ZERO));
 	local_flags = flags & (GFP_CONSTRAINT_MASK|GFP_RECLAIM_MASK);
 
 	check_irq_off();
@@ -2773,7 +2780,7 @@ static inline void verify_redzone_free(struct kmem_cache *cache, void *obj)
 	else
 		slab_error(cache, "memory outside object was overwritten");
 
-	pr_err("%p: redzone 1:0x%llx, redzone 2:0x%llx\n",
+	pr_err("%px: redzone 1:0x%llx, redzone 2:0x%llx\n",
 	       obj, redzone1, redzone2);
 }
 
@@ -3065,6 +3072,7 @@ static inline void cache_alloc_debugcheck_before(struct kmem_cache *cachep,
 static void *cache_alloc_debugcheck_after(struct kmem_cache *cachep,
 				gfp_t flags, void *objp, unsigned long caller)
 {
+	WARN_ON_ONCE(cachep->ctor && (flags & __GFP_ZERO));
 	if (!objp)
 		return objp;
 	if (cachep->flags & SLAB_POISON) {
@@ -3079,7 +3087,7 @@ static void *cache_alloc_debugcheck_after(struct kmem_cache *cachep,
 		if (*dbg_redzone1(cachep, objp) != RED_INACTIVE ||
 				*dbg_redzone2(cachep, objp) != RED_INACTIVE) {
 			slab_error(cachep, "double free, or memory outside object was overwritten");
-			pr_err("%p: redzone 1:0x%llx, redzone 2:0x%llx\n",
+			pr_err("%px: redzone 1:0x%llx, redzone 2:0x%llx\n",
 			       objp, *dbg_redzone1(cachep, objp),
 			       *dbg_redzone2(cachep, objp));
 		}
@@ -3092,7 +3100,7 @@ static void *cache_alloc_debugcheck_after(struct kmem_cache *cachep,
 		cachep->ctor(objp);
 	if (ARCH_SLAB_MINALIGN &&
 	    ((unsigned long)objp & (ARCH_SLAB_MINALIGN-1))) {
-		pr_err("0x%p: not aligned to ARCH_SLAB_MINALIGN=%d\n",
+		pr_err("0x%px: not aligned to ARCH_SLAB_MINALIGN=%d\n",
 		       objp, (int)ARCH_SLAB_MINALIGN);
 	}
 	return objp;
@@ -3485,11 +3493,11 @@ free_done:
  * Release an obj back to its cache. If the obj has a constructed state, it must
  * be in this state _before_ it is released.  Called with disabled ints.
  */
-static inline void __cache_free(struct kmem_cache *cachep, void *objp,
-				unsigned long caller)
+static __always_inline void __cache_free(struct kmem_cache *cachep, void *objp,
+					 unsigned long caller)
 {
 	/* Put the object into the quarantine, don't touch it for now. */
-	if (kasan_slab_free(cachep, objp))
+	if (kasan_slab_free(cachep, objp, _RET_IP_))
 		return;
 
 	___cache_free(cachep, objp, caller);
@@ -4080,7 +4088,8 @@ next:
 	next_reap_node();
 out:
 	/* Set up the next iteration */
-	schedule_delayed_work(work, round_jiffies_relative(REAPTIMEOUT_AC));
+	schedule_delayed_work_on(smp_processor_id(), work,
+				round_jiffies_relative(REAPTIMEOUT_AC));
 }
 
 void get_slabinfo(struct kmem_cache *cachep, struct slabinfo *sinfo)
@@ -4284,7 +4293,7 @@ static void show_symbol(struct seq_file *m, unsigned long address)
 		return;
 	}
 #endif
-	seq_printf(m, "%p", (void *)address);
+	seq_printf(m, "%px", (void *)address);
 }
 
 static int leaks_show(struct seq_file *m, void *p)
@@ -4400,8 +4409,8 @@ module_init(slab_proc_init);
  * Returns NULL if check passes, otherwise const char * to name of cache
  * to indicate an error.
  */
-const char *__check_heap_object(const void *ptr, unsigned long n,
-				struct page *page)
+void __check_heap_object(const void *ptr, unsigned long n, struct page *page,
+			 bool to_user)
 {
 	struct kmem_cache *cachep;
 	unsigned int objnr;
@@ -4415,29 +4424,26 @@ const char *__check_heap_object(const void *ptr, unsigned long n,
 	/* Find offset within object. */
 	offset = ptr - index_to_obj(cachep, page, objnr) - obj_offset(cachep);
 
-	/* Make sure object falls entirely within cache's usercopy region. */
-	if (offset < cachep->useroffset ||
-	    offset - cachep->useroffset > cachep->usersize ||
-	    n > cachep->useroffset - offset + cachep->usersize) {
-#ifdef CONFIG_HARDENED_USERCOPY_FALLBACK
-		/*
-		 * If no whitelist exists, and FALLBACK is set, produce
-		 * a warning instead of rejecting the copy. This is intended
-		 * to be a temporary method to find any missing usercopy
-		 * whitelists.
-		 */
-		if (cachep->usersize == 0 &&
-		    offset <= cachep->object_size &&
-		    n <= cachep->object_size - offset) {
-			WARN_ONCE(1, "unexpected usercopy without slab whitelist from %s offset %lu size %lu",
-				  cachep->name, offset, n);
-			return NULL;
-		}
-#endif
-		return cachep->name;
+	/* Allow address range falling entirely within usercopy region. */
+	if (offset >= cachep->useroffset &&
+	    offset - cachep->useroffset <= cachep->usersize &&
+	    n <= cachep->useroffset - offset + cachep->usersize)
+		return;
+
+	/*
+	 * If the copy is still within the allocated object, produce
+	 * a warning instead of rejecting the copy. This is intended
+	 * to be a temporary method to find any missing usercopy
+	 * whitelists.
+	 */
+	if (usercopy_fallback &&
+	    offset <= cachep->object_size &&
+	    n <= cachep->object_size - offset) {
+		usercopy_warn("SLAB object", cachep->name, to_user, offset, n);
+		return;
 	}
 
-	return NULL;
+	usercopy_abort("SLAB object", cachep->name, to_user, offset, n);
 }
 #endif /* CONFIG_HARDENED_USERCOPY */
 

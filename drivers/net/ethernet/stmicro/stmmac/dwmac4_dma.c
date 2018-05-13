@@ -373,6 +373,15 @@ static void dwmac4_get_hw_feature(void __iomem *ioaddr,
 
 	/* IEEE 1588-2002 */
 	dma_cap->time_stamp = 0;
+
+	/* MAC HW feature3 */
+	hw_cap = readl(ioaddr + GMAC_HW_FEATURE3);
+
+	/* 5.10 Features */
+	dma_cap->asp = (hw_cap & GMAC_HW_FEAT_ASP) >> 28;
+	dma_cap->frpes = (hw_cap & GMAC_HW_FEAT_FRPES) >> 13;
+	dma_cap->frpbs = (hw_cap & GMAC_HW_FEAT_FRPBS) >> 11;
+	dma_cap->frpsel = (hw_cap & GMAC_HW_FEAT_FRPSEL) >> 10;
 }
 
 /* Enable/disable TSO feature and set MSS */

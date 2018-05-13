@@ -38,14 +38,52 @@
 #include <linux/list.h>
 
 #include <uapi/linux/lnet/libcfs_ioctl.h>
-#include <linux/libcfs/linux/libcfs.h>
+#include <linux/bitops.h>
+#include <linux/compiler.h>
+#include <linux/ctype.h>
+#include <linux/errno.h>
+#include <linux/file.h>
+#include <linux/fs.h>
+#include <linux/highmem.h>
+#include <linux/interrupt.h>
+#include <linux/kallsyms.h>
+#include <linux/kernel.h>
+#include <linux/kmod.h>
+#include <linux/kthread.h>
+#include <linux/mm.h>
+#include <linux/mm_inline.h>
+#include <linux/module.h>
+#include <linux/moduleparam.h>
+#include <linux/mutex.h>
+#include <linux/notifier.h>
+#include <linux/pagemap.h>
+#include <linux/random.h>
+#include <linux/rbtree.h>
+#include <linux/rwsem.h>
+#include <linux/scatterlist.h>
+#include <linux/sched.h>
+#include <linux/signal.h>
+#include <linux/slab.h>
+#include <linux/smp.h>
+#include <linux/stat.h>
+#include <linux/string.h>
+#include <linux/time.h>
+#include <linux/timer.h>
+#include <linux/types.h>
+#include <linux/unistd.h>
+#include <linux/vmalloc.h>
+#include <net/sock.h>
+#include <linux/atomic.h>
+#include <asm/div64.h>
+#include <linux/timex.h>
+#include <linux/uaccess.h>
+#include <stdarg.h>
+
 #include <linux/libcfs/libcfs_debug.h>
 #include <linux/libcfs/libcfs_private.h>
 #include <linux/libcfs/libcfs_cpu.h>
 #include <linux/libcfs/libcfs_prim.h>
-#include <linux/libcfs/libcfs_time.h>
 #include <linux/libcfs/libcfs_string.h>
-#include <linux/libcfs/libcfs_workitem.h>
 #include <linux/libcfs/libcfs_hash.h>
 #include <linux/libcfs/libcfs_fail.h>
 #include <linux/libcfs/curproc.h>
@@ -53,6 +91,11 @@
 #define LIBCFS_VERSION "0.7.0"
 
 #define LOWEST_BIT_SET(x)       ((x) & ~((x) - 1))
+
+/*
+ * One jiffy
+ */
+#define CFS_TICK		(1UL)
 
 /*
  * Lustre Error Checksum: calculates checksum
@@ -65,24 +108,21 @@
 #define LNET_ACCEPTOR_MIN_RESERVED_PORT    512
 #define LNET_ACCEPTOR_MAX_RESERVED_PORT    1023
 
-/*
- * Defined by platform
- */
-sigset_t cfs_block_allsigs(void);
-sigset_t cfs_block_sigs(unsigned long sigs);
-sigset_t cfs_block_sigsinv(unsigned long sigs);
-void cfs_restore_sigs(sigset_t sigset);
-void cfs_clear_sigpending(void);
+/* Block all signals except for the @sigs */
+static inline void cfs_block_sigsinv(unsigned long sigs, sigset_t *old)
+{
+	sigset_t new;
 
-/*
- * Random number handling
- */
+	siginitsetinv(&new, sigs);
+	sigorsets(&new, &current->blocked, &new);
+	sigprocmask(SIG_BLOCK, &new, old);
+}
 
-/* returns a random 32-bit integer */
-unsigned int cfs_rand(void);
-/* seed the generator */
-void cfs_srand(unsigned int seed1, unsigned int seed2);
-void cfs_get_random_bytes(void *buf, int size);
+static inline void
+cfs_restore_sigs(sigset_t *old)
+{
+	sigprocmask(SIG_SETMASK, old, NULL);
+}
 
 struct libcfs_ioctl_handler {
 	struct list_head item;
@@ -98,35 +138,14 @@ struct libcfs_ioctl_handler {
 int libcfs_register_ioctl(struct libcfs_ioctl_handler *hand);
 int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand);
 
-int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
-			 const struct libcfs_ioctl_hdr __user *uparam);
-int libcfs_ioctl_data_adjust(struct libcfs_ioctl_data *data);
-int libcfs_ioctl(unsigned long cmd, void __user *arg);
-
-/* container_of depends on "likely" which is defined in libcfs_private.h */
-static inline void *__container_of(void *ptr, unsigned long shift)
-{
-	if (IS_ERR_OR_NULL(ptr))
-		return ptr;
-	return (char *)ptr - shift;
-}
-
-#define container_of0(ptr, type, member) \
-	((type *)__container_of((void *)(ptr), offsetof(type, member)))
-
 #define _LIBCFS_H
 
-void *libcfs_kvzalloc(size_t size, gfp_t flags);
-void *libcfs_kvzalloc_cpt(struct cfs_cpt_table *cptab, int cpt, size_t size,
-			  gfp_t flags);
-
-extern struct miscdevice libcfs_dev;
 /**
  * The path of debug log dump upcall script.
  */
 extern char lnet_debug_log_upcall[1024];
 
-extern struct cfs_wi_sched *cfs_sched_rehash;
+extern struct workqueue_struct *cfs_rehash_wq;
 
 struct lnet_debugfs_symlink_def {
 	char *name;

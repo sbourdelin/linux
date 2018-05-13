@@ -236,8 +236,8 @@ static int proc_readfd_common(struct file *file, struct dir_context *ctx,
 	for (fd = ctx->pos - 2;
 	     fd < files_fdtable(files)->max_fds;
 	     fd++, ctx->pos++) {
-		char name[PROC_NUMBUF];
-		int len;
+		char name[10 + 1];
+		unsigned int len;
 
 		if (!fcheck_files(files, fd))
 			continue;

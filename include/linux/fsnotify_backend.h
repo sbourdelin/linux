@@ -84,6 +84,8 @@ struct fsnotify_event_private_data;
 struct fsnotify_fname;
 struct fsnotify_iter_info;
 
+struct mem_cgroup;
+
 /*
  * Each group much define these ops.  The fsnotify infrastructure will call
  * these operations for each relevant group.
@@ -129,6 +131,8 @@ struct fsnotify_event {
  * everything will be cleaned up.
  */
 struct fsnotify_group {
+	const struct fsnotify_ops *ops;	/* how this group handles things */
+
 	/*
 	 * How the refcnt is used is up to each group.  When the refcnt hits 0
 	 * fsnotify will clean up all of the resources associated with this group.
@@ -138,8 +142,6 @@ struct fsnotify_group {
 	 * closed.
 	 */
 	refcount_t refcnt;		/* things with interest in this group */
-
-	const struct fsnotify_ops *ops;	/* how this group handles things */
 
 	/* needed to send notification to userspace */
 	spinlock_t notification_lock;		/* protect the notification_list */
@@ -162,6 +164,8 @@ struct fsnotify_group {
 	atomic_t num_marks;		/* 1 for each mark and 1 for not being
 					 * past the point of no return when freeing
 					 * a group */
+	atomic_t user_waits;		/* Number of tasks waiting for user
+					 * response */
 	struct list_head marks_list;	/* all inode marks for this group */
 
 	struct fasync_struct *fsn_fa;    /* async notification */
@@ -169,8 +173,8 @@ struct fsnotify_group {
 	struct fsnotify_event *overflow_event;	/* Event we queue when the
 						 * notification list is too
 						 * full */
-	atomic_t user_waits;		/* Number of tasks waiting for user
-					 * response */
+
+	struct mem_cgroup *memcg;	/* memcg to charge allocations */
 
 	/* groups can define private fields here or use the void *private */
 	union {
@@ -217,12 +221,10 @@ struct fsnotify_mark_connector {
 	union {	/* Object pointer [lock] */
 		struct inode *inode;
 		struct vfsmount *mnt;
-	};
-	union {
-		struct hlist_head list;
 		/* Used listing heads to free after srcu period expires */
 		struct fsnotify_mark_connector *destroy_next;
 	};
+	struct hlist_head list;
 };
 
 /*
@@ -248,7 +250,7 @@ struct fsnotify_mark {
 	/* Group this mark is for. Set on mark creation, stable until last ref
 	 * is dropped */
 	struct fsnotify_group *group;
-	/* List of marks by group->i_fsnotify_marks. Also reused for queueing
+	/* List of marks by group->marks_list. Also reused for queueing
 	 * mark into destroy_list when it's waiting for the end of SRCU period
 	 * before it can be freed. [group->mark_mutex] */
 	struct list_head g_list;
@@ -331,6 +333,12 @@ extern int fsnotify_add_event(struct fsnotify_group *group,
 			      struct fsnotify_event *event,
 			      int (*merge)(struct list_head *,
 					   struct fsnotify_event *));
+/* Queue overflow event to a notification group */
+static inline void fsnotify_queue_overflow(struct fsnotify_group *group)
+{
+	fsnotify_add_event(group, group->overflow_event, NULL);
+}
+
 /* true if the group notification queue is empty */
 extern bool fsnotify_notify_queue_is_empty(struct fsnotify_group *group);
 /* return, but do not dequeue the first event on the notification queue */

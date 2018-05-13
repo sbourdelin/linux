@@ -140,11 +140,13 @@ struct efi_boot_memmap {
 
 struct capsule_info {
 	efi_capsule_header_t	header;
+	efi_capsule_header_t	*capsule;
 	int			reset_type;
 	long			index;
 	size_t			count;
 	size_t			total_size;
-	phys_addr_t		*pages;
+	struct page		**pages;
+	phys_addr_t		*phys;
 	size_t			page_bytes_remain;
 };
 
@@ -963,6 +965,8 @@ extern struct efi {
 	struct efi_memory_map memmap;
 	unsigned long flags;
 } efi;
+
+extern struct mm_struct efi_mm;
 
 static inline int
 efi_guidcmp (efi_guid_t left, efi_guid_t right)

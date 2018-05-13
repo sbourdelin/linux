@@ -223,6 +223,14 @@ config ZIIRAVE_WATCHDOG
 	  To compile this driver as a module, choose M here: the
 	  module will be called ziirave_wdt.
 
+config RAVE_SP_WATCHDOG
+	tristate "RAVE SP Watchdog timer"
+	depends on RAVE_SP_CORE
+	depends on NVMEM || !NVMEM
+	select WATCHDOG_CORE
+	help
+	  Support for the watchdog on RAVE SP device.
+
 # ALPHA Architecture
 
 # ARM Architecture
@@ -254,6 +262,17 @@ config ARM_SBSA_WATCHDOG
 
 	  To compile this driver as module, choose M here: The module
 	  will be called sbsa_gwdt.
+
+config ARMADA_37XX_WATCHDOG
+	tristate "Armada 37xx watchdog"
+	depends on ARCH_MVEBU || COMPILE_TEST
+	depends on ARM64
+	select WATCHDOG_CORE
+	help
+	  Say Y here to include support for the watchdog timer found on
+	  Marvell Armada 37xx SoCs.
+	  To compile this driver as a module, choose M here: the
+	  module will be called armada_37xx_wdt.
 
 config ASM9260_WATCHDOG
 	tristate "Alphascale ASM9260 watchdog"
@@ -503,6 +522,17 @@ config COH901327_WATCHDOG
 	help
 	  Say Y here to include Watchdog timer support for the
 	  watchdog embedded into the ST-Ericsson U300 series platforms.
+	  This watchdog is used to reset the system and thus cannot be
+	  compiled as a module.
+
+config NPCM7XX_WATCHDOG
+	bool "Nuvoton NPCM750 watchdog"
+	depends on ARCH_NPCM || COMPILE_TEST
+	default y if ARCH_NPCM750
+	select WATCHDOG_CORE
+	help
+	  Say Y here to include Watchdog timer support for the
+	  watchdog embedded into the NPCM7xx.
 	  This watchdog is used to reset the system and thus cannot be
 	  compiled as a module.
 
@@ -807,32 +837,6 @@ config SPRD_WATCHDOG
 	  Say Y here to include watchdog timer supported
 	  by Spreadtrum system.
 
-# AVR32 Architecture
-
-config AT32AP700X_WDT
-	tristate "AT32AP700x watchdog"
-	depends on CPU_AT32AP700X || COMPILE_TEST
-	help
-	  Watchdog timer embedded into AT32AP700x devices. This will reboot
-	  your system when the timeout is reached.
-
-# BLACKFIN Architecture
-
-config BFIN_WDT
-	tristate "Blackfin On-Chip Watchdog Timer"
-	depends on BLACKFIN
-	---help---
-	  If you say yes here you will get support for the Blackfin On-Chip
-	  Watchdog Timer. If you have one of these processors and wish to
-	  have watchdog support enabled, say Y, otherwise say N.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called bfin_wdt.
-
-# CRIS Architecture
-
-# FRV Architecture
-
 # X86 (i386 + ia64 + x86_64) Architecture
 
 config ACQUIRE_WDT
@@ -884,7 +888,8 @@ config ALIM7101_WDT
 
 config EBC_C384_WDT
 	tristate "WinSystems EBC-C384 Watchdog Timer"
-	depends on X86 && ISA_BUS_API
+	depends on X86
+	select ISA_BUS_API
 	select WATCHDOG_CORE
 	help
 	  Enables watchdog timer support for the watchdog timer on the
@@ -905,6 +910,7 @@ config F71808E_WDT
 config SP5100_TCO
 	tristate "AMD/ATI SP5100 TCO Timer/Watchdog"
 	depends on X86 && PCI
+	select WATCHDOG_CORE
 	---help---
 	  Hardware watchdog driver for the AMD/ATI SP5100 chipset. The TCO
 	  (Total Cost of Ownership) timer is a watchdog timer that will reboot
@@ -1010,6 +1016,7 @@ config WAFER_WDT
 config I6300ESB_WDT
 	tristate "Intel 6300ESB Timer/Watchdog"
 	depends on PCI
+	select WATCHDOG_CORE
 	---help---
 	  Hardware driver for the watchdog timer built into the Intel
 	  6300ESB controller hub.
@@ -1117,6 +1124,7 @@ config IT87_WDT
 
 config HP_WATCHDOG
 	tristate "HP ProLiant iLO2+ Hardware Watchdog Timer"
+	select WATCHDOG_CORE
 	depends on X86 && PCI
 	help
 	  A software monitoring watchdog and NMI sourcing driver. This driver
@@ -1430,8 +1438,6 @@ config NIC7018_WDT
 	  To compile this driver as a module, choose M here: the module will be
 	  called nic7018_wdt.
 
-# M32R Architecture
-
 # M68K Architecture
 
 config M54xx_WATCHDOG
@@ -1604,7 +1610,7 @@ config BCM7038_WDT
 config IMGPDC_WDT
 	tristate "Imagination Technologies PDC Watchdog Timer"
 	depends on HAS_IOMEM
-	depends on METAG || MIPS || COMPILE_TEST
+	depends on MIPS || COMPILE_TEST
 	select WATCHDOG_CORE
 	help
 	  Driver for Imagination Technologies PowerDown Controller
@@ -1839,6 +1845,7 @@ config WATCHDOG_SUN4V
 config XEN_WDT
 	tristate "Xen Watchdog support"
 	depends on XEN
+	select WATCHDOG_CORE
 	help
 	  Say Y here to support the hypervisor watchdog capability provided
 	  by Xen 4.0 and newer.  The watchdog timeout period is normally one

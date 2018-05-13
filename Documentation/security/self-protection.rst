@@ -165,10 +165,15 @@ Stack depth overflow
 A less well understood attack is using a bug that triggers the
 kernel to consume stack memory with deep function calls or large stack
 allocations. With this attack it is possible to write beyond the end of
-the kernel's preallocated stack space and into sensitive structures. Two
-important changes need to be made for better protections: moving the
-sensitive thread_info structure elsewhere, and adding a faulting memory
-hole at the bottom of the stack to catch these overflows.
+the kernel's preallocated stack space and into sensitive structures.
+The combination of the following measures gives better protection:
+
+* moving the sensitive thread_info structure off the stack
+  (``CONFIG_THREAD_INFO_IN_TASK``);
+* adding a faulting memory hole at the bottom of the stack to catch
+  these overflows (``CONFIG_VMAP_STACK``);
+* runtime checking that alloca() calls don't overstep the stack boundary
+  (``CONFIG_GCC_PLUGIN_STACKLEAK``).
 
 Heap memory integrity
 ---------------------
@@ -270,6 +275,21 @@ attacks, it is important to defend against exposure of both kernel memory
 addresses and kernel memory contents (since they may contain kernel
 addresses or other sensitive things like canary values).
 
+Kernel addresses
+----------------
+
+Printing kernel addresses to userspace leaks sensitive information about
+the kernel memory layout. Care should be exercised when using any printk
+specifier that prints the raw address, currently %px, %p[ad], (and %p[sSb]
+in certain circumstances [*]).  Any file written to using one of these
+specifiers should be readable only by privileged processes.
+
+Kernels 4.14 and older printed the raw address using %p. As of 4.15-rc1
+addresses printed with the specifier %p are hashed before printing.
+
+[*] If KALLSYMS is enabled and symbol lookup fails, the raw address is
+printed. If KALLSYMS is not enabled the raw address is printed.
+
 Unique identifiers
 ------------------
 
@@ -287,11 +307,11 @@ sure structure holes are cleared.
 Memory poisoning
 ----------------
 
-When releasing memory, it is best to poison the contents (clear stack on
-syscall return, wipe heap memory on a free), to avoid reuse attacks that
-rely on the old contents of memory. This frustrates many uninitialized
-variable attacks, stack content exposures, heap content exposures, and
-use-after-free attacks.
+When releasing memory, it is best to poison the contents, to avoid reuse
+attacks that rely on the old contents of memory. E.g., clear stack on a
+syscall return (``CONFIG_GCC_PLUGIN_STACKLEAK``), wipe heap memory on a
+free. This frustrates many uninitialized variable attacks, stack content
+exposures, heap content exposures, and use-after-free attacks.
 
 Destination tracking
 --------------------

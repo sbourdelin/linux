@@ -305,6 +305,9 @@ static bool tcp_invert_tuple(struct nf_conntrack_tuple *tuple,
 /* Print out the private part of the conntrack. */
 static void tcp_print_conntrack(struct seq_file *s, struct nf_conn *ct)
 {
+	if (test_bit(IPS_OFFLOAD_BIT, &ct->status))
+		return;
+
 	seq_printf(s, "%s ", tcp_conntrack_names[ct->proto.tcp.state]);
 }
 #endif
@@ -977,6 +980,17 @@ static int tcp_packet(struct nf_conn *ct,
 			nf_ct_l4proto_log_invalid(skb, ct, "challenge-ack ignored");
 			return NF_ACCEPT; /* Don't change state */
 		}
+		break;
+	case TCP_CONNTRACK_SYN_SENT2:
+		/* tcp_conntracks table is not smart enough to handle
+		 * simultaneous open.
+		 */
+		ct->proto.tcp.last_flags |= IP_CT_TCP_SIMULTANEOUS_OPEN;
+		break;
+	case TCP_CONNTRACK_SYN_RECV:
+		if (dir == IP_CT_DIR_REPLY && index == TCP_ACK_SET &&
+		    ct->proto.tcp.last_flags & IP_CT_TCP_SIMULTANEOUS_OPEN)
+			new_state = TCP_CONNTRACK_ESTABLISHED;
 		break;
 	case TCP_CONNTRACK_CLOSE:
 		if (index == TCP_RST_SET

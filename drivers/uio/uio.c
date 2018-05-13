@@ -496,7 +496,7 @@ static int uio_release(struct inode *inode, struct file *filep)
 	return ret;
 }
 
-static unsigned int uio_poll(struct file *filep, poll_table *wait)
+static __poll_t uio_poll(struct file *filep, poll_table *wait)
 {
 	struct uio_listener *listener = filep->private_data;
 	struct uio_device *idev = listener->dev;
@@ -506,7 +506,7 @@ static unsigned int uio_poll(struct file *filep, poll_table *wait)
 
 	poll_wait(filep, &idev->wait, wait);
 	if (listener->event_count != atomic_read(&idev->event))
-		return POLLIN | POLLRDNORM;
+		return EPOLLIN | EPOLLRDNORM;
 	return 0;
 }
 
@@ -597,7 +597,7 @@ static int uio_find_mem_index(struct vm_area_struct *vma)
 	return -1;
 }
 
-static int uio_vma_fault(struct vm_fault *vmf)
+static vm_fault_t uio_vma_fault(struct vm_fault *vmf)
 {
 	struct uio_device *idev = vmf->vma->vm_private_data;
 	struct page *page;

@@ -1528,9 +1528,9 @@ idt77252_tx(struct idt77252_dev *card)
 
 
 static void
-tst_timer(unsigned long data)
+tst_timer(struct timer_list *t)
 {
-	struct idt77252_dev *card = (struct idt77252_dev *)data;
+	struct idt77252_dev *card = from_timer(card, t, tst_timer);
 	unsigned long base, idle, jump;
 	unsigned long flags;
 	u32 pc;
@@ -3173,14 +3173,10 @@ static void init_sram(struct idt77252_dev *card)
 				    (u32) 0xffffffff);
 	}
 
-	writel((SAR_FBQ0_LOW << 28) | 0x00000000 | 0x00000000 |
-	       (SAR_FB_SIZE_0 / 48), SAR_REG_FBQS0);
-	writel((SAR_FBQ1_LOW << 28) | 0x00000000 | 0x00000000 |
-	       (SAR_FB_SIZE_1 / 48), SAR_REG_FBQS1);
-	writel((SAR_FBQ2_LOW << 28) | 0x00000000 | 0x00000000 |
-	       (SAR_FB_SIZE_2 / 48), SAR_REG_FBQS2);
-	writel((SAR_FBQ3_LOW << 28) | 0x00000000 | 0x00000000 |
-	       (SAR_FB_SIZE_3 / 48), SAR_REG_FBQS3);
+	writel((SAR_FBQ0_LOW << 28) | (SAR_FB_SIZE_0 / 48), SAR_REG_FBQS0);
+	writel((SAR_FBQ1_LOW << 28) | (SAR_FB_SIZE_1 / 48), SAR_REG_FBQS1);
+	writel((SAR_FBQ2_LOW << 28) | (SAR_FB_SIZE_2 / 48), SAR_REG_FBQS2);
+	writel((SAR_FBQ3_LOW << 28) | (SAR_FB_SIZE_3 / 48), SAR_REG_FBQS3);
 
 	/* Initialize rate table  */
 	for (i = 0; i < 256; i++) {
@@ -3634,7 +3630,7 @@ static int idt77252_init_one(struct pci_dev *pcidev,
 	spin_lock_init(&card->cmd_lock);
 	spin_lock_init(&card->tst_lock);
 
-	setup_timer(&card->tst_timer, tst_timer, (unsigned long)card);
+	timer_setup(&card->tst_timer, tst_timer, 0);
 
 	/* Do the I/O remapping... */
 	card->membase = ioremap(membase, 1024);

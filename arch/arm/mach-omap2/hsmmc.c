@@ -13,14 +13,11 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/delay.h>
-#include <linux/gpio.h>
 #include <linux/mmc/host.h>
-#include <linux/platform_data/gpio-omap.h>
 #include <linux/platform_data/hsmmc-omap.h>
 
 #include "soc.h"
 #include "omap_device.h"
-#include "omap-pm.h"
 
 #include "hsmmc.h"
 #include "control.h"

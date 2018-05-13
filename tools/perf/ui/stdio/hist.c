@@ -819,8 +819,7 @@ size_t hists__fprintf(struct hists *hists, bool show_header, int max_rows,
 		}
 
 		if (h->ms.map == NULL && verbose > 1) {
-			__map_groups__fprintf_maps(h->thread->mg,
-						   MAP__FUNCTION, fp);
+			map_groups__fprintf(h->thread->mg, fp);
 			fprintf(fp, "%.10s end\n", graph_dotted_line);
 		}
 	}
@@ -840,15 +839,11 @@ size_t events_stats__fprintf(struct events_stats *stats, FILE *fp)
 	for (i = 0; i < PERF_RECORD_HEADER_MAX; ++i) {
 		const char *name;
 
-		if (stats->nr_events[i] == 0)
-			continue;
-
 		name = perf_event__name(i);
 		if (!strcmp(name, "UNKNOWN"))
 			continue;
 
-		ret += fprintf(fp, "%16s events: %10d\n", name,
-			       stats->nr_events[i]);
+		ret += fprintf(fp, "%16s events: %10d\n", name, stats->nr_events[i]);
 	}
 
 	return ret;

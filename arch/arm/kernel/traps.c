@@ -72,7 +72,7 @@ void dump_backtrace_entry(unsigned long where, unsigned long from, unsigned long
 	printk("Function entered at [<%08lx>] from [<%08lx>]\n", where, from);
 #endif
 
-	if (in_exception_text(where))
+	if (in_entry_text(from))
 		dump_mem("", "Exception stack", frame + 4, frame + 4 + sizeof(struct pt_regs));
 }
 
@@ -433,12 +433,13 @@ static int call_undef_hook(struct pt_regs *regs, unsigned int instr)
 	return fn ? fn(regs, instr) : 1;
 }
 
-asmlinkage void __exception do_undefinstr(struct pt_regs *regs)
+asmlinkage void do_undefinstr(struct pt_regs *regs)
 {
 	unsigned int instr;
 	siginfo_t info;
 	void __user *pc;
 
+	clear_siginfo(&info);
 	pc = (void __user *)instruction_pointer(regs);
 
 	if (processor_mode(regs) == SVC_MODE) {
@@ -537,6 +538,7 @@ static int bad_syscall(int n, struct pt_regs *regs)
 {
 	siginfo_t info;
 
+	clear_siginfo(&info);
 	if ((current->personality & PER_MASK) != PER_LINUX) {
 		send_sig(SIGSEGV, current, 1);
 		return regs->ARM_r0;
@@ -604,6 +606,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 {
 	siginfo_t info;
 
+	clear_siginfo(&info);
 	if ((no >> 16) != (__ARM_NR_BASE>> 16))
 		return bad_syscall(no, regs);
 
@@ -740,6 +743,8 @@ baddataabort(int code, unsigned long instr, struct pt_regs *regs)
 	unsigned long addr = instruction_pointer(regs);
 	siginfo_t info;
 
+	clear_siginfo(&info);
+
 #ifdef CONFIG_DEBUG_USER
 	if (user_debug & UDBG_BADABORT) {
 		pr_err("[%d] %s: bad data abort: code %d instr 0x%08lx\n",
@@ -793,7 +798,6 @@ void abort(void)
 	/* if that doesn't kill us, halt */
 	panic("Oops failed to kill thread");
 }
-EXPORT_SYMBOL(abort);
 
 void __init trap_init(void)
 {

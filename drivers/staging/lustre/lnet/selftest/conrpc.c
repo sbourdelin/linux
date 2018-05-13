@@ -75,7 +75,7 @@ lstcon_rpc_done(struct srpc_client_rpc *rpc)
 		/* not aborted */
 		LASSERT(!crpc->crp_status);
 
-		crpc->crp_stamp = cfs_time_current();
+		crpc->crp_stamp = jiffies;
 		crpc->crp_status = rpc->crpc_status;
 	}
 
@@ -129,7 +129,7 @@ lstcon_rpc_prep(struct lstcon_node *nd, int service, unsigned int feats,
 	spin_unlock(&console_session.ses_rpc_lock);
 
 	if (!crpc) {
-		LIBCFS_ALLOC(crpc, sizeof(*crpc));
+		crpc = kzalloc(sizeof(*crpc), GFP_NOFS);
 		if (!crpc)
 			return -ENOMEM;
 	}
@@ -140,7 +140,7 @@ lstcon_rpc_prep(struct lstcon_node *nd, int service, unsigned int feats,
 		return 0;
 	}
 
-	LIBCFS_FREE(crpc, sizeof(*crpc));
+	kfree(crpc);
 
 	return rc;
 }
@@ -250,7 +250,7 @@ lstcon_rpc_trans_prep(struct list_head *translist, int transop,
 	}
 
 	/* create a trans group */
-	LIBCFS_ALLOC(trans, sizeof(*trans));
+	trans = kzalloc(sizeof(*trans), GFP_NOFS);
 	if (!trans)
 		return -ENOMEM;
 
@@ -297,14 +297,14 @@ lstcon_rpc_trans_abort(struct lstcon_rpc_trans *trans, int error)
 		if (!crpc->crp_posted || /* not posted */
 		    crpc->crp_stamp) {	 /* rpc done or aborted already */
 			if (!crpc->crp_stamp) {
-				crpc->crp_stamp = cfs_time_current();
+				crpc->crp_stamp = jiffies;
 				crpc->crp_status = -EINTR;
 			}
 			spin_unlock(&rpc->crpc_lock);
 			continue;
 		}
 
-		crpc->crp_stamp = cfs_time_current();
+		crpc->crp_stamp = jiffies;
 		crpc->crp_status = error;
 
 		spin_unlock(&rpc->crpc_lock);
@@ -315,7 +315,7 @@ lstcon_rpc_trans_abort(struct lstcon_rpc_trans *trans, int error)
 			continue;
 
 		nd = crpc->crp_node;
-		if (cfs_time_after(nd->nd_stamp, crpc->crp_stamp))
+		if (time_after(nd->nd_stamp, crpc->crp_stamp))
 			continue;
 
 		nd->nd_stamp = crpc->crp_stamp;
@@ -359,7 +359,7 @@ lstcon_rpc_trans_postwait(struct lstcon_rpc_trans *trans, int timeout)
 
 	rc = wait_event_interruptible_timeout(trans->tas_waitq,
 					      lstcon_rpc_trans_check(trans),
-					      cfs_time_seconds(timeout));
+					      timeout * HZ);
 	rc = (rc > 0) ? 0 : ((rc < 0) ? -EINTR : -ETIMEDOUT);
 
 	mutex_lock(&console_session.ses_mutex);
@@ -404,7 +404,7 @@ lstcon_rpc_get_reply(struct lstcon_rpc *crpc, struct srpc_msg **msgpp)
 		crpc->crp_unpacked = 1;
 	}
 
-	if (cfs_time_after(nd->nd_stamp, crpc->crp_stamp))
+	if (time_after(nd->nd_stamp, crpc->crp_stamp))
 		return 0;
 
 	nd->nd_stamp = crpc->crp_stamp;
@@ -500,8 +500,8 @@ lstcon_rpc_trans_interpreter(struct lstcon_rpc_trans *trans,
 
 		nd = crpc->crp_node;
 
-		dur = (long)cfs_time_sub(crpc->crp_stamp,
-		      (unsigned long)console_session.ses_id.ses_stamp);
+		dur = (long)(crpc->crp_stamp -
+			     (unsigned long)console_session.ses_id.ses_stamp);
 		jiffies_to_timeval(dur, &tv);
 
 		if (copy_to_user(&ent->rpe_peer, &nd->nd_id,
@@ -585,7 +585,7 @@ lstcon_rpc_trans_destroy(struct lstcon_rpc_trans *trans)
 	CDEBUG(D_NET, "Transaction %s destroyed with %d pending RPCs\n",
 	       lstcon_rpc_trans_name(trans->tas_opc), count);
 
-	LIBCFS_FREE(trans, sizeof(*trans));
+	kfree(trans);
 }
 
 int
@@ -1350,7 +1350,7 @@ lstcon_rpc_cleanup_wait(void)
 
 		CWARN("Session is shutting down, waiting for termination of transactions\n");
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(cfs_time_seconds(1));
+		schedule_timeout(HZ);
 
 		mutex_lock(&console_session.ses_mutex);
 	}
@@ -1369,7 +1369,7 @@ lstcon_rpc_cleanup_wait(void)
 
 	list_for_each_entry_safe(crpc, temp, &zlist, crp_link) {
 		list_del(&crpc->crp_link);
-		LIBCFS_FREE(crpc, sizeof(struct lstcon_rpc));
+		kfree(crpc);
 	}
 }
 

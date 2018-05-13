@@ -358,10 +358,10 @@ struct deferred_entry {
 	struct page *page;
 };
 static LIST_HEAD(deferred_list);
-static void gnttab_handle_deferred(unsigned long);
+static void gnttab_handle_deferred(struct timer_list *);
 static DEFINE_TIMER(deferred_timer, gnttab_handle_deferred);
 
-static void gnttab_handle_deferred(unsigned long unused)
+static void gnttab_handle_deferred(struct timer_list *unused)
 {
 	unsigned int nr = 10;
 	struct deferred_entry *first = NULL;
@@ -382,7 +382,7 @@ static void gnttab_handle_deferred(unsigned long unused)
 			if (entry->page) {
 				pr_debug("freeing g.e. %#x (pfn %#lx)\n",
 					 entry->ref, page_to_pfn(entry->page));
-				__free_page(entry->page);
+				put_page(entry->page);
 			} else
 				pr_info("freeing g.e. %#x\n", entry->ref);
 			kfree(entry);
@@ -438,7 +438,7 @@ void gnttab_end_foreign_access(grant_ref_t ref, int readonly,
 	if (gnttab_end_foreign_access_ref(ref, readonly)) {
 		put_free_entry(ref);
 		if (page != 0)
-			free_page(page);
+			put_page(virt_to_page(page));
 	} else
 		gnttab_add_deferred(ref, readonly,
 				    page ? virt_to_page(page) : NULL);

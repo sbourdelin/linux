@@ -14,7 +14,6 @@
 #include <linux/netdevice.h>
 #include <linux/interrupt.h>
 #include <linux/platform_device.h>
-#include <linux/of.h>
 #include <linux/phy.h>
 #include <linux/phy_fixed.h>
 #include <linux/mii.h>
@@ -34,12 +33,6 @@
 #include "bcm_sf2_regs.h"
 #include "b53/b53_priv.h"
 #include "b53/b53_regs.h"
-
-static enum dsa_tag_protocol bcm_sf2_sw_get_tag_protocol(struct dsa_switch *ds,
-							 int port)
-{
-	return DSA_TAG_PROTO_BRCM;
-}
 
 static void bcm_sf2_imp_setup(struct dsa_switch *ds, int port)
 {
@@ -95,7 +88,7 @@ static void bcm_sf2_gphy_enable_set(struct dsa_switch *ds, bool enable)
 	reg = reg_readl(priv, REG_SPHY_CNTRL);
 	if (enable) {
 		reg |= PHY_RESET;
-		reg &= ~(EXT_PWR_DOWN | IDDQ_BIAS | CK25_DIS);
+		reg &= ~(EXT_PWR_DOWN | IDDQ_BIAS | IDDQ_GLOBAL_PWR | CK25_DIS);
 		reg_writel(priv, reg, REG_SPHY_CNTRL);
 		udelay(21);
 		reg = reg_readl(priv, REG_SPHY_CNTRL);
@@ -861,11 +854,12 @@ static const struct b53_io_ops bcm_sf2_io_ops = {
 };
 
 static const struct dsa_switch_ops bcm_sf2_ops = {
-	.get_tag_protocol	= bcm_sf2_sw_get_tag_protocol,
+	.get_tag_protocol	= b53_get_tag_protocol,
 	.setup			= bcm_sf2_sw_setup,
 	.get_strings		= b53_get_strings,
 	.get_ethtool_stats	= b53_get_ethtool_stats,
 	.get_sset_count		= b53_get_sset_count,
+	.get_ethtool_phy_stats	= b53_get_ethtool_phy_stats,
 	.get_phy_flags		= bcm_sf2_sw_get_phy_flags,
 	.adjust_link		= bcm_sf2_sw_adjust_link,
 	.fixed_link_update	= bcm_sf2_sw_fixed_link_update,
@@ -953,6 +947,9 @@ static const struct of_device_id bcm_sf2_of_match[] = {
 	  .data = &bcm_sf2_7445_data
 	},
 	{ .compatible = "brcm,bcm7278-switch-v4.0",
+	  .data = &bcm_sf2_7278_data
+	},
+	{ .compatible = "brcm,bcm7278-switch-v4.8",
 	  .data = &bcm_sf2_7278_data
 	},
 	{ /* sentinel */ },

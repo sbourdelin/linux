@@ -111,12 +111,7 @@ void unregister_vlan_dev(struct net_device *dev, struct list_head *head)
 		vlan_gvrp_uninit_applicant(real_dev);
 	}
 
-	/* Take it out of our own structures, but be sure to interlock with
-	 * HW accelerating devices or SW vlan input packet processing if
-	 * VLAN is not 0 (leave it there for 802.1p).
-	 */
-	if (vlan_id)
-		vlan_vid_del(real_dev, vlan->vlan_proto, vlan_id);
+	vlan_vid_del(real_dev, vlan->vlan_proto, vlan_id);
 
 	/* Get rid of the vlan's reference to real_dev */
 	dev_put(real_dev);
@@ -365,6 +360,7 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 	struct vlan_dev_priv *vlan;
 	bool last = false;
 	LIST_HEAD(list);
+	int err;
 
 	if (is_vlan_dev(dev)) {
 		int err = __vlan_device_event(dev, event);
@@ -493,6 +489,26 @@ static int vlan_device_event(struct notifier_block *unused, unsigned long event,
 		/* Propagate to vlan devices */
 		vlan_group_for_each_dev(grp, i, vlandev)
 			call_netdevice_notifiers(event, vlandev);
+		break;
+
+	case NETDEV_CVLAN_FILTER_PUSH_INFO:
+		err = vlan_filter_push_vids(vlan_info, htons(ETH_P_8021Q));
+		if (err)
+			return notifier_from_errno(err);
+		break;
+
+	case NETDEV_CVLAN_FILTER_DROP_INFO:
+		vlan_filter_drop_vids(vlan_info, htons(ETH_P_8021Q));
+		break;
+
+	case NETDEV_SVLAN_FILTER_PUSH_INFO:
+		err = vlan_filter_push_vids(vlan_info, htons(ETH_P_8021AD));
+		if (err)
+			return notifier_from_errno(err);
+		break;
+
+	case NETDEV_SVLAN_FILTER_DROP_INFO:
+		vlan_filter_drop_vids(vlan_info, htons(ETH_P_8021AD));
 		break;
 	}
 

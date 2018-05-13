@@ -155,9 +155,9 @@ stt_check_timers(unsigned long *last)
 
 	spin_lock(&stt_data.stt_lock);
 
-	while (cfs_time_aftereq(this_slot, *last)) {
+	while (time_after_eq(this_slot, *last)) {
 		expired += stt_expire_list(STTIMER_SLOT(this_slot), now);
-		this_slot = cfs_time_sub(this_slot, STTIMER_SLOTTIME);
+		this_slot = this_slot - STTIMER_SLOTTIME;
 	}
 
 	*last = now & STTIMER_SLOTTIMEMASK;
@@ -170,14 +170,12 @@ stt_timer_main(void *arg)
 {
 	int rc = 0;
 
-	cfs_block_allsigs();
-
 	while (!stt_data.stt_shuttingdown) {
 		stt_check_timers(&stt_data.stt_prev_slot);
 
 		rc = wait_event_timeout(stt_data.stt_waitq,
 					stt_data.stt_shuttingdown,
-					cfs_time_seconds(STTIMER_SLOTTIME));
+					STTIMER_SLOTTIME * HZ);
 	}
 
 	spin_lock(&stt_data.stt_lock);

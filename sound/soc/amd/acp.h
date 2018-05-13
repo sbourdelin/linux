@@ -70,6 +70,8 @@
 #define CAPTURE_END_DMA_DESCR_CH15 7
 
 #define mmACP_I2S_16BIT_RESOLUTION_EN       0x5209
+#define ACP_I2S_MIC_16BIT_RESOLUTION_EN 0x01
+#define ACP_I2S_SP_16BIT_RESOLUTION_EN	0x02
 enum acp_dma_priority_level {
 	/* 0x0 Specifies the DMA channel is given normal priority */
 	ACP_DMA_PRIORITY_LEVEL_NORMAL = 0x0,
@@ -84,14 +86,14 @@ struct audio_substream_data {
 	u16 num_of_pages;
 	u16 direction;
 	uint64_t size;
-	u64 renderbytescount;
-	u64 capturebytescount;
+	u64 i2ssp_renderbytescount;
+	u64 i2ssp_capturebytescount;
 	void __iomem *acp_mmio;
 };
 
 struct audio_drv_data {
-	struct snd_pcm_substream *play_stream;
-	struct snd_pcm_substream *capture_stream;
+	struct snd_pcm_substream *play_i2ssp_stream;
+	struct snd_pcm_substream *capture_i2ssp_stream;
 	void __iomem *acp_mmio;
 	u32 asic_type;
 };
@@ -113,23 +115,25 @@ enum {
 };
 
 enum {
-	ACP_DMA_ATTRIBUTES_SHAREDMEM_TO_DAGB_ONION = 0x0,
-	ACP_DMA_ATTRIBUTES_SHARED_MEM_TO_DAGB_GARLIC = 0x1,
-	ACP_DMA_ATTRIBUTES_DAGB_ONION_TO_SHAREDMEM = 0x8,
-	ACP_DMA_ATTRIBUTES_DAGB_GARLIC_TO_SHAREDMEM = 0x9,
-	ACP_DMA_ATTRIBUTES_FORCE_SIZE = 0xF
+	ACP_DMA_ATTR_SHAREDMEM_TO_DAGB_ONION = 0x0,
+	ACP_DMA_ATTR_SHARED_MEM_TO_DAGB_GARLIC = 0x1,
+	ACP_DMA_ATTR_DAGB_ONION_TO_SHAREDMEM = 0x8,
+	ACP_DMA_ATTR_DAGB_GARLIC_TO_SHAREDMEM = 0x9,
+	ACP_DMA_ATTR_FORCE_SIZE = 0xF
 };
 
 typedef struct acp_dma_dscr_transfer {
 	/* Specifies the source memory location for the DMA data transfer. */
 	u32 src;
-	/* Specifies the destination memory location to where the data will
+	/*
+	 * Specifies the destination memory location to where the data will
 	 * be transferred.
-	*/
+	 */
 	u32 dest;
-	/* Specifies the number of bytes need to be transferred
-	* from source to destination memory.Transfer direction & IOC enable
-	*/
+	/*
+	 * Specifies the number of bytes need to be transferred
+	 * from source to destination memory.Transfer direction & IOC enable
+	 */
 	u32 xfer_val;
 	/* Reserved for future use */
 	u32 reserved;

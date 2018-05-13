@@ -62,7 +62,7 @@ static int dlm_remaster_locks(struct dlm_ctxt *dlm, u8 dead_node);
 static int dlm_init_recovery_area(struct dlm_ctxt *dlm, u8 dead_node);
 static int dlm_request_all_locks(struct dlm_ctxt *dlm,
 				 u8 request_from, u8 dead_node);
-static void dlm_destroy_recovery_area(struct dlm_ctxt *dlm, u8 dead_node);
+static void dlm_destroy_recovery_area(struct dlm_ctxt *dlm);
 
 static inline int dlm_num_locks_in_lockres(struct dlm_lock_resource *res);
 static void dlm_init_migratable_lockres(struct dlm_migratable_lockres *mres,
@@ -456,8 +456,8 @@ static int dlm_do_recovery(struct dlm_ctxt *dlm)
 	spin_lock(&dlm->spinlock);
 
 	if (dlm->migrate_done) {
-		mlog(0, "%s: no need do recovery after migrating all lockres\n",
-				dlm->name);
+		mlog(0, "%s: no need do recovery after migrating all "
+		     "lock resources\n", dlm->name);
 		spin_unlock(&dlm->spinlock);
 		return 0;
 	}
@@ -746,7 +746,7 @@ static int dlm_remaster_locks(struct dlm_ctxt *dlm, u8 dead_node)
 	}
 
 	if (destroy)
-		dlm_destroy_recovery_area(dlm, dead_node);
+		dlm_destroy_recovery_area(dlm);
 
 	return status;
 }
@@ -771,7 +771,7 @@ static int dlm_init_recovery_area(struct dlm_ctxt *dlm, u8 dead_node)
 
 		ndata = kzalloc(sizeof(*ndata), GFP_NOFS);
 		if (!ndata) {
-			dlm_destroy_recovery_area(dlm, dead_node);
+			dlm_destroy_recovery_area(dlm);
 			return -ENOMEM;
 		}
 		ndata->node_num = num;
@@ -785,7 +785,7 @@ static int dlm_init_recovery_area(struct dlm_ctxt *dlm, u8 dead_node)
 	return 0;
 }
 
-static void dlm_destroy_recovery_area(struct dlm_ctxt *dlm, u8 dead_node)
+static void dlm_destroy_recovery_area(struct dlm_ctxt *dlm)
 {
 	struct dlm_reco_node_data *ndata, *next;
 	LIST_HEAD(tmplist);
@@ -1385,6 +1385,15 @@ int dlm_mig_lockres_handler(struct o2net_msg *msg, u32 len, void *data,
 	if (!dlm_grab(dlm))
 		return -EINVAL;
 
+	if (!dlm_joined(dlm)) {
+		mlog(ML_ERROR, "Domain %s not joined! "
+			  "lockres %.*s, master %u\n",
+			  dlm->name, mres->lockname_len,
+			  mres->lockname, mres->master);
+		dlm_put(dlm);
+		return -EINVAL;
+	}
+
 	BUG_ON(!(mres->flags & (DLM_MRES_RECOVERY|DLM_MRES_MIGRATION)));
 
 	real_master = mres->master;
@@ -1814,7 +1823,6 @@ static int dlm_process_recovery_data(struct dlm_ctxt *dlm,
 	int i, j, bad;
 	struct dlm_lock *lock;
 	u8 from = O2NM_MAX_NODES;
-	unsigned int added = 0;
 	__be64 c;
 
 	mlog(0, "running %d locks for this lockres\n", mres->num_locks);
@@ -1830,7 +1838,6 @@ static int dlm_process_recovery_data(struct dlm_ctxt *dlm,
 			spin_lock(&res->spinlock);
 			dlm_lockres_set_refmap_bit(dlm, res, from);
 			spin_unlock(&res->spinlock);
-			added++;
 			break;
 		}
 		BUG_ON(ml->highest_blocked != LKM_IVMODE);
@@ -1918,7 +1925,6 @@ static int dlm_process_recovery_data(struct dlm_ctxt *dlm,
 			/* do not alter lock refcount.  switching lists. */
 			list_move_tail(&lock->list, queue);
 			spin_unlock(&res->spinlock);
-			added++;
 
 			mlog(0, "just reordered a local lock!\n");
 			continue;
@@ -2044,7 +2050,6 @@ skip_lvb:
 			     "setting refmap bit\n", dlm->name,
 			     res->lockname.len, res->lockname.name, ml->node);
 			dlm_lockres_set_refmap_bit(dlm, res, ml->node);
-			added++;
 		}
 		spin_unlock(&res->spinlock);
 	}
@@ -2337,13 +2342,6 @@ static void dlm_free_dead_locks(struct dlm_ctxt *dlm,
 	/* do not kick thread yet */
 	__dlm_dirty_lockres(dlm, res);
 }
-
-/* if this node is the recovery master, and there are no
- * locks for a given lockres owned by this node that are in
- * either PR or EX mode, zero out the lvb before requesting.
- *
- */
-
 
 static void dlm_do_local_recovery_cleanup(struct dlm_ctxt *dlm, u8 dead_node)
 {

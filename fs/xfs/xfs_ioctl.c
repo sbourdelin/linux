@@ -39,12 +39,12 @@
 #include "xfs_icache.h"
 #include "xfs_symlink.h"
 #include "xfs_trans.h"
-#include "xfs_pnfs.h"
 #include "xfs_acl.h"
 #include "xfs_btree.h"
 #include <linux/fsmap.h>
 #include "xfs_fsmap.h"
 #include "scrub/xfs_scrub.h"
+#include "xfs_sb.h"
 
 #include <linux/capability.h>
 #include <linux/cred.h>
@@ -613,7 +613,7 @@ xfs_ioc_space(
 	struct xfs_inode	*ip = XFS_I(inode);
 	struct iattr		iattr;
 	enum xfs_prealloc_flags	flags = 0;
-	uint			iolock = XFS_IOLOCK_EXCL;
+	uint			iolock = XFS_IOLOCK_EXCL | XFS_MMAPLOCK_EXCL;
 	int			error;
 
 	/*
@@ -643,12 +643,9 @@ xfs_ioc_space(
 		return error;
 
 	xfs_ilock(ip, iolock);
-	error = xfs_break_layouts(inode, &iolock);
+	error = xfs_break_layouts(inode, &iolock, BREAK_UNMAP);
 	if (error)
 		goto out_unlock;
-
-	xfs_ilock(ip, XFS_MMAPLOCK_EXCL);
-	iolock |= XFS_MMAPLOCK_EXCL;
 
 	switch (bf->l_whence) {
 	case 0: /*SEEK_SET*/
@@ -809,7 +806,7 @@ xfs_ioc_fsgeometry_v1(
 	xfs_fsop_geom_t         fsgeo;
 	int			error;
 
-	error = xfs_fs_geometry(mp, &fsgeo, 3);
+	error = xfs_fs_geometry(&mp->m_sb, &fsgeo, 3);
 	if (error)
 		return error;
 
@@ -831,7 +828,7 @@ xfs_ioc_fsgeometry(
 	xfs_fsop_geom_t		fsgeo;
 	int			error;
 
-	error = xfs_fs_geometry(mp, &fsgeo, 4);
+	error = xfs_fs_geometry(&mp->m_sb, &fsgeo, 4);
 	if (error)
 		return error;
 

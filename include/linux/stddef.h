@@ -22,12 +22,20 @@ enum {
 #define sizeof_field(structure, field) sizeof((((structure *)0)->field))
 
 /**
+ * sizeof_field(TYPE, MEMBER)
+ *
+ * @TYPE: The structure containing the field of interest
+ * @MEMBER: The field to return the size of
+ */
+#define sizeof_field(TYPE, MEMBER) sizeof((((TYPE *)0)->MEMBER))
+
+/**
  * offsetofend(TYPE, MEMBER)
  *
  * @TYPE: The type of the structure
  * @MEMBER: The member within the structure to get the end offset of
  */
 #define offsetofend(TYPE, MEMBER) \
-	(offsetof(TYPE, MEMBER)	+ sizeof(((TYPE *)0)->MEMBER))
+	(offsetof(TYPE, MEMBER)	+ sizeof_field(TYPE, MEMBER))
 
 #endif

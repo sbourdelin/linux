@@ -42,7 +42,6 @@
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
-#include <linux/major.h>
 #include <linux/sched.h>
 #include <linux/lp.h>
 #include <linux/slab.h>
@@ -180,7 +179,7 @@ int obd_ioctl_getdata(char **buf, int *len, void __user *arg)
 	 * obdfilter-survey is an example, which relies on ioctl. So we'd
 	 * better avoid vmalloc on ioctl path. LU-66
 	 */
-	*buf = libcfs_kvzalloc(hdr.ioc_len, GFP_NOFS);
+	*buf = kvzalloc(hdr.ioc_len, GFP_KERNEL);
 	if (!*buf) {
 		CERROR("Cannot allocate control buffer of len %d\n",
 		       hdr.ioc_len);
@@ -251,7 +250,7 @@ static long obd_class_ioctl(struct file *filp, unsigned int cmd,
 	int err = 0;
 
 	/* Allow non-root access for OBD_IOC_PING_TARGET - used by lfs check */
-	if (!capable(CFS_CAP_SYS_ADMIN) && (cmd != OBD_IOC_PING_TARGET))
+	if (!capable(CAP_SYS_ADMIN) && (cmd != OBD_IOC_PING_TARGET))
 		return err = -EACCES;
 	if ((cmd & 0xffffff00) == ((int)'T') << 8) /* ignore all tty ioctls */
 		return err = -ENOTTY;
@@ -271,7 +270,7 @@ static const struct file_operations obd_psdev_fops = {
 
 /* modules setup */
 struct miscdevice obd_psdev = {
-	.minor = OBD_DEV_MINOR,
+	.minor = MISC_DYNAMIC_MINOR,
 	.name  = OBD_DEV_NAME,
 	.fops  = &obd_psdev_fops,
 };
@@ -501,6 +500,7 @@ int class_procfs_init(void)
 		rc = debugfs_lustre_root ? PTR_ERR(debugfs_lustre_root)
 					 : -ENOMEM;
 		debugfs_lustre_root = NULL;
+		sysfs_remove_group(lustre_kobj, &lustre_attr_group);
 		kobject_put(lustre_kobj);
 		goto out;
 	}
@@ -509,6 +509,7 @@ int class_procfs_init(void)
 				   &obd_device_list_fops);
 	if (IS_ERR_OR_NULL(file)) {
 		rc = file ? PTR_ERR(file) : -ENOMEM;
+		sysfs_remove_group(lustre_kobj, &lustre_attr_group);
 		kobject_put(lustre_kobj);
 		goto out;
 	}
@@ -522,6 +523,7 @@ int class_procfs_clean(void)
 
 	debugfs_lustre_root = NULL;
 
+	sysfs_remove_group(lustre_kobj, &lustre_attr_group);
 	kobject_put(lustre_kobj);
 
 	return 0;

@@ -16,12 +16,12 @@
 #include <linux/of_net.h>
 #include <linux/of_mdio.h>
 #include <linux/mdio.h>
-#include <linux/list.h>
 #include <net/rtnetlink.h>
 #include <net/pkt_cls.h>
 #include <net/tc_act/tc_mirred.h>
 #include <linux/if_bridge.h>
 #include <linux/netpoll.h>
+#include <linux/ptp_classify.h>
 
 #include "dsa_priv.h"
 
@@ -256,6 +256,22 @@ dsa_slave_fdb_dump(struct sk_buff *skb, struct netlink_callback *cb,
 
 static int dsa_slave_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
+	struct dsa_slave_priv *p = netdev_priv(dev);
+	struct dsa_switch *ds = p->dp->ds;
+	int port = p->dp->index;
+
+	/* Pass through to switch driver if it supports timestamping */
+	switch (cmd) {
+	case SIOCGHWTSTAMP:
+		if (ds->ops->port_hwtstamp_get)
+			return ds->ops->port_hwtstamp_get(ds, port, ifr);
+		break;
+	case SIOCSHWTSTAMP:
+		if (ds->ops->port_hwtstamp_set)
+			return ds->ops->port_hwtstamp_set(ds, port, ifr);
+		break;
+	}
+
 	if (!dev->phydev)
 		return -ENODEV;
 
@@ -386,6 +402,30 @@ static inline netdev_tx_t dsa_slave_netpoll_send_skb(struct net_device *dev,
 	return NETDEV_TX_OK;
 }
 
+static void dsa_skb_tx_timestamp(struct dsa_slave_priv *p,
+				 struct sk_buff *skb)
+{
+	struct dsa_switch *ds = p->dp->ds;
+	struct sk_buff *clone;
+	unsigned int type;
+
+	type = ptp_classify_raw(skb);
+	if (type == PTP_CLASS_NONE)
+		return;
+
+	if (!ds->ops->port_txtstamp)
+		return;
+
+	clone = skb_clone_sk(skb);
+	if (!clone)
+		return;
+
+	if (ds->ops->port_txtstamp(ds, p->dp->index, clone, type))
+		return;
+
+	kfree_skb(clone);
+}
+
 static netdev_tx_t dsa_slave_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct dsa_slave_priv *p = netdev_priv(dev);
@@ -397,6 +437,11 @@ static netdev_tx_t dsa_slave_xmit(struct sk_buff *skb, struct net_device *dev)
 	s->tx_packets++;
 	s->tx_bytes += skb->len;
 	u64_stats_update_end(&s->syncp);
+
+	/* Identify PTP protocol packets, clone them, and pass them to the
+	 * switch driver
+	 */
+	dsa_skb_tx_timestamp(p, skb);
 
 	/* Transmit function may have to reallocate the original SKB,
 	 * in which case it must have freed it. Only free it here on error.
@@ -515,7 +560,8 @@ static void dsa_slave_get_strings(struct net_device *dev,
 		strncpy(data + 2 * len, "rx_packets", len);
 		strncpy(data + 3 * len, "rx_bytes", len);
 		if (ds->ops->get_strings)
-			ds->ops->get_strings(ds, dp->index, data + 4 * len);
+			ds->ops->get_strings(ds, dp->index, stringset,
+					     data + 4 * len);
 	}
 }
 
@@ -560,7 +606,7 @@ static int dsa_slave_get_sset_count(struct net_device *dev, int sset)
 
 		count = 4;
 		if (ds->ops->get_sset_count)
-			count += ds->ops->get_sset_count(ds);
+			count += ds->ops->get_sset_count(ds, dp->index, sset);
 
 		return count;
 	}
@@ -709,14 +755,12 @@ static int dsa_slave_add_cls_matchall(struct net_device *dev,
 	struct dsa_slave_priv *p = netdev_priv(dev);
 	struct dsa_mall_tc_entry *mall_tc_entry;
 	__be16 protocol = cls->common.protocol;
-	struct net *net = dev_net(dev);
 	struct dsa_switch *ds = dp->ds;
 	struct net_device *to_dev;
 	const struct tc_action *a;
 	struct dsa_port *to_dp;
 	int err = -EOPNOTSUPP;
 	LIST_HEAD(actions);
-	int ifindex;
 
 	if (!ds->ops->port_mirror_add)
 		return err;
@@ -730,8 +774,7 @@ static int dsa_slave_add_cls_matchall(struct net_device *dev,
 	if (is_tcf_mirred_egress_mirror(a) && protocol == htons(ETH_P_ALL)) {
 		struct dsa_mall_mirror_tc_entry *mirror;
 
-		ifindex = tcf_mirred_ifindex(a);
-		to_dev = __dev_get_by_index(net, ifindex);
+		to_dev = tcf_mirred_dev(a);
 		if (!to_dev)
 			return -EINVAL;
 
@@ -922,6 +965,18 @@ static int dsa_slave_set_rxnfc(struct net_device *dev,
 	return ds->ops->set_rxnfc(ds, dp->index, nfc);
 }
 
+static int dsa_slave_get_ts_info(struct net_device *dev,
+				 struct ethtool_ts_info *ts)
+{
+	struct dsa_slave_priv *p = netdev_priv(dev);
+	struct dsa_switch *ds = p->dp->ds;
+
+	if (!ds->ops->get_ts_info)
+		return -EOPNOTSUPP;
+
+	return ds->ops->get_ts_info(ds, p->dp->index, ts);
+}
+
 static const struct ethtool_ops dsa_slave_ethtool_ops = {
 	.get_drvinfo		= dsa_slave_get_drvinfo,
 	.get_regs_len		= dsa_slave_get_regs_len,
@@ -942,7 +997,28 @@ static const struct ethtool_ops dsa_slave_ethtool_ops = {
 	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
 	.get_rxnfc		= dsa_slave_get_rxnfc,
 	.set_rxnfc		= dsa_slave_set_rxnfc,
+	.get_ts_info		= dsa_slave_get_ts_info,
 };
+
+/* legacy way, bypassing the bridge *****************************************/
+int dsa_legacy_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
+		       struct net_device *dev,
+		       const unsigned char *addr, u16 vid,
+		       u16 flags)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+
+	return dsa_port_fdb_add(dp, addr, vid);
+}
+
+int dsa_legacy_fdb_del(struct ndmsg *ndm, struct nlattr *tb[],
+		       struct net_device *dev,
+		       const unsigned char *addr, u16 vid)
+{
+	struct dsa_port *dp = dsa_slave_to_port(dev);
+
+	return dsa_port_fdb_del(dp, addr, vid);
+}
 
 static const struct net_device_ops dsa_slave_netdev_ops = {
 	.ndo_open	 	= dsa_slave_open,
@@ -1319,6 +1395,9 @@ static void dsa_slave_switchdev_event_work(struct work_struct *work)
 	switch (switchdev_work->event) {
 	case SWITCHDEV_FDB_ADD_TO_DEVICE:
 		fdb_info = &switchdev_work->fdb_info;
+		if (!fdb_info->added_by_user)
+			break;
+
 		err = dsa_port_fdb_add(dp, fdb_info->addr, fdb_info->vid);
 		if (err) {
 			netdev_dbg(dev, "fdb add failed err=%d\n", err);
@@ -1330,6 +1409,9 @@ static void dsa_slave_switchdev_event_work(struct work_struct *work)
 
 	case SWITCHDEV_FDB_DEL_TO_DEVICE:
 		fdb_info = &switchdev_work->fdb_info;
+		if (!fdb_info->added_by_user)
+			break;
+
 		err = dsa_port_fdb_del(dp, fdb_info->addr, fdb_info->vid);
 		if (err) {
 			netdev_dbg(dev, "fdb del failed err=%d\n", err);
@@ -1382,8 +1464,7 @@ static int dsa_slave_switchdev_event(struct notifier_block *unused,
 	switch (event) {
 	case SWITCHDEV_FDB_ADD_TO_DEVICE: /* fall through */
 	case SWITCHDEV_FDB_DEL_TO_DEVICE:
-		if (dsa_slave_switchdev_fdb_work_init(switchdev_work,
-						      ptr))
+		if (dsa_slave_switchdev_fdb_work_init(switchdev_work, ptr))
 			goto err_fdb_work_init;
 		dev_hold(dev);
 		break;

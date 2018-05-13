@@ -124,7 +124,7 @@ extern void cifs_update_eof(struct cifsInodeInfo *cifsi, loff_t offset,
 			    unsigned int bytes_written);
 extern struct cifsFileInfo *find_writable_file(struct cifsInodeInfo *, bool);
 extern struct cifsFileInfo *find_readable_file(struct cifsInodeInfo *, bool);
-extern unsigned int smbCalcSize(void *buf);
+extern unsigned int smbCalcSize(void *buf, struct TCP_Server_Info *server);
 extern int decode_negTokenInit(unsigned char *security_blob, int length,
 			struct TCP_Server_Info *server);
 extern int cifs_convert_address(struct sockaddr *dst, const char *src, int len);
@@ -542,4 +542,9 @@ enum securityEnum cifs_select_sectype(struct TCP_Server_Info *,
 struct cifs_aio_ctx *cifs_aio_ctx_alloc(void);
 void cifs_aio_ctx_release(struct kref *refcount);
 int setup_aio_ctx_iter(struct cifs_aio_ctx *ctx, struct iov_iter *iter, int rw);
+
+int cifs_alloc_hash(const char *name, struct crypto_shash **shash,
+		    struct sdesc **sdesc);
+void cifs_free_hash(struct crypto_shash **shash, struct sdesc **sdesc);
+
 #endif			/* _CIFSPROTO_H */

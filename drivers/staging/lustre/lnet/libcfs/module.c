@@ -30,6 +30,7 @@
  * This file is part of Lustre, http://www.lustre.org/
  * Lustre is a trademark of Sun Microsystems, Inc.
  */
+#include <linux/miscdevice.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -94,7 +95,138 @@ int libcfs_deregister_ioctl(struct libcfs_ioctl_handler *hand)
 }
 EXPORT_SYMBOL(libcfs_deregister_ioctl);
 
-int libcfs_ioctl(unsigned long cmd, void __user *uparam)
+static inline size_t libcfs_ioctl_packlen(struct libcfs_ioctl_data *data)
+{
+	size_t len = sizeof(*data);
+
+	len += cfs_size_round(data->ioc_inllen1);
+	len += cfs_size_round(data->ioc_inllen2);
+	return len;
+}
+
+static inline bool libcfs_ioctl_is_invalid(struct libcfs_ioctl_data *data)
+{
+	if (data->ioc_hdr.ioc_len > BIT(30)) {
+		CERROR("LIBCFS ioctl: ioc_len larger than 1<<30\n");
+		return true;
+	}
+	if (data->ioc_inllen1 > BIT(30)) {
+		CERROR("LIBCFS ioctl: ioc_inllen1 larger than 1<<30\n");
+		return true;
+	}
+	if (data->ioc_inllen2 > BIT(30)) {
+		CERROR("LIBCFS ioctl: ioc_inllen2 larger than 1<<30\n");
+		return true;
+	}
+	if (data->ioc_inlbuf1 && !data->ioc_inllen1) {
+		CERROR("LIBCFS ioctl: inlbuf1 pointer but 0 length\n");
+		return true;
+	}
+	if (data->ioc_inlbuf2 && !data->ioc_inllen2) {
+		CERROR("LIBCFS ioctl: inlbuf2 pointer but 0 length\n");
+		return true;
+	}
+	if (data->ioc_pbuf1 && !data->ioc_plen1) {
+		CERROR("LIBCFS ioctl: pbuf1 pointer but 0 length\n");
+		return true;
+	}
+	if (data->ioc_pbuf2 && !data->ioc_plen2) {
+		CERROR("LIBCFS ioctl: pbuf2 pointer but 0 length\n");
+		return true;
+	}
+	if (data->ioc_plen1 && !data->ioc_pbuf1) {
+		CERROR("LIBCFS ioctl: plen1 nonzero but no pbuf1 pointer\n");
+		return true;
+	}
+	if (data->ioc_plen2 && !data->ioc_pbuf2) {
+		CERROR("LIBCFS ioctl: plen2 nonzero but no pbuf2 pointer\n");
+		return true;
+	}
+	if ((u32)libcfs_ioctl_packlen(data) != data->ioc_hdr.ioc_len) {
+		CERROR("LIBCFS ioctl: packlen != ioc_len\n");
+		return true;
+	}
+	if (data->ioc_inllen1 &&
+	    data->ioc_bulk[data->ioc_inllen1 - 1] != '\0') {
+		CERROR("LIBCFS ioctl: inlbuf1 not 0 terminated\n");
+		return true;
+	}
+	if (data->ioc_inllen2 &&
+	    data->ioc_bulk[cfs_size_round(data->ioc_inllen1) +
+			   data->ioc_inllen2 - 1] != '\0') {
+		CERROR("LIBCFS ioctl: inlbuf2 not 0 terminated\n");
+		return true;
+	}
+	return false;
+}
+
+static int libcfs_ioctl_data_adjust(struct libcfs_ioctl_data *data)
+{
+	if (libcfs_ioctl_is_invalid(data)) {
+		CERROR("libcfs ioctl: parameter not correctly formatted\n");
+		return -EINVAL;
+	}
+
+	if (data->ioc_inllen1)
+		data->ioc_inlbuf1 = &data->ioc_bulk[0];
+
+	if (data->ioc_inllen2)
+		data->ioc_inlbuf2 = &data->ioc_bulk[0] +
+			cfs_size_round(data->ioc_inllen1);
+
+	return 0;
+}
+
+static int libcfs_ioctl_getdata(struct libcfs_ioctl_hdr **hdr_pp,
+				const struct libcfs_ioctl_hdr __user *uhdr)
+{
+	struct libcfs_ioctl_hdr hdr;
+	int err;
+
+	if (copy_from_user(&hdr, uhdr, sizeof(hdr)))
+		return -EFAULT;
+
+	if (hdr.ioc_version != LIBCFS_IOCTL_VERSION &&
+	    hdr.ioc_version != LIBCFS_IOCTL_VERSION2) {
+		CERROR("libcfs ioctl: version mismatch expected %#x, got %#x\n",
+		       LIBCFS_IOCTL_VERSION, hdr.ioc_version);
+		return -EINVAL;
+	}
+
+	if (hdr.ioc_len < sizeof(hdr)) {
+		CERROR("libcfs ioctl: user buffer too small for ioctl\n");
+		return -EINVAL;
+	}
+
+	if (hdr.ioc_len > LIBCFS_IOC_DATA_MAX) {
+		CERROR("libcfs ioctl: user buffer is too large %d/%d\n",
+		       hdr.ioc_len, LIBCFS_IOC_DATA_MAX);
+		return -EINVAL;
+	}
+
+	*hdr_pp = kvmalloc(hdr.ioc_len, GFP_KERNEL);
+	if (!*hdr_pp)
+		return -ENOMEM;
+
+	if (copy_from_user(*hdr_pp, uhdr, hdr.ioc_len)) {
+		err = -EFAULT;
+		goto free;
+	}
+
+	if ((*hdr_pp)->ioc_version != hdr.ioc_version ||
+	    (*hdr_pp)->ioc_len != hdr.ioc_len) {
+		err = -EINVAL;
+		goto free;
+	}
+
+	return 0;
+
+free:
+	kvfree(*hdr_pp);
+	return err;
+}
+
+static int libcfs_ioctl(unsigned long cmd, void __user *uparam)
 {
 	struct libcfs_ioctl_data *data = NULL;
 	struct libcfs_ioctl_hdr *hdr;
@@ -156,9 +288,37 @@ int libcfs_ioctl(unsigned long cmd, void __user *uparam)
 		break; }
 	}
 out:
-	LIBCFS_FREE(hdr, hdr->ioc_len);
+	kvfree(hdr);
 	return err;
 }
+
+static long
+libcfs_psdev_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
+	if (_IOC_TYPE(cmd) != IOC_LIBCFS_TYPE ||
+	    _IOC_NR(cmd) < IOC_LIBCFS_MIN_NR  ||
+	    _IOC_NR(cmd) > IOC_LIBCFS_MAX_NR) {
+		CDEBUG(D_IOCTL, "invalid ioctl ( type %d, nr %d, size %d )\n",
+		       _IOC_TYPE(cmd), _IOC_NR(cmd), _IOC_SIZE(cmd));
+		return -EINVAL;
+	}
+
+	return libcfs_ioctl(cmd, (void __user *)arg);
+}
+
+static const struct file_operations libcfs_fops = {
+	.owner		= THIS_MODULE,
+	.unlocked_ioctl	= libcfs_psdev_ioctl,
+};
+
+struct miscdevice libcfs_dev = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "lnet",
+	.fops = &libcfs_fops,
+};
 
 int lprocfs_call_handler(void *data, int write, loff_t *ppos,
 			 void __user *buffer, size_t *lenp,
@@ -302,7 +462,7 @@ static int __proc_cpt_table(void *data, int write,
 	LASSERT(cfs_cpt_table);
 
 	while (1) {
-		LIBCFS_ALLOC(buf, len);
+		buf = kzalloc(len, GFP_KERNEL);
 		if (!buf)
 			return -ENOMEM;
 
@@ -311,7 +471,7 @@ static int __proc_cpt_table(void *data, int write,
 			break;
 
 		if (rc == -EFBIG) {
-			LIBCFS_FREE(buf, len);
+			kfree(buf);
 			len <<= 1;
 			continue;
 		}
@@ -325,8 +485,7 @@ static int __proc_cpt_table(void *data, int write,
 
 	rc = cfs_trace_copyout_string(buffer, nob, buf + pos, NULL);
  out:
-	if (buf)
-		LIBCFS_FREE(buf, len);
+	kfree(buf);
 	return rc;
 }
 
@@ -548,33 +707,23 @@ static int libcfs_init(void)
 		goto cleanup_cpu;
 	}
 
-	rc = cfs_wi_startup();
-	if (rc) {
-		CERROR("initialize workitem: error %d\n", rc);
-		goto cleanup_deregister;
-	}
-
-	/* max to 4 threads, should be enough for rehash */
-	rc = min(cfs_cpt_weight(cfs_cpt_table, CFS_CPT_ANY), 4);
-	rc = cfs_wi_sched_create("cfs_rh", cfs_cpt_table, CFS_CPT_ANY,
-				 rc, &cfs_sched_rehash);
-	if (rc) {
-		CERROR("Startup workitem scheduler: error: %d\n", rc);
+	cfs_rehash_wq = alloc_workqueue("cfs_rh", WQ_SYSFS, 4);
+	if (!cfs_rehash_wq) {
+		CERROR("Failed to start rehash workqueue.\n");
+		rc = -ENOMEM;
 		goto cleanup_deregister;
 	}
 
 	rc = cfs_crypto_register();
 	if (rc) {
 		CERROR("cfs_crypto_register: error %d\n", rc);
-		goto cleanup_wi;
+		goto cleanup_deregister;
 	}
 
 	lustre_insert_debugfs(lnet_table, lnet_debugfs_symlinks);
 
 	CDEBUG(D_OTHER, "portals setup OK\n");
 	return 0;
- cleanup_wi:
-	cfs_wi_shutdown();
  cleanup_deregister:
 	misc_deregister(&libcfs_dev);
 cleanup_cpu:
@@ -590,13 +739,12 @@ static void libcfs_exit(void)
 
 	lustre_remove_debugfs();
 
-	if (cfs_sched_rehash) {
-		cfs_wi_sched_destroy(cfs_sched_rehash);
-		cfs_sched_rehash = NULL;
+	if (cfs_rehash_wq) {
+		destroy_workqueue(cfs_rehash_wq);
+		cfs_rehash_wq = NULL;
 	}
 
 	cfs_crypto_unregister();
-	cfs_wi_shutdown();
 
 	misc_deregister(&libcfs_dev);
 

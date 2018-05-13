@@ -148,7 +148,7 @@ struct swim3 {
 #define MOTOR_ON	2
 #define RELAX		3	/* also eject in progress */
 #define READ_DATA_0	4
-#define TWOMEG_DRIVE	5
+#define ONEMEG_DRIVE	5
 #define SINGLE_SIDED	6	/* drive or diskette is 4MB type? */
 #define DRIVE_PRESENT	7
 #define DISK_IN		8
@@ -156,9 +156,9 @@ struct swim3 {
 #define TRACK_ZERO	10
 #define TACHO		11
 #define READ_DATA_1	12
-#define MFM_MODE	13
+#define GCR_MODE	13
 #define SEEK_COMPLETE	14
-#define ONEMEG_MEDIA	15
+#define TWOMEG_MEDIA	15
 
 /* Definitions of values used in writing and formatting */
 #define DATA_ESCAPE	0x99
@@ -397,7 +397,7 @@ static void set_timeout(struct floppy_state *fs, int nticks,
 	if (fs->timeout_pending)
 		del_timer(&fs->timeout);
 	fs->timeout.expires = jiffies + nticks;
-	fs->timeout.function = (TIMER_FUNC_TYPE)proc;
+	fs->timeout.function = proc;
 	add_timer(&fs->timeout);
 	fs->timeout_pending = 1;
 }

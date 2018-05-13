@@ -461,10 +461,15 @@ endmenu # "CPU/Task time and stats accounting"
 
 config CPU_ISOLATION
 	bool "CPU isolation"
+	depends on SMP || COMPILE_TEST
+	default y
 	help
 	  Make sure that CPUs running critical tasks are not disturbed by
 	  any source of "noise" such as unbound workqueues, timers, kthreads...
-	  Unbound jobs get offloaded to housekeeping CPUs.
+	  Unbound jobs get offloaded to housekeeping CPUs. This is driven by
+	  the "isolcpus=" boot parameter.
+
+	  Say Y if unsure.
 
 source "kernel/rcu/Kconfig"
 
@@ -993,7 +998,6 @@ config RELAY
 
 config BLK_DEV_INITRD
 	bool "Initial RAM filesystem and RAM disk (initramfs/initrd) support"
-	depends on BROKEN || !FRV
 	help
 	  The initial RAM filesystem is a ramfs which is loaded by the
 	  boot loader (loadlin or lilo) and that is mounted as root
@@ -1033,6 +1037,33 @@ config CC_OPTIMIZE_FOR_SIZE
 	  If unsure, say N.
 
 endchoice
+
+config HAVE_LD_DEAD_CODE_DATA_ELIMINATION
+	bool
+	help
+	  This requires that the arch annotates or otherwise protects
+	  its external entry points from being discarded. Linker scripts
+	  must also merge .text.*, .data.*, and .bss.* correctly into
+	  output sections. Care must be taken not to pull in unrelated
+	  sections (e.g., '.text.init'). Typically '.' in section names
+	  is used to distinguish them from label names / C identifiers.
+
+config LD_DEAD_CODE_DATA_ELIMINATION
+	bool "Dead code and data elimination (EXPERIMENTAL)"
+	depends on HAVE_LD_DEAD_CODE_DATA_ELIMINATION
+	depends on EXPERT
+	help
+	  Select this if the architecture wants to do dead code and
+	  data elimination with the linker by compiling with
+	  -ffunction-sections -fdata-sections, and linking with
+	  --gc-sections.
+
+	  This can reduce on disk and in-memory size of the kernel
+	  code and static data, particularly for small configs and
+	  on small systems. This has the possibility of introducing
+	  silently broken kernel if the required annotations are not
+	  present. This option is not well tested yet, so use at your
+	  own risk.
 
 config SYSCTL
 	bool
@@ -1103,7 +1134,7 @@ config MULTIUSER
 
 config SGETMASK_SYSCALL
 	bool "sgetmask/ssetmask syscalls support" if EXPERT
-	def_bool PARISC || MN10300 || BLACKFIN || M68K || PPC || MIPS || X86 || SPARC || CRIS || MICROBLAZE || SUPERH
+	def_bool PARISC || M68K || PPC || MIPS || X86 || SPARC || MICROBLAZE || SUPERH
 	---help---
 	  sys_sgetmask and sys_ssetmask are obsolete system calls
 	  no longer supported in libc but still enabled by default in some
@@ -1365,7 +1396,7 @@ config KALLSYMS_ABSOLUTE_PERCPU
 config KALLSYMS_BASE_RELATIVE
 	bool
 	depends on KALLSYMS
-	default !IA64 && !(TILE && 64BIT)
+	default !IA64
 	help
 	  Instead of emitting them as absolute values in the native word size,
 	  emit the symbol references in the kallsyms table as 32-bit entries,
@@ -1392,6 +1423,13 @@ config BPF_SYSCALL
 	  Enable the bpf() system call that allows to manipulate eBPF
 	  programs and maps via file descriptors.
 
+config BPF_JIT_ALWAYS_ON
+	bool "Permanently enable BPF JIT and remove BPF interpreter"
+	depends on BPF_SYSCALL && HAVE_EBPF_JIT && BPF_JIT
+	help
+	  Enables BPF JIT and removes BPF interpreter to avoid
+	  speculative execution of BPF instructions by the interpreter
+
 config USERFAULTFD
 	bool "Enable userfaultfd() system call"
 	select ANON_INODES
@@ -1399,6 +1437,12 @@ config USERFAULTFD
 	help
 	  Enable the userfaultfd() system call that allows to intercept and
 	  handle page faults in userland.
+
+config ARCH_HAS_MEMBARRIER_CALLBACKS
+	bool
+
+config ARCH_HAS_MEMBARRIER_SYNC_CORE
+	bool
 
 config EMBEDDED
 	bool "Embedded system"
@@ -1420,7 +1464,7 @@ config PERF_USE_VMALLOC
 	  See tools/perf/design.txt for details
 
 config PC104
-	bool "PC/104 support"
+	bool "PC/104 support" if EXPERT
 	help
 	  Expose PC/104 form factor device drivers and options available for
 	  selection and configuration. Enable this option if your target
@@ -1903,3 +1947,16 @@ config ASN1
 	  functions to call on what tags.
 
 source "kernel/Kconfig.locks"
+
+config ARCH_HAS_SYNC_CORE_BEFORE_USERMODE
+	bool
+
+# It may be useful for an architecture to override the definitions of the
+# SYSCALL_DEFINE() and __SYSCALL_DEFINEx() macros in <linux/syscalls.h>
+# and the COMPAT_ variants in <linux/compat.h>, in particular to use a
+# different calling convention for syscalls. They can also override the
+# macros for not-implemented syscalls in kernel/sys_ni.c and
+# kernel/time/posix-stubs.c. All these overrides need to be available in
+# <asm/syscall_wrapper.h>.
+config ARCH_HAS_SYSCALL_WRAPPER
+	def_bool n

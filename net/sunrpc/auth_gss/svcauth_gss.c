@@ -481,6 +481,7 @@ static int rsc_parse(struct cache_detail *cd,
 				goto out;
 			rsci.cred.cr_group_info->gid[i] = kgid;
 		}
+		groups_sort(rsci.cred.cr_group_info);
 
 		/* mech name */
 		len = qword_get(&mesg, buf, mlen);
@@ -1374,7 +1375,7 @@ static int create_use_gss_proxy_proc_entry(struct net *net)
 	struct proc_dir_entry **p = &sn->use_gssp_proc;
 
 	sn->use_gss_proxy = -1;
-	*p = proc_create_data("use-gss-proxy", S_IFREG|S_IRUSR|S_IWUSR,
+	*p = proc_create_data("use-gss-proxy", S_IFREG | 0600,
 			      sn->proc_net_rpc,
 			      &use_gss_proxy_ops, net);
 	if (!*p)

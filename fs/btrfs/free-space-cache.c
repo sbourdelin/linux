@@ -1,19 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0
 /*
  * Copyright (C) 2008 Red Hat.  All rights reserved.
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public
- * License v2 as published by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * General Public License for more details.
- *
- * You should have received a copy of the GNU General Public
- * License along with this program; if not, write to the
- * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- * Boston, MA 021110-1307, USA.
  */
 
 #include <linux/pagemap.h>
@@ -22,6 +9,7 @@
 #include <linux/slab.h>
 #include <linux/math64.h>
 #include <linux/ratelimit.h>
+#include <linux/error-injection.h>
 #include "ctree.h"
 #include "free-space-cache.h"
 #include "transaction.h"
@@ -332,6 +320,7 @@ static int io_ctl_init(struct btrfs_io_ctl *io_ctl, struct inode *inode,
 
 	return 0;
 }
+ALLOW_ERROR_INJECTION(io_ctl_init, ERRNO);
 
 static void io_ctl_free(struct btrfs_io_ctl *io_ctl)
 {
@@ -1125,8 +1114,7 @@ cleanup_write_cache_enospc(struct inode *inode,
 {
 	io_ctl_drop_pages(io_ctl);
 	unlock_extent_cached(&BTRFS_I(inode)->io_tree, 0,
-			     i_size_read(inode) - 1, cached_state,
-			     GFP_NOFS);
+			     i_size_read(inode) - 1, cached_state);
 }
 
 static int __btrfs_wait_cache_io(struct btrfs_root *root,
@@ -1262,7 +1250,7 @@ static int __btrfs_write_out_cache(struct btrfs_root *root, struct inode *inode,
 	/* Lock all pages first so we can lock the extent safely. */
 	ret = io_ctl_prepare_pages(io_ctl, inode, 0);
 	if (ret)
-		goto out;
+		goto out_unlock;
 
 	lock_extent_bits(&BTRFS_I(inode)->io_tree, 0, i_size_read(inode) - 1,
 			 &cached_state);
@@ -1320,7 +1308,7 @@ static int __btrfs_write_out_cache(struct btrfs_root *root, struct inode *inode,
 	io_ctl_drop_pages(io_ctl);
 
 	unlock_extent_cached(&BTRFS_I(inode)->io_tree, 0,
-			     i_size_read(inode) - 1, &cached_state, GFP_NOFS);
+			     i_size_read(inode) - 1, &cached_state);
 
 	/*
 	 * at this point the pages are under IO and we're happy,
@@ -1356,6 +1344,7 @@ out_nospc_locked:
 out_nospc:
 	cleanup_write_cache_enospc(inode, io_ctl, &cached_state);
 
+out_unlock:
 	if (block_group && (block_group->flags & BTRFS_BLOCK_GROUP_DATA))
 		up_write(&block_group->data_rwsem);
 
@@ -3113,7 +3102,8 @@ void btrfs_init_free_cluster(struct btrfs_free_cluster *cluster)
 static int do_trimming(struct btrfs_block_group_cache *block_group,
 		       u64 *total_trimmed, u64 start, u64 bytes,
 		       u64 reserved_start, u64 reserved_bytes,
-		       struct btrfs_trim_range *trim_entry)
+		       struct btrfs_trim_range *trim_entry,
+		       enum btrfs_clear_op_type clear)
 {
 	struct btrfs_space_info *space_info = block_group->space_info;
 	struct btrfs_fs_info *fs_info = block_group->fs_info;
@@ -3132,7 +3122,7 @@ static int do_trimming(struct btrfs_block_group_cache *block_group,
 	spin_unlock(&block_group->lock);
 	spin_unlock(&space_info->lock);
 
-	ret = btrfs_discard_extent(fs_info, start, bytes, &trimmed);
+	ret = btrfs_discard_extent(fs_info, start, bytes, &trimmed, clear);
 	if (!ret)
 		*total_trimmed += trimmed;
 
@@ -3156,7 +3146,8 @@ static int do_trimming(struct btrfs_block_group_cache *block_group,
 }
 
 static int trim_no_bitmap(struct btrfs_block_group_cache *block_group,
-			  u64 *total_trimmed, u64 start, u64 end, u64 minlen)
+			  u64 *total_trimmed, u64 start, u64 end, u64 minlen,
+			  enum btrfs_clear_op_type clear)
 {
 	struct btrfs_free_space_ctl *ctl = block_group->free_space_ctl;
 	struct btrfs_free_space *entry;
@@ -3223,7 +3214,7 @@ static int trim_no_bitmap(struct btrfs_block_group_cache *block_group,
 		mutex_unlock(&ctl->cache_writeout_mutex);
 
 		ret = do_trimming(block_group, total_trimmed, start, bytes,
-				  extent_start, extent_bytes, &trim_entry);
+				extent_start, extent_bytes, &trim_entry, clear);
 		if (ret)
 			break;
 next:
@@ -3241,7 +3232,8 @@ out:
 }
 
 static int trim_bitmaps(struct btrfs_block_group_cache *block_group,
-			u64 *total_trimmed, u64 start, u64 end, u64 minlen)
+			u64 *total_trimmed, u64 start, u64 end, u64 minlen,
+			enum btrfs_clear_op_type clear)
 {
 	struct btrfs_free_space_ctl *ctl = block_group->free_space_ctl;
 	struct btrfs_free_space *entry;
@@ -3298,7 +3290,7 @@ static int trim_bitmaps(struct btrfs_block_group_cache *block_group,
 		mutex_unlock(&ctl->cache_writeout_mutex);
 
 		ret = do_trimming(block_group, total_trimmed, start, bytes,
-				  start, bytes, &trim_entry);
+				  start, bytes, &trim_entry, clear);
 		if (ret)
 			break;
 next:
@@ -3366,7 +3358,8 @@ void btrfs_put_block_group_trimming(struct btrfs_block_group_cache *block_group)
 }
 
 int btrfs_trim_block_group(struct btrfs_block_group_cache *block_group,
-			   u64 *trimmed, u64 start, u64 end, u64 minlen)
+			   u64 *trimmed, u64 start, u64 end, u64 minlen,
+			   enum btrfs_clear_op_type clear)
 {
 	int ret;
 
@@ -3380,11 +3373,11 @@ int btrfs_trim_block_group(struct btrfs_block_group_cache *block_group,
 	btrfs_get_block_group_trimming(block_group);
 	spin_unlock(&block_group->lock);
 
-	ret = trim_no_bitmap(block_group, trimmed, start, end, minlen);
+	ret = trim_no_bitmap(block_group, trimmed, start, end, minlen, clear);
 	if (ret)
 		goto out;
 
-	ret = trim_bitmaps(block_group, trimmed, start, end, minlen);
+	ret = trim_bitmaps(block_group, trimmed, start, end, minlen, clear);
 out:
 	btrfs_put_block_group_trimming(block_group);
 	return ret;
@@ -3545,7 +3538,7 @@ int btrfs_write_out_ino_cache(struct btrfs_root *root,
 	if (ret) {
 		if (release_metadata)
 			btrfs_delalloc_release_metadata(BTRFS_I(inode),
-					inode->i_size);
+					inode->i_size, true);
 #ifdef DEBUG
 		btrfs_err(fs_info,
 			  "failed to write free ino cache for root %llu",

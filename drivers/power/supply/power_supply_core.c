@@ -668,7 +668,7 @@ EXPORT_SYMBOL_GPL(power_supply_powers);
 
 static void power_supply_dev_release(struct device *dev)
 {
-	struct power_supply *psy = container_of(dev, struct power_supply, dev);
+	struct power_supply *psy = to_power_supply(dev);
 	dev_dbg(dev, "%s\n", __func__);
 	kfree(psy);
 }
@@ -843,11 +843,20 @@ __power_supply_register(struct device *parent,
 {
 	struct device *dev;
 	struct power_supply *psy;
-	int rc;
+	int i, rc;
 
 	if (!parent)
 		pr_warn("%s: Expected proper parent device for '%s'\n",
 			__func__, desc->name);
+
+	if (!desc || !desc->name || !desc->properties || !desc->num_properties)
+		return ERR_PTR(-EINVAL);
+
+	for (i = 0; i < desc->num_properties; ++i) {
+		if ((desc->properties[i] == POWER_SUPPLY_PROP_USB_TYPE) &&
+		    (!desc->usb_types || !desc->num_usb_types))
+			return ERR_PTR(-EINVAL);
+	}
 
 	psy = kzalloc(sizeof(*psy), GFP_KERNEL);
 	if (!psy)

@@ -115,19 +115,19 @@ static inline const struct lsm_operations *lsm_op_find(int magic)
  */
 #if BITS_PER_LONG == 64
 # define lov_do_div64(n, base) ({					\
-	uint64_t __base = (base);					\
-	uint64_t __rem;							\
-	__rem = ((uint64_t)(n)) % __base;				\
-	(n) = ((uint64_t)(n)) / __base;					\
+	u64 __base = (base);					\
+	u64 __rem;							\
+	__rem = ((u64)(n)) % __base;				\
+	(n) = ((u64)(n)) / __base;					\
 	__rem;								\
 })
 #elif BITS_PER_LONG == 32
 # define lov_do_div64(n, base) ({					\
-	uint64_t __rem;							\
+	u64 __rem;							\
 	if ((sizeof(base) > 4) && (((base) & 0xffffffff00000000ULL) != 0)) {  \
 		int __remainder;					      \
 		LASSERTF(!((base) & (LOV_MIN_STRIPE_SIZE - 1)), "64 bit lov " \
-			 "division %llu / %llu\n", (n), (uint64_t)(base));    \
+			 "division %llu / %llu\n", (n), (u64)(base));    \
 		__remainder = (n) & (LOV_MIN_STRIPE_SIZE - 1);		\
 		(n) >>= LOV_MIN_STRIPE_BITS;				\
 		__rem = do_div(n, (base) >> LOV_MIN_STRIPE_BITS);	\
@@ -149,11 +149,16 @@ struct pool_desc {
 	char			 pool_name[LOV_MAXPOOLNAME + 1];
 	struct ost_pool		 pool_obds;
 	atomic_t		 pool_refcount;
-	struct hlist_node	 pool_hash;		/* access by poolname */
-	struct list_head	 pool_list;		/* serial access */
+	struct rhash_head	 pool_hash;		/* access by poolname */
+	union {
+		struct list_head	pool_list;	/* serial access */
+		struct rcu_head		rcu;		/* delayed free */
+	};
 	struct dentry		*pool_debugfs_entry;	/* file in debugfs */
 	struct obd_device	*pool_lobd;		/* owner */
 };
+int lov_pool_hash_init(struct rhashtable *tbl);
+void lov_pool_hash_destroy(struct rhashtable *tbl);
 
 struct lov_request {
 	struct obd_info	  rq_oi;
@@ -241,8 +246,6 @@ void lprocfs_lov_init_vars(struct lprocfs_static_vars *lvars);
 /* lov_cl.c */
 extern struct lu_device_type lov_device_type;
 
-/* pools */
-extern struct cfs_hash_ops pool_hash_operations;
 /* ost_pool methods */
 int lov_ost_pool_init(struct ost_pool *op, unsigned int count);
 int lov_ost_pool_extend(struct ost_pool *op, unsigned int min_count);
@@ -277,7 +280,7 @@ static inline bool lov_oinfo_is_dummy(const struct lov_oinfo *loi)
 
 static inline struct obd_device *lov2obd(const struct lov_obd *lov)
 {
-	return container_of0(lov, struct obd_device, u.lov);
+	return container_of_safe(lov, struct obd_device, u.lov);
 }
 
 #endif

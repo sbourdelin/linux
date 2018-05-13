@@ -33,6 +33,7 @@
 #include <linux/cpuidle.h>
 #include <linux/cpu.h>
 #include <acpi/processor.h>
+#include <linux/kvm_para.h>
 
 /*
  * Include the apic definitions for x86 to have the APIC timer related defines
@@ -207,6 +208,7 @@ static void tsc_check_state(int state)
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
 	case X86_VENDOR_INTEL:
+	case X86_VENDOR_CENTAUR:
 		/*
 		 * AMD Fam10h TSC will tick in all
 		 * C/P/S0/S1 states when this bit is set.
@@ -291,6 +293,9 @@ static int acpi_processor_get_power_info_default(struct acpi_processor *pr)
 		pr->power.states[ACPI_STATE_C1].type = ACPI_STATE_C1;
 		pr->power.states[ACPI_STATE_C1].valid = 1;
 		pr->power.states[ACPI_STATE_C1].entry_method = ACPI_CSTATE_HALT;
+
+		snprintf(pr->power.states[ACPI_STATE_C1].desc,
+			 ACPI_CX_DESC_LEN, "ACPI HLT");
 	}
 	/* the C0 state only exists as a filler in our array */
 	pr->power.states[ACPI_STATE_C0].valid = 1;
@@ -661,7 +666,8 @@ static void __cpuidle acpi_idle_do_entry(struct acpi_processor_cx *cx)
 		/* Dummy wait op - must do something useless after P_LVL2 read
 		   because chipsets cannot guarantee that STPCLK# signal
 		   gets asserted in time to freeze execution properly. */
-		inl(acpi_gbl_FADT.xpm_timer_block.address);
+		if (!kvm_para_available())
+			inl(acpi_gbl_FADT.xpm_timer_block.address);
 	}
 }
 
@@ -683,7 +689,8 @@ static int acpi_idle_play_dead(struct cpuidle_device *dev, int index)
 		else if (cx->entry_method == ACPI_CSTATE_SYSTEMIO) {
 			inb(cx->address);
 			/* See comment in acpi_idle_do_entry() */
-			inl(acpi_gbl_FADT.xpm_timer_block.address);
+			if (!kvm_para_available())
+				inl(acpi_gbl_FADT.xpm_timer_block.address);
 		} else
 			return -ENODEV;
 	}

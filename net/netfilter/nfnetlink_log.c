@@ -37,7 +37,6 @@
 #include <net/sock.h>
 #include <net/netfilter/nf_log.h>
 #include <net/netns/generic.h>
-#include <net/netfilter/nfnetlink_log.h>
 
 #include <linux/atomic.h>
 #include <linux/refcount.h>
@@ -47,6 +46,7 @@
 #include "../bridge/br_private.h"
 #endif
 
+#define NFULNL_COPY_DISABLED	0xff
 #define NFULNL_NLBUFSIZ_DEFAULT	NLMSG_GOODSIZE
 #define NFULNL_TIMEOUT_DEFAULT 	100	/* every second */
 #define NFULNL_QTHRESH_DEFAULT 	100	/* 100 packets */
@@ -151,7 +151,7 @@ instance_put(struct nfulnl_instance *inst)
 		call_rcu_bh(&inst->rcu, nfulnl_instance_free_rcu);
 }
 
-static void nfulnl_timer(unsigned long data);
+static void nfulnl_timer(struct timer_list *t);
 
 static struct nfulnl_instance *
 instance_create(struct net *net, u_int16_t group_num,
@@ -184,7 +184,7 @@ instance_create(struct net *net, u_int16_t group_num,
 	/* needs to be two, since we _put() after creation */
 	refcount_set(&inst->use, 2);
 
-	setup_timer(&inst->timer, nfulnl_timer, (unsigned long)inst);
+	timer_setup(&inst->timer, nfulnl_timer, 0);
 
 	inst->net = get_net(net);
 	inst->peer_user_ns = user_ns;
@@ -377,9 +377,9 @@ __nfulnl_flush(struct nfulnl_instance *inst)
 }
 
 static void
-nfulnl_timer(unsigned long data)
+nfulnl_timer(struct timer_list *t)
 {
-	struct nfulnl_instance *inst = (struct nfulnl_instance *)data;
+	struct nfulnl_instance *inst = from_timer(inst, t, timer);
 
 	spin_lock_bh(&inst->lock);
 	if (inst->skb)
@@ -618,7 +618,7 @@ static const struct nf_loginfo default_loginfo = {
 };
 
 /* log handler for internal netfilter logging api */
-void
+static void
 nfulnl_log_packet(struct net *net,
 		  u_int8_t pf,
 		  unsigned int hooknum,
@@ -633,7 +633,7 @@ nfulnl_log_packet(struct net *net,
 	struct nfulnl_instance *inst;
 	const struct nf_loginfo *li;
 	unsigned int qthreshold;
-	unsigned int plen;
+	unsigned int plen = 0;
 	struct nfnl_log_net *log = nfnl_log_pernet(net);
 	const struct nfnl_ct_hook *nfnl_ct = NULL;
 	struct nf_conn *ct = NULL;
@@ -648,7 +648,6 @@ nfulnl_log_packet(struct net *net,
 	if (!inst)
 		return;
 
-	plen = 0;
 	if (prefix)
 		plen = strlen(prefix) + 1;
 
@@ -760,7 +759,6 @@ alloc_failure:
 	/* FIXME: statistics */
 	goto unlock_and_release;
 }
-EXPORT_SYMBOL_GPL(nfulnl_log_packet);
 
 static int
 nfulnl_rcv_nl_event(struct notifier_block *this,
@@ -1054,7 +1052,6 @@ static int nful_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations nful_file_ops = {
-	.owner	 = THIS_MODULE,
 	.open	 = nful_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,

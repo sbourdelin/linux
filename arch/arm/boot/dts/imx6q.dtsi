@@ -158,8 +158,6 @@
 			};
 
 			ipu2_di0: port@2 {
-				#address-cells = <1>;
-				#size-cells = <0>;
 				reg = <2>;
 
 				ipu2_di0_disp0: disp0-endpoint {
@@ -183,8 +181,6 @@
 			};
 
 			ipu2_di1: port@3 {
-				#address-cells = <1>;
-				#size-cells = <0>;
 				reg = <3>;
 
 				ipu2_di1_hdmi: hdmi-endpoint {
@@ -214,11 +210,6 @@
 	display-subsystem {
 		compatible = "fsl,imx-display-subsystem";
 		ports = <&ipu1_di0>, <&ipu1_di1>, <&ipu2_di0>, <&ipu2_di1>;
-	};
-
-	gpu-subsystem {
-		compatible = "fsl,imx-gpu-subsystem";
-		cores = <&gpu_2d>, <&gpu_3d>, <&gpu_vg>;
 	};
 };
 

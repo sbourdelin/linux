@@ -1431,7 +1431,7 @@ transport_generic_map_mem_to_cmd(struct se_cmd *cmd, struct scatterlist *sgl,
 	return 0;
 }
 
-/*
+/**
  * target_submit_cmd_map_sgls - lookup unpacked lun and submit uninitialized
  * 			 se_cmd + use pre-allocated SGL memory.
  *
@@ -1441,7 +1441,7 @@ transport_generic_map_mem_to_cmd(struct se_cmd *cmd, struct scatterlist *sgl,
  * @sense: pointer to SCSI sense buffer
  * @unpacked_lun: unpacked LUN to reference for struct se_lun
  * @data_length: fabric expected data transfer length
- * @task_addr: SAM task attribute
+ * @task_attr: SAM task attribute
  * @data_dir: DMA data direction
  * @flags: flags for command submission from target_sc_flags_tables
  * @sgl: struct scatterlist memory for unidirectional mapping
@@ -1578,7 +1578,7 @@ int target_submit_cmd_map_sgls(struct se_cmd *se_cmd, struct se_session *se_sess
 }
 EXPORT_SYMBOL(target_submit_cmd_map_sgls);
 
-/*
+/**
  * target_submit_cmd - lookup unpacked lun and submit uninitialized se_cmd
  *
  * @se_cmd: command descriptor to submit
@@ -1587,7 +1587,7 @@ EXPORT_SYMBOL(target_submit_cmd_map_sgls);
  * @sense: pointer to SCSI sense buffer
  * @unpacked_lun: unpacked LUN to reference for struct se_lun
  * @data_length: fabric expected data transfer length
- * @task_addr: SAM task attribute
+ * @task_attr: SAM task attribute
  * @data_dir: DMA data direction
  * @flags: flags for command submission from target_sc_flags_tables
  *
@@ -1654,7 +1654,7 @@ static bool target_lookup_lun_from_tag(struct se_session *se_sess, u64 tag,
  * @se_sess: associated se_sess for endpoint
  * @sense: pointer to SCSI sense buffer
  * @unpacked_lun: unpacked LUN to reference for struct se_lun
- * @fabric_context: fabric context for TMR req
+ * @fabric_tmr_ptr: fabric context for TMR req
  * @tm_type: Type of TM request
  * @gfp: gfp type for caller
  * @tag: referenced task tag for TMR_ABORT_TASK
@@ -1773,6 +1773,9 @@ void transport_generic_request_failure(struct se_cmd *cmd,
 		break;
 	case TCM_OUT_OF_RESOURCES:
 		cmd->scsi_status = SAM_STAT_TASK_SET_FULL;
+		goto queue_status;
+	case TCM_LUN_BUSY:
+		cmd->scsi_status = SAM_STAT_BUSY;
 		goto queue_status;
 	case TCM_RESERVATION_CONFLICT:
 		/*
@@ -2300,13 +2303,7 @@ queue_full:
 
 void target_free_sgl(struct scatterlist *sgl, int nents)
 {
-	struct scatterlist *sg;
-	int count;
-
-	for_each_sg(sgl, sg, nents, count)
-		__free_page(sg_page(sg));
-
-	kfree(sgl);
+	sgl_free_n_order(sgl, nents, 0);
 }
 EXPORT_SYMBOL(target_free_sgl);
 
@@ -2414,42 +2411,10 @@ int
 target_alloc_sgl(struct scatterlist **sgl, unsigned int *nents, u32 length,
 		 bool zero_page, bool chainable)
 {
-	struct scatterlist *sg;
-	struct page *page;
-	gfp_t zero_flag = (zero_page) ? __GFP_ZERO : 0;
-	unsigned int nalloc, nent;
-	int i = 0;
+	gfp_t gfp = GFP_KERNEL | (zero_page ? __GFP_ZERO : 0);
 
-	nalloc = nent = DIV_ROUND_UP(length, PAGE_SIZE);
-	if (chainable)
-		nalloc++;
-	sg = kmalloc_array(nalloc, sizeof(struct scatterlist), GFP_KERNEL);
-	if (!sg)
-		return -ENOMEM;
-
-	sg_init_table(sg, nalloc);
-
-	while (length) {
-		u32 page_len = min_t(u32, length, PAGE_SIZE);
-		page = alloc_page(GFP_KERNEL | zero_flag);
-		if (!page)
-			goto out;
-
-		sg_set_page(&sg[i], page, page_len, 0);
-		length -= page_len;
-		i++;
-	}
-	*sgl = sg;
-	*nents = nent;
-	return 0;
-
-out:
-	while (i > 0) {
-		i--;
-		__free_page(sg_page(&sg[i]));
-	}
-	kfree(sg);
-	return -ENOMEM;
+	*sgl = sgl_alloc_order(length, 0, chainable, gfp, nents);
+	return *sgl ? 0 : -ENOMEM;
 }
 EXPORT_SYMBOL(target_alloc_sgl);
 
@@ -2641,7 +2606,8 @@ int transport_generic_free_cmd(struct se_cmd *cmd, int wait_for_tasks)
 }
 EXPORT_SYMBOL(transport_generic_free_cmd);
 
-/* target_get_sess_cmd - Add command to active ->sess_cmd_list
+/**
+ * target_get_sess_cmd - Add command to active ->sess_cmd_list
  * @se_cmd:	command descriptor to add
  * @ack_kref:	Signal that fabric will perform an ack target_put_sess_cmd()
  */
@@ -2835,7 +2801,8 @@ void target_show_cmd(const char *pfx, struct se_cmd *cmd)
 }
 EXPORT_SYMBOL(target_show_cmd);
 
-/* target_sess_cmd_list_set_waiting - Flag all commands in
+/**
+ * target_sess_cmd_list_set_waiting - Flag all commands in
  *         sess_cmd_list to complete cmd_wait_comp.  Set
  *         sess_tearing_down so no more commands are queued.
  * @se_sess:	session to flag
@@ -2870,7 +2837,8 @@ void target_sess_cmd_list_set_waiting(struct se_session *se_sess)
 }
 EXPORT_SYMBOL(target_sess_cmd_list_set_waiting);
 
-/* target_wait_for_sess_cmds - Wait for outstanding descriptors
+/**
+ * target_wait_for_sess_cmds - Wait for outstanding descriptors
  * @se_sess:    session to wait for active I/O
  */
 void target_wait_for_sess_cmds(struct se_session *se_sess)

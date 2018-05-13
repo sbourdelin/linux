@@ -30,31 +30,8 @@
 #define RCU_TRACE(stmt)
 #endif /* #else #ifdef CONFIG_RCU_TRACE */
 
-/*
- * Process-level increment to ->dynticks_nesting field.  This allows for
- * architectures that use half-interrupts and half-exceptions from
- * process context.
- *
- * DYNTICK_TASK_NEST_MASK defines a field of width DYNTICK_TASK_NEST_WIDTH
- * that counts the number of process-based reasons why RCU cannot
- * consider the corresponding CPU to be idle, and DYNTICK_TASK_NEST_VALUE
- * is the value used to increment or decrement this field.
- *
- * The rest of the bits could in principle be used to count interrupts,
- * but this would mean that a negative-one value in the interrupt
- * field could incorrectly zero out the DYNTICK_TASK_NEST_MASK field.
- * We therefore provide a two-bit guard field defined by DYNTICK_TASK_MASK
- * that is set to DYNTICK_TASK_FLAG upon initial exit from idle.
- * The DYNTICK_TASK_EXIT_IDLE value is thus the combined value used upon
- * initial exit from idle.
- */
-#define DYNTICK_TASK_NEST_WIDTH 7
-#define DYNTICK_TASK_NEST_VALUE ((LLONG_MAX >> DYNTICK_TASK_NEST_WIDTH) + 1)
-#define DYNTICK_TASK_NEST_MASK  (LLONG_MAX - DYNTICK_TASK_NEST_VALUE + 1)
-#define DYNTICK_TASK_FLAG	   ((DYNTICK_TASK_NEST_VALUE / 8) * 2)
-#define DYNTICK_TASK_MASK	   ((DYNTICK_TASK_NEST_VALUE / 8) * 3)
-#define DYNTICK_TASK_EXIT_IDLE	   (DYNTICK_TASK_NEST_VALUE + \
-				    DYNTICK_TASK_FLAG)
+/* Offset to allow for unmatched rcu_irq_{enter,exit}(). */
+#define DYNTICK_IRQ_NONIDLE	((LONG_MAX / 2) + 1)
 
 
 /*
@@ -100,12 +77,18 @@ static inline void rcu_seq_start(unsigned long *sp)
 	WARN_ON_ONCE(rcu_seq_state(*sp) != 1);
 }
 
+/* Compute the end-of-grace-period value for the specified sequence number. */
+static inline unsigned long rcu_seq_endval(unsigned long *sp)
+{
+	return (*sp | RCU_SEQ_STATE_MASK) + 1;
+}
+
 /* Adjust sequence number for end of update-side operation. */
 static inline void rcu_seq_end(unsigned long *sp)
 {
 	smp_mb(); /* Ensure update-side operation before counter increment. */
 	WARN_ON_ONCE(!rcu_seq_state(*sp));
-	WRITE_ONCE(*sp, (*sp | RCU_SEQ_STATE_MASK) + 1);
+	WRITE_ONCE(*sp, rcu_seq_endval(sp));
 }
 
 /* Take a snapshot of the update side's sequence number. */
@@ -131,6 +114,23 @@ static inline unsigned long rcu_seq_current(unsigned long *sp)
 static inline bool rcu_seq_done(unsigned long *sp, unsigned long s)
 {
 	return ULONG_CMP_GE(READ_ONCE(*sp), s);
+}
+
+/*
+ * Has a grace period completed since the time the old gp_seq was collected?
+ */
+static inline bool rcu_seq_completed_gp(unsigned long old, unsigned long new)
+{
+	return ULONG_CMP_LT(old, new & ~RCU_SEQ_STATE_MASK);
+}
+
+/*
+ * Has a grace period started since the time the old gp_seq was collected?
+ */
+static inline bool rcu_seq_new_gp(unsigned long old, unsigned long new)
+{
+	return ULONG_CMP_LT((old + RCU_SEQ_STATE_MASK) & ~RCU_SEQ_STATE_MASK,
+			    new);
 }
 
 /*
@@ -287,6 +287,15 @@ static inline void rcu_init_levelspread(int *levelspread, const int *levelcnt)
 	}
 }
 
+/* Returns first leaf rcu_node of the specified RCU flavor. */
+#define rcu_first_leaf_node(rsp) ((rsp)->level[rcu_num_lvls - 1])
+
+/* Is this rcu_node a leaf? */
+#define rcu_is_leaf_node(rnp) ((rnp)->level == rcu_num_lvls - 1)
+
+/* Is this rcu_node the last leaf? */
+#define rcu_is_last_leaf_node(rsp, rnp) ((rnp) == &(rsp)->node[rcu_num_nodes - 1])
+
 /*
  * Do a full breadth-first scan of the rcu_node structures for the
  * specified rcu_state structure.
@@ -301,8 +310,7 @@ static inline void rcu_init_levelspread(int *levelspread, const int *levelcnt)
  * rcu_node tree with but one rcu_node structure, this loop is a no-op.
  */
 #define rcu_for_each_nonleaf_node_breadth_first(rsp, rnp) \
-	for ((rnp) = &(rsp)->node[0]; \
-	     (rnp) < (rsp)->level[rcu_num_lvls - 1]; (rnp)++)
+	for ((rnp) = &(rsp)->node[0]; !rcu_is_leaf_node(rsp, rnp); (rnp)++)
 
 /*
  * Scan the leaves of the rcu_node hierarchy for the specified rcu_state
@@ -311,16 +319,26 @@ static inline void rcu_init_levelspread(int *levelspread, const int *levelcnt)
  * It is still a leaf node, even if it is also the root node.
  */
 #define rcu_for_each_leaf_node(rsp, rnp) \
-	for ((rnp) = (rsp)->level[rcu_num_lvls - 1]; \
+	for ((rnp) = rcu_first_leaf_node(rsp); \
 	     (rnp) < &(rsp)->node[rcu_num_nodes]; (rnp)++)
 
 /*
  * Iterate over all possible CPUs in a leaf RCU node.
  */
 #define for_each_leaf_node_possible_cpu(rnp, cpu) \
-	for ((cpu) = cpumask_next(rnp->grplo - 1, cpu_possible_mask); \
-	     cpu <= rnp->grphi; \
-	     cpu = cpumask_next((cpu), cpu_possible_mask))
+	for ((cpu) = cpumask_next((rnp)->grplo - 1, cpu_possible_mask); \
+	     (cpu) <= rnp->grphi; \
+	     (cpu) = cpumask_next((cpu), cpu_possible_mask))
+
+/*
+ * Iterate over all CPUs in a leaf RCU node's specified mask.
+ */
+#define rcu_find_next_bit(rnp, cpu, mask) \
+	((rnp)->grplo + find_next_bit(&(mask), BITS_PER_LONG, (cpu)))
+#define for_each_leaf_node_cpu_mask(rnp, cpu, mask) \
+	for ((cpu) = rcu_find_next_bit((rnp), 0, (mask)); \
+	     (cpu) <= rnp->grphi; \
+	     (cpu) = rcu_find_next_bit((rnp), (cpu) + 1 - (rnp->grplo), (mask)))
 
 /*
  * Wrappers for the rcu_node::lock acquire and release.
@@ -360,7 +378,7 @@ do {									\
 } while (0)
 
 #define raw_spin_unlock_irqrestore_rcu_node(p, flags)			\
-	raw_spin_unlock_irqrestore(&ACCESS_PRIVATE(p, lock), flags)	\
+	raw_spin_unlock_irqrestore(&ACCESS_PRIVATE(p, lock), flags)
 
 #define raw_spin_trylock_rcu_node(p)					\
 ({									\
@@ -371,6 +389,9 @@ do {									\
 	___locked;							\
 })
 
+#define raw_lockdep_assert_held_rcu_node(p)				\
+	lockdep_assert_held(&ACCESS_PRIVATE(p, lock))
+
 #endif /* #if defined(SRCU) || !defined(TINY_RCU) */
 
 #ifdef CONFIG_TINY_RCU
@@ -379,23 +400,19 @@ static inline bool rcu_gp_is_normal(void) { return true; }
 static inline bool rcu_gp_is_expedited(void) { return false; }
 static inline void rcu_expedite_gp(void) { }
 static inline void rcu_unexpedite_gp(void) { }
+static inline void rcu_request_urgent_qs_task(struct task_struct *t) { }
 #else /* #ifdef CONFIG_TINY_RCU */
 bool rcu_gp_is_normal(void);     /* Internal RCU use. */
 bool rcu_gp_is_expedited(void);  /* Internal RCU use. */
 void rcu_expedite_gp(void);
 void rcu_unexpedite_gp(void);
 void rcupdate_announce_bootup_oddness(void);
+void rcu_request_urgent_qs_task(struct task_struct *t);
 #endif /* #else #ifdef CONFIG_TINY_RCU */
 
 #define RCU_SCHEDULER_INACTIVE	0
 #define RCU_SCHEDULER_INIT	1
 #define RCU_SCHEDULER_RUNNING	2
-
-#ifdef CONFIG_TINY_RCU
-static inline void rcu_request_urgent_qs_task(struct task_struct *t) { }
-#else /* #ifdef CONFIG_TINY_RCU */
-void rcu_request_urgent_qs_task(struct task_struct *t);
-#endif /* #else #ifdef CONFIG_TINY_RCU */
 
 enum rcutorture_type {
 	RCU_FLAVOR,
@@ -408,7 +425,7 @@ enum rcutorture_type {
 
 #if defined(CONFIG_TREE_RCU) || defined(CONFIG_PREEMPT_RCU)
 void rcutorture_get_gp_data(enum rcutorture_type test_type, int *flags,
-			    unsigned long *gpnum, unsigned long *completed);
+			    unsigned long *gp_seq);
 void rcutorture_record_test_transition(void);
 void rcutorture_record_progress(unsigned long vernum);
 void do_trace_rcu_torture_read(const char *rcutorturename,
@@ -418,13 +435,10 @@ void do_trace_rcu_torture_read(const char *rcutorturename,
 			       unsigned long c);
 #else
 static inline void rcutorture_get_gp_data(enum rcutorture_type test_type,
-					  int *flags,
-					  unsigned long *gpnum,
-					  unsigned long *completed)
+					  int *flags, unsigned long *gp_seq)
 {
 	*flags = 0;
-	*gpnum = 0;
-	*completed = 0;
+	*gp_seq = 0;
 }
 static inline void rcutorture_record_test_transition(void) { }
 static inline void rcutorture_record_progress(unsigned long vernum) { }
@@ -444,31 +458,26 @@ void do_trace_rcu_torture_read(const char *rcutorturename,
 
 static inline void srcutorture_get_gp_data(enum rcutorture_type test_type,
 					   struct srcu_struct *sp, int *flags,
-					   unsigned long *gpnum,
-					   unsigned long *completed)
+					   unsigned long *gp_seq)
 {
 	if (test_type != SRCU_FLAVOR)
 		return;
 	*flags = 0;
-	*completed = sp->srcu_idx;
-	*gpnum = *completed;
+	*gp_seq = sp->srcu_idx;
 }
 
 #elif defined(CONFIG_TREE_SRCU)
 
 void srcutorture_get_gp_data(enum rcutorture_type test_type,
 			     struct srcu_struct *sp, int *flags,
-			     unsigned long *gpnum, unsigned long *completed);
+			     unsigned long *gp_seq);
 
 #endif
 
 #ifdef CONFIG_TINY_RCU
-static inline unsigned long rcu_batches_started(void) { return 0; }
-static inline unsigned long rcu_batches_started_bh(void) { return 0; }
-static inline unsigned long rcu_batches_started_sched(void) { return 0; }
-static inline unsigned long rcu_batches_completed(void) { return 0; }
-static inline unsigned long rcu_batches_completed_bh(void) { return 0; }
-static inline unsigned long rcu_batches_completed_sched(void) { return 0; }
+static inline unsigned long rcu_get_gp_seq(void) { return 0; }
+static inline unsigned long rcu_bh_get_gp_seq(void) { return 0; }
+static inline unsigned long rcu_sched_get_gp_seq(void) { return 0; }
 static inline unsigned long rcu_exp_batches_completed(void) { return 0; }
 static inline unsigned long rcu_exp_batches_completed_sched(void) { return 0; }
 static inline unsigned long
@@ -480,12 +489,9 @@ static inline void show_rcu_gp_kthreads(void) { }
 #else /* #ifdef CONFIG_TINY_RCU */
 extern unsigned long rcutorture_testseq;
 extern unsigned long rcutorture_vernum;
-unsigned long rcu_batches_started(void);
-unsigned long rcu_batches_started_bh(void);
-unsigned long rcu_batches_started_sched(void);
-unsigned long rcu_batches_completed(void);
-unsigned long rcu_batches_completed_bh(void);
-unsigned long rcu_batches_completed_sched(void);
+unsigned long rcu_get_gp_seq(void);
+unsigned long rcu_bh_get_gp_seq(void);
+unsigned long rcu_sched_get_gp_seq(void);
 unsigned long rcu_exp_batches_completed(void);
 unsigned long rcu_exp_batches_completed_sched(void);
 unsigned long srcu_batches_completed(struct srcu_struct *sp);
@@ -493,6 +499,8 @@ void show_rcu_gp_kthreads(void);
 void rcu_force_quiescent_state(void);
 void rcu_bh_force_quiescent_state(void);
 void rcu_sched_force_quiescent_state(void);
+extern struct workqueue_struct *rcu_gp_wq;
+extern struct workqueue_struct *rcu_par_gp_wq;
 #endif /* #else #ifdef CONFIG_TINY_RCU */
 
 #ifdef CONFIG_RCU_NOCB_CPU

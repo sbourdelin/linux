@@ -146,8 +146,7 @@ extern void		    audit_log_d_path(struct audit_buffer *ab,
 					     const struct path *path);
 extern void		    audit_log_key(struct audit_buffer *ab,
 					  char *key);
-extern void		    audit_log_link_denied(const char *operation,
-						  const struct path *link);
+extern void		    audit_log_link_denied(const char *operation);
 extern void		    audit_log_lost(const char *message);
 
 extern int audit_log_task_context(struct audit_buffer *ab);
@@ -194,8 +193,7 @@ static inline void audit_log_d_path(struct audit_buffer *ab,
 { }
 static inline void audit_log_key(struct audit_buffer *ab, char *key)
 { }
-static inline void audit_log_link_denied(const char *string,
-					 const struct path *link)
+static inline void audit_log_link_denied(const char *string)
 { }
 static inline int audit_log_task_context(struct audit_buffer *ab)
 {
@@ -234,7 +232,9 @@ extern void __audit_file(const struct file *);
 extern void __audit_inode_child(struct inode *parent,
 				const struct dentry *dentry,
 				const unsigned char type);
-extern void __audit_seccomp(unsigned long syscall, long signr, int code);
+extern void audit_seccomp(unsigned long syscall, long signr, int code);
+extern void audit_seccomp_actions_logged(const char *names,
+					 const char *old_names, int res);
 extern void __audit_ptrace(struct task_struct *t);
 
 static inline bool audit_dummy_context(void)
@@ -303,12 +303,6 @@ static inline void audit_inode_child(struct inode *parent,
 		__audit_inode_child(parent, dentry, type);
 }
 void audit_core_dumps(long signr);
-
-static inline void audit_seccomp(unsigned long syscall, long signr, int code)
-{
-	if (audit_enabled && unlikely(!audit_dummy_context()))
-		__audit_seccomp(syscall, signr, code);
-}
 
 static inline void audit_ptrace(struct task_struct *t)
 {
@@ -500,9 +494,10 @@ static inline void audit_inode_child(struct inode *parent,
 { }
 static inline void audit_core_dumps(long signr)
 { }
-static inline void __audit_seccomp(unsigned long syscall, long signr, int code)
-{ }
 static inline void audit_seccomp(unsigned long syscall, long signr, int code)
+{ }
+static inline void audit_seccomp_actions_logged(const char *names,
+						const char *old_names, int res)
 { }
 static inline int auditsc_get_stamp(struct audit_context *ctx,
 			      struct timespec64 *t, unsigned int *serial)

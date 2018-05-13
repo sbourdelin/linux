@@ -872,6 +872,9 @@ static struct ata_queued_cmd *ata_scsi_qc_new(struct ata_device *dev,
 
 		qc->sg = scsi_sglist(cmd);
 		qc->n_elem = scsi_sg_count(cmd);
+
+		if (cmd->request->rq_flags & RQF_QUIET)
+			qc->flags |= ATA_QCFLAG_QUIET;
 	} else {
 		cmd->result = (DID_OK << 16) | (QUEUE_FULL << 1);
 		cmd->scsi_done(cmd);
@@ -3316,6 +3319,12 @@ static unsigned int ata_scsi_pass_thru(struct ata_queued_cmd *qc)
 		goto invalid_fld;
 	}
 
+	/* We may not issue NCQ commands to devices not supporting NCQ */
+	if (ata_is_ncq(tf->protocol) && !ata_ncq_enabled(dev)) {
+		fp = 1;
+		goto invalid_fld;
+	}
+
 	/* sanity check for pio multi commands */
 	if ((cdb[1] & 0xe0) && !is_multi_taskfile(tf)) {
 		fp = 1;
@@ -4282,7 +4291,7 @@ static inline void ata_scsi_dump_cdb(struct ata_port *ap,
 #ifdef ATA_DEBUG
 	struct scsi_device *scsidev = cmd->device;
 
-	DPRINTK("CDB (%u:%d,%d,%d) %9ph\n",
+	DPRINTK("CDB (%u:%d,%d,%lld) %9ph\n",
 		ap->print_id,
 		scsidev->channel, scsidev->id, scsidev->lun,
 		cmd->cmnd);
@@ -4309,7 +4318,9 @@ static inline int __ata_scsi_queuecmd(struct scsi_cmnd *scmd,
 		if (likely((scsi_op != ATA_16) || !atapi_passthru16)) {
 			/* relay SCSI command to ATAPI device */
 			int len = COMMAND_SIZE(scsi_op);
-			if (unlikely(len > scmd->cmd_len || len > dev->cdb_len))
+			if (unlikely(len > scmd->cmd_len ||
+				     len > dev->cdb_len ||
+				     scmd->cmd_len > ATAPI_CDB_LEN))
 				goto bad_cdb_len;
 
 			xlat_func = atapi_xlat;
@@ -5042,6 +5053,18 @@ int ata_sas_port_init(struct ata_port *ap)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(ata_sas_port_init);
+
+int ata_sas_tport_add(struct device *parent, struct ata_port *ap)
+{
+	return ata_tport_add(parent, ap);
+}
+EXPORT_SYMBOL_GPL(ata_sas_tport_add);
+
+void ata_sas_tport_delete(struct ata_port *ap)
+{
+	ata_tport_delete(ap);
+}
+EXPORT_SYMBOL_GPL(ata_sas_tport_delete);
 
 /**
  *	ata_sas_port_destroy - Destroy a SATA port allocated by ata_sas_port_alloc

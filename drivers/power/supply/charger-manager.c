@@ -578,7 +578,7 @@ static int check_charging_duration(struct charger_manager *cm)
 	} else if (is_ext_pwr_online(cm) && !cm->charger_enabled) {
 		duration = curr - cm->charging_end_time;
 
-		if (duration > desc->charging_max_duration_ms &&
+		if (duration > desc->discharging_max_duration_ms &&
 				is_ext_pwr_online(cm)) {
 			dev_info(cm->dev, "Discharging duration exceed %ums\n",
 				 desc->discharging_max_duration_ms);
@@ -1700,8 +1700,9 @@ static int charger_manager_probe(struct platform_device *pdev)
 		power_supply_put(psy);
 	}
 
-	if (desc->polling_interval_ms == 0 ||
-	    msecs_to_jiffies(desc->polling_interval_ms) <= CM_JIFFIES_SMALL) {
+	if (cm->desc->polling_mode != CM_POLL_DISABLE &&
+	    (desc->polling_interval_ms == 0 ||
+	     msecs_to_jiffies(desc->polling_interval_ms) <= CM_JIFFIES_SMALL)) {
 		dev_err(&pdev->dev, "polling_interval_ms is too small\n");
 		return -EINVAL;
 	}

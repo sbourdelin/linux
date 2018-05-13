@@ -150,18 +150,14 @@ EXPORT_SYMBOL(kmemdup_nul);
  * @src: source address in user space
  * @len: number of bytes to copy
  *
- * Returns an ERR_PTR() on failure.
+ * Returns an ERR_PTR() on failure.  Result is physically
+ * contiguous, to be freed by kfree().
  */
 void *memdup_user(const void __user *src, size_t len)
 {
 	void *p;
 
-	/*
-	 * Always use GFP_KERNEL, since copy_from_user() can sleep and
-	 * cause pagefault, which makes it pointless to use GFP_NOFS
-	 * or GFP_ATOMIC.
-	 */
-	p = kmalloc_track_caller(len, GFP_KERNEL);
+	p = kmalloc_track_caller(len, GFP_USER);
 	if (!p)
 		return ERR_PTR(-ENOMEM);
 
@@ -173,6 +169,32 @@ void *memdup_user(const void __user *src, size_t len)
 	return p;
 }
 EXPORT_SYMBOL(memdup_user);
+
+/**
+ * vmemdup_user - duplicate memory region from user space
+ *
+ * @src: source address in user space
+ * @len: number of bytes to copy
+ *
+ * Returns an ERR_PTR() on failure.  Result may be not
+ * physically contiguous.  Use kvfree() to free.
+ */
+void *vmemdup_user(const void __user *src, size_t len)
+{
+	void *p;
+
+	p = kvmalloc(len, GFP_USER);
+	if (!p)
+		return ERR_PTR(-ENOMEM);
+
+	if (copy_from_user(p, src, len)) {
+		kvfree(p);
+		return ERR_PTR(-EFAULT);
+	}
+
+	return p;
+}
+EXPORT_SYMBOL(vmemdup_user);
 
 /*
  * strndup_user - duplicate an existing string from user space
@@ -265,7 +287,7 @@ int vma_is_stack_for_current(struct vm_area_struct *vma)
 }
 
 #if defined(CONFIG_MMU) && !defined(HAVE_ARCH_PICK_MMAP_LAYOUT)
-void arch_pick_mmap_layout(struct mm_struct *mm)
+void arch_pick_mmap_layout(struct mm_struct *mm, struct rlimit *rlim_stack)
 {
 	mm->mmap_base = TASK_UNMAPPED_BASE;
 	mm->get_unmapped_area = arch_get_unmapped_area;
@@ -275,8 +297,10 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
 /*
  * Like get_user_pages_fast() except its IRQ-safe in that it won't fall
  * back to the regular GUP.
- * If the architecture not support this function, simply return with no
- * page pinned
+ * Note a difference with get_user_pages_fast: this always returns the
+ * number of pages pinned, 0 if no pages were pinned.
+ * If the architecture does not support this function, simply return with no
+ * pages pinned.
  */
 int __weak __get_user_pages_fast(unsigned long start,
 				 int nr_pages, int write, struct page **pages)
@@ -493,6 +517,16 @@ struct address_space *page_mapping(struct page *page)
 }
 EXPORT_SYMBOL(page_mapping);
 
+/*
+ * For file cache pages, return the address_space, otherwise return NULL
+ */
+struct address_space *page_mapping_file(struct page *page)
+{
+	if (unlikely(PageSwapCache(page)))
+		return NULL;
+	return page_mapping(page);
+}
+
 /* Slow path of page_mapcount() for compound pages */
 int __page_mapcount(struct page *page)
 {
@@ -587,7 +621,7 @@ EXPORT_SYMBOL_GPL(vm_memory_committed);
  * succeed and -ENOMEM implies there is not.
  *
  * We currently support three overcommit policies, which are set via the
- * vm.overcommit_memory sysctl.  See Documentation/vm/overcommit-accounting
+ * vm.overcommit_memory sysctl.  See Documentation/vm/overcommit-accounting.rst
  *
  * Strict overcommit modes added 2002 Feb 26 by Alan Cox.
  * Additional code 2002 Jul 20 by Robert Love.
@@ -634,6 +668,13 @@ int __vm_enough_memory(struct mm_struct *mm, long pages, int cap_sys_admin)
 		 * cache and most inode caches should fall into this
 		 */
 		free += global_node_page_state(NR_SLAB_RECLAIMABLE);
+
+		/*
+		 * Part of the kernel memory, which can be released
+		 * under memory pressure.
+		 */
+		free += global_node_page_state(
+			NR_INDIRECTLY_RECLAIMABLE_BYTES) >> PAGE_SHIFT;
 
 		/*
 		 * Leave reserved pages. The pages are not for anonymous pages.
@@ -735,3 +776,36 @@ out_mm:
 out:
 	return res;
 }
+
+#ifdef CONFIG_GCC_PLUGIN_STACKLEAK
+void __used track_stack(void)
+{
+	/*
+	 * N.B. The arch-specific part of the STACKLEAK feature fills the
+	 * kernel stack with the poison value, which has the register width.
+	 * That code assumes that the value of thread.lowest_stack is aligned
+	 * on the register width boundary.
+	 *
+	 * That is true for x86 and x86_64 because of the kernel stack
+	 * alignment on these platforms (for details, see cc_stack_align in
+	 * arch/x86/Makefile). Take care of that when you port STACKLEAK to
+	 * new platforms.
+	 */
+	unsigned long sp = (unsigned long)&sp;
+
+	/*
+	 * Having CONFIG_STACKLEAK_TRACK_MIN_SIZE larger than
+	 * STACKLEAK_POISON_CHECK_DEPTH makes the poison search in
+	 * erase_kstack() unreliable. Let's prevent that.
+	 */
+	BUILD_BUG_ON(CONFIG_STACKLEAK_TRACK_MIN_SIZE >
+						STACKLEAK_POISON_CHECK_DEPTH);
+
+	if (sp < current->thread.lowest_stack &&
+	    sp >= (unsigned long)task_stack_page(current) +
+					sizeof(unsigned long)) {
+		current->thread.lowest_stack = sp;
+	}
+}
+EXPORT_SYMBOL(track_stack);
+#endif /* CONFIG_GCC_PLUGIN_STACKLEAK */

@@ -69,8 +69,8 @@ int addrconf_set_dstaddr(struct net *net, void __user *arg);
 int ipv6_chk_addr(struct net *net, const struct in6_addr *addr,
 		  const struct net_device *dev, int strict);
 int ipv6_chk_addr_and_flags(struct net *net, const struct in6_addr *addr,
-			    const struct net_device *dev, int strict,
-			    u32 banned_flags);
+			    const struct net_device *dev, bool skip_dev_check,
+			    int strict, u32 banned_flags);
 
 #if defined(CONFIG_IPV6_MIP6) || defined(CONFIG_IPV6_MIP6_MODULE)
 int ipv6_chk_home_addr(struct net *net, const struct in6_addr *addr);
@@ -180,7 +180,7 @@ static inline int addrconf_finite_timeout(unsigned long timeout)
  */
 int ipv6_addr_label_init(void);
 void ipv6_addr_label_cleanup(void);
-void ipv6_addr_label_rtnl_register(void);
+int ipv6_addr_label_rtnl_register(void);
 u32 ipv6_addr_label(struct net *net, const struct in6_addr *addr,
 		    int type, int ifindex);
 
@@ -223,6 +223,20 @@ struct ipv6_stub {
 				 const struct in6_addr *addr);
 	int (*ipv6_dst_lookup)(struct net *net, struct sock *sk,
 			       struct dst_entry **dst, struct flowi6 *fl6);
+
+	struct fib6_table *(*fib6_get_table)(struct net *net, u32 id);
+	struct fib6_info *(*fib6_lookup)(struct net *net, int oif,
+					 struct flowi6 *fl6, int flags);
+	struct fib6_info *(*fib6_table_lookup)(struct net *net,
+					      struct fib6_table *table,
+					      int oif, struct flowi6 *fl6,
+					      int flags);
+	struct fib6_info *(*fib6_multipath_select)(const struct net *net,
+						   struct fib6_info *f6i,
+						   struct flowi6 *fl6, int oif,
+						   const struct sk_buff *skb,
+						   int strict);
+
 	void (*udpv6_encap_enable)(void);
 	void (*ndisc_send_na)(struct net_device *dev, const struct in6_addr *daddr,
 			      const struct in6_addr *solicited_addr,
@@ -230,6 +244,13 @@ struct ipv6_stub {
 	struct neigh_table *nd_tbl;
 };
 extern const struct ipv6_stub *ipv6_stub __read_mostly;
+
+/* A stub used by bpf helpers. Similarly ugly as ipv6_stub */
+struct ipv6_bpf_stub {
+	int (*inet6_bind)(struct sock *sk, struct sockaddr *uaddr, int addr_len,
+			  bool force_bind_address_no_port, bool with_lock);
+};
+extern const struct ipv6_bpf_stub *ipv6_bpf_stub __read_mostly;
 
 /*
  * identify MLD packets for MLD filter exceptions
@@ -298,6 +319,20 @@ void inet6_netconf_notify_devconf(struct net *net, int event, int type,
 static inline struct inet6_dev *__in6_dev_get(const struct net_device *dev)
 {
 	return rcu_dereference_rtnl(dev->ip6_ptr);
+}
+
+/**
+ * __in6_dev_get_safely - get inet6_dev pointer from netdevice
+ * @dev: network device
+ *
+ * This is a safer version of __in6_dev_get
+ */
+static inline struct inet6_dev *__in6_dev_get_safely(const struct net_device *dev)
+{
+	if (likely(dev))
+		return rcu_dereference_rtnl(dev->ip6_ptr);
+	else
+		return NULL;
 }
 
 /**

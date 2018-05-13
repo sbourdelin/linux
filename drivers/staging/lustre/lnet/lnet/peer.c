@@ -56,8 +56,8 @@ lnet_peer_tables_create(void)
 	cfs_percpt_for_each(ptable, i, the_lnet.ln_peer_tables) {
 		INIT_LIST_HEAD(&ptable->pt_deathrow);
 
-		LIBCFS_CPT_ALLOC(hash, lnet_cpt_table(), i,
-				 LNET_PEER_HASH_SIZE * sizeof(*hash));
+		hash = kvmalloc_cpt(LNET_PEER_HASH_SIZE * sizeof(*hash),
+				    GFP_KERNEL, i);
 		if (!hash) {
 			CERROR("Failed to create peer hash table\n");
 			lnet_peer_tables_destroy();
@@ -94,7 +94,7 @@ lnet_peer_tables_destroy(void)
 		for (j = 0; j < LNET_PEER_HASH_SIZE; j++)
 			LASSERT(list_empty(&hash[j]));
 
-		LIBCFS_FREE(hash, LNET_PEER_HASH_SIZE * sizeof(*hash));
+		kvfree(hash);
 	}
 
 	cfs_percpt_free(the_lnet.ln_peer_tables);
@@ -137,7 +137,7 @@ lnet_peer_table_deathrow_wait_locked(struct lnet_peer_table *ptable,
 			       ptable->pt_zombies);
 		}
 		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(cfs_time_seconds(1) >> 1);
+		schedule_timeout(HZ >> 1);
 		lnet_net_lock(cpt_locked);
 	}
 }
@@ -212,7 +212,7 @@ lnet_peer_tables_cleanup(struct lnet_ni *ni)
 
 	list_for_each_entry_safe(lp, temp, &deathrow, lp_hashlist) {
 		list_del(&lp->lp_hashlist);
-		LIBCFS_FREE(lp, sizeof(*lp));
+		kfree(lp);
 	}
 }
 
@@ -297,7 +297,7 @@ lnet_nid2peer_locked(struct lnet_peer **lpp, lnet_nid_t nid, int cpt)
 	if (lp)
 		memset(lp, 0, sizeof(*lp));
 	else
-		LIBCFS_CPT_ALLOC(lp, lnet_cpt_table(), cpt2, sizeof(*lp));
+		lp = kzalloc_cpt(sizeof(*lp), GFP_NOFS, cpt2);
 
 	if (!lp) {
 		rc = -ENOMEM;
@@ -315,7 +315,7 @@ lnet_nid2peer_locked(struct lnet_peer **lpp, lnet_nid_t nid, int cpt)
 	lp->lp_alive_count = 0;
 	lp->lp_timestamp = 0;
 	lp->lp_alive = !lnet_peers_start_down(); /* 1 bit!! */
-	lp->lp_last_alive = cfs_time_current(); /* assumes alive */
+	lp->lp_last_alive = jiffies; /* assumes alive */
 	lp->lp_last_query = 0; /* haven't asked NI yet */
 	lp->lp_ping_timestamp = 0;
 	lp->lp_ping_feats = LNET_PING_FEAT_INVAL;

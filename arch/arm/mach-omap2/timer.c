@@ -49,8 +49,7 @@
 #include "omap_hwmod.h"
 #include "omap_device.h"
 #include <plat/counter-32k.h>
-#include <plat/dmtimer.h>
-#include "omap-pm.h"
+#include <clocksource/timer-ti-dm.h>
 
 #include "soc.h"
 #include "common.h"
@@ -156,12 +155,6 @@ static struct clock_event_device clockevent_gpt = {
 	.tick_resume		= omap2_gp_timer_shutdown,
 };
 
-static struct property device_disabled = {
-	.name = "status",
-	.length = sizeof("disabled"),
-	.value = "disabled",
-};
-
 static const struct of_device_id omap_timer_match[] __initconst = {
 	{ .compatible = "ti,omap2420-timer", },
 	{ .compatible = "ti,omap3430-timer", },
@@ -173,6 +166,43 @@ static const struct of_device_id omap_timer_match[] __initconst = {
 	{ .compatible = "ti,am335x-timer-1ms", },
 	{ }
 };
+
+static int omap_timer_add_disabled_property(struct device_node *np)
+{
+	struct property *prop;
+
+	prop = kzalloc(sizeof(*prop), GFP_KERNEL);
+	if (!prop)
+		return -ENOMEM;
+
+	prop->name = "status";
+	prop->value = "disabled";
+	prop->length = strlen(prop->value);
+
+	return of_add_property(np, prop);
+}
+
+static int omap_timer_update_dt(struct device_node *np)
+{
+	int error = 0;
+
+	if (!of_device_is_compatible(np, "ti,omap-counter32k")) {
+		error = omap_timer_add_disabled_property(np);
+		if (error)
+			return error;
+	}
+
+	/* No parent interconnect target module configured? */
+	if (of_get_property(np, "ti,hwmods", NULL))
+		return error;
+
+	/* Tag parent interconnect target module disabled */
+	error = omap_timer_add_disabled_property(np->parent);
+	if (error)
+		return error;
+
+	return 0;
+}
 
 /**
  * omap_get_timer_dt - get a timer using device-tree
@@ -189,6 +219,7 @@ static struct device_node * __init omap_get_timer_dt(const struct of_device_id *
 						     const char *property)
 {
 	struct device_node *np;
+	int error;
 
 	for_each_matching_node(np, match) {
 		if (!of_device_is_available(np))
@@ -203,8 +234,9 @@ static struct device_node * __init omap_get_timer_dt(const struct of_device_id *
 				  of_get_property(np, "ti,timer-secure", NULL)))
 			continue;
 
-		if (!of_device_is_compatible(np, "ti,omap-counter32k"))
-			of_add_property(np, &device_disabled);
+		error = omap_timer_update_dt(np);
+		WARN(error, "%s: Could not update dt: %i\n", __func__, error);
+
 		return np;
 	}
 
@@ -263,8 +295,12 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
 		return -ENODEV;
 
 	of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
-	if (!oh_name)
-		return -ENODEV;
+	if (!oh_name) {
+		of_property_read_string_index(np->parent, "ti,hwmods", 0,
+					      &oh_name);
+		if (!oh_name)
+			return -ENODEV;
+	}
 
 	timer->irq = irq_of_parse_and_map(np, 0);
 	if (!timer->irq)
@@ -416,9 +452,12 @@ static int __init __maybe_unused omap2_sync32k_clocksource_init(void)
 	if (!np)
 		return -ENODEV;
 
-	of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
-	if (!oh_name)
-		return -ENODEV;
+	of_property_read_string_index(np->parent, "ti,hwmods", 0, &oh_name);
+	if (!oh_name) {
+		of_property_read_string_index(np, "ti,hwmods", 0, &oh_name);
+		if (!oh_name)
+			return -ENODEV;
+	}
 
 	/*
 	 * First check hwmod data is available for sync32k counter

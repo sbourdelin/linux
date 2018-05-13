@@ -3819,7 +3819,7 @@ void  nes_port_ibevent(struct nes_vnic *nesvnic)
 	if (!nesvnic->event_timer.function) {
 		ib_dispatch_event(&event);
 		nesvnic->last_dispatched_event = event.event;
-		nesvnic->event_timer.function = (TIMER_FUNC_TYPE)nes_handle_delayed_event;
+		nesvnic->event_timer.function = nes_handle_delayed_event;
 		nesvnic->event_timer.expires = jiffies + NES_EVENT_DELAY;
 		add_timer(&nesvnic->event_timer);
 	} else {
@@ -3854,6 +3854,7 @@ int nes_register_ofa_device(struct nes_ib_device *nesibdev)
 	struct nes_adapter *nesadapter = nesdev->nesadapter;
 	int i, ret;
 
+	nesvnic->nesibdev->ibdev.driver_id = RDMA_DRIVER_NES;
 	ret = ib_register_device(&nesvnic->nesibdev->ibdev, NULL);
 	if (ret) {
 		return ret;

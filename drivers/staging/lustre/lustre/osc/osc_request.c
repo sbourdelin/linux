@@ -552,14 +552,12 @@ static int osc_destroy(const struct lu_env *env, struct obd_export *exp,
 
 	req->rq_interpret_reply = osc_destroy_interpret;
 	if (!osc_can_send_destroy(cli)) {
-		struct l_wait_info lwi = LWI_INTR(LWI_ON_SIGNAL_NOOP, NULL);
-
 		/*
 		 * Wait until the number of on-going destroy RPCs drops
 		 * under max_rpc_in_flight
 		 */
-		l_wait_event_exclusive(cli->cl_destroy_waitq,
-				       osc_can_send_destroy(cli), &lwi);
+		l_wait_event_abortable_exclusive(cli->cl_destroy_waitq,
+					       osc_can_send_destroy(cli));
 	}
 
 	/* Do not wait for response */
@@ -619,7 +617,7 @@ static void osc_announce_cached(struct client_obd *cli, struct obdo *oa,
 void osc_update_next_shrink(struct client_obd *cli)
 {
 	cli->cl_next_shrink_grant =
-		cfs_time_shift(cli->cl_grant_shrink_interval);
+		jiffies + cli->cl_grant_shrink_interval * HZ;
 	CDEBUG(D_CACHE, "next time %ld to shrink grant\n",
 	       cli->cl_next_shrink_grant);
 }
@@ -743,14 +741,14 @@ int osc_shrink_grant_to_target(struct client_obd *cli, __u64 target_bytes)
 
 static int osc_should_shrink_grant(struct client_obd *client)
 {
-	unsigned long time = cfs_time_current();
+	unsigned long time = jiffies;
 	unsigned long next_shrink = client->cl_next_shrink_grant;
 
 	if ((client->cl_import->imp_connect_data.ocd_connect_flags &
 	     OBD_CONNECT_GRANT_SHRINK) == 0)
 		return 0;
 
-	if (cfs_time_aftereq(time, next_shrink - 5 * CFS_TICK)) {
+	if (time_after_eq(time, next_shrink - 5 * CFS_TICK)) {
 		/* Get the current RPC size directly, instead of going via:
 		 * cli_brw_size(obd->u.cli.cl_import->imp_obd->obd_self_export)
 		 * Keep comment here so that it can be found by searching.
@@ -933,7 +931,7 @@ static u32 osc_checksum_bulk(int nob, u32 pg_count,
 {
 	__u32 cksum;
 	int i = 0;
-	struct cfs_crypto_hash_desc *hdesc;
+	struct ahash_request *hdesc;
 	unsigned int bufsize;
 	unsigned char cfs_alg = cksum_obd2cfs(cksum_type);
 
@@ -2844,7 +2842,9 @@ static int __init osc_init(void)
 	if (rc)
 		goto out_kmem;
 
-	register_shrinker(&osc_cache_shrinker);
+	rc = register_shrinker(&osc_cache_shrinker);
+	if (rc)
+		goto out_type;
 
 	/* This is obviously too much memory, only prevent overflow here */
 	if (osc_reqpool_mem_max >= 1 << 12 || osc_reqpool_mem_max == 0) {

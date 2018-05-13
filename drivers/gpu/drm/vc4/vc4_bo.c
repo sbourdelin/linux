@@ -195,6 +195,7 @@ static void vc4_bo_destroy(struct vc4_bo *bo)
 	vc4_bo_set_label(obj, -1);
 
 	if (bo->validated_shader) {
+		kfree(bo->validated_shader->uniform_addr_offsets);
 		kfree(bo->validated_shader->texture_samples);
 		kfree(bo->validated_shader);
 		bo->validated_shader = NULL;
@@ -591,6 +592,7 @@ void vc4_free_object(struct drm_gem_object *gem_bo)
 	}
 
 	if (bo->validated_shader) {
+		kfree(bo->validated_shader->uniform_addr_offsets);
 		kfree(bo->validated_shader->texture_samples);
 		kfree(bo->validated_shader);
 		bo->validated_shader = NULL;
@@ -637,7 +639,8 @@ int vc4_bo_inc_usecnt(struct vc4_bo *bo)
 	mutex_lock(&bo->madv_lock);
 	switch (bo->madv) {
 	case VC4_MADV_WILLNEED:
-		refcount_inc(&bo->usecnt);
+		if (!refcount_inc_not_zero(&bo->usecnt))
+			refcount_set(&bo->usecnt, 1);
 		ret = 0;
 		break;
 	case VC4_MADV_DONTNEED:
@@ -674,10 +677,9 @@ void vc4_bo_dec_usecnt(struct vc4_bo *bo)
 	mutex_unlock(&bo->madv_lock);
 }
 
-static void vc4_bo_cache_time_timer(unsigned long data)
+static void vc4_bo_cache_time_timer(struct timer_list *t)
 {
-	struct drm_device *dev = (struct drm_device *)data;
-	struct vc4_dev *vc4 = to_vc4_dev(dev);
+	struct vc4_dev *vc4 = from_timer(vc4, t, bo_cache.time_timer);
 
 	schedule_work(&vc4->bo_cache.time_work);
 }
@@ -1039,9 +1041,7 @@ int vc4_bo_cache_init(struct drm_device *dev)
 	INIT_LIST_HEAD(&vc4->bo_cache.time_list);
 
 	INIT_WORK(&vc4->bo_cache.time_work, vc4_bo_cache_time_work);
-	setup_timer(&vc4->bo_cache.time_timer,
-		    vc4_bo_cache_time_timer,
-		    (unsigned long)dev);
+	timer_setup(&vc4->bo_cache.time_timer, vc4_bo_cache_time_timer, 0);
 
 	return 0;
 }

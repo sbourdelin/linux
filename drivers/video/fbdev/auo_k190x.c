@@ -708,8 +708,8 @@ static ssize_t temp_show(struct device *dev, struct device_attribute *attr,
 	return sprintf(buf, "%d\n", temp);
 }
 
-static DEVICE_ATTR(update_mode, 0644, update_mode_show, update_mode_store);
-static DEVICE_ATTR(flash, 0644, flash_show, flash_store);
+static DEVICE_ATTR_RW(update_mode);
+static DEVICE_ATTR_RW(flash);
 static DEVICE_ATTR(temp, 0644, temp_show, NULL);
 
 static struct attribute *auok190x_attributes[] = {
@@ -776,8 +776,7 @@ static void auok190x_recover(struct auok190xfb_par *par)
  */
 static int __maybe_unused auok190x_runtime_suspend(struct device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct fb_info *info = platform_get_drvdata(pdev);
+	struct fb_info *info = dev_get_drvdata(dev);
 	struct auok190xfb_par *par = info->par;
 	struct auok190x_board *board = par->board;
 	u16 standby_param;
@@ -823,8 +822,7 @@ finish:
 
 static int __maybe_unused auok190x_runtime_resume(struct device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct fb_info *info = platform_get_drvdata(pdev);
+	struct fb_info *info = dev_get_drvdata(dev);
 	struct auok190xfb_par *par = info->par;
 	struct auok190x_board *board = par->board;
 
@@ -857,8 +855,7 @@ static int __maybe_unused auok190x_runtime_resume(struct device *dev)
 
 static int __maybe_unused auok190x_suspend(struct device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct fb_info *info = platform_get_drvdata(pdev);
+	struct fb_info *info = dev_get_drvdata(dev);
 	struct auok190xfb_par *par = info->par;
 	struct auok190x_board *board = par->board;
 	int ret;
@@ -897,8 +894,7 @@ static int __maybe_unused auok190x_suspend(struct device *dev)
 
 static int __maybe_unused auok190x_resume(struct device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct fb_info *info = platform_get_drvdata(pdev);
+	struct fb_info *info = dev_get_drvdata(dev);
 	struct auok190xfb_par *par = info->par;
 	struct auok190x_board *board = par->board;
 
@@ -1056,13 +1052,12 @@ int auok190x_common_probe(struct platform_device *pdev,
 	/* videomemory handling */
 
 	videomemorysize = roundup((panel->w * panel->h) * 2, PAGE_SIZE);
-	videomemory = vmalloc(videomemorysize);
+	videomemory = vzalloc(videomemorysize);
 	if (!videomemory) {
 		ret = -ENOMEM;
 		goto err_irq;
 	}
 
-	memset(videomemory, 0, videomemorysize);
 	info->screen_base = (char *)videomemory;
 	info->fix.smem_len = videomemorysize;
 
@@ -1081,7 +1076,6 @@ int auok190x_common_probe(struct platform_device *pdev,
 				     sizeof(struct fb_deferred_io),
 				     GFP_KERNEL);
 	if (!info->fbdefio) {
-		dev_err(info->device, "Failed to allocate memory\n");
 		ret = -ENOMEM;
 		goto err_defio;
 	}

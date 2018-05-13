@@ -963,8 +963,8 @@ static void do_act_open_rpl(struct cxgbi_device *cdev, struct sk_buff *skb)
 	spin_lock_bh(&csk->lock);
 
 	if (status == CPL_ERR_CONN_EXIST &&
-	    csk->retry_timer.function != (TIMER_FUNC_TYPE)csk_act_open_retry_timer) {
-		csk->retry_timer.function = (TIMER_FUNC_TYPE)csk_act_open_retry_timer;
+	    csk->retry_timer.function != csk_act_open_retry_timer) {
+		csk->retry_timer.function = csk_act_open_retry_timer;
 		mod_timer(&csk->retry_timer, jiffies + HZ / 2);
 	} else
 		cxgbi_sock_fail_act_open(csk,
@@ -2108,12 +2108,12 @@ static int t4_uld_rx_handler(void *handle, const __be64 *rsp,
 	log_debug(1 << CXGBI_DBG_TOE,
 		"cdev %p, opcode 0x%x(0x%x,0x%x), skb %p.\n",
 		 cdev, opc, rpl->ot.opcode_tid, ntohl(rpl->ot.opcode_tid), skb);
-	if (cxgb4i_cplhandlers[opc])
-		cxgb4i_cplhandlers[opc](cdev, skb);
-	else {
+	if (opc >= ARRAY_SIZE(cxgb4i_cplhandlers) || !cxgb4i_cplhandlers[opc]) {
 		pr_err("No handler for opcode 0x%x.\n", opc);
 		__kfree_skb(skb);
-	}
+	} else
+		cxgb4i_cplhandlers[opc](cdev, skb);
+
 	return 0;
 nomem:
 	log_debug(1 << CXGBI_DBG_TOE, "OOM bailing out.\n");

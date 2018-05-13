@@ -31,6 +31,7 @@ static void of_get_regulation_constraints(struct device_node *np,
 	struct regulation_constraints *constraints = &(*init_data)->constraints;
 	struct regulator_state *suspend_state;
 	struct device_node *suspend_np;
+	unsigned int mode;
 	int ret, i;
 	u32 pval;
 
@@ -124,11 +125,11 @@ static void of_get_regulation_constraints(struct device_node *np,
 
 	if (!of_property_read_u32(np, "regulator-initial-mode", &pval)) {
 		if (desc && desc->of_map_mode) {
-			ret = desc->of_map_mode(pval);
-			if (ret == -EINVAL)
+			mode = desc->of_map_mode(pval);
+			if (mode == REGULATOR_MODE_INVALID)
 				pr_err("%s: invalid mode %u\n", np->name, pval);
 			else
-				constraints->initial_mode = ret;
+				constraints->initial_mode = mode;
 		} else {
 			pr_warn("%s: mapping for mode %d not defined\n",
 				np->name, pval);
@@ -163,12 +164,12 @@ static void of_get_regulation_constraints(struct device_node *np,
 		if (!of_property_read_u32(suspend_np, "regulator-mode",
 					  &pval)) {
 			if (desc && desc->of_map_mode) {
-				ret = desc->of_map_mode(pval);
-				if (ret == -EINVAL)
+				mode = desc->of_map_mode(pval);
+				if (mode == REGULATOR_MODE_INVALID)
 					pr_err("%s: invalid mode %u\n",
 					       np->name, pval);
 				else
-					suspend_state->mode = ret;
+					suspend_state->mode = mode;
 			} else {
 				pr_warn("%s: mapping for mode %d not defined\n",
 					np->name, pval);
@@ -177,14 +178,30 @@ static void of_get_regulation_constraints(struct device_node *np,
 
 		if (of_property_read_bool(suspend_np,
 					"regulator-on-in-suspend"))
-			suspend_state->enabled = true;
+			suspend_state->enabled = ENABLE_IN_SUSPEND;
 		else if (of_property_read_bool(suspend_np,
 					"regulator-off-in-suspend"))
-			suspend_state->disabled = true;
+			suspend_state->enabled = DISABLE_IN_SUSPEND;
+		else
+			suspend_state->enabled = DO_NOTHING_IN_SUSPEND;
+
+		if (!of_property_read_u32(np, "regulator-suspend-min-microvolt",
+					  &pval))
+			suspend_state->min_uV = pval;
+
+		if (!of_property_read_u32(np, "regulator-suspend-max-microvolt",
+					  &pval))
+			suspend_state->max_uV = pval;
 
 		if (!of_property_read_u32(suspend_np,
 					"regulator-suspend-microvolt", &pval))
 			suspend_state->uV = pval;
+		else /* otherwise use min_uV as default suspend voltage */
+			suspend_state->uV = suspend_state->min_uV;
+
+		if (of_property_read_bool(suspend_np,
+					"regulator-changeable-in-suspend"))
+			suspend_state->changeable = true;
 
 		if (i == PM_SUSPEND_MEM)
 			constraints->initial_state = PM_SUSPEND_MEM;
@@ -305,6 +322,7 @@ int of_regulator_match(struct device *dev, struct device_node *node,
 				dev_err(dev,
 					"failed to parse DT for regulator %s\n",
 					child->name);
+				of_node_put(child);
 				return -EINVAL;
 			}
 			match->of_node = of_node_get(child);
@@ -375,4 +393,18 @@ struct regulator_init_data *regulator_of_get_init_data(struct device *dev,
 	of_node_put(search);
 
 	return init_data;
+}
+
+static int of_node_match(struct device *dev, const void *data)
+{
+	return dev->of_node == data;
+}
+
+struct regulator_dev *of_find_regulator_by_node(struct device_node *np)
+{
+	struct device *dev;
+
+	dev = class_find_device(&regulator_class, NULL, np, of_node_match);
+
+	return dev ? dev_to_rdev(dev) : NULL;
 }

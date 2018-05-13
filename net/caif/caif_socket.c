@@ -924,7 +924,7 @@ static int caif_release(struct socket *sock)
 
 	caif_disconnect_client(sock_net(sk), &cf_sk->layer);
 	cf_sk->sk.sk_socket->state = SS_DISCONNECTING;
-	wake_up_interruptible_poll(sk_sleep(sk), POLLERR|POLLHUP);
+	wake_up_interruptible_poll(sk_sleep(sk), EPOLLERR|EPOLLHUP);
 
 	sock_orphan(sk);
 	sk_stream_kill_queues(&cf_sk->sk);
@@ -934,11 +934,11 @@ static int caif_release(struct socket *sock)
 }
 
 /* Copied from af_unix.c:unix_poll(), added CAIF tx_flow handling */
-static unsigned int caif_poll(struct file *file,
+static __poll_t caif_poll(struct file *file,
 			      struct socket *sock, poll_table *wait)
 {
 	struct sock *sk = sock->sk;
-	unsigned int mask;
+	__poll_t mask;
 	struct caifsock *cf_sk = container_of(sk, struct caifsock, sk);
 
 	sock_poll_wait(file, sk_sleep(sk), wait);
@@ -946,23 +946,23 @@ static unsigned int caif_poll(struct file *file,
 
 	/* exceptional events? */
 	if (sk->sk_err)
-		mask |= POLLERR;
+		mask |= EPOLLERR;
 	if (sk->sk_shutdown == SHUTDOWN_MASK)
-		mask |= POLLHUP;
+		mask |= EPOLLHUP;
 	if (sk->sk_shutdown & RCV_SHUTDOWN)
-		mask |= POLLRDHUP;
+		mask |= EPOLLRDHUP;
 
 	/* readable? */
 	if (!skb_queue_empty(&sk->sk_receive_queue) ||
 		(sk->sk_shutdown & RCV_SHUTDOWN))
-		mask |= POLLIN | POLLRDNORM;
+		mask |= EPOLLIN | EPOLLRDNORM;
 
 	/*
 	 * we set writable also when the other side has shut down the
 	 * connection. This prevents stuck sockets.
 	 */
 	if (sock_writeable(sk) && tx_flow_is_on(cf_sk))
-		mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
+		mask |= EPOLLOUT | EPOLLWRNORM | EPOLLWRBAND;
 
 	return mask;
 }

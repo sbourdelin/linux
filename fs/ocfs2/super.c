@@ -423,10 +423,10 @@ static int ocfs2_sync_fs(struct super_block *sb, int wait)
 		ocfs2_schedule_truncate_log_flush(osb, 0);
 	}
 
-	if (jbd2_journal_start_commit(OCFS2_SB(sb)->journal->j_journal,
+	if (jbd2_journal_start_commit(osb->journal->j_journal,
 				      &target)) {
 		if (wait)
-			jbd2_log_wait_commit(OCFS2_SB(sb)->journal->j_journal,
+			jbd2_log_wait_commit(osb->journal->j_journal,
 					     target);
 	}
 	return 0;
@@ -474,9 +474,8 @@ static int ocfs2_init_global_system_inodes(struct ocfs2_super *osb)
 		new = ocfs2_get_system_file_inode(osb, i, osb->slot_num);
 		if (!new) {
 			ocfs2_release_system_inodes(osb);
-			status = -EINVAL;
+			status = ocfs2_is_soft_readonly(osb) ? -EROFS : -EINVAL;
 			mlog_errno(status);
-			/* FIXME: Should ERROR_RO_FS */
 			mlog(ML_ERROR, "Unable to load system inode %d, "
 			     "possibly corrupt fs?", i);
 			goto bail;
@@ -505,7 +504,7 @@ static int ocfs2_init_local_system_inodes(struct ocfs2_super *osb)
 		new = ocfs2_get_system_file_inode(osb, i, osb->slot_num);
 		if (!new) {
 			ocfs2_release_system_inodes(osb);
-			status = -EINVAL;
+			status = ocfs2_is_soft_readonly(osb) ? -EROFS : -EINVAL;
 			mlog(ML_ERROR, "status=%d, sysfile=%d, slot=%d\n",
 			     status, i, osb->slot_num);
 			goto bail;
@@ -1782,12 +1781,9 @@ static int ocfs2_initialize_mem_caches(void)
 					NULL);
 	if (!ocfs2_inode_cachep || !ocfs2_dquot_cachep ||
 	    !ocfs2_qf_chunk_cachep) {
-		if (ocfs2_inode_cachep)
-			kmem_cache_destroy(ocfs2_inode_cachep);
-		if (ocfs2_dquot_cachep)
-			kmem_cache_destroy(ocfs2_dquot_cachep);
-		if (ocfs2_qf_chunk_cachep)
-			kmem_cache_destroy(ocfs2_qf_chunk_cachep);
+		kmem_cache_destroy(ocfs2_inode_cachep);
+		kmem_cache_destroy(ocfs2_dquot_cachep);
+		kmem_cache_destroy(ocfs2_qf_chunk_cachep);
 		return -ENOMEM;
 	}
 
@@ -1801,16 +1797,13 @@ static void ocfs2_free_mem_caches(void)
 	 * destroy cache.
 	 */
 	rcu_barrier();
-	if (ocfs2_inode_cachep)
-		kmem_cache_destroy(ocfs2_inode_cachep);
+	kmem_cache_destroy(ocfs2_inode_cachep);
 	ocfs2_inode_cachep = NULL;
 
-	if (ocfs2_dquot_cachep)
-		kmem_cache_destroy(ocfs2_dquot_cachep);
+	kmem_cache_destroy(ocfs2_dquot_cachep);
 	ocfs2_dquot_cachep = NULL;
 
-	if (ocfs2_qf_chunk_cachep)
-		kmem_cache_destroy(ocfs2_qf_chunk_cachep);
+	kmem_cache_destroy(ocfs2_qf_chunk_cachep);
 	ocfs2_qf_chunk_cachep = NULL;
 }
 

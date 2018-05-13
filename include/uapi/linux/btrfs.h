@@ -33,7 +33,12 @@ struct btrfs_ioctl_vol_args {
 	char name[BTRFS_PATH_NAME_MAX + 1];
 };
 
-#define BTRFS_DEVICE_PATH_NAME_MAX 1024
+#define BTRFS_DEVICE_PATH_NAME_MAX	1024
+#define BTRFS_SUBVOL_NAME_MAX 		4039
+
+#define BTRFS_SUBVOL_CREATE_ASYNC	(1ULL << 0)
+#define BTRFS_SUBVOL_RDONLY		(1ULL << 1)
+#define BTRFS_SUBVOL_QGROUP_INHERIT	(1ULL << 2)
 
 #define BTRFS_DEVICE_SPEC_BY_ID		(1ULL << 3)
 
@@ -101,11 +106,7 @@ struct btrfs_ioctl_qgroup_limit_args {
  * - BTRFS_IOC_SUBVOL_GETFLAGS
  * - BTRFS_IOC_SUBVOL_SETFLAGS
  */
-#define BTRFS_SUBVOL_CREATE_ASYNC	(1ULL << 0)
-#define BTRFS_SUBVOL_RDONLY		(1ULL << 1)
-#define BTRFS_SUBVOL_QGROUP_INHERIT	(1ULL << 2)
 
-#define BTRFS_SUBVOL_NAME_MAX 4039
 struct btrfs_ioctl_vol_args_v2 {
 	__s64 fd;
 	__u64 transid;
@@ -736,6 +737,30 @@ enum btrfs_err_code {
 	BTRFS_ERROR_DEV_EXCL_RUN_IN_PROGRESS
 };
 
+/*
+ * Type of operation that will be used to clear unused blocks.
+ */
+enum btrfs_clear_op_type {
+	BTRFS_CLEAR_OP_DISCARD = 0,
+	BTRFS_CLEAR_OP_ZERO,
+	BTRFS_CLEAR_OP_DISCARD_SECURE,
+
+	/* Fine tuning for clearing by zeros, see __blkdev_issue_zeroout */
+	BTRFS_CLEAR_OP_ZERO_NOUNMAP,
+	BTRFS_CLEAR_OP_ZERO_NOFALLBACK,
+	BTRFS_CLEAR_OP_ZERO_NOUNMAP_NOFALLBACK,
+	BTRFS_NR_CLEAR_OP_TYPES,
+};
+
+struct btrfs_ioctl_clear_free_args {
+	__u32 type;			/* in, btrfs_clear_free_op_type */
+	__u32 reserved1;		/* padding, must be zero */
+	__u64 start;			/* in */
+	__u64 length;			/* in, out */
+	__u64 minlen;			/* in */
+	__u64 reserved2[4];
+};
+
 #define BTRFS_IOC_SNAP_CREATE _IOW(BTRFS_IOCTL_MAGIC, 1, \
 				   struct btrfs_ioctl_vol_args)
 #define BTRFS_IOC_DEFRAG _IOW(BTRFS_IOCTL_MAGIC, 2, \
@@ -842,5 +867,7 @@ enum btrfs_err_code {
 				   struct btrfs_ioctl_vol_args_v2)
 #define BTRFS_IOC_LOGICAL_INO_V2 _IOWR(BTRFS_IOCTL_MAGIC, 59, \
 					struct btrfs_ioctl_logical_ino_args)
+#define BTRFS_IOC_CLEAR_FREE _IOW(BTRFS_IOCTL_MAGIC, 90, \
+				struct btrfs_ioctl_clear_free_args)
 
 #endif /* _UAPI_LINUX_BTRFS_H */

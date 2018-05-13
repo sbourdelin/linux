@@ -495,6 +495,8 @@ cifs_show_options(struct seq_file *s, struct dentry *root)
 		seq_puts(s, ",sfu");
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_NO_BRL)
 		seq_puts(s, ",nobrl");
+	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_NO_HANDLE_CACHE)
+		seq_puts(s, ",nohandlecache");
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_CIFS_ACL)
 		seq_puts(s, ",cifsacl");
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DYNPERM)
@@ -1047,6 +1049,18 @@ out:
 	return rc;
 }
 
+/*
+ * Directory operations under CIFS/SMB2/SMB3 are synchronous, so fsync()
+ * is a dummy operation.
+ */
+int cifs_dir_fsync(struct file *file, loff_t start, loff_t end, int datasync)
+{
+	cifs_dbg(FYI, "Sync directory - name: %pD datasync: 0x%x\n",
+		 file, datasync);
+
+	return 0;
+}
+
 static ssize_t cifs_copy_file_range(struct file *src_file, loff_t off,
 				struct file *dst_file, loff_t destoff,
 				size_t len, unsigned int flags)
@@ -1070,6 +1084,7 @@ const struct file_operations cifs_file_ops = {
 	.flush = cifs_flush,
 	.mmap  = cifs_file_mmap,
 	.splice_read = generic_file_splice_read,
+	.splice_write = iter_file_splice_write,
 	.llseek = cifs_llseek,
 	.unlocked_ioctl	= cifs_ioctl,
 	.copy_file_range = cifs_copy_file_range,
@@ -1088,6 +1103,7 @@ const struct file_operations cifs_file_strict_ops = {
 	.flush = cifs_flush,
 	.mmap = cifs_file_strict_mmap,
 	.splice_read = generic_file_splice_read,
+	.splice_write = iter_file_splice_write,
 	.llseek = cifs_llseek,
 	.unlocked_ioctl	= cifs_ioctl,
 	.copy_file_range = cifs_copy_file_range,
@@ -1107,6 +1123,7 @@ const struct file_operations cifs_file_direct_ops = {
 	.flush = cifs_flush,
 	.mmap = cifs_file_mmap,
 	.splice_read = generic_file_splice_read,
+	.splice_write = iter_file_splice_write,
 	.unlocked_ioctl  = cifs_ioctl,
 	.copy_file_range = cifs_copy_file_range,
 	.clone_file_range = cifs_clone_file_range,
@@ -1124,6 +1141,7 @@ const struct file_operations cifs_file_nobrl_ops = {
 	.flush = cifs_flush,
 	.mmap  = cifs_file_mmap,
 	.splice_read = generic_file_splice_read,
+	.splice_write = iter_file_splice_write,
 	.llseek = cifs_llseek,
 	.unlocked_ioctl	= cifs_ioctl,
 	.copy_file_range = cifs_copy_file_range,
@@ -1141,6 +1159,7 @@ const struct file_operations cifs_file_strict_nobrl_ops = {
 	.flush = cifs_flush,
 	.mmap = cifs_file_strict_mmap,
 	.splice_read = generic_file_splice_read,
+	.splice_write = iter_file_splice_write,
 	.llseek = cifs_llseek,
 	.unlocked_ioctl	= cifs_ioctl,
 	.copy_file_range = cifs_copy_file_range,
@@ -1159,6 +1178,7 @@ const struct file_operations cifs_file_direct_nobrl_ops = {
 	.flush = cifs_flush,
 	.mmap = cifs_file_mmap,
 	.splice_read = generic_file_splice_read,
+	.splice_write = iter_file_splice_write,
 	.unlocked_ioctl  = cifs_ioctl,
 	.copy_file_range = cifs_copy_file_range,
 	.clone_file_range = cifs_clone_file_range,
@@ -1175,6 +1195,7 @@ const struct file_operations cifs_dir_ops = {
 	.copy_file_range = cifs_copy_file_range,
 	.clone_file_range = cifs_clone_file_range,
 	.llseek = generic_file_llseek,
+	.fsync = cifs_dir_fsync,
 };
 
 static void
@@ -1480,6 +1501,7 @@ MODULE_SOFTDEP("pre: nls");
 MODULE_SOFTDEP("pre: aes");
 MODULE_SOFTDEP("pre: cmac");
 MODULE_SOFTDEP("pre: sha256");
+MODULE_SOFTDEP("pre: sha512");
 MODULE_SOFTDEP("pre: aead2");
 MODULE_SOFTDEP("pre: ccm");
 module_init(init_cifs)

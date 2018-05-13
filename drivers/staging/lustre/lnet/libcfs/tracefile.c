@@ -328,7 +328,7 @@ int libcfs_debug_vmsg2(struct libcfs_debug_msg_data *msgdata,
 		goto console;
 	}
 
-	depth = __current_nesting_level();
+	depth = 0;
 	known_size = strlen(file) + 1 + depth;
 	if (msgdata->msg_fn)
 		known_size += strlen(msgdata->msg_fn) + 1;
@@ -431,7 +431,7 @@ console:
 	if (cdls) {
 		if (libcfs_console_ratelimit &&
 		    cdls->cdls_next &&		/* not first time ever */
-		    !cfs_time_after(cfs_time_current(), cdls->cdls_next)) {
+		    !time_after(jiffies, cdls->cdls_next)) {
 			/* skipping a console message */
 			cdls->cdls_count++;
 			if (tcd)
@@ -439,9 +439,9 @@ console:
 			return 1;
 		}
 
-		if (cfs_time_after(cfs_time_current(),
-				   cdls->cdls_next + libcfs_console_max_delay +
-				   cfs_time_seconds(10))) {
+		if (time_after(jiffies,
+			       cdls->cdls_next + libcfs_console_max_delay +
+			       10 * HZ)) {
 			/* last timeout was a long time ago */
 			cdls->cdls_delay /= libcfs_console_backoff * 4;
 		} else {
@@ -454,7 +454,7 @@ console:
 			cdls->cdls_delay = libcfs_console_max_delay;
 
 		/* ensure cdls_next is never zero after it's been seen */
-		cdls->cdls_next = (cfs_time_current() + cdls->cdls_delay) | 1;
+		cdls->cdls_next = (jiffies + cdls->cdls_delay) | 1;
 	}
 
 	if (tcd) {
@@ -785,7 +785,7 @@ int cfs_trace_copyin_string(char *knl_buffer, int knl_buffer_nob,
 		return -EFAULT;
 
 	nob = strnlen(knl_buffer, usr_buffer_nob);
-	while (nob-- >= 0)		      /* strip trailing whitespace */
+	while (--nob >= 0)		      /* strip trailing whitespace */
 		if (!isspace(knl_buffer[nob]))
 			break;
 
@@ -1071,7 +1071,7 @@ end_loop:
 		init_waitqueue_entry(&__wait, current);
 		add_wait_queue(&tctl->tctl_waitq, &__wait);
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(cfs_time_seconds(1));
+		schedule_timeout(HZ);
 		remove_wait_queue(&tctl->tctl_waitq, &__wait);
 	}
 	complete(&tctl->tctl_stop);

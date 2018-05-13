@@ -32,7 +32,9 @@
  */
 
 #define DEBUG_SUBSYSTEM S_CLASS
-# include <linux/atomic.h>
+
+#include <linux/atomic.h>
+#include <linux/miscdevice.h>
 
 #include <obd_support.h>
 #include <obd_class.h>
@@ -377,7 +379,8 @@ static int obd_init_checks(void)
 	char buf[64];
 	int len, ret = 0;
 
-	CDEBUG(D_INFO, "LPU64=%s, LPD64=%s, LPX64=%s\n", "%llu", "%lld", "%#llx");
+	CDEBUG(D_INFO, "LPU64=%s, LPD64=%s, LPX64=%s\n", "%llu", "%lld",
+	       "%#llx");
 
 	CDEBUG(D_INFO, "OBD_OBJECT_EOF = %#llx\n", (__u64)OBD_OBJECT_EOF);
 
@@ -461,7 +464,7 @@ static int __init obdclass_init(void)
 
 	err = misc_register(&obd_psdev);
 	if (err) {
-		CERROR("cannot register %d err %d\n", OBD_DEV_MINOR, err);
+		CERROR("cannot register OBD miscdevices: err %d\n", err);
 		return err;
 	}
 

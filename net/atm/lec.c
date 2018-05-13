@@ -41,6 +41,9 @@ static unsigned char bridge_ula_lec[] = { 0x01, 0x80, 0xc2, 0x00, 0x00 };
 #include <linux/module.h>
 #include <linux/init.h>
 
+/* Hardening for Spectre-v1 */
+#include <linux/nospec.h>
+
 #include "lec.h"
 #include "lec_arpc.h"
 #include "resources.h"
@@ -687,8 +690,10 @@ static int lec_vcc_attach(struct atm_vcc *vcc, void __user *arg)
 	bytes_left = copy_from_user(&ioc_data, arg, sizeof(struct atmlec_ioc));
 	if (bytes_left != 0)
 		pr_info("copy from user failed for %d bytes\n", bytes_left);
-	if (ioc_data.dev_num < 0 || ioc_data.dev_num >= MAX_LEC_ITF ||
-	    !dev_lec[ioc_data.dev_num])
+	if (ioc_data.dev_num < 0 || ioc_data.dev_num >= MAX_LEC_ITF)
+		return -EINVAL;
+	ioc_data.dev_num = array_index_nospec(ioc_data.dev_num, MAX_LEC_ITF);
+	if (!dev_lec[ioc_data.dev_num])
 		return -EINVAL;
 	vpriv = kmalloc(sizeof(struct lec_vcc_priv), GFP_KERNEL);
 	if (!vpriv)
@@ -992,7 +997,6 @@ static int lec_seq_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations lec_seq_fops = {
-	.owner = THIS_MODULE,
 	.open = lec_seq_open,
 	.read = seq_read,
 	.llseek = seq_lseek,
@@ -1043,7 +1047,7 @@ static int __init lane_module_init(void)
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *p;
 
-	p = proc_create("lec", S_IRUGO, atm_proc_root, &lec_seq_fops);
+	p = proc_create("lec", 0444, atm_proc_root, &lec_seq_fops);
 	if (!p) {
 		pr_err("Unable to initialize /proc/net/atm/lec\n");
 		return -ENOMEM;
@@ -1798,7 +1802,7 @@ static struct atm_vcc *lec_arp_resolve(struct lec_priv *priv,
 		else
 			send_to_lecd(priv, l_arp_xmt, mac_to_find, NULL, NULL);
 		entry->timer.expires = jiffies + (1 * HZ);
-		entry->timer.function = (TIMER_FUNC_TYPE)lec_arp_expire_arp;
+		entry->timer.function = lec_arp_expire_arp;
 		add_timer(&entry->timer);
 		found = priv->mcast_vcc;
 	}
@@ -1998,7 +2002,7 @@ lec_vcc_added(struct lec_priv *priv, const struct atmlec_ioc *ioc_data,
 		entry->old_recv_push = old_push;
 		entry->status = ESI_UNKNOWN;
 		entry->timer.expires = jiffies + priv->vcc_timeout_period;
-		entry->timer.function = (TIMER_FUNC_TYPE)lec_arp_expire_vcc;
+		entry->timer.function = lec_arp_expire_vcc;
 		hlist_add_head(&entry->next, &priv->lec_no_forward);
 		add_timer(&entry->timer);
 		dump_arp_table(priv);
@@ -2082,7 +2086,7 @@ lec_vcc_added(struct lec_priv *priv, const struct atmlec_ioc *ioc_data,
 	entry->status = ESI_UNKNOWN;
 	hlist_add_head(&entry->next, &priv->lec_arp_empty_ones);
 	entry->timer.expires = jiffies + priv->vcc_timeout_period;
-	entry->timer.function = (TIMER_FUNC_TYPE)lec_arp_expire_vcc;
+	entry->timer.function = lec_arp_expire_vcc;
 	add_timer(&entry->timer);
 	pr_debug("After vcc was added\n");
 	dump_arp_table(priv);

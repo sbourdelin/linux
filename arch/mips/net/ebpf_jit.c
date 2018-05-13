@@ -177,8 +177,6 @@ static u32 b_imm(unsigned int tgt, struct jit_ctx *ctx)
 		(ctx->idx * 4) - 4;
 }
 
-int bpf_jit_enable __read_mostly;
-
 enum which_ebpf_reg {
 	src_reg,
 	src_reg_no_fp,
@@ -743,16 +741,11 @@ static int build_one_insn(const struct bpf_insn *insn, struct jit_ctx *ctx,
 		break;
 	case BPF_ALU | BPF_DIV | BPF_K: /* ALU_IMM */
 	case BPF_ALU | BPF_MOD | BPF_K: /* ALU_IMM */
+		if (insn->imm == 0)
+			return -EINVAL;
 		dst = ebpf_to_mips_reg(ctx, insn, dst_reg);
 		if (dst < 0)
 			return dst;
-		if (insn->imm == 0) { /* Div by zero */
-			b_off = b_imm(exit_idx, ctx);
-			if (is_bad_offset(b_off))
-				return -E2BIG;
-			emit_instr(ctx, beq, MIPS_R_ZERO, MIPS_R_ZERO, b_off);
-			emit_instr(ctx, addu, MIPS_R_V0, MIPS_R_ZERO, MIPS_R_ZERO);
-		}
 		td = get_reg_val_type(ctx, this_idx, insn->dst_reg);
 		if (td == REG_64BIT || td == REG_32BIT_ZERO_EX)
 			/* sign extend */
@@ -772,19 +765,13 @@ static int build_one_insn(const struct bpf_insn *insn, struct jit_ctx *ctx,
 		break;
 	case BPF_ALU64 | BPF_DIV | BPF_K: /* ALU_IMM */
 	case BPF_ALU64 | BPF_MOD | BPF_K: /* ALU_IMM */
+		if (insn->imm == 0)
+			return -EINVAL;
 		dst = ebpf_to_mips_reg(ctx, insn, dst_reg);
 		if (dst < 0)
 			return dst;
-		if (insn->imm == 0) { /* Div by zero */
-			b_off = b_imm(exit_idx, ctx);
-			if (is_bad_offset(b_off))
-				return -E2BIG;
-			emit_instr(ctx, beq, MIPS_R_ZERO, MIPS_R_ZERO, b_off);
-			emit_instr(ctx, addu, MIPS_R_V0, MIPS_R_ZERO, MIPS_R_ZERO);
-		}
 		if (get_reg_val_type(ctx, this_idx, insn->dst_reg) == REG_32BIT)
 			emit_instr(ctx, dinsu, dst, MIPS_R_ZERO, 32, 32);
-
 		if (insn->imm == 1) {
 			/* div by 1 is a nop, mod by 1 is zero */
 			if (bpf_op == BPF_MOD)
@@ -862,11 +849,6 @@ static int build_one_insn(const struct bpf_insn *insn, struct jit_ctx *ctx,
 			break;
 		case BPF_DIV:
 		case BPF_MOD:
-			b_off = b_imm(exit_idx, ctx);
-			if (is_bad_offset(b_off))
-				return -E2BIG;
-			emit_instr(ctx, beq, src, MIPS_R_ZERO, b_off);
-			emit_instr(ctx, movz, MIPS_R_V0, MIPS_R_ZERO, src);
 			emit_instr(ctx, ddivu, dst, src);
 			if (bpf_op == BPF_DIV)
 				emit_instr(ctx, mflo, dst);
@@ -945,11 +927,6 @@ static int build_one_insn(const struct bpf_insn *insn, struct jit_ctx *ctx,
 			break;
 		case BPF_DIV:
 		case BPF_MOD:
-			b_off = b_imm(exit_idx, ctx);
-			if (is_bad_offset(b_off))
-				return -E2BIG;
-			emit_instr(ctx, beq, src, MIPS_R_ZERO, b_off);
-			emit_instr(ctx, movz, MIPS_R_V0, MIPS_R_ZERO, src);
 			emit_instr(ctx, divu, dst, src);
 			if (bpf_op == BPF_DIV)
 				emit_instr(ctx, mflo, dst);
@@ -1290,110 +1267,6 @@ jeq_common:
 			return -EINVAL;
 		break;
 
-	case BPF_LD | BPF_B | BPF_ABS:
-	case BPF_LD | BPF_H | BPF_ABS:
-	case BPF_LD | BPF_W | BPF_ABS:
-	case BPF_LD | BPF_DW | BPF_ABS:
-		ctx->flags |= EBPF_SAVE_RA;
-
-		gen_imm_to_reg(insn, MIPS_R_A1, ctx);
-		emit_instr(ctx, addiu, MIPS_R_A2, MIPS_R_ZERO, size_to_len(insn));
-
-		if (insn->imm < 0) {
-			emit_const_to_reg(ctx, MIPS_R_T9, (u64)bpf_internal_load_pointer_neg_helper);
-		} else {
-			emit_const_to_reg(ctx, MIPS_R_T9, (u64)ool_skb_header_pointer);
-			emit_instr(ctx, daddiu, MIPS_R_A3, MIPS_R_SP, ctx->tmp_offset);
-		}
-		goto ld_skb_common;
-
-	case BPF_LD | BPF_B | BPF_IND:
-	case BPF_LD | BPF_H | BPF_IND:
-	case BPF_LD | BPF_W | BPF_IND:
-	case BPF_LD | BPF_DW | BPF_IND:
-		ctx->flags |= EBPF_SAVE_RA;
-		src = ebpf_to_mips_reg(ctx, insn, src_reg_no_fp);
-		if (src < 0)
-			return src;
-		ts = get_reg_val_type(ctx, this_idx, insn->src_reg);
-		if (ts == REG_32BIT_ZERO_EX) {
-			/* sign extend */
-			emit_instr(ctx, sll, MIPS_R_A1, src, 0);
-			src = MIPS_R_A1;
-		}
-		if (insn->imm >= S16_MIN && insn->imm <= S16_MAX) {
-			emit_instr(ctx, daddiu, MIPS_R_A1, src, insn->imm);
-		} else {
-			gen_imm_to_reg(insn, MIPS_R_AT, ctx);
-			emit_instr(ctx, daddu, MIPS_R_A1, MIPS_R_AT, src);
-		}
-		/* truncate to 32-bit int */
-		emit_instr(ctx, sll, MIPS_R_A1, MIPS_R_A1, 0);
-		emit_instr(ctx, daddiu, MIPS_R_A3, MIPS_R_SP, ctx->tmp_offset);
-		emit_instr(ctx, slt, MIPS_R_AT, MIPS_R_A1, MIPS_R_ZERO);
-
-		emit_const_to_reg(ctx, MIPS_R_T8, (u64)bpf_internal_load_pointer_neg_helper);
-		emit_const_to_reg(ctx, MIPS_R_T9, (u64)ool_skb_header_pointer);
-		emit_instr(ctx, addiu, MIPS_R_A2, MIPS_R_ZERO, size_to_len(insn));
-		emit_instr(ctx, movn, MIPS_R_T9, MIPS_R_T8, MIPS_R_AT);
-
-ld_skb_common:
-		emit_instr(ctx, jalr, MIPS_R_RA, MIPS_R_T9);
-		/* delay slot move */
-		emit_instr(ctx, daddu, MIPS_R_A0, MIPS_R_S0, MIPS_R_ZERO);
-
-		/* Check the error value */
-		b_off = b_imm(exit_idx, ctx);
-		if (is_bad_offset(b_off)) {
-			target = j_target(ctx, exit_idx);
-			if (target == (unsigned int)-1)
-				return -E2BIG;
-
-			if (!(ctx->offsets[this_idx] & OFFSETS_B_CONV)) {
-				ctx->offsets[this_idx] |= OFFSETS_B_CONV;
-				ctx->long_b_conversion = 1;
-			}
-			emit_instr(ctx, bne, MIPS_R_V0, MIPS_R_ZERO, 4 * 3);
-			emit_instr(ctx, nop);
-			emit_instr(ctx, j, target);
-			emit_instr(ctx, nop);
-		} else {
-			emit_instr(ctx, beq, MIPS_R_V0, MIPS_R_ZERO, b_off);
-			emit_instr(ctx, nop);
-		}
-
-#ifdef __BIG_ENDIAN
-		need_swap = false;
-#else
-		need_swap = true;
-#endif
-		dst = MIPS_R_V0;
-		switch (BPF_SIZE(insn->code)) {
-		case BPF_B:
-			emit_instr(ctx, lbu, dst, 0, MIPS_R_V0);
-			break;
-		case BPF_H:
-			emit_instr(ctx, lhu, dst, 0, MIPS_R_V0);
-			if (need_swap)
-				emit_instr(ctx, wsbh, dst, dst);
-			break;
-		case BPF_W:
-			emit_instr(ctx, lw, dst, 0, MIPS_R_V0);
-			if (need_swap) {
-				emit_instr(ctx, wsbh, dst, dst);
-				emit_instr(ctx, rotr, dst, dst, 16);
-			}
-			break;
-		case BPF_DW:
-			emit_instr(ctx, ld, dst, 0, MIPS_R_V0);
-			if (need_swap) {
-				emit_instr(ctx, dsbh, dst, dst);
-				emit_instr(ctx, dshd, dst, dst);
-			}
-			break;
-		}
-
-		break;
 	case BPF_ALU | BPF_END | BPF_FROM_BE:
 	case BPF_ALU | BPF_END | BPF_FROM_LE:
 		dst = ebpf_to_mips_reg(ctx, insn, dst_reg);
@@ -1869,7 +1742,7 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
 	unsigned int image_size;
 	u8 *image_ptr;
 
-	if (!bpf_jit_enable || !cpu_has_mips64r2)
+	if (!prog->jit_requested || !cpu_has_mips64r2)
 		return prog;
 
 	tmp = bpf_jit_blind_constants(prog);

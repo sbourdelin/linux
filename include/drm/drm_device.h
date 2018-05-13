@@ -17,6 +17,7 @@ struct drm_vblank_crtc;
 struct drm_sg_mem;
 struct drm_local_map;
 struct drm_vma_offset_manager;
+struct drm_fb_helper;
 
 struct inode;
 
@@ -45,7 +46,14 @@ struct drm_device {
 	/* currently active master for this device. Protected by master_mutex */
 	struct drm_master *master;
 
-	atomic_t unplugged;			/**< Flag whether dev is dead */
+	/**
+	 * @unplugged:
+	 *
+	 * Flag to tell if the device has been unplugged.
+	 * See drm_dev_enter() and drm_dev_is_unplugged().
+	 */
+	bool unplugged;
+
 	struct inode *anon_inode;		/**< inode for private address-space */
 	char *unique;				/**< unique name of the device */
 	/*@} */
@@ -185,6 +193,14 @@ struct drm_device {
 	struct drm_vma_offset_manager *vma_offset_manager;
 	/*@} */
 	int switch_power_state;
+
+	/**
+	 * @fb_helper:
+	 *
+	 * Pointer to the fbdev emulation structure.
+	 * Set by drm_fb_helper_init() and cleared by drm_fb_helper_fini().
+	 */
+	struct drm_fb_helper *fb_helper;
 };
 
 #endif

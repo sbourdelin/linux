@@ -47,19 +47,15 @@ static void __blk_stat_add(struct blk_rq_stat *stat, u64 value)
 	stat->nr_samples++;
 }
 
-void blk_stat_add(struct request *rq)
+void blk_stat_add(struct request *rq, u64 now)
 {
 	struct request_queue *q = rq->q;
 	struct blk_stat_callback *cb;
 	struct blk_rq_stat *stat;
 	int bucket;
-	u64 now, value;
+	u64 value;
 
-	now = __blk_stat_time(ktime_to_ns(ktime_get()));
-	if (now < blk_stat_time(&rq->issue_stat))
-		return;
-
-	value = now - blk_stat_time(&rq->issue_stat);
+	value = (now >= rq->io_start_time_ns) ? now - rq->io_start_time_ns : 0;
 
 	blk_throtl_stat_add(rq, value);
 
@@ -79,9 +75,9 @@ void blk_stat_add(struct request *rq)
 	rcu_read_unlock();
 }
 
-static void blk_stat_timer_fn(unsigned long data)
+static void blk_stat_timer_fn(struct timer_list *t)
 {
-	struct blk_stat_callback *cb = (void *)data;
+	struct blk_stat_callback *cb = from_timer(cb, t, timer);
 	unsigned int bucket;
 	int cpu;
 
@@ -130,7 +126,7 @@ blk_stat_alloc_callback(void (*timer_fn)(struct blk_stat_callback *),
 	cb->bucket_fn = bucket_fn;
 	cb->data = data;
 	cb->buckets = buckets;
-	setup_timer(&cb->timer, blk_stat_timer_fn, (unsigned long)cb);
+	timer_setup(&cb->timer, blk_stat_timer_fn, 0);
 
 	return cb;
 }
@@ -152,7 +148,7 @@ void blk_stat_add_callback(struct request_queue *q,
 
 	spin_lock(&q->stats->lock);
 	list_add_tail_rcu(&cb->list, &q->stats->callbacks);
-	set_bit(QUEUE_FLAG_STATS, &q->queue_flags);
+	blk_queue_flag_set(QUEUE_FLAG_STATS, q);
 	spin_unlock(&q->stats->lock);
 }
 EXPORT_SYMBOL_GPL(blk_stat_add_callback);
@@ -163,7 +159,7 @@ void blk_stat_remove_callback(struct request_queue *q,
 	spin_lock(&q->stats->lock);
 	list_del_rcu(&cb->list);
 	if (list_empty(&q->stats->callbacks) && !q->stats->enable_accounting)
-		clear_bit(QUEUE_FLAG_STATS, &q->queue_flags);
+		blk_queue_flag_clear(QUEUE_FLAG_STATS, q);
 	spin_unlock(&q->stats->lock);
 
 	del_timer_sync(&cb->timer);
@@ -191,7 +187,7 @@ void blk_stat_enable_accounting(struct request_queue *q)
 {
 	spin_lock(&q->stats->lock);
 	q->stats->enable_accounting = true;
-	set_bit(QUEUE_FLAG_STATS, &q->queue_flags);
+	blk_queue_flag_set(QUEUE_FLAG_STATS, q);
 	spin_unlock(&q->stats->lock);
 }
 

@@ -75,6 +75,7 @@
 #include <linux/ptrace.h>
 #include <linux/tracehook.h>
 #include <linux/printk.h>
+#include <linux/cache.h>
 #include <linux/cgroup.h>
 #include <linux/cpuset.h>
 #include <linux/audit.h>
@@ -93,12 +94,11 @@
 #include <linux/sched/stat.h>
 #include <linux/flex_array.h>
 #include <linux/posix-timers.h>
-#ifdef CONFIG_HARDWALL
-#include <asm/hardwall.h>
-#endif
 #include <trace/events/oom.h>
 #include "internal.h"
 #include "fd.h"
+
+#include "../../lib/kstrtox.h"
 
 /* NOTE:
  *	Implementing inode permission operations in /proc is almost
@@ -110,8 +110,8 @@
  *	in /proc for a task before it execs a suid executable.
  */
 
-static u8 nlink_tid;
-static u8 nlink_tgid;
+static u8 nlink_tid __ro_after_init;
+static u8 nlink_tgid __ro_after_init;
 
 struct pid_entry {
 	const char *name;
@@ -213,10 +213,14 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 	char *page;
 	unsigned long count = _count;
 	unsigned long arg_start, arg_end, env_start, env_end;
-	unsigned long len1, len2, len;
-	unsigned long p;
+	unsigned long len1, len2;
+	char __user *buf0 = buf;
+	struct {
+		unsigned long p;
+		unsigned long len;
+	} cmdline[2];
 	char c;
-	ssize_t rv;
+	int rv;
 
 	BUG_ON(*pos < 0);
 
@@ -239,12 +243,12 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 		goto out_mmput;
 	}
 
-	down_read(&mm->mmap_sem);
+	spin_lock(&mm->arg_lock);
 	arg_start = mm->arg_start;
 	arg_end = mm->arg_end;
 	env_start = mm->env_start;
 	env_end = mm->env_end;
-	up_read(&mm->mmap_sem);
+	spin_unlock(&mm->arg_lock);
 
 	BUG_ON(arg_start > arg_end);
 	BUG_ON(env_start > env_end);
@@ -253,61 +257,31 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 	len2 = env_end - env_start;
 
 	/* Empty ARGV. */
-	if (len1 == 0) {
-		rv = 0;
-		goto out_free_page;
-	}
+	if (len1 == 0)
+		goto end;
+
 	/*
 	 * Inherently racy -- command line shares address space
 	 * with code and data.
 	 */
-	rv = access_remote_vm(mm, arg_end - 1, &c, 1, 0);
-	if (rv <= 0)
-		goto out_free_page;
+	if (access_remote_vm(mm, arg_end - 1, &c, 1, 0) != 1)
+		goto end;
 
-	rv = 0;
-
+	cmdline[0].p = arg_start;
+	cmdline[0].len = len1;
 	if (c == '\0') {
 		/* Command line (set of strings) occupies whole ARGV. */
-		if (len1 <= *pos)
-			goto out_free_page;
-
-		p = arg_start + *pos;
-		len = len1 - *pos;
-		while (count > 0 && len > 0) {
-			unsigned int _count;
-			int nr_read;
-
-			_count = min3(count, len, PAGE_SIZE);
-			nr_read = access_remote_vm(mm, p, page, _count, 0);
-			if (nr_read < 0)
-				rv = nr_read;
-			if (nr_read <= 0)
-				goto out_free_page;
-
-			if (copy_to_user(buf, page, nr_read)) {
-				rv = -EFAULT;
-				goto out_free_page;
-			}
-
-			p	+= nr_read;
-			len	-= nr_read;
-			buf	+= nr_read;
-			count	-= nr_read;
-			rv	+= nr_read;
-		}
+		cmdline[1].len = 0;
 	} else {
 		/*
 		 * Command line (1 string) occupies ARGV and
 		 * extends into ENVP.
 		 */
-		struct {
-			unsigned long p;
-			unsigned long len;
-		} cmdline[2] = {
-			{ .p = arg_start, .len = len1 },
-			{ .p = env_start, .len = len2 },
-		};
+		cmdline[1].p = env_start;
+		cmdline[1].len = len2;
+	}
+
+	{
 		loff_t pos1 = *pos;
 		unsigned int i;
 
@@ -317,44 +291,40 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 			i++;
 		}
 		while (i < 2) {
+			unsigned long p;
+			unsigned long len;
+
 			p = cmdline[i].p + pos1;
 			len = cmdline[i].len - pos1;
 			while (count > 0 && len > 0) {
-				unsigned int _count, l;
-				int nr_read;
-				bool final;
+				unsigned int nr_read, nr_write;
 
-				_count = min3(count, len, PAGE_SIZE);
-				nr_read = access_remote_vm(mm, p, page, _count, 0);
-				if (nr_read < 0)
-					rv = nr_read;
-				if (nr_read <= 0)
-					goto out_free_page;
+				nr_read = min3(count, len, PAGE_SIZE);
+				nr_read = access_remote_vm(mm, p, page, nr_read, 0);
+				if (nr_read == 0)
+					goto end;
 
 				/*
 				 * Command line can be shorter than whole ARGV
 				 * even if last "marker" byte says it is not.
 				 */
-				final = false;
-				l = strnlen(page, nr_read);
-				if (l < nr_read) {
-					nr_read = l;
-					final = true;
-				}
+				if (c == '\0')
+					nr_write = nr_read;
+				else
+					nr_write = strnlen(page, nr_read);
 
-				if (copy_to_user(buf, page, nr_read)) {
+				if (copy_to_user(buf, page, nr_write)) {
 					rv = -EFAULT;
 					goto out_free_page;
 				}
 
-				p	+= nr_read;
-				len	-= nr_read;
-				buf	+= nr_read;
-				count	-= nr_read;
-				rv	+= nr_read;
+				p	+= nr_write;
+				len	-= nr_write;
+				buf	+= nr_write;
+				count	-= nr_write;
 
-				if (final)
-					goto out_free_page;
+				if (nr_write < nr_read)
+					goto end;
 			}
 
 			/* Only first chunk can be read partially. */
@@ -363,12 +333,13 @@ static ssize_t proc_pid_cmdline_read(struct file *file, char __user *buf,
 		}
 	}
 
+end:
+	*pos += buf - buf0;
+	rv = buf - buf0;
 out_free_page:
 	free_page((unsigned long)page);
 out_mmput:
 	mmput(mm);
-	if (rv > 0)
-		*pos += rv;
 	return rv;
 }
 
@@ -388,14 +359,17 @@ static int proc_pid_wchan(struct seq_file *m, struct pid_namespace *ns,
 	unsigned long wchan;
 	char symname[KSYM_NAME_LEN];
 
+	if (!ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS))
+		goto print0;
+
 	wchan = get_wchan(task);
+	if (wchan && !lookup_symbol_name(wchan, symname)) {
+		seq_puts(m, symname);
+		return 0;
+	}
 
-	if (wchan && ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS)
-			&& !lookup_symbol_name(wchan, symname))
-		seq_printf(m, "%s", symname);
-	else
-		seq_putc(m, '0');
-
+print0:
+	seq_putc(m, '0');
 	return 0;
 }
 #endif /* CONFIG_KALLSYMS */
@@ -427,7 +401,6 @@ static int proc_pid_stack(struct seq_file *m, struct pid_namespace *ns,
 	struct stack_trace trace;
 	unsigned long *entries;
 	int err;
-	int i;
 
 	entries = kmalloc(MAX_STACK_TRACE_DEPTH * sizeof(*entries), GFP_KERNEL);
 	if (!entries)
@@ -440,11 +413,12 @@ static int proc_pid_stack(struct seq_file *m, struct pid_namespace *ns,
 
 	err = lock_trace(task);
 	if (!err) {
+		unsigned int i;
+
 		save_stack_trace_tsk(task, &trace);
 
 		for (i = 0; i < trace.nr_entries; i++) {
-			seq_printf(m, "[<%pK>] %pB\n",
-				   (void *)entries[i], (void *)entries[i]);
+			seq_printf(m, "[<0>] %pB\n", (void *)entries[i]);
 		}
 		unlock_trace(task);
 	}
@@ -927,10 +901,10 @@ static ssize_t environ_read(struct file *file, char __user *buf,
 	if (!mmget_not_zero(mm))
 		goto free;
 
-	down_read(&mm->mmap_sem);
+	spin_lock(&mm->arg_lock);
 	env_start = mm->env_start;
 	env_end = mm->env_end;
-	up_read(&mm->mmap_sem);
+	spin_unlock(&mm->arg_lock);
 
 	while (count > 0) {
 		size_t this_len, max_len;
@@ -1371,7 +1345,7 @@ static ssize_t proc_fail_nth_write(struct file *file, const char __user *buf,
 	task = get_proc_task(file_inode(file));
 	if (!task)
 		return -ESRCH;
-	WRITE_ONCE(task->fail_nth, n);
+	task->fail_nth = n;
 	put_task_struct(task);
 
 	return count;
@@ -1387,8 +1361,7 @@ static ssize_t proc_fail_nth_read(struct file *file, char __user *buf,
 	task = get_proc_task(file_inode(file));
 	if (!task)
 		return -ESRCH;
-	len = snprintf(numbuf, sizeof(numbuf), "%u\n",
-			READ_ONCE(task->fail_nth));
+	len = snprintf(numbuf, sizeof(numbuf), "%u\n", task->fail_nth);
 	len = simple_read_from_buffer(buf, count, ppos, numbuf, len);
 	put_task_struct(task);
 
@@ -1692,6 +1665,12 @@ void task_dump_owner(struct task_struct *task, umode_t mode,
 	kuid_t uid;
 	kgid_t gid;
 
+	if (unlikely(task->flags & PF_KTHREAD)) {
+		*ruid = GLOBAL_ROOT_UID;
+		*rgid = GLOBAL_ROOT_GID;
+		return;
+	}
+
 	/* Default to the tasks effective ownership */
 	rcu_read_lock();
 	cred = __task_cred(task);
@@ -1780,9 +1759,9 @@ int pid_getattr(const struct path *path, struct kstat *stat,
 
 	generic_fillattr(inode, stat);
 
-	rcu_read_lock();
 	stat->uid = GLOBAL_ROOT_UID;
 	stat->gid = GLOBAL_ROOT_GID;
+	rcu_read_lock();
 	task = pid_task(proc_pid(inode), PIDTYPE_PID);
 	if (task) {
 		if (!has_pid_permissions(pid, task, HIDEPID_INVISIBLE)) {
@@ -1867,7 +1846,7 @@ const struct dentry_operations pid_dentry_operations =
  * by stat.
  */
 bool proc_fill_cache(struct file *file, struct dir_context *ctx,
-	const char *name, int len,
+	const char *name, unsigned int len,
 	instantiate_t instantiate, struct task_struct *task, const void *ptr)
 {
 	struct dentry *child, *dir = file->f_path.dentry;
@@ -1908,8 +1887,37 @@ end_instantiate:
 static int dname_to_vma_addr(struct dentry *dentry,
 			     unsigned long *start, unsigned long *end)
 {
-	if (sscanf(dentry->d_name.name, "%lx-%lx", start, end) != 2)
+	const char *str = dentry->d_name.name;
+	unsigned long long sval, eval;
+	unsigned int len;
+
+	if (str[0] == '0' && str[1] != '-')
 		return -EINVAL;
+	len = _parse_integer(str, 16, &sval);
+	if (len & KSTRTOX_OVERFLOW)
+		return -EINVAL;
+	if (sval != (unsigned long)sval)
+		return -EINVAL;
+	str += len;
+
+	if (*str != '-')
+		return -EINVAL;
+	str++;
+
+	if (str[0] == '0' && str[1])
+		return -EINVAL;
+	len = _parse_integer(str, 16, &eval);
+	if (len & KSTRTOX_OVERFLOW)
+		return -EINVAL;
+	if (eval != (unsigned long)eval)
+		return -EINVAL;
+	str += len;
+
+	if (*str != '\0')
+		return -EINVAL;
+
+	*start = sval;
+	*end = eval;
 
 	return 0;
 }
@@ -2001,9 +2009,9 @@ out:
 }
 
 struct map_files_info {
+	unsigned long	start;
+	unsigned long	end;
 	fmode_t		mode;
-	unsigned int	len;
-	unsigned char	name[4*sizeof(long)+2]; /* max: %lx-%lx\0 */
 };
 
 /*
@@ -2173,20 +2181,24 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 			if (++pos <= ctx->pos)
 				continue;
 
+			info.start = vma->vm_start;
+			info.end = vma->vm_end;
 			info.mode = vma->vm_file->f_mode;
-			info.len = snprintf(info.name,
-					sizeof(info.name), "%lx-%lx",
-					vma->vm_start, vma->vm_end);
 			if (flex_array_put(fa, i++, &info, GFP_KERNEL))
 				BUG();
 		}
 	}
 	up_read(&mm->mmap_sem);
+	mmput(mm);
 
 	for (i = 0; i < nr_files; i++) {
+		char buf[4 * sizeof(long) + 2];	/* max: %lx-%lx\0 */
+		unsigned int len;
+
 		p = flex_array_get(fa, i);
+		len = snprintf(buf, sizeof(buf), "%lx-%lx", p->start, p->end);
 		if (!proc_fill_cache(file, ctx,
-				      p->name, p->len,
+				      buf, len,
 				      proc_map_files_instantiate,
 				      task,
 				      (void *)(unsigned long)p->mode))
@@ -2195,7 +2207,6 @@ proc_map_files_readdir(struct file *file, struct dir_context *ctx)
 	}
 	if (fa)
 		flex_array_free(fa);
-	mmput(mm);
 
 out_put_task:
 	put_task_struct(task);
@@ -2269,7 +2280,7 @@ static int show_timer(struct seq_file *m, void *v)
 	notify = timer->it_sigev_notify;
 
 	seq_printf(m, "ID: %d\n", timer->it_id);
-	seq_printf(m, "signal: %d/%p\n",
+	seq_printf(m, "signal: %d/%px\n",
 		   timer->sigq->info.si_signo,
 		   timer->sigq->info.si_value.sival_ptr);
 	seq_printf(m, "notify: %s/%s.%d\n",
@@ -2446,14 +2457,11 @@ static struct dentry *proc_pident_lookup(struct inode *dir,
 	for (p = ents; p < last; p++) {
 		if (p->len != dentry->d_name.len)
 			continue;
-		if (!memcmp(dentry->d_name.name, p->name, p->len))
+		if (!memcmp(dentry->d_name.name, p->name, p->len)) {
+			error = proc_pident_instantiate(dir, dentry, task, p);
 			break;
+		}
 	}
-	if (p >= last)
-		goto out;
-
-	error = proc_pident_instantiate(dir, dentry, task, p);
-out:
 	put_task_struct(task);
 out_no_task:
 	return ERR_PTR(error);
@@ -2885,6 +2893,21 @@ static int proc_pid_patch_state(struct seq_file *m, struct pid_namespace *ns,
 }
 #endif /* CONFIG_LIVEPATCH */
 
+#ifdef CONFIG_STACKLEAK_METRICS
+static int proc_stack_depth(struct seq_file *m, struct pid_namespace *ns,
+				struct pid *pid, struct task_struct *task)
+{
+	unsigned long prev_depth = THREAD_SIZE -
+			(task->thread.prev_lowest_stack & (THREAD_SIZE - 1));
+	unsigned long depth = THREAD_SIZE -
+			(task->thread.lowest_stack & (THREAD_SIZE - 1));
+
+	seq_printf(m, "previous stack depth: %lu\nstack depth: %lu\n",
+							prev_depth, depth);
+	return 0;
+}
+#endif /* CONFIG_STACKLEAK_METRICS */
+
 /*
  * Thread groups
  */
@@ -2973,9 +2996,6 @@ static const struct pid_entry tgid_base_stuff[] = {
 #ifdef CONFIG_TASK_IO_ACCOUNTING
 	ONE("io",	S_IRUSR, proc_tgid_io_accounting),
 #endif
-#ifdef CONFIG_HARDWALL
-	ONE("hardwall",   S_IRUGO, proc_pid_hardwall),
-#endif
 #ifdef CONFIG_USER_NS
 	REG("uid_map",    S_IRUGO|S_IWUSR, proc_uid_map_operations),
 	REG("gid_map",    S_IRUGO|S_IWUSR, proc_gid_map_operations),
@@ -2988,6 +3008,9 @@ static const struct pid_entry tgid_base_stuff[] = {
 	REG("timerslack_ns", S_IRUGO|S_IWUGO, proc_pid_set_timerslack_ns_operations),
 #ifdef CONFIG_LIVEPATCH
 	ONE("patch_state",  S_IRUSR, proc_pid_patch_state),
+#endif
+#ifdef CONFIG_STACKLEAK_METRICS
+	ONE("stack_depth", S_IRUGO, proc_stack_depth),
 #endif
 };
 
@@ -3019,11 +3042,11 @@ static const struct inode_operations proc_tgid_base_inode_operations = {
 static void proc_flush_task_mnt(struct vfsmount *mnt, pid_t pid, pid_t tgid)
 {
 	struct dentry *dentry, *leader, *dir;
-	char buf[PROC_NUMBUF];
+	char buf[10 + 1];
 	struct qstr name;
 
 	name.name = buf;
-	name.len = snprintf(buf, sizeof(buf), "%d", pid);
+	name.len = snprintf(buf, sizeof(buf), "%u", pid);
 	/* no ->d_hash() rejects on procfs */
 	dentry = d_hash_and_lookup(mnt->mnt_root, &name);
 	if (dentry) {
@@ -3035,7 +3058,7 @@ static void proc_flush_task_mnt(struct vfsmount *mnt, pid_t pid, pid_t tgid)
 		return;
 
 	name.name = buf;
-	name.len = snprintf(buf, sizeof(buf), "%d", tgid);
+	name.len = snprintf(buf, sizeof(buf), "%u", tgid);
 	leader = d_hash_and_lookup(mnt->mnt_root, &name);
 	if (!leader)
 		goto out;
@@ -3047,7 +3070,7 @@ static void proc_flush_task_mnt(struct vfsmount *mnt, pid_t pid, pid_t tgid)
 		goto out_put_leader;
 
 	name.name = buf;
-	name.len = snprintf(buf, sizeof(buf), "%d", pid);
+	name.len = snprintf(buf, sizeof(buf), "%u", pid);
 	dentry = d_hash_and_lookup(dir, &name);
 	if (dentry) {
 		d_invalidate(dentry);
@@ -3226,14 +3249,14 @@ int proc_pid_readdir(struct file *file, struct dir_context *ctx)
 	for (iter = next_tgid(ns, iter);
 	     iter.task;
 	     iter.tgid += 1, iter = next_tgid(ns, iter)) {
-		char name[PROC_NUMBUF];
-		int len;
+		char name[10 + 1];
+		unsigned int len;
 
 		cond_resched();
 		if (!has_pid_permissions(ns, iter.task, HIDEPID_INVISIBLE))
 			continue;
 
-		len = snprintf(name, sizeof(name), "%d", iter.tgid);
+		len = snprintf(name, sizeof(name), "%u", iter.tgid);
 		ctx->pos = iter.tgid + TGID_OFFSET;
 		if (!proc_fill_cache(file, ctx, name, len,
 				     proc_pid_instantiate, iter.task, NULL)) {
@@ -3363,9 +3386,6 @@ static const struct pid_entry tid_base_stuff[] = {
 #endif
 #ifdef CONFIG_TASK_IO_ACCOUNTING
 	ONE("io",	S_IRUSR, proc_tid_io_accounting),
-#endif
-#ifdef CONFIG_HARDWALL
-	ONE("hardwall",   S_IRUGO, proc_pid_hardwall),
 #endif
 #ifdef CONFIG_USER_NS
 	REG("uid_map",    S_IRUGO|S_IWUSR, proc_uid_map_operations),
@@ -3561,10 +3581,10 @@ static int proc_task_readdir(struct file *file, struct dir_context *ctx)
 	for (task = first_tid(proc_pid(inode), tid, ctx->pos - 2, ns);
 	     task;
 	     task = next_tid(task), ctx->pos++) {
-		char name[PROC_NUMBUF];
-		int len;
+		char name[10 + 1];
+		unsigned int len;
 		tid = task_pid_nr_ns(task, ns);
-		len = snprintf(name, sizeof(name), "%d", tid);
+		len = snprintf(name, sizeof(name), "%u", tid);
 		if (!proc_fill_cache(file, ctx, name, len,
 				proc_task_instantiate, task, NULL)) {
 			/* returning this tgid failed, save it as the first

@@ -569,7 +569,7 @@ static int dl_startup_params(struct net_device *dev)
 	local->card_status = CARD_DL_PARAM;
 	/* Start kernel timer to wait for dl startup to complete. */
 	local->timer.expires = jiffies + HZ / 2;
-	local->timer.function = (TIMER_FUNC_TYPE)verify_dl_startup;
+	local->timer.function = verify_dl_startup;
 	add_timer(&local->timer);
 	dev_dbg(&link->dev,
 	      "ray_cs dl_startup_params started timer for verify_dl_startup\n");
@@ -1947,12 +1947,12 @@ static irqreturn_t ray_interrupt(int irq, void *dev_id)
 					dev_dbg(&link->dev,
 					      "ray_cs interrupt network \"%s\" start failed\n",
 					      memtmp);
-					local->timer.function = (TIMER_FUNC_TYPE)start_net;
+					local->timer.function = start_net;
 				} else {
 					dev_dbg(&link->dev,
 					      "ray_cs interrupt network \"%s\" join failed\n",
 					      memtmp);
-					local->timer.function = (TIMER_FUNC_TYPE)join_net;
+					local->timer.function = join_net;
 				}
 				add_timer(&local->timer);
 			}
@@ -2417,9 +2417,9 @@ static void authenticate(ray_dev_t *local)
 
 	del_timer(&local->timer);
 	if (build_auth_frame(local, local->bss_id, OPEN_AUTH_REQUEST)) {
-		local->timer.function = (TIMER_FUNC_TYPE)join_net;
+		local->timer.function = join_net;
 	} else {
-		local->timer.function = (TIMER_FUNC_TYPE)authenticate_timeout;
+		local->timer.function = authenticate_timeout;
 	}
 	local->timer.expires = jiffies + HZ * 2;
 	add_timer(&local->timer);
@@ -2502,7 +2502,7 @@ static void associate(ray_dev_t *local)
 
 		del_timer(&local->timer);
 		local->timer.expires = jiffies + HZ * 2;
-		local->timer.function = (TIMER_FUNC_TYPE)join_net;
+		local->timer.function = join_net;
 		add_timer(&local->timer);
 		local->card_status = CARD_ASSOC_FAILED;
 		return;
@@ -2815,9 +2815,11 @@ static int __init init_ray_cs(void)
 	proc_mkdir("driver/ray_cs", NULL);
 
 	proc_create("driver/ray_cs/ray_cs", 0, NULL, &ray_cs_proc_fops);
-	proc_create("driver/ray_cs/essid", S_IWUSR, NULL, &ray_cs_essid_proc_fops);
-	proc_create_data("driver/ray_cs/net_type", S_IWUSR, NULL, &int_proc_fops, &net_type);
-	proc_create_data("driver/ray_cs/translate", S_IWUSR, NULL, &int_proc_fops, &translate);
+	proc_create("driver/ray_cs/essid", 0200, NULL, &ray_cs_essid_proc_fops);
+	proc_create_data("driver/ray_cs/net_type", 0200, NULL, &int_proc_fops,
+			 &net_type);
+	proc_create_data("driver/ray_cs/translate", 0200, NULL, &int_proc_fops,
+			 &translate);
 #endif
 	if (translate != 0)
 		translate = 1;

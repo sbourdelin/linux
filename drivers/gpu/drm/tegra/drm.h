@@ -16,6 +16,7 @@
 #include <linux/of_gpio.h>
 
 #include <drm/drmP.h>
+#include <drm/drm_atomic.h>
 #include <drm/drm_crtc_helper.h>
 #include <drm/drm_edid.h>
 #include <drm/drm_encoder.h>
@@ -23,6 +24,7 @@
 #include <drm/drm_fixed.h>
 
 #include "gem.h"
+#include "hub.h"
 #include "trace.h"
 
 struct reset_control;
@@ -44,6 +46,7 @@ struct tegra_drm {
 	struct drm_device *drm;
 
 	struct iommu_domain *domain;
+	struct iommu_group *group;
 	struct mutex mm_lock;
 	struct drm_mm mm;
 
@@ -62,11 +65,7 @@ struct tegra_drm {
 
 	unsigned int pitch_align;
 
-	struct {
-		struct drm_atomic_state *state;
-		struct work_struct work;
-		struct mutex lock;
-	} commit;
+	struct tegra_display_hub *hub;
 
 	struct drm_atomic_state *state;
 };
@@ -111,6 +110,10 @@ int tegra_drm_register_client(struct tegra_drm *tegra,
 			      struct tegra_drm_client *client);
 int tegra_drm_unregister_client(struct tegra_drm *tegra,
 				struct tegra_drm_client *client);
+struct iommu_group *host1x_client_iommu_attach(struct host1x_client *client,
+					       bool shared);
+void host1x_client_iommu_detach(struct host1x_client *client,
+				struct iommu_group *group);
 
 int tegra_drm_init(struct tegra_drm *tegra, struct drm_device *drm);
 int tegra_drm_exit(struct tegra_drm *tegra);
@@ -152,6 +155,8 @@ int tegra_output_probe(struct tegra_output *output);
 void tegra_output_remove(struct tegra_output *output);
 int tegra_output_init(struct drm_device *drm, struct tegra_output *output);
 void tegra_output_exit(struct tegra_output *output);
+void tegra_output_find_possible_crtcs(struct tegra_output *output,
+				      struct drm_device *drm);
 
 int tegra_output_connector_get_modes(struct drm_connector *connector);
 enum drm_connector_status
@@ -188,11 +193,8 @@ int tegra_drm_fb_init(struct drm_device *drm);
 void tegra_drm_fb_exit(struct drm_device *drm);
 void tegra_drm_fb_suspend(struct drm_device *drm);
 void tegra_drm_fb_resume(struct drm_device *drm);
-#ifdef CONFIG_DRM_FBDEV_EMULATION
-void tegra_fbdev_restore_mode(struct tegra_fbdev *fbdev);
-void tegra_fb_output_poll_changed(struct drm_device *drm);
-#endif
 
+extern struct platform_driver tegra_display_hub_driver;
 extern struct platform_driver tegra_dc_driver;
 extern struct platform_driver tegra_hdmi_driver;
 extern struct platform_driver tegra_dsi_driver;

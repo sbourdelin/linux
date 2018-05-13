@@ -52,10 +52,15 @@ static inline struct nvme_loop_ctrl *to_loop_ctrl(struct nvme_ctrl *ctrl)
 	return container_of(ctrl, struct nvme_loop_ctrl, ctrl);
 }
 
+enum nvme_loop_queue_flags {
+	NVME_LOOP_Q_LIVE	= 0,
+};
+
 struct nvme_loop_queue {
 	struct nvmet_cq		nvme_cq;
 	struct nvmet_sq		nvme_sq;
 	struct nvme_loop_ctrl	*ctrl;
+	unsigned long		flags;
 };
 
 static struct nvmet_port *nvmet_loop_port;
@@ -66,7 +71,7 @@ static DEFINE_MUTEX(nvme_loop_ctrl_mutex);
 static void nvme_loop_queue_response(struct nvmet_req *nvme_req);
 static void nvme_loop_delete_ctrl(struct nvmet_ctrl *ctrl);
 
-static struct nvmet_fabrics_ops nvme_loop_ops;
+static const struct nvmet_fabrics_ops nvme_loop_ops;
 
 static inline int nvme_loop_queue_idx(struct nvme_loop_queue *queue)
 {
@@ -153,21 +158,23 @@ static blk_status_t nvme_loop_queue_rq(struct blk_mq_hw_ctx *hctx,
 	struct nvme_loop_iod *iod = blk_mq_rq_to_pdu(req);
 	blk_status_t ret;
 
+	ret = nvmf_check_if_ready(&queue->ctrl->ctrl, req,
+		test_bit(NVME_LOOP_Q_LIVE, &queue->flags), true);
+	if (unlikely(ret))
+		return ret;
+
 	ret = nvme_setup_cmd(ns, req, &iod->cmd);
 	if (ret)
 		return ret;
 
+	blk_mq_start_request(req);
 	iod->cmd.common.flags |= NVME_CMD_SGL_METABUF;
 	iod->req.port = nvmet_loop_port;
 	if (!nvmet_req_init(&iod->req, &queue->nvme_cq,
-			&queue->nvme_sq, &nvme_loop_ops)) {
-		nvme_cleanup_cmd(req);
-		blk_mq_start_request(req);
-		nvme_loop_queue_response(&iod->req);
+			&queue->nvme_sq, &nvme_loop_ops))
 		return BLK_STS_OK;
-	}
 
-	if (blk_rq_bytes(req)) {
+	if (blk_rq_payload_bytes(req)) {
 		iod->sg_table.sgl = iod->first_sgl;
 		if (sg_alloc_table_chained(&iod->sg_table,
 				blk_rq_nr_phys_segments(req),
@@ -176,10 +183,8 @@ static blk_status_t nvme_loop_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 		iod->req.sg = iod->sg_table.sgl;
 		iod->req.sg_cnt = blk_rq_map_sg(req->q, req, iod->sg_table.sgl);
-		iod->req.transfer_len = blk_rq_bytes(req);
+		iod->req.transfer_len = blk_rq_payload_bytes(req);
 	}
-
-	blk_mq_start_request(req);
 
 	schedule_work(&iod->work);
 	return BLK_STS_OK;
@@ -267,6 +272,7 @@ static const struct blk_mq_ops nvme_loop_admin_mq_ops = {
 
 static void nvme_loop_destroy_admin_queue(struct nvme_loop_ctrl *ctrl)
 {
+	clear_bit(NVME_LOOP_Q_LIVE, &ctrl->queues[0].flags);
 	nvmet_sq_destroy(&ctrl->queues[0].nvme_sq);
 	blk_cleanup_queue(ctrl->ctrl.admin_q);
 	blk_mq_free_tag_set(&ctrl->admin_tag_set);
@@ -297,8 +303,10 @@ static void nvme_loop_destroy_io_queues(struct nvme_loop_ctrl *ctrl)
 {
 	int i;
 
-	for (i = 1; i < ctrl->ctrl.queue_count; i++)
+	for (i = 1; i < ctrl->ctrl.queue_count; i++) {
+		clear_bit(NVME_LOOP_Q_LIVE, &ctrl->queues[i].flags);
 		nvmet_sq_destroy(&ctrl->queues[i].nvme_sq);
+	}
 }
 
 static int nvme_loop_init_io_queues(struct nvme_loop_ctrl *ctrl)
@@ -338,6 +346,7 @@ static int nvme_loop_connect_io_queues(struct nvme_loop_ctrl *ctrl)
 		ret = nvmf_connect_io_queue(&ctrl->ctrl, i);
 		if (ret)
 			return ret;
+		set_bit(NVME_LOOP_Q_LIVE, &ctrl->queues[i].flags);
 	}
 
 	return 0;
@@ -379,6 +388,8 @@ static int nvme_loop_configure_admin_queue(struct nvme_loop_ctrl *ctrl)
 	error = nvmf_connect_admin_queue(&ctrl->ctrl);
 	if (error)
 		goto out_cleanup_queue;
+
+	set_bit(NVME_LOOP_Q_LIVE, &ctrl->queues[0].flags);
 
 	error = nvmf_reg_read64(&ctrl->ctrl, NVME_REG_CAP, &ctrl->ctrl.cap);
 	if (error) {
@@ -457,6 +468,12 @@ static void nvme_loop_reset_ctrl_work(struct work_struct *work)
 
 	nvme_stop_ctrl(&ctrl->ctrl);
 	nvme_loop_shutdown_ctrl(ctrl);
+
+	if (!nvme_change_ctrl_state(&ctrl->ctrl, NVME_CTRL_CONNECTING)) {
+		/* state change failure should never happen */
+		WARN_ON_ONCE(1);
+		return;
+	}
 
 	ret = nvme_loop_configure_admin_queue(ctrl);
 	if (ret)
@@ -652,7 +669,7 @@ static void nvme_loop_remove_port(struct nvmet_port *port)
 		nvmet_loop_port = NULL;
 }
 
-static struct nvmet_fabrics_ops nvme_loop_ops = {
+static const struct nvmet_fabrics_ops nvme_loop_ops = {
 	.owner		= THIS_MODULE,
 	.type		= NVMF_TRTYPE_LOOP,
 	.add_port	= nvme_loop_add_port,
@@ -663,6 +680,7 @@ static struct nvmet_fabrics_ops nvme_loop_ops = {
 
 static struct nvmf_transport_ops nvme_loop_transport = {
 	.name		= "loop",
+	.module		= THIS_MODULE,
 	.create_ctrl	= nvme_loop_create_ctrl,
 };
 
@@ -693,7 +711,7 @@ static void __exit nvme_loop_cleanup_module(void)
 		nvme_delete_ctrl(&ctrl->ctrl);
 	mutex_unlock(&nvme_loop_ctrl_mutex);
 
-	flush_workqueue(nvme_wq);
+	flush_workqueue(nvme_delete_wq);
 }
 
 module_init(nvme_loop_init_module);

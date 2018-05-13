@@ -216,10 +216,9 @@ static unsigned long *alloc_thread_stack_node(struct task_struct *tsk, int node)
 		if (!s)
 			continue;
 
-#ifdef CONFIG_DEBUG_KMEMLEAK
 		/* Clear stale pointers from reused stack. */
 		memset(s->addr, 0, THREAD_SIZE);
-#endif
+
 		tsk->stack_vm_area = s;
 		return s->addr;
 	}
@@ -441,6 +440,13 @@ static __latent_entropy int dup_mmap(struct mm_struct *mm,
 			continue;
 		}
 		charge = 0;
+		/*
+		 * Don't duplicate many vmas if we've been oom-killed
+		 */
+		if (fatal_signal_pending(current)) {
+			retval = -EINTR;
+			goto out;
+		}
 		if (mpnt->vm_flags & VM_ACCOUNT) {
 			unsigned long len = vma_pages(mpnt);
 
@@ -592,9 +598,11 @@ static void check_mm(struct mm_struct *mm)
  * is dropped: either by a lazy thread or by
  * mmput. Free the page directory and the mm.
  */
-static void __mmdrop(struct mm_struct *mm)
+void __mmdrop(struct mm_struct *mm)
 {
 	BUG_ON(mm == &init_mm);
+	WARN_ON_ONCE(mm == current->mm);
+	WARN_ON_ONCE(mm == current->active_mm);
 	mm_free_pgd(mm);
 	destroy_context(mm);
 	hmm_mm_destroy(mm);
@@ -603,13 +611,7 @@ static void __mmdrop(struct mm_struct *mm)
 	put_user_ns(mm->user_ns);
 	free_mm(mm);
 }
-
-void mmdrop(struct mm_struct *mm)
-{
-	if (unlikely(atomic_dec_and_test(&mm->mm_count)))
-		__mmdrop(mm);
-}
-EXPORT_SYMBOL_GPL(mmdrop);
+EXPORT_SYMBOL_GPL(__mmdrop);
 
 static void mmdrop_async_fn(struct work_struct *work)
 {
@@ -840,6 +842,9 @@ static struct task_struct *dup_task_struct(struct task_struct *orig, int node)
 	tsk->fail_nth = 0;
 #endif
 
+#ifdef CONFIG_MEMCG
+	tsk->target_memcg = NULL;
+#endif
 	return tsk;
 
 free_stack:
@@ -873,10 +878,19 @@ static void mm_init_aio(struct mm_struct *mm)
 #endif
 }
 
-static void mm_init_owner(struct mm_struct *mm, struct task_struct *p)
+static void mm_init_memcg(struct mm_struct *mm)
 {
 #ifdef CONFIG_MEMCG
-	mm->owner = p;
+	struct cgroup_subsys_state *css;
+
+	/* Ensure mm->memcg is initialized */
+	mm->memcg = NULL;
+
+	rcu_read_lock();
+	css = task_css(current, memory_cgrp_id);
+	if (css && css_tryget(css))
+		mm_update_memcg(mm, mem_cgroup_from_css(css));
+	rcu_read_unlock();
 #endif
 }
 
@@ -904,9 +918,10 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 	mm->pinned_vm = 0;
 	memset(&mm->rss_stat, 0, sizeof(mm->rss_stat));
 	spin_lock_init(&mm->page_table_lock);
+	spin_lock_init(&mm->arg_lock);
 	mm_init_cpumask(mm);
 	mm_init_aio(mm);
-	mm_init_owner(mm, p);
+	mm_init_memcg(mm);
 	RCU_INIT_POINTER(mm->exe_file, NULL);
 	mmu_notifier_mm_init(mm);
 	hmm_mm_init(mm);
@@ -936,6 +951,7 @@ static struct mm_struct *mm_init(struct mm_struct *mm, struct task_struct *p,
 fail_nocontext:
 	mm_free_pgd(mm);
 fail_nopgd:
+	mm_update_memcg(mm, NULL);
 	free_mm(mm);
 	return NULL;
 }
@@ -973,6 +989,7 @@ static inline void __mmput(struct mm_struct *mm)
 	}
 	if (mm->binfmt)
 		module_put(mm->binfmt->module);
+	mm_update_memcg(mm, NULL);
 	mmdrop(mm);
 }
 
@@ -1204,8 +1221,8 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 			 * not set up a proper pointer then tough luck.
 			 */
 			put_user(0, tsk->clear_child_tid);
-			sys_futex(tsk->clear_child_tid, FUTEX_WAKE,
-					1, NULL, NULL, 0);
+			do_futex(tsk->clear_child_tid, FUTEX_WAKE,
+					1, NULL, NULL, 0, 0);
 		}
 		tsk->clear_child_tid = NULL;
 	}
@@ -1589,6 +1606,10 @@ static __latent_entropy struct task_struct *copy_process(
 	int retval;
 	struct task_struct *p;
 
+	/*
+	 * Don't allow sharing the root directory with processes in a different
+	 * namespace
+	 */
 	if ((clone_flags & (CLONE_NEWNS|CLONE_FS)) == (CLONE_NEWNS|CLONE_FS))
 		return ERR_PTR(-EINVAL);
 
@@ -2064,6 +2085,8 @@ long _do_fork(unsigned long clone_flags,
 	      int __user *child_tidptr,
 	      unsigned long tls)
 {
+	struct completion vfork;
+	struct pid *pid;
 	struct task_struct *p;
 	int trace = 0;
 	long nr;
@@ -2089,43 +2112,40 @@ long _do_fork(unsigned long clone_flags,
 	p = copy_process(clone_flags, stack_start, stack_size,
 			 child_tidptr, NULL, trace, tls, NUMA_NO_NODE);
 	add_latent_entropy();
+
+	if (IS_ERR(p))
+		return PTR_ERR(p);
+
 	/*
 	 * Do this prior waking up the new thread - the thread pointer
 	 * might get invalid after that point, if the thread exits quickly.
 	 */
-	if (!IS_ERR(p)) {
-		struct completion vfork;
-		struct pid *pid;
+	trace_sched_process_fork(current, p);
 
-		trace_sched_process_fork(current, p);
+	pid = get_task_pid(p, PIDTYPE_PID);
+	nr = pid_vnr(pid);
 
-		pid = get_task_pid(p, PIDTYPE_PID);
-		nr = pid_vnr(pid);
+	if (clone_flags & CLONE_PARENT_SETTID)
+		put_user(nr, parent_tidptr);
 
-		if (clone_flags & CLONE_PARENT_SETTID)
-			put_user(nr, parent_tidptr);
-
-		if (clone_flags & CLONE_VFORK) {
-			p->vfork_done = &vfork;
-			init_completion(&vfork);
-			get_task_struct(p);
-		}
-
-		wake_up_new_task(p);
-
-		/* forking complete and child started to run, tell ptracer */
-		if (unlikely(trace))
-			ptrace_event_pid(trace, pid);
-
-		if (clone_flags & CLONE_VFORK) {
-			if (!wait_for_vfork_done(p, &vfork))
-				ptrace_event_pid(PTRACE_EVENT_VFORK_DONE, pid);
-		}
-
-		put_pid(pid);
-	} else {
-		nr = PTR_ERR(p);
+	if (clone_flags & CLONE_VFORK) {
+		p->vfork_done = &vfork;
+		init_completion(&vfork);
+		get_task_struct(p);
 	}
+
+	wake_up_new_task(p);
+
+	/* forking complete and child started to run, tell ptracer */
+	if (unlikely(trace))
+		ptrace_event_pid(trace, pid);
+
+	if (clone_flags & CLONE_VFORK) {
+		if (!wait_for_vfork_done(p, &vfork))
+			ptrace_event_pid(PTRACE_EVENT_VFORK_DONE, pid);
+	}
+
+	put_pid(pid);
 	return nr;
 }
 
@@ -2359,7 +2379,7 @@ static int unshare_fd(unsigned long unshare_flags, struct files_struct **new_fdp
  * constructed. Here we are modifying the current, active,
  * task_struct.
  */
-SYSCALL_DEFINE1(unshare, unsigned long, unshare_flags)
+int ksys_unshare(unsigned long unshare_flags)
 {
 	struct fs_struct *fs, *new_fs = NULL;
 	struct files_struct *fd, *new_fd = NULL;
@@ -2473,6 +2493,11 @@ bad_unshare_cleanup_fs:
 
 bad_unshare_out:
 	return err;
+}
+
+SYSCALL_DEFINE1(unshare, unsigned long, unshare_flags)
+{
+	return ksys_unshare(unshare_flags);
 }
 
 /*

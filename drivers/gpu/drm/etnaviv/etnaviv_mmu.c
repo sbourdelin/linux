@@ -29,7 +29,7 @@ static void etnaviv_domain_unmap(struct etnaviv_iommu_domain *domain,
 	size_t pgsize = SZ_4K;
 
 	if (!IS_ALIGNED(iova | size, pgsize)) {
-		pr_err("unaligned: iova 0x%lx size 0x%zx min_pagesz 0x%x\n",
+		pr_err("unaligned: iova 0x%lx size 0x%zx min_pagesz 0x%zx\n",
 		       iova, size, pgsize);
 		return;
 	}
@@ -54,7 +54,7 @@ static int etnaviv_domain_map(struct etnaviv_iommu_domain *domain,
 	int ret = 0;
 
 	if (!IS_ALIGNED(iova | paddr | size, pgsize)) {
-		pr_err("unaligned: iova 0x%lx pa %pa size 0x%zx min_pagesz 0x%x\n",
+		pr_err("unaligned: iova 0x%lx pa %pa size 0x%zx min_pagesz 0x%zx\n",
 		       iova, &paddr, size, pgsize);
 		return -EINVAL;
 	}
@@ -162,21 +162,9 @@ static int etnaviv_iommu_find_iova(struct etnaviv_iommu *mmu,
 		bool found;
 
 		ret = drm_mm_insert_node_in_range(&mmu->mm, node,
-						  size, 0, 0,
-						  mmu->last_iova, U64_MAX,
-						  mode);
+						  size, 0, 0, 0, U64_MAX, mode);
 		if (ret != -ENOSPC)
 			break;
-
-		/*
-		 * If we did not search from the start of the MMU region,
-		 * try again in case there are free slots.
-		 */
-		if (mmu->last_iova) {
-			mmu->last_iova = 0;
-			mmu->need_flush = true;
-			continue;
-		}
 
 		/* Try to retire some entries */
 		drm_mm_scan_init(&scan, &mmu->mm, size, 0, 0, mode);
@@ -263,32 +251,29 @@ int etnaviv_iommu_map_gem(struct etnaviv_iommu *mmu,
 		if (iova < 0x80000000 - sg_dma_len(sgt->sgl)) {
 			mapping->iova = iova;
 			list_add_tail(&mapping->mmu_node, &mmu->mappings);
-			mutex_unlock(&mmu->lock);
-			return 0;
+			ret = 0;
+			goto unlock;
 		}
 	}
 
 	node = &mapping->vram_node;
 
 	ret = etnaviv_iommu_find_iova(mmu, node, etnaviv_obj->base.size);
-	if (ret < 0) {
-		mutex_unlock(&mmu->lock);
-		return ret;
-	}
+	if (ret < 0)
+		goto unlock;
 
-	mmu->last_iova = node->start + etnaviv_obj->base.size;
 	mapping->iova = node->start;
 	ret = etnaviv_iommu_map(mmu, node->start, sgt, etnaviv_obj->base.size,
 				ETNAVIV_PROT_READ | ETNAVIV_PROT_WRITE);
 
 	if (ret < 0) {
 		drm_mm_remove_node(node);
-		mutex_unlock(&mmu->lock);
-		return ret;
+		goto unlock;
 	}
 
 	list_add_tail(&mapping->mmu_node, &mmu->mappings);
 	mmu->need_flush = true;
+unlock:
 	mutex_unlock(&mmu->lock);
 
 	return ret;
@@ -383,7 +368,6 @@ int etnaviv_iommu_get_suballoc_va(struct etnaviv_gpu *gpu, dma_addr_t paddr,
 			mutex_unlock(&mmu->lock);
 			return ret;
 		}
-		mmu->last_iova = vram_node->start + size;
 		gpu->mmu->need_flush = true;
 		mutex_unlock(&mmu->lock);
 

@@ -72,15 +72,6 @@ MODULE_PARM_DESC(ldlm_enqueue_min, "lock enqueue timeout minimum");
 /* in client side, whether the cached locks will be canceled before replay */
 unsigned int ldlm_cancel_unused_locks_before_replay = 1;
 
-static void interrupted_completion_wait(void *data)
-{
-}
-
-struct lock_wait_data {
-	struct ldlm_lock *lwd_lock;
-	__u32	     lwd_conn_cnt;
-};
-
 struct ldlm_async_args {
 	struct lustre_handle lock_handle;
 };
@@ -112,10 +103,8 @@ static int ldlm_request_bufsize(int count, int type)
 	return sizeof(struct ldlm_request) + avail;
 }
 
-static int ldlm_expired_completion_wait(void *data)
+static void ldlm_expired_completion_wait(struct ldlm_lock *lock, __u32 conn_cnt)
 {
-	struct lock_wait_data *lwd = data;
-	struct ldlm_lock *lock = lwd->lwd_lock;
 	struct obd_import *imp;
 	struct obd_device *obd;
 
@@ -127,27 +116,25 @@ static int ldlm_expired_completion_wait(void *data)
 			   (s64)lock->l_last_activity,
 			   (s64)(ktime_get_real_seconds() -
 				 lock->l_last_activity));
-		if (cfs_time_after(cfs_time_current(), next_dump)) {
+		if (time_after(jiffies, next_dump)) {
 			last_dump = next_dump;
-			next_dump = cfs_time_shift(300);
+			next_dump = jiffies + 300 * HZ;
 			ldlm_namespace_dump(D_DLMTRACE,
 					    ldlm_lock_to_ns(lock));
 			if (last_dump == 0)
 				libcfs_debug_dumplog();
 		}
-		return 0;
+		return;
 	}
 
 	obd = lock->l_conn_export->exp_obd;
 	imp = obd->u.cli.cl_import;
-	ptlrpc_fail_import(imp, lwd->lwd_conn_cnt);
+	ptlrpc_fail_import(imp, conn_cnt);
 	LDLM_ERROR(lock,
 		   "lock timed out (enqueued at %lld, %llds ago), entering recovery for %s@%s",
 		   (s64)lock->l_last_activity,
 		   (s64)(ktime_get_real_seconds() - lock->l_last_activity),
 		   obd2cli_tgt(obd), imp->imp_connection->c_remote_uuid.uuid);
-
-	return 0;
 }
 
 /**
@@ -205,29 +192,6 @@ static int ldlm_completion_tail(struct ldlm_lock *lock, void *data)
 }
 
 /**
- * Implementation of ->l_completion_ast() for a client, that doesn't wait
- * until lock is granted. Suitable for locks enqueued through ptlrpcd, of
- * other threads that cannot block for long.
- */
-int ldlm_completion_ast_async(struct ldlm_lock *lock, __u64 flags, void *data)
-{
-	if (flags == LDLM_FL_WAIT_NOREPROC) {
-		LDLM_DEBUG(lock, "client-side enqueue waiting on pending lock");
-		return 0;
-	}
-
-	if (!(flags & LDLM_FL_BLOCKED_MASK)) {
-		wake_up(&lock->l_waitq);
-		return ldlm_completion_tail(lock, data);
-	}
-
-	LDLM_DEBUG(lock,
-		   "client-side enqueue returned a blocked lock, going forward");
-	return 0;
-}
-EXPORT_SYMBOL(ldlm_completion_ast_async);
-
-/**
  * Generic LDLM "completion" AST. This is called in several cases:
  *
  *     - when a reply to an ENQUEUE RPC is received from the server
@@ -251,11 +215,10 @@ EXPORT_SYMBOL(ldlm_completion_ast_async);
 int ldlm_completion_ast(struct ldlm_lock *lock, __u64 flags, void *data)
 {
 	/* XXX ALLOCATE - 160 bytes */
-	struct lock_wait_data lwd;
 	struct obd_device *obd;
 	struct obd_import *imp = NULL;
-	struct l_wait_info lwi;
 	__u32 timeout;
+	__u32 conn_cnt = 0;
 	int rc = 0;
 
 	if (flags == LDLM_FL_WAIT_NOREPROC) {
@@ -281,32 +244,33 @@ noreproc:
 
 	timeout = ldlm_cp_timeout(lock);
 
-	lwd.lwd_lock = lock;
 	lock->l_last_activity = ktime_get_real_seconds();
-
-	if (ldlm_is_no_timeout(lock)) {
-		LDLM_DEBUG(lock, "waiting indefinitely because of NO_TIMEOUT");
-		lwi = LWI_INTR(interrupted_completion_wait, &lwd);
-	} else {
-		lwi = LWI_TIMEOUT_INTR(cfs_time_seconds(timeout),
-				       ldlm_expired_completion_wait,
-				       interrupted_completion_wait, &lwd);
-	}
 
 	if (imp) {
 		spin_lock(&imp->imp_lock);
-		lwd.lwd_conn_cnt = imp->imp_conn_cnt;
+		conn_cnt = imp->imp_conn_cnt;
 		spin_unlock(&imp->imp_lock);
 	}
-
 	if (OBD_FAIL_CHECK_RESET(OBD_FAIL_LDLM_INTR_CP_AST,
 				 OBD_FAIL_LDLM_CP_BL_RACE | OBD_FAIL_ONCE)) {
 		ldlm_set_fail_loc(lock);
 		rc = -EINTR;
 	} else {
-		/* Go to sleep until the lock is granted or cancelled. */
-		rc = l_wait_event(lock->l_waitq,
-				  is_granted_or_cancelled(lock), &lwi);
+		/* Go to sleep until the lock is granted or canceled. */
+		if (!ldlm_is_no_timeout(lock)) {
+			/* Wait uninterruptible for a while first */
+			rc = wait_event_idle_timeout(lock->l_waitq,
+						     is_granted_or_cancelled(lock),
+						     timeout * HZ);
+			if (rc == 0)
+				ldlm_expired_completion_wait(lock, conn_cnt);
+		}
+		/* Now wait abortable */
+		if (rc == 0)
+			rc = l_wait_event_abortable(lock->l_waitq,
+						    is_granted_or_cancelled(lock));
+		else
+			rc = 0;
 	}
 
 	if (rc) {
@@ -441,19 +405,7 @@ int ldlm_cli_enqueue_fini(struct obd_export *exp, struct ptlrpc_request *req,
 	cleanup_phase = 0;
 
 	lock_res_and_lock(lock);
-	/* Key change rehash lock in per-export hash with new key */
-	if (exp->exp_lock_hash) {
-		/* In the function below, .hs_keycmp resolves to
-		 * ldlm_export_lock_keycmp()
-		 */
-		/* coverity[overrun-buffer-val] */
-		cfs_hash_rehash_key(exp->exp_lock_hash,
-				    &lock->l_remote_handle,
-				    &reply->lock_handle,
-				    &lock->l_exp_hash);
-	} else {
-		lock->l_remote_handle = reply->lock_handle;
-	}
+	lock->l_remote_handle = reply->lock_handle;
 
 	*flags = ldlm_flags_from_wire(reply->lock_flags);
 	lock->l_flags |= ldlm_flags_from_wire(reply->lock_flags &
@@ -1209,7 +1161,7 @@ static enum ldlm_policy_res ldlm_cancel_lrur_policy(struct ldlm_namespace *ns,
 						    int unused, int added,
 						    int count)
 {
-	unsigned long cur = cfs_time_current();
+	unsigned long cur = jiffies;
 	struct ldlm_pool *pl = &ns->ns_pool;
 	__u64 slv, lvf, lv;
 	unsigned long la;
@@ -1224,13 +1176,12 @@ static enum ldlm_policy_res ldlm_cancel_lrur_policy(struct ldlm_namespace *ns,
 	 * Despite of the LV, It doesn't make sense to keep the lock which
 	 * is unused for ns_max_age time.
 	 */
-	if (cfs_time_after(cfs_time_current(),
-			   cfs_time_add(lock->l_last_used, ns->ns_max_age)))
+	if (time_after(jiffies, lock->l_last_used + ns->ns_max_age))
 		return LDLM_POLICY_CANCEL_LOCK;
 
 	slv = ldlm_pool_get_slv(pl);
 	lvf = ldlm_pool_get_lvf(pl);
-	la = cfs_duration_sec(cfs_time_sub(cur, lock->l_last_used));
+	la = (cur - lock->l_last_used) / HZ;
 	lv = lvf * la * unused;
 
 	/* Inform pool about current CLV to see it via debugfs. */
@@ -1281,8 +1232,7 @@ static enum ldlm_policy_res ldlm_cancel_aged_policy(struct ldlm_namespace *ns,
 						    int count)
 {
 	if ((added >= count) &&
-	    time_before(cfs_time_current(),
-			cfs_time_add(lock->l_last_used, ns->ns_max_age)))
+	    time_before(jiffies, lock->l_last_used + ns->ns_max_age))
 		return LDLM_POLICY_KEEP_LOCK;
 
 	return LDLM_POLICY_CANCEL_LOCK;
@@ -1428,7 +1378,7 @@ static int ldlm_prepare_lru_list(struct ldlm_namespace *ns,
 				continue;
 
 			last_use = lock->l_last_used;
-			if (last_use == cfs_time_current())
+			if (last_use == jiffies)
 				continue;
 
 			/* Somebody is already doing CANCEL. No need for this
@@ -1656,7 +1606,7 @@ int ldlm_cli_cancel_list(struct list_head *cancels, int count,
 	 */
 	while (count > 0) {
 		LASSERT(!list_empty(cancels));
-		lock = list_entry(cancels->next, struct ldlm_lock, l_bl_ast);
+		lock = list_first_entry(cancels, struct ldlm_lock, l_bl_ast);
 		LASSERT(lock->l_conn_export);
 
 		if (exp_connect_cancelset(lock->l_conn_export)) {
@@ -1780,7 +1730,7 @@ EXPORT_SYMBOL(ldlm_cli_cancel_unused);
 static int ldlm_resource_foreach(struct ldlm_resource *res,
 				 ldlm_iterator_t iter, void *closure)
 {
-	struct list_head *tmp, *next;
+	struct ldlm_lock *tmp;
 	struct ldlm_lock *lock;
 	int rc = LDLM_ITER_CONTINUE;
 
@@ -1788,18 +1738,14 @@ static int ldlm_resource_foreach(struct ldlm_resource *res,
 		return LDLM_ITER_CONTINUE;
 
 	lock_res(res);
-	list_for_each_safe(tmp, next, &res->lr_granted) {
-		lock = list_entry(tmp, struct ldlm_lock, l_res_link);
-
+	list_for_each_entry_safe(lock, tmp, &res->lr_granted, l_res_link) {
 		if (iter(lock, closure) == LDLM_ITER_STOP) {
 			rc = LDLM_ITER_STOP;
 			goto out;
 		}
 	}
 
-	list_for_each_safe(tmp, next, &res->lr_waiting) {
-		lock = list_entry(tmp, struct ldlm_lock, l_res_link);
-
+	list_for_each_entry_safe(lock, tmp, &res->lr_waiting, l_res_link) {
 		if (iter(lock, closure) == LDLM_ITER_STOP) {
 			rc = LDLM_ITER_STOP;
 			goto out;
@@ -1924,18 +1870,7 @@ static int replay_lock_interpret(const struct lu_env *env,
 
 	/* Key change rehash lock in per-export hash with new key */
 	exp = req->rq_export;
-	if (exp && exp->exp_lock_hash) {
-		/* In the function below, .hs_keycmp resolves to
-		 * ldlm_export_lock_keycmp()
-		 */
-		/* coverity[overrun-buffer-val] */
-		cfs_hash_rehash_key(exp->exp_lock_hash,
-				    &lock->l_remote_handle,
-				    &reply->lock_handle,
-				    &lock->l_exp_hash);
-	} else {
-		lock->l_remote_handle = reply->lock_handle;
-	}
+	lock->l_remote_handle = reply->lock_handle;
 
 	LDLM_DEBUG(lock, "replayed lock:");
 	ptlrpc_import_recovery_state_machine(req->rq_import);

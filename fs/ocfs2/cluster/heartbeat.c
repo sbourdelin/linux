@@ -540,11 +540,12 @@ static struct bio *o2hb_setup_one_bio(struct o2hb_region *reg,
 	struct bio *bio;
 	struct page *page;
 
+#define O2HB_BIO_VECS 16
 	/* Testing has shown this allocation to take long enough under
 	 * GFP_KERNEL that the local node can get fenced. It would be
 	 * nicest if we could pre-allocate these bios and avoid this
 	 * all together. */
-	bio = bio_alloc(GFP_ATOMIC, 16);
+	bio = bio_alloc(GFP_ATOMIC, O2HB_BIO_VECS);
 	if (!bio) {
 		mlog(ML_ERROR, "Could not alloc slots BIO!\n");
 		bio = ERR_PTR(-ENOMEM);
@@ -570,7 +571,19 @@ static struct bio *o2hb_setup_one_bio(struct o2hb_region *reg,
 		     current_page, vec_len, vec_start);
 
 		len = bio_add_page(bio, page, vec_len, vec_start);
-		if (len != vec_len) break;
+		if (len == 0 && current_page == O2HB_BIO_VECS) {
+			/* bio is full now. */
+			goto bail;
+		} else if (len != vec_len) {
+			mlog(ML_ERROR, "Adding page[%d] to bio failed, "
+			     "page %p, len %d, vec_len %u, vec_start %u, "
+			     "bi_sector %llu\n", current_page, page, len,
+			     vec_len, vec_start,
+			     (unsigned long long)bio->bi_iter.bi_sector);
+			bio_put(bio);
+			bio = ERR_PTR(-EIO);
+			return bio;
+		}
 
 		cs += vec_len / (PAGE_SIZE/spp);
 		vec_start = 0;

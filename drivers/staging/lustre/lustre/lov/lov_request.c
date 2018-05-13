@@ -49,15 +49,13 @@ static void lov_init_set(struct lov_request_set *set)
 
 static void lov_finish_set(struct lov_request_set *set)
 {
-	struct list_head *pos, *n;
+	struct lov_request *req;
 
 	LASSERT(set);
-	list_for_each_safe(pos, n, &set->set_list) {
-		struct lov_request *req = list_entry(pos,
-							 struct lov_request,
-							 rq_link);
+	while ((req = list_first_entry_or_null(&set->set_list,
+					       struct lov_request,
+					       rq_link)) != NULL) {
 		list_del_init(&req->rq_link);
-
 		kfree(req->rq_oi.oi_osfs);
 		kfree(req);
 	}
@@ -101,8 +99,7 @@ static int lov_check_set(struct lov_obd *lov, int idx)
  */
 static int lov_check_and_wait_active(struct lov_obd *lov, int ost_idx)
 {
-	wait_queue_head_t waitq;
-	struct l_wait_info lwi;
+	int cnt = 0;
 	struct lov_tgt_desc *tgt;
 	int rc = 0;
 
@@ -127,11 +124,10 @@ static int lov_check_and_wait_active(struct lov_obd *lov, int ost_idx)
 
 	mutex_unlock(&lov->lov_lock);
 
-	init_waitqueue_head(&waitq);
-	lwi = LWI_TIMEOUT_INTERVAL(cfs_time_seconds(obd_timeout),
-				   cfs_time_seconds(1), NULL, NULL);
-
-	rc = l_wait_event(waitq, lov_check_set(lov, ost_idx), &lwi);
+	while (cnt < obd_timeout && !lov_check_set(lov, ost_idx)) {
+		schedule_timeout_uninterruptible(HZ);
+		cnt++;
+	}
 	if (tgt->ltd_active)
 		return 1;
 
@@ -164,7 +160,7 @@ static int lov_fini_statfs(struct obd_device *obd, struct obd_statfs *osfs,
 
 		spin_lock(&obd->obd_osfs_lock);
 		memcpy(&obd->obd_osfs, osfs, sizeof(*osfs));
-		obd->obd_osfs_age = cfs_time_current_64();
+		obd->obd_osfs_age = get_jiffies_64();
 		spin_unlock(&obd->obd_osfs_lock);
 		return 0;
 	}
@@ -281,7 +277,7 @@ static int cb_statfs_update(void *cookie, int rc)
 	spin_lock(&tgtobd->obd_osfs_lock);
 	memcpy(&tgtobd->obd_osfs, lov_sfs, sizeof(*lov_sfs));
 	if ((oinfo->oi_flags & OBD_STATFS_FROM_CACHE) == 0)
-		tgtobd->obd_osfs_age = cfs_time_current_64();
+		tgtobd->obd_osfs_age = get_jiffies_64();
 	spin_unlock(&tgtobd->obd_osfs_lock);
 
 out_update:

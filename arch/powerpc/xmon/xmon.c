@@ -41,6 +41,7 @@
 #include <asm/pgtable.h>
 #include <asm/mmu.h>
 #include <asm/mmu_context.h>
+#include <asm/plpar_wrappers.h>
 #include <asm/cputable.h>
 #include <asm/rtas.h>
 #include <asm/sstep.h>
@@ -59,12 +60,6 @@
 #ifdef CONFIG_PPC64
 #include <asm/hvcall.h>
 #include <asm/paca.h>
-#endif
-
-#if defined(CONFIG_PPC_SPLPAR)
-#include <asm/plpar_wrappers.h>
-#else
-static inline long plapr_set_ciabr(unsigned long ciabr) {return 0; };
 #endif
 
 #include "nonstdio.h"
@@ -328,7 +323,7 @@ static void write_ciabr(unsigned long ciabr)
 		mtspr(SPRN_CIABR, ciabr);
 		return;
 	}
-	plapr_set_ciabr(ciabr);
+	plpar_set_ciabr(ciabr);
 }
 
 /**
@@ -1273,6 +1268,16 @@ static long check_bp_loc(unsigned long addr)
 	return 1;
 }
 
+/* Force enable xmon if not already enabled */
+static inline void force_enable_xmon(void)
+{
+	/* Enable xmon hooks if needed */
+	if (!xmon_on) {
+		printf("xmon: Enabling debugger hooks\n");
+		xmon_on = 1;
+	}
+}
+
 static char *breakpoint_help_string =
     "Breakpoint command usage:\n"
     "b                show breakpoints\n"
@@ -1297,6 +1302,10 @@ bpt_cmds(void)
 	static const char badaddr[] = "Only kernel addresses are permitted for breakpoints\n";
 	int mode;
 	case 'd':	/* bd - hardware data breakpoint */
+		if (!ppc_breakpoint_available()) {
+			printf("Hardware data breakpoint not supported on this cpu\n");
+			break;
+		}
 		mode = 7;
 		cmd = inchar();
 		if (cmd == 'r')
@@ -1315,6 +1324,8 @@ bpt_cmds(void)
 			dabr.address &= ~HW_BRK_TYPE_DABR;
 			dabr.enabled = mode | BP_DABR;
 		}
+
+		force_enable_xmon();
 		break;
 
 	case 'i':	/* bi - hardware instr breakpoint */
@@ -1335,6 +1346,7 @@ bpt_cmds(void)
 		if (bp != NULL) {
 			bp->enabled |= BP_CIABR;
 			iabr = bp;
+			force_enable_xmon();
 		}
 		break;
 #endif
@@ -1399,8 +1411,10 @@ bpt_cmds(void)
 		if (!check_bp_loc(a))
 			break;
 		bp = new_breakpoint(a);
-		if (bp != NULL)
+		if (bp != NULL) {
 			bp->enabled |= BP_TRAP;
+			force_enable_xmon();
+		}
 		break;
 	}
 }
@@ -1590,7 +1604,7 @@ static void print_bug_trap(struct pt_regs *regs)
 	printf("kernel BUG at %s:%u!\n",
 	       bug->file, bug->line);
 #else
-	printf("kernel BUG at %p!\n", (void *)bug->bug_addr);
+	printf("kernel BUG at %px!\n", (void *)bug->bug_addr);
 #endif
 #endif /* CONFIG_BUG */
 }
@@ -1623,7 +1637,7 @@ static void excprint(struct pt_regs *fp)
 	printf("  current = 0x%lx\n", current);
 #ifdef CONFIG_PPC64
 	printf("  paca    = 0x%lx\t softe: %d\t irq_happened: 0x%02x\n",
-	       local_paca, local_paca->soft_enabled, local_paca->irq_happened);
+	       local_paca, local_paca->irq_soft_mask, local_paca->irq_happened);
 #endif
 	if (current) {
 		printf("    pid   = %ld, comm = %s\n",
@@ -2327,9 +2341,9 @@ static void dump_one_paca(int cpu)
 	catch_memory_errors = 1;
 	sync();
 
-	p = &paca[cpu];
+	p = paca_ptrs[cpu];
 
-	printf("paca for cpu 0x%x @ %p:\n", cpu, p);
+	printf("paca for cpu 0x%x @ %px:\n", cpu, p);
 
 	printf(" %-*s = %s\n", 20, "possible", cpu_possible(cpu) ? "yes" : "no");
 	printf(" %-*s = %s\n", 20, "present", cpu_present(cpu) ? "yes" : "no");
@@ -2344,10 +2358,10 @@ static void dump_one_paca(int cpu)
 	DUMP(p, kernel_toc, "lx");
 	DUMP(p, kernelbase, "lx");
 	DUMP(p, kernel_msr, "lx");
-	DUMP(p, emergency_sp, "p");
+	DUMP(p, emergency_sp, "px");
 #ifdef CONFIG_PPC_BOOK3S_64
-	DUMP(p, nmi_emergency_sp, "p");
-	DUMP(p, mc_emergency_sp, "p");
+	DUMP(p, nmi_emergency_sp, "px");
+	DUMP(p, mc_emergency_sp, "px");
 	DUMP(p, in_nmi, "x");
 	DUMP(p, in_mce, "x");
 	DUMP(p, hmi_event_available, "x");
@@ -2375,23 +2389,25 @@ static void dump_one_paca(int cpu)
 	DUMP(p, slb_cache_ptr, "x");
 	for (i = 0; i < SLB_CACHE_ENTRIES; i++)
 		printf(" slb_cache[%d]:        = 0x%016lx\n", i, p->slb_cache[i]);
+
+	DUMP(p, rfi_flush_fallback_area, "px");
 #endif
 	DUMP(p, dscr_default, "llx");
 #ifdef CONFIG_PPC_BOOK3E
-	DUMP(p, pgd, "p");
-	DUMP(p, kernel_pgd, "p");
-	DUMP(p, tcd_ptr, "p");
-	DUMP(p, mc_kstack, "p");
-	DUMP(p, crit_kstack, "p");
-	DUMP(p, dbg_kstack, "p");
+	DUMP(p, pgd, "px");
+	DUMP(p, kernel_pgd, "px");
+	DUMP(p, tcd_ptr, "px");
+	DUMP(p, mc_kstack, "px");
+	DUMP(p, crit_kstack, "px");
+	DUMP(p, dbg_kstack, "px");
 #endif
-	DUMP(p, __current, "p");
+	DUMP(p, __current, "px");
 	DUMP(p, kstack, "lx");
 	printf(" kstack_base          = 0x%016lx\n", p->kstack & ~(THREAD_SIZE - 1));
 	DUMP(p, stab_rr, "lx");
 	DUMP(p, saved_r1, "lx");
 	DUMP(p, trap_save, "x");
-	DUMP(p, soft_enabled, "x");
+	DUMP(p, irq_soft_mask, "x");
 	DUMP(p, irq_happened, "x");
 	DUMP(p, io_sync, "x");
 	DUMP(p, irq_work_pending, "x");
@@ -2403,7 +2419,7 @@ static void dump_one_paca(int cpu)
 #endif
 
 #ifdef CONFIG_PPC_POWERNV
-	DUMP(p, core_idle_state_ptr, "p");
+	DUMP(p, core_idle_state_ptr, "px");
 	DUMP(p, thread_idle_state, "x");
 	DUMP(p, thread_mask, "x");
 	DUMP(p, subcore_sibling_mask, "x");
@@ -2945,7 +2961,7 @@ static void show_task(struct task_struct *tsk)
 		(tsk->exit_state & EXIT_DEAD) ? 'E' :
 		(tsk->state & TASK_INTERRUPTIBLE) ? 'S' : '?';
 
-	printf("%p %016lx %6d %6d %c %2d %s\n", tsk,
+	printf("%px %016lx %6d %6d %c %2d %s\n", tsk,
 		tsk->thread.ksp,
 		tsk->pid, tsk->parent->pid,
 		state, task_thread_info(tsk)->cpu,
@@ -2988,7 +3004,7 @@ static void show_pte(unsigned long addr)
 
 	if (setjmp(bus_error_jmp) != 0) {
 		catch_memory_errors = 0;
-		printf("*** Error dumping pte for task %p\n", tsk);
+		printf("*** Error dumping pte for task %px\n", tsk);
 		return;
 	}
 
@@ -3074,7 +3090,7 @@ static void show_tasks(void)
 
 	if (setjmp(bus_error_jmp) != 0) {
 		catch_memory_errors = 0;
-		printf("*** Error dumping task %p\n", tsk);
+		printf("*** Error dumping task %px\n", tsk);
 		return;
 	}
 
@@ -3647,11 +3663,35 @@ device_initcall(setup_xmon_sysrq);
 #endif /* CONFIG_MAGIC_SYSRQ */
 
 #ifdef CONFIG_DEBUG_FS
+static void clear_all_bpt(void)
+{
+	int i;
+
+	/* clear/unpatch all breakpoints */
+	remove_bpts();
+	remove_cpu_bpts();
+
+	/* Disable all breakpoints */
+	for (i = 0; i < NBPTS; ++i)
+		bpts[i].enabled = 0;
+
+	/* Clear any data or iabr breakpoints */
+	if (iabr || dabr.enabled) {
+		iabr = NULL;
+		dabr.enabled = 0;
+	}
+
+	printf("xmon: All breakpoints cleared\n");
+}
+
 static int xmon_dbgfs_set(void *data, u64 val)
 {
 	xmon_on = !!val;
 	xmon_init(xmon_on);
 
+	/* make sure all breakpoints removed when disabling */
+	if (!xmon_on)
+		clear_all_bpt();
 	return 0;
 }
 

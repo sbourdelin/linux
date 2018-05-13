@@ -158,7 +158,7 @@ static void set_cursor(struct vc_data *vc);
 static void hide_cursor(struct vc_data *vc);
 static void console_callback(struct work_struct *ignored);
 static void con_driver_unregister_callback(struct work_struct *ignored);
-static void blank_screen_t(unsigned long dummy);
+static void blank_screen_t(struct timer_list *unused);
 static void set_palette(struct vc_data *vc);
 
 #define vt_get_kmsg_redirect() vt_kmsg_redirect(-1)
@@ -1354,6 +1354,11 @@ static void csi_m(struct vc_data *vc)
 		case 3:
 			vc->vc_italic = 1;
 			break;
+		case 21:
+			/*
+			 * No console drivers support double underline, so
+			 * convert it to a single underline.
+			 */
 		case 4:
 			vc->vc_underline = 1;
 			break;
@@ -1389,7 +1394,6 @@ static void csi_m(struct vc_data *vc)
 			vc->vc_disp_ctrl = 1;
 			vc->vc_toggle_meta = 1;
 			break;
-		case 21:
 		case 22:
 			vc->vc_intensity = 1;
 			break;
@@ -1727,7 +1731,7 @@ static void reset_terminal(struct vc_data *vc, int do_clear)
 	default_attr(vc);
 	update_attr(vc);
 
-	vc->vc_tab_stop[0]	= 0x01010100;
+	vc->vc_tab_stop[0]	=
 	vc->vc_tab_stop[1]	=
 	vc->vc_tab_stop[2]	=
 	vc->vc_tab_stop[3]	=
@@ -1771,7 +1775,7 @@ static void do_con_trol(struct tty_struct *tty, struct vc_data *vc, int c)
 		vc->vc_pos -= (vc->vc_x << 1);
 		while (vc->vc_x < vc->vc_cols - 1) {
 			vc->vc_x++;
-			if (vc->vc_tab_stop[vc->vc_x >> 5] & (1 << (vc->vc_x & 31)))
+			if (vc->vc_tab_stop[7 & (vc->vc_x >> 5)] & (1 << (vc->vc_x & 31)))
 				break;
 		}
 		vc->vc_pos += (vc->vc_x << 1);
@@ -1831,7 +1835,7 @@ static void do_con_trol(struct tty_struct *tty, struct vc_data *vc, int c)
 			lf(vc);
 			return;
 		case 'H':
-			vc->vc_tab_stop[vc->vc_x >> 5] |= (1 << (vc->vc_x & 31));
+			vc->vc_tab_stop[7 & (vc->vc_x >> 5)] |= (1 << (vc->vc_x & 31));
 			return;
 		case 'Z':
 			respond_ID(tty);
@@ -2024,7 +2028,7 @@ static void do_con_trol(struct tty_struct *tty, struct vc_data *vc, int c)
 			return;
 		case 'g':
 			if (!vc->vc_par[0])
-				vc->vc_tab_stop[vc->vc_x >> 5] &= ~(1 << (vc->vc_x & 31));
+				vc->vc_tab_stop[7 & (vc->vc_x >> 5)] &= ~(1 << (vc->vc_x & 31));
 			else if (vc->vc_par[0] == 3) {
 				vc->vc_tab_stop[0] =
 					vc->vc_tab_stop[1] =
@@ -3929,7 +3933,7 @@ void unblank_screen(void)
  * (console operations can still happen at irq time, but only from printk which
  * has the console mutex. Not perfect yet, but better than no locking
  */
-static void blank_screen_t(unsigned long dummy)
+static void blank_screen_t(struct timer_list *unused)
 {
 	blank_timer_expired = 1;
 	schedule_work(&console_work);

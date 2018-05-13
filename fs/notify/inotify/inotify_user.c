@@ -38,6 +38,7 @@
 #include <linux/uaccess.h>
 #include <linux/poll.h>
 #include <linux/wait.h>
+#include <linux/memcontrol.h>
 
 #include "inotify.h"
 #include "../fdinfo.h"
@@ -107,15 +108,15 @@ static inline u32 inotify_mask_to_arg(__u32 mask)
 }
 
 /* intofiy userspace file descriptor functions */
-static unsigned int inotify_poll(struct file *file, poll_table *wait)
+static __poll_t inotify_poll(struct file *file, poll_table *wait)
 {
 	struct fsnotify_group *group = file->private_data;
-	int ret = 0;
+	__poll_t ret = 0;
 
 	poll_wait(file, &group->notification_waitq, wait);
 	spin_lock(&group->notification_lock);
 	if (!fsnotify_notify_queue_is_empty(group))
-		ret = POLLIN | POLLRDNORM;
+		ret = EPOLLIN | EPOLLRDNORM;
 	spin_unlock(&group->notification_lock);
 
 	return ret;
@@ -307,6 +308,20 @@ static long inotify_ioctl(struct file *file, unsigned int cmd,
 		spin_unlock(&group->notification_lock);
 		ret = put_user(send_len, (int __user *) p);
 		break;
+#ifdef CONFIG_CHECKPOINT_RESTORE
+	case INOTIFY_IOC_SETNEXTWD:
+		ret = -EINVAL;
+		if (arg >= 1 && arg <= INT_MAX) {
+			struct inotify_group_private_data *data;
+
+			data = &group->inotify_data;
+			spin_lock(&data->idr_lock);
+			idr_set_cursor(&data->idr, (unsigned int)arg);
+			spin_unlock(&data->idr_lock);
+			ret = 0;
+		}
+		break;
+#endif /* CONFIG_CHECKPOINT_RESTORE */
 	}
 
 	return ret;
@@ -618,6 +633,7 @@ static struct fsnotify_group *inotify_new_group(unsigned int max_events)
 	oevent->name_len = 0;
 
 	group->max_events = max_events;
+	group->memcg = get_mem_cgroup_from_mm(current->mm);
 
 	spin_lock_init(&group->inotify_data.idr_lock);
 	idr_init(&group->inotify_data.idr);
@@ -635,7 +651,7 @@ static struct fsnotify_group *inotify_new_group(unsigned int max_events)
 
 
 /* inotify syscalls */
-SYSCALL_DEFINE1(inotify_init1, int, flags)
+static int do_inotify_init(int flags)
 {
 	struct fsnotify_group *group;
 	int ret;
@@ -660,9 +676,14 @@ SYSCALL_DEFINE1(inotify_init1, int, flags)
 	return ret;
 }
 
+SYSCALL_DEFINE1(inotify_init1, int, flags)
+{
+	return do_inotify_init(flags);
+}
+
 SYSCALL_DEFINE0(inotify_init)
 {
-	return sys_inotify_init1(0);
+	return do_inotify_init(0);
 }
 
 SYSCALL_DEFINE3(inotify_add_watch, int, fd, const char __user *, pathname,
@@ -785,7 +806,8 @@ static int __init inotify_user_setup(void)
 
 	BUG_ON(hweight32(ALL_INOTIFY_BITS) != 21);
 
-	inotify_inode_mark_cachep = KMEM_CACHE(inotify_inode_mark, SLAB_PANIC);
+	inotify_inode_mark_cachep = KMEM_CACHE(inotify_inode_mark,
+					       SLAB_PANIC|SLAB_ACCOUNT);
 
 	inotify_max_queued_events = 16384;
 	init_user_ns.ucount_max[UCOUNT_INOTIFY_INSTANCES] = 128;

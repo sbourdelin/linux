@@ -113,7 +113,7 @@ static int param_set_delay_minmax(const char *val,
 	if (rc)
 		return -EINVAL;
 
-	d = cfs_time_seconds(sec) / 100;
+	d = sec * HZ / 100;
 	if (d < min || d > max)
 		return -EINVAL;
 
@@ -126,7 +126,7 @@ static int param_get_delay(char *buffer, const struct kernel_param *kp)
 {
 	unsigned int d = *(unsigned int *)kp->arg;
 
-	return sprintf(buffer, "%u", (unsigned int)cfs_duration_sec(d * 100));
+	return sprintf(buffer, "%u", (unsigned int)(d * 100) / HZ);
 }
 
 unsigned int libcfs_console_max_delay;
@@ -440,7 +440,7 @@ int libcfs_debug_clear_buffer(void)
 	return 0;
 }
 
-/* Debug markers, although printed by S_LNET should not be be marked as such. */
+/* Debug markers, although printed by S_LNET should not be marked as such. */
 #undef DEBUG_SUBSYSTEM
 #define DEBUG_SUBSYSTEM S_UNDEFINED
 int libcfs_debug_mark_buffer(const char *text)

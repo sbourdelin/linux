@@ -556,10 +556,9 @@ static const u32 src_pdo[] = {
 };
 
 static const u32 snk_pdo[] = {
-	PDO_FIXED(12000, 3000, PDO_FIXED_DUAL_ROLE | PDO_FIXED_DATA_SWAP |
+	PDO_FIXED(5000, 500, PDO_FIXED_DUAL_ROLE | PDO_FIXED_DATA_SWAP |
 		  PDO_FIXED_USB_COMM),
-	PDO_BATT(4750, 12000, 15000),
-	PDO_VAR(4750, 12000, 3000),
+	PDO_VAR(5000, 12000, 3000),
 };
 
 static struct tcpc_config wcove_typec_config = {
@@ -568,12 +567,10 @@ static struct tcpc_config wcove_typec_config = {
 	.snk_pdo = snk_pdo,
 	.nr_snk_pdo = ARRAY_SIZE(snk_pdo),
 
-	.max_snk_mv = 12000,
-	.max_snk_ma = 3000,
-	.max_snk_mw = 36000,
 	.operating_snk_mw = 15000,
 
 	.type = TYPEC_PORT_DRP,
+	.data = TYPEC_PORT_DRD,
 	.default_role = TYPEC_SINK,
 };
 

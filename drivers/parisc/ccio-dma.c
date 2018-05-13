@@ -1263,7 +1263,7 @@ static struct parisc_driver ccio_driver __refdata = {
  * I/O Page Directory, the resource map, and initalizing the
  * U2/Uturn chip into virtual mode.
  */
-static void
+static void __init
 ccio_ioc_init(struct ioc *ioc)
 {
 	int i;
@@ -1596,8 +1596,6 @@ static int __init ccio_probe(struct parisc_device *dev)
 	}
 #endif
 	ioc_count++;
-
-	parisc_has_iommu();
 	return 0;
 }
 

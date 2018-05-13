@@ -1119,15 +1119,11 @@ static struct ftrace_ops global_ops = {
 };
 
 /*
- * This is used by __kernel_text_address() to return true if the
- * address is on a dynamically allocated trampoline that would
- * not return true for either core_kernel_text() or
- * is_module_text_address().
+ * Used by the stack undwinder to know about dynamic ftrace trampolines.
  */
-bool is_ftrace_trampoline(unsigned long addr)
+struct ftrace_ops *ftrace_ops_trampoline(unsigned long addr)
 {
-	struct ftrace_ops *op;
-	bool ret = false;
+	struct ftrace_ops *op = NULL;
 
 	/*
 	 * Some of the ops may be dynamically allocated,
@@ -1144,15 +1140,24 @@ bool is_ftrace_trampoline(unsigned long addr)
 		if (op->trampoline && op->trampoline_size)
 			if (addr >= op->trampoline &&
 			    addr < op->trampoline + op->trampoline_size) {
-				ret = true;
-				goto out;
+				preempt_enable_notrace();
+				return op;
 			}
 	} while_for_each_ftrace_op(op);
-
- out:
 	preempt_enable_notrace();
 
-	return ret;
+	return NULL;
+}
+
+/*
+ * This is used by __kernel_text_address() to return true if the
+ * address is on a dynamically allocated trampoline that would
+ * not return true for either core_kernel_text() or
+ * is_module_text_address().
+ */
+bool is_ftrace_trampoline(unsigned long addr)
+{
+	return ftrace_ops_trampoline(addr) != NULL;
 }
 
 struct ftrace_page {
@@ -3897,14 +3902,13 @@ static bool module_exists(const char *module)
 {
 	/* All modules have the symbol __this_module */
 	const char this_mod[] = "__this_module";
-	const int modname_size = MAX_PARAM_PREFIX_LEN + sizeof(this_mod) + 1;
-	char modname[modname_size + 1];
+	char modname[MAX_PARAM_PREFIX_LEN + sizeof(this_mod) + 2];
 	unsigned long val;
 	int n;
 
-	n = snprintf(modname, modname_size + 1, "%s:%s", module, this_mod);
+	n = snprintf(modname, sizeof(modname), "%s:%s", module, this_mod);
 
-	if (n > modname_size)
+	if (n > sizeof(modname) - 1)
 		return false;
 
 	val = module_kallsyms_lookup_name(modname);
@@ -4451,7 +4455,6 @@ unregister_ftrace_function_probe_func(char *glob, struct trace_array *tr,
 		func_g.type = filter_parse_regex(glob, strlen(glob),
 						 &func_g.search, &not);
 		func_g.len = strlen(func_g.search);
-		func_g.search = glob;
 
 		/* we do not support '!' for function probes */
 		if (WARN_ON(not))
@@ -5010,7 +5013,6 @@ int ftrace_regex_release(struct inode *inode, struct file *file)
 
 	parser = &iter->parser;
 	if (trace_parser_loaded(parser)) {
-		parser->buffer[parser->idx] = 0;
 		ftrace_match_records(iter->hash, parser->buffer, parser->idx);
 	}
 
@@ -5324,7 +5326,6 @@ ftrace_graph_release(struct inode *inode, struct file *file)
 		parser = &fgd->parser;
 
 		if (trace_parser_loaded((parser))) {
-			parser->buffer[parser->idx] = 0;
 			ret = ftrace_graph_set_hash(fgd->new_hash,
 						    parser->buffer);
 		}
@@ -5513,10 +5514,10 @@ static __init int ftrace_init_dyn_tracefs(struct dentry *d_tracer)
 	ftrace_create_filter_files(&global_ops, d_tracer);
 
 #ifdef CONFIG_FUNCTION_GRAPH_TRACER
-	trace_create_file("set_graph_function", 0444, d_tracer,
+	trace_create_file("set_graph_function", 0644, d_tracer,
 				    NULL,
 				    &ftrace_graph_fops);
-	trace_create_file("set_graph_notrace", 0444, d_tracer,
+	trace_create_file("set_graph_notrace", 0644, d_tracer,
 				    NULL,
 				    &ftrace_graph_notrace_fops);
 #endif /* CONFIG_FUNCTION_GRAPH_TRACER */

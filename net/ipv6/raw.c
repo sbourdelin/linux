@@ -1310,7 +1310,6 @@ static int raw6_seq_open(struct inode *inode, struct file *file)
 }
 
 static const struct file_operations raw6_seq_fops = {
-	.owner =	THIS_MODULE,
 	.open =		raw6_seq_open,
 	.read =		seq_read,
 	.llseek =	seq_lseek,
@@ -1319,7 +1318,7 @@ static const struct file_operations raw6_seq_fops = {
 
 static int __net_init raw6_init_net(struct net *net)
 {
-	if (!proc_create("raw6", S_IRUGO, net->proc_net, &raw6_seq_fops))
+	if (!proc_create("raw6", 0444, net->proc_net, &raw6_seq_fops))
 		return -ENOMEM;
 
 	return 0;

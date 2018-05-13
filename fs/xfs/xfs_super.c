@@ -250,6 +250,7 @@ xfs_parseargs(
 				return -EINVAL;
 			break;
 		case Opt_logdev:
+			kfree(mp->m_logname);
 			mp->m_logname = match_strdup(args);
 			if (!mp->m_logname)
 				return -ENOMEM;
@@ -258,6 +259,7 @@ xfs_parseargs(
 			xfs_warn(mp, "%s option not allowed on this system", p);
 			return -EINVAL;
 		case Opt_rtdev:
+			kfree(mp->m_rtname);
 			mp->m_rtname = match_strdup(args);
 			if (!mp->m_rtname)
 				return -ENOMEM;
@@ -720,20 +722,20 @@ xfs_close_devices(
 		struct block_device *logdev = mp->m_logdev_targp->bt_bdev;
 		struct dax_device *dax_logdev = mp->m_logdev_targp->bt_daxdev;
 
-		xfs_free_buftarg(mp, mp->m_logdev_targp);
+		xfs_free_buftarg(mp->m_logdev_targp);
 		xfs_blkdev_put(logdev);
-		fs_put_dax(dax_logdev);
+		fs_dax_release(dax_logdev, mp);
 	}
 	if (mp->m_rtdev_targp) {
 		struct block_device *rtdev = mp->m_rtdev_targp->bt_bdev;
 		struct dax_device *dax_rtdev = mp->m_rtdev_targp->bt_daxdev;
 
-		xfs_free_buftarg(mp, mp->m_rtdev_targp);
+		xfs_free_buftarg(mp->m_rtdev_targp);
 		xfs_blkdev_put(rtdev);
-		fs_put_dax(dax_rtdev);
+		fs_dax_release(dax_rtdev, mp);
 	}
-	xfs_free_buftarg(mp, mp->m_ddev_targp);
-	fs_put_dax(dax_ddev);
+	xfs_free_buftarg(mp->m_ddev_targp);
+	fs_dax_release(dax_ddev, mp);
 }
 
 /*
@@ -751,9 +753,9 @@ xfs_open_devices(
 	struct xfs_mount	*mp)
 {
 	struct block_device	*ddev = mp->m_super->s_bdev;
-	struct dax_device	*dax_ddev = fs_dax_get_by_bdev(ddev);
-	struct dax_device	*dax_logdev = NULL, *dax_rtdev = NULL;
+	struct dax_device	*dax_ddev = fs_dax_claim_bdev(ddev, mp);
 	struct block_device	*logdev = NULL, *rtdev = NULL;
+	struct dax_device	*dax_logdev = NULL, *dax_rtdev = NULL;
 	int			error;
 
 	/*
@@ -763,7 +765,7 @@ xfs_open_devices(
 		error = xfs_blkdev_get(mp, mp->m_logname, &logdev);
 		if (error)
 			goto out;
-		dax_logdev = fs_dax_get_by_bdev(logdev);
+		dax_logdev = fs_dax_claim_bdev(logdev, mp);
 	}
 
 	if (mp->m_rtname) {
@@ -777,7 +779,7 @@ xfs_open_devices(
 			error = -EINVAL;
 			goto out_close_rtdev;
 		}
-		dax_rtdev = fs_dax_get_by_bdev(rtdev);
+		dax_rtdev = fs_dax_claim_bdev(rtdev, mp);
 	}
 
 	/*
@@ -806,19 +808,19 @@ xfs_open_devices(
 
  out_free_rtdev_targ:
 	if (mp->m_rtdev_targp)
-		xfs_free_buftarg(mp, mp->m_rtdev_targp);
+		xfs_free_buftarg(mp->m_rtdev_targp);
  out_free_ddev_targ:
-	xfs_free_buftarg(mp, mp->m_ddev_targp);
+	xfs_free_buftarg(mp->m_ddev_targp);
  out_close_rtdev:
 	xfs_blkdev_put(rtdev);
-	fs_put_dax(dax_rtdev);
+	fs_dax_release(dax_rtdev, mp);
  out_close_logdev:
 	if (logdev && logdev != ddev) {
 		xfs_blkdev_put(logdev);
-		fs_put_dax(dax_logdev);
+		fs_dax_release(dax_logdev, mp);
 	}
  out:
-	fs_put_dax(dax_ddev);
+	fs_dax_release(dax_ddev, mp);
 	return error;
 }
 
@@ -970,21 +972,12 @@ xfs_fs_destroy_inode(
 	struct inode		*inode)
 {
 	struct xfs_inode	*ip = XFS_I(inode);
-	int			error;
 
 	trace_xfs_destroy_inode(ip);
 
 	ASSERT(!rwsem_is_locked(&inode->i_rwsem));
 	XFS_STATS_INC(ip->i_mount, vn_rele);
 	XFS_STATS_INC(ip->i_mount, vn_remove);
-
-	if (xfs_is_reflink_inode(ip)) {
-		error = xfs_reflink_cancel_cow_range(ip, 0, NULLFILEOFF, true);
-		if (error && !XFS_FORCED_SHUTDOWN(ip->i_mount))
-			xfs_warn(ip->i_mount,
-"Error %d while evicting CoW blocks for inode %llu.",
-					error, ip->i_ino);
-	}
 
 	xfs_inactive(ip);
 
@@ -1005,6 +998,28 @@ xfs_fs_destroy_inode(
 	 * reclaim tear down all inodes.
 	 */
 	xfs_inode_set_reclaim_tag(ip);
+}
+
+static void
+xfs_fs_dirty_inode(
+	struct inode			*inode,
+	int				flag)
+{
+	struct xfs_inode		*ip = XFS_I(inode);
+	struct xfs_mount		*mp = ip->i_mount;
+	struct xfs_trans		*tp;
+
+	if (!(inode->i_sb->s_flags & SB_LAZYTIME))
+		return;
+	if (flag != I_DIRTY_SYNC || !(inode->i_state & I_DIRTY_TIME))
+		return;
+
+	if (xfs_trans_alloc(mp, &M_RES(mp)->tr_fsyncts, 0, 0, 0, &tp))
+		return;
+	xfs_ilock(ip, XFS_ILOCK_EXCL);
+	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL);
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_TIMESTAMP);
+	xfs_trans_commit(tp);
 }
 
 /*
@@ -1153,6 +1168,14 @@ xfs_fs_statfs(
 	    ((mp->m_qflags & (XFS_PQUOTA_ACCT|XFS_PQUOTA_ENFD))) ==
 			      (XFS_PQUOTA_ACCT|XFS_PQUOTA_ENFD))
 		xfs_qm_statvfs(ip, statp);
+
+	if (XFS_IS_REALTIME_MOUNT(mp) &&
+	    (ip->i_d.di_flags & (XFS_DIFLAG_RTINHERIT | XFS_DIFLAG_REALTIME))) {
+		statp->f_blocks = sbp->sb_rblocks;
+		statp->f_bavail = statp->f_bfree =
+			sbp->sb_frextents * sbp->sb_rextsize;
+	}
+
 	return 0;
 }
 
@@ -1224,7 +1247,6 @@ xfs_quiesce_attr(
 STATIC int
 xfs_test_remount_options(
 	struct super_block	*sb,
-	struct xfs_mount	*mp,
 	char			*options)
 {
 	int			error = 0;
@@ -1255,7 +1277,7 @@ xfs_fs_remount(
 	int			error;
 
 	/* First, check for complete junk; i.e. invalid options */
-	error = xfs_test_remount_options(sb, mp, options);
+	error = xfs_test_remount_options(sb, options);
 	if (error)
 		return error;
 
@@ -1350,7 +1372,6 @@ xfs_fs_remount(
 		 */
 		xfs_restore_resvblks(mp);
 		xfs_log_work_queue(mp);
-		xfs_queue_eofblocks(mp);
 
 		/* Recover any CoW blocks that never got remapped. */
 		error = xfs_reflink_recover_cow(mp);
@@ -1360,6 +1381,7 @@ xfs_fs_remount(
 			xfs_force_shutdown(mp, SHUTDOWN_CORRUPT_INCORE);
 			return error;
 		}
+		xfs_icache_enable_reclaim(mp);
 
 		/* Create the per-AG metadata reservation pool .*/
 		error = xfs_fs_reserve_ag_blocks(mp);
@@ -1369,6 +1391,19 @@ xfs_fs_remount(
 
 	/* rw -> ro */
 	if (!(mp->m_flags & XFS_MOUNT_RDONLY) && (*flags & SB_RDONLY)) {
+		/*
+		 * Cancel background eofb scanning so it cannot race with the
+		 * final log force+buftarg wait and deadlock the remount.
+		 */
+		xfs_icache_disable_reclaim(mp);
+
+		/* Get rid of any leftover CoW reservations... */
+		error = xfs_icache_free_cowblocks(mp, NULL);
+		if (error) {
+			xfs_force_shutdown(mp, SHUTDOWN_CORRUPT_INCORE);
+			return error;
+		}
+
 		/* Free the per-AG metadata reservation pool. */
 		error = xfs_fs_unreserve_ag_blocks(mp);
 		if (error) {
@@ -1384,12 +1419,6 @@ xfs_fs_remount(
 		 * return it to the same size.
 		 */
 		xfs_save_resvblks(mp);
-
-		/*
-		 * Cancel background eofb scanning so it cannot race with the
-		 * final log force+buftarg wait and deadlock the remount.
-		 */
-		cancel_delayed_work_sync(&mp->m_eofblocks_work);
 
 		xfs_quiesce_attr(mp);
 		mp->m_flags |= XFS_MOUNT_RDONLY;
@@ -1410,6 +1439,7 @@ xfs_fs_freeze(
 {
 	struct xfs_mount	*mp = XFS_M(sb);
 
+	xfs_icache_disable_reclaim(mp);
 	xfs_save_resvblks(mp);
 	xfs_quiesce_attr(mp);
 	return xfs_sync_sb(mp, true);
@@ -1423,6 +1453,7 @@ xfs_fs_unfreeze(
 
 	xfs_restore_resvblks(mp);
 	xfs_log_work_queue(mp);
+	xfs_icache_enable_reclaim(mp);
 	return 0;
 }
 
@@ -1547,6 +1578,31 @@ xfs_destroy_percpu_counters(
 	percpu_counter_destroy(&mp->m_fdblocks);
 }
 
+static struct xfs_mount *
+xfs_mount_alloc(
+	struct super_block	*sb)
+{
+	struct xfs_mount	*mp;
+
+	mp = kzalloc(sizeof(struct xfs_mount), GFP_KERNEL);
+	if (!mp)
+		return NULL;
+
+	mp->m_super = sb;
+	spin_lock_init(&mp->m_sb_lock);
+	spin_lock_init(&mp->m_agirotor_lock);
+	INIT_RADIX_TREE(&mp->m_perag_tree, GFP_ATOMIC);
+	spin_lock_init(&mp->m_perag_lock);
+	mutex_init(&mp->m_growlock);
+	atomic_set(&mp->m_active_trans, 0);
+	INIT_DELAYED_WORK(&mp->m_reclaim_work, xfs_reclaim_worker);
+	INIT_DELAYED_WORK(&mp->m_eofblocks_work, xfs_eofblocks_worker);
+	INIT_DELAYED_WORK(&mp->m_cowblocks_work, xfs_cowblocks_worker);
+	mp->m_kobj.kobject.kset = xfs_kset;
+	return mp;
+}
+
+
 STATIC int
 xfs_fs_fill_super(
 	struct super_block	*sb,
@@ -1557,19 +1613,13 @@ xfs_fs_fill_super(
 	struct xfs_mount	*mp = NULL;
 	int			flags = 0, error = -ENOMEM;
 
-	mp = kzalloc(sizeof(struct xfs_mount), GFP_KERNEL);
+	/*
+	 * allocate mp and do all low-level struct initializations before we
+	 * attach it to the super
+	 */
+	mp = xfs_mount_alloc(sb);
 	if (!mp)
 		goto out;
-
-	spin_lock_init(&mp->m_sb_lock);
-	mutex_init(&mp->m_growlock);
-	atomic_set(&mp->m_active_trans, 0);
-	INIT_DELAYED_WORK(&mp->m_reclaim_work, xfs_reclaim_worker);
-	INIT_DELAYED_WORK(&mp->m_eofblocks_work, xfs_eofblocks_worker);
-	INIT_DELAYED_WORK(&mp->m_cowblocks_work, xfs_cowblocks_worker);
-	mp->m_kobj.kobject.kset = xfs_kset;
-
-	mp->m_super = sb;
 	sb->s_fs_info = mp;
 
 	error = xfs_parseargs(mp, (char *)data);
@@ -1649,9 +1699,12 @@ xfs_fs_fill_super(
 			"DAX unsupported by block device. Turning off DAX.");
 			mp->m_flags &= ~XFS_MOUNT_DAX;
 		}
-		if (xfs_sb_version_hasreflink(&mp->m_sb))
+		if (xfs_sb_version_hasreflink(&mp->m_sb)) {
 			xfs_alert(mp,
-		"DAX and reflink have not been tested together!");
+		"DAX and reflink cannot be used together!");
+			error = -EINVAL;
+			goto out_filestream_unmount;
+		}
 	}
 
 	if (mp->m_flags & XFS_MOUNT_DISCARD) {
@@ -1664,20 +1717,19 @@ xfs_fs_fill_super(
 		}
 	}
 
-	if (xfs_sb_version_hasrmapbt(&mp->m_sb)) {
-		if (mp->m_sb.sb_rblocks) {
-			xfs_alert(mp,
-	"EXPERIMENTAL reverse mapping btree not compatible with realtime device!");
-			error = -EINVAL;
-			goto out_filestream_unmount;
-		}
+	if (xfs_sb_version_hasreflink(&mp->m_sb) && mp->m_sb.sb_rblocks) {
 		xfs_alert(mp,
-	"EXPERIMENTAL reverse mapping btree feature enabled. Use at your own risk!");
+	"reflink not compatible with realtime device!");
+		error = -EINVAL;
+		goto out_filestream_unmount;
 	}
 
-	if (xfs_sb_version_hasreflink(&mp->m_sb))
+	if (xfs_sb_version_hasrmapbt(&mp->m_sb) && mp->m_sb.sb_rblocks) {
 		xfs_alert(mp,
-	"EXPERIMENTAL reflink feature enabled. Use at your own risk!");
+	"reverse mapping btree not compatible with realtime device!");
+		error = -EINVAL;
+		goto out_filestream_unmount;
+	}
 
 	error = xfs_mountfs(mp);
 	if (error)
@@ -1768,6 +1820,7 @@ xfs_fs_free_cached_objects(
 static const struct super_operations xfs_super_operations = {
 	.alloc_inode		= xfs_fs_alloc_inode,
 	.destroy_inode		= xfs_fs_destroy_inode,
+	.dirty_inode		= xfs_fs_dirty_inode,
 	.drop_inode		= xfs_fs_drop_inode,
 	.put_super		= xfs_fs_put_super,
 	.sync_fs		= xfs_fs_sync_fs,
@@ -1827,11 +1880,6 @@ xfs_init_zones(void)
 	if (!xfs_trans_zone)
 		goto out_destroy_ifork_zone;
 
-	xfs_log_item_desc_zone =
-		kmem_zone_init(sizeof(struct xfs_log_item_desc),
-			       "xfs_log_item_desc");
-	if (!xfs_log_item_desc_zone)
-		goto out_destroy_trans_zone;
 
 	/*
 	 * The size of the zone allocated buf log item is the maximum
@@ -1841,7 +1889,7 @@ xfs_init_zones(void)
 	xfs_buf_item_zone = kmem_zone_init(sizeof(struct xfs_buf_log_item),
 					   "xfs_buf_item");
 	if (!xfs_buf_item_zone)
-		goto out_destroy_log_item_desc_zone;
+		goto out_destroy_trans_zone;
 
 	xfs_efd_zone = kmem_zone_init((sizeof(xfs_efd_log_item_t) +
 			((XFS_EFD_MAX_FAST_EXTENTS - 1) *
@@ -1929,8 +1977,6 @@ xfs_init_zones(void)
 	kmem_zone_destroy(xfs_efd_zone);
  out_destroy_buf_item_zone:
 	kmem_zone_destroy(xfs_buf_item_zone);
- out_destroy_log_item_desc_zone:
-	kmem_zone_destroy(xfs_log_item_desc_zone);
  out_destroy_trans_zone:
 	kmem_zone_destroy(xfs_trans_zone);
  out_destroy_ifork_zone:
@@ -1969,7 +2015,6 @@ xfs_destroy_zones(void)
 	kmem_zone_destroy(xfs_efi_zone);
 	kmem_zone_destroy(xfs_efd_zone);
 	kmem_zone_destroy(xfs_buf_item_zone);
-	kmem_zone_destroy(xfs_log_item_desc_zone);
 	kmem_zone_destroy(xfs_trans_zone);
 	kmem_zone_destroy(xfs_ifork_zone);
 	kmem_zone_destroy(xfs_da_state_zone);

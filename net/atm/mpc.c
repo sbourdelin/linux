@@ -121,7 +121,7 @@ static struct notifier_block mpoa_notifier = {
 
 struct mpoa_client *mpcs = NULL; /* FIXME */
 static struct atm_mpoa_qos *qos_head = NULL;
-static DEFINE_TIMER(mpc_timer, NULL);
+static DEFINE_TIMER(mpc_timer, mpc_cache_check);
 
 
 static struct mpoa_client *find_mpc_by_itfnum(int itf)
@@ -1089,7 +1089,7 @@ static void MPOA_trigger_rcvd(struct k_message *msg, struct mpoa_client *mpc)
 		msg->type = SND_MPOA_RES_RQST;
 		msg->content.in_info = entry->ctrl_info;
 		msg_to_mpoad(msg, mpc);
-		do_gettimeofday(&(entry->reply_wait));
+		entry->reply_wait = ktime_get_seconds();
 		mpc->in_ops->put(entry);
 		return;
 	}
@@ -1099,7 +1099,7 @@ static void MPOA_trigger_rcvd(struct k_message *msg, struct mpoa_client *mpc)
 		msg->type = SND_MPOA_RES_RQST;
 		msg->content.in_info = entry->ctrl_info;
 		msg_to_mpoad(msg, mpc);
-		do_gettimeofday(&(entry->reply_wait));
+		entry->reply_wait = ktime_get_seconds();
 		mpc->in_ops->put(entry);
 		return;
 	}
@@ -1175,8 +1175,9 @@ static void MPOA_res_reply_rcvd(struct k_message *msg, struct mpoa_client *mpc)
 	}
 
 	entry->ctrl_info = msg->content.in_info;
-	do_gettimeofday(&(entry->tv));
-	do_gettimeofday(&(entry->reply_wait)); /* Used in refreshing func from now on */
+	entry->time = ktime_get_seconds();
+	/* Used in refreshing func from now on */
+	entry->reply_wait = ktime_get_seconds();
 	entry->refresh_time = 0;
 	ddprintk_cont("entry->shortcut = %p\n", entry->shortcut);
 
@@ -1413,7 +1414,6 @@ static void mpc_timer_refresh(void)
 {
 	mpc_timer.expires = jiffies + (MPC_P2 * HZ);
 	checking_time = mpc_timer.expires;
-	mpc_timer.function = (TIMER_FUNC_TYPE)mpc_cache_check;
 	add_timer(&mpc_timer);
 }
 

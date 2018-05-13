@@ -7,6 +7,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/iversion.h>
 #include "fat.h"
 
 /* Characters that are undesirable in an MS-DOS file name */
@@ -313,10 +314,6 @@ static int msdos_rmdir(struct inode *dir, struct dentry *dentry)
 	int err;
 
 	mutex_lock(&MSDOS_SB(sb)->s_lock);
-	/*
-	 * Check whether the directory is not in use, then check
-	 * whether it is empty.
-	 */
 	err = fat_dir_empty(inode);
 	if (err)
 		goto out;
@@ -480,7 +477,7 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 			} else
 				mark_inode_dirty(old_inode);
 
-			old_dir->i_version++;
+			inode_inc_iversion(old_dir);
 			old_dir->i_ctime = old_dir->i_mtime = current_time(old_dir);
 			if (IS_DIRSYNC(old_dir))
 				(void)fat_sync_inode(old_dir);
@@ -508,7 +505,7 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 			goto out;
 		new_i_pos = sinfo.i_pos;
 	}
-	new_dir->i_version++;
+	inode_inc_iversion(new_dir);
 
 	fat_detach(old_inode);
 	fat_attach(old_inode, new_i_pos);
@@ -540,7 +537,7 @@ static int do_msdos_rename(struct inode *old_dir, unsigned char *old_name,
 	old_sinfo.bh = NULL;
 	if (err)
 		goto error_dotdot;
-	old_dir->i_version++;
+	inode_inc_iversion(old_dir);
 	old_dir->i_ctime = old_dir->i_mtime = ts;
 	if (IS_DIRSYNC(old_dir))
 		(void)fat_sync_inode(old_dir);

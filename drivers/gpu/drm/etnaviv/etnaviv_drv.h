@@ -26,6 +26,7 @@
 #include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <linux/list.h>
+#include <linux/time64.h>
 #include <linux/types.h>
 #include <linux/sizes.h>
 
@@ -34,6 +35,7 @@
 #include <drm/drm_fb_helper.h>
 #include <drm/drm_gem.h>
 #include <drm/etnaviv_drm.h>
+#include <drm/gpu_scheduler.h>
 
 struct etnaviv_cmdbuf;
 struct etnaviv_gpu;
@@ -42,11 +44,11 @@ struct etnaviv_gem_object;
 struct etnaviv_gem_submit;
 
 struct etnaviv_file_private {
-	/* currently we don't do anything useful with this.. but when
-	 * per-context address spaces are supported we'd keep track of
+	/*
+	 * When per-context address spaces are supported we'd keep track of
 	 * the context's page-tables here.
 	 */
-	int dummy;
+	struct drm_sched_entity		sched_entity[ETNA_MAX_PIPES];
 };
 
 struct etnaviv_drm_private {
@@ -56,17 +58,7 @@ struct etnaviv_drm_private {
 	/* list of GEM objects: */
 	struct mutex gem_lock;
 	struct list_head gem_list;
-
-	struct workqueue_struct *wq;
 };
-
-static inline void etnaviv_queue_work(struct drm_device *dev,
-	struct work_struct *w)
-{
-	struct etnaviv_drm_private *priv = dev->dev_private;
-
-	queue_work(priv->wq, w);
-}
 
 int etnaviv_ioctl_gem_submit(struct drm_device *dev, void *data,
 		struct drm_file *file);
@@ -95,10 +87,11 @@ int etnaviv_gem_new_userptr(struct drm_device *dev, struct drm_file *file,
 	uintptr_t ptr, u32 size, u32 flags, u32 *handle);
 u16 etnaviv_buffer_init(struct etnaviv_gpu *gpu);
 u16 etnaviv_buffer_config_mmuv2(struct etnaviv_gpu *gpu, u32 mtlb_addr, u32 safe_addr);
+u16 etnaviv_buffer_config_pta(struct etnaviv_gpu *gpu);
 void etnaviv_buffer_end(struct etnaviv_gpu *gpu);
 void etnaviv_sync_point_queue(struct etnaviv_gpu *gpu, unsigned int event);
-void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, unsigned int event,
-	struct etnaviv_cmdbuf *cmdbuf);
+void etnaviv_buffer_queue(struct etnaviv_gpu *gpu, u32 exec_state,
+	unsigned int event, struct etnaviv_cmdbuf *cmdbuf);
 void etnaviv_validate_init(void);
 bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
 	u32 *stream, unsigned int size,
@@ -108,11 +101,6 @@ bool etnaviv_cmd_validate_one(struct etnaviv_gpu *gpu,
 void etnaviv_gem_describe_objects(struct etnaviv_drm_private *priv,
 	struct seq_file *m);
 #endif
-
-void __iomem *etnaviv_ioremap(struct platform_device *pdev, const char *name,
-		const char *dbgname);
-void etnaviv_writel(u32 data, void __iomem *addr);
-u32 etnaviv_readl(const void __iomem *addr);
 
 #define DBG(fmt, ...) DRM_DEBUG(fmt"\n", ##__VA_ARGS__)
 #define VERB(fmt, ...) if (0) DRM_DEBUG(fmt"\n", ##__VA_ARGS__)
@@ -140,19 +128,27 @@ static inline bool fence_after_eq(u32 a, u32 b)
 	return (s32)(a - b) >= 0;
 }
 
+/*
+ * Etnaviv timeouts are specified wrt CLOCK_MONOTONIC, not jiffies.
+ * We need to calculate the timeout in terms of number of jiffies
+ * between the specified timeout and the current CLOCK_MONOTONIC time.
+ */
 static inline unsigned long etnaviv_timeout_to_jiffies(
 	const struct timespec *timeout)
 {
-	unsigned long timeout_jiffies = timespec_to_jiffies(timeout);
-	unsigned long start_jiffies = jiffies;
-	unsigned long remaining_jiffies;
+	struct timespec64 ts, to;
 
-	if (time_after(start_jiffies, timeout_jiffies))
-		remaining_jiffies = 0;
-	else
-		remaining_jiffies = timeout_jiffies - start_jiffies;
+	to = timespec_to_timespec64(*timeout);
 
-	return remaining_jiffies;
+	ktime_get_ts64(&ts);
+
+	/* timeouts before "now" have already expired */
+	if (timespec64_compare(&to, &ts) <= 0)
+		return 0;
+
+	ts = timespec64_sub(to, ts);
+
+	return timespec64_to_jiffies(&ts);
 }
 
 #endif /* __ETNAVIV_DRV_H__ */

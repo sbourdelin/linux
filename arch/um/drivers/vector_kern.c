@@ -188,7 +188,7 @@ static int get_transport_options(struct arglist *def)
 	if (strncmp(transport, TRANS_TAP, TRANS_TAP_LEN) == 0)
 		return (vec_rx | VECTOR_BPF);
 	if (strncmp(transport, TRANS_RAW, TRANS_RAW_LEN) == 0)
-		return (vec_rx | vec_tx | VECTOR_BPF);
+		return (vec_rx | vec_tx);
 	return (vec_rx | vec_tx);
 }
 
@@ -677,7 +677,7 @@ static struct vector_device *find_device(int n)
 static int vector_parse(char *str, int *index_out, char **str_out,
 			char **error_out)
 {
-	int n, len, err = -EINVAL;
+	int n, len, err;
 	char *start = str;
 
 	len = strlen(str);
@@ -686,7 +686,7 @@ static int vector_parse(char *str, int *index_out, char **str_out,
 		str++;
 	if (*str != ':') {
 		*error_out = "Expected ':' after device number";
-		return err;
+		return -EINVAL;
 	}
 	*str = '\0';
 
@@ -699,7 +699,7 @@ static int vector_parse(char *str, int *index_out, char **str_out,
 	str++;
 	if (find_device(n)) {
 		*error_out = "Device already configured";
-		return err;
+		return -EINVAL;
 	}
 
 	*index_out = n;
@@ -723,7 +723,7 @@ static int vector_config(char *str, char **error_out)
 	 */
 
 	params = kstrdup(params, GFP_KERNEL);
-	if (str == NULL) {
+	if (params == NULL) {
 		*error_out = "vector_config failed to strdup string";
 		return -ENOMEM;
 	}
@@ -1156,8 +1156,10 @@ static int vector_net_open(struct net_device *dev)
 	struct vector_device *vdevice;
 
 	spin_lock_irqsave(&vp->lock, flags);
-	if (vp->opened)
+	if (vp->opened) {
+		spin_unlock_irqrestore(&vp->lock, flags);
 		return -ENXIO;
+	}
 	vp->opened = true;
 	spin_unlock_irqrestore(&vp->lock, flags);
 
@@ -1228,12 +1230,14 @@ static int vector_net_open(struct net_device *dev)
 		irq_rr = (irq_rr + 1) % VECTOR_IRQ_SPACE;
 	}
 
+	if ((vp->options & VECTOR_QDISC_BYPASS) != 0) {
+		if (!uml_raw_enable_qdisc_bypass(vp->fds->rx_fd))
+			vp->options = vp->options | VECTOR_BPF;
+	}
+
 	if ((vp->options & VECTOR_BPF) != 0)
 		vp->bpf = uml_vector_default_bpf(vp->fds->rx_fd, dev->dev_addr);
 
-	/* Write Timeout Timer */
-
-	vp->tl.data = (unsigned long) vp;
 	netif_start_queue(dev);
 
 	/* clear buffer - it can happen that the host side of the interface
@@ -1407,9 +1411,9 @@ static const struct net_device_ops vector_netdev_ops = {
 };
 
 
-static void vector_timer_expire(unsigned long _conn)
+static void vector_timer_expire(struct timer_list *t)
 {
-	struct vector_private *vp = (struct vector_private *)_conn;
+	struct vector_private *vp = from_timer(vp, t, tl);
 
 	vp->estats.tx_kicks++;
 	vector_send(vp->tx_queue);
@@ -1498,9 +1502,8 @@ static void vector_eth_configure(
 	tasklet_init(&vp->tx_poll, vector_tx_poll, (unsigned long)vp);
 	INIT_WORK(&vp->reset_tx, vector_reset_tx);
 
-	init_timer(&vp->tl);
+	timer_setup(&vp->tl, vector_timer_expire, 0);
 	spin_lock_init(&vp->lock);
-	vp->tl.function = vector_timer_expire;
 
 	/* FIXME */
 	dev->netdev_ops = &vector_netdev_ops;

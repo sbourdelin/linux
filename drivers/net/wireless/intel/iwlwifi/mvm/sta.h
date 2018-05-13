@@ -383,13 +383,17 @@ struct iwl_mvm_rxq_dup_data {
  * and from Tx response flow, it needs a spinlock.
  * @tid_data: per tid data + mgmt. Look at %iwl_mvm_tid_data.
  * @tid_to_baid: a simple map of TID to baid
+ * @lq_sta: holds rate scaling data, either for the case when RS is done in
+ *	the driver - %rs_drv or in the FW - %rs_fw.
  * @reserved_queue: the queue reserved for this STA for DQA purposes
  *	Every STA has is given one reserved queue to allow it to operate. If no
  *	such queue can be guaranteed, the STA addition will fail.
  * @tx_protection: reference counter for controlling the Tx protection.
  * @tt_tx_protection: is thermal throttling enable Tx protection?
  * @disable_tx: is tx to this STA disabled?
- * @tlc_amsdu: true if A-MSDU is allowed
+ * @amsdu_enabled: bitmap of TX AMSDU allowed TIDs.
+ *	In case TLC offload is not active it is either 0xFFFF or 0.
+ * @max_amsdu_len: max AMSDU length
  * @agg_tids: bitmap of tids whose status is operational aggregated (IWL_AGG_ON)
  * @sleep_tx_count: the number of frames that we told the firmware to let out
  *	even when that station is asleep. This is useful in case the queue
@@ -417,7 +421,10 @@ struct iwl_mvm_sta {
 	spinlock_t lock;
 	struct iwl_mvm_tid_data tid_data[IWL_MAX_TID_COUNT + 1];
 	u8 tid_to_baid[IWL_MAX_TID_COUNT];
-	struct iwl_lq_sta lq_sta;
+	union {
+		struct iwl_lq_sta_rs_fw rs_fw;
+		struct iwl_lq_sta rs_drv;
+	} lq_sta;
 	struct ieee80211_vif *vif;
 	struct iwl_mvm_key_pn __rcu *ptk_pn[4];
 	struct iwl_mvm_rxq_dup_data *dup_data;
@@ -431,7 +438,8 @@ struct iwl_mvm_sta {
 	bool tt_tx_protection;
 
 	bool disable_tx;
-	bool tlc_amsdu;
+	u16 amsdu_enabled;
+	u16 max_amsdu_len;
 	bool sleeping;
 	bool associated;
 	u8 agg_tids;

@@ -464,15 +464,16 @@ redo_bucket:
 
 	if (!num) {
 		if (dlm->reco.state & DLM_RECO_STATE_ACTIVE) {
-			mlog(0, "%s: perhaps there are more lock resources need to "
-					"be migrated after dlm recovery\n", dlm->name);
+			mlog(0, "%s: perhaps there are more lock resources "
+			     "need to be migrated after dlm recovery\n", dlm->name);
 			ret = -EAGAIN;
 		} else {
-			mlog(0, "%s: we won't do dlm recovery after migrating all lockres",
-					dlm->name);
+			mlog(0, "%s: we won't do dlm recovery after migrating "
+			     "all lock resources\n", dlm->name);
 			dlm->migrate_done = 1;
 		}
 	}
+
 	spin_unlock(&dlm->spinlock);
 	wake_up(&dlm->dlm_thread_wq);
 
@@ -685,20 +686,6 @@ static void dlm_leave_domain(struct dlm_ctxt *dlm)
 			clear_bit(node, dlm->domain_map);
 	}
 	spin_unlock(&dlm->spinlock);
-}
-
-int dlm_shutting_down(struct dlm_ctxt *dlm)
-{
-	int ret = 0;
-
-	spin_lock(&dlm_domain_lock);
-
-	if (dlm->dlm_state == DLM_CTXT_IN_SHUTDOWN)
-		ret = 1;
-
-	spin_unlock(&dlm_domain_lock);
-
-	return ret;
 }
 
 void dlm_unregister_domain(struct dlm_ctxt *dlm)

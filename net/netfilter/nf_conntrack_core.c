@@ -58,8 +58,6 @@
 
 #include "nf_internals.h"
 
-#define NF_CONNTRACK_VERSION	"0.5.0"
-
 int (*nfnetlink_parse_nat_setup_hook)(struct nf_conn *ct,
 				      enum nf_nat_manip_type manip,
 				      const struct nlattr *attr) __read_mostly;
@@ -188,6 +186,7 @@ unsigned int nf_conntrack_htable_size __read_mostly;
 EXPORT_SYMBOL_GPL(nf_conntrack_htable_size);
 
 unsigned int nf_conntrack_max __read_mostly;
+EXPORT_SYMBOL_GPL(nf_conntrack_max);
 seqcount_t nf_conntrack_generation __read_mostly;
 static unsigned int nf_conntrack_hash_rnd __read_mostly;
 
@@ -901,6 +900,9 @@ static unsigned int early_drop_list(struct net *net,
 	hlist_nulls_for_each_entry_rcu(h, n, head, hnnode) {
 		tmp = nf_ct_tuplehash_to_ctrack(h);
 
+		if (test_bit(IPS_OFFLOAD_BIT, &tmp->status))
+			continue;
+
 		if (nf_ct_is_expired(tmp)) {
 			nf_ct_gc_expired(tmp);
 			continue;
@@ -975,6 +977,18 @@ static bool gc_worker_can_early_drop(const struct nf_conn *ct)
 	return false;
 }
 
+#define	DAY	(86400 * HZ)
+
+/* Set an arbitrary timeout large enough not to ever expire, this save
+ * us a check for the IPS_OFFLOAD_BIT from the packet path via
+ * nf_ct_is_expired().
+ */
+static void nf_ct_offload_timeout(struct nf_conn *ct)
+{
+	if (nf_ct_expires(ct) < DAY / 2)
+		ct->timeout = nfct_time_stamp + DAY;
+}
+
 static void gc_worker(struct work_struct *work)
 {
 	unsigned int min_interval = max(HZ / GC_MAX_BUCKETS_DIV, 1u);
@@ -1011,6 +1025,11 @@ static void gc_worker(struct work_struct *work)
 			tmp = nf_ct_tuplehash_to_ctrack(h);
 
 			scanned++;
+			if (test_bit(IPS_OFFLOAD_BIT, &tmp->status)) {
+				nf_ct_offload_timeout(tmp);
+				continue;
+			}
+
 			if (nf_ct_is_expired(tmp)) {
 				nf_ct_gc_expired(tmp);
 				expired_count++;
@@ -1044,7 +1063,7 @@ static void gc_worker(struct work_struct *work)
 		 * we will just continue with next hash slot.
 		 */
 		rcu_read_unlock();
-		cond_resched_rcu_qs();
+		cond_resched();
 	} while (++buckets < goal);
 
 	if (gc_work->exiting)
@@ -1745,14 +1764,14 @@ nf_ct_iterate_destroy(int (*iter)(struct nf_conn *i, void *data), void *data)
 {
 	struct net *net;
 
-	rtnl_lock();
+	down_read(&net_rwsem);
 	for_each_net(net) {
 		if (atomic_read(&net->ct.count) == 0)
 			continue;
 		__nf_ct_unconfirmed_destroy(net);
 		nf_queue_nf_hook_drop(net);
 	}
-	rtnl_unlock();
+	up_read(&net_rwsem);
 
 	/* Need to wait for netns cleanup worker to finish, if its
 	 * running -- it might have deleted a net namespace from
@@ -2047,10 +2066,6 @@ int nf_conntrack_init_start(void)
 						SLAB_TYPESAFE_BY_RCU | SLAB_HWCACHE_ALIGN, NULL);
 	if (!nf_conntrack_cachep)
 		goto err_cachep;
-
-	printk(KERN_INFO "nf_conntrack version %s (%u buckets, %d max)\n",
-	       NF_CONNTRACK_VERSION, nf_conntrack_htable_size,
-	       nf_conntrack_max);
 
 	ret = nf_conntrack_expect_init();
 	if (ret < 0)

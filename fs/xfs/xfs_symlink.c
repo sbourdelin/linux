@@ -232,11 +232,6 @@ xfs_symlink(
 	resblks = XFS_SYMLINK_SPACE_RES(mp, link_name->len, fs_blocks);
 
 	error = xfs_trans_alloc(mp, &M_RES(mp)->tr_symlink, resblks, 0, 0, &tp);
-	if (error == -ENOSPC && fs_blocks == 0) {
-		resblks = 0;
-		error = xfs_trans_alloc(mp, &M_RES(mp)->tr_symlink, 0, 0, 0,
-				&tp);
-	}
 	if (error)
 		goto out_release_inode;
 
@@ -260,24 +255,17 @@ xfs_symlink(
 		goto out_trans_cancel;
 
 	/*
-	 * Check for ability to enter directory entry, if no space reserved.
-	 */
-	if (!resblks) {
-		error = xfs_dir_canenter(tp, dp, link_name);
-		if (error)
-			goto out_trans_cancel;
-	}
-	/*
 	 * Initialize the bmap freelist prior to calling either
 	 * bmapi or the directory create code.
 	 */
 	xfs_defer_init(&dfops, &first_block);
+	tp->t_agfl_dfops = &dfops;
 
 	/*
 	 * Allocate an inode for the symlink.
 	 */
 	error = xfs_dir_ialloc(&tp, dp, S_IFLNK | (mode & ~S_IFMT), 1, 0,
-			       prid, resblks > 0, &ip, NULL);
+			       prid, &ip);
 	if (error)
 		goto out_trans_cancel;
 
@@ -501,16 +489,11 @@ xfs_inactive_symlink_rmt(
 	error = xfs_defer_finish(&tp, &dfops);
 	if (error)
 		goto error_bmap_cancel;
-	/*
-	 * The first xact was committed, so add the inode to the new one.
-	 * Mark it dirty so it will be logged and moved forward in the log as
-	 * part of every commit.
-	 */
-	xfs_trans_ijoin(tp, ip, 0);
-	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+
 	/*
 	 * Commit the transaction containing extent freeing and EFDs.
 	 */
+	xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	error = xfs_trans_commit(tp);
 	if (error) {
 		ASSERT(XFS_FORCED_SHUTDOWN(mp));

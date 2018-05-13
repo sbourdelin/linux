@@ -13,7 +13,7 @@
  * more details.
  */
 #else
-/**
+/*
 Support for Intel Camera Imaging ISP subsystem.
 Copyright (c) 2010 - 2015, Intel Corporation.
 
@@ -175,7 +175,7 @@ enum ia_css_err ia_css_frame_allocate(struct ia_css_frame **frame,
 
 enum ia_css_err ia_css_frame_map(struct ia_css_frame **frame,
 	const struct ia_css_frame_info *info,
-	const void *data,
+	const void __user *data,
 	uint16_t attribute,
 	void *context)
 {
@@ -196,7 +196,7 @@ enum ia_css_err ia_css_frame_map(struct ia_css_frame **frame,
 						  attribute, context);
 		if (me->data == mmgr_NULL)
 			err = IA_CSS_ERR_INVALID_ARGUMENTS;
-	};
+	}
 
 	if (err != IA_CSS_SUCCESS) {
 		sh_css_free(me);
