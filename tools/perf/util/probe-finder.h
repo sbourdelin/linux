@@ -14,6 +14,8 @@
 #define PROBE_ARG_VARS		"$vars"
 #define PROBE_ARG_PARAMS	"$params"
 
+struct dso;
+
 static inline int is_c_varname(const char *name)
 {
 	/* TODO */
@@ -32,6 +34,7 @@ struct debuginfo {
 	Dwfl_Module	*mod;
 	Dwfl		*dwfl;
 	Dwarf_Addr	bias;
+	struct dso	*dso;
 };
 
 /* This also tries to open distro debuginfo */
