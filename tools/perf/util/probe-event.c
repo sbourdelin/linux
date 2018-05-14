@@ -1225,6 +1225,59 @@ static bool is_c_func_name(const char *name)
 	return true;
 }
 
+/* Symbols in demangled CXX function names */
+static inline bool is_cxx_symbol(const char symbol)
+{
+	switch (symbol) {
+	case '_':
+	case ' ':
+	case '&':
+	case '*':
+	case '@':
+	case ',':
+	case ':':
+	case '<':
+	case '>':
+	case '(':
+	case ')':
+		return true;
+	default:
+		return false;
+	}
+}
+
+/* Is name a C++ name? */
+static bool is_cxx_func_name(const char *name)
+{
+	/* C name or a mangled name */
+	if (is_c_func_name(name))
+		return true;
+	while (*++name != '\0') {
+		if (!isalpha(*name) && !isdigit(*name) && !is_cxx_symbol(*name))
+			return false;
+	}
+	return true;
+}
+
+/*
+ * Find the first ':' that isn't part of a C++ namespace or class
+ * name.
+ */
+static char *first_non_cxx_ns(char *name)
+{
+	while (*name) {
+		char cur = *name, nxt = *(name + 1);
+
+		if (cur == ':' && nxt == ':')
+			name += 2;
+		else if (cur == ':')
+			return name;
+
+		name += 1;
+	}
+	return NULL;
+}
+
 /*
  * Stuff 'lr' according to the line range described by 'arg'.
  * The line range syntax is described by:
@@ -1243,7 +1296,7 @@ int parse_line_range_desc(const char *arg, struct line_range *lr)
 	lr->start = 0;
 	lr->end = INT_MAX;
 
-	range = strchr(name, ':');
+	range = first_non_cxx_ns(name);
 	if (range) {
 		*range++ = '\0';
 
@@ -1296,6 +1349,8 @@ int parse_line_range_desc(const char *arg, struct line_range *lr)
 	} else if (strchr(name, '/') || strchr(name, '.'))
 		lr->file = name;
 	else if (is_c_func_name(name))/* We reuse it for checking funcname */
+		lr->function = name;
+	else if (is_cxx_func_name(name))
 		lr->function = name;
 	else {	/* Invalid name */
 		semantic_error("'%s' is not a valid function name.\n", name);
