@@ -43,7 +43,7 @@
 #include "util/probe-file.h"
 
 #define DEFAULT_VAR_FILTER "!__k???tab_* & !__crc_*"
-#define DEFAULT_FUNC_FILTER "!_*"
+#define DEFAULT_FUNC_FILTER "!_* | _Z*"
 #define DEFAULT_LIST_FILTER "*"
 
 /* Session management structure */
