@@ -1317,6 +1317,7 @@ static int add_probe_trace_event(Dwarf_Die *sc_die, struct probe_finder *pf)
 	struct perf_probe_point *pp = &pf->pev->point;
 	struct probe_trace_event *tev;
 	struct perf_probe_arg *args = NULL;
+	const char *linkage_name;
 	int ret, i;
 
 	/* Check number of tevs */
@@ -1332,6 +1333,16 @@ static int add_probe_trace_event(Dwarf_Die *sc_die, struct probe_finder *pf)
 				     pp->retprobe, pp->function, &tev->point);
 	if (ret < 0)
 		goto end;
+
+	/*
+	 * Adding a C++ name like std::vector<int, std::allocator<int> >::at
+	 * will fail. Check if we want to use the linkage name instead.
+	 */
+	linkage_name = die_get_linkage_name(&pf->sp_die);
+	if (linkage_name && strncmp(linkage_name, "_Z", 2) == 0) {
+		free(pp->function);
+		pp->function = strdup(linkage_name);
+	}
 
 	tev->point.realname = strdup(dwarf_diename(sc_die));
 	if (!tev->point.realname) {
