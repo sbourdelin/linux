@@ -8,6 +8,7 @@
 
 s64 perf_atoll(const char *str);
 char **argv_split(const char *str, int *argcp);
+char **argv_split_cxx(const char *str, int *argvcp);
 void argv_free(char **argv);
 bool strglobmatch(const char *str, const char *pat);
 bool strglobmatch_nocase(const char *str, const char *pat);

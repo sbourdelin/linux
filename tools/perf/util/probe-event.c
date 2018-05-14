@@ -1395,6 +1395,22 @@ ng_name:
 	return 0;
 }
 
+/* Split the function name from  @file, :line, %return but be C++ aware */
+static char *split_func_name(char *arg)
+{
+	char *ptr = arg;
+
+	while ((ptr = strpbrk_esc(ptr, ";:+@%"))) {
+		if (ptr[0] == ':' && ptr[1] == ':') {
+			ptr += 2;
+			continue;
+		}
+		return ptr;
+	}
+
+	return NULL;
+}
+
 /* Parse probepoint definition. */
 static int parse_perf_probe_point(char *arg, struct perf_probe_event *pev)
 {
@@ -1474,7 +1490,7 @@ static int parse_perf_probe_point(char *arg, struct perf_probe_event *pev)
 			file_spec = true;
 	}
 
-	ptr = strpbrk_esc(arg, ";:+@%");
+	ptr = split_func_name(arg);
 	if (ptr) {
 		nc = *ptr;
 		*ptr++ = '\0';
@@ -1714,7 +1730,7 @@ int parse_perf_probe_command(const char *cmd, struct perf_probe_event *pev)
 	char **argv;
 	int argc, i, ret = 0;
 
-	argv = argv_split(cmd, &argc);
+	argv = argv_split_cxx(cmd, &argc);
 	if (!argv) {
 		pr_debug("Failed to split arguments.\n");
 		return -ENOMEM;

@@ -80,6 +80,23 @@ static const char *skip_arg(const char *cp)
 	return cp;
 }
 
+static const char *skip_arg_cxx(const char *cp)
+{
+	int tmpl = 0;
+
+	while (*cp) {
+		if (tmpl == 0 && isspace(*cp))
+			break;
+		if (*cp == '<')
+			tmpl += 1;
+		if (*cp == '>')
+			tmpl -= 1;
+		cp++;
+	}
+
+	return cp;
+}
+
 static int count_argc(const char *str)
 {
 	int count = 0;
@@ -159,6 +176,46 @@ out:
 	return argv;
 
 fail:
+	argv_free(argv);
+	return NULL;
+}
+
+char **argv_split_cxx(const char *str, int *argcp)
+{
+	int argc = count_argc(str);
+	char **argv = calloc(argc + 1, sizeof(*argv));
+	char **argvp;
+
+	if (argv == NULL)
+		goto out;
+
+	argvp = argv;
+
+	while (*str) {
+		str = skip_sep(str);
+
+		if (*str) {
+			const char *p = str;
+			char *t;
+
+			str = skip_arg_cxx(str);
+
+			t = strndup(p, str-p);
+			if (t == NULL)
+				goto fail;
+			*argvp++ = t;
+		}
+	}
+	if (argcp)
+		*argcp = argvp - argv;
+	*argvp = NULL;
+
+out:
+	return argv;
+
+fail:
+	if (argcp)
+		*argcp = 0;
 	argv_free(argv);
 	return NULL;
 }
