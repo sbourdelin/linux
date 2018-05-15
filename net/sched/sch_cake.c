@@ -763,6 +763,239 @@ static void flow_queue_add(struct cake_flow *flow, struct sk_buff *skb)
 	skb->next = NULL;
 }
 
+static struct iphdr *cake_get_iphdr(const struct sk_buff *skb,
+				    struct ipv6hdr *buf)
+{
+	unsigned int offset = skb_network_offset(skb);
+	struct iphdr *iph;
+
+	iph = skb_header_pointer(skb, offset, sizeof(struct iphdr), buf);
+
+	if (!iph)
+		return NULL;
+
+	if (iph->version == 4 && iph->protocol == IPPROTO_IPV6)
+		return skb_header_pointer(skb, offset + iph->ihl * 4,
+					  sizeof(struct ipv6hdr), buf);
+
+	else if (iph->version == 4)
+		return iph;
+
+	else if (iph->version == 6)
+		return skb_header_pointer(skb, offset, sizeof(struct ipv6hdr),
+					  buf);
+
+	return NULL;
+}
+
+static struct tcphdr *cake_get_tcphdr(const struct sk_buff *skb,
+				      void *buf, unsigned int bufsize)
+{
+	unsigned int offset = skb_network_offset(skb);
+	const struct ipv6hdr *ipv6h;
+	const struct tcphdr *tcph;
+	const struct iphdr *iph;
+	struct ipv6hdr _ipv6h;
+	struct tcphdr _tcph;
+
+	ipv6h = skb_header_pointer(skb, offset, sizeof(_ipv6h), &_ipv6h);
+
+	if (!ipv6h)
+		return NULL;
+
+	if (ipv6h->version == 4) {
+		iph = (struct iphdr *)ipv6h;
+		offset += iph->ihl * 4;
+
+		/* special-case 6in4 tunnelling, as that is a common way to get
+		 * v6 connectivity in the home
+		 */
+		if (iph->protocol == IPPROTO_IPV6) {
+			ipv6h = skb_header_pointer(skb, offset,
+						   sizeof(_ipv6h), &_ipv6h);
+
+			if (!ipv6h || ipv6h->nexthdr != IPPROTO_TCP)
+				return NULL;
+
+			offset += sizeof(struct ipv6hdr);
+
+		} else if (iph->protocol != IPPROTO_TCP) {
+			return NULL;
+		}
+
+	} else if (ipv6h->version == 6) {
+		if (ipv6h->nexthdr != IPPROTO_TCP)
+			return NULL;
+
+		offset += sizeof(struct ipv6hdr);
+	} else {
+		return NULL;
+	}
+
+	tcph = skb_header_pointer(skb, offset, sizeof(_tcph), &_tcph);
+	if (!tcph)
+		return NULL;
+
+	return skb_header_pointer(skb, offset,
+				  min(__tcp_hdrlen(tcph), bufsize), buf);
+}
+
+static bool cake_tcph_is_sack(const struct tcphdr *tcph)
+{
+	/* inspired by tcp_parse_options in tcp_input.c */
+	int length = __tcp_hdrlen(tcph) - sizeof(struct tcphdr);
+	const u8 *ptr = (const u8 *)(tcph + 1);
+
+	while (length > 0) {
+		int opcode = *ptr++;
+		int opsize;
+
+		if (opcode == TCPOPT_EOL)
+			break;
+		if (opcode == TCPOPT_NOP) {
+			length--;
+			continue;
+		}
+		opsize = *ptr++;
+		if (opsize < 2 || opsize > length)
+			break;
+		if (opcode == TCPOPT_SACK)
+			return true;
+		ptr += opsize - 2;
+		length -= opsize;
+	}
+
+	return false;
+}
+
+static struct sk_buff *cake_ack_filter(struct cake_sched_data *q,
+				       struct cake_flow *flow)
+{
+	bool aggressive = q->ack_filter == CAKE_ACK_AGGRESSIVE;
+	struct sk_buff *elig_ack = NULL, *elig_ack_prev = NULL;
+	struct sk_buff *skb_check, *skb_prev = NULL;
+	const struct ipv6hdr *ipv6h, *ipv6h_check;
+	const struct tcphdr *tcph, *tcph_check;
+	const struct iphdr *iph, *iph_check;
+	struct ipv6hdr _iph, _iph_check;
+	const struct sk_buff *skb;
+	struct tcphdr _tcph_check;
+	int seglen, num_found = 0;
+	unsigned char _tcph[64]; /* need to hold maximum hdr size */
+
+	/* no other possible ACKs to filter */
+	if (flow->head == flow->tail)
+		return NULL;
+
+	skb = flow->tail;
+	tcph = cake_get_tcphdr(skb, _tcph, sizeof(_tcph));
+	iph = cake_get_iphdr(skb, &_iph);
+	if (!tcph)
+		return NULL;
+
+	/* the 'triggering' packet need only have the ACK flag set.
+	 * also check that SYN is not set, as there won't be any previous ACKs.
+	 */
+	if ((tcp_flag_word(tcph) &
+	     (TCP_FLAG_ACK | TCP_FLAG_SYN)) != TCP_FLAG_ACK)
+		return NULL;
+
+	/* the 'triggering' ACK is at the tail of the queue, we have already
+	 * returned if it is the only packet in the flow. loop through the rest
+	 * of the queue looking for pure ACKs with the same 5-tuple as the
+	 * triggering one.
+	 */
+	for (skb_check = flow->head;
+	     skb_check && skb_check != skb;
+	     skb_prev = skb_check, skb_check = skb_check->next) {
+		iph_check = cake_get_iphdr(skb_check, &_iph_check);
+		tcph_check = cake_get_tcphdr(skb_check, &_tcph_check,
+					     sizeof(_tcph_check));
+
+		/* only TCP packets with matching 5-tuple are eligible */
+		if (!tcph_check || iph->version != iph_check->version ||
+		    tcph_check->source != tcph->source ||
+		    tcph_check->dest != tcph->dest)
+			continue;
+
+		if (iph_check->version == 4) {
+			if (iph_check->saddr != iph->saddr ||
+			    iph_check->daddr != iph->daddr)
+				continue;
+
+			seglen = ntohs(iph_check->tot_len) -
+				       (4 * iph_check->ihl);
+		} else if (iph_check->version == 6) {
+			ipv6h = (struct ipv6hdr *)iph;
+			ipv6h_check = (struct ipv6hdr *)iph_check;
+
+			if (ipv6_addr_cmp(&ipv6h_check->saddr, &ipv6h->saddr) ||
+			    ipv6_addr_cmp(&ipv6h_check->daddr, &ipv6h->daddr))
+				continue;
+
+			seglen = ntohs(ipv6h_check->payload_len);
+		} else {
+			WARN_ON(1);  /* shouldn't happen */
+			continue;
+		}
+
+		/* stricter criteria apply to ACKs that we may filter
+		 * 3 reserved flags must be unset to avoid future breakage
+		 * ECE/CWR/NS can be safely ignored
+		 * ACK must be set
+		 * All other flags URG/PSH/RST/SYN/FIN must be unset
+		 * 0x0FFF0000 = all TCP flags (confirm ACK=1, others zero)
+		 * 0x01C00000 = NS/CWR/ECE (safe to ignore)
+		 * 0x0E3F0000 = 0x0FFF0000 & ~0x01C00000
+		 * must be 'pure' ACK, contain zero bytes of segment data
+		 * options are ignored
+		 */
+		if (((tcp_flag_word(tcph_check) &
+			   cpu_to_be32(0x0E3F0000)) != TCP_FLAG_ACK) ||
+			 ((seglen - __tcp_hdrlen(tcph_check)) != 0))
+			continue;
+
+		/* The triggering packet must ACK more data than the ACK under
+		 * consideration, either because is has a strictly higher ACK
+		 * sequence number or because it is a SACK
+		 */
+		if ((ntohl(tcph_check->ack_seq) == ntohl(tcph->ack_seq) &&
+		     !cake_tcph_is_sack(tcph)) ||
+		    (int32_t)(ntohl(tcph_check->ack_seq) -
+			      ntohl(tcph->ack_seq)) > 0)
+			continue;
+
+		/* At this point we have found an eligible pure ACK to drop; if
+		 * we are in aggressive mode, we are done. Otherwise, keep
+		 * searching unless this is the second eligible ACK we
+		 * found.
+		 *
+		 * Since we want to drop ACK closest to the head of the queue,
+		 * save the first eligible ACK we find, even if we need to loop
+		 * again.
+		 */
+		if (!elig_ack) {
+			elig_ack = skb_check;
+			elig_ack_prev = skb_prev;
+		}
+
+		if (num_found++ > 0 || aggressive)
+			goto found;
+	}
+
+	return NULL;
+
+found:
+	if (elig_ack_prev)
+		elig_ack_prev->next = elig_ack->next;
+	else
+		flow->head = elig_ack->next;
+
+	elig_ack->next = NULL;
+
+	return elig_ack;
+}
+
 static cobalt_time_t cake_ewma(cobalt_time_t avg, cobalt_time_t sample,
 			       u32 shift)
 {
@@ -936,6 +1169,7 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 	int len = qdisc_pkt_len(skb);
 	u64 now = cobalt_get_time();
 	int uninitialized_var(ret);
+	struct sk_buff *ack = NULL;
 	struct cake_tin_data *b;
 	struct cake_flow *flow;
 	u32 idx, tin;
@@ -979,8 +1213,24 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 	cobalt_set_enqueue_time(skb, now);
 	flow_queue_add(flow, skb);
 
-	sch->q.qlen++;
-	q->buffer_used      += skb->truesize;
+	if (q->ack_filter)
+		ack = cake_ack_filter(q, flow);
+
+	if (ack) {
+		b->ack_drops++;
+		sch->qstats.drops++;
+		b->bytes += qdisc_pkt_len(ack);
+		len -= qdisc_pkt_len(ack);
+		q->buffer_used += skb->truesize - ack->truesize;
+		if (q->rate_flags & CAKE_FLAG_INGRESS)
+			cake_advance_shaper(q, b, ack, now, true);
+
+		qdisc_tree_reduce_backlog(sch, 1, qdisc_pkt_len(ack));
+		consume_skb(ack);
+	} else {
+		sch->q.qlen++;
+		q->buffer_used      += skb->truesize;
+	}
 
 	/* stats */
 	b->packets++;
@@ -1493,6 +1743,9 @@ static int cake_change(struct Qdisc *sch, struct nlattr *opt,
 			q->rate_flags &= ~CAKE_FLAG_INGRESS;
 	}
 
+	if (tb[TCA_CAKE_ACK_FILTER])
+		q->ack_filter = nla_get_u32(tb[TCA_CAKE_ACK_FILTER]);
+
 	if (tb[TCA_CAKE_MEMORY])
 		q->buffer_config_limit = nla_get_u32(tb[TCA_CAKE_MEMORY]);
 
@@ -1622,6 +1875,9 @@ static int cake_dump(struct Qdisc *sch, struct sk_buff *skb)
 
 	if (nla_put_u32(skb, TCA_CAKE_INGRESS,
 			!!(q->rate_flags & CAKE_FLAG_INGRESS)))
+		goto nla_put_failure;
+
+	if (nla_put_u32(skb, TCA_CAKE_ACK_FILTER, q->ack_filter))
 		goto nla_put_failure;
 
 	return nla_nest_end(skb, opts);
