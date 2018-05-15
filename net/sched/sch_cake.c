@@ -442,7 +442,8 @@ static bool cobalt_queue_empty(struct cobalt_vars *vars,
 static bool cobalt_should_drop(struct cobalt_vars *vars,
 			       struct cobalt_params *p,
 			       cobalt_time_t now,
-			       struct sk_buff *skb)
+			       struct sk_buff *skb,
+			       u32 bulk_flows)
 {
 	bool next_due, over_target, drop = false;
 	cobalt_tdiff_t sojourn, schedule;
@@ -465,6 +466,7 @@ static bool cobalt_should_drop(struct cobalt_vars *vars,
 	sojourn = now - cobalt_get_enqueue_time(skb);
 	schedule = now - vars->drop_next;
 	over_target = sojourn > p->target &&
+		      sojourn > p->mtu_time * bulk_flows * 2 &&
 		      sojourn > p->mtu_time * 4;
 	next_due = vars->count && schedule >= 0;
 
@@ -914,6 +916,9 @@ static unsigned int cake_drop(struct Qdisc *sch, struct sk_buff **to_free)
 	b->tin_dropped++;
 	sch->qstats.drops++;
 
+	if (q->rate_flags & CAKE_FLAG_INGRESS)
+		cake_advance_shaper(q, b, skb, now, true);
+
 	__qdisc_drop(skb, to_free);
 	sch->q.qlen--;
 
@@ -989,8 +994,39 @@ static s32 cake_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 		cake_heapify_up(q, b->overflow_idx[idx]);
 
 	/* incoming bandwidth capacity estimate */
-	q->avg_window_bytes = 0;
-	q->last_packet_time = now;
+	if (q->rate_flags & CAKE_FLAG_AUTORATE_INGRESS) {
+		u64 packet_interval = now - q->last_packet_time;
+
+		if (packet_interval > NSEC_PER_SEC)
+			packet_interval = NSEC_PER_SEC;
+
+		/* filter out short-term bursts, eg. wifi aggregation */
+		q->avg_packet_interval = cake_ewma(q->avg_packet_interval,
+						   packet_interval,
+			packet_interval > q->avg_packet_interval ? 2 : 8);
+
+		q->last_packet_time = now;
+
+		if (packet_interval > q->avg_packet_interval) {
+			u64 window_interval = now - q->avg_window_begin;
+			u64 b = q->avg_window_bytes * (u64)NSEC_PER_SEC;
+
+			do_div(b, window_interval);
+			q->avg_peak_bandwidth =
+				cake_ewma(q->avg_peak_bandwidth, b,
+					  b > q->avg_peak_bandwidth ? 2 : 8);
+			q->avg_window_bytes = 0;
+			q->avg_window_begin = now;
+
+			if (now - q->last_reconfig_time > (NSEC_PER_SEC / 4)) {
+				q->rate_bps = (q->avg_peak_bandwidth * 15) >> 4;
+				cake_reconfigure(sch);
+			}
+		}
+	} else {
+		q->avg_window_bytes = 0;
+		q->last_packet_time = now;
+	}
 
 	/* flowchain */
 	if (!flow->set || flow->set == CAKE_SET_DECAYING) {
@@ -1245,14 +1281,26 @@ retry:
 		}
 
 		/* Last packet in queue may be marked, shouldn't be dropped */
-		if (!cobalt_should_drop(&flow->cvars, &b->cparams, now, skb) ||
+		if (!cobalt_should_drop(&flow->cvars, &b->cparams, now, skb,
+					(b->bulk_flow_count *
+					 !!(q->rate_flags &
+					    CAKE_FLAG_INGRESS))) ||
 		    !flow->head)
 			break;
 
+		/* drop this packet, get another one */
+		if (q->rate_flags & CAKE_FLAG_INGRESS) {
+			len = cake_advance_shaper(q, b, skb,
+						  now, true);
+			flow->deficit -= len;
+			b->tin_deficit -= len;
+		}
 		b->tin_dropped++;
 		qdisc_tree_reduce_backlog(sch, 1, qdisc_pkt_len(skb));
 		qdisc_qstats_drop(sch);
 		kfree_skb(skb);
+		if (q->rate_flags & CAKE_FLAG_INGRESS)
+			goto retry;
 	}
 
 	b->tin_ecn_mark += !!flow->cvars.ecn_marked;
@@ -1431,6 +1479,20 @@ static int cake_change(struct Qdisc *sch, struct nlattr *opt,
 			q->target = 1;
 	}
 
+	if (tb[TCA_CAKE_AUTORATE]) {
+		if (!!nla_get_u32(tb[TCA_CAKE_AUTORATE]))
+			q->rate_flags |= CAKE_FLAG_AUTORATE_INGRESS;
+		else
+			q->rate_flags &= ~CAKE_FLAG_AUTORATE_INGRESS;
+	}
+
+	if (tb[TCA_CAKE_INGRESS]) {
+		if (!!nla_get_u32(tb[TCA_CAKE_INGRESS]))
+			q->rate_flags |= CAKE_FLAG_INGRESS;
+		else
+			q->rate_flags &= ~CAKE_FLAG_INGRESS;
+	}
+
 	if (tb[TCA_CAKE_MEMORY])
 		q->buffer_config_limit = nla_get_u32(tb[TCA_CAKE_MEMORY]);
 
@@ -1552,6 +1614,14 @@ static int cake_dump(struct Qdisc *sch, struct sk_buff *skb)
 		goto nla_put_failure;
 
 	if (nla_put_u32(skb, TCA_CAKE_MEMORY, q->buffer_config_limit))
+		goto nla_put_failure;
+
+	if (nla_put_u32(skb, TCA_CAKE_AUTORATE,
+			!!(q->rate_flags & CAKE_FLAG_AUTORATE_INGRESS)))
+		goto nla_put_failure;
+
+	if (nla_put_u32(skb, TCA_CAKE_INGRESS,
+			!!(q->rate_flags & CAKE_FLAG_INGRESS)))
 		goto nla_put_failure;
 
 	return nla_nest_end(skb, opts);
