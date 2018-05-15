@@ -273,6 +273,9 @@ int update_devfreq(struct devfreq *devfreq)
 	if (err)
 		return err;
 
+	srcu_notifier_call_chain(&devfreq->policy_notifier_list,
+			DEVFREQ_ADJUST, &freq);
+
 	/*
 	 * Adjust the frequency with user freq, QoS and available freq.
 	 *
@@ -640,6 +643,7 @@ struct devfreq *devfreq_add_device(struct device *dev,
 	devfreq->last_stat_updated = jiffies;
 
 	srcu_init_notifier_head(&devfreq->transition_notifier_list);
+	srcu_init_notifier_head(&devfreq->policy_notifier_list);
 
 	mutex_unlock(&devfreq->lock);
 
@@ -1414,7 +1418,7 @@ EXPORT_SYMBOL(devm_devfreq_unregister_opp_notifier);
  * devfreq_register_notifier() - Register a driver with devfreq
  * @devfreq:	The devfreq object.
  * @nb:		The notifier block to register.
- * @list:	DEVFREQ_TRANSITION_NOTIFIER.
+ * @list:	DEVFREQ_TRANSITION_NOTIFIER or DEVFREQ_POLICY_NOTIFIER.
  */
 int devfreq_register_notifier(struct devfreq *devfreq,
 				struct notifier_block *nb,
@@ -1430,6 +1434,10 @@ int devfreq_register_notifier(struct devfreq *devfreq,
 		ret = srcu_notifier_chain_register(
 				&devfreq->transition_notifier_list, nb);
 		break;
+	case DEVFREQ_POLICY_NOTIFIER:
+		ret = srcu_notifier_chain_register(
+				&devfreq->policy_notifier_list, nb);
+		break;
 	default:
 		ret = -EINVAL;
 	}
@@ -1442,7 +1450,7 @@ EXPORT_SYMBOL(devfreq_register_notifier);
  * devfreq_unregister_notifier() - Unregister a driver with devfreq
  * @devfreq:	The devfreq object.
  * @nb:		The notifier block to be unregistered.
- * @list:	DEVFREQ_TRANSITION_NOTIFIER.
+ * @list:	DEVFREQ_TRANSITION_NOTIFIER or DEVFREQ_POLICY_NOTIFIER.
  */
 int devfreq_unregister_notifier(struct devfreq *devfreq,
 				struct notifier_block *nb,
@@ -1457,6 +1465,10 @@ int devfreq_unregister_notifier(struct devfreq *devfreq,
 	case DEVFREQ_TRANSITION_NOTIFIER:
 		ret = srcu_notifier_chain_unregister(
 				&devfreq->transition_notifier_list, nb);
+		break;
+	case DEVFREQ_POLICY_NOTIFIER:
+		ret = srcu_notifier_chain_unregister(
+				&devfreq->policy_notifier_list, nb);
 		break;
 	default:
 		ret = -EINVAL;
@@ -1485,7 +1497,7 @@ static void devm_devfreq_notifier_release(struct device *dev, void *res)
  * @dev:	The devfreq user device. (parent of devfreq)
  * @devfreq:	The devfreq object.
  * @nb:		The notifier block to be unregistered.
- * @list:	DEVFREQ_TRANSITION_NOTIFIER.
+ * @list:	DEVFREQ_TRANSITION_NOTIFIER or DEVFREQ_POLICY_NOTIFIER.
  */
 int devm_devfreq_register_notifier(struct device *dev,
 				struct devfreq *devfreq,
@@ -1521,7 +1533,7 @@ EXPORT_SYMBOL(devm_devfreq_register_notifier);
  * @dev:	The devfreq user device. (parent of devfreq)
  * @devfreq:	The devfreq object.
  * @nb:		The notifier block to be unregistered.
- * @list:	DEVFREQ_TRANSITION_NOTIFIER.
+ * @list:	DEVFREQ_TRANSITION_NOTIFIER or DEVFREQ_POLICY_NOTIFIER.
  */
 void devm_devfreq_unregister_notifier(struct device *dev,
 				struct devfreq *devfreq,
