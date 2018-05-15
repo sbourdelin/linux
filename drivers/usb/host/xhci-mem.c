@@ -33,8 +33,9 @@ static struct xhci_segment *xhci_segment_alloc(struct xhci_hcd *xhci,
 	struct xhci_segment *seg;
 	dma_addr_t	dma;
 	int		i;
+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
 
-	seg = kzalloc(sizeof *seg, flags);
+	seg = kzalloc_node(sizeof(*seg), flags, dev_to_node(dev));
 	if (!seg)
 		return NULL;
 
@@ -45,7 +46,8 @@ static struct xhci_segment *xhci_segment_alloc(struct xhci_hcd *xhci,
 	}
 
 	if (max_packet) {
-		seg->bounce_buf = kzalloc(max_packet, flags);
+		seg->bounce_buf = kzalloc_node(max_packet, flags,
+					dev_to_node(dev));
 		if (!seg->bounce_buf) {
 			dma_pool_free(xhci->segment_pool, seg->trbs, dma);
 			kfree(seg);
@@ -363,8 +365,9 @@ struct xhci_ring *xhci_ring_alloc(struct xhci_hcd *xhci,
 {
 	struct xhci_ring	*ring;
 	int ret;
+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
 
-	ring = kzalloc(sizeof *(ring), flags);
+	ring = kzalloc_node(sizeof(*ring), flags, dev_to_node(dev));
 	if (!ring)
 		return NULL;
 
@@ -458,11 +461,12 @@ struct xhci_container_ctx *xhci_alloc_container_ctx(struct xhci_hcd *xhci,
 						    int type, gfp_t flags)
 {
 	struct xhci_container_ctx *ctx;
+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
 
 	if ((type != XHCI_CTX_TYPE_DEVICE) && (type != XHCI_CTX_TYPE_INPUT))
 		return NULL;
 
-	ctx = kzalloc(sizeof(*ctx), flags);
+	ctx = kzalloc_node(sizeof(*ctx), flags, dev_to_node(dev));
 	if (!ctx)
 		return NULL;
 
@@ -615,6 +619,7 @@ struct xhci_stream_info *xhci_alloc_stream_info(struct xhci_hcd *xhci,
 	struct xhci_ring *cur_ring;
 	u64 addr;
 	int ret;
+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
 
 	xhci_dbg(xhci, "Allocating %u streams and %u "
 			"stream context array entries.\n",
@@ -625,7 +630,8 @@ struct xhci_stream_info *xhci_alloc_stream_info(struct xhci_hcd *xhci,
 	}
 	xhci->cmd_ring_reserved_trbs++;
 
-	stream_info = kzalloc(sizeof(struct xhci_stream_info), mem_flags);
+	stream_info = kzalloc_node(sizeof(*stream_info), mem_flags,
+			dev_to_node(dev));
 	if (!stream_info)
 		goto cleanup_trbs;
 
@@ -633,9 +639,11 @@ struct xhci_stream_info *xhci_alloc_stream_info(struct xhci_hcd *xhci,
 	stream_info->num_stream_ctxs = num_stream_ctxs;
 
 	/* Initialize the array of virtual pointers to stream rings. */
-	stream_info->stream_rings = kzalloc(
-			sizeof(struct xhci_ring *)*num_streams,
-			mem_flags);
+	stream_info->stream_rings = kcalloc_node(
+			num_streams,
+			sizeof(struct xhci_ring *),
+			mem_flags,
+			dev_to_node(dev));
 	if (!stream_info->stream_rings)
 		goto cleanup_info;
 
@@ -831,6 +839,7 @@ int xhci_alloc_tt_info(struct xhci_hcd *xhci,
 	struct xhci_tt_bw_info		*tt_info;
 	unsigned int			num_ports;
 	int				i, j;
+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
 
 	if (!tt->multi)
 		num_ports = 1;
@@ -840,7 +849,8 @@ int xhci_alloc_tt_info(struct xhci_hcd *xhci,
 	for (i = 0; i < num_ports; i++, tt_info++) {
 		struct xhci_interval_bw_table *bw_table;
 
-		tt_info = kzalloc(sizeof(*tt_info), mem_flags);
+		tt_info = kzalloc_node(sizeof(*tt_info), mem_flags,
+				dev_to_node(dev));
 		if (!tt_info)
 			goto free_tts;
 		INIT_LIST_HEAD(&tt_info->tt_list);
@@ -1642,7 +1652,8 @@ static int scratchpad_alloc(struct xhci_hcd *xhci, gfp_t flags)
 	if (!num_sp)
 		return 0;
 
-	xhci->scratchpad = kzalloc(sizeof(*xhci->scratchpad), flags);
+	xhci->scratchpad = kzalloc_node(sizeof(*xhci->scratchpad), flags,
+				dev_to_node(dev));
 	if (!xhci->scratchpad)
 		goto fail_sp;
 
@@ -1652,7 +1663,8 @@ static int scratchpad_alloc(struct xhci_hcd *xhci, gfp_t flags)
 	if (!xhci->scratchpad->sp_array)
 		goto fail_sp2;
 
-	xhci->scratchpad->sp_buffers = kzalloc(sizeof(void *) * num_sp, flags);
+	xhci->scratchpad->sp_buffers = kcalloc_node(num_sp, sizeof(void *),
+					flags, dev_to_node(dev));
 	if (!xhci->scratchpad->sp_buffers)
 		goto fail_sp3;
 
@@ -1720,14 +1732,16 @@ struct xhci_command *xhci_alloc_command(struct xhci_hcd *xhci,
 		bool allocate_completion, gfp_t mem_flags)
 {
 	struct xhci_command *command;
+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
 
-	command = kzalloc(sizeof(*command), mem_flags);
+	command = kzalloc_node(sizeof(*command), mem_flags, dev_to_node(dev));
 	if (!command)
 		return NULL;
 
 	if (allocate_completion) {
 		command->completion =
-			kzalloc(sizeof(struct completion), mem_flags);
+			kzalloc_node(sizeof(struct completion), mem_flags,
+				dev_to_node(dev));
 		if (!command->completion) {
 			kfree(command);
 			return NULL;
@@ -2100,6 +2114,7 @@ static void xhci_add_in_port(struct xhci_hcd *xhci, unsigned int num_ports,
 	int i;
 	u8 major_revision, minor_revision;
 	struct xhci_hub *rhub;
+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
 
 	temp = readl(addr);
 	major_revision = XHCI_EXT_PORT_MAJOR(temp);
@@ -2136,8 +2151,8 @@ static void xhci_add_in_port(struct xhci_hcd *xhci, unsigned int num_ports,
 
 	rhub->psi_count = XHCI_EXT_PORT_PSIC(temp);
 	if (rhub->psi_count) {
-		rhub->psi = kcalloc(rhub->psi_count, sizeof(*rhub->psi),
-				    GFP_KERNEL);
+		rhub->psi = kcalloc_node(rhub->psi_count, sizeof(*rhub->psi),
+				    GFP_KERNEL, dev_to_node(dev));
 		if (!rhub->psi)
 			rhub->psi_count = 0;
 
@@ -2231,13 +2246,16 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 	int i, j, port_index;
 	int cap_count = 0;
 	u32 cap_start;
+	struct device *dev = xhci_to_hcd(xhci)->self.sysdev;
 
 	num_ports = HCS_MAX_PORTS(xhci->hcs_params1);
-	xhci->port_array = kzalloc(sizeof(*xhci->port_array)*num_ports, flags);
+	xhci->port_array = kcalloc_node(num_ports, sizeof(*xhci->port_array),
+				flags, dev_to_node(dev));
 	if (!xhci->port_array)
 		return -ENOMEM;
 
-	xhci->rh_bw = kzalloc(sizeof(*xhci->rh_bw)*num_ports, flags);
+	xhci->rh_bw = kcalloc_node(num_ports, sizeof(*xhci->rh_bw), flags,
+			dev_to_node(dev));
 	if (!xhci->rh_bw)
 		return -ENOMEM;
 	for (i = 0; i < num_ports; i++) {
@@ -2264,7 +2282,8 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 						      XHCI_EXT_CAPS_PROTOCOL);
 	}
 
-	xhci->ext_caps = kzalloc(sizeof(*xhci->ext_caps) * cap_count, flags);
+	xhci->ext_caps = kcalloc_node(cap_count, sizeof(*xhci->ext_caps),
+				flags, dev_to_node(dev));
 	if (!xhci->ext_caps)
 		return -ENOMEM;
 
@@ -2307,8 +2326,8 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 	 * Not sure how the USB core will handle a hub with no ports...
 	 */
 	if (xhci->num_usb2_ports) {
-		xhci->usb2_ports = kmalloc(sizeof(*xhci->usb2_ports)*
-				xhci->num_usb2_ports, flags);
+		xhci->usb2_ports = kcalloc_node(xhci->num_usb2_ports,
+			sizeof(*xhci->usb2_ports), flags, dev_to_node(dev));
 		if (!xhci->usb2_ports)
 			return -ENOMEM;
 
@@ -2332,8 +2351,8 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 		}
 	}
 	if (xhci->num_usb3_ports) {
-		xhci->usb3_ports = kmalloc(sizeof(*xhci->usb3_ports)*
-				xhci->num_usb3_ports, flags);
+		xhci->usb3_ports = kcalloc_node(xhci->num_usb3_ports,
+			sizeof(*xhci->usb3_ports), flags, dev_to_node(dev));
 		if (!xhci->usb3_ports)
 			return -ENOMEM;
 
