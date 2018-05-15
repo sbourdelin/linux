@@ -957,16 +957,17 @@ nvmf_create_ctrl(struct device *dev, const char *buf, size_t count)
 
 	down_read(&nvmf_transports_rwsem);
 	ops = nvmf_lookup_transport(opts);
+	up_read(&nvmf_transports_rwsem);
 	if (!ops) {
 		pr_info("no handler found for transport %s.\n",
 			opts->transport);
 		ret = -EINVAL;
-		goto out_unlock;
+		goto out_free_opts;
 	}
 
 	if (!try_module_get(ops->module)) {
 		ret = -EBUSY;
-		goto out_unlock;
+		goto out_free_opts;
 	}
 
 	ret = nvmf_check_required_opts(opts, ops->required_opts);
@@ -988,19 +989,15 @@ nvmf_create_ctrl(struct device *dev, const char *buf, size_t count)
 			"controller returned incorrect NQN: \"%s\".\n",
 			ctrl->subsys->subnqn);
 		module_put(ops->module);
-		up_read(&nvmf_transports_rwsem);
 		nvme_delete_ctrl_sync(ctrl);
 		return ERR_PTR(-EINVAL);
 	}
 
 	module_put(ops->module);
-	up_read(&nvmf_transports_rwsem);
 	return ctrl;
 
 out_module_put:
 	module_put(ops->module);
-out_unlock:
-	up_read(&nvmf_transports_rwsem);
 out_free_opts:
 	nvmf_free_options(opts);
 	return ERR_PTR(ret);
