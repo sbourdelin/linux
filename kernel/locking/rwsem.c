@@ -130,7 +130,8 @@ EXPORT_SYMBOL(up_read);
 void up_write(struct rw_semaphore *sem)
 {
 	rwsem_release(&sem->dep_map, 1, _RET_IP_);
-	DEBUG_RWSEMS_WARN_ON(sem->owner != current);
+	DEBUG_RWSEMS_WARN_ON((sem->owner != current) &&
+			     !rwsem_has_anonymous_owner(sem->owner));
 
 	rwsem_clear_owner(sem);
 	__up_write(sem);
@@ -221,5 +222,3 @@ void up_read_non_owner(struct rw_semaphore *sem)
 EXPORT_SYMBOL(up_read_non_owner);
 
 #endif
-
-
