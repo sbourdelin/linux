@@ -903,9 +903,9 @@ struct nft_chain_type {
 	void				(*free)(struct nft_ctx *ctx);
 };
 
-int nft_chain_validate_dependency(const struct nft_chain *chain,
+int nft_chain_validate_dependency(const struct nft_ctx *ctx,
 				  enum nft_chain_types type);
-int nft_chain_validate_hooks(const struct nft_chain *chain,
+int nft_chain_validate_hooks(const struct nft_ctx *ctx,
                              unsigned int hook_flags);
 
 struct nft_stats {

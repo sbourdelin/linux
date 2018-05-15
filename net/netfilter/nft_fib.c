@@ -59,7 +59,7 @@ int nft_fib_validate(const struct nft_ctx *ctx, const struct nft_expr *expr,
 		return -EINVAL;
 	}
 
-	return nft_chain_validate_hooks(ctx->chain, hooks);
+	return nft_chain_validate_hooks(ctx, hooks);
 }
 EXPORT_SYMBOL_GPL(nft_fib_validate);
 

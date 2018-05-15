@@ -357,8 +357,8 @@ static int nft_reject_bridge_validate(const struct nft_ctx *ctx,
 				      const struct nft_expr *expr,
 				      const struct nft_data **data)
 {
-	return nft_chain_validate_hooks(ctx->chain, (1 << NF_BR_PRE_ROUTING) |
-						    (1 << NF_BR_LOCAL_IN));
+	return nft_chain_validate_hooks(ctx, (1 << NF_BR_PRE_ROUTING) |
+					     (1 << NF_BR_LOCAL_IN));
 }
 
 static int nft_reject_bridge_init(const struct nft_ctx *ctx,

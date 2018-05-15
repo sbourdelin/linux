@@ -29,11 +29,11 @@ int nft_redir_validate(const struct nft_ctx *ctx,
 {
 	int err;
 
-	err = nft_chain_validate_dependency(ctx->chain, NFT_CHAIN_T_NAT);
+	err = nft_chain_validate_dependency(ctx, NFT_CHAIN_T_NAT);
 	if (err < 0)
 		return err;
 
-	return nft_chain_validate_hooks(ctx->chain,
+	return nft_chain_validate_hooks(ctx,
 					(1 << NF_INET_PRE_ROUTING) |
 					(1 << NF_INET_LOCAL_OUT));
 }

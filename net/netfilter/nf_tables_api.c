@@ -6134,13 +6134,13 @@ static const struct nfnetlink_subsystem nf_tables_subsys = {
 	.valid_genid	= nf_tables_valid_genid,
 };
 
-int nft_chain_validate_dependency(const struct nft_chain *chain,
+int nft_chain_validate_dependency(const struct nft_ctx *ctx,
 				  enum nft_chain_types type)
 {
 	const struct nft_base_chain *basechain;
 
-	if (nft_is_base_chain(chain)) {
-		basechain = nft_base_chain(chain);
+	if (nft_is_base_chain(ctx->chain)) {
+		basechain = nft_base_chain(ctx->chain);
 		if (basechain->type->type != type)
 			return -EOPNOTSUPP;
 	}
@@ -6148,13 +6148,13 @@ int nft_chain_validate_dependency(const struct nft_chain *chain,
 }
 EXPORT_SYMBOL_GPL(nft_chain_validate_dependency);
 
-int nft_chain_validate_hooks(const struct nft_chain *chain,
+int nft_chain_validate_hooks(const struct nft_ctx *ctx,
 			     unsigned int hook_flags)
 {
 	struct nft_base_chain *basechain;
 
-	if (nft_is_base_chain(chain)) {
-		basechain = nft_base_chain(chain);
+	if (nft_is_base_chain(ctx->chain)) {
+		basechain = nft_base_chain(ctx->chain);
 
 		if ((1 << basechain->ops.hooknum) & hook_flags)
 			return 0;

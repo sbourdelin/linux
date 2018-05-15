@@ -94,18 +94,18 @@ static int nft_nat_validate(const struct nft_ctx *ctx,
 	struct nft_nat *priv = nft_expr_priv(expr);
 	int err;
 
-	err = nft_chain_validate_dependency(ctx->chain, NFT_CHAIN_T_NAT);
+	err = nft_chain_validate_dependency(ctx, NFT_CHAIN_T_NAT);
 	if (err < 0)
 		return err;
 
 	switch (priv->type) {
 	case NFT_NAT_SNAT:
-		err = nft_chain_validate_hooks(ctx->chain,
+		err = nft_chain_validate_hooks(ctx,
 					       (1 << NF_INET_POST_ROUTING) |
 					       (1 << NF_INET_LOCAL_IN));
 		break;
 	case NFT_NAT_DNAT:
-		err = nft_chain_validate_hooks(ctx->chain,
+		err = nft_chain_validate_hooks(ctx,
 					       (1 << NF_INET_PRE_ROUTING) |
 					       (1 << NF_INET_LOCAL_OUT));
 		break;

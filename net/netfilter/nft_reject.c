@@ -30,7 +30,7 @@ int nft_reject_validate(const struct nft_ctx *ctx,
 			const struct nft_expr *expr,
 			const struct nft_data **data)
 {
-	return nft_chain_validate_hooks(ctx->chain,
+	return nft_chain_validate_hooks(ctx,
 					(1 << NF_INET_LOCAL_IN) |
 					(1 << NF_INET_FORWARD) |
 					(1 << NF_INET_LOCAL_OUT));

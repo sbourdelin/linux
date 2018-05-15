@@ -128,7 +128,7 @@ static int nft_flow_offload_validate(const struct nft_ctx *ctx,
 {
 	unsigned int hook_mask = (1 << NF_INET_FORWARD);
 
-	return nft_chain_validate_hooks(ctx->chain, hook_mask);
+	return nft_chain_validate_hooks(ctx, hook_mask);
 }
 
 static int nft_flow_offload_init(const struct nft_ctx *ctx,

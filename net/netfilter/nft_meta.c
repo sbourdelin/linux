@@ -354,7 +354,7 @@ static int nft_meta_get_validate(const struct nft_ctx *ctx,
 		return -EOPNOTSUPP;
 	}
 
-	return nft_chain_validate_hooks(ctx->chain, hooks);
+	return nft_chain_validate_hooks(ctx, hooks);
 #else
 	return 0;
 #endif
@@ -386,7 +386,7 @@ int nft_meta_set_validate(const struct nft_ctx *ctx,
 		return -EOPNOTSUPP;
 	}
 
-	return nft_chain_validate_hooks(ctx->chain, hooks);
+	return nft_chain_validate_hooks(ctx, hooks);
 }
 EXPORT_SYMBOL_GPL(nft_meta_set_validate);
 
