@@ -248,6 +248,7 @@ static void ieee80211_key_disable_hw_accel(struct ieee80211_key *key)
 	      (key->conf.flags & IEEE80211_KEY_FLAG_RESERVE_TAILROOM)))
 		increment_tailroom_need_count(sdata);
 
+	key->flags &= ~KEY_FLAG_UPLOADED_TO_HARDWARE;
 	ret = drv_set_key(key->local, DISABLE_KEY, sdata,
 			  sta ? &sta->sta : NULL, &key->conf);
 
@@ -257,7 +258,26 @@ static void ieee80211_key_disable_hw_accel(struct ieee80211_key *key)
 			  key->conf.keyidx,
 			  sta ? sta->sta.addr : bcast_addr, ret);
 
-	key->flags &= ~KEY_FLAG_UPLOADED_TO_HARDWARE;
+}
+
+static void ieee80211_key_retire(struct ieee80211_key *key)
+{
+	struct ieee80211_local *local = key->local;
+	struct sta_info *sta = key->sta;
+
+	assert_key_lock(key->local);
+
+	/* Stop TX till we are on the new key */
+	key->flags |= KEY_FLAG_TAINTED;
+	ieee80211_clear_fast_xmit(sta);
+
+	if (ieee80211_hw_check(&local->hw, AMPDU_AGGREGATION)) {
+		set_sta_flag(sta, WLAN_STA_BLOCK_BA);
+		ieee80211_sta_tear_down_BA_sessions(
+		    sta, AGG_STOP_LOCAL_REQUEST);
+	}
+	ieee80211_flush_queues(key->local, key->sdata, false);
+	ieee80211_key_disable_hw_accel(key);
 }
 
 static void __ieee80211_set_default_key(struct ieee80211_sub_if_data *sdata,
@@ -316,34 +336,45 @@ void ieee80211_set_default_mgmt_key(struct ieee80211_sub_if_data *sdata,
 }
 
 
-static void ieee80211_key_replace(struct ieee80211_sub_if_data *sdata,
+static int ieee80211_key_replace(struct ieee80211_sub_if_data *sdata,
 				  struct sta_info *sta,
 				  bool pairwise,
 				  struct ieee80211_key *old,
 				  struct ieee80211_key *new)
 {
 	int idx;
+	int ret;
 	bool defunikey, defmultikey, defmgmtkey;
 
 	/* caller must provide at least one old/new */
 	if (WARN_ON(!new && !old))
-		return;
+		return 0;
 
 	if (new)
 		list_add_tail_rcu(&new->list, &sdata->key_list);
 
 	WARN_ON(new && old && new->conf.keyidx != old->conf.keyidx);
 
-	if (old)
+	if (old) {
 		idx = old->conf.keyidx;
-	else
+		if(new && sta && pairwise)
+			ieee80211_key_retire(old);
+	} else {
 		idx = new->conf.keyidx;
+	}
+
+	if (new && !new->local->wowlan) {
+		ret = ieee80211_key_enable_hw_accel(new);
+		if (ret)
+			return ret;
+	}
 
 	if (sta) {
 		if (pairwise) {
 			rcu_assign_pointer(sta->ptk[idx], new);
 			sta->ptk_idx = idx;
 			ieee80211_check_fast_xmit(sta);
+			clear_sta_flag(sta, WLAN_STA_BLOCK_BA);
 		} else {
 			rcu_assign_pointer(sta->gtk[idx], new);
 		}
@@ -380,6 +411,7 @@ static void ieee80211_key_replace(struct ieee80211_sub_if_data *sdata,
 
 	if (old)
 		list_del_rcu(&old->list);
+	return 0;
 }
 
 struct ieee80211_key *
@@ -654,7 +686,6 @@ int ieee80211_key_link(struct ieee80211_key *key,
 		       struct ieee80211_sub_if_data *sdata,
 		       struct sta_info *sta)
 {
-	struct ieee80211_local *local = sdata->local;
 	struct ieee80211_key *old_key;
 	int idx, ret;
 	bool pairwise;
@@ -687,18 +718,13 @@ int ieee80211_key_link(struct ieee80211_key *key,
 
 	increment_tailroom_need_count(sdata);
 
-	ieee80211_key_replace(sdata, sta, pairwise, old_key, key);
+	ret = ieee80211_key_replace(sdata, sta, pairwise, old_key, key);
 	ieee80211_key_destroy(old_key, true);
 
 	ieee80211_debugfs_key_add(key);
 
-	if (!local->wowlan) {
-		ret = ieee80211_key_enable_hw_accel(key);
-		if (ret)
-			ieee80211_key_free(key, true);
-	} else {
-		ret = 0;
-	}
+	if (ret)
+		ieee80211_key_free(key, true);
 
  out:
 	mutex_unlock(&sdata->local->key_mtx);
