@@ -1022,15 +1022,14 @@ static ssize_t nvmf_dev_write(struct file *file, const char __user *ubuf,
 	if (IS_ERR(buf))
 		return PTR_ERR(buf);
 
+	ctrl = nvmf_create_ctrl(nvmf_device, buf, count);
+	if (IS_ERR(ctrl))
+		return PTR_ERR(ctrl);
+
 	mutex_lock(&nvmf_dev_mutex);
 	if (seq_file->private) {
+		nvme_delete_ctrl_sync(ctrl);
 		ret = -EINVAL;
-		goto out_unlock;
-	}
-
-	ctrl = nvmf_create_ctrl(nvmf_device, buf, count);
-	if (IS_ERR(ctrl)) {
-		ret = PTR_ERR(ctrl);
 		goto out_unlock;
 	}
 
