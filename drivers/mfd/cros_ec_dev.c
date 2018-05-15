@@ -383,6 +383,18 @@ error:
 	kfree(msg);
 }
 
+static void cros_ec_cec_register(struct cros_ec_dev *ec)
+{
+	int ret;
+	struct mfd_cell cec_cell = {
+		.name = "cros-ec-cec",
+	};
+
+	ret = mfd_add_devices(ec->dev, 0, &cec_cell, 1, NULL, 0, NULL);
+	if (ret)
+		dev_err(ec->dev, "failed to add EC CEC\n");
+}
+
 static int ec_device_probe(struct platform_device *pdev)
 {
 	int retval = -ENOMEM;
@@ -421,6 +433,10 @@ static int ec_device_probe(struct platform_device *pdev)
 	/* check whether this EC is a sensor hub. */
 	if (cros_ec_check_features(ec, EC_FEATURE_MOTION_SENSE))
 		cros_ec_sensors_register(ec);
+
+	/* check whether this EC handles CEC. */
+	if (cros_ec_check_features(ec, EC_FEATURE_CEC))
+		cros_ec_cec_register(ec);
 
 	/* Take control of the lightbar from the EC. */
 	lb_manual_suspend_ctrl(ec, 1);
