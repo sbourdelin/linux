@@ -92,8 +92,8 @@ struct venus_core {
 	void __iomem *base;
 	int irq;
 	struct clk *clks[VIDC_CLKS_NUM_MAX];
-	struct clk *core0_clk;
-	struct clk *core1_clk;
+	struct clk *core0_clk, *core0_bus_clk;
+	struct clk *core1_clk, *core1_bus_clk;
 	struct video_device *vdev_dec;
 	struct video_device *vdev_enc;
 	struct v4l2_device v4l2_dev;

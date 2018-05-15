@@ -1225,10 +1225,16 @@ static int venc_probe(struct platform_device *pdev)
 	if (!core)
 		return -EPROBE_DEFER;
 
-	if (core->res->hfi_version == HFI_VERSION_3XX) {
+	if (IS_V3(core) || IS_V4(core)) {
 		core->core1_clk = devm_clk_get(dev, "core");
 		if (IS_ERR(core->core1_clk))
 			return PTR_ERR(core->core1_clk);
+	}
+
+	if (IS_V4(core)) {
+		core->core1_bus_clk = devm_clk_get(dev, "bus");
+		if (IS_ERR(core->core1_bus_clk))
+			return PTR_ERR(core->core1_bus_clk);
 	}
 
 	platform_set_drvdata(pdev, core);
@@ -1276,12 +1282,23 @@ static __maybe_unused int venc_runtime_suspend(struct device *dev)
 {
 	struct venus_core *core = dev_get_drvdata(dev);
 
-	if (core->res->hfi_version == HFI_VERSION_1XX)
+	if (IS_V1(core))
 		return 0;
 
-	writel(0, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
+	if (IS_V3(core))
+		writel(0, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
+	else if (IS_V4(core))
+		writel(0, core->base + WRAPPER_VCODEC1_MMCC_POWER_CONTROL);
+
+	if (IS_V4(core))
+		clk_disable_unprepare(core->core1_bus_clk);
+
 	clk_disable_unprepare(core->core1_clk);
-	writel(1, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
+
+	if (IS_V3(core))
+		writel(1, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
+	else if (IS_V4(core))
+		writel(1, core->base + WRAPPER_VCODEC1_MMCC_POWER_CONTROL);
 
 	return 0;
 }
@@ -1291,12 +1308,23 @@ static __maybe_unused int venc_runtime_resume(struct device *dev)
 	struct venus_core *core = dev_get_drvdata(dev);
 	int ret;
 
-	if (core->res->hfi_version == HFI_VERSION_1XX)
+	if (IS_V1(core))
 		return 0;
 
-	writel(0, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
+	if (IS_V3(core))
+		writel(0, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
+	else if (IS_V4(core))
+		writel(0, core->base + WRAPPER_VCODEC1_MMCC_POWER_CONTROL);
+
 	ret = clk_prepare_enable(core->core1_clk);
-	writel(1, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
+
+	if (IS_V4(core))
+		ret |= clk_prepare_enable(core->core1_bus_clk);
+
+	if (IS_V3(core))
+		writel(1, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
+	else if (IS_V4(core))
+		writel(1, core->base + WRAPPER_VCODEC1_MMCC_POWER_CONTROL);
 
 	return ret;
 }
