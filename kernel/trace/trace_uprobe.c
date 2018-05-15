@@ -1161,6 +1161,28 @@ static void uretprobe_perf_func(struct trace_uprobe *tu, unsigned long func,
 {
 	__uprobe_perf_func(tu, func, regs, ucb, dsize);
 }
+
+int bpf_get_uprobe_info(struct perf_event *event, u32 *prog_info,
+			const char **filename, u64 *probe_offset,
+			bool perf_type_tracepoint)
+{
+	const char *pevent = trace_event_name(event->tp_event);
+	const char *group = event->tp_event->class->system;
+	struct trace_uprobe *tu;
+
+	if (perf_type_tracepoint)
+		tu = find_probe_event(pevent, group);
+	else
+		tu = event->tp_event->data;
+	if (!tu)
+		return -EINVAL;
+
+	*prog_info = is_ret_probe(tu) ? BPF_PERF_INFO_URETPROBE
+				      : BPF_PERF_INFO_UPROBE;
+	*filename = tu->filename;
+	*probe_offset = tu->offset;
+	return 0;
+}
 #endif	/* CONFIG_PERF_EVENTS */
 
 static int

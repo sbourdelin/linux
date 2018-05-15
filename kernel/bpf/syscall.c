@@ -18,7 +18,9 @@
 #include <linux/vmalloc.h>
 #include <linux/mmzone.h>
 #include <linux/anon_inodes.h>
+#include <linux/fdtable.h>
 #include <linux/file.h>
+#include <linux/fs.h>
 #include <linux/license.h>
 #include <linux/filter.h>
 #include <linux/version.h>
@@ -2093,6 +2095,114 @@ static int bpf_btf_get_fd_by_id(const union bpf_attr *attr)
 	return btf_get_fd_by_id(attr->btf_id);
 }
 
+static int bpf_perf_event_info_copy(const union bpf_attr *attr,
+				    union bpf_attr __user *uattr,
+				    u32 prog_id, u32 prog_info,
+				    const char *buf, u64 probe_offset,
+				    u64 probe_addr)
+{
+	__u64 __user *ubuf;
+	int len;
+
+	ubuf = u64_to_user_ptr(attr->perf_event_query.buf);
+	if (buf) {
+		len = strlen(buf);
+		if (attr->perf_event_query.buf_len < len + 1)
+			return -ENOSPC;
+		if (copy_to_user(ubuf, buf, len + 1))
+			return -EFAULT;
+	} else if (attr->perf_event_query.buf_len) {
+		/* copy '\0' to ubuf */
+		__u8 zero = 0;
+
+		if (copy_to_user(ubuf, &zero, 1))
+			return -EFAULT;
+	}
+
+	if (copy_to_user(&uattr->perf_event_query.prog_id, &prog_id,
+			 sizeof(prog_id)) ||
+	    copy_to_user(&uattr->perf_event_query.prog_info, &prog_info,
+			 sizeof(prog_info)) ||
+	    copy_to_user(&uattr->perf_event_query.probe_offset, &probe_offset,
+			 sizeof(probe_offset)) ||
+	    copy_to_user(&uattr->perf_event_query.probe_addr, &probe_addr,
+			 sizeof(probe_addr)))
+		return -EFAULT;
+
+	return 0;
+}
+
+#define BPF_PERF_EVENT_QUERY_LAST_FIELD perf_event_query.probe_addr
+
+static int bpf_perf_event_query(const union bpf_attr *attr,
+				union bpf_attr __user *uattr)
+{
+	pid_t pid = attr->perf_event_query.pid;
+	int fd = attr->perf_event_query.fd;
+	struct files_struct *files;
+	struct task_struct *task;
+	struct file *file;
+	int err;
+
+	if (CHECK_ATTR(BPF_PERF_EVENT_QUERY))
+		return -EINVAL;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
+	task = get_pid_task(find_vpid(pid), PIDTYPE_PID);
+	if (!task)
+		return -ENOENT;
+
+	files = get_files_struct(task);
+	put_task_struct(task);
+	if (!files)
+		return -ENOENT;
+
+	err = 0;
+	spin_lock(&files->file_lock);
+	file = fcheck_files(files, fd);
+	if (!file)
+		err = -ENOENT;
+	else
+		get_file(file);
+	spin_unlock(&files->file_lock);
+	put_files_struct(files);
+
+	if (err)
+		goto out;
+
+	if (file->f_op == &bpf_raw_tp_fops) {
+		struct bpf_raw_tracepoint *raw_tp = file->private_data;
+		struct bpf_raw_event_map *btp = raw_tp->btp;
+
+		if (!raw_tp->prog)
+			err = -ENOENT;
+		else
+			err = bpf_perf_event_info_copy(attr, uattr,
+						       raw_tp->prog->aux->id,
+						       BPF_PERF_INFO_TP_NAME,
+						       btp->tp->name, 0, 0);
+	} else {
+		u64 probe_offset, probe_addr;
+		u32 prog_id, prog_info;
+		const char *buf;
+
+		err = bpf_get_perf_event_info(file, &prog_id, &prog_info,
+					      &buf, &probe_offset,
+					      &probe_addr);
+		if (!err)
+			err = bpf_perf_event_info_copy(attr, uattr, prog_id,
+						       prog_info, buf,
+						       probe_offset,
+						       probe_addr);
+	}
+
+	fput(file);
+out:
+	return err;
+}
+
 SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, size)
 {
 	union bpf_attr attr = {};
@@ -2178,6 +2288,9 @@ SYSCALL_DEFINE3(bpf, int, cmd, union bpf_attr __user *, uattr, unsigned int, siz
 		break;
 	case BPF_BTF_GET_FD_BY_ID:
 		err = bpf_btf_get_fd_by_id(&attr);
+		break;
+	case BPF_PERF_EVENT_QUERY:
+		err = bpf_perf_event_query(&attr, uattr);
 		break;
 	default:
 		err = -EINVAL;
