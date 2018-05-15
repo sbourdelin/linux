@@ -159,15 +159,15 @@ static const char pkt_data[] =
 
 static inline u32 umem_nb_free(struct xdp_umem_uqueue *q, u32 nb)
 {
-	u32 free_entries = q->size - (q->cached_prod - q->cached_cons);
+	u32 free_entries = q->cached_cons - q->cached_prod;
 
 	if (free_entries >= nb)
 		return free_entries;
 
 	/* Refresh the local tail pointer */
-	q->cached_cons = q->ring->ptrs.consumer;
+	q->cached_cons = q->ring->ptrs.consumer + q->size;
 
-	return q->size - (q->cached_prod - q->cached_cons);
+	return q->cached_cons - q->cached_prod;
 }
 
 static inline u32 xq_nb_free(struct xdp_uqueue *q, u32 ndescs)
@@ -432,6 +432,7 @@ static struct xdp_umem *xdp_umem_configure(int sfd)
 
 	umem->fq.mask = FQ_NUM_DESCS - 1;
 	umem->fq.size = FQ_NUM_DESCS;
+	umem->fq.cached_cons = FQ_NUM_DESCS;
 
 	umem->cq.ring = mmap(0, sizeof(struct xdp_umem_ring) +
 			     CQ_NUM_DESCS * sizeof(u32),
@@ -514,6 +515,7 @@ static struct xdpsock *xsk_configure(struct xdp_umem *umem)
 
 	xsk->tx.mask = NUM_DESCS - 1;
 	xsk->tx.size = NUM_DESCS;
+	xsk->tx.cached_cons = NUM_DESCS;
 
 	sxdp.sxdp_family = PF_XDP;
 	sxdp.sxdp_ifindex = opt_ifindex;
