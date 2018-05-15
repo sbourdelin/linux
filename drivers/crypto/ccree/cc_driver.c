@@ -38,21 +38,20 @@ MODULE_PARM_DESC(cc_dump_bytes, "Dump buffers to kernel log as debugging aid");
 struct cc_hw_data {
 	char *name;
 	enum cc_hw_rev rev;
-	u32 sig;
 };
 
 /* Hardware revisions defs. */
 
 static const struct cc_hw_data cc712_hw = {
-	.name = "712", .rev = CC_HW_REV_712, .sig =  0xDCC71200U
+	.name = "712", .rev = CC_HW_REV_712
 };
 
 static const struct cc_hw_data cc710_hw = {
-	.name = "710", .rev = CC_HW_REV_710, .sig =  0xDCC63200U
+	.name = "710", .rev = CC_HW_REV_710
 };
 
 static const struct cc_hw_data cc630p_hw = {
-	.name = "630P", .rev = CC_HW_REV_630, .sig = 0xDCC63000U
+	.name = "630P", .rev = CC_HW_REV_630
 };
 
 static const struct of_device_id arm_ccree_dev_of_match[] = {
@@ -186,7 +185,6 @@ static int init_cc_resources(struct platform_device *plat_dev)
 	struct cc_drvdata *new_drvdata;
 	struct device *dev = &plat_dev->dev;
 	struct device_node *np = dev->of_node;
-	u32 signature_val;
 	u64 dma_mask;
 	const struct cc_hw_data *hw_rev;
 	const struct of_device_id *dev_id;
@@ -274,16 +272,6 @@ static int init_cc_resources(struct platform_device *plat_dev)
 		dev_err(dev, "Failed to enable clock");
 		return rc;
 	}
-
-	/* Verify correct mapping */
-	signature_val = cc_ioread(new_drvdata, CC_REG(HOST_SIGNATURE));
-	if (signature_val != hw_rev->sig) {
-		dev_err(dev, "Invalid CC signature: SIGNATURE=0x%08X != expected=0x%08X\n",
-			signature_val, hw_rev->sig);
-		rc = -EINVAL;
-		goto post_clk_err;
-	}
-	dev_dbg(dev, "CC SIGNATURE=0x%08X\n", signature_val);
 
 	/* Display HW versions */
 	dev_info(dev, "ARM CryptoCell %s Driver: HW version 0x%08X, Driver version %s\n",
