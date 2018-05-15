@@ -1447,7 +1447,7 @@ static int venus_suspend_3xx(struct venus_core *core)
 {
 	struct venus_hfi_device *hdev = to_hfi_priv(core);
 	struct device *dev = core->dev;
-	u32 ctrl_status, wfi_status;
+	u32 ctrl_status, cpu_status;
 	int ret;
 	int cnt = 100;
 
@@ -1463,28 +1463,49 @@ static int venus_suspend_3xx(struct venus_core *core)
 		return -EINVAL;
 	}
 
-	ctrl_status = venus_readl(hdev, CPU_CS_SCIACMDARG0);
-	if (!(ctrl_status & CPU_CS_SCIACMDARG0_PC_READY)) {
-		wfi_status = venus_readl(hdev, WRAPPER_CPU_STATUS);
+	/*
+	 * Power collapse sequence for Venus 3xx and 4xx versions:
+	 * 1. Check for ARM9 and video core to be idle by checking WFI bit
+	 *    (bit 0) in CPU status register and by checking Idle (bit 30) in
+	 *    Control status register for video core.
+	 * 2. Send a command to prepare for power collapse.
+	 * 3. Check for WFI and PC_READY bits.
+	 */
+
+	while (--cnt) {
+		cpu_status = venus_readl(hdev, WRAPPER_CPU_STATUS);
 		ctrl_status = venus_readl(hdev, CPU_CS_SCIACMDARG0);
 
-		ret = venus_prepare_power_collapse(hdev, false);
-		if (ret) {
-			dev_err(dev, "prepare for power collapse fail (%d)\n",
-				ret);
-			return ret;
-		}
+		if (cpu_status & WRAPPER_CPU_STATUS_WFI &&
+		    ctrl_status & CPU_CS_SCIACMDARG0_INIT_IDLE_MSG_MASK)
+			break;
 
-		cnt = 100;
-		while (cnt--) {
-			wfi_status = venus_readl(hdev, WRAPPER_CPU_STATUS);
-			ctrl_status = venus_readl(hdev, CPU_CS_SCIACMDARG0);
-			if (ctrl_status & CPU_CS_SCIACMDARG0_PC_READY &&
-			    wfi_status & BIT(0))
-				break;
-			usleep_range(1000, 1500);
-		}
+		usleep_range(1000, 1500);
 	}
+
+	if (!cnt)
+		return -ETIMEDOUT;
+
+	ret = venus_prepare_power_collapse(hdev, false);
+	if (ret) {
+		dev_err(dev, "prepare for power collapse fail (%d)\n", ret);
+		return ret;
+	}
+
+	cnt = 100;
+	while (--cnt) {
+		cpu_status = venus_readl(hdev, WRAPPER_CPU_STATUS);
+		ctrl_status = venus_readl(hdev, CPU_CS_SCIACMDARG0);
+
+		if (cpu_status & WRAPPER_CPU_STATUS_WFI &&
+		    ctrl_status & CPU_CS_SCIACMDARG0_PC_READY)
+			break;
+
+		usleep_range(1000, 1500);
+	}
+
+	if (!cnt)
+		return -ETIMEDOUT;
 
 	mutex_lock(&hdev->lock);
 
