@@ -44,6 +44,7 @@
 #include <linux/types.h>
 #include <linux/net.h>
 #include <linux/printk.h>
+#include <linux/refcount.h>
 #include <scsi/libiscsi.h>
 #include <scsi/scsi_transport_iscsi.h>
 #include <scsi/scsi_cmnd.h>
