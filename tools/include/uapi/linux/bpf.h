@@ -140,6 +140,7 @@ enum bpf_prog_type {
 	BPF_PROG_TYPE_SK_MSG,
 	BPF_PROG_TYPE_RAW_TRACEPOINT,
 	BPF_PROG_TYPE_CGROUP_SOCK_ADDR,
+	BPF_PROG_TYPE_RAWIR_EVENT,
 };
 
 enum bpf_attach_type {
@@ -157,6 +158,7 @@ enum bpf_attach_type {
 	BPF_CGROUP_INET6_CONNECT,
 	BPF_CGROUP_INET4_POST_BIND,
 	BPF_CGROUP_INET6_POST_BIND,
+	BPF_RAWIR_EVENT,
 	__MAX_BPF_ATTACH_TYPE
 };
 
@@ -1855,6 +1857,35 @@ union bpf_attr {
  *             Egress device index on success, 0 if packet needs to continue
  *             up the stack for further processing or a negative error in case
  *             of failure.
+ *
+ * int bpf_rc_keydown(void *ctx, u32 protocol, u32 scancode, u32 toggle)
+ *	Description
+ *		Report decoded scancode with toggle value. For use in
+ *		BPF_PROG_TYPE_RAWIR_EVENT, to report a successfully
+ *		decoded scancode. This is will generate a keydown event,
+ *		and a keyup event once the scancode is no longer repeated.
+ *
+ *		*ctx* pointer to bpf_rawir_event, *protocol* is decoded
+ *		protocol (see RC_PROTO_* enum).
+ *
+ *		Some protocols include a toggle bit, in case the button
+ *		was released and pressed again between consecutive scancodes,
+ *		copy this bit into *toggle* if it exists, else set to 0.
+ *
+ *     Return
+ *		Always return 0 (for now)
+ *
+ * int bpf_rc_repeat(void *ctx)
+ *	Description
+ *		Repeat the last decoded scancode; some IR protocols like
+ *		NEC have a special IR message for repeat last button,
+ *		in case user is holding a button down; the scancode is
+ *		not repeated.
+ *
+ *		*ctx* pointer to bpf_rawir_event.
+ *
+ *     Return
+ *		Always return 0 (for now)
  */
 #define __BPF_FUNC_MAPPER(FN)		\
 	FN(unspec),			\
@@ -1926,7 +1957,9 @@ union bpf_attr {
 	FN(skb_get_xfrm_state),		\
 	FN(get_stack),			\
 	FN(skb_load_bytes_relative),	\
-	FN(fib_lookup),
+	FN(fib_lookup),			\
+	FN(rc_repeat),			\
+	FN(rc_keydown),
 
 /* integer value in 'imm' field of BPF_CALL instruction selects which helper
  * function eBPF program intends to call
@@ -1991,6 +2024,26 @@ enum bpf_adj_room_mode {
 enum bpf_hdr_start_off {
 	BPF_HDR_START_MAC,
 	BPF_HDR_START_NET,
+};
+
+/*
+ * user accessible mirror of in-kernel ir_raw_event
+ */
+#define BPF_RAWIR_EVENT_SPACE		0
+#define BPF_RAWIR_EVENT_PULSE		1
+#define BPF_RAWIR_EVENT_TIMEOUT		2
+#define BPF_RAWIR_EVENT_RESET		3
+#define BPF_RAWIR_EVENT_CARRIER		4
+#define BPF_RAWIR_EVENT_DUTY_CYCLE	5
+
+struct bpf_rawir_event {
+	union {
+		__u32	duration;
+		__u32	carrier;
+		__u32	duty_cycle;
+	};
+
+	__u32	type;
 };
 
 /* user accessible mirror of in-kernel sk_buff.

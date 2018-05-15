@@ -24,7 +24,7 @@ urandom_read: urandom_read.c
 # Order correspond to 'make run_tests' order
 TEST_GEN_PROGS = test_verifier test_tag test_maps test_lru_map test_lpm_map test_progs \
 	test_align test_verifier_log test_dev_cgroup test_tcpbpf_user \
-	test_sock test_btf test_sockmap
+	test_sock test_btf test_sockmap test_rawir_event_user
 
 TEST_GEN_FILES = test_pkt_access.o test_xdp.o test_l4lb.o test_tcp_estats.o test_obj_id.o \
 	test_pkt_md_access.o test_xdp_redirect.o test_xdp_meta.o sockmap_parse_prog.o     \
@@ -33,7 +33,7 @@ TEST_GEN_FILES = test_pkt_access.o test_xdp.o test_l4lb.o test_tcp_estats.o test
 	sample_map_ret0.o test_tcpbpf_kern.o test_stacktrace_build_id.o \
 	sockmap_tcp_msg_prog.o connect4_prog.o connect6_prog.o test_adjust_tail.o \
 	test_btf_haskv.o test_btf_nokv.o test_sockmap_kern.o test_tunnel_kern.o \
-	test_get_stack_rawtp.o
+	test_get_stack_rawtp.o test_rawir_event_kern.o
 
 # Order correspond to 'make run_tests' order
 TEST_PROGS := test_kmod.sh \
@@ -42,7 +42,8 @@ TEST_PROGS := test_kmod.sh \
 	test_xdp_meta.sh \
 	test_offload.py \
 	test_sock_addr.sh \
-	test_tunnel.sh
+	test_tunnel.sh \
+	test_rawir.sh
 
 # Compile but not part of 'make run_tests'
 TEST_GEN_PROGS_EXTENDED = test_libbpf_open test_sock_addr

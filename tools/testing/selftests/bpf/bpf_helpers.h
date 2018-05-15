@@ -106,6 +106,12 @@ static int (*bpf_get_stack)(void *ctx, void *buf, int size, int flags) =
 static int (*bpf_fib_lookup)(void *ctx, struct bpf_fib_lookup *params,
 			     int plen, __u32 flags) =
 	(void *) BPF_FUNC_fib_lookup;
+static int (*bpf_rc_repeat)(void *ctx) =
+	(void *) BPF_FUNC_rc_repeat;
+static int (*bpf_rc_keydown)(void *ctx, unsigned protocol, unsigned scancode,
+			     unsigned toggle) =
+	(void *) BPF_FUNC_rc_keydown;
+
 
 /* llvm builtin functions that eBPF C program may use to
  * emit BPF_LD_ABS and BPF_LD_IND instructions
