@@ -13,6 +13,7 @@
 #define	MAX_IR_EVENT_SIZE	512
 
 #include <linux/slab.h>
+#include <uapi/linux/bpf.h>
 #include <media/rc-core.h>
 
 /**
@@ -58,6 +59,11 @@ struct ir_raw_event_ctrl {
 	/* raw decoder state follows */
 	struct ir_raw_event prev_ev;
 	struct ir_raw_event this_ev;
+
+#ifdef CONFIG_BPF_RAWIR_EVENT
+	struct bpf_rawir_event		bpf_rawir_event;
+	struct bpf_prog_array		*progs;
+#endif
 	struct nec_dec {
 		int state;
 		unsigned count;
@@ -294,6 +300,7 @@ void ir_lirc_raw_event(struct rc_dev *dev, struct ir_raw_event ev);
 void ir_lirc_scancode_event(struct rc_dev *dev, struct lirc_scancode *lsc);
 int ir_lirc_register(struct rc_dev *dev);
 void ir_lirc_unregister(struct rc_dev *dev);
+struct rc_dev *rc_dev_get_from_fd(int fd);
 #else
 static inline int lirc_dev_init(void) { return 0; }
 static inline void lirc_dev_exit(void) {}
@@ -303,6 +310,18 @@ static inline void ir_lirc_scancode_event(struct rc_dev *dev,
 					  struct lirc_scancode *lsc) { }
 static inline int ir_lirc_register(struct rc_dev *dev) { return 0; }
 static inline void ir_lirc_unregister(struct rc_dev *dev) { }
+#endif
+
+/*
+ * bpf interface
+ */
+#ifdef CONFIG_BPF_RAWIR_EVENT
+void rc_dev_bpf_put(struct rc_dev *dev);
+void rc_dev_bpf_run(struct rc_dev *dev, struct ir_raw_event ev);
+#else
+static inline void rc_dev_bpf_put(struct rc_dev *dev) { }
+static inline void rc_dev_bpf_run(struct rc_dev *dev, struct ir_raw_event ev)
+{ }
 #endif
 
 #endif /* _RC_CORE_PRIV */

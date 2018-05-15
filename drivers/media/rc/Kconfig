@@ -25,6 +25,16 @@ config LIRC
 	   passes raw IR to and from userspace, which is needed for
 	   IR transmitting (aka "blasting") and for the lirc daemon.
 
+config BPF_RAWIR_EVENT
+	bool "Enable attaching BPF programs to lirc devices"
+	depends on BPF_SYSCALL
+	depends on RC_CORE=y
+	depends on LIRC
+	help
+	   Enable this option to make it possible to load custom IR
+	   decoders written in BPF. These decoders are type
+	   BPF_PROG_TYPE_RAW_IR_EVENT.
+
 menuconfig RC_DECODERS
 	bool "Remote controller decoders"
 	depends on RC_CORE

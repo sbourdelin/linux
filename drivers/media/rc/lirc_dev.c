@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/device.h>
+#include <linux/file.h>
 #include <linux/idr.h>
 #include <linux/poll.h>
 #include <linux/sched.h>
@@ -839,6 +840,33 @@ void __exit lirc_dev_exit(void)
 {
 	class_destroy(lirc_class);
 	unregister_chrdev_region(lirc_base_dev, RC_DEV_MAX);
+}
+
+struct rc_dev *rc_dev_get_from_fd(int fd)
+{
+	struct rc_dev *dev;
+	struct file *f;
+
+	f = fget_raw(fd);
+	if (!f)
+		return ERR_PTR(-EBADF);
+
+	if (!S_ISCHR(f->f_inode->i_mode) ||
+	    imajor(f->f_inode) != MAJOR(lirc_base_dev)) {
+		fput(f);
+		return ERR_PTR(-EBADF);
+	}
+
+	dev = container_of(f->f_inode->i_cdev, struct rc_dev, lirc_cdev);
+	if (!dev->registered) {
+		fput(f);
+		return ERR_PTR(-ENODEV);
+	}
+
+	get_device(&dev->dev);
+	fput(f);
+
+	return dev;
 }
 
 MODULE_ALIAS("lirc_dev");

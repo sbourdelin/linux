@@ -32,6 +32,7 @@ static int ir_raw_event_thread(void *data)
 				    handler->protocols || !handler->protocols)
 					handler->decode(raw->dev, ev);
 			ir_lirc_raw_event(raw->dev, ev);
+			rc_dev_bpf_run(raw->dev, ev);
 			raw->prev_ev = ev;
 		}
 		mutex_unlock(&ir_raw_handler_lock);
@@ -661,6 +662,8 @@ void ir_raw_event_unregister(struct rc_dev *dev)
 		    (handler->protocols & dev->enabled_protocols))
 			handler->raw_unregister(dev);
 	mutex_unlock(&ir_raw_handler_lock);
+
+	rc_dev_bpf_put(dev);
 
 	ir_raw_event_free(dev);
 }
