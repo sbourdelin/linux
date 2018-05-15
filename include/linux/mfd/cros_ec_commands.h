@@ -804,6 +804,8 @@ enum ec_feature_code {
 	EC_FEATURE_MOTION_SENSE_FIFO = 24,
 	/* EC has RTC feature that can be controlled by host commands */
 	EC_FEATURE_RTC = 27,
+	/* EC supports CEC commands */
+	EC_FEATURE_CEC = 35,
 };
 
 #define EC_FEATURE_MASK_0(event_code) (1UL << (event_code % 32))
@@ -2078,6 +2080,12 @@ enum ec_mkbp_event {
 	/* EC sent a sysrq command */
 	EC_MKBP_EVENT_SYSRQ = 6,
 
+	/* Notify the AP that something happened on CEC */
+	EC_MKBP_CEC_EVENT = 8,
+
+	/* Send an incoming CEC message to the AP */
+	EC_MKBP_EVENT_CEC_MESSAGE = 9,
+
 	/* Number of MKBP events */
 	EC_MKBP_EVENT_COUNT,
 };
@@ -2093,10 +2101,29 @@ union ec_response_get_next_data {
 	uint32_t   sysrq;
 } __packed;
 
+union ec_response_get_next_data_v1 {
+	uint8_t   key_matrix[16];
+
+	/* Unaligned */
+	uint32_t  host_event;
+
+	uint32_t   buttons;
+	uint32_t   switches;
+	uint32_t   sysrq;
+	uint32_t   cec_events;
+	uint8_t    cec_message[16];
+} __packed;
+
 struct ec_response_get_next_event {
 	uint8_t event_type;
 	/* Followed by event data if any */
 	union ec_response_get_next_data data;
+} __packed;
+
+struct ec_response_get_next_event_v1 {
+	uint8_t event_type;
+	/* Followed by event data if any */
+	union ec_response_get_next_data_v1 data;
 } __packed;
 
 /* Bit indices for buttons and switches.*/
@@ -2828,6 +2855,59 @@ struct ec_params_reboot_ec {
 /* Current version of ACPI memory address space */
 #define EC_ACPI_MEM_VERSION_CURRENT 1
 
+/*****************************************************************************/
+/*
+ * HDMI CEC commands
+ *
+ * These commands are for sending and receiving message via HDMI CEC
+ */
+#define MAX_CEC_MSG_LEN 16
+
+/* CEC message from the AP to be written on the CEC bus */
+#define EC_CMD_CEC_WRITE_MSG 0x00B8
+
+/* Message to write to the CEC bus */
+struct ec_params_cec_write {
+	uint8_t msg[MAX_CEC_MSG_LEN];
+} __packed;
+
+/* Set various CEC parameters */
+#define EC_CMD_CEC_SET 0x00BA
+
+struct ec_params_cec_set {
+	uint8_t cmd; /* enum cec_command */
+	union {
+		uint8_t enable;
+		uint8_t address;
+	};
+} __packed;
+
+/* Read various CEC parameters */
+#define EC_CMD_CEC_GET 0x00BB
+
+struct ec_params_cec_get {
+	uint8_t cmd; /* enum cec_command */
+} __packed;
+
+struct ec_response_cec_get {
+	union {
+		uint8_t enable;
+		uint8_t address;
+	};
+}__packed;
+
+enum cec_command {
+	/* CEC reading, writing and events enable */
+	CEC_CMD_ENABLE,
+	/* CEC logical address  */
+	CEC_CMD_LOGICAL_ADDRESS,
+};
+
+/* Events from CEC to AP */
+enum mkbp_cec_event {
+	EC_MKBP_CEC_SEND_OK			= 1 << 0,
+	EC_MKBP_CEC_SEND_FAILED			= 1 << 1,
+};
 
 /*****************************************************************************/
 /*
