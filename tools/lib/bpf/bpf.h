@@ -105,4 +105,7 @@ int bpf_prog_query(int target_fd, enum bpf_attach_type type, __u32 query_flags,
 int bpf_raw_tracepoint_open(const char *name, int prog_fd);
 int bpf_load_btf(void *btf, __u32 btf_size, char *log_buf, __u32 log_buf_size,
 		 bool do_log);
+int bpf_trace_event_query(int pid, int fd, char *buf, __u32 buf_len,
+			  __u32 *prog_id, __u32 *prog_info,
+			  __u64 *probe_offset, __u64 *probe_addr);
 #endif

@@ -641,3 +641,26 @@ retry:
 
 	return fd;
 }
+
+int bpf_trace_event_query(int pid, int fd, char *buf, __u32 buf_len,
+			  __u32 *prog_id, __u32 *prog_info,
+			  __u64 *probe_offset, __u64 *probe_addr)
+{
+	union bpf_attr attr = {};
+	int err;
+
+	attr.perf_event_query.pid = pid;
+	attr.perf_event_query.fd = fd;
+	attr.perf_event_query.buf = ptr_to_u64(buf);
+	attr.perf_event_query.buf_len = buf_len;
+
+	err = sys_bpf(BPF_PERF_EVENT_QUERY, &attr, sizeof(attr));
+	if (!err) {
+		*prog_id = attr.perf_event_query.prog_id;
+		*prog_info = attr.perf_event_query.prog_info;
+		*probe_offset = attr.perf_event_query.probe_offset;
+		*probe_addr = attr.perf_event_query.probe_addr;
+	}
+
+	return err;
+}
