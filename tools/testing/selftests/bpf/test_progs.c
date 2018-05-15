@@ -1542,6 +1542,137 @@ close_prog_noerr:
 	bpf_object__close(obj);
 }
 
+static void test_query_trace_event_rawtp(void)
+{
+	const char *file = "./test_get_stack_rawtp.o";
+	struct perf_event_attr attr = {};
+	int efd, err, prog_fd, pmu_fd;
+	struct bpf_object *obj;
+	__u32 duration = 0;
+	char buf[256];
+	__u32 prog_id, prog_info;
+	__u64 probe_offset, probe_addr;
+
+	err = bpf_prog_load(file, BPF_PROG_TYPE_RAW_TRACEPOINT, &obj, &prog_fd);
+	if (CHECK(err, "prog_load raw tp", "err %d errno %d\n", err, errno))
+		return;
+
+	efd = bpf_raw_tracepoint_open("sys_enter", prog_fd);
+	if (CHECK(efd < 0, "raw_tp_open", "err %d errno %d\n", efd, errno))
+		goto close_prog;
+
+	attr.sample_type = PERF_SAMPLE_RAW;
+	attr.type = PERF_TYPE_SOFTWARE;
+	attr.config = PERF_COUNT_SW_BPF_OUTPUT;
+	pmu_fd = syscall(__NR_perf_event_open, &attr, getpid(), -1, -1, 0);
+	if (CHECK(pmu_fd < 0, "perf_event_open", "err %d errno %d\n", pmu_fd,
+		  errno))
+		goto close_prog;
+
+	err = ioctl(pmu_fd, PERF_EVENT_IOC_ENABLE, 0);
+	if (CHECK(err < 0, "ioctl PERF_EVENT_IOC_ENABLE", "err %d errno %d\n",
+		  err, errno))
+		goto close_prog;
+
+	/* query (getpid(), efd */
+	err = bpf_trace_event_query(getpid(), efd, buf, 256, &prog_id,
+				    &prog_info, &probe_offset, &probe_addr);
+	if (CHECK(err < 0, "bpf_trace_event_query", "err %d errno %d\n", err,
+		  errno))
+		goto close_prog;
+
+	err = (prog_info == BPF_PERF_INFO_TP_NAME) &&
+	      (strcmp(buf, "sys_enter") == 0);
+	if (CHECK(!err, "check_results", "prog_info %d tp_name %s\n",
+		  prog_info, buf))
+		goto close_prog;
+
+	goto close_prog_noerr;
+close_prog:
+	error_cnt++;
+close_prog_noerr:
+	bpf_object__close(obj);
+}
+
+static void test_query_trace_event_tp_core(const char *probe_name,
+					   const char *tp_name)
+{
+	const char *file = "./test_tracepoint.o";
+	int err, bytes, efd, prog_fd, pmu_fd;
+	struct perf_event_attr attr = {};
+	struct bpf_object *obj;
+	__u32 duration = 0;
+	char buf[256];
+	__u32 prog_id, prog_info;
+	__u64 probe_offset, probe_addr;
+
+	err = bpf_prog_load(file, BPF_PROG_TYPE_TRACEPOINT, &obj, &prog_fd);
+	if (CHECK(err, "bpf_prog_load", "err %d errno %d\n", err, errno))
+		goto close_prog;
+
+	snprintf(buf, sizeof(buf),
+		 "/sys/kernel/debug/tracing/events/%s/id", probe_name);
+	efd = open(buf, O_RDONLY, 0);
+	if (CHECK(efd < 0, "open", "err %d errno %d\n", efd, errno))
+		goto close_prog;
+	bytes = read(efd, buf, sizeof(buf));
+	close(efd);
+	if (CHECK(bytes <= 0 || bytes >= sizeof(buf), "read",
+		  "bytes %d errno %d\n", bytes, errno))
+		goto close_prog;
+
+	attr.config = strtol(buf, NULL, 0);
+	attr.type = PERF_TYPE_TRACEPOINT;
+	attr.sample_type = PERF_SAMPLE_RAW;
+	attr.sample_period = 1;
+	attr.wakeup_events = 1;
+	pmu_fd = syscall(__NR_perf_event_open, &attr, -1 /* pid */,
+			 0 /* cpu 0 */, -1 /* group id */,
+			 0 /* flags */);
+	if (CHECK(err, "perf_event_open", "err %d errno %d\n", err, errno))
+		goto close_pmu;
+
+	err = ioctl(pmu_fd, PERF_EVENT_IOC_ENABLE, 0);
+	if (CHECK(err, "perf_event_ioc_enable", "err %d errno %d\n", err,
+		  errno))
+		goto close_pmu;
+
+	err = ioctl(pmu_fd, PERF_EVENT_IOC_SET_BPF, prog_fd);
+	if (CHECK(err, "perf_event_ioc_set_bpf", "err %d errno %d\n", err,
+		  errno))
+		goto close_pmu;
+
+	/* query (getpid(), pmu_fd */
+	err = bpf_trace_event_query(getpid(), pmu_fd, buf, 256, &prog_id,
+				    &prog_info, &probe_offset, &probe_addr);
+	if (CHECK(err < 0, "bpf_trace_event_query", "err %d errno %d\n", err,
+		  errno))
+		goto close_pmu;
+
+	err = (prog_info == BPF_PERF_INFO_TP_NAME) && !strcmp(buf, tp_name);
+	if (CHECK(!err, "check_results", "prog_info %d tp_name %s\n",
+		  prog_info, buf))
+		goto close_pmu;
+
+	close(pmu_fd);
+	goto close_prog_noerr;
+
+close_pmu:
+	close(pmu_fd);
+close_prog:
+	error_cnt++;
+close_prog_noerr:
+	bpf_object__close(obj);
+}
+
+static void test_query_trace_event_tp(void)
+{
+	test_query_trace_event_tp_core("sched/sched_switch",
+				       "sched_switch");
+	test_query_trace_event_tp_core("syscalls/sys_enter_read",
+				       "sys_enter_read");
+}
+
 int main(void)
 {
 	jit_enabled = is_jit_enabled();
@@ -1561,6 +1692,8 @@ int main(void)
 	test_stacktrace_build_id_nmi();
 	test_stacktrace_map_raw_tp();
 	test_get_stack_raw_tp();
+	test_query_trace_event_rawtp();
+	test_query_trace_event_tp();
 
 	printf("Summary: %d PASSED, %d FAILED\n", pass_cnt, error_cnt);
 	return error_cnt ? EXIT_FAILURE : EXIT_SUCCESS;
