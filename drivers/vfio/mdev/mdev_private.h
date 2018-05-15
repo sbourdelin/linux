@@ -20,7 +20,6 @@ struct mdev_parent {
 	struct device *dev;
 	const struct mdev_parent_ops *ops;
 	struct kref ref;
-	struct mutex lock;
 	struct list_head next;
 	struct kset *mdev_types_kset;
 	struct list_head type_list;
