@@ -5,6 +5,7 @@
 #include <linux/of_net.h>
 #include <linux/pci.h>
 #include <linux/bpf.h>
+#include <net/xdp_sock.h>
 
 /* Local includes */
 #include "i40e.h"
@@ -3054,6 +3055,9 @@ static int i40e_configure_tx_ring(struct i40e_ring *ring)
 	i40e_status err = 0;
 	u32 qtx_ctl = 0;
 
+	if (ring_is_xdp(ring))
+		ring->xsk_umem = i40e_xsk_umem(ring);
+
 	/* some ATR related tx ring init */
 	if (vsi->back->flags & I40E_FLAG_FD_ATR_ENABLED) {
 		ring->atr_sample_rate = vsi->back->atr_sample_rate;
@@ -3163,13 +3167,31 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	struct i40e_hw *hw = &vsi->back->hw;
 	struct i40e_hmc_obj_rxq rx_ctx;
 	i40e_status err = 0;
+	int ret;
 
 	bitmap_zero(ring->state, __I40E_RING_STATE_NBITS);
 
 	/* clear the context structure first */
 	memset(&rx_ctx, 0, sizeof(rx_ctx));
 
-	ring->rx_buf_len = vsi->rx_buf_len;
+	ring->xsk_umem = i40e_xsk_umem(ring);
+	if (ring->xsk_umem) {
+		ring->clean_rx_irq = i40e_clean_rx_irq_zc;
+		ring->alloc_rx_buffers = i40e_alloc_rx_buffers_zc;
+		ring->rx_buf_len = ring->xsk_umem->props.frame_size -
+				   ring->xsk_umem->frame_headroom -
+				   XDP_PACKET_HEADROOM;
+		ring->zca.free = i40e_zca_free;
+		ret = xdp_rxq_info_reg_mem_model(&ring->xdp_rxq,
+						 MEM_TYPE_ZERO_COPY,
+						 &ring->zca);
+		if (ret)
+			return ret;
+	} else {
+		ring->clean_rx_irq = i40e_clean_rx_irq;
+		ring->alloc_rx_buffers = i40e_alloc_rx_buffers;
+		ring->rx_buf_len = vsi->rx_buf_len;
+	}
 
 	rx_ctx.dbuff = DIV_ROUND_UP(ring->rx_buf_len,
 				    BIT_ULL(I40E_RXQ_CTX_DBUFF_SHIFT));
@@ -3225,7 +3247,7 @@ static int i40e_configure_rx_ring(struct i40e_ring *ring)
 	ring->tail = hw->hw_addr + I40E_QRX_TAIL(pf_q);
 	writel(0, ring->tail);
 
-	i40e_alloc_rx_buffers(ring, I40E_DESC_UNUSED(ring));
+	ring->alloc_rx_buffers(ring, I40E_DESC_UNUSED(ring));
 
 	return 0;
 }
@@ -12050,6 +12072,179 @@ static int i40e_queue_pair_enable(struct i40e_vsi *vsi, int queue_pair)
 	return err;
 }
 
+static int i40e_alloc_xsk_umems(struct i40e_vsi *vsi)
+{
+	if (vsi->xsk_umems)
+		return 0;
+
+	vsi->num_xsk_umems_used = 0;
+	vsi->num_xsk_umems = vsi->alloc_queue_pairs;
+	vsi->xsk_umems = kcalloc(vsi->num_xsk_umems, sizeof(*vsi->xsk_umems),
+				 GFP_KERNEL);
+	if (!vsi->xsk_umems) {
+		vsi->num_xsk_umems = 0;
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+static int i40e_add_xsk_umem(struct i40e_vsi *vsi, struct xdp_umem *umem,
+			     u16 qid)
+{
+	int err;
+
+	err = i40e_alloc_xsk_umems(vsi);
+	if (err)
+		return err;
+
+	vsi->xsk_umems[qid] = umem;
+	vsi->num_xsk_umems_used++;
+
+	return 0;
+}
+
+static void i40e_remove_xsk_umem(struct i40e_vsi *vsi, u16 qid)
+{
+	vsi->xsk_umems[qid] = NULL;
+	vsi->num_xsk_umems_used--;
+
+	if (vsi->num_xsk_umems == 0) {
+		kfree(vsi->xsk_umems);
+		vsi->xsk_umems = NULL;
+		vsi->num_xsk_umems = 0;
+	}
+}
+
+static int i40e_xsk_umem_dma_map(struct i40e_vsi *vsi, struct xdp_umem *umem)
+{
+	struct i40e_pf *pf = vsi->back;
+	struct device *dev;
+	unsigned int i, j;
+	dma_addr_t dma;
+
+	dev = &pf->pdev->dev;
+
+	for (i = 0; i < umem->props.nframes; i++) {
+		dma = dma_map_single_attrs(dev, umem->frames[i].addr,
+					   umem->props.frame_size,
+					   DMA_BIDIRECTIONAL, I40E_RX_DMA_ATTR);
+		if (dma_mapping_error(dev, dma))
+			goto out_unmap;
+
+		umem->frames[i].dma = dma;
+	}
+
+	return 0;
+
+out_unmap:
+	for (j = 0; j < i; j++) {
+		dma_unmap_single_attrs(dev, umem->frames[i].dma,
+				       umem->props.frame_size,
+				       DMA_BIDIRECTIONAL,
+				       I40E_RX_DMA_ATTR);
+		umem->frames[i].dma = 0;
+	}
+
+	return -1;
+}
+
+static void i40e_xsk_umem_dma_unmap(struct i40e_vsi *vsi, struct xdp_umem *umem)
+{
+	struct i40e_pf *pf = vsi->back;
+	struct device *dev;
+	unsigned int i;
+
+	dev = &pf->pdev->dev;
+
+	for (i = 0; i < umem->props.nframes; i++) {
+		dma_unmap_single_attrs(dev, umem->frames[i].dma,
+				       umem->props.frame_size,
+				       DMA_BIDIRECTIONAL,
+				       I40E_RX_DMA_ATTR);
+
+		umem->frames[i].dma = 0;
+	}
+}
+
+static int i40e_xsk_umem_enable(struct i40e_vsi *vsi, struct xdp_umem *umem,
+				u16 qid)
+{
+	bool if_running;
+	int err;
+
+	if (vsi->type != I40E_VSI_MAIN)
+		return -EINVAL;
+
+	if (qid >= vsi->num_queue_pairs)
+		return -EINVAL;
+
+	if (vsi->xsk_umems && vsi->xsk_umems[qid])
+		return -EBUSY;
+
+	err = i40e_xsk_umem_dma_map(vsi, umem);
+	if (err)
+		return err;
+
+	if_running = netif_running(vsi->netdev) && i40e_enabled_xdp_vsi(vsi);
+
+	if (if_running) {
+		err = i40e_queue_pair_disable(vsi, qid);
+		if (err)
+			return err;
+	}
+
+	err = i40e_add_xsk_umem(vsi, umem, qid);
+	if (err)
+		return err;
+
+	if (if_running) {
+		err = i40e_queue_pair_enable(vsi, qid);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
+static int i40e_xsk_umem_disable(struct i40e_vsi *vsi, u16 qid)
+{
+	bool if_running;
+	int err;
+
+	if (!vsi->xsk_umems || qid >= vsi->num_xsk_umems ||
+	    !vsi->xsk_umems[qid])
+		return -EINVAL;
+
+	if_running = netif_running(vsi->netdev) && i40e_enabled_xdp_vsi(vsi);
+
+	if (if_running) {
+		err = i40e_queue_pair_disable(vsi, qid);
+		if (err)
+			return err;
+	}
+
+	i40e_xsk_umem_dma_unmap(vsi, vsi->xsk_umems[qid]);
+	i40e_remove_xsk_umem(vsi, qid);
+
+	if (if_running) {
+		err = i40e_queue_pair_enable(vsi, qid);
+		if (err)
+			return err;
+	}
+
+	return 0;
+}
+
+static int i40e_xsk_umem_setup(struct i40e_vsi *vsi, struct xdp_umem *umem,
+			       u16 qid)
+{
+	if (umem)
+		return i40e_xsk_umem_enable(vsi, umem, qid);
+
+	return i40e_xsk_umem_disable(vsi, qid);
+}
+
 /**
  * i40e_xdp - implements ndo_bpf for i40e
  * @dev: netdevice
@@ -12071,6 +12266,9 @@ static int i40e_xdp(struct net_device *dev,
 		xdp->prog_attached = i40e_enabled_xdp_vsi(vsi);
 		xdp->prog_id = vsi->xdp_prog ? vsi->xdp_prog->aux->id : 0;
 		return 0;
+	case XDP_SETUP_XSK_UMEM:
+		return i40e_xsk_umem_setup(vsi, xdp->xsk.umem,
+					   xdp->xsk.queue_id);
 	default:
 		return -EINVAL;
 	}

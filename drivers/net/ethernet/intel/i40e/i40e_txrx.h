@@ -296,13 +296,22 @@ struct i40e_tx_buffer {
 
 struct i40e_rx_buffer {
 	dma_addr_t dma;
-	struct page *page;
+	union {
+		struct {
+			struct page *page;
 #if (BITS_PER_LONG > 32) || (PAGE_SIZE >= 65536)
-	__u32 page_offset;
+			__u32 page_offset;
 #else
-	__u16 page_offset;
+			__u16 page_offset;
 #endif
-	__u16 pagecnt_bias;
+			__u16 pagecnt_bias;
+		};
+		struct {
+			/* for umem */
+			void *addr;
+			u32 id;
+		};
+	};
 };
 
 struct i40e_queue_stats {
@@ -343,6 +352,8 @@ enum i40e_ring_state_t {
 #define I40E_RX_SPLIT_IP      0x2
 #define I40E_RX_SPLIT_TCP_UDP 0x4
 #define I40E_RX_SPLIT_SCTP    0x8
+
+void i40e_zc_recycle(struct zero_copy_allocator *alloc, unsigned long handle);
 
 /* struct that defines a descriptor ring, associated with a VSI */
 struct i40e_ring {
@@ -414,6 +425,12 @@ struct i40e_ring {
 
 	struct i40e_channel *ch;
 	struct xdp_rxq_info xdp_rxq;
+
+	int (*clean_rx_irq)(struct i40e_ring *, int);
+	bool (*alloc_rx_buffers)(struct i40e_ring *, u16);
+	struct xdp_umem *xsk_umem;
+
+	struct zero_copy_allocator zca; /* ZC allocator anchor */
 } ____cacheline_internodealigned_in_smp;
 
 static inline bool ring_uses_build_skb(struct i40e_ring *ring)
@@ -474,6 +491,7 @@ static inline unsigned int i40e_rx_pg_order(struct i40e_ring *ring)
 #define i40e_rx_pg_size(_ring) (PAGE_SIZE << i40e_rx_pg_order(_ring))
 
 bool i40e_alloc_rx_buffers(struct i40e_ring *rxr, u16 cleaned_count);
+bool i40e_alloc_rx_buffers_zc(struct i40e_ring *rx_ring, u16 cleaned_count);
 netdev_tx_t i40e_lan_xmit_frame(struct sk_buff *skb, struct net_device *netdev);
 void i40e_clean_tx_ring(struct i40e_ring *tx_ring);
 void i40e_clean_rx_ring(struct i40e_ring *rx_ring);
@@ -489,6 +507,9 @@ int __i40e_maybe_stop_tx(struct i40e_ring *tx_ring, int size);
 bool __i40e_chk_linearize(struct sk_buff *skb);
 int i40e_xdp_xmit(struct net_device *dev, struct xdp_frame *xdpf);
 void i40e_xdp_flush(struct net_device *dev);
+int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget);
+int i40e_clean_rx_irq_zc(struct i40e_ring *rx_ring, int budget);
+void i40e_zca_free(struct zero_copy_allocator *alloc, unsigned long handle);
 
 /**
  * i40e_get_head - Retrieve head from head writeback
@@ -575,4 +596,5 @@ static inline struct netdev_queue *txring_txq(const struct i40e_ring *ring)
 {
 	return netdev_get_tx_queue(ring->netdev, ring->queue_index);
 }
+
 #endif /* _I40E_TXRX_H_ */
