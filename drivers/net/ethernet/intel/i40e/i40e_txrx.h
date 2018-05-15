@@ -428,6 +428,7 @@ struct i40e_ring {
 
 	int (*clean_rx_irq)(struct i40e_ring *, int);
 	bool (*alloc_rx_buffers)(struct i40e_ring *, u16);
+	bool (*clean_tx_irq)(struct i40e_vsi *, struct i40e_ring *, int);
 	struct xdp_umem *xsk_umem;
 
 	struct zero_copy_allocator zca; /* ZC allocator anchor */
@@ -510,6 +511,11 @@ void i40e_xdp_flush(struct net_device *dev);
 int i40e_clean_rx_irq(struct i40e_ring *rx_ring, int budget);
 int i40e_clean_rx_irq_zc(struct i40e_ring *rx_ring, int budget);
 void i40e_zca_free(struct zero_copy_allocator *alloc, unsigned long handle);
+bool i40e_clean_tx_irq_zc(struct i40e_vsi *vsi,
+			  struct i40e_ring *tx_ring, int napi_budget);
+bool i40e_clean_tx_irq(struct i40e_vsi *vsi,
+		       struct i40e_ring *tx_ring, int napi_budget);
+int i40e_xsk_async_xmit(struct net_device *dev, u32 queue_id);
 
 /**
  * i40e_get_head - Retrieve head from head writeback
