@@ -31,14 +31,26 @@
  */
 
 #ifdef CONFIG_SMP
-#define LOCK_PREFIX_HERE \
-		".pushsection .smp_locks,\"a\"\n"	\
-		".balign 4\n"				\
-		".long 671f - .\n" /* offset */		\
-		".popsection\n"				\
-		"671:"
 
-#define LOCK_PREFIX LOCK_PREFIX_HERE "\n\tlock; "
+asm ("\n"
+	".macro __LOCK_PREFIX_HERE\n\t"
+	".pushsection .smp_locks,\"a\"\n\t"
+	".balign 4\n\t"
+	".long 671f - .\n\t" /* offset */
+	".popsection\n"
+	"671:\n"
+	".endm");
+
+#define LOCK_PREFIX_HERE "__LOCK_PREFIX_HERE"
+
+asm ("\n"
+	".macro __LOCK_PREFIX ins:vararg\n\t"
+	"__LOCK_PREFIX_HERE\n\t"
+	"lock; \\ins\n"
+	".endm");
+
+#define LOCK_PREFIX "__LOCK_PREFIX "
+
 
 #else /* ! CONFIG_SMP */
 #define LOCK_PREFIX_HERE ""
