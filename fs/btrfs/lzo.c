@@ -271,6 +271,10 @@ static int lzo_decompress_bio(struct list_head *ws, struct compressed_bio *cb)
 
 	data_in = kmap(pages_in[0]);
 	tot_len = read_compress_length(data_in);
+	if (tot_len > BTRFS_MAX_COMPRESSED) {
+		ret = -EIO;
+		goto done;
+	}
 
 	tot_in = LZO_LEN;
 	in_offset = LZO_LEN;
