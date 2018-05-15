@@ -259,6 +259,7 @@ struct venus_inst {
 	struct list_head list;
 	struct mutex lock;
 	struct venus_core *core;
+	struct list_head dpbbufs;
 	struct list_head internalbufs;
 	struct list_head registeredbufs;
 	struct list_head delayed_process;
