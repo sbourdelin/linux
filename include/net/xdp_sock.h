@@ -29,16 +29,18 @@ struct xdp_umem_props {
 	u32 nframes;
 };
 
+struct xdp_umem_frame {
+	void *addr;
+};
+
 struct xdp_umem {
 	struct xsk_queue *fq;
 	struct xsk_queue *cq;
+	struct xdp_umem_frame *frames;
 	struct page **pgs;
 	struct xdp_umem_props props;
 	u32 npgs;
 	u32 frame_headroom;
-	u32 nfpp_mask;
-	u32 nfpplog2;
-	u32 frame_size_log2;
 	struct user_struct *user;
 	struct pid *pid;
 	unsigned long address;

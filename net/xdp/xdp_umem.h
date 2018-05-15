@@ -19,14 +19,7 @@
 
 static inline char *xdp_umem_get_data(struct xdp_umem *umem, u32 idx)
 {
-	u64 pg, off;
-	char *data;
-
-	pg = idx >> umem->nfpplog2;
-	off = (idx & umem->nfpp_mask) << umem->frame_size_log2;
-
-	data = page_address(umem->pgs[pg]);
-	return data + off;
+	return umem->frames[idx].addr;
 }
 
 static inline char *xdp_umem_get_data_with_headroom(struct xdp_umem *umem,

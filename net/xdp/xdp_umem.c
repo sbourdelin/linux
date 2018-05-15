@@ -92,6 +92,9 @@ static void xdp_umem_release(struct xdp_umem *umem)
 		umem->pgs = NULL;
 	}
 
+	kfree(umem->frames);
+	umem->frames = NULL;
+
 	xdp_umem_unaccount_pages(umem);
 out:
 	kfree(umem);
@@ -181,7 +184,8 @@ int xdp_umem_reg(struct xdp_umem *umem, struct xdp_umem_reg *mr)
 {
 	u32 frame_size = mr->frame_size, frame_headroom = mr->frame_headroom;
 	u64 addr = mr->addr, size = mr->len;
-	unsigned int nframes, nfpp;
+	u32 nfpplog2, frame_size_log2;
+	unsigned int nframes, nfpp, i;
 	int size_chk, err;
 
 	if (!umem)
@@ -234,9 +238,6 @@ int xdp_umem_reg(struct xdp_umem *umem, struct xdp_umem_reg *mr)
 	umem->pgs = NULL;
 	umem->user = NULL;
 
-	umem->frame_size_log2 = ilog2(frame_size);
-	umem->nfpp_mask = nfpp - 1;
-	umem->nfpplog2 = ilog2(nfpp);
 	atomic_set(&umem->users, 1);
 
 	err = xdp_umem_account_pages(umem);
@@ -246,6 +247,26 @@ int xdp_umem_reg(struct xdp_umem *umem, struct xdp_umem_reg *mr)
 	err = xdp_umem_pin_pages(umem);
 	if (err)
 		goto out_account;
+
+	umem->frames = kcalloc(nframes, sizeof(*umem->frames), GFP_KERNEL);
+	if (!umem->frames) {
+		err = -ENOMEM;
+		goto out_account;
+	}
+
+	frame_size_log2 = ilog2(frame_size);
+	nfpplog2 = ilog2(nfpp);
+	for (i = 0; i < nframes; i++) {
+		u64 pg, off;
+		char *data;
+
+		pg = i >> nfpplog2;
+		off = (i & (nfpp - 1)) << frame_size_log2;
+
+		data = page_address(umem->pgs[pg]);
+		umem->frames[i].addr = data + off;
+	}
+
 	return 0;
 
 out_account:
