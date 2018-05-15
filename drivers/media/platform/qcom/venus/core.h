@@ -57,6 +57,29 @@ struct venus_format {
 	u32 type;
 };
 
+#define MAX_PLANES		4
+#define MAX_FMT_ENTRIES		32
+#define MAX_CAP_ENTRIES		32
+#define MAX_CODEC_NUM		32
+
+struct raw_formats {
+	u32 buftype;
+	u32 fmt;
+};
+
+struct venus_caps {
+	u32 codec;
+	u32 domain;
+	bool cap_bufs_mode_dynamic;
+	unsigned int num_caps;
+	struct hfi_capability caps[MAX_CAP_ENTRIES];
+	unsigned int num_pl;
+	struct hfi_profile_level pl[HFI_MAX_PROFILE_COUNT];
+	unsigned int num_fmts;
+	struct raw_formats fmts[MAX_FMT_ENTRIES];
+	bool valid;
+};
+
 /**
  * struct venus_core - holds core parameters valid for all instances
  *
@@ -120,6 +143,8 @@ struct venus_core {
 	void *priv;
 	const struct hfi_ops *ops;
 	struct delayed_work work;
+	struct venus_caps caps[MAX_CODEC_NUM];
+	unsigned int codecs_count;
 };
 
 struct vdec_controls {
@@ -224,22 +249,8 @@ struct venus_buffer {
  * @priv:	a private for HFI operations callbacks
  * @session_type:	the type of the session (decoder or encoder)
  * @hprop:	a union used as a holder by get property
- * @cap_width:	width capability
- * @cap_height:	height capability
- * @cap_mbs_per_frame:	macroblocks per frame capability
- * @cap_mbs_per_sec:	macroblocks per second capability
- * @cap_framerate:	framerate capability
- * @cap_scale_x:		horizontal scaling capability
- * @cap_scale_y:		vertical scaling capability
- * @cap_bitrate:		bitrate capability
- * @cap_hier_p:		hier capability
- * @cap_ltr_count:	LTR count capability
- * @cap_secure_output2_threshold: secure OUTPUT2 threshold capability
  * @cap_bufs_mode_static:	buffers allocation mode capability
  * @cap_bufs_mode_dynamic:	buffers allocation mode capability
- * @pl_count:	count of supported profiles/levels
- * @pl:		supported profiles/levels
- * @bufreq:	holds buffer requirements
  */
 struct venus_inst {
 	struct list_head list;
@@ -276,6 +287,7 @@ struct venus_inst {
 	bool reconfig;
 	u32 reconfig_width;
 	u32 reconfig_height;
+	u32 hfi_codec;
 	u32 sequence_cap;
 	u32 sequence_out;
 	struct v4l2_m2m_dev *m2m_dev;
@@ -287,22 +299,8 @@ struct venus_inst {
 	const struct hfi_inst_ops *ops;
 	u32 session_type;
 	union hfi_get_property hprop;
-	struct hfi_capability cap_width;
-	struct hfi_capability cap_height;
-	struct hfi_capability cap_mbs_per_frame;
-	struct hfi_capability cap_mbs_per_sec;
-	struct hfi_capability cap_framerate;
-	struct hfi_capability cap_scale_x;
-	struct hfi_capability cap_scale_y;
-	struct hfi_capability cap_bitrate;
-	struct hfi_capability cap_hier_p;
-	struct hfi_capability cap_ltr_count;
-	struct hfi_capability cap_secure_output2_threshold;
 	bool cap_bufs_mode_static;
 	bool cap_bufs_mode_dynamic;
-	unsigned int pl_count;
-	struct hfi_profile_level pl[HFI_MAX_PROFILE_COUNT];
-	struct hfi_buffer_requirements bufreq[HFI_BUFFER_TYPE_MAX];
 };
 
 #define IS_V1(core)	((core)->res->hfi_version == HFI_VERSION_1XX)
@@ -320,6 +318,20 @@ static inline struct venus_inst *to_inst(struct file *filp)
 static inline void *to_hfi_priv(struct venus_core *core)
 {
 	return core->priv;
+}
+
+static inline struct venus_caps *
+venus_caps_by_codec(struct venus_core *core, u32 codec, u32 domain)
+{
+	unsigned int c;
+
+	for (c = 0; c < MAX_CODEC_NUM; c++) {
+		if (core->caps[c].codec == codec &&
+		    core->caps[c].domain == domain)
+			return &core->caps[c];
+	}
+
+	return NULL;
 }
 
 #endif
