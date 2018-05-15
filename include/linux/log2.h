@@ -83,7 +83,8 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
  */
 #define ilog2(n)				\
 (						\
-	__builtin_constant_p(n) ? (		\
+	__builtin_choose_expr(			\
+		__builtin_constant_p(n), (	\
 		(n) < 2 ? 0 :			\
 		(n) & (1ULL << 63) ? 63 :	\
 		(n) & (1ULL << 62) ? 62 :	\
@@ -147,10 +148,10 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
 		(n) & (1ULL <<  4) ?  4 :	\
 		(n) & (1ULL <<  3) ?  3 :	\
 		(n) & (1ULL <<  2) ?  2 :	\
-		1 ) :				\
-	(sizeof(n) <= 4) ?			\
-	__ilog2_u32(n) :			\
-	__ilog2_u64(n)				\
+		1),				\
+		(sizeof(n) <= 4) ?		\
+		__ilog2_u32(n) :		\
+		__ilog2_u64(n))			\
  )
 
 /**
