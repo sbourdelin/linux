@@ -33,34 +33,10 @@
 #include <net/bluetooth/hci_core.h>
 
 #include "h4_recv.h"
+#include "btuart.h"
 #include "btbcm.h"
 
 #define VERSION "1.0"
-
-struct btuart_vnd {
-	const struct h4_recv_pkt *recv_pkts;
-	int recv_pkts_cnt;
-	unsigned int manufacturer;
-	int (*open)(struct hci_dev *hdev);
-	int (*close)(struct hci_dev *hdev);
-	int (*setup)(struct hci_dev *hdev);
-};
-
-struct btuart_dev {
-	struct hci_dev *hdev;
-	struct serdev_device *serdev;
-
-	struct work_struct tx_work;
-	unsigned long tx_state;
-	struct sk_buff_head txq;
-
-	struct sk_buff *rx_skb;
-
-	const struct btuart_vnd *vnd;
-};
-
-#define BTUART_TX_STATE_ACTIVE	1
-#define BTUART_TX_STATE_WAKEUP	2
 
 static void btuart_tx_work(struct work_struct *work)
 {
@@ -187,13 +163,27 @@ static int btuart_setup(struct hci_dev *hdev)
 	return 0;
 }
 
+static int btuart_shutdown(struct hci_dev *hdev)
+{
+	struct btuart_dev *bdev = hci_get_drvdata(hdev);
+
+	if (bdev->vnd->shutdown)
+		return bdev->vnd->shutdown(hdev);
+
+	return 0;
+}
+
 static int btuart_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 {
 	struct btuart_dev *bdev = hci_get_drvdata(hdev);
 
-	/* Prepend skb with frame type */
-	memcpy(skb_push(skb, 1), &hci_skb_pkt_type(skb), 1);
-	skb_queue_tail(&bdev->txq, skb);
+	if (bdev->vnd->send) {
+		bdev->vnd->send(hdev, skb);
+	} else {
+		/* Prepend skb with frame type */
+		memcpy(skb_push(skb, 1), &hci_skb_pkt_type(skb), 1);
+		skb_queue_tail(&bdev->txq, skb);
+	}
 
 	btuart_tx_wakeup(bdev);
 	return 0;
@@ -204,14 +194,23 @@ static int btuart_receive_buf(struct serdev_device *serdev, const u8 *data,
 {
 	struct btuart_dev *bdev = serdev_device_get_drvdata(serdev);
 	const struct btuart_vnd *vnd = bdev->vnd;
+	int err;
 
-	bdev->rx_skb = h4_recv_buf(bdev->hdev, bdev->rx_skb, data, count,
-				   vnd->recv_pkts, vnd->recv_pkts_cnt);
-	if (IS_ERR(bdev->rx_skb)) {
-		int err = PTR_ERR(bdev->rx_skb);
-		bt_dev_err(bdev->hdev, "Frame reassembly failed (%d)", err);
-		bdev->rx_skb = NULL;
-		return err;
+	if (bdev->vnd->recv) {
+		err = bdev->vnd->recv(bdev->hdev, data, count);
+		if (err < 0)
+			return err;
+	} else {
+		bdev->rx_skb = h4_recv_buf(bdev->hdev, bdev->rx_skb,
+					   data, count, vnd->recv_pkts,
+					   vnd->recv_pkts_cnt);
+		if (IS_ERR(bdev->rx_skb)) {
+			err = PTR_ERR(bdev->rx_skb);
+			bt_dev_err(bdev->hdev,
+				   "Frame reassembly failed (%d)", err);
+			bdev->rx_skb = NULL;
+			return err;
+		}
 	}
 
 	bdev->hdev->stat.byte_rx += count;
@@ -429,6 +428,9 @@ static int btuart_probe(struct serdev_device *serdev)
 	if (!bdev->vnd)
 		bdev->vnd = &default_vnd;
 
+	if (bdev->vnd->init)
+		bdev->data = bdev->vnd->init(&serdev->dev);
+
 	bdev->serdev = serdev;
 	serdev_device_set_drvdata(serdev, bdev);
 
@@ -460,6 +462,7 @@ static int btuart_probe(struct serdev_device *serdev)
 	hdev->close = btuart_close;
 	hdev->flush = btuart_flush;
 	hdev->setup = btuart_setup;
+	hdev->shutdown = btuart_shutdown;
 	hdev->send  = btuart_send_frame;
 	SET_HCIDEV_DEV(hdev, &serdev->dev);
 
