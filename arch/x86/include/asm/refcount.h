@@ -14,34 +14,43 @@
  * central refcount exception. The fixup address for the exception points
  * back to the regular execution flow in .text.
  */
-#define _REFCOUNT_EXCEPTION				\
-	".pushsection .text..refcount\n"		\
-	"111:\tlea %[counter], %%" _ASM_CX "\n"		\
-	"112:\t" ASM_UD2 "\n"				\
-	ASM_UNREACHABLE					\
-	".popsection\n"					\
-	"113:\n"					\
+
+asm ("\n"
+	".macro __REFCOUNT_EXCEPTION counter:vararg\n\t"
+	".pushsection .text..refcount\n"
+	"111:\tlea \\counter, %" _ASM_CX "\n"
+	"112:\t" ASM_UD2 "\n\t"
+	ASM_UNREACHABLE
+	".popsection\n\t"
+	"113:\n"
 	_ASM_EXTABLE_REFCOUNT(112b, 113b)
+	".endm");
 
 /* Trigger refcount exception if refcount result is negative. */
-#define REFCOUNT_CHECK_LT_ZERO				\
-	"js 111f\n\t"					\
-	_REFCOUNT_EXCEPTION
+asm ("\n"
+	".macro __REFCOUNT_CHECK_LT_ZERO counter:vararg\n"
+	"js 111f\n\t"
+	"__REFCOUNT_EXCEPTION \\counter\n"
+	".endm");
 
 /* Trigger refcount exception if refcount result is zero or negative. */
-#define REFCOUNT_CHECK_LE_ZERO				\
-	"jz 111f\n\t"					\
-	REFCOUNT_CHECK_LT_ZERO
+asm ("\n"
+	".macro __REFCOUNT_CHECK_LE_ZERO counter:vararg\n"
+	"jz 111f\n\t"
+	"__REFCOUNT_CHECK_LT_ZERO counter=\\counter\n"
+	".endm");
 
 /* Trigger refcount exception unconditionally. */
-#define REFCOUNT_ERROR					\
-	"jmp 111f\n\t"					\
-	_REFCOUNT_EXCEPTION
+asm ("\n"
+	".macro __REFCOUNT_ERROR counter:vararg\n\t"
+	"jmp 111f\n\t"
+	"__REFCOUNT_EXCEPTION counter=\\counter\n"
+	".endm");
 
 static __always_inline void refcount_add(unsigned int i, refcount_t *r)
 {
 	asm volatile(LOCK_PREFIX "addl %1,%0\n\t"
-		REFCOUNT_CHECK_LT_ZERO
+		"__REFCOUNT_CHECK_LT_ZERO %[counter]"
 		: [counter] "+m" (r->refs.counter)
 		: "ir" (i)
 		: "cc", "cx");
@@ -50,7 +59,7 @@ static __always_inline void refcount_add(unsigned int i, refcount_t *r)
 static __always_inline void refcount_inc(refcount_t *r)
 {
 	asm volatile(LOCK_PREFIX "incl %0\n\t"
-		REFCOUNT_CHECK_LT_ZERO
+		"__REFCOUNT_CHECK_LT_ZERO %[counter]"
 		: [counter] "+m" (r->refs.counter)
 		: : "cc", "cx");
 }
@@ -58,7 +67,7 @@ static __always_inline void refcount_inc(refcount_t *r)
 static __always_inline void refcount_dec(refcount_t *r)
 {
 	asm volatile(LOCK_PREFIX "decl %0\n\t"
-		REFCOUNT_CHECK_LE_ZERO
+		"__REFCOUNT_CHECK_LE_ZERO %[counter]"
 		: [counter] "+m" (r->refs.counter)
 		: : "cc", "cx");
 }
@@ -66,13 +75,15 @@ static __always_inline void refcount_dec(refcount_t *r)
 static __always_inline __must_check
 bool refcount_sub_and_test(unsigned int i, refcount_t *r)
 {
-	GEN_BINARY_SUFFIXED_RMWcc(LOCK_PREFIX "subl", REFCOUNT_CHECK_LT_ZERO,
+	GEN_BINARY_SUFFIXED_RMWcc(LOCK_PREFIX "subl",
+				  "__REFCOUNT_CHECK_LT_ZERO %[counter]",
 				  r->refs.counter, "er", i, "%0", e, "cx");
 }
 
 static __always_inline __must_check bool refcount_dec_and_test(refcount_t *r)
 {
-	GEN_UNARY_SUFFIXED_RMWcc(LOCK_PREFIX "decl", REFCOUNT_CHECK_LT_ZERO,
+	GEN_UNARY_SUFFIXED_RMWcc(LOCK_PREFIX "decl",
+				 "__REFCOUNT_CHECK_LT_ZERO %[counter]",
 				 r->refs.counter, "%0", e, "cx");
 }
 
@@ -90,7 +101,7 @@ bool refcount_add_not_zero(unsigned int i, refcount_t *r)
 
 		/* Did we try to increment from/to an undesirable state? */
 		if (unlikely(c < 0 || c == INT_MAX || result < c)) {
-			asm volatile(REFCOUNT_ERROR
+			asm volatile("__REFCOUNT_ERROR %[counter]"
 				     : : [counter] "m" (r->refs.counter)
 				     : "cc", "cx");
 			break;
