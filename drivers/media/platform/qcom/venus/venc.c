@@ -1267,26 +1267,21 @@ static int venc_remove(struct platform_device *pdev)
 static __maybe_unused int venc_runtime_suspend(struct device *dev)
 {
 	struct venus_core *core = dev_get_drvdata(dev);
+	int ret;
 
 	if (IS_V1(core))
 		return 0;
 
-	if (IS_V3(core))
-		writel(0, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
-	else if (IS_V4(core))
-		writel(0, core->base + WRAPPER_VCODEC1_MMCC_POWER_CONTROL);
+	ret = venus_helper_power_enable(core, VIDC_SESSION_TYPE_ENC, true);
 
 	if (IS_V4(core))
 		clk_disable_unprepare(core->core1_bus_clk);
 
 	clk_disable_unprepare(core->core1_clk);
 
-	if (IS_V3(core))
-		writel(1, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
-	else if (IS_V4(core))
-		writel(1, core->base + WRAPPER_VCODEC1_MMCC_POWER_CONTROL);
+	ret |= venus_helper_power_enable(core, VIDC_SESSION_TYPE_ENC, false);
 
-	return 0;
+	return ret;
 }
 
 static __maybe_unused int venc_runtime_resume(struct device *dev)
@@ -1297,20 +1292,14 @@ static __maybe_unused int venc_runtime_resume(struct device *dev)
 	if (IS_V1(core))
 		return 0;
 
-	if (IS_V3(core))
-		writel(0, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
-	else if (IS_V4(core))
-		writel(0, core->base + WRAPPER_VCODEC1_MMCC_POWER_CONTROL);
+	ret = venus_helper_power_enable(core, VIDC_SESSION_TYPE_ENC, true);
 
-	ret = clk_prepare_enable(core->core1_clk);
+	ret |= clk_prepare_enable(core->core1_clk);
 
 	if (IS_V4(core))
 		ret |= clk_prepare_enable(core->core1_bus_clk);
 
-	if (IS_V3(core))
-		writel(1, core->base + WRAPPER_VENC_VCODEC_POWER_CONTROL);
-	else if (IS_V4(core))
-		writel(1, core->base + WRAPPER_VCODEC1_MMCC_POWER_CONTROL);
+	ret |= venus_helper_power_enable(core, VIDC_SESSION_TYPE_ENC, false);
 
 	return ret;
 }
