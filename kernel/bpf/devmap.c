@@ -222,7 +222,7 @@ static int bq_xmit_all(struct bpf_dtab_netdev *obj,
 			 struct xdp_bulk_queue *bq)
 {
 	struct net_device *dev = obj->dev;
-	int sent = 0, drops = 0;
+	int sent = 0, drops = 0, err = 0;
 	int i;
 
 	if (unlikely(!bq->count))
@@ -234,23 +234,32 @@ static int bq_xmit_all(struct bpf_dtab_netdev *obj,
 		prefetch(xdpf);
 	}
 
-	for (i = 0; i < bq->count; i++) {
-		struct xdp_frame *xdpf = bq->q[i];
-		int err;
-
-		err = dev->netdev_ops->ndo_xdp_xmit(dev, xdpf);
-		if (err) {
-			drops++;
-			xdp_return_frame(xdpf);
-		}
-		sent++;
+	sent = dev->netdev_ops->ndo_xdp_xmit(dev, bq->count, bq->q);
+	if (sent < 0) {
+		err = sent;
+		sent = 0;
+		goto error;
 	}
+	drops = bq->count - sent;
+out:
 	bq->count = 0;
 
 	trace_xdp_devmap_xmit(&obj->dtab->map, obj->bit,
-			      sent, drops, bq->dev_rx, dev);
+			      sent, drops, bq->dev_rx, dev, err);
 	bq->dev_rx = NULL;
 	return 0;
+error:
+	/* If ndo_xdp_xmit fails with an errno, no frames have been
+	 * xmit'ed and it's our responsibility to them free all.
+	 */
+	for (i = 0; i < bq->count; i++) {
+		struct xdp_frame *xdpf = bq->q[i];
+
+		/* RX path under NAPI protection, can return frames faster */
+		xdp_return_frame_rx_napi(xdpf);
+		drops++;
+	}
+	goto out;
 }
 
 /* __dev_map_flush is called from xdp_do_flush_map() which _must_ be signaled
