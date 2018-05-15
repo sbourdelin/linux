@@ -218,3 +218,43 @@ EXPORT_SYMBOL(find_next_bit_le);
 #endif
 
 #endif /* __BIG_ENDIAN */
+
+/**
+ * find_next_clump - find next clump with set bits in a memory region
+ * @index: location to store bitmap word index of found clump
+ * @offset: bits offset of the found clump within the respective bitmap word
+ * @bits: address to base the search on
+ * @size: bitmap size in number of clumps
+ * @clump_index: clump index at which to start searching
+ * @clump_size: clump size in bits
+ *
+ * Returns the clump index for the next clump with set bits; the respective
+ * bitmap word index is stored at the location pointed by @index, and the bits
+ * offset of the found clump within the respective bitmap word is stored at the
+ * location pointed by @offset. If no bits are set, returns @size.
+ */
+size_t find_next_clump(size_t *const index, unsigned int *const offset,
+		       const unsigned long *const bits, const size_t size,
+		       const size_t clump_index, const unsigned int clump_size)
+{
+	size_t i;
+	unsigned int bits_offset;
+	unsigned long word_mask;
+	const unsigned long clump_mask = GENMASK(clump_size - 1, 0);
+
+	for (i = clump_index; i < size; i++) {
+		bits_offset = i * clump_size;
+
+		*index = BIT_WORD(bits_offset);
+		*offset = bits_offset % BITS_PER_LONG;
+
+		word_mask = bits[*index] & (clump_mask << *offset);
+		if (!word_mask)
+			continue;
+
+		return i;
+	}
+
+	return size;
+}
+EXPORT_SYMBOL(find_next_clump);

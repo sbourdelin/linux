@@ -2,6 +2,8 @@
 #ifndef _ASM_GENERIC_BITOPS_FIND_H_
 #define _ASM_GENERIC_BITOPS_FIND_H_
 
+#include <linux/types.h>
+
 #ifndef find_next_bit
 /**
  * find_next_bit - find the next set bit in a memory region
@@ -79,5 +81,12 @@ extern unsigned long find_first_zero_bit(const unsigned long *addr,
 #endif
 
 #endif /* CONFIG_GENERIC_FIND_FIRST_BIT */
+
+size_t find_next_clump(size_t *const index, unsigned int *const offset,
+		       const unsigned long *const bits, const size_t size,
+		       const size_t clump_index, const unsigned int clump_size);
+
+#define find_first_clump(index, offset, bits, size, clump_size) \
+	find_next_clump((index), (offset), (bits), (size), 0, (clump_size))
 
 #endif /*_ASM_GENERIC_BITOPS_FIND_H_ */
