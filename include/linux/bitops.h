@@ -59,6 +59,13 @@ extern unsigned long __sw_hweight64(__u64 w);
 	     (bit) < (size);					\
 	     (bit) = find_next_zero_bit((addr), (size), (bit) + 1))
 
+#define for_each_set_clump(clump, index, offset, bits, size, clump_size) \
+	for ((clump) = find_first_clump(&(index), &(offset), (bits), (size), \
+					(clump_size)); \
+	     (clump) < (size); \
+	     (clump) = find_next_clump(&(index), &(offset), (bits), (size), \
+				       (clump) + 1, (clump_size)))
+
 static inline int get_bitmask_order(unsigned int count)
 {
 	int order;
