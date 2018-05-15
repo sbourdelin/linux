@@ -24,9 +24,28 @@ static inline int nf_nat_initialized(struct nf_conn *ct,
 
 struct nlattr;
 
-extern int
-(*nfnetlink_parse_nat_setup_hook)(struct nf_conn *ct,
-				  enum nf_nat_manip_type manip,
-				  const struct nlattr *attr);
+#include <net/flow.h>
+
+struct nf_nat_hook {
+	int (*parse_nat_setup)(struct nf_conn *ct, enum nf_nat_manip_type manip,
+			       const struct nlattr *attr);
+	void (*decode_session)(struct sk_buff *skb, struct flowi *fl);
+};
+
+extern struct nf_nat_hook __rcu *nf_nat_hook;
+
+static inline void
+nf_nat_decode_session(struct sk_buff *skb, struct flowi *fl, u_int8_t family)
+{
+#ifdef CONFIG_NF_NAT_NEEDED
+	struct nf_nat_hook *nat_hook;
+
+	rcu_read_lock();
+	nat_hook = rcu_dereference(nf_nat_hook);
+	if (nat_hook->decode_session)
+		nat_hook->decode_session(skb, fl);
+	rcu_read_unlock();
+#endif
+}
 
 #endif /* _NF_NAT_CORE_H */

@@ -33,6 +33,7 @@
 #ifdef CONFIG_XFRM_STATISTICS
 #include <net/snmp.h>
 #endif
+#include <net/netfilter/nf_nat_core.h>
 
 #include "xfrm_hash.h"
 

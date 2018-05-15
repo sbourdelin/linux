@@ -320,23 +320,6 @@ int nf_route(struct net *net, struct dst_entry **dst, struct flowi *fl,
 	     bool strict, unsigned short family);
 int nf_reroute(struct sk_buff *skb, struct nf_queue_entry *entry);
 
-#include <net/flow.h>
-extern void (*nf_nat_decode_session_hook)(struct sk_buff *, struct flowi *);
-
-static inline void
-nf_nat_decode_session(struct sk_buff *skb, struct flowi *fl, u_int8_t family)
-{
-#ifdef CONFIG_NF_NAT_NEEDED
-	void (*decodefn)(struct sk_buff *, struct flowi *);
-
-	rcu_read_lock();
-	decodefn = rcu_dereference(nf_nat_decode_session_hook);
-	if (decodefn)
-		decodefn(skb, fl);
-	rcu_read_unlock();
-#endif
-}
-
 #else /* !CONFIG_NETFILTER */
 static inline int
 NF_HOOK_COND(uint8_t pf, unsigned int hook, struct net *net, struct sock *sk,
@@ -361,11 +344,6 @@ static inline int nf_hook(u_int8_t pf, unsigned int hook, struct net *net,
 			  int (*okfn)(struct net *, struct sock *, struct sk_buff *))
 {
 	return 1;
-}
-struct flowi;
-static inline void
-nf_nat_decode_session(struct sk_buff *skb, struct flowi *fl, u_int8_t family)
-{
 }
 #endif /*CONFIG_NETFILTER*/
 

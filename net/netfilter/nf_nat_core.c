@@ -801,6 +801,13 @@ static struct nf_ct_helper_expectfn follow_master_nat = {
 	.expectfn	= nf_nat_follow_master,
 };
 
+struct nf_nat_hook nat_hook = {
+	.parse_nat_setup	= nfnetlink_parse_nat_setup,
+#ifdef CONFIG_XFRM
+	.decode_session		= __nf_nat_decode_session,
+#endif
+};
+
 static int __init nf_nat_init(void)
 {
 	int ret, i;
@@ -826,13 +833,9 @@ static int __init nf_nat_init(void)
 
 	nf_ct_helper_expectfn_register(&follow_master_nat);
 
-	BUG_ON(nfnetlink_parse_nat_setup_hook != NULL);
-	RCU_INIT_POINTER(nfnetlink_parse_nat_setup_hook,
-			   nfnetlink_parse_nat_setup);
-#ifdef CONFIG_XFRM
-	BUG_ON(nf_nat_decode_session_hook != NULL);
-	RCU_INIT_POINTER(nf_nat_decode_session_hook, __nf_nat_decode_session);
-#endif
+	WARN_ON(nf_nat_hook != NULL);
+	RCU_INIT_POINTER(nf_nat_hook, &nat_hook);
+
 	return 0;
 }
 
@@ -845,10 +848,8 @@ static void __exit nf_nat_cleanup(void)
 
 	nf_ct_extend_unregister(&nat_extend);
 	nf_ct_helper_expectfn_unregister(&follow_master_nat);
-	RCU_INIT_POINTER(nfnetlink_parse_nat_setup_hook, NULL);
-#ifdef CONFIG_XFRM
-	RCU_INIT_POINTER(nf_nat_decode_session_hook, NULL);
-#endif
+	RCU_INIT_POINTER(nf_nat_hook, NULL);
+
 	synchronize_rcu();
 
 	for (i = 0; i < NFPROTO_NUMPROTO; i++)
