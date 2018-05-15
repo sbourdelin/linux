@@ -31,6 +31,7 @@ struct xdp_mem_allocator {
 	union {
 		void *allocator;
 		struct page_pool *page_pool;
+		struct zero_copy_allocator *zc_alloc;
 	};
 	struct rhash_head node;
 	struct rcu_head rcu;
@@ -261,7 +262,7 @@ int xdp_rxq_info_reg_mem_model(struct xdp_rxq_info *xdp_rxq,
 	xdp_rxq->mem.type = type;
 
 	if (!allocator) {
-		if (type == MEM_TYPE_PAGE_POOL)
+		if (type == MEM_TYPE_PAGE_POOL || type == MEM_TYPE_ZERO_COPY)
 			return -EINVAL; /* Setup time check page_pool req */
 		return 0;
 	}
@@ -308,9 +309,11 @@ err:
 }
 EXPORT_SYMBOL_GPL(xdp_rxq_info_reg_mem_model);
 
-static void xdp_return(void *data, struct xdp_mem_info *mem)
+void xdp_return_frame(struct xdp_frame *xdpf)
 {
+	struct xdp_mem_info *mem = &xdpf->mem;
 	struct xdp_mem_allocator *xa;
+	void *data = xdpf->data;
 	struct page *page;
 
 	switch (mem->type) {
@@ -336,16 +339,46 @@ static void xdp_return(void *data, struct xdp_mem_info *mem)
 		/* Not possible, checked in xdp_rxq_info_reg_mem_model() */
 		break;
 	}
-}
 
-void xdp_return_frame(struct xdp_frame *xdpf)
-{
-	xdp_return(xdpf->data, &xdpf->mem);
 }
 EXPORT_SYMBOL_GPL(xdp_return_frame);
 
 void xdp_return_buff(struct xdp_buff *xdp)
 {
-	xdp_return(xdp->data, &xdp->rxq->mem);
+	struct xdp_mem_info *mem = &xdp->rxq->mem;
+	struct xdp_mem_allocator *xa;
+	void *data = xdp->data;
+	struct page *page;
+
+	switch (mem->type) {
+	case MEM_TYPE_ZERO_COPY:
+		rcu_read_lock();
+		/* mem->id is valid, checked in xdp_rxq_info_reg_mem_model() */
+		xa = rhashtable_lookup(mem_id_ht, &mem->id, mem_id_rht_params);
+		xa->zc_alloc->free(xa->zc_alloc, xdp->handle);
+		rcu_read_unlock();
+		break;
+	case MEM_TYPE_PAGE_POOL:
+		rcu_read_lock();
+		/* mem->id is valid, checked in xdp_rxq_info_reg_mem_model() */
+		xa = rhashtable_lookup(mem_id_ht, &mem->id, mem_id_rht_params);
+		page = virt_to_head_page(data);
+		if (xa)
+			page_pool_put_page(xa->page_pool, page);
+		else
+			put_page(page);
+		rcu_read_unlock();
+		break;
+	case MEM_TYPE_PAGE_SHARED:
+		page_frag_free(data);
+		break;
+	case MEM_TYPE_PAGE_ORDER0:
+		page = virt_to_page(data); /* Assumes order0 page*/
+		put_page(page);
+		break;
+	default:
+		/* Not possible, checked in xdp_rxq_info_reg_mem_model() */
+		break;
+	}
 }
 EXPORT_SYMBOL_GPL(xdp_return_buff);
