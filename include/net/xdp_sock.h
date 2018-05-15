@@ -31,6 +31,7 @@ struct xdp_umem_props {
 
 struct xdp_umem_frame {
 	void *addr;
+	dma_addr_t dma;
 };
 
 struct xdp_umem {
@@ -47,6 +48,8 @@ struct xdp_umem {
 	size_t size;
 	atomic_t users;
 	struct work_struct work;
+	struct net_device *dev;
+	u16 queue_id;
 };
 
 struct xdp_sock {
@@ -69,6 +72,10 @@ int xsk_generic_rcv(struct xdp_sock *xs, struct xdp_buff *xdp);
 int xsk_rcv(struct xdp_sock *xs, struct xdp_buff *xdp);
 void xsk_flush(struct xdp_sock *xs);
 bool xsk_is_setup_for_bpf_map(struct xdp_sock *xs);
+
+u32 *xsk_umem_peek_id(struct xdp_umem *umem);
+void xsk_umem_discard_id(struct xdp_umem *umem);
+
 #else
 static inline int xsk_generic_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
 {

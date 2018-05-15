@@ -34,4 +34,7 @@ void xdp_get_umem(struct xdp_umem *umem);
 void xdp_put_umem(struct xdp_umem *umem);
 int xdp_umem_create(struct xdp_umem **umem);
 
+int xdp_umem_assign_dev(struct xdp_umem *umem, struct net_device *dev,
+			u16 queue_id);
+
 #endif /* XDP_UMEM_H_ */

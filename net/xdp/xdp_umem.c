@@ -26,6 +26,64 @@
 
 #define XDP_UMEM_MIN_FRAME_SIZE 2048
 
+int xdp_umem_assign_dev(struct xdp_umem *umem, struct net_device *dev,
+			u16 queue_id)
+{
+	struct netdev_bpf bpf;
+	int err;
+
+	if (umem->dev) {
+		if (dev != umem->dev || queue_id != umem->queue_id)
+			return -EBUSY;
+		return 0;
+	}
+
+	dev_hold(dev);
+	if (dev->netdev_ops->ndo_bpf) {
+		bpf.command = XDP_SETUP_XSK_UMEM;
+		bpf.xsk.umem = umem;
+		bpf.xsk.queue_id = queue_id;
+
+		rtnl_lock();
+		err = dev->netdev_ops->ndo_bpf(dev, &bpf);
+		rtnl_unlock();
+
+		if (err) {
+			dev_put(dev);
+			return 0;
+		}
+
+		umem->dev = dev;
+		umem->queue_id = queue_id;
+		return 0;
+	}
+
+	dev_put(dev);
+	return 0;
+}
+
+void xdp_umem_clear_dev(struct xdp_umem *umem)
+{
+	struct netdev_bpf bpf;
+	int err;
+
+	if (umem->dev) {
+		bpf.command = XDP_SETUP_XSK_UMEM;
+		bpf.xsk.umem = NULL;
+		bpf.xsk.queue_id = umem->queue_id;
+
+		rtnl_lock();
+		err = umem->dev->netdev_ops->ndo_bpf(umem->dev, &bpf);
+		rtnl_unlock();
+
+		if (err)
+			WARN(1, "failed to disable umem!\n");
+
+		dev_put(umem->dev);
+		umem->dev = NULL;
+	}
+}
+
 int xdp_umem_create(struct xdp_umem **umem)
 {
 	*umem = kzalloc(sizeof(**umem), GFP_KERNEL);
@@ -65,6 +123,8 @@ static void xdp_umem_release(struct xdp_umem *umem)
 {
 	struct task_struct *task;
 	struct mm_struct *mm;
+
+	xdp_umem_clear_dev(umem);
 
 	if (umem->fq) {
 		xskq_destroy(umem->fq);

@@ -43,6 +43,18 @@ static struct xdp_sock *xdp_sk(struct sock *sk)
 	return (struct xdp_sock *)sk;
 }
 
+u32 *xsk_umem_peek_id(struct xdp_umem *umem)
+{
+	return xskq_peek_id(umem->fq);
+}
+EXPORT_SYMBOL(xsk_umem_peek_id);
+
+void xsk_umem_discard_id(struct xdp_umem *umem)
+{
+	xskq_discard_id(umem->fq);
+}
+EXPORT_SYMBOL(xsk_umem_discard_id);
+
 bool xsk_is_setup_for_bpf_map(struct xdp_sock *xs)
 {
 	return !!xs->rx;
@@ -50,38 +62,52 @@ bool xsk_is_setup_for_bpf_map(struct xdp_sock *xs)
 
 static int __xsk_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
 {
-	u32 *id, len = xdp->data_end - xdp->data;
+	u32 *id, len;
 	void *buffer;
 	int err = 0;
-
-	if (xs->dev != xdp->rxq->dev || xs->queue_id != xdp->rxq->queue_index)
-		return -EINVAL;
 
 	id = xskq_peek_id(xs->umem->fq);
 	if (!id)
 		return -ENOSPC;
 
 	buffer = xdp_umem_get_data_with_headroom(xs->umem, *id);
+	len = xdp->data_end - xdp->data;
 	memcpy(buffer, xdp->data, len);
 	err = xskq_produce_batch_desc(xs->rx, *id, len,
 				      xs->umem->frame_headroom);
-	if (!err)
+	if (!err) {
 		xskq_discard_id(xs->umem->fq);
+		xdp_return_buff(xdp);
+		return 0;
+	}
+
+	xs->rx_dropped++;
+	return err;
+}
+
+static int __xsk_rcv_zc(struct xdp_sock *xs, struct xdp_buff *xdp)
+{
+	u16 off = xdp->data - xdp->data_hard_start;
+	u32 len = xdp->data_end - xdp->data;
+	int err;
+
+	err = xskq_produce_batch_desc(xs->rx, (u32)xdp->handle, len,
+				      xs->umem->frame_headroom + off);
+	if (err) {
+		xdp_return_buff(xdp);
+		xs->rx_dropped++;
+	}
 
 	return err;
 }
 
 int xsk_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
 {
-	int err;
+	if (xs->dev != xdp->rxq->dev || xs->queue_id != xdp->rxq->queue_index)
+		return -EINVAL;
 
-	err = __xsk_rcv(xs, xdp);
-	if (likely(!err))
-		xdp_return_buff(xdp);
-	else
-		xs->rx_dropped++;
-
-	return err;
+	return (xdp->rxq->mem.type == MEM_TYPE_ZERO_COPY) ?
+		__xsk_rcv_zc(xs, xdp) : __xsk_rcv(xs, xdp);
 }
 
 void xsk_flush(struct xdp_sock *xs)
@@ -92,14 +118,26 @@ void xsk_flush(struct xdp_sock *xs)
 
 int xsk_generic_rcv(struct xdp_sock *xs, struct xdp_buff *xdp)
 {
-	int err;
+	u32 *id, len;
+	void *buffer;
+	int err = 0;
 
-	err = __xsk_rcv(xs, xdp);
-	if (!err)
+	id = xskq_peek_id(xs->umem->fq);
+	if (!id)
+		return -ENOSPC;
+
+	buffer = xdp_umem_get_data_with_headroom(xs->umem, *id);
+	len = xdp->data_end - xdp->data;
+	memcpy(buffer, xdp->data, len);
+	err = xskq_produce_batch_desc(xs->rx, *id, len,
+				      xs->umem->frame_headroom);
+	if (!err) {
+		xskq_discard_id(xs->umem->fq);
 		xsk_flush(xs);
-	else
-		xs->rx_dropped++;
+		return 0;
+	}
 
+	xs->rx_dropped++;
 	return err;
 }
 
@@ -362,6 +400,9 @@ static int xsk_bind(struct socket *sock, struct sockaddr *addr, int addr_len)
 
 	xs->dev = dev;
 	xs->queue_id = sxdp->sxdp_queue_id;
+	err = xdp_umem_assign_dev(xs->umem, dev, xs->queue_id);
+	if (err)
+		goto out_unlock;
 
 	xskq_set_umem(xs->rx, &xs->umem->props);
 	xskq_set_umem(xs->tx, &xs->umem->props);
