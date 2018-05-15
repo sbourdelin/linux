@@ -15,12 +15,37 @@
 #ifndef _LINUX_XDP_SOCK_H
 #define _LINUX_XDP_SOCK_H
 
+#include <linux/workqueue.h>
+#include <linux/if_xdp.h>
 #include <linux/mutex.h>
+#include <linux/mm.h>
 #include <net/sock.h>
 
 struct net_device;
 struct xsk_queue;
-struct xdp_umem;
+
+struct xdp_umem_props {
+	u32 frame_size;
+	u32 nframes;
+};
+
+struct xdp_umem {
+	struct xsk_queue *fq;
+	struct xsk_queue *cq;
+	struct page **pgs;
+	struct xdp_umem_props props;
+	u32 npgs;
+	u32 frame_headroom;
+	u32 nfpp_mask;
+	u32 nfpplog2;
+	u32 frame_size_log2;
+	struct user_struct *user;
+	struct pid *pid;
+	unsigned long address;
+	size_t size;
+	atomic_t users;
+	struct work_struct work;
+};
 
 struct xdp_sock {
 	/* struct sock must be the first member of struct xdp_sock */
