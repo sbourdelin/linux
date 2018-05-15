@@ -1317,6 +1317,12 @@ struct ext4_super_block {
 /* Number of quota types we support */
 #define EXT4_MAXQUOTAS 3
 
+enum {
+	EXT4_UNPIN_BBITMAPS = 0,
+	EXT4_LOAD_BBITMAPS,
+	EXT4_PIN_BBITMAPS,
+};
+
 /*
  * fourth extended-fs super-block data in memory
  */
@@ -1487,6 +1493,10 @@ struct ext4_sb_info {
 	/* Barrier between changing inodes' journal flags and writepages ops. */
 	struct percpu_rw_semaphore s_journal_flag_rwsem;
 	struct dax_device *s_daxdev;
+
+	struct mutex s_load_bbitmaps_lock;
+	unsigned long bbitmaps_read_cnt;
+	unsigned int s_load_bbitmaps;
 };
 
 static inline struct ext4_sb_info *EXT4_SB(struct super_block *sb)
@@ -2224,6 +2234,8 @@ int ext4_block_bitmap_csum_verify(struct super_block *sb, ext4_group_t group,
 				  struct buffer_head *bh);
 
 /* balloc.c */
+int ext4_load_block_bitmaps_bh(struct super_block *sb, unsigned int op);
+void ext4_unpin_block_bitmaps_bh(struct super_block *sb);
 extern void ext4_get_group_no_and_offset(struct super_block *sb,
 					 ext4_fsblk_t blocknr,
 					 ext4_group_t *blockgrpp,

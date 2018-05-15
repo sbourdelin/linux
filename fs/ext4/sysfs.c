@@ -23,6 +23,7 @@ typedef enum {
 	attr_session_write_kbytes,
 	attr_lifetime_write_kbytes,
 	attr_reserved_clusters,
+	attr_load_bbitmaps,
 	attr_inode_readahead,
 	attr_trigger_test_error,
 	attr_feature,
@@ -105,6 +106,24 @@ static ssize_t reserved_clusters_store(struct ext4_sb_info *sbi,
 	return count;
 }
 
+static ssize_t load_bbitmaps_store(struct ext4_sb_info *sbi,
+				   const char *buf, size_t count)
+{
+	unsigned long long val;
+	int ret;
+
+	ret = kstrtoull(skip_spaces(buf), 0, &val);
+	if (ret || val > EXT4_PIN_BBITMAPS)
+		return -EINVAL;
+
+	if (val == EXT4_UNPIN_BBITMAPS)
+		ext4_unpin_block_bitmaps_bh(sbi->s_sb);
+	else if (val > EXT4_UNPIN_BBITMAPS)
+		ret = ext4_load_block_bitmaps_bh(sbi->s_sb, val);
+
+	return ret ? ret : count;
+}
+
 static ssize_t trigger_test_error(struct ext4_sb_info *sbi,
 				  const char *buf, size_t count)
 {
@@ -163,6 +182,7 @@ EXT4_ATTR_FUNC(delayed_allocation_blocks, 0444);
 EXT4_ATTR_FUNC(session_write_kbytes, 0444);
 EXT4_ATTR_FUNC(lifetime_write_kbytes, 0444);
 EXT4_ATTR_FUNC(reserved_clusters, 0644);
+EXT4_ATTR_FUNC(load_bbitmaps, 0644);
 
 EXT4_ATTR_OFFSET(inode_readahead_blks, 0644, inode_readahead,
 		 ext4_sb_info, s_inode_readahead_blks);
@@ -193,6 +213,7 @@ static struct attribute *ext4_attrs[] = {
 	ATTR_LIST(session_write_kbytes),
 	ATTR_LIST(lifetime_write_kbytes),
 	ATTR_LIST(reserved_clusters),
+	ATTR_LIST(load_bbitmaps),
 	ATTR_LIST(inode_readahead_blks),
 	ATTR_LIST(inode_goal),
 	ATTR_LIST(mb_stats),
@@ -270,6 +291,9 @@ static ssize_t ext4_attr_show(struct kobject *kobj,
 		return snprintf(buf, PAGE_SIZE, "%llu\n",
 				(unsigned long long)
 				atomic64_read(&sbi->s_resv_clusters));
+	case attr_load_bbitmaps:
+		return snprintf(buf, PAGE_SIZE, "%u\n",
+				sbi->s_load_bbitmaps);
 	case attr_inode_readahead:
 	case attr_pointer_ui:
 		if (!ptr)
@@ -302,6 +326,8 @@ static ssize_t ext4_attr_store(struct kobject *kobj,
 	switch (a->attr_id) {
 	case attr_reserved_clusters:
 		return reserved_clusters_store(sbi, buf, len);
+	case attr_load_bbitmaps:
+		return load_bbitmaps_store(sbi, buf, len);
 	case attr_pointer_ui:
 		if (!ptr)
 			return 0;

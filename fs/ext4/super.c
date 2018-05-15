@@ -902,6 +902,7 @@ static void ext4_put_super(struct super_block *sb)
 	int aborted = 0;
 	int i, err;
 
+	ext4_unpin_block_bitmaps_bh(sb);
 	ext4_unregister_li_request(sb);
 	ext4_quota_off_umount(sb);
 
@@ -4392,6 +4393,8 @@ no_journal:
 	ratelimit_state_init(&sbi->s_err_ratelimit_state, 5 * HZ, 10);
 	ratelimit_state_init(&sbi->s_warning_ratelimit_state, 5 * HZ, 10);
 	ratelimit_state_init(&sbi->s_msg_ratelimit_state, 5 * HZ, 10);
+
+	mutex_init(&EXT4_SB(sb)->s_load_bbitmaps_lock);
 
 	kfree(orig_data);
 	return 0;

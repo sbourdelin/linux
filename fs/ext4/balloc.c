@@ -505,6 +505,8 @@ int ext4_wait_block_bitmap(struct super_block *sb, ext4_group_t block_group,
 					EXT4_GROUP_INFO_BBITMAP_CORRUPT);
 		return -EIO;
 	}
+	/* race is fine */
+	EXT4_SB(sb)->bbitmaps_read_cnt++;
 	clear_buffer_new(bh);
 	/* Panic or remount fs read-only if block bitmap is invalid */
 	return ext4_validate_block_bitmap(sb, desc, block_group, bh);
@@ -658,6 +660,109 @@ ext4_fsblk_t ext4_new_meta_blocks(handle_t *handle, struct inode *inode,
 				EXT4_C2B(EXT4_SB(inode->i_sb), ar.len));
 	}
 	return ret;
+}
+
+int ext4_load_block_bitmaps_bh(struct super_block *sb, unsigned int op)
+{
+	struct buffer_head *bitmap_bh;
+	struct ext4_group_desc *gdp;
+	ext4_group_t i, j;
+	ext4_group_t ngroups = ext4_get_groups_count(sb);
+	ext4_group_t cnt = 0;
+
+	if (op < EXT4_LOAD_BBITMAPS || op > EXT4_PIN_BBITMAPS)
+		return -EINVAL;
+
+	mutex_lock(&EXT4_SB(sb)->s_load_bbitmaps_lock);
+	/* don't pin bitmaps several times */
+	if (EXT4_SB(sb)->s_load_bbitmaps == EXT4_PIN_BBITMAPS) {
+		mutex_unlock(&EXT4_SB(sb)->s_load_bbitmaps_lock);
+		return 0;
+	}
+
+	for (i = 0; i < ngroups; i++) {
+		gdp = ext4_get_group_desc(sb, i, NULL);
+		if (!gdp)
+			continue;
+		/* Load is simple, we could tolerate any
+		 * errors and continue to handle, but for
+		 * pin we return directly for simple handling
+		 * in unpin codes, otherwiese we need remember
+		 * which block bitmaps we pin exactly.
+		 */
+		bitmap_bh = ext4_read_block_bitmap(sb, i);
+		if (IS_ERR(bitmap_bh)) {
+			if (op == EXT4_LOAD_BBITMAPS)
+				continue;
+			else
+				goto failed;
+		}
+		if (op == EXT4_LOAD_BBITMAPS)
+			brelse(bitmap_bh);
+		cnt++;
+	}
+	/* Reset block bitmap to zero now */
+	EXT4_SB(sb)->bbitmaps_read_cnt = 0;
+	ext4_msg(sb, KERN_INFO, "%s %u block bitmaps finished",
+		 op == EXT4_PIN_BBITMAPS ? "pin" : "load", cnt);
+	EXT4_SB(sb)->s_load_bbitmaps = EXT4_PIN_BBITMAPS;
+	mutex_unlock(&EXT4_SB(sb)->s_load_bbitmaps_lock);
+
+	return 0;
+failed:
+	for (j = 0; j < i; j++) {
+		gdp = ext4_get_group_desc(sb, i, NULL);
+		if (!gdp)
+			continue;
+		bitmap_bh = ext4_read_block_bitmap(sb, i);
+		if (!IS_ERR(bitmap_bh)) {
+			brelse(bitmap_bh);
+			brelse(bitmap_bh);
+		}
+	}
+	mutex_unlock(&EXT4_SB(sb)->s_load_bbitmaps_lock);
+	return PTR_ERR(bitmap_bh);
+}
+
+void ext4_unpin_block_bitmaps_bh(struct super_block *sb)
+{
+	struct buffer_head *bitmap_bh;
+	struct ext4_group_desc *gdp;
+	ext4_group_t i;
+	ext4_group_t ngroups = ext4_get_groups_count(sb);
+	ext4_group_t cnt = 0;
+
+	mutex_lock(&EXT4_SB(sb)->s_load_bbitmaps_lock);
+	if (EXT4_SB(sb)->s_load_bbitmaps == EXT4_UNPIN_BBITMAPS) {
+		mutex_unlock(&EXT4_SB(sb)->s_load_bbitmaps_lock);
+		return;
+	}
+
+	ext4_msg(sb, KERN_INFO,
+		 "Read block block bitmaps: %lu afer %s",
+		 EXT4_SB(sb)->bbitmaps_read_cnt,
+		 EXT4_SB(sb)->s_load_bbitmaps == EXT4_PIN_BBITMAPS ?
+		 "pin" : "load");
+
+	if (EXT4_SB(sb)->s_load_bbitmaps != EXT4_PIN_BBITMAPS) {
+		mutex_unlock(&EXT4_SB(sb)->s_load_bbitmaps_lock);
+		return;
+	}
+
+	for (i = 0; i < ngroups; i++) {
+		gdp = ext4_get_group_desc(sb, i, NULL);
+		if (!gdp)
+			continue;
+		bitmap_bh = ext4_read_block_bitmap(sb, i);
+		if (IS_ERR(bitmap_bh))
+			continue;
+		brelse(bitmap_bh);
+		brelse(bitmap_bh);
+		cnt++;
+	}
+	ext4_msg(sb, KERN_INFO, "Unpin %u lock bitmaps finished", cnt);
+	EXT4_SB(sb)->s_load_bbitmaps = EXT4_UNPIN_BBITMAPS;
+	mutex_unlock(&EXT4_SB(sb)->s_load_bbitmaps_lock);
 }
 
 /**
