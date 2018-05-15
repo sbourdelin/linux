@@ -149,8 +149,9 @@ int driver_register(struct device_driver *drv)
 	struct device_driver *other;
 
 	if (!drv->bus->p) {
-		printk(KERN_ERR "Driver '%s' was unable to register bus_type\n",
-			   drv->name);
+		printk(KERN_ERR "Driver '%s' was unable to register bus_type "
+			   "(error: %d)\n",
+			   drv->name, drv->bus->bus_register_retval);
 		return -EINVAL;
 	}
 
