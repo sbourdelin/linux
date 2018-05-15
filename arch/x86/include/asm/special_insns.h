@@ -19,7 +19,7 @@ extern unsigned long __force_order;
 static inline unsigned long native_read_cr0(void)
 {
 	unsigned long val;
-	asm volatile("mov %%cr0,%0\n\t" : "=r" (val), "=m" (__force_order));
+	asm volatile("mov %%cr0,%0" : "=r" (val), "=m" (__force_order));
 	return val;
 }
 
@@ -31,7 +31,7 @@ static inline void native_write_cr0(unsigned long val)
 static inline unsigned long native_read_cr2(void)
 {
 	unsigned long val;
-	asm volatile("mov %%cr2,%0\n\t" : "=r" (val), "=m" (__force_order));
+	asm volatile("mov %%cr2,%0" : "=r" (val), "=m" (__force_order));
 	return val;
 }
 
@@ -43,7 +43,7 @@ static inline void native_write_cr2(unsigned long val)
 static inline unsigned long __native_read_cr3(void)
 {
 	unsigned long val;
-	asm volatile("mov %%cr3,%0\n\t" : "=r" (val), "=m" (__force_order));
+	asm volatile("mov %%cr3,%0" : "=r" (val), "=m" (__force_order));
 	return val;
 }
 
@@ -67,7 +67,7 @@ static inline unsigned long native_read_cr4(void)
 		     : "=r" (val), "=m" (__force_order) : "0" (0));
 #else
 	/* CR4 always exists on x86_64. */
-	asm volatile("mov %%cr4,%0\n\t" : "=r" (val), "=m" (__force_order));
+	asm volatile("mov %%cr4,%0" : "=r" (val), "=m" (__force_order));
 #endif
 	return val;
 }
@@ -101,7 +101,7 @@ static inline u32 __read_pkru(void)
 	 * "rdpkru" instruction.  Places PKRU contents in to EAX,
 	 * clears EDX and requires that ecx=0.
 	 */
-	asm volatile(".byte 0x0f,0x01,0xee\n\t"
+	asm volatile(".byte 0x0f,0x01,0xee"
 		     : "=a" (pkru), "=d" (edx)
 		     : "c" (ecx));
 	return pkru;
@@ -115,7 +115,7 @@ static inline void __write_pkru(u32 pkru)
 	 * "wrpkru" instruction.  Loads contents in EAX to PKRU,
 	 * requires that ecx = edx = 0.
 	 */
-	asm volatile(".byte 0x0f,0x01,0xef\n\t"
+	asm volatile(".byte 0x0f,0x01,0xef"
 		     : : "a" (pkru), "c"(ecx), "d"(edx));
 }
 #else
