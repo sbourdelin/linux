@@ -5843,6 +5843,267 @@ static void nf_tables_commit_release(struct net *net)
 	}
 }
 
+struct nft_chain_info {
+	u8		type;
+	unsigned int	hooknum;
+};
+
+static inline struct nft_chain_info *nft_get_chain_info(struct net *net,
+							struct nft_chain *chain)
+{
+	return net->nft.chain_info + chain->handle;
+}
+
+static int nft_validate_chain(struct net *net, struct nft_chain *chain)
+{
+	struct nft_table *table = chain->table;
+	struct nft_expr *expr, *last;
+	struct nft_rule *rule;
+	struct nft_ctx ctx;
+
+	list_for_each_entry(rule, &chain->rules, list) {
+		if (!nft_is_active_next(net, rule))
+			continue;
+		nft_rule_for_each_expr(expr, last, rule) {
+			const struct nft_data *data = NULL;
+			int err = 0;
+
+			if (!expr->ops->validate)
+				continue;
+
+			ctx.net		= net;
+			ctx.family	= table->family;
+			ctx.table	= table;
+			ctx.chain	= chain;
+			err = expr->ops->validate(&ctx, expr, &data);
+			if (err < 0)
+				return err;
+
+			if (!data)
+				continue;
+
+			switch (data->verdict.code) {
+			case NFT_JUMP:
+			case NFT_GOTO:
+				err = nft_validate_chain(net,
+							 data->verdict.chain);
+				if (err < 0)
+					return err;
+			default:
+				break;
+			}
+		}
+	}
+	return 0;
+}
+
+static int nft_mark_chain_info(struct net *net,
+			       struct nft_chain *pchain,
+			       struct nft_chain *cchain);
+
+static int nft_mark_chain_info_setelem(const struct nft_ctx *ctx,
+				       struct nft_set *set,
+				       const struct nft_set_iter *iter,
+				       struct nft_set_elem *elem)
+{
+	const struct nft_set_ext *ext = nft_set_elem_ext(set, elem->priv);
+	const struct nft_data *data;
+
+	if (nft_set_ext_exists(ext, NFT_SET_EXT_FLAGS) &&
+	    *nft_set_ext_flags(ext) & NFT_SET_ELEM_INTERVAL_END)
+		return 0;
+
+	data = nft_set_ext_data(ext);
+	switch (data->verdict.code) {
+	case NFT_JUMP:
+	case NFT_GOTO:
+		return nft_mark_chain_info(ctx->net, ctx->chain,
+					   data->verdict.chain);
+	default:
+		return 0;
+	}
+
+	return 0;
+}
+
+static int nft_mark_set_elem(struct net *net, struct nft_chain *chain)
+{
+	struct nft_ctx ctx;
+	struct nft_table *table = chain->table;
+	struct nft_set *set;
+	struct nft_set_binding *binding;
+	struct nft_set_iter iter;
+
+	list_for_each_entry(set, &table->sets, list) {
+		if (!nft_is_active_next(net, set))
+			continue;
+		if (!(set->flags & NFT_SET_MAP) ||
+		    set->dtype != NFT_DATA_VERDICT)
+			continue;
+
+		list_for_each_entry(binding, &set->bindings, list) {
+			if (!(binding->flags & NFT_SET_MAP) ||
+			    binding->chain != chain)
+				continue;
+
+			iter.genmask	= nft_genmask_next(net);
+			iter.skip	= 0;
+			iter.count	= 0;
+			iter.err	= 0;
+			iter.fn		= nft_mark_chain_info_setelem;
+
+			ctx.net		= net;
+			ctx.family	= table->family;
+			ctx.table	= table;
+			ctx.chain	= chain;
+			set->ops->walk(&ctx, set, &iter);
+			if (iter.err < 0)
+				return iter.err;
+		}
+	}
+	return 0;
+}
+
+static int nft_mark_rule(struct net *net, struct nft_chain *chain)
+{
+	struct nft_rule *rule;
+	struct nft_expr *expr, *last;
+
+	list_for_each_entry(rule, &chain->rules, list) {
+		if (!nft_is_active_next(net, rule))
+			continue;
+		nft_rule_for_each_expr(expr, last, rule) {
+			const struct nft_data *data = NULL;
+			int err;
+
+			if (!expr->ops->validate)
+				continue;
+			if (strcmp(expr->ops->type->name, "immediate"))
+				continue;
+
+			err = expr->ops->validate(NULL, expr, &data);
+			if (err < 0)
+				return err;
+
+			if (!data)
+				continue;
+
+			switch (data->verdict.code) {
+			case NFT_JUMP:
+			case NFT_GOTO:
+				err = nft_mark_chain_info(net, chain,
+							  data->verdict.chain);
+				if (err < 0)
+					return err;
+			default:
+				break;
+			}
+		}
+	}
+	return 0;
+}
+
+static int nft_mark_chain_info(struct net *net,
+			       struct nft_chain *pchain,
+			       struct nft_chain *cchain)
+{
+	struct nft_chain_info before;
+	struct nft_chain_info *pinfo = nft_get_chain_info(net, pchain);
+	struct nft_chain_info *cinfo = nft_get_chain_info(net, cchain);
+	int err = 0;
+
+	if (pchain != cchain) {
+		if (unlikely(nft_is_base_chain(cchain))) {
+			WARN_ON(1);
+			return -ELOOP;
+		}
+
+		before.type = cinfo->type;
+		before.hooknum = cinfo->hooknum;
+
+		if (cinfo->type && cinfo->type != pinfo->type)
+			cinfo->type = NFT_CHAIN_T_MIX;
+		else
+			cinfo->type = pinfo->type;
+		cinfo->hooknum |= pinfo->hooknum;
+
+		if (cinfo->type == before.type &&
+		    cinfo->hooknum == before.hooknum)
+			return 0;
+	}
+
+	err = nft_mark_rule(net, cchain);
+	if (err < 0)
+		return err;
+	return nft_mark_set_elem(net, cchain);
+}
+
+static int nf_tables_validate(struct net *net)
+{
+	struct nft_table *table;
+	struct nft_chain *chain;
+	struct nft_base_chain *basechain;
+	struct nft_chain_info *cinfo;
+	u64 hgenerator = 0;
+	int err = 0;
+
+	list_for_each_entry(table, &net->nft.tables, list) {
+		if (!nft_is_active_next(net, table))
+			continue;
+		hgenerator = max_t(u64, hgenerator, table->hgenerator);
+	}
+
+	if (!hgenerator)
+		return 0;
+
+	hgenerator++;
+	net->nft.chain_info = kvmalloc(hgenerator *
+				       sizeof(struct nft_chain_info),
+				       GFP_KERNEL);
+	if (!net->nft.chain_info)
+		return -ENOMEM;
+
+	list_for_each_entry(table, &net->nft.tables, list) {
+		if (!nft_is_active_next(net, table))
+			continue;
+
+		memset(net->nft.chain_info, 0,
+		       sizeof(struct nft_chain_info) * hgenerator);
+
+		list_for_each_entry(chain, &table->chains, list) {
+			if (!nft_is_active_next(net, chain))
+				continue;
+			if (!nft_is_base_chain(chain))
+				continue;
+
+			basechain = nft_base_chain(chain);
+			cinfo = nft_get_chain_info(net, chain);
+
+			cinfo->type = basechain->type->type;
+			cinfo->hooknum |= 1 << basechain->ops.hooknum;
+
+			err = nft_mark_chain_info(net, chain, chain);
+			if (err)
+				goto out;
+
+			err = nft_mark_set_elem(net, chain);
+			if (err < 0)
+				goto out;
+		}
+		list_for_each_entry(chain, &table->chains, list) {
+			if (!nft_is_active_next(net, chain))
+				continue;
+			err = nft_validate_chain(net, chain);
+			if (err < 0)
+				goto out;
+		}
+	}
+
+out:
+	kvfree(net->nft.chain_info);
+	return err;
+}
+
 static int nf_tables_commit(struct net *net, struct sk_buff *skb)
 {
 	struct nft_trans *trans, *next;
@@ -6130,6 +6391,7 @@ static const struct nfnetlink_subsystem nf_tables_subsys = {
 	.cb_count	= NFT_MSG_MAX,
 	.cb		= nf_tables_cb,
 	.commit		= nf_tables_commit,
+	.validate	= nf_tables_validate,
 	.abort		= nf_tables_abort,
 	.valid_genid	= nf_tables_valid_genid,
 };

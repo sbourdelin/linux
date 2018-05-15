@@ -4,9 +4,12 @@
 
 #include <linux/list.h>
 
+struct nft_chain_info;
+
 struct netns_nftables {
 	struct list_head	tables;
 	struct list_head	commit_list;
+	struct nft_chain_info	*chain_info;
 	unsigned int		base_seq;
 	u8			gencursor;
 };

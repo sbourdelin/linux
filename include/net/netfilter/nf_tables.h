@@ -877,6 +877,7 @@ enum nft_chain_types {
 	NFT_CHAIN_T_DEFAULT = 0,
 	NFT_CHAIN_T_ROUTE,
 	NFT_CHAIN_T_NAT,
+	NFT_CHAIN_T_MIX,
 	NFT_CHAIN_T_MAX
 };
 
