@@ -1090,6 +1090,10 @@ static int venus_core_init(struct venus_core *core)
 	if (ret)
 		dev_warn(dev, "failed to send image version pkt to fw\n");
 
+	ret = venus_sys_set_default_properties(hdev);
+	if (ret)
+		return ret;
+
 	return 0;
 }
 
@@ -1133,10 +1137,6 @@ static int venus_session_init(struct venus_inst *inst, u32 session_type,
 	struct venus_hfi_device *hdev = to_hfi_priv(inst->core);
 	struct hfi_session_init_pkt pkt;
 	int ret;
-
-	ret = venus_sys_set_default_properties(hdev);
-	if (ret)
-		return ret;
 
 	ret = pkt_session_init(&pkt, inst, session_type, codec);
 	if (ret)
