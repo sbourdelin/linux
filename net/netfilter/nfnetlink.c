@@ -441,8 +441,21 @@ done:
 		kfree_skb(skb);
 		goto replay;
 	} else if (status == NFNL_BATCH_DONE) {
+		if (ss->validate) {
+			err = ss->validate(net);
+			if (err < 0) {
+				if (nfnl_err_add(&err_list, nlmsg_hdr(oskb),
+						 err, &extack) < 0) {
+					nfnl_err_reset(&err_list);
+					netlink_ack(oskb, nlmsg_hdr(oskb),
+						    -ENOMEM, NULL);
+				}
+				goto abort;
+			}
+		}
 		ss->commit(net, oskb);
 	} else {
+abort:
 		ss->abort(net, oskb);
 	}
 
