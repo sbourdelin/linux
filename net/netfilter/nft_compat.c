@@ -54,23 +54,6 @@ static bool nft_xt_put(struct nft_xt *xt)
 	return false;
 }
 
-static int nft_compat_chain_validate_dependency(const char *tablename,
-						const struct nft_chain *chain)
-{
-	const struct nft_base_chain *basechain;
-
-	if (!tablename ||
-	    !nft_is_base_chain(chain))
-		return 0;
-
-	basechain = nft_base_chain(chain);
-	if (strcmp(tablename, "nat") == 0 &&
-	    basechain->type->type != NFT_CHAIN_T_NAT)
-		return -EINVAL;
-
-	return 0;
-}
-
 union nft_entry {
 	struct ipt_entry e4;
 	struct ip6t_entry e6;
@@ -311,24 +294,20 @@ static int nft_target_validate(const struct nft_ctx *ctx,
 			       const struct nft_data **data)
 {
 	struct xt_target *target = expr->ops->data;
-	unsigned int hook_mask = 0;
-	int ret;
+	enum nft_chain_types type;
+	int err;
 
-	if (nft_is_base_chain(ctx->chain)) {
-		const struct nft_base_chain *basechain =
-						nft_base_chain(ctx->chain);
-		const struct nf_hook_ops *ops = &basechain->ops;
+	if (!target->table)
+		return 0;
+	if (!strcmp(target->table, "nat"))
+		type = NFT_CHAIN_T_NAT;
+	else
+		type = NFT_CHAIN_T_DEFAULT;
 
-		hook_mask = 1 << ops->hooknum;
-		if (target->hooks && !(hook_mask & target->hooks))
-			return -EINVAL;
-
-		ret = nft_compat_chain_validate_dependency(target->table,
-							   ctx->chain);
-		if (ret < 0)
-			return ret;
-	}
-	return 0;
+	err = nft_chain_validate_dependency(ctx, type);
+	if (err < 0)
+		return err;
+	return nft_chain_validate_hooks(ctx, target->hooks);
 }
 
 static void __nft_match_eval(const struct nft_expr *expr,
@@ -558,24 +537,20 @@ static int nft_match_validate(const struct nft_ctx *ctx,
 			      const struct nft_data **data)
 {
 	struct xt_match *match = expr->ops->data;
-	unsigned int hook_mask = 0;
-	int ret;
+	enum nft_chain_types type;
+	int err;
 
-	if (nft_is_base_chain(ctx->chain)) {
-		const struct nft_base_chain *basechain =
-						nft_base_chain(ctx->chain);
-		const struct nf_hook_ops *ops = &basechain->ops;
+	if (!match->table)
+		return 0;
+	if (!strcmp(match->table, "nat"))
+		type = NFT_CHAIN_T_NAT;
+	else
+		type = NFT_CHAIN_T_DEFAULT;
 
-		hook_mask = 1 << ops->hooknum;
-		if (match->hooks && !(hook_mask & match->hooks))
-			return -EINVAL;
-
-		ret = nft_compat_chain_validate_dependency(match->table,
-							   ctx->chain);
-		if (ret < 0)
-			return ret;
-	}
-	return 0;
+	err = nft_chain_validate_dependency(ctx, type);
+	if (err < 0)
+		return err;
+	return nft_chain_validate_hooks(ctx, match->hooks);
 }
 
 static int

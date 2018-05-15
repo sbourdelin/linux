@@ -1899,26 +1899,13 @@ static int nf_tables_newexpr(const struct nft_ctx *ctx,
 	expr->ops = ops;
 	if (ops->init) {
 		err = ops->init(ctx, expr, (const struct nlattr **)info->tb);
-		if (err < 0)
-			goto err1;
-	}
-
-	if (ops->validate) {
-		const struct nft_data *data = NULL;
-
-		err = ops->validate(ctx, expr, &data);
-		if (err < 0)
-			goto err2;
+		if (err < 0) {
+			expr->ops = NULL;
+			return err;
+		}
 	}
 
 	return 0;
-
-err2:
-	if (ops->destroy)
-		ops->destroy(ctx, expr);
-err1:
-	expr->ops = NULL;
-	return err;
 }
 
 static void nf_tables_expr_destroy(const struct nft_ctx *ctx,
@@ -6399,13 +6386,12 @@ static const struct nfnetlink_subsystem nf_tables_subsys = {
 int nft_chain_validate_dependency(const struct nft_ctx *ctx,
 				  enum nft_chain_types type)
 {
-	const struct nft_base_chain *basechain;
+	struct net *net = ctx->net;
+	struct nft_chain *chain = ctx->chain;
+	struct nft_chain_info *cinfo = nft_get_chain_info(net, chain);
 
-	if (nft_is_base_chain(ctx->chain)) {
-		basechain = nft_base_chain(ctx->chain);
-		if (basechain->type->type != type)
-			return -EOPNOTSUPP;
-	}
+	if (cinfo->type && cinfo->type != type)
+		return -EOPNOTSUPP;
 	return 0;
 }
 EXPORT_SYMBOL_GPL(nft_chain_validate_dependency);
@@ -6413,17 +6399,14 @@ EXPORT_SYMBOL_GPL(nft_chain_validate_dependency);
 int nft_chain_validate_hooks(const struct nft_ctx *ctx,
 			     unsigned int hook_flags)
 {
-	struct nft_base_chain *basechain;
+	struct net *net = ctx->net;
+	struct nft_chain *chain = ctx->chain;
+	struct nft_chain_info *cinfo = nft_get_chain_info(net, chain);
 
-	if (nft_is_base_chain(ctx->chain)) {
-		basechain = nft_base_chain(ctx->chain);
-
-		if ((1 << basechain->ops.hooknum) & hook_flags)
-			return 0;
-
+	if (!hook_flags)
+		return 0;
+	if (cinfo->hooknum & ~hook_flags)
 		return -EOPNOTSUPP;
-	}
-
 	return 0;
 }
 EXPORT_SYMBOL_GPL(nft_chain_validate_hooks);
@@ -6481,12 +6464,14 @@ static int nf_tables_check_loops(const struct nft_ctx *ctx,
 
 			if (!expr->ops->validate)
 				continue;
+			if (strcmp(expr->ops->type->name, "immediate"))
+				continue;
 
 			err = expr->ops->validate(ctx, expr, &data);
 			if (err < 0)
 				return err;
 
-			if (data == NULL)
+			if (!data)
 				continue;
 
 			switch (data->verdict.code) {
