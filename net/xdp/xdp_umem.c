@@ -27,42 +27,49 @@
 #define XDP_UMEM_MIN_FRAME_SIZE 2048
 
 int xdp_umem_assign_dev(struct xdp_umem *umem, struct net_device *dev,
-			u16 queue_id)
+			u16 queue_id, struct list_head *list_entry)
 {
 	struct netdev_bpf bpf;
+	unsigned long flags;
 	int err;
 
 	if (umem->dev) {
 		if (dev != umem->dev || queue_id != umem->queue_id)
 			return -EBUSY;
-		return 0;
-	}
+	} else {
+		dev_hold(dev);
 
-	dev_hold(dev);
-	if (dev->netdev_ops->ndo_bpf) {
-		bpf.command = XDP_SETUP_XSK_UMEM;
-		bpf.xsk.umem = umem;
-		bpf.xsk.queue_id = queue_id;
+		if (dev->netdev_ops->ndo_bpf) {
+			bpf.command = XDP_SETUP_XSK_UMEM;
+			bpf.xsk.umem = umem;
+			bpf.xsk.queue_id = queue_id;
 
-		rtnl_lock();
-		err = dev->netdev_ops->ndo_bpf(dev, &bpf);
-		rtnl_unlock();
+			rtnl_lock();
+			err = dev->netdev_ops->ndo_bpf(dev, &bpf);
+			rtnl_unlock();
 
-		if (err) {
+			if (err) {
+				dev_put(dev);
+				goto fallback;
+			}
+
+			umem->dev = dev;
+			umem->queue_id = queue_id;
+			umem->zc = true;
+		} else {
 			dev_put(dev);
-			return 0;
 		}
-
-		umem->dev = dev;
-		umem->queue_id = queue_id;
-		return 0;
 	}
 
-	dev_put(dev);
+fallback:
+	spin_lock_irqsave(&umem->xsk_list_lock, flags);
+	list_add_rcu(list_entry, &umem->xsk_list);
+	spin_unlock_irqrestore(&umem->xsk_list_lock, flags);
+
 	return 0;
 }
 
-void xdp_umem_clear_dev(struct xdp_umem *umem)
+static void xdp_umem_clear_dev(struct xdp_umem *umem)
 {
 	struct netdev_bpf bpf;
 	int err;
@@ -172,10 +179,21 @@ void xdp_get_umem(struct xdp_umem *umem)
 	atomic_inc(&umem->users);
 }
 
-void xdp_put_umem(struct xdp_umem *umem)
+void xdp_put_umem(struct xdp_umem *umem, struct xdp_sock *xs)
 {
+	unsigned long flags;
+
 	if (!umem)
 		return;
+
+	if (xs->dev) {
+		spin_lock_irqsave(&umem->xsk_list_lock, flags);
+		list_del_rcu(&xs->list);
+		spin_unlock_irqrestore(&umem->xsk_list_lock, flags);
+
+		if (umem->zc)
+			synchronize_net();
+	}
 
 	if (atomic_dec_and_test(&umem->users)) {
 		INIT_WORK(&umem->work, xdp_umem_release_deferred);
@@ -297,6 +315,8 @@ int xdp_umem_reg(struct xdp_umem *umem, struct xdp_umem_reg *mr)
 	umem->npgs = size / PAGE_SIZE;
 	umem->pgs = NULL;
 	umem->user = NULL;
+	INIT_LIST_HEAD(&umem->xsk_list);
+	spin_lock_init(&umem->xsk_list_lock);
 
 	atomic_set(&umem->users, 1);
 

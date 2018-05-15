@@ -22,6 +22,11 @@ static inline char *xdp_umem_get_data(struct xdp_umem *umem, u32 idx)
 	return umem->frames[idx].addr;
 }
 
+static inline dma_addr_t xdp_umem_get_dma(struct xdp_umem *umem, u32 idx)
+{
+	return umem->frames[idx].dma;
+}
+
 static inline char *xdp_umem_get_data_with_headroom(struct xdp_umem *umem,
 						    u32 idx)
 {
@@ -31,10 +36,10 @@ static inline char *xdp_umem_get_data_with_headroom(struct xdp_umem *umem,
 bool xdp_umem_validate_queues(struct xdp_umem *umem);
 int xdp_umem_reg(struct xdp_umem *umem, struct xdp_umem_reg *mr);
 void xdp_get_umem(struct xdp_umem *umem);
-void xdp_put_umem(struct xdp_umem *umem);
+void xdp_put_umem(struct xdp_umem *umem, struct xdp_sock *xs);
 int xdp_umem_create(struct xdp_umem **umem);
 
 int xdp_umem_assign_dev(struct xdp_umem *umem, struct net_device *dev,
-			u16 queue_id);
+			u16 queue_id, struct list_head *list_entry);
 
 #endif /* XDP_UMEM_H_ */
