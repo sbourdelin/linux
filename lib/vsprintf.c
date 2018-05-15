@@ -1680,7 +1680,7 @@ static void fill_random_ptr_key(struct random_ready_callback *unused)
 	 * ptr_to_id() needs to see have_filled_random_ptr_key==true
 	 * after get_random_bytes() returns.
 	 */
-	smp_mb();
+	smp_wmb();
 	WRITE_ONCE(have_filled_random_ptr_key, true);
 }
 
@@ -1714,6 +1714,9 @@ static char *ptr_to_id(char *buf, char *end, void *ptr, struct printf_spec spec)
 		/* string length must be less than default_width */
 		return string(buf, end, "(ptrval)", spec);
 	}
+
+	/* Read ptr_key after reading have_filled_random_ptr_key */
+	smp_rmb();
 
 #ifdef CONFIG_64BIT
 	hashval = (unsigned long)siphash_1u64((u64)ptr, &ptr_key);
