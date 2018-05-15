@@ -360,6 +360,8 @@ struct nf_conn;
 enum ip_conntrack_info;
 
 struct nf_ct_hook {
+	int (*update)(struct net *net, struct sk_buff *skb, struct nf_conn *ct,
+		      enum ip_conntrack_info ctinfo);
 	void (*destroy)(struct nf_conntrack *);
 };
 extern struct nf_ct_hook __rcu *nf_ct_hook;
