@@ -1385,6 +1385,12 @@ struct net_device_ops {
 	int			(*ndo_xdp_xmit)(struct net_device *dev,
 						struct xdp_frame *xdp);
 	void			(*ndo_xdp_flush)(struct net_device *dev);
+	/* AF_XDP Tx function. NB! That in the PoC we take ownership
+	 * of the XDP Tx rings, so you wont be able to XDP_REDIRECT
+	 * there...
+	 */
+	int			(*ndo_xsk_async_xmit)(struct net_device *dev,
+						      u32 queue_id);
 };
 
 /**
