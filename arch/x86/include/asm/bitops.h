@@ -349,10 +349,10 @@ static __always_inline bool variable_test_bit(long nr, volatile const unsigned l
 static bool test_bit(int nr, const volatile unsigned long *addr);
 #endif
 
-#define test_bit(nr, addr)			\
-	(__builtin_constant_p((nr))		\
-	 ? constant_test_bit((nr), (addr))	\
-	 : variable_test_bit((nr), (addr)))
+#define test_bit(nr, addr)					\
+	__builtin_choose_expr(__builtin_constant_p((nr)),	\
+		constant_test_bit((nr), (addr)),		\
+		variable_test_bit((nr), (addr)))
 
 /**
  * __ffs - find first set bit in word
