@@ -35,6 +35,7 @@
 #include "h4_recv.h"
 #include "btuart.h"
 #include "btbcm.h"
+#include "btmtkuart.h"
 
 #define VERSION "1.0"
 
@@ -396,11 +397,27 @@ static const struct h4_recv_pkt bcm_recv_pkts[] = {
 	{ BCM_RECV_NULL,    .recv = hci_recv_diag  },
 };
 
+static const struct h4_recv_pkt mtk_recv_pkts[] = {
+	{ H4_RECV_ACL,      .recv = hci_recv_frame },
+	{ H4_RECV_SCO,      .recv = hci_recv_frame },
+	{ H4_RECV_EVENT,    .recv = mtk_btuart_hci_frame },
+};
+
 static const struct btuart_vnd bcm_vnd = {
 	.recv_pkts	= bcm_recv_pkts,
 	.recv_pkts_cnt	= ARRAY_SIZE(bcm_recv_pkts),
 	.manufacturer	= 15,
 	.setup		= bcm_setup,
+};
+
+static const struct btuart_vnd mtk_vnd = {
+	.recv_pkts	= mtk_recv_pkts,
+	.recv_pkts_cnt	= ARRAY_SIZE(mtk_recv_pkts),
+	.init		= mtk_btuart_init,
+	.setup		= mtk_btuart_setup,
+	.shutdown	= mtk_btuart_shutdown,
+	.send		= mtk_btuart_send,
+	.recv		= mtk_btuart_recv,
 };
 
 static const struct h4_recv_pkt default_recv_pkts[] = {
@@ -487,6 +504,7 @@ static void btuart_remove(struct serdev_device *serdev)
 #ifdef CONFIG_OF
 static const struct of_device_id btuart_of_match_table[] = {
 	{ .compatible = "brcm,bcm43438-bt", .data = &bcm_vnd },
+	{ .compatible = "mediatek,mt7622-bluetooth", .data = &mtk_vnd },
 	{ }
 };
 MODULE_DEVICE_TABLE(of, btuart_of_match_table);
