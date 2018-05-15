@@ -3344,7 +3344,7 @@ int rdma_bind_addr(struct rdma_cm_id *id, struct sockaddr *addr)
 		return -EAFNOSUPPORT;
 
 	id_priv = container_of(id, struct rdma_id_private, id);
-	if (!cma_comp_exch(id_priv, RDMA_CM_IDLE, RDMA_CM_ADDR_BOUND))
+	if (!cma_comp_exch(id_priv, RDMA_CM_IDLE, RDMA_CM_ADDR_BINDING))
 		return -EINVAL;
 
 	ret = cma_check_linklocal(&id->route.addr.dev_addr, addr);
@@ -3380,6 +3380,8 @@ int rdma_bind_addr(struct rdma_cm_id *id, struct sockaddr *addr)
 	if (ret)
 		goto err2;
 
+	cma_comp_exch(id_priv, RDMA_CM_ADDR_BINDING, RDMA_CM_ADDR_BOUND);
+
 	return 0;
 err2:
 	if (id_priv->cma_dev) {
@@ -3387,7 +3389,7 @@ err2:
 		cma_release_dev(id_priv);
 	}
 err1:
-	cma_comp_exch(id_priv, RDMA_CM_ADDR_BOUND, RDMA_CM_IDLE);
+	cma_comp_exch(id_priv, RDMA_CM_ADDR_BINDING, RDMA_CM_IDLE);
 	return ret;
 }
 EXPORT_SYMBOL(rdma_bind_addr);
