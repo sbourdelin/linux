@@ -22,6 +22,7 @@
  */
 #include "testmode.h"
 
+#include <linux/pm_runtime.h>
 #include <linux/slab.h>
 #include <net/genetlink.h>
 
@@ -97,9 +98,11 @@ static int wl1271_tm_cmd_test(struct wl1271 *wl, struct nlattr *tb[])
 		goto out;
 	}
 
-	ret = wl1271_ps_elp_wakeup(wl);
-	if (ret < 0)
+	ret = pm_runtime_get_sync(wl->dev);
+	if (ret < 0) {
+		pm_runtime_put_noidle(wl->dev);
 		goto out;
+	}
 
 	ret = wl1271_cmd_test(wl, buf, buf_len, answer);
 	if (ret < 0) {
@@ -141,7 +144,7 @@ static int wl1271_tm_cmd_test(struct wl1271 *wl, struct nlattr *tb[])
 	}
 
 out_sleep:
-	wl1271_ps_elp_sleep(wl);
+	pm_runtime_put(wl->dev);
 out:
 	mutex_unlock(&wl->mutex);
 
@@ -169,9 +172,11 @@ static int wl1271_tm_cmd_interrogate(struct wl1271 *wl, struct nlattr *tb[])
 		goto out;
 	}
 
-	ret = wl1271_ps_elp_wakeup(wl);
-	if (ret < 0)
+	ret = pm_runtime_get_sync(wl->dev);
+	if (ret < 0) {
+		pm_runtime_put_noidle(wl->dev);
 		goto out;
+	}
 
 	cmd = kzalloc(sizeof(*cmd), GFP_KERNEL);
 	if (!cmd) {
@@ -205,7 +210,7 @@ static int wl1271_tm_cmd_interrogate(struct wl1271 *wl, struct nlattr *tb[])
 out_free:
 	kfree(cmd);
 out_sleep:
-	wl1271_ps_elp_sleep(wl);
+	pm_runtime_put(wl->dev);
 out:
 	mutex_unlock(&wl->mutex);
 
