@@ -868,6 +868,18 @@
 					};
 				};
 			};
+
+			ports {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				port@0 {
+					reg = <0>;
+					muic_to_usb: endpoint {
+						remote-endpoint = <&usb_to_muic>;
+					};
+				};
+			};
 		};
 
 		regulators {
@@ -1283,12 +1295,17 @@
 
 &usbdrd_dwc3 {
 	dr_mode = "otg";
-	extcon = <&muic>;
 };
 
 &usbdrd30_phy {
 	vbus-supply = <&safeout1_reg>;
 	status = "okay";
+
+	port {
+		usb_to_muic: endpoint {
+			remote-endpoint = <&muic_to_usb>;
+		};
+	};
 };
 
 &xxti {
