@@ -280,6 +280,12 @@ struct btrfs_super_block {
 	(BTRFS_FEATURE_INCOMPAT_EXTENDED_IREF)
 #define BTRFS_FEATURE_INCOMPAT_SAFE_CLEAR		0ULL
 
+#define BTRFS_FEATURE_KERNEL_SUPP			\
+	BTRFS_FEATURE_KERNEL_RMDIR_SUBVOL
+
+#define BTRFS_FEATURE_KERNEL_SAFE_SET			0ULL
+#define BTRFS_FEATURE_KERNEL_SAFE_CLEAR			0ULL
+
 /*
  * A leaf is full of items. offset and size tell us where to find
  * the item in the leaf (relative to the start of the data area)

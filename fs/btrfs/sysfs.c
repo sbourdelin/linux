@@ -43,20 +43,24 @@ static u64 get_features(struct btrfs_fs_info *fs_info,
 		return btrfs_super_compat_flags(disk_super);
 	else if (set == FEAT_COMPAT_RO)
 		return btrfs_super_compat_ro_flags(disk_super);
-	else
+	else if (set == FEAT_INCOMPAT)
 		return btrfs_super_incompat_flags(disk_super);
+	else
+		return BTRFS_FEATURE_KERNEL_SUPP;
 }
 
 static void set_features(struct btrfs_fs_info *fs_info,
 			 enum btrfs_feature_set set, u64 features)
 {
 	struct btrfs_super_block *disk_super = fs_info->super_copy;
+
 	if (set == FEAT_COMPAT)
 		btrfs_set_super_compat_flags(disk_super, features);
 	else if (set == FEAT_COMPAT_RO)
 		btrfs_set_super_compat_ro_flags(disk_super, features);
-	else
+	else if (set == FEAT_INCOMPAT)
 		btrfs_set_super_incompat_flags(disk_super, features);
+	/* Nothing for FEAT_KERNEL for now */
 }
 
 static int can_modify_feature(struct btrfs_feature_attr *fa)
@@ -75,6 +79,10 @@ static int can_modify_feature(struct btrfs_feature_attr *fa)
 	case FEAT_INCOMPAT:
 		set = BTRFS_FEATURE_INCOMPAT_SAFE_SET;
 		clear = BTRFS_FEATURE_INCOMPAT_SAFE_CLEAR;
+		break;
+	case FEAT_KERNEL:
+		set = BTRFS_FEATURE_KERNEL_SAFE_SET;
+		clear = BTRFS_FEATURE_KERNEL_SAFE_CLEAR;
 		break;
 	default:
 		pr_warn("btrfs: sysfs: unknown feature set %d\n",
@@ -122,6 +130,10 @@ static ssize_t btrfs_feature_attr_store(struct kobject *kobj,
 
 	if (sb_rdonly(fs_info->sb))
 		return -EROFS;
+
+	/* FEAT_KERNEL features cannot be changed at runtime */
+	if (fa->feature_set == FEAT_KERNEL)
+		return -EINVAL;
 
 	ret = kstrtoul(skip_spaces(buf), 0, &val);
 	if (ret)
@@ -187,7 +199,10 @@ static umode_t btrfs_feature_visible(struct kobject *kobj,
 		fa = attr_to_btrfs_feature_attr(attr);
 		features = get_features(fs_info, fa->feature_set);
 
-		if (can_modify_feature(fa))
+		/* Do not show FEAT_KERNEL features in /sys/fs/UUID/features */
+		if (fa->feature_set == FEAT_KERNEL)
+			mode = 0;
+		else if (can_modify_feature(fa))
 			mode |= S_IWUSR;
 		else if (!(features & fa->feature_bit))
 			mode = 0;
@@ -207,6 +222,7 @@ BTRFS_FEAT_ATTR_INCOMPAT(raid56, RAID56);
 BTRFS_FEAT_ATTR_INCOMPAT(skinny_metadata, SKINNY_METADATA);
 BTRFS_FEAT_ATTR_INCOMPAT(no_holes, NO_HOLES);
 BTRFS_FEAT_ATTR_COMPAT_RO(free_space_tree, FREE_SPACE_TREE);
+BTRFS_FEAT_ATTR_KERNEL(rmdir_subvol, RMDIR_SUBVOL);
 
 static struct attribute *btrfs_supported_feature_attrs[] = {
 	BTRFS_FEAT_ATTR_PTR(mixed_backref),
@@ -220,6 +236,7 @@ static struct attribute *btrfs_supported_feature_attrs[] = {
 	BTRFS_FEAT_ATTR_PTR(skinny_metadata),
 	BTRFS_FEAT_ATTR_PTR(no_holes),
 	BTRFS_FEAT_ATTR_PTR(free_space_tree),
+	BTRFS_FEAT_ATTR_PTR(rmdir_subvol),
 	NULL
 };
 
@@ -528,10 +545,11 @@ static inline struct btrfs_fs_info *to_fs_info(struct kobject *kobj)
 
 #define NUM_FEATURE_BITS 64
 #define BTRFS_FEATURE_NAME_MAX 13
-static char btrfs_unknown_feature_names[FEAT_MAX][NUM_FEATURE_BITS][BTRFS_FEATURE_NAME_MAX];
-static struct btrfs_feature_attr btrfs_feature_attrs[FEAT_MAX][NUM_FEATURE_BITS];
+/* These are for features related to feature bit and FEAT_KERNEL is excluded */
+static char btrfs_unknown_feature_names[FEAT_MAX-1][NUM_FEATURE_BITS][BTRFS_FEATURE_NAME_MAX];
+static struct btrfs_feature_attr btrfs_feature_attrs[FEAT_MAX-1][NUM_FEATURE_BITS];
 
-static const u64 supported_feature_masks[FEAT_MAX] = {
+static const u64 supported_feature_masks[FEAT_MAX-1] = {
 	[FEAT_COMPAT]    = BTRFS_FEATURE_COMPAT_SUPP,
 	[FEAT_COMPAT_RO] = BTRFS_FEATURE_COMPAT_RO_SUPP,
 	[FEAT_INCOMPAT]  = BTRFS_FEATURE_INCOMPAT_SUPP,
@@ -541,7 +559,7 @@ static int addrm_unknown_feature_attrs(struct btrfs_fs_info *fs_info, bool add)
 {
 	int set;
 
-	for (set = 0; set < FEAT_MAX; set++) {
+	for (set = 0; set < FEAT_MAX-1; set++) {
 		int i;
 		struct attribute *attrs[2];
 		struct attribute_group agroup = {
@@ -623,7 +641,7 @@ void btrfs_sysfs_remove_mounted(struct btrfs_fs_info *fs_info)
 	btrfs_sysfs_rm_device_link(fs_info->fs_devices, NULL);
 }
 
-const char * const btrfs_feature_set_names[FEAT_MAX] = {
+const char * const btrfs_feature_set_names[FEAT_MAX-1] = {
 	[FEAT_COMPAT]	 = "compat",
 	[FEAT_COMPAT_RO] = "compat_ro",
 	[FEAT_INCOMPAT]	 = "incompat",
@@ -679,7 +697,7 @@ static void init_feature_attrs(void)
 		fa->kobj_attr.attr.name = sfa->kobj_attr.attr.name;
 	}
 
-	for (set = 0; set < FEAT_MAX; set++) {
+	for (set = 0; set < FEAT_MAX-1; set++) {
 		for (i = 0; i < ARRAY_SIZE(btrfs_feature_attrs[set]); i++) {
 			char *name = btrfs_unknown_feature_names[set][i];
 			fa = &btrfs_feature_attrs[set][i];

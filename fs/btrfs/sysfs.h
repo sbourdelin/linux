@@ -11,6 +11,7 @@ enum btrfs_feature_set {
 	FEAT_COMPAT,
 	FEAT_COMPAT_RO,
 	FEAT_INCOMPAT,
+	FEAT_KERNEL, /* Kernel feature indepenedent of feature bits */
 	FEAT_MAX
 };
 
@@ -56,6 +57,8 @@ static struct btrfs_feature_attr btrfs_attr_features_##_name = {	     \
 	BTRFS_FEAT_ATTR(name, FEAT_COMPAT_RO, BTRFS_FEATURE_COMPAT_RO, feature)
 #define BTRFS_FEAT_ATTR_INCOMPAT(name, feature) \
 	BTRFS_FEAT_ATTR(name, FEAT_INCOMPAT, BTRFS_FEATURE_INCOMPAT, feature)
+#define BTRFS_FEAT_ATTR_KERNEL(name, feature) \
+	BTRFS_FEAT_ATTR(name, FEAT_KERNEL, BTRFS_FEATURE_KERNEL, feature)
 
 /* convert from attribute */
 static inline struct btrfs_feature_attr *
@@ -76,7 +79,7 @@ attr_to_btrfs_feature_attr(struct attribute *attr)
 }
 
 char *btrfs_printable_features(enum btrfs_feature_set set, u64 flags);
-extern const char * const btrfs_feature_set_names[FEAT_MAX];
+extern const char * const btrfs_feature_set_names[FEAT_MAX-1];
 extern struct kobj_type space_info_ktype;
 extern struct kobj_type btrfs_raid_ktype;
 int btrfs_sysfs_add_device_link(struct btrfs_fs_devices *fs_devices,
