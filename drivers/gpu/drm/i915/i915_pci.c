@@ -584,7 +584,13 @@ static const struct intel_device_info intel_coffeelake_gt3_info = {
 	.ddb_size = 1024, \
 	GLK_COLORS
 
-static const struct intel_device_info intel_cannonlake_info = {
+static const struct intel_device_info intel_cannonlake_gt1_info = {
+	GEN10_FEATURES,
+	PLATFORM(INTEL_CANNONLAKE),
+	.gt = 1,
+};
+
+static const struct intel_device_info intel_cannonlake_gt2_info = {
 	GEN10_FEATURES,
 	PLATFORM(INTEL_CANNONLAKE),
 	.gt = 2,
@@ -665,7 +671,8 @@ static const struct pci_device_id pciidlist[] = {
 	INTEL_CFL_U_GT1_IDS(&intel_coffeelake_gt1_info),
 	INTEL_CFL_U_GT2_IDS(&intel_coffeelake_gt2_info),
 	INTEL_CFL_U_GT3_IDS(&intel_coffeelake_gt3_info),
-	INTEL_CNL_IDS(&intel_cannonlake_info),
+	INTEL_CNL_GT1_IDS(&intel_cannonlake_gt1_info),
+	INTEL_CNL_GT2_IDS(&intel_cannonlake_gt2_info),
 	INTEL_ICL_11_IDS(&intel_icelake_11_info),
 	{0, 0, 0}
 };
