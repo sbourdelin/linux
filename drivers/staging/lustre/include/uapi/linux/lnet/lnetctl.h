@@ -15,7 +15,7 @@
 #ifndef _LNETCTL_H_
 #define _LNETCTL_H_
 
-#include <uapi/linux/lnet/lnet-types.h>
+#include "lnet-types.h"
 
 /** \addtogroup lnet_fault_simulation
  * @{
