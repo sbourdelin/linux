@@ -3458,18 +3458,14 @@ sch_handle_egress(struct sk_buff *skb, int *ret, struct net_device *dev)
 }
 #endif /* CONFIG_NET_EGRESS */
 
-static inline int get_xps_queue(struct net_device *dev, struct sk_buff *skb)
-{
 #ifdef CONFIG_XPS
-	struct xps_dev_maps *dev_maps;
+static int __get_xps_queue_idx(struct net_device *dev, struct sk_buff *skb,
+			       struct xps_dev_maps *dev_maps, unsigned int tci)
+{
 	struct xps_map *map;
 	int queue_index = -1;
 
-	rcu_read_lock();
-	dev_maps = rcu_dereference(dev->xps_maps[XPS_MAP_CPUS]);
 	if (dev_maps) {
-		unsigned int tci = skb->sender_cpu - 1;
-
 		if (dev->num_tc) {
 			tci *= dev->num_tc;
 			tci += netdev_get_prio_tc_map(dev, skb->priority);
@@ -3486,6 +3482,32 @@ static inline int get_xps_queue(struct net_device *dev, struct sk_buff *skb)
 				queue_index = -1;
 		}
 	}
+	return queue_index;
+}
+#endif
+
+static int get_xps_queue(struct net_device *dev, struct sk_buff *skb)
+{
+#ifdef CONFIG_XPS
+	enum xps_map_type i = XPS_MAP_RXQS;
+	struct xps_dev_maps *dev_maps;
+	struct sock *sk = skb->sk;
+	int queue_index = -1;
+	unsigned int tci = 0;
+
+	if (sk && sk->sk_rx_queue_mapping <= dev->real_num_rx_queues &&
+	    dev->ifindex == sk->sk_rx_ifindex)
+		tci = sk->sk_rx_queue_mapping;
+
+	rcu_read_lock();
+	while (queue_index < 0 && i < __XPS_MAP_MAX) {
+		if (i == XPS_MAP_CPUS)
+			tci = skb->sender_cpu - 1;
+		dev_maps = rcu_dereference(dev->xps_maps[i]);
+		queue_index = __get_xps_queue_idx(dev, skb, dev_maps, tci);
+		i++;
+	}
+
 	rcu_read_unlock();
 
 	return queue_index;
