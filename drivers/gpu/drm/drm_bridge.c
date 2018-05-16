@@ -70,6 +70,9 @@ static LIST_HEAD(bridge_list);
  */
 void drm_bridge_add(struct drm_bridge *bridge)
 {
+	if (WARN_ON(!bridge->odev))
+		return;
+
 	mutex_lock(&bridge_lock);
 	list_add_tail(&bridge->list, &bridge_list);
 	mutex_unlock(&bridge_lock);
@@ -113,6 +116,9 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
 	int ret;
 
 	if (!encoder || !bridge)
+		return -EINVAL;
+
+	if (WARN_ON(!bridge->odev))
 		return -EINVAL;
 
 	if (previous && (!previous->dev || previous->encoder != encoder))
