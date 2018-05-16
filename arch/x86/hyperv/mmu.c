@@ -13,32 +13,12 @@
 #define CREATE_TRACE_POINTS
 #include <asm/trace/hyperv.h>
 
-/* HvFlushVirtualAddressSpace, HvFlushVirtualAddressList hypercalls */
-struct hv_flush_pcpu {
-	u64 address_space;
-	u64 flags;
-	u64 processor_mask;
-	u64 gva_list[];
-};
-
-/* HvFlushVirtualAddressSpaceEx, HvFlushVirtualAddressListEx hypercalls */
-struct hv_flush_pcpu_ex {
-	u64 address_space;
-	u64 flags;
-	struct {
-		u64 format;
-		u64 valid_bank_mask;
-		u64 bank_contents[];
-	} hv_vp_set;
-	u64 gva_list[];
-};
-
 /* Each gva in gva_list encodes up to 4096 pages to flush */
 #define HV_TLB_FLUSH_UNIT (4096 * PAGE_SIZE)
 
-static struct hv_flush_pcpu __percpu **pcpu_flush;
+static struct hv_tlb_flush * __percpu *pcpu_flush;
 
-static struct hv_flush_pcpu_ex __percpu **pcpu_flush_ex;
+static struct hv_tlb_flush_ex * __percpu *pcpu_flush_ex;
 
 /*
  * Fills in gva_list starting from offset. Returns the number of items added.
@@ -71,7 +51,7 @@ static inline int fill_gva_list(u64 gva_list[], int offset,
 }
 
 /* Return the number of banks in the resulting vp_set */
-static inline int cpumask_to_vp_set(struct hv_flush_pcpu_ex *flush,
+static inline int cpumask_to_vp_set(struct hv_tlb_flush_ex *flush,
 				    const struct cpumask *cpus)
 {
 	int cpu, vcpu, vcpu_bank, vcpu_offset, nr_bank = 1;
@@ -81,7 +61,7 @@ static inline int cpumask_to_vp_set(struct hv_flush_pcpu_ex *flush,
 		return 0;
 
 	/*
-	 * Clear all banks up to the maximum possible bank as hv_flush_pcpu_ex
+	 * Clear all banks up to the maximum possible bank as hv_tlb_flush_ex
 	 * structs are not cleared between calls, we risk flushing unneeded
 	 * vCPUs otherwise.
 	 */
@@ -109,8 +89,8 @@ static void hyperv_flush_tlb_others(const struct cpumask *cpus,
 				    const struct flush_tlb_info *info)
 {
 	int cpu, vcpu, gva_n, max_gvas;
-	struct hv_flush_pcpu **flush_pcpu;
-	struct hv_flush_pcpu *flush;
+	struct hv_tlb_flush **flush_pcpu;
+	struct hv_tlb_flush *flush;
 	u64 status = U64_MAX;
 	unsigned long flags;
 
@@ -196,8 +176,8 @@ static void hyperv_flush_tlb_others_ex(const struct cpumask *cpus,
 				       const struct flush_tlb_info *info)
 {
 	int nr_bank = 0, max_gvas, gva_n;
-	struct hv_flush_pcpu_ex **flush_pcpu;
-	struct hv_flush_pcpu_ex *flush;
+	struct hv_tlb_flush_ex **flush_pcpu;
+	struct hv_tlb_flush_ex *flush;
 	u64 status = U64_MAX;
 	unsigned long flags;
 
@@ -303,7 +283,7 @@ void hyper_alloc_mmu(void)
 		return;
 
 	if (!(ms_hyperv.hints & HV_X64_EX_PROCESSOR_MASKS_RECOMMENDED))
-		pcpu_flush = alloc_percpu(struct hv_flush_pcpu *);
+		pcpu_flush = alloc_percpu(struct hv_tlb_flush *);
 	else
-		pcpu_flush_ex = alloc_percpu(struct hv_flush_pcpu_ex *);
+		pcpu_flush_ex = alloc_percpu(struct hv_tlb_flush_ex *);
 }
