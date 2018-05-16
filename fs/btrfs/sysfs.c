@@ -210,10 +210,30 @@ static struct attribute *btrfs_supported_feature_attrs[] = {
 	NULL
 };
 
+/* Features which depend on feature bits and may differ between each fs */
 static const struct attribute_group btrfs_feature_attr_group = {
 	.name = "features",
 	.is_visible = btrfs_feature_visible,
 	.attrs = btrfs_supported_feature_attrs,
+};
+
+static ssize_t rmdir_subvol_show(struct kobject *kobj,
+				 struct kobj_attribute *ka, char *buf)
+{
+	/* No meaning for the value */
+	return snprintf(buf, PAGE_SIZE, "0\n");
+}
+BTRFS_ATTR(static_feature, rmdir_subvol, rmdir_subvol_show);
+
+static struct attribute *btrfs_supported_static_feature_attrs[] = {
+	BTRFS_ATTR_PTR(static_feature, rmdir_subvol),
+	NULL
+};
+
+/* Features which only depend on kernel version */
+static const struct attribute_group btrfs_static_feature_attr_group = {
+	.name = "static_features",
+	.attrs = btrfs_supported_static_feature_attrs,
 };
 
 static ssize_t btrfs_show_u64(u64 *value_ptr, spinlock_t *lock, char *buf)
@@ -901,8 +921,15 @@ int __init btrfs_init_sysfs(void)
 	ret = sysfs_create_group(&btrfs_kset->kobj, &btrfs_feature_attr_group);
 	if (ret)
 		goto out2;
+	ret = sysfs_create_group(&btrfs_kset->kobj,
+				 &btrfs_static_feature_attr_group);
+	if (ret)
+		goto out3;
 
 	return 0;
+
+out3:
+	sysfs_remove_group(&btrfs_kset->kobj, &btrfs_feature_attr_group);
 out2:
 	debugfs_remove_recursive(btrfs_debugfs_root_dentry);
 out1:
@@ -914,6 +941,8 @@ out1:
 void __cold btrfs_exit_sysfs(void)
 {
 	sysfs_remove_group(&btrfs_kset->kobj, &btrfs_feature_attr_group);
+	sysfs_remove_group(&btrfs_kset->kobj,
+			   &btrfs_static_feature_attr_group);
 	kset_unregister(btrfs_kset);
 	debugfs_remove_recursive(btrfs_debugfs_root_dentry);
 }
