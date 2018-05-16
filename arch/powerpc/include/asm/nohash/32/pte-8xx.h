@@ -54,9 +54,6 @@
 #define _PMD_GUARDED	0x0010
 #define _PMD_USER	0x0020	/* APG 1 */
 
-/* Until my rework is finished, 8xx still needs atomic PTE updates */
-#define PTE_ATOMIC_UPDATES	1
-
 #ifdef CONFIG_PPC_16K_PAGES
 #define _PAGE_PSIZE	_PAGE_HUGE
 #endif
