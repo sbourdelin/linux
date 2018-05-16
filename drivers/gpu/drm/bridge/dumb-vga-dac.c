@@ -205,8 +205,8 @@ static int dumb_vga_probe(struct platform_device *pdev)
 		}
 	}
 
+	vga->bridge.odev = &pdev->dev;
 	vga->bridge.funcs = &dumb_vga_bridge_funcs;
-	vga->bridge.of_node = pdev->dev.of_node;
 	vga->bridge.timings = of_device_get_match_data(&pdev->dev);
 
 	drm_bridge_add(&vga->bridge);
