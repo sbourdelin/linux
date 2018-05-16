@@ -2082,6 +2082,8 @@ static int intel_pstate_register_driver(struct cpufreq_driver *driver)
 {
 	int ret;
 
+	x86_arch_scale_freq_tick_disable();
+
 	memset(&global, 0, sizeof(global));
 	global.max_perf_pct = 100;
 
@@ -2093,6 +2095,9 @@ static int intel_pstate_register_driver(struct cpufreq_driver *driver)
 	}
 
 	global.min_perf_pct = min_perf_pct_min();
+
+	if (driver == &intel_cpufreq)
+		x86_arch_scale_freq_tick_enable();
 
 	return 0;
 }
