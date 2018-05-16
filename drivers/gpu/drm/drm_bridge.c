@@ -365,8 +365,7 @@ struct drm_bridge *of_drm_find_bridge(struct device_node *np)
 	mutex_lock(&bridge_lock);
 
 	list_for_each_entry(bridge, &bridge_list, list) {
-		if ((bridge->odev && bridge->odev->of_node == np) ||
-		    bridge->of_node == np) {
+		if (bridge->odev->of_node == np) {
 			mutex_unlock(&bridge_lock);
 			return bridge;
 		}
