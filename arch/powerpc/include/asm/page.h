@@ -344,7 +344,7 @@ struct vm_area_struct;
  */
 typedef pte_t *pgtable_t;
 #else
-#if defined(CONFIG_PPC_64K_PAGES) && defined(CONFIG_PPC64)
+#if defined(CONFIG_NEED_PTE_FRAG)
 typedef pte_t *pgtable_t;
 #else
 typedef struct page *pgtable_t;

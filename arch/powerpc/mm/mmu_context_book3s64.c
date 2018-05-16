@@ -192,34 +192,6 @@ static void destroy_contexts(mm_context_t *ctx)
 	spin_unlock(&mmu_context_lock);
 }
 
-#ifdef CONFIG_PPC_64K_PAGES
-static void destroy_pagetable_page(struct mm_struct *mm)
-{
-	int count;
-	void *pte_frag;
-	struct page *page;
-
-	pte_frag = mm->context.pte_frag;
-	if (!pte_frag)
-		return;
-
-	page = virt_to_page(pte_frag);
-	/* drop all the pending references */
-	count = ((unsigned long)pte_frag & ~PAGE_MASK) >> PTE_FRAG_SIZE_SHIFT;
-	/* We allow PTE_FRAG_NR fragments from a PTE page */
-	if (page_ref_sub_and_test(page, PTE_FRAG_NR - count)) {
-		pgtable_page_dtor(page);
-		free_unref_page(page);
-	}
-}
-
-#else
-static inline void destroy_pagetable_page(struct mm_struct *mm)
-{
-	return;
-}
-#endif
-
 void destroy_context(struct mm_struct *mm)
 {
 #ifdef CONFIG_SPAPR_TCE_IOMMU

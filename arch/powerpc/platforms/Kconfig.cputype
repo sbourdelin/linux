@@ -338,6 +338,11 @@ config PPC_MM_SLICES
 	default y if PPC_8xx && HUGETLB_PAGE
 	default n
 
+config NEED_PTE_FRAG
+	bool
+	default y if PPC_BOOK3S_64 && PPC_64K_PAGES
+	default n
+
 config PPC_HAVE_PMU_SUPPORT
        bool
 
