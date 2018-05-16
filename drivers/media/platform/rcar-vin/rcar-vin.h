@@ -52,6 +52,19 @@ enum rvin_csi_id {
 };
 
 /**
+ * enum rvin_port_id
+ *
+ * List the available VIN port functions.
+ *
+ * RVIN_PORT_DIGITAL	- Input port for digital video connection
+ * RVIN_PORT_CSI2	- Input port for CSI-2 video connection
+ */
+enum rvin_port_id {
+	RVIN_PORT_DIGITAL,
+	RVIN_PORT_CSI2
+};
+
+/**
  * STOPPED  - No operation in progress
  * RUNNING  - Operation in progress have buffers
  * STOPPING - Stopping operation
@@ -225,6 +238,7 @@ struct rvin_dev {
  *
  * @lock:		protects the count, notifier, vin and csi members
  * @count:		number of enabled VIN instances found in DT
+ * @v4l2_dev:		pointer to the group v4l2 device
  * @notifier:		pointer to the notifier of a VIN which handles the
  *			groups async sub-devices.
  * @vin:		VIN instances which are part of the group
@@ -238,6 +252,7 @@ struct rvin_group {
 
 	struct mutex lock;
 	unsigned int count;
+	struct v4l2_device *v4l2_dev;
 	struct v4l2_async_notifier *notifier;
 	struct rvin_dev *vin[RCAR_VIN_NUM];
 
