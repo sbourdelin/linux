@@ -345,6 +345,10 @@ _ENTRY(ITLBMiss_cmp)
 	rlwinm	r10, r10, 32 - (PAGE_SHIFT - 2), 32 - PAGE_SHIFT, 29
 #ifdef CONFIG_HUGETLB_PAGE
 	mtcr	r11
+#endif
+	/* Load the MI_TWC with the attributes for this "segment." */
+	mtspr	SPRN_MI_TWC, r11	/* Set segment attributes */
+#ifdef CONFIG_HUGETLB_PAGE
 	bt-	28, 10f		/* bit 28 = Large page (8M) */
 	bt-	29, 20f		/* bit 29 = Large page (8M or 512k) */
 #endif
@@ -354,8 +358,6 @@ _ENTRY(ITLBMiss_cmp)
 #if defined(ITLB_MISS_KERNEL) || defined(CONFIG_HUGETLB_PAGE)
 	mtcr	r12
 #endif
-	/* Load the MI_TWC with the attributes for this "segment." */
-	mtspr	SPRN_MI_TWC, r11	/* Set segment attributes */
 
 #ifdef CONFIG_SWAP
 	rlwinm	r11, r10, 32-5, _PAGE_PRESENT
@@ -457,6 +459,9 @@ _ENTRY(DTLBMiss_jmp)
 	rlwinm	r10, r10, 32 - (PAGE_SHIFT - 2), 32 - PAGE_SHIFT, 29
 #ifdef CONFIG_HUGETLB_PAGE
 	mtcr	r11
+#endif
+	mtspr	SPRN_MD_TWC, r11
+#ifdef CONFIG_HUGETLB_PAGE
 	bt-	28, 10f		/* bit 28 = Large page (8M) */
 	bt-	29, 20f		/* bit 29 = Large page (8M or 512k) */
 #endif
@@ -464,15 +469,6 @@ _ENTRY(DTLBMiss_jmp)
 	lwz	r10, 0(r10)	/* Get the pte */
 4:
 	mtcr	r12
-
-	/* Insert the Guarded flag into the TWC from the Linux PTE.
-	 * It is bit 27 of both the Linux PTE and the TWC (at least
-	 * I got that right :-).  It will be better when we can put
-	 * this into the Linux pgd/pmd and load it in the operation
-	 * above.
-	 */
-	rlwimi	r11, r10, 0, _PAGE_GUARDED
-	mtspr	SPRN_MD_TWC, r11
 
 	/* Both _PAGE_ACCESSED and _PAGE_PRESENT has to be set.
 	 * We also need to know if the insn is a load/store, so:

@@ -34,6 +34,7 @@ config PPC_8xx
 	bool "Freescale 8xx"
 	select FSL_SOC
 	select SYS_SUPPORTS_HUGETLBFS
+	select PPC_GUARDED_PAGE_IN_PMD
 
 config 40x
 	bool "AMCC 40x"
