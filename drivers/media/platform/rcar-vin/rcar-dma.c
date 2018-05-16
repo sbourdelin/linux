@@ -123,6 +123,8 @@
 /* Video n Data Mode Register 2 bits */
 #define VNDMR2_VPS		(1 << 30)
 #define VNDMR2_HPS		(1 << 29)
+#define VNDMR2_CES		(1 << 28)
+#define VNDMR2_CHS		(1 << 23)
 #define VNDMR2_FTEV		(1 << 17)
 #define VNDMR2_VLV(n)		((n & 0xf) << 12)
 
@@ -689,6 +691,15 @@ static int rvin_setup(struct rvin_dev *vin)
 	/* Vsync Signal Polarity Select */
 	if (!(vin->mbus_cfg.flags & V4L2_MBUS_VSYNC_ACTIVE_LOW))
 		dmr2 |= VNDMR2_VPS;
+
+	/*
+	 * Clock-enable active level select.
+	 * Use HSYNC as enable if not specified
+	 */
+	if (vin->mbus_cfg.flags & V4L2_MBUS_DATA_ACTIVE_LOW)
+		dmr2 |= VNDMR2_CES;
+	else if (!(vin->mbus_cfg.flags & V4L2_MBUS_DATA_ACTIVE_HIGH))
+		dmr2 |= VNDMR2_CHS;
 
 	/*
 	 * Output format
