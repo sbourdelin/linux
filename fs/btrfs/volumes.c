@@ -147,16 +147,11 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
  *
  * uuid_mutex (global lock)
  * ------------------------
- * protects the fs_uuids list that tracks all per-fs fs_devices, resulting from
+ * Protects the fs_uuids list that tracks all per-fs fs_devices, resulting from
  * the SCAN_DEV ioctl registration or from mount either implicitly (the first
- * device) or requested by the device= mount option
+ * device) or requested by the device= mount option.
  *
- * the mutex can be very coarse and can cover long-running operations
- *
- * protects: updates to fs_devices counters like missing devices, rw devices,
- * seeding, structure cloning, openning/closing devices at mount/umount time
- *
- * global::fs_devs - add, remove, updates to the global list
+ * global::fs_uuids - add, remove, updates to the global list.
  *
  * does not protect: manipulation of the fs_devices::devices list!
  *
@@ -164,12 +159,14 @@ static int __btrfs_map_block(struct btrfs_fs_info *fs_info,
  *
  * fs_devices::device_list_mutex (per-fs, with RCU)
  * ------------------------------------------------
- * protects updates to fs_devices::devices, ie. adding and deleting
+ * Protects updates to fs_devices::devices, ie. adding and deleting , and its
+ * counters like missing devices, rw devices, seeding, structure cloning,
+ * openning/closing devices at mount/umount time.
  *
- * simple list traversal with read-only actions can be done with RCU protection
+ * Simple list traversal with read-only actions can be done with RCU protection.
  *
- * may be used to exclude some operations from running concurrently without any
- * modifications to the list (see write_all_supers)
+ * May be used to exclude some operations from running concurrently without any
+ * modifications to the list (see write_all_supers).
  *
  * balance_mutex
  * -------------
