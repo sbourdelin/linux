@@ -53,6 +53,16 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
       from external SoC pins described in video-interfaces.txt[1].
       Describing more then one endpoint in port 0 is invalid. Only VIN
       instances that are connected to external pins should have port 0.
+
+      - Optional properties for endpoint nodes of port@0:
+        - hsync-active: active state of the HSYNC signal, 0/1 for LOW/HIGH
+	  respectively. Default is active high.
+        - vsync-active: active state of the VSYNC signal, 0/1 for LOW/HIGH
+	  respectively. Default is active high.
+
+	If both HSYNC and VSYNC polarities are not specified, embedded
+	synchronization is selected.
+
     - port 1 - sub-nodes describing one or more endpoints connected to
       the VIN from local SoC CSI-2 receivers. The endpoint numbers must
       use the following schema.
@@ -61,6 +71,8 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
         - Endpoint 1 - sub-node describing the endpoint connected to CSI21
         - Endpoint 2 - sub-node describing the endpoint connected to CSI40
         - Endpoint 3 - sub-node describing the endpoint connected to CSI41
+
+      Endpoint nodes of port@1 do not support any optional endpoint property.
 
 Device node example for Gen2 platforms
 --------------------------------------
@@ -112,7 +124,6 @@ Board setup example for Gen2 platforms (vin1 composite video input)
 
                 vin1ep0: endpoint {
                         remote-endpoint = <&adv7180>;
-                        bus-width = <8>;
                 };
         };
 };
