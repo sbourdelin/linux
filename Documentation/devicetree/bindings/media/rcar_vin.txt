@@ -63,6 +63,11 @@ from local SoC CSI-2 receivers (port1) depending on SoC.
 	If both HSYNC and VSYNC polarities are not specified, embedded
 	synchronization is selected.
 
+        - data-active: active state of data enable signal (CLOCKENB pin).
+          0/1 for LOW/HIGH respectively. If not specified, use HSYNC as
+          data enable signal. When using embedded synchronization this
+          property is mandatory.
+
     - port 1 - sub-nodes describing one or more endpoints connected to
       the VIN from local SoC CSI-2 receivers. The endpoint numbers must
       use the following schema.
