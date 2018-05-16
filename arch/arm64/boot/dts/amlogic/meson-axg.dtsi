@@ -760,7 +760,12 @@
 				compatible = "amlogic,meson-axg-i2c";
 				reg = <0x0 0x05000 0x0 0x20>;
 				interrupts = <GIC_SPI 195 IRQ_TYPE_EDGE_RISING>;
-				clocks = <&clkc CLKID_I2C>;
+
+				/*
+				 * FIXME: replace with the correct clock when
+				 * the controller is available
+				 */
+				clocks = <&xtal>;
 				#address-cells = <1>;
 				#size-cells = <0>;
 				status = "disabled";
