@@ -26,6 +26,7 @@
 #include <linux/mutex.h>
 
 #include <drm/drm_bridge.h>
+#include <drm/drm_device.h>
 #include <drm/drm_encoder.h>
 
 #include "drm_crtc_internal.h"
@@ -127,12 +128,25 @@ int drm_bridge_attach(struct drm_encoder *encoder, struct drm_bridge *bridge,
 	if (bridge->dev)
 		return -EBUSY;
 
+	if (encoder->dev->dev != bridge->odev) {
+		bridge->link = device_link_add(encoder->dev->dev,
+					       bridge->odev, 0);
+		if (!bridge->link) {
+			dev_err(bridge->odev, "failed to link bridge to %s\n",
+				dev_name(encoder->dev->dev));
+			return -EINVAL;
+		}
+	}
+
 	bridge->dev = encoder->dev;
 	bridge->encoder = encoder;
 
 	if (bridge->funcs->attach) {
 		ret = bridge->funcs->attach(bridge);
 		if (ret < 0) {
+			if (bridge->link)
+				device_link_del(bridge->link);
+			bridge->link = NULL;
 			bridge->dev = NULL;
 			bridge->encoder = NULL;
 			return ret;
@@ -158,6 +172,10 @@ void drm_bridge_detach(struct drm_bridge *bridge)
 
 	if (bridge->funcs->detach)
 		bridge->funcs->detach(bridge);
+
+	if (bridge->link)
+		device_link_del(bridge->link);
+	bridge->link = NULL;
 
 	bridge->dev = NULL;
 }
