@@ -51,6 +51,7 @@
 #include <drm/drm_gem.h>
 #include <drm/drm_auth.h>
 #include <drm/drm_cache.h>
+#include <linux/mm_types.h>
 
 #include "i915_params.h"
 #include "i915_reg.h"
@@ -3169,7 +3170,7 @@ int i915_gem_wait_for_idle(struct drm_i915_private *dev_priv,
 			   unsigned int flags);
 int __must_check i915_gem_suspend(struct drm_i915_private *dev_priv);
 void i915_gem_resume(struct drm_i915_private *dev_priv);
-int i915_gem_fault(struct vm_fault *vmf);
+vm_fault_t i915_gem_fault(struct vm_fault *vmf);
 int i915_gem_object_wait(struct drm_i915_gem_object *obj,
 			 unsigned int flags,
 			 long timeout,

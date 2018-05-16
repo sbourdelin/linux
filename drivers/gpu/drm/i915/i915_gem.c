@@ -1991,7 +1991,7 @@ compute_partial_view(struct drm_i915_gem_object *obj,
  * The current feature set supported by i915_gem_fault() and thus GTT mmaps
  * is exposed via I915_PARAM_MMAP_GTT_VERSION (see i915_gem_mmap_gtt_version).
  */
-int i915_gem_fault(struct vm_fault *vmf)
+vm_fault_t i915_gem_fault(struct vm_fault *vmf)
 {
 #define MIN_CHUNK_PAGES ((1 << 20) >> PAGE_SHIFT) /* 1 MiB */
 	struct vm_area_struct *area = vmf->vma;
@@ -2003,7 +2003,8 @@ int i915_gem_fault(struct vm_fault *vmf)
 	struct i915_vma *vma;
 	pgoff_t page_offset;
 	unsigned int flags;
-	int ret;
+	int err;
+	vm_fault_t ret;
 
 	/* We don't use vmf->pgoff since that has the fake offset */
 	page_offset = (vmf->address - area->vm_start) >> PAGE_SHIFT;
@@ -2015,26 +2016,26 @@ int i915_gem_fault(struct vm_fault *vmf)
 	 * repeat the flush holding the lock in the normal manner to catch cases
 	 * where we are gazumped.
 	 */
-	ret = i915_gem_object_wait(obj,
+	err = i915_gem_object_wait(obj,
 				   I915_WAIT_INTERRUPTIBLE,
 				   MAX_SCHEDULE_TIMEOUT,
 				   NULL);
-	if (ret)
+	if (err)
 		goto err;
 
-	ret = i915_gem_object_pin_pages(obj);
-	if (ret)
+	err = i915_gem_object_pin_pages(obj);
+	if (err)
 		goto err;
 
 	intel_runtime_pm_get(dev_priv);
 
-	ret = i915_mutex_lock_interruptible(dev);
-	if (ret)
+	err = i915_mutex_lock_interruptible(dev);
+	if (err)
 		goto err_rpm;
 
 	/* Access to snoopable pages through the GTT is incoherent. */
 	if (obj->cache_level != I915_CACHE_NONE && !HAS_LLC(dev_priv)) {
-		ret = -EFAULT;
+		err = -EFAULT;
 		goto err_unlock;
 	}
 
@@ -2061,25 +2062,25 @@ int i915_gem_fault(struct vm_fault *vmf)
 		vma = i915_gem_object_ggtt_pin(obj, &view, 0, 0, PIN_MAPPABLE);
 	}
 	if (IS_ERR(vma)) {
-		ret = PTR_ERR(vma);
+		err = PTR_ERR(vma);
 		goto err_unlock;
 	}
 
-	ret = i915_gem_object_set_to_gtt_domain(obj, write);
-	if (ret)
+	err = i915_gem_object_set_to_gtt_domain(obj, write);
+	if (err)
 		goto err_unpin;
 
-	ret = i915_vma_pin_fence(vma);
-	if (ret)
+	err = i915_vma_pin_fence(vma);
+	if (err)
 		goto err_unpin;
 
 	/* Finally, remap it using the new GTT offset */
-	ret = remap_io_mapping(area,
+	err = remap_io_mapping(area,
 			       area->vm_start + (vma->ggtt_view.partial.offset << PAGE_SHIFT),
 			       (ggtt->gmadr.start + vma->node.start) >> PAGE_SHIFT,
 			       min_t(u64, vma->size, area->vm_end - area->vm_start),
 			       &ggtt->iomap);
-	if (ret)
+	if (err)
 		goto err_fence;
 
 	/* Mark as being mmapped into userspace for later revocation */
@@ -2100,7 +2101,7 @@ err_rpm:
 	intel_runtime_pm_put(dev_priv);
 	i915_gem_object_unpin_pages(obj);
 err:
-	switch (ret) {
+	switch (err) {
 	case -EIO:
 		/*
 		 * We eat errors when the gpu is terminally wedged to avoid
@@ -2136,7 +2137,7 @@ err:
 		ret = VM_FAULT_SIGBUS;
 		break;
 	default:
-		WARN_ONCE(ret, "unhandled error in i915_gem_fault: %i\n", ret);
+		WARN_ONCE(ret, "unhandled error in %s: %x\n", __func__, err);
 		ret = VM_FAULT_SIGBUS;
 		break;
 	}
