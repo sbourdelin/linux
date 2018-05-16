@@ -215,6 +215,32 @@ static void mem_avoid_memmap(char *str)
 		memmap_too_large = true;
 }
 
+/* Store the number of 1GB huge pages which user specified.*/
+static unsigned long max_gb_huge_pages;
+
+static int parse_gb_huge_pages(char *param, char* val)
+{
+	char *p;
+	u64 mem_size;
+	static bool gbpage_sz = false;
+
+	if (!strcmp(param, "hugepagesz")) {
+		p = val;
+		mem_size = memparse(p, &p);
+		if (mem_size == PUD_SIZE) {
+			if (gbpage_sz)
+				warn("Repeadly set hugeTLB page size of 1G!\n");
+			gbpage_sz = true;
+		} else
+			gbpage_sz = false;
+	} else if (!strcmp(param, "hugepages") && gbpage_sz) {
+		p = val;
+		max_gb_huge_pages = simple_strtoull(p, &p, 0);
+		debug_putaddr(max_gb_huge_pages);
+	}
+}
+
+
 static int handle_mem_memmap(void)
 {
 	char *args = (char *)get_cmd_line_ptr();
@@ -464,6 +490,51 @@ static void store_slot_info(struct mem_vector *region, unsigned long image_size)
 		slot_areas[slot_area_index++] = slot_area;
 		slot_max += slot_area.num;
 	}
+}
+
+/* Skip as many 1GB huge pages as possible in the passed region. */
+static void process_gb_huge_page(struct mem_vector *region, unsigned long image_size)
+{
+	int i = 0;
+	unsigned long addr, size;
+	struct mem_vector tmp;
+
+	if (!max_gb_huge_pages) {
+		store_slot_info(region, image_size);
+		return;
+	}
+
+	addr = ALIGN(region->start, PUD_SIZE);
+	/* If Did we raise the address above the passed in memory entry? */
+	if (addr < region->start + region->size)
+		size = region->size - (addr - region->start);
+
+	/* Check how many 1GB huge pages can be filtered out*/
+	while (size > PUD_SIZE && max_gb_huge_pages) {
+		size -= PUD_SIZE;
+		max_gb_huge_pages--;
+		i++;
+	}
+
+	if (!i) {
+		store_slot_info(region, image_size);
+		return;
+	}
+
+	/* Process the remaining regions after filtering out. */
+
+	if (addr >= region->start + image_size) {
+		tmp.start = region->start;
+		tmp.size = addr - region->start;
+		store_slot_info(&tmp, image_size);
+	}
+
+	size  = region->size - (addr - region->start) - i * PUD_SIZE;
+        if (size >= image_size) {
+		tmp.start = addr + i*PUD_SIZE;
+		tmp.size = size;
+		store_slot_info(&tmp, image_size);
+        }
 }
 
 static unsigned long slots_fetch_random(void)
