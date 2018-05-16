@@ -40,6 +40,17 @@
 
 extern char etext[], _stext[], _sinittext[], _einittext[];
 
+#ifdef CONFIG_NEED_PTE_FRAG
+void pte_fragment_free(unsigned long *table, int kernel)
+{
+	struct page *page = virt_to_page(table);
+	if (put_page_testzero(page)) {
+		if (!kernel)
+			pgtable_page_dtor(page);
+		free_unref_page(page);
+	}
+}
+#else
 __ref pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
 {
 	pte_t *pte;
@@ -69,6 +80,7 @@ pgtable_t pte_alloc_one(struct mm_struct *mm, unsigned long address)
 	}
 	return ptepage;
 }
+#endif
 
 #ifdef CONFIG_PPC_GUARDED_PAGE_IN_PMD
 int __pte_alloc_kernel_g(pmd_t *pmd, unsigned long address)

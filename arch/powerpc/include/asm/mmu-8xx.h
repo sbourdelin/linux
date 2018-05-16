@@ -190,6 +190,10 @@ typedef struct {
 	struct slice_mask mask_8m;
 # endif
 #endif
+#ifdef CONFIG_NEED_PTE_FRAG
+	/* for 4K PTE fragment support */
+	void *pte_frag;
+#endif
 } mm_context_t;
 
 #define PHYS_IMMR_BASE (mfspr(SPRN_IMMR) & 0xfff80000)
