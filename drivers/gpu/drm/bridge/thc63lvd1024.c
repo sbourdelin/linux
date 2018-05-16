@@ -167,8 +167,8 @@ static int thc63_probe(struct platform_device *pdev)
 	if (ret)
 		return ret;
 
+	thc63->bridge.odev = &pdev->dev;
 	thc63->bridge.driver_private = thc63;
-	thc63->bridge.of_node = pdev->dev.of_node;
 	thc63->bridge.funcs = &thc63_bridge_func;
 
 	drm_bridge_add(&thc63->bridge);
