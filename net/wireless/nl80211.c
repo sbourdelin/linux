@@ -14643,7 +14643,7 @@ void cfg80211_del_sta_sinfo(struct net_device *dev, const u8 *mac_addr,
 	struct station_info *empty_sinfo = NULL;
 
 	if (!sinfo) {
-		empty_sinfo = kzalloc(sizeof(*empty_sinfo), GFP_KERNEL);
+		empty_sinfo = kzalloc(sizeof(*empty_sinfo), gfp);
 		if (!empty_sinfo)
 			return;
 		sinfo = empty_sinfo;
