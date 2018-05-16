@@ -83,7 +83,7 @@ static int lvds_encoder_probe(struct platform_device *pdev)
 	 * but we need a bridge attached to our of_node for our user
 	 * to look up.
 	 */
-	lvds_encoder->bridge.of_node = pdev->dev.of_node;
+	lvds_encoder->bridge.odev = &pdev->dev;
 	lvds_encoder->bridge.funcs = &funcs;
 	drm_bridge_add(&lvds_encoder->bridge);
 
