@@ -173,8 +173,6 @@ void __init setup_initial_memory_limit(phys_addr_t first_memblock_base,
  */
 void set_context(unsigned long id, pgd_t *pgd)
 {
-	s16 offset = (s16)(__pa(swapper_pg_dir));
-
 #ifdef CONFIG_BDI_SWITCH
 	pgd_t	**ptr = *(pgd_t ***)(KERNELBASE + 0xf0);
 
@@ -184,12 +182,8 @@ void set_context(unsigned long id, pgd_t *pgd)
 	*(ptr + 1) = pgd;
 #endif
 
-	/* Register M_TW will contain base address of level 1 table minus the
-	 * lower part of the kernel PGDIR base address, so that all accesses to
-	 * level 1 table are done relative to lower part of kernel PGDIR base
-	 * address.
-	 */
-	mtspr(SPRN_M_TW, __pa(pgd) - offset);
+	/* Register M_TWB will contain base address of level 1 table */
+	mtspr(SPRN_M_TWB, __pa(pgd));
 
 	/* Update context */
 	mtspr(SPRN_M_CASID, id - 1);
