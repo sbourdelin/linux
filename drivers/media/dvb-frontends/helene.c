@@ -666,7 +666,7 @@ static int helene_set_params_s(struct dvb_frontend *fe)
 	return 0;
 }
 
-static int helene_set_params(struct dvb_frontend *fe)
+static int helene_set_params_t(struct dvb_frontend *fe)
 {
 	u8 data[MAX_WRITE_REGSIZE];
 	u32 frequency;
@@ -835,6 +835,19 @@ static int helene_set_params(struct dvb_frontend *fe)
 	return 0;
 }
 
+static int helene_set_params(struct dvb_frontend *fe)
+{
+	struct dtv_frontend_properties *p = &fe->dtv_property_cache;
+
+	if (p->delivery_system == SYS_DVBT ||
+	    p->delivery_system == SYS_DVBT2 ||
+	    p->delivery_system == SYS_ISDBT ||
+	    p->delivery_system == SYS_DVBC_ANNEX_A)
+		return helene_set_params_t(fe);
+
+	return helene_set_params_s(fe);
+}
+
 static int helene_get_frequency(struct dvb_frontend *fe, u32 *frequency)
 {
 	struct helene_priv *priv = fe->tuner_priv;
@@ -843,7 +856,7 @@ static int helene_get_frequency(struct dvb_frontend *fe, u32 *frequency)
 	return 0;
 }
 
-static const struct dvb_tuner_ops helene_tuner_ops = {
+static const struct dvb_tuner_ops helene_tuner_ops_t = {
 	.info = {
 		.name = "Sony HELENE Ter tuner",
 		.frequency_min = 1000000,
@@ -853,7 +866,7 @@ static const struct dvb_tuner_ops helene_tuner_ops = {
 	.init = helene_init,
 	.release = helene_release,
 	.sleep = helene_sleep,
-	.set_params = helene_set_params,
+	.set_params = helene_set_params_t,
 	.get_frequency = helene_get_frequency,
 };
 
@@ -868,6 +881,20 @@ static const struct dvb_tuner_ops helene_tuner_ops_s = {
 	.release = helene_release,
 	.sleep = helene_sleep,
 	.set_params = helene_set_params_s,
+	.get_frequency = helene_get_frequency,
+};
+
+static const struct dvb_tuner_ops helene_tuner_ops = {
+	.info = {
+		.name = "Sony HELENE Sat/Ter tuner",
+		.frequency_min = 500000,
+		.frequency_max = 1200000000,
+		.frequency_step = 1000,
+	},
+	.init = helene_init,
+	.release = helene_release,
+	.sleep = helene_sleep,
+	.set_params = helene_set_params,
 	.get_frequency = helene_get_frequency,
 };
 
@@ -1032,7 +1059,7 @@ struct dvb_frontend *helene_attach(struct dvb_frontend *fe,
 	if (fe->ops.i2c_gate_ctrl)
 		fe->ops.i2c_gate_ctrl(fe, 0);
 
-	memcpy(&fe->ops.tuner_ops, &helene_tuner_ops,
+	memcpy(&fe->ops.tuner_ops, &helene_tuner_ops_t,
 			sizeof(struct dvb_tuner_ops));
 	fe->tuner_priv = priv;
 	dev_info(&priv->i2c->dev,
@@ -1041,6 +1068,59 @@ struct dvb_frontend *helene_attach(struct dvb_frontend *fe,
 	return fe;
 }
 EXPORT_SYMBOL(helene_attach);
+
+static int helene_probe(struct i2c_client *client,
+			const struct i2c_device_id *id)
+{
+	struct helene_config *config = client->dev.platform_data;
+	struct dvb_frontend *fe = config->fe;
+	struct device *dev = &client->dev;
+	struct helene_priv *priv;
+
+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+	if (!priv)
+		return -ENOMEM;
+
+	priv->i2c_address = client->addr;
+	priv->i2c = client->adapter;
+	priv->set_tuner_data = config->set_tuner_priv;
+	priv->set_tuner = config->set_tuner_callback;
+	priv->xtal = config->xtal;
+
+	if (fe->ops.i2c_gate_ctrl)
+		fe->ops.i2c_gate_ctrl(fe, 1);
+
+	if (helene_x_pon(priv) != 0)
+		return -EINVAL;
+
+	if (fe->ops.i2c_gate_ctrl)
+		fe->ops.i2c_gate_ctrl(fe, 0);
+
+	memcpy(&fe->ops.tuner_ops, &helene_tuner_ops,
+	       sizeof(struct dvb_tuner_ops));
+	fe->tuner_priv = priv;
+	i2c_set_clientdata(client, priv);
+
+	dev_info(dev, "Sony HELENE attached on addr=%x at I2C adapter %p\n",
+		 priv->i2c_address, priv->i2c);
+
+	return 0;
+}
+
+static const struct i2c_device_id helene_id[] = {
+	{ "helene", },
+	{}
+};
+MODULE_DEVICE_TABLE(i2c, helene_id);
+
+static struct i2c_driver helene_driver = {
+	.driver = {
+		.name = "helene",
+	},
+	.probe    = helene_probe,
+	.id_table = helene_id,
+};
+module_i2c_driver(helene_driver);
 
 MODULE_DESCRIPTION("Sony HELENE Sat/Ter tuner driver");
 MODULE_AUTHOR("Abylay Ospan <aospan@netup.ru>");
