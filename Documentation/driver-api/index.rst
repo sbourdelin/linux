@@ -25,6 +25,7 @@ available subsections can be seen below.
    frame-buffer
    regulator
    iio/index
+   generic-counter
    input
    usb/index
    pci
