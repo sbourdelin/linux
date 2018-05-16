@@ -152,6 +152,7 @@ static void bus_release(struct kobject *kobj)
 
 	kfree(priv);
 	bus->p = NULL;
+	bus->bus_register_error = 0;
 }
 
 static struct kobj_type bus_ktype = {
@@ -848,8 +849,10 @@ int bus_register(struct bus_type *bus)
 	struct lock_class_key *key = &bus->lock_key;
 
 	priv = kzalloc(sizeof(struct subsys_private), GFP_KERNEL);
-	if (!priv)
+	if (!priv) {
+		bus->bus_register_error = -ENOMEM;
 		return -ENOMEM;
+	}
 
 	priv->bus = bus;
 	bus->p = priv;
@@ -915,6 +918,7 @@ bus_uevent_fail:
 out:
 	kfree(bus->p);
 	bus->p = NULL;
+	bus->bus_register_error = retval;
 	return retval;
 }
 EXPORT_SYMBOL_GPL(bus_register);
