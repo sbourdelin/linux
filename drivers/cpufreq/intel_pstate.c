@@ -227,6 +227,7 @@ struct global_params {
  *			defines callback and arguments
  * @hwp_boost_active:	HWP performance is boosted on this CPU
  * @last_io_update:	Last time when IO wake flag was set
+ * @migrate_hint:	Set when scheduler indicates thread migration
  *
  * This structure stores per CPU instance data for all CPUs.
  */
@@ -263,6 +264,7 @@ struct cpudata {
 	call_single_data_t csd;
 	bool hwp_boost_active;
 	u64 last_io_update;
+	bool migrate_hint;
 };
 
 static struct cpudata **all_cpu_data;
@@ -1438,6 +1440,8 @@ static int hwp_boost_hold_time_ms = 3;
 #define BOOST_PSTATE_THRESHOLD	(SCHED_CAPACITY_SCALE / 2)
 static int hwp_boost_pstate_threshold = BOOST_PSTATE_THRESHOLD;
 
+static int hwp_boost_threshold_busy_pct;
+
 static inline bool intel_pstate_check_boost_threhold(struct cpudata *cpu)
 {
 	/*
@@ -1450,12 +1454,32 @@ static inline bool intel_pstate_check_boost_threhold(struct cpudata *cpu)
 	return true;
 }
 
+static inline int intel_pstate_get_sched_util(struct cpudata *cpu)
+{
+	unsigned long util_cfs, util_dl, max, util;
+
+	cpufreq_get_sched_util(cpu->cpu, &util_cfs, &util_dl, &max);
+	util = min(util_cfs + util_dl, max);
+	return util * 100 / max;
+}
+
 static inline void intel_pstate_update_util_hwp(struct update_util_data *data,
 						u64 time, unsigned int flags)
 {
 	struct cpudata *cpu = container_of(data, struct cpudata, update_util);
 
-	if (flags & SCHED_CPUFREQ_IOWAIT) {
+	if (flags & SCHED_CPUFREQ_MIGRATION) {
+		if (intel_pstate_check_boost_threhold(cpu))
+			cpu->migrate_hint = true;
+
+		cpu->last_update = time;
+		/*
+		 * The rq utilization data is not migrated yet to the new CPU
+		 * rq, so wait for call on local CPU to boost.
+		 */
+		if (smp_processor_id() != cpu->cpu)
+			return;
+	} else if (flags & SCHED_CPUFREQ_IOWAIT) {
 		/*
 		 * Set iowait_boost flag and update time. Since IO WAIT flag
 		 * is set all the time, we can't just conclude that there is
@@ -1499,6 +1523,17 @@ static inline void intel_pstate_update_util_hwp(struct update_util_data *data,
 			intel_pstate_hwp_boost_up(cpu);
 		else
 			smp_call_function_single_async(cpu->cpu, &cpu->csd);
+		return;
+	}
+
+	/* Ignore if the migrated thread has low utilization */
+	if (cpu->migrate_hint && smp_processor_id() == cpu->cpu) {
+		int util = intel_pstate_get_sched_util(cpu);
+
+		if (util >= hwp_boost_threshold_busy_pct) {
+			cpu->hwp_boost_active = true;
+			intel_pstate_hwp_boost_up(cpu);
+		}
 	}
 }
 
