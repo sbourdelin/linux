@@ -142,6 +142,11 @@
 		groups = "usb0";
 		function = "usb0";
 	};
+
+	vin4_pins_cvbs: vin4 {
+		groups = "vin4_data8", "vin4_sync", "vin4_clk";
+		function = "vin4";
+	};
 };
 
 &i2c0 {
@@ -153,6 +158,17 @@
 		compatible = "rohm,br24t01", "atmel,24c01";
 		reg = <0x50>;
 		pagesize = <8>;
+	};
+
+	analog-video@20 {
+		compatible = "adi,adv7180";
+		reg = <0x20>;
+
+		port {
+			adv7180_out: endpoint {
+				remote-endpoint = <&vin4_in>;
+			};
+		};
 	};
 };
 
@@ -245,4 +261,24 @@
 &rwdt {
 	timeout-sec = <60>;
 	status = "okay";
+};
+
+&vin4 {
+	pinctrl-0 = <&vin4_pins_cvbs>;
+	pinctrl-names = "default";
+
+	status = "okay";
+
+	ports {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		port@0 {
+			reg = <0>;
+
+			vin4_in: endpoint {
+				remote-endpoint = <&adv7180_out>;
+			};
+		};
+	};
 };
