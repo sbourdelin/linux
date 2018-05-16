@@ -873,10 +873,8 @@
 	port {
 		vin0ep2: endpoint {
 			remote-endpoint = <&adv7612_out>;
-			bus-width = <24>;
 			hsync-active = <0>;
 			vsync-active = <0>;
-			pclk-sample = <1>;
 			data-active = <1>;
 		};
 	};
@@ -895,7 +893,6 @@
 
 		vin1ep0: endpoint {
 			remote-endpoint = <&adv7180>;
-			bus-width = <8>;
 		};
 	};
 };

@@ -391,7 +391,6 @@
 
 		vin0ep: endpoint {
 			remote-endpoint = <&adv7180>;
-			bus-width = <8>;
 		};
 	};
 };
