@@ -531,15 +531,21 @@ static int rvin_digital_parse_v4l2(struct device *dev,
 		return -ENOTCONN;
 
 	vin->mbus_cfg.type = vep->bus_type;
+	vin->mbus_cfg.flags = vep->bus.parallel.flags;
 
 	switch (vin->mbus_cfg.type) {
 	case V4L2_MBUS_PARALLEL:
 		vin_dbg(vin, "Found PARALLEL media bus\n");
-		vin->mbus_cfg.flags = vep->bus.parallel.flags;
 		break;
 	case V4L2_MBUS_BT656:
 		vin_dbg(vin, "Found BT656 media bus\n");
-		vin->mbus_cfg.flags = 0;
+
+		if (!(vin->mbus_cfg.flags & V4L2_MBUS_DATA_ACTIVE_HIGH) &&
+		    !(vin->mbus_cfg.flags & V4L2_MBUS_DATA_ACTIVE_LOW)) {
+			vin_err(vin,
+				"Missing data enable signal polarity property\n");
+			return -EINVAL;
+		}
 		break;
 	default:
 		vin_err(vin, "Unknown media bus type\n");
