@@ -380,6 +380,7 @@
 
 		vin0ep: endpoint {
 			remote-endpoint = <&adv7180>;
+			data-active = <1>;
 		};
 	};
 };

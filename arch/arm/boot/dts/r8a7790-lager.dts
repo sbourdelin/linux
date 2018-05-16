@@ -893,6 +893,7 @@
 
 		vin1ep0: endpoint {
 			remote-endpoint = <&adv7180>;
+			data-active = <1>;
 		};
 	};
 };
