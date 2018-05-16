@@ -36,6 +36,7 @@ struct vhost_poll {
 
 struct vhost_used_elem {
 	struct vring_used_elem elem;
+	int count;
 };
 
 void vhost_work_init(struct vhost_work *work, vhost_work_fn_t fn);
@@ -91,7 +92,10 @@ struct vhost_virtqueue {
 	/* The actual ring of buffers. */
 	struct mutex mutex;
 	unsigned int num;
-	struct vring_desc __user *desc;
+	union {
+		struct vring_desc __user *desc;
+		struct vring_desc_packed __user *desc_packed;
+	};
 	struct vring_avail __user *avail;
 	struct vring_used __user *used;
 	const struct vhost_umem_node *meta_iotlb[VHOST_NUM_ADDRS];
@@ -148,6 +152,8 @@ struct vhost_virtqueue {
 	bool user_be;
 #endif
 	u32 busyloop_timeout;
+	bool used_wrap_counter;
+	bool avail_wrap_counter;
 };
 
 struct vhost_msg_node {
