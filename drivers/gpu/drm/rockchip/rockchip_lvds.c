@@ -377,8 +377,10 @@ static int rockchip_lvds_bind(struct device *dev, struct device *master,
 	}
 	if (lvds->panel)
 		remote = lvds->panel->dev->of_node;
-	else
+	else if (lvds->bridge->of_node)
 		remote = lvds->bridge->of_node;
+	else
+		remote = lvds->bridge->odev->of_node;
 	if (of_property_read_string(dev->of_node, "rockchip,output", &name))
 		/* default set it as output rgb */
 		lvds->output = DISPLAY_OUTPUT_RGB;
