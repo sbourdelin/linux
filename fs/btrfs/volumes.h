@@ -37,6 +37,7 @@ struct btrfs_pending_bios {
 enum btrfs_read_mirror_type {
 	BTRFS_READ_MIRROR_DEFAULT,
 	BTRFS_READ_MIRROR_BY_PID,
+	BTRFS_READ_MIRROR_BY_DEV,
 };
 
 #define BTRFS_DEV_STATE_WRITEABLE	(0)
@@ -44,6 +45,7 @@ enum btrfs_read_mirror_type {
 #define BTRFS_DEV_STATE_MISSING		(2)
 #define BTRFS_DEV_STATE_REPLACE_TGT	(3)
 #define BTRFS_DEV_STATE_FLUSH_SENT	(4)
+#define BTRFS_DEV_STATE_READ_MIRROR	(5)
 
 struct btrfs_device {
 	struct list_head dev_list;

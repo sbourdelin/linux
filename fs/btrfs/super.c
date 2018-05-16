@@ -852,6 +852,27 @@ int btrfs_parse_options(struct btrfs_fs_info *info, char *options,
 					BTRFS_READ_MIRROR_BY_PID;
 				break;
 			}
+
+			intarg = 0;
+			if (match_int(&args[0], &intarg) == 0) {
+				struct btrfs_device *device;
+
+				device = btrfs_find_device(info, intarg,
+							   NULL, NULL);
+				if (!device) {
+					btrfs_err(info,
+					  "read_mirror_policy: invalid devid %d",
+					  intarg);
+					ret = -EINVAL;
+					goto out;
+				}
+				info->read_mirror_policy =
+						BTRFS_READ_MIRROR_BY_DEV;
+				set_bit(BTRFS_DEV_STATE_READ_MIRROR,
+					&device->dev_state);
+				break;
+			}
+
 			ret = -EINVAL;
 			goto out;
 		case Opt_err:
