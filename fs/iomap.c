@@ -1214,9 +1214,9 @@ static loff_t iomap_swapfile_activate_actor(struct inode *inode, loff_t pos,
 	struct iomap_swapfile_info *isi = data;
 	int error;
 
-	/* Skip holes. */
+	/* No holes. */
 	if (iomap->type == IOMAP_HOLE)
-		goto out;
+		goto err;
 
 	/* Only one bdev per swap file. */
 	if (iomap->bdev != isi->sis->bdev)
