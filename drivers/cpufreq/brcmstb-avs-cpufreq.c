@@ -403,7 +403,7 @@ brcm_avs_get_freq_table(struct device *dev, struct private_data *priv)
 {
 	struct cpufreq_frequency_table *table;
 	unsigned int pstate;
-	int i, ret;
+	int p, i, ret;
 
 	/* Remember P-state for later */
 	ret = brcm_avs_get_pstate(priv, &pstate);
@@ -415,12 +415,13 @@ brcm_avs_get_freq_table(struct device *dev, struct private_data *priv)
 	if (!table)
 		return ERR_PTR(-ENOMEM);
 
-	for (i = AVS_PSTATE_P0; i <= AVS_PSTATE_MAX; i++) {
-		ret = brcm_avs_set_pstate(priv, i);
+	for (p = AVS_PSTATE_MAX, i = 0; p >= 0; p--, i++) {
+		ret = brcm_avs_set_pstate(priv, p);
 		if (ret)
 			return ERR_PTR(ret);
 		table[i].frequency = brcm_avs_get_frequency(priv->base);
-		table[i].driver_data = i;
+		/* Store the corresponding P-state with each frequency */
+		table[i].driver_data = p;
 	}
 	table[i].frequency = CPUFREQ_TABLE_END;
 
