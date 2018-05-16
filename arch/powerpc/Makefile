@@ -17,14 +17,8 @@ HAS_BIARCH	:= $(call cc-option-yn, -m32)
 # Set default 32 bits cross compilers for vdso and boot wrapper
 CROSS32_COMPILE ?=
 
-CROSS32CC		:= $(CROSS32_COMPILE)gcc
-CROSS32AR		:= $(CROSS32_COMPILE)ar
-
 ifeq ($(HAS_BIARCH),y)
 ifeq ($(CROSS32_COMPILE),)
-CROSS32CC	:= $(CC) -m32
-KBUILD_ARFLAGS	+= --target=elf32-powerpc
-
 ifdef CONFIG_PPC32
 # These options will be overridden by any -mcpu option that the CPU
 # or platform code sets later on the command line, but they are needed
@@ -33,12 +27,8 @@ ifdef CONFIG_PPC32
 KBUILD_CFLAGS		+= -mcpu=powerpc
 KBUILD_AFLAGS		+= -mcpu=powerpc
 endif
-
 endif
 endif
-
-
-export CROSS32CC CROSS32AR
 
 ifeq ($(CROSS_COMPILE),)
 KBUILD_DEFCONFIG := $(shell uname -m)_defconfig
