@@ -134,9 +134,16 @@ void __iomem * __ioremap_caller(phys_addr_t addr, unsigned long size,
 	if (slab_is_available()) {
 		struct vm_struct *area;
 
-		area = __get_vm_area_caller(size, VM_IOREMAP,
-					    ioremap_bot, IOREMAP_END,
-					    caller);
+#ifdef CONFIG_PPC_GUARDED_PAGE_IN_PMD
+		if (!(flags & _PAGE_GUARDED))
+			area = __get_vm_area_caller(size, VM_IOREMAP,
+						    VMALLOC_START, VMALLOC_END,
+						    caller);
+		else
+#endif
+			area = __get_vm_area_caller(size, VM_IOREMAP,
+						    ioremap_bot, IOREMAP_END,
+						    caller);
 		if (area == NULL)
 			return NULL;
 

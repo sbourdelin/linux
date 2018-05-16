@@ -74,9 +74,9 @@ struct addr_marker {
 
 static struct addr_marker address_markers[] = {
 	{ 0,	"Start of kernel VM" },
+#ifdef CONFIG_PPC64
 	{ 0,	"vmalloc() Area" },
 	{ 0,	"vmalloc() End" },
-#ifdef CONFIG_PPC64
 	{ 0,	"isa I/O start" },
 	{ 0,	"isa I/O end" },
 	{ 0,	"phb I/O start" },
@@ -85,8 +85,19 @@ static struct addr_marker address_markers[] = {
 	{ 0,	"I/O remap end" },
 	{ 0,	"vmemmap start" },
 #else
+#ifdef CONFIG_PPC_GUARDED_PAGE_IN_PMD
+	{ 0,	"vmalloc() Area" },
+	{ 0,	"vmalloc() End" },
 	{ 0,	"Early I/O remap start" },
 	{ 0,	"Early I/O remap end" },
+	{ 0,	"I/O remap start" },
+	{ 0,	"I/O remap end" },
+#else
+	{ 0,	"Early I/O remap start" },
+	{ 0,	"Early I/O remap end" },
+	{ 0,	"vmalloc() I/O remap start" },
+	{ 0,	"vmalloc() I/O remap end" },
+#endif
 #ifdef CONFIG_NOT_COHERENT_CACHE
 	{ 0,	"Consistent mem start" },
 	{ 0,	"Consistent mem end" },
@@ -437,9 +448,9 @@ static void populate_markers(void)
 	int i = 0;
 
 	address_markers[i++].start_address = PAGE_OFFSET;
+#ifdef CONFIG_PPC64
 	address_markers[i++].start_address = VMALLOC_START;
 	address_markers[i++].start_address = VMALLOC_END;
-#ifdef CONFIG_PPC64
 	address_markers[i++].start_address = ISA_IO_BASE;
 	address_markers[i++].start_address = ISA_IO_END;
 	address_markers[i++].start_address = PHB_IO_BASE;
@@ -452,8 +463,19 @@ static void populate_markers(void)
 	address_markers[i++].start_address =  VMEMMAP_BASE;
 #endif
 #else /* !CONFIG_PPC64 */
+#ifdef CONFIG_PPC_GUARDED_PAGE_IN_PMD
+	address_markers[i++].start_address = VMALLOC_START;
+	address_markers[i++].start_address = VMALLOC_END;
 	address_markers[i++].start_address = IOREMAP_BASE;
 	address_markers[i++].start_address = ioremap_bot;
+	address_markers[i++].start_address = ioremap_bot;
+	address_markers[i++].start_address = IOREMAP_END;
+#else
+	address_markers[i++].start_address = IOREMAP_BASE;
+	address_markers[i++].start_address = ioremap_bot;
+	address_markers[i++].start_address = ioremap_bot;
+	address_markers[i++].start_address = IOREMAP_END;
+#endif
 #ifdef CONFIG_NOT_COHERENT_CACHE
 	address_markers[i++].start_address = IOREMAP_END;
 	address_markers[i++].start_address = IOREMAP_END +

@@ -58,6 +58,14 @@ static inline void pmd_populate_kernel(struct mm_struct *mm, pmd_t *pmdp,
 	*pmdp = __pmd(__pa(pte) | _PMD_PRESENT);
 }
 
+#ifdef CONFIG_PPC_GUARDED_PAGE_IN_PMD
+static inline void pmd_populate_kernel_g(struct mm_struct *mm, pmd_t *pmdp,
+					 pte_t *pte)
+{
+	*pmdp = __pmd(__pa(pte) | _PMD_PRESENT | _PMD_GUARDED);
+}
+#endif
+
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmdp,
 				pgtable_t pte_page)
 {
@@ -82,6 +90,10 @@ static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmdp,
 
 #define pmd_pgtable(pmd) pmd_page(pmd)
 #endif
+
+#define pte_alloc_kernel_g(pmd, address)			\
+	((unlikely(pmd_none(*(pmd))) && __pte_alloc_kernel_g(pmd, address))? \
+		NULL: pte_offset_kernel(pmd, address))
 
 extern pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr);
 extern pgtable_t pte_alloc_one(struct mm_struct *mm, unsigned long addr);
