@@ -329,8 +329,8 @@ static int ptn3460_probe(struct i2c_client *client,
 		return ret;
 	}
 
+	ptn_bridge->bridge.odev = dev;
 	ptn_bridge->bridge.funcs = &ptn3460_bridge_funcs;
-	ptn_bridge->bridge.of_node = dev->of_node;
 	drm_bridge_add(&ptn_bridge->bridge);
 
 	i2c_set_clientdata(client, ptn_bridge);
