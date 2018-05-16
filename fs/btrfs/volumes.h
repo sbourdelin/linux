@@ -34,6 +34,11 @@ struct btrfs_pending_bios {
 #define btrfs_device_data_ordered_init(device) do { } while (0)
 #endif
 
+enum btrfs_read_mirror_type {
+	BTRFS_READ_MIRROR_DEFAULT,
+	BTRFS_READ_MIRROR_BY_PID,
+};
+
 #define BTRFS_DEV_STATE_WRITEABLE	(0)
 #define BTRFS_DEV_STATE_IN_FS_METADATA	(1)
 #define BTRFS_DEV_STATE_MISSING		(2)

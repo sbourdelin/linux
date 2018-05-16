@@ -5291,7 +5291,13 @@ static int find_live_mirror(struct btrfs_fs_info *fs_info,
 	else
 		num_stripes = map->num_stripes;
 
-	preferred_mirror = first + current->pid % num_stripes;
+	switch(fs_info->read_mirror_policy) {
+	case BTRFS_READ_MIRROR_DEFAULT:
+	case BTRFS_READ_MIRROR_BY_PID:
+	default:
+		preferred_mirror = first + current->pid % num_stripes;
+		break;
+	}
 
 	if (dev_replace_is_ongoing &&
 	    fs_info->dev_replace.cont_reading_from_srcdev_mode ==

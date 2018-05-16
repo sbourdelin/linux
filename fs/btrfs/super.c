@@ -345,6 +345,7 @@ enum {
 #ifdef CONFIG_BTRFS_FS_REF_VERIFY
 	Opt_ref_verify,
 #endif
+	Opt_read_mirror_policy,
 	Opt_err,
 };
 
@@ -414,6 +415,7 @@ static const match_table_t tokens = {
 #ifdef CONFIG_BTRFS_FS_REF_VERIFY
 	{Opt_ref_verify, "ref_verify"},
 #endif
+	{Opt_read_mirror_policy, "read_mirror_policy=%s"},
 	{Opt_err, NULL},
 };
 
@@ -844,6 +846,14 @@ int btrfs_parse_options(struct btrfs_fs_info *info, char *options,
 			btrfs_set_opt(info->mount_opt, REF_VERIFY);
 			break;
 #endif
+		case Opt_read_mirror_policy:
+			if (strcmp(args[0].from, "pid") == 0) {
+				info->read_mirror_policy =
+					BTRFS_READ_MIRROR_BY_PID;
+				break;
+			}
+			ret = -EINVAL;
+			goto out;
 		case Opt_err:
 			btrfs_info(info, "unrecognized mount option '%s'", p);
 			ret = -EINVAL;
