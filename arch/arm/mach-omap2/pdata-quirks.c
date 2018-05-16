@@ -35,6 +35,7 @@
 #include "omap-secure.h"
 #include "soc.h"
 #include "hsmmc.h"
+#include "pm.h"
 
 static struct omap_hsmmc_platform_data __maybe_unused mmc_pdata[2];
 
@@ -489,12 +490,17 @@ static struct ti_sysc_platform_data ti_sysc_pdata = {
 	.shutdown_module = ti_sysc_shutdown_module,
 };
 
+int context_may_be_lost(void)
+{
+	return enable_off_mode;
+}
 static struct pcs_pdata pcs_pdata;
 
 void omap_pcs_legacy_init(int irq, void (*rearm)(void))
 {
 	pcs_pdata.irq = irq;
 	pcs_pdata.rearm = rearm;
+	pcs_pdata.context_may_be_lost = context_may_be_lost;
 }
 
 /*

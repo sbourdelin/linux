@@ -10,4 +10,5 @@
 struct pcs_pdata {
 	int irq;
 	void (*rearm)(void);
+	int (*context_may_be_lost)(void);
 };
