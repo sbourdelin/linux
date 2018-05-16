@@ -21,4 +21,9 @@
 /* vDSO location */
 #define AT_SYSINFO_EHDR 33
 
+/*
+ * Do not add new AT_* definitions here without coordinating with
+ * <uapi/linux/auxvec.h>
+ */
+
 #endif /* _UAPI_ASM_RISCV_AUXVEC_H */

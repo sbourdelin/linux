@@ -48,6 +48,11 @@
 #define AT_L3_CACHESIZE		46
 #define AT_L3_CACHEGEOMETRY	47
 
+/*
+ * Do not add new AT_* definitions here without coordinating with
+ * <uapi/linux/auxvec.h>
+ */
+
 #define AT_VECTOR_SIZE_ARCH	14 /* entries in ARCH_DLINFO */
 
 #endif

@@ -10,6 +10,11 @@
 #endif
 #define AT_SYSINFO_EHDR		33
 
+/*
+ * Do not add new AT_* definitions here without coordinating with
+ * <uapi/linux/auxvec.h>
+ */
+
 /* entries in ARCH_DLINFO: */
 #if defined(CONFIG_IA32_EMULATION) || !defined(CONFIG_X86_64)
 # define AT_VECTOR_SIZE_ARCH 2

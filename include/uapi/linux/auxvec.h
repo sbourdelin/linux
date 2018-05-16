@@ -4,8 +4,19 @@
 
 #include <asm/auxvec.h>
 
-/* Symbolic values for the entries in the auxiliary table
-   put on the initial stack */
+/*
+ * Symbolic values for the entries in the auxiliary table
+ * put on the initial stack.
+ *
+ * Values with definitions here are common to all architectures.
+ * Individual architectures may define additional values in their
+ * <uapi/asm/auxvec.h>.
+ *
+ * NOTE: Userspace may treat these numbers as a global namespace.
+ * Any per-architecture definition must not overlap with these or with
+ * any other architecture's definitions, unless it has identical name
+ * and number and compatible meaning.
+ */
 #define AT_NULL   0	/* end of vector */
 #define AT_IGNORE 1	/* entry should be ignored */
 #define AT_EXECFD 2	/* file descriptor of program */
@@ -24,7 +35,11 @@
 #define AT_PLATFORM 15  /* string identifying CPU for optimizations */
 #define AT_HWCAP  16    /* arch dependent hints at CPU capabilities */
 #define AT_CLKTCK 17	/* frequency at which times() increments */
-/* AT_* values 18 through 22 are reserved */
+/* 18 reserved for AT_FPUCW		(sh) */
+/* 19 reserved for AT_DCACHEBSIZE	(powerpc) */
+/* 20 reserved for AT_ICACHEBSIZE	(powerpc) */
+/* 21 reserved for AT_UCACHEBSIZE	(powerpc) */
+/* 22 reserved for AT_IGNOREPPC		(powerpc) */
 #define AT_SECURE 23   /* secure mode boolean */
 #define AT_BASE_PLATFORM 24	/* string identifying real platform, may
 				 * differ from AT_PLATFORM. */
@@ -33,5 +48,24 @@
 
 #define AT_EXECFN  31	/* filename of program */
 
+/* 32 reserved for AT_SYSINFO		(alpha ia64 um x86) */
+/* 33 reserved for AT_SYSINFO_EHDR	(various architectures) */
+/* 34 reserved for AT_L1I_CACHESHAPE	(alpha sh) */
+/* 35 reserved for AT_L1D_CACHESHAPE	(alpha sh) */
+/* 36 reserved for AT_L2_CACHESHAPE	(alpha sh) */
+/* 37 reserved for AT_L3_CACHESHAPE	(alpha) */
+/* 38 reserved, do not allocate */
+/* 39 reserved, do not allocate */
+/* 40 reserved for AT_L1I_CACHESIZE	(powerpc) */
+/* 41 reserved for AT_L1I_CACHEGEOMETRY	(powerpc) */
+/* 42 reserved for AT_L1D_CACHESIZE	(powerpc) */
+/* 43 reserved for AT_L1D_CACHEGEOMETRY	(powerpc) */
+/* 44 reserved for AT_L2_CACHESIZE	(powerpc) */
+/* 45 reserved for AT_L2_CACHEGEOMETRY	(powerpc) */
+/* 46 reserved for AT_L3_CACHESIZE	(powerpc) */
+/* 47 reserved for AT_L3_CACHEGEOMETRY	(powerpc) */
+/* 48 reserved for AT_ADI_BLKSZ		(sparc) */
+/* 49 reserved for AT_ADI_NBITS		(sparc) */
+/* 50 reserved for AT_ADI_UEONADI	(sparc) */
 
 #endif /* _UAPI_LINUX_AUXVEC_H */

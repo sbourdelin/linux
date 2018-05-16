@@ -34,6 +34,11 @@
 #define AT_L1D_CACHESHAPE	35
 #define AT_L2_CACHESHAPE	36
 
+/*
+ * Do not add new AT_* definitions here without coordinating with
+ * <uapi/linux/auxvec.h>
+ */
+
 #define AT_VECTOR_SIZE_ARCH 5 /* entries in ARCH_DLINFO */
 
 #endif /* __ASM_SH_AUXVEC_H */
