@@ -856,6 +856,12 @@ int btrfs_parse_options(struct btrfs_fs_info *info, char *options,
 			intarg = 0;
 			if (match_int(&args[0], &intarg) == 0) {
 				struct btrfs_device *device;
+				int clear = 0;
+
+				if (intarg < 0) {
+					clear = 1;
+					intarg = -intarg;
+				}
 
 				device = btrfs_find_device(info, intarg,
 							   NULL, NULL);
@@ -866,10 +872,17 @@ int btrfs_parse_options(struct btrfs_fs_info *info, char *options,
 					ret = -EINVAL;
 					goto out;
 				}
-				info->read_mirror_policy =
+
+				if (clear) {
+					info->read_mirror_policy = 0;
+					clear_bit(BTRFS_DEV_STATE_READ_MIRROR,
+						&device->dev_state);
+				} else {
+					info->read_mirror_policy =
 						BTRFS_READ_MIRROR_BY_DEV;
-				set_bit(BTRFS_DEV_STATE_READ_MIRROR,
-					&device->dev_state);
+					set_bit(BTRFS_DEV_STATE_READ_MIRROR,
+						  &device->dev_state);
+				}
 				break;
 			}
 
