@@ -1173,6 +1173,7 @@ int analyse_instr(struct instruction_op *op, const struct pt_regs *regs,
 	unsigned long int val, val2;
 	unsigned int mb, me, sh;
 	long ival;
+	int type;
 
 	op->type = COMPUTE;
 
@@ -2544,6 +2545,15 @@ int analyse_instr(struct instruction_op *op, const struct pt_regs *regs,
 #endif /* __powerpc64__ */
 
 	}
+
+#ifdef CONFIG_VSX
+	type = op->type & INSTR_TYPE_MASK;
+	if ((type == LOAD_VSX || type == STORE_VSX) &&
+	    !cpu_has_feature(CPU_FTR_VSX)) {
+		return -1;
+	}
+#endif /* CONFIG_VSX */
+
 	return 0;
 
  logical_done:
