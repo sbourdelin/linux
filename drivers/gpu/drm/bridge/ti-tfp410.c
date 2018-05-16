@@ -215,8 +215,8 @@ static int tfp410_init(struct device *dev)
 		return -ENOMEM;
 	dev_set_drvdata(dev, dvi);
 
+	dvi->bridge.odev = dev;
 	dvi->bridge.funcs = &tfp410_bridge_funcs;
-	dvi->bridge.of_node = dev->of_node;
 	dvi->dev = dev;
 
 	ret = tfp410_get_connector_properties(dvi);
