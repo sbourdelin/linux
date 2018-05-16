@@ -149,9 +149,16 @@ int driver_register(struct device_driver *drv)
 	struct device_driver *other;
 
 	if (!drv->bus->p) {
-		pr_err("Driver '%s' was unable to register with bus_type '%s'"
-			   " because it was not initialized.\n",
-			   drv->name, drv->bus->name);
+		if (drv->bus->bus_register_error) {
+			pr_err("Driver '%s' was unable to register with bus_type '%s'",
+				   " (error: %d).\n",
+				   drv->name, drv->bus->name,
+				   drv->bus->bus_register_error);
+		} else {
+			pr_err("Driver '%s' was unable to register with bus_type '%s'",
+				   " because it was not initialized.\n",
+				   drv->name, drv->bus->name);
+		}
 		return -EINVAL;
 	}
 

@@ -849,8 +849,10 @@ int bus_register(struct bus_type *bus)
 	struct lock_class_key *key = &bus->lock_key;
 
 	priv = kzalloc(sizeof(struct subsys_private), GFP_KERNEL);
-	if (!priv)
+	if (!priv) {
+		bus->bus_register_error = -ENOMEM;
 		return -ENOMEM;
+	}
 
 	priv->bus = bus;
 	bus->p = priv;
