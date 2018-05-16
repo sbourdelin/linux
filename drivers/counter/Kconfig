@@ -1,0 +1,18 @@
+#
+# Counter devices
+#
+# When adding new entries keep the list in alphabetical order
+
+menuconfig COUNTER
+	tristate "Counter support"
+	help
+	  Provides Generic Counter interface support for counter devices.
+
+	  Counter devices are prevalent within a diverse spectrum of industries.
+	  The ubiquitous presence of these devices necessitates a common
+	  interface and standard of interaction and exposure. This driver API
+	  attempts to resolve the issue of duplicate code found among existing
+	  counter device drivers by providing a generic counter interface for
+	  consumption. The Generic Counter interface enables drivers to support
+	  and expose a common set of components and functionality present in
+	  counter devices.
