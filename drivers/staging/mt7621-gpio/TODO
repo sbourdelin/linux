@@ -1,7 +1,4 @@
 
-- general code review and clean up 
-- avoid global variables and use drvdata allocated instead
-- ensure device-tree requirements are documented
 - make sure interrupts work
 
 Cc:  NeilBrown <neil@brown.name>
