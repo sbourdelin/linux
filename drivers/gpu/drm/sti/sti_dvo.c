@@ -460,9 +460,9 @@ static int sti_dvo_bind(struct device *dev, struct device *master, void *data)
 	if (!bridge)
 		return -ENOMEM;
 
+	bridge->odev = &dvo->dev;
 	bridge->driver_private = dvo;
 	bridge->funcs = &sti_dvo_bridge_funcs;
-	bridge->of_node = dvo->dev.of_node;
 	drm_bridge_add(bridge);
 
 	err = drm_bridge_attach(encoder, bridge, NULL);

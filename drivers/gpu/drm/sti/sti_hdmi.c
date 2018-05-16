@@ -1270,6 +1270,7 @@ static int sti_hdmi_bind(struct device *dev, struct device *master, void *data)
 	if (!bridge)
 		return -EINVAL;
 
+	bridge->odev = dev;
 	bridge->driver_private = hdmi;
 	bridge->funcs = &sti_hdmi_bridge_funcs;
 	drm_bridge_attach(encoder, bridge, NULL);
