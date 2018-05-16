@@ -1331,8 +1331,8 @@ static int tc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 
 	tc_connector_set_polling(tc, &tc->connector);
 
+	tc->bridge.odev = dev;
 	tc->bridge.funcs = &tc_bridge_funcs;
-	tc->bridge.of_node = dev->of_node;
 	drm_bridge_add(&tc->bridge);
 
 	i2c_set_clientdata(client, tc);
