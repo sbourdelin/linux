@@ -595,8 +595,8 @@ static int ps8622_probe(struct i2c_client *client,
 		ps8622->bl->props.brightness = PS8622_MAX_BRIGHTNESS;
 	}
 
+	ps8622->bridge.odev = dev;
 	ps8622->bridge.funcs = &ps8622_bridge_funcs;
-	ps8622->bridge.of_node = dev->of_node;
 	drm_bridge_add(&ps8622->bridge);
 
 	i2c_set_clientdata(client, ps8622);
