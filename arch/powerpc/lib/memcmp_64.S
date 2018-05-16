@@ -405,6 +405,35 @@ _GLOBAL(memcmp)
 	/* Enter with src/dst addrs has the same offset with 8 bytes
 	 * align boundary
 	 */
+
+#ifdef CONFIG_KSM
+	/* KSM will always compare at page boundary so it falls into
+	 * .Lsameoffset_vmx_cmp.
+	 *
+	 * There is an optimization for KSM based on following fact:
+	 * KSM pages memcmp() prones to fail early at the first bytes. In
+	 * a statisis data, it shows 76% KSM memcmp() fails at the first
+	 * 16 bytes, and 83% KSM memcmp() fails at the first 32 bytes, 84%
+	 * KSM memcmp() fails at the first 64 bytes.
+	 *
+	 * Before applying VMX instructions which will lead to 32x128bits VMX
+	 * regs load/restore penalty, let us compares the first 32 bytes
+	 * so that we can catch the ~80% fail cases.
+	 */
+
+	li	r0,4
+	mtctr	r0
+.Lksm_32B_loop:
+	LD	rA,0,r3
+	LD	rB,0,r4
+	cmpld	cr0,rA,rB
+	addi	r3,r3,8
+	addi	r4,r4,8
+	bne     cr0,.LcmpAB_lightweight
+	addi	r5,r5,-8
+	bdnz	.Lksm_32B_loop
+#endif
+
 	ENTER_VMX_OPS
 	beq     cr1,.Llong_novmx_cmp
 
