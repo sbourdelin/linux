@@ -345,8 +345,9 @@ void __init mem_init(void)
 #ifdef CONFIG_SWIOTLB
 	swiotlb_init(0);
 #endif
-
+#ifdef CONFIG_PPC64
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
+#endif
 	set_max_mapnr(max_pfn);
 	free_all_bootmem();
 
@@ -383,10 +384,10 @@ void __init mem_init(void)
 #endif /* CONFIG_HIGHMEM */
 #ifdef CONFIG_NOT_COHERENT_CACHE
 	pr_info("  * 0x%08lx..0x%08lx  : consistent mem\n",
-		IOREMAP_TOP, IOREMAP_TOP + CONFIG_CONSISTENT_SIZE);
+		IOREMAP_END, IOREMAP_END + CONFIG_CONSISTENT_SIZE);
 #endif /* CONFIG_NOT_COHERENT_CACHE */
 	pr_info("  * 0x%08lx..0x%08lx  : early ioremap\n",
-		ioremap_bot, IOREMAP_TOP);
+		IOREMAP_BASE, ioremap_bot);
 	pr_info("  * 0x%08lx..0x%08lx  : vmalloc & ioremap\n",
 		VMALLOC_START, VMALLOC_END);
 #endif /* CONFIG_PPC32 */

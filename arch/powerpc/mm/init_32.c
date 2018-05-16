@@ -172,7 +172,11 @@ void __init MMU_init(void)
 	mapin_ram();
 
 	/* Initialize early top-down ioremap allocator */
-	ioremap_bot = IOREMAP_TOP;
+	if (IS_ENABLED(CONFIG_HIGHMEM))
+		high_memory = (void *) __va(lowmem_end_addr);
+	else
+		high_memory = (void *) __va(memblock_end_of_DRAM());
+	ioremap_bot = IOREMAP_BASE;
 
 	if (ppc_md.progress)
 		ppc_md.progress("MMU:exit", 0x211);
