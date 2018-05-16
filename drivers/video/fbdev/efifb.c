@@ -428,6 +428,8 @@ static void efifb_fixup_resources(struct pci_dev *dev)
 {
 	u64 base = screen_info.lfb_base;
 	u64 size = screen_info.lfb_size;
+	struct pci_host_bridge *bridge;
+	struct resource_entry *window;
 	int i;
 
 	if (efifb_pci_dev || screen_info.orig_video_isVGA != VIDEO_TYPE_EFI)
@@ -438,6 +440,27 @@ static void efifb_fixup_resources(struct pci_dev *dev)
 
 	if (!base)
 		return;
+
+	bridge = pci_find_host_bridge(dev->bus);
+	if (!bridge)
+		return;
+
+	resource_list_for_each_entry(window, &bridge->windows) {
+		phys_addr_t win_start;
+		phys_addr_t win_end;
+		size_t win_size;
+
+		if (resource_type(window->res) != IORESOURCE_MEM)
+			continue;
+
+		win_start = window->res->start - window->offset;
+		win_end = window->res->end - window->offset;
+		win_size = window->res->end - window->res->start + 1;
+		if (win_start <= base && win_end >= base + win_size - 1) {
+			base += window->offset;
+			break;
+		}
+	}
 
 	for (i = 0; i <= PCI_STD_RESOURCE_END; i++) {
 		struct resource *res = &dev->resource[i];
