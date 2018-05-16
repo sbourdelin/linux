@@ -710,6 +710,7 @@ struct drm_bridge *msm_dsi_manager_bridge_init(u8 id)
 	encoder = msm_dsi->encoder;
 
 	bridge = &dsi_bridge->base;
+	bridge->odev = msm_dsi->dev->dev;
 	bridge->funcs = &dsi_mgr_bridge_funcs;
 
 	ret = drm_bridge_attach(encoder, bridge, NULL);
