@@ -221,6 +221,9 @@ struct global_params {
  *			preference/bias
  * @epp_saved:		Saved EPP/EPB during system suspend or CPU offline
  *			operation
+ * @hwp_req_cached:	Cached value of the last HWP request MSR
+ * @csd:		A structure used to issue SMP async call, which
+ *			defines callback and arguments
  *
  * This structure stores per CPU instance data for all CPUs.
  */
@@ -253,6 +256,8 @@ struct cpudata {
 	s16 epp_policy;
 	s16 epp_default;
 	s16 epp_saved;
+	u64 hwp_req_cached;
+	call_single_data_t csd;
 };
 
 static struct cpudata **all_cpu_data;
@@ -763,6 +768,7 @@ update_epp:
 		intel_pstate_set_epb(cpu, epp);
 	}
 skip_epp:
+	cpu_data->hwp_req_cached = value;
 	wrmsrl_on_cpu(cpu, MSR_HWP_REQUEST, value);
 }
 
@@ -1381,6 +1387,39 @@ static void intel_pstate_get_cpu_pstates(struct cpudata *cpu)
 	intel_pstate_set_min_pstate(cpu);
 }
 
+
+static inline void intel_pstate_hwp_boost_up(struct cpudata *cpu)
+{
+	u64 hwp_req;
+	u8 max;
+
+	max = (u8) (cpu->hwp_req_cached >> 8);
+
+	hwp_req = cpu->hwp_req_cached & ~GENMASK_ULL(31, 24);
+	hwp_req = (hwp_req & ~GENMASK_ULL(7, 0)) | max;
+
+	wrmsrl(MSR_HWP_REQUEST, hwp_req);
+}
+
+static inline void intel_pstate_hwp_boost_down(struct cpudata *cpu)
+{
+	wrmsrl(MSR_HWP_REQUEST, cpu->hwp_req_cached);
+}
+
+static void intel_pstate_hwp_boost_up_local(void *arg)
+{
+	struct cpudata *cpu = arg;
+
+	intel_pstate_hwp_boost_up(cpu);
+}
+
+static void csd_init(struct cpudata *cpu)
+{
+	cpu->csd.flags = 0;
+	cpu->csd.func = intel_pstate_hwp_boost_up_local;
+	cpu->csd.info = cpu;
+}
+
 static inline void intel_pstate_calc_avg_perf(struct cpudata *cpu)
 {
 	struct sample *sample = &cpu->sample;
@@ -1893,6 +1932,9 @@ static int __intel_pstate_cpu_init(struct cpufreq_policy *policy)
 	intel_pstate_init_acpi_perf_limits(policy);
 
 	policy->fast_switch_possible = true;
+
+	if (hwp_active)
+		csd_init(cpu);
 
 	return 0;
 }
